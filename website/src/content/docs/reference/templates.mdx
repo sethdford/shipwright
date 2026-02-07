@@ -1,0 +1,146 @@
+---
+title: Team Templates
+description: All 12 team templates covering the full SDLC — from feature development to security audits.
+---
+
+Shipwright includes 12 team templates organized by SDLC phase. Each template defines the agent roles, their focus areas, and the files they should own. Browse templates with `cct templates list` and view details with `cct templates show <name>`.
+
+## Build Phase
+
+### Feature Development (`feature-dev`) — 3 agents
+
+| Agent | Focus | Example Files |
+|-------|-------|---------------|
+| **backend** | API routes, services, data layer | `src/api/`, `src/services/` |
+| **frontend** | UI components, state, styling | `apps/web/src/` |
+| **tests** | Unit tests, integration tests | `*.test.ts` |
+
+**Best for:** Multi-layer features where frontend, backend, and tests can be developed in parallel.
+
+### Full-Stack (`full-stack`) — 3 agents
+
+| Agent | Focus | Example Files |
+|-------|-------|---------------|
+| **api** | REST/GraphQL endpoints, middleware, auth | `src/api/`, `src/routes/` |
+| **database** | Schema, migrations, queries, models | `migrations/`, `prisma/` |
+| **ui** | Pages, components, forms, styling | `apps/web/`, `src/components/` |
+
+**Best for:** Features that span the entire stack from database to UI.
+
+## Quality Phase
+
+### Code Review (`code-review`) — 3 agents
+
+| Agent | Focus | What It Checks |
+|-------|-------|----------------|
+| **code-quality** | Logic, patterns, architecture | Bugs, code smells, layer violations |
+| **security** | Error handling, injection, auth | OWASP top 10, silent failures |
+| **test-coverage** | Test completeness, edge cases | Missing tests, weak assertions |
+
+**Best for:** Thorough review of PRs or feature branches.
+
+### Security Audit (`security-audit`) — 3 agents
+
+| Agent | Focus | What It Checks |
+|-------|-------|----------------|
+| **code-analysis** | SAST: injection, auth, XSS, CSRF | Source code vulnerabilities |
+| **dependencies** | CVEs, outdated packages, licenses | Supply chain risks |
+| **config-review** | Secrets, CORS, CSP, env config | Infrastructure security |
+
+**Best for:** Pre-release security reviews and compliance checks.
+
+### Comprehensive Testing (`testing`) — 3 agents
+
+| Agent | Focus | What It Covers |
+|-------|-------|----------------|
+| **unit-tests** | Functions, classes, modules | Isolated unit tests |
+| **integration-tests** | API endpoints, service interactions | Cross-component tests |
+| **e2e-tests** | User flows, UI interactions | Full system tests |
+
+**Best for:** Test coverage campaigns and test suite creation.
+
+## Maintenance Phase
+
+### Bug Fix (`bug-fix`) — 3 agents
+
+| Agent | Focus | What It Does |
+|-------|-------|--------------|
+| **reproducer** | Write failing test, trace root cause | Proves the bug exists |
+| **fixer** | Fix source code, handle edge cases | Implements the fix |
+| **verifier** | Regression check, review changes | Ensures nothing else breaks |
+
+**Best for:** Complex bugs that need reproduction, fix, and verification.
+
+### Refactoring (`refactor`) — 2 agents
+
+| Agent | Focus | What It Does |
+|-------|-------|--------------|
+| **refactor** | Source code changes | Rename, restructure, extract |
+| **consumers** | Tests and dependents | Update imports, fix tests, verify |
+
+**Best for:** Large-scale code transformations with strict file ownership.
+
+### Migration (`migration`) — 3 agents
+
+| Agent | Focus | What It Does |
+|-------|-------|--------------|
+| **schema** | Migration scripts, data transforms | Write the migration |
+| **adapter** | Update app code, queries, models | Adapt to new schema |
+| **rollback** | Rollback scripts, backward compat | Verify safe reversal |
+
+**Best for:** Database migrations and schema changes that need forward and rollback paths.
+
+## Planning Phase
+
+### Architecture (`architecture`) — 2 agents
+
+| Agent | Focus | What It Does |
+|-------|-------|--------------|
+| **researcher** | Analyze code, trace deps, evaluate trade-offs | Deep codebase analysis |
+| **spec-writer** | ADRs, design docs, interface contracts | Write technical specs |
+
+**Best for:** Pre-implementation research and architecture decision records.
+
+### Exploration (`exploration`) — 2 agents
+
+| Agent | Focus | What It Does |
+|-------|-------|--------------|
+| **explorer** | Deep-dive code, trace execution paths | Map the codebase |
+| **synthesizer** | Summarize findings, document patterns | Distill insights |
+
+**Best for:** Onboarding onto unfamiliar codebases and understanding complex systems.
+
+## Operations Phase
+
+### DevOps (`devops`) — 2 agents
+
+| Agent | Focus | What It Does |
+|-------|-------|--------------|
+| **pipeline** | CI/CD workflows, build, deploy | GitHub Actions, Jenkins, etc. |
+| **infrastructure** | Docker, Terraform, K8s, env config | Infrastructure as code |
+
+**Best for:** CI/CD setup, deployment automation, and infrastructure changes.
+
+### Documentation (`documentation`) — 2 agents
+
+| Agent | Focus | What It Does |
+|-------|-------|--------------|
+| **api-docs** | API reference, OpenAPI spec, examples | Endpoint documentation |
+| **guides** | Tutorials, README, architecture docs | User-facing docs |
+
+**Best for:** Documentation sprints and API reference generation.
+
+## Using Templates
+
+```bash
+# List all available templates
+cct templates list
+
+# View template details
+cct templates show feature-dev
+
+# Create a session with a template
+cct session my-feature --template feature-dev
+```
+
+Templates live in `tmux/templates/` as JSON files. You can create custom templates by copying an existing one and modifying the agent definitions.

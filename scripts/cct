@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # ╔═══════════════════════════════════════════════════════════════════════════╗
-# ║  cct — Claude Code Teams CLI                                            ║
-# ║  Manage agent team sessions in tmux                                     ║
+# ║  Shipwright CLI (cct)                                                   ║
+# ║  Orchestrate autonomous Claude Code agent teams in tmux                 ║
 # ╚═══════════════════════════════════════════════════════════════════════════╝
 set -euo pipefail
 
@@ -45,14 +45,14 @@ check_in_tmux() {
 }
 
 show_version() {
-    echo -e "${CYAN}${BOLD}cct${RESET} ${DIM}v${VERSION}${RESET} — Claude Code Teams CLI"
+    echo -e "${CYAN}${BOLD}shipwright${RESET} ${DIM}v${VERSION}${RESET} — Orchestrate AI Coding Teams  ${DIM}(aliases: sw, cct)${RESET}"
 }
 
 show_help() {
     show_version
     echo ""
     echo -e "${BOLD}USAGE${RESET}"
-    echo -e "  ${CYAN}cct${RESET} <command> [options]"
+    echo -e "  ${CYAN}shipwright${RESET} <command> [options]    ${DIM}(also: sw, cct)${RESET}"
     echo ""
     echo -e "${BOLD}COMMANDS${RESET}"
     echo -e "  ${CYAN}session${RESET} [name]       Create a new tmux window for a Claude team"
@@ -125,7 +125,7 @@ show_help() {
     echo -e "  ${DIM}cct upgrade${RESET}               # Check what's changed since install"
     echo -e "  ${DIM}cct upgrade --apply${RESET}       # Apply available updates"
     echo ""
-    echo -e "${DIM}Docs: https://github.com/sethdford/claude-code-teams-tmux${RESET}"
+    echo -e "${DIM}Docs: https://sethdford.github.io/shipwright  |  GitHub: https://github.com/sethdford/shipwright${RESET}"
 }
 
 # ─── Command Router ──────────────────────────────────────────────────────────

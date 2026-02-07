@@ -1,0 +1,83 @@
+---
+title: Shipwright
+description: Orchestrate AI coding teams with autonomous agents, delivery pipelines, and DORA metrics.
+template: splash
+hero:
+  title: Orchestrate AI Coding Teams
+  tagline: Autonomous agents. Delivery pipeline. DORA metrics. One CLI.
+  actions:
+    - text: Get Started
+      link: /quick-start/
+      icon: right-arrow
+      variant: primary
+    - text: View on GitHub
+      link: https://github.com/sethdford/shipwright
+      icon: external
+      variant: minimal
+---
+
+import { Card, CardGrid, Tabs, TabItem } from '@astrojs/starlight/components';
+
+## Install
+
+<Tabs>
+  <TabItem label="npm">
+    ```bash
+    npm install -g shipwright-cli
+    ```
+  </TabItem>
+  <TabItem label="curl">
+    ```bash
+    curl -fsSL https://raw.githubusercontent.com/sethdford/shipwright/main/scripts/install-remote.sh | bash
+    ```
+  </TabItem>
+  <TabItem label="Git">
+    ```bash
+    git clone https://github.com/sethdford/shipwright.git
+    cd shipwright && ./install.sh
+    ```
+  </TabItem>
+</Tabs>
+
+## Features
+
+<CardGrid>
+  <Card title="Agent Teams" icon="group">
+    12 templates for the full SDLC. Feature dev, code review, security audit, testing, and more. Each agent gets its own tmux pane.
+  </Card>
+  <Card title="Delivery Pipeline" icon="rocket">
+    Idea to PR in one command. Self-healing builds, GitHub integration, quality gates, and five pipeline templates.
+  </Card>
+  <Card title="DORA Metrics" icon="bar-chart">
+    Track deployment frequency, cycle time, change failure rate. Elite/High/Medium/Low grading based on Google's research.
+  </Card>
+  <Card title="Repo Preparation" icon="setting">
+    Generate `.claude/` configs, `CLAUDE.md`, and hooks. One command to prep any repo for autonomous agents.
+  </Card>
+</CardGrid>
+
+## Quick Example
+
+```bash
+# Start a team session with the feature-dev template
+cct session my-feature --template feature-dev
+
+# Run a full delivery pipeline from a GitHub issue
+cct pipeline start --issue 42
+
+# Autonomous development loop with quality gates
+cct loop "Build auth" --test-cmd "npm test" --audit
+
+# Start the daemon for hands-free issue processing
+cct daemon start
+```
+
+## Why Shipwright?
+
+Claude Code's agent teams let you spawn multiple AI agents that work in parallel — one on backend, one on frontend, one writing tests. Shipwright gives you the infrastructure to run them effectively:
+
+- **Premium dark tmux theme** with agent-aware pane borders
+- **Quality gate hooks** that block agents until code passes checks
+- **Autonomous loops** that iterate until tests pass
+- **Pipeline automation** from issue intake to PR creation
+- **DORA metrics** to track your team's delivery performance

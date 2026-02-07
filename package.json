@@ -1,0 +1,42 @@
+{
+  "name": "shipwright-cli",
+  "version": "1.6.0",
+  "description": "Orchestrate autonomous Claude Code agent teams in tmux",
+  "bin": {
+    "shipwright": "./scripts/cct",
+    "sw": "./scripts/cct"
+  },
+  "files": [
+    "scripts/",
+    "templates/",
+    "tmux/",
+    "claude-code/",
+    "completions/",
+    "docs/",
+    "LICENSE",
+    "README.md"
+  ],
+  "scripts": {
+    "postinstall": "node scripts/postinstall.mjs",
+    "test": "bash scripts/cct-pipeline-test.sh && bash scripts/cct-daemon-test.sh && bash scripts/cct-prep-test.sh"
+  },
+  "keywords": [
+    "claude",
+    "claude-code",
+    "tmux",
+    "agent-teams",
+    "autonomous",
+    "pipeline",
+    "ai"
+  ],
+  "author": "Seth Ford",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/sethdford/shipwright.git"
+  },
+  "homepage": "https://sethdford.github.io/shipwright",
+  "engines": {
+    "node": ">=20"
+  }
+}

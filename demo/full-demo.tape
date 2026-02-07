@@ -113,7 +113,7 @@ Sleep 3s
 # === Closing ===
 Enter
 Enter
-Type "# github.com/sethdford/claude-code-teams-tmux"
+Type "# github.com/sethdford/shipwright"
 Enter
 Type "# MIT License | v1.4.0"
 Enter

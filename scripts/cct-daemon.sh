@@ -5,7 +5,7 @@
 # ╚═══════════════════════════════════════════════════════════════════════════╝
 set -euo pipefail
 
-VERSION="1.5.0"
+VERSION="1.5.1"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
 
@@ -28,6 +28,14 @@ error()   { echo -e "${RED}${BOLD}✗${RESET} $*" >&2; }
 
 now_iso() { date -u +"%Y-%m-%dT%H:%M:%SZ"; }
 now_epoch() { date +%s; }
+
+epoch_to_iso() {
+    local epoch="$1"
+    date -u -r "$epoch" +"%Y-%m-%dT%H:%M:%SZ" 2>/dev/null || \
+    date -u -d "@$epoch" +"%Y-%m-%dT%H:%M:%SZ" 2>/dev/null || \
+    python3 -c "import datetime; print(datetime.datetime.utcfromtimestamp($epoch).strftime('%Y-%m-%dT%H:%M:%SZ'))" 2>/dev/null || \
+    echo "1970-01-01T00:00:00Z"
+}
 
 format_duration() {
     local secs="$1"
@@ -58,7 +66,7 @@ emit_event() {
         fi
     done
     mkdir -p "${HOME}/.claude-teams"
-    echo "{\"ts\":\"$(now_iso)\",\"type\":\"${event_type}\"${json_fields}}" >> "$EVENTS_FILE"
+    echo "{\"ts\":\"$(now_iso)\",\"ts_epoch\":$(now_epoch),\"type\":\"${event_type}\"${json_fields}}" >> "$EVENTS_FILE"
 }
 
 # ─── Defaults ───────────────────────────────────────────────────────────────
@@ -180,7 +188,7 @@ show_help() {
     echo -e "  4. On failure: adds ${RED}pipeline/failed${RESET}, comments with log tail"
     echo -e "  5. Respects ${CYAN}max_parallel${RESET} limit — excess issues are queued"
     echo ""
-    echo -e "${DIM}Docs: https://github.com/sethdford/claude-code-teams-tmux${RESET}"
+    echo -e "${DIM}Docs: https://sethdford.github.io/shipwright  |  GitHub: https://github.com/sethdford/shipwright${RESET}"
 }
 
 # ─── Config Loading ─────────────────────────────────────────────────────────
@@ -216,6 +224,17 @@ load_config() {
     # notifications
     SLACK_WEBHOOK=$(jq -r '.notifications.slack_webhook // ""' "$config_file")
     if [[ "$SLACK_WEBHOOK" == "null" ]]; then SLACK_WEBHOOK=""; fi
+
+    # health monitoring
+    HEALTH_STALE_TIMEOUT=$(jq -r '.health.stale_timeout_s // 1800' "$config_file")
+
+    # priority labels
+    PRIORITY_LABELS=$(jq -r '.priority_labels // "urgent,p0,high,p1,normal,p2,low,p3"' "$config_file")
+
+    # degradation alerting
+    DEGRADATION_WINDOW=$(jq -r '.alerts.degradation_window // 5' "$config_file")
+    DEGRADATION_CFR_THRESHOLD=$(jq -r '.alerts.cfr_threshold // 30' "$config_file")
+    DEGRADATION_SUCCESS_THRESHOLD=$(jq -r '.alerts.success_threshold // 50' "$config_file")
 
     success "Config loaded"
 }
@@ -296,7 +315,7 @@ preflight_checks() {
 
     # 1. Required tools
     local required_tools=("git" "jq" "gh" "claude")
-    local optional_tools=("tmux" "curl" "bc")
+    local optional_tools=("tmux" "curl")
 
     for tool in "${required_tools[@]}"; do
         if command -v "$tool" &>/dev/null; then
@@ -618,8 +637,8 @@ daemon_reap_completed() {
         started_at=$(echo "$job" | jq -r '.started_at // empty')
         if [[ -n "$started_at" ]]; then
             local start_epoch end_epoch
-            # macOS date -j for parsing ISO dates
-            start_epoch=$(date -j -f "%Y-%m-%dT%H:%M:%SZ" "$started_at" +%s 2>/dev/null || date -d "$started_at" +%s 2>/dev/null || echo "0")
+            # macOS date -j for parsing ISO dates (TZ=UTC to parse Z-suffix correctly)
+            start_epoch=$(TZ=UTC date -j -f "%Y-%m-%dT%H:%M:%SZ" "$started_at" +%s 2>/dev/null || date -d "$started_at" +%s 2>/dev/null || echo "0")
             end_epoch=$(now_epoch)
             if [[ "$start_epoch" -gt 0 ]]; then
                 duration_str=$(format_duration $((end_epoch - start_epoch)))
@@ -817,6 +836,16 @@ daemon_poll_issues() {
     daemon_log INFO "Found ${issue_count} issue(s) with label '${WATCH_LABEL}'"
     emit_event "daemon.poll" "issues_found=$issue_count" "active=$(get_active_count)"
 
+    # Sort by priority labels
+    local priority_labels="${PRIORITY_LABELS:-urgent,p0,high,p1,normal,p2,low,p3}"
+    issues_json=$(echo "$issues_json" | jq --arg plist "$priority_labels" '
+        ($plist | split(",")) as $priorities |
+        sort_by(
+            [.labels[].name] as $issue_labels |
+            ($priorities | to_entries | map(select(.value as $p | $issue_labels | any(. == $p))) | if length > 0 then .[0].key else 999 end)
+        )
+    ')
+
     local active_count
     active_count=$(get_active_count)
 
@@ -846,7 +875,106 @@ daemon_poll_issues() {
     update_state_field "last_poll" "$(now_iso)"
 }
 
+# ─── Health Check ─────────────────────────────────────────────────────────────
+
+daemon_health_check() {
+    local findings=0
+
+    # Stale jobs: kill processes running > timeout
+    local stale_timeout="${HEALTH_STALE_TIMEOUT:-1800}"  # default 30min
+    local now_e
+    now_e=$(now_epoch)
+
+    if [[ -f "$STATE_FILE" ]]; then
+        while IFS= read -r job; do
+            local pid started_at issue_num
+            pid=$(echo "$job" | jq -r '.pid')
+            started_at=$(echo "$job" | jq -r '.started_at // empty')
+            issue_num=$(echo "$job" | jq -r '.issue')
+
+            if [[ -n "$started_at" ]]; then
+                local start_e
+                start_e=$(TZ=UTC date -j -f "%Y-%m-%dT%H:%M:%SZ" "$started_at" +%s 2>/dev/null || date -d "$started_at" +%s 2>/dev/null || echo "0")
+                local elapsed=$(( now_e - start_e ))
+                if [[ "$elapsed" -gt "$stale_timeout" ]] && kill -0 "$pid" 2>/dev/null; then
+                    daemon_log WARN "Stale job detected: issue #${issue_num} (${elapsed}s, PID $pid) — killing"
+                    kill "$pid" 2>/dev/null || true
+                    findings=$((findings + 1))
+                fi
+            fi
+        done < <(jq -c '.active_jobs[]' "$STATE_FILE" 2>/dev/null)
+    fi
+
+    # Disk space warning
+    local free_kb
+    free_kb=$(df -k "." 2>/dev/null | tail -1 | awk '{print $4}')
+    if [[ -n "$free_kb" ]] && [[ "$free_kb" -lt 1048576 ]] 2>/dev/null; then
+        daemon_log WARN "Low disk space: $(( free_kb / 1024 ))MB free"
+        findings=$((findings + 1))
+    fi
+
+    # Events file size warning
+    if [[ -f "$EVENTS_FILE" ]]; then
+        local events_size
+        events_size=$(wc -c < "$EVENTS_FILE" 2>/dev/null || echo 0)
+        if [[ "$events_size" -gt 104857600 ]]; then  # 100MB
+            daemon_log WARN "Events file large ($(( events_size / 1048576 ))MB) — consider rotating"
+            findings=$((findings + 1))
+        fi
+    fi
+
+    if [[ "$findings" -gt 0 ]]; then
+        emit_event "daemon.health" "findings=$findings"
+    fi
+}
+
+# ─── Degradation Alerting ─────────────────────────────────────────────────────
+
+daemon_check_degradation() {
+    if [[ ! -f "$EVENTS_FILE" ]]; then return; fi
+
+    local window="${DEGRADATION_WINDOW:-5}"
+    local cfr_threshold="${DEGRADATION_CFR_THRESHOLD:-30}"
+    local success_threshold="${DEGRADATION_SUCCESS_THRESHOLD:-50}"
+
+    # Get last N pipeline completions
+    local recent
+    recent=$(tail -200 "$EVENTS_FILE" | jq -s "[.[] | select(.type == \"pipeline.completed\")] | .[-${window}:]" 2>/dev/null)
+    local count
+    count=$(echo "$recent" | jq 'length' 2>/dev/null || echo 0)
+
+    if [[ "$count" -lt "$window" ]]; then return; fi
+
+    local failures successes
+    failures=$(echo "$recent" | jq '[.[] | select(.result == "failure")] | length')
+    successes=$(echo "$recent" | jq '[.[] | select(.result == "success")] | length')
+    local cfr_pct=$(( failures * 100 / count ))
+    local success_pct=$(( successes * 100 / count ))
+
+    local alerts=""
+    if [[ "$cfr_pct" -gt "$cfr_threshold" ]]; then
+        alerts="CFR ${cfr_pct}% exceeds threshold ${cfr_threshold}%"
+        daemon_log WARN "DEGRADATION: $alerts"
+    fi
+    if [[ "$success_pct" -lt "$success_threshold" ]]; then
+        local msg="Success rate ${success_pct}% below threshold ${success_threshold}%"
+        [[ -n "$alerts" ]] && alerts="$alerts; $msg" || alerts="$msg"
+        daemon_log WARN "DEGRADATION: $msg"
+    fi
+
+    if [[ -n "$alerts" ]]; then
+        emit_event "daemon.alert" "alerts=$alerts" "cfr_pct=$cfr_pct" "success_pct=$success_pct"
+
+        # Slack notification
+        if [[ -n "${SLACK_WEBHOOK:-}" ]]; then
+            notify "Pipeline Degradation Alert" "$alerts" "warn"
+        fi
+    fi
+}
+
 # ─── Poll Loop ───────────────────────────────────────────────────────────────
+
+POLL_CYCLE_COUNT=0
 
 daemon_poll_loop() {
     daemon_log INFO "Entering poll loop (interval: ${POLL_INTERVAL}s, max_parallel: ${MAX_PARALLEL})"
@@ -855,6 +983,13 @@ daemon_poll_loop() {
     while [[ ! -f "$SHUTDOWN_FLAG" ]]; do
         daemon_poll_issues
         daemon_reap_completed
+        daemon_health_check
+
+        # Check degradation every 5 poll cycles
+        POLL_CYCLE_COUNT=$((POLL_CYCLE_COUNT + 1))
+        if [[ $((POLL_CYCLE_COUNT % 5)) -eq 0 ]]; then
+            daemon_check_degradation
+        fi
 
         # Sleep in 1s intervals so we can catch shutdown quickly
         local i=0
@@ -1069,7 +1204,7 @@ daemon_status() {
             local age=""
             if [[ "$started" != "—" ]] && [[ "$running" == "true" ]]; then
                 local start_epoch
-                start_epoch=$(date -j -f "%Y-%m-%dT%H:%M:%SZ" "$started" +%s 2>/dev/null || echo 0)
+                start_epoch=$(TZ=UTC date -j -f "%Y-%m-%dT%H:%M:%SZ" "$started" +%s 2>/dev/null || echo 0)
                 if [[ "$start_epoch" -gt 0 ]]; then
                     age=" ($(format_duration $(($(now_epoch) - start_epoch))))"
                 fi
@@ -1151,6 +1286,15 @@ daemon_init() {
   },
   "notifications": {
     "slack_webhook": null
+  },
+  "health": {
+    "stale_timeout_s": 1800
+  },
+  "priority_labels": "urgent,p0,high,p1,normal,p2,low,p3",
+  "alerts": {
+    "degradation_window": 5,
+    "cfr_threshold": 30,
+    "success_threshold": 50
   }
 }
 CONFIGEOF
@@ -1209,13 +1353,11 @@ daemon_metrics() {
     local cutoff_epoch
     cutoff_epoch=$(( $(now_epoch) - (period_days * 86400) ))
     local cutoff_iso
-    cutoff_iso=$(date -u -r "$cutoff_epoch" +"%Y-%m-%dT%H:%M:%SZ" 2>/dev/null || \
-                 date -u -d "@$cutoff_epoch" +"%Y-%m-%dT%H:%M:%SZ" 2>/dev/null || \
-                 echo "2000-01-01T00:00:00Z")
+    cutoff_iso=$(epoch_to_iso "$cutoff_epoch")
 
-    # Filter events within period
+    # Filter events within period (prefer ts_epoch when available)
     local period_events
-    period_events=$(jq -c "select(.ts >= \"$cutoff_iso\")" "$EVENTS_FILE" 2>/dev/null)
+    period_events=$(jq -c "select(.ts_epoch >= $cutoff_epoch // .ts >= \"$cutoff_iso\")" "$EVENTS_FILE" 2>/dev/null)
 
     if [[ -z "$period_events" ]]; then
         warn "No events in the last ${period_days} day(s)"
@@ -1233,11 +1375,11 @@ daemon_metrics() {
         deploy_freq=$(echo "$successes $period_days" | awk '{printf "%.1f", $1 / ($2 / 7)}')
     fi
 
-    # ── DORA: Lead Time (median pipeline duration for successes) ──
-    local lead_time_median lead_time_p95
-    lead_time_median=$(echo "$period_events" | \
+    # ── DORA: Cycle Time (median pipeline duration for successes) ──
+    local cycle_time_median cycle_time_p95
+    cycle_time_median=$(echo "$period_events" | \
         jq -s '[.[] | select(.type == "pipeline.completed" and .result == "success") | .duration_s] | sort | if length > 0 then .[length/2 | floor] else 0 end')
-    lead_time_p95=$(echo "$period_events" | \
+    cycle_time_p95=$(echo "$period_events" | \
         jq -s '[.[] | select(.type == "pipeline.completed" and .result == "success") | .duration_s] | sort | if length > 0 then .[length * 95 / 100 | floor] else 0 end')
 
     # ── DORA: Change Failure Rate ──
@@ -1248,9 +1390,20 @@ daemon_metrics() {
 
     # ── DORA: MTTR (average time between failure and next success) ──
     local mttr="0"
-    # Simplified: average duration of failed pipelines (time spent before recovery)
+    # Real MTTR: time gap between each failure event and the next success event
     mttr=$(echo "$period_events" | \
-        jq -s '[.[] | select(.type == "pipeline.completed" and .result == "failure") | .duration_s] | if length > 0 then (add / length | floor) else 0 end')
+        jq -s '
+            [.[] | select(.type == "pipeline.completed")] | sort_by(.ts_epoch // 0) |
+            [range(length) as $i |
+                if .[$i].result == "failure" then
+                    [.[$i+1:][] | select(.result == "success")][0] as $next |
+                    if $next and $next.ts_epoch and .[$i].ts_epoch then
+                        ($next.ts_epoch - .[$i].ts_epoch)
+                    else null end
+                else null end
+            ] | map(select(. != null)) |
+            if length > 0 then (add / length | floor) else 0 end
+        ')
 
     # ── DX: Compound quality first-pass rate ──
     local compound_events first_pass_total first_pass_success
@@ -1273,7 +1426,7 @@ daemon_metrics() {
     # ── Stage Timings ──
     local avg_stage_timings
     avg_stage_timings=$(echo "$period_events" | \
-        jq -s 'group_by(.stage) | map(select(.[0].type == "stage.completed") | {stage: .[0].stage, avg: ([.[].duration_s] | add / length | floor)}) | sort_by(.avg) | reverse')
+        jq -s '[.[] | select(.type == "stage.completed")] | group_by(.stage) | map({stage: .[0].stage, avg: ([.[].duration_s] | add / length | floor)}) | sort_by(.avg) | reverse')
 
     # ── Autonomy ──
     local daemon_spawns daemon_reaps daemon_success
@@ -1288,19 +1441,19 @@ daemon_metrics() {
         local metric="$1" value="$2"
         case "$metric" in
             deploy_freq)
-                if (( $(echo "$value >= 7" | bc -l 2>/dev/null || echo 0) )); then echo "Elite"; return; fi
-                if (( $(echo "$value >= 1" | bc -l 2>/dev/null || echo 0) )); then echo "High"; return; fi
-                if (( $(echo "$value >= 0.25" | bc -l 2>/dev/null || echo 0) )); then echo "Medium"; return; fi
+                if awk "BEGIN{exit !($value >= 7)}" 2>/dev/null; then echo "Elite"; return; fi
+                if awk "BEGIN{exit !($value >= 1)}" 2>/dev/null; then echo "High"; return; fi
+                if awk "BEGIN{exit !($value >= 0.25)}" 2>/dev/null; then echo "Medium"; return; fi
                 echo "Low" ;;
-            lead_time)
+            cycle_time)
                 [[ "$value" -lt 3600 ]] && echo "Elite" && return
                 [[ "$value" -lt 86400 ]] && echo "High" && return
                 [[ "$value" -lt 604800 ]] && echo "Medium" && return
                 echo "Low" ;;
             cfr)
-                if (( $(echo "$value < 5" | bc -l 2>/dev/null || echo 0) )); then echo "Elite"; return; fi
-                if (( $(echo "$value < 10" | bc -l 2>/dev/null || echo 0) )); then echo "High"; return; fi
-                if (( $(echo "$value < 15" | bc -l 2>/dev/null || echo 0) )); then echo "Medium"; return; fi
+                if awk "BEGIN{exit !($value < 5)}" 2>/dev/null; then echo "Elite"; return; fi
+                if awk "BEGIN{exit !($value < 10)}" 2>/dev/null; then echo "High"; return; fi
+                if awk "BEGIN{exit !($value < 15)}" 2>/dev/null; then echo "Medium"; return; fi
                 echo "Low" ;;
             mttr)
                 [[ "$value" -lt 3600 ]] && echo "Elite" && return
@@ -1309,9 +1462,9 @@ daemon_metrics() {
         esac
     }
 
-    local df_grade lt_grade cfr_grade mttr_grade
+    local df_grade ct_grade cfr_grade mttr_grade
     df_grade=$(dora_grade deploy_freq "${deploy_freq:-0}")
-    lt_grade=$(dora_grade lead_time "${lead_time_median:-0}")
+    ct_grade=$(dora_grade cycle_time "${cycle_time_median:-0}")
     cfr_grade=$(dora_grade cfr "${cfr:-0}")
     mttr_grade=$(dora_grade mttr "${mttr:-0}")
 
@@ -1329,12 +1482,12 @@ daemon_metrics() {
         jq -n \
             --arg period "${period_days}d" \
             --argjson deploy_freq "${deploy_freq:-0}" \
-            --argjson lead_time_median "${lead_time_median:-0}" \
-            --argjson lead_time_p95 "${lead_time_p95:-0}" \
+            --argjson cycle_time_median "${cycle_time_median:-0}" \
+            --argjson cycle_time_p95 "${cycle_time_p95:-0}" \
             --arg cfr "$cfr" \
             --argjson mttr "${mttr:-0}" \
             --arg df_grade "$df_grade" \
-            --arg lt_grade "$lt_grade" \
+            --arg ct_grade "$ct_grade" \
             --arg cfr_grade "$cfr_grade" \
             --arg mttr_grade "$mttr_grade" \
             --argjson total_completed "$total_completed" \
@@ -1349,7 +1502,7 @@ daemon_metrics() {
                 period: $period,
                 dora: {
                     deploy_frequency: { value: $deploy_freq, unit: "PRs/week", grade: $df_grade },
-                    lead_time: { median_s: $lead_time_median, p95_s: $lead_time_p95, grade: $lt_grade },
+                    cycle_time: { median_s: $cycle_time_median, p95_s: $cycle_time_p95, grade: $ct_grade },
                     change_failure_rate: { pct: ($cfr | tonumber), grade: $cfr_grade },
                     mttr: { avg_s: $mttr, grade: $mttr_grade }
                 },
@@ -1378,10 +1531,10 @@ daemon_metrics() {
     echo ""
 
     echo -e "${BOLD}  DORA FOUR KEYS${RESET}"
-    echo -e "    Deploy Frequency   ${deploy_freq:-0} PRs/week          $(grade_icon "$df_grade") $df_grade"
-    echo -e "    Lead Time (median) $(format_duration "${lead_time_median:-0}")              $(grade_icon "$lt_grade") $lt_grade"
-    echo -e "    Change Failure     ${cfr}%  (${failures}/${total_completed})             $(grade_icon "$cfr_grade") $cfr_grade"
-    echo -e "    MTTR               $(format_duration "${mttr:-0}")              $(grade_icon "$mttr_grade") $mttr_grade"
+    echo -e "    Deploy Frequency    ${deploy_freq:-0} PRs/week          $(grade_icon "$df_grade") $df_grade"
+    echo -e "    Cycle Time (median) $(format_duration "${cycle_time_median:-0}")              $(grade_icon "$ct_grade") $ct_grade"
+    echo -e "    Change Failure      ${cfr}%  (${failures}/${total_completed})             $(grade_icon "$cfr_grade") $cfr_grade"
+    echo -e "    MTTR                $(format_duration "${mttr:-0}")              $(grade_icon "$mttr_grade") $mttr_grade"
     echo ""
 
     echo -e "${BOLD}  EFFECTIVENESS${RESET}"
@@ -1439,6 +1592,9 @@ case "$SUBCOMMAND" in
         ;;
     metrics)
         daemon_metrics "$@"
+        ;;
+    test)
+        exec "$SCRIPT_DIR/cct-daemon-test.sh" "$@"
         ;;
     help|--help|-h)
         show_help

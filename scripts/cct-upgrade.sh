@@ -80,11 +80,11 @@ find_repo() {
 }
 
 REPO_PATH="$(find_repo)" || {
-    error "Cannot locate the claude-code-teams-tmux repo."
+    error "Cannot locate the Shipwright repo."
     echo ""
     echo -e "  Try one of:"
-    echo -e "    ${DIM}export CCT_REPO_PATH=/path/to/claude-code-teams-tmux${RESET}"
-    echo -e "    ${DIM}cct upgrade --repo-path /path/to/claude-code-teams-tmux${RESET}"
+    echo -e "    ${DIM}export CCT_REPO_PATH=/path/to/shipwright${RESET}"
+    echo -e "    ${DIM}shipwright upgrade --repo-path /path/to/shipwright${RESET}"
     exit 1
 }
 
@@ -113,6 +113,8 @@ FILES=(
     "cct-init.sh|scripts/cct-init.sh|$BIN_DIR/cct-init.sh|false|true"
     "cct-prep.sh|scripts/cct-prep.sh|$BIN_DIR/cct-prep.sh|false|true"
     "cct-daemon.sh|scripts/cct-daemon.sh|$BIN_DIR/cct-daemon.sh|false|true"
+    "cct-daemon-test.sh|scripts/cct-daemon-test.sh|$BIN_DIR/cct-daemon-test.sh|false|true"
+    "cct-prep-test.sh|scripts/cct-prep-test.sh|$BIN_DIR/cct-prep-test.sh|false|true"
     "teammate-idle.sh|claude-code/hooks/teammate-idle.sh|$HOME/.claude/hooks/teammate-idle.sh|false|true"
     "task-completed.sh|claude-code/hooks/task-completed.sh|$HOME/.claude/hooks/task-completed.sh|false|true"
     "notify-idle.sh|claude-code/hooks/notify-idle.sh|$HOME/.claude/hooks/notify-idle.sh|false|true"

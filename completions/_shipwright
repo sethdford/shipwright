@@ -1,0 +1,113 @@
+#compdef shipwright sw cct
+# ╔═══════════════════════════════════════════════════════════════════════════╗
+# ║  Shipwright — Zsh tab completions                                       ║
+# ╚═══════════════════════════════════════════════════════════════════════════╝
+# Place in a directory in your $fpath (e.g. ~/.zfunc/) and run: compinit
+
+_shipwright() {
+    local -a commands
+    commands=(
+        'session:Create a new tmux window for a Claude team'
+        'status:Show dashboard of running teams and agents'
+        'ps:Show running agent processes and status'
+        'logs:View and search agent pane logs'
+        'templates:Manage team composition templates'
+        'doctor:Validate your setup and check for issues'
+        'cleanup:Clean up orphaned team sessions'
+        'reaper:Automatic pane cleanup when agents exit'
+        'upgrade:Check for updates from the repo'
+        'loop:Continuous agent loop — run until goal is achieved'
+        'pipeline:Full delivery pipeline — idea to production'
+        'worktree:Manage git worktrees for agent isolation'
+        'prep:Repo preparation — generate .claude/ configs'
+        'daemon:Issue watcher — auto-process GitHub issues'
+        'init:Quick tmux setup — one command, no prompts'
+        'help:Show help message'
+        'version:Show version'
+    )
+
+    local -a pipeline_cmds daemon_cmds templates_cmds
+    pipeline_cmds=(
+        'start:Start a new pipeline run'
+        'resume:Resume from last stage'
+        'status:Show pipeline progress dashboard'
+        'abort:Cancel the running pipeline'
+        'list:Browse available pipeline templates'
+        'show:Show details of a pipeline template'
+        'test:Run pipeline test suite'
+    )
+    daemon_cmds=(
+        'start:Start issue watcher'
+        'stop:Graceful shutdown'
+        'status:Show active pipelines and queue'
+        'metrics:DORA/DX metrics dashboard'
+        'test:Run daemon test suite'
+        'logs:View daemon logs'
+        'init:Initialize daemon configuration'
+    )
+    templates_cmds=(
+        'list:Browse team templates'
+        'show:Show template details'
+    )
+
+    _arguments -C \
+        '1:command:->command' \
+        '*::arg:->args'
+
+    case "$state" in
+        command)
+            _describe -t commands 'shipwright command' commands
+            ;;
+        args)
+            case "${words[1]}" in
+                pipeline)
+                    _describe -t pipeline-cmds 'pipeline command' pipeline_cmds
+                    ;;
+                daemon)
+                    _describe -t daemon-cmds 'daemon command' daemon_cmds
+                    ;;
+                templates)
+                    _describe -t templates-cmds 'templates command' templates_cmds
+                    ;;
+                prep)
+                    _arguments \
+                        '--check[Audit existing prep quality]' \
+                        '--with-claude[Deep analysis using Claude Code]' \
+                        '--verbose[Verbose output]'
+                    ;;
+                loop)
+                    _arguments \
+                        '--test-cmd[Test command to verify each iteration]:command:' \
+                        '--max-iterations[Maximum loop iterations]:count:' \
+                        '--model[Claude model to use]:model:(opus sonnet haiku)' \
+                        '--agents[Number of agents]:count:' \
+                        '--audit[Enable self-reflection each iteration]' \
+                        '--audit-agent[Use separate auditor agent]' \
+                        '--quality-gates[Enable automated quality checks]' \
+                        '--definition-of-done[Custom completion checklist]:file:_files' \
+                        '--resume[Resume interrupted loop]' \
+                        '--skip-permissions[Skip permission prompts]'
+                    ;;
+                logs)
+                    _arguments \
+                        '--follow[Tail logs in real time]' \
+                        '--lines[Number of lines to show]:count:'
+                    ;;
+                cleanup)
+                    _arguments \
+                        '--force[Actually kill orphaned sessions]'
+                    ;;
+                upgrade)
+                    _arguments \
+                        '--apply[Apply available updates]'
+                    ;;
+                reaper)
+                    _arguments \
+                        '--watch[Continuous watch mode]'
+                    ;;
+            esac
+            ;;
+    esac
+}
+
+_shipwright "$@"

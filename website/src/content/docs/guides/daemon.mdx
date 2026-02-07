@@ -1,0 +1,107 @@
+---
+title: Autonomous Daemon
+description: Run Shipwright as a background daemon that watches GitHub issues and automatically spawns delivery pipelines.
+---
+
+The daemon (`cct daemon`) runs in the background, polling GitHub for new issues and automatically spawning delivery pipelines to handle them. Combined with DORA metrics, it gives you a fully autonomous development operation.
+
+## How It Works
+
+1. The daemon polls your GitHub repo for issues with a configurable label (default: `shipwright`)
+2. When a matching issue is found, it spawns a new pipeline (`cct pipeline start --issue <id>`)
+3. The pipeline runs autonomously through the configured stages
+4. When the pipeline completes, the daemon reaps the finished process
+5. Metrics are emitted at every step for DORA tracking
+
+## Quick Start
+
+```bash
+# Initialize daemon configuration
+cct daemon init
+
+# Start the daemon
+cct daemon start
+
+# Check daemon status
+cct daemon status
+
+# View daemon logs
+cct daemon logs --follow
+
+# Stop the daemon
+cct daemon stop
+```
+
+## DORA Metrics
+
+The daemon tracks delivery performance using the four DORA metrics:
+
+| Metric | What It Measures | Elite | High | Medium | Low |
+|--------|-----------------|-------|------|--------|-----|
+| **Deployment Frequency** | How often you deploy | On-demand | Daily–Weekly | Weekly–Monthly | Monthly+ |
+| **Cycle Time** | Time from commit to deploy | < 1 hour | < 1 day | < 1 week | 1 week+ |
+| **Change Failure Rate** | % of deploys causing failure | < 5% | < 10% | < 15% | 15%+ |
+| **Mean Time to Restore** | Recovery time after failure | < 1 hour | < 1 day | < 1 week | 1 week+ |
+
+View your metrics dashboard:
+
+```bash
+# Default: last 7 days
+cct daemon metrics
+
+# Custom period
+cct daemon metrics --period 30
+
+# JSON output for tooling
+cct daemon metrics --json
+```
+
+Grades follow Google's DORA research thresholds: **Elite**, **High**, **Medium**, **Low**.
+
+## Commands
+
+| Command | Description |
+|---------|-------------|
+| `cct daemon init` | Create daemon configuration file |
+| `cct daemon start` | Start the background daemon |
+| `cct daemon stop` | Stop the daemon gracefully |
+| `cct daemon status` | Show daemon status and current pipelines |
+| `cct daemon metrics` | Display DORA metrics dashboard |
+| `cct daemon logs` | View daemon log output |
+
+## Event Logging
+
+All daemon and pipeline events are logged to `~/.claude-teams/events.jsonl` as newline-delimited JSON. Events include:
+
+- `daemon.started`, `daemon.stopped`
+- `daemon.poll` — each polling cycle
+- `daemon.spawn` — new pipeline started
+- `daemon.reap` — pipeline process finished
+- `pipeline.started`, `pipeline.completed`
+- `stage.started`, `stage.completed`, `stage.failed`
+
+These events power the DORA metrics dashboard and can be consumed by external tools.
+
+## Configuration
+
+After running `cct daemon init`, edit the configuration file at `~/.claude-teams/daemon.json`:
+
+```json
+{
+  "repo": "owner/repo",
+  "label": "shipwright",
+  "poll_interval": 60,
+  "pipeline": "standard",
+  "max_concurrent": 2,
+  "auto_assign": true
+}
+```
+
+| Field | Default | Description |
+|-------|---------|-------------|
+| `repo` | auto-detected | GitHub repository (owner/repo) |
+| `label` | `"shipwright"` | Issue label to watch for |
+| `poll_interval` | `60` | Seconds between polls |
+| `pipeline` | `"standard"` | Default pipeline template |
+| `max_concurrent` | `2` | Maximum concurrent pipelines |
+| `auto_assign` | `true` | Self-assign issues when starting |

@@ -1,0 +1,97 @@
+---
+title: Quick Start
+description: Install Shipwright and run your first agent team session in under 5 minutes.
+---
+
+import { Tabs, TabItem, Steps } from '@astrojs/starlight/components';
+
+## Prerequisites
+
+| Requirement | Version | Install |
+|-------------|---------|---------|
+| **tmux** | 3.2+ | `brew install tmux` |
+| **jq** | any | `brew install jq` |
+| **Claude Code CLI** | latest | `npm install -g @anthropic-ai/claude-code` |
+| **Node.js** | 20+ | For hooks |
+| **Git** | any | For installation |
+
+:::caution[Terminal Compatibility]
+Split-pane agent teams require a real terminal emulator. **VS Code's integrated terminal and Ghostty are not supported.** Use iTerm2, Alacritty, Kitty, or WezTerm. See [Troubleshooting](/troubleshooting/) for details.
+:::
+
+## Installation
+
+<Tabs>
+  <TabItem label="Full Install (Recommended)">
+    Interactive installer that sets up tmux config, Claude Code settings, hooks, and the `cct` CLI:
+
+    ```bash
+    git clone https://github.com/sethdford/shipwright.git
+    cd shipwright
+    ./install.sh
+    ```
+  </TabItem>
+  <TabItem label="Quick Setup (tmux only)">
+    One-command setup with no prompts — installs just the tmux configuration:
+
+    ```bash
+    git clone https://github.com/sethdford/shipwright.git
+    cd shipwright
+    ./scripts/cct-init.sh
+    ```
+  </TabItem>
+</Tabs>
+
+## Your First Team Session
+
+<Steps>
+
+1. **Start tmux**
+
+   ```bash
+   tmux new -s dev
+   ```
+
+2. **Launch a team session with a template**
+
+   ```bash
+   cct session my-feature --template feature-dev
+   ```
+
+   This creates a 3-agent team (backend, frontend, tests) with the leader pane taking 65% of the screen.
+
+3. **Start coding with Claude**
+
+   ```bash
+   claude
+   ```
+
+   Tell Claude what you want to build. It will coordinate the agents across tmux panes.
+
+4. **Monitor your team**
+
+   ```bash
+   cct status      # Team dashboard
+   cct ps          # Running agent processes
+   ```
+
+   Or press `Ctrl-a` then `Ctrl-t` for an inline dashboard.
+
+</Steps>
+
+## Verify Your Setup
+
+Run the built-in doctor to check everything is configured correctly:
+
+```bash
+cct doctor
+```
+
+This checks tmux version, jq availability, overlay hooks, color configuration, and orphaned sessions.
+
+## What's Next?
+
+- **[Delivery Pipeline](/guides/pipeline/)** — Automate the full SDLC from issue to PR
+- **[Continuous Loop](/guides/loop/)** — Run agents autonomously with quality gates
+- **[Team Templates](/reference/templates/)** — Browse all 12 team compositions
+- **[CLI Reference](/reference/cli/)** — Full command documentation

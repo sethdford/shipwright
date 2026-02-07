@@ -1,0 +1,161 @@
+---
+title: Wave Patterns
+description: Structured patterns for running agent teams using iterative, parallel waves of work.
+---
+
+A **wave** is a cycle of parallel work followed by synthesis. Instead of one agent grinding through a task sequentially, you decompose work into independent chunks, assign them to agents in separate tmux panes, and iterate until done.
+
+```
+Wave 1: Research       Wave 2: Build           Wave 3: Integrate
+┌─────┬─────┐          ┌─────┬─────┬─────┐     ┌─────┬─────┐
+│ A1  │ A2  │    →     │ A1  │ A2  │ A3  │  →  │ A1  │ A2  │
+│scan │scan │          │model│routes│ UI  │     │wire │tests│
+└─────┴─────┘          └─────┴─────┴─────┘     └─────┴─────┘
+      ↓ synthesize            ↓ synthesize            ↓ done
+```
+
+## The Wave Cycle
+
+Each wave follows four steps:
+
+1. **Assess** — What did the previous wave accomplish? What failed?
+2. **Decompose** — What can be done in parallel now?
+3. **Spawn** — Launch agents in tmux panes for each independent task
+4. **Synthesize** — Gather results, update state, plan next wave
+
+## File-Based State
+
+Track progress through a markdown state file instead of keeping everything in agent memory. This survives compactions, context resets, and lets any agent pick up where others left off.
+
+**State file:** `.claude/team-state.local.md`
+
+```markdown
+---
+wave: 2
+status: in_progress
+goal: "Build user auth with JWT"
+---
+
+## Completed
+- [x] Scanned existing auth patterns
+- [x] Built User model
+
+## In Progress
+- [ ] JWT route handlers
+- [ ] React login components
+
+## Blocked
+- Integration tests blocked on route completion
+```
+
+**Agent outputs:** `.claude/team-outputs/*.md`
+
+Each agent writes its findings/results to a file in this directory. The team lead reads all outputs between waves.
+
+:::tip
+Add `.claude/team-state.local.md` and `.claude/team-outputs/` to your `.gitignore`.
+:::
+
+## Five Wave Patterns
+
+### Feature Implementation
+
+**Waves:** 3-4 | **Agents:** 2-3
+
+Build multi-component features using iterative parallel waves.
+
+| Wave | Goal | Agents |
+|------|------|--------|
+| 1 | Research existing patterns | backend + frontend |
+| 2 | Parallel implementation | backend + frontend + tests |
+| 3 | Integration & validation | backend + tests |
+| 4 | Polish (if needed) | single agent |
+
+**Key principle:** Partition files strictly. Before Wave 2, explicitly tell each agent which directories they own.
+
+### Research & Exploration
+
+**Waves:** 2-3 | **Agents:** 2-3
+
+Understand a codebase or problem space using parallel exploration.
+
+| Wave | Goal | Agents |
+|------|------|--------|
+| 1 | Broad scan — map territory | structure + patterns + deps |
+| 2 | Deep dives into specific areas | 2 focused investigators |
+| 3 | Synthesis into architecture doc | team lead only |
+
+**Key principle:** Use `haiku` for Wave 1 (broad scanning is simple work), `sonnet` or `opus` for Wave 2 deep dives.
+
+### Test Generation
+
+**Waves:** 3-4+ | **Agents:** 2-3
+
+Build comprehensive test coverage using parallel test writers.
+
+| Wave | Goal | Agents |
+|------|------|--------|
+| 1 | Discover gaps, learn patterns | scanner + patterns |
+| 2 | Generate tests in parallel | unit + integration + edge-cases |
+| 3 | Validate & fix failures | fixers |
+| 4+ | Iterate until green | as needed |
+
+**Key principle:** Each agent writes tests in **different files**. Partition by directory or test type.
+
+### Refactoring
+
+**Waves:** 3-4 | **Agents:** 2
+
+Large-scale code transformations with strict file ownership.
+
+| Wave | Goal | Agents |
+|------|------|--------|
+| 1 | Map all instances, understand deps | refactorer + consumers |
+| 2 | Transform leaf nodes first | refactorer + consumers |
+| 3 | Transform core modules | refactorer + consumers |
+| 4+ | Fix breakage until green | as needed |
+
+**Key principle:** Transform leaf nodes (no dependents) first to keep the test suite green between waves.
+
+### Bug Hunt
+
+**Waves:** 3-4 | **Agents:** 2-3
+
+Track down complex bugs using parallel hypothesis testing.
+
+| Wave | Goal | Agents |
+|------|------|--------|
+| 1 | Gather evidence from multiple angles | logs + code + history |
+| 2 | Test hypotheses in parallel | one agent per hypothesis |
+| 3 | Implement fix | single fixer |
+| 4 | Verify fix & write regression test | regression + verify |
+
+**Key principle:** The team lead forms hypotheses from evidence — agents test them. One hypothesis per agent.
+
+## Key Principles
+
+1. **Parallel everything** — If two tasks don't depend on each other, run them at the same time
+2. **Synthesize between waves** — The team lead reads all outputs and adjusts the plan
+3. **Iterate until done** — Each wave builds on the last. Set a max of 5-10 waves
+4. **File-based state is truth** — The state file tracks what's done, pending, and blocked
+5. **Keep teams small** — 2-3 agents. More creates coordination overhead
+
+## Anti-Patterns
+
+| Don't | Instead |
+|-------|---------|
+| Spawn 5+ agents per wave | 2-3 agents per wave |
+| Skip synthesis between waves | Always read outputs and update state |
+| Give vague task descriptions | Be specific: files, functions, acceptance criteria |
+| Let agents touch overlapping files | Partition files by agent |
+| Keep iterating when stuck | After 3 failed attempts, rethink the approach |
+
+## Model Selection
+
+| Task Type | Recommended Model |
+|-----------|------------------|
+| File search, simple lookups | `haiku` |
+| Implementation, clear requirements | `sonnet` |
+| Architecture decisions, complex debugging | `opus` |
+| Test generation | `sonnet` |
+| Documentation, reports | `sonnet` |

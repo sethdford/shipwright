@@ -1,0 +1,268 @@
+---
+title: CLI Reference
+description: Complete reference for every cct command, subcommand, and flag.
+---
+
+The `cct` CLI is the main entry point for Shipwright. It routes to specialized scripts for each subcommand.
+
+## Setup & Diagnostics
+
+### `cct init`
+
+One-command tmux setup with no prompts. Installs the tmux configuration, overlay, and color hooks.
+
+```bash
+cct init
+```
+
+### `cct doctor`
+
+Validate your setup and diagnose common issues.
+
+```bash
+cct doctor
+```
+
+Checks: tmux version, jq availability, overlay hooks, color configuration, orphaned sessions.
+
+### `cct upgrade`
+
+Check for and apply updates.
+
+```bash
+cct upgrade            # Check for updates
+cct upgrade --apply    # Pull latest and apply
+```
+
+## Team Sessions
+
+### `cct session`
+
+Create a team session with optional template.
+
+```bash
+cct session <name>                          # Bare session
+cct session <name> --template <template>    # With template
+cct session <name> -t feature-dev           # Short flag
+```
+
+**Flags:**
+
+| Flag | Description |
+|------|-------------|
+| `--template`, `-t` | Team template name (see `cct templates list`) |
+
+### `cct status`
+
+Show the team dashboard with all active sessions.
+
+```bash
+cct status
+```
+
+Also available via tmux keybinding: `Ctrl-a` then `Ctrl-t`.
+
+### `cct ps`
+
+Show running agent processes across all sessions.
+
+```bash
+cct ps
+```
+
+### `cct logs`
+
+Tail agent logs for a session.
+
+```bash
+cct logs <session>              # Show recent logs
+cct logs <session> --follow     # Tail continuously
+```
+
+## Continuous Loop
+
+### `cct loop`
+
+Run Claude Code autonomously until a goal is achieved.
+
+```bash
+cct loop "<goal>" [flags]
+```
+
+**Flags:**
+
+| Flag | Description | Default |
+|------|-------------|---------|
+| `--test-cmd <cmd>` | Test command for verification | auto-detected |
+| `--audit` | Self-reflection after each iteration | off |
+| `--audit-agent` | Dedicated auditor agent | off |
+| `--quality-gates` | Run tests as gates between iterations | off |
+| `--definition-of-done <file>` | Completion checklist | none |
+| `--agents <n>` | Number of agents | 1 |
+| `--max-iterations <n>` | Maximum iterations | 10 |
+| `--model <model>` | Claude model | default |
+| `--resume` | Resume interrupted loop | — |
+
+**Examples:**
+
+```bash
+cct loop "Build user auth with JWT" --test-cmd "npm test"
+cct loop "Refactor API" --agents 3 --audit --quality-gates
+cct loop "Build checkout" --definition-of-done requirements.md
+cct loop --resume
+```
+
+See [Continuous Loop guide](/guides/loop/) for details.
+
+## Delivery Pipeline
+
+### `cct pipeline start`
+
+Start a new delivery pipeline.
+
+```bash
+cct pipeline start [flags]
+```
+
+**Flags:**
+
+| Flag | Description |
+|------|-------------|
+| `--goal <text>` | Goal description |
+| `--issue <number>` | GitHub issue number |
+| `--pipeline <template>` | Pipeline template (standard, fast, full, hotfix, autonomous) |
+| `--test-cmd <cmd>` | Override auto-detected test command |
+| `--agents <n>` | Number of build agents |
+| `--self-heal <n>` | Max self-healing cycles |
+| `--skip-gates` | Auto-approve all gates |
+| `--slack-webhook <url>` | Slack notification webhook |
+
+### `cct pipeline resume`
+
+Resume a pipeline from where it left off.
+
+```bash
+cct pipeline resume
+```
+
+### `cct pipeline status`
+
+Show pipeline progress dashboard.
+
+```bash
+cct pipeline status
+```
+
+### `cct pipeline abort`
+
+Abort a running pipeline.
+
+```bash
+cct pipeline abort
+```
+
+### `cct pipeline list`
+
+Browse available pipeline templates.
+
+```bash
+cct pipeline list
+```
+
+### `cct pipeline show`
+
+View details of a pipeline template.
+
+```bash
+cct pipeline show <template>
+```
+
+See [Delivery Pipeline guide](/guides/pipeline/) for details.
+
+## Daemon
+
+### `cct daemon`
+
+Background daemon for autonomous issue processing.
+
+| Subcommand | Description |
+|------------|-------------|
+| `cct daemon init` | Initialize daemon configuration |
+| `cct daemon start` | Start background daemon |
+| `cct daemon stop` | Stop daemon |
+| `cct daemon status` | Show daemon status |
+| `cct daemon metrics` | DORA metrics dashboard |
+| `cct daemon logs` | View daemon logs |
+
+**Metrics flags:**
+
+| Flag | Description | Default |
+|------|-------------|---------|
+| `--period <days>` | Reporting period | 7 |
+| `--json` | JSON output | off |
+
+See [Autonomous Daemon guide](/guides/daemon/) for details.
+
+## Repo Preparation
+
+### `cct prep`
+
+Analyze and prepare a repository for agent teams.
+
+```bash
+cct prep [flags]
+```
+
+**Flags:**
+
+| Flag | Description |
+|------|-------------|
+| `--dry-run` | Preview without writing files |
+| `--path <dir>` | Target directory |
+| `--force` | Overwrite existing configs |
+| `--no-hooks` | Skip hook generation |
+| `--no-claude-md` | Skip CLAUDE.md generation |
+
+See [Repo Preparation guide](/guides/prep/) for details.
+
+## Maintenance
+
+### `cct cleanup`
+
+Clean up orphaned tmux sessions and panes.
+
+```bash
+cct cleanup              # Dry-run: show what would be cleaned
+cct cleanup --force      # Actually clean up
+```
+
+### `cct reaper`
+
+Clean up dead tmux panes (panes where Claude has exited).
+
+```bash
+cct reaper               # One-shot cleanup
+cct reaper --watch       # Background auto-cleanup every 5s
+cct reaper --dry-run     # Preview what would be reaped
+```
+
+Also available via tmux keybinding: `Ctrl-a` then `R`.
+
+### `cct worktree`
+
+Manage git worktrees for agent isolation.
+
+```bash
+cct worktree create <branch>    # Create a worktree
+cct worktree list               # List worktrees
+cct worktree remove <branch>    # Remove a worktree
+```
+
+### `cct templates`
+
+Browse team templates.
+
+```bash
+cct templates list              # List all templates
+cct templates show <name>       # Show template details
+```

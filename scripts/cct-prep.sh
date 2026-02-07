@@ -5,8 +5,14 @@
 # ╚═══════════════════════════════════════════════════════════════════════════╝
 set -euo pipefail
 
-VERSION="1.5.0"
+VERSION="1.5.1"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
+# ─── Handle subcommands ───────────────────────────────────────────────────────
+if [[ "${1:-}" == "test" ]]; then
+    shift
+    exec "$SCRIPT_DIR/cct-prep-test.sh" "$@"
+fi
 
 # ─── Colors (matches Seth's tmux theme) ─────────────────────────────────────
 CYAN='\033[38;2;0;212;255m'     # #00d4ff — primary accent
@@ -104,7 +110,7 @@ show_help() {
     echo -e "  ${DIM}.claude/hooks/*.sh${RESET}                   Pre/post action hooks"
     echo -e "  ${DIM}.github/ISSUE_TEMPLATE/agent-task.md${RESET} Agent task template"
     echo ""
-    echo -e "${DIM}Docs: https://github.com/sethdford/claude-code-teams-tmux${RESET}"
+    echo -e "${DIM}Docs: https://sethdford.github.io/shipwright  |  GitHub: https://github.com/sethdford/shipwright${RESET}"
 }
 
 # ─── CLI Argument Parsing ───────────────────────────────────────────────────
@@ -687,7 +693,7 @@ HOOKEOF
         if [[ -n "$LINT_CMD" ]]; then
             cat >> "$pre_build" <<HOOKEOF
 echo "Running lint check..."
-eval "${LINT_CMD}" || {
+${LINT_CMD} || {
     echo "Lint failed — fix issues before building"
     exit 1
 }

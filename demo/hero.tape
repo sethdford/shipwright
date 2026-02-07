@@ -51,6 +51,6 @@ Sleep 4s
 
 # Closing
 Enter
-Type "# Get started: github.com/sethdford/claude-code-teams-tmux"
+Type "# Get started: github.com/sethdford/shipwright"
 Enter
 Sleep 2s

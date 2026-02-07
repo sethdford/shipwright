@@ -64,8 +64,8 @@ run() {
 # ─── Banner ─────────────────────────────────────────────────────────────────
 echo ""
 echo -e "${CYAN}╔═══════════════════════════════════════════════════════════╗${RESET}"
-echo -e "${CYAN}║${RESET}  ${BOLD}Claude Code Teams + tmux${RESET}                                ${CYAN}║${RESET}"
-echo -e "${CYAN}║${RESET}  ${DIM}Interactive installer${RESET}                                    ${CYAN}║${RESET}"
+echo -e "${CYAN}║${RESET}  ${BOLD}Shipwright${RESET}                                               ${CYAN}║${RESET}"
+echo -e "${CYAN}║${RESET}  ${DIM}Interactive installer for Claude Code agent teams${RESET}         ${CYAN}║${RESET}"
 echo -e "${CYAN}╚═══════════════════════════════════════════════════════════╝${RESET}"
 echo ""
 
@@ -246,7 +246,15 @@ if ask "Install cct CLI to $BIN_DIR?"; then
       "cp '$SCRIPT_DIR/scripts/cct' '$BIN_DIR/cct' && chmod +x '$BIN_DIR/cct'"
     INSTALLED+=("cct")
 
-    for sub in cct-session.sh cct-status.sh cct-cleanup.sh cct-upgrade.sh cct-doctor.sh cct-logs.sh cct-ps.sh cct-templates.sh cct-loop.sh cct-pipeline.sh cct-pipeline-test.sh cct-worktree.sh cct-init.sh cct-prep.sh cct-daemon.sh; do
+    # Create shipwright and sw aliases
+    run "Create shipwright symlink" \
+      "ln -sf '$BIN_DIR/cct' '$BIN_DIR/shipwright'"
+    run "Create sw symlink" \
+      "ln -sf '$BIN_DIR/cct' '$BIN_DIR/sw'"
+    INSTALLED+=("shipwright (symlink)")
+    INSTALLED+=("sw (symlink)")
+
+    for sub in cct-session.sh cct-status.sh cct-cleanup.sh cct-upgrade.sh cct-doctor.sh cct-logs.sh cct-ps.sh cct-templates.sh cct-loop.sh cct-pipeline.sh cct-pipeline-test.sh cct-worktree.sh cct-init.sh cct-prep.sh cct-prep-test.sh cct-daemon.sh cct-daemon-test.sh cct-reaper.sh; do
       if [[ -f "$SCRIPT_DIR/scripts/$sub" ]]; then
         run "Install $sub → $BIN_DIR/$sub" \
           "cp '$SCRIPT_DIR/scripts/$sub' '$BIN_DIR/$sub' && chmod +x '$BIN_DIR/$sub'"
@@ -269,10 +277,14 @@ if ask "Install cct CLI to $BIN_DIR?"; then
     if [[ -d "$SCRIPT_DIR/tmux/templates" ]]; then
       run "Create ~/.claude-teams/templates directory" \
         "mkdir -p '$HOME/.claude-teams/templates'"
+      run "Create ~/.shipwright/templates directory" \
+        "mkdir -p '$HOME/.shipwright/templates'"
       for tpl in "$SCRIPT_DIR"/tmux/templates/*.json; do
         local_name="$(basename "$tpl")"
         run "Install template $local_name" \
           "cp '$tpl' '$HOME/.claude-teams/templates/$local_name'"
+        run "Install template $local_name → ~/.shipwright/templates/" \
+          "cp '$tpl' '$HOME/.shipwright/templates/$local_name'"
       done
       INSTALLED+=("templates")
     fi
@@ -281,10 +293,14 @@ if ask "Install cct CLI to $BIN_DIR?"; then
     if [[ -d "$SCRIPT_DIR/templates/pipelines" ]]; then
       run "Create ~/.claude-teams/pipelines directory" \
         "mkdir -p '$HOME/.claude-teams/pipelines'"
+      run "Create ~/.shipwright/pipelines directory" \
+        "mkdir -p '$HOME/.shipwright/pipelines'"
       for ptpl in "$SCRIPT_DIR"/templates/pipelines/*.json; do
         local_name="$(basename "$ptpl")"
         run "Install pipeline template $local_name" \
           "cp '$ptpl' '$HOME/.claude-teams/pipelines/$local_name'"
+        run "Install pipeline template $local_name → ~/.shipwright/pipelines/" \
+          "cp '$ptpl' '$HOME/.shipwright/pipelines/$local_name'"
       done
       INSTALLED+=("pipeline-templates")
     fi
@@ -405,6 +421,10 @@ if [[ ${#INSTALLED[@]} -gt 0 ]] && ! $DRY_RUN; then
         _add_entry "settings.json.template" "claude-code/settings.json.template" "$HOME/.claude/settings.json.template" false false ;;
       "cct")
         _add_entry "cct" "scripts/cct" "$BIN_DIR/cct" false true ;;
+      "shipwright (symlink)")
+        _add_entry "shipwright" "" "$BIN_DIR/shipwright" false true ;;
+      "sw (symlink)")
+        _add_entry "sw" "" "$BIN_DIR/sw" false true ;;
       "cct-session.sh")
         _add_entry "cct-session.sh" "scripts/cct-session.sh" "$BIN_DIR/cct-session.sh" false true ;;
       "cct-status.sh")
@@ -474,7 +494,7 @@ fi
 # ═════════════════════════════════════════════════════════════════════════════
 echo ""
 echo -e "${CYAN}╔═══════════════════════════════════════════════════════════╗${RESET}"
-echo -e "${CYAN}║${RESET}  ${BOLD}Installation complete${RESET}                                    ${CYAN}║${RESET}"
+echo -e "${CYAN}║${RESET}  ${BOLD}Shipwright installed${RESET}                                      ${CYAN}║${RESET}"
 echo -e "${CYAN}╚═══════════════════════════════════════════════════════════╝${RESET}"
 echo ""
 
@@ -491,7 +511,8 @@ echo ""
 info "Next steps:"
 echo -e "  ${DIM}1.${RESET} Start a tmux session:  ${BOLD}tmux new -s dev${RESET}"
 echo -e "  ${DIM}2.${RESET} Install tmux plugins:  ${BOLD}prefix + I${RESET}"
-echo -e "  ${DIM}3.${RESET} Launch Claude Code:    ${BOLD}claude${RESET}"
+echo -e "  ${DIM}3.${RESET} Launch Shipwright:     ${BOLD}shipwright help${RESET}  ${DIM}(or: sw, cct)${RESET}"
+echo -e "  ${DIM}4.${RESET} Tab completions:       ${BOLD}shipwright completions install${RESET}"
 echo ""
 
 if $DRY_RUN; then

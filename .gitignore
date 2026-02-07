@@ -10,3 +10,13 @@ demo/*.gif
 
 # Upgrade backups
 *.pre-upgrade.bak
+
+# Build artifacts
+dist/
+node_modules/
+*.tgz
+
+# Website build
+website/node_modules/
+website/dist/
+website/.astro/

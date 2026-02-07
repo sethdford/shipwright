@@ -1,0 +1,173 @@
+---
+title: Configuration
+description: Configure tmux theme, Claude Code settings, hooks, and environment variables.
+---
+
+import { Tabs, TabItem } from '@astrojs/starlight/components';
+
+## tmux Theme
+
+The theme lives in `tmux/tmux.conf`. It uses a dark blue-gray background with cyan accents.
+
+### Color Palette
+
+| Element | Color | Hex |
+|---------|-------|-----|
+| Background | Dark blue-gray | `#1a1a2e` |
+| Foreground | Light gray | `#e4e4e7` |
+| Accent (active borders, highlights) | Cyan | `#00d4ff` |
+| Secondary | Blue | `#0066ff` |
+| Tertiary | Purple | `#7c3aed` |
+| Inactive borders | Muted indigo | `#333355` |
+| Inactive elements | Zinc | `#71717a` |
+
+To customize colors, edit the hex values in `tmux/tmux.conf` and reload with `prefix + r`.
+
+### Keybindings
+
+The prefix key is `Ctrl-a` (remapped from the default `Ctrl-b`).
+
+#### General
+
+| Key | Action |
+|-----|--------|
+| `prefix + r` | Reload tmux config |
+| `prefix + \|` | Split pane vertically |
+| `prefix + -` | Split pane horizontally |
+| `prefix + c` | New window |
+| `prefix + x` | Kill pane (with confirmation) |
+| `prefix + X` | Kill window (with confirmation) |
+| `prefix + s` | Choose session (tree view) |
+| `prefix + N` | New session |
+
+#### Pane Navigation (vim-style)
+
+| Key | Action |
+|-----|--------|
+| `prefix + h/j/k/l` | Move between panes |
+| `Ctrl + h/j/k/l` | Smart pane switching (vim-tmux-navigator) |
+| `prefix + H/J/K/L` | Resize pane (repeatable) |
+
+#### Agent Teams
+
+| Key | Action |
+|-----|--------|
+| `prefix + T` | Launch team session |
+| `prefix + Ctrl-t` | Show team status dashboard |
+| `prefix + g` | Display pane numbers |
+| `prefix + G` | Toggle zoom on current pane |
+| `prefix + S` | Toggle synchronized panes |
+| `prefix + M-t` | Toggle team sync mode |
+| `prefix + M-1` | Layout: main-horizontal (leader 65% left) |
+| `prefix + M-2` | Layout: main-vertical (leader 60% top) |
+| `prefix + M-3` | Layout: tiled (equal sizes) |
+| `prefix + M-s` | Capture current pane scrollback |
+| `prefix + M-a` | Capture all panes in window |
+| `prefix + R` | Reap dead panes (one-shot cleanup) |
+
+#### Copy Mode (vi-style)
+
+| Key | Action |
+|-----|--------|
+| `v` | Begin selection |
+| `y` | Copy selection |
+| `r` | Toggle rectangle mode |
+| `prefix + p` | Paste buffer |
+
+## Claude Code Settings
+
+The `claude-code/settings.json.template` configures Claude Code for agent teams.
+
+### Key Settings
+
+| Setting | Default | Description |
+|---------|---------|-------------|
+| `CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS` | `"1"` | Enable agent teams (required) |
+| `CLAUDE_CODE_AUTOCOMPACT_PCT_OVERRIDE` | `"70"` | Context compaction threshold |
+| `CLAUDE_CODE_SUBAGENT_MODEL` | `"haiku"` | Model for subagent lookups |
+| `CLAUDE_CODE_MAX_TOOL_USE_CONCURRENCY` | `"5"` | Parallel tool calls per agent |
+
+### Installation
+
+1. Copy the template: `cp claude-code/settings.json.template ~/.claude/settings.json`
+2. Customize the `enabledPlugins` section
+3. Adjust environment variables as needed
+
+## Hooks
+
+Hooks are shell scripts that run on Claude Code lifecycle events.
+
+### Included Hooks
+
+| Hook | Event | What It Does |
+|------|-------|-------------|
+| `teammate-idle.sh` | TeammateIdle | Runs typecheck — blocks idle until errors are fixed |
+| `task-completed.sh` | TaskCompleted | Runs lint + test — blocks completion until quality passes |
+| `notify-idle.sh` | Notification | Desktop alert when agents need attention |
+| `pre-compact-save.sh` | PreCompact | Saves git context before compaction |
+
+### Installing Hooks
+
+```bash
+# Copy hooks to Claude Code hooks directory
+cp claude-code/hooks/*.sh ~/.claude/hooks/
+chmod +x ~/.claude/hooks/*.sh
+```
+
+Then wire them up in `~/.claude/settings.json`:
+
+```json
+{
+  "hooks": {
+    "teammate-idle": {
+      "command": "~/.claude/hooks/teammate-idle.sh",
+      "timeout": 30000
+    }
+  }
+}
+```
+
+### Writing Custom Hooks
+
+Quality gate hooks use exit codes to control behavior:
+
+| Exit Code | Meaning |
+|-----------|---------|
+| `0` | Pass — agent continues normally |
+| `2` | Block — agent must fix the issue before proceeding |
+| Other | Error — logged but doesn't block |
+
+Example lint check hook:
+
+```bash
+#!/usr/bin/env bash
+cd "$(find_project_root)" || exit 0
+pnpm lint 2>&1 || {
+  echo "::error::Lint errors found. Fix them before going idle."
+  exit 2
+}
+exit 0
+```
+
+## Environment Variables
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS` | — | **Required.** Enables agent teams |
+| `CLAUDE_CODE_SUBAGENT_MODEL` | parent model | Model for subagent lookups (`"haiku"` recommended) |
+| `CLAUDE_CODE_AUTOCOMPACT_PCT_OVERRIDE` | `"80"` | Context compaction threshold (lower = more aggressive) |
+| `CLAUDE_CODE_MAX_TOOL_USE_CONCURRENCY` | `"3"` | Parallel tool calls per agent |
+| `CCT_WEBHOOK_URL` | — | Custom webhook URL for pipeline notifications |
+
+## tmux Plugins (TPM)
+
+After installation, press `prefix + I` to install plugins.
+
+| Plugin | Key | What It Does |
+|--------|-----|--------------|
+| **tmux-fingers** | `prefix + F` | Vimium-style copy hints for URLs, paths, hashes |
+| **tmux-fzf-url** | `prefix + u` | Fuzzy-find and open URLs |
+| **tmux-fzf** | `F5` | Fuzzy finder for sessions, windows, panes |
+| **extrakto** | `prefix + tab` | Extract and copy text from pane output |
+| **tmux-resurrect** | auto | Save and restore sessions across restarts |
+| **tmux-continuum** | auto | Automatic continuous session saving |

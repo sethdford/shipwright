@@ -1,26 +1,58 @@
-# Claude Code Teams + tmux
+# Shipwright
 
-> Production-ready tmux setup for running Claude Code Agent Teams — multi-agent AI development with visual split-pane sessions, quality gates, and autonomous loops.
+> Orchestrate autonomous Claude Code agent teams — delivery pipeline, DORA metrics, and repo preparation.
 
-[![v1.5.0](https://img.shields.io/badge/version-1.5.0-00d4ff?style=flat-square)](https://github.com/sethdford/claude-code-teams-tmux/releases) ![tmux dark theme with cyan accents](https://img.shields.io/badge/theme-dark%20blue--gray%20%2B%20cyan-00d4ff?style=flat-square) ![MIT License](https://img.shields.io/badge/license-MIT-green?style=flat-square)
+[![v1.6.0](https://img.shields.io/badge/version-1.6.0-00d4ff?style=flat-square)](https://github.com/sethdford/shipwright/releases) ![tmux dark theme with cyan accents](https://img.shields.io/badge/theme-dark%20blue--gray%20%2B%20cyan-00d4ff?style=flat-square) ![MIT License](https://img.shields.io/badge/license-MIT-green?style=flat-square)
 
 <p align="center">
-  <img src="https://vhs.charm.sh/vhs-sJ34YHLfLxXLMpJgjqvy2.gif" alt="cct CLI demo — version, help, 12 templates, doctor" width="800" />
+  <img src="https://vhs.charm.sh/vhs-sJ34YHLfLxXLMpJgjqvy2.gif" alt="Shipwright CLI demo — version, help, 12 templates, doctor" width="800" />
 </p>
+
+Full docs at [sethdford.github.io/shipwright](https://sethdford.github.io/shipwright)
+
+## Install
+
+**npm** (recommended)
+
+```bash
+npm install -g shipwright-cli
+```
+
+**curl**
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/sethdford/shipwright/main/scripts/install-remote.sh | sh
+```
+
+**Homebrew**
+
+```bash
+brew install sethdford/shipwright/shipwright
+```
+
+**From source**
+
+```bash
+git clone https://github.com/sethdford/shipwright.git
+cd shipwright && ./install.sh
+```
 
 ## What's This?
 
 Claude Code's **agent teams** feature lets you spawn multiple AI agents that work in parallel on different parts of a task — one on backend, one on frontend, one writing tests, etc. When you run Claude Code inside tmux, each agent gets its own pane so you can watch them all work simultaneously.
 
-This repo packages a complete setup:
+Shipwright packages a complete setup:
 
 - **Premium dark tmux theme** with agent-aware pane borders
-- **`cct` CLI** for managing team sessions, templates, and autonomous loops
+- **`shipwright` CLI** (also `sw` or `cct`) for managing team sessions, templates, and autonomous loops
 - **Quality gate hooks** that block agents until code passes checks
-- **Continuous agent loop** (`cct loop`) for autonomous multi-iteration development
-- **Delivery pipeline** (`cct pipeline`) for full idea-to-PR automation
+- **Continuous agent loop** (`shipwright loop`) for autonomous multi-iteration development
+- **Delivery pipeline** (`shipwright pipeline`) for full idea-to-PR automation
+- **Autonomous daemon** (`shipwright daemon`) for GitHub issue watching and auto-delivery
+- **DORA metrics** (`shipwright daemon metrics`) for engineering performance tracking
+- **Repo preparation** (`shipwright prep`) for generating agent-ready `.claude/` configs
 - **Layout presets** that give the leader pane 60-65% of screen space
-- **One-command setup** via `cct init`
+- **One-command setup** via `shipwright init`
 
 ## Prerequisites
 
@@ -40,16 +72,16 @@ This repo packages a complete setup:
 **Option A: One-command setup (just tmux config, no prompts)**
 
 ```bash
-git clone https://github.com/sethdford/claude-code-teams-tmux.git
-cd claude-code-teams-tmux
+git clone https://github.com/sethdford/shipwright.git
+cd shipwright
 ./scripts/cct-init.sh
 ```
 
 **Option B: Full interactive install (tmux + settings + hooks + CLI)**
 
 ```bash
-git clone https://github.com/sethdford/claude-code-teams-tmux.git
-cd claude-code-teams-tmux
+git clone https://github.com/sethdford/shipwright.git
+cd shipwright
 ./install.sh
 ```
 
@@ -63,7 +95,7 @@ claude
 ## What's Included
 
 ```
-claude-code-teams-tmux/
+shipwright/
 ├── tmux/
 │   ├── tmux.conf                    # Full tmux config with premium dark theme
 │   ├── claude-teams-overlay.conf    # Agent-aware pane styling, color hooks & keybindings
@@ -81,11 +113,16 @@ claude-code-teams-tmux/
 │       ├── architecture.json        #   Researcher + spec writer (2 agents)
 │       └── exploration.json         #   Explorer + synthesizer (2 agents)
 ├── templates/
-│   └── pipelines/                   # 4 delivery pipeline templates
+│   └── pipelines/                   # 5 delivery pipeline templates
 │       ├── standard.json            #   Feature pipeline (plan + review gates)
 │       ├── fast.json                #   Quick fixes (all auto, no gates)
 │       ├── full.json                #   Full deployment (all 8 stages)
-│       └── hotfix.json              #   Urgent fixes (all auto, minimal)
+│       ├── hotfix.json              #   Urgent fixes (all auto, minimal)
+│       └── autonomous.json          #   Daemon-driven (fully autonomous)
+├── completions/                     # Shell tab completions
+│   ├── shipwright.bash              #   Bash completions
+│   ├── _shipwright                  #   Zsh completions
+│   └── shipwright.fish              #   Fish completions
 ├── claude-code/
 │   ├── settings.json.template       # Claude Code settings with teams + hooks
 │   └── hooks/
@@ -94,13 +131,16 @@ claude-code-teams-tmux/
 │       ├── notify-idle.sh           # Desktop notification on idle
 │       └── pre-compact-save.sh      # Save context before compaction
 ├── scripts/
-│   ├── cct                          # CLI router (session, loop, doctor, init, ...)
+│   ├── cct                          # CLI router (shipwright/sw/cct)
 │   ├── cct-init.sh                  # One-command tmux setup (no prompts)
 │   ├── cct-session.sh               # Create team sessions from templates
 │   ├── cct-loop.sh                  # Continuous autonomous agent loop
 │   ├── cct-pipeline.sh              # Full delivery pipeline (idea → PR)
+│   ├── cct-daemon.sh                # Autonomous issue watcher + metrics
+│   ├── cct-prep.sh                  # Repo preparation tool
 │   ├── cct-doctor.sh                # Validate setup and diagnose issues
-│   └── ...                          # status, ps, logs, cleanup, upgrade, worktree
+│   ├── install-completions.sh       # Shell completion installer
+│   └── ...                          # status, ps, logs, cleanup, upgrade, worktree, reaper
 ├── docs/
 │   ├── KNOWN-ISSUES.md              # Tracked bugs with workarounds
 │   └── TIPS.md                      # Power user tips & wave patterns
@@ -130,40 +170,50 @@ Pre-configured `settings.json.template` with:
 
 The `teammate-idle.sh` hook runs `pnpm typecheck` (or `npx tsc --noEmit`) when an agent goes idle. If there are TypeScript errors, it blocks the idle with exit code 2, telling the agent to fix them first.
 
-### `cct` CLI
+### Shipwright CLI
 
-A full-featured CLI for managing team sessions, autonomous loops, and setup:
+A full-featured CLI for managing team sessions, autonomous loops, and setup. All three aliases — `shipwright`, `sw`, and `cct` — work identically:
 
 ```bash
 # Setup & diagnostics
-cct init                              # One-command tmux setup (no prompts)
-cct doctor                            # Validate setup, check color hooks, etc.
-cct upgrade --apply                   # Pull latest and apply updates
+shipwright init                              # One-command tmux setup (no prompts)
+shipwright doctor                            # Validate setup, check color hooks, etc.
+shipwright upgrade --apply                   # Pull latest and apply updates
 
 # Team sessions
-cct session my-feature                # Create a team session
-cct session my-feature -t feature-dev # Use a template (3 agents, leader pane 65%)
-cct status                            # Show team dashboard
-cct ps                                # Show running agent processes
-cct logs myteam --follow              # Tail agent logs
+shipwright session my-feature                # Create a team session
+shipwright session my-feature -t feature-dev # Use a template (3 agents, leader pane 65%)
+sw status                                    # Show team dashboard
+sw ps                                        # Show running agent processes
+sw logs myteam --follow                      # Tail agent logs
 
 # Continuous loop (autonomous agent operation)
-cct loop "Build auth" --test-cmd "npm test"
-cct loop "Fix bugs" --agents 3 --audit --quality-gates
-cct loop --resume                     # Resume interrupted loop
+shipwright loop "Build auth" --test-cmd "npm test"
+shipwright loop "Fix bugs" --agents 3 --audit --quality-gates
+shipwright loop --resume                     # Resume interrupted loop
 
 # Delivery pipeline (idea → PR)
-cct pipeline start --goal "Add auth" --pipeline standard
-cct pipeline start --issue 42 --skip-gates
-cct pipeline resume                   # Continue from last stage
-cct pipeline status                   # Progress dashboard
-cct pipeline list                     # Browse pipeline templates
+shipwright pipeline start --goal "Add auth" --pipeline standard
+shipwright pipeline start --issue 42 --skip-gates
+shipwright pipeline resume                   # Continue from last stage
+sw pipeline status                           # Progress dashboard
+
+# Autonomous daemon (watch GitHub, auto-deliver)
+shipwright daemon start                      # Start issue watcher (foreground)
+shipwright daemon start --detach             # Start in background tmux session
+shipwright daemon metrics                    # DORA/DX metrics dashboard
+shipwright daemon stop                       # Graceful shutdown
+
+# Repo preparation
+shipwright prep                              # Analyze repo, generate .claude/ configs
+shipwright prep --check                      # Audit existing prep quality
+sw prep --with-claude                        # Deep analysis using Claude Code
 
 # Maintenance
-cct cleanup                           # Dry-run: show orphaned sessions
-cct cleanup --force                   # Kill orphaned sessions
-cct worktree create my-branch         # Git worktree for agent isolation
-cct templates list                    # Browse team templates
+shipwright cleanup                           # Dry-run: show orphaned sessions
+shipwright cleanup --force                   # Kill orphaned sessions
+sw worktree create my-branch                 # Git worktree for agent isolation
+sw templates list                            # Browse team templates
 ```
 
 ## Usage
@@ -175,10 +225,10 @@ cct templates list                    # Browse team templates
 tmux new -s dev
 
 # Option 1: Use a template — leader gets 65% of the screen
-cct session my-feature --template feature-dev
+shipwright session my-feature --template feature-dev
 
 # Option 2: Bare session — then ask Claude to create a team
-cct session my-feature
+shipwright session my-feature
 
 # Option 3: tmux keybinding
 # Press Ctrl-a then T to launch a team session
@@ -193,16 +243,16 @@ Run Claude Code autonomously in a loop until a goal is achieved:
 
 ```bash
 # Basic loop with test verification
-cct loop "Build user authentication with JWT" --test-cmd "npm test"
+shipwright loop "Build user authentication with JWT" --test-cmd "npm test"
 
 # Multi-agent with audit and quality gates
-cct loop "Refactor the API layer" --agents 3 --audit --quality-gates
+shipwright loop "Refactor the API layer" --agents 3 --audit --quality-gates
 
 # With a definition of done
-cct loop "Build checkout flow" --definition-of-done requirements.md
+shipwright loop "Build checkout flow" --definition-of-done requirements.md
 
 # Resume an interrupted loop
-cct loop --resume
+shipwright loop --resume
 ```
 
 The loop supports self-audit (agent reflects on its own work), audit agents (separate reviewer), and quality gates (automated checks between iterations).
@@ -213,30 +263,30 @@ Chain the full SDLC into a single command — from issue intake to PR creation w
 
 ```bash
 # Start from a GitHub issue (fully autonomous)
-cct pipeline start --issue 123 --skip-gates
+shipwright pipeline start --issue 123 --skip-gates
 
 # Start from a goal
-cct pipeline start --goal "Add JWT authentication"
+shipwright pipeline start --goal "Add JWT authentication"
 
 # Hotfix with custom test command
-cct pipeline start --issue 456 --pipeline hotfix --test-cmd "pytest"
+shipwright pipeline start --issue 456 --pipeline hotfix --test-cmd "pytest"
 
 # Full deployment pipeline with 3 agents
-cct pipeline start --goal "Build payment flow" --pipeline full --agents 3
+shipwright pipeline start --goal "Build payment flow" --pipeline full --agents 3
 
 # Resume / monitor / abort
-cct pipeline resume
-cct pipeline status
-cct pipeline abort
+shipwright pipeline resume
+sw pipeline status
+shipwright pipeline abort
 
 # Browse available pipelines
-cct pipeline list
-cct pipeline show standard
+sw pipeline list
+sw pipeline show standard
 ```
 
 **Pipeline stages:** `intake → plan → build → test → review → pr → deploy → validate`
 
-Each stage can be enabled/disabled and gated (auto-proceed or pause for approval). The build stage delegates to `cct loop` for autonomous multi-iteration development.
+Each stage can be enabled/disabled and gated (auto-proceed or pause for approval). The build stage delegates to `shipwright loop` for autonomous multi-iteration development.
 
 **Self-healing:** When tests fail after a build, the pipeline automatically captures the error output and re-enters the build loop with that context — just like a human developer reading test failures and fixing them. Configurable retry cycles with `--self-heal N`.
 
@@ -252,6 +302,43 @@ Each stage can be enabled/disabled and gated (auto-proceed or pause for approval
 | `fast` | intake → build → test → PR | all auto | Quick fixes |
 | `full` | all 8 stages | approve: plan, review, pr, deploy | Production deployment |
 | `hotfix` | intake → build → test → PR | all auto | Urgent production fixes |
+| `autonomous` | all stages | all auto | Daemon-driven delivery |
+
+### Autonomous Daemon
+
+Watch a GitHub repo for new issues and automatically deliver them through the pipeline:
+
+```bash
+# Start watching (foreground)
+shipwright daemon start
+
+# Start in background tmux session
+shipwright daemon start --detach
+
+# Show active pipelines, queue, and throughput
+shipwright daemon status
+
+# DORA metrics dashboard (lead time, deploy freq, MTTR, change failure rate)
+shipwright daemon metrics
+
+# Graceful shutdown
+shipwright daemon stop
+```
+
+### Repo Preparation
+
+Generate agent-ready `.claude/` configuration for any repository:
+
+```bash
+# Analyze repo and generate configs
+shipwright prep
+
+# Deep analysis using Claude Code
+shipwright prep --with-claude
+
+# Audit existing prep quality
+shipwright prep --check
+```
 
 ### Layout Presets
 
@@ -267,7 +354,7 @@ Switch between pane arrangements with keybindings:
 
 ```bash
 # Show running team sessions
-cct status
+shipwright status
 
 # Or use the tmux keybinding: Ctrl-a then Ctrl-t
 ```
@@ -275,7 +362,7 @@ cct status
 ### Health Check
 
 ```bash
-cct doctor    # Checks: tmux, jq, overlay hooks, color config, orphaned sessions
+shipwright doctor    # Checks: tmux, jq, overlay hooks, color config, orphaned sessions
 ```
 
 ## Configuration
@@ -334,6 +421,24 @@ To install hooks:
 }
 ```
 
+### Shell Completions
+
+Tab completions are available for bash, zsh, and fish:
+
+```bash
+# Auto-install for your current shell
+./scripts/install-completions.sh
+
+# Or manually source (bash)
+source completions/shipwright.bash
+
+# Or manually install (zsh — add to ~/.zfunc/)
+cp completions/_shipwright ~/.zfunc/_shipwright && compinit
+
+# Or manually install (fish)
+cp completions/shipwright.fish ~/.config/fish/completions/
+```
+
 ## tmux Keybindings
 
 The prefix key is `Ctrl-a` (remapped from the default `Ctrl-b`).
@@ -373,7 +478,7 @@ The prefix key is `Ctrl-a` (remapped from the default `Ctrl-b`).
 
 | Key | Action |
 |-----|--------|
-| `prefix + T` | Launch team session (via `cct`) |
+| `prefix + T` | Launch team session (via `shipwright`) |
 | `prefix + Ctrl-t` | Show team status dashboard |
 | `prefix + g` | Display pane numbers (pick by index) |
 | `prefix + G` | Toggle zoom on current pane |
@@ -397,7 +502,7 @@ The prefix key is `Ctrl-a` (remapped from the default `Ctrl-b`).
 
 ## Team Patterns
 
-12 templates covering the full SDLC and PDLC. Use `cct templates list` to browse, `cct templates show <name>` for details.
+12 templates covering the full SDLC and PDLC. Use `shipwright templates list` to browse, `shipwright templates show <name>` for details.
 
 ### Build Phase
 
@@ -509,10 +614,10 @@ See [docs/KNOWN-ISSUES.md](docs/KNOWN-ISSUES.md) for tracked bugs with workaroun
 | Problem | Cause | Fix |
 |---------|-------|-----|
 | Agents spawn in-process instead of tmux panes | Not inside a tmux session | Start tmux first: `tmux new -s dev` |
-| Garbled pane output with 4+ agents | tmux `send-keys` race condition (#23615) | Use `cct` (uses `new-window` instead of `split-window`) |
+| Garbled pane output with 4+ agents | tmux `send-keys` race condition (#23615) | Use `shipwright` (uses `new-window` instead of `split-window`) |
 | Agents fall back to in-process mode | Not in a real tmux session (#23572) | Launch Claude inside tmux |
 | Context window overflow | Too many tasks per agent | Keep tasks focused (5-6 per agent) |
-| Panes don't show agent names | Pane titles not set | Use `cct session` which sets titles automatically |
+| Panes don't show agent names | Pane titles not set | Use `shipwright session` which sets titles automatically |
 | White/bright pane backgrounds | New panes not inheriting theme | Fixed! Overlay forces dark theme via `set-hook after-split-window` |
 
 ## Plugins (TPM)

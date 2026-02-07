@@ -26,7 +26,7 @@ Walk away. Get coffee. Come back to a working feature with passing tests. (Okay,
 
 Pure bash + jq. No heavy dependencies.
 
-Check it out → https://github.com/sethdford/claude-code-teams-tmux
+Check it out → https://github.com/sethdford/shipwright
 
 What's your multi-agent AI workflow look like? Drop your setup in the comments — I'm always looking for new patterns to steal. 😄
 

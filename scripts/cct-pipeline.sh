@@ -5,7 +5,7 @@
 # ╚═══════════════════════════════════════════════════════════════════════════╝
 set -euo pipefail
 
-VERSION="1.5.0"
+VERSION="1.5.1"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
 
@@ -64,7 +64,18 @@ emit_event() {
         fi
     done
     mkdir -p "$EVENTS_DIR"
-    echo "{\"ts\":\"$(now_iso)\",\"type\":\"${event_type}\"${json_fields}}" >> "$EVENTS_FILE"
+    echo "{\"ts\":\"$(now_iso)\",\"ts_epoch\":$(now_epoch),\"type\":\"${event_type}\"${json_fields}}" >> "$EVENTS_FILE"
+}
+
+# ─── Token / Cost Parsing ─────────────────────────────────────────────────
+parse_claude_tokens() {
+    local log_file="$1"
+    local input_tok output_tok
+    input_tok=$(grep -oE 'input[_ ]tokens?[: ]+[0-9,]+' "$log_file" 2>/dev/null | tail -1 | grep -oE '[0-9,]+' | tr -d ',' || echo "0")
+    output_tok=$(grep -oE 'output[_ ]tokens?[: ]+[0-9,]+' "$log_file" 2>/dev/null | tail -1 | grep -oE '[0-9,]+' | tr -d ',' || echo "0")
+
+    TOTAL_INPUT_TOKENS=$(( TOTAL_INPUT_TOKENS + ${input_tok:-0} ))
+    TOTAL_OUTPUT_TOKENS=$(( TOTAL_OUTPUT_TOKENS + ${output_tok:-0} ))
 }
 
 # ─── Defaults ───────────────────────────────────────────────────────────────
@@ -267,6 +278,12 @@ NOTIFICATION_ENABLED=false
 # Self-healing
 BUILD_TEST_RETRIES=2
 STASHED_CHANGES=false
+SELF_HEAL_COUNT=0
+
+# ─── Cost Tracking ───────────────────────────────────────────────────────
+TOTAL_INPUT_TOKENS=0
+TOTAL_OUTPUT_TOKENS=0
+COST_MODEL_RATES='{"opus":{"input":15,"output":75},"sonnet":{"input":3,"output":15},"haiku":{"input":0.25,"output":1.25}}'
 
 # ─── Signal Handling ───────────────────────────────────────────────────────
 
@@ -1048,6 +1065,7 @@ show_stage_preview() {
         test)     echo -e "  Run test suite and check coverage" ;;
         review)   echo -e "  AI code review on the diff, post findings" ;;
         pr)       echo -e "  Create GitHub PR with labels, reviewers, milestone" ;;
+        merge)    echo -e "  Wait for CI checks, merge PR, optionally delete branch" ;;
         deploy)   echo -e "  Deploy to staging/production with rollback" ;;
         validate) echo -e "  Smoke tests, health checks, close issue" ;;
     esac
@@ -1214,8 +1232,10 @@ Checklist of completion criteria.
     [[ -n "$MODEL" ]] && plan_model="$MODEL"
     [[ -z "$plan_model" || "$plan_model" == "null" ]] && plan_model="opus"
 
+    local _token_log="${ARTIFACTS_DIR}/.claude-tokens-plan.log"
     claude --print --model "$plan_model" --max-turns 10 \
-        "$plan_prompt" > "$plan_file" 2>/dev/null || true
+        "$plan_prompt" > "$plan_file" 2>"$_token_log" || true
+    parse_claude_tokens "$_token_log"
 
     if [[ ! -s "$plan_file" ]]; then
         error "Plan generation failed"
@@ -1382,10 +1402,13 @@ $(cat "$TASKS_FILE")"
         gh_comment_issue "$ISSUE_NUMBER" "🔨 **Build started** — \`cct loop\` with ${max_iter} max iterations, ${agents} agent(s), model: ${build_model}"
     fi
 
-    cct loop "${loop_args[@]}" || {
+    local _token_log="${ARTIFACTS_DIR}/.claude-tokens-build.log"
+    cct loop "${loop_args[@]}" 2>"$_token_log" || {
+        parse_claude_tokens "$_token_log"
         error "Build loop failed"
         return 1
     }
+    parse_claude_tokens "$_token_log"
 
     # Count commits made during build
     local commit_count
@@ -1442,11 +1465,9 @@ $(tail -20 "$test_log")
     if [[ "$coverage_min" -gt 0 ]] 2>/dev/null; then
         coverage=$(grep -oE 'Statements\s*:\s*[0-9.]+' "$test_log" 2>/dev/null | grep -oE '[0-9.]+$' || \
                    grep -oE 'All files\s*\|\s*[0-9.]+' "$test_log" 2>/dev/null | grep -oE '[0-9.]+$' || echo "0")
-        if command -v bc &>/dev/null; then
-            if [[ "$(echo "$coverage < $coverage_min" | bc -l 2>/dev/null || echo 1)" == "1" ]]; then
-                warn "Coverage ${coverage}% below minimum ${coverage_min}%"
-                return 1
-            fi
+        if awk -v cov="$coverage" -v min="$coverage_min" 'BEGIN{exit !(cov < min)}' 2>/dev/null; then
+            warn "Coverage ${coverage}% below minimum ${coverage_min}%"
+            return 1
         fi
         info "Coverage: ${coverage}% (min: ${coverage_min}%)"
     fi
@@ -1512,7 +1533,8 @@ Focus on:
 
 Be specific. Reference exact file paths and line numbers. Only flag genuine issues.
 
-$(cat "$diff_file")" > "$review_file" 2>/dev/null || true
+$(cat "$diff_file")" > "$review_file" 2>"${ARTIFACTS_DIR}/.claude-tokens-review.log" || true
+    parse_claude_tokens "${ARTIFACTS_DIR}/.claude-tokens-review.log"
 
     if [[ ! -s "$review_file" ]]; then
         warn "Review produced no output"
@@ -1713,6 +1735,79 @@ Pipeline duration so far: ${total_dur:-unknown}"
     log_stage "pr" "PR created: $pr_url (${reviewers:+reviewers: $reviewers})"
 }
 
+stage_merge() {
+    CURRENT_STAGE_ID="merge"
+
+    if [[ "$NO_GITHUB" == "true" ]]; then
+        info "Merge stage skipped (--no-github)"
+        return 0
+    fi
+
+    local merge_method wait_ci_timeout auto_delete_branch
+    merge_method=$(jq -r --arg id "merge" '(.stages[] | select(.id == $id) | .config.merge_method) // "squash"' "$PIPELINE_CONFIG" 2>/dev/null) || true
+    [[ -z "$merge_method" || "$merge_method" == "null" ]] && merge_method="squash"
+    wait_ci_timeout=$(jq -r --arg id "merge" '(.stages[] | select(.id == $id) | .config.wait_ci_timeout_s) // 600' "$PIPELINE_CONFIG" 2>/dev/null) || true
+    [[ -z "$wait_ci_timeout" || "$wait_ci_timeout" == "null" ]] && wait_ci_timeout=600
+    auto_delete_branch=$(jq -r --arg id "merge" '(.stages[] | select(.id == $id) | .config.auto_delete_branch) // "true"' "$PIPELINE_CONFIG" 2>/dev/null) || true
+    [[ -z "$auto_delete_branch" || "$auto_delete_branch" == "null" ]] && auto_delete_branch="true"
+
+    # Find PR for current branch
+    local pr_number
+    pr_number=$(gh pr list --head "$GIT_BRANCH" --json number --jq '.[0].number' 2>/dev/null || echo "")
+
+    if [[ -z "$pr_number" ]]; then
+        warn "No PR found for branch $GIT_BRANCH — skipping merge"
+        return 0
+    fi
+
+    info "Found PR #${pr_number} for branch ${GIT_BRANCH}"
+
+    # Wait for CI checks to pass
+    info "Waiting for CI checks (timeout: ${wait_ci_timeout}s)..."
+    local elapsed=0
+    local check_interval=15
+
+    while [[ "$elapsed" -lt "$wait_ci_timeout" ]]; do
+        local check_status
+        check_status=$(gh pr checks "$pr_number" --json 'bucket,name' --jq '[.[] | .bucket] | unique | sort' 2>/dev/null || echo '["pending"]')
+
+        # If all checks passed (only "pass" in buckets)
+        if echo "$check_status" | jq -e '. == ["pass"]' &>/dev/null; then
+            success "All CI checks passed"
+            break
+        fi
+
+        # If any check failed
+        if echo "$check_status" | jq -e 'any(. == "fail")' &>/dev/null; then
+            error "CI checks failed — aborting merge"
+            return 1
+        fi
+
+        sleep "$check_interval"
+        elapsed=$((elapsed + check_interval))
+    done
+
+    if [[ "$elapsed" -ge "$wait_ci_timeout" ]]; then
+        warn "CI check timeout (${wait_ci_timeout}s) — proceeding with merge anyway"
+    fi
+
+    # Merge the PR
+    info "Merging PR #${pr_number} (method: ${merge_method})..."
+    local merge_args=("pr" "merge" "$pr_number" "--${merge_method}")
+    if [[ "$auto_delete_branch" == "true" ]]; then
+        merge_args+=("--delete-branch")
+    fi
+
+    if gh "${merge_args[@]}" 2>/dev/null; then
+        success "PR #${pr_number} merged successfully"
+    else
+        error "Failed to merge PR #${pr_number}"
+        return 1
+    fi
+
+    log_stage "merge" "PR #${pr_number} merged (method: ${merge_method})"
+}
+
 stage_deploy() {
     CURRENT_STAGE_ID="deploy"
     local staging_cmd
@@ -1896,7 +1991,8 @@ Diff:
 $diff_content"
 
     local review_output
-    review_output=$(claude --print "$prompt" 2>/dev/null || true)
+    review_output=$(claude --print "$prompt" 2>"${ARTIFACTS_DIR}/.claude-tokens-adversarial.log" || true)
+    parse_claude_tokens "${ARTIFACTS_DIR}/.claude-tokens-adversarial.log"
 
     echo "$review_output" > "$ARTIFACTS_DIR/adversarial-review.md"
 
@@ -1956,7 +2052,8 @@ Files changed: $changed_files
 $file_contents"
 
     local review_output
-    review_output=$(claude --print "$prompt" 2>/dev/null || true)
+    review_output=$(claude --print "$prompt" 2>"${ARTIFACTS_DIR}/.claude-tokens-negative.log" || true)
+    parse_claude_tokens "${ARTIFACTS_DIR}/.claude-tokens-negative.log"
 
     echo "$review_output" > "$ARTIFACTS_DIR/negative-review.md"
 
@@ -2193,7 +2290,8 @@ stage_compound_quality() {
             "issue=${ISSUE_NUMBER:-0}" \
             "cycle=$cycle" \
             "max_cycles=$max_cycles" \
-            "passed=$all_passed"
+            "passed=$all_passed" \
+            "self_heal_count=$SELF_HEAL_COUNT"
 
         if $all_passed; then
             success "Compound quality passed on cycle ${cycle}"
@@ -2278,6 +2376,7 @@ self_healing_build_test() {
         cycle=$((cycle + 1))
 
         if [[ "$cycle" -gt 1 ]]; then
+            SELF_HEAL_COUNT=$((SELF_HEAL_COUNT + 1))
             echo ""
             echo -e "${YELLOW}${BOLD}━━━ Self-Healing Cycle ${cycle}/$((max_cycles + 1)) ━━━${RESET}"
             info "Feeding test failure back to build loop..."
@@ -2659,15 +2758,34 @@ pipeline_start() {
             "issue=${ISSUE_NUMBER:-0}" \
             "result=success" \
             "duration_s=${total_dur_s:-0}" \
-            "pr_url=${pr_url:-}"
+            "pr_url=${pr_url:-}" \
+            "input_tokens=$TOTAL_INPUT_TOKENS" \
+            "output_tokens=$TOTAL_OUTPUT_TOKENS" \
+            "self_heal_count=$SELF_HEAL_COUNT"
     else
         notify "Pipeline Failed" "Goal: ${GOAL}\nFailed at: ${CURRENT_STAGE_ID:-unknown}" "error"
         emit_event "pipeline.completed" \
             "issue=${ISSUE_NUMBER:-0}" \
             "result=failure" \
             "duration_s=${total_dur_s:-0}" \
-            "failed_stage=${CURRENT_STAGE_ID:-unknown}"
+            "failed_stage=${CURRENT_STAGE_ID:-unknown}" \
+            "input_tokens=$TOTAL_INPUT_TOKENS" \
+            "output_tokens=$TOTAL_OUTPUT_TOKENS" \
+            "self_heal_count=$SELF_HEAL_COUNT"
     fi
+
+    # Emit cost event
+    local model_key="${MODEL:-sonnet}"
+    local input_cost output_cost total_cost
+    input_cost=$(awk -v tokens="$TOTAL_INPUT_TOKENS" -v rate="$(echo "$COST_MODEL_RATES" | jq -r ".${model_key}.input // 3")" 'BEGIN{printf "%.4f", (tokens / 1000000) * rate}')
+    output_cost=$(awk -v tokens="$TOTAL_OUTPUT_TOKENS" -v rate="$(echo "$COST_MODEL_RATES" | jq -r ".${model_key}.output // 15")" 'BEGIN{printf "%.4f", (tokens / 1000000) * rate}')
+    total_cost=$(awk -v i="$input_cost" -v o="$output_cost" 'BEGIN{printf "%.4f", i + o}')
+
+    emit_event "pipeline.cost" \
+        "input_tokens=$TOTAL_INPUT_TOKENS" \
+        "output_tokens=$TOTAL_OUTPUT_TOKENS" \
+        "model=$model_key" \
+        "estimated_cost_usd=$total_cost"
 
     return $exit_code
 }

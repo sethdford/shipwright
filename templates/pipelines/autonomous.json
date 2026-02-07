@@ -31,6 +31,16 @@
     },
     { "id": "pr", "enabled": true, "gate": "auto", "config": { "wait_ci": false } },
     {
+      "id": "merge",
+      "enabled": true,
+      "gate": "auto",
+      "config": {
+        "merge_method": "squash",
+        "wait_ci_timeout_s": 600,
+        "auto_delete_branch": true
+      }
+    },
+    {
       "id": "deploy",
       "enabled": false,
       "gate": "approve",

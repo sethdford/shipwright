@@ -1,0 +1,123 @@
+---
+title: Continuous Loop
+description: Run Claude Code autonomously in a loop until a goal is achieved, with self-audit, audit agents, and quality gates.
+---
+
+import { Tabs, TabItem } from '@astrojs/starlight/components';
+
+The continuous loop (`cct loop`) runs Claude Code autonomously, iterating until a goal is achieved. Each iteration, the agent works toward the goal, optionally runs quality checks, and decides whether to continue or declare completion.
+
+## Quick Start
+
+```bash
+# Basic loop with test verification
+cct loop "Build user authentication with JWT" --test-cmd "npm test"
+
+# Multi-agent with audit and quality gates
+cct loop "Refactor the API layer" --agents 3 --audit --quality-gates
+
+# With a definition of done
+cct loop "Build checkout flow" --definition-of-done requirements.md
+
+# Resume an interrupted loop
+cct loop --resume
+```
+
+## Audit Modes
+
+The loop supports three audit modes that can be combined for different levels of rigor.
+
+### Self-Audit (`--audit`)
+
+The agent pauses after each iteration to review its own work before deciding whether to continue.
+
+- **Cost:** Minimal — ~30 seconds per iteration
+- **Best for:** Solo agent work where you want a sanity check
+
+```bash
+cct loop "Fix the N+1 query in user list" --audit --test-cmd "npm test"
+```
+
+### Audit Agent (`--audit-agent`)
+
+Spawns a dedicated auditor that reviews the work agent's output each iteration. The auditor can reject completion and send specific feedback.
+
+- **Cost:** ~2x API cost (two agents per iteration)
+- **Best for:** Production code, complex features
+
+```bash
+cct loop "Refactor auth to use refresh tokens" --audit-agent
+```
+
+### Quality Gates (`--quality-gates`)
+
+Runs your test command between iterations. The loop only advances if gates pass.
+
+- **Cost:** Wall-clock time only, no extra API cost
+- **Best for:** Projects with existing CI checks
+
+```bash
+cct loop "Add pagination to API" --quality-gates --test-cmd "npm test && npm run lint"
+```
+
+### Maximum Rigor
+
+Combine all three for the most thorough workflow:
+
+```bash
+cct loop "Build payment integration" \
+  --audit-agent \
+  --quality-gates \
+  --test-cmd "npm test" \
+  --definition-of-done dod.md
+```
+
+## Definition of Done
+
+A DoD file is a markdown checklist that the agent must verify before declaring completion. This is the most effective way to prevent premature completion.
+
+```markdown
+# Definition of Done — Payment Integration
+
+- [ ] Stripe webhook handler processes charge.succeeded and charge.failed
+- [ ] Idempotency keys prevent duplicate charges
+- [ ] Unit tests cover success, failure, and duplicate scenarios
+- [ ] Integration test hits Stripe test mode
+- [ ] All amounts stored as cents (integer), never floats
+- [ ] No Stripe secret keys in source code
+- [ ] Error responses follow existing API error format
+```
+
+**Tips for effective DoD files:**
+- Be specific — "Tests pass" is weak; "Unit tests cover the 3 API endpoints" is strong
+- Include negative checks — "No hardcoded API keys", "No TODO markers"
+- Keep it short — 8-15 items; more and the agent loses focus
+- Order by importance — critical items first
+
+## Flags
+
+| Flag | Description |
+|------|-------------|
+| `--test-cmd <cmd>` | Command to run for test verification |
+| `--audit` | Enable self-reflection after each iteration |
+| `--audit-agent` | Spawn a dedicated auditor agent |
+| `--quality-gates` | Run test command as a gate between iterations |
+| `--definition-of-done <file>` | Markdown checklist for completion criteria |
+| `--agents <n>` | Number of agents (default: 1) |
+| `--max-iterations <n>` | Safety limit on loop iterations |
+| `--resume` | Resume an interrupted loop |
+| `--model <model>` | Claude model to use |
+
+## Preventing Premature Completion
+
+The most common failure mode is the agent declaring victory too early.
+
+| Technique | How It Helps |
+|-----------|-------------|
+| `--audit` | Agent re-reads its output and catches obvious gaps |
+| `--audit-agent` | Second opinion catches blind spots |
+| `--definition-of-done` | Explicit checklist the agent must verify |
+| `--quality-gates` | Hard gate — tests must pass or loop continues |
+| `--max-iterations` | Safety net against infinite loops |
+
+**Tip:** If the agent still completes too early, make the goal more specific. "Build auth" is vague. "Build JWT auth with login, signup, password reset, and refresh token rotation" gives a clear finish line.

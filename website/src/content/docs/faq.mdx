@@ -1,0 +1,98 @@
+---
+title: FAQ
+description: Frequently asked questions about Shipwright.
+---
+
+## General
+
+### What is Shipwright?
+
+Shipwright is a CLI tool that orchestrates Claude Code agent teams in tmux. It provides a premium dark theme, team session management, autonomous development loops, delivery pipelines, and DORA metrics — everything you need to run multi-agent AI development effectively.
+
+### What does Shipwright do that Claude Code doesn't?
+
+Claude Code has built-in agent teams support, but Shipwright adds the infrastructure around it:
+
+- **Team templates** — 12 pre-built compositions for common SDLC tasks
+- **Quality gate hooks** — block agents until code passes checks
+- **Delivery pipeline** — full issue-to-PR automation with self-healing builds
+- **Autonomous daemon** — background issue processing with DORA metrics
+- **Repo preparation** — auto-generate configs for any project
+- **tmux theme** — premium dark theme with agent-aware pane borders
+
+### Is Shipwright free?
+
+Yes. Shipwright is open source under the MIT license. You need your own Anthropic API key (or Claude Code subscription) to use Claude Code itself.
+
+### Do I need tmux?
+
+Yes. Shipwright uses tmux to give each agent its own terminal pane. This is what makes it possible to watch multiple agents working simultaneously. tmux 3.2+ is required.
+
+```bash
+brew install tmux    # macOS
+sudo apt install tmux  # Linux
+```
+
+## Claude Code
+
+### What Claude models work with Shipwright?
+
+Any model supported by Claude Code. The agent teams feature works with all Claude models. Recommended setup:
+
+- **Team lead + workers:** Sonnet (good balance of speed and quality)
+- **Subagent lookups:** Haiku (fast and cheap for file searches)
+- **Architecture decisions:** Opus (best reasoning)
+
+### How many agents can I run?
+
+The practical limit is **2-3 agents per team**. More than that increases the risk of tmux race conditions and creates coordination overhead that exceeds the parallel benefit.
+
+### Does it work with Claude Code in VS Code?
+
+Not for the split-pane experience. VS Code's integrated terminal doesn't support the tmux integration needed for agent pane spawning. However, you can run tmux in an external terminal (iTerm2, Alacritty, etc.) while keeping VS Code open for editing.
+
+### How much does it cost to run agent teams?
+
+Cost depends on your Claude Code plan and usage. Each agent in a team uses its own context window. Tips to control costs:
+
+- Use `CLAUDE_CODE_SUBAGENT_MODEL=haiku` for subagent lookups
+- Set `CLAUDE_CODE_AUTOCOMPACT_PCT_OVERRIDE=70` for aggressive context management
+- Keep teams small (2-3 agents)
+- Keep tasks focused (5-6 per agent)
+
+## Pipeline & Daemon
+
+### What's the difference between `cct loop` and `cct pipeline`?
+
+- **`cct loop`** — Runs Claude Code in a loop for a single goal. Ideal for focused tasks like "build this feature" or "fix this bug."
+- **`cct pipeline`** — Chains the full SDLC (intake → plan → build → test → review → PR). The build stage actually uses `cct loop` internally. Use pipeline for end-to-end automation.
+
+### Can the daemon create PRs automatically?
+
+Yes. When the daemon spawns a pipeline for a GitHub issue, the pipeline can run through to PR creation fully autonomously (depending on the pipeline template and gate settings). The `autonomous` template has all gates set to auto-approve.
+
+### Does the pipeline work without GitHub?
+
+Yes, but with reduced functionality. Without GitHub:
+
+- Use `--goal` instead of `--issue`
+- No auto-assignment or progress comments
+- PR creation step is skipped (or creates a local branch)
+
+## Configuration
+
+### How do I customize the tmux theme?
+
+Edit the hex color values in `tmux/tmux.conf` and reload with `prefix + r`. The main colors to change:
+
+- `#1a1a2e` — background
+- `#e4e4e7` — foreground
+- `#00d4ff` — accent (active borders, highlights)
+
+### Can I use my own tmux config?
+
+Yes. The installer can add Shipwright's config as a source overlay rather than replacing your existing config. The overlay (`claude-teams-overlay.conf`) only adds agent-aware pane styling, color hooks, and team keybindings.
+
+### How do I add custom hooks?
+
+Create a shell script in `~/.claude/hooks/` and wire it up in `~/.claude/settings.json`. See the [Configuration reference](/reference/configuration/) for examples.

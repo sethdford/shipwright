@@ -1,0 +1,100 @@
+/* Shipwright brand overrides for Starlight */
+
+:root {
+  --sl-color-accent-low: #002c36;
+  --sl-color-accent: #00d4ff;
+  --sl-color-accent-high: #8ae8ff;
+  --sl-color-white: #e4e4e7;
+  --sl-color-gray-1: #c8c8cd;
+  --sl-color-gray-2: #a1a1aa;
+  --sl-color-gray-3: #71717a;
+  --sl-color-gray-4: #52525b;
+  --sl-color-gray-5: #333355;
+  --sl-color-gray-6: #1a1a2e;
+  --sl-color-black: #0a0a0f;
+}
+
+[data-theme='light'] {
+  --sl-color-accent-low: #d0f4ff;
+  --sl-color-accent: #0098b8;
+  --sl-color-accent-high: #003d4a;
+  --sl-color-white: #111122;
+  --sl-color-gray-1: #333355;
+  --sl-color-gray-2: #52525b;
+  --sl-color-gray-3: #71717a;
+  --sl-color-gray-4: #a1a1aa;
+  --sl-color-gray-5: #c8c8cd;
+  --sl-color-gray-6: #f4f4f5;
+  --sl-color-black: #ffffff;
+}
+
+/* Hero section enhancements */
+.hero-section {
+  text-align: center;
+  padding: 4rem 1rem 3rem;
+}
+
+.hero-title {
+  font-size: 3rem;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  line-height: 1.1;
+  background: linear-gradient(135deg, #00d4ff 0%, #7c3aed 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  margin-bottom: 1rem;
+}
+
+.hero-subtitle {
+  font-size: 1.25rem;
+  color: var(--sl-color-gray-2);
+  max-width: 36rem;
+  margin: 0 auto 2rem;
+}
+
+/* Feature cards grid */
+.feature-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 1.5rem;
+  margin: 2rem 0;
+}
+
+.feature-card {
+  background: var(--sl-color-gray-6);
+  border: 1px solid var(--sl-color-gray-5);
+  border-radius: 0.75rem;
+  padding: 1.5rem;
+  transition: border-color 0.2s;
+}
+
+.feature-card:hover {
+  border-color: var(--sl-color-accent);
+}
+
+.feature-card h3 {
+  margin-top: 0;
+  color: var(--sl-color-white);
+  font-size: 1.1rem;
+}
+
+.feature-card p {
+  color: var(--sl-color-gray-2);
+  font-size: 0.9rem;
+  margin-bottom: 0;
+}
+
+/* Install section */
+.install-section {
+  background: var(--sl-color-gray-6);
+  border: 1px solid var(--sl-color-gray-5);
+  border-radius: 0.75rem;
+  padding: 2rem;
+  margin: 2rem 0;
+}
+
+/* Make Starlight default to dark */
+:root {
+  color-scheme: dark;
+}

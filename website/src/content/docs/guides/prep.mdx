@@ -1,0 +1,72 @@
+---
+title: Repo Preparation
+description: Prepare any repository for Claude Code agent teams with auto-generated configs, CLAUDE.md, and hooks.
+---
+
+The prep command (`cct prep`) analyzes your repository and generates the configuration files needed for effective agent team development. It creates `.claude/` configs, a `CLAUDE.md` file, and quality gate hooks tailored to your project.
+
+## Quick Start
+
+```bash
+# Analyze and prepare the current repo
+cct prep
+
+# Preview what would be generated (dry run)
+cct prep --dry-run
+
+# Prepare a specific directory
+cct prep --path /path/to/project
+```
+
+## What It Generates
+
+### `.claude/` Directory
+
+| File | Purpose |
+|------|---------|
+| `settings.json` | Claude Code settings with agent teams enabled, hooks wired, and sensible defaults |
+| `CLAUDE.md` | Project-specific instructions for Claude — conventions, architecture, key files |
+| `hooks/teammate-idle.sh` | Quality gate: typecheck before agents go idle |
+| `hooks/task-completed.sh` | Quality gate: lint + test before task completion |
+| `hooks/notify-idle.sh` | Desktop notifications when agents need attention |
+
+### `CLAUDE.md` Content
+
+The generated `CLAUDE.md` includes:
+
+- **Project structure** — directory layout, entry points, build system
+- **Conventions** — coding standards, naming patterns, import style
+- **Key files** — the most important files agents should know about
+- **Test commands** — how to run tests, lint, typecheck
+- **Architecture notes** — high-level system organization
+
+## How Analysis Works
+
+Prep scans your repository to detect:
+
+- **Language and framework** — TypeScript, Python, Go, Rust, Java, etc.
+- **Package manager** — npm, pnpm, yarn, pip, cargo, go modules
+- **Test framework** — Jest, Vitest, pytest, go test, cargo test
+- **Linter** — ESLint, Ruff, golangci-lint
+- **Build system** — Webpack, Vite, esbuild, Make
+- **CI/CD** — GitHub Actions, Jenkins, GitLab CI
+
+The generated configuration adapts to what it finds. A TypeScript/React project gets different hooks and CLAUDE.md content than a Python/FastAPI project.
+
+## Customization
+
+After running `cct prep`, review and customize the generated files:
+
+1. **Edit `.claude/CLAUDE.md`** — Add project-specific context that automated analysis might miss (domain terminology, architectural decisions, team conventions)
+2. **Tune hook scripts** — Adjust quality gate thresholds or add project-specific checks
+3. **Update `settings.json`** — Configure model preferences, auto-compact thresholds, and enabled plugins
+
+## Flags
+
+| Flag | Description |
+|------|-------------|
+| `--dry-run` | Show what would be generated without writing files |
+| `--path <dir>` | Target directory (default: current directory) |
+| `--force` | Overwrite existing configuration files |
+| `--no-hooks` | Skip hook generation |
+| `--no-claude-md` | Skip CLAUDE.md generation |

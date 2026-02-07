@@ -1,0 +1,111 @@
+---
+title: Troubleshooting
+description: Known issues and solutions for common Shipwright problems.
+---
+
+## Quick Fixes
+
+| Problem | Cause | Fix |
+|---------|-------|-----|
+| Agents spawn in-process instead of tmux panes | Not inside a tmux session | Start tmux first: `tmux new -s dev` |
+| Garbled pane output with 4+ agents | tmux `send-keys` race condition | Use `cct session` (uses `new-window` instead of `split-window`) |
+| Agents fall back to in-process mode | tmux not detected | Run inside a real tmux session (`echo $TMUX` should show a path) |
+| Context window overflow | Too many tasks per agent | Keep tasks focused (5-6 per agent) |
+| Panes don't show agent names | Pane titles not set | Use `cct session` which sets titles automatically |
+| White/bright pane backgrounds | New panes not inheriting theme | Run `cct init` or `cct upgrade --apply` |
+
+## tmux `send-keys` Race Condition
+
+**Severity:** Medium — affects sessions with 4+ agents
+
+When Claude Code spawns 4+ agent panes simultaneously using `split-window` + `send-keys`, tmux can deliver keystrokes to the wrong pane. This happens because tmux processes these operations asynchronously.
+
+**Symptoms:**
+- Agent commands appear in the wrong pane
+- Panes start with garbled or partial commands
+- Some panes sit empty while others received duplicate input
+
+**Fix:** The `cct` CLI uses `new-window` instead of `split-window` for spawning, which avoids the race. If spawning panes manually, add a small delay:
+
+```bash
+tmux split-window -t "$session" -h
+sleep 0.1
+tmux send-keys -t "$session" "claude" Enter
+```
+
+## Silent Fallback to In-Process Mode
+
+**Severity:** Low — agents work but without separate panes
+
+Agent teams can silently fall back to in-process mode if tmux isn't detected properly.
+
+**Verify tmux is active:**
+
+```bash
+echo $TMUX          # Should show the tmux socket path
+tmux list-panes     # Should show multiple panes if agents are running
+```
+
+**Fix:** Make sure you're inside a real tmux session (not nested) and launch Claude from within it.
+
+## Terminal Compatibility
+
+Split-pane agent teams require a terminal emulator with proper tmux support.
+
+| Terminal | Status |
+|----------|--------|
+| **iTerm2** (macOS) | Supported (recommended) |
+| **Alacritty** | Supported |
+| **Kitty** | Supported |
+| **WezTerm** | Supported |
+| **macOS Terminal.app** | Supported |
+| VS Code terminal | **Not supported** |
+| Ghostty | **Not supported** |
+
+:::tip
+You can run tmux in an external terminal while keeping VS Code open for editing. Claude Code doesn't need to run inside VS Code.
+:::
+
+## Context Window Pressure
+
+With 3+ agents running complex tasks, individual agents can hit context limits faster than expected.
+
+**Mitigations:**
+
+1. **Limit teams to 2-3 agents** — more agents means more coordination overhead
+2. **Keep tasks focused** — 5-6 specific tasks per agent
+3. **Set aggressive auto-compact** — `CLAUDE_CODE_AUTOCOMPACT_PCT_OVERRIDE=70`
+4. **Use haiku for subagent lookups** — `CLAUDE_CODE_SUBAGENT_MODEL=haiku`
+5. **Assign different files** to each agent
+
+## Orphaned Panes After Shutdown
+
+When teammates shut down, the Claude process exits but the tmux pane remains open.
+
+**Fix:** Use the pane reaper:
+
+```bash
+cct reaper              # One-shot cleanup
+cct reaper --watch      # Background auto-cleanup every 5s
+cct reaper --dry-run    # Preview what would be reaped
+```
+
+Or press `prefix + R` for a quick cleanup.
+
+## TPM Plugins Not Loading
+
+After installation, tmux plugins don't load until TPM is initialized.
+
+**Fix:** Press `prefix + I` (capital I) after starting tmux. This only needs to be done once.
+
+If TPM isn't installed:
+
+```bash
+git clone https://github.com/tmux-plugins/tpm ~/.tmux/plugins/tpm
+```
+
+## Getting Help
+
+- Run `cct doctor` to diagnose common setup issues
+- Check the [FAQ](/faq/) for common questions
+- [Open an issue](https://github.com/sethdford/shipwright/issues) on GitHub
