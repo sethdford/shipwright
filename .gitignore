@@ -4,3 +4,9 @@
 *~
 firebase-debug.log
 .worktrees/
+
+# Generated demo GIFs (hosted on vhs.charm.sh)
+demo/*.gif
+
+# Upgrade backups
+*.pre-upgrade.bak
