@@ -1,25 +1,33 @@
 <!-- LinkedIn Post — copy-paste ready -->
 
-**I got tired of watching Claude Code agents stomp on each other's files, so I built a tmux setup to fix it.**
+**I gave Claude Code a team of AI agents and a tmux session. Things got interesting.**
 
-Here's what kept happening: I'd tell Claude Code to spin up a team — backend agent, frontend agent, test agent — and they'd all cram into one terminal. No visibility into who's doing what. Agents editing the same files. Context windows blowing up because I gave one agent too many tasks.
+Picture this: three AI agents working in parallel — one building an API, one wiring up the UI, one writing tests — each in their own tmux pane, all visible on one screen. You can literally watch them think.
 
-So I started building a tmux wrapper around it. Split panes so I can see each agent working. Templates so I don't have to explain the team composition every time. Quality gates so agents can't say "I'm done" when there are TypeScript errors.
+That's what Claude Code agent teams look like when you give them proper tooling.
 
-It's called `cct` (Claude Code Teams) and I just open-sourced it.
+I open-sourced the setup I've been refining: `cct` (Claude Code Teams). It's a CLI + tmux config that turns multi-agent AI development from chaotic to organized.
 
-The thing I use the most is `cct loop`:
+The highlight reel:
+
+🔁 `cct loop` — Give it a goal, a test command, and walk away. It runs Claude in a build-test-review loop until everything passes. Autonomous coding that actually verifies its own work.
+
+📋 12 team templates — Feature dev, bug fixes, security audits, migrations, code review, architecture planning. Each template assigns agents to separate files so they don't step on each other.
+
+🚦 Quality gates — Agents can't mark work as "done" until typecheck, lint, and tests pass. No more "it works on my machine" from your AI teammates.
+
+📐 Layout presets — Leader pane gets 65% of the screen. Because the agent running the show deserves the biggest monitor.
+
+My favorite workflow so far:
 
     cct loop "Build user auth with JWT" --test-cmd "npm test" --audit
 
-It runs Claude in a loop — build, test, self-review, repeat — until the tests pass. I've walked away from my desk and come back to working features. Not always, but often enough that it changed how I work.
+Walk away. Get coffee. Come back to a working feature with passing tests. (Okay, sometimes you come back to a very confident agent that's still arguing with TypeScript. But that's part of the fun.)
 
-There are 12 team templates covering most of what I do day to day — feature dev, bug fixes, security audits, migrations, code review, testing, architecture planning. Each one assigns agents to different files so they don't conflict.
+Pure bash + jq. No heavy dependencies.
 
-The whole thing is bash + jq. No Python, no frameworks, nothing fancy.
+Check it out → https://github.com/sethdford/claude-code-teams-tmux
 
-If you're running Claude Code agent teams and fighting the same problems I was, check it out: https://github.com/sethdford/claude-code-teams-tmux
+What's your multi-agent AI workflow look like? Drop your setup in the comments — I'm always looking for new patterns to steal. 😄
 
-What's working (and not working) for you with multi-agent AI dev? Genuinely curious.
-
-#ClaudeCode #AIEngineering #DeveloperTools #OpenSource
+#ClaudeCode #AIEngineering #DeveloperTools #OpenSource #Anthropic
