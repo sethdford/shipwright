@@ -1,0 +1,120 @@
+{
+  // ═══════════════════════════════════════════════════════════════════════
+  // Claude Code Settings — Agent Teams + tmux Configuration
+  // ═══════════════════════════════════════════════════════════════════════
+  //
+  // Copy this to ~/.claude/settings.json and customize for your project.
+  //
+  // NOTE: Standard JSON does not support comments. This file uses JSONC
+  // (JSON with Comments) syntax for documentation purposes. Before using
+  // as your actual settings.json, either:
+  //   1. Use an editor that supports JSONC (VS Code, Zed, etc.)
+  //   2. Strip comments: sed '/^\s*\/\//d' settings.json.template > settings.json
+  //
+  // Docs: https://docs.anthropic.com/en/docs/claude-code/settings
+
+  // ─── Teammate Mode ────────────────────────────────────────────────────
+  // Agent teams auto-detect tmux: when you launch Claude Code inside a
+  // tmux session, teammates automatically get their own split panes.
+  // No explicit setting needed — just run inside tmux!
+  //
+  // TIP: Use `new-window` (not `split-window`) when spawning 4+ agents
+  // to avoid the tmux send-keys race condition. See KNOWN-ISSUES.md.
+
+  // ─── Hooks ─────────────────────────────────────────────────────────────
+  // Shell commands that run on lifecycle events (teammate idle, task done, etc.).
+  // See claude-code/hooks/ for quality gate examples you can wire in here.
+  //
+  // Example — run typecheck when a teammate goes idle:
+  //   "hooks": {
+  //     "teammate-idle": {
+  //       "command": "~/.claude/hooks/teammate-idle.sh",
+  //       "timeout": 30000
+  //     },
+  //     "task-completed": {
+  //       "command": "~/.claude/hooks/task-completed.sh",
+  //       "timeout": 60000
+  //     }
+  //   }
+  "hooks": {},
+
+  // ─── Status Line ──────────────────────────────────────────────────────
+  // Custom status line shown at the bottom of Claude Code.
+  //   "type": "command" — runs a shell script and displays its stdout
+  //   "type": "static"  — shows fixed text
+  //
+  // Uncomment to enable:
+  // "statusLine": {
+  //   "type": "command",
+  //   "command": "echo \"$(git branch --show-current) | $(date +%H:%M)\""
+  // },
+
+  // ─── Plugins ──────────────────────────────────────────────────────────
+  // Enable/disable official and community plugins.
+  // Browse available plugins: claude plugins list
+  "enabledPlugins": {
+    // Code quality & review
+    "typescript-lsp@claude-plugins-official": true,
+    "feature-dev@claude-plugins-official": true,
+    "code-review@claude-plugins-official": true,
+    "pr-review-toolkit@claude-plugins-official": true,
+    "commit-commands@claude-plugins-official": true,
+
+    // Integrations — enable the ones you use
+    "github@claude-plugins-official": true,
+    "linear@claude-plugins-official": false,
+    "firebase@claude-plugins-official": false,
+    "slack@claude-plugins-official": false,
+
+    // Documentation & context
+    "context7@claude-plugins-official": true,
+    "frontend-design@claude-plugins-official": false,
+
+    // Workflow & output styles
+    "hookify@claude-plugins-official": true,
+    "learning-output-style@claude-plugins-official": false,
+    "explanatory-output-style@claude-plugins-official": false
+  },
+
+  // ─── Extended Thinking ────────────────────────────────────────────────
+  // When true, Claude thinks through complex problems step-by-step.
+  // Recommended for agent teams doing multi-file coordinated work.
+  "alwaysThinkingEnabled": true,
+
+  // ─── Environment Variables ────────────────────────────────────────────
+  // These env vars configure Claude Code's runtime behavior.
+  "env": {
+    // REQUIRED: Enable agent teams feature
+    "CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS": "1",
+
+    // Performance: max concurrent tool calls per agent (default: 3)
+    // Higher = faster parallel work, but more API usage
+    "CLAUDE_CODE_MAX_TOOL_USE_CONCURRENCY": "5",
+
+    // Auto-compact conversation when context usage hits this % (default: 80)
+    // Lower = more aggressive compaction, less risk of hitting limits
+    "CLAUDE_CODE_AUTOCOMPACT_PCT_OVERRIDE": "70",
+
+    // Use haiku for subagent tasks (cheaper + faster for simple lookups)
+    // Remove to use the same model as the parent agent
+    "CLAUDE_CODE_SUBAGENT_MODEL": "haiku",
+
+    // Include hidden files (dotfiles) in glob searches
+    "CLAUDE_CODE_GLOB_HIDDEN": "1",
+
+    // Keep bash working directory consistent across tool calls
+    "CLAUDE_CODE_BASH_MAINTAIN_PROJECT_WORKING_DIR": "1",
+
+    // Show tool use summaries in output (helpful for debugging agent behavior)
+    "CLAUDE_CODE_EMIT_TOOL_USE_SUMMARIES": "1",
+
+    // Show teammate names in messages (makes multi-agent output readable)
+    "CLAUDE_CODE_TST_NAMES_IN_MESSAGES": "1",
+
+    // Flush output eagerly (better for streaming, reduces perceived latency)
+    "CLAUDE_CODE_EAGER_FLUSH": "1",
+
+    // Enable prompt suggestions after idle
+    "CLAUDE_CODE_ENABLE_PROMPT_SUGGESTION": "1"
+  }
+}

@@ -1,0 +1,113 @@
+#!/usr/bin/env bash
+# ╔═══════════════════════════════════════════════════════════════════════════╗
+# ║  cct — Claude Code Teams CLI                                            ║
+# ║  Manage agent team sessions in tmux                                     ║
+# ╚═══════════════════════════════════════════════════════════════════════════╝
+set -euo pipefail
+
+VERSION="1.0.0"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
+# ─── Colors (matches Seth's tmux theme) ─────────────────────────────────────
+CYAN='\033[38;2;0;212;255m'     # #00d4ff — primary accent
+PURPLE='\033[38;2;124;58;237m'  # #7c3aed — secondary
+BLUE='\033[38;2;0;102;255m'     # #0066ff — tertiary
+GREEN='\033[38;2;74;222;128m'   # success
+YELLOW='\033[38;2;250;204;21m'  # warning
+RED='\033[38;2;248;113;113m'    # error
+DIM='\033[2m'
+BOLD='\033[1m'
+RESET='\033[0m'
+
+# ─── Helpers ─────────────────────────────────────────────────────────────────
+
+info()    { echo -e "${CYAN}${BOLD}▸${RESET} $*"; }
+success() { echo -e "${GREEN}${BOLD}✓${RESET} $*"; }
+warn()    { echo -e "${YELLOW}${BOLD}⚠${RESET} $*"; }
+error()   { echo -e "${RED}${BOLD}✗${RESET} $*" >&2; }
+
+check_tmux() {
+    if ! command -v tmux &>/dev/null; then
+        error "tmux is not installed. Install it first:"
+        echo -e "  ${DIM}brew install tmux${RESET}  (macOS)"
+        echo -e "  ${DIM}sudo apt install tmux${RESET}  (Ubuntu/Debian)"
+        exit 1
+    fi
+}
+
+check_in_tmux() {
+    if [[ -z "${TMUX:-}" ]]; then
+        warn "Not inside a tmux session."
+        echo -e "  Start one with: ${DIM}tmux new -s work${RESET}"
+        echo -e "  Or attach:      ${DIM}tmux attach${RESET}"
+        exit 1
+    fi
+}
+
+show_version() {
+    echo -e "${CYAN}${BOLD}cct${RESET} ${DIM}v${VERSION}${RESET} — Claude Code Teams CLI"
+}
+
+show_help() {
+    show_version
+    echo ""
+    echo -e "${BOLD}USAGE${RESET}"
+    echo -e "  ${CYAN}cct${RESET} <command> [options]"
+    echo ""
+    echo -e "${BOLD}COMMANDS${RESET}"
+    echo -e "  ${CYAN}session${RESET} [name]       Create a new tmux window for a Claude team"
+    echo -e "  ${CYAN}status${RESET}               Show dashboard of running teams and agents"
+    echo -e "  ${CYAN}cleanup${RESET} [--force]     Clean up orphaned team sessions"
+    echo -e "  ${CYAN}help${RESET}                  Show this help message"
+    echo -e "  ${CYAN}version${RESET}               Show version"
+    echo ""
+    echo -e "${BOLD}TMUX KEYBINDINGS${RESET}  ${DIM}(with the bundled tmux.conf)${RESET}"
+    echo -e "  ${PURPLE}prefix + T${RESET}           Launch a team session  (runs ${DIM}cct session${RESET})"
+    echo -e "  ${PURPLE}prefix + Ctrl-t${RESET}      Show team dashboard    (runs ${DIM}cct status${RESET})"
+    echo ""
+    echo -e "${BOLD}EXAMPLES${RESET}"
+    echo -e "  ${DIM}cct session refactor${RESET}      # New window named 'claude-refactor'"
+    echo -e "  ${DIM}cct session${RESET}               # New window with timestamp name"
+    echo -e "  ${DIM}cct status${RESET}                # See all active teams"
+    echo -e "  ${DIM}cct cleanup${RESET}               # Dry-run: show what would be cleaned"
+    echo -e "  ${DIM}cct cleanup --force${RESET}       # Actually kill orphaned sessions"
+    echo ""
+    echo -e "${DIM}Docs: https://github.com/sethford/claude-code-teams-tmux${RESET}"
+}
+
+# ─── Command Router ──────────────────────────────────────────────────────────
+
+main() {
+    local cmd="${1:-help}"
+    shift 2>/dev/null || true
+
+    case "$cmd" in
+        session)
+            check_tmux
+            check_in_tmux
+            exec "$SCRIPT_DIR/cct-session.sh" "$@"
+            ;;
+        status)
+            check_tmux
+            exec "$SCRIPT_DIR/cct-status.sh" "$@"
+            ;;
+        cleanup)
+            check_tmux
+            exec "$SCRIPT_DIR/cct-cleanup.sh" "$@"
+            ;;
+        help|--help|-h)
+            show_help
+            ;;
+        version|--version|-v)
+            show_version
+            ;;
+        *)
+            error "Unknown command: ${cmd}"
+            echo ""
+            show_help
+            exit 1
+            ;;
+    esac
+}
+
+main "$@"
