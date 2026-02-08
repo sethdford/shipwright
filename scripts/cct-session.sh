@@ -32,6 +32,8 @@ error()   { echo -e "${RED}${BOLD}✗${RESET} $*" >&2; }
 TEAM_NAME=""
 TEMPLATE_NAME=""
 TERMINAL_ADAPTER=""
+AUTO_LAUNCH=true
+GOAL=""
 
 while [[ $# -gt 0 ]]; do
     case "$1" in
@@ -45,20 +47,32 @@ while [[ $# -gt 0 ]]; do
             [[ -z "$TERMINAL_ADAPTER" ]] && { error "Missing adapter name after --terminal"; exit 1; }
             shift 2
             ;;
+        --goal|-g)
+            GOAL="${2:-}"
+            [[ -z "$GOAL" ]] && { error "Missing goal after --goal"; exit 1; }
+            shift 2
+            ;;
+        --no-launch)
+            AUTO_LAUNCH=false
+            shift
+            ;;
         --help|-h)
-            echo -e "${CYAN}${BOLD}shipwright session${RESET} — Create a new team session"
+            echo -e "${CYAN}${BOLD}shipwright session${RESET} — Create and launch a team session"
             echo ""
             echo -e "${BOLD}USAGE${RESET}"
-            echo -e "  shipwright session [name] [--template <name>] [--terminal <adapter>]"
+            echo -e "  shipwright session [name] [--template <name>] [--goal \"...\"]"
             echo ""
             echo -e "${BOLD}OPTIONS${RESET}"
             echo -e "  ${CYAN}--template, -t${RESET} <name>   Use a team template (see: shipwright templates list)"
+            echo -e "  ${CYAN}--goal, -g${RESET} <text>       Goal for the team (what to build/fix/refactor)"
             echo -e "  ${CYAN}--terminal${RESET} <adapter>    Terminal adapter: tmux (default), iterm2, wezterm"
+            echo -e "  ${CYAN}--no-launch${RESET}             Create window only, don't auto-launch Claude"
             echo ""
             echo -e "${BOLD}EXAMPLES${RESET}"
-            echo -e "  ${DIM}shipwright session refactor${RESET}"
+            echo -e "  ${DIM}shipwright session auth-refactor -t feature-dev -g \"Refactor auth to use JWT\"${RESET}"
             echo -e "  ${DIM}shipwright session my-feature --template feature-dev${RESET}"
-            echo -e "  ${DIM}shipwright session my-feature --terminal iterm2${RESET}"
+            echo -e "  ${DIM}shipwright session bugfix -t bug-fix -g \"Fix login timeout issue\"${RESET}"
+            echo -e "  ${DIM}shipwright session explore --no-launch${RESET}"
             exit 0
             ;;
         -*)
@@ -158,11 +172,45 @@ else
     fi
 fi
 
-# ─── Create Session (tmux default path) ─────────────────────────────────────
+# ─── Build Team Prompt ───────────────────────────────────────────────────────
+# Claude Code's TeamCreate + Task tools handle pane creation automatically.
+# We create ONE window, launch claude with a team setup prompt, and let
+# Claude orchestrate the agents. No pre-splitting needed.
+
+build_team_prompt() {
+    local prompt=""
+
+    if [[ ${#TEMPLATE_AGENTS[@]} -gt 0 ]]; then
+        prompt="Create a team called \"${TEAM_NAME}\" and spawn these agents as teammates using the Task tool with team_name=\"${TEAM_NAME}\":"
+        prompt+=$'\n'
+
+        for agent_entry in "${TEMPLATE_AGENTS[@]}"; do
+            IFS='|' read -r aname arole afocus <<< "$agent_entry"
+            prompt+=$'\n'"- Agent named \"${aname}\": ${arole}"
+            if [[ -n "$afocus" ]]; then
+                prompt+=". Focus on files: ${afocus}"
+            fi
+        done
+
+        prompt+=$'\n\n'"Give each agent a detailed prompt describing their role and which files they own. Agents should work on DIFFERENT files to avoid merge conflicts."
+
+        if [[ -n "$GOAL" ]]; then
+            prompt+=$'\n\n'"The team goal is: ${GOAL}"
+        fi
+    else
+        # No template — simple team creation prompt
+        if [[ -n "$GOAL" ]]; then
+            prompt="Create a team called \"${TEAM_NAME}\" to accomplish this goal: ${GOAL}"
+            prompt+=$'\n\n'"Decide the right number and types of agents, create tasks, and spawn them as teammates. Assign different files to each agent to avoid conflicts."
+        fi
+    fi
+
+    echo "$prompt"
+}
+
+# ─── Create Session ──────────────────────────────────────────────────────────
 
 if [[ "$TERMINAL_ADAPTER" == "tmux" && ! -f "$ADAPTER_FILE" ]]; then
-    # Inline tmux path — original behavior (adapter not required for tmux)
-
     # Check if a window with this name already exists
     if tmux list-windows -F '#W' 2>/dev/null | grep -qx "$WINDOW_NAME"; then
         warn "Window '${WINDOW_NAME}' already exists. Switching to it."
@@ -172,113 +220,83 @@ if [[ "$TERMINAL_ADAPTER" == "tmux" && ! -f "$ADAPTER_FILE" ]]; then
 
     info "Creating team session: ${CYAN}${BOLD}${TEAM_NAME}${RESET}"
 
-    # Create a new window (not split-window — avoids race condition #23615)
+    # Create a single window — Claude Code will create agent panes via TeamCreate + Task
     tmux new-window -n "$WINDOW_NAME" -c "#{pane_current_path}"
 
-    # Force dark theme on the new pane (belt-and-suspenders with overlay hooks)
+    # Force dark theme
     tmux select-pane -t "$WINDOW_NAME" -P 'bg=#1a1a2e,fg=#e4e4e7'
 
-    # Set the pane title so the overlay shows the team name
+    # Set pane title for the lead
     tmux send-keys -t "$WINDOW_NAME" "printf '\\033]2;${TEAM_NAME}-lead\\033\\\\'" Enter
-
     sleep 0.2
     tmux send-keys -t "$WINDOW_NAME" "clear" Enter
 
-    # ─── Template: Create Agent Panes ────────────────────────────────────────
-    if [[ ${#TEMPLATE_AGENTS[@]} -gt 0 ]]; then
-        info "Scaffolding ${#TEMPLATE_AGENTS[@]} agent panes..."
+    # ─── Auto-launch Claude with team prompt ────────────────────────────────
+    TEAM_PROMPT="$(build_team_prompt)"
 
-        for agent_entry in "${TEMPLATE_AGENTS[@]}"; do
-            IFS='|' read -r aname arole afocus <<< "$agent_entry"
+    if [[ "$AUTO_LAUNCH" == true && -n "$TEAM_PROMPT" ]]; then
+        info "Launching Claude Code with team setup..."
 
-            # Split the window to create a new pane
-            tmux split-window -t "$WINDOW_NAME" -c "#{pane_current_path}"
-            sleep 0.1
+        # Write prompt to a temp file to avoid shell escaping issues
+        PROMPT_FILE="${TMPDIR:-/tmp}/shipwright-prompt-$$.txt"
+        echo "$TEAM_PROMPT" > "$PROMPT_FILE"
 
-            # Force dark theme on agent pane
-            tmux select-pane -t "$WINDOW_NAME" -P 'bg=#1a1a2e,fg=#e4e4e7'
+        # Launch claude with the prompt — reads from file to avoid quoting hell
+        # Claude reads the prompt as its initial message and stays interactive
+        tmux send-keys -t "$WINDOW_NAME" "claude \"\$(cat ${PROMPT_FILE})\"" Enter
 
-            # Set the pane title to the agent name
-            tmux send-keys -t "$WINDOW_NAME" "printf '\\033]2;${TEAM_NAME}-${aname}\\033\\\\'" Enter
-            sleep 0.1
-            tmux send-keys -t "$WINDOW_NAME" "clear" Enter
-        done
-
-        # Apply the layout from the template (layout_style takes precedence over layout)
-        if [[ -n "$TEMPLATE_LAYOUT_STYLE" ]]; then
-            tmux select-layout -t "$WINDOW_NAME" "$TEMPLATE_LAYOUT_STYLE" 2>/dev/null || \
-                tmux select-layout -t "$WINDOW_NAME" "${TEMPLATE_LAYOUT:-tiled}" 2>/dev/null || true
-        else
-            tmux select-layout -t "$WINDOW_NAME" "${TEMPLATE_LAYOUT:-tiled}" 2>/dev/null || true
-        fi
-
-        # Resize leader pane to desired percentage
-        if [[ -n "$TEMPLATE_MAIN_PANE_PERCENT" && -n "$TEMPLATE_LAYOUT_STYLE" ]]; then
-            case "$TEMPLATE_LAYOUT_STYLE" in
-                main-horizontal) tmux resize-pane -t "$WINDOW_NAME.0" -x "${TEMPLATE_MAIN_PANE_PERCENT}%" 2>/dev/null ;;
-                main-vertical)   tmux resize-pane -t "$WINDOW_NAME.0" -y "${TEMPLATE_MAIN_PANE_PERCENT}%" 2>/dev/null ;;
-            esac
-        fi
-
-        # Select the first pane (leader)
-        tmux select-pane -t "$WINDOW_NAME.0"
+    elif [[ "$AUTO_LAUNCH" == true && -z "$TEAM_PROMPT" ]]; then
+        # No template and no goal — just launch claude interactively
+        info "Launching Claude Code..."
+        tmux send-keys -t "$WINDOW_NAME" "claude" Enter
+    else
+        info "Window ready. Launch Claude manually: ${DIM}claude${RESET}"
     fi
+
+elif [[ -f "$ADAPTER_FILE" ]] && type -t spawn_agent &>/dev/null; then
+    # ─── Adapter-based session creation ──────────────────────────────────────
+    info "Creating team session: ${CYAN}${BOLD}${TEAM_NAME}${RESET} ${DIM}(${TERMINAL_ADAPTER})${RESET}"
+
+    # Spawn leader only — Claude Code handles agent pane creation
+    spawn_agent "${TEAM_NAME}-lead" "#{pane_current_path}" ""
 
 else
-    # ─── Adapter-based session creation ──────────────────────────────────────
-
-    if type -t spawn_agent &>/dev/null; then
-        info "Creating team session: ${CYAN}${BOLD}${TEAM_NAME}${RESET} ${DIM}(${TERMINAL_ADAPTER})${RESET}"
-
-        # Spawn leader
-        spawn_agent "${TEAM_NAME}-lead" "#{pane_current_path}" ""
-
-        # Spawn template agents if provided
-        if [[ ${#TEMPLATE_AGENTS[@]} -gt 0 ]]; then
-            info "Scaffolding ${#TEMPLATE_AGENTS[@]} agents..."
-            for agent_entry in "${TEMPLATE_AGENTS[@]}"; do
-                IFS='|' read -r aname arole afocus <<< "$agent_entry"
-                spawn_agent "${TEAM_NAME}-${aname}" "#{pane_current_path}" ""
-            done
-        fi
-    else
-        error "Adapter '${TERMINAL_ADAPTER}' loaded but spawn_agent() not found."
-        exit 1
-    fi
+    error "Terminal adapter '${TERMINAL_ADAPTER}' not available."
+    exit 1
 fi
 
 # ─── Summary ────────────────────────────────────────────────────────────────
 
 echo ""
-success "Team session ${CYAN}${BOLD}${TEAM_NAME}${RESET} ready!"
+success "Team session ${CYAN}${BOLD}${TEAM_NAME}${RESET} launched!"
 
 if [[ ${#TEMPLATE_AGENTS[@]} -gt 0 ]]; then
     echo ""
     echo -e "${BOLD}Team from template ${PURPLE}${TEMPLATE_NAME}${RESET}${BOLD}:${RESET}"
-    echo -e "  ${CYAN}${BOLD}lead${RESET}  ${DIM}— Team coordinator${RESET}"
+    echo -e "  ${CYAN}${BOLD}lead${RESET}  ${DIM}— Team coordinator (Claude Code)${RESET}"
     for agent_entry in "${TEMPLATE_AGENTS[@]}"; do
         IFS='|' read -r aname arole afocus <<< "$agent_entry"
         echo -e "  ${PURPLE}${BOLD}${aname}${RESET}  ${DIM}— ${arole}${RESET}"
     done
+    if [[ -n "$GOAL" ]]; then
+        echo ""
+        echo -e "${BOLD}Goal:${RESET} ${GOAL}"
+    fi
+fi
+
+if [[ "$AUTO_LAUNCH" == true ]]; then
     echo ""
-    echo -e "${BOLD}Next steps:${RESET}"
-    echo -e "  ${CYAN}1.${RESET} Switch to window ${DIM}${WINDOW_NAME}${RESET}"
-    echo -e "  ${CYAN}2.${RESET} Start ${DIM}claude${RESET} in the lead pane (top-left)"
-    echo -e "  ${CYAN}3.${RESET} Ask Claude to use the team — agents are ready in their panes"
+    echo -e "${GREEN}${BOLD}Claude Code is starting in window ${DIM}${WINDOW_NAME}${RESET}"
+    echo -e "${DIM}Claude will create the team, spawn agents in their own panes, and begin work.${RESET}"
+    WIN_NUM="$(tmux list-windows -F '#I #W' 2>/dev/null | grep "$WINDOW_NAME" | cut -d' ' -f1)" || WIN_NUM="?"
+    echo -e "${DIM}Switch to it: prefix + ${WIN_NUM}${RESET}"
 else
     echo ""
     echo -e "${BOLD}Next steps:${RESET}"
-    echo -e "  ${CYAN}1.${RESET} Switch to window ${DIM}${WINDOW_NAME}${RESET}  ${DIM}(prefix + $(tmux list-windows -F '#I #W' | grep "$WINDOW_NAME" | cut -d' ' -f1))${RESET}"
-    echo -e "  ${CYAN}2.${RESET} Start Claude Code:"
-    echo -e "     ${DIM}claude${RESET}"
-    echo -e "  ${CYAN}3.${RESET} Ask Claude to create a team:"
-    echo -e "     ${DIM}\"Create a team with 2 agents to refactor the auth module\"${RESET}"
+    WIN_NUM="$(tmux list-windows -F '#I #W' 2>/dev/null | grep "$WINDOW_NAME" | cut -d' ' -f1)" || WIN_NUM="?"
+    echo -e "  ${CYAN}1.${RESET} Switch to window ${DIM}${WINDOW_NAME}${RESET}  ${DIM}(prefix + ${WIN_NUM})${RESET}"
+    echo -e "  ${CYAN}2.${RESET} Start ${DIM}claude${RESET} and ask it to create a team"
 fi
 
 echo ""
-echo -e "${PURPLE}${BOLD}Tip:${RESET} For file isolation between agents, use git worktrees:"
-echo -e "  ${DIM}git worktree add ../project-${TEAM_NAME} -b ${TEAM_NAME}${RESET}"
-echo -e "  Then launch Claude inside the worktree directory."
-echo ""
-echo -e "${DIM}Settings: ~/.claude/settings.json (see settings.json.template)${RESET}"
 echo -e "${DIM}Keybinding: prefix + T re-runs this command${RESET}"
