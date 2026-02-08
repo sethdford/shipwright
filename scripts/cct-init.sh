@@ -1,9 +1,10 @@
 #!/usr/bin/env bash
 # ╔═══════════════════════════════════════════════════════════════════════════╗
-# ║  shipwright init — One-command tmux setup + optional deploy configuration      ║
+# ║  shipwright init — Complete setup for Shipwright + Claude Code Teams    ║
 # ║                                                                          ║
-# ║  Installs tmux config, overlay, and templates. No interactive prompts,  ║
-# ║  no hooks, no Claude Code settings — just tmux config.                  ║
+# ║  Installs: tmux config, overlay, team & pipeline templates, Claude Code ║
+# ║  settings (with agent teams enabled), quality gate hooks, CLAUDE.md     ║
+# ║  agent instructions (global + per-repo). Runs doctor at the end.       ║
 # ║                                                                          ║
 # ║  --deploy  Detect platform and generate deployed.json template          ║
 # ╚═══════════════════════════════════════════════════════════════════════════╝
@@ -65,54 +66,162 @@ while [[ $# -gt 0 ]]; do
 done
 
 echo ""
-echo -e "${CYAN}${BOLD}shipwright init${RESET} — Quick tmux setup"
+echo -e "${CYAN}${BOLD}shipwright init${RESET} — Complete setup"
 echo -e "${DIM}══════════════════════════════════════════${RESET}"
 echo ""
 
 # ─── tmux.conf ────────────────────────────────────────────────────────────────
-if [[ -f "$HOME/.tmux.conf" ]]; then
-    cp "$HOME/.tmux.conf" "$HOME/.tmux.conf.bak"
-    warn "Backed up existing ~/.tmux.conf → ~/.tmux.conf.bak"
+if [[ -f "$REPO_DIR/tmux/tmux.conf" ]]; then
+    if [[ -f "$HOME/.tmux.conf" ]]; then
+        cp "$HOME/.tmux.conf" "$HOME/.tmux.conf.bak"
+        warn "Backed up existing ~/.tmux.conf → ~/.tmux.conf.bak"
+    fi
+    cp "$REPO_DIR/tmux/tmux.conf" "$HOME/.tmux.conf"
+    success "Installed ~/.tmux.conf"
+else
+    warn "tmux.conf not found in package — skipping"
 fi
-cp "$REPO_DIR/tmux/tmux.conf" "$HOME/.tmux.conf"
-success "Installed ~/.tmux.conf"
 
 # ─── Overlay ──────────────────────────────────────────────────────────────────
-mkdir -p "$HOME/.tmux"
-cp "$REPO_DIR/tmux/claude-teams-overlay.conf" "$HOME/.tmux/claude-teams-overlay.conf"
-success "Installed ~/.tmux/claude-teams-overlay.conf"
+if [[ -f "$REPO_DIR/tmux/claude-teams-overlay.conf" ]]; then
+    mkdir -p "$HOME/.tmux"
+    cp "$REPO_DIR/tmux/claude-teams-overlay.conf" "$HOME/.tmux/claude-teams-overlay.conf"
+    success "Installed ~/.tmux/claude-teams-overlay.conf"
+else
+    warn "Overlay not found in package — skipping"
+fi
 
-# ─── Templates ────────────────────────────────────────────────────────────────
-mkdir -p "$HOME/.claude-teams/templates"
-for tpl in "$REPO_DIR"/tmux/templates/*.json; do
-    [[ -f "$tpl" ]] || continue
-    cp "$tpl" "$HOME/.claude-teams/templates/$(basename "$tpl")"
-done
-success "Installed templates → ~/.claude-teams/templates/"
+# ─── Team Templates ──────────────────────────────────────────────────────────
+SHIPWRIGHT_DIR="$HOME/.shipwright"
+TEMPLATES_SRC="$REPO_DIR/tmux/templates"
+if [[ -d "$TEMPLATES_SRC" ]]; then
+    mkdir -p "$SHIPWRIGHT_DIR/templates"
+    for tpl in "$TEMPLATES_SRC"/*.json; do
+        [[ -f "$tpl" ]] || continue
+        cp "$tpl" "$SHIPWRIGHT_DIR/templates/$(basename "$tpl")"
+    done
+    # Also install to legacy path for backward compatibility
+    mkdir -p "$HOME/.claude-teams/templates"
+    for tpl in "$TEMPLATES_SRC"/*.json; do
+        [[ -f "$tpl" ]] || continue
+        cp "$tpl" "$HOME/.claude-teams/templates/$(basename "$tpl")"
+    done
+    tpl_count=$(find "$SHIPWRIGHT_DIR/templates" -name '*.json' -type f 2>/dev/null | wc -l | tr -d ' ')
+    success "Installed ${tpl_count} team templates → ~/.shipwright/templates/"
+fi
 
-# ─── CLAUDE.md — Agent instructions ──────────────────────────────────────────
+# ─── Pipeline Templates ──────────────────────────────────────────────────────
+PIPELINES_SRC="$REPO_DIR/templates/pipelines"
+if [[ -d "$PIPELINES_SRC" ]]; then
+    mkdir -p "$SHIPWRIGHT_DIR/pipelines"
+    for tpl in "$PIPELINES_SRC"/*.json; do
+        [[ -f "$tpl" ]] || continue
+        cp "$tpl" "$SHIPWRIGHT_DIR/pipelines/$(basename "$tpl")"
+    done
+    pip_count=$(find "$SHIPWRIGHT_DIR/pipelines" -name '*.json' -type f 2>/dev/null | wc -l | tr -d ' ')
+    success "Installed ${pip_count} pipeline templates → ~/.shipwright/pipelines/"
+fi
+
+# ─── Claude Code Settings ────────────────────────────────────────────────────
+CLAUDE_DIR="$HOME/.claude"
+SETTINGS_FILE="$CLAUDE_DIR/settings.json"
+SETTINGS_TEMPLATE="$REPO_DIR/claude-code/settings.json.template"
+
+mkdir -p "$CLAUDE_DIR"
+
+if [[ -f "$SETTINGS_FILE" ]]; then
+    # Settings exists — check for agent teams env var
+    if grep -q 'CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS' "$SETTINGS_FILE" 2>/dev/null; then
+        success "Agent teams already enabled in settings.json"
+    else
+        # Try to add using jq
+        if jq -e '.env' "$SETTINGS_FILE" &>/dev/null 2>&1; then
+            tmp=$(mktemp)
+            jq '.env["CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS"] = "1"' "$SETTINGS_FILE" > "$tmp" && mv "$tmp" "$SETTINGS_FILE"
+            success "Enabled agent teams in existing settings.json"
+        elif jq -e '.' "$SETTINGS_FILE" &>/dev/null 2>&1; then
+            tmp=$(mktemp)
+            jq '. + {"env": {"CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS": "1"}}' "$SETTINGS_FILE" > "$tmp" && mv "$tmp" "$SETTINGS_FILE"
+            success "Added agent teams env to settings.json"
+        else
+            warn "Could not auto-configure settings.json (JSONC detected)"
+            echo -e "    ${DIM}Add to ~/.claude/settings.json:${RESET}"
+            echo -e "    ${DIM}\"env\": { \"CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS\": \"1\" }${RESET}"
+        fi
+    fi
+elif [[ -f "$SETTINGS_TEMPLATE" ]]; then
+    cp "$SETTINGS_TEMPLATE" "$SETTINGS_FILE"
+    success "Installed ~/.claude/settings.json (with agent teams enabled)"
+else
+    # Create minimal settings.json with agent teams
+    cat > "$SETTINGS_FILE" << 'SETTINGS_EOF'
+{
+  "hooks": {},
+  "env": {
+    "CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS": "1",
+    "CLAUDE_CODE_MAX_TOOL_USE_CONCURRENCY": "5",
+    "CLAUDE_CODE_AUTOCOMPACT_PCT_OVERRIDE": "70",
+    "CLAUDE_CODE_SUBAGENT_MODEL": "haiku"
+  }
+}
+SETTINGS_EOF
+    success "Created ~/.claude/settings.json with agent teams enabled"
+fi
+
+# ─── Hooks ────────────────────────────────────────────────────────────────────
+HOOKS_SRC="$REPO_DIR/claude-code/hooks"
+if [[ -d "$HOOKS_SRC" ]]; then
+    mkdir -p "$CLAUDE_DIR/hooks"
+    hook_count=0
+    for hook in "$HOOKS_SRC"/*.sh; do
+        [[ -f "$hook" ]] || continue
+        dest="$CLAUDE_DIR/hooks/$(basename "$hook")"
+        if [[ ! -f "$dest" ]]; then
+            cp "$hook" "$dest"
+            chmod +x "$dest"
+            hook_count=$((hook_count + 1))
+        fi
+    done
+    if [[ $hook_count -gt 0 ]]; then
+        success "Installed ${hook_count} quality gate hooks → ~/.claude/hooks/"
+    else
+        info "Hooks already installed — skipping"
+    fi
+fi
+
+# ─── CLAUDE.md — Global agent instructions ────────────────────────────────────
 CLAUDE_MD_SRC="$REPO_DIR/claude-code/CLAUDE.md.shipwright"
-CLAUDE_MD_DST=".claude/CLAUDE.md"
+GLOBAL_CLAUDE_MD="$CLAUDE_DIR/CLAUDE.md"
 
 if [[ "$SKIP_CLAUDE_MD" == "false" && -f "$CLAUDE_MD_SRC" ]]; then
-    if [[ -f "$CLAUDE_MD_DST" ]]; then
-        # Check if it already contains Shipwright instructions
-        if grep -q "Shipwright" "$CLAUDE_MD_DST" 2>/dev/null; then
-            info "CLAUDE.md already contains Shipwright instructions — skipping"
+    if [[ -f "$GLOBAL_CLAUDE_MD" ]]; then
+        if grep -q "Shipwright" "$GLOBAL_CLAUDE_MD" 2>/dev/null; then
+            info "~/.claude/CLAUDE.md already contains Shipwright instructions"
         else
-            # Append Shipwright section to existing CLAUDE.md
-            {
-                echo ""
-                echo "---"
-                echo ""
-                cat "$CLAUDE_MD_SRC"
-            } >> "$CLAUDE_MD_DST"
-            success "Appended Shipwright instructions to ${CLAUDE_MD_DST}"
+            { echo ""; echo "---"; echo ""; cat "$CLAUDE_MD_SRC"; } >> "$GLOBAL_CLAUDE_MD"
+            success "Appended Shipwright instructions to ~/.claude/CLAUDE.md"
+        fi
+    else
+        cp "$CLAUDE_MD_SRC" "$GLOBAL_CLAUDE_MD"
+        success "Installed ~/.claude/CLAUDE.md"
+    fi
+fi
+
+# ─── CLAUDE.md — Per-repo agent instructions ─────────────────────────────────
+LOCAL_CLAUDE_MD=".claude/CLAUDE.md"
+
+if [[ "$SKIP_CLAUDE_MD" == "false" && -f "$CLAUDE_MD_SRC" ]]; then
+    if [[ -f "$LOCAL_CLAUDE_MD" ]]; then
+        if grep -q "Shipwright" "$LOCAL_CLAUDE_MD" 2>/dev/null; then
+            info ".claude/CLAUDE.md already contains Shipwright instructions"
+        else
+            { echo ""; echo "---"; echo ""; cat "$CLAUDE_MD_SRC"; } >> "$LOCAL_CLAUDE_MD"
+            success "Appended Shipwright instructions to ${LOCAL_CLAUDE_MD}"
         fi
     else
         mkdir -p ".claude"
-        cp "$CLAUDE_MD_SRC" "$CLAUDE_MD_DST"
-        success "Created ${CLAUDE_MD_DST} with Shipwright agent instructions"
+        cp "$CLAUDE_MD_SRC" "$LOCAL_CLAUDE_MD"
+        success "Created ${LOCAL_CLAUDE_MD} with Shipwright agent instructions"
     fi
 fi
 
@@ -123,9 +232,12 @@ if [[ -n "${TMUX:-}" ]]; then
         warn "Could not reload tmux config (reload manually with prefix + r)"
 fi
 
-# ─── Quick-start instructions ─────────────────────────────────────────────────
+# ─── Validation ───────────────────────────────────────────────────────────────
 echo ""
-echo -e "${BOLD}Done!${RESET} tmux is configured for Claude Code Teams."
+echo -e "${CYAN}${BOLD}Running doctor...${RESET}"
+echo ""
+"$SCRIPT_DIR/cct-doctor.sh" || true
+
 echo ""
 echo -e "${BOLD}Quick start:${RESET}"
 if [[ -z "${TMUX:-}" ]]; then
@@ -134,11 +246,6 @@ if [[ -z "${TMUX:-}" ]]; then
 else
     echo -e "  ${DIM}1.${RESET} shipwright session my-feature --template feature-dev"
 fi
-echo ""
-echo -e "${BOLD}Layout keybindings:${RESET}"
-echo -e "  ${CYAN}prefix + M-1${RESET}  main-horizontal (leader 65% left)"
-echo -e "  ${CYAN}prefix + M-2${RESET}  main-vertical (leader 60% top)"
-echo -e "  ${CYAN}prefix + M-3${RESET}  tiled (equal sizes)"
 echo ""
 
 # ─── Deploy setup (--deploy) ─────────────────────────────────────────────────

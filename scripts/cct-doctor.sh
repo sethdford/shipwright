@@ -158,7 +158,93 @@ else
 fi
 
 # ═════════════════════════════════════════════════════════════════════════════
-# 3. PATH & CLI
+# 3. Agent Teams
+# ═════════════════════════════════════════════════════════════════════════════
+echo ""
+echo -e "${PURPLE}${BOLD}  AGENT TEAMS${RESET}"
+echo -e "${DIM}  ──────────────────────────────────────────${RESET}"
+
+# Agent teams env var in settings.json
+SETTINGS_FILE="$HOME/.claude/settings.json"
+if [[ -f "$SETTINGS_FILE" ]]; then
+    if grep -q 'CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS' "$SETTINGS_FILE" 2>/dev/null; then
+        check_pass "Agent teams enabled in settings.json"
+    else
+        check_fail "Agent teams NOT enabled in settings.json"
+        echo -e "    ${DIM}Run: shipwright init${RESET}"
+        echo -e "    ${DIM}Or add to ~/.claude/settings.json:${RESET}"
+        echo -e "    ${DIM}\"env\": { \"CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS\": \"1\" }${RESET}"
+    fi
+else
+    check_fail "No ~/.claude/settings.json — agent teams not configured"
+    echo -e "    ${DIM}Run: shipwright init${RESET}"
+fi
+
+# CLAUDE.md with Shipwright instructions
+GLOBAL_CLAUDE_MD="$HOME/.claude/CLAUDE.md"
+if [[ -f "$GLOBAL_CLAUDE_MD" ]]; then
+    if grep -q "Shipwright" "$GLOBAL_CLAUDE_MD" 2>/dev/null; then
+        check_pass "CLAUDE.md contains Shipwright instructions"
+    else
+        check_warn "CLAUDE.md exists but missing Shipwright instructions"
+        echo -e "    ${DIM}Run: shipwright init${RESET}"
+    fi
+else
+    check_warn "No ~/.claude/CLAUDE.md — agents won't know Shipwright commands"
+    echo -e "    ${DIM}Run: shipwright init${RESET}"
+fi
+
+# Team templates
+TEMPLATES_DIR="$HOME/.shipwright/templates"
+if [[ -d "$TEMPLATES_DIR" ]]; then
+    tpl_count=0
+    while IFS= read -r f; do
+        [[ -n "$f" ]] && tpl_count=$((tpl_count + 1))
+    done < <(find "$TEMPLATES_DIR" -maxdepth 1 -name '*.json' -type f 2>/dev/null)
+    if [[ $tpl_count -gt 0 ]]; then
+        check_pass "Team templates: ${tpl_count} installed"
+    else
+        check_warn "Template dir exists but no .json files found"
+    fi
+else
+    check_warn "No team templates at ~/.shipwright/templates/"
+    echo -e "    ${DIM}Run: shipwright init${RESET}"
+fi
+
+# Pipeline templates
+PIPELINES_DIR="$HOME/.shipwright/pipelines"
+if [[ -d "$PIPELINES_DIR" ]]; then
+    pip_count=0
+    while IFS= read -r f; do
+        [[ -n "$f" ]] && pip_count=$((pip_count + 1))
+    done < <(find "$PIPELINES_DIR" -maxdepth 1 -name '*.json' -type f 2>/dev/null)
+    if [[ $pip_count -gt 0 ]]; then
+        check_pass "Pipeline templates: ${pip_count} installed"
+    else
+        check_warn "Pipeline dir exists but no .json files found"
+    fi
+else
+    check_warn "No pipeline templates at ~/.shipwright/pipelines/"
+    echo -e "    ${DIM}Run: shipwright init${RESET}"
+fi
+
+# GitHub CLI
+if command -v gh &>/dev/null; then
+    if gh auth status &>/dev/null; then
+        GH_USER="$(gh api user -q .login 2>/dev/null || echo "authenticated")"
+        check_pass "GitHub CLI: ${GH_USER}"
+    else
+        check_warn "GitHub CLI installed but not authenticated"
+        echo -e "    ${DIM}gh auth login${RESET}"
+    fi
+else
+    check_warn "GitHub CLI (gh) not installed — daemon/pipeline need it for PRs and issues"
+    echo -e "    ${DIM}brew install gh${RESET}  (macOS)"
+    echo -e "    ${DIM}sudo apt install gh${RESET}  (Ubuntu/Debian)"
+fi
+
+# ═════════════════════════════════════════════════════════════════════════════
+# 4. PATH & CLI
 # ═════════════════════════════════════════════════════════════════════════════
 echo ""
 echo -e "${PURPLE}${BOLD}  PATH & CLI${RESET}"
@@ -198,7 +284,7 @@ else
 fi
 
 # ═════════════════════════════════════════════════════════════════════════════
-# 4. Pane Display
+# 5. Pane Display
 # ═════════════════════════════════════════════════════════════════════════════
 echo ""
 echo -e "${PURPLE}${BOLD}  PANE DISPLAY${RESET}"
@@ -246,7 +332,7 @@ else
 fi
 
 # ═════════════════════════════════════════════════════════════════════════════
-# 5. Orphaned Sessions
+# 6. Orphaned Sessions
 # ═════════════════════════════════════════════════════════════════════════════
 echo ""
 echo -e "${PURPLE}${BOLD}  ORPHAN CHECK${RESET}"
@@ -271,7 +357,7 @@ if [[ $orphaned_teams -eq 0 ]]; then
 fi
 
 # ═════════════════════════════════════════════════════════════════════════════
-# 6. Terminal Compatibility
+# 7. Terminal Compatibility
 # ═════════════════════════════════════════════════════════════════════════════
 echo ""
 echo -e "${PURPLE}${BOLD}  TERMINAL${RESET}"
