@@ -456,16 +456,21 @@ TERM_PROGRAM="${TERM_PROGRAM:-unknown}"
 
 case "$TERM_PROGRAM" in
     iTerm.app|iTerm2)
-        check_pass "iTerm2 — full support"
+        check_pass "iTerm2 — full support (true color, SGR mouse, focus events)"
         ;;
     Apple_Terminal)
-        check_pass "Terminal.app — supported"
+        check_warn "Terminal.app — limited support"
+        echo -e "    ${DIM}No true color (256 colors only), no SGR extended mouse.${RESET}"
+        echo -e "    ${DIM}Mouse clicking works, but wide terminals (>223 cols) may mistrack.${RESET}"
+        echo -e "    ${DIM}Recommended: use iTerm2 or WezTerm for best experience.${RESET}"
         ;;
     WezTerm)
-        check_pass "WezTerm — full support"
+        check_pass "WezTerm — full support (true color, SGR mouse, focus events)"
         ;;
     tmux)
-        check_pass "Running inside tmux (nested)"
+        # Detect parent terminal when nested inside tmux
+        PARENT_TERM="${LC_TERMINAL:-unknown}"
+        check_pass "Running inside tmux — parent terminal: ${PARENT_TERM}"
         ;;
     vscode)
         check_warn "VS Code integrated terminal"
@@ -473,13 +478,30 @@ case "$TERM_PROGRAM" in
         echo -e "    ${DIM}Consider running tmux in an external terminal.${RESET}"
         ;;
     Ghostty)
-        check_warn "Ghostty — may have tmux rendering quirks"
-        echo -e "    ${DIM}If pane borders look wrong, try: set -g default-terminal 'xterm-256color'${RESET}"
+        check_pass "Ghostty — full support (true color, SGR mouse)"
+        ;;
+    Alacritty)
+        check_pass "Alacritty — full support (true color, SGR mouse)"
+        ;;
+    kitty)
+        check_pass "kitty — full support (true color, extended keyboard)"
         ;;
     *)
         info "Terminal: ${TERM_PROGRAM}"
         ;;
 esac
+
+# Check mouse window clicking (tmux 3.4+ changed the default)
+if command -v tmux &>/dev/null && [[ -n "${TMUX:-}" ]]; then
+    MOUSE_BIND="$(tmux list-keys 2>/dev/null | grep 'MouseDown1Status' | head -1 || true)"
+    if echo "$MOUSE_BIND" | grep -q 'select-window'; then
+        check_pass "Mouse window click: select-window (correct)"
+    elif echo "$MOUSE_BIND" | grep -q 'switch-client'; then
+        check_fail "Mouse window click: switch-client (broken — clicking windows won't work)"
+        echo -e "    ${DIM}Fix: add to tmux.conf: bind -T root MouseDown1Status select-window -t =${RESET}"
+        echo -e "    ${DIM}Or run: shipwright init${RESET}"
+    fi
+fi
 
 # ═════════════════════════════════════════════════════════════════════════════
 # Summary

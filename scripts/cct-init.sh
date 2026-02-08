@@ -121,6 +121,12 @@ if [[ "$TOOK_FULL_TMUX_CONF" == "false" && -f "$HOME/.tmux.conf" ]]; then
     fi
 fi
 
+# ─── Reload tmux config if inside tmux ─────────────────────────────────────
+if [[ -n "${TMUX:-}" ]]; then
+    tmux source-file "$HOME/.tmux.conf" 2>/dev/null && \
+        success "Reloaded tmux config (mouse, terminal overrides active)" || true
+fi
+
 # ─── Team Templates ──────────────────────────────────────────────────────────
 SHIPWRIGHT_DIR="$HOME/.shipwright"
 TEMPLATES_SRC="$REPO_DIR/tmux/templates"
