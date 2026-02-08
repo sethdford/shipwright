@@ -791,7 +791,7 @@ daemon_spawn_pipeline() {
         if [[ -n "$repo_full_name" ]]; then
             gh_args+=("--repo" "$repo_full_name")
         fi
-        gh issue comment "$issue_num" "${gh_args[@]}" --body "## 🤖 Pipeline Started
+        gh issue comment "$issue_num" ${gh_args[@]+"${gh_args[@]}"} --body "## 🤖 Pipeline Started
 
 **Daemon** picked up this issue and started an autonomous pipeline.
 
@@ -2580,10 +2580,12 @@ daemon_start() {
             cmd_args+=("--no-github")
         fi
 
-        tmux new-session -d -s "cct-daemon" "${cmd_args[*]}" 2>/dev/null || {
+        # Export current PATH so detached session finds claude, gh, etc.
+        local tmux_cmd="export PATH='${PATH}'; ${cmd_args[*]}"
+        tmux new-session -d -s "cct-daemon" "$tmux_cmd" 2>/dev/null || {
             # Session may already exist — try killing and recreating
             tmux kill-session -t "cct-daemon" 2>/dev/null || true
-            tmux new-session -d -s "cct-daemon" "${cmd_args[*]}"
+            tmux new-session -d -s "cct-daemon" "$tmux_cmd"
         }
 
         success "Daemon started in tmux session ${CYAN}cct-daemon${RESET}"
