@@ -127,6 +127,19 @@ if [[ -n "${TMUX:-}" ]]; then
         success "Reloaded tmux config (mouse, terminal overrides active)" || true
 fi
 
+# ─── Fix iTerm2 mouse reporting if disabled ────────────────────────────────
+if [[ "${LC_TERMINAL:-${TERM_PROGRAM:-}}" == *iTerm* ]]; then
+    ITERM_MOUSE="$(defaults read com.googlecode.iterm2 "New Bookmarks" 2>/dev/null \
+        | grep '"Mouse Reporting"' | head -1 | grep -oE '[0-9]+' || echo "unknown")"
+    if [[ "$ITERM_MOUSE" == "0" ]]; then
+        warn "iTerm2 mouse reporting is disabled — tmux can't receive mouse clicks"
+        /usr/libexec/PlistBuddy -c "Set ':New Bookmarks:0:Mouse Reporting' 1" \
+            ~/Library/Preferences/com.googlecode.iterm2.plist 2>/dev/null && \
+            success "Enabled iTerm2 mouse reporting (open a new tab to activate)" || \
+            warn "Could not auto-fix — enable manually: Preferences → Profiles → Terminal → Report mouse clicks"
+    fi
+fi
+
 # ─── Team Templates ──────────────────────────────────────────────────────────
 SHIPWRIGHT_DIR="$HOME/.shipwright"
 TEMPLATES_SRC="$REPO_DIR/tmux/templates"

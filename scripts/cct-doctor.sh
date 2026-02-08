@@ -457,6 +457,15 @@ TERM_PROGRAM="${TERM_PROGRAM:-unknown}"
 case "$TERM_PROGRAM" in
     iTerm.app|iTerm2)
         check_pass "iTerm2 — full support (true color, SGR mouse, focus events)"
+        # Verify mouse reporting is actually enabled in iTerm2 profile
+        ITERM_MOUSE="$(defaults read com.googlecode.iterm2 "New Bookmarks" 2>/dev/null | grep '"Mouse Reporting"' | head -1 | grep -oE '[0-9]+' || echo "unknown")"
+        if [[ "$ITERM_MOUSE" == "0" ]]; then
+            check_fail "iTerm2 mouse reporting is DISABLED — tmux cannot receive mouse clicks"
+            echo -e "    ${DIM}Fix: iTerm2 → Preferences → Profiles → Terminal → enable 'Report mouse clicks & drags'${RESET}"
+            echo -e "    ${DIM}Or run: ${CYAN}/usr/libexec/PlistBuddy -c \"Set ':New Bookmarks:0:Mouse Reporting' 1\" ~/Library/Preferences/com.googlecode.iterm2.plist${RESET}"
+        elif [[ "$ITERM_MOUSE" == "1" ]]; then
+            check_pass "iTerm2 mouse reporting: enabled"
+        fi
         ;;
     Apple_Terminal)
         check_warn "Terminal.app — limited support"
@@ -471,6 +480,17 @@ case "$TERM_PROGRAM" in
         # Detect parent terminal when nested inside tmux
         PARENT_TERM="${LC_TERMINAL:-unknown}"
         check_pass "Running inside tmux — parent terminal: ${PARENT_TERM}"
+        # Check iTerm2 mouse reporting even when nested inside tmux
+        if [[ "$PARENT_TERM" == *iTerm* ]]; then
+            ITERM_MOUSE="$(defaults read com.googlecode.iterm2 "New Bookmarks" 2>/dev/null | grep '"Mouse Reporting"' | head -1 | grep -oE '[0-9]+' || echo "unknown")"
+            if [[ "$ITERM_MOUSE" == "0" ]]; then
+                check_fail "iTerm2 mouse reporting is DISABLED — tmux cannot receive mouse clicks"
+                echo -e "    ${DIM}Fix: iTerm2 → Preferences → Profiles → Terminal → enable 'Report mouse clicks & drags'${RESET}"
+                echo -e "    ${DIM}Or run: ${CYAN}shipwright init${RESET} (auto-fixes this)${RESET}"
+            elif [[ "$ITERM_MOUSE" == "1" ]]; then
+                check_pass "iTerm2 mouse reporting: enabled"
+            fi
+        fi
         ;;
     vscode)
         check_warn "VS Code integrated terminal"
