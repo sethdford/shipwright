@@ -507,8 +507,8 @@ prep_extract_patterns() {
     # ── Import style ──
     if [[ "$LANG_DETECTED" == "nodejs" || "$LANG_DETECTED" == "typescript" ]]; then
         local es_count cjs_count
-        es_count=$(grep -rl "^import " "$root/src" "$root/app" "$root/lib" 2>/dev/null | wc -l | tr -d ' ')
-        cjs_count=$(grep -rl "require(" "$root/src" "$root/app" "$root/lib" 2>/dev/null | wc -l | tr -d ' ')
+        es_count=$( { grep -rl "^import " "$root/src" "$root/app" "$root/lib" 2>/dev/null || true; } | wc -l | tr -d ' ')
+        cjs_count=$( { grep -rl "require(" "$root/src" "$root/app" "$root/lib" 2>/dev/null || true; } | wc -l | tr -d ' ')
         if [[ "$es_count" -gt "$cjs_count" ]]; then
             IMPORT_STYLE="ES modules (import/export)"
         elif [[ "$cjs_count" -gt 0 ]]; then
@@ -520,9 +520,9 @@ prep_extract_patterns() {
 
     # ── Naming convention ──
     local camel_count snake_count
-    camel_count=$(grep -roh '[a-z][a-zA-Z]*(' "$root/src" "$root/app" "$root/lib" 2>/dev/null | grep -c '[a-z][A-Z]' 2>/dev/null || true)
+    camel_count=$( { grep -roh '[a-z][a-zA-Z]*(' "$root/src" "$root/app" "$root/lib" 2>/dev/null || true; } | grep -c '[a-z][A-Z]' 2>/dev/null || true)
     camel_count="${camel_count:-0}"
-    snake_count=$(grep -roh '[a-z_]*_[a-z]*(' "$root/src" "$root/app" "$root/lib" 2>/dev/null | wc -l 2>/dev/null | tr -d ' ')
+    snake_count=$( { grep -roh '[a-z_]*_[a-z]*(' "$root/src" "$root/app" "$root/lib" 2>/dev/null || true; } | wc -l 2>/dev/null | tr -d ' ')
     snake_count="${snake_count:-0}"
     if [[ "$camel_count" -gt "$snake_count" ]]; then
         NAMING_CONVENTION="camelCase"
@@ -613,8 +613,7 @@ prep_generate_claude_md() {
     fi
 
     local content
-    content=$(cat <<HEREDOC
-<!-- cct:auto-start -->
+    content="<!-- cct:auto-start -->
 # Project: ${PROJECT_NAME}
 
 ## Stack
@@ -638,9 +637,7 @@ $(echo -e "$conventions")
 
 ## Important Files
 $(echo -e "$important")
-<!-- cct:auto-end -->
-HEREDOC
-)
+<!-- cct:auto-end -->"
 
     update_auto_section "$filepath" "$content"
     track_file "$filepath"
@@ -883,7 +880,7 @@ prep_generate_architecture() {
         fi
     elif [[ -f "$PROJECT_ROOT/go.mod" ]]; then
         local go_deps
-        go_deps=$(grep "^\t" "$PROJECT_ROOT/go.mod" 2>/dev/null | awk '{print $1}' | head -15)
+        go_deps=$( { grep "^\t" "$PROJECT_ROOT/go.mod" 2>/dev/null || true; } | awk '{print $1}' | head -15)
         if [[ -n "$go_deps" ]]; then
             deps_section="## Dependencies\n"
             while IFS= read -r dep; do
@@ -902,35 +899,52 @@ prep_generate_architecture() {
         data_flow+="Request → ${ROUTE_PATTERNS:-Router} → Handler → Response\n"
     fi
 
+    # Pre-compute entry points section
+    local entry_section=""
+    if [[ -n "$ENTRY_POINTS" ]]; then
+        for f in $ENTRY_POINTS; do
+            entry_section+="- \`${f}\`"$'\n'
+        done
+    else
+        entry_section="- No standard entry points detected"$'\n'
+    fi
+
+    # Pre-compute module map section
+    local module_section=""
+    if [[ -n "$module_map" ]]; then
+        module_section=$(echo -e "$module_map")
+    else
+        module_section="No standard module directories detected."
+    fi
+
+    # Pre-compute infrastructure section
+    local infra_section=""
+    $HAS_DOCKER && infra_section+="- Docker: Dockerfile present"$'\n'
+    $HAS_COMPOSE && infra_section+="- Docker Compose: multi-service setup"$'\n'
+    $HAS_CI && infra_section+="- CI/CD: GitHub Actions workflows"$'\n'
+    $HAS_MAKEFILE && infra_section+="- Makefile: build automation"$'\n'
+    if [[ -z "$infra_section" ]]; then
+        infra_section="- No infrastructure files detected"$'\n'
+    fi
+
     local content
-    content=$(cat <<HEREDOC
-<!-- cct:auto-start -->
+    content="<!-- cct:auto-start -->
 # Architecture
 
 ## Overview
 **${PROJECT_NAME}** is a ${LANG_DETECTED:-unknown}${FRAMEWORK:+ / ${FRAMEWORK}} project with ${SRC_FILE_COUNT} source files and ~${TOTAL_LINES} lines of code.
 
 ## Entry Points
-$(for f in $ENTRY_POINTS; do echo "- \`${f}\`"; done)
-$(if [[ -z "$ENTRY_POINTS" ]]; then echo "- No standard entry points detected"; fi)
-
+${entry_section}
 ## Module Map
-$(echo -e "$module_map")
-$(if [[ -z "$module_map" ]]; then echo "No standard module directories detected."; fi)
+${module_section}
 
 $(echo -e "${deps_section}")
 
 $(echo -e "${data_flow}")
 
 ## Infrastructure
-$(if $HAS_DOCKER; then echo "- Docker: \`Dockerfile\` present"; fi)
-$(if $HAS_COMPOSE; then echo "- Docker Compose: multi-service setup"; fi)
-$(if $HAS_CI; then echo "- CI/CD: GitHub Actions workflows"; fi)
-$(if $HAS_MAKEFILE; then echo "- Makefile: build automation"; fi)
-$(if ! $HAS_DOCKER && ! $HAS_COMPOSE && ! $HAS_CI && ! $HAS_MAKEFILE; then echo "- No infrastructure files detected"; fi)
-<!-- cct:auto-end -->
-HEREDOC
-)
+${infra_section}<!-- cct:auto-end -->"
 
     update_auto_section "$filepath" "$content"
     track_file "$filepath"
@@ -945,44 +959,43 @@ prep_generate_standards() {
 
     info "Generating .claude/CODING-STANDARDS.md..."
 
+    local file_org=""
+    if [[ -n "${SRC_DIRS:-}" ]]; then
+        file_org+="- Source code: \`${SRC_DIRS}\`"$'\n'
+    fi
+    if [[ -n "${TEST_DIRS:-}" ]]; then
+        file_org+="- Tests: \`${TEST_DIRS}\`"$'\n'
+    fi
+
     local content
-    content=$(cat <<HEREDOC
-<!-- cct:auto-start -->
+    content="<!-- cct:auto-start -->
 # Coding Standards
 
 ## Naming
 - Convention: **${NAMING_CONVENTION:-not detected}**
 - Files: follow existing file naming patterns in the project
-- Variables/functions: use ${NAMING_CONVENTION:-the project's established} style consistently
+- Variables/functions: use **${NAMING_CONVENTION:-mixed}** style consistently
 
 ## Imports
 - Style: **${IMPORT_STYLE:-follow existing patterns}**
 - Keep imports organized: stdlib → external deps → internal modules
 
 ## Error Handling
-- Use the project's existing error handling patterns
+- Use the existing error handling patterns
 - Always handle promise rejections / async errors
 - Provide meaningful error messages
-- Don't swallow errors silently
+- Do not swallow errors silently
 
 ## Testing
 - Framework: **${TEST_FRAMEWORK:-unknown}**
 - Write tests for all new functionality
 - Test both success and error paths
-- Use descriptive test names: \`describe("module") → it("should do X when Y")\`
+- Use descriptive test names
 - Keep tests focused — one assertion per test where practical
 
 ## File Organization
-$(if [[ -n "$SRC_DIRS" ]]; then
-    echo "- Source code: \`${SRC_DIRS}\`"
-fi)
-$(if [[ -n "$TEST_DIRS" ]]; then
-    echo "- Tests: \`${TEST_DIRS}\`"
-fi)
-- Follow the existing directory structure — don't create new top-level dirs without discussion
-<!-- cct:auto-end -->
-HEREDOC
-)
+${file_org}- Follow the existing directory structure — do not create new top-level dirs without discussion
+<!-- cct:auto-end -->"
 
     update_auto_section "$filepath" "$content"
     track_file "$filepath"

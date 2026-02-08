@@ -1,0 +1,56 @@
+{
+  "watch_label": "ready-to-build",
+  "poll_interval": 30,
+  "max_parallel": 2,
+  "pipeline_template": "autonomous",
+  "skip_gates": true,
+  "model": "opus",
+  "base_branch": "main",
+  "on_success": {
+    "remove_label": "ready-to-build",
+    "add_label": "pipeline/complete",
+    "close_issue": false
+  },
+  "on_failure": {
+    "add_label": "pipeline/failed",
+    "comment_log_lines": 50
+  },
+  "notifications": {
+    "slack_webhook": null
+  },
+  "health": {
+    "stale_timeout_s": 1800
+  },
+  "priority_labels": "urgent,p0,high,p1,normal,p2,low,p3",
+  "alerts": {
+    "degradation_window": 5,
+    "cfr_threshold": 30,
+    "success_threshold": 50
+  },
+  "patrol": {
+    "interval": 3600,
+    "max_issues": 5,
+    "label": "auto-patrol"
+  },
+  "auto_template": false,
+  "template_map": {
+    "hotfix|incident": "hotfix",
+    "security": "enterprise"
+  },
+  "max_retries": 2,
+  "retry_escalation": true,
+  "self_optimize": true,
+  "optimize_interval": 5,
+  "priority_lane": false,
+  "priority_lane_labels": "hotfix,incident,p0,urgent",
+  "priority_lane_max": 1,
+  "watch_mode": "repo",
+  "org": null,
+  "repo_filter": null,
+  "auto_scale": true,
+  "auto_scale_interval": 3,
+  "max_workers": 6,
+  "min_workers": 1,
+  "worker_mem_gb": 4,
+  "estimated_cost_per_job_usd": 5.0
+}
