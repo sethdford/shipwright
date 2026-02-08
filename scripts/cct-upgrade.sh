@@ -132,6 +132,14 @@ FILES=(
     "code-review.json|tmux/templates/code-review.json|$HOME/.claude-teams/templates/code-review.json|false|false"
     "refactor.json|tmux/templates/refactor.json|$HOME/.claude-teams/templates/refactor.json|false|false"
     "exploration.json|tmux/templates/exploration.json|$HOME/.claude-teams/templates/exploration.json|false|false"
+    "bug-fix.json|tmux/templates/bug-fix.json|$HOME/.claude-teams/templates/bug-fix.json|false|false"
+    "testing.json|tmux/templates/testing.json|$HOME/.claude-teams/templates/testing.json|false|false"
+    "full-stack.json|tmux/templates/full-stack.json|$HOME/.claude-teams/templates/full-stack.json|false|false"
+    "security-audit.json|tmux/templates/security-audit.json|$HOME/.claude-teams/templates/security-audit.json|false|false"
+    "migration.json|tmux/templates/migration.json|$HOME/.claude-teams/templates/migration.json|false|false"
+    "documentation.json|tmux/templates/documentation.json|$HOME/.claude-teams/templates/documentation.json|false|false"
+    "devops.json|tmux/templates/devops.json|$HOME/.claude-teams/templates/devops.json|false|false"
+    "architecture.json|tmux/templates/architecture.json|$HOME/.claude-teams/templates/architecture.json|false|false"
     "definition-of-done.example.md|docs/definition-of-done.example.md|$HOME/.claude-teams/templates/definition-of-done.example.md|false|false"
     "pipeline-standard.json|templates/pipelines/standard.json|$HOME/.claude-teams/pipelines/standard.json|false|false"
     "pipeline-fast.json|templates/pipelines/fast.json|$HOME/.claude-teams/pipelines/fast.json|false|false"
@@ -140,6 +148,7 @@ FILES=(
     "pipeline-autonomous.json|templates/pipelines/autonomous.json|$HOME/.claude-teams/pipelines/autonomous.json|false|false"
     "pipeline-cost-aware.json|templates/pipelines/cost-aware.json|$HOME/.claude-teams/pipelines/cost-aware.json|false|false"
     "pipeline-enterprise.json|templates/pipelines/enterprise.json|$HOME/.claude-teams/pipelines/enterprise.json|false|false"
+    "pipeline-deployed.json|templates/pipelines/deployed.json|$HOME/.claude-teams/pipelines/deployed.json|false|false"
 )
 
 # ─── Checksum helper ──────────────────────────────────────────────────────

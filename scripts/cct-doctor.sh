@@ -97,6 +97,18 @@ else
     check_fail "git not found"
 fi
 
+# Bash version
+BASH_MAJOR="${BASH_VERSINFO[0]:-0}"
+BASH_MINOR="${BASH_VERSINFO[1]:-0}"
+if [[ "$BASH_MAJOR" -ge 5 ]]; then
+    check_pass "bash ${BASH_VERSION}"
+elif [[ "$BASH_MAJOR" -ge 4 ]]; then
+    check_pass "bash ${BASH_VERSION}"
+else
+    check_warn "bash ${BASH_VERSION} — 4.0+ required for associative arrays"
+    echo -e "    ${DIM}brew install bash  (macOS ships 3.2)${RESET}"
+fi
+
 # ═════════════════════════════════════════════════════════════════════════════
 # 2. Installed Files
 # ═════════════════════════════════════════════════════════════════════════════
@@ -357,7 +369,84 @@ if [[ $orphaned_teams -eq 0 ]]; then
 fi
 
 # ═════════════════════════════════════════════════════════════════════════════
-# 7. Terminal Compatibility
+# 7. Environment & Resources
+# ═════════════════════════════════════════════════════════════════════════════
+echo ""
+echo -e "${PURPLE}${BOLD}  ENVIRONMENT${RESET}"
+echo -e "${DIM}  ──────────────────────────────────────────${RESET}"
+
+# Expected directories
+EXPECTED_DIRS=(
+    "$HOME/.claude"
+    "$HOME/.claude/hooks"
+    "$HOME/.claude-teams"
+    "$HOME/.shipwright"
+)
+missing_dirs=0
+for dir in "${EXPECTED_DIRS[@]}"; do
+    if [[ -d "$dir" ]]; then
+        check_pass "Directory: ${dir/#$HOME/\~}"
+    else
+        check_warn "Missing directory: ${dir/#$HOME/\~}"
+        echo -e "    ${DIM}mkdir -p \"$dir\"${RESET}"
+        missing_dirs=$((missing_dirs + 1))
+    fi
+done
+
+# JSON validation for templates
+if command -v jq &>/dev/null; then
+    json_errors=0
+    json_total=0
+    for tpl_dir in "$HOME/.shipwright/templates" "$HOME/.shipwright/pipelines"; do
+        if [[ -d "$tpl_dir" ]]; then
+            while IFS= read -r json_file; do
+                [[ -z "$json_file" ]] && continue
+                json_total=$((json_total + 1))
+                if ! jq -e . "$json_file" &>/dev/null; then
+                    check_fail "Invalid JSON: ${json_file/#$HOME/\~}"
+                    json_errors=$((json_errors + 1))
+                fi
+            done < <(find "$tpl_dir" -maxdepth 1 -name '*.json' -type f 2>/dev/null)
+        fi
+    done
+    if [[ $json_total -gt 0 && $json_errors -eq 0 ]]; then
+        check_pass "Template JSON: ${json_total} files valid"
+    elif [[ $json_total -eq 0 ]]; then
+        check_warn "No template JSON files found to validate"
+    fi
+fi
+
+# Terminal 256-color support
+TERM_VAR="${TERM:-}"
+if [[ "$TERM_VAR" == *"256color"* || "$TERM_VAR" == "xterm-kitty" || "$TERM_VAR" == "tmux-256color" ]]; then
+    check_pass "TERM=$TERM_VAR (256 colors)"
+elif [[ -z "$TERM_VAR" ]]; then
+    check_warn "TERM not set — colors may not display correctly"
+else
+    check_warn "TERM=$TERM_VAR — 256color variant recommended for full theme support"
+    echo -e "    ${DIM}export TERM=xterm-256color${RESET}"
+fi
+
+# Disk space check (warn if < 1GB free)
+if [[ "$(uname)" == "Darwin" ]]; then
+    FREE_GB="$(df -g "$HOME" 2>/dev/null | awk 'NR==2{print $4}')" || FREE_GB=""
+else
+    # Linux: df -BG gives output in GB
+    FREE_GB="$(df -BG "$HOME" 2>/dev/null | awk 'NR==2{print $4}' | tr -d 'G')" || FREE_GB=""
+fi
+if [[ -n "$FREE_GB" && "$FREE_GB" =~ ^[0-9]+$ ]]; then
+    if [[ "$FREE_GB" -ge 5 ]]; then
+        check_pass "Disk space: ${FREE_GB}GB free"
+    elif [[ "$FREE_GB" -ge 1 ]]; then
+        check_warn "Disk space: ${FREE_GB}GB free — getting low"
+    else
+        check_fail "Disk space: ${FREE_GB}GB free — less than 1GB available"
+        echo -e "    ${DIM}Free up disk space to avoid pipeline failures${RESET}"
+    fi
+fi
+
+# ═════════════════════════════════════════════════════════════════════════════
+# 8. Terminal Compatibility
 # ═════════════════════════════════════════════════════════════════════════════
 echo ""
 echo -e "${PURPLE}${BOLD}  TERMINAL${RESET}"

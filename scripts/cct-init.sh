@@ -316,7 +316,7 @@ else
 
     # Confirm with user
     read -rp "$(echo -e "${CYAN}${BOLD}▸${RESET} Configure deploy for ${BOLD}${DEPLOY_PLATFORM}${RESET}? [Y/n] ")" confirm
-    if [[ "${confirm,,}" == "n" ]]; then
+    if [[ "$(echo "$confirm" | tr '[:upper:]' '[:lower:]')" == "n" ]]; then
         info "Aborted. Use --platform to specify manually."
         exit 0
     fi

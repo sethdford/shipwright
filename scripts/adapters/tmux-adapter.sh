@@ -7,8 +7,10 @@
 # ║  kill_agent, focus_agent.                                                ║
 # ╚═══════════════════════════════════════════════════════════════════════════╝
 
-# Track spawned panes by agent name
-declare -A _TMUX_AGENT_PANES
+# Track spawned panes by agent name (file-based for bash 3.2 compat)
+_TMUX_PANE_MAP="${TMPDIR:-/tmp}/shipwright-tmux-pane-map.$$"
+: > "$_TMUX_PANE_MAP"
+trap 'rm -f "$_TMUX_PANE_MAP"' EXIT
 
 spawn_agent() {
     local name="$1"

@@ -89,7 +89,7 @@ if command -v tmux &>/dev/null; then
   if [[ "$TMUX_MAJOR" -ge 3 && "$TMUX_MINOR" -ge 2 ]] || [[ "$TMUX_MAJOR" -ge 4 ]]; then
     success "tmux $TMUX_VERSION"
   else
-    warn "tmux $TMUX_VERSION (3.2+ recommended)"
+    warn "tmux $TMUX_VERSION (3.2+ recommended — display-popup, set-hook unavailable)"
   fi
 else
   warn "tmux not found"
@@ -151,6 +151,38 @@ else
   PREREQ_OK=false
 fi
 
+# jq
+if command -v jq &>/dev/null; then
+  success "jq $(jq --version 2>/dev/null | tr -d 'jq-')"
+else
+  error "jq not found — install with: brew install jq"
+  PREREQ_OK=false
+fi
+
+# Bash version
+BASH_MAJOR="${BASH_VERSINFO[0]:-0}"
+if [[ "$BASH_MAJOR" -ge 4 ]]; then
+  success "bash $BASH_VERSION"
+else
+  warn "bash $BASH_VERSION (4.0+ recommended — associative arrays, globstar unavailable)"
+fi
+
+# gh CLI (optional but recommended)
+if command -v gh &>/dev/null; then
+  GH_VERSION="$(gh --version 2>/dev/null | head -1 | grep -oE '[0-9]+\.[0-9]+\.[0-9]+')"
+  success "gh CLI $GH_VERSION"
+  # Check gh authentication
+  if gh auth status &>/dev/null; then
+    success "gh authenticated"
+  else
+    warn "gh CLI installed but not authenticated — run: gh auth login"
+    warn "  (needed for daemon, pipeline PR creation, and issue management)"
+  fi
+else
+  warn "gh CLI not found — install with: brew install gh"
+  warn "  (needed for daemon, pipeline PR creation, and issue management)"
+fi
+
 if ! $PREREQ_OK; then
   echo ""
   error "Missing prerequisites. Install them and re-run this script."
@@ -159,6 +191,24 @@ fi
 
 echo ""
 success "All prerequisites met"
+
+# ═════════════════════════════════════════════════════════════════════════════
+# CREATE EXPECTED DIRECTORIES
+# ═════════════════════════════════════════════════════════════════════════════
+header "Creating directories"
+
+for dir in \
+  "$HOME/.claude" \
+  "$HOME/.claude/hooks" \
+  "$HOME/.claude-teams" \
+  "$HOME/.shipwright" \
+  "$HOME/.shipwright/templates" \
+  "$HOME/.shipwright/pipelines"; do
+  if [[ ! -d "$dir" ]]; then
+    run "Create $dir" "mkdir -p '$dir'"
+  fi
+done
+success "All directories ready"
 
 # ═════════════════════════════════════════════════════════════════════════════
 # TMUX CONFIGURATION
@@ -171,7 +221,7 @@ INSTALL_OVERLAY_ONLY=false
 if [[ -f "$HOME/.tmux.conf" ]]; then
   info "Found existing ~/.tmux.conf"
   echo ""
-  echo -e "  ${BOLD}1)${RESET} Install full tmux config ${DIM}(backs up existing to ~/.tmux.conf.bak)${RESET}"
+  echo -e "  ${BOLD}1)${RESET} Install full tmux config ${DIM}(backs up existing with timestamp)${RESET}"
   echo -e "  ${BOLD}2)${RESET} Install overlay only ${DIM}(adds agent pane features to your existing config)${RESET}"
   echo -e "  ${BOLD}3)${RESET} Skip tmux config"
   echo ""
@@ -191,9 +241,10 @@ fi
 if $INSTALL_FULL_TMUX; then
   # Back up existing config
   if [[ -f "$HOME/.tmux.conf" ]]; then
-    run "Back up ~/.tmux.conf → ~/.tmux.conf.bak" \
-      "cp '$HOME/.tmux.conf' '$HOME/.tmux.conf.bak'"
-    success "Backed up existing tmux config"
+    TMUX_BACKUP="$HOME/.tmux.conf.bak.$(date +%Y%m%d-%H%M%S)"
+    run "Back up ~/.tmux.conf → $TMUX_BACKUP" \
+      "cp '$HOME/.tmux.conf' '$TMUX_BACKUP'"
+    success "Backed up existing tmux config → $TMUX_BACKUP"
   fi
 
   run "Install tmux.conf → ~/.tmux.conf" \
@@ -241,10 +292,19 @@ else
     "mkdir -p '$HOME/.claude'"
 
   if ask "Install Claude Code settings template as your settings.json?"; then
-    # Strip JSONC comments for the actual settings file
-    run "Install settings.json (comments stripped)" \
+    # Strip JSONC comments and ensure hooks paths are correct
+    run "Install settings.json (comments stripped, hooks enabled)" \
       "sed '/^[[:space:]]*\/\//d' '$SCRIPT_DIR/claude-code/settings.json.template' > '$HOME/.claude/settings.json'"
-    success "Installed Claude Code settings"
+    # Validate the resulting JSON
+    if command -v jq &>/dev/null && [[ -f "$HOME/.claude/settings.json" ]] && ! $DRY_RUN; then
+      if jq -e . "$HOME/.claude/settings.json" >/dev/null 2>&1; then
+        success "Installed Claude Code settings (validated)"
+      else
+        warn "settings.json has invalid JSON — check for syntax errors"
+      fi
+    else
+      success "Installed Claude Code settings"
+    fi
     INSTALLED+=("settings.json")
   else
     run "Copy settings template for reference" \
@@ -353,6 +413,15 @@ if ask "Install Shipwright CLI to $BIN_DIR?"; then
         run "Install template $local_name → ~/.shipwright/templates/" \
           "cp '$tpl' '$HOME/.shipwright/templates/$local_name'"
       done
+      # Validate installed team templates
+      if command -v jq &>/dev/null && ! $DRY_RUN; then
+        for tpl_file in "$HOME/.claude-teams/templates"/*.json; do
+          [[ -f "$tpl_file" ]] || continue
+          if ! jq -e . "$tpl_file" >/dev/null 2>&1; then
+            warn "Invalid JSON: $(basename "$tpl_file")"
+          fi
+        done
+      fi
       INSTALLED+=("templates")
     fi
 
@@ -369,6 +438,15 @@ if ask "Install Shipwright CLI to $BIN_DIR?"; then
         run "Install pipeline template $local_name → ~/.shipwright/pipelines/" \
           "cp '$ptpl' '$HOME/.shipwright/pipelines/$local_name'"
       done
+      # Validate installed pipeline templates
+      if command -v jq &>/dev/null && ! $DRY_RUN; then
+        for ptpl_file in "$HOME/.claude-teams/pipelines"/*.json; do
+          [[ -f "$ptpl_file" ]] || continue
+          if ! jq -e . "$ptpl_file" >/dev/null 2>&1; then
+            warn "Invalid JSON: $(basename "$ptpl_file")"
+          fi
+        done
+      fi
       INSTALLED+=("pipeline-templates")
     fi
 
@@ -384,14 +462,42 @@ if ask "Install Shipwright CLI to $BIN_DIR?"; then
     warn "scripts/cct not found — skipping (may not be built yet)"
   fi
 
-  # Check if ~/.local/bin is in PATH
+  # Check if ~/.local/bin is in PATH and fix if needed
   if ! echo "$PATH" | tr ':' '\n' | grep -q "$BIN_DIR"; then
     echo ""
     warn "$BIN_DIR is not in your PATH"
-    info "Add this to your shell profile (~/.zshrc or ~/.bashrc):"
-    echo ""
-    echo -e "  ${DIM}export PATH=\"\$HOME/.local/bin:\$PATH\"${RESET}"
-    echo ""
+
+    # Detect the user's shell rc file
+    SHELL_NAME="$(basename "${SHELL:-/bin/bash}")"
+    case "$SHELL_NAME" in
+      zsh)  RC_FILE="$HOME/.zshrc" ;;
+      bash)
+        if [[ -f "$HOME/.bash_profile" ]]; then
+          RC_FILE="$HOME/.bash_profile"
+        else
+          RC_FILE="$HOME/.bashrc"
+        fi
+        ;;
+      *)    RC_FILE="$HOME/.profile" ;;
+    esac
+
+    PATH_LINE='export PATH="$HOME/.local/bin:$PATH"'
+    MARKER="# Added by Shipwright"
+
+    if [[ -f "$RC_FILE" ]] && grep -qF "$MARKER" "$RC_FILE" 2>/dev/null; then
+      info "PATH entry already in $RC_FILE (Shipwright marker found)"
+    elif ask "Add $BIN_DIR to PATH in $RC_FILE?"; then
+      run "Add PATH to $RC_FILE" \
+        "printf '\n%s\n%s\n' '$MARKER' '$PATH_LINE' >> '$RC_FILE'"
+      success "Added $BIN_DIR to PATH in $RC_FILE"
+      echo ""
+      info "Run: ${BOLD}source $RC_FILE${RESET}  (or restart your shell)"
+    else
+      info "Add this to your shell profile ($RC_FILE):"
+      echo ""
+      echo -e "  ${DIM}export PATH=\"\$HOME/.local/bin:\$PATH\"${RESET}"
+      echo ""
+    fi
   fi
 fi
 

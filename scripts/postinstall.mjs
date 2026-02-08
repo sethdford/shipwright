@@ -35,6 +35,12 @@ function copyDir(src, dest) {
 }
 
 try {
+  // Ensure expected directories exist
+  ensureDir(CLAUDE_DIR);
+  ensureDir(join(CLAUDE_DIR, "hooks"));
+  ensureDir(LEGACY_DIR);
+  ensureDir(SHIPWRIGHT_DIR);
+
   // Copy team templates → ~/.shipwright/templates/
   copyDir(join(PKG_DIR, "tmux", "templates"), join(SHIPWRIGHT_DIR, "templates"));
   success("Installed team templates");

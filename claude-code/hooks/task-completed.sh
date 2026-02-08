@@ -131,8 +131,12 @@ while IFS= read -r file; do
 done <<< "$CHANGED_FILES"
 
 if [[ ${#TEST_FILES[@]} -gt 0 ]]; then
-  # Deduplicate
-  readarray -t TEST_FILES < <(printf '%s\n' "${TEST_FILES[@]}" | sort -u)
+  # Deduplicate (bash 3.2 compatible — no readarray)
+  _deduped=()
+  while IFS= read -r _f; do
+    [[ -n "$_f" ]] && _deduped+=("$_f")
+  done < <(printf '%s\n' "${TEST_FILES[@]}" | sort -u)
+  TEST_FILES=("${_deduped[@]}")
 
   echo "Running ${#TEST_FILES[@]} related test file(s)..."
 

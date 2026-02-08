@@ -14,8 +14,10 @@ if ! command -v wezterm &>/dev/null; then
     exit 1
 fi
 
-# Track spawned pane IDs for agent management
-declare -A _WEZTERM_AGENT_PANES
+# Track spawned pane IDs for agent management (file-based for bash 3.2 compat)
+_WEZTERM_PANE_MAP="${TMPDIR:-/tmp}/shipwright-wezterm-pane-map.$$"
+: > "$_WEZTERM_PANE_MAP"
+trap 'rm -f "$_WEZTERM_PANE_MAP"' EXIT
 
 spawn_agent() {
     local name="$1"
@@ -30,12 +32,16 @@ spawn_agent() {
     local pane_id
 
     # Spawn a new pane in the current tab (split right by default)
-    if [[ ${#_WEZTERM_AGENT_PANES[@]} -eq 0 ]]; then
+    local pane_count
+    pane_count=$(wc -l < "$_WEZTERM_PANE_MAP" 2>/dev/null | tr -d ' ')
+    pane_count="${pane_count:-0}"
+    if [[ "$pane_count" -eq 0 ]]; then
         # First agent: create a new tab
         pane_id=$(wezterm cli spawn --cwd "$working_dir" 2>/dev/null)
     else
         # Subsequent agents: split from the first pane
-        local first_pane="${_WEZTERM_AGENT_PANES[${!_WEZTERM_AGENT_PANES[*]}]}"
+        local first_pane
+        first_pane=$(head -1 "$_WEZTERM_PANE_MAP" 2>/dev/null | cut -d= -f2-)
         pane_id=$(wezterm cli split-pane --cwd "$working_dir" --right --pane-id "${first_pane:-0}" 2>/dev/null) || \
         pane_id=$(wezterm cli split-pane --cwd "$working_dir" --bottom 2>/dev/null)
     fi
@@ -45,8 +51,8 @@ spawn_agent() {
         return 1
     fi
 
-    # Store mapping
-    _WEZTERM_AGENT_PANES["$name"]="$pane_id"
+    # Store mapping (file-based)
+    echo "${name}=${pane_id}" >> "$_WEZTERM_PANE_MAP"
 
     # Set the pane title
     wezterm cli set-tab-title --pane-id "$pane_id" "$name" 2>/dev/null || true
@@ -70,30 +76,36 @@ list_agents() {
     done
 
     # Also show our tracked agents
-    if [[ ${#_WEZTERM_AGENT_PANES[@]} -gt 0 ]]; then
+    if [[ -s "$_WEZTERM_PANE_MAP" ]]; then
         echo ""
         echo "Tracked agents:"
-        for name in "${!_WEZTERM_AGENT_PANES[@]}"; do
-            echo "  ${name} → pane ${_WEZTERM_AGENT_PANES[$name]}"
-        done
+        while IFS='=' read -r _name _pid; do
+            echo "  ${_name} → pane ${_pid}"
+        done < "$_WEZTERM_PANE_MAP"
     fi
 }
 
 kill_agent() {
     local name="$1"
-    local pane_id="${_WEZTERM_AGENT_PANES[$name]:-}"
+    local pane_id
+    pane_id=$(grep "^${name}=" "$_WEZTERM_PANE_MAP" 2>/dev/null | head -1 | cut -d= -f2-)
 
     if [[ -z "$pane_id" ]]; then
         return 1
     fi
 
     wezterm cli kill-pane --pane-id "$pane_id" 2>/dev/null
-    unset '_WEZTERM_AGENT_PANES[$name]'
+    # Remove entry from pane map
+    local _tmp
+    _tmp=$(mktemp)
+    grep -v "^${name}=" "$_WEZTERM_PANE_MAP" > "$_tmp" 2>/dev/null || true
+    mv "$_tmp" "$_WEZTERM_PANE_MAP"
 }
 
 focus_agent() {
     local name="$1"
-    local pane_id="${_WEZTERM_AGENT_PANES[$name]:-}"
+    local pane_id
+    pane_id=$(grep "^${name}=" "$_WEZTERM_PANE_MAP" 2>/dev/null | head -1 | cut -d= -f2-)
 
     if [[ -z "$pane_id" ]]; then
         return 1
