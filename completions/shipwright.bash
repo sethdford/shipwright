@@ -10,7 +10,7 @@ _shipwright_completions() {
     prev="${COMP_WORDS[COMP_CWORD-1]}"
 
     # Top-level commands
-    local commands="session status ps logs templates doctor cleanup reaper upgrade loop pipeline worktree prep daemon init help version"
+    local commands="session status ps logs templates doctor cleanup reaper upgrade loop pipeline worktree prep daemon memory cost init help version"
 
     case "$prev" in
         shipwright|sw|cct)
@@ -22,7 +22,15 @@ _shipwright_completions() {
             return 0
             ;;
         daemon)
-            COMPREPLY=( $(compgen -W "start stop status metrics test logs init" -- "$cur") )
+            COMPREPLY=( $(compgen -W "start stop status metrics triage patrol test logs init" -- "$cur") )
+            return 0
+            ;;
+        memory)
+            COMPREPLY=( $(compgen -W "show search forget export import stats test" -- "$cur") )
+            return 0
+            ;;
+        cost)
+            COMPREPLY=( $(compgen -W "show budget record calculate check-budget" -- "$cur") )
             return 0
             ;;
         templates)
@@ -53,6 +61,10 @@ _shipwright_completions() {
             COMPREPLY=( $(compgen -W "--watch" -- "$cur") )
             return 0
             ;;
+        budget)
+            COMPREPLY=( $(compgen -W "set show" -- "$cur") )
+            return 0
+            ;;
     esac
 
     # Flags for subcommands already handled above; fall back to commands
@@ -64,6 +76,7 @@ _shipwright_completions() {
             cleanup) COMPREPLY=( $(compgen -W "--force" -- "$cur") ) ;;
             upgrade) COMPREPLY=( $(compgen -W "--apply" -- "$cur") ) ;;
             reaper)  COMPREPLY=( $(compgen -W "--watch" -- "$cur") ) ;;
+            cost)    COMPREPLY=( $(compgen -W "--period --json --by-stage --by-issue" -- "$cur") ) ;;
         esac
         return 0
     fi

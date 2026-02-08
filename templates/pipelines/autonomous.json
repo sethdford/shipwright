@@ -9,6 +9,7 @@
   "stages": [
     { "id": "intake", "enabled": true, "gate": "auto", "config": {} },
     { "id": "plan", "enabled": true, "gate": "auto", "config": { "model": "opus" } },
+    { "id": "design", "enabled": true, "gate": "auto", "config": { "model": "opus" } },
     {
       "id": "build",
       "enabled": true,
@@ -51,6 +52,20 @@
       "enabled": false,
       "gate": "auto",
       "config": { "smoke_cmd": "", "health_url": "", "close_issue": true }
+    },
+    {
+      "id": "monitor",
+      "enabled": true,
+      "gate": "auto",
+      "config": {
+        "duration_minutes": 5,
+        "health_url": "",
+        "error_threshold": 5,
+        "log_pattern": "ERROR|FATAL|PANIC",
+        "log_cmd": "",
+        "rollback_cmd": "",
+        "auto_rollback": false
+      }
     }
   ]
 }

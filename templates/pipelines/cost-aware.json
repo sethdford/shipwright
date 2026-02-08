@@ -1,57 +1,73 @@
 {
-  "name": "standard",
-  "description": "Feature pipeline: intake → plan → design → build → test → review → PR",
+  "name": "cost-aware",
+  "description": "Cost-optimized pipeline: budget limits, model routing (haiku→sonnet→opus), per-stage tracking",
   "defaults": {
     "test_cmd": "npm test",
-    "model": "opus",
-    "agents": 1
+    "model": "sonnet",
+    "agents": 1,
+    "cost_tracking": true,
+    "budget_check": true
   },
   "stages": [
     {
       "id": "intake",
       "enabled": true,
       "gate": "auto",
-      "config": {}
+      "config": {
+        "model": "haiku",
+        "cost_tracking": true
+      }
     },
     {
       "id": "plan",
       "enabled": true,
       "gate": "approve",
-      "config": { "model": "opus" }
-    },
-    {
-      "id": "design",
-      "enabled": true,
-      "gate": "approve",
-      "config": { "model": "opus" }
+      "config": {
+        "model": "sonnet",
+        "cost_tracking": true
+      }
     },
     {
       "id": "build",
       "enabled": true,
       "gate": "auto",
       "config": {
+        "model": "sonnet",
         "max_iterations": 20,
         "audit": true,
-        "quality_gates": true
+        "quality_gates": true,
+        "cost_tracking": true,
+        "abort_on_budget": true
       }
     },
     {
       "id": "test",
       "enabled": true,
       "gate": "auto",
-      "config": { "coverage_min": 80 }
+      "config": {
+        "coverage_min": 80,
+        "model": "haiku",
+        "cost_tracking": true
+      }
     },
     {
       "id": "review",
       "enabled": true,
       "gate": "approve",
-      "config": {}
+      "config": {
+        "model": "opus",
+        "cost_tracking": true
+      }
     },
     {
       "id": "pr",
       "enabled": true,
       "gate": "approve",
-      "config": { "wait_ci": false }
+      "config": {
+        "wait_ci": false,
+        "model": "haiku",
+        "cost_tracking": true
+      }
     },
     {
       "id": "deploy",
@@ -60,7 +76,8 @@
       "config": {
         "staging_cmd": "",
         "production_cmd": "",
-        "rollback_cmd": ""
+        "rollback_cmd": "",
+        "cost_tracking": true
       }
     },
     {
@@ -70,21 +87,8 @@
       "config": {
         "smoke_cmd": "",
         "health_url": "",
-        "close_issue": true
-      }
-    },
-    {
-      "id": "monitor",
-      "enabled": false,
-      "gate": "auto",
-      "config": {
-        "duration_minutes": 5,
-        "health_url": "",
-        "error_threshold": 5,
-        "log_pattern": "ERROR|FATAL|PANIC",
-        "log_cmd": "",
-        "rollback_cmd": "",
-        "auto_rollback": false
+        "close_issue": true,
+        "cost_tracking": true
       }
     }
   ]

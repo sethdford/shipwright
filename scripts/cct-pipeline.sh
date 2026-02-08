@@ -150,7 +150,7 @@ show_help() {
     echo -e "  ${DIM}--self-heal <n>${RESET}            Build→test retry cycles on failure (default: 2)"
     echo ""
     echo -e "${BOLD}STAGES${RESET}  ${DIM}(configurable per pipeline template)${RESET}"
-    echo -e "  intake → plan → build → test → review → pr → deploy → validate"
+    echo -e "  intake → plan → design → build → test → review → pr → deploy → validate → monitor"
     echo ""
     echo -e "${BOLD}GITHUB INTEGRATION${RESET}  ${DIM}(automatic when gh CLI available)${RESET}"
     echo -e "  • Issue intake: fetch metadata, labels, milestone, self-assign"
@@ -1061,6 +1061,7 @@ show_stage_preview() {
     case "$stage_id" in
         intake)   echo -e "  Fetch issue, detect task type, create branch, self-assign" ;;
         plan)     echo -e "  Generate plan via Claude, post task checklist to issue" ;;
+        design)   echo -e "  Generate Architecture Decision Record (ADR), evaluate alternatives" ;;
         build)    echo -e "  Delegate to ${CYAN}cct loop${RESET} for autonomous building" ;;
         test)     echo -e "  Run test suite and check coverage" ;;
         review)   echo -e "  AI code review on the diff, post findings" ;;
@@ -1068,6 +1069,7 @@ show_stage_preview() {
         merge)    echo -e "  Wait for CI checks, merge PR, optionally delete branch" ;;
         deploy)   echo -e "  Deploy to staging/production with rollback" ;;
         validate) echo -e "  Smoke tests, health checks, close issue" ;;
+        monitor)  echo -e "  Post-deploy monitoring, health checks, auto-rollback" ;;
     esac
     echo ""
 }
@@ -1329,10 +1331,139 @@ CC_TASKS_EOF
     log_stage "plan" "Generated plan.md (${line_count} lines, $(echo "$checklist" | wc -l | xargs) tasks)"
 }
 
+stage_design() {
+    CURRENT_STAGE_ID="design"
+    local plan_file="$ARTIFACTS_DIR/plan.md"
+    local design_file="$ARTIFACTS_DIR/design.md"
+
+    if [[ ! -s "$plan_file" ]]; then
+        warn "No plan found — skipping design stage"
+        return 0
+    fi
+
+    if ! command -v claude &>/dev/null; then
+        error "Claude CLI not found — cannot generate design"
+        return 1
+    fi
+
+    info "Generating Architecture Decision Record..."
+
+    # Memory integration — inject context if memory system available
+    local memory_context=""
+    if [[ -x "$SCRIPT_DIR/cct-memory.sh" ]]; then
+        memory_context=$(bash "$SCRIPT_DIR/cct-memory.sh" inject "design" 2>/dev/null) || true
+    fi
+
+    # Build design prompt with plan + project context
+    local project_lang
+    project_lang=$(detect_project_lang)
+
+    local design_prompt="You are a senior software architect. Review the implementation plan below and produce an Architecture Decision Record (ADR).
+
+## Goal
+${GOAL}
+
+## Implementation Plan
+$(cat "$plan_file")
+
+## Project Context
+- Language: ${project_lang}
+- Test command: ${TEST_CMD:-not configured}
+- Task type: ${TASK_TYPE:-feature}
+${memory_context:+
+## Historical Context (from memory)
+${memory_context}
+}
+## Required Output — Architecture Decision Record
+
+Produce this EXACT format:
+
+# Design: ${GOAL}
+
+## Context
+[What problem we're solving, constraints from the codebase]
+
+## Decision
+[The chosen approach — be specific about patterns, data flow, error handling]
+
+## Alternatives Considered
+1. [Alternative A] — Pros: ... / Cons: ...
+2. [Alternative B] — Pros: ... / Cons: ...
+
+## Implementation Plan
+- Files to create: [list with full paths]
+- Files to modify: [list with full paths]
+- Dependencies: [new deps if any]
+- Risk areas: [fragile code, performance concerns]
+
+## Validation Criteria
+- [ ] [How we'll know the design is correct — testable criteria]
+- [ ] [Additional validation items]
+
+Be concrete and specific. Reference actual file paths in the codebase. Consider edge cases and failure modes."
+
+    local design_model
+    design_model=$(jq -r --arg id "design" '(.stages[] | select(.id == $id) | .config.model) // .defaults.model // "opus"' "$PIPELINE_CONFIG" 2>/dev/null) || true
+    [[ -n "$MODEL" ]] && design_model="$MODEL"
+    [[ -z "$design_model" || "$design_model" == "null" ]] && design_model="opus"
+
+    local _token_log="${ARTIFACTS_DIR}/.claude-tokens-design.log"
+    claude --print --model "$design_model" --max-turns 10 \
+        "$design_prompt" > "$design_file" 2>"$_token_log" || true
+    parse_claude_tokens "$_token_log"
+
+    if [[ ! -s "$design_file" ]]; then
+        error "Design generation failed"
+        return 1
+    fi
+
+    local line_count
+    line_count=$(wc -l < "$design_file" | xargs)
+    info "Design saved: ${DIM}$design_file${RESET} (${line_count} lines)"
+
+    # Extract file lists for build stage awareness
+    local files_to_create files_to_modify
+    files_to_create=$(sed -n '/Files to create/,/^-\|^#\|^$/p' "$design_file" 2>/dev/null | grep -E '^\s*-' | head -20 || true)
+    files_to_modify=$(sed -n '/Files to modify/,/^-\|^#\|^$/p' "$design_file" 2>/dev/null | grep -E '^\s*-' | head -20 || true)
+
+    if [[ -n "$files_to_create" || -n "$files_to_modify" ]]; then
+        info "Design scope: ${DIM}$(echo "$files_to_create $files_to_modify" | grep -c '^\s*-' || echo 0) file(s)${RESET}"
+    fi
+
+    # Post design to GitHub issue
+    if [[ -n "$ISSUE_NUMBER" ]]; then
+        local design_summary
+        design_summary=$(head -60 "$design_file")
+        gh_comment_issue "$ISSUE_NUMBER" "## 📐 Architecture Decision Record
+
+<details>
+<summary>Click to expand ADR (${line_count} lines)</summary>
+
+${design_summary}
+
+</details>
+
+---
+_Generated by \`cct pipeline\` design stage at $(now_iso)_"
+    fi
+
+    # Push design to wiki
+    gh_wiki_page "Pipeline-Design-${ISSUE_NUMBER:-inline}" "$(<"$design_file")"
+
+    log_stage "design" "Generated design.md (${line_count} lines)"
+}
+
 stage_build() {
     local plan_file="$ARTIFACTS_DIR/plan.md"
+    local design_file="$ARTIFACTS_DIR/design.md"
     local dod_file="$ARTIFACTS_DIR/dod.md"
     local loop_args=()
+
+    # Memory integration — inject context if memory system available
+    local memory_context=""
+    if [[ -x "$SCRIPT_DIR/cct-memory.sh" ]]; then
+        memory_context=$(bash "$SCRIPT_DIR/cct-memory.sh" inject "build" 2>/dev/null) || true
+    fi
 
     # Build enriched goal with full context
     local enriched_goal="$GOAL"
@@ -1341,6 +1472,22 @@ stage_build() {
 
 Implementation plan (follow this exactly):
 $(cat "$plan_file")"
+    fi
+
+    # Inject approved design document
+    if [[ -s "$design_file" ]]; then
+        enriched_goal="${enriched_goal}
+
+Follow the approved design document:
+$(cat "$design_file")"
+    fi
+
+    # Inject memory context
+    if [[ -n "$memory_context" ]]; then
+        enriched_goal="${enriched_goal}
+
+Historical context (lessons from previous pipelines):
+${memory_context}"
     fi
 
     # Add task list context
@@ -1961,6 +2108,465 @@ _Generated by \`cct pipeline\` at $(now_iso)_"
     log_stage "validate" "Validation complete"
 }
 
+stage_monitor() {
+    CURRENT_STAGE_ID="monitor"
+
+    # Read config from pipeline template
+    local duration_minutes health_url error_threshold log_pattern log_cmd rollback_cmd auto_rollback
+    duration_minutes=$(jq -r --arg id "monitor" '(.stages[] | select(.id == $id) | .config.duration_minutes) // 5' "$PIPELINE_CONFIG" 2>/dev/null) || true
+    [[ -z "$duration_minutes" || "$duration_minutes" == "null" ]] && duration_minutes=5
+    health_url=$(jq -r --arg id "monitor" '(.stages[] | select(.id == $id) | .config.health_url) // ""' "$PIPELINE_CONFIG" 2>/dev/null) || true
+    [[ "$health_url" == "null" ]] && health_url=""
+    error_threshold=$(jq -r --arg id "monitor" '(.stages[] | select(.id == $id) | .config.error_threshold) // 5' "$PIPELINE_CONFIG" 2>/dev/null) || true
+    [[ -z "$error_threshold" || "$error_threshold" == "null" ]] && error_threshold=5
+    log_pattern=$(jq -r --arg id "monitor" '(.stages[] | select(.id == $id) | .config.log_pattern) // "ERROR|FATAL|PANIC"' "$PIPELINE_CONFIG" 2>/dev/null) || true
+    [[ -z "$log_pattern" || "$log_pattern" == "null" ]] && log_pattern="ERROR|FATAL|PANIC"
+    log_cmd=$(jq -r --arg id "monitor" '(.stages[] | select(.id == $id) | .config.log_cmd) // ""' "$PIPELINE_CONFIG" 2>/dev/null) || true
+    [[ "$log_cmd" == "null" ]] && log_cmd=""
+    rollback_cmd=$(jq -r --arg id "monitor" '(.stages[] | select(.id == $id) | .config.rollback_cmd) // ""' "$PIPELINE_CONFIG" 2>/dev/null) || true
+    [[ "$rollback_cmd" == "null" ]] && rollback_cmd=""
+    auto_rollback=$(jq -r --arg id "monitor" '(.stages[] | select(.id == $id) | .config.auto_rollback) // false' "$PIPELINE_CONFIG" 2>/dev/null) || true
+    [[ -z "$auto_rollback" || "$auto_rollback" == "null" ]] && auto_rollback="false"
+
+    if [[ -z "$health_url" && -z "$log_cmd" ]]; then
+        warn "No health_url or log_cmd configured — skipping monitor stage"
+        log_stage "monitor" "Skipped (no monitoring configured)"
+        return 0
+    fi
+
+    local report_file="$ARTIFACTS_DIR/monitor-report.md"
+    local total_errors=0
+    local poll_interval=30  # seconds between polls
+    local total_polls=$(( (duration_minutes * 60) / poll_interval ))
+    [[ "$total_polls" -lt 1 ]] && total_polls=1
+
+    info "Post-deploy monitoring: ${duration_minutes}m (${total_polls} polls, threshold: ${error_threshold} errors)"
+
+    emit_event "monitor.started" \
+        "issue=${ISSUE_NUMBER:-0}" \
+        "duration_minutes=$duration_minutes" \
+        "error_threshold=$error_threshold"
+
+    {
+        echo "# Post-Deploy Monitor Report"
+        echo ""
+        echo "- Duration: ${duration_minutes} minutes"
+        echo "- Health URL: ${health_url:-none}"
+        echo "- Log command: ${log_cmd:-none}"
+        echo "- Error threshold: ${error_threshold}"
+        echo "- Auto-rollback: ${auto_rollback}"
+        echo ""
+        echo "## Poll Results"
+        echo ""
+    } > "$report_file"
+
+    local poll=0
+    local health_failures=0
+    local log_errors=0
+    while [[ "$poll" -lt "$total_polls" ]]; do
+        poll=$((poll + 1))
+        local poll_time
+        poll_time=$(now_iso)
+
+        # Health URL check
+        if [[ -n "$health_url" ]]; then
+            local http_status
+            http_status=$(curl -sf -o /dev/null -w "%{http_code}" "$health_url" 2>/dev/null || echo "000")
+            if [[ "$http_status" -ge 200 && "$http_status" -lt 400 ]]; then
+                echo "- [${poll_time}] Health: ✅ (HTTP ${http_status})" >> "$report_file"
+            else
+                health_failures=$((health_failures + 1))
+                total_errors=$((total_errors + 1))
+                echo "- [${poll_time}] Health: ❌ (HTTP ${http_status})" >> "$report_file"
+                warn "Health check failed: HTTP ${http_status}"
+            fi
+        fi
+
+        # Log command check
+        if [[ -n "$log_cmd" ]]; then
+            local log_output
+            log_output=$(eval "$log_cmd" 2>/dev/null || true)
+            local error_count=0
+            if [[ -n "$log_output" ]]; then
+                error_count=$(echo "$log_output" | grep -cE "$log_pattern" 2>/dev/null || true)
+                error_count="${error_count:-0}"
+            fi
+            if [[ "$error_count" -gt 0 ]]; then
+                log_errors=$((log_errors + error_count))
+                total_errors=$((total_errors + error_count))
+                echo "- [${poll_time}] Logs: ⚠️ ${error_count} error(s) matching '${log_pattern}'" >> "$report_file"
+                warn "Log errors detected: ${error_count}"
+            else
+                echo "- [${poll_time}] Logs: ✅ clean" >> "$report_file"
+            fi
+        fi
+
+        emit_event "monitor.check" \
+            "issue=${ISSUE_NUMBER:-0}" \
+            "poll=$poll" \
+            "total_errors=$total_errors" \
+            "health_failures=$health_failures"
+
+        # Check threshold
+        if [[ "$total_errors" -ge "$error_threshold" ]]; then
+            error "Error threshold exceeded: ${total_errors} >= ${error_threshold}"
+
+            echo "" >> "$report_file"
+            echo "## ❌ THRESHOLD EXCEEDED" >> "$report_file"
+            echo "Total errors: ${total_errors} (threshold: ${error_threshold})" >> "$report_file"
+
+            emit_event "monitor.alert" \
+                "issue=${ISSUE_NUMBER:-0}" \
+                "total_errors=$total_errors" \
+                "threshold=$error_threshold"
+
+            # Auto-rollback if configured
+            if [[ "$auto_rollback" == "true" && -n "$rollback_cmd" ]]; then
+                warn "Auto-rolling back..."
+                echo "" >> "$report_file"
+                echo "## Rollback" >> "$report_file"
+
+                if eval "$rollback_cmd" >> "$report_file" 2>&1; then
+                    success "Rollback executed"
+                    echo "Rollback: ✅ success" >> "$report_file"
+                else
+                    error "Rollback failed!"
+                    echo "Rollback: ❌ failed" >> "$report_file"
+                fi
+
+                emit_event "monitor.rollback" \
+                    "issue=${ISSUE_NUMBER:-0}" \
+                    "total_errors=$total_errors"
+
+                # Post to GitHub
+                if [[ -n "$ISSUE_NUMBER" ]]; then
+                    gh_comment_issue "$ISSUE_NUMBER" "🚨 **Auto-rollback triggered** — ${total_errors} errors exceeded threshold (${error_threshold})
+
+Rollback command: \`${rollback_cmd}\`" 2>/dev/null || true
+
+                    # Create hotfix issue
+                    if [[ "$GH_AVAILABLE" == "true" ]]; then
+                        gh issue create \
+                            --title "Hotfix: Deploy regression for ${GOAL}" \
+                            --label "hotfix,incident" \
+                            --body "Auto-rollback triggered during post-deploy monitoring.
+
+**Original issue:** ${GITHUB_ISSUE:-N/A}
+**Errors detected:** ${total_errors}
+**Threshold:** ${error_threshold}
+**Branch:** ${GIT_BRANCH}
+
+## Monitor Report
+$(cat "$report_file")
+
+---
+_Created automatically by \`cct pipeline\` monitor stage_" 2>/dev/null || true
+                    fi
+                fi
+            fi
+
+            log_stage "monitor" "Failed — ${total_errors} errors (threshold: ${error_threshold})"
+            return 1
+        fi
+
+        # Sleep between polls (skip on last poll)
+        if [[ "$poll" -lt "$total_polls" ]]; then
+            sleep "$poll_interval"
+        fi
+    done
+
+    # Monitoring complete — all clear
+    echo "" >> "$report_file"
+    echo "## ✅ Monitoring Complete" >> "$report_file"
+    echo "Total errors: ${total_errors} (threshold: ${error_threshold})" >> "$report_file"
+    echo "Health failures: ${health_failures}" >> "$report_file"
+    echo "Log errors: ${log_errors}" >> "$report_file"
+
+    success "Post-deploy monitoring clean (${total_errors} errors in ${duration_minutes}m)"
+
+    if [[ -n "$ISSUE_NUMBER" ]]; then
+        gh_comment_issue "$ISSUE_NUMBER" "✅ **Post-deploy monitoring passed** — ${duration_minutes}m, ${total_errors} errors" 2>/dev/null || true
+    fi
+
+    log_stage "monitor" "Clean — ${total_errors} errors in ${duration_minutes}m"
+}
+
+# ─── Multi-Dimensional Quality Checks ─────────────────────────────────────
+# Beyond tests: security, bundle size, perf regression, API compat, coverage
+
+quality_check_security() {
+    info "Security audit..."
+    local audit_log="$ARTIFACTS_DIR/security-audit.log"
+    local audit_exit=0
+    local tool_found=false
+
+    # Try npm audit
+    if [[ -f "package.json" ]] && command -v npm &>/dev/null; then
+        tool_found=true
+        npm audit --production 2>&1 | tee "$audit_log" || audit_exit=$?
+    # Try pip-audit
+    elif [[ -f "requirements.txt" || -f "pyproject.toml" ]] && command -v pip-audit &>/dev/null; then
+        tool_found=true
+        pip-audit 2>&1 | tee "$audit_log" || audit_exit=$?
+    # Try cargo audit
+    elif [[ -f "Cargo.toml" ]] && command -v cargo-audit &>/dev/null; then
+        tool_found=true
+        cargo audit 2>&1 | tee "$audit_log" || audit_exit=$?
+    fi
+
+    if [[ "$tool_found" != "true" ]]; then
+        info "No security audit tool found — skipping"
+        echo "No audit tool available" > "$audit_log"
+        return 0
+    fi
+
+    # Parse results for critical/high severity
+    local critical_count high_count
+    critical_count=$(grep -ciE 'critical' "$audit_log" 2>/dev/null || true)
+    critical_count="${critical_count:-0}"
+    high_count=$(grep -ciE 'high' "$audit_log" 2>/dev/null || true)
+    high_count="${high_count:-0}"
+
+    emit_event "quality.security" \
+        "issue=${ISSUE_NUMBER:-0}" \
+        "critical=$critical_count" \
+        "high=$high_count"
+
+    if [[ "$critical_count" -gt 0 ]]; then
+        warn "Security audit: ${critical_count} critical, ${high_count} high"
+        return 1
+    fi
+
+    success "Security audit: clean"
+    return 0
+}
+
+quality_check_bundle_size() {
+    info "Bundle size check..."
+    local metrics_log="$ARTIFACTS_DIR/bundle-metrics.log"
+    local bundle_size=0
+    local bundle_dir=""
+
+    # Find build output directory
+    for dir in dist build out .next; do
+        if [[ -d "$dir" ]]; then
+            bundle_dir="$dir"
+            break
+        fi
+    done
+
+    if [[ -z "$bundle_dir" ]]; then
+        info "No build output directory found — skipping bundle check"
+        echo "No build directory" > "$metrics_log"
+        return 0
+    fi
+
+    bundle_size=$(du -sk "$bundle_dir" 2>/dev/null | cut -f1 || echo "0")
+    local bundle_size_human
+    bundle_size_human=$(du -sh "$bundle_dir" 2>/dev/null | cut -f1 || echo "unknown")
+
+    echo "Bundle directory: $bundle_dir" > "$metrics_log"
+    echo "Size: ${bundle_size}KB (${bundle_size_human})" >> "$metrics_log"
+
+    emit_event "quality.bundle" \
+        "issue=${ISSUE_NUMBER:-0}" \
+        "size_kb=$bundle_size" \
+        "directory=$bundle_dir"
+
+    # Check against memory baseline if available
+    local baseline_size=""
+    if [[ -x "$SCRIPT_DIR/cct-memory.sh" ]]; then
+        baseline_size=$(bash "$SCRIPT_DIR/cct-memory.sh" get "bundle_size_kb" 2>/dev/null) || true
+    fi
+
+    if [[ -n "$baseline_size" && "$baseline_size" -gt 0 ]] 2>/dev/null; then
+        local growth_pct
+        growth_pct=$(awk -v cur="$bundle_size" -v base="$baseline_size" 'BEGIN{printf "%d", ((cur - base) / base) * 100}')
+        echo "Baseline: ${baseline_size}KB | Growth: ${growth_pct}%" >> "$metrics_log"
+        if [[ "$growth_pct" -gt 20 ]]; then
+            warn "Bundle size grew ${growth_pct}% (${baseline_size}KB → ${bundle_size}KB)"
+            return 1
+        fi
+    fi
+
+    info "Bundle size: ${bundle_size_human}"
+    return 0
+}
+
+quality_check_perf_regression() {
+    info "Performance regression check..."
+    local metrics_log="$ARTIFACTS_DIR/perf-metrics.log"
+    local test_log="$ARTIFACTS_DIR/test-results.log"
+
+    if [[ ! -f "$test_log" ]]; then
+        info "No test results — skipping perf check"
+        echo "No test results available" > "$metrics_log"
+        return 0
+    fi
+
+    # Extract test suite duration (common patterns)
+    local duration_ms=""
+    duration_ms=$(grep -oE 'Time:\s*[0-9.]+\s*s' "$test_log" 2>/dev/null | grep -oE '[0-9.]+' | tail -1 || true)
+    [[ -z "$duration_ms" ]] && duration_ms=$(grep -oE '[0-9.]+ ?s(econds?)?' "$test_log" 2>/dev/null | grep -oE '[0-9.]+' | tail -1 || true)
+
+    if [[ -z "$duration_ms" ]]; then
+        info "Could not extract test duration — skipping perf check"
+        echo "Duration not parseable" > "$metrics_log"
+        return 0
+    fi
+
+    echo "Test duration: ${duration_ms}s" > "$metrics_log"
+
+    emit_event "quality.perf" \
+        "issue=${ISSUE_NUMBER:-0}" \
+        "duration_s=$duration_ms"
+
+    # Check against memory baseline if available
+    local baseline_dur=""
+    if [[ -x "$SCRIPT_DIR/cct-memory.sh" ]]; then
+        baseline_dur=$(bash "$SCRIPT_DIR/cct-memory.sh" get "test_duration_s" 2>/dev/null) || true
+    fi
+
+    if [[ -n "$baseline_dur" ]] && awk -v cur="$duration_ms" -v base="$baseline_dur" 'BEGIN{exit !(base > 0)}' 2>/dev/null; then
+        local slowdown_pct
+        slowdown_pct=$(awk -v cur="$duration_ms" -v base="$baseline_dur" 'BEGIN{printf "%d", ((cur - base) / base) * 100}')
+        echo "Baseline: ${baseline_dur}s | Slowdown: ${slowdown_pct}%" >> "$metrics_log"
+        if [[ "$slowdown_pct" -gt 30 ]]; then
+            warn "Tests ${slowdown_pct}% slower (${baseline_dur}s → ${duration_ms}s)"
+            return 1
+        fi
+    fi
+
+    info "Test duration: ${duration_ms}s"
+    return 0
+}
+
+quality_check_api_compat() {
+    info "API compatibility check..."
+    local compat_log="$ARTIFACTS_DIR/api-compat.log"
+
+    # Look for OpenAPI/Swagger specs
+    local spec_file=""
+    for candidate in openapi.json openapi.yaml swagger.json swagger.yaml api/openapi.json docs/openapi.yaml; do
+        if [[ -f "$candidate" ]]; then
+            spec_file="$candidate"
+            break
+        fi
+    done
+
+    if [[ -z "$spec_file" ]]; then
+        info "No OpenAPI/Swagger spec found — skipping API compat check"
+        echo "No API spec found" > "$compat_log"
+        return 0
+    fi
+
+    # Check if spec was modified in this branch
+    local spec_changed
+    spec_changed=$(git diff --name-only "${BASE_BRANCH}...HEAD" 2>/dev/null | grep -c "$(basename "$spec_file")" || true)
+    spec_changed="${spec_changed:-0}"
+
+    if [[ "$spec_changed" -eq 0 ]]; then
+        info "API spec unchanged"
+        echo "Spec unchanged" > "$compat_log"
+        return 0
+    fi
+
+    # Diff the spec against base branch
+    local old_spec new_spec
+    old_spec=$(git show "${BASE_BRANCH}:${spec_file}" 2>/dev/null || true)
+    new_spec=$(cat "$spec_file" 2>/dev/null || true)
+
+    if [[ -z "$old_spec" ]]; then
+        info "New API spec — no baseline to compare"
+        echo "New spec, no baseline" > "$compat_log"
+        return 0
+    fi
+
+    # Check for breaking changes: removed endpoints, changed methods
+    local removed_endpoints=""
+    if command -v jq &>/dev/null && [[ "$spec_file" == *.json ]]; then
+        local old_paths new_paths
+        old_paths=$(echo "$old_spec" | jq -r '.paths | keys[]' 2>/dev/null | sort || true)
+        new_paths=$(jq -r '.paths | keys[]' "$spec_file" 2>/dev/null | sort || true)
+        removed_endpoints=$(comm -23 <(echo "$old_paths") <(echo "$new_paths") 2>/dev/null || true)
+    fi
+
+    {
+        echo "Spec: $spec_file"
+        echo "Changed: yes"
+        if [[ -n "$removed_endpoints" ]]; then
+            echo "BREAKING — Removed endpoints:"
+            echo "$removed_endpoints"
+        else
+            echo "No breaking changes detected"
+        fi
+    } > "$compat_log"
+
+    if [[ -n "$removed_endpoints" ]]; then
+        local removed_count
+        removed_count=$(echo "$removed_endpoints" | wc -l | xargs)
+        warn "API breaking changes: ${removed_count} endpoint(s) removed"
+        return 1
+    fi
+
+    success "API compatibility: no breaking changes"
+    return 0
+}
+
+quality_check_coverage() {
+    info "Coverage analysis..."
+    local test_log="$ARTIFACTS_DIR/test-results.log"
+
+    if [[ ! -f "$test_log" ]]; then
+        info "No test results — skipping coverage check"
+        return 0
+    fi
+
+    # Extract coverage percentage
+    local coverage=""
+    coverage=$(grep -oE 'Statements\s*:\s*[0-9.]+' "$test_log" 2>/dev/null | grep -oE '[0-9.]+$' || \
+               grep -oE 'All files\s*\|\s*[0-9.]+' "$test_log" 2>/dev/null | grep -oE '[0-9.]+$' || \
+               grep -oE 'TOTAL\s+[0-9]+\s+[0-9]+\s+([0-9]+)%' "$test_log" 2>/dev/null | grep -oE '[0-9]+%' | tr -d '%' || echo "")
+
+    if [[ -z "$coverage" ]]; then
+        info "Could not extract coverage — skipping"
+        return 0
+    fi
+
+    emit_event "quality.coverage" \
+        "issue=${ISSUE_NUMBER:-0}" \
+        "coverage=$coverage"
+
+    # Check against pipeline config minimum
+    local coverage_min
+    coverage_min=$(jq -r --arg id "test" '(.stages[] | select(.id == $id) | .config.coverage_min) // 0' "$PIPELINE_CONFIG" 2>/dev/null) || true
+    [[ -z "$coverage_min" || "$coverage_min" == "null" ]] && coverage_min=0
+
+    # Check against memory baseline (detect coverage drops)
+    local baseline_coverage=""
+    if [[ -x "$SCRIPT_DIR/cct-memory.sh" ]]; then
+        baseline_coverage=$(bash "$SCRIPT_DIR/cct-memory.sh" get "coverage_pct" 2>/dev/null) || true
+    fi
+
+    local dropped=false
+    if [[ -n "$baseline_coverage" ]] && awk -v cur="$coverage" -v base="$baseline_coverage" 'BEGIN{exit !(cur < base)}' 2>/dev/null; then
+        warn "Coverage dropped: ${baseline_coverage}% → ${coverage}%"
+        dropped=true
+    fi
+
+    if [[ "$coverage_min" -gt 0 ]] 2>/dev/null && awk -v cov="$coverage" -v min="$coverage_min" 'BEGIN{exit !(cov < min)}' 2>/dev/null; then
+        warn "Coverage ${coverage}% below minimum ${coverage_min}%"
+        return 1
+    fi
+
+    if $dropped; then
+        return 1
+    fi
+
+    info "Coverage: ${coverage}%"
+    return 0
+}
+
 # ─── Compound Quality Checks ──────────────────────────────────────────────
 # Adversarial review, negative prompting, E2E validation, and DoD audit.
 # Feeds findings back into a self-healing rebuild loop for automatic fixes.
@@ -2191,6 +2797,16 @@ compound_rebuild_with_feedback() {
             grep "❌" "$ARTIFACTS_DIR/dod-audit.md" 2>/dev/null || true
             echo ""
         fi
+        if [[ -f "$ARTIFACTS_DIR/security-audit.log" ]] && grep -qiE 'critical|high' "$ARTIFACTS_DIR/security-audit.log" 2>/dev/null; then
+            echo "## Security Audit Findings"
+            cat "$ARTIFACTS_DIR/security-audit.log"
+            echo ""
+        fi
+        if [[ -f "$ARTIFACTS_DIR/api-compat.log" ]] && grep -qi 'BREAKING' "$ARTIFACTS_DIR/api-compat.log" 2>/dev/null; then
+            echo "## API Breaking Changes"
+            cat "$ARTIFACTS_DIR/api-compat.log"
+            echo ""
+        fi
     } > "$feedback_file"
 
     # Validate feedback file has actual content
@@ -2230,13 +2846,15 @@ stage_compound_quality() {
     CURRENT_STAGE_ID="compound_quality"
 
     # Read config
-    local max_cycles adversarial_enabled negative_enabled e2e_enabled dod_enabled
+    local max_cycles adversarial_enabled negative_enabled e2e_enabled dod_enabled strict_quality
     max_cycles=$(jq -r --arg id "compound_quality" '(.stages[] | select(.id == $id) | .config.max_cycles) // 3' "$PIPELINE_CONFIG" 2>/dev/null) || true
     [[ -z "$max_cycles" || "$max_cycles" == "null" ]] && max_cycles=3
     adversarial_enabled=$(jq -r --arg id "compound_quality" '(.stages[] | select(.id == $id) | .config.adversarial) // true' "$PIPELINE_CONFIG" 2>/dev/null) || true
     negative_enabled=$(jq -r --arg id "compound_quality" '(.stages[] | select(.id == $id) | .config.negative) // true' "$PIPELINE_CONFIG" 2>/dev/null) || true
     e2e_enabled=$(jq -r --arg id "compound_quality" '(.stages[] | select(.id == $id) | .config.e2e) // true' "$PIPELINE_CONFIG" 2>/dev/null) || true
     dod_enabled=$(jq -r --arg id "compound_quality" '(.stages[] | select(.id == $id) | .config.dod_audit) // true' "$PIPELINE_CONFIG" 2>/dev/null) || true
+    strict_quality=$(jq -r --arg id "compound_quality" '(.stages[] | select(.id == $id) | .config.strict_quality) // false' "$PIPELINE_CONFIG" 2>/dev/null) || true
+    [[ -z "$strict_quality" || "$strict_quality" == "null" ]] && strict_quality="false"
 
     local cycle=0
     while [[ "$cycle" -lt "$max_cycles" ]]; do
@@ -2286,6 +2904,38 @@ stage_compound_quality() {
             fi
         fi
 
+        # 5. Multi-dimensional quality checks
+        echo ""
+        info "Running multi-dimensional quality checks..."
+        local quality_failures=0
+
+        if ! quality_check_security; then
+            quality_failures=$((quality_failures + 1))
+        fi
+        if ! quality_check_coverage; then
+            quality_failures=$((quality_failures + 1))
+        fi
+        if ! quality_check_perf_regression; then
+            quality_failures=$((quality_failures + 1))
+        fi
+        if ! quality_check_bundle_size; then
+            quality_failures=$((quality_failures + 1))
+        fi
+        if ! quality_check_api_compat; then
+            quality_failures=$((quality_failures + 1))
+        fi
+
+        if [[ "$quality_failures" -gt 0 ]]; then
+            if [[ "$strict_quality" == "true" ]]; then
+                warn "Multi-dimensional quality: ${quality_failures} check(s) failed (strict mode — blocking)"
+                all_passed=false
+            else
+                warn "Multi-dimensional quality: ${quality_failures} check(s) failed (non-blocking)"
+            fi
+        else
+            success "Multi-dimensional quality: all checks passed"
+        fi
+
         emit_event "compound.cycle" \
             "issue=${ISSUE_NUMBER:-0}" \
             "cycle=$cycle" \
@@ -2303,7 +2953,12 @@ All quality checks clean:
 - Adversarial review: ✅
 - Negative prompting: ✅
 - E2E validation: ✅
-- DoD audit: ✅" 2>/dev/null || true
+- DoD audit: ✅
+- Security audit: ✅
+- Coverage: ✅
+- Performance: ✅
+- Bundle size: ✅
+- API compat: ✅" 2>/dev/null || true
             fi
 
             log_stage "compound_quality" "Passed on cycle ${cycle}/${max_cycles}"
@@ -2639,6 +3294,11 @@ run_pipeline() {
     echo -e "  ${BOLD}Artifacts:${RESET} $ARTIFACTS_DIR/"
     echo ""
 
+    # Capture learnings to memory (success or failure)
+    if [[ -x "$SCRIPT_DIR/cct-memory.sh" ]]; then
+        bash "$SCRIPT_DIR/cct-memory.sh" capture "$STATE_FILE" "$ARTIFACTS_DIR" 2>/dev/null || true
+    fi
+
     # Final GitHub progress update
     if [[ -n "$ISSUE_NUMBER" ]]; then
         local body
@@ -2772,6 +3432,11 @@ pipeline_start() {
             "input_tokens=$TOTAL_INPUT_TOKENS" \
             "output_tokens=$TOTAL_OUTPUT_TOKENS" \
             "self_heal_count=$SELF_HEAL_COUNT"
+
+        # Capture failure learnings to memory
+        if [[ -x "$SCRIPT_DIR/cct-memory.sh" ]]; then
+            bash "$SCRIPT_DIR/cct-memory.sh" capture "$STATE_FILE" "$ARTIFACTS_DIR" 2>/dev/null || true
+        fi
     fi
 
     # Emit cost event

@@ -93,6 +93,13 @@ ON_FAILURE_ADD_LABEL="pipeline/failed"
 ON_FAILURE_LOG_LINES=50
 SLACK_WEBHOOK=""
 
+# Patrol defaults (overridden by daemon-config.json or env)
+PATROL_INTERVAL="${PATROL_INTERVAL:-3600}"
+PATROL_MAX_ISSUES="${PATROL_MAX_ISSUES:-5}"
+PATROL_LABEL="${PATROL_LABEL:-auto-patrol}"
+PATROL_DRY_RUN=false
+LAST_PATROL_EPOCH=0
+
 # Runtime
 NO_GITHUB=false
 CONFIG_PATH=""
@@ -155,6 +162,8 @@ show_help() {
     echo -e "  ${CYAN}init${RESET}                                  Generate default daemon-config.json"
     echo -e "  ${CYAN}logs${RESET}     [--follow]                   Tail daemon activity log"
     echo -e "  ${CYAN}metrics${RESET}  [--period N] [--json]        DORA/DX metrics dashboard"
+    echo -e "  ${CYAN}triage${RESET}                                Show issue triage scores and priority"
+    echo -e "  ${CYAN}patrol${RESET}   [--once] [--dry-run]         Run proactive codebase patrol"
     echo ""
     echo -e "${BOLD}OPTIONS${RESET}"
     echo -e "  ${CYAN}--config${RESET} <path>   Path to daemon-config.json ${DIM}(default: .claude/daemon-config.json)${RESET}"
@@ -173,6 +182,10 @@ show_help() {
     echo -e "  ${DIM}cct daemon metrics${RESET}                     # DORA + DX metrics (last 7 days)"
     echo -e "  ${DIM}cct daemon metrics --period 30${RESET}         # Last 30 days"
     echo -e "  ${DIM}cct daemon metrics --json${RESET}              # JSON output for dashboards"
+    echo -e "  ${DIM}cct daemon triage${RESET}                      # Show issue triage scores"
+    echo -e "  ${DIM}cct daemon patrol${RESET}                      # Run proactive codebase patrol"
+    echo -e "  ${DIM}cct daemon patrol --dry-run${RESET}            # Show what patrol would find"
+    echo -e "  ${DIM}cct daemon patrol --once${RESET}               # Run patrol once and exit"
     echo ""
     echo -e "${BOLD}CONFIG FILE${RESET}  ${DIM}(.claude/daemon-config.json)${RESET}"
     echo -e "  ${DIM}watch_label${RESET}       GitHub label to watch for       ${DIM}(default: ready-to-build)${RESET}"
@@ -235,6 +248,11 @@ load_config() {
     DEGRADATION_WINDOW=$(jq -r '.alerts.degradation_window // 5' "$config_file")
     DEGRADATION_CFR_THRESHOLD=$(jq -r '.alerts.cfr_threshold // 30' "$config_file")
     DEGRADATION_SUCCESS_THRESHOLD=$(jq -r '.alerts.success_threshold // 50' "$config_file")
+
+    # patrol settings
+    PATROL_INTERVAL=$(jq -r '.patrol.interval // 3600' "$config_file")
+    PATROL_MAX_ISSUES=$(jq -r '.patrol.max_issues // 5' "$config_file")
+    PATROL_LABEL=$(jq -r '.patrol.label // "auto-patrol"' "$config_file")
 
     success "Config loaded"
 }
@@ -795,6 +813,704 @@ _Re-add the \`${WATCH_LABEL}\` label to retry._" 2>/dev/null || true
         "Exit code: ${exit_code}, Duration: ${duration:-unknown}" "error"
 }
 
+# ─── Intelligent Triage ──────────────────────────────────────────────────────
+
+# Score an issue from 0-100 based on multiple signals for intelligent prioritization.
+# Combines priority labels, age, complexity, dependencies, type, and memory signals.
+triage_score_issue() {
+    local issue_json="$1"
+    local issue_num issue_title issue_body labels_csv created_at
+    issue_num=$(echo "$issue_json" | jq -r '.number')
+    issue_title=$(echo "$issue_json" | jq -r '.title // ""')
+    issue_body=$(echo "$issue_json" | jq -r '.body // ""')
+    labels_csv=$(echo "$issue_json" | jq -r '[.labels[].name] | join(",")')
+    created_at=$(echo "$issue_json" | jq -r '.createdAt // ""')
+
+    local score=0
+
+    # ── 1. Priority labels (0-30 points) ──
+    local priority_score=0
+    if echo "$labels_csv" | grep -qiE "urgent|p0"; then
+        priority_score=30
+    elif echo "$labels_csv" | grep -qiE "^high$|^high,|,high,|,high$|p1"; then
+        priority_score=20
+    elif echo "$labels_csv" | grep -qiE "normal|p2"; then
+        priority_score=10
+    elif echo "$labels_csv" | grep -qiE "^low$|^low,|,low,|,low$|p3"; then
+        priority_score=5
+    fi
+
+    # ── 2. Issue age (0-15 points) — older issues boosted to prevent starvation ──
+    local age_score=0
+    if [[ -n "$created_at" ]]; then
+        local created_epoch now_e age_secs
+        created_epoch=$(TZ=UTC date -j -f "%Y-%m-%dT%H:%M:%SZ" "$created_at" +%s 2>/dev/null || \
+                       date -d "$created_at" +%s 2>/dev/null || echo "0")
+        now_e=$(now_epoch)
+        if [[ "$created_epoch" -gt 0 ]]; then
+            age_secs=$((now_e - created_epoch))
+            if [[ "$age_secs" -gt 604800 ]]; then    # > 7 days
+                age_score=15
+            elif [[ "$age_secs" -gt 259200 ]]; then   # > 3 days
+                age_score=10
+            elif [[ "$age_secs" -gt 86400 ]]; then    # > 1 day
+                age_score=5
+            fi
+        fi
+    fi
+
+    # ── 3. Complexity estimate (0-20 points, INVERTED — simpler = higher) ──
+    local complexity_score=0
+    local body_len=${#issue_body}
+    local file_refs
+    file_refs=$(echo "$issue_body" | grep -coE '[a-zA-Z0-9_/-]+\.(ts|js|py|go|rs|sh|json|yaml|yml|md)' || true)
+    file_refs=${file_refs:-0}
+
+    if [[ "$body_len" -lt 200 ]] && [[ "$file_refs" -lt 3 ]]; then
+        complexity_score=20   # Short + few files = likely simple
+    elif [[ "$body_len" -lt 1000 ]]; then
+        complexity_score=10   # Medium
+    elif [[ "$file_refs" -lt 5 ]]; then
+        complexity_score=5    # Long but not many files
+    fi
+    # Long + many files = complex = 0 points (lower throughput)
+
+    # ── 4. Dependencies (0-15 points / -15 for blocked) ──
+    local dep_score=0
+    local combined_text="${issue_title} ${issue_body}"
+
+    # Check if this issue is blocked
+    local blocked_refs
+    blocked_refs=$(echo "$combined_text" | grep -oE '(blocked by|depends on) #[0-9]+' | grep -oE '#[0-9]+' || true)
+    if [[ -n "$blocked_refs" ]] && [[ "$NO_GITHUB" != "true" ]]; then
+        local all_closed=true
+        while IFS= read -r ref; do
+            local ref_num="${ref#\#}"
+            local ref_state
+            ref_state=$(gh issue view "$ref_num" --json state -q '.state' 2>/dev/null || echo "UNKNOWN")
+            if [[ "$ref_state" != "CLOSED" ]]; then
+                all_closed=false
+                break
+            fi
+        done <<< "$blocked_refs"
+        if [[ "$all_closed" == "false" ]]; then
+            dep_score=-15
+        fi
+    fi
+
+    # Check if this issue blocks others (search issue references)
+    if [[ "$NO_GITHUB" != "true" ]]; then
+        local mentions
+        mentions=$(gh api "repos/{owner}/{repo}/issues/${issue_num}/timeline" --paginate -q '
+            [.[] | select(.event == "cross-referenced") | .source.issue.body // ""] |
+            map(select(test("blocked by #'"${issue_num}"'|depends on #'"${issue_num}"'"; "i"))) | length
+        ' 2>/dev/null || echo "0")
+        mentions=${mentions:-0}
+        if [[ "$mentions" -gt 0 ]]; then
+            dep_score=15
+        fi
+    fi
+
+    # ── 5. Type bonus (0-10 points) ──
+    local type_score=0
+    if echo "$labels_csv" | grep -qiE "security"; then
+        type_score=10
+    elif echo "$labels_csv" | grep -qiE "bug"; then
+        type_score=10
+    elif echo "$labels_csv" | grep -qiE "feature|enhancement"; then
+        type_score=5
+    fi
+
+    # ── 6. Memory bonus (0-10 points / -5 for prior failures) ──
+    local memory_score=0
+    if [[ -x "$SCRIPT_DIR/cct-memory.sh" ]]; then
+        local memory_result
+        memory_result=$("$SCRIPT_DIR/cct-memory.sh" search --issue "$issue_num" --json 2>/dev/null || true)
+        if [[ -n "$memory_result" ]]; then
+            local prior_result
+            prior_result=$(echo "$memory_result" | jq -r '.last_result // ""' 2>/dev/null || true)
+            if [[ "$prior_result" == "success" ]]; then
+                memory_score=10
+            elif [[ "$prior_result" == "failure" ]]; then
+                memory_score=-5
+            fi
+        fi
+    fi
+
+    # ── Total ──
+    score=$((priority_score + age_score + complexity_score + dep_score + type_score + memory_score))
+    # Clamp to 0-100
+    [[ "$score" -lt 0 ]] && score=0
+    [[ "$score" -gt 100 ]] && score=100
+
+    emit_event "daemon.triage" \
+        "issue=$issue_num" \
+        "score=$score" \
+        "priority=$priority_score" \
+        "age=$age_score" \
+        "complexity=$complexity_score" \
+        "dependency=$dep_score" \
+        "type=$type_score" \
+        "memory=$memory_score"
+
+    echo "$score"
+}
+
+# Auto-select pipeline template based on issue labels
+select_pipeline_template() {
+    local labels="$1"
+    if echo "$labels" | grep -qi "hotfix\|urgent\|p0"; then
+        echo "hotfix"
+    elif echo "$labels" | grep -qi "bug"; then
+        echo "fast"
+    elif echo "$labels" | grep -qi "feature\|enhancement"; then
+        echo "standard"
+    elif echo "$labels" | grep -qi "security"; then
+        echo "full"
+    else
+        echo "standard"
+    fi
+}
+
+# ─── Triage Display ──────────────────────────────────────────────────────────
+
+daemon_triage_show() {
+    if [[ "$NO_GITHUB" == "true" ]]; then
+        error "Triage requires GitHub access (--no-github is set)"
+        exit 1
+    fi
+
+    load_config
+
+    echo -e "${PURPLE}${BOLD}━━━ Issue Triage Scores ━━━${RESET}"
+    echo ""
+
+    local issues_json
+    issues_json=$(gh issue list \
+        --label "$WATCH_LABEL" \
+        --state open \
+        --json number,title,labels,body,createdAt \
+        --limit 50 2>/dev/null) || {
+        error "Failed to fetch issues from GitHub"
+        exit 1
+    }
+
+    local issue_count
+    issue_count=$(echo "$issues_json" | jq 'length' 2>/dev/null || echo 0)
+
+    if [[ "$issue_count" -eq 0 ]]; then
+        echo -e "  ${DIM}No open issues with label '${WATCH_LABEL}'${RESET}"
+        return 0
+    fi
+
+    # Score each issue and collect results
+    local scored_lines=()
+    while IFS= read -r issue; do
+        local num title labels_csv score template
+        num=$(echo "$issue" | jq -r '.number')
+        title=$(echo "$issue" | jq -r '.title // "—"')
+        labels_csv=$(echo "$issue" | jq -r '[.labels[].name] | join(", ")')
+        score=$(triage_score_issue "$issue")
+        template=$(select_pipeline_template "$labels_csv")
+
+        scored_lines+=("${score}|${num}|${title}|${labels_csv}|${template}")
+    done < <(echo "$issues_json" | jq -c '.[]')
+
+    # Sort by score descending
+    local sorted
+    sorted=$(printf '%s\n' "${scored_lines[@]}" | sort -t'|' -k1 -rn)
+
+    # Print header
+    printf "  ${BOLD}%-6s  %-7s  %-45s  %-12s  %s${RESET}\n" "Score" "Issue" "Title" "Template" "Labels"
+    echo -e "  ${DIM}$(printf '%.0s─' {1..90})${RESET}"
+
+    while IFS='|' read -r score num title labels_csv template; do
+        # Color score by tier
+        local score_color="$RED"
+        [[ "$score" -ge 20 ]] && score_color="$YELLOW"
+        [[ "$score" -ge 40 ]] && score_color="$CYAN"
+        [[ "$score" -ge 60 ]] && score_color="$GREEN"
+
+        # Truncate title
+        [[ ${#title} -gt 42 ]] && title="${title:0:39}..."
+
+        printf "  ${score_color}%-6s${RESET}  ${CYAN}#%-6s${RESET}  %-45s  ${DIM}%-12s  %s${RESET}\n" \
+            "$score" "$num" "$title" "$template" "$labels_csv"
+    done <<< "$sorted"
+
+    echo ""
+    echo -e "  ${DIM}${issue_count} issue(s) scored  |  Higher score = higher processing priority${RESET}"
+    echo ""
+}
+
+# ─── Proactive Patrol Mode ───────────────────────────────────────────────────
+
+daemon_patrol() {
+    local once=false
+    local dry_run="$PATROL_DRY_RUN"
+
+    while [[ $# -gt 0 ]]; do
+        case "$1" in
+            --once)    once=true; shift ;;
+            --dry-run) dry_run=true; shift ;;
+            *)         shift ;;
+        esac
+    done
+
+    echo -e "${PURPLE}${BOLD}━━━ Codebase Patrol ━━━${RESET}"
+    echo ""
+
+    if [[ "$dry_run" == "true" ]]; then
+        echo -e "  ${YELLOW}DRY RUN${RESET} — findings will be reported but no issues created"
+        echo ""
+    fi
+
+    emit_event "patrol.started" "dry_run=$dry_run"
+
+    local total_findings=0
+    local issues_created=0
+
+    # ── 1. Dependency Security Audit ──
+    patrol_security_audit() {
+        daemon_log INFO "Patrol: running dependency security audit"
+        local findings=0
+
+        # npm audit
+        if [[ -f "package.json" ]] && command -v npm &>/dev/null; then
+            local audit_json
+            audit_json=$(npm audit --json 2>/dev/null || true)
+            if [[ -n "$audit_json" ]]; then
+                while IFS= read -r vuln; do
+                    local severity name advisory_url title
+                    severity=$(echo "$vuln" | jq -r '.severity // "unknown"')
+                    name=$(echo "$vuln" | jq -r '.name // "unknown"')
+                    advisory_url=$(echo "$vuln" | jq -r '.url // ""')
+                    title=$(echo "$vuln" | jq -r '.title // "vulnerability"')
+
+                    # Only report critical/high
+                    if [[ "$severity" != "critical" ]] && [[ "$severity" != "high" ]]; then
+                        continue
+                    fi
+
+                    findings=$((findings + 1))
+                    emit_event "patrol.finding" "type=security" "severity=$severity" "package=$name"
+
+                    # Check if issue already exists
+                    if [[ "$NO_GITHUB" != "true" ]] && [[ "$dry_run" != "true" ]]; then
+                        local existing
+                        existing=$(gh issue list --label "$PATROL_LABEL" --label "security" \
+                            --search "Security: $name" --json number -q 'length' 2>/dev/null || echo "0")
+                        if [[ "${existing:-0}" -eq 0 ]] && [[ "$issues_created" -lt "$PATROL_MAX_ISSUES" ]]; then
+                            gh issue create \
+                                --title "Security: ${title} in ${name}" \
+                                --body "## Dependency Security Finding
+
+| Field | Value |
+|-------|-------|
+| Package | \`${name}\` |
+| Severity | **${severity}** |
+| Advisory | ${advisory_url} |
+| Found by | Shipwright patrol |
+| Date | $(now_iso) |
+
+Auto-detected by \`shipwright daemon patrol\`." \
+                                --label "security" --label "$PATROL_LABEL" 2>/dev/null || true
+                            issues_created=$((issues_created + 1))
+                            emit_event "patrol.issue_created" "type=security" "package=$name"
+                        fi
+                    else
+                        echo -e "    ${RED}●${RESET} ${BOLD}${severity}${RESET}: ${title} in ${CYAN}${name}${RESET}"
+                    fi
+                done < <(echo "$audit_json" | jq -c '.vulnerabilities | to_entries[] | .value' 2>/dev/null)
+            fi
+        fi
+
+        # pip-audit
+        if [[ -f "requirements.txt" ]] && command -v pip-audit &>/dev/null; then
+            local pip_json
+            pip_json=$(pip-audit --format=json 2>/dev/null || true)
+            if [[ -n "$pip_json" ]]; then
+                local vuln_count
+                vuln_count=$(echo "$pip_json" | jq '[.dependencies[] | select(.vulns | length > 0)] | length' 2>/dev/null || echo "0")
+                findings=$((findings + ${vuln_count:-0}))
+            fi
+        fi
+
+        # cargo audit
+        if [[ -f "Cargo.toml" ]] && command -v cargo-audit &>/dev/null; then
+            local cargo_json
+            cargo_json=$(cargo audit --json 2>/dev/null || true)
+            if [[ -n "$cargo_json" ]]; then
+                local vuln_count
+                vuln_count=$(echo "$cargo_json" | jq '.vulnerabilities.found' 2>/dev/null || echo "0")
+                findings=$((findings + ${vuln_count:-0}))
+            fi
+        fi
+
+        total_findings=$((total_findings + findings))
+        if [[ "$findings" -gt 0 ]]; then
+            daemon_log INFO "Patrol: found ${findings} security vulnerability(ies)"
+        else
+            daemon_log INFO "Patrol: no security vulnerabilities found"
+        fi
+    }
+
+    # ── 2. Stale Dependency Check ──
+    patrol_stale_dependencies() {
+        daemon_log INFO "Patrol: checking for stale dependencies"
+        local findings=0
+
+        if [[ -f "package.json" ]] && command -v npm &>/dev/null; then
+            local outdated_json
+            outdated_json=$(npm outdated --json 2>/dev/null || true)
+            if [[ -n "$outdated_json" ]] && [[ "$outdated_json" != "{}" ]]; then
+                local stale_packages=""
+                while IFS= read -r pkg; do
+                    local name current latest current_major latest_major
+                    name=$(echo "$pkg" | jq -r '.key')
+                    current=$(echo "$pkg" | jq -r '.value.current // "0.0.0"')
+                    latest=$(echo "$pkg" | jq -r '.value.latest // "0.0.0"')
+                    current_major="${current%%.*}"
+                    latest_major="${latest%%.*}"
+
+                    # Only flag if > 2 major versions behind
+                    if [[ "$latest_major" =~ ^[0-9]+$ ]] && [[ "$current_major" =~ ^[0-9]+$ ]]; then
+                        local diff=$((latest_major - current_major))
+                        if [[ "$diff" -ge 2 ]]; then
+                            findings=$((findings + 1))
+                            stale_packages="${stale_packages}\n- \`${name}\`: ${current} → ${latest} (${diff} major versions behind)"
+                            emit_event "patrol.finding" "type=stale_dependency" "package=$name" "current=$current" "latest=$latest"
+
+                            if [[ "$dry_run" == "true" ]] || [[ "$NO_GITHUB" == "true" ]]; then
+                                echo -e "    ${YELLOW}●${RESET} ${CYAN}${name}${RESET}: ${current} → ${latest} (${diff} major versions behind)"
+                            fi
+                        fi
+                    fi
+                done < <(echo "$outdated_json" | jq -c 'to_entries[]' 2>/dev/null)
+
+                # Create a single issue for all stale deps
+                if [[ "$findings" -gt 0 ]] && [[ "$NO_GITHUB" != "true" ]] && [[ "$dry_run" != "true" ]]; then
+                    local existing
+                    existing=$(gh issue list --label "$PATROL_LABEL" --label "dependencies" \
+                        --search "Stale dependencies" --json number -q 'length' 2>/dev/null || echo "0")
+                    if [[ "${existing:-0}" -eq 0 ]] && [[ "$issues_created" -lt "$PATROL_MAX_ISSUES" ]]; then
+                        gh issue create \
+                            --title "Update ${findings} stale dependencies" \
+                            --body "## Stale Dependencies
+
+The following packages are 2+ major versions behind:
+$(echo -e "$stale_packages")
+
+Auto-detected by \`shipwright daemon patrol\` on $(now_iso)." \
+                            --label "dependencies" --label "$PATROL_LABEL" 2>/dev/null || true
+                        issues_created=$((issues_created + 1))
+                        emit_event "patrol.issue_created" "type=stale_dependency" "count=$findings"
+                    fi
+                fi
+            fi
+        fi
+
+        total_findings=$((total_findings + findings))
+        daemon_log INFO "Patrol: found ${findings} stale dependency(ies)"
+    }
+
+    # ── 3. Dead Code Detection ──
+    patrol_dead_code() {
+        daemon_log INFO "Patrol: scanning for dead code"
+        local findings=0
+        local dead_files=""
+
+        # For JS/TS projects: find exported files not imported anywhere
+        if [[ -f "package.json" ]] || [[ -f "tsconfig.json" ]]; then
+            local src_dirs=("src" "lib" "app")
+            for dir in "${src_dirs[@]}"; do
+                [[ -d "$dir" ]] || continue
+                while IFS= read -r file; do
+                    local basename_no_ext
+                    basename_no_ext=$(basename "$file" | sed 's/\.\(ts\|js\|tsx\|jsx\)$//')
+                    # Skip index files and test files
+                    [[ "$basename_no_ext" == "index" ]] && continue
+                    [[ "$basename_no_ext" =~ \.(test|spec)$ ]] && continue
+
+                    # Check if this file is imported anywhere
+                    local import_count
+                    import_count=$(grep -rlE "(from|require).*['\"].*${basename_no_ext}['\"]" \
+                        --include="*.ts" --include="*.js" --include="*.tsx" --include="*.jsx" \
+                        . 2>/dev/null | grep -cv "$file" || true)
+                    import_count=${import_count:-0}
+
+                    if [[ "$import_count" -eq 0 ]]; then
+                        findings=$((findings + 1))
+                        dead_files="${dead_files}\n- \`${file}\`"
+                        if [[ "$dry_run" == "true" ]] || [[ "$NO_GITHUB" == "true" ]]; then
+                            echo -e "    ${DIM}●${RESET} ${file} ${DIM}(not imported)${RESET}"
+                        fi
+                    fi
+                done < <(find "$dir" -type f \( -name "*.ts" -o -name "*.js" -o -name "*.tsx" -o -name "*.jsx" \) \
+                    ! -name "*.test.*" ! -name "*.spec.*" ! -name "*.d.ts" 2>/dev/null)
+            done
+        fi
+
+        if [[ "$findings" -gt 0 ]] && [[ "$NO_GITHUB" != "true" ]] && [[ "$dry_run" != "true" ]]; then
+            local existing
+            existing=$(gh issue list --label "$PATROL_LABEL" --label "tech-debt" \
+                --search "Dead code candidates" --json number -q 'length' 2>/dev/null || echo "0")
+            if [[ "${existing:-0}" -eq 0 ]] && [[ "$issues_created" -lt "$PATROL_MAX_ISSUES" ]]; then
+                gh issue create \
+                    --title "Dead code candidates (${findings} files)" \
+                    --body "## Dead Code Detection
+
+These files appear to have no importers — they may be unused:
+$(echo -e "$dead_files")
+
+> **Note:** Some files may be entry points or dynamically loaded. Verify before removing.
+
+Auto-detected by \`shipwright daemon patrol\` on $(now_iso)." \
+                    --label "tech-debt" --label "$PATROL_LABEL" 2>/dev/null || true
+                issues_created=$((issues_created + 1))
+                emit_event "patrol.issue_created" "type=dead_code" "count=$findings"
+            fi
+        fi
+
+        total_findings=$((total_findings + findings))
+        daemon_log INFO "Patrol: found ${findings} dead code candidate(s)"
+    }
+
+    # ── 4. Test Coverage Gaps ──
+    patrol_coverage_gaps() {
+        daemon_log INFO "Patrol: checking test coverage gaps"
+        local findings=0
+        local low_cov_files=""
+
+        # Look for coverage reports from last pipeline run
+        local coverage_file=""
+        for candidate in \
+            ".claude/pipeline-artifacts/coverage/coverage-summary.json" \
+            "coverage/coverage-summary.json" \
+            ".coverage/coverage-summary.json"; do
+            if [[ -f "$candidate" ]]; then
+                coverage_file="$candidate"
+                break
+            fi
+        done
+
+        if [[ -z "$coverage_file" ]]; then
+            daemon_log INFO "Patrol: no coverage report found — skipping"
+            return
+        fi
+
+        while IFS= read -r entry; do
+            local file_path line_pct
+            file_path=$(echo "$entry" | jq -r '.key')
+            line_pct=$(echo "$entry" | jq -r '.value.lines.pct // 100')
+
+            # Skip total and well-covered files
+            [[ "$file_path" == "total" ]] && continue
+            if awk "BEGIN{exit !($line_pct >= 50)}" 2>/dev/null; then continue; fi
+
+            findings=$((findings + 1))
+            low_cov_files="${low_cov_files}\n- \`${file_path}\`: ${line_pct}% line coverage"
+
+            if [[ "$dry_run" == "true" ]] || [[ "$NO_GITHUB" == "true" ]]; then
+                echo -e "    ${YELLOW}●${RESET} ${file_path}: ${line_pct}% coverage"
+            fi
+        done < <(jq -c 'to_entries[]' "$coverage_file" 2>/dev/null)
+
+        if [[ "$findings" -gt 0 ]] && [[ "$NO_GITHUB" != "true" ]] && [[ "$dry_run" != "true" ]]; then
+            local existing
+            existing=$(gh issue list --label "$PATROL_LABEL" --label "testing" \
+                --search "Test coverage gaps" --json number -q 'length' 2>/dev/null || echo "0")
+            if [[ "${existing:-0}" -eq 0 ]] && [[ "$issues_created" -lt "$PATROL_MAX_ISSUES" ]]; then
+                gh issue create \
+                    --title "Improve test coverage for ${findings} file(s)" \
+                    --body "## Test Coverage Gaps
+
+These files have < 50% line coverage:
+$(echo -e "$low_cov_files")
+
+Auto-detected by \`shipwright daemon patrol\` on $(now_iso)." \
+                    --label "testing" --label "$PATROL_LABEL" 2>/dev/null || true
+                issues_created=$((issues_created + 1))
+                emit_event "patrol.issue_created" "type=coverage" "count=$findings"
+            fi
+        fi
+
+        total_findings=$((total_findings + findings))
+        daemon_log INFO "Patrol: found ${findings} low-coverage file(s)"
+    }
+
+    # ── 5. Documentation Staleness ──
+    patrol_doc_staleness() {
+        daemon_log INFO "Patrol: checking documentation staleness"
+        local findings=0
+        local stale_docs=""
+
+        # Check if README is older than recent source changes
+        if [[ -f "README.md" ]]; then
+            local readme_epoch src_epoch
+            readme_epoch=$(git log -1 --format=%ct -- README.md 2>/dev/null || echo "0")
+            src_epoch=$(git log -1 --format=%ct -- "*.ts" "*.js" "*.py" "*.go" "*.rs" "*.sh" 2>/dev/null || echo "0")
+
+            if [[ "$src_epoch" -gt 0 ]] && [[ "$readme_epoch" -gt 0 ]]; then
+                local drift=$((src_epoch - readme_epoch))
+                # Flag if README is > 30 days behind source
+                if [[ "$drift" -gt 2592000 ]]; then
+                    findings=$((findings + 1))
+                    local days_behind=$((drift / 86400))
+                    stale_docs="${stale_docs}\n- \`README.md\`: ${days_behind} days behind source code"
+                    if [[ "$dry_run" == "true" ]] || [[ "$NO_GITHUB" == "true" ]]; then
+                        echo -e "    ${YELLOW}●${RESET} README.md is ${days_behind} days behind source code"
+                    fi
+                fi
+            fi
+        fi
+
+        # Check if CHANGELOG is behind latest tag
+        if [[ -f "CHANGELOG.md" ]]; then
+            local latest_tag changelog_epoch tag_epoch
+            latest_tag=$(git describe --tags --abbrev=0 2>/dev/null || true)
+            if [[ -n "$latest_tag" ]]; then
+                changelog_epoch=$(git log -1 --format=%ct -- CHANGELOG.md 2>/dev/null || echo "0")
+                tag_epoch=$(git log -1 --format=%ct "$latest_tag" 2>/dev/null || echo "0")
+                if [[ "$tag_epoch" -gt "$changelog_epoch" ]] && [[ "$changelog_epoch" -gt 0 ]]; then
+                    findings=$((findings + 1))
+                    stale_docs="${stale_docs}\n- \`CHANGELOG.md\`: not updated since tag \`${latest_tag}\`"
+                    if [[ "$dry_run" == "true" ]] || [[ "$NO_GITHUB" == "true" ]]; then
+                        echo -e "    ${YELLOW}●${RESET} CHANGELOG.md not updated since ${latest_tag}"
+                    fi
+                fi
+            fi
+        fi
+
+        if [[ "$findings" -gt 0 ]] && [[ "$NO_GITHUB" != "true" ]] && [[ "$dry_run" != "true" ]]; then
+            local existing
+            existing=$(gh issue list --label "$PATROL_LABEL" --label "documentation" \
+                --search "Stale documentation" --json number -q 'length' 2>/dev/null || echo "0")
+            if [[ "${existing:-0}" -eq 0 ]] && [[ "$issues_created" -lt "$PATROL_MAX_ISSUES" ]]; then
+                gh issue create \
+                    --title "Stale documentation detected" \
+                    --body "## Documentation Staleness
+
+The following docs may need updating:
+$(echo -e "$stale_docs")
+
+Auto-detected by \`shipwright daemon patrol\` on $(now_iso)." \
+                    --label "documentation" --label "$PATROL_LABEL" 2>/dev/null || true
+                issues_created=$((issues_created + 1))
+                emit_event "patrol.issue_created" "type=documentation" "count=$findings"
+            fi
+        fi
+
+        total_findings=$((total_findings + findings))
+        daemon_log INFO "Patrol: found ${findings} stale documentation item(s)"
+    }
+
+    # ── 6. Performance Baseline ──
+    patrol_performance_baseline() {
+        daemon_log INFO "Patrol: checking performance baseline"
+
+        # Look for test timing in recent pipeline events
+        if [[ ! -f "$EVENTS_FILE" ]]; then
+            daemon_log INFO "Patrol: no events file — skipping performance check"
+            return
+        fi
+
+        local baseline_file="$DAEMON_DIR/patrol-perf-baseline.json"
+        local recent_test_dur
+        recent_test_dur=$(tail -500 "$EVENTS_FILE" | \
+            jq -s '[.[] | select(.type == "stage.completed" and .stage == "test") | .duration_s] | if length > 0 then .[-1] else null end' \
+            2>/dev/null || echo "null")
+
+        if [[ "$recent_test_dur" == "null" ]] || [[ -z "$recent_test_dur" ]]; then
+            daemon_log INFO "Patrol: no recent test duration found — skipping"
+            return
+        fi
+
+        if [[ -f "$baseline_file" ]]; then
+            local baseline_dur
+            baseline_dur=$(jq -r '.test_duration_s // 0' "$baseline_file" 2>/dev/null || echo "0")
+            if [[ "$baseline_dur" -gt 0 ]]; then
+                local threshold=$(( baseline_dur * 130 / 100 ))  # 30% slower
+                if [[ "$recent_test_dur" -gt "$threshold" ]]; then
+                    total_findings=$((total_findings + 1))
+                    local pct_slower=$(( (recent_test_dur - baseline_dur) * 100 / baseline_dur ))
+                    emit_event "patrol.finding" "type=performance" "baseline=${baseline_dur}s" "current=${recent_test_dur}s" "regression=${pct_slower}%"
+
+                    if [[ "$dry_run" == "true" ]] || [[ "$NO_GITHUB" == "true" ]]; then
+                        echo -e "    ${RED}●${RESET} Test suite ${pct_slower}% slower than baseline (${baseline_dur}s → ${recent_test_dur}s)"
+                    elif [[ "$issues_created" -lt "$PATROL_MAX_ISSUES" ]]; then
+                        local existing
+                        existing=$(gh issue list --label "$PATROL_LABEL" --label "performance" \
+                            --search "Test suite performance regression" --json number -q 'length' 2>/dev/null || echo "0")
+                        if [[ "${existing:-0}" -eq 0 ]]; then
+                            gh issue create \
+                                --title "Test suite performance regression (${pct_slower}% slower)" \
+                                --body "## Performance Regression
+
+| Metric | Value |
+|--------|-------|
+| Baseline | ${baseline_dur}s |
+| Current | ${recent_test_dur}s |
+| Regression | ${pct_slower}% |
+
+Auto-detected by \`shipwright daemon patrol\` on $(now_iso)." \
+                                --label "performance" --label "$PATROL_LABEL" 2>/dev/null || true
+                            issues_created=$((issues_created + 1))
+                            emit_event "patrol.issue_created" "type=performance"
+                        fi
+                    fi
+
+                    daemon_log WARN "Patrol: test suite ${pct_slower}% slower than baseline"
+                    return
+                fi
+            fi
+        fi
+
+        # Save/update baseline
+        jq -n --argjson dur "$recent_test_dur" --arg ts "$(now_iso)" \
+            '{test_duration_s: $dur, updated_at: $ts}' > "$baseline_file"
+        daemon_log INFO "Patrol: performance baseline updated (${recent_test_dur}s)"
+    }
+
+    # ── Run all patrol checks ──
+    echo -e "  ${BOLD}Security Audit${RESET}"
+    patrol_security_audit
+    echo ""
+
+    echo -e "  ${BOLD}Stale Dependencies${RESET}"
+    patrol_stale_dependencies
+    echo ""
+
+    echo -e "  ${BOLD}Dead Code Detection${RESET}"
+    patrol_dead_code
+    echo ""
+
+    echo -e "  ${BOLD}Test Coverage Gaps${RESET}"
+    patrol_coverage_gaps
+    echo ""
+
+    echo -e "  ${BOLD}Documentation Staleness${RESET}"
+    patrol_doc_staleness
+    echo ""
+
+    echo -e "  ${BOLD}Performance Baseline${RESET}"
+    patrol_performance_baseline
+    echo ""
+
+    # ── Summary ──
+    emit_event "patrol.completed" "findings=$total_findings" "issues_created=$issues_created" "dry_run=$dry_run"
+
+    echo -e "${PURPLE}${BOLD}━━━ Patrol Summary ━━━${RESET}"
+    echo -e "  Findings:       ${total_findings}"
+    echo -e "  Issues created: ${issues_created}"
+    if [[ "$dry_run" == "true" ]]; then
+        echo -e "  ${DIM}(dry run — no issues were created)${RESET}"
+    fi
+    echo ""
+
+    daemon_log INFO "Patrol complete: ${total_findings} findings, ${issues_created} issues created"
+}
+
 # ─── Poll Issues ─────────────────────────────────────────────────────────────
 
 daemon_poll_issues() {
@@ -807,7 +1523,7 @@ daemon_poll_issues() {
     issues_json=$(gh issue list \
         --label "$WATCH_LABEL" \
         --state open \
-        --json number,title,labels \
+        --json number,title,labels,body,createdAt \
         --limit 20 2>/dev/null) || {
         # Handle rate limiting with exponential backoff
         if [[ $BACKOFF_SECS -eq 0 ]]; then
@@ -836,24 +1552,29 @@ daemon_poll_issues() {
     daemon_log INFO "Found ${issue_count} issue(s) with label '${WATCH_LABEL}'"
     emit_event "daemon.poll" "issues_found=$issue_count" "active=$(get_active_count)"
 
-    # Sort by priority labels
-    local priority_labels="${PRIORITY_LABELS:-urgent,p0,high,p1,normal,p2,low,p3}"
-    issues_json=$(echo "$issues_json" | jq --arg plist "$priority_labels" '
-        ($plist | split(",")) as $priorities |
-        sort_by(
-            [.labels[].name] as $issue_labels |
-            ($priorities | to_entries | map(select(.value as $p | $issue_labels | any(. == $p))) | if length > 0 then .[0].key else 999 end)
-        )
-    ')
+    # Score each issue using intelligent triage and sort by descending score
+    local scored_issues=()
+    while IFS= read -r issue; do
+        local num score
+        num=$(echo "$issue" | jq -r '.number')
+        score=$(triage_score_issue "$issue")
+        scored_issues+=("${score}|${num}")
+    done < <(echo "$issues_json" | jq -c '.[]')
+
+    # Sort by score descending
+    local sorted_order
+    sorted_order=$(printf '%s\n' "${scored_issues[@]}" | sort -t'|' -k1 -rn)
 
     local active_count
     active_count=$(get_active_count)
 
-    # Process each issue (process substitution keeps state changes in current shell)
-    while IFS= read -r issue; do
-        local issue_num issue_title
-        issue_num=$(echo "$issue" | jq -r '.number')
-        issue_title=$(echo "$issue" | jq -r '.title')
+    # Process each issue in triage order (process substitution keeps state in current shell)
+    while IFS='|' read -r score issue_num; do
+        [[ -z "$issue_num" ]] && continue
+
+        local issue_title labels_csv
+        issue_title=$(echo "$issues_json" | jq -r --argjson n "$issue_num" '.[] | select(.number == $n) | .title')
+        labels_csv=$(echo "$issues_json" | jq -r --argjson n "$issue_num" '.[] | select(.number == $n) | [.labels[].name] | join(",")')
 
         # Skip if already inflight
         if daemon_is_inflight "$issue_num"; then
@@ -867,9 +1588,17 @@ daemon_poll_issues() {
             continue
         fi
 
-        # Spawn pipeline
+        # Auto-select pipeline template based on labels
+        local template
+        template=$(select_pipeline_template "$labels_csv")
+        daemon_log INFO "Triage: issue #${issue_num} scored ${score}, template=${template}"
+
+        # Spawn pipeline (template selection applied via PIPELINE_TEMPLATE override)
+        local orig_template="$PIPELINE_TEMPLATE"
+        PIPELINE_TEMPLATE="$template"
         daemon_spawn_pipeline "$issue_num" "$issue_title"
-    done < <(echo "$issues_json" | jq -c '.[]')
+        PIPELINE_TEMPLATE="$orig_template"
+    done <<< "$sorted_order"
 
     # Update last poll
     update_state_field "last_poll" "$(now_iso)"
@@ -989,6 +1718,20 @@ daemon_poll_loop() {
         POLL_CYCLE_COUNT=$((POLL_CYCLE_COUNT + 1))
         if [[ $((POLL_CYCLE_COUNT % 5)) -eq 0 ]]; then
             daemon_check_degradation
+        fi
+
+        # Proactive patrol during quiet periods
+        local issue_count_now active_count_now
+        issue_count_now=$(jq -r '.queued | length' "$STATE_FILE" 2>/dev/null || echo 0)
+        active_count_now=$(get_active_count)
+        if [[ "$issue_count_now" -eq 0 ]] && [[ "$active_count_now" -eq 0 ]]; then
+            local now_e
+            now_e=$(now_epoch)
+            if [[ $((now_e - LAST_PATROL_EPOCH)) -ge "$PATROL_INTERVAL" ]]; then
+                daemon_log INFO "No active work — running patrol"
+                daemon_patrol --once
+                LAST_PATROL_EPOCH=$now_e
+            fi
         fi
 
         # Sleep in 1s intervals so we can catch shutdown quickly
@@ -1295,6 +2038,11 @@ daemon_init() {
     "degradation_window": 5,
     "cfr_threshold": 30,
     "success_threshold": 50
+  },
+  "patrol": {
+    "interval": 3600,
+    "max_issues": 5,
+    "label": "auto-patrol"
   }
 }
 CONFIGEOF
@@ -1436,6 +2184,18 @@ daemon_metrics() {
     local autonomy_pct="0"
     [[ "$daemon_reaps" -gt 0 ]] && autonomy_pct=$(echo "$daemon_success $daemon_reaps" | awk '{printf "%.1f", ($1/$2)*100}')
 
+    # ── Patrol ──
+    local patrol_runs patrol_findings patrol_issues_created patrol_auto_resolved
+    patrol_runs=$(echo "$period_events" | jq -s '[.[] | select(.type == "patrol.completed")] | length')
+    patrol_findings=$(echo "$period_events" | jq -s '[.[] | select(.type == "patrol.finding")] | length')
+    patrol_issues_created=$(echo "$period_events" | jq -s '[.[] | select(.type == "patrol.issue_created")] | length')
+    # Auto-resolved: patrol issues that were later fixed by a pipeline
+    patrol_auto_resolved=$(echo "$period_events" | jq -s '
+        [.[] | select(.type == "patrol.issue_created") | .issue // empty] as $patrol_issues |
+        [.[] | select(.type == "daemon.reap" and .result == "success") | .issue // empty] as $completed |
+        [$patrol_issues[] | select(. as $p | $completed | any(. == $p))] | length
+    ' 2>/dev/null || echo "0")
+
     # ── DORA Scoring ──
     dora_grade() {
         local metric="$1" value="$2"
@@ -1498,6 +2258,10 @@ daemon_metrics() {
             --argjson issues_processed "$issues_processed" \
             --argjson daemon_spawns "$daemon_spawns" \
             --arg autonomy_pct "$autonomy_pct" \
+            --argjson patrol_runs "$patrol_runs" \
+            --argjson patrol_findings "$patrol_findings" \
+            --argjson patrol_issues_created "$patrol_issues_created" \
+            --argjson patrol_auto_resolved "${patrol_auto_resolved:-0}" \
             '{
                 period: $period,
                 dora: {
@@ -1519,6 +2283,12 @@ daemon_metrics() {
                 autonomy: {
                     daemon_spawns: $daemon_spawns,
                     autonomy_pct: ($autonomy_pct | tonumber)
+                },
+                patrol: {
+                    patrols_run: $patrol_runs,
+                    findings: $patrol_findings,
+                    issues_created: $patrol_issues_created,
+                    auto_resolved: $patrol_auto_resolved
                 }
             }'
         return 0
@@ -1566,6 +2336,13 @@ daemon_metrics() {
     fi
     echo ""
 
+    echo -e "${BOLD}  PATROL${RESET}"
+    echo -e "    Patrols run         ${patrol_runs}"
+    echo -e "    Findings            ${patrol_findings}"
+    echo -e "    Issues created      ${patrol_issues_created}"
+    echo -e "    Auto-resolved       ${patrol_auto_resolved:-0}"
+    echo ""
+
     echo -e "${PURPLE}${BOLD}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${RESET}"
     echo ""
 }
@@ -1592,6 +2369,12 @@ case "$SUBCOMMAND" in
         ;;
     metrics)
         daemon_metrics "$@"
+        ;;
+    triage)
+        daemon_triage_show "$@"
+        ;;
+    patrol)
+        daemon_patrol "$@"
         ;;
     test)
         exec "$SCRIPT_DIR/cct-daemon-test.sh" "$@"

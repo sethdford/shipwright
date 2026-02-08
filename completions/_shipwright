@@ -21,6 +21,8 @@ _shipwright() {
         'worktree:Manage git worktrees for agent isolation'
         'prep:Repo preparation — generate .claude/ configs'
         'daemon:Issue watcher — auto-process GitHub issues'
+        'memory:Persistent memory — learn from every pipeline run'
+        'cost:Cost intelligence — track tokens, budgets, model routing'
         'init:Quick tmux setup — one command, no prompts'
         'help:Show help message'
         'version:Show version'
@@ -41,9 +43,28 @@ _shipwright() {
         'stop:Graceful shutdown'
         'status:Show active pipelines and queue'
         'metrics:DORA/DX metrics dashboard'
+        'triage:Show issue triage scores'
+        'patrol:Run proactive codebase patrol'
         'test:Run daemon test suite'
         'logs:View daemon logs'
         'init:Initialize daemon configuration'
+    )
+    local -a memory_cmds cost_cmds
+    memory_cmds=(
+        'show:Show learned patterns for this repo'
+        'search:Search across all memories'
+        'forget:Remove a memory entry'
+        'export:Export memories to file'
+        'import:Import memories from file'
+        'stats:Memory usage and coverage'
+        'test:Run memory test suite'
+    )
+    cost_cmds=(
+        'show:Show cost summary for current period'
+        'budget:Manage daily budget'
+        'record:Record token usage'
+        'calculate:Calculate cost estimate'
+        'check-budget:Check budget before starting'
     )
     templates_cmds=(
         'list:Browse team templates'
@@ -65,6 +86,12 @@ _shipwright() {
                     ;;
                 daemon)
                     _describe -t daemon-cmds 'daemon command' daemon_cmds
+                    ;;
+                memory)
+                    _describe -t memory-cmds 'memory command' memory_cmds
+                    ;;
+                cost)
+                    _describe -t cost-cmds 'cost command' cost_cmds
                     ;;
                 templates)
                     _describe -t templates-cmds 'templates command' templates_cmds

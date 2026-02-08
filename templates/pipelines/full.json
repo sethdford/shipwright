@@ -1,6 +1,6 @@
 {
   "name": "full",
-  "description": "Full deployment pipeline: all 8 stages from intake to production validation",
+  "description": "Full deployment pipeline: all stages from intake to production monitoring",
   "defaults": {
     "test_cmd": "npm test",
     "model": "opus",
@@ -15,6 +15,12 @@
     },
     {
       "id": "plan",
+      "enabled": true,
+      "gate": "approve",
+      "config": { "model": "opus" }
+    },
+    {
+      "id": "design",
       "enabled": true,
       "gate": "approve",
       "config": { "model": "opus" }
@@ -42,6 +48,19 @@
       "config": {}
     },
     {
+      "id": "compound_quality",
+      "enabled": true,
+      "gate": "auto",
+      "config": {
+        "adversarial": true,
+        "negative": true,
+        "e2e": true,
+        "dod_audit": true,
+        "max_cycles": 3,
+        "strict_quality": true
+      }
+    },
+    {
       "id": "pr",
       "enabled": true,
       "gate": "approve",
@@ -65,6 +84,20 @@
         "smoke_cmd": "",
         "health_url": "",
         "close_issue": true
+      }
+    },
+    {
+      "id": "monitor",
+      "enabled": true,
+      "gate": "auto",
+      "config": {
+        "duration_minutes": 5,
+        "health_url": "",
+        "error_threshold": 5,
+        "log_pattern": "ERROR|FATAL|PANIC",
+        "log_cmd": "",
+        "rollback_cmd": "",
+        "auto_rollback": false
       }
     }
   ]

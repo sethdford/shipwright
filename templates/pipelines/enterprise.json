@@ -1,6 +1,6 @@
 {
-  "name": "standard",
-  "description": "Feature pipeline: intake → plan → design → build → test → review → PR",
+  "name": "enterprise",
+  "description": "Maximum safety pipeline: all stages enabled, all gates on approve, strict quality, auto-rollback",
   "defaults": {
     "test_cmd": "npm test",
     "model": "opus",
@@ -10,7 +10,7 @@
     {
       "id": "intake",
       "enabled": true,
-      "gate": "auto",
+      "gate": "approve",
       "config": {}
     },
     {
@@ -28,7 +28,7 @@
     {
       "id": "build",
       "enabled": true,
-      "gate": "auto",
+      "gate": "approve",
       "config": {
         "max_iterations": 20,
         "audit": true,
@@ -38,8 +38,8 @@
     {
       "id": "test",
       "enabled": true,
-      "gate": "auto",
-      "config": { "coverage_min": 80 }
+      "gate": "approve",
+      "config": { "coverage_min": 90 }
     },
     {
       "id": "review",
@@ -48,14 +48,37 @@
       "config": {}
     },
     {
+      "id": "compound_quality",
+      "enabled": true,
+      "gate": "approve",
+      "config": {
+        "adversarial": true,
+        "negative": true,
+        "e2e": true,
+        "dod_audit": true,
+        "max_cycles": 5,
+        "strict_quality": true
+      }
+    },
+    {
       "id": "pr",
       "enabled": true,
       "gate": "approve",
-      "config": { "wait_ci": false }
+      "config": { "wait_ci": true }
+    },
+    {
+      "id": "merge",
+      "enabled": true,
+      "gate": "approve",
+      "config": {
+        "merge_method": "squash",
+        "wait_ci_timeout_s": 900,
+        "auto_delete_branch": true
+      }
     },
     {
       "id": "deploy",
-      "enabled": false,
+      "enabled": true,
       "gate": "approve",
       "config": {
         "staging_cmd": "",
@@ -65,8 +88,8 @@
     },
     {
       "id": "validate",
-      "enabled": false,
-      "gate": "auto",
+      "enabled": true,
+      "gate": "approve",
       "config": {
         "smoke_cmd": "",
         "health_url": "",
@@ -75,16 +98,16 @@
     },
     {
       "id": "monitor",
-      "enabled": false,
-      "gate": "auto",
+      "enabled": true,
+      "gate": "approve",
       "config": {
-        "duration_minutes": 5,
+        "duration_minutes": 10,
         "health_url": "",
-        "error_threshold": 5,
+        "error_threshold": 3,
         "log_pattern": "ERROR|FATAL|PANIC",
         "log_cmd": "",
         "rollback_cmd": "",
-        "auto_rollback": false
+        "auto_rollback": true
       }
     }
   ]

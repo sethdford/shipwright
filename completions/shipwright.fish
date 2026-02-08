@@ -8,23 +8,26 @@ for cmd in shipwright sw cct
     complete -c $cmd -f
 
     # Top-level commands
-    complete -c $cmd -n "not __fish_seen_subcommand_from session status ps logs templates doctor cleanup reaper upgrade loop pipeline worktree prep daemon init help version" -a "session" -d "Create a new tmux window for a Claude team"
-    complete -c $cmd -n "not __fish_seen_subcommand_from session status ps logs templates doctor cleanup reaper upgrade loop pipeline worktree prep daemon init help version" -a "status" -d "Show dashboard of running teams and agents"
-    complete -c $cmd -n "not __fish_seen_subcommand_from session status ps logs templates doctor cleanup reaper upgrade loop pipeline worktree prep daemon init help version" -a "ps" -d "Show running agent processes and status"
-    complete -c $cmd -n "not __fish_seen_subcommand_from session status ps logs templates doctor cleanup reaper upgrade loop pipeline worktree prep daemon init help version" -a "logs" -d "View and search agent pane logs"
-    complete -c $cmd -n "not __fish_seen_subcommand_from session status ps logs templates doctor cleanup reaper upgrade loop pipeline worktree prep daemon init help version" -a "templates" -d "Manage team composition templates"
-    complete -c $cmd -n "not __fish_seen_subcommand_from session status ps logs templates doctor cleanup reaper upgrade loop pipeline worktree prep daemon init help version" -a "doctor" -d "Validate your setup and check for issues"
-    complete -c $cmd -n "not __fish_seen_subcommand_from session status ps logs templates doctor cleanup reaper upgrade loop pipeline worktree prep daemon init help version" -a "cleanup" -d "Clean up orphaned team sessions"
-    complete -c $cmd -n "not __fish_seen_subcommand_from session status ps logs templates doctor cleanup reaper upgrade loop pipeline worktree prep daemon init help version" -a "reaper" -d "Automatic pane cleanup when agents exit"
-    complete -c $cmd -n "not __fish_seen_subcommand_from session status ps logs templates doctor cleanup reaper upgrade loop pipeline worktree prep daemon init help version" -a "upgrade" -d "Check for updates from the repo"
-    complete -c $cmd -n "not __fish_seen_subcommand_from session status ps logs templates doctor cleanup reaper upgrade loop pipeline worktree prep daemon init help version" -a "loop" -d "Continuous agent loop"
-    complete -c $cmd -n "not __fish_seen_subcommand_from session status ps logs templates doctor cleanup reaper upgrade loop pipeline worktree prep daemon init help version" -a "pipeline" -d "Full delivery pipeline"
-    complete -c $cmd -n "not __fish_seen_subcommand_from session status ps logs templates doctor cleanup reaper upgrade loop pipeline worktree prep daemon init help version" -a "worktree" -d "Manage git worktrees"
-    complete -c $cmd -n "not __fish_seen_subcommand_from session status ps logs templates doctor cleanup reaper upgrade loop pipeline worktree prep daemon init help version" -a "prep" -d "Repo preparation"
-    complete -c $cmd -n "not __fish_seen_subcommand_from session status ps logs templates doctor cleanup reaper upgrade loop pipeline worktree prep daemon init help version" -a "daemon" -d "Issue watcher daemon"
-    complete -c $cmd -n "not __fish_seen_subcommand_from session status ps logs templates doctor cleanup reaper upgrade loop pipeline worktree prep daemon init help version" -a "init" -d "Quick tmux setup"
-    complete -c $cmd -n "not __fish_seen_subcommand_from session status ps logs templates doctor cleanup reaper upgrade loop pipeline worktree prep daemon init help version" -a "help" -d "Show help message"
-    complete -c $cmd -n "not __fish_seen_subcommand_from session status ps logs templates doctor cleanup reaper upgrade loop pipeline worktree prep daemon init help version" -a "version" -d "Show version"
+    set -l all_cmds session status ps logs templates doctor cleanup reaper upgrade loop pipeline worktree prep daemon memory cost init help version
+    complete -c $cmd -n "not __fish_seen_subcommand_from $all_cmds" -a "session" -d "Create a new tmux window for a Claude team"
+    complete -c $cmd -n "not __fish_seen_subcommand_from $all_cmds" -a "status" -d "Show dashboard of running teams and agents"
+    complete -c $cmd -n "not __fish_seen_subcommand_from $all_cmds" -a "ps" -d "Show running agent processes and status"
+    complete -c $cmd -n "not __fish_seen_subcommand_from $all_cmds" -a "logs" -d "View and search agent pane logs"
+    complete -c $cmd -n "not __fish_seen_subcommand_from $all_cmds" -a "templates" -d "Manage team composition templates"
+    complete -c $cmd -n "not __fish_seen_subcommand_from $all_cmds" -a "doctor" -d "Validate your setup and check for issues"
+    complete -c $cmd -n "not __fish_seen_subcommand_from $all_cmds" -a "cleanup" -d "Clean up orphaned team sessions"
+    complete -c $cmd -n "not __fish_seen_subcommand_from $all_cmds" -a "reaper" -d "Automatic pane cleanup when agents exit"
+    complete -c $cmd -n "not __fish_seen_subcommand_from $all_cmds" -a "upgrade" -d "Check for updates from the repo"
+    complete -c $cmd -n "not __fish_seen_subcommand_from $all_cmds" -a "loop" -d "Continuous agent loop"
+    complete -c $cmd -n "not __fish_seen_subcommand_from $all_cmds" -a "pipeline" -d "Full delivery pipeline"
+    complete -c $cmd -n "not __fish_seen_subcommand_from $all_cmds" -a "worktree" -d "Manage git worktrees"
+    complete -c $cmd -n "not __fish_seen_subcommand_from $all_cmds" -a "prep" -d "Repo preparation"
+    complete -c $cmd -n "not __fish_seen_subcommand_from $all_cmds" -a "daemon" -d "Issue watcher daemon"
+    complete -c $cmd -n "not __fish_seen_subcommand_from $all_cmds" -a "memory" -d "Persistent memory system"
+    complete -c $cmd -n "not __fish_seen_subcommand_from $all_cmds" -a "cost" -d "Cost intelligence"
+    complete -c $cmd -n "not __fish_seen_subcommand_from $all_cmds" -a "init" -d "Quick tmux setup"
+    complete -c $cmd -n "not __fish_seen_subcommand_from $all_cmds" -a "help" -d "Show help message"
+    complete -c $cmd -n "not __fish_seen_subcommand_from $all_cmds" -a "version" -d "Show version"
 
     # pipeline subcommands
     complete -c $cmd -n "__fish_seen_subcommand_from pipeline" -a "start" -d "Start a new pipeline run"
@@ -40,9 +43,33 @@ for cmd in shipwright sw cct
     complete -c $cmd -n "__fish_seen_subcommand_from daemon" -a "stop" -d "Graceful shutdown"
     complete -c $cmd -n "__fish_seen_subcommand_from daemon" -a "status" -d "Show active pipelines"
     complete -c $cmd -n "__fish_seen_subcommand_from daemon" -a "metrics" -d "DORA/DX metrics dashboard"
+    complete -c $cmd -n "__fish_seen_subcommand_from daemon" -a "triage" -d "Show issue triage scores"
+    complete -c $cmd -n "__fish_seen_subcommand_from daemon" -a "patrol" -d "Run proactive codebase patrol"
     complete -c $cmd -n "__fish_seen_subcommand_from daemon" -a "test" -d "Run daemon test suite"
     complete -c $cmd -n "__fish_seen_subcommand_from daemon" -a "logs" -d "View daemon logs"
     complete -c $cmd -n "__fish_seen_subcommand_from daemon" -a "init" -d "Initialize daemon config"
+
+    # memory subcommands
+    complete -c $cmd -n "__fish_seen_subcommand_from memory" -a "show" -d "Show learned patterns"
+    complete -c $cmd -n "__fish_seen_subcommand_from memory" -a "search" -d "Search across memories"
+    complete -c $cmd -n "__fish_seen_subcommand_from memory" -a "forget" -d "Remove a memory entry"
+    complete -c $cmd -n "__fish_seen_subcommand_from memory" -a "export" -d "Export memories to file"
+    complete -c $cmd -n "__fish_seen_subcommand_from memory" -a "import" -d "Import memories from file"
+    complete -c $cmd -n "__fish_seen_subcommand_from memory" -a "stats" -d "Memory usage and coverage"
+    complete -c $cmd -n "__fish_seen_subcommand_from memory" -a "test" -d "Run memory test suite"
+
+    # cost subcommands
+    complete -c $cmd -n "__fish_seen_subcommand_from cost" -a "show" -d "Show cost summary"
+    complete -c $cmd -n "__fish_seen_subcommand_from cost" -a "budget" -d "Manage daily budget"
+    complete -c $cmd -n "__fish_seen_subcommand_from cost" -a "record" -d "Record token usage"
+    complete -c $cmd -n "__fish_seen_subcommand_from cost" -a "calculate" -d "Calculate cost estimate"
+    complete -c $cmd -n "__fish_seen_subcommand_from cost" -a "check-budget" -d "Check budget before starting"
+
+    # cost show flags
+    complete -c $cmd -n "__fish_seen_subcommand_from cost" -l period -d "Number of days to report" -r
+    complete -c $cmd -n "__fish_seen_subcommand_from cost" -l json -d "JSON output"
+    complete -c $cmd -n "__fish_seen_subcommand_from cost" -l by-stage -d "Breakdown by pipeline stage"
+    complete -c $cmd -n "__fish_seen_subcommand_from cost" -l by-issue -d "Breakdown by issue"
 
     # templates subcommands
     complete -c $cmd -n "__fish_seen_subcommand_from templates" -a "list" -d "Browse team templates"

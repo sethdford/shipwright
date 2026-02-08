@@ -115,6 +115,9 @@ FILES=(
     "cct-daemon.sh|scripts/cct-daemon.sh|$BIN_DIR/cct-daemon.sh|false|true"
     "cct-daemon-test.sh|scripts/cct-daemon-test.sh|$BIN_DIR/cct-daemon-test.sh|false|true"
     "cct-prep-test.sh|scripts/cct-prep-test.sh|$BIN_DIR/cct-prep-test.sh|false|true"
+    "cct-memory.sh|scripts/cct-memory.sh|$BIN_DIR/cct-memory.sh|false|true"
+    "cct-memory-test.sh|scripts/cct-memory-test.sh|$BIN_DIR/cct-memory-test.sh|false|true"
+    "cct-cost.sh|scripts/cct-cost.sh|$BIN_DIR/cct-cost.sh|false|true"
     "teammate-idle.sh|claude-code/hooks/teammate-idle.sh|$HOME/.claude/hooks/teammate-idle.sh|false|true"
     "task-completed.sh|claude-code/hooks/task-completed.sh|$HOME/.claude/hooks/task-completed.sh|false|true"
     "notify-idle.sh|claude-code/hooks/notify-idle.sh|$HOME/.claude/hooks/notify-idle.sh|false|true"
@@ -129,6 +132,8 @@ FILES=(
     "pipeline-full.json|templates/pipelines/full.json|$HOME/.claude-teams/pipelines/full.json|false|false"
     "pipeline-hotfix.json|templates/pipelines/hotfix.json|$HOME/.claude-teams/pipelines/hotfix.json|false|false"
     "pipeline-autonomous.json|templates/pipelines/autonomous.json|$HOME/.claude-teams/pipelines/autonomous.json|false|false"
+    "pipeline-cost-aware.json|templates/pipelines/cost-aware.json|$HOME/.claude-teams/pipelines/cost-aware.json|false|false"
+    "pipeline-enterprise.json|templates/pipelines/enterprise.json|$HOME/.claude-teams/pipelines/enterprise.json|false|false"
 )
 
 # ─── Checksum helper ──────────────────────────────────────────────────────

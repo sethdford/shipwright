@@ -69,6 +69,8 @@ show_help() {
     echo -e "  ${CYAN}worktree${RESET} <cmd>         Manage git worktrees for agent isolation"
     echo -e "  ${CYAN}prep${RESET} [options]         ${BOLD}Repo preparation${RESET} — generate .claude/ configs for agents"
     echo -e "  ${CYAN}daemon${RESET} <cmd>           ${BOLD}Issue watcher${RESET} — auto-process GitHub issues"
+    echo -e "  ${CYAN}memory${RESET} <cmd>           ${BOLD}Persistent memory${RESET} — learn from every pipeline run"
+    echo -e "  ${CYAN}cost${RESET} <cmd>             ${BOLD}Cost intelligence${RESET} — track tokens, budgets, model routing"
     echo -e "  ${CYAN}init${RESET}                  ${BOLD}Quick tmux setup${RESET} — one command, no prompts"
     echo -e "  ${CYAN}help${RESET}                  Show this help message"
     echo -e "  ${CYAN}version${RESET}               Show version"
@@ -91,6 +93,14 @@ show_help() {
     echo -e "  ${DIM}cct daemon status${RESET}                 # Show active pipelines and queue"
     echo -e "  ${DIM}cct daemon metrics${RESET}                # DORA/DX metrics dashboard"
     echo -e "  ${DIM}cct daemon stop${RESET}                   # Graceful shutdown"
+    echo ""
+    echo -e "${BOLD}MEMORY & COST${RESET}  ${DIM}(intelligence layer)${RESET}"
+    echo -e "  ${DIM}cct memory show${RESET}                    # Show learned patterns for this repo"
+    echo -e "  ${DIM}cct memory search \"auth\"${RESET}            # Search across all memories"
+    echo -e "  ${DIM}cct memory stats${RESET}                    # Memory usage and coverage"
+    echo -e "  ${DIM}cct cost show${RESET}                        # Token usage and spend overview"
+    echo -e "  ${DIM}cct cost budget set 10.00${RESET}           # Set daily budget"
+    echo -e "  ${DIM}cct cost show --period 30 --by-stage${RESET} # Detailed cost report"
     echo ""
     echo -e "${BOLD}REPO PREPARATION${RESET}  ${DIM}(prep repo for agents)${RESET}"
     echo -e "  ${DIM}cct prep${RESET}                          # Analyze repo, generate .claude/ configs"
@@ -182,6 +192,12 @@ main() {
             ;;
         daemon)
             exec "$SCRIPT_DIR/cct-daemon.sh" "$@"
+            ;;
+        memory)
+            exec "$SCRIPT_DIR/cct-memory.sh" "$@"
+            ;;
+        cost)
+            exec "$SCRIPT_DIR/cct-cost.sh" "$@"
             ;;
         init)
             exec "$SCRIPT_DIR/cct-init.sh" "$@"
