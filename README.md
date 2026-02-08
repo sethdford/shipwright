@@ -5,7 +5,7 @@
 [![v1.7.0](https://img.shields.io/badge/version-1.7.0-00d4ff?style=flat-square)](https://github.com/sethdford/shipwright/releases) ![tmux dark theme with cyan accents](https://img.shields.io/badge/theme-dark%20blue--gray%20%2B%20cyan-00d4ff?style=flat-square) ![MIT License](https://img.shields.io/badge/license-MIT-green?style=flat-square)
 
 <p align="center">
-  <img src="https://vhs.charm.sh/vhs-sJ34YHLfLxXLMpJgjqvy2.gif" alt="Shipwright CLI demo — version, help, 12 templates, doctor" width="800" />
+  <img src="https://vhs.charm.sh/vhs-41InCkfQqYy0qoOiM3vOtj.gif" alt="Shipwright CLI demo — version, help, pipeline templates, doctor" width="800" />
 </p>
 
 Full docs at [sethdford.github.io/shipwright](https://sethdford.github.io/shipwright)
@@ -875,13 +875,17 @@ The tmux config uses [TPM](https://github.com/tmux-plugins/tpm) for plugin manag
 
 ## Demo
 
-The hero GIF above shows the CLI in action. For the full walkthrough (setup, templates, loop, layouts):
-
-<details>
-<summary>Full demo (click to expand)</summary>
+The hero GIF above shows the CLI in action. The team demo below shows the multi-pane tmux experience with leader + agent panes working in parallel:
 
 <p align="center">
-  <img src="https://vhs.charm.sh/vhs-3w7KifJzCC9zLxzCfzdsp3.gif" alt="Full demo — setup, doctor, 12 templates, loop, layouts" width="900" />
+  <img src="https://vhs.charm.sh/vhs-1mEKCC1vYY5nFs0ogwSfQm.gif" alt="Team demo — multi-pane tmux with leader + backend + test agents" width="900" />
+</p>
+
+<details>
+<summary>Full CLI walkthrough (click to expand)</summary>
+
+<p align="center">
+  <img src="https://vhs.charm.sh/vhs-73OusTnQ3Kb7c3RTV7G0EF.gif" alt="Full demo — setup, doctor, templates, pipeline, fleet, cost" width="900" />
 </p>
 
 </details>
@@ -889,8 +893,9 @@ The hero GIF above shows the CLI in action. For the full walkthrough (setup, tem
 Re-record the demos yourself:
 
 ```bash
-vhs demo/hero.tape       # Short hero GIF
-vhs demo/full-demo.tape  # Full walkthrough
+vhs demo/hero.tape        # Short hero GIF
+vhs demo/team-demo.tape   # Multi-pane team experience
+vhs demo/full-demo.tape   # Full CLI walkthrough
 ```
 
 ## Sources & Inspiration
