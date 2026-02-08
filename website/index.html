@@ -500,6 +500,115 @@ section {
 }
 
 /* ═══════════════════════════════════════════════
+   FOUNDATION — ARCHITECTURE LAYERS
+   ═══════════════════════════════════════════════ */
+.foundation-layers {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0;
+  margin-top: 3rem;
+  max-width: 800px;
+  margin-left: auto;
+  margin-right: auto;
+}
+
+.foundation-layer {
+  width: 100%;
+  border-radius: 16px;
+  padding: 2rem 2.5rem;
+  position: relative;
+}
+
+.shipwright-layer {
+  background: rgba(0, 212, 255, 0.04);
+  border: 1px solid rgba(0, 212, 255, 0.15);
+  z-index: 2;
+  margin-bottom: -1px;
+  border-bottom-left-radius: 0;
+  border-bottom-right-radius: 0;
+}
+
+.claude-layer {
+  background: rgba(124, 58, 237, 0.04);
+  border: 1px solid rgba(124, 58, 237, 0.15);
+  border-top: none;
+  border-top-left-radius: 0;
+  border-top-right-radius: 0;
+}
+
+.layer-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  margin-bottom: 1.25rem;
+}
+
+.layer-name {
+  font-family: var(--font-body);
+  font-size: 1rem;
+  font-weight: 700;
+}
+
+.shipwright-layer .layer-name { color: var(--cyan); }
+.claude-layer .layer-name { color: var(--purple); }
+
+.layer-role {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  font-weight: 600;
+}
+
+.layer-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.layer-chip {
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+  padding: 0.35rem 0.85rem;
+  border-radius: 100px;
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+.shipwright-layer .layer-chip {
+  background: rgba(0, 212, 255, 0.08);
+  border: 1px solid rgba(0, 212, 255, 0.2);
+  color: var(--cyan);
+}
+
+.claude-layer .layer-chip {
+  background: rgba(124, 58, 237, 0.08);
+  border: 1px solid rgba(124, 58, 237, 0.2);
+  color: rgba(124, 58, 237, 0.8);
+}
+
+.foundation-connector {
+  width: 100%;
+  height: 4px;
+  position: relative;
+  z-index: 3;
+}
+
+.foundation-connector::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(90deg, var(--cyan), var(--purple));
+  opacity: 0.4;
+}
+
+@media (max-width: 600px) {
+  .foundation-layer { padding: 1.5rem; }
+  .layer-header { flex-direction: column; gap: 0.25rem; }
+}
+
+/* ═══════════════════════════════════════════════
    VOYAGE — HOW IT WORKS
    ═══════════════════════════════════════════════ */
 .voyage-grid {
@@ -1198,6 +1307,7 @@ footer {
     Shipwright
   </div>
   <ul class="nav-links">
+    <li><a href="#foundation">Foundation</a></li>
     <li><a href="#voyage">How It Works</a></li>
     <li><a href="#features">Features</a></li>
     <li><a href="#demo">Demo</a></li>
@@ -1321,6 +1431,50 @@ footer {
     <path d="M0 60 Q360 35 720 60 T1440 60 V80 H0Z" fill="var(--cyan)"/>
   </svg>
 </div>
+
+<!-- ════════════════════════════════════════════════
+     THE FOUNDATION — ARCHITECTURE LAYERS
+     ════════════════════════════════════════════════ -->
+<section id="foundation">
+  <div class="container">
+    <div class="gs-reveal">
+      <div class="section-label">The Foundation</div>
+      <h2 class="section-title">Claude Code is the engine.<br>Shipwright is the ship.</h2>
+      <p class="section-desc">Claude Code by Anthropic provides AI coding agents with built-in team mode. Shipwright wraps them in a complete delivery system — pipelines, autonomous daemon, fleet operations, persistent memory, and DORA metrics.</p>
+    </div>
+
+    <div class="foundation-layers">
+      <div class="foundation-layer shipwright-layer gs-reveal">
+        <div class="layer-header">
+          <span class="layer-name">Shipwright</span>
+          <span class="layer-role">Orchestration &amp; Delivery</span>
+        </div>
+        <div class="layer-chips">
+          <span class="layer-chip">12-stage pipelines</span>
+          <span class="layer-chip">Autonomous daemon</span>
+          <span class="layer-chip">Fleet operations</span>
+          <span class="layer-chip">Persistent memory</span>
+          <span class="layer-chip">Deploy adapters</span>
+          <span class="layer-chip">DORA metrics</span>
+        </div>
+      </div>
+      <div class="foundation-connector"></div>
+      <div class="foundation-layer claude-layer gs-reveal">
+        <div class="layer-header">
+          <span class="layer-name">Claude Code</span>
+          <span class="layer-role">Anthropic's AI Coding Tool</span>
+        </div>
+        <div class="layer-chips">
+          <span class="layer-chip">AI coding agents</span>
+          <span class="layer-chip">Team mode</span>
+          <span class="layer-chip">Code read/write</span>
+          <span class="layer-chip">Git operations</span>
+          <span class="layer-chip">Hooks system</span>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
 
 <!-- ════════════════════════════════════════════════
      HOW IT WORKS — THE VOYAGE
