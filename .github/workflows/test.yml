@@ -33,6 +33,30 @@ jobs:
       - name: Run prep tests
         run: bash scripts/cct-prep-test.sh
 
+      - name: Run fleet tests
+        run: bash scripts/cct-fleet-test.sh
+
+      - name: Run fix tests
+        run: bash scripts/cct-fix-test.sh
+
+      - name: Run memory tests
+        run: bash scripts/cct-memory-test.sh
+
+      - name: Run session tests
+        run: bash scripts/cct-session-test.sh
+
+      - name: Run init tests
+        run: bash scripts/cct-init-test.sh
+
+      - name: Run tracker tests
+        run: bash scripts/cct-tracker-test.sh
+
+      - name: Run heartbeat tests
+        run: bash scripts/cct-heartbeat-test.sh
+
+      - name: Run remote tests
+        run: bash scripts/cct-remote-test.sh
+
   shellcheck:
     runs-on: ubuntu-latest
     steps:

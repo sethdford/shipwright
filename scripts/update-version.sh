@@ -16,6 +16,9 @@ BOLD='\033[1m'
 DIM='\033[2m'
 RESET='\033[0m'
 
+# shellcheck source=lib/compat.sh
+[[ -f "$SCRIPT_DIR/lib/compat.sh" ]] && source "$SCRIPT_DIR/lib/compat.sh"
+
 info()    { echo -e "${CYAN}${BOLD}▸${RESET} $*"; }
 success() { echo -e "${GREEN}${BOLD}✓${RESET} $*"; }
 error()   { echo -e "${RED}${BOLD}✗${RESET} $*" >&2; }
@@ -36,7 +39,7 @@ COUNT=0
 
 # Update VERSION= in all scripts
 while IFS= read -r file; do
-    sed -i '' "s/^VERSION=\"[^\"]*\"/VERSION=\"$NEW_VERSION\"/" "$file"
+    sed_i "s/^VERSION=\"[^\"]*\"/VERSION=\"$NEW_VERSION\"/" "$file"
     success "Updated $(basename "$file")"
     ((COUNT++))
 done < <(grep -rl '^VERSION="' "$REPO_ROOT/scripts/" "$REPO_ROOT/install.sh" 2>/dev/null || true)
@@ -47,7 +50,7 @@ if [[ -f "$PKG" ]]; then
     if command -v jq &>/dev/null; then
         jq --arg v "$NEW_VERSION" '.version = $v' "$PKG" > "$PKG.tmp" && mv "$PKG.tmp" "$PKG"
     else
-        sed -i '' "s/\"version\": \"[^\"]*\"/\"version\": \"$NEW_VERSION\"/" "$PKG"
+        sed_i "s/\"version\": \"[^\"]*\"/\"version\": \"$NEW_VERSION\"/" "$PKG"
     fi
     success "Updated package.json"
     ((COUNT++))

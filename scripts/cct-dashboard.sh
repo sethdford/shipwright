@@ -18,6 +18,10 @@ RED='\033[38;2;248;113;113m'    # error
 DIM='\033[2m'
 BOLD='\033[1m'
 RESET='\033[0m'
+
+# ─── Cross-platform compatibility ──────────────────────────────────────────
+# shellcheck source=lib/compat.sh
+[[ -f "$SCRIPT_DIR/lib/compat.sh" ]] && source "$SCRIPT_DIR/lib/compat.sh"
 UNDERLINE='\033[4m'
 
 # ─── Output Helpers ─────────────────────────────────────────────────────────
@@ -379,12 +383,10 @@ dashboard_open() {
     local url="http://localhost:${port}"
     info "Opening ${UNDERLINE}${url}${RESET}"
 
-    if [[ "$(uname)" == "Darwin" ]]; then
-        open "$url"
-    elif command -v xdg-open &>/dev/null; then
-        xdg-open "$url"
-    elif command -v wslview &>/dev/null; then
-        wslview "$url"
+    if open_url "$url" 2>/dev/null; then
+        : # opened via compat.sh
+    elif command -v powershell.exe &>/dev/null; then
+        powershell.exe -Command "Start-Process '$url'" 2>/dev/null
     else
         error "No browser opener found"
         info "Open manually: ${UNDERLINE}${url}${RESET}"

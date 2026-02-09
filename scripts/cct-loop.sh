@@ -22,6 +22,10 @@ DIM='\033[2m'
 BOLD='\033[1m'
 RESET='\033[0m'
 
+# ─── Cross-platform compatibility ──────────────────────────────────────────
+# shellcheck source=lib/compat.sh
+[[ -f "$SCRIPT_DIR/lib/compat.sh" ]] && source "$SCRIPT_DIR/lib/compat.sh"
+
 info()    { echo -e "${CYAN}${BOLD}▸${RESET} $*"; }
 success() { echo -e "${GREEN}${BOLD}✓${RESET} $*"; }
 warn()    { echo -e "${YELLOW}${BOLD}⚠${RESET} $*"; }
@@ -1112,13 +1116,13 @@ echo -e "\n${DIM}Agent ${AGENT_NUM} finished after ${ITERATION} iterations${RESE
 WORKEREOF
 
     # Replace placeholders
-    sed -i '' "s|__AGENT_NUM__|${agent_num}|g" "$worker_script"
-    sed -i '' "s|__TOTAL_AGENTS__|${total_agents}|g" "$worker_script"
-    sed -i '' "s|__WORK_DIR__|${wt_path}|g" "$worker_script"
-    sed -i '' "s|__LOG_DIR__|${LOG_DIR}|g" "$worker_script"
-    sed -i '' "s|__MAX_ITERATIONS__|${MAX_ITERATIONS}|g" "$worker_script"
-    sed -i '' "s|__TEST_CMD__|${TEST_CMD}|g" "$worker_script"
-    sed -i '' "s|__CLAUDE_FLAGS__|${claude_flags}|g" "$worker_script"
+    sed_i "s|__AGENT_NUM__|${agent_num}|g" "$worker_script"
+    sed_i "s|__TOTAL_AGENTS__|${total_agents}|g" "$worker_script"
+    sed_i "s|__WORK_DIR__|${wt_path}|g" "$worker_script"
+    sed_i "s|__LOG_DIR__|${LOG_DIR}|g" "$worker_script"
+    sed_i "s|__MAX_ITERATIONS__|${MAX_ITERATIONS}|g" "$worker_script"
+    sed_i "s|__TEST_CMD__|${TEST_CMD}|g" "$worker_script"
+    sed_i "s|__CLAUDE_FLAGS__|${claude_flags}|g" "$worker_script"
     # Goal needs special handling for sed (may contain special chars)
     # Use awk for safe string replacement without python
     awk -v goal="$GOAL" '{gsub(/__GOAL__/, goal); print}' "$worker_script" > "${worker_script}.tmp" \

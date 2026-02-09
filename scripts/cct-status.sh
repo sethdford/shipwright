@@ -17,6 +17,11 @@ DIM='\033[2m'
 BOLD='\033[1m'
 RESET='\033[0m'
 
+# ─── Cross-platform compatibility ──────────────────────────────────────────
+_COMPAT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/lib/compat.sh"
+# shellcheck source=lib/compat.sh
+[[ -f "$_COMPAT" ]] && source "$_COMPAT"
+
 # ─── Header ──────────────────────────────────────────────────────────────────
 
 echo ""

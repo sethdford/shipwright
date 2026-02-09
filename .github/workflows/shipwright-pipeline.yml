@@ -1,0 +1,155 @@
+name: Shipwright Pipeline
+
+# Autonomous agents process labeled issues — Shipwright building itself
+on:
+  issues:
+    types: [labeled]
+  workflow_dispatch:
+    inputs:
+      issue_number:
+        description: "Issue number to process"
+        required: true
+        type: number
+      template:
+        description: "Pipeline template (fast, standard, full, autonomous)"
+        required: false
+        default: "autonomous"
+        type: choice
+        options:
+          - fast
+          - standard
+          - full
+          - autonomous
+          - cost-aware
+
+# Only one pipeline per issue at a time
+concurrency:
+  group: shipwright-issue-${{ github.event.inputs.issue_number || github.event.issue.number }}
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+  issues: write
+  pull-requests: write
+
+jobs:
+  pipeline:
+    # Trigger on 'shipwright' label or manual dispatch
+    if: >
+      github.event_name == 'workflow_dispatch' ||
+      (github.event.action == 'labeled' && github.event.label.name == 'shipwright')
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+
+    env:
+      ISSUE_NUMBER: ${{ github.event.inputs.issue_number || github.event.issue.number }}
+      TEMPLATE: ${{ github.event.inputs.template || 'autonomous' }}
+      ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+      GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      NO_COLOR: "1"
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Configure git
+        run: |
+          git config user.name "shipwright[bot]"
+          git config user.email "shipwright[bot]@users.noreply.github.com"
+
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y tmux jq
+
+      - name: Install Claude Code
+        run: |
+          npm install -g @anthropic-ai/claude-code
+
+      - name: Install Shipwright
+        run: |
+          # Install from local checkout
+          npm link
+
+      - name: Validate setup
+        run: |
+          echo "--- Environment ---"
+          echo "Issue: #$ISSUE_NUMBER"
+          echo "Template: $TEMPLATE"
+          echo "Runner: $(uname -s) $(uname -m)"
+          echo "Bash: $(bash --version | head -1)"
+          echo ""
+          echo "--- Shipwright Doctor ---"
+          shipwright doctor || true
+
+      - name: Comment on issue — pipeline starting
+        run: |
+          gh issue comment "$ISSUE_NUMBER" --body "$(cat <<'EOF'
+          ⚓ **Shipwright Pipeline Starting**
+
+          | Field | Value |
+          |-------|-------|
+          | Template | `${{ env.TEMPLATE }}` |
+          | Runner | `ubuntu-latest` |
+          | Triggered by | `${{ github.event_name }}` |
+          | Workflow | [${{ github.run_id }}](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}) |
+
+          The autonomous pipeline is processing this issue. Updates will be posted as stages complete.
+          EOF
+          )"
+
+      - name: Run Shipwright pipeline
+        id: pipeline
+        run: |
+          set +e
+          shipwright pipeline start \
+            --issue "$ISSUE_NUMBER" \
+            --template "$TEMPLATE" \
+            --no-github-label \
+            --ci 2>&1 | tee /tmp/pipeline.log
+          PIPELINE_EXIT=$?
+          echo "exit_code=$PIPELINE_EXIT" >> "$GITHUB_OUTPUT"
+          exit $PIPELINE_EXIT
+
+      - name: Comment on issue — pipeline result
+        if: always()
+        run: |
+          EXIT_CODE="${{ steps.pipeline.outputs.exit_code }}"
+          if [[ "$EXIT_CODE" == "0" ]]; then
+            STATUS="✅ **Pipeline Completed Successfully**"
+          else
+            STATUS="❌ **Pipeline Failed** (exit code: $EXIT_CODE)"
+          fi
+
+          # Extract summary from pipeline state if available
+          SUMMARY=""
+          if [[ -f ".claude/pipeline-state.md" ]]; then
+            SUMMARY=$(head -30 ".claude/pipeline-state.md" 2>/dev/null || echo "")
+          fi
+
+          gh issue comment "$ISSUE_NUMBER" --body "$(cat <<EOF
+          $STATUS
+
+          <details>
+          <summary>Pipeline State</summary>
+
+          \`\`\`
+          $SUMMARY
+          \`\`\`
+          </details>
+
+          [View full run](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }})
+          EOF
+          )"
+
+      - name: Upload pipeline artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: pipeline-artifacts-${{ env.ISSUE_NUMBER }}
+          path: |
+            .claude/pipeline-state.md
+            .claude/pipeline-artifacts/
+          retention-days: 30
+          if-no-files-found: ignore

@@ -20,6 +20,10 @@ DIM='\033[2m'
 BOLD='\033[1m'
 RESET='\033[0m'
 
+# ─── Cross-platform compatibility ──────────────────────────────────────────
+# shellcheck source=lib/compat.sh
+[[ -f "$SCRIPT_DIR/lib/compat.sh" ]] && source "$SCRIPT_DIR/lib/compat.sh"
+
 # ─── Output Helpers ─────────────────────────────────────────────────────────
 info()    { echo -e "${CYAN}${BOLD}▸${RESET} $*"; }
 success() { echo -e "${GREEN}${BOLD}✓${RESET} $*"; }
@@ -94,6 +98,8 @@ REVIEWERS=""
 LABELS=""
 BASE_BRANCH="main"
 NO_GITHUB=false
+NO_GITHUB_LABEL=false
+CI_MODE=false
 DRY_RUN=false
 IGNORE_BUDGET=false
 PR_NUMBER=""
@@ -150,6 +156,8 @@ show_help() {
     echo -e "  ${DIM}--reviewers \"a,b\"${RESET}        Request PR reviewers (auto-detected if omitted)"
     echo -e "  ${DIM}--labels \"a,b\"${RESET}            Add labels to PR (inherited from issue if omitted)"
     echo -e "  ${DIM}--no-github${RESET}               Disable GitHub integration"
+    echo -e "  ${DIM}--no-github-label${RESET}         Don't modify issue labels"
+    echo -e "  ${DIM}--ci${RESET}                      CI mode (skip gates, non-interactive)"
     echo -e "  ${DIM}--ignore-budget${RESET}           Skip budget enforcement checks"
     echo -e "  ${DIM}--worktree [=name]${RESET}         Run in isolated git worktree (parallel-safe)"
     echo -e "  ${DIM}--dry-run${RESET}                 Show what would happen without executing"
@@ -226,6 +234,8 @@ parse_args() {
             --reviewers)   REVIEWERS="$2"; shift 2 ;;
             --labels)      LABELS="$2"; shift 2 ;;
             --no-github)   NO_GITHUB=true; shift ;;
+            --no-github-label) NO_GITHUB_LABEL=true; shift ;;
+            --ci)          CI_MODE=true; SKIP_GATES=true; shift ;;
             --ignore-budget) IGNORE_BUDGET=true; shift ;;
             --worktree=*) AUTO_WORKTREE=true; WORKTREE_NAME="${1#--worktree=}"; WORKTREE_NAME="${WORKTREE_NAME//[^a-zA-Z0-9_-]/}"; if [[ -z "$WORKTREE_NAME" ]]; then error "Invalid worktree name (alphanumeric, hyphens, underscores only)"; exit 1; fi; shift ;;
             --worktree)   AUTO_WORKTREE=true; shift ;;
