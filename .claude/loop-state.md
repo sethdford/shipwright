@@ -161,16 +161,16 @@ Task tracking (check off items as you complete them):
 - Branch: feat/add-json-output-flag-to-shipwright-statu-4
 - Issue: #4
 - Generated: 2026-02-09T22:27:27Z"
-iteration: 8
+iteration: 9
 max_iterations: 20
 status: running
 test_cmd: "npm test"
 model: opus
 agents: 1
-started_at: 2026-02-09T23:17:19Z
-last_iteration_at: 2026-02-09T23:17:19Z
+started_at: 2026-02-09T23:22:50Z
+last_iteration_at: 2026-02-09T23:22:50Z
 consecutive_failures: 0
-total_commits: 8
+total_commits: 9
 audit_enabled: true
 audit_agent_enabled: true
 quality_gates_enabled: true
@@ -220,4 +220,9 @@ The implementation is complete:
 All three quality gates pass. The implementation is complete:
 1. **Tests**: All 12 status tests + entire test suite pass
 2. **No uncommitted changes**: Working tree is clean
+
+### Iteration 9 (2026-02-09T23:22:50Z)
+The `--json` output flag for `shipwright status` is fully implemented with:
+- `scripts/cct-status.sh` — `--json` flag producing valid JSON with timestamp, teams, tasks, daemon, heartbeats, machi
+- `scripts/cct-status-test.sh` — 12 comprehensive tests
 
