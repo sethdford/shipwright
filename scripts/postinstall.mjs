@@ -4,7 +4,14 @@
 // ║  Copies templates and migrates legacy config directories                ║
 // ╚═══════════════════════════════════════════════════════════════════════════╝
 
-import { existsSync, mkdirSync, cpSync, readFileSync, writeFileSync, appendFileSync } from "fs";
+import {
+  existsSync,
+  mkdirSync,
+  cpSync,
+  readFileSync,
+  writeFileSync,
+  appendFileSync,
+} from "fs";
 import { join } from "path";
 
 const HOME = process.env.HOME || process.env.USERPROFILE;
@@ -20,9 +27,15 @@ const DIM = "\x1b[2m";
 const BOLD = "\x1b[1m";
 const RESET = "\x1b[0m";
 
-function info(msg) { console.log(`${CYAN}${BOLD}▸${RESET} ${msg}`); }
-function success(msg) { console.log(`${GREEN}${BOLD}✓${RESET} ${msg}`); }
-function warn(msg) { console.log(`${YELLOW}${BOLD}⚠${RESET} ${msg}`); }
+function info(msg) {
+  console.log(`${CYAN}${BOLD}▸${RESET} ${msg}`);
+}
+function success(msg) {
+  console.log(`${GREEN}${BOLD}✓${RESET} ${msg}`);
+}
+function warn(msg) {
+  console.log(`${YELLOW}${BOLD}⚠${RESET} ${msg}`);
+}
 
 function ensureDir(dir) {
   if (!existsSync(dir)) mkdirSync(dir, { recursive: true });
@@ -42,15 +55,25 @@ try {
   ensureDir(SHIPWRIGHT_DIR);
 
   // Copy team templates → ~/.shipwright/templates/
-  copyDir(join(PKG_DIR, "tmux", "templates"), join(SHIPWRIGHT_DIR, "templates"));
+  copyDir(
+    join(PKG_DIR, "tmux", "templates"),
+    join(SHIPWRIGHT_DIR, "templates"),
+  );
   success("Installed team templates");
 
   // Copy pipeline templates → ~/.shipwright/pipelines/
-  copyDir(join(PKG_DIR, "templates", "pipelines"), join(SHIPWRIGHT_DIR, "pipelines"));
+  copyDir(
+    join(PKG_DIR, "templates", "pipelines"),
+    join(SHIPWRIGHT_DIR, "pipelines"),
+  );
   success("Installed pipeline templates");
 
   // Copy settings template → ~/.claude/settings.json.template (if missing)
-  const settingsTemplate = join(PKG_DIR, "claude-code", "settings.json");
+  const settingsTemplate = join(
+    PKG_DIR,
+    "claude-code",
+    "settings.json.template",
+  );
   const settingsDest = join(CLAUDE_DIR, "settings.json.template");
   if (existsSync(settingsTemplate) && !existsSync(settingsDest)) {
     ensureDir(CLAUDE_DIR);
@@ -66,7 +89,10 @@ try {
     if (existsSync(claudeMdDest)) {
       const existing = readFileSync(claudeMdDest, "utf8");
       if (!existing.includes("Shipwright")) {
-        appendFileSync(claudeMdDest, "\n---\n\n" + readFileSync(claudeMdSrc, "utf8"));
+        appendFileSync(
+          claudeMdDest,
+          "\n---\n\n" + readFileSync(claudeMdSrc, "utf8"),
+        );
         success("Appended Shipwright instructions to ~/.claude/CLAUDE.md");
       } else {
         success("~/.claude/CLAUDE.md already contains Shipwright instructions");
@@ -78,7 +104,10 @@ try {
   }
 
   // Migrate ~/.claude-teams/ → ~/.shipwright/ (non-destructive)
-  if (existsSync(LEGACY_DIR) && !existsSync(join(SHIPWRIGHT_DIR, ".migrated"))) {
+  if (
+    existsSync(LEGACY_DIR) &&
+    !existsSync(join(SHIPWRIGHT_DIR, ".migrated"))
+  ) {
     info("Migrating legacy ~/.claude-teams/ config...");
     copyDir(LEGACY_DIR, SHIPWRIGHT_DIR);
     writeFileSync(join(SHIPWRIGHT_DIR, ".migrated"), new Date().toISOString());
@@ -86,14 +115,22 @@ try {
   }
 
   // Print success banner
-  const version = JSON.parse(readFileSync(join(PKG_DIR, "package.json"), "utf8")).version;
+  const version = JSON.parse(
+    readFileSync(join(PKG_DIR, "package.json"), "utf8"),
+  ).version;
   console.log();
   console.log(`${CYAN}${BOLD}  ⚓ Shipwright v${version} installed${RESET}`);
   console.log();
   console.log(`  Next steps:`);
-  console.log(`  ${DIM}$${RESET} shipwright doctor     ${DIM}# Verify your setup${RESET}`);
-  console.log(`  ${DIM}$${RESET} shipwright session    ${DIM}# Launch an agent team${RESET}`);
-  console.log(`  ${DIM}$${RESET} shipwright pipeline   ${DIM}# Run a delivery pipeline${RESET}`);
+  console.log(
+    `  ${DIM}$${RESET} shipwright doctor     ${DIM}# Verify your setup${RESET}`,
+  );
+  console.log(
+    `  ${DIM}$${RESET} shipwright session    ${DIM}# Launch an agent team${RESET}`,
+  );
+  console.log(
+    `  ${DIM}$${RESET} shipwright pipeline   ${DIM}# Run a delivery pipeline${RESET}`,
+  );
   console.log();
 } catch (err) {
   warn(`Postinstall encountered an issue: ${err.message}`);

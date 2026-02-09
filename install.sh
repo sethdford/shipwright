@@ -650,6 +650,34 @@ if [[ ${#INSTALLED[@]} -gt 0 ]] && ! $DRY_RUN; then
         _add_entry "cct-daemon.sh" "scripts/cct-daemon.sh" "$BIN_DIR/cct-daemon.sh" false true ;;
       "cct-dashboard.sh")
         _add_entry "cct-dashboard.sh" "scripts/cct-dashboard.sh" "$BIN_DIR/cct-dashboard.sh" false true ;;
+      "cct-pipeline.sh")
+        _add_entry "cct-pipeline.sh" "scripts/cct-pipeline.sh" "$BIN_DIR/cct-pipeline.sh" false true ;;
+      "cct-reaper.sh")
+        _add_entry "cct-reaper.sh" "scripts/cct-reaper.sh" "$BIN_DIR/cct-reaper.sh" false true ;;
+      "cct-memory.sh")
+        _add_entry "cct-memory.sh" "scripts/cct-memory.sh" "$BIN_DIR/cct-memory.sh" false true ;;
+      "cct-cost.sh")
+        _add_entry "cct-cost.sh" "scripts/cct-cost.sh" "$BIN_DIR/cct-cost.sh" false true ;;
+      "cct-fleet.sh")
+        _add_entry "cct-fleet.sh" "scripts/cct-fleet.sh" "$BIN_DIR/cct-fleet.sh" false true ;;
+      "cct-fix.sh")
+        _add_entry "cct-fix.sh" "scripts/cct-fix.sh" "$BIN_DIR/cct-fix.sh" false true ;;
+      "cct-tracker.sh")
+        _add_entry "cct-tracker.sh" "scripts/cct-tracker.sh" "$BIN_DIR/cct-tracker.sh" false true ;;
+      "cct-tracker-linear.sh")
+        _add_entry "cct-tracker-linear.sh" "scripts/cct-tracker-linear.sh" "$BIN_DIR/cct-tracker-linear.sh" false true ;;
+      "cct-tracker-jira.sh")
+        _add_entry "cct-tracker-jira.sh" "scripts/cct-tracker-jira.sh" "$BIN_DIR/cct-tracker-jira.sh" false true ;;
+      "cct-heartbeat.sh")
+        _add_entry "cct-heartbeat.sh" "scripts/cct-heartbeat.sh" "$BIN_DIR/cct-heartbeat.sh" false true ;;
+      "cct-checkpoint.sh")
+        _add_entry "cct-checkpoint.sh" "scripts/cct-checkpoint.sh" "$BIN_DIR/cct-checkpoint.sh" false true ;;
+      "cct-remote.sh")
+        _add_entry "cct-remote.sh" "scripts/cct-remote.sh" "$BIN_DIR/cct-remote.sh" false true ;;
+      "cct-linear.sh")
+        _add_entry "cct-linear.sh" "scripts/cct-linear.sh" "$BIN_DIR/cct-linear.sh" false true ;;
+      "cct-jira.sh")
+        _add_entry "cct-jira.sh" "scripts/cct-jira.sh" "$BIN_DIR/cct-jira.sh" false true ;;
 
       "teammate-idle.sh")
         _add_entry "teammate-idle.sh" "claude-code/hooks/teammate-idle.sh" "$HOME/.claude/hooks/teammate-idle.sh" false true ;;
