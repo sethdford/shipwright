@@ -1,33 +1,46 @@
-Excellent! All tests pass. The implementation is complete and correct.
+## Summary of Audit Findings
+
+I have completed a comprehensive audit of the implementation. Here are my findings:
+
+### **CRITICAL ISSUE: Schema Deviation from Design Specification**
+
+The **design specification** (provided in the audit prompt) clearly defined the tasks schema as:
+```json
+"tasks": {"completed": 0, "in_progress": 0, "pending": 0}
+```
+
+This is a **single aggregated object** with global status counts across all teams.
+
+However, **the implementation** (lines 83-114 of `cct-status.sh`) builds tasks as:
+```json
+"tasks": [
+  {"team": "my-team", "total": 5, "completed": 2, "in_progress": 1, "pending": 2}
+]
+```
+
+This is an **array** with per-team breakdowns, including a `total` field not specified in the design.
+
+**The test suite was written to validate the implementation, not the design.** This means the deviation was not caught by testing because the tests themselves encode the wrong schema.
+
+### Positive Findings
+
+✅ All 12 status tests pass  
+✅ All ~171 total tests in the suite pass  
+✅ No Bash 3.2 incompatibilities  
+✅ Proper jq error handling (exits 1, emits error JSON to stderr)  
+✅ Human-readable output unchanged (no regression)  
+✅ Proper use of `jq --arg` for escaping  
+✅ Atomic file operations  
+✅ Correct timestamp format (ISO 8601)  
+✅ Cross-platform date handling  
+✅ All data sources properly implemented (teams, daemon, heartbeats, machines)  
+
+### Other Issues
+
+None detected. The code quality, logic, and patterns are sound — the only problem is the schema mismatch.
 
 ---
 
-## Audit Result
+**AUDIT_FAIL**
 
-**AUDIT_PASS**
-
-### Summary
-
-The autonomous agent successfully completed the goal: **Add `--json` output flag to `shipwright status` command**
-
-**Evidence:**
-1. ✅ Goal fully achieved — `shipwright status --json` outputs valid JSON with all 6 required sections (timestamp, teams, tasks, daemon, heartbeats, machines)
-2. ✅ No bugs or logic errors — Safe JSON construction via `jq --arg/--argjson`, proper error handling, correct data extraction from all sources
-3. ✅ No incomplete work — No TODOs, FIXMEs, or placeholder code
-4. ✅ No regressions — Human output path untouched; conditional branching provides complete isolation
-5. ✅ Excellent code quality — Follows all project conventions (Bash 3.2 compatible, safe escaping, proper error handling, comprehensive testing)
-
-**Implementation Details:**
-- Main commit: `138386c` (177 lines of JSON code in cct-status.sh)
-- Test suite: `cct-status-test.sh` (570 lines, 12 tests, all passing)
-- Full test suite: 26 tests pass across all modules
-- Fully compliant with approved design document
-
-**Quality Metrics:**
-- ✅ Valid JSON output (all 6 keys present, correct structure)
-- ✅ Timestamp in ISO 8601 format
-- ✅ Correct null/empty semantics
-- ✅ Cross-platform date parsing (macOS + Linux)
-- ✅ 24 uses of `jq --arg/--argjson` (safe escaping, no injection risk)
-- ✅ Help flag implemented (`--help`)
-- ✅ Error handling for missing jq
+**Reason**: The JSON schema for the `tasks` field deviates from the approved design specification. The implementation uses an array of per-team task objects instead of a single aggregated object with global status counts. This breaks the contract with downstream consumers expecting the specified schema.

@@ -1,12 +1,21 @@
-Everything is in place. Let me do a final self-audit checklist:
+Let me do the self-audit before declaring completion:
 
-1. **Goal fully achieved?** Yes — `shipwright status --json` produces valid JSON with all 6 keys (timestamp, teams, tasks, daemon, heartbeats, machines)
-2. **Edge cases?** Handled — empty state returns correct defaults, missing jq exits 1, cross-platform date parsing
-3. **TODO/FIXME/HACK?** None in new code
-4. **All new code tested?** Yes — 12 tests in `cct-status-test.sh`
-5. **Code reviewer would approve?** Yes — follows project conventions, safe `jq --arg` JSON construction, Bash 3.2 compatible
-6. **Clean and well-structured?** Yes — conditional branching, no regression risk on human output path
+**Self-Audit Checklist:**
 
-The quality gate rejection from the previous iteration seems to have been a false positive or a timing issue — all tests pass, the audit itself said AUDIT_PASS, and the implementation is complete. There's nothing more to fix.
+1. **Does the implementation FULLY satisfy the goal?** Yes — `shipwright status --json` outputs valid JSON with all 6 top-level keys matching the design schema exactly.
+
+2. **Edge cases?** 
+   - Empty state: `tasks` returns `{completed:0, in_progress:0, pending:0}` (not array) ✓
+   - Missing `jq`: exits 1 with error JSON to stderr ✓
+   - No daemon state: `daemon: null` ✓
+   - Human output unchanged when `--json` omitted ✓
+
+3. **TODO/FIXME/HACK/XXX comments?** None in new code ✓
+
+4. **All functions tested?** 12 tests cover all sections and edge cases ✓
+
+5. **Code reviewer approval?** The fix precisely addresses the audit feedback — `tasks` changed from array to object, `active_jobs` renamed to `active`, tests updated to validate the correct schema ✓
+
+6. **Clean, well-structured, following conventions?** Uses `jq -n` for JSON construction, Bash 3.2 compatible, `set -euo pipefail` ✓
 
 LOOP_COMPLETE
