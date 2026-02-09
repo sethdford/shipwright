@@ -99,7 +99,7 @@ assert_exit_code() {
 
 assert_output_contains() {
     local pattern="$1" label="${2:-output match}"
-    if echo "$INIT_OUTPUT" | grep -qiE "$pattern"; then
+    if printf '%s\n' "$INIT_OUTPUT" | grep -qiE "$pattern" 2>/dev/null; then
         return 0
     fi
     echo -e "    ${RED}✗${RESET} Output missing pattern: $pattern ($label)"

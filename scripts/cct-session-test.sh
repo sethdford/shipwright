@@ -119,7 +119,7 @@ assert_exit_code() {
 
 assert_output_contains() {
     local pattern="$1" label="${2:-output match}"
-    if echo "$SESSION_OUTPUT" | grep -qiE "$pattern"; then
+    if printf '%s\n' "$SESSION_OUTPUT" | grep -qiE "$pattern" 2>/dev/null; then
         return 0
     fi
     echo -e "    ${RED}✗${RESET} Output missing pattern: $pattern ($label)"
@@ -130,7 +130,7 @@ assert_output_contains() {
 
 assert_output_not_contains() {
     local pattern="$1" label="${2:-output exclusion}"
-    if ! echo "$SESSION_OUTPUT" | grep -qiE "$pattern"; then
+    if ! printf '%s\n' "$SESSION_OUTPUT" | grep -qiE "$pattern" 2>/dev/null; then
         return 0
     fi
     echo -e "    ${RED}✗${RESET} Output unexpectedly contains: $pattern ($label)"

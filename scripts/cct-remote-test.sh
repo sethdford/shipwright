@@ -196,7 +196,7 @@ test_list_machines() {
         bash "$TEMP_DIR/scripts/cct-remote.sh" list 2>/dev/null)
 
     # Should contain machine info
-    if echo "$output" | grep -q "builder-1"; then
+    if printf '%s\n' "$output" | grep -q "builder-1" 2>/dev/null; then
         return 0
     fi
     echo -e "    ${RED}✗${RESET} List output missing machine info"
@@ -249,7 +249,7 @@ test_remote_help() {
     local output
     output=$(bash "$TEMP_DIR/scripts/cct-remote.sh" help 2>&1) || exit_code=$?
 
-    if echo "$output" | grep -qi "usage\|remote\|machine"; then
+    if printf '%s\n' "$output" | grep -qi "usage\|remote\|machine" 2>/dev/null; then
         return 0
     fi
     echo -e "    ${RED}✗${RESET} Help output missing expected content"

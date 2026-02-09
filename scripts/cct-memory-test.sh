@@ -153,7 +153,7 @@ run_test() {
 
 assert_contains() {
     local haystack="$1" needle="$2" label="${3:-contains}"
-    if echo "$haystack" | grep -qiE "$needle"; then
+    if printf '%s\n' "$haystack" | grep -qiE "$needle" 2>/dev/null; then
         return 0
     fi
     echo -e "    ${RED}✗${RESET} Missing pattern: ${needle} (${label})"

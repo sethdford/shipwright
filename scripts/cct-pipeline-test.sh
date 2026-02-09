@@ -399,7 +399,7 @@ assert_exit_code() {
 
 assert_output_contains() {
     local pattern="$1" label="${2:-output match}"
-    if echo "$PIPELINE_OUTPUT" | grep -qiE "$pattern"; then
+    if printf '%s\n' "$PIPELINE_OUTPUT" | grep -qiE "$pattern" 2>/dev/null; then
         return 0
     fi
     echo -e "    ${RED}✗${RESET} Output missing pattern: $pattern ($label)"
@@ -410,7 +410,7 @@ assert_output_contains() {
 
 assert_output_not_contains() {
     local pattern="$1" label="${2:-output exclusion}"
-    if ! echo "$PIPELINE_OUTPUT" | grep -qiE "$pattern"; then
+    if ! printf '%s\n' "$PIPELINE_OUTPUT" | grep -qiE "$pattern" 2>/dev/null; then
         return 0
     fi
     echo -e "    ${RED}✗${RESET} Output unexpectedly contains: $pattern ($label)"
@@ -455,7 +455,7 @@ assert_branch_exists() {
     local pattern="$1" label="${2:-branch exists}"
     local branches
     branches=$(cd "$TEMP_DIR/project" && git branch --list 2>/dev/null)
-    if echo "$branches" | grep -qE "$pattern"; then
+    if printf '%s\n' "$branches" | grep -qE "$pattern" 2>/dev/null; then
         return 0
     fi
     echo -e "    ${RED}✗${RESET} No branch matching: $pattern ($label)"
@@ -595,7 +595,7 @@ test_build_invokes_cct() {
     # Verify a commit exists with "feat:" prefix (from mock cct loop)
     local commits
     commits=$(cd "$TEMP_DIR/project" && git log --oneline 2>/dev/null)
-    if ! echo "$commits" | grep -q "feat:"; then
+    if ! printf '%s\n' "$commits" | grep -q "feat:" 2>/dev/null; then
         echo -e "    ${RED}✗${RESET} No 'feat:' commit found"
         return 1
     fi
