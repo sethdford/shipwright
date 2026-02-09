@@ -52,21 +52,43 @@ jobs:
             echo "--- Checking issue #$issue ---"
 
             # Get all comments for this issue (single API call)
-            COMMENTS=$(gh issue view "$issue" --repo "$GITHUB_REPOSITORY" \
-              --json comments --jq '.comments[].body' 2>/dev/null || echo "")
+            # Detect API failures to avoid bad decisions on empty data
+            COMMENTS=""
+            if ! COMMENTS=$(gh issue view "$issue" --repo "$GITHUB_REPOSITORY" \
+              --json comments --jq '.comments[].body' 2>/dev/null); then
+              echo "Issue #$issue: failed to fetch comments (rate limited?) — skipping"
+              continue
+            fi
 
-            COMMENTS_WITH_DATES=$(gh issue view "$issue" --repo "$GITHUB_REPOSITORY" \
-              --json comments --jq '.comments[] | "\(.createdAt)|\(.body)"' 2>/dev/null || echo "")
+            COMMENTS_WITH_DATES=""
+            if ! COMMENTS_WITH_DATES=$(gh issue view "$issue" --repo "$GITHUB_REPOSITORY" \
+              --json comments --jq '.comments[] | "\(.createdAt)|\(.body)"' 2>/dev/null); then
+              echo "Issue #$issue: failed to fetch comment dates — skipping"
+              continue
+            fi
 
             # ── Check 1: Active/queued runs for THIS issue ──
             # Check by displayTitle which includes "#N" via run-name
-            ISSUE_ACTIVE=$(gh run list --repo "$GITHUB_REPOSITORY" \
+            # Use temp files to detect API failures (rate limiting)
+            ISSUE_ACTIVE="0"
+            if gh run list --repo "$GITHUB_REPOSITORY" \
               --workflow=shipwright-pipeline.yml --status in_progress \
-              --json displayTitle --jq "[.[] | select(.displayTitle | test(\"#${issue}( |$)\"))] | length" 2>/dev/null || echo "0")
+              --json displayTitle --jq "[.[] | select(.displayTitle | test(\"#${issue}( |$)\"))] | length" > /tmp/sweep-active-$issue.txt 2>/dev/null; then
+              ISSUE_ACTIVE=$(cat /tmp/sweep-active-$issue.txt 2>/dev/null || echo "0")
+            else
+              echo "Issue #$issue: API call failed — skipping to avoid duplicate dispatch"
+              continue
+            fi
 
-            ISSUE_QUEUED=$(gh run list --repo "$GITHUB_REPOSITORY" \
+            ISSUE_QUEUED="0"
+            if gh run list --repo "$GITHUB_REPOSITORY" \
               --workflow=shipwright-pipeline.yml --status queued \
-              --json displayTitle --jq "[.[] | select(.displayTitle | test(\"#${issue}( |$)\"))] | length" 2>/dev/null || echo "0")
+              --json displayTitle --jq "[.[] | select(.displayTitle | test(\"#${issue}( |$)\"))] | length" > /tmp/sweep-queued-$issue.txt 2>/dev/null; then
+              ISSUE_QUEUED=$(cat /tmp/sweep-queued-$issue.txt 2>/dev/null || echo "0")
+            else
+              echo "Issue #$issue: API call failed — skipping to avoid duplicate dispatch"
+              continue
+            fi
 
             if [[ "${ISSUE_ACTIVE:-0}" -gt 0 ]] || [[ "${ISSUE_QUEUED:-0}" -gt 0 ]]; then
               echo "Issue #$issue: pipeline already running/queued for this issue — skipping"
