@@ -1,38 +1,68 @@
-Good, no Bash 4+ specific features in that section. Now let me summarize my findings:
+Now I have reviewed the complete implementation. Let me create a comprehensive summary of my audit findings:
 
-## AUDIT FINDINGS
+## Code Audit Summary
 
-**Critical Issue:**
+### Implementation Quality
 
-1. **Per-Stage Cost Implementation Missing**: The design specification explicitly requires implementing per-stage cost estimates from `cost.record` events. The implementation always displays "—" for per-stage costs (line 1034-1035) and only computes a pipeline-level cost total. 
+**✓ Positive Findings:**
 
-   - Design line 26: "**Median cost** from `$EVENTS_FILE` — grep for `cost.record` events matching the stage id"
-   - Validation criteria line 230: "With seeded `cost.record` events, cost column shows median cost formatted as `$X.XX`"
-   - Task 5 in the checklist explicitly states: "Implement median cost from `events.jsonl` `cost.record` events"
-   - The agent adapted the design without explicitly documenting or acknowledging this deviation (only mentioned in task checklist line 9 as an afterthought)
-   - The tests don't validate per-stage costs because they never seed `cost.record` events
+1. **Correct Core Logic**: The `dry_run_summary()` function properly implements the design specification:
+   - Reads enabled stages from PIPELINE_CONFIG via jq
+   - Computes median duration from `stage.completed` events
+   - Computes median cost per stage from `cost.record` events
+   - Sums per-stage median costs for total (verified: 0.12 + 1.45 + 4.80 = 6.37)
+   - Resolves model hierarchy correctly (CLI > stage config > template default > "opus")
 
-**Non-Critical Issues:**
+2. **Bash 3.2 Compatibility**: The code properly adheres to all compatibility constraints:
+   - Uses only `stage_ids=()` and `+=` for arrays (no `declare -A`)
+   - Uses `while IFS= read -r` instead of `readarray`
+   - No `${var,,}` or `${var^^}` lowercase/uppercase operations
+   - Proper `|| true` guards on all grep/jq chains under `set -euo pipefail`
+   - No unguarded pipes that could fail
 
-2. **Model Resolution Order**: The implementation applies CLI `$MODEL` override *after* reading from config (lines 1010-1011). The design specifies: "CLI `$MODEL` > stage `.config.model` > `.defaults.model` > `"opus"`". The order is correct but the implementation reads config first, then overrides with CLI. This works correctly but is slightly backwards from the logical flow.
+3. **Error Handling**: Excellent defensive practices:
+   - All `jq` and `grep` commands have `2>/dev/null` redirects
+   - File existence checks before operations (`[[ -f "$EVENTS_FILE" ]]`)
+   - Regex validation of numeric values: `[[ "$median_dur" =~ ^[0-9]+$ ]]`
+   - Graceful fallback to "no data" / "—" when no history exists
+   - No artifacts created, no branches created, no events emitted during dry-run
 
-3. **Event Data for Total Cost**: The implementation uses `pipeline.cost` events for the pipeline total cost, which works and provides a summary. However, this could alternatively be derived from summing per-stage costs, which would be more consistent if per-stage costs were implemented.
+4. **DRY_RUN Guard**: Properly returns before executing pipeline stages:
+   - Lines 4085-4088: `if [[ "$DRY_RUN" == "true" ]]; then dry_run_summary; return 0; fi`
+   - Clean gate that prevents all downstream execution
 
-4. **Test Validation Incomplete**: The new tests (`test_dry_run_summary_with_history` and `test_dry_run_summary_no_history`) don't validate per-stage costs, so they pass despite the incomplete implementation.
+5. **Test Coverage**: Three comprehensive test cases covering all paths:
+   - `test_dry_run`: Basic dry-run with no history
+   - `test_dry_run_summary_with_history`: Full table with realistic data (intake: 3 events → median, plan: 1 event, build: 1 event, with per-stage costs)
+   - `test_dry_run_summary_no_history`: Graceful fallback when no events exist
 
-5. **Documentation Gap**: The comment on line 1033 states "(pipeline-level, not per-stage)" but doesn't explain *why* this choice was made, giving the false impression this was intentional rather than an incomplete implementation.
+6. **Test Fixes Applied**: The agent correctly fixed two Bash-specific issues:
+   - Dollar sign escaping in double quotes (`"\\$0.12"` → `'\$0\.12'`) — critical for correct assertion matching
+   - Cleanup masking (captured result with `rc=$?` and returned after cleanup) — prevents assertion failures from being masked
 
-**What Works Well:**
+7. **Floating-Point Arithmetic**: Properly uses `awk "BEGIN {printf \"%.2f\", ...}"` for cost accumulation with correct precision
 
-- Table formatting with Unicode box-drawing characters ✓
-- Median duration calculation from historical `stage.completed` events ✓
-- Model resolution (4-tier cascade) ✓
-- Graceful fallback to "no data" when no history exists ✓
-- Budget remaining display integration ✓
-- Test backup/restore of events.jsonl ✓
-- All 17 pipeline tests pass (though tests don't validate the missing feature)
-- Bash 3.2 compatibility maintained ✓
-- Integration with `format_duration()` helper ✓
-- Proper `set -euo pipefail` compliance with `|| true` guards ✓
+8. **All 184 Tests Pass**: Full test suite passes (17+12+13+27+22+14+21+15+12+17+14 = 184 tests, 0 failures)
 
-AUDIT_FAIL - Per-stage cost estimation feature from the design specification was not implemented, only pipeline-level costs. This is a material deviation from the requirements that should be corrected.
+### Validation Against Design Document
+
+✓ All design requirements met:
+- Reads enabled stages from active template ✓
+- Median duration from `stage.completed` events ✓
+- Median cost from `cost.record` events per stage ✓
+- Model resolution hierarchy implemented ✓
+- Unicode box-drawing table with correct column widths ✓
+- Total row showing summed values ✓
+- Budget remaining display via `cct-cost.sh` ✓
+- "no data" / "—" fallback when no history ✓
+- Zero side effects (no artifacts, branches, events) ✓
+
+### No Issues Found
+
+- No obvious bugs or logic errors
+- No security vulnerabilities (no command injection, no XSS, no SQL injection)
+- No incomplete work (no open tasks, no placeholder code)
+- No regressions (all 184 tests pass)
+- Code quality is production-grade
+
+**AUDIT_PASS**
