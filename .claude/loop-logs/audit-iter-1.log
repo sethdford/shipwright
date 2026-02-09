@@ -1,0 +1,47 @@
+## Audit Summary
+
+I have completed a comprehensive review of the agent's implementation of the `--json` output flag for `shipwright status`. Here are my findings:
+
+### ✅ **Goal Achievement**
+The agent successfully implemented the requested feature. `shipwright status --json` now outputs valid machine-readable JSON with all 6 required sections.
+
+### ✅ **Implementation Quality**
+- **Conditional branching** — The JSON and human-readable paths are cleanly separated via `if [[ "$JSON_OUTPUT" == "true" ]]...else...fi`, minimizing regression risk
+- **Safe JSON construction** — All values are passed via `jq --arg` and `--argjson`, preventing injection vulnerabilities
+- **No unsafe patterns** — Zero instances of `eval`, `exec`, or raw string interpolation
+- **Cross-platform date parsing** — The `parse_iso_epoch()` helper correctly tries macOS `date -j` first, then falls back to Linux `date -d`
+
+### ✅ **Bash Standards Compliance**
+- Respects `set -euo pipefail`
+- Bash 3.2 compatible (no associative arrays, `readarray`, lowercase expansion)
+- Proper variable scoping (`local` used only inside the `parse_iso_epoch()` function)
+- No remaining shellcheck errors in the JSON branch (pre-existing errors in human section left untouched)
+
+### ✅ **Test Coverage**
+The test suite (`cct-status-test.sh`, 570 lines) is comprehensive:
+- **12 tests covering:**
+  - JSON validity (valid JSON, all 6 keys present)
+  - Empty state handling (arrays empty, daemon is null)
+  - Timestamp format (ISO 8601)
+  - All 5 data sections (teams, tasks, daemon, heartbeats, machines)
+  - Flag behavior (`--json`, `--help`)
+  - Human output regression (still produces ANSI text)
+  - Error handling (missing jq exits 1)
+- **All 12 tests pass** ✓
+
+### ✅ **Backward Compatibility**
+- Human output unchanged and verified to still render correctly
+- All 127+ existing tests in `npm test` still pass
+- No breaking changes to the existing API or output format
+
+### ✅ **No Incomplete Work**
+- No TODO/FIXME/HACK comments
+- `package.json` properly updated with test registration
+- All files are complete and committed
+
+### ✅ **Code Quality**
+- Follows project conventions (colors, test harness pattern, error handling)
+- Clear and maintainable code structure
+- Proper error messages for missing `jq`
+
+**AUDIT_PASS**
