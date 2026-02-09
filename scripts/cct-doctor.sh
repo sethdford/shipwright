@@ -700,6 +700,108 @@ else
 fi
 
 # ═════════════════════════════════════════════════════════════════════════════
+# 12. Dashboard
+# ═════════════════════════════════════════════════════════════════════════════
+echo ""
+echo -e "${PURPLE}${BOLD}  DASHBOARD${RESET}"
+echo -e "${DIM}  ──────────────────────────────────────────${RESET}"
+
+# Bun runtime (required for dashboard)
+if command -v bun &>/dev/null; then
+    BUN_VERSION="$(bun --version 2>/dev/null || echo "unknown")"
+    check_pass "Bun ${BUN_VERSION}"
+else
+    check_warn "Bun not installed — required for the web dashboard"
+    echo -e "    ${DIM}Install: curl -fsSL https://bun.sh/install | bash${RESET}"
+fi
+
+# Dashboard server file
+DOCTOR_SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+DOCTOR_REPO_DIR="$(cd "$DOCTOR_SCRIPT_DIR/.." && pwd)"
+DASHBOARD_SERVER=""
+for search_dir in \
+    "${DOCTOR_REPO_DIR}/dashboard" \
+    "${HOME}/.local/share/shipwright/dashboard" \
+    "${HOME}/.shipwright/dashboard"; do
+    if [[ -f "${search_dir}/server.ts" ]]; then
+        DASHBOARD_SERVER="${search_dir}/server.ts"
+        break
+    fi
+done
+
+if [[ -n "$DASHBOARD_SERVER" ]]; then
+    check_pass "Dashboard server: ${DASHBOARD_SERVER/#$HOME/\~}"
+else
+    check_warn "Dashboard server.ts not found"
+    echo -e "    ${DIM}Expected at: ${DOCTOR_REPO_DIR}/dashboard/server.ts${RESET}"
+fi
+
+# Dashboard public assets
+DASHBOARD_PUBLIC=""
+for search_dir in \
+    "${DOCTOR_REPO_DIR}/dashboard/public" \
+    "${HOME}/.local/share/shipwright/dashboard/public" \
+    "${HOME}/.shipwright/dashboard/public"; do
+    if [[ -d "$search_dir" ]]; then
+        DASHBOARD_PUBLIC="$search_dir"
+        break
+    fi
+done
+
+if [[ -n "$DASHBOARD_PUBLIC" ]]; then
+    dash_assets=0
+    for asset in index.html app.js styles.css; do
+        if [[ -f "${DASHBOARD_PUBLIC}/${asset}" ]]; then
+            dash_assets=$((dash_assets + 1))
+        fi
+    done
+    if [[ $dash_assets -eq 3 ]]; then
+        check_pass "Dashboard assets: all present (index.html, app.js, styles.css)"
+    else
+        check_warn "Dashboard assets: ${dash_assets}/3 found in ${DASHBOARD_PUBLIC/#$HOME/\~}"
+    fi
+else
+    check_warn "Dashboard public directory not found"
+fi
+
+# Port availability (default dashboard port 8767)
+DASHBOARD_PORT="${DASHBOARD_PORT:-8767}"
+DASHBOARD_PID_FILE="${HOME}/.claude-teams/dashboard.pid"
+
+if [[ -f "$DASHBOARD_PID_FILE" ]]; then
+    DASH_PID="$(cat "$DASHBOARD_PID_FILE" 2>/dev/null || true)"
+    if [[ -n "$DASH_PID" ]] && kill -0 "$DASH_PID" 2>/dev/null; then
+        check_pass "Dashboard running (PID: ${DASH_PID})"
+    else
+        check_warn "Stale dashboard PID file (process ${DASH_PID:-?} not running)"
+        echo -e "    ${DIM}Clean up: rm ${DASHBOARD_PID_FILE}${RESET}"
+    fi
+else
+    # Check if default port is available
+    PORT_IN_USE=false
+    if command -v lsof &>/dev/null; then
+        if lsof -iTCP:"$DASHBOARD_PORT" -sTCP:LISTEN &>/dev/null; then
+            PORT_IN_USE=true
+        fi
+    elif command -v ss &>/dev/null; then
+        if ss -tlnp 2>/dev/null | grep -q ":${DASHBOARD_PORT} "; then
+            PORT_IN_USE=true
+        fi
+    elif command -v netstat &>/dev/null; then
+        if netstat -tln 2>/dev/null | grep -q ":${DASHBOARD_PORT} "; then
+            PORT_IN_USE=true
+        fi
+    fi
+
+    if [[ "$PORT_IN_USE" == "true" ]]; then
+        check_warn "Port ${DASHBOARD_PORT} in use — dashboard may fail to start"
+        echo -e "    ${DIM}Use --port <N> to choose a different port${RESET}"
+    else
+        check_pass "Port ${DASHBOARD_PORT} available for dashboard"
+    fi
+fi
+
+# ═════════════════════════════════════════════════════════════════════════════
 # Summary
 # ═════════════════════════════════════════════════════════════════════════════
 echo ""

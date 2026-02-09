@@ -27,7 +27,7 @@
   ],
   "scripts": {
     "postinstall": "node scripts/postinstall.mjs",
-    "test": "bash scripts/cct-pipeline-test.sh && bash scripts/cct-daemon-test.sh && bash scripts/cct-prep-test.sh && bash scripts/cct-fleet-test.sh && bash scripts/cct-fix-test.sh && bash scripts/cct-memory-test.sh && bash scripts/cct-session-test.sh && bash scripts/cct-init-test.sh && bash scripts/cct-tracker-test.sh && bash scripts/cct-heartbeat-test.sh && bash scripts/cct-remote-test.sh"
+    "test": "bash scripts/cct-pipeline-test.sh && bash scripts/cct-daemon-test.sh && bash scripts/cct-prep-test.sh && bash scripts/cct-fleet-test.sh && bash scripts/cct-fix-test.sh && bash scripts/cct-memory-test.sh && bash scripts/cct-session-test.sh && bash scripts/cct-init-test.sh && bash scripts/cct-tracker-test.sh && bash scripts/cct-heartbeat-test.sh && bash scripts/cct-remote-test.sh && bash scripts/cct-doctor-test.sh"
   },
   "keywords": [
     "claude",
