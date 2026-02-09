@@ -1366,8 +1366,8 @@ Checklist of completion criteria.
     [[ -z "$plan_model" || "$plan_model" == "null" ]] && plan_model="opus"
 
     local _token_log="${ARTIFACTS_DIR}/.claude-tokens-plan.log"
-    claude --print --model "$plan_model" --max-turns 10 \
-        "$plan_prompt" > "$plan_file" 2>"$_token_log" || true
+    claude --print --model "$plan_model" --max-turns 25 \
+        "$plan_prompt" < /dev/null > "$plan_file" 2>"$_token_log" || true
     parse_claude_tokens "$_token_log"
 
     if [[ ! -s "$plan_file" ]]; then
@@ -1539,8 +1539,8 @@ Be concrete and specific. Reference actual file paths in the codebase. Consider 
     [[ -z "$design_model" || "$design_model" == "null" ]] && design_model="opus"
 
     local _token_log="${ARTIFACTS_DIR}/.claude-tokens-design.log"
-    claude --print --model "$design_model" --max-turns 10 \
-        "$design_prompt" > "$design_file" 2>"$_token_log" || true
+    claude --print --model "$design_model" --max-turns 25 \
+        "$design_prompt" < /dev/null > "$design_file" 2>"$_token_log" || true
     parse_claude_tokens "$_token_log"
 
     if [[ ! -s "$design_file" ]]; then
@@ -1682,7 +1682,7 @@ $(cat "$TASKS_FILE")"
 
     local _token_log="${ARTIFACTS_DIR}/.claude-tokens-build.log"
     export PIPELINE_JOB_ID="${PIPELINE_NAME:-pipeline-$$}"
-    cct loop "${loop_args[@]}" 2>"$_token_log" || {
+    cct loop "${loop_args[@]}" < /dev/null 2>"$_token_log" || {
         parse_claude_tokens "$_token_log"
         error "Build loop failed"
         return 1
@@ -1795,7 +1795,7 @@ stage_review() {
 
     local review_model="${MODEL:-opus}"
 
-    claude --print --model "$review_model" --max-turns 15 \
+    claude --print --model "$review_model" --max-turns 25 \
         "You are a senior code reviewer. Review this git diff thoroughly.
 
 For each issue found, use this format:
@@ -1812,7 +1812,7 @@ Focus on:
 
 Be specific. Reference exact file paths and line numbers. Only flag genuine issues.
 
-$(cat "$diff_file")" > "$review_file" 2>"${ARTIFACTS_DIR}/.claude-tokens-review.log" || true
+$(cat "$diff_file")" < /dev/null > "$review_file" 2>"${ARTIFACTS_DIR}/.claude-tokens-review.log" || true
     parse_claude_tokens "${ARTIFACTS_DIR}/.claude-tokens-review.log"
 
     if [[ ! -s "$review_file" ]]; then
@@ -2798,7 +2798,7 @@ Diff:
 $diff_content"
 
     local review_output
-    review_output=$(claude --print "$prompt" 2>"${ARTIFACTS_DIR}/.claude-tokens-adversarial.log" || true)
+    review_output=$(claude --print "$prompt" < /dev/null 2>"${ARTIFACTS_DIR}/.claude-tokens-adversarial.log" || true)
     parse_claude_tokens "${ARTIFACTS_DIR}/.claude-tokens-adversarial.log"
 
     echo "$review_output" > "$ARTIFACTS_DIR/adversarial-review.md"
@@ -2859,7 +2859,7 @@ Files changed: $changed_files
 $file_contents"
 
     local review_output
-    review_output=$(claude --print "$prompt" 2>"${ARTIFACTS_DIR}/.claude-tokens-negative.log" || true)
+    review_output=$(claude --print "$prompt" < /dev/null 2>"${ARTIFACTS_DIR}/.claude-tokens-negative.log" || true)
     parse_claude_tokens "${ARTIFACTS_DIR}/.claude-tokens-negative.log"
 
     echo "$review_output" > "$ARTIFACTS_DIR/negative-review.md"

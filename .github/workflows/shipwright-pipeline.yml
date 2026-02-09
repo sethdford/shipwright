@@ -151,10 +151,21 @@ jobs:
           ${BODY}
           EOF
 
-          # Call Claude for triage (fast model, minimal tokens)
-          RESPONSE=$(claude --print -m haiku /tmp/triage-prompt.txt 2>/dev/null || echo "APPROVED: true
+          # Call Anthropic API directly for triage (no CLI install needed)
+          PROMPT_TEXT=$(cat /tmp/triage-prompt.txt)
+          RESPONSE=$(curl -s --max-time 30 \
+            -H "x-api-key: ${ANTHROPIC_API_KEY}" \
+            -H "anthropic-version: 2023-06-01" \
+            -H "content-type: application/json" \
+            -d "$(jq -n --arg prompt "$PROMPT_TEXT" '{
+              model: "claude-haiku-4-5-20251001",
+              max_tokens: 256,
+              messages: [{role: "user", content: $prompt}]
+            }')" \
+            https://api.anthropic.com/v1/messages 2>/dev/null | \
+            jq -r '.content[0].text // empty' 2>/dev/null || echo "APPROVED: true
           COMPLEXITY: standard
-          REASON: Triage model unavailable — defaulting to approved")
+          REASON: Triage API unavailable — defaulting to approved")
 
           # Parse response
           APPROVED=$(echo "$RESPONSE" | grep -i "^APPROVED:" | head -1 | awk '{print $2}' | tr '[:upper:]' '[:lower:]')
