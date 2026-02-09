@@ -862,14 +862,17 @@ detect_reviewers() {
         fi
     fi
 
-    # Fallback: top contributors from recent git log (excluding self)
+    # Fallback: try to extract GitHub usernames from recent commit emails
+    # Format: user@users.noreply.github.com → user, or noreply+user@... → user
     local current_user
-    current_user=$(gh api user --jq '.login' 2>/dev/null || git config user.name 2>/dev/null || true)
+    current_user=$(gh api user --jq '.login' 2>/dev/null || true)
     local contributors
-    contributors=$(git log --format='%aN' -100 2>/dev/null | \
+    contributors=$(git log --format='%aE' -100 2>/dev/null | \
+        grep -oE '[a-zA-Z0-9_-]+@users\.noreply\.github\.com' | \
+        sed 's/@users\.noreply\.github\.com//' | sed 's/^[0-9]*+//' | \
         sort | uniq -c | sort -rn | \
         awk '{print $NF}' | \
-        grep -v "^${current_user}$" 2>/dev/null | \
+        grep -v "^${current_user:-___}$" 2>/dev/null | \
         head -2 | tr '\n' ',')
     contributors="${contributors%,}"
     echo "$contributors"
@@ -2089,6 +2092,13 @@ stage_pr() {
         warn "Branch has ${wip_commits} WIP/fixup/squash commit(s) — consider cleaning up"
     fi
 
+    # Commit any uncommitted changes left by the build agent
+    if ! git diff --quiet 2>/dev/null || ! git diff --cached --quiet 2>/dev/null; then
+        info "Committing remaining uncommitted changes..."
+        git add -A 2>/dev/null || true
+        git commit -m "chore: pipeline cleanup — commit remaining build changes" --no-verify 2>/dev/null || true
+    fi
+
     # Auto-rebase onto latest base branch before PR
     auto_rebase || {
         warn "Rebase/merge failed — pushing as-is"
@@ -2206,11 +2216,21 @@ EOF
     fi
 
     info "Creating PR..."
-    local pr_url
-    pr_url=$(gh pr create "${pr_args[@]}" 2>&1) || {
-        error "PR creation failed: $pr_url"
-        return 1
-    }
+    local pr_url pr_stderr pr_exit=0
+    pr_url=$(gh pr create "${pr_args[@]}" 2>/tmp/shipwright-pr-stderr.txt) || pr_exit=$?
+    pr_stderr=$(cat /tmp/shipwright-pr-stderr.txt 2>/dev/null || true)
+    rm -f /tmp/shipwright-pr-stderr.txt
+
+    # gh pr create may return non-zero for reviewer issues but still create the PR
+    if [[ "$pr_exit" -ne 0 ]]; then
+        if [[ "$pr_url" == *"github.com"* ]]; then
+            # PR was created but something non-fatal failed (e.g., reviewer not found)
+            warn "PR created with warnings: ${pr_stderr:-unknown}"
+        else
+            error "PR creation failed: ${pr_stderr:-$pr_url}"
+            return 1
+        fi
+    fi
 
     success "PR created: ${BOLD}$pr_url${RESET}"
     echo "$pr_url" > "$ARTIFACTS_DIR/pr-url.txt"
