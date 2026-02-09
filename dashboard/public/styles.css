@@ -1644,6 +1644,13 @@ body::-webkit-scrollbar-thumb {
   white-space: nowrap;
 }
 
+.agent-stage {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 4px;
+}
+
 .agent-stage-badge {
   display: inline-block;
   padding: 2px 10px;

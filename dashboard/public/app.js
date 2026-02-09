@@ -1429,6 +1429,7 @@ function renderTimelineTab(data) {
 
     for (var s = 0; s < segments.length; s++) {
       var seg = segments[s];
+      if (!seg.start) continue;
       var segStart = new Date(seg.start).getTime();
       var segEnd = seg.end ? new Date(seg.end).getTime() : now;
 
@@ -1498,7 +1499,8 @@ function renderCostTicker(data) {
   var spent = cost.today_spent || 0;
   var budget = cost.daily_budget || 1;
   var pct = budget > 0 ? Math.min((spent / budget) * 100, 100) : 0;
-  var statusClass = pct >= 80 ? "over" : pct >= 60 ? "warn" : "ok";
+  var statusClass =
+    pct >= 80 ? "cost-over" : pct >= 60 ? "cost-warn" : "cost-ok";
 
   ticker.innerHTML =
     '<span class="cost-amount">$' +
