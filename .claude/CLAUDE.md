@@ -94,7 +94,7 @@ All scripts are bash. Key files with approximate line counts:
 | `scripts/cct-memory.sh`     | ~1150 | Persistent learning and context system          |
 | `scripts/cct-fleet.sh`      | ~900  | Multi-repo daemon orchestration                 |
 | `scripts/cct-cost.sh`       | ~590  | Token usage and cost intelligence               |
-| `scripts/cct-doctor.sh`     | ~500  | Setup validation and diagnostics                |
+| `scripts/cct-doctor.sh`     | ~820  | Setup validation and diagnostics                |
 | `scripts/cct-fix.sh`        | ~480  | Bulk fix across repos                           |
 | `scripts/cct-upgrade.sh`    | ~430  | Upgrade checker and applier                     |
 | `scripts/cct-init.sh`       | ~390  | One-command tmux setup                          |
