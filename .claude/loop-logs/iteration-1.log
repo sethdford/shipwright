@@ -1,0 +1,10 @@
+Let me do a self-audit before declaring complete:
+
+1. **Does the implementation fully satisfy the goal?** Yes — `shipwright status --json` produces valid JSON with all 6 sections (timestamp, teams, tasks, daemon, heartbeats, machines).
+2. **Edge cases?** Empty state returns `[]`/`null` correctly. Missing `jq` exits 1 with error. `--help` works. Non-Claude tmux windows are filtered out.
+3. **TODO/FIXME/HACK comments?** None.
+4. **All new code tested?** 12 tests covering validity, keys, empty state, timestamp format, all 5 data sections, help flag, human regression, and missing jq.
+5. **Code reviewer would approve?** Yes — follows established patterns, `jq --arg` for safe JSON construction, Bash 3.2 compatible, cross-platform date parsing.
+6. **Clean and follows conventions?** Yes — uses `set -euo pipefail`, same color scheme, same test harness pattern.
+
+LOOP_COMPLETE
