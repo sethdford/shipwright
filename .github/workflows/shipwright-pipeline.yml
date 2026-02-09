@@ -21,6 +21,11 @@ on:
           - full
           - autonomous
           - cost-aware
+      skip_triage:
+        description: "Skip issue triage (maintainer override)"
+        required: false
+        default: false
+        type: boolean
 
 # Only one pipeline per issue at a time
 concurrency:
@@ -33,17 +38,179 @@ permissions:
   pull-requests: write
 
 jobs:
-  pipeline:
-    # Trigger on 'shipwright' label or manual dispatch
+  # ────────────────────────────────────────────────────────────────────────────
+  # Stage 1: Triage — vet the issue against project mission and goals
+  # ────────────────────────────────────────────────────────────────────────────
+  triage:
     if: >
       github.event_name == 'workflow_dispatch' ||
       (github.event.action == 'labeled' && github.event.label.name == 'shipwright')
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      approved: ${{ steps.triage.outputs.approved }}
+      reason: ${{ steps.triage.outputs.reason }}
+      complexity: ${{ steps.triage.outputs.complexity }}
+
+    env:
+      ISSUE_NUMBER: ${{ github.event.inputs.issue_number || github.event.issue.number }}
+      ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+      GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Skip triage (maintainer override)
+        if: github.event.inputs.skip_triage == 'true'
+        id: skip
+        run: |
+          echo "approved=true" >> "$GITHUB_OUTPUT"
+          echo "reason=Maintainer override — triage skipped" >> "$GITHUB_OUTPUT"
+          echo "complexity=standard" >> "$GITHUB_OUTPUT"
+
+      - name: Fetch issue details
+        if: steps.skip.conclusion == 'skipped'
+        id: issue
+        run: |
+          ISSUE_JSON=$(gh issue view "$ISSUE_NUMBER" --json title,body,labels,author)
+          TITLE=$(echo "$ISSUE_JSON" | jq -r '.title')
+          BODY=$(echo "$ISSUE_JSON" | jq -r '.body // ""' | head -200)
+          LABELS=$(echo "$ISSUE_JSON" | jq -r '[.labels[].name] | join(", ")')
+          AUTHOR=$(echo "$ISSUE_JSON" | jq -r '.author.login')
+
+          echo "title=$TITLE" >> "$GITHUB_OUTPUT"
+          echo "author=$AUTHOR" >> "$GITHUB_OUTPUT"
+          echo "labels=$LABELS" >> "$GITHUB_OUTPUT"
+
+          # Save body to file (too long for env var)
+          echo "$BODY" > /tmp/issue-body.txt
+
+      - name: Vet issue alignment
+        if: steps.skip.conclusion == 'skipped'
+        id: triage
+        run: |
+          TITLE="${{ steps.issue.outputs.title }}"
+          LABELS="${{ steps.issue.outputs.labels }}"
+          AUTHOR="${{ steps.issue.outputs.author }}"
+          BODY=$(cat /tmp/issue-body.txt 2>/dev/null || echo "")
+
+          # Build triage prompt
+          cat > /tmp/triage-prompt.txt <<'TRIAGE_EOF'
+          You are the triage gate for the Shipwright open-source project.
+
+          ## Shipwright Mission
+          Shipwright orchestrates autonomous Claude Code agent teams. It provides:
+          - Delivery pipelines (issue → plan → build → test → review → PR)
+          - Daemon-driven issue processing with auto-scaling
+          - Fleet management across multiple repos
+          - Agent heartbeats, checkpoints, and fault tolerance
+          - Multi-machine distributed workers
+          - Real-time web dashboard with agent presence
+          - Cost intelligence and budget enforcement
+          - Persistent memory and failure pattern learning
+          - tmux-based team sessions with templates
+
+          ## Alignment Criteria
+          An issue ALIGNS if it:
+          1. Improves Shipwright's core functionality (pipelines, daemons, fleet, dashboard)
+          2. Fixes bugs or improves reliability/resilience
+          3. Improves developer experience (CLI, docs, templates, setup)
+          4. Adds cross-platform support (Linux, macOS, WSL)
+          5. Improves test coverage or CI/CD
+          6. Enhances cost efficiency, metrics, or observability
+          7. Improves security or error handling
+
+          An issue DOES NOT ALIGN if it:
+          1. Requests features unrelated to agent orchestration
+          2. Is spam, low-effort, or unclear
+          3. Requests integration with unrelated tools (unless clearly valuable)
+          4. Would introduce unnecessary complexity or scope creep
+          5. Duplicates existing functionality
+          6. Is a support question (should be a Discussion, not Issue)
+
+          ## Complexity Rating
+          - fast: trivial fix, typo, config change (< 30 min agent work)
+          - standard: feature or bugfix touching 2-5 files (< 2 hours)
+          - full: significant feature or refactor (> 2 hours, multiple subsystems)
+
+          ## Your Task
+          Evaluate the following issue. Respond with EXACTLY this format:
+          APPROVED: true|false
+          COMPLEXITY: fast|standard|full
+          REASON: one-sentence explanation
+          TRIAGE_EOF
+
+          # Append issue details
+          cat >> /tmp/triage-prompt.txt <<EOF
+
+          ## Issue #${ISSUE_NUMBER}
+          **Title**: ${TITLE}
+          **Author**: ${AUTHOR}
+          **Labels**: ${LABELS}
+          **Body**:
+          ${BODY}
+          EOF
+
+          # Call Claude for triage (fast model, minimal tokens)
+          RESPONSE=$(claude --print -m haiku /tmp/triage-prompt.txt 2>/dev/null || echo "APPROVED: true
+          COMPLEXITY: standard
+          REASON: Triage model unavailable — defaulting to approved")
+
+          # Parse response
+          APPROVED=$(echo "$RESPONSE" | grep -i "^APPROVED:" | head -1 | awk '{print $2}' | tr '[:upper:]' '[:lower:]')
+          COMPLEXITY=$(echo "$RESPONSE" | grep -i "^COMPLEXITY:" | head -1 | awk '{print $2}' | tr '[:upper:]' '[:lower:]')
+          REASON=$(echo "$RESPONSE" | grep -i "^REASON:" | head -1 | sed 's/^REASON: *//')
+
+          # Defaults if parsing fails
+          APPROVED="${APPROVED:-true}"
+          COMPLEXITY="${COMPLEXITY:-standard}"
+          REASON="${REASON:-Could not parse triage response}"
+
+          echo "approved=$APPROVED" >> "$GITHUB_OUTPUT"
+          echo "complexity=$COMPLEXITY" >> "$GITHUB_OUTPUT"
+          echo "reason=$REASON" >> "$GITHUB_OUTPUT"
+
+          echo "--- Triage Result ---"
+          echo "Approved: $APPROVED"
+          echo "Complexity: $COMPLEXITY"
+          echo "Reason: $REASON"
+
+      - name: Comment on rejected issue
+        if: steps.triage.outputs.approved == 'false'
+        run: |
+          REASON="${{ steps.triage.outputs.reason }}"
+          gh issue comment "$ISSUE_NUMBER" --body "$(cat <<EOF
+          ⚓ **Shipwright Triage — Issue Declined**
+
+          This issue was reviewed by the automated triage system and does not appear to align with Shipwright's project goals.
+
+          **Reason**: $REASON
+
+          If you believe this is incorrect, a maintainer can override by:
+          1. Running the workflow manually with "Skip triage" enabled
+          2. Adding context to the issue and re-applying the \`shipwright\` label
+
+          For questions or support, please use [Discussions](../../discussions) instead.
+          EOF
+          )"
+
+      - name: Remove shipwright label from rejected issue
+        if: steps.triage.outputs.approved == 'false'
+        run: |
+          gh issue edit "$ISSUE_NUMBER" --remove-label "shipwright" || true
+
+  # ────────────────────────────────────────────────────────────────────────────
+  # Stage 2: Pipeline — autonomous agent processes the approved issue
+  # ────────────────────────────────────────────────────────────────────────────
+  pipeline:
+    needs: triage
+    if: needs.triage.outputs.approved == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 60
 
     env:
       ISSUE_NUMBER: ${{ github.event.inputs.issue_number || github.event.issue.number }}
-      TEMPLATE: ${{ github.event.inputs.template || 'autonomous' }}
+      TEMPLATE: ${{ needs.triage.outputs.complexity || github.event.inputs.template || 'autonomous' }}
       ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
       GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       NO_COLOR: "1"
@@ -69,7 +236,6 @@ jobs:
 
       - name: Install Shipwright
         run: |
-          # Install from local checkout
           npm link
 
       - name: Validate setup
@@ -77,22 +243,22 @@ jobs:
           echo "--- Environment ---"
           echo "Issue: #$ISSUE_NUMBER"
           echo "Template: $TEMPLATE"
+          echo "Triage: ${{ needs.triage.outputs.reason }}"
           echo "Runner: $(uname -s) $(uname -m)"
-          echo "Bash: $(bash --version | head -1)"
           echo ""
-          echo "--- Shipwright Doctor ---"
           shipwright doctor || true
 
       - name: Comment on issue — pipeline starting
         run: |
-          gh issue comment "$ISSUE_NUMBER" --body "$(cat <<'EOF'
+          gh issue comment "$ISSUE_NUMBER" --body "$(cat <<EOF
           ⚓ **Shipwright Pipeline Starting**
 
           | Field | Value |
           |-------|-------|
-          | Template | `${{ env.TEMPLATE }}` |
-          | Runner | `ubuntu-latest` |
-          | Triggered by | `${{ github.event_name }}` |
+          | Template | \`$TEMPLATE\` |
+          | Complexity | \`${{ needs.triage.outputs.complexity }}\` |
+          | Triage | ${{ needs.triage.outputs.reason }} |
+          | Runner | \`ubuntu-latest\` |
           | Workflow | [${{ github.run_id }}](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}) |
 
           The autonomous pipeline is processing this issue. Updates will be posted as stages complete.
@@ -122,7 +288,6 @@ jobs:
             STATUS="❌ **Pipeline Failed** (exit code: $EXIT_CODE)"
           fi
 
-          # Extract summary from pipeline state if available
           SUMMARY=""
           if [[ -f ".claude/pipeline-state.md" ]]; then
             SUMMARY=$(head -30 ".claude/pipeline-state.md" 2>/dev/null || echo "")
