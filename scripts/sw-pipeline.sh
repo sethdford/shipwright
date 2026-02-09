@@ -997,6 +997,131 @@ get_stage_description() {
     esac
 }
 
+# ─── Dry-Run Summary ─────────────────────────────────────────────────────────
+# Renders a formatted table of enabled stages with timing/cost estimates from
+# historical events.jsonl data. Called when --dry-run is active.
+# Event schema: stage.completed has duration_s, pipeline.cost has estimated_cost_usd
+
+dry_run_summary() {
+    local stages stage_ids=()
+    stages=$(jq -c '.stages[] | select(.enabled == true)' "$PIPELINE_CONFIG" 2>/dev/null) || true
+
+    # Collect enabled stage ids
+    local ids_raw=""
+    ids_raw=$(echo "$stages" | jq -r '.id' 2>/dev/null) || true
+    while IFS= read -r sid; do
+        [[ -z "$sid" ]] && continue
+        stage_ids+=("$sid")
+    done <<< "$ids_raw"
+
+    # Column widths
+    local col_stage=18 col_dur=15 col_model=9 col_cost=12
+    local total_w=$(( col_stage + col_dur + col_model + col_cost + 5 ))
+
+    # Box-drawing table header
+    printf "┌%s┬%s┬%s┬%s┐\n" \
+        "$(printf '─%.0s' $(seq 1 $col_stage))" \
+        "$(printf '─%.0s' $(seq 1 $col_dur))" \
+        "$(printf '─%.0s' $(seq 1 $col_model))" \
+        "$(printf '─%.0s' $(seq 1 $col_cost))"
+    printf "│ %-$((col_stage-2))s │ %-$((col_dur-2))s │ %-$((col_model-2))s │ %-$((col_cost-2))s │\n" \
+        "Stage" "Est. Duration" "Model" "Est. Cost"
+    printf "├%s┼%s┼%s┼%s┤\n" \
+        "$(printf '─%.0s' $(seq 1 $col_stage))" \
+        "$(printf '─%.0s' $(seq 1 $col_dur))" \
+        "$(printf '─%.0s' $(seq 1 $col_model))" \
+        "$(printf '─%.0s' $(seq 1 $col_cost))"
+
+    local total_dur_s=0
+    local total_cost_val=0
+    local has_any_dur="false"
+    local has_any_cost="false"
+
+    for sid in "${stage_ids[@]}"; do
+        # ── Model resolution: CLI > stage config > template default > opus ──
+        local stage_model
+        stage_model=$(jq -r --arg id "$sid" '(.stages[] | select(.id == $id) | .config.model) // .defaults.model // "opus"' "$PIPELINE_CONFIG" 2>/dev/null) || true
+        [[ -n "$MODEL" ]] && stage_model="$MODEL"
+        [[ -z "$stage_model" || "$stage_model" == "null" ]] && stage_model="opus"
+
+        # ── Median duration from stage.completed events ──
+        local dur_display="no data"
+        if [[ -f "$EVENTS_FILE" ]]; then
+            local dur_values=""
+            dur_values=$(grep '"stage.completed"' "$EVENTS_FILE" 2>/dev/null | grep "\"stage\":\"${sid}\"" 2>/dev/null | jq -r '.duration_s // empty' 2>/dev/null | sort -n || true)
+            if [[ -n "$dur_values" ]]; then
+                local dur_count=0
+                while IFS= read -r _v; do dur_count=$((dur_count + 1)); done <<< "$dur_values"
+                local median_idx=$(( (dur_count + 1) / 2 ))
+                local median_dur
+                median_dur=$(echo "$dur_values" | sed -n "${median_idx}p")
+                if [[ -n "$median_dur" && "$median_dur" =~ ^[0-9]+$ ]]; then
+                    dur_display="~$(format_duration "$median_dur")"
+                    total_dur_s=$((total_dur_s + median_dur))
+                    has_any_dur="true"
+                fi
+            fi
+        fi
+
+        # ── Median cost from pipeline.cost events (pipeline-level, not per-stage) ──
+        local cost_display="—"
+
+        printf "│ %-$((col_stage-2))s │ %-$((col_dur-2))s │ %-$((col_model-2))s │ %-$((col_cost-2))s │\n" \
+            "$sid" "$dur_display" "$stage_model" "$cost_display"
+    done
+
+    # ── Separator before totals ──
+    printf "├%s┼%s┼%s┼%s┤\n" \
+        "$(printf '─%.0s' $(seq 1 $col_stage))" \
+        "$(printf '─%.0s' $(seq 1 $col_dur))" \
+        "$(printf '─%.0s' $(seq 1 $col_model))" \
+        "$(printf '─%.0s' $(seq 1 $col_cost))"
+
+    # ── Total row ──
+    local total_dur_display="—"
+    if [[ "$has_any_dur" == "true" ]]; then
+        total_dur_display="~$(format_duration "$total_dur_s")"
+    fi
+
+    # Pipeline-level median cost from pipeline.cost events
+    local total_cost_display="—"
+    if [[ -f "$EVENTS_FILE" ]]; then
+        local cost_values=""
+        cost_values=$(grep '"pipeline.cost"' "$EVENTS_FILE" 2>/dev/null | jq -r '.estimated_cost_usd // empty' 2>/dev/null | sort -n || true)
+        if [[ -n "$cost_values" ]]; then
+            local cost_count=0
+            while IFS= read -r _v; do cost_count=$((cost_count + 1)); done <<< "$cost_values"
+            local cost_median_idx=$(( (cost_count + 1) / 2 ))
+            local median_cost
+            median_cost=$(echo "$cost_values" | sed -n "${cost_median_idx}p")
+            if [[ -n "$median_cost" ]]; then
+                total_cost_display="~\$${median_cost}"
+                has_any_cost="true"
+            fi
+        fi
+    fi
+
+    printf "│ %-$((col_stage-2))s │ %-$((col_dur-2))s │ %-$((col_model-2))s │ %-$((col_cost-2))s │\n" \
+        "Total" "$total_dur_display" "" "$total_cost_display"
+
+    # ── Bottom border ──
+    printf "└%s┴%s┴%s┴%s┘\n" \
+        "$(printf '─%.0s' $(seq 1 $col_stage))" \
+        "$(printf '─%.0s' $(seq 1 $col_dur))" \
+        "$(printf '─%.0s' $(seq 1 $col_model))" \
+        "$(printf '─%.0s' $(seq 1 $col_cost))"
+
+    # ── Budget remaining (only if budget is enabled) ──
+    local budget_remaining=""
+    budget_remaining=$("$SCRIPT_DIR/cct-cost.sh" remaining-budget 2>/dev/null) || true
+    if [[ -n "$budget_remaining" && "$budget_remaining" != "unlimited" ]]; then
+        printf "Budget remaining: \$%s\n" "$budget_remaining"
+    fi
+
+    echo ""
+    info "Dry run — no stages will execute"
+}
+
 # Build inline stage progress string (e.g. "intake:complete plan:running test:pending")
 build_stage_progress() {
     local progress=""
@@ -4089,7 +4214,7 @@ pipeline_start() {
     echo ""
 
     if [[ "$DRY_RUN" == "true" ]]; then
-        info "Dry run — no stages will execute"
+        dry_run_summary
         return 0
     fi
 

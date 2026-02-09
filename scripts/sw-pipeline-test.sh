@@ -44,6 +44,13 @@ TEMP_DIR=""
 setup_env() {
     TEMP_DIR=$(mktemp -d "${TMPDIR:-/tmp}/sw-pipeline-test.XXXXXX")
 
+    # ── Backup events.jsonl to prevent test pollution ─────────────────────
+    EVENTS_BACKUP=""
+    if [[ -f "${HOME}/.claude-teams/events.jsonl" ]]; then
+        EVENTS_BACKUP="$TEMP_DIR/events.jsonl.backup"
+        cp "${HOME}/.claude-teams/events.jsonl" "$EVENTS_BACKUP"
+    fi
+
     # ── Copy real pipeline script ─────────────────────────────────────────
     mkdir -p "$TEMP_DIR/scripts"
     cp "$REAL_PIPELINE_SCRIPT" "$TEMP_DIR/scripts/sw-pipeline.sh"
@@ -356,6 +363,17 @@ reset_test() {
 }
 
 cleanup_env() {
+    # Restore events.jsonl from backup
+    if [[ -n "${EVENTS_BACKUP:-}" && -f "$EVENTS_BACKUP" ]]; then
+        mkdir -p "${HOME}/.claude-teams"
+        cp "$EVENTS_BACKUP" "${HOME}/.claude-teams/events.jsonl"
+    elif [[ -n "${EVENTS_BACKUP:-}" ]]; then
+        # Backup var was set but file gone — original existed, restore is best-effort
+        :
+    else
+        # No backup means there was no original — remove any test-created file
+        rm -f "${HOME}/.claude-teams/events.jsonl" 2>/dev/null || true
+    fi
     if [[ -n "$TEMP_DIR" && -d "$TEMP_DIR" ]]; then
         rm -rf "$TEMP_DIR"
     fi
@@ -789,6 +807,71 @@ HEAL_EOF
     assert_state_contains "test.*complete" "test eventually passes"
 }
 
+# ──────────────────────────────────────────────────────────────────────────────
+# 16. Dry-run summary with timing estimates (historical data present)
+# ──────────────────────────────────────────────────────────────────────────────
+test_dry_run_summary_with_history() {
+    write_standard_template
+
+    # Seed events.jsonl with historical stage.completed events
+    local events_dir="${HOME}/.claude-teams"
+    mkdir -p "$events_dir"
+    local events_file="${events_dir}/events.jsonl"
+    rm -f "$events_file" 2>/dev/null || true
+
+    # intake: 3 events (90s, 120s, 150s) → median = 120s = ~2m 0s
+    echo '{"ts":"2026-01-01T00:00:00Z","ts_epoch":1735689600,"type":"stage.completed","stage":"intake","duration_s":90}' >> "$events_file"
+    echo '{"ts":"2026-01-02T00:00:00Z","ts_epoch":1735776000,"type":"stage.completed","stage":"intake","duration_s":150}' >> "$events_file"
+    echo '{"ts":"2026-01-03T00:00:00Z","ts_epoch":1735862400,"type":"stage.completed","stage":"intake","duration_s":120}' >> "$events_file"
+
+    # plan: 1 event (300s = ~5m 0s)
+    echo '{"ts":"2026-01-01T00:00:00Z","ts_epoch":1735689600,"type":"stage.completed","stage":"plan","duration_s":300}' >> "$events_file"
+
+    # build: 1 event (900s = ~15m 0s)
+    echo '{"ts":"2026-01-01T00:00:00Z","ts_epoch":1735689600,"type":"stage.completed","stage":"build","duration_s":900}' >> "$events_file"
+
+    # pipeline.cost event for total cost display
+    echo '{"ts":"2026-01-01T00:00:00Z","ts_epoch":1735689600,"type":"pipeline.cost","estimated_cost_usd":7.62}' >> "$events_file"
+
+    invoke_pipeline start --goal "Dry run summary test" --skip-gates --dry-run
+
+    assert_exit_code 0 "dry-run summary should succeed" &&
+    assert_output_contains "Stage" "table has Stage header" &&
+    assert_output_contains "Est\\. Duration" "table has duration header" &&
+    assert_output_contains "Model" "table has model header" &&
+    assert_output_contains "Est\\. Cost" "table has cost header" &&
+    assert_output_contains "intake" "shows intake stage" &&
+    assert_output_contains "plan" "shows plan stage" &&
+    assert_output_contains "build" "shows build stage" &&
+    assert_output_contains "~2m 0s" "intake median duration is ~2m 0s" &&
+    assert_output_contains "~5m 0s" "plan duration is ~5m 0s" &&
+    assert_output_contains "Total" "shows total row" &&
+    assert_output_contains "Dry run" "shows dry-run message" &&
+    assert_file_not_exists ".claude/pipeline-artifacts/intake.json" "no artifacts created"
+
+    # Clean up seeded events
+    rm -f "$events_file" 2>/dev/null || true
+}
+
+# ──────────────────────────────────────────────────────────────────────────────
+# 17. Dry-run summary without history (no events.jsonl)
+# ──────────────────────────────────────────────────────────────────────────────
+test_dry_run_summary_no_history() {
+    write_standard_template
+
+    # Ensure no events file exists
+    rm -f "${HOME}/.claude-teams/events.jsonl" 2>/dev/null || true
+
+    invoke_pipeline start --goal "Dry run no history" --skip-gates --dry-run
+
+    assert_exit_code 0 "dry-run summary should succeed without history" &&
+    assert_output_contains "Stage" "table has Stage header" &&
+    assert_output_contains "no data" "shows no data for duration" &&
+    assert_output_contains "intake" "shows intake stage" &&
+    assert_output_contains "plan" "shows plan stage" &&
+    assert_output_contains "Dry run" "shows dry-run message"
+}
+
 # ═══════════════════════════════════════════════════════════════════════════════
 # MAIN
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -835,6 +918,8 @@ main() {
         "test_resume:Resume continues from partial state"
         "test_abort:Abort marks pipeline as aborted"
         "test_dry_run:Dry run shows config, no artifacts"
+        "test_dry_run_summary_with_history:Dry run shows timing estimates from history"
+        "test_dry_run_summary_no_history:Dry run shows no-data when no history exists"
         "test_self_healing:Self-healing build→test retry loop"
     )
 
