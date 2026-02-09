@@ -313,7 +313,7 @@ start_heartbeat() {
                 --activity "$(get_stage_description "${CURRENT_STAGE_ID:-}" 2>/dev/null || echo "Running pipeline")" 2>/dev/null || true
             sleep 30
         done
-    ) &
+    ) >/dev/null 2>&1 &
     HEARTBEAT_PID=$!
 }
 
@@ -3646,9 +3646,6 @@ pipeline_start() {
     load_pipeline_config
     initialize_state
 
-    # Start background heartbeat writer
-    start_heartbeat
-
     echo ""
     echo -e "${PURPLE}${BOLD}╔═══════════════════════════════════════════════════════════════════╗${RESET}"
     echo -e "${PURPLE}${BOLD}║  shipwright pipeline — Autonomous Feature Delivery               ║${RESET}"
@@ -3696,6 +3693,9 @@ pipeline_start() {
         info "Dry run — no stages will execute"
         return 0
     fi
+
+    # Start background heartbeat writer
+    start_heartbeat
 
     # Send start notification
     notify "Pipeline Started" "Goal: ${GOAL}\nPipeline: ${PIPELINE_NAME}" "info"

@@ -1770,6 +1770,31 @@ body::-webkit-scrollbar-thumb {
   height: 24px;
 }
 
+.gantt-label-header {
+  width: 100px;
+  flex-shrink: 0;
+  font-family: var(--font-mono);
+  font-size: 0.65rem;
+  font-weight: 600;
+  color: var(--text-muted);
+  padding-right: 12px;
+  text-align: right;
+}
+
+.gantt-bar-header {
+  flex: 1;
+  position: relative;
+  height: 24px;
+}
+
+.gantt-marker {
+  position: absolute;
+  font-family: var(--font-mono);
+  font-size: 0.6rem;
+  color: var(--text-muted);
+  transform: translateX(-50%);
+}
+
 .gantt-hour-mark {
   position: absolute;
   font-family: var(--font-mono);
@@ -1802,6 +1827,15 @@ body::-webkit-scrollbar-thumb {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.gantt-label-title {
+  display: block;
+  font-weight: 400;
+  font-size: 0.6rem;
+  color: var(--text-muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .gantt-bar-area {

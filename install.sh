@@ -381,13 +381,37 @@ if ask "Install Shipwright CLI to $BIN_DIR?"; then
     INSTALLED+=("shipwright (symlink)")
     INSTALLED+=("sw (symlink)")
 
-    for sub in cct-session.sh cct-status.sh cct-cleanup.sh cct-upgrade.sh cct-doctor.sh cct-logs.sh cct-ps.sh cct-templates.sh cct-loop.sh cct-pipeline.sh cct-pipeline-test.sh cct-worktree.sh cct-init.sh cct-prep.sh cct-prep-test.sh cct-daemon.sh cct-daemon-test.sh cct-reaper.sh cct-memory.sh cct-memory-test.sh cct-cost.sh cct-fleet.sh cct-fleet-test.sh cct-fix.sh cct-fix-test.sh cct-dashboard.sh; do
+    for sub in cct-session.sh cct-status.sh cct-cleanup.sh cct-upgrade.sh cct-doctor.sh cct-logs.sh cct-ps.sh cct-templates.sh cct-loop.sh cct-pipeline.sh cct-pipeline-test.sh cct-worktree.sh cct-init.sh cct-prep.sh cct-prep-test.sh cct-daemon.sh cct-daemon-test.sh cct-reaper.sh cct-memory.sh cct-memory-test.sh cct-cost.sh cct-fleet.sh cct-fleet-test.sh cct-fix.sh cct-fix-test.sh cct-dashboard.sh cct-tracker.sh cct-tracker-linear.sh cct-tracker-jira.sh cct-heartbeat.sh cct-checkpoint.sh cct-remote.sh cct-linear.sh cct-jira.sh; do
       if [[ -f "$SCRIPT_DIR/scripts/$sub" ]]; then
         run "Install $sub → $BIN_DIR/$sub" \
           "cp '$SCRIPT_DIR/scripts/$sub' '$BIN_DIR/$sub' && chmod +x '$BIN_DIR/$sub'"
         INSTALLED+=("$sub")
       fi
     done
+
+    # Install dashboard
+    if [[ -d "$SCRIPT_DIR/dashboard" ]]; then
+      local DASH_DEST="$HOME/.local/share/shipwright/dashboard"
+      run "Create dashboard directory" \
+        "mkdir -p '$DASH_DEST'"
+      for f in "$SCRIPT_DIR"/dashboard/*.ts; do
+        [[ -f "$f" ]] || continue
+        local_name="$(basename "$f")"
+        run "Install $local_name → $DASH_DEST/$local_name" \
+          "cp '$f' '$DASH_DEST/$local_name'"
+      done
+      if [[ -d "$SCRIPT_DIR/dashboard/public" ]]; then
+        run "Create dashboard/public directory" \
+          "mkdir -p '$DASH_DEST/public'"
+        for f in "$SCRIPT_DIR"/dashboard/public/*; do
+          [[ -f "$f" ]] || continue
+          local_name="$(basename "$f")"
+          run "Install $local_name → $DASH_DEST/public/$local_name" \
+            "cp '$f' '$DASH_DEST/public/$local_name'"
+        done
+      fi
+      INSTALLED+=("dashboard")
+    fi
 
     # Install terminal adapters
     if [[ -d "$SCRIPT_DIR/scripts/adapters" ]]; then

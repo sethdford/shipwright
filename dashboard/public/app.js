@@ -1290,7 +1290,7 @@ function renderAgentsTab(data) {
       escapeHtml(a.title || "Untitled") +
       "</div>" +
       '<div class="agent-stage">' +
-      '<span class="stage-badge">' +
+      '<span class="agent-stage-badge">' +
       escapeHtml(a.stage || "—") +
       "</span>" +
       '<span class="agent-iteration">iter ' +
@@ -1340,7 +1340,7 @@ function renderAgentsTab(data) {
       '<button class="agent-action-btn" onclick="openInterventionModal(' +
       a.issue +
       ')" title="Message">&#9993;</button>' +
-      '<button class="agent-action-btn agent-action-danger" onclick="confirmAbort(' +
+      '<button class="agent-action-btn btn-abort" onclick="confirmAbort(' +
       a.issue +
       ')" title="Abort">&#10005;</button>' +
       "</div>" +
@@ -1538,7 +1538,7 @@ function renderMachines(data) {
 
     html +=
       '<div class="machine-card">' +
-      '<div class="machine-header">' +
+      '<div class="machine-card-header">' +
       '<span class="presence-dot ' +
       statusClass +
       '"></span>' +

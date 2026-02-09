@@ -1136,8 +1136,19 @@ function getCostInfo(): CostInfo {
   if (existsSync(COSTS_FILE)) {
     try {
       const data = JSON.parse(readFileSync(COSTS_FILE, "utf-8"));
-      todaySpent =
-        (data.today_usd as number) || (data.total_usd as number) || 0;
+      // Cost file format: {entries: [{cost_usd, ts_epoch, ...}]}
+      // Sum entries from today (midnight UTC)
+      const entries = (data.entries as Array<Record<string, unknown>>) || [];
+      const todayMidnight = new Date();
+      todayMidnight.setUTCHours(0, 0, 0, 0);
+      const cutoff = Math.floor(todayMidnight.getTime() / 1000);
+      for (const entry of entries) {
+        const epoch = (entry.ts_epoch as number) || 0;
+        if (epoch >= cutoff) {
+          todaySpent += (entry.cost_usd as number) || 0;
+        }
+      }
+      todaySpent = Math.round(todaySpent * 100) / 100;
     } catch {
       /* ignore */
     }
@@ -1146,8 +1157,8 @@ function getCostInfo(): CostInfo {
   if (existsSync(BUDGET_FILE)) {
     try {
       const data = JSON.parse(readFileSync(BUDGET_FILE, "utf-8"));
-      dailyBudget =
-        (data.daily_budget_usd as number) || (data.daily as number) || 0;
+      // Budget file format: {daily_budget_usd: N, enabled: bool}
+      dailyBudget = (data.daily_budget_usd as number) || 0;
     } catch {
       /* ignore */
     }
@@ -1558,7 +1569,7 @@ async function handlePatLogin(req: Request): Promise<Response> {
 // ─── HTTP + WebSocket server ─────────────────────────────────────────
 const CORS_HEADERS = {
   "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Methods": "GET, OPTIONS",
+  "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
   "Access-Control-Allow-Headers": "Content-Type",
 };
 
@@ -1732,7 +1743,7 @@ const server = Bun.serve({
       if (!issueNum || !action) {
         return new Response(JSON.stringify({ error: "Invalid intervention" }), {
           status: 400,
-          headers: { "Content-Type": "application/json" },
+          headers: { "Content-Type": "application/json", ...CORS_HEADERS },
         });
       }
 
@@ -1800,7 +1811,7 @@ const server = Bun.serve({
           default:
             return new Response(JSON.stringify({ error: "Unknown action" }), {
               status: 400,
-              headers: { "Content-Type": "application/json" },
+              headers: { "Content-Type": "application/json", ...CORS_HEADERS },
             });
         }
         return new Response(
@@ -1810,7 +1821,7 @@ const server = Bun.serve({
       } catch (err) {
         return new Response(JSON.stringify({ error: String(err) }), {
           status: 500,
-          headers: { "Content-Type": "application/json" },
+          headers: { "Content-Type": "application/json", ...CORS_HEADERS },
         });
       }
     }

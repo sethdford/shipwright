@@ -18,6 +18,7 @@
     "tmux/templates/",
     "tmux/tmux.conf",
     "tmux/claude-teams-overlay.conf",
+    "dashboard/",
     "claude-code/",
     "completions/",
     "docs/",

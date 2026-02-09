@@ -61,14 +61,14 @@ Shipwright packages a complete setup:
 
 ## Prerequisites
 
-| Requirement | Version | Notes |
-|-------------|---------|-------|
-| **tmux** | 3.2+ (tested on 3.6a) | `brew install tmux` on macOS |
-| **jq** | any | `brew install jq` — JSON parsing for templates |
-| **Claude Code CLI** | latest | `npm install -g @anthropic-ai/claude-code` |
-| **Node.js** | 20+ | For hooks |
-| **Git** | any | For installation |
-| **Terminal** | iTerm2, Alacritty, Kitty, WezTerm | See note below |
+| Requirement         | Version                           | Notes                                          |
+| ------------------- | --------------------------------- | ---------------------------------------------- |
+| **tmux**            | 3.2+ (tested on 3.6a)             | `brew install tmux` on macOS                   |
+| **jq**              | any                               | `brew install jq` — JSON parsing for templates |
+| **Claude Code CLI** | latest                            | `npm install -g @anthropic-ai/claude-code`     |
+| **Node.js**         | 20+                               | For hooks                                      |
+| **Git**             | any                               | For installation                               |
+| **Terminal**        | iTerm2, Alacritty, Kitty, WezTerm | See note below                                 |
 
 > **Terminal compatibility:** Split-pane agent teams only work in real terminal emulators. **VS Code's integrated terminal and Ghostty are not supported** — they lack the tmux integration needed for agent pane spawning. See [Known Issues](docs/KNOWN-ISSUES.md) for details.
 
@@ -104,7 +104,7 @@ shipwright/
 ├── tmux/
 │   ├── tmux.conf                    # Full tmux config with premium dark theme
 │   ├── claude-teams-overlay.conf    # Agent-aware pane styling, color hooks & keybindings
-│   └── templates/                   # 12 team composition templates (full SDLC)
+│   └── templates/                   # 24 team composition templates (full SDLC + PDLC)
 │       ├── feature-dev.json         #   Backend + frontend + tests (3 agents)
 │       ├── full-stack.json          #   API + database + UI (3 agents)
 │       ├── bug-fix.json             #   Reproducer + fixer + verifier (3 agents)
@@ -116,7 +116,19 @@ shipwright/
 │       ├── documentation.json       #   API docs + guides (2 agents)
 │       ├── devops.json              #   Pipeline + infrastructure (2 agents)
 │       ├── architecture.json        #   Researcher + spec writer (2 agents)
-│       └── exploration.json         #   Explorer + synthesizer (2 agents)
+│       ├── exploration.json         #   Explorer + synthesizer (2 agents)
+│       ├── accessibility.json       #   Audit + remediation (2 agents)
+│       ├── api-design.json          #   API design + contracts (2 agents)
+│       ├── compliance.json          #   Compliance audit + remediation (2 agents)
+│       ├── data-pipeline.json       #   ETL + data processing (2 agents)
+│       ├── debt-paydown.json        #   Tech debt identification + fix (2 agents)
+│       ├── i18n.json                #   Internationalization + translation (2 agents)
+│       ├── incident-response.json   #   Triage + fix + postmortem (3 agents)
+│       ├── observability.json       #   Metrics + logging + tracing (2 agents)
+│       ├── onboarding.json          #   Setup + documentation (2 agents)
+│       ├── performance.json         #   Profile + optimize (2 agents)
+│       ├── release.json             #   Release prep + validation (2 agents)
+│       └── spike.json               #   Research spike + prototype (2 agents)
 ├── templates/
 │   └── pipelines/                   # 8 delivery pipeline templates
 │       ├── standard.json            #   Feature pipeline (plan + review gates)
@@ -151,6 +163,11 @@ shipwright/
 │   ├── cct-cost.sh                  # Token usage & cost intelligence
 │   ├── cct-prep.sh                  # Repo preparation tool
 │   ├── cct-doctor.sh                # Validate setup and diagnose issues
+│   ├── cct-heartbeat.sh             # Agent heartbeat writer/checker
+│   ├── cct-checkpoint.sh            # Pipeline checkpoint save/restore
+│   ├── cct-remote.sh                # Multi-machine registry + remote management
+│   ├── cct-tracker.sh               # Issue tracker router (Linear/Jira)
+│   ├── cct-dashboard.sh             # Dashboard server launcher
 │   ├── install-completions.sh       # Shell completion installer
 │   ├── adapters/                    # Deploy platform adapters
 │   │   ├── vercel-deploy.sh         #   Vercel deploy adapter
@@ -158,6 +175,9 @@ shipwright/
 │   │   ├── railway-deploy.sh        #   Railway deploy adapter
 │   │   └── docker-deploy.sh         #   Docker deploy adapter
 │   └── ...                          # status, ps, logs, cleanup, upgrade, worktree, reaper
+├── dashboard/
+│   ├── server.ts                    # Bun WebSocket dashboard server
+│   └── public/                      # Dashboard frontend (HTML/CSS/JS)
 ├── docs/
 │   ├── KNOWN-ISSUES.md              # Tracked bugs with workarounds
 │   └── TIPS.md                      # Power user tips & wave patterns
@@ -172,6 +192,7 @@ Dark blue-gray background (`#1a1a2e`) with cyan accents (`#00d4ff`). The status 
 ### Claude Code Settings + Hooks
 
 Pre-configured `settings.json.template` with:
+
 - Agent teams enabled (`CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=1`)
 - Five production-ready hooks wired in:
   - **TeammateIdle** — typecheck gate (blocks idle until errors fixed)
@@ -252,6 +273,21 @@ shipwright cost budget show                  # Check current budget
 shipwright prep                              # Analyze repo, generate .claude/ configs
 shipwright prep --check                      # Audit existing prep quality
 sw prep --with-claude                        # Deep analysis using Claude Code
+
+# Real-time dashboard
+shipwright dashboard                         # Launch web dashboard (requires Bun)
+shipwright dashboard start                   # Start dashboard in background
+
+# Agent heartbeats
+shipwright heartbeat list                    # Show agent heartbeat status
+
+# Pipeline checkpoints
+shipwright checkpoint list                   # Show saved pipeline checkpoints
+
+# Remote machines
+shipwright remote list                       # Show registered remote machines
+shipwright remote add worker1 --host 10.0.0.5  # Register a remote worker machine
+shipwright remote status                     # Health check all remote machines
 
 # Maintenance
 shipwright cleanup                           # Dry-run: show orphaned sessions
@@ -349,16 +385,16 @@ Each stage can be enabled/disabled and gated (auto-proceed or pause for approval
 
 **Notifications:** Slack webhook (`--slack-webhook <url>`) or custom webhook (`SHIPWRIGHT_WEBHOOK_URL` env var, with `CCT_WEBHOOK_URL` fallback) for pipeline events.
 
-| Template | Stages | Gates | Use Case |
-|----------|--------|-------|----------|
-| `standard` | intake → plan → build → test → review → PR | approve: plan, review, pr | Normal feature work |
-| `fast` | intake → build → test → PR | all auto | Quick fixes |
-| `full` | all stages | approve: plan, review, pr, deploy | Production deployment |
-| `hotfix` | intake → build → test → PR | all auto | Urgent production fixes |
-| `autonomous` | all stages | all auto | Daemon-driven delivery |
-| `enterprise` | all stages | all approve, auto-rollback | Maximum safety pipelines |
-| `cost-aware` | all stages | all auto, budget checks | Budget-limited delivery |
-| `deployed` | all stages + deploy + validate + monitor | approve: deploy | Full deploy + monitoring |
+| Template     | Stages                                     | Gates                             | Use Case                 |
+| ------------ | ------------------------------------------ | --------------------------------- | ------------------------ |
+| `standard`   | intake → plan → build → test → review → PR | approve: plan, review, pr         | Normal feature work      |
+| `fast`       | intake → build → test → PR                 | all auto                          | Quick fixes              |
+| `full`       | all stages                                 | approve: plan, review, pr, deploy | Production deployment    |
+| `hotfix`     | intake → build → test → PR                 | all auto                          | Urgent production fixes  |
+| `autonomous` | all stages                                 | all auto                          | Daemon-driven delivery   |
+| `enterprise` | all stages                                 | all approve, auto-rollback        | Maximum safety pipelines |
+| `cost-aware` | all stages                                 | all auto, budget checks           | Budget-limited delivery  |
+| `deployed`   | all stages + deploy + validate + monitor   | approve: deploy                   | Full deploy + monitoring |
 
 ### Autonomous Daemon
 
@@ -494,6 +530,7 @@ shipwright memory import backup.json
 ```
 
 **Pipeline integration** — Memory is captured automatically after each pipeline:
+
 - **Patterns**: Codebase conventions, test patterns, build configs
 - **Failures**: Root cause analysis of test/build failures
 - **Decisions**: Design decisions and their rationale
@@ -525,11 +562,11 @@ shipwright cost calculate 50000 10000 opus
 
 **Model pricing:**
 
-| Model | Input | Output |
-|-------|-------|--------|
-| Opus | $15.00 / 1M tokens | $75.00 / 1M tokens |
-| Sonnet | $3.00 / 1M tokens | $15.00 / 1M tokens |
-| Haiku | $0.25 / 1M tokens | $1.25 / 1M tokens |
+| Model  | Input              | Output             |
+| ------ | ------------------ | ------------------ |
+| Opus   | $15.00 / 1M tokens | $75.00 / 1M tokens |
+| Sonnet | $3.00 / 1M tokens  | $15.00 / 1M tokens |
+| Haiku  | $0.25 / 1M tokens  | $1.25 / 1M tokens  |
 
 Use the `cost-aware` pipeline template for automatic budget checking and model routing (haiku for simple stages, sonnet for builds, opus only when needed).
 
@@ -562,15 +599,75 @@ shipwright prep --with-claude
 shipwright prep --check
 ```
 
+### Real-Time Dashboard
+
+A web-based dashboard powered by Bun and WebSockets for live monitoring of pipelines, agents, and daemon status:
+
+```bash
+# Launch dashboard (opens browser)
+shipwright dashboard
+
+# Start in background
+shipwright dashboard start
+
+# Stop background dashboard
+shipwright dashboard stop
+```
+
+### Agent Heartbeats
+
+Monitor agent liveness with periodic heartbeat signals:
+
+```bash
+# Show heartbeat status for all active agents
+shipwright heartbeat list
+```
+
+Heartbeat data is stored in `~/.claude-teams/heartbeats/<job-id>.json`. The daemon uses heartbeats to detect stale jobs and take corrective action.
+
+### Pipeline Checkpoints
+
+Save and restore pipeline state at any point for resilience:
+
+```bash
+# List saved checkpoints
+shipwright checkpoint list
+
+# Save current pipeline state
+shipwright checkpoint save
+
+# Restore from a checkpoint
+shipwright checkpoint restore <id>
+```
+
+Checkpoints are stored in `.claude/pipeline-artifacts/checkpoints/`.
+
+### Remote Machines
+
+Distribute pipeline work across multiple machines:
+
+```bash
+# List registered machines
+shipwright remote list
+
+# Register a new worker machine
+shipwright remote add worker1 --host 10.0.0.5
+
+# Health check all registered machines
+shipwright remote status
+```
+
+Machine registry is stored in `~/.claude-teams/machines.json`.
+
 ### Layout Presets
 
 Switch between pane arrangements with keybindings:
 
-| Key | Layout | Description |
-|-----|--------|-------------|
+| Key            | Layout          | Description                           |
+| -------------- | --------------- | ------------------------------------- |
 | `prefix + M-1` | main-horizontal | Leader 65% left, agents stacked right |
-| `prefix + M-2` | main-vertical | Leader 60% top, agents tiled bottom |
-| `prefix + M-3` | tiled | Equal sizes |
+| `prefix + M-2` | main-vertical   | Leader 60% top, agents tiled bottom   |
+| `prefix + M-3` | tiled           | Equal sizes                           |
 
 ### Monitoring Teams
 
@@ -593,15 +690,15 @@ shipwright doctor    # Checks: tmux, jq, overlay hooks, color config, orphaned s
 
 The theme lives in `tmux/tmux.conf`. Key color values:
 
-| Element | Color | Hex |
-|---------|-------|-----|
-| Background | Dark blue-gray | `#1a1a2e` |
-| Foreground | Light gray | `#e4e4e7` |
-| Accent (active borders, highlights) | Cyan | `#00d4ff` |
-| Secondary | Blue | `#0066ff` |
-| Tertiary | Purple | `#7c3aed` |
-| Inactive borders | Muted indigo | `#333355` |
-| Inactive elements | Zinc | `#71717a` |
+| Element                             | Color          | Hex       |
+| ----------------------------------- | -------------- | --------- |
+| Background                          | Dark blue-gray | `#1a1a2e` |
+| Foreground                          | Light gray     | `#e4e4e7` |
+| Accent (active borders, highlights) | Cyan           | `#00d4ff` |
+| Secondary                           | Blue           | `#0066ff` |
+| Tertiary                            | Purple         | `#7c3aed` |
+| Inactive borders                    | Muted indigo   | `#333355` |
+| Inactive elements                   | Zinc           | `#71717a` |
 
 To customize, edit the hex values in `tmux/tmux.conf` and reload: `prefix + r`.
 
@@ -615,12 +712,12 @@ The `claude-code/settings.json.template` is a JSONC file (JSON with comments). T
 
 Key settings to customize:
 
-| Setting | Default | What it does |
-|---------|---------|--------------|
-| `CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS` | `"1"` | Enable agent teams (required) |
-| `CLAUDE_CODE_AUTOCOMPACT_PCT_OVERRIDE` | `"70"` | When to compact context (lower = more aggressive) |
-| `CLAUDE_CODE_SUBAGENT_MODEL` | `"haiku"` | Model for subagent lookups (cheaper + faster) |
-| `CLAUDE_CODE_MAX_TOOL_USE_CONCURRENCY` | `"5"` | Parallel tool calls per agent |
+| Setting                                | Default   | What it does                                      |
+| -------------------------------------- | --------- | ------------------------------------------------- |
+| `CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS` | `"1"`     | Enable agent teams (required)                     |
+| `CLAUDE_CODE_AUTOCOMPACT_PCT_OVERRIDE` | `"70"`    | When to compact context (lower = more aggressive) |
+| `CLAUDE_CODE_SUBAGENT_MODEL`           | `"haiku"` | Model for subagent lookups (cheaper + faster)     |
+| `CLAUDE_CODE_MAX_TOOL_USE_CONCURRENCY` | `"5"`     | Parallel tool calls per agent                     |
 
 ### Hooks
 
@@ -696,165 +793,165 @@ The prefix key is `Ctrl-a` (remapped from the default `Ctrl-b`).
 
 ### General
 
-| Key | Action |
-|-----|--------|
-| `prefix + r` | Reload tmux config |
-| `prefix + \|` | Split pane vertically |
-| `prefix + -` | Split pane horizontally |
-| `prefix + c` | New window |
-| `prefix + x` | Kill pane (with confirmation) |
-| `prefix + X` | Kill window (with confirmation) |
-| `prefix + s` | Choose session (tree view) |
-| `prefix + N` | New session |
+| Key           | Action                          |
+| ------------- | ------------------------------- |
+| `prefix + r`  | Reload tmux config              |
+| `prefix + \|` | Split pane vertically           |
+| `prefix + -`  | Split pane horizontally         |
+| `prefix + c`  | New window                      |
+| `prefix + x`  | Kill pane (with confirmation)   |
+| `prefix + X`  | Kill window (with confirmation) |
+| `prefix + s`  | Choose session (tree view)      |
+| `prefix + N`  | New session                     |
 
 ### Pane Navigation (vim-style)
 
-| Key | Action |
-|-----|--------|
-| `prefix + h` | Move left |
-| `prefix + j` | Move down |
-| `prefix + k` | Move up |
-| `prefix + l` | Move right |
-| `Ctrl + h/j/k/l` | Smart pane switching (works with vim-tmux-navigator) |
-| `prefix + H/J/K/L` | Resize pane (repeatable) |
+| Key                | Action                                               |
+| ------------------ | ---------------------------------------------------- |
+| `prefix + h`       | Move left                                            |
+| `prefix + j`       | Move down                                            |
+| `prefix + k`       | Move up                                              |
+| `prefix + l`       | Move right                                           |
+| `Ctrl + h/j/k/l`   | Smart pane switching (works with vim-tmux-navigator) |
+| `prefix + H/J/K/L` | Resize pane (repeatable)                             |
 
 ### Window Navigation
 
-| Key | Action |
-|-----|--------|
+| Key               | Action          |
+| ----------------- | --------------- |
 | `prefix + Ctrl-h` | Previous window |
-| `prefix + Ctrl-l` | Next window |
+| `prefix + Ctrl-l` | Next window     |
 
 ### Agent Teams
 
-| Key | Action |
-|-----|--------|
-| `prefix + T` | Launch team session (via `shipwright`) |
-| `prefix + Ctrl-t` | Show team status dashboard |
-| `prefix + g` | Display pane numbers (pick by index) |
-| `prefix + G` | Toggle zoom on current pane |
-| `prefix + S` | Toggle synchronized panes (type in all at once) |
-| `prefix + M-t` | Toggle team sync mode |
-| `prefix + M-l` | Cycle through pane layouts |
-| `prefix + M-1` | Layout: main-horizontal (leader 65% left) |
-| `prefix + M-2` | Layout: main-vertical (leader 60% top) |
-| `prefix + M-3` | Layout: tiled (equal sizes) |
-| `prefix + M-s` | Capture current pane scrollback to file |
-| `prefix + M-a` | Capture ALL panes in window |
+| Key               | Action                                          |
+| ----------------- | ----------------------------------------------- |
+| `prefix + T`      | Launch team session (via `shipwright`)          |
+| `prefix + Ctrl-t` | Show team status dashboard                      |
+| `prefix + g`      | Display pane numbers (pick by index)            |
+| `prefix + G`      | Toggle zoom on current pane                     |
+| `prefix + S`      | Toggle synchronized panes (type in all at once) |
+| `prefix + M-t`    | Toggle team sync mode                           |
+| `prefix + M-l`    | Cycle through pane layouts                      |
+| `prefix + M-1`    | Layout: main-horizontal (leader 65% left)       |
+| `prefix + M-2`    | Layout: main-vertical (leader 60% top)          |
+| `prefix + M-3`    | Layout: tiled (equal sizes)                     |
+| `prefix + M-s`    | Capture current pane scrollback to file         |
+| `prefix + M-a`    | Capture ALL panes in window                     |
 
 ### Copy Mode (vi-style)
 
-| Key | Action |
-|-----|--------|
-| `v` | Begin selection |
-| `y` | Copy selection |
-| `r` | Toggle rectangle mode |
-| `prefix + p` | Paste buffer |
+| Key          | Action                |
+| ------------ | --------------------- |
+| `v`          | Begin selection       |
+| `y`          | Copy selection        |
+| `r`          | Toggle rectangle mode |
+| `prefix + p` | Paste buffer          |
 
 ## Team Patterns
 
-12 templates covering the full SDLC and PDLC. Use `shipwright templates list` to browse, `shipwright templates show <name>` for details.
+24 templates covering the full SDLC and PDLC. Use `shipwright templates list` to browse, `shipwright templates show <name>` for details.
 
 ### Build Phase
 
 #### Feature Development (`feature-dev`) — 3 agents
 
-| Agent | Focus | Example files |
-|-------|-------|---------------|
-| **backend** | API routes, services, data layer | `src/api/`, `src/services/` |
-| **frontend** | UI components, state, styling | `apps/web/src/` |
-| **tests** | Unit tests, integration tests | `*.test.ts` |
+| Agent        | Focus                            | Example files               |
+| ------------ | -------------------------------- | --------------------------- |
+| **backend**  | API routes, services, data layer | `src/api/`, `src/services/` |
+| **frontend** | UI components, state, styling    | `apps/web/src/`             |
+| **tests**    | Unit tests, integration tests    | `*.test.ts`                 |
 
 #### Full-Stack (`full-stack`) — 3 agents
 
-| Agent | Focus | Example files |
-|-------|-------|---------------|
-| **api** | REST/GraphQL endpoints, middleware, auth | `src/api/`, `src/routes/` |
-| **database** | Schema, migrations, queries, models | `migrations/`, `prisma/` |
-| **ui** | Pages, components, forms, styling | `apps/web/`, `src/components/` |
+| Agent        | Focus                                    | Example files                  |
+| ------------ | ---------------------------------------- | ------------------------------ |
+| **api**      | REST/GraphQL endpoints, middleware, auth | `src/api/`, `src/routes/`      |
+| **database** | Schema, migrations, queries, models      | `migrations/`, `prisma/`       |
+| **ui**       | Pages, components, forms, styling        | `apps/web/`, `src/components/` |
 
 ### Quality Phase
 
 #### Code Review (`code-review`) — 3 agents
 
-| Agent | Focus | What it checks |
-|-------|-------|----------------|
-| **code-quality** | Logic, patterns, architecture | Bugs, code smells, layer violations |
-| **security** | Error handling, injection, auth | OWASP top 10, silent failures |
-| **test-coverage** | Test completeness, edge cases | Missing tests, weak assertions |
+| Agent             | Focus                           | What it checks                      |
+| ----------------- | ------------------------------- | ----------------------------------- |
+| **code-quality**  | Logic, patterns, architecture   | Bugs, code smells, layer violations |
+| **security**      | Error handling, injection, auth | OWASP top 10, silent failures       |
+| **test-coverage** | Test completeness, edge cases   | Missing tests, weak assertions      |
 
 #### Security Audit (`security-audit`) — 3 agents
 
-| Agent | Focus | What it checks |
-|-------|-------|----------------|
-| **code-analysis** | SAST: injection, auth, XSS, CSRF | Source code vulnerabilities |
-| **dependencies** | CVEs, outdated packages, licenses | Supply chain risks |
-| **config-review** | Secrets, CORS, CSP, env config | Infrastructure security |
+| Agent             | Focus                             | What it checks              |
+| ----------------- | --------------------------------- | --------------------------- |
+| **code-analysis** | SAST: injection, auth, XSS, CSRF  | Source code vulnerabilities |
+| **dependencies**  | CVEs, outdated packages, licenses | Supply chain risks          |
+| **config-review** | Secrets, CORS, CSP, env config    | Infrastructure security     |
 
 #### Comprehensive Testing (`testing`) — 3 agents
 
-| Agent | Focus | What it covers |
-|-------|-------|----------------|
-| **unit-tests** | Functions, classes, modules | Isolated unit tests |
+| Agent                 | Focus                               | What it covers        |
+| --------------------- | ----------------------------------- | --------------------- |
+| **unit-tests**        | Functions, classes, modules         | Isolated unit tests   |
 | **integration-tests** | API endpoints, service interactions | Cross-component tests |
-| **e2e-tests** | User flows, UI interactions | Full system tests |
+| **e2e-tests**         | User flows, UI interactions         | Full system tests     |
 
 ### Maintenance Phase
 
 #### Bug Fix (`bug-fix`) — 3 agents
 
-| Agent | Focus | What it does |
-|-------|-------|--------------|
-| **reproducer** | Write failing test, trace root cause | Proves the bug exists |
-| **fixer** | Fix source code, handle edge cases | Implements the fix |
-| **verifier** | Regression check, review changes | Ensures nothing else breaks |
+| Agent          | Focus                                | What it does                |
+| -------------- | ------------------------------------ | --------------------------- |
+| **reproducer** | Write failing test, trace root cause | Proves the bug exists       |
+| **fixer**      | Fix source code, handle edge cases   | Implements the fix          |
+| **verifier**   | Regression check, review changes     | Ensures nothing else breaks |
 
 #### Refactoring (`refactor`) — 2 agents
 
-| Agent | Focus | What it does |
-|-------|-------|--------------|
-| **refactor** | Source code changes | Rename, restructure, extract |
+| Agent         | Focus                | What it does                      |
+| ------------- | -------------------- | --------------------------------- |
+| **refactor**  | Source code changes  | Rename, restructure, extract      |
 | **consumers** | Tests and dependents | Update imports, fix tests, verify |
 
 #### Migration (`migration`) — 3 agents
 
-| Agent | Focus | What it does |
-|-------|-------|--------------|
-| **schema** | Migration scripts, data transforms | Write the migration |
-| **adapter** | Update app code, queries, models | Adapt to new schema |
-| **rollback** | Rollback scripts, backward compat | Verify safe reversal |
+| Agent        | Focus                              | What it does         |
+| ------------ | ---------------------------------- | -------------------- |
+| **schema**   | Migration scripts, data transforms | Write the migration  |
+| **adapter**  | Update app code, queries, models   | Adapt to new schema  |
+| **rollback** | Rollback scripts, backward compat  | Verify safe reversal |
 
 ### Planning Phase
 
 #### Architecture (`architecture`) — 2 agents
 
-| Agent | Focus | What it does |
-|-------|-------|--------------|
-| **researcher** | Analyze code, trace deps, evaluate trade-offs | Deep codebase analysis |
-| **spec-writer** | ADRs, design docs, interface contracts | Write technical specs |
+| Agent           | Focus                                         | What it does           |
+| --------------- | --------------------------------------------- | ---------------------- |
+| **researcher**  | Analyze code, trace deps, evaluate trade-offs | Deep codebase analysis |
+| **spec-writer** | ADRs, design docs, interface contracts        | Write technical specs  |
 
 #### Exploration (`exploration`) — 2 agents
 
-| Agent | Focus | What it does |
-|-------|-------|--------------|
-| **explorer** | Deep-dive code, trace execution paths | Map the codebase |
+| Agent           | Focus                                 | What it does     |
+| --------------- | ------------------------------------- | ---------------- |
+| **explorer**    | Deep-dive code, trace execution paths | Map the codebase |
 | **synthesizer** | Summarize findings, document patterns | Distill insights |
 
 ### Operations Phase
 
 #### DevOps (`devops`) — 2 agents
 
-| Agent | Focus | What it does |
-|-------|-------|--------------|
-| **pipeline** | CI/CD workflows, build, deploy | GitHub Actions, Jenkins, etc. |
-| **infrastructure** | Docker, Terraform, K8s, env config | Infrastructure as code |
+| Agent              | Focus                              | What it does                  |
+| ------------------ | ---------------------------------- | ----------------------------- |
+| **pipeline**       | CI/CD workflows, build, deploy     | GitHub Actions, Jenkins, etc. |
+| **infrastructure** | Docker, Terraform, K8s, env config | Infrastructure as code        |
 
 #### Documentation (`documentation`) — 2 agents
 
-| Agent | Focus | What it does |
-|-------|-------|--------------|
+| Agent        | Focus                                 | What it does           |
+| ------------ | ------------------------------------- | ---------------------- |
 | **api-docs** | API reference, OpenAPI spec, examples | Endpoint documentation |
-| **guides** | Tutorials, README, architecture docs | User-facing docs |
+| **guides**   | Tutorials, README, architecture docs  | User-facing docs       |
 
 ## Troubleshooting
 
@@ -862,14 +959,14 @@ See [docs/KNOWN-ISSUES.md](docs/KNOWN-ISSUES.md) for tracked bugs with workaroun
 
 **Common problems:**
 
-| Problem | Cause | Fix |
-|---------|-------|-----|
-| Agents spawn in-process instead of tmux panes | Not inside a tmux session | Start tmux first: `tmux new -s dev` |
-| Garbled pane output with 4+ agents | tmux `send-keys` race condition (#23615) | Use `shipwright` (uses `new-window` instead of `split-window`) |
-| Agents fall back to in-process mode | Not in a real tmux session (#23572) | Launch Claude inside tmux |
-| Context window overflow | Too many tasks per agent | Keep tasks focused (5-6 per agent) |
-| Panes don't show agent names | Pane titles not set | Use `shipwright session` which sets titles automatically |
-| White/bright pane backgrounds | New panes not inheriting theme | Fixed! Overlay forces dark theme via `set-hook after-split-window` |
+| Problem                                       | Cause                                    | Fix                                                                |
+| --------------------------------------------- | ---------------------------------------- | ------------------------------------------------------------------ |
+| Agents spawn in-process instead of tmux panes | Not inside a tmux session                | Start tmux first: `tmux new -s dev`                                |
+| Garbled pane output with 4+ agents            | tmux `send-keys` race condition (#23615) | Use `shipwright` (uses `new-window` instead of `split-window`)     |
+| Agents fall back to in-process mode           | Not in a real tmux session (#23572)      | Launch Claude inside tmux                                          |
+| Context window overflow                       | Too many tasks per agent                 | Keep tasks focused (5-6 per agent)                                 |
+| Panes don't show agent names                  | Pane titles not set                      | Use `shipwright session` which sets titles automatically           |
+| White/bright pane backgrounds                 | New panes not inheriting theme           | Fixed! Overlay forces dark theme via `set-hook after-split-window` |
 
 ## Plugins (TPM)
 
@@ -877,15 +974,15 @@ The tmux config uses [TPM](https://github.com/tmux-plugins/tpm) for plugin manag
 
 ### tmux Plugins (Best-in-Class)
 
-| Plugin | Key | What it does |
-|--------|-----|--------------|
-| **tmux-fingers** | `prefix + F` | Vimium-style copy hints — highlight and copy URLs, paths, hashes from any pane |
-| **tmux-fzf-url** | `prefix + u` | Fuzzy-find and open any URL visible in the current pane |
-| **tmux-fzf** | `F5` | Fuzzy finder for sessions, windows, and panes — jump to any agent by name |
-| **extrakto** | `prefix + tab` | Extract and copy any text from pane output (paths, IDs, errors) |
-| **tmux-resurrect** | auto | Save and restore sessions across restarts |
-| **tmux-continuum** | auto | Automatic continuous session saving |
-| **tmux-sensible** | — | Sensible defaults everyone agrees on |
+| Plugin             | Key            | What it does                                                                   |
+| ------------------ | -------------- | ------------------------------------------------------------------------------ |
+| **tmux-fingers**   | `prefix + F`   | Vimium-style copy hints — highlight and copy URLs, paths, hashes from any pane |
+| **tmux-fzf-url**   | `prefix + u`   | Fuzzy-find and open any URL visible in the current pane                        |
+| **tmux-fzf**       | `F5`           | Fuzzy finder for sessions, windows, and panes — jump to any agent by name      |
+| **extrakto**       | `prefix + tab` | Extract and copy any text from pane output (paths, IDs, errors)                |
+| **tmux-resurrect** | auto           | Save and restore sessions across restarts                                      |
+| **tmux-continuum** | auto           | Automatic continuous session saving                                            |
+| **tmux-sensible**  | —              | Sensible defaults everyone agrees on                                           |
 
 ## Demo
 

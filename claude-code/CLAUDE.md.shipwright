@@ -20,6 +20,12 @@ This project uses [Shipwright](https://github.com/sethdford/shipwright) for auto
 | `shipwright cost budget set <amount>` | Set daily budget limit |
 | `shipwright cost remaining-budget` | Check remaining daily budget (used by auto-scaler) |
 | `shipwright memory list` | View captured failure patterns |
+| `shipwright dashboard` | Real-time web dashboard (requires Bun) |
+| `shipwright dashboard start` | Start dashboard in background |
+| `shipwright heartbeat list` | Show agent heartbeat status |
+| `shipwright checkpoint list` | Show saved pipeline checkpoints |
+| `shipwright remote list` | Show registered machines |
+| `shipwright remote add <name> --host <h>` | Register a remote worker machine |
 
 ## Pipeline Stages
 
