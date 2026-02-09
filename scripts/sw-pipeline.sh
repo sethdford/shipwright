@@ -1000,7 +1000,7 @@ get_stage_description() {
 # ─── Dry-Run Summary ─────────────────────────────────────────────────────────
 # Renders a formatted table of enabled stages with timing/cost estimates from
 # historical events.jsonl data. Called when --dry-run is active.
-# Event schema: stage.completed has duration_s, pipeline.cost has estimated_cost_usd
+# Event schema: stage.completed has duration_s+stage, cost.record has cost_usd+stage
 
 dry_run_summary() {
     local stages stage_ids=()
@@ -1063,8 +1063,24 @@ dry_run_summary() {
             fi
         fi
 
-        # ── Median cost from pipeline.cost events (pipeline-level, not per-stage) ──
+        # ── Median cost from cost.record events for this stage ──
         local cost_display="—"
+        if [[ -f "$EVENTS_FILE" ]]; then
+            local cost_values=""
+            cost_values=$(grep '"cost.record"' "$EVENTS_FILE" 2>/dev/null | grep "\"stage\":\"${sid}\"" 2>/dev/null | jq -r '.cost_usd // empty' 2>/dev/null | sort -n || true)
+            if [[ -n "$cost_values" ]]; then
+                local cost_count=0
+                while IFS= read -r _v; do cost_count=$((cost_count + 1)); done <<< "$cost_values"
+                local cost_median_idx=$(( (cost_count + 1) / 2 ))
+                local median_cost
+                median_cost=$(echo "$cost_values" | sed -n "${cost_median_idx}p")
+                if [[ -n "$median_cost" ]]; then
+                    cost_display="\$${median_cost}"
+                    total_cost_val=$(awk "BEGIN {printf \"%.2f\", $total_cost_val + $median_cost}")
+                    has_any_cost="true"
+                fi
+            fi
+        fi
 
         printf "│ %-$((col_stage-2))s │ %-$((col_dur-2))s │ %-$((col_model-2))s │ %-$((col_cost-2))s │\n" \
             "$sid" "$dur_display" "$stage_model" "$cost_display"
@@ -1083,22 +1099,10 @@ dry_run_summary() {
         total_dur_display="~$(format_duration "$total_dur_s")"
     fi
 
-    # Pipeline-level median cost from pipeline.cost events
+    # Total cost from summing per-stage median costs
     local total_cost_display="—"
-    if [[ -f "$EVENTS_FILE" ]]; then
-        local cost_values=""
-        cost_values=$(grep '"pipeline.cost"' "$EVENTS_FILE" 2>/dev/null | jq -r '.estimated_cost_usd // empty' 2>/dev/null | sort -n || true)
-        if [[ -n "$cost_values" ]]; then
-            local cost_count=0
-            while IFS= read -r _v; do cost_count=$((cost_count + 1)); done <<< "$cost_values"
-            local cost_median_idx=$(( (cost_count + 1) / 2 ))
-            local median_cost
-            median_cost=$(echo "$cost_values" | sed -n "${cost_median_idx}p")
-            if [[ -n "$median_cost" ]]; then
-                total_cost_display="~\$${median_cost}"
-                has_any_cost="true"
-            fi
-        fi
+    if [[ "$has_any_cost" == "true" ]]; then
+        total_cost_display="~\$${total_cost_val}"
     fi
 
     printf "│ %-$((col_stage-2))s │ %-$((col_dur-2))s │ %-$((col_model-2))s │ %-$((col_cost-2))s │\n" \

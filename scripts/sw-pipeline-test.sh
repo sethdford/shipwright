@@ -830,8 +830,16 @@ test_dry_run_summary_with_history() {
     # build: 1 event (900s = ~15m 0s)
     echo '{"ts":"2026-01-01T00:00:00Z","ts_epoch":1735689600,"type":"stage.completed","stage":"build","duration_s":900}' >> "$events_file"
 
-    # pipeline.cost event for total cost display
-    echo '{"ts":"2026-01-01T00:00:00Z","ts_epoch":1735689600,"type":"pipeline.cost","estimated_cost_usd":7.62}' >> "$events_file"
+    # cost.record events per stage (median cost for intake: 0.10, 0.12, 0.15 → median = 0.12)
+    echo '{"ts":"2026-01-01T00:00:00Z","ts_epoch":1735689600,"type":"cost.record","stage":"intake","cost_usd":0.10}' >> "$events_file"
+    echo '{"ts":"2026-01-02T00:00:00Z","ts_epoch":1735776000,"type":"cost.record","stage":"intake","cost_usd":0.15}' >> "$events_file"
+    echo '{"ts":"2026-01-03T00:00:00Z","ts_epoch":1735862400,"type":"cost.record","stage":"intake","cost_usd":0.12}' >> "$events_file"
+
+    # cost.record for plan: single event ($1.45)
+    echo '{"ts":"2026-01-01T00:00:00Z","ts_epoch":1735689600,"type":"cost.record","stage":"plan","cost_usd":1.45}' >> "$events_file"
+
+    # cost.record for build: single event ($4.80)
+    echo '{"ts":"2026-01-01T00:00:00Z","ts_epoch":1735689600,"type":"cost.record","stage":"build","cost_usd":4.80}' >> "$events_file"
 
     invoke_pipeline start --goal "Dry run summary test" --skip-gates --dry-run
 
@@ -845,7 +853,11 @@ test_dry_run_summary_with_history() {
     assert_output_contains "build" "shows build stage" &&
     assert_output_contains "~2m 0s" "intake median duration is ~2m 0s" &&
     assert_output_contains "~5m 0s" "plan duration is ~5m 0s" &&
+    assert_output_contains "\\$0.12" "intake median cost is $0.12" &&
+    assert_output_contains "\\$1.45" "plan cost is $1.45" &&
+    assert_output_contains "\\$4.80" "build cost is $4.80" &&
     assert_output_contains "Total" "shows total row" &&
+    assert_output_contains "~\\$6.37" "total cost sums per-stage medians" &&
     assert_output_contains "Dry run" "shows dry-run message" &&
     assert_file_not_exists ".claude/pipeline-artifacts/intake.json" "no artifacts created"
 
@@ -867,6 +879,7 @@ test_dry_run_summary_no_history() {
     assert_exit_code 0 "dry-run summary should succeed without history" &&
     assert_output_contains "Stage" "table has Stage header" &&
     assert_output_contains "no data" "shows no data for duration" &&
+    assert_output_contains "—" "shows dash for cost when no history" &&
     assert_output_contains "intake" "shows intake stage" &&
     assert_output_contains "plan" "shows plan stage" &&
     assert_output_contains "Dry run" "shows dry-run message"
