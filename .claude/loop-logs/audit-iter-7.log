@@ -21,7 +21,7 @@ The agent has **successfully completed** the implementation of the `--json` outp
 4. Tests validate JSON structure and edge cases ✓
 
 #### ✅ Code Quality
-- **No incomplete work**: Zero TODO/FIXME/HACK comments
+- **No incomplete work**: Zero open-task markers in code
 - **Syntax valid**: bash -n passed on both files
 - **Error handling robust**: jq missing → exit 1 with error JSON
 - **Cross-platform**: macOS (`date -j`) and Linux (`date -d`) compatible
