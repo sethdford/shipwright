@@ -1576,7 +1576,7 @@ const CORS_HEADERS = {
 const server = Bun.serve({
   port: PORT,
 
-  fetch(req, server) {
+  async fetch(req, server) {
     const url = new URL(req.url);
     const pathname = url.pathname;
 
