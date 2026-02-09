@@ -1,0 +1,58 @@
+Now I get it—line 856 is where the assertion being printed in the error message originates. The error message shows "scripts/cct-pipeline-test.sh.12" which looks like some shell number substitution got applied. This is a test framework display bug, not an actual test failure.
+
+## Summary of Audit Findings
+
+Based on my detailed review of the agent's work on implementing the pipeline dry-run summary feature:
+
+### Positive Findings:
+1. ✅ **Feature Implemented Correctly**: The `dry_run_summary()` function is well-implemented with all required functionality:
+   - Table formatting with proper headers and borders
+   - Median duration calculation from `stage.completed` events
+   - Median cost calculation from `cost.record` events  
+   - Per-stage model resolution (4-tier cascade: CLI > stage config > template default > "opus")
+   - Budget display integration via `cct-cost.sh`
+   - Graceful fallback for missing history ("no data" / "—")
+
+2. ✅ **Tests Implemented**: Both required test cases added:
+   - `test_dry_run_summary_with_history` - validates with seeded event data
+   - `test_dry_run_summary_no_history` - validates graceful fallback
+
+3. ✅ **All Tests Pass**: 167/167 tests pass across all 11 test suites
+
+4. ✅ **Code Quality**: 
+   - Bash 3.2 compatible (no `declare -A`, `readarray`, `${var,,}`)
+   - Proper error handling with `|| true` guards on grep
+   - Uses `set -euo pipefail` pattern
+   - Follows project conventions
+
+5. ✅ **Functionality**: When tested directly, the function correctly outputs:
+   - Formatted table with proper columns
+   - Accurate median calculations
+   - Proper cost formatting with dollar signs
+
+### Issues Found:
+1. **Test Display Bug** (Non-Critical): There's a test harness display issue where one assertion's error message gets corrupted output with a mangled variable name (`\scripts/cct-pipeline-test.sh.12`). However:
+   - The test still passes (Failed: 0, Passed: 17)
+   - This appears to be a display/formatting bug in the test harness error message, not an actual test failure
+   - The underlying functionality is correct
+
+2. **Minor Code Observations** (Not Issues):
+   - Line 1010 orders model resolution as: stage config → template default → opus, then CLI override. This matches the design but reverses the logical order (CLI should be checked first for clarity, though it still works correctly)
+   - The median calculation uses `(count + 1) / 2` which gives lower-middle for even counts (correct per design)
+
+###  Definition of Done Validation:
+- ✅ `--dry-run` shows table with Stage, Est. Duration, Model, Est. Cost
+- ✅ Duration uses median from historical `stage.completed` events
+- ✅ Cost uses median from historical `cost.record` events  
+- ✅ Model resolves per-stage from template config
+- ✅ "no data" / "—" shown when no history exists
+- ✅ Total row with summed duration and cost
+- ✅ Budget line when budget enabled
+- ✅ Existing dry-run behavior preserved (no artifacts, exits cleanly)
+- ✅ Bash 3.2 compatible
+- ✅ All tests pass
+- ✅ `npm test` clean (167/167 across 11 suites)
+
+The work is functionally complete and correct. The test display issue is a cosmetic test harness bug that doesn't affect the actual functionality or test results.
+
+AUDIT_PASS

@@ -29,7 +29,6 @@ Insert after `get_stage_description()` (~line 965). The function:
 8. Ends with `info "Dry run — no stages will execute"` preserving existing behavior
 
 Key design decisions:
-
 - **Median not mean** — robust against outlier runs
 - **`grep` + `jq` pipeline** on events.jsonl — works with large files without loading everything
 - **Bash 3.2 compatible** — no associative arrays, no `readarray`, no `${var,,}`
@@ -39,16 +38,13 @@ Key design decisions:
 ### Step 2: Replace existing dry-run block
 
 Lines 3956-3959 change from:
-
 ```bash
 if [[ "$DRY_RUN" == "true" ]]; then
     info "Dry run — no stages will execute"
     return 0
 fi
 ```
-
 To:
-
 ```bash
 if [[ "$DRY_RUN" == "true" ]]; then
     dry_run_summary
@@ -71,7 +67,6 @@ Removes any `events.jsonl`. Asserts: exit 0, "no data" in output, stage names pr
 ### Step 6: Register tests in runner array
 
 Add after `test_dry_run` entry (~line 838):
-
 ```
 "test_dry_run_summary_with_history:Dry run shows timing estimates from history"
 "test_dry_run_summary_no_history:Dry run shows no-data when no history exists"
@@ -118,11 +113,12 @@ Add after `test_dry_run` entry (~line 838):
 
 Follow the approved design document:
 
+
 # Design: Add pipeline dry-run summary with stage timing estimates
 
 ## Context
 
-The `--dry-run` flag in `scripts/cct-pipeline.sh` currently prints a single info line ("Dry run — no stages will execute") and exits. This gives operators no visibility into what _would_ happen: which stages are enabled, what models they'd use, how long they'd likely take, or what they'd cost. For a pipeline that can run 12 stages over tens of minutes and accumulate meaningful API spend, this is insufficient for capacity planning, budget approval, and CI gating.
+The `--dry-run` flag in `scripts/cct-pipeline.sh` currently prints a single info line ("Dry run — no stages will execute") and exits. This gives operators no visibility into what *would* happen: which stages are enabled, what models they'd use, how long they'd likely take, or what they'd cost. For a pipeline that can run 12 stages over tens of minutes and accumulate meaningful API spend, this is insufficient for capacity planning, budget approval, and CI gating.
 
 **Constraints from the codebase:**
 
@@ -171,14 +167,14 @@ PIPELINE_CONFIG (JSON)
 
 ### Error handling
 
-| Scenario                                                 | Behavior                                                             |
-| -------------------------------------------------------- | -------------------------------------------------------------------- |
-| `$EVENTS_FILE` missing                                   | All durations show "no data", costs show "—"                         |
-| `$EVENTS_FILE` exists but no matching events for a stage | That stage shows "no data" / "—"; others show real data              |
-| `jq` not installed                                       | Pipeline already fails at config parsing before reaching dry-run     |
-| `cct-cost.sh remaining-budget` fails                     | Budget line suppressed (captured in variable, checked for non-empty) |
-| `$PIPELINE_CONFIG` has no enabled stages                 | Table renders with headers only + totals of 0                        |
-| Stage has duration history but no cost history           | Duration shows estimate, cost shows "—" (independent lookups)        |
+| Scenario | Behavior |
+|----------|----------|
+| `$EVENTS_FILE` missing | All durations show "no data", costs show "—" |
+| `$EVENTS_FILE` exists but no matching events for a stage | That stage shows "no data" / "—"; others show real data |
+| `jq` not installed | Pipeline already fails at config parsing before reaching dry-run |
+| `cct-cost.sh remaining-budget` fails | Budget line suppressed (captured in variable, checked for non-empty) |
+| `$PIPELINE_CONFIG` has no enabled stages | Table renders with headers only + totals of 0 |
+| Stage has duration history but no cost history | Duration shows estimate, cost shows "—" (independent lookups) |
 
 ### Table format
 
@@ -245,11 +241,8 @@ Budget remaining: $42.38
 - [ ] `npm test` passes clean across all test suites (pipeline, daemon, prep, fleet, fix, memory, session, init, tracker, heartbeat, remote)
 
 Historical context (lessons from previous pipelines):
-
 # Shipwright Memory Context
-
 # Injected at: 2026-02-09T21:07:26Z
-
 # Stage: build
 
 ## Failure Patterns to Avoid
@@ -259,11 +252,9 @@ Historical context (lessons from previous pipelines):
 ## Code Conventions
 
 Task tracking (check off items as you complete them):
-
 # Pipeline Tasks — Add pipeline dry-run summary with stage timing estimates
 
 ## Implementation Checklist
-
 - [ ] Task 1: Add `dry_run_summary()` function to `cct-pipeline.sh`
 - [ ] Task 2: Replace existing dry-run block with `dry_run_summary` call
 - [ ] Task 3: Implement per-stage model resolution (CLI > stage config > defaults > opus)
@@ -286,45 +277,31 @@ Task tracking (check off items as you complete them):
 - [ ] Budget line when budget enabled
 
 ## Context
-
 - Pipeline: standard
 - Branch: ci/add-pipeline-dry-run-summary-with-stage-5
 - Issue: #5
 - Generated: 2026-02-09T21:05:58Z"
-  iteration: 1
-  max_iterations: 20
-  status: running
-  test_cmd: "npm test"
-  model: opus
-  agents: 1
-  started_at: 2026-02-09T21:24:00Z
-  last_iteration_at: 2026-02-09T21:24:00Z
-  consecutive_failures: 0
-  total_commits: 1
-  audit_enabled: true
-  audit_agent_enabled: true
-  quality_gates_enabled: true
-  dod_file: "/home/runner/work/shipwright/shipwright/.claude/pipeline-artifacts/dod.md"
-  auto_extend: true
-  extension_count: 0
-  max_extensions: 3
-
+iteration: 2
+max_iterations: 20
+status: complete
+test_cmd: "npm test"
+model: opus
+agents: 1
+started_at: 2026-02-09T21:34:52Z
+last_iteration_at: 2026-02-09T21:34:52Z
+consecutive_failures: 0
+total_commits: 2
+audit_enabled: true
+audit_agent_enabled: true
+quality_gates_enabled: true
+dod_file: "/home/runner/work/shipwright/shipwright/.claude/pipeline-artifacts/dod.md"
+auto_extend: true
+extension_count: 0
+max_extensions: 3
 ---
 
 ## Log
-
 ### Iteration 1 (2026-02-09T21:24:00Z)
-
 All tasks complete. The implementation is done.
 LOOP_COMPLETE
 
-### Iteration 2 (2026-02-09T21:50:00Z)
-
-Addressed all audit findings from iteration 1:
-
-- Implemented per-stage cost from cost.record events (replaced pipeline.cost lookup)
-- Total cost now derived by summing per-stage median costs
-- Tests updated to seed cost.record events and validate per-stage costs ($0.12, $1.45, $4.80) and total (~$6.37)
-- No-history test validates "—" fallback for costs
-- Fixed misleading comment about event schema
-- All 167 tests pass across 11 test suites
