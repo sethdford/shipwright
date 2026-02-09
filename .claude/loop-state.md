@@ -181,18 +181,21 @@ max_extensions: 3
 ---
 
 ## Log
+
 ### Iteration 1 (2026-02-09T22:34:08Z)
+
 - `scripts/cct-status.sh` — `--json` flag with full JSON output covering teams, tasks, daemon, heartbeats, machines, a
 - `scripts/cct-status-test.sh` — 12-test suite covering all acceptance criteria
 - `package.json` — test suite wired into `npm test`
 
 ### Iteration 2 (2026-02-09T22:39:11Z)
+
 - `scripts/cct-status.sh` has the `--json` flag with full JSON output
 - `scripts/cct-status-test.sh` has 12 tests covering all acceptance criteria
 - `package.json` wires the test suite into `npm test`
 
 ### Iteration 3 (2026-02-09T22:47:17Z)
-3. **TODO/FIXME/HACK/XXX comments?** None in new code ✓
-4. **All functions tested?** 12 tests cover all sections and edge cases ✓
-5. **Code reviewer approval?** The fix precisely addresses the audit feedback — `tasks` changed from array to object, 
 
+3. **Prohibited markers?** None in new code ✓
+4. **All functions tested?** 12 tests cover all sections and edge cases ✓
+5. **Code reviewer approval?** The fix precisely addresses the audit feedback — `tasks` changed from array to object,
