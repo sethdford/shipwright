@@ -1788,9 +1788,20 @@ $(cat "$TASKS_FILE")"
     loop_args+=(--max-iterations "$max_iter")
     loop_args+=(--model "$build_model")
     [[ "$agents" -gt 1 ]] 2>/dev/null && loop_args+=(--agents "$agents")
-    [[ "$audit" == "true" ]] && loop_args+=(--audit --audit-agent)
-    [[ "$quality" == "true" ]] && loop_args+=(--quality-gates)
+
+    # Quality gates: always enabled in CI, otherwise from template config
+    if [[ "${CI_MODE:-false}" == "true" ]]; then
+        loop_args+=(--audit --audit-agent --quality-gates)
+    else
+        [[ "$audit" == "true" ]] && loop_args+=(--audit --audit-agent)
+        [[ "$quality" == "true" ]] && loop_args+=(--quality-gates)
+    fi
+
+    # Definition of Done: use plan-extracted DoD if available
     [[ -s "$dod_file" ]] && loop_args+=(--definition-of-done "$dod_file")
+
+    # Skip permissions in CI (no interactive terminal)
+    [[ "${CI_MODE:-false}" == "true" ]] && loop_args+=(--skip-permissions)
 
     info "Starting build loop: ${DIM}shipwright loop${RESET} (max ${max_iter} iterations, ${agents} agent(s))"
 
