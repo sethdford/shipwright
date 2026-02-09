@@ -136,7 +136,7 @@ init_git_repo() {
     local dir="$1"
     (
         cd "$dir"
-        git init --quiet
+        git init --quiet -b main
         git config user.email "test@test.com"
         git config user.name "Test User"
         git add -A
@@ -432,12 +432,9 @@ test_check_mode() {
     invoke_prep "$test_dir" --force
     assert_exit_code 0 "initial prep should succeed"
 
-    # Record modification time of CLAUDE.md
-    local mtime_before
-    mtime_before=$(stat -f "%m" "$test_dir/.claude/CLAUDE.md" 2>/dev/null || stat -c "%Y" "$test_dir/.claude/CLAUDE.md" 2>/dev/null)
-
-    # Small delay to ensure timestamps would differ
-    sleep 1
+    # Record content hash of CLAUDE.md (more reliable than mtime across platforms)
+    local hash_before
+    hash_before=$(shasum "$test_dir/.claude/CLAUDE.md" 2>/dev/null | awk '{print $1}' || md5sum "$test_dir/.claude/CLAUDE.md" 2>/dev/null | awk '{print $1}' || cat "$test_dir/.claude/CLAUDE.md" | wc -c)
 
     # Second run: check mode
     invoke_prep "$test_dir" --check
@@ -445,12 +442,12 @@ test_check_mode() {
     assert_exit_code 0 "check should succeed" &&
     assert_output_contains "Score|Grade|Audit" "check shows scoring"
 
-    # Verify file was not modified
-    local mtime_after
-    mtime_after=$(stat -f "%m" "$test_dir/.claude/CLAUDE.md" 2>/dev/null || stat -c "%Y" "$test_dir/.claude/CLAUDE.md" 2>/dev/null)
+    # Verify file content was not modified
+    local hash_after
+    hash_after=$(shasum "$test_dir/.claude/CLAUDE.md" 2>/dev/null | awk '{print $1}' || md5sum "$test_dir/.claude/CLAUDE.md" 2>/dev/null | awk '{print $1}' || cat "$test_dir/.claude/CLAUDE.md" | wc -c)
 
-    if [[ "$mtime_before" != "$mtime_after" ]]; then
-        echo -e "    ${RED}✗${RESET} CLAUDE.md was modified during --check (timestamps differ)"
+    if [[ "$hash_before" != "$hash_after" ]]; then
+        echo -e "    ${RED}✗${RESET} CLAUDE.md content was modified during --check"
         return 1
     fi
 }
