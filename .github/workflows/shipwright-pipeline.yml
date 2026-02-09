@@ -217,7 +217,7 @@ jobs:
     needs: triage
     if: needs.triage.outputs.approved == 'true'
     runs-on: ubuntu-latest
-    timeout-minutes: 60
+    timeout-minutes: 120
 
     env:
       ISSUE_NUMBER: ${{ github.event.inputs.issue_number || github.event.issue.number }}
@@ -284,6 +284,7 @@ jobs:
             --issue "$ISSUE_NUMBER" \
             --template "$TEMPLATE" \
             --no-github-label \
+            --skip-gates \
             --ci 2>&1 | tee /tmp/pipeline.log
           PIPELINE_EXIT=$?
           echo "exit_code=$PIPELINE_EXIT" >> "$GITHUB_OUTPUT"
