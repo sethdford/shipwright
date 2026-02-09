@@ -81,20 +81,16 @@ while IFS= read -r line; do
 done < <(tmux list-windows -a -F '#{session_name}:#{window_index}|#{window_name}|#{window_panes}|#{window_active}' 2>/dev/null || true)
 
 # ── 2. Tasks ──
-tasks_json="[]"
+t_completed=0
+t_in_progress=0
+t_pending=0
 TASKS_DIR="${HOME}/.claude/tasks"
 if [[ -d "$TASKS_DIR" ]]; then
     while IFS= read -r task_dir; do
         [[ -z "$task_dir" ]] && continue
-        t_team="$(basename "$task_dir")"
-        t_total=0
-        t_completed=0
-        t_in_progress=0
-        t_pending=0
 
         while IFS= read -r task_file; do
             [[ -z "$task_file" ]] && continue
-            t_total=$((t_total + 1))
             t_status=$(grep -o '"status"[[:space:]]*:[[:space:]]*"[^"]*"' "$task_file" 2>/dev/null | head -1 | sed 's/.*"\([^"]*\)"$/\1/')
             case "$t_status" in
                 completed)   t_completed=$((t_completed + 1)) ;;
@@ -102,16 +98,13 @@ if [[ -d "$TASKS_DIR" ]]; then
                 pending)     t_pending=$((t_pending + 1)) ;;
             esac
         done < <(find "$task_dir" -type f -name '*.json' 2>/dev/null)
-
-        tasks_json=$(echo "$tasks_json" | jq \
-            --arg team "$t_team" \
-            --argjson total "$t_total" \
-            --argjson completed "$t_completed" \
-            --argjson in_progress "$t_in_progress" \
-            --argjson pending "$t_pending" \
-            '. + [{"team": $team, "total": $total, "completed": $completed, "in_progress": $in_progress, "pending": $pending}]')
     done < <(find "$TASKS_DIR" -mindepth 1 -maxdepth 1 -type d 2>/dev/null | sort)
 fi
+tasks_json=$(jq -n \
+    --argjson completed "$t_completed" \
+    --argjson in_progress "$t_in_progress" \
+    --argjson pending "$t_pending" \
+    '{completed: $completed, in_progress: $in_progress, pending: $pending}')
 
 # ── 3. Daemon ──
 daemon_json="null"
@@ -135,10 +128,10 @@ if [[ -f "$STATE_FILE" ]]; then
 
     daemon_json=$(jq -n \
         --argjson running "$d_running" \
-        --argjson active_jobs "${d_active:-0}" \
+        --argjson active "${d_active:-0}" \
         --argjson queued "${d_queued:-0}" \
         --argjson completed "${d_completed:-0}" \
-        '{running: $running, active_jobs: $active_jobs, queued: $queued, completed: $completed}')
+        '{running: $running, active: $active, queued: $queued, completed: $completed}')
 fi
 
 # ── 4. Heartbeats ──

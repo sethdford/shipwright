@@ -120,15 +120,18 @@ test_json_top_level_keys() {
 }
 
 # ──────────────────────────────────────────────────────────────────────────────
-# 3. Empty state: teams=[], tasks=[], daemon=null, heartbeats=[], machines=[]
+# 3. Empty state: teams=[], tasks={completed:0,...}, daemon=null, etc.
 # ──────────────────────────────────────────────────────────────────────────────
 test_json_empty_state() {
     local output
     output=$(run_status_json)
 
-    local teams_len tasks_len hb_len machines_len daemon_val
+    local teams_len hb_len machines_len daemon_val
+    local tasks_completed tasks_in_progress tasks_pending
     teams_len=$(echo "$output" | jq '.teams | length')
-    tasks_len=$(echo "$output" | jq '.tasks | length')
+    tasks_completed=$(echo "$output" | jq '.tasks.completed')
+    tasks_in_progress=$(echo "$output" | jq '.tasks.in_progress')
+    tasks_pending=$(echo "$output" | jq '.tasks.pending')
     hb_len=$(echo "$output" | jq '.heartbeats | length')
     machines_len=$(echo "$output" | jq '.machines | length')
     daemon_val=$(echo "$output" | jq '.daemon')
@@ -137,8 +140,16 @@ test_json_empty_state() {
         echo -e "    ${RED}✗${RESET} Expected teams=[], got length $teams_len"
         return 1
     fi
-    if [[ "$tasks_len" != "0" ]]; then
-        echo -e "    ${RED}✗${RESET} Expected tasks=[], got length $tasks_len"
+    if [[ "$tasks_completed" != "0" ]]; then
+        echo -e "    ${RED}✗${RESET} Expected tasks.completed=0, got $tasks_completed"
+        return 1
+    fi
+    if [[ "$tasks_in_progress" != "0" ]]; then
+        echo -e "    ${RED}✗${RESET} Expected tasks.in_progress=0, got $tasks_in_progress"
+        return 1
+    fi
+    if [[ "$tasks_pending" != "0" ]]; then
+        echo -e "    ${RED}✗${RESET} Expected tasks.pending=0, got $tasks_pending"
         return 1
     fi
     if [[ "$hb_len" != "0" ]]; then
@@ -253,19 +264,15 @@ test_json_tasks_populated() {
     local output
     output=$(run_status_json)
 
-    local team total completed in_progress pending
-    team=$(echo "$output" | jq -r '.tasks[0].team')
-    total=$(echo "$output" | jq '.tasks[0].total')
-    completed=$(echo "$output" | jq '.tasks[0].completed')
-    in_progress=$(echo "$output" | jq '.tasks[0].in_progress')
-    pending=$(echo "$output" | jq '.tasks[0].pending')
+    # tasks should be a flat object with aggregated counts (not an array)
+    local tasks_type completed in_progress pending
+    tasks_type=$(echo "$output" | jq -r '.tasks | type')
+    completed=$(echo "$output" | jq '.tasks.completed')
+    in_progress=$(echo "$output" | jq '.tasks.in_progress')
+    pending=$(echo "$output" | jq '.tasks.pending')
 
-    if [[ "$team" != "my-team" ]]; then
-        echo -e "    ${RED}✗${RESET} Expected team 'my-team', got '$team'"
-        return 1
-    fi
-    if [[ "$total" != "5" ]]; then
-        echo -e "    ${RED}✗${RESET} Expected total=5, got $total"
+    if [[ "$tasks_type" != "object" ]]; then
+        echo -e "    ${RED}✗${RESET} Expected tasks to be an object, got '$tasks_type'"
         return 1
     fi
     if [[ "$completed" != "2" ]]; then
@@ -304,7 +311,7 @@ EOF
 
     local running active queued completed
     running=$(echo "$output" | jq '.daemon.running')
-    active=$(echo "$output" | jq '.daemon.active_jobs')
+    active=$(echo "$output" | jq '.daemon.active')
     queued=$(echo "$output" | jq '.daemon.queued')
     completed=$(echo "$output" | jq '.daemon.completed')
 
@@ -313,7 +320,7 @@ EOF
         return 1
     fi
     if [[ "$active" != "1" ]]; then
-        echo -e "    ${RED}✗${RESET} Expected active_jobs=1, got $active"
+        echo -e "    ${RED}✗${RESET} Expected active=1, got $active"
         return 1
     fi
     if [[ "$queued" != "2" ]]; then
