@@ -11,6 +11,10 @@ demo/*.gif
 # Upgrade backups
 *.pre-upgrade.bak
 
+# Pipeline runtime artifacts (created per-repo at runtime)
+.claude/pipeline-artifacts/
+.claude/pipeline-state.md
+
 # Build artifacts
 dist/
 node_modules/
