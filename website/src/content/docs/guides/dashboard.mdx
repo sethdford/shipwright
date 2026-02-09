@@ -1,0 +1,92 @@
+---
+title: Dashboard
+description: Real-time web dashboard for monitoring pipelines, agents, and daemon status.
+---
+
+The Shipwright dashboard provides a real-time web interface for monitoring pipeline progress, agent activity, daemon status, and DORA metrics. It uses WebSocket connections for live updates.
+
+## Prerequisites
+
+The dashboard requires [Bun](https://bun.sh) runtime:
+
+```bash
+curl -fsSL https://bun.sh/install | bash
+```
+
+## Starting the Dashboard
+
+```bash
+# Foreground (see logs in terminal)
+shipwright dashboard
+
+# Background (runs in detached mode)
+shipwright dashboard start
+
+# Stop background dashboard
+shipwright dashboard stop
+```
+
+The dashboard runs on `http://localhost:3000` by default.
+
+## Features
+
+### Pipeline Monitoring
+
+View real-time progress for all active pipelines:
+
+- Current stage and elapsed time per stage
+- Self-healing cycle status
+- Build agent output
+- Test results and coverage
+- Review findings
+
+### Agent Activity
+
+Track all running Claude Code agents:
+
+- Heartbeat status (alive, stale, dead)
+- Current task and iteration count
+- Token usage per agent
+- Session mapping (which tmux pane)
+
+### Daemon Status
+
+Monitor the autonomous daemon:
+
+- Active jobs and queue depth
+- Worker utilization and auto-scaling decisions
+- Issue triage scores
+- Recent completions and failures
+
+### DORA Metrics
+
+Live DORA/DX metrics dashboard:
+
+- **Lead Time** — time from issue creation to PR merge
+- **Deployment Frequency** — pipelines completed per day
+- **Change Failure Rate** — percentage of pipelines that fail
+- **Mean Time to Recovery** — time from failure to successful retry
+
+## Architecture
+
+The dashboard consists of:
+
+| Component      | Location                       | Purpose                                               |
+| -------------- | ------------------------------ | ----------------------------------------------------- |
+| **Server**     | `dashboard/server.ts`          | Bun WebSocket server, reads pipeline state and events |
+| **Frontend**   | `dashboard/public/`            | HTML/CSS/JS single-page application                   |
+| **Events**     | `~/.claude-teams/events.jsonl` | JSONL event stream consumed by the server             |
+| **State**      | `.claude/pipeline-state.md`    | Pipeline state file polled for updates                |
+| **Heartbeats** | `~/.claude-teams/heartbeats/`  | Agent liveness data                                   |
+
+The server watches the events file and pipeline state for changes, pushing updates to connected clients via WebSocket.
+
+## Configuration
+
+The dashboard reads from standard Shipwright configuration locations. No additional configuration is required beyond having a running pipeline or daemon.
+
+To change the port:
+
+```bash
+PORT=8080 shipwright dashboard
+```

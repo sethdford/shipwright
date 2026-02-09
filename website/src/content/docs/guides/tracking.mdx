@@ -1,0 +1,116 @@
+---
+title: Issue Tracking
+description: Bidirectional integration with Linear and Jira for pipeline-driven issue management.
+---
+
+Shipwright integrates with issue trackers to provide bidirectional sync between pipelines and your project management tool. When a pipeline completes a stage, the tracker is updated automatically. When issues are created or updated in the tracker, they can trigger pipeline runs.
+
+## Supported Trackers
+
+| Tracker           | Status       | Features                                               |
+| ----------------- | ------------ | ------------------------------------------------------ |
+| **Linear**        | Full support | Bidirectional sync, status updates, stage comments     |
+| **Jira**          | Full support | Bidirectional sync, status transitions, stage comments |
+| **GitHub Issues** | Built-in     | Always available, no configuration needed              |
+
+## Architecture
+
+Shipwright uses a **router pattern** for tracker integration:
+
+```
+Pipeline → cct-tracker.sh (router) → cct-tracker-linear.sh
+                                   → cct-tracker-jira.sh
+```
+
+The router reads `~/.claude-teams/tracker-config.json` to determine which provider to use, then delegates to the provider-specific script.
+
+## Configuration
+
+### Initial Setup
+
+```bash
+# Configure Linear
+shipwright linear setup
+
+# Configure Jira
+shipwright jira setup
+```
+
+### Configuration File
+
+The tracker configuration lives at `~/.claude-teams/tracker-config.json`:
+
+```json
+{
+  "provider": "linear",
+  "linear": {
+    "api_key": "lin_api_...",
+    "team_id": "TEAM-ID",
+    "project_id": "PROJECT-ID"
+  }
+}
+```
+
+For Jira:
+
+```json
+{
+  "provider": "jira",
+  "jira": {
+    "url": "https://yourcompany.atlassian.net",
+    "email": "you@company.com",
+    "api_token": "...",
+    "project_key": "PROJ"
+  }
+}
+```
+
+## Pipeline Integration
+
+The pipeline automatically notifies the tracker at key points:
+
+| Event                 | When                      | What Gets Updated            |
+| --------------------- | ------------------------- | ---------------------------- |
+| **Stage complete**    | After each stage finishes | Stage name, duration, status |
+| **Stage failed**      | When a stage fails        | Error context, failed stage  |
+| **PR created**        | After PR stage            | PR URL linked to issue       |
+| **Pipeline complete** | On successful completion  | Issue status moved to "Done" |
+| **Pipeline failed**   | On final failure          | Issue gets failure summary   |
+
+## Daemon Integration
+
+The daemon also integrates with the tracker:
+
+| Event             | Description                         |
+| ----------------- | ----------------------------------- |
+| **Job spawned**   | Issue marked as "In Progress"       |
+| **Job completed** | Issue marked as "Done" with PR link |
+| **Job failed**    | Issue updated with failure details  |
+
+## Commands
+
+```bash
+# Check current tracker configuration
+shipwright tracker config
+
+# Manual sync (usually automatic)
+shipwright tracker notify stage_complete <issue> "<stage>|<duration>|<description>"
+
+# Linear-specific commands
+shipwright linear setup          # Configure Linear
+shipwright linear sync <issue>   # Manual sync
+
+# Jira-specific commands
+shipwright jira setup            # Configure Jira
+shipwright jira sync <issue>     # Manual sync
+```
+
+## Disabling Tracker Integration
+
+If you only want GitHub Issues (the default), simply don't configure a tracker. The pipeline always posts progress comments to GitHub Issues regardless of tracker configuration.
+
+To temporarily disable tracker notifications:
+
+```bash
+NO_TRACKER=true shipwright pipeline start --issue 42
+```

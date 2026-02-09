@@ -1,0 +1,154 @@
+---
+title: Advanced Features
+description: Heartbeats, checkpoints, remote machines, and other advanced Shipwright features.
+---
+
+Shipwright includes several advanced features for production-grade autonomous agent operations. These features support resilience, distributed execution, and operational visibility.
+
+## Heartbeats
+
+Agent heartbeats provide liveness monitoring for running pipeline jobs. The pipeline writes periodic heartbeat files that can be checked by the daemon, dashboard, and doctor to detect stale or crashed jobs.
+
+### How It Works
+
+1. When a pipeline starts, it begins writing heartbeat files every 60 seconds
+2. Each heartbeat file contains the job ID, timestamp, current stage, and process info
+3. The daemon checks heartbeats to detect stale jobs (no update in 5+ minutes)
+4. The doctor includes heartbeat health in its diagnostic output
+
+### Storage
+
+Heartbeat files are stored at `~/.claude-teams/heartbeats/<job-id>.json`:
+
+```json
+{
+  "job_id": "pipeline-42-1707500000",
+  "timestamp": "2026-02-09T12:00:00Z",
+  "stage": "build",
+  "pid": 12345,
+  "issue": 42
+}
+```
+
+### Commands
+
+```bash
+shipwright heartbeat list              # Show all active heartbeats
+shipwright heartbeat check <job-id>    # Check specific job
+shipwright heartbeat clear             # Remove stale heartbeats
+```
+
+### Integration Points
+
+| Component     | How It Uses Heartbeats                  |
+| ------------- | --------------------------------------- |
+| **Pipeline**  | Writes heartbeats during execution      |
+| **Daemon**    | Checks for stale jobs, triggers cleanup |
+| **Dashboard** | Shows live agent status                 |
+| **Doctor**    | Reports heartbeat health in diagnostics |
+| **Status**    | Displays agent heartbeat section        |
+
+## Checkpoints
+
+Pipeline checkpoints save the complete state of a pipeline at a point in time, enabling recovery from failures and the ability to experiment with different approaches from a known-good state.
+
+### Saving Checkpoints
+
+```bash
+# Save current pipeline state with auto-generated name
+shipwright checkpoint save
+
+# Save with a specific name
+shipwright checkpoint save "before-refactor"
+```
+
+### Restoring Checkpoints
+
+```bash
+# List available checkpoints
+shipwright checkpoint list
+
+# Restore from a checkpoint
+shipwright checkpoint restore "before-refactor"
+```
+
+### Storage
+
+Checkpoints are stored in `.claude/pipeline-artifacts/checkpoints/` and include:
+
+- Pipeline state file (stage statuses, timings, configuration)
+- Current branch and commit reference
+- Artifact references (plan, design, review files)
+
+### Use Cases
+
+- **Recovery** — Restore after a failed stage without re-running earlier stages
+- **Experimentation** — Save state, try an approach, restore if it doesn't work
+- **CI Resume** — The auto-retry workflow uses checkpoint data to resume from the last successful stage
+
+## Remote Machines
+
+Remote machine management enables distributed pipeline execution across multiple hosts. Register worker machines, monitor their health, and let the daemon distribute work across the fleet.
+
+### Registering Machines
+
+```bash
+# Add a worker machine
+shipwright remote add builder-1 \
+  --host 192.168.1.100 \
+  --path /opt/shipwright \
+  --user deploy \
+  --max-workers 4
+
+# Add another machine
+shipwright remote add builder-2 \
+  --host 192.168.1.101 \
+  --path /opt/shipwright \
+  --max-workers 8
+```
+
+### Machine Registry
+
+The registry is stored at `~/.claude-teams/machines.json`:
+
+```json
+{
+  "machines": [
+    {
+      "name": "builder-1",
+      "host": "192.168.1.100",
+      "path": "/opt/shipwright",
+      "user": "deploy",
+      "role": "worker",
+      "max_workers": 4
+    }
+  ]
+}
+```
+
+### Health Checks
+
+```bash
+# Check all registered machines
+shipwright remote status
+
+# View registered machines
+shipwright remote list
+
+# Remove a machine
+shipwright remote remove builder-1
+```
+
+Health checks verify:
+
+- SSH connectivity
+- Shipwright installation at the specified path
+- System resources (CPU, memory, load average)
+
+### Integration with Daemon
+
+When remote machines are registered, the daemon can distribute pipeline jobs across them. The fleet rebalancer monitors load and reassigns work to underutilized machines.
+
+### Integration with Doctor
+
+The `shipwright doctor` command includes a "REMOTE MACHINES" health check section that verifies all registered machines are reachable and properly configured.

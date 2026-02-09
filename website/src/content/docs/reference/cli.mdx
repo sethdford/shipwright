@@ -48,8 +48,8 @@ shipwright session <name> -t feature-dev           # Short flag
 
 **Flags:**
 
-| Flag | Description |
-|------|-------------|
+| Flag               | Description                                          |
+| ------------------ | ---------------------------------------------------- |
 | `--template`, `-t` | Team template name (see `shipwright templates list`) |
 
 ### `shipwright status`
@@ -91,17 +91,17 @@ shipwright loop "<goal>" [flags]
 
 **Flags:**
 
-| Flag | Description | Default |
-|------|-------------|---------|
-| `--test-cmd <cmd>` | Test command for verification | auto-detected |
-| `--audit` | Self-reflection after each iteration | off |
-| `--audit-agent` | Dedicated auditor agent | off |
-| `--quality-gates` | Run tests as gates between iterations | off |
-| `--definition-of-done <file>` | Completion checklist | none |
-| `--agents <n>` | Number of agents | 1 |
-| `--max-iterations <n>` | Maximum iterations | 10 |
-| `--model <model>` | Claude model | default |
-| `--resume` | Resume interrupted loop | — |
+| Flag                          | Description                           | Default       |
+| ----------------------------- | ------------------------------------- | ------------- |
+| `--test-cmd <cmd>`            | Test command for verification         | auto-detected |
+| `--audit`                     | Self-reflection after each iteration  | off           |
+| `--audit-agent`               | Dedicated auditor agent               | off           |
+| `--quality-gates`             | Run tests as gates between iterations | off           |
+| `--definition-of-done <file>` | Completion checklist                  | none          |
+| `--agents <n>`                | Number of agents                      | 1             |
+| `--max-iterations <n>`        | Maximum iterations                    | 10            |
+| `--model <model>`             | Claude model                          | default       |
+| `--resume`                    | Resume interrupted loop               | —             |
 
 **Examples:**
 
@@ -126,16 +126,16 @@ shipwright pipeline start [flags]
 
 **Flags:**
 
-| Flag | Description |
-|------|-------------|
-| `--goal <text>` | Goal description |
-| `--issue <number>` | GitHub issue number |
+| Flag                    | Description                                                  |
+| ----------------------- | ------------------------------------------------------------ |
+| `--goal <text>`         | Goal description                                             |
+| `--issue <number>`      | GitHub issue number                                          |
 | `--pipeline <template>` | Pipeline template (standard, fast, full, hotfix, autonomous) |
-| `--test-cmd <cmd>` | Override auto-detected test command |
-| `--agents <n>` | Number of build agents |
-| `--self-heal <n>` | Max self-healing cycles |
-| `--skip-gates` | Auto-approve all gates |
-| `--slack-webhook <url>` | Slack notification webhook |
+| `--test-cmd <cmd>`      | Override auto-detected test command                          |
+| `--agents <n>`          | Number of build agents                                       |
+| `--self-heal <n>`       | Max self-healing cycles                                      |
+| `--skip-gates`          | Auto-approve all gates                                       |
+| `--slack-webhook <url>` | Slack notification webhook                                   |
 
 ### `shipwright pipeline resume`
 
@@ -185,38 +185,38 @@ See [Delivery Pipeline guide](/guides/pipeline/) for details.
 
 Background daemon for autonomous issue processing with intelligent triage, adaptive templates, and self-optimizing metrics.
 
-| Subcommand | Description |
-|------------|-------------|
-| `shipwright daemon init` | Initialize daemon configuration |
-| `shipwright daemon start` | Start background daemon |
-| `shipwright daemon stop` | Stop daemon |
-| `shipwright daemon status` | Show daemon status and active pipelines |
-| `shipwright daemon metrics` | DORA/DX metrics dashboard |
-| `shipwright daemon logs` | View daemon logs |
-| `shipwright daemon triage` | Show issue triage scores and priority |
-| `shipwright daemon patrol` | Run proactive codebase patrol |
+| Subcommand                  | Description                             |
+| --------------------------- | --------------------------------------- |
+| `shipwright daemon init`    | Initialize daemon configuration         |
+| `shipwright daemon start`   | Start background daemon                 |
+| `shipwright daemon stop`    | Stop daemon                             |
+| `shipwright daemon status`  | Show daemon status and active pipelines |
+| `shipwright daemon metrics` | DORA/DX metrics dashboard               |
+| `shipwright daemon logs`    | View daemon logs                        |
+| `shipwright daemon triage`  | Show issue triage scores and priority   |
+| `shipwright daemon patrol`  | Run proactive codebase patrol           |
 
 **Start flags:**
 
-| Flag | Description | Default |
-|------|-------------|---------|
-| `--config <path>` | Path to daemon-config.json | `.claude/daemon-config.json` |
-| `--detach`, `-d` | Run in a detached tmux session | off |
-| `--no-github` | Disable GitHub API calls (dry-run mode) | off |
+| Flag              | Description                             | Default                      |
+| ----------------- | --------------------------------------- | ---------------------------- |
+| `--config <path>` | Path to daemon-config.json              | `.claude/daemon-config.json` |
+| `--detach`, `-d`  | Run in a detached tmux session          | off                          |
+| `--no-github`     | Disable GitHub API calls (dry-run mode) | off                          |
 
 **Metrics flags:**
 
-| Flag | Description | Default |
-|------|-------------|---------|
-| `--period <days>` | Reporting period | 7 |
-| `--json` | JSON output | off |
+| Flag              | Description      | Default |
+| ----------------- | ---------------- | ------- |
+| `--period <days>` | Reporting period | 7       |
+| `--json`          | JSON output      | off     |
 
 **Patrol flags:**
 
-| Flag | Description | Default |
-|------|-------------|---------|
-| `--once` | Run patrol once and exit | off |
-| `--dry-run` | Show findings without creating issues | off |
+| Flag        | Description                           | Default |
+| ----------- | ------------------------------------- | ------- |
+| `--once`    | Run patrol once and exit              | off     |
+| `--dry-run` | Show findings without creating issues | off     |
 
 **Examples:**
 
@@ -244,21 +244,21 @@ See [Autonomous Daemon guide](/guides/daemon/) for details.
 
 Multi-repo daemon orchestrator. Spawn daemons across repositories, view a fleet-wide dashboard, and aggregate DORA metrics.
 
-| Subcommand | Description |
-|------------|-------------|
-| `shipwright fleet init` | Generate fleet-config.json (auto-detects sibling repos) |
-| `shipwright fleet start` | Start daemons for all configured repos |
-| `shipwright fleet stop` | Stop all fleet daemons |
-| `shipwright fleet status` | Show fleet dashboard (per-repo status) |
-| `shipwright fleet metrics` | Aggregate DORA metrics across repos |
+| Subcommand                 | Description                                             |
+| -------------------------- | ------------------------------------------------------- |
+| `shipwright fleet init`    | Generate fleet-config.json (auto-detects sibling repos) |
+| `shipwright fleet start`   | Start daemons for all configured repos                  |
+| `shipwright fleet stop`    | Stop all fleet daemons                                  |
+| `shipwright fleet status`  | Show fleet dashboard (per-repo status)                  |
+| `shipwright fleet metrics` | Aggregate DORA metrics across repos                     |
 
 **Flags:**
 
-| Flag | Description | Default |
-|------|-------------|---------|
-| `--config <path>` | Path to fleet-config.json | `.claude/fleet-config.json` |
-| `--period <days>` | Reporting period for metrics | 7 |
-| `--json` | JSON output for metrics | off |
+| Flag              | Description                  | Default                     |
+| ----------------- | ---------------------------- | --------------------------- |
+| `--config <path>` | Path to fleet-config.json    | `.claude/fleet-config.json` |
+| `--period <days>` | Reporting period for metrics | 7                           |
+| `--json`          | JSON output for metrics      | off                         |
 
 **Examples:**
 
@@ -285,16 +285,16 @@ shipwright fix "<goal>" [flags]
 
 **Flags:**
 
-| Flag | Description | Default |
-|------|-------------|---------|
-| `--repos <dir1,dir2,...>` | Comma-separated repo paths | — |
-| `--repos-from <file>` | Read repo paths from file (one per line) | — |
-| `--pipeline <template>` | Pipeline template | `fast` |
-| `--model <model>` | Claude model | auto |
-| `--max-parallel <n>` | Max concurrent pipelines | 3 |
-| `--branch-prefix <prefix>` | Branch name prefix | `fix/` |
-| `--dry-run` | Show what would happen without executing | off |
-| `--status` | Show running fix sessions | — |
+| Flag                       | Description                              | Default |
+| -------------------------- | ---------------------------------------- | ------- |
+| `--repos <dir1,dir2,...>`  | Comma-separated repo paths               | —       |
+| `--repos-from <file>`      | Read repo paths from file (one per line) | —       |
+| `--pipeline <template>`    | Pipeline template                        | `fast`  |
+| `--model <model>`          | Claude model                             | auto    |
+| `--max-parallel <n>`       | Max concurrent pipelines                 | 3       |
+| `--branch-prefix <prefix>` | Branch name prefix                       | `fix/`  |
+| `--dry-run`                | Show what would happen without executing | off     |
+| `--status`                 | Show running fix sessions                | —       |
 
 **Examples:**
 
@@ -313,26 +313,26 @@ See [Bulk Fix guide](/guides/fix/) for details.
 
 Persistent learning and context system. Captures pipeline learnings, failure patterns, and design decisions per repository with cross-repo global memory.
 
-| Subcommand | Description |
-|------------|-------------|
-| `shipwright memory show` | Display memory for current repo |
-| `shipwright memory show --global` | Display cross-repo learnings |
-| `shipwright memory search <keyword>` | Search memory for a keyword |
-| `shipwright memory stats` | Show memory size, age, and hit rate |
-| `shipwright memory export` | Export memory as JSON |
-| `shipwright memory import <file>` | Import memory from JSON |
-| `shipwright memory forget --all` | Clear memory for current repo |
+| Subcommand                           | Description                         |
+| ------------------------------------ | ----------------------------------- |
+| `shipwright memory show`             | Display memory for current repo     |
+| `shipwright memory show --global`    | Display cross-repo learnings        |
+| `shipwright memory search <keyword>` | Search memory for a keyword         |
+| `shipwright memory stats`            | Show memory size, age, and hit rate |
+| `shipwright memory export`           | Export memory as JSON               |
+| `shipwright memory import <file>`    | Import memory from JSON             |
+| `shipwright memory forget --all`     | Clear memory for current repo       |
 
 **Pipeline integration commands** (called automatically by pipelines):
 
-| Subcommand | Description |
-|------------|-------------|
-| `shipwright memory capture <state> <artifacts>` | Capture pipeline learnings |
-| `shipwright memory inject <stage_id>` | Inject context for a pipeline stage |
-| `shipwright memory pattern <type> [data]` | Record a codebase pattern |
-| `shipwright memory metric <name> <value>` | Update a performance baseline |
-| `shipwright memory decision <type> <summary>` | Record a design decision |
-| `shipwright memory analyze-failure <log> <stage>` | Analyze failure root cause via AI |
+| Subcommand                                        | Description                         |
+| ------------------------------------------------- | ----------------------------------- |
+| `shipwright memory capture <state> <artifacts>`   | Capture pipeline learnings          |
+| `shipwright memory inject <stage_id>`             | Inject context for a pipeline stage |
+| `shipwright memory pattern <type> [data]`         | Record a codebase pattern           |
+| `shipwright memory metric <name> <value>`         | Update a performance baseline       |
+| `shipwright memory decision <type> <summary>`     | Record a design decision            |
+| `shipwright memory analyze-failure <log> <stage>` | Analyze failure root cause via AI   |
 
 **Examples:**
 
@@ -354,36 +354,36 @@ See [Memory guide](/guides/memory/) for details.
 
 Token usage tracking, budget enforcement, and spending analysis.
 
-| Subcommand | Description |
-|------------|-------------|
-| `shipwright cost show` | Show cost summary for current period |
-| `shipwright cost budget set <amount>` | Set daily budget (USD) |
-| `shipwright cost budget show` | Show current budget and usage |
+| Subcommand                            | Description                          |
+| ------------------------------------- | ------------------------------------ |
+| `shipwright cost show`                | Show cost summary for current period |
+| `shipwright cost budget set <amount>` | Set daily budget (USD)               |
+| `shipwright cost budget show`         | Show current budget and usage        |
 
 **Show flags:**
 
-| Flag | Description | Default |
-|------|-------------|---------|
-| `--period <days>` | Reporting period | 7 |
-| `--json` | JSON output | off |
-| `--by-stage` | Breakdown by pipeline stage | off |
-| `--by-issue` | Breakdown by issue | off |
+| Flag              | Description                 | Default |
+| ----------------- | --------------------------- | ------- |
+| `--period <days>` | Reporting period            | 7       |
+| `--json`          | JSON output                 | off     |
+| `--by-stage`      | Breakdown by pipeline stage | off     |
+| `--by-issue`      | Breakdown by issue          | off     |
 
 **Pipeline integration commands** (called automatically by pipelines):
 
-| Subcommand | Description |
-|------------|-------------|
-| `shipwright cost record <in> <out> <model> <stage> [issue]` | Record token usage |
-| `shipwright cost calculate <in> <out> <model>` | Calculate cost without recording |
-| `shipwright cost check-budget [estimated_usd]` | Check budget before starting |
+| Subcommand                                                  | Description                      |
+| ----------------------------------------------------------- | -------------------------------- |
+| `shipwright cost record <in> <out> <model> <stage> [issue]` | Record token usage               |
+| `shipwright cost calculate <in> <out> <model>`              | Calculate cost without recording |
+| `shipwright cost check-budget [estimated_usd]`              | Check budget before starting     |
 
 **Model pricing (USD per 1M tokens):**
 
-| Model | Input | Output |
-|-------|-------|--------|
-| opus | $15.00 | $75.00 |
-| sonnet | $3.00 | $15.00 |
-| haiku | $0.25 | $1.25 |
+| Model  | Input  | Output |
+| ------ | ------ | ------ |
+| opus   | $15.00 | $75.00 |
+| sonnet | $3.00  | $15.00 |
+| haiku  | $0.25  | $1.25  |
 
 **Examples:**
 
@@ -409,13 +409,13 @@ shipwright prep [flags]
 
 **Flags:**
 
-| Flag | Description |
-|------|-------------|
-| `--dry-run` | Preview without writing files |
-| `--path <dir>` | Target directory |
-| `--force` | Overwrite existing configs |
-| `--no-hooks` | Skip hook generation |
-| `--no-claude-md` | Skip CLAUDE.md generation |
+| Flag             | Description                   |
+| ---------------- | ----------------------------- |
+| `--dry-run`      | Preview without writing files |
+| `--path <dir>`   | Target directory              |
+| `--force`        | Overwrite existing configs    |
+| `--no-hooks`     | Skip hook generation          |
+| `--no-claude-md` | Skip CLAUDE.md generation     |
 
 See [Repo Preparation guide](/guides/prep/) for details.
 
@@ -460,3 +460,102 @@ Browse team templates.
 shipwright templates list              # List all templates
 shipwright templates show <name>       # Show template details
 ```
+
+## Dashboard
+
+### `shipwright dashboard`
+
+Real-time web dashboard for monitoring pipelines, agents, and daemon status.
+
+```bash
+shipwright dashboard              # Start dashboard (foreground)
+shipwright dashboard start        # Start in background
+shipwright dashboard stop         # Stop background dashboard
+```
+
+Requires [Bun](https://bun.sh) runtime. The dashboard server runs on port 3000 and uses WebSockets for real-time updates.
+
+## Heartbeats
+
+### `shipwright heartbeat`
+
+Agent liveness monitoring. Heartbeats are written automatically by pipeline agents and checked by the daemon for stale job detection.
+
+| Subcommand                            | Description                      |
+| ------------------------------------- | -------------------------------- |
+| `shipwright heartbeat list`           | Show all active heartbeats       |
+| `shipwright heartbeat check <job-id>` | Check if a specific job is alive |
+| `shipwright heartbeat clear`          | Remove stale heartbeats          |
+
+Heartbeat files are stored at `~/.claude-teams/heartbeats/<job-id>.json`.
+
+## Checkpoints
+
+### `shipwright checkpoint`
+
+Save and restore pipeline state for resilience and recovery.
+
+| Subcommand                             | Description                 |
+| -------------------------------------- | --------------------------- |
+| `shipwright checkpoint list`           | List saved checkpoints      |
+| `shipwright checkpoint save [name]`    | Save current pipeline state |
+| `shipwright checkpoint restore <name>` | Restore from a checkpoint   |
+
+Checkpoints are stored in `.claude/pipeline-artifacts/checkpoints/`.
+
+## Remote Machines
+
+### `shipwright remote`
+
+Manage distributed worker machines for scaling pipeline execution across multiple hosts.
+
+| Subcommand                                | Description               |
+| ----------------------------------------- | ------------------------- |
+| `shipwright remote list`                  | Show registered machines  |
+| `shipwright remote add <name> --host <h>` | Register a worker machine |
+| `shipwright remote remove <name>`         | Unregister a machine      |
+| `shipwright remote status`                | Health check all machines |
+
+**Add flags:**
+
+| Flag                | Description                       | Default      |
+| ------------------- | --------------------------------- | ------------ |
+| `--host <hostname>` | Machine hostname or IP            | required     |
+| `--path <path>`     | Shipwright install path on remote | required     |
+| `--user <user>`     | SSH user                          | current user |
+| `--max-workers <n>` | Max concurrent workers            | 4            |
+
+Machine registry is stored at `~/.claude-teams/machines.json`.
+
+See [Advanced Features](/reference/advanced/) for details.
+
+## Issue Tracking
+
+### `shipwright tracker`
+
+Generic issue tracker integration that routes to provider-specific implementations.
+
+```bash
+shipwright tracker config         # Show tracker configuration
+shipwright tracker notify <event> <issue> <data>   # Send event to tracker
+```
+
+### `shipwright linear`
+
+Linear issue tracker integration for bidirectional sync between pipelines and Linear issues.
+
+```bash
+shipwright linear setup           # Configure Linear integration
+shipwright linear sync <issue>    # Sync issue status to Linear
+```
+
+### `shipwright jira`
+
+Jira issue tracker integration.
+
+```bash
+shipwright jira setup             # Configure Jira integration
+shipwright jira sync <issue>      # Sync issue status to Jira
+```
+
+Configuration is stored at `~/.claude-teams/tracker-config.json`. See [Issue Tracking guide](/guides/tracking/) for setup instructions.

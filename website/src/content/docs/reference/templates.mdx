@@ -1,9 +1,9 @@
 ---
 title: Templates
-description: 12 team templates and 8 pipeline templates — from feature development to autonomous deployment.
+description: 24 team templates and 8 pipeline templates — from feature development to autonomous deployment.
 ---
 
-Shipwright includes **12 team templates** organized by SDLC phase and **8 pipeline templates** for different delivery strategies. Team templates define agent roles, focus areas, and file ownership. Pipeline templates define which stages run and how they're gated.
+Shipwright includes **24 team templates** organized by SDLC phase and **8 pipeline templates** for different delivery strategies. Team templates define agent roles, focus areas, and file ownership. Pipeline templates define which stages run and how they're gated.
 
 Browse team templates with `shipwright templates list` and pipeline templates with `shipwright pipeline list`.
 
@@ -17,21 +17,21 @@ Team templates define agent roles, their focus areas, and the files they should 
 
 ### Feature Development (`feature-dev`) — 3 agents
 
-| Agent | Focus | Example Files |
-|-------|-------|---------------|
-| **backend** | API routes, services, data layer | `src/api/`, `src/services/` |
-| **frontend** | UI components, state, styling | `apps/web/src/` |
-| **tests** | Unit tests, integration tests | `*.test.ts` |
+| Agent        | Focus                            | Example Files               |
+| ------------ | -------------------------------- | --------------------------- |
+| **backend**  | API routes, services, data layer | `src/api/`, `src/services/` |
+| **frontend** | UI components, state, styling    | `apps/web/src/`             |
+| **tests**    | Unit tests, integration tests    | `*.test.ts`                 |
 
 **Best for:** Multi-layer features where frontend, backend, and tests can be developed in parallel.
 
 ### Full-Stack (`full-stack`) — 3 agents
 
-| Agent | Focus | Example Files |
-|-------|-------|---------------|
-| **api** | REST/GraphQL endpoints, middleware, auth | `src/api/`, `src/routes/` |
-| **database** | Schema, migrations, queries, models | `migrations/`, `prisma/` |
-| **ui** | Pages, components, forms, styling | `apps/web/`, `src/components/` |
+| Agent        | Focus                                    | Example Files                  |
+| ------------ | ---------------------------------------- | ------------------------------ |
+| **api**      | REST/GraphQL endpoints, middleware, auth | `src/api/`, `src/routes/`      |
+| **database** | Schema, migrations, queries, models      | `migrations/`, `prisma/`       |
+| **ui**       | Pages, components, forms, styling        | `apps/web/`, `src/components/` |
 
 **Best for:** Features that span the entire stack from database to UI.
 
@@ -39,31 +39,31 @@ Team templates define agent roles, their focus areas, and the files they should 
 
 ### Code Review (`code-review`) — 3 agents
 
-| Agent | Focus | What It Checks |
-|-------|-------|----------------|
-| **code-quality** | Logic, patterns, architecture | Bugs, code smells, layer violations |
-| **security** | Error handling, injection, auth | OWASP top 10, silent failures |
-| **test-coverage** | Test completeness, edge cases | Missing tests, weak assertions |
+| Agent             | Focus                           | What It Checks                      |
+| ----------------- | ------------------------------- | ----------------------------------- |
+| **code-quality**  | Logic, patterns, architecture   | Bugs, code smells, layer violations |
+| **security**      | Error handling, injection, auth | OWASP top 10, silent failures       |
+| **test-coverage** | Test completeness, edge cases   | Missing tests, weak assertions      |
 
 **Best for:** Thorough review of PRs or feature branches.
 
 ### Security Audit (`security-audit`) — 3 agents
 
-| Agent | Focus | What It Checks |
-|-------|-------|----------------|
-| **code-analysis** | SAST: injection, auth, XSS, CSRF | Source code vulnerabilities |
-| **dependencies** | CVEs, outdated packages, licenses | Supply chain risks |
-| **config-review** | Secrets, CORS, CSP, env config | Infrastructure security |
+| Agent             | Focus                             | What It Checks              |
+| ----------------- | --------------------------------- | --------------------------- |
+| **code-analysis** | SAST: injection, auth, XSS, CSRF  | Source code vulnerabilities |
+| **dependencies**  | CVEs, outdated packages, licenses | Supply chain risks          |
+| **config-review** | Secrets, CORS, CSP, env config    | Infrastructure security     |
 
 **Best for:** Pre-release security reviews and compliance checks.
 
 ### Comprehensive Testing (`testing`) — 3 agents
 
-| Agent | Focus | What It Covers |
-|-------|-------|----------------|
-| **unit-tests** | Functions, classes, modules | Isolated unit tests |
+| Agent                 | Focus                               | What It Covers        |
+| --------------------- | ----------------------------------- | --------------------- |
+| **unit-tests**        | Functions, classes, modules         | Isolated unit tests   |
 | **integration-tests** | API endpoints, service interactions | Cross-component tests |
-| **e2e-tests** | User flows, UI interactions | Full system tests |
+| **e2e-tests**         | User flows, UI interactions         | Full system tests     |
 
 **Best for:** Test coverage campaigns and test suite creation.
 
@@ -71,30 +71,30 @@ Team templates define agent roles, their focus areas, and the files they should 
 
 ### Bug Fix (`bug-fix`) — 3 agents
 
-| Agent | Focus | What It Does |
-|-------|-------|--------------|
-| **reproducer** | Write failing test, trace root cause | Proves the bug exists |
-| **fixer** | Fix source code, handle edge cases | Implements the fix |
-| **verifier** | Regression check, review changes | Ensures nothing else breaks |
+| Agent          | Focus                                | What It Does                |
+| -------------- | ------------------------------------ | --------------------------- |
+| **reproducer** | Write failing test, trace root cause | Proves the bug exists       |
+| **fixer**      | Fix source code, handle edge cases   | Implements the fix          |
+| **verifier**   | Regression check, review changes     | Ensures nothing else breaks |
 
 **Best for:** Complex bugs that need reproduction, fix, and verification.
 
 ### Refactoring (`refactor`) — 2 agents
 
-| Agent | Focus | What It Does |
-|-------|-------|--------------|
-| **refactor** | Source code changes | Rename, restructure, extract |
+| Agent         | Focus                | What It Does                      |
+| ------------- | -------------------- | --------------------------------- |
+| **refactor**  | Source code changes  | Rename, restructure, extract      |
 | **consumers** | Tests and dependents | Update imports, fix tests, verify |
 
 **Best for:** Large-scale code transformations with strict file ownership.
 
 ### Migration (`migration`) — 3 agents
 
-| Agent | Focus | What It Does |
-|-------|-------|--------------|
-| **schema** | Migration scripts, data transforms | Write the migration |
-| **adapter** | Update app code, queries, models | Adapt to new schema |
-| **rollback** | Rollback scripts, backward compat | Verify safe reversal |
+| Agent        | Focus                              | What It Does         |
+| ------------ | ---------------------------------- | -------------------- |
+| **schema**   | Migration scripts, data transforms | Write the migration  |
+| **adapter**  | Update app code, queries, models   | Adapt to new schema  |
+| **rollback** | Rollback scripts, backward compat  | Verify safe reversal |
 
 **Best for:** Database migrations and schema changes that need forward and rollback paths.
 
@@ -102,18 +102,18 @@ Team templates define agent roles, their focus areas, and the files they should 
 
 ### Architecture (`architecture`) — 2 agents
 
-| Agent | Focus | What It Does |
-|-------|-------|--------------|
-| **researcher** | Analyze code, trace deps, evaluate trade-offs | Deep codebase analysis |
-| **spec-writer** | ADRs, design docs, interface contracts | Write technical specs |
+| Agent           | Focus                                         | What It Does           |
+| --------------- | --------------------------------------------- | ---------------------- |
+| **researcher**  | Analyze code, trace deps, evaluate trade-offs | Deep codebase analysis |
+| **spec-writer** | ADRs, design docs, interface contracts        | Write technical specs  |
 
 **Best for:** Pre-implementation research and architecture decision records.
 
 ### Exploration (`exploration`) — 2 agents
 
-| Agent | Focus | What It Does |
-|-------|-------|--------------|
-| **explorer** | Deep-dive code, trace execution paths | Map the codebase |
+| Agent           | Focus                                 | What It Does     |
+| --------------- | ------------------------------------- | ---------------- |
+| **explorer**    | Deep-dive code, trace execution paths | Map the codebase |
 | **synthesizer** | Summarize findings, document patterns | Distill insights |
 
 **Best for:** Onboarding onto unfamiliar codebases and understanding complex systems.
@@ -122,21 +122,143 @@ Team templates define agent roles, their focus areas, and the files they should 
 
 ### DevOps (`devops`) — 2 agents
 
-| Agent | Focus | What It Does |
-|-------|-------|--------------|
-| **pipeline** | CI/CD workflows, build, deploy | GitHub Actions, Jenkins, etc. |
-| **infrastructure** | Docker, Terraform, K8s, env config | Infrastructure as code |
+| Agent              | Focus                              | What It Does                  |
+| ------------------ | ---------------------------------- | ----------------------------- |
+| **pipeline**       | CI/CD workflows, build, deploy     | GitHub Actions, Jenkins, etc. |
+| **infrastructure** | Docker, Terraform, K8s, env config | Infrastructure as code        |
 
 **Best for:** CI/CD setup, deployment automation, and infrastructure changes.
 
 ### Documentation (`documentation`) — 2 agents
 
-| Agent | Focus | What It Does |
-|-------|-------|--------------|
+| Agent        | Focus                                 | What It Does           |
+| ------------ | ------------------------------------- | ---------------------- |
 | **api-docs** | API reference, OpenAPI spec, examples | Endpoint documentation |
-| **guides** | Tutorials, README, architecture docs | User-facing docs |
+| **guides**   | Tutorials, README, architecture docs  | User-facing docs       |
 
 **Best for:** Documentation sprints and API reference generation.
+
+## Specialized Phase
+
+### Accessibility (`accessibility`) — 3 agents
+
+| Agent        | Focus                                               | Example Files                        |
+| ------------ | --------------------------------------------------- | ------------------------------------ |
+| **auditor**  | WCAG compliance, a11y testing, screen reader checks | `src/components/`, `*.tsx`, `*.html` |
+| **fixer**    | Fix a11y issues, add ARIA attributes, keyboard nav  | `src/components/`, `*.css`           |
+| **verifier** | Verify fixes, run a11y test suite                   | `*.test.*`, `e2e/`, `cypress/`       |
+
+**Best for:** Accessibility audits and WCAG compliance remediation.
+
+### API Design (`api-design`) — 3 agents
+
+| Agent           | Focus                                         | Example Files                      |
+| --------------- | --------------------------------------------- | ---------------------------------- |
+| **designer**    | OpenAPI specs, GraphQL schemas, API contracts | `*.yaml`, `*.graphql`, `docs/api/` |
+| **implementer** | API endpoints, middleware, controllers        | `src/api/`, `src/routes/`          |
+| **consumer**    | Client SDKs, examples, integration tests      | `sdk/`, `examples/`, `*.test.*`    |
+
+**Best for:** API-first development with spec, implementation, and client generation.
+
+### Compliance (`compliance`) — 3 agents
+
+| Agent          | Focus                                             | Example Files                        |
+| -------------- | ------------------------------------------------- | ------------------------------------ |
+| **scanner**    | License scanning, dependency audit, policy checks | `package.json`, `*.lock`, `LICENSE`  |
+| **remediator** | Fix compliance violations, update licenses        | `src/`, `LICENSE`, `NOTICE`          |
+| **documenter** | Compliance documentation, security policies       | `docs/`, `SECURITY.md`, `PRIVACY.md` |
+
+**Best for:** Regulatory compliance, license auditing, and policy documentation.
+
+### Data Pipeline (`data-pipeline`) — 3 agents
+
+| Agent           | Focus                                  | Example Files                         |
+| --------------- | -------------------------------------- | ------------------------------------- |
+| **extractor**   | Data sources, connectors, ingestion    | `src/extract/`, `src/connectors/`     |
+| **transformer** | Data models, validation, SQL/dbt       | `src/transform/`, `sql/`, `dbt/`      |
+| **loader**      | Data sinks, destinations, verification | `src/load/`, `src/sinks/`, `*.test.*` |
+
+**Best for:** ETL/ELT pipeline development with extract, transform, and load separation.
+
+### Debt Paydown (`debt-paydown`) — 3 agents
+
+| Agent          | Focus                                   | Example Files                    |
+| -------------- | --------------------------------------- | -------------------------------- |
+| **analyzer**   | Identify tech debt, complexity hotspots | `src/`, `package.json`, `*.lock` |
+| **refactorer** | Reduce debt, simplify code, update deps | `src/`, `lib/`, `apps/`          |
+| **reviewer**   | Verify improvements, run test suite     | `*.test.*`, `*.spec.*`           |
+
+**Best for:** Systematic technical debt reduction campaigns.
+
+### Internationalization (`i18n`) — 3 agents
+
+| Agent          | Focus                                                | Example Files                       |
+| -------------- | ---------------------------------------------------- | ----------------------------------- |
+| **extractor**  | Find hardcoded strings, extract to locale files      | `src/components/`, `*.tsx`, `*.vue` |
+| **translator** | Translation setup, locale management                 | `src/locales/`, `translations/`     |
+| **verifier**   | Verify all strings translated, test locale switching | `*.test.*`, `e2e/`                  |
+
+**Best for:** Adding internationalization support to an existing application.
+
+### Incident Response (`incident-response`) — 3 agents
+
+| Agent            | Focus                                  | Example Files              |
+| ---------------- | -------------------------------------- | -------------------------- |
+| **investigator** | Root cause analysis, log investigation | `src/`, `logs/`, `config/` |
+| **fixer**        | Implement fix, add safeguards          | `src/`, `lib/`             |
+| **postmortem**   | Write postmortem, add monitoring       | `docs/`, `src/monitoring/` |
+
+**Best for:** Production incident investigation, fix, and postmortem documentation.
+
+### Observability (`observability`) — 3 agents
+
+| Agent            | Focus                                   | Example Files                           |
+| ---------------- | --------------------------------------- | --------------------------------------- |
+| **instrumenter** | Add metrics, traces, structured logging | `src/`, `src/middleware/`               |
+| **dashboarder**  | Monitoring dashboards, alert rules      | `monitoring/`, `dashboards/`, `alerts/` |
+| **validator**    | Verify instrumentation, test alerts     | `*.test.*`, `monitoring/tests/`         |
+
+**Best for:** Adding monitoring, tracing, and alerting to services.
+
+### Onboarding (`onboarding`) — 3 agents
+
+| Agent        | Focus                                       | Example Files                           |
+| ------------ | ------------------------------------------- | --------------------------------------- |
+| **auditor**  | Audit DX, README quality, setup friction    | `README.md`, `Makefile`, `scripts/`     |
+| **improver** | Improve docs, scripts, developer experience | `docs/`, `README.md`, `CONTRIBUTING.md` |
+| **tester**   | Test setup flow, verify scripts work        | `scripts/`, `Makefile`, `*.test.*`      |
+
+**Best for:** Improving developer onboarding experience and documentation.
+
+### Performance (`performance`) — 3 agents
+
+| Agent         | Focus                                            | Example Files                       |
+| ------------- | ------------------------------------------------ | ----------------------------------- |
+| **profiler**  | Benchmarks, profiling, bottleneck identification | `*.bench.*`, `*.perf.*`, `scripts/` |
+| **optimizer** | Optimize hot paths, reduce allocations           | `src/`, `lib/`                      |
+| **validator** | Verify improvements, regression testing          | `*.test.*`, `*.bench.*`             |
+
+**Best for:** Performance optimization with profiling, fixing, and verification.
+
+### Release (`release`) — 3 agents
+
+| Agent         | Focus                                         | Example Files                           |
+| ------------- | --------------------------------------------- | --------------------------------------- |
+| **preparer**  | Version bumps, changelog, release notes       | `package.json`, `CHANGELOG.md`          |
+| **validator** | Release testing, smoke tests, CI verification | `*.test.*`, `e2e/`, `scripts/`          |
+| **announcer** | Release docs, migration guides                | `docs/`, `CHANGELOG.md`, `UPGRADING.md` |
+
+**Best for:** Release management with preparation, validation, and documentation.
+
+### Spike (`spike`) — 3 agents
+
+| Agent          | Focus                                       | Example Files                  |
+| -------------- | ------------------------------------------- | ------------------------------ |
+| **researcher** | Technology evaluation, feasibility research | `docs/`, `package.json`        |
+| **prototyper** | Build proof of concept, experiment          | `spike/`, `prototype/`, `src/` |
+| **evaluator**  | Evaluate results, write recommendations     | `docs/`, `*.md`                |
+
+**Best for:** Time-boxed technical spikes and proof-of-concept development.
 
 ## Pipeline Templates
 
@@ -146,51 +268,52 @@ In addition to team templates, Shipwright includes pipeline templates that defin
 
 The default balanced pipeline.
 
-| Stage | Gate | Notes |
-|-------|------|-------|
+| Stage                                                         | Gate | Notes                           |
+| ------------------------------------------------------------- | ---- | ------------------------------- |
 | intake → plan → build → test → review → compound_quality → pr | auto | Standard stages with auto-gates |
 
 ### Fast (`fast`)
 
 Minimal pipeline for quick changes.
 
-| Stage | Gate | Notes |
-|-------|------|-------|
+| Stage                      | Gate | Notes                                    |
+| -------------------------- | ---- | ---------------------------------------- |
 | intake → build → test → pr | auto | Skips plan, review, and compound quality |
 
 ### Full (`full`)
 
 Maximum thoroughness with all stages enabled.
 
-| Stage | Gate | Notes |
-|-------|------|-------|
+| Stage                                                                  | Gate    | Notes                      |
+| ---------------------------------------------------------------------- | ------- | -------------------------- |
 | intake → plan → design → build → test → review → compound_quality → pr | approve | All stages, approval gates |
 
 ### Hotfix (`hotfix`)
 
 Emergency pipeline for critical fixes.
 
-| Stage | Gate | Notes |
-|-------|------|-------|
+| Stage                      | Gate | Notes                 |
+| -------------------------- | ---- | --------------------- |
 | intake → build → test → pr | auto | Fast path, auto-gates |
 
 ### Autonomous (`autonomous`)
 
 Fully autonomous — no human gates.
 
-| Stage | Gate | Notes |
-|-------|------|-------|
+| Stage                                                                  | Gate | Notes                    |
+| ---------------------------------------------------------------------- | ---- | ------------------------ |
 | intake → plan → design → build → test → review → compound_quality → pr | auto | All stages auto-approved |
 
 ### Deployed (`deployed`)
 
 Full autonomous pipeline extended with deploy, validate, and monitor stages. Generated by `shipwright init --deploy`.
 
-| Stage | Gate | Notes |
-|-------|------|-------|
+| Stage                                                                                                        | Gate                        | Notes                                                                                           |
+| ------------------------------------------------------------------------------------------------------------ | --------------------------- | ----------------------------------------------------------------------------------------------- |
 | intake → plan → design → build → test → review → compound_quality → pr → merge → deploy → validate → monitor | deploy: approve, rest: auto | Deploy requires approval; merge auto-squashes; monitor watches for 5 minutes with auto-rollback |
 
 Key config:
+
 - `merge` — squash merge with CI wait (600s timeout), auto-delete branch
 - `deploy` — staging and production commands with rollback
 - `validate` — smoke test command and health URL check
@@ -200,11 +323,12 @@ Key config:
 
 Maximum safety — all stages, all gates on `approve`, strict quality, auto-rollback.
 
-| Stage | Gate | Notes |
-|-------|------|-------|
+| Stage                                                                                                        | Gate         | Notes                         |
+| ------------------------------------------------------------------------------------------------------------ | ------------ | ----------------------------- |
 | intake → plan → design → build → test → review → compound_quality → pr → merge → deploy → validate → monitor | all: approve | Every stage requires approval |
 
 Key config:
+
 - `test` — 90% minimum coverage
 - `compound_quality` — adversarial + negative + e2e + DoD audit, 5 max cycles, strict quality enabled
 - `pr` — waits for CI to pass
@@ -215,16 +339,17 @@ Key config:
 
 Cost-optimized pipeline with intelligent model routing, per-stage cost tracking, and budget enforcement.
 
-| Stage | Gate | Model | Notes |
-|-------|------|-------|-------|
-| intake | auto | haiku | Cheap model for intake |
-| plan | approve | sonnet | Mid-tier for planning |
-| build | auto | sonnet | Aborts if budget exceeded |
-| test | auto | haiku | Cheap model for test analysis |
-| review | approve | opus | Best model for code review |
-| pr | approve | haiku | Cheap model for PR creation |
+| Stage  | Gate    | Model  | Notes                         |
+| ------ | ------- | ------ | ----------------------------- |
+| intake | auto    | haiku  | Cheap model for intake        |
+| plan   | approve | sonnet | Mid-tier for planning         |
+| build  | auto    | sonnet | Aborts if budget exceeded     |
+| test   | auto    | haiku  | Cheap model for test analysis |
+| review | approve | opus   | Best model for code review    |
+| pr     | approve | haiku  | Cheap model for PR creation   |
 
 Key config:
+
 - `cost_tracking: true` on every stage
 - `abort_on_budget: true` on build stage
 - `budget_check: true` in defaults

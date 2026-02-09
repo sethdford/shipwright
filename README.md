@@ -2,7 +2,7 @@
 
 > Orchestrate autonomous Claude Code agent teams — delivery pipeline, fleet operations, DORA metrics, persistent memory, cost intelligence, and repo preparation.
 
-[![v1.7.0](https://img.shields.io/badge/version-1.7.0-00d4ff?style=flat-square)](https://github.com/sethdford/shipwright/releases) ![tmux dark theme with cyan accents](https://img.shields.io/badge/theme-dark%20blue--gray%20%2B%20cyan-00d4ff?style=flat-square) ![MIT License](https://img.shields.io/badge/license-MIT-green?style=flat-square)
+[![v1.7.1](https://img.shields.io/badge/version-1.7.1-00d4ff?style=flat-square)](https://github.com/sethdford/shipwright/releases) ![tmux dark theme with cyan accents](https://img.shields.io/badge/theme-dark%20blue--gray%20%2B%20cyan-00d4ff?style=flat-square) ![MIT License](https://img.shields.io/badge/license-MIT-green?style=flat-square)
 
 <p align="center">
   <img src="https://vhs.charm.sh/vhs-189lBjHtyH2su8TuxiPQhn.gif" alt="Shipwright CLI demo — version, help, pipeline templates, doctor" width="800" />

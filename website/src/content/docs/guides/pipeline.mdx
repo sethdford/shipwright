@@ -3,60 +3,61 @@ title: Delivery Pipeline
 description: Chain the full SDLC into a single command — from issue intake to PR creation with self-healing builds and GitHub integration.
 ---
 
-import { Tabs, TabItem } from '@astrojs/starlight/components';
+import { Tabs, TabItem } from "@astrojs/starlight/components";
 
 The delivery pipeline (`shipwright pipeline`) automates the entire software development lifecycle. Start from a GitHub issue or a goal description and Shipwright handles planning, building, testing, reviewing, and PR creation.
 
 ## Pipeline Stages
 
 ```
-intake → plan → build → test → review → compound_quality → pr → deploy → validate
+intake → plan → design → build → test → review → compound_quality → pr → merge → deploy → validate → monitor
 ```
 
-Each stage can be enabled/disabled and gated (auto-proceed or pause for approval).
+12 stages, each can be enabled/disabled and gated (auto-proceed or pause for approval).
 
-| Stage | What Happens |
-|-------|-------------|
-| **intake** | Fetch issue metadata from GitHub, or parse the goal description |
-| **plan** | Claude generates an implementation plan |
-| **build** | Delegates to `shipwright loop` for autonomous multi-iteration development |
-| **test** | Run the test suite and collect results |
-| **review** | Claude reviews the changes for quality and correctness |
-| **compound_quality** | Self-healing cycle — if tests fail, re-enter build with error context |
-| **pr** | Create a GitHub PR with labels, milestone, and reviewers |
-| **deploy** | Deploy to staging/production (if configured) |
-| **validate** | Post-deploy validation checks |
+| Stage                | What Happens                                                              |
+| -------------------- | ------------------------------------------------------------------------- |
+| **intake**           | Fetch issue metadata from GitHub, or parse the goal description           |
+| **plan**             | Claude generates an implementation plan with tasks and approach           |
+| **design**           | Design interfaces, data models, and API contracts                         |
+| **build**            | Delegates to `shipwright loop` for autonomous multi-iteration development |
+| **test**             | Run the test suite and validate coverage                                  |
+| **review**           | Claude reviews the changes for quality, security, and correctness         |
+| **compound_quality** | Multi-dimensional quality audit — adversarial, negative, e2e, DoD         |
+| **pr**               | Create a GitHub PR with labels, milestone, and reviewers                  |
+| **merge**            | Auto-merge with CI wait and squash (deployed/enterprise templates)        |
+| **deploy**           | Deploy to staging/production (if configured)                              |
+| **validate**         | Post-deploy smoke tests and health URL checks                             |
+| **monitor**          | Watch for errors post-deploy with auto-rollback                           |
 
 ## Quick Start
 
 <Tabs>
   <TabItem label="From a GitHub Issue">
-    ```bash
-    # Fully autonomous — fetches issue, plans, builds, creates PR
-    shipwright pipeline start --issue 123 --skip-gates
-    ```
+    ```bash # Fully autonomous — fetches issue, plans, builds, creates PR
+    shipwright pipeline start --issue 123 --skip-gates ```
   </TabItem>
   <TabItem label="From a Goal">
-    ```bash
-    shipwright pipeline start --goal "Add JWT authentication"
-    ```
+    ```bash shipwright pipeline start --goal "Add JWT authentication" ```
   </TabItem>
   <TabItem label="Hotfix">
-    ```bash
-    shipwright pipeline start --issue 456 --pipeline hotfix --test-cmd "pytest"
-    ```
+    ```bash shipwright pipeline start --issue 456 --pipeline hotfix --test-cmd
+    "pytest" ```
   </TabItem>
 </Tabs>
 
 ## Pipeline Templates
 
-| Template | Stages | Gates | Use Case |
-|----------|--------|-------|----------|
-| `standard` | intake → plan → build → test → review → PR | approve: plan, review, pr | Normal feature work |
-| `fast` | intake → build → test → PR | all auto | Quick fixes |
-| `full` | all 8 stages | approve: plan, review, pr, deploy | Production deployment |
-| `hotfix` | intake → build → test → PR | all auto | Urgent production fixes |
-| `autonomous` | all stages | all auto | Fully autonomous operation |
+| Template     | Stages                                          | Gates                             | Use Case                   |
+| ------------ | ----------------------------------------------- | --------------------------------- | -------------------------- |
+| `standard`   | intake → plan → build → test → review → PR      | approve: plan, review, pr         | Normal feature work        |
+| `fast`       | intake → build → test → PR                      | all auto                          | Quick fixes                |
+| `full`       | all 12 stages                                   | approve: plan, review, pr, deploy | Production deployment      |
+| `hotfix`     | intake → build → test → PR                      | all auto                          | Urgent production fixes    |
+| `autonomous` | all 12 stages                                   | all auto                          | Fully autonomous operation |
+| `deployed`   | all 12 stages (incl. deploy, validate, monitor) | approve: deploy                   | Full deploy + monitoring   |
+| `enterprise` | all 12 stages                                   | all approve, auto-rollback        | Maximum safety             |
+| `cost-aware` | intake → plan → build → test → review → PR      | auto, budget checks               | Budget-limited delivery    |
 
 Browse templates:
 
