@@ -1,0 +1,15 @@
+All quality gates now pass:
+- No uncommitted changes
+- No staged changes
+- 0 TODO/FIXME/HACK/XXX markers in diff
+
+Let me do a final self-audit:
+
+1. **Does the implementation fully satisfy the goal?** Yes — `--json` flag added to `shipwright status`, outputs valid JSON with all 6 top-level keys.
+2. **Edge cases?** Empty state, missing jq, all covered by tests.
+3. **TODO/FIXME/HACK/XXX in code?** None.
+4. **All functions tested?** 12 tests covering all sections and edge cases.
+5. **Would a reviewer approve?** Yes — clean implementation following project conventions.
+6. **Code clean and well-structured?** Yes — follows Bash 3.2 conventions, uses jq safely.
+
+LOOP_COMPLETE
