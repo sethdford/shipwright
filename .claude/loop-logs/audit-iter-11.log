@@ -1,85 +1,68 @@
-Perfect! The implementation is in the current branch. Now I'll compile my audit findings:
+Perfect! The error message goes to stderr and exits with code 1. Let me do a final comprehensive check of the implementation against the design spec:
 
-## Audit Summary
+## Summary of Critical Review
 
-I've completed a comprehensive review of the agent's work on adding the `--json` flag to `shipwright status`. Here are my findings:
+I've thoroughly reviewed the agent's work on the `--json` output flag for `shipwright status`. Here's my analysis:
 
-### ✅ **Verification Results**
+### ✅ **Strengths:**
 
-1. **Implementation Completeness**: The agent fully implemented the goal
-   - `scripts/cct-status.sh`: 177 new lines added (JSON branch: lines 44-196)
-   - `scripts/cct-status-test.sh`: 570 lines (new file, comprehensive test suite)
-   - `package.json`: Updated test chain with `bash scripts/cct-status-test.sh`
+1. **Complete Implementation**: All required components are implemented:
+   - Flag parsing for `--json` (lines 27-42)
+   - jq dependency check with proper error handling (lines 49-52)
+   - JSON output mode with all 6 required top-level keys (timestamp, teams, tasks, daemon, heartbeats, machines)
+   - Full test suite with 12 comprehensive tests
+   - Human-readable output path unchanged
 
-2. **Functional Testing**: All 12 tests pass
-   ```
-   ✓ JSON output is valid JSON
-   ✓ JSON has all six top-level keys (timestamp, teams, tasks, daemon, heartbeats, machines)
-   ✓ Empty state returns correct defaults
-   ✓ Timestamp is ISO 8601 format
-   ✓ Teams populated from tmux
-   ✓ Tasks populated from mock files
-   ✓ Daemon populated from state file
-   ✓ Heartbeats populated from files
-   ✓ Machines populated from file
-   ✓ --help prints usage and exits 0
-   ✓ Human output unchanged (no --json)
-   ✓ JSON with missing jq exits 1
-   ```
+2. **Correct JSON Schema**: Output matches the design spec exactly:
+   - `timestamp`: ISO 8601 format ✓
+   - `teams`: Array of objects with name, panes, status, session ✓
+   - `tasks`: Object with completed/in_progress/pending counts ✓
+   - `daemon`: Null when no state file, object with running/active/queued/completed when present ✓
+   - `heartbeats`: Array with job_id, stage, issue, age_s, alive ✓
+   - `machines`: Array with name, host, cores, memory_gb, max_workers ✓
 
-3. **Full Test Suite**: `npm test` passes all 194 tests (12 test suites) with zero failures
+3. **Code Quality**:
+   - No Bash 3.2 incompatibilities (no associative arrays, no readarray, no case transforms)
+   - Proper use of `jq --arg` and `--argjson` for safe escaping
+   - Uses `process substitution` (<()) to avoid subshell issues with `set -euo pipefail`
+   - Proper error handling and fallbacks with `|| true` and `// empty`
+   - Cross-platform date parsing with fallback from macOS (`date -j`) to Linux (`date -d`)
 
-4. **Manual Verification**:
-   - `shipwright status --json | jq .` produces valid JSON ✓
-   - `shipwright status --help` shows correct usage ✓
-   - `shipwright status` (no flag) outputs human-readable dashboard unchanged ✓
+4. **Test Coverage**: All 12 tests pass:
+   - JSON validity and structure
+   - Empty state behavior
+   - All data sections (teams, tasks, daemon, heartbeats, machines)
+   - Flag handling (--json, --help)
+   - Human output regression (no --json still works)
+   - Missing jq graceful degradation
 
-### ✅ **Code Quality**
+5. **Backward Compatibility**: No changes to human-readable output path—completely untouched
 
-1. **Bash Compatibility**: 
-   - ✓ No associative arrays
-   - ✓ No `readarray`
-   - ✓ No `${var,,}` or `${var^^}` (case manipulation)
-   - ✓ Syntax check passes: `bash -n scripts/cct-status.sh`
+6. **Error Handling**: 
+   - Missing jq outputs JSON error to stderr and exits 1
+   - Missing/invalid data sources produce empty defaults ([], null)
+   - Heartbeat alive detection uses `kill -0` (safe process check)
 
-2. **JSON Construction**: 
-   - ✓ Uses `jq --arg` and `jq --argjson` exclusively (no string interpolation)
-   - ✓ Safe parameter escaping throughout
-   - ✓ No shell injection vulnerabilities
+### ⚠️ **Minor Observations** (not defects):
 
-3. **Conditional Branching**: 
-   - ✓ Clean `if [[ "$JSON_OUTPUT" == "true" ]]` at line 44
-   - ✓ Human-readable path (lines 197-704) untouched
-   - ✓ Proper `fi` closure at line 705
-   - ✓ Zero regression risk
+1. **Task status parsing** (line 94) uses grep + sed to extract status from JSON files instead of `jq`. This is intentional—it avoids nested jq invocations and the script still counts tasks correctly.
 
-4. **Variable Scoping**:
-   - ✓ No `local` outside functions in JSON branch (only in `parse_iso_epoch()` helper)
-   - ✓ Note: Pre-existing `local` issues in human path (lines 435, 443, 455, 456) are out of scope
+2. **Performance**: Building JSON incrementally with `jq '. + [...]'` in loops (lines 74-79, 163-169) could be slow with many teams/heartbeats, but:
+   - Design decision accepted in the spec
+   - No realistic use case with thousands of teams
+   - All tests pass with acceptable performance
 
-5. **Error Handling**:
-   - ✓ `jq` availability check with graceful error message
-   - ✓ Cross-platform date parsing (macOS `date -j` + Linux `date -d` fallback)
-   - ✓ `2>/dev/null || true` guards on all external commands
-   - ✓ Missing directories handled safely
+### ✅ **All Acceptance Criteria Met:**
 
-### ✅ **Design Adherence**
+- [x] `shipwright status --json` outputs valid JSON
+- [x] All sections present: timestamp, teams, daemon, heartbeats, machines, tasks
+- [x] `shipwright status` (without flag) produces identical output
+- [x] Tests validate JSON output structure
+- [x] Empty state returns correct defaults
+- [x] jq dependency error on missing jq
+- [x] --help documents --json flag
+- [x] All 12 tests pass
+- [x] Full test suite passes (no regressions)
+- [x] No Bash 3.2 incompatibilities
 
-- ✓ Matches approved design document exactly
-- ✓ Follows established codebase patterns (`jq --arg`, `set -euo pipefail`, version variable)
-- ✓ Test harness follows existing conventions (mock binaries, sandboxed HOME, run_test())
-- ✓ No TODOs, FIXMEs, or placeholder code
-- ✓ No incomplete work
-
-### ✅ **Documentation & Testing**
-
-- ✓ Help flag implemented and tested
-- ✓ All 6 JSON top-level keys validated
-- ✓ Empty state behavior tested
-- ✓ All 5 data sections tested (teams, tasks, daemon, heartbeats, machines)
-- ✓ Regression test for human output
-- ✓ Error path tested (missing jq)
-
----
-
-AUDIT_PASS
+**AUDIT_PASS**
