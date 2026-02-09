@@ -1,0 +1,29 @@
+Now I have all the information I need. Let me provide the final evaluation:
+
+## DOD Evaluation Summary
+
+Based on detailed analysis of the code changes and test results:
+
+**NOT SATISFIED ITEMS:**
+
+1. **"Cost uses median from historical `cost.record` events"** — The DOD specifies per-stage costs calculated from `cost.record` events (which do contain a `stage` field). However, the implementation:
+   - Shows "—" for all per-stage costs (lines 1033-1034, 1036-1037)
+   - Only uses `pipeline.cost` events for the total row cost (lines 1053-1069)
+   - Never queries `cost.record` events by stage
+   - This is a deviation from the Design of Done specification
+
+**All other 10 items PASS:**
+- ✓ `--dry-run` shows table with Stage, Est. Duration, Model, Est. Cost
+- ✓ Duration uses median from historical `stage.completed` events
+- ✓ Model resolves per-stage from template config
+- ✓ "no data" / "—" shown when no history exists
+- ✓ Total row with summed duration and cost
+- ✓ Budget line when budget enabled
+- ✓ Existing dry-run behavior preserved (no artifacts, exits cleanly)
+- ✓ Bash 3.2 compatible
+- ✓ All tests pass, including 2 new + existing `test_dry_run`
+- ✓ `npm test` clean (167 tests, all passing)
+
+---
+
+**"Cost uses median from historical `cost.record` events"** is NOT satisfied. The implementation deviates from the DOD by using pipeline-level `pipeline.cost` events instead of per-stage `cost.record` events for individual stage cost estimates.
