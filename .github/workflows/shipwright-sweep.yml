@@ -1,0 +1,118 @@
+name: Shipwright Sweep
+
+# Cron sweep: picks up any shipwright-labeled issues that don't have an active pipeline.
+# Runs every 30 minutes — catches missed webhooks, outage recoveries, and retries.
+on:
+  schedule:
+    - cron: "*/30 * * * *"
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+  issues: read
+  actions: write
+
+jobs:
+  sweep:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+
+    env:
+      GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+    steps:
+      - name: Find unprocessed shipwright issues
+        id: find
+        run: |
+          echo "--- Shipwright Sweep: $(date -u +%Y-%m-%dT%H:%M:%SZ) ---"
+
+          # Get all open issues with the 'shipwright' label
+          ISSUES=$(gh issue list --repo "$GITHUB_REPOSITORY" \
+            --label shipwright --state open --json number,title \
+            --jq '.[].number' 2>/dev/null || echo "")
+
+          if [[ -z "$ISSUES" ]]; then
+            echo "No open shipwright-labeled issues found."
+            echo "dispatch=" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          echo "Found shipwright issues: $ISSUES"
+
+          # Check which issues have an active (in_progress or queued) pipeline run
+          DISPATCH=""
+          for issue in $ISSUES; do
+            # Check for any in-progress runs for this issue
+            ACTIVE=$(gh run list --repo "$GITHUB_REPOSITORY" \
+              --workflow=shipwright-pipeline.yml --status in_progress \
+              --json displayTitle,databaseId \
+              --jq ".[].databaseId" 2>/dev/null || echo "")
+
+            # Also check queued runs
+            QUEUED=$(gh run list --repo "$GITHUB_REPOSITORY" \
+              --workflow=shipwright-pipeline.yml --status queued \
+              --json databaseId \
+              --jq ".[].databaseId" 2>/dev/null || echo "")
+
+            # Check recently completed (within last hour) — don't re-dispatch completed work
+            RECENT_SUCCESS=$(gh run list --repo "$GITHUB_REPOSITORY" \
+              --workflow=shipwright-pipeline.yml --status completed \
+              --json conclusion,createdAt,displayTitle \
+              --jq "[.[] | select(.conclusion == \"success\" and (.createdAt > \"$(date -u -d '1 hour ago' +%Y-%m-%dT%H:%M:%SZ 2>/dev/null || date -u -v-1H +%Y-%m-%dT%H:%M:%SZ 2>/dev/null || echo '2000-01-01')\" ))] | length" 2>/dev/null || echo "0")
+
+            # Check if this specific issue has a recent comment indicating pipeline activity
+            LAST_PIPELINE_COMMENT=$(gh issue view "$issue" --repo "$GITHUB_REPOSITORY" \
+              --json comments \
+              --jq '[.comments[] | select(.body | contains("Shipwright Pipeline"))] | last | .createdAt // ""' 2>/dev/null || echo "")
+
+            # If there are active/queued runs, skip
+            if [[ -n "$ACTIVE" ]] || [[ -n "$QUEUED" ]]; then
+              echo "Issue #$issue: pipeline already running/queued — skipping"
+              continue
+            fi
+
+            # Check if the last pipeline comment was a success result (already done)
+            LAST_RESULT=$(gh issue view "$issue" --repo "$GITHUB_REPOSITORY" \
+              --json comments \
+              --jq '[.comments[] | select(.body | contains("Pipeline Completed Successfully"))] | length' 2>/dev/null || echo "0")
+
+            if [[ "$LAST_RESULT" -gt 0 ]]; then
+              # Check if there's been a successful PR created
+              HAS_PR=$(gh issue view "$issue" --repo "$GITHUB_REPOSITORY" \
+                --json comments \
+                --jq '[.comments[] | select(.body | contains("Pull Request Created"))] | length' 2>/dev/null || echo "0")
+              if [[ "$HAS_PR" -gt 0 ]]; then
+                echo "Issue #$issue: pipeline completed with PR — skipping"
+                continue
+              fi
+            fi
+
+            echo "Issue #$issue: needs pipeline dispatch"
+            DISPATCH="${DISPATCH}${issue}\n"
+          done
+
+          # Output issues to dispatch
+          DISPATCH=$(echo -e "$DISPATCH" | grep -v '^$' || true)
+          echo "dispatch<<EOF" >> "$GITHUB_OUTPUT"
+          echo "$DISPATCH" >> "$GITHUB_OUTPUT"
+          echo "EOF" >> "$GITHUB_OUTPUT"
+
+          if [[ -n "$DISPATCH" ]]; then
+            echo "Will dispatch pipelines for: $DISPATCH"
+          else
+            echo "All shipwright issues have active pipelines."
+          fi
+
+      - name: Dispatch pipelines for unprocessed issues
+        if: steps.find.outputs.dispatch != ''
+        run: |
+          echo "${{ steps.find.outputs.dispatch }}" | while read -r issue; do
+            [[ -z "$issue" ]] && continue
+            echo "Dispatching pipeline for issue #$issue..."
+            gh workflow run shipwright-pipeline.yml \
+              --repo "$GITHUB_REPOSITORY" \
+              -f issue_number="$issue" \
+              -f template=standard \
+              -f skip_triage=false 2>&1 || echo "  Failed to dispatch for #$issue (will retry next sweep)"
+            sleep 5  # Avoid rate limiting
+          done
