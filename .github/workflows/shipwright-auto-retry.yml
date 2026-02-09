@@ -1,6 +1,6 @@
 name: Shipwright Auto-Retry
 
-# Automatically retries failed pipelines with escalating strategy
+# Automatically retries failed pipelines with error-aware escalating strategy
 on:
   workflow_run:
     workflows: ["Shipwright Pipeline"]
@@ -47,7 +47,6 @@ jobs:
 
           # Method 2: Check run logs for the issue number
           if [[ -z "$ISSUE_NUMBER" ]]; then
-            # Download the run log and look for ISSUE_NUMBER
             RUN_LOG=$(gh run view "$RUN_ID" --repo "$GITHUB_REPOSITORY" --log 2>/dev/null | head -200 || echo "")
             ISSUE_NUMBER=$(echo "$RUN_LOG" | grep -oE 'Issue: #[0-9]+' | head -1 | grep -oE '[0-9]+' || true)
           fi
@@ -77,12 +76,108 @@ jobs:
           echo "issue_number=$ISSUE_NUMBER" >> "$GITHUB_OUTPUT"
           echo "Found issue #$ISSUE_NUMBER for failed run $RUN_ID"
 
+      # ── Error categorization: fetch logs, classify failure, extract root cause ──
+      - name: Categorize error from run logs
+        if: steps.extract.outputs.issue_number != ''
+        id: categorize
+        run: |
+          RUN_ID="${{ steps.extract.outputs.run_id }}"
+          CONCLUSION="${{ steps.extract.outputs.conclusion }}"
+          ISSUE_NUMBER="${{ steps.extract.outputs.issue_number }}"
+
+          # Fetch the last 200 lines of the failed run's log
+          LOG_TAIL=$(gh run view "$RUN_ID" --repo "$GITHUB_REPOSITORY" --log 2>/dev/null | tail -200 || echo "")
+
+          # Default values
+          ERROR_CATEGORY="UNKNOWN"
+          LAST_ERROR=""
+          FAILED_STAGE=""
+
+          # Extract the last error message (look for common error patterns)
+          LAST_ERROR=$(echo "$LOG_TAIL" | grep -iE "(error|fatal|fail|panic|exception)" | tail -1 || true)
+          # Truncate to 200 chars for comment readability
+          if [[ ${#LAST_ERROR} -gt 200 ]]; then
+            LAST_ERROR="${LAST_ERROR:0:200}..."
+          fi
+
+          # Extract failed stage from issue comments (SHIPWRIGHT-RESULT marker)
+          COMMENTS=$(gh issue view "$ISSUE_NUMBER" --repo "$GITHUB_REPOSITORY" \
+            --json comments --jq '.comments[].body' 2>/dev/null || echo "")
+          FAILED_STAGE=$(echo "$COMMENTS" | grep -oE 'SHIPWRIGHT-RESULT: [0-9]+:[a-z_]+' | tail -1 | cut -d: -f3 || true)
+
+          # ── Categorize the failure ──
+
+          # If the run was cancelled (e.g., by watchdog), treat as TRANSIENT
+          if [[ "$CONCLUSION" == "cancelled" ]]; then
+            ERROR_CATEGORY="TRANSIENT"
+          fi
+
+          # Check for TRANSIENT patterns: timeouts, rate limits, connection errors
+          if [[ "$ERROR_CATEGORY" == "UNKNOWN" ]]; then
+            TRANSIENT_MATCH=$(echo "$LOG_TAIL" | grep -ciE "timeout|rate.limit|503|502|connection.refused|ETIMEDOUT|ECONNRESET|socket.hang.up|too many requests" || true)
+            if [[ "${TRANSIENT_MATCH:-0}" -gt 0 ]]; then
+              ERROR_CATEGORY="TRANSIENT"
+            fi
+          fi
+
+          # Check for INFRA patterns: git failures, permissions, disk/memory
+          if [[ "$ERROR_CATEGORY" == "UNKNOWN" ]]; then
+            INFRA_MATCH=$(echo "$LOG_TAIL" | grep -ciE "permission denied|git.*fatal|ENOMEM|disk.*full|no space left|out of memory|cannot allocate" || true)
+            if [[ "${INFRA_MATCH:-0}" -gt 0 ]]; then
+              ERROR_CATEGORY="INFRA"
+            fi
+          fi
+
+          # Check for BUILD_FAILURE patterns: test/build/lint errors
+          if [[ "$ERROR_CATEGORY" == "UNKNOWN" ]]; then
+            BUILD_MATCH=$(echo "$LOG_TAIL" | grep -ciE "test.*fail|assert|FAIL.*test|npm ERR|build.*fail|lint.*error|compilation.*error|SyntaxError|TypeError" || true)
+            if [[ "${BUILD_MATCH:-0}" -gt 0 ]]; then
+              ERROR_CATEGORY="BUILD_FAILURE"
+            fi
+          fi
+
+          # Check for DESIGN_FAILURE: same error pattern across 2+ retries
+          # Look at previous retry comments for matching error messages
+          if [[ "$ERROR_CATEGORY" == "BUILD_FAILURE" || "$ERROR_CATEGORY" == "UNKNOWN" ]]; then
+            # Get error messages from previous retry comments
+            PREV_ERRORS=$(echo "$COMMENTS" | grep -oE 'SHIPWRIGHT-ERROR-MSG: [^<]+' | sed 's/SHIPWRIGHT-ERROR-MSG: //' || true)
+            if [[ -n "$PREV_ERRORS" && -n "$LAST_ERROR" ]]; then
+              # Extract first 50 chars of current error as a fingerprint
+              ERROR_FINGERPRINT="${LAST_ERROR:0:50}"
+              REPEAT_COUNT=$(echo "$PREV_ERRORS" | grep -cF "$ERROR_FINGERPRINT" || true)
+              if [[ "${REPEAT_COUNT:-0}" -ge 1 ]]; then
+                ERROR_CATEGORY="DESIGN_FAILURE"
+              fi
+            fi
+          fi
+
+          # Default remaining unknowns to BUILD_FAILURE (safest retry strategy)
+          if [[ "$ERROR_CATEGORY" == "UNKNOWN" ]]; then
+            ERROR_CATEGORY="BUILD_FAILURE"
+          fi
+
+          echo "--- Error Analysis ---"
+          echo "Category: $ERROR_CATEGORY"
+          echo "Failed stage: ${FAILED_STAGE:-unknown}"
+          echo "Last error: ${LAST_ERROR:-none}"
+
+          echo "error_category=$ERROR_CATEGORY" >> "$GITHUB_OUTPUT"
+          echo "failed_stage=${FAILED_STAGE:-unknown}" >> "$GITHUB_OUTPUT"
+
+          # Multi-line outputs
+          {
+            echo "last_error<<EOF"
+            echo "${LAST_ERROR:-No error message extracted}"
+            echo "EOF"
+          } >> "$GITHUB_OUTPUT"
+
       - name: Check retry count and determine strategy
         if: steps.extract.outputs.issue_number != ''
         id: strategy
         run: |
           ISSUE_NUMBER="${{ steps.extract.outputs.issue_number }}"
           RUN_ID="${{ steps.extract.outputs.run_id }}"
+          ERROR_CATEGORY="${{ steps.categorize.outputs.error_category }}"
 
           # Read retry count from issue comments (hidden HTML marker)
           COMMENTS=$(gh issue view "$ISSUE_NUMBER" --repo "$GITHUB_REPOSITORY" \
@@ -101,36 +196,63 @@ jobs:
 
           echo "Last failed stage: ${LAST_STAGE:-unknown}"
           echo "Completed stages: ${COMPLETED_STAGES:-none}"
+          echo "Error category: $ERROR_CATEGORY"
+
+          # ── INFRA errors: never retry, alert immediately ──
+          if [[ "$ERROR_CATEGORY" == "INFRA" ]]; then
+            echo "INFRA error detected — skipping retry, creating alert"
+            echo "should_retry=false" >> "$GITHUB_OUTPUT"
+            echo "skip_reason=infra" >> "$GITHUB_OUTPUT"
+            echo "retry_count=$RETRY_COUNT" >> "$GITHUB_OUTPUT"
+            echo "last_stage=$LAST_STAGE" >> "$GITHUB_OUTPUT"
+            echo "completed_stages=$COMPLETED_STAGES" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
 
           if [[ "$RETRY_COUNT" -ge 3 ]]; then
             echo "Max retries (3) reached for issue #$ISSUE_NUMBER — giving up"
             echo "should_retry=false" >> "$GITHUB_OUTPUT"
+            echo "skip_reason=exhausted" >> "$GITHUB_OUTPUT"
             echo "retry_count=$RETRY_COUNT" >> "$GITHUB_OUTPUT"
+            echo "last_stage=$LAST_STAGE" >> "$GITHUB_OUTPUT"
+            echo "completed_stages=$COMPLETED_STAGES" >> "$GITHUB_OUTPUT"
             exit 0
           fi
 
           NEXT_RETRY=$((RETRY_COUNT + 1))
           echo "retry_count=$NEXT_RETRY" >> "$GITHUB_OUTPUT"
           echo "should_retry=true" >> "$GITHUB_OUTPUT"
+          echo "skip_reason=" >> "$GITHUB_OUTPUT"
           echo "last_stage=$LAST_STAGE" >> "$GITHUB_OUTPUT"
           echo "completed_stages=$COMPLETED_STAGES" >> "$GITHUB_OUTPUT"
 
-          # Escalation table
-          case "$NEXT_RETRY" in
-            1)
-              # Retry 1: same config (transient failure recovery)
+          # ── Adaptive strategy based on error category ──
+          case "$ERROR_CATEGORY" in
+            TRANSIENT)
+              # Transient: retry with same config (just bad luck)
               TEMPLATE="standard"
               MAX_ITERATIONS="20"
               ;;
-            2)
-              # Retry 2: upgrade template, increase iterations
-              TEMPLATE="full"
-              MAX_ITERATIONS="25"
+            BUILD_FAILURE)
+              # Build failure: escalate template, increase iterations
+              case "$NEXT_RETRY" in
+                1) TEMPLATE="standard"; MAX_ITERATIONS="25" ;;
+                2) TEMPLATE="full";     MAX_ITERATIONS="25" ;;
+                3) TEMPLATE="full";     MAX_ITERATIONS="30" ;;
+              esac
               ;;
-            3)
-              # Retry 3: full template, max iterations
+            DESIGN_FAILURE)
+              # Design failure: same error repeating — use full template, max iterations
               TEMPLATE="full"
               MAX_ITERATIONS="30"
+              ;;
+            *)
+              # Fallback: escalation table from retry count
+              case "$NEXT_RETRY" in
+                1) TEMPLATE="standard"; MAX_ITERATIONS="20" ;;
+                2) TEMPLATE="full";     MAX_ITERATIONS="25" ;;
+                3) TEMPLATE="full";     MAX_ITERATIONS="30" ;;
+              esac
               ;;
           esac
 
@@ -138,12 +260,13 @@ jobs:
           echo "max_iterations=$MAX_ITERATIONS" >> "$GITHUB_OUTPUT"
 
           echo "--- Retry Strategy ---"
+          echo "Category: $ERROR_CATEGORY"
           echo "Retry: $NEXT_RETRY/3"
           echo "Template: $TEMPLATE"
           echo "Max Iterations: $MAX_ITERATIONS"
           echo "Resume from: ${COMPLETED_STAGES:-start}"
 
-      - name: Post retry comment
+      - name: Post retry comment with root cause
         if: steps.strategy.outputs.should_retry == 'true'
         run: |
           ISSUE_NUMBER="${{ steps.extract.outputs.issue_number }}"
@@ -154,9 +277,27 @@ jobs:
           COMPLETED_STAGES="${{ steps.strategy.outputs.completed_stages }}"
           FAILED_RUN="${{ steps.extract.outputs.run_id }}"
           CONCLUSION="${{ steps.extract.outputs.conclusion }}"
+          ERROR_CATEGORY="${{ steps.categorize.outputs.error_category }}"
+          FAILED_STAGE="${{ steps.categorize.outputs.failed_stage }}"
+          LAST_ERROR="${{ steps.categorize.outputs.last_error }}"
+
+          # Build human-readable category label
+          case "$ERROR_CATEGORY" in
+            TRANSIENT)      CATEGORY_LABEL="Transient (timeout/network)" ;;
+            BUILD_FAILURE)  CATEGORY_LABEL="Build/Test Failure" ;;
+            DESIGN_FAILURE) CATEGORY_LABEL="Repeated Failure (design issue)" ;;
+            *)              CATEGORY_LABEL="$ERROR_CATEGORY" ;;
+          esac
+
+          # Design failure gets an extra warning
+          DESIGN_NOTE=""
+          if [[ "$ERROR_CATEGORY" == "DESIGN_FAILURE" ]]; then
+            DESIGN_NOTE="
+          > **Note**: This error has occurred in previous retries. The issue may need human review or simplification."
+          fi
 
           gh issue comment "$ISSUE_NUMBER" --repo "$GITHUB_REPOSITORY" --body "$(cat <<EOF
-          🔄 **Shipwright Auto-Retry** (attempt ${RETRY_COUNT}/3)
+          :arrows_counterclockwise: **Shipwright Auto-Retry** (attempt ${RETRY_COUNT}/3)
 
           Previous run ${CONCLUSION} at stage: \`${LAST_STAGE:-unknown}\`
 
@@ -168,11 +309,22 @@ jobs:
           | Resume Stages | \`${COMPLETED_STAGES:-none}\` |
           | Failed Run | [${FAILED_RUN}](${{ github.server_url }}/${{ github.repository }}/actions/runs/${FAILED_RUN}) |
 
+          ### Root Cause Analysis
+
+          | Field | Value |
+          |-------|-------|
+          | Error Category | **${CATEGORY_LABEL}** |
+          | Failed Stage | \`${FAILED_STAGE}\` |
+          | Last Error | \`${LAST_ERROR}\` |
+          ${DESIGN_NOTE}
+
           <!-- SHIPWRIGHT-RETRY: ${RETRY_COUNT} -->
+          <!-- SHIPWRIGHT-RETRY-CATEGORY: ${ERROR_CATEGORY} -->
+          <!-- SHIPWRIGHT-ERROR-MSG: ${LAST_ERROR} -->
           <!-- SHIPWRIGHT-LAST-STAGE: ${LAST_STAGE} -->
           <!-- SHIPWRIGHT-FAILED-RUN: ${FAILED_RUN} -->
           EOF
-          )"
+          )" 2>/dev/null || true
 
       - name: Dispatch retry pipeline
         if: steps.strategy.outputs.should_retry == 'true'
@@ -196,18 +348,98 @@ jobs:
 
           echo "Retry dispatched successfully"
 
+      # ── INFRA failure: don't retry, label and alert ──
+      - name: Handle INFRA failure (no retry)
+        if: steps.strategy.outputs.skip_reason == 'infra' && steps.extract.outputs.issue_number != ''
+        run: |
+          ISSUE_NUMBER="${{ steps.extract.outputs.issue_number }}"
+          FAILED_RUN="${{ steps.extract.outputs.run_id }}"
+          ERROR_CATEGORY="${{ steps.categorize.outputs.error_category }}"
+          FAILED_STAGE="${{ steps.categorize.outputs.failed_stage }}"
+          LAST_ERROR="${{ steps.categorize.outputs.last_error }}"
+
+          # Add infra-issue label
+          gh issue edit "$ISSUE_NUMBER" --repo "$GITHUB_REPOSITORY" \
+            --add-label "shipwright-infra-issue" 2>/dev/null || true
+
+          gh issue comment "$ISSUE_NUMBER" --repo "$GITHUB_REPOSITORY" --body "$(cat <<EOF
+          :warning: **Shipwright Auto-Retry — Infrastructure Error (Not Retrying)**
+
+          The pipeline failed with an infrastructure error that auto-retry cannot fix.
+
+          | Field | Value |
+          |-------|-------|
+          | Error Category | **Infrastructure** |
+          | Failed Stage | \`${FAILED_STAGE}\` |
+          | Last Error | \`${LAST_ERROR}\` |
+          | Failed Run | [${FAILED_RUN}](${{ github.server_url }}/${{ github.repository }}/actions/runs/${FAILED_RUN}) |
+
+          ### Likely Causes
+          - Git permission or authentication error
+          - Runner out of memory or disk space
+          - Network/filesystem infrastructure issue
+
+          ### Action Required
+          1. Check the [run logs](${{ github.server_url }}/${{ github.repository }}/actions/runs/${FAILED_RUN}) for the infrastructure error
+          2. Fix the underlying infrastructure issue
+          3. Retry manually once resolved:
+          \`\`\`
+          gh workflow run shipwright-pipeline.yml -f issue_number=$ISSUE_NUMBER -f template=full -f skip_triage=true
+          \`\`\`
+
+          <!-- SHIPWRIGHT-INFRA-ALERT: ${FAILED_RUN} -->
+          <!-- SHIPWRIGHT-ERROR-MSG: ${LAST_ERROR} -->
+          EOF
+          )" 2>/dev/null || true
+
+      # ── Max retries exhausted: post detailed analysis of all attempts ──
       - name: Mark issue as failed (max retries exhausted)
-        if: steps.strategy.outputs.should_retry == 'false' && steps.extract.outputs.issue_number != ''
+        if: steps.strategy.outputs.skip_reason == 'exhausted' && steps.extract.outputs.issue_number != ''
         run: |
           ISSUE_NUMBER="${{ steps.extract.outputs.issue_number }}"
           RETRY_COUNT="${{ steps.strategy.outputs.retry_count }}"
+          FAILED_RUN="${{ steps.extract.outputs.run_id }}"
+          ERROR_CATEGORY="${{ steps.categorize.outputs.error_category }}"
+          FAILED_STAGE="${{ steps.categorize.outputs.failed_stage }}"
+          LAST_ERROR="${{ steps.categorize.outputs.last_error }}"
+
+          # Build a summary of all retry attempts from issue comments
+          COMMENTS=$(gh issue view "$ISSUE_NUMBER" --repo "$GITHUB_REPOSITORY" \
+            --json comments --jq '.comments[].body' 2>/dev/null || echo "")
+
+          ATTEMPT_SUMMARY=""
+          for i in 1 2 3; do
+            # Find the retry comment for attempt $i
+            ATTEMPT_CATEGORY=$(echo "$COMMENTS" | grep -A1 "SHIPWRIGHT-RETRY: $i" | grep -oE 'SHIPWRIGHT-RETRY-CATEGORY: [A-Z_]+' | sed 's/SHIPWRIGHT-RETRY-CATEGORY: //' || echo "N/A")
+            ATTEMPT_ERROR=$(echo "$COMMENTS" | grep -A2 "SHIPWRIGHT-RETRY: $i" | grep -oE 'SHIPWRIGHT-ERROR-MSG: [^<]+' | sed 's/SHIPWRIGHT-ERROR-MSG: //' | head -c 100 || echo "N/A")
+            ATTEMPT_STAGE=$(echo "$COMMENTS" | grep -A3 "SHIPWRIGHT-RETRY: $i" | grep -oE 'SHIPWRIGHT-LAST-STAGE: [a-z_]+' | sed 's/SHIPWRIGHT-LAST-STAGE: //' || echo "N/A")
+
+            if [[ "$ATTEMPT_CATEGORY" != "N/A" || "$i" -le "$RETRY_COUNT" ]]; then
+              ATTEMPT_SUMMARY="${ATTEMPT_SUMMARY}| ${i} | ${ATTEMPT_CATEGORY:-N/A} | \`${ATTEMPT_STAGE:-N/A}\` | \`${ATTEMPT_ERROR:-N/A}\` |
+          "
+            fi
+          done
 
           gh issue comment "$ISSUE_NUMBER" --repo "$GITHUB_REPOSITORY" --body "$(cat <<EOF
-          ❌ **Shipwright Auto-Retry Exhausted**
+          :x: **Shipwright Auto-Retry Exhausted**
 
           All ${RETRY_COUNT} retry attempts have failed for this issue. Human intervention is needed.
 
-          ### What to check:
+          ### Final Failure
+          | Field | Value |
+          |-------|-------|
+          | Error Category | **${ERROR_CATEGORY}** |
+          | Failed Stage | \`${FAILED_STAGE}\` |
+          | Last Error | \`${LAST_ERROR}\` |
+          | Failed Run | [${FAILED_RUN}](${{ github.server_url }}/${{ github.repository }}/actions/runs/${FAILED_RUN}) |
+
+          ### Retry History
+
+          | Attempt | Category | Stage | Error |
+          |---------|----------|-------|-------|
+          ${ATTEMPT_SUMMARY}
+
+          ### What to check
           1. Review the [workflow runs](${{ github.server_url }}/${{ github.repository }}/actions/workflows/shipwright-pipeline.yml) for error patterns
           2. Check if the issue requirements are achievable by the autonomous pipeline
           3. Consider breaking the issue into smaller sub-issues
@@ -217,7 +449,7 @@ jobs:
           gh workflow run shipwright-pipeline.yml -f issue_number=$ISSUE_NUMBER -f template=full -f skip_triage=true
           \`\`\`
           EOF
-          )"
+          )" 2>/dev/null || true
 
           # Add failed label for visibility
           gh issue edit "$ISSUE_NUMBER" --repo "$GITHUB_REPOSITORY" \

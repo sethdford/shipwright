@@ -1502,6 +1502,80 @@ CC_TASKS_EOF
     # Extract definition of done for quality gates
     sed -n '/[Dd]efinition [Oo]f [Dd]one/,/^#/p' "$plan_file" | head -20 > "$ARTIFACTS_DIR/dod.md" 2>/dev/null || true
 
+    # ── Plan Validation Gate ──
+    # Ask Claude to validate the plan before proceeding
+    if command -v claude &>/dev/null && [[ -s "$plan_file" ]]; then
+        local validation_attempts=0
+        local max_validation_attempts=2
+        local plan_valid=false
+
+        while [[ "$validation_attempts" -lt "$max_validation_attempts" ]]; do
+            validation_attempts=$((validation_attempts + 1))
+            info "Validating plan (attempt ${validation_attempts}/${max_validation_attempts})..."
+
+            local validation_prompt="You are a plan validator. Review this implementation plan and determine if it is valid.
+
+## Goal
+${GOAL}
+
+## Plan
+$(cat "$plan_file")
+
+Evaluate:
+1. Are all requirements from the goal addressed?
+2. Is the plan decomposed into clear, achievable tasks?
+3. Are the implementation steps specific enough to execute?
+
+Respond with EXACTLY one of these on the first line:
+VALID: true
+VALID: false
+
+Then explain your reasoning briefly."
+
+            local validation_model="${plan_model:-opus}"
+            local validation_result
+            validation_result=$(claude --print --output-format text -p "$validation_prompt" --model "$validation_model" < /dev/null 2>"${ARTIFACTS_DIR}/.claude-tokens-plan-validate.log" || true)
+            parse_claude_tokens "${ARTIFACTS_DIR}/.claude-tokens-plan-validate.log"
+
+            # Save validation result
+            echo "$validation_result" > "$ARTIFACTS_DIR/plan-validation.md"
+
+            if echo "$validation_result" | head -5 | grep -qi "VALID: true"; then
+                success "Plan validation passed"
+                plan_valid=true
+                break
+            fi
+
+            warn "Plan validation failed (attempt ${validation_attempts}/${max_validation_attempts})"
+
+            if [[ "$validation_attempts" -lt "$max_validation_attempts" ]]; then
+                info "Regenerating plan with validation feedback..."
+                local regen_prompt="${plan_prompt}
+
+IMPORTANT: A previous plan was rejected by validation. Issues found:
+$(echo "$validation_result" | tail -20)
+
+Fix these issues in the new plan."
+
+                claude --print --model "$plan_model" --max-turns 25 \
+                    "$regen_prompt" < /dev/null > "$plan_file" 2>"$_token_log" || true
+                parse_claude_tokens "$_token_log"
+
+                line_count=$(wc -l < "$plan_file" | xargs)
+                info "Regenerated plan: ${DIM}$plan_file${RESET} (${line_count} lines)"
+            fi
+        done
+
+        if [[ "$plan_valid" != "true" ]]; then
+            warn "Plan validation did not pass after ${max_validation_attempts} attempts — proceeding anyway"
+        fi
+
+        emit_event "plan.validated" \
+            "issue=${ISSUE_NUMBER:-0}" \
+            "valid=${plan_valid}" \
+            "attempts=${validation_attempts}"
+    fi
+
     log_stage "plan" "Generated plan.md (${line_count} lines, $(echo "$checklist" | wc -l | xargs) tasks)"
 }
 
@@ -1884,6 +1958,66 @@ $(cat "$diff_file")" < /dev/null > "$review_file" 2>"${ARTIFACTS_DIR}/.claude-to
         success "Review clean"
     fi
 
+    # ── Review Blocking Gate ──
+    # Block pipeline on critical/security issues unless compound_quality handles them
+    local security_count
+    security_count=$(grep -ciE '\*\*\[?Security\]?\*\*' "$review_file" 2>/dev/null || true)
+    security_count="${security_count:-0}"
+
+    local blocking_issues=$((critical_count + security_count))
+
+    if [[ "$blocking_issues" -gt 0 ]]; then
+        # Check if compound_quality stage is enabled — if so, let it handle issues
+        local compound_enabled="false"
+        if [[ -n "${PIPELINE_CONFIG:-}" && -f "${PIPELINE_CONFIG:-/dev/null}" ]]; then
+            compound_enabled=$(jq -r '.stages[] | select(.id == "compound_quality") | .enabled' "$PIPELINE_CONFIG" 2>/dev/null) || true
+            [[ -z "$compound_enabled" || "$compound_enabled" == "null" ]] && compound_enabled="false"
+        fi
+
+        # Check if this is a fast template (don't block fast pipelines)
+        local is_fast="false"
+        if [[ "${PIPELINE_NAME:-}" == "fast" || "${PIPELINE_NAME:-}" == "hotfix" ]]; then
+            is_fast="true"
+        fi
+
+        if [[ "$compound_enabled" == "true" ]]; then
+            info "Review found ${blocking_issues} critical/security issue(s) — compound_quality stage will handle"
+        elif [[ "$is_fast" == "true" ]]; then
+            warn "Review found ${blocking_issues} critical/security issue(s) — fast template, not blocking"
+        else
+            error "Review found ${BOLD}${blocking_issues} critical/security issue(s)${RESET} — blocking pipeline"
+            emit_event "review.blocked" \
+                "issue=${ISSUE_NUMBER:-0}" \
+                "critical=${critical_count}" \
+                "security=${security_count}"
+
+            # Save blocking issues for self-healing context
+            grep -iE '\*\*\[?(Critical|Security)\]?\*\*' "$review_file" > "$ARTIFACTS_DIR/review-blockers.md" 2>/dev/null || true
+
+            # Post review to GitHub before failing
+            if [[ -n "$ISSUE_NUMBER" ]]; then
+                local review_summary
+                review_summary=$(head -40 "$review_file")
+                gh_comment_issue "$ISSUE_NUMBER" "## 🔍 Code Review — ❌ Blocked
+
+**Stats:** $diff_stats
+**Blocking issues:** ${blocking_issues} (${critical_count} critical, ${security_count} security)
+
+<details>
+<summary>Review details</summary>
+
+${review_summary}
+
+</details>
+
+_Pipeline will attempt self-healing rebuild._"
+            fi
+
+            log_stage "review" "BLOCKED: $blocking_issues critical/security issues found"
+            return 1
+        fi
+    fi
+
     # Post review to GitHub issue
     if [[ -n "$ISSUE_NUMBER" ]]; then
         local review_summary
@@ -1909,6 +2043,23 @@ stage_pr() {
     local plan_file="$ARTIFACTS_DIR/plan.md"
     local test_log="$ARTIFACTS_DIR/test-results.log"
     local review_file="$ARTIFACTS_DIR/review.md"
+
+    # ── PR Hygiene Checks (informational) ──
+    local hygiene_commit_count
+    hygiene_commit_count=$(git log --oneline "${BASE_BRANCH}..HEAD" 2>/dev/null | wc -l | xargs)
+    hygiene_commit_count="${hygiene_commit_count:-0}"
+
+    if [[ "$hygiene_commit_count" -gt 20 ]]; then
+        warn "PR has ${hygiene_commit_count} commits — consider squashing before merge"
+    fi
+
+    # Check for WIP/fixup/squash commits
+    local wip_commits
+    wip_commits=$(git log --oneline "${BASE_BRANCH}..HEAD" 2>/dev/null | grep -ciE '^[0-9a-f]+ (WIP|fixup!|squash!)' || true)
+    wip_commits="${wip_commits:-0}"
+    if [[ "$wip_commits" -gt 0 ]]; then
+        warn "Branch has ${wip_commits} WIP/fixup/squash commit(s) — consider cleaning up"
+    fi
 
     # Auto-rebase onto latest base branch before PR
     auto_rebase || {

@@ -1,0 +1,230 @@
+name: Shipwright Watchdog
+
+# Intelligent pipeline monitor — detects stale/stuck runs using heartbeat signals
+# rather than blunt timeouts. Checks every 15 minutes.
+on:
+  schedule:
+    - cron: "*/15 * * * *"
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+  issues: write
+  actions: write
+
+jobs:
+  watchdog:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    env:
+      GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+    steps:
+      - name: Monitor in-progress pipeline runs
+        run: |
+          echo "--- Shipwright Watchdog: $(date -u +%Y-%m-%dT%H:%M:%SZ) ---"
+          NOW_EPOCH=$(date +%s)
+
+          # Get all in-progress pipeline runs
+          RUNS=$(gh run list --repo "$GITHUB_REPOSITORY" \
+            --workflow=shipwright-pipeline.yml --status in_progress \
+            --json databaseId,createdAt,displayTitle --limit 50 2>/dev/null || echo "[]")
+
+          RUN_COUNT=$(echo "$RUNS" | jq 'length')
+          if [[ "$RUN_COUNT" -eq 0 ]]; then
+            echo "No in-progress pipeline runs. All clear."
+            exit 0
+          fi
+
+          echo "Found $RUN_COUNT in-progress run(s)"
+
+          STALE_COUNT=0
+          CANCELLED_COUNT=0
+
+          while read -r run; do
+            RUN_ID=$(echo "$run" | jq -r '.databaseId')
+            CREATED_AT=$(echo "$run" | jq -r '.createdAt')
+            TITLE=$(echo "$run" | jq -r '.displayTitle')
+
+            echo ""
+            echo "--- Run $RUN_ID: $TITLE ---"
+
+            # Calculate elapsed time in minutes
+            CREATED_EPOCH=$(date -d "$CREATED_AT" +%s 2>/dev/null || date -j -f "%Y-%m-%dT%H:%M:%SZ" "$CREATED_AT" +%s 2>/dev/null || echo "0")
+            ELAPSED_SECS=$((NOW_EPOCH - CREATED_EPOCH))
+            ELAPSED_MINS=$((ELAPSED_SECS / 60))
+            echo "Elapsed: ${ELAPSED_MINS}m"
+
+            # Skip young runs (< 30 min) — they're probably fine
+            if [[ "$ELAPSED_MINS" -lt 30 ]]; then
+              echo "Run is < 30 min old — skipping"
+              continue
+            fi
+
+            # Try to extract issue number from the run title
+            ISSUE_NUMBER=$(echo "$TITLE" | grep -oE '#[0-9]+' | head -1 | tr -d '#' || true)
+            if [[ -z "$ISSUE_NUMBER" ]]; then
+              echo "Cannot determine issue number — skipping"
+              continue
+            fi
+
+            echo "Associated issue: #$ISSUE_NUMBER"
+
+            # Get issue comments with timestamps to find latest progress signal
+            COMMENTS_JSON=$(gh issue view "$ISSUE_NUMBER" --repo "$GITHUB_REPOSITORY" \
+              --json comments --jq '.comments[] | {createdAt, body}' 2>/dev/null || echo "")
+
+            # Find the most recent SHIPWRIGHT-HEARTBEAT or SHIPWRIGHT-STAGE marker
+            LAST_SIGNAL_DATE=""
+
+            # Check for heartbeat markers: <!-- SHIPWRIGHT-HEARTBEAT: timestamp -->
+            HEARTBEAT_DATE=$(echo "$COMMENTS_JSON" | jq -r 'select(.body | contains("SHIPWRIGHT-HEARTBEAT")) | .createdAt' 2>/dev/null | tail -1 || true)
+
+            # Check for stage markers: <!-- SHIPWRIGHT-STAGE: ... -->
+            STAGE_DATE=$(echo "$COMMENTS_JSON" | jq -r 'select(.body | contains("SHIPWRIGHT-STAGE")) | .createdAt' 2>/dev/null | tail -1 || true)
+
+            # Check for the initial run ID marker: <!-- SHIPWRIGHT-RUN-ID: ... -->
+            START_DATE=$(echo "$COMMENTS_JSON" | jq -r "select(.body | contains(\"SHIPWRIGHT-RUN-ID: $RUN_ID\")) | .createdAt" 2>/dev/null | tail -1 || true)
+
+            # Use the most recent signal
+            for date in "$HEARTBEAT_DATE" "$STAGE_DATE" "$START_DATE"; do
+              if [[ -n "$date" && ("$date" > "$LAST_SIGNAL_DATE" || -z "$LAST_SIGNAL_DATE") ]]; then
+                LAST_SIGNAL_DATE="$date"
+              fi
+            done
+
+            if [[ -z "$LAST_SIGNAL_DATE" ]]; then
+              echo "No progress signals found — using run start time"
+              LAST_SIGNAL_DATE="$CREATED_AT"
+            fi
+
+            # Calculate minutes since last signal
+            SIGNAL_EPOCH=$(date -d "$LAST_SIGNAL_DATE" +%s 2>/dev/null || date -j -f "%Y-%m-%dT%H:%M:%SZ" "$LAST_SIGNAL_DATE" +%s 2>/dev/null || echo "0")
+            SILENT_MINS=$(( (NOW_EPOCH - SIGNAL_EPOCH) / 60 ))
+            echo "Last signal: ${LAST_SIGNAL_DATE} (${SILENT_MINS}m ago)"
+
+            # ── Decision logic ──
+
+            # Under 20 min silence: healthy
+            if [[ "$SILENT_MINS" -lt 20 ]]; then
+              echo "Status: HEALTHY (recent activity)"
+              continue
+            fi
+
+            # 20-45 min silence on a 30+ min run: STALE — warn
+            if [[ "$SILENT_MINS" -lt 45 ]]; then
+              echo "Status: STALE (no signal in ${SILENT_MINS}m)"
+              STALE_COUNT=$((STALE_COUNT + 1))
+
+              # Post observation comment (only if we haven't already in this window)
+              EXISTING_WATCHDOG=$(echo "$COMMENTS_JSON" | jq -r "select(.body | contains(\"SHIPWRIGHT-WATCHDOG-STALE: $RUN_ID\")) | .createdAt" 2>/dev/null | tail -1 || true)
+              if [[ -z "$EXISTING_WATCHDOG" ]]; then
+                gh issue comment "$ISSUE_NUMBER" --repo "$GITHUB_REPOSITORY" --body "$(cat <<EOF
+          :eye: **Shipwright Watchdog — Stale Pipeline Detected**
+
+          Run [$RUN_ID](${{ github.server_url }}/${{ github.repository }}/actions/runs/$RUN_ID) has had no progress signal for **${SILENT_MINS} minutes**.
+
+          | Field | Value |
+          |-------|-------|
+          | Run | [$RUN_ID](${{ github.server_url }}/${{ github.repository }}/actions/runs/$RUN_ID) |
+          | Elapsed | ${ELAPSED_MINS}m |
+          | Silent | ${SILENT_MINS}m |
+          | Last Signal | ${LAST_SIGNAL_DATE} |
+          | Action | Monitoring — will cancel if no progress in 45m |
+
+          <!-- SHIPWRIGHT-WATCHDOG-STALE: $RUN_ID -->
+          EOF
+          )" 2>/dev/null || true
+              fi
+              continue
+            fi
+
+            # 45 min - 2h silence: cancel and retry
+            if [[ "$SILENT_MINS" -lt 120 ]]; then
+              echo "Status: STUCK (${SILENT_MINS}m silence) — cancelling and retrying"
+              CANCELLED_COUNT=$((CANCELLED_COUNT + 1))
+
+              # Cancel the run
+              gh run cancel "$RUN_ID" --repo "$GITHUB_REPOSITORY" 2>/dev/null || true
+
+              # Extract completed stages from comments
+              COMPLETED_STAGES=$(echo "$COMMENTS_JSON" | jq -r '.body' 2>/dev/null | grep -oE 'SHIPWRIGHT-STAGE: [a-z_]+:complete' | sed 's/SHIPWRIGHT-STAGE: //' | sed 's/:complete//' | tr '\n' ',' | sed 's/,$//' || true)
+
+              # Post cancellation comment
+              gh issue comment "$ISSUE_NUMBER" --repo "$GITHUB_REPOSITORY" --body "$(cat <<EOF
+          :rotating_light: **Shipwright Watchdog — Pipeline Cancelled (Stuck)**
+
+          Run [$RUN_ID](${{ github.server_url }}/${{ github.repository }}/actions/runs/$RUN_ID) was cancelled after **${SILENT_MINS} minutes** with no progress signal.
+
+          | Field | Value |
+          |-------|-------|
+          | Run | [$RUN_ID](${{ github.server_url }}/${{ github.repository }}/actions/runs/$RUN_ID) |
+          | Elapsed | ${ELAPSED_MINS}m |
+          | Silent | ${SILENT_MINS}m |
+          | Completed Stages | \`${COMPLETED_STAGES:-none}\` |
+          | Action | Dispatching retry with resume |
+
+          <!-- SHIPWRIGHT-WATCHDOG-CANCEL: $RUN_ID -->
+          EOF
+          )" 2>/dev/null || true
+
+              # Dispatch retry
+              gh workflow run shipwright-pipeline.yml \
+                --repo "$GITHUB_REPOSITORY" \
+                -f issue_number="$ISSUE_NUMBER" \
+                -f template=full \
+                -f max_iterations="25" \
+                -f completed_stages="$COMPLETED_STAGES" \
+                -f skip_triage=true 2>/dev/null || echo "Failed to dispatch retry for #$ISSUE_NUMBER"
+              sleep 5
+              continue
+            fi
+
+            # > 2h silence: cancel, label stuck, DON'T retry
+            echo "Status: ABANDONED (${SILENT_MINS}m silence, ${ELAPSED_MINS}m elapsed) — cancelling, no retry"
+            CANCELLED_COUNT=$((CANCELLED_COUNT + 1))
+
+            # Cancel the run
+            gh run cancel "$RUN_ID" --repo "$GITHUB_REPOSITORY" 2>/dev/null || true
+
+            # Label as stuck
+            gh issue edit "$ISSUE_NUMBER" --repo "$GITHUB_REPOSITORY" \
+              --add-label "shipwright-stuck" 2>/dev/null || true
+
+            # Post comment
+            gh issue comment "$ISSUE_NUMBER" --repo "$GITHUB_REPOSITORY" --body "$(cat <<EOF
+          :stop_sign: **Shipwright Watchdog — Pipeline Abandoned**
+
+          Run [$RUN_ID](${{ github.server_url }}/${{ github.repository }}/actions/runs/$RUN_ID) was cancelled after **${ELAPSED_MINS} minutes** with no progress for **${SILENT_MINS} minutes**.
+
+          This exceeds the 2-hour silence threshold. The pipeline will **not** be automatically retried.
+
+          | Field | Value |
+          |-------|-------|
+          | Run | [$RUN_ID](${{ github.server_url }}/${{ github.repository }}/actions/runs/$RUN_ID) |
+          | Elapsed | ${ELAPSED_MINS}m |
+          | Silent | ${SILENT_MINS}m |
+          | Action | Cancelled — human review required |
+
+          ### What to check
+          1. Review the [run logs](${{ github.server_url }}/${{ github.repository }}/actions/runs/$RUN_ID) for errors
+          2. Check if the issue is too complex for autonomous processing
+          3. Consider breaking the issue into smaller sub-issues
+
+          To retry manually:
+          \`\`\`
+          gh workflow run shipwright-pipeline.yml -f issue_number=$ISSUE_NUMBER -f template=full -f skip_triage=true
+          \`\`\`
+
+          <!-- SHIPWRIGHT-WATCHDOG-ABANDON: $RUN_ID -->
+          EOF
+          )" 2>/dev/null || true
+
+          done < <(echo "$RUNS" | jq -c '.[]')
+
+          echo ""
+          echo "--- Watchdog Summary ---"
+          echo "Runs checked: $RUN_COUNT"
+          echo "Stale (warned): $STALE_COUNT"
+          echo "Cancelled: $CANCELLED_COUNT"

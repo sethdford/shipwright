@@ -285,7 +285,8 @@ jobs:
     needs: triage
     if: needs.triage.outputs.approved == 'true'
     runs-on: ubuntu-latest
-    timeout-minutes: ${{ fromJSON(needs.triage.outputs.estimated_minutes || '120') }}
+    # Dynamic timeout: estimated + 30 min buffer, capped at 180 (watchdog handles stuck detection)
+    timeout-minutes: ${{ fromJSON(needs.triage.outputs.estimated_minutes || '90') + 30 > 180 && 180 || fromJSON(needs.triage.outputs.estimated_minutes || '90') + 30 }}
 
     env:
       ISSUE_NUMBER: ${{ github.event.inputs.issue_number || github.event.issue.number }}
@@ -390,8 +391,20 @@ jobs:
             PIPELINE_ARGS+=(--completed-stages "$COMPLETED_STAGES")
           fi
 
+          # Heartbeat: post progress marker every 10 minutes so watchdog knows we're alive
+          (while true; do
+            sleep 600
+            gh issue comment "$ISSUE_NUMBER" --body "<!-- SHIPWRIGHT-HEARTBEAT: $(date -u +%Y-%m-%dT%H:%M:%SZ):running -->" 2>/dev/null || true
+          done) &
+          HEARTBEAT_PID=$!
+
           shipwright pipeline start "${PIPELINE_ARGS[@]}" 2>&1 | tee /tmp/pipeline.log
           PIPELINE_EXIT=$?
+
+          # Stop heartbeat
+          kill $HEARTBEAT_PID 2>/dev/null || true
+          wait $HEARTBEAT_PID 2>/dev/null || true
+
           echo "exit_code=$PIPELINE_EXIT" >> "$GITHUB_OUTPUT"
           exit $PIPELINE_EXIT
 
@@ -399,38 +412,98 @@ jobs:
         if: always()
         run: |
           EXIT_CODE="${{ steps.pipeline.outputs.exit_code }}"
-          if [[ "$EXIT_CODE" == "0" ]]; then
-            STATUS="✅ **Pipeline Completed Successfully**"
-          else
-            STATUS="❌ **Pipeline Failed** (exit code: $EXIT_CODE)"
-          fi
 
-          SUMMARY=""
-          if [[ -f ".claude/pipeline-state.md" ]]; then
-            SUMMARY=$(head -30 ".claude/pipeline-state.md" 2>/dev/null || echo "")
-          fi
-
-          # Extract last completed stage for retry intelligence
+          # Extract current/failed stage from pipeline state
           LAST_STAGE=""
           if [[ -f ".claude/pipeline-state.md" ]]; then
             LAST_STAGE=$(grep "current_stage:" ".claude/pipeline-state.md" 2>/dev/null | awk '{print $2}' || true)
           fi
 
-          gh issue comment "$ISSUE_NUMBER" --body "$(cat <<EOF
-          $STATUS
+          # Build stage timeline from SHIPWRIGHT-STAGE comments on the issue
+          STAGE_TIMELINE=""
+          COMPLETED_LIST=""
+          STAGE_COMMENTS=$(gh issue view "$ISSUE_NUMBER" --json comments --jq '.comments[].body' 2>/dev/null | grep "SHIPWRIGHT-STAGE:" || true)
+          if [[ -n "$STAGE_COMMENTS" ]]; then
+            STAGE_TIMELINE="### Stage Timeline"$'\n'"| Stage | Status | Duration |"$'\n'"| ----- | ------ | -------- |"
+            while IFS= read -r line; do
+              # Format: <!-- SHIPWRIGHT-STAGE: stage:status:elapsed -->
+              STAGE_DATA=$(echo "$line" | sed 's/.*SHIPWRIGHT-STAGE: //;s/ *-->.*//')
+              STAGE_NAME=$(echo "$STAGE_DATA" | cut -d: -f1)
+              STAGE_STATUS=$(echo "$STAGE_DATA" | cut -d: -f2)
+              STAGE_ELAPSED=$(echo "$STAGE_DATA" | cut -d: -f3)
+              if [[ "$STAGE_STATUS" == "complete" || "$STAGE_STATUS" == "completed" ]]; then
+                ICON="✅"
+                if [[ -n "$COMPLETED_LIST" ]]; then
+                  COMPLETED_LIST="${COMPLETED_LIST}, ${STAGE_NAME}"
+                else
+                  COMPLETED_LIST="$STAGE_NAME"
+                fi
+              elif [[ "$STAGE_STATUS" == "failed" ]]; then
+                ICON="❌"
+              elif [[ "$STAGE_STATUS" == "skipped" ]]; then
+                ICON="⏭️"
+              else
+                ICON="🔄"
+              fi
+              STAGE_TIMELINE="${STAGE_TIMELINE}"$'\n'"| ${STAGE_NAME} | ${ICON} | ${STAGE_ELAPSED:-—} |"
+            done <<< "$STAGE_COMMENTS"
+          fi
 
-          <details>
-          <summary>Pipeline State</summary>
+          if [[ "$EXIT_CODE" == "0" ]]; then
+            # --- Success comment ---
+            gh issue comment "$ISSUE_NUMBER" --body "$(cat <<EOF
+          ✅ **Pipeline Completed Successfully**
+
+          ${STAGE_TIMELINE}
+
+          [View full run](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }})
+          <!-- SHIPWRIGHT-RESULT: 0:${LAST_STAGE}:${{ github.run_id }} -->
+          EOF
+          )"
+          else
+            # --- Failure comment with structured analysis ---
+
+            # Classify error type from log tail
+            ERROR_TYPE="unknown"
+            LOG_TAIL=""
+            if [[ -f /tmp/pipeline.log ]]; then
+              LOG_TAIL=$(tail -20 /tmp/pipeline.log 2>/dev/null || echo "")
+              if echo "$LOG_TAIL" | grep -qi "test.*fail\|assertion.*fail\|FAIL\|jest\|pytest"; then
+                ERROR_TYPE="test_failure"
+              elif echo "$LOG_TAIL" | grep -qi "build.*error\|compile.*error\|syntax.*error\|tsc"; then
+                ERROR_TYPE="build_error"
+              elif echo "$LOG_TAIL" | grep -qi "timeout\|timed out\|exceeded.*time"; then
+                ERROR_TYPE="timeout"
+              elif echo "$LOG_TAIL" | grep -qi "rate.*limit\|quota\|429\|503\|ECONNREFUSED"; then
+                ERROR_TYPE="infra"
+              fi
+            fi
+
+            gh issue comment "$ISSUE_NUMBER" --body "$(cat <<EOF
+          ❌ **Pipeline Failed** (exit code: $EXIT_CODE)
+
+          ### Failure Analysis
+          | Field | Value |
+          | ----- | ----- |
+          | Failed Stage | \`${LAST_STAGE:-unknown}\` |
+          | Error Type | \`${ERROR_TYPE}\` |
+          | Completed | ${COMPLETED_LIST:-none} |
+
+          ${STAGE_TIMELINE}
+
+          <details><summary>Last 20 lines of log</summary>
 
           \`\`\`
-          $SUMMARY
+          ${LOG_TAIL}
           \`\`\`
           </details>
 
           [View full run](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }})
           <!-- SHIPWRIGHT-RESULT: ${EXIT_CODE}:${LAST_STAGE}:${{ github.run_id }} -->
+          <!-- SHIPWRIGHT-FAILURE-ANALYSIS: stage=${LAST_STAGE:-unknown}:type=${ERROR_TYPE}:completed=${COMPLETED_LIST:-none} -->
           EOF
           )"
+          fi
 
       - name: Push partial work on failure
         if: failure()
