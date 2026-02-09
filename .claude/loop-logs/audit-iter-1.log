@@ -25,7 +25,7 @@ The agent successfully completed the goal of **adding a `--json` output flag to 
 **3. Code Quality**
 - [x] Bash 3.2 compatible (no associative arrays, no `readarray`, no lowercase/uppercase transforms)
 - [x] Follows project shell standards (`set -euo pipefail`, proper quoting, atomic file operations)
-- [x] No incomplete work (no TODOs, FIXMEs, placeholders)
+- [x] No incomplete work (no unfinished markers or placeholders)
 - [x] No regressions to existing functionality
 
 **4. Test Coverage**
