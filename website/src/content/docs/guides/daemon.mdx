@@ -41,12 +41,12 @@ shipwright daemon stop
 
 The daemon tracks delivery performance using the four DORA metrics:
 
-| Metric | What It Measures | Elite | High | Medium | Low |
-|--------|-----------------|-------|------|--------|-----|
-| **Deployment Frequency** | How often you deploy | On-demand | Daily–Weekly | Weekly–Monthly | Monthly+ |
-| **Cycle Time** | Time from commit to deploy | < 1 hour | < 1 day | < 1 week | 1 week+ |
-| **Change Failure Rate** | % of deploys causing failure | < 5% | < 10% | < 15% | 15%+ |
-| **Mean Time to Restore** | Recovery time after failure | < 1 hour | < 1 day | < 1 week | 1 week+ |
+| Metric                   | What It Measures             | Elite     | High         | Medium         | Low      |
+| ------------------------ | ---------------------------- | --------- | ------------ | -------------- | -------- |
+| **Deployment Frequency** | How often you deploy         | On-demand | Daily–Weekly | Weekly–Monthly | Monthly+ |
+| **Cycle Time**           | Time from commit to deploy   | < 1 hour  | < 1 day      | < 1 week       | 1 week+  |
+| **Change Failure Rate**  | % of deploys causing failure | < 5%      | < 10%        | < 15%          | 15%+     |
+| **Mean Time to Restore** | Recovery time after failure  | < 1 hour  | < 1 day      | < 1 week       | 1 week+  |
 
 View your metrics dashboard:
 
@@ -65,14 +65,16 @@ Grades follow Google's DORA research thresholds: **Elite**, **High**, **Medium**
 
 ## Commands
 
-| Command | Description |
-|---------|-------------|
-| `shipwright daemon init` | Create daemon configuration file |
-| `shipwright daemon start` | Start the background daemon |
-| `shipwright daemon stop` | Stop the daemon gracefully |
-| `shipwright daemon status` | Show daemon status and current pipelines |
-| `shipwright daemon metrics` | Display DORA metrics dashboard |
-| `shipwright daemon logs` | View daemon log output |
+| Command                     | Description                                                                          |
+| --------------------------- | ------------------------------------------------------------------------------------ |
+| `shipwright daemon init`    | Create daemon configuration file                                                     |
+| `shipwright daemon start`   | Start the background daemon                                                          |
+| `shipwright daemon stop`    | Stop the daemon gracefully                                                           |
+| `shipwright daemon status`  | Show daemon status and current pipelines                                             |
+| `shipwright daemon metrics` | Display DORA metrics dashboard                                                       |
+| `shipwright daemon logs`    | View daemon log output                                                               |
+| `shipwright daemon triage`  | Show issue triage scores and priority ranking                                        |
+| `shipwright daemon patrol`  | Run proactive codebase patrol (use `--once` for single run, `--dry-run` for preview) |
 
 ## Event Logging
 
@@ -91,14 +93,14 @@ These events power the DORA metrics dashboard and can be consumed by external to
 
 Every incoming issue is scored on a 0–100 scale across six dimensions. Higher-scoring issues are processed first, preventing starvation and ensuring critical work gets done.
 
-| Dimension | Points | How It's Scored |
-|-----------|--------|-----------------|
-| **Priority labels** | 0–30 | `urgent`/`p0` = 30, `high`/`p1` = 20, `normal`/`p2` = 10, `low`/`p3` = 5 |
-| **Issue age** | 0–15 | > 7 days = 15, > 3 days = 10, > 1 day = 5 (prevents starvation) |
-| **Complexity** | 0–20 | Simpler issues score higher (shorter body, fewer file references) |
-| **Dependencies** | -15 to 15 | Blocks other issues = +15, blocked by open issues = -15 |
-| **Type** | 0–10 | `security`/`bug` = 10, `feature`/`enhancement` = 5 |
-| **Memory** | -5 to 10 | Prior success on similar work = +10, prior failures = -5 |
+| Dimension           | Points    | How It's Scored                                                          |
+| ------------------- | --------- | ------------------------------------------------------------------------ |
+| **Priority labels** | 0–30      | `urgent`/`p0` = 30, `high`/`p1` = 20, `normal`/`p2` = 10, `low`/`p3` = 5 |
+| **Issue age**       | 0–15      | > 7 days = 15, > 3 days = 10, > 1 day = 5 (prevents starvation)          |
+| **Complexity**      | 0–20      | Simpler issues score higher (shorter body, fewer file references)        |
+| **Dependencies**    | -15 to 15 | Blocks other issues = +15, blocked by open issues = -15                  |
+| **Type**            | 0–10      | `security`/`bug` = 10, `feature`/`enhancement` = 5                       |
+| **Memory**          | -5 to 10  | Prior success on similar work = +10, prior failures = -5                 |
 
 View current triage scores:
 
@@ -111,6 +113,7 @@ shipwright daemon triage
 When `auto_template` is enabled, the daemon automatically selects the best pipeline template for each issue based on its labels and triage score.
 
 **Selection priority:**
+
 1. **Label overrides** — `hotfix`/`incident` labels → `hotfix` template, `security` → `enterprise`
 2. **`template_map` overrides** — regex patterns in config matched against issue labels
 3. **Score-based fallback** — score ≥ 70 → `fast`, ≥ 40 → `standard`, below 40 → `full`
@@ -144,14 +147,14 @@ When `self_optimize` is enabled, the daemon periodically reviews its own DORA me
 
 The optimization loop runs every `optimize_interval` poll cycles (default: 10) and applies these adjustments:
 
-| Condition | Adjustment |
-|-----------|------------|
-| CFR > 40% | Switch to `full` template |
-| CFR > 20% | Enable compound quality stage |
+| Condition           | Adjustment                                     |
+| ------------------- | ---------------------------------------------- |
+| CFR > 40%           | Switch to `full` template                      |
+| CFR > 20%           | Enable compound quality stage                  |
 | Lead time > 4 hours | Increase `max_parallel`, halve `poll_interval` |
-| Lead time > 2 hours | Enable `auto_template` for adaptive routing |
-| Deploy freq < 1/day | Recommend merge stage |
-| MTTR > 2 hours | Recommend auto-rollback |
+| Lead time > 2 hours | Enable `auto_template` for adaptive routing    |
+| Deploy freq < 1/day | Recommend merge stage                          |
+| MTTR > 2 hours      | Recommend auto-rollback                        |
 
 Enable in config:
 
@@ -186,10 +189,10 @@ Instead of watching a single repository, the daemon can poll issues across all r
 }
 ```
 
-| Field | Description |
-|-------|-------------|
-| `watch_mode` | Set to `"org"` for organization mode |
-| `org` | GitHub organization name |
+| Field         | Description                               |
+| ------------- | ----------------------------------------- |
+| `watch_mode`  | Set to `"org"` for organization mode      |
+| `org`         | GitHub organization name                  |
 | `repo_filter` | Optional regex to filter repository names |
 
 ## Proactive Patrol

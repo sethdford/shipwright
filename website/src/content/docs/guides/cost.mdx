@@ -39,33 +39,34 @@ shipwright cost calculate 50000 10000 opus
 
 Costs are calculated using per-model rates (USD per 1M tokens):
 
-| Model | Input | Output |
-|-------|-------|--------|
-| **Opus** | $15.00 | $75.00 |
-| **Sonnet** | $3.00 | $15.00 |
-| **Haiku** | $0.25 | $1.25 |
+| Model      | Input  | Output |
+| ---------- | ------ | ------ |
+| **Opus**   | $15.00 | $75.00 |
+| **Sonnet** | $3.00  | $15.00 |
+| **Haiku**  | $0.25  | $1.25  |
 
 ## Commands
 
-| Command | Description |
-|---------|-------------|
-| `shipwright cost show` | Show cost summary for the current period |
-| `shipwright cost show --period <days>` | Custom period (default: 7 days) |
-| `shipwright cost show --by-stage` | Breakdown by pipeline stage |
-| `shipwright cost show --by-issue` | Breakdown by GitHub issue |
-| `shipwright cost show --json` | JSON output for tooling |
-| `shipwright cost budget set <amount>` | Set daily budget in USD |
-| `shipwright cost budget show` | Show current budget and today's usage |
+| Command                                | Description                              |
+| -------------------------------------- | ---------------------------------------- |
+| `shipwright cost show`                 | Show cost summary for the current period |
+| `shipwright cost show --period <days>` | Custom period (default: 7 days)          |
+| `shipwright cost show --by-stage`      | Breakdown by pipeline stage              |
+| `shipwright cost show --by-issue`      | Breakdown by GitHub issue                |
+| `shipwright cost show --json`          | JSON output for tooling                  |
+| `shipwright cost budget set <amount>`  | Set daily budget in USD                  |
+| `shipwright cost budget show`          | Show current budget and today's usage    |
 
 ### Pipeline Integration Commands
 
 These are called automatically by the pipeline:
 
-| Command | Description |
-|---------|-------------|
-| `shipwright cost record <in> <out> <model> <stage> [issue]` | Record token usage |
-| `shipwright cost calculate <in> <out> <model>` | Calculate cost without recording |
-| `shipwright cost check-budget [estimated_usd]` | Pre-flight budget check |
+| Command                                                     | Description                                                            |
+| ----------------------------------------------------------- | ---------------------------------------------------------------------- |
+| `shipwright cost record <in> <out> <model> <stage> [issue]` | Record token usage                                                     |
+| `shipwright cost calculate <in> <out> <model>`              | Calculate cost without recording                                       |
+| `shipwright cost check-budget [estimated_usd]`              | Pre-flight budget check                                                |
+| `shipwright cost remaining-budget`                          | Return remaining daily budget as a number (used by daemon auto-scaler) |
 
 ## Budget Enforcement
 
@@ -78,10 +79,10 @@ shipwright cost budget set 50.00
 
 The budget system has two thresholds:
 
-| Threshold | Behavior |
-|-----------|----------|
-| **80% used** | Warning logged, pipeline continues |
-| **100% exceeded** | Pipeline blocked, event emitted |
+| Threshold         | Behavior                           |
+| ----------------- | ---------------------------------- |
+| **80% used**      | Warning logged, pipeline continues |
+| **100% exceeded** | Pipeline blocked, event emitted    |
 
 The budget resets daily at midnight UTC.
 
@@ -115,11 +116,11 @@ The budget resets daily at midnight UTC.
 
 The dashboard compares spending in the first and second halves of the period to detect trends:
 
-| Trend | Meaning |
-|-------|---------|
-| `↑ N% (increasing)` | Spending grew by more than 10% |
+| Trend               | Meaning                           |
+| ------------------- | --------------------------------- |
+| `↑ N% (increasing)` | Spending grew by more than 10%    |
 | `↓ N% (decreasing)` | Spending dropped by more than 10% |
-| `→ stable` | Change within 10% |
+| `→ stable`          | Change within 10%                 |
 
 ## Cost Optimization Tips
 
