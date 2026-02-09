@@ -5,6 +5,9 @@
 # ╚═══════════════════════════════════════════════════════════════════════════╝
 set -euo pipefail
 
+# Error trap for CI debugging — shows which line fails
+trap 'echo "ERROR: $BASH_SOURCE:$LINENO exited with status $?" >&2' ERR
+
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
 REAL_PIPELINE_SCRIPT="$SCRIPT_DIR/cct-pipeline.sh"

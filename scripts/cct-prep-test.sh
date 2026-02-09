@@ -4,6 +4,7 @@
 # ║  Every test runs cct-prep.sh as a subprocess · No logic reimpl.        ║
 # ╚═══════════════════════════════════════════════════════════════════════════╝
 set -euo pipefail
+trap 'echo "ERROR: $BASH_SOURCE:$LINENO exited with status $?" >&2' ERR
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PREP_SCRIPT="$SCRIPT_DIR/cct-prep.sh"

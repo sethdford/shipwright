@@ -4,6 +4,7 @@
 # ║  Mock tmux/daemon · Config parsing · Start/stop/status/metrics          ║
 # ╚═══════════════════════════════════════════════════════════════════════════╝
 set -euo pipefail
+trap 'echo "ERROR: $BASH_SOURCE:$LINENO exited with status $?" >&2' ERR
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 FLEET_SCRIPT="$SCRIPT_DIR/cct-fleet.sh"

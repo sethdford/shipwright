@@ -1857,13 +1857,23 @@ stage_test() {
         success "Tests passed"
     else
         error "Tests failed (exit code: $test_exit)"
-        tail -20 "$test_log"
+        tail -40 "$test_log"
 
-        # Post failure to GitHub
+        # Post failure to GitHub with more context
         if [[ -n "$ISSUE_NUMBER" ]]; then
-            gh_comment_issue "$ISSUE_NUMBER" "❌ **Tests failed**
+            local log_lines
+            log_lines=$(wc -l < "$test_log" 2>/dev/null || echo "0")
+            local log_excerpt
+            if [[ "$log_lines" -lt 60 ]]; then
+                log_excerpt="$(cat "$test_log" 2>/dev/null || true)"
+            else
+                log_excerpt="$(head -20 "$test_log" 2>/dev/null || true)
+... (${log_lines} lines total, showing head + tail) ...
+$(tail -30 "$test_log" 2>/dev/null || true)"
+            fi
+            gh_comment_issue "$ISSUE_NUMBER" "❌ **Tests failed** (exit code: $test_exit, ${log_lines} lines)
 \`\`\`
-$(tail -20 "$test_log")
+${log_excerpt}
 \`\`\`"
         fi
         return 1

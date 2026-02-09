@@ -4,6 +4,7 @@
 # ║  Mock pipelines · Arg parsing · Dry run · Status · Parallel limits      ║
 # ╚═══════════════════════════════════════════════════════════════════════════╝
 set -euo pipefail
+trap 'echo "ERROR: $BASH_SOURCE:$LINENO exited with status $?" >&2' ERR
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 FIX_SCRIPT="$SCRIPT_DIR/cct-fix.sh"
