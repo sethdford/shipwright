@@ -843,6 +843,7 @@ test_dry_run_summary_with_history() {
 
     invoke_pipeline start --goal "Dry run summary test" --skip-gates --dry-run
 
+    local rc=0
     assert_exit_code 0 "dry-run summary should succeed" &&
     assert_output_contains "Stage" "table has Stage header" &&
     assert_output_contains "Est\\. Duration" "table has duration header" &&
@@ -853,16 +854,17 @@ test_dry_run_summary_with_history() {
     assert_output_contains "build" "shows build stage" &&
     assert_output_contains "~2m 0s" "intake median duration is ~2m 0s" &&
     assert_output_contains "~5m 0s" "plan duration is ~5m 0s" &&
-    assert_output_contains "\\$0.12" "intake median cost is $0.12" &&
-    assert_output_contains "\\$1.45" "plan cost is $1.45" &&
-    assert_output_contains "\\$4.80" "build cost is $4.80" &&
+    assert_output_contains '\$0\.12' "intake median cost is \$0.12" &&
+    assert_output_contains '\$1\.45' "plan cost is \$1.45" &&
+    assert_output_contains '\$4\.80' "build cost is \$4.80" &&
     assert_output_contains "Total" "shows total row" &&
-    assert_output_contains "~\\$6.37" "total cost sums per-stage medians" &&
+    assert_output_contains '~\$6\.37' "total cost sums per-stage medians" &&
     assert_output_contains "Dry run" "shows dry-run message" &&
-    assert_file_not_exists ".claude/pipeline-artifacts/intake.json" "no artifacts created"
+    assert_file_not_exists ".claude/pipeline-artifacts/intake.json" "no artifacts created" || rc=$?
 
     # Clean up seeded events
     rm -f "$events_file" 2>/dev/null || true
+    return "$rc"
 }
 
 # ──────────────────────────────────────────────────────────────────────────────
