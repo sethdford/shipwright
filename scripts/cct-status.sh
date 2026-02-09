@@ -22,6 +22,181 @@ _COMPAT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/lib/compat.sh"
 # shellcheck source=lib/compat.sh
 [[ -f "$_COMPAT" ]] && source "$_COMPAT"
 
+# ─── Argument parsing ─────────────────────────────────────────────────────────
+JSON_OUTPUT=false
+for arg in "$@"; do
+    case "$arg" in
+        --json) JSON_OUTPUT=true ;;
+        --help|-h)
+            echo "Usage: shipwright status [OPTIONS]"
+            echo ""
+            echo "Show team dashboard with running agents, tasks, and pipelines."
+            echo ""
+            echo "Options:"
+            echo "  --json    Output machine-readable JSON instead of human-readable dashboard"
+            echo "  --help    Show this help message"
+            exit 0
+            ;;
+    esac
+done
+
+if [[ "$JSON_OUTPUT" == "true" ]]; then
+
+# ─── JSON Output Mode ──────────────────────────────────────────────────────
+
+# Require jq for JSON output
+if ! command -v jq &>/dev/null; then
+    echo '{"error":"jq is required for --json output"}' >&2
+    exit 1
+fi
+
+# ── Helper: cross-platform ISO date → epoch ──
+parse_iso_epoch() {
+    local ts="$1"
+    TZ=UTC date -j -f "%Y-%m-%dT%H:%M:%SZ" "$ts" +%s 2>/dev/null \
+        || date -d "$ts" +%s 2>/dev/null \
+        || echo 0
+}
+
+# ── 1. Teams (tmux windows) ──
+teams_json="[]"
+while IFS= read -r line; do
+    [[ -z "$line" ]] && continue
+    w_session_window="$(echo "$line" | cut -d'|' -f1)"
+    w_name="$(echo "$line" | cut -d'|' -f2)"
+    w_panes="$(echo "$line" | cut -d'|' -f3)"
+    w_active="$(echo "$line" | cut -d'|' -f4)"
+
+    if echo "$w_name" | grep -qi "claude"; then
+        w_status="active"
+        [[ "$w_active" != "1" ]] && w_status="idle"
+        teams_json=$(echo "$teams_json" | jq \
+            --arg name "$w_name" \
+            --argjson panes "$w_panes" \
+            --arg status "$w_status" \
+            --arg session "$w_session_window" \
+            '. + [{"name": $name, "panes": $panes, "status": $status, "session": $session}]')
+    fi
+done < <(tmux list-windows -a -F '#{session_name}:#{window_index}|#{window_name}|#{window_panes}|#{window_active}' 2>/dev/null || true)
+
+# ── 2. Tasks ──
+tasks_json="[]"
+TASKS_DIR="${HOME}/.claude/tasks"
+if [[ -d "$TASKS_DIR" ]]; then
+    while IFS= read -r task_dir; do
+        [[ -z "$task_dir" ]] && continue
+        t_team="$(basename "$task_dir")"
+        t_total=0
+        t_completed=0
+        t_in_progress=0
+        t_pending=0
+
+        while IFS= read -r task_file; do
+            [[ -z "$task_file" ]] && continue
+            t_total=$((t_total + 1))
+            t_status=$(grep -o '"status"[[:space:]]*:[[:space:]]*"[^"]*"' "$task_file" 2>/dev/null | head -1 | sed 's/.*"\([^"]*\)"$/\1/')
+            case "$t_status" in
+                completed)   t_completed=$((t_completed + 1)) ;;
+                in_progress) t_in_progress=$((t_in_progress + 1)) ;;
+                pending)     t_pending=$((t_pending + 1)) ;;
+            esac
+        done < <(find "$task_dir" -type f -name '*.json' 2>/dev/null)
+
+        tasks_json=$(echo "$tasks_json" | jq \
+            --arg team "$t_team" \
+            --argjson total "$t_total" \
+            --argjson completed "$t_completed" \
+            --argjson in_progress "$t_in_progress" \
+            --argjson pending "$t_pending" \
+            '. + [{"team": $team, "total": $total, "completed": $completed, "in_progress": $in_progress, "pending": $pending}]')
+    done < <(find "$TASKS_DIR" -mindepth 1 -maxdepth 1 -type d 2>/dev/null | sort)
+fi
+
+# ── 3. Daemon ──
+daemon_json="null"
+DAEMON_DIR="${HOME}/.claude-teams"
+STATE_FILE="${DAEMON_DIR}/daemon-state.json"
+PID_FILE="${DAEMON_DIR}/daemon.pid"
+
+if [[ -f "$STATE_FILE" ]]; then
+    d_pid=""
+    d_running=false
+    if [[ -f "$PID_FILE" ]]; then
+        d_pid=$(cat "$PID_FILE" 2>/dev/null || true)
+        if [[ -n "$d_pid" ]] && kill -0 "$d_pid" 2>/dev/null; then
+            d_running=true
+        fi
+    fi
+
+    d_active=$(jq -r '.active_jobs | length' "$STATE_FILE" 2>/dev/null || echo 0)
+    d_queued=$(jq -r '.queued | length' "$STATE_FILE" 2>/dev/null || echo 0)
+    d_completed=$(jq -r '.completed | length' "$STATE_FILE" 2>/dev/null || echo 0)
+
+    daemon_json=$(jq -n \
+        --argjson running "$d_running" \
+        --argjson active_jobs "${d_active:-0}" \
+        --argjson queued "${d_queued:-0}" \
+        --argjson completed "${d_completed:-0}" \
+        '{running: $running, active_jobs: $active_jobs, queued: $queued, completed: $completed}')
+fi
+
+# ── 4. Heartbeats ──
+heartbeats_json="[]"
+HEARTBEAT_DIR="$HOME/.claude-teams/heartbeats"
+if [[ -d "$HEARTBEAT_DIR" ]]; then
+    for hb_file in "${HEARTBEAT_DIR}"/*.json; do
+        [[ -f "$hb_file" ]] || continue
+        hb_job_id="$(basename "$hb_file" .json)"
+        hb_pid=$(jq -r '.pid // ""' "$hb_file" 2>/dev/null || true)
+        hb_stage=$(jq -r '.stage // ""' "$hb_file" 2>/dev/null || true)
+        hb_issue=$(jq -r '.issue // ""' "$hb_file" 2>/dev/null || true)
+        hb_updated=$(jq -r '.updated_at // ""' "$hb_file" 2>/dev/null || true)
+
+        hb_alive=false
+        if [[ -n "$hb_pid" && "$hb_pid" != "null" ]] && kill -0 "$hb_pid" 2>/dev/null; then
+            hb_alive=true
+        fi
+
+        hb_age_s=0
+        if [[ -n "$hb_updated" && "$hb_updated" != "null" ]]; then
+            hb_epoch=$(parse_iso_epoch "$hb_updated")
+            if [[ "$hb_epoch" -gt 0 ]]; then
+                now_e=$(date +%s)
+                hb_age_s=$((now_e - hb_epoch))
+            fi
+        fi
+
+        heartbeats_json=$(echo "$heartbeats_json" | jq \
+            --arg job_id "$hb_job_id" \
+            --arg stage "$hb_stage" \
+            --arg issue "$hb_issue" \
+            --argjson age_s "$hb_age_s" \
+            --argjson alive "$hb_alive" \
+            '. + [{"job_id": $job_id, "stage": $stage, "issue": $issue, "age_s": $age_s, "alive": $alive}]')
+    done
+fi
+
+# ── 5. Machines ──
+machines_json="[]"
+MACHINES_FILE="$HOME/.claude-teams/machines.json"
+if [[ -f "$MACHINES_FILE" ]]; then
+    machines_json=$(jq '[.machines[] | {name: .name, host: .host, cores: (.cores // null), memory_gb: (.memory_gb // null), max_workers: (.max_workers // null)}]' "$MACHINES_FILE" 2>/dev/null || echo "[]")
+fi
+
+# ── Emit final JSON ──
+jq -n \
+    --arg ts "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
+    --argjson teams "$teams_json" \
+    --argjson tasks "$tasks_json" \
+    --argjson daemon "$daemon_json" \
+    --argjson heartbeats "$heartbeats_json" \
+    --argjson machines "$machines_json" \
+    '{timestamp: $ts, teams: $teams, tasks: $tasks, daemon: $daemon, heartbeats: $heartbeats, machines: $machines}'
+
+else
+
+# ─── Human-Readable Output Mode ───────────────────────────────────────────
+
 # ─── Header ──────────────────────────────────────────────────────────────────
 
 echo ""
@@ -525,3 +700,5 @@ else
     echo -e "  ${DIM}No active teams. Start one:${RESET} ${CYAN}shipwright session <name>${RESET}"
 fi
 echo ""
+
+fi  # end JSON_OUTPUT conditional
