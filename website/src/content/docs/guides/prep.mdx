@@ -1,34 +1,48 @@
 ---
 title: Repo Preparation
-description: Prepare any repository for Claude Code agent teams with auto-generated configs, CLAUDE.md, and hooks.
+description: Prepare any repository for Claude Code agent teams with auto-generated configs, CLAUDE.md, architecture docs, and hooks.
 ---
 
-The prep command (`shipwright prep`) analyzes your repository and generates the configuration files needed for effective agent team development. It creates `.claude/` configs, a `CLAUDE.md` file, and quality gate hooks tailored to your project.
+The prep command (`shipwright prep`) analyzes your repository and generates the configuration files needed for effective agent team development. It creates `.claude/` configs, architecture documentation, agent role definitions, quality gate hooks, and a GitHub issue template — all tailored to your project.
 
 ## Quick Start
 
 ```bash
-# Analyze and prepare the current repo
+# Full analysis + generation
 shipwright prep
 
-# Preview what would be generated (dry run)
-shipwright prep --dry-run
+# Audit existing prep quality (dry run)
+shipwright prep --check
 
-# Prepare a specific directory
-shipwright prep --path /path/to/project
+# Refresh auto-generated sections without overwriting user edits
+shipwright prep --update
+
+# Regenerate everything (overwrite existing)
+shipwright prep --force
+
+# Deep analysis using Claude Code (slower, richer output)
+shipwright prep --with-claude
 ```
 
 ## What It Generates
 
 ### `.claude/` Directory
 
-| File | Purpose |
-|------|---------|
-| `settings.json` | Claude Code settings with agent teams enabled, hooks wired, and sensible defaults |
-| `CLAUDE.md` | Project-specific instructions for Claude — conventions, architecture, key files |
-| `hooks/teammate-idle.sh` | Quality gate: typecheck before agents go idle |
-| `hooks/task-completed.sh` | Quality gate: lint + test before task completion |
-| `hooks/notify-idle.sh` | Desktop notifications when agents need attention |
+| File                    | Purpose                                                                         |
+| ----------------------- | ------------------------------------------------------------------------------- |
+| `CLAUDE.md`             | Project-specific instructions for Claude — conventions, architecture, key files |
+| `settings.json`         | Claude Code settings with permission allowlists and sensible defaults           |
+| `ARCHITECTURE.md`       | System architecture overview — layers, data flow, key abstractions              |
+| `CODING-STANDARDS.md`   | Coding conventions — style, naming, patterns, anti-patterns                     |
+| `DEFINITION-OF-DONE.md` | Completion checklist — what "done" means for this project                       |
+| `agents/*.md`           | Agent role definitions for team-based development                               |
+| `hooks/*.sh`            | Pre/post action hooks — quality gates, notifications                            |
+
+### GitHub Issue Template
+
+| File                                   | Purpose                                               |
+| -------------------------------------- | ----------------------------------------------------- |
+| `.github/ISSUE_TEMPLATE/agent-task.md` | Structured issue template for agent-processable tasks |
 
 ### `CLAUDE.md` Content
 
@@ -53,6 +67,28 @@ Prep scans your repository to detect:
 
 The generated configuration adapts to what it finds. A TypeScript/React project gets different hooks and CLAUDE.md content than a Python/FastAPI project.
 
+## Modes
+
+### Default (`shipwright prep`)
+
+Runs full analysis and generates all files. Skips files that already exist (use `--force` to overwrite).
+
+### Check (`shipwright prep --check`)
+
+Audits an existing prep without modifying any files. Reports on:
+
+- Missing or outdated generated files
+- Configuration quality and completeness
+- Hook health and permissions
+
+### Update (`shipwright prep --update`)
+
+Refreshes auto-generated sections (architecture analysis, detected commands) while preserving any manual edits you've made to `CLAUDE.md` or other files.
+
+### Deep Analysis (`shipwright prep --with-claude`)
+
+Uses Claude Code for richer analysis — better architecture descriptions, more accurate convention detection, and higher-quality agent role definitions. Slower but produces significantly better output for complex codebases.
+
 ## Customization
 
 After running `shipwright prep`, review and customize the generated files:
@@ -60,13 +96,13 @@ After running `shipwright prep`, review and customize the generated files:
 1. **Edit `.claude/CLAUDE.md`** — Add project-specific context that automated analysis might miss (domain terminology, architectural decisions, team conventions)
 2. **Tune hook scripts** — Adjust quality gate thresholds or add project-specific checks
 3. **Update `settings.json`** — Configure model preferences, auto-compact thresholds, and enabled plugins
+4. **Review agent roles** — Customize agent definitions in `agents/*.md` for your team structure
 
 ## Flags
 
-| Flag | Description |
-|------|-------------|
-| `--dry-run` | Show what would be generated without writing files |
-| `--path <dir>` | Target directory (default: current directory) |
-| `--force` | Overwrite existing configuration files |
-| `--no-hooks` | Skip hook generation |
-| `--no-claude-md` | Skip CLAUDE.md generation |
+| Flag            | Description                                      |
+| --------------- | ------------------------------------------------ |
+| `--force`       | Overwrite existing configuration files           |
+| `--check`       | Audit existing prep quality (dry run, no writes) |
+| `--update`      | Refresh auto-generated sections only             |
+| `--with-claude` | Deep analysis using Claude Code (slower, richer) |

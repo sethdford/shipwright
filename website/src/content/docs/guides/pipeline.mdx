@@ -32,17 +32,23 @@ intake → plan → design → build → test → review → compound_quality �
 
 ## Quick Start
 
+{/* prettier-ignore */}
 <Tabs>
   <TabItem label="From a GitHub Issue">
-    ```bash # Fully autonomous — fetches issue, plans, builds, creates PR
-    shipwright pipeline start --issue 123 --skip-gates ```
+    ```bash
+    # Fully autonomous — fetches issue, plans, builds, creates PR
+    shipwright pipeline start --issue 123 --skip-gates
+    ```
   </TabItem>
   <TabItem label="From a Goal">
-    ```bash shipwright pipeline start --goal "Add JWT authentication" ```
+    ```bash
+    shipwright pipeline start --goal "Add JWT authentication"
+    ```
   </TabItem>
   <TabItem label="Hotfix">
-    ```bash shipwright pipeline start --issue 456 --pipeline hotfix --test-cmd
-    "pytest" ```
+    ```bash
+    shipwright pipeline start --issue 456 --pipeline hotfix --test-cmd "pytest"
+    ```
   </TabItem>
 </Tabs>
 
