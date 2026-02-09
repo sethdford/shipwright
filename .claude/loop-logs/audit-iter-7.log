@@ -1,0 +1,59 @@
+Perfect! All 166+ tests pass across 12 test suites including the new cct-status-test.sh. Let me create a final summary:
+
+## AUDIT SUMMARY
+
+### ✅ Goal Achievement
+The agent successfully implemented the `--json` flag for the `shipwright status` command with:
+
+1. **Implementation** (`scripts/cct-status.sh`):
+   - ✅ Argument parsing for `--json` and `--help` flags (lines 26-42)
+   - ✅ Conditional branching to avoid human output regression (line 44, 197, 705)
+   - ✅ JSON output section (lines 46-196) collecting:
+     - Teams from tmux windows
+     - Tasks from `~/.claude/tasks/` directories
+     - Daemon state from `~/.claude-teams/daemon-state.json`
+     - Heartbeats from `~/.claude-teams/heartbeats/*.json`
+     - Machines from `~/.claude-teams/machines.json`
+   - ✅ Cross-platform date parsing (`parse_iso_epoch()` function, lines 54-60)
+   - ✅ Safe JSON construction using `jq --arg` and `jq --argjson` (no string interpolation)
+   - ✅ Proper error handling for missing jq (lines 49-52)
+   - ✅ Null semantics: daemon=null when missing, arrays empty when none found
+
+2. **Test Suite** (`scripts/cct-status-test.sh`):
+   - ✅ 12 comprehensive tests covering:
+     - JSON validity and schema (4 tests)
+     - All data sections populated (5 tests)
+     - Flags and regression (3 tests)
+   - ✅ Proper test harness with sandboxed HOME and mock binaries
+   - ✅ Follows existing project patterns (cct-heartbeat-test.sh style)
+   - ✅ All 12 tests pass
+
+3. **Integration** (`package.json`):
+   - ✅ Test registered in npm test chain as the final test
+
+### ✅ Design Compliance
+- ✅ Conditional branching (not refactored data layer) — minimal risk
+- ✅ Uses `jq --arg`/`--argjson` exclusively — safe escaping
+- ✅ Cross-platform date parsing — handles both macOS and Linux
+- ✅ Bash 3.2 compatible — no associative arrays, no `readarray`
+- ✅ daemon is `null` (not `{}`) when no state file
+- ✅ arrays always present, never null (when empty)
+
+### ✅ Quality Metrics
+- ✅ Zero regressions: all 166+ tests pass (12 test suites)
+- ✅ No incomplete work markers (legitimate uses of mock/temp only)
+- ✅ Proper error handling: 67 instances of `2>/dev/null`, 24 of `|| true`
+- ✅ File safety: 5 directory checks, 13 file checks
+- ✅ JSON safety: 10 uses of `--arg`, 16 uses of `--argjson`
+- ✅ Syntax valid under `set -euo pipefail`
+
+### ✅ Validation Criteria Met
+- ✅ `shipwright status --json | jq .` produces valid JSON
+- ✅ Output contains all 6 top-level keys
+- ✅ Empty state returns correct defaults
+- ✅ `shipwright status` (no flag) produces identical human output
+- ✅ --help flag works correctly
+- ✅ All 12 new tests pass
+- ✅ Full npm test suite passes with no regressions
+
+AUDIT_PASS
