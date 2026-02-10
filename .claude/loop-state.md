@@ -145,16 +145,16 @@ Task tracking (check off items as you complete them):
 - Branch: docs/shipwright-doctor-should-validate-dashbo-6
 - Issue: #6
 - Generated: 2026-02-09T23:46:34Z"
-iteration: 21
+iteration: 22
 max_iterations: 25
 status: running
 test_cmd: "npm test"
 model: opus
 agents: 1
-started_at: 2026-02-10T02:24:51Z
-last_iteration_at: 2026-02-10T02:24:51Z
+started_at: 2026-02-10T02:32:39Z
+last_iteration_at: 2026-02-10T02:32:39Z
 consecutive_failures: 0
-total_commits: 21
+total_commits: 22
 audit_enabled: true
 audit_agent_enabled: true
 quality_gates_enabled: true
@@ -269,4 +269,9 @@ The implementation is complete:
 3. **Audit**: AUDIT_PASS from iteration 20
 The implementation is fully complete:
 - `scripts/cct-doctor.sh` Section 12 (DASHBOARD) validates Bun runtime, server.ts location, public assets, and port 8767
+
+### Iteration 22 (2026-02-10T02:32:39Z)
+   - Port 8767 availability with `lsof`/`ss`/`netstat` fallback chain
+   - PID file staleness detection
+2. **`scripts/cct-doctor-test.sh`** — 14 tests, all passing via `npm test`
 
