@@ -1,6 +1,6 @@
 
 > shipwright-cli@1.7.1 test
-> bash scripts/cct-pipeline-test.sh && bash scripts/cct-daemon-test.sh && bash scripts/cct-prep-test.sh && bash scripts/cct-fleet-test.sh && bash scripts/cct-fix-test.sh && bash scripts/cct-memory-test.sh && bash scripts/cct-session-test.sh && bash scripts/cct-init-test.sh && bash scripts/cct-tracker-test.sh && bash scripts/cct-heartbeat-test.sh && bash scripts/cct-remote-test.sh
+> bash scripts/cct-pipeline-test.sh && bash scripts/cct-daemon-test.sh && bash scripts/cct-prep-test.sh && bash scripts/cct-fleet-test.sh && bash scripts/cct-fix-test.sh && bash scripts/cct-memory-test.sh && bash scripts/cct-session-test.sh && bash scripts/cct-init-test.sh && bash scripts/cct-tracker-test.sh && bash scripts/cct-heartbeat-test.sh && bash scripts/cct-remote-test.sh && bash scripts/cct-doctor-test.sh
 
 
 [38;2;124;58;237m[1m╔═══════════════════════════════════════════════════════════════════╗[0m
@@ -8,7 +8,7 @@
 [38;2;124;58;237m[1m╚═══════════════════════════════════════════════════════════════════╝[0m
 
 [2mSetting up mock environment...[0m
-[38;2;74;222;128m✓[0m Environment ready: [2m/tmp/cct-pipeline-test.B6dAmh[0m
+[38;2;74;222;128m✓[0m Environment ready: [2m/tmp/cct-pipeline-test.aUOTPb[0m
 
   [38;2;0;212;255m▸[0m Preflight passes with all mocks... [38;2;74;222;128m✓[0m
   [38;2;0;212;255m▸[0m Preflight fails when cct-loop.sh missing... [38;2;74;222;128m✓[0m
@@ -39,7 +39,7 @@
 [38;2;124;58;237m[1m╚═══════════════════════════════════════════════════════════════════╝[0m
 
 [2mSetting up test environment...[0m
-[38;2;74;222;128m✓[0m Environment ready: [2m/tmp/cct-daemon-test.HFnWV6[0m
+[38;2;74;222;128m✓[0m Environment ready: [2m/tmp/cct-daemon-test.x5nXRL[0m
 
   [38;2;0;212;255m▸[0m dora_grade deploy_freq Elite (>= 7)... [38;2;74;222;128m✓[0m
   [38;2;0;212;255m▸[0m dora_grade deploy_freq High (>= 1)... [38;2;74;222;128m✓[0m
@@ -67,7 +67,7 @@
 [38;2;124;58;237m[1m╚═══════════════════════════════════════════════════════════════════╝[0m
 
 [2mSetting up test environment...[0m
-[38;2;74;222;128m✓[0m Environment ready: [2m/tmp/cct-prep-test.Yc3xpS[0m
+[38;2;74;222;128m✓[0m Environment ready: [2m/tmp/cct-prep-test.ws1Coi[0m
 
   [38;2;0;212;255m▸[0m Node.js project detection... [38;2;74;222;128m✓[0m
   [38;2;0;212;255m▸[0m Python project detection... [38;2;74;222;128m✓[0m
@@ -96,7 +96,7 @@
 [38;2;124;58;237m[1m╚═══════════════════════════════════════════════════════════════════╝[0m
 
 [2mSetting up test environment...[0m
-[38;2;74;222;128m✓[0m Environment ready: [2m/tmp/cct-fleet-test.qYORIR[0m
+[38;2;74;222;128m✓[0m Environment ready: [2m/tmp/cct-fleet-test.UBGJut[0m
 
   [38;2;0;212;255m▸[0m Help output contains expected sections... [38;2;74;222;128m✓[0m
   [38;2;0;212;255m▸[0m Help via --help flag... [38;2;74;222;128m✓[0m
@@ -139,7 +139,7 @@
 [38;2;124;58;237m[1m╚═══════════════════════════════════════════════════════════════════╝[0m
 
 [2mSetting up test environment...[0m
-[38;2;74;222;128m✓[0m Environment ready: [2m/tmp/cct-fix-test.h59z2s[0m
+[38;2;74;222;128m✓[0m Environment ready: [2m/tmp/cct-fix-test.EczmZl[0m
 
   [38;2;0;212;255m▸[0m Help output contains expected sections... [38;2;74;222;128m✓[0m
   [38;2;0;212;255m▸[0m Help via --help flag... [38;2;74;222;128m✓[0m
@@ -177,7 +177,7 @@
 [38;2;124;58;237m[1m╚═══════════════════════════════════════════════════════════════════╝[0m
 
 [2mSetting up mock environment...[0m
-[38;2;74;222;128m✓[0m Environment ready: [2m/tmp/cct-memory-test.fOcsFD[0m
+[38;2;74;222;128m✓[0m Environment ready: [2m/tmp/cct-memory-test.nZxkA2[0m
 
   [38;2;0;212;255m▸[0m Memory capture from pipeline state... [38;2;74;222;128m✓[0m
   [38;2;0;212;255m▸[0m Memory inject returns context for each stage... [38;2;74;222;128m✓[0m
@@ -207,7 +207,7 @@
 [38;2;0;212;255m[1m╚═══════════════════════════════════════════════════╝[0m
 
 [2mSetting up test environment...[0m
-[2mTest tmux session: cct-test-253106[0m
+[2mTest tmux session: cct-test-1671171[0m
 
 [38;2;124;58;237m[1mTemplate Loading[0m
   [38;2;0;212;255m▸[0m Load feature-dev template (3 agents)... [38;2;74;222;128m✓[0m
@@ -250,7 +250,7 @@
 [38;2;0;212;255m[1m╚═══════════════════════════════════════════════════╝[0m
 
 [2mSetting up sandboxed environment...[0m
-[2mTemp dir: /tmp/cct-init-test.FyR33D[0m
+[2mTemp dir: /tmp/cct-init-test.PZBLJw[0m
 
 [38;2;124;58;237m[1mConfiguration[0m
   [38;2;0;212;255m▸[0m Settings.json created with agent teams... [38;2;74;222;128m✓[0m
@@ -319,7 +319,7 @@
   [38;2;0;212;255m▸[0m Write heartbeat creates JSON file... [38;2;74;222;128m✓[0m
   [38;2;0;212;255m▸[0m Check heartbeat reports alive... [38;2;74;222;128m[1m✓[0m Job test-job-alive alive (0s ago)
 [38;2;74;222;128m✓[0m
-  [38;2;0;212;255m▸[0m Check heartbeat reports stale... [38;2;250;204;21m[1m⚠[0m Job test-job-stale stale (192832491s ago, timeout: 120s)
+  [38;2;0;212;255m▸[0m Check heartbeat reports stale... [38;2;250;204;21m[1m⚠[0m Job test-job-stale stale (192847792s ago, timeout: 120s)
 [38;2;74;222;128m✓[0m
   [38;2;0;212;255m▸[0m Clear heartbeat removes file... [38;2;74;222;128m[1m✓[0m Cleared heartbeat for job: test-job-clear
 [38;2;74;222;128m✓[0m
@@ -361,12 +361,12 @@
 [2mSetting up test environment...[0m
 
 [38;2;124;58;237m[1mMachine Registry[0m
-  [38;2;0;212;255m▸[0m Add machine creates machines.json... [38;2;0;212;255m[1m▸[0m Checking shipwright installation at [2m/tmp/cct-remote-test.Og25gD/mock-install[0m...
-[38;2;74;222;128m[1m✓[0m Shipwright found at /tmp/cct-remote-test.Og25gD/mock-install
+  [38;2;0;212;255m▸[0m Add machine creates machines.json... [38;2;0;212;255m[1m▸[0m Checking shipwright installation at [2m/tmp/cct-remote-test.VpkUEz/mock-install[0m...
+[38;2;74;222;128m[1m✓[0m Shipwright found at /tmp/cct-remote-test.VpkUEz/mock-install
 [38;2;74;222;128m[1m✓[0m Registered machine: [1mbuilder-1[0m (localhost, worker, 4 workers)
 [38;2;74;222;128m✓[0m
-  [38;2;0;212;255m▸[0m Add second machine appends to array... [38;2;0;212;255m[1m▸[0m Checking shipwright installation at [2m/tmp/cct-remote-test.Og25gD/mock-install[0m...
-[38;2;74;222;128m[1m✓[0m Shipwright found at /tmp/cct-remote-test.Og25gD/mock-install
+  [38;2;0;212;255m▸[0m Add second machine appends to array... [38;2;0;212;255m[1m▸[0m Checking shipwright installation at [2m/tmp/cct-remote-test.VpkUEz/mock-install[0m...
+[38;2;74;222;128m[1m✓[0m Shipwright found at /tmp/cct-remote-test.VpkUEz/mock-install
 [38;2;74;222;128m[1m✓[0m Registered machine: [1mbuilder-2[0m (localhost, worker, 8 workers)
 [38;2;74;222;128m✓[0m
   [38;2;0;212;255m▸[0m Remove machine by name... [38;2;74;222;128m[1m✓[0m Removed machine: [1mbuilder-2[0m
@@ -385,6 +385,37 @@
   [38;2;0;212;255m▸[0m Doctor has remote machine checks... [38;2;74;222;128m✓[0m
   [38;2;0;212;255m▸[0m Status shows heartbeat section... [38;2;74;222;128m✓[0m
   [38;2;0;212;255m▸[0m Status shows remote machines section... [38;2;74;222;128m✓[0m
+
+[38;2;0;212;255m[1m════════════════════════════════════════════════════[0m
+[38;2;74;222;128m[1m  All 14 tests passed ✓[0m
+[38;2;0;212;255m[1m════════════════════════════════════════════════════[0m
+
+
+[38;2;0;212;255m[1m╔═══════════════════════════════════════════════════╗[0m
+[38;2;0;212;255m[1m║  shipwright doctor — Test Suite                   ║[0m
+[38;2;0;212;255m[1m╚═══════════════════════════════════════════════════╝[0m
+
+[38;2;124;58;237m[1mScript Structure[0m
+  [38;2;0;212;255m▸[0m Doctor script exists and is executable... [38;2;74;222;128m✓[0m
+  [38;2;0;212;255m▸[0m Doctor has DASHBOARD section... [38;2;74;222;128m✓[0m
+  [38;2;0;212;255m▸[0m Doctor has HEARTBEATS section... [38;2;74;222;128m✓[0m
+  [38;2;0;212;255m▸[0m Doctor has REMOTE MACHINES section... [38;2;74;222;128m✓[0m
+
+[38;2;124;58;237m[1mDashboard Dependency Checks[0m
+  [38;2;0;212;255m▸[0m Doctor checks for Bun runtime... [38;2;74;222;128m✓[0m
+  [38;2;0;212;255m▸[0m Doctor checks dashboard server.ts... [38;2;74;222;128m✓[0m
+  [38;2;0;212;255m▸[0m Doctor checks dashboard public assets... [38;2;74;222;128m✓[0m
+
+[38;2;124;58;237m[1mPort Availability Checks[0m
+  [38;2;0;212;255m▸[0m Doctor checks port availability... [38;2;74;222;128m✓[0m
+  [38;2;0;212;255m▸[0m Doctor uses default port 8767... [38;2;74;222;128m✓[0m
+  [38;2;0;212;255m▸[0m Doctor checks dashboard PID file... [38;2;74;222;128m✓[0m
+  [38;2;0;212;255m▸[0m Doctor has port check fallbacks (lsof/ss/netstat)... [38;2;74;222;128m✓[0m
+  [38;2;0;212;255m▸[0m Doctor searches multiple dashboard locations... [38;2;74;222;128m✓[0m
+
+[38;2;124;58;237m[1mSmoke Tests[0m
+  [38;2;0;212;255m▸[0m Doctor script runs without errors... [38;2;74;222;128m✓[0m
+  [38;2;0;212;255m▸[0m Doctor output includes Dashboard section... [38;2;74;222;128m✓[0m
 
 [38;2;0;212;255m[1m════════════════════════════════════════════════════[0m
 [38;2;74;222;128m[1m  All 14 tests passed ✓[0m

@@ -1,1 +1,49 @@
-Credit balance is too low
+Perfect! It's there. Now let me create a final comprehensive review summary:
+
+## Critical Review Summary
+
+I've thoroughly audited the agent's work on **"shipwright doctor should validate dashboard dependencies and port availability"** (Issue #6).
+
+### Findings
+
+**✅ IMPLEMENTATION QUALITY: EXCELLENT**
+
+**1. Completeness vs. Design Specification:**
+- ✅ All four design components fully implemented (lines 703-802):
+  - **Bun runtime check** (710-716): Detects Bun, shows version, provides install instructions
+  - **Server.ts location** (719-737): Searches 3 paths in priority order (repo, XDG, legacy)
+  - **Public assets validation** (740-765): Checks index.html, app.js, styles.css
+  - **Port availability** (768-802): Uses lsof/ss/netstat fallback chain, checks PID file
+  
+**2. Code Quality:**
+- ✅ **Bash 3.2 compatible**: No associative arrays, no `readarray`, no parameter expansion
+- ✅ **Proper pipefail handling**: All grep commands wrapped in `if` conditions (lines 787, 791) to prevent unguarded exits
+- ✅ **Consistent patterns**: Uses existing `check_pass()`/`check_warn()`/`check_fail()` helpers correctly
+- ✅ **Counter integration**: Variables `PASS`/`WARN`/`FAIL` initialized and properly incremented, summary includes them (line 813)
+- ✅ **Cross-platform**: Handles both macOS (lsof) and Linux (ss/netstat) port detection
+
+**3. Test Coverage:**
+- ✅ 14 dedicated doctor tests in `scripts/cct-doctor-test.sh`:
+  - Tests script structure, dashboard sections, all four check types
+  - Includes smoke tests that actually run the doctor script
+  - All 14 tests pass (verified: `npm test` output confirms)
+- ✅ Properly wired into `npm test` pipeline
+- ✅ Tests validate fallback chain, multiple search paths, PID file handling
+
+**4. No Issues Found:**
+- ✅ No syntax errors (bash -n validation passed)
+- ✅ No unguarded commands under pipefail
+- ✅ No incomplete TODOs or placeholder code
+- ✅ No regressions (all 185+ tests in full suite pass)
+- ✅ No security issues (proper escaping, no command injection)
+- ✅ Clean git state (only loop log changes, no uncommitted implementation)
+
+**5. Acceptance Criteria:**
+- ✅ `shipwright doctor` shows Bun check with install instructions
+- ✅ Dashboard file existence verified (server.ts + public assets)
+- ✅ Port availability checked (lsof/ss/netstat fallbacks)
+- ✅ Tests exist and are part of `npm test`
+- ✅ Uses correct port (8767, not 3000)
+- ✅ Matches design document exactly
+
+**AUDIT_PASS**
