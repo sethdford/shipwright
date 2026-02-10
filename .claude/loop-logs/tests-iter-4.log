@@ -1,6 +1,6 @@
 
 > shipwright-cli@1.7.1 test
-> bash scripts/cct-pipeline-test.sh && bash scripts/cct-daemon-test.sh && bash scripts/cct-prep-test.sh && bash scripts/cct-fleet-test.sh && bash scripts/cct-fix-test.sh && bash scripts/cct-memory-test.sh && bash scripts/cct-session-test.sh && bash scripts/cct-init-test.sh && bash scripts/cct-tracker-test.sh && bash scripts/cct-heartbeat-test.sh && bash scripts/cct-remote-test.sh
+> bash scripts/sw-pipeline-test.sh && bash scripts/sw-daemon-test.sh && bash scripts/sw-prep-test.sh && bash scripts/sw-fleet-test.sh && bash scripts/sw-fix-test.sh && bash scripts/sw-memory-test.sh && bash scripts/sw-session-test.sh && bash scripts/sw-init-test.sh && bash scripts/sw-tracker-test.sh && bash scripts/sw-heartbeat-test.sh && bash scripts/sw-remote-test.sh
 
 
 [38;2;124;58;237m[1m╔═══════════════════════════════════════════════════════════════════╗[0m
@@ -8,15 +8,15 @@
 [38;2;124;58;237m[1m╚═══════════════════════════════════════════════════════════════════╝[0m
 
 [2mSetting up mock environment...[0m
-[38;2;74;222;128m✓[0m Environment ready: [2m/tmp/cct-pipeline-test.uPQWsh[0m
+[38;2;74;222;128m✓[0m Environment ready: [2m/tmp/sw-pipeline-test.gjbOYg[0m
 
   [38;2;0;212;255m▸[0m Preflight passes with all mocks... [38;2;74;222;128m✓[0m
-  [38;2;0;212;255m▸[0m Preflight fails when cct-loop.sh missing... [38;2;74;222;128m✓[0m
+  [38;2;0;212;255m▸[0m Preflight fails when sw-loop.sh missing... [38;2;74;222;128m✓[0m
   [38;2;0;212;255m▸[0m Start requires --goal or --issue... [38;2;74;222;128m✓[0m
   [38;2;0;212;255m▸[0m Intake with --goal creates branch + artifacts... [38;2;74;222;128m✓[0m
   [38;2;0;212;255m▸[0m Intake with --issue fetches from GitHub... [38;2;74;222;128m✓[0m
   [38;2;0;212;255m▸[0m Plan generates plan.md, dod.md, tasks... [38;2;74;222;128m✓[0m
-  [38;2;0;212;255m▸[0m Build invokes cct loop and commits... [38;2;74;222;128m✓[0m
+  [38;2;0;212;255m▸[0m Build invokes sw loop and commits... [38;2;74;222;128m✓[0m
   [38;2;0;212;255m▸[0m Test stage captures results to log... [38;2;74;222;128m✓[0m
   [38;2;0;212;255m▸[0m Review generates report with severities... [38;2;74;222;128m✓[0m
   [38;2;0;212;255m▸[0m PR stage creates PR URL artifact... [38;2;74;222;128m✓[0m
@@ -41,7 +41,7 @@
 [38;2;124;58;237m[1m╚═══════════════════════════════════════════════════════════════════╝[0m
 
 [2mSetting up test environment...[0m
-[38;2;74;222;128m✓[0m Environment ready: [2m/tmp/cct-daemon-test.wtZYox[0m
+[38;2;74;222;128m✓[0m Environment ready: [2m/tmp/sw-daemon-test.9g1igp[0m
 
   [38;2;0;212;255m▸[0m dora_grade deploy_freq Elite (>= 7)... [38;2;74;222;128m✓[0m
   [38;2;0;212;255m▸[0m dora_grade deploy_freq High (>= 1)... [38;2;74;222;128m✓[0m
@@ -55,13 +55,19 @@
   [38;2;0;212;255m▸[0m Priority label sorting... [38;2;74;222;128m✓[0m
   [38;2;0;212;255m▸[0m Degradation alert triggers on high CFR... [38;2;74;222;128m✓[0m
   [38;2;0;212;255m▸[0m Metrics --json output with cycle_time keys... [38;2;74;222;128m✓[0m
+  [38;2;0;212;255m▸[0m Self-labeling includes watch_label when enabled... [38;2;74;222;128m✓[0m
+  [38;2;0;212;255m▸[0m Self-labeling excludes watch_label when disabled... [38;2;74;222;128m✓[0m
+  [38;2;0;212;255m▸[0m Patrol recurring failures label construction... [38;2;74;222;128m✓[0m
+  [38;2;0;212;255m▸[0m DORA degradation event detection... [38;2;74;222;128m✓[0m
+  [38;2;0;212;255m▸[0m Retry exhaustion event detection... [38;2;74;222;128m✓[0m
+  [38;2;0;212;255m▸[0m Untested script detection logic... [38;2;74;222;128m✓[0m
 
 [38;2;124;58;237m[1m━━━ Results ━━━[0m
-  [38;2;74;222;128mPassed:[0m 12
+  [38;2;74;222;128mPassed:[0m 18
   [38;2;248;113;113mFailed:[0m 0
-  [2mTotal:[0m  12
+  [2mTotal:[0m  18
 
-[38;2;74;222;128m[1mAll 12 tests passed![0m
+[38;2;74;222;128m[1mAll 18 tests passed![0m
 
 
 [38;2;124;58;237m[1m╔═══════════════════════════════════════════════════════════════════╗[0m
@@ -69,7 +75,7 @@
 [38;2;124;58;237m[1m╚═══════════════════════════════════════════════════════════════════╝[0m
 
 [2mSetting up test environment...[0m
-[38;2;74;222;128m✓[0m Environment ready: [2m/tmp/cct-prep-test.KDS6v2[0m
+[38;2;74;222;128m✓[0m Environment ready: [2m/tmp/sw-prep-test.X0Srbx[0m
 
   [38;2;0;212;255m▸[0m Node.js project detection... [38;2;74;222;128m✓[0m
   [38;2;0;212;255m▸[0m Python project detection... [38;2;74;222;128m✓[0m
@@ -98,7 +104,7 @@
 [38;2;124;58;237m[1m╚═══════════════════════════════════════════════════════════════════╝[0m
 
 [2mSetting up test environment...[0m
-[38;2;74;222;128m✓[0m Environment ready: [2m/tmp/cct-fleet-test.4MLoXP[0m
+[38;2;74;222;128m✓[0m Environment ready: [2m/tmp/sw-fleet-test.4wlJJV[0m
 
   [38;2;0;212;255m▸[0m Help output contains expected sections... [38;2;74;222;128m✓[0m
   [38;2;0;212;255m▸[0m Help via --help flag... [38;2;74;222;128m✓[0m
@@ -141,7 +147,7 @@
 [38;2;124;58;237m[1m╚═══════════════════════════════════════════════════════════════════╝[0m
 
 [2mSetting up test environment...[0m
-[38;2;74;222;128m✓[0m Environment ready: [2m/tmp/cct-fix-test.AvbdzP[0m
+[38;2;74;222;128m✓[0m Environment ready: [2m/tmp/sw-fix-test.eN2v7V[0m
 
   [38;2;0;212;255m▸[0m Help output contains expected sections... [38;2;74;222;128m✓[0m
   [38;2;0;212;255m▸[0m Help via --help flag... [38;2;74;222;128m✓[0m
@@ -179,7 +185,7 @@
 [38;2;124;58;237m[1m╚═══════════════════════════════════════════════════════════════════╝[0m
 
 [2mSetting up mock environment...[0m
-[38;2;74;222;128m✓[0m Environment ready: [2m/tmp/cct-memory-test.yetB8o[0m
+[38;2;74;222;128m✓[0m Environment ready: [2m/tmp/sw-memory-test.LAeI0Z[0m
 
   [38;2;0;212;255m▸[0m Memory capture from pipeline state... [38;2;74;222;128m✓[0m
   [38;2;0;212;255m▸[0m Memory inject returns context for each stage... [38;2;74;222;128m✓[0m
@@ -195,13 +201,16 @@
   [38;2;0;212;255m▸[0m Budget set and check... [38;2;74;222;128m✓[0m
   [38;2;0;212;255m▸[0m Cost dashboard runs without errors... [38;2;74;222;128m✓[0m
   [38;2;0;212;255m▸[0m Cost JSON output is valid... [38;2;74;222;128m✓[0m
+  [38;2;0;212;255m▸[0m Actionable failures threshold filtering... [38;2;74;222;128m✓[0m
+  [38;2;0;212;255m▸[0m Actionable failures with no file returns []... [38;2;74;222;128m✓[0m
+  [38;2;0;212;255m▸[0m DORA baseline calculation from events... [38;2;74;222;128m✓[0m
 
 [38;2;124;58;237m[1m━━━ Results ━━━[0m
-  [38;2;74;222;128mPassed:[0m 14
+  [38;2;74;222;128mPassed:[0m 17
   [38;2;248;113;113mFailed:[0m 0
-  [2mTotal:[0m  14
+  [2mTotal:[0m  17
 
-[38;2;74;222;128m[1mAll 14 tests passed![0m
+[38;2;74;222;128m[1mAll 17 tests passed![0m
 
 
 [38;2;0;212;255m[1m╔═══════════════════════════════════════════════════╗[0m
@@ -209,7 +218,7 @@
 [38;2;0;212;255m[1m╚═══════════════════════════════════════════════════╝[0m
 
 [2mSetting up test environment...[0m
-[2mTest tmux session: cct-test-1310716[0m
+[2mTest tmux session: sw-test-453319[0m
 
 [38;2;124;58;237m[1mTemplate Loading[0m
   [38;2;0;212;255m▸[0m Load feature-dev template (3 agents)... [38;2;74;222;128m✓[0m
@@ -252,7 +261,7 @@
 [38;2;0;212;255m[1m╚═══════════════════════════════════════════════════╝[0m
 
 [2mSetting up sandboxed environment...[0m
-[2mTemp dir: /tmp/cct-init-test.FovBlB[0m
+[2mTemp dir: /tmp/sw-init-test.IRjAP0[0m
 
 [38;2;124;58;237m[1mConfiguration[0m
   [38;2;0;212;255m▸[0m Settings.json created with agent teams... [38;2;74;222;128m✓[0m
@@ -321,7 +330,7 @@
   [38;2;0;212;255m▸[0m Write heartbeat creates JSON file... [38;2;74;222;128m✓[0m
   [38;2;0;212;255m▸[0m Check heartbeat reports alive... [38;2;74;222;128m[1m✓[0m Job test-job-alive alive (0s ago)
 [38;2;74;222;128m✓[0m
-  [38;2;0;212;255m▸[0m Check heartbeat reports stale... [38;2;250;204;21m[1m⚠[0m Job test-job-stale stale (192840295s ago, timeout: 120s)
+  [38;2;0;212;255m▸[0m Check heartbeat reports stale... [38;2;250;204;21m[1m⚠[0m Job test-job-stale stale (192854422s ago, timeout: 120s)
 [38;2;74;222;128m✓[0m
   [38;2;0;212;255m▸[0m Clear heartbeat removes file... [38;2;74;222;128m[1m✓[0m Cleared heartbeat for job: test-job-clear
 [38;2;74;222;128m✓[0m
@@ -363,12 +372,12 @@
 [2mSetting up test environment...[0m
 
 [38;2;124;58;237m[1mMachine Registry[0m
-  [38;2;0;212;255m▸[0m Add machine creates machines.json... [38;2;0;212;255m[1m▸[0m Checking shipwright installation at [2m/tmp/cct-remote-test.i4WY3P/mock-install[0m...
-[38;2;74;222;128m[1m✓[0m Shipwright found at /tmp/cct-remote-test.i4WY3P/mock-install
+  [38;2;0;212;255m▸[0m Add machine creates machines.json... [38;2;0;212;255m[1m▸[0m Checking shipwright installation at [2m/tmp/sw-remote-test.Wqz5Xb/mock-install[0m...
+[38;2;74;222;128m[1m✓[0m Shipwright found at /tmp/sw-remote-test.Wqz5Xb/mock-install
 [38;2;74;222;128m[1m✓[0m Registered machine: [1mbuilder-1[0m (localhost, worker, 4 workers)
 [38;2;74;222;128m✓[0m
-  [38;2;0;212;255m▸[0m Add second machine appends to array... [38;2;0;212;255m[1m▸[0m Checking shipwright installation at [2m/tmp/cct-remote-test.i4WY3P/mock-install[0m...
-[38;2;74;222;128m[1m✓[0m Shipwright found at /tmp/cct-remote-test.i4WY3P/mock-install
+  [38;2;0;212;255m▸[0m Add second machine appends to array... [38;2;0;212;255m[1m▸[0m Checking shipwright installation at [2m/tmp/sw-remote-test.Wqz5Xb/mock-install[0m...
+[38;2;74;222;128m[1m✓[0m Shipwright found at /tmp/sw-remote-test.Wqz5Xb/mock-install
 [38;2;74;222;128m[1m✓[0m Registered machine: [1mbuilder-2[0m (localhost, worker, 8 workers)
 [38;2;74;222;128m✓[0m
   [38;2;0;212;255m▸[0m Remove machine by name... [38;2;74;222;128m[1m✓[0m Removed machine: [1mbuilder-2[0m

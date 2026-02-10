@@ -1,17 +1,1 @@
-All quality gates pass:
-
-1. **Tests**: All 184 tests pass across 11 test suites (17+12+13+27+22+14+21+15+12+17+14)
-2. **No uncommitted changes**: Working tree clean
-3. **Implementation complete**: `dry_run_summary()` function in `cct-pipeline.sh` with three comprehensive test cases
-4. **Audit**: AUDIT_PASS from iteration 4 audit agent
-
-The feature is fully implemented:
-- `--dry-run` flag shows a formatted table with Stage, Est. Duration, Model, Est. Cost columns
-- Duration uses median from historical `stage.completed` events
-- Cost uses pipeline-level median from `pipeline.cost` events
-- Model resolution per-stage from template config (CLI > stage config > defaults > opus)
-- "no data" / "—" graceful fallback when no history exists
-- Total row with summed duration and cost
-- Budget remaining display when configured
-
-LOOP_COMPLETE
+API Error: 400 {"type":"error","error":{"type":"invalid_request_error","message":"You have reached your specified API usage limits. You will regain access on 2026-03-01 at 00:00 UTC."},"request_id":"req_011CXycf31FtWnzhPbnuiDpj"}
