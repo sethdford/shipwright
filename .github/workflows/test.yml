@@ -58,6 +58,21 @@ jobs:
       - name: Run remote tests
         run: bash scripts/sw-remote-test.sh
 
+      - name: Run intelligence tests
+        run: bash scripts/sw-intelligence-test.sh
+
+      - name: Run pipeline composer tests
+        run: bash scripts/sw-pipeline-composer-test.sh
+
+      - name: Run self-optimize tests
+        run: bash scripts/sw-self-optimize-test.sh
+
+      - name: Run predictive tests
+        run: bash scripts/sw-predictive-test.sh
+
+      - name: Run frontier tests
+        run: bash scripts/sw-frontier-test.sh
+
   shellcheck:
     runs-on: ubuntu-latest
     steps:

@@ -1,0 +1,63 @@
+name: "Let Shipwright Build This"
+description: "Create an issue for Shipwright to autonomously implement"
+labels: ["shipwright"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        ## Autonomous AI Implementation
+
+        This issue will be automatically picked up by Shipwright's CI pipeline. An AI agent will:
+        - Triage and plan the work
+        - Implement across the full stack
+        - Run all tests
+        - Self-review the code
+        - Create a pull request
+
+        **Be specific.** The more detail you provide, the better the agent can execute.
+  - type: textarea
+    id: goal
+    attributes:
+      label: "What should Shipwright build?"
+      description: "Be specific. Include acceptance criteria, file paths, or test expectations if you have them."
+      placeholder: |
+        Example:
+        - Add a new CLI command `shipwright sync --jira` that syncs issues from Jira
+        - Should support both pushing and pulling
+        - Files: scripts/sw-sync.sh, update scripts/sw
+        - Tests in scripts/sw-sync-test.sh
+    validations:
+      required: true
+  - type: dropdown
+    id: complexity
+    attributes:
+      label: "Estimated complexity"
+      description: "This helps Shipwright choose the right pipeline template"
+      options:
+        - "Simple (config, typo, small fix)"
+        - "Medium (feature touching 2-5 files)"
+        - "Complex (multi-system refactor)"
+    validations:
+      required: false
+  - type: textarea
+    id: context
+    attributes:
+      label: "Additional context"
+      description: "Links, screenshots, related issues, or technical notes"
+      placeholder: |
+        - Related to issue #123
+        - See the Jira docs at https://...
+        - Should follow the pattern in sw-linear.sh
+    validations:
+      required: false
+  - type: checkboxes
+    id: review
+    attributes:
+      label: "Before submitting"
+      options:
+        - label: "I've read the Shipwright documentation"
+          required: false
+        - label: "I've checked for similar issues"
+          required: false
+        - label: "This is not a bug report (use Bug Report template for bugs)"
+          required: false

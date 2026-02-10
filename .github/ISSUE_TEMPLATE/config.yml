@@ -1,0 +1,5 @@
+blank_issues_enabled: true
+contact_links:
+  - name: Documentation
+    url: https://sethdford.github.io/shipwright
+    about: Read the full docs before filing

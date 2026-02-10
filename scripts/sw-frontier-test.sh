@@ -88,7 +88,7 @@ MD5EOF
 _setup_mock_claude_adversarial() {
     cat > "$TEMP_DIR/bin/claude" <<'CLEOF'
 #!/usr/bin/env bash
-echo '{"result":"[{\"severity\":\"critical\",\"category\":\"security\",\"description\":\"SQL injection in user input\",\"location\":\"src/db.ts:42\",\"exploit_scenario\":\"Attacker sends malicious input\"},{\"severity\":\"high\",\"category\":\"logic\",\"description\":\"Off-by-one error in pagination\",\"location\":\"src/api.ts:88\",\"exploit_scenario\":\"Last page returns wrong results\"},{\"severity\":\"low\",\"category\":\"edge_case\",\"description\":\"Empty array not handled\",\"location\":\"src/utils.ts:15\",\"exploit_scenario\":\"Crash on empty input\"}]"}'
+echo '[{"severity":"critical","category":"security","description":"SQL injection in user input","location":"src/db.ts:42","exploit_scenario":"Attacker sends malicious input"},{"severity":"high","category":"logic","description":"Off-by-one error in pagination","location":"src/api.ts:88","exploit_scenario":"Last page returns wrong results"},{"severity":"low","category":"edge_case","description":"Empty array not handled","location":"src/utils.ts:15","exploit_scenario":"Crash on empty input"}]'
 CLEOF
     chmod +x "$TEMP_DIR/bin/claude"
 }
@@ -97,7 +97,7 @@ CLEOF
 _setup_mock_claude_converged() {
     cat > "$TEMP_DIR/bin/claude" <<'CLEOF'
 #!/usr/bin/env bash
-echo '{"result":"[{\"severity\":\"low\",\"category\":\"edge_case\",\"description\":\"Minor style issue\",\"location\":\"src/utils.ts:5\",\"exploit_scenario\":\"N/A\"}]"}'
+echo '[{"severity":"low","category":"edge_case","description":"Minor style issue","location":"src/utils.ts:5","exploit_scenario":"N/A"}]'
 CLEOF
     chmod +x "$TEMP_DIR/bin/claude"
 }
@@ -106,7 +106,7 @@ CLEOF
 _setup_mock_claude_simulation() {
     cat > "$TEMP_DIR/bin/claude" <<'CLEOF'
 #!/usr/bin/env bash
-echo '{"result":"[{\"concern\":\"Potential XSS in template rendering\",\"severity\":\"high\",\"suggestion\":\"Sanitize output with escape function\"},{\"concern\":\"Missing rate limiting on API endpoint\",\"severity\":\"medium\",\"suggestion\":\"Add rate limiter middleware\"}]"}'
+echo '[{"concern":"Potential XSS in template rendering","severity":"high","suggestion":"Sanitize output with escape function"},{"concern":"Missing rate limiting on API endpoint","severity":"medium","suggestion":"Add rate limiter middleware"}]'
 CLEOF
     chmod +x "$TEMP_DIR/bin/claude"
 }
@@ -115,7 +115,7 @@ CLEOF
 _setup_mock_claude_architecture() {
     cat > "$TEMP_DIR/bin/claude" <<'CLEOF'
 #!/usr/bin/env bash
-echo '{"result":"{\"layers\":[\"presentation\",\"business\",\"data\"],\"patterns\":[\"pipeline\",\"provider\",\"event-driven\"],\"conventions\":[\"set -euo pipefail\",\"atomic writes\",\"jq for JSON\"],\"dependencies\":[\"bash\",\"jq\",\"git\",\"claude\"]}"}'
+echo '{"layers":["presentation","business","data"],"patterns":["pipeline","provider","event-driven"],"conventions":["set -euo pipefail","atomic writes","jq for JSON"],"dependencies":["bash","jq","git","claude"]}'
 CLEOF
     chmod +x "$TEMP_DIR/bin/claude"
 }
@@ -124,7 +124,7 @@ CLEOF
 _setup_mock_claude_violations() {
     cat > "$TEMP_DIR/bin/claude" <<'CLEOF'
 #!/usr/bin/env bash
-echo '{"result":"[{\"violation\":\"Direct echo to file instead of atomic write\",\"severity\":\"high\",\"pattern_broken\":\"atomic writes\",\"suggestion\":\"Use tmp file + mv pattern\"}]"}'
+echo '[{"violation":"Direct echo to file instead of atomic write","severity":"high","pattern_broken":"atomic writes","suggestion":"Use tmp file + mv pattern"}]'
 CLEOF
     chmod +x "$TEMP_DIR/bin/claude"
 }
@@ -305,7 +305,7 @@ test_simulation_address() {
     # Mock claude that returns addressed objections
     cat > "$TEMP_DIR/bin/claude" <<'CLEOF'
 #!/usr/bin/env bash
-echo '{"result":"[{\"concern\":\"XSS risk\",\"response\":\"Added sanitization\",\"action\":\"will_fix\",\"code_change\":\"escape(input)\"},{\"concern\":\"Rate limiting\",\"response\":\"Already handled by middleware\",\"action\":\"already_addressed\",\"code_change\":\"\"}]"}'
+echo '[{"concern":"XSS risk","response":"Added sanitization","action":"will_fix","code_change":"escape(input)"},{"concern":"Rate limiting","response":"Already handled by middleware","action":"already_addressed","code_change":""}]'
 CLEOF
     chmod +x "$TEMP_DIR/bin/claude"
     rm -f "$TEMP_DIR/project/.claude/intelligence-cache.json"

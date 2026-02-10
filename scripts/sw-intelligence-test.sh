@@ -55,12 +55,12 @@ DAEMONCFG
     cat > "$TEMP_DIR/bin/claude" <<'MOCKBIN'
 #!/usr/bin/env bash
 # Mock claude CLI — reads MOCK_CLAUDE_RESPONSE env var and outputs it
-# Simulates: claude -p "..." --output-format json
+# Simulates: claude -p "..." (plain text mode, returns raw text/JSON)
 if [[ "${1:-}" == "-p" ]] || [[ "${1:-}" == "--print" ]]; then
     if [[ -n "${MOCK_CLAUDE_RESPONSE:-}" ]]; then
         echo "$MOCK_CLAUDE_RESPONSE"
     else
-        echo '{"result": "{\"complexity\": 5, \"risk_level\": \"medium\", \"success_probability\": 50, \"recommended_template\": \"standard\", \"key_risks\": [\"unknown\"], \"implementation_hints\": [\"review code\"]}"}'
+        echo '{"complexity": 5, "risk_level": "medium", "success_probability": 50, "recommended_template": "standard", "key_risks": ["unknown"], "implementation_hints": ["review code"]}'
     fi
     exit 0
 fi
