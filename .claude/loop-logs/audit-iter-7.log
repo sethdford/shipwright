@@ -1,1 +1,90 @@
-Credit balance is too low
+Perfect! All tests pass. Let me create a final summary of my audit:
+
+---
+
+## AUDIT SUMMARY
+
+I have thoroughly reviewed the implementation of "shipwright doctor should validate dashboard dependencies and port availability" and verified it against the approved design document.
+
+### Implementation Status: COMPLETE ✓
+
+**Files Implemented:**
+1. **`scripts/cct-doctor.sh`** — Section 12 (DASHBOARD) at lines 703–802
+2. **`scripts/cct-doctor-test.sh`** — 238-line test suite with 14 tests
+
+### Design Compliance Verification
+
+**1. Bun Runtime Detection** ✓
+- Uses `command -v bun` to check availability
+- Displays version via `bun --version`
+- Provides install instructions on failure
+- Properly increments warn count (not fail)
+
+**2. Dashboard Server.ts Location** ✓
+- Searches three paths in order:
+  - `$DOCTOR_REPO_DIR/dashboard/server.ts`
+  - `~/.local/share/shipwright/dashboard/server.ts`
+  - `~/.shipwright/dashboard/server.ts`
+- First match wins; proper fallback handling
+- Warns (not fails) if none found
+
+**3. Public Asset Validation** ✓
+- Checks index.html, app.js, styles.css
+- Counts present assets (0-3)
+- Warns on missing assets
+- Success message when all 3 present
+
+**4. Port 8767 Availability** ✓
+- PID file check first (with `kill -0` for safety)
+- Port probe fallback chain:
+  - `lsof -iTCP:8767 -sTCP:LISTEN` (macOS/Linux)
+  - `ss -tlnp | grep :8767` (modern Linux)
+  - `netstat -tln | grep :8767` (legacy Linux)
+- Proper warnings for occupied ports
+- Success for available ports
+
+**5. Code Quality** ✓
+- Bash 3.2 compatible (no associative arrays, readarray, etc.)
+- `set -euo pipefail` safety maintained
+- All external commands properly guarded
+- Variables properly quoted
+- Correct use of `|| true` and `2>/dev/null` guards
+- Safe PID validation with `kill -0`
+
+**6. Test Coverage** ✓
+- 14 comprehensive tests covering all functionality
+- Tests verify:
+  - Script structure (DASHBOARD section exists)
+  - Bun check implementation
+  - Server.ts search paths
+  - Public assets check
+  - Port availability check
+  - PID file check
+  - Fallback chain presence
+  - Multi-location search
+  - Smoke tests (actual doctor execution)
+- All 14 tests passing
+
+**7. Integration** ✓
+- Wired into `npm test` (verified in package.json)
+- Full test suite passes: 185 tests across 12 test suites
+- No regressions or broken patterns
+- No incomplete work or placeholder code
+
+### Test Results
+```
+✓ All 14 doctor-specific tests pass
+✓ All 185 total tests pass (across all 12 test suites)
+✓ Doctor runs cleanly with DASHBOARD section output
+✓ Implementation properly committed to HEAD
+```
+
+### Verification
+The agent:
+- ✓ Made meaningful progress toward the goal (fully implemented)
+- ✓ No obvious bugs, logic errors, or security issues
+- ✓ No incomplete work (no TODOs, no placeholder code)
+- ✓ No regressions or broken patterns
+- ✓ Code quality is production-ready
+
+**AUDIT_PASS**
