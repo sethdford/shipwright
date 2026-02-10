@@ -13,3 +13,17 @@
 {"ts":"2026-02-10T01:48:23Z","ts_epoch":1770688103,"type":"patrol.finding","check":"untested_script","script":"sw-checkpoint.sh","lines":384,"usage":2}
 {"ts":"2026-02-10T01:48:24Z","ts_epoch":1770688104,"type":"patrol.issue_created","check":"untested_scripts","count":18}
 {"ts":"2026-02-10T01:48:24Z","ts_epoch":1770688104,"type":"patrol.completed","findings":19,"issues_created":2,"dry_run":"false"}
+{"ts":"2026-02-10T02:17:36Z","ts_epoch":1770689856,"type":"pipeline.started","issue":5,"pipeline":"standard","model":"opus","goal":""}
+{"ts":"2026-02-10T02:17:36Z","ts_epoch":1770689856,"type":"stage.started","issue":5,"stage":"intake"}
+{"ts":"2026-02-10T02:17:42Z","ts_epoch":1770689862,"type":"stage.completed","issue":5,"stage":"intake","duration_s":6}
+{"ts":"2026-02-10T02:17:42Z","ts_epoch":1770689862,"type":"stage.started","issue":5,"stage":"plan"}
+{"ts":"2026-02-10T02:21:20Z","ts_epoch":1770690080,"type":"plan.validated","issue":5,"valid":"true","attempts":1}
+{"ts":"2026-02-10T02:21:22Z","ts_epoch":1770690082,"type":"stage.completed","issue":5,"stage":"plan","duration_s":220}
+{"ts":"2026-02-10T02:21:22Z","ts_epoch":1770690082,"type":"stage.started","issue":5,"stage":"design"}
+{"ts":"2026-02-10T02:21:23Z","ts_epoch":1770690083,"type":"memory.inject","stage":"design"}
+{"ts":"2026-02-10T02:22:28Z","ts_epoch":1770690148,"type":"stage.completed","issue":5,"stage":"design","duration_s":66}
+{"ts":"2026-02-10T02:22:28Z","ts_epoch":1770690148,"type":"memory.inject","stage":"build"}
+{"ts":"2026-02-10T03:15:23Z","ts_epoch":1770693323,"type":"stage.started","issue":5,"stage":"review"}
+{"ts":"2026-02-10T03:15:25Z","ts_epoch":1770693325,"type":"stage.completed","issue":5,"stage":"review","duration_s":2}
+{"ts":"2026-02-10T03:15:25Z","ts_epoch":1770693325,"type":"stage.started","issue":5,"stage":"pr"}
+{"ts":"2026-02-10T03:15:31Z","ts_epoch":1770693331,"type":"stage.failed","issue":5,"stage":"pr","duration_s":6}
