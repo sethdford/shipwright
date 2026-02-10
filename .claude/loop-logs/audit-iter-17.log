@@ -1,1 +1,68 @@
-Credit balance is too low
+Perfect. Let me do a final checklist review:
+
+## Critical Audit Findings
+
+I've thoroughly reviewed the implementation. Here's my analysis against the acceptance criteria:
+
+### ✅ Implementation Verification
+
+1. **Bun Runtime Check** (lines 710-716)
+   - ✅ Detects bun with `command -v bun`
+   - ✅ Shows version with `bun --version`
+   - ✅ Provides install instructions on failure
+   - ✅ Uses `check_warn` (not `check_fail`) — correct severity for optional feature
+
+2. **Dashboard server.ts Location** (lines 719-737)
+   - ✅ Searches three paths in correct priority order
+   - ✅ Handles dev env (`../dashboard/server.ts`)
+   - ✅ Handles XDG install (`~/.local/share/shipwright/dashboard/server.ts`)
+   - ✅ Handles legacy install (`~/.shipwright/dashboard/server.ts`)
+   - ✅ Stores resolved path for display
+
+3. **Public Asset Validation** (lines 740-765)
+   - ✅ Checks index.html, app.js, styles.css
+   - ✅ Reports count (3/3 vs partial)
+   - ✅ Each asset missing produces specific warning
+
+4. **Port Availability** (lines 767-802)
+   - ✅ Checks PID file first with `kill -0` validation
+   - ✅ Port check uses correct port **8767** (matches cct-dashboard.sh line 42)
+   - ✅ Implements proper fallback chain: `lsof` → `ss` → `netstat`
+   - ✅ All grep commands properly guarded within if blocks (no pipefail exposure)
+   - ✅ `PORT_IN_USE` flag set before conditional (avoids subshell variable loss)
+
+5. **Error Handling**
+   - ✅ All external commands wrapped in `if` blocks with `2>/dev/null`
+   - ✅ Script runs under `set -euo pipefail` without unguarded failures
+   - ✅ Bash 3.2 compatible — no associative arrays, no `readarray`, no `${var,,}`
+
+6. **Test Coverage** (`scripts/cct-doctor-test.sh`)
+   - ✅ 14 dedicated tests for dashboard doctor checks
+   - ✅ All tests pass via `npm test` (185 total tests across suite)
+   - ✅ Tests are wired into npm package.json scripts
+   - ✅ Tests cover: Bun, server.ts, assets, PID file, port 8767, fallbacks, multiple locations
+
+7. **Code Quality**
+   - ✅ Uses standardized output helpers (`check_pass`, `check_warn`)
+   - ✅ Unicode box-drawing headers match existing style
+   - ✅ Pass/warn/fail counts properly integrated with summary section
+   - ✅ No uncommitted work (working tree clean except logs)
+   - ✅ Syntax valid under bash -n check
+
+8. **Real-World Execution**
+   - ✅ Doctor runs successfully and shows DASHBOARD section
+   - ✅ Correctly identifies Bun as missing (warns, doesn't fail)
+   - ✅ Correctly finds dashboard/server.ts in repo
+   - ✅ Correctly finds and validates all public assets
+   - ✅ Correctly reports port 8767 available
+   - ✅ Pass/warn/fail counts correctly reflected in summary
+
+### No Issues Found
+
+- No TODO markers or placeholder code
+- No logic errors or security issues
+- No regressions in existing tests
+- No backward compatibility breaks
+- Implementation exactly matches the approved design
+
+**AUDIT_PASS**
