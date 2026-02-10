@@ -1,17 +1,14 @@
-Everything is complete. The implementation fully satisfies the goal:
+All tasks complete. Let me do a final self-audit against the Definition of Done:
 
-**Summary of what's implemented:**
-- `dry_run_summary()` function in `scripts/cct-pipeline.sh` (lines 972-1094)
-- Unicode box-drawing table showing Stage, Est. Duration, Model, Est. Cost per enabled stage
-- Median duration from historical `stage.completed` events
-- Median cost from `cost.record` events per stage
-- Model resolution hierarchy: CLI flag > stage config > template default > "opus"
-- Budget remaining display when configured
-- Graceful fallback ("no data" / "—") when no history exists
-- Zero side effects during dry-run (no artifacts, no branches, no events)
-- Two comprehensive tests with properly escaped assertions
-- All 184 tests pass
-
-**This iteration's fix:** Corrected dollar sign escaping and cleanup masking bugs in the test that were silently passing with wrong assertion patterns.
+- **`--dry-run` shows timing estimates when historical data exists**: Test 16 passes with `~2m 0s`, `~5m 0s`, `~15m 0s` and costs `$0.12`, `$1.45`, `$4.80`, total `~$6.37`
+- **`--dry-run` gracefully shows "no data" when no history**: Test 17 passes with "no data" and "—"
+- **Existing `--dry-run` behavior preserved**: Test 15 passes (shows stages, exits without artifacts)
+- **Cost estimate uses model routing from template**: Already implemented in `dry_run_summary()`
+- **Budget remaining uses correct `sw-cost.sh` script**: Fixed from `cct-cost.sh`
+- **All three dry-run tests pass**: Tests 15, 16, 17 all pass
+- **Full pipeline test suite passes**: 17/17
+- **Full `npm test` passes**: All 11 suites pass
+- **No stale `claude-teams` in scripts** (except migration helper): Verified
+- **No stale `cct-cost` in scripts**: Verified
 
 LOOP_COMPLETE

@@ -2,99 +2,192 @@
 goal: "Add pipeline dry-run summary with stage timing estimates
 
 Implementation plan (follow this exactly):
-Error: Reached max turns (25)
+The plan file is in a protected directory. Let me present the plan directly.
+
+## Implementation Plan: Add Pipeline Dry-Run Summary with Stage Timing Estimates
+
+### Analysis Summary
+
+After thorough codebase exploration, the `dry_run_summary()` function in `scripts/sw-pipeline.sh:972-1094` **already implements the full feature**:
+- Stage timing estimates via median calculation from historical `stage.completed` events
+- Per-stage cost estimates via median from `cost.record` events
+- Model resolution per stage (CLI > stage config > template default > `opus`)
+- Total duration/cost summation with budget remaining display
+- Box-drawing table with `Stage | Est. Duration | Model | Est. Cost` columns
+- Graceful "no data" / "—" when no history exists
+
+The corresponding tests also already exist (`sw-pipeline-test.sh:813-888`).
+
+**However, there are two bugs preventing the tests from passing:**
+
+### Bug 1: Events File Path Mismatch
+- **Pipeline script** reads from `~/.shipwright/events.jsonl` (`sw-pipeline.sh:51`)
+- **Test file** writes events to `~/.claude-teams/events.jsonl` (`sw-pipeline-test.sh:817`)
+- The test harness uses the **old pre-rebrand path** while the pipeline uses the **new path**
+
+### Bug 2: Stale `cct-cost.sh` Reference
+- `sw-pipeline.sh:1087` references `cct-cost.sh` (pre-rebrand name)
+- Should be `sw-cost.sh` — causes budget display to silently fail
+
+---
+
+### Files to Modify
+
+| File | Change |
+|------|--------|
+| `scripts/sw-pipeline-test.sh` | Fix all `~/.claude-teams/` → `~/.shipwright/` references (7 occurrences across lines 49, 51, 368, 369, 375, 817, 877) |
+| `scripts/sw-pipeline.sh` | Fix `cct-cost.sh` → `sw-cost.sh` on line 1087 |
+
+---
+
+### Implementation Steps
+
+1. **Fix events path in test `setup_env()`** — Update backup path from `~/.claude-teams/events.jsonl` to `~/.shipwright/events.jsonl` (lines 49, 51)
+2. **Fix events path in test `cleanup_env()`** — Update restore/cleanup path (lines 368, 369, 375)
+3. **Fix events path in `test_dry_run_summary_with_history()`** — Update seed directory (line 817)
+4. **Fix events path in `test_dry_run_summary_no_history()`** — Update cleanup path (line 877)
+5. **Fix cost script reference in `dry_run_summary()`** — Change `cct-cost.sh` to `sw-cost.sh` (line 1087)
+6. **Run targeted dry-run tests** to verify fixes
+7. **Run full pipeline test suite** to verify no regressions
+8. **Run full `npm test`** to verify all test suites pass
+
+---
+
+### Task Checklist
+
+- [ ] Task 1: Fix `~/.claude-teams/` → `~/.shipwright/` in `setup_env()` backup logic
+- [ ] Task 2: Fix `~/.claude-teams/` → `~/.shipwright/` in `cleanup_env()` restore logic
+- [ ] Task 3: Fix `~/.claude-teams/` → `~/.shipwright/` in `test_dry_run_summary_with_history()` event seeding
+- [ ] Task 4: Fix `~/.claude-teams/` → `~/.shipwright/` in `test_dry_run_summary_no_history()` cleanup
+- [ ] Task 5: Fix `cct-cost.sh` → `sw-cost.sh` in `dry_run_summary()` budget check
+- [ ] Task 6: Run dry-run tests to verify fixes
+- [ ] Task 7: Run full pipeline test suite (no regressions)
+- [ ] Task 8: Run full `npm test` (all suites pass)
+
+---
+
+### Testing Approach
+
+1. **Targeted**: Run the three dry-run tests individually to validate each fix
+2. **Pipeline suite**: `bash scripts/sw-pipeline-test.sh` — all 17 tests pass
+3. **Full suite**: `npm test` — all 11 test files pass
+4. **Manual**: `shipwright pipeline start --goal "test" --dry-run` for visual verification
+
+---
+
+### Definition of Done
+
+- [ ] `--dry-run` shows timing estimates when historical data exists
+- [ ] `--dry-run` gracefully shows "no data" when no history
+- [ ] Existing `--dry-run` behavior preserved (shows stages, exits without running)
+- [ ] Cost estimate uses model routing from template
+- [ ] Budget remaining uses correct `sw-cost.sh` script
+- [ ] All three dry-run tests pass
+- [ ] Full pipeline test suite passes
+- [ ] Full `npm test` passes
 
 Follow the approved design document:
-Now I have a thorough understanding of the implementation. Let me produce the ADR.
+All 7 occurrences confirmed. Here's the ADR:
+
+---
 
 # Design: Add pipeline dry-run summary with stage timing estimates
 
 ## Context
 
-Shipwright's delivery pipeline (`scripts/cct-pipeline.sh`, ~3800 lines) executes up to 12 stages sequentially, each potentially invoking Claude Code agents. Before committing to a full run — which can take 30+ minutes and cost $10+ in API usage — operators need visibility into expected duration and cost.
+The `--dry-run` flag on `shipwright pipeline start` should display a table of enabled stages with per-stage timing estimates (from historical data), model routing, and cost estimates — then exit without executing anything. This helps operators preview pipeline cost and duration before committing to a run.
 
-**Constraints from the codebase:**
-- All scripts are Bash 3.2-compatible (no associative arrays, no `readarray`, no `${var,,}`)
-- `set -euo pipefail` is enforced; `grep` in pipelines must be guarded with `|| true`
-- Event data lives in `~/.claude-teams/events.jsonl` (JSONL format, one JSON object per line)
-- Cost data uses `cost.record` events with `stage` and `cost_usd` fields; timing uses `stage.completed` events with `stage` and `duration_s` fields
-- Pipeline templates (`templates/pipelines/*.json`) define enabled stages, gate modes, and per-stage config including model overrides
-- The `DRY_RUN` flag (line 103) gates execution at the main entry point (line 4085-4088), calling `dry_run_summary()` and returning before any stages execute
+The feature implementation already exists in `scripts/sw-pipeline.sh:972-1094` (`dry_run_summary()`), including:
+- Median duration from `stage.completed` events in `~/.shipwright/events.jsonl`
+- Median cost from `cost.record` events
+- Model resolution (CLI arg > stage config > template default > `"opus"`)
+- Box-drawing table output with totals row
+- Budget remaining via the cost script
+
+Corresponding tests exist in `scripts/sw-pipeline-test.sh:813-888` (tests 16 and 17).
+
+**The feature is broken by two post-rebrand bugs:**
+
+1. **Events file path mismatch**: The pipeline reads from `~/.shipwright/events.jsonl` (line 51), but the test harness writes to / cleans up `~/.claude-teams/events.jsonl` — the pre-rebrand path. Tests seed data the pipeline never sees.
+2. **Stale cost script reference**: `dry_run_summary()` calls `cct-cost.sh` (line 1087), the pre-rebrand name. The script was renamed to `sw-cost.sh`. Budget display silently fails.
+
+No new code needs to be written. This is a pure bug-fix task — correcting stale paths left behind during the `cct` → `sw` rebrand.
 
 ## Decision
 
-Implement dry-run summary as a self-contained function (`dry_run_summary()`, lines 972-1094 of `scripts/cct-pipeline.sh`) that:
+**Fix the two stale references in place.** No new abstractions, no refactoring.
 
-1. **Reads enabled stages** from the active pipeline template via `jq '.stages[] | select(.enabled == true)'` — no hardcoded stage list, adapts to any template.
+### Data flow (already implemented, just broken plumbing)
 
-2. **Computes median duration** per stage from historical `stage.completed` events in `events.jsonl`. Median (not mean) is chosen because pipeline durations are right-skewed — a single outlier build shouldn't distort estimates. Duration values are extracted with `jq -r '.duration_s'`, sorted numerically, and the middle value selected.
-
-3. **Computes median cost** per stage from `cost.record` events, using the same median approach. Cost is summed across stages for a total estimate. Arithmetic uses `awk "BEGIN {printf ...}"` for floating-point addition (Bash integer arithmetic is insufficient for dollar amounts).
-
-4. **Resolves model per stage** using the hierarchy: CLI `--model` flag > stage-level `config.model` > template `defaults.model` > `"opus"` fallback. This matches the runtime resolution order.
-
-5. **Renders a Unicode box-drawing table** with fixed column widths (Stage=18, Duration=15, Model=9, Cost=12) and a Total row. Gracefully degrades to "no data" / "—" when no historical events exist.
-
-6. **Shows budget remaining** by calling `cct-cost.sh remaining-budget`, displayed only when a budget is configured.
-
-7. **Ensures zero side effects**: no artifacts created, no branches created, no events emitted, no heartbeat started. The function returns before `run_pipeline()` is reached.
-
-**Data flow:**
 ```
-CLI --dry-run → DRY_RUN=true → main entry (line 4085) → dry_run_summary()
-                                                          ├─ read PIPELINE_CONFIG (jq)
-                                                          ├─ for each stage:
-                                                          │   ├─ resolve model (jq)
-                                                          │   ├─ grep events.jsonl for stage.completed → median duration
-                                                          │   └─ grep events.jsonl for cost.record → median cost
-                                                          ├─ sum totals
-                                                          ├─ render table (printf)
-                                                          └─ show budget (cct-cost.sh)
+events.jsonl  ──grep──►  stage.completed / cost.record JSON lines
+                            │
+                     sort -n + median
+                            │
+                     ┌──────▼──────┐
+                     │ dry_run_    │
+                     │ summary()   │──► box-drawing table to stdout
+                     └──────┬──────┘
+                            │
+                    sw-cost.sh remaining-budget
+                            │
+                     budget line (if set)
 ```
 
-**Error handling:**
-- All `jq` and `grep` calls are guarded with `2>/dev/null` and `|| true` to satisfy `pipefail`
-- Missing `events.jsonl` shows graceful fallback ("no data", "—")
-- Non-numeric duration values are rejected by `[[ "$median_dur" =~ ^[0-9]+$ ]]`
-- Empty pipeline configs produce an empty table (no crash)
+### Specific changes
+
+1. **`scripts/sw-pipeline.sh` line 1087**: `cct-cost.sh` → `sw-cost.sh`
+   - The `$SCRIPT_DIR/cct-cost.sh` call fails silently (trapped by `|| true`), so no error appears but the budget line is never printed.
+
+2. **`scripts/sw-pipeline-test.sh`** — 7 occurrences of `~/.claude-teams/` → `~/.shipwright/`:
+   - `setup_env()` backup: lines 49, 51
+   - `cleanup_env()` restore/cleanup: lines 368, 369, 375
+   - `test_dry_run_summary_with_history()` event seeding: line 817
+   - `test_dry_run_summary_no_history()` cleanup: line 877
+
+### Error handling
+
+The existing `dry_run_summary()` handles all edge cases correctly:
+- **No events file**: `[[ -f "$EVENTS_FILE" ]]` guard skips median computation → displays "no data" / "—"
+- **Empty or malformed events**: `jq -r '... // empty'` + `|| true` → graceful fallback
+- **Non-integer durations**: `=~ ^[0-9]+$` regex guard prevents arithmetic errors
+- **No budget set**: `remaining-budget` returns "unlimited" or empty → line suppressed
+- **No enabled stages**: Loop iterates zero times → table renders headers + empty totals
 
 ## Alternatives Considered
 
-1. **Mean instead of median for estimates** — Pros: simpler calculation, single `awk` pass / Cons: highly sensitive to outlier runs (a stuck build at 45m skews a typical 8m average to 20m+). Median is more representative of "typical" experience.
+1. **Centralize the events path into a shared constant file** — Pros: prevents future drift if the path changes again. Cons: introduces a new shared file and `source` dependency across all scripts; over-engineering for a two-file fix. The `EVENTS_DIR` / `EVENTS_FILE` variables are already defined at the top of each script; a grep-and-replace during any future rebrand is sufficient.
 
-2. **Percentile-based estimates (p50/p90)** — Pros: shows range of outcomes, more informative / Cons: significantly more complex in Bash (requires array indexing or multi-pass), harder to fit in a clean table layout, and overkill when most users have <10 historical runs. Could be added later as `--dry-run --verbose`.
+2. **Make the test harness read `EVENTS_FILE` from the pipeline script** — Pros: single source of truth. Cons: requires sourcing the pipeline script or parsing it, adding fragile coupling. The test harness intentionally operates with its own environment setup to isolate side effects.
 
-3. **Static timing defaults when no history exists** — Pros: always shows a number / Cons: misleading — a static "~5m" for the build stage could be wildly off depending on project size. "no data" is more honest and encourages running the pipeline once to seed real data.
-
-4. **Separate `--estimate` command** — Pros: clean separation of concerns / Cons: introduces a new subcommand for a feature tightly coupled to pipeline config parsing. Keeping it as `--dry-run` on the existing `pipeline start` command means it automatically picks up the same template, model overrides, and goal context.
+3. **Remove `|| true` from the cost script call and let it fail loudly** — Pros: surfaces future breakage. Cons: breaks the dry-run on any system without `sw-cost.sh` (e.g., minimal installs). The silent fallback is intentional — budget display is optional.
 
 ## Implementation Plan
 
-- **Files to create:** None
-- **Files to modify:**
-  - `scripts/cct-pipeline.sh` — `dry_run_summary()` function (lines 972-1094), `DRY_RUN` flag init (line 103), CLI parsing (line 248), main entry gate (lines 4085-4088)
-  - `scripts/cct-pipeline-test.sh` — Three test cases: `test_dry_run()` (lines 760-778), `test_dry_run_summary_with_history()` (lines 813-866), `test_dry_run_summary_no_history()` (lines 871-886)
-- **Dependencies:** None new. Uses existing `jq`, `awk`, `grep`, `sort`, `sed` — all already required by the pipeline.
-- **Risk areas:**
-  - **`grep` under `pipefail`:** The `grep '"stage.completed"' ... | grep "\"stage\":\"${sid}\""` chains could fail if `events.jsonl` is empty or malformed. Mitigated by `|| true` on each chain and `2>/dev/null` redirects.
-  - **Large `events.jsonl`:** Over time, this file grows unbounded. Sequential `grep` per stage per column (2 greps × N stages) scales linearly. For a 12-stage pipeline with a 10MB events file, this is negligible (<1s). If it becomes a problem, a future optimization could pre-filter with a single `jq` pass.
-  - **Floating-point cost arithmetic:** `awk "BEGIN {printf ...}"` with string-interpolated variables could break on malformed cost values. The `cost.record` events are emitted by `cct-cost.sh` which always formats as `%.2f`, so this is safe in practice.
-  - **Column truncation:** Stage names longer than 16 characters (e.g., `compound_quality` at 16 chars) fit within the 18-char column. Future stages with longer names would need width adjustment.
+- **Files to create**: None
+- **Files to modify**:
+  - `scripts/sw-pipeline.sh` — 1 line change (line 1087: `cct-cost.sh` → `sw-cost.sh`)
+  - `scripts/sw-pipeline-test.sh` — 7 occurrences across 6 lines (49, 51, 368, 369, 375, 817, 877: `~/.claude-teams/` → `~/.shipwright/`)
+- **Dependencies**: None (no new packages, no new scripts)
+- **Risk areas**:
+  - **Test environment pollution**: `setup_env()` / `cleanup_env()` backs up and restores the real `events.jsonl`. After the fix, it will correctly operate on `~/.shipwright/events.jsonl`. If a user's real events file is at the old path, it would no longer be backed up — but since the pipeline itself already reads only from `~/.shipwright/`, this is consistent.
+  - **`format_duration` integer guard** (line 1025): The `=~ ^[0-9]+$` regex rejects float durations (e.g., `120.5`). This is fine — `emit_event` writes integer seconds. But if future events include fractional seconds, the display would show "no data" instead of an approximate value. Not a regression from this change.
+  - **Median on even-count data**: The `(count + 1) / 2` formula uses integer division, selecting the lower-middle element for even counts rather than averaging. This is acceptable for approximate estimates — not a regression.
 
 ## Validation Criteria
 
-- [ ] `test_dry_run` passes: `--dry-run` exits 0, outputs "Dry run", shows pipeline name, creates no artifacts or branches
-- [ ] `test_dry_run_summary_with_history` passes: seeded events produce correct median durations (`~2m 0s`, `~5m 0s`) and costs (`$0.12`, `$1.45`, `$4.80`), total cost is `~$6.37`
-- [ ] `test_dry_run_summary_no_history` passes: missing events.jsonl produces "no data" for duration and "—" for cost
-- [ ] Model resolution shows correct model per stage (stage config > template default > fallback)
-- [ ] Budget remaining is displayed when configured, omitted when not
-- [ ] No pipeline stages execute during dry-run (no `stage.started` events emitted, no artifacts created)
-- [ ] Table renders correctly with box-drawing characters for all 8 pipeline templates (varying stage counts)
-- [ ] Full test suite passes: `npm test` exits 0 with no regressions
+- [ ] Test 16 (`test_dry_run_summary_with_history`) passes: table shows `~2m 0s` for intake, `~5m 0s` for plan, `~15m 0s` for build; costs `$0.12`, `$1.45`, `$4.80`; total `~$6.37`
+- [ ] Test 17 (`test_dry_run_summary_no_history`) passes: table shows "no data" for all durations and "—" for all costs
+- [ ] Test 18 (`test_dry_run_flag`) continues to pass (existing dry-run behavior preserved)
+- [ ] Full pipeline test suite (`bash scripts/sw-pipeline-test.sh`) — all tests pass, no regressions
+- [ ] Full test suite (`npm test`) — all 11 test files pass
+- [ ] `grep -r 'claude-teams' scripts/` returns zero matches (no remaining stale paths)
+- [ ] `grep -r 'cct-cost' scripts/` returns zero matches (no remaining stale references)
+- [ ] Manual: `shipwright pipeline start --goal "test" --dry-run` renders the table and exits cleanly (with and without historical events present)
 
 Historical context (lessons from previous pipelines):
 # Shipwright Memory Context
-# Injected at: 2026-02-09T21:56:44Z
+# Injected at: 2026-02-10T02:22:28Z
 # Stage: build
 
 ## Failure Patterns to Avoid
@@ -107,71 +200,38 @@ Task tracking (check off items as you complete them):
 # Pipeline Tasks — Add pipeline dry-run summary with stage timing estimates
 
 ## Implementation Checklist
-
-- [x] Task 1: Add `dry_run_summary()` function to `cct-pipeline.sh`
-- [x] Task 2: Replace existing dry-run block with `dry_run_summary` call
-- [x] Task 3: Implement per-stage model resolution (CLI > stage config > defaults > opus)
-- [x] Task 4: Implement median duration from `events.jsonl` `stage.completed` events
-- [x] Task 5: Implement median cost from `events.jsonl` — adapted: no per-stage cost events exist, uses pipeline.cost for total
-- [x] Task 6: Add budget remaining display via `cct-cost.sh remaining-budget`
-- [x] Task 7: Add formatted table output with Unicode separators
-- [x] Task 8: Handle graceful fallback ("no data" / "—") when no history
-- [x] Task 9: Add `test_dry_run_summary_with_history` test
-- [x] Task 10: Add `test_dry_run_summary_no_history` test
-- [x] Task 11: Register both new tests in runner array
-- [x] Task 12: Add events.jsonl backup/restore in test setup/teardown
-- [x] Task 13: Run full test suite and fix failures — all 167 tests pass
-- [x] `--dry-run` shows table with Stage, Est. Duration, Model, Est. Cost
-- [x] Duration uses median from historical `stage.completed` events
-- [x] Cost: pipeline-level median from `pipeline.cost` events (no per-stage cost events exist)
-- [x] Model resolves per-stage from template config
-- [x] "no data" / "—" shown when no history exists
-- [x] Total row with summed duration and cost
-- [x] Budget line when budget enabled
+- [ ] Task 1: Fix `~/.claude-teams/` → `~/.shipwright/` in `setup_env()` backup logic
+- [ ] Task 2: Fix `~/.claude-teams/` → `~/.shipwright/` in `cleanup_env()` restore logic
+- [ ] Task 3: Fix `~/.claude-teams/` → `~/.shipwright/` in `test_dry_run_summary_with_history()` event seeding
+- [ ] Task 4: Fix `~/.claude-teams/` → `~/.shipwright/` in `test_dry_run_summary_no_history()` cleanup
+- [ ] Task 5: Fix `cct-cost.sh` → `sw-cost.sh` in `dry_run_summary()` budget check
+- [ ] Task 6: Run dry-run tests to verify fixes
+- [ ] Task 7: Run full pipeline test suite (no regressions)
+- [ ] Task 8: Run full `npm test` (all suites pass)
 
 ## Context
-
 - Pipeline: standard
 - Branch: ci/add-pipeline-dry-run-summary-with-stage-5
 - Issue: #5
-- Generated: 2026-02-09T21:05:58Z"
-iteration: 5
+- Generated: 2026-02-10T02:21:06Z"
+iteration: 0
 max_iterations: 20
-status: complete
+status: running
 test_cmd: "npm test"
 model: opus
 agents: 1
-started_at: 2026-02-09T22:58:49Z
-last_iteration_at: 2026-02-09T22:58:49Z
+started_at: 2026-02-10T02:22:29Z
+last_iteration_at: 2026-02-10T02:22:29Z
 consecutive_failures: 0
-total_commits: 5
+total_commits: 0
 audit_enabled: true
 audit_agent_enabled: true
 quality_gates_enabled: true
-dod_file: ""
+dod_file: "/home/runner/work/shipwright/shipwright/.claude/pipeline-artifacts/dod.md"
 auto_extend: true
 extension_count: 0
 max_extensions: 3
 ---
 
 ## Log
-### Iteration 1 (2026-02-09T22:12:27Z)
-- Zero side effects during dry-run (no artifacts, no branches, no events)
-- Two comprehensive tests with properly escaped assertions
-- All 184 tests pass
-
-### Iteration 2 (2026-02-09T22:31:31Z)
-Quality gates status:
-- Gate 1 (tests pass): ✓ All 184 tests pass
-- Gate 2 (no uncommitted changes): ✓ All changes committed
-
-### Iteration 3 (2026-02-09T22:41:16Z)
-1. **Tests**: All 184 tests pass across 11 test suites (17+12+13+27+22+14+21+15+12+17+14)
-2. **No uncommitted changes**: All changes committed
-3. **Code quality verified**: No Bash 3.2 incompatibilities, no unguarded grep calls, no TODO/FIXME markers, proper doll
-
-### Iteration 4 (2026-02-09T22:49:18Z)
-1. **Tests**: All 184 tests pass across 11 test suites (17+12+13+27+22+14+21+15+12+17+14)
-2. **No uncommitted changes**: Working tree clean
-3. **Implementation complete**: `dry_run_summary()` function at line 972-1094 of `cct-pipeline.sh`, three comprehensive 
 
