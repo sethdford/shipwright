@@ -118,13 +118,13 @@ while IFS='|' read -r window_name pane_title pane_pid cmd pane_active pane_idle 
     local_idle_fmt="$(format_idle "$pane_idle")"
 
     # Active pane indicator
-    local active_marker=""
+    active_marker=""
     if [[ "$pane_active" == "1" ]]; then
         active_marker=" ${CYAN}●${RESET}"
     fi
 
     # Agent display name
-    local agent_name="${pane_title:-${cmd}}"
+    agent_name="${pane_title:-${cmd}}"
 
     printf "  %-20s %-8s " "$agent_name" "$pane_pid"
     status_display "$local_status"
