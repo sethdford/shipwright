@@ -1,1 +1,85 @@
-Credit balance is too low
+Perfect! Now let me review the implementation against the design document checklist:
+
+## Critical Review Against Design Document
+
+**Design Requirement 1: Bun runtime detection (lines ~710–716)**
+- ✅ `command -v bun` check present (line 710)
+- ✅ Version display via `bun --version` (line 711)
+- ✅ Check increment (implicit via `check_pass` and `check_warn` helpers)
+- ✅ Install instructions provided (line 715)
+
+**Design Requirement 2: Dashboard server.ts location (lines ~719–737)**
+- ✅ Three-path search in priority order:
+  - `$DOCTOR_REPO_DIR/dashboard` (line 723)
+  - `${HOME}/.local/share/shipwright/dashboard` (line 724)
+  - `${HOME}/.shipwright/dashboard` (line 725)
+- ✅ First match wins (break statement at line 728)
+- ✅ Path stored in variable (DASHBOARD_SERVER at line 727)
+- ✅ Warning with upgrade guidance if not found (lines 735–737)
+
+**Design Requirement 3: Public asset validation (lines ~740–765)**
+- ✅ Searches for public directory in three locations (lines 741–748)
+- ✅ Checks all three files: `index.html`, `app.js`, `styles.css` (line 753)
+- ✅ Counter-based validation (dash_assets variable, lines 752–757)
+- ✅ Passes only if all 3 present (line 758)
+- ✅ Warns with specific count if partial (line 761)
+
+**Design Requirement 4: Port 8767 availability (lines ~767–802)**
+- ✅ PID file check first (lines 771–778)
+- ✅ Process liveness verification via `kill -0` (line 773)
+- ✅ Stale PID file detection and warning (line 776)
+- ✅ Three-tool fallback chain (lines 782–794):
+  - `lsof -iTCP:$PORT -sTCP:LISTEN` (line 783)
+  - `ss -tlnp | grep :$PORT` (line 787)
+  - `netstat -tln | grep :$PORT` (line 791)
+- ✅ Port-in-use warning (lines 796–798)
+- ✅ Port-available success message (line 800)
+
+**Design Requirement 5: Error handling under pipefail**
+- ✅ All external commands in `if` blocks with `2>/dev/null` redirection
+- ✅ Grep commands properly guarded with `-q` (quiet mode)
+- ✅ Variable capture before conditional testing (PORT_IN_USE flag)
+
+**Design Requirement 6: Test suite**
+- ✅ `cct-doctor-test.sh` exists with 14 tests (all passing as shown above)
+- ✅ Tests cover structural checks (3 tests)
+- ✅ Tests cover dashboard dependencies (3 tests)
+- ✅ Tests cover port availability (5 tests)
+- ✅ Smoke tests included (2 tests)
+- ✅ Tests wired into `npm test` (verified in output)
+
+**Validation Criteria from Design:**
+1. ✅ Bun check shows version string when installed
+2. ✅ Bun warning with install command when missing
+3. ✅ Dashboard server.ts found with resolved path
+4. ✅ Warning with upgrade guidance when not found
+5. ✅ Individual missing asset warnings
+6. ✅ Port free = green pass
+7. ✅ Port occupied = warning with process info
+8. ✅ Stale PID file = warning
+9. ✅ All 14 tests pass
+10. ✅ No unguarded commands under pipefail
+11. ✅ Pass/warn/fail counts integrated into summary
+12. ✅ Works on both macOS and Linux (fallback chain)
+
+**Code Quality:**
+- ✅ No TODO or placeholder code
+- ✅ Follows Bash 3.2 compatibility (no associative arrays, no readarray)
+- ✅ Consistent with existing doctor script patterns
+- ✅ Proper use of `check_pass()`, `check_warn()` helpers
+- ✅ Unicode box-drawing headers match codebase style
+- ✅ Output formatting consistent with other sections
+- ✅ Git history shows complete implementation in single commit (cc1b955)
+
+**Completeness:**
+- ✅ All acceptance criteria met
+- ✅ Implementation complete (not partial)
+- ✅ Tests comprehensive and passing
+- ✅ No regressions (all 196 tests pass)
+- ✅ Clean working tree on master
+
+---
+
+**AUDIT_PASS**
+
+The implementation is complete, well-tested, and correctly implements the design specification. All four dashboard validation sub-checks (Bun, server.ts, public assets, port availability) are properly implemented with appropriate error handling, fallback chains, and integration into the doctor summary. The test suite is comprehensive (14 tests) and all 196 tests across the entire codebase pass. No issues identified.
