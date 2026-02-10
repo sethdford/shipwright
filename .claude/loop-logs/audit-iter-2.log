@@ -1,1 +1,122 @@
-Credit balance is too low
+Perfect! Now let me do a final complete audit review:
+
+## COMPREHENSIVE CODE AUDIT
+
+### ✅ Implementation Completeness
+
+**All 4 Required Components Implemented:**
+
+1. **Bun runtime check** (lines 710-716): ✅
+   - Detects `bun` command availability
+   - Displays version on success
+   - Shows install instructions (`curl -fsSL https://bun.sh/install | bash`) on failure
+   - Increments warn count (appropriate, as dashboard is optional)
+
+2. **Dashboard server.ts location** (lines 719-737): ✅
+   - Searches 3 paths in priority order:
+     - `$REPO/dashboard/server.ts` (development)
+     - `~/.local/share/shipwright/dashboard/server.ts` (XDG install)
+     - `~/.shipwright/dashboard/server.ts` (legacy install)
+   - Displays resolved path with `~` abbreviation
+   - Proper fallthrough logic with first-match wins
+
+3. **Public asset validation** (lines 740-765): ✅
+   - Checks for `index.html`, `app.js`, `styles.css`
+   - Reports count of found assets
+   - Increments warn count for missing files
+
+4. **Port 8767 availability** (lines 767-802): ✅
+   - Uses correct default port (8767, not 3000)
+   - **Fallback chain:** lsof → ss → netstat
+   - **PID file check:** Detects running dashboard and stale PIDs
+   - Properly handles port in-use scenario with helpful guidance
+
+### ✅ Code Quality
+
+**Bash 3.2 Compatibility:**
+- No associative arrays (`declare -A`)
+- No `readarray`
+- Standard for-loops used throughout
+- Bash 3.2 safe string expansion
+
+**Pipefail Safety:**
+- All external commands wrapped in conditional blocks
+- Variable `PORT_IN_USE` assigned before use (no subshell variable loss)
+- Grep commands in pipes guarded with `2>/dev/null`
+- No unguarded commands that could exit on non-zero
+
+**Proper Error Handling:**
+- All tool availability checks: `command -v <tool> &>/dev/null`
+- File operations guarded: `[[ -f ]]` and `[[ -d ]]` tests
+- Process checks: `kill -0 $PID 2>/dev/null`
+- Port probe results captured to variable before evaluation
+
+**Helper Functions:**
+- Correctly uses `check_pass()`, `check_warn()`, `check_fail()` from parent script
+- Increments shared counters (PASS_COUNT, WARN_COUNT, FAIL_COUNT)
+- Maintains consistent formatting with Unicode box-drawing
+
+### ✅ Test Coverage
+
+**Test File Created:** `scripts/cct-doctor-test.sh` (237 lines)
+
+**14 Tests Covering:**
+1. Script existence and executable permission
+2. DASHBOARD section present
+3. HEARTBEATS section present
+4. REMOTE MACHINES section present
+5. Bun runtime check
+6. Dashboard server.ts check
+7. Public assets check
+8. Port availability check
+9. Default port 8767 usage
+10. PID file check
+11. Fallback chain (lsof/ss/netstat)
+12. Multiple search paths
+13. Smoke test (doctor runs without error)
+14. Dashboard section in output
+
+**All 14 tests passing** ✅
+
+**Full test suite status:** 185+ tests across all modules passing ✅
+
+### ✅ Design Compliance
+
+All **acceptance criteria from the design document met:**
+
+- [x] `shipwright doctor` shows Bun check with install instructions if missing
+- [x] Dashboard file existence verified (server.ts + public assets)
+- [x] Port availability checked with lsof/ss/netstat fallbacks
+- [x] Tests exist and are part of `npm test`
+- [x] Works on both macOS (lsof) and Linux (ss/netstat)
+- [x] PID file detection for running dashboards
+- [x] Proper severity (warnings, not hard failures)
+- [x] No unguarded commands under pipefail
+- [x] Proper variable scoping
+
+### ✅ No Incomplete Work
+
+- No TODO/FIXME markers in dashboard section
+- No placeholder code
+- No stubbed functions
+- All logic is complete and functional
+
+### ✅ No Regressions
+
+- Existing 11 doctor sections intact
+- Section count correctly updated to 12
+- All existing tests still passing
+- No modifications to unrelated code
+
+### ✅ Production Ready
+
+The implementation is:
+- **Correct:** All 4 components working as designed
+- **Safe:** Proper error handling and pipefail compliance
+- **Tested:** 14 dedicated tests plus full suite passes
+- **Documented:** Clear messaging with actionable guidance
+- **Maintainable:** Follows project conventions and standards
+
+---
+
+**AUDIT_PASS**
