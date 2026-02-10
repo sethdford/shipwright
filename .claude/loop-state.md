@@ -33,10 +33,10 @@ The corresponding tests also already exist (`sw-pipeline-test.sh:813-888`).
 
 ### Files to Modify
 
-| File | Change |
-|------|--------|
+| File                          | Change                                                                                                                |
+| ----------------------------- | --------------------------------------------------------------------------------------------------------------------- |
 | `scripts/sw-pipeline-test.sh` | Fix all `~/.claude-teams/` → `~/.shipwright/` references (7 occurrences across lines 49, 51, 368, 369, 375, 817, 877) |
-| `scripts/sw-pipeline.sh` | Fix `cct-cost.sh` → `sw-cost.sh` on line 1087 |
+| `scripts/sw-pipeline.sh`      | Fix `cct-cost.sh` → `sw-cost.sh` on line 1087                                                                         |
 
 ---
 
@@ -98,6 +98,7 @@ All 7 occurrences confirmed. Here's the ADR:
 The `--dry-run` flag on `shipwright pipeline start` should display a table of enabled stages with per-stage timing estimates (from historical data), model routing, and cost estimates — then exit without executing anything. This helps operators preview pipeline cost and duration before committing to a run.
 
 The feature implementation already exists in `scripts/sw-pipeline.sh:972-1094` (`dry_run_summary()`), including:
+
 - Median duration from `stage.completed` events in `~/.shipwright/events.jsonl`
 - Median cost from `cost.record` events
 - Model resolution (CLI arg > stage config > template default > `"opus"`)
@@ -148,6 +149,7 @@ events.jsonl  ──grep──►  stage.completed / cost.record JSON lines
 ### Error handling
 
 The existing `dry_run_summary()` handles all edge cases correctly:
+
 - **No events file**: `[[ -f "$EVENTS_FILE" ]]` guard skips median computation → displays "no data" / "—"
 - **Empty or malformed events**: `jq -r '... // empty'` + `|| true` → graceful fallback
 - **Non-integer durations**: `=~ ^[0-9]+$` regex guard prevents arithmetic errors
@@ -186,8 +188,11 @@ The existing `dry_run_summary()` handles all edge cases correctly:
 - [ ] Manual: `shipwright pipeline start --goal "test" --dry-run` renders the table and exits cleanly (with and without historical events present)
 
 Historical context (lessons from previous pipelines):
+
 # Shipwright Memory Context
+
 # Injected at: 2026-02-10T02:22:28Z
+
 # Stage: build
 
 ## Failure Patterns to Avoid
@@ -197,9 +202,11 @@ Historical context (lessons from previous pipelines):
 ## Code Conventions
 
 Task tracking (check off items as you complete them):
+
 # Pipeline Tasks — Add pipeline dry-run summary with stage timing estimates
 
 ## Implementation Checklist
+
 - [ ] Task 1: Fix `~/.claude-teams/` → `~/.shipwright/` in `setup_env()` backup logic
 - [ ] Task 2: Fix `~/.claude-teams/` → `~/.shipwright/` in `cleanup_env()` restore logic
 - [ ] Task 3: Fix `~/.claude-teams/` → `~/.shipwright/` in `test_dry_run_summary_with_history()` event seeding
@@ -210,28 +217,42 @@ Task tracking (check off items as you complete them):
 - [ ] Task 8: Run full `npm test` (all suites pass)
 
 ## Context
+
 - Pipeline: standard
 - Branch: ci/add-pipeline-dry-run-summary-with-stage-5
 - Issue: #5
 - Generated: 2026-02-10T02:21:06Z"
-iteration: 0
-max_iterations: 20
-status: running
-test_cmd: "npm test"
-model: opus
-agents: 1
-started_at: 2026-02-10T02:22:29Z
-last_iteration_at: 2026-02-10T02:22:29Z
-consecutive_failures: 0
-total_commits: 0
-audit_enabled: true
-audit_agent_enabled: true
-quality_gates_enabled: true
-dod_file: "/home/runner/work/shipwright/shipwright/.claude/pipeline-artifacts/dod.md"
-auto_extend: true
-extension_count: 0
-max_extensions: 3
+  iteration: 2
+  max_iterations: 20
+  status: running
+  test_cmd: "npm test"
+  model: opus
+  agents: 1
+  started_at: 2026-02-10T02:30:07Z
+  last_iteration_at: 2026-02-10T02:35:00Z
+  consecutive_failures: 0
+  total_commits: 1
+  audit_enabled: true
+  audit_agent_enabled: true
+  quality_gates_enabled: true
+  dod_file: "/home/runner/work/shipwright/shipwright/.claude/pipeline-artifacts/dod.md"
+  auto_extend: true
+  extension_count: 0
+  max_extensions: 3
+
 ---
 
 ## Log
 
+### Iteration 1 (2026-02-10T02:30:07Z)
+
+- **Full pipeline test suite passes**: 17/17
+- **Full `npm test` passes**: All 11 suites pass
+- **No stale `claude-teams` in scripts** (except migration helper): Verified
+
+### Iteration 2 (2026-02-10T02:35:00Z)
+
+- **Re-verified all fixes in place**: No stale `claude-teams` in scripts (except migration helper), no `cct-cost` references
+- **Full `npm test` passes**: All 11 suites pass (176 tests, 0 failures)
+- **All implementation tasks complete**: Both bugs fixed in commit 26be43f
+- **All DoD criteria satisfied**: Dry-run with history, without history, existing behavior preserved
