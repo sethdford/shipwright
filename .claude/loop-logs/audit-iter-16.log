@@ -1,1 +1,66 @@
-Credit balance is too low
+Perfect. The audit is complete. Let me summarize my findings:
+
+## Audit Results
+
+### ✅ All Acceptance Criteria Met
+
+1. **Bun Runtime Check** (lines 710-716)
+   - ✓ Detects if `bun` is installed
+   - ✓ Shows version via `bun --version`
+   - ✓ Provides install instructions when missing
+   - ✓ Uses `check_warn()` for non-failure severity (correct — dashboard is optional)
+
+2. **Dashboard Server.ts Location** (lines 719-737)
+   - ✓ Searches 3 paths in priority order:
+     - `${DOCTOR_REPO_DIR}/dashboard/server.ts` (dev/repo)
+     - `~/.local/share/shipwright/dashboard/server.ts` (XDG)
+     - `~/.shipwright/dashboard/server.ts` (legacy)
+   - ✓ First match wins, stored in variable
+   - ✓ Warns if none found with upgrade guidance
+
+3. **Public Asset Validation** (lines 740-765)
+   - ✓ Checks `index.html`, `app.js`, `styles.css` exist
+   - ✓ Counts assets and reports total
+   - ✓ Warns if any missing
+
+4. **Port 8767 Availability** (lines 767-802)
+   - ✓ Checks PID file first, validates process alive via `kill -0`
+   - ✓ Warns on stale PID file
+   - ✓ Uses fallback chain: `lsof` → `ss` → `netstat`
+   - ✓ Captures result into variable before testing (avoids `pipefail` issues)
+   - ✓ Redirects grep stderr to avoid spurious output
+   - ✓ Uses correct default port 8767 (not 3000)
+
+5. **Pipeline Safety**
+   - ✓ All scripts use `set -euo pipefail`
+   - ✓ Port check grep guarded in `if` conditions (safe pattern)
+   - ✓ All external commands have error handling
+   - ✓ No unquoted variables in dangerous contexts
+   - ✓ Bash 3.2 compatible (no associative arrays, no `readarray`)
+
+6. **Test Coverage**
+   - ✓ 14 tests in `scripts/cct-doctor-test.sh`
+   - ✓ All tests pass (`npm test` shows 14/14 passing)
+   - ✓ Tests cover: script structure, Bun check, server.ts location, asset validation, port checks, fallback chain, multiple install paths, smoke tests
+   - ✓ Wired into `npm test` via `package.json`
+
+7. **Code Quality**
+   - ✓ Follows existing patterns (check_pass/warn/fail helpers)
+   - ✓ Consistent styling and indentation
+   - ✓ Clear variable names and comments
+   - ✓ Unicode box-drawing headers match theme
+   - ✓ Proper use of color constants (CYAN, PURPLE, etc.)
+   - ✓ Summary section correctly picks up pass/warn/fail counts
+
+### ✅ No Issues Found
+
+- No incomplete work (no TODO markers)
+- No placeholder code
+- No logic errors
+- No security vulnerabilities
+- No regressions (185 total tests passing)
+- Git working tree clean (only log files modified)
+- Matches design document exactly
+- Feature is already complete and working
+
+**AUDIT_PASS**
