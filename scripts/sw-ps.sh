@@ -5,7 +5,9 @@
 # ║  Displays a table of agents running in claude-* tmux windows with       ║
 # ║  PID, status, idle time, and pane references.                           ║
 # ╚═══════════════════════════════════════════════════════════════════════════╝
+VERSION="1.7.1"
 set -euo pipefail
+trap 'echo "ERROR: $BASH_SOURCE:$LINENO exited with status $?" >&2' ERR
 
 # ─── Colors ──────────────────────────────────────────────────────────────────
 CYAN='\033[38;2;0;212;255m'

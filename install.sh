@@ -381,7 +381,7 @@ if ask "Install Shipwright CLI to $BIN_DIR?"; then
     INSTALLED+=("shipwright (symlink)")
     INSTALLED+=("cct (symlink)")
 
-    for sub in sw-session.sh sw-status.sh sw-cleanup.sh sw-upgrade.sh sw-doctor.sh sw-logs.sh sw-ps.sh sw-templates.sh sw-loop.sh sw-pipeline.sh sw-pipeline-test.sh sw-worktree.sh sw-init.sh sw-prep.sh sw-prep-test.sh sw-daemon.sh sw-daemon-test.sh sw-reaper.sh sw-memory.sh sw-memory-test.sh sw-cost.sh sw-fleet.sh sw-fleet-test.sh sw-fix.sh sw-fix-test.sh sw-dashboard.sh sw-tracker.sh sw-tracker-linear.sh sw-tracker-jira.sh sw-heartbeat.sh sw-checkpoint.sh sw-remote.sh sw-linear.sh sw-jira.sh; do
+    for sub in sw-session.sh sw-status.sh sw-cleanup.sh sw-upgrade.sh sw-doctor.sh sw-logs.sh sw-ps.sh sw-templates.sh sw-loop.sh sw-pipeline.sh sw-pipeline-test.sh sw-worktree.sh sw-init.sh sw-prep.sh sw-prep-test.sh sw-daemon.sh sw-daemon-test.sh sw-reaper.sh sw-memory.sh sw-memory-test.sh sw-cost.sh sw-fleet.sh sw-fleet-test.sh sw-fix.sh sw-fix-test.sh sw-dashboard.sh sw-tracker.sh sw-tracker-linear.sh sw-tracker-jira.sh sw-heartbeat.sh sw-checkpoint.sh sw-remote.sh sw-linear.sh sw-jira.sh sw-setup.sh sw-adversarial.sh sw-architecture-enforcer.sh sw-developer-simulation.sh sw-intelligence.sh sw-pipeline-composer.sh sw-predictive.sh sw-self-optimize.sh; do
       if [[ -f "$SCRIPT_DIR/scripts/$sub" ]]; then
         run "Install $sub → $BIN_DIR/$sub" \
           "cp '$SCRIPT_DIR/scripts/$sub' '$BIN_DIR/$sub' && chmod +x '$BIN_DIR/$sub'"
@@ -683,6 +683,22 @@ if [[ ${#INSTALLED[@]} -gt 0 ]] && ! $DRY_RUN; then
         _add_entry "sw-linear.sh" "scripts/sw-linear.sh" "$BIN_DIR/sw-linear.sh" false true ;;
       "sw-jira.sh")
         _add_entry "sw-jira.sh" "scripts/sw-jira.sh" "$BIN_DIR/sw-jira.sh" false true ;;
+      "sw-setup.sh")
+        _add_entry "sw-setup.sh" "scripts/sw-setup.sh" "$BIN_DIR/sw-setup.sh" false true ;;
+      "sw-adversarial.sh")
+        _add_entry "sw-adversarial.sh" "scripts/sw-adversarial.sh" "$BIN_DIR/sw-adversarial.sh" false true ;;
+      "sw-architecture-enforcer.sh")
+        _add_entry "sw-architecture-enforcer.sh" "scripts/sw-architecture-enforcer.sh" "$BIN_DIR/sw-architecture-enforcer.sh" false true ;;
+      "sw-developer-simulation.sh")
+        _add_entry "sw-developer-simulation.sh" "scripts/sw-developer-simulation.sh" "$BIN_DIR/sw-developer-simulation.sh" false true ;;
+      "sw-intelligence.sh")
+        _add_entry "sw-intelligence.sh" "scripts/sw-intelligence.sh" "$BIN_DIR/sw-intelligence.sh" false true ;;
+      "sw-pipeline-composer.sh")
+        _add_entry "sw-pipeline-composer.sh" "scripts/sw-pipeline-composer.sh" "$BIN_DIR/sw-pipeline-composer.sh" false true ;;
+      "sw-predictive.sh")
+        _add_entry "sw-predictive.sh" "scripts/sw-predictive.sh" "$BIN_DIR/sw-predictive.sh" false true ;;
+      "sw-self-optimize.sh")
+        _add_entry "sw-self-optimize.sh" "scripts/sw-self-optimize.sh" "$BIN_DIR/sw-self-optimize.sh" false true ;;
 
       "teammate-idle.sh")
         _add_entry "teammate-idle.sh" "claude-code/hooks/teammate-idle.sh" "$HOME/.claude/hooks/teammate-idle.sh" false true ;;

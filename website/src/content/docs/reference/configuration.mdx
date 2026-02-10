@@ -3,7 +3,7 @@ title: Configuration
 description: Configure tmux theme, Claude Code settings, hooks, and environment variables.
 ---
 
-import { Tabs, TabItem } from '@astrojs/starlight/components';
+import { Tabs, TabItem } from "@astrojs/starlight/components";
 
 ## tmux Theme
 
@@ -11,15 +11,15 @@ The theme lives in `tmux/tmux.conf`. It uses a dark blue-gray background with cy
 
 ### Color Palette
 
-| Element | Color | Hex |
-|---------|-------|-----|
-| Background | Dark blue-gray | `#1a1a2e` |
-| Foreground | Light gray | `#e4e4e7` |
-| Accent (active borders, highlights) | Cyan | `#00d4ff` |
-| Secondary | Blue | `#0066ff` |
-| Tertiary | Purple | `#7c3aed` |
-| Inactive borders | Muted indigo | `#333355` |
-| Inactive elements | Zinc | `#71717a` |
+| Element                             | Color          | Hex       |
+| ----------------------------------- | -------------- | --------- |
+| Background                          | Dark blue-gray | `#1a1a2e` |
+| Foreground                          | Light gray     | `#e4e4e7` |
+| Accent (active borders, highlights) | Cyan           | `#00d4ff` |
+| Secondary                           | Blue           | `#0066ff` |
+| Tertiary                            | Purple         | `#7c3aed` |
+| Inactive borders                    | Muted indigo   | `#333355` |
+| Inactive elements                   | Zinc           | `#71717a` |
 
 To customize colors, edit the hex values in `tmux/tmux.conf` and reload with `prefix + r`.
 
@@ -29,50 +29,50 @@ The prefix key is `Ctrl-a` (remapped from the default `Ctrl-b`).
 
 #### General
 
-| Key | Action |
-|-----|--------|
-| `prefix + r` | Reload tmux config |
-| `prefix + \|` | Split pane vertically |
-| `prefix + -` | Split pane horizontally |
-| `prefix + c` | New window |
-| `prefix + x` | Kill pane (with confirmation) |
-| `prefix + X` | Kill window (with confirmation) |
-| `prefix + s` | Choose session (tree view) |
-| `prefix + N` | New session |
+| Key           | Action                          |
+| ------------- | ------------------------------- |
+| `prefix + r`  | Reload tmux config              |
+| `prefix + \|` | Split pane vertically           |
+| `prefix + -`  | Split pane horizontally         |
+| `prefix + c`  | New window                      |
+| `prefix + x`  | Kill pane (with confirmation)   |
+| `prefix + X`  | Kill window (with confirmation) |
+| `prefix + s`  | Choose session (tree view)      |
+| `prefix + N`  | New session                     |
 
 #### Pane Navigation (vim-style)
 
-| Key | Action |
-|-----|--------|
-| `prefix + h/j/k/l` | Move between panes |
-| `Ctrl + h/j/k/l` | Smart pane switching (vim-tmux-navigator) |
-| `prefix + H/J/K/L` | Resize pane (repeatable) |
+| Key                | Action                                    |
+| ------------------ | ----------------------------------------- |
+| `prefix + h/j/k/l` | Move between panes                        |
+| `Ctrl + h/j/k/l`   | Smart pane switching (vim-tmux-navigator) |
+| `prefix + H/J/K/L` | Resize pane (repeatable)                  |
 
 #### Agent Teams
 
-| Key | Action |
-|-----|--------|
-| `prefix + T` | Launch team session |
-| `prefix + Ctrl-t` | Show team status dashboard |
-| `prefix + g` | Display pane numbers |
-| `prefix + G` | Toggle zoom on current pane |
-| `prefix + S` | Toggle synchronized panes |
-| `prefix + M-t` | Toggle team sync mode |
-| `prefix + M-1` | Layout: main-horizontal (leader 65% left) |
-| `prefix + M-2` | Layout: main-vertical (leader 60% top) |
-| `prefix + M-3` | Layout: tiled (equal sizes) |
-| `prefix + M-s` | Capture current pane scrollback |
-| `prefix + M-a` | Capture all panes in window |
-| `prefix + R` | Reap dead panes (one-shot cleanup) |
+| Key               | Action                                    |
+| ----------------- | ----------------------------------------- |
+| `prefix + T`      | Launch team session                       |
+| `prefix + Ctrl-t` | Show team status dashboard                |
+| `prefix + g`      | Display pane numbers                      |
+| `prefix + G`      | Toggle zoom on current pane               |
+| `prefix + S`      | Toggle synchronized panes                 |
+| `prefix + M-t`    | Toggle team sync mode                     |
+| `prefix + M-1`    | Layout: main-horizontal (leader 65% left) |
+| `prefix + M-2`    | Layout: main-vertical (leader 60% top)    |
+| `prefix + M-3`    | Layout: tiled (equal sizes)               |
+| `prefix + M-s`    | Capture current pane scrollback           |
+| `prefix + M-a`    | Capture all panes in window               |
+| `prefix + R`      | Reap dead panes (one-shot cleanup)        |
 
 #### Copy Mode (vi-style)
 
-| Key | Action |
-|-----|--------|
-| `v` | Begin selection |
-| `y` | Copy selection |
-| `r` | Toggle rectangle mode |
-| `prefix + p` | Paste buffer |
+| Key          | Action                |
+| ------------ | --------------------- |
+| `v`          | Begin selection       |
+| `y`          | Copy selection        |
+| `r`          | Toggle rectangle mode |
+| `prefix + p` | Paste buffer          |
 
 ## Claude Code Settings
 
@@ -80,12 +80,12 @@ The `claude-code/settings.json.template` configures Claude Code for agent teams.
 
 ### Key Settings
 
-| Setting | Default | Description |
-|---------|---------|-------------|
-| `CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS` | `"1"` | Enable agent teams (required) |
-| `CLAUDE_CODE_AUTOCOMPACT_PCT_OVERRIDE` | `"70"` | Context compaction threshold |
-| `CLAUDE_CODE_SUBAGENT_MODEL` | `"haiku"` | Model for subagent lookups |
-| `CLAUDE_CODE_MAX_TOOL_USE_CONCURRENCY` | `"5"` | Parallel tool calls per agent |
+| Setting                                | Default   | Description                   |
+| -------------------------------------- | --------- | ----------------------------- |
+| `CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS` | `"1"`     | Enable agent teams (required) |
+| `CLAUDE_CODE_AUTOCOMPACT_PCT_OVERRIDE` | `"70"`    | Context compaction threshold  |
+| `CLAUDE_CODE_SUBAGENT_MODEL`           | `"haiku"` | Model for subagent lookups    |
+| `CLAUDE_CODE_MAX_TOOL_USE_CONCURRENCY` | `"5"`     | Parallel tool calls per agent |
 
 ### Installation
 
@@ -99,12 +99,12 @@ Hooks are shell scripts that run on Claude Code lifecycle events.
 
 ### Included Hooks
 
-| Hook | Event | What It Does |
-|------|-------|-------------|
-| `teammate-idle.sh` | TeammateIdle | Runs typecheck — blocks idle until errors are fixed |
-| `task-completed.sh` | TaskCompleted | Runs lint + test — blocks completion until quality passes |
-| `notify-idle.sh` | Notification | Desktop alert when agents need attention |
-| `pre-compact-save.sh` | PreCompact | Saves git context before compaction |
+| Hook                  | Event         | What It Does                                              |
+| --------------------- | ------------- | --------------------------------------------------------- |
+| `teammate-idle.sh`    | TeammateIdle  | Runs typecheck — blocks idle until errors are fixed       |
+| `task-completed.sh`   | TaskCompleted | Runs lint + test — blocks completion until quality passes |
+| `notify-idle.sh`      | Notification  | Desktop alert when agents need attention                  |
+| `pre-compact-save.sh` | PreCompact    | Saves git context before compaction                       |
 
 ### Installing Hooks
 
@@ -131,11 +131,11 @@ Then wire them up in `~/.claude/settings.json`:
 
 Quality gate hooks use exit codes to control behavior:
 
-| Exit Code | Meaning |
-|-----------|---------|
-| `0` | Pass — agent continues normally |
-| `2` | Block — agent must fix the issue before proceeding |
-| Other | Error — logged but doesn't block |
+| Exit Code | Meaning                                            |
+| --------- | -------------------------------------------------- |
+| `0`       | Pass — agent continues normally                    |
+| `2`       | Block — agent must fix the issue before proceeding |
+| Other     | Error — logged but doesn't block                   |
 
 Example lint check hook:
 
@@ -155,24 +155,24 @@ The daemon configuration file at `.claude/daemon-config.json` controls all daemo
 
 ### Core Settings
 
-| Field | Default | Description |
-|-------|---------|-------------|
-| `watch_label` | `"ready-to-build"` | GitHub label to watch for |
-| `poll_interval` | `60` | Seconds between polls |
-| `max_parallel` | `2` | Maximum concurrent pipeline jobs |
-| `pipeline_template` | `"autonomous"` | Default pipeline template |
-| `base_branch` | `"main"` | Branch to create worktrees from |
-| `model` | `"opus"` | Default Claude model |
-| `skip_gates` | `true` | Auto-approve all gates |
+| Field               | Default            | Description                      |
+| ------------------- | ------------------ | -------------------------------- |
+| `watch_label`       | `"ready-to-build"` | GitHub label to watch for        |
+| `poll_interval`     | `60`               | Seconds between polls            |
+| `max_parallel`      | `2`                | Maximum concurrent pipeline jobs |
+| `pipeline_template` | `"autonomous"`     | Default pipeline template        |
+| `base_branch`       | `"main"`           | Branch to create worktrees from  |
+| `model`             | `"opus"`           | Default Claude model             |
+| `skip_gates`        | `true`             | Auto-approve all gates           |
 
 ### Adaptive Template Selection
 
 Automatically selects the best pipeline template based on issue labels and triage score.
 
-| Field | Default | Description |
-|-------|---------|-------------|
-| `auto_template` | `false` | Enable adaptive template selection |
-| `template_map` | `{}` | Regex-based template overrides (label pattern → template name) |
+| Field           | Default | Description                                                    |
+| --------------- | ------- | -------------------------------------------------------------- |
+| `auto_template` | `false` | Enable adaptive template selection                             |
+| `template_map`  | `{}`    | Regex-based template overrides (label pattern → template name) |
 
 When `auto_template` is enabled, template selection uses this priority:
 
@@ -194,21 +194,22 @@ When `auto_template` is enabled, template selection uses this priority:
 
 Automatically retries failed pipelines with optional model/template escalation.
 
-| Field | Default | Description |
-|-------|---------|-------------|
-| `max_retries` | `2` | Maximum retry attempts per issue |
-| `retry_escalation` | `true` | Escalate model/template on retry |
+| Field              | Default | Description                      |
+| ------------------ | ------- | -------------------------------- |
+| `max_retries`      | `2`     | Maximum retry attempts per issue |
+| `retry_escalation` | `true`  | Escalate model/template on retry |
 
 ### Self-Optimizing Metrics
 
 Automatically tunes daemon parameters based on DORA metric thresholds.
 
-| Field | Default | Description |
-|-------|---------|-------------|
-| `self_optimize` | `false` | Enable self-optimizing loop |
-| `optimize_interval` | `10` | Poll cycles between optimization checks |
+| Field               | Default | Description                             |
+| ------------------- | ------- | --------------------------------------- |
+| `self_optimize`     | `false` | Enable self-optimizing loop             |
+| `optimize_interval` | `10`    | Poll cycles between optimization checks |
 
 Self-optimization adjustments:
+
 - **CFR > 40%** — switches to `full` template
 - **CFR > 20%** — enables compound quality
 - **Lead time > 4hrs** — increases `max_parallel`, halves `poll_interval`
@@ -220,63 +221,63 @@ Self-optimization adjustments:
 
 Allows critical issues to bypass the normal queue and get processed immediately.
 
-| Field | Default | Description |
-|-------|---------|-------------|
-| `priority_lane` | `false` | Enable priority bypass queue |
-| `priority_lane_labels` | `"hotfix,incident,p0,urgent"` | Labels that trigger priority lane |
-| `priority_lane_max` | `1` | Maximum extra slots for priority issues |
+| Field                  | Default                       | Description                             |
+| ---------------------- | ----------------------------- | --------------------------------------- |
+| `priority_lane`        | `false`                       | Enable priority bypass queue            |
+| `priority_lane_labels` | `"hotfix,incident,p0,urgent"` | Labels that trigger priority lane       |
+| `priority_lane_max`    | `1`                           | Maximum extra slots for priority issues |
 
 ### Org-Wide Mode
 
 Watch issues across all repositories in a GitHub organization.
 
-| Field | Default | Description |
-|-------|---------|-------------|
-| `watch_mode` | `"repo"` | `"repo"` for single repo, `"org"` for org-wide |
-| `org` | `null` | GitHub organization name (required for org mode) |
-| `repo_filter` | `null` | Regex filter for repository names (e.g. `"api-.*\|web-.*"`) |
+| Field         | Default  | Description                                                 |
+| ------------- | -------- | ----------------------------------------------------------- |
+| `watch_mode`  | `"repo"` | `"repo"` for single repo, `"org"` for org-wide              |
+| `org`         | `null`   | GitHub organization name (required for org mode)            |
+| `repo_filter` | `null`   | Regex filter for repository names (e.g. `"api-.*\|web-.*"`) |
 
 ### Patrol Settings
 
 Proactive codebase scanning during quiet periods.
 
-| Field | Default | Description |
-|-------|---------|-------------|
-| `patrol.interval` | `3600` | Seconds between patrol runs |
-| `patrol.max_issues` | `5` | Maximum issues to create per patrol |
-| `patrol.label` | `"auto-patrol"` | Label applied to patrol-created issues |
+| Field               | Default         | Description                            |
+| ------------------- | --------------- | -------------------------------------- |
+| `patrol.interval`   | `3600`          | Seconds between patrol runs            |
+| `patrol.max_issues` | `5`             | Maximum issues to create per patrol    |
+| `patrol.label`      | `"auto-patrol"` | Label applied to patrol-created issues |
 
 ### Degradation Alerting
 
 Monitors pipeline success rates and alerts on quality declines.
 
-| Field | Default | Description |
-|-------|---------|-------------|
-| `alerts.degradation_window` | `5` | Number of recent pipelines to evaluate |
-| `alerts.cfr_threshold` | `30` | Change failure rate (%) that triggers alert |
-| `alerts.success_threshold` | `50` | Success rate (%) below which an alert fires |
+| Field                       | Default | Description                                 |
+| --------------------------- | ------- | ------------------------------------------- |
+| `alerts.degradation_window` | `5`     | Number of recent pipelines to evaluate      |
+| `alerts.cfr_threshold`      | `30`    | Change failure rate (%) that triggers alert |
+| `alerts.success_threshold`  | `50`    | Success rate (%) below which an alert fires |
 
 ### Health Monitoring
 
-| Field | Default | Description |
-|-------|---------|-------------|
-| `health.stale_timeout_s` | `1800` | Seconds before a job is considered stale |
+| Field                    | Default | Description                              |
+| ------------------------ | ------- | ---------------------------------------- |
+| `health.stale_timeout_s` | `1800`  | Seconds before a job is considered stale |
 
 ### Lifecycle Hooks
 
-| Field | Default | Description |
-|-------|---------|-------------|
-| `on_success.remove_label` | `"ready-to-build"` | Label to remove on success |
-| `on_success.add_label` | `"pipeline/complete"` | Label to add on success |
-| `on_success.close_issue` | `false` | Close issue on success |
-| `on_failure.add_label` | `"pipeline/failed"` | Label to add on failure |
-| `on_failure.comment_log_lines` | `50` | Log lines to include in failure comment |
+| Field                          | Default               | Description                             |
+| ------------------------------ | --------------------- | --------------------------------------- |
+| `on_success.remove_label`      | `"ready-to-build"`    | Label to remove on success              |
+| `on_success.add_label`         | `"pipeline/complete"` | Label to add on success                 |
+| `on_success.close_issue`       | `false`               | Close issue on success                  |
+| `on_failure.add_label`         | `"pipeline/failed"`   | Label to add on failure                 |
+| `on_failure.comment_log_lines` | `50`                  | Log lines to include in failure comment |
 
 ### Notifications
 
-| Field | Default | Description |
-|-------|---------|-------------|
-| `notifications.slack_webhook` | `null` | Slack webhook URL for alerts |
+| Field                         | Default | Description                  |
+| ----------------------------- | ------- | ---------------------------- |
+| `notifications.slack_webhook` | `null`  | Slack webhook URL for alerts |
 
 ### Full Example
 
@@ -332,6 +333,69 @@ Monitors pipeline success rates and alerts on quality declines.
 }
 ```
 
+## Intelligence Configuration
+
+The intelligence layer adds semantic codebase analysis, predictive risk assessment, and self-optimization to the daemon. All intelligence features are optional, disabled by default, and configured in the `intelligence` section of `.claude/daemon-config.json`.
+
+### Core Intelligence Settings
+
+| Field                            | Default | Description                                                                                |
+| -------------------------------- | ------- | ------------------------------------------------------------------------------------------ |
+| `intelligence.enabled`           | `false` | Master switch for the intelligence core (semantic triage, AI memory search, model routing) |
+| `intelligence.cache_ttl_seconds` | `3600`  | Cache duration for intelligence responses (prevents re-analyzing the same issue)           |
+
+### Intelligence Feature Flags
+
+| Field                               | Default | Description                                                                     |
+| ----------------------------------- | ------- | ------------------------------------------------------------------------------- |
+| `intelligence.composer_enabled`     | `false` | Enable dynamic pipeline composition (replaces static template selection)        |
+| `intelligence.optimization_enabled` | `false` | Enable self-optimization (outcome analysis, template tuning, model A/B testing) |
+| `intelligence.prediction_enabled`   | `false` | Enable predictive analytics (risk assessment, anomaly detection, AI patrol)     |
+| `intelligence.adversarial_enabled`  | `false` | Enable adversarial code review (red-team review after primary agent)            |
+| `intelligence.simulation_enabled`   | `false` | Enable developer simulation (simulated PR review with multiple personas)        |
+| `intelligence.architecture_enabled` | `false` | Enable architecture enforcer (living architectural model and validation)        |
+
+### Intelligence Tuning Parameters
+
+| Field                            | Default | Description                                               |
+| -------------------------------- | ------- | --------------------------------------------------------- |
+| `intelligence.ab_test_ratio`     | `0.1`   | Fraction of runs using composed pipelines for A/B testing |
+| `intelligence.anomaly_threshold` | `3.0`   | Standard deviations for anomaly detection                 |
+
+All intelligence features degrade gracefully when disabled or when Claude API calls fail. The system falls back to existing static behavior.
+
+## Auto-Scaling Configuration
+
+The daemon supports resource-aware dynamic worker scaling based on system capacity and budget.
+
+| Field                        | Default | Description                                    |
+| ---------------------------- | ------- | ---------------------------------------------- |
+| `auto_scale`                 | `false` | Enable resource-aware dynamic worker scaling   |
+| `auto_scale_interval`        | `5`     | Seconds between scale checks                   |
+| `max_workers`                | `8`     | Maximum workers the auto-scaler can allocate   |
+| `min_workers`                | `1`     | Minimum workers (floor)                        |
+| `worker_mem_gb`              | `4`     | Memory per worker for capacity calculation     |
+| `estimated_cost_per_job_usd` | `5.0`   | Cost estimate per job for budget-based scaling |
+
+Scaling factors (takes the minimum):
+
+- **CPU**: 75% of system cores
+- **Memory**: available GB / `worker_mem_gb`
+- **Budget**: remaining daily budget / `estimated_cost_per_job_usd`
+- **Queue**: current demand (active + queued issues)
+
+## Worker Pool Configuration
+
+For fleet operations, distribute workers across multiple repositories.
+
+| Field                                    | Default | Description                                  |
+| ---------------------------------------- | ------- | -------------------------------------------- |
+| `worker_pool.enabled`                    | `false` | Enable shared worker pool across fleet repos |
+| `worker_pool.total_workers`              | `12`    | Total workers to distribute across repos     |
+| `worker_pool.rebalance_interval_seconds` | `120`   | Seconds between rebalance cycles             |
+
+When enabled, the fleet rebalancer runs in the background and redistributes workers every N seconds. Repos with more queued issues get more workers. Each repo always gets at least 1 worker.
+
 ## Fleet Configuration
 
 The fleet configuration file at `.claude/fleet-config.json` manages multi-repo daemon orchestration. Generate it with `shipwright fleet init`.
@@ -356,23 +420,23 @@ The fleet configuration file at `.claude/fleet-config.json` manages multi-repo d
 
 Each entry in the `repos` array can override the fleet defaults:
 
-| Field | Default | Description |
-|-------|---------|-------------|
-| `path` | — | **Required.** Absolute path to the repository |
-| `template` | `defaults.pipeline_template` | Pipeline template override |
-| `max_parallel` | `defaults.max_parallel` | Max concurrent pipelines for this repo |
-| `watch_label` | `defaults.watch_label` | Label override for this repo |
-| `model` | `defaults.model` | Model override for this repo |
+| Field          | Default                      | Description                                   |
+| -------------- | ---------------------------- | --------------------------------------------- |
+| `path`         | —                            | **Required.** Absolute path to the repository |
+| `template`     | `defaults.pipeline_template` | Pipeline template override                    |
+| `max_parallel` | `defaults.max_parallel`      | Max concurrent pipelines for this repo        |
+| `watch_label`  | `defaults.watch_label`       | Label override for this repo                  |
+| `model`        | `defaults.model`             | Model override for this repo                  |
 
 ### Fleet Defaults
 
-| Field | Default | Description |
-|-------|---------|-------------|
-| `defaults.watch_label` | `"ready-to-build"` | Default issue label to watch |
-| `defaults.pipeline_template` | `"autonomous"` | Default pipeline template |
-| `defaults.max_parallel` | `2` | Default max concurrent pipelines |
-| `defaults.model` | `"opus"` | Default Claude model |
-| `shared_events` | `true` | Share events.jsonl across repos |
+| Field                        | Default            | Description                      |
+| ---------------------------- | ------------------ | -------------------------------- |
+| `defaults.watch_label`       | `"ready-to-build"` | Default issue label to watch     |
+| `defaults.pipeline_template` | `"autonomous"`     | Default pipeline template        |
+| `defaults.max_parallel`      | `2`                | Default max concurrent pipelines |
+| `defaults.model`             | `"opus"`           | Default Claude model             |
+| `shared_events`              | `true`             | Share events.jsonl across repos  |
 
 ## Deploy Configuration
 
@@ -380,34 +444,34 @@ Deploy configuration is set up via `shipwright init --deploy` or by using the `d
 
 Available deploy adapters:
 
-| Adapter | File | Description |
-|---------|------|-------------|
-| Vercel | `adapters/vercel-deploy.sh` | Vercel deployment |
-| Fly.io | `adapters/fly-deploy.sh` | Fly.io deployment |
-| Railway | `adapters/railway-deploy.sh` | Railway deployment |
-| Docker | `adapters/docker-deploy.sh` | Docker-based deployment |
+| Adapter | File                         | Description             |
+| ------- | ---------------------------- | ----------------------- |
+| Vercel  | `adapters/vercel-deploy.sh`  | Vercel deployment       |
+| Fly.io  | `adapters/fly-deploy.sh`     | Fly.io deployment       |
+| Railway | `adapters/railway-deploy.sh` | Railway deployment      |
+| Docker  | `adapters/docker-deploy.sh`  | Docker-based deployment |
 
 The `deployed` pipeline template uses placeholder commands (`__STAGING_CMD__`, `__PRODUCTION_CMD__`, `__ROLLBACK_CMD__`, `__SMOKE_CMD__`, `__HEALTH_URL__`) that are replaced during `shipwright init --deploy`.
 
 ## Environment Variables
 
-| Variable | Default | Description |
-|----------|---------|-------------|
-| `CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS` | — | **Required.** Enables agent teams |
-| `CLAUDE_CODE_SUBAGENT_MODEL` | parent model | Model for subagent lookups (`"haiku"` recommended) |
-| `CLAUDE_CODE_AUTOCOMPACT_PCT_OVERRIDE` | `"80"` | Context compaction threshold (lower = more aggressive) |
-| `CLAUDE_CODE_MAX_TOOL_USE_CONCURRENCY` | `"3"` | Parallel tool calls per agent |
-| `SHIPWRIGHT_WEBHOOK_URL` | — | Custom webhook URL for pipeline notifications |
+| Variable                               | Default      | Description                                            |
+| -------------------------------------- | ------------ | ------------------------------------------------------ |
+| `CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS` | —            | **Required.** Enables agent teams                      |
+| `CLAUDE_CODE_SUBAGENT_MODEL`           | parent model | Model for subagent lookups (`"haiku"` recommended)     |
+| `CLAUDE_CODE_AUTOCOMPACT_PCT_OVERRIDE` | `"80"`       | Context compaction threshold (lower = more aggressive) |
+| `CLAUDE_CODE_MAX_TOOL_USE_CONCURRENCY` | `"3"`        | Parallel tool calls per agent                          |
+| `SHIPWRIGHT_WEBHOOK_URL`               | —            | Custom webhook URL for pipeline notifications          |
 
 ## tmux Plugins (TPM)
 
 After installation, press `prefix + I` to install plugins.
 
-| Plugin | Key | What It Does |
-|--------|-----|--------------|
-| **tmux-fingers** | `prefix + F` | Vimium-style copy hints for URLs, paths, hashes |
-| **tmux-fzf-url** | `prefix + u` | Fuzzy-find and open URLs |
-| **tmux-fzf** | `F5` | Fuzzy finder for sessions, windows, panes |
-| **extrakto** | `prefix + tab` | Extract and copy text from pane output |
-| **tmux-resurrect** | auto | Save and restore sessions across restarts |
-| **tmux-continuum** | auto | Automatic continuous session saving |
+| Plugin             | Key            | What It Does                                    |
+| ------------------ | -------------- | ----------------------------------------------- |
+| **tmux-fingers**   | `prefix + F`   | Vimium-style copy hints for URLs, paths, hashes |
+| **tmux-fzf-url**   | `prefix + u`   | Fuzzy-find and open URLs                        |
+| **tmux-fzf**       | `F5`           | Fuzzy finder for sessions, windows, panes       |
+| **extrakto**       | `prefix + tab` | Extract and copy text from pane output          |
+| **tmux-resurrect** | auto           | Save and restore sessions across restarts       |
+| **tmux-continuum** | auto           | Automatic continuous session saving             |

@@ -14,13 +14,13 @@ The memory system (`shipwright memory`) gives Shipwright a persistent learning l
 
 ## What Gets Captured
 
-| Category | What It Stores | Example |
-|----------|---------------|---------|
-| **Patterns** | Project type, framework, test runner, conventions | `node / express / jest / ESM imports` |
-| **Failures** | Error patterns with stage, frequency, root cause, fix | `[test] Cannot find module './auth' — seen 3x` |
-| **Decisions** | Design choices and architectural decisions (ADRs) | `[architecture] Use refresh token rotation` |
-| **Baselines** | Performance metrics like test duration and coverage | `test_duration_s: 42, coverage_pct: 87` |
-| **Global** | Cross-repo learnings and review feedback patterns | `org/api — review_feedback: 2 bugs, 1 warning` |
+| Category      | What It Stores                                        | Example                                        |
+| ------------- | ----------------------------------------------------- | ---------------------------------------------- |
+| **Patterns**  | Project type, framework, test runner, conventions     | `node / express / jest / ESM imports`          |
+| **Failures**  | Error patterns with stage, frequency, root cause, fix | `[test] Cannot find module './auth' — seen 3x` |
+| **Decisions** | Design choices and architectural decisions (ADRs)     | `[architecture] Use refresh token rotation`    |
+| **Baselines** | Performance metrics like test duration and coverage   | `test_duration_s: 42, coverage_pct: 87`        |
+| **Global**    | Cross-repo learnings and review feedback patterns     | `org/api — review_feedback: 2 bugs, 1 warning` |
 
 ## Quick Start
 
@@ -51,37 +51,37 @@ shipwright memory forget --all
 
 When a pipeline runs, each stage receives tailored context from memory:
 
-| Stage | Injected Context |
-|-------|-----------------|
-| **plan / design** | Codebase patterns, past design decisions, known issues |
-| **build** | Failure patterns to avoid, known fixes, code conventions |
-| **test** | Known test failures, flaky test patterns, coverage baselines |
-| **review** | Common review feedback, cross-repo learnings |
+| Stage             | Injected Context                                             |
+| ----------------- | ------------------------------------------------------------ |
+| **plan / design** | Codebase patterns, past design decisions, known issues       |
+| **build**         | Failure patterns to avoid, known fixes, code conventions     |
+| **test**          | Known test failures, flaky test patterns, coverage baselines |
+| **review**        | Common review feedback, cross-repo learnings                 |
 
 ## Commands
 
-| Command | Description |
-|---------|-------------|
-| `shipwright memory show` | Display memory for the current repo |
-| `shipwright memory show --global` | Display cross-repo learnings |
-| `shipwright memory search <keyword>` | Search across all memory categories |
-| `shipwright memory stats` | Show storage size, entry counts, usage stats |
-| `shipwright memory export` | Export repo memory as JSON to stdout |
-| `shipwright memory import <file>` | Import memory from a JSON file |
-| `shipwright memory forget --all` | Clear all memory for the current repo |
+| Command                              | Description                                  |
+| ------------------------------------ | -------------------------------------------- |
+| `shipwright memory show`             | Display memory for the current repo          |
+| `shipwright memory show --global`    | Display cross-repo learnings                 |
+| `shipwright memory search <keyword>` | Search across all memory categories          |
+| `shipwright memory stats`            | Show storage size, entry counts, usage stats |
+| `shipwright memory export`           | Export repo memory as JSON to stdout         |
+| `shipwright memory import <file>`    | Import memory from a JSON file               |
+| `shipwright memory forget --all`     | Clear all memory for the current repo        |
 
 ### Pipeline Integration Commands
 
 These are called automatically by the pipeline, but can also be used manually:
 
-| Command | Description |
-|---------|-------------|
-| `shipwright memory capture <state> <artifacts>` | Capture learnings from a completed pipeline |
-| `shipwright memory inject <stage>` | Output context block for a pipeline stage |
-| `shipwright memory pattern project` | Detect and record codebase patterns |
-| `shipwright memory metric <name> <value>` | Update a performance baseline |
-| `shipwright memory decision <type> <summary>` | Record a design decision |
-| `shipwright memory analyze-failure <log> <stage>` | AI-powered root cause analysis |
+| Command                                           | Description                                 |
+| ------------------------------------------------- | ------------------------------------------- |
+| `shipwright memory capture <state> <artifacts>`   | Capture learnings from a completed pipeline |
+| `shipwright memory inject <stage>`                | Output context block for a pipeline stage   |
+| `shipwright memory pattern project`               | Detect and record codebase patterns         |
+| `shipwright memory metric <name> <value>`         | Update a performance baseline               |
+| `shipwright memory decision <type> <summary>`     | Record a design decision                    |
+| `shipwright memory analyze-failure <log> <stage>` | AI-powered root cause analysis              |
 
 ## AI Failure Analysis
 
@@ -98,13 +98,13 @@ Failure categories: `test_failure`, `build_error`, `lint_error`, `timeout`, `dep
 
 Memory is stored per-repo at `~/.shipwright/memory/<repo-hash>/`:
 
-| File | Contents |
-|------|----------|
-| `patterns.json` | Project type, framework, conventions, known issues |
-| `failures.json` | Failure patterns with frequency and fixes (capped at 100) |
-| `decisions.json` | Design decisions / ADRs (capped at 100) |
-| `metrics.json` | Performance baselines with regression detection |
-| `global.json` | Cross-repo learnings (capped at 50) |
+| File             | Contents                                                  |
+| ---------------- | --------------------------------------------------------- |
+| `patterns.json`  | Project type, framework, conventions, known issues        |
+| `failures.json`  | Failure patterns with frequency and fixes (capped at 100) |
+| `decisions.json` | Design decisions / ADRs (capped at 100)                   |
+| `metrics.json`   | Performance baselines with regression detection           |
+| `global.json`    | Cross-repo learnings (capped at 50)                       |
 
 ## Tips
 
@@ -112,3 +112,13 @@ Memory is stored per-repo at `~/.shipwright/memory/<repo-hash>/`:
 - **Export before major refactors** — If you're restructuring the codebase, export memory first. The patterns file may need to be re-captured.
 - **Regression detection** — When a metric increases by more than 20% from its baseline, Shipwright emits a warning and logs a regression event.
 - **Cross-repo patterns** — Global memory captures review feedback across all repos, so common mistakes in one project inform reviews in another.
+
+## Intelligence-Powered Memory
+
+When the intelligence layer is enabled, two memory features are enhanced:
+
+**AI-Ranked Search** — `intelligence_search_memory` uses Claude to rank memory entries by relevance to the current context, returning the most useful patterns instead of a keyword dump.
+
+**Memory Evolution** — The self-optimization module automatically prunes patterns not confirmed in 30 days, strengthens patterns seen 3+ times recently, and promotes recurring cross-repo patterns to global memory.
+
+See the [Intelligence guide](/guides/intelligence/) for details on self-optimization and memory evolution.

@@ -5,7 +5,9 @@
 # ║  Each agent gets its own worktree so parallel agents don't clobber       ║
 # ║  each other's files. Worktrees live in .worktrees/ relative to root.    ║
 # ╚═══════════════════════════════════════════════════════════════════════════╝
+VERSION="1.7.1"
 set -euo pipefail
+trap 'echo "ERROR: $BASH_SOURCE:$LINENO exited with status $?" >&2' ERR
 
 # ─── Colors ────────────────────────────────────────────────────────────────
 CYAN='\033[38;2;0;212;255m'

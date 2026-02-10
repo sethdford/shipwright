@@ -1,0 +1,791 @@
+#!/usr/bin/env bash
+# ╔═══════════════════════════════════════════════════════════════════════════╗
+# ║  shipwright self-optimize — Learning & Self-Tuning System               ║
+# ║  Outcome analysis · Template tuning · Model routing · Memory evolution  ║
+# ╚═══════════════════════════════════════════════════════════════════════════╝
+set -euo pipefail
+trap 'echo "ERROR: $BASH_SOURCE:$LINENO exited with status $?" >&2' ERR
+
+VERSION="1.7.1"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+REPO_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
+
+# ─── Colors (matches Seth's tmux theme) ─────────────────────────────────────
+CYAN='\033[38;2;0;212;255m'     # #00d4ff — primary accent
+PURPLE='\033[38;2;124;58;237m'  # #7c3aed — secondary
+BLUE='\033[38;2;0;102;255m'     # #0066ff — tertiary
+GREEN='\033[38;2;74;222;128m'   # success
+YELLOW='\033[38;2;250;204;21m'  # warning
+RED='\033[38;2;248;113;113m'    # error
+DIM='\033[2m'
+BOLD='\033[1m'
+RESET='\033[0m'
+
+# ─── Cross-platform compatibility ──────────────────────────────────────────
+# shellcheck source=lib/compat.sh
+[[ -f "$SCRIPT_DIR/lib/compat.sh" ]] && source "$SCRIPT_DIR/lib/compat.sh"
+
+info()    { echo -e "${CYAN}${BOLD}▸${RESET} $*"; }
+success() { echo -e "${GREEN}${BOLD}✓${RESET} $*"; }
+warn()    { echo -e "${YELLOW}${BOLD}⚠${RESET} $*"; }
+error()   { echo -e "${RED}${BOLD}✗${RESET} $*" >&2; }
+
+now_iso() { date -u +"%Y-%m-%dT%H:%M:%SZ"; }
+now_epoch() { date +%s; }
+
+# ─── Structured Event Log ────────────────────────────────────────────────────
+EVENTS_FILE="${HOME}/.shipwright/events.jsonl"
+
+emit_event() {
+    local event_type="$1"
+    shift
+    local json_fields=""
+    for kv in "$@"; do
+        local key="${kv%%=*}"
+        local val="${kv#*=}"
+        if [[ "$val" =~ ^-?[0-9]+\.?[0-9]*$ ]]; then
+            json_fields="${json_fields},\"${key}\":${val}"
+        else
+            val="${val//\"/\\\"}"
+            json_fields="${json_fields},\"${key}\":\"${val}\""
+        fi
+    done
+    mkdir -p "${HOME}/.shipwright"
+    echo "{\"ts\":\"$(now_iso)\",\"ts_epoch\":$(now_epoch),\"type\":\"${event_type}\"${json_fields}}" >> "$EVENTS_FILE"
+}
+
+# ─── Storage Paths ───────────────────────────────────────────────────────────
+OPTIMIZATION_DIR="${HOME}/.shipwright/optimization"
+OUTCOMES_FILE="${OPTIMIZATION_DIR}/outcomes.jsonl"
+TEMPLATE_WEIGHTS_FILE="${OPTIMIZATION_DIR}/template-weights.json"
+MODEL_ROUTING_FILE="${OPTIMIZATION_DIR}/model-routing.json"
+ITERATION_MODEL_FILE="${OPTIMIZATION_DIR}/iteration-model.json"
+
+ensure_optimization_dir() {
+    mkdir -p "$OPTIMIZATION_DIR"
+    [[ -f "$TEMPLATE_WEIGHTS_FILE" ]] || echo '{}' > "$TEMPLATE_WEIGHTS_FILE"
+    [[ -f "$MODEL_ROUTING_FILE" ]]    || echo '{}' > "$MODEL_ROUTING_FILE"
+    [[ -f "$ITERATION_MODEL_FILE" ]]  || echo '{}' > "$ITERATION_MODEL_FILE"
+}
+
+# ═════════════════════════════════════════════════════════════════════════════
+# OUTCOME ANALYSIS
+# ═════════════════════════════════════════════════════════════════════════════
+
+# optimize_analyze_outcome <pipeline_state_file>
+# Extract metrics from a completed pipeline and append to outcomes.jsonl
+optimize_analyze_outcome() {
+    local state_file="${1:-}"
+
+    if [[ -z "$state_file" || ! -f "$state_file" ]]; then
+        error "Pipeline state file not found: ${state_file:-<empty>}"
+        return 1
+    fi
+
+    ensure_optimization_dir
+
+    # Extract fields from the state file (markdown-style key: value)
+    local issue_number template_used result total_iterations total_cost labels model
+    issue_number=$(sed -n 's/^issue: *#*//p' "$state_file" | head -1 | tr -d ' ')
+    template_used=$(sed -n 's/^template: *//p' "$state_file" | head -1 | tr -d ' ')
+    result=$(sed -n 's/^status: *//p' "$state_file" | head -1 | tr -d ' ')
+    total_iterations=$(sed -n 's/^iterations: *//p' "$state_file" | head -1 | tr -d ' ')
+    total_cost=$(sed -n 's/^cost: *\$*//p' "$state_file" | head -1 | tr -d ' ')
+    labels=$(sed -n 's/^labels: *//p' "$state_file" | head -1)
+    model=$(sed -n 's/^model: *//p' "$state_file" | head -1 | tr -d ' ')
+
+    # Extract complexity score if present
+    local complexity
+    complexity=$(sed -n 's/^complexity: *//p' "$state_file" | head -1 | tr -d ' ')
+
+    # Extract stage durations from stages section
+    local stages_json="[]"
+    local stages_section=""
+    stages_section=$(sed -n '/^stages:/,/^---/p' "$state_file" 2>/dev/null || true)
+    if [[ -n "$stages_section" ]]; then
+        # Build JSON array of stage results
+        local stage_entries=""
+        while IFS= read -r line; do
+            local stage_name stage_status
+            stage_name=$(echo "$line" | sed 's/:.*//' | tr -d ' ')
+            stage_status=$(echo "$line" | sed 's/.*: *//' | tr -d ' ')
+            if [[ -n "$stage_name" && "$stage_name" != "stages" && "$stage_name" != "---" ]]; then
+                if [[ -n "$stage_entries" ]]; then
+                    stage_entries="${stage_entries},"
+                fi
+                stage_entries="${stage_entries}{\"name\":\"${stage_name}\",\"status\":\"${stage_status}\"}"
+            fi
+        done <<< "$stages_section"
+        if [[ -n "$stage_entries" ]]; then
+            stages_json="[${stage_entries}]"
+        fi
+    fi
+
+    # Build outcome record using jq for proper escaping
+    local tmp_outcome
+    tmp_outcome=$(mktemp)
+    jq -c -n \
+        --arg ts "$(now_iso)" \
+        --arg issue "${issue_number:-unknown}" \
+        --arg template "${template_used:-unknown}" \
+        --arg result "${result:-unknown}" \
+        --arg model "${model:-opus}" \
+        --arg labels "${labels:-}" \
+        --argjson iterations "${total_iterations:-0}" \
+        --argjson cost "${total_cost:-0}" \
+        --argjson complexity "${complexity:-0}" \
+        --argjson stages "$stages_json" \
+        '{
+            ts: $ts,
+            issue: $issue,
+            template: $template,
+            result: $result,
+            model: $model,
+            labels: $labels,
+            iterations: $iterations,
+            cost: $cost,
+            complexity: $complexity,
+            stages: $stages
+        }' > "$tmp_outcome"
+
+    # Append to outcomes file (atomic: write to tmp, then cat + mv)
+    local outcome_line
+    outcome_line=$(cat "$tmp_outcome")
+    rm -f "$tmp_outcome"
+    echo "$outcome_line" >> "$OUTCOMES_FILE"
+
+    emit_event "optimize.outcome_analyzed" \
+        "issue=${issue_number:-unknown}" \
+        "template=${template_used:-unknown}" \
+        "result=${result:-unknown}" \
+        "iterations=${total_iterations:-0}" \
+        "cost=${total_cost:-0}"
+
+    success "Outcome recorded for issue #${issue_number:-unknown} (${result:-unknown})"
+}
+
+# ═════════════════════════════════════════════════════════════════════════════
+# TEMPLATE TUNING
+# ═════════════════════════════════════════════════════════════════════════════
+
+# optimize_tune_templates [outcomes_file]
+# Adjust template selection weights based on success/failure rates per label
+optimize_tune_templates() {
+    local outcomes_file="${1:-$OUTCOMES_FILE}"
+
+    if [[ ! -f "$outcomes_file" ]]; then
+        warn "No outcomes data found at: $outcomes_file"
+        return 0
+    fi
+
+    ensure_optimization_dir
+
+    info "Tuning template weights..."
+
+    # Process outcomes: group by template+label, calculate success rates
+    # Uses a temp file approach compatible with Bash 3.2 (no associative arrays)
+    local tmp_stats tmp_weights
+    tmp_stats=$(mktemp)
+    tmp_weights=$(mktemp)
+
+    # Extract template, labels, result from each outcome line
+    while IFS= read -r line; do
+        local template result labels_str
+        template=$(echo "$line" | jq -r '.template // "unknown"' 2>/dev/null) || continue
+        result=$(echo "$line" | jq -r '.result // "unknown"' 2>/dev/null) || continue
+        labels_str=$(echo "$line" | jq -r '.labels // ""' 2>/dev/null) || continue
+
+        # Default label if none
+        if [[ -z "$labels_str" ]]; then
+            labels_str="unlabeled"
+        fi
+
+        # Record template+label combination with result
+        local label
+        # Split labels by comma
+        echo "$labels_str" | tr ',' '\n' | while IFS= read -r label; do
+            label=$(echo "$label" | tr -d ' ')
+            [[ -z "$label" ]] && continue
+            local is_success=0
+            if [[ "$result" == "success" || "$result" == "completed" ]]; then
+                is_success=1
+            fi
+            echo "${template}|${label}|${is_success}" >> "$tmp_stats"
+        done
+    done < "$outcomes_file"
+
+    # Calculate weights per template+label
+    local current_weights='{}'
+    if [[ -f "$TEMPLATE_WEIGHTS_FILE" ]]; then
+        current_weights=$(cat "$TEMPLATE_WEIGHTS_FILE")
+    fi
+
+    # Get unique template|label combos
+    if [[ -f "$tmp_stats" ]]; then
+        local combos
+        combos=$(cut -d'|' -f1,2 "$tmp_stats" | sort -u || true)
+
+        local new_weights="$current_weights"
+        while IFS= read -r combo; do
+            [[ -z "$combo" ]] && continue
+            local tmpl lbl
+            tmpl=$(echo "$combo" | cut -d'|' -f1)
+            lbl=$(echo "$combo" | cut -d'|' -f2)
+
+            local total successes rate
+            total=$(grep -c "^${tmpl}|${lbl}|" "$tmp_stats" || true)
+            total="${total:-0}"
+            successes=$(grep -c "^${tmpl}|${lbl}|1$" "$tmp_stats" || true)
+            successes="${successes:-0}"
+
+            if [[ "$total" -gt 0 ]]; then
+                rate=$(awk "BEGIN{printf \"%.2f\", ($successes/$total)*100}")
+            else
+                rate="0"
+            fi
+
+            # Get current weight (default 1.0)
+            local current_weight
+            current_weight=$(echo "$new_weights" | jq -r --arg t "$tmpl" --arg l "$lbl" '.[$t + "|" + $l] // 1.0' 2>/dev/null)
+            current_weight="${current_weight:-1.0}"
+
+            # Adjust weight based on success rate
+            local new_weight="$current_weight"
+            if awk "BEGIN{exit !($rate < 60)}" 2>/dev/null; then
+                # Low success: reduce weight by 30%
+                new_weight=$(awk "BEGIN{w=$current_weight * 0.7; if(w<0.1) w=0.1; printf \"%.3f\", w}")
+            elif awk "BEGIN{exit !($rate > 90)}" 2>/dev/null; then
+                # High success: increase weight by 10%
+                new_weight=$(awk "BEGIN{w=$current_weight * 1.1; if(w>1.0) w=1.0; printf \"%.3f\", w}")
+            fi
+
+            # Update weights JSON
+            new_weights=$(echo "$new_weights" | jq --arg key "${tmpl}|${lbl}" --argjson w "$new_weight" '.[$key] = $w')
+        done <<< "$combos"
+
+        # Atomic write
+        echo "$new_weights" > "$tmp_weights" && mv "$tmp_weights" "$TEMPLATE_WEIGHTS_FILE"
+    fi
+
+    rm -f "$tmp_stats" "$tmp_weights" 2>/dev/null || true
+
+    emit_event "optimize.template_tuned"
+    success "Template weights updated"
+}
+
+# ═════════════════════════════════════════════════════════════════════════════
+# ITERATION LEARNING
+# ═════════════════════════════════════════════════════════════════════════════
+
+# optimize_learn_iterations [outcomes_file]
+# Build a prediction model for iterations by complexity bucket
+optimize_learn_iterations() {
+    local outcomes_file="${1:-$OUTCOMES_FILE}"
+
+    if [[ ! -f "$outcomes_file" ]]; then
+        warn "No outcomes data found at: $outcomes_file"
+        return 0
+    fi
+
+    ensure_optimization_dir
+
+    info "Learning iteration patterns..."
+
+    # Group by complexity bucket: 1-3=low, 4-6=medium, 7-10=high
+    local tmp_low tmp_med tmp_high
+    tmp_low=$(mktemp)
+    tmp_med=$(mktemp)
+    tmp_high=$(mktemp)
+
+    while IFS= read -r line; do
+        local complexity iterations
+        complexity=$(echo "$line" | jq -r '.complexity // 0' 2>/dev/null) || continue
+        iterations=$(echo "$line" | jq -r '.iterations // 0' 2>/dev/null) || continue
+
+        # Skip entries without iteration data
+        [[ "$iterations" == "0" || "$iterations" == "null" ]] && continue
+
+        if [[ "$complexity" -le 3 ]]; then
+            echo "$iterations" >> "$tmp_low"
+        elif [[ "$complexity" -le 6 ]]; then
+            echo "$iterations" >> "$tmp_med"
+        else
+            echo "$iterations" >> "$tmp_high"
+        fi
+    done < "$outcomes_file"
+
+    # Calculate mean and stddev for each bucket using awk
+    calc_stats() {
+        local file="$1"
+        if [[ ! -s "$file" ]]; then
+            echo '{"mean":0,"stddev":0,"samples":0}'
+            return
+        fi
+        awk '{
+            sum += $1; sumsq += ($1 * $1); n++
+        } END {
+            if (n == 0) { print "{\"mean\":0,\"stddev\":0,\"samples\":0}"; exit }
+            mean = sum / n
+            if (n > 1) {
+                variance = (sumsq / n) - (mean * mean)
+                if (variance < 0) variance = 0
+                stddev = sqrt(variance)
+            } else {
+                stddev = 0
+            }
+            printf "{\"mean\":%.1f,\"stddev\":%.1f,\"samples\":%d}\n", mean, stddev, n
+        }' "$file"
+    }
+
+    local low_stats med_stats high_stats
+    low_stats=$(calc_stats "$tmp_low")
+    med_stats=$(calc_stats "$tmp_med")
+    high_stats=$(calc_stats "$tmp_high")
+
+    # Build iteration model
+    local tmp_model
+    tmp_model=$(mktemp)
+    jq -n \
+        --argjson low "$low_stats" \
+        --argjson medium "$med_stats" \
+        --argjson high "$high_stats" \
+        --arg updated "$(now_iso)" \
+        '{low: $low, medium: $medium, high: $high, updated_at: $updated}' \
+        > "$tmp_model" && mv "$tmp_model" "$ITERATION_MODEL_FILE"
+
+    rm -f "$tmp_low" "$tmp_med" "$tmp_high" 2>/dev/null || true
+
+    success "Iteration model updated"
+}
+
+# ═════════════════════════════════════════════════════════════════════════════
+# MODEL ROUTING
+# ═════════════════════════════════════════════════════════════════════════════
+
+# optimize_should_ab_test <stage>
+# Returns 0 (true) ~20% of the time for A/B testing
+optimize_should_ab_test() {
+    local threshold=20
+    local roll=$((RANDOM % 100))
+    [[ "$roll" -lt "$threshold" ]]
+}
+
+# optimize_route_models [outcomes_file]
+# Track per-stage model success rates and recommend cheaper models when viable
+optimize_route_models() {
+    local outcomes_file="${1:-$OUTCOMES_FILE}"
+
+    if [[ ! -f "$outcomes_file" ]]; then
+        warn "No outcomes data found at: $outcomes_file"
+        return 0
+    fi
+
+    ensure_optimization_dir
+
+    info "Analyzing model routing..."
+
+    # Collect per-stage, per-model stats
+    local tmp_stage_stats
+    tmp_stage_stats=$(mktemp)
+
+    while IFS= read -r line; do
+        local model result stages_arr
+        model=$(echo "$line" | jq -r '.model // "opus"' 2>/dev/null) || continue
+        result=$(echo "$line" | jq -r '.result // "unknown"' 2>/dev/null) || continue
+        local cost
+        cost=$(echo "$line" | jq -r '.cost // 0' 2>/dev/null) || continue
+
+        # Extract stage names from the stages array
+        local stage_count
+        stage_count=$(echo "$line" | jq '.stages | length' 2>/dev/null || echo "0")
+
+        local i=0
+        while [[ "$i" -lt "$stage_count" ]]; do
+            local stage_name stage_status
+            stage_name=$(echo "$line" | jq -r ".stages[$i].name" 2>/dev/null)
+            stage_status=$(echo "$line" | jq -r ".stages[$i].status" 2>/dev/null)
+            local is_success=0
+            if [[ "$stage_status" == "complete" || "$stage_status" == "success" ]]; then
+                is_success=1
+            fi
+            echo "${stage_name}|${model}|${is_success}|${cost}" >> "$tmp_stage_stats"
+            i=$((i + 1))
+        done
+    done < "$outcomes_file"
+
+    # Build routing recommendations
+    local routing='{}'
+    if [[ -f "$MODEL_ROUTING_FILE" ]]; then
+        routing=$(cat "$MODEL_ROUTING_FILE")
+    fi
+
+    if [[ -f "$tmp_stage_stats" && -s "$tmp_stage_stats" ]]; then
+        local stages
+        stages=$(cut -d'|' -f1 "$tmp_stage_stats" | sort -u || true)
+
+        while IFS= read -r stage; do
+            [[ -z "$stage" ]] && continue
+
+            # Sonnet stats for this stage
+            local sonnet_total sonnet_success sonnet_rate
+            sonnet_total=$(grep -c "^${stage}|sonnet|" "$tmp_stage_stats" || true)
+            sonnet_total="${sonnet_total:-0}"
+            sonnet_success=$(grep -c "^${stage}|sonnet|1|" "$tmp_stage_stats" || true)
+            sonnet_success="${sonnet_success:-0}"
+
+            if [[ "$sonnet_total" -gt 0 ]]; then
+                sonnet_rate=$(awk "BEGIN{printf \"%.1f\", ($sonnet_success/$sonnet_total)*100}")
+            else
+                sonnet_rate="0"
+            fi
+
+            # Opus stats for this stage
+            local opus_total opus_success opus_rate
+            opus_total=$(grep -c "^${stage}|opus|" "$tmp_stage_stats" || true)
+            opus_total="${opus_total:-0}"
+            opus_success=$(grep -c "^${stage}|opus|1|" "$tmp_stage_stats" || true)
+            opus_success="${opus_success:-0}"
+
+            if [[ "$opus_total" -gt 0 ]]; then
+                opus_rate=$(awk "BEGIN{printf \"%.1f\", ($opus_success/$opus_total)*100}")
+            else
+                opus_rate="0"
+            fi
+
+            # Recommend sonnet if it succeeds 90%+ with enough samples
+            local recommendation="opus"
+            if [[ "$sonnet_total" -ge 3 ]] && awk "BEGIN{exit !($sonnet_rate >= 90)}" 2>/dev/null; then
+                recommendation="sonnet"
+                emit_event "optimize.model_switched" \
+                    "stage=$stage" \
+                    "from=opus" \
+                    "to=sonnet" \
+                    "sonnet_rate=$sonnet_rate"
+            fi
+
+            routing=$(echo "$routing" | jq \
+                --arg stage "$stage" \
+                --arg rec "$recommendation" \
+                --argjson sonnet_rate "$sonnet_rate" \
+                --argjson opus_rate "$opus_rate" \
+                --argjson sonnet_n "$sonnet_total" \
+                --argjson opus_n "$opus_total" \
+                '.[$stage] = {
+                    recommended: $rec,
+                    sonnet_rate: $sonnet_rate,
+                    opus_rate: $opus_rate,
+                    sonnet_samples: $sonnet_n,
+                    opus_samples: $opus_n
+                }')
+        done <<< "$stages"
+    fi
+
+    # Atomic write
+    local tmp_routing
+    tmp_routing=$(mktemp)
+    echo "$routing" > "$tmp_routing" && mv "$tmp_routing" "$MODEL_ROUTING_FILE"
+
+    rm -f "$tmp_stage_stats" 2>/dev/null || true
+
+    success "Model routing updated"
+}
+
+# ═════════════════════════════════════════════════════════════════════════════
+# MEMORY EVOLUTION
+# ═════════════════════════════════════════════════════════════════════════════
+
+# optimize_evolve_memory
+# Prune stale patterns, strengthen confirmed ones, promote cross-repo patterns
+optimize_evolve_memory() {
+    local memory_root="${HOME}/.shipwright/memory"
+
+    if [[ ! -d "$memory_root" ]]; then
+        warn "No memory directory found"
+        return 0
+    fi
+
+    info "Evolving memory patterns..."
+
+    local pruned=0
+    local strengthened=0
+    local promoted=0
+    local now_e
+    now_e=$(now_epoch)
+    local thirty_days_ago=$((now_e - 2592000))  # 30 * 86400
+    local seven_days_ago=$((now_e - 604800))     # 7 * 86400
+
+    # Process each repo's failures.json
+    local repo_dir
+    for repo_dir in "$memory_root"/*/; do
+        [[ -d "$repo_dir" ]] || continue
+        local failures_file="${repo_dir}failures.json"
+        [[ -f "$failures_file" ]] || continue
+
+        local entry_count
+        entry_count=$(jq '.failures | length' "$failures_file" 2>/dev/null || echo "0")
+        [[ "$entry_count" -eq 0 ]] && continue
+
+        local tmp_file
+        tmp_file=$(mktemp)
+
+        # Prune entries not seen in 30 days
+        local pruned_json
+        pruned_json=$(jq --arg cutoff "$(date -u -r "$thirty_days_ago" +"%Y-%m-%dT%H:%M:%SZ" 2>/dev/null || date -u +"%Y-%m-%dT%H:%M:%SZ")" \
+            '[.failures[] | select(.last_seen >= $cutoff or .last_seen == null)]' \
+            "$failures_file" 2>/dev/null || echo "[]")
+
+        local after_count
+        after_count=$(echo "$pruned_json" | jq 'length' 2>/dev/null || echo "0")
+        local delta=$((entry_count - after_count))
+        pruned=$((pruned + delta))
+
+        # Strengthen entries seen 3+ times in last 7 days
+        pruned_json=$(echo "$pruned_json" | jq --arg cutoff7 "$(date -u -r "$seven_days_ago" +"%Y-%m-%dT%H:%M:%SZ" 2>/dev/null || date -u +"%Y-%m-%dT%H:%M:%SZ")" '
+            [.[] | if (.seen_count >= 3 and .last_seen >= $cutoff7) then
+                .weight = ((.weight // 1.0) * 1.5)
+            else . end]')
+
+        local strong_count
+        strong_count=$(echo "$pruned_json" | jq '[.[] | select(.weight != null and .weight > 1.0)] | length' 2>/dev/null || echo "0")
+        strengthened=$((strengthened + strong_count))
+
+        # Write back
+        jq -n --argjson f "$pruned_json" '{failures: $f}' > "$tmp_file" && mv "$tmp_file" "$failures_file"
+    done
+
+    # Promote patterns that appear in 3+ repos to global.json
+    local global_file="${memory_root}/global.json"
+    if [[ ! -f "$global_file" ]]; then
+        echo '{"common_patterns":[],"cross_repo_learnings":[]}' > "$global_file"
+    fi
+
+    # Collect all patterns across repos
+    local tmp_all_patterns
+    tmp_all_patterns=$(mktemp)
+    for repo_dir in "$memory_root"/*/; do
+        [[ -d "$repo_dir" ]] || continue
+        local failures_file="${repo_dir}failures.json"
+        [[ -f "$failures_file" ]] || continue
+        jq -r '.failures[]?.pattern // empty' "$failures_file" 2>/dev/null >> "$tmp_all_patterns" || true
+    done
+
+    if [[ -s "$tmp_all_patterns" ]]; then
+        # Find patterns appearing in 3+ repos
+        local promoted_patterns
+        promoted_patterns=$(sort "$tmp_all_patterns" | uniq -c | sort -rn | awk '$1 >= 3 {$1=""; print substr($0,2)}' || true)
+
+        if [[ -n "$promoted_patterns" ]]; then
+            local tmp_global
+            tmp_global=$(mktemp)
+            local pcount=0
+            while IFS= read -r pattern; do
+                [[ -z "$pattern" ]] && continue
+                # Check if already in global
+                local exists
+                exists=$(jq --arg p "$pattern" '[.common_patterns[] | select(.pattern == $p)] | length' "$global_file" 2>/dev/null || echo "0")
+                if [[ "$exists" == "0" ]]; then
+                    jq --arg p "$pattern" --arg ts "$(now_iso)" \
+                        '.common_patterns += [{pattern: $p, promoted_at: $ts, source: "cross-repo"}]' \
+                        "$global_file" > "$tmp_global" && mv "$tmp_global" "$global_file"
+                    pcount=$((pcount + 1))
+                fi
+            done <<< "$promoted_patterns"
+            promoted=$((promoted + pcount))
+        fi
+    fi
+
+    rm -f "$tmp_all_patterns" 2>/dev/null || true
+
+    emit_event "optimize.memory_pruned" \
+        "pruned=$pruned" \
+        "strengthened=$strengthened" \
+        "promoted=$promoted"
+
+    success "Memory evolved: pruned=$pruned, strengthened=$strengthened, promoted=$promoted"
+}
+
+# ═════════════════════════════════════════════════════════════════════════════
+# FULL ANALYSIS (DAILY)
+# ═════════════════════════════════════════════════════════════════════════════
+
+# optimize_full_analysis
+# Run all optimization steps — designed for daily execution
+optimize_full_analysis() {
+    echo ""
+    echo -e "${PURPLE}${BOLD}╔═══════════════════════════════════════════════════════════════╗${RESET}"
+    echo -e "${PURPLE}${BOLD}║  Self-Optimization — Full Analysis                           ║${RESET}"
+    echo -e "${PURPLE}${BOLD}╚═══════════════════════════════════════════════════════════════╝${RESET}"
+    echo ""
+
+    ensure_optimization_dir
+
+    optimize_tune_templates
+    optimize_learn_iterations
+    optimize_route_models
+    optimize_evolve_memory
+
+    echo ""
+    success "Full optimization analysis complete"
+}
+
+# ═════════════════════════════════════════════════════════════════════════════
+# REPORT
+# ═════════════════════════════════════════════════════════════════════════════
+
+# optimize_report
+# Generate a summary report of optimization trends over last 7 days
+optimize_report() {
+    ensure_optimization_dir
+
+    echo ""
+    echo -e "${PURPLE}${BOLD}╔═══════════════════════════════════════════════════════════════╗${RESET}"
+    echo -e "${PURPLE}${BOLD}║  Self-Optimization Report                                    ║${RESET}"
+    echo -e "${PURPLE}${BOLD}╚═══════════════════════════════════════════════════════════════╝${RESET}"
+    echo ""
+
+    if [[ ! -f "$OUTCOMES_FILE" ]]; then
+        warn "No outcomes data available yet"
+        return 0
+    fi
+
+    local now_e seven_days_ago
+    now_e=$(now_epoch)
+    seven_days_ago=$((now_e - 604800))
+    local cutoff_iso
+    cutoff_iso=$(date -u -r "$seven_days_ago" +"%Y-%m-%dT%H:%M:%SZ" 2>/dev/null || date -u +"%Y-%m-%dT%H:%M:%SZ")
+
+    # Count outcomes in last 7 days
+    local total_recent=0
+    local success_recent=0
+    local total_cost_recent=0
+    local total_iterations_recent=0
+
+    while IFS= read -r line; do
+        local ts result cost iterations
+        ts=$(echo "$line" | jq -r '.ts // ""' 2>/dev/null) || continue
+        [[ "$ts" < "$cutoff_iso" ]] && continue
+
+        result=$(echo "$line" | jq -r '.result // "unknown"' 2>/dev/null) || continue
+        cost=$(echo "$line" | jq -r '.cost // 0' 2>/dev/null) || continue
+        iterations=$(echo "$line" | jq -r '.iterations // 0' 2>/dev/null) || continue
+
+        total_recent=$((total_recent + 1))
+        if [[ "$result" == "success" || "$result" == "completed" ]]; then
+            success_recent=$((success_recent + 1))
+        fi
+        total_cost_recent=$(awk "BEGIN{printf \"%.2f\", $total_cost_recent + $cost}")
+        total_iterations_recent=$((total_iterations_recent + iterations))
+    done < "$OUTCOMES_FILE"
+
+    # Calculate rates
+    local success_rate="0"
+    local avg_iterations="0"
+    local avg_cost="0"
+    if [[ "$total_recent" -gt 0 ]]; then
+        success_rate=$(awk "BEGIN{printf \"%.1f\", ($success_recent/$total_recent)*100}")
+        avg_iterations=$(awk "BEGIN{printf \"%.1f\", $total_iterations_recent/$total_recent}")
+        avg_cost=$(awk "BEGIN{printf \"%.2f\", $total_cost_recent/$total_recent}")
+    fi
+
+    echo -e "${CYAN}${BOLD}  Last 7 Days${RESET}"
+    echo -e "  ${DIM}─────────────────────────────────${RESET}"
+    echo -e "  Pipelines:       ${BOLD}$total_recent${RESET}"
+    echo -e "  Success rate:    ${BOLD}${success_rate}%${RESET}"
+    echo -e "  Avg iterations:  ${BOLD}${avg_iterations}${RESET}"
+    echo -e "  Avg cost:        ${BOLD}\$${avg_cost}${RESET}"
+    echo -e "  Total cost:      ${BOLD}\$${total_cost_recent}${RESET}"
+    echo ""
+
+    # Template weights summary
+    if [[ -f "$TEMPLATE_WEIGHTS_FILE" ]]; then
+        local weight_count
+        weight_count=$(jq 'keys | length' "$TEMPLATE_WEIGHTS_FILE" 2>/dev/null || echo "0")
+        if [[ "$weight_count" -gt 0 ]]; then
+            echo -e "${CYAN}${BOLD}  Template Weights${RESET}"
+            echo -e "  ${DIM}─────────────────────────────────${RESET}"
+            jq -r 'to_entries[] | "  \(.key): \(.value)"' "$TEMPLATE_WEIGHTS_FILE" 2>/dev/null || true
+            echo ""
+        fi
+    fi
+
+    # Model routing summary
+    if [[ -f "$MODEL_ROUTING_FILE" ]]; then
+        local route_count
+        route_count=$(jq 'keys | length' "$MODEL_ROUTING_FILE" 2>/dev/null || echo "0")
+        if [[ "$route_count" -gt 0 ]]; then
+            echo -e "${CYAN}${BOLD}  Model Routing${RESET}"
+            echo -e "  ${DIM}─────────────────────────────────${RESET}"
+            jq -r 'to_entries[] | "  \(.key): \(.value.recommended) (sonnet: \(.value.sonnet_rate)%, opus: \(.value.opus_rate)%)"' \
+                "$MODEL_ROUTING_FILE" 2>/dev/null || true
+            echo ""
+        fi
+    fi
+
+    # Iteration model summary
+    if [[ -f "$ITERATION_MODEL_FILE" ]]; then
+        local has_data
+        has_data=$(jq '.low.samples // 0' "$ITERATION_MODEL_FILE" 2>/dev/null || echo "0")
+        if [[ "$has_data" -gt 0 ]]; then
+            echo -e "${CYAN}${BOLD}  Iteration Model${RESET}"
+            echo -e "  ${DIM}─────────────────────────────────${RESET}"
+            echo -e "  Low complexity:  $(jq -r '.low | "\(.mean) ± \(.stddev) (\(.samples) samples)"' "$ITERATION_MODEL_FILE" 2>/dev/null)"
+            echo -e "  Med complexity:  $(jq -r '.medium | "\(.mean) ± \(.stddev) (\(.samples) samples)"' "$ITERATION_MODEL_FILE" 2>/dev/null)"
+            echo -e "  High complexity: $(jq -r '.high | "\(.mean) ± \(.stddev) (\(.samples) samples)"' "$ITERATION_MODEL_FILE" 2>/dev/null)"
+            echo ""
+        fi
+    fi
+
+    emit_event "optimize.report" \
+        "pipelines=$total_recent" \
+        "success_rate=$success_rate" \
+        "avg_cost=$avg_cost"
+
+    success "Report complete"
+}
+
+# ═════════════════════════════════════════════════════════════════════════════
+# HELP
+# ═════════════════════════════════════════════════════════════════════════════
+
+show_help() {
+    echo ""
+    echo -e "${PURPLE}${BOLD}shipwright self-optimize${RESET} — Learning & Self-Tuning System"
+    echo ""
+    echo -e "${CYAN}USAGE${RESET}"
+    echo "  shipwright self-optimize <command>"
+    echo ""
+    echo -e "${CYAN}COMMANDS${RESET}"
+    echo "  analyze-outcome <state-file>   Analyze a completed pipeline outcome"
+    echo "  tune                           Run full optimization analysis"
+    echo "  report                         Show optimization report (last 7 days)"
+    echo "  evolve-memory                  Prune/strengthen/promote memory patterns"
+    echo "  help                           Show this help"
+    echo ""
+    echo -e "${CYAN}STORAGE${RESET}"
+    echo "  ~/.shipwright/optimization/outcomes.jsonl        Outcome history"
+    echo "  ~/.shipwright/optimization/template-weights.json Template selection weights"
+    echo "  ~/.shipwright/optimization/model-routing.json    Per-stage model routing"
+    echo "  ~/.shipwright/optimization/iteration-model.json  Iteration predictions"
+    echo ""
+}
+
+# ═════════════════════════════════════════════════════════════════════════════
+# MAIN
+# ═════════════════════════════════════════════════════════════════════════════
+
+main() {
+    local cmd="${1:-help}"
+    shift 2>/dev/null || true
+    case "$cmd" in
+        analyze-outcome) optimize_analyze_outcome "$@" ;;
+        tune)            optimize_full_analysis ;;
+        report)          optimize_report ;;
+        evolve-memory)   optimize_evolve_memory ;;
+        help|--help|-h)  show_help ;;
+        *)               error "Unknown command: $cmd"; exit 1 ;;
+    esac
+}
+
+if [[ "${BASH_SOURCE[0]}" == "$0" ]]; then
+    main "$@"
+fi

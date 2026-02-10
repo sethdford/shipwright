@@ -27,7 +27,7 @@
   ],
   "scripts": {
     "postinstall": "node scripts/postinstall.mjs",
-    "test": "bash scripts/sw-pipeline-test.sh && bash scripts/sw-daemon-test.sh && bash scripts/sw-prep-test.sh && bash scripts/sw-fleet-test.sh && bash scripts/sw-fix-test.sh && bash scripts/sw-memory-test.sh && bash scripts/sw-session-test.sh && bash scripts/sw-init-test.sh && bash scripts/sw-tracker-test.sh && bash scripts/sw-heartbeat-test.sh && bash scripts/sw-remote-test.sh"
+    "test": "bash scripts/sw-pipeline-test.sh && bash scripts/sw-daemon-test.sh && bash scripts/sw-prep-test.sh && bash scripts/sw-fleet-test.sh && bash scripts/sw-fix-test.sh && bash scripts/sw-memory-test.sh && bash scripts/sw-session-test.sh && bash scripts/sw-init-test.sh && bash scripts/sw-tracker-test.sh && bash scripts/sw-heartbeat-test.sh && bash scripts/sw-remote-test.sh && bash scripts/sw-intelligence-test.sh && bash scripts/sw-pipeline-composer-test.sh && bash scripts/sw-self-optimize-test.sh && bash scripts/sw-predictive-test.sh && bash scripts/sw-frontier-test.sh"
   },
   "keywords": [
     "claude",

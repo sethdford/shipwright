@@ -152,3 +152,76 @@ When remote machines are registered, the daemon can distribute pipeline jobs acr
 ### Integration with Doctor
 
 The `shipwright doctor` command includes a "REMOTE MACHINES" health check section that verifies all registered machines are reachable and properly configured.
+
+## Intelligence Modules
+
+Shipwright includes frontier AI capabilities that run as optional plugins. All intelligence features are disabled by default and configured via the `intelligence` section in `.claude/daemon-config.json`.
+
+### Adversarial Code Review
+
+After the primary agent writes code, a second adversarial agent attempts to find bugs, security vulnerabilities, race conditions, and edge cases. The agents iterate — the primary agent fixes findings, the adversary re-reviews — converging until no critical issues remain or the maximum round count (default: 3) is reached.
+
+Adversarial review integrates as an optional pipeline stage after `review`, before `compound_quality`. Enable with `intelligence.adversarial_enabled` in daemon-config.json.
+
+```bash
+# Manual adversarial review
+shipwright adversarial review "$(git diff HEAD~1)" "context about the change"
+```
+
+### Developer Simulation
+
+Before PR submission, Shipwright simulates an internal code review with multiple reviewer personas — security, performance, and maintainability reviewers each raise objections specific to their domain. The implementation agent addresses objections before the PR is created, reducing real PR review cycles.
+
+Enable with `intelligence.simulation_enabled` in daemon-config.json.
+
+```bash
+# Manual developer simulation
+shipwright developer-simulation review "$(git diff main)"
+```
+
+### Architecture Enforcer
+
+Maintains a living architectural model of your codebase — layers, patterns, conventions, and dependencies. On subsequent pipelines, changes are validated against this model. Violations are flagged before PR creation. When legitimate architectural evolution is detected, the model updates automatically.
+
+The model is stored per-repo at `~/.shipwright/memory/<repo-hash>/architecture.json`. Enable with `intelligence.architecture_enabled` in daemon-config.json.
+
+```bash
+# Build the architectural model
+shipwright architecture build
+
+# Validate changes
+shipwright architecture validate "$(git diff main)"
+```
+
+### Self-Optimization
+
+The self-optimization module learns from every pipeline run and tunes system parameters:
+
+- **Outcome analysis** — extracts what worked, what failed, and why after each pipeline
+- **Template tuning** — adjusts template selection weights based on success/failure rates per issue type
+- **Model routing** — A/B tests cheaper models on 20% of stages; if success rate holds, makes them the default
+- **Iteration estimation** — builds prediction models for how many iterations each complexity level needs
+- **Memory evolution** — prunes stale patterns, strengthens confirmed ones, promotes cross-repo learnings
+
+Data is stored at `~/.shipwright/optimization/`. Enable with `intelligence.optimization_enabled` in daemon-config.json.
+
+### Predictive Analytics
+
+Predicts failures before they happen and takes preventative action:
+
+- **Risk assessment** — before any pipeline starts, estimates overall risk and identifies high-risk stages
+- **Anomaly detection** — during pipeline execution, compares metrics against baselines and alerts on deviations
+- **AI patrol** — enhances grep-based patrol with Claude analysis for holistic codebase review
+- **Failure prevention** — injects contextual warnings from memory into stages where similar issues have previously failed
+
+Enable with `intelligence.prediction_enabled` in daemon-config.json.
+
+### Pipeline Composer
+
+Generates custom pipeline configurations by adjusting stage timeouts, iteration counts, and model routing based on codebase analysis. Replaces static template selection with dynamic composition tailored to your specific code patterns.
+
+Enable with `intelligence.composer_enabled` in daemon-config.json.
+
+---
+
+For a comprehensive overview of all intelligence capabilities, configuration options, and best practices, see the [Intelligence guide](/guides/intelligence/).

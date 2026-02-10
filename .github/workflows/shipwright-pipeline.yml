@@ -383,7 +383,20 @@ jobs:
             }
           fi
 
+      - name: Check claim lock
+        id: claim_check
+        run: |
+          CLAIMED=$(gh issue view "$ISSUE_NUMBER" --json labels \
+            --jq '[.labels[].name | select(startswith("claimed:"))] | .[0] // ""' 2>/dev/null || echo "")
+          if [ -n "$CLAIMED" ]; then
+            echo "Issue #$ISSUE_NUMBER claimed by $CLAIMED — CI yielding to local daemon"
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "skip=false" >> "$GITHUB_OUTPUT"
+          fi
+
       - name: Validate setup
+        if: steps.claim_check.outputs.skip != 'true'
         run: |
           echo "--- Environment ---"
           echo "Issue: #$ISSUE_NUMBER"
@@ -408,6 +421,7 @@ jobs:
           shipwright doctor || true
 
       - name: Comment on issue — pipeline starting
+        if: steps.claim_check.outputs.skip != 'true'
         run: |
           RESUME_NOTE=""
           if [[ -n "$COMPLETED_STAGES" ]]; then
@@ -432,7 +446,20 @@ jobs:
           EOF
           )"
 
+      - name: Notify dashboard — pipeline starting
+        if: steps.claim_check.outputs.skip != 'true'
+        env:
+          DASHBOARD_URL: ${{ secrets.DASHBOARD_URL }}
+        run: |
+          if [ -n "${DASHBOARD_URL:-}" ]; then
+            curl -s --max-time 5 -X POST "${DASHBOARD_URL}/api/webhook/ci" \
+              -H "Content-Type: application/json" \
+              -d "{\"type\":\"ci.pipeline_started\",\"issue\":${ISSUE_NUMBER},\"run_id\":\"${{ github.run_id }}\",\"template\":\"${TEMPLATE}\"}" \
+              2>/dev/null || true
+          fi
+
       - name: Run Shipwright pipeline
+        if: steps.claim_check.outputs.skip != 'true'
         id: pipeline
         run: |
           set +e          # Don't abort on failure — we capture the exit code
@@ -485,7 +512,7 @@ jobs:
           exit $PIPELINE_EXIT
 
       - name: Comment on issue — pipeline result
-        if: always()
+        if: always() && steps.claim_check.outputs.skip != 'true'
         run: |
           EXIT_CODE="${{ steps.pipeline.outputs.exit_code }}"
 
@@ -600,7 +627,7 @@ jobs:
           fi
 
       - name: Push partial work on failure
-        if: failure()
+        if: failure() && steps.claim_check.outputs.skip != 'true'
         run: |
           BRANCH="shipwright/issue-${ISSUE_NUMBER}"
           if ! git diff --quiet 2>/dev/null || ! git diff --cached --quiet 2>/dev/null; then
@@ -612,7 +639,7 @@ jobs:
           echo "Partial work pushed to branch: $BRANCH"
 
       - name: Upload pipeline artifacts
-        if: always()
+        if: always() && steps.claim_check.outputs.skip != 'true'
         uses: actions/upload-artifact@v4
         with:
           name: pipeline-artifacts-${{ env.ISSUE_NUMBER }}
@@ -623,7 +650,7 @@ jobs:
           if-no-files-found: ignore
 
       - name: Persist state to shipwright-data branch
-        if: always()
+        if: always() && steps.claim_check.outputs.skip != 'true'
         run: |
           SW_STATE_DIR=$(mktemp -d)
           cd "$SW_STATE_DIR"
@@ -652,9 +679,24 @@ jobs:
             echo "State persisted to shipwright-data branch"
           fi
 
+      - name: Notify dashboard — pipeline result
+        if: always() && steps.claim_check.outputs.skip != 'true'
+        env:
+          DASHBOARD_URL: ${{ secrets.DASHBOARD_URL }}
+        run: |
+          if [ -n "${DASHBOARD_URL:-}" ]; then
+            EXIT_CODE="${{ steps.pipeline.outputs.exit_code }}"
+            RESULT="success"
+            if [ "${EXIT_CODE:-1}" != "0" ]; then RESULT="failure"; fi
+            curl -s --max-time 5 -X POST "${DASHBOARD_URL}/api/webhook/ci" \
+              -H "Content-Type: application/json" \
+              -d "{\"type\":\"ci.pipeline_completed\",\"issue\":${ISSUE_NUMBER},\"run_id\":\"${{ github.run_id }}\",\"result\":\"${RESULT}\",\"template\":\"${TEMPLATE}\"}" \
+              2>/dev/null || true
+          fi
+
       # Gatekeeper: ensure job fails if pipeline failed (triggers auto-retry)
       - name: Propagate pipeline exit code
-        if: always()
+        if: always() && steps.claim_check.outputs.skip != 'true'
         run: |
           EXIT_CODE="${{ steps.pipeline.outputs.exit_code }}"
           if [[ -n "$EXIT_CODE" && "$EXIT_CODE" != "0" ]]; then

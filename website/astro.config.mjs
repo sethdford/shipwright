@@ -36,6 +36,7 @@ export default defineConfig({
             { label: "Dashboard", link: "/guides/dashboard/" },
             { label: "Issue Tracking", link: "/guides/tracking/" },
             { label: "Persistent Memory", link: "/guides/memory/" },
+            { label: "Intelligence Layer", link: "/guides/intelligence/" },
           ],
         },
         {

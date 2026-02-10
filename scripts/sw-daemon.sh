@@ -4,6 +4,7 @@
 # ║  Polls for labeled issues · Spawns pipelines · Manages worktrees      ║
 # ╚═══════════════════════════════════════════════════════════════════════════╝
 set -euo pipefail
+trap 'echo "ERROR: $BASH_SOURCE:$LINENO exited with status $?" >&2' ERR
 
 VERSION="1.7.1"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -23,6 +24,17 @@ RESET='\033[0m'
 # ─── Cross-platform compatibility ──────────────────────────────────────────
 # shellcheck source=lib/compat.sh
 [[ -f "$SCRIPT_DIR/lib/compat.sh" ]] && source "$SCRIPT_DIR/lib/compat.sh"
+
+# ─── Intelligence Engine (optional) ──────────────────────────────────────────
+# shellcheck source=sw-intelligence.sh
+[[ -f "$SCRIPT_DIR/sw-intelligence.sh" ]] && source "$SCRIPT_DIR/sw-intelligence.sh"
+# shellcheck source=sw-pipeline-composer.sh
+[[ -f "$SCRIPT_DIR/sw-pipeline-composer.sh" ]] && source "$SCRIPT_DIR/sw-pipeline-composer.sh"
+# shellcheck source=sw-self-optimize.sh
+[[ -f "$SCRIPT_DIR/sw-self-optimize.sh" ]] && source "$SCRIPT_DIR/sw-self-optimize.sh"
+# shellcheck source=sw-predictive.sh
+[[ -f "$SCRIPT_DIR/sw-predictive.sh" ]] && source "$SCRIPT_DIR/sw-predictive.sh"
+
 # ─── Output Helpers ─────────────────────────────────────────────────────────
 info()    { echo -e "${CYAN}${BOLD}▸${RESET} $*"; }
 success() { echo -e "${GREEN}${BOLD}✓${RESET} $*"; }
@@ -70,6 +82,37 @@ emit_event() {
     done
     mkdir -p "${HOME}/.shipwright"
     echo "{\"ts\":\"$(now_iso)\",\"ts_epoch\":$(now_epoch),\"type\":\"${event_type}\"${json_fields}}" >> "$EVENTS_FILE"
+}
+
+# ─── Event Log Rotation ─────────────────────────────────────────────────────
+rotate_event_log() {
+    local max_size=$((50 * 1024 * 1024))  # 50MB
+    local max_rotations=3
+
+    # Rotate events.jsonl if too large
+    if [[ -f "$EVENTS_FILE" ]]; then
+        local size
+        size=$(wc -c < "$EVENTS_FILE" 2>/dev/null || echo 0)
+        if [[ "$size" -gt "$max_size" ]]; then
+            # Shift rotations: .3 → delete, .2 → .3, .1 → .2, current → .1
+            local i=$max_rotations
+            while [[ $i -gt 1 ]]; do
+                local prev=$((i - 1))
+                [[ -f "${EVENTS_FILE}.${prev}" ]] && mv "${EVENTS_FILE}.${prev}" "${EVENTS_FILE}.${i}"
+                i=$((i - 1))
+            done
+            mv "$EVENTS_FILE" "${EVENTS_FILE}.1"
+            touch "$EVENTS_FILE"
+            emit_event "daemon.log_rotated" "previous_size=$size"
+            info "Rotated events.jsonl (was $(( size / 1048576 ))MB)"
+        fi
+    fi
+
+    # Clean old heartbeat files (> 24h)
+    local heartbeat_dir="$HOME/.shipwright/heartbeats"
+    if [[ -d "$heartbeat_dir" ]]; then
+        find "$heartbeat_dir" -name "*.json" -mmin +1440 -delete 2>/dev/null || true
+    fi
 }
 
 # ─── GitHub API Retry with Backoff ────────────────────────────────────────
@@ -163,6 +206,9 @@ PATROL_UNTESTED_ENABLED=true
 PATROL_RETRY_ENABLED=true
 PATROL_RETRY_THRESHOLD=2
 LAST_PATROL_EPOCH=0
+
+# Team dashboard coordination
+DASHBOARD_URL="${DASHBOARD_URL:-http://localhost:8767}"
 
 # Runtime
 NO_GITHUB=false
@@ -348,6 +394,14 @@ load_config() {
     SELF_OPTIMIZE=$(jq -r '.self_optimize // false' "$config_file")
     OPTIMIZE_INTERVAL=$(jq -r '.optimize_interval // 10' "$config_file")
 
+    # intelligence engine settings
+    INTELLIGENCE_ENABLED=$(jq -r '.intelligence.enabled // false' "$config_file")
+    INTELLIGENCE_CACHE_TTL=$(jq -r '.intelligence.cache_ttl_seconds // 3600' "$config_file")
+    COMPOSER_ENABLED=$(jq -r '.intelligence.composer_enabled // false' "$config_file")
+    OPTIMIZATION_ENABLED=$(jq -r '.intelligence.optimization_enabled // false' "$config_file")
+    PREDICTION_ENABLED=$(jq -r '.intelligence.prediction_enabled // false' "$config_file")
+    ANOMALY_THRESHOLD=$(jq -r '.intelligence.anomaly_threshold // 3.0' "$config_file")
+
     # gh_retry: enable retry wrapper on critical GitHub API calls
     GH_RETRY_ENABLED=$(jq -r '.gh_retry // true' "$config_file")
 
@@ -379,6 +433,13 @@ load_config() {
     # heartbeat + checkpoint recovery
     HEALTH_HEARTBEAT_TIMEOUT=$(jq -r '.health.heartbeat_timeout_s // 120' "$config_file")
     CHECKPOINT_ENABLED=$(jq -r '.health.checkpoint_enabled // true' "$config_file")
+
+    # team dashboard URL (for coordinated claiming)
+    local cfg_dashboard_url
+    cfg_dashboard_url=$(jq -r '.dashboard_url // ""' "$config_file")
+    if [[ -n "$cfg_dashboard_url" && "$cfg_dashboard_url" != "null" ]]; then
+        DASHBOARD_URL="$cfg_dashboard_url"
+    fi
 
     success "Config loaded"
 }
@@ -448,15 +509,6 @@ notify() {
         curl -sf -X POST -H 'Content-Type: application/json' \
             -d "$payload" "$_webhook_url" >/dev/null 2>&1 || true
     fi
-}
-
-# ─── Linear Notification Helper ──────────────────────────────────────────
-# Calls sw-linear.sh notify to update linked Linear issues on pipeline events.
-# Silently skips if Linear is not configured.
-
-linear_notify() {
-    local event="$1" gh_issue="${2:-}" detail="${3:-}"
-    "$SCRIPT_DIR/sw-linear.sh" notify "$event" "$gh_issue" "$detail" 2>/dev/null || true
 }
 
 # ─── Pre-flight Checks ──────────────────────────────────────────────────────
@@ -723,24 +775,51 @@ claim_issue() {
 
     [[ "$NO_GITHUB" == "true" ]] && return 0  # No claiming in no-github mode
 
-    # Post claiming comment
-    local claim_body="<!-- shipwright-claim:${machine_name}:$(date -u +%s) -->"
-    gh issue comment "$issue_num" --body "$claim_body" 2>/dev/null || return 1
+    # Try dashboard-coordinated claim first (atomic label-based)
+    local resp
+    resp=$(curl -s --max-time 5 -X POST "${DASHBOARD_URL}/api/claim" \
+        -H "Content-Type: application/json" \
+        -d "$(jq -n --argjson issue "$issue_num" --arg machine "$machine_name" \
+            '{issue: $issue, machine: $machine}')" 2>/dev/null || echo "")
 
-    # Wait for other claims
-    sleep 2
-
-    # Check if we won (first claim wins)
-    local first_claimer
-    first_claimer=$(gh issue view "$issue_num" --json comments --jq \
-        '.comments[] | select(.body | contains("shipwright-claim:")) | .body' 2>/dev/null | \
-        head -1 | grep -oE 'shipwright-claim:[^:]+' | cut -d: -f2 || true)
-
-    if [[ "$first_claimer" == "$machine_name" ]]; then
+    if [[ -n "$resp" ]] && echo "$resp" | jq -e '.approved == true' &>/dev/null; then
         return 0
-    else
+    elif [[ -n "$resp" ]] && echo "$resp" | jq -e '.approved == false' &>/dev/null; then
+        local claimed_by
+        claimed_by=$(echo "$resp" | jq -r '.claimed_by // "another machine"')
+        daemon_log INFO "Issue #${issue_num} claimed by ${claimed_by} (via dashboard)"
         return 1
     fi
+
+    # Fallback: direct GitHub label check (dashboard unreachable)
+    daemon_log WARN "Dashboard unreachable — falling back to direct GitHub label claim"
+    local existing_claim
+    existing_claim=$(gh issue view "$issue_num" --json labels --jq \
+        '[.labels[].name | select(startswith("claimed:"))] | .[0] // ""' 2>/dev/null || true)
+
+    if [[ -n "$existing_claim" ]]; then
+        daemon_log INFO "Issue #${issue_num} already claimed: ${existing_claim}"
+        return 1
+    fi
+
+    gh issue edit "$issue_num" --add-label "claimed:${machine_name}" 2>/dev/null || return 1
+    return 0
+}
+
+release_claim() {
+    local issue_num="$1"
+    local machine_name="$2"
+
+    [[ "$NO_GITHUB" == "true" ]] && return 0
+
+    # Try dashboard-coordinated release first
+    curl -s --max-time 5 -X POST "${DASHBOARD_URL}/api/claim/release" \
+        -H "Content-Type: application/json" \
+        -d "$(jq -n --argjson issue "$issue_num" --arg machine "$machine_name" \
+            '{issue: $issue, machine: $machine}')" 2>/dev/null || true
+
+    # Also remove label directly as backup (idempotent)
+    gh issue edit "$issue_num" --remove-label "claimed:${machine_name}" 2>/dev/null || true
 }
 
 # ─── Org-Wide Repo Management ─────────────────────────────────────────────
@@ -782,6 +861,28 @@ daemon_spawn_pipeline() {
         issue_body_first=$(gh issue view "$issue_num" --json body --jq '.body' 2>/dev/null | head -3 | tr '\n' ' ' | cut -c1-200 || true)
         if [[ -n "$issue_body_first" ]]; then
             issue_goal="${issue_title}: ${issue_body_first}"
+        fi
+    fi
+
+    # ── Predictive risk assessment (if enabled) ──
+    if [[ "${PREDICTION_ENABLED:-false}" == "true" ]] && type predict_pipeline_risk &>/dev/null 2>&1; then
+        local issue_json_for_pred=""
+        if [[ "$NO_GITHUB" != "true" ]]; then
+            issue_json_for_pred=$(gh issue view "$issue_num" --json number,title,body,labels 2>/dev/null || echo "")
+        fi
+        if [[ -n "$issue_json_for_pred" ]]; then
+            local risk_result
+            risk_result=$(predict_pipeline_risk "$issue_json_for_pred" "" 2>/dev/null || echo "")
+            if [[ -n "$risk_result" ]]; then
+                local overall_risk
+                overall_risk=$(echo "$risk_result" | jq -r '.overall_risk // 50' 2>/dev/null || echo "50")
+                if [[ "$overall_risk" -gt 80 ]]; then
+                    daemon_log WARN "HIGH RISK (${overall_risk}%) predicted for issue #${issue_num} — upgrading model"
+                    export CLAUDE_MODEL="opus"
+                elif [[ "$overall_risk" -lt 30 ]]; then
+                    daemon_log INFO "LOW RISK (${overall_risk}%) predicted for issue #${issue_num}"
+                fi
+            fi
         fi
     fi
 
@@ -951,6 +1052,11 @@ daemon_reap_completed() {
         else
             daemon_on_failure "$issue_num" "$exit_code" "$duration_str"
         fi
+
+        # Release claim lock (label-based coordination)
+        local reap_machine_name
+        reap_machine_name=$(jq -r '.machines[] | select(.role == "primary") | .name' "$HOME/.shipwright/machines.json" 2>/dev/null || hostname -s)
+        release_claim "$issue_num" "$reap_machine_name"
 
         # Remove from active_jobs and priority lane tracking
         local tmp
@@ -1198,12 +1304,55 @@ _Re-add the \`${WATCH_LABEL}\` label to retry._" 2>/dev/null || true
 
 # Score an issue from 0-100 based on multiple signals for intelligent prioritization.
 # Combines priority labels, age, complexity, dependencies, type, and memory signals.
+# When intelligence engine is enabled, uses semantic AI analysis for richer scoring.
 triage_score_issue() {
     local issue_json="$1"
     local issue_num issue_title issue_body labels_csv created_at
     issue_num=$(echo "$issue_json" | jq -r '.number')
     issue_title=$(echo "$issue_json" | jq -r '.title // ""')
     issue_body=$(echo "$issue_json" | jq -r '.body // ""')
+
+    # ── Intelligence-powered triage (if enabled) ──
+    if [[ "${INTELLIGENCE_ENABLED:-false}" == "true" ]] && type intelligence_analyze_issue &>/dev/null 2>&1; then
+        local analysis
+        analysis=$(intelligence_analyze_issue "$issue_json" 2>/dev/null || echo "")
+        if [[ -n "$analysis" && "$analysis" != "{}" && "$analysis" != "null" ]]; then
+            # Extract complexity (1-10) and convert to score (0-100)
+            local ai_complexity ai_risk ai_success_prob
+            ai_complexity=$(echo "$analysis" | jq -r '.complexity // 0' 2>/dev/null || echo "0")
+            ai_risk=$(echo "$analysis" | jq -r '.risk_level // "medium"' 2>/dev/null || echo "medium")
+            ai_success_prob=$(echo "$analysis" | jq -r '.success_probability // 50' 2>/dev/null || echo "50")
+
+            # Store analysis for downstream use (composer, predictions)
+            export INTELLIGENCE_ANALYSIS="$analysis"
+            export INTELLIGENCE_COMPLEXITY="$ai_complexity"
+
+            # Convert AI analysis to triage score:
+            # Higher success probability + lower complexity = higher score (process sooner)
+            local ai_score
+            ai_score=$(( ai_success_prob - (ai_complexity * 3) ))
+            # Risk adjustment
+            case "$ai_risk" in
+                critical) ai_score=$((ai_score + 15)) ;;  # Critical = process urgently
+                high)     ai_score=$((ai_score + 10)) ;;
+                low)      ai_score=$((ai_score - 5)) ;;
+            esac
+            # Clamp
+            [[ "$ai_score" -lt 0 ]] && ai_score=0
+            [[ "$ai_score" -gt 100 ]] && ai_score=100
+
+            emit_event "intelligence.triage" \
+                "issue=$issue_num" \
+                "complexity=$ai_complexity" \
+                "risk=$ai_risk" \
+                "success_prob=$ai_success_prob" \
+                "score=$ai_score"
+
+            echo "$ai_score"
+            return
+        fi
+        # Fall through to heuristic scoring if intelligence call failed
+    fi
     labels_csv=$(echo "$issue_json" | jq -r '[.labels[].name] | join(",")')
     created_at=$(echo "$issue_json" | jq -r '.createdAt // ""')
 
@@ -1338,6 +1487,7 @@ triage_score_issue() {
 }
 
 # Auto-select pipeline template based on issue labels
+# When intelligence/composer is enabled, composes a custom pipeline instead of static selection.
 select_pipeline_template() {
     local labels="$1"
     local score="${2:-50}"
@@ -1346,6 +1496,31 @@ select_pipeline_template() {
     if [[ "${AUTO_TEMPLATE:-false}" != "true" ]]; then
         echo "$PIPELINE_TEMPLATE"
         return
+    fi
+
+    # ── Intelligence-composed pipeline (if enabled) ──
+    if [[ "${COMPOSER_ENABLED:-false}" == "true" ]] && type composer_create_pipeline &>/dev/null 2>&1; then
+        local analysis="${INTELLIGENCE_ANALYSIS:-{}}"
+        local repo_context=""
+        if [[ -f "${REPO_DIR:-}/.claude/pipeline-state.md" ]]; then
+            repo_context="has_pipeline_state"
+        fi
+        local budget_json="{}"
+        if [[ -x "$SCRIPT_DIR/sw-cost.sh" ]]; then
+            local remaining
+            remaining=$(bash "$SCRIPT_DIR/sw-cost.sh" remaining-budget 2>/dev/null || echo "")
+            if [[ -n "$remaining" ]]; then
+                budget_json="{\"remaining_usd\": $remaining}"
+            fi
+        fi
+        local composed_path
+        composed_path=$(composer_create_pipeline "$analysis" "$repo_context" "$budget_json" 2>/dev/null || echo "")
+        if [[ -n "$composed_path" && -f "$composed_path" ]]; then
+            emit_event "daemon.composed_pipeline" "labels=$labels" "score=$score"
+            echo "composed"
+            return
+        fi
+        # Fall through to static selection if composition failed
     fi
 
     # ── Label-based overrides (highest priority) ──
@@ -2361,6 +2536,38 @@ Auto-detected by \`shipwright daemon patrol\` on $(now_iso)." \
     patrol_retry_exhaustion
     echo ""
 
+    # ── AI-Powered Deep Analysis (if enabled) ──
+    if [[ "${PREDICTION_ENABLED:-false}" == "true" ]] && type patrol_ai_analyze &>/dev/null 2>&1; then
+        echo -e "  ${BOLD}AI Deep Analysis${RESET}"
+        # Sample recent source files for AI analysis
+        local sample_files=""
+        local git_log_recent=""
+        sample_files=$(git diff --name-only HEAD~5 2>/dev/null | head -10 | tr '\n' ',' || echo "")
+        git_log_recent=$(git log --oneline -10 2>/dev/null || echo "")
+        if [[ -n "$sample_files" ]]; then
+            local ai_findings
+            ai_findings=$(patrol_ai_analyze "$sample_files" "$git_log_recent" 2>/dev/null || echo "[]")
+            if [[ -n "$ai_findings" && "$ai_findings" != "[]" ]]; then
+                local ai_count
+                ai_count=$(echo "$ai_findings" | jq 'length' 2>/dev/null || echo "0")
+                ai_count=${ai_count:-0}
+                total_findings=$((total_findings + ai_count))
+                echo -e "    ${CYAN}●${RESET} AI found ${ai_count} additional finding(s)"
+                emit_event "patrol.ai_analysis" "findings=$ai_count"
+            else
+                echo -e "    ${GREEN}●${RESET} AI analysis: no additional findings"
+            fi
+        fi
+        echo ""
+    fi
+
+    # ── Meta Self-Improvement Patrol ──
+    if [[ -f "$SCRIPT_DIR/sw-patrol-meta.sh" ]]; then
+        # shellcheck source=sw-patrol-meta.sh
+        source "$SCRIPT_DIR/sw-patrol-meta.sh"
+        patrol_meta_run
+    fi
+
     # ── Summary ──
     emit_event "patrol.completed" "findings=$total_findings" "issues_created=$issues_created" "dry_run=$dry_run"
 
@@ -2380,6 +2587,12 @@ Auto-detected by \`shipwright daemon patrol\` on $(now_iso)." \
 daemon_poll_issues() {
     if [[ "$NO_GITHUB" == "true" ]]; then
         daemon_log INFO "Polling skipped (--no-github)"
+        return
+    fi
+
+    # Check for pause flag (set by dashboard or disk_low alert)
+    if [[ -f "$HOME/.shipwright/daemon-pause.flag" ]]; then
+        daemon_log INFO "Daemon paused — skipping poll"
         return
     fi
 
@@ -2620,11 +2833,22 @@ daemon_health_check() {
         fi
     fi
 
-    # Disk space warning
+    # Disk space warning (check both repo dir and ~/.shipwright)
     local free_kb
     free_kb=$(df -k "." 2>/dev/null | tail -1 | awk '{print $4}')
     if [[ -n "$free_kb" ]] && [[ "$free_kb" -lt 1048576 ]] 2>/dev/null; then
         daemon_log WARN "Low disk space: $(( free_kb / 1024 ))MB free"
+        findings=$((findings + 1))
+    fi
+
+    # Critical disk space on ~/.shipwright — pause spawning
+    local sw_free_kb
+    sw_free_kb=$(df -k "$HOME/.shipwright" 2>/dev/null | tail -1 | awk '{print $4}')
+    if [[ -n "$sw_free_kb" ]] && [[ "$sw_free_kb" -lt 512000 ]] 2>/dev/null; then
+        daemon_log WARN "Critical disk space on ~/.shipwright: $(( sw_free_kb / 1024 ))MB — pausing spawns"
+        emit_event "daemon.disk_low" "free_mb=$(( sw_free_kb / 1024 ))"
+        mkdir -p "$HOME/.shipwright"
+        echo '{"paused":true,"reason":"disk_low"}' > "$HOME/.shipwright/daemon-pause.flag"
         findings=$((findings + 1))
     fi
 
@@ -2844,6 +3068,15 @@ daemon_self_optimize() {
 
     if [[ ! -f "$EVENTS_FILE" ]]; then
         return
+    fi
+
+    # ── Intelligence-powered optimization (if enabled) ──
+    if [[ "${OPTIMIZATION_ENABLED:-false}" == "true" ]] && type optimize_full_analysis &>/dev/null 2>&1; then
+        daemon_log INFO "Running intelligence-powered optimization"
+        optimize_full_analysis 2>/dev/null || {
+            daemon_log WARN "Intelligence optimization failed — falling back to DORA-based tuning"
+        }
+        # Still run DORA-based tuning below as a complement
     fi
 
     daemon_log INFO "Running self-optimization check"
@@ -3098,6 +3331,11 @@ daemon_poll_loop() {
             daemon_cleanup_stale
         fi
 
+        # Rotate event log every 10 cycles (~10 min with 60s interval)
+        if [[ $((POLL_CYCLE_COUNT % 10)) -eq 0 ]]; then
+            rotate_event_log
+        fi
+
         # Proactive patrol during quiet periods
         local issue_count_now active_count_now
         issue_count_now=$(jq -r '.queued | length' "$STATE_FILE" 2>/dev/null || echo 0)
@@ -3213,6 +3451,9 @@ daemon_start() {
 
     # Reap any orphaned jobs from previous runs
     daemon_reap_completed
+
+    # Rotate event log on startup
+    rotate_event_log
 
     daemon_log INFO "Daemon started successfully"
     daemon_log INFO "Config: poll_interval=${POLL_INTERVAL}s, max_parallel=${MAX_PARALLEL}, label=${WATCH_LABEL}"
@@ -3451,7 +3692,19 @@ daemon_init() {
   "max_workers": 8,
   "min_workers": 1,
   "worker_mem_gb": 4,
-  "estimated_cost_per_job_usd": 5.0
+  "estimated_cost_per_job_usd": 5.0,
+  "intelligence": {
+    "enabled": false,
+    "cache_ttl_seconds": 3600,
+    "composer_enabled": false,
+    "optimization_enabled": false,
+    "prediction_enabled": false,
+    "adversarial_enabled": false,
+    "simulation_enabled": false,
+    "architecture_enabled": false,
+    "ab_test_ratio": 0.2,
+    "anomaly_threshold": 3.0
+  }
 }
 CONFIGEOF
 

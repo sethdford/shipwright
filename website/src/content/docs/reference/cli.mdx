@@ -135,6 +135,8 @@ shipwright pipeline start [flags]
 | `--agents <n>`          | Number of build agents                                       |
 | `--self-heal <n>`       | Max self-healing cycles                                      |
 | `--skip-gates`          | Auto-approve all gates                                       |
+| `--worktree`            | Run pipeline in a git worktree for isolation                 |
+| `--worktree=<name>`     | Named worktree for parallel execution                        |
 | `--slack-webhook <url>` | Slack notification webhook                                   |
 
 ### `shipwright pipeline resume`
@@ -354,11 +356,12 @@ See [Memory guide](/guides/memory/) for details.
 
 Token usage tracking, budget enforcement, and spending analysis.
 
-| Subcommand                            | Description                          |
-| ------------------------------------- | ------------------------------------ |
-| `shipwright cost show`                | Show cost summary for current period |
-| `shipwright cost budget set <amount>` | Set daily budget (USD)               |
-| `shipwright cost budget show`         | Show current budget and usage        |
+| Subcommand                            | Description                                         |
+| ------------------------------------- | --------------------------------------------------- |
+| `shipwright cost show`                | Show cost summary for current period                |
+| `shipwright cost budget set <amount>` | Set daily budget (USD)                              |
+| `shipwright cost budget show`         | Show current budget and usage                       |
+| `shipwright cost remaining-budget`    | Return remaining daily budget (used by auto-scaler) |
 
 **Show flags:**
 
@@ -562,3 +565,138 @@ shipwright jira sync <issue>      # Sync issue status to Jira
 ```
 
 Configuration is stored at `~/.shipwright/tracker-config.json`. See [Issue Tracking guide](/guides/tracking/) for setup instructions.
+
+## Intelligence Layer
+
+The intelligence layer provides AI-powered analysis and optimization. All intelligence features are behind feature flags and off by default — enable them in `daemon-config.json`.
+
+### `shipwright intelligence`
+
+Core intelligence engine for semantic analysis, pipeline composition, cost prediction, and decision synthesis.
+
+| Subcommand                                | Description                              |
+| ----------------------------------------- | ---------------------------------------- |
+| `shipwright intelligence analyze`         | Semantic analysis of issues for triage   |
+| `shipwright intelligence compose`         | AI-driven pipeline composition           |
+| `shipwright intelligence predict`         | Cost and complexity prediction           |
+| `shipwright intelligence synthesize`      | Synthesize findings into recommendations |
+| `shipwright intelligence search-memory`   | Search cross-repo memory for patterns    |
+| `shipwright intelligence recommend-model` | Recommend Claude model for stage         |
+| `shipwright intelligence cache-stats`     | Show intelligence cache statistics       |
+| `shipwright intelligence cache-clear`     | Clear intelligence cache                 |
+
+**Examples:**
+
+```bash
+shipwright intelligence analyze '{"title":"Add auth","labels":["feature"]}'
+shipwright intelligence compose <issue_json>
+shipwright intelligence predict --stage build --goal "Refactor API"
+shipwright intelligence recommend-model --stage test
+```
+
+### `shipwright optimize`
+
+Self-optimization and learning system. Analyzes outcomes, tunes template weights, and evolves routing decisions.
+
+| Subcommand                            | Description                             |
+| ------------------------------------- | --------------------------------------- |
+| `shipwright optimize analyze-outcome` | Analyze completed pipeline outcome      |
+| `shipwright optimize tune`            | Full outcome analysis and model tuning  |
+| `shipwright optimize report`          | Show optimization learnings and metrics |
+| `shipwright optimize evolve-memory`   | Evolve memory from optimization data    |
+
+**Examples:**
+
+```bash
+shipwright optimize analyze-outcome .claude/pipeline-state.md
+shipwright optimize tune
+shipwright optimize report --period 30
+```
+
+### `shipwright predict`
+
+Predictive analytics for risk assessment, anomaly detection, and proactive codebase patrol.
+
+| Subcommand                    | Description                                |
+| ----------------------------- | ------------------------------------------ |
+| `shipwright predict risk`     | Pre-pipeline risk assessment               |
+| `shipwright predict anomaly`  | Compare metrics against running baselines  |
+| `shipwright predict patrol`   | AI-driven code analysis for high-risk code |
+| `shipwright predict baseline` | Update running metric baselines (EMA)      |
+
+**Examples:**
+
+```bash
+shipwright predict risk '{"title":"Add payment","complexity":7}'
+shipwright predict anomaly build duration 45.3
+shipwright predict patrol src/ --git-log commits.log
+```
+
+### `shipwright developer-simulation`
+
+Multi-persona code review using simulated developer personas (security, performance, maintainability).
+
+| Subcommand                                | Description                 |
+| ----------------------------------------- | --------------------------- |
+| `shipwright developer-simulation review`  | Run 3-persona PR review     |
+| `shipwright developer-simulation address` | Address reviewer objections |
+
+**Examples:**
+
+```bash
+shipwright developer-simulation review <code_diff> "<PR description>"
+shipwright developer-simulation address <objections_json> "<implementation context>"
+```
+
+### `shipwright adversarial`
+
+Red-team code review that finds security flaws, race conditions, and edge cases.
+
+| Subcommand                      | Description                    |
+| ------------------------------- | ------------------------------ |
+| `shipwright adversarial review` | Hostile security and QA review |
+
+**Examples:**
+
+```bash
+shipwright adversarial review <code_diff> "<context>"
+```
+
+### `shipwright architecture`
+
+Living architecture model: build, validate changes, and evolve patterns over time.
+
+| Subcommand                         | Description                            |
+| ---------------------------------- | -------------------------------------- |
+| `shipwright architecture build`    | Build architecture model from codebase |
+| `shipwright architecture validate` | Validate code changes against model    |
+| `shipwright architecture evolve`   | Evolve model with intentional changes  |
+
+**Examples:**
+
+```bash
+shipwright architecture build
+shipwright architecture validate <code_diff>
+shipwright architecture evolve architecture.json "Added event-driven patterns"
+```
+
+**Configuration:**
+
+All intelligence features are controlled via feature flags in `.claude/daemon-config.json`:
+
+```json
+{
+  "intelligence": {
+    "enabled": true,
+    "analyze_enabled": true,
+    "compose_enabled": true,
+    "optimize_enabled": true,
+    "predict_enabled": true,
+    "adversarial_enabled": true,
+    "simulation_enabled": true,
+    "architecture_enabled": true
+  }
+}
+```
+
+See [Intelligence guide](/guides/intelligence/) for detailed setup and examples.

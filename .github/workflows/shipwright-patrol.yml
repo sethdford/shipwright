@@ -6,7 +6,7 @@ run-name: "Shipwright Patrol — ${{ github.event_name == 'schedule' && 'Schedul
 
 on:
   schedule:
-    - cron: "0 6 * * *" # Daily at 6am UTC
+    - cron: "0 */6 * * *" # Every 6 hours
   workflow_dispatch: {} # Manual trigger for testing
 
 permissions:
@@ -64,6 +64,22 @@ jobs:
           shipwright daemon patrol --once 2>&1 || {
             echo "WARNING: Patrol exited with code $? — continuing to persist state"
           }
+
+      - name: Auto-label patrol findings
+        if: always()
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          # Add ready-to-build label to any open auto-patrol issues so daemon picks them up
+          ISSUES=$(gh issue list --label "auto-patrol" --state open --json number --jq '.[].number' 2>/dev/null || echo "")
+          if [ -n "$ISSUES" ]; then
+            echo "$ISSUES" | while read -r num; do
+              gh issue edit "$num" --repo "$GITHUB_REPOSITORY" --add-label "ready-to-build" 2>/dev/null || true
+              echo "Labeled issue #$num with ready-to-build"
+            done
+          else
+            echo "No open auto-patrol issues to label"
+          fi
 
       - name: Persist state to shipwright-data branch
         if: always()

@@ -90,7 +90,9 @@ show_help() {
     echo -e "  ${CYAN}tracker${RESET} <cmd>           ${BOLD}Issue tracker${RESET} — configure Linear/Jira integration"
     echo -e "  ${CYAN}heartbeat${RESET} <cmd>        ${BOLD}Agent heartbeat${RESET} — write/check/list/clear heartbeats"
     echo -e "  ${CYAN}checkpoint${RESET} <cmd>       ${BOLD}Checkpoints${RESET} — save/restore agent state mid-stage"
+    echo -e "  ${CYAN}connect${RESET} <cmd>          ${BOLD}Team connect${RESET} — sync local state to team dashboard"
     echo -e "  ${CYAN}remote${RESET} <cmd>           ${BOLD}Remote machines${RESET} — register and manage distributed workers"
+    echo -e "  ${CYAN}launchd${RESET} <cmd>          ${BOLD}Process supervision${RESET} — auto-start daemon + dashboard on boot"
     echo -e "  ${CYAN}init${RESET}                  ${BOLD}Quick tmux setup${RESET} — one command, no prompts"
     echo -e "  ${CYAN}setup${RESET}                 ${BOLD}Guided setup${RESET} — prerequisites, init, doctor, quick start"
     echo -e "  ${CYAN}help${RESET}                  Show this help message"
@@ -256,8 +258,23 @@ main() {
         checkpoint)
             exec "$SCRIPT_DIR/sw-checkpoint.sh" "$@"
             ;;
+        connect)
+            exec "$SCRIPT_DIR/sw-connect.sh" "$@"
+            ;;
         remote)
             exec "$SCRIPT_DIR/sw-remote.sh" "$@"
+            ;;
+        launchd)
+            exec "$SCRIPT_DIR/sw-launchd.sh" "$@"
+            ;;
+        intelligence|intel)
+            exec "$SCRIPT_DIR/sw-intelligence.sh" "$@"
+            ;;
+        optimize)
+            exec "$SCRIPT_DIR/sw-self-optimize.sh" "$@"
+            ;;
+        predict)
+            exec "$SCRIPT_DIR/sw-predictive.sh" "$@"
             ;;
         help|--help|-h)
             show_help

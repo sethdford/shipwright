@@ -1,13 +1,13 @@
 {
-  "watch_label": "shipwright",
-  "poll_interval": 30,
-  "max_parallel": 2,
+  "watch_label": "ready-to-build",
+  "poll_interval": 60,
+  "max_parallel": 4,
   "pipeline_template": "autonomous",
   "skip_gates": true,
-  "model": "opus",
+  "model": "sonnet",
   "base_branch": "main",
   "on_success": {
-    "remove_label": "shipwright",
+    "remove_label": "ready-to-build",
     "add_label": "pipeline/complete",
     "close_issue": true
   },
@@ -28,11 +28,18 @@
     "success_threshold": 50
   },
   "patrol": {
-    "interval": 3600,
+    "enabled": true,
+    "interval": 1800,
     "max_issues": 5,
     "label": "auto-patrol",
     "auto_watch": true,
     "checks": {
+      "security": { "enabled": true },
+      "stale_deps": { "enabled": true },
+      "dead_code": { "enabled": true },
+      "test_coverage": { "enabled": true },
+      "doc_staleness": { "enabled": true },
+      "performance": { "enabled": true },
       "recurring_failures": { "enabled": true, "threshold": 3 },
       "dora_degradation": { "enabled": true },
       "untested_scripts": { "enabled": true },
@@ -48,16 +55,30 @@
   "retry_escalation": true,
   "self_optimize": true,
   "optimize_interval": 5,
-  "priority_lane": false,
+  "priority_lane": true,
   "priority_lane_labels": "hotfix,incident,p0,urgent",
   "priority_lane_max": 1,
   "watch_mode": "repo",
   "org": null,
   "repo_filter": null,
   "auto_scale": true,
-  "auto_scale_interval": 3,
+  "auto_scale_interval": 5,
   "max_workers": 6,
   "min_workers": 1,
   "worker_mem_gb": 4,
-  "estimated_cost_per_job_usd": 5.0
+  "estimated_cost_per_job_usd": 8.0,
+  "stale_reaper": true,
+  "stale_reaper_interval": 10,
+  "intelligence": {
+    "enabled": true,
+    "cache_ttl_seconds": 3600,
+    "composer_enabled": false,
+    "optimization_enabled": true,
+    "prediction_enabled": true,
+    "adversarial_enabled": false,
+    "simulation_enabled": false,
+    "architecture_enabled": false,
+    "ab_test_ratio": 0.1,
+    "anomaly_threshold": 3.0
+  }
 }

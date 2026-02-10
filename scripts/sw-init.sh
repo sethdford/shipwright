@@ -8,7 +8,9 @@
 # ║                                                                          ║
 # ║  --deploy  Detect platform and generate deployed.json template          ║
 # ╚═══════════════════════════════════════════════════════════════════════════╝
+VERSION="1.7.1"
 set -euo pipefail
+trap 'echo "ERROR: $BASH_SOURCE:$LINENO exited with status $?" >&2' ERR
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"

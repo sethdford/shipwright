@@ -4,6 +4,7 @@
 # ║  Write · Check · List · Clear heartbeats for autonomous agents          ║
 # ╚═══════════════════════════════════════════════════════════════════════════╝
 set -euo pipefail
+trap 'echo "ERROR: $BASH_SOURCE:$LINENO exited with status $?" >&2' ERR
 
 VERSION="1.7.1"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"

@@ -1,0 +1,34 @@
+name: Shipwright Auto-Label
+
+# Bridge: auto-label patrol findings with ready-to-build so the daemon picks them up.
+# This is a belt-and-suspenders safety net alongside patrol.auto_watch in daemon config.
+run-name: "Auto-Label — issue #${{ github.event.issue.number }}"
+
+on:
+  issues:
+    types: [opened, labeled]
+
+permissions:
+  issues: write
+
+jobs:
+  auto-label:
+    if: contains(github.event.issue.labels.*.name, 'auto-patrol')
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+
+    steps:
+      - name: Add ready-to-build label
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          ISSUE="${{ github.event.issue.number }}"
+          # Check if ready-to-build label already exists
+          HAS_LABEL=$(gh issue view "$ISSUE" --repo "$GITHUB_REPOSITORY" \
+            --json labels --jq '[.labels[].name] | map(select(. == "ready-to-build")) | length')
+          if [ "$HAS_LABEL" -eq 0 ]; then
+            gh issue edit "$ISSUE" --repo "$GITHUB_REPOSITORY" --add-label "ready-to-build"
+            echo "Added ready-to-build label to issue #$ISSUE"
+          else
+            echo "Issue #$ISSUE already has ready-to-build label"
+          fi

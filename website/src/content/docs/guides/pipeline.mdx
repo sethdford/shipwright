@@ -39,6 +39,12 @@ intake → plan → design → build → test → review → compound_quality �
     # Fully autonomous — fetches issue, plans, builds, creates PR
     shipwright pipeline start --issue 123 --skip-gates
     ```
+
+    ```bash
+    # Parallel-safe — each pipeline runs in its own git worktree
+    shipwright pipeline start --issue 123 --worktree
+    ```
+
   </TabItem>
   <TabItem label="From a Goal">
     ```bash
@@ -71,6 +77,12 @@ Browse templates:
 shipwright pipeline list        # List all templates
 shipwright pipeline show standard  # View template details
 ```
+
+## Intelligence-Composed Pipelines
+
+When the intelligence layer is enabled, Shipwright can compose custom pipelines dynamically instead of using static templates. The intelligence engine analyzes the issue semantically and builds a tailored stage configuration — adding extra stages for high-risk changes, removing unnecessary stages for simple fixes, and routing each stage to the optimal model (opus, sonnet, or haiku) based on task complexity and remaining budget.
+
+Static templates remain as fallbacks when intelligence is disabled or when a Claude API call fails. See the [Intelligence guide](/guides/intelligence/) for configuration details.
 
 ## Self-Healing Builds
 

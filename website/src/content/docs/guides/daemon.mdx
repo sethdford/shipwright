@@ -8,7 +8,7 @@ The daemon (`shipwright daemon`) runs in the background, polling GitHub for new 
 ## How It Works
 
 1. The daemon polls your GitHub repo (or entire org) for issues with a configurable label (default: `ready-to-build`)
-2. Each issue is scored by **intelligent triage** across 6 dimensions (priority, age, complexity, dependencies, type, memory)
+2. Each issue is scored by **intelligent triage** — with the intelligence layer enabled, Claude semantically analyzes each issue for complexity, risk, and optimal approach; without it, scoring uses 6 heuristic dimensions (priority, age, complexity, dependencies, type, memory)
 3. Issues are processed in triage-score order; **priority lane** issues bypass the queue
 4. The daemon **auto-selects a pipeline template** based on issue labels and triage score (when `auto_template` is enabled)
 5. A git worktree is created and a pipeline is spawned (`shipwright pipeline start --issue <id>`)
@@ -231,6 +231,12 @@ Configure patrol behavior:
 }
 ```
 
+## AI-Powered Patrol
+
+When the intelligence layer is enabled (`intelligence.predictive_enabled` in daemon-config.json), patrol scans are enhanced with AI analysis. Instead of relying solely on grep-based checks, Claude reads sampled source files, test files, and recent git history to perform holistic codebase analysis. The existing grep checks serve as pre-filters, and Claude confirms or dismisses findings — reducing false positive rates significantly.
+
+See the [Intelligence guide](/guides/intelligence/) for details on predictive analytics and AI patrol.
+
 ## Degradation Detection
 
 The daemon monitors recent pipeline success rates and alerts when quality degrades. It checks the last `degradation_window` pipelines (default: 5) and fires alerts when:
@@ -295,3 +301,25 @@ After running `shipwright daemon init`, edit the configuration file at `.claude/
 ```
 
 See [Configuration reference](/reference/configuration/) for the full list of fields.
+
+## Auto-Scaling
+
+The daemon can dynamically adjust worker count based on system resources when `auto_scale` is enabled:
+
+```json
+{
+  "auto_scale": true,
+  "auto_scale_interval": 5,
+  "max_workers": 8,
+  "min_workers": 1,
+  "worker_mem_gb": 4,
+  "estimated_cost_per_job_usd": 5.0
+}
+```
+
+Scaling factors (takes the minimum):
+
+- **CPU**: 75% of cores
+- **Memory**: available GB / `worker_mem_gb`
+- **Budget**: remaining daily budget / `estimated_cost_per_job_usd`
+- **Queue**: current demand (active + queued issues)

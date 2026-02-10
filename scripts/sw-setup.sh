@@ -7,6 +7,7 @@
 # ║  start guide.                                                           ║
 # ╚═══════════════════════════════════════════════════════════════════════════╝
 set -euo pipefail
+trap 'echo "ERROR: $BASH_SOURCE:$LINENO exited with status $?" >&2' ERR
 
 VERSION="1.7.1"
 

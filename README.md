@@ -760,30 +760,153 @@ cp completions/shipwright.fish ~/.config/fish/completions/
 
 ### Daemon Configuration
 
-The daemon is configured via `.claude/daemon-config.json`:
+The daemon is configured via `.claude/daemon-config.json`. Generate a starter config with `shipwright daemon init`.
+
+#### Core Settings
+
+| Field               | Type     | Default            | Purpose                                        |
+| ------------------- | -------- | ------------------ | ---------------------------------------------- |
+| `watch_label`       | `string` | `"ready-to-build"` | GitHub label that triggers pipeline runs       |
+| `poll_interval`     | `number` | `60`               | Seconds between GitHub polling cycles          |
+| `max_parallel`      | `number` | `2`                | Static worker limit (overridden by auto_scale) |
+| `pipeline_template` | `string` | `"autonomous"`     | Default pipeline template for jobs             |
+| `skip_gates`        | `bool`   | `true`             | Skip approval gates in autonomous mode         |
+| `model`             | `string` | `"opus"`           | Claude model for pipeline agents               |
+| `base_branch`       | `string` | `"main"`           | Branch to create feature branches from         |
+
+#### Success/Failure Hooks
+
+| Field                          | Type     | Default               | Purpose                              |
+| ------------------------------ | -------- | --------------------- | ------------------------------------ |
+| `on_success.remove_label`      | `string` | `"ready-to-build"`    | Label to remove on success           |
+| `on_success.add_label`         | `string` | `"pipeline/complete"` | Label to add on success              |
+| `on_success.close_issue`       | `bool`   | `false`               | Auto-close issue on success          |
+| `on_failure.add_label`         | `string` | `"pipeline/failed"`   | Label to add on failure              |
+| `on_failure.comment_log_lines` | `number` | `50`                  | Log lines to post in failure comment |
+
+#### Notifications & Health
+
+| Field                         | Type     | Default | Purpose                                        |
+| ----------------------------- | -------- | ------- | ---------------------------------------------- |
+| `notifications.slack_webhook` | `string` | `null`  | Slack webhook for notifications                |
+| `health.stale_timeout_s`      | `number` | `1800`  | Seconds before a job is considered stale       |
+| `health.heartbeat_timeout_s`  | `number` | `120`   | Seconds before a heartbeat is considered stale |
+| `health.checkpoint_enabled`   | `bool`   | `true`  | Enable checkpoint-based recovery               |
+
+#### Priority & Scheduling
+
+| Field                  | Type     | Default                                | Purpose                                 |
+| ---------------------- | -------- | -------------------------------------- | --------------------------------------- |
+| `priority_labels`      | `string` | `"urgent,p0,high,p1,normal,p2,low,p3"` | Comma-separated priority label order    |
+| `priority_lane`        | `bool`   | `false`                                | Reserve a worker slot for urgent issues |
+| `priority_lane_labels` | `string` | `"hotfix,incident,p0,urgent"`          | Labels that qualify for priority lane   |
+| `priority_lane_max`    | `number` | `1`                                    | Max concurrent priority lane jobs       |
+
+#### Degradation Alerts
+
+| Field                       | Type     | Default | Purpose                                   |
+| --------------------------- | -------- | ------- | ----------------------------------------- |
+| `alerts.degradation_window` | `number` | `5`     | Number of recent runs to evaluate         |
+| `alerts.cfr_threshold`      | `number` | `30`    | Change failure rate % that triggers alert |
+| `alerts.success_threshold`  | `number` | `50`    | Success rate % below which alerts trigger |
+
+#### Patrol (Autonomous CI)
+
+| Field                                        | Type     | Default         | Purpose                                |
+| -------------------------------------------- | -------- | --------------- | -------------------------------------- |
+| `patrol.interval`                            | `number` | `3600`          | Seconds between patrol scans           |
+| `patrol.max_issues`                          | `number` | `5`             | Max issues to create per scan          |
+| `patrol.label`                               | `string` | `"auto-patrol"` | Label applied to patrol-created issues |
+| `patrol.auto_watch`                          | `bool`   | `false`         | Auto-add watch label to patrol issues  |
+| `patrol.checks.recurring_failures.enabled`   | `bool`   | `true`          | Detect recurring pipeline failures     |
+| `patrol.checks.recurring_failures.threshold` | `number` | `3`             | Failures before creating an issue      |
+| `patrol.checks.dora_degradation.enabled`     | `bool`   | `true`          | Detect DORA metric degradation         |
+| `patrol.checks.untested_scripts.enabled`     | `bool`   | `true`          | Detect scripts without test coverage   |
+| `patrol.checks.retry_exhaustion.enabled`     | `bool`   | `true`          | Detect jobs exhausting all retries     |
+| `patrol.checks.retry_exhaustion.threshold`   | `number` | `2`             | Retry exhaustions before alerting      |
+
+#### Template Selection & Retries
+
+| Field              | Type     | Default | Purpose                                  |
+| ------------------ | -------- | ------- | ---------------------------------------- |
+| `auto_template`    | `bool`   | `false` | Auto-select template by issue complexity |
+| `template_map`     | `object` | `{}`    | Label patterns → template overrides      |
+| `max_retries`      | `number` | `2`     | Max retry attempts for failed pipelines  |
+| `retry_escalation` | `bool`   | `true`  | Escalate model/template on retry         |
+
+#### Self-Optimization
+
+| Field               | Type     | Default | Purpose                                |
+| ------------------- | -------- | ------- | -------------------------------------- |
+| `self_optimize`     | `bool`   | `false` | Auto-tune config based on DORA metrics |
+| `optimize_interval` | `number` | `10`    | Runs between optimization passes       |
+
+#### Auto-Scaling
+
+| Field                        | Type     | Default | Purpose                               |
+| ---------------------------- | -------- | ------- | ------------------------------------- |
+| `auto_scale`                 | `bool`   | `false` | Enable resource-aware dynamic scaling |
+| `auto_scale_interval`        | `number` | `5`     | Minutes between scaling evaluations   |
+| `max_workers`                | `number` | `8`     | Ceiling for auto-scaler               |
+| `min_workers`                | `number` | `1`     | Floor for auto-scaler                 |
+| `worker_mem_gb`              | `number` | `4`     | Assumed memory per worker (GB)        |
+| `estimated_cost_per_job_usd` | `number` | `5.0`   | Budget-aware scaling factor           |
+
+#### Org-Wide Mode
+
+| Field         | Type     | Default  | Purpose                                             |
+| ------------- | -------- | -------- | --------------------------------------------------- |
+| `watch_mode`  | `string` | `"repo"` | `"repo"` for single repo, `"org"` for org-wide      |
+| `org`         | `string` | `""`     | GitHub org name (required when `watch_mode: "org"`) |
+| `repo_filter` | `string` | `""`     | Regex to filter repos in org mode                   |
+
+#### Stale Reaper
+
+| Field                   | Type     | Default | Purpose                                    |
+| ----------------------- | -------- | ------- | ------------------------------------------ |
+| `stale_reaper`          | `bool`   | `true`  | Auto-clean old worktrees, artifacts, state |
+| `stale_reaper_interval` | `number` | `10`    | Runs between reaper sweeps                 |
+| `stale_reaper_age_days` | `number` | `7`     | Age in days before cleanup                 |
+
+#### GitHub API
+
+| Field      | Type   | Default | Purpose                                    |
+| ---------- | ------ | ------- | ------------------------------------------ |
+| `gh_retry` | `bool` | `true`  | Retry wrapper on critical GitHub API calls |
+
+#### Intelligence Engine
+
+| Field                               | Type     | Default | Purpose                                   |
+| ----------------------------------- | -------- | ------- | ----------------------------------------- |
+| `intelligence.enabled`              | `bool`   | `false` | Master switch for the intelligence engine |
+| `intelligence.cache_ttl_seconds`    | `number` | `3600`  | Cache lifetime for intelligence analysis  |
+| `intelligence.composer_enabled`     | `bool`   | `false` | Dynamic pipeline composition              |
+| `intelligence.optimization_enabled` | `bool`   | `false` | Self-tuning based on historical metrics   |
+| `intelligence.prediction_enabled`   | `bool`   | `false` | Risk scoring and anomaly detection        |
+| `intelligence.adversarial_enabled`  | `bool`   | `false` | Adversarial code review pass              |
+| `intelligence.simulation_enabled`   | `bool`   | `false` | Developer workflow simulation testing     |
+| `intelligence.architecture_enabled` | `bool`   | `false` | Architecture rule enforcement             |
+| `intelligence.ab_test_ratio`        | `number` | `0.2`   | Fraction of runs using composed pipelines |
+| `intelligence.anomaly_threshold`    | `number` | `3.0`   | Standard deviations for anomaly detection |
+
+Example config with intelligence enabled:
 
 ```json
 {
-  "watch_label": "ready-to-build",
-  "poll_interval": 60,
+  "watch_label": "shipwright",
+  "poll_interval": 30,
   "max_parallel": 2,
   "pipeline_template": "autonomous",
+  "skip_gates": true,
+  "model": "opus",
   "base_branch": "main",
-  "priority_lane": true,
-  "priority_lane_labels": "hotfix,incident,p0,urgent",
-  "priority_lane_max": 1,
-  "auto_template": true,
-  "max_retries": 2,
-  "retry_escalation": true,
-  "self_optimize": false,
-  "auto_scale": false,
-  "auto_scale_interval": 5,
-  "max_workers": 8,
-  "min_workers": 1,
-  "worker_mem_gb": 4,
-  "estimated_cost_per_job_usd": 5.0,
-  "watch_mode": "repo",
-  "org": ""
+  "auto_scale": true,
+  "max_workers": 6,
+  "intelligence": {
+    "enabled": true,
+    "composer_enabled": true,
+    "prediction_enabled": true
+  }
 }
 ```
 

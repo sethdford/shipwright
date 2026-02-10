@@ -326,8 +326,27 @@ jobs:
           EOF
           )" 2>/dev/null || true
 
-      - name: Dispatch retry pipeline
+      - name: Check budget before retry
         if: steps.strategy.outputs.should_retry == 'true'
+        id: budget
+        run: |
+          # Ensure Shipwright is available
+          if command -v shipwright &>/dev/null || [ -x ./node_modules/.bin/sw ]; then
+            REMAINING=$(shipwright cost remaining-budget 2>/dev/null || echo "100")
+          else
+            REMAINING="100"
+          fi
+          echo "remaining=$REMAINING" >> "$GITHUB_OUTPUT"
+          if [ "$(echo "$REMAINING < 10" | bc 2>/dev/null || echo "0")" -eq 1 ]; then
+            echo "Budget too low (\$$REMAINING remaining), skipping retry"
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "Budget OK (\$$REMAINING remaining)"
+            echo "skip=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Dispatch retry pipeline
+        if: steps.strategy.outputs.should_retry == 'true' && steps.budget.outputs.skip != 'true'
         run: |
           ISSUE_NUMBER="${{ steps.extract.outputs.issue_number }}"
           TEMPLATE="${{ steps.strategy.outputs.template }}"

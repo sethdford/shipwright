@@ -62,6 +62,24 @@
         <span class="cost-ticker" id="cost-ticker"></span>
       </div>
       <div class="header-right">
+        <button
+          class="emergency-brake-btn"
+          id="emergency-brake"
+          style="display: none"
+          title="Emergency Brake — Pause All"
+        >
+          <svg
+            viewBox="0 0 24 24"
+            width="18"
+            height="18"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+          >
+            <circle cx="12" cy="12" r="10" />
+            <rect x="8" y="8" width="8" height="8" rx="1" fill="currentColor" />
+          </svg>
+        </button>
         <div class="user-menu" id="user-menu">
           <button class="user-avatar" id="user-avatar" aria-label="User menu">
             <span class="avatar-initials" id="avatar-initials">?</span>
@@ -83,9 +101,24 @@
         <button class="tab-btn" data-tab="timeline">Timeline</button>
         <button class="tab-btn" data-tab="activity">Activity</button>
         <button class="tab-btn" data-tab="metrics">Metrics</button>
+        <button class="tab-btn" data-tab="machines">Machines</button>
+        <button class="tab-btn" data-tab="insights">Insights</button>
+        <button class="tab-btn" data-tab="team">Team</button>
         <div class="tab-indicator" id="tab-indicator"></div>
       </div>
     </nav>
+
+    <!-- Alert Banner -->
+    <div class="alert-banner" id="alert-banner" style="display: none">
+      <div class="alert-banner-inner">
+        <span class="alert-icon" id="alert-icon"></span>
+        <span class="alert-message" id="alert-message"></span>
+        <div class="alert-actions" id="alert-actions"></div>
+        <button class="alert-dismiss" id="alert-dismiss" aria-label="Dismiss">
+          &times;
+        </button>
+      </div>
+    </div>
 
     <!-- Main Content -->
     <main class="main" id="main-content">
@@ -118,6 +151,69 @@
             <div class="stat-subtitle" id="stat-failed-sub">0 failed</div>
           </div>
         </section>
+
+        <!-- Daemon Control Bar -->
+        <div class="daemon-control-bar" id="daemon-control-bar">
+          <div class="daemon-control-status">
+            <span class="daemon-status-badge" id="daemon-status-badge"
+              >Unknown</span
+            >
+            <span class="daemon-status-label">Daemon</span>
+          </div>
+          <div class="daemon-control-actions">
+            <button
+              class="btn btn-sm btn-start"
+              id="daemon-btn-start"
+              onclick="daemonControl('start')"
+              title="Start daemon"
+            >
+              Start
+            </button>
+            <button
+              class="btn btn-sm btn-stop"
+              id="daemon-btn-stop"
+              onclick="daemonControl('stop')"
+              title="Stop daemon"
+            >
+              Stop
+            </button>
+            <button
+              class="btn btn-sm btn-pause"
+              id="daemon-btn-pause"
+              onclick="daemonControl('pause')"
+              title="Pause/Resume daemon"
+            >
+              Pause
+            </button>
+            <button
+              class="btn btn-sm btn-patrol"
+              id="daemon-btn-patrol"
+              onclick="daemonControl('patrol')"
+              title="Run patrol now"
+            >
+              Run Patrol
+            </button>
+          </div>
+          <div class="daemon-control-info" id="daemon-control-info">
+            <span class="daemon-info-item"
+              ><strong>Workers:</strong>
+              <span id="daemon-info-workers">-</span></span
+            >
+            <span class="daemon-info-item"
+              ><strong>Poll:</strong>
+              <span id="daemon-info-poll">-</span>s</span
+            >
+            <span class="daemon-info-item"
+              ><strong>Patrol:</strong>
+              <span id="daemon-info-patrol">-</span>s</span
+            >
+            <span class="daemon-info-item"
+              ><strong>Budget:</strong> $<span id="daemon-info-budget"
+                >-</span
+              ></span
+            >
+          </div>
+        </div>
 
         <!-- Active Pipelines -->
         <section class="section">
@@ -214,11 +310,27 @@
           <button class="filter-chip" data-filter="failed">Failed</button>
         </div>
 
+        <div class="bulk-actions" id="bulk-actions" style="display: none">
+          <span class="bulk-count" id="bulk-count">0 selected</span>
+          <button class="bulk-btn" id="bulk-pause">Pause Selected</button>
+          <button class="bulk-btn" id="bulk-resume">Resume Selected</button>
+          <button class="bulk-btn bulk-btn-danger" id="bulk-abort">
+            Abort Selected
+          </button>
+        </div>
+
         <!-- Pipeline table -->
         <div class="pipeline-table-wrap">
           <table class="pipeline-table" id="pipeline-table">
             <thead>
               <tr>
+                <th>
+                  <input
+                    type="checkbox"
+                    id="pipeline-select-all"
+                    class="pipeline-checkbox"
+                  />
+                </th>
                 <th>Issue</th>
                 <th>Title</th>
                 <th>Status</th>
@@ -229,7 +341,7 @@
             </thead>
             <tbody id="pipeline-table-body">
               <tr>
-                <td colspan="6" class="empty-state"><p>No pipeline data</p></td>
+                <td colspan="7" class="empty-state"><p>No pipeline data</p></td>
               </tr>
             </tbody>
           </table>
@@ -313,7 +425,7 @@
           <div class="metrics-top-row">
             <div class="metric-card metric-card-lg">
               <span class="metric-label">SUCCESS RATE</span>
-              <div class="donut-wrap">
+              <div id="metric-donut-wrap" class="donut-wrap">
                 <div class="donut" id="metric-donut" style="--pct: 0%">
                   <span class="donut-value" id="metric-success-rate">—</span>
                 </div>
@@ -356,6 +468,119 @@
               <div class="empty-state"><p>No data</p></div>
             </div>
           </div>
+
+          <!-- DORA Grades -->
+          <div
+            class="metric-card metric-card-wide"
+            id="dora-grades-container"
+            style="display: none"
+          >
+            <span class="metric-label">DORA GRADES</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- ═══ MACHINES TAB ═══ -->
+      <div class="tab-panel" id="panel-machines">
+        <!-- Summary row -->
+        <div class="machines-summary" id="machines-summary"></div>
+
+        <!-- Action bar -->
+        <div class="machines-actions">
+          <button class="btn-primary" id="btn-add-machine">
+            + Add Machine
+          </button>
+          <button class="btn-secondary" id="btn-join-link">
+            Generate Join Link
+          </button>
+        </div>
+
+        <!-- Machine cards grid -->
+        <div class="machines-grid" id="machines-tab-grid">
+          <div class="empty-state"><p>No machines registered</p></div>
+        </div>
+
+        <!-- Active join tokens -->
+        <section class="section" id="join-tokens-section" style="display: none">
+          <h2 class="section-label">ACTIVE JOIN LINKS</h2>
+          <div id="join-tokens-list"></div>
+        </section>
+      </div>
+
+      <!-- ═══ INSIGHTS TAB ═══ -->
+      <div class="tab-panel" id="panel-insights">
+        <div class="insights-grid">
+          <!-- Failure Patterns -->
+          <section class="section">
+            <h2 class="section-label">FAILURE PATTERNS</h2>
+            <div id="failure-patterns">
+              <div class="empty-state"><p>Loading patterns...</p></div>
+            </div>
+          </section>
+
+          <!-- Patrol Findings -->
+          <section class="section">
+            <h2 class="section-label">PATROL FINDINGS</h2>
+            <div id="patrol-findings">
+              <div class="empty-state"><p>No patrol data</p></div>
+            </div>
+          </section>
+
+          <!-- Decision Log -->
+          <section class="section">
+            <h2 class="section-label">DECISION LOG</h2>
+            <div id="decision-log">
+              <div class="empty-state"><p>No decisions recorded</p></div>
+            </div>
+          </section>
+
+          <!-- Failure Heatmap -->
+          <section class="section">
+            <h2 class="section-label">FAILURE HEATMAP</h2>
+            <div id="failure-heatmap">
+              <div class="empty-state"><p>No data</p></div>
+            </div>
+          </section>
+        </div>
+      </div>
+
+      <!-- ═══ TEAM TAB ═══ -->
+      <div class="tab-panel" id="panel-team">
+        <!-- Team Stats Bar -->
+        <section class="team-stats-bar" id="team-stats-bar">
+          <div class="team-stat">
+            <span class="team-stat-label">DEVELOPERS ONLINE</span>
+            <div class="team-stat-value gradient-text" id="team-stat-online">
+              0
+            </div>
+          </div>
+          <div class="team-stat">
+            <span class="team-stat-label">ACTIVE PIPELINES</span>
+            <div class="team-stat-value" id="team-stat-pipelines">0</div>
+          </div>
+          <div class="team-stat">
+            <span class="team-stat-label">TOTAL QUEUED</span>
+            <div class="team-stat-value" id="team-stat-queued">0</div>
+          </div>
+        </section>
+
+        <!-- Developer Cards -->
+        <section class="section-header">
+          <h2 class="section-label">CONNECTED DEVELOPERS</h2>
+        </section>
+        <div class="team-grid" id="team-grid">
+          <div class="empty-state">
+            No developers connected. Run
+            <code>shipwright connect start</code> to join.
+          </div>
+        </div>
+
+        <!-- Team Activity Feed -->
+        <section class="section-header" style="margin-top: 2rem">
+          <h2 class="section-label">TEAM ACTIVITY</h2>
+        </section>
+        <div class="team-activity" id="team-activity">
+          <div class="empty-state">No team activity yet.</div>
         </div>
       </div>
     </main>
@@ -386,6 +611,202 @@
             Cancel
           </button>
           <button class="modal-btn modal-btn-send" id="modal-send">Send</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Emergency Brake Modal -->
+    <div class="modal-overlay" id="emergency-modal" style="display: none">
+      <div class="modal-card">
+        <div class="modal-header">
+          <h3 class="modal-title">Emergency Brake</h3>
+          <button class="modal-close" id="emergency-modal-close">
+            &times;
+          </button>
+        </div>
+        <div class="modal-body">
+          <p class="emergency-warning">
+            This will pause
+            <strong id="emergency-active-count">0</strong> active pipelines and
+            <strong id="emergency-queue-count">0</strong> queued items.
+          </p>
+        </div>
+        <div class="modal-footer">
+          <button class="modal-btn modal-btn-cancel" id="emergency-cancel">
+            Cancel
+          </button>
+          <button class="modal-btn modal-btn-danger" id="emergency-confirm">
+            Pause Everything
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Add Machine Modal -->
+    <div class="modal-overlay" id="add-machine-modal" style="display: none">
+      <div class="modal-card modal-wide">
+        <div class="modal-header">
+          <h3 class="modal-title">Register Machine</h3>
+          <button class="modal-close" id="machine-modal-close">&times;</button>
+        </div>
+        <div class="modal-body">
+          <div class="form-row">
+            <div class="form-group">
+              <label class="form-label" for="machine-name">Name</label>
+              <input
+                type="text"
+                id="machine-name"
+                class="form-input"
+                placeholder="e.g. build-server-1"
+              />
+            </div>
+            <div class="form-group">
+              <label class="form-label" for="machine-host">Host</label>
+              <input
+                type="text"
+                id="machine-host"
+                class="form-input"
+                placeholder="e.g. 10.0.1.5 or localhost"
+              />
+            </div>
+          </div>
+          <div class="form-row">
+            <div class="form-group">
+              <label class="form-label" for="machine-ssh-user">SSH User</label>
+              <input
+                type="text"
+                id="machine-ssh-user"
+                class="form-input"
+                placeholder="optional"
+              />
+            </div>
+            <div class="form-group">
+              <label class="form-label" for="machine-path"
+                >Shipwright Path</label
+              >
+              <input
+                type="text"
+                id="machine-path"
+                class="form-input"
+                placeholder="/opt/shipwright"
+              />
+            </div>
+          </div>
+          <div class="form-row">
+            <div class="form-group">
+              <label class="form-label" for="machine-workers"
+                >Max Workers</label
+              >
+              <input
+                type="number"
+                id="machine-workers"
+                class="form-input"
+                value="4"
+                min="1"
+                max="64"
+              />
+            </div>
+            <div class="form-group">
+              <label class="form-label" for="machine-role">Role</label>
+              <select id="machine-role" class="form-input">
+                <option value="worker">Worker</option>
+                <option value="primary">Primary</option>
+              </select>
+            </div>
+          </div>
+          <div
+            id="machine-modal-error"
+            class="form-error"
+            style="display: none"
+          ></div>
+        </div>
+        <div class="modal-footer">
+          <button class="modal-btn modal-btn-cancel" id="machine-modal-cancel">
+            Cancel
+          </button>
+          <button class="modal-btn modal-btn-send" id="machine-modal-submit">
+            Register
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Join Link Modal -->
+    <div class="modal-overlay" id="join-link-modal" style="display: none">
+      <div class="modal-card">
+        <div class="modal-header">
+          <h3 class="modal-title">Generate Join Link</h3>
+          <button class="modal-close" id="join-modal-close">&times;</button>
+        </div>
+        <div class="modal-body">
+          <div class="form-group">
+            <label class="form-label" for="join-label">Label (optional)</label>
+            <input
+              type="text"
+              id="join-label"
+              class="form-input"
+              placeholder="e.g. Seth's laptop"
+            />
+          </div>
+          <div class="form-group">
+            <label class="form-label" for="join-workers">Max Workers</label>
+            <input
+              type="number"
+              id="join-workers"
+              class="form-input"
+              value="4"
+              min="1"
+              max="64"
+            />
+          </div>
+          <div id="join-command-display" style="display: none">
+            <label class="form-label">Run this command on the machine:</label>
+            <div class="join-command">
+              <code id="join-command-text"></code>
+              <button
+                class="join-copy-btn"
+                id="join-copy-btn"
+                title="Copy to clipboard"
+              >
+                Copy
+              </button>
+            </div>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button class="modal-btn modal-btn-cancel" id="join-modal-cancel">
+            Cancel
+          </button>
+          <button class="modal-btn modal-btn-send" id="join-modal-generate">
+            Generate
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Remove Machine Modal -->
+    <div class="modal-overlay" id="remove-machine-modal" style="display: none">
+      <div class="modal-card">
+        <div class="modal-header">
+          <h3 class="modal-title">Remove Machine</h3>
+          <button class="modal-close" id="remove-modal-close">&times;</button>
+        </div>
+        <div class="modal-body">
+          <p class="emergency-warning">
+            Remove <strong id="remove-machine-name"></strong> from the fleet?
+          </p>
+          <label class="form-checkbox-label">
+            <input type="checkbox" id="remove-stop-daemon" />
+            Also stop daemon on this machine
+          </label>
+        </div>
+        <div class="modal-footer">
+          <button class="modal-btn modal-btn-cancel" id="remove-modal-cancel">
+            Cancel
+          </button>
+          <button class="modal-btn modal-btn-danger" id="remove-modal-confirm">
+            Remove
+          </button>
         </div>
       </div>
     </div>

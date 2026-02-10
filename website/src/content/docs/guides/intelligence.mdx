@@ -1,0 +1,567 @@
+---
+title: Intelligence Layer
+description: AI-powered decision making across the entire pipeline — from semantic issue analysis to self-improving delivery optimization.
+---
+
+import { Tabs, TabItem, Card, CardGrid } from "@astrojs/starlight/components";
+
+Shipwright's intelligence layer replaces hardcoded heuristics with AI-powered analysis at every decision point in the delivery pipeline. From issue triage to model selection to architecture validation, intelligence modules make context-aware decisions that improve over time.
+
+All intelligence features are behind feature flags and degrade gracefully to static fallbacks when disabled. Enable any combination of modules based on your workflow.
+
+## Overview
+
+The intelligence layer consists of seven specialized modules that work together:
+
+- **Intelligence Core** — Analyzes issues semantically, manages cached analysis, and provides unified API
+- **Pipeline Composer** — Dynamically composes pipeline configurations from analysis
+- **Self-Optimize** — Learns from historical metrics and tunes configuration
+- **Predictive Analytics** — Pre-pipeline risk assessment and anomaly detection
+- **Adversarial Review** — Red-team code for edge cases and security issues
+- **Developer Simulation** — Simulates reviewer personas before PR submission
+- **Architecture Enforcer** — Validates changes against established architectural patterns
+
+## Enabling Intelligence
+
+All intelligence features are disabled by default. Enable them in `.claude/daemon-config.json`:
+
+```json
+{
+  "intelligence": {
+    "enabled": true,
+    "cache_ttl_seconds": 3600,
+    "composer_enabled": false,
+    "optimization_enabled": true,
+    "prediction_enabled": true,
+    "adversarial_enabled": false,
+    "simulation_enabled": false,
+    "architecture_enabled": false,
+    "ab_test_ratio": 0.1,
+    "anomaly_threshold": 3.0
+  }
+}
+```
+
+**Recommended starting configuration:**
+
+- `enabled: true` — Master switch
+- `optimization_enabled: true` — Learn from every pipeline run
+- `prediction_enabled: true` — Risk assessment before pipeline starts
+
+Enable additional modules as your workflows mature:
+
+- `composer_enabled: true` — Custom pipelines based on issue analysis (advanced)
+- `adversarial_enabled: true` — Extra code review pass (slower pipelines)
+- `simulation_enabled: true` — Simulate PR review before submitting
+- `architecture_enabled: true` — Enforce architectural patterns (requires initial model build)
+
+## Intelligence Core
+
+The `sw-intelligence.sh` module provides semantic analysis and unified APIs for all other intelligence modules.
+
+### Issue Analysis
+
+Analyzes GitHub issues semantically instead of just counting words and matching regex patterns:
+
+```bash
+shipwright intelligence analyze '{"title":"Add OAuth2 support","body":"Users can't...","labels":"feature,auth"}'
+```
+
+Returns structured analysis:
+
+```json
+{
+  "complexity": 7,
+  "risk_level": "high",
+  "success_probability": 65,
+  "recommended_template": "standard",
+  "key_risks": ["scope creep", "security validation", "backward compatibility"],
+  "implementation_hints": [
+    "start with design phase",
+    "security review required"
+  ]
+}
+```
+
+### Pipeline Composition
+
+Generates initial pipeline configuration from issue analysis:
+
+```bash
+shipwright intelligence compose <analysis_json> [repo_context] [budget_usd]
+```
+
+### Cost Prediction
+
+Estimates cost and iterations before pipeline runs:
+
+```bash
+shipwright intelligence predict <analysis_json> [historical_data]
+```
+
+Returns:
+
+```json
+{
+  "estimated_cost_usd": 12.5,
+  "estimated_iterations": 8,
+  "estimated_tokens": 750000,
+  "likely_failure_stage": "test",
+  "confidence": 75
+}
+```
+
+### Memory Search
+
+Ranks memory entries by relevance to current context:
+
+```bash
+shipwright intelligence search-memory "auth refactor" [memory_dir] [top_n]
+```
+
+### Model Recommendation
+
+Recommends the right model (opus/sonnet/haiku) for each stage based on complexity and budget:
+
+```bash
+shipwright intelligence recommend-model design 8 50
+```
+
+## Pipeline Composer
+
+The `sw-pipeline-composer.sh` module creates custom pipelines tailored to each issue.
+
+### Dynamic Composition
+
+Instead of selecting a static template, the composer generates a pipeline that matches the issue:
+
+- **Low complexity issues** → Skip plan/design stages, focus on build/test
+- **High-risk issues** → Add extra review and validation stages
+- **Budget-constrained runs** → Downgrade Opus to Sonnet in later stages
+- **Security issues** → Insert dedicated security audit stage
+
+### Conditional Stage Insertion
+
+Insert specialized stages dynamically:
+
+```bash
+composer_insert_conditional_stage <pipeline> after_review '{"id":"security_audit","enabled":true,"model":"opus"}'
+```
+
+### Model Downgrading
+
+When budget runs low, downgrade remaining stages to cheaper models:
+
+```bash
+composer_downgrade_models <pipeline> from_test_stage
+```
+
+## Self-Optimization
+
+The `sw-self-optimize.sh` module learns from every pipeline run and automatically tunes configuration.
+
+### Outcome Analysis
+
+Records metrics from each completed pipeline:
+
+```bash
+shipwright self-optimize analyze-outcome .claude/pipeline-state.md
+```
+
+Tracks: complexity, template used, result, iterations, cost, and per-stage outcomes.
+
+### Template Tuning
+
+Analyzes success/failure rates per template and label combination:
+
+```bash
+shipwright self-optimize tune
+```
+
+Adjusts template weights over time:
+
+```json
+{
+  "standard|feature": 1.1,
+  "standard|bugfix": 0.9,
+  "fast|hotfix": 1.0
+}
+```
+
+### Iteration Learning
+
+Builds a prediction model for build iterations by complexity:
+
+```json
+{
+  "low": { "mean": 3.2, "stddev": 1.1, "samples": 24 },
+  "medium": { "mean": 8.5, "stddev": 2.3, "samples": 18 },
+  "high": { "mean": 15.2, "stddev": 4.1, "samples": 12 }
+}
+```
+
+### Model Routing
+
+Tracks per-stage model success rates and recommends cheaper models when viable:
+
+```json
+{
+  "build": {
+    "recommended": "sonnet",
+    "sonnet_rate": 92.5,
+    "opus_rate": 95.0,
+    "sonnet_samples": 20,
+    "opus_samples": 5
+  }
+}
+```
+
+Switches from Opus to Sonnet when Sonnet achieves 90%+ success rate with sufficient samples.
+
+### Memory Evolution
+
+Prunes stale failure patterns, strengthens confirmed ones, and promotes cross-repo patterns:
+
+```bash
+shipwright self-optimize evolve-memory
+```
+
+## Predictive Analytics
+
+The `sw-predictive.sh` module assesses pipeline risk and detects anomalies.
+
+### Pre-Pipeline Risk Assessment
+
+Analyzes issues before pipeline starts to identify high-risk work:
+
+```bash
+shipwright predict risk <issue_json>
+```
+
+Returns:
+
+```json
+{
+  "overall_risk": 72,
+  "failure_stages": [
+    {
+      "stage": "build",
+      "risk": 85,
+      "reason": "Complex refactor with many dependencies"
+    },
+    {
+      "stage": "test",
+      "risk": 65,
+      "reason": "Difficult to test concurrent changes"
+    }
+  ],
+  "preventative_actions": [
+    "Add integration tests first",
+    "Validate dependency impact"
+  ]
+}
+```
+
+### AI Patrol
+
+Replaces grep-based checks with AI analysis of sampled source files:
+
+```bash
+patrol_ai_analyze <sample_files> [git_log]
+```
+
+Analyzes code for high/critical security, performance, architecture, and testing issues.
+
+### Anomaly Detection
+
+Compares current pipeline metrics against baselines:
+
+```bash
+predict_detect_anomaly build test_duration 45.2
+```
+
+Returns: `normal`, `warning`, or `critical` based on deviation from historical baseline.
+
+### Preventative Injection
+
+Injects prevention context into stages based on memory patterns for similar work.
+
+## Adversarial Review
+
+The `sw-adversarial.sh` module adds a red-team code review pass.
+
+After the primary agent writes code, an adversarial agent tries to break it:
+
+```bash
+shipwright adversarial review <code_diff> [context]
+```
+
+Returns findings with severity (critical/high/medium/low) and exploit scenarios:
+
+```json
+[
+  {
+    "severity": "critical",
+    "category": "security",
+    "description": "SQL injection in query builder",
+    "location": "db.ts:145",
+    "exploit_scenario": "Pass malicious WHERE clause in user input"
+  }
+]
+```
+
+### Iterative Hardening
+
+Up to 3 rounds of find-and-fix. After adversarial review finds issues, the primary agent addresses them and the adversarial agent re-reviews:
+
+```bash
+shipwright adversarial iterate <primary_code> <findings_json> [round]
+```
+
+Use `ADVERSARIAL_MAX_ROUNDS` environment variable to control iteration count (default: 3).
+
+## Developer Simulation
+
+The `sw-developer-simulation.sh` module simulates reviewer personas before PR submission.
+
+Instead of waiting for human review, simulate three reviewer personas:
+
+```bash
+shipwright simulation review <pr_diff> [pr_description]
+```
+
+### Reviewer Personas
+
+1. **Security** — Focuses on authentication, injection risks, data exposure, privilege escalation
+2. **Performance** — Focuses on N+1 queries, allocations, caching, algorithmic complexity
+3. **Maintainability** — Focuses on code smells, test coverage, naming, coupling
+
+Each persona returns concerns with severity and specific suggestions.
+
+### Address Objections
+
+After simulated review, the agent addresses each concern:
+
+```bash
+shipwright simulation address <objections_json> [implementation_context]
+```
+
+Returns for each concern: `will_fix`, `wont_fix`, or `already_addressed`, with explanations.
+
+Use `SIMULATION_MAX_ROUNDS` environment variable (default: 3).
+
+## Architecture Enforcer
+
+The `sw-architecture-enforcer.sh` module validates changes against established architectural patterns.
+
+### Build Architecture Model
+
+Analyzes codebase structure and establishes the architectural model:
+
+```bash
+shipwright architecture build [repo_root]
+```
+
+Extracts:
+
+- **Layers** — Presentation, business, data, etc.
+- **Patterns** — MVC, provider, pipeline, middleware, etc.
+- **Conventions** — Naming, file organization, dependency direction
+- **Dependencies** — External libraries and their roles
+
+Model is stored per repo at `~/.shipwright/memory/<repo-hash>/architecture.json`.
+
+### Validate Changes
+
+Check if code changes respect the architectural model:
+
+```bash
+shipwright architecture validate <diff> [model_file]
+```
+
+Returns violations with severity, the pattern broken, and suggestions.
+
+### Evolve Model
+
+When legitimate architectural changes are made, update the model:
+
+```bash
+shipwright architecture evolve [model_file] <changes_summary>
+```
+
+The system decides if changes represent intentional evolution and updates the model accordingly.
+
+## CLI Commands
+
+### Intelligence
+
+```bash
+shipwright intelligence analyze <issue_json>          # Semantic issue analysis
+shipwright intelligence compose <analysis> [ctx] [$$] # Dynamic pipeline composition
+shipwright intelligence predict <analysis> [history]  # Cost and effort prediction
+shipwright intelligence synthesize <findings_json>    # Unify findings into strategy
+shipwright intelligence search-memory <context> [dir] # Ranked memory search
+shipwright intelligence recommend-model <stage> [cplx]# Model recommendation
+shipwright intelligence cache-stats                   # Show cache statistics
+shipwright intelligence cache-clear                   # Clear intelligence cache
+```
+
+### Self-Optimize
+
+```bash
+shipwright self-optimize analyze-outcome <state-file> # Record pipeline outcome
+shipwright self-optimize tune                        # Run full optimization
+shipwright self-optimize report                      # Show 7-day report
+shipwright self-optimize evolve-memory               # Evolve memory patterns
+```
+
+### Predict
+
+```bash
+shipwright predict risk <issue_json>                 # Pre-pipeline risk assessment
+shipwright predict anomaly <stage> <metric> <value>  # Detect metric anomaly
+```
+
+### Adversarial
+
+```bash
+shipwright adversarial review <diff> [context]       # Red-team code review
+shipwright adversarial iterate <code> <findings> [r] # Iterative hardening
+```
+
+### Simulation
+
+```bash
+shipwright simulation review <diff> [description]    # Multi-persona PR review
+shipwright simulation address <objections> [ctx]     # Address reviewer concerns
+```
+
+### Architecture
+
+```bash
+shipwright architecture build [repo_root]            # Build architecture model
+shipwright architecture validate <diff> [model]      # Validate against model
+shipwright architecture evolve <model> <changes>     # Evolve model
+```
+
+## Configuration Reference
+
+All intelligence settings go in `.claude/daemon-config.json` under `intelligence`:
+
+| Setting                | Default | Purpose                                              |
+| ---------------------- | ------- | ---------------------------------------------------- |
+| `enabled`              | `false` | Master switch for intelligence engine                |
+| `cache_ttl_seconds`    | `3600`  | How long analysis results are cached                 |
+| `composer_enabled`     | `false` | Enable dynamic pipeline composition                  |
+| `optimization_enabled` | `false` | Enable self-tuning based on DORA metrics             |
+| `prediction_enabled`   | `false` | Enable risk assessment and anomaly detection         |
+| `adversarial_enabled`  | `false` | Enable adversarial code review pass                  |
+| `simulation_enabled`   | `false` | Enable developer workflow simulation                 |
+| `architecture_enabled` | `false` | Enable architecture rule enforcement                 |
+| `ab_test_ratio`        | `0.1`   | Fraction of runs using composed pipelines (A/B test) |
+| `anomaly_threshold`    | `3.0`   | Standard deviations from baseline for anomaly alert  |
+
+## Performance Considerations
+
+### Caching
+
+Intelligence analysis results are cached to avoid repeated Claude calls. Cache TTL defaults to 1 hour but can be customized:
+
+- **Issue analysis** — Cached by title+body hash
+- **Pipeline composition** — Cached by analysis+budget hash
+- **Memory search** — Cached by context+directory hash
+- **Risk assessment** — Cached per-issue
+
+Clear cache with `shipwright intelligence cache-clear`.
+
+### Feature Flag Interactions
+
+Enable features in order of impact:
+
+1. **Phase 1:** `optimization_enabled: true` — Learn from every run (low cost)
+2. **Phase 2:** `prediction_enabled: true` — Risk assessment and anomaly detection
+3. **Phase 3:** `simulation_enabled: true` — Simulated PR review (adds time)
+4. **Phase 4:** `adversarial_enabled: true` — Red-team review (slower)
+5. **Advanced:** `architecture_enabled: true`, `composer_enabled: true`
+
+Starting with optimization and prediction gives immediate feedback without slowing pipelines significantly.
+
+### A/B Testing
+
+With `composer_enabled: true`, `ab_test_ratio` controls how often composed pipelines are used. Set to 0.1 (10%) initially to compare against standard templates before full rollout.
+
+## Monitoring Intelligence
+
+### View Cache Statistics
+
+```bash
+shipwright intelligence cache-stats
+```
+
+Shows cache hit rate and age of entries.
+
+### Review Optimization Report
+
+```bash
+shipwright self-optimize report
+```
+
+Shows last 7 days of metrics, template weights, model routing recommendations, and iteration model statistics.
+
+### Check Predictive Alerts
+
+Prediction findings are logged to `~/.shipwright/events.jsonl` with type `prediction.*`:
+
+```bash
+grep 'prediction' ~/.shipwright/events.jsonl | tail -20
+```
+
+### Architecture Model Status
+
+```bash
+cat ~/.shipwright/memory/<repo-hash>/architecture.json | jq .
+```
+
+## Troubleshooting
+
+### Intelligence Disabled or Unavailable
+
+Ensure `enabled: true` in daemon config and Claude CLI is available:
+
+```bash
+which claude
+claude --version
+```
+
+### Cache Stale or Growing
+
+Clear cache if analysis is outdated:
+
+```bash
+shipwright intelligence cache-clear
+```
+
+Monitor cache size — it grows as more unique issues are analyzed. Clear periodically if size exceeds 10MB.
+
+### Anomalies Not Detected
+
+Set baseline by running several pipelines, then enable anomaly detection. Threshold is configurable via `anomaly_threshold` (default: 3.0 standard deviations).
+
+### Architecture Violations Not Found
+
+First build the architecture model:
+
+```bash
+shipwright architecture build
+```
+
+Then validate changes. Model must exist for validation to work.
+
+## Next Steps
+
+See related guides for complementary features:
+
+- [Persistent Memory](/guides/memory/) — How the system learns from failures
+- [Cost Intelligence](/guides/cost/) — Token tracking and budget management
+- [Self-Optimization](/guides/cost/#continuous-optimization) — DORA-driven tuning
+- [Continuous Loop](/guides/loop/) — The autonomous development loop

@@ -67,6 +67,18 @@ var activityFilter = "all";
 var activityIssueFilter = "";
 var pipelineFilter = "all";
 var firstRender = true;
+var insightsCache = null;
+var selectedIssues = {};
+var alertsCache = null;
+var alertDismissed = false;
+var costBreakdownCache = null;
+var machinesCache = null;
+var joinTokensCache = null;
+var workerUpdateTimer = null;
+var removeMachineTarget = null;
+var teamCache = null;
+var teamActivityCache = null;
+var teamRefreshTimer = null;
 
 // ── WebSocket ───────────────────────────────────────────────────
 var wsUrl = "ws://" + location.host + "/ws";
@@ -101,6 +113,12 @@ function connect() {
       currentData = data;
       renderCostTicker(data);
       renderActiveTab();
+      renderAlertBanner();
+      updateEmergencyBrakeVisibility(data);
+      if (data.team && activeTab === "team") {
+        renderTeamGrid(data.team);
+        renderTeamStats(data.team);
+      }
       firstRender = false;
     } catch (err) {
       console.error("Failed to parse message:", err);
@@ -610,32 +628,24 @@ function setupTabs() {
 
   // Read initial hash
   var hash = location.hash.replace("#", "");
-  if (
-    [
-      "overview",
-      "agents",
-      "pipelines",
-      "timeline",
-      "activity",
-      "metrics",
-    ].indexOf(hash) !== -1
-  ) {
+  var validTabs = [
+    "overview",
+    "agents",
+    "pipelines",
+    "timeline",
+    "activity",
+    "metrics",
+    "machines",
+    "insights",
+    "team",
+  ];
+  if (validTabs.indexOf(hash) !== -1) {
     switchTab(hash);
   }
 
   window.addEventListener("hashchange", function () {
     var hash = location.hash.replace("#", "");
-    if (
-      [
-        "overview",
-        "agents",
-        "pipelines",
-        "timeline",
-        "activity",
-        "metrics",
-      ].indexOf(hash) !== -1 &&
-      hash !== activeTab
-    ) {
+    if (validTabs.indexOf(hash) !== -1 && hash !== activeTab) {
       switchTab(hash);
     }
   });
@@ -675,6 +685,22 @@ function switchTab(tab) {
   if (tab === "timeline") {
     fetchTimeline();
   }
+  if (tab === "insights") {
+    fetchInsightsData();
+  }
+  if (tab === "machines") {
+    fetchMachinesTab();
+  }
+  if (tab === "team") {
+    fetchTeamData();
+    if (teamRefreshTimer) clearInterval(teamRefreshTimer);
+    teamRefreshTimer = setInterval(fetchTeamData, 10000);
+  } else {
+    if (teamRefreshTimer) {
+      clearInterval(teamRefreshTimer);
+      teamRefreshTimer = null;
+    }
+  }
   if (currentData) {
     renderActiveTab();
   }
@@ -701,6 +727,21 @@ function renderActiveTab() {
       break;
     case "metrics":
       // Metrics use cached data; don't re-fetch on every WS push
+      break;
+    case "machines":
+      // Machines use cached data; don't re-fetch on every WS push
+      if (machinesCache) renderMachinesTab(machinesCache);
+      break;
+    case "insights":
+      // Insights use cached data; don't re-fetch on every WS push
+      if (insightsCache) renderInsightsTab(insightsCache);
+      break;
+    case "team":
+      // Team uses cached data; don't re-fetch on every WS push
+      if (teamCache) {
+        renderTeamGrid(teamCache);
+        renderTeamStats(teamCache);
+      }
       break;
   }
 }
@@ -872,8 +913,16 @@ function renderQueue(data) {
   var html = "";
   for (var i = 0; i < data.queue.length; i++) {
     var q = data.queue[i];
+    var costEst =
+      q.estimated_cost != null
+        ? ' <span class="queue-cost-est">~$' +
+          q.estimated_cost.toFixed(2) +
+          "</span>"
+        : "";
     html +=
-      '<div class="queue-row">' +
+      '<div class="queue-row" data-queue-idx="' +
+      i +
+      '">' +
       '<span class="queue-issue">#' +
       q.issue +
       "</span>" +
@@ -883,9 +932,64 @@ function renderQueue(data) {
       '<span class="queue-score">' +
       (q.score != null ? q.score : "\u2014") +
       "</span>" +
+      costEst +
       "</div>";
+    if (q.factors) {
+      html +=
+        '<div class="queue-scoring-detail" id="queue-detail-' +
+        i +
+        '" style="display:none">';
+      html += renderScoringFactors(q.factors);
+      html += "</div>";
+    }
   }
   container.innerHTML = html;
+
+  // Click handlers for expandable queue items
+  var rows = container.querySelectorAll(".queue-row");
+  for (var i = 0; i < rows.length; i++) {
+    rows[i].addEventListener("click", function () {
+      var idx = this.getAttribute("data-queue-idx");
+      var detail = document.getElementById("queue-detail-" + idx);
+      if (detail) {
+        detail.style.display = detail.style.display === "none" ? "" : "none";
+      }
+    });
+  }
+}
+
+function renderScoringFactors(factors) {
+  if (!factors) return "";
+  var keys = [
+    "complexity",
+    "impact",
+    "priority",
+    "age",
+    "dependency",
+    "memory",
+  ];
+  var html = '<div class="scoring-factors">';
+  for (var i = 0; i < keys.length; i++) {
+    var k = keys[i];
+    var val = factors[k] != null ? factors[k] : 0;
+    var pct = Math.max(0, Math.min(100, val));
+    html +=
+      '<div class="scoring-factor-row">' +
+      '<span class="scoring-factor-label">' +
+      escapeHtml(k) +
+      "</span>" +
+      '<div class="scoring-factor-track">' +
+      '<div class="scoring-factor-fill" style="width:' +
+      pct +
+      '%"></div>' +
+      "</div>" +
+      '<span class="scoring-factor-val">' +
+      pct +
+      "</span>" +
+      "</div>";
+  }
+  html += "</div>";
+  return html;
 }
 
 // ── Overview Activity Feed (compact, 10 items) ──────────────────
@@ -1092,7 +1196,7 @@ function renderPipelinesTab(data) {
 
   if (filtered.length === 0) {
     tbody.innerHTML =
-      '<tr><td colspan="6" class="empty-state"><p>No pipelines match filter</p></td></tr>';
+      '<tr><td colspan="7" class="empty-state"><p>No pipelines match filter</p></td></tr>';
     return;
   }
 
@@ -1100,12 +1204,18 @@ function renderPipelinesTab(data) {
   for (var i = 0; i < filtered.length; i++) {
     var r = filtered[i];
     var selectedClass = selectedPipelineIssue == r.issue ? " row-selected" : "";
+    var isChecked = selectedIssues[r.issue] ? " checked" : "";
     html +=
       '<tr class="pipeline-row' +
       selectedClass +
       '" data-issue="' +
       r.issue +
       '">' +
+      '<td class="col-checkbox"><input type="checkbox" class="pipeline-checkbox" data-issue="' +
+      r.issue +
+      '"' +
+      isChecked +
+      "></td>" +
       '<td class="col-issue">#' +
       r.issue +
       "</td>" +
@@ -1129,6 +1239,42 @@ function renderPipelinesTab(data) {
       "</tr>";
   }
   tbody.innerHTML = html;
+
+  // Checkbox handlers
+  var checkboxes = tbody.querySelectorAll(".pipeline-checkbox");
+  for (var i = 0; i < checkboxes.length; i++) {
+    checkboxes[i].addEventListener("change", function (e) {
+      e.stopPropagation();
+      var iss = this.getAttribute("data-issue");
+      if (this.checked) {
+        selectedIssues[iss] = true;
+      } else {
+        delete selectedIssues[iss];
+      }
+      updateBulkToolbar();
+    });
+    checkboxes[i].addEventListener("click", function (e) {
+      e.stopPropagation();
+    });
+  }
+
+  // Select-all checkbox
+  var selectAll = document.getElementById("select-all-pipelines");
+  if (selectAll) {
+    selectAll.addEventListener("change", function () {
+      var cbs = tbody.querySelectorAll(".pipeline-checkbox");
+      for (var j = 0; j < cbs.length; j++) {
+        cbs[j].checked = this.checked;
+        var iss = cbs[j].getAttribute("data-issue");
+        if (this.checked) {
+          selectedIssues[iss] = true;
+        } else {
+          delete selectedIssues[iss];
+        }
+      }
+      updateBulkToolbar();
+    });
+  }
 
   // Click handlers
   var trs = tbody.querySelectorAll(".pipeline-row");
@@ -1185,6 +1331,11 @@ function fetchPipelineDetail(issue) {
 function renderPipelineDetail(detail) {
   var body = document.getElementById("detail-panel-body");
   var html = "";
+  var issue = detail.issue || selectedPipelineIssue;
+
+  // GitHub status banner at top
+  html +=
+    '<div id="github-status-' + issue + '" class="github-status-banner"></div>';
 
   // SVG pipeline visualization at top of detail
   html +=
@@ -1194,9 +1345,17 @@ function renderPipelineDetail(detail) {
         return h.stage;
       }),
       stage: detail.stage,
-      status: "",
+      status: detail.status || "",
     }) +
     "</div>";
+
+  // Error highlight for failed stages
+  if (detail.status === "failed" || detail.error) {
+    html +=
+      '<div id="error-highlight-' +
+      issue +
+      '" class="error-highlight-box"></div>';
+  }
 
   // Stage timeline
   var history = detail.stageHistory || [];
@@ -1246,40 +1405,45 @@ function renderPipelineDetail(detail) {
   }
   html += "</div>";
 
-  // Plan
-  if (detail.plan) {
+  // Failure pattern match box
+  if (detail.failurePatterns && detail.failurePatterns.length > 0) {
     html +=
-      '<div class="detail-section">' +
-      '<div class="detail-section-label">PLAN</div>' +
-      '<div class="detail-plan-content">' +
-      escapeHtml(detail.plan) +
-      "</div>" +
-      "</div>";
+      '<div class="detail-section pattern-match-box">' +
+      '<div class="detail-section-label">MATCHED FAILURE PATTERNS</div>';
+    for (var fp = 0; fp < detail.failurePatterns.length; fp++) {
+      var pat = detail.failurePatterns[fp];
+      html +=
+        '<div class="pattern-match-item">' +
+        '<span class="pattern-match-desc">' +
+        escapeHtml(pat.description || pat.pattern || "") +
+        "</span>" +
+        (pat.fix
+          ? '<span class="pattern-match-fix">Fix: ' +
+            escapeHtml(pat.fix) +
+            "</span>"
+          : "") +
+        "</div>";
+    }
+    html += "</div>";
   }
 
-  // Design
-  if (detail.design) {
-    html +=
-      '<div class="detail-section">' +
-      '<div class="detail-section-label">DESIGN</div>' +
-      '<div class="detail-plan-content">' +
-      escapeHtml(detail.design) +
-      "</div>" +
-      "</div>";
-  }
-
-  // Definition of Done
-  if (detail.dod) {
-    html +=
-      '<div class="detail-section">' +
-      '<div class="detail-section-label">DEFINITION OF DONE</div>' +
-      '<div class="detail-plan-content">' +
-      escapeHtml(detail.dod) +
-      "</div>" +
-      "</div>";
-  }
+  // Artifact viewer tabs (replaces static plan/design/dod)
+  html += renderArtifactViewer(issue, detail);
 
   body.innerHTML = html;
+
+  // Async: fetch GitHub status
+  if (issue) {
+    renderGitHubStatus(issue);
+  }
+
+  // Async: fetch error highlight for failed pipelines
+  if (issue && (detail.status === "failed" || detail.error)) {
+    renderErrorHighlight(issue);
+  }
+
+  // Setup artifact tab clicks
+  setupArtifactTabs(issue);
 }
 
 function closePipelineDetail() {
@@ -1547,6 +1711,40 @@ function renderMetrics(data) {
     doraContainer.style.display = "";
   } else if (doraContainer) {
     doraContainer.style.display = "none";
+  }
+
+  // Phase 2: Cost breakdown and trend
+  var costBreakdownEl = document.getElementById("cost-breakdown-container");
+  if (costBreakdownEl) {
+    renderCostBreakdown();
+  }
+  var costTrendEl = document.getElementById("cost-trend-container");
+  if (costTrendEl) {
+    renderCostTrend();
+  }
+
+  // Phase 2: DORA trend sparklines
+  var doraTrendEl = document.getElementById("dora-trend-container");
+  if (doraTrendEl) {
+    renderDoraTrend();
+  }
+
+  // Phase 4: Stage performance, bottleneck, throughput, capacity
+  var stagePerfEl = document.getElementById("stage-performance-container");
+  if (stagePerfEl) {
+    renderStagePerformance();
+  }
+  var bottleneckEl = document.getElementById("bottleneck-alert-container");
+  if (bottleneckEl) {
+    renderBottleneckAlert();
+  }
+  var throughputEl = document.getElementById("throughput-trend-container");
+  if (throughputEl) {
+    renderThroughputTrend();
+  }
+  var capacityEl = document.getElementById("capacity-forecast-container");
+  if (capacityEl) {
+    renderCapacityForecast();
   }
 }
 
@@ -1944,6 +2142,518 @@ function renderMachines(data) {
   grid.innerHTML = html;
 }
 
+// ── Machines Tab Functions ────────────────────────────────────────
+
+function fetchMachinesTab() {
+  fetch("/api/machines")
+    .then(function (r) {
+      return r.json();
+    })
+    .then(function (data) {
+      machinesCache = data;
+      renderMachinesTab(data);
+    })
+    .catch(function (err) {
+      console.error("Failed to fetch machines:", err);
+    });
+  fetchJoinTokens();
+}
+
+function fetchJoinTokens() {
+  fetch("/api/join-tokens")
+    .then(function (r) {
+      return r.json();
+    })
+    .then(function (data) {
+      joinTokensCache = data;
+      renderJoinTokens(data || []);
+    })
+    .catch(function () {
+      /* ignore */
+    });
+}
+
+function renderMachinesTab(machines) {
+  var summaryEl = document.getElementById("machines-summary");
+  var gridEl = document.getElementById("machines-tab-grid");
+  if (!summaryEl || !gridEl) return;
+
+  if (!machines || machines.length === 0) {
+    summaryEl.innerHTML = "";
+    gridEl.innerHTML =
+      '<div class="empty-state"><p>No machines registered. Click <strong>+ Add Machine</strong> to get started.</p></div>';
+    return;
+  }
+
+  summaryEl.innerHTML = renderMachineSummary(machines);
+
+  var cardsHtml = "";
+  for (var i = 0; i < machines.length; i++) {
+    cardsHtml += renderMachineCard(machines[i]);
+  }
+  gridEl.innerHTML = cardsHtml;
+}
+
+function renderMachineSummary(machines) {
+  var totalMachines = machines.length;
+  var totalMaxWorkers = 0;
+  var totalActiveWorkers = 0;
+  var onlineCount = 0;
+  for (var i = 0; i < machines.length; i++) {
+    totalMaxWorkers += machines[i].max_workers || 0;
+    totalActiveWorkers += machines[i].active_workers || 0;
+    if (machines[i].status === "online") onlineCount++;
+  }
+
+  return (
+    '<div class="machines-summary-card">' +
+    '<div class="stat-value">' +
+    totalMachines +
+    "</div>" +
+    '<div class="stat-label">Total Machines</div>' +
+    "</div>" +
+    '<div class="machines-summary-card">' +
+    '<div class="stat-value">' +
+    onlineCount +
+    "</div>" +
+    '<div class="stat-label">Online</div>' +
+    "</div>" +
+    '<div class="machines-summary-card">' +
+    '<div class="stat-value">' +
+    totalActiveWorkers +
+    " / " +
+    totalMaxWorkers +
+    "</div>" +
+    '<div class="stat-label">Active / Max Workers</div>' +
+    "</div>"
+  );
+}
+
+function renderMachineCard(machine) {
+  var name = machine.name || "";
+  var host = machine.host || "\u2014";
+  var role = machine.role || "worker";
+  var status = machine.status || "offline";
+  var maxWorkers = machine.max_workers || 4;
+  var activeWorkers = machine.active_workers || 0;
+  var health = machine.health || {};
+  var daemonRunning = health.daemon_running || false;
+  var heartbeatCount = health.heartbeat_count || 0;
+  var lastHbAge = health.last_heartbeat_s_ago;
+  var lastHbText = "\u2014";
+  if (typeof lastHbAge === "number" && lastHbAge < 9999) {
+    if (lastHbAge < 60) lastHbText = lastHbAge + "s ago";
+    else if (lastHbAge < 3600)
+      lastHbText = Math.floor(lastHbAge / 60) + "m ago";
+    else lastHbText = Math.floor(lastHbAge / 3600) + "h ago";
+  }
+
+  return (
+    '<div class="machine-card" id="machine-card-' +
+    escapeHtml(name) +
+    '">' +
+    '<div class="machine-card-header">' +
+    '<span class="presence-dot ' +
+    status +
+    '"></span>' +
+    '<span class="machine-name">' +
+    escapeHtml(name) +
+    "</span>" +
+    '<span class="machine-role">' +
+    escapeHtml(role) +
+    "</span>" +
+    "</div>" +
+    '<div class="machine-host">' +
+    escapeHtml(host) +
+    "</div>" +
+    '<div class="machine-workers-section">' +
+    '<div class="machine-workers-label-row">' +
+    "<span>Workers</span>" +
+    '<span class="workers-count">' +
+    activeWorkers +
+    " / " +
+    maxWorkers +
+    "</span>" +
+    "</div>" +
+    '<input type="range" class="workers-slider" min="1" max="64" value="' +
+    maxWorkers +
+    '"' +
+    " oninput=\"updateWorkerCount('" +
+    escapeHtml(name) +
+    "', this.value)\"" +
+    ' title="Max workers" />' +
+    "</div>" +
+    '<div class="machine-health">' +
+    '<div class="machine-health-row">' +
+    '<span class="health-label">Daemon</span>' +
+    '<span class="health-status ' +
+    (daemonRunning ? "running" : "stopped") +
+    '">' +
+    (daemonRunning ? "Running" : "Stopped") +
+    "</span>" +
+    "</div>" +
+    '<div class="machine-health-row">' +
+    '<span class="health-label">Heartbeats</span>' +
+    '<span class="health-value">' +
+    heartbeatCount +
+    "</span>" +
+    "</div>" +
+    '<div class="machine-health-row">' +
+    '<span class="health-label">Last heartbeat</span>' +
+    '<span class="health-value">' +
+    lastHbText +
+    "</span>" +
+    "</div>" +
+    "</div>" +
+    '<div class="machine-card-actions">' +
+    '<button class="machine-action-btn" onclick="machineHealthCheck(\'' +
+    escapeHtml(name) +
+    "')\">Check</button>" +
+    '<button class="machine-action-btn danger" onclick="confirmMachineRemove(\'' +
+    escapeHtml(name) +
+    "')\">Remove</button>" +
+    "</div>" +
+    "</div>"
+  );
+}
+
+function renderJoinTokens(tokens) {
+  var section = document.getElementById("join-tokens-section");
+  var list = document.getElementById("join-tokens-list");
+  if (!section || !list) return;
+
+  if (!tokens || tokens.length === 0) {
+    section.style.display = "none";
+    return;
+  }
+
+  section.style.display = "";
+  var html = "";
+  for (var i = 0; i < tokens.length; i++) {
+    var t = tokens[i];
+    var label = t.label || "Unlabeled";
+    var created = t.created_at
+      ? new Date(t.created_at).toLocaleDateString()
+      : "\u2014";
+    var used = t.used ? "Claimed" : "Active";
+    var usedClass = t.used ? "c-amber" : "c-green";
+    html +=
+      '<div class="join-token-row">' +
+      '<span class="join-token-label">' +
+      escapeHtml(label) +
+      "</span>" +
+      '<span class="join-token-created">' +
+      created +
+      "</span>" +
+      '<span class="join-token-status ' +
+      usedClass +
+      '">' +
+      used +
+      "</span>" +
+      "</div>";
+  }
+  list.innerHTML = html;
+}
+
+function openAddMachineModal() {
+  document.getElementById("add-machine-modal").style.display = "flex";
+  document.getElementById("machine-name").value = "";
+  document.getElementById("machine-host").value = "";
+  document.getElementById("machine-ssh-user").value = "";
+  document.getElementById("machine-path").value = "";
+  document.getElementById("machine-workers").value = "4";
+  document.getElementById("machine-role").value = "worker";
+  document.getElementById("machine-modal-error").style.display = "none";
+}
+
+function closeAddMachineModal() {
+  document.getElementById("add-machine-modal").style.display = "none";
+}
+
+function submitAddMachine() {
+  var name = document.getElementById("machine-name").value.trim();
+  var host = document.getElementById("machine-host").value.trim();
+  var sshUser = document.getElementById("machine-ssh-user").value.trim();
+  var swPath = document.getElementById("machine-path").value.trim();
+  var maxWorkers =
+    parseInt(document.getElementById("machine-workers").value, 10) || 4;
+  var role = document.getElementById("machine-role").value;
+  var errEl = document.getElementById("machine-modal-error");
+
+  if (!name || !host) {
+    errEl.textContent = "Name and host are required";
+    errEl.style.display = "";
+    return;
+  }
+
+  var body = { name: name, host: host, role: role, max_workers: maxWorkers };
+  if (sshUser) body.ssh_user = sshUser;
+  if (swPath) body.shipwright_path = swPath;
+
+  fetch("/api/machines", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  })
+    .then(function (r) {
+      if (!r.ok)
+        return r.json().then(function (d) {
+          throw new Error(d.error || "Failed");
+        });
+      return r.json();
+    })
+    .then(function () {
+      closeAddMachineModal();
+      fetchMachinesTab();
+    })
+    .catch(function (err) {
+      errEl.textContent = err.message || "Failed to register machine";
+      errEl.style.display = "";
+    });
+}
+
+function updateWorkerCount(name, value) {
+  if (workerUpdateTimer) clearTimeout(workerUpdateTimer);
+  workerUpdateTimer = setTimeout(function () {
+    fetch("/api/machines/" + encodeURIComponent(name), {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ max_workers: parseInt(value, 10) }),
+    })
+      .then(function (r) {
+        return r.json();
+      })
+      .then(function (updated) {
+        // Update the count display in the card
+        var card = document.getElementById("machine-card-" + name);
+        if (card) {
+          var countEl = card.querySelector(".workers-count");
+          if (countEl) {
+            countEl.textContent =
+              (updated.active_workers || 0) +
+              " / " +
+              (updated.max_workers || value);
+          }
+        }
+      })
+      .catch(function (err) {
+        console.error("Worker update failed:", err);
+      });
+  }, 500);
+}
+
+function machineHealthCheck(name) {
+  var card = document.getElementById("machine-card-" + name);
+  if (card) {
+    var checkBtn = card.querySelector(".machine-action-btn");
+    if (checkBtn) {
+      checkBtn.textContent = "Checking\u2026";
+      checkBtn.disabled = true;
+    }
+  }
+
+  fetch("/api/machines/" + encodeURIComponent(name) + "/health-check", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+  })
+    .then(function (r) {
+      return r.json();
+    })
+    .then(function (result) {
+      if (result.machine && card) {
+        var m = result.machine;
+        var health = m.health || {};
+        var daemonRunning = health.daemon_running || false;
+        var heartbeatCount = health.heartbeat_count || 0;
+        var lastHbAge = health.last_heartbeat_s_ago;
+        var lastHbText = "\u2014";
+        if (typeof lastHbAge === "number" && lastHbAge < 9999) {
+          if (lastHbAge < 60) lastHbText = lastHbAge + "s ago";
+          else if (lastHbAge < 3600)
+            lastHbText = Math.floor(lastHbAge / 60) + "m ago";
+          else lastHbText = Math.floor(lastHbAge / 3600) + "h ago";
+        }
+
+        var healthRows = card.querySelectorAll(".machine-health-row");
+        if (healthRows.length >= 3) {
+          healthRows[0].querySelector(".health-status").className =
+            "health-status " + (daemonRunning ? "running" : "stopped");
+          healthRows[0].querySelector(".health-status").textContent =
+            daemonRunning ? "Running" : "Stopped";
+          healthRows[1].querySelector(".health-value").textContent =
+            heartbeatCount;
+          healthRows[2].querySelector(".health-value").textContent = lastHbText;
+        }
+
+        // Update presence dot
+        var dot = card.querySelector(".presence-dot");
+        if (dot) {
+          dot.className = "presence-dot " + (m.status || "offline");
+        }
+      }
+      // Reset button
+      if (card) {
+        var btn = card.querySelector(".machine-action-btn");
+        if (btn) {
+          btn.textContent = "Check";
+          btn.disabled = false;
+        }
+      }
+    })
+    .catch(function (err) {
+      console.error("Health check failed:", err);
+      if (card) {
+        var btn = card.querySelector(".machine-action-btn");
+        if (btn) {
+          btn.textContent = "Check";
+          btn.disabled = false;
+        }
+      }
+    });
+}
+
+function confirmMachineRemove(name) {
+  removeMachineTarget = name;
+  document.getElementById("remove-machine-name").textContent = name;
+  document.getElementById("remove-stop-daemon").checked = false;
+  document.getElementById("remove-machine-modal").style.display = "flex";
+}
+
+function executeRemoveMachine() {
+  if (!removeMachineTarget) return;
+  var name = removeMachineTarget;
+
+  fetch("/api/machines/" + encodeURIComponent(name), {
+    method: "DELETE",
+    headers: { "Content-Type": "application/json" },
+  })
+    .then(function (r) {
+      if (!r.ok)
+        return r.json().then(function (d) {
+          throw new Error(d.error || "Failed");
+        });
+      return r.json();
+    })
+    .then(function () {
+      document.getElementById("remove-machine-modal").style.display = "none";
+      removeMachineTarget = null;
+      fetchMachinesTab();
+    })
+    .catch(function (err) {
+      console.error("Remove machine failed:", err);
+      document.getElementById("remove-machine-modal").style.display = "none";
+      removeMachineTarget = null;
+    });
+}
+
+function openJoinLinkModal() {
+  document.getElementById("join-link-modal").style.display = "flex";
+  document.getElementById("join-label").value = "";
+  document.getElementById("join-workers").value = "4";
+  document.getElementById("join-command-display").style.display = "none";
+  document.getElementById("join-command-text").textContent = "";
+}
+
+function closeJoinLinkModal() {
+  document.getElementById("join-link-modal").style.display = "none";
+}
+
+function generateJoinLink() {
+  var label = document.getElementById("join-label").value.trim();
+  var maxWorkers =
+    parseInt(document.getElementById("join-workers").value, 10) || 4;
+  var generateBtn = document.getElementById("join-modal-generate");
+  generateBtn.textContent = "Generating\u2026";
+  generateBtn.disabled = true;
+
+  fetch("/api/join-token", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ label: label, max_workers: maxWorkers }),
+  })
+    .then(function (r) {
+      return r.json();
+    })
+    .then(function (data) {
+      document.getElementById("join-command-text").textContent =
+        data.join_cmd || "";
+      document.getElementById("join-command-display").style.display = "";
+      generateBtn.textContent = "Generate";
+      generateBtn.disabled = false;
+      // Refresh token list
+      fetchJoinTokens();
+    })
+    .catch(function (err) {
+      console.error("Generate join link failed:", err);
+      generateBtn.textContent = "Generate";
+      generateBtn.disabled = false;
+    });
+}
+
+function copyJoinCommand() {
+  var text = document.getElementById("join-command-text").textContent;
+  if (text && navigator.clipboard) {
+    navigator.clipboard.writeText(text).then(function () {
+      var btn = document.getElementById("join-copy-btn");
+      btn.textContent = "Copied!";
+      setTimeout(function () {
+        btn.textContent = "Copy";
+      }, 2000);
+    });
+  }
+}
+
+function setupMachinesTab() {
+  var addBtn = document.getElementById("btn-add-machine");
+  if (addBtn) addBtn.addEventListener("click", openAddMachineModal);
+
+  var joinBtn = document.getElementById("btn-join-link");
+  if (joinBtn) joinBtn.addEventListener("click", openJoinLinkModal);
+
+  var machineModalClose = document.getElementById("machine-modal-close");
+  if (machineModalClose)
+    machineModalClose.addEventListener("click", closeAddMachineModal);
+
+  var machineModalCancel = document.getElementById("machine-modal-cancel");
+  if (machineModalCancel)
+    machineModalCancel.addEventListener("click", closeAddMachineModal);
+
+  var machineModalSubmit = document.getElementById("machine-modal-submit");
+  if (machineModalSubmit)
+    machineModalSubmit.addEventListener("click", submitAddMachine);
+
+  var joinModalClose = document.getElementById("join-modal-close");
+  if (joinModalClose)
+    joinModalClose.addEventListener("click", closeJoinLinkModal);
+
+  var joinModalCancel = document.getElementById("join-modal-cancel");
+  if (joinModalCancel)
+    joinModalCancel.addEventListener("click", closeJoinLinkModal);
+
+  var joinModalGenerate = document.getElementById("join-modal-generate");
+  if (joinModalGenerate)
+    joinModalGenerate.addEventListener("click", generateJoinLink);
+
+  var joinCopyBtn = document.getElementById("join-copy-btn");
+  if (joinCopyBtn) joinCopyBtn.addEventListener("click", copyJoinCommand);
+
+  var removeModalClose = document.getElementById("remove-modal-close");
+  if (removeModalClose)
+    removeModalClose.addEventListener("click", function () {
+      document.getElementById("remove-machine-modal").style.display = "none";
+    });
+
+  var removeModalCancel = document.getElementById("remove-modal-cancel");
+  if (removeModalCancel)
+    removeModalCancel.addEventListener("click", function () {
+      document.getElementById("remove-machine-modal").style.display = "none";
+    });
+
+  var removeModalConfirm = document.getElementById("remove-modal-confirm");
+  if (removeModalConfirm)
+    removeModalConfirm.addEventListener("click", executeRemoveMachine);
+}
+
 // ══════════════════════════════════════════════════════════════════
 // INTERVENTION HANDLERS
 // ══════════════════════════════════════════════════════════════════
@@ -2020,6 +2730,1379 @@ function setupInterventionModal() {
 }
 
 // ══════════════════════════════════════════════════════════════════
+// PHASE 1: ARTIFACT VIEWER, GITHUB STATUS, LOG VIEWER, ERROR HIGHLIGHT
+// ══════════════════════════════════════════════════════════════════
+
+function renderArtifactViewer(issue, detail) {
+  var tabs = [
+    { key: "plan", label: "Plan", content: detail.plan },
+    { key: "design", label: "Design", content: detail.design },
+    { key: "dod", label: "DoD", content: detail.dod },
+    { key: "tests", label: "Tests", content: null },
+    { key: "review", label: "Review", content: null },
+    { key: "logs", label: "Logs", content: null },
+  ];
+
+  var html = '<div class="artifact-viewer">';
+  html += '<div class="artifact-tabs">';
+  for (var i = 0; i < tabs.length; i++) {
+    var activeClass = i === 0 ? " active" : "";
+    html +=
+      '<button class="artifact-tab-btn' +
+      activeClass +
+      '" data-artifact="' +
+      tabs[i].key +
+      '" data-issue="' +
+      issue +
+      '">' +
+      escapeHtml(tabs[i].label) +
+      "</button>";
+  }
+  html += "</div>";
+
+  html += '<div class="artifact-content" id="artifact-content-' + issue + '">';
+  // Show plan by default if available
+  if (detail.plan) {
+    html +=
+      '<div class="detail-plan-content">' +
+      formatMarkdown(detail.plan) +
+      "</div>";
+  } else {
+    html += '<div class="empty-state"><p>No plan data</p></div>';
+  }
+  html += "</div>";
+  html += "</div>";
+  return html;
+}
+
+function setupArtifactTabs(issue) {
+  var btns = document.querySelectorAll(
+    '.artifact-tab-btn[data-issue="' + issue + '"]',
+  );
+  for (var i = 0; i < btns.length; i++) {
+    btns[i].addEventListener("click", function () {
+      var artifact = this.getAttribute("data-artifact");
+      var iss = this.getAttribute("data-issue");
+      var siblings = document.querySelectorAll(
+        '.artifact-tab-btn[data-issue="' + iss + '"]',
+      );
+      for (var j = 0; j < siblings.length; j++) {
+        siblings[j].classList.remove("active");
+      }
+      this.classList.add("active");
+      fetchArtifact(iss, artifact);
+    });
+  }
+}
+
+function fetchArtifact(issue, type) {
+  var container = document.getElementById("artifact-content-" + issue);
+  if (!container) return;
+  container.innerHTML = '<div class="empty-state"><p>Loading...</p></div>';
+
+  // Check if we have inline data from detail
+  if (pipelineDetail) {
+    if (type === "plan" && pipelineDetail.plan) {
+      container.innerHTML =
+        '<div class="detail-plan-content">' +
+        formatMarkdown(pipelineDetail.plan) +
+        "</div>";
+      return;
+    }
+    if (type === "design" && pipelineDetail.design) {
+      container.innerHTML =
+        '<div class="detail-plan-content">' +
+        formatMarkdown(pipelineDetail.design) +
+        "</div>";
+      return;
+    }
+    if (type === "dod" && pipelineDetail.dod) {
+      container.innerHTML =
+        '<div class="detail-plan-content">' +
+        formatMarkdown(pipelineDetail.dod) +
+        "</div>";
+      return;
+    }
+  }
+
+  fetch(
+    "/api/artifacts/" +
+      encodeURIComponent(issue) +
+      "/" +
+      encodeURIComponent(type),
+  )
+    .then(function (r) {
+      if (!r.ok) throw new Error("HTTP " + r.status);
+      return r.json();
+    })
+    .then(function (data) {
+      if (type === "logs") {
+        container.innerHTML = renderLogViewer(data.content || "");
+      } else {
+        container.innerHTML =
+          '<div class="detail-plan-content">' +
+          formatMarkdown(data.content || "") +
+          "</div>";
+      }
+    })
+    .catch(function (err) {
+      container.innerHTML =
+        '<div class="empty-state"><p>Not available: ' +
+        escapeHtml(String(err)) +
+        "</p></div>";
+    });
+}
+
+function formatMarkdown(text) {
+  if (!text) return "";
+  var escaped = escapeHtml(text);
+  // Headers → bold
+  escaped = escaped.replace(/^#{1,3}\s+(.+)$/gm, function (_m, content) {
+    return "<strong>" + content + "</strong>";
+  });
+  // Code blocks → monospace
+  escaped = escaped.replace(/```[\s\S]*?```/g, function (block) {
+    var inner = block.replace(/^```\w*\n?/, "").replace(/\n?```$/, "");
+    return '<pre class="artifact-code">' + inner + "</pre>";
+  });
+  // Inline code
+  escaped = escaped.replace(/`([^`]+)`/g, "<code>$1</code>");
+  // Bullet lists
+  escaped = escaped.replace(/^[-*]\s+(.+)$/gm, "<li>$1</li>");
+  // Line breaks
+  escaped = escaped.replace(/\n/g, "<br>");
+  return escaped;
+}
+
+function renderGitHubStatus(issue) {
+  var container = document.getElementById("github-status-" + issue);
+  if (!container) return;
+
+  fetch("/api/github/" + encodeURIComponent(issue))
+    .then(function (r) {
+      if (!r.ok) throw new Error("HTTP " + r.status);
+      return r.json();
+    })
+    .then(function (data) {
+      if (!data.configured) {
+        container.innerHTML = "";
+        return;
+      }
+      var html = '<div class="github-banner">';
+      // Issue state badge
+      if (data.issue_state) {
+        html +=
+          '<span class="github-badge ' +
+          escapeHtml(data.issue_state) +
+          '">' +
+          escapeHtml(data.issue_state) +
+          "</span>";
+      }
+      // PR link
+      if (data.pr_number) {
+        html +=
+          '<a class="github-link" href="' +
+          escapeHtml(data.pr_url || "") +
+          '" target="_blank">PR #' +
+          data.pr_number +
+          "</a>";
+      }
+      // CI checks
+      if (data.checks && data.checks.length > 0) {
+        html += '<span class="github-checks">';
+        for (var c = 0; c < data.checks.length; c++) {
+          var check = data.checks[c];
+          var icon =
+            check.status === "success"
+              ? "\u2713"
+              : check.status === "failure"
+                ? "\u2717"
+                : "\u25CF";
+          var cls =
+            check.status === "success"
+              ? "github-badge success"
+              : check.status === "failure"
+                ? "github-badge failure"
+                : "github-badge pending";
+          html +=
+            '<span class="' +
+            cls +
+            '" title="' +
+            escapeHtml(check.name || "") +
+            '">' +
+            icon +
+            "</span>";
+        }
+        html += "</span>";
+      }
+      html += "</div>";
+      container.innerHTML = html;
+    })
+    .catch(function () {
+      container.innerHTML = "";
+    });
+}
+
+function renderLogViewer(content) {
+  if (!content)
+    return '<div class="empty-state"><p>No logs available</p></div>';
+  // Strip ANSI escape codes
+  var clean = content.replace(/\x1b\[[0-9;]*m/g, "");
+  var lines = clean.split("\n");
+  var html = '<div class="log-viewer">';
+  for (var i = 0; i < lines.length; i++) {
+    var lineNum = i + 1;
+    var lineClass = "";
+    var lower = lines[i].toLowerCase();
+    if (lower.indexOf("error") !== -1 || lower.indexOf("fail") !== -1) {
+      lineClass = " log-line-error";
+    }
+    html +=
+      '<div class="log-line' +
+      lineClass +
+      '">' +
+      '<span class="log-line-num">' +
+      lineNum +
+      "</span>" +
+      '<span class="log-line-text">' +
+      escapeHtml(lines[i]) +
+      "</span>" +
+      "</div>";
+  }
+  html += "</div>";
+  return html;
+}
+
+function renderErrorHighlight(issue) {
+  var container = document.getElementById("error-highlight-" + issue);
+  if (!container) return;
+
+  fetch("/api/logs/" + encodeURIComponent(issue))
+    .then(function (r) {
+      if (!r.ok) throw new Error("HTTP " + r.status);
+      return r.json();
+    })
+    .then(function (data) {
+      var content = data.content || "";
+      var lines = content.split("\n");
+      var errorLines = [];
+      for (var i = 0; i < lines.length; i++) {
+        var lower = lines[i].toLowerCase();
+        if (lower.indexOf("error") !== -1 || lower.indexOf("fail") !== -1) {
+          errorLines.push(lines[i]);
+        }
+      }
+      if (errorLines.length === 0) {
+        container.innerHTML = "";
+        return;
+      }
+      // Show last error
+      var lastError = errorLines[errorLines.length - 1];
+      container.innerHTML =
+        '<div class="error-highlight">' +
+        '<span class="error-highlight-title">LAST ERROR</span>' +
+        '<pre class="error-highlight-content">' +
+        escapeHtml(lastError) +
+        "</pre>" +
+        "</div>";
+    })
+    .catch(function () {
+      container.innerHTML = "";
+    });
+}
+
+// ══════════════════════════════════════════════════════════════════
+// PHASE 2: QUEUE DETAILED, COST BREAKDOWN, COST TREND, DORA TREND
+// ══════════════════════════════════════════════════════════════════
+
+function renderQueueDetailed() {
+  var container = document.getElementById("queue-detailed-container");
+  if (!container) return;
+
+  fetch("/api/queue/detailed")
+    .then(function (r) {
+      if (!r.ok) throw new Error("HTTP " + r.status);
+      return r.json();
+    })
+    .then(function (data) {
+      var items = data.items || data.queue || [];
+      if (items.length === 0) {
+        container.innerHTML =
+          '<div class="empty-state"><p>Queue empty</p></div>';
+        return;
+      }
+      var html = "";
+      for (var i = 0; i < items.length; i++) {
+        var q = items[i];
+        var costEst =
+          q.estimated_cost != null
+            ? "$" + q.estimated_cost.toFixed(2)
+            : "\u2014";
+        html +=
+          '<div class="queue-detailed-row" data-idx="' +
+          i +
+          '">' +
+          '<div class="queue-detailed-header">' +
+          '<span class="queue-issue">#' +
+          q.issue +
+          "</span>" +
+          '<span class="queue-title-text">' +
+          escapeHtml(q.title || "") +
+          "</span>" +
+          '<span class="queue-score">' +
+          (q.score != null ? q.score : "\u2014") +
+          "</span>" +
+          '<span class="queue-cost-est">' +
+          costEst +
+          "</span>" +
+          "</div>" +
+          '<div class="queue-detailed-body" id="queue-detailed-body-' +
+          i +
+          '" style="display:none">';
+        if (q.factors) {
+          html += renderScoringFactors(q.factors);
+        }
+        html += "</div></div>";
+      }
+      container.innerHTML = html;
+
+      // Expand/collapse handlers
+      var rows = container.querySelectorAll(".queue-detailed-row");
+      for (var i = 0; i < rows.length; i++) {
+        rows[i]
+          .querySelector(".queue-detailed-header")
+          .addEventListener("click", function () {
+            var idx = this.parentNode.getAttribute("data-idx");
+            var body = document.getElementById("queue-detailed-body-" + idx);
+            if (body) {
+              body.style.display = body.style.display === "none" ? "" : "none";
+            }
+          });
+      }
+    })
+    .catch(function (err) {
+      container.innerHTML =
+        '<div class="empty-state"><p>Failed to load: ' +
+        escapeHtml(String(err)) +
+        "</p></div>";
+    });
+}
+
+function renderCostBreakdown() {
+  var container = document.getElementById("cost-breakdown-container");
+  if (!container) return;
+
+  fetch("/api/costs/breakdown?period=7")
+    .then(function (r) {
+      if (!r.ok) throw new Error("HTTP " + r.status);
+      return r.json();
+    })
+    .then(function (data) {
+      costBreakdownCache = data;
+      var html = "";
+
+      // Cost by model
+      if (data.by_model) {
+        html +=
+          '<div class="cost-section"><div class="cost-section-label">COST BY MODEL</div>';
+        var modelColors = {
+          opus: "#7c3aed",
+          sonnet: "#00d4ff",
+          haiku: "#4ade80",
+        };
+        var models = Object.keys(data.by_model);
+        var maxModel = 0;
+        for (var i = 0; i < models.length; i++) {
+          if (data.by_model[models[i]] > maxModel)
+            maxModel = data.by_model[models[i]];
+        }
+        if (maxModel === 0) maxModel = 1;
+        for (var i = 0; i < models.length; i++) {
+          var m = models[i];
+          var val = data.by_model[m];
+          var pct = (val / maxModel) * 100;
+          var color = modelColors[m.toLowerCase()] || "#5a6d8a";
+          html +=
+            '<div class="cost-bar-row">' +
+            '<span class="cost-bar-label">' +
+            escapeHtml(m) +
+            "</span>" +
+            '<div class="cost-bar-track-h">' +
+            '<div class="cost-bar-fill-h" style="width:' +
+            pct +
+            "%;background:" +
+            color +
+            '"></div>' +
+            "</div>" +
+            '<span class="cost-bar-value">$' +
+            val.toFixed(2) +
+            "</span>" +
+            "</div>";
+        }
+        html += "</div>";
+      }
+
+      // Cost by stage
+      if (data.by_stage) {
+        html +=
+          '<div class="cost-section"><div class="cost-section-label">COST BY STAGE</div>';
+        var stages = Object.keys(data.by_stage);
+        var maxStage = 0;
+        for (var i = 0; i < stages.length; i++) {
+          if (data.by_stage[stages[i]] > maxStage)
+            maxStage = data.by_stage[stages[i]];
+        }
+        if (maxStage === 0) maxStage = 1;
+        for (var i = 0; i < stages.length; i++) {
+          var s = stages[i];
+          var val = data.by_stage[s];
+          var pct = (val / maxStage) * 100;
+          var colorIdx = STAGES.indexOf(s);
+          var barColor = colorIdx >= 0 ? STAGE_HEX[s] || "#5a6d8a" : "#5a6d8a";
+          html +=
+            '<div class="cost-bar-row">' +
+            '<span class="cost-bar-label">' +
+            escapeHtml(s) +
+            "</span>" +
+            '<div class="cost-bar-track-h">' +
+            '<div class="cost-bar-fill-h" style="width:' +
+            pct +
+            "%;background:" +
+            barColor +
+            '"></div>' +
+            "</div>" +
+            '<span class="cost-bar-value">$' +
+            val.toFixed(2) +
+            "</span>" +
+            "</div>";
+        }
+        html += "</div>";
+      }
+
+      // Cost per issue
+      if (data.by_issue && data.by_issue.length > 0) {
+        html +=
+          '<div class="cost-section"><div class="cost-section-label">COST PER ISSUE</div>';
+        html +=
+          '<table class="cost-issue-table"><thead><tr><th>Issue</th><th>Cost</th></tr></thead><tbody>';
+        var sorted = data.by_issue.slice().sort(function (a, b) {
+          return (b.cost || 0) - (a.cost || 0);
+        });
+        for (var i = 0; i < sorted.length; i++) {
+          html +=
+            "<tr><td>#" +
+            sorted[i].issue +
+            "</td><td>$" +
+            (sorted[i].cost || 0).toFixed(2) +
+            "</td></tr>";
+        }
+        html += "</tbody></table></div>";
+      }
+
+      // Budget utilization
+      if (data.budget != null && data.spent != null) {
+        var budgetPct =
+          data.budget > 0 ? Math.min((data.spent / data.budget) * 100, 100) : 0;
+        var budgetClass =
+          budgetPct >= 80
+            ? "cost-over"
+            : budgetPct >= 60
+              ? "cost-warn"
+              : "cost-ok";
+        html +=
+          '<div class="cost-section"><div class="cost-section-label">BUDGET UTILIZATION</div>' +
+          '<div class="budget-util-bar">' +
+          '<div class="cost-bar-track"><div class="cost-bar-fill ' +
+          budgetClass +
+          '" style="width:' +
+          budgetPct.toFixed(0) +
+          '%"></div></div>' +
+          '<span class="budget-util-text">$' +
+          data.spent.toFixed(2) +
+          " / $" +
+          data.budget.toFixed(2) +
+          " (" +
+          budgetPct.toFixed(0) +
+          "%)</span>" +
+          "</div></div>";
+      }
+
+      container.innerHTML =
+        html || '<div class="empty-state"><p>No cost data</p></div>';
+    })
+    .catch(function (err) {
+      container.innerHTML =
+        '<div class="empty-state"><p>Failed to load: ' +
+        escapeHtml(String(err)) +
+        "</p></div>";
+    });
+}
+
+function renderCostTrend() {
+  var container = document.getElementById("cost-trend-container");
+  if (!container) return;
+
+  fetch("/api/costs/trend?period=30")
+    .then(function (r) {
+      if (!r.ok) throw new Error("HTTP " + r.status);
+      return r.json();
+    })
+    .then(function (data) {
+      var points = data.points || data.daily || [];
+      if (points.length === 0) {
+        container.innerHTML =
+          '<div class="empty-state"><p>No trend data</p></div>';
+        return;
+      }
+      container.innerHTML = renderSVGLineChart(
+        points,
+        "cost",
+        "#00d4ff",
+        300,
+        100,
+      );
+    })
+    .catch(function (err) {
+      container.innerHTML =
+        '<div class="empty-state"><p>Failed to load: ' +
+        escapeHtml(String(err)) +
+        "</p></div>";
+    });
+}
+
+function renderDoraTrend() {
+  var container = document.getElementById("dora-trend-container");
+  if (!container) return;
+
+  fetch("/api/metrics/dora-trend?period=30")
+    .then(function (r) {
+      if (!r.ok) throw new Error("HTTP " + r.status);
+      return r.json();
+    })
+    .then(function (data) {
+      var metrics = [
+        { key: "deploy_freq", label: "Deploy Freq", color: "#00d4ff" },
+        { key: "lead_time", label: "Lead Time", color: "#0066ff" },
+        { key: "cfr", label: "Change Fail Rate", color: "#f43f5e" },
+        { key: "mttr", label: "MTTR", color: "#4ade80" },
+      ];
+      var html = '<div class="dora-trend-grid">';
+      for (var i = 0; i < metrics.length; i++) {
+        var m = metrics[i];
+        var points = data[m.key] || [];
+        html +=
+          '<div class="dora-trend-card">' +
+          '<span class="dora-trend-label">' +
+          escapeHtml(m.label) +
+          "</span>";
+        if (points.length > 0) {
+          html += renderSparkline(points, m.color, 120, 30);
+        } else {
+          html += '<span class="dora-trend-empty">\u2014</span>';
+        }
+        html += "</div>";
+      }
+      html += "</div>";
+      container.innerHTML = html;
+    })
+    .catch(function (err) {
+      container.innerHTML =
+        '<div class="empty-state"><p>Failed to load: ' +
+        escapeHtml(String(err)) +
+        "</p></div>";
+    });
+}
+
+function renderSparkline(points, color, width, height) {
+  if (!points || points.length < 2) return "";
+  var maxVal = 0;
+  var minVal = Infinity;
+  for (var i = 0; i < points.length; i++) {
+    var v = typeof points[i] === "object" ? points[i].value || 0 : points[i];
+    if (v > maxVal) maxVal = v;
+    if (v < minVal) minVal = v;
+  }
+  var range = maxVal - minVal || 1;
+  var padding = 2;
+  var w = width - padding * 2;
+  var h = height - padding * 2;
+
+  var pathParts = [];
+  for (var i = 0; i < points.length; i++) {
+    var v = typeof points[i] === "object" ? points[i].value || 0 : points[i];
+    var x = padding + (i / (points.length - 1)) * w;
+    var y = padding + h - ((v - minVal) / range) * h;
+    pathParts.push((i === 0 ? "M" : "L") + x.toFixed(1) + "," + y.toFixed(1));
+  }
+
+  return (
+    '<svg class="sparkline" width="' +
+    width +
+    '" height="' +
+    height +
+    '" viewBox="0 0 ' +
+    width +
+    " " +
+    height +
+    '">' +
+    '<path d="' +
+    pathParts.join(" ") +
+    '" fill="none" stroke="' +
+    color +
+    '" stroke-width="1.5" stroke-linecap="round"/></svg>'
+  );
+}
+
+function renderSVGLineChart(points, valueKey, color, width, height) {
+  if (!points || points.length < 2)
+    return '<div class="empty-state"><p>Not enough data</p></div>';
+  var maxVal = 0;
+  for (var i = 0; i < points.length; i++) {
+    var v =
+      typeof points[i] === "object"
+        ? points[i][valueKey] || points[i].value || 0
+        : points[i];
+    if (v > maxVal) maxVal = v;
+  }
+  if (maxVal === 0) maxVal = 1;
+  var padding = 20;
+  var chartW = width - padding * 2;
+  var chartH = height - padding * 2;
+
+  var svg =
+    '<svg class="svg-line-chart" viewBox="0 0 ' +
+    width +
+    " " +
+    height +
+    '" width="100%" height="' +
+    height +
+    '">';
+
+  // Grid lines
+  for (var g = 0; g <= 4; g++) {
+    var gy = padding + (g / 4) * chartH;
+    svg +=
+      '<line x1="' +
+      padding +
+      '" y1="' +
+      gy +
+      '" x2="' +
+      (width - padding) +
+      '" y2="' +
+      gy +
+      '" stroke="#1a3a6a" stroke-width="0.5"/>';
+  }
+
+  var pathParts = [];
+  for (var i = 0; i < points.length; i++) {
+    var v =
+      typeof points[i] === "object"
+        ? points[i][valueKey] || points[i].value || 0
+        : points[i];
+    var x = padding + (i / (points.length - 1)) * chartW;
+    var y = padding + chartH - (v / maxVal) * chartH;
+    pathParts.push((i === 0 ? "M" : "L") + x.toFixed(1) + "," + y.toFixed(1));
+  }
+
+  // Fill area
+  var lastX = padding + chartW;
+  var firstX = padding;
+  svg +=
+    '<path d="' +
+    pathParts.join(" ") +
+    " L" +
+    lastX +
+    "," +
+    (padding + chartH) +
+    " L" +
+    firstX +
+    "," +
+    (padding + chartH) +
+    ' Z" fill="' +
+    color +
+    '" opacity="0.1"/>';
+  // Line
+  svg +=
+    '<path d="' +
+    pathParts.join(" ") +
+    '" fill="none" stroke="' +
+    color +
+    '" stroke-width="2" stroke-linecap="round"/>';
+
+  svg += "</svg>";
+  return svg;
+}
+
+// ══════════════════════════════════════════════════════════════════
+// PHASE 3: INSIGHTS TAB
+// ══════════════════════════════════════════════════════════════════
+
+function fetchInsightsData() {
+  var panel = document.getElementById("panel-insights");
+  if (!panel) return;
+  if (insightsCache) {
+    renderInsightsTab(insightsCache);
+    return;
+  }
+
+  panel.innerHTML = '<div class="empty-state"><p>Loading insights...</p></div>';
+
+  var results = {
+    patterns: null,
+    decisions: null,
+    patrol: null,
+    heatmap: null,
+  };
+  var pending = 4;
+
+  function checkDone() {
+    pending--;
+    if (pending <= 0) {
+      insightsCache = results;
+      renderInsightsTab(results);
+    }
+  }
+
+  fetch("/api/memory/patterns")
+    .then(function (r) {
+      return r.ok ? r.json() : { patterns: [] };
+    })
+    .then(function (d) {
+      results.patterns = d.patterns || d;
+    })
+    .catch(function () {
+      results.patterns = [];
+    })
+    .then(checkDone);
+
+  fetch("/api/memory/decisions")
+    .then(function (r) {
+      return r.ok ? r.json() : { decisions: [] };
+    })
+    .then(function (d) {
+      results.decisions = d.decisions || d;
+    })
+    .catch(function () {
+      results.decisions = [];
+    })
+    .then(checkDone);
+
+  fetch("/api/patrol/recent")
+    .then(function (r) {
+      return r.ok ? r.json() : { findings: [] };
+    })
+    .then(function (d) {
+      results.patrol = d.findings || d;
+    })
+    .catch(function () {
+      results.patrol = [];
+    })
+    .then(checkDone);
+
+  fetch("/api/metrics/failure-heatmap")
+    .then(function (r) {
+      return r.ok ? r.json() : { data: [] };
+    })
+    .then(function (d) {
+      results.heatmap = d;
+    })
+    .catch(function () {
+      results.heatmap = null;
+    })
+    .then(checkDone);
+}
+
+function renderInsightsTab(data) {
+  var panel = document.getElementById("panel-insights");
+  if (!panel) return;
+
+  var html = '<div class="insights-grid">';
+
+  // Failure patterns section
+  html +=
+    '<div class="insights-section">' +
+    '<div class="section-header"><h3>Failure Patterns</h3></div>' +
+    '<div id="failure-patterns-content">' +
+    renderFailurePatterns(data.patterns || []) +
+    "</div></div>";
+
+  // Patrol findings section
+  html +=
+    '<div class="insights-section">' +
+    '<div class="section-header"><h3>Patrol Findings</h3></div>' +
+    '<div id="patrol-findings-content">' +
+    renderPatrolFindings(data.patrol || []) +
+    "</div></div>";
+
+  // Decision log section
+  html +=
+    '<div class="insights-section insights-full-width">' +
+    '<div class="section-header"><h3>Decision Log</h3></div>' +
+    '<div id="decision-log-content">' +
+    renderDecisionLog(data.decisions || []) +
+    "</div></div>";
+
+  // Failure heatmap section
+  html +=
+    '<div class="insights-section insights-full-width">' +
+    '<div class="section-header"><h3>Failure Heatmap</h3></div>' +
+    '<div id="failure-heatmap-content">' +
+    renderFailureHeatmap(data.heatmap) +
+    "</div></div>";
+
+  html += "</div>";
+  panel.innerHTML = html;
+}
+
+function renderFailurePatterns(patterns) {
+  if (!patterns || patterns.length === 0) {
+    return '<div class="empty-state"><p>No failure patterns recorded</p></div>';
+  }
+
+  // Sort by frequency (most common first)
+  var sorted = patterns.slice().sort(function (a, b) {
+    return (b.frequency || b.count || 0) - (a.frequency || a.count || 0);
+  });
+
+  var html = "";
+  for (var i = 0; i < sorted.length; i++) {
+    var p = sorted[i];
+    var freq = p.frequency || p.count || 0;
+    html +=
+      '<div class="pattern-card">' +
+      '<div class="pattern-card-header">' +
+      '<span class="pattern-desc">' +
+      escapeHtml(p.description || p.pattern || "") +
+      "</span>" +
+      '<span class="pattern-freq-badge">' +
+      freq +
+      "x</span>" +
+      "</div>";
+    if (p.root_cause) {
+      html +=
+        '<div class="pattern-detail"><span class="pattern-label">Root cause:</span> ' +
+        escapeHtml(p.root_cause) +
+        "</div>";
+    }
+    if (p.fix || p.suggested_fix) {
+      html +=
+        '<div class="pattern-detail pattern-fix"><span class="pattern-label">Fix:</span> ' +
+        escapeHtml(p.fix || p.suggested_fix) +
+        "</div>";
+    }
+    html += "</div>";
+  }
+  return html;
+}
+
+function renderPatrolFindings(findings) {
+  if (!findings || findings.length === 0) {
+    return '<div class="empty-state"><p>No patrol findings</p></div>';
+  }
+
+  var html = "";
+  for (var i = 0; i < findings.length; i++) {
+    var f = findings[i];
+    var severity = (f.severity || "low").toLowerCase();
+    html +=
+      '<div class="patrol-card">' +
+      '<div class="patrol-card-header">' +
+      '<span class="patrol-severity-badge severity-' +
+      escapeHtml(severity) +
+      '">' +
+      escapeHtml(severity.toUpperCase()) +
+      "</span>" +
+      '<span class="patrol-type">' +
+      escapeHtml(f.type || f.category || "") +
+      "</span>" +
+      "</div>" +
+      '<div class="patrol-desc">' +
+      escapeHtml(f.description || f.message || "") +
+      "</div>" +
+      (f.file
+        ? '<div class="patrol-file">' + escapeHtml(f.file) + "</div>"
+        : "") +
+      "</div>";
+  }
+  return html;
+}
+
+function renderDecisionLog(decisions) {
+  if (!decisions || decisions.length === 0) {
+    return '<div class="empty-state"><p>No decisions logged</p></div>';
+  }
+
+  var html = '<div class="decision-list">';
+  for (var i = 0; i < decisions.length; i++) {
+    var d = decisions[i];
+    html +=
+      '<div class="decision-row">' +
+      '<span class="decision-ts">' +
+      formatTime(d.timestamp || d.ts) +
+      "</span>" +
+      '<span class="decision-action">' +
+      escapeHtml(d.action || d.decision || "") +
+      "</span>" +
+      '<span class="decision-outcome">' +
+      escapeHtml(d.outcome || d.result || "") +
+      "</span>" +
+      (d.issue ? '<span class="decision-issue">#' + d.issue + "</span>" : "") +
+      "</div>";
+  }
+  html += "</div>";
+  return html;
+}
+
+function renderFailureHeatmap(data) {
+  if (!data || !data.stages || !data.days) {
+    return '<div class="empty-state"><p>No heatmap data</p></div>';
+  }
+
+  var stages = data.stages || [];
+  var days = data.days || [];
+  var cells = data.cells || {};
+
+  if (stages.length === 0 || days.length === 0) {
+    return '<div class="empty-state"><p>No heatmap data</p></div>';
+  }
+
+  // Find max for color scaling
+  var maxCount = 0;
+  for (var key in cells) {
+    if (cells[key] > maxCount) maxCount = cells[key];
+  }
+  if (maxCount === 0) maxCount = 1;
+
+  var html =
+    '<div class="heatmap-grid" style="grid-template-columns: 100px repeat(' +
+    days.length +
+    ', 1fr)">';
+
+  // Header row
+  html += '<div class="heatmap-corner"></div>';
+  for (var d = 0; d < days.length; d++) {
+    var parts = days[d].split("-");
+    var label = parts.length >= 3 ? parts[1] + "/" + parts[2] : days[d];
+    html += '<div class="heatmap-day-label">' + escapeHtml(label) + "</div>";
+  }
+
+  // Data rows
+  for (var s = 0; s < stages.length; s++) {
+    html +=
+      '<div class="heatmap-stage-label">' + escapeHtml(stages[s]) + "</div>";
+    for (var d = 0; d < days.length; d++) {
+      var key = stages[s] + ":" + days[d];
+      var count = cells[key] || 0;
+      var intensity = count / maxCount;
+      var bgColor =
+        count === 0
+          ? "transparent"
+          : "rgba(244, 63, 94, " + (0.2 + intensity * 0.8).toFixed(2) + ")";
+      html +=
+        '<div class="heatmap-cell" style="background:' +
+        bgColor +
+        '" title="' +
+        escapeHtml(stages[s]) +
+        " " +
+        escapeHtml(days[d]) +
+        ": " +
+        count +
+        ' failures">' +
+        (count > 0 ? count : "") +
+        "</div>";
+    }
+  }
+
+  html += "</div>";
+  return html;
+}
+
+// ══════════════════════════════════════════════════════════════════
+// PHASE 4: STAGE PERFORMANCE, BOTTLENECK, THROUGHPUT, CAPACITY
+// ══════════════════════════════════════════════════════════════════
+
+function renderStagePerformance() {
+  var container = document.getElementById("stage-performance-container");
+  if (!container) return;
+
+  fetch("/api/metrics/stage-performance?period=7")
+    .then(function (r) {
+      if (!r.ok) throw new Error("HTTP " + r.status);
+      return r.json();
+    })
+    .then(function (data) {
+      var stages = data.stages || [];
+      if (stages.length === 0) {
+        container.innerHTML =
+          '<div class="empty-state"><p>No stage performance data</p></div>';
+        return;
+      }
+      var html =
+        '<table class="stage-perf-table">' +
+        "<thead><tr><th>Stage</th><th>Avg</th><th>Min</th><th>Max</th><th>Count</th><th>Trend</th></tr></thead>" +
+        "<tbody>";
+      for (var i = 0; i < stages.length; i++) {
+        var s = stages[i];
+        var trendArrow = "";
+        if (s.trend_pct != null) {
+          if (s.trend_pct > 5)
+            trendArrow =
+              '<span class="trend-up">\u2191 ' +
+              s.trend_pct.toFixed(0) +
+              "%</span>";
+          else if (s.trend_pct < -5)
+            trendArrow =
+              '<span class="trend-down">\u2193 ' +
+              Math.abs(s.trend_pct).toFixed(0) +
+              "%</span>";
+          else trendArrow = '<span class="trend-flat">\u2192</span>';
+        }
+        html +=
+          "<tr>" +
+          "<td>" +
+          escapeHtml(s.name || s.stage || "") +
+          "</td>" +
+          "<td>" +
+          formatDuration(s.avg_s) +
+          "</td>" +
+          "<td>" +
+          formatDuration(s.min_s) +
+          "</td>" +
+          "<td>" +
+          formatDuration(s.max_s) +
+          "</td>" +
+          "<td>" +
+          (s.count || 0) +
+          "</td>" +
+          "<td>" +
+          trendArrow +
+          "</td>" +
+          "</tr>";
+      }
+      html += "</tbody></table>";
+      container.innerHTML = html;
+    })
+    .catch(function (err) {
+      container.innerHTML =
+        '<div class="empty-state"><p>Failed to load: ' +
+        escapeHtml(String(err)) +
+        "</p></div>";
+    });
+}
+
+function renderBottleneckAlert() {
+  var container = document.getElementById("bottleneck-alert-container");
+  if (!container) return;
+
+  fetch("/api/metrics/bottlenecks")
+    .then(function (r) {
+      if (!r.ok) throw new Error("HTTP " + r.status);
+      return r.json();
+    })
+    .then(function (data) {
+      if (!data.bottleneck) {
+        container.innerHTML = "";
+        return;
+      }
+      var b = data.bottleneck;
+      var msg =
+        escapeHtml(b.stage || "Unknown") +
+        " stage averages " +
+        formatDuration(b.avg_s) +
+        ", " +
+        (b.ratio || "?") +
+        "x longer than " +
+        escapeHtml(b.comparison_stage || "other stages");
+      var suggestion = b.suggestion
+        ? '<div class="bottleneck-suggestion">' +
+          escapeHtml(b.suggestion) +
+          "</div>"
+        : "";
+      container.innerHTML =
+        '<div class="bottleneck-alert">' +
+        '<span class="bottleneck-icon">\u26A0</span>' +
+        '<span class="bottleneck-msg">' +
+        msg +
+        "</span>" +
+        suggestion +
+        "</div>";
+    })
+    .catch(function () {
+      container.innerHTML = "";
+    });
+}
+
+function renderThroughputTrend() {
+  var container = document.getElementById("throughput-trend-container");
+  if (!container) return;
+
+  fetch("/api/metrics/throughput-trend?period=30")
+    .then(function (r) {
+      if (!r.ok) throw new Error("HTTP " + r.status);
+      return r.json();
+    })
+    .then(function (data) {
+      var points = data.points || data.daily || [];
+      if (points.length === 0) {
+        container.innerHTML =
+          '<div class="empty-state"><p>No throughput data</p></div>';
+        return;
+      }
+      container.innerHTML = renderSVGLineChart(
+        points,
+        "throughput",
+        "#4ade80",
+        300,
+        100,
+      );
+    })
+    .catch(function (err) {
+      container.innerHTML =
+        '<div class="empty-state"><p>Failed to load: ' +
+        escapeHtml(String(err)) +
+        "</p></div>";
+    });
+}
+
+function renderCapacityForecast() {
+  var container = document.getElementById("capacity-forecast-container");
+  if (!container) return;
+
+  fetch("/api/metrics/capacity")
+    .then(function (r) {
+      if (!r.ok) throw new Error("HTTP " + r.status);
+      return r.json();
+    })
+    .then(function (data) {
+      if (!data.rate && !data.queue_clear_hours) {
+        container.innerHTML =
+          '<div class="empty-state"><p>No capacity data</p></div>';
+        return;
+      }
+      var rate = data.rate != null ? data.rate.toFixed(1) : "?";
+      var clearTime =
+        data.queue_clear_hours != null
+          ? data.queue_clear_hours.toFixed(1)
+          : "?";
+      container.innerHTML =
+        '<div class="capacity-forecast">' +
+        '<span class="capacity-text">At current rate (' +
+        rate +
+        "/hr), queue will clear in " +
+        "<strong>" +
+        clearTime +
+        " hours</strong></span>" +
+        "</div>";
+    })
+    .catch(function (err) {
+      container.innerHTML =
+        '<div class="empty-state"><p>Failed to load: ' +
+        escapeHtml(String(err)) +
+        "</p></div>";
+    });
+}
+
+// ══════════════════════════════════════════════════════════════════
+// PHASE 5: ALERT BANNER, BULK ACTIONS, EMERGENCY BRAKE
+// ══════════════════════════════════════════════════════════════════
+
+function renderAlertBanner() {
+  var container = document.getElementById("alert-banner");
+  if (!container) return;
+
+  if (alertDismissed) {
+    container.innerHTML = "";
+    container.style.display = "none";
+    return;
+  }
+
+  fetch("/api/alerts")
+    .then(function (r) {
+      if (!r.ok) throw new Error("HTTP " + r.status);
+      return r.json();
+    })
+    .then(function (data) {
+      var alerts = data.alerts || [];
+      if (alerts.length === 0) {
+        container.innerHTML = "";
+        container.style.display = "none";
+        return;
+      }
+
+      // Show highest severity alert
+      var alert = alerts[0];
+      alertsCache = alerts;
+
+      var severityClass = "alert-" + (alert.severity || "info");
+      var html =
+        '<div class="alert-banner-content ' +
+        severityClass +
+        '">' +
+        '<span class="alert-banner-icon">\u26A0</span>' +
+        '<span class="alert-banner-msg">' +
+        escapeHtml(alert.message || "") +
+        "</span>" +
+        '<span class="alert-banner-actions">';
+
+      // Action buttons depend on alert type
+      if (alert.issue) {
+        html +=
+          '<button class="alert-action-btn" onclick="switchTab(\'pipelines\');fetchPipelineDetail(' +
+          alert.issue +
+          ')">View</button>';
+      }
+      if (alert.type === "failure_spike") {
+        html +=
+          "<button class=\"alert-action-btn btn-abort\" onclick=\"document.getElementById('emergency-modal').style.display=''\">Emergency Brake</button>";
+      }
+      if (alert.type === "stuck_pipeline" && alert.issue) {
+        html +=
+          '<button class="alert-action-btn btn-abort" onclick="sendIntervention(' +
+          alert.issue +
+          ",'abort')\">Abort</button>" +
+          '<button class="alert-action-btn" onclick="sendIntervention(' +
+          alert.issue +
+          ",'skip_stage')\">Skip Stage</button>";
+      }
+
+      html +=
+        '<button class="alert-dismiss-btn" onclick="dismissAlert()">\u2715</button>';
+      html += "</span></div>";
+
+      container.innerHTML = html;
+      container.style.display = "";
+    })
+    .catch(function () {
+      container.innerHTML = "";
+      container.style.display = "none";
+    });
+}
+
+function dismissAlert() {
+  alertDismissed = true;
+  var container = document.getElementById("alert-banner");
+  if (container) {
+    container.innerHTML = "";
+    container.style.display = "none";
+  }
+  // Reset on next WS message with new alerts
+  setTimeout(function () {
+    alertDismissed = false;
+  }, 30000);
+}
+
+function updateBulkToolbar() {
+  var toolbar = document.getElementById("bulk-actions");
+  if (!toolbar) return;
+  var count = Object.keys(selectedIssues).length;
+  if (count === 0) {
+    toolbar.style.display = "none";
+    return;
+  }
+  toolbar.style.display = "";
+  var countEl = document.getElementById("bulk-count");
+  if (countEl) countEl.textContent = count + " selected";
+}
+
+function setupBulkActions() {
+  var toolbar = document.getElementById("bulk-actions");
+  if (!toolbar) return;
+
+  var pauseBtn = document.getElementById("bulk-pause");
+  var resumeBtn = document.getElementById("bulk-resume");
+  var abortBtn = document.getElementById("bulk-abort");
+
+  if (pauseBtn) {
+    pauseBtn.addEventListener("click", function () {
+      var issues = Object.keys(selectedIssues);
+      for (var i = 0; i < issues.length; i++) {
+        sendIntervention(issues[i], "pause");
+      }
+    });
+  }
+
+  if (resumeBtn) {
+    resumeBtn.addEventListener("click", function () {
+      var issues = Object.keys(selectedIssues);
+      for (var i = 0; i < issues.length; i++) {
+        sendIntervention(issues[i], "resume");
+      }
+    });
+  }
+
+  if (abortBtn) {
+    abortBtn.addEventListener("click", function () {
+      var issues = Object.keys(selectedIssues);
+      if (issues.length === 0) return;
+      if (
+        confirm(
+          "Abort " + issues.length + " pipeline(s)? This cannot be undone.",
+        )
+      ) {
+        for (var i = 0; i < issues.length; i++) {
+          sendIntervention(issues[i], "abort");
+        }
+        selectedIssues = {};
+        updateBulkToolbar();
+      }
+    });
+  }
+}
+
+function updateEmergencyBrakeVisibility(data) {
+  var brakeBtn = document.getElementById("emergency-brake");
+  if (!brakeBtn) return;
+  var active = data.pipelines ? data.pipelines.length : 0;
+  brakeBtn.style.display = active > 0 ? "" : "none";
+}
+
+function setupEmergencyBrake() {
+  var brakeBtn = document.getElementById("emergency-brake");
+  if (!brakeBtn) return;
+
+  brakeBtn.addEventListener("click", function () {
+    var modal = document.getElementById("emergency-modal");
+    if (modal) modal.style.display = "";
+  });
+
+  var confirmBtn = document.getElementById("emergency-confirm");
+  var cancelBtn = document.getElementById("emergency-cancel");
+  var modal = document.getElementById("emergency-modal");
+
+  if (cancelBtn && modal) {
+    cancelBtn.addEventListener("click", function () {
+      modal.style.display = "none";
+    });
+  }
+
+  if (modal) {
+    modal.addEventListener("click", function (e) {
+      if (e.target === modal) modal.style.display = "none";
+    });
+  }
+
+  if (confirmBtn) {
+    confirmBtn.addEventListener("click", function () {
+      fetch("/api/emergency-brake", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+      })
+        .then(function (r) {
+          if (!r.ok) throw new Error("HTTP " + r.status);
+          return r.json();
+        })
+        .then(function () {
+          if (modal) modal.style.display = "none";
+        })
+        .catch(function (err) {
+          console.error("Emergency brake failed:", err);
+          if (modal) modal.style.display = "none";
+        });
+    });
+  }
+}
+
+// ══════════════════════════════════════════════════════════════════
 // HELPERS — truncate
 // ══════════════════════════════════════════════════════════════════
 
@@ -2033,6 +4116,294 @@ function padZero(n) {
 }
 
 // ══════════════════════════════════════════════════════════════════
+// Daemon Control
+// ══════════════════════════════════════════════════════════════════
+async function daemonControl(action) {
+  var btn = document.getElementById("daemon-btn-" + action);
+  if (btn) btn.disabled = true;
+
+  try {
+    var method = "POST";
+    var url = "/api/daemon/" + action;
+
+    // Toggle pause/resume
+    if (action === "pause") {
+      var badge = document.getElementById("daemon-status-badge");
+      if (badge && badge.classList.contains("paused")) {
+        url = "/api/daemon/resume";
+      }
+    }
+
+    var resp = await fetch(url, { method: method });
+    var data = await resp.json();
+    if (!data.ok && data.error) {
+      console.warn("Daemon control error:", data.error);
+    }
+    // Refresh daemon status after action
+    setTimeout(fetchDaemonConfig, 1000);
+  } catch (err) {
+    console.error("Daemon control failed:", err);
+  } finally {
+    if (btn) btn.disabled = false;
+  }
+}
+
+async function fetchDaemonConfig() {
+  try {
+    var resp = await fetch("/api/daemon/config");
+    if (!resp.ok) return;
+    var data = await resp.json();
+    updateDaemonControlBar(data);
+  } catch {
+    // dashboard may not be running
+  }
+}
+
+function updateDaemonControlBar(data) {
+  var badge = document.getElementById("daemon-status-badge");
+  var pauseBtn = document.getElementById("daemon-btn-pause");
+  var workersEl = document.getElementById("daemon-info-workers");
+  var pollEl = document.getElementById("daemon-info-poll");
+  var patrolEl = document.getElementById("daemon-info-patrol");
+  var budgetEl = document.getElementById("daemon-info-budget");
+
+  if (!badge) return;
+
+  // Determine daemon status
+  if (data.paused) {
+    badge.textContent = "Paused";
+    badge.className = "daemon-status-badge paused";
+    if (pauseBtn) pauseBtn.textContent = "Resume";
+  } else if (data.config && data.config.watch_label) {
+    badge.textContent = "Running";
+    badge.className = "daemon-status-badge running";
+    if (pauseBtn) pauseBtn.textContent = "Pause";
+  } else {
+    badge.textContent = "Stopped";
+    badge.className = "daemon-status-badge stopped";
+    if (pauseBtn) pauseBtn.textContent = "Pause";
+  }
+
+  // Update config info
+  if (data.config) {
+    if (workersEl) workersEl.textContent = data.config.max_workers || "-";
+    if (pollEl) pollEl.textContent = data.config.poll_interval || "-";
+    if (patrolEl)
+      patrolEl.textContent =
+        (data.config.patrol && data.config.patrol.interval) || "-";
+  }
+
+  // Update budget info
+  if (data.budget && budgetEl) {
+    var remaining = data.budget.remaining || data.budget.daily_limit || "-";
+    budgetEl.textContent =
+      typeof remaining === "number" ? remaining.toFixed(2) : remaining;
+  }
+}
+
+// Wire alert actions for daemon control
+function handleAlertAction(action) {
+  if (action === "pause_daemon") {
+    daemonControl("pause");
+  } else if (action === "scale_up") {
+    // Could implement config update; for now just log
+    console.log("Scale up requested via alert action");
+  }
+}
+
+// ══════════════════════════════════════════════════════════════════
+// TEAM TAB
+// ══════════════════════════════════════════════════════════════════
+
+function timeAgo(date) {
+  var seconds = Math.floor((Date.now() - date.getTime()) / 1000);
+  if (seconds < 60) return seconds + "s ago";
+  var minutes = Math.floor(seconds / 60);
+  if (minutes < 60) return minutes + "m ago";
+  var hours = Math.floor(minutes / 60);
+  if (hours < 24) return hours + "h ago";
+  return Math.floor(hours / 24) + "d ago";
+}
+
+function fetchTeamData() {
+  fetch("/api/team")
+    .then(function (r) {
+      return r.json();
+    })
+    .then(function (data) {
+      teamCache = data;
+      renderTeamGrid(data);
+      renderTeamStats(data);
+    })
+    .catch(function () {});
+
+  fetch("/api/team/activity")
+    .then(function (r) {
+      return r.json();
+    })
+    .then(function (data) {
+      teamActivityCache = data;
+      renderTeamActivity(data);
+    })
+    .catch(function () {});
+}
+
+function renderTeamStats(data) {
+  var el = document.getElementById("team-stat-online");
+  if (el) el.textContent = (data.total_online || 0).toString();
+  el = document.getElementById("team-stat-pipelines");
+  if (el) el.textContent = (data.total_active_pipelines || 0).toString();
+  el = document.getElementById("team-stat-queued");
+  if (el) el.textContent = (data.total_queued || 0).toString();
+}
+
+function renderTeamGrid(data) {
+  var grid = document.getElementById("team-grid");
+  if (!grid) return;
+
+  var devs = data.developers || [];
+  if (devs.length === 0) {
+    grid.innerHTML =
+      '<div class="empty-state">No developers connected. Run <code>shipwright connect start</code> to join.</div>';
+    return;
+  }
+
+  grid.innerHTML = devs
+    .map(function (dev) {
+      var presence = dev._presence || "offline";
+      var initials = (dev.developer_id || "?").substring(0, 2).toUpperCase();
+      var pipelines = (dev.active_jobs || [])
+        .map(function (job) {
+          return (
+            '<div class="team-card-pipeline-item">' +
+            '<span class="team-card-pipeline-issue">#' +
+            escapeHtml(String(job.issue)) +
+            "</span>" +
+            '<span class="team-card-pipeline-stage">' +
+            escapeHtml(job.stage || "\u2014") +
+            "</span>" +
+            "</div>"
+          );
+        })
+        .join("");
+
+      var pipelineSection = pipelines
+        ? '<div class="team-card-pipelines">' + pipelines + "</div>"
+        : "";
+
+      return (
+        '<div class="team-card">' +
+        '<div class="team-card-header">' +
+        '<div class="team-card-avatar">' +
+        escapeHtml(initials) +
+        "</div>" +
+        '<div class="team-card-info">' +
+        '<div class="team-card-name">' +
+        escapeHtml(dev.developer_id) +
+        "</div>" +
+        '<div class="team-card-machine">' +
+        escapeHtml(dev.machine_name) +
+        "</div>" +
+        "</div>" +
+        '<div class="presence-dot ' +
+        presence +
+        '" title="' +
+        presence +
+        '"></div>' +
+        "</div>" +
+        '<div class="team-card-body">' +
+        '<div class="team-card-row">' +
+        '<span class="team-card-row-label">Daemon</span>' +
+        '<span class="team-card-row-value">' +
+        (dev.daemon_running ? "\u25cf Running" : "\u25cb Stopped") +
+        "</span>" +
+        "</div>" +
+        '<div class="team-card-row">' +
+        '<span class="team-card-row-label">Active</span>' +
+        '<span class="team-card-row-value">' +
+        (dev.active_jobs || []).length +
+        " pipelines</span>" +
+        "</div>" +
+        '<div class="team-card-row">' +
+        '<span class="team-card-row-label">Queued</span>' +
+        '<span class="team-card-row-value">' +
+        (dev.queued || []).length +
+        " issues</span>" +
+        "</div>" +
+        pipelineSection +
+        "</div>" +
+        "</div>"
+      );
+    })
+    .join("");
+}
+
+function renderTeamActivity(events) {
+  var container = document.getElementById("team-activity");
+  if (!container) return;
+
+  var items = Array.isArray(events) ? events : events.events || [];
+  if (items.length === 0) {
+    container.innerHTML =
+      '<div class="empty-state">No team activity yet.</div>';
+    return;
+  }
+
+  container.innerHTML = items
+    .slice(0, 50)
+    .map(function (evt) {
+      var isCI = evt.from_developer === "github-actions";
+      var badgeClass = isCI ? "ci" : "local";
+      var badgeText = isCI ? "CI" : evt.from_developer || "local";
+      var text = formatTeamEvent(evt);
+      var time = evt.ts ? timeAgo(new Date(evt.ts)) : "";
+
+      return (
+        '<div class="team-activity-item">' +
+        '<span class="source-badge ' +
+        badgeClass +
+        '">' +
+        escapeHtml(badgeText) +
+        "</span>" +
+        '<div class="team-activity-content">' +
+        '<div class="team-activity-text">' +
+        text +
+        "</div>" +
+        '<div class="team-activity-time">' +
+        time +
+        "</div>" +
+        "</div>" +
+        "</div>"
+      );
+    })
+    .join("");
+}
+
+function formatTeamEvent(evt) {
+  var type = evt.type || "";
+  var issue = evt.issue ? " #" + evt.issue : "";
+
+  if (type.indexOf("pipeline.started") !== -1)
+    return "Pipeline started" + issue;
+  if (
+    type.indexOf("pipeline.completed") !== -1 ||
+    type.indexOf("pipeline_completed") !== -1
+  ) {
+    var result = evt.result === "success" ? "\u2713" : "\u2717";
+    return "Pipeline " + result + issue;
+  }
+  if (type.indexOf("stage.") !== -1) {
+    var stage = evt.stage || type.split(".").pop();
+    return "Stage " + escapeHtml(stage) + issue;
+  }
+  if (type.indexOf("daemon.") !== -1)
+    return type.replace("daemon.", "Daemon: ");
+  if (type.indexOf("ci.") !== -1) return type.replace("ci.", "CI: ") + issue;
+
+  return escapeHtml(type) + issue;
+}
+
+// ══════════════════════════════════════════════════════════════════
 // BOOT
 // ══════════════════════════════════════════════════════════════════
 
@@ -2043,4 +4414,9 @@ setupPipelineFilters();
 setupActivityFilters();
 setupTimelineControls();
 setupInterventionModal();
+setupBulkActions();
+setupEmergencyBrake();
+setupMachinesTab();
+fetchDaemonConfig();
+setInterval(fetchDaemonConfig, 30000);
 connect();

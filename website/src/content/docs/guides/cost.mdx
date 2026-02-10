@@ -130,3 +130,7 @@ The dashboard compares spending in the first and second halves of the period to 
 - **Set budgets early** — A daily budget prevents surprises during autonomous daemon operation.
 - **Monitor by stage** — Use `--by-stage` to identify which stages consume the most tokens and optimize accordingly.
 - **Track by issue** — Use `--by-issue` to understand cost per feature and estimate future work.
+
+## Intelligent Cost Prediction
+
+With the intelligence layer enabled, the `intelligence_predict_cost` function estimates token usage and cost before a pipeline runs, based on issue complexity and historical data. The `intelligence_recommend_model` function routes each stage to the cheapest model that can handle the task — using haiku for simple stages and opus only when complexity warrants it. See the [Intelligence guide](/guides/intelligence/) for details.

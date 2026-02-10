@@ -4,6 +4,7 @@
 # ║  Captures learnings · Injects context · Searches memory · Tracks metrics║
 # ╚═══════════════════════════════════════════════════════════════════════════╝
 set -euo pipefail
+trap 'echo "ERROR: $BASH_SOURCE:$LINENO exited with status $?" >&2' ERR
 
 VERSION="1.7.1"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -23,6 +24,11 @@ RESET='\033[0m'
 # ─── Cross-platform compatibility ──────────────────────────────────────────
 # shellcheck source=lib/compat.sh
 [[ -f "$SCRIPT_DIR/lib/compat.sh" ]] && source "$SCRIPT_DIR/lib/compat.sh"
+
+# ─── Intelligence Engine (optional) ──────────────────────────────────────────
+# shellcheck source=sw-intelligence.sh
+[[ -f "$SCRIPT_DIR/sw-intelligence.sh" ]] && source "$SCRIPT_DIR/sw-intelligence.sh"
+
 # ─── Output Helpers ─────────────────────────────────────────────────────────
 info()    { echo -e "${CYAN}${BOLD}▸${RESET} $*"; }
 success() { echo -e "${GREEN}${BOLD}✓${RESET} $*"; }
@@ -481,8 +487,26 @@ memory_capture_pattern() {
 
 # memory_inject_context <stage_id>
 # Returns a text block of relevant memory for a given pipeline stage.
+# When intelligence engine is available, uses AI-ranked search for better relevance.
 memory_inject_context() {
     local stage_id="${1:-}"
+
+    # Try intelligence-ranked search first
+    if type intelligence_search_memory &>/dev/null 2>&1; then
+        local config="${REPO_DIR:-.}/.claude/daemon-config.json"
+        local intel_enabled="false"
+        if [[ -f "$config" ]]; then
+            intel_enabled=$(jq -r '.intelligence.enabled // false' "$config" 2>/dev/null || echo "false")
+        fi
+        if [[ "$intel_enabled" == "true" ]]; then
+            local ranked_result
+            ranked_result=$(intelligence_search_memory "$stage_id stage context" "$(repo_memory_dir)" 5 2>/dev/null || echo "")
+            if [[ -n "$ranked_result" ]] && [[ "$ranked_result" != *'"error"'* ]]; then
+                echo "$ranked_result"
+                return 0
+            fi
+        fi
+    fi
 
     ensure_memory_dir
     local mem_dir

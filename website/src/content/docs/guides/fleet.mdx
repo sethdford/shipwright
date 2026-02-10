@@ -58,31 +58,47 @@ After running `shipwright fleet init`, a config file is created at `.claude/flee
 
 Each repo inherits from `defaults` but can override any field:
 
-| Field | Default | Description |
-|-------|---------|-------------|
-| `path` | *(required)* | Absolute path to the repo |
-| `template` | `"autonomous"` | Pipeline template for this repo |
-| `max_parallel` | `2` | Max concurrent pipelines per repo |
-| `watch_label` | `"ready-to-build"` | GitHub issue label to watch |
-| `model` | `"opus"` | Claude model to use |
+| Field          | Default            | Description                       |
+| -------------- | ------------------ | --------------------------------- |
+| `path`         | _(required)_       | Absolute path to the repo         |
+| `template`     | `"autonomous"`     | Pipeline template for this repo   |
+| `max_parallel` | `2`                | Max concurrent pipelines per repo |
+| `watch_label`  | `"ready-to-build"` | GitHub issue label to watch       |
+| `model`        | `"opus"`           | Claude model to use               |
+
+## Worker Pool
+
+The fleet supports a shared worker pool that distributes workers across repos proportionally to demand:
+
+```json
+{
+  "worker_pool": {
+    "enabled": true,
+    "total_workers": 12,
+    "rebalance_interval_seconds": 120
+  }
+}
+```
+
+When enabled, a background rebalancer redistributes workers every N seconds. Repos with more queued issues receive more workers. Each repo always gets at least 1 worker.
 
 ## Commands
 
-| Command | Description |
-|---------|-------------|
-| `shipwright fleet init` | Generate `fleet-config.json` with auto-detected repos |
-| `shipwright fleet start` | Start a daemon for every configured repo |
-| `shipwright fleet stop` | Gracefully stop all fleet daemons |
-| `shipwright fleet status` | Show fleet dashboard with per-repo status |
-| `shipwright fleet metrics` | Aggregate DORA metrics across all repos |
+| Command                    | Description                                           |
+| -------------------------- | ----------------------------------------------------- |
+| `shipwright fleet init`    | Generate `fleet-config.json` with auto-detected repos |
+| `shipwright fleet start`   | Start a daemon for every configured repo              |
+| `shipwright fleet stop`    | Gracefully stop all fleet daemons                     |
+| `shipwright fleet status`  | Show fleet dashboard with per-repo status             |
+| `shipwright fleet metrics` | Aggregate DORA metrics across all repos               |
 
 ## Options
 
-| Flag | Description |
-|------|-------------|
+| Flag              | Description                                                 |
+| ----------------- | ----------------------------------------------------------- |
 | `--config <path>` | Path to fleet config (default: `.claude/fleet-config.json`) |
-| `--period <days>` | Metrics period in days (default: `7`) |
-| `--json` | Output metrics as JSON |
+| `--period <days>` | Metrics period in days (default: `7`)                       |
+| `--json`          | Output metrics as JSON                                      |
 
 ## Fleet Dashboard
 

@@ -5,6 +5,8 @@ import {
   renameSync,
   mkdirSync,
   existsSync,
+  unlinkSync,
+  appendFileSync,
   watch,
   type FSWatcher,
 } from "fs";
@@ -16,13 +18,14 @@ const PORT = parseInt(
   process.argv[2] || process.env.SHIPWRIGHT_DASHBOARD_PORT || "8767",
 );
 const HOME = process.env.HOME || "";
-const EVENTS_FILE = join(HOME, ".claude-teams", "events.jsonl");
-const DAEMON_STATE = join(HOME, ".claude-teams", "daemon-state.json");
-const LOGS_DIR = join(HOME, ".claude-teams", "logs");
-const HEARTBEAT_DIR = join(HOME, ".claude-teams", "heartbeats");
-const MACHINES_FILE = join(HOME, ".claude-teams", "machines.json");
+const EVENTS_FILE = join(HOME, ".shipwright", "events.jsonl");
+const DAEMON_STATE = join(HOME, ".shipwright", "daemon-state.json");
+const LOGS_DIR = join(HOME, ".shipwright", "logs");
+const HEARTBEAT_DIR = join(HOME, ".shipwright", "heartbeats");
+const MACHINES_FILE = join(HOME, ".shipwright", "machines.json");
 const COSTS_FILE = join(HOME, ".shipwright", "costs.json");
 const BUDGET_FILE = join(HOME, ".shipwright", "budget.json");
+const MEMORY_DIR = join(HOME, ".shipwright", "memory");
 const PUBLIC_DIR = join(import.meta.dir, "public");
 const WS_PUSH_INTERVAL_MS = 2000;
 
@@ -99,6 +102,26 @@ interface DoraGrades {
   mttr: DoraMetric;
 }
 
+interface ConnectedDeveloper {
+  developer_id: string;
+  machine_name: string;
+  hostname: string;
+  platform: string;
+  last_heartbeat: number; // epoch ms
+  daemon_running: boolean;
+  daemon_pid: number | null;
+  active_jobs: Array<{ issue: number; title: string; stage: string }>;
+  queued: number[];
+  events_since: number; // last synced event timestamp
+}
+
+interface TeamState {
+  developers: Array<ConnectedDeveloper & { _presence?: string }>;
+  total_online: number;
+  total_active_pipelines: number;
+  total_queued: number;
+}
+
 interface FleetState {
   timestamp: string;
   daemon: {
@@ -129,6 +152,7 @@ interface FleetState {
   machines: MachineInfo[];
   cost: CostInfo;
   dora: DoraGrades;
+  team?: TeamState;
 }
 
 interface HealthResponse {
@@ -154,6 +178,7 @@ function createSession(data: Omit<Session, "expiresAt">): string {
     ...data,
     expiresAt: Date.now() + SESSION_TTL_MS,
   });
+  saveSessions();
   return sessionId;
 }
 
@@ -170,6 +195,7 @@ function getSession(req: Request): Session | null {
 
   if (Date.now() > session.expiresAt) {
     sessions.delete(sessionId);
+    saveSessions();
     return null;
   }
 
@@ -193,6 +219,110 @@ function clearSessionCookie(): string {
   return "fleet_session=; Path=/; HttpOnly; SameSite=Lax; Max-Age=0";
 }
 
+// ─── File-backed Sessions ───────────────────────────────────────────
+const SESSIONS_FILE = join(HOME, ".shipwright", "sessions.json");
+
+function loadSessions(): void {
+  try {
+    if (existsSync(SESSIONS_FILE)) {
+      const data = JSON.parse(readFileSync(SESSIONS_FILE, "utf-8"));
+      const now = Date.now();
+      if (data && typeof data === "object") {
+        for (const [id, sess] of Object.entries(data)) {
+          const s = sess as Session;
+          if (s.expiresAt > now) {
+            sessions.set(id, s);
+          }
+        }
+      }
+    }
+  } catch {
+    /* start fresh */
+  }
+}
+
+function saveSessions(): void {
+  const dir = join(HOME, ".shipwright");
+  if (!existsSync(dir)) mkdirSync(dir, { recursive: true });
+  const obj: Record<string, Session> = {};
+  for (const [id, sess] of sessions) {
+    obj[id] = sess;
+  }
+  const tmp = SESSIONS_FILE + ".tmp";
+  writeFileSync(tmp, JSON.stringify(obj, null, 2));
+  renameSync(tmp, SESSIONS_FILE);
+}
+
+// ─── Developer Registry ─────────────────────────────────────────────
+const DEVELOPER_REGISTRY_FILE = join(
+  HOME,
+  ".shipwright",
+  "developer-registry.json",
+);
+const TEAM_EVENTS_FILE = join(HOME, ".shipwright", "team-events.jsonl");
+const developerRegistry = new Map<string, ConnectedDeveloper>();
+
+function loadDeveloperRegistry(): void {
+  try {
+    if (existsSync(DEVELOPER_REGISTRY_FILE)) {
+      const data = JSON.parse(readFileSync(DEVELOPER_REGISTRY_FILE, "utf-8"));
+      if (Array.isArray(data)) {
+        for (const dev of data) {
+          const key = `${dev.developer_id}@${dev.machine_name}`;
+          developerRegistry.set(key, dev);
+        }
+      }
+    }
+  } catch {
+    /* start fresh */
+  }
+}
+
+function saveDeveloperRegistry(): void {
+  const dir = join(HOME, ".shipwright");
+  if (!existsSync(dir)) mkdirSync(dir, { recursive: true });
+  const data = JSON.stringify(Array.from(developerRegistry.values()), null, 2);
+  const tmp = DEVELOPER_REGISTRY_FILE + ".tmp";
+  writeFileSync(tmp, data);
+  renameSync(tmp, DEVELOPER_REGISTRY_FILE);
+}
+
+function getPresenceStatus(
+  lastHeartbeat: number,
+): "online" | "idle" | "offline" {
+  const age = Date.now() - lastHeartbeat;
+  if (age < 30_000) return "online";
+  if (age < 120_000) return "idle";
+  return "offline";
+}
+
+function getTeamState(): TeamState {
+  const developers = Array.from(developerRegistry.values()).filter(
+    (d) => Date.now() - d.last_heartbeat < 86_400_000,
+  ); // exclude >24h offline
+  const online = developers.filter(
+    (d) => getPresenceStatus(d.last_heartbeat) === "online",
+  );
+  return {
+    developers: developers.map((d) => ({
+      ...d,
+      _presence: getPresenceStatus(d.last_heartbeat),
+    })),
+    total_online: online.length,
+    total_active_pipelines: developers.reduce(
+      (sum, d) => sum + d.active_jobs.length,
+      0,
+    ),
+    total_queued: developers.reduce((sum, d) => sum + d.queued.length, 0),
+  };
+}
+
+// Invite tokens (in-memory, separate from join-tokens)
+const inviteTokens = new Map<
+  string,
+  { token: string; created_at: string; expires_at: string }
+>();
+
 // ─── Auth check ─────────────────────────────────────────────────────
 type AuthMode = "oauth" | "pat" | "none";
 
@@ -212,7 +342,15 @@ function isPublicRoute(pathname: string): boolean {
   return (
     pathname === "/login" ||
     pathname.startsWith("/auth/") ||
-    pathname === "/api/health"
+    pathname === "/api/health" ||
+    pathname.startsWith("/api/join/") ||
+    pathname.startsWith("/api/connect/") ||
+    pathname === "/api/team" ||
+    pathname === "/api/team/activity" ||
+    pathname === "/api/team/invite" ||
+    pathname === "/api/claim" ||
+    pathname === "/api/claim/release" ||
+    pathname === "/api/webhook/ci"
   );
 }
 
@@ -632,6 +770,11 @@ function getFleetState(): FleetState {
   }
   for (const p of state.pipelines) {
     if (issueStages[p.issue]) p.stagesDone = issueStages[p.issue];
+  }
+
+  // Add team data if any developers are connected
+  if (developerRegistry.size > 0) {
+    state.team = getTeamState();
   }
 
   return state;
@@ -1243,23 +1386,155 @@ interface MachineInfo {
   host: string;
   role: string;
   max_workers: number;
+  active_workers: number;
   registered_at: string;
+  ssh_user?: string;
+  shipwright_path?: string;
+  status: "online" | "degraded" | "offline";
+  health: {
+    daemon_running: boolean;
+    heartbeat_count: number;
+    last_heartbeat_s_ago: number;
+  };
+  join_token?: string;
+}
+
+interface MachinesFileData {
+  machines: Array<Record<string, unknown>>;
+}
+
+const JOIN_TOKENS_FILE = join(HOME, ".shipwright", "join-tokens.json");
+const MACHINE_HEALTH_FILE = join(HOME, ".shipwright", "machine-health.json");
+
+function readMachinesFile(): MachinesFileData {
+  const raw = readFileOr(MACHINES_FILE, '{"machines":[]}');
+  try {
+    const data = JSON.parse(raw);
+    return { machines: data.machines || [] };
+  } catch {
+    return { machines: [] };
+  }
+}
+
+function writeMachinesFile(data: MachinesFileData): void {
+  const dir = join(HOME, ".shipwright");
+  if (!existsSync(dir)) mkdirSync(dir, { recursive: true });
+  const tmp = MACHINES_FILE + ".tmp";
+  writeFileSync(tmp, JSON.stringify(data, null, 2), "utf-8");
+  renameSync(tmp, MACHINES_FILE);
+}
+
+function enrichMachineHealth(
+  machine: Record<string, unknown>,
+  agents: AgentInfo[],
+): MachineInfo {
+  const name = (machine.name as string) || "";
+  const host = (machine.host as string) || "";
+  const activeWorkers = agents.filter(
+    (a) => a.machine === name || a.machine === host,
+  ).length;
+
+  // Read health data if available
+  let daemonRunning = false;
+  let heartbeatCount = 0;
+  let lastHeartbeatSAgo = 9999;
+
+  try {
+    if (existsSync(MACHINE_HEALTH_FILE)) {
+      const healthData = JSON.parse(readFileSync(MACHINE_HEALTH_FILE, "utf-8"));
+      const mHealth = healthData[name] || healthData[host];
+      if (mHealth) {
+        daemonRunning = !!mHealth.daemon_running;
+        heartbeatCount = (mHealth.heartbeat_count as number) || 0;
+        if (mHealth.last_check) {
+          const checkEpoch = Math.floor(
+            new Date(mHealth.last_check as string).getTime() / 1000,
+          );
+          lastHeartbeatSAgo = Math.floor(Date.now() / 1000) - checkEpoch;
+        }
+      }
+    }
+  } catch {
+    // ignore health read errors
+  }
+
+  // Also check heartbeat files for this machine
+  const machineHeartbeats = agents.filter(
+    (a) => a.machine === name || a.machine === host,
+  );
+  if (machineHeartbeats.length > 0) {
+    heartbeatCount = machineHeartbeats.length;
+    const minAge = Math.min(...machineHeartbeats.map((a) => a.heartbeat_age_s));
+    if (minAge < lastHeartbeatSAgo) lastHeartbeatSAgo = minAge;
+  }
+
+  let status: MachineInfo["status"] = "offline";
+  if (lastHeartbeatSAgo < 60) status = "online";
+  else if (lastHeartbeatSAgo < 300 || daemonRunning) status = "degraded";
+
+  return {
+    name,
+    host,
+    role: (machine.role as string) || "worker",
+    max_workers: (machine.max_workers as number) || 4,
+    active_workers: activeWorkers,
+    registered_at: (machine.registered_at as string) || "",
+    ssh_user: (machine.ssh_user as string) || undefined,
+    shipwright_path: (machine.shipwright_path as string) || undefined,
+    status,
+    health: {
+      daemon_running: daemonRunning,
+      heartbeat_count: heartbeatCount,
+      last_heartbeat_s_ago: lastHeartbeatSAgo,
+    },
+    join_token: (machine.join_token as string) || undefined,
+  };
 }
 
 function getMachines(): MachineInfo[] {
-  if (!existsSync(MACHINES_FILE)) return [];
-  try {
-    const data = JSON.parse(readFileSync(MACHINES_FILE, "utf-8"));
-    return (data.machines || []).map((m: Record<string, unknown>) => ({
-      name: (m.name as string) || "",
-      host: (m.host as string) || "",
-      role: (m.role as string) || "worker",
-      max_workers: (m.max_workers as number) || 4,
-      registered_at: (m.registered_at as string) || "",
-    }));
-  } catch {
-    return [];
-  }
+  const data = readMachinesFile();
+  if (data.machines.length === 0) return [];
+  const agents = getAgents();
+  return data.machines.map((m) => enrichMachineHealth(m, agents));
+}
+
+function generateJoinScript(
+  token: string,
+  dashboardUrl: string,
+  maxWorkers: number,
+): string {
+  return `#!/usr/bin/env bash
+set -euo pipefail
+# Shipwright remote worker join script
+# Generated by Shipwright Dashboard
+
+DASHBOARD_URL="${dashboardUrl}"
+JOIN_TOKEN="${token}"
+MAX_WORKERS="${maxWorkers}"
+
+echo "==> Joining Shipwright cluster..."
+echo "    Dashboard: \${DASHBOARD_URL}"
+echo "    Max workers: \${MAX_WORKERS}"
+
+# Verify shipwright is installed
+if ! command -v shipwright &>/dev/null && ! command -v sw &>/dev/null; then
+  echo "ERROR: shipwright not found in PATH"
+  echo "Install: curl -fsSL https://raw.githubusercontent.com/sethdford/shipwright/main/install.sh | bash"
+  exit 1
+fi
+
+SW=\$(command -v shipwright || command -v sw)
+
+# Register this machine with the dashboard
+HOSTNAME=\$(hostname)
+\$SW remote add "\${HOSTNAME}" \\
+  --host "\$(hostname -f 2>/dev/null || hostname)" \\
+  --max-workers "\${MAX_WORKERS}" \\
+  --join-token "\${JOIN_TOKEN}" 2>/dev/null || true
+
+echo "==> Machine registered. Starting daemon..."
+\$SW daemon start --max-parallel "\${MAX_WORKERS}"
+`;
 }
 
 // ─── Cost Data ─────────────────────────────────────────────────────
@@ -1399,7 +1674,7 @@ interface LinearStatus {
 
 function getLinearStatus(): LinearStatus {
   const hasEnvKey = !!process.env.LINEAR_API_KEY;
-  const configPath = join(HOME, ".claude-teams", "linear-config.json");
+  const configPath = join(HOME, ".shipwright", "tracker-config.json");
   const hasConfigFile = existsSync(configPath);
 
   let linkedIssues: Record<string, unknown> = {};
@@ -1418,6 +1693,55 @@ function getLinearStatus(): LinearStatus {
     linkedIssues,
   };
 }
+
+// ─── GitHub CLI Cache ────────────────────────────────────────────────
+const ghCache = new Map<string, { data: unknown; ts: number }>();
+const GH_CACHE_TTL_MS = 30_000;
+
+function ghCached<T>(key: string, fn: () => T): T {
+  const now = Date.now();
+  const cached = ghCache.get(key);
+  if (cached && now - cached.ts < GH_CACHE_TTL_MS) return cached.data as T;
+  const data = fn();
+  ghCache.set(key, { data, ts: now });
+  return data;
+}
+
+// ─── Memory System Helpers ──────────────────────────────────────────
+function readMemoryFiles(filename: string): unknown[] {
+  if (!existsSync(MEMORY_DIR)) return [];
+  const results: unknown[] = [];
+  try {
+    const subdirs = readdirSync(MEMORY_DIR);
+    for (const sub of subdirs) {
+      const filePath = join(MEMORY_DIR, sub, filename);
+      if (existsSync(filePath)) {
+        try {
+          const content = readFileSync(filePath, "utf-8");
+          const parsed = JSON.parse(content);
+          if (Array.isArray(parsed)) results.push(...parsed);
+          else results.push(parsed);
+        } catch {
+          // skip malformed files
+        }
+      }
+    }
+  } catch {
+    // ignore
+  }
+  return results;
+}
+
+function stripAnsi(content: string): string {
+  return content.replace(/\x1b\[[0-9;]*m/g, "");
+}
+
+// ─── Model Pricing (per 1M tokens) ──────────────────────────────────
+const MODEL_PRICING: Record<string, { input: number; output: number }> = {
+  opus: { input: 15, output: 75 },
+  sonnet: { input: 3, output: 15 },
+  haiku: { input: 0.25, output: 1.25 },
+};
 
 // ─── Static file serving ─────────────────────────────────────────────
 const MIME_TYPES: Record<string, string> = {
@@ -1464,7 +1788,7 @@ let eventsWatcher: FSWatcher | null = null;
 
 function startEventsWatcher(): void {
   // Watch the directory containing events.jsonl (file may not exist yet)
-  const watchDir = join(HOME, ".claude-teams");
+  const watchDir = join(HOME, ".shipwright");
   if (!existsSync(watchDir)) return;
 
   try {
@@ -1633,7 +1957,10 @@ function handleAuthLogout(req: Request): Response {
   const cookie = req.headers.get("cookie");
   if (cookie) {
     const match = cookie.match(/fleet_session=([^;]+)/);
-    if (match) sessions.delete(match[1]);
+    if (match) {
+      sessions.delete(match[1]);
+      saveSessions();
+    }
   }
 
   return new Response(null, {
@@ -1709,7 +2036,7 @@ async function handlePatLogin(req: Request): Promise<Response> {
 // ─── HTTP + WebSocket server ─────────────────────────────────────────
 const CORS_HEADERS = {
   "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
+  "Access-Control-Allow-Methods": "GET, POST, PATCH, DELETE, OPTIONS",
   "Access-Control-Allow-Headers": "Content-Type",
 };
 
@@ -1737,6 +2064,57 @@ const server = Bun.serve({
       return new Response(JSON.stringify(health), {
         headers: { "Content-Type": "application/json", ...CORS_HEADERS },
       });
+    }
+
+    // GET /api/join/{token} — Serve join script (public, no auth required)
+    if (pathname.startsWith("/api/join/") && req.method === "GET") {
+      const token = pathname.split("/")[3] || "";
+      if (!token) {
+        return new Response("Missing token", { status: 400 });
+      }
+      try {
+        let tokens: Array<Record<string, unknown>> = [];
+        try {
+          if (existsSync(JOIN_TOKENS_FILE)) {
+            tokens = JSON.parse(readFileSync(JOIN_TOKENS_FILE, "utf-8"));
+          }
+        } catch {
+          tokens = [];
+        }
+        const entry = tokens.find((t) => (t.token as string) === token);
+        if (!entry) {
+          return new Response(
+            "#!/usr/bin/env bash\necho 'ERROR: Invalid or expired join token'\nexit 1\n",
+            {
+              headers: { "Content-Type": "text/plain", ...CORS_HEADERS },
+            },
+          );
+        }
+        const dashboardUrl = `${url.protocol}//${url.host}`;
+        const maxWorkers = (entry.max_workers as number) || 4;
+        const script = generateJoinScript(token, dashboardUrl, maxWorkers);
+
+        // Mark token as used
+        entry.used = true;
+        entry.used_at = new Date().toISOString();
+        const dir = join(HOME, ".shipwright");
+        if (!existsSync(dir)) mkdirSync(dir, { recursive: true });
+        const tokensTmp = JOIN_TOKENS_FILE + ".tmp";
+        writeFileSync(tokensTmp, JSON.stringify(tokens, null, 2), "utf-8");
+        renameSync(tokensTmp, JOIN_TOKENS_FILE);
+
+        return new Response(script, {
+          headers: { "Content-Type": "text/plain", ...CORS_HEADERS },
+        });
+      } catch (err) {
+        return new Response(
+          `#!/usr/bin/env bash\necho 'ERROR: ${String(err)}'\nexit 1\n`,
+          {
+            status: 500,
+            headers: { "Content-Type": "text/plain", ...CORS_HEADERS },
+          },
+        );
+      }
     }
 
     // Auth routes
@@ -1877,6 +2255,87 @@ const server = Bun.serve({
       });
     }
 
+    // REST: Bulk intervention (must be before generic /api/intervention/)
+    if (pathname === "/api/intervention/bulk" && req.method === "POST") {
+      try {
+        const body = (await req.json()) as {
+          issues: number[];
+          action: string;
+        };
+        const { issues, action } = body;
+        if (!Array.isArray(issues) || !action) {
+          return new Response(
+            JSON.stringify({ error: "Missing issues array or action" }),
+            {
+              status: 400,
+              headers: { "Content-Type": "application/json", ...CORS_HEADERS },
+            },
+          );
+        }
+
+        const dState = readDaemonState();
+        const activeJobsList = dState
+          ? (dState.active_jobs as Array<Record<string, unknown>>) || []
+          : [];
+
+        const results: Array<{ issue: number; ok: boolean; error?: string }> =
+          [];
+        for (const issueNum of issues) {
+          try {
+            let pid: number | null = null;
+            for (const job of activeJobsList) {
+              if ((job.issue as number) === issueNum) {
+                pid = (job.pid as number) || null;
+                break;
+              }
+            }
+            if (!pid) {
+              results.push({
+                issue: issueNum,
+                ok: false,
+                error: "No active PID found",
+              });
+              continue;
+            }
+            switch (action) {
+              case "pause":
+                execSync(`kill -STOP ${pid}`);
+                break;
+              case "resume":
+                execSync(`kill -CONT ${pid}`);
+                break;
+              case "abort":
+                execSync(`kill -TERM ${pid}`);
+                break;
+              default:
+                results.push({
+                  issue: issueNum,
+                  ok: false,
+                  error: `Unknown action: ${action}`,
+                });
+                continue;
+            }
+            results.push({ issue: issueNum, ok: true });
+          } catch (err) {
+            results.push({
+              issue: issueNum,
+              ok: false,
+              error: String(err),
+            });
+          }
+        }
+
+        return new Response(JSON.stringify({ results }), {
+          headers: { "Content-Type": "application/json", ...CORS_HEADERS },
+        });
+      } catch (err) {
+        return new Response(JSON.stringify({ error: String(err) }), {
+          status: 500,
+          headers: { "Content-Type": "application/json", ...CORS_HEADERS },
+        });
+      }
+    }
+
     // REST: Intervention actions
     if (pathname.startsWith("/api/intervention/") && req.method === "POST") {
       const parts = pathname.split("/");
@@ -2000,6 +2459,1595 @@ const server = Bun.serve({
       );
     }
 
+    // ── Phase 1: Pipeline Deep-Dive endpoints ─────────────────────
+
+    // REST: Pipeline build logs
+    if (pathname.startsWith("/api/logs/")) {
+      const issueNum = parseInt(pathname.split("/")[3] || "0");
+      if (!issueNum || isNaN(issueNum)) {
+        return new Response(JSON.stringify({ error: "Invalid issue number" }), {
+          status: 400,
+          headers: { "Content-Type": "application/json", ...CORS_HEADERS },
+        });
+      }
+      const logFile = join(LOGS_DIR, `issue-${issueNum}.log`);
+      const raw = readFileOr(logFile, "");
+      return new Response(JSON.stringify({ content: stripAnsi(raw) }), {
+        headers: { "Content-Type": "application/json", ...CORS_HEADERS },
+      });
+    }
+
+    // REST: Pipeline artifacts (plan, design, dod, test-results, review, coverage)
+    if (pathname.startsWith("/api/artifacts/")) {
+      const parts = pathname.split("/");
+      const issueNum = parseInt(parts[3] || "0");
+      const artifactType = parts[4] || "";
+      if (!issueNum || isNaN(issueNum) || !artifactType) {
+        return new Response(
+          JSON.stringify({ error: "Invalid issue or artifact type" }),
+          {
+            status: 400,
+            headers: { "Content-Type": "application/json", ...CORS_HEADERS },
+          },
+        );
+      }
+      const worktreeBase = findWorktreeBase(issueNum);
+      let content = "";
+      let fileType = "md";
+      if (worktreeBase) {
+        const artifactsDir = join(
+          worktreeBase,
+          ".claude",
+          "pipeline-artifacts",
+        );
+        // Try .md, .log, .json extensions
+        for (const ext of [".md", ".log", ".json"]) {
+          const filePath = join(artifactsDir, `${artifactType}${ext}`);
+          if (existsSync(filePath)) {
+            content = readFileOr(filePath, "");
+            fileType = ext.slice(1);
+            break;
+          }
+        }
+      }
+      return new Response(JSON.stringify({ content, type: fileType }), {
+        headers: { "Content-Type": "application/json", ...CORS_HEADERS },
+      });
+    }
+
+    // REST: GitHub issue + PR info
+    if (pathname.startsWith("/api/github/")) {
+      const issueNum = parseInt(pathname.split("/")[3] || "0");
+      if (!issueNum || isNaN(issueNum)) {
+        return new Response(JSON.stringify({ error: "Invalid issue number" }), {
+          status: 400,
+          headers: { "Content-Type": "application/json", ...CORS_HEADERS },
+        });
+      }
+      const data = ghCached(`github-${issueNum}`, () => {
+        try {
+          const issueRaw = execSync(
+            `gh issue view ${issueNum} --json title,state,labels,assignees,url`,
+            { encoding: "utf-8", timeout: 10000 },
+          );
+          const prRaw = execSync(
+            `gh pr list --search "issue-${issueNum}" --json number,state,url,statusCheckRollup,reviews`,
+            { encoding: "utf-8", timeout: 10000 },
+          );
+          const issue = JSON.parse(issueRaw);
+          const prs = JSON.parse(prRaw) as Array<Record<string, unknown>>;
+          const pr = prs.length > 0 ? prs[0] : null;
+          const checks = pr
+            ? (
+                (pr.statusCheckRollup as Array<Record<string, string>>) || []
+              ).map((c) => ({
+                name: c.name || c.context || "",
+                status: (c.conclusion || c.state || "pending").toLowerCase(),
+              }))
+            : [];
+          return {
+            configured: true,
+            issue_title: issue.title || "",
+            issue_state: (issue.state || "").toLowerCase(),
+            issue_url: issue.url || "",
+            pr_number: pr ? (pr.number as number) : null,
+            pr_state: pr ? ((pr.state as string) || "").toLowerCase() : null,
+            pr_url: pr ? (pr.url as string) || "" : null,
+            checks,
+          };
+        } catch {
+          return { configured: false };
+        }
+      });
+      return new Response(JSON.stringify(data), {
+        headers: { "Content-Type": "application/json", ...CORS_HEADERS },
+      });
+    }
+
+    // REST: Events filtered by issue
+    if (pathname.startsWith("/api/events/")) {
+      const issueNum = parseInt(pathname.split("/")[3] || "0");
+      if (!issueNum || isNaN(issueNum)) {
+        return new Response(JSON.stringify({ error: "Invalid issue number" }), {
+          status: 400,
+          headers: { "Content-Type": "application/json", ...CORS_HEADERS },
+        });
+      }
+      const allEvents = readEvents();
+      const filtered = allEvents.filter((e) => e.issue === issueNum);
+      return new Response(JSON.stringify({ events: filtered }), {
+        headers: { "Content-Type": "application/json", ...CORS_HEADERS },
+      });
+    }
+
+    // REST: Memory failure patterns for a specific issue
+    if (pathname.startsWith("/api/memory/failures/")) {
+      const issueNum = parseInt(pathname.split("/")[4] || "0");
+      if (!issueNum || isNaN(issueNum)) {
+        return new Response(JSON.stringify({ error: "Invalid issue number" }), {
+          status: 400,
+          headers: { "Content-Type": "application/json", ...CORS_HEADERS },
+        });
+      }
+      const allPatterns = readMemoryFiles("failures.json") as Array<
+        Record<string, unknown>
+      >;
+      const matched = allPatterns.filter((p) => {
+        const issues = (p.issues as number[]) || [];
+        const issue = p.issue as number;
+        return issues.includes(issueNum) || issue === issueNum;
+      });
+      return new Response(JSON.stringify({ patterns: matched }), {
+        headers: { "Content-Type": "application/json", ...CORS_HEADERS },
+      });
+    }
+
+    // ── Phase 2: Queue Intelligence + Cost Analytics ─────────────
+
+    // REST: Detailed queue with triage scores
+    if (pathname === "/api/queue/detailed") {
+      const daemonState = readDaemonState();
+      const events = readEvents();
+      const queued = daemonState
+        ? (daemonState.queued as Array<number | Record<string, unknown>>) || []
+        : [];
+
+      // Build triage score map from most recent daemon.triage events
+      const triageMap: Record<number, Record<string, unknown>> = {};
+      for (const e of events) {
+        if (e.type === "daemon.triage" && e.issue) {
+          triageMap[e.issue] = {
+            complexity: e.complexity,
+            impact: e.impact,
+            priority: e.priority,
+            age: e.age,
+            dependency: e.dependency,
+            memory: e.memory,
+            score: e.score,
+          };
+        }
+      }
+
+      const enriched = queued.map((q) => {
+        const issue = typeof q === "number" ? q : (q.issue as number) || 0;
+        const title = typeof q === "number" ? "" : (q.title as string) || "";
+        const score = typeof q === "number" ? 0 : (q.score as number) || 0;
+        const triage = triageMap[issue] || {};
+        return { issue, title, score, ...triage };
+      });
+
+      return new Response(JSON.stringify({ queue: enriched }), {
+        headers: { "Content-Type": "application/json", ...CORS_HEADERS },
+      });
+    }
+
+    // REST: Cost breakdown by stage, model, issue
+    if (pathname === "/api/costs/breakdown") {
+      const period = parseInt(url.searchParams.get("period") || "7");
+      const events = readEvents();
+      const now = Math.floor(Date.now() / 1000);
+      const cutoff = now - period * 86400;
+
+      const byStage: Record<string, number> = {};
+      const byModel: Record<string, number> = {};
+      const byIssue: Record<number, number> = {};
+      let total = 0;
+
+      for (const e of events) {
+        if ((e.ts_epoch || 0) < cutoff) continue;
+        if (e.type !== "pipeline.cost" && e.type !== "cost.record") continue;
+
+        let cost = (e.cost_usd as number) || 0;
+        if (!cost) {
+          // Calculate from tokens if cost not directly recorded
+          const inputTokens = (e.input_tokens as number) || 0;
+          const outputTokens = (e.output_tokens as number) || 0;
+          const model = ((e.model as string) || "sonnet").toLowerCase();
+          const pricing = MODEL_PRICING[model] || MODEL_PRICING["sonnet"];
+          cost =
+            (inputTokens / 1_000_000) * pricing.input +
+            (outputTokens / 1_000_000) * pricing.output;
+        }
+
+        if (cost <= 0) continue;
+        total += cost;
+
+        const stage = (e.stage as string) || "unknown";
+        byStage[stage] = (byStage[stage] || 0) + cost;
+
+        const model = (e.model as string) || "unknown";
+        byModel[model] = (byModel[model] || 0) + cost;
+
+        if (e.issue) {
+          byIssue[e.issue] = (byIssue[e.issue] || 0) + cost;
+        }
+      }
+
+      // Round all values
+      for (const k of Object.keys(byStage))
+        byStage[k] = Math.round(byStage[k] * 100) / 100;
+      for (const k of Object.keys(byModel))
+        byModel[k] = Math.round(byModel[k] * 100) / 100;
+      for (const k of Object.keys(byIssue))
+        byIssue[parseInt(k)] = Math.round(byIssue[parseInt(k)] * 100) / 100;
+
+      return new Response(
+        JSON.stringify({
+          byStage,
+          byModel,
+          byIssue,
+          total: Math.round(total * 100) / 100,
+        }),
+        { headers: { "Content-Type": "application/json", ...CORS_HEADERS } },
+      );
+    }
+
+    // REST: Cost trend (daily aggregation)
+    if (pathname === "/api/costs/trend") {
+      const period = parseInt(url.searchParams.get("period") || "30");
+      const events = readEvents();
+      const now = Math.floor(Date.now() / 1000);
+      const cutoff = now - period * 86400;
+
+      const dailyMap: Record<string, number> = {};
+      // Initialize all days
+      for (let i = period - 1; i >= 0; i--) {
+        const d = new Date((now - i * 86400) * 1000);
+        dailyMap[d.toISOString().split("T")[0]] = 0;
+      }
+
+      for (const e of events) {
+        if ((e.ts_epoch || 0) < cutoff) continue;
+        if (e.type !== "pipeline.cost" && e.type !== "cost.record") continue;
+        let cost = (e.cost_usd as number) || 0;
+        if (!cost) {
+          const inputTokens = (e.input_tokens as number) || 0;
+          const outputTokens = (e.output_tokens as number) || 0;
+          const model = ((e.model as string) || "sonnet").toLowerCase();
+          const pricing = MODEL_PRICING[model] || MODEL_PRICING["sonnet"];
+          cost =
+            (inputTokens / 1_000_000) * pricing.input +
+            (outputTokens / 1_000_000) * pricing.output;
+        }
+        if (cost <= 0) continue;
+        const dateKey = (e.ts || "").split("T")[0];
+        if (dateKey in dailyMap) {
+          dailyMap[dateKey] += cost;
+        }
+      }
+
+      const daily = Object.entries(dailyMap)
+        .sort(([a], [b]) => a.localeCompare(b))
+        .map(([date, cost]) => ({ date, cost: Math.round(cost * 100) / 100 }));
+
+      return new Response(JSON.stringify({ daily }), {
+        headers: { "Content-Type": "application/json", ...CORS_HEADERS },
+      });
+    }
+
+    // REST: DORA trend (weekly sliding windows)
+    if (pathname === "/api/metrics/dora-trend") {
+      const period = parseInt(url.searchParams.get("period") || "30");
+      const events = readEvents();
+      const weeks: Array<{ week: string; grades: DoraGrades }> = [];
+
+      // Create weekly windows
+      const now = Math.floor(Date.now() / 1000);
+      const numWeeks = Math.ceil(period / 7);
+      for (let i = numWeeks - 1; i >= 0; i--) {
+        const weekEnd = now - i * 7 * 86400;
+        const weekStart = weekEnd - 7 * 86400;
+        const weekEvents = events.filter(
+          (e) => (e.ts_epoch || 0) >= weekStart && (e.ts_epoch || 0) < weekEnd,
+        );
+        const weekDate = new Date(weekEnd * 1000).toISOString().split("T")[0];
+        weeks.push({
+          week: weekDate,
+          grades: calculateDoraGrades(weekEvents, 7),
+        });
+      }
+
+      return new Response(JSON.stringify({ weeks }), {
+        headers: { "Content-Type": "application/json", ...CORS_HEADERS },
+      });
+    }
+
+    // ── Phase 3: Memory + Patrol + Failure Heatmap ──────────────
+
+    // REST: All memory failure patterns aggregated
+    if (pathname === "/api/memory/patterns") {
+      const allPatterns = readMemoryFiles("failures.json") as Array<
+        Record<string, unknown>
+      >;
+      // Aggregate by pattern signature (error message or pattern field)
+      const freqMap: Record<
+        string,
+        { pattern: string; frequency: number; rootCause: string; fix: string }
+      > = {};
+      for (const p of allPatterns) {
+        const key = (p.pattern as string) || (p.error as string) || "unknown";
+        if (!freqMap[key]) {
+          freqMap[key] = {
+            pattern: key,
+            frequency: 0,
+            rootCause:
+              (p.root_cause as string) || (p.rootCause as string) || "",
+            fix: (p.fix as string) || (p.resolution as string) || "",
+          };
+        }
+        freqMap[key].frequency++;
+      }
+      const patterns = Object.values(freqMap).sort(
+        (a, b) => b.frequency - a.frequency,
+      );
+      return new Response(JSON.stringify({ patterns }), {
+        headers: { "Content-Type": "application/json", ...CORS_HEADERS },
+      });
+    }
+
+    // REST: Memory decisions
+    if (pathname === "/api/memory/decisions") {
+      const decisions = readMemoryFiles("decisions.json");
+      return new Response(JSON.stringify({ decisions }), {
+        headers: { "Content-Type": "application/json", ...CORS_HEADERS },
+      });
+    }
+
+    // REST: Global memory/learnings
+    if (pathname === "/api/memory/global") {
+      const globalPath = join(MEMORY_DIR, "global.json");
+      let learnings: unknown[] = [];
+      if (existsSync(globalPath)) {
+        try {
+          const data = JSON.parse(readFileSync(globalPath, "utf-8"));
+          learnings = Array.isArray(data) ? data : data.learnings || [];
+        } catch {
+          // ignore
+        }
+      }
+      return new Response(JSON.stringify({ learnings }), {
+        headers: { "Content-Type": "application/json", ...CORS_HEADERS },
+      });
+    }
+
+    // REST: Recent patrol findings
+    if (pathname === "/api/patrol/recent") {
+      const events = readEvents();
+      const findings: DaemonEvent[] = [];
+      const runs: DaemonEvent[] = [];
+      for (const e of events) {
+        if (e.type === "patrol.finding") findings.push(e);
+        if (e.type === "patrol.completed") runs.push(e);
+      }
+      return new Response(
+        JSON.stringify({
+          findings: findings.slice(-50),
+          runs: runs.slice(-20),
+        }),
+        { headers: { "Content-Type": "application/json", ...CORS_HEADERS } },
+      );
+    }
+
+    // REST: Failure heatmap (stage x day)
+    if (pathname === "/api/metrics/failure-heatmap") {
+      const events = readEvents();
+      const heatmap: Record<string, Record<string, number>> = {};
+      for (const e of events) {
+        if (e.type !== "stage.failed") continue;
+        const stage = e.stage || "unknown";
+        const date = (e.ts || "").split("T")[0];
+        if (!date) continue;
+        if (!heatmap[stage]) heatmap[stage] = {};
+        heatmap[stage][date] = (heatmap[stage][date] || 0) + 1;
+      }
+      return new Response(JSON.stringify({ heatmap }), {
+        headers: { "Content-Type": "application/json", ...CORS_HEADERS },
+      });
+    }
+
+    // ── Phase 4: Performance Analytics ──────────────────────────
+
+    // REST: Per-stage performance stats
+    if (pathname === "/api/metrics/stage-performance") {
+      const period = parseInt(url.searchParams.get("period") || "7");
+      const events = readEvents();
+      const now = Math.floor(Date.now() / 1000);
+      const cutoff = now - period * 86400;
+      const halfCutoff = now - Math.floor(period / 2) * 86400;
+
+      const stageData: Record<
+        string,
+        {
+          durations: number[];
+          costs: number[];
+          firstHalf: number[];
+          secondHalf: number[];
+        }
+      > = {};
+
+      for (const e of events) {
+        if ((e.ts_epoch || 0) < cutoff) continue;
+        if (e.type === "stage.completed" && e.stage) {
+          const stage = e.stage;
+          if (!stageData[stage]) {
+            stageData[stage] = {
+              durations: [],
+              costs: [],
+              firstHalf: [],
+              secondHalf: [],
+            };
+          }
+          const dur = e.duration_s || 0;
+          stageData[stage].durations.push(dur);
+          if ((e.ts_epoch || 0) < halfCutoff) {
+            stageData[stage].firstHalf.push(dur);
+          } else {
+            stageData[stage].secondHalf.push(dur);
+          }
+          const cost = (e.cost_usd as number) || 0;
+          if (cost > 0) stageData[stage].costs.push(cost);
+        }
+      }
+
+      const stages = Object.entries(stageData).map(([name, data]) => {
+        const sum = data.durations.reduce((a, b) => a + b, 0);
+        const avg = data.durations.length > 0 ? sum / data.durations.length : 0;
+        const firstAvg =
+          data.firstHalf.length > 0
+            ? data.firstHalf.reduce((a, b) => a + b, 0) / data.firstHalf.length
+            : avg;
+        const secondAvg =
+          data.secondHalf.length > 0
+            ? data.secondHalf.reduce((a, b) => a + b, 0) /
+              data.secondHalf.length
+            : avg;
+        const trend =
+          firstAvg > 0
+            ? Math.round(((secondAvg - firstAvg) / firstAvg) * 100)
+            : 0;
+        const costSum = data.costs.reduce((a, b) => a + b, 0);
+
+        return {
+          name,
+          avgDuration: Math.round(avg),
+          minDuration: Math.min(...data.durations),
+          maxDuration: Math.max(...data.durations),
+          count: data.durations.length,
+          cost: Math.round(costSum * 100) / 100,
+          trend,
+        };
+      });
+
+      return new Response(JSON.stringify({ stages }), {
+        headers: { "Content-Type": "application/json", ...CORS_HEADERS },
+      });
+    }
+
+    // REST: Bottleneck analysis
+    if (pathname === "/api/metrics/bottlenecks") {
+      const events = readEvents();
+      const now = Math.floor(Date.now() / 1000);
+      const cutoff = now - 7 * 86400;
+
+      const stageDurs: Record<string, number[]> = {};
+      for (const e of events) {
+        if ((e.ts_epoch || 0) < cutoff) continue;
+        if (e.type === "stage.completed" && e.stage) {
+          if (!stageDurs[e.stage]) stageDurs[e.stage] = [];
+          stageDurs[e.stage].push(e.duration_s || 0);
+        }
+      }
+
+      const bottlenecks = Object.entries(stageDurs)
+        .map(([stage, durs]) => {
+          const avg = durs.reduce((a, b) => a + b, 0) / durs.length;
+          return { stage, avgDuration: Math.round(avg), count: durs.length };
+        })
+        .sort((a, b) => b.avgDuration - a.avgDuration)
+        .slice(0, 5)
+        .map((b) => ({
+          stage: b.stage,
+          avgDuration: b.avgDuration,
+          impact:
+            b.avgDuration > 600
+              ? "high"
+              : b.avgDuration > 300
+                ? "medium"
+                : "low",
+          suggestion:
+            b.avgDuration > 600
+              ? `${b.stage} averages ${Math.round(b.avgDuration / 60)}min — consider parallelization or caching`
+              : b.avgDuration > 300
+                ? `${b.stage} is moderately slow — review for optimization opportunities`
+                : `${b.stage} is performing well`,
+        }));
+
+      return new Response(JSON.stringify({ bottlenecks }), {
+        headers: { "Content-Type": "application/json", ...CORS_HEADERS },
+      });
+    }
+
+    // REST: Throughput trend (issues per hour, daily)
+    if (pathname === "/api/metrics/throughput-trend") {
+      const period = parseInt(url.searchParams.get("period") || "30");
+      const events = readEvents();
+      const now = Math.floor(Date.now() / 1000);
+      const cutoff = now - period * 86400;
+
+      const dailyMap: Record<string, number> = {};
+      for (let i = period - 1; i >= 0; i--) {
+        const d = new Date((now - i * 86400) * 1000);
+        dailyMap[d.toISOString().split("T")[0]] = 0;
+      }
+
+      for (const e of events) {
+        if ((e.ts_epoch || 0) < cutoff) continue;
+        if (e.type === "pipeline.completed" && e.result === "success") {
+          const dateKey = (e.ts || "").split("T")[0];
+          if (dateKey in dailyMap) dailyMap[dateKey]++;
+        }
+      }
+
+      const daily = Object.entries(dailyMap)
+        .sort(([a], [b]) => a.localeCompare(b))
+        .map(([date, count]) => ({
+          date,
+          throughput: Math.round((count / 24) * 100) / 100,
+        }));
+
+      return new Response(JSON.stringify({ daily }), {
+        headers: { "Content-Type": "application/json", ...CORS_HEADERS },
+      });
+    }
+
+    // REST: Capacity estimation
+    if (pathname === "/api/metrics/capacity") {
+      const daemonState = readDaemonState();
+      const events = readEvents();
+      const now = Math.floor(Date.now() / 1000);
+
+      // Queue depth
+      const queued = daemonState
+        ? ((daemonState.queued as Array<unknown>) || []).length
+        : 0;
+
+      // Calculate current rate (completions per hour in last 24h)
+      const oneDayAgo = now - 86400;
+      let completedLast24h = 0;
+      for (const e of events) {
+        if (
+          e.type === "pipeline.completed" &&
+          e.result === "success" &&
+          (e.ts_epoch || 0) >= oneDayAgo
+        ) {
+          completedLast24h++;
+        }
+      }
+      const currentRate = Math.round((completedLast24h / 24) * 100) / 100;
+      const estimatedClearTime =
+        currentRate > 0
+          ? `${Math.round(queued / currentRate)}h`
+          : queued > 0
+            ? "unknown"
+            : "0h";
+
+      return new Response(
+        JSON.stringify({
+          queueDepth: queued,
+          currentRate,
+          estimatedClearTime,
+        }),
+        { headers: { "Content-Type": "application/json", ...CORS_HEADERS } },
+      );
+    }
+
+    // ── Phase 5: Alerts + Bulk Actions + Emergency ──────────────
+
+    // REST: Computed alerts
+    if (pathname === "/api/alerts") {
+      const events = readEvents();
+      const daemonState = readDaemonState();
+      const costInfo = getCostInfo();
+      const now = Math.floor(Date.now() / 1000);
+      const alerts: Array<{
+        type: string;
+        severity: string;
+        message: string;
+        issue?: number;
+        actions?: string[];
+      }> = [];
+
+      // Stuck pipelines: no stage change > 30min
+      if (daemonState) {
+        const activeJobs =
+          (daemonState.active_jobs as Array<Record<string, unknown>>) || [];
+        for (const job of activeJobs) {
+          const issue = (job.issue as number) || 0;
+          // Find most recent stage event for this issue
+          let lastStageEpoch = 0;
+          for (const e of events) {
+            if (
+              e.issue === issue &&
+              (e.type === "stage.started" || e.type === "stage.completed")
+            ) {
+              lastStageEpoch = Math.max(lastStageEpoch, e.ts_epoch || 0);
+            }
+          }
+          if (lastStageEpoch > 0 && now - lastStageEpoch > 1800) {
+            alerts.push({
+              type: "stuck_pipeline",
+              severity: "warning",
+              message: `Pipeline for issue #${issue} has had no stage change for ${Math.round((now - lastStageEpoch) / 60)}min`,
+              issue,
+              actions: ["pause", "abort", "message"],
+            });
+          }
+        }
+      }
+
+      // Budget warning (>80%)
+      if (costInfo.pct_used > 80) {
+        alerts.push({
+          type: "budget_warning",
+          severity: costInfo.pct_used > 95 ? "critical" : "warning",
+          message: `Budget usage at ${costInfo.pct_used}% ($${costInfo.today_spent}/$${costInfo.daily_budget})`,
+          actions: ["pause_daemon"],
+        });
+      }
+
+      // Queue depth (>10)
+      const queueDepth = daemonState
+        ? ((daemonState.queued as Array<unknown>) || []).length
+        : 0;
+      if (queueDepth > 10) {
+        alerts.push({
+          type: "queue_depth",
+          severity: queueDepth > 20 ? "critical" : "warning",
+          message: `Queue depth is ${queueDepth} issues`,
+          actions: ["scale_up"],
+        });
+      }
+
+      // Failure spike (>3 failures/hr)
+      const oneHourAgo = now - 3600;
+      let failuresLastHour = 0;
+      for (const e of events) {
+        if (
+          e.type === "pipeline.completed" &&
+          e.result !== "success" &&
+          (e.ts_epoch || 0) >= oneHourAgo
+        ) {
+          failuresLastHour++;
+        }
+      }
+      if (failuresLastHour > 3) {
+        alerts.push({
+          type: "failure_spike",
+          severity: "critical",
+          message: `${failuresLastHour} pipeline failures in the last hour`,
+          actions: ["emergency_brake", "review_logs"],
+        });
+      }
+
+      // Stale heartbeat (>5min)
+      if (existsSync(HEARTBEAT_DIR)) {
+        try {
+          const files = readdirSync(HEARTBEAT_DIR).filter((f) =>
+            f.endsWith(".json"),
+          );
+          for (const file of files) {
+            try {
+              const hb = JSON.parse(
+                readFileSync(join(HEARTBEAT_DIR, file), "utf-8"),
+              );
+              const updatedAt = hb.updated_at || "";
+              let hbEpoch = 0;
+              try {
+                hbEpoch = Math.floor(new Date(updatedAt).getTime() / 1000);
+              } catch {
+                /* ignore */
+              }
+              if (hbEpoch > 0 && now - hbEpoch > 300) {
+                const issue = (hb.issue as number) || 0;
+                alerts.push({
+                  type: "stale_heartbeat",
+                  severity: "warning",
+                  message: `Agent heartbeat for ${file.replace(".json", "")} is ${Math.round((now - hbEpoch) / 60)}min stale`,
+                  issue: issue || undefined,
+                  actions: ["abort", "investigate"],
+                });
+              }
+            } catch {
+              // skip
+            }
+          }
+        } catch {
+          // ignore
+        }
+      }
+
+      return new Response(JSON.stringify({ alerts }), {
+        headers: { "Content-Type": "application/json", ...CORS_HEADERS },
+      });
+    }
+
+    // REST: Emergency brake — pause all active pipelines + clear queue
+    if (pathname === "/api/emergency-brake" && req.method === "POST") {
+      try {
+        const daemonState = readDaemonState();
+        let paused = 0;
+        let queued = 0;
+
+        if (daemonState) {
+          const activeJobs =
+            (daemonState.active_jobs as Array<Record<string, unknown>>) || [];
+          for (const job of activeJobs) {
+            const pid = (job.pid as number) || 0;
+            if (pid) {
+              try {
+                execSync(`kill -STOP ${pid}`);
+                paused++;
+              } catch {
+                // process may already be gone
+              }
+            }
+          }
+          queued = ((daemonState.queued as Array<unknown>) || []).length;
+        }
+
+        return new Response(JSON.stringify({ paused, queued }), {
+          headers: { "Content-Type": "application/json", ...CORS_HEADERS },
+        });
+      } catch (err) {
+        return new Response(JSON.stringify({ error: String(err) }), {
+          status: 500,
+          headers: { "Content-Type": "application/json", ...CORS_HEADERS },
+        });
+      }
+    }
+
+    // ── Machine Management endpoints ──────────────────────────────
+
+    // POST /api/machines — Register a new machine
+    if (pathname === "/api/machines" && req.method === "POST") {
+      try {
+        const body = (await req.json()) as Record<string, unknown>;
+        const name = (body.name as string) || "";
+        const host = (body.host as string) || "";
+        if (!name || !host) {
+          return new Response(
+            JSON.stringify({ error: "name and host are required" }),
+            {
+              status: 400,
+              headers: { "Content-Type": "application/json", ...CORS_HEADERS },
+            },
+          );
+        }
+        const data = readMachinesFile();
+        if (data.machines.some((m) => (m.name as string) === name)) {
+          return new Response(
+            JSON.stringify({ error: `Machine "${name}" already exists` }),
+            {
+              status: 409,
+              headers: { "Content-Type": "application/json", ...CORS_HEADERS },
+            },
+          );
+        }
+        const newMachine: Record<string, unknown> = {
+          name,
+          host,
+          role: (body.role as string) || "worker",
+          max_workers: (body.max_workers as number) || 4,
+          ssh_user: (body.ssh_user as string) || undefined,
+          shipwright_path: (body.shipwright_path as string) || undefined,
+          registered_at: new Date().toISOString(),
+        };
+        data.machines.push(newMachine);
+        writeMachinesFile(data);
+        const agents = getAgents();
+        return new Response(
+          JSON.stringify(enrichMachineHealth(newMachine, agents)),
+          {
+            headers: { "Content-Type": "application/json", ...CORS_HEADERS },
+          },
+        );
+      } catch (err) {
+        return new Response(JSON.stringify({ error: String(err) }), {
+          status: 500,
+          headers: { "Content-Type": "application/json", ...CORS_HEADERS },
+        });
+      }
+    }
+
+    // GET /api/machines — List all machines with enriched health
+    if (pathname === "/api/machines" && req.method === "GET") {
+      return new Response(JSON.stringify(getMachines()), {
+        headers: { "Content-Type": "application/json", ...CORS_HEADERS },
+      });
+    }
+
+    // PATCH /api/machines/{name} — Scale workers or update fields
+    if (
+      pathname.startsWith("/api/machines/") &&
+      !pathname.includes("/health-check") &&
+      req.method === "PATCH"
+    ) {
+      const machineName = decodeURIComponent(pathname.split("/")[3] || "");
+      if (!machineName) {
+        return new Response(
+          JSON.stringify({ error: "Machine name is required" }),
+          {
+            status: 400,
+            headers: { "Content-Type": "application/json", ...CORS_HEADERS },
+          },
+        );
+      }
+      try {
+        const body = (await req.json()) as Record<string, unknown>;
+        const data = readMachinesFile();
+        const idx = data.machines.findIndex(
+          (m) => (m.name as string) === machineName,
+        );
+        if (idx === -1) {
+          return new Response(
+            JSON.stringify({ error: `Machine "${machineName}" not found` }),
+            {
+              status: 400,
+              headers: { "Content-Type": "application/json", ...CORS_HEADERS },
+            },
+          );
+        }
+        // Update allowed fields
+        if (body.max_workers !== undefined)
+          data.machines[idx].max_workers = body.max_workers;
+        if (body.role !== undefined) data.machines[idx].role = body.role;
+        if (body.ssh_user !== undefined)
+          data.machines[idx].ssh_user = body.ssh_user;
+        if (body.shipwright_path !== undefined)
+          data.machines[idx].shipwright_path = body.shipwright_path;
+
+        // If scaling, attempt to send command to remote machine
+        if (body.max_workers !== undefined) {
+          const machine = data.machines[idx];
+          const sshUser = (machine.ssh_user as string) || "";
+          const mHost = (machine.host as string) || "";
+          const swPath = (machine.shipwright_path as string) || "shipwright";
+          if (
+            sshUser &&
+            mHost &&
+            mHost !== "localhost" &&
+            mHost !== "127.0.0.1"
+          ) {
+            try {
+              execSync(
+                `ssh -o ConnectTimeout=5 ${sshUser}@${mHost} "${swPath} daemon scale ${body.max_workers}" 2>/dev/null`,
+                { timeout: 10000 },
+              );
+            } catch {
+              // Remote scale command failed — update saved anyway
+            }
+          }
+        }
+
+        writeMachinesFile(data);
+        const agents = getAgents();
+        return new Response(
+          JSON.stringify(enrichMachineHealth(data.machines[idx], agents)),
+          {
+            headers: { "Content-Type": "application/json", ...CORS_HEADERS },
+          },
+        );
+      } catch (err) {
+        return new Response(JSON.stringify({ error: String(err) }), {
+          status: 500,
+          headers: { "Content-Type": "application/json", ...CORS_HEADERS },
+        });
+      }
+    }
+
+    // POST /api/machines/{name}/health-check — On-demand health check
+    if (
+      pathname.match(/^\/api\/machines\/[^/]+\/health-check$/) &&
+      req.method === "POST"
+    ) {
+      const machineName = decodeURIComponent(pathname.split("/")[3] || "");
+      try {
+        const data = readMachinesFile();
+        const machine = data.machines.find(
+          (m) => (m.name as string) === machineName,
+        );
+        if (!machine) {
+          return new Response(
+            JSON.stringify({ error: `Machine "${machineName}" not found` }),
+            {
+              status: 400,
+              headers: { "Content-Type": "application/json", ...CORS_HEADERS },
+            },
+          );
+        }
+
+        const sshUser = (machine.ssh_user as string) || "";
+        const mHost = (machine.host as string) || "";
+        const swPath = (machine.shipwright_path as string) || "shipwright";
+        let daemonRunning = false;
+        let reachable = false;
+
+        if (!mHost || mHost === "localhost" || mHost === "127.0.0.1") {
+          // Local machine — check daemon state directly
+          reachable = true;
+          try {
+            const dState = readFileOr(DAEMON_STATE, "");
+            if (dState) {
+              const parsed = JSON.parse(dState);
+              daemonRunning = !!parsed.pid;
+            }
+          } catch {
+            // ignore
+          }
+        } else if (sshUser) {
+          try {
+            const result = execSync(
+              `ssh -o ConnectTimeout=5 -o BatchMode=yes ${sshUser}@${mHost} "${swPath} ps 2>/dev/null || echo OFFLINE"`,
+              { timeout: 10000, encoding: "utf-8" },
+            );
+            reachable = true;
+            daemonRunning =
+              !result.includes("OFFLINE") && !result.includes("No daemon");
+          } catch {
+            reachable = false;
+          }
+        }
+
+        // Save health data
+        let healthData: Record<string, Record<string, unknown>> = {};
+        try {
+          if (existsSync(MACHINE_HEALTH_FILE)) {
+            healthData = JSON.parse(readFileSync(MACHINE_HEALTH_FILE, "utf-8"));
+          }
+        } catch {
+          // ignore
+        }
+        healthData[machineName] = {
+          daemon_running: daemonRunning,
+          reachable,
+          last_check: new Date().toISOString(),
+        };
+        const healthTmp = MACHINE_HEALTH_FILE + ".tmp";
+        writeFileSync(healthTmp, JSON.stringify(healthData, null, 2), "utf-8");
+        renameSync(healthTmp, MACHINE_HEALTH_FILE);
+
+        const agents = getAgents();
+        return new Response(
+          JSON.stringify({
+            machine: enrichMachineHealth(machine, agents),
+            reachable,
+            daemon_running: daemonRunning,
+            checked_at: new Date().toISOString(),
+          }),
+          { headers: { "Content-Type": "application/json", ...CORS_HEADERS } },
+        );
+      } catch (err) {
+        return new Response(JSON.stringify({ error: String(err) }), {
+          status: 500,
+          headers: { "Content-Type": "application/json", ...CORS_HEADERS },
+        });
+      }
+    }
+
+    // DELETE /api/machines/{name} — Remove a machine
+    if (pathname.startsWith("/api/machines/") && req.method === "DELETE") {
+      const machineName = decodeURIComponent(pathname.split("/")[3] || "");
+      if (!machineName) {
+        return new Response(
+          JSON.stringify({ error: "Machine name is required" }),
+          {
+            status: 400,
+            headers: { "Content-Type": "application/json", ...CORS_HEADERS },
+          },
+        );
+      }
+      try {
+        const data = readMachinesFile();
+        const idx = data.machines.findIndex(
+          (m) => (m.name as string) === machineName,
+        );
+        if (idx === -1) {
+          return new Response(
+            JSON.stringify({ error: `Machine "${machineName}" not found` }),
+            {
+              status: 400,
+              headers: { "Content-Type": "application/json", ...CORS_HEADERS },
+            },
+          );
+        }
+        data.machines.splice(idx, 1);
+        writeMachinesFile(data);
+        return new Response(
+          JSON.stringify({ ok: true, removed: machineName }),
+          {
+            headers: { "Content-Type": "application/json", ...CORS_HEADERS },
+          },
+        );
+      } catch (err) {
+        return new Response(JSON.stringify({ error: String(err) }), {
+          status: 500,
+          headers: { "Content-Type": "application/json", ...CORS_HEADERS },
+        });
+      }
+    }
+
+    // POST /api/join-token — Generate a join token and command
+    if (pathname === "/api/join-token" && req.method === "POST") {
+      try {
+        const body = (await req.json()) as Record<string, unknown>;
+        const maxWorkers = (body.max_workers as number) || 4;
+        const label = (body.label as string) || "";
+        const token = crypto.randomUUID();
+        const dashboardUrl = `${url.protocol}//${url.host}`;
+
+        // Save token
+        let tokens: Array<Record<string, unknown>> = [];
+        try {
+          if (existsSync(JOIN_TOKENS_FILE)) {
+            const raw = readFileSync(JOIN_TOKENS_FILE, "utf-8");
+            tokens = JSON.parse(raw);
+          }
+        } catch {
+          tokens = [];
+        }
+        tokens.push({
+          token,
+          label,
+          max_workers: maxWorkers,
+          created_at: new Date().toISOString(),
+          used: false,
+        });
+        const tokensTmp = JOIN_TOKENS_FILE + ".tmp";
+        writeFileSync(tokensTmp, JSON.stringify(tokens, null, 2), "utf-8");
+        renameSync(tokensTmp, JOIN_TOKENS_FILE);
+
+        const joinUrl = `${dashboardUrl}/api/join/${token}`;
+        const joinCmd = `curl -fsSL "${joinUrl}" | bash`;
+
+        return new Response(
+          JSON.stringify({
+            token,
+            join_url: joinUrl,
+            join_cmd: joinCmd,
+            max_workers: maxWorkers,
+          }),
+          { headers: { "Content-Type": "application/json", ...CORS_HEADERS } },
+        );
+      } catch (err) {
+        return new Response(JSON.stringify({ error: String(err) }), {
+          status: 500,
+          headers: { "Content-Type": "application/json", ...CORS_HEADERS },
+        });
+      }
+    }
+
+    // GET /api/join-tokens — List active join tokens
+    if (pathname === "/api/join-tokens" && req.method === "GET") {
+      try {
+        let tokens: Array<Record<string, unknown>> = [];
+        try {
+          if (existsSync(JOIN_TOKENS_FILE)) {
+            tokens = JSON.parse(readFileSync(JOIN_TOKENS_FILE, "utf-8"));
+          }
+        } catch {
+          tokens = [];
+        }
+        return new Response(JSON.stringify(tokens), {
+          headers: { "Content-Type": "application/json", ...CORS_HEADERS },
+        });
+      } catch (err) {
+        return new Response(JSON.stringify({ error: String(err) }), {
+          status: 500,
+          headers: { "Content-Type": "application/json", ...CORS_HEADERS },
+        });
+      }
+    }
+
+    // ── Daemon Control endpoints ─────────────────────────────────
+
+    // POST /api/daemon/start — Start daemon in background
+    if (pathname === "/api/daemon/start" && req.method === "POST") {
+      try {
+        execSync("shipwright daemon start --detach", {
+          timeout: 10000,
+          stdio: "pipe",
+        });
+        return new Response(JSON.stringify({ ok: true, action: "started" }), {
+          headers: { "Content-Type": "application/json", ...CORS_HEADERS },
+        });
+      } catch (err) {
+        return new Response(JSON.stringify({ ok: false, error: String(err) }), {
+          status: 500,
+          headers: { "Content-Type": "application/json", ...CORS_HEADERS },
+        });
+      }
+    }
+
+    // POST /api/daemon/stop — Stop daemon by PID
+    if (pathname === "/api/daemon/stop" && req.method === "POST") {
+      try {
+        let pid = 0;
+        try {
+          if (existsSync(DAEMON_STATE)) {
+            const state = JSON.parse(readFileSync(DAEMON_STATE, "utf-8"));
+            pid = state.pid || 0;
+          }
+        } catch {
+          // state file may be corrupt
+        }
+        if (pid > 0) {
+          try {
+            execSync(`kill -TERM ${pid}`, { timeout: 5000, stdio: "pipe" });
+          } catch {
+            // process may already be gone
+          }
+        }
+        // Also try the daemon stop command
+        try {
+          execSync("shipwright daemon stop", { timeout: 10000, stdio: "pipe" });
+        } catch {
+          // may fail if already stopped
+        }
+        return new Response(
+          JSON.stringify({ ok: true, action: "stopped", pid }),
+          {
+            headers: { "Content-Type": "application/json", ...CORS_HEADERS },
+          },
+        );
+      } catch (err) {
+        return new Response(JSON.stringify({ ok: false, error: String(err) }), {
+          status: 500,
+          headers: { "Content-Type": "application/json", ...CORS_HEADERS },
+        });
+      }
+    }
+
+    // POST /api/daemon/pause — Pause daemon polling
+    if (pathname === "/api/daemon/pause" && req.method === "POST") {
+      try {
+        const flagPath = join(HOME, ".shipwright", "daemon-pause.flag");
+        const dir = join(HOME, ".shipwright");
+        if (!existsSync(dir)) mkdirSync(dir, { recursive: true });
+        writeFileSync(
+          flagPath,
+          JSON.stringify({ paused: true, at: new Date().toISOString() }),
+        );
+        return new Response(JSON.stringify({ ok: true, action: "paused" }), {
+          headers: { "Content-Type": "application/json", ...CORS_HEADERS },
+        });
+      } catch (err) {
+        return new Response(JSON.stringify({ ok: false, error: String(err) }), {
+          status: 500,
+          headers: { "Content-Type": "application/json", ...CORS_HEADERS },
+        });
+      }
+    }
+
+    // POST /api/daemon/resume — Resume daemon polling
+    if (pathname === "/api/daemon/resume" && req.method === "POST") {
+      try {
+        const flagPath = join(HOME, ".shipwright", "daemon-pause.flag");
+        if (existsSync(flagPath)) {
+          unlinkSync(flagPath);
+        }
+        return new Response(JSON.stringify({ ok: true, action: "resumed" }), {
+          headers: { "Content-Type": "application/json", ...CORS_HEADERS },
+        });
+      } catch (err) {
+        return new Response(JSON.stringify({ ok: false, error: String(err) }), {
+          status: 500,
+          headers: { "Content-Type": "application/json", ...CORS_HEADERS },
+        });
+      }
+    }
+
+    // GET /api/daemon/config — Return daemon configuration
+    if (pathname === "/api/daemon/config" && req.method === "GET") {
+      try {
+        // Look for daemon-config.json in common locations
+        const configPaths = [
+          join(process.cwd(), ".claude", "daemon-config.json"),
+          join(HOME, ".claude", "daemon-config.json"),
+        ];
+        let config: Record<string, unknown> = {};
+        for (const p of configPaths) {
+          if (existsSync(p)) {
+            config = JSON.parse(readFileSync(p, "utf-8"));
+            break;
+          }
+        }
+        // Add budget info
+        let budget: Record<string, unknown> = {};
+        try {
+          if (existsSync(BUDGET_FILE)) {
+            budget = JSON.parse(readFileSync(BUDGET_FILE, "utf-8"));
+          }
+        } catch {
+          // no budget set
+        }
+        // Check pause state
+        const pauseFlag = join(HOME, ".shipwright", "daemon-pause.flag");
+        const paused = existsSync(pauseFlag);
+
+        return new Response(JSON.stringify({ config, budget, paused }), {
+          headers: { "Content-Type": "application/json", ...CORS_HEADERS },
+        });
+      } catch (err) {
+        return new Response(JSON.stringify({ ok: false, error: String(err) }), {
+          status: 500,
+          headers: { "Content-Type": "application/json", ...CORS_HEADERS },
+        });
+      }
+    }
+
+    // POST /api/daemon/patrol — Trigger a one-off patrol run
+    if (pathname === "/api/daemon/patrol" && req.method === "POST") {
+      try {
+        // Run patrol in background (don't block the response)
+        execSync("nohup shipwright daemon patrol --once > /dev/null 2>&1 &", {
+          timeout: 5000,
+          stdio: "pipe",
+          shell: "/bin/bash",
+        });
+        return new Response(
+          JSON.stringify({ ok: true, action: "patrol_triggered" }),
+          {
+            headers: { "Content-Type": "application/json", ...CORS_HEADERS },
+          },
+        );
+      } catch (err) {
+        return new Response(JSON.stringify({ ok: false, error: String(err) }), {
+          status: 500,
+          headers: { "Content-Type": "application/json", ...CORS_HEADERS },
+        });
+      }
+    }
+
+    // ── Multi-Developer Platform endpoints ──────────────────────────
+
+    // POST /api/connect/heartbeat — Update developer presence
+    if (pathname === "/api/connect/heartbeat" && req.method === "POST") {
+      try {
+        const body = (await req.json()) as any;
+        const key = `${body.developer_id}@${body.machine_name}`;
+
+        developerRegistry.set(key, {
+          developer_id: body.developer_id,
+          machine_name: body.machine_name,
+          hostname: body.hostname || body.machine_name,
+          platform: body.platform || "unknown",
+          last_heartbeat: Date.now(),
+          daemon_running: body.daemon_running || false,
+          daemon_pid: body.daemon_pid || null,
+          active_jobs: body.active_jobs || [],
+          queued: body.queued || [],
+          events_since: body.events_since || 0,
+        });
+
+        // Append incoming events to team events log
+        if (body.events && Array.isArray(body.events)) {
+          const dir = join(HOME, ".shipwright");
+          if (!existsSync(dir)) mkdirSync(dir, { recursive: true });
+          const enriched = body.events
+            .map((e: any) =>
+              JSON.stringify({
+                ...e,
+                from_developer: body.developer_id,
+                from_machine: body.machine_name,
+              }),
+            )
+            .join("\n");
+          if (enriched) {
+            appendFileSync(TEAM_EVENTS_FILE, enriched + "\n");
+          }
+        }
+
+        saveDeveloperRegistry();
+
+        // Broadcast updated state to dashboard clients
+        if (wsClients.size > 0) {
+          broadcastToClients(getFleetState());
+        }
+
+        return new Response(
+          JSON.stringify({ ok: true, team_size: developerRegistry.size }),
+          {
+            headers: { "Content-Type": "application/json", ...CORS_HEADERS },
+          },
+        );
+      } catch (err) {
+        return new Response(JSON.stringify({ ok: false, error: String(err) }), {
+          status: 500,
+          headers: { "Content-Type": "application/json", ...CORS_HEADERS },
+        });
+      }
+    }
+
+    // POST /api/connect/disconnect — Mark developer offline
+    if (pathname === "/api/connect/disconnect" && req.method === "POST") {
+      try {
+        const body = (await req.json()) as any;
+        const key = `${body.developer_id}@${body.machine_name}`;
+        const dev = developerRegistry.get(key);
+        if (dev) {
+          dev.last_heartbeat = 0; // mark as offline immediately
+          dev.daemon_running = false;
+          dev.daemon_pid = null;
+          dev.active_jobs = [];
+          developerRegistry.set(key, dev);
+          saveDeveloperRegistry();
+        }
+
+        if (wsClients.size > 0) {
+          broadcastToClients(getFleetState());
+        }
+
+        return new Response(JSON.stringify({ ok: true }), {
+          headers: { "Content-Type": "application/json", ...CORS_HEADERS },
+        });
+      } catch (err) {
+        return new Response(JSON.stringify({ ok: false, error: String(err) }), {
+          status: 500,
+          headers: { "Content-Type": "application/json", ...CORS_HEADERS },
+        });
+      }
+    }
+
+    // GET /api/team — Return all connected developers with presence
+    if (pathname === "/api/team" && req.method === "GET") {
+      return new Response(JSON.stringify(getTeamState()), {
+        headers: { "Content-Type": "application/json", ...CORS_HEADERS },
+      });
+    }
+
+    // GET /api/team/activity — Return last 100 team events
+    if (pathname === "/api/team/activity" && req.method === "GET") {
+      try {
+        let events: unknown[] = [];
+        if (existsSync(TEAM_EVENTS_FILE)) {
+          const lines = readFileSync(TEAM_EVENTS_FILE, "utf-8")
+            .trim()
+            .split("\n")
+            .filter(Boolean);
+          const recent = lines.slice(-100);
+          events = recent
+            .map((line) => {
+              try {
+                return JSON.parse(line);
+              } catch {
+                return null;
+              }
+            })
+            .filter(Boolean);
+        }
+        return new Response(JSON.stringify(events), {
+          headers: { "Content-Type": "application/json", ...CORS_HEADERS },
+        });
+      } catch (err) {
+        return new Response(JSON.stringify({ error: String(err) }), {
+          status: 500,
+          headers: { "Content-Type": "application/json", ...CORS_HEADERS },
+        });
+      }
+    }
+
+    // POST /api/claim — Label-based claim coordination
+    if (pathname === "/api/claim" && req.method === "POST") {
+      try {
+        const body = (await req.json()) as any;
+        const issue = body.issue as number;
+        const machine = (body.machine || body.machine_name) as string;
+        const repo = (body.repo as string) || "";
+
+        // Check for existing claimed:* label
+        const repoFlag = repo ? ` -R ${repo}` : "";
+        let labels = "";
+        try {
+          labels = execSync(
+            `gh issue view ${issue}${repoFlag} --json labels -q '.labels[].name'`,
+            {
+              encoding: "utf-8",
+              timeout: 10000,
+              stdio: ["pipe", "pipe", "pipe"],
+            },
+          ).trim();
+        } catch {
+          labels = "";
+        }
+
+        const claimedLabel = labels
+          .split("\n")
+          .find((l: string) => l.startsWith("claimed:"));
+        if (claimedLabel) {
+          return new Response(
+            JSON.stringify({
+              approved: false,
+              claimed_by: claimedLabel.replace("claimed:", ""),
+            }),
+            {
+              headers: { "Content-Type": "application/json", ...CORS_HEADERS },
+            },
+          );
+        }
+
+        // Add claimed:<machine> label
+        try {
+          execSync(
+            `gh issue edit ${issue}${repoFlag} --add-label "claimed:${machine}"`,
+            {
+              timeout: 10000,
+              stdio: ["pipe", "pipe", "pipe"],
+            },
+          );
+        } catch {
+          return new Response(
+            JSON.stringify({ approved: false, error: "Failed to set label" }),
+            {
+              status: 500,
+              headers: { "Content-Type": "application/json", ...CORS_HEADERS },
+            },
+          );
+        }
+
+        return new Response(
+          JSON.stringify({ approved: true, claimed_by: machine }),
+          {
+            headers: { "Content-Type": "application/json", ...CORS_HEADERS },
+          },
+        );
+      } catch (err) {
+        return new Response(
+          JSON.stringify({ approved: false, error: String(err) }),
+          {
+            status: 500,
+            headers: { "Content-Type": "application/json", ...CORS_HEADERS },
+          },
+        );
+      }
+    }
+
+    // POST /api/claim/release — Remove claimed:* label from issue
+    if (pathname === "/api/claim/release" && req.method === "POST") {
+      try {
+        const body = (await req.json()) as any;
+        const issue = body.issue as number;
+        const machine = ((body.machine || body.machine_name) as string) || "";
+        const repo = (body.repo as string) || "";
+
+        const repoFlag = repo ? ` -R ${repo}` : "";
+        const label = machine ? `claimed:${machine}` : "";
+
+        // Find the actual claimed label if machine not specified
+        let targetLabel = label;
+        if (!targetLabel) {
+          try {
+            const labels = execSync(
+              `gh issue view ${issue}${repoFlag} --json labels -q '.labels[].name'`,
+              {
+                encoding: "utf-8",
+                timeout: 10000,
+                stdio: ["pipe", "pipe", "pipe"],
+              },
+            ).trim();
+            const found = labels
+              .split("\n")
+              .find((l: string) => l.startsWith("claimed:"));
+            targetLabel = found || "";
+          } catch {
+            /* ignore */
+          }
+        }
+
+        if (targetLabel) {
+          try {
+            execSync(
+              `gh issue edit ${issue}${repoFlag} --remove-label "${targetLabel}"`,
+              {
+                timeout: 10000,
+                stdio: ["pipe", "pipe", "pipe"],
+              },
+            );
+          } catch {
+            /* label may already be removed */
+          }
+        }
+
+        return new Response(JSON.stringify({ ok: true }), {
+          headers: { "Content-Type": "application/json", ...CORS_HEADERS },
+        });
+      } catch (err) {
+        return new Response(JSON.stringify({ ok: false, error: String(err) }), {
+          status: 500,
+          headers: { "Content-Type": "application/json", ...CORS_HEADERS },
+        });
+      }
+    }
+
+    // POST /api/webhook/ci — Accept CI pipeline events
+    if (pathname === "/api/webhook/ci" && req.method === "POST") {
+      try {
+        const body = (await req.json()) as any;
+        const dir = join(HOME, ".shipwright");
+        if (!existsSync(dir)) mkdirSync(dir, { recursive: true });
+
+        const event = {
+          ...body,
+          from_developer: "github-actions",
+          from_machine: "ci",
+          received_at: new Date().toISOString(),
+        };
+        appendFileSync(TEAM_EVENTS_FILE, JSON.stringify(event) + "\n");
+
+        // Broadcast to dashboard clients
+        if (wsClients.size > 0) {
+          broadcastToClients(getFleetState());
+        }
+
+        return new Response(JSON.stringify({ ok: true }), {
+          headers: { "Content-Type": "application/json", ...CORS_HEADERS },
+        });
+      } catch (err) {
+        return new Response(JSON.stringify({ ok: false, error: String(err) }), {
+          status: 500,
+          headers: { "Content-Type": "application/json", ...CORS_HEADERS },
+        });
+      }
+    }
+
+    // POST /api/team/invite — Generate a team invite token
+    if (pathname === "/api/team/invite" && req.method === "POST") {
+      try {
+        const token = crypto.randomUUID();
+        const now = new Date();
+        const expires = new Date(now.getTime() + 24 * 60 * 60 * 1000); // 24h
+        inviteTokens.set(token, {
+          token,
+          created_at: now.toISOString(),
+          expires_at: expires.toISOString(),
+        });
+
+        const dashboardUrl = `${url.protocol}//${url.host}`;
+        const command = `shipwright connect join ${dashboardUrl} --token ${token}`;
+
+        return new Response(
+          JSON.stringify({ token, command, expires_at: expires.toISOString() }),
+          {
+            headers: { "Content-Type": "application/json", ...CORS_HEADERS },
+          },
+        );
+      } catch (err) {
+        return new Response(JSON.stringify({ error: String(err) }), {
+          status: 500,
+          headers: { "Content-Type": "application/json", ...CORS_HEADERS },
+        });
+      }
+    }
+
     // Static files from public/
     const staticResponse = serveStaticFile(pathname);
     if (staticResponse) return staticResponse;
@@ -2028,11 +4076,56 @@ const server = Bun.serve({
 
 // Start background tasks
 startEventsWatcher();
+loadSessions();
+loadDeveloperRegistry();
 const pushInterval = setInterval(periodicPush, WS_PUSH_INTERVAL_MS);
+
+// Stale claim reaper — runs every 5 minutes
+const staleClaimInterval = setInterval(
+  () => {
+    try {
+      const twoHoursAgo = Date.now() - 2 * 60 * 60 * 1000;
+      for (const [key, dev] of developerRegistry) {
+        if (dev.last_heartbeat < twoHoursAgo && dev.last_heartbeat > 0) {
+          // Check if this developer has claimed issues via labels
+          try {
+            const result = execSync(
+              `gh issue list --label "claimed:${dev.machine_name}" --state open --json number -q '.[].number'`,
+              {
+                encoding: "utf-8",
+                timeout: 15000,
+                stdio: ["pipe", "pipe", "pipe"],
+              },
+            ).trim();
+            if (result) {
+              const issues = result.split("\n").filter(Boolean);
+              for (const issueNum of issues) {
+                try {
+                  execSync(
+                    `gh issue edit ${issueNum} --remove-label "claimed:${dev.machine_name}"`,
+                    { timeout: 10000, stdio: ["pipe", "pipe", "pipe"] },
+                  );
+                } catch {
+                  /* label may already be removed */
+                }
+              }
+            }
+          } catch {
+            /* gh may not be available or no issues found */
+          }
+        }
+      }
+    } catch {
+      /* reaper errors are non-fatal */
+    }
+  },
+  5 * 60 * 1000,
+);
 
 // Graceful shutdown
 process.on("SIGINT", () => {
   clearInterval(pushInterval);
+  clearInterval(staleClaimInterval);
   if (eventsWatcher) eventsWatcher.close();
   for (const ws of wsClients) {
     try {

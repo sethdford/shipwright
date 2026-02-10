@@ -7,7 +7,7 @@ description: Frequently asked questions about Shipwright.
 
 ### What is Shipwright?
 
-Shipwright is a CLI tool that orchestrates Claude Code agent teams in tmux. It provides a premium dark theme, team session management, autonomous development loops, delivery pipelines, and DORA metrics — everything you need to run multi-agent AI development effectively.
+Shipwright is a CLI tool that orchestrates Claude Code agent teams in tmux. It provides a premium dark theme, team session management, autonomous development loops, delivery pipelines, AI-powered intelligence layer, and DORA metrics — everything you need to run multi-agent AI development effectively.
 
 ### What does Shipwright do that Claude Code doesn't?
 
@@ -18,6 +18,7 @@ Claude Code has built-in agent teams support, but Shipwright adds the infrastruc
 - **Delivery pipeline** — full issue-to-PR automation with self-healing builds
 - **Autonomous daemon** — background issue processing with DORA metrics
 - **Repo preparation** — auto-generate configs for any project
+- **Intelligence layer** — AI-powered triage, dynamic pipeline composition, self-optimization, and predictive analytics
 - **tmux theme** — premium dark theme with agent-aware pane borders
 
 ### Is Shipwright free?
@@ -78,6 +79,20 @@ Yes, but with reduced functionality. Without GitHub:
 - Use `--goal` instead of `--issue`
 - No auto-assignment or progress comments
 - PR creation step is skipped (or creates a local branch)
+
+## Intelligence
+
+### What is the intelligence layer?
+
+The intelligence layer is a set of 7 modules that replace hardcoded heuristics with AI-powered analysis. Instead of word-count scoring and label regex for triage, Claude semantically analyzes each issue. Instead of picking from static templates, Claude composes a custom pipeline per issue. All intelligence features are behind feature flags and off by default — enable them in daemon-config.json.
+
+### Does intelligence cost extra?
+
+Intelligence features use Claude API calls, so they add some token usage. However, the self-optimization and model routing modules actively reduce overall cost by routing cheaper models to simpler stages. The net effect depends on your workload, but the system aims to pay for itself through smarter resource allocation.
+
+### What happens if intelligence calls fail?
+
+Every intelligence function degrades gracefully to the existing static behavior. If Claude is unavailable, triage falls back to word-count scoring, template selection falls back to score thresholds, and patrol falls back to grep-based checks. The system never blocks on an intelligence failure.
 
 ## Cost & Memory
 

@@ -4,6 +4,7 @@
 # ║  Full GitHub integration · Auto-detection · Task tracking · Metrics    ║
 # ╚═══════════════════════════════════════════════════════════════════════════╝
 set -euo pipefail
+trap 'echo "ERROR: $BASH_SOURCE:$LINENO exited with status $?" >&2' ERR
 
 VERSION="1.7.1"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -23,6 +24,16 @@ RESET='\033[0m'
 # ─── Cross-platform compatibility ──────────────────────────────────────────
 # shellcheck source=lib/compat.sh
 [[ -f "$SCRIPT_DIR/lib/compat.sh" ]] && source "$SCRIPT_DIR/lib/compat.sh"
+
+# ─── Intelligence Engine (optional) ──────────────────────────────────────────
+# shellcheck source=sw-intelligence.sh
+if [[ -f "$SCRIPT_DIR/sw-intelligence.sh" ]]; then
+    source "$SCRIPT_DIR/sw-intelligence.sh"
+fi
+# shellcheck source=sw-pipeline-composer.sh
+if [[ -f "$SCRIPT_DIR/sw-pipeline-composer.sh" ]]; then
+    source "$SCRIPT_DIR/sw-pipeline-composer.sh"
+fi
 
 # ─── Output Helpers ─────────────────────────────────────────────────────────
 info()    { echo -e "${CYAN}${BOLD}▸${RESET} $*"; }
@@ -290,6 +301,28 @@ find_pipeline_config() {
 }
 
 load_pipeline_config() {
+    # Check for intelligence-composed pipeline first
+    local composed_pipeline="${REPO_DIR}/.claude/pipeline-artifacts/composed-pipeline.json"
+    if [[ -f "$composed_pipeline" ]] && type composer_validate_pipeline &>/dev/null; then
+        # Use composed pipeline if fresh (< 1 hour old)
+        local composed_age=99999
+        local composed_mtime
+        composed_mtime=$(stat -f %m "$composed_pipeline" 2>/dev/null || stat -c %Y "$composed_pipeline" 2>/dev/null || echo "0")
+        if [[ "$composed_mtime" -gt 0 ]]; then
+            composed_age=$(( $(now_epoch) - composed_mtime ))
+        fi
+        if [[ "$composed_age" -lt 3600 ]]; then
+            local validate_json
+            validate_json=$(cat "$composed_pipeline" 2>/dev/null || echo "")
+            if [[ -n "$validate_json" ]] && composer_validate_pipeline "$validate_json" 2>/dev/null; then
+                PIPELINE_CONFIG="$composed_pipeline"
+                info "Pipeline: ${BOLD}composed${RESET} ${DIM}(intelligence-driven)${RESET}"
+                emit_event "pipeline.composed_loaded" "issue=${ISSUE_NUMBER:-0}"
+                return
+            fi
+        fi
+    fi
+
     PIPELINE_CONFIG=$(find_pipeline_config "$PIPELINE_NAME") || {
         error "Pipeline template not found: $PIPELINE_NAME"
         echo -e "  Available templates: ${DIM}shipwright pipeline list${RESET}"
@@ -1601,7 +1634,11 @@ stage_design() {
 
     # Memory integration — inject context if memory system available
     local memory_context=""
-    if [[ -x "$SCRIPT_DIR/sw-memory.sh" ]]; then
+    if type intelligence_search_memory &>/dev/null 2>&1; then
+        local mem_dir="${HOME}/.shipwright/memory"
+        memory_context=$(intelligence_search_memory "design stage for: ${GOAL:-}" "$mem_dir" 5 2>/dev/null) || true
+    fi
+    if [[ -z "$memory_context" ]] && [[ -x "$SCRIPT_DIR/sw-memory.sh" ]]; then
         memory_context=$(bash "$SCRIPT_DIR/sw-memory.sh" inject "design" 2>/dev/null) || true
     fi
 
@@ -1712,7 +1749,11 @@ stage_build() {
 
     # Memory integration — inject context if memory system available
     local memory_context=""
-    if [[ -x "$SCRIPT_DIR/sw-memory.sh" ]]; then
+    if type intelligence_search_memory &>/dev/null 2>&1; then
+        local mem_dir="${HOME}/.shipwright/memory"
+        memory_context=$(intelligence_search_memory "build stage for: ${GOAL:-}" "$mem_dir" 5 2>/dev/null) || true
+    fi
+    if [[ -z "$memory_context" ]] && [[ -x "$SCRIPT_DIR/sw-memory.sh" ]]; then
         memory_context=$(bash "$SCRIPT_DIR/sw-memory.sh" inject "build" 2>/dev/null) || true
     fi
 
@@ -3509,6 +3550,21 @@ self_healing_build_test() {
     local max_cycles="$BUILD_TEST_RETRIES"
     local last_test_error=""
 
+    # Intelligence: adaptive iteration limit
+    if type composer_estimate_iterations &>/dev/null 2>&1; then
+        local estimated
+        estimated=$(composer_estimate_iterations \
+            "${INTELLIGENCE_ANALYSIS:-{}}" \
+            "${HOME}/.shipwright/optimization/iteration-model.json" 2>/dev/null || echo "")
+        if [[ -n "$estimated" && "$estimated" =~ ^[0-9]+$ && "$estimated" -gt 0 ]]; then
+            max_cycles="$estimated"
+            emit_event "intelligence.adaptive_iterations" \
+                "issue=${ISSUE_NUMBER:-0}" \
+                "estimated=$estimated" \
+                "original=$BUILD_TEST_RETRIES"
+        fi
+    fi
+
     while [[ "$cycle" -le "$max_cycles" ]]; do
         cycle=$((cycle + 1))
 
@@ -3773,6 +3829,24 @@ run_pipeline() {
                 emit_event "pipeline.budget_paused" "issue=${ISSUE_NUMBER:-0}" "stage=$id"
                 update_status "paused" "$id"
                 return 0
+            fi
+        fi
+
+        # Intelligence: per-stage model routing
+        if type intelligence_recommend_model &>/dev/null 2>&1; then
+            local stage_complexity="${INTELLIGENCE_COMPLEXITY:-5}"
+            local budget_remaining=""
+            if [[ -x "$SCRIPT_DIR/sw-cost.sh" ]]; then
+                budget_remaining=$(bash "$SCRIPT_DIR/sw-cost.sh" remaining-budget 2>/dev/null || echo "")
+            fi
+            local recommended_model
+            recommended_model=$(intelligence_recommend_model "$id" "$stage_complexity" "$budget_remaining" 2>/dev/null || echo "")
+            if [[ -n "$recommended_model" && "$recommended_model" != "null" ]]; then
+                export CLAUDE_MODEL="$recommended_model"
+                emit_event "intelligence.model" \
+                    "issue=${ISSUE_NUMBER:-0}" \
+                    "stage=$id" \
+                    "recommended=$recommended_model"
             fi
         fi
 

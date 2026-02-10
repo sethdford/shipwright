@@ -4,7 +4,7 @@ description: Orchestrate AI coding teams with autonomous agents, delivery pipeli
 template: splash
 hero:
   title: Orchestrate AI Coding Teams
-  tagline: Autonomous agents. Delivery pipeline. DORA metrics. One CLI.
+  tagline: Autonomous agents. Intelligent pipelines. Self-improving delivery. One CLI.
   actions:
     - text: Get Started
       link: /quick-start/
@@ -20,16 +20,23 @@ import { Card, CardGrid, Tabs, TabItem } from "@astrojs/starlight/components";
 
 ## Install
 
+{/* prettier-ignore */}
 <Tabs>
-  <TabItem label="npm">```bash npm install -g shipwright-cli ```</TabItem>
+  <TabItem label="npm">
+    ```bash
+    npm install -g shipwright-cli
+    ```
+  </TabItem>
   <TabItem label="curl">
-    ```bash curl -fsSL
-    https://raw.githubusercontent.com/sethdford/shipwright/main/scripts/install-remote.sh
-    | bash ```
+    ```bash
+    curl -fsSL https://raw.githubusercontent.com/sethdford/shipwright/main/scripts/install-remote.sh | bash
+    ```
   </TabItem>
   <TabItem label="Git">
-    ```bash git clone https://github.com/sethdford/shipwright.git cd shipwright
-    && ./install.sh ```
+    ```bash
+    git clone https://github.com/sethdford/shipwright.git
+    cd shipwright && ./install.sh
+    ```
   </TabItem>
 </Tabs>
 
@@ -43,6 +50,10 @@ import { Card, CardGrid, Tabs, TabItem } from "@astrojs/starlight/components";
   <Card title="Delivery Pipeline" icon="rocket">
     Idea to PR in one command. Self-healing builds, GitHub integration, quality
     gates, and eight pipeline templates.
+  </Card>
+  <Card title="Intelligence Layer" icon="puzzle">
+    AI-powered triage, dynamic pipeline composition, per-stage model routing,
+    risk assessment, adversarial code review, and self-optimization.
   </Card>
   <Card title="DORA Metrics" icon="bar-chart">
     Track deployment frequency, cycle time, change failure rate.
@@ -85,6 +96,8 @@ Shipwright agent teams outperform traditional development workflows in ways that
 - **24/7 availability** -- no standup meetings, no context switching, no PTO gaps
 - **Consistent quality** through compound quality gates that enforce standards on every change
 - **Parallel execution** -- three agents building simultaneously across backend, frontend, and tests
+- **Intelligent triage** -- AI analyzes issues semantically, not just word counts and label regex
+- **Self-improving** -- the system learns from every pipeline run and tunes itself automatically
 - **Persistent memory** -- agents learn from every run; humans need onboarding every time
 - **Self-healing builds** -- agents read error output and fix failures automatically
 - **Predictable cost per issue** vs. salary overhead, benefits, and coordination tax
