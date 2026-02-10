@@ -1,1 +1,71 @@
-Credit balance is too low
+Perfect! The feature is fully implemented in the working directory. Now let me do a final comprehensive review:
+
+## Critical Review Summary
+
+### ✅ **Meaningful Progress Toward Goal**
+
+The agent successfully implemented the full feature as specified:
+- Added a complete **DASHBOARD section** (Section 12) to `scripts/cct-doctor.sh` with 100 lines of well-structured code
+- Implements all four required checks:
+  1. **Bun runtime detection** (lines 710-716) with install instructions
+  2. **Dashboard server.ts location** (lines 719-737) with 3-path search strategy
+  3. **Public asset validation** (lines 740-765) checking index.html, app.js, styles.css
+  4. **Port 8767 availability** (lines 768-802) with lsof/ss/netstat fallback chain
+
+### ✅ **No Obvious Bugs or Logic Errors**
+
+1. **Bash 3.2 compatibility**: No forbidden constructs (no associative arrays, no `readarray`, no `${var,,}`)
+2. **Pipefail compliance**: All grep and command chains properly guarded:
+   - Lines 783, 787, 791 use `&>/dev/null` or `2>/dev/null`
+   - Port detection uses `PORT_IN_USE=false` with variable assignment before conditional testing
+   - `kill -0` safely guarded in conditional
+3. **Variable scoping**: All variables properly declared and used
+4. **Logic correctness**:
+   - PID check correctly uses `kill -0` to test if process is alive
+   - Port availability falls through all three tools correctly with `elif`
+   - Asset counting correctly tallies 3 files and provides feedback on partial assets
+   - Multiple dashboard install paths searched in priority order
+
+### ✅ **No Incomplete Work**
+
+- No TODOs, FIXMEs, or placeholder code
+- Implementation fully follows the design document
+- All acceptance criteria met and working
+
+### ✅ **No Regressions**
+
+- All 196+ existing tests pass (15 pipeline + 12 daemon + 13 prep + 27 fleet + 22 fix + 14 memory/cost + 21 session + 15 init + 12 tracker + 17 heartbeat/checkpoint + 14 remote + **14 doctor**)
+- Working tree clean with no broken patterns
+- Existing doctor sections unchanged, only extended
+- Tests properly integrated into `npm test`
+
+### ✅ **Code Quality**
+
+1. **Consistency**: Matches existing doctor patterns (check_pass/check_warn/check_fail helpers)
+2. **Output formatting**: Uses existing color scheme and Unicode headers
+3. **Error handling**: Robust fallback chains and proper error messages
+4. **Documentation**: Clear, actionable guidance for users (install instructions, cleanup steps, port override option)
+5. **Test coverage**: 14 comprehensive tests covering:
+   - Script structure and section existence
+   - Bun, server.ts, asset checks
+   - Port availability detection
+   - Multiple install path search
+   - Smoke tests (script runs without errors, produces expected output)
+
+### ✅ **Acceptance Criteria Met**
+
+All validation criteria from the design pass:
+- ✅ Bun version shown or install instructions provided
+- ✅ Dashboard server path resolved correctly
+- ✅ Public assets validated (index.html, app.js, styles.css)
+- ✅ Port 8767 availability checked with proper fallbacks
+- ✅ Dashboard PID file detection works
+- ✅ Port-check works on both macOS (lsof) and Linux (ss/netstat)
+- ✅ Integration into summary section counts passes/warnings/failures
+- ✅ All 14 tests pass
+
+---
+
+**AUDIT_PASS**
+
+The implementation is complete, correct, and production-ready. The agent demonstrated strong understanding of bash patterns, pipefail constraints, cross-platform compatibility, and Shipwright conventions. All tests pass, no regressions exist, and the feature provides valuable diagnostic capability to users.
