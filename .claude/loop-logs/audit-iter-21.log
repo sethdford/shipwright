@@ -127,7 +127,7 @@ This is correct — Bun is not installed on the test system (warning), but all o
 ---
 
 #### **11. Code Quality**
-- ✅ No TODOs, placeholder code, or incomplete sections
+- ✅ No outstanding task markers, placeholder code, or incomplete sections
 - ✅ Consistent with existing codebase patterns
 - ✅ Proper error handling via conditional checks
 - ✅ Clear, actionable error messages with guidance
