@@ -59,3 +59,16 @@
 {"ts":"2026-02-10T03:35:06Z","ts_epoch":1770694506,"type":"memory.capture","repo":"sethdford/shipwright","result":"complete","passed_stages":"intake,plan,design","failed_stages":""}
 {"ts":"2026-02-10T03:35:07Z","ts_epoch":1770694507,"type":"pipeline.completed","issue":5,"result":"success","duration_s":40,"pr_url":"","input_tokens":0,"output_tokens":0,"self_heal_count":0}
 {"ts":"2026-02-10T03:35:07Z","ts_epoch":1770694507,"type":"pipeline.cost","input_tokens":0,"output_tokens":0,"model":"sonnet","estimated_cost_usd":0.0000}
+{"ts":"2026-02-10T06:28:29Z","ts_epoch":1770704909,"type":"patrol.started","dry_run":"false"}
+{"ts":"2026-02-10T06:28:31Z","ts_epoch":1770704911,"type":"patrol.issue_created","check":"documentation","count":1}
+{"ts":"2026-02-10T06:28:31Z","ts_epoch":1770704911,"type":"patrol.finding","check":"untested_script","script":"sw-loop.sh","lines":1446,"usage":4}
+{"ts":"2026-02-10T06:28:31Z","ts_epoch":1770704911,"type":"patrol.finding","check":"untested_script","script":"sw-doctor.sh","lines":794,"usage":4}
+{"ts":"2026-02-10T06:28:31Z","ts_epoch":1770704911,"type":"patrol.finding","check":"untested_script","script":"sw-cost.sh","lines":594,"usage":4}
+{"ts":"2026-02-10T06:28:31Z","ts_epoch":1770704911,"type":"patrol.finding","check":"untested_script","script":"sw-tracker-linear.sh","lines":193,"usage":3}
+{"ts":"2026-02-10T06:28:31Z","ts_epoch":1770704911,"type":"patrol.finding","check":"untested_script","script":"sw-tracker-jira.sh","lines":187,"usage":3}
+{"ts":"2026-02-10T06:28:31Z","ts_epoch":1770704911,"type":"patrol.finding","check":"untested_script","script":"sw-status.sh","lines":605,"usage":3}
+{"ts":"2026-02-10T06:28:31Z","ts_epoch":1770704911,"type":"patrol.finding","check":"untested_script","script":"sw-ps.sh","lines":170,"usage":2}
+{"ts":"2026-02-10T06:28:31Z","ts_epoch":1770704911,"type":"patrol.finding","check":"untested_script","script":"sw-developer-simulation.sh","lines":250,"usage":2}
+{"ts":"2026-02-10T06:28:31Z","ts_epoch":1770704911,"type":"patrol.finding","check":"untested_script","script":"sw-cleanup.sh","lines":174,"usage":2}
+{"ts":"2026-02-10T06:28:31Z","ts_epoch":1770704911,"type":"patrol.finding","check":"untested_script","script":"sw-checkpoint.sh","lines":385,"usage":2}
+{"ts":"2026-02-10T06:28:33Z","ts_epoch":1770704913,"type":"patrol.issue_created","check":"untested_scripts","count":23}
