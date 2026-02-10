@@ -1,0 +1,16 @@
+## Iteration 2 Summary
+
+All work for "Add pipeline dry-run summary with stage timing estimates" is complete:
+
+**Fixes applied** (commit `26be43f`):
+1. `scripts/sw-pipeline.sh:1087` — `cct-cost.sh` → `sw-cost.sh` (budget display now works)
+2. `scripts/sw-pipeline-test.sh` — 7 occurrences of `~/.claude-teams/` → `~/.shipwright/` (tests now seed data where the pipeline reads it)
+
+**Verification** (iteration 2):
+- All 11 test suites pass: 176 tests, 0 failures
+- All 3 dry-run tests pass (with history, no history, existing behavior)
+- No stale `claude-teams` paths in scripts (only in `postinstall.mjs` migration helper)
+- No stale `cct-cost` references anywhere in scripts
+- All 8 DoD criteria satisfied
+
+LOOP_COMPLETE
