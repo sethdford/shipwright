@@ -85,3 +85,16 @@
 {"ts":"2026-02-10T12:21:19Z","ts_epoch":1770726079,"type":"patrol.finding","check":"untested_script","script":"sw-cleanup.sh","lines":174,"usage":2}
 {"ts":"2026-02-10T12:21:19Z","ts_epoch":1770726079,"type":"patrol.finding","check":"untested_script","script":"sw-checkpoint.sh","lines":385,"usage":2}
 {"ts":"2026-02-10T12:21:20Z","ts_epoch":1770726080,"type":"patrol.issue_created","check":"untested_scripts","count":23}
+{"ts":"2026-02-10T18:25:26Z","ts_epoch":1770747926,"type":"patrol.started","dry_run":"false"}
+{"ts":"2026-02-10T18:25:28Z","ts_epoch":1770747928,"type":"patrol.issue_created","check":"documentation","count":1}
+{"ts":"2026-02-10T18:25:28Z","ts_epoch":1770747928,"type":"patrol.finding","check":"untested_script","script":"sw-loop.sh","lines":1446,"usage":4}
+{"ts":"2026-02-10T18:25:29Z","ts_epoch":1770747929,"type":"patrol.finding","check":"untested_script","script":"sw-doctor.sh","lines":794,"usage":4}
+{"ts":"2026-02-10T18:25:29Z","ts_epoch":1770747929,"type":"patrol.finding","check":"untested_script","script":"sw-cost.sh","lines":594,"usage":4}
+{"ts":"2026-02-10T18:25:29Z","ts_epoch":1770747929,"type":"patrol.finding","check":"untested_script","script":"sw-tracker-linear.sh","lines":193,"usage":3}
+{"ts":"2026-02-10T18:25:29Z","ts_epoch":1770747929,"type":"patrol.finding","check":"untested_script","script":"sw-tracker-jira.sh","lines":187,"usage":3}
+{"ts":"2026-02-10T18:25:29Z","ts_epoch":1770747929,"type":"patrol.finding","check":"untested_script","script":"sw-status.sh","lines":605,"usage":3}
+{"ts":"2026-02-10T18:25:29Z","ts_epoch":1770747929,"type":"patrol.finding","check":"untested_script","script":"sw-ps.sh","lines":170,"usage":2}
+{"ts":"2026-02-10T18:25:29Z","ts_epoch":1770747929,"type":"patrol.finding","check":"untested_script","script":"sw-developer-simulation.sh","lines":250,"usage":2}
+{"ts":"2026-02-10T18:25:29Z","ts_epoch":1770747929,"type":"patrol.finding","check":"untested_script","script":"sw-cleanup.sh","lines":174,"usage":2}
+{"ts":"2026-02-10T18:25:29Z","ts_epoch":1770747929,"type":"patrol.finding","check":"untested_script","script":"sw-checkpoint.sh","lines":385,"usage":2}
+{"ts":"2026-02-10T18:25:30Z","ts_epoch":1770747930,"type":"patrol.issue_created","check":"untested_scripts","count":23}
