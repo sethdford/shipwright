@@ -46,9 +46,9 @@ setup_env() {
 
     # ── Backup events.jsonl to prevent test pollution ─────────────────────
     EVENTS_BACKUP=""
-    if [[ -f "${HOME}/.claude-teams/events.jsonl" ]]; then
+    if [[ -f "${HOME}/.shipwright/events.jsonl" ]]; then
         EVENTS_BACKUP="$TEMP_DIR/events.jsonl.backup"
-        cp "${HOME}/.claude-teams/events.jsonl" "$EVENTS_BACKUP"
+        cp "${HOME}/.shipwright/events.jsonl" "$EVENTS_BACKUP"
     fi
 
     # ── Copy real pipeline script ─────────────────────────────────────────
@@ -365,14 +365,14 @@ reset_test() {
 cleanup_env() {
     # Restore events.jsonl from backup
     if [[ -n "${EVENTS_BACKUP:-}" && -f "$EVENTS_BACKUP" ]]; then
-        mkdir -p "${HOME}/.claude-teams"
-        cp "$EVENTS_BACKUP" "${HOME}/.claude-teams/events.jsonl"
+        mkdir -p "${HOME}/.shipwright"
+        cp "$EVENTS_BACKUP" "${HOME}/.shipwright/events.jsonl"
     elif [[ -n "${EVENTS_BACKUP:-}" ]]; then
         # Backup var was set but file gone — original existed, restore is best-effort
         :
     else
         # No backup means there was no original — remove any test-created file
-        rm -f "${HOME}/.claude-teams/events.jsonl" 2>/dev/null || true
+        rm -f "${HOME}/.shipwright/events.jsonl" 2>/dev/null || true
     fi
     if [[ -n "$TEMP_DIR" && -d "$TEMP_DIR" ]]; then
         rm -rf "$TEMP_DIR"
@@ -814,7 +814,7 @@ test_dry_run_summary_with_history() {
     write_standard_template
 
     # Seed events.jsonl with historical stage.completed events
-    local events_dir="${HOME}/.claude-teams"
+    local events_dir="${HOME}/.shipwright"
     mkdir -p "$events_dir"
     local events_file="${events_dir}/events.jsonl"
     rm -f "$events_file" 2>/dev/null || true
@@ -874,7 +874,7 @@ test_dry_run_summary_no_history() {
     write_standard_template
 
     # Ensure no events file exists
-    rm -f "${HOME}/.claude-teams/events.jsonl" 2>/dev/null || true
+    rm -f "${HOME}/.shipwright/events.jsonl" 2>/dev/null || true
 
     invoke_pipeline start --goal "Dry run no history" --skip-gates --dry-run
 

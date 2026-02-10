@@ -1117,7 +1117,7 @@ dry_run_summary() {
 
     # ── Budget remaining (only if budget is enabled) ──
     local budget_remaining=""
-    budget_remaining=$("$SCRIPT_DIR/cct-cost.sh" remaining-budget 2>/dev/null) || true
+    budget_remaining=$("$SCRIPT_DIR/sw-cost.sh" remaining-budget 2>/dev/null) || true
     if [[ -n "$budget_remaining" && "$budget_remaining" != "unlimited" ]]; then
         printf "Budget remaining: \$%s\n" "$budget_remaining"
     fi
