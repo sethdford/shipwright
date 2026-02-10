@@ -1,1 +1,15 @@
 []
+{"ts":"2026-02-10T01:48:21Z","ts_epoch":1770688101,"type":"patrol.started","dry_run":"false"}
+{"ts":"2026-02-10T01:48:23Z","ts_epoch":1770688103,"type":"patrol.issue_created","check":"documentation","count":1}
+{"ts":"2026-02-10T01:48:23Z","ts_epoch":1770688103,"type":"patrol.finding","check":"untested_script","script":"sw-loop.sh","lines":1445,"usage":4}
+{"ts":"2026-02-10T01:48:23Z","ts_epoch":1770688103,"type":"patrol.finding","check":"untested_script","script":"sw-doctor.sh","lines":721,"usage":4}
+{"ts":"2026-02-10T01:48:23Z","ts_epoch":1770688103,"type":"patrol.finding","check":"untested_script","script":"sw-cost.sh","lines":593,"usage":4}
+{"ts":"2026-02-10T01:48:23Z","ts_epoch":1770688103,"type":"patrol.finding","check":"untested_script","script":"sw-status.sh","lines":527,"usage":3}
+{"ts":"2026-02-10T01:48:23Z","ts_epoch":1770688103,"type":"patrol.finding","check":"untested_script","script":"sw-tracker-linear.sh","lines":193,"usage":2}
+{"ts":"2026-02-10T01:48:23Z","ts_epoch":1770688103,"type":"patrol.finding","check":"untested_script","script":"sw-tracker-jira.sh","lines":187,"usage":2}
+{"ts":"2026-02-10T01:48:23Z","ts_epoch":1770688103,"type":"patrol.finding","check":"untested_script","script":"sw-ps.sh","lines":168,"usage":2}
+{"ts":"2026-02-10T01:48:23Z","ts_epoch":1770688103,"type":"patrol.finding","check":"untested_script","script":"sw-linear.sh","lines":647,"usage":2}
+{"ts":"2026-02-10T01:48:23Z","ts_epoch":1770688103,"type":"patrol.finding","check":"untested_script","script":"sw-cleanup.sh","lines":172,"usage":2}
+{"ts":"2026-02-10T01:48:23Z","ts_epoch":1770688103,"type":"patrol.finding","check":"untested_script","script":"sw-checkpoint.sh","lines":384,"usage":2}
+{"ts":"2026-02-10T01:48:24Z","ts_epoch":1770688104,"type":"patrol.issue_created","check":"untested_scripts","count":18}
+{"ts":"2026-02-10T01:48:24Z","ts_epoch":1770688104,"type":"patrol.completed","findings":19,"issues_created":2,"dry_run":"false"}
