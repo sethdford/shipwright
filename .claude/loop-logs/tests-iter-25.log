@@ -8,7 +8,7 @@
 [38;2;124;58;237m[1m╚═══════════════════════════════════════════════════════════════════╝[0m
 
 [2mSetting up mock environment...[0m
-[38;2;74;222;128m✓[0m Environment ready: [2m/tmp/sw-pipeline-test.nFNXgG[0m
+[38;2;74;222;128m✓[0m Environment ready: [2m/tmp/sw-pipeline-test.C0ywjf[0m
 
   [38;2;0;212;255m▸[0m Preflight passes with all mocks... [38;2;74;222;128m✓[0m
   [38;2;0;212;255m▸[0m Preflight fails when sw-loop.sh missing... [38;2;74;222;128m✓[0m
@@ -39,7 +39,7 @@
 [38;2;124;58;237m[1m╚═══════════════════════════════════════════════════════════════════╝[0m
 
 [2mSetting up test environment...[0m
-[38;2;74;222;128m✓[0m Environment ready: [2m/tmp/sw-daemon-test.7Omgo1[0m
+[38;2;74;222;128m✓[0m Environment ready: [2m/tmp/sw-daemon-test.E1e8Nu[0m
 
   [38;2;0;212;255m▸[0m dora_grade deploy_freq Elite (>= 7)... [38;2;74;222;128m✓[0m
   [38;2;0;212;255m▸[0m dora_grade deploy_freq High (>= 1)... [38;2;74;222;128m✓[0m
@@ -73,7 +73,7 @@
 [38;2;124;58;237m[1m╚═══════════════════════════════════════════════════════════════════╝[0m
 
 [2mSetting up test environment...[0m
-[38;2;74;222;128m✓[0m Environment ready: [2m/tmp/sw-prep-test.JDQXQy[0m
+[38;2;74;222;128m✓[0m Environment ready: [2m/tmp/sw-prep-test.VhfX1k[0m
 
   [38;2;0;212;255m▸[0m Node.js project detection... [38;2;74;222;128m✓[0m
   [38;2;0;212;255m▸[0m Python project detection... [38;2;74;222;128m✓[0m
@@ -102,7 +102,7 @@
 [38;2;124;58;237m[1m╚═══════════════════════════════════════════════════════════════════╝[0m
 
 [2mSetting up test environment...[0m
-[38;2;74;222;128m✓[0m Environment ready: [2m/tmp/sw-fleet-test.znyBd3[0m
+[38;2;74;222;128m✓[0m Environment ready: [2m/tmp/sw-fleet-test.rtyIgE[0m
 
   [38;2;0;212;255m▸[0m Help output contains expected sections... [38;2;74;222;128m✓[0m
   [38;2;0;212;255m▸[0m Help via --help flag... [38;2;74;222;128m✓[0m
@@ -145,7 +145,7 @@
 [38;2;124;58;237m[1m╚═══════════════════════════════════════════════════════════════════╝[0m
 
 [2mSetting up test environment...[0m
-[38;2;74;222;128m✓[0m Environment ready: [2m/tmp/sw-fix-test.gjJrwt[0m
+[38;2;74;222;128m✓[0m Environment ready: [2m/tmp/sw-fix-test.mbY2fE[0m
 
   [38;2;0;212;255m▸[0m Help output contains expected sections... [38;2;74;222;128m✓[0m
   [38;2;0;212;255m▸[0m Help via --help flag... [38;2;74;222;128m✓[0m
@@ -183,7 +183,7 @@
 [38;2;124;58;237m[1m╚═══════════════════════════════════════════════════════════════════╝[0m
 
 [2mSetting up mock environment...[0m
-[38;2;74;222;128m✓[0m Environment ready: [2m/tmp/sw-memory-test.5gLqje[0m
+[38;2;74;222;128m✓[0m Environment ready: [2m/tmp/sw-memory-test.7IDSof[0m
 
   [38;2;0;212;255m▸[0m Memory capture from pipeline state... [38;2;74;222;128m✓[0m
   [38;2;0;212;255m▸[0m Memory inject returns context for each stage... [38;2;74;222;128m✓[0m
@@ -216,7 +216,7 @@
 [38;2;0;212;255m[1m╚═══════════════════════════════════════════════════╝[0m
 
 [2mSetting up test environment...[0m
-[2mTest tmux session: sw-test-819336[0m
+[2mTest tmux session: sw-test-2132184[0m
 
 [38;2;124;58;237m[1mTemplate Loading[0m
   [38;2;0;212;255m▸[0m Load feature-dev template (3 agents)... [38;2;74;222;128m✓[0m
@@ -259,7 +259,7 @@
 [38;2;0;212;255m[1m╚═══════════════════════════════════════════════════╝[0m
 
 [2mSetting up sandboxed environment...[0m
-[2mTemp dir: /tmp/sw-init-test.Ns3SSr[0m
+[2mTemp dir: /tmp/sw-init-test.RmndKK[0m
 
 [38;2;124;58;237m[1mConfiguration[0m
   [38;2;0;212;255m▸[0m Settings.json created with agent teams... [38;2;74;222;128m✓[0m
@@ -328,7 +328,7 @@
   [38;2;0;212;255m▸[0m Write heartbeat creates JSON file... [38;2;74;222;128m✓[0m
   [38;2;0;212;255m▸[0m Check heartbeat reports alive... [38;2;74;222;128m[1m✓[0m Job test-job-alive alive (0s ago)
 [38;2;74;222;128m✓[0m
-  [38;2;0;212;255m▸[0m Check heartbeat reports stale... [38;2;250;204;21m[1m⚠[0m Job test-job-stale stale (192939759s ago, timeout: 120s)
+  [38;2;0;212;255m▸[0m Check heartbeat reports stale... [38;2;250;204;21m[1m⚠[0m Job test-job-stale stale (192942162s ago, timeout: 120s)
 [38;2;74;222;128m✓[0m
   [38;2;0;212;255m▸[0m Clear heartbeat removes file... [38;2;74;222;128m[1m✓[0m Cleared heartbeat for job: test-job-clear
 [38;2;74;222;128m✓[0m
@@ -370,12 +370,12 @@
 [2mSetting up test environment...[0m
 
 [38;2;124;58;237m[1mMachine Registry[0m
-  [38;2;0;212;255m▸[0m Add machine creates machines.json... [38;2;0;212;255m[1m▸[0m Checking shipwright installation at [2m/tmp/sw-remote-test.2QhxgZ/mock-install[0m...
-[38;2;74;222;128m[1m✓[0m Shipwright found at /tmp/sw-remote-test.2QhxgZ/mock-install
+  [38;2;0;212;255m▸[0m Add machine creates machines.json... [38;2;0;212;255m[1m▸[0m Checking shipwright installation at [2m/tmp/sw-remote-test.oXTNhg/mock-install[0m...
+[38;2;74;222;128m[1m✓[0m Shipwright found at /tmp/sw-remote-test.oXTNhg/mock-install
 [38;2;74;222;128m[1m✓[0m Registered machine: [1mbuilder-1[0m (localhost, worker, 4 workers)
 [38;2;74;222;128m✓[0m
-  [38;2;0;212;255m▸[0m Add second machine appends to array... [38;2;0;212;255m[1m▸[0m Checking shipwright installation at [2m/tmp/sw-remote-test.2QhxgZ/mock-install[0m...
-[38;2;74;222;128m[1m✓[0m Shipwright found at /tmp/sw-remote-test.2QhxgZ/mock-install
+  [38;2;0;212;255m▸[0m Add second machine appends to array... [38;2;0;212;255m[1m▸[0m Checking shipwright installation at [2m/tmp/sw-remote-test.oXTNhg/mock-install[0m...
+[38;2;74;222;128m[1m✓[0m Shipwright found at /tmp/sw-remote-test.oXTNhg/mock-install
 [38;2;74;222;128m[1m✓[0m Registered machine: [1mbuilder-2[0m (localhost, worker, 8 workers)
 [38;2;74;222;128m✓[0m
   [38;2;0;212;255m▸[0m Remove machine by name... [38;2;74;222;128m[1m✓[0m Removed machine: [1mbuilder-2[0m
@@ -405,7 +405,7 @@
 [38;2;124;58;237m[1m╚═══════════════════════════════════════════════════════════════════╝[0m
 
 [2mSetting up test environment...[0m
-✓ Environment ready: /tmp/sw-intelligence-test.GjWF6Q
+✓ Environment ready: /tmp/sw-intelligence-test.eR9xaq
 
   ▸ analyze_issue returns valid schema... ✓
   ▸ Cache hit on second call with same input... ✓
@@ -576,8 +576,8 @@ All 16 tests passed!
 [38;2;124;58;237m[1mStart/Stop Lifecycle[0m
   [38;2;0;212;255m▸[0m cmd_start creates PID file... [38;2;0;212;255m[1m▸[0m Starting connect to [1mhttp://localhost:8767[0m
 [38;2;0;212;255m[1m▸[0m Developer: [1mtest-developer[0m @ [1mtest-machine[0m
-[38;2;74;222;128m[1m✓[0m Connect started (PID 830346)
-  [2mLogs: /tmp/sw-connect-test.IJqaCy/home/.shipwright/connect.log[0m
+[38;2;74;222;128m[1m✓[0m Connect started (PID 2144244)
+  [2mLogs: /tmp/sw-connect-test.giTsqf/home/.shipwright/connect.log[0m
   [2mStop: shipwright connect stop[0m
 [38;2;74;222;128m✓[0m
   [38;2;0;212;255m▸[0m cmd_start rejects if already running...   [2mStop it first: shipwright connect stop[0m
