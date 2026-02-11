@@ -523,6 +523,40 @@ notify() {
     fi
 }
 
+# ─── GitHub Rate-Limit Circuit Breaker ─────────────────────────────────────
+# Tracks consecutive GitHub API failures. If we hit too many failures in a row,
+# we back off exponentially to avoid hammering a rate-limited API.
+
+GH_CONSECUTIVE_FAILURES=0
+GH_BACKOFF_UNTIL=0  # epoch seconds — skip gh calls until this time
+
+gh_rate_limited() {
+    # Returns 0 (true) if we should skip GitHub API calls
+    local now_e
+    now_e=$(now_epoch)
+    if [[ "$GH_BACKOFF_UNTIL" -gt "$now_e" ]]; then
+        return 0
+    fi
+    return 1
+}
+
+gh_record_success() {
+    GH_CONSECUTIVE_FAILURES=0
+    GH_BACKOFF_UNTIL=0
+}
+
+gh_record_failure() {
+    GH_CONSECUTIVE_FAILURES=$((GH_CONSECUTIVE_FAILURES + 1))
+    if [[ "$GH_CONSECUTIVE_FAILURES" -ge 3 ]]; then
+        # Exponential backoff: 30s, 60s, 120s, 240s (capped at 5min)
+        local backoff_secs=$((30 * (1 << (GH_CONSECUTIVE_FAILURES - 3))))
+        [[ "$backoff_secs" -gt 300 ]] && backoff_secs=300
+        GH_BACKOFF_UNTIL=$(( $(now_epoch) + backoff_secs ))
+        daemon_log WARN "GitHub rate-limit circuit breaker: backing off ${backoff_secs}s after ${GH_CONSECUTIVE_FAILURES} failures"
+        emit_event "daemon.rate_limit" "failures=$GH_CONSECUTIVE_FAILURES" "backoff_s=$backoff_secs"
+    fi
+}
+
 # ─── Pre-flight Checks ──────────────────────────────────────────────────────
 
 preflight_checks() {
@@ -733,11 +767,8 @@ get_active_count() {
 
 enqueue_issue() {
     local issue_num="$1"
-    local tmp
-    tmp=$(jq --argjson num "$issue_num" \
-        '.queued += [$num] | .queued |= unique' \
-        "$STATE_FILE")
-    atomic_write_state "$tmp"
+    locked_state_update --argjson num "$issue_num" \
+        '.queued += [$num] | .queued |= unique'
     daemon_log INFO "Queued issue #${issue_num} (at capacity)"
 }
 
@@ -749,10 +780,8 @@ dequeue_next() {
     local next
     next=$(jq -r '.queued[0] // empty' "$STATE_FILE" 2>/dev/null || true)
     if [[ -n "$next" ]]; then
-        # Remove from queue
-        local tmp
-        tmp=$(jq '.queued = .queued[1:]' "$STATE_FILE")
-        atomic_write_state "$tmp"
+        # Remove from queue (locked to prevent race with enqueue)
+        locked_state_update '.queued = .queued[1:]'
         echo "$next"
     fi
 }
@@ -785,11 +814,8 @@ get_priority_active_count() {
 
 track_priority_job() {
     local issue_num="$1"
-    local tmp
-    tmp=$(jq --argjson num "$issue_num" \
-        '.priority_lane_active = ((.priority_lane_active // []) + [$num] | unique)' \
-        "$STATE_FILE")
-    atomic_write_state "$tmp"
+    locked_state_update --argjson num "$issue_num" \
+        '.priority_lane_active = ((.priority_lane_active // []) + [$num] | unique)'
 }
 
 untrack_priority_job() {
@@ -797,11 +823,8 @@ untrack_priority_job() {
     if [[ ! -f "$STATE_FILE" ]]; then
         return
     fi
-    local tmp
-    tmp=$(jq --argjson num "$issue_num" \
-        '.priority_lane_active = [(.priority_lane_active // [])[] | select(. != $num)]' \
-        "$STATE_FILE")
-    atomic_write_state "$tmp"
+    locked_state_update --argjson num "$issue_num" \
+        '.priority_lane_active = [(.priority_lane_active // [])[] | select(. != $num)]'
 }
 
 # ─── Distributed Issue Claiming ───────────────────────────────────────────
@@ -1026,8 +1049,7 @@ _Progress updates will appear below as the pipeline advances through each stage.
 
 daemon_track_job() {
     local issue_num="$1" pid="$2" worktree="$3" title="${4:-}" repo="${5:-}" goal="${6:-}"
-    local tmp
-    tmp=$(jq \
+    locked_state_update \
         --argjson num "$issue_num" \
         --argjson pid "$pid" \
         --arg wt "$worktree" \
@@ -1043,9 +1065,7 @@ daemon_track_job() {
             started_at: $started,
             repo: $repo,
             goal: $goal
-        }]' \
-        "$STATE_FILE")
-    atomic_write_state "$tmp"
+        }]'
 }
 
 # ─── Reap Completed Jobs ────────────────────────────────────────────────────
@@ -1123,12 +1143,9 @@ daemon_reap_completed() {
         reap_machine_name=$(jq -r '.machines[] | select(.role == "primary") | .name' "$HOME/.shipwright/machines.json" 2>/dev/null || hostname -s)
         release_claim "$issue_num" "$reap_machine_name"
 
-        # Remove from active_jobs and priority lane tracking
-        local tmp
-        tmp=$(jq --argjson num "$issue_num" \
-            '.active_jobs = [.active_jobs[] | select(.issue != $num)]' \
-            "$STATE_FILE")
-        atomic_write_state "$tmp"
+        # Remove from active_jobs and priority lane tracking (locked)
+        locked_state_update --argjson num "$issue_num" \
+            '.active_jobs = [.active_jobs[] | select(.issue != $num)]'
         untrack_priority_job "$issue_num"
 
         # Clean up worktree (skip for org-mode clones — they persist)
@@ -1165,9 +1182,8 @@ daemon_on_success() {
 
     daemon_log SUCCESS "Pipeline completed for issue #${issue_num} (${duration:-unknown})"
 
-    # Record in completed list (cap at 500 entries to prevent O(n) slowdown)
-    local tmp
-    tmp=$(jq \
+    # Record in completed list + clear retry count for this issue
+    locked_state_update \
         --argjson num "$issue_num" \
         --arg result "success" \
         --arg dur "${duration:-unknown}" \
@@ -1177,9 +1193,8 @@ daemon_on_success() {
             result: $result,
             duration: $dur,
             completed_at: $completed_at
-        }] | .completed = .completed[-500:]' \
-        "$STATE_FILE")
-    atomic_write_state "$tmp"
+        }] | .completed = .completed[-500:]
+        | del(.retry_counts[($num | tostring)])'
 
     if [[ "$NO_GITHUB" != "true" ]]; then
         # Remove watch label, add success label
@@ -1217,9 +1232,8 @@ daemon_on_failure() {
 
     daemon_log ERROR "Pipeline failed for issue #${issue_num} (exit: ${exit_code}, ${duration:-unknown})"
 
-    # Record in completed list (cap at 500 entries to prevent O(n) slowdown)
-    local tmp
-    tmp=$(jq \
+    # Record in completed list
+    locked_state_update \
         --argjson num "$issue_num" \
         --arg result "failed" \
         --argjson code "$exit_code" \
@@ -1231,9 +1245,7 @@ daemon_on_failure() {
             exit_code: $code,
             duration: $dur,
             completed_at: $completed_at
-        }] | .completed = .completed[-500:]' \
-        "$STATE_FILE")
-    atomic_write_state "$tmp"
+        }] | .completed = .completed[-500:]'
 
     # ── Auto-retry with strategy escalation ──
     if [[ "${RETRY_ESCALATION:-true}" == "true" ]]; then
@@ -1244,11 +1256,10 @@ daemon_on_failure() {
         if [[ "$retry_count" -lt "${MAX_RETRIES:-2}" ]]; then
             retry_count=$((retry_count + 1))
 
-            # Update retry count in state
-            local tmp_state
-            tmp_state=$(jq --arg num "$issue_num" --argjson count "$retry_count" \
-                '.retry_counts[$num] = $count' "$STATE_FILE")
-            atomic_write_state "$tmp_state"
+            # Update retry count in state (locked to prevent race)
+            locked_state_update \
+                --arg num "$issue_num" --argjson count "$retry_count" \
+                '.retry_counts[$num] = $count'
 
             daemon_log WARN "Auto-retry #${retry_count}/${MAX_RETRIES:-2} for issue #${issue_num}"
             emit_event "daemon.retry" "issue=$issue_num" "retry=$retry_count" "max=${MAX_RETRIES:-2}"
@@ -1303,6 +1314,11 @@ Pipeline failed — retrying with escalated strategy.
 
 _Escalation: $(if [[ "$retry_count" -eq 1 ]]; then echo "upgraded model + increased iterations"; else echo "full template + compound quality"; fi)_" 2>/dev/null || true
             fi
+
+            # Backoff before retry: 30s * retry_count (30s, 60s, ...)
+            local backoff_secs=$((30 * retry_count))
+            daemon_log INFO "Waiting ${backoff_secs}s before retry #${retry_count}"
+            sleep "$backoff_secs"
 
             # Re-spawn with escalated strategy
             local orig_template="$PIPELINE_TEMPLATE"
@@ -2664,6 +2680,12 @@ daemon_poll_issues() {
         return
     fi
 
+    # Circuit breaker: skip poll if in backoff window
+    if gh_rate_limited; then
+        daemon_log INFO "Polling skipped (rate-limit backoff until $(epoch_to_iso "$GH_BACKOFF_UNTIL"))"
+        return
+    fi
+
     local issues_json
 
     # Select gh command wrapper: gh_retry for critical poll calls when enabled
@@ -2690,6 +2712,7 @@ daemon_poll_issues() {
                 fi
             fi
             daemon_log WARN "GitHub API error (org search) — backing off ${BACKOFF_SECS}s"
+            gh_record_failure
             sleep "$BACKOFF_SECS"
             return
         }
@@ -2716,6 +2739,7 @@ daemon_poll_issues() {
                 fi
             fi
             daemon_log WARN "GitHub API error — backing off ${BACKOFF_SECS}s"
+            gh_record_failure
             sleep "$BACKOFF_SECS"
             return
         }
@@ -2723,6 +2747,7 @@ daemon_poll_issues() {
 
     # Reset backoff on success
     BACKOFF_SECS=0
+    gh_record_success
 
     local issue_count
     issue_count=$(echo "$issues_json" | jq 'length' 2>/dev/null || echo 0)
@@ -3334,7 +3359,26 @@ daemon_cleanup_stale() {
         done < <(find "$artifacts_dir" -mindepth 1 -maxdepth 1 -type d 2>/dev/null)
     fi
 
-    # ── 3. Prune completed/failed state entries older than age_days ──
+    # ── 3. Clean orphaned daemon/* branches (no matching worktree or active job) ──
+    if command -v git &>/dev/null; then
+        while IFS= read -r branch; do
+            [[ -z "$branch" ]] && continue
+            branch="${branch## }"  # trim leading spaces
+            # Only clean daemon-created branches
+            [[ "$branch" == daemon/issue-* ]] || continue
+            # Extract issue number
+            local branch_issue_num="${branch#daemon/issue-}"
+            # Skip if there's an active job for this issue
+            if daemon_is_inflight "$branch_issue_num" 2>/dev/null; then
+                continue
+            fi
+            daemon_log INFO "Removing orphaned branch: ${branch}"
+            git branch -D "$branch" 2>/dev/null || true
+            cleaned=$((cleaned + 1))
+        done < <(git branch --list 'daemon/issue-*' 2>/dev/null)
+    fi
+
+    # ── 4. Prune completed/failed state entries older than age_days ──
     if [[ -f "$STATE_FILE" ]]; then
         local cutoff_iso
         cutoff_iso=$(epoch_to_iso $((now_e - age_secs)))
@@ -3352,6 +3396,28 @@ daemon_cleanup_stale() {
                 daemon_log INFO "Pruned ${pruned} old completed state entries"
                 cleaned=$((cleaned + pruned))
             fi
+        fi
+    fi
+
+    # ── 5. Prune stale retry_counts (issues no longer in flight or queued) ──
+    if [[ -f "$STATE_FILE" ]]; then
+        local retry_keys
+        retry_keys=$(jq -r '.retry_counts // {} | keys[]' "$STATE_FILE" 2>/dev/null || true)
+        local stale_keys=()
+        while IFS= read -r key; do
+            [[ -z "$key" ]] && continue
+            if ! daemon_is_inflight "$key" 2>/dev/null; then
+                stale_keys+=("$key")
+            fi
+        done <<< "$retry_keys"
+        if [[ ${#stale_keys[@]} -gt 0 ]]; then
+            for sk in "${stale_keys[@]}"; do
+                local tmp_rc
+                tmp_rc=$(jq --arg k "$sk" 'del(.retry_counts[$k])' "$STATE_FILE" 2>/dev/null) || continue
+                atomic_write_state "$tmp_rc"
+            done
+            daemon_log INFO "Pruned ${#stale_keys[@]} stale retry count(s)"
+            cleaned=$((cleaned + ${#stale_keys[@]}))
         fi
     fi
 
