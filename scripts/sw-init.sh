@@ -126,10 +126,30 @@ if [[ "$TOOK_FULL_TMUX_CONF" == "false" && -f "$HOME/.tmux.conf" ]]; then
     fi
 fi
 
+# ─── TPM (Tmux Plugin Manager) ────────────────────────────────────────────
+if [[ ! -d "$HOME/.tmux/plugins/tpm" ]]; then
+    info "Installing TPM (Tmux Plugin Manager)..."
+    if git clone https://github.com/tmux-plugins/tpm "$HOME/.tmux/plugins/tpm" 2>/dev/null; then
+        success "TPM installed"
+    else
+        warn "Could not install TPM — install manually or run: shipwright tmux install"
+    fi
+else
+    success "TPM already installed"
+fi
+
+# ─── Install TPM plugins ──────────────────────────────────────────────────
+if [[ -x "$HOME/.tmux/plugins/tpm/bin/install_plugins" ]]; then
+    info "Installing tmux plugins..."
+    "$HOME/.tmux/plugins/tpm/bin/install_plugins" 2>/dev/null && \
+        success "Plugins installed (sensible, resurrect, continuum, yank, fzf)" || \
+        warn "Some plugins may not have installed — press prefix + I inside tmux"
+fi
+
 # ─── Reload tmux config if inside tmux ─────────────────────────────────────
 if [[ -n "${TMUX:-}" ]]; then
     tmux source-file "$HOME/.tmux.conf" 2>/dev/null && \
-        success "Reloaded tmux config (mouse, terminal overrides active)" || true
+        success "Reloaded tmux config (passthrough, extended-keys, plugins active)" || true
 fi
 
 # ─── Fix iTerm2 mouse reporting if disabled ────────────────────────────────

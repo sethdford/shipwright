@@ -93,6 +93,8 @@ show_help() {
     echo -e "  ${CYAN}connect${RESET} <cmd>          ${BOLD}Team connect${RESET} — sync local state to team dashboard"
     echo -e "  ${CYAN}remote${RESET} <cmd>           ${BOLD}Remote machines${RESET} — register and manage distributed workers"
     echo -e "  ${CYAN}launchd${RESET} <cmd>          ${BOLD}Process supervision${RESET} — auto-start daemon + dashboard on boot"
+    echo -e "  ${CYAN}docs${RESET} <cmd>            ${BOLD}Documentation keeper${RESET} — auto-sync docs from source"
+    echo -e "  ${CYAN}tmux${RESET} <cmd>            ${BOLD}tmux health${RESET} — doctor, install plugins, fix issues"
     echo -e "  ${CYAN}github${RESET}               ${BOLD}GitHub context${RESET} — repo metadata, security, blame"
     echo -e "  ${CYAN}checks${RESET}               ${BOLD}GitHub checks${RESET} — CI check runs and status"
     echo -e "  ${CYAN}deploys${RESET}              ${BOLD}Deployments${RESET} — deployment history and environments"
@@ -294,6 +296,12 @@ main() {
             ;;
         architecture)
             exec "$SCRIPT_DIR/sw-architecture-enforcer.sh" "$@"
+            ;;
+        docs)
+            exec "$SCRIPT_DIR/sw-docs.sh" "$@"
+            ;;
+        tmux)
+            exec "$SCRIPT_DIR/sw-tmux.sh" "$@"
             ;;
         github|gh-context)
             exec "$SCRIPT_DIR/sw-github-graphql.sh" "$@"

@@ -909,6 +909,90 @@ $TEST_OUTPUT"
         fi
     fi
 
+    # Append mid-loop memory refresh if available
+    local memory_refresh_file="$LOG_DIR/memory-refresh-$(( ITERATION - 1 )).txt"
+    if [[ -f "$memory_refresh_file" ]]; then
+        memory_section="${memory_section}
+
+## Fresh Context (from iteration $(( ITERATION - 1 )) analysis)
+$(cat "$memory_refresh_file")"
+    fi
+
+    # GitHub intelligence context (gated by availability)
+    local intelligence_section=""
+    if [[ "${NO_GITHUB:-}" != "true" ]]; then
+        # File hotspots — top 5 most-changed files
+        if type gh_file_change_frequency &>/dev/null 2>&1; then
+            local hotspots
+            hotspots=$(gh_file_change_frequency 2>/dev/null | head -5 || true)
+            if [[ -n "$hotspots" ]]; then
+                intelligence_section="${intelligence_section}
+## File Hotspots (most frequently changed)
+${hotspots}"
+            fi
+        fi
+
+        # CODEOWNERS context
+        if type gh_codeowners &>/dev/null 2>&1; then
+            local owners
+            owners=$(gh_codeowners 2>/dev/null | head -10 || true)
+            if [[ -n "$owners" ]]; then
+                intelligence_section="${intelligence_section}
+## Code Owners
+${owners}"
+            fi
+        fi
+
+        # Active security alerts
+        if type gh_security_alerts &>/dev/null 2>&1; then
+            local alerts
+            alerts=$(gh_security_alerts 2>/dev/null | head -5 || true)
+            if [[ -n "$alerts" ]]; then
+                intelligence_section="${intelligence_section}
+## Active Security Alerts
+${alerts}"
+            fi
+        fi
+    fi
+
+    # Architecture rules (from intelligence layer)
+    local repo_hash
+    repo_hash=$(echo -n "$(pwd)" | shasum -a 256 2>/dev/null | cut -c1-12 || echo "unknown")
+    local arch_file="${HOME}/.shipwright/memory/${repo_hash}/architecture.json"
+    if [[ -f "$arch_file" ]]; then
+        local arch_rules
+        arch_rules=$(jq -r '.rules[]? // empty' "$arch_file" 2>/dev/null | head -10 || true)
+        if [[ -n "$arch_rules" ]]; then
+            intelligence_section="${intelligence_section}
+## Architecture Rules
+${arch_rules}"
+        fi
+    fi
+
+    # Coverage baseline
+    local coverage_file="${HOME}/.shipwright/baselines/${repo_hash}/coverage.json"
+    if [[ -f "$coverage_file" ]]; then
+        local coverage_pct
+        coverage_pct=$(jq -r '.coverage_percent // empty' "$coverage_file" 2>/dev/null || true)
+        if [[ -n "$coverage_pct" ]]; then
+            intelligence_section="${intelligence_section}
+## Coverage Baseline
+Current coverage: ${coverage_pct}% — do not decrease this."
+        fi
+    fi
+
+    # Error classification from last failure
+    local error_log=".claude/pipeline-artifacts/error-log.jsonl"
+    if [[ -f "$error_log" ]]; then
+        local last_error
+        last_error=$(tail -1 "$error_log" 2>/dev/null | jq -r '"Type: \(.type), Exit: \(.exit_code), Error: \(.error | split("\n") | first)"' 2>/dev/null || true)
+        if [[ -n "$last_error" ]]; then
+            intelligence_section="${intelligence_section}
+## Last Error Context
+${last_error}"
+        fi
+    fi
+
     # Stuckness detection — compare last 3 iteration outputs
     local stuckness_section=""
     stuckness_section="$(detect_stuckness)"
@@ -932,6 +1016,8 @@ ${memory_section:+## Memory Context
 $memory_section
 }
 ${dora_section:+$dora_section
+}
+${intelligence_section:+$intelligence_section
 }
 ## Instructions
 1. Read the codebase and understand the current state
@@ -1591,6 +1677,21 @@ run_single_agent_loop() {
         run_claude_iteration || exit_code=$?
 
         local log_file="$LOG_DIR/iteration-${ITERATION}.log"
+
+        # Mid-loop memory refresh — re-query with current error context after iteration 3
+        if [[ "$ITERATION" -ge 3 ]] && type memory_inject_context &>/dev/null 2>&1; then
+            local refresh_ctx
+            refresh_ctx=$(tail -20 "$log_file" 2>/dev/null || true)
+            if [[ -n "$refresh_ctx" ]]; then
+                local refreshed_memory
+                refreshed_memory=$(memory_inject_context "build" "$refresh_ctx" 2>/dev/null | head -5 || true)
+                if [[ -n "$refreshed_memory" ]]; then
+                    # Append to next iteration's memory context
+                    local memory_refresh_file="$LOG_DIR/memory-refresh-${ITERATION}.txt"
+                    echo "$refreshed_memory" > "$memory_refresh_file"
+                fi
+            fi
+        fi
 
         # Auto-commit if Claude didn't
         local commits_before

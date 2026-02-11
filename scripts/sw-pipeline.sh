@@ -1602,6 +1602,26 @@ ${memory_summary}
         fi
     fi
 
+    # Inject architecture patterns from intelligence layer
+    local repo_hash_plan
+    repo_hash_plan=$(echo -n "$PROJECT_ROOT" | shasum -a 256 2>/dev/null | cut -c1-12 || echo "unknown")
+    local arch_file_plan="${HOME}/.shipwright/memory/${repo_hash_plan}/architecture.json"
+    if [[ -f "$arch_file_plan" ]]; then
+        local arch_patterns
+        arch_patterns=$(jq -r '
+            "Language: \(.language // "unknown")",
+            "Framework: \(.framework // "unknown")",
+            "Patterns: \((.patterns // []) | join(", "))",
+            "Rules: \((.rules // []) | join("; "))"
+        ' "$arch_file_plan" 2>/dev/null || true)
+        if [[ -n "$arch_patterns" ]]; then
+            plan_prompt="${plan_prompt}
+## Architecture Patterns
+${arch_patterns}
+"
+        fi
+    fi
+
     # Task-type-specific guidance
     case "${TASK_TYPE:-feature}" in
         bug)
@@ -2134,6 +2154,44 @@ Task tracking (check off items as you complete them):
 $(cat "$TASKS_FILE")"
     fi
 
+    # Inject file hotspots from GitHub intelligence
+    if [[ "${NO_GITHUB:-}" != "true" ]] && type gh_file_change_frequency &>/dev/null 2>&1; then
+        local build_hotspots
+        build_hotspots=$(gh_file_change_frequency 2>/dev/null | head -5 || true)
+        if [[ -n "$build_hotspots" ]]; then
+            enriched_goal="${enriched_goal}
+
+File hotspots (most frequently changed — review these carefully):
+${build_hotspots}"
+        fi
+    fi
+
+    # Inject security alerts context
+    if [[ "${NO_GITHUB:-}" != "true" ]] && type gh_security_alerts &>/dev/null 2>&1; then
+        local build_alerts
+        build_alerts=$(gh_security_alerts 2>/dev/null | head -3 || true)
+        if [[ -n "$build_alerts" ]]; then
+            enriched_goal="${enriched_goal}
+
+Active security alerts (do not introduce new vulnerabilities):
+${build_alerts}"
+        fi
+    fi
+
+    # Inject coverage baseline
+    local repo_hash_build
+    repo_hash_build=$(echo -n "$PROJECT_ROOT" | shasum -a 256 2>/dev/null | cut -c1-12 || echo "unknown")
+    local coverage_file_build="${HOME}/.shipwright/baselines/${repo_hash_build}/coverage.json"
+    if [[ -f "$coverage_file_build" ]]; then
+        local coverage_baseline
+        coverage_baseline=$(jq -r '.coverage_percent // empty' "$coverage_file_build" 2>/dev/null || true)
+        if [[ -n "$coverage_baseline" ]]; then
+            enriched_goal="${enriched_goal}
+
+Coverage baseline: ${coverage_baseline}% — do not decrease coverage."
+        fi
+    fi
+
     loop_args+=("$enriched_goal")
 
     # Build loop args from pipeline config + CLI overrides
@@ -2435,6 +2493,18 @@ ${review_memory}
             review_prompt+="
 ## Project Conventions
 ${conventions}
+"
+        fi
+    fi
+
+    # Inject CODEOWNERS focus areas for review
+    if [[ "${NO_GITHUB:-}" != "true" ]] && type gh_codeowners &>/dev/null 2>&1; then
+        local review_owners
+        review_owners=$(gh_codeowners 2>/dev/null | head -10 || true)
+        if [[ -n "$review_owners" ]]; then
+            review_prompt+="
+## Code Owners (focus areas)
+${review_owners}
 "
         fi
     fi

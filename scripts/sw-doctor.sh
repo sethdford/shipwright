@@ -56,15 +56,24 @@ if command -v tmux &>/dev/null; then
     TMUX_VERSION="$(tmux -V | grep -oE '[0-9]+\.[0-9a-z]+')"
     TMUX_MAJOR="$(echo "$TMUX_VERSION" | cut -d. -f1)"
     TMUX_MINOR="$(echo "$TMUX_VERSION" | cut -d. -f2 | tr -dc '0-9')"
-    if [[ "$TMUX_MAJOR" -ge 3 && "$TMUX_MINOR" -ge 2 ]] || [[ "$TMUX_MAJOR" -ge 4 ]]; then
-        check_pass "tmux ${TMUX_VERSION}"
+    if [[ "$TMUX_MAJOR" -ge 3 && "$TMUX_MINOR" -ge 3 ]] || [[ "$TMUX_MAJOR" -ge 4 ]]; then
+        check_pass "tmux ${TMUX_VERSION} (all features: passthrough, popups, extended-keys)"
+    elif [[ "$TMUX_MAJOR" -ge 3 && "$TMUX_MINOR" -ge 2 ]]; then
+        check_warn "tmux ${TMUX_VERSION} — 3.3+ recommended for allow-passthrough"
     else
-        check_warn "tmux ${TMUX_VERSION} — 3.2+ recommended for pane-border-format"
+        check_warn "tmux ${TMUX_VERSION} — 3.2+ required, 3.3+ recommended"
     fi
 else
     check_fail "tmux not installed"
     echo -e "    ${DIM}brew install tmux  (macOS)${RESET}"
     echo -e "    ${DIM}sudo apt install tmux  (Ubuntu/Debian)${RESET}"
+fi
+
+# TPM (Tmux Plugin Manager)
+if [[ -d "$HOME/.tmux/plugins/tpm" ]]; then
+    check_pass "TPM installed"
+else
+    check_warn "TPM not installed — run: shipwright tmux install"
 fi
 
 # jq
@@ -374,6 +383,29 @@ if [[ -n "${TMUX:-}" ]]; then
         check_pass "Pane border format includes cyan accent"
     else
         check_warn "Pane border format missing cyan accent — overlay may not be loaded"
+    fi
+    # Check Claude Code compatibility settings
+    PASSTHROUGH="$(tmux show-option -gv allow-passthrough 2>/dev/null || echo "off")"
+    if [[ "$PASSTHROUGH" == "on" ]]; then
+        check_pass "allow-passthrough: on (DEC 2026 synchronized output)"
+    else
+        check_warn "allow-passthrough: ${PASSTHROUGH} — Claude Code may flicker"
+        echo -e "    ${DIM}Fix: shipwright tmux fix${RESET}"
+    fi
+
+    EXTKEYS="$(tmux show-option -gv extended-keys 2>/dev/null || echo "off")"
+    if [[ "$EXTKEYS" == "on" ]]; then
+        check_pass "extended-keys: on"
+    else
+        check_warn "extended-keys: ${EXTKEYS} — some TUI key combos may not work"
+    fi
+
+    HIST_LIMIT="$(tmux show-option -gv history-limit 2>/dev/null || echo "2000")"
+    if [[ "$HIST_LIMIT" -ge 100000 ]]; then
+        check_pass "history-limit: ${HIST_LIMIT}"
+    else
+        check_warn "history-limit: ${HIST_LIMIT} — 250000+ recommended for Claude Code"
+        echo -e "    ${DIM}Fix: shipwright tmux fix${RESET}"
     fi
 else
     info "Not in tmux session — skipping runtime display checks"

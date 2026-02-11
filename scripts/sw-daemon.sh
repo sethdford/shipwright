@@ -2521,6 +2521,46 @@ Auto-detected by \`shipwright daemon patrol\` on $(now_iso)." \
             fi
         fi
 
+        # Check CLAUDE.md staleness (same pattern as README)
+        if [[ -f ".claude/CLAUDE.md" ]]; then
+            local claudemd_epoch claudemd_src_epoch
+            claudemd_src_epoch=$(git log -1 --format=%ct -- "*.ts" "*.js" "*.py" "*.go" "*.rs" "*.sh" 2>/dev/null || echo "0")
+            claudemd_epoch=$(git log -1 --format=%ct -- ".claude/CLAUDE.md" 2>/dev/null || echo "0")
+            if [[ "$claudemd_src_epoch" -gt 0 ]] && [[ "$claudemd_epoch" -gt 0 ]]; then
+                local claude_drift=$((claudemd_src_epoch - claudemd_epoch))
+                if [[ "$claude_drift" -gt 2592000 ]]; then
+                    findings=$((findings + 1))
+                    local claude_days_behind=$((claude_drift / 86400))
+                    stale_docs="${stale_docs}\n- \`.claude/CLAUDE.md\`: ${claude_days_behind} days behind source code"
+                    if [[ "$dry_run" == "true" ]] || [[ "$NO_GITHUB" == "true" ]]; then
+                        echo -e "    ${YELLOW}●${RESET} CLAUDE.md is ${claude_days_behind} days behind source code"
+                    fi
+                fi
+            fi
+        fi
+
+        # Check AUTO section freshness (if sw-docs.sh available)
+        if [[ -x "$SCRIPT_DIR/sw-docs.sh" ]]; then
+            local docs_stale=false
+            bash "$SCRIPT_DIR/sw-docs.sh" check >/dev/null 2>&1 || docs_stale=true
+            if [[ "$docs_stale" == "true" ]]; then
+                findings=$((findings + 1))
+                stale_docs="${stale_docs}\n- AUTO sections: some documentation sections are stale"
+                if [[ "$dry_run" == "true" ]] || [[ "$NO_GITHUB" == "true" ]]; then
+                    echo -e "    ${YELLOW}●${RESET} AUTO documentation sections are stale"
+                fi
+                # Auto-sync if not dry run
+                if [[ "$dry_run" != "true" ]] && [[ "$NO_GITHUB" != "true" ]]; then
+                    daemon_log INFO "Auto-syncing stale documentation sections"
+                    bash "$SCRIPT_DIR/sw-docs.sh" sync 2>/dev/null || true
+                    if ! git diff --quiet -- '*.md' 2>/dev/null; then
+                        git add -A '*.md' 2>/dev/null || true
+                        git commit -m "docs: auto-sync stale documentation sections" 2>/dev/null || true
+                    fi
+                fi
+            fi
+        fi
+
         if [[ "$findings" -gt 0 ]] && [[ "$NO_GITHUB" != "true" ]] && [[ "$dry_run" != "true" ]]; then
             local existing
             existing=$(gh issue list --label "$PATROL_LABEL" --label "documentation" \
