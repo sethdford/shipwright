@@ -55,10 +55,10 @@ get_mock_response() {
     esac
 }
 
-local url=""
-local method="GET"
-local output_mode="body"
-local max_time="5"
+url=""
+method="GET"
+output_mode="body"
+max_time="5"
 
 while [[ $# -gt 0 ]]; do
     case "$1" in

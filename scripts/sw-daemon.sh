@@ -4130,61 +4130,64 @@ daemon_poll_loop() {
     daemon_log INFO "Watching for label: ${CYAN}${WATCH_LABEL}${RESET}"
 
     while [[ ! -f "$SHUTDOWN_FLAG" ]]; do
-        daemon_poll_issues
-        daemon_reap_completed
-        daemon_health_check
+        # All poll loop calls are error-guarded to prevent set -e from killing the daemon.
+        # The || operator disables set -e for the entire call chain, so transient failures
+        # (GitHub API timeouts, jq errors, intelligence failures) are logged and skipped.
+        daemon_poll_issues || daemon_log WARN "daemon_poll_issues failed — continuing"
+        daemon_reap_completed || daemon_log WARN "daemon_reap_completed failed — continuing"
+        daemon_health_check || daemon_log WARN "daemon_health_check failed — continuing"
 
         # Increment cycle counter (must be before all modulo checks)
         POLL_CYCLE_COUNT=$((POLL_CYCLE_COUNT + 1))
 
         # Fleet config reload every 3 cycles
         if [[ $((POLL_CYCLE_COUNT % 3)) -eq 0 ]]; then
-            daemon_reload_config
+            daemon_reload_config || daemon_log WARN "daemon_reload_config failed — continuing"
         fi
 
         # Check degradation every 5 poll cycles
         if [[ $((POLL_CYCLE_COUNT % 5)) -eq 0 ]]; then
-            daemon_check_degradation
+            daemon_check_degradation || daemon_log WARN "daemon_check_degradation failed — continuing"
         fi
 
         # Auto-scale every N cycles (default: 5)
         if [[ $((POLL_CYCLE_COUNT % ${AUTO_SCALE_INTERVAL:-5})) -eq 0 ]]; then
-            daemon_auto_scale
+            daemon_auto_scale || daemon_log WARN "daemon_auto_scale failed — continuing"
         fi
 
         # Self-optimize every N cycles (default: 10)
         if [[ $((POLL_CYCLE_COUNT % ${OPTIMIZE_INTERVAL:-10})) -eq 0 ]]; then
-            daemon_self_optimize
+            daemon_self_optimize || daemon_log WARN "daemon_self_optimize failed — continuing"
         fi
 
         # Stale state reaper every N cycles (default: 10)
         if [[ $((POLL_CYCLE_COUNT % ${STALE_REAPER_INTERVAL:-10})) -eq 0 ]]; then
-            daemon_cleanup_stale
+            daemon_cleanup_stale || daemon_log WARN "daemon_cleanup_stale failed — continuing"
         fi
 
         # Rotate event log every 10 cycles (~10 min with 60s interval)
         if [[ $((POLL_CYCLE_COUNT % 10)) -eq 0 ]]; then
-            rotate_event_log
+            rotate_event_log || true
         fi
 
         # Proactive patrol during quiet periods (with adaptive limits)
         local issue_count_now active_count_now
         issue_count_now=$(jq -r '.queued | length' "$STATE_FILE" 2>/dev/null || echo 0)
-        active_count_now=$(get_active_count)
+        active_count_now=$(get_active_count || echo 0)
         if [[ "$issue_count_now" -eq 0 ]] && [[ "$active_count_now" -eq 0 ]]; then
             local now_e
-            now_e=$(now_epoch)
+            now_e=$(now_epoch || date +%s)
             if [[ $((now_e - LAST_PATROL_EPOCH)) -ge "$PATROL_INTERVAL" ]]; then
-                load_adaptive_patrol_limits
+                load_adaptive_patrol_limits || true
                 daemon_log INFO "No active work — running patrol"
-                daemon_patrol --once
+                daemon_patrol --once || daemon_log WARN "daemon_patrol failed — continuing"
                 LAST_PATROL_EPOCH=$now_e
             fi
         fi
 
         # ── Adaptive poll interval: adjust sleep based on queue state ──
         local effective_interval
-        effective_interval=$(get_adaptive_poll_interval "$issue_count_now" "$active_count_now")
+        effective_interval=$(get_adaptive_poll_interval "$issue_count_now" "$active_count_now" || echo "${POLL_INTERVAL:-30}")
 
         # Sleep in 1s intervals so we can catch shutdown quickly
         local i=0
@@ -4324,16 +4327,16 @@ daemon_start() {
     trap '' SIGHUP
 
     # Reap any orphaned jobs from previous runs
-    daemon_reap_completed
+    daemon_reap_completed || daemon_log WARN "Failed to reap orphaned jobs — continuing"
 
     # Clean up stale temp files from previous crashes
     find "$(dirname "$STATE_FILE")" -name "*.tmp.*" -mmin +5 -delete 2>/dev/null || true
 
     # Rotate event log on startup
-    rotate_event_log
+    rotate_event_log || true
 
     # Load GitHub context (repo metadata, security alerts, etc.)
-    daemon_github_context
+    daemon_github_context || daemon_log WARN "Failed to load GitHub context — continuing without it"
 
     daemon_log INFO "Daemon started successfully"
     daemon_log INFO "Config: poll_interval=${POLL_INTERVAL}s, max_parallel=${MAX_PARALLEL}, label=${WATCH_LABEL}"
