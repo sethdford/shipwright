@@ -9,155 +9,24 @@ Invalid API key · Fix external API key
 
 Historical context (lessons from previous pipelines):
 {"error":"memory_search_failed","results":[]}"
-iteration: 44
-max_iterations: 44
-status: max_iterations
+iteration: 0
+max_iterations: 20
+status: running
 test_cmd: "npm test"
 model: opus
 agents: 1
-started_at: 2026-02-11T07:47:17Z
-last_iteration_at: 2026-02-11T07:47:17Z
+started_at: 2026-02-11T11:21:51Z
+last_iteration_at: 2026-02-11T11:21:51Z
 consecutive_failures: 0
-total_commits: 44
+total_commits: 0
 audit_enabled: true
 audit_agent_enabled: true
 quality_gates_enabled: true
 dod_file: ""
 auto_extend: true
-extension_count: 3
+extension_count: 0
 max_extensions: 3
 ---
 
 ## Log
-### Iteration 1 (2026-02-11T06:53:44Z)
-Invalid API key · Fix external API key
-
-### Iteration 2 (2026-02-11T06:55:02Z)
-Invalid API key · Fix external API key
-
-### Iteration 3 (2026-02-11T06:56:20Z)
-Invalid API key · Fix external API key
-
-### Iteration 4 (2026-02-11T06:57:37Z)
-Invalid API key · Fix external API key
-
-### Iteration 5 (2026-02-11T06:58:55Z)
-Invalid API key · Fix external API key
-
-### Iteration 6 (2026-02-11T07:00:08Z)
-Invalid API key · Fix external API key
-
-### Iteration 7 (2026-02-11T07:01:21Z)
-Invalid API key · Fix external API key
-
-### Iteration 8 (2026-02-11T07:02:33Z)
-Invalid API key · Fix external API key
-
-### Iteration 9 (2026-02-11T07:03:45Z)
-Invalid API key · Fix external API key
-
-### Iteration 10 (2026-02-11T07:04:55Z)
-Invalid API key · Fix external API key
-
-### Iteration 11 (2026-02-11T07:06:06Z)
-Invalid API key · Fix external API key
-
-### Iteration 12 (2026-02-11T07:07:16Z)
-Invalid API key · Fix external API key
-
-### Iteration 13 (2026-02-11T07:08:26Z)
-Invalid API key · Fix external API key
-
-### Iteration 14 (2026-02-11T07:09:35Z)
-Invalid API key · Fix external API key
-
-### Iteration 15 (2026-02-11T07:10:45Z)
-Invalid API key · Fix external API key
-
-### Iteration 16 (2026-02-11T07:11:56Z)
-Invalid API key · Fix external API key
-
-### Iteration 17 (2026-02-11T07:13:06Z)
-Invalid API key · Fix external API key
-
-### Iteration 18 (2026-02-11T07:14:16Z)
-Invalid API key · Fix external API key
-
-### Iteration 19 (2026-02-11T07:15:25Z)
-Invalid API key · Fix external API key
-
-### Iteration 20 (2026-02-11T07:16:37Z)
-Invalid API key · Fix external API key
-
-### Iteration 21 (2026-02-11T07:17:47Z)
-Invalid API key · Fix external API key
-
-### Iteration 22 (2026-02-11T07:18:58Z)
-Invalid API key · Fix external API key
-
-### Iteration 23 (2026-02-11T07:20:08Z)
-Invalid API key · Fix external API key
-
-### Iteration 24 (2026-02-11T07:21:19Z)
-Invalid API key · Fix external API key
-
-### Iteration 25 (2026-02-11T07:22:30Z)
-Invalid API key · Fix external API key
-
-### Iteration 26 (2026-02-11T07:23:41Z)
-Invalid API key · Fix external API key
-
-### Iteration 27 (2026-02-11T07:24:59Z)
-Invalid API key · Fix external API key
-
-### Iteration 28 (2026-02-11T07:26:14Z)
-Invalid API key · Fix external API key
-
-### Iteration 29 (2026-02-11T07:27:29Z)
-Invalid API key · Fix external API key
-
-### Iteration 30 (2026-02-11T07:28:43Z)
-Invalid API key · Fix external API key
-
-### Iteration 31 (2026-02-11T07:29:59Z)
-Invalid API key · Fix external API key
-
-### Iteration 32 (2026-02-11T07:31:16Z)
-Invalid API key · Fix external API key
-
-### Iteration 33 (2026-02-11T07:32:33Z)
-Invalid API key · Fix external API key
-
-### Iteration 34 (2026-02-11T07:33:50Z)
-Invalid API key · Fix external API key
-
-### Iteration 35 (2026-02-11T07:35:07Z)
-Invalid API key · Fix external API key
-
-### Iteration 36 (2026-02-11T07:36:24Z)
-Invalid API key · Fix external API key
-
-### Iteration 37 (2026-02-11T07:37:47Z)
-Invalid API key · Fix external API key
-
-### Iteration 38 (2026-02-11T07:39:11Z)
-Invalid API key · Fix external API key
-
-### Iteration 39 (2026-02-11T07:40:33Z)
-Invalid API key · Fix external API key
-
-### Iteration 40 (2026-02-11T07:41:55Z)
-Invalid API key · Fix external API key
-
-### Iteration 41 (2026-02-11T07:43:17Z)
-Invalid API key · Fix external API key
-
-### Iteration 42 (2026-02-11T07:44:40Z)
-Invalid API key · Fix external API key
-
-### Iteration 43 (2026-02-11T07:45:57Z)
-Invalid API key · Fix external API key
-
-### Iteration 44 (2026-02-11T07:47:15Z)
-Invalid API key · Fix external API key
 
