@@ -23420,3 +23420,23 @@
 {"ts":"2026-02-11T21:45:30Z","ts_epoch":1770846330,"type":"model.outcome","issue":0,"stage":"intake","model":"opus","success":"true"}
 {"ts":"2026-02-11T21:45:30Z","ts_epoch":1770846330,"type":"model.outcome","issue":0,"stage":"plan","model":"opus","success":"true"}
 {"ts":"2026-02-11T21:45:30Z","ts_epoch":1770846330,"type":"pipeline.cost","input_tokens":0,"output_tokens":0,"model":"sonnet","estimated_cost_usd":0.0000}
+{"ts":"2026-02-11T21:47:55Z","ts_epoch":1770846475,"type":"checks.pipeline_start","stages":10}
+{"ts":"2026-02-11T21:47:55Z","ts_epoch":1770846475,"type":"pipeline.started","issue":13,"pipeline":"autonomous","model":"opus","goal":"Add pipeline dry-run mode for CI validation"}
+{"ts":"2026-02-11T21:47:55Z","ts_epoch":1770846475,"type":"stage.skipped","issue":13,"stage":"intake","reason":"ci_resume"}
+{"ts":"2026-02-11T21:47:55Z","ts_epoch":1770846475,"type":"stage.skipped","issue":13,"stage":"plan","reason":"ci_resume"}
+{"ts":"2026-02-11T21:47:55Z","ts_epoch":1770846475,"type":"stage.skipped","issue":13,"stage":"design","reason":"ci_resume"}
+{"ts":"2026-02-11T21:47:55Z","ts_epoch":1770846475,"type":"stage.skipped","issue":13,"stage":"build","reason":"ci_resume"}
+{"ts":"2026-02-11T21:47:55Z","ts_epoch":1770846475,"type":"stage.skipped","issue":13,"stage":"test","reason":"ci_resume"}
+{"ts":"2026-02-11T21:47:55Z","ts_epoch":1770846475,"type":"stage.skipped","issue":13,"stage":"review","reason":"ci_resume"}
+{"ts":"2026-02-11T21:47:55Z","ts_epoch":1770846475,"type":"stage.skipped","issue":13,"stage":"compound_quality","reason":"ci_resume"}
+{"ts":"2026-02-11T21:47:55Z","ts_epoch":1770846475,"type":"intelligence.model","stage":"pr","complexity":5,"model":"haiku","source":"heuristic"}
+{"ts":"2026-02-11T21:47:55Z","ts_epoch":1770846475,"type":"intelligence.model_ab","issue":13,"stage":"pr","recommended":"{
+  \"model\": \"haiku\",
+  \"reason\": \"budget constrained (< $5 remaining)\",
+  \"stage\": \"pr\",
+  \"complexity\": 5,
+  \"source\": \"heuristic\"
+}","applied":"opus","ab_group":"control","ab_ratio":10}
+{"ts":"2026-02-11T21:47:55Z","ts_epoch":1770846475,"type":"stage.started","issue":13,"stage":"pr"}
+{"ts":"2026-02-11T21:47:55Z","ts_epoch":1770846475,"type":"pr.rejected","issue":13,"reason":"no_real_changes"}
+{"ts":"2026-02-11T21:47:58Z","ts_epoch":1770846478,"type":"stage.failed","issue":13,"stage":"pr","duration_s":3}
