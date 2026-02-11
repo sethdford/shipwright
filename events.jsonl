@@ -162,3 +162,16 @@
 {"ts":"2026-02-11T00:22:32Z","ts_epoch":1770769352,"type":"memory.capture","repo":"sethdford/shipwright","result":"complete","passed_stages":"intake,plan,design","failed_stages":""}
 {"ts":"2026-02-11T00:22:33Z","ts_epoch":1770769353,"type":"pipeline.completed","issue":4,"result":"success","duration_s":39,"pr_url":"","input_tokens":0,"output_tokens":0,"self_heal_count":0}
 {"ts":"2026-02-11T00:22:33Z","ts_epoch":1770769353,"type":"pipeline.cost","input_tokens":0,"output_tokens":0,"model":"sonnet","estimated_cost_usd":0.0000}
+{"ts":"2026-02-11T00:33:14Z","ts_epoch":1770769994,"type":"patrol.started","dry_run":"false"}
+{"ts":"2026-02-11T00:33:17Z","ts_epoch":1770769997,"type":"patrol.issue_created","check":"documentation","count":1}
+{"ts":"2026-02-11T00:33:18Z","ts_epoch":1770769998,"type":"patrol.finding","check":"untested_script","script":"sw-loop.sh","lines":1446,"usage":4}
+{"ts":"2026-02-11T00:33:18Z","ts_epoch":1770769998,"type":"patrol.finding","check":"untested_script","script":"sw-doctor.sh","lines":794,"usage":4}
+{"ts":"2026-02-11T00:33:18Z","ts_epoch":1770769998,"type":"patrol.finding","check":"untested_script","script":"sw-cost.sh","lines":594,"usage":4}
+{"ts":"2026-02-11T00:33:18Z","ts_epoch":1770769998,"type":"patrol.finding","check":"untested_script","script":"sw-tracker-linear.sh","lines":193,"usage":3}
+{"ts":"2026-02-11T00:33:18Z","ts_epoch":1770769998,"type":"patrol.finding","check":"untested_script","script":"sw-tracker-jira.sh","lines":187,"usage":3}
+{"ts":"2026-02-11T00:33:18Z","ts_epoch":1770769998,"type":"patrol.finding","check":"untested_script","script":"sw-status.sh","lines":605,"usage":3}
+{"ts":"2026-02-11T00:33:18Z","ts_epoch":1770769998,"type":"patrol.finding","check":"untested_script","script":"sw-ps.sh","lines":170,"usage":2}
+{"ts":"2026-02-11T00:33:18Z","ts_epoch":1770769998,"type":"patrol.finding","check":"untested_script","script":"sw-developer-simulation.sh","lines":252,"usage":2}
+{"ts":"2026-02-11T00:33:18Z","ts_epoch":1770769998,"type":"patrol.finding","check":"untested_script","script":"sw-cleanup.sh","lines":174,"usage":2}
+{"ts":"2026-02-11T00:33:18Z","ts_epoch":1770769998,"type":"patrol.finding","check":"untested_script","script":"sw-checkpoint.sh","lines":385,"usage":2}
+{"ts":"2026-02-11T00:33:19Z","ts_epoch":1770769999,"type":"patrol.issue_created","check":"untested_scripts","count":23}
