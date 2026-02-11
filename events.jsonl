@@ -22182,3 +22182,16 @@
 {"ts":"2026-02-11T06:27:15Z","ts_epoch":1770791235,"type":"stage.started","issue":33,"stage":"pr"}
 {"ts":"2026-02-11T06:27:15Z","ts_epoch":1770791235,"type":"pr.rejected","issue":33,"reason":"no_real_changes"}
 {"ts":"2026-02-11T06:27:16Z","ts_epoch":1770791236,"type":"stage.failed","issue":33,"stage":"pr","duration_s":1}
+{"ts":"2026-02-11T06:27:51Z","ts_epoch":1770791271,"type":"patrol.started","dry_run":"false"}
+{"ts":"2026-02-11T06:27:54Z","ts_epoch":1770791274,"type":"patrol.issue_created","check":"documentation","count":1}
+{"ts":"2026-02-11T06:27:54Z","ts_epoch":1770791274,"type":"patrol.finding","check":"untested_script","script":"sw-loop.sh","lines":1702,"usage":4}
+{"ts":"2026-02-11T06:27:54Z","ts_epoch":1770791274,"type":"patrol.finding","check":"untested_script","script":"sw-doctor.sh","lines":794,"usage":4}
+{"ts":"2026-02-11T06:27:54Z","ts_epoch":1770791274,"type":"patrol.finding","check":"untested_script","script":"sw-cost.sh","lines":919,"usage":4}
+{"ts":"2026-02-11T06:27:54Z","ts_epoch":1770791274,"type":"patrol.finding","check":"untested_script","script":"sw-tracker-linear.sh","lines":292,"usage":3}
+{"ts":"2026-02-11T06:27:54Z","ts_epoch":1770791274,"type":"patrol.finding","check":"untested_script","script":"sw-tracker-jira.sh","lines":277,"usage":3}
+{"ts":"2026-02-11T06:27:54Z","ts_epoch":1770791274,"type":"patrol.finding","check":"untested_script","script":"sw-status.sh","lines":605,"usage":3}
+{"ts":"2026-02-11T06:27:54Z","ts_epoch":1770791274,"type":"patrol.finding","check":"untested_script","script":"sw-ps.sh","lines":170,"usage":2}
+{"ts":"2026-02-11T06:27:54Z","ts_epoch":1770791274,"type":"patrol.finding","check":"untested_script","script":"sw-developer-simulation.sh","lines":252,"usage":2}
+{"ts":"2026-02-11T06:27:54Z","ts_epoch":1770791274,"type":"patrol.finding","check":"untested_script","script":"sw-cleanup.sh","lines":174,"usage":2}
+{"ts":"2026-02-11T06:27:54Z","ts_epoch":1770791274,"type":"patrol.finding","check":"untested_script","script":"sw-checkpoint.sh","lines":385,"usage":2}
+{"ts":"2026-02-11T06:27:54Z","ts_epoch":1770791274,"type":"patrol.issue_created","check":"untested_scripts","count":23}
