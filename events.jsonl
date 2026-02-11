@@ -9693,3 +9693,16 @@
 {"ts":"2026-02-11T17:26:25Z","ts_epoch":1770830785,"type":"model.outcome","issue":0,"stage":"intake","model":"opus","success":"true"}
 {"ts":"2026-02-11T17:26:25Z","ts_epoch":1770830785,"type":"model.outcome","issue":0,"stage":"plan","model":"opus","success":"true"}
 {"ts":"2026-02-11T17:26:25Z","ts_epoch":1770830785,"type":"pipeline.cost","input_tokens":0,"output_tokens":0,"model":"sonnet","estimated_cost_usd":0.0000}
+{"ts":"2026-02-11T18:23:50Z","ts_epoch":1770834230,"type":"patrol.started","dry_run":"false"}
+{"ts":"2026-02-11T18:24:01Z","ts_epoch":1770834241,"type":"patrol.issue_created","check":"documentation","count":1}
+{"ts":"2026-02-11T18:24:01Z","ts_epoch":1770834241,"type":"patrol.finding","check":"untested_script","script":"sw-tracker-linear.sh","lines":292,"usage":5}
+{"ts":"2026-02-11T18:24:01Z","ts_epoch":1770834241,"type":"patrol.finding","check":"untested_script","script":"sw-tracker-jira.sh","lines":277,"usage":5}
+{"ts":"2026-02-11T18:24:01Z","ts_epoch":1770834241,"type":"patrol.finding","check":"untested_script","script":"sw-loop.sh","lines":1803,"usage":4}
+{"ts":"2026-02-11T18:24:01Z","ts_epoch":1770834241,"type":"patrol.finding","check":"untested_script","script":"sw-doctor.sh","lines":907,"usage":4}
+{"ts":"2026-02-11T18:24:01Z","ts_epoch":1770834241,"type":"patrol.finding","check":"untested_script","script":"sw-cost.sh","lines":919,"usage":4}
+{"ts":"2026-02-11T18:24:01Z","ts_epoch":1770834241,"type":"patrol.finding","check":"untested_script","script":"sw-status.sh","lines":605,"usage":3}
+{"ts":"2026-02-11T18:24:01Z","ts_epoch":1770834241,"type":"patrol.finding","check":"untested_script","script":"sw-linear.sh","lines":648,"usage":3}
+{"ts":"2026-02-11T18:24:01Z","ts_epoch":1770834241,"type":"patrol.finding","check":"untested_script","script":"sw-developer-simulation.sh","lines":252,"usage":3}
+{"ts":"2026-02-11T18:24:01Z","ts_epoch":1770834241,"type":"patrol.finding","check":"untested_script","script":"sw-checkpoint.sh","lines":385,"usage":3}
+{"ts":"2026-02-11T18:24:01Z","ts_epoch":1770834241,"type":"patrol.finding","check":"untested_script","script":"sw-architecture-enforcer.sh","lines":330,"usage":3}
+{"ts":"2026-02-11T18:24:03Z","ts_epoch":1770834243,"type":"patrol.issue_created","check":"untested_scripts","count":23}
