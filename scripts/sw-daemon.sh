@@ -467,6 +467,18 @@ daemon_log() {
     ts=$(now_iso)
     echo "[$ts] [$level] $msg" >> "$LOG_FILE"
 
+    # Rotate daemon.log if over 20MB (checked every ~100 writes)
+    if [[ $(( RANDOM % 100 )) -eq 0 ]] && [[ -f "$LOG_FILE" ]]; then
+        local log_size
+        log_size=$(wc -c < "$LOG_FILE" 2>/dev/null || echo 0)
+        if [[ "$log_size" -gt 20971520 ]]; then
+            [[ -f "${LOG_FILE}.2" ]] && mv "${LOG_FILE}.2" "${LOG_FILE}.3"
+            [[ -f "${LOG_FILE}.1" ]] && mv "${LOG_FILE}.1" "${LOG_FILE}.2"
+            mv "$LOG_FILE" "${LOG_FILE}.1"
+            touch "$LOG_FILE"
+        fi
+    fi
+
     # Also print to stdout
     case "$level" in
         INFO)    info "$msg" ;;
@@ -598,6 +610,9 @@ preflight_checks() {
 
 # ─── State Management ───────────────────────────────────────────────────────
 
+# State file lock FD (used by locked_state_update for serialized read-modify-write)
+STATE_LOCK_FD=7
+
 # Atomic write: write to tmp file, then mv (prevents corruption on crash)
 atomic_write_state() {
     local content="$1"
@@ -608,6 +623,24 @@ atomic_write_state() {
     }
     echo "$content" > "$tmp_file"
     mv "$tmp_file" "$STATE_FILE"
+}
+
+# Locked read-modify-write: prevents TOCTOU race on state file.
+# Usage: locked_state_update '.queued += [42]'
+# The jq expression is applied to the current state file atomically.
+locked_state_update() {
+    local jq_expr="$1"
+    shift
+    local lock_file="${STATE_FILE}.lock"
+    (
+        flock -w 5 200 2>/dev/null || true
+        local tmp
+        tmp=$(jq "$jq_expr" "$@" "$STATE_FILE" 2>/dev/null) || {
+            daemon_log ERROR "locked_state_update: jq failed on expression"
+            return 1
+        }
+        atomic_write_state "$tmp"
+    ) 200>"$lock_file"
 }
 
 init_state() {
@@ -919,27 +952,26 @@ daemon_spawn_pipeline() {
         # Standard mode: use git worktree
         work_dir="${WORKTREE_DIR}/daemon-issue-${issue_num}"
 
-        # Serialize worktree operations with a lock file
-        local lock_file="${WORKTREE_DIR}/.worktree.lock"
+        # Serialize worktree operations with a lock file (run in subshell to auto-close FD)
         mkdir -p "$WORKTREE_DIR"
-        local lock_fd=8
-        eval "exec ${lock_fd}>\"$lock_file\""
-        if ! flock -w 30 "$lock_fd" 2>/dev/null; then
-            daemon_log WARN "Worktree lock held for 30s — proceeding without lock"
-        fi
+        local wt_ok=0
+        (
+            flock -w 30 200 2>/dev/null || true
 
-        # Clean up stale worktree if it exists
-        if [[ -d "$work_dir" ]]; then
-            git worktree remove "$work_dir" --force 2>/dev/null || true
-        fi
-        git branch -D "$branch_name" 2>/dev/null || true
+            # Clean up stale worktree if it exists
+            if [[ -d "$work_dir" ]]; then
+                git worktree remove "$work_dir" --force 2>/dev/null || true
+            fi
+            git branch -D "$branch_name" 2>/dev/null || true
 
-        if ! git worktree add "$work_dir" -b "$branch_name" "$BASE_BRANCH" 2>/dev/null; then
-            eval "exec ${lock_fd}>&-"
+            git worktree add "$work_dir" -b "$branch_name" "$BASE_BRANCH" 2>/dev/null
+        ) 200>"${WORKTREE_DIR}/.worktree.lock"
+        wt_ok=$?
+
+        if [[ $wt_ok -ne 0 ]]; then
             daemon_log ERROR "Failed to create worktree for issue #${issue_num}"
             return 1
         fi
-        eval "exec ${lock_fd}>&-"
         daemon_log INFO "Worktree created at ${work_dir}"
     fi
 
@@ -1041,8 +1073,26 @@ daemon_reap_completed() {
         fi
 
         # Process is dead — determine exit code
+        # Note: wait returns 127 if process was already reaped (e.g., by init)
+        # In that case, check pipeline log for success/failure indicators
         local exit_code=0
         wait "$pid" 2>/dev/null || exit_code=$?
+        if [[ "$exit_code" -eq 127 ]]; then
+            # Process already reaped — check log file for real outcome
+            local issue_log="$LOG_DIR/issue-${issue_num}.log"
+            if [[ -f "$issue_log" ]]; then
+                if grep -q "Pipeline completed successfully" "$issue_log" 2>/dev/null; then
+                    exit_code=0
+                elif grep -q "Pipeline failed\|ERROR.*stage.*failed\|exited with status" "$issue_log" 2>/dev/null; then
+                    exit_code=1
+                else
+                    daemon_log WARN "Could not determine exit code for issue #${issue_num} (PID ${pid} already reaped) — marking as failure"
+                    exit_code=1
+                fi
+            else
+                exit_code=1
+            fi
+        fi
 
         local started_at duration_str=""
         started_at=$(echo "$job" | jq -r '.started_at // empty')
@@ -1092,15 +1142,18 @@ daemon_reap_completed() {
             daemon_log INFO "Org-mode: preserving clone for ${job_repo}"
         fi
 
-        # Dequeue next issue if available
-        local next_issue
-        next_issue=$(dequeue_next)
-        if [[ -n "$next_issue" ]]; then
-            # Look up cached title for the dequeued issue
-            local next_title
-            next_title=$(jq -r --arg n "$next_issue" '.titles[$n] // ""' "$STATE_FILE" 2>/dev/null || true)
-            daemon_log INFO "Dequeuing issue #${next_issue}: ${next_title}"
-            daemon_spawn_pipeline "$next_issue" "$next_title"
+        # Dequeue next issue if available AND we have capacity
+        local current_active
+        current_active=$(get_active_count)
+        if [[ "$current_active" -lt "$MAX_PARALLEL" ]]; then
+            local next_issue
+            next_issue=$(dequeue_next)
+            if [[ -n "$next_issue" ]]; then
+                local next_title
+                next_title=$(jq -r --arg n "$next_issue" '.titles[$n] // ""' "$STATE_FILE" 2>/dev/null || true)
+                daemon_log INFO "Dequeuing issue #${next_issue}: ${next_title}"
+                daemon_spawn_pipeline "$next_issue" "$next_title"
+            fi
         fi
     done <<< "$jobs"
 }
@@ -1112,7 +1165,7 @@ daemon_on_success() {
 
     daemon_log SUCCESS "Pipeline completed for issue #${issue_num} (${duration:-unknown})"
 
-    # Record in completed list
+    # Record in completed list (cap at 500 entries to prevent O(n) slowdown)
     local tmp
     tmp=$(jq \
         --argjson num "$issue_num" \
@@ -1124,7 +1177,7 @@ daemon_on_success() {
             result: $result,
             duration: $dur,
             completed_at: $completed_at
-        }]' \
+        }] | .completed = .completed[-500:]' \
         "$STATE_FILE")
     atomic_write_state "$tmp"
 
@@ -1164,7 +1217,7 @@ daemon_on_failure() {
 
     daemon_log ERROR "Pipeline failed for issue #${issue_num} (exit: ${exit_code}, ${duration:-unknown})"
 
-    # Record in completed list
+    # Record in completed list (cap at 500 entries to prevent O(n) slowdown)
     local tmp
     tmp=$(jq \
         --argjson num "$issue_num" \
@@ -1178,7 +1231,7 @@ daemon_on_failure() {
             exit_code: $code,
             duration: $dur,
             completed_at: $completed_at
-        }]' \
+        }] | .completed = .completed[-500:]' \
         "$STATE_FILE")
     atomic_write_state "$tmp"
 
@@ -2830,16 +2883,21 @@ daemon_health_check() {
                 done
 
                 if [[ -n "$hb_file" ]]; then
-                    local hb_updated
+                    local hb_updated hb_file_issue
                     hb_updated=$(jq -r '.updated_at // ""' "$hb_file" 2>/dev/null || echo "")
+                    hb_file_issue=$(jq -r '.issue // ""' "$hb_file" 2>/dev/null || echo "")
                     if [[ -n "$hb_updated" ]]; then
                         local hb_epoch
                         hb_epoch=$(TZ=UTC date -j -f "%Y-%m-%dT%H:%M:%SZ" "$hb_updated" +%s 2>/dev/null || date -d "$hb_updated" +%s 2>/dev/null || echo "0")
                         local hb_age=$(( now_e - hb_epoch ))
-                        if [[ "$hb_age" -gt "$heartbeat_timeout" ]] && kill -0 "$hb_pid" 2>/dev/null; then
+                        # Only kill if: stale AND process alive AND heartbeat issue matches tracked issue
+                        # This prevents killing a new process that reused the PID of a dead pipeline
+                        if [[ "$hb_age" -gt "$heartbeat_timeout" ]] && kill -0 "$hb_pid" 2>/dev/null && [[ "$hb_file_issue" == "$hb_issue" ]]; then
                             daemon_log WARN "Heartbeat stale for issue #${hb_issue} (${hb_age}s, PID ${hb_pid})"
                             emit_event "daemon.heartbeat_stale" "issue=$hb_issue" "age_s=$hb_age" "pid=$hb_pid"
                             kill "$hb_pid" 2>/dev/null || true
+                            # Remove the stale heartbeat file to prevent re-triggering
+                            rm -f "$hb_file"
                             findings=$((findings + 1))
                         fi
                     fi
@@ -3428,15 +3486,19 @@ daemon_start() {
         local existing_pid
         existing_pid=$(cat "$PID_FILE" 2>/dev/null || true)
         if [[ -n "$existing_pid" ]] && kill -0 "$existing_pid" 2>/dev/null; then
+            exec 9>&-  # Release FD before exiting
             error "Daemon already running (PID: ${existing_pid})"
             info "Use ${CYAN}shipwright daemon stop${RESET} to stop it first"
             exit 1
         else
             warn "Stale PID file found — removing"
             rm -f "$PID_FILE"
+            exec 9>&-  # Release old FD
             exec 9>"$PID_FILE"
         fi
     fi
+    # Release FD 9 — we only needed it for the startup race check
+    exec 9>&-
 
     # Load config
     load_config
