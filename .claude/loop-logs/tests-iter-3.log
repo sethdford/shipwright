@@ -1,0 +1,100 @@
+
+> shipwright-cli@1.7.1 test
+> bash scripts/sw-pipeline-test.sh && bash scripts/sw-daemon-test.sh && bash scripts/sw-prep-test.sh && bash scripts/sw-fleet-test.sh && bash scripts/sw-fix-test.sh && bash scripts/sw-memory-test.sh && bash scripts/sw-session-test.sh && bash scripts/sw-init-test.sh && bash scripts/sw-tracker-test.sh && bash scripts/sw-heartbeat-test.sh && bash scripts/sw-remote-test.sh && bash scripts/sw-intelligence-test.sh && bash scripts/sw-pipeline-composer-test.sh && bash scripts/sw-self-optimize-test.sh && bash scripts/sw-predictive-test.sh && bash scripts/sw-frontier-test.sh && bash scripts/sw-connect-test.sh
+
+
+[38;2;124;58;237m[1m╔═══════════════════════════════════════════════════════════════════╗[0m
+[38;2;124;58;237m[1m║  shipwright pipeline test — E2E Validation (Real Subprocess)     ║[0m
+[38;2;124;58;237m[1m╚═══════════════════════════════════════════════════════════════════╝[0m
+
+[2mSetting up mock environment...[0m
+[38;2;74;222;128m✓[0m Environment ready: [2m/tmp/sw-pipeline-test.D3fDcN[0m
+
+  [38;2;0;212;255m▸[0m Preflight passes with all mocks... [38;2;74;222;128m✓[0m
+  [38;2;0;212;255m▸[0m Preflight fails when sw-loop.sh missing... [38;2;74;222;128m✓[0m
+  [38;2;0;212;255m▸[0m Start requires --goal or --issue... [38;2;74;222;128m✓[0m
+  [38;2;0;212;255m▸[0m Intake with --goal creates branch + artifacts... [38;2;74;222;128m✓[0m
+  [38;2;0;212;255m▸[0m Intake with --issue fetches from GitHub... [38;2;74;222;128m✓[0m
+  [38;2;0;212;255m▸[0m Plan generates plan.md, dod.md, tasks... [38;2;74;222;128m✓[0m
+  [38;2;0;212;255m▸[0m Build invokes sw loop and commits... [38;2;74;222;128m✓[0m
+  [38;2;0;212;255m▸[0m Test stage captures results to log... [38;2;74;222;128m✓[0m
+  [38;2;0;212;255m▸[0m Review generates report with severities... [38;2;74;222;128m✓[0m
+  [38;2;0;212;255m▸[0m PR stage creates PR URL artifact... [38;2;74;222;128m✓[0m
+  [38;2;0;212;255m▸[0m Full E2E pipeline (6 stages)... [38;2;74;222;128m✓[0m
+  [38;2;0;212;255m▸[0m Resume continues from partial state... [38;2;74;222;128m✓[0m
+  [38;2;0;212;255m▸[0m Abort marks pipeline as aborted... [38;2;74;222;128m✓[0m
+  [38;2;0;212;255m▸[0m Dry run shows config, no artifacts... [38;2;74;222;128m✓[0m
+  [38;2;0;212;255m▸[0m Self-healing build→test retry loop... [38;2;74;222;128m✓[0m
+
+[38;2;124;58;237m[1m━━━ Results ━━━[0m
+  [38;2;74;222;128mPassed:[0m 15
+  [38;2;248;113;113mFailed:[0m 0
+  [2mTotal:[0m  15
+
+[38;2;74;222;128m[1mAll 15 tests passed![0m
+
+
+[38;2;124;58;237m[1m╔═══════════════════════════════════════════════════════════════════╗[0m
+[38;2;124;58;237m[1m║  shipwright daemon test — Unit Tests (Synthetic Events)           ║[0m
+[38;2;124;58;237m[1m╚═══════════════════════════════════════════════════════════════════╝[0m
+
+[2mSetting up test environment...[0m
+[38;2;74;222;128m✓[0m Environment ready: [2m/tmp/sw-daemon-test.hLp9dI[0m
+
+  [38;2;0;212;255m▸[0m dora_grade deploy_freq Elite (>= 7)... [38;2;74;222;128m✓[0m
+  [38;2;0;212;255m▸[0m dora_grade deploy_freq High (>= 1)... [38;2;74;222;128m✓[0m
+  [38;2;0;212;255m▸[0m dora_grade deploy_freq Medium (>= 0.25)... [38;2;74;222;128m✓[0m
+  [38;2;0;212;255m▸[0m dora_grade deploy_freq Low (< 0.25)... [38;2;74;222;128m✓[0m
+  [38;2;0;212;255m▸[0m dora_grade CFR thresholds (Elite/High/Medium/Low)... [38;2;74;222;128m✓[0m
+  [38;2;0;212;255m▸[0m Stage timings filter-first jq query... [38;2;74;222;128m✓[0m
+  [38;2;0;212;255m▸[0m MTTR pairs failures with next success... [38;2;74;222;128m✓[0m
+  [38;2;0;212;255m▸[0m epoch_to_iso helper function... [38;2;74;222;128m✓[0m
+  [38;2;0;212;255m▸[0m Health check detects stale jobs... [38;2;74;222;128m✓[0m
+  [38;2;0;212;255m▸[0m Priority label sorting... [38;2;74;222;128m✓[0m
+  [38;2;0;212;255m▸[0m Degradation alert triggers on high CFR... [38;2;74;222;128m✓[0m
+  [38;2;0;212;255m▸[0m Metrics --json output with cycle_time keys... [38;2;74;222;128m✓[0m
+  [38;2;0;212;255m▸[0m Self-labeling includes watch_label when enabled... [38;2;74;222;128m✓[0m
+  [38;2;0;212;255m▸[0m Self-labeling excludes watch_label when disabled... [38;2;74;222;128m✓[0m
+  [38;2;0;212;255m▸[0m Patrol recurring failures label construction... [38;2;74;222;128m✓[0m
+  [38;2;0;212;255m▸[0m DORA degradation event detection... [38;2;74;222;128m✓[0m
+  [38;2;0;212;255m▸[0m Retry exhaustion event detection... [38;2;74;222;128m✓[0m
+  [38;2;0;212;255m▸[0m Untested script detection logic... [38;2;74;222;128m✓[0m
+
+[38;2;124;58;237m[1m━━━ Results ━━━[0m
+  [38;2;74;222;128mPassed:[0m 18
+  [38;2;248;113;113mFailed:[0m 0
+  [2mTotal:[0m  18
+
+[38;2;74;222;128m[1mAll 18 tests passed![0m
+
+
+[38;2;124;58;237m[1m╔═══════════════════════════════════════════════════════════════════╗[0m
+[38;2;124;58;237m[1m║  shipwright prep test — Validation Suite (Real Subprocess)        ║[0m
+[38;2;124;58;237m[1m╚═══════════════════════════════════════════════════════════════════╝[0m
+
+[2mSetting up test environment...[0m
+[38;2;74;222;128m✓[0m Environment ready: [2m/tmp/sw-prep-test.hbWpN4[0m
+
+  [38;2;0;212;255m▸[0m Node.js project detection... [38;2;74;222;128m✓[0m
+  [38;2;0;212;255m▸[0m Python project detection... [38;2;74;222;128m✓[0m
+  [38;2;0;212;255m▸[0m Go project detection... [38;2;74;222;128m✓[0m
+  [38;2;0;212;255m▸[0m Rust project detection... [38;2;74;222;128m✓[0m
+  [38;2;0;212;255m▸[0m settings.json is valid JSON... [38;2;74;222;128m✓[0m
+  [38;2;0;212;255m▸[0m Hook scripts are executable... [38;2;74;222;128m✓[0m
+  [38;2;0;212;255m▸[0m Hook scripts have valid syntax... [38;2;74;222;128m✓[0m
+  [38;2;0;212;255m▸[0m CLAUDE.md has required sections... [38;2;74;222;128m✓[0m
+  [38;2;0;212;255m▸[0m Check mode outputs scoring... [38;2;74;222;128m✓[0m
+  [38;2;0;212;255m▸[0m Idempotency without --force...     [38;2;248;113;113m✗[0m CLAUDE.md was overwritten without --force
+[38;2;248;113;113m✗ FAILED[0m
+  [38;2;0;212;255m▸[0m --force overwrites modified files... [38;2;74;222;128m✓[0m
+  [38;2;0;212;255m▸[0m No eval in generated hooks... [38;2;74;222;128m✓[0m
+  [38;2;0;212;255m▸[0m Definition of Done generated... [38;2;74;222;128m✓[0m
+
+[38;2;124;58;237m[1m━━━ Results ━━━[0m
+  [38;2;74;222;128mPassed:[0m 12
+  [38;2;248;113;113mFailed:[0m 1
+  [2mTotal:[0m  13
+
+[38;2;248;113;113m[1mFailed tests:[0m
+  [38;2;248;113;113m✗[0m Idempotency without --force
+
