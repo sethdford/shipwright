@@ -2178,6 +2178,19 @@ stage_pr() {
         warn "Branch has ${wip_commits} WIP/fixup/squash commit(s) — consider cleaning up"
     fi
 
+    # ── PR Quality Gate: reject PRs with no real code changes ──
+    local real_files
+    real_files=$(git diff --name-only "${BASE_BRANCH}...HEAD" 2>/dev/null | grep -v '^\.claude/' | grep -v '^\.github/' || true)
+    if [[ -z "$real_files" ]]; then
+        error "No real code changes detected — only pipeline artifacts (.claude/ logs)."
+        error "The build agent did not produce meaningful changes. Skipping PR creation."
+        emit_event "pr.rejected" "issue=${ISSUE_NUMBER:-0}" "reason=no_real_changes"
+        return 1
+    fi
+    local real_file_count
+    real_file_count=$(echo "$real_files" | wc -l | xargs)
+    info "PR quality gate: ${real_file_count} real file(s) changed"
+
     # Commit any uncommitted changes left by the build agent
     if ! git diff --quiet 2>/dev/null || ! git diff --cached --quiet 2>/dev/null; then
         info "Committing remaining uncommitted changes..."
@@ -2265,10 +2278,16 @@ stage_pr() {
         fi
     fi
 
-    # Build PR title
-    local pr_title
-    pr_title=$(head -1 "$plan_file" 2>/dev/null | sed 's/^#* *//' | cut -c1-70)
-    [[ -z "$pr_title" ]] && pr_title="$GOAL"
+    # Build PR title — prefer GOAL over plan file first line
+    # (plan file first line often contains Claude analysis text, not a clean title)
+    local pr_title=""
+    if [[ -n "${GOAL:-}" ]]; then
+        pr_title=$(echo "$GOAL" | cut -c1-70)
+    fi
+    if [[ -z "$pr_title" ]] && [[ -s "$plan_file" ]]; then
+        pr_title=$(head -1 "$plan_file" 2>/dev/null | sed 's/^#* *//' | cut -c1-70)
+    fi
+    [[ -z "$pr_title" ]] && pr_title="Pipeline changes for issue ${ISSUE_NUMBER:-unknown}"
 
     # Build comprehensive PR body
     local plan_summary=""
