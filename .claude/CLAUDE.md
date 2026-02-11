@@ -163,7 +163,7 @@ All scripts are bash (except the dashboard server in TypeScript). Grouped by lay
 | `scripts/sw-cleanup.sh` | 174 | Clean up orphaned Claude team sessions |
 | `scripts/sw-connect.sh` | 619 | Sync local state to team dashboard |
 | `scripts/sw-cost.sh` | 919 | Token Usage & Cost Intelligence |
-| `scripts/sw-daemon.sh` | 4896 | Autonomous GitHub Issue Watcher |
+| `scripts/sw-daemon.sh` | 4932 | Autonomous GitHub Issue Watcher |
 | `scripts/sw-dashboard.sh` | 477 | Fleet Command Dashboard |
 | `scripts/sw-developer-simulation.sh` | 252 | Multi-Persona Developer Simulation |
 | `scripts/sw-docs.sh` | 635 | Documentation Keeper |
@@ -172,7 +172,7 @@ All scripts are bash (except the dashboard server in TypeScript). Grouped by lay
 | `scripts/sw-fleet.sh` | 1376 | Multi-Repo Daemon Orchestrator |
 | `scripts/sw-heartbeat.sh` | 293 | File-based agent heartbeat protocol |
 | `scripts/sw-init.sh` | 522 | Complete setup for Shipwright + Shipwright |
-| `scripts/sw-intelligence.sh` | 1205 | AI-Powered Analysis & Decision Engine |
+| `scripts/sw-intelligence.sh` | 1196 | AI-Powered Analysis & Decision Engine |
 | `scripts/sw-jira.sh` | 643 | Jira ↔ GitHub Bidirectional Sync |
 | `scripts/sw-launchd.sh` | 364 | Process supervision on macOS |
 | `scripts/sw-linear.sh` | 648 | Linear ↔ GitHub Bidirectional Sync |
@@ -234,7 +234,7 @@ All scripts are bash (except the dashboard server in TypeScript). Grouped by lay
 
 | File | Lines | Purpose |
 | --- | ---: | --- |
-| `scripts/sw-connect-test.sh` | 824 | Validate dashboard connection, heartbeat |
+| `scripts/sw-connect-test.sh` | 828 | Validate dashboard connection, heartbeat |
 | `scripts/sw-daemon-test.sh` | 911 | Unit tests for daemon metrics, health, alerting |
 | `scripts/sw-docs-test.sh` | 791 | Validate documentation keeper, AUTO sections, |
 | `scripts/sw-fix-test.sh` | 630 | Unit tests for bulk fix across repos |
@@ -249,7 +249,7 @@ All scripts are bash (except the dashboard server in TypeScript). Grouped by lay
 | `scripts/sw-memory-test.sh` | 709 | Unit tests for memory system & cost tracking |
 | `scripts/sw-pipeline-composer-test.sh` | 643 | Test Suite |
 | `scripts/sw-pipeline-test.sh` | 874 | E2E validation invoking the REAL pipeline |
-| `scripts/sw-predictive-test.sh` | 689 | Unit tests for predictive intelligence |
+| `scripts/sw-predictive-test.sh` | 698 | Unit tests for predictive intelligence |
 | `scripts/sw-prep-test.sh` | 644 | Validate repo preparation |
 | `scripts/sw-remote-test.sh` | 404 | Validate machine registry, atomic writes, |
 | `scripts/sw-self-optimize-test.sh` | 618 | Unit tests for learning & tuning system |
