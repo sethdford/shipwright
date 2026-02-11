@@ -249,14 +249,22 @@ optimize_tune_templates() {
             current_weight=$(echo "$new_weights" | jq -r --arg t "$tmpl" --arg l "$lbl" '.[$t + "|" + $l] // 1.0' 2>/dev/null)
             current_weight="${current_weight:-1.0}"
 
-            # Adjust weight based on success rate
+            # Adjust weight: proportional update if enough samples, else skip
             local new_weight="$current_weight"
-            if awk "BEGIN{exit !($rate < 60)}" 2>/dev/null; then
-                # Low success: reduce weight by 30%
-                new_weight=$(awk "BEGIN{w=$current_weight * 0.7; if(w<0.1) w=0.1; printf \"%.3f\", w}")
-            elif awk "BEGIN{exit !($rate > 90)}" 2>/dev/null; then
-                # High success: increase weight by 10%
-                new_weight=$(awk "BEGIN{w=$current_weight * 1.1; if(w>1.0) w=1.0; printf \"%.3f\", w}")
+            if [[ "$total" -ge 5 ]]; then
+                # Calculate average success rate across all combos for dynamic thresholds
+                local all_total all_successes avg_rate
+                all_total=$(wc -l < "$tmp_stats" | tr -d ' ')
+                all_total="${all_total:-1}"
+                all_successes=$(grep -c "|1$" "$tmp_stats" || true)
+                all_successes="${all_successes:-0}"
+                avg_rate=$(awk -v s="$all_successes" -v t="$all_total" 'BEGIN { if (t > 0) printf "%.2f", (s/t)*100; else print "50" }')
+
+                # Proportional update: new_weight = old_weight * (rate / avg_rate), clamp [0.1, 2.0]
+                if awk -v ar="$avg_rate" 'BEGIN { exit !(ar > 0) }' 2>/dev/null; then
+                    new_weight=$(awk -v cw="$current_weight" -v r="$rate" -v ar="$avg_rate" \
+                        'BEGIN { w = cw * (r / ar); if (w < 0.1) w = 0.1; if (w > 2.0) w = 2.0; printf "%.3f", w }')
+                fi
             fi
 
             # Update weights JSON
@@ -291,11 +299,25 @@ optimize_learn_iterations() {
 
     info "Learning iteration patterns..."
 
-    # Group by complexity bucket: 1-3=low, 4-6=medium, 7-10=high
-    local tmp_low tmp_med tmp_high
+    # Read complexity bucket boundaries from config or use defaults (3, 6)
+    local clusters_file="${OPTIMIZATION_DIR}/complexity-clusters.json"
+    local low_max=3
+    local med_max=6
+
+    if [[ -f "$clusters_file" ]]; then
+        local cfg_low cfg_med
+        cfg_low=$(jq -r '.low_max // empty' "$clusters_file" 2>/dev/null || true)
+        cfg_med=$(jq -r '.med_max // empty' "$clusters_file" 2>/dev/null || true)
+        [[ -n "$cfg_low" && "$cfg_low" != "null" ]] && low_max="$cfg_low"
+        [[ -n "$cfg_med" && "$cfg_med" != "null" ]] && med_max="$cfg_med"
+    fi
+
+    # Group by complexity bucket
+    local tmp_low tmp_med tmp_high tmp_all_pairs
     tmp_low=$(mktemp)
     tmp_med=$(mktemp)
     tmp_high=$(mktemp)
+    tmp_all_pairs=$(mktemp)
 
     while IFS= read -r line; do
         local complexity iterations
@@ -305,14 +327,73 @@ optimize_learn_iterations() {
         # Skip entries without iteration data
         [[ "$iterations" == "0" || "$iterations" == "null" ]] && continue
 
-        if [[ "$complexity" -le 3 ]]; then
+        # Store (complexity, iterations) pairs for potential k-means
+        echo "${complexity} ${iterations}" >> "$tmp_all_pairs"
+
+        if [[ "$complexity" -le "$low_max" ]]; then
             echo "$iterations" >> "$tmp_low"
-        elif [[ "$complexity" -le 6 ]]; then
+        elif [[ "$complexity" -le "$med_max" ]]; then
             echo "$iterations" >> "$tmp_med"
         else
             echo "$iterations" >> "$tmp_high"
         fi
     done < "$outcomes_file"
+
+    # If 50+ data points, compute k-means (3 clusters) to find natural boundaries
+    local pair_count=0
+    [[ -s "$tmp_all_pairs" ]] && pair_count=$(wc -l < "$tmp_all_pairs" | tr -d ' ')
+    if [[ "$pair_count" -ge 50 ]]; then
+        # Simple k-means in awk: cluster by complexity value into 3 groups
+        local new_boundaries
+        new_boundaries=$(awk '
+        BEGIN { n=0 }
+        { c[n]=$1; it[n]=$2; n++ }
+        END {
+            if (n < 50) exit
+            # Sort by complexity (simple bubble sort — small n)
+            for (i=0; i<n-1; i++)
+                for (j=i+1; j<n; j++)
+                    if (c[i] > c[j]) {
+                        tmp=c[i]; c[i]=c[j]; c[j]=tmp
+                        tmp=it[i]; it[i]=it[j]; it[j]=tmp
+                    }
+            # Split into 3 equal groups and find boundaries
+            third = int(n / 3)
+            low_boundary = c[third - 1]
+            med_boundary = c[2 * third - 1]
+            # Ensure boundaries are sane (1-9 range)
+            if (low_boundary < 1) low_boundary = 1
+            if (low_boundary > 5) low_boundary = 5
+            if (med_boundary < low_boundary + 1) med_boundary = low_boundary + 1
+            if (med_boundary > 8) med_boundary = 8
+            printf "%d %d", low_boundary, med_boundary
+        }' "$tmp_all_pairs")
+
+        if [[ -n "$new_boundaries" ]]; then
+            local new_low new_med
+            new_low=$(echo "$new_boundaries" | cut -d' ' -f1)
+            new_med=$(echo "$new_boundaries" | cut -d' ' -f2)
+
+            if [[ -n "$new_low" && -n "$new_med" ]]; then
+                # Write boundaries back to config (atomic)
+                local tmp_clusters
+                tmp_clusters=$(mktemp "${TMPDIR:-/tmp}/sw-clusters.XXXXXX")
+                jq -n \
+                    --argjson low_max "$new_low" \
+                    --argjson med_max "$new_med" \
+                    --argjson samples "$pair_count" \
+                    --arg updated "$(now_iso)" \
+                    '{low_max: $low_max, med_max: $med_max, samples: $samples, updated: $updated}' \
+                    > "$tmp_clusters" && mv "$tmp_clusters" "$clusters_file" || rm -f "$tmp_clusters"
+
+                emit_event "optimize.clusters_updated" \
+                    "low_max=$new_low" \
+                    "med_max=$new_med" \
+                    "samples=$pair_count"
+            fi
+        fi
+    fi
+    rm -f "$tmp_all_pairs" 2>/dev/null || true
 
     # Calculate mean and stddev for each bucket using awk
     calc_stats() {
@@ -511,8 +592,36 @@ optimize_evolve_memory() {
     local promoted=0
     local now_e
     now_e=$(now_epoch)
-    local thirty_days_ago=$((now_e - 2592000))  # 30 * 86400
-    local seven_days_ago=$((now_e - 604800))     # 7 * 86400
+
+    # Read adaptive timescales from config or use defaults
+    local timescales_file="${OPTIMIZATION_DIR}/memory-timescales.json"
+    local prune_days=30
+    local boost_days=7
+    local strength_threshold=3
+    local promotion_threshold=3
+
+    if [[ -f "$timescales_file" ]]; then
+        local cfg_prune cfg_boost
+        cfg_prune=$(jq -r '.prune_days // empty' "$timescales_file" 2>/dev/null || true)
+        cfg_boost=$(jq -r '.boost_days // empty' "$timescales_file" 2>/dev/null || true)
+        [[ -n "$cfg_prune" && "$cfg_prune" != "null" ]] && prune_days="$cfg_prune"
+        [[ -n "$cfg_boost" && "$cfg_boost" != "null" ]] && boost_days="$cfg_boost"
+    fi
+
+    # Read strength and cross-repo thresholds from config
+    local thresholds_file="${OPTIMIZATION_DIR}/memory-thresholds.json"
+    if [[ -f "$thresholds_file" ]]; then
+        local cfg_strength cfg_promotion
+        cfg_strength=$(jq -r '.strength_threshold // empty' "$thresholds_file" 2>/dev/null || true)
+        cfg_promotion=$(jq -r '.promotion_threshold // empty' "$thresholds_file" 2>/dev/null || true)
+        [[ -n "$cfg_strength" && "$cfg_strength" != "null" ]] && strength_threshold="$cfg_strength"
+        [[ -n "$cfg_promotion" && "$cfg_promotion" != "null" ]] && promotion_threshold="$cfg_promotion"
+    fi
+
+    local prune_seconds=$((prune_days * 86400))
+    local boost_seconds=$((boost_days * 86400))
+    local prune_cutoff=$((now_e - prune_seconds))
+    local boost_cutoff=$((now_e - boost_seconds))
 
     # Process each repo's failures.json
     local repo_dir
@@ -528,9 +637,9 @@ optimize_evolve_memory() {
         local tmp_file
         tmp_file=$(mktemp)
 
-        # Prune entries not seen in 30 days
+        # Prune entries not seen within prune window
         local pruned_json
-        pruned_json=$(jq --arg cutoff "$(date -u -r "$thirty_days_ago" +"%Y-%m-%dT%H:%M:%SZ" 2>/dev/null || date -u +"%Y-%m-%dT%H:%M:%SZ")" \
+        pruned_json=$(jq --arg cutoff "$(date -u -r "$prune_cutoff" +"%Y-%m-%dT%H:%M:%SZ" 2>/dev/null || date -u +"%Y-%m-%dT%H:%M:%SZ")" \
             '[.failures[] | select(.last_seen >= $cutoff or .last_seen == null)]' \
             "$failures_file" 2>/dev/null || echo "[]")
 
@@ -539,9 +648,11 @@ optimize_evolve_memory() {
         local delta=$((entry_count - after_count))
         pruned=$((pruned + delta))
 
-        # Strengthen entries seen 3+ times in last 7 days
-        pruned_json=$(echo "$pruned_json" | jq --arg cutoff7 "$(date -u -r "$seven_days_ago" +"%Y-%m-%dT%H:%M:%SZ" 2>/dev/null || date -u +"%Y-%m-%dT%H:%M:%SZ")" '
-            [.[] | if (.seen_count >= 3 and .last_seen >= $cutoff7) then
+        # Strengthen entries seen N+ times within boost window (adaptive thresholds)
+        pruned_json=$(echo "$pruned_json" | jq \
+            --arg cutoff_b "$(date -u -r "$boost_cutoff" +"%Y-%m-%dT%H:%M:%SZ" 2>/dev/null || date -u +"%Y-%m-%dT%H:%M:%SZ")" \
+            --argjson st "$strength_threshold" '
+            [.[] | if (.seen_count >= $st and .last_seen >= $cutoff_b) then
                 .weight = ((.weight // 1.0) * 1.5)
             else . end]')
 
@@ -570,9 +681,9 @@ optimize_evolve_memory() {
     done
 
     if [[ -s "$tmp_all_patterns" ]]; then
-        # Find patterns appearing in 3+ repos
+        # Find patterns appearing in N+ repos (adaptive threshold)
         local promoted_patterns
-        promoted_patterns=$(sort "$tmp_all_patterns" | uniq -c | sort -rn | awk '$1 >= 3 {$1=""; print substr($0,2)}' || true)
+        promoted_patterns=$(sort "$tmp_all_patterns" | uniq -c | sort -rn | awk -v pt="$promotion_threshold" '$1 >= pt {$1=""; print substr($0,2)}' || true)
 
         if [[ -n "$promoted_patterns" ]]; then
             local tmp_global

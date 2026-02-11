@@ -77,13 +77,36 @@ ensure_cost_dir() {
 }
 
 # ─── Model Pricing (USD per million tokens) ────────────────────────────────
-# Pricing as of 2025
-OPUS_INPUT_PER_M=15.00
-OPUS_OUTPUT_PER_M=75.00
-SONNET_INPUT_PER_M=3.00
-SONNET_OUTPUT_PER_M=15.00
-HAIKU_INPUT_PER_M=0.25
-HAIKU_OUTPUT_PER_M=1.25
+# Default pricing (fallback when no config file exists)
+_DEFAULT_OPUS_INPUT_PER_M=15.00
+_DEFAULT_OPUS_OUTPUT_PER_M=75.00
+_DEFAULT_SONNET_INPUT_PER_M=3.00
+_DEFAULT_SONNET_OUTPUT_PER_M=15.00
+_DEFAULT_HAIKU_INPUT_PER_M=0.25
+_DEFAULT_HAIKU_OUTPUT_PER_M=1.25
+
+MODEL_PRICING_FILE="${HOME}/.shipwright/model-pricing.json"
+
+# Load pricing from config file or use defaults
+_cost_load_pricing() {
+    if [[ -f "$MODEL_PRICING_FILE" ]]; then
+        OPUS_INPUT_PER_M=$(jq -r '.opus.input_per_m // empty' "$MODEL_PRICING_FILE" 2>/dev/null || true)
+        OPUS_OUTPUT_PER_M=$(jq -r '.opus.output_per_m // empty' "$MODEL_PRICING_FILE" 2>/dev/null || true)
+        SONNET_INPUT_PER_M=$(jq -r '.sonnet.input_per_m // empty' "$MODEL_PRICING_FILE" 2>/dev/null || true)
+        SONNET_OUTPUT_PER_M=$(jq -r '.sonnet.output_per_m // empty' "$MODEL_PRICING_FILE" 2>/dev/null || true)
+        HAIKU_INPUT_PER_M=$(jq -r '.haiku.input_per_m // empty' "$MODEL_PRICING_FILE" 2>/dev/null || true)
+        HAIKU_OUTPUT_PER_M=$(jq -r '.haiku.output_per_m // empty' "$MODEL_PRICING_FILE" 2>/dev/null || true)
+    fi
+    # Fallback to defaults for any missing values
+    OPUS_INPUT_PER_M="${OPUS_INPUT_PER_M:-$_DEFAULT_OPUS_INPUT_PER_M}"
+    OPUS_OUTPUT_PER_M="${OPUS_OUTPUT_PER_M:-$_DEFAULT_OPUS_OUTPUT_PER_M}"
+    SONNET_INPUT_PER_M="${SONNET_INPUT_PER_M:-$_DEFAULT_SONNET_INPUT_PER_M}"
+    SONNET_OUTPUT_PER_M="${SONNET_OUTPUT_PER_M:-$_DEFAULT_SONNET_OUTPUT_PER_M}"
+    HAIKU_INPUT_PER_M="${HAIKU_INPUT_PER_M:-$_DEFAULT_HAIKU_INPUT_PER_M}"
+    HAIKU_OUTPUT_PER_M="${HAIKU_OUTPUT_PER_M:-$_DEFAULT_HAIKU_OUTPUT_PER_M}"
+}
+
+_cost_load_pricing
 
 # cost_calculate <input_tokens> <output_tokens> <model>
 # Returns the cost in USD (floating point)
@@ -250,6 +273,268 @@ cost_remaining_budget() {
     remaining=$(awk -v budget="$budget_usd" -v spent="$today_spent" 'BEGIN { printf "%.2f", budget - spent }')
 
     echo "$remaining"
+}
+
+# ─── Cost-Per-Outcome ──────────────────────────────────────────────────────
+
+OUTCOMES_FILE="${COST_DIR}/cost-outcomes.json"
+
+_ensure_outcomes_file() {
+    mkdir -p "$COST_DIR"
+    [[ -f "$OUTCOMES_FILE" ]] || echo '{"outcomes":[],"summary":{"total_pipelines":0,"successful":0,"failed":0,"total_cost":0}}' > "$OUTCOMES_FILE"
+}
+
+# cost_record_outcome <pipeline_id> <total_cost> <success> <model_used> <template>
+# Records pipeline outcome with cost for efficiency tracking.
+cost_record_outcome() {
+    local pipeline_id="${1:-unknown}"
+    local total_cost="${2:-0}"
+    local success_flag="${3:-false}"
+    local model_used="${4:-sonnet}"
+    local template="${5:-standard}"
+
+    _ensure_outcomes_file
+
+    local tmp_file
+    tmp_file=$(mktemp "${TMPDIR:-/tmp}/sw-cost-outcome.XXXXXX")
+    jq --arg pid "$pipeline_id" \
+       --arg cost "$total_cost" \
+       --arg success "$success_flag" \
+       --arg model "$model_used" \
+       --arg tpl "$template" \
+       --arg ts "$(now_iso)" \
+       --argjson epoch "$(now_epoch)" \
+       '
+       .outcomes += [{
+           pipeline_id: $pid,
+           cost_usd: ($cost | tonumber),
+           success: ($success == "true"),
+           model: $model,
+           template: $tpl,
+           ts: $ts,
+           ts_epoch: $epoch
+       }] |
+       .outcomes = (.outcomes | .[-500:]) |
+       .summary.total_pipelines = (.outcomes | length) |
+       .summary.successful = ([.outcomes[] | select(.success == true)] | length) |
+       .summary.failed = ([.outcomes[] | select(.success == false)] | length) |
+       .summary.total_cost = ([.outcomes[].cost_usd] | add // 0 | . * 100 | round / 100)
+       ' "$OUTCOMES_FILE" > "$tmp_file" && mv "$tmp_file" "$OUTCOMES_FILE" || rm -f "$tmp_file"
+
+    emit_event "cost.outcome_recorded" \
+        "pipeline_id=$pipeline_id" \
+        "cost_usd=$total_cost" \
+        "success=$success_flag" \
+        "model=$model_used" \
+        "template=$template"
+}
+
+# cost_show_efficiency [--json]
+# Displays cost/success efficiency metrics.
+cost_show_efficiency() {
+    local json_output=false
+    [[ "${1:-}" == "--json" ]] && json_output=true
+
+    _ensure_outcomes_file
+
+    local total_pipelines successful failed total_cost
+    total_pipelines=$(jq '.summary.total_pipelines // 0' "$OUTCOMES_FILE" 2>/dev/null || echo "0")
+    successful=$(jq '.summary.successful // 0' "$OUTCOMES_FILE" 2>/dev/null || echo "0")
+    failed=$(jq '.summary.failed // 0' "$OUTCOMES_FILE" 2>/dev/null || echo "0")
+    total_cost=$(jq '.summary.total_cost // 0' "$OUTCOMES_FILE" 2>/dev/null || echo "0")
+
+    local cost_per_success="N/A"
+    local cost_per_pipeline="N/A"
+    if [[ "$successful" -gt 0 ]]; then
+        cost_per_success=$(awk -v tc="$total_cost" -v s="$successful" 'BEGIN { printf "%.2f", tc / s }')
+    fi
+    if [[ "$total_pipelines" -gt 0 ]]; then
+        cost_per_pipeline=$(awk -v tc="$total_cost" -v tp="$total_pipelines" 'BEGIN { printf "%.2f", tc / tp }')
+    fi
+
+    local success_rate="0"
+    if [[ "$total_pipelines" -gt 0 ]]; then
+        success_rate=$(awk -v s="$successful" -v tp="$total_pipelines" 'BEGIN { printf "%.1f", (s / tp) * 100 }')
+    fi
+
+    # Model breakdown from outcomes
+    local model_breakdown
+    model_breakdown=$(jq '[.outcomes[] | {model, cost_usd, success}] |
+        group_by(.model) | map({
+            model: .[0].model,
+            count: length,
+            cost: ([.[].cost_usd] | add // 0 | . * 100 | round / 100),
+            successes: ([.[] | select(.success == true)] | length)
+        }) | sort_by(-.cost)' "$OUTCOMES_FILE" 2>/dev/null || echo "[]")
+
+    # Template breakdown
+    local template_breakdown
+    template_breakdown=$(jq '[.outcomes[] | {template, cost_usd, success}] |
+        group_by(.template) | map({
+            template: .[0].template,
+            count: length,
+            cost: ([.[].cost_usd] | add // 0 | . * 100 | round / 100),
+            successes: ([.[] | select(.success == true)] | length)
+        }) | sort_by(-.cost)' "$OUTCOMES_FILE" 2>/dev/null || echo "[]")
+
+    # Savings opportunity: estimate savings if sonnet handled opus stages
+    local opus_cost sonnet_equivalent_cost savings_estimate
+    opus_cost=$(jq '[.outcomes[] | select(.model == "opus") | .cost_usd] | add // 0' "$OUTCOMES_FILE" 2>/dev/null || echo "0")
+    # Sonnet is roughly 5x cheaper than opus (3/15 input, 15/75 output)
+    sonnet_equivalent_cost=$(awk -v oc="$opus_cost" 'BEGIN { printf "%.2f", oc / 5.0 }')
+    savings_estimate=$(awk -v oc="$opus_cost" -v sc="$sonnet_equivalent_cost" 'BEGIN { printf "%.2f", oc - sc }')
+
+    if [[ "$json_output" == "true" ]]; then
+        jq -n \
+            --argjson total "$total_pipelines" \
+            --argjson successful "$successful" \
+            --argjson failed "$failed" \
+            --argjson total_cost "$total_cost" \
+            --arg cost_per_success "$cost_per_success" \
+            --arg cost_per_pipeline "$cost_per_pipeline" \
+            --arg success_rate "$success_rate" \
+            --argjson model_breakdown "$model_breakdown" \
+            --argjson template_breakdown "$template_breakdown" \
+            --argjson savings_estimate "$savings_estimate" \
+            '{
+                total_pipelines: $total,
+                successful: $successful,
+                failed: $failed,
+                total_cost_usd: $total_cost,
+                cost_per_success_usd: $cost_per_success,
+                cost_per_pipeline_usd: $cost_per_pipeline,
+                success_rate_pct: $success_rate,
+                by_model: $model_breakdown,
+                by_template: $template_breakdown,
+                potential_savings_usd: $savings_estimate
+            }'
+        return 0
+    fi
+
+    echo ""
+    echo -e "${BOLD}  COST EFFICIENCY${RESET}"
+    echo -e "    Pipelines total     ${CYAN}${total_pipelines}${RESET}"
+    echo -e "    Successful          ${GREEN}${successful}${RESET} (${success_rate}%)"
+    echo -e "    Failed              ${RED}${failed}${RESET}"
+    echo -e "    Total cost          ${CYAN}\$${total_cost}${RESET}"
+    echo -e "    Cost per pipeline   \$${cost_per_pipeline}"
+    echo -e "    Cost per success    \$${cost_per_success}"
+    echo ""
+
+    # Model breakdown
+    local model_count
+    model_count=$(echo "$model_breakdown" | jq 'length' 2>/dev/null || echo "0")
+    if [[ "$model_count" -gt 0 ]]; then
+        echo -e "${BOLD}  BY MODEL${RESET}"
+        echo "$model_breakdown" | jq -r '.[] | "    \(.model)\t$\(.cost)\t\(.successes)/\(.count) successful"' 2>/dev/null | \
+            while IFS=$'\t' read -r mdl cost stats; do
+                printf "    %-12s %-12s %s\n" "$mdl" "$cost" "$stats"
+            done
+        echo ""
+    fi
+
+    # Template breakdown
+    local tpl_count
+    tpl_count=$(echo "$template_breakdown" | jq 'length' 2>/dev/null || echo "0")
+    if [[ "$tpl_count" -gt 0 ]]; then
+        echo -e "${BOLD}  BY TEMPLATE${RESET}"
+        echo "$template_breakdown" | jq -r '.[] | "    \(.template)\t$\(.cost)\t\(.successes)/\(.count) successful"' 2>/dev/null | \
+            while IFS=$'\t' read -r tpl cost stats; do
+                printf "    %-16s %-12s %s\n" "$tpl" "$cost" "$stats"
+            done
+        echo ""
+    fi
+
+    # Savings opportunity
+    if awk -v s="$savings_estimate" 'BEGIN { exit !(s > 0.01) }' 2>/dev/null; then
+        echo -e "${BOLD}  SAVINGS OPPORTUNITY${RESET}"
+        echo -e "    If sonnet handled opus stages: ~\$${savings_estimate} potential savings"
+        echo -e "    ${DIM}(Based on ~5x cost difference between opus and sonnet)${RESET}"
+        echo ""
+    fi
+}
+
+# ─── Pricing Management ──────────────────────────────────────────────────────
+
+# cost_update_pricing [model] [input_per_m] [output_per_m]
+# Updates model pricing config. With no args, shows current pricing.
+cost_update_pricing() {
+    local model="${1:-}"
+    local input_price="${2:-}"
+    local output_price="${3:-}"
+
+    mkdir -p "$COST_DIR"
+
+    if [[ -z "$model" ]]; then
+        # Show current pricing
+        echo ""
+        echo -e "${BOLD}  Model Pricing${RESET} (per 1M tokens)"
+        echo -e "    ${DIM}Source: ${MODEL_PRICING_FILE:-defaults}${RESET}"
+        echo ""
+        printf "    %-12s %-12s %-12s\n" "Model" "Input" "Output"
+        printf "    %-12s %-12s %-12s\n" "─────" "─────" "──────"
+        printf "    %-12s \$%-11s \$%-11s\n" "opus" "$OPUS_INPUT_PER_M" "$OPUS_OUTPUT_PER_M"
+        printf "    %-12s \$%-11s \$%-11s\n" "sonnet" "$SONNET_INPUT_PER_M" "$SONNET_OUTPUT_PER_M"
+        printf "    %-12s \$%-11s \$%-11s\n" "haiku" "$HAIKU_INPUT_PER_M" "$HAIKU_OUTPUT_PER_M"
+        echo ""
+        if [[ -f "$MODEL_PRICING_FILE" ]]; then
+            echo -e "    ${GREEN}Using custom pricing from config${RESET}"
+        else
+            echo -e "    ${DIM}Using default pricing (no config file)${RESET}"
+        fi
+        echo ""
+        return 0
+    fi
+
+    if [[ -z "$input_price" || -z "$output_price" ]]; then
+        error "Usage: shipwright cost update-pricing <model> <input_per_m> <output_per_m>"
+        return 1
+    fi
+
+    # Validate model name
+    case "$model" in
+        opus|sonnet|haiku) ;;
+        *) error "Unknown model: $model (expected opus, sonnet, or haiku)"; return 1 ;;
+    esac
+
+    # Validate prices are numbers
+    if ! echo "$input_price" | grep -qE '^[0-9]+\.?[0-9]*$'; then
+        error "Invalid input price: $input_price"
+        return 1
+    fi
+    if ! echo "$output_price" | grep -qE '^[0-9]+\.?[0-9]*$'; then
+        error "Invalid output price: $output_price"
+        return 1
+    fi
+
+    # Initialize config if missing
+    if [[ ! -f "$MODEL_PRICING_FILE" ]]; then
+        jq -n \
+            --argjson oi "$_DEFAULT_OPUS_INPUT_PER_M" --argjson oo "$_DEFAULT_OPUS_OUTPUT_PER_M" \
+            --argjson si "$_DEFAULT_SONNET_INPUT_PER_M" --argjson so "$_DEFAULT_SONNET_OUTPUT_PER_M" \
+            --argjson hi "$_DEFAULT_HAIKU_INPUT_PER_M" --argjson ho "$_DEFAULT_HAIKU_OUTPUT_PER_M" \
+            '{
+                opus: {input_per_m: $oi, output_per_m: $oo},
+                sonnet: {input_per_m: $si, output_per_m: $so},
+                haiku: {input_per_m: $hi, output_per_m: $ho},
+                updated_at: ""
+            }' > "$MODEL_PRICING_FILE"
+    fi
+
+    local tmp_file
+    tmp_file=$(mktemp "${TMPDIR:-/tmp}/sw-cost-pricing.XXXXXX")
+    jq --arg model "$model" \
+       --argjson input "$input_price" \
+       --argjson output "$output_price" \
+       --arg ts "$(now_iso)" \
+       '.[$model].input_per_m = $input | .[$model].output_per_m = $output | .updated_at = $ts' \
+       "$MODEL_PRICING_FILE" > "$tmp_file" && mv "$tmp_file" "$MODEL_PRICING_FILE" || rm -f "$tmp_file"
+
+    # Reload pricing
+    _cost_load_pricing
+
+    success "Pricing updated: ${model} → \$${input_price}/\$${output_price} per 1M tokens (in/out)"
+    emit_event "cost.pricing_updated" "model=$model" "input_per_m=$input_price" "output_per_m=$output_price"
 }
 
 # ─── Dashboard ─────────────────────────────────────────────────────────────
@@ -456,6 +741,30 @@ cost_dashboard() {
         echo ""
     fi
 
+    # Efficiency summary (if outcome data exists)
+    if [[ -f "$OUTCOMES_FILE" ]]; then
+        local outcome_count
+        outcome_count=$(jq '.summary.total_pipelines // 0' "$OUTCOMES_FILE" 2>/dev/null || echo "0")
+        if [[ "$outcome_count" -gt 0 ]]; then
+            local eff_successful eff_total_cost eff_cost_per_success eff_rate
+            eff_successful=$(jq '.summary.successful // 0' "$OUTCOMES_FILE" 2>/dev/null || echo "0")
+            eff_total_cost=$(jq '.summary.total_cost // 0' "$OUTCOMES_FILE" 2>/dev/null || echo "0")
+            eff_rate="0"
+            if [[ "$outcome_count" -gt 0 ]]; then
+                eff_rate=$(awk -v s="$eff_successful" -v t="$outcome_count" 'BEGIN { printf "%.0f", (s/t)*100 }')
+            fi
+            eff_cost_per_success="N/A"
+            if [[ "$eff_successful" -gt 0 ]]; then
+                eff_cost_per_success=$(awk -v tc="$eff_total_cost" -v s="$eff_successful" 'BEGIN { printf "%.2f", tc / s }')
+            fi
+
+            echo -e "${BOLD}  EFFICIENCY${RESET}"
+            echo -e "    Success rate        ${eff_rate}% (${eff_successful}/${outcome_count})"
+            echo -e "    Cost per success    \$${eff_cost_per_success}"
+            echo ""
+        fi
+    fi
+
     echo -e "${PURPLE}${BOLD}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${RESET}"
     echo ""
 }
@@ -535,19 +844,26 @@ show_help() {
     echo ""
     echo -e "${BOLD}PIPELINE INTEGRATION${RESET}"
     echo -e "  ${CYAN}record${RESET} <in> <out> <model> <stage> [issue]   Record token usage"
+    echo -e "  ${CYAN}record-outcome${RESET} <id> <cost> <success> <model> <tpl>  Record pipeline outcome"
     echo -e "  ${CYAN}calculate${RESET} <in> <out> <model>                Calculate cost (no record)"
     echo -e "  ${CYAN}check-budget${RESET} [estimated_usd]                Check budget before starting"
     echo ""
+    echo -e "${BOLD}EFFICIENCY${RESET}"
+    echo -e "  ${CYAN}efficiency${RESET}                     Show cost/success efficiency metrics"
+    echo -e "  ${CYAN}efficiency${RESET} --json              JSON output"
+    echo ""
     echo -e "${BOLD}MODEL PRICING${RESET}"
-    echo -e "  opus     \$15.00 / \$75.00 per 1M tokens (in/out)"
-    echo -e "  sonnet   \$3.00 / \$15.00 per 1M tokens (in/out)"
-    echo -e "  haiku    \$0.25 / \$1.25 per 1M tokens (in/out)"
+    echo -e "  ${CYAN}update-pricing${RESET} [model] [in] [out]  Update model pricing"
+    echo -e "  ${CYAN}update-pricing${RESET}                     Show current pricing"
+    echo -e "  ${DIM}Current: opus \$${OPUS_INPUT_PER_M}/\$${OPUS_OUTPUT_PER_M}, sonnet \$${SONNET_INPUT_PER_M}/\$${SONNET_OUTPUT_PER_M}, haiku \$${HAIKU_INPUT_PER_M}/\$${HAIKU_OUTPUT_PER_M}${RESET}"
     echo ""
     echo -e "${BOLD}EXAMPLES${RESET}"
     echo -e "  ${DIM}shipwright cost show${RESET}                              # 7-day cost summary"
     echo -e "  ${DIM}shipwright cost show --period 30 --by-stage${RESET}       # 30-day breakdown by stage"
     echo -e "  ${DIM}shipwright cost budget set 50.00${RESET}                  # Set \$50/day limit"
     echo -e "  ${DIM}shipwright cost budget show${RESET}                       # Check current budget"
+    echo -e "  ${DIM}shipwright cost efficiency${RESET}                        # Cost per successful pipeline"
+    echo -e "  ${DIM}shipwright cost update-pricing opus 15.00 75.00${RESET}   # Update opus pricing"
     echo -e "  ${DIM}shipwright cost calculate 50000 10000 opus${RESET}        # Estimate cost"
 }
 
@@ -572,6 +888,9 @@ case "$SUBCOMMAND" in
     record)
         cost_record "$@"
         ;;
+    record-outcome)
+        cost_record_outcome "$@"
+        ;;
     calculate)
         cost_calculate "$@"
         echo ""
@@ -581,6 +900,12 @@ case "$SUBCOMMAND" in
         ;;
     check-budget)
         cost_check_budget "$@"
+        ;;
+    efficiency)
+        cost_show_efficiency "$@"
+        ;;
+    update-pricing)
+        cost_update_pricing "$@"
         ;;
     help|--help|-h)
         show_help

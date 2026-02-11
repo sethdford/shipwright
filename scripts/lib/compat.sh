@@ -73,3 +73,113 @@ pid_exists() {
     local pid="$1"
     kill -0 "$pid" 2>/dev/null
 }
+
+# ─── Shared Error Taxonomy ───────────────────────────────────────────────
+# Canonical error categories used by sw-pipeline.sh, sw-memory.sh, and others.
+# Extend via ~/.shipwright/optimization/error-taxonomy.json
+SW_ERROR_CATEGORIES="test_failure build_error lint_error timeout dependency flaky config security permission unknown"
+
+sw_valid_error_category() {
+    local category="${1:-}"
+    local custom_file="$HOME/.shipwright/optimization/error-taxonomy.json"
+    # Check custom taxonomy first
+    if [[ -f "$custom_file" ]] && command -v jq &>/dev/null; then
+        local custom_cats
+        custom_cats=$(jq -r '.categories[]? // empty' "$custom_file" 2>/dev/null || true)
+        if [[ -n "$custom_cats" ]]; then
+            local cat_item
+            while IFS= read -r cat_item; do
+                if [[ "$cat_item" == "$category" ]]; then
+                    return 0
+                fi
+            done <<< "$custom_cats"
+        fi
+    fi
+    # Check built-in categories
+    local builtin
+    for builtin in $SW_ERROR_CATEGORIES; do
+        if [[ "$builtin" == "$category" ]]; then
+            return 0
+        fi
+    done
+    return 1
+}
+
+# ─── Complexity Bucketing ────────────────────────────────────────────────
+# Shared by sw-intelligence.sh and sw-self-optimize.sh.
+# Thresholds tunable via ~/.shipwright/optimization/complexity-clusters.json
+complexity_bucket() {
+    local complexity="${1:-5}"
+    local config_file="$HOME/.shipwright/optimization/complexity-clusters.json"
+    local low_boundary=3
+    local high_boundary=6
+    if [[ -f "$config_file" ]] && command -v jq &>/dev/null; then
+        local lb hb
+        lb=$(jq -r '.low_boundary // 3' "$config_file" 2>/dev/null || echo "3")
+        hb=$(jq -r '.high_boundary // 6' "$config_file" 2>/dev/null || echo "6")
+        [[ "$lb" =~ ^[0-9]+$ ]] && low_boundary="$lb"
+        [[ "$hb" =~ ^[0-9]+$ ]] && high_boundary="$hb"
+    fi
+    if [[ "$complexity" -le "$low_boundary" ]]; then
+        echo "low"
+    elif [[ "$complexity" -le "$high_boundary" ]]; then
+        echo "medium"
+    else
+        echo "high"
+    fi
+}
+
+# ─── Framework / Language Detection ──────────────────────────────────────
+# Shared by sw-prep.sh and sw-pipeline.sh.
+detect_primary_language() {
+    local dir="${1:-.}"
+    if [[ -f "$dir/package.json" ]]; then
+        if [[ -f "$dir/tsconfig.json" ]]; then
+            echo "typescript"
+        else
+            echo "javascript"
+        fi
+    elif [[ -f "$dir/requirements.txt" || -f "$dir/pyproject.toml" || -f "$dir/setup.py" ]]; then
+        echo "python"
+    elif [[ -f "$dir/go.mod" ]]; then
+        echo "go"
+    elif [[ -f "$dir/Cargo.toml" ]]; then
+        echo "rust"
+    elif [[ -f "$dir/build.gradle" || -f "$dir/pom.xml" ]]; then
+        echo "java"
+    elif [[ -f "$dir/mix.exs" ]]; then
+        echo "elixir"
+    else
+        echo "unknown"
+    fi
+}
+
+detect_test_framework() {
+    local dir="${1:-.}"
+    if [[ -f "$dir/package.json" ]] && command -v jq &>/dev/null; then
+        local runner
+        runner=$(jq -r '
+            if .devDependencies.vitest then "vitest"
+            elif .devDependencies.jest then "jest"
+            elif .devDependencies.mocha then "mocha"
+            elif .devDependencies.ava then "ava"
+            elif .devDependencies.tap then "tap"
+            else ""
+            end' "$dir/package.json" 2>/dev/null || echo "")
+        if [[ -n "$runner" ]]; then
+            echo "$runner"
+            return 0
+        fi
+    fi
+    if [[ -f "$dir/pytest.ini" || -f "$dir/pyproject.toml" ]]; then
+        echo "pytest"
+    elif [[ -f "$dir/go.mod" ]]; then
+        echo "go test"
+    elif [[ -f "$dir/Cargo.toml" ]]; then
+        echo "cargo test"
+    elif [[ -f "$dir/build.gradle" ]]; then
+        echo "gradle test"
+    else
+        echo ""
+    fi
+}

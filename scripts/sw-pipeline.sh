@@ -42,6 +42,10 @@ fi
 if [[ -f "$SCRIPT_DIR/sw-architecture-enforcer.sh" ]]; then
     source "$SCRIPT_DIR/sw-architecture-enforcer.sh"
 fi
+# shellcheck source=sw-adversarial.sh
+if [[ -f "$SCRIPT_DIR/sw-adversarial.sh" ]]; then
+    source "$SCRIPT_DIR/sw-adversarial.sh"
+fi
 
 # ─── Output Helpers ─────────────────────────────────────────────────────────
 info()    { echo -e "${CYAN}${BOLD}▸${RESET} $*"; }
@@ -51,6 +55,30 @@ error()   { echo -e "${RED}${BOLD}✗${RESET} $*" >&2; }
 
 now_iso() { date -u +"%Y-%m-%dT%H:%M:%SZ"; }
 now_epoch() { date +%s; }
+
+# Parse coverage percentage from test output — multi-framework patterns
+# Usage: parse_coverage_from_output <log_file>
+# Outputs coverage percentage or empty string
+parse_coverage_from_output() {
+    local log_file="$1"
+    [[ ! -f "$log_file" ]] && return
+    local cov=""
+    # Jest/Istanbul: "Statements : 85.5%"
+    cov=$(grep -oE 'Statements\s*:\s*[0-9.]+' "$log_file" 2>/dev/null | grep -oE '[0-9.]+$' || true)
+    # Istanbul table: "All files | 85.5"
+    [[ -z "$cov" ]] && cov=$(grep -oE 'All files\s*\|\s*[0-9.]+' "$log_file" 2>/dev/null | grep -oE '[0-9.]+$' || true)
+    # pytest-cov: "TOTAL    500    75    85%"
+    [[ -z "$cov" ]] && cov=$(grep -oE 'TOTAL\s+[0-9]+\s+[0-9]+\s+[0-9]+%' "$log_file" 2>/dev/null | grep -oE '[0-9]+%' | tr -d '%' | tail -1 || true)
+    # Vitest: "All files  |  85.5  |"
+    [[ -z "$cov" ]] && cov=$(grep -oE 'All files\s*\|\s*[0-9.]+\s*\|' "$log_file" 2>/dev/null | grep -oE '[0-9.]+' | head -1 || true)
+    # Go coverage: "coverage: 85.5% of statements"
+    [[ -z "$cov" ]] && cov=$(grep -oE 'coverage:\s*[0-9.]+%' "$log_file" 2>/dev/null | grep -oE '[0-9.]+' | tail -1 || true)
+    # Cargo tarpaulin: "85.50% coverage"
+    [[ -z "$cov" ]] && cov=$(grep -oE '[0-9.]+%\s*coverage' "$log_file" 2>/dev/null | grep -oE '[0-9.]+' | head -1 || true)
+    # Generic: "Coverage: 85.5%"
+    [[ -z "$cov" ]] && cov=$(grep -oiE 'coverage:?\s*[0-9.]+%' "$log_file" 2>/dev/null | grep -oE '[0-9.]+' | tail -1 || true)
+    echo "$cov"
+}
 
 format_duration() {
     local secs="$1"
@@ -854,36 +882,58 @@ detect_test_cmd() {
 # Detect project language/framework
 detect_project_lang() {
     local root="$PROJECT_ROOT"
+    local detected=""
+
+    # Fast heuristic detection (grep-based)
     if [[ -f "$root/package.json" ]]; then
         if grep -q "typescript" "$root/package.json" 2>/dev/null; then
-            echo "typescript"
+            detected="typescript"
         elif grep -q "\"next\"" "$root/package.json" 2>/dev/null; then
-            echo "nextjs"
+            detected="nextjs"
         elif grep -q "\"react\"" "$root/package.json" 2>/dev/null; then
-            echo "react"
+            detected="react"
         else
-            echo "nodejs"
+            detected="nodejs"
         fi
     elif [[ -f "$root/Cargo.toml" ]]; then
-        echo "rust"
+        detected="rust"
     elif [[ -f "$root/go.mod" ]]; then
-        echo "go"
+        detected="go"
     elif [[ -f "$root/pyproject.toml" || -f "$root/setup.py" || -f "$root/requirements.txt" ]]; then
-        echo "python"
+        detected="python"
     elif [[ -f "$root/Gemfile" ]]; then
-        echo "ruby"
+        detected="ruby"
     elif [[ -f "$root/pom.xml" || -f "$root/build.gradle" ]]; then
-        echo "java"
+        detected="java"
     else
-        echo "unknown"
+        detected="unknown"
     fi
+
+    # Intelligence: holistic analysis for polyglot/monorepo detection
+    if [[ "$detected" == "unknown" ]] && type intelligence_search_memory &>/dev/null 2>&1 && command -v claude &>/dev/null; then
+        local config_files
+        config_files=$(ls "$root" 2>/dev/null | grep -E '\.(json|toml|yaml|yml|xml|gradle|lock|mod)$' | head -15)
+        if [[ -n "$config_files" ]]; then
+            local ai_lang
+            ai_lang=$(claude --print --output-format text -p "Based on these config files in a project root, what is the primary language/framework? Reply with ONE word (e.g., typescript, python, rust, go, java, ruby, nodejs):
+
+Files: ${config_files}" --model haiku < /dev/null 2>/dev/null || true)
+            ai_lang=$(echo "$ai_lang" | tr -d '[:space:]' | tr '[:upper:]' '[:lower:]')
+            case "$ai_lang" in
+                typescript|python|rust|go|java|ruby|nodejs|react|nextjs|kotlin|swift|elixir|scala)
+                    detected="$ai_lang" ;;
+            esac
+        fi
+    fi
+
+    echo "$detected"
 }
 
 # Detect likely reviewers from CODEOWNERS or git log
 detect_reviewers() {
     local root="$PROJECT_ROOT"
 
-    # Check CODEOWNERS
+    # Check CODEOWNERS — common paths first, then broader search
     local codeowners=""
     for f in "$root/.github/CODEOWNERS" "$root/CODEOWNERS" "$root/docs/CODEOWNERS"; do
         if [[ -f "$f" ]]; then
@@ -891,6 +941,10 @@ detect_reviewers() {
             break
         fi
     done
+    # Broader search if not found at common locations
+    if [[ -z "$codeowners" ]]; then
+        codeowners=$(find "$root" -maxdepth 3 -name "CODEOWNERS" -type f 2>/dev/null | head -1 || true)
+    fi
 
     if [[ -n "$codeowners" ]]; then
         # Extract GitHub usernames from CODEOWNERS (lines like: * @user1 @user2)
@@ -919,9 +973,38 @@ detect_reviewers() {
     echo "$contributors"
 }
 
-# Get branch prefix from task type
+# Get branch prefix from task type — checks git history for conventions first
 branch_prefix_for_type() {
-    case "$1" in
+    local task_type="$1"
+
+    # Analyze recent branches for naming conventions
+    local branch_prefixes
+    branch_prefixes=$(git branch -r 2>/dev/null | sed 's#origin/##' | grep -oE '^[a-z]+/' | sort | uniq -c | sort -rn | head -5 || true)
+    if [[ -n "$branch_prefixes" ]]; then
+        local total_branches dominant_prefix dominant_count
+        total_branches=$(echo "$branch_prefixes" | awk '{s+=$1} END {print s}' || echo "0")
+        dominant_prefix=$(echo "$branch_prefixes" | head -1 | awk '{print $2}' | tr -d '/' || true)
+        dominant_count=$(echo "$branch_prefixes" | head -1 | awk '{print $1}' || echo "0")
+        # If >80% of branches use a pattern, adopt it for the matching type
+        if [[ "$total_branches" -gt 5 ]] && [[ "$dominant_count" -gt 0 ]]; then
+            local pct=$(( (dominant_count * 100) / total_branches ))
+            if [[ "$pct" -gt 80 && -n "$dominant_prefix" ]]; then
+                # Map task type to the repo's convention
+                local mapped=""
+                case "$task_type" in
+                    bug)      mapped=$(echo "$branch_prefixes" | awk '{print $2}' | tr -d '/' | grep -E '^(fix|bug|hotfix)$' | head -1 || true) ;;
+                    feature)  mapped=$(echo "$branch_prefixes" | awk '{print $2}' | tr -d '/' | grep -E '^(feat|feature)$' | head -1 || true) ;;
+                esac
+                if [[ -n "$mapped" ]]; then
+                    echo "$mapped"
+                    return
+                fi
+            fi
+        fi
+    fi
+
+    # Fallback: hardcoded mapping
+    case "$task_type" in
         bug)          echo "fix" ;;
         refactor)     echo "refactor" ;;
         testing)      echo "test" ;;
@@ -988,7 +1071,45 @@ get_stage_timing() {
 }
 
 get_stage_description() {
-    case "$1" in
+    local stage_id="$1"
+
+    # Try to generate dynamic description from pipeline config
+    if [[ -n "${PIPELINE_CONFIG:-}" && -f "${PIPELINE_CONFIG:-/dev/null}" ]]; then
+        local stage_cfg
+        stage_cfg=$(jq -c --arg id "$stage_id" '.stages[] | select(.id == $id) | .config // {}' "$PIPELINE_CONFIG" 2>/dev/null || echo "{}")
+        case "$stage_id" in
+            test)
+                local cfg_test_cmd cfg_cov_min
+                cfg_test_cmd=$(echo "$stage_cfg" | jq -r '.test_cmd // empty' 2>/dev/null || true)
+                cfg_cov_min=$(echo "$stage_cfg" | jq -r '.coverage_min // empty' 2>/dev/null || true)
+                if [[ -n "$cfg_test_cmd" ]]; then
+                    echo "Running ${cfg_test_cmd}${cfg_cov_min:+ with ${cfg_cov_min}% coverage gate}"
+                    return
+                fi
+                ;;
+            build)
+                local cfg_max_iter cfg_model
+                cfg_max_iter=$(echo "$stage_cfg" | jq -r '.max_iterations // empty' 2>/dev/null || true)
+                cfg_model=$(jq -r '.defaults.model // empty' "$PIPELINE_CONFIG" 2>/dev/null || true)
+                if [[ -n "$cfg_max_iter" ]]; then
+                    echo "Building with ${cfg_max_iter} max iterations${cfg_model:+ using ${cfg_model}}"
+                    return
+                fi
+                ;;
+            monitor)
+                local cfg_dur cfg_thresh
+                cfg_dur=$(echo "$stage_cfg" | jq -r '.duration_minutes // empty' 2>/dev/null || true)
+                cfg_thresh=$(echo "$stage_cfg" | jq -r '.error_threshold // empty' 2>/dev/null || true)
+                if [[ -n "$cfg_dur" ]]; then
+                    echo "Monitoring for ${cfg_dur}m${cfg_thresh:+ (threshold: ${cfg_thresh} errors)}"
+                    return
+                fi
+                ;;
+        esac
+    fi
+
+    # Static fallback descriptions
+    case "$stage_id" in
         intake)           echo "Extracting requirements and auto-detecting project setup" ;;
         plan)             echo "Creating implementation plan with architecture decisions" ;;
         design)           echo "Designing interfaces, data models, and API contracts" ;;
@@ -1110,6 +1231,8 @@ initialize_state() {
     STAGE_STATUSES=""
     STAGE_TIMINGS=""
     LOG_ENTRIES=""
+    # Clear per-run tracking files
+    rm -f "$ARTIFACTS_DIR/model-routing.log" "$ARTIFACTS_DIR/.plan-failure-sig.txt"
     write_state
 }
 
@@ -1241,6 +1364,32 @@ ${sid}:${sst}"
 
 detect_task_type() {
     local goal="$1"
+
+    # Intelligence: Claude classification with confidence score
+    if type intelligence_search_memory &>/dev/null 2>&1 && command -v claude &>/dev/null; then
+        local ai_result
+        ai_result=$(claude --print --output-format text -p "Classify this task into exactly ONE category. Reply in format: CATEGORY|CONFIDENCE (0-100)
+
+Categories: bug, refactor, testing, security, docs, devops, migration, architecture, feature
+
+Task: ${goal}" --model haiku < /dev/null 2>/dev/null || true)
+        if [[ -n "$ai_result" ]]; then
+            local ai_type ai_conf
+            ai_type=$(echo "$ai_result" | head -1 | cut -d'|' -f1 | tr -d '[:space:]' | tr '[:upper:]' '[:lower:]')
+            ai_conf=$(echo "$ai_result" | head -1 | cut -d'|' -f2 | grep -oE '[0-9]+' | head -1 || echo "0")
+            # Use AI classification if confidence >= 70
+            case "$ai_type" in
+                bug|refactor|testing|security|docs|devops|migration|architecture|feature)
+                    if [[ "${ai_conf:-0}" -ge 70 ]] 2>/dev/null; then
+                        echo "$ai_type"
+                        return
+                    fi
+                    ;;
+            esac
+        fi
+    fi
+
+    # Fallback: keyword matching
     local lower
     lower=$(echo "$goal" | tr '[:upper:]' '[:lower:]')
     case "$lower" in
@@ -1416,6 +1565,42 @@ ${ISSUE_BODY}
 "
     fi
 
+    # Inject intelligence memory context for similar past plans
+    if type intelligence_search_memory &>/dev/null 2>&1; then
+        local plan_memory
+        plan_memory=$(intelligence_search_memory "plan stage for ${TASK_TYPE:-feature}: ${GOAL:-}" "${HOME}/.shipwright/memory" 5 2>/dev/null) || true
+        if [[ -n "$plan_memory" && "$plan_memory" != *'"results":[]'* && "$plan_memory" != *'"error"'* ]]; then
+            local memory_summary
+            memory_summary=$(echo "$plan_memory" | jq -r '.results[]? | "- \(.)"' 2>/dev/null | head -10 || true)
+            if [[ -n "$memory_summary" ]]; then
+                plan_prompt="${plan_prompt}
+## Historical Context (from previous pipelines)
+Previous similar issues were planned as:
+${memory_summary}
+"
+            fi
+        fi
+    fi
+
+    # Task-type-specific guidance
+    case "${TASK_TYPE:-feature}" in
+        bug)
+            plan_prompt="${plan_prompt}
+## Task Type: Bug Fix
+Focus on: reproducing the bug, identifying root cause, minimal targeted fix, regression tests.
+" ;;
+        refactor)
+            plan_prompt="${plan_prompt}
+## Task Type: Refactor
+Focus on: preserving all existing behavior, incremental changes, comprehensive test coverage.
+" ;;
+        security)
+            plan_prompt="${plan_prompt}
+## Task Type: Security
+Focus on: threat modeling, OWASP top 10, input validation, authentication/authorization.
+" ;;
+    esac
+
     # Add project context
     local project_lang
     project_lang=$(detect_project_lang)
@@ -1451,6 +1636,10 @@ Checklist of completion criteria.
     plan_model=$(jq -r --arg id "plan" '(.stages[] | select(.id == $id) | .config.model) // .defaults.model // "opus"' "$PIPELINE_CONFIG" 2>/dev/null) || true
     [[ -n "$MODEL" ]] && plan_model="$MODEL"
     [[ -z "$plan_model" || "$plan_model" == "null" ]] && plan_model="opus"
+    # Intelligence model routing (when no explicit CLI --model override)
+    if [[ -z "$MODEL" && -n "${CLAUDE_MODEL:-}" ]]; then
+        plan_model="$CLAUDE_MODEL"
+    fi
 
     local _token_log="${ARTIFACTS_DIR}/.claude-tokens-plan.log"
     claude --print --model "$plan_model" --max-turns 25 \
@@ -1557,14 +1746,52 @@ CC_TASKS_EOF
             validation_attempts=$((validation_attempts + 1))
             info "Validating plan (attempt ${validation_attempts}/${max_validation_attempts})..."
 
+            # Build enriched validation prompt with learned context
+            local validation_extra=""
+
+            # Inject rejected plan history from memory
+            if type intelligence_search_memory &>/dev/null 2>&1; then
+                local rejected_plans
+                rejected_plans=$(intelligence_search_memory "rejected plan validation failures for: ${GOAL:-}" "${HOME}/.shipwright/memory" 3 2>/dev/null) || true
+                if [[ -n "$rejected_plans" ]]; then
+                    validation_extra="${validation_extra}
+## Previously Rejected Plans
+These issues were found in past plan validations for similar tasks:
+${rejected_plans}
+"
+                fi
+            fi
+
+            # Inject repo conventions contextually
+            local claudemd="$PROJECT_ROOT/.claude/CLAUDE.md"
+            if [[ -f "$claudemd" ]]; then
+                local conventions_summary
+                conventions_summary=$(head -100 "$claudemd" 2>/dev/null | grep -E '^##|^-|^\*' | head -15 || true)
+                if [[ -n "$conventions_summary" ]]; then
+                    validation_extra="${validation_extra}
+## Repo Conventions
+${conventions_summary}
+"
+                fi
+            fi
+
+            # Inject complexity estimate
+            local complexity_hint=""
+            if [[ -n "${INTELLIGENCE_COMPLEXITY:-}" && "${INTELLIGENCE_COMPLEXITY:-0}" -gt 0 ]]; then
+                complexity_hint="This is estimated as complexity ${INTELLIGENCE_COMPLEXITY}/10. Plans for this complexity typically need ${INTELLIGENCE_COMPLEXITY} or more tasks."
+            fi
+
             local validation_prompt="You are a plan validator. Review this implementation plan and determine if it is valid.
 
 ## Goal
 ${GOAL}
-
+${complexity_hint:+
+## Complexity Estimate
+${complexity_hint}
+}
 ## Plan
 $(cat "$plan_file")
-
+${validation_extra}
 Evaluate:
 1. Are all requirements from the goal addressed?
 2. Is the plan decomposed into clear, achievable tasks?
@@ -1592,12 +1819,57 @@ Then explain your reasoning briefly."
 
             warn "Plan validation failed (attempt ${validation_attempts}/${max_validation_attempts})"
 
+            # Analyze failure mode to decide how to recover
+            local failure_mode="unknown"
+            local validation_lower
+            validation_lower=$(echo "$validation_result" | tr '[:upper:]' '[:lower:]')
+            if echo "$validation_lower" | grep -qE 'requirements? unclear|goal.*vague|ambiguous|underspecified'; then
+                failure_mode="requirements_unclear"
+            elif echo "$validation_lower" | grep -qE 'insufficient detail|not specific|too high.level|missing.*steps|lacks.*detail'; then
+                failure_mode="insufficient_detail"
+            elif echo "$validation_lower" | grep -qE 'scope too (large|broad)|too many|overly complex|break.*down'; then
+                failure_mode="scope_too_large"
+            fi
+
+            emit_event "plan.validation_failure" \
+                "issue=${ISSUE_NUMBER:-0}" \
+                "attempt=$validation_attempts" \
+                "failure_mode=$failure_mode"
+
+            # Track repeated failures — escalate if stuck in a loop
+            if [[ -f "$ARTIFACTS_DIR/.plan-failure-sig.txt" ]]; then
+                local prev_sig
+                prev_sig=$(cat "$ARTIFACTS_DIR/.plan-failure-sig.txt" 2>/dev/null || true)
+                if [[ "$failure_mode" == "$prev_sig" && "$failure_mode" != "unknown" ]]; then
+                    warn "Same validation failure mode repeated ($failure_mode) — escalating"
+                    emit_event "plan.validation_escalated" \
+                        "issue=${ISSUE_NUMBER:-0}" \
+                        "failure_mode=$failure_mode"
+                    break
+                fi
+            fi
+            echo "$failure_mode" > "$ARTIFACTS_DIR/.plan-failure-sig.txt"
+
             if [[ "$validation_attempts" -lt "$max_validation_attempts" ]]; then
-                info "Regenerating plan with validation feedback..."
+                info "Regenerating plan with validation feedback (mode: ${failure_mode})..."
+
+                # Tailor regeneration prompt based on failure mode
+                local failure_guidance=""
+                case "$failure_mode" in
+                    requirements_unclear)
+                        failure_guidance="The validator found the requirements unclear. Add more specific acceptance criteria, input/output examples, and concrete success metrics." ;;
+                    insufficient_detail)
+                        failure_guidance="The validator found the plan lacks detail. Break each task into smaller, more specific implementation steps with exact file paths and function names." ;;
+                    scope_too_large)
+                        failure_guidance="The validator found the scope too large. Focus on the minimal viable implementation and defer non-essential features to follow-up tasks." ;;
+                esac
+
                 local regen_prompt="${plan_prompt}
 
 IMPORTANT: A previous plan was rejected by validation. Issues found:
 $(echo "$validation_result" | tail -20)
+${failure_guidance:+
+GUIDANCE: ${failure_guidance}}
 
 Fix these issues in the new plan."
 
@@ -1644,10 +1916,47 @@ stage_design() {
     local memory_context=""
     if type intelligence_search_memory &>/dev/null 2>&1; then
         local mem_dir="${HOME}/.shipwright/memory"
-        memory_context=$(intelligence_search_memory "design stage for: ${GOAL:-}" "$mem_dir" 5 2>/dev/null) || true
+        memory_context=$(intelligence_search_memory "design stage architecture patterns for: ${GOAL:-}" "$mem_dir" 5 2>/dev/null) || true
     fi
     if [[ -z "$memory_context" ]] && [[ -x "$SCRIPT_DIR/sw-memory.sh" ]]; then
         memory_context=$(bash "$SCRIPT_DIR/sw-memory.sh" inject "design" 2>/dev/null) || true
+    fi
+
+    # Inject architecture model patterns if available
+    local arch_context=""
+    local repo_hash
+    repo_hash=$(echo -n "$PROJECT_ROOT" | shasum -a 256 2>/dev/null | cut -c1-12 || echo "unknown")
+    local arch_model_file="${HOME}/.shipwright/memory/${repo_hash}/architecture.json"
+    if [[ -f "$arch_model_file" ]]; then
+        local arch_patterns
+        arch_patterns=$(jq -r '
+            [.patterns // [] | .[] | "- \(.name // "unnamed"): \(.description // "no description")"] | join("\n")
+        ' "$arch_model_file" 2>/dev/null) || true
+        local arch_layers
+        arch_layers=$(jq -r '
+            [.layers // [] | .[] | "- \(.name // "unnamed"): \(.path // "")"] | join("\n")
+        ' "$arch_model_file" 2>/dev/null) || true
+        if [[ -n "$arch_patterns" || -n "$arch_layers" ]]; then
+            arch_context="Previous designs in this repo follow these patterns:
+${arch_patterns:+Patterns:
+${arch_patterns}
+}${arch_layers:+Layers:
+${arch_layers}}"
+        fi
+    fi
+
+    # Inject rejected design approaches and anti-patterns from memory
+    local design_antipatterns=""
+    if type intelligence_search_memory &>/dev/null 2>&1; then
+        local rejected_designs
+        rejected_designs=$(intelligence_search_memory "rejected design approaches anti-patterns for: ${GOAL:-}" "${HOME}/.shipwright/memory" 3 2>/dev/null) || true
+        if [[ -n "$rejected_designs" ]]; then
+            design_antipatterns="
+## Rejected Approaches (from past reviews)
+These design approaches were rejected in past reviews. Avoid repeating them:
+${rejected_designs}
+"
+        fi
     fi
 
     # Build design prompt with plan + project context
@@ -1669,7 +1978,10 @@ $(cat "$plan_file")
 ${memory_context:+
 ## Historical Context (from memory)
 ${memory_context}
-}
+}${arch_context:+
+## Architecture Model (from previous designs)
+${arch_context}
+}${design_antipatterns}
 ## Required Output — Architecture Decision Record
 
 Produce this EXACT format:
@@ -1702,6 +2014,10 @@ Be concrete and specific. Reference actual file paths in the codebase. Consider 
     design_model=$(jq -r --arg id "design" '(.stages[] | select(.id == $id) | .config.model) // .defaults.model // "opus"' "$PIPELINE_CONFIG" 2>/dev/null) || true
     [[ -n "$MODEL" ]] && design_model="$MODEL"
     [[ -z "$design_model" || "$design_model" == "null" ]] && design_model="opus"
+    # Intelligence model routing (when no explicit CLI --model override)
+    if [[ -z "$MODEL" && -n "${CLAUDE_MODEL:-}" ]]; then
+        design_model="$CLAUDE_MODEL"
+    fi
 
     local _token_log="${ARTIFACTS_DIR}/.claude-tokens-design.log"
     claude --print --model "$design_model" --max-turns 25 \
@@ -1825,6 +2141,16 @@ $(cat "$TASKS_FILE")"
         [[ -z "$agents" || "$agents" == "null" ]] && agents=1
     fi
 
+    # Intelligence: suggest parallelism if design indicates independent work
+    if [[ "${agents:-1}" -le 1 ]] && [[ -s "$ARTIFACTS_DIR/design.md" ]]; then
+        local design_lower
+        design_lower=$(tr '[:upper:]' '[:lower:]' < "$ARTIFACTS_DIR/design.md" 2>/dev/null || true)
+        if echo "$design_lower" | grep -qE 'independent (files|modules|components|services)|separate (modules|packages|directories)|parallel|no shared state'; then
+            info "Design mentions independent modules — consider --agents 2 for parallelism"
+            emit_event "build.parallelism_suggested" "issue=${ISSUE_NUMBER:-0}" "current_agents=$agents"
+        fi
+    fi
+
     local audit
     audit=$(jq -r --arg id "build" '(.stages[] | select(.id == $id) | .config.audit) // false' "$PIPELINE_CONFIG" 2>/dev/null) || true
     local quality
@@ -1834,6 +2160,10 @@ $(cat "$TASKS_FILE")"
     if [[ -z "$build_model" ]]; then
         build_model=$(jq -r '.defaults.model // "opus"' "$PIPELINE_CONFIG" 2>/dev/null) || true
         [[ -z "$build_model" || "$build_model" == "null" ]] && build_model="opus"
+    fi
+    # Intelligence model routing (when no explicit CLI --model override)
+    if [[ -z "$MODEL" && -n "${CLAUDE_MODEL:-}" ]]; then
+        build_model="$CLAUDE_MODEL"
     fi
 
     [[ -n "$test_cmd" && "$test_cmd" != "null" ]] && loop_args+=(--test-cmd "$test_cmd")
@@ -1876,6 +2206,29 @@ $(cat "$TASKS_FILE")"
     commit_count=$(git log --oneline "${BASE_BRANCH}..HEAD" 2>/dev/null | wc -l | xargs)
     info "Build produced ${BOLD}$commit_count${RESET} commit(s)"
 
+    # Commit quality evaluation when intelligence is enabled
+    if type intelligence_search_memory &>/dev/null 2>&1 && command -v claude &>/dev/null && [[ "${commit_count:-0}" -gt 0 ]]; then
+        local commit_msgs
+        commit_msgs=$(git log --format="%s" "${BASE_BRANCH}..HEAD" 2>/dev/null | head -20)
+        local quality_score
+        quality_score=$(claude --print --output-format text -p "Rate the quality of these git commit messages on a scale of 0-100. Consider: focus (one thing per commit), clarity (describes the why), atomicity (small logical units). Reply with ONLY a number 0-100.
+
+Commit messages:
+${commit_msgs}" --model haiku < /dev/null 2>/dev/null || true)
+        quality_score=$(echo "$quality_score" | grep -oE '^[0-9]+' | head -1 || true)
+        if [[ -n "$quality_score" ]]; then
+            emit_event "build.commit_quality" \
+                "issue=${ISSUE_NUMBER:-0}" \
+                "score=$quality_score" \
+                "commit_count=$commit_count"
+            if [[ "$quality_score" -lt 40 ]] 2>/dev/null; then
+                warn "Commit message quality low (score: ${quality_score}/100)"
+            else
+                info "Commit quality score: ${quality_score}/100"
+            fi
+        fi
+    fi
+
     log_stage "build" "Build loop completed ($commit_count commits)"
 }
 
@@ -1909,7 +2262,13 @@ stage_test() {
         success "Tests passed"
     else
         error "Tests failed (exit code: $test_exit)"
-        tail -40 "$test_log"
+        # Extract most relevant error section (assertion failures, stack traces)
+        local relevant_output=""
+        relevant_output=$(grep -A5 -E 'FAIL|AssertionError|Expected.*but.*got|Error:|panic:|assert' "$test_log" 2>/dev/null | tail -40 || true)
+        if [[ -z "$relevant_output" ]]; then
+            relevant_output=$(tail -40 "$test_log")
+        fi
+        echo "$relevant_output"
 
         # Post failure to GitHub with more context
         if [[ -n "$ISSUE_NUMBER" ]]; then
@@ -1934,11 +2293,7 @@ ${log_excerpt}
     # Coverage check — only enforce when coverage data is actually detected
     local coverage=""
     if [[ "$coverage_min" -gt 0 ]] 2>/dev/null; then
-        # Try to extract coverage from common formats (jest/istanbul/nyc)
-        coverage=$(grep -oE 'Statements\s*:\s*[0-9.]+' "$test_log" 2>/dev/null | grep -oE '[0-9.]+$' || true)
-        if [[ -z "$coverage" ]]; then
-            coverage=$(grep -oE 'All files\s*\|\s*[0-9.]+' "$test_log" 2>/dev/null | grep -oE '[0-9.]+$' || true)
-        fi
+        coverage=$(parse_coverage_from_output "$test_log")
         if [[ -z "$coverage" ]]; then
             # No coverage data found — skip enforcement (project may not have coverage tooling)
             info "No coverage data detected — skipping coverage check (min: ${coverage_min}%)"
@@ -1992,7 +2347,31 @@ stage_review() {
     diff_stats=$(git diff --stat "${BASE_BRANCH}...${GIT_BRANCH}" 2>/dev/null | tail -1 || echo "")
     info "Running AI code review... ${DIM}($diff_stats)${RESET}"
 
+    # Semantic risk scoring when intelligence is enabled
+    if type intelligence_search_memory &>/dev/null 2>&1 && command -v claude &>/dev/null; then
+        local diff_files
+        diff_files=$(git diff --name-only "${BASE_BRANCH}...${GIT_BRANCH}" 2>/dev/null || true)
+        local risk_score="low"
+        # Fast heuristic: flag high-risk file patterns
+        if echo "$diff_files" | grep -qiE 'migration|schema|auth|crypto|security|password|token|secret|\.env'; then
+            risk_score="high"
+        elif echo "$diff_files" | grep -qiE 'api|route|controller|middleware|hook'; then
+            risk_score="medium"
+        fi
+        emit_event "review.risk_assessed" \
+            "issue=${ISSUE_NUMBER:-0}" \
+            "risk=$risk_score" \
+            "files_changed=$(echo "$diff_files" | wc -l | xargs)"
+        if [[ "$risk_score" == "high" ]]; then
+            warn "High-risk changes detected (DB schema, auth, crypto, or secrets)"
+        fi
+    fi
+
     local review_model="${MODEL:-opus}"
+    # Intelligence model routing (when no explicit CLI --model override)
+    if [[ -z "$MODEL" && -n "${CLAUDE_MODEL:-}" ]]; then
+        review_model="$CLAUDE_MODEL"
+    fi
 
     # Build review prompt with project context
     local review_prompt="You are a senior code reviewer. Review this git diff thoroughly.
@@ -2013,6 +2392,19 @@ Focus on:
 Be specific. Reference exact file paths and line numbers. Only flag genuine issues.
 If no issues are found, write: \"Review clean — no issues found.\"
 "
+
+    # Inject previous review findings and anti-patterns from memory
+    if type intelligence_search_memory &>/dev/null 2>&1; then
+        local review_memory
+        review_memory=$(intelligence_search_memory "code review findings anti-patterns for: ${GOAL:-}" "${HOME}/.shipwright/memory" 5 2>/dev/null) || true
+        if [[ -n "$review_memory" ]]; then
+            review_prompt+="
+## Known Issues from Previous Reviews
+These anti-patterns and issues have been found in past reviews of this codebase. Flag them if they recur:
+${review_memory}
+"
+        fi
+    fi
 
     # Inject project conventions if CLAUDE.md exists
     local claudemd="$PROJECT_ROOT/.claude/CLAUDE.md"
@@ -2054,13 +2446,31 @@ $(cat "$diff_file")"
         return 0
     fi
 
-    local critical_count bug_count warning_count
-    critical_count=$(grep -ciE '\*\*\[?Critical\]?\*\*' "$review_file" 2>/dev/null || true)
-    critical_count="${critical_count:-0}"
-    bug_count=$(grep -ciE '\*\*\[?(Bug|Security)\]?\*\*' "$review_file" 2>/dev/null || true)
-    bug_count="${bug_count:-0}"
-    warning_count=$(grep -ciE '\*\*\[?(Warning|Suggestion)\]?\*\*' "$review_file" 2>/dev/null || true)
-    warning_count="${warning_count:-0}"
+    # Extract severity counts — try JSON structure first, then grep fallback
+    local critical_count=0 bug_count=0 warning_count=0
+
+    # Check if review output is structured JSON (e.g. from structured review tools)
+    local json_parsed=false
+    if head -1 "$review_file" 2>/dev/null | grep -q '^{' 2>/dev/null; then
+        local j_critical j_bug j_warning
+        j_critical=$(jq -r '.issues | map(select(.severity == "Critical")) | length' "$review_file" 2>/dev/null || echo "")
+        if [[ -n "$j_critical" && "$j_critical" != "null" ]]; then
+            critical_count="$j_critical"
+            bug_count=$(jq -r '.issues | map(select(.severity == "Bug" or .severity == "Security")) | length' "$review_file" 2>/dev/null || echo "0")
+            warning_count=$(jq -r '.issues | map(select(.severity == "Warning" or .severity == "Suggestion")) | length' "$review_file" 2>/dev/null || echo "0")
+            json_parsed=true
+        fi
+    fi
+
+    # Grep fallback for markdown-formatted review output
+    if [[ "$json_parsed" != "true" ]]; then
+        critical_count=$(grep -ciE '\*\*\[?Critical\]?\*\*' "$review_file" 2>/dev/null || true)
+        critical_count="${critical_count:-0}"
+        bug_count=$(grep -ciE '\*\*\[?(Bug|Security)\]?\*\*' "$review_file" 2>/dev/null || true)
+        bug_count="${bug_count:-0}"
+        warning_count=$(grep -ciE '\*\*\[?(Warning|Suggestion)\]?\*\*' "$review_file" 2>/dev/null || true)
+        warning_count="${warning_count:-0}"
+    fi
     local total_issues=$((critical_count + bug_count + warning_count))
 
     if [[ "$critical_count" -gt 0 ]]; then
@@ -2170,12 +2580,12 @@ stage_pr() {
         warn "PR has ${hygiene_commit_count} commits — consider squashing before merge"
     fi
 
-    # Check for WIP/fixup/squash commits
+    # Check for WIP/fixup/squash commits (expanded patterns)
     local wip_commits
-    wip_commits=$(git log --oneline "${BASE_BRANCH}..HEAD" 2>/dev/null | grep -ciE '^[0-9a-f]+ (WIP|fixup!|squash!)' || true)
+    wip_commits=$(git log --oneline "${BASE_BRANCH}..HEAD" 2>/dev/null | grep -ciE '^[0-9a-f]+ (WIP|fixup!|squash!|TODO|HACK|TEMP|BROKEN|wip[:-]|temp[:-]|broken[:-]|do not merge)' || true)
     wip_commits="${wip_commits:-0}"
     if [[ "$wip_commits" -gt 0 ]]; then
-        warn "Branch has ${wip_commits} WIP/fixup/squash commit(s) — consider cleaning up"
+        warn "Branch has ${wip_commits} WIP/fixup/squash/temp commit(s) — consider cleaning up"
     fi
 
     # ── PR Quality Gate: reject PRs with no real code changes ──
@@ -2302,9 +2712,16 @@ stage_pr() {
 
     local review_summary=""
     if [[ -s "$review_file" ]]; then
-        local total_issues
-        total_issues=$(grep -ciE '\*\*\[?(Critical|Bug|Security|Warning|Suggestion)\]?\*\*' "$review_file" 2>/dev/null || true)
-        total_issues="${total_issues:-0}"
+        local total_issues=0
+        # Try JSON structured output first
+        if head -1 "$review_file" 2>/dev/null | grep -q '^{' 2>/dev/null; then
+            total_issues=$(jq -r '.issues | length' "$review_file" 2>/dev/null || echo "0")
+        fi
+        # Grep fallback for markdown
+        if [[ "${total_issues:-0}" -eq 0 ]]; then
+            total_issues=$(grep -ciE '\*\*\[?(Critical|Bug|Security|Warning|Suggestion)\]?\*\*' "$review_file" 2>/dev/null || true)
+            total_issues="${total_issues:-0}"
+        fi
         review_summary="**Code review:** $total_issues issues found"
     fi
 
@@ -2444,8 +2861,34 @@ stage_merge() {
     local merge_method wait_ci_timeout auto_delete_branch auto_merge auto_approve merge_strategy
     merge_method=$(jq -r --arg id "merge" '(.stages[] | select(.id == $id) | .config.merge_method) // "squash"' "$PIPELINE_CONFIG" 2>/dev/null) || true
     [[ -z "$merge_method" || "$merge_method" == "null" ]] && merge_method="squash"
-    wait_ci_timeout=$(jq -r --arg id "merge" '(.stages[] | select(.id == $id) | .config.wait_ci_timeout_s) // 600' "$PIPELINE_CONFIG" 2>/dev/null) || true
-    [[ -z "$wait_ci_timeout" || "$wait_ci_timeout" == "null" ]] && wait_ci_timeout=600
+    wait_ci_timeout=$(jq -r --arg id "merge" '(.stages[] | select(.id == $id) | .config.wait_ci_timeout_s) // 0' "$PIPELINE_CONFIG" 2>/dev/null) || true
+    [[ -z "$wait_ci_timeout" || "$wait_ci_timeout" == "null" ]] && wait_ci_timeout=0
+
+    # Adaptive CI timeout: 90th percentile of historical times × 1.5 safety margin
+    if [[ "$wait_ci_timeout" -eq 0 ]] 2>/dev/null; then
+        local repo_hash_ci
+        repo_hash_ci=$(echo -n "$PROJECT_ROOT" | shasum -a 256 2>/dev/null | cut -c1-12 || echo "unknown")
+        local ci_times_file="${HOME}/.shipwright/baselines/${repo_hash_ci}/ci-times.json"
+        if [[ -f "$ci_times_file" ]]; then
+            local p90_time
+            p90_time=$(jq '
+                .times | sort |
+                (length * 0.9 | floor) as $idx |
+                .[$idx] // 600
+            ' "$ci_times_file" 2>/dev/null || echo "0")
+            if [[ -n "$p90_time" ]] && awk -v t="$p90_time" 'BEGIN{exit !(t > 0)}' 2>/dev/null; then
+                # 1.5x safety margin, clamped to [120, 1800]
+                wait_ci_timeout=$(awk -v p90="$p90_time" 'BEGIN{
+                    t = p90 * 1.5;
+                    if (t < 120) t = 120;
+                    if (t > 1800) t = 1800;
+                    printf "%d", t
+                }')
+            fi
+        fi
+        # Default fallback if no history
+        [[ "$wait_ci_timeout" -eq 0 ]] && wait_ci_timeout=600
+    fi
     auto_delete_branch=$(jq -r --arg id "merge" '(.stages[] | select(.id == $id) | .config.auto_delete_branch) // "true"' "$PIPELINE_CONFIG" 2>/dev/null) || true
     [[ -z "$auto_delete_branch" || "$auto_delete_branch" == "null" ]] && auto_delete_branch="true"
     auto_merge=$(jq -r --arg id "merge" '(.stages[] | select(.id == $id) | .config.auto_merge) // false' "$PIPELINE_CONFIG" 2>/dev/null) || true
@@ -2494,6 +2937,26 @@ stage_merge() {
         sleep "$check_interval"
         elapsed=$((elapsed + check_interval))
     done
+
+    # Record CI wait time for adaptive timeout calculation
+    if [[ "$elapsed" -gt 0 ]]; then
+        local repo_hash_ci_rec
+        repo_hash_ci_rec=$(echo -n "$PROJECT_ROOT" | shasum -a 256 2>/dev/null | cut -c1-12 || echo "unknown")
+        local ci_times_dir="${HOME}/.shipwright/baselines/${repo_hash_ci_rec}"
+        local ci_times_rec_file="${ci_times_dir}/ci-times.json"
+        mkdir -p "$ci_times_dir"
+        local ci_history="[]"
+        if [[ -f "$ci_times_rec_file" ]]; then
+            ci_history=$(jq '.times // []' "$ci_times_rec_file" 2>/dev/null || echo "[]")
+        fi
+        local updated_ci
+        updated_ci=$(echo "$ci_history" | jq --arg t "$elapsed" '. + [($t | tonumber)] | .[-20:]' 2>/dev/null || echo "[$elapsed]")
+        local tmp_ci
+        tmp_ci=$(mktemp "${ci_times_dir}/ci-times.json.XXXXXX")
+        jq -n --argjson times "$updated_ci" --arg updated "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
+            '{times: $times, updated: $updated}' > "$tmp_ci" 2>/dev/null
+        mv "$tmp_ci" "$ci_times_rec_file" 2>/dev/null || true
+    fi
 
     if [[ "$elapsed" -ge "$wait_ci_timeout" ]]; then
         warn "CI check timeout (${wait_ci_timeout}s) — proceeding with merge anyway"
@@ -2708,6 +3171,24 @@ stage_monitor() {
     [[ "$health_url" == "null" ]] && health_url=""
     error_threshold=$(jq -r --arg id "monitor" '(.stages[] | select(.id == $id) | .config.error_threshold) // 5' "$PIPELINE_CONFIG" 2>/dev/null) || true
     [[ -z "$error_threshold" || "$error_threshold" == "null" ]] && error_threshold=5
+
+    # Adaptive monitor: use historical baselines if available
+    local repo_hash
+    repo_hash=$(echo "${PROJECT_ROOT:-$(pwd)}" | cksum | awk '{print $1}')
+    local baseline_file="${HOME}/.shipwright/baselines/${repo_hash}/deploy-monitor.json"
+    if [[ -f "$baseline_file" ]]; then
+        local hist_duration hist_threshold
+        hist_duration=$(jq -r '.p90_stabilization_minutes // empty' "$baseline_file" 2>/dev/null || true)
+        hist_threshold=$(jq -r '.p90_error_threshold // empty' "$baseline_file" 2>/dev/null || true)
+        if [[ -n "$hist_duration" && "$hist_duration" != "null" ]]; then
+            duration_minutes="$hist_duration"
+            info "Monitor duration: ${duration_minutes}m ${DIM}(from baseline)${RESET}"
+        fi
+        if [[ -n "$hist_threshold" && "$hist_threshold" != "null" ]]; then
+            error_threshold="$hist_threshold"
+            info "Error threshold: ${error_threshold} ${DIM}(from baseline)${RESET}"
+        fi
+    fi
     log_pattern=$(jq -r --arg id "monitor" '(.stages[] | select(.id == $id) | .config.log_pattern) // "ERROR|FATAL|PANIC"' "$PIPELINE_CONFIG" 2>/dev/null) || true
     [[ -z "$log_pattern" || "$log_pattern" == "null" ]] && log_pattern="ERROR|FATAL|PANIC"
     log_cmd=$(jq -r --arg id "monitor" '(.stages[] | select(.id == $id) | .config.log_cmd) // ""' "$PIPELINE_CONFIG" 2>/dev/null) || true
@@ -2906,6 +3387,30 @@ _Created automatically by \`shipwright pipeline\` monitor stage_" 2>/dev/null ||
     fi
 
     log_stage "monitor" "Clean — ${total_errors} errors in ${duration_minutes}m"
+
+    # Record baseline for adaptive monitoring on future runs
+    local baseline_dir="${HOME}/.shipwright/baselines/${repo_hash}"
+    mkdir -p "$baseline_dir" 2>/dev/null || true
+    local baseline_tmp
+    baseline_tmp="$(mktemp)"
+    if [[ -f "${baseline_dir}/deploy-monitor.json" ]]; then
+        # Append to history and recalculate p90
+        jq --arg dur "$duration_minutes" --arg errs "$total_errors" \
+            '.history += [{"duration_minutes": ($dur | tonumber), "errors": ($errs | tonumber)}] |
+             .p90_stabilization_minutes = ([.history[].duration_minutes] | sort | .[length * 9 / 10 | floor]) |
+             .p90_error_threshold = (([.history[].errors] | sort | .[length * 9 / 10 | floor]) + 2) |
+             .updated_at = now' \
+            "${baseline_dir}/deploy-monitor.json" > "$baseline_tmp" 2>/dev/null && \
+            mv "$baseline_tmp" "${baseline_dir}/deploy-monitor.json" || rm -f "$baseline_tmp"
+    else
+        jq -n --arg dur "$duration_minutes" --arg errs "$total_errors" \
+            '{history: [{"duration_minutes": ($dur | tonumber), "errors": ($errs | tonumber)}],
+              p90_stabilization_minutes: ($dur | tonumber),
+              p90_error_threshold: (($errs | tonumber) + 2),
+              updated_at: now}' \
+            > "$baseline_tmp" 2>/dev/null && \
+            mv "$baseline_tmp" "${baseline_dir}/deploy-monitor.json" || rm -f "$baseline_tmp"
+    fi
 }
 
 # ─── Multi-Dimensional Quality Checks ─────────────────────────────────────
@@ -2964,13 +3469,33 @@ quality_check_bundle_size() {
     local bundle_size=0
     local bundle_dir=""
 
-    # Find build output directory
-    for dir in dist build out .next; do
-        if [[ -d "$dir" ]]; then
-            bundle_dir="$dir"
-            break
+    # Find build output directory — check config files first, then common dirs
+    # Parse tsconfig.json outDir
+    if [[ -z "$bundle_dir" && -f "tsconfig.json" ]]; then
+        local ts_out
+        ts_out=$(jq -r '.compilerOptions.outDir // empty' tsconfig.json 2>/dev/null || true)
+        [[ -n "$ts_out" && -d "$ts_out" ]] && bundle_dir="$ts_out"
+    fi
+    # Parse package.json build script for output hints
+    if [[ -z "$bundle_dir" && -f "package.json" ]]; then
+        local build_script
+        build_script=$(jq -r '.scripts.build // ""' package.json 2>/dev/null || true)
+        if [[ -n "$build_script" ]]; then
+            # Check for common output flags: --outDir, -o, --out-dir
+            local parsed_out
+            parsed_out=$(echo "$build_script" | grep -oE '(--outDir|--out-dir|-o)\s+[^ ]+' 2>/dev/null | awk '{print $NF}' | head -1 || true)
+            [[ -n "$parsed_out" && -d "$parsed_out" ]] && bundle_dir="$parsed_out"
         fi
-    done
+    fi
+    # Fallback: check common directories
+    if [[ -z "$bundle_dir" ]]; then
+        for dir in dist build out .next target; do
+            if [[ -d "$dir" ]]; then
+                bundle_dir="$dir"
+                break
+            fi
+        done
+    fi
 
     if [[ -z "$bundle_dir" ]]; then
         info "No build output directory found — skipping bundle check"
@@ -2990,23 +3515,106 @@ quality_check_bundle_size() {
         "size_kb=$bundle_size" \
         "directory=$bundle_dir"
 
-    # Check against memory baseline if available
-    local baseline_size=""
-    if [[ -x "$SCRIPT_DIR/sw-memory.sh" ]]; then
-        baseline_size=$(bash "$SCRIPT_DIR/sw-memory.sh" get "bundle_size_kb" 2>/dev/null) || true
+    # Adaptive bundle size check: statistical deviation from historical mean
+    local repo_hash_bundle
+    repo_hash_bundle=$(echo -n "$PROJECT_ROOT" | shasum -a 256 2>/dev/null | cut -c1-12 || echo "unknown")
+    local bundle_baselines_dir="${HOME}/.shipwright/baselines/${repo_hash_bundle}"
+    local bundle_history_file="${bundle_baselines_dir}/bundle-history.json"
+
+    local bundle_history="[]"
+    if [[ -f "$bundle_history_file" ]]; then
+        bundle_history=$(jq '.sizes // []' "$bundle_history_file" 2>/dev/null || echo "[]")
     fi
 
-    if [[ -n "$baseline_size" && "$baseline_size" -gt 0 ]] 2>/dev/null; then
-        local growth_pct
-        growth_pct=$(awk -v cur="$bundle_size" -v base="$baseline_size" 'BEGIN{printf "%d", ((cur - base) / base) * 100}')
-        echo "Baseline: ${baseline_size}KB | Growth: ${growth_pct}%" >> "$metrics_log"
-        if [[ "$growth_pct" -gt 20 ]]; then
-            warn "Bundle size grew ${growth_pct}% (${baseline_size}KB → ${bundle_size}KB)"
+    local bundle_hist_count
+    bundle_hist_count=$(echo "$bundle_history" | jq 'length' 2>/dev/null || echo "0")
+
+    if [[ "$bundle_hist_count" -ge 3 ]]; then
+        # Statistical check: alert on growth > 2σ from historical mean
+        local mean_size stddev_size
+        mean_size=$(echo "$bundle_history" | jq 'add / length' 2>/dev/null || echo "0")
+        stddev_size=$(echo "$bundle_history" | jq '
+            (add / length) as $mean |
+            (map(. - $mean | . * .) | add / length | sqrt)
+        ' 2>/dev/null || echo "0")
+
+        # Adaptive tolerance: small repos (<1MB mean) get wider tolerance (3σ), large repos get 2σ
+        local sigma_mult
+        sigma_mult=$(awk -v mean="$mean_size" 'BEGIN{ print (mean < 1024 ? 3 : 2) }')
+        local adaptive_max
+        adaptive_max=$(awk -v mean="$mean_size" -v sd="$stddev_size" -v mult="$sigma_mult" \
+            'BEGIN{ t = mean + mult*sd; min_t = mean * 1.1; printf "%.0f", (t > min_t ? t : min_t) }')
+
+        echo "History: ${bundle_hist_count} runs | Mean: ${mean_size}KB | StdDev: ${stddev_size}KB | Max: ${adaptive_max}KB (${sigma_mult}σ)" >> "$metrics_log"
+
+        if [[ "$bundle_size" -gt "$adaptive_max" ]] 2>/dev/null; then
+            local growth_pct
+            growth_pct=$(awk -v cur="$bundle_size" -v mean="$mean_size" 'BEGIN{printf "%d", ((cur - mean) / mean) * 100}')
+            warn "Bundle size ${growth_pct}% above average (${mean_size}KB → ${bundle_size}KB, ${sigma_mult}σ threshold: ${adaptive_max}KB)"
             return 1
+        fi
+    else
+        # Fallback: legacy memory baseline with hardcoded 20% (not enough history)
+        local baseline_size=""
+        if [[ -x "$SCRIPT_DIR/sw-memory.sh" ]]; then
+            baseline_size=$(bash "$SCRIPT_DIR/sw-memory.sh" get "bundle_size_kb" 2>/dev/null) || true
+        fi
+        if [[ -n "$baseline_size" && "$baseline_size" -gt 0 ]] 2>/dev/null; then
+            local growth_pct
+            growth_pct=$(awk -v cur="$bundle_size" -v base="$baseline_size" 'BEGIN{printf "%d", ((cur - base) / base) * 100}')
+            echo "Baseline: ${baseline_size}KB | Growth: ${growth_pct}%" >> "$metrics_log"
+            if [[ "$growth_pct" -gt 20 ]]; then
+                warn "Bundle size grew ${growth_pct}% (${baseline_size}KB → ${bundle_size}KB)"
+                return 1
+            fi
         fi
     fi
 
-    info "Bundle size: ${bundle_size_human}"
+    # Append current size to rolling history (keep last 10)
+    mkdir -p "$bundle_baselines_dir"
+    local updated_bundle_hist
+    updated_bundle_hist=$(echo "$bundle_history" | jq --arg sz "$bundle_size" '
+        . + [($sz | tonumber)] | .[-10:]
+    ' 2>/dev/null || echo "[$bundle_size]")
+    local tmp_bundle_hist
+    tmp_bundle_hist=$(mktemp "${bundle_baselines_dir}/bundle-history.json.XXXXXX")
+    jq -n --argjson sizes "$updated_bundle_hist" --arg updated "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
+        '{sizes: $sizes, updated: $updated}' > "$tmp_bundle_hist" 2>/dev/null
+    mv "$tmp_bundle_hist" "$bundle_history_file" 2>/dev/null || true
+
+    # Intelligence: identify top dependency bloaters
+    if type intelligence_search_memory &>/dev/null 2>&1 && [[ -f "package.json" ]] && command -v jq &>/dev/null; then
+        local dep_sizes=""
+        local deps
+        deps=$(jq -r '.dependencies // {} | keys[]' package.json 2>/dev/null || true)
+        if [[ -n "$deps" ]]; then
+            while IFS= read -r dep; do
+                [[ -z "$dep" ]] && continue
+                local dep_dir="node_modules/${dep}"
+                if [[ -d "$dep_dir" ]]; then
+                    local dep_size
+                    dep_size=$(du -sk "$dep_dir" 2>/dev/null | cut -f1 || echo "0")
+                    dep_sizes="${dep_sizes}${dep_size} ${dep}
+"
+                fi
+            done <<< "$deps"
+            if [[ -n "$dep_sizes" ]]; then
+                local top_bloaters
+                top_bloaters=$(echo "$dep_sizes" | sort -rn | head -3)
+                if [[ -n "$top_bloaters" ]]; then
+                    echo "" >> "$metrics_log"
+                    echo "Top 3 dependency sizes:" >> "$metrics_log"
+                    echo "$top_bloaters" | while IFS=' ' read -r sz nm; do
+                        [[ -z "$nm" ]] && continue
+                        echo "  ${nm}: ${sz}KB" >> "$metrics_log"
+                    done
+                    info "Top bloaters: $(echo "$top_bloaters" | head -1 | awk '{print $2 ": " $1 "KB"}')"
+                fi
+            fi
+        fi
+    fi
+
+    info "Bundle size: ${bundle_size_human}${bundle_hist_count:+ (${bundle_hist_count} historical samples)}"
     return 0
 }
 
@@ -3021,10 +3629,38 @@ quality_check_perf_regression() {
         return 0
     fi
 
-    # Extract test suite duration (common patterns)
+    # Extract test suite duration — multi-framework patterns
     local duration_ms=""
+    # Jest/Vitest: "Time: 12.34 s" or "Duration  12.34s"
     duration_ms=$(grep -oE 'Time:\s*[0-9.]+\s*s' "$test_log" 2>/dev/null | grep -oE '[0-9.]+' | tail -1 || true)
+    [[ -z "$duration_ms" ]] && duration_ms=$(grep -oE 'Duration\s+[0-9.]+\s*s' "$test_log" 2>/dev/null | grep -oE '[0-9.]+' | tail -1 || true)
+    # pytest: "passed in 12.34s" or "====== 5 passed in 12.34 seconds ======"
+    [[ -z "$duration_ms" ]] && duration_ms=$(grep -oE 'passed in [0-9.]+s' "$test_log" 2>/dev/null | grep -oE '[0-9.]+' | tail -1 || true)
+    # Go test: "ok  pkg  12.345s"
+    [[ -z "$duration_ms" ]] && duration_ms=$(grep -oE '^ok\s+\S+\s+[0-9.]+s' "$test_log" 2>/dev/null | grep -oE '[0-9.]+s' | grep -oE '[0-9.]+' | tail -1 || true)
+    # Cargo test: "test result: ok. ... finished in 12.34s"
+    [[ -z "$duration_ms" ]] && duration_ms=$(grep -oE 'finished in [0-9.]+s' "$test_log" 2>/dev/null | grep -oE '[0-9.]+' | tail -1 || true)
+    # Generic: "12.34 seconds" or "12.34s"
     [[ -z "$duration_ms" ]] && duration_ms=$(grep -oE '[0-9.]+ ?s(econds?)?' "$test_log" 2>/dev/null | grep -oE '[0-9.]+' | tail -1 || true)
+
+    # Claude fallback: parse test output when no pattern matches
+    if [[ -z "$duration_ms" ]]; then
+        local intel_enabled="false"
+        local daemon_cfg="${PROJECT_ROOT}/.claude/daemon-config.json"
+        if [[ -f "$daemon_cfg" ]]; then
+            intel_enabled=$(jq -r '.intelligence.enabled // false' "$daemon_cfg" 2>/dev/null || echo "false")
+        fi
+        if [[ "$intel_enabled" == "true" ]] && command -v claude &>/dev/null; then
+            local tail_output
+            tail_output=$(tail -30 "$test_log" 2>/dev/null || true)
+            if [[ -n "$tail_output" ]]; then
+                duration_ms=$(claude --print -p "Extract ONLY the total test suite duration in seconds from this output. Reply with ONLY a number (e.g. 12.34). If no duration found, reply NONE.
+
+$tail_output" < /dev/null 2>/dev/null | grep -oE '^[0-9.]+$' | head -1 || true)
+                [[ "$duration_ms" == "NONE" ]] && duration_ms=""
+            fi
+        fi
+    fi
 
     if [[ -z "$duration_ms" ]]; then
         info "Could not extract test duration — skipping perf check"
@@ -3038,23 +3674,73 @@ quality_check_perf_regression() {
         "issue=${ISSUE_NUMBER:-0}" \
         "duration_s=$duration_ms"
 
-    # Check against memory baseline if available
-    local baseline_dur=""
-    if [[ -x "$SCRIPT_DIR/sw-memory.sh" ]]; then
-        baseline_dur=$(bash "$SCRIPT_DIR/sw-memory.sh" get "test_duration_s" 2>/dev/null) || true
+    # Adaptive performance check: 2σ from rolling 10-run average
+    local repo_hash_perf
+    repo_hash_perf=$(echo -n "$PROJECT_ROOT" | shasum -a 256 2>/dev/null | cut -c1-12 || echo "unknown")
+    local perf_baselines_dir="${HOME}/.shipwright/baselines/${repo_hash_perf}"
+    local perf_history_file="${perf_baselines_dir}/perf-history.json"
+
+    # Read historical durations (rolling window of last 10 runs)
+    local history_json="[]"
+    if [[ -f "$perf_history_file" ]]; then
+        history_json=$(jq '.durations // []' "$perf_history_file" 2>/dev/null || echo "[]")
     fi
 
-    if [[ -n "$baseline_dur" ]] && awk -v cur="$duration_ms" -v base="$baseline_dur" 'BEGIN{exit !(base > 0)}' 2>/dev/null; then
-        local slowdown_pct
-        slowdown_pct=$(awk -v cur="$duration_ms" -v base="$baseline_dur" 'BEGIN{printf "%d", ((cur - base) / base) * 100}')
-        echo "Baseline: ${baseline_dur}s | Slowdown: ${slowdown_pct}%" >> "$metrics_log"
-        if [[ "$slowdown_pct" -gt 30 ]]; then
-            warn "Tests ${slowdown_pct}% slower (${baseline_dur}s → ${duration_ms}s)"
+    local history_count
+    history_count=$(echo "$history_json" | jq 'length' 2>/dev/null || echo "0")
+
+    if [[ "$history_count" -ge 3 ]]; then
+        # Calculate mean and standard deviation from history
+        local mean_dur stddev_dur
+        mean_dur=$(echo "$history_json" | jq 'add / length' 2>/dev/null || echo "0")
+        stddev_dur=$(echo "$history_json" | jq '
+            (add / length) as $mean |
+            (map(. - $mean | . * .) | add / length | sqrt)
+        ' 2>/dev/null || echo "0")
+
+        # Threshold: mean + 2σ (but at least 10% above mean)
+        local adaptive_threshold
+        adaptive_threshold=$(awk -v mean="$mean_dur" -v sd="$stddev_dur" \
+            'BEGIN{ t = mean + 2*sd; min_t = mean * 1.1; printf "%.2f", (t > min_t ? t : min_t) }')
+
+        echo "History: ${history_count} runs | Mean: ${mean_dur}s | StdDev: ${stddev_dur}s | Threshold: ${adaptive_threshold}s" >> "$metrics_log"
+
+        if awk -v cur="$duration_ms" -v thresh="$adaptive_threshold" 'BEGIN{exit !(cur > thresh)}' 2>/dev/null; then
+            local slowdown_pct
+            slowdown_pct=$(awk -v cur="$duration_ms" -v mean="$mean_dur" 'BEGIN{printf "%d", ((cur - mean) / mean) * 100}')
+            warn "Tests ${slowdown_pct}% slower than rolling average (${mean_dur}s → ${duration_ms}s, threshold: ${adaptive_threshold}s)"
             return 1
+        fi
+    else
+        # Fallback: legacy memory baseline with hardcoded 30% (not enough history)
+        local baseline_dur=""
+        if [[ -x "$SCRIPT_DIR/sw-memory.sh" ]]; then
+            baseline_dur=$(bash "$SCRIPT_DIR/sw-memory.sh" get "test_duration_s" 2>/dev/null) || true
+        fi
+        if [[ -n "$baseline_dur" ]] && awk -v cur="$duration_ms" -v base="$baseline_dur" 'BEGIN{exit !(base > 0)}' 2>/dev/null; then
+            local slowdown_pct
+            slowdown_pct=$(awk -v cur="$duration_ms" -v base="$baseline_dur" 'BEGIN{printf "%d", ((cur - base) / base) * 100}')
+            echo "Baseline: ${baseline_dur}s | Slowdown: ${slowdown_pct}%" >> "$metrics_log"
+            if [[ "$slowdown_pct" -gt 30 ]]; then
+                warn "Tests ${slowdown_pct}% slower (${baseline_dur}s → ${duration_ms}s)"
+                return 1
+            fi
         fi
     fi
 
-    info "Test duration: ${duration_ms}s"
+    # Append current duration to rolling history (keep last 10)
+    mkdir -p "$perf_baselines_dir"
+    local updated_history
+    updated_history=$(echo "$history_json" | jq --arg dur "$duration_ms" '
+        . + [($dur | tonumber)] | .[-10:]
+    ' 2>/dev/null || echo "[$duration_ms]")
+    local tmp_perf_hist
+    tmp_perf_hist=$(mktemp "${perf_baselines_dir}/perf-history.json.XXXXXX")
+    jq -n --argjson durations "$updated_history" --arg updated "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
+        '{durations: $durations, updated: $updated}' > "$tmp_perf_hist" 2>/dev/null
+    mv "$tmp_perf_hist" "$perf_history_file" 2>/dev/null || true
+
+    info "Test duration: ${duration_ms}s${history_count:+ (${history_count} historical samples)}"
     return 0
 }
 
@@ -3062,7 +3748,7 @@ quality_check_api_compat() {
     info "API compatibility check..."
     local compat_log="$ARTIFACTS_DIR/api-compat.log"
 
-    # Look for OpenAPI/Swagger specs
+    # Look for OpenAPI/Swagger specs — search beyond hardcoded paths
     local spec_file=""
     for candidate in openapi.json openapi.yaml swagger.json swagger.yaml api/openapi.json docs/openapi.yaml; do
         if [[ -f "$candidate" ]]; then
@@ -3070,6 +3756,10 @@ quality_check_api_compat() {
             break
         fi
     done
+    # Broader search if nothing found at common paths
+    if [[ -z "$spec_file" ]]; then
+        spec_file=$(find . -maxdepth 4 \( -name "openapi*.json" -o -name "openapi*.yaml" -o -name "openapi*.yml" -o -name "swagger*.json" -o -name "swagger*.yaml" -o -name "swagger*.yml" \) -type f 2>/dev/null | head -1 || true)
+    fi
 
     if [[ -z "$spec_file" ]]; then
         info "No OpenAPI/Swagger spec found — skipping API compat check"
@@ -3108,21 +3798,64 @@ quality_check_api_compat() {
         removed_endpoints=$(comm -23 <(echo "$old_paths") <(echo "$new_paths") 2>/dev/null || true)
     fi
 
+    # Enhanced schema diff: parameter changes, response schema, auth changes
+    local param_changes="" schema_changes=""
+    if command -v jq &>/dev/null && [[ "$spec_file" == *.json ]]; then
+        # Detect parameter changes on existing endpoints
+        local common_paths
+        common_paths=$(comm -12 <(echo "$old_spec" | jq -r '.paths | keys[]' 2>/dev/null | sort) <(jq -r '.paths | keys[]' "$spec_file" 2>/dev/null | sort) 2>/dev/null || true)
+        if [[ -n "$common_paths" ]]; then
+            while IFS= read -r path; do
+                [[ -z "$path" ]] && continue
+                local old_params new_params
+                old_params=$(echo "$old_spec" | jq -r --arg p "$path" '.paths[$p] | to_entries[] | .value.parameters // [] | .[].name' 2>/dev/null | sort || true)
+                new_params=$(jq -r --arg p "$path" '.paths[$p] | to_entries[] | .value.parameters // [] | .[].name' "$spec_file" 2>/dev/null | sort || true)
+                local removed_params
+                removed_params=$(comm -23 <(echo "$old_params") <(echo "$new_params") 2>/dev/null || true)
+                [[ -n "$removed_params" ]] && param_changes="${param_changes}${path}: removed params: ${removed_params}
+"
+            done <<< "$common_paths"
+        fi
+    fi
+
+    # Intelligence: semantic API diff for complex changes
+    local semantic_diff=""
+    if type intelligence_search_memory &>/dev/null 2>&1 && command -v claude &>/dev/null; then
+        local spec_git_diff
+        spec_git_diff=$(git diff "${BASE_BRANCH}...HEAD" -- "$spec_file" 2>/dev/null | head -200 || true)
+        if [[ -n "$spec_git_diff" ]]; then
+            semantic_diff=$(claude --print --output-format text -p "Analyze this API spec diff for breaking changes. List: removed endpoints, changed parameters, altered response schemas, auth changes. Be concise.
+
+${spec_git_diff}" --model haiku < /dev/null 2>/dev/null || true)
+        fi
+    fi
+
     {
         echo "Spec: $spec_file"
         echo "Changed: yes"
         if [[ -n "$removed_endpoints" ]]; then
             echo "BREAKING — Removed endpoints:"
             echo "$removed_endpoints"
-        else
+        fi
+        if [[ -n "$param_changes" ]]; then
+            echo "BREAKING — Parameter changes:"
+            echo "$param_changes"
+        fi
+        if [[ -n "$semantic_diff" ]]; then
+            echo ""
+            echo "Semantic analysis:"
+            echo "$semantic_diff"
+        fi
+        if [[ -z "$removed_endpoints" && -z "$param_changes" ]]; then
             echo "No breaking changes detected"
         fi
     } > "$compat_log"
 
-    if [[ -n "$removed_endpoints" ]]; then
-        local removed_count
-        removed_count=$(echo "$removed_endpoints" | wc -l | xargs)
-        warn "API breaking changes: ${removed_count} endpoint(s) removed"
+    if [[ -n "$removed_endpoints" || -n "$param_changes" ]]; then
+        local issue_count=0
+        [[ -n "$removed_endpoints" ]] && issue_count=$((issue_count + $(echo "$removed_endpoints" | wc -l | xargs)))
+        [[ -n "$param_changes" ]] && issue_count=$((issue_count + $(echo "$param_changes" | grep -c '.' || true)))
+        warn "API breaking changes: ${issue_count} issue(s) found"
         return 1
     fi
 
@@ -3139,11 +3872,28 @@ quality_check_coverage() {
         return 0
     fi
 
-    # Extract coverage percentage
+    # Extract coverage percentage using shared parser
     local coverage=""
-    coverage=$(grep -oE 'Statements\s*:\s*[0-9.]+' "$test_log" 2>/dev/null | grep -oE '[0-9.]+$' || \
-               grep -oE 'All files\s*\|\s*[0-9.]+' "$test_log" 2>/dev/null | grep -oE '[0-9.]+$' || \
-               grep -oE 'TOTAL\s+[0-9]+\s+[0-9]+\s+([0-9]+)%' "$test_log" 2>/dev/null | grep -oE '[0-9]+%' | tr -d '%' || echo "")
+    coverage=$(parse_coverage_from_output "$test_log")
+
+    # Claude fallback: parse test output when no pattern matches
+    if [[ -z "$coverage" ]]; then
+        local intel_enabled_cov="false"
+        local daemon_cfg_cov="${PROJECT_ROOT}/.claude/daemon-config.json"
+        if [[ -f "$daemon_cfg_cov" ]]; then
+            intel_enabled_cov=$(jq -r '.intelligence.enabled // false' "$daemon_cfg_cov" 2>/dev/null || echo "false")
+        fi
+        if [[ "$intel_enabled_cov" == "true" ]] && command -v claude &>/dev/null; then
+            local tail_cov_output
+            tail_cov_output=$(tail -40 "$test_log" 2>/dev/null || true)
+            if [[ -n "$tail_cov_output" ]]; then
+                coverage=$(claude --print -p "Extract ONLY the overall code coverage percentage from this test output. Reply with ONLY a number (e.g. 85.5). If no coverage found, reply NONE.
+
+$tail_cov_output" < /dev/null 2>/dev/null | grep -oE '^[0-9.]+$' | head -1 || true)
+                [[ "$coverage" == "NONE" ]] && coverage=""
+            fi
+        fi
+    fi
 
     if [[ -z "$coverage" ]]; then
         info "Could not extract coverage — skipping"
@@ -3159,16 +3909,30 @@ quality_check_coverage() {
     coverage_min=$(jq -r --arg id "test" '(.stages[] | select(.id == $id) | .config.coverage_min) // 0' "$PIPELINE_CONFIG" 2>/dev/null) || true
     [[ -z "$coverage_min" || "$coverage_min" == "null" ]] && coverage_min=0
 
-    # Check against memory baseline (detect coverage drops)
+    # Adaptive baseline: read from baselines file, enforce no-regression (>= baseline - 2%)
+    local repo_hash_cov
+    repo_hash_cov=$(echo -n "$PROJECT_ROOT" | shasum -a 256 2>/dev/null | cut -c1-12 || echo "unknown")
+    local baselines_dir="${HOME}/.shipwright/baselines/${repo_hash_cov}"
+    local coverage_baseline_file="${baselines_dir}/coverage.json"
+
     local baseline_coverage=""
-    if [[ -x "$SCRIPT_DIR/sw-memory.sh" ]]; then
+    if [[ -f "$coverage_baseline_file" ]]; then
+        baseline_coverage=$(jq -r '.baseline // empty' "$coverage_baseline_file" 2>/dev/null) || true
+    fi
+    # Fallback: try legacy memory baseline
+    if [[ -z "$baseline_coverage" ]] && [[ -x "$SCRIPT_DIR/sw-memory.sh" ]]; then
         baseline_coverage=$(bash "$SCRIPT_DIR/sw-memory.sh" get "coverage_pct" 2>/dev/null) || true
     fi
 
     local dropped=false
-    if [[ -n "$baseline_coverage" ]] && awk -v cur="$coverage" -v base="$baseline_coverage" 'BEGIN{exit !(cur < base)}' 2>/dev/null; then
-        warn "Coverage dropped: ${baseline_coverage}% → ${coverage}%"
-        dropped=true
+    if [[ -n "$baseline_coverage" && "$baseline_coverage" != "0" ]] && awk -v cur="$coverage" -v base="$baseline_coverage" 'BEGIN{exit !(base > 0)}' 2>/dev/null; then
+        # Adaptive: allow 2% regression tolerance from baseline
+        local min_allowed
+        min_allowed=$(awk -v base="$baseline_coverage" 'BEGIN{printf "%d", base - 2}')
+        if awk -v cur="$coverage" -v min="$min_allowed" 'BEGIN{exit !(cur < min)}' 2>/dev/null; then
+            warn "Coverage regression: ${baseline_coverage}% → ${coverage}% (adaptive min: ${min_allowed}%)"
+            dropped=true
+        fi
     fi
 
     if [[ "$coverage_min" -gt 0 ]] 2>/dev/null && awk -v cov="$coverage" -v min="$coverage_min" 'BEGIN{exit !(cov < min)}' 2>/dev/null; then
@@ -3180,7 +3944,17 @@ quality_check_coverage() {
         return 1
     fi
 
-    info "Coverage: ${coverage}%"
+    # Update baseline on success (first run or improvement)
+    if [[ -z "$baseline_coverage" ]] || awk -v cur="$coverage" -v base="$baseline_coverage" 'BEGIN{exit !(cur >= base)}' 2>/dev/null; then
+        mkdir -p "$baselines_dir"
+        local tmp_cov_baseline
+        tmp_cov_baseline=$(mktemp "${baselines_dir}/coverage.json.XXXXXX")
+        jq -n --arg baseline "$coverage" --arg updated "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
+            '{baseline: ($baseline | tonumber), updated: $updated}' > "$tmp_cov_baseline" 2>/dev/null
+        mv "$tmp_cov_baseline" "$coverage_baseline_file" 2>/dev/null || true
+    fi
+
+    info "Coverage: ${coverage}%${baseline_coverage:+ (baseline: ${baseline_coverage}%)}"
     return 0
 }
 
@@ -3197,6 +3971,57 @@ run_adversarial_review() {
         return 0
     fi
 
+    # Delegate to sw-adversarial.sh module when available (uses intelligence cache)
+    if type adversarial_review &>/dev/null 2>&1; then
+        info "Using intelligence-backed adversarial review..."
+        local json_result
+        json_result=$(adversarial_review "$diff_content" "${GOAL:-}" 2>/dev/null || echo "[]")
+
+        # Save raw JSON result
+        echo "$json_result" > "$ARTIFACTS_DIR/adversarial-review.json"
+
+        # Convert JSON findings to markdown for compatibility with compound_rebuild_with_feedback
+        local critical_count high_count
+        critical_count=$(echo "$json_result" | jq '[.[] | select(.severity == "critical")] | length' 2>/dev/null || echo "0")
+        high_count=$(echo "$json_result" | jq '[.[] | select(.severity == "high")] | length' 2>/dev/null || echo "0")
+        local total_findings
+        total_findings=$(echo "$json_result" | jq 'length' 2>/dev/null || echo "0")
+
+        # Generate markdown report from JSON
+        {
+            echo "# Adversarial Review (Intelligence-backed)"
+            echo ""
+            echo "Total findings: ${total_findings} (${critical_count} critical, ${high_count} high)"
+            echo ""
+            echo "$json_result" | jq -r '.[] | "- **[\(.severity // "unknown")]** \(.location // "unknown") — \(.description // .concern // "no description")"' 2>/dev/null || true
+        } > "$ARTIFACTS_DIR/adversarial-review.md"
+
+        emit_event "adversarial.delegated" \
+            "issue=${ISSUE_NUMBER:-0}" \
+            "findings=$total_findings" \
+            "critical=$critical_count" \
+            "high=$high_count"
+
+        if [[ "$critical_count" -gt 0 ]]; then
+            warn "Adversarial review: ${critical_count} critical, ${high_count} high"
+            return 1
+        elif [[ "$high_count" -gt 0 ]]; then
+            warn "Adversarial review: ${high_count} high-severity issues"
+            return 1
+        fi
+
+        success "Adversarial review: clean"
+        return 0
+    fi
+
+    # Fallback: inline Claude call when module not loaded
+
+    # Inject previous adversarial findings from memory
+    local adv_memory=""
+    if type intelligence_search_memory &>/dev/null 2>&1; then
+        adv_memory=$(intelligence_search_memory "adversarial review security findings for: ${GOAL:-}" "${HOME}/.shipwright/memory" 5 2>/dev/null) || true
+    fi
+
     local prompt="You are a hostile code reviewer. Your job is to find EVERY possible issue in this diff.
 Look for:
 - Bugs (logic errors, off-by-one, null/undefined access, race conditions)
@@ -3209,7 +4034,11 @@ Look for:
 
 Be thorough and adversarial. List every issue with severity [Critical/Bug/Warning].
 Format: **[Severity]** file:line — description
-
+${adv_memory:+
+## Known Security Issues from Previous Reviews
+These security issues have been found in past reviews. Check if any recur:
+${adv_memory}
+}
 Diff:
 $diff_content"
 
@@ -3258,6 +4087,12 @@ $(head -200 "$file" 2>/dev/null || true)
         fi
     done <<< "$changed_files"
 
+    # Inject previous negative prompting findings from memory
+    local neg_memory=""
+    if type intelligence_search_memory &>/dev/null 2>&1; then
+        neg_memory=$(intelligence_search_memory "negative prompting findings common concerns for: ${GOAL:-}" "${HOME}/.shipwright/memory" 5 2>/dev/null) || true
+    fi
+
     local prompt="You are a pessimistic engineer who assumes everything will break.
 Review these changes and answer:
 1. What could go wrong in production?
@@ -3267,7 +4102,11 @@ Review these changes and answer:
 5. What happens under load/stress?
 6. What happens with malicious input?
 7. Are there any implicit dependencies that could break?
-
+${neg_memory:+
+## Known Concerns from Previous Reviews
+These issues have been found in past reviews of this codebase. Check if any apply to the current changes:
+${neg_memory}
+}
 Be specific. Reference actual code. Categorize each concern as [Critical/Concern/Minor].
 
 Files changed: $changed_files
@@ -3473,6 +4312,9 @@ stage_compound_quality() {
     strict_quality=$(jq -r --arg id "compound_quality" '(.stages[] | select(.id == $id) | .config.strict_quality) // false' "$PIPELINE_CONFIG" 2>/dev/null) || true
     [[ -z "$strict_quality" || "$strict_quality" == "null" ]] && strict_quality="false"
 
+    # Convergence tracking
+    local prev_issue_count=-1
+
     local cycle=0
     while [[ "$cycle" -lt "$max_cycles" ]]; do
         cycle=$((cycle + 1))
@@ -3503,7 +4345,87 @@ stage_compound_quality() {
             fi
         fi
 
-        # 3. E2E Validation
+        # 3. Developer Simulation (intelligence module)
+        if type simulation_review &>/dev/null 2>&1; then
+            local sim_enabled
+            sim_enabled=$(jq -r '.intelligence.simulation_enabled // false' "$PIPELINE_CONFIG" 2>/dev/null || echo "false")
+            local daemon_cfg="${PROJECT_ROOT}/.claude/daemon-config.json"
+            if [[ "$sim_enabled" != "true" && -f "$daemon_cfg" ]]; then
+                sim_enabled=$(jq -r '.intelligence.simulation_enabled // false' "$daemon_cfg" 2>/dev/null || echo "false")
+            fi
+            if [[ "$sim_enabled" == "true" ]]; then
+                echo ""
+                info "Running developer simulation review..."
+                local sim_diff
+                sim_diff=$(git diff "${BASE_BRANCH}...HEAD" 2>/dev/null || true)
+                if [[ -n "$sim_diff" ]]; then
+                    local sim_result
+                    sim_result=$(simulation_review "$sim_diff" "${GOAL:-}" 2>/dev/null || echo "[]")
+                    if [[ -n "$sim_result" && "$sim_result" != "[]" && "$sim_result" != *'"error"'* ]]; then
+                        echo "$sim_result" > "$ARTIFACTS_DIR/compound-simulation-review.json"
+                        local sim_critical
+                        sim_critical=$(echo "$sim_result" | jq '[.[] | select(.severity == "critical" or .severity == "high")] | length' 2>/dev/null || echo "0")
+                        local sim_total
+                        sim_total=$(echo "$sim_result" | jq 'length' 2>/dev/null || echo "0")
+                        if [[ "$sim_critical" -gt 0 ]]; then
+                            warn "Developer simulation: ${sim_critical} critical/high concerns (${sim_total} total)"
+                            all_passed=false
+                        else
+                            success "Developer simulation: ${sim_total} concerns (none critical/high)"
+                        fi
+                        emit_event "compound.simulation" \
+                            "issue=${ISSUE_NUMBER:-0}" \
+                            "cycle=$cycle" \
+                            "total=$sim_total" \
+                            "critical=$sim_critical"
+                    else
+                        success "Developer simulation: no concerns"
+                    fi
+                fi
+            fi
+        fi
+
+        # 4. Architecture Enforcer (intelligence module)
+        if type architecture_validate_changes &>/dev/null 2>&1; then
+            local arch_enabled
+            arch_enabled=$(jq -r '.intelligence.architecture_enabled // false' "$PIPELINE_CONFIG" 2>/dev/null || echo "false")
+            local daemon_cfg="${PROJECT_ROOT}/.claude/daemon-config.json"
+            if [[ "$arch_enabled" != "true" && -f "$daemon_cfg" ]]; then
+                arch_enabled=$(jq -r '.intelligence.architecture_enabled // false' "$daemon_cfg" 2>/dev/null || echo "false")
+            fi
+            if [[ "$arch_enabled" == "true" ]]; then
+                echo ""
+                info "Running architecture validation..."
+                local arch_diff
+                arch_diff=$(git diff "${BASE_BRANCH}...HEAD" 2>/dev/null || true)
+                if [[ -n "$arch_diff" ]]; then
+                    local arch_result
+                    arch_result=$(architecture_validate_changes "$arch_diff" "" 2>/dev/null || echo "[]")
+                    if [[ -n "$arch_result" && "$arch_result" != "[]" && "$arch_result" != *'"error"'* ]]; then
+                        echo "$arch_result" > "$ARTIFACTS_DIR/compound-architecture-validation.json"
+                        local arch_violations
+                        arch_violations=$(echo "$arch_result" | jq '[.[] | select(.severity == "critical" or .severity == "high")] | length' 2>/dev/null || echo "0")
+                        local arch_total
+                        arch_total=$(echo "$arch_result" | jq 'length' 2>/dev/null || echo "0")
+                        if [[ "$arch_violations" -gt 0 ]]; then
+                            warn "Architecture validation: ${arch_violations} critical/high violations (${arch_total} total)"
+                            all_passed=false
+                        else
+                            success "Architecture validation: ${arch_total} violations (none critical/high)"
+                        fi
+                        emit_event "compound.architecture" \
+                            "issue=${ISSUE_NUMBER:-0}" \
+                            "cycle=$cycle" \
+                            "total=$arch_total" \
+                            "violations=$arch_violations"
+                    else
+                        success "Architecture validation: no violations"
+                    fi
+                fi
+            fi
+        fi
+
+        # 5. E2E Validation
         if [[ "$e2e_enabled" == "true" ]]; then
             echo ""
             info "Running E2E validation..."
@@ -3512,7 +4434,7 @@ stage_compound_quality() {
             fi
         fi
 
-        # 4. DoD Audit
+        # 6. DoD Audit
         if [[ "$dod_enabled" == "true" ]]; then
             echo ""
             info "Running Definition of Done audit..."
@@ -3521,7 +4443,7 @@ stage_compound_quality() {
             fi
         fi
 
-        # 5. Multi-dimensional quality checks
+        # 7. Multi-dimensional quality checks
         echo ""
         info "Running multi-dimensional quality checks..."
         local quality_failures=0
@@ -3553,15 +4475,37 @@ stage_compound_quality() {
             success "Multi-dimensional quality: all checks passed"
         fi
 
+        # ── Convergence Detection ──
+        # Count critical/high issues from all review artifacts
+        local current_issue_count=0
+        if [[ -f "$ARTIFACTS_DIR/adversarial-review.md" ]]; then
+            local adv_issues
+            adv_issues=$(grep -ciE '\*\*\[?(Critical|Bug|critical|high)\]?\*\*' "$ARTIFACTS_DIR/adversarial-review.md" 2>/dev/null || true)
+            current_issue_count=$((current_issue_count + ${adv_issues:-0}))
+        fi
+        if [[ -f "$ARTIFACTS_DIR/adversarial-review.json" ]]; then
+            local adv_json_issues
+            adv_json_issues=$(jq '[.[] | select(.severity == "critical" or .severity == "high")] | length' "$ARTIFACTS_DIR/adversarial-review.json" 2>/dev/null || echo "0")
+            current_issue_count=$((current_issue_count + ${adv_json_issues:-0}))
+        fi
+        if [[ -f "$ARTIFACTS_DIR/negative-review.md" ]]; then
+            local neg_issues
+            neg_issues=$(grep -ciE '\[Critical\]' "$ARTIFACTS_DIR/negative-review.md" 2>/dev/null || true)
+            current_issue_count=$((current_issue_count + ${neg_issues:-0}))
+        fi
+        current_issue_count=$((current_issue_count + quality_failures))
+
         emit_event "compound.cycle" \
             "issue=${ISSUE_NUMBER:-0}" \
             "cycle=$cycle" \
             "max_cycles=$max_cycles" \
             "passed=$all_passed" \
+            "critical_issues=$current_issue_count" \
             "self_heal_count=$SELF_HEAL_COUNT"
 
-        if $all_passed; then
-            success "Compound quality passed on cycle ${cycle}"
+        # Early exit: zero critical/high issues
+        if [[ "$current_issue_count" -eq 0 ]] && $all_passed; then
+            success "Compound quality passed on cycle ${cycle} — zero critical/high issues"
 
             if [[ -n "$ISSUE_NUMBER" ]]; then
                 gh_comment_issue "$ISSUE_NUMBER" "✅ **Compound quality passed** — cycle ${cycle}/${max_cycles}
@@ -3569,6 +4513,8 @@ stage_compound_quality() {
 All quality checks clean:
 - Adversarial review: ✅
 - Negative prompting: ✅
+- Developer simulation: ✅
+- Architecture validation: ✅
 - E2E validation: ✅
 - DoD audit: ✅
 - Security audit: ✅
@@ -3581,6 +4527,36 @@ All quality checks clean:
             log_stage "compound_quality" "Passed on cycle ${cycle}/${max_cycles}"
             return 0
         fi
+
+        if $all_passed; then
+            success "Compound quality passed on cycle ${cycle}"
+
+            if [[ -n "$ISSUE_NUMBER" ]]; then
+                gh_comment_issue "$ISSUE_NUMBER" "✅ **Compound quality passed** — cycle ${cycle}/${max_cycles}" 2>/dev/null || true
+            fi
+
+            log_stage "compound_quality" "Passed on cycle ${cycle}/${max_cycles}"
+            return 0
+        fi
+
+        # Check for plateau: issue count unchanged between cycles
+        if [[ "$prev_issue_count" -ge 0 && "$current_issue_count" -eq "$prev_issue_count" && "$cycle" -gt 1 ]]; then
+            warn "Convergence: quality plateau — ${current_issue_count} issues unchanged between cycles"
+            emit_event "compound.plateau" \
+                "issue=${ISSUE_NUMBER:-0}" \
+                "cycle=$cycle" \
+                "issue_count=$current_issue_count"
+
+            if [[ -n "$ISSUE_NUMBER" ]]; then
+                gh_comment_issue "$ISSUE_NUMBER" "⚠️ **Compound quality plateau** — ${current_issue_count} issues unchanged after cycle ${cycle}. Stopping early." 2>/dev/null || true
+            fi
+
+            log_stage "compound_quality" "Plateau at cycle ${cycle}/${max_cycles} (${current_issue_count} issues)"
+            return 1
+        fi
+        prev_issue_count="$current_issue_count"
+
+        info "Convergence: ${current_issue_count} critical/high issues remaining"
 
         # Not all passed — rebuild if we have cycles left
         if [[ "$cycle" -lt "$max_cycles" ]]; then
@@ -3611,6 +4587,100 @@ Quality issues remain. Check artifacts for details." 2>/dev/null || true
     return 1
 }
 
+# ─── Error Classification ──────────────────────────────────────────────────
+# Classifies errors to determine whether retrying makes sense.
+# Returns: "infrastructure", "logic", "configuration", or "unknown"
+
+classify_error() {
+    local stage_id="$1"
+    local log_file="${ARTIFACTS_DIR}/${stage_id}-results.log"
+    [[ ! -f "$log_file" ]] && log_file="${ARTIFACTS_DIR}/test-results.log"
+    [[ ! -f "$log_file" ]] && { echo "unknown"; return; }
+
+    local log_tail
+    log_tail=$(tail -50 "$log_file" 2>/dev/null || echo "")
+
+    # Generate error signature for history lookup
+    local error_sig
+    error_sig=$(echo "$log_tail" | grep -iE 'error|fail|exception|fatal' 2>/dev/null | head -3 | cksum | awk '{print $1}' || echo "0")
+
+    # Check classification history first (learned from previous runs)
+    local class_history="${HOME}/.shipwright/optimization/error-classifications.json"
+    if [[ -f "$class_history" ]]; then
+        local cached_class
+        cached_class=$(jq -r --arg sig "$error_sig" '.[$sig].classification // empty' "$class_history" 2>/dev/null || true)
+        if [[ -n "$cached_class" && "$cached_class" != "null" ]]; then
+            echo "$cached_class"
+            return
+        fi
+    fi
+
+    local classification="unknown"
+
+    # Infrastructure errors: timeout, OOM, network — retry makes sense
+    if echo "$log_tail" | grep -qiE 'timeout|timed out|ETIMEDOUT|ECONNREFUSED|ECONNRESET|network|socket hang up|OOM|out of memory|killed|signal 9|Cannot allocate memory'; then
+        classification="infrastructure"
+    # Configuration errors: missing env, wrong path — don't retry, escalate
+    elif echo "$log_tail" | grep -qiE 'ENOENT|not found|No such file|command not found|MODULE_NOT_FOUND|Cannot find module|missing.*env|undefined variable|permission denied|EACCES'; then
+        classification="configuration"
+    # Logic errors: assertion failures, type errors — retry won't help without code change
+    elif echo "$log_tail" | grep -qiE 'AssertionError|assert.*fail|Expected.*but.*got|TypeError|ReferenceError|SyntaxError|CompileError|type mismatch|cannot assign|incompatible type'; then
+        classification="logic"
+    # Build errors: compilation failures
+    elif echo "$log_tail" | grep -qiE 'error\[E[0-9]+\]|error: aborting|FAILED.*compile|build failed|tsc.*error|eslint.*error'; then
+        classification="logic"
+    # Intelligence fallback: Claude classification for unknown errors
+    elif [[ "$classification" == "unknown" ]] && type intelligence_search_memory &>/dev/null 2>&1 && command -v claude &>/dev/null; then
+        local ai_class
+        ai_class=$(claude --print --output-format text -p "Classify this error as exactly one of: infrastructure, configuration, logic, unknown.
+
+Error output:
+$(echo "$log_tail" | tail -20)
+
+Reply with ONLY the classification word, nothing else." --model haiku < /dev/null 2>/dev/null || true)
+        ai_class=$(echo "$ai_class" | tr -d '[:space:]' | tr '[:upper:]' '[:lower:]')
+        case "$ai_class" in
+            infrastructure|configuration|logic) classification="$ai_class" ;;
+        esac
+    fi
+
+    # Map retry categories to shared taxonomy (from lib/compat.sh SW_ERROR_CATEGORIES)
+    # Retry uses: infrastructure, configuration, logic, unknown
+    # Shared uses: test_failure, build_error, lint_error, timeout, dependency, flaky, config, security, permission, unknown
+    local canonical_category="unknown"
+    case "$classification" in
+        infrastructure) canonical_category="timeout" ;;
+        configuration)  canonical_category="config" ;;
+        logic)
+            case "$stage_id" in
+                test) canonical_category="test_failure" ;;
+                *)    canonical_category="build_error" ;;
+            esac
+            ;;
+    esac
+
+    # Record classification for future runs (using both retry and canonical categories)
+    if [[ -n "$error_sig" && "$error_sig" != "0" ]]; then
+        local class_dir="${HOME}/.shipwright/optimization"
+        mkdir -p "$class_dir" 2>/dev/null || true
+        local tmp_class
+        tmp_class="$(mktemp)"
+        if [[ -f "$class_history" ]]; then
+            jq --arg sig "$error_sig" --arg cls "$classification" --arg canon "$canonical_category" --arg stage "$stage_id" \
+                '.[$sig] = {"classification": $cls, "canonical": $canon, "stage": $stage, "recorded_at": now}' \
+                "$class_history" > "$tmp_class" 2>/dev/null && \
+                mv "$tmp_class" "$class_history" || rm -f "$tmp_class"
+        else
+            jq -n --arg sig "$error_sig" --arg cls "$classification" --arg canon "$canonical_category" --arg stage "$stage_id" \
+                '{($sig): {"classification": $cls, "canonical": $canon, "stage": $stage, "recorded_at": now}}' \
+                > "$tmp_class" 2>/dev/null && \
+                mv "$tmp_class" "$class_history" || rm -f "$tmp_class"
+        fi
+    fi
+
+    echo "$classification"
+}
+
 # ─── Stage Runner ───────────────────────────────────────────────────────────
 
 run_stage_with_retry() {
@@ -3620,6 +4690,7 @@ run_stage_with_retry() {
     [[ -z "$max_retries" || "$max_retries" == "null" ]] && max_retries=0
 
     local attempt=0
+    local prev_error_class=""
     while true; do
         if "stage_${stage_id}"; then
             return 0
@@ -3630,8 +4701,53 @@ run_stage_with_retry() {
             return 1
         fi
 
-        warn "Stage $stage_id failed (attempt $attempt/$((max_retries + 1))) — retrying..."
-        sleep 2
+        # Classify the error to decide whether retry makes sense
+        local error_class
+        error_class=$(classify_error "$stage_id")
+
+        emit_event "retry.classified" \
+            "issue=${ISSUE_NUMBER:-0}" \
+            "stage=$stage_id" \
+            "attempt=$attempt" \
+            "error_class=$error_class"
+
+        case "$error_class" in
+            infrastructure)
+                info "Error classified as infrastructure (timeout/network/OOM) — retry makes sense"
+                ;;
+            configuration)
+                error "Error classified as configuration (missing env/path) — skipping retry, escalating"
+                emit_event "retry.escalated" \
+                    "issue=${ISSUE_NUMBER:-0}" \
+                    "stage=$stage_id" \
+                    "reason=configuration_error"
+                return 1
+                ;;
+            logic)
+                if [[ "$error_class" == "$prev_error_class" ]]; then
+                    error "Error classified as logic (assertion/type error) with same class — retry won't help without code change"
+                    emit_event "retry.skipped" \
+                        "issue=${ISSUE_NUMBER:-0}" \
+                        "stage=$stage_id" \
+                        "reason=repeated_logic_error"
+                    return 1
+                fi
+                warn "Error classified as logic — retrying once in case build fixes it"
+                ;;
+            *)
+                info "Error classification: unknown — retrying"
+                ;;
+        esac
+        prev_error_class="$error_class"
+
+        warn "Stage $stage_id failed (attempt $attempt/$((max_retries + 1)), class: $error_class) — retrying..."
+        # Exponential backoff with jitter to avoid thundering herd
+        local backoff=$((2 ** attempt))
+        [[ "$backoff" -gt 16 ]] && backoff=16
+        local jitter=$(( RANDOM % (backoff + 1) ))
+        local total_sleep=$((backoff + jitter))
+        info "Backing off ${total_sleep}s before retry..."
+        sleep "$total_sleep"
     done
 }
 
@@ -3643,6 +4759,10 @@ self_healing_build_test() {
     local cycle=0
     local max_cycles="$BUILD_TEST_RETRIES"
     local last_test_error=""
+
+    # Convergence tracking
+    local prev_error_sig="" consecutive_same_error=0
+    local prev_fail_count=0 zero_convergence_streak=0
 
     # Intelligence: adaptive iteration limit
     if type composer_estimate_iterations &>/dev/null 2>&1; then
@@ -3734,6 +4854,9 @@ Focus on fixing the failing tests while keeping all passing tests working."
             local timing
             timing=$(get_stage_timing "test")
             success "Stage ${BOLD}test${RESET} complete ${DIM}(${timing})${RESET}"
+            emit_event "convergence.tests_passed" \
+                "issue=${ISSUE_NUMBER:-0}" \
+                "cycle=$cycle"
             return 0  # Tests passed!
         fi
 
@@ -3741,6 +4864,59 @@ Focus on fixing the failing tests while keeping all passing tests working."
         local test_log="$ARTIFACTS_DIR/test-results.log"
         last_test_error=$(tail -30 "$test_log" 2>/dev/null || echo "Test command failed with no output")
         mark_stage_failed "test"
+
+        # ── Convergence Detection ──
+        # Hash the error output to detect repeated failures
+        local error_sig
+        error_sig=$(echo "$last_test_error" | shasum -a 256 2>/dev/null | cut -c1-16 || echo "unknown")
+
+        # Count failing tests (extract from common patterns)
+        local current_fail_count=0
+        current_fail_count=$(grep -ciE 'fail|error|FAIL' "$test_log" 2>/dev/null || true)
+        current_fail_count="${current_fail_count:-0}"
+
+        if [[ "$error_sig" == "$prev_error_sig" ]]; then
+            consecutive_same_error=$((consecutive_same_error + 1))
+        else
+            consecutive_same_error=1
+        fi
+        prev_error_sig="$error_sig"
+
+        # Check: same error 3 times consecutively → stuck
+        if [[ "$consecutive_same_error" -ge 3 ]]; then
+            error "Convergence: stuck on same error for 3 consecutive cycles — exiting early"
+            emit_event "convergence.stuck" \
+                "issue=${ISSUE_NUMBER:-0}" \
+                "cycle=$cycle" \
+                "error_sig=$error_sig" \
+                "consecutive=$consecutive_same_error"
+            notify "Build Convergence" "Stuck on unfixable error after ${cycle} cycles" "error"
+            return 1
+        fi
+
+        # Track convergence rate: did we reduce failures?
+        if [[ "$cycle" -gt 1 && "$prev_fail_count" -gt 0 ]]; then
+            if [[ "$current_fail_count" -ge "$prev_fail_count" ]]; then
+                zero_convergence_streak=$((zero_convergence_streak + 1))
+            else
+                zero_convergence_streak=0
+            fi
+
+            # Check: zero convergence for 2 consecutive iterations → plateau
+            if [[ "$zero_convergence_streak" -ge 2 ]]; then
+                error "Convergence: no progress for 2 consecutive cycles (${current_fail_count} failures remain) — exiting early"
+                emit_event "convergence.plateau" \
+                    "issue=${ISSUE_NUMBER:-0}" \
+                    "cycle=$cycle" \
+                    "fail_count=$current_fail_count" \
+                    "streak=$zero_convergence_streak"
+                notify "Build Convergence" "No progress after ${cycle} cycles — plateau reached" "error"
+                return 1
+            fi
+        fi
+        prev_fail_count="$current_fail_count"
+
+        info "Convergence: error_sig=${error_sig:0:8} repeat=${consecutive_same_error} failures=${current_fail_count} no_progress=${zero_convergence_streak}"
 
         if [[ "$cycle" -le "$max_cycles" ]]; then
             warn "Tests failed — will attempt self-healing (cycle $((cycle + 1))/$((max_cycles + 1)))"
@@ -3926,7 +5102,7 @@ run_pipeline() {
             fi
         fi
 
-        # Intelligence: per-stage model routing
+        # Intelligence: per-stage model routing with A/B testing
         if type intelligence_recommend_model &>/dev/null 2>&1; then
             local stage_complexity="${INTELLIGENCE_COMPLEXITY:-5}"
             local budget_remaining=""
@@ -3936,11 +5112,58 @@ run_pipeline() {
             local recommended_model
             recommended_model=$(intelligence_recommend_model "$id" "$stage_complexity" "$budget_remaining" 2>/dev/null || echo "")
             if [[ -n "$recommended_model" && "$recommended_model" != "null" ]]; then
-                export CLAUDE_MODEL="$recommended_model"
-                emit_event "intelligence.model" \
+                # A/B testing: decide whether to use the recommended model
+                local ab_ratio=20  # default 20% use recommended model
+                local daemon_cfg="${PROJECT_ROOT}/.claude/daemon-config.json"
+                if [[ -f "$daemon_cfg" ]]; then
+                    local cfg_ratio
+                    cfg_ratio=$(jq -r '.intelligence.ab_test_ratio // 0.2' "$daemon_cfg" 2>/dev/null || echo "0.2")
+                    # Convert ratio (0.0-1.0) to percentage (0-100)
+                    ab_ratio=$(awk -v r="$cfg_ratio" 'BEGIN{printf "%d", r * 100}' 2>/dev/null || echo "20")
+                fi
+
+                # Check if we have enough data points to graduate from A/B testing
+                local routing_file="${HOME}/.shipwright/optimization/model-routing.json"
+                local use_recommended=false
+                local ab_group="control"
+
+                if [[ -f "$routing_file" ]]; then
+                    local stage_samples
+                    stage_samples=$(jq -r --arg s "$id" '.[$s].sonnet_samples // 0' "$routing_file" 2>/dev/null || echo "0")
+                    local total_samples
+                    total_samples=$(jq -r --arg s "$id" '((.[$s].sonnet_samples // 0) + (.[$s].opus_samples // 0))' "$routing_file" 2>/dev/null || echo "0")
+
+                    if [[ "$total_samples" -ge 50 ]]; then
+                        # Enough data — use optimizer's recommendation as default
+                        use_recommended=true
+                        ab_group="graduated"
+                    fi
+                fi
+
+                if [[ "$use_recommended" != "true" ]]; then
+                    # A/B test: RANDOM % 100 < ab_ratio → use recommended
+                    local roll=$((RANDOM % 100))
+                    if [[ "$roll" -lt "$ab_ratio" ]]; then
+                        use_recommended=true
+                        ab_group="experiment"
+                    else
+                        ab_group="control"
+                    fi
+                fi
+
+                if [[ "$use_recommended" == "true" ]]; then
+                    export CLAUDE_MODEL="$recommended_model"
+                else
+                    export CLAUDE_MODEL="opus"
+                fi
+
+                emit_event "intelligence.model_ab" \
                     "issue=${ISSUE_NUMBER:-0}" \
                     "stage=$id" \
-                    "recommended=$recommended_model"
+                    "recommended=$recommended_model" \
+                    "applied=$CLAUDE_MODEL" \
+                    "ab_group=$ab_group" \
+                    "ab_ratio=$ab_ratio"
             fi
         fi
 
@@ -3952,6 +5175,7 @@ run_pipeline() {
         stage_start_epoch=$(now_epoch)
         emit_event "stage.started" "issue=${ISSUE_NUMBER:-0}" "stage=$id"
 
+        local stage_model_used="${CLAUDE_MODEL:-${MODEL:-opus}}"
         if run_stage_with_retry "$id"; then
             mark_stage_complete "$id"
             completed=$((completed + 1))
@@ -3960,6 +5184,8 @@ run_pipeline() {
             stage_dur_s=$(( $(now_epoch) - stage_start_epoch ))
             success "Stage ${BOLD}$id${RESET} complete ${DIM}(${timing})${RESET}"
             emit_event "stage.completed" "issue=${ISSUE_NUMBER:-0}" "stage=$id" "duration_s=$stage_dur_s"
+            # Log model used for prediction feedback
+            echo "${id}|${stage_model_used}|true" >> "${ARTIFACTS_DIR}/model-routing.log"
         else
             mark_stage_failed "$id"
             local stage_dur_s
@@ -3967,6 +5193,8 @@ run_pipeline() {
             error "Pipeline failed at stage: ${BOLD}$id${RESET}"
             update_status "failed" "$id"
             emit_event "stage.failed" "issue=${ISSUE_NUMBER:-0}" "stage=$id" "duration_s=$stage_dur_s"
+            # Log model used for prediction feedback
+            echo "${id}|${stage_model_used}|false" >> "${ARTIFACTS_DIR}/model-routing.log"
             return 1
         fi
     done 3<<< "$stages"
@@ -4235,6 +5463,50 @@ pipeline_start() {
             bash "$SCRIPT_DIR/sw-memory.sh" capture "$STATE_FILE" "$ARTIFACTS_DIR" 2>/dev/null || true
             bash "$SCRIPT_DIR/sw-memory.sh" analyze-failure "$ARTIFACTS_DIR/.claude-tokens-${CURRENT_STAGE_ID:-build}.log" "${CURRENT_STAGE_ID:-unknown}" 2>/dev/null || true
         fi
+    fi
+
+    # ── Prediction Validation Events ──
+    # Compare predicted vs actual outcomes for feedback loop calibration
+    local pipeline_success="false"
+    [[ "$exit_code" -eq 0 ]] && pipeline_success="true"
+
+    # Complexity prediction vs actual iterations
+    emit_event "prediction.validated" \
+        "issue=${ISSUE_NUMBER:-0}" \
+        "predicted_complexity=${INTELLIGENCE_COMPLEXITY:-0}" \
+        "actual_iterations=$SELF_HEAL_COUNT" \
+        "success=$pipeline_success"
+
+    # Template outcome tracking
+    emit_event "template.outcome" \
+        "issue=${ISSUE_NUMBER:-0}" \
+        "template=${PIPELINE_NAME}" \
+        "success=$pipeline_success" \
+        "duration_s=${total_dur_s:-0}"
+
+    # Risk prediction vs actual failure
+    local predicted_risk="${INTELLIGENCE_RISK_SCORE:-0}"
+    emit_event "risk.outcome" \
+        "issue=${ISSUE_NUMBER:-0}" \
+        "predicted_risk=$predicted_risk" \
+        "actual_failure=$([[ "$exit_code" -ne 0 ]] && echo "true" || echo "false")"
+
+    # Per-stage model outcome events (read from stage timings)
+    local routing_log="${ARTIFACTS_DIR}/model-routing.log"
+    if [[ -f "$routing_log" ]]; then
+        while IFS='|' read -r s_stage s_model s_success; do
+            [[ -z "$s_stage" ]] && continue
+            emit_event "model.outcome" \
+                "issue=${ISSUE_NUMBER:-0}" \
+                "stage=$s_stage" \
+                "model=$s_model" \
+                "success=$s_success"
+        done < "$routing_log"
+    fi
+
+    # Record pipeline outcome for model routing feedback loop
+    if type optimize_analyze_outcome &>/dev/null 2>&1; then
+        optimize_analyze_outcome "$STATE_FILE" 2>/dev/null || true
     fi
 
     # Emit cost event

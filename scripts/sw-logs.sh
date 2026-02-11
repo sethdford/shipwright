@@ -27,6 +27,58 @@ error()   { echo -e "${RED}${BOLD}✗${RESET} $*" >&2; }
 
 LOGS_DIR="$HOME/.shipwright/logs"
 
+# ─── Intelligence Check ──────────────────────────────────────────────────
+intelligence_available() {
+    command -v claude &>/dev/null || return 1
+    local config
+    for config in "$(git rev-parse --show-toplevel 2>/dev/null)/.claude/daemon-config.json" \
+                  "${HOME}/.shipwright/config.json"; do
+        if [[ -f "$config" ]]; then
+            local enabled
+            enabled=$(jq -r '.intelligence.enabled // false' "$config" 2>/dev/null || echo "false")
+            [[ "$enabled" == "true" ]] && return 0
+        fi
+    done
+    return 1
+}
+
+# ─── Semantic Log Ranking ────────────────────────────────────────────────
+# After grep results are collected, use Claude to rank by relevance,
+# group by error type/stage, and highlight actionable entries.
+semantic_rank_results() {
+    local query="$1"
+    local raw_results="$2"
+
+    [[ -z "$raw_results" ]] && return 0
+
+    # Truncate if too long to avoid overflowing Claude context
+    local truncated
+    truncated=$(echo "$raw_results" | head -200)
+
+    local analysis
+    analysis=$(claude --print "You are analyzing agent log search results. The user searched for: \"${query}\"
+
+Here are the grep results:
+${truncated}
+
+Respond with:
+1. MOST ACTIONABLE entries first (errors that need attention, failures with clear root causes)
+2. Group by error type or pipeline stage
+3. For each group, provide a one-line summary
+
+Format your response as plain text suitable for terminal display. Use --- to separate groups. Be concise." 2>/dev/null || true)
+
+    if [[ -n "$analysis" ]]; then
+        echo ""
+        echo -e "  ${PURPLE}${BOLD}Semantic Analysis${RESET} ${DIM}(intelligence-enhanced)${RESET}"
+        echo -e "${DIM}  ──────────────────────────────────────────${RESET}"
+        echo "$analysis" | while IFS= read -r line; do
+            echo -e "  $line"
+        done
+        echo ""
+    fi
+}
+
 show_usage() {
     echo -e "${CYAN}${BOLD}shipwright logs${RESET} — View agent pane logs"
     echo ""
@@ -189,6 +241,7 @@ show_team_logs() {
         info "Searching for '${grep_pattern}' in ${#log_files[@]} log file(s)..."
         echo ""
         local found=false
+        local all_raw_matches=""
         for f in "${log_files[@]}"; do
             local matches
             matches="$(grep -n --color=always "$grep_pattern" "$f" 2>/dev/null || true)"
@@ -199,11 +252,26 @@ show_team_logs() {
                     echo -e "    ${line}"
                 done
                 echo ""
+                # Collect plain matches for semantic analysis
+                local plain_matches
+                plain_matches="$(grep -n "$grep_pattern" "$f" 2>/dev/null || true)"
+                if [[ -n "$plain_matches" ]]; then
+                    all_raw_matches+="=== $(basename "$f") ===
+${plain_matches}
+
+"
+                fi
             fi
         done
         if ! $found; then
             warn "No matches for '${grep_pattern}'"
         fi
+
+        # Semantic enhancement (intelligence-gated)
+        if $found && intelligence_available; then
+            semantic_rank_results "$grep_pattern" "$all_raw_matches"
+        fi
+
         return
     fi
 

@@ -34,9 +34,9 @@ error()   { echo -e "${RED}${BOLD}✗${RESET} $*" >&2; }
 
 # ─── Defaults ─────────────────────────────────────────────────────────────────
 GOAL=""
-MAX_ITERATIONS=20
+MAX_ITERATIONS="${SW_MAX_ITERATIONS:-20}"
 TEST_CMD=""
-MODEL="opus"
+MODEL="${SW_MODEL:-opus}"
 AGENTS=1
 USE_WORKTREE=false
 SKIP_PERMISSIONS=false
@@ -51,6 +51,10 @@ AUTO_EXTEND=true          # Auto-extend iterations when work is incomplete
 EXTENSION_SIZE=5          # Additional iterations per extension
 MAX_EXTENSIONS=3          # Max number of extensions (hard cap safety net)
 EXTENSION_COUNT=0         # Current number of extensions applied
+
+# ─── Circuit Breaker Defaults ──────────────────────────────────────────────
+CIRCUIT_BREAKER_THRESHOLD=3       # Consecutive low-progress iterations before stopping
+MIN_PROGRESS_LINES=5              # Minimum insertions to count as progress
 
 # ─── Audit & Quality Gate Defaults ───────────────────────────────────────────
 AUDIT_ENABLED=false
@@ -102,7 +106,7 @@ show_help() {
     echo -e "  ${DIM}• Claude outputs LOOP_COMPLETE and all quality gates pass${RESET}"
     echo -e "  ${DIM}• Max iterations reached (auto-extends if work is incomplete)${RESET}"
     echo -e "  The loop stops (circuit breaker) if:"
-    echo -e "  ${DIM}• 3 consecutive iterations with < 5 lines changed${RESET}"
+    echo -e "  ${DIM}• ${CIRCUIT_BREAKER_THRESHOLD} consecutive iterations with < ${MIN_PROGRESS_LINES} lines changed${RESET}"
     echo -e "  ${DIM}• Hard cap reached (max_iterations + max_extensions * extension_size)${RESET}"
     echo -e "  ${DIM}• Ctrl-C (graceful shutdown with summary)${RESET}"
     echo ""
@@ -242,6 +246,114 @@ LOG_DIR="$STATE_DIR/loop-logs"
 WORKTREE_DIR="$PROJECT_ROOT/.worktrees"
 
 mkdir -p "$STATE_DIR" "$LOG_DIR"
+
+# ─── Adaptive Model Selection ────────────────────────────────────────────────
+# Uses intelligence engine when available, falls back to defaults.
+select_adaptive_model() {
+    local role="${1:-build}"
+    local default_model="${2:-opus}"
+    # If user explicitly set --model, respect it
+    if [[ "$default_model" != "${SW_MODEL:-opus}" ]]; then
+        echo "$default_model"
+        return 0
+    fi
+    # Try intelligence-based recommendation
+    if type intelligence_recommend_model &>/dev/null 2>&1; then
+        local rec
+        rec=$(intelligence_recommend_model "$role" "${COMPLEXITY:-5}" "${BUDGET:-0}" 2>/dev/null || echo "")
+        if [[ -n "$rec" ]]; then
+            local recommended
+            recommended=$(echo "$rec" | jq -r '.model // ""' 2>/dev/null || echo "")
+            if [[ -n "$recommended" && "$recommended" != "null" ]]; then
+                echo "$recommended"
+                return 0
+            fi
+        fi
+    fi
+    echo "$default_model"
+}
+
+# Select audit/DoD model — uses haiku if success rate is high enough, else sonnet
+select_audit_model() {
+    local default_model="haiku"
+    local opt_file="$HOME/.shipwright/optimization/audit-tuning.json"
+    if [[ -f "$opt_file" ]] && command -v jq &>/dev/null; then
+        local success_rate
+        success_rate=$(jq -r '.haiku_success_rate // 100' "$opt_file" 2>/dev/null || echo "100")
+        if [[ "${success_rate%%.*}" -lt 90 ]]; then
+            echo "sonnet"
+            return 0
+        fi
+    fi
+    echo "$default_model"
+}
+
+# ─── Adaptive Iteration Budget ──────────────────────────────────────────────
+# Reads tuning config for smarter iteration/circuit-breaker thresholds.
+apply_adaptive_budget() {
+    local tuning_file="$HOME/.shipwright/optimization/loop-tuning.json"
+    if [[ -f "$tuning_file" ]] && command -v jq &>/dev/null; then
+        local tuned_max tuned_ext tuned_ext_count tuned_cb
+        tuned_max=$(jq -r '.max_iterations // ""' "$tuning_file" 2>/dev/null || echo "")
+        tuned_ext=$(jq -r '.extension_size // ""' "$tuning_file" 2>/dev/null || echo "")
+        tuned_ext_count=$(jq -r '.max_extensions // ""' "$tuning_file" 2>/dev/null || echo "")
+        tuned_cb=$(jq -r '.circuit_breaker_threshold // ""' "$tuning_file" 2>/dev/null || echo "")
+
+        # Only apply tuned values if user didn't explicitly set them
+        if ! $MAX_ITERATIONS_EXPLICIT && [[ -n "$tuned_max" && "$tuned_max" != "null" ]]; then
+            MAX_ITERATIONS="$tuned_max"
+        fi
+        [[ -n "$tuned_ext" && "$tuned_ext" != "null" ]] && EXTENSION_SIZE="$tuned_ext"
+        [[ -n "$tuned_ext_count" && "$tuned_ext_count" != "null" ]] && MAX_EXTENSIONS="$tuned_ext_count"
+        [[ -n "$tuned_cb" && "$tuned_cb" != "null" ]] && CIRCUIT_BREAKER_THRESHOLD="$tuned_cb"
+    fi
+
+    # Try intelligence-based iteration estimate
+    if type intelligence_estimate_iterations &>/dev/null 2>&1 && ! $MAX_ITERATIONS_EXPLICIT; then
+        local est
+        est=$(intelligence_estimate_iterations "${GOAL:-}" "${COMPLEXITY:-5}" 2>/dev/null || echo "")
+        if [[ -n "$est" && "$est" =~ ^[0-9]+$ ]]; then
+            MAX_ITERATIONS="$est"
+        fi
+    fi
+}
+
+# ─── Progress Velocity Tracking ─────────────────────────────────────────────
+ITERATION_LINES_CHANGED=""
+VELOCITY_HISTORY=""
+
+track_iteration_velocity() {
+    local changes
+    changes="$(git -C "$PROJECT_ROOT" diff --stat HEAD~1 2>/dev/null | tail -1 || echo "")"
+    local insertions
+    insertions="$(echo "$changes" | grep -oE '[0-9]+ insertion' | grep -oE '[0-9]+' || echo 0)"
+    ITERATION_LINES_CHANGED="${insertions:-0}"
+    if [[ -n "$VELOCITY_HISTORY" ]]; then
+        VELOCITY_HISTORY="${VELOCITY_HISTORY},${ITERATION_LINES_CHANGED}"
+    else
+        VELOCITY_HISTORY="${ITERATION_LINES_CHANGED}"
+    fi
+}
+
+# Compute average lines/iteration from recent history
+compute_velocity_avg() {
+    if [[ -z "$VELOCITY_HISTORY" ]]; then
+        echo "0"
+        return 0
+    fi
+    local total=0 count=0
+    local IFS=','
+    local val
+    for val in $VELOCITY_HISTORY; do
+        total=$((total + val))
+        count=$((count + 1))
+    done
+    if [[ "$count" -gt 0 ]]; then
+        echo $((total / count))
+    else
+        echo "0"
+    fi
+}
 
 # ─── Timing Helpers ───────────────────────────────────────────────────────────
 
@@ -435,7 +547,7 @@ check_progress() {
     changes="$(git -C "$PROJECT_ROOT" diff --stat HEAD~1 2>/dev/null | tail -1 || echo "")"
     local insertions
     insertions="$(echo "$changes" | grep -oE '[0-9]+ insertion' | grep -oE '[0-9]+' || echo 0)"
-    if [[ "${insertions:-0}" -lt 5 ]]; then
+    if [[ "${insertions:-0}" -lt "$MIN_PROGRESS_LINES" ]]; then
         return 1  # No meaningful progress
     fi
     return 0
@@ -447,8 +559,8 @@ check_completion() {
 }
 
 check_circuit_breaker() {
-    if [[ "$CONSECUTIVE_FAILURES" -ge 3 ]]; then
-        error "Circuit breaker tripped: 3 consecutive iterations with no meaningful progress."
+    if [[ "$CONSECUTIVE_FAILURES" -ge "$CIRCUIT_BREAKER_THRESHOLD" ]]; then
+        error "Circuit breaker tripped: ${CIRCUIT_BREAKER_THRESHOLD} consecutive iterations with no meaningful progress."
         STATUS="circuit_breaker"
         return 1
     fi
@@ -493,10 +605,21 @@ check_max_iterations() {
     fi
 
     if $should_extend; then
+        # Scale extension size by velocity — good progress earns more iterations
+        local velocity_avg
+        velocity_avg="$(compute_velocity_avg)"
+        local effective_extension="$EXTENSION_SIZE"
+        if [[ "$velocity_avg" -gt 20 ]]; then
+            # High velocity: grant more iterations
+            effective_extension=$(( EXTENSION_SIZE + 3 ))
+        elif [[ "$velocity_avg" -lt 5 ]]; then
+            # Low velocity: grant fewer iterations
+            effective_extension=$(( EXTENSION_SIZE > 2 ? EXTENSION_SIZE - 2 : 1 ))
+        fi
         EXTENSION_COUNT=$(( EXTENSION_COUNT + 1 ))
-        MAX_ITERATIONS=$(( MAX_ITERATIONS + EXTENSION_SIZE ))
-        echo -e "  ${GREEN}✓${RESET} Auto-extending: +${EXTENSION_SIZE} iterations (now ${MAX_ITERATIONS} max, extension ${EXTENSION_COUNT}/${MAX_EXTENSIONS})"
-        echo -e "  ${DIM}Reason: ${extension_reason}${RESET}"
+        MAX_ITERATIONS=$(( MAX_ITERATIONS + effective_extension ))
+        echo -e "  ${GREEN}✓${RESET} Auto-extending: +${effective_extension} iterations (now ${MAX_ITERATIONS} max, extension ${EXTENSION_COUNT}/${MAX_EXTENSIONS})"
+        echo -e "  ${DIM}Reason: ${extension_reason} | velocity: ~${velocity_avg} lines/iter${RESET}"
         return 0
     fi
 
@@ -567,9 +690,11 @@ AUDIT_PROMPT
 
     echo -e "  ${PURPLE}▸${RESET} Running audit agent..."
 
-    # Build flags with haiku model override for fast/cheap audit
+    # Select audit model adaptively (haiku if success rate high, else sonnet)
+    local audit_model
+    audit_model="$(select_audit_model)"
     local audit_flags=()
-    audit_flags+=("--model" "haiku")
+    audit_flags+=("--model" "$audit_model")
     if $SKIP_PERMISSIONS; then
         audit_flags+=("--dangerously-skip-permissions")
     fi
@@ -664,8 +789,10 @@ Otherwise, list which items are NOT satisfied and why.
 DOD_PROMPT
 
     local dod_log="$LOG_DIR/dod-iter-${ITERATION}.log"
+    local dod_model
+    dod_model="$(select_audit_model)"
     local dod_flags=()
-    dod_flags+=("--model" "haiku")
+    dod_flags+=("--model" "$dod_model")
     if $SKIP_PERMISSIONS; then
         dod_flags+=("--dangerously-skip-permissions")
     fi
@@ -756,6 +883,36 @@ $TEST_OUTPUT"
     local rejection_notice_section
     rejection_notice_section="$(compose_rejection_notice_section)"
 
+    # Memory context injection (failure patterns + past learnings)
+    local memory_section=""
+    if type memory_inject_context &>/dev/null 2>&1; then
+        memory_section="$(memory_inject_context "build" 2>/dev/null || true)"
+    elif [[ -f "$SCRIPT_DIR/sw-memory.sh" ]]; then
+        memory_section="$("$SCRIPT_DIR/sw-memory.sh" inject build 2>/dev/null || true)"
+    fi
+
+    # DORA baselines for context
+    local dora_section=""
+    if type memory_get_dora_baseline &>/dev/null 2>&1; then
+        local dora_json
+        dora_json="$(memory_get_dora_baseline 7 2>/dev/null || echo "{}")"
+        local dora_total
+        dora_total=$(echo "$dora_json" | jq -r '.total // 0' 2>/dev/null || echo "0")
+        if [[ "$dora_total" -gt 0 ]]; then
+            local dora_df dora_cfr
+            dora_df=$(echo "$dora_json" | jq -r '.deploy_freq // 0' 2>/dev/null || echo "0")
+            dora_cfr=$(echo "$dora_json" | jq -r '.cfr // 0' 2>/dev/null || echo "0")
+            dora_section="## Performance Baselines (Last 7 Days)
+- Deploy frequency: ${dora_df}/week
+- Change failure rate: ${dora_cfr}%
+- Total pipeline runs: ${dora_total}"
+        fi
+    fi
+
+    # Stuckness detection — compare last 3 iteration outputs
+    local stuckness_section=""
+    stuckness_section="$(detect_stuckness)"
+
     cat <<PROMPT
 You are an autonomous coding agent on iteration ${ITERATION}/${MAX_ITERATIONS} of a continuous loop.
 
@@ -771,6 +928,11 @@ ${git_log}
 ## Test Results (Previous Iteration)
 ${test_section}
 
+${memory_section:+## Memory Context
+$memory_section
+}
+${dora_section:+$dora_section
+}
 ## Instructions
 1. Read the codebase and understand the current state
 2. Identify the highest-priority remaining work toward the goal
@@ -785,6 +947,8 @@ ${audit_feedback_section}
 
 ${rejection_notice_section}
 
+${stuckness_section}
+
 ## Rules
 - Focus on ONE task per iteration — do it well
 - Always commit with descriptive messages
@@ -794,22 +958,107 @@ ${rejection_notice_section}
 PROMPT
 }
 
+# ─── Stuckness Detection ─────────────────────────────────────────────────────
+# Compares last 3 iteration log outputs for high overlap (>90% similar lines).
+detect_stuckness() {
+    if [[ "$ITERATION" -lt 3 ]]; then
+        return 0
+    fi
+
+    local log1="$LOG_DIR/iteration-$(( ITERATION - 1 )).log"
+    local log2="$LOG_DIR/iteration-$(( ITERATION - 2 )).log"
+    local log3="$LOG_DIR/iteration-$(( ITERATION - 3 )).log"
+
+    # Need at least 2 previous logs
+    if [[ ! -f "$log1" || ! -f "$log2" ]]; then
+        return 0
+    fi
+
+    # Compare last 50 lines of each (ignoring timestamps and blank lines)
+    local lines1 lines2 common total overlap_pct
+    lines1=$(tail -50 "$log1" 2>/dev/null | grep -v '^$' | sort || true)
+    lines2=$(tail -50 "$log2" 2>/dev/null | grep -v '^$' | sort || true)
+
+    if [[ -z "$lines1" || -z "$lines2" ]]; then
+        return 0
+    fi
+
+    total=$(echo "$lines1" | wc -l | tr -d ' ')
+    common=$(comm -12 <(echo "$lines1") <(echo "$lines2") 2>/dev/null | wc -l | tr -d ' ' || echo "0")
+
+    if [[ "$total" -gt 0 ]]; then
+        overlap_pct=$(( common * 100 / total ))
+    else
+        overlap_pct=0
+    fi
+
+    if [[ "$overlap_pct" -ge 90 ]]; then
+        local diff_summary=""
+        if [[ -f "$log3" ]]; then
+            diff_summary=$(diff <(tail -30 "$log3" 2>/dev/null) <(tail -30 "$log1" 2>/dev/null) 2>/dev/null | head -10 || true)
+        fi
+
+        # Gather memory-based alternative approaches
+        local alternatives=""
+        if type memory_inject_context &>/dev/null 2>&1; then
+            alternatives=$(memory_inject_context "build" 2>/dev/null | grep -i "fix:" | head -3 || true)
+        fi
+
+        cat <<STUCK_SECTION
+## Stuckness Detected
+Your last ${CONSECUTIVE_FAILURES:-2}+ iterations produced very similar output (${overlap_pct}% overlap).
+You appear to be stuck on the same approach.
+
+${diff_summary:+Changes between recent iterations:
+$diff_summary
+}
+${alternatives:+Consider these alternative approaches from past fixes:
+$alternatives
+}
+Try a fundamentally different approach:
+- Break the problem into smaller steps
+- Look for an entirely different implementation strategy
+- Check if there's a dependency or configuration issue blocking progress
+- Read error messages more carefully — the root cause may differ from your assumption
+STUCK_SECTION
+    fi
+}
+
 compose_audit_section() {
     if ! $AUDIT_ENABLED; then
         return
     fi
-    cat <<'AUDIT_SECTION'
-## Self-Audit Checklist
-Before declaring LOOP_COMPLETE, critically evaluate your own work:
-1. Does the implementation FULLY satisfy the goal, not just partially?
-2. Are there any edge cases you haven't handled?
-3. Did you leave any TODO, FIXME, HACK, or XXX comments in new code?
-4. Are all new functions/modules tested (if a test command exists)?
-5. Would a code reviewer approve this, or would they request changes?
-6. Is the code clean, well-structured, and following project conventions?
 
-If ANY answer is "no", do NOT output LOOP_COMPLETE. Instead, fix the issues first.
-AUDIT_SECTION
+    # Try to inject audit items from past review feedback in memory
+    local memory_audit_items=""
+    if [[ -f "$SCRIPT_DIR/sw-memory.sh" ]]; then
+        local mem_dir_path
+        mem_dir_path="$HOME/.shipwright/memory"
+        # Look for review feedback in any repo memory
+        local repo_hash_val
+        repo_hash_val=$(git config --get remote.origin.url 2>/dev/null | shasum -a 256 2>/dev/null | cut -c1-12 || echo "")
+        if [[ -n "$repo_hash_val" && -f "$mem_dir_path/$repo_hash_val/failures.json" ]]; then
+            memory_audit_items=$(jq -r '.failures[] | select(.stage == "review" and .pattern != "") |
+                "- Check for: \(.pattern[:100])"' \
+                "$mem_dir_path/$repo_hash_val/failures.json" 2>/dev/null | head -5 || true)
+        fi
+    fi
+
+    echo "## Self-Audit Checklist"
+    echo "Before declaring LOOP_COMPLETE, critically evaluate your own work:"
+    echo "1. Does the implementation FULLY satisfy the goal, not just partially?"
+    echo "2. Are there any edge cases you haven't handled?"
+    echo "3. Did you leave any TODO, FIXME, HACK, or XXX comments in new code?"
+    echo "4. Are all new functions/modules tested (if a test command exists)?"
+    echo "5. Would a code reviewer approve this, or would they request changes?"
+    echo "6. Is the code clean, well-structured, and following project conventions?"
+    if [[ -n "$memory_audit_items" ]]; then
+        echo ""
+        echo "Common review findings from this repo's history:"
+        echo "$memory_audit_items"
+    fi
+    echo ""
+    echo "If ANY answer is \"no\", do NOT output LOOP_COMPLETE. Instead, fix the issues first."
 }
 
 compose_audit_feedback_section() {
@@ -1325,6 +1574,10 @@ run_single_agent_loop() {
         initialize_state
     fi
 
+    # Apply adaptive budget/model before showing banner
+    apply_adaptive_budget
+    MODEL="$(select_adaptive_model "build" "$MODEL")"
+
     show_banner
 
     while true; do
@@ -1354,6 +1607,9 @@ run_single_agent_loop() {
         if [[ -n "$diff_stat" ]]; then
             echo -e "  ${GREEN}✓${RESET} Git: $diff_stat"
         fi
+
+        # Track velocity for adaptive extension budget
+        track_iteration_velocity
 
         # Test gate
         run_test_gate
@@ -1385,7 +1641,7 @@ run_single_agent_loop() {
             echo -e "  ${GREEN}✓${RESET} Progress detected — continuing"
         else
             CONSECUTIVE_FAILURES=$(( CONSECUTIVE_FAILURES + 1 ))
-            echo -e "  ${YELLOW}⚠${RESET} Low progress (${CONSECUTIVE_FAILURES}/3 before circuit breaker)"
+            echo -e "  ${YELLOW}⚠${RESET} Low progress (${CONSECUTIVE_FAILURES}/${CIRCUIT_BREAKER_THRESHOLD} before circuit breaker)"
         fi
 
         # Extract summary and update state

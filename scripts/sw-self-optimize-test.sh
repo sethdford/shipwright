@@ -269,12 +269,19 @@ test_template_weight_low_success() {
     for i in $(seq 1 8); do
         add_mock_outcome "fast" "failed" "feature"
     done
+    # Add high-success template to shift average up (proportional update needs contrast)
+    for i in $(seq 1 8); do
+        add_mock_outcome "standard" "success" "feature"
+    done
+    for i in 1 2; do
+        add_mock_outcome "standard" "failed" "feature"
+    done
 
     optimize_tune_templates "$OUTCOMES_FILE" > /dev/null 2>&1
 
     local weight
     weight=$(jq -r '.["fast|feature"] // 1' "$TEMPLATE_WEIGHTS_FILE")
-    # 20% < 60% → weight * 0.7 = 0.7
+    # fast=20%, standard=80%, avg=50% → fast weight = 1.0 * (20/50) = 0.4
     awk "BEGIN{exit !($weight < 0.8)}" || return 1
 }
 

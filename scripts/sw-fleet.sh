@@ -228,10 +228,21 @@ fleet_rebalance() {
         fi
 
         # Collect demand per repo using indexed arrays (bash 3.2 compatible)
+        # When intelligence is available, weight by complexity × urgency
         local repo_list=()
         local demand_list=()
+        local weight_list=()
         local total_demand=0
+        local total_weight=0
         local repo_count=0
+
+        # Check if intelligence weighting is enabled
+        local intel_weighting=false
+        local fleet_intel_enabled
+        fleet_intel_enabled=$(jq -r '.intelligence.fleet_weighting // false' "$config_file" 2>/dev/null || echo "false")
+        if [[ "$fleet_intel_enabled" == "true" ]]; then
+            intel_weighting=true
+        fi
 
         while IFS= read -r repo_name; do
             local repo_path
@@ -254,9 +265,52 @@ fleet_rebalance() {
             fi
 
             local demand=$((active + queued))
+
+            # Compute intelligence weight: complexity × urgency
+            # Falls back to raw demand when no intelligence data exists
+            local weight="$demand"
+            if [[ "$intel_weighting" == "true" && "$demand" -gt 0 ]]; then
+                local intel_cache="$repo_path/.claude/intelligence-cache.json"
+                local avg_complexity=50
+                local urgency_factor=1
+
+                # Read average issue complexity from intelligence cache
+                if [[ -f "$intel_cache" ]]; then
+                    local cached_complexity
+                    cached_complexity=$(jq -r '.analysis.avg_issue_complexity // 50' "$intel_cache" 2>/dev/null || echo "50")
+                    [[ "$cached_complexity" =~ ^[0-9]+$ ]] && avg_complexity="$cached_complexity"
+                fi
+
+                # Check for deadline urgency in queued issues
+                if [[ -f "$daemon_state" ]]; then
+                    local urgent_count=0
+                    local urgent_raw
+                    urgent_raw=$(jq -r '[.queued[]? | select(.labels[]? == "priority" or .labels[]? == "urgent" or .labels[]? == "hotfix")] | length' "$daemon_state" 2>/dev/null || echo "0")
+                    [[ "$urgent_raw" =~ ^[0-9]+$ ]] && urgent_count="$urgent_raw"
+
+                    if [[ "$queued" -gt 0 && "$urgent_count" -gt 0 ]]; then
+                        # Urgency boost: 1.0 base + 0.5 per urgent ratio
+                        urgency_factor=$(awk -v uc="$urgent_count" -v q="$queued" \
+                            'BEGIN { r = uc / q; f = 1.0 + (r * 0.5); printf "%.0f", f * 100 }')
+                        # urgency_factor is now scaled by 100 (e.g. 150 = 1.5x)
+                    else
+                        urgency_factor=100
+                    fi
+                else
+                    urgency_factor=100
+                fi
+
+                # Weight = demand × (complexity / 50) × (urgency_factor / 100)
+                # complexity 50 = baseline, 100 = 2x weight, 25 = 0.5x weight
+                weight=$(awk -v d="$demand" -v c="$avg_complexity" -v u="$urgency_factor" \
+                    'BEGIN { w = d * (c / 50.0) * (u / 100.0); if (w < 1) w = 1; printf "%.0f", w }')
+            fi
+
             repo_list+=("$repo_name")
             demand_list+=("$demand")
+            weight_list+=("$weight")
             total_demand=$((total_demand + demand))
+            total_weight=$((total_weight + weight))
             repo_count=$((repo_count + 1))
         done <<< "$repo_names"
 
@@ -265,17 +319,28 @@ fleet_rebalance() {
         fi
 
         # Distribute workers proportionally with budget enforcement
+        # When intelligence weighting is active, use weighted demand
         local allocated_total=0
         local alloc_list=()
+        local use_weight="$total_weight"
+        local effective_total="$total_demand"
+        if [[ "$intel_weighting" == "true" && "$total_weight" -gt 0 ]]; then
+            effective_total="$total_weight"
+        fi
 
         local i
         for i in $(seq 0 $((repo_count - 1))); do
             local new_max
-            if [[ "$total_demand" -eq 0 ]]; then
+            if [[ "$effective_total" -eq 0 ]]; then
                 new_max=$(( total_workers / repo_count ))
             else
-                local repo_demand="${demand_list[$i]}"
-                new_max=$(awk -v d="$repo_demand" -v td="$total_demand" -v tw="$total_workers" \
+                local repo_score
+                if [[ "$intel_weighting" == "true" && "$total_weight" -gt 0 ]]; then
+                    repo_score="${weight_list[$i]}"
+                else
+                    repo_score="${demand_list[$i]}"
+                fi
+                new_max=$(awk -v d="$repo_score" -v td="$effective_total" -v tw="$total_workers" \
                     'BEGIN { v = (d / td) * tw; if (v < 1) v = 1; printf "%.0f", v }')
             fi
             [[ "$new_max" -lt 1 ]] && new_max=1
@@ -325,6 +390,8 @@ fleet_rebalance() {
             emit_event "fleet.rebalance" \
                 "total_workers=$total_workers" \
                 "total_demand=$total_demand" \
+                "total_weight=$total_weight" \
+                "intel_weighting=$intel_weighting" \
                 "repo_count=$repo_count" \
                 "allocated=$allocated_total"
         fi

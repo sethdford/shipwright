@@ -78,6 +78,10 @@ HAS_DB=false
 HAS_MIDDLEWARE=false
 ROUTE_PATTERNS=""
 DB_PATTERNS=""
+ARCHITECTURE_PATTERN=""
+SEMICOLONS=""
+QUOTE_STYLE=""
+INDENT_STYLE=""
 
 # Tracking generated files
 GENERATED_FILES=()
@@ -571,6 +575,271 @@ prep_extract_patterns() {
     fi
 
     success "Patterns: ${NAMING_CONVENTION} naming${IMPORT_STYLE:+, ${IMPORT_STYLE}}${ROUTE_PATTERNS:+, ${ROUTE_PATTERNS}}"
+}
+
+# ─── Intelligence Check ──────────────────────────────────────────────────
+
+intelligence_available() {
+    command -v claude &>/dev/null || return 1
+    # Honor --with-claude flag
+    $WITH_CLAUDE && return 0
+    # Check daemon config for intelligence.enabled
+    local config="${PROJECT_ROOT}/.claude/daemon-config.json"
+    if [[ -f "$config" ]]; then
+        local enabled
+        enabled=$(jq -r '.intelligence.enabled // false' "$config" 2>/dev/null || echo "false")
+        [[ "$enabled" == "true" ]] && return 0
+    fi
+    return 1
+}
+
+# ─── prep_smart_detect — Claude-enhanced detection ────────────────────────
+
+prep_smart_detect() {
+    intelligence_available || return 0
+
+    info "Running intelligent stack analysis..."
+
+    # Collect dependency manifests (truncated)
+    local dep_info=""
+    local manifest
+    for manifest in package.json requirements.txt Cargo.toml go.mod pyproject.toml Gemfile pom.xml build.gradle; do
+        if [[ -f "$PROJECT_ROOT/$manifest" ]]; then
+            dep_info+="=== ${manifest} ===
+$(head -100 "$PROJECT_ROOT/$manifest" 2>/dev/null)
+
+"
+        fi
+    done
+
+    # Collect grep detection results summary
+    local grep_results="Language: ${LANG_DETECTED:-unknown}
+Framework: ${FRAMEWORK:-unknown}
+Package Manager: ${PACKAGE_MANAGER:-unknown}
+Test Framework: ${TEST_FRAMEWORK:-unknown}
+Import Style: ${IMPORT_STYLE:-unknown}
+Naming: ${NAMING_CONVENTION:-unknown}
+Routes: ${ROUTE_PATTERNS:-none}
+Database: ${DB_PATTERNS:-none}"
+
+    # Sample code from entry points (first 50 lines of up to 3 files)
+    local code_samples=""
+    local sample_count=0
+    local entry
+    for entry in $ENTRY_POINTS; do
+        [[ $sample_count -ge 3 ]] && break
+        if [[ -f "$PROJECT_ROOT/$entry" ]]; then
+            code_samples+="=== ${entry} (first 50 lines) ===
+$(head -50 "$PROJECT_ROOT/$entry" 2>/dev/null)
+
+"
+            sample_count=$((sample_count + 1))
+        fi
+    done
+
+    # If no entry points found, sample some source files
+    if [[ $sample_count -eq 0 ]]; then
+        local f
+        while IFS= read -r f; do
+            [[ $sample_count -ge 3 ]] && break
+            [[ -z "$f" ]] && continue
+            local relpath="${f#"$PROJECT_ROOT"/}"
+            code_samples+="=== ${relpath} (first 50 lines) ===
+$(head -50 "$f" 2>/dev/null)
+
+"
+            sample_count=$((sample_count + 1))
+        done < <(find "$PROJECT_ROOT/src" "$PROJECT_ROOT/app" "$PROJECT_ROOT/lib" \
+            \( -name '*.ts' -o -name '*.js' -o -name '*.py' -o -name '*.go' -o -name '*.rs' \) \
+            -not -path "*/node_modules/*" 2>/dev/null | head -3)
+    fi
+
+    # Sample route files if routes detected
+    local route_samples=""
+    if $HAS_ROUTES; then
+        local route_count=0
+        local f
+        while IFS= read -r f; do
+            [[ $route_count -ge 2 ]] && break
+            [[ -z "$f" ]] && continue
+            local relpath="${f#"$PROJECT_ROOT"/}"
+            route_samples+="=== ${relpath} (first 40 lines) ===
+$(head -40 "$f" 2>/dev/null)
+
+"
+            route_count=$((route_count + 1))
+        done < <(find "$PROJECT_ROOT/src" "$PROJECT_ROOT/app" "$PROJECT_ROOT/routes" "$PROJECT_ROOT/lib" \
+            \( -name '*route*' -o -name '*controller*' -o -name '*handler*' -o -name '*endpoint*' \) \
+            -not -path "*/node_modules/*" 2>/dev/null | head -2)
+    fi
+
+    # Sample style from up to 10 source files (first 20 lines each)
+    local style_samples=""
+    local style_count=0
+    local f
+    while IFS= read -r f; do
+        [[ $style_count -ge 10 ]] && break
+        [[ -z "$f" ]] && continue
+        local relpath="${f#"$PROJECT_ROOT"/}"
+        style_samples+="=== ${relpath} (first 20 lines) ===
+$(head -20 "$f" 2>/dev/null)
+
+"
+        style_count=$((style_count + 1))
+    done < <(find "$PROJECT_ROOT/src" "$PROJECT_ROOT/app" "$PROJECT_ROOT/lib" \
+        \( -name '*.ts' -o -name '*.js' -o -name '*.py' -o -name '*.go' -o -name '*.rs' -o -name '*.rb' -o -name '*.java' \) \
+        -not -path "*/node_modules/*" -not -path "*/.git/*" 2>/dev/null | head -10)
+
+    [[ -z "$dep_info" && -z "$code_samples" && -z "$style_samples" ]] && return 0
+
+    local prompt
+    prompt="Analyze this project and respond in EXACTLY this format (one value per line, no extra text):
+PRIMARY_LANGUAGE: <language>
+FRAMEWORK: <framework or none>
+ARCHITECTURE: <monolith|microservice|serverless|CLI|library>
+TEST_FRAMEWORK: <test framework or unknown>
+CI_SYSTEM: <CI system or unknown>
+IMPORT_STYLE: <ESM|CJS|mixed|N/A>
+NAMING: <camelCase|snake_case|PascalCase|kebab-case|mixed>
+SEMICOLONS: <yes|no|N/A>
+QUOTE_STYLE: <single|double|mixed|N/A>
+INDENT: <spaces-2|spaces-4|tabs|mixed>
+ROUTE_STYLE: <description of routing pattern or none>
+DB_PATTERN: <description of database access pattern or none>
+
+Detected so far by grep:
+${grep_results}
+
+Dependencies:
+${dep_info}
+Code samples:
+${code_samples}
+${route_samples:+Route files:
+${route_samples}}
+Style samples (analyze imports, naming, code style):
+${style_samples}"
+
+    local analysis
+    analysis=$(claude --print "$prompt" 2>/dev/null || true)
+
+    [[ -z "$analysis" ]] && { warn "Smart detection returned empty — using grep results"; return 0; }
+
+    # Parse and enrich (only override gaps — grep results take priority)
+    local smart_val
+
+    smart_val=$(echo "$analysis" | grep "^FRAMEWORK:" | sed 's/^FRAMEWORK:[[:space:]]*//' | head -1)
+    if [[ -n "$smart_val" && "$smart_val" != "none" && "$smart_val" != "unknown" && -z "$FRAMEWORK" ]]; then
+        FRAMEWORK="$smart_val"
+    fi
+
+    smart_val=$(echo "$analysis" | grep "^TEST_FRAMEWORK:" | sed 's/^TEST_FRAMEWORK:[[:space:]]*//' | head -1)
+    if [[ -n "$smart_val" && "$smart_val" != "unknown" && -z "$TEST_FRAMEWORK" ]]; then
+        TEST_FRAMEWORK="$smart_val"
+    fi
+
+    smart_val=$(echo "$analysis" | grep "^IMPORT_STYLE:" | sed 's/^IMPORT_STYLE:[[:space:]]*//' | head -1)
+    if [[ -n "$smart_val" && "$smart_val" != "N/A" ]]; then
+        case "$smart_val" in
+            ESM)   IMPORT_STYLE="ES modules (import/export)" ;;
+            CJS)   IMPORT_STYLE="CommonJS (require/module.exports)" ;;
+            mixed) IMPORT_STYLE="Mixed (ESM + CJS)" ;;
+        esac
+    fi
+
+    smart_val=$(echo "$analysis" | grep "^NAMING:" | sed 's/^NAMING:[[:space:]]*//' | head -1)
+    if [[ -n "$smart_val" && "$smart_val" != "mixed" && "$smart_val" != "unknown" ]]; then
+        NAMING_CONVENTION="$smart_val"
+    fi
+
+    smart_val=$(echo "$analysis" | grep "^ARCHITECTURE:" | sed 's/^ARCHITECTURE:[[:space:]]*//' | head -1)
+    ARCHITECTURE_PATTERN="${smart_val:-}"
+
+    smart_val=$(echo "$analysis" | grep "^ROUTE_STYLE:" | sed 's/^ROUTE_STYLE:[[:space:]]*//' | head -1)
+    if [[ -n "$smart_val" && "$smart_val" != "none" && -z "$ROUTE_PATTERNS" ]]; then
+        HAS_ROUTES=true
+        ROUTE_PATTERNS="$smart_val"
+    fi
+
+    smart_val=$(echo "$analysis" | grep "^DB_PATTERN:" | sed 's/^DB_PATTERN:[[:space:]]*//' | head -1)
+    if [[ -n "$smart_val" && "$smart_val" != "none" && -z "$DB_PATTERNS" ]]; then
+        HAS_DB=true
+        DB_PATTERNS="$smart_val"
+    fi
+
+    SEMICOLONS=$(echo "$analysis" | grep "^SEMICOLONS:" | sed 's/^SEMICOLONS:[[:space:]]*//' | head -1)
+    QUOTE_STYLE=$(echo "$analysis" | grep "^QUOTE_STYLE:" | sed 's/^QUOTE_STYLE:[[:space:]]*//' | head -1)
+    INDENT_STYLE=$(echo "$analysis" | grep "^INDENT:" | sed 's/^INDENT:[[:space:]]*//' | head -1)
+
+    success "Smart detection: ${ARCHITECTURE_PATTERN:-unknown} architecture${FRAMEWORK:+, ${FRAMEWORK}}"
+}
+
+# ─── prep_learn_patterns — Record detected patterns per repo ──────────────
+
+prep_learn_patterns() {
+    intelligence_available || return 0
+
+    local repo_hash
+    repo_hash=$(echo "$PROJECT_ROOT" | md5 2>/dev/null || echo "$PROJECT_ROOT" | md5sum 2>/dev/null | awk '{print $1}' || echo "default")
+
+    local baselines_dir="${HOME}/.shipwright/baselines/${repo_hash}"
+    mkdir -p "$baselines_dir"
+
+    local patterns_file="${baselines_dir}/file-patterns.json"
+
+    # Detect test file patterns present in this repo
+    local test_patterns="[]"
+    if find "$PROJECT_ROOT" -name "*.test.*" -not -path "*/node_modules/*" -not -path "*/.git/*" 2>/dev/null | head -1 | grep -q .; then
+        test_patterns=$(echo "$test_patterns" | jq '. + ["*.test.*"]')
+    fi
+    if find "$PROJECT_ROOT" -name "*.spec.*" -not -path "*/node_modules/*" -not -path "*/.git/*" 2>/dev/null | head -1 | grep -q .; then
+        test_patterns=$(echo "$test_patterns" | jq '. + ["*.spec.*"]')
+    fi
+    if find "$PROJECT_ROOT" -name "*_test.*" -not -path "*/node_modules/*" -not -path "*/.git/*" 2>/dev/null | head -1 | grep -q .; then
+        test_patterns=$(echo "$test_patterns" | jq '. + ["*_test.*"]')
+    fi
+    if find "$PROJECT_ROOT" -name "test_*" -not -path "*/node_modules/*" -not -path "*/.git/*" 2>/dev/null | head -1 | grep -q .; then
+        test_patterns=$(echo "$test_patterns" | jq '. + ["test_*"]')
+    fi
+
+    # Build config file list
+    local config_json="[]"
+    local f
+    for f in $CONFIG_FILES; do
+        config_json=$(echo "$config_json" | jq --arg f "$f" '. + [$f]')
+    done
+
+    # Build entry points list
+    local entry_json="[]"
+    for f in $ENTRY_POINTS; do
+        entry_json=$(echo "$entry_json" | jq --arg f "$f" '. + [$f]')
+    done
+
+    # Write patterns file atomically
+    local tmp_patterns
+    tmp_patterns=$(mktemp)
+    jq -n \
+        --arg ts "$(date -u +"%Y-%m-%dT%H:%M:%SZ")" \
+        --arg lang "${LANG_DETECTED:-}" \
+        --arg framework "${FRAMEWORK:-}" \
+        --arg naming "${NAMING_CONVENTION:-}" \
+        --arg imports "${IMPORT_STYLE:-}" \
+        --arg arch "${ARCHITECTURE_PATTERN:-}" \
+        --argjson test_patterns "$test_patterns" \
+        --argjson config_files "$config_json" \
+        --argjson entry_points "$entry_json" \
+        '{
+            updated_at: $ts,
+            language: $lang,
+            framework: $framework,
+            architecture: $arch,
+            naming_convention: $naming,
+            import_style: $imports,
+            test_file_patterns: $test_patterns,
+            config_files: $config_files,
+            entry_points: $entry_points
+        }' > "$tmp_patterns" 2>/dev/null && mv "$tmp_patterns" "$patterns_file" || rm -f "$tmp_patterns"
+
+    success "Learned file patterns → ${patterns_file##"$HOME"/}"
 }
 
 # ─── prep_generate_claude_md ────────────────────────────────────────────────
@@ -1344,6 +1613,10 @@ main() {
     prep_detect_stack
     prep_scan_structure
     prep_extract_patterns
+
+    # Smart detection (intelligence-gated)
+    prep_smart_detect
+    prep_learn_patterns
 
     # Generation
     prep_generate_claude_md

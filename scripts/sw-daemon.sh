@@ -402,6 +402,10 @@ load_config() {
     PREDICTION_ENABLED=$(jq -r '.intelligence.prediction_enabled // false' "$config_file")
     ANOMALY_THRESHOLD=$(jq -r '.intelligence.anomaly_threshold // 3.0' "$config_file")
 
+    # adaptive thresholds (intelligence-driven operational tuning)
+    ADAPTIVE_THRESHOLDS_ENABLED=$(jq -r '.intelligence.adaptive_enabled // false' "$config_file")
+    PRIORITY_STRATEGY=$(jq -r '.intelligence.priority_strategy // "quick-wins-first"' "$config_file")
+
     # gh_retry: enable retry wrapper on critical GitHub API calls
     GH_RETRY_ENABLED=$(jq -r '.gh_retry // true' "$config_file")
 
@@ -455,6 +459,338 @@ setup_dirs() {
     WORKTREE_DIR=".worktrees"
 
     mkdir -p "$LOG_DIR"
+}
+
+# ─── Adaptive Threshold Helpers ──────────────────────────────────────────────
+# When intelligence.adaptive_enabled=true, operational thresholds are learned
+# from historical data instead of using fixed defaults.
+# Every function falls back to the current hardcoded value when no data exists.
+
+ADAPTIVE_THRESHOLDS_ENABLED="${ADAPTIVE_THRESHOLDS_ENABLED:-false}"
+PRIORITY_STRATEGY="${PRIORITY_STRATEGY:-quick-wins-first}"
+EMPTY_QUEUE_CYCLES=0
+
+# Adapt poll interval based on queue state
+# Empty queue 5+ cycles → 120s; queue has items → 30s; processing → 60s
+get_adaptive_poll_interval() {
+    local queue_depth="$1"
+    local active_count="$2"
+
+    if [[ "${ADAPTIVE_THRESHOLDS_ENABLED:-false}" != "true" ]]; then
+        echo "$POLL_INTERVAL"
+        return
+    fi
+
+    if [[ "$queue_depth" -eq 0 && "$active_count" -eq 0 ]]; then
+        EMPTY_QUEUE_CYCLES=$((EMPTY_QUEUE_CYCLES + 1))
+    else
+        EMPTY_QUEUE_CYCLES=0
+    fi
+
+    local interval="$POLL_INTERVAL"
+    if [[ "$EMPTY_QUEUE_CYCLES" -ge 5 ]]; then
+        interval=120
+    elif [[ "$queue_depth" -gt 0 ]]; then
+        interval=30
+    else
+        interval=60
+    fi
+
+    # Persist current setting for dashboard visibility
+    local tuning_file="$HOME/.shipwright/optimization/daemon-tuning.json"
+    mkdir -p "$HOME/.shipwright/optimization"
+    local tmp_tuning="${tuning_file}.tmp.$$"
+    if [[ -f "$tuning_file" ]]; then
+        jq --argjson pi "$interval" --argjson eqc "$EMPTY_QUEUE_CYCLES" \
+            '.poll_interval = $pi | .empty_queue_cycles = $eqc' \
+            "$tuning_file" > "$tmp_tuning" 2>/dev/null && mv "$tmp_tuning" "$tuning_file"
+    else
+        jq -n --argjson pi "$interval" --argjson eqc "$EMPTY_QUEUE_CYCLES" \
+            '{poll_interval: $pi, empty_queue_cycles: $eqc}' > "$tmp_tuning" \
+            && mv "$tmp_tuning" "$tuning_file"
+    fi
+
+    echo "$interval"
+}
+
+# Rolling average cost per template from costs.json (last 10 runs)
+get_adaptive_cost_estimate() {
+    local template="${1:-autonomous}"
+
+    if [[ "${ADAPTIVE_THRESHOLDS_ENABLED:-false}" != "true" ]]; then
+        echo "$EST_COST_PER_JOB"
+        return
+    fi
+
+    local costs_file="$HOME/.shipwright/costs.json"
+    if [[ ! -f "$costs_file" ]]; then
+        echo "$EST_COST_PER_JOB"
+        return
+    fi
+
+    local avg_cost
+    avg_cost=$(jq -r --arg tpl "$template" '
+        [.sessions // [] | .[] | select(.template == $tpl) | .total_cost_usd // 0] |
+        .[-10:] | if length > 0 then (add / length) else null end
+    ' "$costs_file" 2>/dev/null || echo "")
+
+    if [[ -n "$avg_cost" && "$avg_cost" != "null" && "$avg_cost" != "0" ]]; then
+        echo "$avg_cost"
+    else
+        echo "$EST_COST_PER_JOB"
+    fi
+}
+
+# Per-stage adaptive heartbeat timeout from learned stage durations
+get_adaptive_heartbeat_timeout() {
+    local stage="${1:-unknown}"
+
+    if [[ "${ADAPTIVE_THRESHOLDS_ENABLED:-false}" != "true" ]]; then
+        echo "${HEALTH_HEARTBEAT_TIMEOUT:-120}"
+        return
+    fi
+
+    # Stage-specific defaults (used when no learned data)
+    local default_timeout="${HEALTH_HEARTBEAT_TIMEOUT:-120}"
+    case "$stage" in
+        build)  default_timeout=300 ;;
+        test)   default_timeout=180 ;;
+        review|compound_quality) default_timeout=180 ;;
+        lint|format|intake|plan|design) default_timeout=60 ;;
+    esac
+
+    local durations_file="$HOME/.shipwright/optimization/stage-durations.json"
+    if [[ ! -f "$durations_file" ]]; then
+        echo "$default_timeout"
+        return
+    fi
+
+    local learned_duration
+    learned_duration=$(jq -r --arg s "$stage" \
+        '.stages[$s].p90_duration_s // 0' "$durations_file" 2>/dev/null || echo "0")
+
+    if [[ "$learned_duration" -gt 0 ]]; then
+        # 150% of p90 duration, floor of 60s
+        local adaptive_timeout=$(( (learned_duration * 3) / 2 ))
+        [[ "$adaptive_timeout" -lt 60 ]] && adaptive_timeout=60
+        echo "$adaptive_timeout"
+    else
+        echo "$default_timeout"
+    fi
+}
+
+# Adaptive stale pipeline timeout using 95th percentile of historical durations
+get_adaptive_stale_timeout() {
+    local template="${1:-autonomous}"
+
+    if [[ "${ADAPTIVE_THRESHOLDS_ENABLED:-false}" != "true" ]]; then
+        echo "${HEALTH_STALE_TIMEOUT:-1800}"
+        return
+    fi
+
+    local durations_file="$HOME/.shipwright/optimization/pipeline-durations.json"
+    if [[ ! -f "$durations_file" ]]; then
+        echo "${HEALTH_STALE_TIMEOUT:-1800}"
+        return
+    fi
+
+    local p95_duration
+    p95_duration=$(jq -r --arg tpl "$template" \
+        '.templates[$tpl].p95_duration_s // 0' "$durations_file" 2>/dev/null || echo "0")
+
+    if [[ "$p95_duration" -gt 0 ]]; then
+        # 1.5x safety margin, clamped 600s-7200s
+        local adaptive_timeout=$(( (p95_duration * 3) / 2 ))
+        [[ "$adaptive_timeout" -lt 600 ]] && adaptive_timeout=600
+        [[ "$adaptive_timeout" -gt 7200 ]] && adaptive_timeout=7200
+        echo "$adaptive_timeout"
+    else
+        echo "${HEALTH_STALE_TIMEOUT:-1800}"
+    fi
+}
+
+# Record pipeline duration for future threshold learning
+record_pipeline_duration() {
+    local template="$1" duration_s="$2" result="$3"
+
+    if [[ "${ADAPTIVE_THRESHOLDS_ENABLED:-false}" != "true" ]]; then
+        return
+    fi
+    [[ ! "$duration_s" =~ ^[0-9]+$ ]] && return
+
+    local durations_file="$HOME/.shipwright/optimization/pipeline-durations.json"
+    mkdir -p "$HOME/.shipwright/optimization"
+
+    if [[ ! -f "$durations_file" ]]; then
+        echo '{"templates":{}}' > "$durations_file"
+    fi
+
+    local tmp_dur="${durations_file}.tmp.$$"
+    jq --arg tpl "$template" --argjson dur "$duration_s" --arg res "$result" --arg ts "$(now_iso)" '
+        .templates[$tpl] = (
+            (.templates[$tpl] // {durations: [], p95_duration_s: 0}) |
+            .durations = ((.durations + [{duration_s: $dur, result: $res, ts: $ts}]) | .[-50:]) |
+            .p95_duration_s = (
+                [.durations[].duration_s] | sort |
+                if length > 0 then .[((length * 95 / 100) | floor)] else 0 end
+            )
+        )
+    ' "$durations_file" > "$tmp_dur" 2>/dev/null && mv "$tmp_dur" "$durations_file"
+}
+
+# Learn actual worker memory from peak RSS of pipeline processes
+learn_worker_memory() {
+    if [[ "${ADAPTIVE_THRESHOLDS_ENABLED:-false}" != "true" ]]; then
+        return
+    fi
+    if [[ ! -f "$STATE_FILE" ]]; then
+        return
+    fi
+
+    local total_rss=0
+    local process_count=0
+
+    while IFS= read -r job; do
+        local pid
+        pid=$(echo "$job" | jq -r '.pid')
+        if kill -0 "$pid" 2>/dev/null; then
+            local rss_kb
+            rss_kb=$(ps -o rss= -p "$pid" 2>/dev/null | tr -d ' ' || echo "0")
+            [[ ! "$rss_kb" =~ ^[0-9]+$ ]] && rss_kb=0
+            if [[ "$rss_kb" -gt 0 ]]; then
+                total_rss=$((total_rss + rss_kb))
+                process_count=$((process_count + 1))
+            fi
+        fi
+    done < <(jq -c '.active_jobs[]' "$STATE_FILE" 2>/dev/null || true)
+
+    if [[ "$process_count" -gt 0 ]]; then
+        local avg_rss_gb=$(( total_rss / process_count / 1048576 ))
+        # 125% headroom, minimum 1GB, max 16GB
+        local learned_mem_gb=$(( (avg_rss_gb * 5 + 3) / 4 ))
+        [[ "$learned_mem_gb" -lt 1 ]] && learned_mem_gb=1
+        [[ "$learned_mem_gb" -gt 16 ]] && learned_mem_gb=16
+
+        local tuning_file="$HOME/.shipwright/optimization/daemon-tuning.json"
+        mkdir -p "$HOME/.shipwright/optimization"
+        local tmp_tuning="${tuning_file}.tmp.$$"
+        if [[ -f "$tuning_file" ]]; then
+            jq --argjson mem "$learned_mem_gb" --argjson rss "$total_rss" --argjson cnt "$process_count" \
+                '.learned_worker_mem_gb = $mem | .last_rss_total_kb = $rss | .last_rss_process_count = $cnt' \
+                "$tuning_file" > "$tmp_tuning" 2>/dev/null && mv "$tmp_tuning" "$tuning_file"
+        else
+            jq -n --argjson mem "$learned_mem_gb" \
+                '{learned_worker_mem_gb: $mem}' > "$tmp_tuning" && mv "$tmp_tuning" "$tuning_file"
+        fi
+
+        WORKER_MEM_GB="$learned_mem_gb"
+    fi
+}
+
+# Record scaling outcome for learning optimal parallelism
+record_scaling_outcome() {
+    local parallelism="$1" result="$2"
+
+    if [[ "${ADAPTIVE_THRESHOLDS_ENABLED:-false}" != "true" ]]; then
+        return
+    fi
+
+    local tuning_file="$HOME/.shipwright/optimization/daemon-tuning.json"
+    mkdir -p "$HOME/.shipwright/optimization"
+    local tmp_tuning="${tuning_file}.tmp.$$"
+    if [[ -f "$tuning_file" ]]; then
+        jq --argjson p "$parallelism" --arg r "$result" --arg ts "$(now_iso)" '
+            .scaling_history = ((.scaling_history // []) + [{parallelism: $p, result: $r, ts: $ts}]) |
+            .scaling_history |= .[-50:]
+        ' "$tuning_file" > "$tmp_tuning" 2>/dev/null && mv "$tmp_tuning" "$tuning_file"
+    else
+        jq -n --argjson p "$parallelism" --arg r "$result" --arg ts "$(now_iso)" '
+            {scaling_history: [{parallelism: $p, result: $r, ts: $ts}]}
+        ' > "$tmp_tuning" && mv "$tmp_tuning" "$tuning_file"
+    fi
+}
+
+# Get success rate at a given parallelism level (for gradual scaling decisions)
+get_success_rate_at_parallelism() {
+    local target_parallelism="$1"
+
+    local tuning_file="$HOME/.shipwright/optimization/daemon-tuning.json"
+    if [[ ! -f "$tuning_file" ]]; then
+        echo "100"
+        return
+    fi
+
+    local rate
+    rate=$(jq -r --argjson p "$target_parallelism" '
+        [.scaling_history // [] | .[] | select(.parallelism == $p)] |
+        if length > 0 then
+            ([.[] | select(.result == "success")] | length) * 100 / length | floor
+        else 100 end
+    ' "$tuning_file" 2>/dev/null || echo "100")
+
+    echo "${rate:-100}"
+}
+
+# Adapt patrol limits based on hit rate
+adapt_patrol_limits() {
+    local findings="$1" max_issues="$2"
+
+    if [[ "${ADAPTIVE_THRESHOLDS_ENABLED:-false}" != "true" ]]; then
+        return
+    fi
+
+    local tuning_file="$HOME/.shipwright/optimization/daemon-tuning.json"
+    mkdir -p "$HOME/.shipwright/optimization"
+
+    local new_max="$max_issues"
+    if [[ "$findings" -ge "$max_issues" ]]; then
+        # Consistently hitting limit — increase
+        new_max=$((max_issues + 2))
+        [[ "$new_max" -gt 20 ]] && new_max=20
+    elif [[ "$findings" -eq 0 ]]; then
+        # Finds nothing — reduce
+        if [[ "$max_issues" -gt 3 ]]; then
+            new_max=$((max_issues - 1))
+        else
+            new_max=3
+        fi
+    fi
+
+    local tmp_tuning="${tuning_file}.tmp.$$"
+    if [[ -f "$tuning_file" ]]; then
+        jq --argjson pm "$new_max" --argjson lf "$findings" --arg ts "$(now_iso)" \
+            '.patrol_max_issues = $pm | .last_patrol_findings = $lf | .patrol_adapted_at = $ts' \
+            "$tuning_file" > "$tmp_tuning" 2>/dev/null && mv "$tmp_tuning" "$tuning_file"
+    else
+        jq -n --argjson pm "$new_max" --argjson lf "$findings" --arg ts "$(now_iso)" \
+            '{patrol_max_issues: $pm, last_patrol_findings: $lf, patrol_adapted_at: $ts}' \
+            > "$tmp_tuning" && mv "$tmp_tuning" "$tuning_file"
+    fi
+}
+
+# Load adaptive patrol limits from tuning config
+load_adaptive_patrol_limits() {
+    if [[ "${ADAPTIVE_THRESHOLDS_ENABLED:-false}" != "true" ]]; then
+        return
+    fi
+
+    local tuning_file="$HOME/.shipwright/optimization/daemon-tuning.json"
+    if [[ ! -f "$tuning_file" ]]; then
+        return
+    fi
+
+    local adaptive_max_issues
+    adaptive_max_issues=$(jq -r '.patrol_max_issues // 0' "$tuning_file" 2>/dev/null || echo "0")
+    if [[ "$adaptive_max_issues" -gt 0 ]]; then
+        PATROL_MAX_ISSUES="$adaptive_max_issues"
+    fi
+}
+
+# Extract dependency issue numbers from issue text
+extract_issue_dependencies() {
+    local text="$1"
+
+    echo "$text" | grep -oE '(depends on|blocked by|after) #[0-9]+' | grep -oE '#[0-9]+' | sort -u || true
 }
 
 # ─── Logging ─────────────────────────────────────────────────────────────────
@@ -1182,6 +1518,21 @@ daemon_on_success() {
 
     daemon_log SUCCESS "Pipeline completed for issue #${issue_num} (${duration:-unknown})"
 
+    # Record pipeline duration for adaptive threshold learning
+    if [[ -n "$duration" && "$duration" != "unknown" ]]; then
+        # Parse duration string back to seconds (e.g. "5m 30s" → 330)
+        local dur_secs=0
+        local _h _m _s
+        _h=$(echo "$duration" | grep -oE '[0-9]+h' | grep -oE '[0-9]+' || true)
+        _m=$(echo "$duration" | grep -oE '[0-9]+m' | grep -oE '[0-9]+' || true)
+        _s=$(echo "$duration" | grep -oE '[0-9]+s' | grep -oE '[0-9]+' || true)
+        dur_secs=$(( ${_h:-0} * 3600 + ${_m:-0} * 60 + ${_s:-0} ))
+        if [[ "$dur_secs" -gt 0 ]]; then
+            record_pipeline_duration "$PIPELINE_TEMPLATE" "$dur_secs" "success"
+            record_scaling_outcome "$MAX_PARALLEL" "success"
+        fi
+    fi
+
     # Record in completed list + clear retry count for this issue
     locked_state_update \
         --argjson num "$issue_num" \
@@ -1231,6 +1582,20 @@ daemon_on_failure() {
     local issue_num="$1" exit_code="${2:-1}" duration="${3:-}"
 
     daemon_log ERROR "Pipeline failed for issue #${issue_num} (exit: ${exit_code}, ${duration:-unknown})"
+
+    # Record pipeline duration for adaptive threshold learning
+    if [[ -n "$duration" && "$duration" != "unknown" ]]; then
+        local dur_secs=0
+        local _h _m _s
+        _h=$(echo "$duration" | grep -oE '[0-9]+h' | grep -oE '[0-9]+' || true)
+        _m=$(echo "$duration" | grep -oE '[0-9]+m' | grep -oE '[0-9]+' || true)
+        _s=$(echo "$duration" | grep -oE '[0-9]+s' | grep -oE '[0-9]+' || true)
+        dur_secs=$(( ${_h:-0} * 3600 + ${_m:-0} * 60 + ${_s:-0} ))
+        if [[ "$dur_secs" -gt 0 ]]; then
+            record_pipeline_duration "$PIPELINE_TEMPLATE" "$dur_secs" "failure"
+            record_scaling_outcome "$MAX_PARALLEL" "failure"
+        fi
+    fi
 
     # Record in completed list
     locked_state_update \
@@ -1398,6 +1763,7 @@ triage_score_issue() {
 
     # ── Intelligence-powered triage (if enabled) ──
     if [[ "${INTELLIGENCE_ENABLED:-false}" == "true" ]] && type intelligence_analyze_issue &>/dev/null 2>&1; then
+        daemon_log INFO "Intelligence: using AI triage (intelligence enabled)"
         local analysis
         analysis=$(intelligence_analyze_issue "$issue_json" 2>/dev/null || echo "")
         if [[ -n "$analysis" && "$analysis" != "{}" && "$analysis" != "null" ]]; then
@@ -1436,6 +1802,9 @@ triage_score_issue() {
             return
         fi
         # Fall through to heuristic scoring if intelligence call failed
+        daemon_log INFO "Intelligence: AI triage failed, falling back to heuristic scoring"
+    else
+        daemon_log INFO "Intelligence: using heuristic triage (intelligence disabled, enable with intelligence.enabled=true)"
     fi
     labels_csv=$(echo "$issue_json" | jq -r '[.labels[].name] | join(",")')
     created_at=$(echo "$issue_json" | jq -r '.createdAt // ""')
@@ -1584,6 +1953,7 @@ select_pipeline_template() {
 
     # ── Intelligence-composed pipeline (if enabled) ──
     if [[ "${COMPOSER_ENABLED:-false}" == "true" ]] && type composer_create_pipeline &>/dev/null 2>&1; then
+        daemon_log INFO "Intelligence: using AI pipeline composition (composer enabled)"
         local analysis="${INTELLIGENCE_ANALYSIS:-{}}"
         local repo_context=""
         if [[ -f "${REPO_DIR:-}/.claude/pipeline-state.md" ]]; then
@@ -1605,6 +1975,9 @@ select_pipeline_template() {
             return
         fi
         # Fall through to static selection if composition failed
+        daemon_log INFO "Intelligence: AI pipeline composition failed, falling back to static template selection"
+    else
+        daemon_log INFO "Intelligence: using static template selection (composer disabled, enable with intelligence.composer_enabled=true)"
     fi
 
     # ── Label-based overrides (highest priority) ──
@@ -2579,55 +2952,106 @@ Auto-detected by \`shipwright daemon patrol\` on $(now_iso)." \
         daemon_log INFO "Patrol: found retry exhaustion pattern (${exhausted_count} in 7 days)"
     }
 
-    # ── Run all patrol checks ──
+    # ── Stage 1: Run all grep-based patrol checks (fast pre-filter) ──
+    local patrol_findings_summary=""
+    local pre_check_findings=0
+
     echo -e "  ${BOLD}Security Audit${RESET}"
+    pre_check_findings=$total_findings
     patrol_security_audit
+    if [[ "$total_findings" -gt "$pre_check_findings" ]]; then
+        patrol_findings_summary="${patrol_findings_summary}security: $((total_findings - pre_check_findings)) finding(s); "
+    fi
     echo ""
 
     echo -e "  ${BOLD}Stale Dependencies${RESET}"
+    pre_check_findings=$total_findings
     patrol_stale_dependencies
+    if [[ "$total_findings" -gt "$pre_check_findings" ]]; then
+        patrol_findings_summary="${patrol_findings_summary}stale_deps: $((total_findings - pre_check_findings)) finding(s); "
+    fi
     echo ""
 
     echo -e "  ${BOLD}Dead Code Detection${RESET}"
+    pre_check_findings=$total_findings
     patrol_dead_code
+    if [[ "$total_findings" -gt "$pre_check_findings" ]]; then
+        patrol_findings_summary="${patrol_findings_summary}dead_code: $((total_findings - pre_check_findings)) finding(s); "
+    fi
     echo ""
 
     echo -e "  ${BOLD}Test Coverage Gaps${RESET}"
+    pre_check_findings=$total_findings
     patrol_coverage_gaps
+    if [[ "$total_findings" -gt "$pre_check_findings" ]]; then
+        patrol_findings_summary="${patrol_findings_summary}coverage: $((total_findings - pre_check_findings)) finding(s); "
+    fi
     echo ""
 
     echo -e "  ${BOLD}Documentation Staleness${RESET}"
+    pre_check_findings=$total_findings
     patrol_doc_staleness
+    if [[ "$total_findings" -gt "$pre_check_findings" ]]; then
+        patrol_findings_summary="${patrol_findings_summary}docs: $((total_findings - pre_check_findings)) finding(s); "
+    fi
     echo ""
 
     echo -e "  ${BOLD}Performance Baseline${RESET}"
+    pre_check_findings=$total_findings
     patrol_performance_baseline
+    if [[ "$total_findings" -gt "$pre_check_findings" ]]; then
+        patrol_findings_summary="${patrol_findings_summary}performance: $((total_findings - pre_check_findings)) finding(s); "
+    fi
     echo ""
 
     echo -e "  ${BOLD}Recurring Failures${RESET}"
+    pre_check_findings=$total_findings
     patrol_recurring_failures
+    if [[ "$total_findings" -gt "$pre_check_findings" ]]; then
+        patrol_findings_summary="${patrol_findings_summary}recurring_failures: $((total_findings - pre_check_findings)) finding(s); "
+    fi
     echo ""
 
     echo -e "  ${BOLD}DORA Degradation${RESET}"
+    pre_check_findings=$total_findings
     patrol_dora_degradation
+    if [[ "$total_findings" -gt "$pre_check_findings" ]]; then
+        patrol_findings_summary="${patrol_findings_summary}dora: $((total_findings - pre_check_findings)) finding(s); "
+    fi
     echo ""
 
     echo -e "  ${BOLD}Untested Scripts${RESET}"
+    pre_check_findings=$total_findings
     patrol_untested_scripts
+    if [[ "$total_findings" -gt "$pre_check_findings" ]]; then
+        patrol_findings_summary="${patrol_findings_summary}untested: $((total_findings - pre_check_findings)) finding(s); "
+    fi
     echo ""
 
     echo -e "  ${BOLD}Retry Exhaustion${RESET}"
+    pre_check_findings=$total_findings
     patrol_retry_exhaustion
+    if [[ "$total_findings" -gt "$pre_check_findings" ]]; then
+        patrol_findings_summary="${patrol_findings_summary}retry_exhaustion: $((total_findings - pre_check_findings)) finding(s); "
+    fi
     echo ""
 
-    # ── AI-Powered Deep Analysis (if enabled) ──
+    # ── Stage 2: AI-Powered Confirmation (if enabled) ──
     if [[ "${PREDICTION_ENABLED:-false}" == "true" ]] && type patrol_ai_analyze &>/dev/null 2>&1; then
+        daemon_log INFO "Intelligence: using AI patrol analysis (prediction enabled)"
         echo -e "  ${BOLD}AI Deep Analysis${RESET}"
         # Sample recent source files for AI analysis
         local sample_files=""
         local git_log_recent=""
         sample_files=$(git diff --name-only HEAD~5 2>/dev/null | head -10 | tr '\n' ',' || echo "")
         git_log_recent=$(git log --oneline -10 2>/dev/null || echo "")
+        # Include grep-based findings summary as context for AI confirmation
+        if [[ -n "$patrol_findings_summary" ]]; then
+            git_log_recent="${git_log_recent}
+
+Patrol pre-filter findings to confirm: ${patrol_findings_summary}"
+            daemon_log INFO "Patrol: passing ${total_findings} grep findings to AI for confirmation"
+        fi
         if [[ -n "$sample_files" ]]; then
             local ai_findings
             ai_findings=$(patrol_ai_analyze "$sample_files" "$git_log_recent" 2>/dev/null || echo "[]")
@@ -2636,13 +3060,15 @@ Auto-detected by \`shipwright daemon patrol\` on $(now_iso)." \
                 ai_count=$(echo "$ai_findings" | jq 'length' 2>/dev/null || echo "0")
                 ai_count=${ai_count:-0}
                 total_findings=$((total_findings + ai_count))
-                echo -e "    ${CYAN}●${RESET} AI found ${ai_count} additional finding(s)"
-                emit_event "patrol.ai_analysis" "findings=$ai_count"
+                echo -e "    ${CYAN}●${RESET} AI confirmed findings + found ${ai_count} additional issue(s)"
+                emit_event "patrol.ai_analysis" "findings=$ai_count" "grep_findings=${patrol_findings_summary:-none}"
             else
-                echo -e "    ${GREEN}●${RESET} AI analysis: no additional findings"
+                echo -e "    ${GREEN}●${RESET} AI analysis: grep findings confirmed, no additional issues"
             fi
         fi
         echo ""
+    else
+        daemon_log INFO "Intelligence: using grep-only patrol (prediction disabled, enable with intelligence.prediction_enabled=true)"
     fi
 
     # ── Meta Self-Improvement Patrol ──
@@ -2664,6 +3090,9 @@ Auto-detected by \`shipwright daemon patrol\` on $(now_iso)." \
     echo ""
 
     daemon_log INFO "Patrol complete: ${total_findings} findings, ${issues_created} issues created"
+
+    # Adapt patrol limits based on hit rate
+    adapt_patrol_limits "$total_findings" "$PATROL_MAX_ISSUES"
 }
 
 # ─── Poll Issues ─────────────────────────────────────────────────────────────
@@ -2763,6 +3192,7 @@ daemon_poll_issues() {
 
     # Score each issue using intelligent triage and sort by descending score
     local scored_issues=()
+    local dep_graph=""  # "issue:dep1,dep2" entries for dependency ordering
     while IFS= read -r issue; do
         local num score
         num=$(echo "$issue" | jq -r '.number')
@@ -2773,11 +3203,82 @@ daemon_poll_issues() {
             repo_name=$(echo "$issue" | jq -r '.repository.nameWithOwner // ""')
         fi
         scored_issues+=("${score}|${num}|${repo_name}")
+
+        # Issue dependency detection (adaptive: extract "depends on #X", "blocked by #X")
+        if [[ "${ADAPTIVE_THRESHOLDS_ENABLED:-false}" == "true" ]]; then
+            local issue_text
+            issue_text=$(echo "$issue" | jq -r '(.title // "") + " " + (.body // "")')
+            local deps
+            deps=$(extract_issue_dependencies "$issue_text")
+            if [[ -n "$deps" ]]; then
+                local dep_nums
+                dep_nums=$(echo "$deps" | tr -d '#' | tr '\n' ',' | sed 's/,$//')
+                dep_graph="${dep_graph}${num}:${dep_nums}\n"
+                daemon_log INFO "Issue #${num} depends on: ${deps//$'\n'/, }"
+            fi
+        fi
     done < <(echo "$issues_json" | jq -c '.[]')
 
-    # Sort by score descending
+    # Sort by score — strategy determines ascending vs descending
     local sorted_order
-    sorted_order=$(printf '%s\n' "${scored_issues[@]}" | sort -t'|' -k1 -rn)
+    if [[ "${PRIORITY_STRATEGY:-quick-wins-first}" == "complex-first" ]]; then
+        # Complex-first: lower score (more complex) first
+        sorted_order=$(printf '%s\n' "${scored_issues[@]}" | sort -t'|' -k1 -n)
+    else
+        # Quick-wins-first (default): higher score (simpler) first
+        sorted_order=$(printf '%s\n' "${scored_issues[@]}" | sort -t'|' -k1 -rn)
+    fi
+
+    # Dependency-aware reordering: move dependencies before dependents
+    if [[ -n "$dep_graph" && "${ADAPTIVE_THRESHOLDS_ENABLED:-false}" == "true" ]]; then
+        local reordered=""
+        local scheduled=""
+        # Multiple passes to resolve transitive dependencies (max 3)
+        local pass=0
+        while [[ $pass -lt 3 ]]; do
+            local changed=false
+            local new_order=""
+            while IFS='|' read -r s_score s_num s_repo; do
+                [[ -z "$s_num" ]] && continue
+                # Check if this issue has unscheduled dependencies
+                local issue_deps
+                issue_deps=$(echo -e "$dep_graph" | grep "^${s_num}:" | head -1 | cut -d: -f2 || true)
+                if [[ -n "$issue_deps" ]]; then
+                    # Check if all deps are scheduled (or not in our issue set)
+                    local all_deps_ready=true
+                    local IFS_SAVE="$IFS"
+                    IFS=','
+                    for dep in $issue_deps; do
+                        dep="${dep## }"
+                        dep="${dep%% }"
+                        # Is this dep in our scored set and not yet scheduled?
+                        if echo "$sorted_order" | grep -q "|${dep}|" && ! echo "$scheduled" | grep -q "|${dep}|"; then
+                            all_deps_ready=false
+                            break
+                        fi
+                    done
+                    IFS="$IFS_SAVE"
+                    if [[ "$all_deps_ready" == "false" ]]; then
+                        # Defer this issue — append at end
+                        new_order="${new_order}${s_score}|${s_num}|${s_repo}\n"
+                        changed=true
+                        continue
+                    fi
+                fi
+                reordered="${reordered}${s_score}|${s_num}|${s_repo}\n"
+                scheduled="${scheduled}|${s_num}|"
+            done <<< "$sorted_order"
+            # Append deferred issues
+            reordered="${reordered}${new_order}"
+            sorted_order=$(echo -e "$reordered" | grep -v '^$')
+            reordered=""
+            scheduled=""
+            if [[ "$changed" == "false" ]]; then
+                break
+            fi
+            pass=$((pass + 1))
+        done
+    fi
 
     local active_count
     active_count=$(get_active_count)
@@ -2860,8 +3361,9 @@ daemon_poll_issues() {
 daemon_health_check() {
     local findings=0
 
-    # Stale jobs: kill processes running > timeout
-    local stale_timeout="${HEALTH_STALE_TIMEOUT:-1800}"  # default 30min
+    # Stale jobs: kill processes running > timeout (adaptive per template)
+    local stale_timeout
+    stale_timeout=$(get_adaptive_stale_timeout "$PIPELINE_TEMPLATE")
     local now_e
     now_e=$(now_epoch)
 
@@ -2884,8 +3386,7 @@ daemon_health_check() {
             fi
         done < <(jq -c '.active_jobs[]' "$STATE_FILE" 2>/dev/null)
 
-        # Heartbeat-based stale detection (more responsive than process-age check)
-        local heartbeat_timeout="${HEALTH_HEARTBEAT_TIMEOUT:-120}"
+        # Heartbeat-based stale detection (adaptive per-stage timeout)
         local heartbeat_dir="$HOME/.shipwright/heartbeats"
         if [[ -d "$heartbeat_dir" ]]; then
             while IFS= read -r job; do
@@ -2906,9 +3407,13 @@ daemon_health_check() {
                 done
 
                 if [[ -n "$hb_file" ]]; then
-                    local hb_updated hb_file_issue
+                    local hb_updated hb_file_issue hb_stage
                     hb_updated=$(jq -r '.updated_at // ""' "$hb_file" 2>/dev/null || echo "")
                     hb_file_issue=$(jq -r '.issue // ""' "$hb_file" 2>/dev/null || echo "")
+                    hb_stage=$(jq -r '.stage // "unknown"' "$hb_file" 2>/dev/null || echo "unknown")
+                    # Adaptive heartbeat timeout based on current stage
+                    local heartbeat_timeout
+                    heartbeat_timeout=$(get_adaptive_heartbeat_timeout "$hb_stage")
                     if [[ -n "$hb_updated" ]]; then
                         local hb_epoch
                         hb_epoch=$(TZ=UTC date -j -f "%Y-%m-%dT%H:%M:%SZ" "$hb_updated" +%s 2>/dev/null || date -d "$hb_updated" +%s 2>/dev/null || echo "0")
@@ -2916,8 +3421,8 @@ daemon_health_check() {
                         # Only kill if: stale AND process alive AND heartbeat issue matches tracked issue
                         # This prevents killing a new process that reused the PID of a dead pipeline
                         if [[ "$hb_age" -gt "$heartbeat_timeout" ]] && kill -0 "$hb_pid" 2>/dev/null && [[ "$hb_file_issue" == "$hb_issue" ]]; then
-                            daemon_log WARN "Heartbeat stale for issue #${hb_issue} (${hb_age}s, PID ${hb_pid})"
-                            emit_event "daemon.heartbeat_stale" "issue=$hb_issue" "age_s=$hb_age" "pid=$hb_pid"
+                            daemon_log WARN "Heartbeat stale for issue #${hb_issue} (${hb_age}s > ${heartbeat_timeout}s timeout, stage=${hb_stage}, PID ${hb_pid})"
+                            emit_event "daemon.heartbeat_stale" "issue=$hb_issue" "age_s=$hb_age" "timeout_s=$heartbeat_timeout" "stage=$hb_stage" "pid=$hb_pid"
                             kill "$hb_pid" 2>/dev/null || true
                             # Remove the stale heartbeat file to prevent re-triggering
                             rm -f "$hb_file"
@@ -3017,6 +3522,13 @@ daemon_auto_scale() {
 
     local prev_max="$MAX_PARALLEL"
 
+    # ── Learn worker memory from actual RSS (adaptive) ──
+    learn_worker_memory
+
+    # ── Adaptive cost estimate per template ──
+    local effective_cost_per_job
+    effective_cost_per_job=$(get_adaptive_cost_estimate "$PIPELINE_TEMPLATE")
+
     # ── CPU cores ──
     local cpu_cores=2
     if [[ "$(uname -s)" == "Darwin" ]]; then
@@ -3027,10 +3539,9 @@ daemon_auto_scale() {
     local max_by_cpu=$(( (cpu_cores * 3) / 4 ))  # 75% utilization cap
     [[ "$max_by_cpu" -lt 1 ]] && max_by_cpu=1
 
-    # ── Load average check (back off if system is stressed) ──
+    # ── Load average check — gradual scaling curve (replaces 90% cliff) ──
     local load_avg
     load_avg=$(uptime | awk -F'load averages?: ' '{print $2}' | awk -F'[, ]+' '{print $1}' 2>/dev/null || echo "0")
-    # Validate numeric
     if [[ ! "$load_avg" =~ ^[0-9]+\.?[0-9]*$ ]]; then
         load_avg="0"
     fi
@@ -3038,17 +3549,28 @@ daemon_auto_scale() {
     if [[ "$cpu_cores" -gt 0 ]]; then
         load_ratio=$(awk -v load="$load_avg" -v cores="$cpu_cores" 'BEGIN { printf "%.0f", (load / cores) * 100 }')
     fi
-    if [[ "$load_ratio" -gt 90 ]]; then
-        # System under heavy load — scale down to min
+    # Gradual load scaling curve (replaces binary 90% cliff)
+    if [[ "$load_ratio" -gt 95 ]]; then
+        # 95%+: minimum workers only
         max_by_cpu="$MIN_WORKERS"
-        daemon_log WARN "Auto-scale: high load (${load_avg}/${cpu_cores} cores) — constraining to ${max_by_cpu}"
+        daemon_log WARN "Auto-scale: critical load (${load_ratio}%) — minimum workers only"
+    elif [[ "$load_ratio" -gt 85 ]]; then
+        # 85-95%: reduce by 50%
+        max_by_cpu=$(( max_by_cpu / 2 ))
+        [[ "$max_by_cpu" -lt "$MIN_WORKERS" ]] && max_by_cpu="$MIN_WORKERS"
+        daemon_log WARN "Auto-scale: high load (${load_ratio}%) — reducing capacity 50%"
+    elif [[ "$load_ratio" -gt 70 ]]; then
+        # 70-85%: reduce by 25%
+        max_by_cpu=$(( (max_by_cpu * 3) / 4 ))
+        [[ "$max_by_cpu" -lt "$MIN_WORKERS" ]] && max_by_cpu="$MIN_WORKERS"
+        daemon_log INFO "Auto-scale: moderate load (${load_ratio}%) — reducing capacity 25%"
     fi
+    # 0-70%: full capacity (no change)
 
     # ── Available memory ──
     local avail_mem_gb=8
     if [[ "$(uname -s)" == "Darwin" ]]; then
         local page_size free_pages inactive_pages purgeable_pages speculative_pages
-        # Page size is in format: "(page size of 16384 bytes)"
         page_size=$(vm_stat | awk '/page size of/ {for(i=1;i<=NF;i++) if($i ~ /^[0-9]+$/) print $i}')
         page_size="${page_size:-16384}"
         free_pages=$(vm_stat | awk '/^Pages free:/ {gsub(/\./, "", $NF); print $NF}')
@@ -3059,7 +3581,6 @@ daemon_auto_scale() {
         inactive_pages="${inactive_pages:-0}"
         purgeable_pages=$(vm_stat | awk '/^Pages purgeable:/ {gsub(/\./, "", $NF); print $NF}')
         purgeable_pages="${purgeable_pages:-0}"
-        # Available ≈ free + speculative + inactive + purgeable
         local avail_pages=$(( free_pages + speculative_pages + inactive_pages + purgeable_pages ))
         if [[ "$avail_pages" -gt 0 && "$page_size" -gt 0 ]]; then
             local free_bytes=$(( avail_pages * page_size ))
@@ -3074,13 +3595,13 @@ daemon_auto_scale() {
     local max_by_mem=$(( avail_mem_gb / WORKER_MEM_GB ))
     [[ "$max_by_mem" -lt 1 ]] && max_by_mem=1
 
-    # ── Budget remaining ──
+    # ── Budget remaining (adaptive cost estimate) ──
     local max_by_budget="$MAX_WORKERS"
     local remaining_usd
     remaining_usd=$("$SCRIPT_DIR/sw-cost.sh" remaining-budget 2>/dev/null || echo "unlimited")
     if [[ "$remaining_usd" != "unlimited" && -n "$remaining_usd" ]]; then
-        if awk -v r="$remaining_usd" -v c="$EST_COST_PER_JOB" 'BEGIN { exit !(r > 0 && c > 0) }'; then
-            max_by_budget=$(awk -v r="$remaining_usd" -v c="$EST_COST_PER_JOB" 'BEGIN { printf "%.0f", r / c }')
+        if awk -v r="$remaining_usd" -v c="$effective_cost_per_job" 'BEGIN { exit !(r > 0 && c > 0) }'; then
+            max_by_budget=$(awk -v r="$remaining_usd" -v c="$effective_cost_per_job" 'BEGIN { printf "%.0f", r / c }')
             [[ "$max_by_budget" -lt 0 ]] && max_by_budget=0
         else
             max_by_budget=0
@@ -3113,10 +3634,31 @@ daemon_auto_scale() {
     # Clamp to min_workers
     [[ "$computed" -lt "$MIN_WORKERS" ]] && computed="$MIN_WORKERS"
 
+    # ── Gradual scaling: change by at most 1 at a time (adaptive) ──
+    if [[ "${ADAPTIVE_THRESHOLDS_ENABLED:-false}" == "true" ]]; then
+        if [[ "$computed" -gt "$prev_max" ]]; then
+            # Check success rate at target parallelism before scaling up
+            local target_rate
+            target_rate=$(get_success_rate_at_parallelism "$((prev_max + 1))")
+            if [[ "$target_rate" -lt 50 ]]; then
+                # Poor success rate at higher parallelism — hold steady
+                computed="$prev_max"
+                daemon_log INFO "Auto-scale: holding at ${prev_max} (success rate ${target_rate}% at $((prev_max + 1)))"
+            else
+                # Scale up by 1, not jump to target
+                computed=$((prev_max + 1))
+            fi
+        elif [[ "$computed" -lt "$prev_max" ]]; then
+            # Scale down by 1, not drop to minimum
+            computed=$((prev_max - 1))
+            [[ "$computed" -lt "$MIN_WORKERS" ]] && computed="$MIN_WORKERS"
+        fi
+    fi
+
     MAX_PARALLEL="$computed"
 
     if [[ "$MAX_PARALLEL" -ne "$prev_max" ]]; then
-        daemon_log INFO "Auto-scale: ${prev_max} → ${MAX_PARALLEL} (cpu=${max_by_cpu} mem=${max_by_mem} budget=${max_by_budget} queue=${max_by_queue})"
+        daemon_log INFO "Auto-scale: ${prev_max} → ${MAX_PARALLEL} (cpu=${max_by_cpu} mem=${max_by_mem} budget=${max_by_budget} queue=${max_by_queue} load=${load_ratio}%)"
         emit_event "daemon.scale" \
             "from=$prev_max" \
             "to=$MAX_PARALLEL" \
@@ -3126,7 +3668,8 @@ daemon_auto_scale() {
             "max_by_queue=$max_by_queue" \
             "cpu_cores=$cpu_cores" \
             "avail_mem_gb=$avail_mem_gb" \
-            "remaining_usd=$remaining_usd"
+            "remaining_usd=$remaining_usd" \
+            "load_ratio=$load_ratio"
     fi
 }
 
@@ -3464,7 +4007,7 @@ daemon_poll_loop() {
             rotate_event_log
         fi
 
-        # Proactive patrol during quiet periods
+        # Proactive patrol during quiet periods (with adaptive limits)
         local issue_count_now active_count_now
         issue_count_now=$(jq -r '.queued | length' "$STATE_FILE" 2>/dev/null || echo 0)
         active_count_now=$(get_active_count)
@@ -3472,15 +4015,20 @@ daemon_poll_loop() {
             local now_e
             now_e=$(now_epoch)
             if [[ $((now_e - LAST_PATROL_EPOCH)) -ge "$PATROL_INTERVAL" ]]; then
+                load_adaptive_patrol_limits
                 daemon_log INFO "No active work — running patrol"
                 daemon_patrol --once
                 LAST_PATROL_EPOCH=$now_e
             fi
         fi
 
+        # ── Adaptive poll interval: adjust sleep based on queue state ──
+        local effective_interval
+        effective_interval=$(get_adaptive_poll_interval "$issue_count_now" "$active_count_now")
+
         # Sleep in 1s intervals so we can catch shutdown quickly
         local i=0
-        while [[ $i -lt $POLL_INTERVAL ]] && [[ ! -f "$SHUTDOWN_FLAG" ]]; do
+        while [[ $i -lt $effective_interval ]] && [[ ! -f "$SHUTDOWN_FLAG" ]]; do
             sleep 1
             i=$((i + 1))
         done
@@ -3863,11 +4411,11 @@ daemon_init() {
   "worker_mem_gb": 4,
   "estimated_cost_per_job_usd": 5.0,
   "intelligence": {
-    "enabled": false,
+    "enabled": true,
     "cache_ttl_seconds": 3600,
-    "composer_enabled": false,
-    "optimization_enabled": false,
-    "prediction_enabled": false,
+    "composer_enabled": true,
+    "optimization_enabled": true,
+    "prediction_enabled": true,
     "adversarial_enabled": false,
     "simulation_enabled": false,
     "architecture_enabled": false,

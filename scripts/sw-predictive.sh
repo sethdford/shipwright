@@ -60,7 +60,247 @@ fi
 
 # ─── Storage ───────────────────────────────────────────────────────────────
 BASELINES_DIR="${HOME}/.shipwright/baselines"
-ANOMALY_THRESHOLD="${ANOMALY_THRESHOLD:-3.0}"
+OPTIMIZATION_DIR="${HOME}/.shipwright/optimization"
+DEFAULT_ANOMALY_THRESHOLD=3.0
+DEFAULT_WARNING_MULTIPLIER=2.0
+DEFAULT_EMA_ALPHA=0.1
+ANOMALY_THRESHOLD="${ANOMALY_THRESHOLD:-$DEFAULT_ANOMALY_THRESHOLD}"
+
+# ─── Adaptive Threshold Helpers ───────────────────────────────────────────
+
+# _predictive_get_repo_hash
+# Returns a short hash for the current repo (for per-repo config isolation)
+_predictive_get_repo_hash() {
+    local repo_root
+    repo_root=$(git -C "$REPO_DIR" rev-parse --show-toplevel 2>/dev/null || echo "$REPO_DIR")
+    echo -n "$repo_root" | md5 2>/dev/null || echo -n "$repo_root" | md5sum 2>/dev/null | cut -d' ' -f1
+}
+
+# _predictive_get_anomaly_threshold <metric_name>
+# Returns per-metric anomaly threshold from config, or default
+_predictive_get_anomaly_threshold() {
+    local metric_name="${1:-}"
+    local repo_hash
+    repo_hash=$(_predictive_get_repo_hash)
+    local thresholds_file="${BASELINES_DIR}/${repo_hash}/anomaly-thresholds.json"
+
+    if [[ -n "$metric_name" && -f "$thresholds_file" ]]; then
+        local threshold
+        threshold=$(jq -r --arg m "$metric_name" '.[$m].critical_multiplier // empty' "$thresholds_file" 2>/dev/null || true)
+        if [[ -n "$threshold" && "$threshold" != "null" ]]; then
+            echo "$threshold"
+            return 0
+        fi
+    fi
+    echo "$DEFAULT_ANOMALY_THRESHOLD"
+}
+
+# _predictive_get_warning_multiplier <metric_name>
+# Returns per-metric warning multiplier from config, or default
+_predictive_get_warning_multiplier() {
+    local metric_name="${1:-}"
+    local repo_hash
+    repo_hash=$(_predictive_get_repo_hash)
+    local thresholds_file="${BASELINES_DIR}/${repo_hash}/anomaly-thresholds.json"
+
+    if [[ -n "$metric_name" && -f "$thresholds_file" ]]; then
+        local multiplier
+        multiplier=$(jq -r --arg m "$metric_name" '.[$m].warning_multiplier // empty' "$thresholds_file" 2>/dev/null || true)
+        if [[ -n "$multiplier" && "$multiplier" != "null" ]]; then
+            echo "$multiplier"
+            return 0
+        fi
+    fi
+    echo "$DEFAULT_WARNING_MULTIPLIER"
+}
+
+# _predictive_get_ema_alpha
+# Returns EMA alpha from per-repo config, or default
+_predictive_get_ema_alpha() {
+    local repo_hash
+    repo_hash=$(_predictive_get_repo_hash)
+    local ema_config="${BASELINES_DIR}/${repo_hash}/ema-config.json"
+
+    if [[ -f "$ema_config" ]]; then
+        local alpha
+        alpha=$(jq -r '.alpha // empty' "$ema_config" 2>/dev/null || true)
+        if [[ -n "$alpha" && "$alpha" != "null" ]]; then
+            echo "$alpha"
+            return 0
+        fi
+    fi
+    echo "$DEFAULT_EMA_ALPHA"
+}
+
+# _predictive_get_risk_keywords
+# Returns JSON object of keyword→weight mapping from config, or empty
+_predictive_get_risk_keywords() {
+    local keywords_file="${OPTIMIZATION_DIR}/risk-keywords.json"
+    if [[ -f "$keywords_file" ]]; then
+        local content
+        content=$(jq '.' "$keywords_file" 2>/dev/null || true)
+        if [[ -n "$content" && "$content" != "null" ]]; then
+            echo "$content"
+            return 0
+        fi
+    fi
+    echo ""
+}
+
+# _predictive_record_anomaly <stage> <metric_name> <severity> <value> <baseline>
+# Records an anomaly detection event for false-alarm tracking
+_predictive_record_anomaly() {
+    local stage="${1:-}"
+    local metric_name="${2:-}"
+    local severity="${3:-}"
+    local value="${4:-0}"
+    local baseline="${5:-0}"
+
+    local repo_hash
+    repo_hash=$(_predictive_get_repo_hash)
+    local tracking_file="${BASELINES_DIR}/${repo_hash}/anomaly-tracking.jsonl"
+    mkdir -p "${BASELINES_DIR}/${repo_hash}"
+
+    local record
+    record=$(jq -c -n \
+        --arg ts "$(now_iso)" \
+        --argjson epoch "$(now_epoch)" \
+        --arg stage "$stage" \
+        --arg metric "$metric_name" \
+        --arg severity "$severity" \
+        --argjson value "$value" \
+        --argjson baseline "$baseline" \
+        '{ts: $ts, ts_epoch: $epoch, stage: $stage, metric: $metric, severity: $severity, value: $value, baseline: $baseline, confirmed: null}')
+    echo "$record" >> "$tracking_file"
+}
+
+# predictive_confirm_anomaly <stage> <metric_name> <was_real_failure>
+# After pipeline completes, confirm whether anomaly predicted a real failure
+predictive_confirm_anomaly() {
+    local stage="${1:-}"
+    local metric_name="${2:-}"
+    local was_real="${3:-false}"
+
+    local repo_hash
+    repo_hash=$(_predictive_get_repo_hash)
+    local tracking_file="${BASELINES_DIR}/${repo_hash}/anomaly-tracking.jsonl"
+
+    [[ -f "$tracking_file" ]] || return 0
+
+    # Find the most recent unconfirmed anomaly for this stage+metric
+    local tmp_file
+    tmp_file=$(mktemp "${TMPDIR:-/tmp}/sw-anomaly-confirm.XXXXXX")
+    local found=false
+
+    # Process file in reverse to find most recent unconfirmed
+    while IFS= read -r line; do
+        local line_stage line_metric line_confirmed
+        line_stage=$(echo "$line" | jq -r '.stage // ""' 2>/dev/null || true)
+        line_metric=$(echo "$line" | jq -r '.metric // ""' 2>/dev/null || true)
+        line_confirmed=$(echo "$line" | jq -r '.confirmed // "null"' 2>/dev/null || true)
+
+        if [[ "$line_stage" == "$stage" && "$line_metric" == "$metric_name" && "$line_confirmed" == "null" && "$found" == "false" ]]; then
+            # Update this entry
+            echo "$line" | jq -c --arg c "$was_real" '.confirmed = ($c == "true")' >> "$tmp_file"
+            found=true
+        else
+            echo "$line" >> "$tmp_file"
+        fi
+    done < "$tracking_file"
+
+    if [[ "$found" == "true" ]]; then
+        mv "$tmp_file" "$tracking_file"
+    else
+        rm -f "$tmp_file"
+    fi
+
+    # Update false-alarm rate and adjust thresholds
+    _predictive_update_alarm_rates "$metric_name"
+}
+
+# _predictive_update_alarm_rates <metric_name>
+# Recalculates false-alarm rate for a metric and adjusts thresholds
+_predictive_update_alarm_rates() {
+    local metric_name="${1:-}"
+    [[ -z "$metric_name" ]] && return 0
+
+    local repo_hash
+    repo_hash=$(_predictive_get_repo_hash)
+    local tracking_file="${BASELINES_DIR}/${repo_hash}/anomaly-tracking.jsonl"
+    local thresholds_file="${BASELINES_DIR}/${repo_hash}/anomaly-thresholds.json"
+
+    [[ -f "$tracking_file" ]] || return 0
+
+    # Count confirmed entries for this metric
+    local total_confirmed=0
+    local true_positives=0
+    local false_positives=0
+
+    while IFS= read -r line; do
+        local line_metric line_confirmed
+        line_metric=$(echo "$line" | jq -r '.metric // ""' 2>/dev/null || true)
+        line_confirmed=$(echo "$line" | jq -r '.confirmed // "null"' 2>/dev/null || true)
+
+        [[ "$line_metric" != "$metric_name" ]] && continue
+        [[ "$line_confirmed" == "null" ]] && continue
+
+        total_confirmed=$((total_confirmed + 1))
+        if [[ "$line_confirmed" == "true" ]]; then
+            true_positives=$((true_positives + 1))
+        else
+            false_positives=$((false_positives + 1))
+        fi
+    done < "$tracking_file"
+
+    # Need at least 5 confirmed anomalies to adjust
+    [[ "$total_confirmed" -lt 5 ]] && return 0
+
+    local precision
+    precision=$(awk -v tp="$true_positives" -v total="$total_confirmed" 'BEGIN { printf "%.2f", (tp / total) * 100 }')
+
+    # Initialize thresholds file if missing
+    mkdir -p "${BASELINES_DIR}/${repo_hash}"
+    if [[ ! -f "$thresholds_file" ]]; then
+        echo '{}' > "$thresholds_file"
+    fi
+
+    # Adjust thresholds to maintain 90%+ precision
+    local current_critical current_warning
+    current_critical=$(jq -r --arg m "$metric_name" '.[$m].critical_multiplier // 3.0' "$thresholds_file" 2>/dev/null || echo "3.0")
+    current_warning=$(jq -r --arg m "$metric_name" '.[$m].warning_multiplier // 2.0' "$thresholds_file" 2>/dev/null || echo "2.0")
+
+    local new_critical="$current_critical"
+    local new_warning="$current_warning"
+
+    if awk -v p="$precision" 'BEGIN { exit !(p < 90) }' 2>/dev/null; then
+        # Too many false alarms — loosen thresholds (increase multipliers)
+        new_critical=$(awk -v c="$current_critical" 'BEGIN { v = c * 1.1; if (v > 10.0) v = 10.0; printf "%.2f", v }')
+        new_warning=$(awk -v w="$current_warning" 'BEGIN { v = w * 1.1; if (v > 8.0) v = 8.0; printf "%.2f", v }')
+    elif awk -v p="$precision" 'BEGIN { exit !(p > 95) }' 2>/dev/null; then
+        # Very high precision — can tighten slightly (decrease multipliers)
+        new_critical=$(awk -v c="$current_critical" 'BEGIN { v = c * 0.95; if (v < 1.5) v = 1.5; printf "%.2f", v }')
+        new_warning=$(awk -v w="$current_warning" 'BEGIN { v = w * 0.95; if (v < 1.2) v = 1.2; printf "%.2f", v }')
+    fi
+
+    # Atomic write
+    local tmp_file
+    tmp_file=$(mktemp "${TMPDIR:-/tmp}/sw-anomaly-thresh.XXXXXX")
+    jq --arg m "$metric_name" \
+       --argjson crit "$new_critical" \
+       --argjson warn "$new_warning" \
+       --argjson precision "$precision" \
+       --argjson tp "$true_positives" \
+       --argjson fp "$false_positives" \
+       --arg ts "$(now_iso)" \
+       '.[$m] = {critical_multiplier: $crit, warning_multiplier: $warn, precision: $precision, true_positives: $tp, false_positives: $fp, updated: $ts}' \
+       "$thresholds_file" > "$tmp_file" && mv "$tmp_file" "$thresholds_file" || rm -f "$tmp_file"
+
+    emit_event "predictive.threshold_adjusted" \
+        "metric=$metric_name" \
+        "precision=$precision" \
+        "critical=$new_critical" \
+        "warning=$new_warning"
+}
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # RISK ASSESSMENT
@@ -101,10 +341,40 @@ Return JSON format:
     local risk=50
     local reason="Default medium risk — no AI analysis available"
 
-    # Bump risk if issue mentions complex keywords
-    if echo "$issue_json" | grep -qiE "refactor|migration|breaking|security|deploy"; then
-        risk=70
-        reason="Keywords suggest elevated complexity"
+    # Check for learned keyword weights first, fall back to hardcoded
+    local keywords_json
+    keywords_json=$(_predictive_get_risk_keywords)
+
+    if [[ -n "$keywords_json" ]]; then
+        # Use learned keyword→weight mapping
+        local total_weight=0
+        local matched_keywords=""
+        local issue_lower
+        issue_lower=$(echo "$issue_json" | tr '[:upper:]' '[:lower:]')
+
+        while IFS= read -r keyword; do
+            [[ -z "$keyword" ]] && continue
+            local kw_lower
+            kw_lower=$(echo "$keyword" | tr '[:upper:]' '[:lower:]')
+            if echo "$issue_lower" | grep -q "$kw_lower" 2>/dev/null; then
+                local weight
+                weight=$(echo "$keywords_json" | jq -r --arg k "$keyword" '.[$k] // 0' 2>/dev/null || echo "0")
+                total_weight=$(awk -v tw="$total_weight" -v w="$weight" 'BEGIN { printf "%.0f", tw + w }')
+                matched_keywords="${matched_keywords}${keyword}, "
+            fi
+        done < <(echo "$keywords_json" | jq -r 'keys[]' 2>/dev/null || true)
+
+        if [[ "$total_weight" -gt 0 ]]; then
+            # Clamp risk to 0-100
+            risk=$(awk -v base=50 -v tw="$total_weight" 'BEGIN { v = base + tw; if (v > 100) v = 100; if (v < 0) v = 0; printf "%.0f", v }')
+            reason="Learned keyword weights: ${matched_keywords%%, }"
+        fi
+    else
+        # Default hardcoded keyword check
+        if echo "$issue_json" | grep -qiE "refactor|migration|breaking|security|deploy"; then
+            risk=70
+            reason="Keywords suggest elevated complexity"
+        fi
     fi
 
     local result_json
@@ -247,16 +517,21 @@ predict_detect_anomaly() {
         return 0
     fi
 
+    # Get per-metric thresholds (adaptive or default)
+    local metric_critical_mult metric_warning_mult
+    metric_critical_mult=$(_predictive_get_anomaly_threshold "$metric_name")
+    metric_warning_mult=$(_predictive_get_warning_multiplier "$metric_name")
+
     # Calculate thresholds using awk for floating-point
     local critical_threshold warning_threshold
-    critical_threshold=$(awk "BEGIN{printf \"%.2f\", ${baseline_value} * ${ANOMALY_THRESHOLD}}")
-    warning_threshold=$(awk "BEGIN{printf \"%.2f\", ${baseline_value} * 2.0}")
+    critical_threshold=$(awk -v bv="$baseline_value" -v m="$metric_critical_mult" 'BEGIN{printf "%.2f", bv * m}')
+    warning_threshold=$(awk -v bv="$baseline_value" -v m="$metric_warning_mult" 'BEGIN{printf "%.2f", bv * m}')
 
     local severity="normal"
 
-    if awk "BEGIN{exit !(${current_value} > ${critical_threshold})}" 2>/dev/null; then
+    if awk -v cv="$current_value" -v ct="$critical_threshold" 'BEGIN{exit !(cv > ct)}' 2>/dev/null; then
         severity="critical"
-    elif awk "BEGIN{exit !(${current_value} > ${warning_threshold})}" 2>/dev/null; then
+    elif awk -v cv="$current_value" -v wt="$warning_threshold" 'BEGIN{exit !(cv > wt)}' 2>/dev/null; then
         severity="warning"
     fi
 
@@ -266,7 +541,12 @@ predict_detect_anomaly() {
             "metric=${metric_name}" \
             "value=${current_value}" \
             "baseline=${baseline_value}" \
-            "severity=${severity}"
+            "severity=${severity}" \
+            "critical_mult=${metric_critical_mult}" \
+            "warning_mult=${metric_warning_mult}"
+
+        # Record anomaly for false-alarm tracking
+        _predictive_record_anomaly "$stage" "$metric_name" "$severity" "$current_value" "$baseline_value"
     fi
 
     echo "$severity"
@@ -389,8 +669,15 @@ predict_update_baseline() {
         # First data point — use raw value
         new_value="$value"
     else
-        # Exponential moving average: 0.9 * old + 0.1 * new
-        new_value=$(awk "BEGIN{printf \"%.2f\", 0.9 * ${old_value} + 0.1 * ${value}}")
+        # Get adaptive EMA alpha (learned or default)
+        local alpha
+        alpha=$(_predictive_get_ema_alpha)
+        local one_minus_alpha
+        one_minus_alpha=$(awk -v a="$alpha" 'BEGIN{printf "%.4f", 1.0 - a}')
+
+        # Exponential moving average: (1-alpha) * old + alpha * new
+        new_value=$(awk -v oma="$one_minus_alpha" -v ov="$old_value" -v a="$alpha" -v nv="$value" \
+            'BEGIN{printf "%.2f", oma * ov + a * nv}')
     fi
 
     local updated_at
@@ -429,7 +716,11 @@ show_help() {
     echo ""
     echo -e "  ${BOLD}Baseline Management${RESET}"
     echo -e "    ${CYAN}shipwright predictive baseline${RESET} <stage> <metric> <value> [baseline_file]"
-    echo -e "    Update running metric baselines (EMA)"
+    echo -e "    Update running metric baselines (adaptive EMA)"
+    echo ""
+    echo -e "  ${BOLD}False-Alarm Tracking${RESET}"
+    echo -e "    ${CYAN}shipwright predictive confirm-anomaly${RESET} <stage> <metric> <was_real>"
+    echo -e "    Confirm whether detected anomaly predicted a real failure"
     echo ""
     echo -e "${CYAN}${BOLD}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${RESET}"
     echo ""
@@ -445,6 +736,7 @@ main() {
     case "$cmd" in
         risk)        predict_pipeline_risk "$@" ;;
         anomaly)     predict_detect_anomaly "$@" ;;
+        confirm-anomaly) predictive_confirm_anomaly "$@" ;;
         patrol)      patrol_ai_analyze "$@" ;;
         baseline)    predict_update_baseline "$@" ;;
         help|--help|-h) show_help ;;

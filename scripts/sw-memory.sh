@@ -244,6 +244,64 @@ memory_capture_failure() {
     emit_event "memory.failure" "stage=${stage}" "pattern=${pattern:0:80}"
 }
 
+# memory_record_fix_outcome <failure_hash_or_pattern> <fix_applied:bool> <fix_resolved:bool>
+# Tracks whether suggested fixes actually worked. Builds effectiveness data
+# so future memory injection can prioritize high-success-rate fixes.
+memory_record_fix_outcome() {
+    local pattern_match="${1:-}"
+    local fix_applied="${2:-false}"
+    local fix_resolved="${3:-false}"
+
+    [[ -z "$pattern_match" ]] && return 1
+
+    ensure_memory_dir
+    local mem_dir
+    mem_dir="$(repo_memory_dir)"
+    local failures_file="$mem_dir/failures.json"
+
+    [[ ! -f "$failures_file" ]] && return 1
+
+    # Find matching failure by pattern substring
+    local match_idx
+    match_idx=$(jq --arg pat "$pattern_match" \
+        '[.failures[]] | to_entries | map(select(.value.pattern | contains($pat))) | .[0].key // -1' \
+        "$failures_file" 2>/dev/null || echo "-1")
+
+    if [[ "$match_idx" == "-1" || "$match_idx" == "null" ]]; then
+        warn "No matching failure found for: ${pattern_match:0:60}"
+        return 1
+    fi
+
+    local tmp_file
+    tmp_file=$(mktemp)
+
+    # Update fix outcome tracking fields
+    local applied_inc=0 resolved_inc=0
+    [[ "$fix_applied" == "true" ]] && applied_inc=1
+    [[ "$fix_resolved" == "true" ]] && resolved_inc=1
+
+    jq --argjson idx "$match_idx" \
+       --argjson app "$applied_inc" \
+       --argjson res "$resolved_inc" \
+       --arg ts "$(now_iso)" \
+       '.failures[$idx].times_fix_suggested = ((.failures[$idx].times_fix_suggested // 0) + 1) |
+        .failures[$idx].times_fix_applied = ((.failures[$idx].times_fix_applied // 0) + $app) |
+        .failures[$idx].times_fix_resolved = ((.failures[$idx].times_fix_resolved // 0) + $res) |
+        .failures[$idx].fix_effectiveness_rate = (
+            if ((.failures[$idx].times_fix_applied // 0) + $app) > 0 then
+                (((.failures[$idx].times_fix_resolved // 0) + $res) * 100 /
+                 ((.failures[$idx].times_fix_applied // 0) + $app))
+            else 0 end
+        ) |
+        .failures[$idx].last_outcome_at = $ts' \
+       "$failures_file" > "$tmp_file" && mv "$tmp_file" "$failures_file"
+
+    emit_event "memory.fix_outcome" \
+        "pattern=${pattern_match:0:60}" \
+        "applied=${fix_applied}" \
+        "resolved=${fix_resolved}"
+}
+
 # memory_analyze_failure <log_file> <stage>
 # Uses Claude to analyze a pipeline failure and fill in root_cause/fix/category.
 memory_analyze_failure() {
@@ -290,16 +348,41 @@ memory_analyze_failure() {
 
     info "Analyzing failure in ${CYAN}${stage}${RESET} stage..."
 
+    # Gather past successful analyses for the same stage/category as examples
+    local past_examples=""
+    if [[ -f "$failures_file" ]]; then
+        past_examples=$(jq -r --arg stg "$stage" \
+            '[.failures[] | select(.stage == $stg and .root_cause != "" and .fix != "")] |
+             sort_by(-.fix_effectiveness_rate // 0) | .[:2][] |
+             "- Pattern: \(.pattern[:80])\n  Root cause: \(.root_cause)\n  Fix: \(.fix)"' \
+            "$failures_file" 2>/dev/null || true)
+    fi
+
+    # Build valid categories list (from compat.sh if available, else hardcoded)
+    local valid_cats="test_failure, build_error, lint_error, timeout, dependency, flaky, config"
+    if [[ -n "${SW_ERROR_CATEGORIES:-}" ]]; then
+        valid_cats=$(echo "$SW_ERROR_CATEGORIES" | tr ' ' ', ')
+    fi
+
     # Build the analysis prompt
     local prompt
     prompt="Analyze this pipeline failure. The stage was: ${stage}.
 The error pattern is: ${last_pattern}
 
 Log output (last 200 lines):
-${log_tail}
+${log_tail}"
+
+    if [[ -n "$past_examples" ]]; then
+        prompt="${prompt}
+
+Here are examples of how similar failures were diagnosed in this repo:
+${past_examples}"
+    fi
+
+    prompt="${prompt}
 
 Return ONLY a JSON object with exactly these fields:
-{\"root_cause\": \"one-line root cause\", \"fix\": \"one-line fix suggestion\", \"category\": \"one of: test_failure, build_error, lint_error, timeout, dependency, flaky, config\"}
+{\"root_cause\": \"one-line root cause\", \"fix\": \"one-line fix suggestion\", \"category\": \"one of: ${valid_cats}\"}
 
 Return JSON only, no markdown fences, no explanation."
 
@@ -324,11 +407,17 @@ Return JSON only, no markdown fences, no explanation."
         return 1
     fi
 
-    # Validate category against allowed values
-    case "$category" in
-        test_failure|build_error|lint_error|timeout|dependency|flaky|config) ;;
-        *) category="unknown" ;;
-    esac
+    # Validate category against shared taxonomy (compat.sh) or built-in list
+    if type sw_valid_error_category &>/dev/null 2>&1; then
+        if ! sw_valid_error_category "$category"; then
+            category="unknown"
+        fi
+    else
+        case "$category" in
+            test_failure|build_error|lint_error|timeout|dependency|flaky|config) ;;
+            *) category="unknown" ;;
+        esac
+    fi
 
     # Update the most recent failure entry with root_cause, fix, category
     local tmp_file
@@ -564,12 +653,28 @@ memory_inject_context() {
             ;;
 
         build)
-            # Failure patterns to avoid + code conventions
+            # Failure patterns to avoid — ranked by relevance (recency + effectiveness + frequency)
             echo "## Failure Patterns to Avoid"
             if [[ -f "$mem_dir/failures.json" ]]; then
-                jq -r '.failures | sort_by(-.seen_count) | .[:10][] |
+                jq -r 'now as $now |
+                    .failures | map(. +
+                        { relevance_score:
+                            ((.seen_count // 1) * 1) +
+                            (if .fix_effectiveness_rate then (.fix_effectiveness_rate / 10) else 0 end) +
+                            (if .last_seen then
+                                (($now - ((.last_seen | sub("\\.[0-9]+Z$"; "Z") | strptime("%Y-%m-%dT%H:%M:%SZ") | mktime) // 0)) |
+                                 if . < 86400 then 5
+                                 elif . < 604800 then 3
+                                 elif . < 2592000 then 1
+                                 else 0 end)
+                            else 0 end)
+                        }
+                    ) | sort_by(-.relevance_score) | .[:10][] |
                     "- [\(.stage)] \(.pattern) (seen \(.seen_count)x)" +
-                    if .fix != "" then "\n  Fix: \(.fix)" else "" end' \
+                    if .fix != "" then
+                        "\n  Fix: \(.fix)" +
+                        if .fix_effectiveness_rate then " (effectiveness: \(.fix_effectiveness_rate)%)" else "" end
+                    else "" end' \
                     "$mem_dir/failures.json" 2>/dev/null || echo "- No failures recorded."
             fi
 
@@ -577,7 +682,8 @@ memory_inject_context() {
             echo "## Known Fixes"
             if [[ -f "$mem_dir/failures.json" ]]; then
                 jq -r '.failures[] | select(.root_cause != "" and .fix != "" and .stage == "build") |
-                    "- [\(.category // "unknown")] \(.root_cause)\n  Fix: \(.fix)"' \
+                    "- [\(.category // "unknown")] \(.root_cause)\n  Fix: \(.fix)" +
+                    if .fix_effectiveness_rate then " (effectiveness: \(.fix_effectiveness_rate)%)" else "" end' \
                     "$mem_dir/failures.json" 2>/dev/null || echo "- No analyzed fixes yet."
             else
                 echo "- No analyzed fixes yet."
@@ -645,11 +751,34 @@ memory_inject_context() {
             ;;
 
         *)
-            # Generic context for any other stage
+            # Generic context for any stage — inject top-K most relevant across all categories
             echo "## Repository Patterns"
             if [[ -f "$mem_dir/patterns.json" ]]; then
                 jq -r 'to_entries | map(select(.key != "known_issues")) | from_entries' \
                     "$mem_dir/patterns.json" 2>/dev/null || true
+            fi
+
+            # Inject top failures regardless of category (ranked by relevance)
+            echo ""
+            echo "## Relevant Failure Patterns"
+            if [[ -f "$mem_dir/failures.json" ]]; then
+                jq -r --arg stg "$stage_id" \
+                    '.failures |
+                     map(. + { stage_match: (if .stage == $stg then 10 else 0 end) }) |
+                     sort_by(-(.seen_count + .stage_match + (.fix_effectiveness_rate // 0) / 10)) |
+                     .[:5][] |
+                     "- [\(.stage)] \(.pattern[:80]) (seen \(.seen_count)x)" +
+                     if .fix != "" then "\n  Fix: \(.fix)" else "" end' \
+                    "$mem_dir/failures.json" 2>/dev/null || echo "- None recorded."
+            fi
+
+            # Inject recent decisions
+            echo ""
+            echo "## Recent Decisions"
+            if [[ -f "$mem_dir/decisions.json" ]]; then
+                jq -r '.decisions[-3:][] |
+                    "- [\(.type // "decision")] \(.summary // "no description")"' \
+                    "$mem_dir/decisions.json" 2>/dev/null || echo "- None recorded."
             fi
             ;;
     esac
@@ -950,6 +1079,34 @@ memory_search() {
 
     local found=0
 
+    # ── Semantic search via intelligence (if available) ──
+    if type intelligence_search_memory &>/dev/null 2>&1; then
+        local semantic_results
+        semantic_results=$(intelligence_search_memory "$keyword" "$mem_dir" 5 2>/dev/null || echo "")
+        if [[ -n "$semantic_results" ]] && echo "$semantic_results" | jq -e '.results | length > 0' &>/dev/null; then
+            echo -e "  ${BOLD}${CYAN}Semantic Results (AI-ranked):${RESET}"
+            local result_count
+            result_count=$(echo "$semantic_results" | jq '.results | length')
+            local i=0
+            while [[ "$i" -lt "$result_count" ]]; do
+                local file rel summary
+                file=$(echo "$semantic_results" | jq -r ".results[$i].file // \"\"")
+                rel=$(echo "$semantic_results" | jq -r ".results[$i].relevance // 0")
+                summary=$(echo "$semantic_results" | jq -r ".results[$i].summary // \"\"")
+                echo -e "    ${GREEN}●${RESET} [${rel}%] ${BOLD}${file}${RESET} — ${summary}"
+                i=$((i + 1))
+            done
+            echo ""
+            found=$((found + 1))
+
+            # Also run grep search below for completeness
+            echo -e "  ${DIM}Grep results (supplemental):${RESET}"
+            echo ""
+        fi
+    fi
+
+    # ── Grep-based search (fallback / supplemental) ──
+
     # Search patterns
     if [[ -f "$mem_dir/patterns.json" ]]; then
         local pattern_matches
@@ -1195,6 +1352,7 @@ show_help() {
     echo -e "  ${CYAN}metric${RESET} <name> <value>           Update a performance baseline"
     echo -e "  ${CYAN}decision${RESET} <type> <summary>       Record a design decision"
     echo -e "  ${CYAN}analyze-failure${RESET} <log> <stage>    Analyze failure root cause via AI"
+    echo -e "  ${CYAN}fix-outcome${RESET} <pattern> <applied> <resolved>  Record fix effectiveness"
     echo ""
     echo -e "${BOLD}EXAMPLES${RESET}"
     echo -e "  ${DIM}shipwright memory show${RESET}                            # View repo memory"
@@ -1247,6 +1405,9 @@ case "$SUBCOMMAND" in
         ;;
     analyze-failure)
         memory_analyze_failure "$@"
+        ;;
+    fix-outcome)
+        memory_record_fix_outcome "$@"
         ;;
     help|--help|-h)
         show_help

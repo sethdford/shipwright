@@ -57,7 +57,96 @@ emit_event() {
 
 # ─── Intelligence Configuration ─────────────────────────────────────────────
 INTELLIGENCE_CACHE="${REPO_DIR}/.claude/intelligence-cache.json"
-DEFAULT_CACHE_TTL=3600  # 1 hour
+INTELLIGENCE_CONFIG_DIR="${HOME}/.shipwright/optimization"
+CACHE_TTL_CONFIG="${INTELLIGENCE_CONFIG_DIR}/cache-ttl.json"
+CACHE_STATS_FILE="${INTELLIGENCE_CONFIG_DIR}/cache-stats.json"
+DEFAULT_CACHE_TTL=3600  # 1 hour (fallback)
+
+# Load adaptive cache TTL from config or use default
+_intelligence_get_cache_ttl() {
+    if [[ -f "$CACHE_TTL_CONFIG" ]]; then
+        local ttl
+        ttl=$(jq -r '.ttl // empty' "$CACHE_TTL_CONFIG" 2>/dev/null || true)
+        if [[ -n "$ttl" && "$ttl" != "null" && "$ttl" -gt 0 ]] 2>/dev/null; then
+            echo "$ttl"
+            return 0
+        fi
+    fi
+    echo "$DEFAULT_CACHE_TTL"
+}
+
+# Track cache hit/miss and adjust TTL
+_intelligence_track_cache_access() {
+    local hit_or_miss="${1:-miss}"  # "hit" or "miss"
+
+    mkdir -p "$INTELLIGENCE_CONFIG_DIR"
+    if [[ ! -f "$CACHE_STATS_FILE" ]]; then
+        echo '{"hits":0,"misses":0,"total":0}' > "$CACHE_STATS_FILE"
+    fi
+
+    local tmp_file
+    tmp_file=$(mktemp "${TMPDIR:-/tmp}/sw-cache-stats.XXXXXX")
+    if [[ "$hit_or_miss" == "hit" ]]; then
+        jq '.hits += 1 | .total += 1' "$CACHE_STATS_FILE" > "$tmp_file" && mv "$tmp_file" "$CACHE_STATS_FILE" || rm -f "$tmp_file"
+    else
+        jq '.misses += 1 | .total += 1' "$CACHE_STATS_FILE" > "$tmp_file" && mv "$tmp_file" "$CACHE_STATS_FILE" || rm -f "$tmp_file"
+    fi
+
+    # Every 20 accesses, evaluate whether to adjust TTL
+    local total
+    total=$(jq '.total // 0' "$CACHE_STATS_FILE" 2>/dev/null || echo "0")
+    if [[ "$((total % 20))" -eq 0 && "$total" -gt 0 ]]; then
+        _intelligence_adjust_cache_ttl
+    fi
+}
+
+# Adjust cache TTL based on hit/miss rates
+_intelligence_adjust_cache_ttl() {
+    [[ -f "$CACHE_STATS_FILE" ]] || return 0
+
+    local hits misses total
+    hits=$(jq '.hits // 0' "$CACHE_STATS_FILE" 2>/dev/null || echo "0")
+    misses=$(jq '.misses // 0' "$CACHE_STATS_FILE" 2>/dev/null || echo "0")
+    total=$(jq '.total // 0' "$CACHE_STATS_FILE" 2>/dev/null || echo "0")
+
+    [[ "$total" -lt 10 ]] && return 0
+
+    local miss_rate
+    miss_rate=$(awk -v m="$misses" -v t="$total" 'BEGIN { printf "%.0f", (m / t) * 100 }')
+
+    local current_ttl
+    current_ttl=$(_intelligence_get_cache_ttl)
+    local new_ttl="$current_ttl"
+
+    if [[ "$miss_rate" -gt 30 ]]; then
+        # High miss rate — reduce TTL (data getting stale too often)
+        new_ttl=$(awk -v ttl="$current_ttl" 'BEGIN { v = int(ttl * 0.75); if (v < 300) v = 300; print v }')
+    elif [[ "$miss_rate" -lt 5 ]]; then
+        # Very low miss rate — increase TTL (cache is very effective)
+        new_ttl=$(awk -v ttl="$current_ttl" 'BEGIN { v = int(ttl * 1.25); if (v > 14400) v = 14400; print v }')
+    fi
+
+    if [[ "$new_ttl" != "$current_ttl" ]]; then
+        local tmp_file
+        tmp_file=$(mktemp "${TMPDIR:-/tmp}/sw-cache-ttl.XXXXXX")
+        jq -n \
+            --argjson ttl "$new_ttl" \
+            --argjson miss_rate "$miss_rate" \
+            --arg updated "$(now_iso)" \
+            '{ttl: $ttl, miss_rate_pct: $miss_rate, updated: $updated}' \
+            > "$tmp_file" && mv "$tmp_file" "$CACHE_TTL_CONFIG" || rm -f "$tmp_file"
+
+        emit_event "intelligence.cache_ttl_adjusted" \
+            "old_ttl=$current_ttl" \
+            "new_ttl=$new_ttl" \
+            "miss_rate=$miss_rate"
+    fi
+
+    # Reset stats for next window
+    local tmp_reset
+    tmp_reset=$(mktemp "${TMPDIR:-/tmp}/sw-cache-reset.XXXXXX")
+    echo '{"hits":0,"misses":0,"total":0}' > "$tmp_reset" && mv "$tmp_reset" "$CACHE_STATS_FILE" || rm -f "$tmp_reset"
+}
 
 # ─── Feature Flag ───────────────────────────────────────────────────────────
 
@@ -96,7 +185,9 @@ _intelligence_cache_init() {
 
 _intelligence_cache_get() {
     local cache_key="$1"
-    local ttl="${2:-$DEFAULT_CACHE_TTL}"
+    local adaptive_ttl
+    adaptive_ttl=$(_intelligence_get_cache_ttl)
+    local ttl="${2:-$adaptive_ttl}"
 
     _intelligence_cache_init
 
@@ -107,6 +198,7 @@ _intelligence_cache_get() {
     entry=$(jq -r --arg h "$hash" '.entries[$h] // empty' "$INTELLIGENCE_CACHE" 2>/dev/null || true)
 
     if [[ -z "$entry" ]]; then
+        _intelligence_track_cache_access "miss"
         return 1
     fi
 
@@ -117,9 +209,11 @@ _intelligence_cache_get() {
     local age=$(( now - cached_ts ))
 
     if [[ "$age" -gt "$ttl" ]]; then
+        _intelligence_track_cache_access "miss"
         return 1
     fi
 
+    _intelligence_track_cache_access "hit"
     echo "$entry" | jq -r '.result'
     return 0
 }
@@ -510,6 +604,111 @@ Return the top ${top_n} most relevant entries:
     fi
 }
 
+# ─── Estimate Iterations ─────────────────────────────────────────────────────
+
+intelligence_estimate_iterations() {
+    local issue_analysis="${1:-"{}"}"
+    local historical_data="${2:-""}"
+
+    local iteration_model="${HOME}/.shipwright/optimization/iteration-model.json"
+
+    # Extract complexity from issue analysis (numeric 1-10)
+    local complexity
+    complexity=$(echo "$issue_analysis" | jq -r '.complexity // 5' 2>/dev/null || echo "5")
+
+    # Map numeric complexity to bucket: 1-3=low, 4-6=medium, 7-10=high
+    local bucket
+    if [[ "$complexity" -le 3 ]]; then
+        bucket="low"
+    elif [[ "$complexity" -le 6 ]]; then
+        bucket="medium"
+    else
+        bucket="high"
+    fi
+
+    # Strategy 1: Intelligence-enabled — call Claude for fine-grained estimation
+    if _intelligence_enabled; then
+        local prompt
+        prompt="Estimate the number of build-test iterations needed for this issue. Return ONLY a JSON object.
+
+Issue analysis: ${issue_analysis}
+Historical iteration data: ${historical_data:-none}
+
+Consider:
+- Complexity: ${complexity}/10 (${bucket})
+- Higher complexity usually needs more iterations
+- Well-understood patterns need fewer iterations
+
+Return JSON: {\"estimated_iterations\": <integer 1-50>}"
+
+        local cache_key
+        cache_key="estimate_iterations_$(_intelligence_md5 "${issue_analysis}")"
+
+        local result
+        if result=$(_intelligence_call_claude "$prompt" "$cache_key" 1800); then
+            # Extract number from result
+            local estimate
+            estimate=$(echo "$result" | jq -r '.estimated_iterations // .iterations // .estimate // empty' 2>/dev/null || true)
+            if [[ -z "$estimate" ]]; then
+                # Try raw number from response
+                estimate=$(echo "$result" | jq -r '.raw_response // empty' 2>/dev/null | tr -dc '0-9' | head -c 3 || true)
+            fi
+            if [[ -n "$estimate" ]] && [[ "$estimate" =~ ^[0-9]+$ ]] && \
+               [[ "$estimate" -ge 1 ]] && [[ "$estimate" -le 50 ]]; then
+                emit_event "intelligence.estimate_iterations" \
+                    "estimate=$estimate" \
+                    "complexity=$complexity" \
+                    "source=claude"
+                echo "$estimate"
+                return 0
+            fi
+        fi
+        # Fall through to historical data if Claude call fails
+    fi
+
+    # Strategy 2: Use historical averages from iteration model
+    if [[ -f "$iteration_model" ]]; then
+        local mean samples
+        mean=$(jq -r --arg b "$bucket" '.[$b].mean // 0' "$iteration_model" 2>/dev/null || echo "0")
+        samples=$(jq -r --arg b "$bucket" '.[$b].samples // 0' "$iteration_model" 2>/dev/null || echo "0")
+
+        if [[ "$samples" -gt 0 ]] && [[ "$mean" != "0" ]]; then
+            # Round to nearest integer, clamp 1-50
+            local estimate
+            estimate=$(awk "BEGIN{v=int($mean + 0.5); if(v<1)v=1; if(v>50)v=50; print v}")
+            emit_event "intelligence.estimate_iterations" \
+                "estimate=$estimate" \
+                "complexity=$complexity" \
+                "source=historical" \
+                "samples=$samples"
+            echo "$estimate"
+            return 0
+        fi
+    fi
+
+    # Strategy 3: Heuristic fallback based on numeric complexity
+    local estimate
+    if [[ "$complexity" -le 2 ]]; then
+        estimate=5
+    elif [[ "$complexity" -le 4 ]]; then
+        estimate=10
+    elif [[ "$complexity" -le 6 ]]; then
+        estimate=15
+    elif [[ "$complexity" -le 8 ]]; then
+        estimate=25
+    else
+        estimate=35
+    fi
+
+    emit_event "intelligence.estimate_iterations" \
+        "estimate=$estimate" \
+        "complexity=$complexity" \
+        "source=heuristic"
+
+    echo "$estimate"
+    return 0
+}
+
 # ─── Recommend Model ─────────────────────────────────────────────────────────
 
 intelligence_recommend_model() {
@@ -517,10 +716,108 @@ intelligence_recommend_model() {
     local complexity="${2:-5}"
     local budget_remaining="${3:-100}"
 
-    # This function uses heuristics first, with optional Claude refinement
     local model="sonnet"
     local reason="default balanced choice"
 
+    # Strategy 1: Check historical model routing data
+    local routing_file="${HOME}/.shipwright/optimization/model-routing.json"
+    if [[ -f "$routing_file" ]]; then
+        local stage_data
+        stage_data=$(jq -r --arg s "$stage" '.[$s] // empty' "$routing_file" 2>/dev/null || true)
+
+        if [[ -n "$stage_data" && "$stage_data" != "null" ]]; then
+            local recommended sonnet_rate sonnet_samples opus_rate opus_samples
+            recommended=$(echo "$stage_data" | jq -r '.recommended // empty' 2>/dev/null || true)
+            sonnet_rate=$(echo "$stage_data" | jq -r '.sonnet_rate // 0' 2>/dev/null || echo "0")
+            sonnet_samples=$(echo "$stage_data" | jq -r '.sonnet_samples // 0' 2>/dev/null || echo "0")
+            opus_rate=$(echo "$stage_data" | jq -r '.opus_rate // 0' 2>/dev/null || echo "0")
+            opus_samples=$(echo "$stage_data" | jq -r '.opus_samples // 0' 2>/dev/null || echo "0")
+
+            # Load adaptive routing thresholds from config or use defaults
+            local routing_config="${HOME}/.shipwright/optimization/model-routing-thresholds.json"
+            local min_samples=3
+            local success_threshold=90
+            local complexity_upgrade=8
+
+            if [[ -f "$routing_config" ]]; then
+                local cfg_min cfg_success cfg_complexity
+                cfg_min=$(jq -r '.min_samples // empty' "$routing_config" 2>/dev/null || true)
+                cfg_success=$(jq -r '.success_threshold // empty' "$routing_config" 2>/dev/null || true)
+                cfg_complexity=$(jq -r '.complexity_upgrade // empty' "$routing_config" 2>/dev/null || true)
+                [[ -n "$cfg_min" && "$cfg_min" != "null" ]] && min_samples="$cfg_min"
+                [[ -n "$cfg_success" && "$cfg_success" != "null" ]] && success_threshold="$cfg_success"
+                [[ -n "$cfg_complexity" && "$cfg_complexity" != "null" ]] && complexity_upgrade="$cfg_complexity"
+            fi
+
+            # SPRT-inspired evidence check: if enough data, use log-likelihood ratio
+            local use_sonnet=false
+            local total_samples=$((sonnet_samples + opus_samples))
+
+            if [[ "$total_samples" -ge 10 ]]; then
+                # With 10+ data points, use evidence ratio
+                # Log-likelihood ratio: ln(P(data|sonnet_good) / P(data|sonnet_bad))
+                # Simplified: if sonnet_rate / opus_rate > 0.95, switch to sonnet
+                local rate_ratio
+                if awk -v or="$opus_rate" 'BEGIN { exit !(or > 0) }' 2>/dev/null; then
+                    rate_ratio=$(awk -v sr="$sonnet_rate" -v or="$opus_rate" 'BEGIN { printf "%.3f", sr / or }')
+                else
+                    rate_ratio="1.0"
+                fi
+
+                if [[ "$sonnet_samples" -ge "$min_samples" ]] && \
+                   awk -v sr="$sonnet_rate" -v st="$success_threshold" 'BEGIN { exit !(sr >= st) }' 2>/dev/null && \
+                   awk -v rr="$rate_ratio" 'BEGIN { exit !(rr >= 0.95) }' 2>/dev/null; then
+                    use_sonnet=true
+                fi
+            elif [[ "$sonnet_samples" -ge "$min_samples" ]] && \
+                 awk -v sr="$sonnet_rate" -v st="$success_threshold" 'BEGIN { exit !(sr >= st) }' 2>/dev/null; then
+                # Fewer data points — fall back to simple threshold check
+                use_sonnet=true
+            fi
+
+            if [[ "$use_sonnet" == "true" ]]; then
+                if [[ "$budget_remaining" != "" ]] && [[ "$(echo "$budget_remaining < 5" | bc 2>/dev/null || echo "0")" == "1" ]]; then
+                    model="haiku"
+                    reason="sonnet viable (${sonnet_rate}% success) but budget constrained"
+                else
+                    model="sonnet"
+                    reason="evidence-based: ${sonnet_rate}% success on ${stage} (${sonnet_samples} samples, SPRT)"
+                fi
+            elif [[ -n "$recommended" && "$recommended" != "null" ]]; then
+                model="$recommended"
+                reason="historical routing recommendation for ${stage}"
+            fi
+
+            # Override: high complexity + critical stage → upgrade to opus if budget allows
+            if [[ "$complexity" -ge "$complexity_upgrade" ]]; then
+                case "$stage" in
+                    plan|design|review|compound_quality)
+                        if [[ "$model" != "opus" ]]; then
+                            if [[ "$budget_remaining" == "" ]] || [[ "$(echo "$budget_remaining >= 10" | bc 2>/dev/null || echo "1")" == "1" ]]; then
+                                model="opus"
+                                reason="high complexity (${complexity}/10) overrides historical for critical stage (${stage})"
+                            fi
+                        fi
+                        ;;
+                esac
+            fi
+
+            local result
+            result=$(jq -n --arg model "$model" --arg reason "$reason" --arg stage "$stage" --argjson complexity "$complexity" \
+                '{"model": $model, "reason": $reason, "stage": $stage, "complexity": $complexity, "source": "historical"}')
+
+            emit_event "intelligence.model" \
+                "stage=$stage" \
+                "complexity=$complexity" \
+                "model=$model" \
+                "source=historical"
+
+            echo "$result"
+            return 0
+        fi
+    fi
+
+    # Strategy 2: Heuristic fallback (no historical data available)
     # Budget-constrained: use haiku
     if [[ "$budget_remaining" != "" ]] && [[ "$(echo "$budget_remaining < 5" | bc 2>/dev/null || echo "0")" == "1" ]]; then
         model="haiku"
@@ -561,15 +858,115 @@ intelligence_recommend_model() {
 
     local result
     result=$(jq -n --arg model "$model" --arg reason "$reason" --arg stage "$stage" --argjson complexity "$complexity" \
-        '{"model": $model, "reason": $reason, "stage": $stage, "complexity": $complexity}')
+        '{"model": $model, "reason": $reason, "stage": $stage, "complexity": $complexity, "source": "heuristic"}')
 
     emit_event "intelligence.model" \
         "stage=$stage" \
         "complexity=$complexity" \
-        "model=$model"
+        "model=$model" \
+        "source=heuristic"
 
     echo "$result"
     return 0
+}
+
+# ─── Prediction Validation ─────────────────────────────────────────────────
+
+# intelligence_validate_prediction <issue_id> <predicted_complexity> <actual_iterations> <actual_success>
+# Compares predicted complexity to actual outcome for feedback learning.
+intelligence_validate_prediction() {
+    local issue_id="${1:-}"
+    local predicted_complexity="${2:-0}"
+    local actual_iterations="${3:-0}"
+    local actual_success="${4:-false}"
+
+    if [[ -z "$issue_id" ]]; then
+        error "Usage: intelligence_validate_prediction <issue_id> <predicted> <actual_iterations> <actual_success>"
+        return 1
+    fi
+
+    # Infer actual complexity from iterations (heuristic: map iterations to 1-10 scale)
+    local actual_complexity
+    if [[ "$actual_iterations" -le 5 ]]; then
+        actual_complexity=2
+    elif [[ "$actual_iterations" -le 10 ]]; then
+        actual_complexity=4
+    elif [[ "$actual_iterations" -le 15 ]]; then
+        actual_complexity=6
+    elif [[ "$actual_iterations" -le 25 ]]; then
+        actual_complexity=8
+    else
+        actual_complexity=10
+    fi
+
+    # Calculate prediction error (signed delta)
+    local delta=$(( predicted_complexity - actual_complexity ))
+    local abs_delta="${delta#-}"
+
+    # Emit prediction error event
+    emit_event "intelligence.prediction_error" \
+        "issue_id=$issue_id" \
+        "predicted=$predicted_complexity" \
+        "actual=$actual_complexity" \
+        "delta=$delta" \
+        "actual_iterations=$actual_iterations" \
+        "actual_success=$actual_success"
+
+    # Warn if prediction was significantly off
+    if [[ "$abs_delta" -gt 3 ]]; then
+        warn "Prediction error for issue #${issue_id}: predicted complexity=${predicted_complexity}, actual~=${actual_complexity} (delta=${delta})"
+    fi
+
+    # Update cache entry with actual outcome for future learning
+    _intelligence_cache_init
+
+    local validation_file="${HOME}/.shipwright/optimization/prediction-validation.jsonl"
+    mkdir -p "${HOME}/.shipwright/optimization"
+
+    local record
+    record=$(jq -c -n \
+        --arg ts "$(now_iso)" \
+        --arg issue "$issue_id" \
+        --argjson predicted "$predicted_complexity" \
+        --argjson actual "$actual_complexity" \
+        --argjson delta "$delta" \
+        --argjson iterations "$actual_iterations" \
+        --arg success "$actual_success" \
+        '{
+            ts: $ts,
+            issue: $issue,
+            predicted_complexity: $predicted,
+            actual_complexity: $actual,
+            delta: $delta,
+            actual_iterations: $iterations,
+            actual_success: $success
+        }')
+
+    echo "$record" >> "$validation_file"
+
+    # Output summary
+    local accuracy_label="good"
+    if [[ "$abs_delta" -gt 3 ]]; then
+        accuracy_label="poor"
+    elif [[ "$abs_delta" -gt 1 ]]; then
+        accuracy_label="fair"
+    fi
+
+    jq -n \
+        --arg issue "$issue_id" \
+        --argjson predicted "$predicted_complexity" \
+        --argjson actual "$actual_complexity" \
+        --argjson delta "$delta" \
+        --arg accuracy "$accuracy_label" \
+        --arg success "$actual_success" \
+        '{
+            issue: $issue,
+            predicted_complexity: $predicted,
+            actual_complexity: $actual,
+            delta: $delta,
+            accuracy: $accuracy,
+            actual_success: $success
+        }'
 }
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -589,8 +986,10 @@ show_help() {
     echo -e "  ${CYAN}predict${RESET} <analysis> [history]   Predict cost and effort"
     echo -e "  ${CYAN}synthesize${RESET} <findings_json>     Synthesize findings into strategy"
     echo -e "  ${CYAN}search-memory${RESET} <context> [dir]  Search memory by relevance"
+    echo -e "  ${CYAN}estimate-iterations${RESET} <analysis>  Estimate build iterations"
     echo -e "  ${CYAN}recommend-model${RESET} <stage> [cplx] Recommend model for stage"
     echo -e "  ${CYAN}cache-stats${RESET}                    Show cache statistics"
+    echo -e "  ${CYAN}validate-prediction${RESET} <id> <pred> <iters> <success>  Validate prediction accuracy"
     echo -e "  ${CYAN}cache-clear${RESET}                    Clear intelligence cache"
     echo -e "  ${CYAN}help${RESET}                           Show this help"
     echo ""
@@ -667,8 +1066,14 @@ main() {
         search-memory)
             intelligence_search_memory "$@"
             ;;
+        estimate-iterations)
+            intelligence_estimate_iterations "$@"
+            ;;
         recommend-model)
             intelligence_recommend_model "$@"
+            ;;
+        validate-prediction)
+            intelligence_validate_prediction "$@"
             ;;
         cache-stats)
             cmd_cache_stats
