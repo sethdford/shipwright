@@ -1,2503 +1,3352 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
-<head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Shipwright — Autonomous Agent Fleet Command</title>
-<meta name="description" content="Orchestrate fully autonomous Claude Code agent teams. From GitHub issue to deployed PR with delivery pipelines, fleet operations, and DORA metrics.">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Shipwright — Autonomous Agent Fleet Command</title>
+    <meta
+      name="description"
+      content="Orchestrate fully autonomous Claude Code agent teams. From GitHub issue to deployed PR with delivery pipelines, fleet operations, and DORA metrics."
+    />
 
-<!-- Open Graph / GitHub Pages -->
-<meta property="og:title" content="Shipwright — Autonomous Agent Fleet Command">
-<meta property="og:description" content="Orchestrate fully autonomous Claude Code agent teams. From GitHub issue to deployed PR — zero human intervention.">
-<meta property="og:type" content="website">
-<meta property="og:url" content="https://sethdford.github.io/shipwright/">
-<meta name="twitter:card" content="summary_large_image">
-<meta name="twitter:title" content="Shipwright — Ship Right. Every Time.">
-<meta name="twitter:description" content="Autonomous Claude Code agent teams. Delivery pipelines, fleet ops, DORA metrics.">
-<link rel="canonical" href="https://sethdford.github.io/shipwright/">
+    <!-- Open Graph / GitHub Pages -->
+    <meta
+      property="og:title"
+      content="Shipwright — Autonomous Agent Fleet Command"
+    />
+    <meta
+      property="og:description"
+      content="Orchestrate fully autonomous Claude Code agent teams. From GitHub issue to deployed PR — zero human intervention."
+    />
+    <meta property="og:type" content="website" />
+    <meta property="og:url" content="https://sethdford.github.io/shipwright/" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="Shipwright — Ship Right. Every Time." />
+    <meta
+      name="twitter:description"
+      content="Autonomous Claude Code agent teams. Delivery pipelines, fleet ops, DORA metrics."
+    />
+    <link rel="canonical" href="https://sethdford.github.io/shipwright/" />
 
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=JetBrains+Mono:wght@400;500;700&family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
-<style>
-/* ═══════════════════════════════════════════════
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=JetBrains+Mono:wght@400;500;700&family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap"
+      rel="stylesheet"
+    />
+    <style>
+      /* ═══════════════════════════════════════════════
    SHIPWRIGHT — DESIGN SYSTEM V2
    ═══════════════════════════════════════════════ */
-:root {
-  --abyss: #060a14;
-  --deep: #0a1628;
-  --ocean: #0d1f3c;
-  --surface: #132d56;
-  --foam: #1a3a6a;
+      :root {
+        --abyss: #060a14;
+        --deep: #0a1628;
+        --ocean: #0d1f3c;
+        --surface: #132d56;
+        --foam: #1a3a6a;
 
-  --cyan: #00d4ff;
-  --cyan-glow: rgba(0, 212, 255, 0.15);
-  --cyan-dim: rgba(0, 212, 255, 0.4);
-  --purple: #7c3aed;
-  --purple-glow: rgba(124, 58, 237, 0.15);
-  --blue: #0066ff;
-  --green: #4ade80;
-  --amber: #fbbf24;
-  --rose: #f43f5e;
+        --cyan: #00d4ff;
+        --cyan-glow: rgba(0, 212, 255, 0.15);
+        --cyan-dim: rgba(0, 212, 255, 0.4);
+        --purple: #7c3aed;
+        --purple-glow: rgba(124, 58, 237, 0.15);
+        --blue: #0066ff;
+        --green: #4ade80;
+        --amber: #fbbf24;
+        --rose: #f43f5e;
 
-  --text-primary: #e8ecf4;
-  --text-secondary: #8899b8;
-  --text-muted: #5a6d8a;
+        --text-primary: #e8ecf4;
+        --text-secondary: #8899b8;
+        --text-muted: #5a6d8a;
 
-  --font-display: 'Instrument Serif', Georgia, serif;
-  --font-body: 'Plus Jakarta Sans', system-ui, sans-serif;
-  --font-mono: 'JetBrains Mono', 'SF Mono', monospace;
+        --font-display: "Instrument Serif", Georgia, serif;
+        --font-body: "Plus Jakarta Sans", system-ui, sans-serif;
+        --font-mono: "JetBrains Mono", "SF Mono", monospace;
 
-  --section-gap: clamp(5rem, 10vw, 8rem);
-}
+        --section-gap: clamp(5rem, 10vw, 8rem);
+      }
 
-/* ═══════════════════════════════════════════════
+      /* ═══════════════════════════════════════════════
    RESET & BASE
    ═══════════════════════════════════════════════ */
-*, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+      *,
+      *::before,
+      *::after {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
 
-html {
-  scroll-behavior: smooth;
-  font-size: 16px;
-  -webkit-font-smoothing: antialiased;
-  scrollbar-width: thin;
-  scrollbar-color: var(--cyan-dim) var(--deep);
-}
+      html {
+        scroll-behavior: smooth;
+        font-size: 16px;
+        -webkit-font-smoothing: antialiased;
+        scrollbar-width: thin;
+        scrollbar-color: var(--cyan-dim) var(--deep);
+      }
 
-body {
-  font-family: var(--font-body);
-  background: var(--abyss);
-  color: var(--text-primary);
-  overflow-x: hidden;
-  line-height: 1.7;
-}
+      body {
+        font-family: var(--font-body);
+        background: var(--abyss);
+        color: var(--text-primary);
+        overflow-x: hidden;
+        line-height: 1.7;
+      }
 
-::selection {
-  background: var(--cyan);
-  color: var(--abyss);
-}
+      ::selection {
+        background: var(--cyan);
+        color: var(--abyss);
+      }
 
-a { color: var(--cyan); text-decoration: none; }
-a:hover { text-decoration: underline; }
+      a {
+        color: var(--cyan);
+        text-decoration: none;
+      }
+      a:hover {
+        text-decoration: underline;
+      }
 
-.icon {
-  width: 24px;
-  height: 24px;
-  display: inline-block;
-  vertical-align: middle;
-  color: currentColor;
-  flex-shrink: 0;
-}
+      .icon {
+        width: 24px;
+        height: 24px;
+        display: inline-block;
+        vertical-align: middle;
+        color: currentColor;
+        flex-shrink: 0;
+      }
 
-.icon-sm { width: 16px; height: 16px; }
-.icon-lg { width: 32px; height: 32px; }
+      .icon-sm {
+        width: 16px;
+        height: 16px;
+      }
+      .icon-lg {
+        width: 32px;
+        height: 32px;
+      }
 
-/* ═══════════════════════════════════════════════
+      /* ═══════════════════════════════════════════════
    CANVAS — PARTICLE OCEAN
    ═══════════════════════════════════════════════ */
-#ocean-canvas {
-  position: fixed;
-  inset: 0;
-  z-index: 0;
-  pointer-events: none;
-}
+      #ocean-canvas {
+        position: fixed;
+        inset: 0;
+        z-index: 0;
+        pointer-events: none;
+      }
 
-/* ═══════════════════════════════════════════════
+      /* ═══════════════════════════════════════════════
    SVG WAVE DIVIDERS
    ═══════════════════════════════════════════════ */
-.wave-divider {
-  position: relative;
-  width: 100%;
-  height: 80px;
-  overflow: hidden;
-  z-index: 1;
-}
+      .wave-divider {
+        position: relative;
+        width: 100%;
+        height: 80px;
+        overflow: hidden;
+        z-index: 1;
+      }
 
-.wave-divider svg {
-  position: absolute;
-  width: 200%;
-  height: 100%;
-  left: 0;
-  bottom: 0;
-}
+      .wave-divider svg {
+        position: absolute;
+        width: 200%;
+        height: 100%;
+        left: 0;
+        bottom: 0;
+      }
 
-.wave-divider .wave-back { opacity: 0.04; }
-.wave-divider .wave-mid { opacity: 0.06; }
-.wave-divider .wave-front { opacity: 0.08; }
+      .wave-divider .wave-back {
+        opacity: 0.04;
+      }
+      .wave-divider .wave-mid {
+        opacity: 0.06;
+      }
+      .wave-divider .wave-front {
+        opacity: 0.08;
+      }
 
-/* ═══════════════════════════════════════════════
+      /* ═══════════════════════════════════════════════
    NAV
    ═══════════════════════════════════════════════ */
-nav {
-  position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  z-index: 100;
-  padding: 1rem 2rem;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  transition: background 0.4s, backdrop-filter 0.4s, border-color 0.4s;
-  border-bottom: 1px solid transparent;
-}
+      nav {
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        z-index: 100;
+        padding: 1rem 2rem;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        transition:
+          background 0.4s,
+          backdrop-filter 0.4s,
+          border-color 0.4s;
+        border-bottom: 1px solid transparent;
+      }
 
-nav.scrolled {
-  background: rgba(6, 10, 20, 0.85);
-  backdrop-filter: blur(20px) saturate(1.5);
-  border-bottom-color: rgba(0, 212, 255, 0.08);
-}
+      nav.scrolled {
+        background: rgba(6, 10, 20, 0.85);
+        backdrop-filter: blur(20px) saturate(1.5);
+        border-bottom-color: rgba(0, 212, 255, 0.08);
+      }
 
-.nav-logo {
-  display: flex;
-  align-items: center;
-  gap: 0.75rem;
-  font-family: var(--font-display);
-  font-size: 1.5rem;
-  color: var(--text-primary);
-  letter-spacing: 0.02em;
-}
+      .nav-logo {
+        display: flex;
+        align-items: center;
+        gap: 0.75rem;
+        font-family: var(--font-display);
+        font-size: 1.5rem;
+        color: var(--text-primary);
+        letter-spacing: 0.02em;
+      }
 
-.nav-logo svg { width: 32px; height: 32px; }
+      .nav-logo svg {
+        width: 32px;
+        height: 32px;
+      }
 
-.nav-links {
-  display: flex;
-  align-items: center;
-  gap: 2rem;
-  list-style: none;
-}
+      .nav-links {
+        display: flex;
+        align-items: center;
+        gap: 2rem;
+        list-style: none;
+      }
 
-.nav-links a {
-  color: var(--text-secondary);
-  font-size: 0.85rem;
-  font-weight: 500;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
-  transition: color 0.3s;
-}
+      .nav-links a {
+        color: var(--text-secondary);
+        font-size: 0.85rem;
+        font-weight: 500;
+        letter-spacing: 0.04em;
+        text-transform: uppercase;
+        transition: color 0.3s;
+      }
 
-.nav-links a:hover {
-  color: var(--cyan);
-  text-decoration: none;
-}
+      .nav-links a:hover {
+        color: var(--cyan);
+        text-decoration: none;
+      }
 
-.nav-cta {
-  background: linear-gradient(135deg, var(--cyan), var(--blue));
-  color: var(--abyss) !important;
-  padding: 0.55rem 1.25rem;
-  border-radius: 6px;
-  font-weight: 700 !important;
-  font-size: 0.8rem !important;
-  letter-spacing: 0.06em !important;
-  transition: transform 0.2s, box-shadow 0.3s;
-}
+      .nav-cta {
+        background: linear-gradient(135deg, var(--cyan), var(--blue));
+        color: var(--abyss) !important;
+        padding: 0.55rem 1.25rem;
+        border-radius: 6px;
+        font-weight: 700 !important;
+        font-size: 0.8rem !important;
+        letter-spacing: 0.06em !important;
+        transition:
+          transform 0.2s,
+          box-shadow 0.3s;
+      }
 
-.nav-cta:hover {
-  transform: translateY(-1px);
-  box-shadow: 0 4px 20px rgba(0, 212, 255, 0.3);
-  text-decoration: none !important;
-}
+      .nav-cta:hover {
+        transform: translateY(-1px);
+        box-shadow: 0 4px 20px rgba(0, 212, 255, 0.3);
+        text-decoration: none !important;
+      }
 
-/* ═══════════════════════════════════════════════
+      /* ═══════════════════════════════════════════════
    HERO
    ═══════════════════════════════════════════════ */
-.hero {
-  position: relative;
-  min-height: 100vh;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  text-align: center;
-  padding: 6rem 2rem 4rem;
-  z-index: 1;
-}
+      .hero {
+        position: relative;
+        min-height: 100vh;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        text-align: center;
+        padding: 6rem 2rem 4rem;
+        z-index: 1;
+      }
 
-.hero-logo-svg {
-  width: 120px;
-  height: 120px;
-  margin-bottom: 2rem;
-  opacity: 0;
-}
+      .hero-logo-svg {
+        width: 120px;
+        height: 120px;
+        margin-bottom: 2rem;
+        opacity: 0;
+      }
 
-.hero-logo-svg path,
-.hero-logo-svg line,
-.hero-logo-svg circle {
-  stroke-dasharray: var(--dash-len, 200);
-  stroke-dashoffset: var(--dash-len, 200);
-}
+      .hero-logo-svg path,
+      .hero-logo-svg line,
+      .hero-logo-svg circle {
+        stroke-dasharray: var(--dash-len, 200);
+        stroke-dashoffset: var(--dash-len, 200);
+      }
 
-.hero-badge {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.5rem;
-  padding: 0.4rem 1rem;
-  background: rgba(0, 212, 255, 0.08);
-  border: 1px solid rgba(0, 212, 255, 0.2);
-  border-radius: 100px;
-  font-family: var(--font-mono);
-  font-size: 0.75rem;
-  color: var(--cyan);
-  letter-spacing: 0.06em;
-  margin-bottom: 2rem;
-  opacity: 0;
-}
+      .hero-badge {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.5rem;
+        padding: 0.4rem 1rem;
+        background: rgba(0, 212, 255, 0.08);
+        border: 1px solid rgba(0, 212, 255, 0.2);
+        border-radius: 100px;
+        font-family: var(--font-mono);
+        font-size: 0.75rem;
+        color: var(--cyan);
+        letter-spacing: 0.06em;
+        margin-bottom: 2rem;
+        opacity: 0;
+      }
 
-.hero-badge .dot {
-  width: 6px;
-  height: 6px;
-  background: var(--green);
-  border-radius: 50%;
-  animation: pulse 2s ease-in-out infinite;
-}
+      .hero-badge .dot {
+        width: 6px;
+        height: 6px;
+        background: var(--green);
+        border-radius: 50%;
+        animation: pulse 2s ease-in-out infinite;
+      }
 
-.hero-title {
-  font-family: var(--font-display);
-  font-size: clamp(3.5rem, 10vw, 8rem);
-  line-height: 0.95;
-  letter-spacing: -0.02em;
-  margin-bottom: 1.5rem;
-}
+      .hero-title {
+        font-family: var(--font-display);
+        font-size: clamp(3.5rem, 10vw, 8rem);
+        line-height: 0.95;
+        letter-spacing: -0.02em;
+        margin-bottom: 1.5rem;
+      }
 
-.hero-title .line1 {
-  display: block;
-  background: linear-gradient(135deg, var(--text-primary) 0%, var(--cyan) 100%);
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  background-clip: text;
-  opacity: 0;
-}
+      .hero-title .line1 {
+        display: block;
+        background: linear-gradient(
+          135deg,
+          var(--text-primary) 0%,
+          var(--cyan) 100%
+        );
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        background-clip: text;
+        opacity: 0;
+      }
 
-.hero-title .line2 {
-  display: block;
-  font-style: italic;
-  background: linear-gradient(135deg, var(--cyan) 0%, var(--purple) 50%, var(--cyan) 100%);
-  background-size: 200% 100%;
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  background-clip: text;
-  animation: shimmer 6s ease-in-out infinite;
-  opacity: 0;
-}
+      .hero-title .line2 {
+        display: block;
+        font-style: italic;
+        background: linear-gradient(
+          135deg,
+          var(--cyan) 0%,
+          var(--purple) 50%,
+          var(--cyan) 100%
+        );
+        background-size: 200% 100%;
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        background-clip: text;
+        animation: shimmer 6s ease-in-out infinite;
+        opacity: 0;
+      }
 
-.hero-sub {
-  font-size: clamp(1.1rem, 2.5vw, 1.35rem);
-  color: var(--text-secondary);
-  max-width: 640px;
-  margin-bottom: 2.5rem;
-  font-weight: 300;
-  line-height: 1.6;
-  opacity: 0;
-}
+      .hero-sub {
+        font-size: clamp(1.1rem, 2.5vw, 1.35rem);
+        color: var(--text-secondary);
+        max-width: 640px;
+        margin-bottom: 2.5rem;
+        font-weight: 300;
+        line-height: 1.6;
+        opacity: 0;
+      }
 
-.hero-actions {
-  display: flex;
-  align-items: center;
-  gap: 1rem;
-  flex-wrap: wrap;
-  justify-content: center;
-  opacity: 0;
-}
+      .hero-actions {
+        display: flex;
+        align-items: center;
+        gap: 1rem;
+        flex-wrap: wrap;
+        justify-content: center;
+        opacity: 0;
+      }
 
-.btn-primary {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.5rem;
-  padding: 0.85rem 2rem;
-  background: linear-gradient(135deg, var(--cyan), var(--blue));
-  color: var(--abyss);
-  font-weight: 700;
-  font-size: 0.95rem;
-  border-radius: 8px;
-  border: none;
-  cursor: pointer;
-  transition: transform 0.2s, box-shadow 0.3s;
-  letter-spacing: 0.02em;
-}
+      .btn-primary {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.5rem;
+        padding: 0.85rem 2rem;
+        background: linear-gradient(135deg, var(--cyan), var(--blue));
+        color: var(--abyss);
+        font-weight: 700;
+        font-size: 0.95rem;
+        border-radius: 8px;
+        border: none;
+        cursor: pointer;
+        transition:
+          transform 0.2s,
+          box-shadow 0.3s;
+        letter-spacing: 0.02em;
+      }
 
-.btn-primary:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 8px 30px rgba(0, 212, 255, 0.35);
-  text-decoration: none;
-  color: var(--abyss);
-}
+      .btn-primary:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 8px 30px rgba(0, 212, 255, 0.35);
+        text-decoration: none;
+        color: var(--abyss);
+      }
 
-.btn-secondary {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.5rem;
-  padding: 0.85rem 2rem;
-  background: rgba(255, 255, 255, 0.04);
-  color: var(--text-primary);
-  font-weight: 600;
-  font-size: 0.95rem;
-  border-radius: 8px;
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  cursor: pointer;
-  transition: all 0.3s;
-}
+      .btn-secondary {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.5rem;
+        padding: 0.85rem 2rem;
+        background: rgba(255, 255, 255, 0.04);
+        color: var(--text-primary);
+        font-weight: 600;
+        font-size: 0.95rem;
+        border-radius: 8px;
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        cursor: pointer;
+        transition: all 0.3s;
+      }
 
-.btn-secondary:hover {
-  background: rgba(255, 255, 255, 0.08);
-  border-color: rgba(0, 212, 255, 0.3);
-  color: var(--cyan);
-  text-decoration: none;
-}
+      .btn-secondary:hover {
+        background: rgba(255, 255, 255, 0.08);
+        border-color: rgba(0, 212, 255, 0.3);
+        color: var(--cyan);
+        text-decoration: none;
+      }
 
-.hero-install {
-  margin-top: 2.5rem;
-  opacity: 0;
-}
+      .hero-install {
+        margin-top: 2.5rem;
+        opacity: 0;
+      }
 
-.install-cmd {
-  display: inline-flex;
-  align-items: center;
-  gap: 1rem;
-  padding: 0.75rem 1.5rem;
-  background: rgba(0, 0, 0, 0.4);
-  border: 1px solid rgba(0, 212, 255, 0.15);
-  border-radius: 8px;
-  font-family: var(--font-mono);
-  font-size: 0.9rem;
-  cursor: pointer;
-  transition: border-color 0.3s, background 0.3s;
-}
+      .install-cmd {
+        display: inline-flex;
+        align-items: center;
+        gap: 1rem;
+        padding: 0.75rem 1.5rem;
+        background: rgba(0, 0, 0, 0.4);
+        border: 1px solid rgba(0, 212, 255, 0.15);
+        border-radius: 8px;
+        font-family: var(--font-mono);
+        font-size: 0.9rem;
+        cursor: pointer;
+        transition:
+          border-color 0.3s,
+          background 0.3s;
+      }
 
-.install-cmd:hover {
-  border-color: var(--cyan-dim);
-  background: rgba(0, 212, 255, 0.05);
-}
+      .install-cmd:hover {
+        border-color: var(--cyan-dim);
+        background: rgba(0, 212, 255, 0.05);
+      }
 
-.install-cmd .prompt { color: var(--cyan); }
-.install-cmd .cmd { color: var(--text-primary); }
-.install-cmd .copy-label {
-  color: var(--text-muted);
-  transition: color 0.3s;
-  font-size: 0.8rem;
-}
-.install-cmd:hover .copy-label { color: var(--cyan); }
+      .install-cmd .prompt {
+        color: var(--cyan);
+      }
+      .install-cmd .cmd {
+        color: var(--text-primary);
+      }
+      .install-cmd .copy-label {
+        color: var(--text-muted);
+        transition: color 0.3s;
+        font-size: 0.8rem;
+      }
+      .install-cmd:hover .copy-label {
+        color: var(--cyan);
+      }
 
-.scroll-indicator {
-  position: absolute;
-  bottom: 2rem;
-  left: 50%;
-  transform: translateX(-50%);
-  opacity: 0;
-}
+      .scroll-indicator {
+        position: absolute;
+        bottom: 2rem;
+        left: 50%;
+        transform: translateX(-50%);
+        opacity: 0;
+      }
 
-.scroll-indicator .mouse {
-  width: 24px;
-  height: 38px;
-  border: 2px solid var(--text-muted);
-  border-radius: 12px;
-  position: relative;
-}
+      .scroll-indicator .mouse {
+        width: 24px;
+        height: 38px;
+        border: 2px solid var(--text-muted);
+        border-radius: 12px;
+        position: relative;
+      }
 
-.scroll-indicator .wheel {
-  width: 4px;
-  height: 8px;
-  background: var(--cyan);
-  border-radius: 2px;
-  position: absolute;
-  top: 6px;
-  left: 50%;
-  transform: translateX(-50%);
-  animation: scrollWheel 2s ease-in-out infinite;
-}
+      .scroll-indicator .wheel {
+        width: 4px;
+        height: 8px;
+        background: var(--cyan);
+        border-radius: 2px;
+        position: absolute;
+        top: 6px;
+        left: 50%;
+        transform: translateX(-50%);
+        animation: scrollWheel 2s ease-in-out infinite;
+      }
 
-/* ═══════════════════════════════════════════════
+      /* ═══════════════════════════════════════════════
    SECTION BASE
    ═══════════════════════════════════════════════ */
-section {
-  position: relative;
-  z-index: 1;
-  padding: var(--section-gap) 2rem;
-}
+      section {
+        position: relative;
+        z-index: 1;
+        padding: var(--section-gap) 2rem;
+      }
 
-.container {
-  max-width: 1200px;
-  margin: 0 auto;
-}
+      .container {
+        max-width: 1200px;
+        margin: 0 auto;
+      }
 
-.section-label {
-  font-family: var(--font-mono);
-  font-size: 0.7rem;
-  font-weight: 700;
-  letter-spacing: 0.2em;
-  text-transform: uppercase;
-  color: var(--cyan);
-  margin-bottom: 1rem;
-  display: flex;
-  align-items: center;
-  gap: 0.75rem;
-}
+      .section-label {
+        font-family: var(--font-mono);
+        font-size: 0.7rem;
+        font-weight: 700;
+        letter-spacing: 0.2em;
+        text-transform: uppercase;
+        color: var(--cyan);
+        margin-bottom: 1rem;
+        display: flex;
+        align-items: center;
+        gap: 0.75rem;
+      }
 
-.section-label::before {
-  content: '';
-  width: 24px;
-  height: 1px;
-  background: var(--cyan);
-}
+      .section-label::before {
+        content: "";
+        width: 24px;
+        height: 1px;
+        background: var(--cyan);
+      }
 
-.section-title {
-  font-family: var(--font-display);
-  font-size: clamp(2.2rem, 5vw, 3.5rem);
-  line-height: 1.1;
-  margin-bottom: 1.25rem;
-  letter-spacing: -0.02em;
-}
+      .section-title {
+        font-family: var(--font-display);
+        font-size: clamp(2.2rem, 5vw, 3.5rem);
+        line-height: 1.1;
+        margin-bottom: 1.25rem;
+        letter-spacing: -0.02em;
+      }
 
-.section-desc {
-  font-size: 1.1rem;
-  color: var(--text-secondary);
-  max-width: 560px;
-  font-weight: 300;
-  line-height: 1.7;
-}
+      .section-desc {
+        font-size: 1.1rem;
+        color: var(--text-secondary);
+        max-width: 560px;
+        font-weight: 300;
+        line-height: 1.7;
+      }
 
-/* ═══════════════════════════════════════════════
+      /* ═══════════════════════════════════════════════
    SOCIAL STATS BAR
    ═══════════════════════════════════════════════ */
-.social-bar {
-  text-align: center;
-  padding: 3rem 2rem 0;
-  z-index: 1;
-  position: relative;
-}
+      .social-bar {
+        text-align: center;
+        padding: 3rem 2rem 0;
+        z-index: 1;
+        position: relative;
+      }
 
-.social-bar p {
-  font-size: 0.8rem;
-  color: var(--text-muted);
-  text-transform: uppercase;
-  letter-spacing: 0.15em;
-  margin-bottom: 2rem;
-  font-weight: 500;
-}
+      .social-bar p {
+        font-size: 0.8rem;
+        color: var(--text-muted);
+        text-transform: uppercase;
+        letter-spacing: 0.15em;
+        margin-bottom: 2rem;
+        font-weight: 500;
+      }
 
-.stats-row {
-  display: flex;
-  justify-content: center;
-  gap: 3rem;
-  flex-wrap: wrap;
-}
+      .stats-row {
+        display: flex;
+        justify-content: center;
+        gap: 3rem;
+        flex-wrap: wrap;
+      }
 
-.stat-item { text-align: center; }
+      .stat-item {
+        text-align: center;
+      }
 
-.stat-value {
-  font-family: var(--font-display);
-  font-size: 2.5rem;
-  color: var(--cyan);
-  line-height: 1;
-  margin-bottom: 0.25rem;
-}
+      .stat-value {
+        font-family: var(--font-display);
+        font-size: 2.5rem;
+        color: var(--cyan);
+        line-height: 1;
+        margin-bottom: 0.25rem;
+      }
 
-.stat-label {
-  font-size: 0.75rem;
-  color: var(--text-muted);
-  text-transform: uppercase;
-  letter-spacing: 0.1em;
-  font-weight: 600;
-}
+      .stat-label {
+        font-size: 0.75rem;
+        color: var(--text-muted);
+        text-transform: uppercase;
+        letter-spacing: 0.1em;
+        font-weight: 600;
+      }
 
-/* ═══════════════════════════════════════════════
+      /* ═══════════════════════════════════════════════
    FOUNDATION — ARCHITECTURE LAYERS
    ═══════════════════════════════════════════════ */
-.foundation-layers {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 0;
-  margin-top: 3rem;
-  max-width: 800px;
-  margin-left: auto;
-  margin-right: auto;
-}
+      .foundation-layers {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 0;
+        margin-top: 3rem;
+        max-width: 800px;
+        margin-left: auto;
+        margin-right: auto;
+      }
 
-.foundation-layer {
-  width: 100%;
-  border-radius: 16px;
-  padding: 2rem 2.5rem;
-  position: relative;
-}
+      .foundation-layer {
+        width: 100%;
+        border-radius: 16px;
+        padding: 2rem 2.5rem;
+        position: relative;
+      }
 
-.shipwright-layer {
-  background: rgba(0, 212, 255, 0.04);
-  border: 1px solid rgba(0, 212, 255, 0.15);
-  z-index: 2;
-  margin-bottom: -1px;
-  border-bottom-left-radius: 0;
-  border-bottom-right-radius: 0;
-}
+      .shipwright-layer {
+        background: rgba(0, 212, 255, 0.04);
+        border: 1px solid rgba(0, 212, 255, 0.15);
+        z-index: 2;
+        margin-bottom: -1px;
+        border-bottom-left-radius: 0;
+        border-bottom-right-radius: 0;
+      }
 
-.claude-layer {
-  background: rgba(124, 58, 237, 0.04);
-  border: 1px solid rgba(124, 58, 237, 0.15);
-  border-top: none;
-  border-top-left-radius: 0;
-  border-top-right-radius: 0;
-}
+      .claude-layer {
+        background: rgba(124, 58, 237, 0.04);
+        border: 1px solid rgba(124, 58, 237, 0.15);
+        border-top: none;
+        border-top-left-radius: 0;
+        border-top-right-radius: 0;
+      }
 
-.layer-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: baseline;
-  margin-bottom: 1.25rem;
-}
+      .layer-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: baseline;
+        margin-bottom: 1.25rem;
+      }
 
-.layer-name {
-  font-family: var(--font-body);
-  font-size: 1rem;
-  font-weight: 700;
-}
+      .layer-name {
+        font-family: var(--font-body);
+        font-size: 1rem;
+        font-weight: 700;
+      }
 
-.shipwright-layer .layer-name { color: var(--cyan); }
-.claude-layer .layer-name { color: var(--purple); }
+      .shipwright-layer .layer-name {
+        color: var(--cyan);
+      }
+      .claude-layer .layer-name {
+        color: var(--purple);
+      }
 
-.layer-role {
-  font-size: 0.75rem;
-  color: var(--text-muted);
-  text-transform: uppercase;
-  letter-spacing: 0.1em;
-  font-weight: 600;
-}
+      .layer-role {
+        font-size: 0.75rem;
+        color: var(--text-muted);
+        text-transform: uppercase;
+        letter-spacing: 0.1em;
+        font-weight: 600;
+      }
 
-.layer-chips {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.5rem;
-}
+      .layer-chips {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.5rem;
+      }
 
-.layer-chip {
-  font-family: var(--font-mono);
-  font-size: 0.72rem;
-  padding: 0.35rem 0.85rem;
-  border-radius: 100px;
-  font-weight: 500;
-  white-space: nowrap;
-}
+      .layer-chip {
+        font-family: var(--font-mono);
+        font-size: 0.72rem;
+        padding: 0.35rem 0.85rem;
+        border-radius: 100px;
+        font-weight: 500;
+        white-space: nowrap;
+      }
 
-.shipwright-layer .layer-chip {
-  background: rgba(0, 212, 255, 0.08);
-  border: 1px solid rgba(0, 212, 255, 0.2);
-  color: var(--cyan);
-}
+      .shipwright-layer .layer-chip {
+        background: rgba(0, 212, 255, 0.08);
+        border: 1px solid rgba(0, 212, 255, 0.2);
+        color: var(--cyan);
+      }
 
-.claude-layer .layer-chip {
-  background: rgba(124, 58, 237, 0.08);
-  border: 1px solid rgba(124, 58, 237, 0.2);
-  color: rgba(124, 58, 237, 0.8);
-}
+      .claude-layer .layer-chip {
+        background: rgba(124, 58, 237, 0.08);
+        border: 1px solid rgba(124, 58, 237, 0.2);
+        color: rgba(124, 58, 237, 0.8);
+      }
 
-.foundation-connector {
-  width: 100%;
-  height: 4px;
-  position: relative;
-  z-index: 3;
-}
+      .foundation-connector {
+        width: 100%;
+        height: 4px;
+        position: relative;
+        z-index: 3;
+      }
 
-.foundation-connector::after {
-  content: '';
-  position: absolute;
-  inset: 0;
-  background: linear-gradient(90deg, var(--cyan), var(--purple));
-  opacity: 0.4;
-}
+      .foundation-connector::after {
+        content: "";
+        position: absolute;
+        inset: 0;
+        background: linear-gradient(90deg, var(--cyan), var(--purple));
+        opacity: 0.4;
+      }
 
-@media (max-width: 600px) {
-  .foundation-layer { padding: 1.5rem; }
-  .layer-header { flex-direction: column; gap: 0.25rem; }
-}
+      @media (max-width: 600px) {
+        .foundation-layer {
+          padding: 1.5rem;
+        }
+        .layer-header {
+          flex-direction: column;
+          gap: 0.25rem;
+        }
+      }
 
-/* ═══════════════════════════════════════════════
+      /* ═══════════════════════════════════════════════
    VOYAGE — HOW IT WORKS
    ═══════════════════════════════════════════════ */
-.voyage-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
-  gap: 1px;
-  margin-top: 3rem;
-  background: rgba(0, 212, 255, 0.06);
-  border-radius: 16px;
-  overflow: hidden;
-  border: 1px solid rgba(0, 212, 255, 0.06);
-}
+      .voyage-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+        gap: 1px;
+        margin-top: 3rem;
+        background: rgba(0, 212, 255, 0.06);
+        border-radius: 16px;
+        overflow: hidden;
+        border: 1px solid rgba(0, 212, 255, 0.06);
+      }
 
-.voyage-step {
-  background: rgba(6, 10, 20, 0.8);
-  padding: 2.5rem;
-  position: relative;
-  transition: background 0.4s;
-}
+      .voyage-step {
+        background: rgba(6, 10, 20, 0.8);
+        padding: 2.5rem;
+        position: relative;
+        transition: background 0.4s;
+      }
 
-.voyage-step:hover {
-  background: rgba(0, 212, 255, 0.03);
-}
+      .voyage-step:hover {
+        background: rgba(0, 212, 255, 0.03);
+      }
 
-.voyage-step-num {
-  font-family: var(--font-display);
-  font-size: 3.5rem;
-  color: rgba(0, 212, 255, 0.1);
-  line-height: 1;
-  position: absolute;
-  top: 1.5rem;
-  right: 1.5rem;
-}
+      .voyage-step-num {
+        font-family: var(--font-display);
+        font-size: 3.5rem;
+        color: rgba(0, 212, 255, 0.1);
+        line-height: 1;
+        position: absolute;
+        top: 1.5rem;
+        right: 1.5rem;
+      }
 
-.voyage-icon {
-  width: 48px;
-  height: 48px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  border-radius: 12px;
-  background: linear-gradient(135deg, rgba(0, 212, 255, 0.1), rgba(124, 58, 237, 0.1));
-  border: 1px solid rgba(0, 212, 255, 0.15);
-  margin-bottom: 1.25rem;
-  color: var(--cyan);
-}
+      .voyage-icon {
+        width: 48px;
+        height: 48px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        border-radius: 12px;
+        background: linear-gradient(
+          135deg,
+          rgba(0, 212, 255, 0.1),
+          rgba(124, 58, 237, 0.1)
+        );
+        border: 1px solid rgba(0, 212, 255, 0.15);
+        margin-bottom: 1.25rem;
+        color: var(--cyan);
+      }
 
-.voyage-icon .icon { width: 22px; height: 22px; }
+      .voyage-icon .icon {
+        width: 22px;
+        height: 22px;
+      }
 
-.voyage-step h3 {
-  font-family: var(--font-body);
-  font-size: 1.1rem;
-  font-weight: 700;
-  margin-bottom: 0.5rem;
-  color: var(--text-primary);
-}
+      .voyage-step h3 {
+        font-family: var(--font-body);
+        font-size: 1.1rem;
+        font-weight: 700;
+        margin-bottom: 0.5rem;
+        color: var(--text-primary);
+      }
 
-.voyage-step .nautical {
-  font-family: var(--font-display);
-  font-style: italic;
-  color: var(--cyan);
-  font-size: 0.9rem;
-  margin-bottom: 0.75rem;
-}
+      .voyage-step .nautical {
+        font-family: var(--font-display);
+        font-style: italic;
+        color: var(--cyan);
+        font-size: 0.9rem;
+        margin-bottom: 0.75rem;
+      }
 
-.voyage-step p {
-  font-size: 0.9rem;
-  color: var(--text-secondary);
-  line-height: 1.6;
-}
+      .voyage-step p {
+        font-size: 0.9rem;
+        color: var(--text-secondary);
+        line-height: 1.6;
+      }
 
-/* ═══════════════════════════════════════════════
+      /* ═══════════════════════════════════════════════
    PIPELINE VISUALIZATION (SVG-based)
    ═══════════════════════════════════════════════ */
-.pipeline-section { overflow: hidden; }
+      .pipeline-section {
+        overflow: hidden;
+      }
 
-.pipeline-svg-wrap {
-  margin-top: 2rem;
-  overflow-x: auto;
-  scrollbar-width: none;
-  -webkit-overflow-scrolling: touch;
-}
+      .pipeline-svg-wrap {
+        margin-top: 2rem;
+        overflow-x: auto;
+        scrollbar-width: none;
+        -webkit-overflow-scrolling: touch;
+      }
 
-.pipeline-svg-wrap::-webkit-scrollbar { display: none; }
+      .pipeline-svg-wrap::-webkit-scrollbar {
+        display: none;
+      }
 
-.pipeline-svg {
-  display: block;
-  margin: 0 auto;
-  max-width: 100%;
-  height: auto;
-}
+      .pipeline-svg {
+        display: block;
+        margin: 0 auto;
+        max-width: 100%;
+        height: auto;
+      }
 
-/* ═══════════════════════════════════════════════
+      /* ═══════════════════════════════════════════════
    FEATURES
    ═══════════════════════════════════════════════ */
-.features-grid {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 1px;
-  margin-top: 3rem;
-  background: rgba(0, 212, 255, 0.04);
-  border-radius: 16px;
-  overflow: hidden;
-  border: 1px solid rgba(0, 212, 255, 0.06);
-}
+      .features-grid {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 1px;
+        margin-top: 3rem;
+        background: rgba(0, 212, 255, 0.04);
+        border-radius: 16px;
+        overflow: hidden;
+        border: 1px solid rgba(0, 212, 255, 0.06);
+      }
 
-.feature-card {
-  background: rgba(6, 10, 20, 0.85);
-  padding: 2.25rem;
-  transition: background 0.4s, transform 0.3s;
-  position: relative;
-  overflow: hidden;
-}
+      .feature-card {
+        background: rgba(6, 10, 20, 0.85);
+        padding: 2.25rem;
+        transition:
+          background 0.4s,
+          transform 0.3s;
+        position: relative;
+        overflow: hidden;
+      }
 
-.feature-card::before {
-  content: '';
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  height: 1px;
-  background: linear-gradient(90deg, transparent, var(--cyan), transparent);
-  opacity: 0;
-  transition: opacity 0.4s;
-}
+      .feature-card::before {
+        content: "";
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        height: 1px;
+        background: linear-gradient(
+          90deg,
+          transparent,
+          var(--cyan),
+          transparent
+        );
+        opacity: 0;
+        transition: opacity 0.4s;
+      }
 
-.feature-card:hover {
-  background: rgba(0, 212, 255, 0.02);
-}
+      .feature-card:hover {
+        background: rgba(0, 212, 255, 0.02);
+      }
 
-.feature-card:hover::before {
-  opacity: 0.5;
-}
+      .feature-card:hover::before {
+        opacity: 0.5;
+      }
 
-.feature-icon {
-  width: 40px;
-  height: 40px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  border-radius: 10px;
-  margin-bottom: 1.25rem;
-  transition: box-shadow 0.4s;
-}
+      .feature-icon {
+        width: 40px;
+        height: 40px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        border-radius: 10px;
+        margin-bottom: 1.25rem;
+        transition: box-shadow 0.4s;
+      }
 
-.feature-card:hover .feature-icon {
-  box-shadow: 0 0 20px rgba(0, 212, 255, 0.2);
-}
+      .feature-card:hover .feature-icon {
+        box-shadow: 0 0 20px rgba(0, 212, 255, 0.2);
+      }
 
-.feature-icon .icon { width: 20px; height: 20px; }
+      .feature-icon .icon {
+        width: 20px;
+        height: 20px;
+      }
 
-.feature-icon.daemon { background: linear-gradient(135deg, rgba(74, 222, 128, 0.15), rgba(0, 212, 255, 0.1)); border: 1px solid rgba(74, 222, 128, 0.2); color: var(--green); }
-.feature-icon.fleet { background: linear-gradient(135deg, rgba(0, 102, 255, 0.15), rgba(0, 212, 255, 0.1)); border: 1px solid rgba(0, 102, 255, 0.2); color: var(--blue); }
-.feature-icon.scale { background: linear-gradient(135deg, rgba(124, 58, 237, 0.15), rgba(0, 212, 255, 0.1)); border: 1px solid rgba(124, 58, 237, 0.2); color: var(--purple); }
-.feature-icon.dora { background: linear-gradient(135deg, rgba(251, 191, 36, 0.15), rgba(0, 212, 255, 0.1)); border: 1px solid rgba(251, 191, 36, 0.2); color: var(--amber); }
-.feature-icon.quality { background: linear-gradient(135deg, rgba(244, 63, 94, 0.15), rgba(0, 212, 255, 0.1)); border: 1px solid rgba(244, 63, 94, 0.2); color: var(--rose); }
-.feature-icon.worktree { background: linear-gradient(135deg, rgba(0, 212, 255, 0.15), rgba(124, 58, 237, 0.1)); border: 1px solid rgba(0, 212, 255, 0.2); color: var(--cyan); }
+      .feature-icon.daemon {
+        background: linear-gradient(
+          135deg,
+          rgba(74, 222, 128, 0.15),
+          rgba(0, 212, 255, 0.1)
+        );
+        border: 1px solid rgba(74, 222, 128, 0.2);
+        color: var(--green);
+      }
+      .feature-icon.fleet {
+        background: linear-gradient(
+          135deg,
+          rgba(0, 102, 255, 0.15),
+          rgba(0, 212, 255, 0.1)
+        );
+        border: 1px solid rgba(0, 102, 255, 0.2);
+        color: var(--blue);
+      }
+      .feature-icon.scale {
+        background: linear-gradient(
+          135deg,
+          rgba(124, 58, 237, 0.15),
+          rgba(0, 212, 255, 0.1)
+        );
+        border: 1px solid rgba(124, 58, 237, 0.2);
+        color: var(--purple);
+      }
+      .feature-icon.dora {
+        background: linear-gradient(
+          135deg,
+          rgba(251, 191, 36, 0.15),
+          rgba(0, 212, 255, 0.1)
+        );
+        border: 1px solid rgba(251, 191, 36, 0.2);
+        color: var(--amber);
+      }
+      .feature-icon.quality {
+        background: linear-gradient(
+          135deg,
+          rgba(244, 63, 94, 0.15),
+          rgba(0, 212, 255, 0.1)
+        );
+        border: 1px solid rgba(244, 63, 94, 0.2);
+        color: var(--rose);
+      }
+      .feature-icon.worktree {
+        background: linear-gradient(
+          135deg,
+          rgba(0, 212, 255, 0.15),
+          rgba(124, 58, 237, 0.1)
+        );
+        border: 1px solid rgba(0, 212, 255, 0.2);
+        color: var(--cyan);
+      }
 
-.feature-card h3 {
-  font-size: 1.05rem;
-  font-weight: 700;
-  margin-bottom: 0.5rem;
-  color: var(--text-primary);
-}
+      .feature-card h3 {
+        font-size: 1.05rem;
+        font-weight: 700;
+        margin-bottom: 0.5rem;
+        color: var(--text-primary);
+      }
 
-.feature-card p {
-  font-size: 0.88rem;
-  color: var(--text-secondary);
-  line-height: 1.6;
-}
+      .feature-card p {
+        font-size: 0.88rem;
+        color: var(--text-secondary);
+        line-height: 1.6;
+      }
 
-.feature-tag {
-  display: inline-block;
-  padding: 0.15rem 0.5rem;
-  background: rgba(0, 212, 255, 0.08);
-  border: 1px solid rgba(0, 212, 255, 0.15);
-  border-radius: 4px;
-  font-family: var(--font-mono);
-  font-size: 0.65rem;
-  color: var(--cyan);
-  margin-top: 0.75rem;
-  letter-spacing: 0.04em;
-}
+      .feature-tag {
+        display: inline-block;
+        padding: 0.15rem 0.5rem;
+        background: rgba(0, 212, 255, 0.08);
+        border: 1px solid rgba(0, 212, 255, 0.15);
+        border-radius: 4px;
+        font-family: var(--font-mono);
+        font-size: 0.65rem;
+        color: var(--cyan);
+        margin-top: 0.75rem;
+        letter-spacing: 0.04em;
+      }
 
-/* ═══════════════════════════════════════════════
+      /* ═══════════════════════════════════════════════
    TERMINAL DEMO
    ═══════════════════════════════════════════════ */
-.terminal-section {
-  background: linear-gradient(180deg, transparent, rgba(0, 212, 255, 0.02), transparent);
-}
+      .terminal-section {
+        background: linear-gradient(
+          180deg,
+          transparent,
+          rgba(0, 212, 255, 0.02),
+          transparent
+        );
+      }
 
-.terminal-window {
-  max-width: 900px;
-  margin: 3rem auto 0;
-  border-radius: 12px;
-  overflow: hidden;
-  border: 1px solid rgba(0, 212, 255, 0.12);
-  box-shadow:
-    0 0 60px rgba(0, 212, 255, 0.06),
-    0 20px 60px rgba(0, 0, 0, 0.4);
-}
+      .terminal-window {
+        max-width: 900px;
+        margin: 3rem auto 0;
+        border-radius: 12px;
+        overflow: hidden;
+        border: 1px solid rgba(0, 212, 255, 0.12);
+        box-shadow:
+          0 0 60px rgba(0, 212, 255, 0.06),
+          0 20px 60px rgba(0, 0, 0, 0.4);
+      }
 
-.terminal-titlebar {
-  background: rgba(13, 31, 60, 0.9);
-  padding: 0.75rem 1rem;
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  border-bottom: 1px solid rgba(0, 212, 255, 0.08);
-}
+      .terminal-titlebar {
+        background: rgba(13, 31, 60, 0.9);
+        padding: 0.75rem 1rem;
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        border-bottom: 1px solid rgba(0, 212, 255, 0.08);
+      }
 
-.terminal-dot {
-  width: 10px;
-  height: 10px;
-  border-radius: 50%;
-}
+      .terminal-dot {
+        width: 10px;
+        height: 10px;
+        border-radius: 50%;
+      }
 
-.terminal-dot.red { background: #ff5f57; }
-.terminal-dot.yellow { background: #febc2e; }
-.terminal-dot.green { background: #28c840; }
+      .terminal-dot.red {
+        background: #ff5f57;
+      }
+      .terminal-dot.yellow {
+        background: #febc2e;
+      }
+      .terminal-dot.green {
+        background: #28c840;
+      }
 
-.terminal-title {
-  margin-left: 0.75rem;
-  font-family: var(--font-mono);
-  font-size: 0.75rem;
-  color: var(--text-muted);
-}
+      .terminal-title {
+        margin-left: 0.75rem;
+        font-family: var(--font-mono);
+        font-size: 0.75rem;
+        color: var(--text-muted);
+      }
 
-.terminal-body {
-  background: rgba(6, 10, 20, 0.95);
-  padding: 1.5rem;
-  font-family: var(--font-mono);
-  font-size: 0.82rem;
-  line-height: 1.8;
-  min-height: 380px;
-  position: relative;
-  overflow-x: auto;
-}
+      .terminal-body {
+        background: rgba(6, 10, 20, 0.95);
+        padding: 1.5rem;
+        font-family: var(--font-mono);
+        font-size: 0.82rem;
+        line-height: 1.8;
+        min-height: 380px;
+        position: relative;
+        overflow-x: auto;
+      }
 
-.terminal-body .line {
-  opacity: 0;
-  transform: translateY(4px);
-  white-space: pre;
-}
+      .terminal-body .line {
+        opacity: 0;
+        transform: translateY(4px);
+        white-space: pre;
+      }
 
-.terminal-body .line.visible {
-  opacity: 1;
-  transform: translateY(0);
-  transition: all 0.3s ease-out;
-}
+      .terminal-body .line.visible {
+        opacity: 1;
+        transform: translateY(0);
+        transition: all 0.3s ease-out;
+      }
 
-.t-prompt { color: var(--cyan); }
-.t-cmd { color: var(--text-primary); font-weight: 700; }
-.t-flag { color: var(--purple); }
-.t-string { color: var(--green); }
-.t-dim { color: var(--text-muted); }
-.t-info { color: var(--cyan); }
-.t-success { color: var(--green); }
-.t-warn { color: var(--amber); }
-.t-stage { color: var(--purple); }
-.t-box { color: rgba(0, 212, 255, 0.4); }
+      .t-prompt {
+        color: var(--cyan);
+      }
+      .t-cmd {
+        color: var(--text-primary);
+        font-weight: 700;
+      }
+      .t-flag {
+        color: var(--purple);
+      }
+      .t-string {
+        color: var(--green);
+      }
+      .t-dim {
+        color: var(--text-muted);
+      }
+      .t-info {
+        color: var(--cyan);
+      }
+      .t-success {
+        color: var(--green);
+      }
+      .t-warn {
+        color: var(--amber);
+      }
+      .t-stage {
+        color: var(--purple);
+      }
+      .t-box {
+        color: rgba(0, 212, 255, 0.4);
+      }
 
-/* ═══════════════════════════════════════════════
+      /* ═══════════════════════════════════════════════
    SCALE / NUMBERS
    ═══════════════════════════════════════════════ */
-.scale-section {
-  text-align: center;
-  position: relative;
-  overflow: hidden;
-}
+      .scale-section {
+        text-align: center;
+        position: relative;
+        overflow: hidden;
+      }
 
-.scale-section::before {
-  content: '';
-  position: absolute;
-  top: 50%;
-  left: 50%;
-  transform: translate(-50%, -50%);
-  width: 600px;
-  height: 600px;
-  background: radial-gradient(circle, rgba(0, 212, 255, 0.05) 0%, transparent 70%);
-  pointer-events: none;
-}
+      .scale-section::before {
+        content: "";
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        width: 600px;
+        height: 600px;
+        background: radial-gradient(
+          circle,
+          rgba(0, 212, 255, 0.05) 0%,
+          transparent 70%
+        );
+        pointer-events: none;
+      }
 
-.scale-grid {
-  display: grid;
-  grid-template-columns: repeat(4, 1fr);
-  gap: 2rem;
-  margin-top: 3rem;
-}
+      .scale-grid {
+        display: grid;
+        grid-template-columns: repeat(4, 1fr);
+        gap: 2rem;
+        margin-top: 3rem;
+      }
 
-.scale-card {
-  padding: 2rem 1rem;
-  position: relative;
-}
+      .scale-card {
+        padding: 2rem 1rem;
+        position: relative;
+      }
 
-.scale-card::after {
-  content: '';
-  position: absolute;
-  top: 50%;
-  right: 0;
-  transform: translateY(-50%);
-  width: 1px;
-  height: 40%;
-  background: rgba(0, 212, 255, 0.1);
-}
+      .scale-card::after {
+        content: "";
+        position: absolute;
+        top: 50%;
+        right: 0;
+        transform: translateY(-50%);
+        width: 1px;
+        height: 40%;
+        background: rgba(0, 212, 255, 0.1);
+      }
 
-.scale-card:last-child::after { display: none; }
+      .scale-card:last-child::after {
+        display: none;
+      }
 
-.scale-number {
-  font-family: var(--font-display);
-  font-size: clamp(3rem, 6vw, 4.5rem);
-  background: linear-gradient(135deg, var(--cyan), var(--purple));
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  background-clip: text;
-  line-height: 1;
-  margin-bottom: 0.5rem;
-}
+      .scale-number {
+        font-family: var(--font-display);
+        font-size: clamp(3rem, 6vw, 4.5rem);
+        background: linear-gradient(135deg, var(--cyan), var(--purple));
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        background-clip: text;
+        line-height: 1;
+        margin-bottom: 0.5rem;
+      }
 
-.scale-unit {
-  font-family: var(--font-display);
-  font-style: italic;
-  font-size: 1.2rem;
-  color: var(--text-secondary);
-  margin-bottom: 0.25rem;
-}
+      .scale-unit {
+        font-family: var(--font-display);
+        font-style: italic;
+        font-size: 1.2rem;
+        color: var(--text-secondary);
+        margin-bottom: 0.25rem;
+      }
 
-.scale-detail {
-  font-size: 0.8rem;
-  color: var(--text-muted);
-  max-width: 180px;
-  margin: 0 auto;
-}
+      .scale-detail {
+        font-size: 0.8rem;
+        color: var(--text-muted);
+        max-width: 180px;
+        margin: 0 auto;
+      }
 
-/* ═══════════════════════════════════════════════
+      /* ═══════════════════════════════════════════════
    TEAM TEMPLATES
    ═══════════════════════════════════════════════ */
-.templates-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
-  gap: 1rem;
-  margin-top: 3rem;
-}
+      .templates-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+        gap: 1rem;
+        margin-top: 3rem;
+      }
 
-.template-card {
-  padding: 1.5rem;
-  background: rgba(13, 31, 60, 0.3);
-  border: 1px solid rgba(0, 212, 255, 0.08);
-  border-radius: 12px;
-  transition: all 0.3s;
-}
+      .template-card {
+        padding: 1.5rem;
+        background: rgba(13, 31, 60, 0.3);
+        border: 1px solid rgba(0, 212, 255, 0.08);
+        border-radius: 12px;
+        transition: all 0.3s;
+      }
 
-.template-card:hover {
-  border-color: rgba(0, 212, 255, 0.2);
-  background: rgba(0, 212, 255, 0.03);
-  transform: translateY(-2px);
-}
+      .template-card:hover {
+        border-color: rgba(0, 212, 255, 0.2);
+        background: rgba(0, 212, 255, 0.03);
+        transform: translateY(-2px);
+      }
 
-.template-header {
-  display: flex;
-  align-items: center;
-  gap: 0.75rem;
-  margin-bottom: 0.75rem;
-}
+      .template-header {
+        display: flex;
+        align-items: center;
+        gap: 0.75rem;
+        margin-bottom: 0.75rem;
+      }
 
-.template-icon {
-  width: 28px;
-  height: 28px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  color: var(--cyan);
-}
+      .template-icon {
+        width: 28px;
+        height: 28px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: var(--cyan);
+      }
 
-.template-icon .icon { width: 20px; height: 20px; }
+      .template-icon .icon {
+        width: 20px;
+        height: 20px;
+      }
 
-.template-name {
-  font-family: var(--font-mono);
-  font-size: 0.85rem;
-  font-weight: 700;
-  color: var(--text-primary);
-}
+      .template-name {
+        font-family: var(--font-mono);
+        font-size: 0.85rem;
+        font-weight: 700;
+        color: var(--text-primary);
+      }
 
-.template-agents {
-  font-family: var(--font-mono);
-  font-size: 0.65rem;
-  color: var(--cyan);
-  background: rgba(0, 212, 255, 0.08);
-  padding: 0.15rem 0.5rem;
-  border-radius: 4px;
-  margin-left: auto;
-}
+      .template-agents {
+        font-family: var(--font-mono);
+        font-size: 0.65rem;
+        color: var(--cyan);
+        background: rgba(0, 212, 255, 0.08);
+        padding: 0.15rem 0.5rem;
+        border-radius: 4px;
+        margin-left: auto;
+      }
 
-.template-desc {
-  font-size: 0.82rem;
-  color: var(--text-secondary);
-  line-height: 1.5;
-}
+      .template-desc {
+        font-size: 0.82rem;
+        color: var(--text-secondary);
+        line-height: 1.5;
+      }
 
-/* ═══════════════════════════════════════════════
+      /* ═══════════════════════════════════════════════
    OPEN SOURCE
    ═══════════════════════════════════════════════ */
-.opensource-section {
-  text-align: center;
-}
+      .opensource-section {
+        text-align: center;
+      }
 
-.opensource-grid {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 1.5rem;
-  margin-top: 3rem;
-}
+      .opensource-grid {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 1.5rem;
+        margin-top: 3rem;
+      }
 
-.os-card {
-  padding: 2rem;
-  background: rgba(13, 31, 60, 0.25);
-  border: 1px solid rgba(0, 212, 255, 0.08);
-  border-radius: 12px;
-  transition: border-color 0.3s;
-}
+      .os-card {
+        padding: 2rem;
+        background: rgba(13, 31, 60, 0.25);
+        border: 1px solid rgba(0, 212, 255, 0.08);
+        border-radius: 12px;
+        transition: border-color 0.3s;
+      }
 
-.os-card:hover {
-  border-color: rgba(0, 212, 255, 0.2);
-}
+      .os-card:hover {
+        border-color: rgba(0, 212, 255, 0.2);
+      }
 
-.os-card-icon {
-  width: 48px;
-  height: 48px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  margin: 0 auto 1rem;
-  border-radius: 12px;
-  background: linear-gradient(135deg, rgba(0, 212, 255, 0.1), rgba(124, 58, 237, 0.1));
-  border: 1px solid rgba(0, 212, 255, 0.15);
-  color: var(--cyan);
-}
+      .os-card-icon {
+        width: 48px;
+        height: 48px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        margin: 0 auto 1rem;
+        border-radius: 12px;
+        background: linear-gradient(
+          135deg,
+          rgba(0, 212, 255, 0.1),
+          rgba(124, 58, 237, 0.1)
+        );
+        border: 1px solid rgba(0, 212, 255, 0.15);
+        color: var(--cyan);
+      }
 
-.os-card h3 {
-  font-size: 1.05rem;
-  font-weight: 700;
-  margin-bottom: 0.5rem;
-}
+      .os-card h3 {
+        font-size: 1.05rem;
+        font-weight: 700;
+        margin-bottom: 0.5rem;
+      }
 
-.os-card p {
-  font-size: 0.88rem;
-  color: var(--text-secondary);
-  line-height: 1.6;
-}
+      .os-card p {
+        font-size: 0.88rem;
+        color: var(--text-secondary);
+        line-height: 1.6;
+      }
 
-.os-card .os-link {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.4rem;
-  margin-top: 1rem;
-  font-size: 0.82rem;
-  font-weight: 600;
-  color: var(--cyan);
-}
+      .os-card .os-link {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.4rem;
+        margin-top: 1rem;
+        font-size: 0.82rem;
+        font-weight: 600;
+        color: var(--cyan);
+      }
 
-.os-card .os-link:hover { text-decoration: underline; }
+      .os-card .os-link:hover {
+        text-decoration: underline;
+      }
 
-/* ═══════════════════════════════════════════════
+      /* ═══════════════════════════════════════════════
    CTA
    ═══════════════════════════════════════════════ */
-.cta-section {
-  text-align: center;
-  position: relative;
-  overflow: hidden;
-}
+      .cta-section {
+        text-align: center;
+        position: relative;
+        overflow: hidden;
+      }
 
-.cta-section::before {
-  content: '';
-  position: absolute;
-  top: 0;
-  left: 50%;
-  transform: translateX(-50%);
-  width: 100%;
-  max-width: 800px;
-  height: 1px;
-  background: linear-gradient(90deg, transparent, var(--cyan), transparent);
-  opacity: 0.3;
-}
+      .cta-section::before {
+        content: "";
+        position: absolute;
+        top: 0;
+        left: 50%;
+        transform: translateX(-50%);
+        width: 100%;
+        max-width: 800px;
+        height: 1px;
+        background: linear-gradient(
+          90deg,
+          transparent,
+          var(--cyan),
+          transparent
+        );
+        opacity: 0.3;
+      }
 
-.cta-title {
-  font-family: var(--font-display);
-  font-size: clamp(2.5rem, 6vw, 4rem);
-  line-height: 1.1;
-  margin-bottom: 1rem;
-  margin-top: 2rem;
-}
+      .cta-title {
+        font-family: var(--font-display);
+        font-size: clamp(2.5rem, 6vw, 4rem);
+        line-height: 1.1;
+        margin-bottom: 1rem;
+        margin-top: 2rem;
+      }
 
-.cta-desc {
-  font-size: 1.1rem;
-  color: var(--text-secondary);
-  max-width: 500px;
-  margin: 0 auto 2.5rem;
-  font-weight: 300;
-}
+      .cta-desc {
+        font-size: 1.1rem;
+        color: var(--text-secondary);
+        max-width: 500px;
+        margin: 0 auto 2.5rem;
+        font-weight: 300;
+      }
 
-.install-options {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 1rem;
-  margin-top: 2rem;
-}
+      .install-options {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 1rem;
+        margin-top: 2rem;
+      }
 
-.install-option {
-  display: flex;
-  align-items: center;
-  gap: 1.5rem;
-  padding: 1rem 1.5rem;
-  background: rgba(0, 0, 0, 0.3);
-  border: 1px solid rgba(0, 212, 255, 0.1);
-  border-radius: 10px;
-  min-width: 420px;
-  cursor: pointer;
-  transition: all 0.3s;
-}
+      .install-option {
+        display: flex;
+        align-items: center;
+        gap: 1.5rem;
+        padding: 1rem 1.5rem;
+        background: rgba(0, 0, 0, 0.3);
+        border: 1px solid rgba(0, 212, 255, 0.1);
+        border-radius: 10px;
+        min-width: 420px;
+        cursor: pointer;
+        transition: all 0.3s;
+      }
 
-.install-option:hover {
-  border-color: var(--cyan-dim);
-  background: rgba(0, 212, 255, 0.04);
-}
+      .install-option:hover {
+        border-color: var(--cyan-dim);
+        background: rgba(0, 212, 255, 0.04);
+      }
 
-.install-method {
-  font-size: 0.7rem;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.1em;
-  color: var(--text-muted);
-  min-width: 60px;
-}
+      .install-method {
+        font-size: 0.7rem;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 0.1em;
+        color: var(--text-muted);
+        min-width: 60px;
+      }
 
-.install-code {
-  font-family: var(--font-mono);
-  font-size: 0.85rem;
-  color: var(--cyan);
-}
+      .install-code {
+        font-family: var(--font-mono);
+        font-size: 0.85rem;
+        color: var(--cyan);
+      }
 
-/* ═══════════════════════════════════════════════
+      /* ═══════════════════════════════════════════════
    FOOTER
    ═══════════════════════════════════════════════ */
-footer {
-  position: relative;
-  z-index: 1;
-  padding: 3rem 2rem;
-  border-top: 1px solid rgba(0, 212, 255, 0.06);
-}
+      footer {
+        position: relative;
+        z-index: 1;
+        padding: 3rem 2rem;
+        border-top: 1px solid rgba(0, 212, 255, 0.06);
+      }
 
-.footer-inner {
-  max-width: 1200px;
-  margin: 0 auto;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-}
+      .footer-inner {
+        max-width: 1200px;
+        margin: 0 auto;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+      }
 
-.footer-brand {
-  font-family: var(--font-display);
-  font-size: 1.1rem;
-  color: var(--text-secondary);
-}
+      .footer-brand {
+        font-family: var(--font-display);
+        font-size: 1.1rem;
+        color: var(--text-secondary);
+      }
 
-.footer-links {
-  display: flex;
-  gap: 2rem;
-  list-style: none;
-}
+      .footer-links {
+        display: flex;
+        gap: 2rem;
+        list-style: none;
+      }
 
-.footer-links a {
-  color: var(--text-muted);
-  font-size: 0.8rem;
-  transition: color 0.3s;
-}
+      .footer-links a {
+        color: var(--text-muted);
+        font-size: 0.8rem;
+        transition: color 0.3s;
+      }
 
-.footer-links a:hover { color: var(--cyan); }
+      .footer-links a:hover {
+        color: var(--cyan);
+      }
 
-.footer-copy {
-  font-size: 0.75rem;
-  color: var(--text-muted);
-}
+      .footer-copy {
+        font-size: 0.75rem;
+        color: var(--text-muted);
+      }
 
-/* ═══════════════════════════════════════════════
+      /* ═══════════════════════════════════════════════
    ANIMATIONS
    ═══════════════════════════════════════════════ */
-@keyframes shimmer {
-  0%, 100% { background-position: 0% 50%; }
-  50% { background-position: 100% 50%; }
-}
+      @keyframes shimmer {
+        0%,
+        100% {
+          background-position: 0% 50%;
+        }
+        50% {
+          background-position: 100% 50%;
+        }
+      }
 
-@keyframes pulse {
-  0%, 100% { opacity: 1; transform: scale(1); }
-  50% { opacity: 0.5; transform: scale(0.8); }
-}
+      @keyframes pulse {
+        0%,
+        100% {
+          opacity: 1;
+          transform: scale(1);
+        }
+        50% {
+          opacity: 0.5;
+          transform: scale(0.8);
+        }
+      }
 
-@keyframes scrollWheel {
-  0%, 100% { opacity: 1; transform: translateX(-50%) translateY(0); }
-  50% { opacity: 0.3; transform: translateX(-50%) translateY(12px); }
-}
+      @keyframes scrollWheel {
+        0%,
+        100% {
+          opacity: 1;
+          transform: translateX(-50%) translateY(0);
+        }
+        50% {
+          opacity: 0.3;
+          transform: translateX(-50%) translateY(12px);
+        }
+      }
 
-@keyframes terminalBlink {
-  0%, 100% { opacity: 1; }
-  50% { opacity: 0; }
-}
+      @keyframes terminalBlink {
+        0%,
+        100% {
+          opacity: 1;
+        }
+        50% {
+          opacity: 0;
+        }
+      }
 
-.cursor-blink {
-  display: inline-block;
-  width: 8px;
-  height: 16px;
-  background: var(--cyan);
-  animation: terminalBlink 1s step-end infinite;
-  vertical-align: text-bottom;
-  margin-left: 2px;
-}
+      .cursor-blink {
+        display: inline-block;
+        width: 8px;
+        height: 16px;
+        background: var(--cyan);
+        animation: terminalBlink 1s step-end infinite;
+        vertical-align: text-bottom;
+        margin-left: 2px;
+      }
 
-/* ═══════════════════════════════════════════════
+      /* ═══════════════════════════════════════════════
    GSAP SCROLL REVEAL (initial state)
    ═══════════════════════════════════════════════ */
-.gs-reveal {
-  opacity: 0;
-  transform: translateY(30px);
-  will-change: transform, opacity;
-}
+      .gs-reveal {
+        opacity: 0;
+        transform: translateY(30px);
+        will-change: transform, opacity;
+      }
 
-/* ═══════════════════════════════════════════════
+      /* ═══════════════════════════════════════════════
    RESPONSIVE
    ═══════════════════════════════════════════════ */
-@media (max-width: 900px) {
-  .features-grid { grid-template-columns: repeat(2, 1fr); }
-  .scale-grid { grid-template-columns: repeat(2, 1fr); gap: 1rem; }
-  .scale-card::after { display: none; }
-  .nav-links { display: none; }
-  .install-option { min-width: auto; flex-direction: column; align-items: flex-start; gap: 0.5rem; }
-  .opensource-grid { grid-template-columns: 1fr; }
-}
+      @media (max-width: 900px) {
+        .features-grid {
+          grid-template-columns: repeat(2, 1fr);
+        }
+        .scale-grid {
+          grid-template-columns: repeat(2, 1fr);
+          gap: 1rem;
+        }
+        .scale-card::after {
+          display: none;
+        }
+        .nav-links {
+          display: none;
+        }
+        .install-option {
+          min-width: auto;
+          flex-direction: column;
+          align-items: flex-start;
+          gap: 0.5rem;
+        }
+        .opensource-grid {
+          grid-template-columns: 1fr;
+        }
+      }
 
-@media (max-width: 600px) {
-  .features-grid { grid-template-columns: 1fr; }
-  .scale-grid { grid-template-columns: 1fr; }
-  .hero-actions { flex-direction: column; }
-  .stats-row { flex-direction: column; gap: 1.5rem; }
-  .hero-logo-svg { width: 80px; height: 80px; }
-}
+      @media (max-width: 600px) {
+        .features-grid {
+          grid-template-columns: 1fr;
+        }
+        .scale-grid {
+          grid-template-columns: 1fr;
+        }
+        .hero-actions {
+          flex-direction: column;
+        }
+        .stats-row {
+          flex-direction: column;
+          gap: 1.5rem;
+        }
+        .hero-logo-svg {
+          width: 80px;
+          height: 80px;
+        }
+      }
 
-/* ═══════════════════════════════════════════════
+      /* ═══════════════════════════════════════════════
    REDUCED MOTION
    ═══════════════════════════════════════════════ */
-@media (prefers-reduced-motion: reduce) {
-  *, *::before, *::after {
-    animation-duration: 0.01ms !important;
-    animation-iteration-count: 1 !important;
-    transition-duration: 0.01ms !important;
-  }
-  .gs-reveal {
-    opacity: 1;
-    transform: none;
-  }
-  .hero-badge, .hero-title .line1, .hero-title .line2,
-  .hero-sub, .hero-actions, .hero-install, .scroll-indicator,
-  .hero-logo-svg {
-    opacity: 1 !important;
-    transform: none !important;
-  }
-}
-</style>
-</head>
-<body>
-
-<!-- ════════════════════════════════════════════════
+      @media (prefers-reduced-motion: reduce) {
+        *,
+        *::before,
+        *::after {
+          animation-duration: 0.01ms !important;
+          animation-iteration-count: 1 !important;
+          transition-duration: 0.01ms !important;
+        }
+        .gs-reveal {
+          opacity: 1;
+          transform: none;
+        }
+        .hero-badge,
+        .hero-title .line1,
+        .hero-title .line2,
+        .hero-sub,
+        .hero-actions,
+        .hero-install,
+        .scroll-indicator,
+        .hero-logo-svg {
+          opacity: 1 !important;
+          transform: none !important;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <!-- ════════════════════════════════════════════════
      PARTICLE CANVAS
      ════════════════════════════════════════════════ -->
-<canvas id="ocean-canvas"></canvas>
+    <canvas id="ocean-canvas"></canvas>
 
-<!-- ════════════════════════════════════════════════
+    <!-- ════════════════════════════════════════════════
      NAVIGATION
      ════════════════════════════════════════════════ -->
-<nav id="nav">
-  <div class="nav-logo">
-    <svg viewBox="0 0 32 32" fill="none">
-      <path d="M16 2L4 12l4 16h16l4-16L16 2z" stroke="currentColor" stroke-width="1.5" fill="none" opacity="0.6"/>
-      <path d="M16 2v26" stroke="url(#nav-mast)" stroke-width="1.5"/>
-      <path d="M16 8l10 6" stroke="currentColor" stroke-width="1" opacity="0.4"/>
-      <path d="M16 8l-10 6" stroke="currentColor" stroke-width="1" opacity="0.4"/>
-      <path d="M16 14l8 4" stroke="currentColor" stroke-width="1" opacity="0.3"/>
-      <path d="M16 14l-8 4" stroke="currentColor" stroke-width="1" opacity="0.3"/>
-      <circle cx="16" cy="6" r="2" fill="url(#nav-mast)"/>
-      <defs>
-        <linearGradient id="nav-mast" x1="16" y1="2" x2="16" y2="28">
-          <stop offset="0%" stop-color="#00d4ff"/>
-          <stop offset="100%" stop-color="#7c3aed"/>
-        </linearGradient>
-      </defs>
-    </svg>
-    Shipwright
-  </div>
-  <ul class="nav-links">
-    <li><a href="#foundation">Foundation</a></li>
-    <li><a href="#voyage">How It Works</a></li>
-    <li><a href="#features">Features</a></li>
-    <li><a href="#demo">Demo</a></li>
-    <li><a href="#templates">Templates</a></li>
-    <li><a href="https://github.com/sethdford/shipwright" target="_blank">GitHub</a></li>
-    <li><a href="#cta" class="nav-cta">Get Started</a></li>
-  </ul>
-</nav>
+    <nav id="nav">
+      <div class="nav-logo">
+        <svg viewBox="0 0 32 32" fill="none">
+          <path
+            d="M16 2L4 12l4 16h16l4-16L16 2z"
+            stroke="currentColor"
+            stroke-width="1.5"
+            fill="none"
+            opacity="0.6"
+          />
+          <path d="M16 2v26" stroke="url(#nav-mast)" stroke-width="1.5" />
+          <path
+            d="M16 8l10 6"
+            stroke="currentColor"
+            stroke-width="1"
+            opacity="0.4"
+          />
+          <path
+            d="M16 8l-10 6"
+            stroke="currentColor"
+            stroke-width="1"
+            opacity="0.4"
+          />
+          <path
+            d="M16 14l8 4"
+            stroke="currentColor"
+            stroke-width="1"
+            opacity="0.3"
+          />
+          <path
+            d="M16 14l-8 4"
+            stroke="currentColor"
+            stroke-width="1"
+            opacity="0.3"
+          />
+          <circle cx="16" cy="6" r="2" fill="url(#nav-mast)" />
+          <defs>
+            <linearGradient id="nav-mast" x1="16" y1="2" x2="16" y2="28">
+              <stop offset="0%" stop-color="#00d4ff" />
+              <stop offset="100%" stop-color="#7c3aed" />
+            </linearGradient>
+          </defs>
+        </svg>
+        Shipwright
+      </div>
+      <ul class="nav-links">
+        <li><a href="#foundation">Foundation</a></li>
+        <li><a href="#voyage">How It Works</a></li>
+        <li><a href="#features">Features</a></li>
+        <li><a href="#demo">Demo</a></li>
+        <li><a href="#templates">Templates</a></li>
+        <li>
+          <a href="https://github.com/sethdford/shipwright" target="_blank"
+            >GitHub</a
+          >
+        </li>
+        <li><a href="#cta" class="nav-cta">Get Started</a></li>
+      </ul>
+    </nav>
 
-<!-- ════════════════════════════════════════════════
+    <!-- ════════════════════════════════════════════════
      HERO
      ════════════════════════════════════════════════ -->
-<section class="hero">
-  <!-- Inline logo SVG for draw-on animation -->
-  <svg class="hero-logo-svg" viewBox="0 0 64 64" fill="none" aria-hidden="true">
-    <defs>
-      <linearGradient id="hero-grad" x1="32" y1="4" x2="32" y2="60" gradientUnits="userSpaceOnUse">
-        <stop offset="0%" stop-color="#00d4ff"/>
-        <stop offset="50%" stop-color="#0066ff"/>
-        <stop offset="100%" stop-color="#7c3aed"/>
-      </linearGradient>
-      <linearGradient id="hero-hull" x1="32" y1="32" x2="32" y2="56" gradientUnits="userSpaceOnUse">
-        <stop offset="0%" stop-color="#00d4ff" stop-opacity="0.9"/>
-        <stop offset="100%" stop-color="#7c3aed" stop-opacity="0.9"/>
-      </linearGradient>
-      <linearGradient id="hero-sail-r" x1="32" y1="10" x2="48" y2="38" gradientUnits="userSpaceOnUse">
-        <stop offset="0%" stop-color="#00d4ff" stop-opacity="0.7"/>
-        <stop offset="100%" stop-color="#0066ff" stop-opacity="0.3"/>
-      </linearGradient>
-      <linearGradient id="hero-sail-l" x1="32" y1="10" x2="16" y2="38" gradientUnits="userSpaceOnUse">
-        <stop offset="0%" stop-color="#00d4ff" stop-opacity="0.5"/>
-        <stop offset="100%" stop-color="#7c3aed" stop-opacity="0.2"/>
-      </linearGradient>
-    </defs>
-    <line class="logo-draw" x1="32" y1="6" x2="32" y2="48" stroke="url(#hero-grad)" stroke-width="2.5" stroke-linecap="round"/>
-    <circle class="logo-draw" cx="32" cy="7" r="3" fill="none" stroke="url(#hero-grad)" stroke-width="2"/>
-    <path class="logo-draw" d="M33 12 L50 36 L33 40 Z" fill="url(#hero-sail-r)" stroke="url(#hero-grad)" stroke-width="1.2" stroke-linejoin="round"/>
-    <path class="logo-draw" d="M31 14 L16 34 L31 38 Z" fill="url(#hero-sail-l)" stroke="url(#hero-grad)" stroke-width="1.2" stroke-linejoin="round"/>
-    <line class="logo-draw" x1="18" y1="28" x2="46" y2="28" stroke="url(#hero-grad)" stroke-width="1.5" stroke-linecap="round" opacity="0.5"/>
-    <path class="logo-draw" d="M14 48 Q18 44 32 44 Q46 44 50 48 L47 54 Q40 58 32 58 Q24 58 17 54 Z" fill="url(#hero-hull)" stroke="url(#hero-grad)" stroke-width="1.5" stroke-linejoin="round"/>
-    <path class="logo-draw" d="M19 51 Q25 49 32 49 Q39 49 45 51" stroke="#00d4ff" stroke-width="0.8" stroke-linecap="round" fill="none" opacity="0.5"/>
-    <path class="logo-draw" d="M6 56 Q10 53 16 56 Q22 59 28 56 Q34 53 40 56 Q46 59 52 56 Q56 54 58 56" stroke="#00d4ff" stroke-width="1.2" stroke-linecap="round" fill="none" opacity="0.3"/>
-    <path class="logo-draw" d="M4 60 Q9 57 15 60 Q21 63 27 60 Q33 57 39 60 Q45 63 51 60 Q57 57 60 60" stroke="#7c3aed" stroke-width="1" stroke-linecap="round" fill="none" opacity="0.2"/>
-  </svg>
+    <section class="hero">
+      <!-- Inline logo SVG for draw-on animation -->
+      <svg
+        class="hero-logo-svg"
+        viewBox="0 0 64 64"
+        fill="none"
+        aria-hidden="true"
+      >
+        <defs>
+          <linearGradient
+            id="hero-grad"
+            x1="32"
+            y1="4"
+            x2="32"
+            y2="60"
+            gradientUnits="userSpaceOnUse"
+          >
+            <stop offset="0%" stop-color="#00d4ff" />
+            <stop offset="50%" stop-color="#0066ff" />
+            <stop offset="100%" stop-color="#7c3aed" />
+          </linearGradient>
+          <linearGradient
+            id="hero-hull"
+            x1="32"
+            y1="32"
+            x2="32"
+            y2="56"
+            gradientUnits="userSpaceOnUse"
+          >
+            <stop offset="0%" stop-color="#00d4ff" stop-opacity="0.9" />
+            <stop offset="100%" stop-color="#7c3aed" stop-opacity="0.9" />
+          </linearGradient>
+          <linearGradient
+            id="hero-sail-r"
+            x1="32"
+            y1="10"
+            x2="48"
+            y2="38"
+            gradientUnits="userSpaceOnUse"
+          >
+            <stop offset="0%" stop-color="#00d4ff" stop-opacity="0.7" />
+            <stop offset="100%" stop-color="#0066ff" stop-opacity="0.3" />
+          </linearGradient>
+          <linearGradient
+            id="hero-sail-l"
+            x1="32"
+            y1="10"
+            x2="16"
+            y2="38"
+            gradientUnits="userSpaceOnUse"
+          >
+            <stop offset="0%" stop-color="#00d4ff" stop-opacity="0.5" />
+            <stop offset="100%" stop-color="#7c3aed" stop-opacity="0.2" />
+          </linearGradient>
+        </defs>
+        <line
+          class="logo-draw"
+          x1="32"
+          y1="6"
+          x2="32"
+          y2="48"
+          stroke="url(#hero-grad)"
+          stroke-width="2.5"
+          stroke-linecap="round"
+        />
+        <circle
+          class="logo-draw"
+          cx="32"
+          cy="7"
+          r="3"
+          fill="none"
+          stroke="url(#hero-grad)"
+          stroke-width="2"
+        />
+        <path
+          class="logo-draw"
+          d="M33 12 L50 36 L33 40 Z"
+          fill="url(#hero-sail-r)"
+          stroke="url(#hero-grad)"
+          stroke-width="1.2"
+          stroke-linejoin="round"
+        />
+        <path
+          class="logo-draw"
+          d="M31 14 L16 34 L31 38 Z"
+          fill="url(#hero-sail-l)"
+          stroke="url(#hero-grad)"
+          stroke-width="1.2"
+          stroke-linejoin="round"
+        />
+        <line
+          class="logo-draw"
+          x1="18"
+          y1="28"
+          x2="46"
+          y2="28"
+          stroke="url(#hero-grad)"
+          stroke-width="1.5"
+          stroke-linecap="round"
+          opacity="0.5"
+        />
+        <path
+          class="logo-draw"
+          d="M14 48 Q18 44 32 44 Q46 44 50 48 L47 54 Q40 58 32 58 Q24 58 17 54 Z"
+          fill="url(#hero-hull)"
+          stroke="url(#hero-grad)"
+          stroke-width="1.5"
+          stroke-linejoin="round"
+        />
+        <path
+          class="logo-draw"
+          d="M19 51 Q25 49 32 49 Q39 49 45 51"
+          stroke="#00d4ff"
+          stroke-width="0.8"
+          stroke-linecap="round"
+          fill="none"
+          opacity="0.5"
+        />
+        <path
+          class="logo-draw"
+          d="M6 56 Q10 53 16 56 Q22 59 28 56 Q34 53 40 56 Q46 59 52 56 Q56 54 58 56"
+          stroke="#00d4ff"
+          stroke-width="1.2"
+          stroke-linecap="round"
+          fill="none"
+          opacity="0.3"
+        />
+        <path
+          class="logo-draw"
+          d="M4 60 Q9 57 15 60 Q21 63 27 60 Q33 57 39 60 Q45 63 51 60 Q57 57 60 60"
+          stroke="#7c3aed"
+          stroke-width="1"
+          stroke-linecap="round"
+          fill="none"
+          opacity="0.2"
+        />
+      </svg>
 
-  <div class="hero-badge">
-    <span class="dot"></span>
-    v1.7.1 — Autonomous Fleet Command
-  </div>
+      <div class="hero-badge">
+        <span class="dot"></span>
+        v1.7.1 — Autonomous Fleet Command
+      </div>
 
-  <h1 class="hero-title">
-    <span class="line1">Ship Right.</span>
-    <span class="line2">Every Time.</span>
-  </h1>
+      <h1 class="hero-title">
+        <span class="line1">Ship Right.</span>
+        <span class="line2">Every Time.</span>
+      </h1>
 
-  <p class="hero-sub">
-    Orchestrate fully autonomous Claude Code agent teams.
-    From GitHub issue to deployed PR — zero human intervention.
-  </p>
+      <p class="hero-sub">
+        Orchestrate fully autonomous Claude Code agent teams. From GitHub issue
+        to deployed PR — zero human intervention.
+      </p>
 
-  <div class="hero-actions">
-    <a href="#cta" class="btn-primary">
-      <svg class="icon icon-sm"><use href="icons.svg#icon-arrow-up-right"/></svg>
-      Install Shipwright
-    </a>
-    <a href="#demo" class="btn-secondary">
-      <svg class="icon icon-sm"><use href="icons.svg#icon-play"/></svg>
-      Watch Demo
-    </a>
-  </div>
+      <div class="hero-actions">
+        <a href="#cta" class="btn-primary">
+          <svg class="icon icon-sm">
+            <use href="icons.svg#icon-arrow-up-right" />
+          </svg>
+          Install Shipwright
+        </a>
+        <a href="#demo" class="btn-secondary">
+          <svg class="icon icon-sm"><use href="icons.svg#icon-play" /></svg>
+          Watch Demo
+        </a>
+      </div>
 
-  <div class="hero-install">
-    <div class="install-cmd" onclick="navigator.clipboard.writeText('npm install -g shipwright-cli');this.querySelector('.copy-label').textContent='Copied!'">
-      <span class="prompt">$</span>
-      <span class="cmd">npm install -g shipwright-cli</span>
-      <span class="copy-label">Copy</span>
-    </div>
-  </div>
+      <div class="hero-install">
+        <div
+          class="install-cmd"
+          onclick="
+            navigator.clipboard.writeText('npm install -g shipwright-cli');
+            this.querySelector('.copy-label').textContent = 'Copied!';
+          "
+        >
+          <span class="prompt">$</span>
+          <span class="cmd">npm install -g shipwright-cli</span>
+          <span class="copy-label">Copy</span>
+        </div>
+      </div>
 
-  <div class="scroll-indicator">
-    <div class="mouse">
-      <div class="wheel"></div>
-    </div>
-  </div>
-</section>
+      <div class="scroll-indicator">
+        <div class="mouse">
+          <div class="wheel"></div>
+        </div>
+      </div>
+    </section>
 
-<!-- ════════════════════════════════════════════════
+    <!-- ════════════════════════════════════════════════
      SOCIAL STATS BAR
      ════════════════════════════════════════════════ -->
-<div class="social-bar gs-reveal">
-  <p>Built for engineering teams who ship</p>
-  <div class="stats-row">
-    <div class="stat-item">
-      <div class="stat-value" data-stat="12">0</div>
-      <div class="stat-label">Team Templates</div>
-    </div>
-    <div class="stat-item">
-      <div class="stat-value" data-stat="12">0</div>
-      <div class="stat-label">Pipeline Stages</div>
-    </div>
-    <div class="stat-item">
-      <div class="stat-value" data-stat="4">0</div>
-      <div class="stat-label">Deploy Adapters</div>
-    </div>
-    <div class="stat-item">
-      <div class="stat-value stat-inf">&#8734;</div>
-      <div class="stat-label">Autonomous Cycles</div>
-    </div>
-  </div>
-</div>
-
-<!-- Wave divider -->
-<div class="wave-divider" aria-hidden="true">
-  <svg class="wave-back" viewBox="0 0 1440 80" preserveAspectRatio="none">
-    <path d="M0 40 Q360 0 720 40 T1440 40 V80 H0Z" fill="var(--cyan)"/>
-  </svg>
-  <svg class="wave-mid" viewBox="0 0 1440 80" preserveAspectRatio="none">
-    <path d="M0 50 Q360 20 720 50 T1440 50 V80 H0Z" fill="var(--purple)"/>
-  </svg>
-  <svg class="wave-front" viewBox="0 0 1440 80" preserveAspectRatio="none">
-    <path d="M0 60 Q360 35 720 60 T1440 60 V80 H0Z" fill="var(--cyan)"/>
-  </svg>
-</div>
-
-<!-- ════════════════════════════════════════════════
-     THE FOUNDATION — ARCHITECTURE LAYERS
-     ════════════════════════════════════════════════ -->
-<section id="foundation">
-  <div class="container">
-    <div class="gs-reveal">
-      <div class="section-label">The Foundation</div>
-      <h2 class="section-title">Claude Code is the engine.<br>Shipwright is the ship.</h2>
-      <p class="section-desc">Claude Code by Anthropic provides AI coding agents with built-in team mode. Shipwright wraps them in a complete delivery system — pipelines, autonomous daemon, fleet operations, persistent memory, and DORA metrics.</p>
+    <div class="social-bar gs-reveal">
+      <p>Built for engineering teams who ship</p>
+      <div class="stats-row">
+        <div class="stat-item">
+          <div class="stat-value" data-stat="24">0</div>
+          <div class="stat-label">Team Templates</div>
+        </div>
+        <div class="stat-item">
+          <div class="stat-value" data-stat="12">0</div>
+          <div class="stat-label">Pipeline Stages</div>
+        </div>
+        <div class="stat-item">
+          <div class="stat-value" data-stat="7">0</div>
+          <div class="stat-label">Intelligence Modules</div>
+        </div>
+        <div class="stat-item">
+          <div class="stat-value stat-inf">&#8734;</div>
+          <div class="stat-label">Autonomous Cycles</div>
+        </div>
+      </div>
     </div>
 
-    <div class="foundation-layers">
-      <div class="foundation-layer shipwright-layer gs-reveal">
-        <div class="layer-header">
-          <span class="layer-name">Shipwright</span>
-          <span class="layer-role">Orchestration &amp; Delivery</span>
-        </div>
-        <div class="layer-chips">
-          <span class="layer-chip">12-stage pipelines</span>
-          <span class="layer-chip">Autonomous daemon</span>
-          <span class="layer-chip">Fleet operations</span>
-          <span class="layer-chip">Persistent memory</span>
-          <span class="layer-chip">Deploy adapters</span>
-          <span class="layer-chip">DORA metrics</span>
-        </div>
-      </div>
-      <div class="foundation-connector"></div>
-      <div class="foundation-layer claude-layer gs-reveal">
-        <div class="layer-header">
-          <span class="layer-name">Claude Code</span>
-          <span class="layer-role">Anthropic's AI Coding Tool</span>
-        </div>
-        <div class="layer-chips">
-          <span class="layer-chip">AI coding agents</span>
-          <span class="layer-chip">Team mode</span>
-          <span class="layer-chip">Code read/write</span>
-          <span class="layer-chip">Git operations</span>
-          <span class="layer-chip">Hooks system</span>
-        </div>
-      </div>
-    </div>
-  </div>
-</section>
-
-<!-- ════════════════════════════════════════════════
-     HOW IT WORKS — THE VOYAGE
-     ════════════════════════════════════════════════ -->
-<section id="voyage">
-  <div class="container">
-    <div class="gs-reveal">
-      <div class="section-label">The Voyage</div>
-      <h2 class="section-title">From issue to production.<br>Fully autonomous.</h2>
-      <p class="section-desc">Every deployment follows a charted course. Shipwright orchestrates the entire journey — your agents are the crew.</p>
-    </div>
-
-    <div class="voyage-grid">
-      <div class="voyage-step gs-reveal">
-        <div class="voyage-step-num">01</div>
-        <div class="voyage-icon">
-          <svg class="icon"><use href="icons.svg#icon-chart-course"/></svg>
-        </div>
-        <div class="nautical">Chart the Course</div>
-        <h3>Intake &amp; Planning</h3>
-        <p>The daemon spots a labeled GitHub issue, triages priority, and plots the delivery strategy. Context from past voyages is loaded automatically.</p>
-      </div>
-      <div class="voyage-step gs-reveal">
-        <div class="voyage-step-num">02</div>
-        <div class="voyage-icon">
-          <svg class="icon"><use href="icons.svg#icon-assemble-crew"/></svg>
-        </div>
-        <div class="nautical">Assemble the Crew</div>
-        <h3>Agent Team Spawn</h3>
-        <p>Specialized agents spin up in parallel — backend, frontend, tests. Each gets their own tmux pane, their own context, their own mission.</p>
-      </div>
-      <div class="voyage-step gs-reveal">
-        <div class="voyage-step-num">03</div>
-        <div class="voyage-icon">
-          <svg class="icon"><use href="icons.svg#icon-set-sail"/></svg>
-        </div>
-        <div class="nautical">Set Sail</div>
-        <h3>Build &amp; Self-Heal</h3>
-        <p>Agents build autonomously with compound quality loops — lint, typecheck, test, fix, repeat. If something breaks, they read the errors and try again.</p>
-      </div>
-      <div class="voyage-step gs-reveal">
-        <div class="voyage-step-num">04</div>
-        <div class="voyage-icon">
-          <svg class="icon"><use href="icons.svg#icon-navigate"/></svg>
-        </div>
-        <div class="nautical">Navigate the Waters</div>
-        <h3>Review &amp; Quality</h3>
-        <p>Automated code review, security audit, and test coverage analysis. Quality gates ensure nothing ships that isn't seaworthy.</p>
-      </div>
-      <div class="voyage-step gs-reveal">
-        <div class="voyage-step-num">05</div>
-        <div class="voyage-icon">
-          <svg class="icon"><use href="icons.svg#icon-make-port"/></svg>
-        </div>
-        <div class="nautical">Make Port</div>
-        <h3>PR &amp; Deploy</h3>
-        <p>A clean PR is created with full context, labels, and reviewers. Deploy adapters push to Vercel, Fly.io, Railway, or Docker. DORA metrics are logged.</p>
-      </div>
-      <div class="voyage-step gs-reveal">
-        <div class="voyage-step-num">06</div>
-        <div class="voyage-icon">
-          <svg class="icon"><use href="icons.svg#icon-watch-horizon"/></svg>
-        </div>
-        <div class="nautical">Watch the Horizon</div>
-        <h3>Monitor &amp; Learn</h3>
-        <p>Post-deploy validation confirms health. Persistent memory captures what was learned for the next voyage. The fleet grows smarter.</p>
-      </div>
-    </div>
-  </div>
-</section>
-
-<!-- Wave divider -->
-<div class="wave-divider" aria-hidden="true">
-  <svg class="wave-back" viewBox="0 0 1440 80" preserveAspectRatio="none">
-    <path d="M0 30 Q360 60 720 30 T1440 30 V80 H0Z" fill="var(--purple)"/>
-  </svg>
-  <svg class="wave-front" viewBox="0 0 1440 80" preserveAspectRatio="none">
-    <path d="M0 45 Q360 70 720 45 T1440 45 V80 H0Z" fill="var(--cyan)"/>
-  </svg>
-</div>
-
-<!-- ════════════════════════════════════════════════
-     PIPELINE VISUALIZATION (SVG)
-     ════════════════════════════════════════════════ -->
-<section id="pipeline" class="pipeline-section">
-  <div class="container">
-    <div class="gs-reveal" style="text-align:center; margin-bottom: 1rem;">
-      <div class="section-label" style="justify-content:center;">
-        <span>Live Pipeline</span>
-      </div>
-      <p style="color: var(--text-muted); font-size: 0.85rem;">The autonomous delivery pipeline — every stage, every gate</p>
-    </div>
-    <div class="pipeline-svg-wrap gs-reveal">
-      <svg class="pipeline-svg" id="pipeline-svg" viewBox="0 0 1100 140" fill="none" xmlns="http://www.w3.org/2000/svg">
-        <defs>
-          <linearGradient id="pipe-grad-done" x1="0" y1="0" x2="1" y2="0">
-            <stop offset="0%" stop-color="#4ade80"/>
-            <stop offset="100%" stop-color="#00d4ff"/>
-          </linearGradient>
-          <linearGradient id="pipe-grad-active" x1="0" y1="0" x2="1" y2="0">
-            <stop offset="0%" stop-color="#00d4ff"/>
-            <stop offset="100%" stop-color="#0066ff"/>
-          </linearGradient>
-          <filter id="glow-active">
-            <feGaussianBlur stdDeviation="4" result="blur"/>
-            <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
-          </filter>
-          <filter id="glow-complete">
-            <feGaussianBlur stdDeviation="3" result="blur"/>
-            <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
-          </filter>
-        </defs>
-        <!-- Main pipeline path (drawn by GSAP) -->
-        <path id="pipeline-path" d="M 30 70 L 1070 70" stroke="var(--text-muted)" stroke-width="2" stroke-dasharray="6 4" opacity="0.3"/>
-        <path id="pipeline-progress" d="M 30 70 L 1070 70" stroke="url(#pipe-grad-done)" stroke-width="3" stroke-linecap="round" opacity="0"/>
-        <!-- Nodes rendered by JS -->
-        <g id="pipeline-nodes"></g>
-        <!-- Particles -->
-        <g id="pipeline-particles"></g>
+    <!-- Wave divider -->
+    <div class="wave-divider" aria-hidden="true">
+      <svg class="wave-back" viewBox="0 0 1440 80" preserveAspectRatio="none">
+        <path d="M0 40 Q360 0 720 40 T1440 40 V80 H0Z" fill="var(--cyan)" />
+      </svg>
+      <svg class="wave-mid" viewBox="0 0 1440 80" preserveAspectRatio="none">
+        <path d="M0 50 Q360 20 720 50 T1440 50 V80 H0Z" fill="var(--purple)" />
+      </svg>
+      <svg class="wave-front" viewBox="0 0 1440 80" preserveAspectRatio="none">
+        <path d="M0 60 Q360 35 720 60 T1440 60 V80 H0Z" fill="var(--cyan)" />
       </svg>
     </div>
-  </div>
-</section>
 
-<!-- ════════════════════════════════════════════════
+    <!-- ════════════════════════════════════════════════
+     THE FOUNDATION — ARCHITECTURE LAYERS
+     ════════════════════════════════════════════════ -->
+    <section id="foundation">
+      <div class="container">
+        <div class="gs-reveal">
+          <div class="section-label">The Foundation</div>
+          <h2 class="section-title">
+            Claude Code is the engine.<br />Shipwright is the ship.
+          </h2>
+          <p class="section-desc">
+            Claude Code by Anthropic provides AI coding agents with built-in
+            team mode. Shipwright wraps them in a complete delivery system —
+            pipelines, autonomous daemon, fleet operations, persistent memory,
+            and DORA metrics.
+          </p>
+        </div>
+
+        <div class="foundation-layers">
+          <div class="foundation-layer shipwright-layer gs-reveal">
+            <div class="layer-header">
+              <span class="layer-name">Shipwright</span>
+              <span class="layer-role">Orchestration &amp; Delivery</span>
+            </div>
+            <div class="layer-chips">
+              <span class="layer-chip">12-stage pipelines</span>
+              <span class="layer-chip">Autonomous daemon</span>
+              <span class="layer-chip">Fleet operations</span>
+              <span class="layer-chip">Persistent memory</span>
+              <span class="layer-chip">Intelligence layer</span>
+              <span class="layer-chip">GitHub API integration</span>
+              <span class="layer-chip">DORA metrics</span>
+            </div>
+          </div>
+          <div class="foundation-connector"></div>
+          <div class="foundation-layer claude-layer gs-reveal">
+            <div class="layer-header">
+              <span class="layer-name">Claude Code</span>
+              <span class="layer-role">Anthropic's AI Coding Tool</span>
+            </div>
+            <div class="layer-chips">
+              <span class="layer-chip">AI coding agents</span>
+              <span class="layer-chip">Team mode</span>
+              <span class="layer-chip">Code read/write</span>
+              <span class="layer-chip">Git operations</span>
+              <span class="layer-chip">Hooks system</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ════════════════════════════════════════════════
+     HOW IT WORKS — THE VOYAGE
+     ════════════════════════════════════════════════ -->
+    <section id="voyage">
+      <div class="container">
+        <div class="gs-reveal">
+          <div class="section-label">The Voyage</div>
+          <h2 class="section-title">
+            From issue to production.<br />Fully autonomous.
+          </h2>
+          <p class="section-desc">
+            Every deployment follows a charted course. Shipwright orchestrates
+            the entire journey — your agents are the crew.
+          </p>
+        </div>
+
+        <div class="voyage-grid">
+          <div class="voyage-step gs-reveal">
+            <div class="voyage-step-num">01</div>
+            <div class="voyage-icon">
+              <svg class="icon"><use href="icons.svg#icon-chart-course" /></svg>
+            </div>
+            <div class="nautical">Chart the Course</div>
+            <h3>Intake &amp; Planning</h3>
+            <p>
+              The daemon spots a labeled GitHub issue, triages priority, and
+              plots the delivery strategy. Context from past voyages is loaded
+              automatically.
+            </p>
+          </div>
+          <div class="voyage-step gs-reveal">
+            <div class="voyage-step-num">02</div>
+            <div class="voyage-icon">
+              <svg class="icon">
+                <use href="icons.svg#icon-assemble-crew" />
+              </svg>
+            </div>
+            <div class="nautical">Assemble the Crew</div>
+            <h3>Agent Team Spawn</h3>
+            <p>
+              Specialized agents spin up in parallel — backend, frontend, tests.
+              Each gets their own tmux pane, their own context, their own
+              mission.
+            </p>
+          </div>
+          <div class="voyage-step gs-reveal">
+            <div class="voyage-step-num">03</div>
+            <div class="voyage-icon">
+              <svg class="icon"><use href="icons.svg#icon-set-sail" /></svg>
+            </div>
+            <div class="nautical">Set Sail</div>
+            <h3>Build &amp; Self-Heal</h3>
+            <p>
+              Agents build autonomously with compound quality loops — lint,
+              typecheck, test, fix, repeat. If something breaks, they read the
+              errors and try again.
+            </p>
+          </div>
+          <div class="voyage-step gs-reveal">
+            <div class="voyage-step-num">04</div>
+            <div class="voyage-icon">
+              <svg class="icon"><use href="icons.svg#icon-navigate" /></svg>
+            </div>
+            <div class="nautical">Navigate the Waters</div>
+            <h3>Review &amp; Quality</h3>
+            <p>
+              Automated code review, security audit, and test coverage analysis.
+              Quality gates ensure nothing ships that isn't seaworthy.
+            </p>
+          </div>
+          <div class="voyage-step gs-reveal">
+            <div class="voyage-step-num">05</div>
+            <div class="voyage-icon">
+              <svg class="icon"><use href="icons.svg#icon-make-port" /></svg>
+            </div>
+            <div class="nautical">Make Port</div>
+            <h3>PR &amp; Deploy</h3>
+            <p>
+              A clean PR is created with full context, labels, and reviewers.
+              Deploy adapters push to Vercel, Fly.io, Railway, or Docker. DORA
+              metrics are logged.
+            </p>
+          </div>
+          <div class="voyage-step gs-reveal">
+            <div class="voyage-step-num">06</div>
+            <div class="voyage-icon">
+              <svg class="icon">
+                <use href="icons.svg#icon-watch-horizon" />
+              </svg>
+            </div>
+            <div class="nautical">Watch the Horizon</div>
+            <h3>Monitor &amp; Learn</h3>
+            <p>
+              Post-deploy validation confirms health. Persistent memory captures
+              what was learned for the next voyage. The fleet grows smarter.
+            </p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Wave divider -->
+    <div class="wave-divider" aria-hidden="true">
+      <svg class="wave-back" viewBox="0 0 1440 80" preserveAspectRatio="none">
+        <path d="M0 30 Q360 60 720 30 T1440 30 V80 H0Z" fill="var(--purple)" />
+      </svg>
+      <svg class="wave-front" viewBox="0 0 1440 80" preserveAspectRatio="none">
+        <path d="M0 45 Q360 70 720 45 T1440 45 V80 H0Z" fill="var(--cyan)" />
+      </svg>
+    </div>
+
+    <!-- ════════════════════════════════════════════════
+     PIPELINE VISUALIZATION (SVG)
+     ════════════════════════════════════════════════ -->
+    <section id="pipeline" class="pipeline-section">
+      <div class="container">
+        <div class="gs-reveal" style="text-align: center; margin-bottom: 1rem">
+          <div class="section-label" style="justify-content: center">
+            <span>Live Pipeline</span>
+          </div>
+          <p style="color: var(--text-muted); font-size: 0.85rem">
+            The autonomous delivery pipeline — every stage, every gate
+          </p>
+        </div>
+        <div class="pipeline-svg-wrap gs-reveal">
+          <svg
+            class="pipeline-svg"
+            id="pipeline-svg"
+            viewBox="0 0 1100 140"
+            fill="none"
+            xmlns="http://www.w3.org/2000/svg"
+          >
+            <defs>
+              <linearGradient id="pipe-grad-done" x1="0" y1="0" x2="1" y2="0">
+                <stop offset="0%" stop-color="#4ade80" />
+                <stop offset="100%" stop-color="#00d4ff" />
+              </linearGradient>
+              <linearGradient id="pipe-grad-active" x1="0" y1="0" x2="1" y2="0">
+                <stop offset="0%" stop-color="#00d4ff" />
+                <stop offset="100%" stop-color="#0066ff" />
+              </linearGradient>
+              <filter id="glow-active">
+                <feGaussianBlur stdDeviation="4" result="blur" />
+                <feMerge>
+                  <feMergeNode in="blur" />
+                  <feMergeNode in="SourceGraphic" />
+                </feMerge>
+              </filter>
+              <filter id="glow-complete">
+                <feGaussianBlur stdDeviation="3" result="blur" />
+                <feMerge>
+                  <feMergeNode in="blur" />
+                  <feMergeNode in="SourceGraphic" />
+                </feMerge>
+              </filter>
+            </defs>
+            <!-- Main pipeline path (drawn by GSAP) -->
+            <path
+              id="pipeline-path"
+              d="M 30 70 L 1070 70"
+              stroke="var(--text-muted)"
+              stroke-width="2"
+              stroke-dasharray="6 4"
+              opacity="0.3"
+            />
+            <path
+              id="pipeline-progress"
+              d="M 30 70 L 1070 70"
+              stroke="url(#pipe-grad-done)"
+              stroke-width="3"
+              stroke-linecap="round"
+              opacity="0"
+            />
+            <!-- Nodes rendered by JS -->
+            <g id="pipeline-nodes"></g>
+            <!-- Particles -->
+            <g id="pipeline-particles"></g>
+          </svg>
+        </div>
+      </div>
+    </section>
+
+    <!-- ════════════════════════════════════════════════
      FEATURES
      ════════════════════════════════════════════════ -->
-<section id="features">
-  <div class="container">
-    <div class="gs-reveal">
-      <div class="section-label">Capabilities</div>
-      <h2 class="section-title">Everything you need to<br>command the fleet.</h2>
-      <p class="section-desc">From a single daemon watching issues to a full fleet spanning repositories — Shipwright scales with your ambition.</p>
+    <section id="features">
+      <div class="container">
+        <div class="gs-reveal">
+          <div class="section-label">Capabilities</div>
+          <h2 class="section-title">
+            Everything you need to<br />command the fleet.
+          </h2>
+          <p class="section-desc">
+            From a single daemon watching issues to a full fleet spanning
+            repositories — Shipwright scales with your ambition.
+          </p>
+        </div>
+
+        <div class="features-grid">
+          <div class="feature-card gs-reveal">
+            <div class="feature-icon daemon">
+              <svg class="icon"><use href="icons.svg#icon-daemon" /></svg>
+            </div>
+            <h3>Autonomous Daemon</h3>
+            <p>
+              Watches GitHub for labeled issues, triages by priority, and spawns
+              delivery pipelines automatically. Sleeps when idle, wakes when
+              needed.
+            </p>
+            <span class="feature-tag">shipwright daemon start</span>
+          </div>
+
+          <div class="feature-card gs-reveal">
+            <div class="feature-icon fleet">
+              <svg class="icon"><use href="icons.svg#icon-fleet" /></svg>
+            </div>
+            <h3>Fleet Operations</h3>
+            <p>
+              Orchestrate daemons across your entire org. One config, multiple
+              repos, shared worker pools, aggregate metrics. Enterprise-scale
+              autonomy.
+            </p>
+            <span class="feature-tag">shipwright fleet start</span>
+          </div>
+
+          <div class="feature-card gs-reveal">
+            <div class="feature-icon scale">
+              <svg class="icon"><use href="icons.svg#icon-auto-scale" /></svg>
+            </div>
+            <h3>Auto-Scaling Workers</h3>
+            <p>
+              Dynamic worker allocation based on CPU, memory, budget, and queue
+              depth. Workers spin up under load and scale down when quiet.
+            </p>
+            <span class="feature-tag">auto_scale: true</span>
+          </div>
+
+          <div class="feature-card gs-reveal">
+            <div class="feature-icon dora">
+              <svg class="icon"><use href="icons.svg#icon-dora-metrics" /></svg>
+            </div>
+            <h3>DORA Metrics</h3>
+            <p>
+              Deployment frequency, lead time, change failure rate, MTTR —
+              graded against Google's Elite/High/Medium/Low thresholds. Know
+              your performance.
+            </p>
+            <span class="feature-tag">shipwright daemon metrics</span>
+          </div>
+
+          <div class="feature-card gs-reveal">
+            <div class="feature-icon quality">
+              <svg class="icon">
+                <use href="icons.svg#icon-compound-quality" />
+              </svg>
+            </div>
+            <h3>Compound Quality</h3>
+            <p>
+              Iterative quality cycles: lint, typecheck, test, self-heal. The
+              agent reads its own failures and fixes them. Up to N retry rounds
+              until clean.
+            </p>
+            <span class="feature-tag">--self-heal 3</span>
+          </div>
+
+          <div class="feature-card gs-reveal">
+            <div class="feature-icon worktree">
+              <svg class="icon"><use href="icons.svg#icon-worktree" /></svg>
+            </div>
+            <h3>Worktree Isolation</h3>
+            <p>
+              Each pipeline runs in its own git worktree — safe parallel
+              execution. Multiple issues, multiple branches, zero conflicts.
+            </p>
+            <span class="feature-tag">--worktree</span>
+          </div>
+
+          <div class="feature-card gs-reveal">
+            <div class="feature-icon daemon">
+              <svg class="icon"><use href="icons.svg#icon-github" /></svg>
+            </div>
+            <h3>GitHub Integration</h3>
+            <p>
+              Native GitHub API: GraphQL queries for code history and blame,
+              Checks API for CI status, Deployments API for environment
+              tracking, security alert enrichment.
+            </p>
+            <span class="feature-tag">shipwright github context</span>
+          </div>
+
+          <div class="feature-card gs-reveal">
+            <div class="feature-icon scale">
+              <svg class="icon"><use href="icons.svg#icon-auto-scale" /></svg>
+            </div>
+            <h3>Intelligence Layer</h3>
+            <p>
+              7 AI modules that make the pipeline smarter over time: semantic
+              triage, predictive risk scoring, adversarial review, adaptive
+              thresholds, convergence detection, and model routing.
+            </p>
+            <span class="feature-tag">shipwright intelligence</span>
+          </div>
+
+          <div class="feature-card gs-reveal">
+            <div class="feature-icon quality">
+              <svg class="icon">
+                <use href="icons.svg#icon-compound-quality" />
+              </svg>
+            </div>
+            <h3>Persistent Memory</h3>
+            <p>
+              Failure patterns, root causes, and codebase conventions captured
+              after every run. Future builds receive relevant context —
+              convergence detection ensures agents learn, not repeat.
+            </p>
+            <span class="feature-tag">shipwright memory show</span>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Wave divider -->
+    <div class="wave-divider" aria-hidden="true">
+      <svg class="wave-back" viewBox="0 0 1440 80" preserveAspectRatio="none">
+        <path d="M0 40 Q360 0 720 40 T1440 40 V80 H0Z" fill="var(--cyan)" />
+      </svg>
+      <svg class="wave-front" viewBox="0 0 1440 80" preserveAspectRatio="none">
+        <path d="M0 55 Q360 25 720 55 T1440 55 V80 H0Z" fill="var(--purple)" />
+      </svg>
     </div>
 
-    <div class="features-grid">
-      <div class="feature-card gs-reveal">
-        <div class="feature-icon daemon">
-          <svg class="icon"><use href="icons.svg#icon-daemon"/></svg>
-        </div>
-        <h3>Autonomous Daemon</h3>
-        <p>Watches GitHub for labeled issues, triages by priority, and spawns delivery pipelines automatically. Sleeps when idle, wakes when needed.</p>
-        <span class="feature-tag">shipwright daemon start</span>
-      </div>
-
-      <div class="feature-card gs-reveal">
-        <div class="feature-icon fleet">
-          <svg class="icon"><use href="icons.svg#icon-fleet"/></svg>
-        </div>
-        <h3>Fleet Operations</h3>
-        <p>Orchestrate daemons across your entire org. One config, multiple repos, shared worker pools, aggregate metrics. Enterprise-scale autonomy.</p>
-        <span class="feature-tag">shipwright fleet start</span>
-      </div>
-
-      <div class="feature-card gs-reveal">
-        <div class="feature-icon scale">
-          <svg class="icon"><use href="icons.svg#icon-auto-scale"/></svg>
-        </div>
-        <h3>Auto-Scaling Workers</h3>
-        <p>Dynamic worker allocation based on CPU, memory, budget, and queue depth. Workers spin up under load and scale down when quiet.</p>
-        <span class="feature-tag">auto_scale: true</span>
-      </div>
-
-      <div class="feature-card gs-reveal">
-        <div class="feature-icon dora">
-          <svg class="icon"><use href="icons.svg#icon-dora-metrics"/></svg>
-        </div>
-        <h3>DORA Metrics</h3>
-        <p>Deployment frequency, lead time, change failure rate, MTTR — graded against Google's Elite/High/Medium/Low thresholds. Know your performance.</p>
-        <span class="feature-tag">shipwright daemon metrics</span>
-      </div>
-
-      <div class="feature-card gs-reveal">
-        <div class="feature-icon quality">
-          <svg class="icon"><use href="icons.svg#icon-compound-quality"/></svg>
-        </div>
-        <h3>Compound Quality</h3>
-        <p>Iterative quality cycles: lint, typecheck, test, self-heal. The agent reads its own failures and fixes them. Up to N retry rounds until clean.</p>
-        <span class="feature-tag">--self-heal 3</span>
-      </div>
-
-      <div class="feature-card gs-reveal">
-        <div class="feature-icon worktree">
-          <svg class="icon"><use href="icons.svg#icon-worktree"/></svg>
-        </div>
-        <h3>Worktree Isolation</h3>
-        <p>Each pipeline runs in its own git worktree — safe parallel execution. Multiple issues, multiple branches, zero conflicts.</p>
-        <span class="feature-tag">--worktree</span>
-      </div>
-    </div>
-  </div>
-</section>
-
-<!-- Wave divider -->
-<div class="wave-divider" aria-hidden="true">
-  <svg class="wave-back" viewBox="0 0 1440 80" preserveAspectRatio="none">
-    <path d="M0 40 Q360 0 720 40 T1440 40 V80 H0Z" fill="var(--cyan)"/>
-  </svg>
-  <svg class="wave-front" viewBox="0 0 1440 80" preserveAspectRatio="none">
-    <path d="M0 55 Q360 25 720 55 T1440 55 V80 H0Z" fill="var(--purple)"/>
-  </svg>
-</div>
-
-<!-- ════════════════════════════════════════════════
+    <!-- ════════════════════════════════════════════════
      TERMINAL DEMO
      ════════════════════════════════════════════════ -->
-<section id="demo" class="terminal-section">
-  <div class="container">
-    <div class="gs-reveal">
-      <div class="section-label">See It In Action</div>
-      <h2 class="section-title">One command.<br>Full autonomy.</h2>
-      <p class="section-desc">Watch a pipeline come to life — from issue intake to PR creation, with agent teams building in parallel.</p>
-    </div>
+    <section id="demo" class="terminal-section">
+      <div class="container">
+        <div class="gs-reveal">
+          <div class="section-label">See It In Action</div>
+          <h2 class="section-title">One command.<br />Full autonomy.</h2>
+          <p class="section-desc">
+            Watch a pipeline come to life — from issue intake to PR creation,
+            with agent teams building in parallel.
+          </p>
+        </div>
 
-    <div class="terminal-window gs-reveal">
-      <div class="terminal-titlebar">
-        <div class="terminal-dot red"></div>
-        <div class="terminal-dot yellow"></div>
-        <div class="terminal-dot green"></div>
-        <span class="terminal-title">shipwright — pipeline</span>
+        <div class="terminal-window gs-reveal">
+          <div class="terminal-titlebar">
+            <div class="terminal-dot red"></div>
+            <div class="terminal-dot yellow"></div>
+            <div class="terminal-dot green"></div>
+            <span class="terminal-title">shipwright — pipeline</span>
+          </div>
+          <div class="terminal-body" id="terminal">
+            <!-- Lines injected by GSAP timeline -->
+          </div>
+        </div>
       </div>
-      <div class="terminal-body" id="terminal">
-        <!-- Lines injected by GSAP timeline -->
-      </div>
-    </div>
-  </div>
-</section>
+    </section>
 
-<!-- ════════════════════════════════════════════════
+    <!-- ════════════════════════════════════════════════
      SCALE
      ════════════════════════════════════════════════ -->
-<section class="scale-section" id="scale">
-  <div class="container">
-    <div class="gs-reveal">
-      <div class="section-label" style="justify-content:center;">Fleet Scale</div>
-      <h2 class="section-title">Built for the scale<br>of real engineering.</h2>
-    </div>
+    <section class="scale-section" id="scale">
+      <div class="container">
+        <div class="gs-reveal">
+          <div class="section-label" style="justify-content: center">
+            Fleet Scale
+          </div>
+          <h2 class="section-title">
+            Built for the scale<br />of real engineering.
+          </h2>
+        </div>
 
-    <div class="scale-grid gs-reveal">
-      <div class="scale-card">
-        <div class="scale-number" data-count="12">0</div>
-        <div class="scale-unit">Pipeline Stages</div>
-        <div class="scale-detail">Intake to monitoring, every step automated</div>
+        <div class="scale-grid gs-reveal">
+          <div class="scale-card">
+            <div class="scale-number" data-count="12">0</div>
+            <div class="scale-unit">Pipeline Stages</div>
+            <div class="scale-detail">
+              Intake to monitoring, every step automated
+            </div>
+          </div>
+          <div class="scale-card">
+            <div class="scale-number" data-count="37">0</div>
+            <div class="scale-unit">Scripts</div>
+            <div class="scale-detail">
+              ~35K lines of bash powering the entire platform
+            </div>
+          </div>
+          <div class="scale-card">
+            <div class="scale-number" data-count="24">0</div>
+            <div class="scale-unit">Team Templates</div>
+            <div class="scale-detail">
+              Full SDLC coverage — build, quality, ops, planning
+            </div>
+          </div>
+          <div class="scale-card">
+            <div class="scale-number" data-count="320">0</div>
+            <div class="scale-unit">Tests Passing</div>
+            <div class="scale-detail">
+              20 test suites covering every module end-to-end
+            </div>
+          </div>
+        </div>
       </div>
-      <div class="scale-card">
-        <div class="scale-number" data-count="8">0</div>
-        <div class="scale-unit">Pipeline Templates</div>
-        <div class="scale-detail">Fast, standard, enterprise, cost-aware, and more</div>
-      </div>
-      <div class="scale-card">
-        <div class="scale-number" data-count="12">0</div>
-        <div class="scale-unit">Team Templates</div>
-        <div class="scale-detail">Full SDLC coverage — build, quality, ops, planning</div>
-      </div>
-      <div class="scale-card">
-        <div class="scale-number special">&#8734;</div>
-        <div class="scale-unit">Repos per Fleet</div>
-        <div class="scale-detail">Orchestrate daemons across your entire org</div>
-      </div>
-    </div>
-  </div>
-</section>
+    </section>
 
-<!-- ════════════════════════════════════════════════
+    <!-- ════════════════════════════════════════════════
      TEAM TEMPLATES
      ════════════════════════════════════════════════ -->
-<section id="templates">
-  <div class="container">
-    <div class="gs-reveal">
-      <div class="section-label">Crew Manifests</div>
-      <h2 class="section-title">12 specialized crews.<br>Every mission covered.</h2>
-      <p class="section-desc">From feature development to security audits — pre-configured agent teams for every phase of the software lifecycle.</p>
-    </div>
+    <section id="templates">
+      <div class="container">
+        <div class="gs-reveal">
+          <div class="section-label">Crew Manifests</div>
+          <h2 class="section-title">
+            24 specialized crews.<br />Every mission covered.
+          </h2>
+          <p class="section-desc">
+            From feature development to security audits — pre-configured agent
+            teams for every phase of the software lifecycle.
+          </p>
+        </div>
 
-    <div class="templates-grid">
-      <div class="template-card gs-reveal">
-        <div class="template-header">
-          <span class="template-icon"><svg class="icon"><use href="icons.svg#icon-feature-dev"/></svg></span>
-          <span class="template-name">feature-dev</span>
-          <span class="template-agents">3 agents</span>
+        <div class="templates-grid">
+          <div class="template-card gs-reveal">
+            <div class="template-header">
+              <span class="template-icon"
+                ><svg class="icon">
+                  <use href="icons.svg#icon-feature-dev" /></svg
+              ></span>
+              <span class="template-name">feature-dev</span>
+              <span class="template-agents">3 agents</span>
+            </div>
+            <div class="template-desc">
+              Backend + frontend + tests working in parallel. The workhorse
+              template for feature development.
+            </div>
+          </div>
+          <div class="template-card gs-reveal">
+            <div class="template-header">
+              <span class="template-icon"
+                ><svg class="icon">
+                  <use href="icons.svg#icon-code-review" /></svg
+              ></span>
+              <span class="template-name">code-review</span>
+              <span class="template-agents">3 agents</span>
+            </div>
+            <div class="template-desc">
+              Quality + security + coverage reviewers. Three lenses on every
+              change.
+            </div>
+          </div>
+          <div class="template-card gs-reveal">
+            <div class="template-header">
+              <span class="template-icon"
+                ><svg class="icon">
+                  <use href="icons.svg#icon-security-audit" /></svg
+              ></span>
+              <span class="template-name">security-audit</span>
+              <span class="template-agents">3 agents</span>
+            </div>
+            <div class="template-desc">
+              SAST, dependency CVEs, and config review. OWASP-aware
+              vulnerability scanning.
+            </div>
+          </div>
+          <div class="template-card gs-reveal">
+            <div class="template-header">
+              <span class="template-icon"
+                ><svg class="icon"><use href="icons.svg#icon-bug-fix" /></svg
+              ></span>
+              <span class="template-name">bug-fix</span>
+              <span class="template-agents">3 agents</span>
+            </div>
+            <div class="template-desc">
+              Reproduce, fix, verify. One agent proves the bug, one fixes it,
+              one confirms nothing else breaks.
+            </div>
+          </div>
+          <div class="template-card gs-reveal">
+            <div class="template-header">
+              <span class="template-icon"
+                ><svg class="icon"><use href="icons.svg#icon-testing" /></svg
+              ></span>
+              <span class="template-name">testing</span>
+              <span class="template-agents">3 agents</span>
+            </div>
+            <div class="template-desc">
+              Unit + integration + e2e test generation. Comprehensive test
+              coverage in parallel.
+            </div>
+          </div>
+          <div class="template-card gs-reveal">
+            <div class="template-header">
+              <span class="template-icon"
+                ><svg class="icon"><use href="icons.svg#icon-migration" /></svg
+              ></span>
+              <span class="template-name">migration</span>
+              <span class="template-agents">3 agents</span>
+            </div>
+            <div class="template-desc">
+              Schema + adapter + rollback. Safe database migrations with
+              automatic rollback scripts.
+            </div>
+          </div>
+          <div class="template-card gs-reveal">
+            <div class="template-header">
+              <span class="template-icon"
+                ><svg class="icon">
+                  <use href="icons.svg#icon-architecture" /></svg
+              ></span>
+              <span class="template-name">architecture</span>
+              <span class="template-agents">2 agents</span>
+            </div>
+            <div class="template-desc">
+              Researcher + spec writer. Deep codebase analysis and technical
+              spec generation.
+            </div>
+          </div>
+          <div class="template-card gs-reveal">
+            <div class="template-header">
+              <span class="template-icon"
+                ><svg class="icon"><use href="icons.svg#icon-devops" /></svg
+              ></span>
+              <span class="template-name">devops</span>
+              <span class="template-agents">2 agents</span>
+            </div>
+            <div class="template-desc">
+              Pipeline + infrastructure. CI/CD workflows and infrastructure as
+              code, side by side.
+            </div>
+          </div>
         </div>
-        <div class="template-desc">Backend + frontend + tests working in parallel. The workhorse template for feature development.</div>
       </div>
-      <div class="template-card gs-reveal">
-        <div class="template-header">
-          <span class="template-icon"><svg class="icon"><use href="icons.svg#icon-code-review"/></svg></span>
-          <span class="template-name">code-review</span>
-          <span class="template-agents">3 agents</span>
-        </div>
-        <div class="template-desc">Quality + security + coverage reviewers. Three lenses on every change.</div>
-      </div>
-      <div class="template-card gs-reveal">
-        <div class="template-header">
-          <span class="template-icon"><svg class="icon"><use href="icons.svg#icon-security-audit"/></svg></span>
-          <span class="template-name">security-audit</span>
-          <span class="template-agents">3 agents</span>
-        </div>
-        <div class="template-desc">SAST, dependency CVEs, and config review. OWASP-aware vulnerability scanning.</div>
-      </div>
-      <div class="template-card gs-reveal">
-        <div class="template-header">
-          <span class="template-icon"><svg class="icon"><use href="icons.svg#icon-bug-fix"/></svg></span>
-          <span class="template-name">bug-fix</span>
-          <span class="template-agents">3 agents</span>
-        </div>
-        <div class="template-desc">Reproduce, fix, verify. One agent proves the bug, one fixes it, one confirms nothing else breaks.</div>
-      </div>
-      <div class="template-card gs-reveal">
-        <div class="template-header">
-          <span class="template-icon"><svg class="icon"><use href="icons.svg#icon-testing"/></svg></span>
-          <span class="template-name">testing</span>
-          <span class="template-agents">3 agents</span>
-        </div>
-        <div class="template-desc">Unit + integration + e2e test generation. Comprehensive test coverage in parallel.</div>
-      </div>
-      <div class="template-card gs-reveal">
-        <div class="template-header">
-          <span class="template-icon"><svg class="icon"><use href="icons.svg#icon-migration"/></svg></span>
-          <span class="template-name">migration</span>
-          <span class="template-agents">3 agents</span>
-        </div>
-        <div class="template-desc">Schema + adapter + rollback. Safe database migrations with automatic rollback scripts.</div>
-      </div>
-      <div class="template-card gs-reveal">
-        <div class="template-header">
-          <span class="template-icon"><svg class="icon"><use href="icons.svg#icon-architecture"/></svg></span>
-          <span class="template-name">architecture</span>
-          <span class="template-agents">2 agents</span>
-        </div>
-        <div class="template-desc">Researcher + spec writer. Deep codebase analysis and technical spec generation.</div>
-      </div>
-      <div class="template-card gs-reveal">
-        <div class="template-header">
-          <span class="template-icon"><svg class="icon"><use href="icons.svg#icon-devops"/></svg></span>
-          <span class="template-name">devops</span>
-          <span class="template-agents">2 agents</span>
-        </div>
-        <div class="template-desc">Pipeline + infrastructure. CI/CD workflows and infrastructure as code, side by side.</div>
-      </div>
-    </div>
-  </div>
-</section>
+    </section>
 
-<!-- ════════════════════════════════════════════════
+    <!-- ════════════════════════════════════════════════
      OPEN SOURCE
      ════════════════════════════════════════════════ -->
-<section class="opensource-section" id="open-source">
-  <div class="container">
-    <div class="gs-reveal">
-      <div class="section-label" style="justify-content:center;">Open Source</div>
-      <h2 class="section-title">Built in the open.<br>Free to use, fork, and improve.</h2>
-      <p class="section-desc" style="margin:0 auto 0.5rem;">Shipwright is MIT-licensed and developed on GitHub. The entire toolchain — CLI, templates, daemon, fleet, pipeline — is yours.</p>
-    </div>
+    <section class="opensource-section" id="open-source">
+      <div class="container">
+        <div class="gs-reveal">
+          <div class="section-label" style="justify-content: center">
+            Open Source
+          </div>
+          <h2 class="section-title">
+            Built in the open.<br />Free to use, fork, and improve.
+          </h2>
+          <p class="section-desc" style="margin: 0 auto 0.5rem">
+            Shipwright is MIT-licensed and developed on GitHub. The entire
+            toolchain — CLI, templates, daemon, fleet, pipeline — is yours.
+          </p>
+        </div>
 
-    <div class="opensource-grid gs-reveal">
-      <div class="os-card">
-        <div class="os-card-icon">
-          <svg class="icon"><use href="icons.svg#icon-github"/></svg>
+        <div class="opensource-grid gs-reveal">
+          <div class="os-card">
+            <div class="os-card-icon">
+              <svg class="icon"><use href="icons.svg#icon-github" /></svg>
+            </div>
+            <h3>Source on GitHub</h3>
+            <p>
+              Full source code, issue tracker, and contribution guidelines. Star
+              the repo, file issues, send PRs.
+            </p>
+            <a
+              href="https://github.com/sethdford/shipwright"
+              target="_blank"
+              class="os-link"
+            >
+              github.com/sethdford/shipwright
+              <svg class="icon icon-sm">
+                <use href="icons.svg#icon-arrow-up-right" />
+              </svg>
+            </a>
+          </div>
+          <div class="os-card">
+            <div class="os-card-icon">
+              <svg class="icon"><use href="icons.svg#icon-quality" /></svg>
+            </div>
+            <h3>MIT License</h3>
+            <p>
+              Use Shipwright in personal projects, at your startup, or across
+              the enterprise. No restrictions, no license fees, no strings.
+            </p>
+            <a
+              href="https://github.com/sethdford/shipwright/blob/main/LICENSE"
+              target="_blank"
+              class="os-link"
+            >
+              View LICENSE
+              <svg class="icon icon-sm">
+                <use href="icons.svg#icon-arrow-up-right" />
+              </svg>
+            </a>
+          </div>
+          <div class="os-card">
+            <div class="os-card-icon">
+              <svg class="icon"><use href="icons.svg#icon-fleet" /></svg>
+            </div>
+            <h3>24 Templates, 8 Pipelines</h3>
+            <p>
+              Pre-configured agent teams for every phase of the SDLC. 7
+              intelligence modules, GitHub API integration, cost intelligence
+              built in.
+            </p>
+            <a
+              href="https://sethdford.github.io/shipwright"
+              target="_blank"
+              class="os-link"
+            >
+              Read the docs
+              <svg class="icon icon-sm">
+                <use href="icons.svg#icon-arrow-up-right" />
+              </svg>
+            </a>
+          </div>
         </div>
-        <h3>Source on GitHub</h3>
-        <p>Full source code, issue tracker, and contribution guidelines. Star the repo, file issues, send PRs.</p>
-        <a href="https://github.com/sethdford/shipwright" target="_blank" class="os-link">
-          github.com/sethdford/shipwright
-          <svg class="icon icon-sm"><use href="icons.svg#icon-arrow-up-right"/></svg>
-        </a>
       </div>
-      <div class="os-card">
-        <div class="os-card-icon">
-          <svg class="icon"><use href="icons.svg#icon-quality"/></svg>
-        </div>
-        <h3>MIT License</h3>
-        <p>Use Shipwright in personal projects, at your startup, or across the enterprise. No restrictions, no license fees, no strings.</p>
-        <a href="https://github.com/sethdford/shipwright/blob/main/LICENSE" target="_blank" class="os-link">
-          View LICENSE
-          <svg class="icon icon-sm"><use href="icons.svg#icon-arrow-up-right"/></svg>
-        </a>
-      </div>
-      <div class="os-card">
-        <div class="os-card-icon">
-          <svg class="icon"><use href="icons.svg#icon-fleet"/></svg>
-        </div>
-        <h3>12 Templates, 8 Pipelines</h3>
-        <p>Pre-configured agent teams for every phase of the SDLC. 4 deploy adapters (Vercel, Fly.io, Railway, Docker). Cost intelligence built in.</p>
-        <a href="https://sethdford.github.io/shipwright" target="_blank" class="os-link">
-          Read the docs
-          <svg class="icon icon-sm"><use href="icons.svg#icon-arrow-up-right"/></svg>
-        </a>
-      </div>
-    </div>
-  </div>
-</section>
+    </section>
 
-<!-- ════════════════════════════════════════════════
+    <!-- ════════════════════════════════════════════════
      CTA
      ════════════════════════════════════════════════ -->
-<section class="cta-section" id="cta">
-  <div class="container">
-    <div class="gs-reveal">
-      <h2 class="cta-title">Ready to command<br>the fleet?</h2>
-      <p class="cta-desc">Install Shipwright in seconds. Start shipping with autonomous agent teams today.</p>
+    <section class="cta-section" id="cta">
+      <div class="container">
+        <div class="gs-reveal">
+          <h2 class="cta-title">Ready to command<br />the fleet?</h2>
+          <p class="cta-desc">
+            Install Shipwright in seconds. Start shipping with autonomous agent
+            teams today.
+          </p>
 
-      <a href="https://github.com/sethdford/shipwright" target="_blank" class="btn-primary" style="margin-bottom:1.5rem;">
-        <svg class="icon icon-sm"><use href="icons.svg#icon-github"/></svg>
-        View on GitHub
-      </a>
+          <a
+            href="https://github.com/sethdford/shipwright"
+            target="_blank"
+            class="btn-primary"
+            style="margin-bottom: 1.5rem"
+          >
+            <svg class="icon icon-sm"><use href="icons.svg#icon-github" /></svg>
+            View on GitHub
+          </a>
 
-      <div class="install-options">
-        <div class="install-option" onclick="navigator.clipboard.writeText('npm install -g shipwright-cli')">
-          <span class="install-method">npm</span>
-          <span class="install-code">npm install -g shipwright-cli</span>
-        </div>
-        <div class="install-option" onclick="navigator.clipboard.writeText('curl -fsSL https://raw.githubusercontent.com/sethdford/shipwright/main/scripts/install-remote.sh | sh')">
-          <span class="install-method">curl</span>
-          <span class="install-code">curl -fsSL .../install-remote.sh | sh</span>
+          <div class="install-options">
+            <div
+              class="install-option"
+              onclick="
+                navigator.clipboard.writeText('npm install -g shipwright-cli')
+              "
+            >
+              <span class="install-method">npm</span>
+              <span class="install-code">npm install -g shipwright-cli</span>
+            </div>
+            <div
+              class="install-option"
+              onclick="
+                navigator.clipboard.writeText(
+                  'curl -fsSL https://raw.githubusercontent.com/sethdford/shipwright/main/scripts/install-remote.sh | sh',
+                )
+              "
+            >
+              <span class="install-method">curl</span>
+              <span class="install-code"
+                >curl -fsSL .../install-remote.sh | sh</span
+              >
+            </div>
+          </div>
         </div>
       </div>
-    </div>
-  </div>
-</section>
+    </section>
 
-<!-- ════════════════════════════════════════════════
+    <!-- ════════════════════════════════════════════════
      FOOTER
      ════════════════════════════════════════════════ -->
-<footer>
-  <div class="footer-inner">
-    <div class="footer-brand">Shipwright</div>
-    <ul class="footer-links">
-      <li><a href="https://sethdford.github.io/shipwright" target="_blank">Documentation</a></li>
-      <li><a href="https://github.com/sethdford/shipwright" target="_blank">GitHub</a></li>
-      <li><a href="https://github.com/sethdford/shipwright/blob/main/LICENSE" target="_blank">MIT License</a></li>
-    </ul>
-    <div class="footer-copy">Seth Ford, 2026</div>
-  </div>
-</footer>
+    <footer>
+      <div class="footer-inner">
+        <div class="footer-brand">Shipwright</div>
+        <ul class="footer-links">
+          <li>
+            <a href="https://sethdford.github.io/shipwright" target="_blank"
+              >Documentation</a
+            >
+          </li>
+          <li>
+            <a href="https://github.com/sethdford/shipwright" target="_blank"
+              >GitHub</a
+            >
+          </li>
+          <li>
+            <a
+              href="https://github.com/sethdford/shipwright/blob/main/LICENSE"
+              target="_blank"
+              >MIT License</a
+            >
+          </li>
+        </ul>
+        <div class="footer-copy">Seth Ford, 2026</div>
+      </div>
+    </footer>
 
-<!-- ════════════════════════════════════════════════
+    <!-- ════════════════════════════════════════════════
      SCRIPTS — GSAP + ScrollTrigger from CDN
      ════════════════════════════════════════════════ -->
-<script src="https://cdn.jsdelivr.net/npm/gsap@3.12.7/dist/gsap.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/gsap@3.12.7/dist/ScrollTrigger.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/gsap@3.12.7/dist/gsap.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/gsap@3.12.7/dist/ScrollTrigger.min.js"></script>
 
-<script>
-// ═══════════════════════════════════════════════
-// PARTICLE OCEAN — Constellation of Agents
-// ═══════════════════════════════════════════════
-(function() {
-  const canvas = document.getElementById('ocean-canvas');
-  const ctx = canvas.getContext('2d');
-  let w, h, particles, mouse;
-  const isMobile = window.innerWidth < 768;
-  const PARTICLE_COUNT = isMobile ? 60 : 120;
-  const CONNECTION_DIST = 150;
-  const MOUSE_DIST = 200;
+    <script>
+      // ═══════════════════════════════════════════════
+      // PARTICLE OCEAN — Constellation of Agents
+      // ═══════════════════════════════════════════════
+      (function () {
+        const canvas = document.getElementById("ocean-canvas");
+        const ctx = canvas.getContext("2d");
+        let w, h, particles, mouse;
+        const isMobile = window.innerWidth < 768;
+        const PARTICLE_COUNT = isMobile ? 60 : 120;
+        const CONNECTION_DIST = 150;
+        const MOUSE_DIST = 200;
 
-  function resize() {
-    w = canvas.width = window.innerWidth;
-    h = canvas.height = window.innerHeight;
-  }
-
-  function init() {
-    resize();
-    mouse = { x: -1000, y: -1000 };
-    particles = [];
-
-    for (let i = 0; i < PARTICLE_COUNT; i++) {
-      particles.push({
-        x: Math.random() * w,
-        y: Math.random() * h,
-        vx: (Math.random() - 0.5) * 0.4,
-        vy: (Math.random() - 0.5) * 0.4,
-        r: Math.random() * 2 + 0.5,
-        bright: Math.random() > 0.85,
-        pulse: Math.random() * Math.PI * 2
-      });
-    }
-  }
-
-  let isVisible = true;
-  document.addEventListener('visibilitychange', () => {
-    isVisible = !document.hidden;
-  });
-
-  function draw() {
-    if (!isVisible) { requestAnimationFrame(draw); return; }
-
-    ctx.clearRect(0, 0, w, h);
-
-    // Deep ocean gradient
-    const grad = ctx.createLinearGradient(0, 0, 0, h);
-    grad.addColorStop(0, '#060a14');
-    grad.addColorStop(0.4, '#0a1628');
-    grad.addColorStop(0.7, '#0d1f3c');
-    grad.addColorStop(1, '#060a14');
-    ctx.fillStyle = grad;
-    ctx.fillRect(0, 0, w, h);
-
-    // Subtle nebula glow
-    const glow = ctx.createRadialGradient(w * 0.3, h * 0.4, 0, w * 0.3, h * 0.4, w * 0.5);
-    glow.addColorStop(0, 'rgba(0, 212, 255, 0.015)');
-    glow.addColorStop(0.5, 'rgba(124, 58, 237, 0.008)');
-    glow.addColorStop(1, 'transparent');
-    ctx.fillStyle = glow;
-    ctx.fillRect(0, 0, w, h);
-
-    for (let i = 0; i < particles.length; i++) {
-      const p = particles[i];
-      p.x += p.vx;
-      p.y += p.vy;
-      p.pulse += 0.02;
-
-      if (p.x < 0) p.x = w;
-      if (p.x > w) p.x = 0;
-      if (p.y < 0) p.y = h;
-      if (p.y > h) p.y = 0;
-
-      // Mouse repulsion (disabled on mobile)
-      if (!isMobile) {
-        const mdx = p.x - mouse.x;
-        const mdy = p.y - mouse.y;
-        const md = Math.sqrt(mdx * mdx + mdy * mdy);
-        if (md < MOUSE_DIST) {
-          const force = (MOUSE_DIST - md) / MOUSE_DIST * 0.02;
-          p.vx += mdx / md * force;
-          p.vy += mdy / md * force;
+        function resize() {
+          w = canvas.width = window.innerWidth;
+          h = canvas.height = window.innerHeight;
         }
-      }
 
-      p.vx *= 0.999;
-      p.vy *= 0.999;
+        function init() {
+          resize();
+          mouse = { x: -1000, y: -1000 };
+          particles = [];
 
-      const alpha = p.bright
-        ? 0.6 + Math.sin(p.pulse) * 0.3
-        : 0.15 + Math.sin(p.pulse) * 0.1;
-
-      ctx.beginPath();
-      ctx.arc(p.x, p.y, p.r, 0, Math.PI * 2);
-      ctx.fillStyle = p.bright
-        ? `rgba(0, 212, 255, ${alpha})`
-        : `rgba(136, 153, 184, ${alpha})`;
-      ctx.fill();
-
-      if (p.bright) {
-        ctx.beginPath();
-        ctx.arc(p.x, p.y, p.r * 4, 0, Math.PI * 2);
-        ctx.fillStyle = `rgba(0, 212, 255, ${alpha * 0.08})`;
-        ctx.fill();
-      }
-
-      for (let j = i + 1; j < particles.length; j++) {
-        const q = particles[j];
-        const dx = p.x - q.x;
-        const dy = p.y - q.y;
-        const dist = Math.sqrt(dx * dx + dy * dy);
-
-        if (dist < CONNECTION_DIST) {
-          const lineAlpha = (1 - dist / CONNECTION_DIST) * 0.08;
-          ctx.beginPath();
-          ctx.moveTo(p.x, p.y);
-          ctx.lineTo(q.x, q.y);
-          ctx.strokeStyle = `rgba(0, 212, 255, ${lineAlpha})`;
-          ctx.lineWidth = 0.5;
-          ctx.stroke();
+          for (let i = 0; i < PARTICLE_COUNT; i++) {
+            particles.push({
+              x: Math.random() * w,
+              y: Math.random() * h,
+              vx: (Math.random() - 0.5) * 0.4,
+              vy: (Math.random() - 0.5) * 0.4,
+              r: Math.random() * 2 + 0.5,
+              bright: Math.random() > 0.85,
+              pulse: Math.random() * Math.PI * 2,
+            });
+          }
         }
-      }
-    }
 
-    requestAnimationFrame(draw);
-  }
-
-  window.addEventListener('resize', resize);
-  if (!isMobile) {
-    document.addEventListener('mousemove', (e) => {
-      mouse.x = e.clientX;
-      mouse.y = e.clientY;
-    });
-  }
-
-  init();
-  draw();
-})();
-
-// ═══════════════════════════════════════════════
-// NAV SCROLL EFFECT
-// ═══════════════════════════════════════════════
-(function() {
-  const nav = document.getElementById('nav');
-  window.addEventListener('scroll', () => {
-    nav.classList.toggle('scrolled', window.scrollY > 60);
-  });
-})();
-
-// ═══════════════════════════════════════════════
-// GSAP — Register ScrollTrigger
-// ═══════════════════════════════════════════════
-gsap.registerPlugin(ScrollTrigger);
-
-// Respect reduced motion
-const prefersReducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-
-// ═══════════════════════════════════════════════
-// HERO ENTRANCE SEQUENCE (GSAP Timeline)
-// ═══════════════════════════════════════════════
-(function() {
-  const heroEls = '.hero-badge, .hero-title .line1, .hero-title .line2, .hero-sub, .hero-actions, .hero-install, .scroll-indicator, .hero-logo-svg';
-
-  if (prefersReducedMotion) {
-    gsap.set(heroEls, { opacity: 1, y: 0 });
-    return;
-  }
-
-  // Disable lag smoothing so background-tab catch-up works instantly
-  gsap.ticker.lagSmoothing(0);
-
-  // Logo SVG draw-on prep
-  const logoPaths = document.querySelectorAll('.hero-logo-svg .logo-draw');
-  logoPaths.forEach(el => {
-    try {
-      const len = el.getTotalLength ? el.getTotalLength() : 200;
-      el.style.strokeDasharray = len;
-      el.style.strokeDashoffset = len;
-    } catch(e) { /* skip */ }
-  });
-
-  const tl = gsap.timeline({ defaults: { ease: 'power2.out' } });
-
-  tl.fromTo('.hero-logo-svg', { opacity: 0 }, { opacity: 1, duration: 0.3 }, 0)
-    .to(logoPaths, {
-      strokeDashoffset: 0,
-      duration: 1.5,
-      ease: 'power1.inOut',
-      stagger: 0.08
-    }, 0.1)
-    .fromTo('.hero-badge', { opacity: 0, y: 20 }, { opacity: 1, y: 0, duration: 0.6 }, 0.6)
-    .fromTo('.hero-title .line1', { opacity: 0, y: 30 }, { opacity: 1, y: 0, duration: 0.7 }, 0.9)
-    .fromTo('.hero-title .line2', { opacity: 0, y: 30 }, { opacity: 1, y: 0, duration: 0.7 }, 1.2)
-    .fromTo('.hero-sub', { opacity: 0, y: 20 }, { opacity: 1, y: 0, duration: 0.6 }, 1.5)
-    .fromTo('.hero-actions', { opacity: 0, y: 20 }, { opacity: 1, y: 0, duration: 0.6 }, 1.8)
-    .fromTo('.hero-install', { opacity: 0, y: 20 }, { opacity: 1, y: 0, duration: 0.6 }, 2.0)
-    .fromTo('.scroll-indicator', { opacity: 0 }, { opacity: 1, duration: 0.8 }, 2.4);
-
-  // Safety net: if tab was backgrounded during load, complete hero on visibility
-  function ensureHeroVisible() {
-    if (tl.progress() < 1) {
-      tl.progress(1);
-    }
-  }
-  document.addEventListener('visibilitychange', function onVis() {
-    if (!document.hidden) {
-      ensureHeroVisible();
-      document.removeEventListener('visibilitychange', onVis);
-    }
-  });
-  // Absolute fallback: force-complete after 5s real time
-  setTimeout(ensureHeroVisible, 5000);
-})();
-
-// ═══════════════════════════════════════════════
-// GSAP ScrollTrigger — Batch Reveal
-// ═══════════════════════════════════════════════
-(function() {
-  if (prefersReducedMotion) return;
-
-  ScrollTrigger.batch('.gs-reveal', {
-    onEnter: (batch) => {
-      gsap.to(batch, {
-        opacity: 1,
-        y: 0,
-        duration: 0.7,
-        ease: 'power2.out',
-        stagger: 0.1,
-        overwrite: true
-      });
-    },
-    start: 'top 88%',
-    once: true
-  });
-})();
-
-// ═══════════════════════════════════════════════
-// VOYAGE — Staggered scroll reveal with icon pop
-// ═══════════════════════════════════════════════
-(function() {
-  if (prefersReducedMotion) return;
-
-  gsap.utils.toArray('.voyage-step').forEach((step, i) => {
-    const icon = step.querySelector('.voyage-icon');
-    gsap.from(icon, {
-      scrollTrigger: { trigger: step, start: 'top 85%', once: true },
-      scale: 0,
-      duration: 0.5,
-      delay: 0.15,
-      ease: 'elastic.out(1, 0.5)'
-    });
-  });
-})();
-
-// ═══════════════════════════════════════════════
-// PIPELINE VISUALIZATION — SVG animated
-// ═══════════════════════════════════════════════
-(function() {
-  const stages = [
-    { name: 'intake', icon: '#icon-intake', status: 'complete' },
-    { name: 'plan', icon: '#icon-plan', status: 'complete' },
-    { name: 'design', icon: '#icon-design', status: 'complete' },
-    { name: 'build', icon: '#icon-build', status: 'complete' },
-    { name: 'test', icon: '#icon-test', status: 'complete' },
-    { name: 'review', icon: '#icon-review', status: 'complete' },
-    { name: 'quality', icon: '#icon-quality', status: 'active' },
-    { name: 'pr', icon: '#icon-pr', status: 'pending' },
-    { name: 'merge', icon: '#icon-merge', status: 'pending' },
-    { name: 'deploy', icon: '#icon-deploy', status: 'pending' },
-    { name: 'validate', icon: '#icon-validate', status: 'pending' },
-    { name: 'monitor', icon: '#icon-monitor', status: 'pending' },
-  ];
-
-  const svg = document.getElementById('pipeline-svg');
-  const nodesGroup = document.getElementById('pipeline-nodes');
-  const particlesGroup = document.getElementById('pipeline-particles');
-  const spacing = 1040 / (stages.length - 1);
-
-  stages.forEach((s, i) => {
-    const cx = 30 + i * spacing;
-    const cy = 70;
-
-    // Background circle
-    const circle = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
-    circle.setAttribute('cx', cx);
-    circle.setAttribute('cy', cy);
-    circle.setAttribute('r', 18);
-    circle.setAttribute('class', `pipeline-node-circle pipeline-${s.status}`);
-
-    if (s.status === 'complete') {
-      circle.setAttribute('fill', '#132d56');
-      circle.setAttribute('stroke', '#4ade80');
-      circle.setAttribute('stroke-width', '2');
-      circle.setAttribute('filter', 'url(#glow-complete)');
-    } else if (s.status === 'active') {
-      circle.setAttribute('fill', 'url(#pipe-grad-active)');
-      circle.setAttribute('stroke', '#00d4ff');
-      circle.setAttribute('stroke-width', '2');
-      circle.setAttribute('filter', 'url(#glow-active)');
-    } else {
-      circle.setAttribute('fill', '#0d1f3c');
-      circle.setAttribute('stroke', '#5a6d8a');
-      circle.setAttribute('stroke-width', '1.5');
-    }
-
-    circle.style.opacity = '0';
-    nodesGroup.appendChild(circle);
-
-    // Icon via <use> — centered inside the circle
-    const useEl = document.createElementNS('http://www.w3.org/2000/svg', 'use');
-    useEl.setAttribute('href', 'icons.svg' + s.icon);
-    useEl.setAttribute('x', cx - 10);
-    useEl.setAttribute('y', cy - 10);
-    useEl.setAttribute('width', '20');
-    useEl.setAttribute('height', '20');
-    useEl.style.opacity = '0';
-    if (s.status === 'complete') {
-      useEl.setAttribute('color', '#4ade80');
-    } else if (s.status === 'active') {
-      useEl.setAttribute('color', '#060a14');
-    } else {
-      useEl.setAttribute('color', '#5a6d8a');
-    }
-    nodesGroup.appendChild(useEl);
-
-    // Label
-    const label = document.createElementNS('http://www.w3.org/2000/svg', 'text');
-    label.setAttribute('x', cx);
-    label.setAttribute('y', cy + 34);
-    label.setAttribute('text-anchor', 'middle');
-    label.setAttribute('fill', s.status === 'active' ? '#00d4ff' : '#5a6d8a');
-    label.setAttribute('font-family', "'JetBrains Mono', monospace");
-    label.setAttribute('font-size', '9');
-    label.setAttribute('letter-spacing', '0.08em');
-    label.textContent = s.name.toUpperCase();
-    label.style.opacity = '0';
-    nodesGroup.appendChild(label);
-  });
-
-  // Animate pipeline on scroll
-  if (!prefersReducedMotion) {
-    const progressPath = document.getElementById('pipeline-progress');
-    const pathLen = progressPath.getTotalLength ? progressPath.getTotalLength() : 1040;
-    progressPath.style.strokeDasharray = pathLen;
-    progressPath.style.strokeDashoffset = pathLen;
-
-    // Find active index
-    const activeIdx = stages.findIndex(s => s.status === 'active');
-    const progressFraction = (activeIdx + 0.5) / stages.length;
-
-    ScrollTrigger.create({
-      trigger: '#pipeline',
-      start: 'top 80%',
-      once: true,
-      onEnter: () => {
-        // Draw the progress line
-        gsap.to(progressPath, {
-          opacity: 1,
-          strokeDashoffset: pathLen * (1 - progressFraction),
-          duration: 2,
-          ease: 'power2.out'
+        let isVisible = true;
+        document.addEventListener("visibilitychange", () => {
+          isVisible = !document.hidden;
         });
 
-        // Stagger node reveals
-        const circles = nodesGroup.querySelectorAll('circle');
-        const uses = nodesGroup.querySelectorAll('use');
-        const labels = nodesGroup.querySelectorAll('text');
+        function draw() {
+          if (!isVisible) {
+            requestAnimationFrame(draw);
+            return;
+          }
 
-        gsap.to(circles, { opacity: 1, duration: 0.4, stagger: 0.12, ease: 'power2.out', delay: 0.3 });
-        gsap.to(uses, { opacity: 1, duration: 0.3, stagger: 0.12, delay: 0.5 });
-        gsap.to(labels, { opacity: 1, duration: 0.3, stagger: 0.12, delay: 0.6 });
+          ctx.clearRect(0, 0, w, h);
 
-        // Particle flow along path
-        for (let p = 0; p < 5; p++) {
-          const dot = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
-          dot.setAttribute('r', '2.5');
-          dot.setAttribute('fill', '#00d4ff');
-          dot.setAttribute('opacity', '0.6');
-          dot.setAttribute('cx', '30');
-          dot.setAttribute('cy', '70');
-          particlesGroup.appendChild(dot);
+          // Deep ocean gradient
+          const grad = ctx.createLinearGradient(0, 0, 0, h);
+          grad.addColorStop(0, "#060a14");
+          grad.addColorStop(0.4, "#0a1628");
+          grad.addColorStop(0.7, "#0d1f3c");
+          grad.addColorStop(1, "#060a14");
+          ctx.fillStyle = grad;
+          ctx.fillRect(0, 0, w, h);
 
-          const endX = 30 + (activeIdx * spacing);
-          gsap.to(dot, {
-            attr: { cx: endX },
-            duration: 2 + p * 0.4,
-            ease: 'none',
-            repeat: -1,
-            delay: p * 0.8,
-            onRepeat: function() {
-              gsap.set(dot, { attr: { cx: 30, opacity: 0.6 } });
+          // Subtle nebula glow
+          const glow = ctx.createRadialGradient(
+            w * 0.3,
+            h * 0.4,
+            0,
+            w * 0.3,
+            h * 0.4,
+            w * 0.5,
+          );
+          glow.addColorStop(0, "rgba(0, 212, 255, 0.015)");
+          glow.addColorStop(0.5, "rgba(124, 58, 237, 0.008)");
+          glow.addColorStop(1, "transparent");
+          ctx.fillStyle = glow;
+          ctx.fillRect(0, 0, w, h);
+
+          for (let i = 0; i < particles.length; i++) {
+            const p = particles[i];
+            p.x += p.vx;
+            p.y += p.vy;
+            p.pulse += 0.02;
+
+            if (p.x < 0) p.x = w;
+            if (p.x > w) p.x = 0;
+            if (p.y < 0) p.y = h;
+            if (p.y > h) p.y = 0;
+
+            // Mouse repulsion (disabled on mobile)
+            if (!isMobile) {
+              const mdx = p.x - mouse.x;
+              const mdy = p.y - mouse.y;
+              const md = Math.sqrt(mdx * mdx + mdy * mdy);
+              if (md < MOUSE_DIST) {
+                const force = ((MOUSE_DIST - md) / MOUSE_DIST) * 0.02;
+                p.vx += (mdx / md) * force;
+                p.vy += (mdy / md) * force;
+              }
             }
+
+            p.vx *= 0.999;
+            p.vy *= 0.999;
+
+            const alpha = p.bright
+              ? 0.6 + Math.sin(p.pulse) * 0.3
+              : 0.15 + Math.sin(p.pulse) * 0.1;
+
+            ctx.beginPath();
+            ctx.arc(p.x, p.y, p.r, 0, Math.PI * 2);
+            ctx.fillStyle = p.bright
+              ? `rgba(0, 212, 255, ${alpha})`
+              : `rgba(136, 153, 184, ${alpha})`;
+            ctx.fill();
+
+            if (p.bright) {
+              ctx.beginPath();
+              ctx.arc(p.x, p.y, p.r * 4, 0, Math.PI * 2);
+              ctx.fillStyle = `rgba(0, 212, 255, ${alpha * 0.08})`;
+              ctx.fill();
+            }
+
+            for (let j = i + 1; j < particles.length; j++) {
+              const q = particles[j];
+              const dx = p.x - q.x;
+              const dy = p.y - q.y;
+              const dist = Math.sqrt(dx * dx + dy * dy);
+
+              if (dist < CONNECTION_DIST) {
+                const lineAlpha = (1 - dist / CONNECTION_DIST) * 0.08;
+                ctx.beginPath();
+                ctx.moveTo(p.x, p.y);
+                ctx.lineTo(q.x, q.y);
+                ctx.strokeStyle = `rgba(0, 212, 255, ${lineAlpha})`;
+                ctx.lineWidth = 0.5;
+                ctx.stroke();
+              }
+            }
+          }
+
+          requestAnimationFrame(draw);
+        }
+
+        window.addEventListener("resize", resize);
+        if (!isMobile) {
+          document.addEventListener("mousemove", (e) => {
+            mouse.x = e.clientX;
+            mouse.y = e.clientY;
           });
-          gsap.to(dot, { opacity: 0, duration: 0.5, delay: 1.8 + p * 0.4, repeat: -1, repeatDelay: 1.5 + p * 0.4 });
         }
-      }
-    });
-  }
-})();
 
-// ═══════════════════════════════════════════════
-// FEATURES — Card hover tilt (mouse move)
-// ═══════════════════════════════════════════════
-(function() {
-  if (prefersReducedMotion) return;
+        init();
+        draw();
+      })();
 
-  document.querySelectorAll('.feature-card').forEach(card => {
-    card.addEventListener('mousemove', (e) => {
-      const rect = card.getBoundingClientRect();
-      const x = (e.clientX - rect.left) / rect.width - 0.5;
-      const y = (e.clientY - rect.top) / rect.height - 0.5;
-      gsap.to(card, {
-        rotateY: x * 4,
-        rotateX: -y * 4,
-        duration: 0.3,
-        ease: 'power2.out',
-        transformPerspective: 800
-      });
-    });
-    card.addEventListener('mouseleave', () => {
-      gsap.to(card, { rotateY: 0, rotateX: 0, duration: 0.5, ease: 'power2.out' });
-    });
-  });
-})();
+      // ═══════════════════════════════════════════════
+      // NAV SCROLL EFFECT
+      // ═══════════════════════════════════════════════
+      (function () {
+        const nav = document.getElementById("nav");
+        window.addEventListener("scroll", () => {
+          nav.classList.toggle("scrolled", window.scrollY > 60);
+        });
+      })();
 
-// ═══════════════════════════════════════════════
-// TERMINAL ANIMATION — GSAP Timeline
-// ═══════════════════════════════════════════════
-(function() {
-  const terminal = document.getElementById('terminal');
-  const lines = [
-    { html: '<span class="t-prompt">$</span> <span class="t-cmd">shipwright pipeline start</span> <span class="t-flag">--issue 42</span> <span class="t-flag">--pipeline</span> <span class="t-string">autonomous</span>' },
-    { html: '' },
-    { html: '<span class="t-box">\u256d\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u256e</span>' },
-    { html: '<span class="t-box">\u2502</span>  <span class="t-info">&#9875; Shipwright Pipeline v1.7.1</span>               <span class="t-box">\u2502</span>' },
-    { html: '<span class="t-box">\u2570\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u256f</span>' },
-    { html: '' },
-    { html: '<span class="t-dim">[intake]</span>  <span class="t-info">Fetching issue #42...</span>' },
-    { html: '<span class="t-dim">[intake]</span>  <span class="t-success">\u2713</span> "Add JWT authentication to API"' },
-    { html: '<span class="t-dim">[intake]</span>  <span class="t-success">\u2713</span> Labels: <span class="t-info">feature, auth, backend</span>' },
-    { html: '<span class="t-dim">[plan]</span>    <span class="t-info">Generating implementation plan...</span>' },
-    { html: '<span class="t-dim">[plan]</span>    <span class="t-success">\u2713</span> 3 files to create, 2 to modify' },
-    { html: '<span class="t-dim">[build]</span>   <span class="t-stage">Spawning agent team...</span>' },
-    { html: '<span class="t-dim">[build]</span>   <span class="t-info">\u251c\u2500</span> <span class="t-warn">backend</span>  \u2192 src/auth/, src/middleware/' },
-    { html: '<span class="t-dim">[build]</span>   <span class="t-info">\u251c\u2500</span> <span class="t-warn">frontend</span> \u2192 src/components/Login.tsx' },
-    { html: '<span class="t-dim">[build]</span>   <span class="t-info">\u2514\u2500</span> <span class="t-warn">tests</span>    \u2192 __tests__/auth.test.ts' },
-    { html: '<span class="t-dim">[build]</span>   <span class="t-success">\u2713</span> All agents completed (3m 42s)' },
-    { html: '<span class="t-dim">[quality]</span> <span class="t-info">Compound quality cycle 1/3...</span>' },
-    { html: '<span class="t-dim">[quality]</span> <span class="t-success">\u2713</span> lint: 0 errors  <span class="t-success">\u2713</span> types: clean  <span class="t-success">\u2713</span> tests: 14/14' },
-    { html: '<span class="t-dim">[review]</span>  <span class="t-success">\u2713</span> No issues found. Ship it.' },
-    { html: '<span class="t-dim">[pr]</span>      <span class="t-success">\u2713</span> PR #87 created \u2192 <span class="t-info">feat/issue-42-jwt-auth</span>' },
-    { html: '' },
-    { html: '<span class="t-success">&#9875; Pipeline complete in 4m 18s</span> <span class="t-dim">\u2022 Cost: $3.42</span>' },
-  ];
+      // ═══════════════════════════════════════════════
+      // GSAP — Register ScrollTrigger
+      // ═══════════════════════════════════════════════
+      gsap.registerPlugin(ScrollTrigger);
 
-  // Create line elements
-  lines.forEach((l) => {
-    const div = document.createElement('div');
-    div.className = 'line';
-    div.innerHTML = l.html || '&nbsp;';
-    terminal.appendChild(div);
-  });
+      // Respect reduced motion
+      const prefersReducedMotion = window.matchMedia(
+        "(prefers-reduced-motion: reduce)",
+      ).matches;
 
-  // GSAP timeline triggered by ScrollTrigger
-  const lineEls = terminal.querySelectorAll('.line');
+      // ═══════════════════════════════════════════════
+      // HERO ENTRANCE SEQUENCE (GSAP Timeline)
+      // ═══════════════════════════════════════════════
+      (function () {
+        const heroEls =
+          ".hero-badge, .hero-title .line1, .hero-title .line2, .hero-sub, .hero-actions, .hero-install, .scroll-indicator, .hero-logo-svg";
 
-  if (!prefersReducedMotion) {
-    const tl = gsap.timeline({
-      scrollTrigger: {
-        trigger: terminal,
-        start: 'top 70%',
-        once: true
-      }
-    });
+        if (prefersReducedMotion) {
+          gsap.set(heroEls, { opacity: 1, y: 0 });
+          return;
+        }
 
-    lineEls.forEach((el, i) => {
-      tl.to(el, {
-        opacity: 1,
-        y: 0,
-        duration: 0.15,
-        ease: 'power1.out'
-      }, i * 0.18);
-    });
+        // Disable lag smoothing so background-tab catch-up works instantly
+        gsap.ticker.lagSmoothing(0);
 
-    // Blinking cursor after last line
-    tl.call(() => {
-      const cursor = document.createElement('span');
-      cursor.className = 'cursor-blink';
-      lineEls[lineEls.length - 1].appendChild(cursor);
-    }, null, lines.length * 0.18 + 0.2);
-  } else {
-    lineEls.forEach(el => { el.style.opacity = 1; el.style.transform = 'none'; });
-  }
-})();
-
-// ═══════════════════════════════════════════════
-// COUNTER ANIMATION — GSAP
-// ═══════════════════════════════════════════════
-(function() {
-  if (prefersReducedMotion) {
-    document.querySelectorAll('.scale-number[data-count]').forEach(el => {
-      el.textContent = el.dataset.count;
-    });
-    return;
-  }
-
-  document.querySelectorAll('.scale-number[data-count]').forEach(el => {
-    const target = parseInt(el.dataset.count);
-    ScrollTrigger.create({
-      trigger: el,
-      start: 'top 80%',
-      once: true,
-      onEnter: () => {
-        gsap.to({ val: 0 }, {
-          val: target,
-          duration: 1.5,
-          ease: 'power2.out',
-          onUpdate: function() {
-            el.textContent = Math.round(this.targets()[0].val);
+        // Logo SVG draw-on prep
+        const logoPaths = document.querySelectorAll(
+          ".hero-logo-svg .logo-draw",
+        );
+        logoPaths.forEach((el) => {
+          try {
+            const len = el.getTotalLength ? el.getTotalLength() : 200;
+            el.style.strokeDasharray = len;
+            el.style.strokeDashoffset = len;
+          } catch (e) {
+            /* skip */
           }
         });
-      }
-    });
-  });
 
-  // Stats bar counters
-  document.querySelectorAll('.stat-value[data-stat]').forEach(el => {
-    const target = parseInt(el.dataset.stat);
-    ScrollTrigger.create({
-      trigger: el,
-      start: 'top 90%',
-      once: true,
-      onEnter: () => {
-        gsap.to({ val: 0 }, {
-          val: target,
-          duration: 1.2,
-          ease: 'power2.out',
-          onUpdate: function() {
-            el.textContent = Math.round(this.targets()[0].val);
+        const tl = gsap.timeline({ defaults: { ease: "power2.out" } });
+
+        tl.fromTo(
+          ".hero-logo-svg",
+          { opacity: 0 },
+          { opacity: 1, duration: 0.3 },
+          0,
+        )
+          .to(
+            logoPaths,
+            {
+              strokeDashoffset: 0,
+              duration: 1.5,
+              ease: "power1.inOut",
+              stagger: 0.08,
+            },
+            0.1,
+          )
+          .fromTo(
+            ".hero-badge",
+            { opacity: 0, y: 20 },
+            { opacity: 1, y: 0, duration: 0.6 },
+            0.6,
+          )
+          .fromTo(
+            ".hero-title .line1",
+            { opacity: 0, y: 30 },
+            { opacity: 1, y: 0, duration: 0.7 },
+            0.9,
+          )
+          .fromTo(
+            ".hero-title .line2",
+            { opacity: 0, y: 30 },
+            { opacity: 1, y: 0, duration: 0.7 },
+            1.2,
+          )
+          .fromTo(
+            ".hero-sub",
+            { opacity: 0, y: 20 },
+            { opacity: 1, y: 0, duration: 0.6 },
+            1.5,
+          )
+          .fromTo(
+            ".hero-actions",
+            { opacity: 0, y: 20 },
+            { opacity: 1, y: 0, duration: 0.6 },
+            1.8,
+          )
+          .fromTo(
+            ".hero-install",
+            { opacity: 0, y: 20 },
+            { opacity: 1, y: 0, duration: 0.6 },
+            2.0,
+          )
+          .fromTo(
+            ".scroll-indicator",
+            { opacity: 0 },
+            { opacity: 1, duration: 0.8 },
+            2.4,
+          );
+
+        // Safety net: if tab was backgrounded during load, complete hero on visibility
+        function ensureHeroVisible() {
+          if (tl.progress() < 1) {
+            tl.progress(1);
+          }
+        }
+        document.addEventListener("visibilitychange", function onVis() {
+          if (!document.hidden) {
+            ensureHeroVisible();
+            document.removeEventListener("visibilitychange", onVis);
           }
         });
-      }
-    });
-  });
-})();
+        // Absolute fallback: force-complete after 5s real time
+        setTimeout(ensureHeroVisible, 5000);
+      })();
 
-// ═══════════════════════════════════════════════
-// WAVE DIVIDER — Parallax on Scroll
-// ═══════════════════════════════════════════════
-(function() {
-  if (prefersReducedMotion) return;
+      // ═══════════════════════════════════════════════
+      // GSAP ScrollTrigger — Batch Reveal
+      // ═══════════════════════════════════════════════
+      (function () {
+        if (prefersReducedMotion) return;
 
-  document.querySelectorAll('.wave-divider').forEach(divider => {
-    const svgs = divider.querySelectorAll('svg');
-    svgs.forEach((svg, i) => {
-      gsap.to(svg, {
-        x: -(50 + i * 30),
-        ease: 'none',
-        scrollTrigger: {
-          trigger: divider,
-          start: 'top bottom',
-          end: 'bottom top',
-          scrub: 1
+        ScrollTrigger.batch(".gs-reveal", {
+          onEnter: (batch) => {
+            gsap.to(batch, {
+              opacity: 1,
+              y: 0,
+              duration: 0.7,
+              ease: "power2.out",
+              stagger: 0.1,
+              overwrite: true,
+            });
+          },
+          start: "top 88%",
+          once: true,
+        });
+      })();
+
+      // ═══════════════════════════════════════════════
+      // VOYAGE — Staggered scroll reveal with icon pop
+      // ═══════════════════════════════════════════════
+      (function () {
+        if (prefersReducedMotion) return;
+
+        gsap.utils.toArray(".voyage-step").forEach((step, i) => {
+          const icon = step.querySelector(".voyage-icon");
+          gsap.from(icon, {
+            scrollTrigger: { trigger: step, start: "top 85%", once: true },
+            scale: 0,
+            duration: 0.5,
+            delay: 0.15,
+            ease: "elastic.out(1, 0.5)",
+          });
+        });
+      })();
+
+      // ═══════════════════════════════════════════════
+      // PIPELINE VISUALIZATION — SVG animated
+      // ═══════════════════════════════════════════════
+      (function () {
+        const stages = [
+          { name: "intake", icon: "#icon-intake", status: "complete" },
+          { name: "plan", icon: "#icon-plan", status: "complete" },
+          { name: "design", icon: "#icon-design", status: "complete" },
+          { name: "build", icon: "#icon-build", status: "complete" },
+          { name: "test", icon: "#icon-test", status: "complete" },
+          { name: "review", icon: "#icon-review", status: "complete" },
+          { name: "quality", icon: "#icon-quality", status: "active" },
+          { name: "pr", icon: "#icon-pr", status: "pending" },
+          { name: "merge", icon: "#icon-merge", status: "pending" },
+          { name: "deploy", icon: "#icon-deploy", status: "pending" },
+          { name: "validate", icon: "#icon-validate", status: "pending" },
+          { name: "monitor", icon: "#icon-monitor", status: "pending" },
+        ];
+
+        const svg = document.getElementById("pipeline-svg");
+        const nodesGroup = document.getElementById("pipeline-nodes");
+        const particlesGroup = document.getElementById("pipeline-particles");
+        const spacing = 1040 / (stages.length - 1);
+
+        stages.forEach((s, i) => {
+          const cx = 30 + i * spacing;
+          const cy = 70;
+
+          // Background circle
+          const circle = document.createElementNS(
+            "http://www.w3.org/2000/svg",
+            "circle",
+          );
+          circle.setAttribute("cx", cx);
+          circle.setAttribute("cy", cy);
+          circle.setAttribute("r", 18);
+          circle.setAttribute(
+            "class",
+            `pipeline-node-circle pipeline-${s.status}`,
+          );
+
+          if (s.status === "complete") {
+            circle.setAttribute("fill", "#132d56");
+            circle.setAttribute("stroke", "#4ade80");
+            circle.setAttribute("stroke-width", "2");
+            circle.setAttribute("filter", "url(#glow-complete)");
+          } else if (s.status === "active") {
+            circle.setAttribute("fill", "url(#pipe-grad-active)");
+            circle.setAttribute("stroke", "#00d4ff");
+            circle.setAttribute("stroke-width", "2");
+            circle.setAttribute("filter", "url(#glow-active)");
+          } else {
+            circle.setAttribute("fill", "#0d1f3c");
+            circle.setAttribute("stroke", "#5a6d8a");
+            circle.setAttribute("stroke-width", "1.5");
+          }
+
+          circle.style.opacity = "0";
+          nodesGroup.appendChild(circle);
+
+          // Icon via <use> — centered inside the circle
+          const useEl = document.createElementNS(
+            "http://www.w3.org/2000/svg",
+            "use",
+          );
+          useEl.setAttribute("href", "icons.svg" + s.icon);
+          useEl.setAttribute("x", cx - 10);
+          useEl.setAttribute("y", cy - 10);
+          useEl.setAttribute("width", "20");
+          useEl.setAttribute("height", "20");
+          useEl.style.opacity = "0";
+          if (s.status === "complete") {
+            useEl.setAttribute("color", "#4ade80");
+          } else if (s.status === "active") {
+            useEl.setAttribute("color", "#060a14");
+          } else {
+            useEl.setAttribute("color", "#5a6d8a");
+          }
+          nodesGroup.appendChild(useEl);
+
+          // Label
+          const label = document.createElementNS(
+            "http://www.w3.org/2000/svg",
+            "text",
+          );
+          label.setAttribute("x", cx);
+          label.setAttribute("y", cy + 34);
+          label.setAttribute("text-anchor", "middle");
+          label.setAttribute(
+            "fill",
+            s.status === "active" ? "#00d4ff" : "#5a6d8a",
+          );
+          label.setAttribute("font-family", "'JetBrains Mono', monospace");
+          label.setAttribute("font-size", "9");
+          label.setAttribute("letter-spacing", "0.08em");
+          label.textContent = s.name.toUpperCase();
+          label.style.opacity = "0";
+          nodesGroup.appendChild(label);
+        });
+
+        // Animate pipeline on scroll
+        if (!prefersReducedMotion) {
+          const progressPath = document.getElementById("pipeline-progress");
+          const pathLen = progressPath.getTotalLength
+            ? progressPath.getTotalLength()
+            : 1040;
+          progressPath.style.strokeDasharray = pathLen;
+          progressPath.style.strokeDashoffset = pathLen;
+
+          // Find active index
+          const activeIdx = stages.findIndex((s) => s.status === "active");
+          const progressFraction = (activeIdx + 0.5) / stages.length;
+
+          ScrollTrigger.create({
+            trigger: "#pipeline",
+            start: "top 80%",
+            once: true,
+            onEnter: () => {
+              // Draw the progress line
+              gsap.to(progressPath, {
+                opacity: 1,
+                strokeDashoffset: pathLen * (1 - progressFraction),
+                duration: 2,
+                ease: "power2.out",
+              });
+
+              // Stagger node reveals
+              const circles = nodesGroup.querySelectorAll("circle");
+              const uses = nodesGroup.querySelectorAll("use");
+              const labels = nodesGroup.querySelectorAll("text");
+
+              gsap.to(circles, {
+                opacity: 1,
+                duration: 0.4,
+                stagger: 0.12,
+                ease: "power2.out",
+                delay: 0.3,
+              });
+              gsap.to(uses, {
+                opacity: 1,
+                duration: 0.3,
+                stagger: 0.12,
+                delay: 0.5,
+              });
+              gsap.to(labels, {
+                opacity: 1,
+                duration: 0.3,
+                stagger: 0.12,
+                delay: 0.6,
+              });
+
+              // Particle flow along path
+              for (let p = 0; p < 5; p++) {
+                const dot = document.createElementNS(
+                  "http://www.w3.org/2000/svg",
+                  "circle",
+                );
+                dot.setAttribute("r", "2.5");
+                dot.setAttribute("fill", "#00d4ff");
+                dot.setAttribute("opacity", "0.6");
+                dot.setAttribute("cx", "30");
+                dot.setAttribute("cy", "70");
+                particlesGroup.appendChild(dot);
+
+                const endX = 30 + activeIdx * spacing;
+                gsap.to(dot, {
+                  attr: { cx: endX },
+                  duration: 2 + p * 0.4,
+                  ease: "none",
+                  repeat: -1,
+                  delay: p * 0.8,
+                  onRepeat: function () {
+                    gsap.set(dot, { attr: { cx: 30, opacity: 0.6 } });
+                  },
+                });
+                gsap.to(dot, {
+                  opacity: 0,
+                  duration: 0.5,
+                  delay: 1.8 + p * 0.4,
+                  repeat: -1,
+                  repeatDelay: 1.5 + p * 0.4,
+                });
+              }
+            },
+          });
         }
-      });
-    });
-  });
-})();
+      })();
 
-// ═══════════════════════════════════════════════
-// SMOOTH ANCHOR SCROLLING
-// ═══════════════════════════════════════════════
-document.querySelectorAll('a[href^="#"]').forEach(a => {
-  a.addEventListener('click', (e) => {
-    const target = document.querySelector(a.getAttribute('href'));
-    if (target) {
-      e.preventDefault();
-      target.scrollIntoView({ behavior: 'smooth', block: 'start' });
-    }
-  });
-});
-</script>
-</body>
+      // ═══════════════════════════════════════════════
+      // FEATURES — Card hover tilt (mouse move)
+      // ═══════════════════════════════════════════════
+      (function () {
+        if (prefersReducedMotion) return;
+
+        document.querySelectorAll(".feature-card").forEach((card) => {
+          card.addEventListener("mousemove", (e) => {
+            const rect = card.getBoundingClientRect();
+            const x = (e.clientX - rect.left) / rect.width - 0.5;
+            const y = (e.clientY - rect.top) / rect.height - 0.5;
+            gsap.to(card, {
+              rotateY: x * 4,
+              rotateX: -y * 4,
+              duration: 0.3,
+              ease: "power2.out",
+              transformPerspective: 800,
+            });
+          });
+          card.addEventListener("mouseleave", () => {
+            gsap.to(card, {
+              rotateY: 0,
+              rotateX: 0,
+              duration: 0.5,
+              ease: "power2.out",
+            });
+          });
+        });
+      })();
+
+      // ═══════════════════════════════════════════════
+      // TERMINAL ANIMATION — GSAP Timeline
+      // ═══════════════════════════════════════════════
+      (function () {
+        const terminal = document.getElementById("terminal");
+        const lines = [
+          {
+            html: '<span class="t-prompt">$</span> <span class="t-cmd">shipwright pipeline start</span> <span class="t-flag">--issue 42</span> <span class="t-flag">--pipeline</span> <span class="t-string">autonomous</span>',
+          },
+          { html: "" },
+          {
+            html: '<span class="t-box">\u256d\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u256e</span>',
+          },
+          {
+            html: '<span class="t-box">\u2502</span>  <span class="t-info">&#9875; Shipwright Pipeline v1.7.1</span>               <span class="t-box">\u2502</span>',
+          },
+          {
+            html: '<span class="t-box">\u2570\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u256f</span>',
+          },
+          { html: "" },
+          {
+            html: '<span class="t-dim">[intake]</span>  <span class="t-info">Fetching issue #42...</span>',
+          },
+          {
+            html: '<span class="t-dim">[intake]</span>  <span class="t-success">\u2713</span> "Add JWT authentication to API"',
+          },
+          {
+            html: '<span class="t-dim">[intake]</span>  <span class="t-success">\u2713</span> Labels: <span class="t-info">feature, auth, backend</span>',
+          },
+          {
+            html: '<span class="t-dim">[plan]</span>    <span class="t-info">Generating implementation plan...</span>',
+          },
+          {
+            html: '<span class="t-dim">[plan]</span>    <span class="t-success">\u2713</span> 3 files to create, 2 to modify',
+          },
+          {
+            html: '<span class="t-dim">[build]</span>   <span class="t-stage">Spawning agent team...</span>',
+          },
+          {
+            html: '<span class="t-dim">[build]</span>   <span class="t-info">\u251c\u2500</span> <span class="t-warn">backend</span>  \u2192 src/auth/, src/middleware/',
+          },
+          {
+            html: '<span class="t-dim">[build]</span>   <span class="t-info">\u251c\u2500</span> <span class="t-warn">frontend</span> \u2192 src/components/Login.tsx',
+          },
+          {
+            html: '<span class="t-dim">[build]</span>   <span class="t-info">\u2514\u2500</span> <span class="t-warn">tests</span>    \u2192 __tests__/auth.test.ts',
+          },
+          {
+            html: '<span class="t-dim">[build]</span>   <span class="t-success">\u2713</span> All agents completed (3m 42s)',
+          },
+          {
+            html: '<span class="t-dim">[quality]</span> <span class="t-info">Compound quality cycle 1/3...</span>',
+          },
+          {
+            html: '<span class="t-dim">[quality]</span> <span class="t-success">\u2713</span> lint: 0 errors  <span class="t-success">\u2713</span> types: clean  <span class="t-success">\u2713</span> tests: 14/14',
+          },
+          {
+            html: '<span class="t-dim">[intel]</span>   <span class="t-info">Running intelligence analysis...</span>',
+          },
+          {
+            html: '<span class="t-dim">[intel]</span>   <span class="t-success">\u2713</span> Risk: <span class="t-warn">low</span>  Complexity: <span class="t-info">medium</span>  Predict: <span class="t-success">safe</span>',
+          },
+          {
+            html: '<span class="t-dim">[review]</span>  <span class="t-success">\u2713</span> No issues found. Ship it.',
+          },
+          {
+            html: '<span class="t-dim">[github]</span>  <span class="t-success">\u2713</span> Check run created \u2192 <span class="t-info">Shipwright CI</span>',
+          },
+          {
+            html: '<span class="t-dim">[pr]</span>      <span class="t-success">\u2713</span> PR #87 created \u2192 <span class="t-info">feat/issue-42-jwt-auth</span>',
+          },
+          {
+            html: '<span class="t-dim">[deploy]</span>  <span class="t-success">\u2713</span> Deployment tracked \u2192 <span class="t-info">staging</span>',
+          },
+          { html: "" },
+          {
+            html: '<span class="t-success">&#9875; Pipeline complete in 4m 18s</span> <span class="t-dim">\u2022 Cost: $3.42</span>',
+          },
+        ];
+
+        // Create line elements
+        lines.forEach((l) => {
+          const div = document.createElement("div");
+          div.className = "line";
+          div.innerHTML = l.html || "&nbsp;";
+          terminal.appendChild(div);
+        });
+
+        // GSAP timeline triggered by ScrollTrigger
+        const lineEls = terminal.querySelectorAll(".line");
+
+        if (!prefersReducedMotion) {
+          const tl = gsap.timeline({
+            scrollTrigger: {
+              trigger: terminal,
+              start: "top 70%",
+              once: true,
+            },
+          });
+
+          lineEls.forEach((el, i) => {
+            tl.to(
+              el,
+              {
+                opacity: 1,
+                y: 0,
+                duration: 0.15,
+                ease: "power1.out",
+              },
+              i * 0.18,
+            );
+          });
+
+          // Blinking cursor after last line
+          tl.call(
+            () => {
+              const cursor = document.createElement("span");
+              cursor.className = "cursor-blink";
+              lineEls[lineEls.length - 1].appendChild(cursor);
+            },
+            null,
+            lines.length * 0.18 + 0.2,
+          );
+        } else {
+          lineEls.forEach((el) => {
+            el.style.opacity = 1;
+            el.style.transform = "none";
+          });
+        }
+      })();
+
+      // ═══════════════════════════════════════════════
+      // COUNTER ANIMATION — GSAP
+      // ═══════════════════════════════════════════════
+      (function () {
+        if (prefersReducedMotion) {
+          document
+            .querySelectorAll(".scale-number[data-count]")
+            .forEach((el) => {
+              el.textContent = el.dataset.count;
+            });
+          return;
+        }
+
+        document.querySelectorAll(".scale-number[data-count]").forEach((el) => {
+          const target = parseInt(el.dataset.count);
+          ScrollTrigger.create({
+            trigger: el,
+            start: "top 80%",
+            once: true,
+            onEnter: () => {
+              gsap.to(
+                { val: 0 },
+                {
+                  val: target,
+                  duration: 1.5,
+                  ease: "power2.out",
+                  onUpdate: function () {
+                    el.textContent = Math.round(this.targets()[0].val);
+                  },
+                },
+              );
+            },
+          });
+        });
+
+        // Stats bar counters
+        document.querySelectorAll(".stat-value[data-stat]").forEach((el) => {
+          const target = parseInt(el.dataset.stat);
+          ScrollTrigger.create({
+            trigger: el,
+            start: "top 90%",
+            once: true,
+            onEnter: () => {
+              gsap.to(
+                { val: 0 },
+                {
+                  val: target,
+                  duration: 1.2,
+                  ease: "power2.out",
+                  onUpdate: function () {
+                    el.textContent = Math.round(this.targets()[0].val);
+                  },
+                },
+              );
+            },
+          });
+        });
+      })();
+
+      // ═══════════════════════════════════════════════
+      // WAVE DIVIDER — Parallax on Scroll
+      // ═══════════════════════════════════════════════
+      (function () {
+        if (prefersReducedMotion) return;
+
+        document.querySelectorAll(".wave-divider").forEach((divider) => {
+          const svgs = divider.querySelectorAll("svg");
+          svgs.forEach((svg, i) => {
+            gsap.to(svg, {
+              x: -(50 + i * 30),
+              ease: "none",
+              scrollTrigger: {
+                trigger: divider,
+                start: "top bottom",
+                end: "bottom top",
+                scrub: 1,
+              },
+            });
+          });
+        });
+      })();
+
+      // ═══════════════════════════════════════════════
+      // SMOOTH ANCHOR SCROLLING
+      // ═══════════════════════════════════════════════
+      document.querySelectorAll('a[href^="#"]').forEach((a) => {
+        a.addEventListener("click", (e) => {
+          const target = document.querySelector(a.getAttribute("href"));
+          if (target) {
+            e.preventDefault();
+            target.scrollIntoView({ behavior: "smooth", block: "start" });
+          }
+        });
+      });
+    </script>
+  </body>
 </html>

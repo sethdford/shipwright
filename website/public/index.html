@@ -1809,8 +1809,8 @@
           <div class="stat-label">Pipeline Stages</div>
         </div>
         <div class="stat-item">
-          <div class="stat-value" data-stat="4">0</div>
-          <div class="stat-label">Deploy Adapters</div>
+          <div class="stat-value" data-stat="7">0</div>
+          <div class="stat-label">Intelligence Modules</div>
         </div>
         <div class="stat-item">
           <div class="stat-value stat-inf">&#8734;</div>
@@ -1861,7 +1861,8 @@
               <span class="layer-chip">Autonomous daemon</span>
               <span class="layer-chip">Fleet operations</span>
               <span class="layer-chip">Persistent memory</span>
-              <span class="layer-chip">Deploy adapters</span>
+              <span class="layer-chip">Intelligence layer</span>
+              <span class="layer-chip">GitHub API integration</span>
               <span class="layer-chip">DORA metrics</span>
             </div>
           </div>
@@ -2159,6 +2160,47 @@
             </p>
             <span class="feature-tag">--worktree</span>
           </div>
+
+          <div class="feature-card gs-reveal">
+            <div class="feature-icon daemon">
+              <svg class="icon"><use href="icons.svg#icon-github" /></svg>
+            </div>
+            <h3>GitHub Integration</h3>
+            <p>
+              Native GitHub API: GraphQL queries for code history and blame,
+              Checks API for CI status, Deployments API for environment
+              tracking, security alert enrichment.
+            </p>
+            <span class="feature-tag">shipwright github context</span>
+          </div>
+
+          <div class="feature-card gs-reveal">
+            <div class="feature-icon scale">
+              <svg class="icon"><use href="icons.svg#icon-auto-scale" /></svg>
+            </div>
+            <h3>Intelligence Layer</h3>
+            <p>
+              7 AI modules that make the pipeline smarter over time: semantic
+              triage, predictive risk scoring, adversarial review, adaptive
+              thresholds, convergence detection, and model routing.
+            </p>
+            <span class="feature-tag">shipwright intelligence</span>
+          </div>
+
+          <div class="feature-card gs-reveal">
+            <div class="feature-icon quality">
+              <svg class="icon">
+                <use href="icons.svg#icon-compound-quality" />
+              </svg>
+            </div>
+            <h3>Persistent Memory</h3>
+            <p>
+              Failure patterns, root causes, and codebase conventions captured
+              after every run. Future builds receive relevant context —
+              convergence detection ensures agents learn, not repeat.
+            </p>
+            <span class="feature-tag">shipwright memory show</span>
+          </div>
         </div>
       </div>
     </section>
@@ -2224,10 +2266,10 @@
             </div>
           </div>
           <div class="scale-card">
-            <div class="scale-number" data-count="8">0</div>
-            <div class="scale-unit">Pipeline Templates</div>
+            <div class="scale-number" data-count="37">0</div>
+            <div class="scale-unit">Scripts</div>
             <div class="scale-detail">
-              Fast, standard, enterprise, cost-aware, and more
+              ~35K lines of bash powering the entire platform
             </div>
           </div>
           <div class="scale-card">
@@ -2238,10 +2280,10 @@
             </div>
           </div>
           <div class="scale-card">
-            <div class="scale-number special">&#8734;</div>
-            <div class="scale-unit">Repos per Fleet</div>
+            <div class="scale-number" data-count="320">0</div>
+            <div class="scale-unit">Tests Passing</div>
             <div class="scale-detail">
-              Orchestrate daemons across your entire org
+              20 test suites covering every module end-to-end
             </div>
           </div>
         </div>
@@ -2440,10 +2482,10 @@
             <div class="os-card-icon">
               <svg class="icon"><use href="icons.svg#icon-fleet" /></svg>
             </div>
-            <h3>24 Team Templates, 8 Pipelines</h3>
+            <h3>24 Templates, 8 Pipelines</h3>
             <p>
-              Pre-configured agent teams for every phase of the SDLC. 4 deploy
-              adapters (Vercel, Fly.io, Railway, Docker). Cost intelligence
+              Pre-configured agent teams for every phase of the SDLC. 7
+              intelligence modules, GitHub API integration, cost intelligence
               built in.
             </p>
             <a
@@ -3137,10 +3179,22 @@
             html: '<span class="t-dim">[quality]</span> <span class="t-success">\u2713</span> lint: 0 errors  <span class="t-success">\u2713</span> types: clean  <span class="t-success">\u2713</span> tests: 14/14',
           },
           {
+            html: '<span class="t-dim">[intel]</span>   <span class="t-info">Running intelligence analysis...</span>',
+          },
+          {
+            html: '<span class="t-dim">[intel]</span>   <span class="t-success">\u2713</span> Risk: <span class="t-warn">low</span>  Complexity: <span class="t-info">medium</span>  Predict: <span class="t-success">safe</span>',
+          },
+          {
             html: '<span class="t-dim">[review]</span>  <span class="t-success">\u2713</span> No issues found. Ship it.',
           },
           {
+            html: '<span class="t-dim">[github]</span>  <span class="t-success">\u2713</span> Check run created \u2192 <span class="t-info">Shipwright CI</span>',
+          },
+          {
             html: '<span class="t-dim">[pr]</span>      <span class="t-success">\u2713</span> PR #87 created \u2192 <span class="t-info">feat/issue-42-jwt-auth</span>',
+          },
+          {
+            html: '<span class="t-dim">[deploy]</span>  <span class="t-success">\u2713</span> Deployment tracked \u2192 <span class="t-info">staging</span>',
           },
           { html: "" },
           {

@@ -2615,6 +2615,10 @@ stage_pr() {
         error "No real code changes detected — only pipeline artifacts (.claude/ logs)."
         error "The build agent did not produce meaningful changes. Skipping PR creation."
         emit_event "pr.rejected" "issue=${ISSUE_NUMBER:-0}" "reason=no_real_changes"
+        # Mark issue so auto-retry knows not to retry empty builds
+        if [[ -n "${ISSUE_NUMBER:-}" && "${ISSUE_NUMBER:-0}" != "0" ]]; then
+            gh issue comment "$ISSUE_NUMBER" --body "<!-- SHIPWRIGHT-NO-CHANGES: true -->" 2>/dev/null || true
+        fi
         return 1
     fi
     local real_file_count
@@ -2824,20 +2828,33 @@ EOF
         info "Milestone: ${DIM}$ISSUE_MILESTONE${RESET}"
     fi
 
-    info "Creating PR..."
-    local pr_url pr_stderr pr_exit=0
-    pr_url=$(gh pr create "${pr_args[@]}" 2>/tmp/shipwright-pr-stderr.txt) || pr_exit=$?
-    pr_stderr=$(cat /tmp/shipwright-pr-stderr.txt 2>/dev/null || true)
-    rm -f /tmp/shipwright-pr-stderr.txt
+    # Check for existing open PR on this branch to avoid duplicates (issue #12)
+    local pr_url=""
+    local existing_pr
+    existing_pr=$(gh pr list --head "$GIT_BRANCH" --state open --json number,url --jq '.[0]' 2>/dev/null || echo "")
+    if [[ -n "$existing_pr" && "$existing_pr" != "null" ]]; then
+        local existing_pr_number existing_pr_url
+        existing_pr_number=$(echo "$existing_pr" | jq -r '.number' 2>/dev/null || echo "")
+        existing_pr_url=$(echo "$existing_pr" | jq -r '.url' 2>/dev/null || echo "")
+        info "Updating existing PR #$existing_pr_number instead of creating duplicate"
+        gh pr edit "$existing_pr_number" --title "$pr_title" --body "$pr_body" 2>/dev/null || true
+        pr_url="$existing_pr_url"
+    else
+        info "Creating PR..."
+        local pr_stderr pr_exit=0
+        pr_url=$(gh pr create "${pr_args[@]}" 2>/tmp/shipwright-pr-stderr.txt) || pr_exit=$?
+        pr_stderr=$(cat /tmp/shipwright-pr-stderr.txt 2>/dev/null || true)
+        rm -f /tmp/shipwright-pr-stderr.txt
 
-    # gh pr create may return non-zero for reviewer issues but still create the PR
-    if [[ "$pr_exit" -ne 0 ]]; then
-        if [[ "$pr_url" == *"github.com"* ]]; then
-            # PR was created but something non-fatal failed (e.g., reviewer not found)
-            warn "PR created with warnings: ${pr_stderr:-unknown}"
-        else
-            error "PR creation failed: ${pr_stderr:-$pr_url}"
-            return 1
+        # gh pr create may return non-zero for reviewer issues but still create the PR
+        if [[ "$pr_exit" -ne 0 ]]; then
+            if [[ "$pr_url" == *"github.com"* ]]; then
+                # PR was created but something non-fatal failed (e.g., reviewer not found)
+                warn "PR created with warnings: ${pr_stderr:-unknown}"
+            else
+                error "PR creation failed: ${pr_stderr:-$pr_url}"
+                return 1
+            fi
         fi
     fi
 

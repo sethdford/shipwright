@@ -132,7 +132,14 @@ jobs:
               echo "Issue #$issue: failed without retry — dispatching with full template"
 
               # Extract completed stages from stage event comments
-              COMPLETED_STAGES=$(echo "$COMMENTS" | grep -oE 'SHIPWRIGHT-STAGE: [a-z_]+:complete' | sed 's/SHIPWRIGHT-STAGE: //' | sed 's/:complete//' | tr '\n' ',' | sed 's/,$//' || echo "")
+              # Only skip pre-build stages on retry — build must always re-run to produce code changes
+              RAW_STAGES=$(echo "$COMMENTS" | grep -oE 'SHIPWRIGHT-STAGE: [a-z_]+:complete' | sed 's/SHIPWRIGHT-STAGE: //' | sed 's/:complete//' | sort -u || echo "")
+              COMPLETED_STAGES=""
+              for stage in $RAW_STAGES; do
+                case "$stage" in
+                  intake|plan|design) COMPLETED_STAGES="${COMPLETED_STAGES:+$COMPLETED_STAGES,}$stage" ;;
+                esac
+              done
 
               gh workflow run shipwright-pipeline.yml \
                 --repo "$GITHUB_REPOSITORY" \

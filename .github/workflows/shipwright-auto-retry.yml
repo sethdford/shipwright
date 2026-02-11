@@ -107,6 +107,13 @@ jobs:
 
           # ── Categorize the failure ──
 
+          # Check if last run produced no code changes — don't retry empty builds
+          NO_CHANGES=$(echo "$COMMENTS" | grep -c "SHIPWRIGHT-NO-CHANGES: true" || true)
+          if [[ "${NO_CHANGES:-0}" -gt 0 ]]; then
+            ERROR_CATEGORY="DESIGN_FAILURE"
+            LAST_ERROR="Pipeline produced no code changes — build agent did not modify source files"
+          fi
+
           # If the run was cancelled (e.g., by watchdog), treat as TRANSIENT
           if [[ "$CONCLUSION" == "cancelled" ]]; then
             ERROR_CATEGORY="TRANSIENT"
@@ -192,7 +199,14 @@ jobs:
           LAST_STAGE=$(echo "$COMMENTS" | grep -oE 'SHIPWRIGHT-RESULT: [0-9]+:[a-z_]+' | tail -1 | cut -d: -f3 || echo "")
 
           # Extract completed stages from stage event comments
-          COMPLETED_STAGES=$(echo "$COMMENTS" | grep -oE 'SHIPWRIGHT-STAGE: [a-z_]+:complete' | sed 's/SHIPWRIGHT-STAGE: //' | sed 's/:complete//' | sort -u | tr '\n' ',' | sed 's/,$//' || echo "")
+          # Only skip pre-build stages on retry — build must always re-run to produce code changes
+          RAW_STAGES=$(echo "$COMMENTS" | grep -oE 'SHIPWRIGHT-STAGE: [a-z_]+:complete' | sed 's/SHIPWRIGHT-STAGE: //' | sed 's/:complete//' | sort -u || echo "")
+          COMPLETED_STAGES=""
+          for stage in $RAW_STAGES; do
+            case "$stage" in
+              intake|plan|design) COMPLETED_STAGES="${COMPLETED_STAGES:+$COMPLETED_STAGES,}$stage" ;;
+            esac
+          done
 
           echo "Last failed stage: ${LAST_STAGE:-unknown}"
           echo "Completed stages: ${COMPLETED_STAGES:-none}"
