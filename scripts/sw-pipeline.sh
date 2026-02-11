@@ -706,7 +706,7 @@ gh_build_progress_body() {
 
     local stages
     stages=$(jq -c '.stages[]' "$PIPELINE_CONFIG" 2>/dev/null)
-    while IFS= read -r stage; do
+    while IFS= read -r -u 3 stage; do
         local id enabled
         id=$(echo "$stage" | jq -r '.id')
         enabled=$(echo "$stage" | jq -r '.enabled')
@@ -732,7 +732,7 @@ gh_build_progress_body() {
 
         body="${body}
 | ${id} | ${icon} ${sstatus:-pending} | ${duration:-—} | ${detail_col} |"
-    done <<< "$stages"
+    done 3<<< "$stages"
 
     body="${body}
 
@@ -1010,7 +1010,7 @@ build_stage_progress() {
     local progress=""
     local stages
     stages=$(jq -c '.stages[]' "$PIPELINE_CONFIG" 2>/dev/null) || return 0
-    while IFS= read -r stage; do
+    while IFS= read -r -u 3 stage; do
         local id enabled
         id=$(echo "$stage" | jq -r '.id')
         enabled=$(echo "$stage" | jq -r '.enabled')
@@ -1023,7 +1023,7 @@ build_stage_progress() {
         else
             progress="${id}:${sstatus}"
         fi
-    done <<< "$stages"
+    done 3<<< "$stages"
     echo "$progress"
 }
 
@@ -3789,7 +3789,7 @@ run_pipeline() {
         use_self_healing=true
     fi
 
-    while IFS= read -r stage; do
+    while IFS= read -r -u 3 stage; do
         local id enabled gate
         id=$(echo "$stage" | jq -r '.id')
         enabled=$(echo "$stage" | jq -r '.enabled')
@@ -3950,7 +3950,7 @@ run_pipeline() {
             emit_event "stage.failed" "issue=${ISSUE_NUMBER:-0}" "stage=$id" "duration_s=$stage_dur_s"
             return 1
         fi
-    done <<< "$stages"
+    done 3<<< "$stages"
 
     # Pipeline complete!
     update_status "complete" ""
