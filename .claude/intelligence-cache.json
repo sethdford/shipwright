@@ -1,1 +1,149 @@
-{"entries":{}}
+{
+  "entries": {
+    "5e7956014b5c20a00aade7ba70181a58": {
+      "result": {
+        "results": [
+          {
+            "file": "architecture.json",
+            "relevance": 85,
+            "summary": "Contains architecture layers, patterns, conventions, and dependencies for the shipwright project — essential context for planning where and how to add --json flag to the status command"
+          },
+          {
+            "file": "decisions.json",
+            "relevance": 15,
+            "summary": "Could contain prior architectural decisions relevant to output formatting, but is empty"
+          },
+          {
+            "file": "failures.json",
+            "relevance": 10,
+            "summary": "Could contain prior failure patterns to avoid, but is empty"
+          },
+          {
+            "file": "global.json",
+            "relevance": 8,
+            "summary": "Could contain cross-repo learnings applicable to CLI flag patterns, but is empty"
+          },
+          {
+            "file": "patterns.json",
+            "relevance": 5,
+            "summary": "Could contain code patterns for JSON output, but is empty"
+          }
+        ]
+      },
+      "timestamp": 1770917771,
+      "ttl": 1800
+    },
+    "78446d9bb6bc500c31c933ca46691b01": {
+      "result": {
+        "results": [
+          {
+            "file": "architecture.json",
+            "relevance": 82,
+            "summary": "Contains project architecture patterns, conventions, and shell standards directly relevant to implementing a --json flag in sw-status.sh"
+          },
+          {
+            "file": "decisions.json",
+            "relevance": 15,
+            "summary": "Could contain past architectural decisions about output formatting, but is currently empty"
+          },
+          {
+            "file": "failures.json",
+            "relevance": 10,
+            "summary": "Could contain past validation failures for similar changes, but is currently empty"
+          }
+        ]
+      },
+      "timestamp": 1770917931,
+      "ttl": 1800
+    },
+    "6ab383888dc79311f7745ac7cc32d918": {
+      "result": {
+        "results": [
+          {
+            "file": "architecture.json",
+            "relevance": 92,
+            "summary": "Contains CLI/Presentation layer patterns, command router architecture, output helper conventions, and bash coding standards — all directly relevant to designing a --json flag for the status command"
+          },
+          {
+            "file": "patterns.json",
+            "relevance": 8,
+            "summary": "Empty patterns file, no relevant content"
+          },
+          {
+            "file": "decisions.json",
+            "relevance": 5,
+            "summary": "Empty decisions log, no prior design decisions to reference"
+          },
+          {
+            "file": "failures.json",
+            "relevance": 3,
+            "summary": "Empty failures log, no relevant failure patterns"
+          },
+          {
+            "file": "global.json",
+            "relevance": 2,
+            "summary": "Empty cross-repo learnings, no relevant patterns"
+          }
+        ]
+      },
+      "timestamp": 1770918035,
+      "ttl": 1800
+    },
+    "8c662703a7c5f192e955ea11cdf0f374": {
+      "result": {
+        "results": [
+          {
+            "file": "architecture.json",
+            "relevance": 82,
+            "summary": "Documents CLI patterns (command router, output helpers, conventions) and bash standards that constrain how --json flag should be implemented in sw-status.sh"
+          },
+          {
+            "file": "decisions.json",
+            "relevance": 15,
+            "summary": "Would contain rejected design decisions if any existed, but currently empty — no prior anti-patterns recorded"
+          },
+          {
+            "file": "failures.json",
+            "relevance": 10,
+            "summary": "Would contain failure patterns from previous attempts if any existed, but currently empty"
+          }
+        ]
+      },
+      "timestamp": 1770918074,
+      "ttl": 1800
+    },
+    "084fb2847033ee321e558b3683be0f26": {
+      "result": {
+        "results": [
+          {
+            "file": "architecture.json",
+            "relevance": 92,
+            "summary": "Contains codebase architecture, patterns, conventions, and dependencies essential for implementing the --json flag in sw-status.sh correctly"
+          },
+          {
+            "file": "failures.json",
+            "relevance": 15,
+            "summary": "No failure patterns recorded — empty but could contain relevant build failures if populated"
+          },
+          {
+            "file": "decisions.json",
+            "relevance": 12,
+            "summary": "No architectural decisions recorded — empty but could contain relevant design decisions if populated"
+          },
+          {
+            "file": "global.json",
+            "relevance": 8,
+            "summary": "No cross-repo learnings recorded — empty, minimal relevance"
+          },
+          {
+            "file": "patterns.json",
+            "relevance": 5,
+            "summary": "Empty pattern file — no relevant content"
+          }
+        ]
+      },
+      "timestamp": 1770918190,
+      "ttl": 1800
+    }
+  }
+}
