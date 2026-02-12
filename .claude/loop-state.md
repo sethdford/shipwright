@@ -175,88 +175,143 @@ Follow the approved design document:
 
 ## Context
 
-The `shipwright status` command (`scripts/sw-status.sh`, ~605 lines) renders a human-readable dashboard showing tmux windows, team configs, task lists, daemon/pipeline state, issue tracker info, heartbeats, remote machines, and connected developers. It currently interleaves data collection (tmux queries, JSON file reads, curl calls) with ANSI-colored echo output, making it impossible to consume programmatically.
+The `shipwright status` command (`scripts/sw-status.sh`, 605 lines) renders a rich terminal dashboard with 8 sections: tmux windows, team configs, task lists, daemon pipelines, issue tracker, heartbeats, remote machines, and connected developers. Currently it only produces ANSI-colored human-readable output.
 
-Other shipwright commands already support `--json` output: `sw-pipeline-vitals.sh`, `sw-cost.sh`, and `sw-fleet.sh` all follow a pattern of flag parsing at the top, data collection into variables, and conditional rendering. The project requires Bash 3.2 compatibility (no associative arrays, no `readarray`, no `${var,,}`), `set -euo pipefail`, and `jq --arg` for JSON construction (never string interpolation).
+Users and automated tooling (the web dashboard, CI scripts, `sw-connect.sh`) need machine-readable access to the same data. The codebase already has `--json` flag precedents in `sw-cost.sh`, `sw-fleet.sh`, and `sw-pipeline-vitals.sh` — all using the "early-exit separate code path" pattern where JSON collection runs before display code, assembles via `jq -n`, prints, and exits.
+
+**Constraints:**
+- Bash 3.2 compatible (no associative arrays, no `readarray`, no `${var,,}`)
+- `set -euo pipefail` throughout
+- `jq` is the only JSON tool available (already a dependency across the project)
+- The existing 600-line display code path must remain completely untouched to avoid regression
+- Output helpers (`info()`, `success()`, `warn()`, `error()`) write to stderr, which naturally keeps JSON stdout clean
 
 ## Decision
 
-**Refactor `sw-status.sh` into collect/render pairs, gated by a `--json` flag.**
+**Separate early-exit code path**, matching the established pattern from `sw-cost.sh:550-670`.
 
-**Data flow:**
-1. Parse `--json` / `--help` flags at script top (after `source compat.sh`)
-2. Eight `collect_*` functions each populate a `*_JSON` shell variable with a jq-constructed JSON fragment (array or object). These functions perform no stdout output.
-3. When `JSON_OUTPUT=false`: eight `render_*` functions reproduce the existing human-readable output verbatim using the collected data.
-4. When `JSON_OUTPUT=true`: a single `jq -n` call assembles all eight fragments plus `version` and `timestamp` into one JSON object written to stdout, then exits.
+### Data Flow
 
-**JSON schema (top-level keys):**
+1. Parse `--json` flag in the existing argument loop at the top of `sw-status.sh`
+2. When `--json` is set, run a dedicated collection block that gathers each section into shell variables holding JSON strings (e.g., `WINDOWS_JSON`, `TEAMS_JSON`)
+3. Each collector function reads the same files/commands the display code does (tmux list-windows, daemon-state.json, heartbeat files, etc.) but produces JSON fragments via `jq`
+4. Assemble all fragments into a single object with `jq -n --argjson ...` and print to stdout
+5. `exit 0` before the display code path ever executes
+
+### JSON Schema (top-level keys)
+
 ```json
 {
   "version": "string",
   "timestamp": "ISO-8601 UTC",
-  "tmux_windows": [{"name", "session_window", "pane_count", "active"}],
-  "teams": [{"name", "members", "member_names"}],
-  "tasks": [{"team", "total", "completed", "in_progress", "pending", "percent_complete"}],
-  "daemon": {"running", "pid", "uptime_seconds", "active_jobs", "queued", "completed", "recent_activity"},
-  "tracker": {"provider", "url"},
-  "heartbeats": [{"job_id", "pid", "alive", "stage", "issue", "iteration", "activity", "updated_at", "age_seconds", "memory_mb"}],
-  "remote_machines": [{"name", "host", "cores", "memory_gb", "max_workers"}],
-  "connected_developers": {"reachable", "dashboard_url", "total_online", "developers"}
+  "tmux_windows": [{"name": "string", "panes": N, "active": bool}],
+  "teams": [{"name": "string", "template": "string", "agents": N}],
+  "task_lists": [{"team": "string", "total": N, "completed": N, "tasks": [...]}],
+  "daemon": {"running": bool, "pid": N|null, "active_jobs": [...], "queued": [...], "recent_completions": [...]},
+  "issue_tracker": {"provider": "string|null", "url": "string|null"},
+  "heartbeats": [{"agent": "string", "last_seen": "ISO-8601", "status": "string"}],
+  "remote_machines": [{"name": "string", "host": "string", "status": "string"}],
+  "connected_developers": {"reachable": bool, "total_online": N, "developers": [...]}
 }
 ```
 
-**Error handling:** Each `collect_*` function initializes its variable to `[]` or `{}` before attempting data reads. Missing files, unreachable daemons, or failed tmux queries result in empty collections — never missing keys. All `jq` calls use `--arg` / `--argjson` for safe escaping. ANSI escape codes are never written when `JSON_OUTPUT=true` (color helpers short-circuit or are bypassed entirely).
+Missing/unavailable sections produce `null` or `[]` — never omitted keys. This guarantees consumers can always reference any top-level key without existence checks.
 
-**Pattern alignment:** Follows the same flag-parsing and `jq -n` assembly pattern used in `sw-pipeline-vitals.sh` (which the user's supermemory confirms has a `--json` flag) and `sw-cost.sh`.
+### Error Handling
+
+- If `jq` is not installed, emit `error "jq is required for --json output"` to stderr and `exit 1` — check happens immediately after flag parsing, before any collection work
+- If tmux is not running, `tmux_windows` becomes `[]` (not an error)
+- If daemon-state.json is missing or malformed, `daemon.running` is `false` with remaining fields null/empty
+- Each collector is wrapped in a guard: if the source data is absent, emit the empty/null default. No collector failure should abort the entire JSON output
+
+### Flag Parsing
+
+```bash
+JSON_OUTPUT="false"
+while [[ $# -gt 0 ]]; do
+    case "$1" in
+        --json) JSON_OUTPUT="true"; shift ;;
+        --help|-h) usage; exit 0 ;;
+        *) error "Unknown option: $1"; usage; exit 1 ;;
+    esac
+done
+```
+
+### CLI Router Update
+
+The help text in `scripts/sw` line ~70 updates to: `status [--json]  Show dashboard of running teams and agents`
 
 ## Alternatives Considered
 
-1. **Emit JSON per-section (streaming NDJSON)** — Pros: simpler implementation, each section independently parseable. Cons: breaks `jq .` on the full output, inconsistent with `sw-pipeline-vitals.sh` and `sw-cost.sh` which emit a single JSON object. Users expect `| jq .field` to work on a single document.
+1. **Refactor into collect/render pairs** — Pros: Cleaner separation, each section gets `collect_X()` and `render_X()` functions, the JSON path calls `collect_*` only. Cons: Touching all 600 lines of existing display code to refactor into render functions creates significant regression risk. The plan initially proposed this but the "early exit" approach achieves the same result with zero changes to existing code. Refactoring can happen later as a separate PR.
 
-2. **Separate `sw-status-json.sh` script** — Pros: zero risk of regressing human-readable output. Cons: duplicates all data-collection logic, doubles maintenance surface, diverges from the `--json` flag convention established by other sw scripts.
+2. **Inline JSON into each display section (interleaved)** — Pros: Single code path, no duplication. Cons: Mixes display and data concerns, every section gets `if $JSON; then ... fi` blocks that double the complexity of every section. Much harder to maintain. Fragile — any display change risks breaking JSON output.
 
-3. **Template-based rendering (shared data, pluggable formatters)** — Pros: cleanest separation of concerns. Cons: over-engineered for a bash script; adds abstraction layers that make the code harder to read and maintain. The collect/render pair approach achieves adequate separation without framework overhead.
+3. **External wrapper script** — Pros: Zero changes to `sw-status.sh`. Cons: Would need to screen-scrape ANSI output or duplicate all the data collection logic in a new file. Not maintainable. Violates the "source of truth" principle.
 
 ## Implementation Plan
 
-**Files to create:**
-- `scripts/sw-status-test.sh` — test suite following existing harness pattern (mock binaries, PASS/FAIL counters, ERR trap, temp directory fixtures)
+### Files to modify
+- `scripts/sw-status.sh` — Add `--json` flag parsing, `jq` check, 8 collector blocks, JSON assembly, early exit
+- `scripts/sw` — Update help text for `status` subcommand (~line 70)
+- `completions/shipwright.bash` — Add `--json` to status completions
+- `completions/_shipwright` — Add `--json` to status completions (zsh)
+- `completions/shipwright.fish` — Add `--json` to status completions (fish)
+- `package.json` — Register new test suite
 
-**Files to modify:**
-- `scripts/sw-status.sh` — add flag parsing, refactor into 8 collect/render pairs, add JSON assembly
-- `scripts/sw` — update help text for `status` subcommand to show `[--json]`
-- `package.json` — append `&& bash scripts/sw-status-test.sh` to the npm test script
+### Files to create
+- `scripts/sw-status-test.sh` — Test suite (mock environment, 10+ test cases, PASS/FAIL counters, ERR trap)
 
-**Dependencies:** None new. `jq` is already a project dependency used throughout.
+### Dependencies
+- None new. `jq` is already required by the project (used in 20+ scripts)
 
-**Risk areas:**
-- **Regression in human-readable output.** The render functions must reproduce the exact current output including ANSI codes, box-drawing characters, and conditional sections. Mitigation: capture a baseline snapshot of current output before refactoring; compare after.
-- **`set -euo pipefail` interactions.** Commands like `tmux list-windows` or `curl` that may fail (no tmux session, daemon not running) must be guarded with `|| true` or checked via return code, not allowed to exit the script. The current code already handles some of these; refactoring must preserve all guards.
-- **Large JSON assembly.** If a user has many heartbeats or team configs, the `jq -n` call receives many `--argjson` arguments. This is fine for practical team sizes but worth noting. No mitigation needed.
-- **Bash 3.2 `$()` nesting.** Complex jq command substitutions must avoid nested `$()` where possible, using temp variables instead.
+### Risk Areas
+- **`jq --argjson` with large daemon state**: If `daemon-state.json` contains hundreds of completed jobs, the assembled JSON could be large. Mitigate by limiting `recent_completions` to the last 20 entries (matching the dashboard's visual limit).
+- **tmux not available**: The `tmux list-windows` call will fail if tmux isn't running. The collector must handle this gracefully (return `[]`).
+- **Shell variable size**: Each JSON fragment is stored in a bash variable. Extremely large task lists could theoretically hit shell limits. In practice, shipwright task lists are small (< 100 items). No mitigation needed for v1.
+- **Pipefail + jq chains**: Under `set -eo pipefail`, a `jq` parse error in a collector could abort the entire script. Each collector should use `|| echo '[]'` / `|| echo 'null'` fallbacks.
 
 ## Validation Criteria
-
-- [ ] `shipwright status` (no flag) produces byte-identical output to the pre-change version in all states (active daemon, no daemon, empty teams, populated teams)
-- [ ] `shipwright status --json` outputs valid JSON: `shipwright status --json | jq empty` exits 0
-- [ ] JSON output contains zero ANSI escape codes: `shipwright status --json | grep -P '\x1b\[' | wc -l` returns 0
-- [ ] All 10 top-level keys present in JSON output: `version`, `timestamp`, `tmux_windows`, `teams`, `tasks`, `daemon`, `tracker`, `heartbeats`, `remote_machines`, `connected_developers`
-- [ ] Empty state (no daemon, no teams, no tmux) produces empty arrays/objects for all collection keys — no `null` values, no missing keys
-- [ ] `shipwright status --help` prints usage including `--json` documentation
-- [ ] `shipwright help` / `sw` help text shows `[--json]` for the status subcommand
-- [ ] `sw-status-test.sh` passes all tests (valid JSON structure, key presence, empty-state handling, human-readable section headers, help output)
+- [ ] `shipwright status` (no flags) produces byte-identical output to the current version
+- [ ] `shipwright status --json` outputs valid JSON (`jq empty` exits 0)
+- [ ] JSON output contains zero ANSI escape sequences (`grep -P '\x1b\['` finds nothing)
+- [ ] All 10 top-level keys present: `version`, `timestamp`, `tmux_windows`, `teams`, `task_lists`, `daemon`, `issue_tracker`, `heartbeats`, `remote_machines`, `connected_developers`
+- [ ] Empty state (no tmux, no daemon, no teams) produces valid JSON with `[]`/`null` — not errors, not missing keys
+- [ ] `shipwright status --json | jq .daemon.active_jobs` returns a valid array (subsections independently queryable)
+- [ ] `sw-status-test.sh` passes all cases (valid JSON, key presence, empty state, active daemon, heartbeats, human-readable section headers preserved)
 - [ ] Test suite registered in `package.json` and runs via `npm test`
-- [ ] No Bash 3.2 incompatibilities: no `declare -A`, no `readarray`, no `${var,,}`, no `${var^^}`
-- [ ] `set -euo pipefail` maintained; no unguarded commands that could exit on expected failures
+- [ ] No Bash 3.2 incompatibilities (`shellcheck` clean, no associative arrays)
+- [ ] `--json` without `jq` installed prints clear error to stderr and exits 1
+- [ ] Tab completion works for `shipwright status --json` in bash, zsh, and fish
 
 Historical context (lessons from previous pipelines):
 {
   "results": [
-    {"file": "architecture.json", "relevance": 92, "summary": "Contains codebase architecture, patterns, conventions, and dependencies essential for implementing the --json flag in sw-status.sh correctly"},
-    {"file": "failures.json", "relevance": 15, "summary": "No failure patterns recorded — empty but could contain relevant build failures if populated"},
-    {"file": "decisions.json", "relevance": 12, "summary": "No architectural decisions recorded — empty but could contain relevant design decisions if populated"},
-    {"file": "global.json", "relevance": 8, "summary": "No cross-repo learnings recorded — empty, minimal relevance"},
-    {"file": "patterns.json", "relevance": 5, "summary": "Empty pattern file — no relevant content"}
+    {
+      "file": "architecture.json",
+      "relevance": 92,
+      "summary": "Contains codebase architecture, patterns, conventions, and dependencies essential for implementing the --json flag in sw-status.sh correctly"
+    },
+    {
+      "file": "failures.json",
+      "relevance": 15,
+      "summary": "No failure patterns recorded — empty but could contain relevant build failures if populated"
+    },
+    {
+      "file": "decisions.json",
+      "relevance": 12,
+      "summary": "No architectural decisions recorded — empty but could contain relevant design decisions if populated"
+    },
+    {
+      "file": "global.json",
+      "relevance": 8,
+      "summary": "No cross-repo learnings recorded — empty, minimal relevance"
+    },
+    {
+      "file": "patterns.json",
+      "relevance": 5,
+      "summary": "Empty pattern file — no relevant content"
+    }
   ]
 }
 
@@ -290,8 +345,8 @@ status: running
 test_cmd: "npm test"
 model: opus
 agents: 1
-started_at: 2026-02-12T17:53:42Z
-last_iteration_at: 2026-02-12T17:53:42Z
+started_at: 2026-02-12T17:54:51Z
+last_iteration_at: 2026-02-12T17:54:51Z
 consecutive_failures: 0
 total_commits: 1
 audit_enabled: true
@@ -304,6 +359,6 @@ max_extensions: 3
 ---
 
 ## Log
-### Iteration 1 (2026-02-12T17:53:42Z)
+### Iteration 1 (2026-02-12T17:54:51Z)
 You've hit your limit · resets 11am (America/Denver)
 
