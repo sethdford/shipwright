@@ -200,32 +200,166 @@ source_daemon_functions() {
         esac
     }
 
-    # daemon_health_check — from the updated daemon
+    # Progress monitoring directory for tests
+    PROGRESS_DIR="$TEMP_DIR/progress"
+    mkdir -p "$PROGRESS_DIR"
+
+    # daemon_clear_progress — clean up progress state
+    daemon_clear_progress() {
+        local issue_num="$1"
+        rm -f "$PROGRESS_DIR/issue-${issue_num}.json"
+    }
+
+    # daemon_assess_progress — compare snapshots and return verdict
+    daemon_assess_progress() {
+        local issue_num="$1" current_snapshot="$2"
+
+        mkdir -p "$PROGRESS_DIR"
+        local progress_file="$PROGRESS_DIR/issue-${issue_num}.json"
+
+        if [[ ! -f "$progress_file" ]]; then
+            jq -n \
+                --argjson snap "$current_snapshot" \
+                --arg issue "$issue_num" \
+                '{
+                    issue: $issue,
+                    snapshots: [$snap],
+                    no_progress_count: 0,
+                    last_progress_at: $snap.ts,
+                    repeated_error_count: 0
+                }' > "$progress_file"
+            echo "healthy"
+            return
+        fi
+
+        local prev_data
+        prev_data=$(cat "$progress_file")
+
+        local prev_stage prev_iteration prev_diff_lines prev_files prev_error prev_no_progress
+        prev_stage=$(echo "$prev_data" | jq -r '.snapshots[-1].stage // "unknown"')
+        prev_iteration=$(echo "$prev_data" | jq -r '.snapshots[-1].iteration // 0')
+        prev_diff_lines=$(echo "$prev_data" | jq -r '.snapshots[-1].diff_lines // 0')
+        prev_files=$(echo "$prev_data" | jq -r '.snapshots[-1].files_changed // 0')
+        prev_error=$(echo "$prev_data" | jq -r '.snapshots[-1].last_error // ""')
+        prev_no_progress=$(echo "$prev_data" | jq -r '.no_progress_count // 0')
+        local prev_repeated_errors
+        prev_repeated_errors=$(echo "$prev_data" | jq -r '.repeated_error_count // 0')
+
+        local cur_stage cur_iteration cur_diff cur_files cur_error
+        cur_stage=$(echo "$current_snapshot" | jq -r '.stage')
+        cur_iteration=$(echo "$current_snapshot" | jq -r '.iteration')
+        cur_diff=$(echo "$current_snapshot" | jq -r '.diff_lines')
+        cur_files=$(echo "$current_snapshot" | jq -r '.files_changed')
+        cur_error=$(echo "$current_snapshot" | jq -r '.last_error')
+
+        local has_progress=false
+
+        if [[ "$cur_stage" != "$prev_stage" && "$cur_stage" != "unknown" ]]; then
+            has_progress=true
+        fi
+        if [[ "$cur_iteration" -gt "$prev_iteration" ]]; then
+            has_progress=true
+        fi
+        if [[ "$cur_diff" -gt "$prev_diff_lines" ]]; then
+            has_progress=true
+        fi
+        if [[ "$cur_files" -gt "$prev_files" ]]; then
+            has_progress=true
+        fi
+
+        local repeated_errors="$prev_repeated_errors"
+        if [[ -n "$cur_error" && "$cur_error" == "$prev_error" ]]; then
+            repeated_errors=$((repeated_errors + 1))
+        elif [[ -n "$cur_error" && "$cur_error" != "$prev_error" ]]; then
+            repeated_errors=0
+        fi
+
+        local no_progress_count
+        if [[ "$has_progress" == "true" ]]; then
+            no_progress_count=0
+            repeated_errors=0
+        else
+            no_progress_count=$((prev_no_progress + 1))
+        fi
+
+        local tmp_progress="${progress_file}.tmp.$$"
+        jq \
+            --argjson snap "$current_snapshot" \
+            --argjson npc "$no_progress_count" \
+            --argjson rec "$repeated_errors" \
+            --arg ts "$(now_iso)" \
+            '
+            .snapshots = ((.snapshots + [$snap]) | .[-10:]) |
+            .no_progress_count = $npc |
+            .repeated_error_count = $rec |
+            if $npc == 0 then .last_progress_at = $ts else . end
+            ' "$progress_file" > "$tmp_progress" 2>/dev/null && mv "$tmp_progress" "$progress_file"
+
+        local warn_threshold="${PROGRESS_CHECKS_BEFORE_WARN:-3}"
+        local kill_threshold="${PROGRESS_CHECKS_BEFORE_KILL:-6}"
+
+        if [[ "$repeated_errors" -ge 3 ]]; then
+            echo "stuck"
+            return
+        fi
+
+        if [[ "$no_progress_count" -ge "$kill_threshold" ]]; then
+            echo "stuck"
+        elif [[ "$no_progress_count" -ge "$warn_threshold" ]]; then
+            echo "stalled"
+        elif [[ "$no_progress_count" -ge 1 ]]; then
+            echo "slowing"
+        else
+            echo "healthy"
+        fi
+    }
+
+    # daemon_health_check — updated with progress-based monitoring
     daemon_health_check() {
         local findings=0
-
-        local stale_timeout="${HEALTH_STALE_TIMEOUT:-1800}"
         local now_e
         now_e=$(now_epoch)
+        local use_progress="${PROGRESS_MONITORING:-true}"
+        local hard_limit="${PROGRESS_HARD_LIMIT_S:-10800}"
 
         if [[ -f "$STATE_FILE" ]]; then
             while IFS= read -r job; do
-                local pid started_at issue_num
+                local pid started_at issue_num worktree
                 pid=$(echo "$job" | jq -r '.pid')
                 started_at=$(echo "$job" | jq -r '.started_at // empty')
                 issue_num=$(echo "$job" | jq -r '.issue')
+                worktree=$(echo "$job" | jq -r '.worktree // ""')
 
+                if ! kill -0 "$pid" 2>/dev/null; then
+                    continue
+                fi
+
+                local elapsed=0
                 if [[ -n "$started_at" ]]; then
                     local start_e
                     start_e=$(TZ=UTC date -j -f "%Y-%m-%dT%H:%M:%SZ" "$started_at" +%s 2>/dev/null || date -d "$started_at" +%s 2>/dev/null || echo "0")
-                    local elapsed=$(( now_e - start_e ))
-                    if [[ "$elapsed" -gt "$stale_timeout" ]] && kill -0 "$pid" 2>/dev/null; then
-                        daemon_log WARN "Stale job detected: issue #${issue_num} (${elapsed}s, PID $pid) — killing"
+                    elapsed=$(( now_e - start_e ))
+                fi
+
+                # Hard wall-clock limit
+                if [[ "$elapsed" -gt "$hard_limit" ]]; then
+                    daemon_log WARN "Hard limit exceeded: issue #${issue_num} (${elapsed}s > ${hard_limit}s, PID $pid) — killing"
+                    kill "$pid" 2>/dev/null || true
+                    daemon_clear_progress "$issue_num"
+                    findings=$((findings + 1))
+                    continue
+                fi
+
+                # Legacy fallback: use static timeout when progress monitoring is off
+                if [[ "$use_progress" != "true" ]]; then
+                    local stale_timeout="${HEALTH_STALE_TIMEOUT:-1800}"
+                    if [[ "$elapsed" -gt "$stale_timeout" ]]; then
+                        daemon_log WARN "Stale job (legacy): issue #${issue_num} (${elapsed}s > ${stale_timeout}s, PID $pid) — killing"
                         kill "$pid" 2>/dev/null || true
                         findings=$((findings + 1))
                     fi
                 fi
-            done < <(jq -c '.active_jobs[]' "$STATE_FILE" 2>/dev/null)
+            done < <(jq -c '.active_jobs[]' "$STATE_FILE" 2>/dev/null || true)
         fi
 
         local free_kb
@@ -567,6 +701,8 @@ test_health_check_stale() {
             completed: []
         }' > "$STATE_FILE"
 
+    # Test legacy mode (progress_based=false)
+    PROGRESS_MONITORING=false
     HEALTH_STALE_TIMEOUT=1800  # 30min — job is 2h old, should be killed
 
     daemon_health_check
@@ -582,8 +718,11 @@ test_health_check_stale() {
     kill "$stale_pid" 2>/dev/null || true
     wait "$stale_pid" 2>/dev/null || true
 
+    # Reset to default
+    PROGRESS_MONITORING=true
+
     assert_equals "false" "$still_running" "stale process was killed" &&
-    assert_contains "$(cat "$LOG_FILE")" "Stale job detected" "log mentions stale job"
+    assert_contains "$(cat "$LOG_FILE")" "Stale job .legacy." "log mentions stale job"
 }
 
 # ──────────────────────────────────────────────────────────────────────────────
@@ -822,6 +961,145 @@ test_patrol_untested_detection() {
     assert_equals "true" "$foo_has_test" "foo has test file"
 }
 
+# ──────────────────────────────────────────────────────────────────────────────
+# 19. Progress assessment detects forward progress (stage change)
+# ──────────────────────────────────────────────────────────────────────────────
+test_progress_stage_advance() {
+    daemon_clear_progress "42"
+
+    # First snapshot: build stage
+    local snap1
+    snap1=$(jq -n '{stage:"build", iteration:1, diff_lines:50, files_changed:3, last_error:"", ts:"2026-01-01T00:00:00Z"}')
+    local verdict1
+    verdict1=$(daemon_assess_progress "42" "$snap1")
+    assert_equals "healthy" "$verdict1" "first snapshot is always healthy"
+
+    # Second snapshot: test stage (advanced!)
+    local snap2
+    snap2=$(jq -n '{stage:"test", iteration:1, diff_lines:50, files_changed:3, last_error:"", ts:"2026-01-01T00:05:00Z"}')
+    local verdict2
+    verdict2=$(daemon_assess_progress "42" "$snap2")
+    assert_equals "healthy" "$verdict2" "stage advance = progress"
+}
+
+# ──────────────────────────────────────────────────────────────────────────────
+# 20. Progress assessment detects stuck (no change for N checks)
+# ──────────────────────────────────────────────────────────────────────────────
+test_progress_stuck_detection() {
+    daemon_clear_progress "43"
+    PROGRESS_CHECKS_BEFORE_WARN=2
+    PROGRESS_CHECKS_BEFORE_KILL=4
+
+    # Same snapshot repeated — no progress
+    local snap
+    snap=$(jq -n '{stage:"build", iteration:3, diff_lines:100, files_changed:5, last_error:"", ts:"2026-01-01T00:00:00Z"}')
+
+    local v
+    v=$(daemon_assess_progress "43" "$snap"); # first → healthy
+    v=$(daemon_assess_progress "43" "$snap"); assert_equals "slowing" "$v" "1 check with no progress = slowing"
+    v=$(daemon_assess_progress "43" "$snap"); assert_equals "stalled" "$v" "2 checks = stalled"
+    v=$(daemon_assess_progress "43" "$snap"); assert_equals "stalled" "$v" "3 checks = stalled"
+    v=$(daemon_assess_progress "43" "$snap"); assert_equals "stuck" "$v" "4 checks = stuck (kill threshold)"
+
+    # Reset
+    PROGRESS_CHECKS_BEFORE_WARN=3
+    PROGRESS_CHECKS_BEFORE_KILL=6
+}
+
+# ──────────────────────────────────────────────────────────────────────────────
+# 21. Progress assessment detects repeated errors (same error 3x)
+# ──────────────────────────────────────────────────────────────────────────────
+test_progress_repeated_errors() {
+    daemon_clear_progress "44"
+    PROGRESS_CHECKS_BEFORE_WARN=3
+    PROGRESS_CHECKS_BEFORE_KILL=6
+
+    # Same error signature repeating with no progress
+    local snap
+    snap=$(jq -n '{stage:"build", iteration:3, diff_lines:100, files_changed:5, last_error:"TypeError: undefined is not a function", ts:"2026-01-01T00:00:00Z"}')
+
+    local v
+    v=$(daemon_assess_progress "44" "$snap"); # first → healthy (no previous)
+    v=$(daemon_assess_progress "44" "$snap"); # 1 repeat
+    v=$(daemon_assess_progress "44" "$snap"); # 2 repeats
+    v=$(daemon_assess_progress "44" "$snap"); # 3 repeats → stuck
+    assert_equals "stuck" "$v" "3 repeated errors → stuck regardless of check count"
+
+    # Reset
+    PROGRESS_CHECKS_BEFORE_WARN=3
+    PROGRESS_CHECKS_BEFORE_KILL=6
+}
+
+# ──────────────────────────────────────────────────────────────────────────────
+# 22. Progress resets when diff grows (agent writing code)
+# ──────────────────────────────────────────────────────────────────────────────
+test_progress_diff_growth_resets() {
+    daemon_clear_progress "45"
+    PROGRESS_CHECKS_BEFORE_WARN=2
+    PROGRESS_CHECKS_BEFORE_KILL=4
+
+    local snap1
+    snap1=$(jq -n '{stage:"build", iteration:3, diff_lines:50, files_changed:3, last_error:"", ts:"2026-01-01T00:00:00Z"}')
+    local v
+    v=$(daemon_assess_progress "45" "$snap1"); # first → healthy
+
+    # Same snapshot → slowing
+    v=$(daemon_assess_progress "45" "$snap1"); assert_equals "slowing" "$v" "no change = slowing"
+
+    # But diff_lines grew → back to healthy
+    local snap2
+    snap2=$(jq -n '{stage:"build", iteration:3, diff_lines:80, files_changed:3, last_error:"", ts:"2026-01-01T00:10:00Z"}')
+    v=$(daemon_assess_progress "45" "$snap2"); assert_equals "healthy" "$v" "diff growth = progress"
+
+    # Reset
+    PROGRESS_CHECKS_BEFORE_WARN=3
+    PROGRESS_CHECKS_BEFORE_KILL=6
+}
+
+# ──────────────────────────────────────────────────────────────────────────────
+# 23. Hard limit kills even with progress monitoring on
+# ──────────────────────────────────────────────────────────────────────────────
+test_hard_limit_override() {
+    # Job that started 4 hours ago (exceeds 3h hard limit)
+    local old_start
+    old_start=$(epoch_to_iso $(($(now_epoch) - 14400)))
+
+    sleep 300 &
+    local stale_pid=$!
+
+    jq -n \
+        --argjson pid "$stale_pid" \
+        --arg started "$old_start" \
+        '{
+            version: 1,
+            active_jobs: [{
+                issue: 98,
+                pid: $pid,
+                worktree: "/tmp/test-hard",
+                title: "Long running test",
+                started_at: $started
+            }],
+            queued: [],
+            completed: []
+        }' > "$STATE_FILE"
+
+    PROGRESS_MONITORING=true
+    PROGRESS_HARD_LIMIT_S=10800  # 3h
+
+    daemon_health_check
+
+    sleep 0.5
+
+    local still_running=true
+    kill -0 "$stale_pid" 2>/dev/null || still_running=false
+
+    kill "$stale_pid" 2>/dev/null || true
+    wait "$stale_pid" 2>/dev/null || true
+
+    assert_equals "false" "$still_running" "process killed by hard limit" &&
+    assert_contains "$(cat "$LOG_FILE")" "Hard limit exceeded" "log mentions hard limit"
+}
+
 # ═══════════════════════════════════════════════════════════════════════════════
 # MAIN
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -873,6 +1151,11 @@ main() {
         "test_patrol_dora_events:DORA degradation event detection"
         "test_patrol_retry_exhaustion_events:Retry exhaustion event detection"
         "test_patrol_untested_detection:Untested script detection logic"
+        "test_progress_stage_advance:Progress detects stage advancement"
+        "test_progress_stuck_detection:Progress detects stuck (no change N checks)"
+        "test_progress_repeated_errors:Progress detects repeated error loop"
+        "test_progress_diff_growth_resets:Progress resets on diff growth"
+        "test_hard_limit_override:Hard limit kills even with progress on"
     )
 
     for entry in "${tests[@]}"; do

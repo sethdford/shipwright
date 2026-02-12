@@ -469,6 +469,12 @@ load_config() {
     HEALTH_HEARTBEAT_TIMEOUT=$(jq -r '.health.heartbeat_timeout_s // 120' "$config_file")
     CHECKPOINT_ENABLED=$(jq -r '.health.checkpoint_enabled // true' "$config_file")
 
+    # progress-based health monitoring (replaces static timeouts)
+    PROGRESS_MONITORING=$(jq -r '.health.progress_based // true' "$config_file")
+    PROGRESS_CHECKS_BEFORE_WARN=$(jq -r '.health.stale_checks_before_warn // 3' "$config_file")
+    PROGRESS_CHECKS_BEFORE_KILL=$(jq -r '.health.stale_checks_before_kill // 6' "$config_file")
+    PROGRESS_HARD_LIMIT_S=$(jq -r '.health.hard_limit_s // 10800' "$config_file")  # 3hr absolute max
+
     # team dashboard URL (for coordinated claiming)
     local cfg_dashboard_url
     cfg_dashboard_url=$(jq -r '.dashboard_url // ""' "$config_file")
@@ -490,6 +496,7 @@ setup_dirs() {
     WORKTREE_DIR=".worktrees"
 
     mkdir -p "$LOG_DIR"
+    mkdir -p "$HOME/.shipwright/progress"
 }
 
 # ─── Adaptive Threshold Helpers ──────────────────────────────────────────────
@@ -667,6 +674,212 @@ record_pipeline_duration() {
             )
         )
     ' "$durations_file" > "$tmp_dur" 2>/dev/null && mv "$tmp_dur" "$durations_file"
+}
+
+# ─── Progress-Based Health Monitoring ─────────────────────────────────────────
+# Instead of killing jobs after a static timeout, we check for forward progress.
+# Progress signals: stage transitions, iteration advances, git diff growth, new files.
+# Graduated response: healthy → slowing → stalled → stuck → kill.
+
+PROGRESS_DIR="$HOME/.shipwright/progress"
+
+# Collect a progress snapshot for an active job
+# Returns JSON with stage, iteration, diff_lines, files_changed
+daemon_collect_snapshot() {
+    local issue_num="$1" worktree="$2" pid="$3"
+
+    local stage="" iteration=0 diff_lines=0 files_changed=0 last_error=""
+
+    # Get stage and iteration from heartbeat (fastest source)
+    local heartbeat_dir="$HOME/.shipwright/heartbeats"
+    if [[ -d "$heartbeat_dir" ]]; then
+        local hb_file
+        for hb_file in "$heartbeat_dir"/*.json; do
+            [[ ! -f "$hb_file" ]] && continue
+            local hb_pid
+            hb_pid=$(jq -r '.pid // 0' "$hb_file" 2>/dev/null || echo 0)
+            if [[ "$hb_pid" == "$pid" ]]; then
+                stage=$(jq -r '.stage // "unknown"' "$hb_file" 2>/dev/null || echo "unknown")
+                iteration=$(jq -r '.iteration // 0' "$hb_file" 2>/dev/null || echo 0)
+                [[ "$iteration" == "null" ]] && iteration=0
+                break
+            fi
+        done
+    fi
+
+    # Fallback: read stage from pipeline-state.md in worktree
+    if [[ -z "$stage" || "$stage" == "unknown" ]] && [[ -d "$worktree" ]]; then
+        local state_file="$worktree/.claude/pipeline-state.md"
+        if [[ -f "$state_file" ]]; then
+            stage=$(grep -m1 '^current_stage:' "$state_file" 2>/dev/null | sed 's/^current_stage: *//' || echo "unknown")
+        fi
+    fi
+
+    # Get git diff stats from worktree (how much code has been written)
+    if [[ -d "$worktree/.git" ]] || [[ -f "$worktree/.git" ]]; then
+        diff_lines=$(cd "$worktree" && git diff --stat 2>/dev/null | tail -1 | grep -o '[0-9]* insertion' | grep -o '[0-9]*' || echo "0")
+        [[ -z "$diff_lines" ]] && diff_lines=0
+        files_changed=$(cd "$worktree" && git diff --name-only 2>/dev/null | wc -l | tr -d ' ' || echo "0")
+        # Also count untracked files the agent has created
+        local untracked
+        untracked=$(cd "$worktree" && git ls-files --others --exclude-standard 2>/dev/null | wc -l | tr -d ' ' || echo "0")
+        files_changed=$((files_changed + untracked))
+    fi
+
+    # Check last error from error log
+    if [[ -d "$worktree" ]]; then
+        local error_log="$worktree/.claude/pipeline-artifacts/error-log.jsonl"
+        if [[ -f "$error_log" ]]; then
+            last_error=$(tail -1 "$error_log" 2>/dev/null | jq -r '.signature // ""' 2>/dev/null || echo "")
+        fi
+    fi
+
+    # Output JSON snapshot
+    jq -n \
+        --arg stage "$stage" \
+        --argjson iteration "${iteration:-0}" \
+        --argjson diff_lines "${diff_lines:-0}" \
+        --argjson files_changed "${files_changed:-0}" \
+        --arg last_error "$last_error" \
+        --arg ts "$(now_iso)" \
+        '{
+            stage: $stage,
+            iteration: $iteration,
+            diff_lines: $diff_lines,
+            files_changed: $files_changed,
+            last_error: $last_error,
+            ts: $ts
+        }'
+}
+
+# Assess job progress by comparing current snapshot to previous
+# Returns: healthy | slowing | stalled | stuck
+daemon_assess_progress() {
+    local issue_num="$1" current_snapshot="$2"
+
+    mkdir -p "$PROGRESS_DIR"
+    local progress_file="$PROGRESS_DIR/issue-${issue_num}.json"
+
+    # If no previous snapshot, store this one and return healthy
+    if [[ ! -f "$progress_file" ]]; then
+        jq -n \
+            --argjson snap "$current_snapshot" \
+            --arg issue "$issue_num" \
+            '{
+                issue: $issue,
+                snapshots: [$snap],
+                no_progress_count: 0,
+                last_progress_at: $snap.ts,
+                repeated_error_count: 0
+            }' > "$progress_file"
+        echo "healthy"
+        return
+    fi
+
+    local prev_data
+    prev_data=$(cat "$progress_file")
+
+    # Get previous snapshot values
+    local prev_stage prev_iteration prev_diff_lines prev_files prev_error prev_no_progress
+    prev_stage=$(echo "$prev_data" | jq -r '.snapshots[-1].stage // "unknown"')
+    prev_iteration=$(echo "$prev_data" | jq -r '.snapshots[-1].iteration // 0')
+    prev_diff_lines=$(echo "$prev_data" | jq -r '.snapshots[-1].diff_lines // 0')
+    prev_files=$(echo "$prev_data" | jq -r '.snapshots[-1].files_changed // 0')
+    prev_error=$(echo "$prev_data" | jq -r '.snapshots[-1].last_error // ""')
+    prev_no_progress=$(echo "$prev_data" | jq -r '.no_progress_count // 0')
+    local prev_repeated_errors
+    prev_repeated_errors=$(echo "$prev_data" | jq -r '.repeated_error_count // 0')
+
+    # Get current values
+    local cur_stage cur_iteration cur_diff cur_files cur_error
+    cur_stage=$(echo "$current_snapshot" | jq -r '.stage')
+    cur_iteration=$(echo "$current_snapshot" | jq -r '.iteration')
+    cur_diff=$(echo "$current_snapshot" | jq -r '.diff_lines')
+    cur_files=$(echo "$current_snapshot" | jq -r '.files_changed')
+    cur_error=$(echo "$current_snapshot" | jq -r '.last_error')
+
+    # Detect progress
+    local has_progress=false
+
+    # Stage advanced → clear progress
+    if [[ "$cur_stage" != "$prev_stage" && "$cur_stage" != "unknown" ]]; then
+        has_progress=true
+        daemon_log INFO "Progress: issue #${issue_num} stage ${prev_stage} → ${cur_stage}"
+    fi
+
+    # Iteration increased → clear progress (agent is looping but advancing)
+    if [[ "$cur_iteration" -gt "$prev_iteration" ]]; then
+        has_progress=true
+        daemon_log INFO "Progress: issue #${issue_num} iteration ${prev_iteration} → ${cur_iteration}"
+    fi
+
+    # Diff lines grew (agent is writing code)
+    if [[ "$cur_diff" -gt "$prev_diff_lines" ]]; then
+        has_progress=true
+    fi
+
+    # More files touched
+    if [[ "$cur_files" -gt "$prev_files" ]]; then
+        has_progress=true
+    fi
+
+    # Detect repeated errors (same error signature hitting again)
+    local repeated_errors="$prev_repeated_errors"
+    if [[ -n "$cur_error" && "$cur_error" == "$prev_error" ]]; then
+        repeated_errors=$((repeated_errors + 1))
+    elif [[ -n "$cur_error" && "$cur_error" != "$prev_error" ]]; then
+        # Different error — reset counter (agent is making different mistakes, that's progress)
+        repeated_errors=0
+    fi
+
+    # Update no_progress counter
+    local no_progress_count
+    if [[ "$has_progress" == "true" ]]; then
+        no_progress_count=0
+        repeated_errors=0
+    else
+        no_progress_count=$((prev_no_progress + 1))
+    fi
+
+    # Update progress file (keep last 10 snapshots)
+    local tmp_progress="${progress_file}.tmp.$$"
+    jq \
+        --argjson snap "$current_snapshot" \
+        --argjson npc "$no_progress_count" \
+        --argjson rec "$repeated_errors" \
+        --arg ts "$(now_iso)" \
+        '
+        .snapshots = ((.snapshots + [$snap]) | .[-10:]) |
+        .no_progress_count = $npc |
+        .repeated_error_count = $rec |
+        if $npc == 0 then .last_progress_at = $ts else . end
+        ' "$progress_file" > "$tmp_progress" 2>/dev/null && mv "$tmp_progress" "$progress_file"
+
+    # Determine verdict
+    local warn_threshold="${PROGRESS_CHECKS_BEFORE_WARN:-3}"
+    local kill_threshold="${PROGRESS_CHECKS_BEFORE_KILL:-6}"
+
+    # Stuck in same error loop — accelerate to kill
+    if [[ "$repeated_errors" -ge 3 ]]; then
+        echo "stuck"
+        return
+    fi
+
+    if [[ "$no_progress_count" -ge "$kill_threshold" ]]; then
+        echo "stuck"
+    elif [[ "$no_progress_count" -ge "$warn_threshold" ]]; then
+        echo "stalled"
+    elif [[ "$no_progress_count" -ge 1 ]]; then
+        echo "slowing"
+    else
+        echo "healthy"
+    fi
+}
+
+# Clean up progress tracking for a completed/failed job
+daemon_clear_progress() {
+    local issue_num="$1"
+    rm -f "$PROGRESS_DIR/issue-${issue_num}.json"
 }
 
 # Learn actual worker memory from peak RSS of pipeline processes
@@ -1558,6 +1771,9 @@ daemon_reap_completed() {
         else
             daemon_on_failure "$issue_num" "$exit_code" "$duration_str"
         fi
+
+        # Clean up progress tracking for this job
+        daemon_clear_progress "$issue_num"
 
         # Release claim lock (label-based coordination)
         local reap_machine_name
@@ -3550,78 +3766,92 @@ daemon_poll_issues() {
 
 daemon_health_check() {
     local findings=0
-
-    # Stale jobs: kill processes running > timeout (adaptive per template)
-    local stale_timeout
-    stale_timeout=$(get_adaptive_stale_timeout "$PIPELINE_TEMPLATE")
     local now_e
     now_e=$(now_epoch)
 
     if [[ -f "$STATE_FILE" ]]; then
+        # ── Progress-Based Health Monitoring ──
+        # Instead of killing after a static timeout, check for forward progress.
+        # Only kill when the agent is truly stuck (no stage change, no new code,
+        # same error repeating). A hard wall-clock limit remains as absolute safety net.
+
+        local hard_limit="${PROGRESS_HARD_LIMIT_S:-10800}"
+        local use_progress="${PROGRESS_MONITORING:-true}"
+
         while IFS= read -r job; do
-            local pid started_at issue_num
+            local pid started_at issue_num worktree
             pid=$(echo "$job" | jq -r '.pid')
             started_at=$(echo "$job" | jq -r '.started_at // empty')
             issue_num=$(echo "$job" | jq -r '.issue')
+            worktree=$(echo "$job" | jq -r '.worktree // ""')
 
+            # Skip dead processes
+            if ! kill -0 "$pid" 2>/dev/null; then
+                continue
+            fi
+
+            local elapsed=0
             if [[ -n "$started_at" ]]; then
                 local start_e
                 start_e=$(TZ=UTC date -j -f "%Y-%m-%dT%H:%M:%SZ" "$started_at" +%s 2>/dev/null || date -d "$started_at" +%s 2>/dev/null || echo "0")
-                local elapsed=$(( now_e - start_e ))
-                if [[ "$elapsed" -gt "$stale_timeout" ]] && kill -0 "$pid" 2>/dev/null; then
-                    daemon_log WARN "Stale job detected: issue #${issue_num} (${elapsed}s, PID $pid) — killing"
+                elapsed=$(( now_e - start_e ))
+            fi
+
+            # Hard wall-clock limit — absolute safety net (default 3h)
+            if [[ "$elapsed" -gt "$hard_limit" ]]; then
+                daemon_log WARN "Hard limit exceeded: issue #${issue_num} (${elapsed}s > ${hard_limit}s, PID $pid) — killing"
+                emit_event "daemon.hard_limit" "issue=$issue_num" "elapsed_s=$elapsed" "limit_s=$hard_limit" "pid=$pid"
+                kill "$pid" 2>/dev/null || true
+                daemon_clear_progress "$issue_num"
+                findings=$((findings + 1))
+                continue
+            fi
+
+            # Progress-based detection (when enabled)
+            if [[ "$use_progress" == "true" && -n "$worktree" ]]; then
+                local snapshot verdict
+                snapshot=$(daemon_collect_snapshot "$issue_num" "$worktree" "$pid" 2>/dev/null || echo '{}')
+
+                if [[ "$snapshot" != "{}" ]]; then
+                    verdict=$(daemon_assess_progress "$issue_num" "$snapshot" 2>/dev/null || echo "healthy")
+
+                    case "$verdict" in
+                        healthy)
+                            # All good — agent is making progress
+                            ;;
+                        slowing)
+                            daemon_log INFO "Issue #${issue_num} slowing (no progress for 1-2 checks, ${elapsed}s elapsed)"
+                            ;;
+                        stalled)
+                            local no_progress_count
+                            no_progress_count=$(jq -r '.no_progress_count // 0' "$PROGRESS_DIR/issue-${issue_num}.json" 2>/dev/null || echo 0)
+                            daemon_log WARN "Issue #${issue_num} stalled: no progress for ${no_progress_count} checks (${elapsed}s elapsed, PID $pid)"
+                            emit_event "daemon.stalled" "issue=$issue_num" "no_progress=$no_progress_count" "elapsed_s=$elapsed" "pid=$pid"
+                            ;;
+                        stuck)
+                            local no_progress_count repeated_errors cur_stage
+                            no_progress_count=$(jq -r '.no_progress_count // 0' "$PROGRESS_DIR/issue-${issue_num}.json" 2>/dev/null || echo 0)
+                            repeated_errors=$(jq -r '.repeated_error_count // 0' "$PROGRESS_DIR/issue-${issue_num}.json" 2>/dev/null || echo 0)
+                            cur_stage=$(echo "$snapshot" | jq -r '.stage // "unknown"')
+                            daemon_log WARN "Issue #${issue_num} STUCK: no progress for ${no_progress_count} checks, ${repeated_errors} repeated errors (stage=${cur_stage}, ${elapsed}s, PID $pid) — killing"
+                            emit_event "daemon.stuck_kill" "issue=$issue_num" "no_progress=$no_progress_count" "repeated_errors=$repeated_errors" "stage=$cur_stage" "elapsed_s=$elapsed" "pid=$pid"
+                            kill "$pid" 2>/dev/null || true
+                            daemon_clear_progress "$issue_num"
+                            findings=$((findings + 1))
+                            ;;
+                    esac
+                fi
+            else
+                # Fallback: legacy time-based detection when progress monitoring is off
+                local stale_timeout
+                stale_timeout=$(get_adaptive_stale_timeout "$PIPELINE_TEMPLATE")
+                if [[ "$elapsed" -gt "$stale_timeout" ]]; then
+                    daemon_log WARN "Stale job (legacy): issue #${issue_num} (${elapsed}s > ${stale_timeout}s, PID $pid) — killing"
                     kill "$pid" 2>/dev/null || true
                     findings=$((findings + 1))
                 fi
             fi
-        done < <(jq -c '.active_jobs[]' "$STATE_FILE" 2>/dev/null)
-
-        # Heartbeat-based stale detection (adaptive per-stage timeout)
-        local heartbeat_dir="$HOME/.shipwright/heartbeats"
-        if [[ -d "$heartbeat_dir" ]]; then
-            while IFS= read -r job; do
-                local hb_pid hb_issue
-                hb_pid=$(echo "$job" | jq -r '.pid')
-                hb_issue=$(echo "$job" | jq -r '.issue')
-
-                # Look for heartbeat file matching this job
-                local hb_file=""
-                for f in "$heartbeat_dir"/*.json; do
-                    [[ ! -f "$f" ]] && continue
-                    local f_pid
-                    f_pid=$(jq -r '.pid // 0' "$f" 2>/dev/null || echo 0)
-                    if [[ "$f_pid" == "$hb_pid" ]]; then
-                        hb_file="$f"
-                        break
-                    fi
-                done
-
-                if [[ -n "$hb_file" ]]; then
-                    local hb_updated hb_file_issue hb_stage
-                    hb_updated=$(jq -r '.updated_at // ""' "$hb_file" 2>/dev/null || echo "")
-                    hb_file_issue=$(jq -r '.issue // ""' "$hb_file" 2>/dev/null || echo "")
-                    hb_stage=$(jq -r '.stage // "unknown"' "$hb_file" 2>/dev/null || echo "unknown")
-                    # Adaptive heartbeat timeout based on current stage
-                    local heartbeat_timeout
-                    heartbeat_timeout=$(get_adaptive_heartbeat_timeout "$hb_stage")
-                    if [[ -n "$hb_updated" ]]; then
-                        local hb_epoch
-                        hb_epoch=$(TZ=UTC date -j -f "%Y-%m-%dT%H:%M:%SZ" "$hb_updated" +%s 2>/dev/null || date -d "$hb_updated" +%s 2>/dev/null || echo "0")
-                        local hb_age=$(( now_e - hb_epoch ))
-                        # Only kill if: stale AND process alive AND heartbeat issue matches tracked issue
-                        # This prevents killing a new process that reused the PID of a dead pipeline
-                        if [[ "$hb_age" -gt "$heartbeat_timeout" ]] && kill -0 "$hb_pid" 2>/dev/null && [[ "$hb_file_issue" == "$hb_issue" ]]; then
-                            daemon_log WARN "Heartbeat stale for issue #${hb_issue} (${hb_age}s > ${heartbeat_timeout}s timeout, stage=${hb_stage}, PID ${hb_pid})"
-                            emit_event "daemon.heartbeat_stale" "issue=$hb_issue" "age_s=$hb_age" "timeout_s=$heartbeat_timeout" "stage=$hb_stage" "pid=$hb_pid"
-                            kill "$hb_pid" 2>/dev/null || true
-                            # Remove the stale heartbeat file to prevent re-triggering
-                            rm -f "$hb_file"
-                            findings=$((findings + 1))
-                        fi
-                    fi
-                fi
-            done < <(jq -c '.active_jobs[]' "$STATE_FILE" 2>/dev/null || true)
-        fi
+        done < <(jq -c '.active_jobs[]' "$STATE_FILE" 2>/dev/null || true)
     fi
 
     # Disk space warning (check both repo dir and ~/.shipwright)

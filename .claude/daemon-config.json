@@ -19,7 +19,11 @@
     "slack_webhook": null
   },
   "health": {
-    "stale_timeout_s": 1800
+    "stale_timeout_s": 5400,
+    "progress_based": true,
+    "stale_checks_before_warn": 3,
+    "stale_checks_before_kill": 6,
+    "hard_limit_s": 10800
   },
   "priority_labels": "urgent,p0,high,p1,normal,p2,low,p3",
   "alerts": {
@@ -51,7 +55,7 @@
     "hotfix|incident": "hotfix",
     "security": "enterprise"
   },
-  "max_retries": 2,
+  "max_retries": 3,
   "retry_escalation": true,
   "self_optimize": true,
   "optimize_interval": 5,
