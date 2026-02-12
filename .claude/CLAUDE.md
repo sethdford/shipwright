@@ -234,7 +234,7 @@ All scripts are bash (except the dashboard server in TypeScript). Grouped by lay
 
 | File | Lines | Purpose |
 | --- | ---: | --- |
-| `scripts/sw-connect-test.sh` | 828 | Validate dashboard connection, heartbeat |
+| `scripts/sw-connect-test.sh` | 831 | Validate dashboard connection, heartbeat |
 | `scripts/sw-daemon-test.sh` | 1194 | Unit tests for daemon metrics, health, alerting |
 | `scripts/sw-docs-test.sh` | 791 | Validate documentation keeper, AUTO sections, |
 | `scripts/sw-fix-test.sh` | 630 | Unit tests for bulk fix across repos |
