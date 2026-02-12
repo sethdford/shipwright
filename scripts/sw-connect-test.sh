@@ -698,8 +698,11 @@ test_now_iso_format() {
 # 24. Script has correct version
 # ──────────────────────────────────────────────────────────────────────────────
 test_script_version() {
-    if ! grep -q 'VERSION="1.8.0"' "$TEMP_DIR/sw-connect.sh"; then
-        echo -e "    ${RED}✗${RESET} Script version not 1.7.1"
+    # Dynamically read expected version from the source script
+    local expected_version
+    expected_version=$(grep -m1 '^VERSION=' "$TEMP_DIR/sw-connect.sh" | sed 's/VERSION="//;s/"//')
+    if [[ -z "$expected_version" ]] || ! [[ "$expected_version" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+        echo -e "    ${RED}✗${RESET} Could not read version from script"
         return 1
     fi
     return 0

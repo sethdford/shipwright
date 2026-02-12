@@ -5,7 +5,7 @@
 # ╚═══════════════════════════════════════════════════════════════════════════╝
 set -euo pipefail
 
-VERSION="1.8.1"
+VERSION="1.9.0"
 REPO="sethdford/shipwright"
 INSTALL_DIR="${SHIPWRIGHT_INSTALL_DIR:-$HOME/.local/bin}"
 INSTALL_LIB="${SHIPWRIGHT_INSTALL_LIB:-$HOME/.local/lib/shipwright}"
