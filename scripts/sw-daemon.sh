@@ -3784,10 +3784,10 @@ daemon_poll_issues() {
     local sorted_order
     if [[ "${PRIORITY_STRATEGY:-quick-wins-first}" == "complex-first" ]]; then
         # Complex-first: lower score (more complex) first
-        sorted_order=$(printf '%s\n' "${scored_issues[@]}" | sort -t'|' -k1 -n -k2 -n)
+        sorted_order=$(printf '%s\n' "${scored_issues[@]}" | sort -t'|' -k1,1 -n -k2,2 -n)
     else
-        # Quick-wins-first (default): higher score (simpler) first
-        sorted_order=$(printf '%s\n' "${scored_issues[@]}" | sort -t'|' -k1 -rn -k2 -n)
+        # Quick-wins-first (default): higher score (simpler) first, lowest issue# first on ties
+        sorted_order=$(printf '%s\n' "${scored_issues[@]}" | sort -t'|' -k1,1 -rn -k2,2 -n)
     fi
 
     # Dependency-aware reordering: move dependencies before dependents
