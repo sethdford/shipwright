@@ -24,6 +24,198 @@ _COMPAT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/lib/compat.sh"
 # shellcheck source=lib/compat.sh
 [[ -f "$_COMPAT" ]] && source "$_COMPAT"
 
+# ─── Argument Parsing ─────────────────────────────────────────────────────────
+JSON_OUTPUT="false"
+while [[ $# -gt 0 ]]; do
+    case "$1" in
+        --json)  JSON_OUTPUT="true"; shift ;;
+        --help|-h)
+            echo "Usage: shipwright status [--json]"
+            echo ""
+            echo "Options:"
+            echo "  --json    Output structured JSON instead of formatted text"
+            echo "  --help    Show this help message"
+            exit 0
+            ;;
+        *)  echo "Unknown option: $1" >&2; exit 1 ;;
+    esac
+done
+
+# ─── JSON Output Mode ─────────────────────────────────────────────────────────
+if [[ "$JSON_OUTPUT" == "true" ]]; then
+    if ! command -v jq &>/dev/null; then
+        echo "Error: jq is required for --json output" >&2
+        exit 1
+    fi
+
+    # -- tmux windows --
+    WINDOWS_JSON="[]"
+    if command -v tmux &>/dev/null; then
+        WINDOWS_JSON=$(tmux list-windows -a -F '#{session_name}:#{window_index}|#{window_name}|#{window_panes}|#{window_active}' 2>/dev/null | \
+            while IFS='|' read -r sw wn pc act; do
+                is_claude="false"
+                echo "$wn" | grep -qi "claude" && is_claude="true"
+                is_active="false"
+                [[ "$act" == "1" ]] && is_active="true"
+                printf '%s\n' "{\"session_window\":\"$sw\",\"name\":\"$wn\",\"panes\":$pc,\"active\":$is_active,\"claude\":$is_claude}"
+            done | jq -s '.' 2>/dev/null) || WINDOWS_JSON="[]"
+    fi
+
+    # -- team configs --
+    TEAMS_JSON="[]"
+    _teams_dir="${HOME}/.claude/teams"
+    if [[ -d "$_teams_dir" ]]; then
+        TEAMS_JSON=$(find "$_teams_dir" -mindepth 1 -maxdepth 1 -type d 2>/dev/null | sort | \
+            while IFS= read -r td; do
+                [[ -z "$td" ]] && continue
+                tn="$(basename "$td")"
+                cf="${td}/config.json"
+                if [[ -f "$cf" ]]; then
+                    mc=$(jq '.members | length' "$cf" 2>/dev/null || echo 0)
+                    printf '%s\n' "{\"name\":\"$tn\",\"members\":$mc,\"has_config\":true}"
+                else
+                    printf '%s\n' "{\"name\":\"$tn\",\"members\":0,\"has_config\":false}"
+                fi
+            done | jq -s '.' 2>/dev/null) || TEAMS_JSON="[]"
+    fi
+
+    # -- task lists --
+    TASKS_JSON="[]"
+    _tasks_dir="${HOME}/.claude/tasks"
+    if [[ -d "$_tasks_dir" ]]; then
+        _tasks_tmp=""
+        while IFS= read -r td; do
+            [[ -z "$td" ]] && continue
+            tn="$(basename "$td")"
+            _total=0; _completed=0; _in_progress=0; _pending=0
+            while IFS= read -r tf; do
+                [[ -z "$tf" ]] && continue
+                _total=$((_total + 1))
+                _st=$(jq -r '.status // "unknown"' "$tf" 2>/dev/null || echo "unknown")
+                case "$_st" in
+                    completed)   _completed=$((_completed + 1)) ;;
+                    in_progress) _in_progress=$((_in_progress + 1)) ;;
+                    pending)     _pending=$((_pending + 1)) ;;
+                esac
+            done < <(find "$td" -type f -name '*.json' 2>/dev/null)
+            _tasks_tmp="${_tasks_tmp}{\"team\":\"$tn\",\"total\":$_total,\"completed\":$_completed,\"in_progress\":$_in_progress,\"pending\":$_pending}
+"
+        done < <(find "$_tasks_dir" -mindepth 1 -maxdepth 1 -type d 2>/dev/null | sort)
+        if [[ -n "$_tasks_tmp" ]]; then
+            TASKS_JSON=$(printf '%s' "$_tasks_tmp" | jq -s '.' 2>/dev/null) || TASKS_JSON="[]"
+        fi
+    fi
+
+    # -- daemon --
+    DAEMON_JSON="null"
+    _state_file="${HOME}/.shipwright/daemon-state.json"
+    _pid_file="${HOME}/.shipwright/daemon.pid"
+    if [[ -f "$_state_file" ]]; then
+        _d_running="false"
+        _d_pid="null"
+        if [[ -f "$_pid_file" ]]; then
+            _d_pid_val=$(cat "$_pid_file" 2>/dev/null || true)
+            if [[ -n "$_d_pid_val" ]] && kill -0 "$_d_pid_val" 2>/dev/null; then
+                _d_running="true"
+                _d_pid="$_d_pid_val"
+            fi
+        fi
+        _active=$(jq -c '.active_jobs // []' "$_state_file" 2>/dev/null || echo "[]")
+        _queued=$(jq -c '.queued // []' "$_state_file" 2>/dev/null || echo "[]")
+        _completed=$(jq -c '[.completed // [] | reverse | .[:20][]]' "$_state_file" 2>/dev/null || echo "[]")
+        _started_at=$(jq -r '.started_at // null' "$_state_file" 2>/dev/null || echo "null")
+        _last_poll=$(jq -r '.last_poll // null' "$_state_file" 2>/dev/null || echo "null")
+        DAEMON_JSON=$(jq -n \
+            --argjson running "$_d_running" \
+            --argjson pid "$_d_pid" \
+            --argjson active_jobs "$_active" \
+            --argjson queued "$_queued" \
+            --argjson recent_completions "$_completed" \
+            --arg started_at "$_started_at" \
+            --arg last_poll "$_last_poll" \
+            '{running:$running, pid:$pid, started_at:$started_at, last_poll:$last_poll, active_jobs:$active_jobs, queued:$queued, recent_completions:$recent_completions}') || DAEMON_JSON="null"
+    fi
+
+    # -- issue tracker --
+    TRACKER_JSON="null"
+    _tracker_cfg="${HOME}/.shipwright/tracker-config.json"
+    if [[ -f "$_tracker_cfg" ]]; then
+        _provider=$(jq -r '.provider // "none"' "$_tracker_cfg" 2>/dev/null || echo "none")
+        if [[ "$_provider" != "none" && -n "$_provider" ]]; then
+            _url="null"
+            [[ "$_provider" == "jira" ]] && _url=$(jq -r '.jira.base_url // null' "$_tracker_cfg" 2>/dev/null || echo "null")
+            TRACKER_JSON=$(jq -n --arg provider "$_provider" --arg url "$_url" '{provider:$provider, url:$url}') || TRACKER_JSON="null"
+        fi
+    fi
+
+    # -- heartbeats --
+    HEARTBEATS_JSON="[]"
+    _hb_dir="${HOME}/.shipwright/heartbeats"
+    if [[ -d "$_hb_dir" ]]; then
+        HEARTBEATS_JSON=$(find "$_hb_dir" -name '*.json' -type f 2>/dev/null | \
+            while IFS= read -r hf; do
+                [[ -z "$hf" ]] && continue
+                _jid="$(basename "$hf" .json)"
+                _stage=$(jq -r '.stage // "unknown"' "$hf" 2>/dev/null || echo "unknown")
+                _ts=$(jq -r '.timestamp // null' "$hf" 2>/dev/null || echo "null")
+                _iter=$(jq -r '.iteration // 0' "$hf" 2>/dev/null || echo "0")
+                printf '%s\n' "{\"job_id\":\"$_jid\",\"stage\":\"$_stage\",\"timestamp\":\"$_ts\",\"iteration\":$_iter}"
+            done | jq -s '.' 2>/dev/null) || HEARTBEATS_JSON="[]"
+    fi
+
+    # -- remote machines --
+    MACHINES_JSON="[]"
+    _machines_file="${HOME}/.shipwright/machines.json"
+    if [[ -f "$_machines_file" ]]; then
+        MACHINES_JSON=$(jq -c '.machines // []' "$_machines_file" 2>/dev/null) || MACHINES_JSON="[]"
+    fi
+
+    # -- connected developers --
+    DEVELOPERS_JSON="null"
+    _team_cfg="${HOME}/.shipwright/team-config.json"
+    if [[ -f "$_team_cfg" ]]; then
+        _dash_url=$(jq -r '.dashboard_url // ""' "$_team_cfg" 2>/dev/null || true)
+        if [[ -n "$_dash_url" ]] && command -v curl &>/dev/null; then
+            _api_resp=$(curl -s --max-time 3 "${_dash_url}/api/status" 2>/dev/null || echo "")
+            if [[ -n "$_api_resp" ]] && echo "$_api_resp" | jq empty 2>/dev/null; then
+                _reachable="true"
+                _online=$(echo "$_api_resp" | jq '.total_online // 0' 2>/dev/null || echo "0")
+                _devs=$(echo "$_api_resp" | jq -c '.developers // []' 2>/dev/null || echo "[]")
+                DEVELOPERS_JSON=$(jq -n --argjson reachable true --argjson total_online "$_online" --argjson developers "$_devs" \
+                    '{reachable:$reachable, total_online:$total_online, developers:$developers}') || DEVELOPERS_JSON="null"
+            else
+                DEVELOPERS_JSON='{"reachable":false,"total_online":0,"developers":[]}'
+            fi
+        fi
+    fi
+
+    # -- assemble and output --
+    jq -n \
+        --arg version "$VERSION" \
+        --arg timestamp "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
+        --argjson tmux_windows "$WINDOWS_JSON" \
+        --argjson teams "$TEAMS_JSON" \
+        --argjson task_lists "$TASKS_JSON" \
+        --argjson daemon "$DAEMON_JSON" \
+        --argjson issue_tracker "$TRACKER_JSON" \
+        --argjson heartbeats "$HEARTBEATS_JSON" \
+        --argjson remote_machines "$MACHINES_JSON" \
+        --argjson connected_developers "$DEVELOPERS_JSON" \
+        '{
+            version: $version,
+            timestamp: $timestamp,
+            tmux_windows: $tmux_windows,
+            teams: $teams,
+            task_lists: $task_lists,
+            daemon: $daemon,
+            issue_tracker: $issue_tracker,
+            heartbeats: $heartbeats,
+            remote_machines: $remote_machines,
+            connected_developers: $connected_developers
+        }'
+    exit 0
+fi
+
 # ─── Header ──────────────────────────────────────────────────────────────────
 
 echo ""
