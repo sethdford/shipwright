@@ -12,8 +12,8 @@
 <p align="center">
   <a href="https://github.com/sethdford/shipwright/actions/workflows/test.yml"><img src="https://github.com/sethdford/shipwright/actions/workflows/test.yml/badge.svg" alt="Tests"></a>
   <a href="https://github.com/sethdford/shipwright/actions/workflows/shipwright-pipeline.yml"><img src="https://github.com/sethdford/shipwright/actions/workflows/shipwright-pipeline.yml/badge.svg" alt="Pipeline"></a>
-  <img src="https://img.shields.io/badge/tests-320%2B_passing-4ade80?style=flat-square" alt="320+ tests">
-  <img src="https://img.shields.io/badge/version-1.7.1-00d4ff?style=flat-square" alt="v1.7.1">
+  <img src="https://img.shields.io/badge/tests-400%2B_passing-4ade80?style=flat-square" alt="400+ tests">
+  <img src="https://img.shields.io/badge/version-1.8.1-00d4ff?style=flat-square" alt="v1.8.1">
   <img src="https://img.shields.io/badge/license-MIT-green?style=flat-square" alt="MIT License">
   <img src="https://img.shields.io/badge/bash-3.2%2B-7c3aed?style=flat-square" alt="Bash 3.2+">
 </p>
@@ -284,7 +284,7 @@ shipwright templates list
 
 ## Architecture
 
-37 bash scripts (~35K lines), 20 test suites (320+ tests), plus a Bun TypeScript dashboard server. Bash 3.2 compatible — runs on macOS out of the box.
+48 bash scripts (~51K lines), 22 test suites (400+ tests), plus a Bun TypeScript dashboard server. Bash 3.2 compatible — runs on macOS out of the box.
 
 ```
 scripts/
@@ -303,7 +303,7 @@ scripts/
   sw-fleet.sh                 # Multi-repo orchestration
   sw-memory.sh                # Persistent learning
   sw-cost.sh                  # Cost intelligence
-  ...                         # 22 more scripts
+  ...                         # 33 more scripts
 dashboard/
   server.ts                   # Bun WebSocket dashboard (4300+ lines)
   public/                     # Dashboard frontend
@@ -316,7 +316,7 @@ dashboard/
 **Manual development:** Fork, branch, then:
 
 ```bash
-npm test    # 320+ tests across 20 suites
+npm test    # 400+ tests across 22 suites
 ```
 
 ## License
