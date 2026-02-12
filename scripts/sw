@@ -67,7 +67,7 @@ show_help() {
     echo ""
     echo -e "${BOLD}COMMANDS${RESET}"
     echo -e "  ${CYAN}session${RESET} [name]       Create a new tmux window for a Claude team"
-    echo -e "  ${CYAN}status${RESET}               Show dashboard of running teams and agents"
+    echo -e "  ${CYAN}status${RESET} [--json]        Show dashboard of running teams and agents"
     echo -e "  ${CYAN}ps${RESET}                    Show running agent processes and status"
     echo -e "  ${CYAN}logs${RESET} [team] [opts]    View and search agent pane logs"
     echo -e "  ${CYAN}templates${RESET} [list|show]  Manage team composition templates"
