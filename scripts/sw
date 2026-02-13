@@ -103,6 +103,7 @@ show_help() {
     echo -e "  ${CYAN}setup${RESET}                 ${BOLD}Guided setup${RESET} — prerequisites, init, doctor, quick start"
     echo -e "  ${CYAN}help${RESET}                  Show this help message"
     echo -e "  ${CYAN}version${RESET}               Show version"
+    echo -e "  ${CYAN}hello${RESET}                Say hello world"
     echo ""
     echo -e "${BOLD}CONTINUOUS LOOP${RESET}  ${DIM}(autonomous agent operation)${RESET}"
     echo -e "  ${DIM}shipwright loop \"Build auth\" --test-cmd \"npm test\"${RESET}"
@@ -321,6 +322,9 @@ main() {
             ;;
         version|--version|-v)
             show_version
+            ;;
+        hello)
+            echo "hello world"
             ;;
         *)
             error "Unknown command: ${cmd}"
