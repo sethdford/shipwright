@@ -36,14 +36,20 @@ error()   { echo -e "${RED}${BOLD}✗${RESET} $*" >&2; }
 GOAL=""
 MAX_ITERATIONS="${SW_MAX_ITERATIONS:-20}"
 TEST_CMD=""
+FAST_TEST_CMD=""
+FAST_TEST_INTERVAL=5
 MODEL="${SW_MODEL:-opus}"
 AGENTS=1
+AGENT_ROLES=""
 USE_WORKTREE=false
 SKIP_PERMISSIONS=false
 MAX_TURNS=""
 RESUME=false
 VERBOSE=false
 MAX_ITERATIONS_EXPLICIT=false
+MAX_RESTARTS=0
+SESSION_RESTART=false
+RESTART_COUNT=0
 VERSION="1.10.0"
 
 # ─── Flexible Iteration Defaults ────────────────────────────────────────────
@@ -75,8 +81,11 @@ show_help() {
     echo -e "${BOLD}OPTIONS${RESET}"
     echo -e "  ${CYAN}--max-iterations${RESET} N       Max loop iterations (default: 20)"
     echo -e "  ${CYAN}--test-cmd${RESET} \"cmd\"         Test command to run between iterations"
+    echo -e "  ${CYAN}--fast-test-cmd${RESET} \"cmd\"      Fast/subset test command (alternates with full)"
+    echo -e "  ${CYAN}--fast-test-interval${RESET} N       Run full tests every N iterations (default: 5)"
     echo -e "  ${CYAN}--model${RESET} MODEL             Claude model to use (default: opus)"
     echo -e "  ${CYAN}--agents${RESET} N                Number of parallel agents (default: 1)"
+    echo -e "  ${CYAN}--roles${RESET} \"r1,r2,...\"        Role per agent: builder,reviewer,tester,optimizer,docs,security"
     echo -e "  ${CYAN}--worktree${RESET}                Use git worktrees for isolation (auto if agents > 1)"
     echo -e "  ${CYAN}--skip-permissions${RESET}        Pass --dangerously-skip-permissions to Claude"
     echo -e "  ${CYAN}--max-turns${RESET} N             Max API turns per Claude session"
@@ -89,6 +98,7 @@ show_help() {
     echo -e "  ${CYAN}--audit-agent${RESET}             Run separate auditor agent (haiku) after each iteration"
     echo -e "  ${CYAN}--quality-gates${RESET}           Enable automated quality gates before accepting completion"
     echo -e "  ${CYAN}--definition-of-done${RESET} FILE DoD checklist file — evaluated by AI against git diff"
+    echo -e "  ${CYAN}--max-restarts${RESET} N          Max session restarts on exhaustion (default: 0)"
     echo -e "  ${CYAN}--no-auto-extend${RESET}          Disable auto-extension when max iterations reached"
     echo -e "  ${CYAN}--extension-size${RESET} N         Additional iterations per extension (default: 5)"
     echo -e "  ${CYAN}--max-extensions${RESET} N         Max number of auto-extensions (default: 3)"
@@ -175,6 +185,30 @@ while [[ $# -gt 0 ]]; do
             shift 2
             ;;
         --max-extensions=*) MAX_EXTENSIONS="${1#--max-extensions=}"; shift ;;
+        --fast-test-cmd)
+            FAST_TEST_CMD="${2:-}"
+            [[ -z "$FAST_TEST_CMD" ]] && { error "Missing value for --fast-test-cmd"; exit 1; }
+            shift 2
+            ;;
+        --fast-test-cmd=*) FAST_TEST_CMD="${1#--fast-test-cmd=}"; shift ;;
+        --fast-test-interval)
+            FAST_TEST_INTERVAL="${2:-}"
+            [[ -z "$FAST_TEST_INTERVAL" ]] && { error "Missing value for --fast-test-interval"; exit 1; }
+            shift 2
+            ;;
+        --fast-test-interval=*) FAST_TEST_INTERVAL="${1#--fast-test-interval=}"; shift ;;
+        --max-restarts)
+            MAX_RESTARTS="${2:-}"
+            [[ -z "$MAX_RESTARTS" ]] && { error "Missing value for --max-restarts"; exit 1; }
+            shift 2
+            ;;
+        --max-restarts=*) MAX_RESTARTS="${1#--max-restarts=}"; shift ;;
+        --roles)
+            AGENT_ROLES="${2:-}"
+            [[ -z "$AGENT_ROLES" ]] && { error "Missing value for --roles"; exit 1; }
+            shift 2
+            ;;
+        --roles=*) AGENT_ROLES="${1#--roles=}"; shift ;;
         --help|-h)
             show_help
             exit 0
@@ -531,6 +565,46 @@ $LOG_ENTRIES
 EOF
 }
 
+write_progress() {
+    local progress_file="$LOG_DIR/progress.md"
+    local recent_commits
+    recent_commits=$(git -C "$PROJECT_ROOT" log --oneline -5 2>/dev/null || echo "(no commits)")
+    local changed_files
+    changed_files=$(git -C "$PROJECT_ROOT" diff --name-only HEAD~3 2>/dev/null | head -20 || echo "(none)")
+    local last_error=""
+    local prev_test_log="$LOG_DIR/tests-iter-${ITERATION}.log"
+    if [[ -f "$prev_test_log" ]] && [[ "${TEST_PASSED:-}" == "false" ]]; then
+        last_error=$(tail -10 "$prev_test_log" 2>/dev/null || true)
+    fi
+
+    local tmp_progress="${progress_file}.tmp.$$"
+    cat > "$tmp_progress" <<PROGRESS_EOF
+# Session Progress (Auto-Generated)
+
+## Goal
+${GOAL}
+
+## Status
+- Iteration: ${ITERATION}/${MAX_ITERATIONS}
+- Session restart: ${RESTART_COUNT}/${MAX_RESTARTS}
+- Tests passing: ${TEST_PASSED:-unknown}
+- Status: ${STATUS:-running}
+
+## Recent Commits
+${recent_commits}
+
+## Changed Files
+${changed_files}
+
+${last_error:+## Last Error
+$last_error
+}
+## Timestamp
+$(date -u +"%Y-%m-%dT%H:%M:%SZ")
+PROGRESS_EOF
+    mv "$tmp_progress" "$progress_file"
+}
+
 append_log_entry() {
     local entry="$1"
     if [[ -n "$LOG_ENTRIES" ]]; then
@@ -693,14 +767,78 @@ run_test_gate() {
         return
     fi
 
+    # Determine which test command to use this iteration
+    local active_test_cmd="$TEST_CMD"
+    local test_mode="full"
+    if [[ -n "$FAST_TEST_CMD" ]]; then
+        # Use full test every FAST_TEST_INTERVAL iterations, on first iteration, and on final iteration
+        if [[ "$ITERATION" -eq 1 ]] || [[ $(( ITERATION % FAST_TEST_INTERVAL )) -eq 0 ]] || [[ "$ITERATION" -ge "$MAX_ITERATIONS" ]]; then
+            active_test_cmd="$TEST_CMD"
+            test_mode="full"
+        else
+            active_test_cmd="$FAST_TEST_CMD"
+            test_mode="fast"
+        fi
+    fi
+
     local test_log="$LOG_DIR/tests-iter-${ITERATION}.log"
-    if bash -c "$TEST_CMD" > "$test_log" 2>&1; then
+    echo -e "  ${DIM}Running ${test_mode} tests...${RESET}"
+    if bash -c "$active_test_cmd" > "$test_log" 2>&1; then
         TEST_PASSED=true
-        TEST_OUTPUT="All tests passed."
+        TEST_OUTPUT="All tests passed (${test_mode} mode)."
     else
         TEST_PASSED=false
         TEST_OUTPUT="$(tail -50 "$test_log")"
+        # If fast test failed, also run full test to confirm
+        if [[ "$test_mode" == "fast" ]]; then
+            local full_test_log="$LOG_DIR/tests-iter-${ITERATION}-full.log"
+            if bash -c "$TEST_CMD" > "$full_test_log" 2>&1; then
+                TEST_PASSED=true
+                TEST_OUTPUT="Fast tests failed but full tests passed (false positive in fast mode)."
+            else
+                TEST_OUTPUT="$(tail -50 "$full_test_log")"
+            fi
+        fi
     fi
+}
+
+write_error_summary() {
+    local error_json="$LOG_DIR/error-summary.json"
+
+    # Only write on test failure
+    if [[ "${TEST_PASSED:-}" != "false" ]]; then
+        # Clear previous error summary on success
+        rm -f "$error_json" 2>/dev/null || true
+        return
+    fi
+
+    local test_log="$LOG_DIR/tests-iter-${ITERATION}.log"
+    [[ ! -f "$test_log" ]] && return
+
+    # Extract error lines (last 30 lines, grep for error patterns)
+    local error_lines_raw
+    error_lines_raw=$(tail -30 "$test_log" 2>/dev/null | grep -iE '(error|fail|assert|exception|panic|FAIL|TypeError|ReferenceError|SyntaxError)' | head -10 || true)
+
+    local error_count=0
+    if [[ -n "$error_lines_raw" ]]; then
+        error_count=$(echo "$error_lines_raw" | wc -l | tr -d ' ')
+    fi
+
+    # Build JSON with jq for proper escaping
+    local tmp_json="${error_json}.tmp.$$"
+    jq -n \
+        --argjson iteration "$ITERATION" \
+        --arg timestamp "$(date -u +"%Y-%m-%dT%H:%M:%SZ")" \
+        --argjson error_count "$error_count" \
+        --arg error_lines "$error_lines_raw" \
+        --arg test_cmd "$TEST_CMD" \
+        '{
+            iteration: $iteration,
+            timestamp: $timestamp,
+            error_count: $error_count,
+            error_lines: ($error_lines | split("\n") | map(select(length > 0))),
+            test_cmd: $test_cmd
+        }' > "$tmp_json" 2>/dev/null && mv "$tmp_json" "$error_json" || rm -f "$tmp_json" 2>/dev/null
 }
 
 # ─── Audit Agent ─────────────────────────────────────────────────────────────
@@ -931,6 +1069,21 @@ compose_prompt() {
 $TEST_OUTPUT"
     fi
 
+    # Structured error context (machine-readable)
+    local error_summary_section=""
+    local error_json="$LOG_DIR/error-summary.json"
+    if [[ -f "$error_json" ]]; then
+        local err_count err_lines
+        err_count=$(jq -r '.error_count // 0' "$error_json" 2>/dev/null || echo "0")
+        err_lines=$(jq -r '.error_lines[]? // empty' "$error_json" 2>/dev/null | head -10 || true)
+        if [[ "$err_count" -gt 0 ]] && [[ -n "$err_lines" ]]; then
+            error_summary_section="## Structured Error Summary (${err_count} errors detected)
+${err_lines}
+
+Fix these specific errors. Each line above is one distinct error from the test output."
+        fi
+    fi
+
     # Build audit sections (captured before heredoc to avoid nested heredoc issues)
     local audit_section
     audit_section="$(compose_audit_section)"
@@ -1053,6 +1206,16 @@ ${last_error}"
     local stuckness_section=""
     stuckness_section="$(detect_stuckness)"
 
+    # Session restart context — inject previous session progress
+    local restart_section=""
+    if [[ "$SESSION_RESTART" == "true" ]] && [[ -f "$LOG_DIR/progress.md" ]]; then
+        restart_section="## Previous Session Progress
+$(cat "$LOG_DIR/progress.md")
+
+You are starting a FRESH session after the previous one exhausted its iterations.
+Read the progress above and continue from where it left off. Do NOT repeat work already done."
+    fi
+
     cat <<PROMPT
 You are an autonomous coding agent on iteration ${ITERATION}/${MAX_ITERATIONS} of a continuous loop.
 
@@ -1068,12 +1231,16 @@ ${git_log}
 ## Test Results (Previous Iteration)
 ${test_section}
 
+${error_summary_section:+$error_summary_section
+}
 ${memory_section:+## Memory Context
 $memory_section
 }
 ${dora_section:+$dora_section
 }
 ${intelligence_section:+$intelligence_section
+}
+${restart_section:+$restart_section
 }
 ## Instructions
 1. Read the codebase and understand the current state
@@ -1236,6 +1403,38 @@ compose_worker_prompt() {
     local base_prompt
     base_prompt="$(compose_prompt)"
 
+    # Role-specific instructions
+    local role_section=""
+    if [[ -n "$AGENT_ROLES" ]]; then
+        # Split comma-separated roles and get role for this agent
+        local role=""
+        local idx=1
+        local IFS_BAK="$IFS"
+        IFS=',' read -ra _roles <<< "$AGENT_ROLES"
+        IFS="$IFS_BAK"
+        if [[ "$agent_num" -le "${#_roles[@]}" ]]; then
+            role="${_roles[$((agent_num - 1))]}"
+            # Trim whitespace
+            role="$(echo "$role" | tr -d ' ')"
+        fi
+
+        if [[ -n "$role" ]]; then
+            local role_desc=""
+            case "$role" in
+                builder)   role_desc="Focus on implementation — writing code, fixing bugs, building features. You are the primary builder." ;;
+                reviewer)  role_desc="Focus on code review — look for bugs, security issues, edge cases in recent commits. Make fixes via commits." ;;
+                tester)    role_desc="Focus on test coverage — write new tests, fix failing tests, improve assertions and edge case coverage." ;;
+                optimizer) role_desc="Focus on performance — profile hot paths, reduce complexity, optimize algorithms and data structures." ;;
+                docs)      role_desc="Focus on documentation — update README, add docstrings, write usage guides for new features." ;;
+                security)  role_desc="Focus on security — audit for vulnerabilities, fix injection risks, validate inputs, check auth boundaries." ;;
+                *)         role_desc="Focus on: ${role}. Apply your expertise in this area to advance the goal." ;;
+            esac
+            role_section="## Your Role: ${role}
+${role_desc}
+Prioritize work in your area of expertise. Coordinate with other agents via git log."
+        fi
+    fi
+
     cat <<PROMPT
 ${base_prompt}
 
@@ -1243,6 +1442,8 @@ ${base_prompt}
 You are Agent ${agent_num} of ${total_agents}. Other agents are working in parallel.
 Check git log to see what they've done — avoid duplicating their work.
 Focus on areas they haven't touched yet.
+
+${role_section}
 PROMPT
 }
 
@@ -1812,6 +2013,7 @@ ${GOAL}"
 
         # Test gate
         run_test_gate
+        write_error_summary
         if [[ -n "$TEST_CMD" ]]; then
             if [[ "$TEST_PASSED" == "true" ]]; then
                 echo -e "  ${GREEN}✓${RESET} Tests: passed"
@@ -1862,6 +2064,7 @@ ${GOAL}"
 $summary
 "
         write_state
+        write_progress
 
         # Update heartbeat
         "$SCRIPT_DIR/sw-heartbeat.sh" write "${PIPELINE_JOB_ID:-loop-$$}" \
@@ -1893,6 +2096,55 @@ HUMAN FEEDBACK (received after iteration $ITERATION): $human_msg"
     show_summary
 }
 
+# ─── Session Restart Wrapper ─────────────────────────────────────────────────
+
+run_loop_with_restarts() {
+    while true; do
+        run_single_agent_loop
+        local loop_exit=$?
+
+        # Write final progress for potential restart
+        write_progress
+
+        # If completed successfully or no restarts configured, exit
+        if [[ "$STATUS" == "complete" ]]; then
+            return 0
+        fi
+        if [[ "$MAX_RESTARTS" -le 0 ]]; then
+            return "$loop_exit"
+        fi
+        if [[ "$RESTART_COUNT" -ge "$MAX_RESTARTS" ]]; then
+            warn "Max restarts ($MAX_RESTARTS) reached — stopping"
+            return "$loop_exit"
+        fi
+        # Hard cap safety net
+        if [[ "$RESTART_COUNT" -ge 5 ]]; then
+            warn "Hard restart cap (5) reached — stopping"
+            return "$loop_exit"
+        fi
+
+        # Check if tests are still failing (worth restarting)
+        if [[ "${TEST_PASSED:-}" == "true" ]]; then
+            info "Tests passing but loop incomplete — restarting session"
+        else
+            info "Tests failing and loop exhausted — restarting with fresh context"
+        fi
+
+        RESTART_COUNT=$(( RESTART_COUNT + 1 ))
+        emit_event "loop.restart" "restart=$RESTART_COUNT" "max=$MAX_RESTARTS" "iteration=$ITERATION"
+        info "Session restart ${RESTART_COUNT}/${MAX_RESTARTS} — resetting iteration counter"
+
+        # Reset for fresh session
+        ITERATION=0
+        SESSION_RESTART=true
+        CONSECUTIVE_FAILURES=0
+        EXTENSION_COUNT=0
+        STATUS="running"
+
+        sleep 2
+    done
+}
+
 # ─── Main: Entry Point ───────────────────────────────────────────────────────
 
 main() {
@@ -1906,7 +2158,7 @@ main() {
         launch_multi_agent
         show_summary
     else
-        run_single_agent_loop
+        run_loop_with_restarts
     fi
 }
 

@@ -423,6 +423,10 @@ load_config() {
     MAX_RETRIES=$(jq -r '.max_retries // 2' "$config_file")
     RETRY_ESCALATION=$(jq -r '.retry_escalation // true' "$config_file")
 
+    # session restart + fast test passthrough
+    MAX_RESTARTS_CFG=$(jq -r '.max_restarts // 3' "$config_file" 2>/dev/null || echo "3")
+    FAST_TEST_CMD_CFG=$(jq -r '.fast_test_cmd // ""' "$config_file" 2>/dev/null || echo "")
+
     # self-optimization
     SELF_OPTIMIZE=$(jq -r '.self_optimize // false' "$config_file")
     OPTIMIZE_INTERVAL=$(jq -r '.optimize_interval // 10' "$config_file")
@@ -1705,6 +1709,14 @@ daemon_spawn_pipeline() {
     if [[ "$NO_GITHUB" == "true" ]]; then
         pipeline_args+=("--no-github")
     fi
+    # Pass session restart config
+    if [[ "${MAX_RESTARTS_CFG:-0}" -gt 0 ]]; then
+        pipeline_args+=("--max-restarts" "$MAX_RESTARTS_CFG")
+    fi
+    # Pass fast test command
+    if [[ -n "${FAST_TEST_CMD_CFG:-}" ]]; then
+        pipeline_args+=("--fast-test-cmd" "$FAST_TEST_CMD_CFG")
+    fi
 
     # Run pipeline in work directory (background)
     echo -e "\n\n===== Pipeline run $(date -u +%Y-%m-%dT%H:%M:%SZ) =====" >> "$LOG_DIR/issue-${issue_num}.log" 2>/dev/null || true
@@ -2061,6 +2073,22 @@ daemon_on_failure() {
                 fi
             fi
 
+            # Detect context exhaustion from progress file
+            local failure_reason="unknown"
+            local issue_worktree_path="${WORKTREE_DIR:-${REPO_DIR}/.worktrees}/daemon-issue-${issue_num}"
+            local progress_file="${issue_worktree_path}/.claude/loop-logs/progress.md"
+            if [[ -f "$progress_file" ]]; then
+                local progress_iter
+                progress_iter=$(grep -oE 'Iteration: [0-9]+' "$progress_file" 2>/dev/null | grep -oE '[0-9]+' || echo "0")
+                local progress_tests
+                progress_tests=$(grep -oE 'Tests passing: (true|false)' "$progress_file" 2>/dev/null | awk '{print $NF}' || echo "unknown")
+                if [[ "$progress_tests" == "false" ]] || [[ "$progress_tests" == "unknown" ]]; then
+                    failure_reason="context_exhaustion"
+                    emit_event "daemon.context_exhaustion" "issue=$issue_num" "iterations=$progress_iter"
+                    daemon_log WARN "Context exhaustion detected for issue #${issue_num} (iterations: ${progress_iter})"
+                fi
+            fi
+
             # Build escalated pipeline args
             local retry_template="$PIPELINE_TEMPLATE"
             local retry_model="${MODEL:-opus}"
@@ -2077,6 +2105,13 @@ daemon_on_failure() {
                 retry_model="opus"
                 extra_args+=("--max-iterations" "30" "--compound-cycles" "5")
                 daemon_log INFO "Escalation: template=full, compound_cycles=5"
+            fi
+
+            # Increase restarts on context exhaustion
+            if [[ "$failure_reason" == "context_exhaustion" ]]; then
+                local boosted_restarts=$(( ${MAX_RESTARTS_CFG:-3} + retry_count ))
+                extra_args+=("--max-restarts" "$boosted_restarts")
+                daemon_log INFO "Boosting max-restarts to $boosted_restarts (context exhaustion)"
             fi
 
             if [[ "$NO_GITHUB" != "true" ]]; then

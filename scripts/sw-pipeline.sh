@@ -211,6 +211,8 @@ DRY_RUN=false
 IGNORE_BUDGET=false
 COMPLETED_STAGES=""
 MAX_ITERATIONS_OVERRIDE=""
+MAX_RESTARTS_OVERRIDE=""
+FAST_TEST_CMD_OVERRIDE=""
 PR_NUMBER=""
 AUTO_WORKTREE=false
 WORKTREE_NAME=""
@@ -274,6 +276,8 @@ show_help() {
     echo -e "  ${DIM}--slack-webhook <url>${RESET}     Send notifications to Slack"
     echo -e "  ${DIM}--self-heal <n>${RESET}            Build→test retry cycles on failure (default: 2)"
     echo -e "  ${DIM}--max-iterations <n>${RESET}       Override max build loop iterations"
+    echo -e "  ${DIM}--max-restarts <n>${RESET}         Max session restarts in build loop"
+    echo -e "  ${DIM}--fast-test-cmd <cmd>${RESET}      Fast/subset test for build loop"
     echo -e "  ${DIM}--completed-stages \"a,b\"${RESET}   Skip these stages (CI resume)"
     echo ""
     echo -e "${BOLD}STAGES${RESET}  ${DIM}(configurable per pipeline template)${RESET}"
@@ -356,6 +360,8 @@ parse_args() {
             --dry-run)     DRY_RUN=true; shift ;;
             --slack-webhook) SLACK_WEBHOOK="$2"; shift 2 ;;
             --self-heal)   BUILD_TEST_RETRIES="${2:-3}"; shift 2 ;;
+            --max-restarts) MAX_RESTARTS_OVERRIDE="$2"; shift 2 ;;
+            --fast-test-cmd) FAST_TEST_CMD_OVERRIDE="$2"; shift 2 ;;
             --help|-h)     show_help; exit 0 ;;
             *)
                 if [[ -z "$PIPELINE_NAME_ARG" ]]; then
@@ -2305,6 +2311,11 @@ Coverage baseline: ${coverage_baseline}% — do not decrease coverage."
         [[ "$quality" == "true" ]] && loop_args+=(--quality-gates)
     fi
 
+    # Session restart capability
+    [[ -n "${MAX_RESTARTS_OVERRIDE:-}" ]] && loop_args+=(--max-restarts "$MAX_RESTARTS_OVERRIDE")
+    # Fast test mode
+    [[ -n "${FAST_TEST_CMD_OVERRIDE:-}" ]] && loop_args+=(--fast-test-cmd "$FAST_TEST_CMD_OVERRIDE")
+
     # Definition of Done: use plan-extracted DoD if available
     [[ -s "$dod_file" ]] && loop_args+=(--definition-of-done "$dod_file")
 
@@ -2321,7 +2332,22 @@ Coverage baseline: ${coverage_baseline}% — do not decrease coverage."
     local _token_log="${ARTIFACTS_DIR}/.claude-tokens-build.log"
     export PIPELINE_JOB_ID="${PIPELINE_NAME:-pipeline-$$}"
     sw loop "${loop_args[@]}" < /dev/null 2>"$_token_log" || {
+        local _loop_exit=$?
         parse_claude_tokens "$_token_log"
+
+        # Detect context exhaustion from progress file
+        local _progress_file=".claude/loop-logs/progress.md"
+        if [[ -f "$_progress_file" ]]; then
+            local _prog_tests
+            _prog_tests=$(grep -oE 'Tests passing: (true|false)' "$_progress_file" 2>/dev/null | awk '{print $NF}' || echo "unknown")
+            if [[ "$_prog_tests" != "true" ]]; then
+                warn "Build loop exhausted with failing tests (context exhaustion)"
+                emit_event "pipeline.context_exhaustion" "issue=${ISSUE_NUMBER:-0}" "stage=build"
+                # Write flag for daemon retry logic
+                echo "context_exhaustion" > "$ARTIFACTS_DIR/failure-reason.txt" 2>/dev/null || true
+            fi
+        fi
+
         error "Build loop failed"
         return 1
     }
