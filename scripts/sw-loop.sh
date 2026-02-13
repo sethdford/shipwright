@@ -2043,6 +2043,7 @@ ${GOAL}"
         if guard_completion; then
             STATUS="complete"
             write_state
+            write_progress
             show_summary
             return 0
         fi
@@ -2092,6 +2093,7 @@ HUMAN FEEDBACK (received after iteration $ITERATION): $human_msg"
 
     # Write final state after loop exits
     write_state
+    write_progress
     show_summary
 }
 
