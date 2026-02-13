@@ -173,7 +173,7 @@ All scripts are bash (except the dashboard server in TypeScript). Grouped by lay
 | `scripts/sw-cleanup.sh` | 359 | Clean up orphaned Claude team sessions & artifacts |
 | `scripts/sw-connect.sh` | 619 | Sync local state to team dashboard |
 | `scripts/sw-cost.sh` | 924 | Token Usage & Cost Intelligence |
-| `scripts/sw-daemon.sh` | 5552 | Autonomous GitHub Issue Watcher |
+| `scripts/sw-daemon.sh` | 5553 | Autonomous GitHub Issue Watcher |
 | `scripts/sw-dashboard.sh` | 477 | Fleet Command Dashboard |
 | `scripts/sw-developer-simulation.sh` | 252 | Multi-Persona Developer Simulation |
 | `scripts/sw-docs.sh` | 635 | Documentation Keeper |
@@ -192,7 +192,7 @@ All scripts are bash (except the dashboard server in TypeScript). Grouped by lay
 | `scripts/sw-patrol-meta.sh` | 417 | Shipwright Self-Improvement Patrol |
 | `scripts/sw-pipeline-composer.sh` | 455 | Dynamic Pipeline Composition |
 | `scripts/sw-pipeline-vitals.sh` | 1096 | Pipeline Vitals Engine |
-| `scripts/sw-pipeline.sh` | 7588 | Autonomous Feature Delivery (Idea → Production) |
+| `scripts/sw-pipeline.sh` | 7590 | Autonomous Feature Delivery (Idea → Production) |
 | `scripts/sw-predictive.sh` | 820 | Predictive & Proactive Intelligence |
 | `scripts/sw-prep.sh` | 1642 | Repository Preparation for Agent Teams |
 | `scripts/sw-ps.sh` | 171 | Show running agent process status |
