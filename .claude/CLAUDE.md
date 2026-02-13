@@ -173,7 +173,7 @@ All scripts are bash (except the dashboard server in TypeScript). Grouped by lay
 | `scripts/sw-cleanup.sh` | 359 | Clean up orphaned Claude team sessions & artifacts |
 | `scripts/sw-connect.sh` | 619 | Sync local state to team dashboard |
 | `scripts/sw-cost.sh` | 924 | Token Usage & Cost Intelligence |
-| `scripts/sw-daemon.sh` | 5553 | Autonomous GitHub Issue Watcher |
+| `scripts/sw-daemon.sh` | 5565 | Autonomous GitHub Issue Watcher |
 | `scripts/sw-dashboard.sh` | 477 | Fleet Command Dashboard |
 | `scripts/sw-developer-simulation.sh` | 252 | Multi-Persona Developer Simulation |
 | `scripts/sw-docs.sh` | 635 | Documentation Keeper |
