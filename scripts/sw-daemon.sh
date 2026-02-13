@@ -2415,6 +2415,7 @@ triage_score_issue() {
 select_pipeline_template() {
     local labels="$1"
     local score="${2:-50}"
+    local _selected_template=""
 
     # When auto_template is disabled, use default pipeline template
     if [[ "${AUTO_TEMPLATE:-false}" != "true" ]]; then
@@ -2424,7 +2425,7 @@ select_pipeline_template() {
 
     # ── Intelligence-composed pipeline (if enabled) ──
     if [[ "${COMPOSER_ENABLED:-false}" == "true" ]] && type composer_create_pipeline &>/dev/null 2>&1; then
-        daemon_log INFO "Intelligence: using AI pipeline composition (composer enabled)"
+        daemon_log INFO "Intelligence: using AI pipeline composition (composer enabled)" >&2
         local analysis="${INTELLIGENCE_ANALYSIS:-{}}"
         local repo_context=""
         if [[ -f "${REPO_DIR:-}/.claude/pipeline-state.md" ]]; then
@@ -2446,9 +2447,9 @@ select_pipeline_template() {
             return
         fi
         # Fall through to static selection if composition failed
-        daemon_log INFO "Intelligence: AI pipeline composition failed, falling back to static template selection"
+        daemon_log INFO "Intelligence: AI pipeline composition failed, falling back to static template selection" >&2
     else
-        daemon_log INFO "Intelligence: using static template selection (composer disabled, enable with intelligence.composer_enabled=true)"
+        daemon_log INFO "Intelligence: using static template selection (composer disabled, enable with intelligence.composer_enabled=true)" >&2
     fi
 
     # ── DORA-driven template escalation ──
@@ -2464,7 +2465,7 @@ select_pipeline_template() {
             _dora_failures="${_dora_failures:-0}"
             _dora_cfr=$(( _dora_failures * 100 / _dora_total ))
             if [[ "$_dora_cfr" -gt 40 ]]; then
-                daemon_log INFO "DORA escalation: CFR ${_dora_cfr}% > 40% — forcing enterprise template"
+                daemon_log INFO "DORA escalation: CFR ${_dora_cfr}% > 40% — forcing enterprise template" >&2
                 emit_event "daemon.dora_escalation" \
                     "cfr=$_dora_cfr" \
                     "total=$_dora_total" \
@@ -2474,7 +2475,7 @@ select_pipeline_template() {
                 return
             fi
             if [[ "$_dora_cfr" -lt 10 && "$score" -ge 60 ]]; then
-                daemon_log INFO "DORA: CFR ${_dora_cfr}% < 10% — fast template eligible"
+                daemon_log INFO "DORA: CFR ${_dora_cfr}% < 10% — fast template eligible" >&2
                 # Fall through to allow other factors to also vote for fast
             fi
 
@@ -2485,7 +2486,7 @@ select_pipeline_template() {
                 | sort -n | awk '{ a[NR]=$1 } END { if (NR>0) print int(a[int(NR/2)+1]/60); else print 0 }' 2>/dev/null) || _dora_cycle_time=0
             _dora_cycle_time="${_dora_cycle_time:-0}"
             if [[ "${_dora_cycle_time:-0}" -gt 120 ]]; then
-                daemon_log INFO "DORA: cycle time ${_dora_cycle_time}min > 120 — preferring fast template"
+                daemon_log INFO "DORA: cycle time ${_dora_cycle_time}min > 120 — preferring fast template" >&2
                 if [[ "${score:-0}" -ge 60 ]]; then
                     echo "fast"
                     return
@@ -2504,7 +2505,7 @@ select_pipeline_template() {
                 fi
             fi
             if [[ -n "${_dora_deploy_freq:-}" ]] && awk -v f="${_dora_deploy_freq:-0}" 'BEGIN{exit !(f > 0 && f < 1)}' 2>/dev/null; then
-                daemon_log INFO "DORA: deploy freq ${_dora_deploy_freq}/week — using cost-aware"
+                daemon_log INFO "DORA: deploy freq ${_dora_deploy_freq}/week — using cost-aware" >&2
                 echo "cost-aware"
                 return
             fi
@@ -2525,7 +2526,7 @@ select_pipeline_template() {
             local required_reviews
             required_reviews=$(echo "$protection" | jq -r '.required_pull_request_reviews.required_approving_review_count // 0' 2>/dev/null || echo "0")
             if [[ "$strict_protection" == "true" ]] || [[ "${required_reviews:-0}" -gt 1 ]]; then
-                daemon_log INFO "Branch has strict protection — escalating to enterprise template"
+                daemon_log INFO "Branch has strict protection — escalating to enterprise template" >&2
                 echo "enterprise"
                 return
             fi
@@ -2573,21 +2574,21 @@ select_pipeline_template() {
 
             # Critical findings in recent history → force enterprise
             if [[ "$has_critical" == "yes" ]]; then
-                daemon_log INFO "Quality memory: critical findings in recent runs — using enterprise template"
+                daemon_log INFO "Quality memory: critical findings in recent runs — using enterprise template" >&2
                 echo "enterprise"
                 return
             fi
 
             # Poor quality history → use full template
             if [[ "${avg_quality:-70}" -lt 60 ]]; then
-                daemon_log INFO "Quality memory: avg score ${avg_quality}/100 in recent runs — using full template"
+                daemon_log INFO "Quality memory: avg score ${avg_quality}/100 in recent runs — using full template" >&2
                 echo "full"
                 return
             fi
 
             # Excellent quality history → allow faster template
             if [[ "${avg_quality:-70}" -gt 80 ]]; then
-                daemon_log INFO "Quality memory: avg score ${avg_quality}/100 in recent runs — eligible for fast template"
+                daemon_log INFO "Quality memory: avg score ${avg_quality}/100 in recent runs — eligible for fast template" >&2
                 # Only upgrade if score also suggests fast
                 if [[ "$score" -ge 60 ]]; then
                     echo "fast"
@@ -2609,7 +2610,7 @@ select_pipeline_template() {
         ' "$_tw_file" 2>/dev/null) || true
         if [[ -n "${_best_template:-}" && "${_best_template:-}" != "null" && "${_best_template:-}" != "" ]]; then
             _best_rate=$(jq -r --arg t "$_best_template" '.weights[$t].success_rate // 0' "$_tw_file" 2>/dev/null) || _best_rate=0
-            daemon_log INFO "Template weights: ${_best_template} (${_best_rate} success rate)"
+            daemon_log INFO "Template weights: ${_best_template} (${_best_rate} success rate)" >&2
             echo "$_best_template"
             return
         fi

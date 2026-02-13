@@ -1107,6 +1107,7 @@ LOG_ENTRIES=""
 
 save_artifact() {
     local name="$1" content="$2"
+    mkdir -p "$ARTIFACTS_DIR" 2>/dev/null || true
     echo "$content" > "$ARTIFACTS_DIR/$name"
 }
 
@@ -1329,6 +1330,7 @@ initialize_state() {
 
 write_state() {
     [[ -z "${STATE_FILE:-}" || -z "${ARTIFACTS_DIR:-}" ]] && return 0
+    mkdir -p "$(dirname "$STATE_FILE")" 2>/dev/null || true
     local stages_yaml=""
     while IFS=: read -r sid sstatus; do
         [[ -z "$sid" ]] && continue
