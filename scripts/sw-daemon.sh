@@ -1758,10 +1758,12 @@ daemon_spawn_pipeline() {
     fi
 
     # Run pipeline in work directory (background)
+    # Ignore SIGHUP so tmux attach/detach and process group changes don't kill the pipeline
     echo -e "\n\n===== Pipeline run $(date -u +%Y-%m-%dT%H:%M:%SZ) =====" >> "$LOG_DIR/issue-${issue_num}.log" 2>/dev/null || true
     (
+        trap '' HUP
         cd "$work_dir"
-        "$SCRIPT_DIR/sw-pipeline.sh" "${pipeline_args[@]}"
+        exec "$SCRIPT_DIR/sw-pipeline.sh" "${pipeline_args[@]}"
     ) >> "$LOG_DIR/issue-${issue_num}.log" 2>&1 200>&- &
     local pid=$!
 
