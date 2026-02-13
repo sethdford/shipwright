@@ -1,1 +1,37 @@
-{"entries":{}}
+{
+  "entries": {
+    "2c0b7b6f98146a80ce92dcaa903bc3d7": {
+      "result": {
+        "results": [
+          {
+            "file": "architecture.json",
+            "relevance": 95,
+            "summary": "Contains coding conventions, patterns, and dependencies essential for build stage context"
+          },
+          {
+            "file": "failures.json",
+            "relevance": 80,
+            "summary": "Failure patterns from previous builds inform the current build stage to avoid repeating mistakes"
+          },
+          {
+            "file": "patterns.json",
+            "relevance": 60,
+            "summary": "Could contain learned patterns relevant to build optimization, currently empty"
+          },
+          {
+            "file": "decisions.json",
+            "relevance": 50,
+            "summary": "Past architectural decisions may constrain or guide build stage choices"
+          },
+          {
+            "file": "metrics.json",
+            "relevance": 40,
+            "summary": "Build performance baselines could inform iteration limits and timeouts"
+          }
+        ]
+      },
+      "timestamp": 1770948186,
+      "ttl": 1800
+    }
+  }
+}

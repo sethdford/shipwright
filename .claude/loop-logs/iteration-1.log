@@ -1,1 +1,11 @@
-Invalid API key · Fix external API key
+Perfect! The goal has been fully achieved. The shipwright CLI now has a `hello` command that outputs "hello world". The implementation:
+
+1. ✅ Added the `hello` command to the help text
+2. ✅ Implemented the command case statement in the main router
+3. ✅ Tested the command works correctly
+4. ✅ All tests pass
+5. ✅ Committed with a descriptive message
+
+The command is now available as `shipwright hello` (and with aliases `sw hello` and `cct hello`).
+
+LOOP_COMPLETE
