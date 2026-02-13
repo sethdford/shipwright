@@ -1,6 +1,6 @@
 
-> shipwright-cli@1.7.1 test
-> bash scripts/sw-pipeline-test.sh && bash scripts/sw-daemon-test.sh && bash scripts/sw-prep-test.sh && bash scripts/sw-fleet-test.sh && bash scripts/sw-fix-test.sh && bash scripts/sw-memory-test.sh && bash scripts/sw-session-test.sh && bash scripts/sw-init-test.sh && bash scripts/sw-tracker-test.sh && bash scripts/sw-heartbeat-test.sh && bash scripts/sw-remote-test.sh && bash scripts/sw-intelligence-test.sh && bash scripts/sw-pipeline-composer-test.sh && bash scripts/sw-self-optimize-test.sh && bash scripts/sw-predictive-test.sh && bash scripts/sw-frontier-test.sh && bash scripts/sw-connect-test.sh
+> shipwright-cli@1.9.0 test
+> bash scripts/sw-pipeline-test.sh && bash scripts/sw-daemon-test.sh && bash scripts/sw-prep-test.sh && bash scripts/sw-fleet-test.sh && bash scripts/sw-fix-test.sh && bash scripts/sw-memory-test.sh && bash scripts/sw-session-test.sh && bash scripts/sw-init-test.sh && bash scripts/sw-tracker-test.sh && bash scripts/sw-heartbeat-test.sh && bash scripts/sw-remote-test.sh && bash scripts/sw-intelligence-test.sh && bash scripts/sw-pipeline-composer-test.sh && bash scripts/sw-self-optimize-test.sh && bash scripts/sw-predictive-test.sh && bash scripts/sw-frontier-test.sh && bash scripts/sw-connect-test.sh && bash scripts/sw-github-graphql-test.sh && bash scripts/sw-github-checks-test.sh && bash scripts/sw-github-deploy-test.sh && bash scripts/sw-docs-test.sh && bash scripts/sw-tmux-test.sh
 
 
 [38;2;124;58;237m[1m╔═══════════════════════════════════════════════════════════════════╗[0m
@@ -8,7 +8,7 @@
 [38;2;124;58;237m[1m╚═══════════════════════════════════════════════════════════════════╝[0m
 
 [2mSetting up mock environment...[0m
-[38;2;74;222;128m✓[0m Environment ready: [2m/tmp/sw-pipeline-test.WS9eZX[0m
+[38;2;74;222;128m✓[0m Environment ready: [2m/tmp/sw-pipeline-test.elmGMr[0m
 
   [38;2;0;212;255m▸[0m Preflight passes with all mocks... [38;2;74;222;128m✓[0m
   [38;2;0;212;255m▸[0m Preflight fails when sw-loop.sh missing... [38;2;74;222;128m✓[0m
@@ -39,7 +39,7 @@
 [38;2;124;58;237m[1m╚═══════════════════════════════════════════════════════════════════╝[0m
 
 [2mSetting up test environment...[0m
-[38;2;74;222;128m✓[0m Environment ready: [2m/tmp/sw-daemon-test.tkI72b[0m
+[38;2;74;222;128m✓[0m Environment ready: [2m/tmp/sw-daemon-test.zvtr01[0m
 
   [38;2;0;212;255m▸[0m dora_grade deploy_freq Elite (>= 7)... [38;2;74;222;128m✓[0m
   [38;2;0;212;255m▸[0m dora_grade deploy_freq High (>= 1)... [38;2;74;222;128m✓[0m
@@ -59,13 +59,18 @@
   [38;2;0;212;255m▸[0m DORA degradation event detection... [38;2;74;222;128m✓[0m
   [38;2;0;212;255m▸[0m Retry exhaustion event detection... [38;2;74;222;128m✓[0m
   [38;2;0;212;255m▸[0m Untested script detection logic... [38;2;74;222;128m✓[0m
+  [38;2;0;212;255m▸[0m Progress detects stage advancement... [38;2;74;222;128m✓[0m
+  [38;2;0;212;255m▸[0m Progress detects stuck (no change N checks)... [38;2;74;222;128m✓[0m
+  [38;2;0;212;255m▸[0m Progress detects repeated error loop... [38;2;74;222;128m✓[0m
+  [38;2;0;212;255m▸[0m Progress resets on diff growth... [38;2;74;222;128m✓[0m
+  [38;2;0;212;255m▸[0m Hard limit kills even with progress on... [38;2;74;222;128m✓[0m
 
 [38;2;124;58;237m[1m━━━ Results ━━━[0m
-  [38;2;74;222;128mPassed:[0m 18
+  [38;2;74;222;128mPassed:[0m 23
   [38;2;248;113;113mFailed:[0m 0
-  [2mTotal:[0m  18
+  [2mTotal:[0m  23
 
-[38;2;74;222;128m[1mAll 18 tests passed![0m
+[38;2;74;222;128m[1mAll 23 tests passed![0m
 
 
 [38;2;124;58;237m[1m╔═══════════════════════════════════════════════════════════════════╗[0m
@@ -73,7 +78,7 @@
 [38;2;124;58;237m[1m╚═══════════════════════════════════════════════════════════════════╝[0m
 
 [2mSetting up test environment...[0m
-[38;2;74;222;128m✓[0m Environment ready: [2m/tmp/sw-prep-test.t1IGhi[0m
+[38;2;74;222;128m✓[0m Environment ready: [2m/tmp/sw-prep-test.6Cc6iD[0m
 
   [38;2;0;212;255m▸[0m Node.js project detection... [38;2;74;222;128m✓[0m
   [38;2;0;212;255m▸[0m Python project detection... [38;2;74;222;128m✓[0m
@@ -102,7 +107,7 @@
 [38;2;124;58;237m[1m╚═══════════════════════════════════════════════════════════════════╝[0m
 
 [2mSetting up test environment...[0m
-[38;2;74;222;128m✓[0m Environment ready: [2m/tmp/sw-fleet-test.AIBBIt[0m
+[38;2;74;222;128m✓[0m Environment ready: [2m/tmp/sw-fleet-test.zLGiH1[0m
 
   [38;2;0;212;255m▸[0m Help output contains expected sections... [38;2;74;222;128m✓[0m
   [38;2;0;212;255m▸[0m Help via --help flag... [38;2;74;222;128m✓[0m
@@ -145,7 +150,7 @@
 [38;2;124;58;237m[1m╚═══════════════════════════════════════════════════════════════════╝[0m
 
 [2mSetting up test environment...[0m
-[38;2;74;222;128m✓[0m Environment ready: [2m/tmp/sw-fix-test.18bCer[0m
+[38;2;74;222;128m✓[0m Environment ready: [2m/tmp/sw-fix-test.gqGCuf[0m
 
   [38;2;0;212;255m▸[0m Help output contains expected sections... [38;2;74;222;128m✓[0m
   [38;2;0;212;255m▸[0m Help via --help flag... [38;2;74;222;128m✓[0m
@@ -183,7 +188,7 @@
 [38;2;124;58;237m[1m╚═══════════════════════════════════════════════════════════════════╝[0m
 
 [2mSetting up mock environment...[0m
-[38;2;74;222;128m✓[0m Environment ready: [2m/tmp/sw-memory-test.umpa9q[0m
+[38;2;74;222;128m✓[0m Environment ready: [2m/tmp/sw-memory-test.XUizJQ[0m
 
   [38;2;0;212;255m▸[0m Memory capture from pipeline state... [38;2;74;222;128m✓[0m
   [38;2;0;212;255m▸[0m Memory inject returns context for each stage... [38;2;74;222;128m✓[0m
@@ -216,7 +221,7 @@
 [38;2;0;212;255m[1m╚═══════════════════════════════════════════════════╝[0m
 
 [2mSetting up test environment...[0m
-[2mTest tmux session: sw-test-1408590[0m
+[2mTest tmux session: sw-test-223473[0m
 
 [38;2;124;58;237m[1mTemplate Loading[0m
   [38;2;0;212;255m▸[0m Load feature-dev template (3 agents)... [38;2;74;222;128m✓[0m
@@ -259,7 +264,7 @@
 [38;2;0;212;255m[1m╚═══════════════════════════════════════════════════╝[0m
 
 [2mSetting up sandboxed environment...[0m
-[2mTemp dir: /tmp/sw-init-test.bqGRif[0m
+[2mTemp dir: /tmp/sw-init-test.GTIXRV[0m
 
 [38;2;124;58;237m[1mConfiguration[0m
   [38;2;0;212;255m▸[0m Settings.json created with agent teams... [38;2;74;222;128m✓[0m
@@ -328,7 +333,7 @@
   [38;2;0;212;255m▸[0m Write heartbeat creates JSON file... [38;2;74;222;128m✓[0m
   [38;2;0;212;255m▸[0m Check heartbeat reports alive... [38;2;74;222;128m[1m✓[0m Job test-job-alive alive (0s ago)
 [38;2;74;222;128m✓[0m
-  [38;2;0;212;255m▸[0m Check heartbeat reports stale... [38;2;250;204;21m[1m⚠[0m Job test-job-stale stale (192940830s ago, timeout: 120s)
+  [38;2;0;212;255m▸[0m Check heartbeat reports stale... [38;2;250;204;21m[1m⚠[0m Job test-job-stale stale (193057044s ago, timeout: 120s)
 [38;2;74;222;128m✓[0m
   [38;2;0;212;255m▸[0m Clear heartbeat removes file... [38;2;74;222;128m[1m✓[0m Cleared heartbeat for job: test-job-clear
 [38;2;74;222;128m✓[0m
@@ -370,12 +375,12 @@
 [2mSetting up test environment...[0m
 
 [38;2;124;58;237m[1mMachine Registry[0m
-  [38;2;0;212;255m▸[0m Add machine creates machines.json... [38;2;0;212;255m[1m▸[0m Checking shipwright installation at [2m/tmp/sw-remote-test.PB0Clx/mock-install[0m...
-[38;2;74;222;128m[1m✓[0m Shipwright found at /tmp/sw-remote-test.PB0Clx/mock-install
+  [38;2;0;212;255m▸[0m Add machine creates machines.json... [38;2;0;212;255m[1m▸[0m Checking shipwright installation at [2m/tmp/sw-remote-test.wRaHqD/mock-install[0m...
+[38;2;74;222;128m[1m✓[0m Shipwright found at /tmp/sw-remote-test.wRaHqD/mock-install
 [38;2;74;222;128m[1m✓[0m Registered machine: [1mbuilder-1[0m (localhost, worker, 4 workers)
 [38;2;74;222;128m✓[0m
-  [38;2;0;212;255m▸[0m Add second machine appends to array... [38;2;0;212;255m[1m▸[0m Checking shipwright installation at [2m/tmp/sw-remote-test.PB0Clx/mock-install[0m...
-[38;2;74;222;128m[1m✓[0m Shipwright found at /tmp/sw-remote-test.PB0Clx/mock-install
+  [38;2;0;212;255m▸[0m Add second machine appends to array... [38;2;0;212;255m[1m▸[0m Checking shipwright installation at [2m/tmp/sw-remote-test.wRaHqD/mock-install[0m...
+[38;2;74;222;128m[1m✓[0m Shipwright found at /tmp/sw-remote-test.wRaHqD/mock-install
 [38;2;74;222;128m[1m✓[0m Registered machine: [1mbuilder-2[0m (localhost, worker, 8 workers)
 [38;2;74;222;128m✓[0m
   [38;2;0;212;255m▸[0m Remove machine by name... [38;2;74;222;128m[1m✓[0m Removed machine: [1mbuilder-2[0m
@@ -405,7 +410,7 @@
 [38;2;124;58;237m[1m╚═══════════════════════════════════════════════════════════════════╝[0m
 
 [2mSetting up test environment...[0m
-✓ Environment ready: /tmp/sw-intelligence-test.udFpwt
+✓ Environment ready: /tmp/sw-intelligence-test.LnIM2T
 
   ▸ analyze_issue returns valid schema... ✓
   ▸ Cache hit on second call with same input... ✓
@@ -413,7 +418,8 @@
   ▸ compose_pipeline produces valid pipeline JSON... ✓
   ▸ recommend_model returns valid model names... ✓
   ▸ predict_cost returns numeric estimates... ✓
-  ▸ Cache TTL expiry returns miss... ✓
+  ▸ Cache TTL expiry returns miss... scripts/sw-intelligence-test.sh: line 344: _intelligence_md5: command not found
+✓
   ▸ search_memory returns ranked results... ✓
   ▸ Feature flag disabled returns fallback... ✓
   ▸ Events emitted for analysis... ✓
@@ -476,7 +482,7 @@ All 12 tests passed!
   ▸ Model routing tracks success rates... ✓
   ▸ Model routing keeps opus with few sonnet samples... ✓
   ▸ Memory pruning removes old patterns... ✓
-  ▸ Memory strengthening boosts confirmed patterns... ✓
+  ▸ Memory strengthening boosts confirmed patterns... ✗ FAILED
   ▸ Memory promotion copies cross-repo patterns... ✓
   ▸ Full analysis runs on empty data... ✓
   ▸ Report generates output with data... ✓
@@ -484,132 +490,10 @@ All 12 tests passed!
   ▸ Outcome analysis extracts stage data... ✓
 
 ━━━ Results ━━━
-  Passed: 16
-  Failed: 0
+  Passed: 15
+  Failed: 1
   Total:  16
 
-All 16 tests passed!
-
-
-[38;2;0;212;255m[1m╔═══════════════════════════════════════════════════════════╗[0m
-[38;2;0;212;255m[1m║  shipwright predictive test                              ║[0m
-[38;2;0;212;255m[1m╚═══════════════════════════════════════════════════════════╝[0m
-
-
-[38;2;124;58;237m[1mRisk Assessment[0m
-  [38;2;0;212;255m▸[0m Risk returns valid schema with 0-100 range... [38;2;74;222;128m✓[0m
-  [38;2;0;212;255m▸[0m Risk elevates for complex keywords... [38;2;74;222;128m✓[0m
-  [38;2;0;212;255m▸[0m Risk emits event... [38;2;74;222;128m✓[0m
-
-[38;2;124;58;237m[1mAnomaly Detection[0m
-  [38;2;0;212;255m▸[0m Critical at 3x threshold (181 vs 60 baseline)... [38;2;74;222;128m✓[0m
-  [38;2;0;212;255m▸[0m Normal at 2x (119 vs 60 baseline)... [38;2;74;222;128m✓[0m
-  [38;2;0;212;255m▸[0m Warning between 2x and 3x (150 vs 60)... [38;2;74;222;128m✓[0m
-  [38;2;0;212;255m▸[0m Normal when no baseline exists... [38;2;74;222;128m✓[0m
-  [38;2;0;212;255m▸[0m Emits event for critical anomaly... [38;2;74;222;128m✓[0m
-
-[38;2;124;58;237m[1mBaseline Management[0m
-  [38;2;0;212;255m▸[0m First data point uses raw value... [38;2;74;222;128m✓[0m
-  [38;2;0;212;255m▸[0m EMA calculation (0.9*100 + 0.1*200 = 110)... [38;2;74;222;128m✓[0m
-  [38;2;0;212;255m▸[0m Creates baseline file if missing... [38;2;74;222;128m✓[0m
-
-[38;2;124;58;237m[1mPreventative Injection[0m
-  [38;2;0;212;255m▸[0m Injects context from matching patterns... [38;2;74;222;128m✓[0m
-  [38;2;0;212;255m▸[0m Returns empty for non-matching stage... [38;2;74;222;128m✓[0m
-
-[38;2;124;58;237m[1mGraceful Degradation[0m
-  [38;2;0;212;255m▸[0m Works without intelligence engine... [38;2;74;222;128m✓[0m
-
-[38;2;124;58;237m[1mAI Patrol[0m
-  [38;2;0;212;255m▸[0m AI patrol returns structured findings... [38;2;74;222;128m✓[0m
-
-[38;2;0;212;255m[1m════════════════════════════════════════════════════[0m
-[38;2;74;222;128m[1m  All 15 tests passed ✓[0m
-[38;2;0;212;255m[1m════════════════════════════════════════════════════[0m
-
-
-[38;2;0;212;255m[1m╔═══════════════════════════════════════════════════╗[0m
-[38;2;0;212;255m[1m║  shipwright frontier — Test Suite                 ║[0m
-[38;2;0;212;255m[1m╚═══════════════════════════════════════════════════╝[0m
-
-[2mSetting up test environment...[0m
-
-[38;2;124;58;237m[1mAdversarial Review[0m
-  [38;2;0;212;255m▸[0m Adversarial review produces structured findings... [38;2;74;222;128m✓[0m
-  [38;2;0;212;255m▸[0m Adversarial iteration converges on no critical findings... [38;2;74;222;128m✓[0m
-
-[38;2;124;58;237m[1mDeveloper Simulation[0m
-  [38;2;0;212;255m▸[0m Simulation generates objections from 3 personas... [38;2;74;222;128m✓[0m
-  [38;2;0;212;255m▸[0m Simulation address returns action items... [38;2;74;222;128m✓[0m
-
-[38;2;124;58;237m[1mArchitecture Enforcer[0m
-  [38;2;0;212;255m▸[0m Architecture model has valid schema... [38;2;74;222;128m✓[0m
-  [38;2;0;212;255m▸[0m Architecture validates changes (violation detected)... [38;2;74;222;128m✓[0m
-
-[38;2;124;58;237m[1mGraceful Degradation[0m
-  [38;2;0;212;255m▸[0m All three degrade gracefully when claude unavailable... [38;2;74;222;128m✓[0m
-
-[38;2;0;212;255m[1m════════════════════════════════════════════════════[0m
-[38;2;74;222;128m[1m  All 7 tests passed ✓[0m
-[38;2;0;212;255m[1m════════════════════════════════════════════════════[0m
-
-
-[38;2;0;212;255m[1m╔═══════════════════════════════════════════════════╗[0m
-[38;2;0;212;255m[1m║  shipwright connect — Test Suite                 ║[0m
-[38;2;0;212;255m[1m╚═══════════════════════════════════════════════════╝[0m
-
-[2mSetting up test environment...[0m
-
-[38;2;124;58;237m[1mIdentity Resolution[0m
-  [38;2;0;212;255m▸[0m resolve_developer_id from DEVELOPER_ID env... [38;2;74;222;128m✓[0m
-  [38;2;0;212;255m▸[0m resolve_developer_id from git config... [38;2;74;222;128m✓[0m
-  [38;2;0;212;255m▸[0m resolve_developer_id fallback to USER... [38;2;74;222;128m✓[0m
-  [38;2;0;212;255m▸[0m resolve_machine_name from MACHINE_NAME env... [38;2;74;222;128m✓[0m
-  [38;2;0;212;255m▸[0m resolve_machine_name from hostname... [38;2;74;222;128m✓[0m
-
-[38;2;124;58;237m[1mDashboard URL Resolution[0m
-  [38;2;0;212;255m▸[0m resolve_dashboard_url from --url flag... [38;2;74;222;128m✓[0m
-  [38;2;0;212;255m▸[0m resolve_dashboard_url from DASHBOARD_URL env... [38;2;74;222;128m✓[0m
-  [38;2;0;212;255m▸[0m resolve_dashboard_url from team-config.json... [38;2;74;222;128m✓[0m
-  [38;2;0;212;255m▸[0m resolve_dashboard_url falls back to default... [38;2;74;222;128m✓[0m
-
-[38;2;124;58;237m[1mStart/Stop Lifecycle[0m
-  [38;2;0;212;255m▸[0m cmd_start creates PID file... [38;2;0;212;255m[1m▸[0m Starting connect to [1mhttp://localhost:8767[0m
-[38;2;0;212;255m[1m▸[0m Developer: [1mtest-developer[0m @ [1mtest-machine[0m
-[38;2;74;222;128m[1m✓[0m Connect started (PID 1419896)
-  [2mLogs: /tmp/sw-connect-test.NEyd30/home/.shipwright/connect.log[0m
-  [2mStop: shipwright connect stop[0m
-[38;2;74;222;128m✓[0m
-  [38;2;0;212;255m▸[0m cmd_start rejects if already running...   [2mStop it first: shipwright connect stop[0m
-[38;2;74;222;128m✓[0m
-  [38;2;0;212;255m▸[0m cmd_stop removes PID file... [38;2;250;204;21m[1m⚠[0m Process 99999 not running — cleaning up stale PID file
-[38;2;74;222;128m✓[0m
-  [38;2;0;212;255m▸[0m cmd_stop handles missing PID gracefully... [38;2;250;204;21m[1m⚠[0m Connect is not running (no PID file)
-[38;2;74;222;128m✓[0m
-
-[38;2;124;58;237m[1mStatus[0m
-  [38;2;0;212;255m▸[0m cmd_status shows connected when PID alive... [38;2;74;222;128m✓[0m
-  [38;2;0;212;255m▸[0m cmd_status shows disconnected when no PID... [38;2;74;222;128m✓[0m
-
-[38;2;124;58;237m[1mJoin Flow[0m
-  [38;2;0;212;255m▸[0m cmd_join verifies token against dashboard... [38;2;74;222;128m✓[0m
-  [38;2;0;212;255m▸[0m cmd_join saves team-config.json... [38;2;74;222;128m✓[0m
-  [38;2;0;212;255m▸[0m cmd_join rejects invalid token... [38;2;74;222;128m✓[0m
-  [38;2;0;212;255m▸[0m cmd_join accepts --url and --token flags... [38;2;74;222;128m✓[0m
-
-[38;2;124;58;237m[1mHeartbeat & Disconnect Payloads[0m
-  [38;2;0;212;255m▸[0m Heartbeat payload includes required fields... [38;2;74;222;128m✓[0m
-  [38;2;0;212;255m▸[0m Send disconnect sends proper payload... [38;2;74;222;128m✓[0m
-
-[38;2;124;58;237m[1mConfiguration & Utilities[0m
-  [38;2;0;212;255m▸[0m ensure_dir creates shipwright directory... [38;2;74;222;128m✓[0m
-  [38;2;0;212;255m▸[0m now_iso returns valid ISO timestamp... [38;2;74;222;128m✓[0m
-  [38;2;0;212;255m▸[0m Script has correct version... [38;2;74;222;128m✓[0m
-
-[38;2;124;58;237m[1mIntegration[0m
-  [38;2;0;212;255m▸[0m Help command shows all main commands... [38;2;74;222;128m✓[0m
-
-[38;2;0;212;255m[1m════════════════════════════════════════════════════[0m
-[38;2;74;222;128m[1m  All 25 tests passed ✓[0m
-[38;2;0;212;255m[1m════════════════════════════════════════════════════[0m
+Failed tests:
+  ✗ Memory strengthening boosts confirmed patterns
 
