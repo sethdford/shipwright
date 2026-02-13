@@ -173,7 +173,7 @@ All scripts are bash (except the dashboard server in TypeScript). Grouped by lay
 | `scripts/sw-cleanup.sh` | 359 | Clean up orphaned Claude team sessions & artifacts |
 | `scripts/sw-connect.sh` | 619 | Sync local state to team dashboard |
 | `scripts/sw-cost.sh` | 924 | Token Usage & Cost Intelligence |
-| `scripts/sw-daemon.sh` | 5432 | Autonomous GitHub Issue Watcher |
+| `scripts/sw-daemon.sh` | 5552 | Autonomous GitHub Issue Watcher |
 | `scripts/sw-dashboard.sh` | 477 | Fleet Command Dashboard |
 | `scripts/sw-developer-simulation.sh` | 252 | Multi-Persona Developer Simulation |
 | `scripts/sw-docs.sh` | 635 | Documentation Keeper |
@@ -187,19 +187,19 @@ All scripts are bash (except the dashboard server in TypeScript). Grouped by lay
 | `scripts/sw-launchd.sh` | 364 | Process supervision on macOS |
 | `scripts/sw-linear.sh` | 648 | Linear ↔ GitHub Bidirectional Sync |
 | `scripts/sw-logs.sh` | 343 | View and search agent pane logs |
-| `scripts/sw-loop.sh` | 1846 | Continuous agent loop harness for Claude Code |
-| `scripts/sw-memory.sh` | 1507 | Persistent Learning & Context System |
+| `scripts/sw-loop.sh` | 2215 | Continuous agent loop harness for Claude Code |
+| `scripts/sw-memory.sh` | 1626 | Persistent Learning & Context System |
 | `scripts/sw-patrol-meta.sh` | 417 | Shipwright Self-Improvement Patrol |
 | `scripts/sw-pipeline-composer.sh` | 455 | Dynamic Pipeline Composition |
-| `scripts/sw-pipeline-vitals.sh` | 1062 | Pipeline Vitals Engine |
-| `scripts/sw-pipeline.sh` | 7490 | Autonomous Feature Delivery (Idea → Production) |
+| `scripts/sw-pipeline-vitals.sh` | 1096 | Pipeline Vitals Engine |
+| `scripts/sw-pipeline.sh` | 7588 | Autonomous Feature Delivery (Idea → Production) |
 | `scripts/sw-predictive.sh` | 820 | Predictive & Proactive Intelligence |
 | `scripts/sw-prep.sh` | 1642 | Repository Preparation for Agent Teams |
-| `scripts/sw-ps.sh` | 170 | Show running agent process status |
-| `scripts/sw-reaper.sh` | 392 | Automatic tmux pane cleanup when agents exit |
+| `scripts/sw-ps.sh` | 171 | Show running agent process status |
+| `scripts/sw-reaper.sh` | 394 | Automatic tmux pane cleanup when agents exit |
 | `scripts/sw-remote.sh` | 687 | Machine Registry & Remote Daemon Management |
-| `scripts/sw-self-optimize.sh` | 999 | Learning & Self-Tuning System |
-| `scripts/sw-session.sh` | 519 | Launch a Claude Code team session in a new tmux window |
+| `scripts/sw-self-optimize.sh` | 1048 | Learning & Self-Tuning System |
+| `scripts/sw-session.sh` | 541 | Launch a Claude Code team session in a new tmux window |
 | `scripts/sw-setup.sh` | 234 | One-shot setup: check prerequisites, init, doctor |
 | `scripts/sw-status.sh` | 796 | Dashboard showing Claude Code team status |
 | `scripts/sw-templates.sh` | 247 | Browse and inspect team templates |
@@ -207,7 +207,7 @@ All scripts are bash (except the dashboard server in TypeScript). Grouped by lay
 | `scripts/sw-tracker.sh` | 409 | Provider Router for Issue Tracker Integration |
 | `scripts/sw-upgrade.sh` | 479 | Detect and apply updates from the repo |
 | `scripts/sw-worktree.sh` | 408 | Git worktree management for multi-agent isolation |
-| `scripts/sw` | 334 | CLI router — dispatches subcommands via exec |
+| `scripts/sw` | 338 | CLI router — dispatches subcommands via exec |
 <!-- /AUTO:core-scripts -->
 
 ### GitHub API Modules
@@ -246,7 +246,7 @@ All scripts are bash (except the dashboard server in TypeScript). Grouped by lay
 | File | Lines | Purpose |
 | --- | ---: | --- |
 | `scripts/sw-connect-test.sh` | 831 | Validate dashboard connection, heartbeat |
-| `scripts/sw-daemon-test.sh` | 1743 | Unit tests for daemon metrics, health, alerting |
+| `scripts/sw-daemon-test.sh` | 1781 | Unit tests for daemon metrics, health, alerting |
 | `scripts/sw-docs-test.sh` | 791 | Validate documentation keeper, AUTO sections, |
 | `scripts/sw-fix-test.sh` | 630 | Unit tests for bulk fix across repos |
 | `scripts/sw-fleet-test.sh` | 833 | Unit tests for fleet orchestration |
@@ -257,13 +257,13 @@ All scripts are bash (except the dashboard server in TypeScript). Grouped by lay
 | `scripts/sw-heartbeat-test.sh` | 588 | Validate heartbeat lifecycle, |
 | `scripts/sw-init-test.sh` | 494 | E2E validation of init/setup flow |
 | `scripts/sw-intelligence-test.sh` | 544 | Unit tests for intelligence core |
-| `scripts/sw-memory-test.sh` | 709 | Unit tests for memory system & cost tracking |
+| `scripts/sw-memory-test.sh` | 872 | Unit tests for memory system & cost tracking |
 | `scripts/sw-pipeline-composer-test.sh` | 643 | Test Suite |
-| `scripts/sw-pipeline-test.sh` | 1586 | E2E validation invoking the REAL pipeline |
+| `scripts/sw-pipeline-test.sh` | 1757 | E2E validation invoking the REAL pipeline |
 | `scripts/sw-predictive-test.sh` | 698 | Unit tests for predictive intelligence |
 | `scripts/sw-prep-test.sh` | 644 | Validate repo preparation |
 | `scripts/sw-remote-test.sh` | 404 | Validate machine registry, atomic writes, |
-| `scripts/sw-self-optimize-test.sh` | 618 | Unit tests for learning & tuning system |
+| `scripts/sw-self-optimize-test.sh` | 730 | Unit tests for learning & tuning system |
 | `scripts/sw-session-test.sh` | 591 | E2E validation of session creation flow |
 | `scripts/sw-status-test.sh` | 339 | Validate status dashboard and --json output |
 | `scripts/sw-tmux-test.sh` | 752 | Validate tmux doctor, install, fix, reload, |
@@ -308,9 +308,6 @@ All scripts are bash (except the dashboard server in TypeScript). Grouped by lay
 - Check run IDs: `.claude/pipeline-artifacts/check-run-ids.json`
 - Deployment tracking: `.claude/pipeline-artifacts/deployment.json`
 - Error log: `.claude/pipeline-artifacts/error-log.jsonl`
-- Loop progress: `.claude/loop-logs/progress.md`
-- Error summary: `.claude/loop-logs/error-summary.json`
-- Failure reason: `.claude/pipeline-artifacts/failure-reason.txt`
 <!-- /AUTO:runtime-state -->
 
 ## GitHub Integration
