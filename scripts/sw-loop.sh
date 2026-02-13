@@ -238,6 +238,11 @@ if [[ "$AGENTS" -gt 1 ]]; then
     USE_WORKTREE=true
 fi
 
+# Warn if --roles without --agents
+if [[ -n "$AGENT_ROLES" ]] && [[ "$AGENTS" -le 1 ]]; then
+    warn "--roles requires --agents > 1 (roles are ignored in single-agent mode)"
+fi
+
 # ─── Validate Inputs ─────────────────────────────────────────────────────────
 
 if ! $RESUME && [[ -z "$GOAL" ]]; then
@@ -791,17 +796,6 @@ run_test_gate() {
     else
         TEST_PASSED=false
         TEST_OUTPUT="$(tail -50 "$test_log")"
-        # If fast test failed, also run full test to confirm
-        if [[ "$test_mode" == "fast" ]]; then
-            local full_test_log="$LOG_DIR/tests-iter-${ITERATION}-full.log"
-            if bash -c "$TEST_CMD" > "$full_test_log" 2>&1; then
-                TEST_PASSED=true
-                TEST_OUTPUT="Fast tests failed but full tests passed (false positive in fast mode)."
-            else
-                TEST_OUTPUT="$(tail -50 "$full_test_log")"
-                TEST_LOG_FILE="$full_test_log"
-            fi
-        fi
     fi
 }
 
@@ -1932,7 +1926,10 @@ cleanup_multi_agent() {
 # ─── Main: Single-Agent Loop ─────────────────────────────────────────────────
 
 run_single_agent_loop() {
-    if $RESUME; then
+    if [[ "$SESSION_RESTART" == "true" ]]; then
+        # Restart: state already reset by run_loop_with_restarts, skip init
+        info "Session restart ${RESTART_COUNT}/${MAX_RESTARTS} — fresh context, reading progress"
+    elif $RESUME; then
         resume_state
     else
         initialize_state
@@ -2133,12 +2130,23 @@ run_loop_with_restarts() {
         emit_event "loop.restart" "restart=$RESTART_COUNT" "max=$MAX_RESTARTS" "iteration=$ITERATION"
         info "Session restart ${RESTART_COUNT}/${MAX_RESTARTS} — resetting iteration counter"
 
-        # Reset for fresh session
-        ITERATION=0
+        # Reset iteration-level state for the new session
+        # SESSION_RESTART tells run_single_agent_loop to skip init/resume
         SESSION_RESTART=true
+        ITERATION=0
         CONSECUTIVE_FAILURES=0
         EXTENSION_COUNT=0
         STATUS="running"
+        LOG_ENTRIES=""
+
+        # Rename old iteration logs so they don't get overwritten
+        local restart_archive="$LOG_DIR/restart-${RESTART_COUNT}"
+        mkdir -p "$restart_archive"
+        for old_log in "$LOG_DIR"/iteration-*.log "$LOG_DIR"/tests-iter-*.log; do
+            [[ -f "$old_log" ]] && mv "$old_log" "$restart_archive/" 2>/dev/null || true
+        done
+
+        write_state
 
         sleep 2
     done
