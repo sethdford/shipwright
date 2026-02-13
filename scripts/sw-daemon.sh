@@ -2234,7 +2234,7 @@ triage_score_issue() {
 
     # ── Intelligence-powered triage (if enabled) ──
     if [[ "${INTELLIGENCE_ENABLED:-false}" == "true" ]] && type intelligence_analyze_issue &>/dev/null 2>&1; then
-        daemon_log INFO "Intelligence: using AI triage (intelligence enabled)"
+        daemon_log INFO "Intelligence: using AI triage (intelligence enabled)" >&2
         local analysis
         analysis=$(intelligence_analyze_issue "$issue_json" 2>/dev/null || echo "")
         if [[ -n "$analysis" && "$analysis" != "{}" && "$analysis" != "null" ]]; then
@@ -2273,9 +2273,9 @@ triage_score_issue() {
             return
         fi
         # Fall through to heuristic scoring if intelligence call failed
-        daemon_log INFO "Intelligence: AI triage failed, falling back to heuristic scoring"
+        daemon_log INFO "Intelligence: AI triage failed, falling back to heuristic scoring" >&2
     else
-        daemon_log INFO "Intelligence: using heuristic triage (intelligence disabled, enable with intelligence.enabled=true)"
+        daemon_log INFO "Intelligence: using heuristic triage (intelligence disabled, enable with intelligence.enabled=true)" >&2
     fi
     labels_csv=$(echo "$issue_json" | jq -r '[.labels[].name] | join(",")')
     created_at=$(echo "$issue_json" | jq -r '.createdAt // ""')
@@ -2664,8 +2664,12 @@ daemon_triage_show() {
         num=$(echo "$issue" | jq -r '.number')
         title=$(echo "$issue" | jq -r '.title // "—"')
         labels_csv=$(echo "$issue" | jq -r '[.labels[].name] | join(", ")')
-        score=$(triage_score_issue "$issue")
-        template=$(select_pipeline_template "$labels_csv" "$score")
+        score=$(triage_score_issue "$issue" 2>/dev/null | tail -1)
+        score=$(printf '%s' "$score" | tr -cd '[:digit:]')
+        [[ -z "$score" ]] && score=50
+        template=$(select_pipeline_template "$labels_csv" "$score" 2>/dev/null | tail -1)
+        template=$(printf '%s' "$template" | sed $'s/\x1b\\[[0-9;]*m//g' | tr -cd '[:alnum:]-_')
+        [[ -z "$template" ]] && template="$PIPELINE_TEMPLATE"
 
         scored_lines+=("${score}|${num}|${title}|${labels_csv}|${template}")
     done < <(echo "$issues_json" | jq -c '.[]')
@@ -3878,7 +3882,9 @@ daemon_poll_issues() {
     while IFS= read -r issue; do
         local num score
         num=$(echo "$issue" | jq -r '.number')
-        score=$(triage_score_issue "$issue")
+        score=$(triage_score_issue "$issue" 2>/dev/null | tail -1)
+        score=$(printf '%s' "$score" | tr -cd '[:digit:]')
+        [[ -z "$score" ]] && score=50
         # For org mode, include repo name in the scored entry
         local repo_name=""
         if [[ "$WATCH_MODE" == "org" ]]; then
@@ -4003,7 +4009,9 @@ daemon_poll_issues() {
                 emit_event "daemon.priority_lane" "issue=$issue_num" "score=$score"
 
                 local template
-                template=$(select_pipeline_template "$labels_csv" "$score")
+                template=$(select_pipeline_template "$labels_csv" "$score" 2>/dev/null | tail -1)
+                template=$(printf '%s' "$template" | sed $'s/\x1b\\[[0-9;]*m//g' | tr -cd '[:alnum:]-_')
+                [[ -z "$template" ]] && template="$PIPELINE_TEMPLATE"
                 daemon_log INFO "Triage: issue #${issue_num} scored ${score}, template=${template} [PRIORITY]"
 
                 local orig_template="$PIPELINE_TEMPLATE"
@@ -4024,7 +4032,9 @@ daemon_poll_issues() {
 
         # Auto-select pipeline template based on labels + triage score
         local template
-        template=$(select_pipeline_template "$labels_csv" "$score")
+        template=$(select_pipeline_template "$labels_csv" "$score" 2>/dev/null | tail -1)
+        template=$(printf '%s' "$template" | sed $'s/\x1b\\[[0-9;]*m//g' | tr -cd '[:alnum:]-_')
+        [[ -z "$template" ]] && template="$PIPELINE_TEMPLATE"
         daemon_log INFO "Triage: issue #${issue_num} scored ${score}, template=${template}"
 
         # Spawn pipeline (template selection applied via PIPELINE_TEMPLATE override)
@@ -4055,7 +4065,9 @@ daemon_poll_issues() {
         drain_labels=$(echo "$issues_json" | jq -r --argjson n "$drain_issue" \
             '.[] | select(.number == $n) | [.labels[].name] | join(",")' 2>/dev/null || echo "")
         drain_score=$(echo "$sorted_order" | grep "|${drain_issue}|" | cut -d'|' -f1 || echo "50")
-        drain_template=$(select_pipeline_template "$drain_labels" "${drain_score:-50}")
+        drain_template=$(select_pipeline_template "$drain_labels" "${drain_score:-50}" 2>/dev/null | tail -1)
+        drain_template=$(printf '%s' "$drain_template" | sed $'s/\x1b\\[[0-9;]*m//g' | tr -cd '[:alnum:]-_')
+        [[ -z "$drain_template" ]] && drain_template="$PIPELINE_TEMPLATE"
 
         daemon_log INFO "Draining queue: issue #${drain_issue}, template=${drain_template}"
         local orig_template="$PIPELINE_TEMPLATE"
