@@ -478,9 +478,11 @@ load_config() {
 
     # progress-based health monitoring (replaces static timeouts)
     PROGRESS_MONITORING=$(jq -r '.health.progress_based // true' "$config_file")
-    PROGRESS_CHECKS_BEFORE_WARN=$(jq -r '.health.stale_checks_before_warn // 3' "$config_file")
-    PROGRESS_CHECKS_BEFORE_KILL=$(jq -r '.health.stale_checks_before_kill // 6' "$config_file")
-    PROGRESS_HARD_LIMIT_S=$(jq -r '.health.hard_limit_s // 10800' "$config_file")  # 3hr absolute max
+    PROGRESS_CHECKS_BEFORE_WARN=$(jq -r '.health.stale_checks_before_warn // 20' "$config_file")
+    PROGRESS_CHECKS_BEFORE_KILL=$(jq -r '.health.stale_checks_before_kill // 120' "$config_file")
+    PROGRESS_HARD_LIMIT_S=$(jq -r '.health.hard_limit_s // 0' "$config_file")  # 0 = disabled (no hard kill)
+    NUDGE_ENABLED=$(jq -r '.health.nudge_enabled // true' "$config_file")
+    NUDGE_AFTER_CHECKS=$(jq -r '.health.nudge_after_checks // 40' "$config_file")
 
     # team dashboard URL (for coordinated claiming)
     local cfg_dashboard_url
@@ -834,6 +836,31 @@ daemon_assess_progress() {
     # More files touched
     if [[ "$cur_files" -gt "$prev_files" ]]; then
         has_progress=true
+    fi
+
+    # Claude subprocess is alive and consuming CPU — agent is thinking/working
+    # During build stage, Claude can spend 10+ minutes thinking before any
+    # visible git changes appear.  Detect this as progress.
+    if [[ "$has_progress" != "true" ]]; then
+        local _pid_for_check
+        _pid_for_check=$(echo "$current_snapshot" | jq -r '.pid // empty' 2>/dev/null || true)
+        if [[ -z "$_pid_for_check" ]]; then
+            # Fallback: get PID from active_jobs
+            _pid_for_check=$(jq -r --argjson num "$issue_num" \
+                '.active_jobs[] | select(.issue == ($num | tonumber)) | .pid' "$STATE_FILE" 2>/dev/null | head -1 || true)
+        fi
+        if [[ -n "$_pid_for_check" ]]; then
+            # Check if any child process (claude) is alive and using CPU
+            local child_cpu=0
+            child_cpu=$(ps -o pid=,pcpu= -p "$_pid_for_check" 2>/dev/null | awk '{sum+=$2} END{printf "%d", sum+0}' || echo "0")
+            if [[ "$child_cpu" -eq 0 ]]; then
+                # Check children of the pipeline process
+                child_cpu=$(pgrep -P "$_pid_for_check" 2>/dev/null | xargs -I{} ps -o pcpu= -p {} 2>/dev/null | awk '{sum+=$1} END{printf "%d", sum+0}' || echo "0")
+            fi
+            if [[ "${child_cpu:-0}" -gt 0 ]]; then
+                has_progress=true
+            fi
+        fi
     fi
 
     # Detect repeated errors (same error signature hitting again)
@@ -1904,15 +1931,18 @@ daemon_reap_completed() {
         reap_machine_name=$(jq -r '.machines[] | select(.role == "primary") | .name' "$HOME/.shipwright/machines.json" 2>/dev/null || hostname -s)
         release_claim "$issue_num" "$reap_machine_name"
 
-        # Skip cleanup if a retry was just spawned for this issue
+        # Always remove the OLD job entry from active_jobs to prevent
+        # re-reaping of the dead PID on the next cycle.  When a retry was
+        # spawned, daemon_spawn_pipeline already added a fresh entry with
+        # the new PID — we must not leave the stale one behind.
+        locked_state_update --argjson num "$issue_num" \
+            --argjson old_pid "${pid:-0}" \
+            '.active_jobs = [.active_jobs[] | select(.issue != $num or .pid != $old_pid)]'
+        untrack_priority_job "$issue_num"
+
         if [[ "$_retry_spawned_for" == "$issue_num" ]]; then
             daemon_log INFO "Retry spawned for issue #${issue_num} — skipping worktree cleanup"
         else
-            # Remove from active_jobs and priority lane tracking (locked)
-            locked_state_update --argjson num "$issue_num" \
-                '.active_jobs = [.active_jobs[] | select(.issue != $num)]'
-            untrack_priority_job "$issue_num"
-
             # Clean up worktree (skip for org-mode clones — they persist)
             local job_repo
             job_repo=$(echo "$job" | jq -r '.repo // ""')
@@ -4095,13 +4125,15 @@ daemon_health_check() {
     now_e=$(now_epoch)
 
     if [[ -f "$STATE_FILE" ]]; then
-        # ── Progress-Based Health Monitoring ──
-        # Instead of killing after a static timeout, check for forward progress.
-        # Only kill when the agent is truly stuck (no stage change, no new code,
-        # same error repeating). A hard wall-clock limit remains as absolute safety net.
+        # ── Intelligent Health Monitoring ──
+        # Instead of killing after a countdown, sense what the agent is doing.
+        # Agents think for long stretches — that's normal and expected.
+        # Strategy: sense → understand → be patient → nudge → only kill as last resort.
 
-        local hard_limit="${PROGRESS_HARD_LIMIT_S:-10800}"
+        local hard_limit="${PROGRESS_HARD_LIMIT_S:-0}"
         local use_progress="${PROGRESS_MONITORING:-true}"
+        local nudge_enabled="${NUDGE_ENABLED:-true}"
+        local nudge_after="${NUDGE_AFTER_CHECKS:-40}"
 
         while IFS= read -r job; do
             local pid started_at issue_num worktree
@@ -4122,8 +4154,8 @@ daemon_health_check() {
                 elapsed=$(( now_e - start_e ))
             fi
 
-            # Hard wall-clock limit — absolute safety net (default 3h)
-            if [[ "$elapsed" -gt "$hard_limit" ]]; then
+            # Hard wall-clock limit — disabled by default (0 = off)
+            if [[ "$hard_limit" -gt 0 && "$elapsed" -gt "$hard_limit" ]]; then
                 daemon_log WARN "Hard limit exceeded: issue #${issue_num} (${elapsed}s > ${hard_limit}s, PID $pid) — killing"
                 emit_event "daemon.hard_limit" "issue=$issue_num" "elapsed_s=$elapsed" "limit_s=$hard_limit" "pid=$pid"
                 kill "$pid" 2>/dev/null || true
@@ -4132,7 +4164,7 @@ daemon_health_check() {
                 continue
             fi
 
-            # Progress-based detection (when enabled)
+            # ── Intelligent Progress Sensing ──
             if [[ "$use_progress" == "true" && -n "$worktree" ]]; then
                 local snapshot verdict
                 snapshot=$(daemon_collect_snapshot "$issue_num" "$worktree" "$pid" 2>/dev/null || echo '{}')
@@ -4140,29 +4172,87 @@ daemon_health_check() {
                 if [[ "$snapshot" != "{}" ]]; then
                     verdict=$(daemon_assess_progress "$issue_num" "$snapshot" 2>/dev/null || echo "healthy")
 
+                    local no_progress_count=0
+                    no_progress_count=$(jq -r '.no_progress_count // 0' "$PROGRESS_DIR/issue-${issue_num}.json" 2>/dev/null || echo 0)
+                    local cur_stage
+                    cur_stage=$(echo "$snapshot" | jq -r '.stage // "unknown"')
+
                     case "$verdict" in
                         healthy)
                             # All good — agent is making progress
                             ;;
                         slowing)
-                            daemon_log INFO "Issue #${issue_num} slowing (no progress for 1-2 checks, ${elapsed}s elapsed)"
+                            daemon_log INFO "Issue #${issue_num} slowing (no visible changes for ${no_progress_count} checks, ${elapsed}s elapsed, stage=${cur_stage})"
                             ;;
                         stalled)
-                            local no_progress_count
-                            no_progress_count=$(jq -r '.no_progress_count // 0' "$PROGRESS_DIR/issue-${issue_num}.json" 2>/dev/null || echo 0)
-                            daemon_log WARN "Issue #${issue_num} stalled: no progress for ${no_progress_count} checks (${elapsed}s elapsed, PID $pid)"
-                            emit_event "daemon.stalled" "issue=$issue_num" "no_progress=$no_progress_count" "elapsed_s=$elapsed" "pid=$pid"
+                            # Check if agent subprocess is alive and consuming CPU
+                            local agent_alive=false
+                            local child_cpu=0
+                            child_cpu=$(pgrep -P "$pid" 2>/dev/null | xargs -I{} ps -o pcpu= -p {} 2>/dev/null | awk '{sum+=$1} END{printf "%d", sum+0}' || echo "0")
+                            if [[ "${child_cpu:-0}" -gt 0 ]]; then
+                                agent_alive=true
+                            fi
+
+                            if [[ "$agent_alive" == "true" ]]; then
+                                daemon_log INFO "Issue #${issue_num} no visible progress (${no_progress_count} checks) but agent is alive (CPU: ${child_cpu}%, stage=${cur_stage}, ${elapsed}s) — being patient"
+                            else
+                                daemon_log WARN "Issue #${issue_num} stalled: no progress for ${no_progress_count} checks, no CPU activity (${elapsed}s elapsed, PID $pid)"
+                                emit_event "daemon.stalled" "issue=$issue_num" "no_progress=$no_progress_count" "elapsed_s=$elapsed" "pid=$pid"
+                            fi
                             ;;
                         stuck)
-                            local no_progress_count repeated_errors cur_stage
-                            no_progress_count=$(jq -r '.no_progress_count // 0' "$PROGRESS_DIR/issue-${issue_num}.json" 2>/dev/null || echo 0)
+                            local repeated_errors
                             repeated_errors=$(jq -r '.repeated_error_count // 0' "$PROGRESS_DIR/issue-${issue_num}.json" 2>/dev/null || echo 0)
-                            cur_stage=$(echo "$snapshot" | jq -r '.stage // "unknown"')
-                            daemon_log WARN "Issue #${issue_num} STUCK: no progress for ${no_progress_count} checks, ${repeated_errors} repeated errors (stage=${cur_stage}, ${elapsed}s, PID $pid) — killing"
-                            emit_event "daemon.stuck_kill" "issue=$issue_num" "no_progress=$no_progress_count" "repeated_errors=$repeated_errors" "stage=$cur_stage" "elapsed_s=$elapsed" "pid=$pid"
-                            kill "$pid" 2>/dev/null || true
-                            daemon_clear_progress "$issue_num"
-                            findings=$((findings + 1))
+
+                            # Even "stuck" — check if the process tree is alive first
+                            local agent_alive=false
+                            local child_cpu=0
+                            child_cpu=$(pgrep -P "$pid" 2>/dev/null | xargs -I{} ps -o pcpu= -p {} 2>/dev/null | awk '{sum+=$1} END{printf "%d", sum+0}' || echo "0")
+                            if [[ "${child_cpu:-0}" -gt 0 ]]; then
+                                agent_alive=true
+                            fi
+
+                            if [[ "$agent_alive" == "true" && "$repeated_errors" -lt 3 ]]; then
+                                # Agent is alive — nudge instead of kill
+                                if [[ "$nudge_enabled" == "true" && "$no_progress_count" -ge "$nudge_after" ]]; then
+                                    local nudge_file="${worktree}/.claude/nudge.md"
+                                    if [[ ! -f "$nudge_file" ]]; then
+                                        cat > "$nudge_file" <<NUDGE_EOF
+# Nudge from Daemon Health Monitor
+
+The daemon has noticed no visible progress for $(( no_progress_count * 30 / 60 )) minutes.
+Current stage: ${cur_stage}
+
+If you're stuck, consider:
+- Breaking the task into smaller steps
+- Committing partial progress
+- Running tests to validate current state
+
+This is just a gentle check-in — take your time if you're working through a complex problem.
+NUDGE_EOF
+                                        daemon_log INFO "Issue #${issue_num} nudged (${no_progress_count} checks, stage=${cur_stage}, CPU=${child_cpu}%) — file written to worktree"
+                                        emit_event "daemon.nudge" "issue=$issue_num" "no_progress=$no_progress_count" "stage=$cur_stage" "elapsed_s=$elapsed"
+                                    fi
+                                else
+                                    daemon_log INFO "Issue #${issue_num} no visible progress (${no_progress_count} checks) but agent is alive (CPU: ${child_cpu}%, stage=${cur_stage}) — waiting"
+                                fi
+                            elif [[ "$repeated_errors" -ge 5 ]]; then
+                                # Truly stuck in an error loop — kill as last resort
+                                daemon_log WARN "Issue #${issue_num} in error loop: ${repeated_errors} repeated errors (stage=${cur_stage}, ${elapsed}s, PID $pid) — killing"
+                                emit_event "daemon.stuck_kill" "issue=$issue_num" "no_progress=$no_progress_count" "repeated_errors=$repeated_errors" "stage=$cur_stage" "elapsed_s=$elapsed" "pid=$pid" "reason=error_loop"
+                                kill "$pid" 2>/dev/null || true
+                                daemon_clear_progress "$issue_num"
+                                findings=$((findings + 1))
+                            elif [[ "$agent_alive" != "true" && "$no_progress_count" -ge "$((PROGRESS_CHECKS_BEFORE_KILL * 2))" ]]; then
+                                # Process tree is dead AND no progress for very long time
+                                daemon_log WARN "Issue #${issue_num} appears dead: no CPU, no progress for ${no_progress_count} checks (${elapsed}s, PID $pid) — killing"
+                                emit_event "daemon.stuck_kill" "issue=$issue_num" "no_progress=$no_progress_count" "repeated_errors=$repeated_errors" "stage=$cur_stage" "elapsed_s=$elapsed" "pid=$pid" "reason=dead_process"
+                                kill "$pid" 2>/dev/null || true
+                                daemon_clear_progress "$issue_num"
+                                findings=$((findings + 1))
+                            else
+                                daemon_log WARN "Issue #${issue_num} struggling (${no_progress_count} checks, ${repeated_errors} errors, CPU=${child_cpu}%, stage=${cur_stage}) — monitoring"
+                            fi
                             ;;
                     esac
                 fi
@@ -4171,8 +4261,9 @@ daemon_health_check() {
                 local stale_timeout
                 stale_timeout=$(get_adaptive_stale_timeout "$PIPELINE_TEMPLATE")
                 if [[ "$elapsed" -gt "$stale_timeout" ]]; then
-                    daemon_log WARN "Stale job (legacy): issue #${issue_num} (${elapsed}s > ${stale_timeout}s, PID $pid) — killing"
-                    kill "$pid" 2>/dev/null || true
+                    daemon_log WARN "Stale job (legacy): issue #${issue_num} (${elapsed}s > ${stale_timeout}s, PID $pid)"
+                    # Don't kill — just log. Let the process run.
+                    emit_event "daemon.stale_warning" "issue=$issue_num" "elapsed_s=$elapsed" "pid=$pid"
                     findings=$((findings + 1))
                 fi
             fi
