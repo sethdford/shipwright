@@ -1,18 +1,29 @@
 ---
-goal: "Say hello world"
+goal: "Live terminal streaming — watch agents work in real-time from dashboard
+
+## Plan Summary
+Invalid API key · Fix external API key
+[... full plan in .claude/pipeline-artifacts/plan.md]
+
+## Key Design Decisions
+
+[... full design in .claude/pipeline-artifacts/design.md]
+
+Historical context (lessons from previous pipelines):
+{"error":"memory_search_failed","results":[]}"
 iteration: 0
-max_iterations: 1
+max_iterations: 20
 status: running
-test_cmd: "echo PASS"
-model: haiku
+test_cmd: "npm test"
+model: opus
 agents: 1
-started_at: 2026-02-13T02:00:56Z
-last_iteration_at: 2026-02-13T02:00:56Z
+started_at: 2026-02-13T04:22:50Z
+last_iteration_at: 2026-02-13T04:22:50Z
 consecutive_failures: 0
 total_commits: 0
-audit_enabled: false
-audit_agent_enabled: false
-quality_gates_enabled: false
+audit_enabled: true
+audit_agent_enabled: true
+quality_gates_enabled: true
 dod_file: ""
 auto_extend: true
 extension_count: 0
