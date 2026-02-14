@@ -1,18 +1,21 @@
 ---
-goal: "Say hello world"
-iteration: 0
-max_iterations: 1
-status: running
-test_cmd: "echo PASS"
-model: haiku
+goal: "Regression detection pipeline — automated baseline comparison after merge
+
+Historical context (lessons from previous pipelines):
+{"error":"memory_search_failed","results":[]}"
+iteration: 1
+max_iterations: 20
+status: error
+test_cmd: "npm test"
+model: opus
 agents: 1
-started_at: 2026-02-13T02:00:56Z
-last_iteration_at: 2026-02-13T02:00:56Z
+started_at: 2026-02-14T02:17:04Z
+last_iteration_at: 2026-02-14T02:17:04Z
 consecutive_failures: 0
 total_commits: 0
-audit_enabled: false
-audit_agent_enabled: false
-quality_gates_enabled: false
+audit_enabled: true
+audit_agent_enabled: true
+quality_gates_enabled: true
 dod_file: ""
 auto_extend: true
 extension_count: 0
