@@ -81,6 +81,7 @@ show_help() {
     echo -e "  ${CYAN}prep${RESET} [options]         ${BOLD}Repo preparation${RESET} — generate .claude/ configs for agents"
     echo -e "  ${CYAN}daemon${RESET} <cmd>           ${BOLD}Issue watcher${RESET} — auto-process GitHub issues"
     echo -e "  ${CYAN}memory${RESET} <cmd>           ${BOLD}Persistent memory${RESET} — learn from every pipeline run"
+    echo -e "  ${CYAN}instrument${RESET} <cmd>       ${BOLD}Pipeline instrumentation${RESET} — record predicted vs actual metrics"
     echo -e "  ${CYAN}cost${RESET} <cmd>             ${BOLD}Cost intelligence${RESET} — track tokens, budgets, model routing"
     echo -e "  ${CYAN}adaptive${RESET} <cmd>         ${BOLD}Adaptive tuning${RESET} — data-driven pipeline defaults from historical runs"
     echo -e "  ${CYAN}regression${RESET} <cmd>       ${BOLD}Regression detection${RESET} — detect regressions after merge"
@@ -260,6 +261,9 @@ main() {
             ;;
         memory)
             exec "$SCRIPT_DIR/sw-memory.sh" "$@"
+            ;;
+        instrument)
+            exec "$SCRIPT_DIR/sw-instrument.sh" "$@"
             ;;
         cost)
             exec "$SCRIPT_DIR/sw-cost.sh" "$@"
