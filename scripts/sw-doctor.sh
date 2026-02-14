@@ -886,6 +886,64 @@ else
 fi
 
 # ═════════════════════════════════════════════════════════════════════════════
+# 14. Dashboard & Dependencies
+# ═════════════════════════════════════════════════════════════════════════════
+echo ""
+echo -e "${PURPLE}${BOLD}  DASHBOARD & DEPENDENCIES${RESET}"
+echo -e "${DIM}  ──────────────────────────────────────────${RESET}"
+
+# Bun runtime
+if command -v bun &>/dev/null; then
+    bun_ver="$(bun --version 2>/dev/null || echo "unknown")"
+    check_pass "bun $bun_ver"
+else
+    check_warn "bun not found — required for shipwright dashboard"
+    echo -e "    ${DIM}Install: curl -fsSL https://bun.sh/install | bash${RESET}"
+fi
+
+# Dashboard files — check multiple locations
+_DOCTOR_SCRIPT_DIR="${_DOCTOR_SCRIPT_DIR:-$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)}"
+_DOCTOR_REPO_DIR="$(cd "$_DOCTOR_SCRIPT_DIR/.." 2>/dev/null && pwd 2>/dev/null || echo "")"
+_DASHBOARD_DIR=""
+
+if [[ -n "$_DOCTOR_REPO_DIR" && -f "$_DOCTOR_REPO_DIR/dashboard/server.ts" ]]; then
+    _DASHBOARD_DIR="$_DOCTOR_REPO_DIR/dashboard"
+elif [[ -f "$HOME/.local/share/shipwright/dashboard/server.ts" ]]; then
+    _DASHBOARD_DIR="$HOME/.local/share/shipwright/dashboard"
+fi
+
+if [[ -n "$_DASHBOARD_DIR" ]]; then
+    check_pass "Dashboard server found: ${DIM}$_DASHBOARD_DIR/server.ts${RESET}"
+    if [[ -f "$_DASHBOARD_DIR/public/index.html" ]]; then
+        check_pass "Dashboard frontend found"
+    else
+        check_warn "Dashboard public/index.html not found"
+    fi
+else
+    check_warn "Dashboard files not found"
+    echo -e "    ${DIM}Expected: dashboard/server.ts in repo or ~/.local/share/shipwright/dashboard/${RESET}"
+fi
+
+# Port 3000 availability
+if command -v lsof &>/dev/null; then
+    if lsof -i :3000 -sTCP:LISTEN &>/dev/null 2>&1; then
+        dr_port_proc="$(lsof -i :3000 -sTCP:LISTEN -t 2>/dev/null | head -1 || echo "unknown")"
+        check_warn "Port 3000 in use (PID: $dr_port_proc) — dashboard may need a different port"
+        echo -e "    ${DIM}Use: shipwright dashboard start --port 3001${RESET}"
+    else
+        check_pass "Port 3000 available"
+    fi
+elif command -v ss &>/dev/null; then
+    if ss -tlnp 2>/dev/null | grep -q ':3000 '; then
+        check_warn "Port 3000 in use — dashboard may need a different port"
+    else
+        check_pass "Port 3000 available"
+    fi
+else
+    info "  Port check skipped ${DIM}(lsof/ss not found)${RESET}"
+fi
+
+# ═════════════════════════════════════════════════════════════════════════════
 # Summary
 # ═════════════════════════════════════════════════════════════════════════════
 echo ""
