@@ -176,6 +176,7 @@ All scripts are bash (except the dashboard server in TypeScript). Grouped by lay
 | `scripts/sw-cost.sh` | 924 | Token Usage & Cost Intelligence |
 | `scripts/sw-daemon.sh` | 5683 | Autonomous GitHub Issue Watcher |
 | `scripts/sw-dashboard.sh` | 477 | Fleet Command Dashboard |
+| `scripts/sw-db.sh` | 540 | SQLite Persistence Layer |
 | `scripts/sw-decompose.sh` | 539 | Issue Complexity Analysis & Subtask Generation |
 | `scripts/sw-developer-simulation.sh` | 252 | Multi-Persona Developer Simulation |
 | `scripts/sw-docs.sh` | 635 | Documentation Keeper |
@@ -186,7 +187,7 @@ All scripts are bash (except the dashboard server in TypeScript). Grouped by lay
 | `scripts/sw-init.sh` | 522 | Complete setup for Shipwright + Shipwright |
 | `scripts/sw-intelligence.sh` | 1196 | AI-Powered Analysis & Decision Engine |
 | `scripts/sw-jira.sh` | 643 | Jira ↔ GitHub Bidirectional Sync |
-| `scripts/sw-launchd.sh` | 364 | Process supervision on macOS |
+| `scripts/sw-launchd.sh` | 699 | Process supervision (macOS + Linux) |
 | `scripts/sw-linear.sh` | 648 | Linear ↔ GitHub Bidirectional Sync |
 | `scripts/sw-logs.sh` | 343 | View and search agent pane logs |
 | `scripts/sw-loop.sh` | 2278 | Continuous agent loop harness for Claude Code |
@@ -194,7 +195,7 @@ All scripts are bash (except the dashboard server in TypeScript). Grouped by lay
 | `scripts/sw-patrol-meta.sh` | 417 | Shipwright Self-Improvement Patrol |
 | `scripts/sw-pipeline-composer.sh` | 455 | Dynamic Pipeline Composition |
 | `scripts/sw-pipeline-vitals.sh` | 1096 | Pipeline Vitals Engine |
-| `scripts/sw-pipeline.sh` | 8010 | Autonomous Feature Delivery (Idea → Production) |
+| `scripts/sw-pipeline.sh` | 8090 | Autonomous Feature Delivery (Idea → Production) |
 | `scripts/sw-predictive.sh` | 820 | Predictive & Proactive Intelligence |
 | `scripts/sw-prep.sh` | 1642 | Repository Preparation for Agent Teams |
 | `scripts/sw-ps.sh` | 171 | Show running agent process status |
@@ -209,7 +210,7 @@ All scripts are bash (except the dashboard server in TypeScript). Grouped by lay
 | `scripts/sw-tracker.sh` | 409 | Provider Router for Issue Tracker Integration |
 | `scripts/sw-upgrade.sh` | 479 | Detect and apply updates from the repo |
 | `scripts/sw-worktree.sh` | 408 | Git worktree management for multi-agent isolation |
-| `scripts/sw` | 346 | CLI router — dispatches subcommands via exec |
+| `scripts/sw` | 350 | CLI router — dispatches subcommands via exec |
 <!-- /AUTO:core-scripts -->
 
 ### GitHub API Modules
@@ -259,6 +260,7 @@ All scripts are bash (except the dashboard server in TypeScript). Grouped by lay
 | `scripts/sw-heartbeat-test.sh` | 588 | Validate heartbeat lifecycle, |
 | `scripts/sw-init-test.sh` | 494 | E2E validation of init/setup flow |
 | `scripts/sw-intelligence-test.sh` | 544 | Unit tests for intelligence core |
+| `scripts/sw-launchd-test.sh` | 905 | Validate service management on |
 | `scripts/sw-memory-test.sh` | 872 | Unit tests for memory system & cost tracking |
 | `scripts/sw-pipeline-composer-test.sh` | 643 | Test Suite |
 | `scripts/sw-pipeline-test.sh` | 1757 | E2E validation invoking the REAL pipeline |

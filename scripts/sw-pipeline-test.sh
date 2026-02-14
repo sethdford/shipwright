@@ -1637,6 +1637,189 @@ test_health_gate_passes() {
         { echo "Expected return 0 path in health gate"; return 1; }
 }
 
+# ══════════════════════════════════════════════════════════════════════════════
+# DURABLE ARTIFACT PERSISTENCE TESTS
+# ══════════════════════════════════════════════════════════════════════════════
+
+# ──────────────────────────────────────────────────────────────────────────────
+# 51. persist_artifacts function exists in pipeline
+# ──────────────────────────────────────────────────────────────────────────────
+test_persist_artifacts_exists() {
+    grep -q "^persist_artifacts()" "$REAL_PIPELINE_SCRIPT"
+}
+
+# ──────────────────────────────────────────────────────────────────────────────
+# 52. persist_artifacts skips in non-CI mode
+# ──────────────────────────────────────────────────────────────────────────────
+test_persist_artifacts_ci_guard() {
+    (
+        # Source pipeline with stubs to avoid full init
+        info()    { true; }
+        success() { true; }
+        warn()    { true; }
+        error()   { true; }
+        emit_event() { true; }
+        now_iso()  { echo "2026-02-14T00:00:00Z"; }
+        now_epoch() { echo "1739491200"; }
+
+        CI_MODE=false
+        ISSUE_NUMBER="99"
+        ARTIFACTS_DIR=$(mktemp -d "${TMPDIR:-/tmp}/sw-art-test.XXXXXX")
+        echo "test plan" > "$ARTIFACTS_DIR/plan.md"
+
+        source "$REAL_PIPELINE_SCRIPT" 2>/dev/null || true
+
+        # Should return 0 (skip) and NOT touch git
+        persist_artifacts "plan" "plan.md" > /dev/null 2>&1
+        local rc=$?
+        rm -rf "$ARTIFACTS_DIR"
+        exit "$rc"
+    )
+}
+
+# ──────────────────────────────────────────────────────────────────────────────
+# 53. verify_stage_artifacts returns 0 when all artifacts present
+# ──────────────────────────────────────────────────────────────────────────────
+test_verify_artifacts_present() {
+    (
+        info()    { true; }
+        success() { true; }
+        warn()    { true; }
+        error()   { true; }
+        emit_event() { true; }
+        now_iso()  { echo "2026-02-14T00:00:00Z"; }
+        now_epoch() { echo "1739491200"; }
+
+        ARTIFACTS_DIR=$(mktemp -d "${TMPDIR:-/tmp}/sw-art-test.XXXXXX")
+        echo "# Plan" > "$ARTIFACTS_DIR/plan.md"
+
+        source "$REAL_PIPELINE_SCRIPT" 2>/dev/null || true
+
+        verify_stage_artifacts "plan" > /dev/null 2>&1
+        local rc=$?
+        rm -rf "$ARTIFACTS_DIR"
+        exit "$rc"
+    )
+}
+
+# ──────────────────────────────────────────────────────────────────────────────
+# 54. verify_stage_artifacts returns 1 when artifacts missing
+# ──────────────────────────────────────────────────────────────────────────────
+test_verify_artifacts_missing() {
+    (
+        info()    { true; }
+        success() { true; }
+        warn()    { true; }
+        error()   { true; }
+        emit_event() { true; }
+        now_iso()  { echo "2026-02-14T00:00:00Z"; }
+        now_epoch() { echo "1739491200"; }
+
+        ARTIFACTS_DIR=$(mktemp -d "${TMPDIR:-/tmp}/sw-art-test.XXXXXX")
+        # plan.md does NOT exist
+
+        source "$REAL_PIPELINE_SCRIPT" 2>/dev/null || true
+
+        if verify_stage_artifacts "plan" > /dev/null 2>&1; then
+            rm -rf "$ARTIFACTS_DIR"
+            exit 1  # Should have returned 1
+        else
+            rm -rf "$ARTIFACTS_DIR"
+            exit 0  # Correctly detected missing
+        fi
+    )
+}
+
+# ──────────────────────────────────────────────────────────────────────────────
+# 55. verify_stage_artifacts returns 1 when artifact is empty
+# ──────────────────────────────────────────────────────────────────────────────
+test_verify_artifacts_empty() {
+    (
+        info()    { true; }
+        success() { true; }
+        warn()    { true; }
+        error()   { true; }
+        emit_event() { true; }
+        now_iso()  { echo "2026-02-14T00:00:00Z"; }
+        now_epoch() { echo "1739491200"; }
+
+        ARTIFACTS_DIR=$(mktemp -d "${TMPDIR:-/tmp}/sw-art-test.XXXXXX")
+        touch "$ARTIFACTS_DIR/plan.md"  # Empty file
+
+        source "$REAL_PIPELINE_SCRIPT" 2>/dev/null || true
+
+        if verify_stage_artifacts "plan" > /dev/null 2>&1; then
+            rm -rf "$ARTIFACTS_DIR"
+            exit 1  # Should have returned 1
+        else
+            rm -rf "$ARTIFACTS_DIR"
+            exit 0  # Correctly detected empty
+        fi
+    )
+}
+
+# ──────────────────────────────────────────────────────────────────────────────
+# 56. verify_stage_artifacts passes for stages with no artifact requirements
+# ──────────────────────────────────────────────────────────────────────────────
+test_verify_artifacts_no_requirements() {
+    (
+        info()    { true; }
+        success() { true; }
+        warn()    { true; }
+        error()   { true; }
+        emit_event() { true; }
+        now_iso()  { echo "2026-02-14T00:00:00Z"; }
+        now_epoch() { echo "1739491200"; }
+
+        ARTIFACTS_DIR=$(mktemp -d "${TMPDIR:-/tmp}/sw-art-test.XXXXXX")
+
+        source "$REAL_PIPELINE_SCRIPT" 2>/dev/null || true
+
+        # build, test, review etc. have no artifact requirements
+        verify_stage_artifacts "build" > /dev/null 2>&1
+        local rc=$?
+        rm -rf "$ARTIFACTS_DIR"
+        exit "$rc"
+    )
+}
+
+# ──────────────────────────────────────────────────────────────────────────────
+# 57. verify_stage_artifacts design requires both design.md and plan.md
+# ──────────────────────────────────────────────────────────────────────────────
+test_verify_artifacts_design_needs_plan() {
+    (
+        info()    { true; }
+        success() { true; }
+        warn()    { true; }
+        error()   { true; }
+        emit_event() { true; }
+        now_iso()  { echo "2026-02-14T00:00:00Z"; }
+        now_epoch() { echo "1739491200"; }
+
+        ARTIFACTS_DIR=$(mktemp -d "${TMPDIR:-/tmp}/sw-art-test.XXXXXX")
+        echo "# Design" > "$ARTIFACTS_DIR/design.md"
+        # plan.md missing — design should fail
+
+        source "$REAL_PIPELINE_SCRIPT" 2>/dev/null || true
+
+        if verify_stage_artifacts "design" > /dev/null 2>&1; then
+            rm -rf "$ARTIFACTS_DIR"
+            exit 1  # Should have failed
+        else
+            rm -rf "$ARTIFACTS_DIR"
+            exit 0  # Correctly detected missing plan.md
+        fi
+    )
+}
+
+# ──────────────────────────────────────────────────────────────────────────────
+# 58. mark_stage_complete calls persist_artifacts for plan stage
+# ──────────────────────────────────────────────────────────────────────────────
+test_mark_complete_persists_plan() {
+    grep -A5 "Persist artifacts to feature branch" "$REAL_PIPELINE_SCRIPT" | \
+        grep -q 'plan.*persist_artifacts.*plan.md.*dod.md.*context-bundle.md'
+}
+
 # ═══════════════════════════════════════════════════════════════════════════════
 # MAIN
 # ═══════════════════════════════════════════════════════════════════════════════
