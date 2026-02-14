@@ -102,6 +102,7 @@ show_help() {
     echo -e "  ${CYAN}launchd${RESET} <cmd>          ${BOLD}Process supervision${RESET} — auto-start daemon + dashboard on boot"
     echo -e "  ${CYAN}docs${RESET} <cmd>            ${BOLD}Documentation keeper${RESET} — auto-sync docs from source"
     echo -e "  ${CYAN}release${RESET} <cmd>         ${BOLD}Release automation${RESET} — bump versions, changelog, tags, releases"
+    echo -e "  ${CYAN}replay${RESET} <cmd>           ${BOLD}Pipeline DVR${RESET} — list, show, narrative, diff, export, compare runs"
     echo -e "  ${CYAN}scale${RESET} <cmd>            ${BOLD}Dynamic team scaling${RESET} — scale agents up/down during pipeline"
     echo -e "  ${CYAN}dora${RESET} <cmd>            ${BOLD}DORA metrics${RESET} — deploy frequency, lead time, CFR, MTTR dashboard"
     echo -e "  ${CYAN}tmux${RESET} <cmd>            ${BOLD}tmux health${RESET} — doctor, install plugins, fix issues"
@@ -338,6 +339,9 @@ main() {
             ;;
         release)
             exec "$SCRIPT_DIR/sw-release.sh" "$@"
+            ;;
+        replay)
+            exec "$SCRIPT_DIR/sw-replay.sh" "$@"
             ;;
         scale)
             exec "$SCRIPT_DIR/sw-scale.sh" "$@"
