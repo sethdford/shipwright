@@ -109,6 +109,7 @@ show_help() {
     echo -e "  ${CYAN}context${RESET}              ${BOLD}Context engine${RESET} — gather context for pipeline stages"
     echo -e "  ${CYAN}trace${RESET}                ${BOLD}E2E traceability${RESET} — issue to commit to PR to deploy"
     echo -e "  ${CYAN}widgets${RESET}              ${BOLD}Status widgets${RESET} — embeddable badges, Slack messages, markdown"
+    echo -e "  ${CYAN}eventbus${RESET}             ${BOLD}Event bus${RESET} — real-time inter-component communication"
     echo -e "  ${CYAN}init${RESET}                  ${BOLD}Quick tmux setup${RESET} — one command, no prompts"
     echo -e "  ${CYAN}setup${RESET}                 ${BOLD}Guided setup${RESET} — prerequisites, init, doctor, quick start"
     echo -e "  ${CYAN}help${RESET}                  Show this help message"
@@ -359,6 +360,9 @@ main() {
             ;;
         feedback)
             exec "$SCRIPT_DIR/sw-feedback.sh" "$@"
+            ;;
+        eventbus)
+            exec "$SCRIPT_DIR/sw-eventbus.sh" "$@"
             ;;
         help|--help|-h)
             show_help
