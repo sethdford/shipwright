@@ -182,7 +182,8 @@ All scripts are bash (except the dashboard server in TypeScript). Grouped by lay
 | `scripts/sw-docs.sh` | 635 | Documentation Keeper |
 | `scripts/sw-doctor.sh` | 907 | Validate Shipwright setup |
 | `scripts/sw-fix.sh` | 482 | Bulk Fix Across Multiple Repos |
-| `scripts/sw-fleet.sh` | 1380 | Multi-Repo Daemon Orchestrator |
+| `scripts/sw-fleet-discover.sh` | 567 | Auto-Discovery from GitHub Orgs |
+| `scripts/sw-fleet.sh` | 1387 | Multi-Repo Daemon Orchestrator |
 | `scripts/sw-heartbeat.sh` | 293 | File-based agent heartbeat protocol |
 | `scripts/sw-init.sh` | 522 | Complete setup for Shipwright + Shipwright |
 | `scripts/sw-intelligence.sh` | 1196 | AI-Powered Analysis & Decision Engine |
@@ -196,6 +197,7 @@ All scripts are bash (except the dashboard server in TypeScript). Grouped by lay
 | `scripts/sw-pipeline-composer.sh` | 455 | Dynamic Pipeline Composition |
 | `scripts/sw-pipeline-vitals.sh` | 1096 | Pipeline Vitals Engine |
 | `scripts/sw-pipeline.sh` | 8090 | Autonomous Feature Delivery (Idea → Production) |
+| `scripts/sw-pr-lifecycle.sh` | 522 | Autonomous PR Management |
 | `scripts/sw-predictive.sh` | 820 | Predictive & Proactive Intelligence |
 | `scripts/sw-prep.sh` | 1642 | Repository Preparation for Agent Teams |
 | `scripts/sw-ps.sh` | 171 | Show running agent process status |
@@ -209,8 +211,9 @@ All scripts are bash (except the dashboard server in TypeScript). Grouped by lay
 | `scripts/sw-tmux.sh` | 591 | tmux Health & Plugin Management |
 | `scripts/sw-tracker.sh` | 409 | Provider Router for Issue Tracker Integration |
 | `scripts/sw-upgrade.sh` | 479 | Detect and apply updates from the repo |
+| `scripts/sw-webhook.sh` | 627 | GitHub Webhook Receiver for Instant Issue Processing |
 | `scripts/sw-worktree.sh` | 408 | Git worktree management for multi-agent isolation |
-| `scripts/sw` | 350 | CLI router — dispatches subcommands via exec |
+| `scripts/sw` | 358 | CLI router — dispatches subcommands via exec |
 <!-- /AUTO:core-scripts -->
 
 ### GitHub API Modules
