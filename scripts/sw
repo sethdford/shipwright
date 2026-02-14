@@ -118,6 +118,7 @@ show_help() {
     echo -e "  ${CYAN}stream${RESET}               ${BOLD}Terminal streaming${RESET} — live agent output to dashboard or CLI"
     echo -e "  ${CYAN}github${RESET}               ${BOLD}GitHub context${RESET} — repo metadata, security, blame"
     echo -e "  ${CYAN}checks${RESET}               ${BOLD}GitHub checks${RESET} — CI check runs and status"
+    echo -e "  ${CYAN}ci${RESET}                   ${BOLD}CI/CD orchestration${RESET} — workflow generation, matrix, caching, secrets"
     echo -e "  ${CYAN}deploys${RESET}              ${BOLD}Deployments${RESET} — deployment history and environments"
     echo -e "  ${CYAN}github-app${RESET}           ${BOLD}GitHub App management${RESET} — JWT, tokens, webhooks, manifest"
     echo -e "  ${CYAN}pr${RESET}                   ${BOLD}PR lifecycle${RESET} — auto-review, merge, cleanup, feedback"
@@ -403,6 +404,9 @@ main() {
             ;;
         checks)
             exec "$SCRIPT_DIR/sw-github-checks.sh" "$@"
+            ;;
+        ci)
+            exec "$SCRIPT_DIR/sw-ci.sh" "$@"
             ;;
         deploys|deployments)
             exec "$SCRIPT_DIR/sw-github-deploy.sh" "$@"
