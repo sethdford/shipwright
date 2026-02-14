@@ -167,9 +167,11 @@ All scripts are bash (except the dashboard server in TypeScript). Grouped by lay
 
 | File | Lines | Purpose |
 | --- | ---: | --- |
+| `scripts/sw-activity.sh` | 500 | Live agent activity stream |
 | `scripts/sw-adaptive.sh` | 925 | data-driven pipeline tuning |
 | `scripts/sw-adversarial.sh` | 274 | Adversarial Agent Code Review |
 | `scripts/sw-architecture-enforcer.sh` | 330 | Living Architecture Model & Enforcer |
+| `scripts/sw-auth.sh` | 613 | GitHub OAuth Authentication |
 | `scripts/sw-checkpoint.sh` | 468 | Save and restore agent state mid-stage |
 | `scripts/sw-cleanup.sh` | 359 | Clean up orphaned Claude team sessions & artifacts |
 | `scripts/sw-connect.sh` | 619 | Sync local state to team dashboard |
@@ -201,6 +203,7 @@ All scripts are bash (except the dashboard server in TypeScript). Grouped by lay
 | `scripts/sw-logs.sh` | 343 | View and search agent pane logs |
 | `scripts/sw-loop.sh` | 2278 | Continuous agent loop harness for Claude Code |
 | `scripts/sw-memory.sh` | 1626 | Persistent Learning & Context System |
+| `scripts/sw-mission-control.sh` | 487 | Terminal-based pipeline mission control |
 | `scripts/sw-model-router.sh` | 545 | Intelligent Model Routing & Cost Optimization |
 | `scripts/sw-otel.sh` | 596 | OpenTelemetry Observability |
 | `scripts/sw-patrol-meta.sh` | 417 | Shipwright Self-Improvement Patrol |
@@ -212,6 +215,7 @@ All scripts are bash (except the dashboard server in TypeScript). Grouped by lay
 | `scripts/sw-predictive.sh` | 820 | Predictive & Proactive Intelligence |
 | `scripts/sw-prep.sh` | 1642 | Repository Preparation for Agent Teams |
 | `scripts/sw-ps.sh` | 171 | Show running agent process status |
+| `scripts/sw-public-dashboard.sh` | 798 | Public real-time pipeline progress |
 | `scripts/sw-quality.sh` | 595 | Intelligent completion, audits, zero auto |
 | `scripts/sw-reaper.sh` | 394 | Automatic tmux pane cleanup when agents exit |
 | `scripts/sw-regression.sh` | 642 | Regression Detection Pipeline |
@@ -224,6 +228,8 @@ All scripts are bash (except the dashboard server in TypeScript). Grouped by lay
 | `scripts/sw-setup.sh` | 234 | One-shot setup: check prerequisites, init, doctor |
 | `scripts/sw-status.sh` | 796 | Dashboard showing Claude Code team status |
 | `scripts/sw-strategic.sh` | 677 | Strategic Intelligence Agent |
+| `scripts/sw-stream.sh` | 450 | Live terminal output streaming from agent panes |
+| `scripts/sw-team-stages.sh` | 511 | Multi-agent execution with leader/specialist roles |
 | `scripts/sw-templates.sh` | 247 | Browse and inspect team templates |
 | `scripts/sw-tmux-pipeline.sh` | 554 | Spawn and manage pipelines in tmux windows |
 | `scripts/sw-tmux.sh` | 591 | tmux Health & Plugin Management |
@@ -231,10 +237,11 @@ All scripts are bash (except the dashboard server in TypeScript). Grouped by lay
 | `scripts/sw-tracker.sh` | 524 | Provider Router for Issue Tracker Integration |
 | `scripts/sw-triage.sh` | 603 | Intelligent Issue Labeling & Prioritization |
 | `scripts/sw-upgrade.sh` | 479 | Detect and apply updates from the repo |
+| `scripts/sw-ux.sh` | 677 | Premium UX Enhancement Layer |
 | `scripts/sw-webhook.sh` | 627 | GitHub Webhook Receiver for Instant Issue Processing |
 | `scripts/sw-widgets.sh` | 530 | Embeddable Status Widgets |
 | `scripts/sw-worktree.sh` | 408 | Git worktree management for multi-agent isolation |
-| `scripts/sw` | 440 | CLI router — dispatches subcommands via exec |
+| `scripts/sw` | 473 | CLI router — dispatches subcommands via exec |
 <!-- /AUTO:core-scripts -->
 
 ### GitHub API Modules
@@ -243,6 +250,7 @@ All scripts are bash (except the dashboard server in TypeScript). Grouped by lay
 
 | File | Lines | Purpose |
 | --- | ---: | --- |
+| `scripts/sw-github-app.sh` | 596 | GitHub App Management & Webhook Receiver |
 | `scripts/sw-github-checks.sh` | 521 | Native GitHub Checks API Integration |
 | `scripts/sw-github-deploy.sh` | 533 | Native GitHub Deployments API Integration |
 | `scripts/sw-github-graphql.sh` | 972 | GitHub GraphQL API Client |
