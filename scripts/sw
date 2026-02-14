@@ -101,6 +101,7 @@ show_help() {
     echo -e "  ${CYAN}tracker${RESET} <cmd>           ${BOLD}Issue tracker${RESET} — configure Linear/Jira integration"
     echo -e "  ${CYAN}heartbeat${RESET} <cmd>        ${BOLD}Agent heartbeat${RESET} — write/check/list/clear heartbeats"
     echo -e "  ${CYAN}checkpoint${RESET} <cmd>       ${BOLD}Checkpoints${RESET} — save/restore agent state mid-stage"
+    echo -e "  ${CYAN}durable${RESET} <cmd>          ${BOLD}Durable workflow${RESET} — event log, checkpoints, locks, exactly-once"
     echo -e "  ${CYAN}webhook${RESET} <cmd>          ${BOLD}GitHub webhooks${RESET} — instant issue processing, no polling"
     echo -e "  ${CYAN}decompose${RESET} <cmd>        ${BOLD}Issue decomposer${RESET} — analyze complexity, auto-create subtasks"
     echo -e "  ${CYAN}discovery${RESET} <cmd>        ${BOLD}Cross-pipeline learning${RESET} — real-time knowledge sharing"
@@ -334,6 +335,9 @@ main() {
             ;;
         checkpoint)
             exec "$SCRIPT_DIR/sw-checkpoint.sh" "$@"
+            ;;
+        durable)
+            exec "$SCRIPT_DIR/sw-durable.sh" "$@"
             ;;
         webhook)
             exec "$SCRIPT_DIR/sw-webhook.sh" "$@"
