@@ -412,6 +412,9 @@ main() {
         quality)
             exec "$SCRIPT_DIR/sw-quality.sh" "$@"
             ;;
+        strategic|strategy)
+            exec "$SCRIPT_DIR/sw-strategic.sh" "$@"
+            ;;
         pm)
             exec "$SCRIPT_DIR/sw-pm.sh" "$@"
             ;;

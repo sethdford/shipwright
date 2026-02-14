@@ -1,0 +1,128 @@
+name: Shipwright Strategic Intelligence
+
+# Autonomous product development — reads strategy, codebase, and metrics
+# to decide what to build next. Creates well-scoped issues for the pipeline.
+on:
+  schedule:
+    - cron: "0 6 * * *" # Daily at 6am UTC
+  workflow_dispatch: {}
+
+concurrency:
+  group: shipwright-strategic
+  cancel-in-progress: true
+
+permissions:
+  contents: write
+  issues: write
+
+jobs:
+  strategic:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    env:
+      GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Install jq
+        run: sudo apt-get update && sudo apt-get install -y jq
+
+      - name: Configure git
+        run: |
+          git config user.name "shipwright[bot]"
+          git config user.email "shipwright[bot]@users.noreply.github.com"
+
+      - name: Restore persistent state
+        run: |
+          mkdir -p ~/.shipwright/memory ~/.shipwright/optimization
+          if git fetch origin shipwright-data 2>/dev/null; then
+            echo "Restoring state from shipwright-data branch..."
+            for file in events.jsonl costs.json budget.json; do
+              git show "origin/shipwright-data:${file}" > ~/.shipwright/"${file}" 2>/dev/null || true
+            done
+            for dir in memory optimization; do
+              for file in $(git ls-tree -r --name-only origin/shipwright-data -- "${dir}/" 2>/dev/null); do
+                mkdir -p ~/.shipwright/"$(dirname "$file")"
+                git show "origin/shipwright-data:${file}" > ~/.shipwright/"${file}" 2>/dev/null || true
+              done
+            done
+            echo "State restored successfully"
+          else
+            echo "No shipwright-data branch found — starting fresh"
+          fi
+
+      - name: Run strategic analysis
+        run: |
+          set +e
+
+          if [[ -z "${ANTHROPIC_API_KEY:-}" ]]; then
+            echo "WARNING: ANTHROPIC_API_KEY not set — strategic analysis requires AI"
+            echo "Set ANTHROPIC_API_KEY in repository secrets to enable strategic intelligence"
+            exit 0
+          fi
+
+          echo "--- Running Strategic Intelligence Agent ---"
+          bash ./scripts/sw-strategic.sh run 2>&1
+          EXIT_CODE=$?
+
+          if [[ "$EXIT_CODE" -eq 0 ]]; then
+            echo "Strategic analysis completed successfully"
+          else
+            echo "Strategic analysis exited with code $EXIT_CODE (non-fatal)"
+          fi
+
+      - name: Persist state to shipwright-data branch
+        if: always()
+        run: |
+          SW_STATE_DIR=$(mktemp -d)
+          cd "$SW_STATE_DIR"
+          git init
+          git remote add origin "https://x-access-token:${GITHUB_TOKEN}@github.com/${{ github.repository }}.git"
+          if git fetch origin shipwright-data 2>/dev/null; then
+            git checkout -b shipwright-data origin/shipwright-data
+          else
+            git checkout --orphan shipwright-data
+            echo "# Shipwright Persistent State" > README.md
+          fi
+          cp ~/.shipwright/events.jsonl . 2>/dev/null || true
+          cp ~/.shipwright/costs.json . 2>/dev/null || true
+          cp ~/.shipwright/budget.json . 2>/dev/null || true
+          for dir in memory optimization; do
+            if [[ -d ~/.shipwright/${dir} ]]; then
+              cp -r ~/.shipwright/${dir} . 2>/dev/null || true
+            fi
+          done
+          git config user.name "shipwright[bot]"
+          git config user.email "shipwright[bot]@users.noreply.github.com"
+          git add -A
+          if git diff --cached --quiet 2>/dev/null; then
+            echo "No state changes to persist"
+          else
+            git commit -m "chore: persist strategic state [skip ci]"
+            PUSHED=false
+            for ATTEMPT in 1 2 3 4 5; do
+              if git push origin shipwright-data 2>/dev/null; then
+                PUSHED=true
+                break
+              fi
+              JITTER=$((RANDOM % 10 + 2))
+              echo "Push attempt $ATTEMPT failed — retrying in ${JITTER}s..."
+              sleep "$JITTER"
+              git fetch origin shipwright-data 2>/dev/null || true
+              git rebase origin/shipwright-data 2>/dev/null || {
+                echo "Rebase conflict — force pushing"
+                git rebase --abort 2>/dev/null || true
+                git push origin shipwright-data --force 2>/dev/null && PUSHED=true && break
+              }
+            done
+            if [ "$PUSHED" = "true" ]; then
+              echo "State persisted to shipwright-data branch"
+            else
+              echo "WARNING: Failed to persist state after 5 attempts — non-fatal"
+            fi
+          fi

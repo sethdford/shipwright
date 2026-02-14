@@ -4001,6 +4001,13 @@ Patrol pre-filter findings to confirm: ${patrol_findings_summary}"
         patrol_meta_run
     fi
 
+    # ── Strategic Intelligence Patrol (requires ANTHROPIC_API_KEY) ──
+    if [[ -f "$SCRIPT_DIR/sw-strategic.sh" ]] && [[ -n "${ANTHROPIC_API_KEY:-}" ]]; then
+        # shellcheck source=sw-strategic.sh
+        source "$SCRIPT_DIR/sw-strategic.sh"
+        strategic_patrol_run || true
+    fi
+
     # ── Summary ──
     emit_event "patrol.completed" "findings=$total_findings" "issues_created=$issues_created" "dry_run=$dry_run"
 
