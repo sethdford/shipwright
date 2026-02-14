@@ -110,6 +110,7 @@ show_help() {
     echo -e "  ${CYAN}auth${RESET} <cmd>            ${BOLD}GitHub authentication${RESET} — OAuth login, token management, multi-user"
     echo -e "  ${CYAN}docs${RESET} <cmd>            ${BOLD}Documentation keeper${RESET} — auto-sync docs from source"
     echo -e "  ${CYAN}release${RESET} <cmd>         ${BOLD}Release automation${RESET} — bump versions, changelog, tags, releases"
+    echo -e "  ${CYAN}release-manager|rm${RESET}    ${BOLD}Autonomous release pipeline${RESET} — readiness checks, RC flow, rollback"
     echo -e "  ${CYAN}replay${RESET} <cmd>           ${BOLD}Pipeline DVR${RESET} — list, show, narrative, diff, export, compare runs"
     echo -e "  ${CYAN}scale${RESET} <cmd>            ${BOLD}Dynamic team scaling${RESET} — scale agents up/down during pipeline"
     echo -e "  ${CYAN}dora${RESET} <cmd>            ${BOLD}DORA metrics${RESET} — deploy frequency, lead time, CFR, MTTR dashboard"
@@ -382,6 +383,9 @@ main() {
             ;;
         release)
             exec "$SCRIPT_DIR/sw-release.sh" "$@"
+            ;;
+        release-manager|rm)
+            exec "$SCRIPT_DIR/sw-release-manager.sh" "$@"
             ;;
         replay)
             exec "$SCRIPT_DIR/sw-replay.sh" "$@"
