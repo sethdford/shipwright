@@ -94,6 +94,7 @@ show_help() {
     echo -e "  ${CYAN}checkpoint${RESET} <cmd>       ${BOLD}Checkpoints${RESET} — save/restore agent state mid-stage"
     echo -e "  ${CYAN}webhook${RESET} <cmd>          ${BOLD}GitHub webhooks${RESET} — instant issue processing, no polling"
     echo -e "  ${CYAN}decompose${RESET} <cmd>        ${BOLD}Issue decomposer${RESET} — analyze complexity, auto-create subtasks"
+    echo -e "  ${CYAN}discovery${RESET} <cmd>        ${BOLD}Cross-pipeline learning${RESET} — real-time knowledge sharing"
     echo -e "  ${CYAN}connect${RESET} <cmd>          ${BOLD}Team connect${RESET} — sync local state to team dashboard"
     echo -e "  ${CYAN}remote${RESET} <cmd>           ${BOLD}Remote machines${RESET} — register and manage distributed workers"
     echo -e "  ${CYAN}launchd${RESET} <cmd>          ${BOLD}Process supervision${RESET} — auto-start daemon + dashboard on boot"
@@ -340,6 +341,9 @@ main() {
             ;;
         decompose)
             exec "$SCRIPT_DIR/sw-decompose.sh" "$@"
+            ;;
+        discovery)
+            exec "$SCRIPT_DIR/sw-discovery.sh" "$@"
             ;;
         context)
             exec "$SCRIPT_DIR/sw-context.sh" "$@"
