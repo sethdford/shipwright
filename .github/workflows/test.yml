@@ -97,6 +97,9 @@ jobs:
       - name: Run launchd tests
         run: bash scripts/sw-launchd-test.sh
 
+      - name: Run E2E smoke tests
+        run: bash scripts/sw-e2e-smoke-test.sh
+
   shellcheck:
     runs-on: ubuntu-latest
     steps:

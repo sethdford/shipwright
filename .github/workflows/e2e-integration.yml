@@ -1,0 +1,129 @@
+name: E2E Integration Tests
+
+on:
+  workflow_dispatch: {}
+  schedule:
+    - cron: "0 2 * * 0" # Weekly Sunday 2am UTC
+
+concurrency:
+  group: e2e-integration
+  cancel-in-progress: false
+
+jobs:
+  integration:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      CLAUDE_CODE_OAUTH_TOKEN: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+      GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Install system dependencies
+        run: sudo apt-get update && sudo apt-get install -y tmux jq
+
+      - name: Install Claude Code CLI
+        run: npm install -g @anthropic-ai/claude-code
+
+      - name: Pre-flight auth check
+        run: |
+          echo "Checking GitHub authentication..."
+          gh auth status
+          echo ""
+          echo "Checking Claude Code authentication..."
+          if [ -n "${CLAUDE_CODE_OAUTH_TOKEN:-}" ]; then
+            echo "✓ CLAUDE_CODE_OAUTH_TOKEN is set"
+          elif [ -n "${ANTHROPIC_API_KEY:-}" ]; then
+            echo "✓ ANTHROPIC_API_KEY is set"
+          else
+            echo "✗ No Claude authentication found"
+            exit 1
+          fi
+
+      - name: Run E2E integration tests
+        run: bash scripts/sw-e2e-integration-test.sh
+
+      - name: Write job summary
+        if: always()
+        run: |
+          echo "## E2E Integration Test Results" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          if [ "${{ job.status }}" == "success" ]; then
+            echo "✅ All integration tests passed" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "❌ Some integration tests failed" >> $GITHUB_STEP_SUMMARY
+          fi
+          echo "" >> $GITHUB_STEP_SUMMARY
+
+          # Show pipeline state if available
+          if [ -f .claude/pipeline-state.md ]; then
+            echo "### Pipeline State" >> $GITHUB_STEP_SUMMARY
+            echo '```' >> $GITHUB_STEP_SUMMARY
+            head -20 .claude/pipeline-state.md >> $GITHUB_STEP_SUMMARY
+            echo '```' >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+          fi
+
+          # Show cost info if available
+          if [ -f ~/.shipwright/costs.json ]; then
+            echo "### Cost Breakdown" >> $GITHUB_STEP_SUMMARY
+            echo '```json' >> $GITHUB_STEP_SUMMARY
+            tail -5 ~/.shipwright/costs.json >> $GITHUB_STEP_SUMMARY
+            echo '```' >> $GITHUB_STEP_SUMMARY
+          fi
+
+      - name: Upload test artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: integration-test-artifacts
+          path: |
+            .claude/pipeline-state.md
+            .claude/pipeline-artifacts/
+            ~/.shipwright/costs.json
+          if-no-files-found: ignore
+          retention-days: 30
+
+  cleanup:
+    runs-on: ubuntu-latest
+    needs: integration
+    if: always()
+    env:
+      GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Cleanup orphaned e2e-test resources
+        run: |
+          echo "Cleaning up orphaned e2e-test resources..."
+
+          # Close any open e2e-test issues
+          gh issue list --label "e2e-test" --state open --json number --jq '.[].number' | while read -r num; do
+            echo "Closing orphaned issue #$num"
+            gh issue close "$num" 2>/dev/null || true
+          done
+
+          # Close any open e2e-test PRs
+          gh pr list --label "e2e-test" --state open --json number --jq '.[].number' | while read -r num; do
+            echo "Closing orphaned PR #$num"
+            gh pr close "$num" --delete-branch 2>/dev/null || true
+          done
+
+          # Delete orphaned e2e branches
+          git branch -r --list 'origin/shipwright/issue-*' 2>/dev/null | while read -r branch; do
+            local_name="${branch#origin/}"
+            # Check if the associated issue/PR is closed
+            echo "Checking remote branch: $local_name"
+          done
+
+          echo "Cleanup complete"

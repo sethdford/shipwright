@@ -185,7 +185,7 @@ All scripts are bash (except the dashboard server in TypeScript). Grouped by lay
 | `scripts/sw-fleet-discover.sh` | 567 | Auto-Discovery from GitHub Orgs |
 | `scripts/sw-fleet.sh` | 1387 | Multi-Repo Daemon Orchestrator |
 | `scripts/sw-heartbeat.sh` | 293 | File-based agent heartbeat protocol |
-| `scripts/sw-init.sh` | 522 | Complete setup for Shipwright + Shipwright |
+| `scripts/sw-init.sh` | 609 | Complete setup for Shipwright + Shipwright |
 | `scripts/sw-intelligence.sh` | 1196 | AI-Powered Analysis & Decision Engine |
 | `scripts/sw-jira.sh` | 643 | Jira ↔ GitHub Bidirectional Sync |
 | `scripts/sw-launchd.sh` | 699 | Process supervision (macOS + Linux) |
@@ -196,7 +196,7 @@ All scripts are bash (except the dashboard server in TypeScript). Grouped by lay
 | `scripts/sw-patrol-meta.sh` | 417 | Shipwright Self-Improvement Patrol |
 | `scripts/sw-pipeline-composer.sh` | 455 | Dynamic Pipeline Composition |
 | `scripts/sw-pipeline-vitals.sh` | 1096 | Pipeline Vitals Engine |
-| `scripts/sw-pipeline.sh` | 8090 | Autonomous Feature Delivery (Idea → Production) |
+| `scripts/sw-pipeline.sh` | 8256 | Autonomous Feature Delivery (Idea → Production) |
 | `scripts/sw-pr-lifecycle.sh` | 522 | Autonomous PR Management |
 | `scripts/sw-predictive.sh` | 820 | Predictive & Proactive Intelligence |
 | `scripts/sw-prep.sh` | 1642 | Repository Preparation for Agent Teams |

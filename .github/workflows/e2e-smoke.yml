@@ -1,0 +1,54 @@
+name: E2E Smoke Tests
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  smoke:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install dependencies (macOS)
+        if: runner.os == 'macOS'
+        run: brew install tmux jq
+
+      - name: Install dependencies (Linux)
+        if: runner.os == 'Linux'
+        run: sudo apt-get update && sudo apt-get install -y tmux jq
+
+      - name: Run E2E smoke tests
+        run: bash scripts/sw-e2e-smoke-test.sh
+
+      - name: Write job summary
+        if: always()
+        run: |
+          echo "## E2E Smoke Test Results (${{ matrix.os }})" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          if [ ${{ job.status }} == 'success' ]; then
+            echo "✅ All smoke tests passed" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "❌ Some smoke tests failed" >> $GITHUB_STEP_SUMMARY
+          fi
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "See the test output above for detailed results." >> $GITHUB_STEP_SUMMARY
+
+      - name: Upload test artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: smoke-test-artifacts-${{ matrix.os }}
+          path: |
+            .claude/pipeline-state.md
+            .claude/pipeline-artifacts/
+          if-no-files-found: ignore
+          retention-days: 7
