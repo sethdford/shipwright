@@ -172,9 +172,11 @@ All scripts are bash (except the dashboard server in TypeScript). Grouped by lay
 | `scripts/sw-checkpoint.sh` | 468 | Save and restore agent state mid-stage |
 | `scripts/sw-cleanup.sh` | 359 | Clean up orphaned Claude team sessions & artifacts |
 | `scripts/sw-connect.sh` | 619 | Sync local state to team dashboard |
+| `scripts/sw-context.sh` | 605 | Context Engine for Pipeline Stages |
 | `scripts/sw-cost.sh` | 924 | Token Usage & Cost Intelligence |
-| `scripts/sw-daemon.sh` | 5670 | Autonomous GitHub Issue Watcher |
+| `scripts/sw-daemon.sh` | 5683 | Autonomous GitHub Issue Watcher |
 | `scripts/sw-dashboard.sh` | 477 | Fleet Command Dashboard |
+| `scripts/sw-decompose.sh` | 539 | Issue Complexity Analysis & Subtask Generation |
 | `scripts/sw-developer-simulation.sh` | 252 | Multi-Persona Developer Simulation |
 | `scripts/sw-docs.sh` | 635 | Documentation Keeper |
 | `scripts/sw-doctor.sh` | 907 | Validate Shipwright setup |
@@ -192,7 +194,7 @@ All scripts are bash (except the dashboard server in TypeScript). Grouped by lay
 | `scripts/sw-patrol-meta.sh` | 417 | Shipwright Self-Improvement Patrol |
 | `scripts/sw-pipeline-composer.sh` | 455 | Dynamic Pipeline Composition |
 | `scripts/sw-pipeline-vitals.sh` | 1096 | Pipeline Vitals Engine |
-| `scripts/sw-pipeline.sh` | 7652 | Autonomous Feature Delivery (Idea → Production) |
+| `scripts/sw-pipeline.sh` | 8010 | Autonomous Feature Delivery (Idea → Production) |
 | `scripts/sw-predictive.sh` | 820 | Predictive & Proactive Intelligence |
 | `scripts/sw-prep.sh` | 1642 | Repository Preparation for Agent Teams |
 | `scripts/sw-ps.sh` | 171 | Show running agent process status |
@@ -207,7 +209,7 @@ All scripts are bash (except the dashboard server in TypeScript). Grouped by lay
 | `scripts/sw-tracker.sh` | 409 | Provider Router for Issue Tracker Integration |
 | `scripts/sw-upgrade.sh` | 479 | Detect and apply updates from the repo |
 | `scripts/sw-worktree.sh` | 408 | Git worktree management for multi-agent isolation |
-| `scripts/sw` | 338 | CLI router — dispatches subcommands via exec |
+| `scripts/sw` | 346 | CLI router — dispatches subcommands via exec |
 <!-- /AUTO:core-scripts -->
 
 ### GitHub API Modules
