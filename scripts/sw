@@ -104,6 +104,7 @@ show_help() {
     echo -e "  ${CYAN}connect${RESET} <cmd>          ${BOLD}Team connect${RESET} — sync local state to team dashboard"
     echo -e "  ${CYAN}remote${RESET} <cmd>           ${BOLD}Remote machines${RESET} — register and manage distributed workers"
     echo -e "  ${CYAN}launchd${RESET} <cmd>          ${BOLD}Process supervision${RESET} — auto-start daemon + dashboard on boot"
+    echo -e "  ${CYAN}auth${RESET} <cmd>            ${BOLD}GitHub authentication${RESET} — OAuth login, token management, multi-user"
     echo -e "  ${CYAN}docs${RESET} <cmd>            ${BOLD}Documentation keeper${RESET} — auto-sync docs from source"
     echo -e "  ${CYAN}release${RESET} <cmd>         ${BOLD}Release automation${RESET} — bump versions, changelog, tags, releases"
     echo -e "  ${CYAN}replay${RESET} <cmd>           ${BOLD}Pipeline DVR${RESET} — list, show, narrative, diff, export, compare runs"
@@ -335,6 +336,9 @@ main() {
             ;;
         launchd)
             exec "$SCRIPT_DIR/sw-launchd.sh" "$@"
+            ;;
+        auth)
+            exec "$SCRIPT_DIR/sw-auth.sh" "$@"
             ;;
         intelligence|intel)
             exec "$SCRIPT_DIR/sw-intelligence.sh" "$@"
