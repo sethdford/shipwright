@@ -122,6 +122,7 @@ show_help() {
     echo -e "  ${CYAN}triage${RESET}                ${BOLD}Issue labeling & prioritization${RESET} — auto-analyze, label, score, team sizing"
     echo -e "  ${CYAN}quality${RESET}               ${BOLD}Quality validation${RESET} — ruthless gates, adversarial audits, completion detection"
     echo -e "  ${CYAN}pm${RESET}                    ${BOLD}Autonomous PM agent${RESET} — intelligent team sizing, composition, orchestration"
+    echo -e "  ${CYAN}strategic${RESET}             ${BOLD}Strategic intelligence${RESET} — analyze strategy, metrics, create improvement issues"
     echo -e "  ${CYAN}init${RESET}                  ${BOLD}Quick tmux setup${RESET} — one command, no prompts"
     echo -e "  ${CYAN}setup${RESET}                 ${BOLD}Guided setup${RESET} — prerequisites, init, doctor, quick start"
     echo -e "  ${CYAN}help${RESET}                  Show this help message"
@@ -343,6 +344,9 @@ main() {
         simulation)
             exec "$SCRIPT_DIR/sw-developer-simulation.sh" "$@"
             ;;
+        strategic|strategy)
+            exec "$SCRIPT_DIR/sw-strategic.sh" "$@"
+            ;;
         architecture)
             exec "$SCRIPT_DIR/sw-architecture-enforcer.sh" "$@"
             ;;
@@ -411,9 +415,6 @@ main() {
             ;;
         quality)
             exec "$SCRIPT_DIR/sw-quality.sh" "$@"
-            ;;
-        strategic|strategy)
-            exec "$SCRIPT_DIR/sw-strategic.sh" "$@"
             ;;
         pm)
             exec "$SCRIPT_DIR/sw-pm.sh" "$@"
