@@ -102,6 +102,7 @@ show_help() {
     echo -e "  ${CYAN}docs${RESET} <cmd>            ${BOLD}Documentation keeper${RESET} — auto-sync docs from source"
     echo -e "  ${CYAN}release${RESET} <cmd>         ${BOLD}Release automation${RESET} — bump versions, changelog, tags, releases"
     echo -e "  ${CYAN}scale${RESET} <cmd>            ${BOLD}Dynamic team scaling${RESET} — scale agents up/down during pipeline"
+    echo -e "  ${CYAN}dora${RESET} <cmd>            ${BOLD}DORA metrics${RESET} — deploy frequency, lead time, CFR, MTTR dashboard"
     echo -e "  ${CYAN}tmux${RESET} <cmd>            ${BOLD}tmux health${RESET} — doctor, install plugins, fix issues"
     echo -e "  ${CYAN}vitals${RESET}               ${BOLD}Pipeline vitals${RESET} — real-time health scoring and dashboard"
     echo -e "  ${CYAN}github${RESET}               ${BOLD}GitHub context${RESET} — repo metadata, security, blame"
@@ -336,6 +337,9 @@ main() {
             ;;
         scale)
             exec "$SCRIPT_DIR/sw-scale.sh" "$@"
+            ;;
+        dora)
+            exec "$SCRIPT_DIR/sw-dora.sh" "$@"
             ;;
         tmux)
             exec "$SCRIPT_DIR/sw-tmux.sh" "$@"
