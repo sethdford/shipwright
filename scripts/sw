@@ -85,6 +85,7 @@ show_help() {
     echo -e "  ${CYAN}regression${RESET} <cmd>       ${BOLD}Regression detection${RESET} — detect regressions after merge"
     echo -e "  ${CYAN}db${RESET} <cmd>               ${BOLD}SQLite persistence${RESET} — events, runs, developers, metrics"
     echo -e "  ${CYAN}fleet${RESET} <cmd>           ${BOLD}Multi-repo fleet${RESET} — orchestrate daemons across repos"
+    echo -e "  ${CYAN}fleet-viz${RESET} <cmd>        ${BOLD}Fleet visualization${RESET} — cross-repo insights and queue"
     echo -e "  ${CYAN}fix${RESET} \"goal\" [opts]     ${BOLD}Bulk fix${RESET} — apply a fix across multiple repos"
     echo -e "  ${CYAN}dashboard${RESET} <cmd>        ${BOLD}Fleet Command${RESET} — real-time WebSocket dashboard"
     echo -e "  ${CYAN}jira${RESET} <cmd>             ${BOLD}Jira sync${RESET} — bidirectional issue sync with Jira"
@@ -265,6 +266,9 @@ main() {
             ;;
         fleet)
             exec "$SCRIPT_DIR/sw-fleet.sh" "$@"
+            ;;
+        fleet-viz)
+            exec "$SCRIPT_DIR/sw-fleet-viz.sh" "$@"
             ;;
         fix)
             exec "$SCRIPT_DIR/sw-fix.sh" "$@"
