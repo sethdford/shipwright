@@ -7618,6 +7618,172 @@ pipeline_cleanup_worktree() {
     fi
 }
 
+# ─── Dry Run Mode ───────────────────────────────────────────────────────────
+# Shows what would happen without executing
+run_dry_run() {
+    echo ""
+    echo -e "${BLUE}${BOLD}━━━ Dry Run: Pipeline Validation ━━━${RESET}"
+    echo ""
+
+    # Validate pipeline config
+    if [[ ! -f "$PIPELINE_CONFIG" ]]; then
+        error "Pipeline config not found: $PIPELINE_CONFIG"
+        return 1
+    fi
+
+    # Validate JSON structure
+    local validate_json
+    validate_json=$(jq . "$PIPELINE_CONFIG" 2>/dev/null) || {
+        error "Pipeline config is not valid JSON: $PIPELINE_CONFIG"
+        return 1
+    }
+
+    # Extract pipeline metadata
+    local pipeline_name stages_count enabled_stages gated_stages
+    pipeline_name=$(jq -r '.name // "unknown"' "$PIPELINE_CONFIG")
+    stages_count=$(jq '.stages | length' "$PIPELINE_CONFIG")
+    enabled_stages=$(jq '[.stages[] | select(.enabled == true)] | length' "$PIPELINE_CONFIG")
+    gated_stages=$(jq '[.stages[] | select(.enabled == true and .gate == "approve")] | length' "$PIPELINE_CONFIG")
+
+    # Build model (per-stage override or default)
+    local default_model stage_model
+    default_model=$(jq -r '.defaults.model // "opus"' "$PIPELINE_CONFIG")
+    stage_model="$MODEL"
+    [[ -z "$stage_model" ]] && stage_model="$default_model"
+
+    echo -e "  ${BOLD}Pipeline:${RESET}       $pipeline_name"
+    echo -e "  ${BOLD}Stages:${RESET}         $enabled_stages enabled of $stages_count total"
+    if [[ "$SKIP_GATES" == "true" ]]; then
+        echo -e "  ${BOLD}Gates:${RESET}         ${YELLOW}all auto (--skip-gates)${RESET}"
+    else
+        echo -e "  ${BOLD}Gates:${RESET}         $gated_stages approval gate(s)"
+    fi
+    echo -e "  ${BOLD}Model:${RESET}         $stage_model"
+    echo ""
+
+    # Table header
+    echo -e "${CYAN}${BOLD}Stage         Enabled  Gate     Model${RESET}"
+    echo -e "${CYAN}────────────────────────────────────────${RESET}"
+
+    # List all stages
+    while IFS= read -r stage_json; do
+        local stage_id stage_enabled stage_gate stage_config_model stage_model_display
+        stage_id=$(echo "$stage_json" | jq -r '.id')
+        stage_enabled=$(echo "$stage_json" | jq -r '.enabled')
+        stage_gate=$(echo "$stage_json" | jq -r '.gate')
+
+        # Determine stage model (config override or default)
+        stage_config_model=$(echo "$stage_json" | jq -r '.config.model // ""')
+        if [[ -n "$stage_config_model" && "$stage_config_model" != "null" ]]; then
+            stage_model_display="$stage_config_model"
+        else
+            stage_model_display="$default_model"
+        fi
+
+        # Format enabled
+        local enabled_str
+        if [[ "$stage_enabled" == "true" ]]; then
+            enabled_str="${GREEN}yes${RESET}"
+        else
+            enabled_str="${DIM}no${RESET}"
+        fi
+
+        # Format gate
+        local gate_str
+        if [[ "$stage_enabled" == "true" ]]; then
+            if [[ "$stage_gate" == "approve" ]]; then
+                gate_str="${YELLOW}approve${RESET}"
+            else
+                gate_str="${GREEN}auto${RESET}"
+            fi
+        else
+            gate_str="${DIM}—${RESET}"
+        fi
+
+        printf "%-15s %s  %s  %s\n" "$stage_id" "$enabled_str" "$gate_str" "$stage_model_display"
+    done < <(jq -c '.stages[]' "$PIPELINE_CONFIG")
+
+    echo ""
+
+    # Validate required tools
+    echo -e "${BLUE}${BOLD}━━━ Tool Validation ━━━${RESET}"
+    echo ""
+
+    local tool_errors=0
+    local required_tools=("git" "jq")
+    local optional_tools=("gh" "claude" "bc")
+
+    for tool in "${required_tools[@]}"; do
+        if command -v "$tool" &>/dev/null; then
+            echo -e "  ${GREEN}✓${RESET} $tool"
+        else
+            echo -e "  ${RED}✗${RESET} $tool ${RED}(required)${RESET}"
+            tool_errors=$((tool_errors + 1))
+        fi
+    done
+
+    for tool in "${optional_tools[@]}"; do
+        if command -v "$tool" &>/dev/null; then
+            echo -e "  ${GREEN}✓${RESET} $tool"
+        else
+            echo -e "  ${DIM}○${RESET} $tool"
+        fi
+    done
+
+    echo ""
+
+    # Cost estimation (rough approximation)
+    echo -e "${BLUE}${BOLD}━━━ Estimated Resource Usage ━━━${RESET}"
+    echo ""
+
+    # Very rough cost estimation: ~2000 input tokens per stage, ~3000 output tokens
+    # Adjust based on pipeline complexity
+    local input_tokens_estimate output_tokens_estimate
+    input_tokens_estimate=$(( enabled_stages * 2000 ))
+    output_tokens_estimate=$(( enabled_stages * 3000 ))
+
+    # Calculate cost based on selected model
+    local input_rate output_rate input_cost output_cost total_cost
+    input_rate=$(echo "$COST_MODEL_RATES" | jq -r ".${stage_model}.input // 3" 2>/dev/null || echo "3")
+    output_rate=$(echo "$COST_MODEL_RATES" | jq -r ".${stage_model}.output // 15" 2>/dev/null || echo "15")
+
+    # Cost calculation: tokens per million * rate
+    input_cost=$(awk -v tokens="$input_tokens_estimate" -v rate="$input_rate" 'BEGIN{printf "%.4f", (tokens / 1000000) * rate}')
+    output_cost=$(awk -v tokens="$output_tokens_estimate" -v rate="$output_rate" 'BEGIN{printf "%.4f", (tokens / 1000000) * rate}')
+    total_cost=$(awk -v i="$input_cost" -v o="$output_cost" 'BEGIN{printf "%.4f", i + o}')
+
+    echo -e "  ${BOLD}Estimated Input Tokens:${RESET}  ~$input_tokens_estimate"
+    echo -e "  ${BOLD}Estimated Output Tokens:${RESET} ~$output_tokens_estimate"
+    echo -e "  ${BOLD}Model Cost Rate:${RESET}        $stage_model"
+    echo -e "  ${BOLD}Estimated Cost:${RESET}         \$$total_cost USD (rough estimate)"
+    echo ""
+
+    # Validate composed pipeline if intelligence is enabled
+    if [[ -f "$ARTIFACTS_DIR/composed-pipeline.json" ]] && type composer_validate_pipeline &>/dev/null; then
+        echo -e "${BLUE}${BOLD}━━━ Intelligence-Composed Pipeline ━━━${RESET}"
+        echo ""
+
+        if composer_validate_pipeline "$(cat "$ARTIFACTS_DIR/composed-pipeline.json" 2>/dev/null || echo "")" 2>/dev/null; then
+            echo -e "  ${GREEN}✓${RESET} Composed pipeline is valid"
+        else
+            echo -e "  ${YELLOW}⚠${RESET} Composed pipeline validation failed (will use template defaults)"
+        fi
+        echo ""
+    fi
+
+    # Final validation result
+    if [[ "$tool_errors" -gt 0 ]]; then
+        error "Dry run validation failed: $tool_errors required tool(s) missing"
+        return 1
+    fi
+
+    success "Dry run validation passed"
+    echo ""
+    echo -e "  To execute this pipeline: ${DIM}remove --dry-run flag${RESET}"
+    echo ""
+    return 0
+}
+
 # ─── Subcommands ────────────────────────────────────────────────────────────
 
 pipeline_start() {
@@ -7735,8 +7901,8 @@ pipeline_start() {
     echo ""
 
     if [[ "$DRY_RUN" == "true" ]]; then
-        info "Dry run — no stages will execute"
-        return 0
+        run_dry_run
+        return $?
     fi
 
     # Start background heartbeat writer
