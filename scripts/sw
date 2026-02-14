@@ -111,6 +111,7 @@ show_help() {
     echo -e "  ${CYAN}dora${RESET} <cmd>            ${BOLD}DORA metrics${RESET} — deploy frequency, lead time, CFR, MTTR dashboard"
     echo -e "  ${CYAN}tmux${RESET} <cmd>            ${BOLD}tmux health${RESET} — doctor, install plugins, fix issues"
     echo -e "  ${CYAN}vitals${RESET}               ${BOLD}Pipeline vitals${RESET} — real-time health scoring and dashboard"
+    echo -e "  ${CYAN}stream${RESET}               ${BOLD}Terminal streaming${RESET} — live agent output to dashboard or CLI"
     echo -e "  ${CYAN}github${RESET}               ${BOLD}GitHub context${RESET} — repo metadata, security, blame"
     echo -e "  ${CYAN}checks${RESET}               ${BOLD}GitHub checks${RESET} — CI check runs and status"
     echo -e "  ${CYAN}deploys${RESET}              ${BOLD}Deployments${RESET} — deployment history and environments"
@@ -358,6 +359,9 @@ main() {
             ;;
         vitals)
             exec "$SCRIPT_DIR/sw-pipeline-vitals.sh" "$@"
+            ;;
+        stream)
+            exec "$SCRIPT_DIR/sw-stream.sh" "$@"
             ;;
         docs)
             exec "$SCRIPT_DIR/sw-docs.sh" "$@"
