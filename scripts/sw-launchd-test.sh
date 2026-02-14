@@ -237,22 +237,25 @@ test_macos_detection() {
 }
 
 # ──────────────────────────────────────────────────────────────────────────────
-# 2. Linux detection fails gracefully on launchd-only script
+# 2. Linux detection routes to systemd install path
 # ──────────────────────────────────────────────────────────────────────────────
-test_linux_detection_fails() {
+test_linux_detection_systemd() {
     create_mock_uname "linux"
 
-    # Run install on Linux — should fail with error message
+    # Create mock systemctl
+    cat > "$TEMP_DIR/bin/systemctl" <<'MOCK'
+#!/usr/bin/env bash
+echo "Mock systemctl: $*" >> "$TEMP_DIR/systemctl.log"
+MOCK
+    chmod +x "$TEMP_DIR/bin/systemctl"
+
+    # Run install on Linux — should succeed via systemd path
     local output exit_code=0
     output=$(OSTYPE="linux-gnu" bash "$TEMP_DIR/scripts/sw-launchd.sh" install 2>&1) || exit_code=$?
 
-    if [[ "$exit_code" -eq 0 ]]; then
-        echo -e "    ${RED}✗${RESET} Should have failed on Linux"
-        return 1
-    fi
-
-    if [[ ! "$output" =~ "only available on macOS" ]]; then
-        echo -e "    ${RED}✗${RESET} Expected macOS-only error message"
+    # Should NOT error with "macOS only" — systemd support is implemented
+    if [[ "$output" =~ "only available on macOS" ]]; then
+        echo -e "    ${RED}✗${RESET} Should use systemd on Linux, not fail with macOS-only error"
         return 1
     fi
     return 0
@@ -840,7 +843,7 @@ echo ""
 # OS Detection Tests
 echo -e "${PURPLE}${BOLD}OS Detection${RESET}"
 run_test "macOS detection sets OSTYPE correctly" test_macos_detection
-run_test "Linux detection fails gracefully" test_linux_detection_fails
+run_test "Linux detection routes to systemd" test_linux_detection_systemd
 echo ""
 
 # macOS Plist Generation Tests
