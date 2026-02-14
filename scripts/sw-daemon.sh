@@ -1238,6 +1238,74 @@ gh_record_failure() {
     fi
 }
 
+# ─── Runtime Auth Check ──────────────────────────────────────────────────────
+
+LAST_AUTH_CHECK_EPOCH=0
+AUTH_CHECK_INTERVAL=300  # 5 minutes
+
+daemon_preflight_auth_check() {
+    local now_e
+    now_e=$(now_epoch)
+    if [[ $((now_e - LAST_AUTH_CHECK_EPOCH)) -lt "$AUTH_CHECK_INTERVAL" ]]; then
+        return 0
+    fi
+    LAST_AUTH_CHECK_EPOCH="$now_e"
+
+    # gh auth check
+    if [[ "${NO_GITHUB:-false}" != "true" ]]; then
+        if ! gh auth status &>/dev/null 2>&1; then
+            daemon_log ERROR "GitHub auth check failed — auto-pausing daemon"
+            local pause_json
+            pause_json=$(jq -n --arg reason "gh_auth_failure" --arg ts "$(now_iso)" \
+                '{reason: $reason, timestamp: $ts}')
+            local _tmp_pause
+            _tmp_pause=$(mktemp "${TMPDIR:-/tmp}/sw-pause.XXXXXX")
+            echo "$pause_json" > "$_tmp_pause"
+            mv "$_tmp_pause" "$PAUSE_FLAG"
+            emit_event "daemon.auto_pause" "reason=gh_auth_failure"
+            return 1
+        fi
+    fi
+
+    # claude auth check with 15s timeout (macOS has no timeout command)
+    local claude_auth_ok=false
+    local _auth_tmp
+    _auth_tmp=$(mktemp "${TMPDIR:-/tmp}/sw-auth.XXXXXX")
+    ( claude --print -p "ok" --max-turns 1 > "$_auth_tmp" 2>/dev/null ) &
+    local _auth_pid=$!
+    local _auth_waited=0
+    while kill -0 "$_auth_pid" 2>/dev/null && [[ "$_auth_waited" -lt 15 ]]; do
+        sleep 1
+        _auth_waited=$((_auth_waited + 1))
+    done
+    if kill -0 "$_auth_pid" 2>/dev/null; then
+        kill "$_auth_pid" 2>/dev/null || true
+        wait "$_auth_pid" 2>/dev/null || true
+    else
+        wait "$_auth_pid" 2>/dev/null || true
+    fi
+
+    if [[ -s "$_auth_tmp" ]]; then
+        claude_auth_ok=true
+    fi
+    rm -f "$_auth_tmp"
+
+    if [[ "$claude_auth_ok" != "true" ]]; then
+        daemon_log ERROR "Claude auth check failed — auto-pausing daemon"
+        local pause_json
+        pause_json=$(jq -n --arg reason "claude_auth_failure" --arg ts "$(now_iso)" \
+            '{reason: $reason, timestamp: $ts}')
+        local _tmp_pause
+        _tmp_pause=$(mktemp "${TMPDIR:-/tmp}/sw-pause.XXXXXX")
+        echo "$pause_json" > "$_tmp_pause"
+        mv "$_tmp_pause" "$PAUSE_FLAG"
+        emit_event "daemon.auto_pause" "reason=claude_auth_failure"
+        return 1
+    fi
+
+    return 0
+}
+
 # ─── Pre-flight Checks ──────────────────────────────────────────────────────
 
 preflight_checks() {
@@ -1639,6 +1707,8 @@ daemon_spawn_pipeline() {
     local issue_num="$1"
     local issue_title="${2:-}"
     local repo_full_name="${3:-}"  # owner/repo (org mode only)
+    shift 3 2>/dev/null || true
+    local extra_pipeline_args=("$@")  # Optional extra args passed to sw-pipeline.sh
 
     daemon_log INFO "Spawning pipeline for issue #${issue_num}: ${issue_title}"
 
@@ -1768,6 +1838,11 @@ daemon_spawn_pipeline() {
     # Pass fast test command
     if [[ -n "${FAST_TEST_CMD_CFG:-}" ]]; then
         pipeline_args+=("--fast-test-cmd" "$FAST_TEST_CMD_CFG")
+    fi
+
+    # Append any extra pipeline args (from retry escalation, etc.)
+    if [[ ${#extra_pipeline_args[@]} -gt 0 ]]; then
+        pipeline_args+=("${extra_pipeline_args[@]}")
     fi
 
     # Run pipeline in work directory (background)
@@ -1999,6 +2074,9 @@ daemon_reap_completed() {
 daemon_on_success() {
     local issue_num="$1" duration="${2:-}"
 
+    # Reset consecutive failure tracking on any success
+    reset_failure_tracking
+
     daemon_log SUCCESS "Pipeline completed for issue #${issue_num} (${duration:-unknown})"
 
     # Record pipeline duration for adaptive threshold learning
@@ -2059,6 +2137,91 @@ Check the associated PR for the implementation." 2>/dev/null || true
     "$SCRIPT_DIR/sw-tracker.sh" notify "completed" "$issue_num" 2>/dev/null || true
 }
 
+# ─── Failure Classification ─────────────────────────────────────────────────
+
+classify_failure() {
+    local issue_num="$1"
+    if [[ -z "${LOG_DIR:-}" ]]; then
+        echo "unknown"
+        return
+    fi
+    local log_path="$LOG_DIR/issue-${issue_num}.log"
+    if [[ ! -f "$log_path" ]]; then
+        echo "unknown"
+        return
+    fi
+    local tail_content
+    tail_content=$(tail -200 "$log_path" 2>/dev/null || true)
+
+    # Auth errors
+    if echo "$tail_content" | grep -qiE 'not logged in|unauthorized|auth.*fail|401 |invalid.*token|CLAUDE_CODE_OAUTH_TOKEN|api key.*invalid|authentication required'; then
+        echo "auth_error"
+        return
+    fi
+    # API errors (rate limits, timeouts, server errors)
+    if echo "$tail_content" | grep -qiE 'rate limit|429 |503 |502 |overloaded|timeout|ETIMEDOUT|ECONNRESET|socket hang up|service unavailable'; then
+        echo "api_error"
+        return
+    fi
+    # Invalid issue (not found, empty body)
+    if echo "$tail_content" | grep -qiE 'issue not found|404 |no body|could not resolve|GraphQL.*not found|issue.*does not exist'; then
+        echo "invalid_issue"
+        return
+    fi
+    # Context exhaustion — check progress file
+    local issue_worktree_path="${WORKTREE_DIR:-${REPO_DIR}/.worktrees}/daemon-issue-${issue_num}"
+    local progress_file="${issue_worktree_path}/.claude/loop-logs/progress.md"
+    if [[ -f "$progress_file" ]]; then
+        local cf_iter
+        cf_iter=$(grep -oE 'Iteration: [0-9]+' "$progress_file" 2>/dev/null | tail -1 | grep -oE '[0-9]+' || echo "0")
+        if ! [[ "${cf_iter:-0}" =~ ^[0-9]+$ ]]; then cf_iter="0"; fi
+        local cf_tests
+        cf_tests=$(grep -oE 'Tests passing: (true|false)' "$progress_file" 2>/dev/null | awk '{print $NF}' || echo "unknown")
+        if [[ "${cf_iter:-0}" -gt 0 ]] && { [[ "$cf_tests" == "false" ]] || [[ "$cf_tests" == "unknown" ]]; }; then
+            echo "context_exhaustion"
+            return
+        fi
+    fi
+    # Build failure (test errors, compile errors)
+    if echo "$tail_content" | grep -qiE 'test.*fail|FAIL|build.*error|compile.*error|lint.*fail|npm ERR|exit code [1-9]'; then
+        echo "build_failure"
+        return
+    fi
+    echo "unknown"
+}
+
+# ─── Consecutive Failure Tracking ──────────────────────────────────────────
+
+DAEMON_CONSECUTIVE_FAILURE_CLASS=""
+DAEMON_CONSECUTIVE_FAILURE_COUNT=0
+
+record_failure_class() {
+    local failure_class="$1"
+    if [[ "$failure_class" == "$DAEMON_CONSECUTIVE_FAILURE_CLASS" ]]; then
+        DAEMON_CONSECUTIVE_FAILURE_COUNT=$((DAEMON_CONSECUTIVE_FAILURE_COUNT + 1))
+    else
+        DAEMON_CONSECUTIVE_FAILURE_CLASS="$failure_class"
+        DAEMON_CONSECUTIVE_FAILURE_COUNT=1
+    fi
+
+    if [[ "$DAEMON_CONSECUTIVE_FAILURE_COUNT" -ge 3 ]]; then
+        daemon_log ERROR "3 consecutive failures (class: ${failure_class}) — auto-pausing daemon"
+        local pause_json
+        pause_json=$(jq -n --arg reason "consecutive_${failure_class}" --arg ts "$(now_iso)" \
+            '{reason: $reason, timestamp: $ts}')
+        local _tmp_pause
+        _tmp_pause=$(mktemp "${TMPDIR:-/tmp}/sw-pause.XXXXXX")
+        echo "$pause_json" > "$_tmp_pause"
+        mv "$_tmp_pause" "$PAUSE_FLAG"
+        emit_event "daemon.auto_pause" "reason=consecutive_failures" "class=$failure_class" "count=$DAEMON_CONSECUTIVE_FAILURE_COUNT"
+    fi
+}
+
+reset_failure_tracking() {
+    DAEMON_CONSECUTIVE_FAILURE_CLASS=""
+    DAEMON_CONSECUTIVE_FAILURE_COUNT=0
+}
+
 # ─── Failure Handler ────────────────────────────────────────────────────────
 
 daemon_on_failure() {
@@ -2095,123 +2258,143 @@ daemon_on_failure() {
             completed_at: $completed_at
         }] | .completed = .completed[-500:]'
 
+    # ── Classify failure and decide retry strategy ──
+    local failure_class
+    failure_class=$(classify_failure "$issue_num")
+    daemon_log INFO "Failure classified as: ${failure_class} for issue #${issue_num}"
+    emit_event "daemon.failure_classified" "issue=$issue_num" "class=$failure_class"
+    record_failure_class "$failure_class"
+
     # ── Auto-retry with strategy escalation ──
     if [[ "${RETRY_ESCALATION:-true}" == "true" ]]; then
         local retry_count
         retry_count=$(jq -r --arg num "$issue_num" \
             '.retry_counts[$num] // 0' "$STATE_FILE" 2>/dev/null || echo "0")
 
-        if [[ "$retry_count" -lt "${MAX_RETRIES:-2}" ]]; then
-            retry_count=$((retry_count + 1))
+        # Non-retryable failures — skip retry entirely
+        case "$failure_class" in
+            auth_error)
+                daemon_log ERROR "Auth error for issue #${issue_num} — skipping retry"
+                emit_event "daemon.skip_retry" "issue=$issue_num" "reason=auth_error"
+                if [[ "$NO_GITHUB" != "true" ]]; then
+                    gh issue edit "$issue_num" --add-label "pipeline/auth-error" 2>/dev/null || true
+                fi
+                ;;
+            invalid_issue)
+                daemon_log ERROR "Invalid issue #${issue_num} — skipping retry"
+                emit_event "daemon.skip_retry" "issue=$issue_num" "reason=invalid_issue"
+                if [[ "$NO_GITHUB" != "true" ]]; then
+                    gh issue comment "$issue_num" --body "Pipeline skipped retry: issue appears invalid or has no body." 2>/dev/null || true
+                fi
+                ;;
+            *)
+                # Retryable failures — proceed with escalation
+                if [[ "$retry_count" -lt "${MAX_RETRIES:-2}" ]]; then
+                    retry_count=$((retry_count + 1))
 
-            # Update retry count in state (locked to prevent race)
-            locked_state_update \
-                --arg num "$issue_num" --argjson count "$retry_count" \
-                '.retry_counts[$num] = $count'
+                    # Update retry count in state (locked to prevent race)
+                    locked_state_update \
+                        --arg num "$issue_num" --argjson count "$retry_count" \
+                        '.retry_counts[$num] = $count'
 
-            daemon_log WARN "Auto-retry #${retry_count}/${MAX_RETRIES:-2} for issue #${issue_num}"
-            emit_event "daemon.retry" "issue=$issue_num" "retry=$retry_count" "max=${MAX_RETRIES:-2}"
+                    daemon_log WARN "Auto-retry #${retry_count}/${MAX_RETRIES:-2} for issue #${issue_num} (class: ${failure_class})"
+                    emit_event "daemon.retry" "issue=$issue_num" "retry=$retry_count" "max=${MAX_RETRIES:-2}" "class=$failure_class"
 
-            # Check for checkpoint to enable resume-from-checkpoint
-            local checkpoint_args=()
-            if [[ "${CHECKPOINT_ENABLED:-true}" == "true" ]]; then
-                # Try to find worktree for this issue to check for checkpoints
-                local issue_worktree="${REPO_DIR}/.worktrees/daemon-issue-${issue_num}"
-                if [[ -d "$issue_worktree/.claude/pipeline-artifacts/checkpoints" ]]; then
-                    local latest_checkpoint=""
-                    for cp_file in "$issue_worktree/.claude/pipeline-artifacts/checkpoints"/*-checkpoint.json; do
-                        [[ -f "$cp_file" ]] && latest_checkpoint="$cp_file"
-                    done
-                    if [[ -n "$latest_checkpoint" ]]; then
-                        daemon_log INFO "Found checkpoint: $latest_checkpoint"
-                        emit_event "daemon.recovery" "issue=$issue_num" "checkpoint=$latest_checkpoint"
-                        checkpoint_args+=("--resume")
+                    # Check for checkpoint to enable resume-from-checkpoint
+                    local checkpoint_args=()
+                    if [[ "${CHECKPOINT_ENABLED:-true}" == "true" ]]; then
+                        local issue_worktree="${REPO_DIR}/.worktrees/daemon-issue-${issue_num}"
+                        if [[ -d "$issue_worktree/.claude/pipeline-artifacts/checkpoints" ]]; then
+                            local latest_checkpoint=""
+                            for cp_file in "$issue_worktree/.claude/pipeline-artifacts/checkpoints"/*-checkpoint.json; do
+                                [[ -f "$cp_file" ]] && latest_checkpoint="$cp_file"
+                            done
+                            if [[ -n "$latest_checkpoint" ]]; then
+                                daemon_log INFO "Found checkpoint: $latest_checkpoint"
+                                emit_event "daemon.recovery" "issue=$issue_num" "checkpoint=$latest_checkpoint"
+                                checkpoint_args+=("--resume")
+                            fi
+                        fi
                     fi
-                fi
-            fi
 
-            # Detect context exhaustion from progress file
-            local failure_reason="unknown"
-            local issue_worktree_path="${WORKTREE_DIR:-${REPO_DIR}/.worktrees}/daemon-issue-${issue_num}"
-            local progress_file="${issue_worktree_path}/.claude/loop-logs/progress.md"
-            if [[ -f "$progress_file" ]]; then
-                local progress_iter
-                progress_iter=$(grep -oE 'Iteration: [0-9]+' "$progress_file" 2>/dev/null | tail -1 | grep -oE '[0-9]+' || echo "0")
-                if ! [[ "${progress_iter:-0}" =~ ^[0-9]+$ ]]; then
-                    progress_iter="0"
-                fi
-                local progress_tests
-                progress_tests=$(grep -oE 'Tests passing: (true|false)' "$progress_file" 2>/dev/null | awk '{print $NF}' || echo "unknown")
-                if [[ "${progress_iter:-0}" -gt 0 ]] && { [[ "$progress_tests" == "false" ]] || [[ "$progress_tests" == "unknown" ]]; }; then
-                    failure_reason="context_exhaustion"
-                    emit_event "daemon.context_exhaustion" "issue=$issue_num" "iterations=$progress_iter"
-                    daemon_log WARN "Context exhaustion detected for issue #${issue_num} (iterations: ${progress_iter})"
-                fi
-            fi
+                    # Build escalated pipeline args
+                    local retry_template="$PIPELINE_TEMPLATE"
+                    local retry_model="${MODEL:-opus}"
+                    local extra_args=()
 
-            # Build escalated pipeline args
-            local retry_template="$PIPELINE_TEMPLATE"
-            local retry_model="${MODEL:-opus}"
-            local extra_args=()
+                    if [[ "$retry_count" -eq 1 ]]; then
+                        retry_model="opus"
+                        extra_args+=("--max-iterations" "30")
+                        daemon_log INFO "Escalation: model=opus, max_iterations=30"
+                    elif [[ "$retry_count" -ge 2 ]]; then
+                        retry_template="full"
+                        retry_model="opus"
+                        extra_args+=("--max-iterations" "30" "--compound-cycles" "5")
+                        daemon_log INFO "Escalation: template=full, compound_cycles=5"
+                    fi
 
-            if [[ "$retry_count" -eq 1 ]]; then
-                # Retry 1: same template, upgrade model, more iterations
-                retry_model="opus"
-                extra_args+=("--max-iterations" "30")
-                daemon_log INFO "Escalation: model=opus, max_iterations=30"
-            elif [[ "$retry_count" -ge 2 ]]; then
-                # Retry 2: full template, compound quality max cycles
-                retry_template="full"
-                retry_model="opus"
-                extra_args+=("--max-iterations" "30" "--compound-cycles" "5")
-                daemon_log INFO "Escalation: template=full, compound_cycles=5"
-            fi
+                    # Increase restarts on context exhaustion
+                    if [[ "$failure_class" == "context_exhaustion" ]]; then
+                        local boosted_restarts=$(( ${MAX_RESTARTS_CFG:-3} + retry_count ))
+                        if [[ "$boosted_restarts" -gt 5 ]]; then
+                            boosted_restarts=5
+                        fi
+                        extra_args+=("--max-restarts" "$boosted_restarts")
+                        daemon_log INFO "Boosting max-restarts to $boosted_restarts (context exhaustion)"
+                    fi
 
-            # Increase restarts on context exhaustion
-            if [[ "$failure_reason" == "context_exhaustion" ]]; then
-                local boosted_restarts=$(( ${MAX_RESTARTS_CFG:-3} + retry_count ))
-                # Cap at sw-loop's hard limit of 5
-                if [[ "$boosted_restarts" -gt 5 ]]; then
-                    boosted_restarts=5
-                fi
-                extra_args+=("--max-restarts" "$boosted_restarts")
-                daemon_log INFO "Boosting max-restarts to $boosted_restarts (context exhaustion)"
-            fi
+                    # API errors get extended backoff
+                    local api_backoff=300
+                    local backoff_secs=$((30 * retry_count))
+                    if [[ "$failure_class" == "api_error" ]]; then
+                        backoff_secs=$((api_backoff * retry_count))
+                        daemon_log INFO "API error — extended backoff ${backoff_secs}s"
+                    fi
 
-            if [[ "$NO_GITHUB" != "true" ]]; then
-                gh issue comment "$issue_num" --body "## 🔄 Auto-Retry #${retry_count}
+                    if [[ "$NO_GITHUB" != "true" ]]; then
+                        gh issue comment "$issue_num" --body "## 🔄 Auto-Retry #${retry_count}
 
-Pipeline failed — retrying with escalated strategy.
+Pipeline failed (${failure_class}) — retrying with escalated strategy.
 
 | Field | Value |
 |-------|-------|
 | Retry | ${retry_count} / ${MAX_RETRIES:-2} |
+| Failure | \`${failure_class}\` |
 | Template | \`${retry_template}\` |
 | Model | \`${retry_model}\` |
 | Started | $(now_iso) |
 
 _Escalation: $(if [[ "$retry_count" -eq 1 ]]; then echo "upgraded model + increased iterations"; else echo "full template + compound quality"; fi)_" 2>/dev/null || true
-            fi
+                    fi
 
-            # Backoff before retry: 30s * retry_count (30s, 60s, ...)
-            local backoff_secs=$((30 * retry_count))
-            daemon_log INFO "Waiting ${backoff_secs}s before retry #${retry_count}"
-            sleep "$backoff_secs"
+                    daemon_log INFO "Waiting ${backoff_secs}s before retry #${retry_count}"
+                    sleep "$backoff_secs"
 
-            # Re-spawn with escalated strategy
-            local orig_template="$PIPELINE_TEMPLATE"
-            local orig_model="$MODEL"
-            PIPELINE_TEMPLATE="$retry_template"
-            MODEL="$retry_model"
-            daemon_spawn_pipeline "$issue_num" "retry-${retry_count}"
-            _retry_spawned_for="$issue_num"
-            PIPELINE_TEMPLATE="$orig_template"
-            MODEL="$orig_model"
-            return
-        fi
+                    # Merge checkpoint args + extra args for passthrough
+                    local all_extra_args=()
+                    if [[ ${#checkpoint_args[@]} -gt 0 ]]; then
+                        all_extra_args+=("${checkpoint_args[@]}")
+                    fi
+                    if [[ ${#extra_args[@]} -gt 0 ]]; then
+                        all_extra_args+=("${extra_args[@]}")
+                    fi
 
-        daemon_log WARN "Max retries (${MAX_RETRIES:-2}) exhausted for issue #${issue_num}"
-        emit_event "daemon.retry_exhausted" "issue=$issue_num" "retries=$retry_count"
+                    # Re-spawn with escalated strategy
+                    local orig_template="$PIPELINE_TEMPLATE"
+                    local orig_model="$MODEL"
+                    PIPELINE_TEMPLATE="$retry_template"
+                    MODEL="$retry_model"
+                    daemon_spawn_pipeline "$issue_num" "retry-${retry_count}" "" "${all_extra_args[@]}"
+                    _retry_spawned_for="$issue_num"
+                    PIPELINE_TEMPLATE="$orig_template"
+                    MODEL="$orig_model"
+                    return
+                fi
+
+                daemon_log WARN "Max retries (${MAX_RETRIES:-2}) exhausted for issue #${issue_num}"
+                emit_event "daemon.retry_exhausted" "issue=$issue_num" "retries=$retry_count"
+                ;;
+        esac
     fi
 
     # ── No retry — report final failure ──
@@ -4874,6 +5057,7 @@ daemon_poll_loop() {
         # All poll loop calls are error-guarded to prevent set -e from killing the daemon.
         # The || operator disables set -e for the entire call chain, so transient failures
         # (GitHub API timeouts, jq errors, intelligence failures) are logged and skipped.
+        daemon_preflight_auth_check || daemon_log WARN "Auth check failed — daemon may be paused"
         daemon_poll_issues || daemon_log WARN "daemon_poll_issues failed — continuing"
         daemon_reap_completed || daemon_log WARN "daemon_reap_completed failed — continuing"
         daemon_health_check || daemon_log WARN "daemon_health_check failed — continuing"
@@ -4957,7 +5141,8 @@ cleanup_on_exit() {
             while IFS= read -r cpid; do
                 [[ -z "$cpid" ]] && continue
                 if kill -0 "$cpid" 2>/dev/null; then
-                    daemon_log INFO "Killing pipeline process PID ${cpid}"
+                    daemon_log INFO "Killing pipeline process tree PID ${cpid}"
+                    pkill -TERM -P "$cpid" 2>/dev/null || true
                     kill "$cpid" 2>/dev/null || true
                     killed=$((killed + 1))
                 fi
@@ -4969,7 +5154,8 @@ cleanup_on_exit() {
                 while IFS= read -r cpid; do
                     [[ -z "$cpid" ]] && continue
                     if kill -0 "$cpid" 2>/dev/null; then
-                        daemon_log WARN "Force-killing pipeline PID ${cpid}"
+                        daemon_log WARN "Force-killing pipeline tree PID ${cpid}"
+                        pkill -9 -P "$cpid" 2>/dev/null || true
                         kill -9 "$cpid" 2>/dev/null || true
                     fi
                 done <<< "$child_pids"

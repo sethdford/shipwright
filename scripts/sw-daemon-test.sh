@@ -1668,6 +1668,216 @@ test_auto_enable_self_optimize() {
         { echo "Expected AUTO_TEMPLATE/SELF_OPTIMIZE condition check"; return 1; }
 }
 
+# ──────────────────────────────────────────────────────────────────────────────
+# 43-52. Intelligence: Failure classification, auth check, process management
+# ──────────────────────────────────────────────────────────────────────────────
+
+test_classify_failure_auth() {
+    local daemon_src
+    daemon_src="$(dirname "$DAEMON_SCRIPT")/sw-daemon.sh"
+    grep -q 'classify_failure()' "$daemon_src" || \
+        { echo "classify_failure function not found"; return 1; }
+    grep -A 30 'classify_failure()' "$daemon_src" | grep -q 'not logged in' || \
+        { echo "Missing auth error pattern 'not logged in'"; return 1; }
+    grep -A 30 'classify_failure()' "$daemon_src" | grep -q 'unauthorized' || \
+        { echo "Missing auth error pattern 'unauthorized'"; return 1; }
+}
+
+test_classify_failure_all_classes() {
+    local daemon_src
+    daemon_src="$(dirname "$DAEMON_SCRIPT")/sw-daemon.sh"
+    local classes=("auth_error" "api_error" "invalid_issue" "context_exhaustion" "build_failure" "unknown")
+    for class in "${classes[@]}"; do
+        grep -A 80 'classify_failure()' "$daemon_src" | grep -q "echo \"$class\"" || \
+            { echo "Missing failure class: $class"; return 1; }
+    done
+}
+
+test_retry_skips_non_retryable() {
+    local daemon_src
+    daemon_src="$(dirname "$DAEMON_SCRIPT")/sw-daemon.sh"
+    grep -A 80 'daemon_on_failure()' "$daemon_src" | grep -q 'auth_error)' || \
+        { echo "Missing auth_error case in retry logic"; return 1; }
+    grep -A 80 'daemon_on_failure()' "$daemon_src" | grep -q 'invalid_issue)' || \
+        { echo "Missing invalid_issue case in retry logic"; return 1; }
+    grep -A 80 'daemon_on_failure()' "$daemon_src" | grep -q 'skip.*retry\|skipping retry' || \
+        { echo "Missing skip retry action for non-retryable failures"; return 1; }
+}
+
+test_api_error_extended_backoff() {
+    local daemon_src
+    daemon_src="$(dirname "$DAEMON_SCRIPT")/sw-daemon.sh"
+    grep -q 'api_backoff=300' "$daemon_src" || \
+        { echo "Missing api_backoff=300 constant"; return 1; }
+}
+
+test_preflight_auth_check() {
+    local daemon_src
+    daemon_src="$(dirname "$DAEMON_SCRIPT")/sw-daemon.sh"
+    grep -q 'daemon_preflight_auth_check()' "$daemon_src" || \
+        { echo "daemon_preflight_auth_check function not found"; return 1; }
+    grep -A 60 'daemon_preflight_auth_check()' "$daemon_src" | grep -q 'gh auth status' || \
+        { echo "Missing gh auth check"; return 1; }
+    grep -A 60 'daemon_preflight_auth_check()' "$daemon_src" | grep -q 'claude.*--print' || \
+        { echo "Missing claude auth check"; return 1; }
+    grep -B 5 'daemon_poll_issues' "$daemon_src" | grep -q 'daemon_preflight_auth_check' || \
+        { echo "Auth check not wired into poll loop"; return 1; }
+}
+
+test_process_group_spawn() {
+    local daemon_src
+    daemon_src="$(dirname "$DAEMON_SCRIPT")/sw-daemon.sh"
+    grep -B 5 'exec.*sw-pipeline.sh' "$daemon_src" | grep -q "trap '' HUP" || \
+        { echo "Missing HUP trap in spawn subshell"; return 1; }
+}
+
+test_process_tree_kill() {
+    local daemon_src
+    daemon_src="$(dirname "$DAEMON_SCRIPT")/sw-daemon.sh"
+    grep -A 30 'cleanup_on_exit()' "$daemon_src" | grep -q 'pkill.*-P' || \
+        { echo "Missing pkill -P in cleanup_on_exit"; return 1; }
+}
+
+test_consecutive_failure_pause() {
+    local daemon_src
+    daemon_src="$(dirname "$DAEMON_SCRIPT")/sw-daemon.sh"
+    grep -q 'DAEMON_CONSECUTIVE_FAILURE_CLASS=' "$daemon_src" || \
+        { echo "Missing DAEMON_CONSECUTIVE_FAILURE_CLASS variable"; return 1; }
+    grep -q 'DAEMON_CONSECUTIVE_FAILURE_COUNT=' "$daemon_src" || \
+        { echo "Missing DAEMON_CONSECUTIVE_FAILURE_COUNT variable"; return 1; }
+    grep -q 'DAEMON_CONSECUTIVE_FAILURE_COUNT.*-ge 3' "$daemon_src" || \
+        { echo "Missing consecutive failure threshold of 3"; return 1; }
+    grep -q 'daemon.auto_pause.*consecutive_failures' "$daemon_src" || \
+        { echo "Missing auto_pause event for consecutive failures"; return 1; }
+    grep -q 'reset_failure_tracking()' "$daemon_src" || \
+        { echo "Missing reset_failure_tracking function"; return 1; }
+}
+
+test_retry_args_passed_to_spawn() {
+    local daemon_src
+    daemon_src="$(dirname "$DAEMON_SCRIPT")/sw-daemon.sh"
+    grep -q 'extra_pipeline_args=.*"$@"' "$daemon_src" || \
+        { echo "daemon_spawn_pipeline missing extra_pipeline_args parameter"; return 1; }
+    grep -q 'pipeline_args+=.*extra_pipeline_args' "$daemon_src" || \
+        { echo "extra_pipeline_args not merged into pipeline_args"; return 1; }
+    grep -q 'all_extra_args' "$daemon_src" || \
+        { echo "Retry logic missing all_extra_args merge"; return 1; }
+}
+
+test_failure_classification_wired() {
+    local daemon_src
+    daemon_src="$(dirname "$DAEMON_SCRIPT")/sw-daemon.sh"
+    grep -A 50 'daemon_on_failure()' "$daemon_src" | grep -q 'classify_failure' || \
+        { echo "classify_failure not called in daemon_on_failure"; return 1; }
+    grep -q 'daemon.failure_classified' "$daemon_src" || \
+        { echo "Missing daemon.failure_classified event"; return 1; }
+}
+
+# ──────────────────────────────────────────────────────────────────────────────
+# 43-52. Intelligence: Failure classification, auth check, process management
+# ──────────────────────────────────────────────────────────────────────────────
+
+test_classify_failure_auth() {
+    local daemon_src
+    daemon_src="$(dirname "$DAEMON_SCRIPT")/sw-daemon.sh"
+    grep -q 'classify_failure()' "$daemon_src" || \
+        { echo "classify_failure function not found"; return 1; }
+    grep -A 30 'classify_failure()' "$daemon_src" | grep -q 'not logged in' || \
+        { echo "Missing auth error pattern 'not logged in'"; return 1; }
+    grep -A 30 'classify_failure()' "$daemon_src" | grep -q 'unauthorized' || \
+        { echo "Missing auth error pattern 'unauthorized'"; return 1; }
+}
+
+test_classify_failure_all_classes() {
+    local daemon_src
+    daemon_src="$(dirname "$DAEMON_SCRIPT")/sw-daemon.sh"
+    local classes=("auth_error" "api_error" "invalid_issue" "context_exhaustion" "build_failure" "unknown")
+    for class in "${classes[@]}"; do
+        grep -A 80 'classify_failure()' "$daemon_src" | grep -q "echo \"$class\"" || \
+            { echo "Missing failure class: $class"; return 1; }
+    done
+}
+
+test_retry_skips_non_retryable() {
+    local daemon_src
+    daemon_src="$(dirname "$DAEMON_SCRIPT")/sw-daemon.sh"
+    grep -A 80 'daemon_on_failure()' "$daemon_src" | grep -q 'auth_error)' || \
+        { echo "Missing auth_error case in retry logic"; return 1; }
+    grep -A 80 'daemon_on_failure()' "$daemon_src" | grep -q 'invalid_issue)' || \
+        { echo "Missing invalid_issue case in retry logic"; return 1; }
+    grep -A 80 'daemon_on_failure()' "$daemon_src" | grep -q 'skip.*retry\|skipping retry' || \
+        { echo "Missing skip retry action for non-retryable failures"; return 1; }
+}
+
+test_api_error_extended_backoff() {
+    local daemon_src
+    daemon_src="$(dirname "$DAEMON_SCRIPT")/sw-daemon.sh"
+    grep -q 'api_backoff=300' "$daemon_src" || \
+        { echo "Missing api_backoff=300 constant"; return 1; }
+}
+
+test_preflight_auth_check() {
+    local daemon_src
+    daemon_src="$(dirname "$DAEMON_SCRIPT")/sw-daemon.sh"
+    grep -q 'daemon_preflight_auth_check()' "$daemon_src" || \
+        { echo "daemon_preflight_auth_check function not found"; return 1; }
+    grep -A 60 'daemon_preflight_auth_check()' "$daemon_src" | grep -q 'gh auth status' || \
+        { echo "Missing gh auth check"; return 1; }
+    grep -A 60 'daemon_preflight_auth_check()' "$daemon_src" | grep -q 'claude.*--print' || \
+        { echo "Missing claude auth check"; return 1; }
+    grep -B 5 'daemon_poll_issues' "$daemon_src" | grep -q 'daemon_preflight_auth_check' || \
+        { echo "Auth check not wired into poll loop"; return 1; }
+}
+
+test_process_group_spawn() {
+    local daemon_src
+    daemon_src="$(dirname "$DAEMON_SCRIPT")/sw-daemon.sh"
+    grep -B 5 'exec.*sw-pipeline.sh' "$daemon_src" | grep -q "trap '' HUP" || \
+        { echo "Missing HUP trap in spawn subshell"; return 1; }
+}
+
+test_process_tree_kill() {
+    local daemon_src
+    daemon_src="$(dirname "$DAEMON_SCRIPT")/sw-daemon.sh"
+    grep -A 30 'cleanup_on_exit()' "$daemon_src" | grep -q 'pkill.*-P' || \
+        { echo "Missing pkill -P in cleanup_on_exit"; return 1; }
+}
+
+test_consecutive_failure_pause() {
+    local daemon_src
+    daemon_src="$(dirname "$DAEMON_SCRIPT")/sw-daemon.sh"
+    grep -q 'DAEMON_CONSECUTIVE_FAILURE_CLASS=' "$daemon_src" || \
+        { echo "Missing DAEMON_CONSECUTIVE_FAILURE_CLASS variable"; return 1; }
+    grep -q 'DAEMON_CONSECUTIVE_FAILURE_COUNT=' "$daemon_src" || \
+        { echo "Missing DAEMON_CONSECUTIVE_FAILURE_COUNT variable"; return 1; }
+    grep -q 'DAEMON_CONSECUTIVE_FAILURE_COUNT.*-ge 3' "$daemon_src" || \
+        { echo "Missing consecutive failure threshold of 3"; return 1; }
+    grep -q 'daemon.auto_pause.*consecutive_failures' "$daemon_src" || \
+        { echo "Missing auto_pause event for consecutive failures"; return 1; }
+    grep -q 'reset_failure_tracking()' "$daemon_src" || \
+        { echo "Missing reset_failure_tracking function"; return 1; }
+}
+
+test_retry_args_passed_to_spawn() {
+    local daemon_src
+    daemon_src="$(dirname "$DAEMON_SCRIPT")/sw-daemon.sh"
+    grep -q 'extra_pipeline_args=.*"$@"' "$daemon_src" || \
+        { echo "daemon_spawn_pipeline missing extra_pipeline_args parameter"; return 1; }
+    grep -q 'pipeline_args+=.*extra_pipeline_args' "$daemon_src" || \
+        { echo "extra_pipeline_args not merged into pipeline_args"; return 1; }
+    grep -q 'all_extra_args' "$daemon_src" || \
+        { echo "Retry logic missing all_extra_args merge"; return 1; }
+}
+
+test_failure_classification_wired() {
+    local daemon_src
+    daemon_src="$(dirname "$DAEMON_SCRIPT")/sw-daemon.sh"
+    grep -A 50 'daemon_on_failure()' "$daemon_src" | grep -q 'classify_failure' || \
+        { echo "classify_failure not called in daemon_on_failure"; return 1; }
+    grep -q 'daemon.failure_classified' "$daemon_src" || \
+        { echo "Missing daemon.failure_classified event"; return 1; }
+}
+
 # ═══════════════════════════════════════════════════════════════════════════════
 # MAIN
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -1743,6 +1953,16 @@ main() {
         "test_error_classification_categories:Memory: All 12 error categories in post-tool-use.sh"
         "test_template_weights_selection:Daemon: Template weights selection reads weights file"
         "test_auto_enable_self_optimize:Daemon: Auto-enable self_optimize when auto_template is true"
+        "test_classify_failure_auth:Intelligence: classify_failure detects auth errors"
+        "test_classify_failure_all_classes:Intelligence: classify_failure has all 6 failure classes"
+        "test_retry_skips_non_retryable:Intelligence: Retry skips auth_error and invalid_issue"
+        "test_api_error_extended_backoff:Intelligence: API errors get extended 300s backoff"
+        "test_preflight_auth_check:Intelligence: daemon_preflight_auth_check exists and auto-pauses"
+        "test_process_group_spawn:Intelligence: Process group spawning (set -m)"
+        "test_process_tree_kill:Intelligence: Process tree kill in cleanup (pkill -P)"
+        "test_consecutive_failure_pause:Intelligence: Consecutive failure auto-pause (3 threshold)"
+        "test_retry_args_passed_to_spawn:Intelligence: Retry escalation args passed to spawn"
+        "test_failure_classification_wired:Intelligence: classify_failure wired into retry logic"
     )
 
     for entry in "${tests[@]}"; do

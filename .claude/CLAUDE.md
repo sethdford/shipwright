@@ -174,7 +174,7 @@ All scripts are bash (except the dashboard server in TypeScript). Grouped by lay
 | `scripts/sw-connect.sh` | 619 | Sync local state to team dashboard |
 | `scripts/sw-context.sh` | 605 | Context Engine for Pipeline Stages |
 | `scripts/sw-cost.sh` | 924 | Token Usage & Cost Intelligence |
-| `scripts/sw-daemon.sh` | 5683 | Autonomous GitHub Issue Watcher |
+| `scripts/sw-daemon.sh` | 5869 | Autonomous GitHub Issue Watcher |
 | `scripts/sw-dashboard.sh` | 477 | Fleet Command Dashboard |
 | `scripts/sw-db.sh` | 540 | SQLite Persistence Layer |
 | `scripts/sw-decompose.sh` | 539 | Intelligent Issue Decomposition |
@@ -267,7 +267,7 @@ All scripts are bash (except the dashboard server in TypeScript). Grouped by lay
 | File | Lines | Purpose |
 | --- | ---: | --- |
 | `scripts/sw-connect-test.sh` | 831 | Validate dashboard connection, heartbeat |
-| `scripts/sw-daemon-test.sh` | 1781 | Unit tests for daemon metrics, health, alerting |
+| `scripts/sw-daemon-test.sh` | 1932 | Unit tests for daemon metrics, health, alerting |
 | `scripts/sw-docs-test.sh` | 791 | Validate documentation keeper, AUTO sections, |
 | `scripts/sw-e2e-integration-test.sh` | 359 | Real Claude + Real GitHub |
 | `scripts/sw-e2e-smoke-test.sh` | 799 | Pipeline orchestration without API keys |
