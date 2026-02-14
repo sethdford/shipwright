@@ -1,12 +1,12 @@
 #!/usr/bin/env bash
 # ╔═══════════════════════════════════════════════════════════════════════════╗
-# ║  shipwright launchd — Process supervision on macOS                        ║
-# ║  Auto-start daemon + dashboard on boot via launchd                       ║
+# ║  shipwright launchd — Process supervision (macOS + Linux)                 ║
+# ║  Auto-start daemon + dashboard on boot via launchd (macOS) or systemd     ║
 # ╚═══════════════════════════════════════════════════════════════════════════╝
 set -euo pipefail
 trap 'echo "ERROR: $BASH_SOURCE:$LINENO exited with status $?" >&2' ERR
 
-VERSION="1.10.0"
+VERSION="1.11.0"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
 
@@ -31,48 +31,111 @@ success() { echo -e "${GREEN}${BOLD}✓${RESET} $*"; }
 warn()    { echo -e "${YELLOW}${BOLD}⚠${RESET} $*"; }
 error()   { echo -e "${RED}${BOLD}✗${RESET} $*" >&2; }
 
-# ─── Constants ──────────────────────────────────────────────────────────────
-PLIST_DIR="$HOME/Library/LaunchAgents"
-DAEMON_PLIST="$PLIST_DIR/com.shipwright.daemon.plist"
-DASHBOARD_PLIST="$PLIST_DIR/com.shipwright.dashboard.plist"
-CONNECT_PLIST="$PLIST_DIR/com.shipwright.connect.plist"
-LOG_DIR="$HOME/.shipwright/logs"
-TEAM_CONFIG="$HOME/.shipwright/team-config.json"
-
-# ─── Check macOS ─────────────────────────────────────────────────────────────
-check_macos() {
-    if [[ "$OSTYPE" != "darwin"* ]]; then
-        error "launchd is only available on macOS"
-        exit 1
+# ─── OS Detection ───────────────────────────────────────────────────────────
+detect_os() {
+    if [[ "$OSTYPE" == "darwin"* ]]; then
+        echo "macos"
+    elif [[ "$OSTYPE" == "linux-gnu"* ]] || [[ "$OSTYPE" == "linux"* ]]; then
+        echo "linux"
+    else
+        echo "unknown"
     fi
 }
+
+OS_TYPE=$(detect_os)
+
+# ─── Platform-specific Constants ────────────────────────────────────────────
+if [[ "$OS_TYPE" == "macos" ]]; then
+    PLIST_DIR="$HOME/Library/LaunchAgents"
+    DAEMON_PLIST="$PLIST_DIR/com.shipwright.daemon.plist"
+    DASHBOARD_PLIST="$PLIST_DIR/com.shipwright.dashboard.plist"
+    CONNECT_PLIST="$PLIST_DIR/com.shipwright.connect.plist"
+    LOG_DIR="$HOME/.shipwright/logs"
+elif [[ "$OS_TYPE" == "linux" ]]; then
+    SYSTEMD_USER_DIR="$HOME/.config/systemd/user"
+    DAEMON_SERVICE="$SYSTEMD_USER_DIR/shipwright-daemon.service"
+    DASHBOARD_SERVICE="$SYSTEMD_USER_DIR/shipwright-dashboard.service"
+    CONNECT_SERVICE="$SYSTEMD_USER_DIR/shipwright-connect.service"
+    LOG_DIR="$HOME/.shipwright/logs"
+fi
+
+TEAM_CONFIG="$HOME/.shipwright/team-config.json"
 
 # ─── Help ───────────────────────────────────────────────────────────────────
 show_help() {
     echo ""
-    echo -e "${CYAN}${BOLD}  Shipwright launchd${RESET}  ${DIM}v${VERSION}${RESET}"
+    echo -e "${CYAN}${BOLD}  Shipwright Supervisor${RESET}  ${DIM}v${VERSION}${RESET}"
     echo -e "${DIM}  ════════════════════════════════════════════${RESET}"
     echo ""
     echo -e "  ${BOLD}USAGE${RESET}"
     echo -e "    shipwright launchd <command>"
     echo ""
+    echo -e "  ${BOLD}PLATFORM${RESET}: $OS_TYPE"
+    echo ""
     echo -e "  ${BOLD}COMMANDS${RESET}"
-    echo -e "    ${CYAN}install${RESET}      Install launchd agents for daemon and dashboard (auto-start on boot)"
-    echo -e "    ${CYAN}uninstall${RESET}    Remove launchd agents and stop services"
-    echo -e "    ${CYAN}status${RESET}       Check status of launchd services"
+    echo -e "    ${CYAN}install${RESET}      Install services for daemon and dashboard (auto-start on boot)"
+    echo -e "    ${CYAN}uninstall${RESET}    Remove services and stop running daemons"
+    echo -e "    ${CYAN}status${RESET}       Check status of services"
+    echo -e "    ${CYAN}logs${RESET}         Tail service logs (systemd only)"
     echo -e "    ${CYAN}help${RESET}         Show this help message"
     echo ""
     echo -e "  ${BOLD}EXAMPLES${RESET}"
     echo -e "    ${DIM}shipwright launchd install${RESET}   # Set up auto-start on boot"
     echo -e "    ${DIM}shipwright launchd status${RESET}    # Check if services are running"
+    echo -e "    ${DIM}shipwright launchd logs${RESET}      # View service logs"
     echo -e "    ${DIM}shipwright launchd uninstall${RESET} # Remove auto-start"
     echo ""
 }
 
+# ─── Systemd Unit File Generator (Linux) ──────────────────────────────────
+create_systemd_unit() {
+    local unit_name="$1"
+    local description="$2"
+    local exec_start="$3"
+    local output_file="$4"
+
+    mkdir -p "$(dirname "$output_file")"
+
+    cat > "$output_file" <<EOF
+[Unit]
+Description=${description}
+After=network.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+ExecStart=${exec_start}
+Restart=on-failure
+RestartSec=10
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=${unit_name}
+Environment="PATH=/usr/local/bin:/usr/bin:/bin:/opt/homebrew/bin:\$HOME/.local/bin"
+Environment="HOME=\$HOME"
+
+[Install]
+WantedBy=default.target
+EOF
+
+    chmod 644 "$output_file"
+}
+
 # ─── Install Command ─────────────────────────────────────────────────────────
 cmd_install() {
-    check_macos
+    if [[ "$OS_TYPE" == "unknown" ]]; then
+        error "Unsupported OS type: $OSTYPE"
+        exit 1
+    fi
 
+    if [[ "$OS_TYPE" == "macos" ]]; then
+        cmd_install_macos
+    else
+        cmd_install_linux
+    fi
+}
+
+# ─── Install macOS launchd agents ──────────────────────────────────────────
+cmd_install_macos() {
     info "Installing launchd agents..."
 
     # Create directories
@@ -250,10 +313,135 @@ EOF
     info "Uninstall: ${DIM}shipwright launchd uninstall${RESET}"
 }
 
+# ─── Install Linux systemd user services ───────────────────────────────────
+cmd_install_linux() {
+    info "Installing systemd user services..."
+
+    # Create directories
+    mkdir -p "$SYSTEMD_USER_DIR" "$LOG_DIR"
+
+    # Find the full path to the sw CLI
+    local sw_bin
+    if [[ -x "$SCRIPT_DIR/sw" ]]; then
+        sw_bin="$SCRIPT_DIR/sw"
+    else
+        # Try to find it via PATH
+        sw_bin=$(command -v sw 2>/dev/null || echo "")
+        if [[ -z "$sw_bin" ]]; then
+            error "Could not find 'sw' binary — make sure Shipwright is installed"
+            exit 1
+        fi
+    fi
+
+    # Resolve symlinks in case sw is symlinked
+    sw_bin=$(cd "$(dirname "$sw_bin")" && pwd)/$(basename "$sw_bin")
+
+    # ─── Create Daemon Service ─────────────────────────────────────────────────
+    create_systemd_unit "shipwright-daemon" \
+        "Shipwright Daemon - Autonomous Issue Processor" \
+        "env -u CLAUDECODE ${sw_bin} daemon start --detach" \
+        "$DAEMON_SERVICE"
+
+    success "Created daemon service: ${DAEMON_SERVICE}"
+
+    # ─── Create Dashboard Service ──────────────────────────────────────────────
+    local bun_bin
+    bun_bin=$(command -v bun 2>/dev/null || echo "bun")
+
+    local server_file="$REPO_DIR/dashboard/server.ts"
+    if [[ ! -f "$server_file" ]]; then
+        warn "server.ts not found at $server_file — dashboard service will reference a missing file"
+    fi
+
+    create_systemd_unit "shipwright-dashboard" \
+        "Shipwright Dashboard - Real-time Team Status" \
+        "${bun_bin} run ${server_file}" \
+        "$DASHBOARD_SERVICE"
+
+    success "Created dashboard service: ${DASHBOARD_SERVICE}"
+
+    # ─── Create Connect Service (only if team-config.json exists) ──────────────
+    if [[ -f "$TEAM_CONFIG" ]]; then
+        create_systemd_unit "shipwright-connect" \
+            "Shipwright Connect - Team Sync Service" \
+            "env -u CLAUDECODE ${sw_bin} connect start" \
+            "$CONNECT_SERVICE"
+
+        success "Created connect service: ${CONNECT_SERVICE}"
+    else
+        info "Skipping connect service — ${TEAM_CONFIG} not found"
+    fi
+
+    # ─── Enable and Start Services ─────────────────────────────────────────────
+    info "Enabling systemd user services..."
+
+    if systemctl --user enable shipwright-daemon.service 2>/dev/null; then
+        success "Enabled daemon service"
+    else
+        warn "Could not enable daemon service"
+    fi
+
+    if systemctl --user enable shipwright-dashboard.service 2>/dev/null; then
+        success "Enabled dashboard service"
+    else
+        warn "Could not enable dashboard service"
+    fi
+
+    if [[ -f "$CONNECT_SERVICE" ]]; then
+        if systemctl --user enable shipwright-connect.service 2>/dev/null; then
+            success "Enabled connect service"
+        else
+            warn "Could not enable connect service"
+        fi
+    fi
+
+    # Start services immediately
+    info "Starting systemd user services..."
+
+    if systemctl --user start shipwright-daemon.service 2>/dev/null; then
+        success "Started daemon service"
+    else
+        warn "Could not start daemon service — enable user lingering first: loginctl enable-linger"
+    fi
+
+    if systemctl --user start shipwright-dashboard.service 2>/dev/null; then
+        success "Started dashboard service"
+    else
+        warn "Could not start dashboard service"
+    fi
+
+    if [[ -f "$CONNECT_SERVICE" ]]; then
+        if systemctl --user start shipwright-connect.service 2>/dev/null; then
+            success "Started connect service"
+        else
+            warn "Could not start connect service"
+        fi
+    fi
+
+    echo ""
+    info "Services will auto-start on next login (with systemd lingering enabled)"
+    info "Enable lingering: ${DIM}loginctl enable-linger${RESET}"
+    info "View logs: ${DIM}journalctl --user -u shipwright-daemon -f${RESET}"
+    info "View all logs: ${DIM}journalctl --user -u shipwright-* -f${RESET}"
+    info "Uninstall: ${DIM}shipwright launchd uninstall${RESET}"
+}
+
 # ─── Uninstall Command ──────────────────────────────────────────────────────
 cmd_uninstall() {
-    check_macos
+    if [[ "$OS_TYPE" == "unknown" ]]; then
+        error "Unsupported OS type: $OSTYPE"
+        exit 1
+    fi
 
+    if [[ "$OS_TYPE" == "macos" ]]; then
+        cmd_uninstall_macos
+    else
+        cmd_uninstall_linux
+    fi
+}
+
+# ─── Uninstall macOS launchd agents ────────────────────────────────────────
+cmd_uninstall_macos() {
     info "Uninstalling launchd agents..."
 
     # Unload daemon
@@ -293,31 +481,112 @@ cmd_uninstall() {
     success "Uninstalled all launchd agents"
 }
 
+# ─── Uninstall Linux systemd user services ────────────────────────────────
+cmd_uninstall_linux() {
+    info "Uninstalling systemd user services..."
+
+    # Stop and disable daemon
+    if systemctl --user is-active --quiet shipwright-daemon.service 2>/dev/null; then
+        if systemctl --user stop shipwright-daemon.service 2>/dev/null; then
+            success "Stopped daemon service"
+        else
+            warn "Could not stop daemon service"
+        fi
+    fi
+
+    if systemctl --user is-enabled --quiet shipwright-daemon.service 2>/dev/null; then
+        if systemctl --user disable shipwright-daemon.service 2>/dev/null; then
+            success "Disabled daemon service"
+        else
+            warn "Could not disable daemon service"
+        fi
+    fi
+
+    # Stop and disable dashboard
+    if systemctl --user is-active --quiet shipwright-dashboard.service 2>/dev/null; then
+        if systemctl --user stop shipwright-dashboard.service 2>/dev/null; then
+            success "Stopped dashboard service"
+        else
+            warn "Could not stop dashboard service"
+        fi
+    fi
+
+    if systemctl --user is-enabled --quiet shipwright-dashboard.service 2>/dev/null; then
+        if systemctl --user disable shipwright-dashboard.service 2>/dev/null; then
+            success "Disabled dashboard service"
+        else
+            warn "Could not disable dashboard service"
+        fi
+    fi
+
+    # Stop and disable connect
+    if systemctl --user is-active --quiet shipwright-connect.service 2>/dev/null; then
+        if systemctl --user stop shipwright-connect.service 2>/dev/null; then
+            success "Stopped connect service"
+        else
+            warn "Could not stop connect service"
+        fi
+    fi
+
+    if systemctl --user is-enabled --quiet shipwright-connect.service 2>/dev/null; then
+        if systemctl --user disable shipwright-connect.service 2>/dev/null; then
+            success "Disabled connect service"
+        else
+            warn "Could not disable connect service"
+        fi
+    fi
+
+    # Remove service files
+    [[ -f "$DAEMON_SERVICE" ]] && rm -f "$DAEMON_SERVICE" && success "Removed daemon service file"
+    [[ -f "$DASHBOARD_SERVICE" ]] && rm -f "$DASHBOARD_SERVICE" && success "Removed dashboard service file"
+    [[ -f "$CONNECT_SERVICE" ]] && rm -f "$CONNECT_SERVICE" && success "Removed connect service file"
+
+    # Reload systemd daemon
+    if systemctl --user daemon-reload 2>/dev/null; then
+        success "Reloaded systemd user daemon"
+    fi
+
+    echo ""
+    success "Uninstalled all systemd user services"
+}
+
 # ─── Status Command ─────────────────────────────────────────────────────────
 cmd_status() {
-    check_macos
+    if [[ "$OS_TYPE" == "unknown" ]]; then
+        error "Unsupported OS type: $OSTYPE"
+        exit 1
+    fi
 
+    if [[ "$OS_TYPE" == "macos" ]]; then
+        cmd_status_macos
+    else
+        cmd_status_linux
+    fi
+}
+
+# ─── Status macOS launchd services ─────────────────────────────────────────
+cmd_status_macos() {
     echo ""
     echo -e "${CYAN}${BOLD}Launchd Services${RESET}"
     echo -e "${DIM}════════════════════════════════════════════${RESET}"
     echo ""
 
     # Check daemon
-    if launchctl list | grep -q "com.shipwright.daemon" 2>/dev/null; then
+    if launchctl list 2>/dev/null | grep -q "com.shipwright.daemon"; then
         echo -e "  ${GREEN}●${RESET} Daemon service is ${GREEN}loaded${RESET}"
     else
         echo -e "  ${RED}○${RESET} Daemon service is ${RED}not loaded${RESET}"
     fi
 
     # Check dashboard
-    if launchctl list | grep -q "com.shipwright.dashboard" 2>/dev/null; then
+    if launchctl list 2>/dev/null | grep -q "com.shipwright.dashboard"; then
         echo -e "  ${GREEN}●${RESET} Dashboard service is ${GREEN}loaded${RESET}"
     else
         echo -e "  ${RED}○${RESET} Dashboard service is ${RED}not loaded${RESET}"
     fi
 
     # Check connect
-    if launchctl list | grep -q "com.shipwright.connect" 2>/dev/null; then
+    if launchctl list 2>/dev/null | grep -q "com.shipwright.connect"; then
         echo -e "  ${GREEN}●${RESET} Connect service is ${GREEN}loaded${RESET}"
     else
         echo -e "  ${RED}○${RESET} Connect service is ${RED}not loaded${RESET}"
@@ -330,9 +599,70 @@ cmd_status() {
     # Show recent log entries
     if [[ -f "$LOG_DIR/daemon.stdout.log" ]]; then
         echo -e "${DIM}Recent daemon logs:${RESET}"
-        tail -3 "$LOG_DIR/daemon.stdout.log" | sed 's/^/    /'
+        tail -3 "$LOG_DIR/daemon.stdout.log" 2>/dev/null | sed 's/^/    /'
         echo ""
     fi
+}
+
+# ─── Status Linux systemd services ────────────────────────────────────────
+cmd_status_linux() {
+    echo ""
+    echo -e "${CYAN}${BOLD}Systemd User Services${RESET}"
+    echo -e "${DIM}════════════════════════════════════════════${RESET}"
+    echo ""
+
+    # Check daemon
+    if systemctl --user is-active --quiet shipwright-daemon.service 2>/dev/null; then
+        echo -e "  ${GREEN}●${RESET} Daemon service is ${GREEN}running${RESET}"
+    else
+        echo -e "  ${RED}○${RESET} Daemon service is ${RED}not running${RESET}"
+    fi
+
+    # Check dashboard
+    if systemctl --user is-active --quiet shipwright-dashboard.service 2>/dev/null; then
+        echo -e "  ${GREEN}●${RESET} Dashboard service is ${GREEN}running${RESET}"
+    else
+        echo -e "  ${RED}○${RESET} Dashboard service is ${RED}not running${RESET}"
+    fi
+
+    # Check connect
+    if systemctl --user is-active --quiet shipwright-connect.service 2>/dev/null; then
+        echo -e "  ${GREEN}●${RESET} Connect service is ${GREEN}running${RESET}"
+    else
+        echo -e "  ${RED}○${RESET} Connect service is ${RED}not running${RESET}"
+    fi
+
+    echo ""
+    echo -e "  Services: ${DIM}${SYSTEMD_USER_DIR}${RESET}"
+    echo -e "  Logs: ${DIM}journalctl --user${RESET}"
+    echo ""
+
+    # Show recent journal entries for daemon
+    if command -v journalctl &>/dev/null; then
+        echo -e "${DIM}Recent daemon logs:${RESET}"
+        journalctl --user -u shipwright-daemon.service -n 3 --no-pager 2>/dev/null | tail -3 | sed 's/^/    /' || true
+        echo ""
+    fi
+}
+
+# ─── Logs Command (systemd only) ────────────────────────────────────────────
+cmd_logs() {
+    if [[ "$OS_TYPE" != "linux" ]]; then
+        error "logs command is only available on Linux (systemd)"
+        exit 1
+    fi
+
+    local service="${1:-shipwright-daemon.service}"
+
+    if ! systemctl --user is-active --quiet "$service" 2>/dev/null; then
+        warn "Service $service is not running"
+    fi
+
+    echo ""
+    info "Tailing logs for $service (Ctrl-C to stop)..."
+    echo ""
+
+    journalctl --user -u "$service" -f --no-pager
 }
 
 # ─── Main ───────────────────────────────────────────────────────────────────
@@ -349,6 +679,9 @@ main() {
         status)
             cmd_status
             ;;
+        logs)
+            cmd_logs "${2:-}"
+            ;;
         help|--help|-h)
             show_help
             ;;
@@ -361,4 +694,6 @@ main() {
     esac
 }
 
-main "$@"
+if [[ "${BASH_SOURCE[0]}" == "$0" ]]; then
+    main "$@"
+fi
