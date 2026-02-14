@@ -182,6 +182,7 @@ All scripts are bash (except the dashboard server in TypeScript). Grouped by lay
 | `scripts/sw-discovery.sh` | 412 | Cross-Pipeline Real-Time Learning |
 | `scripts/sw-docs.sh` | 635 | Documentation Keeper |
 | `scripts/sw-doctor.sh` | 965 | Validate Shipwright setup |
+| `scripts/sw-eventbus.sh` | 393 | Durable event bus for real-time inter-component |
 | `scripts/sw-feedback.sh` | 471 | Production Feedback Loop |
 | `scripts/sw-fix.sh` | 482 | Bulk Fix Across Multiple Repos |
 | `scripts/sw-fleet-discover.sh` | 567 | Auto-Discovery from GitHub Orgs |
@@ -195,6 +196,8 @@ All scripts are bash (except the dashboard server in TypeScript). Grouped by lay
 | `scripts/sw-logs.sh` | 343 | View and search agent pane logs |
 | `scripts/sw-loop.sh` | 2278 | Continuous agent loop harness for Claude Code |
 | `scripts/sw-memory.sh` | 1626 | Persistent Learning & Context System |
+| `scripts/sw-model-router.sh` | 545 | Intelligent Model Routing & Cost Optimization |
+| `scripts/sw-otel.sh` | 596 | OpenTelemetry Observability |
 | `scripts/sw-patrol-meta.sh` | 417 | Shipwright Self-Improvement Patrol |
 | `scripts/sw-pipeline-composer.sh` | 455 | Dynamic Pipeline Composition |
 | `scripts/sw-pipeline-vitals.sh` | 1096 | Pipeline Vitals Engine |
@@ -219,7 +222,7 @@ All scripts are bash (except the dashboard server in TypeScript). Grouped by lay
 | `scripts/sw-webhook.sh` | 627 | GitHub Webhook Receiver for Instant Issue Processing |
 | `scripts/sw-widgets.sh` | 530 | Embeddable Status Widgets |
 | `scripts/sw-worktree.sh` | 408 | Git worktree management for multi-agent isolation |
-| `scripts/sw` | 381 | CLI router — dispatches subcommands via exec |
+| `scripts/sw` | 393 | CLI router — dispatches subcommands via exec |
 <!-- /AUTO:core-scripts -->
 
 ### GitHub API Modules
