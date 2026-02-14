@@ -344,7 +344,7 @@ cmd_learn() {
     ensure_dirs
 
     local incident_entry
-    incident_entry=$(jq -n \
+    incident_entry=$(jq -c -n \
         --arg ts "$(now_iso)" \
         --arg cause "$root_cause" \
         --arg fix "$fix_applied" \
@@ -375,29 +375,22 @@ cmd_report() {
     info "Incident Report (last $days days)"
     echo ""
 
-    local cutoff_epoch
-    cutoff_epoch=$(($(now_epoch) - days * 86400))
-
     local incident_count=0
-    local total_time=0
 
     while IFS= read -r line; do
-        local ts_epoch
-        ts_epoch=$(echo "$line" | jq -r '.timestamp // ""' | xargs -I {} date -d {} +%s 2>/dev/null || echo 0)
+        incident_count=$((incident_count + 1))
 
-        if [[ "$ts_epoch" -ge "$cutoff_epoch" ]]; then
-            incident_count=$((incident_count + 1))
+        local ts
+        ts=$(echo "$line" | jq -r '.timestamp // "Unknown"')
+        local cause
+        cause=$(echo "$line" | jq -r '.root_cause // "Unknown"')
+        local fixed
+        fixed=$(echo "$line" | jq -r '.fix_applied // "Pending"')
 
-            local cause
-            cause=$(echo "$line" | jq -r '.root_cause // "Unknown"')
-            local fixed
-            fixed=$(echo "$line" | jq -r '.fix_applied // "Pending"')
-
-            echo "  ${CYAN}Incident $incident_count${RESET}"
-            echo "    ${DIM}Cause: ${RESET}$cause"
-            echo "    ${DIM}Fix: ${RESET}$fixed"
-        fi
-    done < <(tac "$INCIDENTS_FILE")
+        echo "  ${CYAN}Incident $incident_count${RESET} ${DIM}($ts)${RESET}"
+        echo "    ${DIM}Cause: ${RESET}$cause"
+        echo "    ${DIM}Fix: ${RESET}$fixed"
+    done < "$INCIDENTS_FILE"
 
     echo ""
     success "Total incidents: $incident_count"
