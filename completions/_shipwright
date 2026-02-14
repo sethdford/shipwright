@@ -1,12 +1,14 @@
 #compdef shipwright sw cct
 # ╔═══════════════════════════════════════════════════════════════════════════╗
 # ║  Shipwright — Zsh tab completions                                       ║
+# ║  Auto-install to ~/.zsh/completions/ during shipwright init             ║
 # ╚═══════════════════════════════════════════════════════════════════════════╝
-# Place in a directory in your $fpath (e.g. ~/.zfunc/) and run: compinit
 
 _shipwright() {
     local -a commands
     commands=(
+        'init:Quick tmux setup — one command, no prompts'
+        'setup:Guided setup — prerequisites, init, doctor'
         'session:Create a new tmux window for a Claude team'
         'status:Show dashboard of running teams and agents'
         'ps:Show running agent processes and status'
@@ -21,21 +23,50 @@ _shipwright() {
         'worktree:Manage git worktrees for agent isolation'
         'prep:Repo preparation — generate .claude/ configs'
         'daemon:Issue watcher — auto-process GitHub issues'
+        'fleet:Multi-repo fleet — orchestrate daemons'
         'memory:Persistent memory — learn from every pipeline run'
-        'cost:Cost intelligence — track tokens, budgets, model routing'
-        'init:Quick tmux setup — one command, no prompts'
+        'cost:Cost intelligence — track tokens, budgets'
+        'db:SQLite persistence — events, runs, developers'
+        'fix:Bulk fix — apply a fix across multiple repos'
+        'dashboard:Fleet Command — real-time dashboard'
+        'jira:Jira sync — bidirectional issue sync'
+        'linear:Linear sync — bidirectional issue sync'
+        'tracker:Issue tracker — configure Linear/Jira'
+        'heartbeat:Agent heartbeat — write/check/list'
+        'checkpoint:Checkpoints — save/restore agent state'
+        'webhook:GitHub webhooks — instant processing'
+        'decompose:Issue decomposer — analyze complexity'
+        'connect:Team connect — sync local state'
+        'remote:Remote machines — manage distributed workers'
+        'launchd:Process supervision — auto-start on boot'
+        'intelligence:Intelligence engine analysis'
+        'optimize:Self-optimization based on DORA'
+        'predict:Predictive risk assessment'
+        'adversarial:Adversarial Agent Code Review'
+        'simulate:Developer simulation workflow'
+        'architecture:Architecture Model & Enforcer'
+        'vitals:Pipeline vitals — real-time scoring'
+        'docs:Documentation keeper — auto-sync docs'
+        'tmux:tmux health — doctor, install, fix'
+        'github:GitHub context — repo metadata'
+        'checks:GitHub checks — CI check runs'
+        'deploys:Deployments — deployment history'
+        'pr:PR lifecycle — auto-review, merge'
+        'context:Context engine — gather context'
         'help:Show help message'
         'version:Show version'
     )
 
-    local -a pipeline_cmds daemon_cmds templates_cmds
+    local -a pipeline_cmds daemon_cmds fleet_cmds memory_cmds cost_cmds
+    local -a templates_cmds worktree_cmds tracker_cmds heartbeat_cmds
+    local -a checkpoint_cmds connect_cmds remote_cmds launchd_cmds
+    local -a dashboard_cmds github_cmds checks_cmds deploys_cmds docs_cmds
+    local -a tmux_cmds decompose_cmds pr_cmds
+
     pipeline_cmds=(
         'start:Start a new pipeline run'
         'resume:Resume from last stage'
         'status:Show pipeline progress dashboard'
-        'abort:Cancel the running pipeline'
-        'list:Browse available pipeline templates'
-        'show:Show details of a pipeline template'
         'test:Run pipeline test suite'
     )
     daemon_cmds=(
@@ -43,32 +74,113 @@ _shipwright() {
         'stop:Graceful shutdown'
         'status:Show active pipelines and queue'
         'metrics:DORA/DX metrics dashboard'
-        'triage:Show issue triage scores'
-        'patrol:Run proactive codebase patrol'
         'test:Run daemon test suite'
-        'logs:View daemon logs'
-        'init:Initialize daemon configuration'
     )
-    local -a memory_cmds cost_cmds
+    fleet_cmds=(
+        'start:Start daemons for all repos'
+        'stop:Stop all daemons'
+        'status:Show fleet-wide status'
+        'metrics:Cross-repo DORA metrics'
+        'test:Run fleet test suite'
+    )
     memory_cmds=(
         'show:Show learned patterns for this repo'
         'search:Search across all memories'
-        'forget:Remove a memory entry'
-        'export:Export memories to file'
-        'import:Import memories from file'
         'stats:Memory usage and coverage'
-        'test:Run memory test suite'
     )
     cost_cmds=(
-        'show:Show cost summary for current period'
+        'show:Show cost summary'
         'budget:Manage daily budget'
-        'record:Record token usage'
-        'calculate:Calculate cost estimate'
-        'check-budget:Check budget before starting'
     )
     templates_cmds=(
         'list:Browse team templates'
         'show:Show template details'
+    )
+    worktree_cmds=(
+        'create:Create git worktree'
+        'list:List active worktrees'
+        'remove:Remove worktree'
+    )
+    tracker_cmds=(
+        'init:Initialize tracker'
+        'status:Show tracker status'
+        'sync:Sync issues'
+        'test:Run tracker test suite'
+    )
+    heartbeat_cmds=(
+        'write:Write heartbeat'
+        'check:Check heartbeat'
+        'list:List heartbeats'
+        'clear:Clear heartbeats'
+    )
+    checkpoint_cmds=(
+        'save:Save agent state'
+        'restore:Restore agent state'
+        'list:List checkpoints'
+        'delete:Delete checkpoint'
+    )
+    connect_cmds=(
+        'start:Sync to team dashboard'
+        'stop:Stop connection'
+        'join:Join a team'
+        'status:Show connection status'
+    )
+    remote_cmds=(
+        'list:Show remote machines'
+        'add:Register a remote'
+        'remove:Remove a remote'
+        'status:Health check remotes'
+        'test:Run remote test suite'
+    )
+    launchd_cmds=(
+        'install:Auto-start on boot'
+        'uninstall:Remove services'
+        'status:Show service status'
+        'test:Run launchd test suite'
+    )
+    dashboard_cmds=(
+        'start:Start dashboard'
+        'stop:Stop dashboard'
+        'status:Show dashboard status'
+    )
+    github_cmds=(
+        'context:Show GitHub context'
+        'security:Show security alerts'
+        'blame:Show file ownership'
+    )
+    checks_cmds=(
+        'list:Show check runs'
+        'status:Show check status'
+        'test:Run checks test suite'
+    )
+    deploys_cmds=(
+        'list:Show deployment history'
+        'status:Show deployment status'
+        'test:Run deploys test suite'
+    )
+    docs_cmds=(
+        'check:Report stale sections'
+        'sync:Regenerate stale sections'
+        'wiki:Generate wiki pages'
+        'report:Show freshness report'
+        'test:Run docs test suite'
+    )
+    tmux_cmds=(
+        'doctor:Check Claude compat'
+        'install:Install TPM'
+        'fix:Auto-fix issues'
+        'reload:Reload config'
+        'test:Run tmux test suite'
+    )
+    decompose_cmds=(
+        'analyze:Analyze complexity'
+        'create-subtasks:Create subtasks'
+    )
+    pr_cmds=(
+        'review:Auto-review PR'
+        'merge:Auto-merge PR'
+        'cleanup:Cleanup merged branches'
+        'feedback:Get PR feedback'
     )
 
     _arguments -C \
@@ -83,9 +195,13 @@ _shipwright() {
             case "${words[1]}" in
                 pipeline)
                     _describe -t pipeline-cmds 'pipeline command' pipeline_cmds
+                    _arguments '*:options:_pipeline_options'
                     ;;
                 daemon)
                     _describe -t daemon-cmds 'daemon command' daemon_cmds
+                    ;;
+                fleet)
+                    _describe -t fleet-cmds 'fleet command' fleet_cmds
                     ;;
                 memory)
                     _describe -t memory-cmds 'memory command' memory_cmds
@@ -96,6 +212,53 @@ _shipwright() {
                 templates)
                     _describe -t templates-cmds 'templates command' templates_cmds
                     ;;
+                worktree)
+                    _describe -t worktree-cmds 'worktree command' worktree_cmds
+                    ;;
+                tracker)
+                    _describe -t tracker-cmds 'tracker command' tracker_cmds
+                    ;;
+                heartbeat)
+                    _describe -t heartbeat-cmds 'heartbeat command' heartbeat_cmds
+                    ;;
+                checkpoint)
+                    _describe -t checkpoint-cmds 'checkpoint command' checkpoint_cmds
+                    ;;
+                connect)
+                    _describe -t connect-cmds 'connect command' connect_cmds
+                    _arguments '--token[Invite token]:token'
+                    ;;
+                remote)
+                    _describe -t remote-cmds 'remote command' remote_cmds
+                    _arguments '--host[Hostname]:host' '--port[SSH port]:port' '--key[SSH key]:file' '--user[SSH user]:user'
+                    ;;
+                launchd)
+                    _describe -t launchd-cmds 'launchd command' launchd_cmds
+                    ;;
+                dashboard)
+                    _describe -t dashboard-cmds 'dashboard command' dashboard_cmds
+                    ;;
+                github)
+                    _describe -t github-cmds 'github command' github_cmds
+                    ;;
+                checks)
+                    _describe -t checks-cmds 'checks command' checks_cmds
+                    ;;
+                deploys)
+                    _describe -t deploys-cmds 'deploys command' deploys_cmds
+                    ;;
+                docs)
+                    _describe -t docs-cmds 'docs command' docs_cmds
+                    ;;
+                tmux)
+                    _describe -t tmux-cmds 'tmux command' tmux_cmds
+                    ;;
+                decompose)
+                    _describe -t decompose-cmds 'decompose command' decompose_cmds
+                    ;;
+                pr)
+                    _describe -t pr-cmds 'pr command' pr_cmds
+                    ;;
                 prep)
                     _arguments \
                         '--check[Audit existing prep quality]' \
@@ -104,29 +267,37 @@ _shipwright() {
                     ;;
                 loop)
                     _arguments \
-                        '--test-cmd[Test command to verify each iteration]:command:' \
-                        '--max-iterations[Maximum loop iterations]:count:' \
-                        '--model[Claude model to use]:model:(opus sonnet haiku)' \
+                        '1:goal:' \
+                        '--test-cmd[Test command]:command:' \
+                        '--max-iterations[Max iterations]:count:' \
+                        '--model[Model to use]:model:(opus sonnet haiku)' \
                         '--agents[Number of agents]:count:' \
-                        '--audit[Enable self-reflection each iteration]' \
-                        '--audit-agent[Use separate auditor agent]' \
-                        '--quality-gates[Enable automated quality checks]' \
-                        '--definition-of-done[Custom completion checklist]:file:_files' \
+                        '--audit[Self-reflection each iteration]' \
+                        '--audit-agent[Separate auditor]' \
+                        '--quality-gates[Quality checks]' \
+                        '--definition-of-done[Checklist]:file:_files' \
                         '--resume[Resume interrupted loop]' \
-                        '--skip-permissions[Skip permission prompts]'
+                        '--skip-permissions[Skip prompts]'
+                    ;;
+                fix)
+                    _arguments \
+                        '1:goal:' \
+                        '--repos[Repository paths]:repos:'
                     ;;
                 logs)
                     _arguments \
-                        '--follow[Tail logs in real time]' \
-                        '--lines[Number of lines to show]:count:'
+                        '1:team name:' \
+                        '--follow[Tail logs]' \
+                        '--lines[Number of lines]:count:' \
+                        '--grep[Search pattern]:pattern:'
                     ;;
                 cleanup)
                     _arguments \
-                        '--force[Actually kill orphaned sessions]'
+                        '--force[Kill orphaned sessions]'
                     ;;
                 upgrade)
                     _arguments \
-                        '--apply[Apply available updates]'
+                        '--apply[Apply updates]'
                     ;;
                 reaper)
                     _arguments \
@@ -135,6 +306,15 @@ _shipwright() {
             esac
             ;;
     esac
+}
+
+_pipeline_options() {
+    _arguments \
+        '--issue[GitHub issue number]:issue:' \
+        '--goal[Goal description]:goal:' \
+        '--worktree[Use isolated worktree]' \
+        '--template[Pipeline template]:file:_files' \
+        '--skip-gates[Auto-proceed all gates]'
 }
 
 _shipwright "$@"

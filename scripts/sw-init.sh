@@ -196,6 +196,93 @@ if [[ -d "$PIPELINES_SRC" ]]; then
     success "Installed ${pip_count} pipeline templates → ~/.shipwright/pipelines/"
 fi
 
+# ─── Shell Completions ────────────────────────────────────────────────────────
+# Detect shell type and install completions to the correct location
+SHELL_TYPE=""
+if [[ -n "${ZSH_VERSION:-}" ]]; then
+    SHELL_TYPE="zsh"
+elif [[ -n "${BASH_VERSION:-}" ]]; then
+    SHELL_TYPE="bash"
+else
+    # Try to detect from $SHELL env var
+    if [[ "$SHELL" == *"zsh"* ]]; then
+        SHELL_TYPE="zsh"
+    elif [[ "$SHELL" == *"bash"* ]]; then
+        SHELL_TYPE="bash"
+    fi
+fi
+
+COMPLETIONS_SRC="$REPO_DIR/completions"
+install_completions=0
+
+if [[ -z "$SHELL_TYPE" ]]; then
+    warn "Could not detect shell type — skipping completions installation"
+elif [[ "$SHELL_TYPE" == "zsh" ]]; then
+    # Install zsh completion to ~/.zsh/completions/
+    ZSH_COMPLETION_DIR="$HOME/.zsh/completions"
+    if [[ -f "$COMPLETIONS_SRC/_shipwright" ]]; then
+        mkdir -p "$ZSH_COMPLETION_DIR"
+        cp "$COMPLETIONS_SRC/_shipwright" "$ZSH_COMPLETION_DIR/_shipwright"
+        chmod 644 "$ZSH_COMPLETION_DIR/_shipwright"
+
+        # Ensure fpath includes the completions directory
+        if [[ -f "$HOME/.zshrc" ]]; then
+            if ! grep -q "fpath.*\.zsh/completions" "$HOME/.zshrc" 2>/dev/null; then
+                {
+                    echo ""
+                    echo "# Shipwright shell completions"
+                    echo "fpath+=~/.zsh/completions"
+                } >> "$HOME/.zshrc"
+                info "Added ~/.zsh/completions to fpath in ~/.zshrc"
+            fi
+        else
+            # Create minimal .zshrc with fpath
+            {
+                echo "# Shipwright shell completions"
+                echo "fpath+=~/.zsh/completions"
+                echo "autoload -Uz compinit && compinit"
+            } > "$HOME/.zshrc"
+            info "Created ~/.zshrc with completions"
+        fi
+
+        success "Installed zsh completions → ~/.zsh/completions/_shipwright"
+        install_completions=1
+    fi
+elif [[ "$SHELL_TYPE" == "bash" ]]; then
+    # Install bash completion to ~/.local/share/bash-completion/completions/ (Linux/macOS)
+    BASH_COMPLETION_DIR="$HOME/.local/share/bash-completion/completions"
+    if [[ -f "$COMPLETIONS_SRC/shipwright.bash" ]]; then
+        mkdir -p "$BASH_COMPLETION_DIR"
+        cp "$COMPLETIONS_SRC/shipwright.bash" "$BASH_COMPLETION_DIR/shipwright"
+        chmod 644 "$BASH_COMPLETION_DIR/shipwright"
+
+        # Also try to add to .bashrc for systems without bash-completion infrastructure
+        if [[ -f "$HOME/.bashrc" ]]; then
+            if ! grep -q "bash-completion/completions" "$HOME/.bashrc" 2>/dev/null && \
+               ! grep -q "source.*shipwright.bash" "$HOME/.bashrc" 2>/dev/null; then
+                {
+                    echo ""
+                    echo "# Shipwright shell completions"
+                    echo "[[ -r $HOME/.local/share/bash-completion/completions/shipwright ]] && source $HOME/.local/share/bash-completion/completions/shipwright"
+                } >> "$HOME/.bashrc"
+                info "Added completion source to ~/.bashrc"
+            fi
+        fi
+
+        success "Installed bash completions → ~/.local/share/bash-completion/completions/shipwright"
+        install_completions=1
+    fi
+fi
+
+if [[ $install_completions -eq 1 ]]; then
+    echo -e "  ${DIM}Reload your shell config to activate:${RESET}"
+    if [[ "$SHELL_TYPE" == "zsh" ]]; then
+        echo -e "    ${DIM}source ~/.zshrc${RESET}"
+    elif [[ "$SHELL_TYPE" == "bash" ]]; then
+        echo -e "    ${DIM}source ~/.bashrc${RESET}"
+    fi
+fi
+
 # ─── Claude Code Settings ────────────────────────────────────────────────────
 CLAUDE_DIR="$HOME/.claude"
 SETTINGS_FILE="$CLAUDE_DIR/settings.json"
