@@ -335,7 +335,6 @@ jobs:
       TEMPLATE: ${{ needs.triage.outputs.template || github.event.inputs.template || 'autonomous' }}
       MAX_ITERATIONS: ${{ needs.triage.outputs.max_iterations || '20' }}
       COMPLETED_STAGES: ${{ github.event.inputs.completed_stages || '' }}
-      ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
       CLAUDE_CODE_OAUTH_TOKEN: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
       GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       NO_COLOR: "1"
