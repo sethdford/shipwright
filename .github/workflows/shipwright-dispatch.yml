@@ -1,0 +1,132 @@
+name: Shipwright Dispatch
+
+# Bridges ready-to-build labeled issues to pipeline dispatch.
+# Runs every 15 minutes — picks up issues that have been triaged and labeled.
+on:
+  schedule:
+    - cron: "*/15 * * * *"
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+  issues: write
+  actions: write
+
+concurrency:
+  group: shipwright-dispatch
+  cancel-in-progress: false
+
+jobs:
+  dispatch:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    env:
+      GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+    steps:
+      - name: Scan and dispatch ready-to-build issues
+        run: |
+          echo "--- Shipwright Dispatch: $(date -u +%Y-%m-%dT%H:%M:%SZ) ---"
+
+          # Get all open issues with the 'ready-to-build' label
+          ISSUES=$(gh issue list --repo "$GITHUB_REPOSITORY" \
+            --label ready-to-build --state open --json number,title \
+            --jq '.[].number' 2>/dev/null || echo "")
+
+          if [[ -z "$ISSUES" ]]; then
+            echo "No open ready-to-build issues found."
+            exit 0
+          fi
+
+          echo "Found ready-to-build issues: $ISSUES"
+
+          DISPATCHED=0
+          SKIPPED=0
+
+          for issue in $ISSUES; do
+            echo ""
+            echo "--- Checking issue #$issue ---"
+
+            # ── Check 1: Skip if issue has shipwright-failed label ──
+            HAS_FAILED_LABEL=$(gh issue view "$issue" --repo "$GITHUB_REPOSITORY" \
+              --json labels --jq '[.labels[].name] | index("shipwright-failed") // empty' 2>/dev/null || echo "")
+
+            if [[ -n "$HAS_FAILED_LABEL" ]]; then
+              echo "Issue #$issue: has shipwright-failed label — skipping"
+              SKIPPED=$((SKIPPED + 1))
+              continue
+            fi
+
+            # ── Check 2: Active/queued pipeline runs for THIS issue ──
+            # Check by displayTitle which includes "#N" via run-name
+            # Use temp files to detect API failures (rate limiting)
+            ISSUE_ACTIVE="0"
+            if gh run list --repo "$GITHUB_REPOSITORY" \
+              --workflow=shipwright-pipeline.yml --status in_progress \
+              --json displayTitle --jq "[.[] | select(.displayTitle | test(\"#${issue}( |$)\"))] | length" > /tmp/dispatch-active-$issue.txt 2>/dev/null; then
+              ISSUE_ACTIVE=$(cat /tmp/dispatch-active-$issue.txt 2>/dev/null || echo "0")
+            else
+              echo "Issue #$issue: API call failed — skipping to avoid duplicate dispatch"
+              SKIPPED=$((SKIPPED + 1))
+              continue
+            fi
+
+            ISSUE_QUEUED="0"
+            if gh run list --repo "$GITHUB_REPOSITORY" \
+              --workflow=shipwright-pipeline.yml --status queued \
+              --json displayTitle --jq "[.[] | select(.displayTitle | test(\"#${issue}( |$)\"))] | length" > /tmp/dispatch-queued-$issue.txt 2>/dev/null; then
+              ISSUE_QUEUED=$(cat /tmp/dispatch-queued-$issue.txt 2>/dev/null || echo "0")
+            else
+              echo "Issue #$issue: API call failed — skipping to avoid duplicate dispatch"
+              SKIPPED=$((SKIPPED + 1))
+              continue
+            fi
+
+            if [[ "${ISSUE_ACTIVE:-0}" -gt 0 ]] || [[ "${ISSUE_QUEUED:-0}" -gt 0 ]]; then
+              echo "Issue #$issue: pipeline already running/queued — skipping"
+              SKIPPED=$((SKIPPED + 1))
+              continue
+            fi
+
+            # ── Check 3: Already completed with PR ──
+            COMMENTS=""
+            if ! COMMENTS=$(gh issue view "$issue" --repo "$GITHUB_REPOSITORY" \
+              --json comments --jq '.comments[].body' 2>/dev/null); then
+              echo "Issue #$issue: failed to fetch comments — skipping"
+              SKIPPED=$((SKIPPED + 1))
+              continue
+            fi
+
+            HAS_SUCCESS=$(echo "$COMMENTS" | grep -c "Pipeline Completed Successfully" || true)
+            HAS_PR=$(echo "$COMMENTS" | grep -c "Pull Request Created" || true)
+
+            if [[ "$HAS_SUCCESS" -gt 0 && "$HAS_PR" -gt 0 ]]; then
+              echo "Issue #$issue: pipeline already completed with PR — skipping"
+              SKIPPED=$((SKIPPED + 1))
+              continue
+            fi
+
+            # ── All checks passed — dispatch pipeline ──
+            echo "Issue #$issue: dispatching pipeline..."
+            if gh workflow run shipwright-pipeline.yml \
+              --repo "$GITHUB_REPOSITORY" \
+              -f issue_number="$issue" \
+              -f template=standard 2>&1; then
+              echo "Issue #$issue: pipeline dispatched successfully"
+              DISPATCHED=$((DISPATCHED + 1))
+
+              # Add shipwright label so sweep can track it too
+              gh issue edit "$issue" --repo "$GITHUB_REPOSITORY" \
+                --add-label "shipwright" 2>/dev/null || true
+            else
+              echo "Issue #$issue: failed to dispatch pipeline"
+            fi
+
+            sleep 5  # Avoid rate limiting between dispatches
+          done
+
+          echo ""
+          echo "--- Dispatch Summary ---"
+          echo "Dispatched: $DISPATCHED"
+          echo "Skipped: $SKIPPED"

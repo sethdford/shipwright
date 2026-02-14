@@ -67,6 +67,8 @@ jobs:
       template: ${{ steps.skip.outputs.template || steps.strategy.outputs.template }}
       max_iterations: ${{ steps.skip.outputs.max_iterations || steps.strategy.outputs.max_iterations }}
       estimated_minutes: ${{ steps.skip.outputs.estimated_minutes || steps.strategy.outputs.estimated_minutes }}
+      risk_level: ${{ steps.risk.outputs.risk_level }}
+      risk_score: ${{ steps.risk.outputs.risk_score }}
 
     env:
       ISSUE_NUMBER: ${{ github.event.inputs.issue_number || github.event.issue.number }}
@@ -249,6 +251,29 @@ jobs:
           echo "Complexity: $COMPLEXITY"
           echo "Reason: $REASON"
 
+      - name: Predictive risk assessment
+        if: steps.skip.conclusion == 'skipped' && steps.triage.outputs.approved == 'true'
+        id: risk
+        run: |
+          # Advisory only — never blocks the pipeline
+          set +e
+
+          RISK_LEVEL="unknown"
+          RISK_SCORE="0"
+
+          if [[ -f "./scripts/sw-predictive.sh" ]]; then
+            RISK_OUTPUT=$(bash ./scripts/sw-predictive.sh risk --issue "$ISSUE_NUMBER" --json 2>/dev/null || echo "{}")
+            RISK_LEVEL=$(echo "$RISK_OUTPUT" | jq -r '.risk_level // "unknown"' 2>/dev/null || echo "unknown")
+            RISK_SCORE=$(echo "$RISK_OUTPUT" | jq -r '.risk_score // "0"' 2>/dev/null || echo "0")
+
+            echo "Risk assessment: level=$RISK_LEVEL score=$RISK_SCORE"
+          else
+            echo "Predictive script not found — skipping risk assessment"
+          fi
+
+          echo "risk_level=$RISK_LEVEL" >> "$GITHUB_OUTPUT"
+          echo "risk_score=$RISK_SCORE" >> "$GITHUB_OUTPUT"
+
       - name: Map strategy from triage
         if: steps.skip.conclusion == 'skipped' && steps.triage.outputs.approved == 'true'
         id: strategy
@@ -275,6 +300,14 @@ jobs:
               ESTIMATED_MINUTES=90
               ;;
           esac
+
+          # Bump strategy if predictive risk is high
+          RISK_LEVEL="${{ steps.risk.outputs.risk_level }}"
+          if [[ "$RISK_LEVEL" == "high" || "$RISK_LEVEL" == "critical" ]]; then
+            echo "High risk detected — escalating strategy"
+            TEMPLATE="autonomous"
+            MAX_ITERATIONS=$((MAX_ITERATIONS + 5))
+          fi
 
           # Allow workflow_dispatch overrides
           INPUT_TEMPLATE="${{ github.event.inputs.template }}"
@@ -512,6 +545,7 @@ Run \`claude setup-token\` locally to generate a fresh token." 2>/dev/null || tr
           | Max Iterations | \`$MAX_ITERATIONS\` |
           | Triage | ${{ needs.triage.outputs.reason }} |
           | Runner | \`ubuntu-latest\` |
+          | Risk Level | \`${{ needs.triage.outputs.risk_level || 'N/A' }}\` |
           | Workflow | [${{ github.run_id }}](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}) |
           ${RESUME_NOTE}
 
@@ -585,6 +619,28 @@ Run \`claude setup-token\` locally to generate a fresh token." 2>/dev/null || tr
 
           exit $PIPELINE_EXIT
 
+      - name: Pipeline vitals health check
+        if: always() && steps.claim_check.outputs.skip != 'true' && steps.pipeline.outputs.exit_code == '0'
+        id: vitals
+        run: |
+          set +e
+
+          HEALTH_SCORE="N/A"
+          HEALTH_VERDICT="unknown"
+
+          if [[ -f "./scripts/sw-pipeline-vitals.sh" ]]; then
+            VITALS_OUTPUT=$(bash ./scripts/sw-pipeline-vitals.sh --issue "$ISSUE_NUMBER" --json 2>/dev/null || echo "{}")
+            HEALTH_SCORE=$(echo "$VITALS_OUTPUT" | jq -r '.health_score // "N/A"' 2>/dev/null || echo "N/A")
+            HEALTH_VERDICT=$(echo "$VITALS_OUTPUT" | jq -r '.verdict // "unknown"' 2>/dev/null || echo "unknown")
+
+            echo "Vitals: score=$HEALTH_SCORE verdict=$HEALTH_VERDICT"
+          else
+            echo "Vitals script not found — skipping health check"
+          fi
+
+          echo "health_score=$HEALTH_SCORE" >> "$GITHUB_OUTPUT"
+          echo "health_verdict=$HEALTH_VERDICT" >> "$GITHUB_OUTPUT"
+
       - name: Comment on issue — pipeline result
         if: always() && steps.claim_check.outputs.skip != 'true'
         run: |
@@ -644,12 +700,20 @@ Run \`claude setup-token\` locally to generate a fresh token." 2>/dev/null || tr
             done <<< "$STAGE_COMMENTS"
           fi
 
+          # Read vitals output
+          HEALTH_SCORE="${{ steps.vitals.outputs.health_score }}"
+          HEALTH_VERDICT="${{ steps.vitals.outputs.health_verdict }}"
+          HEALTH_SCORE="${HEALTH_SCORE:-N/A}"
+          HEALTH_VERDICT="${HEALTH_VERDICT:-unknown}"
+
           if [[ "$EXIT_CODE" == "0" ]]; then
             # --- Success comment ---
             gh issue comment "$ISSUE_NUMBER" --body "$(cat <<EOF
           ✅ **Pipeline Completed Successfully**
 
           ${STAGE_TIMELINE}
+
+          | Health Score | ${HEALTH_SCORE} / 100 (${HEALTH_VERDICT}) |
 
           [View full run](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }})
           <!-- SHIPWRIGHT-RESULT: 0:${LAST_STAGE}:${{ github.run_id }} -->
