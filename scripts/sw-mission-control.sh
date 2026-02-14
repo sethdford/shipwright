@@ -115,7 +115,7 @@ get_recent_alerts() {
         return
     fi
 
-    grep -E '"type":"(error|warning|anomaly|vitals_check)"' "$EVENTS_FILE" 2>/dev/null | \
+    grep -E '"type":"(error|warning|anomaly|vitals_check)"' "$EVENTS_FILE" 2>/dev/null || true | \
         tail -"$limit" | while IFS= read -r line; do
         local ts
         local type
