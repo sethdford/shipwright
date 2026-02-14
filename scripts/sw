@@ -117,6 +117,7 @@ show_help() {
     echo -e "  ${CYAN}eventbus${RESET}             ${BOLD}Event bus${RESET} — real-time inter-component communication"
     echo -e "  ${CYAN}otel${RESET}                 ${BOLD}OpenTelemetry observability${RESET} — Prometheus metrics, traces, OTLP export"
     echo -e "  ${CYAN}triage${RESET}                ${BOLD}Issue labeling & prioritization${RESET} — auto-analyze, label, score, team sizing"
+    echo -e "  ${CYAN}quality${RESET}               ${BOLD}Quality validation${RESET} — ruthless gates, adversarial audits, completion detection"
     echo -e "  ${CYAN}init${RESET}                  ${BOLD}Quick tmux setup${RESET} — one command, no prompts"
     echo -e "  ${CYAN}setup${RESET}                 ${BOLD}Guided setup${RESET} — prerequisites, init, doctor, quick start"
     echo -e "  ${CYAN}help${RESET}                  Show this help message"
@@ -394,6 +395,9 @@ main() {
             ;;
         triage)
             exec "$SCRIPT_DIR/sw-triage.sh" "$@"
+            ;;
+        quality)
+            exec "$SCRIPT_DIR/sw-quality.sh" "$@"
             ;;
         help|--help|-h)
             show_help
