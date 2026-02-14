@@ -130,6 +130,7 @@ show_help() {
     echo -e "  ${CYAN}stop${RESET}                               Stop all fleet daemons"
     echo -e "  ${CYAN}status${RESET}                             Show fleet dashboard"
     echo -e "  ${CYAN}metrics${RESET}  [--period N] [--json]     Aggregate DORA metrics across repos"
+    echo -e "  ${CYAN}discover${RESET} --org <name> [options]    Auto-discover repos from GitHub org"
     echo -e "  ${CYAN}init${RESET}                               Generate fleet-config.json"
     echo -e "  ${CYAN}help${RESET}                               Show this help"
     echo ""
@@ -138,6 +139,7 @@ show_help() {
     echo ""
     echo -e "${BOLD}EXAMPLES${RESET}"
     echo -e "  ${DIM}shipwright fleet init${RESET}                           # Generate config"
+    echo -e "  ${DIM}shipwright fleet discover --org myorg${RESET}           # Auto-discover repos"
     echo -e "  ${DIM}shipwright fleet start${RESET}                          # Start all daemons"
     echo -e "  ${DIM}shipwright fleet start --config my-fleet.json${RESET}   # Custom config"
     echo -e "  ${DIM}shipwright fleet status${RESET}                         # Fleet dashboard"
@@ -1364,6 +1366,11 @@ case "$SUBCOMMAND" in
         ;;
     metrics)
         fleet_metrics
+        ;;
+    discover)
+        # Delegate to fleet-discover script
+        shift 2>/dev/null || true
+        exec "$SCRIPT_DIR/sw-fleet-discover.sh" "$@"
         ;;
     init)
         fleet_init
