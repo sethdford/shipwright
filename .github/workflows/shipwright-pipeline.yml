@@ -379,6 +379,25 @@ jobs:
         run: |
           npm link
 
+      - name: Pre-flight auth check
+        run: |
+          echo "Verifying Claude Code authentication..."
+          if claude -p "Reply with exactly: AUTH_OK" --max-turns 1 2>/tmp/auth-check-err.log | grep -q "AUTH_OK"; then
+            echo "Claude Code authentication verified"
+          else
+            echo "::error::Claude Code authentication failed — check CLAUDE_CODE_OAUTH_TOKEN secret"
+            echo "--- stderr ---"
+            cat /tmp/auth-check-err.log 2>/dev/null || true
+            echo "--- end ---"
+            # Post failure comment on issue
+            gh issue comment "$ISSUE_NUMBER" --body "## Pipeline Auth Failure
+
+Claude Code failed to authenticate. Check that \`CLAUDE_CODE_OAUTH_TOKEN\` is set and valid in repository secrets.
+
+Run \`claude setup-token\` locally to generate a fresh token." 2>/dev/null || true
+            exit 1
+          fi
+
       - name: Check for partial work branch
         run: |
           BRANCH="shipwright/issue-${ISSUE_NUMBER}"
@@ -714,8 +733,29 @@ jobs:
             echo "No state changes to persist"
           else
             git commit -m "chore: persist pipeline state [skip ci]"
-            git push origin shipwright-data 2>/dev/null || git push origin shipwright-data --force
-            echo "State persisted to shipwright-data branch"
+            # Retry with jitter — concurrent pipelines race on this branch
+            PUSHED=false
+            for ATTEMPT in 1 2 3 4 5; do
+              if git push origin shipwright-data 2>/dev/null; then
+                PUSHED=true
+                break
+              fi
+              JITTER=$((RANDOM % 10 + 2))
+              echo "Push attempt $ATTEMPT failed — retrying in ${JITTER}s..."
+              sleep "$JITTER"
+              # Re-fetch, rebase, and retry
+              git fetch origin shipwright-data 2>/dev/null || true
+              git rebase origin/shipwright-data 2>/dev/null || {
+                echo "Rebase conflict — force pushing"
+                git rebase --abort 2>/dev/null || true
+                git push origin shipwright-data --force 2>/dev/null && PUSHED=true && break
+              }
+            done
+            if [ "$PUSHED" = "true" ]; then
+              echo "State persisted to shipwright-data branch"
+            else
+              echo "WARNING: Failed to persist state after 5 attempts — non-fatal, continuing"
+            fi
           fi
 
       - name: Notify dashboard — pipeline result
