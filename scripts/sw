@@ -113,6 +113,7 @@ show_help() {
     echo -e "  ${CYAN}github${RESET}               ${BOLD}GitHub context${RESET} — repo metadata, security, blame"
     echo -e "  ${CYAN}checks${RESET}               ${BOLD}GitHub checks${RESET} — CI check runs and status"
     echo -e "  ${CYAN}deploys${RESET}              ${BOLD}Deployments${RESET} — deployment history and environments"
+    echo -e "  ${CYAN}github-app${RESET}           ${BOLD}GitHub App management${RESET} — JWT, tokens, webhooks, manifest"
     echo -e "  ${CYAN}pr${RESET}                   ${BOLD}PR lifecycle${RESET} — auto-review, merge, cleanup, feedback"
     echo -e "  ${CYAN}context${RESET}              ${BOLD}Context engine${RESET} — gather context for pipeline stages"
     echo -e "  ${CYAN}trace${RESET}                ${BOLD}E2E traceability${RESET} — issue to commit to PR to deploy"
@@ -382,6 +383,9 @@ main() {
             ;;
         deploys|deployments)
             exec "$SCRIPT_DIR/sw-github-deploy.sh" "$@"
+            ;;
+        github-app)
+            exec "$SCRIPT_DIR/sw-github-app.sh" "$@"
             ;;
         decompose)
             exec "$SCRIPT_DIR/sw-decompose.sh" "$@"
