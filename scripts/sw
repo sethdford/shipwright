@@ -71,6 +71,7 @@ show_help() {
     echo -e "  ${CYAN}mission-control|mc${RESET}   Terminal-based pipeline mission control (drill-down, team tree, orchestration)"
     echo -e "  ${CYAN}ps${RESET}                    Show running agent processes and status"
     echo -e "  ${CYAN}logs${RESET} [team] [opts]    View and search agent pane logs"
+    echo -e "  ${CYAN}activity${RESET} [cmd] [opts]  Live agent activity stream — watch Claude think"
     echo -e "  ${CYAN}templates${RESET} [list|show]  Manage team composition templates"
     echo -e "  ${CYAN}doctor${RESET}                Validate your setup and check for issues"
     echo -e "  ${CYAN}cleanup${RESET} [--force]     Clean up orphaned team sessions"
@@ -236,6 +237,9 @@ main() {
             ;;
         logs)
             exec "$SCRIPT_DIR/sw-logs.sh" "$@"
+            ;;
+        activity)
+            exec "$SCRIPT_DIR/sw-activity.sh" "$@"
             ;;
         templates)
             exec "$SCRIPT_DIR/sw-templates.sh" "$@"
