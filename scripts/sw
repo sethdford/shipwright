@@ -132,6 +132,7 @@ show_help() {
     echo -e "  ${CYAN}strategic${RESET}             ${BOLD}Strategic intelligence${RESET} — analyze strategy, metrics, create improvement issues"
     echo -e "  ${CYAN}team-stages${RESET}          ${BOLD}Multi-agent stage execution${RESET} — compose teams, delegate tasks, tally votes"
     echo -e "  ${CYAN}ux${RESET}                    ${BOLD}Premium UX layer${RESET} — themes, animations, shortcuts, accessibility"
+    echo -e "  ${CYAN}security-audit|audit${RESET} ${BOLD}Security auditing${RESET} — secrets, licenses, vulnerabilities, SBOM, compliance"
     echo -e "  ${CYAN}init${RESET}                  ${BOLD}Quick tmux setup${RESET} — one command, no prompts"
     echo -e "  ${CYAN}setup${RESET}                 ${BOLD}Guided setup${RESET} — prerequisites, init, doctor, quick start"
     echo -e "  ${CYAN}help${RESET}                  Show this help message"
@@ -451,6 +452,9 @@ main() {
             ;;
         ux)
             exec "$SCRIPT_DIR/sw-ux.sh" "$@"
+            ;;
+        security-audit|audit)
+            exec "$SCRIPT_DIR/sw-security-audit.sh" "$@"
             ;;
         help|--help|-h)
             show_help
