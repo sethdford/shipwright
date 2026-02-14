@@ -439,19 +439,19 @@ cmd_finish() {
         --arg finished_at "$(now_iso)" \
         --argjson finished_epoch "$(now_epoch)" \
         --arg result "$result" \
-        '(.finished_epoch - .started_epoch) as $total_duration |
-        .finished_at = $finished_at |
+        '.finished_at = $finished_at |
         .finished_epoch = $finished_epoch |
         .result = $result |
+        (.finished_epoch - .started_epoch) as $total_duration |
         .total_duration_s = $total_duration' \
         "$run_file" > "$tmp_file" || { rm -f "$tmp_file"; return 1; }
 
-    # Move to completed log
-    mv "$tmp_file" "$run_file.completed"
+    # Compact and append to JSONL (single-line JSON)
+    jq -c '.' "$tmp_file" >> "$INSTRUMENT_COMPLETED"
+    rm -f "$tmp_file"
 
-    # Append to JSONL
-    cat "$run_file.completed" >> "$INSTRUMENT_COMPLETED"
-    rm -f "$run_file.completed"
+    # Remove active file
+    rm -f "$run_file"
 
     success "Finished instrumentation for run ${CYAN}${run_id}${RESET} (${result})"
     emit_event "instrument_finish" "run_id=${run_id}" "result=${result}"
@@ -604,39 +604,26 @@ cmd_trends() {
         echo -e "  ${DIM}────────────────────────────────────────${RESET}"
     fi
 
-    # Use jq to analyze trends
-    local filter=""
+    # Use jq to analyze trends from JSONL file (with compact output)
     if [[ -n "$metric" ]]; then
-        filter="| select(.metric == \"$metric\")"
+        jq -c -s '[.[] | .metrics[] | select(.metric == "'$metric'")] | group_by(.metric) | map({metric: .[0].metric, count: length, avg: (map(.value | tonumber) | add / length), min: (map(.value | tonumber) | min), max: (map(.value | tonumber) | max)}) | .[]' "$INSTRUMENT_COMPLETED" | while read -r line; do
+            local m avg min max
+            m=$(echo "$line" | jq -r '.metric')
+            avg=$(echo "$line" | jq -r '.avg | round')
+            min=$(echo "$line" | jq -r '.min | round')
+            max=$(echo "$line" | jq -r '.max | round')
+            printf "  %-25s avg: %-8s min: %-8s max: %-8s\n" "$m" "$avg" "$min" "$max"
+        done
+    else
+        jq -c -s '[.[] | .metrics[]] | group_by(.metric) | map({metric: .[0].metric, count: length, avg: (map(.value | tonumber) | add / length), min: (map(.value | tonumber) | min), max: (map(.value | tonumber) | max)}) | .[]' "$INSTRUMENT_COMPLETED" | while read -r line; do
+            local m avg min max
+            m=$(echo "$line" | jq -r '.metric')
+            avg=$(echo "$line" | jq -r '.avg | round')
+            min=$(echo "$line" | jq -r '.min | round')
+            max=$(echo "$line" | jq -r '.max | round')
+            printf "  %-25s avg: %-8s min: %-8s max: %-8s\n" "$m" "$avg" "$min" "$max"
+        done
     fi
-
-    tail -n "$last" "$INSTRUMENT_COMPLETED" | jq -s \
-        --arg metric "$metric" \
-        '[
-            .[] |
-            .metrics[] '"${filter}"' |
-            {
-                metric: .metric,
-                stage: .stage,
-                value: .value
-            }
-        ] |
-        group_by(.metric) |
-        map({
-            metric: .[0].metric,
-            count: length,
-            avg: (map(.value | tonumber) | add / length),
-            min: (map(.value | tonumber) | min),
-            max: (map(.value | tonumber) | max)
-        }) |
-        .[]' | while read -r line; do
-        local m avg min max
-        m=$(echo "$line" | jq -r '.metric')
-        avg=$(echo "$line" | jq -r '.avg | round')
-        min=$(echo "$line" | jq -r '.min | round')
-        max=$(echo "$line" | jq -r '.max | round')
-        printf "  %-25s avg: %-8s min: %-8s max: %-8s\n" "$m" "$avg" "$min" "$max"
-    done
 
     echo ""
 }
