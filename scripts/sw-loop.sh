@@ -673,11 +673,50 @@ git_auto_commit() {
     return 0
 }
 
+# ─── Fatal Error Detection ────────────────────────────────────────────────────
+
+check_fatal_error() {
+    local log_file="$1"
+    local cli_exit_code="${2:-0}"
+    [[ -f "$log_file" ]] || return 1
+
+    # Known fatal error patterns from Claude CLI / Anthropic API
+    local fatal_patterns="Invalid API key|invalid_api_key|authentication_error|API key expired"
+    fatal_patterns="${fatal_patterns}|rate_limit_error|overloaded_error|billing"
+    fatal_patterns="${fatal_patterns}|Could not resolve host|connection refused|ECONNREFUSED"
+    fatal_patterns="${fatal_patterns}|ANTHROPIC_API_KEY.*not set|No API key"
+
+    if grep -qiE "$fatal_patterns" "$log_file" 2>/dev/null; then
+        local match
+        match=$(grep -iE "$fatal_patterns" "$log_file" 2>/dev/null | head -1 | cut -c1-120)
+        error "Fatal CLI error: $match"
+        return 0  # fatal error detected
+    fi
+
+    # Non-zero exit + tiny output = likely CLI crash
+    if [[ "$cli_exit_code" -ne 0 ]]; then
+        local line_count
+        line_count=$(grep -cv '^$' "$log_file" 2>/dev/null || echo 0)
+        if [[ "$line_count" -lt 3 ]]; then
+            local content
+            content=$(head -3 "$log_file" 2>/dev/null | cut -c1-120)
+            error "CLI exited $cli_exit_code with minimal output: $content"
+            return 0
+        fi
+    fi
+
+    return 1  # no fatal error
+}
+
 # ─── Progress & Circuit Breaker ───────────────────────────────────────────────
 
 check_progress() {
     local changes
-    changes="$(git -C "$PROJECT_ROOT" diff --stat HEAD~1 2>/dev/null | tail -1 || echo "")"
+    # Exclude loop bookkeeping files — only count real code changes as progress
+    changes="$(git -C "$PROJECT_ROOT" diff --stat HEAD~1 \
+        -- . ':!.claude/loop-state.md' ':!.claude/pipeline-state.md' \
+        ':!**/progress.md' ':!**/error-summary.json' \
+        2>/dev/null | tail -1 || echo "")"
     local insertions
     insertions="$(echo "$changes" | grep -oE '[0-9]+ insertion' | grep -oE '[0-9]+' || echo 0)"
     if [[ "${insertions:-0}" -lt "$MIN_PROGRESS_LINES" ]]; then
@@ -1550,7 +1589,14 @@ extract_summary() {
     local summary
     summary="$(grep -v '^$' "$log_file" | tail -5 | head -3 2>/dev/null || echo "(no output)")"
     # Truncate long lines
-    echo "$summary" | cut -c1-120
+    summary="$(echo "$summary" | cut -c1-120)"
+
+    # Sanitize: if summary is just a CLI/API error, replace with generic text
+    if echo "$summary" | grep -qiE 'Invalid API key|authentication_error|rate_limit|API key expired|ANTHROPIC_API_KEY'; then
+        summary="(CLI error — no useful output this iteration)"
+    fi
+
+    echo "$summary"
 }
 
 # ─── Display Helpers ─────────────────────────────────────────────────────────
@@ -2013,6 +2059,16 @@ ${GOAL}"
         run_claude_iteration || exit_code=$?
 
         local log_file="$LOG_DIR/iteration-${ITERATION}.log"
+
+        # Detect fatal CLI errors (API key, auth, network) — abort immediately
+        if check_fatal_error "$log_file" "$exit_code"; then
+            STATUS="error"
+            write_state
+            write_progress
+            error "Fatal CLI error detected — aborting loop (see iteration log)"
+            show_summary
+            return 1
+        fi
 
         # Mid-loop memory refresh — re-query with current error context after iteration 3
         if [[ "$ITERATION" -ge 3 ]] && type memory_inject_context &>/dev/null 2>&1; then

@@ -32,6 +32,257 @@
       },
       "timestamp": 1770948186,
       "ttl": 1800
+    },
+    "d41d8cd98f00b204e9800998ecf8427e": {
+      "result": {
+        "overall_risk": 82,
+        "failure_stages": [
+          {
+            "stage": "design",
+            "risk": 75,
+            "reason": "Massive scope with 3 new dashboard views, 6+ client components, 4+ API endpoints, WebSocket streaming, and xterm.js integration. Architecture decisions around real-time data flow (tmux capture-pane → server → WebSocket → xterm.js) are complex and easy to get wrong."
+          },
+          {
+            "stage": "build",
+            "risk": 90,
+            "reason": "This is effectively a full frontend application rewrite touching server.ts (3501 lines), multiple new client components, WebSocket message types, tmux pane capture integration, and xterm.js terminal emulation. The sheer volume of changes across both server and client will exhaust context quickly. Dependencies on issues #41, #42, #43 may not be resolved."
+          },
+          {
+            "stage": "test",
+            "risk": 80,
+            "reason": "Testing real-time WebSocket streaming, xterm.js rendering, tmux capture-pane integration, and keyboard navigation requires browser-level testing infrastructure that likely doesn't exist yet. Mock complexity is very high for the data flow pipeline."
+          },
+          {
+            "stage": "review",
+            "risk": 70,
+            "reason": "Large diff across TypeScript server, HTML/CSS/JS frontend, and bash integration points. Security surface includes new API endpoints and WebSocket streams that could leak terminal output or allow unauthorized tmux access."
+          },
+          {
+            "stage": "compound_quality",
+            "risk": 65,
+            "reason": "Integration between bash-based tmux capture, Bun WebSocket server, and browser xterm.js creates a fragile chain. Any component mismatch breaks the real-time experience silently."
+          },
+          {
+            "stage": "deploy",
+            "risk": 55,
+            "reason": "Dashboard requires Bun runtime and tmux access on the host. New WebSocket endpoints and terminal streaming add operational complexity."
+          }
+        ],
+        "preventative_actions": [
+          "Break into sub-issues: fleet overview enhancements, team tree component, live terminal streaming, stage orchestration view — each as a separate pipeline",
+          "Verify dependencies #41, #42, #43 are merged before starting build",
+          "Implement server-side API endpoints first with unit tests before building client components",
+          "Use --max-restarts 3 and increase build loop iterations given the scope",
+          "Add security review for terminal streaming — ensure no credential leakage through captured pane output",
+          "Create mock tmux capture-pane output fixtures for testing without live tmux sessions",
+          "Scope first iteration to team tree + activity indicators only, defer xterm.js live terminals to follow-up"
+        ]
+      },
+      "timestamp": 1770988486,
+      "ttl": 3600
+    },
+    "efd5524ad1244fd20344bf3ff5d95233": {
+      "result": {
+        "complexity": 8,
+        "risk_level": "high",
+        "success_probability": 35,
+        "recommended_template": "enterprise",
+        "key_risks": [
+          "Heavy dependency on unbuilt features (#43 team-based stages, #44 autonomous PM agent) — cannot implement without them",
+          "Race conditions and state corruption when spawning/dismissing agents mid-pipeline while other agents hold file locks or are mid-edit",
+          "Context transfer to new agents is lossy — late-joining agents may lack critical reasoning context that accumulated over iterations",
+          "Budget-aware scaling adds circular complexity: cost tracking must be real-time accurate while scaling decisions happen concurrently",
+          "Cooldown logic and thrashing prevention are hard to tune — too aggressive wastes resources, too conservative defeats the purpose",
+          "tmux pane management for dynamic spawn/dismiss is fragile — pane IDs shift, windows resize, and cleanup of dismissed agent panes can leave orphans"
+        ],
+        "implementation_hints": [
+          "Implement as an extension to sw-pipeline.sh with a new sw-team-scaler.sh module that the PM agent calls — keep scaling logic separate from pipeline orchestration",
+          "Use file-based signaling (e.g., .claude/pipeline-artifacts/scale-requests.json) for scale-up/down requests to avoid race conditions with direct tmux manipulation",
+          "Start with scale-up only (adding agents) — scale-down (dismissing agents) is much harder due to in-flight work and should be phase 2",
+          "Context transfer should reuse the existing memory system (sw-memory.sh) plus pipeline-state.md rather than inventing a new context protocol",
+          "Build and test the cooldown mechanism with a simple time-based lock file before adding sophisticated thrashing detection",
+          "Mock all scaling triggers in tests — create sw-team-scaler-test.sh with simulated build failures, coverage gaps, and budget exhaustion scenarios"
+        ]
+      },
+      "timestamp": 1770988612,
+      "ttl": 3600
+    },
+    "91e6bc5f344d2fc00ace6fcd7ecd630e": {
+      "result": {
+        "results": [
+          {
+            "file": "architecture.json",
+            "relevance": 95,
+            "summary": "Contains the full architecture model including layers, patterns, conventions, and dependencies — essential context for planning dynamic team scaling within the existing architecture"
+          },
+          {
+            "file": "global.json",
+            "relevance": 15,
+            "summary": "Cross-repo learnings could inform scaling patterns, but currently empty"
+          },
+          {
+            "file": "decisions.json",
+            "relevance": 10,
+            "summary": "Past architectural decisions would inform new scaling design, but currently empty"
+          },
+          {
+            "file": "patterns.json",
+            "relevance": 5,
+            "summary": "Could contain relevant scaling or daemon patterns, but currently empty"
+          },
+          {
+            "file": "failures.json",
+            "relevance": 5,
+            "summary": "Past failures could highlight scaling pain points, but currently empty"
+          }
+        ]
+      },
+      "timestamp": 1770988703,
+      "ttl": 1800
+    },
+    "db450ca4fae2d1197cbd22657da1d0e0": {
+      "result": {
+        "complexity": 9,
+        "risk_level": "high",
+        "success_probability": 30,
+        "recommended_template": "enterprise",
+        "key_risks": [
+          "Heavy dependency chain — requires #41 (tmux-native), #42 (live terminal), and #43 (team-based stages) to be completed first",
+          "xterm.js terminal streaming at 500ms intervals across multiple agents creates significant performance and bandwidth challenges",
+          "Team tree visualization requires real-time aggregation from multiple data sources (heartbeats, tmux capture, state files) that don't exist yet",
+          "Full-stack feature spanning dashboard server (TypeScript), frontend (HTML/CSS/JS), and bash scripts with no existing patterns for agent-level drill-down",
+          "Click-to-attach tmux functionality crosses browser-to-terminal boundary which is architecturally complex",
+          "Stage orchestration Gantt view requires timing data that pipeline stages don't currently emit at the granularity needed"
+        ],
+        "implementation_hints": [
+          "Build incrementally: start with fleet overview agent count (minimal server change), then team tree, then terminal last",
+          "Extend existing heartbeat JSON with agent role, current file, and tool usage fields before building any UI",
+          "Use the existing WebSocket infrastructure in dashboard/server.ts — add new message types (team-update, terminal-update) rather than new endpoints",
+          "For terminal streaming, implement server-side diff calculation to minimize WebSocket payload — only send changed lines",
+          "File heatmap can be derived from git diff --stat per agent worktree without needing real-time file watching",
+          "Keyboard shortcuts should use the same pattern as issue #33 (Premium UX) — implement a shared keyboard handler module",
+          "Consider implementing #41 and #42 as prerequisite PRs first, then this issue becomes primarily a frontend composition task",
+          "Stage orchestration view can use pipeline-state.md timestamps that already exist — parse stage start/end times into Gantt bars"
+        ]
+      },
+      "timestamp": 1770988748,
+      "ttl": 3600
+    },
+    "8938bf094af53646fbaab8bb3e1844d3": {
+      "result": {
+        "results": [
+          {
+            "file": "architecture.json",
+            "relevance": 95,
+            "summary": "Contains the full architecture model (layers, patterns, conventions, dependencies) essential for planning an autonomous PM agent that needs to understand team sizing, composition, and stage orchestration within the existing system"
+          },
+          {
+            "file": "global.json",
+            "relevance": 15,
+            "summary": "Cross-repo learnings could inform team sizing decisions, but currently empty"
+          },
+          {
+            "file": "decisions.json",
+            "relevance": 10,
+            "summary": "Past architectural decisions would inform new feature planning, but currently empty"
+          },
+          {
+            "file": "patterns.json",
+            "relevance": 8,
+            "summary": "Repo-specific patterns could guide implementation approach, but currently empty"
+          },
+          {
+            "file": "failures.json",
+            "relevance": 5,
+            "summary": "Past failures could inform risk areas for the new feature, but currently empty"
+          }
+        ]
+      },
+      "timestamp": 1770988750,
+      "ttl": 1800
+    },
+    "d9f4d8ab14467e7123fddcbbda7f220e": {
+      "result": {
+        "complexity": 9,
+        "risk_level": "high",
+        "success_probability": 35,
+        "recommended_template": "full",
+        "key_risks": [
+          "Hard dependency on #43 (team-based pipeline stages) which is itself unimplemented",
+          "Requires AI-in-the-loop decision making (Claude analyzing issues to produce team plans) which is non-deterministic and hard to test",
+          "Dynamic mid-pipeline scaling (spawning additional agents when builds are slow) requires real-time monitoring infrastructure that doesn't exist yet",
+          "Learning from outcomes requires a statistically significant number of pipeline runs before recommendations improve over static rules",
+          "Confidence scoring and min_confidence gating could cause pipelines to stall or fall back too frequently in early deployment",
+          "Parallel stage execution introduces race conditions and artifact dependency ordering that the current sequential pipeline doesn't handle",
+          "PM agent model cost (opus per issue analysis) could be significant overhead for simple issues that don't benefit from intelligent sizing"
+        ],
+        "implementation_hints": [
+          "Start with static team-plan.json generation based on heuristics (file count, module count, label-based complexity) before adding Claude-based analysis — get the schema and pipeline integration right first",
+          "Implement the fallback-to-static-template path first and make it the default; PM agent becomes an optional enhancement layer",
+          "Build the learning/outcome tracking as passive logging first (actual vs predicted), defer the feedback loop that adjusts future plans until you have enough data",
+          "Reuse existing intelligence engine signals (sw-intelligence.sh cache) rather than re-analyzing the codebase per issue — the PM agent should be a consumer of intelligence, not a parallel analyzer",
+          "Keep parallel_stages as an allowlist of known-safe pairs (e.g., design+test_setup) rather than letting the PM agent discover parallelism dynamically",
+          "Gate dynamic scaling behind a separate feature flag from the core PM agent — team plan generation and dynamic mid-pipeline adjustment are two very different complexity levels"
+        ]
+      },
+      "timestamp": 1770988897,
+      "ttl": 3600
+    },
+    "82dcf6329437beabaa71b4b3ee7f698c": {
+      "result": {
+        "complexity": 9,
+        "risk_level": "high",
+        "success_probability": 35,
+        "recommended_template": "full",
+        "key_risks": [
+          "Deep integration with pipeline orchestrator (sw-pipeline.sh ~7600 lines) requires careful modification of spawn/wait/artifact logic",
+          "tmux multi-pane coordination within pipeline windows adds race conditions and cleanup complexity",
+          "Depends on unbuilt issue #41 (tmux-native pipeline execution) — cannot implement without it",
+          "Agent file-assignment conflict avoidance requires new coordination protocol not yet designed",
+          "Team lifecycle management (spawn → monitor → collect artifacts → teardown) across 3+ stages multiplies failure modes",
+          "Fallback from team to single-agent must preserve all artifact handoff contracts"
+        ],
+        "implementation_hints": [
+          "Start with a single team-enabled stage (build) before expanding to review and compound_quality",
+          "Implement issue #41 (tmux-native execution) first — team panes depend on pipeline windows existing",
+          "Reuse existing sw-session.sh team spawn logic rather than building new orchestration from scratch",
+          "Define a strict artifact contract (JSON manifest per stage) before touching team handoff code",
+          "Add team config as optional fields in pipeline template JSON — missing fields = single-agent fallback",
+          "Use the existing heartbeat protocol (sw-heartbeat.sh) for team member health monitoring",
+          "Test with a mock 2-agent build team on a trivial issue before scaling to 4-agent teams"
+        ]
+      },
+      "timestamp": 1770989030,
+      "ttl": 3600
+    },
+    "8729561ddd7369a90e499d317668e979": {
+      "result": {
+        "complexity": 7,
+        "risk_level": "medium",
+        "success_probability": 72,
+        "recommended_template": "full",
+        "key_risks": [
+          "xterm.js integration with vanilla JS dashboard (no framework) requires careful DOM management",
+          "tmux capture-pane at 500ms intervals may cause performance issues with multiple concurrent streams",
+          "Diff-based streaming logic is non-trivial — must handle screen redraws, cursor jumps, and ANSI escape sequences correctly",
+          "Depends on issue #41 (tmux-native pipeline execution) being completed first for pane IDs in heartbeats",
+          "WebSocket message ordering and late-joining client state reconstruction adds complexity",
+          "Browser memory management with xterm.js terminals — must properly dispose terminals on navigation"
+        ],
+        "implementation_hints": [
+          "Start with issue #41 (tmux-native execution) as a prerequisite — this issue depends on pane IDs existing in heartbeats",
+          "Use xterm.js v5 with @xterm/xterm package — it supports ANSI colors, cursor positioning, and the fit addon natively",
+          "For diff-based streaming, hash each line and only send changed line indices + content rather than computing a full diff",
+          "Implement server-side capture as a shared loop per pipeline — use a Map<issue, {interval, clients[], buffer}> pattern",
+          "Add the terminal-subscribe/unsubscribe WebSocket messages alongside existing dashboard message types in server.ts",
+          "Use Page Visibility API on client to send terminal-unsubscribe when tab is hidden, terminal-subscribe when visible again",
+          "Keep the 1000-line history buffer as a circular buffer (ring buffer) for memory efficiency",
+          "For the UI, add a split-pane layout to the pipeline detail view — artifacts on left, terminal on right, with a draggable divider",
+          "Rate-limit capture-pane calls per pipeline and share results across all subscribed clients to avoid redundant tmux calls"
+        ]
+      },
+      "timestamp": 1770989238,
+      "ttl": 3600
     }
   }
 }

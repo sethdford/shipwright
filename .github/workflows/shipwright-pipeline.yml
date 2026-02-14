@@ -76,6 +76,14 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Rate limit jitter
+        run: |
+          # Stagger API calls when multiple issues are labeled simultaneously
+          # to avoid GitHub GraphQL rate limit stampede (5-50s random delay)
+          JITTER=$((RANDOM % 45 + 5))
+          echo "Sleeping ${JITTER}s to avoid rate limit stampede..."
+          sleep "$JITTER"
+
       - name: Skip triage (maintainer override)
         if: github.event.inputs.skip_triage == 'true'
         id: skip
@@ -375,15 +383,25 @@ jobs:
         run: |
           BRANCH="shipwright/issue-${ISSUE_NUMBER}"
           if git ls-remote --heads origin "$BRANCH" 2>/dev/null | grep -q "$BRANCH"; then
-            echo "Found partial work branch: $BRANCH — merging into workspace"
+            echo "Found partial work branch: $BRANCH"
             git fetch origin "$BRANCH" 2>/dev/null || true
-            git merge "origin/$BRANCH" --no-edit 2>/dev/null || {
-              echo "Merge conflict on partial branch — starting fresh"
-              git merge --abort 2>/dev/null || true
-            }
+
+            # Check if branch is polluted with API error artifacts
+            LAST_MSG=$(git log -1 --format='%s' "origin/$BRANCH" 2>/dev/null || echo "")
+            BRANCH_CONTENT=$(git log -5 --format='%s' "origin/$BRANCH" 2>/dev/null || echo "")
+            if echo "$BRANCH_CONTENT" | grep -qiE 'Invalid API key|authentication_error|API key expired'; then
+              echo "WARNING: Partial work branch appears polluted with API errors — deleting and starting fresh"
+              git push origin --delete "$BRANCH" 2>/dev/null || true
+            else
+              echo "Merging partial work branch..."
+              git merge "origin/$BRANCH" --no-edit 2>/dev/null || {
+                echo "Merge conflict on partial branch — starting fresh"
+                git merge --abort 2>/dev/null || true
+              }
+            fi
           fi
 
-      - name: Check claim lock
+      - name: Check claim lock and pipeline start cap
         id: claim_check
         run: |
           CLAIMED=$(gh issue view "$ISSUE_NUMBER" --json labels \
@@ -391,9 +409,30 @@ jobs:
           if [ -n "$CLAIMED" ]; then
             echo "Issue #$ISSUE_NUMBER claimed by $CLAIMED — CI yielding to local daemon"
             echo "skip=true" >> "$GITHUB_OUTPUT"
-          else
-            echo "skip=false" >> "$GITHUB_OUTPUT"
+            exit 0
           fi
+
+          # Pipeline start cap — prevent runaway retry loops
+          PIPELINE_STARTS=$(gh issue view "$ISSUE_NUMBER" --json comments \
+            --jq '[.comments[].body | select(contains("Pipeline Starting"))] | length' 2>/dev/null || echo "0")
+          if [ "${PIPELINE_STARTS:-0}" -ge 6 ]; then
+            echo "Pipeline start cap reached ($PIPELINE_STARTS attempts) for issue #$ISSUE_NUMBER"
+            gh issue comment "$ISSUE_NUMBER" --body "$(cat <<CAPEOF
+          :stop_sign: **Shipwright Pipeline — Start Cap Reached**
+
+          This issue has had **${PIPELINE_STARTS} pipeline attempts** — exceeding the safety cap of 6.
+
+          This usually means the issue cannot be solved autonomously and needs human review.
+          Re-apply the \`shipwright\` label after clearing old pipeline comments to retry.
+          CAPEOF
+          )" 2>/dev/null || true
+            gh issue edit "$ISSUE_NUMBER" --remove-label "shipwright" 2>/dev/null || true
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          echo "skip=false" >> "$GITHUB_OUTPUT"
+          echo "Pipeline starts so far: ${PIPELINE_STARTS:-0}/6"
 
       - name: Validate setup
         if: steps.claim_check.outputs.skip != 'true'

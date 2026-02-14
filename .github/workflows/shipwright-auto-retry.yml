@@ -367,6 +367,12 @@ jobs:
           MAX_ITERATIONS="${{ steps.strategy.outputs.max_iterations }}"
           COMPLETED_STAGES="${{ steps.strategy.outputs.completed_stages }}"
 
+          # Backoff delay — avoid hammering the pipeline immediately after failure
+          RETRY_COUNT="${{ steps.strategy.outputs.retry_count }}"
+          BACKOFF=$((RETRY_COUNT * 30))
+          echo "Waiting ${BACKOFF}s before retry (attempt ${RETRY_COUNT})..."
+          sleep "$BACKOFF"
+
           echo "Dispatching retry pipeline for issue #$ISSUE_NUMBER..."
           gh workflow run shipwright-pipeline.yml \
             --repo "$GITHUB_REPOSITORY" \

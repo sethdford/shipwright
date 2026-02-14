@@ -1771,12 +1771,24 @@ Checklist of completion criteria.
     parse_claude_tokens "$_token_log"
 
     if [[ ! -s "$plan_file" ]]; then
-        error "Plan generation failed"
+        error "Plan generation failed — empty output"
+        return 1
+    fi
+
+    # Validate plan content — detect API/CLI errors masquerading as plans
+    local _plan_fatal="Invalid API key|invalid_api_key|authentication_error|API key expired"
+    _plan_fatal="${_plan_fatal}|rate_limit_error|overloaded_error|Could not resolve host|ANTHROPIC_API_KEY"
+    if grep -qiE "$_plan_fatal" "$plan_file" 2>/dev/null; then
+        error "Plan stage produced API/CLI error instead of a plan: $(head -1 "$plan_file" | cut -c1-100)"
         return 1
     fi
 
     local line_count
     line_count=$(wc -l < "$plan_file" | xargs)
+    if [[ "$line_count" -lt 3 ]]; then
+        error "Plan too short (${line_count} lines) — likely an error, not a real plan"
+        return 1
+    fi
     info "Plan saved: ${DIM}$plan_file${RESET} (${line_count} lines)"
 
     # Extract task checklist for GitHub issue and task tracking
@@ -2149,12 +2161,24 @@ Be concrete and specific. Reference actual file paths in the codebase. Consider 
     parse_claude_tokens "$_token_log"
 
     if [[ ! -s "$design_file" ]]; then
-        error "Design generation failed"
+        error "Design generation failed — empty output"
+        return 1
+    fi
+
+    # Validate design content — detect API/CLI errors masquerading as designs
+    local _design_fatal="Invalid API key|invalid_api_key|authentication_error|API key expired"
+    _design_fatal="${_design_fatal}|rate_limit_error|overloaded_error|Could not resolve host|ANTHROPIC_API_KEY"
+    if grep -qiE "$_design_fatal" "$design_file" 2>/dev/null; then
+        error "Design stage produced API/CLI error instead of a design: $(head -1 "$design_file" | cut -c1-100)"
         return 1
     fi
 
     local line_count
     line_count=$(wc -l < "$design_file" | xargs)
+    if [[ "$line_count" -lt 3 ]]; then
+        error "Design too short (${line_count} lines) — likely an error, not a real design"
+        return 1
+    fi
     info "Design saved: ${DIM}$design_file${RESET} (${line_count} lines)"
 
     # Extract file lists for build stage awareness
@@ -2478,7 +2502,7 @@ ${log_excerpt}
     # Post test results to GitHub
     if [[ -n "$ISSUE_NUMBER" ]]; then
         local test_summary
-        test_summary=$(tail -10 "$test_log")
+        test_summary=$(tail -10 "$test_log" | sed 's/\x1b\[[0-9;]*m//g')
         local cov_line=""
         [[ -n "$coverage" ]] && cov_line="
 **Coverage:** ${coverage}%"
@@ -2884,6 +2908,19 @@ stage_pr() {
         fi
     fi
 
+    # Pre-PR diff gate — verify meaningful code changes exist (not just bookkeeping)
+    local real_changes
+    real_changes=$(git diff --name-only "origin/${BASE_BRANCH:-main}...HEAD" \
+        -- . ':!.claude/loop-state.md' ':!.claude/pipeline-state.md' \
+        ':!.claude/pipeline-artifacts/*' ':!**/progress.md' \
+        ':!**/error-summary.json' 2>/dev/null | wc -l | xargs || echo "0")
+    if [[ "${real_changes:-0}" -eq 0 ]]; then
+        error "No meaningful code changes detected — only bookkeeping files modified"
+        error "Refusing to create PR with zero real changes"
+        return 1
+    fi
+    info "Pre-PR diff check: ${real_changes} real files changed"
+
     # Build PR title — prefer GOAL over plan file first line
     # (plan file first line often contains Claude analysis text, not a clean title)
     local pr_title=""
@@ -2895,6 +2932,12 @@ stage_pr() {
     fi
     [[ -z "$pr_title" ]] && pr_title="Pipeline changes for issue ${ISSUE_NUMBER:-unknown}"
 
+    # Sanitize: reject PR titles that look like error messages
+    if echo "$pr_title" | grep -qiE 'Invalid API|API key|authentication_error|rate_limit|CLI error|no useful output'; then
+        warn "PR title looks like an error message: $pr_title"
+        pr_title="Pipeline changes for issue ${ISSUE_NUMBER:-unknown}"
+    fi
+
     # Build comprehensive PR body
     local plan_summary=""
     if [[ -s "$plan_file" ]]; then
@@ -2903,7 +2946,7 @@ stage_pr() {
 
     local test_summary=""
     if [[ -s "$test_log" ]]; then
-        test_summary=$(tail -10 "$test_log")
+        test_summary=$(tail -10 "$test_log" | sed 's/\x1b\[[0-9;]*m//g')
     fi
 
     local review_summary=""
@@ -5761,6 +5804,17 @@ ${route_instruction}"
 
 stage_compound_quality() {
     CURRENT_STAGE_ID="compound_quality"
+
+    # Pre-check: verify meaningful changes exist before running expensive quality checks
+    local _cq_real_changes
+    _cq_real_changes=$(git diff --name-only "origin/${BASE_BRANCH:-main}...HEAD" \
+        -- . ':!.claude/loop-state.md' ':!.claude/pipeline-state.md' \
+        ':!.claude/pipeline-artifacts/*' ':!**/progress.md' \
+        ':!**/error-summary.json' 2>/dev/null | wc -l | xargs || echo "0")
+    if [[ "${_cq_real_changes:-0}" -eq 0 ]]; then
+        error "Compound quality: no meaningful code changes found — failing quality gate"
+        return 1
+    fi
 
     # Read config
     local max_cycles adversarial_enabled negative_enabled e2e_enabled dod_enabled strict_quality
