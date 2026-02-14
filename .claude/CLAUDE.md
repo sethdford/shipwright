@@ -260,10 +260,10 @@ All scripts are bash (except the dashboard server in TypeScript). Grouped by lay
 | `scripts/sw-heartbeat-test.sh` | 588 | Validate heartbeat lifecycle, |
 | `scripts/sw-init-test.sh` | 494 | E2E validation of init/setup flow |
 | `scripts/sw-intelligence-test.sh` | 544 | Unit tests for intelligence core |
-| `scripts/sw-launchd-test.sh` | 905 | Validate service management on |
+| `scripts/sw-launchd-test.sh` | 908 | Validate service management on |
 | `scripts/sw-memory-test.sh` | 872 | Unit tests for memory system & cost tracking |
 | `scripts/sw-pipeline-composer-test.sh` | 643 | Test Suite |
-| `scripts/sw-pipeline-test.sh` | 1757 | E2E validation invoking the REAL pipeline |
+| `scripts/sw-pipeline-test.sh` | 1940 | E2E validation invoking the REAL pipeline |
 | `scripts/sw-predictive-test.sh` | 698 | Unit tests for predictive intelligence |
 | `scripts/sw-prep-test.sh` | 644 | Validate repo preparation |
 | `scripts/sw-remote-test.sh` | 404 | Validate machine registry, atomic writes, |
