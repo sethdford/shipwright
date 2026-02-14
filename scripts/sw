@@ -82,6 +82,7 @@ show_help() {
     echo -e "  ${CYAN}daemon${RESET} <cmd>           ${BOLD}Issue watcher${RESET} — auto-process GitHub issues"
     echo -e "  ${CYAN}memory${RESET} <cmd>           ${BOLD}Persistent memory${RESET} — learn from every pipeline run"
     echo -e "  ${CYAN}cost${RESET} <cmd>             ${BOLD}Cost intelligence${RESET} — track tokens, budgets, model routing"
+    echo -e "  ${CYAN}db${RESET} <cmd>               ${BOLD}SQLite persistence${RESET} — events, runs, developers, metrics"
     echo -e "  ${CYAN}fleet${RESET} <cmd>           ${BOLD}Multi-repo fleet${RESET} — orchestrate daemons across repos"
     echo -e "  ${CYAN}fix${RESET} \"goal\" [opts]     ${BOLD}Bulk fix${RESET} — apply a fix across multiple repos"
     echo -e "  ${CYAN}dashboard${RESET} <cmd>        ${BOLD}Fleet Command${RESET} — real-time WebSocket dashboard"
@@ -243,6 +244,9 @@ main() {
             ;;
         cost)
             exec "$SCRIPT_DIR/sw-cost.sh" "$@"
+            ;;
+        db)
+            exec "$SCRIPT_DIR/sw-db.sh" "$@"
             ;;
         fleet)
             exec "$SCRIPT_DIR/sw-fleet.sh" "$@"
