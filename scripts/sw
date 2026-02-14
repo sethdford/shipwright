@@ -340,6 +340,9 @@ main() {
         tmux)
             exec "$SCRIPT_DIR/sw-tmux.sh" "$@"
             ;;
+        tmux-pipeline)
+            exec "$SCRIPT_DIR/sw-tmux-pipeline.sh" "$@"
+            ;;
         github|gh-context)
             exec "$SCRIPT_DIR/sw-github-graphql.sh" "$@"
             ;;
