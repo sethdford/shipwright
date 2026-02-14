@@ -178,6 +178,7 @@ All scripts are bash (except the dashboard server in TypeScript). Grouped by lay
 | `scripts/sw-dashboard.sh` | 477 | Fleet Command Dashboard |
 | `scripts/sw-db.sh` | 540 | SQLite Persistence Layer |
 | `scripts/sw-decompose.sh` | 539 | Intelligent Issue Decomposition |
+| `scripts/sw-deps.sh` | 551 | Automated Dependency Update Management |
 | `scripts/sw-developer-simulation.sh` | 252 | Multi-Persona Developer Simulation |
 | `scripts/sw-discovery.sh` | 412 | Cross-Pipeline Real-Time Learning |
 | `scripts/sw-docs.sh` | 635 | Documentation Keeper |
@@ -204,10 +205,12 @@ All scripts are bash (except the dashboard server in TypeScript). Grouped by lay
 | `scripts/sw-pipeline-composer.sh` | 455 | Dynamic Pipeline Composition |
 | `scripts/sw-pipeline-vitals.sh` | 1096 | Pipeline Vitals Engine |
 | `scripts/sw-pipeline.sh` | 8256 | Autonomous Feature Delivery (Idea → Production) |
+| `scripts/sw-pm.sh` | 693 | Autonomous PM Agent for Team Orchestration |
 | `scripts/sw-pr-lifecycle.sh` | 522 | Autonomous PR Management |
 | `scripts/sw-predictive.sh` | 820 | Predictive & Proactive Intelligence |
 | `scripts/sw-prep.sh` | 1642 | Repository Preparation for Agent Teams |
 | `scripts/sw-ps.sh` | 171 | Show running agent process status |
+| `scripts/sw-quality.sh` | 595 | Intelligent completion, audits, zero auto |
 | `scripts/sw-reaper.sh` | 394 | Automatic tmux pane cleanup when agents exit |
 | `scripts/sw-regression.sh` | 642 | Regression Detection Pipeline |
 | `scripts/sw-release.sh` | 706 | Release train automation |
@@ -228,7 +231,7 @@ All scripts are bash (except the dashboard server in TypeScript). Grouped by lay
 | `scripts/sw-webhook.sh` | 627 | GitHub Webhook Receiver for Instant Issue Processing |
 | `scripts/sw-widgets.sh` | 530 | Embeddable Status Widgets |
 | `scripts/sw-worktree.sh` | 408 | Git worktree management for multi-agent isolation |
-| `scripts/sw` | 416 | CLI router — dispatches subcommands via exec |
+| `scripts/sw` | 428 | CLI router — dispatches subcommands via exec |
 <!-- /AUTO:core-scripts -->
 
 ### GitHub API Modules
