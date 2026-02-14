@@ -165,78 +165,75 @@ All scripts are bash (except the dashboard server in TypeScript). Grouped by lay
 
 <!-- AUTO:core-scripts -->
 
-| File                                  | Lines | Purpose                                                |
-| ------------------------------------- | ----: | ------------------------------------------------------ |
-| `scripts/sw-adversarial.sh`           |   274 | Adversarial Agent Code Review                          |
-| `scripts/sw-architecture-enforcer.sh` |   330 | Living Architecture Model & Enforcer                   |
-| `scripts/sw-checkpoint.sh`            |   468 | Save and restore agent state mid-stage                 |
-| `scripts/sw-cleanup.sh`               |   359 | Clean up orphaned Claude team sessions & artifacts     |
-| `scripts/sw-connect.sh`               |   619 | Sync local state to team dashboard                     |
-| `scripts/sw-context.sh`               |   605 | Context Engine for Pipeline Stages                     |
-| `scripts/sw-cost.sh`                  |   924 | Token Usage & Cost Intelligence                        |
-| `scripts/sw-daemon.sh`                |  5683 | Autonomous GitHub Issue Watcher                        |
-| `scripts/sw-dashboard.sh`             |   477 | Fleet Command Dashboard                                |
-| `scripts/sw-db.sh`                    |   540 | SQLite Persistence Layer                               |
-| `scripts/sw-decompose.sh`             |   539 | Issue Complexity Analysis & Subtask Generation         |
-| `scripts/sw-developer-simulation.sh`  |   252 | Multi-Persona Developer Simulation                     |
-| `scripts/sw-docs.sh`                  |   635 | Documentation Keeper                                   |
-| `scripts/sw-doctor.sh`                |   907 | Validate Shipwright setup                              |
-| `scripts/sw-fix.sh`                   |   482 | Bulk Fix Across Multiple Repos                         |
-| `scripts/sw-fleet.sh`                 |  1380 | Multi-Repo Daemon Orchestrator                         |
-| `scripts/sw-heartbeat.sh`             |   293 | File-based agent heartbeat protocol                    |
-| `scripts/sw-init.sh`                  |   522 | Complete setup for Shipwright + Shipwright             |
-| `scripts/sw-intelligence.sh`          |  1196 | AI-Powered Analysis & Decision Engine                  |
-| `scripts/sw-jira.sh`                  |   643 | Jira ↔ GitHub Bidirectional Sync                       |
-| `scripts/sw-launchd.sh`               |   699 | Process supervision (macOS + Linux)                    |
-| `scripts/sw-linear.sh`                |   648 | Linear ↔ GitHub Bidirectional Sync                     |
-| `scripts/sw-logs.sh`                  |   343 | View and search agent pane logs                        |
-| `scripts/sw-loop.sh`                  |  2278 | Continuous agent loop harness for Claude Code          |
-| `scripts/sw-memory.sh`                |  1626 | Persistent Learning & Context System                   |
-| `scripts/sw-patrol-meta.sh`           |   417 | Shipwright Self-Improvement Patrol                     |
-| `scripts/sw-pipeline-composer.sh`     |   455 | Dynamic Pipeline Composition                           |
-| `scripts/sw-pipeline-vitals.sh`       |  1096 | Pipeline Vitals Engine                                 |
-| `scripts/sw-pipeline.sh`              |  8090 | Autonomous Feature Delivery (Idea → Production)        |
-| `scripts/sw-predictive.sh`            |   820 | Predictive & Proactive Intelligence                    |
-| `scripts/sw-prep.sh`                  |  1642 | Repository Preparation for Agent Teams                 |
-| `scripts/sw-ps.sh`                    |   171 | Show running agent process status                      |
-| `scripts/sw-reaper.sh`                |   394 | Automatic tmux pane cleanup when agents exit           |
-| `scripts/sw-remote.sh`                |   687 | Machine Registry & Remote Daemon Management            |
-| `scripts/sw-self-optimize.sh`         |  1048 | Learning & Self-Tuning System                          |
-| `scripts/sw-session.sh`               |   541 | Launch a Claude Code team session in a new tmux window |
-| `scripts/sw-setup.sh`                 |   234 | One-shot setup: check prerequisites, init, doctor      |
-| `scripts/sw-status.sh`                |   796 | Dashboard showing Claude Code team status              |
-| `scripts/sw-templates.sh`             |   247 | Browse and inspect team templates                      |
-| `scripts/sw-tmux.sh`                  |   591 | tmux Health & Plugin Management                        |
-| `scripts/sw-tracker.sh`               |   409 | Provider Router for Issue Tracker Integration          |
-| `scripts/sw-upgrade.sh`               |   479 | Detect and apply updates from the repo                 |
-| `scripts/sw-worktree.sh`              |   408 | Git worktree management for multi-agent isolation      |
-| `scripts/sw`                          |   350 | CLI router — dispatches subcommands via exec           |
-
+| File | Lines | Purpose |
+| --- | ---: | --- |
+| `scripts/sw-adversarial.sh` | 274 | Adversarial Agent Code Review |
+| `scripts/sw-architecture-enforcer.sh` | 330 | Living Architecture Model & Enforcer |
+| `scripts/sw-checkpoint.sh` | 468 | Save and restore agent state mid-stage |
+| `scripts/sw-cleanup.sh` | 359 | Clean up orphaned Claude team sessions & artifacts |
+| `scripts/sw-connect.sh` | 619 | Sync local state to team dashboard |
+| `scripts/sw-context.sh` | 605 | Context Engine for Pipeline Stages |
+| `scripts/sw-cost.sh` | 924 | Token Usage & Cost Intelligence |
+| `scripts/sw-daemon.sh` | 5683 | Autonomous GitHub Issue Watcher |
+| `scripts/sw-dashboard.sh` | 477 | Fleet Command Dashboard |
+| `scripts/sw-db.sh` | 540 | SQLite Persistence Layer |
+| `scripts/sw-decompose.sh` | 539 | Issue Complexity Analysis & Subtask Generation |
+| `scripts/sw-developer-simulation.sh` | 252 | Multi-Persona Developer Simulation |
+| `scripts/sw-docs.sh` | 635 | Documentation Keeper |
+| `scripts/sw-doctor.sh` | 907 | Validate Shipwright setup |
+| `scripts/sw-fix.sh` | 482 | Bulk Fix Across Multiple Repos |
+| `scripts/sw-fleet.sh` | 1380 | Multi-Repo Daemon Orchestrator |
+| `scripts/sw-heartbeat.sh` | 293 | File-based agent heartbeat protocol |
+| `scripts/sw-init.sh` | 522 | Complete setup for Shipwright + Shipwright |
+| `scripts/sw-intelligence.sh` | 1196 | AI-Powered Analysis & Decision Engine |
+| `scripts/sw-jira.sh` | 643 | Jira ↔ GitHub Bidirectional Sync |
+| `scripts/sw-launchd.sh` | 699 | Process supervision (macOS + Linux) |
+| `scripts/sw-linear.sh` | 648 | Linear ↔ GitHub Bidirectional Sync |
+| `scripts/sw-logs.sh` | 343 | View and search agent pane logs |
+| `scripts/sw-loop.sh` | 2278 | Continuous agent loop harness for Claude Code |
+| `scripts/sw-memory.sh` | 1626 | Persistent Learning & Context System |
+| `scripts/sw-patrol-meta.sh` | 417 | Shipwright Self-Improvement Patrol |
+| `scripts/sw-pipeline-composer.sh` | 455 | Dynamic Pipeline Composition |
+| `scripts/sw-pipeline-vitals.sh` | 1096 | Pipeline Vitals Engine |
+| `scripts/sw-pipeline.sh` | 8090 | Autonomous Feature Delivery (Idea → Production) |
+| `scripts/sw-predictive.sh` | 820 | Predictive & Proactive Intelligence |
+| `scripts/sw-prep.sh` | 1642 | Repository Preparation for Agent Teams |
+| `scripts/sw-ps.sh` | 171 | Show running agent process status |
+| `scripts/sw-reaper.sh` | 394 | Automatic tmux pane cleanup when agents exit |
+| `scripts/sw-remote.sh` | 687 | Machine Registry & Remote Daemon Management |
+| `scripts/sw-self-optimize.sh` | 1048 | Learning & Self-Tuning System |
+| `scripts/sw-session.sh` | 541 | Launch a Claude Code team session in a new tmux window |
+| `scripts/sw-setup.sh` | 234 | One-shot setup: check prerequisites, init, doctor |
+| `scripts/sw-status.sh` | 796 | Dashboard showing Claude Code team status |
+| `scripts/sw-templates.sh` | 247 | Browse and inspect team templates |
+| `scripts/sw-tmux.sh` | 591 | tmux Health & Plugin Management |
+| `scripts/sw-tracker.sh` | 409 | Provider Router for Issue Tracker Integration |
+| `scripts/sw-upgrade.sh` | 479 | Detect and apply updates from the repo |
+| `scripts/sw-worktree.sh` | 408 | Git worktree management for multi-agent isolation |
+| `scripts/sw` | 350 | CLI router — dispatches subcommands via exec |
 <!-- /AUTO:core-scripts -->
 
 ### GitHub API Modules
 
 <!-- AUTO:github-modules -->
 
-| File                           | Lines | Purpose                                   |
-| ------------------------------ | ----: | ----------------------------------------- |
-| `scripts/sw-github-checks.sh`  |   521 | Native GitHub Checks API Integration      |
-| `scripts/sw-github-deploy.sh`  |   533 | Native GitHub Deployments API Integration |
-| `scripts/sw-github-graphql.sh` |   972 | GitHub GraphQL API Client                 |
-
+| File | Lines | Purpose |
+| --- | ---: | --- |
+| `scripts/sw-github-checks.sh` | 521 | Native GitHub Checks API Integration |
+| `scripts/sw-github-deploy.sh` | 533 | Native GitHub Deployments API Integration |
+| `scripts/sw-github-graphql.sh` | 972 | GitHub GraphQL API Client |
 <!-- /AUTO:github-modules -->
 
 ### Issue Tracker Adapters
 
 <!-- AUTO:tracker-adapters -->
 
-| File                           | Lines | Purpose                            |
-| ------------------------------ | ----: | ---------------------------------- |
-| `scripts/sw-linear.sh`         |   648 | Linear ↔ GitHub Bidirectional Sync |
-| `scripts/sw-jira.sh`           |   643 | Jira ↔ GitHub Bidirectional Sync   |
-| `scripts/sw-tracker-linear.sh` |   292 | do not call directly               |
-| `scripts/sw-tracker-jira.sh`   |   277 | do not call directly               |
-
+| File | Lines | Purpose |
+| --- | ---: | --- |
+| `scripts/sw-linear.sh` | 648 | Linear ↔ GitHub Bidirectional Sync |
+| `scripts/sw-jira.sh` | 643 | Jira ↔ GitHub Bidirectional Sync |
+| `scripts/sw-tracker-linear.sh` | 292 | do not call directly |
+| `scripts/sw-tracker-jira.sh` | 277 | do not call directly |
 <!-- /AUTO:tracker-adapters -->
 
 ### Shared Libraries
@@ -249,33 +246,32 @@ All scripts are bash (except the dashboard server in TypeScript). Grouped by lay
 
 <!-- AUTO:test-suites -->
 
-| File                                   | Lines | Purpose                                         |
-| -------------------------------------- | ----: | ----------------------------------------------- |
-| `scripts/sw-connect-test.sh`           |   831 | Validate dashboard connection, heartbeat        |
-| `scripts/sw-daemon-test.sh`            |  1781 | Unit tests for daemon metrics, health, alerting |
-| `scripts/sw-docs-test.sh`              |   791 | Validate documentation keeper, AUTO sections,   |
-| `scripts/sw-fix-test.sh`               |   630 | Unit tests for bulk fix across repos            |
-| `scripts/sw-fleet-test.sh`             |   833 | Unit tests for fleet orchestration              |
-| `scripts/sw-frontier-test.sh`          |   581 | Validate adversarial review, developer          |
-| `scripts/sw-github-checks-test.sh`     |   541 | Validate Checks API wrapper                     |
-| `scripts/sw-github-deploy-test.sh`     |   530 | Validate Deployments API wrapper                |
-| `scripts/sw-github-graphql-test.sh`    |   671 | Unit tests for GitHub GraphQL client            |
-| `scripts/sw-heartbeat-test.sh`         |   588 | Validate heartbeat lifecycle,                   |
-| `scripts/sw-init-test.sh`              |   494 | E2E validation of init/setup flow               |
-| `scripts/sw-intelligence-test.sh`      |   544 | Unit tests for intelligence core                |
-| `scripts/sw-launchd-test.sh`           |   908 | Validate service management on                  |
-| `scripts/sw-memory-test.sh`            |   872 | Unit tests for memory system & cost tracking    |
-| `scripts/sw-pipeline-composer-test.sh` |   643 | Test Suite                                      |
-| `scripts/sw-pipeline-test.sh`          |  1940 | E2E validation invoking the REAL pipeline       |
-| `scripts/sw-predictive-test.sh`        |   698 | Unit tests for predictive intelligence          |
-| `scripts/sw-prep-test.sh`              |   644 | Validate repo preparation                       |
-| `scripts/sw-remote-test.sh`            |   404 | Validate machine registry, atomic writes,       |
-| `scripts/sw-self-optimize-test.sh`     |   730 | Unit tests for learning & tuning system         |
-| `scripts/sw-session-test.sh`           |   591 | E2E validation of session creation flow         |
-| `scripts/sw-status-test.sh`            |   339 | Validate status dashboard and --json output     |
-| `scripts/sw-tmux-test.sh`              |   752 | Validate tmux doctor, install, fix, reload,     |
-| `scripts/sw-tracker-test.sh`           |   476 | Validate tracker router, providers, and         |
-
+| File | Lines | Purpose |
+| --- | ---: | --- |
+| `scripts/sw-connect-test.sh` | 831 | Validate dashboard connection, heartbeat |
+| `scripts/sw-daemon-test.sh` | 1781 | Unit tests for daemon metrics, health, alerting |
+| `scripts/sw-docs-test.sh` | 791 | Validate documentation keeper, AUTO sections, |
+| `scripts/sw-fix-test.sh` | 630 | Unit tests for bulk fix across repos |
+| `scripts/sw-fleet-test.sh` | 833 | Unit tests for fleet orchestration |
+| `scripts/sw-frontier-test.sh` | 581 | Validate adversarial review, developer |
+| `scripts/sw-github-checks-test.sh` | 541 | Validate Checks API wrapper |
+| `scripts/sw-github-deploy-test.sh` | 530 | Validate Deployments API wrapper |
+| `scripts/sw-github-graphql-test.sh` | 671 | Unit tests for GitHub GraphQL client |
+| `scripts/sw-heartbeat-test.sh` | 588 | Validate heartbeat lifecycle, |
+| `scripts/sw-init-test.sh` | 494 | E2E validation of init/setup flow |
+| `scripts/sw-intelligence-test.sh` | 544 | Unit tests for intelligence core |
+| `scripts/sw-launchd-test.sh` | 908 | Validate service management on |
+| `scripts/sw-memory-test.sh` | 872 | Unit tests for memory system & cost tracking |
+| `scripts/sw-pipeline-composer-test.sh` | 643 | Test Suite |
+| `scripts/sw-pipeline-test.sh` | 1900 | E2E validation invoking the REAL pipeline |
+| `scripts/sw-predictive-test.sh` | 698 | Unit tests for predictive intelligence |
+| `scripts/sw-prep-test.sh` | 644 | Validate repo preparation |
+| `scripts/sw-remote-test.sh` | 404 | Validate machine registry, atomic writes, |
+| `scripts/sw-self-optimize-test.sh` | 730 | Unit tests for learning & tuning system |
+| `scripts/sw-session-test.sh` | 591 | E2E validation of session creation flow |
+| `scripts/sw-status-test.sh` | 339 | Validate status dashboard and --json output |
+| `scripts/sw-tmux-test.sh` | 752 | Validate tmux doctor, install, fix, reload, |
+| `scripts/sw-tracker-test.sh` | 476 | Validate tracker router, providers, and |
 <!-- /AUTO:test-suites -->
 
 ### Dashboard & Infra
@@ -346,19 +342,18 @@ All intelligence features are behind feature flags and disabled by default. Conf
 
 <!-- AUTO:feature-flags -->
 
-| Flag                                | Default | Purpose |
-| ----------------------------------- | ------- | ------- |
-| `intelligence.enabled`              | `true`  |         |
-| `intelligence.cache_ttl_seconds`    | `3600`  |         |
-| `intelligence.composer_enabled`     | `true`  |         |
-| `intelligence.optimization_enabled` | `true`  |         |
-| `intelligence.prediction_enabled`   | `true`  |         |
-| `intelligence.adversarial_enabled`  | `false` |         |
-| `intelligence.simulation_enabled`   | `false` |         |
-| `intelligence.architecture_enabled` | `false` |         |
-| `intelligence.ab_test_ratio`        | `0.2`   |         |
-| `intelligence.anomaly_threshold`    | `3.0`   |         |
-
+| Flag | Default | Purpose |
+| --- | --- | --- |
+| `intelligence.enabled` | `true` | |
+| `intelligence.cache_ttl_seconds` | `3600` | |
+| `intelligence.composer_enabled` | `true` | |
+| `intelligence.optimization_enabled` | `true` | |
+| `intelligence.prediction_enabled` | `true` | |
+| `intelligence.adversarial_enabled` | `false` | |
+| `intelligence.simulation_enabled` | `false` | |
+| `intelligence.architecture_enabled` | `false` | |
+| `intelligence.ab_test_ratio` | `0.2` | |
+| `intelligence.anomaly_threshold` | `3.0` | |
 <!-- /AUTO:feature-flags -->
 
 ### Modules
