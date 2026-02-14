@@ -107,6 +107,7 @@ show_help() {
     echo -e "  ${CYAN}pr${RESET}                   ${BOLD}PR lifecycle${RESET} — auto-review, merge, cleanup, feedback"
     echo -e "  ${CYAN}context${RESET}              ${BOLD}Context engine${RESET} — gather context for pipeline stages"
     echo -e "  ${CYAN}trace${RESET}                ${BOLD}E2E traceability${RESET} — issue to commit to PR to deploy"
+    echo -e "  ${CYAN}widgets${RESET}              ${BOLD}Status widgets${RESET} — embeddable badges, Slack messages, markdown"
     echo -e "  ${CYAN}init${RESET}                  ${BOLD}Quick tmux setup${RESET} — one command, no prompts"
     echo -e "  ${CYAN}setup${RESET}                 ${BOLD}Guided setup${RESET} — prerequisites, init, doctor, quick start"
     echo -e "  ${CYAN}help${RESET}                  Show this help message"
@@ -348,6 +349,9 @@ main() {
             ;;
         pr)
             exec "$SCRIPT_DIR/sw-pr-lifecycle.sh" "$@"
+            ;;
+        widgets)
+            exec "$SCRIPT_DIR/sw-widgets.sh" "$@"
             ;;
         help|--help|-h)
             show_help
