@@ -187,6 +187,7 @@ show_help() {
     echo -e "  ${DIM}shipwright daemon test${RESET}                   # Run daemon test suite"
     echo -e "  ${DIM}shipwright prep test${RESET}                     # Run prep test suite"
     echo -e "  ${DIM}shipwright pipeline test${RESET}                 # Run pipeline test suite"
+    echo -e "  ${DIM}shipwright e2e${RESET} <cmd>          ${BOLD}Test orchestration${RESET} — smoke/integration/regression"
     echo ""
     echo -e "${BOLD}AUDIT & QUALITY${RESET}  ${DIM}(loop guardrails)${RESET}"
     echo -e "  ${DIM}shipwright loop \"goal\" --audit${RESET}                     # Self-reflection each iteration"
@@ -451,6 +452,9 @@ main() {
             ;;
         ux)
             exec "$SCRIPT_DIR/sw-ux.sh" "$@"
+            ;;
+        e2e)
+            exec "$SCRIPT_DIR/sw-e2e-orchestrator.sh" "$@"
             ;;
         help|--help|-h)
             show_help
