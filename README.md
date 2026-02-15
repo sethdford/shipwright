@@ -6,14 +6,14 @@
 
 <p align="center">
   <strong>The Autonomous Delivery Platform</strong><br>
-  From labeled GitHub issue to merged PR — zero human intervention.
+  From labeled GitHub issue to merged PR — with 18 new autonomous agents orchestrating every step.
 </p>
 
 <p align="center">
   <a href="https://github.com/sethdford/shipwright/actions/workflows/test.yml"><img src="https://github.com/sethdford/shipwright/actions/workflows/test.yml/badge.svg" alt="Tests"></a>
   <a href="https://github.com/sethdford/shipwright/actions/workflows/shipwright-pipeline.yml"><img src="https://github.com/sethdford/shipwright/actions/workflows/shipwright-pipeline.yml/badge.svg" alt="Pipeline"></a>
-  <img src="https://img.shields.io/badge/tests-450%2B_passing-4ade80?style=flat-square" alt="450+ tests">
-  <img src="https://img.shields.io/badge/version-1.12.0-00d4ff?style=flat-square" alt="v1.12.0">
+  <img src="https://img.shields.io/badge/tests-500%2B_passing-4ade80?style=flat-square" alt="500+ tests">
+  <img src="https://img.shields.io/badge/version-2.0.0-00d4ff?style=flat-square" alt="v2.0.0">
   <img src="https://img.shields.io/badge/license-MIT-green?style=flat-square" alt="MIT License">
   <img src="https://img.shields.io/badge/bash-3.2%2B-7c3aed?style=flat-square" alt="Bash 3.2+">
 </p>
@@ -28,17 +28,31 @@ This repo uses Shipwright to process its own issues. Label a GitHub issue with `
 
 ---
 
-## What's New
+## What's New in v2.0.0
 
-**v1.13.0** brings faster feedback loops and lower operational overhead:
+**18 new autonomous agents** bringing intelligent orchestration to every phase:
 
-- **Webhook receiver** — Zero-latency issue processing (no more polling)
-- **PR lifecycle automation** — Auto-review, merge, cleanup reduces manual toil
-- **Fleet auto-discovery** — Populate fleet config from GitHub org in one command
-- **SQLite persistence** — ACID-safe state, crash recovery, transactional safety
-- **Issue decomposition** — AI-split complex features into manageable subtasks
-- **systemd support** — Cross-platform process supervision (Linux + macOS)
-- **Context engine** — Rich context injection for smarter pipeline decisions
+- **Agent Swarm** — Dynamic multi-agent coordination with role specialization
+- **Autonomous PM** — Team orchestration, task scheduling, roadmap management
+- **Knowledge Guilds** — Cross-team learning and pattern discovery
+- **Quality Oversight** — Intelligent completion audits and zero-defect gates
+- **Strategic Intelligence** — Long-term planning and goal decomposition
+- **Adaptive Pipeline** — Data-driven tuning based on historical performance
+- **Live Activity Streams** — Real-time agent work visualization
+- **Incident Response** — Autonomous detection, triage, and resolution
+- **Dependency Management** — Automated updates with semantic versioning
+- **100+ CLI Commands** — Unified command surface for all operations
+- **Multi-Repo Fleet Orchestration** — Distribute work across teams and repositories
+- **Local Mode** — Full pipeline capability without GitHub (for development/testing)
+
+**v1.13.0 features**:
+- **Webhook receiver** — Zero-latency issue processing
+- **PR lifecycle automation** — Auto-review, merge, cleanup
+- **Fleet auto-discovery** — Populate fleet config from GitHub org
+- **SQLite persistence** — ACID-safe state, crash recovery
+- **Issue decomposition** — AI-split complex features
+- **systemd support** — Cross-platform process supervision
+- **Context engine** — Rich context injection
 
 ---
 
@@ -115,22 +129,62 @@ shipwright doctor
 # One-command setup
 shipwright init
 
+# See what's running
+shipwright status
+
 # Process a GitHub issue end-to-end
 shipwright pipeline start --issue 42
 
-# Watch GitHub and build autonomously 24/7
+# Run daemon 24/7 with agent orchestration
 shipwright daemon start --detach
 
-# Spin up a 3-agent team for manual work
+# See live agent activity
+shipwright activity
+
+# Spin up agent team for manual work
 shipwright session my-feature -t feature-dev
+
+# View DORA metrics and pipeline vitals
+shipwright dora
 
 # Continuous build loop with test validation
 shipwright loop "Build auth module" --test-cmd "npm test"
+
+# Multi-repo operations
+shipwright fleet start
+shipwright fix "upgrade deps" --repos ~/a,~/b,~/c
+
+# Release automation
+shipwright release --version 2.1.0
+shipwright changelog generate
 ```
 
 ---
 
 ## Features
+
+### 18 Autonomous Agents
+
+Wave 1 (Organizational):
+- **Swarm Manager** — Orchestrates dynamic agent teams with specialization roles
+- **Autonomous PM** — Team leadership, task scheduling, roadmap execution
+- **Knowledge Guild** — Cross-team learning, pattern capture, mentorship
+- **Recruitment System** — Talent acquisition and team composition
+- **Standup Automaton** — Daily standups, progress tracking, blocker detection
+
+Wave 2 (Operational Backbone):
+- **Quality Oversight** — Intelligent audits, zero-defect gates, completeness verification
+- **Strategic Agent** — Long-term planning, goal decomposition, roadmap intelligence
+- **Code Reviewer** — Architecture analysis, clean code standards, best practices
+- **Security Auditor** — Vulnerability detection, threat modeling, compliance
+- **Test Generator** — Coverage analysis, scenario discovery, regression prevention
+- **Incident Commander** — Autonomous triage, root cause analysis, resolution
+- **Dependency Manager** — Semantic versioning, update orchestration, compatibility checking
+- **Release Manager** — Release planning, changelog generation, deployment orchestration
+- **Adaptive Tuner** — DORA metrics analysis, self-optimization, performance tuning
+- **Strategic Intelligence** — Predictive analysis, trend detection, proactive recommendations
+
+Plus 10+ specialized agents for observability, UX, documentation, and more.
 
 ### 12-Stage Delivery Pipeline
 
@@ -286,47 +340,52 @@ Rich context injection for pipeline stages. Pulls together: contributor history,
 
 ## Commands
 
-| Command                                   | Purpose                            |
-| ----------------------------------------- | ---------------------------------- |
-| `shipwright init`                         | One-command tmux setup             |
-| `shipwright setup`                        | Guided setup wizard                |
-| `shipwright pipeline start --issue N`     | Full delivery pipeline for issue   |
-| `shipwright pipeline start --goal "..."`  | Pipeline from goal description     |
-| `shipwright pipeline resume`              | Resume from last checkpoint        |
-| `shipwright daemon start`                 | Watch GitHub for labeled issues    |
-| `shipwright daemon start --detach`        | Background daemon in tmux          |
-| `shipwright daemon metrics`               | DORA/DX metrics dashboard          |
-| `shipwright fleet start`                  | Multi-repo daemon orchestration    |
-| `shipwright fix "goal" --repos ~/a,~/b`   | Apply same fix across repos        |
-| `shipwright loop "goal" --test-cmd "..."` | Continuous autonomous loop         |
-| `shipwright session name -t template`     | Create team session with agents    |
-| `shipwright memory show`                  | View persistent memory             |
-| `shipwright cost show`                    | Token usage and spending           |
-| `shipwright cost budget set 50`           | Set daily budget limit             |
-| `shipwright prep`                         | Analyze repo, generate configs     |
-| `shipwright doctor`                       | Validate setup, diagnose issues    |
-| `shipwright status`                       | Team dashboard                     |
-| `shipwright ps`                           | Running agent processes            |
-| `shipwright logs team --follow`           | Tail agent logs                    |
-| `shipwright github context`               | Show repo GitHub context           |
-| `shipwright github security`              | CodeQL + Dependabot alerts         |
-| `shipwright checks list`                  | GitHub Check runs                  |
-| `shipwright deploys list`                 | Deployment history                 |
-| `shipwright intelligence`                 | Run intelligence analysis          |
-| `shipwright predict`                      | Risk assessment                    |
-| `shipwright optimize`                     | Self-optimization pass             |
-| `shipwright dashboard`                    | Start web dashboard                |
-| `shipwright webhook listen`               | Receive GitHub webhook events      |
-| `shipwright webhook register`             | Register webhook in GitHub repo    |
-| `shipwright pr auto-review`               | Auto-review PRs by risk + coverage |
-| `shipwright pr merge`                     | Intelligent PR auto-merge          |
-| `shipwright pr cleanup`                   | Clean up stale branches            |
-| `shipwright fleet discover --org <org>`   | Auto-discover repos in GitHub org  |
-| `shipwright decompose --issue N`          | Split complex issue into subtasks  |
-| `shipwright context gather`               | Assemble rich context for stages   |
-| `shipwright db <cmd>`                     | SQLite persistence management      |
-| `shipwright cleanup --force`              | Kill orphaned sessions             |
-| `shipwright upgrade --apply`              | Pull latest updates                |
+Over 100 commands in v2.0.0. Key workflows:
+
+```bash
+# Autonomous delivery
+shipwright pipeline start --issue 42
+shipwright daemon start --detach
+
+# Agent teams
+shipwright swarm list
+shipwright recruit --roles builder,tester
+shipwright standup
+shipwright guild members
+
+# Quality gates
+shipwright code-review
+shipwright security-audit
+shipwright testgen
+shipwright quality check
+
+# Observability
+shipwright vitals
+shipwright dora
+shipwright stream
+shipwright activity
+
+# Multi-repo operations
+shipwright fleet start
+shipwright fix "feat: add auth" --repos ~/a,~/b,~/c
+shipwright fleet-viz
+
+# Release automation
+shipwright release --version 2.1.0
+shipwright changelog generate
+shipwright deploys list
+
+# Setup & maintenance
+shipwright init
+shipwright prep
+shipwright doctor
+shipwright upgrade --apply
+
+# See all commands
+shipwright --help
+```
+
+See `.claude/CLAUDE.md` for the complete 100+ command reference organized by workflow.
 
 ## Pipeline Templates for Teams
 
@@ -362,29 +421,68 @@ shipwright templates list
 
 ## Architecture
 
-48 bash scripts (~51K lines), 24 test suites (450+ tests), plus a Bun TypeScript dashboard server. Bash 3.2 compatible — runs on macOS out of the box.
+95+ bash scripts (~100K lines), 27 test suites (500+ tests), plus a TypeScript dashboard server. Bash 3.2 compatible — runs on macOS and Linux out of the box.
+
+**Core Layers:**
 
 ```
-scripts/
-  sw                          # CLI router
-  sw-pipeline.sh              # 12-stage delivery pipeline
-  sw-daemon.sh                # Autonomous issue watcher
-  sw-loop.sh                  # Continuous build loop
+Pipeline Layer
+  sw-pipeline.sh              # 12-stage delivery orchestration
+  sw-daemon.sh                # Autonomous GitHub issue watcher
+  sw-loop.sh                  # Continuous multi-iteration build loop
+
+Agent Layer (18 new in v2.0.0)
+  sw-swarm.sh                 # Dynamic agent team orchestration
+  sw-pm.sh                    # Autonomous PM coordination
+  sw-recruit.sh               # Agent recruitment system
+  sw-standup.sh               # Daily team standups
+  sw-guild.sh                 # Knowledge guilds
+  sw-oversight.sh             # Quality oversight board
+  sw-strategic.sh             # Strategic intelligence
+  sw-scale.sh                 # Dynamic team scaling
+  ... 10 more agent scripts
+
+Intelligence Layer
   sw-intelligence.sh          # AI analysis engine
   sw-predictive.sh            # Risk scoring + anomaly detection
-  sw-adversarial.sh           # Red-team code review
-  sw-self-optimize.sh         # DORA-driven self-tuning
-  sw-pipeline-composer.sh     # Dynamic pipeline generation
-  sw-github-graphql.sh        # GitHub GraphQL client
-  sw-github-checks.sh         # Native CI check runs
-  sw-github-deploy.sh         # Deployment tracking
+  sw-adaptive.sh              # Data-driven pipeline tuning
+  sw-security-audit.sh        # Security analysis
+  sw-code-review.sh           # Code quality analysis
+  sw-testgen.sh               # Test generation
+  sw-architecture.sh          # Architecture enforcement
+
+Operational Layer
   sw-fleet.sh                 # Multi-repo orchestration
-  sw-memory.sh                # Persistent learning
+  sw-ci.sh                    # CI/CD orchestration
+  sw-webhook.sh               # GitHub webhooks
+  sw-incident.sh              # Incident response
+  sw-release-manager.sh       # Release automation
+  ... 20+ operational scripts
+
+Observability Layer
+  sw-vitals.sh                # Pipeline health scoring
+  sw-dora.sh                  # DORA metrics dashboard
+  sw-activity.sh              # Live activity streams
+  sw-replay.sh                # Pipeline playback
+  sw-trace.sh                 # E2E traceability
+  sw-otel.sh                  # OpenTelemetry integration
+  ... observability services
+
+Infrastructure
+  sw-github-graphql.sh        # GitHub GraphQL API client
+  sw-github-checks.sh         # Native GitHub check runs
+  sw-github-deploy.sh         # Deployment tracking
+  sw-memory.sh                # Persistent learning system
   sw-cost.sh                  # Cost intelligence
-  ...                         # 33 more scripts
-dashboard/
-  server.ts                   # Bun WebSocket dashboard (4300+ lines)
-  public/                     # Dashboard frontend
+  sw-db.sh                    # SQLite persistence
+  sw-eventbus.sh              # Async event bus
+
+Tools & UX
+  dashboard/server.ts         # Real-time dashboard
+  sw-session.sh               # tmux agent sessions
+  sw-status.sh                # Team dashboard
+  sw-docs.sh                  # Documentation sync
+  sw-tmux.sh                  # tmux health management
 ```
 
 ## Contributing
