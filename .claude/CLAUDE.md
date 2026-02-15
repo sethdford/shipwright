@@ -513,14 +513,14 @@ All scripts are bash (except the dashboard server in TypeScript). Grouped by lay
 | `scripts/sw-heartbeat.sh` | 293 | File-based agent heartbeat protocol |
 | `scripts/sw-hygiene.sh` | 559 | Repository Organization & Cleanup |
 | `scripts/sw-incident.sh` | 617 | Autonomous Incident Detection & Response |
-| `scripts/sw-init.sh` | 609 | Complete setup for Shipwright + Shipwright |
+| `scripts/sw-init.sh` | 627 | Complete setup for Shipwright + Shipwright |
 | `scripts/sw-instrument.sh` | 699 | Pipeline Instrumentation & Feedback Loops |
 | `scripts/sw-intelligence.sh` | 1196 | AI-Powered Analysis & Decision Engine |
 | `scripts/sw-jira.sh` | 643 | Jira ↔ GitHub Bidirectional Sync |
 | `scripts/sw-launchd.sh` | 699 | Process supervision (macOS + Linux) |
 | `scripts/sw-linear.sh` | 648 | Linear ↔ GitHub Bidirectional Sync |
 | `scripts/sw-logs.sh` | 343 | View and search agent pane logs |
-| `scripts/sw-loop.sh` | 2278 | Continuous agent loop harness for Claude Code |
+| `scripts/sw-loop.sh` | 2308 | Continuous agent loop harness for Claude Code |
 | `scripts/sw-memory.sh` | 1626 | Persistent Learning & Context System |
 | `scripts/sw-mission-control.sh` | 487 | Terminal-based pipeline mission control |
 | `scripts/sw-model-router.sh` | 545 | Intelligent Model Routing & Cost Optimization |
@@ -529,7 +529,7 @@ All scripts are bash (except the dashboard server in TypeScript). Grouped by lay
 | `scripts/sw-patrol-meta.sh` | 417 | Shipwright Self-Improvement Patrol |
 | `scripts/sw-pipeline-composer.sh` | 455 | Dynamic Pipeline Composition |
 | `scripts/sw-pipeline-vitals.sh` | 1096 | Pipeline Vitals Engine |
-| `scripts/sw-pipeline.sh` | 8256 | Autonomous Feature Delivery (Idea → Production) |
+| `scripts/sw-pipeline.sh` | 8279 | Autonomous Feature Delivery (Idea → Production) |
 | `scripts/sw-pm.sh` | 693 | Autonomous PM Agent for Team Orchestration |
 | `scripts/sw-pr-lifecycle.sh` | 522 | Autonomous PR Management |
 | `scripts/sw-predictive.sh` | 820 | Predictive & Proactive Intelligence |
@@ -549,10 +549,10 @@ All scripts are bash (except the dashboard server in TypeScript). Grouped by lay
 | `scripts/sw-security-audit.sh` | 505 | Comprehensive Security Auditing |
 | `scripts/sw-self-optimize.sh` | 1048 | Learning & Self-Tuning System |
 | `scripts/sw-session.sh` | 541 | Launch a Claude Code team session in a new tmux window |
-| `scripts/sw-setup.sh` | 234 | One-shot setup: check prerequisites, init, doctor |
+| `scripts/sw-setup.sh` | 370 | Comprehensive onboarding wizard |
 | `scripts/sw-standup.sh` | 712 | Automated Daily Standups for AI Agent Teams |
 | `scripts/sw-status.sh` | 796 | Dashboard showing Claude Code team status |
-| `scripts/sw-strategic.sh` | 658 | Strategic Intelligence Agent |
+| `scripts/sw-strategic.sh` | 693 | Strategic Intelligence Agent |
 | `scripts/sw-stream.sh` | 450 | Live terminal output streaming from agent panes |
 | `scripts/sw-swarm.sh` | 583 | Dynamic agent swarm management |
 | `scripts/sw-team-stages.sh` | 511 | Multi-agent execution with leader/specialist roles |
@@ -568,7 +568,7 @@ All scripts are bash (except the dashboard server in TypeScript). Grouped by lay
 | `scripts/sw-webhook.sh` | 627 | GitHub Webhook Receiver for Instant Issue Processing |
 | `scripts/sw-widgets.sh` | 530 | Embeddable Status Widgets |
 | `scripts/sw-worktree.sh` | 408 | Git worktree management for multi-agent isolation |
-| `scripts/sw` | 545 | CLI router — dispatches subcommands via exec |
+| `scripts/sw` | 659 | CLI router — dispatches subcommands via exec |
 <!-- /AUTO:core-scripts -->
 
 ### GitHub API Modules
@@ -619,7 +619,7 @@ All scripts are bash (except the dashboard server in TypeScript). Grouped by lay
 | `scripts/sw-github-deploy-test.sh` | 530 | Validate Deployments API wrapper |
 | `scripts/sw-github-graphql-test.sh` | 671 | Unit tests for GitHub GraphQL client |
 | `scripts/sw-heartbeat-test.sh` | 588 | Validate heartbeat lifecycle, |
-| `scripts/sw-init-test.sh` | 494 | E2E validation of init/setup flow |
+| `scripts/sw-init-test.sh` | 501 | E2E validation of init/setup flow |
 | `scripts/sw-intelligence-test.sh` | 544 | Unit tests for intelligence core |
 | `scripts/sw-launchd-test.sh` | 908 | Validate service management on |
 | `scripts/sw-memory-test.sh` | 872 | Unit tests for memory system & cost tracking |
