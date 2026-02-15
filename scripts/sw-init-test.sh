@@ -40,6 +40,13 @@ setup_env() {
 
     # ── Mock project directory ─────────────────────────────────────────────
     mkdir -p "$TEMP_DIR/project/.claude"
+
+    # ── Pre-create TPM directory to skip real git clone ───────────────────
+    # Without this, init tries to git-clone tmux-plugins/tpm and run
+    # install_plugins, which can hang on CI (no tmux server running).
+    mkdir -p "$TEMP_DIR/home/.tmux/plugins/tpm/bin"
+    printf '#!/usr/bin/env bash\nexit 0\n' > "$TEMP_DIR/home/.tmux/plugins/tpm/bin/install_plugins"
+    chmod +x "$TEMP_DIR/home/.tmux/plugins/tpm/bin/install_plugins"
 }
 
 cleanup_env() {

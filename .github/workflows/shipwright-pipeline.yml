@@ -406,11 +406,14 @@ jobs:
             cat /tmp/auth-check-err.log 2>/dev/null || true
             echo "--- end ---"
             # Post failure comment on issue
-            gh issue comment "$ISSUE_NUMBER" --body "## Pipeline Auth Failure
+            gh issue comment "$ISSUE_NUMBER" --body "$(cat <<'AUTHEOF'
+          ## Pipeline Auth Failure
 
-Claude Code failed to authenticate. Check that \`CLAUDE_CODE_OAUTH_TOKEN\` is set and valid in repository secrets.
+          Claude Code failed to authenticate. Check that `CLAUDE_CODE_OAUTH_TOKEN` is set and valid in repository secrets.
 
-Run \`claude setup-token\` locally to generate a fresh token." 2>/dev/null || true
+          Run `claude setup-token` locally to generate a fresh token.
+          AUTHEOF
+            )" 2>/dev/null || true
             exit 1
           fi
 
