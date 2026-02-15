@@ -5,7 +5,7 @@
 set -euo pipefail
 trap 'echo "ERROR: $BASH_SOURCE:$LINENO exited with status $?" >&2' ERR
 
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+REAL_SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 CYAN='\033[38;2;0;212;255m'
 GREEN='\033[38;2;74;222;128m'
@@ -108,18 +108,18 @@ setup_env
 
 # ─── Test 1: Help ────────────────────────────────────────────────────
 echo -e "${BOLD}  Help${RESET}"
-output=$(bash "$SCRIPT_DIR/../scripts/sw-strategic.sh" help 2>&1) || true
+output=$(bash "$REAL_SCRIPT_DIR/sw-strategic.sh" help 2>&1) || true
 assert_contains "help shows usage" "$output" "Usage"
 assert_contains "help shows commands" "$output" "Commands"
 
 # ─── Test 2: Unknown command ─────────────────────────────────────────
-output=$(bash "$SCRIPT_DIR/../scripts/sw-strategic.sh" nonexistent 2>&1) || true
+output=$(bash "$REAL_SCRIPT_DIR/sw-strategic.sh" nonexistent 2>&1) || true
 assert_contains "unknown command shows error" "$output" "Unknown command"
 
 # ─── Test 3: Source the script for function testing ──────────────────
 echo -e "${BOLD}  Sourced Functions${RESET}"
 # Source the strategic script for function testing
-source "$SCRIPT_DIR/../scripts/sw-strategic.sh" 2>/dev/null || true
+source "$REAL_SCRIPT_DIR/sw-strategic.sh" 2>/dev/null || true
 
 # ─── Test 4: strategic_check_cooldown with no events ────────────────
 if strategic_check_cooldown 2>/dev/null; then
@@ -190,8 +190,9 @@ assert_contains "status shows last run" "$output" "Last run"
 
 # ─── Test 12: Run without CLAUDE_CODE_OAUTH_TOKEN ────────────────────
 echo -e "${BOLD}  Run Guard${RESET}"
+echo "" > "$EVENTS_FILE"  # Clear cooldown so token check is reached
 unset CLAUDE_CODE_OAUTH_TOKEN 2>/dev/null || true
-output=$(bash "$SCRIPT_DIR/../scripts/sw-strategic.sh" run 2>&1) || true
+output=$(bash "$REAL_SCRIPT_DIR/sw-strategic.sh" run 2>&1) || true
 assert_contains "run without token shows error" "$output" "CLAUDE_CODE_OAUTH_TOKEN"
 
 echo ""

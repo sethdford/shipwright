@@ -445,6 +445,58 @@ accumulate_loop_tokens() {
     fi
 }
 
+# ─── JSON→Text Extraction ──────────────────────────────────────────────────
+# Extract plain text from Claude's --output-format json response.
+# Handles: valid JSON arrays, malformed JSON, non-JSON output, empty output.
+_extract_text_from_json() {
+    local json_file="$1" log_file="$2" err_file="${3:-}"
+
+    # Case 1: File doesn't exist or is empty
+    if [[ ! -s "$json_file" ]]; then
+        # Check stderr for error messages
+        if [[ -s "$err_file" ]]; then
+            cp "$err_file" "$log_file"
+        else
+            echo "(no output)" > "$log_file"
+        fi
+        return 0
+    fi
+
+    local first_char
+    first_char=$(head -c1 "$json_file" 2>/dev/null || true)
+
+    # Case 2: Valid JSON array — extract .result from last element
+    if [[ "$first_char" == "[" ]] && command -v jq &>/dev/null; then
+        local extracted
+        extracted=$(jq -r '.[-1].result // empty' "$json_file" 2>/dev/null) || true
+        if [[ -n "$extracted" ]]; then
+            echo "$extracted" > "$log_file"
+            return 0
+        fi
+        # jq succeeded but result was null/empty — try .content or raw text
+        extracted=$(jq -r '.[].content // empty' "$json_file" 2>/dev/null | head -500) || true
+        if [[ -n "$extracted" ]]; then
+            echo "$extracted" > "$log_file"
+            return 0
+        fi
+        # JSON parsed but no text found — write placeholder
+        warn "JSON output has no .result field — check $json_file"
+        echo "(no text result in JSON output)" > "$log_file"
+        return 0
+    fi
+
+    # Case 3: Looks like JSON but no jq — can't parse, use raw
+    if [[ "$first_char" == "[" || "$first_char" == "{" ]]; then
+        warn "JSON output but jq not available — using raw output"
+        cp "$json_file" "$log_file"
+        return 0
+    fi
+
+    # Case 4: Not JSON at all (plain text, error message, etc.) — use as-is
+    cp "$json_file" "$log_file"
+    return 0
+}
+
 # Write accumulated token totals to a JSON file for the pipeline to read.
 write_loop_tokens() {
     local token_file="$LOG_DIR/loop-tokens.json"
@@ -1643,10 +1695,11 @@ run_claude_iteration() {
     # Output goes to .json first, then we extract text into .log for compat
     local exit_code=0
     # shellcheck disable=SC2086
+    local err_file="${json_file%.json}.stderr"
     if [[ -n "$TIMEOUT_CMD" ]]; then
-        $TIMEOUT_CMD "$CLAUDE_TIMEOUT" claude -p "$prompt" $flags > "$json_file" 2>&1 &
+        $TIMEOUT_CMD "$CLAUDE_TIMEOUT" claude -p "$prompt" $flags > "$json_file" 2>"$err_file" &
     else
-        claude -p "$prompt" $flags > "$json_file" 2>&1 &
+        claude -p "$prompt" $flags > "$json_file" 2>"$err_file" &
     fi
     CHILD_PID=$!
     wait "$CHILD_PID" 2>/dev/null || exit_code=$?
@@ -1656,13 +1709,8 @@ run_claude_iteration() {
     fi
 
     # Extract text result from JSON into .log for backwards compatibility
-    # The result text is in the last array element's .result field
-    if command -v jq &>/dev/null && [[ -f "$json_file" ]] && head -c1 "$json_file" 2>/dev/null | grep -q '\['; then
-        jq -r '.[-1].result // empty' "$json_file" > "$log_file" 2>/dev/null || cp "$json_file" "$log_file"
-    else
-        # Fallback: if JSON parsing fails, just use raw output as log
-        [[ -f "$json_file" ]] && cp "$json_file" "$log_file"
-    fi
+    # With --output-format json, stdout is a JSON array; .[-1].result has the text
+    _extract_text_from_json "$json_file" "$log_file" "$err_file"
 
     local iter_end
     iter_end="$(now_epoch)"
@@ -1942,16 +1990,13 @@ PROMPT
 
     # Run Claude (output is JSON due to --output-format json in CLAUDE_FLAGS)
     local JSON_FILE="$LOG_DIR/agent-${AGENT_NUM}-iter-${ITERATION}.json"
+    local ERR_FILE="$LOG_DIR/agent-${AGENT_NUM}-iter-${ITERATION}.stderr"
     LOG_FILE="$LOG_DIR/agent-${AGENT_NUM}-iter-${ITERATION}.log"
     # shellcheck disable=SC2086
-    claude -p "$PROMPT" $CLAUDE_FLAGS > "$JSON_FILE" 2>&1 || true
+    claude -p "$PROMPT" $CLAUDE_FLAGS > "$JSON_FILE" 2>"$ERR_FILE" || true
 
     # Extract text result from JSON into .log for backwards compat
-    if command -v jq &>/dev/null && [[ -f "$JSON_FILE" ]] && head -c1 "$JSON_FILE" 2>/dev/null | grep -q '\['; then
-        jq -r '.[-1].result // empty' "$JSON_FILE" > "$LOG_FILE" 2>/dev/null || cp "$JSON_FILE" "$LOG_FILE"
-    else
-        [[ -f "$JSON_FILE" ]] && cp "$JSON_FILE" "$LOG_FILE"
-    fi
+    _extract_text_from_json "$JSON_FILE" "$LOG_FILE" "$ERR_FILE"
 
     echo -e "  ${GREEN}✓${RESET} Claude session completed"
 

@@ -20,6 +20,8 @@ DIM='\033[2m'
 BOLD='\033[1m'
 RESET='\033[0m'
 
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
 # ─── Cross-platform compatibility ──────────────────────────────────────────
 # shellcheck source=lib/compat.sh
 [[ -f "$SCRIPT_DIR/lib/compat.sh" ]] && source "$SCRIPT_DIR/lib/compat.sh"
@@ -29,8 +31,6 @@ warn()    { echo -e "${YELLOW}${BOLD}⚠${RESET} $*"; }
 error()   { echo -e "${RED}${BOLD}✗${RESET} $*" >&2; }
 
 # ─── Template Discovery ─────────────────────────────────────────────────────
-
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_TEMPLATES_DIR="$(cd "$SCRIPT_DIR/../tmux/templates" 2>/dev/null && pwd)" || REPO_TEMPLATES_DIR=""
 USER_TEMPLATES_DIR="${HOME}/.shipwright/templates"
 

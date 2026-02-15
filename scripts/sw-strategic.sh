@@ -67,7 +67,7 @@ STRATEGIC_LABELS="auto-patrol,ready-to-build,strategic,shipwright"
 # ─── Semantic Dedup ─────────────────────────────────────────────────────────
 # Cache of existing issue titles (open + recently closed) loaded at cycle start.
 STRATEGIC_TITLE_CACHE=""
-STRATEGIC_OVERLAP_THRESHOLD=70  # Skip if >70% word overlap
+STRATEGIC_OVERLAP_THRESHOLD=60  # Skip if >60% word overlap
 
 # Compute word-overlap similarity between two titles (0-100).
 # Uses lowercase word sets, ignoring common stop words.
@@ -75,10 +75,14 @@ strategic_word_overlap() {
     local title_a="$1"
     local title_b="$2"
 
-    # Normalize: lowercase, strip punctuation, split to words
+    # Normalize: lowercase, strip punctuation, split to words, basic stemming
     local words_a words_b
-    words_a=$(printf '%s' "$title_a" | tr '[:upper:]' '[:lower:]' | tr -cs '[:alnum:]' '\n' | sort -u | grep -vE '^(a|an|the|and|or|for|to|in|of|is|it|by|on|at|with|from)$' | grep -v '^$' || true)
-    words_b=$(printf '%s' "$title_b" | tr '[:upper:]' '[:lower:]' | tr -cs '[:alnum:]' '\n' | sort -u | grep -vE '^(a|an|the|and|or|for|to|in|of|is|it|by|on|at|with|from)$' | grep -v '^$' || true)
+    words_a=$(printf '%s' "$title_a" | tr '[:upper:]' '[:lower:]' | tr -cs '[:alnum:]' '\n' | \
+        sed -E 's/ations?$//; s/tions?$//; s/ments?$//; s/ings?$//; s/ness$//; s/ies$/y/; s/([^s])s$/\1/' | \
+        sort -u | grep -vE '^(a|an|the|and|or|for|to|in|of|is|it|by|on|at|with|from|based)$' | grep -v '^$' || true)
+    words_b=$(printf '%s' "$title_b" | tr '[:upper:]' '[:lower:]' | tr -cs '[:alnum:]' '\n' | \
+        sed -E 's/ations?$//; s/tions?$//; s/ments?$//; s/ings?$//; s/ness$//; s/ies$/y/; s/([^s])s$/\1/' | \
+        sort -u | grep -vE '^(a|an|the|and|or|for|to|in|of|is|it|by|on|at|with|from|based)$' | grep -v '^$' || true)
 
     [[ -z "$words_a" || -z "$words_b" ]] && echo "0" && return 0
 

@@ -297,12 +297,59 @@ else
     assert_fail "write_loop_tokens includes cost_usd"
 fi
 
-# ─── Test 15: JSON-to-text extraction in run_claude_iteration ────────────────
-if grep -q 'jq.*result.*empty.*json_file' "$SCRIPT_DIR/sw-loop.sh"; then
-    assert_pass "run_claude_iteration extracts text from JSON"
+# ─── Test 15: _extract_text_from_json helper exists ──────────────────────────
+if grep -q '_extract_text_from_json' "$SCRIPT_DIR/sw-loop.sh"; then
+    assert_pass "_extract_text_from_json helper defined"
 else
-    assert_fail "run_claude_iteration extracts text from JSON"
+    assert_fail "_extract_text_from_json helper defined"
 fi
+
+# ─── Test 16: run_claude_iteration separates stdout/stderr ───────────────────
+if grep -q '2>"$err_file"' "$SCRIPT_DIR/sw-loop.sh"; then
+    assert_pass "run_claude_iteration separates stdout from stderr"
+else
+    assert_fail "run_claude_iteration separates stdout from stderr"
+fi
+
+# ─── Test 17-19: _extract_text_from_json robustness ──────────────────────────
+echo ""
+echo -e "${DIM}  json extraction robustness${RESET}"
+# Extract the function from sw-loop.sh and test it in isolation (can't source
+# sw-loop.sh because it has no source guard — main() runs unconditionally)
+_extract_fn=$(sed -n '/^_extract_text_from_json()/,/^}/p' "$SCRIPT_DIR/sw-loop.sh")
+tmpdir=$(mktemp -d)
+bash -c "
+warn() { :; }
+$_extract_fn
+# Test 1: empty file → '(no output)'
+touch '$tmpdir/empty.json'
+_extract_text_from_json '$tmpdir/empty.json' '$tmpdir/out1.log' ''
+# Test 2: valid JSON array → extracts .result
+echo '[{\"type\":\"result\",\"result\":\"Hello world\",\"usage\":{\"input_tokens\":100}}]' > '$tmpdir/valid.json'
+_extract_text_from_json '$tmpdir/valid.json' '$tmpdir/out2.log' ''
+# Test 3: plain text → pass through
+echo 'This is plain text output' > '$tmpdir/text.json'
+_extract_text_from_json '$tmpdir/text.json' '$tmpdir/out3.log' ''
+" 2>/dev/null
+
+if grep -q "no output" "$tmpdir/out1.log" 2>/dev/null; then
+    assert_pass "_extract_text_from_json handles empty file"
+else
+    assert_fail "_extract_text_from_json handles empty file" "expected '(no output)' in $tmpdir/out1.log"
+fi
+
+if grep -q "Hello world" "$tmpdir/out2.log" 2>/dev/null; then
+    assert_pass "_extract_text_from_json extracts .result from JSON"
+else
+    assert_fail "_extract_text_from_json extracts .result from JSON" "expected 'Hello world' in $tmpdir/out2.log"
+fi
+
+if grep -q "plain text" "$tmpdir/out3.log" 2>/dev/null; then
+    assert_pass "_extract_text_from_json passes through plain text"
+else
+    assert_fail "_extract_text_from_json passes through plain text" "expected 'plain text' in $tmpdir/out3.log"
+fi
+rm -rf "$tmpdir"
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # RESULTS
