@@ -112,6 +112,7 @@ show_help() {
     echo -e "  ${CYAN}release${RESET} <cmd>         ${BOLD}Release automation${RESET} — bump versions, changelog, tags, releases"
     echo -e "  ${CYAN}replay${RESET} <cmd>           ${BOLD}Pipeline DVR${RESET} — list, show, narrative, diff, export, compare runs"
     echo -e "  ${CYAN}scale${RESET} <cmd>            ${BOLD}Dynamic team scaling${RESET} — scale agents up/down during pipeline"
+    echo -e "  ${CYAN}swarm${RESET} <cmd>            ${BOLD}Agent swarm manager${RESET} — registry, spawning, scaling, health, topology"
     echo -e "  ${CYAN}dora${RESET} <cmd>            ${BOLD}DORA metrics${RESET} — deploy frequency, lead time, CFR, MTTR dashboard"
     echo -e "  ${CYAN}tmux${RESET} <cmd>            ${BOLD}tmux health${RESET} — doctor, install plugins, fix issues"
     echo -e "  ${CYAN}vitals${RESET}               ${BOLD}Pipeline vitals${RESET} — real-time health scoring and dashboard"
@@ -388,6 +389,9 @@ main() {
             ;;
         scale)
             exec "$SCRIPT_DIR/sw-scale.sh" "$@"
+            ;;
+        swarm)
+            exec "$SCRIPT_DIR/sw-swarm.sh" "$@"
             ;;
         dora)
             exec "$SCRIPT_DIR/sw-dora.sh" "$@"
