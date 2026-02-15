@@ -116,6 +116,7 @@ show_help() {
     echo -e "  ${CYAN}scale${RESET} <cmd>            ${BOLD}Dynamic team scaling${RESET} — scale agents up/down during pipeline"
     echo -e "  ${CYAN}swarm${RESET} <cmd>            ${BOLD}Agent swarm manager${RESET} — registry, spawning, scaling, health, topology"
     echo -e "  ${CYAN}dora${RESET} <cmd>            ${BOLD}DORA metrics${RESET} — deploy frequency, lead time, CFR, MTTR dashboard"
+    echo -e "  ${CYAN}retro${RESET} <cmd>           ${BOLD}Sprint retrospective${RESET} — analyze sprints, identify improvements, create actions"
     echo -e "  ${CYAN}tmux${RESET} <cmd>            ${BOLD}tmux health${RESET} — doctor, install plugins, fix issues"
     echo -e "  ${CYAN}vitals${RESET}               ${BOLD}Pipeline vitals${RESET} — real-time health scoring and dashboard"
     echo -e "  ${CYAN}stream${RESET}               ${BOLD}Terminal streaming${RESET} — live agent output to dashboard or CLI"
@@ -404,6 +405,9 @@ main() {
             ;;
         dora)
             exec "$SCRIPT_DIR/sw-dora.sh" "$@"
+            ;;
+        retro)
+            exec "$SCRIPT_DIR/sw-retro.sh" "$@"
             ;;
         tmux)
             exec "$SCRIPT_DIR/sw-tmux.sh" "$@"
