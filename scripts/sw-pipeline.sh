@@ -223,6 +223,7 @@ AUTO_WORKTREE=false
 WORKTREE_NAME=""
 CLEANUP_WORKTREE=false
 ORIGINAL_REPO_DIR=""
+REPO_OVERRIDE=""
 _cleanup_done=""
 
 # GitHub metadata (populated during intake)
@@ -264,6 +265,8 @@ show_help() {
     echo -e "${BOLD}START OPTIONS${RESET}"
     echo -e "  ${DIM}--goal \"description\"${RESET}     What to build (required unless --issue)"
     echo -e "  ${DIM}--issue <number>${RESET}          Fetch goal from GitHub issue"
+    echo -e "  ${DIM}--repo <path>${RESET}             Change to directory before running (must be a git repo)"
+    echo -e "  ${DIM}--local${RESET}                   Alias for --no-github --no-github-label (local-only mode)"
     echo -e "  ${DIM}--pipeline <name>${RESET}         Pipeline template (default: standard)"
     echo -e "  ${DIM}--test-cmd \"command\"${RESET}     Override test command (auto-detected if omitted)"
     echo -e "  ${DIM}--model <model>${RESET}           Override AI model (opus, sonnet, haiku)"
@@ -346,6 +349,8 @@ parse_args() {
         case "$1" in
             --goal)        GOAL="$2"; shift 2 ;;
             --issue)       ISSUE_NUMBER="$2"; shift 2 ;;
+            --repo)        REPO_OVERRIDE="$2"; shift 2 ;;
+            --local)       NO_GITHUB=true; NO_GITHUB_LABEL=true; shift ;;
             --pipeline|--template) PIPELINE_NAME="$2"; shift 2 ;;
             --test-cmd)    TEST_CMD="$2"; shift 2 ;;
             --model)       MODEL="$2"; shift 2 ;;
@@ -7787,6 +7792,24 @@ run_dry_run() {
 # ─── Subcommands ────────────────────────────────────────────────────────────
 
 pipeline_start() {
+    # Handle --repo flag: change to directory before running
+    if [[ -n "$REPO_OVERRIDE" ]]; then
+        if [[ ! -d "$REPO_OVERRIDE" ]]; then
+            error "Directory does not exist: $REPO_OVERRIDE"
+            exit 1
+        fi
+        if ! cd "$REPO_OVERRIDE" 2>/dev/null; then
+            error "Cannot cd to: $REPO_OVERRIDE"
+            exit 1
+        fi
+        if ! git rev-parse --show-toplevel >/dev/null 2>&1; then
+            error "Not a git repository: $REPO_OVERRIDE"
+            exit 1
+        fi
+        ORIGINAL_REPO_DIR="$(pwd)"
+        info "Using repository: $ORIGINAL_REPO_DIR"
+    fi
+
     if [[ -z "$GOAL" && -z "$ISSUE_NUMBER" ]]; then
         error "Must provide --goal or --issue"
         echo -e "  Example: ${DIM}shipwright pipeline start --goal \"Add JWT auth\"${RESET}"

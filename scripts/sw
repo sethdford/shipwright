@@ -64,8 +64,16 @@ show_help() {
     echo ""
     echo -e "${BOLD}USAGE${RESET}"
     echo -e "  ${CYAN}shipwright${RESET} <command> [options]    ${DIM}(also: sw, cct)${RESET}"
+    echo -e "  ${CYAN}shipwright${RESET} <group> <subcommand> [options]"
     echo ""
-    echo -e "${BOLD}COMMANDS${RESET}"
+    echo -e "${BOLD}COMMAND GROUPS${RESET}  ${DIM}(new grouped syntax)${RESET}"
+    echo -e "  ${CYAN}agent${RESET} <subcmd>         ${DIM}Agent management: recruit, swarm, standup, guild, oversight${RESET}"
+    echo -e "  ${CYAN}quality${RESET} <subcmd>       ${DIM}Quality & review: code-review, security-audit, testgen, hygiene${RESET}"
+    echo -e "  ${CYAN}observe${RESET} <subcmd>       ${DIM}Observability: vitals, dora, retro, stream, activity, replay${RESET}"
+    echo -e "  ${CYAN}release${RESET} <subcmd>       ${DIM}Release & deploy: release, release-manager, changelog, deploy${RESET}"
+    echo -e "  ${CYAN}intel${RESET} <subcmd>         ${DIM}Intelligence: predict, intelligence, strategic, optimize${RESET}"
+    echo ""
+    echo -e "${BOLD}CORE COMMANDS${RESET}  ${DIM}(flat aliases for backwards compat)${RESET}"
     echo -e "  ${CYAN}session${RESET} [name]       Create a new tmux window for a Claude team"
     echo -e "  ${CYAN}status${RESET} [--json]        Show dashboard of running teams and agents"
     echo -e "  ${CYAN}mission-control|mc${RESET}   Terminal-based pipeline mission control (drill-down, team tree, orchestration)"
@@ -232,6 +240,72 @@ show_help() {
     echo -e "${DIM}Docs: https://sethdford.github.io/shipwright  |  GitHub: https://github.com/sethdford/shipwright${RESET}"
 }
 
+# ─── Command Group Routers ───────────────────────────────────────────────────
+
+route_agent() {
+    local subcmd="${1:-help}"
+    shift 2>/dev/null || true
+    case "$subcmd" in
+        recruit)      exec "$SCRIPT_DIR/sw-recruit.sh" "$@" ;;
+        swarm)        exec "$SCRIPT_DIR/sw-swarm.sh" "$@" ;;
+        standup)      exec "$SCRIPT_DIR/sw-standup.sh" "$@" ;;
+        guild)        exec "$SCRIPT_DIR/sw-guild.sh" "$@" ;;
+        oversight)    exec "$SCRIPT_DIR/sw-oversight.sh" "$@" ;;
+        help|*) echo "Usage: shipwright agent {recruit|swarm|standup|guild|oversight}"; exit 1 ;;
+    esac
+}
+
+route_quality() {
+    local subcmd="${1:-help}"
+    shift 2>/dev/null || true
+    case "$subcmd" in
+        code-review)      exec "$SCRIPT_DIR/sw-code-review.sh" "$@" ;;
+        security-audit|audit) exec "$SCRIPT_DIR/sw-security-audit.sh" "$@" ;;
+        testgen)          exec "$SCRIPT_DIR/sw-testgen.sh" "$@" ;;
+        hygiene)          exec "$SCRIPT_DIR/sw-hygiene.sh" "$@" ;;
+        help|*) echo "Usage: shipwright quality {code-review|security-audit|testgen|hygiene}"; exit 1 ;;
+    esac
+}
+
+route_observe() {
+    local subcmd="${1:-help}"
+    shift 2>/dev/null || true
+    case "$subcmd" in
+        vitals)       exec "$SCRIPT_DIR/sw-pipeline-vitals.sh" "$@" ;;
+        dora)         exec "$SCRIPT_DIR/sw-dora.sh" "$@" ;;
+        retro)        exec "$SCRIPT_DIR/sw-retro.sh" "$@" ;;
+        stream)       exec "$SCRIPT_DIR/sw-stream.sh" "$@" ;;
+        activity)     exec "$SCRIPT_DIR/sw-activity.sh" "$@" ;;
+        replay)       exec "$SCRIPT_DIR/sw-replay.sh" "$@" ;;
+        status)       exec "$SCRIPT_DIR/sw-status.sh" "$@" ;;
+        help|*) echo "Usage: shipwright observe {vitals|dora|retro|stream|activity|replay|status}"; exit 1 ;;
+    esac
+}
+
+route_release() {
+    local subcmd="${1:-help}"
+    shift 2>/dev/null || true
+    case "$subcmd" in
+        release)          exec "$SCRIPT_DIR/sw-release.sh" "$@" ;;
+        release-manager)  exec "$SCRIPT_DIR/sw-release-manager.sh" "$@" ;;
+        changelog)        exec "$SCRIPT_DIR/sw-changelog.sh" "$@" ;;
+        deploy|deploys)   exec "$SCRIPT_DIR/sw-github-deploy.sh" "$@" ;;
+        help|*) echo "Usage: shipwright release {release|release-manager|changelog|deploy}"; exit 1 ;;
+    esac
+}
+
+route_intel() {
+    local subcmd="${1:-help}"
+    shift 2>/dev/null || true
+    case "$subcmd" in
+        predict)      exec "$SCRIPT_DIR/sw-predictive.sh" "$@" ;;
+        intelligence) exec "$SCRIPT_DIR/sw-intelligence.sh" "$@" ;;
+        strategic)    exec "$SCRIPT_DIR/sw-strategic.sh" "$@" ;;
+        optimize)     exec "$SCRIPT_DIR/sw-self-optimize.sh" "$@" ;;
+        help|*) echo "Usage: shipwright intel {predict|intelligence|strategic|optimize}"; exit 1 ;;
+    esac
+}
+
 # ─── Command Router ──────────────────────────────────────────────────────────
 
 main() {
@@ -239,6 +313,13 @@ main() {
     shift 2>/dev/null || true
 
     case "$cmd" in
+        # Command groups
+        agent)          route_agent "$@" ;;
+        quality)        route_quality "$@" ;;
+        observe)        route_observe "$@" ;;
+        release)        route_release "$@" ;;
+        intel)          route_intel "$@" ;;
+
         session)
             check_tmux
             check_in_tmux

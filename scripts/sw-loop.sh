@@ -57,6 +57,7 @@ MAX_ITERATIONS_EXPLICIT=false
 MAX_RESTARTS=0
 SESSION_RESTART=false
 RESTART_COUNT=0
+REPO_OVERRIDE=""
 VERSION="2.0.0"
 
 # ─── Flexible Iteration Defaults ────────────────────────────────────────────
@@ -86,6 +87,8 @@ show_help() {
     echo -e "  ${CYAN}shipwright loop${RESET} \"<goal>\" [options]"
     echo ""
     echo -e "${BOLD}OPTIONS${RESET}"
+    echo -e "  ${CYAN}--repo <path>${RESET}             Change to directory before running (must be a git repo)"
+    echo -e "  ${CYAN}--local${RESET}                   Disable GitHub operations (local-only mode)"
     echo -e "  ${CYAN}--max-iterations${RESET} N       Max loop iterations (default: 20)"
     echo -e "  ${CYAN}--test-cmd${RESET} \"cmd\"         Test command to run between iterations"
     echo -e "  ${CYAN}--fast-test-cmd${RESET} \"cmd\"      Fast/subset test command (alternates with full)"
@@ -135,6 +138,16 @@ show_help() {
 
 while [[ $# -gt 0 ]]; do
     case "$1" in
+        --repo)
+            REPO_OVERRIDE="${2:-}"
+            [[ -z "$REPO_OVERRIDE" ]] && { error "Missing value for --repo"; exit 1; }
+            shift 2
+            ;;
+        --repo=*) REPO_OVERRIDE="${1#--repo=}"; shift ;;
+        --local)
+            # Skip GitHub operations in loop
+            export NO_GITHUB=true
+            shift ;;
         --max-iterations)
             MAX_ITERATIONS="${2:-}"
             MAX_ITERATIONS_EXPLICIT=true
@@ -273,6 +286,23 @@ if ! $RESUME && [[ -z "$GOAL" ]]; then
     echo -e "  ${DIM}shipwright loop \"Build user auth with JWT\"${RESET}"
     echo -e "  ${DIM}shipwright loop --resume${RESET}"
     exit 1
+fi
+
+# Handle --repo flag: change to directory before running
+if [[ -n "$REPO_OVERRIDE" ]]; then
+    if [[ ! -d "$REPO_OVERRIDE" ]]; then
+        error "Directory does not exist: $REPO_OVERRIDE"
+        exit 1
+    fi
+    if ! cd "$REPO_OVERRIDE" 2>/dev/null; then
+        error "Cannot cd to: $REPO_OVERRIDE"
+        exit 1
+    fi
+    if ! git rev-parse --show-toplevel >/dev/null 2>&1; then
+        error "Not a git repository: $REPO_OVERRIDE"
+        exit 1
+    fi
+    info "Using repository: $(pwd)"
 fi
 
 if ! command -v claude &>/dev/null; then

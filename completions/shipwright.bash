@@ -9,12 +9,32 @@ _shipwright_completions() {
     cur="${COMP_WORDS[COMP_CWORD]}"
     prev="${COMP_WORDS[COMP_CWORD-1]}"
 
-    # Top-level commands
-    local commands="init setup session status ps logs templates doctor cleanup reaper upgrade loop pipeline worktree prep daemon fleet memory cost db fix dashboard jira linear tracker heartbeat checkpoint webhook decompose connect remote launchd intelligence optimize predict adversarial simulate architecture vitals docs tmux github checks deploys pr context help version"
+    # Top-level commands (includes groups and flat commands)
+    local commands="agent quality observe release intel init setup session status ps logs templates doctor cleanup reaper upgrade loop pipeline worktree prep daemon fleet memory cost db fix dashboard jira linear tracker heartbeat checkpoint webhook decompose connect remote launchd intelligence optimize predict adversarial simulate architecture vitals docs tmux github checks deploys pr context help version"
 
     case "$prev" in
         shipwright|sw|cct)
             COMPREPLY=( $(compgen -W "$commands" -- "$cur") )
+            return 0
+            ;;
+        agent)
+            COMPREPLY=( $(compgen -W "recruit swarm standup guild oversight" -- "$cur") )
+            return 0
+            ;;
+        quality)
+            COMPREPLY=( $(compgen -W "code-review security-audit testgen hygiene" -- "$cur") )
+            return 0
+            ;;
+        observe)
+            COMPREPLY=( $(compgen -W "vitals dora retro stream activity replay status" -- "$cur") )
+            return 0
+            ;;
+        release)
+            COMPREPLY=( $(compgen -W "release release-manager changelog deploy" -- "$cur") )
+            return 0
+            ;;
+        intel)
+            COMPREPLY=( $(compgen -W "predict intelligence strategic optimize" -- "$cur") )
             return 0
             ;;
         pipeline)
@@ -111,13 +131,13 @@ _shipwright_completions() {
     if [[ "$cur" == -* ]]; then
         case "${COMP_WORDS[1]}" in
             pipeline)
-                COMPREPLY=( $(compgen -W "--issue --goal --worktree --template --skip-gates" -- "$cur") )
+                COMPREPLY=( $(compgen -W "--issue --goal --repo --local --worktree --template --skip-gates --test-cmd --model --agents --base --reviewers --labels --no-github --no-github-label --ci --ignore-budget --dry-run --slack-webhook --self-heal --max-iterations --max-restarts --fast-test-cmd --completed-stages" -- "$cur") )
                 ;;
             prep)
                 COMPREPLY=( $(compgen -W "--check --with-claude --verbose" -- "$cur") )
                 ;;
             loop)
-                COMPREPLY=( $(compgen -W "--test-cmd --max-iterations --model --agents --audit --audit-agent --quality-gates --definition-of-done --resume --skip-permissions" -- "$cur") )
+                COMPREPLY=( $(compgen -W "--repo --local --test-cmd --fast-test-cmd --fast-test-interval --max-iterations --model --agents --roles --worktree --skip-permissions --max-turns --resume --max-restarts --verbose --audit --audit-agent --quality-gates --definition-of-done --no-auto-extend --extension-size --max-extensions" -- "$cur") )
                 ;;
             fix)
                 COMPREPLY=( $(compgen -W "--repos" -- "$cur") )

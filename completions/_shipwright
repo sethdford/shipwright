@@ -7,6 +7,11 @@
 _shipwright() {
     local -a commands
     commands=(
+        'agent:Agent management (recruit, swarm, standup, guild, oversight)'
+        'quality:Quality & review (code-review, security-audit, testgen, hygiene)'
+        'observe:Observability (vitals, dora, retro, stream, activity, replay)'
+        'release:Release & deploy (release, release-manager, changelog, deploy)'
+        'intel:Intelligence (predict, intelligence, strategic, optimize)'
         'init:Quick tmux setup — one command, no prompts'
         'setup:Guided setup — prerequisites, init, doctor'
         'session:Create a new tmux window for a Claude team'
@@ -39,13 +44,6 @@ _shipwright() {
         'connect:Team connect — sync local state'
         'remote:Remote machines — manage distributed workers'
         'launchd:Process supervision — auto-start on boot'
-        'intelligence:Intelligence engine analysis'
-        'optimize:Self-optimization based on DORA'
-        'predict:Predictive risk assessment'
-        'adversarial:Adversarial Agent Code Review'
-        'simulate:Developer simulation workflow'
-        'architecture:Architecture Model & Enforcer'
-        'vitals:Pipeline vitals — real-time scoring'
         'docs:Documentation keeper — auto-sync docs'
         'tmux:tmux health — doctor, install, fix'
         'github:GitHub context — repo metadata'
@@ -62,7 +60,42 @@ _shipwright() {
     local -a checkpoint_cmds connect_cmds remote_cmds launchd_cmds
     local -a dashboard_cmds github_cmds checks_cmds deploys_cmds docs_cmds
     local -a tmux_cmds decompose_cmds pr_cmds
+    local -a agent_cmds quality_cmds observe_cmds release_cmds intel_cmds
 
+    agent_cmds=(
+        'recruit:Agent recruitment & talent management'
+        'swarm:Dynamic agent swarm management'
+        'standup:Automated daily standups'
+        'guild:Knowledge guilds & cross-team learning'
+        'oversight:Quality oversight board'
+    )
+    quality_cmds=(
+        'code-review:Clean code & architecture analysis'
+        'security-audit:Comprehensive security auditing'
+        'testgen:Autonomous test generation'
+        'hygiene:Repository organization & cleanup'
+    )
+    observe_cmds=(
+        'vitals:Pipeline vitals — real-time scoring'
+        'dora:DORA metrics dashboard'
+        'retro:Sprint retrospective engine'
+        'stream:Live terminal output streaming'
+        'activity:Live agent activity stream'
+        'replay:Pipeline DVR — view past runs'
+        'status:Team status dashboard'
+    )
+    release_cmds=(
+        'release:Release train automation'
+        'release-manager:Autonomous release pipeline'
+        'changelog:Automated release notes'
+        'deploy:Deployments — deployment history'
+    )
+    intel_cmds=(
+        'predict:Predictive risk assessment'
+        'intelligence:Intelligence engine analysis'
+        'strategic:Strategic intelligence agent'
+        'optimize:Self-optimization based on DORA'
+    )
     pipeline_cmds=(
         'start:Start a new pipeline run'
         'resume:Resume from last stage'
@@ -193,6 +226,21 @@ _shipwright() {
             ;;
         args)
             case "${words[1]}" in
+                agent)
+                    _describe -t agent-cmds 'agent command' agent_cmds
+                    ;;
+                quality)
+                    _describe -t quality-cmds 'quality command' quality_cmds
+                    ;;
+                observe)
+                    _describe -t observe-cmds 'observe command' observe_cmds
+                    ;;
+                release)
+                    _describe -t release-cmds 'release command' release_cmds
+                    ;;
+                intel)
+                    _describe -t intel-cmds 'intel command' intel_cmds
+                    ;;
                 pipeline)
                     _describe -t pipeline-cmds 'pipeline command' pipeline_cmds
                     _arguments '*:options:_pipeline_options'
@@ -268,6 +316,8 @@ _shipwright() {
                 loop)
                     _arguments \
                         '1:goal:' \
+                        '--repo[Directory path]:directory:_directories' \
+                        '--local[Local-only mode (no GitHub)]' \
                         '--test-cmd[Test command]:command:' \
                         '--max-iterations[Max iterations]:count:' \
                         '--model[Model to use]:model:(opus sonnet haiku)' \
@@ -312,6 +362,8 @@ _pipeline_options() {
     _arguments \
         '--issue[GitHub issue number]:issue:' \
         '--goal[Goal description]:goal:' \
+        '--repo[Directory path]:directory:_directories' \
+        '--local[Local-only mode (no GitHub)]' \
         '--worktree[Use isolated worktree]' \
         '--template[Pipeline template]:file:_files' \
         '--skip-gates[Auto-proceed all gates]'
