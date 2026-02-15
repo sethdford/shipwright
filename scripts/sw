@@ -82,6 +82,7 @@ show_help() {
     echo -e "  ${CYAN}worktree${RESET} <cmd>         Manage git worktrees for agent isolation"
     echo -e "  ${CYAN}prep${RESET} [options]         ${BOLD}Repo preparation${RESET} — generate .claude/ configs for agents"
     echo -e "  ${CYAN}daemon${RESET} <cmd>           ${BOLD}Issue watcher${RESET} — auto-process GitHub issues"
+    echo -e "  ${CYAN}autonomous|auto${RESET} <cmd>  ${BOLD}Autonomous loop${RESET} — AI-building-AI: analyze, create, build, learn"
     echo -e "  ${CYAN}memory${RESET} <cmd>           ${BOLD}Persistent memory${RESET} — learn from every pipeline run"
     echo -e "  ${CYAN}instrument${RESET} <cmd>       ${BOLD}Pipeline instrumentation${RESET} — record predicted vs actual metrics"
     echo -e "  ${CYAN}cost${RESET} <cmd>             ${BOLD}Cost intelligence${RESET} — track tokens, budgets, model routing"
@@ -274,6 +275,9 @@ main() {
             ;;
         daemon)
             exec "$SCRIPT_DIR/sw-daemon.sh" "$@"
+            ;;
+        autonomous|auto)
+            exec "$SCRIPT_DIR/sw-autonomous.sh" "$@"
             ;;
         memory)
             exec "$SCRIPT_DIR/sw-memory.sh" "$@"
