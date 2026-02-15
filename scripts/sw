@@ -87,6 +87,7 @@ show_help() {
     echo -e "  ${CYAN}cost${RESET} <cmd>             ${BOLD}Cost intelligence${RESET} — track tokens, budgets, model routing"
     echo -e "  ${CYAN}adaptive${RESET} <cmd>         ${BOLD}Adaptive tuning${RESET} — data-driven pipeline defaults from historical runs"
     echo -e "  ${CYAN}regression${RESET} <cmd>       ${BOLD}Regression detection${RESET} — detect regressions after merge"
+    echo -e "  ${CYAN}incident${RESET} <cmd>        ${BOLD}Incident commander${RESET} — detect failures, triage, remediate"
     echo -e "  ${CYAN}db${RESET} <cmd>               ${BOLD}SQLite persistence${RESET} — events, runs, developers, metrics"
     echo -e "  ${CYAN}deps${RESET} <cmd>            ${BOLD}Dependency updates${RESET} — scan, classify, test, merge Dependabot/Renovate PRs"
     echo -e "  ${CYAN}fleet${RESET} <cmd>           ${BOLD}Multi-repo fleet${RESET} — orchestrate daemons across repos"
@@ -289,6 +290,9 @@ main() {
             ;;
         regression)
             exec "$SCRIPT_DIR/sw-regression.sh" "$@"
+            ;;
+        incident)
+            exec "$SCRIPT_DIR/sw-incident.sh" "$@"
             ;;
         db)
             exec "$SCRIPT_DIR/sw-db.sh" "$@"
