@@ -66,8 +66,8 @@
         "merge_method": "squash",
         "wait_ci_timeout_s": 600,
         "auto_delete_branch": true,
-        "auto_merge": true,
-        "auto_approve": true
+        "auto_merge": false,
+        "auto_approve": false
       }
     },
     {

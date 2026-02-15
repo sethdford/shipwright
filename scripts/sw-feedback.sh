@@ -220,6 +220,12 @@ cmd_create_issue() {
 
     info "Creating GitHub issue for regression..."
 
+    # Check if NO_GITHUB is set before attempting GitHub operations
+    if [[ "${NO_GITHUB:-}" == "true" || "${NO_GITHUB:-}" == "1" ]]; then
+        warn "NO_GITHUB set — skipping GitHub issue creation"
+        return 0
+    fi
+
     # Get repo info
     local owner_repo
     owner_repo=$(get_owner_repo) || {
@@ -266,12 +272,6 @@ git show $regression_commit
 **Component**: $0
 EOF
     )
-
-    # Check if gh is available and NO_GITHUB is not set
-    if [[ "${NO_GITHUB:-}" == "true" || "${NO_GITHUB:-}" == "1" ]]; then
-        warn "NO_GITHUB set — skipping GitHub issue creation"
-        return 0
-    fi
 
     if ! command -v gh &>/dev/null; then
         error "gh CLI not found — cannot create issue"

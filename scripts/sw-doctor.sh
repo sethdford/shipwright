@@ -944,6 +944,54 @@ else
 fi
 
 # ═════════════════════════════════════════════════════════════════════════════
+# 15. Database Health
+# ═════════════════════════════════════════════════════════════════════════════
+echo ""
+echo -e "${PURPLE}${BOLD}  DATABASE HEALTH${RESET}"
+echo -e "${DIM}  ──────────────────────────────────────────${RESET}"
+
+if command -v sqlite3 &>/dev/null; then
+    _sqlite_ver="$(sqlite3 --version 2>/dev/null | cut -d' ' -f1 || echo "unknown")"
+    check_pass "sqlite3 ${_sqlite_ver}"
+
+    _db_file="${HOME}/.shipwright/shipwright.db"
+    if [[ -f "$_db_file" ]]; then
+        check_pass "Database exists: ${DIM}${_db_file}${RESET}"
+
+        # Check WAL mode
+        _wal_mode=$(sqlite3 "$_db_file" "PRAGMA journal_mode;" 2>/dev/null || echo "unknown")
+        if [[ "$_wal_mode" == "wal" ]]; then
+            check_pass "WAL mode enabled"
+        else
+            check_warn "WAL mode not enabled (current: ${_wal_mode})"
+        fi
+
+        # Check schema version
+        _schema_ver=$(sqlite3 "$_db_file" "SELECT MAX(version) FROM _schema;" 2>/dev/null || echo "0")
+        if [[ "${_schema_ver:-0}" -ge 2 ]]; then
+            check_pass "Schema version: ${_schema_ver}"
+        else
+            check_warn "Schema version ${_schema_ver:-0} — expected >= 2. Run: shipwright db init"
+        fi
+
+        # Check file size
+        _db_size=$(ls -l "$_db_file" 2>/dev/null | awk '{print $5}')
+        _db_size_mb=$(awk -v s="${_db_size:-0}" 'BEGIN { printf "%.1f", s / 1048576 }')
+        check_pass "Database size: ${_db_size_mb} MB"
+
+        # Check table counts
+        _event_count=$(sqlite3 "$_db_file" "SELECT COUNT(*) FROM events;" 2>/dev/null || echo "0")
+        _run_count=$(sqlite3 "$_db_file" "SELECT COUNT(*) FROM pipeline_runs;" 2>/dev/null || echo "0")
+        info "  Tables: events=${_event_count} pipeline_runs=${_run_count}"
+    else
+        check_warn "Database not initialized — run: shipwright db init"
+    fi
+else
+    check_warn "sqlite3 not installed — DB features disabled"
+    echo -e "    ${DIM}Install: brew install sqlite (macOS) or apt install sqlite3 (Linux)${RESET}"
+fi
+
+# ═════════════════════════════════════════════════════════════════════════════
 # Summary
 # ═════════════════════════════════════════════════════════════════════════════
 echo ""

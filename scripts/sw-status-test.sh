@@ -184,9 +184,9 @@ else
 fi
 
 # ─── Test 2: All top-level keys present ───────────────────────────────────────
-expected_keys="connected_developers daemon heartbeats issue_tracker remote_machines task_lists teams timestamp tmux_windows version"
+expected_keys="connected_developers daemon database heartbeats issue_tracker remote_machines task_lists teams timestamp tmux_windows version"
 actual_keys=$(echo "$json_output" | jq -r 'keys[]' 2>/dev/null | sort | tr '\n' ' ' | sed 's/ $//')
-assert_eq "All 10 top-level keys present" "$expected_keys" "$actual_keys"
+assert_eq "All 11 top-level keys present" "$expected_keys" "$actual_keys"
 
 # ─── Test 3: Version field ────────────────────────────────────────────────────
 version=$(echo "$json_output" | jq -r '.version' 2>/dev/null)

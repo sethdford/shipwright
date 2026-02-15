@@ -70,6 +70,12 @@ COST_DIR="${HOME}/.shipwright"
 COST_FILE="${COST_DIR}/costs.json"
 BUDGET_FILE="${COST_DIR}/budget.json"
 
+# Source sw-db.sh for SQLite cost functions (if available)
+_COST_SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+if [[ -f "$_COST_SCRIPT_DIR/sw-db.sh" ]]; then
+    source "$_COST_SCRIPT_DIR/sw-db.sh" 2>/dev/null || true
+fi
+
 ensure_cost_dir() {
     mkdir -p "$COST_DIR"
     [[ -f "$COST_FILE" ]] || echo '{"entries":[],"summary":{}}' > "$COST_FILE"
@@ -143,6 +149,7 @@ cost_calculate() {
 
 # cost_record <input_tokens> <output_tokens> <model> <stage> [issue]
 # Records a cost entry to the cost file and events log.
+# Tries SQLite first, always writes to JSON for backward compat.
 cost_record() {
     local input_tokens="${1:-0}"
     local output_tokens="${2:-0}"
@@ -155,6 +162,12 @@ cost_record() {
     local cost_usd
     cost_usd=$(cost_calculate "$input_tokens" "$output_tokens" "$model")
 
+    # Try SQLite first
+    if type db_record_cost &>/dev/null; then
+        db_record_cost "$input_tokens" "$output_tokens" "$model" "$stage" "$cost_usd" "$issue" 2>/dev/null || true
+    fi
+
+    # Always write to JSON (dual-write period)
     (
         if command -v flock &>/dev/null; then
             flock -w 10 200 2>/dev/null || { warn "Cost lock timeout"; }
@@ -197,9 +210,20 @@ cost_check_budget() {
 
     ensure_cost_dir
 
+    # Try DB for budget info
     local budget_enabled budget_usd
-    budget_enabled=$(jq -r '.enabled' "$BUDGET_FILE" 2>/dev/null || echo "false")
-    budget_usd=$(jq -r '.daily_budget_usd' "$BUDGET_FILE" 2>/dev/null || echo "0")
+    if type db_get_budget &>/dev/null && type db_available &>/dev/null && db_available 2>/dev/null; then
+        local db_budget
+        db_budget=$(db_get_budget 2>/dev/null || true)
+        if [[ -n "$db_budget" ]]; then
+            budget_enabled=$(echo "$db_budget" | cut -d'|' -f2)
+            budget_usd=$(echo "$db_budget" | cut -d'|' -f1)
+            [[ "$budget_enabled" == "1" ]] && budget_enabled="true"
+        fi
+    fi
+    # Fallback to JSON
+    budget_enabled="${budget_enabled:-$(jq -r '.enabled' "$BUDGET_FILE" 2>/dev/null || echo "false")}"
+    budget_usd="${budget_usd:-$(jq -r '.daily_budget_usd' "$BUDGET_FILE" 2>/dev/null || echo "0")}"
 
     if [[ "$budget_enabled" != "true" || "$budget_usd" == "0" ]]; then
         return 0
@@ -244,6 +268,17 @@ cost_check_budget() {
 cost_remaining_budget() {
     ensure_cost_dir
 
+    # Try DB for remaining budget (single query)
+    if type db_remaining_budget &>/dev/null && type db_available &>/dev/null && db_available 2>/dev/null; then
+        local db_result
+        db_result=$(db_remaining_budget 2>/dev/null || true)
+        if [[ -n "$db_result" ]]; then
+            echo "$db_result"
+            return 0
+        fi
+    fi
+
+    # Fallback to JSON
     local budget_enabled budget_usd
     budget_enabled=$(jq -r '.enabled' "$BUDGET_FILE" 2>/dev/null || echo "false")
     budget_usd=$(jq -r '.daily_budget_usd' "$BUDGET_FILE" 2>/dev/null || echo "0")
@@ -792,6 +827,12 @@ budget_set() {
 
     ensure_cost_dir
 
+    # Write to DB if available
+    if type db_set_budget &>/dev/null; then
+        db_set_budget "$amount" 2>/dev/null || true
+    fi
+
+    # Always write to JSON (dual-write)
     local tmp_file
     tmp_file=$(mktemp)
     jq --arg amt "$amount" \

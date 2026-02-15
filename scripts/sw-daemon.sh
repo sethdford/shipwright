@@ -40,6 +40,10 @@ RESET='\033[0m'
 # shellcheck source=sw-pipeline-vitals.sh
 [[ -f "$SCRIPT_DIR/sw-pipeline-vitals.sh" ]] && source "$SCRIPT_DIR/sw-pipeline-vitals.sh"
 
+# ─── SQLite Persistence (optional) ──────────────────────────────────────────
+# shellcheck source=sw-db.sh
+[[ -f "$SCRIPT_DIR/sw-db.sh" ]] && source "$SCRIPT_DIR/sw-db.sh"
+
 # ─── GitHub API Modules (optional) ────────────────────────────────────────
 # shellcheck source=sw-github-graphql.sh
 [[ -f "$SCRIPT_DIR/sw-github-graphql.sh" ]] && source "$SCRIPT_DIR/sw-github-graphql.sh"
@@ -1887,6 +1891,14 @@ _Progress updates will appear below as the pipeline advances through each stage.
 
 daemon_track_job() {
     local issue_num="$1" pid="$2" worktree="$3" title="${4:-}" repo="${5:-}" goal="${6:-}"
+
+    # Write to SQLite (non-blocking, best-effort)
+    if type db_save_job &>/dev/null; then
+        local job_id="daemon-${issue_num}-$(now_epoch)"
+        db_save_job "$job_id" "$issue_num" "$title" "$pid" "$worktree" "" "${PIPELINE_TEMPLATE:-autonomous}" "$goal" 2>/dev/null || true
+    fi
+
+    # Always write to JSON state file (primary for now)
     locked_state_update \
         --argjson num "$issue_num" \
         --argjson pid "$pid" \
@@ -1974,6 +1986,16 @@ daemon_reap_completed() {
         local dur_s=0
         [[ "$start_epoch" -gt 0 ]] && dur_s=$((end_epoch - start_epoch))
         emit_event "daemon.reap" "issue=$issue_num" "result=$result_str" "duration_s=$dur_s"
+
+        # Update SQLite (mark job complete/failed)
+        if type db_complete_job &>/dev/null && type db_fail_job &>/dev/null; then
+            local _db_job_id="daemon-${issue_num}-${start_epoch}"
+            if [[ "$exit_code" -eq 0 ]]; then
+                db_complete_job "$_db_job_id" "$result_str" 2>/dev/null || true
+            else
+                db_fail_job "$_db_job_id" "$result_str" 2>/dev/null || true
+            fi
+        fi
 
         if [[ "$exit_code" -eq 0 ]]; then
             daemon_on_success "$issue_num" "$duration_str"
@@ -5252,6 +5274,11 @@ daemon_start() {
 
     # Remove stale shutdown flag
     rm -f "$SHUTDOWN_FLAG"
+
+    # Initialize SQLite database (if available)
+    if type init_schema &>/dev/null; then
+        init_schema 2>/dev/null || true
+    fi
 
     # Initialize state
     init_state

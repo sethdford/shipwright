@@ -64,6 +64,82 @@ STRATEGIC_MAX_TOKENS=4096
 STRATEGIC_STRATEGY_LINES=200
 STRATEGIC_LABELS="auto-patrol,ready-to-build,strategic,shipwright"
 
+# ─── Semantic Dedup ─────────────────────────────────────────────────────────
+# Cache of existing issue titles (open + recently closed) loaded at cycle start.
+STRATEGIC_TITLE_CACHE=""
+STRATEGIC_OVERLAP_THRESHOLD=70  # Skip if >70% word overlap
+
+# Compute word-overlap similarity between two titles (0-100).
+# Uses lowercase word sets, ignoring common stop words.
+strategic_word_overlap() {
+    local title_a="$1"
+    local title_b="$2"
+
+    # Normalize: lowercase, strip punctuation, split to words
+    local words_a words_b
+    words_a=$(printf '%s' "$title_a" | tr '[:upper:]' '[:lower:]' | tr -cs '[:alnum:]' '\n' | sort -u | grep -vE '^(a|an|the|and|or|for|to|in|of|is|it|by|on|at|with|from)$' | grep -v '^$' || true)
+    words_b=$(printf '%s' "$title_b" | tr '[:upper:]' '[:lower:]' | tr -cs '[:alnum:]' '\n' | sort -u | grep -vE '^(a|an|the|and|or|for|to|in|of|is|it|by|on|at|with|from)$' | grep -v '^$' || true)
+
+    [[ -z "$words_a" || -z "$words_b" ]] && echo "0" && return 0
+
+    # Count words in each set
+    local count_a count_b
+    count_a=$(printf '%s\n' "$words_a" | wc -l | tr -d ' ')
+    count_b=$(printf '%s\n' "$words_b" | wc -l | tr -d ' ')
+
+    # Count shared words (intersection)
+    local shared
+    shared=$(comm -12 <(printf '%s\n' "$words_a") <(printf '%s\n' "$words_b") | wc -l | tr -d ' ')
+
+    # Overlap = shared / min(count_a, count_b) * 100
+    local min_count
+    if [[ "$count_a" -le "$count_b" ]]; then
+        min_count="$count_a"
+    else
+        min_count="$count_b"
+    fi
+
+    [[ "$min_count" -eq 0 ]] && echo "0" && return 0
+
+    echo $(( shared * 100 / min_count ))
+}
+
+# Load all open + recently closed issue titles into cache.
+strategic_load_title_cache() {
+    STRATEGIC_TITLE_CACHE=""
+
+    if [[ "${NO_GITHUB:-false}" == "true" ]]; then
+        return 0
+    fi
+
+    local open_titles closed_titles
+    open_titles=$(gh issue list --state open --json title --jq '.[].title' 2>/dev/null || echo "")
+    closed_titles=$(gh issue list --state closed --limit 30 --json title --jq '.[].title' 2>/dev/null || echo "")
+
+    STRATEGIC_TITLE_CACHE="${open_titles}
+${closed_titles}"
+}
+
+# Check if a title has >threshold% overlap with any cached title.
+# Returns 0 (true) if a near-duplicate is found, 1 (false) otherwise.
+strategic_is_near_duplicate() {
+    local new_title="$1"
+
+    [[ -z "$STRATEGIC_TITLE_CACHE" ]] && return 1
+
+    while IFS= read -r existing_title; do
+        [[ -z "$existing_title" ]] && continue
+        local overlap
+        overlap=$(strategic_word_overlap "$new_title" "$existing_title")
+        if [[ "$overlap" -gt "$STRATEGIC_OVERLAP_THRESHOLD" ]]; then
+            info "  Near-duplicate (${overlap}% overlap): \"${existing_title}\"" >&2
+            return 0
+        fi
+    done <<< "$STRATEGIC_TITLE_CACHE"
+
+    return 1
+}
+
 # ─── Cooldown Check ──────────────────────────────────────────────────────────
 strategic_check_cooldown() {
     local events_file="${EVENTS_FILE:-${HOME}/.shipwright/events.jsonl}"
@@ -468,6 +544,12 @@ strategic_create_issue() {
         return 1
     fi
 
+    # Semantic dedup: check word overlap against cached titles
+    if strategic_is_near_duplicate "$title"; then
+        info "  Skipping near-duplicate: ${title}" >&2
+        return 1
+    fi
+
     # Dry-run mode
     if [[ "${NO_GITHUB:-false}" == "true" ]]; then
         info "  [dry-run] Would create: ${title}" >&2
@@ -524,6 +606,9 @@ BODY_EOF
     }
 
     emit_event "strategic.issue_created" "title=$title" "priority=$priority" "complexity=$complexity"
+    # Add to title cache so subsequent issues in this cycle don't duplicate
+    STRATEGIC_TITLE_CACHE="${STRATEGIC_TITLE_CACHE}
+${title}"
     # Output to stderr so it doesn't pollute the parse_and_create return value
     success "  Created issue: ${title} (${issue_url})" >&2
     return 0
@@ -556,6 +641,10 @@ strategic_run() {
         error "CLAUDE_CODE_OAUTH_TOKEN not set — strategic analysis requires Claude access"
         return 1
     fi
+
+    # Load existing issue titles for semantic dedup
+    info "Loading issue title cache for dedup..."
+    strategic_load_title_cache
 
     # Build prompt with all context
     info "Gathering context..."

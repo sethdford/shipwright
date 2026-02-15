@@ -2493,6 +2493,19 @@ Coverage baseline: ${coverage_baseline}% — do not decrease coverage."
     }
     parse_claude_tokens "$_token_log"
 
+    # Read accumulated token counts from build loop (written by sw-loop.sh)
+    local _loop_token_file="${PROJECT_ROOT}/.claude/loop-logs/loop-tokens.json"
+    if [[ -f "$_loop_token_file" ]] && command -v jq &>/dev/null; then
+        local _loop_in _loop_out
+        _loop_in=$(jq -r '.input_tokens // 0' "$_loop_token_file" 2>/dev/null || echo "0")
+        _loop_out=$(jq -r '.output_tokens // 0' "$_loop_token_file" 2>/dev/null || echo "0")
+        TOTAL_INPUT_TOKENS=$(( TOTAL_INPUT_TOKENS + ${_loop_in:-0} ))
+        TOTAL_OUTPUT_TOKENS=$(( TOTAL_OUTPUT_TOKENS + ${_loop_out:-0} ))
+        if [[ "${_loop_in:-0}" -gt 0 || "${_loop_out:-0}" -gt 0 ]]; then
+            info "Build loop tokens: in=${_loop_in} out=${_loop_out}"
+        fi
+    fi
+
     # Count commits made during build
     local commit_count
     commit_count=$(git log --oneline "${BASE_BRANCH}..HEAD" 2>/dev/null | wc -l | xargs)

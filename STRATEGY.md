@@ -105,10 +105,10 @@ Open source growth through demonstrated value.
 
 | Metric                                  | Current | Target  |
 | --------------------------------------- | ------- | ------- |
-| Pipeline success rate                   | ~60%    | >80%    |
+| Pipeline success rate                   | ~77%    | >85%    |
 | Avg pipeline duration                   | ~90 min | <60 min |
 | Setup time (new repo)                   | ~30 min | <5 min  |
-| Test coverage (scripts with tests)      | ~70%    | >90%    |
+| Test coverage (scripts with tests)      | ~80%    | >90%    |
 | Cost per successful pipeline            | ~$5-10  | <$5     |
 | Mean time to recovery (failed pipeline) | ~2h     | <30 min |
 

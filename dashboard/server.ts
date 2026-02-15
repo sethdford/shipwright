@@ -12,6 +12,7 @@ import {
 } from "fs";
 import { join, extname } from "path";
 import { execSync } from "child_process";
+import { Database } from "bun:sqlite";
 
 // ─── Config ──────────────────────────────────────────────────────────
 const PORT = parseInt(
@@ -39,6 +40,107 @@ const DASHBOARD_REPO = process.env.DASHBOARD_REPO || ""; // "owner/repo"
 const SESSION_SECRET = process.env.SESSION_SECRET || crypto.randomUUID();
 const SESSION_TTL_MS = 24 * 60 * 60 * 1000; // 24 hours
 const ALLOWED_PERMISSIONS = ["admin", "write"];
+
+// ─── SQLite Database (optional) ──────────────────────────────────────
+const DB_FILE = join(HOME, ".shipwright", "shipwright.db");
+let db: Database | null = null;
+
+function getDb(): Database | null {
+  if (db) return db;
+  try {
+    if (!existsSync(DB_FILE)) return null;
+    db = new Database(DB_FILE, { readonly: true });
+    db.exec("PRAGMA journal_mode=WAL;");
+    return db;
+  } catch {
+    return null;
+  }
+}
+
+function dbQueryEvents(since?: number, limit = 200): DaemonEvent[] {
+  const conn = getDb();
+  if (!conn) return [];
+  try {
+    const cutoff = since || 0;
+    const rows = conn
+      .query(
+        `SELECT ts, ts_epoch, type, job_id, stage, status, duration_secs, metadata
+         FROM events WHERE ts_epoch >= ? ORDER BY ts_epoch DESC LIMIT ?`,
+      )
+      .all(cutoff, limit) as Array<Record<string, unknown>>;
+    return rows.map((r) => {
+      const base: DaemonEvent = {
+        ts: r.ts as string,
+        ts_epoch: r.ts_epoch as number,
+        type: r.type as string,
+      };
+      if (r.job_id)
+        base.issue = parseInt(String(r.job_id).replace(/\D/g, "")) || undefined;
+      if (r.stage) base.stage = r.stage as string;
+      if (r.duration_secs) base.duration_s = r.duration_secs as number;
+      if (r.status) base.result = r.status as string;
+      if (r.metadata) {
+        try {
+          Object.assign(base, JSON.parse(r.metadata as string));
+        } catch {
+          /* ignore malformed metadata */
+        }
+      }
+      return base;
+    });
+  } catch {
+    return [];
+  }
+}
+
+function dbQueryJobs(status?: string): Array<Record<string, unknown>> {
+  const conn = getDb();
+  if (!conn) return [];
+  try {
+    if (status) {
+      return conn
+        .query(
+          "SELECT * FROM daemon_state WHERE status = ? ORDER BY started_at DESC",
+        )
+        .all(status) as Array<Record<string, unknown>>;
+    }
+    return conn
+      .query("SELECT * FROM daemon_state ORDER BY started_at DESC LIMIT 50")
+      .all() as Array<Record<string, unknown>>;
+  } catch {
+    return [];
+  }
+}
+
+function dbQueryCostsToday(): { total: number; count: number } {
+  const conn = getDb();
+  if (!conn) return { total: 0, count: 0 };
+  try {
+    const todayStart = new Date();
+    todayStart.setUTCHours(0, 0, 0, 0);
+    const epoch = Math.floor(todayStart.getTime() / 1000);
+    const row = conn
+      .query(
+        "SELECT COALESCE(SUM(cost_usd), 0) as total, COUNT(*) as count FROM cost_entries WHERE ts_epoch >= ?",
+      )
+      .get(epoch) as { total: number; count: number } | null;
+    return row || { total: 0, count: 0 };
+  } catch {
+    return { total: 0, count: 0 };
+  }
+}
+
+function dbQueryHeartbeats(): Array<Record<string, unknown>> {
+  const conn = getDb();
+  if (!conn) return [];
+  try {
+    return conn
+      .query("SELECT * FROM heartbeats ORDER BY updated_at DESC")
+      .all() as Array<Record<string, unknown>>;
+  } catch {
+    return [];
+  }
+}
 
 // ─── ANSI helpers ────────────────────────────────────────────────────
 const CYAN = "\x1b[38;2;0;212;255m";
@@ -602,6 +704,11 @@ function broadcastToClients(data: FleetState): void {
 
 // ─── Data Collection ─────────────────────────────────────────────────
 function readEvents(): DaemonEvent[] {
+  // Try SQLite first (faster for large event logs)
+  const dbEvents = dbQueryEvents(0, 10000);
+  if (dbEvents.length > 0) return dbEvents;
+
+  // Fallback to JSONL
   if (!existsSync(EVENTS_FILE)) return [];
   try {
     const content = readFileSync(EVENTS_FILE, "utf-8").trim();
@@ -2608,6 +2715,107 @@ const server = Bun.serve({
       return new Response(JSON.stringify({ events: filtered }), {
         headers: { "Content-Type": "application/json", ...CORS_HEADERS },
       });
+    }
+
+    // ── SQLite DB API endpoints ─────────────────────────────────────
+
+    // REST: Events from DB with since/limit params
+    if (pathname === "/api/db/events") {
+      const since = parseInt(url.searchParams.get("since") || "0");
+      const limit = Math.min(
+        parseInt(url.searchParams.get("limit") || "200"),
+        10000,
+      );
+      const events = dbQueryEvents(since, limit);
+      return new Response(
+        JSON.stringify({
+          events,
+          source: events.length > 0 ? "sqlite" : "none",
+        }),
+        {
+          headers: { "Content-Type": "application/json", ...CORS_HEADERS },
+        },
+      );
+    }
+
+    // REST: Active/completed jobs from DB
+    if (pathname === "/api/db/jobs") {
+      const status = url.searchParams.get("status") || undefined;
+      const jobs = dbQueryJobs(status);
+      return new Response(
+        JSON.stringify({ jobs, source: jobs.length > 0 ? "sqlite" : "none" }),
+        {
+          headers: { "Content-Type": "application/json", ...CORS_HEADERS },
+        },
+      );
+    }
+
+    // REST: Today's cost from DB
+    if (pathname === "/api/db/costs/today") {
+      const costs = dbQueryCostsToday();
+      return new Response(JSON.stringify({ ...costs, source: "sqlite" }), {
+        headers: { "Content-Type": "application/json", ...CORS_HEADERS },
+      });
+    }
+
+    // REST: Heartbeats from DB
+    if (pathname === "/api/db/heartbeats") {
+      const heartbeats = dbQueryHeartbeats();
+      return new Response(
+        JSON.stringify({
+          heartbeats,
+          source: heartbeats.length > 0 ? "sqlite" : "none",
+        }),
+        {
+          headers: { "Content-Type": "application/json", ...CORS_HEADERS },
+        },
+      );
+    }
+
+    // REST: DB health info
+    if (pathname === "/api/db/health") {
+      const conn = getDb();
+      if (!conn) {
+        return new Response(JSON.stringify({ available: false }), {
+          headers: { "Content-Type": "application/json", ...CORS_HEADERS },
+        });
+      }
+      try {
+        const version = conn
+          .query("SELECT MAX(version) as v FROM _schema")
+          .get() as { v: number } | null;
+        const walMode = conn.query("PRAGMA journal_mode").get() as {
+          journal_mode: string;
+        } | null;
+        const eventCount = conn
+          .query("SELECT COUNT(*) as c FROM events")
+          .get() as { c: number } | null;
+        const runCount = conn
+          .query("SELECT COUNT(*) as c FROM pipeline_runs")
+          .get() as { c: number } | null;
+        const costCount = conn
+          .query("SELECT COUNT(*) as c FROM cost_entries")
+          .get() as { c: number } | null;
+
+        return new Response(
+          JSON.stringify({
+            available: true,
+            schema_version: version?.v || 0,
+            wal_mode: walMode?.journal_mode || "unknown",
+            events: eventCount?.c || 0,
+            runs: runCount?.c || 0,
+            costs: costCount?.c || 0,
+          }),
+          { headers: { "Content-Type": "application/json", ...CORS_HEADERS } },
+        );
+      } catch {
+        return new Response(
+          JSON.stringify({ available: false, error: "query failed" }),
+          {
+            headers: { "Content-Type": "application/json", ...CORS_HEADERS },
+          },
+        );
+      }
     }
 
     // REST: Memory failure patterns for a specific issue

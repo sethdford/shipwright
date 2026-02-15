@@ -188,6 +188,26 @@ if [[ "$JSON_OUTPUT" == "true" ]]; then
         fi
     fi
 
+    # -- database --
+    DATABASE_JSON="null"
+    _db_file="${HOME}/.shipwright/shipwright.db"
+    if command -v sqlite3 &>/dev/null && [[ -f "$_db_file" ]]; then
+        _db_ver=$(sqlite3 "$_db_file" "SELECT MAX(version) FROM _schema;" 2>/dev/null || echo "0")
+        _db_wal=$(sqlite3 "$_db_file" "PRAGMA journal_mode;" 2>/dev/null || echo "unknown")
+        _db_events=$(sqlite3 "$_db_file" "SELECT COUNT(*) FROM events;" 2>/dev/null || echo "0")
+        _db_runs=$(sqlite3 "$_db_file" "SELECT COUNT(*) FROM pipeline_runs;" 2>/dev/null || echo "0")
+        _db_costs=$(sqlite3 "$_db_file" "SELECT COUNT(*) FROM cost_entries;" 2>/dev/null || echo "0")
+        _db_size=$(ls -l "$_db_file" 2>/dev/null | awk '{print $5}')
+        DATABASE_JSON=$(jq -n \
+            --argjson schema_version "${_db_ver:-0}" \
+            --arg wal_mode "$_db_wal" \
+            --argjson events "${_db_events:-0}" \
+            --argjson runs "${_db_runs:-0}" \
+            --argjson costs "${_db_costs:-0}" \
+            --argjson size_bytes "${_db_size:-0}" \
+            '{schema_version:$schema_version, wal_mode:$wal_mode, events:$events, runs:$runs, costs:$costs, size_bytes:$size_bytes}') || DATABASE_JSON="null"
+    fi
+
     # -- assemble and output --
     jq -n \
         --arg version "$VERSION" \
@@ -200,6 +220,7 @@ if [[ "$JSON_OUTPUT" == "true" ]]; then
         --argjson heartbeats "$HEARTBEATS_JSON" \
         --argjson remote_machines "$MACHINES_JSON" \
         --argjson connected_developers "$DEVELOPERS_JSON" \
+        --argjson database "$DATABASE_JSON" \
         '{
             version: $version,
             timestamp: $timestamp,
@@ -210,7 +231,8 @@ if [[ "$JSON_OUTPUT" == "true" ]]; then
             issue_tracker: $issue_tracker,
             heartbeats: $heartbeats,
             remote_machines: $remote_machines,
-            connected_developers: $connected_developers
+            connected_developers: $connected_developers,
+            database: $database
         }'
     exit 0
 fi
@@ -706,6 +728,26 @@ if [[ -f "$MACHINES_FILE" ]]; then
             echo -e "  ${BLUE}●${RESET} ${BOLD}${m_name}${RESET}  ${DIM}${m_host}${RESET}  ${DIM}cores:${m_cores} mem:${m_mem}GB workers:${m_workers}${RESET}"
         done < <(jq -c '.machines[]' "$MACHINES_FILE" 2>/dev/null)
     fi
+fi
+
+# ─── Database ────────────────────────────────────────────────────────────
+
+_DB_FILE="${HOME}/.shipwright/shipwright.db"
+if command -v sqlite3 &>/dev/null && [[ -f "$_DB_FILE" ]]; then
+    echo ""
+    echo -e "${PURPLE}${BOLD}  DATABASE${RESET}  ${DIM}~/.shipwright/shipwright.db${RESET}"
+    echo -e "${DIM}  ──────────────────────────────────────────${RESET}"
+
+    _db_wal=$(sqlite3 "$_DB_FILE" "PRAGMA journal_mode;" 2>/dev/null || echo "?")
+    _db_ver=$(sqlite3 "$_DB_FILE" "SELECT MAX(version) FROM _schema;" 2>/dev/null || echo "?")
+    _db_size_bytes=$(ls -l "$_DB_FILE" 2>/dev/null | awk '{print $5}')
+    _db_size_mb=$(awk -v s="${_db_size_bytes:-0}" 'BEGIN { printf "%.1f", s / 1048576 }')
+    _db_events=$(sqlite3 "$_DB_FILE" "SELECT COUNT(*) FROM events;" 2>/dev/null || echo "0")
+    _db_runs=$(sqlite3 "$_DB_FILE" "SELECT COUNT(*) FROM pipeline_runs;" 2>/dev/null || echo "0")
+    _db_costs=$(sqlite3 "$_DB_FILE" "SELECT COUNT(*) FROM cost_entries;" 2>/dev/null || echo "0")
+
+    echo -e "  ${GREEN}●${RESET} ${BOLD}SQLite${RESET}  ${DIM}v${_db_ver} WAL=${_db_wal} ${_db_size_mb}MB${RESET}"
+    echo -e "    ${DIM}events:${_db_events}  runs:${_db_runs}  costs:${_db_costs}${RESET}"
 fi
 
 # ─── Connected Developers ─────────────────────────────────────────────────

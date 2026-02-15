@@ -60,6 +60,10 @@ RESTART_COUNT=0
 REPO_OVERRIDE=""
 VERSION="2.0.0"
 
+# ─── Token Tracking ─────────────────────────────────────────────────────────
+LOOP_INPUT_TOKENS=0
+LOOP_OUTPUT_TOKENS=0
+
 # ─── Flexible Iteration Defaults ────────────────────────────────────────────
 AUTO_EXTEND=true          # Auto-extend iterations when work is incomplete
 EXTENSION_SIZE=5          # Additional iterations per extension
@@ -401,6 +405,32 @@ select_audit_model() {
         fi
     fi
     echo "$default_model"
+}
+
+# ─── Token Accumulation ─────────────────────────────────────────────────────
+# Parse token counts from a Claude CLI log file and accumulate running totals.
+# Claude CLI may print usage info to stderr; logs capture both stdout+stderr.
+accumulate_loop_tokens() {
+    local log_file="$1"
+    [[ ! -f "$log_file" ]] && return 0
+
+    local input_tok output_tok
+    input_tok=$(grep -oE 'input[_ ]tokens?[: ]+[0-9,]+' "$log_file" 2>/dev/null | tail -1 | grep -oE '[0-9,]+' | tr -d ',' || echo "0")
+    output_tok=$(grep -oE 'output[_ ]tokens?[: ]+[0-9,]+' "$log_file" 2>/dev/null | tail -1 | grep -oE '[0-9,]+' | tr -d ',' || echo "0")
+
+    LOOP_INPUT_TOKENS=$(( LOOP_INPUT_TOKENS + ${input_tok:-0} ))
+    LOOP_OUTPUT_TOKENS=$(( LOOP_OUTPUT_TOKENS + ${output_tok:-0} ))
+}
+
+# Write accumulated token totals to a JSON file for the pipeline to read.
+write_loop_tokens() {
+    local token_file="$LOG_DIR/loop-tokens.json"
+    local tmp_file
+    tmp_file=$(mktemp "${token_file}.XXXXXX" 2>/dev/null || mktemp)
+    cat > "$tmp_file" <<TOKJSON
+{"input_tokens":${LOOP_INPUT_TOKENS},"output_tokens":${LOOP_OUTPUT_TOKENS},"iterations":${ITERATION:-0}}
+TOKJSON
+    mv "$tmp_file" "$token_file"
 }
 
 # ─── Adaptive Iteration Budget ──────────────────────────────────────────────
@@ -1601,6 +1631,9 @@ run_claude_iteration() {
 
     echo -e "  ${GREEN}✓${RESET} Claude session completed ($(format_duration "$iter_duration"), exit $exit_code)"
 
+    # Accumulate token usage from this iteration
+    accumulate_loop_tokens "$log_file"
+
     # Show verbose output if requested
     if $VERBOSE; then
         echo -e "  ${DIM}─── Claude Output ───${RESET}"
@@ -1696,10 +1729,16 @@ show_summary() {
     echo -e "  ${BOLD}Duration:${RESET}    $(format_duration "$duration")"
     echo -e "  ${BOLD}Commits:${RESET}     $TOTAL_COMMITS"
     echo -e "  ${BOLD}Tests:${RESET}       $test_display"
+    if [[ "$LOOP_INPUT_TOKENS" -gt 0 || "$LOOP_OUTPUT_TOKENS" -gt 0 ]]; then
+        echo -e "  ${BOLD}Tokens:${RESET}      in=${LOOP_INPUT_TOKENS} out=${LOOP_OUTPUT_TOKENS}"
+    fi
     echo ""
     echo -e "  ${DIM}State: $STATE_FILE${RESET}"
     echo -e "  ${DIM}Logs:  $LOG_DIR/${RESET}"
     echo ""
+
+    # Write token totals for pipeline cost tracking
+    write_loop_tokens
 }
 
 # ─── Signal Handling ──────────────────────────────────────────────────────────

@@ -56,6 +56,13 @@ EVENTS_FILE="${EVENTS_FILE:-${HOME}/.shipwright/events.jsonl}"
 emit_event() {
     local event_type="$1"
     shift
+
+    # Try SQLite first (via sw-db.sh's db_add_event)
+    if type db_add_event &>/dev/null; then
+        db_add_event "$event_type" "$@" 2>/dev/null || true
+    fi
+
+    # Always write to JSONL (dual-write period for backward compat)
     local json_fields=""
     for kv in "$@"; do
         local key="${kv%%=*}"
