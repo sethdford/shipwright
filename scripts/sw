@@ -138,6 +138,7 @@ show_help() {
     echo -e "  ${CYAN}triage${RESET}                ${BOLD}Issue labeling & prioritization${RESET} — auto-analyze, label, score, team sizing"
     echo -e "  ${CYAN}quality${RESET}               ${BOLD}Quality validation${RESET} — ruthless gates, adversarial audits, completion detection"
     echo -e "  ${CYAN}oversight${RESET}             ${BOLD}Quality oversight board${RESET} — multi-agent review council, voting, architecture governance"
+    echo -e "  ${CYAN}code-review${RESET}           ${BOLD}Autonomous code review${RESET} — clean code, SOLID, architecture boundaries, complexity"
     echo -e "  ${CYAN}pm${RESET}                    ${BOLD}Autonomous PM agent${RESET} — intelligent team sizing, composition, orchestration"
     echo -e "  ${CYAN}strategic${RESET}             ${BOLD}Strategic intelligence${RESET} — analyze strategy, metrics, create improvement issues"
     echo -e "  ${CYAN}team-stages${RESET}          ${BOLD}Multi-agent stage execution${RESET} — compose teams, delegate tasks, tally votes"
@@ -484,6 +485,9 @@ main() {
             ;;
         oversight)
             exec "$SCRIPT_DIR/sw-oversight.sh" "$@"
+            ;;
+        code-review)
+            exec "$SCRIPT_DIR/sw-code-review.sh" "$@"
             ;;
         pm)
             exec "$SCRIPT_DIR/sw-pm.sh" "$@"
