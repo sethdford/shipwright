@@ -348,7 +348,7 @@ strategic_call_api() {
     # Debug: show first 200 chars of response
     local preview
     preview=$(printf '%s' "$response_text" | head -c 200)
-    info "Response preview: ${preview}..."
+    info "Response preview: ${preview}..." >&2
 
     printf '%s' "$response_text"
 }
@@ -382,7 +382,7 @@ strategic_parse_and_create() {
                 fi
 
                 if [[ "$created" -ge "$STRATEGIC_MAX_ISSUES" ]]; then
-                    info "Reached max issues per cycle (${STRATEGIC_MAX_ISSUES})"
+                    info "Reached max issues per cycle (${STRATEGIC_MAX_ISSUES})" >&2
                     break
                 fi
             fi
@@ -470,7 +470,7 @@ strategic_create_issue() {
 
     # Dry-run mode
     if [[ "${NO_GITHUB:-false}" == "true" ]]; then
-        info "  [dry-run] Would create: ${title}"
+        info "  [dry-run] Would create: ${title}" >&2
         return 0
     fi
 
@@ -478,7 +478,7 @@ strategic_create_issue() {
     local existing
     existing=$(gh issue list --state open --search "$title" --json number,title --jq ".[].title" 2>/dev/null || echo "")
     if echo "$existing" | grep -qF "$title" 2>/dev/null; then
-        info "  Skipping duplicate: ${title}"
+        info "  Skipping duplicate: ${title}" >&2
         return 1
     fi
 
@@ -514,16 +514,18 @@ BODY_EOF
     done
     unset IFS
 
-    gh issue create \
+    local issue_url
+    issue_url=$(gh issue create \
         --title "$title" \
         --body "$body" \
-        --label "$labels" 2>/dev/null || {
-        warn "  Failed to create issue: ${title}"
+        --label "$labels" 2>/dev/null) || {
+        warn "  Failed to create issue: ${title}" >&2
         return 1
     }
 
     emit_event "strategic.issue_created" "title=$title" "priority=$priority" "complexity=$complexity"
-    success "  Created issue: ${title}"
+    # Output to stderr so it doesn't pollute the parse_and_create return value
+    success "  Created issue: ${title} (${issue_url})" >&2
     return 0
 }
 
