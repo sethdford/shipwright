@@ -81,6 +81,7 @@ show_help() {
     echo -e "  ${CYAN}pipeline${RESET} <cmd>         ${BOLD}Full delivery pipeline${RESET} — idea to production"
     echo -e "  ${CYAN}worktree${RESET} <cmd>         Manage git worktrees for agent isolation"
     echo -e "  ${CYAN}prep${RESET} [options]         ${BOLD}Repo preparation${RESET} — generate .claude/ configs for agents"
+    echo -e "  ${CYAN}hygiene${RESET} <cmd>         ${BOLD}Repo hygiene${RESET} — dead code, structure, deps, cleanup"
     echo -e "  ${CYAN}daemon${RESET} <cmd>           ${BOLD}Issue watcher${RESET} — auto-process GitHub issues"
     echo -e "  ${CYAN}autonomous|auto${RESET} <cmd>  ${BOLD}Autonomous loop${RESET} — AI-building-AI: analyze, create, build, learn"
     echo -e "  ${CYAN}memory${RESET} <cmd>           ${BOLD}Persistent memory${RESET} — learn from every pipeline run"
@@ -281,6 +282,9 @@ main() {
             ;;
         prep)
             exec "$SCRIPT_DIR/sw-prep.sh" "$@"
+            ;;
+        hygiene)
+            exec "$SCRIPT_DIR/sw-hygiene.sh" "$@"
             ;;
         daemon)
             exec "$SCRIPT_DIR/sw-daemon.sh" "$@"
