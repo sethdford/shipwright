@@ -4,56 +4,173 @@ Shipwright orchestrates autonomous Claude Code agent teams with delivery pipelin
 
 ## Commands
 
-| Command                                            | Purpose                                           |
-| -------------------------------------------------- | ------------------------------------------------- |
-| `shipwright init`                                  | One-command tmux setup (no prompts)               |
-| `shipwright setup`                                 | Guided setup — prerequisites, init, doctor        |
-| `shipwright session <name> -t <template>`          | Create team session with agent panes              |
-| `shipwright loop "<goal>" --test-cmd "..."`        | Continuous autonomous agent loop                  |
-| `shipwright pipeline start --issue <N>`            | Full delivery pipeline for an issue               |
+100+ commands organized by workflow. All CLI aliases (`shipwright`, `sw`, `cct`) work identically.
+
+### Core Workflow
+
+| Command | Purpose |
+| --- | --- |
+| `shipwright pipeline start --issue <N>` | Full delivery pipeline for an issue |
 | `shipwright pipeline start --issue <N> --worktree` | Pipeline in isolated git worktree (parallel-safe) |
-| `shipwright pipeline start --goal "..."`           | Pipeline from a goal description                  |
-| `shipwright pipeline resume`                       | Resume from last stage                            |
-| `shipwright daemon start`                          | Watch repo for labeled issues, auto-process       |
-| `shipwright daemon start --detach`                 | Start daemon in background tmux session           |
-| `shipwright daemon metrics`                        | DORA/DX metrics dashboard                         |
-| `shipwright fleet start`                           | Multi-repo daemon orchestration                   |
-| `shipwright fix "<goal>" --repos <paths>`          | Apply same fix across repos in parallel           |
-| `shipwright memory show`                           | View captured failure patterns and learnings      |
-| `shipwright cost show`                             | Token usage and spending dashboard                |
-| `shipwright cost budget set <amount>`              | Set daily budget limit                            |
-| `shipwright prep`                                  | Analyze repo and generate .claude/ configs        |
-| `shipwright doctor`                                | Validate setup and diagnose issues                |
-| `shipwright status`                                | Show team dashboard                               |
-| `shipwright ps`                                    | Show running agent processes                      |
-| `shipwright logs <team> --follow`                  | Tail agent logs                                   |
-| `shipwright upgrade --apply`                       | Pull latest and apply updates                     |
-| `shipwright cleanup --force`                       | Kill orphaned sessions                            |
-| `shipwright reaper --watch`                        | Automatic pane cleanup when agents exit           |
-| `shipwright worktree create <branch>`              | Git worktree for agent isolation                  |
-| `shipwright templates list`                        | Browse team templates                             |
-| `shipwright dashboard`                             | Real-time web dashboard (requires Bun)            |
-| `shipwright dashboard start`                       | Start dashboard in background                     |
-| `shipwright jira <cmd>`                            | Bidirectional issue sync with Jira                |
-| `shipwright linear <cmd>`                          | Bidirectional issue sync with Linear              |
-| `shipwright tracker <cmd>`                         | Configure Linear/Jira integration                 |
-| `shipwright heartbeat list`                        | Show agent heartbeat status                       |
-| `shipwright checkpoint list`                       | Show saved pipeline checkpoints                   |
-| `shipwright remote list`                           | Show registered remote machines                   |
-| `shipwright remote add <name> --host <h>`          | Register a remote worker machine                  |
-| `shipwright remote status`                         | Health check all remote machines                  |
-| `shipwright intelligence`                          | Run intelligence engine analysis                  |
-| `shipwright optimize`                              | Self-optimization based on DORA metrics           |
-| `shipwright predict`                               | Predictive risk assessment and anomaly detection  |
-| `shipwright connect start`                         | Sync local state to team dashboard                |
-| `shipwright connect join --token <t>`              | Join a team using an invite token                 |
-| `shipwright connect status`                        | Show connection status                            |
-| `shipwright launchd install`                       | Auto-start daemon + dashboard + connect on boot   |
-| `shipwright github context`                        | Show repo GitHub context (contributors, alerts)   |
-| `shipwright github security`                       | Show CodeQL + Dependabot security alerts          |
-| `shipwright checks list`                           | List GitHub Check runs for a commit               |
-| `shipwright deploys list`                          | List GitHub deployments by environment            |
-| `shipwright vitals`                                | Pipeline vitals — real-time health scoring        |
+| `shipwright pipeline start --goal "..."` | Pipeline from a goal description |
+| `shipwright pipeline resume` | Resume from last stage |
+| `shipwright loop "<goal>" --test-cmd "..."` | Continuous autonomous agent loop |
+| `shipwright daemon start` | Watch repo for labeled issues, auto-process |
+| `shipwright daemon start --detach` | Start daemon in background tmux session |
+| `shipwright daemon metrics` | DORA/DX metrics dashboard |
+| `shipwright autonomous <cmd>` | AI-building-AI master controller |
+
+### Agent Management
+
+| Command | Purpose |
+| --- | --- |
+| `shipwright swarm <cmd>` | Dynamic agent swarm orchestration |
+| `shipwright recruit <cmd>` | Agent recruitment & talent management |
+| `shipwright standup` | Automated daily standups for AI teams |
+| `shipwright guild <cmd>` | Knowledge guilds & cross-team learning |
+| `shipwright oversight <cmd>` | Quality oversight board |
+| `shipwright pm <cmd>` | Autonomous PM agent for team orchestration |
+| `shipwright team-stages <cmd>` | Multi-agent execution with roles |
+| `shipwright session <name> -t <template>` | Create team session with agent panes |
+| `shipwright scale <cmd>` | Dynamic agent team scaling |
+
+### Quality & Review
+
+| Command | Purpose |
+| --- | --- |
+| `shipwright code-review` | Clean code & architecture analysis |
+| `shipwright security-audit` | Comprehensive security auditing |
+| `shipwright testgen` | Autonomous test generation & coverage |
+| `shipwright hygiene` | Repository organization & cleanup |
+| `shipwright adversarial` | Red-team code review & edge case finding |
+| `shipwright simulate` | Multi-persona developer simulation |
+| `shipwright architecture` | Living architecture model & enforcement |
+| `shipwright quality <cmd>` | Intelligent completion audits |
+
+### Observability & Monitoring
+
+| Command | Purpose |
+| --- | --- |
+| `shipwright vitals` | Pipeline vitals — real-time health scoring |
+| `shipwright dora` | DORA metrics dashboard with intelligence |
+| `shipwright retro` | Sprint retrospective engine |
+| `shipwright stream` | Live terminal output streaming from panes |
+| `shipwright activity` | Live agent activity stream |
+| `shipwright replay` | Pipeline run replay & timeline viewing |
+| `shipwright status` | Team dashboard |
+| `shipwright logs <team> --follow` | Tail agent logs |
+| `shipwright ps` | Show running agent processes |
+| `shipwright heartbeat list` | Show agent heartbeat status |
+
+### Release & Deployment
+
+| Command | Purpose |
+| --- | --- |
+| `shipwright release` | Release train automation |
+| `shipwright release-manager` | Autonomous release pipeline |
+| `shipwright changelog` | Automated release notes & migration guides |
+| `shipwright deploys list` | List GitHub deployments by environment |
+| `shipwright durable <cmd>` | Durable workflow engine for long-running ops |
+
+### Intelligence & Optimization
+
+| Command | Purpose |
+| --- | --- |
+| `shipwright intelligence` | Run intelligence engine analysis |
+| `shipwright predict` | Predictive risk assessment & anomaly detection |
+| `shipwright strategic` | Strategic intelligence agent |
+| `shipwright optimize` | Self-optimization based on DORA metrics |
+| `shipwright model-router` | Intelligent model routing & cost optimization |
+| `shipwright adaptive` | Data-driven pipeline tuning |
+
+### Issue & Ticket Management
+
+| Command | Purpose |
+| --- | --- |
+| `shipwright triage` | Intelligent issue labeling & prioritization |
+| `shipwright decompose --issue <N>` | AI-split complex features into subtasks |
+| `shipwright tracker <cmd>` | Provider router for tracker integration |
+| `shipwright jira <cmd>` | Jira ↔ GitHub bidirectional sync |
+| `shipwright linear <cmd>` | Linear ↔ GitHub bidirectional sync |
+| `shipwright pr-lifecycle` | Autonomous PR management |
+
+### Infrastructure & Operations
+
+| Command | Purpose |
+| --- | --- |
+| `shipwright fleet start` | Multi-repo daemon orchestration |
+| `shipwright fleet-discover --org <org>` | Auto-discovery of repos in GitHub org |
+| `shipwright fleet-viz` | Multi-repo fleet visualization |
+| `shipwright fix "<goal>" --repos <paths>` | Bulk fix across multiple repos in parallel |
+| `shipwright remote list` | Show registered remote machines |
+| `shipwright remote add <name> --host <h>` | Register a remote worker machine |
+| `shipwright remote status` | Health check all remote machines |
+| `shipwright connect start` | Sync local state to team dashboard |
+| `shipwright connect join --token <t>` | Join a team using an invite token |
+| `shipwright connect status` | Show connection status |
+| `shipwright dashboard` | Real-time web dashboard |
+| `shipwright dashboard start` | Start dashboard in background |
+| `shipwright public-dashboard` | Public real-time pipeline progress |
+| `shipwright mission-control` | Terminal-based pipeline mission control |
+| `shipwright launchd install` | Auto-start daemon + dashboard + connect on boot |
+
+### GitHub & CI/CD
+
+| Command | Purpose |
+| --- | --- |
+| `shipwright ci <cmd>` | GitHub Actions CI/CD orchestration |
+| `shipwright github-app <cmd>` | GitHub App management & webhook receiver |
+| `shipwright webhook <cmd>` | GitHub webhook receiver for instant processing |
+| `shipwright checks list` | List GitHub Check runs for a commit |
+| `shipwright github context` | Show repo GitHub context |
+| `shipwright github security` | CodeQL + Dependabot security alerts |
+| `shipwright trace` | E2E traceability (Issue → Commit → PR → Deploy) |
+| `shipwright instrument` | Pipeline instrumentation & feedback loops |
+
+### Data, Learning & Memory
+
+| Command | Purpose |
+| --- | --- |
+| `shipwright memory show` | View captured failure patterns & learnings |
+| `shipwright cost show` | Token usage and spending dashboard |
+| `shipwright cost budget set <amount>` | Set daily budget limit |
+| `shipwright db <cmd>` | SQLite persistence layer management |
+| `shipwright eventbus <cmd>` | Durable event bus for component communication |
+| `shipwright discovery <cmd>` | Cross-pipeline real-time learning |
+| `shipwright feedback <cmd>` | Production feedback loop |
+| `shipwright regression` | Regression detection pipeline |
+| `shipwright otel` | OpenTelemetry observability |
+
+### Setup, Maintenance & Configuration
+
+| Command | Purpose |
+| --- | --- |
+| `shipwright init` | One-command tmux setup |
+| `shipwright setup` | Guided setup — prerequisites, init, doctor |
+| `shipwright prep` | Analyze repo and generate .claude/ configs |
+| `shipwright doctor` | Validate setup and diagnose issues |
+| `shipwright upgrade --apply` | Pull latest and apply updates |
+| `shipwright cleanup --force` | Kill orphaned sessions |
+| `shipwright reaper --watch` | Automatic pane cleanup when agents exit |
+| `shipwright worktree create <branch>` | Git worktree for agent isolation |
+| `shipwright templates list` | Browse team templates |
+| `shipwright docs <cmd>` | Documentation keeper |
+| `shipwright docs-agent` | Auto-sync README, wiki, API docs |
+| `shipwright tmux <cmd>` | tmux health & plugin management |
+| `shipwright tmux-pipeline` | Spawn and manage pipelines in tmux |
+| `shipwright checkpoint list` | Show saved pipeline checkpoints |
+| `shipwright auth <cmd>` | GitHub OAuth authentication |
+| `shipwright incident <cmd>` | Autonomous incident detection & response |
+
+### Advanced & Experimental
+
+| Command | Purpose |
+| --- | --- |
+| `shipwright e2e-orchestrator` | Test suite registry & execution |
+| `shipwright ux` | Premium UX enhancement layer |
+| `shipwright widgets` | Embeddable status widgets |
+| `shipwright context gather` | Assemble rich context for stages |
+| `shipwright deps <cmd>` | Automated dependency update management |
 
 ## Pipeline Stages
 
@@ -87,6 +204,197 @@ The build stage delegates to `shipwright loop` for autonomous multi-iteration de
 | `cost-aware` | all stages                                 | all auto, budget checks           | Budget-limited delivery  |
 | `deployed`   | all + deploy + validate + monitor          | approve: deploy                   | Full deploy + monitoring |
 
+## Autonomous Agents in v2.0.0
+
+**Wave 1 (Organizational Agents):**
+
+| Agent | Command | Purpose |
+| --- | --- | --- |
+| Swarm Manager | `swarm` | Dynamic agent team orchestration, role specialization |
+| Autonomous PM | `pm` | Team leadership, task scheduling, roadmap execution |
+| Knowledge Guild | `guild` | Cross-team learning, pattern capture, mentorship |
+| Recruitment System | `recruit` | Talent acquisition, team composition optimization |
+| Standup Automaton | `standup` | Daily standups, progress tracking, blocker detection |
+
+**Wave 2 (Operational Backbone):**
+
+| Agent | Command | Purpose |
+| --- | --- | --- |
+| Quality Oversight | `oversight` | Intelligent audits, zero-defect gates, completeness |
+| Strategic Agent | `strategic` | Long-term planning, goal decomposition, roadmap |
+| Code Reviewer | `code-review` | Architecture analysis, clean code, best practices |
+| Security Auditor | `security-audit` | Vulnerability detection, threat modeling, compliance |
+| Test Generator | `testgen` | Coverage analysis, scenario discovery, regression |
+| Incident Commander | `incident` | Autonomous triage, root cause, resolution |
+| Dependency Manager | `deps` | Semantic versioning, updates, compatibility |
+| Release Manager | `release-manager` | Release planning, changelog, deployment |
+| Adaptive Tuner | `adaptive` | DORA metrics, self-optimization, performance |
+| Strategic Intelligence | (integrated in `predict`) | Predictive analysis, trend detection |
+
+Each agent spawns specialized Claude Code sessions with domain-specific instructions. Agents coordinate via the task list and persistent memory.
+
+## Local Mode
+
+Run Shipwright entirely offline (no GitHub) for development and testing:
+
+```bash
+# Full pipeline without GitHub
+shipwright pipeline start --goal "build auth module" --local
+
+# Daemon mode locally
+shipwright daemon start --no-github
+
+# What works offline
+- All 12 pipeline stages execute
+- Intelligence layer operates
+- Cost tracking (estimated)
+- Memory system (local only)
+- Agent teams
+- Test execution
+- Output to ~/.shipwright/local-artifacts/
+
+# What requires --skip or degrades gracefully
+- GitHub PR creation — skipped, saved to .claude/pr-draft.md
+- Deployment tracking — skipped
+- GitHub checks — skipped
+- Contributor analysis — uses local git history only
+- Security alerts — local scanning only
+- CODEOWNERS — read from repo if present
+```
+
+Enable via config:
+
+```json
+{
+  "local_mode": true,
+  "skip_github": true,
+  "offline_enabled": true
+}
+```
+
+Or environment variables:
+
+```bash
+export SHIPWRIGHT_LOCAL=1
+export NO_GITHUB=1
+```
+
+## Multi-Repo Operations
+
+### Fleet Mode
+
+Run daemon across multiple repositories with shared worker pool:
+
+```bash
+# Initialize fleet
+shipwright fleet start
+
+# Auto-discover repos in GitHub org
+shipwright fleet discover --org myorg --language go,python
+
+# Visualize fleet state
+shipwright fleet-viz
+
+# View fleet dashboard
+shipwright dashboard --fleet
+
+# Config at ~/.shipwright/fleet-config.json
+{
+  "worker_pool": {
+    "enabled": true,
+    "total_workers": 12,
+    "rebalance_interval_seconds": 120
+  },
+  "repos": [
+    {
+      "path": "/path/to/repo1",
+      "priority": 1,
+      "auto_sync": true,
+      "labels": ["shipwright"]
+    }
+  ]
+}
+```
+
+Worker pool scales across repos proportionally to queue depth and issue complexity.
+
+### Bulk Fix Across Repos
+
+Apply the same fix to multiple repositories in parallel:
+
+```bash
+# Single fix across many repos
+shipwright fix "upgrade Go to 1.21" --repos \
+  ~/projects/api,~/projects/cli,~/projects/sdk
+
+# With custom test command per repo type
+shipwright fix "add license header" \
+  --repos ~/a,~/b,~/c \
+  --test-cmd "npm test"
+
+# With worktree isolation (true parallelism)
+shipwright fix "refactor logging" \
+  --repos ~/a,~/b,~/c \
+  --worktree
+```
+
+Output:
+
+```
+Fix Results Across 3 Repos
+  ~/projects/api     ✓ MERGED   (1 PR)
+  ~/projects/cli     ✓ MERGED   (1 PR)
+  ~/projects/sdk     ✓ MERGED   (1 PR)
+
+Total: 3 PRs merged, $0.47 cost
+```
+
+### Per-Repo Pipeline Override
+
+Control pipeline behavior per repository:
+
+```bash
+# Via environment
+export SHIPWRIGHT_PIPELINE_TEMPLATE=fast     # global
+export REPO_a_TEMPLATE=full                  # repo-specific
+
+# Via fleet-config.json
+{
+  "repos": [
+    {
+      "path": "/path/to/repo",
+      "pipeline_template": "full",
+      "max_parallel_builds": 1,
+      "auto_merge": false,
+      "labels": ["shipwright", "gated"]
+    }
+  ]
+}
+```
+
+### Distributed Execution
+
+Execute pipeline steps on remote machines:
+
+```bash
+# Register remote worker
+shipwright remote add builder-1 --host 192.168.1.50
+
+# View health
+shipwright remote status
+
+# Configure in daemon-config.json
+{
+  "remote": {
+    "enabled": true,
+    "machines": ["builder-1", "builder-2"],
+    "load_balance": true
+  }
+}
+```
+
+The daemon routes builds to remote workers, syncing state atomically.
+
 ## Team Patterns
 
 - Assign each agent **different files** to avoid merge conflicts
@@ -94,6 +402,7 @@ The build stage delegates to `shipwright loop` for autonomous multi-iteration de
 - Keep tasks self-contained — 5-6 focused tasks per agent
 - Use the task list for coordination, not direct messaging
 - 12 team templates cover the full SDLC: `shipwright templates list`
+- Agents from Wave 1 coordinate Wave 2 specialists via PM agent
 
 ## tmux Integration
 
