@@ -552,7 +552,7 @@ All scripts are bash (except the dashboard server in TypeScript). Grouped by lay
 | `scripts/sw-setup.sh` | 370 | Comprehensive onboarding wizard |
 | `scripts/sw-standup.sh` | 712 | Automated Daily Standups for AI Agent Teams |
 | `scripts/sw-status.sh` | 796 | Dashboard showing Claude Code team status |
-| `scripts/sw-strategic.sh` | 711 | Strategic Intelligence Agent |
+| `scripts/sw-strategic.sh` | 713 | Strategic Intelligence Agent |
 | `scripts/sw-stream.sh` | 450 | Live terminal output streaming from agent panes |
 | `scripts/sw-swarm.sh` | 583 | Dynamic agent swarm management |
 | `scripts/sw-team-stages.sh` | 511 | Multi-agent execution with leader/specialist roles |
