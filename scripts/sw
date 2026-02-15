@@ -111,6 +111,7 @@ show_help() {
     echo -e "  ${CYAN}launchd${RESET} <cmd>          ${BOLD}Process supervision${RESET} — auto-start daemon + dashboard on boot"
     echo -e "  ${CYAN}auth${RESET} <cmd>            ${BOLD}GitHub authentication${RESET} — OAuth login, token management, multi-user"
     echo -e "  ${CYAN}docs${RESET} <cmd>            ${BOLD}Documentation keeper${RESET} — auto-sync docs from source"
+    echo -e "  ${CYAN}changelog${RESET} <cmd>       ${BOLD}Changelog engine${RESET} — auto-generate release notes and migration guides"
     echo -e "  ${CYAN}release${RESET} <cmd>         ${BOLD}Release automation${RESET} — bump versions, changelog, tags, releases"
     echo -e "  ${CYAN}replay${RESET} <cmd>           ${BOLD}Pipeline DVR${RESET} — list, show, narrative, diff, export, compare runs"
     echo -e "  ${CYAN}scale${RESET} <cmd>            ${BOLD}Dynamic team scaling${RESET} — scale agents up/down during pipeline"
@@ -390,6 +391,9 @@ main() {
             ;;
         docs)
             exec "$SCRIPT_DIR/sw-docs.sh" "$@"
+            ;;
+        changelog)
+            exec "$SCRIPT_DIR/sw-changelog.sh" "$@"
             ;;
         release)
             exec "$SCRIPT_DIR/sw-release.sh" "$@"
