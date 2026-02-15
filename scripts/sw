@@ -103,6 +103,7 @@ show_help() {
     echo -e "  ${CYAN}model${RESET} <cmd>            ${BOLD}Model router${RESET} — intelligent model routing and cost optimization"
     echo -e "  ${CYAN}tracker${RESET} <cmd>           ${BOLD}Issue tracker${RESET} — configure Linear/Jira integration"
     echo -e "  ${CYAN}heartbeat${RESET} <cmd>        ${BOLD}Agent heartbeat${RESET} — write/check/list/clear heartbeats"
+    echo -e "  ${CYAN}standup${RESET} <cmd>         ${BOLD}Daily standups${RESET} — gather status, summarize work, report blockers"
     echo -e "  ${CYAN}checkpoint${RESET} <cmd>       ${BOLD}Checkpoints${RESET} — save/restore agent state mid-stage"
     echo -e "  ${CYAN}webhook${RESET} <cmd>          ${BOLD}GitHub webhooks${RESET} — instant issue processing, no polling"
     echo -e "  ${CYAN}decompose${RESET} <cmd>        ${BOLD}Issue decomposer${RESET} — analyze complexity, auto-create subtasks"
@@ -348,6 +349,9 @@ main() {
             ;;
         heartbeat)
             exec "$SCRIPT_DIR/sw-heartbeat.sh" "$@"
+            ;;
+        standup)
+            exec "$SCRIPT_DIR/sw-standup.sh" "$@"
             ;;
         checkpoint)
             exec "$SCRIPT_DIR/sw-checkpoint.sh" "$@"
