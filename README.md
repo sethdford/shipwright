@@ -13,7 +13,7 @@
   <a href="https://github.com/sethdford/shipwright/actions/workflows/test.yml"><img src="https://github.com/sethdford/shipwright/actions/workflows/test.yml/badge.svg" alt="Tests"></a>
   <a href="https://github.com/sethdford/shipwright/actions/workflows/shipwright-pipeline.yml"><img src="https://github.com/sethdford/shipwright/actions/workflows/shipwright-pipeline.yml/badge.svg" alt="Pipeline"></a>
   <img src="https://img.shields.io/badge/tests-103_suites_passing-4ade80?style=flat-square" alt="103 suites">
-  <img src="https://img.shields.io/badge/version-2.1.2-00d4ff?style=flat-square" alt="v2.1.2">
+  <img src="https://img.shields.io/badge/version-2.2.2-00d4ff?style=flat-square" alt="v2.2.2">
   <img src="https://img.shields.io/badge/license-MIT-green?style=flat-square" alt="MIT License">
   <img src="https://img.shields.io/badge/bash-3.2%2B-7c3aed?style=flat-square" alt="Bash 3.2+">
 </p>
@@ -23,7 +23,7 @@
 ## Table of Contents
 
 - [Shipwright Builds Itself](#shipwright-builds-itself)
-- [What's New in v2.1.2](#whats-new-in-v212)
+- [What's New in v2.2.2](#whats-new-in-v222)
 - [How It Works](#how-it-works)
 - [Install](#install)
 - [Quick Start](#quick-start)
@@ -46,17 +46,16 @@ This repo uses Shipwright to process its own issues. Label a GitHub issue with `
 
 ---
 
-## What's New in v2.1.2
+## What's New in v2.2.2
 
-**AGI-Level Agent Recruitment** — dynamic role creation, LLM-powered matching, closed-loop learning:
+**Docs & platform polish** — doc-fleet, shared libs, policy schema, release infra:
 
-- **`recruit match`** — AI/heuristic task→role matching with `--json` output for pipeline integration
-- **`recruit team`** — Context-aware team composition with cost estimation
-- **`recruit route`** — Smart routing based on agent performance history
-- **Cross-system integration** — Pipeline, PM, triage, loop, and swarm all use recruit for model/role selection
-- **Self-tuning heuristics** — System learns keyword→role mappings from successful outcomes
-- **Meta-learning** — Accuracy tracking and self-correction for matching decisions
-- **CI auto-discovery** — All 103 test suites now run in CI (previously 26)
+- **Doc-fleet** — Five Cursor agents (doc-architect, claude-md, strategy-curator, pattern-writer, readme-optimizer) keep docs, strategy, and README in sync
+- **Pipeline lib split** — `scripts/lib/pipeline-quality.sh`, `daemon-health.sh`, `policy.sh` for reuse and tests
+- **Policy schema** — `config/policy.json` and `docs/config-policy.md` for hygiene, quality, and platform rules
+- **Release infra** — npm, GitHub Releases (darwin/linux/windows), Homebrew tap; `scripts/build-release.sh` and `.github/workflows/release.yml` ship all platforms
+
+**v2.1.2**: AGI-level recruit — `recruit match` / `team` / `route`, cross-system integration, 103 test suites in CI
 
 **v2.1.0**: tmux visual overhaul — role-colored borders, pipeline status widgets, active pane depth
 
@@ -163,7 +162,7 @@ shipwright fleet start
 shipwright fix "upgrade deps" --repos ~/a,~/b,~/c
 
 # Release automation
-shipwright release --version 2.1.0
+shipwright release --version 2.2.2
 shipwright changelog generate
 ```
 
@@ -382,7 +381,7 @@ shipwright fix "feat: add auth" --repos ~/a,~/b,~/c
 shipwright fleet-viz
 
 # Release automation
-shipwright release --version 2.1.0
+shipwright release --version 2.2.2
 shipwright changelog generate
 shipwright deploys list
 

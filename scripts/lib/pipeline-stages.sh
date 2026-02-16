@@ -3,6 +3,26 @@
 [[ -n "${_PIPELINE_STAGES_LOADED:-}" ]] && return 0
 _PIPELINE_STAGES_LOADED=1
 
+show_stage_preview() {
+    local stage_id="$1"
+    echo ""
+    echo -e "${PURPLE}${BOLD}━━━ Stage: ${stage_id} ━━━${RESET}"
+    case "$stage_id" in
+        intake)   echo -e "  Fetch issue, detect task type, create branch, self-assign" ;;
+        plan)     echo -e "  Generate plan via Claude, post task checklist to issue" ;;
+        design)   echo -e "  Generate Architecture Decision Record (ADR), evaluate alternatives" ;;
+        build)    echo -e "  Delegate to ${CYAN}shipwright loop${RESET} for autonomous building" ;;
+        test)     echo -e "  Run test suite and check coverage" ;;
+        review)   echo -e "  AI code review on the diff, post findings" ;;
+        pr)       echo -e "  Create GitHub PR with labels, reviewers, milestone" ;;
+        merge)    echo -e "  Wait for CI checks, merge PR, optionally delete branch" ;;
+        deploy)   echo -e "  Deploy to staging/production with rollback" ;;
+        validate) echo -e "  Smoke tests, health checks, close issue" ;;
+        monitor)  echo -e "  Post-deploy monitoring, health checks, auto-rollback" ;;
+    esac
+    echo ""
+}
+
 stage_intake() {
     CURRENT_STAGE_ID="intake"
     local project_lang

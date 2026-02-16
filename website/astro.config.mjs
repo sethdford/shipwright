@@ -6,6 +6,9 @@ export default defineConfig({
   base: "/shipwright",
   integrations: [
     starlight({
+      components: {
+        Footer: "./src/components/Footer.astro",
+      },
       title: "Shipwright",
       description:
         "Orchestrate AI coding teams with autonomous agents, delivery pipelines, and DORA metrics.",

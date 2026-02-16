@@ -19,6 +19,9 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Check version consistency
+        run: bash scripts/check-version-consistency.sh
+
       - name: Install dependencies (macOS)
         if: runner.os == 'macOS'
         run: brew install tmux jq

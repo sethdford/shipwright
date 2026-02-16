@@ -1,0 +1,7 @@
+#!/usr/bin/env bash
+MOCK_LOG="${MOCK_PIPELINE_LOG:-/tmp/mock-pipeline.log}"
+echo "pipeline $*" >> "$MOCK_LOG"
+# Simulate quick pipeline run
+sleep 0.1
+echo "https://github.com/test/repo/pull/42"
+exit 0

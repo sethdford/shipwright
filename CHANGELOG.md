@@ -7,6 +7,49 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ---
 
+## [2.2.2] — 2026-02-16
+
+**CLI release automation, doctor version check, CLAUDE.md maintainer section.**
+
+### Added
+
+- **`shipwright version bump <x.y.z>`** — Bump version everywhere (scripts, package.json, README badge/TOC/What's New, hygiene-report)
+- **`shipwright version check`** — Verify version consistency (CI step; fails if package.json, README, or scripts drift)
+- **`shipwright release build`** — Build platform tarballs for GitHub Releases (runs `scripts/build-release.sh`)
+- **Doctor version consistency** — When run from the Shipwright repo, `shipwright doctor` runs version check and warns on drift
+- **CLAUDE.md Maintainer / Release** — Table of which CLI command (or script) to call for bump, check, build, publish; Setup & validation section
+
+### Changed
+
+- **Website footer** — Starlight footer shows "Shipwright CLI vX.Y.Z" from repo `package.json` at build time
+- **CI** — `.github/workflows/test.yml` runs `scripts/check-version-consistency.sh` on every push/PR
+
+---
+
+## [2.2.1] — 2026-02-16
+
+**Docs, libs, policy, release infra.**
+
+### Added
+
+- **Doc-fleet** — Five Cursor agents (doc-architect, claude-md, strategy-curator, pattern-writer, readme-optimizer) for docs, strategy, and README sync
+- **Shared libs** — `scripts/lib/pipeline-quality.sh`, `daemon-health.sh`, `policy.sh` for pipeline, daemon, and policy checks
+- **Policy schema** — `config/policy.json` and `docs/config-policy.md` for hygiene, quality, and platform rules
+- **Release workflow** — `.github/workflows/release.yml` builds darwin/linux/windows, publishes to npm and GitHub Releases; Homebrew tap (`sethdford/homebrew-shipwright`) updated for 2.2.x
+
+### Changed
+
+- **Build** — `scripts/build-release.sh` includes `config/` in tarball; Homebrew formula uses `libexec/scripts/sw` wrappers
+- **Docs** — `docs/README.md` hub, strategy/patterns/tmux-research reorganized; CLAUDE.md and README aligned with doc-fleet
+
+---
+
+## [2.2.0] — 2026-02-16
+
+Initial 2.2 release: doc-fleet, pipeline lib split, policy config, and multi-platform release automation (npm, GitHub Releases, Homebrew).
+
+---
+
 ## [2.1.2] — 2026-02-16
 
 **Autonomy wiring — connect all feedback loops, kill zombie pipelines, clean up branches.**

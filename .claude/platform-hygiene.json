@@ -1,12 +1,12 @@
 {
-  "timestamp": "2026-02-16T20:44:24Z",
+  "timestamp": "2026-02-16T21:15:04Z",
   "repository": "shipwright",
   "counts": {
-    "hardcoded": 66,
-    "fallback": 71,
-    "todo": 38,
+    "hardcoded": 58,
+    "fallback": 54,
+    "todo": 37,
     "fixme": 19,
-    "hack": 18
+    "hack": 17
   },
   "findings_sample": [
     {
@@ -107,18 +107,10 @@
     },
     {
       "file": "scripts/sw-pipeline.sh",
-      "line": 1101
+      "line": 817
     }
   ],
   "script_size_hotspots": [
-    {
-      "script": "sw-pipeline.sh",
-      "lines": 8665
-    },
-    {
-      "script": "sw-daemon.sh",
-      "lines": 6150
-    },
     {
       "script": "sw-recruit.sh",
       "lines": 2636
@@ -126,6 +118,10 @@
     {
       "script": "sw-loop.sh",
       "lines": 2492
+    },
+    {
+      "script": "sw-pipeline.sh",
+      "lines": 2434
     },
     {
       "script": "sw-daemon-test.sh",
@@ -156,6 +152,10 @@
       "lines": 1377
     },
     {
+      "script": "sw-daemon.sh",
+      "lines": 1351
+    },
+    {
       "script": "sw-self-optimize.sh",
       "lines": 1195
     },
@@ -164,12 +164,12 @@
       "lines": 1191
     },
     {
-      "script": "sw-pipeline-vitals.sh",
-      "lines": 1082
+      "script": "sw-doctor.sh",
+      "lines": 1086
     },
     {
-      "script": "sw-doctor.sh",
-      "lines": 1045
+      "script": "sw-pipeline-vitals.sh",
+      "lines": 1082
     }
   ]
 }

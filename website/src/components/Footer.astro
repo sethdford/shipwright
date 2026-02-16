@@ -1,0 +1,78 @@
+---
+import EditLink from 'virtual:starlight/components/EditLink';
+import LastUpdated from 'virtual:starlight/components/LastUpdated';
+import Pagination from 'virtual:starlight/components/Pagination';
+import config from 'virtual:starlight/user-config';
+import { readFileSync } from 'node:fs';
+import { join, dirname } from 'node:path';
+import { fileURLToPath } from 'node:url';
+
+const __dirname = dirname(fileURLToPath(import.meta.url));
+// Repo root package.json (shipwright CLI version): website/src/components -> ../../../package.json
+let cliVersion = '';
+try {
+  const pkgPath = join(__dirname, '../../../package.json');
+  const pkg = JSON.parse(readFileSync(pkgPath, 'utf-8'));
+  cliVersion = pkg.version || '';
+} catch {
+  // Fallback when building outside repo or path differs
+}
+---
+
+<footer class="sl-flex">
+  <div class="meta sl-flex">
+    <EditLink />
+    <LastUpdated />
+  </div>
+  <Pagination />
+
+  <div class="meta sl-flex version-row">
+    {cliVersion && (
+      <span class="cli-version">Shipwright CLI v{cliVersion}</span>
+    )}
+    {config.credits && (
+      <a class="kudos sl-flex" href="https://starlight.astro.build">
+        {Astro.locals.t('builtWithStarlight.label')}
+      </a>
+    )}
+  </div>
+</footer>
+
+<style>
+  footer {
+    flex-direction: column;
+    gap: 1.5rem;
+  }
+  .meta {
+    gap: 0.75rem 3rem;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    margin-top: 3rem;
+    font-size: var(--sl-text-sm);
+    color: var(--sl-color-gray-3);
+  }
+  .meta > :global(p:only-child) {
+    margin-inline-start: auto;
+  }
+  .version-row {
+    margin-top: 0.5rem;
+  }
+  .cli-version {
+    font-size: var(--sl-text-xs);
+    color: var(--sl-color-gray-4);
+  }
+  .kudos {
+    align-items: center;
+    gap: 0.5em;
+    margin: 1.5rem auto;
+    font-size: var(--sl-text-xs);
+    text-decoration: none;
+    color: var(--sl-color-gray-3);
+  }
+  .kudos :global(svg) {
+    color: var(--sl-color-orange);
+  }
+  .kudos:hover {
+    color: var(--sl-color-white);
+  }
+</style>

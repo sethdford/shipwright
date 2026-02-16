@@ -14,7 +14,7 @@ if [[ -n "${_SW_DB_LOADED:-}" ]] && [[ "${BASH_SOURCE[0]}" != "$0" ]]; then
 fi
 _SW_DB_LOADED=1
 
-VERSION="2.2.1"
+VERSION="2.2.2"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
 

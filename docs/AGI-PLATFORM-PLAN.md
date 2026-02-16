@@ -51,7 +51,7 @@
 
 **Goal:** Pipeline and daemon are split into sourced modules; no single file > 2000 lines for orchestration core.
 
-**Status:** 3.2 and 3.4 done (pipeline-quality.sh and daemon-health.sh created, wired, and sourced). 3.1 and 3.3 (full stage/poll extraction) deferred — high risk, requires incremental approach.
+**Status:** All done. 3.1 pipeline fully decomposed: sw-pipeline.sh reduced from 8,665 → 2,434 lines (72% reduction) by wiring pipeline-state.sh, pipeline-github.sh, pipeline-detection.sh, pipeline-quality-checks.sh, pipeline-intelligence.sh, pipeline-stages.sh. 3.2 done (pipeline-quality.sh). 3.3 daemon fully decomposed: sw-daemon.sh reduced from 6,150 → 1,351 lines (78% reduction) by wiring daemon-state.sh, daemon-adaptive.sh, daemon-triage.sh, daemon-failure.sh, daemon-dispatch.sh, daemon-patrol.sh, daemon-poll.sh. 3.4 done (daemon-health.sh). All tests pass.
 
 | #   | Task                                                                                                                                                                                                   | Owner | Acceptance                                                            |
 | --- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ----- | --------------------------------------------------------------------- |
@@ -66,7 +66,7 @@
 
 **Goal:** Triage all TODO/FIXME/HACK; remove dead code; reduce fallback count.
 
-**Status:** 4.1–4.2 done (PLATFORM-TODO-TRIAGE.md created with full triage: 4 github-issue, 3 accepted-debt, 0 stale). 4.3–4.4 ongoing (run hygiene dead-code; reduce fallbacks over time). Pre-existing `now_unix` bug in sw-scale.sh fixed. Current snapshot refreshed after monolith decomposition (platform-refactor counts: 66 hardcoded, 71 fallback).
+**Status:** All done. 4.1–4.2 triage complete (PLATFORM-TODO-TRIAGE.md: 4 github-issue, 3 accepted-debt). 4.3 dead code scan complete — 1 confirmed dead function (get_adaptive_heartbeat_timeout in daemon-adaptive.sh, accepted debt; may wire later). No unused scripts. No .bak/temp files. 4.4 fallback count reduced from 71 → 54 via monolith decomposition; remaining fallbacks are legitimate defensive patterns (intelligence heuristics, template fallbacks, grep-based search fallbacks). Pre-existing `now_unix` bug in sw-scale.sh fixed.
 
 | #   | Task                                                                                                                                                                                                    | Owner | Acceptance                                               |
 | --- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----- | -------------------------------------------------------- |

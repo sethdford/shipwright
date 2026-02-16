@@ -5,7 +5,7 @@
 # ╚═══════════════════════════════════════════════════════════════════════════╝
 set -euo pipefail
 
-VERSION="2.2.1"
+VERSION="2.2.2"
 
 # Resolve symlinks (required for npm global install where bin/ symlinks to node_modules/)
 SOURCE="${BASH_SOURCE[0]}"
@@ -173,7 +173,9 @@ show_help() {
     echo -e "  ${CYAN}init${RESET}                  ${BOLD}Quick tmux setup${RESET} — one command, no prompts"
     echo -e "  ${CYAN}setup${RESET}                 ${BOLD}Guided setup${RESET} — prerequisites, init, doctor, quick start"
     echo -e "  ${CYAN}help${RESET}                  Show this help message"
-    echo -e "  ${CYAN}version${RESET}               Show version"
+    echo -e "  ${CYAN}version${RESET} [show]        Show version"
+    echo -e "  ${CYAN}version bump${RESET} <x.y.z>  Bump version everywhere (scripts, README, package.json)"
+    echo -e "  ${CYAN}version check${RESET}         Verify version consistency (CI / before release)"
     echo -e "  ${CYAN}hello${RESET}                Say hello world"
     echo ""
     echo -e "${BOLD}CONTINUOUS LOOP${RESET}  ${DIM}(autonomous agent operation)${RESET}"
@@ -303,7 +305,8 @@ route_release() {
         release-manager)  exec "$SCRIPT_DIR/sw-release-manager.sh" "$@" ;;
         changelog)        exec "$SCRIPT_DIR/sw-changelog.sh" "$@" ;;
         deploy|deploys)   exec "$SCRIPT_DIR/sw-github-deploy.sh" "$@" ;;
-        help|*) echo "Usage: shipwright release {release|release-manager|changelog|deploy}"; exit 1 ;;
+        build)            exec "$SCRIPT_DIR/build-release.sh" "$@" ;;
+        help|*) echo "Usage: shipwright release {release|release-manager|changelog|deploy|build}"; exit 1 ;;
     esac
 }
 
@@ -645,7 +648,26 @@ main() {
         help|--help|-h)
             show_help
             ;;
-        version|--version|-v)
+        version)
+            case "${1:-show}" in
+                bump)
+                    shift
+                    if [[ -z "${1:-}" ]]; then
+                        error "Usage: shipwright version bump <x.y.z>"
+                        echo -e "  ${DIM}Example: shipwright version bump 2.3.0${RESET}"
+                        exit 1
+                    fi
+                    exec "$SCRIPT_DIR/update-version.sh" "$@"
+                    ;;
+                check)
+                    exec "$SCRIPT_DIR/check-version-consistency.sh" "$@"
+                    ;;
+                show|*)
+                    show_version
+                    ;;
+            esac
+            ;;
+        --version|-v)
             show_version
             ;;
         hello)

@@ -54,12 +54,16 @@ trap cleanup EXIT
 # ── 1.1 Daemon: failure_history initialized in state ──────────────────────────
 test_failure_history_init() {
     # Verify the init_state function includes failure_history: [] (can be up to 50 lines into function)
-    grep -A 50 'init_state()' "$SCRIPT_DIR/sw-daemon.sh" | grep -q 'failure_history' || {
+    local _ctx
+    _ctx="$(grep -A 50 'init_state()' "$SCRIPT_DIR/sw-daemon.sh" "$SCRIPT_DIR"/lib/daemon-*.sh 2>/dev/null || true)"
+    echo "$_ctx" | grep -q 'failure_history' || {
         echo "failure_history not in init_state function"
         return 1
     }
     # Verify it's initialized as an array
-    grep -q 'failure_history.*\[\]' "$SCRIPT_DIR/sw-daemon.sh" || {
+    local _arr
+    _arr="$(grep 'failure_history.*\[\]' "$SCRIPT_DIR/sw-daemon.sh" "$SCRIPT_DIR"/lib/daemon-*.sh 2>/dev/null || true)"
+    [[ -n "$_arr" ]] || {
         echo "failure_history not initialized as empty array []"
         return 1
     }
@@ -115,9 +119,9 @@ JSON
 
 # ── 1.3 Daemon: get_max_retries_for_class returns correct values ──────────────
 test_max_retries_per_class() {
-    # Extract the function and test it in isolation
+    # Extract the function and test it in isolation (may be in lib/daemon-failure.sh)
     local func_body
-    func_body=$(sed -n '/^get_max_retries_for_class()/,/^}/p' "$SCRIPT_DIR/sw-daemon.sh")
+    func_body=$(sed -n '/^get_max_retries_for_class()/,/^}/p' "$SCRIPT_DIR/sw-daemon.sh" "$SCRIPT_DIR"/lib/daemon-*.sh 2>/dev/null)
     [[ -n "$func_body" ]] || { echo "get_max_retries_for_class function not found"; return 1; }
     local result
     result=$(bash -c "
@@ -182,15 +186,15 @@ test_pm_learn_functional() {
 
 # ── 1.8 Daemon: PM integration in triage (wiring check) ──────────────────────
 test_daemon_pm_triage_wiring() {
-    grep -q 'sw-pm.sh.*recommend.*--json' "$SCRIPT_DIR/sw-daemon.sh" || { echo "PM recommend --json not wired into daemon triage"; return 1; }
-    grep -q 'sw-pm.sh.*learn.*success' "$SCRIPT_DIR/sw-daemon.sh" || { echo "PM learn success not wired into daemon"; return 1; }
-    grep -q 'sw-pm.sh.*learn.*failure' "$SCRIPT_DIR/sw-daemon.sh" || { echo "PM learn failure not wired into daemon"; return 1; }
+    grep -q 'sw-pm.sh.*recommend.*--json' "$SCRIPT_DIR/sw-daemon.sh" "$SCRIPT_DIR"/lib/daemon-*.sh 2>/dev/null || { echo "PM recommend --json not wired into daemon triage"; return 1; }
+    grep -q 'sw-pm.sh.*learn.*success' "$SCRIPT_DIR/sw-daemon.sh" "$SCRIPT_DIR"/lib/daemon-*.sh 2>/dev/null || { echo "PM learn success not wired into daemon"; return 1; }
+    grep -q 'sw-pm.sh.*learn.*failure' "$SCRIPT_DIR/sw-daemon.sh" "$SCRIPT_DIR"/lib/daemon-*.sh 2>/dev/null || { echo "PM learn failure not wired into daemon"; return 1; }
 }
 
 # ── 1.9 Daemon: confidence-based template upgrade ────────────────────────────
 test_confidence_template_upgrade() {
-    grep -q 'confidence.*-lt 60' "$SCRIPT_DIR/sw-daemon.sh" || { echo "Missing confidence < 60 threshold check"; return 1; }
-    grep -q 'upgrading to full template' "$SCRIPT_DIR/sw-daemon.sh" || { echo "Missing upgrade to full template on low confidence"; return 1; }
+    grep -q 'confidence.*-lt 60' "$SCRIPT_DIR/sw-daemon.sh" "$SCRIPT_DIR"/lib/daemon-*.sh 2>/dev/null || { echo "Missing confidence < 60 threshold check"; return 1; }
+    grep -q 'upgrading to full template' "$SCRIPT_DIR/sw-daemon.sh" "$SCRIPT_DIR"/lib/daemon-*.sh 2>/dev/null || { echo "Missing upgrade to full template on low confidence"; return 1; }
 }
 
 # ══════════════════════════════════════════════════════════════════════════════

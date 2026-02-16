@@ -78,6 +78,8 @@ Navigation hub for all Shipwright docs. Start here or jump to a section.
 
 ## See Also
 
+- [../CHANGELOG.md](../CHANGELOG.md) — Version history and release notes
+- **Release automation** — Prefer CLI: `shipwright version bump <x.y.z>`, `shipwright version check`, `shipwright release build`. Scripts: `scripts/update-version.sh`, `scripts/check-version-consistency.sh`, `scripts/build-release.sh`. Website footer reads version from repo `package.json` at build time.
 - [demo/README.md](../demo/README.md) — Demo app for pipeline testing
 - [claude-code/CLAUDE.md.shipwright](../claude-code/CLAUDE.md.shipwright) — Downstream repo template
 - [.github/pull_request_template.md](../.github/pull_request_template.md) — PR checklist

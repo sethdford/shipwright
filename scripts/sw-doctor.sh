@@ -4,7 +4,7 @@
 # ║                                                                          ║
 # ║  Checks prerequisites, installed files, PATH, and common issues.        ║
 # ╚═══════════════════════════════════════════════════════════════════════════╝
-VERSION="2.2.1"
+VERSION="2.2.2"
 set -euo pipefail
 trap 'echo "ERROR: $BASH_SOURCE:$LINENO exited with status $?" >&2' ERR
 
@@ -45,6 +45,15 @@ RESET="${RESET:-\033[0m}"
 PASS=0
 WARN=0
 FAIL=0
+SKIP_PLATFORM_SCAN=false
+
+# Parse doctor flags
+for _arg in "$@"; do
+    case "$_arg" in
+        --skip-platform-scan) SKIP_PLATFORM_SCAN=true ;;
+        --version|-V) echo "sw-doctor $VERSION"; exit 0 ;;
+    esac
+done
 
 check_pass() { success "$*"; PASS=$((PASS + 1)); }
 check_warn() { warn "$*"; WARN=$((WARN + 1)); }
@@ -350,6 +359,29 @@ if command -v sw &>/dev/null; then
 else
     check_fail "shipwright command not found in PATH"
     echo -e "    ${DIM}Re-run install.sh to install the CLI${RESET}"
+fi
+
+# ═════════════════════════════════════════════════════════════════════════════
+# 4b. Version consistency (Shipwright repo only)
+# ═════════════════════════════════════════════════════════════════════════════
+REPO_ROOT_DOC="$(cd "$SCRIPT_DIR/.." 2>/dev/null && pwd)"
+if [[ -n "$REPO_ROOT_DOC" && -f "$REPO_ROOT_DOC/package.json" ]] && \
+   command -v jq &>/dev/null && \
+   [[ "$(jq -r '.name // ""' "$REPO_ROOT_DOC/package.json" 2>/dev/null)" == "shipwright-cli" ]]; then
+    echo ""
+    echo -e "${PURPLE}${BOLD}  VERSION CONSISTENCY${RESET} ${DIM}(Shipwright repo)${RESET}"
+    echo -e "${DIM}  ──────────────────────────────────────────${RESET}"
+    if [[ -x "$SCRIPT_DIR/check-version-consistency.sh" ]]; then
+        if bash "$SCRIPT_DIR/check-version-consistency.sh" 2>/dev/null; then
+            check_pass "Version consistent (package.json, README, scripts)"
+        else
+            check_warn "Version drift — package.json, README, or scripts out of sync"
+            echo -e "    ${DIM}Run: shipwright version check${RESET}"
+            echo -e "    ${DIM}Fix: shipwright version bump <x.y.z>${RESET}"
+        fi
+    else
+        check_warn "check-version-consistency.sh not found"
+    fi
 fi
 
 # ═════════════════════════════════════════════════════════════════════════════
@@ -1011,6 +1043,13 @@ echo -e "${DIM}  ─────────────────────
 SCRIPT_DIR_DOC="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_DIR_DOC="$(cd "$SCRIPT_DIR_DOC/.." && pwd)"
 PH_FILE="$REPO_DIR_DOC/.claude/platform-hygiene.json"
+# Auto-run platform-refactor scan if report is missing (unless --skip-platform-scan)
+if [[ ! -f "$PH_FILE" ]] && [[ "$SKIP_PLATFORM_SCAN" != "true" ]]; then
+    if [[ -f "$SCRIPT_DIR_DOC/sw-hygiene.sh" ]]; then
+        info "  Platform hygiene report not found — running scan..."
+        bash "$SCRIPT_DIR_DOC/sw-hygiene.sh" platform-refactor >/dev/null 2>&1 || true
+    fi
+fi
 if [[ -f "$PH_FILE" ]] && command -v jq &>/dev/null; then
     hc=$(jq -r '.counts.hardcoded // 0' "$PH_FILE" 2>/dev/null || echo "0")
     fb=$(jq -r '.counts.fallback // 0' "$PH_FILE" 2>/dev/null || echo "0")
@@ -1019,6 +1058,8 @@ if [[ -f "$PH_FILE" ]] && command -v jq &>/dev/null; then
     hack=$(jq -r '.counts.hack // 0' "$PH_FILE" 2>/dev/null || echo "0")
     check_pass "Platform hygiene: hardcoded=$hc fallback=$fb TODO=$todo FIXME=$fixme HACK=$hack"
     info "  Refresh: shipwright hygiene platform-refactor"
+elif [[ "$SKIP_PLATFORM_SCAN" == "true" ]]; then
+    info "  Platform hygiene skipped (--skip-platform-scan)"
 else
     check_warn "Platform hygiene not run — run: shipwright hygiene platform-refactor"
 fi

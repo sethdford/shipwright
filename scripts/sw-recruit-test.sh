@@ -1047,21 +1047,21 @@ echo -e "\n${CYAN}${BOLD}═══ Section 18: Integration Validation ═══$
 # --- Static: Verify recruit integration hooks exist in other scripts ---
 
 test_case "sw-pipeline.sh has agent_id in pipeline.completed events"
-if grep -q "agent_id=\${PIPELINE_AGENT_ID" "${SCRIPT_DIR}/sw-pipeline.sh"; then
+if grep -q "agent_id=\${PIPELINE_AGENT_ID" "${SCRIPT_DIR}/sw-pipeline.sh" "${SCRIPT_DIR}"/lib/pipeline-*.sh 2>/dev/null; then
     pass
 else
     fail "pipeline.sh missing agent_id in pipeline.completed"
 fi
 
 test_case "sw-pipeline.sh has recruit model selection"
-if grep -q "sw-recruit.sh.*match.*--json" "${SCRIPT_DIR}/sw-pipeline.sh"; then
+if grep -q "sw-recruit.sh.*match.*--json" "${SCRIPT_DIR}/sw-pipeline.sh" "${SCRIPT_DIR}"/lib/pipeline-*.sh 2>/dev/null; then
     pass
 else
     fail "pipeline.sh missing recruit model selection"
 fi
 
 test_case "sw-pipeline.sh has auto-ingest after completion"
-if grep -q "sw-recruit.sh.*ingest-pipeline" "${SCRIPT_DIR}/sw-pipeline.sh"; then
+if grep -q "sw-recruit.sh.*ingest-pipeline" "${SCRIPT_DIR}/sw-pipeline.sh" "${SCRIPT_DIR}"/lib/pipeline-*.sh 2>/dev/null; then
     pass
 else
     fail "pipeline.sh missing auto-ingest"
