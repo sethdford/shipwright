@@ -9,29 +9,39 @@ trap 'echo "ERROR: $BASH_SOURCE:$LINENO exited with status $?" >&2' ERR
 VERSION="2.1.2"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
-# ─── Colors (matches Seth's tmux theme) ─────────────────────────────────────
-CYAN='\033[38;2;0;212;255m'     # #00d4ff — primary accent
-PURPLE='\033[38;2;124;58;237m'  # #7c3aed — secondary
-BLUE='\033[38;2;0;102;255m'     # #0066ff — tertiary
-GREEN='\033[38;2;74;222;128m'   # #4ade80 — success
-YELLOW='\033[38;2;250;204;21m'  # #faca15 — warning
-RED='\033[38;2;248;113;113m'    # #f87171 — error
-DIM='\033[2m'
-BOLD='\033[1m'
-RESET='\033[0m'
-
 # ─── Cross-platform compatibility ──────────────────────────────────────────
 _COMPAT="$SCRIPT_DIR/lib/compat.sh"
 [[ -f "$_COMPAT" ]] && source "$_COMPAT"
 
-# ─── Helpers ────────────────────────────────────────────────────────────────
-info()    { echo -e "${CYAN}${BOLD}▸${RESET} $*"; }
-success() { echo -e "${GREEN}${BOLD}✓${RESET} $*"; }
-warn()    { echo -e "${YELLOW}${BOLD}⚠${RESET} $*"; }
-error()   { echo -e "${RED}${BOLD}✗${RESET} $*" >&2; }
-
-now_iso() { date -u +"%Y-%m-%dT%H:%M:%SZ"; }
-now_epoch() { date +%s; }
+# Canonical helpers (colors, output, events)
+# shellcheck source=lib/helpers.sh
+[[ -f "$SCRIPT_DIR/lib/helpers.sh" ]] && source "$SCRIPT_DIR/lib/helpers.sh"
+# Fallbacks when helpers not loaded (e.g. test env with overridden SCRIPT_DIR)
+[[ "$(type -t info 2>/dev/null)" == "function" ]]    || info()    { echo -e "\033[38;2;0;212;255m\033[1m▸\033[0m $*"; }
+[[ "$(type -t success 2>/dev/null)" == "function" ]] || success() { echo -e "\033[38;2;74;222;128m\033[1m✓\033[0m $*"; }
+[[ "$(type -t warn 2>/dev/null)" == "function" ]]    || warn()    { echo -e "\033[38;2;250;204;21m\033[1m⚠\033[0m $*"; }
+[[ "$(type -t error 2>/dev/null)" == "function" ]]   || error()   { echo -e "\033[38;2;248;113;113m\033[1m✗\033[0m $*" >&2; }
+if [[ "$(type -t now_iso 2>/dev/null)" != "function" ]]; then
+  now_iso()   { date -u +"%Y-%m-%dT%H:%M:%SZ"; }
+  now_epoch() { date +%s; }
+fi
+if [[ "$(type -t emit_event 2>/dev/null)" != "function" ]]; then
+  emit_event() {
+    local event_type="$1"; shift; mkdir -p "${HOME}/.shipwright"
+    local payload="{\"ts\":\"$(date -u +%Y-%m-%dT%H:%M:%SZ)\",\"type\":\"$event_type\""
+    while [[ $# -gt 0 ]]; do local key="${1%%=*}" val="${1#*=}"; payload="${payload},\"${key}\":\"${val}\""; shift; done
+    echo "${payload}}" >> "${HOME}/.shipwright/events.jsonl"
+  }
+fi
+CYAN="${CYAN:-\033[38;2;0;212;255m}"
+PURPLE="${PURPLE:-\033[38;2;124;58;237m}"
+BLUE="${BLUE:-\033[38;2;0;102;255m}"
+GREEN="${GREEN:-\033[38;2;74;222;128m}"
+YELLOW="${YELLOW:-\033[38;2;250;204;21m}"
+RED="${RED:-\033[38;2;248;113;113m}"
+DIM="${DIM:-\033[2m}"
+BOLD="${BOLD:-\033[1m}"
+RESET="${RESET:-\033[0m}"
 
 epoch_to_iso() {
     local epoch="$1"
@@ -50,25 +60,6 @@ format_duration() {
     else
         printf "%ds" "$secs"
     fi
-}
-
-emit_event() {
-    local event_type="$1"; shift
-    local events_file="${HOME}/.shipwright/events.jsonl"
-    mkdir -p "$(dirname "$events_file")"
-    local payload="{\"ts\":\"$(now_iso)\",\"ts_epoch\":$(now_epoch),\"type\":\"$event_type\""
-    for kv in "$@"; do
-        local key="${kv%%=*}"
-        local val="${kv#*=}"
-        if [[ "$val" =~ ^-?[0-9]+\.?[0-9]*$ ]]; then
-            payload="${payload},\"${key}\":${val}"
-        else
-            val="${val//\"/\\\"}"
-            payload="${payload},\"${key}\":\"${val}\""
-        fi
-    done
-    payload="${payload}}"
-    echo "$payload" >> "$events_file"
 }
 
 # ─── State Storage ──────────────────────────────────────────────────────────
