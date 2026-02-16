@@ -9,6 +9,94 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Added
+
+- **100% test coverage** — 22 new test suites (98 total) covering every command
+- **CLI architecture overhaul** — command grouping, repo support, improved help
+- **Strategic agent improvements** — Sonnet model, 4h cooldown, 5-issue batching, `--force` flag
+- **Cost tracking via JSON** — structured output format for token usage
+
+### Fixed
+
+- **Robust JSON extraction** in build loop + semantic dedup threshold tuning
+- **Generated artifact hygiene** — `.gitignore` patterns for runtime outputs
+- **`grep -c` pipefail bug** in `sw-templates.sh`
+- **`gh issue create` stdout corruption** in parse results
+- **Strategic agent** parser robustness and debug output
+
+---
+
+## [2.0.0] — 2026-02-15
+
+**The Autonomous Agent Platform.**
+
+Shipwright v2.0.0 is a major release that adds 18 autonomous agents organized in two waves, intelligence-driven pipeline composition, and comprehensive observability. This transforms Shipwright from a pipeline runner into a full autonomous development platform.
+
+### Added — Wave 1 (Organizational Agents)
+
+- **Dynamic agent swarm** (`swarm`) — Agent team orchestration with role specialization (#65)
+- **Autonomous PM** (`pm`) — Intelligent team orchestration, task scheduling, roadmap execution (#44)
+- **Knowledge guilds** (`guild`) — Cross-team learning, pattern capture, mentorship (#71)
+- **Agent recruitment** (`recruit`) — Talent acquisition and team composition optimization (#70)
+- **Automated standups** (`standup`) — Daily standups with progress tracking and blocker detection
+
+### Added — Wave 2 (Operational Backbone)
+
+- **Quality oversight board** (`oversight`) — Multi-agent review council with voting system
+- **Strategic intelligence** (`strategic`) — Long-term planning, goal decomposition, roadmap
+- **Code reviewer** (`code-review`) — Architecture analysis, clean code, best practices (#76)
+- **Security auditor** (`security-audit`) — Vulnerability detection, threat modeling, compliance
+- **Test generator** (`testgen`) — Coverage analysis, scenario discovery, regression (#75)
+- **Incident commander** (`incident`) — Autonomous triage, root cause, resolution (#67)
+- **Dependency manager** (`deps`) — Semantic versioning, updates, compatibility (#58)
+- **Release manager** (`release-manager`) — Release planning, changelog, deployment
+- **Adaptive tuner** (`adaptive`) — Data-driven pipeline tuning with DORA metrics (#62)
+- **Sprint retrospective** (`retro`) — Sprint retrospective engine (#68)
+- **Changelog engine** (`changelog`) — Automated release notes and migration guides
+
+### Added — Intelligence & Observability
+
+- **OpenTelemetry** (`otel`) — Prometheus metrics and distributed tracing (#35)
+- **Model router** (`model-router`) — Multi-model orchestration with intelligent routing (#56)
+- **Event bus** (`eventbus`) — Durable event-driven architecture (#51)
+- **Production feedback loop** (`feedback`) — Closed-loop learning from production (#52)
+- **Cross-pipeline learning** (`discovery`) — Real-time learning across pipelines (#53)
+- **Issue decomposition** (`decompose`) — Complexity analysis and subtask generation (#54)
+- **DORA dashboard** (`dora`) — DORA metrics with engineering intelligence (#30)
+- **Pipeline replay** (`replay`) — Pipeline run DVR and timeline viewing (#26)
+- **Pipeline vitals** — Real-time health scoring and monitoring
+- **Live activity stream** (`activity`) — Real-time agent monitoring (#31)
+- **Terminal streaming** (`stream`) — Live output from agent panes to dashboard (#42)
+
+### Added — Infrastructure & Operations
+
+- **GitHub App management** (`github-app`) — JWT auth, tokens, webhooks
+- **GitHub OAuth** (`auth`) — Dashboard authentication (#6)
+- **Public dashboard** (`public-dashboard`) — Shareable pipeline progress
+- **Mission control** (`mission-control`) — Terminal-based pipeline monitoring
+- **Team stages** (`team-stages`) — Multi-agent execution with leader/specialist roles
+- **Pipeline instrumentation** (`instrument`) — Predicted vs actual metrics (#63)
+- **Tracker abstraction** (`tracker`) — Provider-agnostic issue discovery (#61)
+- **CI orchestrator** (`ci`) — GitHub Actions workflow generation and management (#77)
+- **E2E test orchestrator** (`e2e-orchestrator`) — Test suite registry and execution (#80)
+- **Fleet visualization** (`fleet-viz`) — Multi-repo fleet dashboard (#32)
+- **tmux pipeline** (`tmux-pipeline`) — Spawn and manage pipelines in tmux (#41)
+- **Dynamic scaling** (`scale`) — Agent team scaling during execution (#46)
+- **UX layer** (`ux`) — Premium UX enhancements
+- **Widgets** (`widgets`) — Embeddable status widgets
+- **Regression detection** (`regression`) — Automated baseline comparison
+- **Release train** (`release`) — Release automation
+- **E2E traceability** (`trace`) — Issue → Commit → PR → Deploy
+- **Shell completions** — Full bash, zsh, and fish tab completion
+- **Pipeline dry-run** — CI validation mode
+
+### Changed
+
+- Renamed `ANTHROPIC_API_KEY` → `CLAUDE_CODE_OAUTH_TOKEN` everywhere
+- First-run onboarding experience completely overhauled
+- Documentation overhauled for v2.0.0 with 18 new autonomous agents
+- 22 test suites (up from 25 in 1.12.0) — comprehensive coverage
+
 ---
 
 ## [1.12.0] — 2026-02-14
@@ -49,6 +137,91 @@ Major expansion of Shipwright's core infrastructure: cross-platform service mana
 - **Cross-platform service management**: Abstracted platform detection for launchd/systemd compatibility
 - **Race conditions in daemon**: SQLite transactions replace file-based state
 - **Memory leaks in long-running daemon**: Persistent state prevents unbounded JSON growth
+
+---
+
+## [1.10.0] — 2026-02-12
+
+**Closed-Loop Intelligence.**
+
+Complete the autonomous feedback loop: errors feed into memory, memory feeds into fixes, DORA metrics drive self-optimization. Plus C-compiler-level loop capabilities for maximum iteration resilience.
+
+### Added
+
+- **C-compiler-level loop** — Fault-tolerant iteration with progress persistence, restart lifecycle, and exhaustion detection
+- **Closed-loop learning** — Error → memory → fix cycle fully connected
+- **Progressive deployment** — Staged rollout with validation gates
+- **`--json` output flag** for `shipwright status`
+- **`hello` command** for quick CLI verification
+
+### Fixed
+
+- **Daemon queue deadlock** — Drain queued issues when no active jobs exist
+- **Daemon reliability** — Single-worker mode, stagger spawns, sort tiebreaker
+- **Template name corruption** in daemon spawning
+- **Progress.md** written on all loop exit paths
+- **Restart lifecycle** and fast-test double-run elimination
+
+---
+
+## [1.9.0] — 2026-02-12
+
+**Progress-Based Health Monitoring.**
+
+### Added
+
+- **Intelligent progress monitoring** — Pipeline health scoring based on iteration progress, not just timeouts
+
+### Fixed
+
+- **Production reliability hardening** — Locking, timeouts, cleanup, state safety
+
+---
+
+## [1.8.1] — 2026-02-11
+
+**Daemon Stability.**
+
+### Fixed
+
+- **Daemon signal handling** — Trap SIGPIPE, log ERR to file, guard sleep
+- **Daemon poll loop** — Error-guard to prevent crash on transient failures
+- **Daemon state** — Eliminate eval injection, enforce Bash 3.2 compatibility
+- **PID/issue_num validation** from JSON before use in daemon reaper
+- **`local` outside function** in `sw-status.sh`
+
+---
+
+## [1.8.0] — 2026-02-11
+
+**Intelligence Layer & Deep GitHub Integration.**
+
+Major capability expansion: full intelligence layer with adaptive thresholds, deep GitHub API integration (GraphQL, Checks, Deployments), agent heartbeat/checkpoint system, self-healing CI, and cross-platform compatibility.
+
+### Added
+
+- **Intelligence layer** — Adaptive thresholds, feedback loops, semantic detection
+- **GitHub GraphQL client** — Cached queries for file churn, blame, contributors, similar issues
+- **GitHub Checks API** — Native Check Runs per pipeline stage
+- **GitHub Deployments API** — Environment tracking with rollback support
+- **Agent heartbeat/checkpoint** — Persistent agent health monitoring
+- **Multi-machine workers** — Distributed execution across remote machines
+- **Self-healing CI** — Auto-retry with strategy engine and health dashboard
+- **AI triage gate** — Intelligent issue labeling in CI pipeline
+- **Cross-platform compat library** — `scripts/lib/compat.sh` for macOS + Linux
+- **Auto-launch Claude Code** with team prompt in session command
+- **Compound quality stage** in pipeline
+- **24/7 sweep cron** for missed pipeline triggers
+
+### Fixed
+
+- **Pipeline loop exits** from stdin consumption in while-read
+- **Daemon hardening** — Rate-limit circuit breaker, locked state ops, stale cleanup
+- **Daemon resilience** — State locking, FD leaks, zombie recovery, capacity bounds
+- **Daemon crash** on tmux attach and orphaned child processes
+- **PR quality gate** and title generation
+- **Bash 3.2 compatibility** — Install hardening, doctor enhancements
+- **Pipeline timeout** simplified — Watchdog handles stuck detection
 
 ---
 
@@ -231,7 +404,12 @@ This release turns Shipwright from a team session manager into a full autonomous
 
 ---
 
-[1.12.0]: https://github.com/sethdford/shipwright/compare/v1.11.0...v1.12.0
+[2.0.0]: https://github.com/sethdford/shipwright/compare/v1.10.0...v2.0.0
+[1.12.0]: https://github.com/sethdford/shipwright/compare/v1.10.0...v1.12.0
+[1.10.0]: https://github.com/sethdford/shipwright/compare/v1.9.0...v1.10.0
+[1.9.0]: https://github.com/sethdford/shipwright/compare/v1.8.1...v1.9.0
+[1.8.1]: https://github.com/sethdford/shipwright/compare/v1.8.0...v1.8.1
+[1.8.0]: https://github.com/sethdford/shipwright/compare/v1.7.0...v1.8.0
 [1.7.0]: https://github.com/sethdford/shipwright/compare/v1.6.0...v1.7.0
 [1.6.0]: https://github.com/sethdford/shipwright/compare/v1.5.1...v1.6.0
 [1.5.1]: https://github.com/sethdford/shipwright/compare/v1.5.0...v1.5.1
