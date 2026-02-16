@@ -530,7 +530,7 @@ All scripts are bash (except the dashboard server in TypeScript). Grouped by lay
 | `scripts/sw-patrol-meta.sh` | 448 | Shipwright Self-Improvement Patrol |
 | `scripts/sw-pipeline-composer.sh` | 446 | Dynamic Pipeline Composition |
 | `scripts/sw-pipeline-vitals.sh` | 1082 | Pipeline Vitals Engine |
-| `scripts/sw-pipeline.sh` | 8665 | Autonomous Feature Delivery (Idea → Production) |
+| `scripts/sw-pipeline.sh` | 2474 | Autonomous Feature Delivery (Idea → Production) |
 | `scripts/sw-pm.sh` | 748 | Autonomous PM Agent for Team Orchestration |
 | `scripts/sw-pr-lifecycle.sh` | 510 | Autonomous PR Management |
 | `scripts/sw-predictive.sh` | 825 | Predictive & Proactive Intelligence |
@@ -613,7 +613,7 @@ All scripts are bash (except the dashboard server in TypeScript). Grouped by lay
 | `scripts/sw-activity-test.sh` | 286 | Validate live agent activity stream |
 | `scripts/sw-adaptive-test.sh` | 203 | Validate data-driven pipeline tuning |
 | `scripts/sw-adversarial-test.sh` | 296 | Validate adversarial agent code review |
-| `scripts/sw-agi-roadmap-test.sh` | 858 | Tests every feature we implemented |
+| `scripts/sw-agi-roadmap-test.sh` | 862 | Tests every feature we implemented |
 | `scripts/sw-architecture-enforcer-test.sh` | 339 | Validate architecture model |
 | `scripts/sw-auth-test.sh` | 168 | Validate OAuth authentication commands |
 | `scripts/sw-autonomous-test.sh` | 219 | AI-building-AI master controller tests |
@@ -625,7 +625,7 @@ All scripts are bash (except the dashboard server in TypeScript). Grouped by lay
 | `scripts/sw-connect-test.sh` | 831 | Validate dashboard connection, heartbeat |
 | `scripts/sw-context-test.sh` | 239 | Context Engine for Pipeline Stages tests |
 | `scripts/sw-cost-test.sh` | 230 | Validate token usage & cost intelligence |
-| `scripts/sw-daemon-test.sh` | 2005 | Unit tests for daemon metrics, health, alerting |
+| `scripts/sw-daemon-test.sh` | 2013 | Unit tests for daemon metrics, health, alerting |
 | `scripts/sw-dashboard-test.sh` | 347 | Validate fleet command dashboard |
 | `scripts/sw-db-test.sh` | 980 | SQLite Persistence Layer Test Suite |
 | `scripts/sw-decompose-test.sh` | 160 | Intelligent Issue Decomposition tests |
