@@ -6,7 +6,7 @@
 set -euo pipefail
 trap 'echo "ERROR: $BASH_SOURCE:$LINENO exited with status $?" >&2' ERR
 
-VERSION="2.1.2"
+VERSION="2.2.0"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
 
@@ -49,11 +49,12 @@ RESET="${RESET:-\033[0m}"
 ARTIFACTS_DIR="${ARTIFACTS_DIR:-./.claude/pipeline-artifacts}"
 COVERAGE_THRESHOLD="${QUALITY_COVERAGE_THRESHOLD:-70}"
 QUALITY_THRESHOLD="${QUALITY_GATE_SCORE_THRESHOLD:-70}"
-TEST_PASS_WEIGHT=0.30
-COVERAGE_WEIGHT=0.20
-SECURITY_WEIGHT=0.20
-ARCHITECTURE_WEIGHT=0.15
-CORRECTNESS_WEIGHT=0.15
+# Audit weights from policy (via pipeline-quality.sh) — expressed as decimals
+TEST_PASS_WEIGHT=$(awk -v w="${QUALITY_WEIGHT_TEST_PASS:-30}" 'BEGIN{printf "%.2f", w/100}')
+COVERAGE_WEIGHT=$(awk -v w="${QUALITY_WEIGHT_COVERAGE:-20}" 'BEGIN{printf "%.2f", w/100}')
+SECURITY_WEIGHT=$(awk -v w="${QUALITY_WEIGHT_SECURITY:-20}" 'BEGIN{printf "%.2f", w/100}')
+ARCHITECTURE_WEIGHT=$(awk -v w="${QUALITY_WEIGHT_ARCHITECTURE:-15}" 'BEGIN{printf "%.2f", w/100}')
+CORRECTNESS_WEIGHT=$(awk -v w="${QUALITY_WEIGHT_CORRECTNESS:-15}" 'BEGIN{printf "%.2f", w/100}')
 
 # ─── Validate subcommand ────────────────────────────────────────────────────
 validate_quality() {

@@ -6,7 +6,7 @@
 set -euo pipefail
 trap 'echo "ERROR: $BASH_SOURCE:$LINENO exited with status $?" >&2' ERR
 
-VERSION="2.1.2"
+VERSION="2.2.0"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
 
@@ -168,6 +168,9 @@ optimize_analyze_outcome() {
     outcome_line=$(cat "$tmp_outcome")
     rm -f "$tmp_outcome"
     echo "$outcome_line" >> "$OUTCOMES_FILE"
+
+    # Rotate outcomes file to prevent unbounded growth
+    type rotate_jsonl &>/dev/null 2>&1 && rotate_jsonl "$OUTCOMES_FILE" 10000
 
     # Record GitHub CI metrics alongside outcome
     local gh_ci_metrics

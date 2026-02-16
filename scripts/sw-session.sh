@@ -8,7 +8,7 @@
 # ║  Supports --template to scaffold from a team template and --terminal    ║
 # ║  to select a terminal adapter (tmux, iterm2, wezterm).                  ║
 # ╚═══════════════════════════════════════════════════════════════════════════╝
-VERSION="2.1.2"
+VERSION="2.2.0"
 set -euo pipefail
 trap 'echo "ERROR: $BASH_SOURCE:$LINENO exited with status $?" >&2' ERR
 

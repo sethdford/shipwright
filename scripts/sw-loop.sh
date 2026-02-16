@@ -71,7 +71,7 @@ MAX_RESTARTS=0
 SESSION_RESTART=false
 RESTART_COUNT=0
 REPO_OVERRIDE=""
-VERSION="2.1.2"
+VERSION="2.2.0"
 
 # ─── Token Tracking ─────────────────────────────────────────────────────────
 LOOP_INPUT_TOKENS=0
@@ -1688,8 +1688,8 @@ compose_worker_prompt() {
                     reviewer)  role_desc="Focus on code review — look for bugs, security issues, edge cases in recent commits. Make fixes via commits." ;;
                     tester)    role_desc="Focus on test coverage — write new tests, fix failing tests, improve assertions and edge case coverage." ;;
                     optimizer) role_desc="Focus on performance — profile hot paths, reduce complexity, optimize algorithms and data structures." ;;
-                    docs)      role_desc="Focus on documentation — update README, add docstrings, write usage guides for new features." ;;
-                    security)  role_desc="Focus on security — audit for vulnerabilities, fix injection risks, validate inputs, check auth boundaries." ;;
+                    docs|docs-writer) role_desc="Focus on documentation — update README, add docstrings, write usage guides for new features." ;;
+                    security|security-auditor) role_desc="Focus on security — audit for vulnerabilities, fix injection risks, validate inputs, check auth boundaries." ;;
                     *)         role_desc="Focus on: ${role}. Apply your expertise in this area to advance the goal." ;;
                 esac
             fi

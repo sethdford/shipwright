@@ -6,8 +6,14 @@
 set -euo pipefail
 trap 'echo "ERROR: $BASH_SOURCE:$LINENO exited with status $?" >&2' ERR
 
-VERSION="2.1.2"
+VERSION="2.2.0"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
+# ─── Dependency check ─────────────────────────────────────────────────────────
+if ! command -v jq &>/dev/null; then
+    echo "ERROR: sw-scale.sh requires 'jq'. Install with: brew install jq (macOS) or apt install jq (Linux)" >&2
+    exit 1
+fi
 
 # ─── Cross-platform compatibility ──────────────────────────────────────────
 # shellcheck source=lib/compat.sh
@@ -66,7 +72,7 @@ init_rules() {
   "budget_check": true,
   "cooldown_seconds": 120,
   "max_team_size": 8,
-  "roles": ["builder", "reviewer", "tester", "security"]
+  "roles": ["builder", "reviewer", "tester", "security-auditor"]
 }
 JSON
         mv "$tmp_file" "$SCALE_RULES_FILE"
@@ -90,7 +96,7 @@ in_cooldown() {
     local last_time
     last_time=$(get_last_scale_time)
     local now
-    now=$(now_unix)
+    now=$(now_epoch)
     local elapsed=$((now - last_time))
     [[ $elapsed -lt $cooldown ]]
 }
@@ -102,12 +108,12 @@ update_scale_state() {
 
     if [[ -f "$SCALE_STATE_FILE" ]]; then
         # Update existing state
-        jq --arg now "$(now_unix)" '.last_scale_time = ($now | tonumber)' "$SCALE_STATE_FILE" > "$tmp_file"
+        jq --arg now "$(now_epoch)" '.last_scale_time = ($now | tonumber)' "$SCALE_STATE_FILE" > "$tmp_file"
     else
         # Create new state
         cat > "$tmp_file" << JSON
 {
-  "last_scale_time": $(now_unix),
+  "last_scale_time": $(now_epoch),
   "team_size": 0,
   "events_count": 0
 }
@@ -136,6 +142,7 @@ emit_scale_event() {
         '{ts: $ts, action: $action, role: $role, reason: $reason, context: $context}')
 
     echo "$event" >> "$SCALE_EVENTS_FILE"
+    type rotate_jsonl &>/dev/null 2>&1 && rotate_jsonl "$SCALE_EVENTS_FILE" 5000
 }
 
 # ─── Scale Up: spawn new agent ───────────────────────────────────────────
@@ -147,7 +154,7 @@ cmd_up() {
     init_rules
 
     # Validate role
-    local valid_roles="builder reviewer tester security"
+    local valid_roles="builder reviewer tester security-auditor architect docs-writer optimizer devops pm incident-responder"
     if ! echo "$valid_roles" | grep -q "$role"; then
         error "Invalid role: $role. Valid roles: $valid_roles"
         return 1

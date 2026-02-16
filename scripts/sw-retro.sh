@@ -6,7 +6,7 @@
 set -euo pipefail
 trap 'echo "ERROR: $BASH_SOURCE:$LINENO exited with status $?" >&2' ERR
 
-VERSION="2.1.2"
+VERSION="2.2.0"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 # ─── Cross-platform compatibility ──────────────────────────────────────────
@@ -157,9 +157,9 @@ analyze_agent_performance() {
 
     jq -s --argjson from "$from_epoch" --argjson to "$to_epoch" '
         [.[] | select(.ts_epoch >= $from and .ts_epoch <= $to)] as $events |
-        [$events[] | select(.type == "pipeline.completed" and .agent)] as $completions |
-        $completions | group_by(.agent) | map({
-            agent: .[0].agent,
+        [$events[] | select(.type == "pipeline.completed" and (.agent_id // .agent))] as $completions |
+        $completions | group_by(.agent_id // .agent) | map({
+            agent: .[0].agent_id // .[0].agent,
             completed: length,
             succeeded: ([.[] | select(.result == "success")] | length),
             failed: ([.[] | select(.result == "failure")] | length),

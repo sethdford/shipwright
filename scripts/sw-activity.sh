@@ -6,7 +6,7 @@
 set -euo pipefail
 trap 'echo "ERROR: $BASH_SOURCE:$LINENO exited with status $?" >&2' ERR
 
-VERSION="2.1.2"
+VERSION="2.2.0"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 # ─── Cross-platform compatibility ──────────────────────────────────────────
@@ -151,7 +151,7 @@ cmd_watch() {
                 local ts type agent stage issue
                 ts=$(echo "$line" | jq -r '.ts // ""' 2>/dev/null || true)
                 type=$(echo "$line" | jq -r '.type // ""' 2>/dev/null || true)
-                agent=$(echo "$line" | jq -r '.agent // "system"' 2>/dev/null || true)
+                agent=$(echo "$line" | jq -r '.agent_id // .agent // "system"' 2>/dev/null || true)
                 stage=$(echo "$line" | jq -r '.stage // ""' 2>/dev/null || true)
                 issue=$(echo "$line" | jq -r '.issue // ""' 2>/dev/null || true)
 
@@ -240,7 +240,7 @@ cmd_snapshot() {
         [ -z "$line" ] && continue
 
         local agent stage ts
-        agent=$(echo "$line" | jq -r '.agent // "system"' 2>/dev/null || true)
+        agent=$(echo "$line" | jq -r '.agent_id // .agent // "system"' 2>/dev/null || true)
         stage=$(echo "$line" | jq -r '.stage // ""' 2>/dev/null || true)
         ts=$(echo "$line" | jq -r '.ts // ""' 2>/dev/null || true)
 
@@ -299,7 +299,7 @@ cmd_history() {
 
         local epoch agent ts type
         epoch=$(echo "$line" | jq -r '.ts_epoch // 0' 2>/dev/null || true)
-        agent=$(echo "$line" | jq -r '.agent // "system"' 2>/dev/null || true)
+        agent=$(echo "$line" | jq -r '.agent_id // .agent // "system"' 2>/dev/null || true)
         ts=$(echo "$line" | jq -r '.ts // ""' 2>/dev/null || true)
         type=$(echo "$line" | jq -r '.type // ""' 2>/dev/null || true)
 
@@ -350,7 +350,7 @@ cmd_stats() {
 
         local type agent ts
         type=$(echo "$line" | jq -r '.type // ""' 2>/dev/null || true)
-        agent=$(echo "$line" | jq -r '.agent // "system"' 2>/dev/null || true)
+        agent=$(echo "$line" | jq -r '.agent_id // .agent // "system"' 2>/dev/null || true)
         ts=$(echo "$line" | jq -r '.ts // ""' 2>/dev/null || true)
 
         # Track unique agents
@@ -402,7 +402,7 @@ cmd_agents() {
         [ -z "$line" ] && continue
 
         local agent ts type
-        agent=$(echo "$line" | jq -r '.agent // "system"' 2>/dev/null || true)
+        agent=$(echo "$line" | jq -r '.agent_id // .agent // "system"' 2>/dev/null || true)
         ts=$(echo "$line" | jq -r '.ts // ""' 2>/dev/null || true)
         type=$(echo "$line" | jq -r '.type // ""' 2>/dev/null || true)
 

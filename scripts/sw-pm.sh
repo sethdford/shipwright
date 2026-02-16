@@ -6,7 +6,7 @@
 set -euo pipefail
 trap 'echo "ERROR: $BASH_SOURCE:$LINENO exited with status $?" >&2' ERR
 
-VERSION="2.1.2"
+VERSION="2.2.0"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 # ─── Cross-platform compatibility ──────────────────────────────────────────
@@ -319,7 +319,7 @@ recommend_team() {
 
     # Add security specialist if needed
     if [[ "$is_security" == "true" ]]; then
-        roles="${roles},security"
+        roles="${roles},security-auditor"
         estimated_agents=$((estimated_agents + 1))
         confidence=$((confidence - 10))
         risk_factors="${risk_factors}; security-sensitive changes"

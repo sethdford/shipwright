@@ -5,7 +5,7 @@
 # ╚═══════════════════════════════════════════════════════════════════════════╝
 set -euo pipefail
 
-VERSION="2.1.2"
+VERSION="2.2.0"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 DIST_DIR="$REPO_ROOT/dist"
@@ -67,6 +67,7 @@ cp -R "$REPO_ROOT/tmux" "$STAGING/"
 cp -R "$REPO_ROOT/claude-code" "$STAGING/"
 [[ -d "$REPO_ROOT/completions" ]] && cp -R "$REPO_ROOT/completions" "$STAGING/"
 [[ -d "$REPO_ROOT/docs" ]] && cp -R "$REPO_ROOT/docs" "$STAGING/"
+[[ -d "$REPO_ROOT/config" ]] && cp -R "$REPO_ROOT/config" "$STAGING/"
 
 # Include repo-level agent definitions and hooks
 mkdir -p "$STAGING/.claude"

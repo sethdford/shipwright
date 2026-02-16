@@ -411,6 +411,16 @@ _recruit_record_match() {
         '{ts: $ts, ts_epoch: $epoch, match_id: $match_id, task: $task, role: $role, method: $method, confidence: $conf, agent_id: $agent, outcome: null}')
     echo "$record" >> "$MATCH_HISTORY"
 
+    # Enforce max match history size (from policy)
+    local max_history="${RECRUIT_MAX_MATCH_HISTORY:-5000}"
+    local current_lines
+    current_lines=$(wc -l < "$MATCH_HISTORY" 2>/dev/null | tr -d ' ')
+    if [[ "$current_lines" -gt "$max_history" ]]; then
+        local tmp_trunc
+        tmp_trunc=$(mktemp)
+        tail -n "$max_history" "$MATCH_HISTORY" > "$tmp_trunc" && _recruit_locked_write "$MATCH_HISTORY" "$tmp_trunc" || rm -f "$tmp_trunc"
+    fi
+
     # Update role usage stats
     _recruit_track_role_usage "$role" "match"
 

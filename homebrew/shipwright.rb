@@ -5,7 +5,7 @@
 class Shipwright < Formula
   desc "Orchestrate autonomous Claude Code agent teams in tmux"
   homepage "https://github.com/sethdford/shipwright"
-  version "1.6.0"
+  version "2.2.0"
   license "MIT"
 
   on_macos do
@@ -23,29 +23,42 @@ class Shipwright < Formula
     sha256 "PLACEHOLDER_LINUX_X86_64_SHA256"
   end
 
-  depends_on "tmux"
+  depends_on "bash"
   depends_on "jq"
+  depends_on "tmux"
 
   def install
-    # Install all scripts
-    libexec.install Dir["scripts/*"]
+    # Preserve tarball layout under libexec so REPO_DIR=libexec (scripts expect SCRIPT_DIR/.. = repo root)
+    libexec.install "scripts" if Dir.exist?("scripts")
+    libexec.install "templates" if Dir.exist?("templates")
+    libexec.install "tmux" if Dir.exist?("tmux")
+    libexec.install "config" if Dir.exist?("config")
+    (libexec/".claude").install Dir[".claude/agents"] if Dir.exist?(".claude/agents")
+    (libexec/".claude").install Dir[".claude/hooks"] if Dir.exist?(".claude/hooks")
 
-    # Make scripts executable
-    (libexec/"scripts").children.each { |f| f.chmod 0755 if f.file? }
+    # Make shell scripts executable
+    Dir[libexec/"scripts/*.sh"].each { |f| File.chmod(0755, f) }
+    Dir[libexec/"scripts/lib/*.sh"].each { |f| File.chmod(0755, f) } if Dir.exist?(libexec/"scripts/lib")
 
-    # Create bin entries — all three names point to the same router
-    bin.install_symlink libexec/"sw" => "shipwright"
-    bin.install_symlink libexec/"sw" => "sw"
-    bin.install_symlink libexec/"sw" => "cct"
+    # Wrapper runs libexec/scripts/sw so SCRIPT_DIR=libexec/scripts, REPO_DIR=libexec
+    (bin/"shipwright").write <<~EOS
+      #!/usr/bin/env bash
+      exec "#{libexec}/scripts/sw" "$@"
+    EOS
 
-    # Install team templates
-    (share/"shipwright/templates").install Dir["tmux/templates/*.json"]
+    (bin/"sw").write <<~EOS
+      #!/usr/bin/env bash
+      exec "#{libexec}/scripts/sw" "$@"
+    EOS
 
-    # Install pipeline templates
-    (share/"shipwright/pipelines").install Dir["templates/pipelines/*.json"]
+    (bin/"cct").write <<~EOS
+      #!/usr/bin/env bash
+      exec "#{libexec}/scripts/sw" "$@"
+    EOS
 
-    # Install Claude Code settings template
-    (share/"shipwright/claude-code").install Dir["claude-code/*"]
+    # Install team templates to share for post_install
+    (share/"shipwright/templates").install Dir["tmux/templates/*.json"] if Dir.exist?("tmux/templates")
+    (share/"shipwright/pipelines").install Dir["templates/pipelines/*.json"] if Dir.exist?("templates/pipelines")
 
     # Install documentation
     doc.install Dir["docs/*"] if Dir.exist?("docs")
@@ -59,7 +72,6 @@ class Shipwright < Formula
   end
 
   def post_install
-    # Create user template directories
     shipwright_dir = Pathname.new(Dir.home)/".shipwright"
     templates_dir = shipwright_dir/"templates"
     pipelines_dir = shipwright_dir/"pipelines"
@@ -67,7 +79,6 @@ class Shipwright < Formula
     templates_dir.mkpath
     pipelines_dir.mkpath
 
-    # Copy templates to user directory (don't overwrite existing)
     (share/"shipwright/templates").children.each do |tpl|
       dest = templates_dir/tpl.basename
       FileUtils.cp(tpl, dest) unless dest.exist?

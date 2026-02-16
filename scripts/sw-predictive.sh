@@ -6,7 +6,7 @@
 set -euo pipefail
 trap 'echo "ERROR: $BASH_SOURCE:$LINENO exited with status $?" >&2' ERR
 
-VERSION="2.1.2"
+VERSION="2.2.0"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
 
@@ -168,6 +168,8 @@ _predictive_record_anomaly() {
         --argjson baseline "$baseline" \
         '{ts: $ts, ts_epoch: $epoch, stage: $stage, metric: $metric, severity: $severity, value: $value, baseline: $baseline, confirmed: null}')
     echo "$record" >> "$tracking_file"
+    # Rotate anomaly tracking to prevent unbounded growth
+    type rotate_jsonl &>/dev/null 2>&1 && rotate_jsonl "$tracking_file" 5000
 }
 
 # predictive_confirm_anomaly <stage> <metric_name> <was_real_failure>
