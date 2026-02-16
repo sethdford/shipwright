@@ -100,6 +100,7 @@ jobs:
           client-payload: |
             {
               "version": "${{ steps.version.outputs.version }}",
+              "sha256": "${{ steps.sha.outputs.darwin_arm64 }}",
               "sha_darwin_arm64": "${{ steps.sha.outputs.darwin_arm64 }}",
               "sha_darwin_x86_64": "${{ steps.sha.outputs.darwin_x86_64 }}",
               "sha_linux_x86_64": "${{ steps.sha.outputs.linux_x86_64 }}"
