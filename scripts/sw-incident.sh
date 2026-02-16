@@ -6,7 +6,7 @@
 set -euo pipefail
 trap 'echo "ERROR: $BASH_SOURCE:$LINENO exited with status $?" >&2' ERR
 
-VERSION="2.0.0"
+VERSION="2.1.0"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
 
@@ -252,17 +252,47 @@ See incident details: \`shipwright incident show $incident_id\`
 This issue was automatically created by the incident commander.
 "
 
+    # shipwright label so daemon picks up; hotfix for routing
     local issue_url
-    issue_url=$(gh issue create --title "$title" --body "$body" --label "hotfix" 2>/dev/null || echo "")
+    issue_url=$(gh issue create --title "$title" --body "$body" --label "hotfix,shipwright" 2>/dev/null || echo "")
 
     if [[ -n "$issue_url" ]]; then
         success "Created hotfix issue: $issue_url"
-        echo "$issue_url"
+        local issue_num
+        issue_num=$(echo "$issue_url" | sed -n 's|.*/issues/\([0-9]*\)|\1|p')
+        [[ -n "$issue_num" ]] && echo "$issue_num"
         return 0
     fi
 
     warn "Failed to create GitHub issue"
     return 1
+}
+
+# Trigger pipeline for P0/P1 hotfix issue (auto-remediation)
+trigger_pipeline_for_incident() {
+    local issue_num="$1"
+    local incident_id="$2"
+    if [[ -z "$issue_num" || ! "$issue_num" =~ ^[0-9]+$ ]]; then
+        return 0
+    fi
+    if [[ ! -x "$SCRIPT_DIR/sw-pipeline.sh" ]]; then
+        return 0
+    fi
+    info "Auto-triggering pipeline for P0/P1 hotfix issue #${issue_num} (incident: $incident_id)"
+    (cd "$REPO_DIR" && export REPO_DIR SCRIPT_DIR && bash "$SCRIPT_DIR/sw-pipeline.sh" start --issue "$issue_num" --template hotfix 2>/dev/null) &
+    emit_event "incident.pipeline_triggered" "incident_id=$incident_id" "issue=$issue_num"
+}
+
+# Execute rollback when auto_rollback_enabled (wire to sw-feedback / sw-github-deploy)
+trigger_rollback_for_incident() {
+    local incident_id="$1"
+    local reason="${2:-P0/P1 incident}"
+    if [[ ! -x "$SCRIPT_DIR/sw-feedback.sh" ]]; then
+        return 0
+    fi
+    info "Auto-rollback triggered for incident $incident_id: $reason"
+    (cd "$REPO_DIR" && bash "$SCRIPT_DIR/sw-feedback.sh" rollback production "$reason" 2>/dev/null) || true
+    emit_event "incident.rollback_triggered" "incident_id=$incident_id" "reason=$reason"
 }
 
 # ─── Watch Command ─────────────────────────────────────────────────────────
@@ -284,7 +314,7 @@ cmd_watch() {
     # Background process
     (
         echo $$ > "$MONITOR_PID_FILE"
-        trap "rm -f '$MONITOR_PID_FILE'" EXIT
+        trap 'rm -f "'"$MONITOR_PID_FILE"'"' EXIT
 
         while true; do
             sleep "$interval"
@@ -313,12 +343,21 @@ cmd_watch() {
                 info "Incident $incident_id created (severity: $severity)"
                 emit_event "incident.detected" "incident_id=$incident_id" "severity=$severity"
 
-                # Auto-response for P0/P1
+                # Auto-response for P0/P1: hotfix issue, trigger pipeline, optional rollback
                 if [[ "$severity" == "P0" ]] || [[ "$severity" == "P1" ]]; then
+                    local auto_rollback
+                    auto_rollback=$(jq -r '.auto_rollback_enabled // false' "$INCIDENT_CONFIG" 2>/dev/null || echo "false")
+                    if [[ "$auto_rollback" == "true" ]]; then
+                        trigger_rollback_for_incident "$incident_id" "P0/P1 incident: $root_cause"
+                    fi
                     local auto_hotfix
                     auto_hotfix=$(jq -r '.p0_auto_hotfix // .p1_auto_hotfix' "$INCIDENT_CONFIG" 2>/dev/null || echo "false")
                     if [[ "$auto_hotfix" == "true" ]]; then
-                        create_hotfix_issue "$incident_id" "$severity" "$root_cause"
+                        local issue_num
+                        issue_num=$(create_hotfix_issue "$incident_id" "$severity" "$root_cause")
+                        if [[ -n "$issue_num" ]]; then
+                            trigger_pipeline_for_incident "$issue_num" "$incident_id"
+                        fi
                     fi
                 fi
             fi

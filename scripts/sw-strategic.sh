@@ -7,7 +7,7 @@
 # When sourced, do NOT add set -euo pipefail — the parent handles that.
 # When run directly, main() sets up the error handling.
 
-VERSION="2.0.0"
+VERSION="2.1.0"
 
 # ─── Colors (matches Seth's tmux theme) ─────────────────────────────────────
 CYAN='\033[38;2;0;212;255m'

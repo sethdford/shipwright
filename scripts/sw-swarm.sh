@@ -6,8 +6,9 @@
 set -euo pipefail
 trap 'echo "ERROR: $BASH_SOURCE:$LINENO exited with status $?" >&2' ERR
 
-VERSION="2.0.0"
+VERSION="2.1.0"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+REPO_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
 
 # ─── Colors (matches Seth's tmux theme) ─────────────────────────────────────
 CYAN='\033[38;2;0;212;255m'     # #00d4ff — primary accent
@@ -113,12 +114,32 @@ record_metric() {
 
 # ─── Spawn a new agent ────────────────────────────────────────────────────
 cmd_spawn() {
-    local agent_type="${1:-standard}"
+    local agent_type="${1:-}"
+    shift 2>/dev/null || true
+    local task_desc="${1:-}"
     shift 2>/dev/null || true
 
     ensure_dirs
     init_registry
     init_config
+
+    # Recruit-powered type selection when task description given but no explicit type
+    if [[ -z "$agent_type" || "$agent_type" == "--task" ]] && [[ -n "$task_desc" ]]; then
+        if [[ -x "${SCRIPT_DIR:-}/sw-recruit.sh" ]]; then
+            local _recruit_match
+            _recruit_match=$(bash "$SCRIPT_DIR/sw-recruit.sh" match --json "$task_desc" 2>/dev/null) || true
+            if [[ -n "$_recruit_match" ]]; then
+                local _role
+                _role=$(echo "$_recruit_match" | jq -r '.primary_role // ""' 2>/dev/null) || true
+                case "$_role" in
+                    architect|security-auditor|incident-responder) agent_type="powerful" ;;
+                    docs-writer) agent_type="fast" ;;
+                    *) agent_type="standard" ;;
+                esac
+            fi
+        fi
+    fi
+    [[ -z "$agent_type" ]] && agent_type="standard"
 
     local agent_id
     agent_id=$(gen_agent_id)
@@ -165,6 +186,16 @@ cmd_spawn() {
     mv "$tmp_file" "$REGISTRY_FILE"
     record_metric "$agent_id" "spawn" "1" "$agent_type"
 
+    # Create real tmux session for the agent (so scale/loop can send commands)
+    if command -v tmux &>/dev/null; then
+        local session_name="swarm-${agent_id}"
+        if ! tmux has-session -t "$session_name" 2>/dev/null; then
+            tmux new-session -d -s "$session_name" -c "$REPO_DIR" \
+                "echo \"Agent $agent_id ready (type: $agent_type)\"; while true; do sleep 3600; done" 2>/dev/null && \
+                info "Tmux session created: $session_name" || warn "Tmux session creation failed (agent still in registry)"
+        fi
+    fi
+
     success "Spawned agent: ${CYAN}${agent_id}${RESET} (type: ${agent_type})"
     echo ""
     echo -e "  Agent ID:    ${CYAN}${agent_id}${RESET}"
@@ -206,18 +237,24 @@ cmd_retire() {
         echo ""
     fi
 
-    # Mark as retiring
+    # Kill real tmux session if present
+    local session_name="swarm-${agent_id}"
+    if command -v tmux &>/dev/null && tmux has-session -t "$session_name" 2>/dev/null; then
+        tmux kill-session -t "$session_name" 2>/dev/null && info "Tmux session killed: $session_name" || warn "Tmux kill failed for $session_name"
+    fi
+
+    # Mark as retiring / remove from registry
     local tmp_file
     tmp_file=$(mktemp)
 
     jq --arg aid "$agent_id" \
-       '.agents |= map(if .id == $aid then .status = "retiring" else . end) | .last_updated = "'$(now_iso)'"' \
+       '.agents |= map(select(.id != $aid)) | .active_count = ([.agents[] | select(.status == "active")] | length) | .last_updated = "'$(now_iso)'"' \
         "$REGISTRY_FILE" > "$tmp_file"
 
     mv "$tmp_file" "$REGISTRY_FILE"
     record_metric "$agent_id" "retire" "1" "graceful_shutdown"
 
-    success "Retiring agent: ${CYAN}${agent_id}${RESET}"
+    success "Retired agent: ${CYAN}${agent_id}${RESET}"
     echo ""
 }
 

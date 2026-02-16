@@ -9,11 +9,18 @@ The `shipwright` CLI is the main entry point for Shipwright. It routes to specia
 
 ### `shipwright init`
 
-One-command tmux setup with no prompts. Installs the tmux configuration, overlay, and color hooks.
+One-command tmux setup with no prompts. Installs the tmux configuration, overlay, status widgets, and role-color hooks.
 
 ```bash
-shipwright init
+shipwright init            # Standard install
+shipwright init --repair   # Force clean reinstall (after OS upgrades)
 ```
+
+**Flags:**
+
+| Flag       | Description                                    |
+| ---------- | ---------------------------------------------- |
+| `--repair` | Force reinstall of all tmux config and plugins |
 
 ### `shipwright doctor`
 

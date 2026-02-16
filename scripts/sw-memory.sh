@@ -6,7 +6,7 @@
 set -euo pipefail
 trap 'echo "ERROR: $BASH_SOURCE:$LINENO exited with status $?" >&2' ERR
 
-VERSION="2.0.0"
+VERSION="2.1.0"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
 
@@ -1077,6 +1077,20 @@ memory_get_dora_baseline() {
     echo "$metrics"
 }
 
+# memory_get_baseline <metric_name>
+# Output baseline value for a metric (bundle_size_kb, test_duration_s, coverage_pct, etc.).
+# Used by pipeline for regression checks. Outputs nothing if not set.
+memory_get_baseline() {
+    local metric_name="${1:-}"
+    [[ -z "$metric_name" ]] && return 1
+    ensure_memory_dir
+    local mem_dir
+    mem_dir="$(repo_memory_dir)"
+    local metrics_file="$mem_dir/metrics.json"
+    [[ ! -f "$metrics_file" ]] && return 0
+    jq -r --arg m "$metric_name" '.baselines[$m] // empty' "$metrics_file" 2>/dev/null || true
+}
+
 # memory_update_metrics <metric_name> <value>
 # Track performance baselines and flag regressions.
 memory_update_metrics() {
@@ -1601,6 +1615,9 @@ case "$SUBCOMMAND" in
         ;;
     pattern)
         memory_capture_pattern "$@"
+        ;;
+    get)
+        memory_get_baseline "$@"
         ;;
     metric)
         memory_update_metrics "$@"

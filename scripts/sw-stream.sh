@@ -5,7 +5,7 @@
 # ║  Streams tmux pane output in real-time to the dashboard or CLI.         ║
 # ║  Captures output periodically, tags by agent/team, supports replay.     ║
 # ╚═══════════════════════════════════════════════════════════════════════════╝
-VERSION="2.0.0"
+VERSION="2.1.0"
 set -euo pipefail
 trap 'echo "ERROR: $BASH_SOURCE:$LINENO exited with status $?" >&2' ERR
 

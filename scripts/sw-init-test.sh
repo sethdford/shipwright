@@ -428,6 +428,149 @@ EOF
     fi
 }
 
+# ──────────────────────────────────────────────────────────────────────────────
+# 16. Legacy overlay cleanup
+# ──────────────────────────────────────────────────────────────────────────────
+test_legacy_overlay_cleanup() {
+    # Plant a legacy claude-teams-overlay.conf
+    mkdir -p "$TEMP_DIR/home/.tmux"
+    echo "# old overlay" > "$TEMP_DIR/home/.tmux/claude-teams-overlay.conf"
+    echo "# old backup" > "$TEMP_DIR/home/.tmux/claude-teams-overlay.conf.pre-upgrade.bak"
+
+    invoke_init --no-claude-md
+    assert_exit_code 0 "init should succeed"
+
+    # Legacy files should be gone
+    if [[ -f "$TEMP_DIR/home/.tmux/claude-teams-overlay.conf" ]]; then
+        echo -e "    ${RED}✗${RESET} Legacy claude-teams-overlay.conf still exists"
+        return 1
+    fi
+    if [[ -f "$TEMP_DIR/home/.tmux/claude-teams-overlay.conf.pre-upgrade.bak" ]]; then
+        echo -e "    ${RED}✗${RESET} Legacy backup still exists"
+        return 1
+    fi
+}
+
+# ──────────────────────────────────────────────────────────────────────────────
+# 17. Legacy overlay source-file reference stripped
+# ──────────────────────────────────────────────────────────────────────────────
+test_legacy_overlay_reference_stripped() {
+    # Plant a custom tmux.conf with legacy source-file line
+    mkdir -p "$TEMP_DIR/home/.tmux/plugins/tpm/bin"
+    printf '#!/usr/bin/env bash\nexit 0\n' > "$TEMP_DIR/home/.tmux/plugins/tpm/bin/install_plugins"
+    chmod +x "$TEMP_DIR/home/.tmux/plugins/tpm/bin/install_plugins"
+    cat > "$TEMP_DIR/home/.tmux.conf" <<'TMUXEOF'
+set -g mouse on
+source-file -q ~/.tmux/claude-teams-overlay.conf
+set -g status on
+TMUXEOF
+
+    invoke_init --no-claude-md
+    assert_exit_code 0 "init should succeed"
+
+    # The legacy source line should be gone
+    if grep -q "claude-teams-overlay" "$TEMP_DIR/home/.tmux.conf" 2>/dev/null; then
+        echo -e "    ${RED}✗${RESET} Legacy claude-teams-overlay reference still in tmux.conf"
+        return 1
+    fi
+}
+
+# ──────────────────────────────────────────────────────────────────────────────
+# 18. Repair mode forces clean reinstall
+# ──────────────────────────────────────────────────────────────────────────────
+test_repair_mode() {
+    # First run: normal install
+    invoke_init --no-claude-md
+    assert_exit_code 0 "first init should succeed"
+
+    # Plant stale artifacts
+    echo "# stale" > "$TEMP_DIR/home/.tmux/claude-teams-overlay.conf"
+
+    # Second run: repair mode
+    invoke_init --no-claude-md --repair
+    assert_exit_code 0 "repair init should succeed"
+
+    # Stale artifact should be cleaned
+    if [[ -f "$TEMP_DIR/home/.tmux/claude-teams-overlay.conf" ]]; then
+        echo -e "    ${RED}✗${RESET} Repair mode did not clean legacy overlay"
+        return 1
+    fi
+
+    # Shipwright overlay should still be there
+    assert_file_exists "$TEMP_DIR/home/.tmux/shipwright-overlay.conf" "overlay survives repair"
+}
+
+# ──────────────────────────────────────────────────────────────────────────────
+# 19. Plugin direct-clone fallback (outside tmux)
+# ──────────────────────────────────────────────────────────────────────────────
+test_plugin_direct_clone_fallback() {
+    # Remove pre-created TPM mock to simulate fresh install
+    rm -rf "$TEMP_DIR/home/.tmux/plugins"
+
+    # Mock git to pretend cloning works (create plugin dirs)
+    mkdir -p "$TEMP_DIR/mock-bin"
+    cat > "$TEMP_DIR/mock-bin/git" <<'GITEOF'
+#!/usr/bin/env bash
+# Mock git: for clone, just mkdir the target
+if [[ "${1:-}" == "clone" ]]; then
+    target="${3:-$2}"
+    mkdir -p "$target"
+    exit 0
+fi
+# Pass through for other git commands
+command git "$@"
+GITEOF
+    chmod +x "$TEMP_DIR/mock-bin/git"
+
+    INIT_OUTPUT=$(
+        cd "$TEMP_DIR/project"
+        HOME="$TEMP_DIR/home" \
+        TMUX="" \
+        PATH="$TEMP_DIR/mock-bin:$PATH" \
+        bash "$REAL_INIT_SCRIPT" --no-claude-md 2>&1 <<'INPUT'
+y
+y
+y
+y
+INPUT
+    ) || INIT_EXIT=$?
+
+    # Should have the 5 plugin dirs
+    local plugin_count
+    plugin_count=$(find "$TEMP_DIR/home/.tmux/plugins" -mindepth 1 -maxdepth 1 -type d 2>/dev/null | wc -l | tr -d ' ')
+    if [[ "$plugin_count" -lt 5 ]]; then
+        echo -e "    ${RED}✗${RESET} Expected >= 5 plugin dirs, got $plugin_count"
+        return 1
+    fi
+}
+
+# ──────────────────────────────────────────────────────────────────────────────
+# 20. Post-install verification
+# ──────────────────────────────────────────────────────────────────────────────
+test_post_install_verification() {
+    invoke_init --no-claude-md
+    assert_exit_code 0 "init should succeed"
+
+    # Verify output contains the verification success message
+    assert_output_contains "Verified.*tmux config" "verification message present"
+}
+
+# ──────────────────────────────────────────────────────────────────────────────
+# 21. tmux adapter deployed
+# ──────────────────────────────────────────────────────────────────────────────
+test_tmux_adapter_deployed() {
+    invoke_init --no-claude-md
+    assert_exit_code 0 "init should succeed"
+
+    assert_file_exists "$TEMP_DIR/home/.shipwright/adapters/tmux-adapter.sh" "adapter installed"
+
+    # Should be executable
+    if [[ ! -x "$TEMP_DIR/home/.shipwright/adapters/tmux-adapter.sh" ]]; then
+        echo -e "    ${RED}✗${RESET} tmux adapter not executable"
+        return 1
+    fi
+}
+
 # ═══════════════════════════════════════════════════════════════════════════════
 # RUN ALL TESTS
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -479,6 +622,16 @@ run_test "Hooks wired into settings.json" test_hooks_wired
 run_test "Hook wiring preserves existing hooks" test_hook_wiring_preserves_existing
 run_test "SessionStart hook installed" test_session_start_hook_installed
 run_test "Hook wiring with pre-existing settings" test_hook_wiring_with_existing_settings
+echo ""
+
+# Repair & robustness tests
+echo -e "${PURPLE}${BOLD}Repair & Cleanup${RESET}"
+run_test "Legacy overlay cleanup" test_legacy_overlay_cleanup
+run_test "Legacy overlay source-file reference stripped" test_legacy_overlay_reference_stripped
+run_test "Repair mode forces clean reinstall" test_repair_mode
+run_test "Plugin direct-clone fallback (outside tmux)" test_plugin_direct_clone_fallback
+run_test "Post-install verification" test_post_install_verification
+run_test "tmux adapter deployed" test_tmux_adapter_deployed
 echo ""
 
 # ═══════════════════════════════════════════════════════════════════════════════

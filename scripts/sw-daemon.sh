@@ -9,7 +9,7 @@ trap 'echo "ERROR: $BASH_SOURCE:$LINENO exited with status $?" >&2' ERR
 # Allow spawning Claude CLI from within a Claude Code session (daemon, fleet, etc.)
 unset CLAUDECODE 2>/dev/null || true
 
-VERSION="2.0.0"
+VERSION="2.1.0"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
 
@@ -511,11 +511,13 @@ load_config() {
 
 setup_dirs() {
     mkdir -p "$DAEMON_DIR"
+    mkdir -p "$HOME/.shipwright"
 
     STATE_FILE="$DAEMON_DIR/daemon-state.json"
     LOG_FILE="$DAEMON_DIR/daemon.log"
     LOG_DIR="$DAEMON_DIR/logs"
     WORKTREE_DIR=".worktrees"
+    PAUSE_FLAG="${HOME}/.shipwright/daemon-pause.flag"
 
     mkdir -p "$LOG_DIR"
     mkdir -p "$HOME/.shipwright/progress"
@@ -1471,6 +1473,7 @@ init_state() {
                 queued: [],
                 completed: [],
                 retry_counts: {},
+                failure_history: [],
                 priority_lane_active: [],
                 titles: {}
             }')
@@ -2157,6 +2160,11 @@ Check the associated PR for the implementation." 2>/dev/null || true
     notify "Pipeline Complete — Issue #${issue_num}" \
         "Duration: ${duration:-unknown}" "success"
     "$SCRIPT_DIR/sw-tracker.sh" notify "completed" "$issue_num" 2>/dev/null || true
+
+    # PM agent: record success for learning
+    if [[ -x "$SCRIPT_DIR/sw-pm.sh" ]]; then
+        bash "$SCRIPT_DIR/sw-pm.sh" learn "$issue_num" success 2>/dev/null || true
+    fi
 }
 
 # ─── Failure Classification ─────────────────────────────────────────────────
@@ -2212,13 +2220,27 @@ classify_failure() {
     echo "unknown"
 }
 
-# ─── Consecutive Failure Tracking ──────────────────────────────────────────
+# ─── Consecutive Failure Tracking (persisted + adaptive) ─────────────────────
 
 DAEMON_CONSECUTIVE_FAILURE_CLASS=""
 DAEMON_CONSECUTIVE_FAILURE_COUNT=0
 
+# Max retries per failure class (adaptive retry strategy)
+get_max_retries_for_class() {
+    local class="${1:-unknown}"
+    case "$class" in
+        auth_error|invalid_issue) echo 0 ;;
+        api_error)                echo "${MAX_RETRIES_API_ERROR:-4}" ;;
+        context_exhaustion)       echo "${MAX_RETRIES_CONTEXT_EXHAUSTION:-2}" ;;
+        build_failure)           echo "${MAX_RETRIES_BUILD:-2}" ;;
+        *)                       echo "${MAX_RETRIES:-2}" ;;
+    esac
+}
+
+# Append failure to persisted history and compute consecutive count; smart pause with exponential backoff
 record_failure_class() {
     local failure_class="$1"
+    # In-memory consecutive (for backward compat)
     if [[ "$failure_class" == "$DAEMON_CONSECUTIVE_FAILURE_CLASS" ]]; then
         DAEMON_CONSECUTIVE_FAILURE_COUNT=$((DAEMON_CONSECUTIVE_FAILURE_COUNT + 1))
     else
@@ -2226,16 +2248,55 @@ record_failure_class() {
         DAEMON_CONSECUTIVE_FAILURE_COUNT=1
     fi
 
-    if [[ "$DAEMON_CONSECUTIVE_FAILURE_COUNT" -ge 3 ]]; then
-        daemon_log ERROR "3 consecutive failures (class: ${failure_class}) — auto-pausing daemon"
+    # Persist failure to state (failure_history) for pattern tracking
+    if [[ -f "${STATE_FILE:-}" ]]; then
+        local entry
+        entry=$(jq -n --arg ts "$(now_iso)" --arg class "$failure_class" '{ts: $ts, class: $class}')
+        locked_state_update --argjson entry "$entry" \
+            '.failure_history = ((.failure_history // []) + [$entry] | .[-100:])' 2>/dev/null || true
+    fi
+
+    # Consecutive count from persisted tail: count only the unbroken run of $failure_class
+    # from the newest entry backwards (not total occurrences)
+    local consecutive="$DAEMON_CONSECUTIVE_FAILURE_COUNT"
+    if [[ -f "${STATE_FILE:-}" ]]; then
+        local from_state
+        from_state=$(jq -r --arg c "$failure_class" '
+            (.failure_history // []) | [.[].class] | reverse |
+            if length == 0 then 0
+            elif .[0] != $c then 0
+            else
+                reduce .[] as $x (
+                    {count: 0, done: false};
+                    if .done then . elif $x == $c then .count += 1 else .done = true end
+                ) | .count
+            end
+        ' "$STATE_FILE" 2>/dev/null || echo "1")
+        consecutive="${from_state:-1}"
+        [[ "$consecutive" -eq 0 ]] && consecutive="$DAEMON_CONSECUTIVE_FAILURE_COUNT"
+        DAEMON_CONSECUTIVE_FAILURE_COUNT="$consecutive"
+    fi
+
+    # Smart pause: exponential backoff instead of hard stop (resume_after so daemon can auto-resume)
+    if [[ "$consecutive" -ge 3 ]]; then
+        local pause_mins=$((5 * (1 << (consecutive - 3))))
+        [[ "$pause_mins" -gt 480 ]] && pause_mins=480
+        local resume_ts resume_after
+        resume_ts=$(($(date +%s) + pause_mins * 60))
+        resume_after=$(epoch_to_iso "$resume_ts")
+        daemon_log ERROR "${consecutive} consecutive failures (class: ${failure_class}) — auto-pausing until ${resume_after} (${pause_mins}m backoff)"
         local pause_json
-        pause_json=$(jq -n --arg reason "consecutive_${failure_class}" --arg ts "$(now_iso)" \
-            '{reason: $reason, timestamp: $ts}')
+        pause_json=$(jq -n \
+            --arg reason "consecutive_${failure_class}" \
+            --arg ts "$(now_iso)" \
+            --arg resume "$resume_after" \
+            --argjson count "$consecutive" \
+            '{reason: $reason, timestamp: $ts, resume_after: $resume, consecutive_count: $count}')
         local _tmp_pause
         _tmp_pause=$(mktemp "${TMPDIR:-/tmp}/sw-pause.XXXXXX")
         echo "$pause_json" > "$_tmp_pause"
         mv "$_tmp_pause" "$PAUSE_FLAG"
-        emit_event "daemon.auto_pause" "reason=consecutive_failures" "class=$failure_class" "count=$DAEMON_CONSECUTIVE_FAILURE_COUNT"
+        emit_event "daemon.auto_pause" "reason=consecutive_failures" "class=$failure_class" "count=$consecutive" "resume_after=$resume_after"
     fi
 }
 
@@ -2310,8 +2371,10 @@ daemon_on_failure() {
                 fi
                 ;;
             *)
-                # Retryable failures — proceed with escalation
-                if [[ "$retry_count" -lt "${MAX_RETRIES:-2}" ]]; then
+                # Retryable failures — per-class max retries and escalation
+                local effective_max
+                effective_max=$(get_max_retries_for_class "$failure_class")
+                if [[ "$retry_count" -lt "$effective_max" ]]; then
                     retry_count=$((retry_count + 1))
 
                     # Update retry count in state (locked to prevent race)
@@ -2319,8 +2382,8 @@ daemon_on_failure() {
                         --arg num "$issue_num" --argjson count "$retry_count" \
                         '.retry_counts[$num] = $count'
 
-                    daemon_log WARN "Auto-retry #${retry_count}/${MAX_RETRIES:-2} for issue #${issue_num} (class: ${failure_class})"
-                    emit_event "daemon.retry" "issue=$issue_num" "retry=$retry_count" "max=${MAX_RETRIES:-2}" "class=$failure_class"
+                    daemon_log WARN "Auto-retry #${retry_count}/${effective_max} for issue #${issue_num} (class: ${failure_class})"
+                    emit_event "daemon.retry" "issue=$issue_num" "retry=$retry_count" "max=$effective_max" "class=$failure_class"
 
                     # Check for checkpoint to enable resume-from-checkpoint
                     local checkpoint_args=()
@@ -2365,13 +2428,12 @@ daemon_on_failure() {
                         daemon_log INFO "Boosting max-restarts to $boosted_restarts (context exhaustion)"
                     fi
 
-                    # API errors get extended backoff
-                    local api_backoff=300
-                    local backoff_secs=$((30 * retry_count))
-                    if [[ "$failure_class" == "api_error" ]]; then
-                        backoff_secs=$((api_backoff * retry_count))
-                        daemon_log INFO "API error — extended backoff ${backoff_secs}s"
-                    fi
+                    # Exponential backoff (per-class base); cap at 1h
+                    local base_secs=30
+                    [[ "$failure_class" == "api_error" ]] && base_secs=300
+                    local backoff_secs=$((base_secs * (1 << (retry_count - 1))))
+                    [[ "$backoff_secs" -gt 3600 ]] && backoff_secs=3600
+                    [[ "$failure_class" == "api_error" ]] && daemon_log INFO "API error — exponential backoff ${backoff_secs}s"
 
                     if [[ "$NO_GITHUB" != "true" ]]; then
                         gh issue comment "$issue_num" --body "## 🔄 Auto-Retry #${retry_count}
@@ -2413,13 +2475,18 @@ _Escalation: $(if [[ "$retry_count" -eq 1 ]]; then echo "upgraded model + increa
                     return
                 fi
 
-                daemon_log WARN "Max retries (${MAX_RETRIES:-2}) exhausted for issue #${issue_num}"
+                daemon_log WARN "Max retries (${effective_max}) exhausted for issue #${issue_num}"
                 emit_event "daemon.retry_exhausted" "issue=$issue_num" "retries=$retry_count"
                 ;;
         esac
     fi
 
     # ── No retry — report final failure ──
+    # PM agent: record failure for learning (only when we're done with this issue)
+    if [[ -x "$SCRIPT_DIR/sw-pm.sh" ]]; then
+        bash "$SCRIPT_DIR/sw-pm.sh" learn "$issue_num" failure 2>/dev/null || true
+    fi
+
     if [[ "$NO_GITHUB" != "true" ]]; then
         # Add failure label and remove watch label (prevent re-processing)
         gh issue edit "$issue_num" \
@@ -2444,10 +2511,11 @@ _Escalation: $(if [[ "$retry_count" -eq 1 ]]; then echo "upgraded model + increa
 
         local retry_info=""
         if [[ "${RETRY_ESCALATION:-true}" == "true" ]]; then
-            local final_count
+            local final_count final_max
             final_count=$(jq -r --arg num "$issue_num" \
                 '.retry_counts[$num] // 0' "$STATE_FILE" 2>/dev/null || echo "0")
-            retry_info="| Retries | ${final_count} / ${MAX_RETRIES:-2} (exhausted) |"
+            final_max=$(get_max_retries_for_class "$failure_class")
+            retry_info="| Retries | ${final_count} / ${final_max} (exhausted) |"
         fi
 
         gh issue comment "$issue_num" --body "## ❌ Pipeline Failed
@@ -4055,10 +4123,27 @@ daemon_poll_issues() {
         return
     fi
 
-    # Check for pause flag (set by dashboard or disk_low alert)
-    if [[ -f "$HOME/.shipwright/daemon-pause.flag" ]]; then
-        daemon_log INFO "Daemon paused — skipping poll"
-        return
+    # Check for pause flag (set by dashboard, disk_low, or consecutive-failure backoff)
+    local pause_file="${PAUSE_FLAG:-$HOME/.shipwright/daemon-pause.flag}"
+    if [[ -f "$pause_file" ]]; then
+        local resume_after
+        resume_after=$(jq -r '.resume_after // empty' "$pause_file" 2>/dev/null || true)
+        if [[ -n "$resume_after" ]]; then
+            local now_epoch resume_epoch
+            now_epoch=$(date +%s)
+            resume_epoch=$(TZ=UTC date -j -f "%Y-%m-%dT%H:%M:%SZ" "$resume_after" +%s 2>/dev/null || \
+                date -d "$resume_after" +%s 2>/dev/null || echo 0)
+            if [[ "$resume_epoch" -gt 0 ]] && [[ "$now_epoch" -ge "$resume_epoch" ]]; then
+                rm -f "$pause_file"
+                daemon_log INFO "Auto-resuming after backoff (resume_after passed)"
+            else
+                daemon_log INFO "Daemon paused until ${resume_after} — skipping poll"
+                return
+            fi
+        else
+            daemon_log INFO "Daemon paused — skipping poll"
+            return
+        fi
     fi
 
     # Circuit breaker: skip poll if in backoff window
@@ -4296,9 +4381,25 @@ daemon_poll_issues() {
             continue
         fi
 
-        # Auto-select pipeline template based on labels + triage score
+        # Auto-select pipeline template: PM recommendation (if available) else labels + triage score
         local template
-        template=$(select_pipeline_template "$labels_csv" "$score" 2>/dev/null | tail -1)
+        if [[ "$NO_GITHUB" != "true" ]] && [[ -x "$SCRIPT_DIR/sw-pm.sh" ]]; then
+            local pm_rec
+            pm_rec=$(bash "$SCRIPT_DIR/sw-pm.sh" recommend --json "$issue_num" 2>/dev/null) || true
+            if [[ -n "$pm_rec" ]]; then
+                template=$(echo "$pm_rec" | jq -r '.team_composition.template // empty' 2>/dev/null) || true
+                # Capability self-assessment: low confidence → upgrade to full template
+                local confidence
+                confidence=$(echo "$pm_rec" | jq -r '.team_composition.confidence_percent // 100' 2>/dev/null) || true
+                if [[ -n "$confidence" && "$confidence" != "null" && "$confidence" -lt 60 ]]; then
+                    daemon_log INFO "Low PM confidence (${confidence}%) — upgrading to full template"
+                    template="full"
+                fi
+            fi
+        fi
+        if [[ -z "$template" ]]; then
+            template=$(select_pipeline_template "$labels_csv" "$score" 2>/dev/null | tail -1)
+        fi
         template=$(printf '%s' "$template" | sed $'s/\x1b\\[[0-9;]*m//g' | tr -cd '[:alnum:]-_')
         [[ -z "$template" ]] && template="$PIPELINE_TEMPLATE"
         daemon_log INFO "Triage: issue #${issue_num} scored ${score}, template=${template}"

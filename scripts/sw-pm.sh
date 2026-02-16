@@ -6,7 +6,7 @@
 set -euo pipefail
 trap 'echo "ERROR: $BASH_SOURCE:$LINENO exited with status $?" >&2' ERR
 
-VERSION="2.0.0"
+VERSION="2.1.0"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 # ─── Colors (matches Seth's tmux theme) ─────────────────────────────────────
@@ -223,9 +223,57 @@ analyze_issue() {
 
 # ─── recommend_team <analysis_json> ──────────────────────────────────────────
 # Based on analysis, recommend team composition
+# Tries recruit's AI/heuristic team composition first, falls back to hardcoded rules.
 recommend_team() {
     local analysis="$1"
 
+    # ── Try recruit-powered team composition first ──
+    if [[ -x "${SCRIPT_DIR:-}/sw-recruit.sh" ]]; then
+        local issue_title
+        issue_title=$(echo "$analysis" | jq -r '.title // .recommendation // ""' 2>/dev/null || true)
+        if [[ -n "$issue_title" ]]; then
+            local recruit_result
+            recruit_result=$(bash "$SCRIPT_DIR/sw-recruit.sh" team --json "$issue_title" 2>/dev/null) || true
+            if [[ -n "$recruit_result" ]] && echo "$recruit_result" | jq -e '.team' &>/dev/null 2>&1; then
+                local recruit_roles recruit_model recruit_agents recruit_cost
+                recruit_roles=$(echo "$recruit_result" | jq -r '.team | join(",")')
+                recruit_model=$(echo "$recruit_result" | jq -r '.model // "sonnet"')
+                recruit_agents=$(echo "$recruit_result" | jq -r '.agents // 2')
+                recruit_cost=$(echo "$recruit_result" | jq -r '.estimated_cost // 0')
+
+                # Map recruit roles/model to PM output format
+                local max_iterations=5
+                local template="standard"
+                if [[ "$recruit_agents" -ge 4 ]]; then template="full"; max_iterations=8;
+                elif [[ "$recruit_agents" -le 1 ]]; then template="fast"; max_iterations=3;
+                fi
+
+                local team_rec
+                team_rec=$(jq -n \
+                    --arg roles "$recruit_roles" \
+                    --arg template "$template" \
+                    --arg model "$recruit_model" \
+                    --arg max_iter "$max_iterations" \
+                    --arg agents "$recruit_agents" \
+                    --arg cost "$recruit_cost" \
+                    '{
+                        roles: ($roles | split(",")),
+                        template: $template,
+                        model: $model,
+                        max_iterations: ($max_iter | tonumber),
+                        estimated_agents: ($agents | tonumber),
+                        confidence_percent: 80,
+                        risk_factors: "recruit-powered recommendation",
+                        mitigation_strategies: "AI-optimized team composition",
+                        source: "recruit"
+                    }')
+                echo "$team_rec"
+                return 0
+            fi
+        fi
+    fi
+
+    # ── Fallback: hardcoded heuristic team composition ──
     local complexity risk is_security is_perf file_scope
     complexity=$(echo "$analysis" | jq -r '.complexity')
     risk=$(echo "$analysis" | jq -r '.risk')
@@ -442,15 +490,22 @@ cmd_orchestrate() {
     emit_event "pm.orchestrate" "issue=${issue_num}"
 }
 
-# ─── cmd_recommend <issue_num> ──────────────────────────────────────────────
+# ─── cmd_recommend <issue_num> [--json] ──────────────────────────────────────
 cmd_recommend() {
-    local issue_num="${1:-}"
+    local json_mode="false"
+    local issue_num=""
+    if [[ "${1:-}" == "--json" ]]; then
+        json_mode="true"
+        issue_num="${2:-}"
+    else
+        issue_num="${1:-}"
+    fi
     if [[ -z "$issue_num" ]]; then
-        error "Usage: shipwright pm recommend <issue-num>"
+        error "Usage: shipwright pm recommend <issue-num> [--json]"
         return 1
     fi
 
-    info "Generating full PM recommendation for issue #${issue_num}..."
+    [[ "$json_mode" != "true" ]] && info "Generating full PM recommendation for issue #${issue_num}..."
     local analysis team_rec stages
 
     analysis=$(analyze_issue "$issue_num")
@@ -471,6 +526,16 @@ cmd_recommend() {
             stage_orchestration: $stages,
             recommendation_timestamp: "'$(now_iso)'"
         }')
+
+    if [[ "$json_mode" == "true" ]]; then
+        echo "$recommendation"
+        ensure_pm_history
+        local tmp_hist
+        tmp_hist=$(mktemp)
+        jq --argjson rec "$recommendation" '.decisions += [$rec]' "$PM_HISTORY" > "$tmp_hist" && mv "$tmp_hist" "$PM_HISTORY"
+        emit_event "pm.recommend" "issue=${issue_num}"
+        return 0
+    fi
 
     # Pretty-print
     echo ""

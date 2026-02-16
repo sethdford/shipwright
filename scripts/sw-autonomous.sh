@@ -7,7 +7,7 @@
 set -euo pipefail
 trap 'echo "ERROR: $BASH_SOURCE:$LINENO exited with status $?" >&2' ERR
 
-VERSION="2.0.0"
+VERSION="2.1.0"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
 
@@ -203,31 +203,17 @@ run_analysis_cycle() {
     if command -v claude &>/dev/null; then
         info "Running codebase analysis with Claude..."
 
-        claude code << 'ANALYSIS_PROMPT'
-You are Shipwright's autonomous PM. Analyze this repository for:
-1. **Bugs & Issues**: Missing error handling, potential crashes, edge cases
-2. **Performance**: Bottlenecks, n+1 queries, memory leaks, unnecessary work
-3. **Missing Tests**: Uncovered code paths, critical scenarios
-4. **Stale Documentation**: Outdated guides, missing API docs
-5. **Security**: Input validation, injection risks, credential leaks
-6. **Code Quality**: Dead code, refactoring opportunities, tech debt
-7. **Self-Improvement**: How Shipwright itself could be enhanced
+        claude -p 'You are Shipwright'"'"'s autonomous PM. Analyze this repository for:
+1. Bugs & Issues: Missing error handling, potential crashes, edge cases
+2. Performance: Bottlenecks, n+1 queries, memory leaks, unnecessary work
+3. Missing Tests: Uncovered code paths, critical scenarios
+4. Stale Documentation: Outdated guides, missing API docs
+5. Security: Input validation, injection risks, credential leaks
+6. Code Quality: Dead code, refactoring opportunities, tech debt
+7. Self-Improvement: How Shipwright itself could be enhanced
 
-For each finding, suggest:
-- Priority: critical/high/medium/low
-- Effort estimate: S/M/L (small/medium/large)
-- Labels: e.g. "bug", "performance", "test", "docs", "security", "refactor", "self-improvement"
-
-Output as JSON array of findings with fields:
-{
-  "title": "...",
-  "description": "...",
-  "priority": "high",
-  "effort": "M",
-  "labels": ["..."],
-  "category": "bug|performance|test|docs|security|refactor|self-improvement"
-}
-ANALYSIS_PROMPT
+For each finding, output JSON with fields: title, description, priority (critical/high/medium/low), effort (S/M/L), labels (array), category.
+Output ONLY a JSON array, no other text.' --max-turns 3 > "$findings" 2>/dev/null || true
 
     else
         warn "Claude CLI not available, using static heuristics..."
@@ -289,8 +275,9 @@ create_issue_from_finding() {
     # Add shipwright label to auto-feed daemon
     local all_labels="shipwright,$labels"
 
-    # Create GitHub issue
-    gh issue create \
+    # Create GitHub issue; capture URL and parse issue number
+    local create_out
+    create_out=$(gh issue create \
         --title "$title" \
         --body "$description
 
@@ -301,14 +288,83 @@ create_issue_from_finding() {
 - Created: \`$(now_iso)\`
 - By: Autonomous loop (sw-autonomous.sh)
 " \
-        --label "$all_labels" 2>/dev/null && \
-        success "Created issue: $title" && \
-        return 0 || \
-        warn "Failed to create issue: $title" && \
+        --label "$all_labels" 2>/dev/null) || {
+        warn "Failed to create issue: $title"
         return 1
+    }
+    success "Created issue: $title"
+    local issue_num
+    issue_num=$(echo "$create_out" | sed -n 's|.*/issues/\([0-9]*\)|\1|p')
+    [[ -n "$issue_num" ]] && echo "$issue_num"
+    return 0
 }
 
 # ─── Issue Processing from Analysis ────────────────────────────────────────
+# Trigger pipeline for a finding issue (daemon will also pick it up; this runs immediately)
+trigger_pipeline_for_finding() {
+    local issue_num="$1"
+    local title="$2"
+    if [[ -z "$issue_num" || ! "$issue_num" =~ ^[0-9]+$ ]]; then
+        return 0
+    fi
+    if [[ ! -x "$SCRIPT_DIR/sw-pipeline.sh" ]]; then
+        return 0
+    fi
+    info "Triggering pipeline for finding issue #${issue_num}: $title"
+    (cd "$REPO_DIR" && export REPO_DIR SCRIPT_DIR && bash "$SCRIPT_DIR/sw-pipeline.sh" start --issue "$issue_num" 2>/dev/null) &
+    emit_event "autonomous.pipeline_triggered" "issue=$issue_num" "title=$title"
+}
+
+# Record finding outcome for learning (which findings led to successful fixes)
+record_finding_pending() {
+    local issue_num="$1"
+    local finding_title="$2"
+    ensure_state_dir
+    local state_file="${STATE_DIR}/state.json"
+    local pending_file="${STATE_DIR}/pending_findings.jsonl"
+    [[ ! -f "$pending_file" ]] && touch "$pending_file"
+    echo "{\"issue_number\":$issue_num,\"finding_title\":\"${finding_title//\"/\\\"}\",\"created_at\":\"$(now_iso)\",\"outcome\":\"pending\"}" >> "$pending_file"
+}
+
+# Update outcomes for pending findings (called at start of each cycle)
+update_finding_outcomes() {
+    [[ "$NO_GITHUB" == "true" ]] && return 0
+    local pending_file="${STATE_DIR}/pending_findings.jsonl"
+    [[ ! -f "$pending_file" ]] && return 0
+    local updated_file
+    updated_file=$(mktemp "${TMPDIR:-/tmp}/sw-autonomous-pending.XXXXXX")
+    while IFS= read -r line; do
+        [[ -z "$line" ]] && continue
+        local issue_num outcome
+        issue_num=$(echo "$line" | jq -r '.issue_number // empty')
+        outcome=$(echo "$line" | jq -r '.outcome // "pending"')
+        if [[ "$outcome" != "pending" || -z "$issue_num" ]]; then
+            echo "$line" >> "$updated_file"
+            continue
+        fi
+        local state
+        state=$(gh issue view "$issue_num" --json state 2>/dev/null | jq -r '.state // "OPEN"') || state="OPEN"
+        if [[ "$state" != "CLOSED" ]]; then
+            echo "$line" >> "$updated_file"
+            continue
+        fi
+        local merged=""
+        local merged_pipeline merged_daemon
+        merged_pipeline=$(gh pr list --head "pipeline/issue-${issue_num}" --json state -q '.[0].state' 2>/dev/null || echo "")
+        merged_daemon=$(gh pr list --head "daemon/issue-${issue_num}" --json state -q '.[0].state' 2>/dev/null || echo "")
+        [[ "$merged_pipeline" == "MERGED" || "$merged_daemon" == "MERGED" ]] && merged="MERGED"
+        if [[ "$merged" == "MERGED" ]]; then
+            outcome="success"
+            increment_counter "issues_completed"
+            emit_event "autonomous.finding_success" "issue=$issue_num"
+        else
+            outcome="failure"
+            emit_event "autonomous.finding_failure" "issue=$issue_num"
+        fi
+        echo "$line" | jq --arg o "$outcome" '.outcome = $o' >> "$updated_file"
+    done < "$pending_file"
+    mv "$updated_file" "$pending_file"
+}
 
 process_findings() {
     local findings_file="$1"
@@ -320,7 +376,7 @@ process_findings() {
     local created=0
     local total=0
 
-    # Parse findings and create issues
+    # Parse findings and create issues; trigger pipeline for each; record for outcome tracking
     while IFS= read -r finding; do
         [[ -z "$finding" ]] && continue
 
@@ -344,14 +400,18 @@ process_findings() {
             labels="${category}${labels:+,$labels}"
         fi
 
-        if create_issue_from_finding "$title" "$description" "$priority" "$effort" "$labels"; then
+        local issue_num
+        issue_num=$(create_issue_from_finding "$title" "$description" "$priority" "$effort" "$labels")
+        if [[ $? -eq 0 && -n "$issue_num" ]]; then
             created=$((created + 1))
             increment_counter "issues_created"
-            emit_event "autonomous.issue_created" "title=$title" "priority=$priority" "effort=$effort"
+            emit_event "autonomous.issue_created" "title=$title" "priority=$priority" "effort=$effort" "issue=$issue_num"
+            trigger_pipeline_for_finding "$issue_num" "$title"
+            record_finding_pending "$issue_num" "$title"
         fi
     done < <(jq -c '.[]' "$findings_file" 2>/dev/null)
 
-    info "Created $created of $total findings as issues"
+    info "Created $created of $total findings as issues (pipelines triggered)"
     echo "$created"
 }
 
@@ -452,6 +512,29 @@ show_history() {
 
 # ─── Loop Control ──────────────────────────────────────────────────────────
 
+# Scheduler: run cycles at interval (real scheduler instead of manual cycle only)
+run_scheduler() {
+    ensure_state_dir
+    init_state
+    update_state "status" "running"
+    info "Autonomous scheduler started (cycle every $(get_config "cycle_interval_minutes" "60") minutes)"
+    emit_event "autonomous.scheduler_started"
+
+    while true; do
+        local status
+        status=$(read_state | jq -r '.status // "running"')
+        if [[ "$status" != "running" ]]; then
+            info "Status is ${status} — exiting scheduler"
+            break
+        fi
+        run_single_cycle || true
+        local interval_mins
+        interval_mins=$(get_config "cycle_interval_minutes" "60")
+        info "Next cycle in ${interval_mins} minutes"
+        sleep $((interval_mins * 60))
+    done
+}
+
 start_loop() {
     ensure_state_dir
     init_state
@@ -490,6 +573,9 @@ resume_loop() {
 run_single_cycle() {
     ensure_state_dir
     update_state "status" "analyzing"
+
+    # Update outcomes for pending findings (which led to successful fixes)
+    update_finding_outcomes
 
     info "Running single analysis cycle..."
 
@@ -574,11 +660,12 @@ USAGE
   sw autonomous <command> [options]
 
 COMMANDS
-  start                     Begin autonomous loop (analyze → create → build → learn → repeat)
+  start                     Set status to running (use with external scheduler)
+  run                       Run scheduler: cycle every N minutes until stopped
   stop                      Stop the loop gracefully
   pause                     Pause without losing state
   resume                    Resume from pause
-  cycle                     Run one analysis cycle manually
+  cycle                     Run one analysis cycle manually (create issues + trigger pipelines)
   status                    Show loop status, recent cycles, issue creation stats
   config [show|set]         Show or set configuration
   history                   Show past cycles and their outcomes
@@ -610,6 +697,9 @@ main() {
     case "$cmd" in
         start)
             start_loop
+            ;;
+        run)
+            run_scheduler
             ;;
         stop)
             stop_loop

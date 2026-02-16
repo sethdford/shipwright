@@ -7,7 +7,40 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ---
 
-## [Unreleased]
+## [2.1.0] — 2026-02-15
+
+**tmux Visual Overhaul & Init Hardening.**
+
+### Added
+
+- **Active pane background lift** — subtle depth effect between active/inactive panes
+- **Role-colored pane borders** — border color reflects agent role (builder=blue, reviewer=orange, tester=yellow, etc.)
+- **Pipeline stage badge in status bar** — live `⚙ BUILD` / `⚡ TEST` / `↑ PR` widget with stage-colored badges
+- **Agent count widget in status bar** — shows `λN` active agents from heartbeat files
+- **`shipwright init --repair` flag** — force clean reinstall after OS upgrades
+- **Post-install verification step** in `shipwright init`
+- **Direct-clone fallback** for TPM plugins (works outside tmux)
+- **tmux adapter deployed by init** (`~/.shipwright/adapters/`)
+- **tmux status widgets deployed by init** (`~/.shipwright/scripts/`)
+- **`COLORTERM=truecolor`** set in tmux environment for Claude Code color fidelity
+- 6 new init test cases (21 total)
+
+### Fixed
+
+- **`pane-base-index 1 → 0`** — Claude Code expects 0-based pane indexing
+- **Shell `$()` expansion bug** in `M-a` and `M-s` capture bindings (evaluated at config load, not keypress)
+- **Duplicate unsafe `bind x/X`** — overlay's `confirm-before` is now sole definition
+- **Config reload (`prefix+r`)** now sources both tmux.conf and overlay
+- **tmux-yank clipboard conflicts** removed (plugin handles all clipboard)
+- **Duplicate `window-style` definitions** removed (overlay is authoritative)
+- **Legacy `claude-teams-overlay.conf`** auto-cleaned during init
+- **Legacy overlay `source-file` references** stripped from user's tmux.conf
+- **Near-white text (`#e4e4e7`)** replaced across all tmux chrome with warm grays
+- **`status-interval`** reduced from 1s to 3s (less CPU during agent streaming)
+
+---
+
+## [Unreleased — pre-2.1.0]
 
 ### Added
 
@@ -404,6 +437,7 @@ This release turns Shipwright from a team session manager into a full autonomous
 
 ---
 
+[2.1.0]: https://github.com/sethdford/shipwright/compare/v2.0.0...v2.1.0
 [2.0.0]: https://github.com/sethdford/shipwright/compare/v1.10.0...v2.0.0
 [1.12.0]: https://github.com/sethdford/shipwright/compare/v1.10.0...v1.12.0
 [1.10.0]: https://github.com/sethdford/shipwright/compare/v1.9.0...v1.10.0

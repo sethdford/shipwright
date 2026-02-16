@@ -13,7 +13,7 @@
   <a href="https://github.com/sethdford/shipwright/actions/workflows/test.yml"><img src="https://github.com/sethdford/shipwright/actions/workflows/test.yml/badge.svg" alt="Tests"></a>
   <a href="https://github.com/sethdford/shipwright/actions/workflows/shipwright-pipeline.yml"><img src="https://github.com/sethdford/shipwright/actions/workflows/shipwright-pipeline.yml/badge.svg" alt="Pipeline"></a>
   <img src="https://img.shields.io/badge/tests-500%2B_passing-4ade80?style=flat-square" alt="500+ tests">
-  <img src="https://img.shields.io/badge/version-2.0.0-00d4ff?style=flat-square" alt="v2.0.0">
+  <img src="https://img.shields.io/badge/version-2.1.0-00d4ff?style=flat-square" alt="v2.1.0">
   <img src="https://img.shields.io/badge/license-MIT-green?style=flat-square" alt="MIT License">
   <img src="https://img.shields.io/badge/bash-3.2%2B-7c3aed?style=flat-square" alt="Bash 3.2+">
 </p>
@@ -28,31 +28,19 @@ This repo uses Shipwright to process its own issues. Label a GitHub issue with `
 
 ---
 
-## What's New in v2.0.0
+## What's New in v2.1.0
 
-**18 new autonomous agents** bringing intelligent orchestration to every phase:
+**tmux visual overhaul** — role-colored borders, pipeline status widgets, and active pane depth:
 
-- **Agent Swarm** — Dynamic multi-agent coordination with role specialization
-- **Autonomous PM** — Team orchestration, task scheduling, roadmap management
-- **Knowledge Guilds** — Cross-team learning and pattern discovery
-- **Quality Oversight** — Intelligent completion audits and zero-defect gates
-- **Strategic Intelligence** — Long-term planning and goal decomposition
-- **Adaptive Pipeline** — Data-driven tuning based on historical performance
-- **Live Activity Streams** — Real-time agent work visualization
-- **Incident Response** — Autonomous detection, triage, and resolution
-- **Dependency Management** — Automated updates with semantic versioning
-- **100+ CLI Commands** — Unified command surface for all operations
-- **Multi-Repo Fleet Orchestration** — Distribute work across teams and repositories
-- **Local Mode** — Full pipeline capability without GitHub (for development/testing)
+- **Role-Colored Pane Borders** — Border color reflects agent role (builder=blue, reviewer=orange, tester=yellow)
+- **Pipeline Stage Badge** — Live `⚙ BUILD` / `⚡ TEST` / `↑ PR` widget in status bar with stage-colored badges
+- **Active Pane Lift** — Subtle background depth effect between active and inactive panes
+- **Agent Count Widget** — `λN` heartbeat-based agent counter in status bar
+- **`shipwright init --repair`** — Force clean reinstall after OS upgrades
+- **Color Palette Overhaul** — Warm grays replace harsh near-white text across all tmux chrome
+- **7 tmux Bug Fixes** — Pane indexing, capture bindings, reload, clipboard, and more
 
-**v1.13.0 features**:
-- **Webhook receiver** — Zero-latency issue processing
-- **PR lifecycle automation** — Auto-review, merge, cleanup
-- **Fleet auto-discovery** — Populate fleet config from GitHub org
-- **SQLite persistence** — ACID-safe state, crash recovery
-- **Issue decomposition** — AI-split complex features
-- **systemd support** — Cross-platform process supervision
-- **Context engine** — Rich context injection
+**v2.0.0 highlights**: 18 autonomous agents, 100+ CLI commands, intelligence layer, multi-repo fleet, local mode
 
 ---
 
@@ -166,6 +154,7 @@ shipwright changelog generate
 ### 18 Autonomous Agents
 
 Wave 1 (Organizational):
+
 - **Swarm Manager** — Orchestrates dynamic agent teams with specialization roles
 - **Autonomous PM** — Team leadership, task scheduling, roadmap execution
 - **Knowledge Guild** — Cross-team learning, pattern capture, mentorship
@@ -173,6 +162,7 @@ Wave 1 (Organizational):
 - **Standup Automaton** — Daily standups, progress tracking, blocker detection
 
 Wave 2 (Operational Backbone):
+
 - **Quality Oversight** — Intelligent audits, zero-defect gates, completeness verification
 - **Strategic Agent** — Long-term planning, goal decomposition, roadmap intelligence
 - **Code Reviewer** — Architecture analysis, clean code standards, best practices
@@ -340,7 +330,7 @@ Rich context injection for pipeline stages. Pulls together: contributor history,
 
 ## Commands
 
-Over 100 commands in v2.0.0. Key workflows:
+Over 100 commands. Key workflows:
 
 ```bash
 # Autonomous delivery
@@ -431,7 +421,7 @@ Pipeline Layer
   sw-daemon.sh                # Autonomous GitHub issue watcher
   sw-loop.sh                  # Continuous multi-iteration build loop
 
-Agent Layer (18 new in v2.0.0)
+Agent Layer (18 agents)
   sw-swarm.sh                 # Dynamic agent team orchestration
   sw-pm.sh                    # Autonomous PM coordination
   sw-recruit.sh               # Agent recruitment system

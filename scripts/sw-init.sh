@@ -8,7 +8,7 @@
 # ║                                                                          ║
 # ║  --deploy  Detect platform and generate deployed.json template          ║
 # ╚═══════════════════════════════════════════════════════════════════════════╝
-VERSION="2.0.0"
+VERSION="2.1.0"
 set -euo pipefail
 trap 'echo "ERROR: $BASH_SOURCE:$LINENO exited with status $?" >&2' ERR
 
@@ -37,6 +37,7 @@ error()   { echo -e "${RED}${BOLD}✗${RESET} $*" >&2; }
 DEPLOY_SETUP=false
 DEPLOY_PLATFORM=""
 SKIP_CLAUDE_MD=false
+REPAIR_MODE=false
 
 while [[ $# -gt 0 ]]; do
     case "$1" in
@@ -53,13 +54,18 @@ while [[ $# -gt 0 ]]; do
             SKIP_CLAUDE_MD=true
             shift
             ;;
+        --repair)
+            REPAIR_MODE=true
+            shift
+            ;;
         --help|-h)
-            echo "Usage: shipwright init [--deploy] [--platform vercel|fly|railway|docker] [--no-claude-md]"
+            echo "Usage: shipwright init [--deploy] [--platform vercel|fly|railway|docker] [--no-claude-md] [--repair]"
             echo ""
             echo "Options:"
             echo "  --deploy             Detect deploy platform and generate deployed.json"
             echo "  --platform PLATFORM  Skip detection, use specified platform"
             echo "  --no-claude-md       Skip creating .claude/CLAUDE.md"
+            echo "  --repair             Force clean reinstall of tmux config, plugins, and adapters"
             echo "  --help, -h           Show this help"
             exit 0
             ;;
@@ -78,8 +84,22 @@ echo ""
 # ─── tmux.conf ────────────────────────────────────────────────────────────────
 TOOK_FULL_TMUX_CONF=false
 IS_INTERACTIVE="${INTERACTIVE:-false}"
+
+# --repair: remove stale files first for clean slate
+if [[ "$REPAIR_MODE" == "true" ]]; then
+    info "Repair mode: cleaning stale tmux artifacts..."
+    rm -f "$HOME/.tmux/claude-teams-overlay.conf" 2>/dev/null || true
+    rm -f "$HOME/.tmux/claude-teams-overlay.conf.pre-upgrade.bak" 2>/dev/null || true
+    # Strip legacy overlay source lines from user's tmux.conf
+    if [[ -f "$HOME/.tmux.conf" ]] && grep -q "claude-teams-overlay" "$HOME/.tmux.conf" 2>/dev/null; then
+        tmp=$(mktemp)
+        grep -v "claude-teams-overlay" "$HOME/.tmux.conf" > "$tmp" && mv "$tmp" "$HOME/.tmux.conf"
+        success "Removed legacy claude-teams-overlay references from ~/.tmux.conf"
+    fi
+fi
+
 if [[ -f "$REPO_DIR/tmux/tmux.conf" ]]; then
-    if [[ -f "$HOME/.tmux.conf" ]]; then
+    if [[ -f "$HOME/.tmux.conf" ]] && [[ "$REPAIR_MODE" == "false" ]]; then
         cp "$HOME/.tmux.conf" "$HOME/.tmux.conf.bak"
         warn "Backed up existing ~/.tmux.conf → ~/.tmux.conf.bak"
         if [[ "$IS_INTERACTIVE" == "true" ]]; then
@@ -92,7 +112,6 @@ if [[ -f "$REPO_DIR/tmux/tmux.conf" ]]; then
                 info "Kept existing ~/.tmux.conf"
             fi
         else
-            # Non-interactive: default to yes
             cp "$REPO_DIR/tmux/tmux.conf" "$HOME/.tmux.conf"
             success "Installed ~/.tmux.conf"
             TOOK_FULL_TMUX_CONF=true
@@ -115,6 +134,20 @@ else
     warn "Overlay not found in package — skipping"
 fi
 
+# ─── Clean up legacy overlay files ───────────────────────────────────────────
+# Renamed from claude-teams-overlay.conf → shipwright-overlay.conf in v2.0
+if [[ -f "$HOME/.tmux/claude-teams-overlay.conf" ]]; then
+    rm -f "$HOME/.tmux/claude-teams-overlay.conf"
+    rm -f "$HOME/.tmux/claude-teams-overlay.conf.pre-upgrade.bak" 2>/dev/null || true
+    success "Removed legacy claude-teams-overlay.conf"
+fi
+# Strip any lingering source-file references to the old overlay name
+if [[ -f "$HOME/.tmux.conf" ]] && grep -q "claude-teams-overlay" "$HOME/.tmux.conf" 2>/dev/null; then
+    tmp=$(mktemp)
+    grep -v "claude-teams-overlay" "$HOME/.tmux.conf" > "$tmp" && mv "$tmp" "$HOME/.tmux.conf"
+    success "Removed legacy overlay reference from ~/.tmux.conf"
+fi
+
 # ─── Overlay injection ───────────────────────────────────────────────────────
 # If user kept their own tmux.conf, ensure it sources the overlay
 if [[ "$TOOK_FULL_TMUX_CONF" == "false" && -f "$HOME/.tmux.conf" ]]; then
@@ -133,7 +166,6 @@ if [[ "$TOOK_FULL_TMUX_CONF" == "false" && -f "$HOME/.tmux.conf" ]]; then
                 echo -e "    ${DIM}source-file -q ~/.tmux/shipwright-overlay.conf${RESET}"
             fi
         else
-            # Non-interactive: inject automatically
             {
                 echo ""
                 echo "# Shipwright agent overlay"
@@ -145,8 +177,9 @@ if [[ "$TOOK_FULL_TMUX_CONF" == "false" && -f "$HOME/.tmux.conf" ]]; then
 fi
 
 # ─── TPM (Tmux Plugin Manager) ────────────────────────────────────────────
-if [[ ! -d "$HOME/.tmux/plugins/tpm" ]]; then
+if [[ ! -d "$HOME/.tmux/plugins/tpm" ]] || [[ "$REPAIR_MODE" == "true" ]]; then
     info "Installing TPM (Tmux Plugin Manager)..."
+    rm -rf "$HOME/.tmux/plugins/tpm" 2>/dev/null || true
     if git clone https://github.com/tmux-plugins/tpm "$HOME/.tmux/plugins/tpm" 2>/dev/null; then
         success "TPM installed"
     else
@@ -157,18 +190,69 @@ else
 fi
 
 # ─── Install TPM plugins ──────────────────────────────────────────────────
-if [[ -x "$HOME/.tmux/plugins/tpm/bin/install_plugins" ]]; then
-    info "Installing tmux plugins..."
-    "$HOME/.tmux/plugins/tpm/bin/install_plugins" 2>/dev/null && \
-        success "Plugins installed (sensible, resurrect, continuum, yank, fzf)" || \
-        warn "Some plugins may not have installed — press prefix + I inside tmux"
+# TPM's install_plugins requires a running tmux server to parse the config.
+# When run outside tmux (e.g., fresh OS install), we fall back to cloning
+# each plugin directly — the repos are the plugins, no build step needed.
+_tmux_plugins_installed=false
+if [[ -n "${TMUX:-}" ]] && [[ -x "$HOME/.tmux/plugins/tpm/bin/install_plugins" ]]; then
+    info "Installing tmux plugins via TPM..."
+    if "$HOME/.tmux/plugins/tpm/bin/install_plugins" 2>/dev/null; then
+        success "Plugins installed via TPM"
+        _tmux_plugins_installed=true
+    fi
 fi
 
-# ─── Reload tmux config if inside tmux ─────────────────────────────────────
-if [[ -n "${TMUX:-}" ]]; then
-    tmux source-file "$HOME/.tmux.conf" 2>/dev/null && \
-        success "Reloaded tmux config (passthrough, extended-keys, plugins active)" || true
+if [[ "$_tmux_plugins_installed" == "false" ]]; then
+    info "Installing tmux plugins directly (not inside tmux)..."
+    _plugin_repos=(
+        "tmux-plugins/tmux-sensible"
+        "tmux-plugins/tmux-resurrect"
+        "tmux-plugins/tmux-continuum"
+        "tmux-plugins/tmux-yank"
+        "sainnhe/tmux-fzf"
+    )
+    _plugins_ok=0
+    _plugins_fail=0
+    for _repo in "${_plugin_repos[@]}"; do
+        _name="${_repo##*/}"
+        _dest="$HOME/.tmux/plugins/$_name"
+        if [[ -d "$_dest" ]] && [[ "$REPAIR_MODE" == "false" ]]; then
+            _plugins_ok=$((_plugins_ok + 1))
+        else
+            rm -rf "$_dest" 2>/dev/null || true
+            if git clone "https://github.com/$_repo" "$_dest" 2>/dev/null; then
+                _plugins_ok=$((_plugins_ok + 1))
+            else
+                _plugins_fail=$((_plugins_fail + 1))
+            fi
+        fi
+    done
+    if [[ $_plugins_fail -eq 0 ]]; then
+        success "Installed ${_plugins_ok} tmux plugins (sensible, resurrect, continuum, yank, fzf)"
+    else
+        warn "${_plugins_ok} plugins installed, ${_plugins_fail} failed — retry with: shipwright tmux install"
+    fi
 fi
+
+# ─── tmux Adapter ────────────────────────────────────────────────────────────
+# Deploy the tmux adapter (pane ID safety layer) to ~/.shipwright/adapters/
+if [[ -f "$SCRIPT_DIR/adapters/tmux-adapter.sh" ]]; then
+    mkdir -p "$HOME/.shipwright/adapters"
+    cp "$SCRIPT_DIR/adapters/tmux-adapter.sh" "$HOME/.shipwright/adapters/tmux-adapter.sh"
+    chmod +x "$HOME/.shipwright/adapters/tmux-adapter.sh"
+    success "Installed tmux adapter → ~/.shipwright/adapters/"
+fi
+
+# ─── tmux Status Widgets & Role Colors ──────────────────────────────────────
+# Deploy scripts called by tmux hooks and #() status-bar widgets
+mkdir -p "$HOME/.shipwright/scripts"
+for _widget in sw-tmux-status.sh sw-tmux-role-color.sh; do
+    if [[ -f "$SCRIPT_DIR/$_widget" ]]; then
+        cp "$SCRIPT_DIR/$_widget" "$HOME/.shipwright/scripts/$_widget"
+        chmod +x "$HOME/.shipwright/scripts/$_widget"
+    fi
+done
+success "Installed tmux widgets → ~/.shipwright/scripts/"
 
 # ─── Fix iTerm2 mouse reporting if disabled ────────────────────────────────
 if [[ "${LC_TERMINAL:-${TERM_PROGRAM:-}}" == *iTerm* ]]; then
@@ -181,6 +265,27 @@ if [[ "${LC_TERMINAL:-${TERM_PROGRAM:-}}" == *iTerm* ]]; then
             success "Enabled iTerm2 mouse reporting (open a new tab to activate)" || \
             warn "Could not auto-fix — enable manually: Preferences → Profiles → Terminal → Report mouse clicks"
     fi
+fi
+
+# ─── Verify tmux deployment ──────────────────────────────────────────────────
+_verify_fail=0
+if [[ ! -f "$HOME/.tmux.conf" ]]; then
+    error "VERIFY FAILED: ~/.tmux.conf not found after install"
+    _verify_fail=1
+elif ! grep -q "allow-passthrough" "$HOME/.tmux.conf" 2>/dev/null; then
+    error "VERIFY FAILED: ~/.tmux.conf missing allow-passthrough (Claude Code compat)"
+    _verify_fail=1
+fi
+if [[ ! -f "$HOME/.tmux/shipwright-overlay.conf" ]]; then
+    error "VERIFY FAILED: ~/.tmux/shipwright-overlay.conf not found"
+    _verify_fail=1
+fi
+if [[ ! -d "$HOME/.tmux/plugins/tpm" ]]; then
+    warn "VERIFY: TPM not installed — press prefix + I inside tmux to install"
+    _verify_fail=1
+fi
+if [[ $_verify_fail -eq 0 ]]; then
+    success "Verified: tmux config, overlay, TPM, and plugins all deployed"
 fi
 
 # ─── Team Templates ──────────────────────────────────────────────────────────
@@ -465,9 +570,12 @@ fi
 
 # ─── Reload tmux if inside a session ──────────────────────────────────────────
 if [[ -n "${TMUX:-}" ]]; then
-    tmux source-file "$HOME/.tmux.conf" 2>/dev/null && \
-        success "Reloaded tmux config" || \
+    if tmux source-file "$HOME/.tmux.conf" 2>/dev/null; then
+        tmux source-file -q "$HOME/.tmux/shipwright-overlay.conf" 2>/dev/null || true
+        success "Reloaded tmux config + overlay"
+    else
         warn "Could not reload tmux config (reload manually with prefix + r)"
+    fi
 fi
 
 # ─── Validation ───────────────────────────────────────────────────────────────

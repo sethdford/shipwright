@@ -6,7 +6,7 @@
 set -euo pipefail
 trap 'echo "ERROR: $BASH_SOURCE:$LINENO exited with status $?" >&2' ERR
 
-VERSION="1.13.0"
+VERSION="2.1.0"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 # ─── Handle subcommands ───────────────────────────────────────────────────────
@@ -208,8 +208,12 @@ EOF
     done
     echo ""
 
-    # Generate test template
+    # Generate test template; use Claude for real assertions when available
     local test_template_file="$TESTGEN_DIR/generated-tests.sh"
+    local use_claude="false"
+    command -v claude &>/dev/null && use_claude="true"
+    [[ "${TESTGEN_USE_CLAUDE:-true}" == "false" ]] && use_claude="false"
+
     {
         echo "#!/usr/bin/env bash"
         echo "# Generated tests for $target_script"
@@ -217,24 +221,71 @@ EOF
         echo "trap 'echo \"ERROR: \$BASH_SOURCE:\$LINENO exited with status \$?\" >&2' ERR"
         echo ""
         echo "SCRIPT_DIR=\"\$(cd \"\$(dirname \"\${BASH_SOURCE[0]}\")\" && pwd)\""
+        echo "REPO_DIR=\"\$(cd \"\$SCRIPT_DIR/..\" && pwd)\""
         echo ""
-        echo "# Test counters"
+        echo "# Helpers: assert equal (or contains) so tests fail when behavior is wrong"
+        echo "assert_equal() { local e=\"\$1\" a=\"\$2\"; if [[ \"\$a\" != \"\$e\" ]]; then echo \"Expected: \$e\"; echo \"Actual: \$a\"; exit 1; fi; }"
+        echo "assert_contains() { local sub=\"\$1\" full=\"\$2\"; if [[ \"\$full\" != *\"\$sub\"* ]]; then echo \"Expected to contain: \$sub\"; echo \"In: \$full\"; exit 1; fi; }"
+        echo ""
         echo "PASS=0"
         echo "FAIL=0"
         echo ""
+    } > "$test_template_file"
 
-        echo "$untested_functions" | while IFS= read -r func; do
-            [[ -z "$func" ]] && continue
-            echo "test_${func}() {"
-            echo "    # TODO: Implement test for $func"
-            echo "    # - Test happy path"
-            echo "    # - Test error cases"
-            echo "    # - Test edge cases"
-            echo "    ((PASS++))"
-            echo "}"
+    local func_count=0
+    while IFS= read -r func; do
+        [[ -z "$func" ]] && continue
+        func_count=$((func_count + 1))
+        {
+            if [[ "$use_claude" == "true" ]]; then
+                local func_snippet
+                func_snippet=$(awk "/^${func}\(\\)/,/^[a-zA-Z_][a-zA-Z0-9_]*\(\)|^$/" "$target_script" 2>/dev/null | head -40 || true)
+                local prompt_file
+                prompt_file=$(mktemp "${TMPDIR:-/tmp}/sw-testgen-prompt.XXXXXX")
+                {
+                    echo "Generate a bash test function for the following shell function. Use real assertions (assert_equal, assert_contains, or test exit code). Test happy path and at least one edge or error case. Output only the bash function body."
+                    echo "Function name: ${func}"
+                    echo "Function body:"
+                    echo "$func_snippet"
+                } > "$prompt_file"
+                local claude_out
+                # Read prompt through pipe to avoid shell expansion of $vars in function body
+                claude_out=$(cat "$prompt_file" | claude -p --max-turns 2 2>/dev/null || true)
+                rm -f "$prompt_file"
+                if [[ -n "$claude_out" ]]; then
+                    local code_block
+                    code_block=$(echo "$claude_out" | sed -n '/^test_'"${func}"'()/,/^}/p' || echo "$claude_out" | sed -n '/^test_/,/^}/p' || true)
+                    [[ -z "$code_block" ]] && code_block="$claude_out"
+                    if echo "$code_block" | grep -qE 'assert_equal|assert_contains|\[\[.*\]\]|exit 1'; then
+                        echo "test_${func}() {"
+                        echo "$code_block" | sed 's/^test_'"${func}"'()//' | sed 's/^{//' | sed 's/^}//' | head -50
+                        echo "    ((PASS++))"
+                        echo "}"
+                    else
+                        echo "test_${func}() {"
+                        echo "    # Claude-generated; review assertions"
+                        echo "$code_block" | head -30 | sed 's/^/    /'
+                        echo "    ((PASS++))"
+                        echo "}"
+                    fi
+                else
+                    echo "test_${func}() { # TODO: Claude unavailable"
+                    echo "    ((PASS++))"
+                    echo "}"
+                fi
+            else
+                echo "test_${func}() {"
+                echo "    # TODO: Implement test for $func"
+                echo "    ((PASS++))"
+                echo "}"
+            fi
             echo ""
-        done
+        } >> "$test_template_file"
+    done << EOF
+$untested_functions
+EOF
 
+    {
         echo "# Run all tests"
         echo "$untested_functions" | while IFS= read -r func; do
             [[ -z "$func" ]] && continue
@@ -242,11 +293,11 @@ EOF
         done
         echo ""
         echo "echo \"Results: \$PASS passed, \$FAIL failed\""
-    } > "$test_template_file"
+    } >> "$test_template_file"
 
     chmod +x "$test_template_file"
     success "Generated test template: $test_template_file"
-    info "Review and implement test logic, then move to test suite"
+    [[ "$use_claude" == "true" ]] && info "Used Claude for assertions; review and run tests to validate"
 }
 
 # ═══════════════════════════════════════════════════════════════════════════════

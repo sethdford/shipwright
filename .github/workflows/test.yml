@@ -98,8 +98,42 @@ jobs:
       - name: Run launchd tests
         run: bash scripts/sw-launchd-test.sh
 
+      - name: Run recruit tests
+        run: bash scripts/sw-recruit-test.sh
+
       - name: Run E2E smoke tests
         run: bash scripts/sw-e2e-smoke-test.sh
+
+  # Budget-limited real-Claude smoke (~$0.25/PR); runs only when Claude secret is set
+  integration-claude:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    if: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN != '' || secrets.ANTHROPIC_API_KEY != '' }}
+    env:
+      CLAUDE_CODE_OAUTH_TOKEN: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+      ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install dependencies
+        run: sudo apt-get update && sudo apt-get install -y tmux jq
+
+      - name: Install Claude Code CLI
+        run: npm install -g @anthropic-ai/claude-code
+
+      - name: Run budget-limited Claude integration smoke
+        run: bash scripts/sw-integration-claude-test.sh
+
+  # Validate integration-claude skip path when no secret (script must exit 0 and skip)
+  integration-claude-skip:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Run integration-claude without secrets (expect skip)
+        run: |
+          out=$(bash scripts/sw-integration-claude-test.sh 2>&1) || exit 1
+          echo "$out" | grep -q "Skipping integration-claude" || (echo "$out"; exit 1)
+          echo "Skip path OK"
 
   shellcheck:
     runs-on: ubuntu-latest

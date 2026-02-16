@@ -6,7 +6,7 @@
 set -euo pipefail
 trap 'echo "ERROR: $BASH_SOURCE:$LINENO exited with status $?" >&2' ERR
 
-VERSION="2.0.0"
+VERSION="2.1.0"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
 
@@ -382,6 +382,50 @@ auto_fix() {
     echo "$fixed"
 }
 
+# ─── Claude-powered semantic review (logic, race conditions, API usage, requirements) ──
+run_claude_semantic_review() {
+    local diff_content="$1"
+    local requirements="${2:-}"
+    [[ -z "$diff_content" ]] && return 0
+    if ! command -v claude &>/dev/null; then
+        return 0
+    fi
+
+    local prompt="You are a senior code reviewer. Review this git diff for semantic issues (not just style).
+
+Focus on:
+1. Logic errors and edge cases (off-by-one, null/empty handling, wrong conditions)
+2. Race conditions and concurrency issues (shared state, ordering, locks)
+3. Incorrect or unsafe API usage (wrong arguments, missing error handling, deprecated APIs)
+4. Security issues (injection, auth bypass, sensitive data exposure)
+5. Requirements alignment: does the change match the intended behavior?
+
+For each issue use this format on its own line:
+- **[SEVERITY]** file:line — brief description
+
+Severity: Critical, Bug, Security, Warning, Suggestion.
+If no issues found, reply with exactly: Review clean — no semantic issues found.
+
+## Diff
+${diff_content}
+"
+    [[ -n "$requirements" ]] && prompt="${prompt}
+
+## Requirements / intended behavior
+${requirements}
+"
+
+    local claude_out
+    claude_out=$(claude -p "$prompt" --max-turns 3 2>/dev/null || true)
+    [[ -z "$claude_out" ]] && return 0
+
+    if echo "$claude_out" | grep -qi "Review clean — no semantic issues found"; then
+        return 0
+    fi
+    echo "$claude_out" | grep -oE '\*\*\[?(Critical|Bug|Security|Warning|Suggestion)\]?\*\*[^—]*—[^$]+' 2>/dev/null || \
+        echo "$claude_out" | grep -oE '-\s+\*\*[^*]+\*\*[^\n]+' 2>/dev/null || true
+}
+
 # ─── Review Subcommand ───────────────────────────────────────────────────────
 
 review_changes() {
@@ -409,6 +453,23 @@ review_changes() {
     fi
 
     [[ ${#changed_files[@]} -eq 0 ]] && { success "No changes to review"; return 0; }
+
+    # Claude-powered semantic review (logic, race conditions, API usage) when available
+    local diff_content
+    if [[ "$review_scope" == "staged" ]]; then
+        diff_content=$(cd "$REPO_DIR" && git diff --cached 2>/dev/null || true)
+    else
+        diff_content=$(cd "$REPO_DIR" && git diff main...HEAD 2>/dev/null || true)
+    fi
+    local semantic_issues=()
+    if [[ -n "$diff_content" ]] && command -v claude &>/dev/null; then
+        info "Running Claude semantic review (logic, race conditions, API usage)..."
+        mapfile -t semantic_issues < <(run_claude_semantic_review "$diff_content" "${REVIEW_REQUIREMENTS:-}" || true)
+        if [[ ${#semantic_issues[@]} -gt 0 ]]; then
+            total_issues=$((total_issues + ${#semantic_issues[@]}))
+            review_output=$(echo "$review_output" | jq --argjson arr "$(printf '%s\n' "${semantic_issues[@]}" | jq -R . | jq -s .)" '.semantic_findings = $arr' 2>/dev/null || echo "$review_output")
+        fi
+    fi
 
     for file in "${changed_files[@]}"; do
         local file_path="${REPO_DIR}/${file}"

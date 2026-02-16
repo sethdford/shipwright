@@ -11,7 +11,7 @@ unset CLAUDECODE 2>/dev/null || true
 # Ignore SIGHUP so tmux attach/detach doesn't kill long-running plan/design/review stages
 trap '' HUP
 
-VERSION="2.0.0"
+VERSION="2.1.0"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
 
@@ -202,6 +202,7 @@ PIPELINE_CONFIG=""
 TEST_CMD=""
 MODEL=""
 AGENTS=""
+PIPELINE_AGENT_ID="${PIPELINE_AGENT_ID:-pipeline-$$}"
 SKIP_GATES=false
 GIT_BRANCH=""
 GITHUB_ISSUE=""
@@ -401,6 +402,7 @@ setup_dirs() {
     ARTIFACTS_DIR="$STATE_DIR/pipeline-artifacts"
     TASKS_FILE="$STATE_DIR/pipeline-tasks.md"
     mkdir -p "$STATE_DIR" "$ARTIFACTS_DIR"
+    export SHIPWRIGHT_PIPELINE_ID="pipeline-$$-${ISSUE_NUMBER:-0}"
 }
 
 # ─── Pipeline Config Loading ───────────────────────────────────────────────
@@ -1160,6 +1162,21 @@ get_stage_timing() {
     fi
 }
 
+# Raw seconds for a stage (for memory baseline updates)
+get_stage_timing_seconds() {
+    local stage_id="$1"
+    local start_e end_e
+    start_e=$(echo "$STAGE_TIMINGS" | grep "^${stage_id}_start:" | cut -d: -f2 | tail -1 || true)
+    end_e=$(echo "$STAGE_TIMINGS" | grep "^${stage_id}_end:" | cut -d: -f2 | tail -1 || true)
+    if [[ -n "$start_e" && -n "$end_e" ]]; then
+        echo $(( end_e - start_e ))
+    elif [[ -n "$start_e" ]]; then
+        echo $(( $(now_epoch) - start_e ))
+    else
+        echo "0"
+    fi
+}
+
 get_stage_description() {
     local stage_id="$1"
 
@@ -1254,6 +1271,22 @@ mark_stage_complete() {
     timing=$(get_stage_timing "$stage_id")
     log_stage "$stage_id" "complete (${timing})"
     write_state
+
+    record_stage_effectiveness "$stage_id" "complete"
+    # Update memory baselines and predictive baselines for stage durations
+    if [[ "$stage_id" == "test" || "$stage_id" == "build" ]]; then
+        local secs
+        secs=$(get_stage_timing_seconds "$stage_id")
+        if [[ -n "$secs" && "$secs" != "0" ]]; then
+            [[ -x "$SCRIPT_DIR/sw-memory.sh" ]] && bash "$SCRIPT_DIR/sw-memory.sh" metric "${stage_id}_duration_s" "$secs" 2>/dev/null || true
+            if [[ -x "$SCRIPT_DIR/sw-predictive.sh" ]]; then
+                local anomaly_sev
+                anomaly_sev=$(bash "$SCRIPT_DIR/sw-predictive.sh" anomaly "$stage_id" "duration_s" "$secs" 2>/dev/null || echo "normal")
+                [[ "$anomaly_sev" == "critical" || "$anomaly_sev" == "warning" ]] && emit_event "pipeline.anomaly" "stage=$stage_id" "metric=duration_s" "value=$secs" "severity=$anomaly_sev" 2>/dev/null || true
+                bash "$SCRIPT_DIR/sw-predictive.sh" baseline "$stage_id" "duration_s" "$secs" 2>/dev/null || true
+            fi
+        fi
+    fi
 
     # Update GitHub progress comment
     if [[ -n "$ISSUE_NUMBER" ]]; then
@@ -1351,9 +1384,40 @@ verify_stage_artifacts() {
     return "$missing"
 }
 
+# Self-aware pipeline: record stage effectiveness for meta-cognition
+STAGE_EFFECTIVENESS_FILE="${HOME}/.shipwright/stage-effectiveness.jsonl"
+record_stage_effectiveness() {
+    local stage_id="$1" outcome="${2:-failed}"
+    mkdir -p "${HOME}/.shipwright"
+    echo "{\"stage\":\"$stage_id\",\"outcome\":\"$outcome\",\"ts\":\"$(now_iso)\"}" >> "${STAGE_EFFECTIVENESS_FILE}"
+    # Keep last 100 entries
+    tail -100 "${STAGE_EFFECTIVENESS_FILE}" > "${STAGE_EFFECTIVENESS_FILE}.tmp" 2>/dev/null && mv "${STAGE_EFFECTIVENESS_FILE}.tmp" "${STAGE_EFFECTIVENESS_FILE}" 2>/dev/null || true
+}
+get_stage_self_awareness_hint() {
+    local stage_id="$1"
+    [[ ! -f "$STAGE_EFFECTIVENESS_FILE" ]] && return 0
+    local recent
+    recent=$(grep "\"stage\":\"$stage_id\"" "$STAGE_EFFECTIVENESS_FILE" 2>/dev/null | tail -10 || true)
+    [[ -z "$recent" ]] && return 0
+    local failures=0 total=0
+    while IFS= read -r line; do
+        [[ -z "$line" ]] && continue
+        total=$((total + 1))
+        echo "$line" | grep -q '"outcome":"failed"' && failures=$((failures + 1)) || true
+    done <<< "$recent"
+    if [[ "$total" -ge 3 ]] && [[ $((failures * 100 / total)) -ge 50 ]]; then
+        case "$stage_id" in
+            plan)  echo "Recent plan stage failures: consider adding more context or breaking the goal into smaller steps." ;;
+            build) echo "Recent build stage failures: consider adding test expectations or simplifying the change." ;;
+            *)     echo "Recent $stage_id failures: review past logs and adjust approach." ;;
+        esac
+    fi
+}
+
 mark_stage_failed() {
     local stage_id="$1"
     record_stage_end "$stage_id"
+    record_stage_effectiveness "$stage_id" "failed"
     set_stage_status "$stage_id" "failed"
     local timing
     timing=$(get_stage_timing "$stage_id")
@@ -1784,6 +1848,28 @@ ${memory_summary}
         fi
     fi
 
+    # Self-aware pipeline: inject hint when plan stage has been failing recently
+    local plan_hint
+    plan_hint=$(get_stage_self_awareness_hint "plan" 2>/dev/null || true)
+    if [[ -n "$plan_hint" ]]; then
+        plan_prompt="${plan_prompt}
+## Self-Assessment (recent plan stage performance)
+${plan_hint}
+"
+    fi
+
+    # Inject cross-pipeline discoveries (from other concurrent/similar pipelines)
+    if [[ -x "$SCRIPT_DIR/sw-discovery.sh" ]]; then
+        local plan_discoveries
+        plan_discoveries=$("$SCRIPT_DIR/sw-discovery.sh" inject "*.md,*.json" 2>/dev/null | head -20 || true)
+        if [[ -n "$plan_discoveries" ]]; then
+            plan_prompt="${plan_prompt}
+## Discoveries from Other Pipelines
+${plan_discoveries}
+"
+        fi
+    fi
+
     # Inject architecture patterns from intelligence layer
     local repo_hash_plan
     repo_hash_plan=$(echo -n "$PROJECT_ROOT" | shasum -a 256 2>/dev/null | cut -c1-12 || echo "unknown")
@@ -2156,6 +2242,12 @@ stage_design() {
         memory_context=$(bash "$SCRIPT_DIR/sw-memory.sh" inject "design" 2>/dev/null) || true
     fi
 
+    # Inject cross-pipeline discoveries for design stage
+    local design_discoveries=""
+    if [[ -x "$SCRIPT_DIR/sw-discovery.sh" ]]; then
+        design_discoveries=$("$SCRIPT_DIR/sw-discovery.sh" inject "*.md,*.ts,*.tsx,*.js" 2>/dev/null | head -20 || true)
+    fi
+
     # Inject architecture model patterns if available
     local arch_context=""
     local repo_hash
@@ -2215,7 +2307,10 @@ ${memory_context}
 }${arch_context:+
 ## Architecture Model (from previous designs)
 ${arch_context}
-}${design_antipatterns}
+}${design_antipatterns}${design_discoveries:+
+## Discoveries from Other Pipelines
+${design_discoveries}
+}
 ## Required Output — Architecture Decision Record
 
 Produce this EXACT format:
@@ -2339,6 +2434,18 @@ Historical context (lessons from previous pipelines):
 ${memory_context}"
     fi
 
+    # Inject cross-pipeline discoveries for build stage
+    if [[ -x "$SCRIPT_DIR/sw-discovery.sh" ]]; then
+        local build_discoveries
+        build_discoveries=$("$SCRIPT_DIR/sw-discovery.sh" inject "src/*,*.ts,*.tsx,*.js" 2>/dev/null | head -20 || true)
+        if [[ -n "$build_discoveries" ]]; then
+            enriched_goal="${enriched_goal}
+
+Discoveries from other pipelines:
+${build_discoveries}"
+        fi
+    fi
+
     # Add task list context
     if [[ -s "$TASKS_FILE" ]]; then
         enriched_goal="${enriched_goal}
@@ -2382,6 +2489,19 @@ ${build_alerts}"
             enriched_goal="${enriched_goal}
 
 Coverage baseline: ${coverage_baseline}% — do not decrease coverage."
+        fi
+    fi
+
+    # Predictive: inject prevention hints when risk/memory patterns suggest build-stage failures
+    if [[ -x "$SCRIPT_DIR/sw-predictive.sh" ]]; then
+        local issue_json_build="{}"
+        [[ -n "${ISSUE_NUMBER:-}" ]] && issue_json_build=$(jq -n --arg title "${GOAL:-}" --arg num "${ISSUE_NUMBER:-}" '{title: $title, number: $num}')
+        local prevention_text
+        prevention_text=$(bash "$SCRIPT_DIR/sw-predictive.sh" inject-prevention "build" "$issue_json_build" 2>/dev/null || true)
+        if [[ -n "$prevention_text" ]]; then
+            enriched_goal="${enriched_goal}
+
+${prevention_text}"
         fi
     fi
 
@@ -2435,6 +2555,23 @@ Coverage baseline: ${coverage_baseline}% — do not decrease coverage."
     # Intelligence model routing (when no explicit CLI --model override)
     if [[ -z "$MODEL" && -n "${CLAUDE_MODEL:-}" ]]; then
         build_model="$CLAUDE_MODEL"
+    fi
+
+    # Recruit-powered model selection (when no explicit override)
+    if [[ -z "$MODEL" ]] && [[ -x "$SCRIPT_DIR/sw-recruit.sh" ]]; then
+        local _recruit_goal="${GOAL:-}"
+        if [[ -n "$_recruit_goal" ]]; then
+            local _recruit_match
+            _recruit_match=$(bash "$SCRIPT_DIR/sw-recruit.sh" match --json "$_recruit_goal" 2>/dev/null) || true
+            if [[ -n "$_recruit_match" ]]; then
+                local _recruit_model
+                _recruit_model=$(echo "$_recruit_match" | jq -r '.model // ""' 2>/dev/null) || true
+                if [[ -n "$_recruit_model" && "$_recruit_model" != "null" && "$_recruit_model" != "" ]]; then
+                    info "Recruit recommends model: ${CYAN}${_recruit_model}${RESET} for this task"
+                    build_model="$_recruit_model"
+                fi
+            fi
+        fi
     fi
 
     [[ -n "$test_cmd" && "$test_cmd" != "null" ]] && loop_args+=(--test-cmd "$test_cmd")
@@ -2812,6 +2949,22 @@ $(cat "$diff_file")"
         info "Review found $total_issues suggestion(s)"
     else
         success "Review clean"
+    fi
+
+    # ── Oversight gate: pipeline review/quality stages block on verdict ──
+    if [[ -x "$SCRIPT_DIR/sw-oversight.sh" ]] && [[ "${SKIP_GATES:-false}" != "true" ]]; then
+        local reject_reason=""
+        local _sec_count
+        _sec_count=$(grep -ciE '\*\*\[?Security\]?\*\*' "$review_file" 2>/dev/null || true)
+        _sec_count="${_sec_count:-0}"
+        local _blocking=$((critical_count + _sec_count))
+        [[ "$_blocking" -gt 0 ]] && reject_reason="Review found ${_blocking} critical/security issue(s)"
+        if ! bash "$SCRIPT_DIR/sw-oversight.sh" gate --diff "$diff_file" --description "${GOAL:-Pipeline review}" --reject-if "$reject_reason" >/dev/null 2>&1; then
+            error "Oversight gate rejected — blocking pipeline"
+            emit_event "review.oversight_blocked" "issue=${ISSUE_NUMBER:-0}"
+            log_stage "review" "BLOCKED: oversight gate rejected"
+            return 1
+        fi
     fi
 
     # ── Review Blocking Gate ──
@@ -3793,6 +3946,8 @@ stage_monitor() {
     fi
 
     local report_file="$ARTIFACTS_DIR/monitor-report.md"
+    local deploy_log_file="$ARTIFACTS_DIR/deploy-logs.txt"
+    : > "$deploy_log_file"
     local total_errors=0
     local poll_interval=30  # seconds between polls
     local total_polls=$(( (duration_minutes * 60) / poll_interval ))
@@ -3840,10 +3995,11 @@ stage_monitor() {
             fi
         fi
 
-        # Log command check
+        # Log command check (accumulate deploy logs for feedback collect)
         if [[ -n "$log_cmd" ]]; then
             local log_output
             log_output=$(bash -c "$log_cmd" 2>/dev/null || true)
+            [[ -n "$log_output" ]] && echo "$log_output" >> "$deploy_log_file"
             local error_count=0
             if [[ -n "$log_output" ]]; then
                 error_count=$(echo "$log_output" | grep -cE "$log_pattern" 2>/dev/null || true)
@@ -3878,13 +4034,24 @@ stage_monitor() {
                 "total_errors=$total_errors" \
                 "threshold=$error_threshold"
 
-            # Auto-rollback if configured
-            if [[ "$auto_rollback" == "true" && -n "$rollback_cmd" ]]; then
+            # Feedback loop: collect deploy logs and optionally create issue
+            if [[ -f "$deploy_log_file" ]] && [[ -s "$deploy_log_file" ]] && [[ -x "$SCRIPT_DIR/sw-feedback.sh" ]]; then
+                (cd "$PROJECT_ROOT" && ARTIFACTS_DIR="$ARTIFACTS_DIR" bash "$SCRIPT_DIR/sw-feedback.sh" collect "$deploy_log_file" 2>/dev/null) || true
+                (cd "$PROJECT_ROOT" && ARTIFACTS_DIR="$ARTIFACTS_DIR" bash "$SCRIPT_DIR/sw-feedback.sh" create-issue 2>/dev/null) || true
+            fi
+
+            # Auto-rollback: feedback rollback (GitHub Deployments API) and/or config rollback_cmd
+            if [[ "$auto_rollback" == "true" ]]; then
                 warn "Auto-rolling back..."
                 echo "" >> "$report_file"
                 echo "## Rollback" >> "$report_file"
 
-                if bash -c "$rollback_cmd" >> "$report_file" 2>&1; then
+                # Trigger feedback rollback (calls sw-github-deploy.sh rollback)
+                if [[ -x "$SCRIPT_DIR/sw-feedback.sh" ]]; then
+                    (cd "$PROJECT_ROOT" && ARTIFACTS_DIR="$ARTIFACTS_DIR" bash "$SCRIPT_DIR/sw-feedback.sh" rollback production "Monitor threshold exceeded (${total_errors} errors)" >> "$report_file" 2>&1) || true
+                fi
+
+                if [[ -n "$rollback_cmd" ]] && bash -c "$rollback_cmd" >> "$report_file" 2>&1; then
                     success "Rollback executed"
                     echo "Rollback: ✅ success" >> "$report_file"
 
@@ -7098,6 +7265,12 @@ Focus on fixing the failing tests while keeping all passing tests working."
                 _snap_error="${_snap_error:-}"
                 pipeline_emit_progress_snapshot "${ISSUE_NUMBER}" "${CURRENT_STAGE_ID:-test}" "${cycle:-0}" "${_diff_count:-0}" "${_snap_files}" "${_snap_error}" 2>/dev/null || true
             fi
+            # Record fix outcome when tests pass after a retry with memory injection (pipeline path)
+            if [[ "$cycle" -gt 1 && -n "${last_test_error:-}" ]] && [[ -x "$SCRIPT_DIR/sw-memory.sh" ]]; then
+                local _sig
+                _sig=$(echo "$last_test_error" | head -3 | tr '\n' ' ' | sed 's/^ *//;s/ *$//')
+                [[ -n "$_sig" ]] && bash "$SCRIPT_DIR/sw-memory.sh" fix-outcome "$_sig" "true" "true" 2>/dev/null || true
+            fi
             return 0  # Tests passed!
         fi
 
@@ -7448,11 +7621,29 @@ run_pipeline() {
         if run_stage_with_retry "$id"; then
             mark_stage_complete "$id"
             completed=$((completed + 1))
+            # Capture project pattern after intake (for memory context in later stages)
+            if [[ "$id" == "intake" ]] && [[ -x "$SCRIPT_DIR/sw-memory.sh" ]]; then
+                (cd "$REPO_DIR" && bash "$SCRIPT_DIR/sw-memory.sh" pattern "project" "{}" 2>/dev/null) || true
+            fi
             local timing stage_dur_s
             timing=$(get_stage_timing "$id")
             stage_dur_s=$(( $(now_epoch) - stage_start_epoch ))
             success "Stage ${BOLD}$id${RESET} complete ${DIM}(${timing})${RESET}"
             emit_event "stage.completed" "issue=${ISSUE_NUMBER:-0}" "stage=$id" "duration_s=$stage_dur_s"
+            # Broadcast discovery for cross-pipeline learning
+            if [[ -x "$SCRIPT_DIR/sw-discovery.sh" ]]; then
+                local _disc_cat _disc_patterns _disc_text
+                _disc_cat="$id"
+                case "$id" in
+                    plan)   _disc_patterns="*.md"; _disc_text="Plan completed: ${GOAL:-goal}" ;;
+                    design) _disc_patterns="*.md,*.ts,*.tsx,*.js"; _disc_text="Design completed for ${GOAL:-goal}" ;;
+                    build)  _disc_patterns="src/*,*.ts,*.tsx,*.js"; _disc_text="Build completed" ;;
+                    test)   _disc_patterns="*.test.*,*_test.*"; _disc_text="Tests passed" ;;
+                    review) _disc_patterns="*.md,*.ts,*.tsx"; _disc_text="Review completed" ;;
+                    *)      _disc_patterns="*"; _disc_text="Stage $id completed" ;;
+                esac
+                bash "$SCRIPT_DIR/sw-discovery.sh" broadcast "$_disc_cat" "$_disc_patterns" "$_disc_text" "" 2>/dev/null || true
+            fi
             # Log model used for prediction feedback
             echo "${id}|${stage_model_used}|true" >> "${ARTIFACTS_DIR}/model-routing.log"
         else
@@ -7986,9 +8177,15 @@ pipeline_start() {
             "result=success" \
             "duration_s=${total_dur_s:-0}" \
             "pr_url=${pr_url:-}" \
+            "agent_id=${PIPELINE_AGENT_ID}" \
             "input_tokens=$TOTAL_INPUT_TOKENS" \
             "output_tokens=$TOTAL_OUTPUT_TOKENS" \
             "self_heal_count=$SELF_HEAL_COUNT"
+
+        # Auto-ingest pipeline outcome into recruit profiles
+        if [[ -x "$SCRIPT_DIR/sw-recruit.sh" ]]; then
+            bash "$SCRIPT_DIR/sw-recruit.sh" ingest-pipeline 1 2>/dev/null || true
+        fi
     else
         notify "Pipeline Failed" "Goal: ${GOAL}\nFailed at: ${CURRENT_STAGE_ID:-unknown}" "error"
         emit_event "pipeline.completed" \
@@ -7996,9 +8193,15 @@ pipeline_start() {
             "result=failure" \
             "duration_s=${total_dur_s:-0}" \
             "failed_stage=${CURRENT_STAGE_ID:-unknown}" \
+            "agent_id=${PIPELINE_AGENT_ID}" \
             "input_tokens=$TOTAL_INPUT_TOKENS" \
             "output_tokens=$TOTAL_OUTPUT_TOKENS" \
             "self_heal_count=$SELF_HEAL_COUNT"
+
+        # Auto-ingest pipeline outcome into recruit profiles
+        if [[ -x "$SCRIPT_DIR/sw-recruit.sh" ]]; then
+            bash "$SCRIPT_DIR/sw-recruit.sh" ingest-pipeline 1 2>/dev/null || true
+        fi
 
         # Capture failure learnings to memory
         if [[ -x "$SCRIPT_DIR/sw-memory.sh" ]]; then

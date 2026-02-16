@@ -14,12 +14,36 @@ The theme lives in `tmux/tmux.conf`. It uses a dark blue-gray background with cy
 | Element                             | Color          | Hex       |
 | ----------------------------------- | -------------- | --------- |
 | Background                          | Dark blue-gray | `#1a1a2e` |
-| Foreground                          | Light gray     | `#e4e4e7` |
+| Foreground                          | Warm gray      | `#a8a8b0` |
 | Accent (active borders, highlights) | Cyan           | `#00d4ff` |
 | Secondary                           | Blue           | `#0066ff` |
 | Tertiary                            | Purple         | `#7c3aed` |
 | Inactive borders                    | Muted indigo   | `#333355` |
 | Inactive elements                   | Zinc           | `#71717a` |
+| Active pane background              | Lifted dark    | `#1e1e34` |
+
+:::note[v2.1.0 Color Update]
+Near-white text (`#e4e4e7`) was replaced with warm grays across all tmux chrome for reduced glare during extended sessions.
+:::
+
+### Visual Features (v2.1.0)
+
+**Role-Colored Pane Borders** — active pane border color reflects the agent role:
+
+| Role      | Color  | Hex       |
+| --------- | ------ | --------- |
+| Builder   | Blue   | `#0066ff` |
+| Reviewer  | Orange | `#f59e0b` |
+| Tester    | Yellow | `#eab308` |
+| Optimizer | Purple | `#7c3aed` |
+| Security  | Red    | `#ef4444` |
+| Docs      | Green  | `#4ade80` |
+
+**Pipeline Stage Badge** — the status bar shows a live pipeline stage indicator (`⚙ BUILD`, `⚡ TEST`, `↑ PR`) with stage-specific colors.
+
+**Agent Count Widget** — displays `λN` in the status bar showing the count of active agents from heartbeat files.
+
+**Active Pane Lift** — subtle background depth effect distinguishes the active pane from inactive panes.
 
 To customize colors, edit the hex values in `tmux/tmux.conf` and reload with `prefix + r`.
 

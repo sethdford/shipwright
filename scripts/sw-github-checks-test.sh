@@ -6,6 +6,10 @@
 set -euo pipefail
 trap 'echo "ERROR: $BASH_SOURCE:$LINENO exited with status $?" >&2' ERR
 
+# Prevent inherited NO_GITHUB from breaking mock-gh tests;
+# the specific NO_GITHUB guard test re-exports it.
+unset NO_GITHUB 2>/dev/null || true
+
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
 
@@ -32,17 +36,16 @@ TEMP_DIR=""
 
 setup_env() {
     TEMP_DIR=$(mktemp -d "${TMPDIR:-/tmp}/sw-github-checks-test.XXXXXX")
-    mkdir -p "$TEMP_DIR/scripts/lib"
+    mkdir -p "$TEMP_DIR/repo/scripts/lib"
     mkdir -p "$TEMP_DIR/home/.shipwright"
     mkdir -p "$TEMP_DIR/repo/.claude/pipeline-artifacts"
     mkdir -p "$TEMP_DIR/bin"
-    mkdir -p "$TEMP_DIR/repo/.git"
 
-    # Copy the script under test
-    cp "$SCRIPT_DIR/sw-github-checks.sh" "$TEMP_DIR/scripts/"
+    # Copy the script under test into repo/scripts/ so REPO_DIR auto-resolves to repo/
+    cp "$SCRIPT_DIR/sw-github-checks.sh" "$TEMP_DIR/repo/scripts/"
 
     # Create compat.sh stub
-    touch "$TEMP_DIR/scripts/lib/compat.sh"
+    touch "$TEMP_DIR/repo/scripts/lib/compat.sh"
 
     # Create a mock git config for _gh_detect_repo
     git -C "$TEMP_DIR/repo" init --quiet 2>/dev/null || true
@@ -104,9 +107,9 @@ source_checks() {
     # Source with overridden REPO_DIR
     (
         REPO_DIR="$TEMP_DIR/repo"
-        SCRIPT_DIR="$TEMP_DIR/scripts"
+        SCRIPT_DIR="$TEMP_DIR/repo/scripts"
         ARTIFACTS_DIR="$TEMP_DIR/repo/.claude/pipeline-artifacts"
-        source "$TEMP_DIR/scripts/sw-github-checks.sh"
+        source "$TEMP_DIR/repo/scripts/sw-github-checks.sh"
     )
 }
 
@@ -151,10 +154,10 @@ test_checks_available_success() {
 
     (
         REPO_DIR="$TEMP_DIR/repo"
-        SCRIPT_DIR="$TEMP_DIR/scripts"
+        SCRIPT_DIR="$TEMP_DIR/repo/scripts"
         ARTIFACTS_DIR="$TEMP_DIR/repo/.claude/pipeline-artifacts"
         _GH_CHECKS_AVAILABLE=""
-        source "$TEMP_DIR/scripts/sw-github-checks.sh"
+        source "$TEMP_DIR/repo/scripts/sw-github-checks.sh"
         _gh_checks_available "testowner" "testrepo"
     )
 }
@@ -172,10 +175,10 @@ test_checks_available_fail() {
     local result=0
     (
         REPO_DIR="$TEMP_DIR/repo"
-        SCRIPT_DIR="$TEMP_DIR/scripts"
+        SCRIPT_DIR="$TEMP_DIR/repo/scripts"
         ARTIFACTS_DIR="$TEMP_DIR/repo/.claude/pipeline-artifacts"
         _GH_CHECKS_AVAILABLE=""
-        source "$TEMP_DIR/scripts/sw-github-checks.sh"
+        source "$TEMP_DIR/repo/scripts/sw-github-checks.sh"
         _gh_checks_available "testowner" "testrepo"
     ) || result=$?
 
@@ -198,9 +201,9 @@ test_create_run_returns_id() {
     local run_id
     run_id=$(
         REPO_DIR="$TEMP_DIR/repo"
-        SCRIPT_DIR="$TEMP_DIR/scripts"
+        SCRIPT_DIR="$TEMP_DIR/repo/scripts"
         ARTIFACTS_DIR="$TEMP_DIR/repo/.claude/pipeline-artifacts"
-        source "$TEMP_DIR/scripts/sw-github-checks.sh"
+        source "$TEMP_DIR/repo/scripts/sw-github-checks.sh"
         gh_checks_create_run "testowner" "testrepo" "abc123" "shipwright/build" "in_progress"
     )
 
@@ -220,9 +223,9 @@ test_create_run_handles_403() {
     local run_id
     run_id=$(
         REPO_DIR="$TEMP_DIR/repo"
-        SCRIPT_DIR="$TEMP_DIR/scripts"
+        SCRIPT_DIR="$TEMP_DIR/repo/scripts"
         ARTIFACTS_DIR="$TEMP_DIR/repo/.claude/pipeline-artifacts"
-        source "$TEMP_DIR/scripts/sw-github-checks.sh"
+        source "$TEMP_DIR/repo/scripts/sw-github-checks.sh"
         gh_checks_create_run "testowner" "testrepo" "abc123" "test-check" "in_progress"
     )
 
@@ -245,9 +248,9 @@ test_update_run_sends_patch() {
 
     (
         REPO_DIR="$TEMP_DIR/repo"
-        SCRIPT_DIR="$TEMP_DIR/scripts"
+        SCRIPT_DIR="$TEMP_DIR/repo/scripts"
         ARTIFACTS_DIR="$TEMP_DIR/repo/.claude/pipeline-artifacts"
-        source "$TEMP_DIR/scripts/sw-github-checks.sh"
+        source "$TEMP_DIR/repo/scripts/sw-github-checks.sh"
         gh_checks_update_run "testowner" "testrepo" "12345" "completed" "success" "Build passed" "All tests green" ""
     ) >/dev/null 2>&1
 
@@ -268,9 +271,9 @@ test_update_run_skips_empty_id() {
 
     (
         REPO_DIR="$TEMP_DIR/repo"
-        SCRIPT_DIR="$TEMP_DIR/scripts"
+        SCRIPT_DIR="$TEMP_DIR/repo/scripts"
         ARTIFACTS_DIR="$TEMP_DIR/repo/.claude/pipeline-artifacts"
-        source "$TEMP_DIR/scripts/sw-github-checks.sh"
+        source "$TEMP_DIR/repo/scripts/sw-github-checks.sh"
         gh_checks_update_run "testowner" "testrepo" "" "completed" "success"
     ) >/dev/null 2>&1
 
@@ -303,9 +306,9 @@ test_annotate_batches_at_50() {
 
     (
         REPO_DIR="$TEMP_DIR/repo"
-        SCRIPT_DIR="$TEMP_DIR/scripts"
+        SCRIPT_DIR="$TEMP_DIR/repo/scripts"
         ARTIFACTS_DIR="$TEMP_DIR/repo/.claude/pipeline-artifacts"
-        source "$TEMP_DIR/scripts/sw-github-checks.sh"
+        source "$TEMP_DIR/repo/scripts/sw-github-checks.sh"
         gh_checks_annotate "testowner" "testrepo" "12345" "$annotations"
     ) >/dev/null 2>&1
 
@@ -329,9 +332,9 @@ test_list_runs_parses() {
     local result
     result=$(
         REPO_DIR="$TEMP_DIR/repo"
-        SCRIPT_DIR="$TEMP_DIR/scripts"
+        SCRIPT_DIR="$TEMP_DIR/repo/scripts"
         ARTIFACTS_DIR="$TEMP_DIR/repo/.claude/pipeline-artifacts"
-        source "$TEMP_DIR/scripts/sw-github-checks.sh"
+        source "$TEMP_DIR/repo/scripts/sw-github-checks.sh"
         gh_checks_list_runs "testowner" "testrepo" "abc123"
     )
 
@@ -358,9 +361,9 @@ test_complete_wrapper() {
 
     (
         REPO_DIR="$TEMP_DIR/repo"
-        SCRIPT_DIR="$TEMP_DIR/scripts"
+        SCRIPT_DIR="$TEMP_DIR/repo/scripts"
         ARTIFACTS_DIR="$TEMP_DIR/repo/.claude/pipeline-artifacts"
-        source "$TEMP_DIR/scripts/sw-github-checks.sh"
+        source "$TEMP_DIR/repo/scripts/sw-github-checks.sh"
         gh_checks_complete "testowner" "testrepo" "12345" "success" "All good"
     ) >/dev/null 2>&1
 
@@ -400,7 +403,7 @@ MOCKEOF
 
     local result
     result=$(
-        source "$TEMP_DIR/scripts/sw-github-checks.sh"
+        source "$TEMP_DIR/repo/scripts/sw-github-checks.sh"
         REPO_DIR="$TEMP_DIR/repo"
         ARTIFACTS_DIR="$TEMP_DIR/repo/.claude/pipeline-artifacts"
         gh_checks_pipeline_start "testowner" "testrepo" "abc123" '["build","test","review"]'
@@ -430,7 +433,7 @@ test_stage_update_uses_stored_ids() {
     echo '{"build":"55555","test":"66666","review":"77777"}' > "$TEMP_DIR/repo/.claude/pipeline-artifacts/check-run-ids.json"
 
     (
-        source "$TEMP_DIR/scripts/sw-github-checks.sh"
+        source "$TEMP_DIR/repo/scripts/sw-github-checks.sh"
         REPO_DIR="$TEMP_DIR/repo"
         ARTIFACTS_DIR="$TEMP_DIR/repo/.claude/pipeline-artifacts"
         gh_checks_stage_update "test" "completed" "success" "Tests passed"
@@ -452,10 +455,10 @@ test_no_github_guard() {
 
     (
         REPO_DIR="$TEMP_DIR/repo"
-        SCRIPT_DIR="$TEMP_DIR/scripts"
+        SCRIPT_DIR="$TEMP_DIR/repo/scripts"
         ARTIFACTS_DIR="$TEMP_DIR/repo/.claude/pipeline-artifacts"
         _GH_CHECKS_AVAILABLE=""
-        source "$TEMP_DIR/scripts/sw-github-checks.sh"
+        source "$TEMP_DIR/repo/scripts/sw-github-checks.sh"
 
         # All of these should return early without calling gh
         gh_checks_create_run "testowner" "testrepo" "abc123" "test" "in_progress"

@@ -7,7 +7,7 @@
 set -euo pipefail
 trap 'echo "ERROR: $BASH_SOURCE:$LINENO exited with status $?" >&2' ERR
 
-VERSION="2.0.0"
+VERSION="2.1.0"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
 
@@ -328,6 +328,80 @@ _update_verdict() {
 
     if [[ "$verdict" != "pending" ]]; then
         emit_event "oversight_verdict_rendered" "review_id=$review_id" "verdict=$verdict" "confidence=$confidence_score"
+    fi
+}
+
+# ─── Pipeline gate: submit review, record vote(s), output verdict ───────────
+# Usage: oversight gate --diff <file> [--description <text>] [--reject-if <reason>]
+# Outputs: approved | rejected | deadlock | pending (for pipeline to block on non-approved)
+cmd_gate() {
+    local diff_file=""
+    local description=""
+    local reject_if=""
+
+    while [[ $# -gt 0 ]]; do
+        case "$1" in
+            --diff)         diff_file="$2"; shift 2 ;;
+            --description)  description="$2"; shift 2 ;;
+            --reject-if)    reject_if="$2"; shift 2 ;;
+            -h|--help)
+                echo "Usage: oversight gate --diff <file> [--description <text>] [--reject-if <reason>]"
+                echo "Outputs verdict: approved | rejected | deadlock | pending"
+                exit 0
+                ;;
+            *)  error "Unknown option: $1"; exit 1 ;;
+        esac
+    done
+
+    if [[ -z "$diff_file" || ! -f "$diff_file" ]]; then
+        error "Provide --diff <file> (must exist)"
+        exit 1
+    fi
+
+    _init_board_config
+    _init_members
+
+    local review_id
+    review_id=$(date +%s)_$(head -c8 /dev/urandom 2>/dev/null | od -A n -t x1 | tr -d ' ' || echo "$$")
+    local review_file="${OVERSIGHT_ROOT}/${review_id}.json"
+
+    # Build review record safely via jq (no JSON injection from description/diff_file)
+    jq -n \
+        --arg id "$review_id" \
+        --arg submitted "$(now_iso)" \
+        --arg diff "$diff_file" \
+        --arg desc "$description" \
+        '{id: $id, submitted_at: $submitted, pr_number: null, commit: null, diff_file: $diff, description: $desc, votes: {}, verdict: null, confidence_score: 0.0, appeals: []}' \
+        > "$review_file"
+
+    # Single pipeline voter: reject if --reject-if given, else approve
+    local decision="approve"
+    local reasoning="Pipeline review passed"
+    if [[ -n "$reject_if" ]]; then
+        decision="reject"
+        reasoning="$reject_if"
+    fi
+
+    local tmp_file="${review_file}.tmp"
+    jq --arg reviewer "pipeline" \
+       --arg decision "$decision" \
+       --arg reasoning "${reasoning//\"/\\\"}" \
+       --arg confidence "0.9" \
+       '.votes[$reviewer] = {
+           "decision": $decision,
+           "reasoning": $reasoning,
+           "confidence": ($confidence | tonumber),
+           "voted_at": "'$(now_iso)'"
+       }' "$review_file" > "$tmp_file"
+    mv "$tmp_file" "$review_file"
+
+    _update_verdict "$review_id"
+
+    local verdict
+    verdict=$(jq -r '.verdict // "pending"' "$review_file")
+    echo "$verdict"
+    if [[ "$verdict" == "rejected" || "$verdict" == "deadlock" ]]; then
+        exit 1
     fi
 }
 
@@ -667,6 +741,7 @@ main() {
     case "$cmd" in
         review)   cmd_review "$@" ;;
         vote)     cmd_vote "$@" ;;
+        gate)     cmd_gate "$@" ;;
         verdict)  cmd_verdict "$@" ;;
         history)  cmd_history "$@" ;;
         members)  cmd_members "$@" ;;

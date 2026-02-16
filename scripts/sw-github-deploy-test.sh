@@ -6,6 +6,10 @@
 set -euo pipefail
 trap 'echo "ERROR: $BASH_SOURCE:$LINENO exited with status $?" >&2' ERR
 
+# Prevent inherited NO_GITHUB from breaking mock-gh tests;
+# the specific NO_GITHUB guard test re-exports it.
+unset NO_GITHUB 2>/dev/null || true
+
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
 

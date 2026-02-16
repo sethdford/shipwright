@@ -6,7 +6,7 @@
 set -euo pipefail
 trap 'echo "ERROR: $BASH_SOURCE:$LINENO exited with status $?" >&2' ERR
 
-VERSION="2.0.0"
+VERSION="2.1.0"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
 
@@ -810,6 +810,13 @@ main() {
         confirm-anomaly) predictive_confirm_anomaly "$@" ;;
         patrol)      patrol_ai_analyze "$@" ;;
         baseline)    predict_update_baseline "$@" ;;
+        inject-prevention)
+            local stage="${1:-build}"
+            local issue_json="${2:-{}}"
+            local mem_ctx="${3:-}"
+            [[ -n "$mem_ctx" && -f "$mem_ctx" ]] && mem_ctx=$(cat "$mem_ctx" 2>/dev/null || true)
+            predict_inject_prevention "$stage" "$issue_json" "$mem_ctx" || true
+            ;;
         help|--help|-h) show_help ;;
         *) error "Unknown command: $cmd"; exit 1 ;;
     esac

@@ -6,7 +6,7 @@
 set -euo pipefail
 trap 'echo "ERROR: $BASH_SOURCE:$LINENO exited with status $?" >&2' ERR
 
-VERSION="2.0.0"
+VERSION="2.1.0"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
 
@@ -403,40 +403,63 @@ cmd_team() {
     risk=$(echo "$analysis" | jq -r '.risk')
     effort=$(echo "$analysis" | jq -r '.effort')
 
-    # Recommend based on complexity/risk
-    local template model max_iterations agents
-    case "${complexity}-${risk}" in
-        trivial-low|simple-low)
-            template="fast"
-            model="haiku"
-            max_iterations=2
-            agents=1
-            ;;
-        simple-*|moderate-low)
-            template="standard"
-            model="sonnet"
-            max_iterations=5
-            agents=2
-            ;;
-        moderate-*|complex-low)
-            template="standard"
-            model="sonnet"
-            max_iterations=8
-            agents=3
-            ;;
-        complex-*|epic-*)
-            template="full"
-            model="opus"
-            max_iterations=15
-            agents=4
-            ;;
-        *)
-            template="standard"
-            model="sonnet"
-            max_iterations=5
-            agents=2
-            ;;
-    esac
+    # ── Try recruit-powered team composition first ──
+    local template="" model="" max_iterations="" agents=""
+    local recruit_source="heuristic"
+    if [[ -x "${SCRIPT_DIR:-}/sw-recruit.sh" ]]; then
+        local issue_title
+        issue_title=$(gh issue view "$issue" --json title -q '.title' 2>/dev/null || echo "")
+        if [[ -n "$issue_title" ]]; then
+            local recruit_result
+            recruit_result=$(bash "$SCRIPT_DIR/sw-recruit.sh" team --json "$issue_title" 2>/dev/null) || true
+            if [[ -n "$recruit_result" ]] && echo "$recruit_result" | jq -e '.team' &>/dev/null 2>&1; then
+                model=$(echo "$recruit_result" | jq -r '.model // "sonnet"')
+                agents=$(echo "$recruit_result" | jq -r '.agents // 2')
+                # Map agent count to template
+                if [[ "$agents" -ge 4 ]]; then template="full"; max_iterations=15;
+                elif [[ "$agents" -ge 3 ]]; then template="standard"; max_iterations=8;
+                elif [[ "$agents" -le 1 ]]; then template="fast"; max_iterations=2;
+                else template="standard"; max_iterations=5; fi
+                recruit_source="recruit"
+            fi
+        fi
+    fi
+
+    # ── Fallback: hardcoded complexity/risk mapping ──
+    if [[ -z "$template" ]]; then
+        case "${complexity}-${risk}" in
+            trivial-low|simple-low)
+                template="fast"
+                model="haiku"
+                max_iterations=2
+                agents=1
+                ;;
+            simple-*|moderate-low)
+                template="standard"
+                model="sonnet"
+                max_iterations=5
+                agents=2
+                ;;
+            moderate-*|complex-low)
+                template="standard"
+                model="sonnet"
+                max_iterations=8
+                agents=3
+                ;;
+            complex-*|epic-*)
+                template="full"
+                model="opus"
+                max_iterations=15
+                agents=4
+                ;;
+            *)
+                template="standard"
+                model="sonnet"
+                max_iterations=5
+                agents=2
+                ;;
+        esac
+    fi
 
     cat << EOF
 {
@@ -448,12 +471,13 @@ cmd_team() {
     "pipeline_template": "$template",
     "model": "$model",
     "max_iterations": $max_iterations,
-    "agents": $agents
+    "agents": $agents,
+    "source": "$recruit_source"
   }
 }
 EOF
 
-    emit_event "triage_team_recommended" "issue=$issue" "template=$template" "agents=$agents"
+    emit_event "triage_team_recommended" "issue=$issue" "template=$template" "agents=$agents" "source=$recruit_source"
 }
 
 # ─── Subcommand: batch ────────────────────────────────────────────────────

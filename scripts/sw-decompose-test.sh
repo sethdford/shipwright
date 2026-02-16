@@ -84,7 +84,7 @@ echo ""
 echo -e "  ${CYAN}version flag${RESET}"
 output=$(bash "$SCRIPT_DIR/sw-decompose.sh" --version 2>&1) && rc=0 || rc=$?
 assert_eq "--version exits 0" "0" "$rc"
-assert_contains "--version shows version" "$output" "2.0.0"
+assert_contains "--version shows version" "$output" "2.1.0"
 
 # ─── Test 4: unknown command ──────────────────────────────────────────────
 echo ""

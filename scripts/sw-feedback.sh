@@ -6,7 +6,7 @@
 set -euo pipefail
 trap 'echo "ERROR: $BASH_SOURCE:$LINENO exited with status $?" >&2' ERR
 
-VERSION="2.0.0"
+VERSION="2.1.0"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
 
@@ -59,7 +59,7 @@ emit_event() {
 INCIDENTS_FILE="${HOME}/.shipwright/incidents.jsonl"
 ERROR_THRESHOLD=5          # Create issue if error count >= threshold
 ERROR_LOG_DIR="${REPO_DIR}/.claude/pipeline-artifacts"
-ARTIFACTS_DIR="${REPO_DIR}/.claude/pipeline-artifacts"
+ARTIFACTS_DIR="${ARTIFACTS_DIR:-${REPO_DIR}/.claude/pipeline-artifacts}"
 
 # ─── Initialize directories ────────────────────────────────────────────────
 ensure_dirs() {
@@ -319,20 +319,28 @@ cmd_rollback() {
         return 1
     }
 
-    # For now, just log the rollback intent
-    # Full implementation would call sw-github-deploy.sh and update deployment status
+    # Trigger real rollback via sw-github-deploy.sh (GitHub Deployments API)
+    local rollback_status="initiated"
+    local rollback_rc=0
+    bash "$SCRIPT_DIR/sw-github-deploy.sh" rollback "$environment" 2>&1 | tee -a "${ARTIFACTS_DIR}/rollback-output.log"
+    rollback_rc=${PIPESTATUS[0]:-$?}
+    if [[ "$rollback_rc" -eq 0 ]]; then
+        rollback_status="executed"
+        success "Rollback executed for $environment via GitHub Deployments API"
+    else
+        warn "GitHub Deployments rollback failed or unavailable (exit $rollback_rc, see rollback-output.log)"
+    fi
+
     local rollback_entry
     rollback_entry=$(jq -n \
         --arg ts "$(now_iso)" \
         --arg env "$environment" \
         --arg reason "$reason" \
-        '{timestamp: $ts, environment: $env, reason: $reason, status: "initiated"}')
+        --arg status "$rollback_status" \
+        '{timestamp: $ts, environment: $env, reason: $reason, status: $status}')
 
     echo "$rollback_entry" >> "${ARTIFACTS_DIR}/rollbacks.jsonl"
-
-    success "Rollback initiated for $environment"
-    emit_event "feedback_rollback" "environment=$environment" "reason=$reason"
-    info "Note: Full rollback requires manual GitHub Deployments API call"
+    emit_event "feedback_rollback" "environment=$environment" "reason=$reason" "status=$rollback_status"
 }
 
 # ─── Capture incident in memory system ───────────────────────────────────────

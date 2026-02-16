@@ -58,7 +58,7 @@ MAX_RESTARTS=0
 SESSION_RESTART=false
 RESTART_COUNT=0
 REPO_OVERRIDE=""
-VERSION="2.0.0"
+VERSION="2.1.0"
 
 # ─── Token Tracking ─────────────────────────────────────────────────────────
 LOOP_INPUT_TOKENS=0
@@ -262,16 +262,28 @@ if [[ "$AGENTS" -gt 1 ]]; then
     USE_WORKTREE=true
 fi
 
+# Recruit-powered auto-role assignment when multi-agent but no roles specified
+if [[ "$AGENTS" -gt 1 ]] && [[ -z "$AGENT_ROLES" ]] && [[ -x "${SCRIPT_DIR:-}/sw-recruit.sh" ]]; then
+    _recruit_goal="${GOAL:-}"
+    if [[ -n "$_recruit_goal" ]]; then
+        _recruit_team=$(bash "$SCRIPT_DIR/sw-recruit.sh" team --json "$_recruit_goal" 2>/dev/null) || true
+        if [[ -n "$_recruit_team" ]]; then
+            _recruit_roles=$(echo "$_recruit_team" | jq -r '.team | join(",")' 2>/dev/null) || true
+            if [[ -n "$_recruit_roles" && "$_recruit_roles" != "null" ]]; then
+                AGENT_ROLES="$_recruit_roles"
+                info "Recruit assigned roles: ${AGENT_ROLES}"
+            fi
+        fi
+    fi
+fi
+
 # Warn if --roles without --agents
 if [[ -n "$AGENT_ROLES" ]] && [[ "$AGENTS" -le 1 ]]; then
     warn "--roles requires --agents > 1 (roles are ignored in single-agent mode)"
 fi
 
-# Warn if --max-restarts with --agents > 1 (not yet supported)
-if [[ "${MAX_RESTARTS:-0}" -gt 0 ]] && [[ "$AGENTS" -gt 1 ]]; then
-    warn "--max-restarts is ignored in multi-agent mode (restart support is single-agent only)"
-    MAX_RESTARTS=0
-fi
+# max-restarts is supported in both single-agent and multi-agent mode
+# In multi-agent mode, restarts apply per-agent (agent can be respawned up to MAX_RESTARTS)
 
 # Validate numeric flags
 if ! [[ "$FAST_TEST_INTERVAL" =~ ^[1-9][0-9]*$ ]]; then
@@ -1632,15 +1644,27 @@ compose_worker_prompt() {
 
         if [[ -n "$role" ]]; then
             local role_desc=""
-            case "$role" in
-                builder)   role_desc="Focus on implementation — writing code, fixing bugs, building features. You are the primary builder." ;;
-                reviewer)  role_desc="Focus on code review — look for bugs, security issues, edge cases in recent commits. Make fixes via commits." ;;
-                tester)    role_desc="Focus on test coverage — write new tests, fix failing tests, improve assertions and edge case coverage." ;;
-                optimizer) role_desc="Focus on performance — profile hot paths, reduce complexity, optimize algorithms and data structures." ;;
-                docs)      role_desc="Focus on documentation — update README, add docstrings, write usage guides for new features." ;;
-                security)  role_desc="Focus on security — audit for vulnerabilities, fix injection risks, validate inputs, check auth boundaries." ;;
-                *)         role_desc="Focus on: ${role}. Apply your expertise in this area to advance the goal." ;;
-            esac
+            # Try to pull description from recruit's roles DB first
+            local recruit_roles_db="${HOME}/.shipwright/recruitment/roles.json"
+            if [[ -f "$recruit_roles_db" ]] && command -v jq &>/dev/null; then
+                local recruit_desc
+                recruit_desc=$(jq -r --arg r "$role" '.[$r].description // ""' "$recruit_roles_db" 2>/dev/null) || true
+                if [[ -n "$recruit_desc" && "$recruit_desc" != "null" ]]; then
+                    role_desc="$recruit_desc"
+                fi
+            fi
+            # Fallback to hardcoded descriptions
+            if [[ -z "$role_desc" ]]; then
+                case "$role" in
+                    builder)   role_desc="Focus on implementation — writing code, fixing bugs, building features. You are the primary builder." ;;
+                    reviewer)  role_desc="Focus on code review — look for bugs, security issues, edge cases in recent commits. Make fixes via commits." ;;
+                    tester)    role_desc="Focus on test coverage — write new tests, fix failing tests, improve assertions and edge case coverage." ;;
+                    optimizer) role_desc="Focus on performance — profile hot paths, reduce complexity, optimize algorithms and data structures." ;;
+                    docs)      role_desc="Focus on documentation — update README, add docstrings, write usage guides for new features." ;;
+                    security)  role_desc="Focus on security — audit for vulnerabilities, fix injection risks, validate inputs, check auth boundaries." ;;
+                    *)         role_desc="Focus on: ${role}. Apply your expertise in this area to advance the goal." ;;
+                esac
+            fi
             role_section="## Your Role: ${role}
 ${role_desc}
 Prioritize work in your area of expertise. Coordinate with other agents via git log."

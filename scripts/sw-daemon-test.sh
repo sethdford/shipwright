@@ -1303,8 +1303,8 @@ test_daemon_failure_removes_watch_label() {
     local daemon_src
     daemon_src="$(dirname "$DAEMON_SCRIPT")/sw-daemon.sh"
 
-    # Check that the failure handler removes the watch label
-    if grep -A 5 "No retry.*report final failure" "$daemon_src" | grep -q "remove-label.*WATCH_LABEL"; then
+    # Check that the failure handler removes the watch label (PM learn block appears between comment and label removal)
+    if grep -A 15 "No retry.*report final failure" "$daemon_src" | grep -q "remove-label.*WATCH_LABEL"; then
         PASS=$((PASS + 1))
         return 0
     fi
@@ -1707,8 +1707,9 @@ test_retry_skips_non_retryable() {
 test_api_error_extended_backoff() {
     local daemon_src
     daemon_src="$(dirname "$DAEMON_SCRIPT")/sw-daemon.sh"
-    grep -q 'api_backoff=300' "$daemon_src" || \
-        { echo "Missing api_backoff=300 constant"; return 1; }
+    # API error backoff uses base_secs=300 in per-class exponential backoff
+    grep -q 'base_secs=300' "$daemon_src" || \
+        { echo "Missing API error 300s backoff (base_secs=300)"; return 1; }
 }
 
 test_preflight_auth_check() {
@@ -1745,7 +1746,8 @@ test_consecutive_failure_pause() {
         { echo "Missing DAEMON_CONSECUTIVE_FAILURE_CLASS variable"; return 1; }
     grep -q 'DAEMON_CONSECUTIVE_FAILURE_COUNT=' "$daemon_src" || \
         { echo "Missing DAEMON_CONSECUTIVE_FAILURE_COUNT variable"; return 1; }
-    grep -q 'DAEMON_CONSECUTIVE_FAILURE_COUNT.*-ge 3' "$daemon_src" || \
+    # Threshold check: uses local $consecutive var set from DAEMON_CONSECUTIVE_FAILURE_COUNT
+    grep -q 'consecutive.*-ge 3' "$daemon_src" || \
         { echo "Missing consecutive failure threshold of 3"; return 1; }
     grep -q 'daemon.auto_pause.*consecutive_failures' "$daemon_src" || \
         { echo "Missing auto_pause event for consecutive failures"; return 1; }
@@ -1812,8 +1814,9 @@ test_retry_skips_non_retryable() {
 test_api_error_extended_backoff() {
     local daemon_src
     daemon_src="$(dirname "$DAEMON_SCRIPT")/sw-daemon.sh"
-    grep -q 'api_backoff=300' "$daemon_src" || \
-        { echo "Missing api_backoff=300 constant"; return 1; }
+    # API error backoff uses base_secs=300 in per-class exponential backoff
+    grep -q 'base_secs=300' "$daemon_src" || \
+        { echo "Missing API error 300s backoff (base_secs=300)"; return 1; }
 }
 
 test_preflight_auth_check() {
@@ -1850,7 +1853,8 @@ test_consecutive_failure_pause() {
         { echo "Missing DAEMON_CONSECUTIVE_FAILURE_CLASS variable"; return 1; }
     grep -q 'DAEMON_CONSECUTIVE_FAILURE_COUNT=' "$daemon_src" || \
         { echo "Missing DAEMON_CONSECUTIVE_FAILURE_COUNT variable"; return 1; }
-    grep -q 'DAEMON_CONSECUTIVE_FAILURE_COUNT.*-ge 3' "$daemon_src" || \
+    # Threshold check: uses local $consecutive var set from DAEMON_CONSECUTIVE_FAILURE_COUNT
+    grep -q 'consecutive.*-ge 3' "$daemon_src" || \
         { echo "Missing consecutive failure threshold of 3"; return 1; }
     grep -q 'daemon.auto_pause.*consecutive_failures' "$daemon_src" || \
         { echo "Missing auto_pause event for consecutive failures"; return 1; }
