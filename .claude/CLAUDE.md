@@ -530,7 +530,7 @@ All scripts are bash (except the dashboard server in TypeScript). Grouped by lay
 | `scripts/sw-patrol-meta.sh` | 448 | Shipwright Self-Improvement Patrol |
 | `scripts/sw-pipeline-composer.sh` | 446 | Dynamic Pipeline Composition |
 | `scripts/sw-pipeline-vitals.sh` | 1082 | Pipeline Vitals Engine |
-| `scripts/sw-pipeline.sh` | 2467 | Autonomous Feature Delivery (Idea → Production) |
+| `scripts/sw-pipeline.sh` | 8665 | Autonomous Feature Delivery (Idea → Production) |
 | `scripts/sw-pm.sh` | 748 | Autonomous PM Agent for Team Orchestration |
 | `scripts/sw-pr-lifecycle.sh` | 510 | Autonomous PR Management |
 | `scripts/sw-predictive.sh` | 825 | Predictive & Proactive Intelligence |
@@ -613,7 +613,7 @@ All scripts are bash (except the dashboard server in TypeScript). Grouped by lay
 | `scripts/sw-activity-test.sh` | 286 | Validate live agent activity stream |
 | `scripts/sw-adaptive-test.sh` | 203 | Validate data-driven pipeline tuning |
 | `scripts/sw-adversarial-test.sh` | 296 | Validate adversarial agent code review |
-| `scripts/sw-agi-roadmap-test.sh` | 856 | Tests every feature we implemented |
+| `scripts/sw-agi-roadmap-test.sh` | 858 | Tests every feature we implemented |
 | `scripts/sw-architecture-enforcer-test.sh` | 339 | Validate architecture model |
 | `scripts/sw-auth-test.sh` | 168 | Validate OAuth authentication commands |
 | `scripts/sw-autonomous-test.sh` | 219 | AI-building-AI master controller tests |
@@ -672,9 +672,10 @@ All scripts are bash (except the dashboard server in TypeScript). Grouped by lay
 | `scripts/sw-oversight-test.sh` | 221 | Quality oversight board tests |
 | `scripts/sw-patrol-meta-test.sh` | 344 | Validate self-improvement patrol |
 | `scripts/sw-pipeline-composer-test.sh` | 643 | Test Suite |
-| `scripts/sw-pipeline-test.sh` | 1900 | E2E validation invoking the REAL pipeline |
+| `scripts/sw-pipeline-test.sh` | 1902 | E2E validation invoking the REAL pipeline |
 | `scripts/sw-pipeline-vitals-test.sh` | 203 | Validate pipeline health scoring |
 | `scripts/sw-pm-test.sh` | 246 | Autonomous PM Agent test suite |
+| `scripts/sw-policy-e2e-test.sh` | 286 | Verify config/policy.json is honored |
 | `scripts/sw-pr-lifecycle-test.sh` | 357 | Validate autonomous PR management |
 | `scripts/sw-predictive-test.sh` | 698 | Unit tests for predictive intelligence |
 | `scripts/sw-prep-test.sh` | 644 | Validate repo preparation |
