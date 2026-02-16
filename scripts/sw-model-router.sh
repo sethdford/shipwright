@@ -204,6 +204,7 @@ set_config() {
     # Use jq to safely update the config
     local tmp_config
     tmp_config=$(mktemp)
+    trap "rm -f '$tmp_config'" RETURN
 
     if [[ "$value" == "true" ]] || [[ "$value" == "false" ]]; then
         jq ".${key} = ${value}" "$MODEL_ROUTING_CONFIG" > "$tmp_config"
@@ -336,6 +337,7 @@ configure_ab_test() {
 
     local tmp_config
     tmp_config=$(mktemp)
+    trap "rm -f '$tmp_config'" RETURN
 
     jq ".a_b_test = {\"enabled\": true, \"percentage\": $percentage, \"variant\": \"$variant\"}" \
         "$MODEL_ROUTING_CONFIG" > "$tmp_config"
@@ -521,6 +523,7 @@ main() {
                 if command -v jq &>/dev/null; then
                     local tmp_config
                     tmp_config=$(mktemp)
+                    trap "rm -f '$tmp_config'" RETURN
                     jq ".a_b_test.enabled = false" "$MODEL_ROUTING_CONFIG" > "$tmp_config"
                     mv "$tmp_config" "$MODEL_ROUTING_CONFIG"
                     success "Disabled A/B testing"

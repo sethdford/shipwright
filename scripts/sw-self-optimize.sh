@@ -139,6 +139,7 @@ optimize_analyze_outcome() {
     # Build outcome record using jq for proper escaping
     local tmp_outcome
     tmp_outcome=$(mktemp)
+    trap "rm -f '$tmp_outcome'" RETURN
     jq -c -n \
         --arg ts "$(now_iso)" \
         --arg issue "${issue_number:-unknown}" \
@@ -228,6 +229,7 @@ optimize_tune_templates() {
     local tmp_stats tmp_weights
     tmp_stats=$(mktemp)
     tmp_weights=$(mktemp)
+    trap "rm -f '$tmp_stats' '$tmp_weights'" RETURN
 
     # Extract template, labels, result from each outcome line
     while IFS= read -r line; do
@@ -334,6 +336,7 @@ optimize_tune_templates() {
         # Atomic write
         local tmp_cw
         tmp_cw=$(mktemp "${TEMPLATE_WEIGHTS_FILE}.tmp.XXXXXX")
+        trap "rm -f '$tmp_cw'" RETURN
         echo "$consumer_weights" > "$tmp_cw" && mv "$tmp_cw" "$TEMPLATE_WEIGHTS_FILE" || rm -f "$tmp_cw"
     fi
 
@@ -380,6 +383,7 @@ optimize_learn_iterations() {
     tmp_med=$(mktemp)
     tmp_high=$(mktemp)
     tmp_all_pairs=$(mktemp)
+    trap "rm -f '$tmp_low' '$tmp_med' '$tmp_high' '$tmp_all_pairs'" RETURN
 
     while IFS= read -r line; do
         local complexity iterations
@@ -440,6 +444,7 @@ optimize_learn_iterations() {
                 # Write boundaries back to config (atomic)
                 local tmp_clusters
                 tmp_clusters=$(mktemp "${TMPDIR:-/tmp}/sw-clusters.XXXXXX")
+                trap "rm -f '$tmp_clusters'" RETURN
                 jq -n \
                     --argjson low_max "$new_low" \
                     --argjson med_max "$new_med" \
@@ -488,6 +493,7 @@ optimize_learn_iterations() {
     # Build iteration model (flat format for readers: .low, .medium, .high)
     local tmp_model
     tmp_model=$(mktemp "${ITERATION_MODEL_FILE}.tmp.XXXXXX")
+    trap "rm -f '$tmp_model'" RETURN
     jq -n \
         --argjson low "$low_stats" \
         --argjson medium "$med_stats" \
@@ -568,6 +574,7 @@ _optimize_apply_prediction_bias() {
     if [[ "$changed" == true ]]; then
         local tmp_model
         tmp_model=$(mktemp)
+        trap "rm -f '$tmp_model'" RETURN
         if echo "$updated_model" | jq '.' > "$tmp_model" 2>/dev/null && [[ -s "$tmp_model" ]]; then
             mv "$tmp_model" "$model_file"
             emit_event "optimize.prediction_bias_corrected"
@@ -609,6 +616,7 @@ optimize_route_models() {
     # Collect per-stage, per-model stats
     local tmp_stage_stats
     tmp_stage_stats=$(mktemp)
+    trap "rm -f '$tmp_stage_stats'" RETURN
 
     while IFS= read -r line; do
         local model result stages_arr
@@ -724,6 +732,7 @@ optimize_route_models() {
     # Atomic write
     local tmp_routing
     tmp_routing=$(mktemp "${MODEL_ROUTING_FILE}.tmp.XXXXXX")
+    trap "rm -f '$tmp_routing'" RETURN
     echo "$consumer_routing" > "$tmp_routing" && mv "$tmp_routing" "$MODEL_ROUTING_FILE" || rm -f "$tmp_routing"
 
     rm -f "$tmp_stage_stats" 2>/dev/null || true
@@ -798,6 +807,7 @@ optimize_learn_risk_keywords() {
         keywords=$(echo "$keywords" | jq 'to_entries | map(select(.value != 0)) | from_entries' 2>/dev/null || echo "$keywords")
         local tmp_risk
         tmp_risk=$(mktemp)
+        trap "rm -f '$tmp_risk'" RETURN
         if echo "$keywords" | jq '.' > "$tmp_risk" 2>/dev/null && [[ -s "$tmp_risk" ]]; then
             mv "$tmp_risk" "$risk_file"
             success "Risk keywords updated ($(echo "$keywords" | jq 'length' 2>/dev/null || echo '?') keywords)"
@@ -874,6 +884,7 @@ optimize_evolve_memory() {
 
         local tmp_file
         tmp_file=$(mktemp)
+        trap "rm -f '$tmp_file'" RETURN
 
         # Prune entries not seen within prune window
         local pruned_json
@@ -911,6 +922,7 @@ optimize_evolve_memory() {
     # Collect all patterns across repos
     local tmp_all_patterns
     tmp_all_patterns=$(mktemp)
+    trap "rm -f '$tmp_all_patterns'" RETURN
     for repo_dir in "$memory_root"/*/; do
         [[ -d "$repo_dir" ]] || continue
         local failures_file="${repo_dir}failures.json"
@@ -926,6 +938,7 @@ optimize_evolve_memory() {
         if [[ -n "$promoted_patterns" ]]; then
             local tmp_global
             tmp_global=$(mktemp)
+            trap "rm -f '$tmp_global'" RETURN
             local pcount=0
             while IFS= read -r pattern; do
                 [[ -z "$pattern" ]] && continue
@@ -1132,6 +1145,7 @@ optimize_adjust_audit_intensity() {
         info "Quality trend: ${trend} (avg: ${avg_quality}) — increasing audit intensity"
         local tmp_dc
         tmp_dc=$(mktemp "${daemon_config}.tmp.XXXXXX")
+        trap "rm -f '$tmp_dc'" RETURN
         jq '.intelligence.adversarial_enabled = true | .intelligence.architecture_enabled = true' \
             "$daemon_config" > "$tmp_dc" 2>/dev/null && mv "$tmp_dc" "$daemon_config" || rm -f "$tmp_dc"
         emit_event "optimize.audit_intensity" \

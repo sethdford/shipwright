@@ -286,6 +286,7 @@ EOF
 )
     local _tmp_roles
     _tmp_roles=$(mktemp)
+    trap "rm -f '$_tmp_roles'" RETURN
     if echo "$roles_json" | jq '.' > "$_tmp_roles" 2>/dev/null && [[ -s "$_tmp_roles" ]]; then
         mv "$_tmp_roles" "$ROLES_DB"
     else
@@ -426,6 +427,7 @@ _recruit_record_match() {
     if [[ "$current_lines" -gt "$max_history" ]]; then
         local tmp_trunc
         tmp_trunc=$(mktemp)
+        trap "rm -f '$tmp_trunc'" RETURN
         tail -n "$max_history" "$MATCH_HISTORY" > "$tmp_trunc" && _recruit_locked_write "$MATCH_HISTORY" "$tmp_trunc" || rm -f "$tmp_trunc"
     fi
 
@@ -492,6 +494,7 @@ Return JSON only."
             # Persist to roles DB
             local tmp_file
             tmp_file=$(mktemp)
+            trap "rm -f '$tmp_file'" RETURN
             if jq --arg key "$role_key" --argjson role "$(echo "$result" | jq 'del(.key)')" '.[$key] = $role' "$ROLES_DB" > "$tmp_file"; then
                 _recruit_locked_write "$ROLES_DB" "$tmp_file"
             else
@@ -544,6 +547,7 @@ Return JSON only."
 
     local tmp_file
     tmp_file=$(mktemp)
+    trap "rm -f '$tmp_file'" RETURN
     if jq --arg key "$role_key" --argjson role "$role_json" '.[$key] = $role' "$ROLES_DB" > "$tmp_file"; then
         _recruit_locked_write "$ROLES_DB" "$tmp_file"
     else
@@ -622,6 +626,7 @@ cmd_record_outcome() {
 
     local tmp_file
     tmp_file=$(mktemp)
+    trap "rm -f '$tmp_file'" RETURN
     jq --arg id "$agent_id" \
        --argjson tc "$tasks_completed" \
        --argjson sc "$success_count" \
@@ -659,6 +664,7 @@ cmd_record_outcome() {
     if [[ -f "$MATCH_HISTORY" ]]; then
         local tmp_mh
         tmp_mh=$(mktemp)
+        trap "rm -f '$tmp_mh'" RETURN
         # Find the most recent match for this agent_id with null outcome, and backfill
         awk -v agent="$agent_id" -v outcome="$outcome" '
         BEGIN { found = 0 }
@@ -753,6 +759,7 @@ _recruit_track_role_usage() {
 
     local tmp_file
     tmp_file=$(mktemp)
+    trap "rm -f '$tmp_file'" RETURN
     jq --arg role "$role" --arg event "$event" --arg ts "$(now_iso)" '
         .[$role] = (.[$role] // {matches: 0, successes: 0, failures: 0, last_used: ""}) |
         .[$role].last_used = $ts |
@@ -1221,6 +1228,7 @@ _recruit_meta_learning_check() {
 
         local tmp_file
         tmp_file=$(mktemp)
+        trap "rm -f '$tmp_file'" RETURN
         jq --argjson corr "$correction" '
             .corrections = ((.corrections // []) + [$corr] | .[-100:])
         ' "$META_LEARNING_DB" > "$tmp_file" && _recruit_locked_write "$META_LEARNING_DB" "$tmp_file" || rm -f "$tmp_file"
@@ -1267,6 +1275,7 @@ _recruit_reflect() {
     # Track accuracy trend
     local tmp_file
     tmp_file=$(mktemp)
+    trap "rm -f '$tmp_file'" RETURN
     jq --argjson acc "$accuracy" --arg ts "$(now_iso)" '
         .accuracy_trend = ((.accuracy_trend // []) + [{accuracy: $acc, ts: $ts}] | .[-50:]) |
         .last_reflection = $ts
@@ -1355,6 +1364,7 @@ _recruit_meta_validate_self_tune() {
             # Reset heuristics to empty (forces fallback to keyword_match defaults)
             local tmp_heur
             tmp_heur=$(mktemp)
+            trap "rm -f '$tmp_heur'" RETURN
             echo '{"keyword_weights": {}, "meta_reverted_at": "'"$(now_iso)"'", "revert_reason": "accuracy_below_floor"}' > "$tmp_heur"
             _recruit_locked_write "$HEURISTICS_DB" "$tmp_heur" || rm -f "$tmp_heur"
             emit_event "recruit_meta_revert" "accuracy=${current_accuracy}" "floor=${accuracy_floor}" "reason=declining_below_floor"
@@ -1454,6 +1464,7 @@ Return JSON only."
 
             local tmp_file
             tmp_file=$(mktemp)
+            trap "rm -f '$tmp_file'" RETURN
             jq --arg key "$role_key" --argjson role "$role_json" '.[$key] = $role' "$ROLES_DB" > "$tmp_file" && _recruit_locked_write "$ROLES_DB" "$tmp_file" || rm -f "$tmp_file"
 
             # Update heuristics with trigger keywords
@@ -1462,6 +1473,7 @@ Return JSON only."
             if [[ -n "$keywords" ]]; then
                 local heur_tmp
                 heur_tmp=$(mktemp)
+                trap "rm -f '$heur_tmp'" RETURN
                 while IFS= read -r kw; do
                     [[ -z "$kw" ]] && continue
                     jq --arg kw "$kw" --arg role "$role_key" \
@@ -1588,6 +1600,7 @@ Return JSON only."
             # Save the LLM-generated mind profile
             local tmp_file
             tmp_file=$(mktemp)
+            trap "rm -f '$tmp_file'" RETURN
             jq --arg id "$agent_id" --argjson mind "$result" '.[$id] = ($mind + {updated: (now | todate)})' "$AGENT_MINDS_DB" > "$tmp_file" && _recruit_locked_write "$AGENT_MINDS_DB" "$tmp_file" || rm -f "$tmp_file"
 
             success "Mind profile generated:"
@@ -1629,6 +1642,7 @@ Return JSON only."
 
     local tmp_file
     tmp_file=$(mktemp)
+    trap "rm -f '$tmp_file'" RETURN
     jq --arg id "$agent_id" --argjson mind "$mind_json" '.[$id] = $mind' "$AGENT_MINDS_DB" > "$tmp_file" && _recruit_locked_write "$AGENT_MINDS_DB" "$tmp_file" || rm -f "$tmp_file"
 
     local strengths_display="none detected"
@@ -1815,6 +1829,7 @@ cmd_self_tune() {
 
     local tmp_heuristics
     tmp_heuristics=$(mktemp)
+    trap "rm -f '$tmp_heuristics'" RETURN
     cp "$HEURISTICS_DB" "$tmp_heuristics"
 
     local i=0
@@ -2561,6 +2576,7 @@ cmd_audit() {
     if [[ -f "$META_LEARNING_DB" ]]; then
         local tmp_audit
         tmp_audit=$(mktemp)
+        trap "rm -f '$tmp_audit'" RETURN
         jq --argjson score "$score" --arg ts "$(now_iso)" --argjson fails "$fail_count" '
             .audit_trend = ((.audit_trend // []) + [{score: $score, ts: $ts, failures: $fails}] | .[-50:])
         ' "$META_LEARNING_DB" > "$tmp_audit" && _recruit_locked_write "$META_LEARNING_DB" "$tmp_audit" || rm -f "$tmp_audit"

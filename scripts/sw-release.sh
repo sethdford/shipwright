@@ -5,6 +5,7 @@
 # ╚═══════════════════════════════════════════════════════════════════════════╝
 set -euo pipefail
 trap 'echo "ERROR: $BASH_SOURCE:$LINENO exited with status $?" >&2' ERR
+trap 'rm -f "${tmp_file:-}"' EXIT
 
 VERSION="2.2.2"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -258,7 +259,7 @@ generate_changelog_md() {
         echo ""
         echo "$breaking_commits" | while IFS='|' read -r hash subject; do
             [[ -z "$hash" ]] && continue
-            echo "- $subject ([\`$hash\`](https://github.com/sethdford/shipwright/commit/$hash))"
+            echo "- $subject ([\`$hash\`]($(_sw_github_url)/commit/$hash))"
         done
         echo ""
     fi
@@ -269,7 +270,7 @@ generate_changelog_md() {
         echo ""
         echo "$features_commits" | while IFS='|' read -r hash subject; do
             [[ -z "$hash" ]] && continue
-            echo "- $subject ([\`$hash\`](https://github.com/sethdford/shipwright/commit/$hash))"
+            echo "- $subject ([\`$hash\`]($(_sw_github_url)/commit/$hash))"
         done
         echo ""
     fi
@@ -280,7 +281,7 @@ generate_changelog_md() {
         echo ""
         echo "$fixes_commits" | while IFS='|' read -r hash subject; do
             [[ -z "$hash" ]] && continue
-            echo "- $subject ([\`$hash\`](https://github.com/sethdford/shipwright/commit/$hash))"
+            echo "- $subject ([\`$hash\`]($(_sw_github_url)/commit/$hash))"
         done
         echo ""
     fi
@@ -291,7 +292,7 @@ generate_changelog_md() {
         echo ""
         echo "$docs_commits" | while IFS='|' read -r hash subject; do
             [[ -z "$hash" ]] && continue
-            echo "- $subject ([\`$hash\`](https://github.com/sethdford/shipwright/commit/$hash))"
+            echo "- $subject ([\`$hash\`]($(_sw_github_url)/commit/$hash))"
         done
         echo ""
     fi
@@ -346,6 +347,7 @@ update_version_in_files() {
             # This is shell-safe: VERSION="1.11.0" → VERSION="1.12.0"
             local tmp_file
             tmp_file=$(mktemp)
+            trap "rm -f '$tmp_file'" RETURN
             sed 's/^VERSION="[^"]*"$/VERSION="'"$version_num"'"/' "$file" > "$tmp_file"
             mv "$tmp_file" "$file"
             success "Updated VERSION in $(basename "$file")"

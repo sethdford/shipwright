@@ -115,6 +115,7 @@ provider_discover_statuses() {
     mkdir -p "$cache_dir"
     local tmp_cache
     tmp_cache=$(mktemp)
+    trap "rm -f '$tmp_cache'" RETURN
     jq -n \
         --arg ts "$(date +%s)" \
         --arg backlog "${discovered_backlog:-}" \

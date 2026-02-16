@@ -118,6 +118,7 @@ cmd_spawn() {
 
     local tmp_file
     tmp_file=$(mktemp)
+    trap "rm -f '$tmp_file'" RETURN
     cat > "$tmp_file" << EOF
 {
   "job_id": "pipeline-${issue_num}",

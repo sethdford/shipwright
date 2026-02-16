@@ -138,7 +138,7 @@ parse_commits() {
         # Build entry
         local entry="$msg"
         [[ -n "$scope" ]] && entry="**${scope}**: $entry"
-        [[ -n "$pr_num" ]] && entry="$entry ([\#$pr_num](https://github.com/sethdford/shipwright/pull/$pr_num))"
+        [[ -n "$pr_num" ]] && entry="$entry ([\#$pr_num]($(_sw_github_url)/pull/$pr_num))"
 
         # Categorize
         case "$type" in

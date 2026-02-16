@@ -348,11 +348,19 @@ cmd_login() {
     info "Starting GitHub OAuth device flow..."
 
     # Initiate device flow
-    local device_flow_vars
-    device_flow_vars=$(initiate_device_flow) || return 1
+    local device_flow_response
+    device_flow_response=$(initiate_device_flow) || return 1
 
-    # Source the variables
-    eval "$device_flow_vars"
+    # Extract variables without eval (initiate_device_flow outputs key=value pairs)
+    local DEVICE_CODE USER_CODE INTERVAL EXPIRES_IN
+    while IFS='=' read -r key value; do
+        case "$key" in
+            DEVICE_CODE) DEVICE_CODE="$value" ;;
+            USER_CODE) USER_CODE="$value" ;;
+            INTERVAL) INTERVAL="$value" ;;
+            EXPIRES_IN) EXPIRES_IN="$value" ;;
+        esac
+    done <<< "$device_flow_response"
 
     info "Visit: ${CYAN}${DEVICE_FLOW_ENDPOINT}${RESET}"
     info "Enter code: ${BOLD}${USER_CODE}${RESET}"

@@ -395,7 +395,7 @@ show_help() {
     echo -e "  6. Priority lane: ${CYAN}hotfix${RESET}/${CYAN}incident${RESET} issues bypass the queue"
     echo -e "  7. Org mode: watches issues across all repos in a GitHub org"
     echo ""
-    echo -e "${DIM}Docs: https://sethdford.github.io/shipwright  |  GitHub: https://github.com/sethdford/shipwright${RESET}"
+    echo -e "${DIM}Docs: $(_sw_docs_url)  |  GitHub: $(_sw_github_url)${RESET}"
 }
 
 # ─── Config Loading ─────────────────────────────────────────────────────────

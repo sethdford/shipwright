@@ -227,7 +227,7 @@ fix_start() {
     # Validate repos exist
     for repo in "${REPOS[@]}"; do
         local expanded
-        expanded=$(eval echo "$repo")
+        expanded="${repo/#\~/$HOME}"
         if [[ ! -d "$expanded" ]]; then
             error "Repo directory not found: $expanded"
             exit 1
@@ -267,7 +267,7 @@ fix_start() {
         info "Dry run — would execute:"
         for repo in "${REPOS[@]}"; do
             local expanded
-            expanded=$(eval echo "$repo")
+            expanded="${repo/#\~/$HOME}"
             local rname
             rname=$(basename "$expanded")
             echo -e "  ${DIM}cd $expanded && git checkout -b $branch_name${RESET}"
@@ -281,7 +281,7 @@ fix_start() {
     local repos_json="[]"
     for repo in "${REPOS[@]}"; do
         local expanded
-        expanded=$(eval echo "$repo")
+        expanded="${repo/#\~/$HOME}"
         local rname
         rname=$(basename "$expanded")
         repos_json=$(echo "$repos_json" | jq --arg name "$rname" --arg path "$expanded" \
@@ -291,6 +291,7 @@ fix_start() {
     # Atomic write initial state
     local tmp_state
     tmp_state=$(mktemp)
+    trap 'rm -f "$tmp_state"' RETURN
     jq -n \
         --arg goal "$GOAL" \
         --arg branch "$branch_name" \
@@ -311,7 +312,7 @@ fix_start() {
 
     for repo in "${REPOS[@]}"; do
         local expanded
-        expanded=$(eval echo "$repo")
+        expanded="${repo/#\~/$HOME}"
         local rname
         rname=$(basename "$expanded")
 

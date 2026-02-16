@@ -531,6 +531,7 @@ write_loop_tokens() {
     fi
     local tmp_file
     tmp_file=$(mktemp "${token_file}.XXXXXX" 2>/dev/null || mktemp)
+    trap "rm -f '$tmp_file'" RETURN
     cat > "$tmp_file" <<TOKJSON
 {"input_tokens":${LOOP_INPUT_TOKENS},"output_tokens":${LOOP_OUTPUT_TOKENS},"cost_usd":${cost_usd},"iterations":${ITERATION:-0}}
 TOKJSON

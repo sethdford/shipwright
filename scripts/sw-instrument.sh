@@ -200,6 +200,7 @@ cmd_start() {
     local run_file="${INSTRUMENT_ACTIVE}/${run_id}.json"
     local tmp_file
     tmp_file="$(mktemp "${INSTRUMENT_ACTIVE}/.tmp.XXXXXX")"
+    trap "rm -f '$tmp_file'" RETURN
 
     # Get repo info if not provided
     if [[ "$repo" == "." ]]; then
@@ -266,6 +267,7 @@ cmd_record() {
 
     local tmp_file
     tmp_file="$(mktemp "${INSTRUMENT_ACTIVE}/.tmp.XXXXXX")"
+    trap "rm -f '$tmp_file'" RETURN
 
     # Parse value as number if it's numeric
     local value_json
@@ -328,6 +330,7 @@ cmd_stage_start() {
 
     local tmp_file
     tmp_file="$(mktemp "${INSTRUMENT_ACTIVE}/.tmp.XXXXXX")"
+    trap "rm -f '$tmp_file'" RETURN
 
     jq \
         --arg stage "$stage" \
@@ -373,6 +376,7 @@ cmd_stage_end() {
 
     local tmp_file
     tmp_file="$(mktemp "${INSTRUMENT_ACTIVE}/.tmp.XXXXXX")"
+    trap "rm -f '$tmp_file'" RETURN
 
     jq \
         --arg stage "$stage" \
@@ -422,6 +426,7 @@ cmd_finish() {
 
     local tmp_file
     tmp_file="$(mktemp "${INSTRUMENT_ACTIVE}/.tmp.XXXXXX")"
+    trap "rm -f '$tmp_file'" RETURN
 
     # Update run record with finish data
     jq \

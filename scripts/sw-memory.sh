@@ -150,6 +150,7 @@ memory_capture_pipeline() {
             # Record review patterns to global memory for cross-repo learning
             local tmp_global
             tmp_global=$(mktemp)
+            trap "rm -f '$tmp_global'" RETURN
             jq --arg repo "$repo" \
                --arg ts "$captured_at" \
                --argjson bugs "${bug_count:-0}" \
@@ -211,6 +212,7 @@ memory_capture_failure() {
         fi
         local tmp_file
         tmp_file=$(mktemp "${failures_file}.tmp.XXXXXX")
+        trap "rm -f '$tmp_file'" EXIT
 
         if [[ "$existing_idx" != "-1" && "$existing_idx" != "null" ]]; then
             # Update existing entry
@@ -277,6 +279,7 @@ memory_record_fix_outcome() {
         fi
         local tmp_file
         tmp_file=$(mktemp "${failures_file}.tmp.XXXXXX")
+        trap "rm -f '$tmp_file'" EXIT
 
         jq --argjson idx "$match_idx" \
            --argjson app "$applied_inc" \
@@ -442,6 +445,7 @@ _memory_aggregate_global() {
         # Add to global, cap at 100 entries
         local tmp_global
         tmp_global=$(mktemp "${global_file}.tmp.XXXXXX")
+        trap "rm -f '$tmp_global'" RETURN
         jq --arg p "$pattern" \
            --arg ts "$(now_iso)" \
            --arg cat "general" \
@@ -593,6 +597,7 @@ Return JSON only, no markdown fences, no explanation."
     # Update the most recent failure entry with root_cause, fix, category
     local tmp_file
     tmp_file=$(mktemp)
+    trap "rm -f '$tmp_file'" RETURN
     jq --arg rc "$root_cause" \
        --arg fix "$fix" \
        --arg cat "$category" \
@@ -622,6 +627,7 @@ memory_capture_pattern() {
 
     local tmp_file
     tmp_file=$(mktemp)
+    trap "rm -f '$tmp_file'" RETURN
 
     case "$pattern_type" in
         project)
@@ -1112,6 +1118,7 @@ memory_update_metrics() {
     # Update baseline using atomic write
     local tmp_file
     tmp_file=$(mktemp)
+    trap "rm -f '$tmp_file'" RETURN
     jq --arg m "$metric_name" \
        --argjson v "$value" \
        --arg ts "$(now_iso)" \
@@ -1135,6 +1142,7 @@ memory_capture_decision() {
 
     local tmp_file
     tmp_file=$(mktemp)
+    trap "rm -f '$tmp_file'" RETURN
     jq --arg type "$dec_type" \
        --arg summary "$summary" \
        --arg detail "$detail" \
@@ -1454,6 +1462,7 @@ memory_import() {
     # Extract and write each section
     local tmp_file
     tmp_file=$(mktemp)
+    trap "rm -f '$tmp_file'" RETURN
 
     jq '.patterns // {}' "$import_file" > "$tmp_file" && mv "$tmp_file" "$mem_dir/patterns.json"
     jq '.failures // {"failures":[]}' "$import_file" > "$tmp_file" && mv "$tmp_file" "$mem_dir/failures.json"

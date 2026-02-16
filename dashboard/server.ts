@@ -945,9 +945,10 @@ function resolveWorktreePath(relative: string): string | null {
   // Try well-known repo locations
   const candidates: string[] = [];
 
-  // Check env var
-  if (process.env.VOICEAI_REPO) {
-    candidates.push(join(process.env.VOICEAI_REPO, relative));
+  // Check env vars for repo location
+  const repoEnv = process.env.SHIPWRIGHT_REPO || process.env.VOICEAI_REPO;
+  if (repoEnv) {
+    candidates.push(join(repoEnv, relative));
   }
 
   // Scan daemon state for any repo paths from completed or active jobs
@@ -961,15 +962,15 @@ function resolveWorktreePath(relative: string): string | null {
     }
   }
 
-  // Try common parent directories where worktrees might live
-  const homeDir = process.env.HOME || "";
-  const commonBases = [
-    join(homeDir, "Documents/voiceai"),
-    join(homeDir, "Documents/claude-code-teams-tmux"),
-    join(homeDir, "voiceai"),
-  ];
-  for (const base of commonBases) {
-    candidates.push(join(base, relative));
+  // Try discovering repo root via git
+  try {
+    const gitRoot = execSync("git rev-parse --show-toplevel 2>/dev/null", {
+      encoding: "utf-8",
+      timeout: 3000,
+    }).trim();
+    if (gitRoot) candidates.push(join(gitRoot, relative));
+  } catch {
+    // not in a git repo or git not available
   }
 
   for (const candidate of candidates) {

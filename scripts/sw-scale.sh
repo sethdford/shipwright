@@ -64,6 +64,7 @@ init_rules() {
     if [[ ! -f "$SCALE_RULES_FILE" ]]; then
         local tmp_file
         tmp_file=$(mktemp)
+        trap "rm -f '$tmp_file'" RETURN
         cat > "$tmp_file" << 'JSON'
 {
   "iteration_threshold": 3,
@@ -105,6 +106,7 @@ in_cooldown() {
 update_scale_state() {
     local tmp_file
     tmp_file=$(mktemp)
+    trap "rm -f '$tmp_file'" RETURN
 
     if [[ -f "$SCALE_STATE_FILE" ]]; then
         # Update existing state
@@ -241,6 +243,7 @@ cmd_rules() {
 
             local tmp_file
             tmp_file=$(mktemp)
+            trap "rm -f '$tmp_file'" RETURN
 
             jq --arg key "$key" --arg value "$value" \
                 'if ($value | test("^[0-9]+$")) then

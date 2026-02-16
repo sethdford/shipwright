@@ -90,6 +90,7 @@ cmd_setup() {
     # Create config atomically
     local tmp_config
     tmp_config=$(mktemp)
+    trap "rm -f '$tmp_config'" RETURN
     jq -n \
         --arg app_id "$app_id" \
         --arg key_path "$key_path" \
@@ -194,6 +195,7 @@ _cache_token() {
 
     local tmp_tokens
     tmp_tokens=$(mktemp)
+    trap "rm -f '$tmp_tokens'" RETURN
 
     if [[ -f "$TOKENS_FILE" ]]; then
         jq ".tokens += [{\"installation_id\":$installation_id,\"token\":\"$token\",\"expires_at\":\"$expires_at\"}]" \
@@ -399,9 +401,10 @@ cmd_manifest() {
     manifest=$(jq -n \
         --arg name "$app_name" \
         --arg webhook_url "$webhook_url" \
+        --arg github_url "$(_sw_github_url)" \
         '{
             name: $name,
-            url: "https://github.com/sethdford/shipwright",
+            url: $github_url,
             hook_attributes: {
                 url: $webhook_url
             },

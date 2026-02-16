@@ -316,13 +316,11 @@ _compute_error_maturity() {
 # ─── File Locking Helpers ──────────────────────────────────────────────────
 _vitals_acquire_lock() {
     local lockfile="$1.lock"
-    local fd=200
-    eval "exec $fd>\"$lockfile\""
-    flock -w 5 "$fd" || { warn "Vitals lock timeout"; return 1; }
+    exec 200>"$lockfile"
+    flock -w 5 200 || { warn "Vitals lock timeout"; return 1; }
 }
 _vitals_release_lock() {
-    local fd=200
-    flock -u "$fd" 2>/dev/null || true
+    flock -u 200 2>/dev/null || true
 }
 
 # ═══════════════════════════════════════════════════════════════════════════

@@ -124,6 +124,7 @@ composer_create_pipeline() {
                 # Atomic write
                 local tmp_file
                 tmp_file=$(mktemp "${output_file}.XXXXXX")
+                trap "rm -f '$tmp_file'" RETURN
                 echo "$composed" | jq '.' > "$tmp_file"
                 mv "$tmp_file" "$output_file"
 
@@ -152,6 +153,7 @@ composer_create_pipeline() {
         info "Using fallback template: standard" >&2
         local tmp_file
         tmp_file=$(mktemp "${output_file}.XXXXXX")
+        trap "rm -f '$tmp_file'" RETURN
         cp "$fallback_template" "$tmp_file"
         mv "$tmp_file" "$output_file"
 

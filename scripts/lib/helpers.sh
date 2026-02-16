@@ -157,3 +157,33 @@ rotate_jsonl() {
         tail -n "$max_lines" "$file" > "$tmp_rotate" && mv "$tmp_rotate" "$file" || rm -f "$tmp_rotate"
     fi
 }
+
+# ─── Project Identity ────────────────────────────────────────────
+# Auto-detect GitHub owner/repo from git remote, with fallbacks
+_sw_github_repo() {
+    local remote_url
+    remote_url="$(git remote get-url origin 2>/dev/null || echo "")"
+    if [[ "$remote_url" =~ github\.com[:/]([^/]+)/([^/.]+) ]]; then
+        echo "${BASH_REMATCH[1]}/${BASH_REMATCH[2]}"
+    else
+        echo "${SHIPWRIGHT_GITHUB_REPO:-sethdford/shipwright}"
+    fi
+}
+
+_sw_github_owner() {
+    local repo
+    repo="$(_sw_github_repo)"
+    echo "${repo%%/*}"
+}
+
+_sw_docs_url() {
+    local owner
+    owner="$(_sw_github_owner)"
+    echo "${SHIPWRIGHT_DOCS_URL:-https://${owner}.github.io/shipwright}"
+}
+
+_sw_github_url() {
+    local repo
+    repo="$(_sw_github_repo)"
+    echo "https://github.com/${repo}"
+}

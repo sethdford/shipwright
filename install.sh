@@ -100,6 +100,15 @@ else
     echo -e "${YELLOW}!${RESET} gh CLI not found (optional: brew install gh)"
 fi
 
+if command -v bun &>/dev/null || [[ -x "$HOME/.bun/bin/bun" ]]; then
+    BUN_CMD="${HOME}/.bun/bin/bun"
+    command -v bun &>/dev/null && BUN_CMD="bun"
+    echo -e "${GREEN}✓${RESET} Bun $($BUN_CMD --version 2>/dev/null || echo "installed")"
+else
+    echo -e "${YELLOW}!${RESET} Bun not found — required for ${BOLD}shipwright dashboard${RESET}"
+    echo -e "    ${DIM}Install: curl -fsSL https://bun.sh/install | bash${RESET}"
+fi
+
 echo ""
 
 if [[ ${#MISSING[@]} -gt 0 ]]; then

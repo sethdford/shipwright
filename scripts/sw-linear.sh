@@ -48,12 +48,14 @@ RESET="${RESET:-\033[0m}"
 CONFIG_DIR="${HOME}/.shipwright"
 LINEAR_CONFIG="${CONFIG_DIR}/linear-config.json"
 
-# Linear Status IDs (Sethdford team)
-STATUS_BACKLOG="147eb91d-0428-457b-bdcb-0875b847b061"
-STATUS_TODO="f89d423b-9cad-4e60-aec9-422b64b78a4b"
-STATUS_IN_PROGRESS="7ed39c42-434d-4239-86f3-ffa24dbf1275"
-STATUS_IN_REVIEW="ea38a4f2-f0ee-4e0b-ae45-7e5aad45ef53"
-STATUS_DONE="dc2430cf-0713-40c9-a8c6-889413b626e7"
+# Linear Status IDs — loaded from config, with env var overrides
+# Configure via: shipwright tracker init --provider linear
+# Or set env vars: LINEAR_STATUS_BACKLOG, LINEAR_STATUS_TODO, etc.
+STATUS_BACKLOG="${LINEAR_STATUS_BACKLOG:-}"
+STATUS_TODO="${LINEAR_STATUS_TODO:-}"
+STATUS_IN_PROGRESS="${LINEAR_STATUS_IN_PROGRESS:-}"
+STATUS_IN_REVIEW="${LINEAR_STATUS_IN_REVIEW:-}"
+STATUS_DONE="${LINEAR_STATUS_DONE:-}"
 
 LINEAR_API="https://api.linear.app/graphql"
 
@@ -65,8 +67,17 @@ load_config() {
     fi
 
     LINEAR_API_KEY="${LINEAR_API_KEY:-}"
-    LINEAR_TEAM_ID="${LINEAR_TEAM_ID:-83deb533-69d2-43ef-bc58-eadb6e72a8f2}"
-    LINEAR_PROJECT_ID="${LINEAR_PROJECT_ID:-b262d625-5bbe-47bd-9f89-df27c45eba8b}"
+    LINEAR_TEAM_ID="${LINEAR_TEAM_ID:-$(jq -r '.team_id // empty' "$LINEAR_CONFIG" 2>/dev/null || true)}"
+    LINEAR_PROJECT_ID="${LINEAR_PROJECT_ID:-$(jq -r '.project_id // empty' "$LINEAR_CONFIG" 2>/dev/null || true)}"
+
+    # Load status IDs from config if not set via env
+    if [[ -f "$LINEAR_CONFIG" ]]; then
+        STATUS_BACKLOG="${STATUS_BACKLOG:-$(jq -r '.status_ids.backlog // empty' "$LINEAR_CONFIG" 2>/dev/null || true)}"
+        STATUS_TODO="${STATUS_TODO:-$(jq -r '.status_ids.todo // empty' "$LINEAR_CONFIG" 2>/dev/null || true)}"
+        STATUS_IN_PROGRESS="${STATUS_IN_PROGRESS:-$(jq -r '.status_ids.in_progress // empty' "$LINEAR_CONFIG" 2>/dev/null || true)}"
+        STATUS_IN_REVIEW="${STATUS_IN_REVIEW:-$(jq -r '.status_ids.in_review // empty' "$LINEAR_CONFIG" 2>/dev/null || true)}"
+        STATUS_DONE="${STATUS_DONE:-$(jq -r '.status_ids.done // empty' "$LINEAR_CONFIG" 2>/dev/null || true)}"
+    fi
 }
 
 check_api_key() {

@@ -198,6 +198,7 @@ cmd_baseline() {
 
     local tmp_file
     tmp_file=$(mktemp "${baseline_file}.tmp.XXXXXX")
+    trap "rm -f '$tmp_file'" RETURN
 
     echo "$metrics" > "$tmp_file"
     mv "$tmp_file" "$baseline_file"

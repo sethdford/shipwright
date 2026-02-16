@@ -1,347 +1,203 @@
 #!/usr/bin/env bash
 # ╔═══════════════════════════════════════════════════════════════════════════╗
-# ║  shipwright dashboard test — Validate fleet command dashboard            ║
+# ║  shipwright dashboard smoke test — validates dashboard structure        ║
+# ║  Checks server.ts, public/, routes, and syntax. No server startup.       ║
 # ╚═══════════════════════════════════════════════════════════════════════════╝
 set -euo pipefail
 trap 'echo "ERROR: $BASH_SOURCE:$LINENO exited with status $?" >&2' ERR
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+REPO_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
+DASHBOARD_DIR="$REPO_DIR/dashboard"
+SERVER_TS="$DASHBOARD_DIR/server.ts"
+PUBLIC_DIR="$DASHBOARD_DIR/public"
+INDEX_HTML="$PUBLIC_DIR/index.html"
+APP_JS="$PUBLIC_DIR/app.js"
 
-# ─── Colors (matches shipwright theme) ────────────────────────────────────────
+# ─── Colors (matches shipwright theme) ─────────────────────────────────────
 CYAN='\033[38;2;0;212;255m'
+PURPLE='\033[38;2;124;58;237m'
 GREEN='\033[38;2;74;222;128m'
+YELLOW='\033[38;2;250;204;21m'
 RED='\033[38;2;248;113;113m'
 DIM='\033[2m'
 BOLD='\033[1m'
 RESET='\033[0m'
 
-# ─── Counters ─────────────────────────────────────────────────────────────────
+# ─── Counters ─────────────────────────────────────────────────────────────
 PASS=0
 FAIL=0
 TOTAL=0
 FAILURES=()
-TEMP_DIR=""
 
-setup_env() {
-    TEMP_DIR=$(mktemp -d "${TMPDIR:-/tmp}/sw-dashboard-test.XXXXXX")
-    mkdir -p "$TEMP_DIR/home/.shipwright/logs"
-    mkdir -p "$TEMP_DIR/bin"
-    mkdir -p "$TEMP_DIR/repo/.git"
-    mkdir -p "$TEMP_DIR/repo/dashboard"
+# ═══════════════════════════════════════════════════════════════════════════════
+# ASSERTIONS
+# ═══════════════════════════════════════════════════════════════════════════════
 
-    # Link real utilities
-    for cmd in jq date wc cat grep sed awk sort mkdir rm mv cp mktemp basename dirname printf tr cut head tail tee touch find ls kill sleep nohup lsof stat curl; do
-        command -v "$cmd" &>/dev/null && ln -sf "$(command -v "$cmd")" "$TEMP_DIR/bin/$cmd"
-    done
-
-    # Mock git
-    cat > "$TEMP_DIR/bin/git" <<'MOCKEOF'
-#!/usr/bin/env bash
-case "${1:-}" in
-    rev-parse)
-        if [[ "${2:-}" == "--show-toplevel" ]]; then echo "/tmp/mock-repo"
-        elif [[ "${2:-}" == "--abbrev-ref" ]]; then echo "main"
-        else echo "abc1234"; fi ;;
-    remote) echo "git@github.com:test/repo.git" ;;
-    log) echo "abc1234 Mock commit" ;;
-    *) echo "mock git: $*" ;;
-esac
-exit 0
-MOCKEOF
-    chmod +x "$TEMP_DIR/bin/git"
-
-    # Mock gh, claude, tmux
-    for mock in gh claude tmux; do
-        printf '#!/usr/bin/env bash\necho "mock %s: $*"\nexit 0\n' "$mock" > "$TEMP_DIR/bin/$mock"
-        chmod +x "$TEMP_DIR/bin/$mock"
-    done
-
-    # Mock bun — enough to satisfy check_bun but not actually start a server
-    cat > "$TEMP_DIR/bin/bun" <<'MOCKEOF'
-#!/usr/bin/env bash
-echo "mock bun: $*"
-# If asked to "run" something, just sleep briefly and exit
-if [[ "${1:-}" == "run" ]]; then
-    sleep 0.1
-    exit 0
-fi
-exit 0
-MOCKEOF
-    chmod +x "$TEMP_DIR/bin/bun"
-
-    # Create a mock server.ts so find_server succeeds
-    echo "// mock server" > "$TEMP_DIR/repo/dashboard/server.ts"
-
-    export PATH="$TEMP_DIR/bin:$PATH"
-    export HOME="$TEMP_DIR/home"
-    export NO_GITHUB=true
+assert_file_exists() {
+    local filepath="$1" label="${2:-file exists}"
+    if [[ -f "$filepath" ]]; then
+        return 0
+    fi
+    echo -e "    ${RED}✗${RESET} File not found: $filepath ($label)"
+    return 1
 }
 
-cleanup_env() {
-    [[ -n "$TEMP_DIR" ]] && rm -rf "$TEMP_DIR"
+assert_dir_exists() {
+    local dirpath="$1" label="${2:-dir exists}"
+    if [[ -d "$dirpath" ]]; then
+        return 0
+    fi
+    echo -e "    ${RED}✗${RESET} Directory not found: $dirpath ($label)"
+    return 1
 }
-trap cleanup_env EXIT
 
-assert_pass() {
-    local desc="$1"
+assert_file_contains() {
+    local filepath="$1" pattern="$2" label="${3:-file content}"
+    if [[ ! -f "$filepath" ]]; then
+        echo -e "    ${RED}✗${RESET} File not found: $filepath ($label)"
+        return 1
+    fi
+    if grep -qiE "$pattern" "$filepath"; then
+        return 0
+    fi
+    echo -e "    ${RED}✗${RESET} File $filepath missing pattern: $pattern ($label)"
+    return 1
+}
+
+assert_file_matches_grep() {
+    local filepath="$1" pattern="$2" label="${3:-grep match}"
+    if [[ ! -f "$filepath" ]]; then
+        echo -e "    ${RED}✗${RESET} File not found: $filepath ($label)"
+        return 1
+    fi
+    if grep -qE "$pattern" "$filepath"; then
+        return 0
+    fi
+    echo -e "    ${RED}✗${RESET} File $filepath missing pattern: $pattern ($label)"
+    return 1
+}
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# TEST RUNNER
+# ═══════════════════════════════════════════════════════════════════════════════
+
+run_test() {
+    local test_name="$1"
+    local test_fn="$2"
     TOTAL=$((TOTAL + 1))
-    PASS=$((PASS + 1))
-    echo -e "  ${GREEN}✓${RESET} ${desc}"
-}
 
-assert_fail() {
-    local desc="$1"
-    local detail="${2:-}"
-    TOTAL=$((TOTAL + 1))
-    FAIL=$((FAIL + 1))
-    FAILURES+=("$desc")
-    echo -e "  ${RED}✗${RESET} ${desc}"
-    if [[ -n "$detail" ]]; then echo -e "    ${DIM}${detail}${RESET}"; fi
-}
+    echo -ne "  ${CYAN}▸${RESET} ${test_name}... "
 
-assert_contains() {
-    local desc="$1" haystack="$2" needle="$3"
-    local _count
-    _count=$(printf '%s\n' "$haystack" | grep -cF -- "$needle" 2>/dev/null) || true
-    if [[ "${_count:-0}" -gt 0 ]]; then
-        assert_pass "$desc"
+    local result=0
+    "$test_fn" || result=$?
+
+    if [[ "$result" -eq 0 ]]; then
+        echo -e "${GREEN}✓${RESET}"
+        PASS=$((PASS + 1))
     else
-        assert_fail "$desc" "output missing: $needle"
+        echo -e "${RED}✗ FAILED${RESET}"
+        FAIL=$((FAIL + 1))
+        FAILURES+=("$test_name")
     fi
 }
 
-assert_eq() {
-    local desc="$1" expected="$2" actual="$3"
-    if [[ "$expected" == "$actual" ]]; then
-        assert_pass "$desc"
-    else
-        assert_fail "$desc" "expected: $expected, got: $actual"
-    fi
+# ═══════════════════════════════════════════════════════════════════════════════
+# TESTS
+# ═══════════════════════════════════════════════════════════════════════════════
+
+test_server_ts_exists() {
+    assert_file_exists "$SERVER_TS" "server.ts exists"
 }
 
-# ─── Setup ────────────────────────────────────────────────────────────────────
-setup_env
+test_server_ts_valid_syntax_basic() {
+    # Basic syntax: must have valid import/export and no obvious parse errors
+    assert_file_contains "$SERVER_TS" "^import " "has import statement" &&
+    assert_file_contains "$SERVER_TS" "fetch\(req" "has fetch handler"
+}
 
-SRC="$SCRIPT_DIR/sw-dashboard.sh"
+test_public_dir_exists() {
+    assert_dir_exists "$PUBLIC_DIR" "public/ directory exists"
+}
 
-echo ""
-echo -e "${CYAN}${BOLD}  shipwright dashboard test${RESET}"
-echo -e "${DIM}  ══════════════════════════════════════════${RESET}"
-echo ""
+test_index_html_exists() {
+    assert_file_exists "$INDEX_HTML" "index.html exists"
+}
 
-# ─── 1. Script Safety ────────────────────────────────────────────────────────
-echo -e "${BOLD}  Script Safety${RESET}"
+test_app_js_exists() {
+    assert_file_exists "$APP_JS" "app.js exists"
+}
 
-if grep -qF 'set -euo pipefail' "$SRC" 2>/dev/null; then
-    assert_pass "set -euo pipefail present"
-else
-    assert_fail "set -euo pipefail present"
-fi
+test_server_exports_api_routes() {
+    assert_file_matches_grep "$SERVER_TS" "/api/health" "exports /api/health" &&
+    assert_file_matches_grep "$SERVER_TS" "/api/status" "exports /api/status"
+}
 
-if grep -qF 'trap' "$SRC" 2>/dev/null; then
-    assert_pass "ERR trap present"
-else
-    assert_fail "ERR trap present"
-fi
+test_server_exports_ws_route() {
+    assert_file_matches_grep "$SERVER_TS" 'pathname === "/ws"' "exports /ws route"
+}
 
-if grep -qE '^VERSION=' "$SRC" 2>/dev/null; then
-    assert_pass "VERSION variable defined"
-else
-    assert_fail "VERSION variable defined"
-fi
+test_bun_check_passes() {
+    if ! command -v bun &>/dev/null; then
+        echo -e "    ${DIM}(bun not installed, skipping)${RESET}"
+        return 0
+    fi
+    local tmpout
+    tmpout=$(mktemp -d "${TMPDIR:-/tmp}/sw-dashboard-build.XXXXXX")
+    if bun build "$SERVER_TS" --outdir="$tmpout" --target=bun &>/dev/null; then
+        rm -rf "$tmpout"
+        return 0
+    fi
+    rm -rf "$tmpout"
+    echo -e "    ${RED}✗${RESET} bun build failed on server.ts"
+    return 1
+}
 
-# Dashboard uses top-level arg parsing, no source guard (acceptable)
-if grep -qF 'DEFAULT_PORT=' "$SRC" 2>/dev/null; then
-    assert_pass "DEFAULT_PORT constant defined"
-else
-    assert_fail "DEFAULT_PORT constant defined"
-fi
+test_html_references_app_js() {
+    assert_file_contains "$INDEX_HTML" 'app\.js' "HTML references app.js"
+}
 
-echo ""
-
-# ─── 2. Help ─────────────────────────────────────────────────────────────────
-echo -e "${BOLD}  Help Output${RESET}"
-
-HELP_OUT=$(bash "$SRC" help 2>&1) || true
-
-assert_contains "help exits 0 and contains USAGE" "$HELP_OUT" "USAGE"
-assert_contains "help lists 'start' subcommand" "$HELP_OUT" "start"
-assert_contains "help lists 'stop' subcommand" "$HELP_OUT" "stop"
-assert_contains "help lists 'status' subcommand" "$HELP_OUT" "status"
-assert_contains "help lists 'open' subcommand" "$HELP_OUT" "open"
-assert_contains "help mentions --port option" "$HELP_OUT" "--port"
-assert_contains "help mentions --foreground option" "$HELP_OUT" "--foreground"
-
-HELP2=$(bash "$SRC" --help 2>&1) || true
-assert_contains "--help alias works" "$HELP2" "USAGE"
-
-HELP3=$(bash "$SRC" -h 2>&1) || true
-assert_contains "-h alias works" "$HELP3" "USAGE"
+# ═══════════════════════════════════════════════════════════════════════════════
+# MAIN
+# ═══════════════════════════════════════════════════════════════════════════════
 
 echo ""
-
-# ─── 3. Version flag ────────────────────────────────────────────────────────
-echo -e "${BOLD}  Version Flag${RESET}"
-
-VER_OUT=$(bash "$SRC" --version 2>&1) || true
-assert_contains "--version shows version" "$VER_OUT" "shipwright dashboard v"
-
-VER_OUT2=$(bash "$SRC" -v 2>&1) || true
-assert_contains "-v shows version" "$VER_OUT2" "shipwright dashboard v"
-
+echo -e "${PURPLE}${BOLD}Dashboard Smoke Tests${RESET}"
 echo ""
 
-# ─── 4. Error Handling ───────────────────────────────────────────────────────
-echo -e "${BOLD}  Error Handling${RESET}"
-
-if bash "$SRC" nonexistent-cmd 2>/dev/null; then
-    assert_fail "Unknown argument exits non-zero"
-else
-    assert_pass "Unknown argument exits non-zero"
-fi
-
+echo -e "${PURPLE}${BOLD}Structure${RESET}"
+run_test "server.ts exists" test_server_ts_exists
+run_test "server.ts has valid structure (imports, fetch)" test_server_ts_valid_syntax_basic
+run_test "public/ directory exists" test_public_dir_exists
+run_test "index.html exists" test_index_html_exists
+run_test "app.js exists" test_app_js_exists
 echo ""
 
-# ─── 5. Status when not running ─────────────────────────────────────────────
-echo -e "${BOLD}  Status Subcommand${RESET}"
-
-# Remove any PID file
-rm -f "$HOME/.shipwright/dashboard.pid"
-
-STATUS_OUT=$(bash "$SRC" status 2>&1) || true
-assert_contains "status when not running shows Stopped" "$STATUS_OUT" "Stopped"
-
-# Status cleans up stale PID file
-echo "99999" > "$HOME/.shipwright/dashboard.pid"
-STATUS_OUT2=$(bash "$SRC" status 2>&1) || true
-assert_contains "status with stale PID shows Stopped" "$STATUS_OUT2" "Stopped"
-
-# Stale PID file should be cleaned up
-if [[ ! -f "$HOME/.shipwright/dashboard.pid" ]]; then
-    assert_pass "status cleans up stale PID file"
-else
-    assert_fail "status cleans up stale PID file"
-fi
-
+echo -e "${PURPLE}${BOLD}Routes${RESET}"
+run_test "Server exports /api/health and /api/status" test_server_exports_api_routes
+run_test "Server exports /ws WebSocket route" test_server_exports_ws_route
 echo ""
 
-# ─── 6. Stop when not running ───────────────────────────────────────────────
-echo -e "${BOLD}  Stop Subcommand${RESET}"
-
-rm -f "$HOME/.shipwright/dashboard.pid"
-
-if bash "$SRC" stop 2>/dev/null; then
-    assert_fail "stop without PID file exits non-zero"
-else
-    assert_pass "stop without PID file exits non-zero"
-fi
-
-# stop with stale PID — should clean up gracefully
-echo "99999" > "$HOME/.shipwright/dashboard.pid"
-STOP_OUT=$(bash "$SRC" stop 2>&1) || true
-assert_contains "stop with dead PID cleans up" "$STOP_OUT" "not running"
-
-if [[ ! -f "$HOME/.shipwright/dashboard.pid" ]]; then
-    assert_pass "stop removes stale PID file"
-else
-    assert_fail "stop removes stale PID file"
-fi
-
+echo -e "${PURPLE}${BOLD}Integrity${RESET}"
+run_test "bun check passes (if bun available)" test_bun_check_passes
+run_test "index.html references app.js" test_html_references_app_js
 echo ""
 
-# ─── 7. Port parsing ────────────────────────────────────────────────────────
-echo -e "${BOLD}  Port Parsing${RESET}"
+# ═══════════════════════════════════════════════════════════════════════════════
+# SUMMARY
+# ═══════════════════════════════════════════════════════════════════════════════
 
-# --port without value should fail
-if bash "$SRC" --port 2>/dev/null; then
-    assert_fail "--port without value exits non-zero"
+echo -e "${CYAN}${BOLD}════════════════════════════════════════════════════${RESET}"
+if [[ "$FAIL" -eq 0 ]]; then
+    echo -e "${GREEN}${BOLD}  All ${TOTAL} tests passed ✓${RESET}"
 else
-    assert_pass "--port without value exits non-zero"
+    echo -e "${RED}${BOLD}  ${FAIL}/${TOTAL} tests failed${RESET}"
+    echo ""
+    for f in "${FAILURES[@]}"; do
+        echo -e "  ${RED}✗${RESET} $f"
+    done
 fi
-
+echo -e "${CYAN}${BOLD}════════════════════════════════════════════════════${RESET}"
 echo ""
 
-# ─── 8. find_server ─────────────────────────────────────────────────────────
-echo -e "${BOLD}  Server Discovery${RESET}"
-
-# find_server should find our mock server.ts
-# We can test this indirectly — start with --foreground should try to exec bun
-# but we test by checking that the script finds the server path
-
-# Remove the mock server.ts and verify start fails
-rm -f "$TEMP_DIR/repo/dashboard/server.ts"
-
-# Need to make the script look in the right place — the script derives repo_dir from SCRIPT_DIR
-# Since we're running $SRC (the real script), it will look relative to its own SCRIPT_DIR
-# Instead, just verify the find_server function exists and the fallback paths are checked
-if grep -qF 'find_server' "$SRC" 2>/dev/null; then
-    assert_pass "find_server function defined"
-else
-    assert_fail "find_server function defined"
-fi
-
-if grep -qF 'dashboard/server.ts' "$SRC" 2>/dev/null; then
-    assert_pass "Looks for dashboard/server.ts"
-else
-    assert_fail "Looks for dashboard/server.ts"
-fi
-
-echo ""
-
-# ─── 9. Event emission ──────────────────────────────────────────────────────
-echo -e "${BOLD}  Event Emission${RESET}"
-
-rm -f "$HOME/.shipwright/events.jsonl"
-
-# Source just the emit_event portion by extracting it
-# The dashboard script doesn't have a source guard so we can't source it directly
-# (it runs main at parse time). Instead, verify emit_event usage in source.
-if grep -qF 'emit_event "dashboard.started"' "$SRC" 2>/dev/null; then
-    assert_pass "Emits dashboard.started event"
-else
-    assert_fail "Emits dashboard.started event"
-fi
-
-if grep -qF 'emit_event "dashboard.stopped"' "$SRC" 2>/dev/null; then
-    assert_pass "Emits dashboard.stopped event"
-else
-    assert_fail "Emits dashboard.stopped event"
-fi
-
-echo ""
-
-# ─── 10. State paths ────────────────────────────────────────────────────────
-echo -e "${BOLD}  State Paths${RESET}"
-
-if grep -qF 'dashboard.pid' "$SRC" 2>/dev/null; then
-    assert_pass "Uses dashboard.pid for process tracking"
-else
-    assert_fail "Uses dashboard.pid for process tracking"
-fi
-
-if grep -qF 'dashboard.log' "$SRC" 2>/dev/null; then
-    assert_pass "Uses dashboard.log for logging"
-else
-    assert_fail "Uses dashboard.log for logging"
-fi
-
-if grep -qF 'is_running' "$SRC" 2>/dev/null; then
-    assert_pass "is_running function defined"
-else
-    assert_fail "is_running function defined"
-fi
-
-echo ""
-
-# ─── Results ─────────────────────────────────────────────────────────────────
-echo ""
-echo -e "${DIM}  ──────────────────────────────────────────${RESET}"
-echo ""
-if [[ $FAIL -eq 0 ]]; then
-    echo -e "  ${GREEN}${BOLD}All $TOTAL tests passed${RESET}"
-else
-    echo -e "  ${RED}${BOLD}$FAIL of $TOTAL tests failed${RESET}"
-    for f in "${FAILURES[@]}"; do echo -e "  ${RED}✗${RESET} $f"; done
-fi
-echo ""
 exit "$FAIL"

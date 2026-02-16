@@ -423,6 +423,7 @@ strategic_call_api() {
 
     local tmp_prompt
     tmp_prompt=$(mktemp)
+    trap "rm -f '$tmp_prompt'" RETURN
     printf '%s' "$prompt" > "$tmp_prompt"
 
     local response_text

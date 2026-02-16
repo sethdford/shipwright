@@ -11,6 +11,7 @@
 VERSION="2.2.2"
 set -euo pipefail
 trap 'echo "ERROR: $BASH_SOURCE:$LINENO exited with status $?" >&2' ERR
+trap 'rm -f "${tmp:-}"' EXIT
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
@@ -641,6 +642,22 @@ if [[ "$SKIP_CLAUDE_MD" == "false" && -f "$CLAUDE_MD_SRC" ]]; then
     fi
 fi
 
+# ─── GitHub CLI Authentication ────────────────────────────────────────────────
+# gh auth is required for daemon, pipeline, PR creation, and issue management
+if command -v gh &>/dev/null; then
+    if gh auth status &>/dev/null 2>&1; then
+        success "GitHub CLI authenticated"
+    else
+        warn "GitHub CLI installed but not authenticated"
+        echo -e "    ${DIM}Required for: daemon, pipeline, PR creation, issue management${RESET}"
+        echo -e "    ${DIM}Run: ${RESET}${BOLD}gh auth login${RESET}"
+    fi
+else
+    warn "GitHub CLI (gh) not installed"
+    echo -e "    ${DIM}Required for: daemon, pipeline, PR creation, issue management${RESET}"
+    echo -e "    ${DIM}Install: ${RESET}${BOLD}brew install gh && gh auth login${RESET}"
+fi
+
 # ─── Reload tmux if inside a session ──────────────────────────────────────────
 if [[ -n "${TMUX:-}" ]]; then
     if tmux source-file "$HOME/.tmux.conf" 2>/dev/null; then
@@ -649,6 +666,36 @@ if [[ -n "${TMUX:-}" ]]; then
     else
         warn "Could not reload tmux config (reload manually with prefix + r)"
     fi
+fi
+
+# ─── Bun (required for dashboard) ──────────────────────────────────────────
+if command -v bun &>/dev/null || [[ -x "$HOME/.bun/bin/bun" ]]; then
+    _bun_cmd="bun"
+    [[ -x "$HOME/.bun/bin/bun" ]] && _bun_cmd="$HOME/.bun/bin/bun"
+    success "Bun $($_bun_cmd --version 2>/dev/null || echo "installed") — dashboard ready"
+else
+    info "Installing Bun (required for ${BOLD}shipwright dashboard${RESET})..."
+    if curl -fsSL https://bun.sh/install | bash 2>/dev/null; then
+        export PATH="$HOME/.bun/bin:$PATH"
+        success "Bun installed — dashboard ready"
+    else
+        warn "Could not install Bun automatically"
+        echo -e "    ${DIM}Install manually: curl -fsSL https://bun.sh/install | bash${RESET}"
+        echo -e "    ${DIM}The dashboard requires Bun to run: shipwright dashboard${RESET}"
+    fi
+fi
+
+# ─── Dashboard Files ──────────────────────────────────────────────────────
+# Copy dashboard files to the install location for non-source installs
+DASHBOARD_SRC="$REPO_DIR/dashboard"
+DASHBOARD_DEST="$HOME/.local/share/shipwright/dashboard"
+if [[ -f "$DASHBOARD_SRC/server.ts" ]]; then
+    mkdir -p "$DASHBOARD_DEST/public"
+    cp "$DASHBOARD_SRC/server.ts" "$DASHBOARD_DEST/server.ts"
+    for _f in "$DASHBOARD_SRC/public"/*; do
+        [[ -f "$_f" ]] && cp "$_f" "$DASHBOARD_DEST/public/$(basename "$_f")"
+    done
+    success "Dashboard files installed → ~/.local/share/shipwright/dashboard/"
 fi
 
 # ─── Validation ───────────────────────────────────────────────────────────────

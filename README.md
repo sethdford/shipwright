@@ -102,18 +102,19 @@ When tests fail, the pipeline re-enters the build loop with error context — se
 
 ## Install
 
+**One-command install** (recommended):
+
 ```bash
-curl -fsSL https://raw.githubusercontent.com/sethdford/shipwright/main/scripts/install-remote.sh | bash
+git clone https://github.com/sethdford/shipwright.git && cd shipwright && ./install.sh
 ```
 
 <details>
 <summary>Other methods</summary>
 
-**From source**
+**curl**
 
 ```bash
-git clone https://github.com/sethdford/shipwright.git
-cd shipwright && ./install.sh
+curl -fsSL https://raw.githubusercontent.com/sethdford/shipwright/main/scripts/install-remote.sh | bash
 ```
 
 **npm** (global)
@@ -162,7 +163,7 @@ shipwright fleet start
 shipwright fix "upgrade deps" --repos ~/a,~/b,~/c
 
 # Release automation
-shipwright release --version 2.2.2
+shipwright version bump 2.2.2
 shipwright changelog generate
 ```
 
@@ -381,7 +382,7 @@ shipwright fix "feat: add auth" --repos ~/a,~/b,~/c
 shipwright fleet-viz
 
 # Release automation
-shipwright release --version 2.2.2
+shipwright version bump 2.2.2
 shipwright changelog generate
 shipwright deploys list
 
@@ -395,11 +396,11 @@ shipwright upgrade --apply
 shipwright --help
 ```
 
-See [.claude/CLAUDE.md](.claude/CLAUDE.md) for the complete 100+ command reference organized by workflow. Full documentation: [docs/](docs/).
+See [.claude/CLAUDE.md](.claude/CLAUDE.md) for the complete 100+ command reference organized by workflow. Full documentation: [https://sethdford.github.io/shipwright](https://sethdford.github.io/shipwright).
 
 ## Pipeline Templates for Teams
 
-25 team templates covering the full SDLC:
+24 team templates covering the full SDLC:
 
 ```bash
 shipwright templates list

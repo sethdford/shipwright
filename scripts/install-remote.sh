@@ -6,7 +6,7 @@
 set -euo pipefail
 
 VERSION="2.2.2"
-REPO="sethdford/shipwright"
+REPO="${SHIPWRIGHT_GITHUB_REPO:-sethdford/shipwright}"
 INSTALL_DIR="${SHIPWRIGHT_INSTALL_DIR:-$HOME/.local/bin}"
 INSTALL_LIB="${SHIPWRIGHT_INSTALL_LIB:-$HOME/.local/lib/shipwright}"
 

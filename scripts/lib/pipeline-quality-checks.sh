@@ -927,7 +927,7 @@ run_test_coverage_check() {
     # Run tests and capture output
     local test_output
     local test_rc=0
-    test_output=$(eval "$test_cmd" 2>&1) || test_rc=$?
+    test_output=$(bash -c "$test_cmd" 2>&1) || test_rc=$?
 
     if [[ "$test_rc" -ne 0 ]]; then
         warn "Test command failed (exit code: $test_rc) — cannot extract coverage"

@@ -850,6 +850,7 @@ Reply with ONLY the classification word, nothing else." --model haiku < /dev/nul
         mkdir -p "$class_dir" 2>/dev/null || true
         local tmp_class
         tmp_class="$(mktemp)"
+        trap "rm -f '$tmp_class'" RETURN
         if [[ -f "$class_history" ]]; then
             jq --arg sig "$error_sig" --arg cls "$classification" --arg canon "$canonical_category" --arg stage "$stage_id" \
                 '.[$sig] = {"classification": $cls, "canonical": $canon, "stage": $stage, "recorded_at": now}' \
@@ -1269,6 +1270,7 @@ run_pipeline() {
                 # Remove this stage from the skip file
                 local tmp_skip
                 tmp_skip="$(mktemp)"
+                trap "rm -f '$tmp_skip'" RETURN
                 grep -vx "$id" "$ARTIFACTS_DIR/skip-stage.txt" > "$tmp_skip" 2>/dev/null || true
                 mv "$tmp_skip" "$ARTIFACTS_DIR/skip-stage.txt"
                 continue
@@ -1600,6 +1602,7 @@ pipeline_post_completion_cleanup() {
         # Reset status to idle (preserves the file for reference but unblocks new runs)
         local tmp_state
         tmp_state=$(mktemp)
+        trap "rm -f '$tmp_state'" RETURN
         sed 's/^status: .*/status: idle/' "$STATE_FILE" > "$tmp_state" 2>/dev/null || true
         mv "$tmp_state" "$STATE_FILE"
     fi

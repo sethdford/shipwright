@@ -77,7 +77,7 @@ show_help() {
     echo -e "  ${DIM}shipwright pm history${RESET}                     # Show past decisions"
     echo -e "  ${DIM}shipwright pm history --pattern${RESET}           # Show success patterns"
     echo ""
-    echo -e "${DIM}Docs: https://sethdford.github.io/shipwright  |  GitHub: https://github.com/sethdford/shipwright${RESET}"
+    echo -e "${DIM}Docs: $(_sw_docs_url)  |  GitHub: $(_sw_github_url)${RESET}"
 }
 
 # ─── analyze_issue <issue_num> ───────────────────────────────────────────────
@@ -522,6 +522,7 @@ cmd_recommend() {
         ensure_pm_history
         local tmp_hist
         tmp_hist=$(mktemp)
+        trap "rm -f '$tmp_hist'" RETURN
         jq --argjson rec "$recommendation" '.decisions += [$rec]' "$PM_HISTORY" > "$tmp_hist" && mv "$tmp_hist" "$PM_HISTORY"
         emit_event "pm.recommend" "issue=${issue_num}"
         return 0
@@ -549,6 +550,7 @@ cmd_recommend() {
     ensure_pm_history
     local tmp_hist
     tmp_hist=$(mktemp)
+    trap "rm -f '$tmp_hist'" RETURN
     jq --argjson rec "$recommendation" '.decisions += [$rec]' "$PM_HISTORY" > "$tmp_hist" && mv "$tmp_hist" "$PM_HISTORY"
 
     success "Recommendation saved to history"
@@ -612,6 +614,7 @@ cmd_learn() {
     # Save to history
     local tmp_hist
     tmp_hist=$(mktemp)
+    trap "rm -f '$tmp_hist'" RETURN
     jq --argjson outcome "$outcome_record" '.outcomes += [$outcome]' "$PM_HISTORY" > "$tmp_hist" && mv "$tmp_hist" "$PM_HISTORY"
 
     success "Recorded ${outcome} outcome for issue #${issue_num}"

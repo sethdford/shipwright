@@ -87,7 +87,7 @@ show_help() {
     echo -e "  ${DIM}shipwright testgen generate --threshold 75${RESET}         # Generate with threshold"
     echo -e "  ${DIM}shipwright testgen quality sw-pipeline-test.sh${RESET}  # Score test quality"
     echo ""
-    echo -e "${DIM}Docs: https://sethdford.github.io/shipwright${RESET}"
+    echo -e "${DIM}Docs: $(_sw_docs_url)${RESET}"
 }
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -241,6 +241,7 @@ EOF
                 func_snippet=$(awk "/^${func}\(\\)/,/^[a-zA-Z_][a-zA-Z0-9_]*\(\)|^$/" "$target_script" 2>/dev/null | head -40 || true)
                 local prompt_file
                 prompt_file=$(mktemp "${TMPDIR:-/tmp}/sw-testgen-prompt.XXXXXX")
+                trap "rm -f '$prompt_file'" RETURN
                 {
                     echo "Generate a bash test function for the following shell function. Use real assertions (assert_equal, assert_contains, or test exit code). Test happy path and at least one edge or error case. Output only the bash function body."
                     echo "Function name: ${func}"

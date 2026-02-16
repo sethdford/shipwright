@@ -60,6 +60,7 @@ init_config() {
     if [[ ! -f "$CONFIG_FILE" ]]; then
         local tmp_file
         tmp_file=$(mktemp)
+        trap "rm -f '$tmp_file'" RETURN
         cat > "$tmp_file" << 'JSON'
 {
   "auto_scaling_enabled": false,
@@ -85,6 +86,7 @@ init_registry() {
     if [[ ! -f "$REGISTRY_FILE" ]]; then
         local tmp_file
         tmp_file=$(mktemp)
+        trap "rm -f '$tmp_file'" RETURN
         cat > "$tmp_file" << 'JSON'
 {
   "agents": [],
@@ -173,6 +175,7 @@ cmd_spawn() {
     # Add agent to registry
     local tmp_file
     tmp_file=$(mktemp)
+    trap "rm -f '$tmp_file'" RETURN
 
     jq --arg agent_id "$agent_id" \
        --arg agent_type "$agent_type" \
@@ -254,6 +257,7 @@ cmd_retire() {
     # Mark as retiring / remove from registry
     local tmp_file
     tmp_file=$(mktemp)
+    trap "rm -f '$tmp_file'" RETURN
 
     jq --arg aid "$agent_id" \
        '.agents |= map(select(.id != $aid)) | .active_count = ([.agents[] | select(.status == "active")] | length) | .last_updated = "'$(now_iso)'"' \
@@ -482,6 +486,7 @@ cmd_config() {
 
             local tmp_file
             tmp_file=$(mktemp)
+            trap "rm -f '$tmp_file'" RETURN
 
             jq --arg key "$key" --arg value "$value" \
                 'if ($value | test("^[0-9]+$")) then

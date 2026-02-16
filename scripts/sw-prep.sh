@@ -129,7 +129,7 @@ show_help() {
     echo -e "  ${DIM}.claude/hooks/*.sh${RESET}                   Pre/post action hooks"
     echo -e "  ${DIM}.github/ISSUE_TEMPLATE/agent-task.md${RESET} Agent task template"
     echo ""
-    echo -e "${DIM}Docs: https://sethdford.github.io/shipwright  |  GitHub: https://github.com/sethdford/shipwright${RESET}"
+    echo -e "${DIM}Docs: $(_sw_docs_url)  |  GitHub: $(_sw_github_url)${RESET}"
 }
 
 # ─── CLI Argument Parsing ───────────────────────────────────────────────────
@@ -828,6 +828,7 @@ prep_learn_patterns() {
     # Write patterns file atomically
     local tmp_patterns
     tmp_patterns=$(mktemp)
+    trap "rm -f '$tmp_patterns'" RETURN
     jq -n \
         --arg ts "$(date -u +"%Y-%m-%dT%H:%M:%SZ")" \
         --arg lang "${LANG_DETECTED:-}" \

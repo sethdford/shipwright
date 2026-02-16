@@ -188,6 +188,7 @@ predictive_confirm_anomaly() {
     # Find the most recent unconfirmed anomaly for this stage+metric
     local tmp_file
     tmp_file=$(mktemp "${TMPDIR:-/tmp}/sw-anomaly-confirm.XXXXXX")
+    trap "rm -f '$tmp_file'" RETURN
     local found=false
 
     # Process file in reverse to find most recent unconfirmed
@@ -283,6 +284,7 @@ _predictive_update_alarm_rates() {
     # Atomic write
     local tmp_file
     tmp_file=$(mktemp "${TMPDIR:-/tmp}/sw-anomaly-thresh.XXXXXX")
+    trap "rm -f '$tmp_file'" RETURN
     jq --arg m "$metric_name" \
        --argjson crit "$new_critical" \
        --argjson warn "$new_warning" \
@@ -755,6 +757,7 @@ predict_update_baseline() {
     # Atomic write
     local tmp_file
     tmp_file=$(mktemp)
+    trap "rm -f '$tmp_file'" RETURN
     jq --arg key "$key" \
        --argjson val "$new_value" \
        --argjson cnt "$new_count" \

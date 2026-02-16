@@ -503,6 +503,7 @@ cmd_notify() {
     if [[ -z "$message_file" ]]; then
         # Generate a digest
         message_file=$(mktemp)
+        trap "rm -f '$message_file'" RETURN
         cmd_digest > "$message_file" 2>&1 || true
     fi
 
