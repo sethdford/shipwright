@@ -9,7 +9,7 @@ trap 'echo "ERROR: $BASH_SOURCE:$LINENO exited with status $?" >&2' ERR
 # Allow spawning Claude CLI from within a Claude Code session (daemon, fleet, etc.)
 unset CLAUDECODE 2>/dev/null || true
 
-VERSION="2.2.1"
+VERSION="2.1.2"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
 
@@ -5527,8 +5527,43 @@ daemon_start() {
         "max_parallel=$MAX_PARALLEL" \
         "watch_label=$WATCH_LABEL"
 
-    # Enter poll loop
-    daemon_poll_loop
+    # Enter poll loop with watchdog self-restart on unexpected exit
+    local _watchdog_restarts=0
+    local _watchdog_max=${WATCHDOG_MAX_RESTARTS:-5}
+    local _watchdog_backoff=5
+
+    while true; do
+        daemon_poll_loop || true  # poll_loop only returns on shutdown or crash
+
+        # If shutdown was requested, exit cleanly
+        if [[ -f "$SHUTDOWN_FLAG" ]]; then
+            daemon_log INFO "Poll loop exited due to shutdown flag"
+            break
+        fi
+
+        # Unexpected exit — attempt watchdog restart
+        _watchdog_restarts=$((_watchdog_restarts + 1))
+        if [[ "$_watchdog_restarts" -gt "$_watchdog_max" ]]; then
+            daemon_log ERROR "Watchdog: exceeded max restarts ($_watchdog_max) — giving up"
+            emit_event "daemon.watchdog_exhausted" "restarts=$_watchdog_restarts"
+            break
+        fi
+
+        daemon_log WARN "Watchdog: poll loop exited unexpectedly — restart #${_watchdog_restarts}/${_watchdog_max} in ${_watchdog_backoff}s"
+        emit_event "daemon.watchdog_restart" "restart=$_watchdog_restarts" "backoff=$_watchdog_backoff"
+
+        sleep "$_watchdog_backoff" || true
+        _watchdog_backoff=$((_watchdog_backoff * 2))
+        [[ "$_watchdog_backoff" -gt 300 ]] && _watchdog_backoff=300
+
+        # Re-validate state before restarting
+        if [[ -f "$STATE_FILE" ]]; then
+            if ! jq '.' "$STATE_FILE" >/dev/null 2>&1; then
+                daemon_log WARN "Watchdog: state file corrupt — recovering from backup"
+                type validate_json &>/dev/null 2>&1 && validate_json "$STATE_FILE" || true
+            fi
+        fi
+    done
 }
 
 # ─── daemon stop ─────────────────────────────────────────────────────────────

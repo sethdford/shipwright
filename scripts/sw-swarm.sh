@@ -190,9 +190,8 @@ cmd_spawn() {
            resource_usage: {cpu: 0, memory: 0},
            last_heartbeat: "'$(now_iso)'"
        }] | .active_count += 1 | .last_updated = "'$(now_iso)'"' \
-        "$REGISTRY_FILE" > "$tmp_file"
-
-    mv "$tmp_file" "$REGISTRY_FILE"
+        "$REGISTRY_FILE" > "$tmp_file" && [[ -s "$tmp_file" ]] && \
+    mv "$tmp_file" "$REGISTRY_FILE" || { rm -f "$tmp_file"; error "Failed to update registry"; return 1; }
     record_metric "$agent_id" "spawn" "1" "$agent_type"
 
     # Create real tmux session for the agent (so scale/loop can send commands)
@@ -258,9 +257,8 @@ cmd_retire() {
 
     jq --arg aid "$agent_id" \
        '.agents |= map(select(.id != $aid)) | .active_count = ([.agents[] | select(.status == "active")] | length) | .last_updated = "'$(now_iso)'"' \
-        "$REGISTRY_FILE" > "$tmp_file"
-
-    mv "$tmp_file" "$REGISTRY_FILE"
+        "$REGISTRY_FILE" > "$tmp_file" && [[ -s "$tmp_file" ]] && \
+    mv "$tmp_file" "$REGISTRY_FILE" || { rm -f "$tmp_file"; error "Failed to update registry"; return 1; }
     record_metric "$agent_id" "retire" "1" "graceful_shutdown"
 
     success "Retired agent: ${CYAN}${agent_id}${RESET}"
@@ -492,9 +490,8 @@ cmd_config() {
                     .[$key] = ($value | fromjson)
                 else
                     .[$key] = $value
-                end' "$CONFIG_FILE" > "$tmp_file"
-
-            mv "$tmp_file" "$CONFIG_FILE"
+                end' "$CONFIG_FILE" > "$tmp_file" && [[ -s "$tmp_file" ]] && \
+            mv "$tmp_file" "$CONFIG_FILE" || { rm -f "$tmp_file"; error "Failed to update config"; return 1; }
             success "Updated: ${key} = ${value}"
             ;;
         reset)

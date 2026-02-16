@@ -213,8 +213,8 @@ show_insights() {
 
     # Fleet-wide success rate (last 30 days)
     local total_pipelines successful_pipelines
-    total_pipelines=$(grep '"type":"pipeline_complete"' "$EVENTS_FILE" 2>/dev/null | tail -5000 | wc -l || echo "0")
-    successful_pipelines=$(grep '"type":"pipeline_complete".*"status":"success"' "$EVENTS_FILE" 2>/dev/null | tail -5000 | wc -l || echo "0")
+    total_pipelines=$(grep '"type":"pipeline.completed"' "$EVENTS_FILE" 2>/dev/null | tail -5000 | wc -l || echo "0")
+    successful_pipelines=$(grep '"type":"pipeline.completed".*"status":"success"' "$EVENTS_FILE" 2>/dev/null | tail -5000 | wc -l || echo "0")
 
     local success_rate=0
     if [[ "$total_pipelines" -gt 0 ]]; then

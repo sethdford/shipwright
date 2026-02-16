@@ -108,7 +108,11 @@ update_scale_state() {
 
     if [[ -f "$SCALE_STATE_FILE" ]]; then
         # Update existing state
-        jq --arg now "$(now_epoch)" '.last_scale_time = ($now | tonumber)' "$SCALE_STATE_FILE" > "$tmp_file"
+        if ! jq --arg now "$(now_epoch)" '.last_scale_time = ($now | tonumber)' "$SCALE_STATE_FILE" > "$tmp_file" 2>/dev/null || [[ ! -s "$tmp_file" ]]; then
+            rm -f "$tmp_file"
+            warn "Failed to update scale state"
+            return 1
+        fi
     else
         # Create new state
         cat > "$tmp_file" << JSON
@@ -243,9 +247,8 @@ cmd_rules() {
                     .[$key] = ($value | tonumber)
                 else
                     .[$key] = $value
-                end' "$SCALE_RULES_FILE" > "$tmp_file"
-
-            mv "$tmp_file" "$SCALE_RULES_FILE"
+                end' "$SCALE_RULES_FILE" > "$tmp_file" && [[ -s "$tmp_file" ]] && \
+            mv "$tmp_file" "$SCALE_RULES_FILE" || { rm -f "$tmp_file"; error "Failed to update config"; return 1; }
             success "Updated: ${key} = ${value}"
             ;;
         reset)

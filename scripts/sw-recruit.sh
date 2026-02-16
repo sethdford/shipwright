@@ -284,7 +284,15 @@ initialize_builtin_roles() {
 }
 EOF
 )
-    echo "$roles_json" | jq '.' > "$ROLES_DB"
+    local _tmp_roles
+    _tmp_roles=$(mktemp)
+    if echo "$roles_json" | jq '.' > "$_tmp_roles" 2>/dev/null && [[ -s "$_tmp_roles" ]]; then
+        mv "$_tmp_roles" "$ROLES_DB"
+    else
+        rm -f "$_tmp_roles"
+        error "Failed to initialize roles DB"
+        return 1
+    fi
     success "Initialized 10 built-in agent roles"
 }
 

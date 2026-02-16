@@ -485,7 +485,7 @@ optimize_learn_iterations() {
     med_stats=$(calc_stats "$tmp_med")
     high_stats=$(calc_stats "$tmp_high")
 
-    # Build iteration model with predictions wrapper
+    # Build iteration model (flat format for readers: .low, .medium, .high)
     local tmp_model
     tmp_model=$(mktemp "${ITERATION_MODEL_FILE}.tmp.XXXXXX")
     jq -n \
@@ -494,11 +494,9 @@ optimize_learn_iterations() {
         --argjson high "$high_stats" \
         --arg updated "$(now_iso)" \
         '{
-            predictions: {
-                low: {max_iterations: (if $low.mean > 0 then (($low.mean + $low.stddev) | floor | if . < 5 then 5 else . end) else 10 end), confidence: (if $low.samples >= 10 then 0.8 elif $low.samples >= 5 then 0.6 else 0.4 end), mean: $low.mean, stddev: $low.stddev, samples: $low.samples},
-                medium: {max_iterations: (if $medium.mean > 0 then (($medium.mean + $medium.stddev) | floor | if . < 10 then 10 else . end) else 20 end), confidence: (if $medium.samples >= 10 then 0.8 elif $medium.samples >= 5 then 0.6 else 0.4 end), mean: $medium.mean, stddev: $medium.stddev, samples: $medium.samples},
-                high: {max_iterations: (if $high.mean > 0 then (($high.mean + $high.stddev) | floor | if . < 15 then 15 else . end) else 30 end), confidence: (if $high.samples >= 10 then 0.8 elif $high.samples >= 5 then 0.6 else 0.4 end), mean: $high.mean, stddev: $high.stddev, samples: $high.samples}
-            },
+            low: {max_iterations: (if $low.mean > 0 then (($low.mean + $low.stddev) | floor | if . < 5 then 5 else . end) else 10 end), confidence: (if $low.samples >= 10 then 0.8 elif $low.samples >= 5 then 0.6 else 0.4 end), mean: $low.mean, stddev: $low.stddev, samples: $low.samples},
+            medium: {max_iterations: (if $medium.mean > 0 then (($medium.mean + $medium.stddev) | floor | if . < 10 then 10 else . end) else 20 end), confidence: (if $medium.samples >= 10 then 0.8 elif $medium.samples >= 5 then 0.6 else 0.4 end), mean: $medium.mean, stddev: $medium.stddev, samples: $medium.samples},
+            high: {max_iterations: (if $high.mean > 0 then (($high.mean + $high.stddev) | floor | if . < 15 then 15 else . end) else 30 end), confidence: (if $high.samples >= 10 then 0.8 elif $high.samples >= 5 then 0.6 else 0.4 end), mean: $high.mean, stddev: $high.stddev, samples: $high.samples},
             updated_at: $updated
         }' \
         > "$tmp_model" && mv "$tmp_model" "$ITERATION_MODEL_FILE" || rm -f "$tmp_model"
@@ -506,6 +504,80 @@ optimize_learn_iterations() {
     rm -f "$tmp_low" "$tmp_med" "$tmp_high" 2>/dev/null || true
 
     success "Iteration model updated"
+
+    # Apply prediction error bias correction from validation data
+    _optimize_apply_prediction_bias
+}
+
+# _optimize_apply_prediction_bias
+# Reads prediction-validation.jsonl and applies bias correction to iteration model.
+# If predictions consistently over/under-estimate, shift the model's means.
+_optimize_apply_prediction_bias() {
+    local validation_file="${HOME}/.shipwright/optimization/prediction-validation.jsonl"
+    [[ ! -f "$validation_file" ]] && return 0
+
+    local model_file="$ITERATION_MODEL_FILE"
+    [[ ! -f "$model_file" ]] && return 0
+
+    # Compute mean delta (predicted - actual) from recent validations
+    local recent_count=50
+    local bias_data
+    bias_data=$(tail -n "$recent_count" "$validation_file" | jq -s '
+        if length == 0 then empty
+        else
+            group_by(
+                if .predicted_complexity <= 3 then "low"
+                elif .predicted_complexity <= 6 then "medium"
+                else "high" end
+            ) | map({
+                bucket: (.[0] | if .predicted_complexity <= 3 then "low" elif .predicted_complexity <= 6 then "medium" else "high" end),
+                mean_delta: ([.[].delta] | add / length),
+                count: length
+            })
+        end' 2>/dev/null || true)
+
+    [[ -z "$bias_data" || "$bias_data" == "null" ]] && return 0
+
+    # Apply bias correction: if mean_delta > 0, predictions are too high → increase model mean
+    # (model mean drives estimates, and positive delta = predicted > actual = model underestimates actual iterations needed)
+    local updated_model
+    updated_model=$(cat "$model_file")
+    local changed=false
+
+    for bucket in low medium high; do
+        local bucket_bias count
+        bucket_bias=$(echo "$bias_data" | jq -r --arg b "$bucket" '.[] | select(.bucket == $b) | .mean_delta // 0' 2>/dev/null || echo "0")
+        count=$(echo "$bias_data" | jq -r --arg b "$bucket" '.[] | select(.bucket == $b) | .count // 0' 2>/dev/null || echo "0")
+
+        # Only correct if enough samples and significant bias (|delta| > 1)
+        if [[ "${count:-0}" -ge 5 ]]; then
+            local abs_bias
+            abs_bias=$(awk -v b="$bucket_bias" 'BEGIN { v = b < 0 ? -b : b; printf "%.1f", v }')
+            if awk -v ab="$abs_bias" 'BEGIN { exit !(ab > 1.0) }' 2>/dev/null; then
+                # Correction = -delta * 0.3 (partial correction to avoid overshooting)
+                local correction
+                correction=$(awk -v d="$bucket_bias" 'BEGIN { printf "%.2f", -d * 0.3 }')
+                updated_model=$(echo "$updated_model" | jq --arg b "$bucket" --argjson c "$correction" \
+                    '.[$b].mean = ((.[$b].mean // 0) + $c) | .[$b].bias_correction = $c' 2>/dev/null || echo "$updated_model")
+                changed=true
+                info "Prediction bias correction for $bucket: delta=${bucket_bias}, correction=${correction} (${count} samples)"
+            fi
+        fi
+    done
+
+    if [[ "$changed" == true ]]; then
+        local tmp_model
+        tmp_model=$(mktemp)
+        if echo "$updated_model" | jq '.' > "$tmp_model" 2>/dev/null && [[ -s "$tmp_model" ]]; then
+            mv "$tmp_model" "$model_file"
+            emit_event "optimize.prediction_bias_corrected"
+        else
+            rm -f "$tmp_model"
+        fi
+    fi
+
+    # Rotate validation file
+    type rotate_jsonl &>/dev/null 2>&1 && rotate_jsonl "$validation_file" 5000
 }
 
 # ═════════════════════════════════════════════════════════════════════════════
@@ -657,6 +729,84 @@ optimize_route_models() {
     rm -f "$tmp_stage_stats" 2>/dev/null || true
 
     success "Model routing updated"
+}
+
+# ═════════════════════════════════════════════════════════════════════════════
+# RISK KEYWORD LEARNING
+# ═════════════════════════════════════════════════════════════════════════════
+
+# optimize_learn_risk_keywords [outcomes_file]
+# Learns keyword→risk-weight mapping from pipeline outcomes for predictive risk scoring.
+# Failed pipelines with labels/keywords get positive weights; successful ones get negative.
+optimize_learn_risk_keywords() {
+    local outcomes_file="${1:-$OUTCOMES_FILE}"
+
+    if [[ ! -f "$outcomes_file" ]]; then
+        return 0
+    fi
+
+    ensure_optimization_dir
+
+    info "Learning risk keywords from outcomes..."
+
+    local risk_file="${OPTIMIZATION_DIR}/risk-keywords.json"
+    local keywords='{}'
+    if [[ -f "$risk_file" ]]; then
+        keywords=$(jq '.' "$risk_file" 2>/dev/null || echo '{}')
+    fi
+
+    local decay=0.95
+    local learn_rate=5
+
+    # Read outcomes and extract keywords from labels
+    local updated=false
+    while IFS= read -r line; do
+        local result labels
+        result=$(echo "$line" | jq -r '.result // "unknown"' 2>/dev/null) || continue
+        labels=$(echo "$line" | jq -r '.labels // ""' 2>/dev/null) || continue
+        [[ -z "$labels" || "$labels" == "null" ]] && continue
+
+        # Split labels on comma/space and learn from each keyword
+        local IFS=', '
+        for kw in $labels; do
+            kw=$(echo "$kw" | tr '[:upper:]' '[:lower:]' | tr -cd '[:alnum:]-')
+            [[ -z "$kw" || ${#kw} -lt 3 ]] && continue
+
+            local current_weight
+            current_weight=$(echo "$keywords" | jq -r --arg k "$kw" '.[$k] // 0' 2>/dev/null || echo "0")
+
+            local delta=0
+            if [[ "$result" == "failed" || "$result" == "error" ]]; then
+                delta=$learn_rate
+            elif [[ "$result" == "success" || "$result" == "complete" ]]; then
+                delta=$((-learn_rate / 2))
+            fi
+
+            if [[ "$delta" -ne 0 ]]; then
+                local new_weight
+                new_weight=$(awk -v cw="$current_weight" -v d="$decay" -v dw="$delta" 'BEGIN { printf "%.0f", (cw * d) + dw }')
+                # Clamp to -50..50
+                new_weight=$(awk -v w="$new_weight" 'BEGIN { if(w>50) w=50; if(w<-50) w=-50; printf "%.0f", w }')
+                keywords=$(echo "$keywords" | jq --arg k "$kw" --argjson w "$new_weight" '.[$k] = $w' 2>/dev/null || echo "$keywords")
+                updated=true
+            fi
+        done
+    done < "$outcomes_file"
+
+    if [[ "$updated" == true ]]; then
+        # Prune zero-weight keywords
+        keywords=$(echo "$keywords" | jq 'to_entries | map(select(.value != 0)) | from_entries' 2>/dev/null || echo "$keywords")
+        local tmp_risk
+        tmp_risk=$(mktemp)
+        if echo "$keywords" | jq '.' > "$tmp_risk" 2>/dev/null && [[ -s "$tmp_risk" ]]; then
+            mv "$tmp_risk" "$risk_file"
+            success "Risk keywords updated ($(echo "$keywords" | jq 'length' 2>/dev/null || echo '?') keywords)"
+        else
+            rm -f "$tmp_risk"
+        fi
+    else
+        info "No label data in outcomes — risk keywords unchanged"
+    fi
 }
 
 # ═════════════════════════════════════════════════════════════════════════════
@@ -821,6 +971,7 @@ optimize_full_analysis() {
     optimize_tune_templates
     optimize_learn_iterations
     optimize_route_models
+    optimize_learn_risk_keywords
     optimize_evolve_memory
     optimize_report >> "${OPTIMIZATION_DIR}/last-report.txt" 2>/dev/null || true
     optimize_adjust_audit_intensity 2>/dev/null || true

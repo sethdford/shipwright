@@ -260,7 +260,13 @@ cmd_init() {
         local tmp_config="${TRACKER_CONFIG}.tmp"
         jq -n --arg provider "none" --arg updated "$(now_iso)" \
             '{provider: $provider, updated_at: $updated}' > "$tmp_config"
-        mv "$tmp_config" "$TRACKER_CONFIG"
+        if [[ -s "$tmp_config" ]]; then
+            mv "$tmp_config" "$TRACKER_CONFIG"
+        else
+            rm -f "$tmp_config"
+            error "Failed to write tracker config"
+            return 1
+        fi
         success "Tracker disabled"
         return 0
     fi
@@ -307,8 +313,14 @@ _init_linear() {
             },
             updated_at: $updated
         }' > "$tmp_config"
-    mv "$tmp_config" "$TRACKER_CONFIG"
-    chmod 600 "$TRACKER_CONFIG"
+    if [[ -s "$tmp_config" ]]; then
+        mv "$tmp_config" "$TRACKER_CONFIG"
+        chmod 600 "$TRACKER_CONFIG"
+    else
+        rm -f "$tmp_config"
+        error "Failed to write tracker config"
+        return 1
+    fi
 
     success "Linear tracker configured"
     echo ""
@@ -376,8 +388,14 @@ _init_jira() {
             },
             updated_at: $updated
         }' > "$tmp_config"
-    mv "$tmp_config" "$TRACKER_CONFIG"
-    chmod 600 "$TRACKER_CONFIG"
+    if [[ -s "$tmp_config" ]]; then
+        mv "$tmp_config" "$TRACKER_CONFIG"
+        chmod 600 "$TRACKER_CONFIG"
+    else
+        rm -f "$tmp_config"
+        error "Failed to write tracker config"
+        return 1
+    fi
 
     success "Jira tracker configured"
     echo ""

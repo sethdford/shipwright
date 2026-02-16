@@ -38,8 +38,11 @@ setup_env() {
     mkdir -p "$TEMP_DIR/repo/src"
     mkdir -p "$TEMP_DIR/repo/tests"
 
-    # Copy script under test
+    # Copy script under test and lib directory
     cp "$SCRIPT_DIR/sw-predictive.sh" "$TEMP_DIR/scripts/"
+    if [[ -d "$SCRIPT_DIR/lib" ]]; then
+        cp -r "$SCRIPT_DIR/lib" "$TEMP_DIR/scripts/lib"
+    fi
 
     # Create mock intelligence engine (claude unavailable by default)
     cat > "$TEMP_DIR/scripts/sw-intelligence.sh" <<'INTEOF'

@@ -521,7 +521,7 @@ cmd_profile() {
     local model_val
     model_val=$(get_model "build" "opus")
     local model_samples
-    model_samples=$(jq -s "map(select(.model != null and .type == \"pipeline_complete\")) | length" "$EVENTS_FILE" 2>/dev/null || echo "0")
+    model_samples=$(jq -s "map(select(.model != null and .type == \"pipeline.completed\")) | length" "$EVENTS_FILE" 2>/dev/null || echo "0")
     local model_conf
     model_conf=$(confidence_level "$model_samples")
     printf "%-25s %-15s %-15s %-12s %-10s\n" "model" "$model_val" "opus" "$model_samples" "$model_conf"

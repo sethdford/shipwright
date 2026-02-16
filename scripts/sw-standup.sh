@@ -302,14 +302,14 @@ cmd_velocity() {
                 if [[ "$ts_epoch" -ge "$cutoff" ]]; then
                     local event_type
                     event_type=$(echo "$line" | jq -r '.type // ""' 2>/dev/null || true)
-                    if [[ "$event_type" == "pipeline_completed" ]]; then
+                    if [[ "$event_type" == "pipeline.completed" || "$event_type" == "pipeline_completed" ]]; then
                         completed_24h=$((completed_24h + 1))
                     fi
                 fi
 
                 local event_type
                 event_type=$(echo "$line" | jq -r '.type // ""' 2>/dev/null || true)
-                if [[ "$event_type" == "pipeline_completed" ]]; then
+                if [[ "$event_type" == "pipeline.completed" || "$event_type" == "pipeline_completed" ]]; then
                     total_completed=$((total_completed + 1))
                 fi
             done < "$EVENTS_FILE"

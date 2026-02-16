@@ -1050,3 +1050,5 @@ run_new_function_test_check() {
         warn "New functions without tests: ${details}"
     fi
 
+    echo "$untested_functions"
+}

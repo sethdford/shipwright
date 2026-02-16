@@ -94,16 +94,16 @@ cmd_metrics() {
             event_type=$(echo "$line" | jq -r '.type // empty' 2>/dev/null || true)
 
             case "$event_type" in
-                pipeline_start)
+                pipeline_start|pipeline.started)
                     ((total_pipelines++))
                     ((active_pipelines++))
                     ;;
-                pipeline_complete)
+                pipeline_complete|pipeline.completed)
                     ((active_pipelines--))
                     ((succeeded_pipelines++))
                     ((status_success++))
                     ;;
-                pipeline_failed)
+                pipeline_failed|pipeline.failed)
                     ((active_pipelines--))
                     ((failed_pipelines++))
                     ((status_failed++))

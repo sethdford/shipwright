@@ -326,19 +326,19 @@ test_iteration_model() {
 
     [[ -f "$ITERATION_MODEL_FILE" ]] || return 1
 
-    # With .predictions wrapper, access via .predictions.low etc.
+    # Flat format: access via .low, .medium, .high (no .predictions wrapper)
     local low_mean
-    low_mean=$(jq '.predictions.low.mean' "$ITERATION_MODEL_FILE")
+    low_mean=$(jq '.low.mean' "$ITERATION_MODEL_FILE")
     awk "BEGIN{exit !($low_mean >= 6 && $low_mean <= 8)}" || return 1
 
     # Verify medium samples = 3
     local med_samples
-    med_samples=$(jq '.predictions.medium.samples' "$ITERATION_MODEL_FILE")
+    med_samples=$(jq '.medium.samples' "$ITERATION_MODEL_FILE")
     [[ "$med_samples" -eq 3 ]] || return 1
 
     # Verify high mean is ~25 (20+25+30)/3
     local high_mean
-    high_mean=$(jq '.predictions.high.mean' "$ITERATION_MODEL_FILE")
+    high_mean=$(jq '.high.mean' "$ITERATION_MODEL_FILE")
     awk "BEGIN{exit !($high_mean >= 24 && $high_mean <= 26)}" || return 1
 }
 
@@ -578,7 +578,7 @@ test_template_weights_format() {
 }
 
 # ──────────────────────────────────────────────────────────────────────────────
-# 18. Iteration model output has .predictions wrapper
+# 18. Iteration model output has flat format (.low, .medium, .high)
 # ──────────────────────────────────────────────────────────────────────────────
 test_iteration_model_format() {
     reset_test
@@ -593,22 +593,17 @@ test_iteration_model_format() {
 
     optimize_learn_iterations > /dev/null 2>&1
 
-    # Verify .predictions wrapper
-    local has_predictions
-    has_predictions=$(jq 'has("predictions")' "$ITERATION_MODEL_FILE" 2>/dev/null || echo "false")
-    [[ "$has_predictions" == "true" ]] || { echo "Expected .predictions wrapper in iteration-model.json"; return 1; }
-
-    # Verify low/medium/high buckets
+    # Verify flat format: low/medium/high at root level (no .predictions wrapper)
     local has_low has_medium has_high
-    has_low=$(jq '.predictions | has("low")' "$ITERATION_MODEL_FILE" 2>/dev/null || echo "false")
-    has_medium=$(jq '.predictions | has("medium")' "$ITERATION_MODEL_FILE" 2>/dev/null || echo "false")
-    has_high=$(jq '.predictions | has("high")' "$ITERATION_MODEL_FILE" 2>/dev/null || echo "false")
+    has_low=$(jq 'has("low")' "$ITERATION_MODEL_FILE" 2>/dev/null || echo "false")
+    has_medium=$(jq 'has("medium")' "$ITERATION_MODEL_FILE" 2>/dev/null || echo "false")
+    has_high=$(jq 'has("high")' "$ITERATION_MODEL_FILE" 2>/dev/null || echo "false")
     [[ "$has_low" == "true" && "$has_medium" == "true" && "$has_high" == "true" ]] || \
-        { echo "Expected .predictions.{low,medium,high}"; return 1; }
+        { echo "Expected .{low,medium,high} at root level"; return 1; }
 
     # Verify max_iterations field exists
     local max_iter
-    max_iter=$(jq '.predictions.low.max_iterations // 0' "$ITERATION_MODEL_FILE" 2>/dev/null || echo "0")
+    max_iter=$(jq '.low.max_iterations // 0' "$ITERATION_MODEL_FILE" 2>/dev/null || echo "0")
     [[ "$max_iter" -gt 0 ]] || { echo "Expected max_iterations > 0, got $max_iter"; return 1; }
 }
 
@@ -689,7 +684,7 @@ main() {
         "test_report_empty:Report handles empty outcomes"
         "test_outcome_stages:Outcome analysis extracts stage data"
         "test_template_weights_format:Template weights output has .weights wrapper"
-        "test_iteration_model_format:Iteration model output has .predictions wrapper"
+        "test_iteration_model_format:Iteration model output has flat format"
         "test_model_routing_format:Model routing output has .routes wrapper"
         "test_full_analysis_calls_report:Full analysis creates last-report.txt"
     )

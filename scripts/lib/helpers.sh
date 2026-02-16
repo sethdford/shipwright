@@ -94,6 +94,57 @@ emit_event() {
 
 # Rotate a JSONL file to keep it within max_lines.
 # Usage: rotate_jsonl <file> <max_lines>
+# ─── Retry Helper ─────────────────────────────────────────────────
+# Retries a command with exponential backoff for transient failures.
+# Usage: with_retry <max_attempts> <command> [args...]
+with_retry() {
+    local max_attempts="${1:-3}"
+    shift
+    local attempt=1
+    local delay=1
+    while [[ "$attempt" -le "$max_attempts" ]]; do
+        if "$@"; then
+            return 0
+        fi
+        local exit_code=$?
+        if [[ "$attempt" -lt "$max_attempts" ]]; then
+            warn "Attempt $attempt/$max_attempts failed (exit $exit_code), retrying in ${delay}s..."
+            sleep "$delay"
+            delay=$((delay * 2))
+            [[ "$delay" -gt 30 ]] && delay=30
+        fi
+        attempt=$((attempt + 1))
+    done
+    error "All $max_attempts attempts failed"
+    return 1
+}
+
+# ─── JSON Validation + Recovery ───────────────────────────────────
+# Validates a JSON file and recovers from backup if corrupt.
+# Usage: validate_json <file> [backup_suffix]
+validate_json() {
+    local file="$1"
+    local backup_suffix="${2:-.bak}"
+    [[ ! -f "$file" ]] && return 0
+
+    if jq '.' "$file" >/dev/null 2>&1; then
+        # Valid — create backup
+        cp "$file" "${file}${backup_suffix}" 2>/dev/null || true
+        return 0
+    fi
+
+    # Corrupt — try to recover from backup
+    warn "Corrupt JSON detected: $file"
+    if [[ -f "${file}${backup_suffix}" ]] && jq '.' "${file}${backup_suffix}" >/dev/null 2>&1; then
+        cp "${file}${backup_suffix}" "$file"
+        warn "Recovered from backup: ${file}${backup_suffix}"
+        return 0
+    fi
+
+    error "No valid backup for $file — manual intervention needed"
+    return 1
+}
+
 rotate_jsonl() {
     local file="$1"
     local max_lines="${2:-10000}"

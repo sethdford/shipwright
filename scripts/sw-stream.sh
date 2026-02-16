@@ -374,7 +374,13 @@ stream_config() {
             ;;
     esac
 
-    mv "$tmp_file" "$STREAM_CONFIG"
+    if [[ -s "$tmp_file" ]]; then
+        mv "$tmp_file" "$STREAM_CONFIG"
+    else
+        rm -f "$tmp_file"
+        error "Failed to update stream config"
+        return 1
+    fi
     success "Config updated: $key = $value"
     emit_event "stream.config_updated" "key=$key" "value=$value"
 }

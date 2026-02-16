@@ -42,6 +42,10 @@ setup_env() {
     cp "$SCRIPT_DIR/sw-tracker-jira.sh" "$TEMP_DIR/scripts/"
     cp "$SCRIPT_DIR/sw-tracker-github.sh" "$TEMP_DIR/scripts/"
     cp "$SCRIPT_DIR/sw-pipeline.sh" "$TEMP_DIR/scripts/"
+    # Copy lib directory (pipeline-*.sh contain extracted functions)
+    if [[ -d "$SCRIPT_DIR/lib" ]]; then
+        cp -r "$SCRIPT_DIR/lib" "$TEMP_DIR/scripts/lib"
+    fi
 
     # Mock binaries directory
     mkdir -p "$TEMP_DIR/bin"
@@ -195,15 +199,19 @@ test_stage_descriptions_all_12() {
     local stages=(intake plan design build test review compound_quality pr merge deploy validate monitor)
     local missing=0
 
+    # Check across pipeline and lib files
+    local all_sources="$pipeline_script"
+    [[ -d "$TEMP_DIR/scripts/lib" ]] && all_sources="$all_sources $TEMP_DIR/scripts/lib/pipeline-*.sh"
+
     for stage in "${stages[@]}"; do
-        if ! grep -q "^        ${stage})" "$pipeline_script" 2>/dev/null; then
+        if ! grep -q "^        ${stage})" $all_sources 2>/dev/null; then
             echo -e "    ${RED}✗${RESET} Missing stage description for: $stage"
             missing=$((missing + 1))
         fi
     done
 
-    # Also verify the function exists
-    if ! grep -q "get_stage_description()" "$pipeline_script" 2>/dev/null; then
+    # Also verify the function exists (in pipeline or lib)
+    if ! grep -q "get_stage_description()" $all_sources 2>/dev/null; then
         echo -e "    ${RED}✗${RESET} get_stage_description() function not found"
         return 1
     fi
@@ -216,8 +224,10 @@ test_stage_descriptions_all_12() {
 # ──────────────────────────────────────────────────────────────────────────────
 test_enriched_progress_delivering() {
     local pipeline_script="$TEMP_DIR/scripts/sw-pipeline.sh"
+    local all_sources="$pipeline_script"
+    [[ -d "$TEMP_DIR/scripts/lib" ]] && all_sources="$all_sources $TEMP_DIR/scripts/lib/pipeline-*.sh"
 
-    if grep -q '^\*\*Delivering:\*\*' "$pipeline_script" 2>/dev/null; then
+    if grep -q '^\*\*Delivering:\*\*' $all_sources 2>/dev/null; then
         return 0
     fi
     echo -e "    ${RED}✗${RESET} Pipeline script missing '**Delivering:**' line in progress body"
@@ -229,9 +239,11 @@ test_enriched_progress_delivering() {
 # ──────────────────────────────────────────────────────────────────────────────
 test_enriched_progress_stage_descriptions() {
     local pipeline_script="$TEMP_DIR/scripts/sw-pipeline.sh"
+    local all_sources="$pipeline_script"
+    [[ -d "$TEMP_DIR/scripts/lib" ]] && all_sources="$all_sources $TEMP_DIR/scripts/lib/pipeline-*.sh"
 
     # The progress body should call get_stage_description
-    if grep -q 'get_stage_description' "$pipeline_script" 2>/dev/null; then
+    if grep -q 'get_stage_description' $all_sources 2>/dev/null; then
         return 0
     fi
     echo -e "    ${RED}✗${RESET} Pipeline script does not use get_stage_description in progress rendering"
@@ -243,8 +255,10 @@ test_enriched_progress_stage_descriptions() {
 # ──────────────────────────────────────────────────────────────────────────────
 test_pipeline_state_stage_progress() {
     local pipeline_script="$TEMP_DIR/scripts/sw-pipeline.sh"
+    local all_sources="$pipeline_script"
+    [[ -d "$TEMP_DIR/scripts/lib" ]] && all_sources="$all_sources $TEMP_DIR/scripts/lib/pipeline-*.sh"
 
-    if grep -q 'stage_progress:' "$pipeline_script" 2>/dev/null; then
+    if grep -q 'stage_progress:' $all_sources 2>/dev/null; then
         return 0
     fi
     echo -e "    ${RED}✗${RESET} Pipeline state missing stage_progress field"
@@ -256,8 +270,10 @@ test_pipeline_state_stage_progress() {
 # ──────────────────────────────────────────────────────────────────────────────
 test_pipeline_state_stage_description() {
     local pipeline_script="$TEMP_DIR/scripts/sw-pipeline.sh"
+    local all_sources="$pipeline_script"
+    [[ -d "$TEMP_DIR/scripts/lib" ]] && all_sources="$all_sources $TEMP_DIR/scripts/lib/pipeline-*.sh"
 
-    if grep -q 'current_stage_description:' "$pipeline_script" 2>/dev/null; then
+    if grep -q 'current_stage_description:' $all_sources 2>/dev/null; then
         return 0
     fi
     echo -e "    ${RED}✗${RESET} Pipeline state missing current_stage_description field"

@@ -1090,12 +1090,6 @@ ${route_instruction}"
     fi
 }
 
-# ──────────────────────────────────────────────────────────────────────────────
-# Bash 3.2 Compatibility Check
-
-    echo "$untested_functions"
-}
-
 stage_compound_quality() {
     CURRENT_STAGE_ID="compound_quality"
 
