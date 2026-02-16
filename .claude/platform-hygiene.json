@@ -1,5 +1,5 @@
 {
-  "timestamp": "2026-02-16T19:19:40Z",
+  "timestamp": "2026-02-16T19:50:04Z",
   "repository": "shipwright",
   "counts": {
     "hardcoded": 58,
@@ -19,23 +19,23 @@
     },
     {
       "file": "scripts/sw-adaptive.sh",
-      "line": 700
+      "line": 691
     },
     {
       "file": "scripts/sw-adaptive.sh",
-      "line": 703
+      "line": 694
     },
     {
       "file": "scripts/sw-adaptive.sh",
-      "line": 829
+      "line": 820
     },
     {
       "file": "scripts/sw-adaptive.sh",
-      "line": 840
+      "line": 831
     },
     {
       "file": "scripts/sw-e2e-integration-test.sh",
-      "line": 864
+      "line": 855
     },
     {
       "file": "scripts/sw-scale.sh",
@@ -43,35 +43,35 @@
     },
     {
       "file": "scripts/sw-scale.sh",
-      "line": 163
+      "line": 173
     },
     {
       "file": "scripts/sw-scale.sh",
-      "line": 189
+      "line": 199
     },
     {
       "file": "scripts/sw-recruit.sh",
-      "line": 327
+      "line": 337
     },
     {
       "file": "scripts/sw-recruit.sh",
-      "line": 1079
+      "line": 1067
     },
     {
       "file": "scripts/sw-recruit.sh",
-      "line": 1601
+      "line": 1589
     },
     {
       "file": "scripts/sw-recruit.sh",
-      "line": 1724
+      "line": 1712
     },
     {
       "file": "scripts/sw-checkpoint.sh",
-      "line": 2018
+      "line": 2006
     },
     {
       "file": "scripts/sw-intelligence-test.sh",
-      "line": 388
+      "line": 400
     },
     {
       "file": "scripts/sw-regression.sh",
@@ -79,7 +79,7 @@
     },
     {
       "file": "scripts/sw-daemon-test.sh",
-      "line": 104
+      "line": 96
     },
     {
       "file": "scripts/sw-daemon-test.sh",
@@ -91,19 +91,19 @@
     },
     {
       "file": "scripts/sw-predictive.sh",
-      "line": 396
+      "line": 392
     },
     {
       "file": "scripts/sw-predictive.sh",
-      "line": 400
+      "line": 396
     },
     {
       "file": "scripts/sw-connect.sh",
-      "line": 429
+      "line": 425
     },
     {
       "file": "scripts/sw-pipeline.sh",
-      "line": 516
+      "line": 527
     },
     {
       "file": "scripts/sw-pipeline.sh",
@@ -117,11 +117,11 @@
     },
     {
       "script": "sw-daemon.sh",
-      "lines": 6104
+      "lines": 6115
     },
     {
       "script": "sw-recruit.sh",
-      "lines": 2626
+      "lines": 2618
     },
     {
       "script": "sw-loop.sh",
@@ -137,39 +137,39 @@
     },
     {
       "script": "sw-prep.sh",
-      "lines": 1646
+      "lines": 1657
     },
     {
       "script": "sw-memory.sh",
-      "lines": 1645
+      "lines": 1634
     },
     {
       "script": "sw-recruit-test.sh",
       "lines": 1399
     },
     {
-      "script": "sw-fleet.sh",
-      "lines": 1387
+      "script": "sw-db.sh",
+      "lines": 1390
     },
     {
-      "script": "sw-db.sh",
-      "lines": 1380
+      "script": "sw-fleet.sh",
+      "lines": 1377
     },
     {
       "script": "sw-intelligence.sh",
-      "lines": 1202
+      "lines": 1191
     },
     {
       "script": "sw-pipeline-vitals.sh",
-      "lines": 1096
-    },
-    {
-      "script": "sw-self-optimize.sh",
-      "lines": 1048
+      "lines": 1082
     },
     {
       "script": "sw-doctor.sh",
       "lines": 1045
+    },
+    {
+      "script": "sw-self-optimize.sh",
+      "lines": 1041
     }
   ]
 }
