@@ -7,7 +7,7 @@
 # When sourced, do NOT add set -euo pipefail — the parent handles that.
 # When run directly, main() sets up the error handling.
 
-VERSION="2.2.0"
+VERSION="2.2.1"
 
 # ─── Paths (set defaults if not provided by parent) ──────────────────────────
 SCRIPT_DIR="${SCRIPT_DIR:-$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)}"

@@ -666,11 +666,15 @@ test_stage_self_awareness_hint() {
 # ── 4.3 Pipeline: record_stage_effectiveness called on both complete/failed ──
 test_effectiveness_both_paths() {
     # mark_stage_complete calls record_stage_effectiveness (can be up to 15 lines in)
-    ( grep -A 15 'mark_stage_complete()' "$SCRIPT_DIR/sw-pipeline.sh" 2>/dev/null; grep -A 15 'mark_stage_complete()' "$SCRIPT_DIR"/lib/pipeline-*.sh 2>/dev/null ) | grep -q 'record_stage_effectiveness.*complete' || {
+    local _complete_ctx
+    _complete_ctx="$(grep -A 15 'mark_stage_complete()' "$SCRIPT_DIR/sw-pipeline.sh" 2>/dev/null || true; grep -A 15 'mark_stage_complete()' "$SCRIPT_DIR"/lib/pipeline-*.sh 2>/dev/null || true)"
+    echo "$_complete_ctx" | grep -q 'record_stage_effectiveness.*complete' || {
         echo "record_stage_effectiveness not called on mark_stage_complete"
         return 1
     }
-    ( grep -A 10 'mark_stage_failed()' "$SCRIPT_DIR/sw-pipeline.sh" 2>/dev/null; grep -A 10 'mark_stage_failed()' "$SCRIPT_DIR"/lib/pipeline-*.sh 2>/dev/null ) | grep -q 'record_stage_effectiveness.*failed' || {
+    local _failed_ctx
+    _failed_ctx="$(grep -A 10 'mark_stage_failed()' "$SCRIPT_DIR/sw-pipeline.sh" 2>/dev/null || true; grep -A 10 'mark_stage_failed()' "$SCRIPT_DIR"/lib/pipeline-*.sh 2>/dev/null || true)"
+    echo "$_failed_ctx" | grep -q 'record_stage_effectiveness.*failed' || {
         echo "record_stage_effectiveness not called on mark_stage_failed"
         return 1
     }

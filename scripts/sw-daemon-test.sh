@@ -1119,8 +1119,10 @@ ISSUE_NUMBER=""
 # Extract and include the real function from sw-pipeline.sh
 FEOF
 
-    # Extract the pipeline_adaptive_cycles function from the real pipeline
-    sed -n '/^pipeline_adaptive_cycles()/,/^}/p' "$(dirname "$DAEMON_SCRIPT")/sw-pipeline.sh" >> "$fns_script" 2>/dev/null
+    # Extract the pipeline_adaptive_cycles function from the real pipeline (or lib)
+    local _src_dir; _src_dir="$(dirname "$DAEMON_SCRIPT")"
+    sed -n '/^pipeline_adaptive_cycles()/,/^}/p' "$_src_dir/sw-pipeline.sh" >> "$fns_script" 2>/dev/null
+    sed -n '/^pipeline_adaptive_cycles()/,/^}/p' "$_src_dir"/lib/pipeline-*.sh >> "$fns_script" 2>/dev/null
 
     # Test 1: rapid convergence (10 issues → 3 issues, >50% drop) should extend by 1
     local result
@@ -1155,8 +1157,10 @@ SCRIPT_DIR="/nonexistent"
 ISSUE_NUMBER=""
 FEOF
 
-    # Extract the pipeline_adaptive_cycles function from the real pipeline
-    sed -n '/^pipeline_adaptive_cycles()/,/^}/p' "$(dirname "$DAEMON_SCRIPT")/sw-pipeline.sh" >> "$fns_script" 2>/dev/null
+    # Extract the pipeline_adaptive_cycles function from the real pipeline (or lib)
+    local _src_dir; _src_dir="$(dirname "$DAEMON_SCRIPT")"
+    sed -n '/^pipeline_adaptive_cycles()/,/^}/p' "$_src_dir/sw-pipeline.sh" >> "$fns_script" 2>/dev/null
+    sed -n '/^pipeline_adaptive_cycles()/,/^}/p' "$_src_dir"/lib/pipeline-*.sh >> "$fns_script" 2>/dev/null
 
     # Test: divergence (5 issues → 8 issues) should reduce limit by 1
     local result
@@ -1191,8 +1195,10 @@ SCRIPT_DIR="/nonexistent"
 ISSUE_NUMBER=""
 FEOF
 
-    # Extract the pipeline_adaptive_cycles function from the real pipeline
-    sed -n '/^pipeline_adaptive_cycles()/,/^}/p' "$(dirname "$DAEMON_SCRIPT")/sw-pipeline.sh" >> "$fns_script" 2>/dev/null
+    # Extract the pipeline_adaptive_cycles function from the real pipeline (or lib)
+    local _src_dir; _src_dir="$(dirname "$DAEMON_SCRIPT")"
+    sed -n '/^pipeline_adaptive_cycles()/,/^}/p' "$_src_dir/sw-pipeline.sh" >> "$fns_script" 2>/dev/null
+    sed -n '/^pipeline_adaptive_cycles()/,/^}/p' "$_src_dir"/lib/pipeline-*.sh >> "$fns_script" 2>/dev/null
 
     # Test: even with convergence, hard ceiling is 2x base (base=3 → max=6)
     local result
@@ -1228,8 +1234,10 @@ SCRIPT_DIR="/nonexistent"
 ISSUE_NUMBER=""
 FEOF
 
-    # Extract the pipeline_adaptive_cycles function from the real pipeline
-    sed -n '/^pipeline_adaptive_cycles()/,/^}/p' "$(dirname "$DAEMON_SCRIPT")/sw-pipeline.sh" >> "$fns_script" 2>/dev/null
+    # Extract the pipeline_adaptive_cycles function from the real pipeline (or lib)
+    local _src_dir; _src_dir="$(dirname "$DAEMON_SCRIPT")"
+    sed -n '/^pipeline_adaptive_cycles()/,/^}/p' "$_src_dir/sw-pipeline.sh" >> "$fns_script" 2>/dev/null
+    sed -n '/^pipeline_adaptive_cycles()/,/^}/p' "$_src_dir"/lib/pipeline-*.sh >> "$fns_script" 2>/dev/null
 
     # Test: on first cycle (no previous count), return base_limit unchanged
     local result
