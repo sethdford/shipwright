@@ -305,6 +305,59 @@ if [[ $_verify_fail -eq 0 ]]; then
     success "Verified: tmux config, overlay, TPM, and plugins all deployed"
 fi
 
+# ─── CLI Bootstrap (symlinks + PATH) ─────────────────────────────────────────
+# Install sw/shipwright/cct symlinks so the CLI works from anywhere
+BIN_DIR="$HOME/.local/bin"
+mkdir -p "$BIN_DIR"
+
+SW_SRC="$SCRIPT_DIR/sw"
+if [[ -f "$SW_SRC" ]]; then
+    _cli_changed=false
+    for _cmd in sw shipwright cct; do
+        _dest="$BIN_DIR/$_cmd"
+        if [[ -L "$_dest" ]] && [[ "$(readlink "$_dest")" == "$SW_SRC" ]]; then
+            continue
+        fi
+        ln -sf "$SW_SRC" "$_dest"
+        _cli_changed=true
+    done
+    if [[ "$_cli_changed" == "true" ]]; then
+        success "CLI symlinks: sw, shipwright, cct → $BIN_DIR"
+    else
+        success "CLI symlinks already correct"
+    fi
+fi
+
+# Ensure ~/.local/bin is in PATH via shell profile
+if ! echo "$PATH" | tr ':' '\n' | grep -qxF "$BIN_DIR"; then
+    _login_shell="$(basename "${SHELL:-/bin/zsh}")"
+    case "$_login_shell" in
+        zsh)  _rc="$HOME/.zshrc" ;;
+        bash)
+            if [[ -f "$HOME/.bash_profile" ]]; then _rc="$HOME/.bash_profile"
+            else _rc="$HOME/.bashrc"; fi
+            ;;
+        *)    _rc="$HOME/.profile" ;;
+    esac
+
+    _marker="# Added by Shipwright"
+    _line='export PATH="$HOME/.local/bin:$PATH"'
+
+    if [[ -f "$_rc" ]] && grep -qF "$_marker" "$_rc" 2>/dev/null; then
+        info "PATH already configured in $_rc"
+    else
+        if [[ -f "$_rc" ]]; then
+            printf '\n%s\n%s\n' "$_marker" "$_line" >> "$_rc"
+        else
+            printf '%s\n%s\n' "$_marker" "$_line" > "$_rc"
+        fi
+        success "Added ~/.local/bin to PATH in $_rc"
+    fi
+    export PATH="$BIN_DIR:$PATH"
+else
+    success "~/.local/bin already in PATH"
+fi
+
 # ─── Team Templates ──────────────────────────────────────────────────────────
 SHIPWRIGHT_DIR="$HOME/.shipwright"
 TEMPLATES_SRC="$REPO_DIR/tmux/templates"
@@ -338,18 +391,17 @@ fi
 
 # ─── Shell Completions ────────────────────────────────────────────────────────
 # Detect shell type and install completions to the correct location
+# Detect the user's login shell (not the script's running shell).
+# This script runs in bash, so $BASH_VERSION is always set — check $SHELL first.
 SHELL_TYPE=""
-if [[ -n "${ZSH_VERSION:-}" ]]; then
+if [[ "${SHELL:-}" == *"zsh"* ]]; then
+    SHELL_TYPE="zsh"
+elif [[ "${SHELL:-}" == *"bash"* ]]; then
+    SHELL_TYPE="bash"
+elif [[ -n "${ZSH_VERSION:-}" ]]; then
     SHELL_TYPE="zsh"
 elif [[ -n "${BASH_VERSION:-}" ]]; then
     SHELL_TYPE="bash"
-else
-    # Try to detect from $SHELL env var
-    if [[ "$SHELL" == *"zsh"* ]]; then
-        SHELL_TYPE="zsh"
-    elif [[ "$SHELL" == *"bash"* ]]; then
-        SHELL_TYPE="bash"
-    fi
 fi
 
 COMPLETIONS_SRC="$REPO_DIR/completions"
@@ -374,6 +426,10 @@ elif [[ "$SHELL_TYPE" == "zsh" ]]; then
                     echo "fpath+=~/.zsh/completions"
                 } >> "$HOME/.zshrc"
                 info "Added ~/.zsh/completions to fpath in ~/.zshrc"
+            fi
+            # Ensure compinit is present (needed for completions to work)
+            if ! grep -q "compinit" "$HOME/.zshrc" 2>/dev/null; then
+                echo "autoload -Uz compinit && compinit" >> "$HOME/.zshrc"
             fi
         else
             # Create minimal .zshrc with fpath

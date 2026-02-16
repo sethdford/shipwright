@@ -341,6 +341,13 @@ fi
 # Check sw subcommands are installed alongside the router
 if command -v sw &>/dev/null; then
     SW_DIR="$(dirname "$(command -v sw)")"
+    # Follow symlinks to find the actual scripts directory
+    _sw_path="$(command -v sw)"
+    if [[ -L "$_sw_path" ]]; then
+        _sw_real="$(readlink "$_sw_path")"
+        [[ "$_sw_real" != /* ]] && _sw_real="$(cd "$(dirname "$_sw_path")" && cd "$(dirname "$_sw_real")" && pwd)/$(basename "$_sw_real")"
+        SW_DIR="$(dirname "$_sw_real")"
+    fi
     check_pass "shipwright router found at ${SW_DIR}/sw"
 
     missing_subs=()
