@@ -7,6 +7,50 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ---
 
+## [2.3.0] — 2026-02-16
+
+**Fleet Command completeness overhaul + autonomous team oversight.**
+
+### Added
+
+- **Live diff/files panels** — Pipeline Theater and Agent Cockpit show real-time `git diff` and changed files (`GET /api/pipeline/:issue/diff`, `/files`)
+- **Agent reasoning tab** — Per-pipeline reasoning/thinking surfaced in pipeline detail (`GET /api/pipeline/:issue/reasoning`)
+- **Failure analysis tab** — Dedicated failure analysis view per pipeline (`GET /api/pipeline/:issue/failures`)
+- **Webhook notifications** — Configurable Slack/webhook alerts for pipeline completion, failure, and alerts with config UI in header
+- **Human approval gates** — Stage transitions can require human approval; approve/reject UI in pipeline detail
+- **Quality gates** — Configurable rules (test coverage, lint errors, type errors) displayed per pipeline (`GET /api/pipeline/:issue/quality`)
+- **Audit log** — All human interventions (pause, resume, abort, message, skip, emergency brake, daemon control) logged to `~/.shipwright/audit-log.jsonl` with who/when/action; viewable in Insights tab
+- **RBAC** — Viewer/operator/admin roles with permission enforcement; viewers see read-only UI
+- **Dark mode toggle** — Full light/dark theme switching via CSS custom properties with `localStorage` persistence
+- **Mobile responsive** — 12-tab bar horizontally scrollable on small screens, compressed header/layout
+- **Error boundaries** — Per-tab try-catch with visible error banner and retry button
+- **Offline resilience** — Stale data age indicator (30s threshold), connection-lost banner with manual reconnect
+- **Global learnings** — Insights tab shows `GET /api/memory/global` cross-pipeline learnings
+- **Triage reasoning** — Queue items expandable to show detailed triage reasoning from `/api/queue/detailed`
+- **Team invite UI** — Create invite link button on Team tab
+- **Linear integration status** — Team tab shows Linear/GitHub connection status
+- **Admin/debug panel** — Direct SQLite DB inspection via `/api/db/*` endpoints on Team tab
+- **Machine claim/release** — Issue claim/release UI for coordinating work among machines
+- **E2E test suite** — 15 new endpoint tests (37 total, all passing)
+
+### Fixed
+
+- **Daemon buttons** — Start/Stop/Patrol buttons wired via `addEventListener` (were dead `onclick` attributes)
+- **Select-all checkbox** — Pipeline select-all ID mismatch (`pipeline-select-all` vs `select-all-pipelines`) resolved
+- **Emergency brake counts** — Modal now shows live active/queue counts from fleet state
+- **Fleet map click** — Clicking a node navigates to that pipeline's detail view
+- **Predictions** — ETA/cost predictions use real historical stage durations instead of hardcoded averages
+- **Missing containers** — 7 missing metric container `div`s added to Metrics tab
+- **Pipeline sub-routes** — Fixed broad `/api/pipeline/` handler intercepting specific sub-routes (`/diff`, `/files`, etc.)
+
+### Changed
+
+- **Frontend** — Migrated from monolithic `app.js` to modular TypeScript (33 modules, 194KB bundle)
+- **Design system** — Full CSS custom property system with dark/light tokens
+- **Icons** — Lucide SVG icon library with 30+ inline icons
+
+---
+
 ## [2.2.2] — 2026-02-16
 
 **CLI release automation, doctor version check, CLAUDE.md maintainer section.**

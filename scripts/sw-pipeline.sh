@@ -11,7 +11,7 @@ unset CLAUDECODE 2>/dev/null || true
 # Ignore SIGHUP so tmux attach/detach doesn't kill long-running plan/design/review stages
 trap '' HUP
 
-VERSION="2.2.2"
+VERSION="2.3.0"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
 

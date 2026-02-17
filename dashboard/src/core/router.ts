@@ -67,17 +67,27 @@ export function switchTab(tab: TabId): void {
     }
   });
 
-  // Initialize the new view
+  // Initialize the new view with error boundary
   const view = views.get(tab);
   if (view && !initializedViews.has(tab)) {
-    view.init();
-    initializedViews.add(tab);
+    try {
+      view.init();
+      initializedViews.add(tab);
+    } catch (err) {
+      console.error(`[Error Boundary] Tab "${tab}" init failed:`, err);
+      showTabError(tab, err);
+    }
   }
 
   // Render with current data
   const fleetState = store.get("fleetState");
   if (fleetState && view) {
-    view.render(fleetState);
+    try {
+      view.render(fleetState);
+    } catch (err) {
+      console.error(`[Error Boundary] Tab "${tab}" render failed:`, err);
+      showTabError(tab, err);
+    }
   }
 }
 
@@ -87,12 +97,55 @@ export function renderActiveView(): void {
   const fleetState = store.get("fleetState");
   if (!view || !fleetState) return;
 
-  if (!initializedViews.has(tab)) {
-    view.init();
-    initializedViews.add(tab);
+  try {
+    if (!initializedViews.has(tab)) {
+      view.init();
+      initializedViews.add(tab);
+    }
+    view.render(fleetState);
+  } catch (err) {
+    console.error(`[Error Boundary] Tab "${tab}" render failed:`, err);
+    showTabError(tab, err);
   }
+}
 
-  view.render(fleetState);
+function showTabError(tab: TabId, err: unknown): void {
+  const panel = document.getElementById("panel-" + tab);
+  if (!panel) return;
+  const msg = err instanceof Error ? err.message : String(err);
+  const existing = panel.querySelector(".tab-error-boundary");
+  if (existing) return; // don't stack errors
+  const div = document.createElement("div");
+  div.className = "tab-error-boundary";
+  div.innerHTML =
+    `<div class="error-boundary-content">` +
+    `<span class="error-boundary-icon">\u26A0</span>` +
+    `<div><strong>This tab encountered an error</strong>` +
+    `<pre class="error-boundary-msg">${msg.replace(/</g, "&lt;")}</pre></div>` +
+    `<button class="btn-sm error-boundary-retry">Retry</button></div>`;
+  panel.prepend(div);
+  const retryBtn = div.querySelector(".error-boundary-retry");
+  if (retryBtn) {
+    retryBtn.addEventListener("click", () => {
+      div.remove();
+      initializedViews.delete(tab);
+      const v = views.get(tab);
+      if (v) {
+        try {
+          v.init();
+          initializedViews.add(tab);
+          const state = store.get("fleetState");
+          if (state) v.render(state);
+        } catch (retryErr) {
+          console.error(
+            `[Error Boundary] Retry failed for "${tab}":`,
+            retryErr,
+          );
+          showTabError(tab, retryErr);
+        }
+      }
+    });
+  }
 }
 
 export function setupRouter(): void {

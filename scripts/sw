@@ -5,7 +5,7 @@
 # ╚═══════════════════════════════════════════════════════════════════════════╝
 set -euo pipefail
 
-VERSION="2.2.2"
+VERSION="2.3.0"
 
 # Resolve symlinks (required for npm global install where bin/ symlinks to node_modules/)
 SOURCE="${BASH_SOURCE[0]}"

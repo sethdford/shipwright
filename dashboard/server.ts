@@ -268,6 +268,7 @@ interface Session {
   accessToken: string;
   avatarUrl: string;
   isAdmin: boolean;
+  role: "viewer" | "operator" | "admin";
   expiresAt: number;
 }
 
@@ -685,6 +686,192 @@ function accessDeniedHTML(repo: string): string {
   </div>
 </body>
 </html>`;
+}
+
+// ─── Notification / Webhook System ──────────────────────────────────
+const NOTIFICATIONS_CONFIG_FILE = join(
+  HOME,
+  ".shipwright",
+  "notifications.json",
+);
+
+interface NotificationConfig {
+  enabled: boolean;
+  webhooks: Array<{
+    url: string;
+    label: string;
+    events: string[]; // "pipeline.completed", "pipeline.failed", "alert", "all"
+    created_at: string;
+  }>;
+}
+
+function loadNotificationConfig(): NotificationConfig {
+  try {
+    if (existsSync(NOTIFICATIONS_CONFIG_FILE)) {
+      return JSON.parse(
+        readFileOr(
+          NOTIFICATIONS_CONFIG_FILE,
+          '{"enabled":false,"webhooks":[]}',
+        ),
+      );
+    }
+  } catch {}
+  return { enabled: false, webhooks: [] };
+}
+
+function saveNotificationConfig(config: NotificationConfig): void {
+  try {
+    const dir = join(HOME, ".shipwright");
+    if (!existsSync(dir)) mkdirSync(dir, { recursive: true });
+    const tmp = NOTIFICATIONS_CONFIG_FILE + ".tmp";
+    writeFileSync(tmp, JSON.stringify(config, null, 2));
+    renameSync(tmp, NOTIFICATIONS_CONFIG_FILE);
+  } catch {}
+}
+
+let lastNotifiedEvents = new Set<string>();
+
+async function sendNotifications(
+  eventType: string,
+  payload: Record<string, unknown>,
+): Promise<void> {
+  const config = loadNotificationConfig();
+  if (!config.enabled || config.webhooks.length === 0) return;
+
+  // Deduplicate: create a key from event type + issue + timestamp
+  const eventKey = `${eventType}:${payload.issue || ""}:${payload.ts || ""}`;
+  if (lastNotifiedEvents.has(eventKey)) return;
+  lastNotifiedEvents.add(eventKey);
+  // Trim to prevent memory leak
+  if (lastNotifiedEvents.size > 500) {
+    const arr = Array.from(lastNotifiedEvents);
+    lastNotifiedEvents = new Set(arr.slice(-250));
+  }
+
+  for (const webhook of config.webhooks) {
+    if (webhook.events.includes("all") || webhook.events.includes(eventType)) {
+      try {
+        await fetch(webhook.url, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            event: eventType,
+            timestamp: new Date().toISOString(),
+            ...payload,
+          }),
+        });
+      } catch {}
+    }
+  }
+}
+
+// Hook into event processing to detect new completions/failures
+let lastEventCount = 0;
+function checkAndNotifyNewEvents(): void {
+  const events = readEvents();
+  if (events.length <= lastEventCount) {
+    lastEventCount = events.length;
+    return;
+  }
+  const newEvents = events.slice(lastEventCount);
+  lastEventCount = events.length;
+
+  for (const evt of newEvents) {
+    const e = evt as Record<string, unknown>;
+    const type = String(e.type || "");
+    if (type === "pipeline.completed") {
+      const result =
+        e.result === "failure" ? "pipeline.failed" : "pipeline.completed";
+      sendNotifications(result, {
+        issue: e.issue,
+        result: e.result,
+        duration_s: e.duration_s,
+        ts: e.ts,
+      });
+    }
+    if (type.includes("failed") && !type.includes("pipeline")) {
+      sendNotifications("stage.failed", {
+        issue: e.issue,
+        stage: e.stage,
+        ts: e.ts,
+      });
+    }
+  }
+}
+
+// ─── RBAC (Role-Based Access Control) ───────────────────────────────
+const RBAC_CONFIG_FILE = join(HOME, ".shipwright", "rbac.json");
+
+interface RBACConfig {
+  default_role: "viewer" | "operator" | "admin";
+  users: Record<string, "viewer" | "operator" | "admin">;
+}
+
+function loadRBACConfig(): RBACConfig {
+  try {
+    if (existsSync(RBAC_CONFIG_FILE)) {
+      return JSON.parse(
+        readFileOr(RBAC_CONFIG_FILE, '{"default_role":"admin","users":{}}'),
+      );
+    }
+  } catch {}
+  return { default_role: "admin", users: {} };
+}
+
+function saveRBACConfig(config: RBACConfig): void {
+  try {
+    const dir = join(HOME, ".shipwright");
+    if (!existsSync(dir)) mkdirSync(dir, { recursive: true });
+    const tmp = RBAC_CONFIG_FILE + ".tmp";
+    writeFileSync(tmp, JSON.stringify(config, null, 2));
+    renameSync(tmp, RBAC_CONFIG_FILE);
+  } catch {}
+}
+
+function resolveUserRole(username: string): "viewer" | "operator" | "admin" {
+  const config = loadRBACConfig();
+  return config.users[username] || config.default_role;
+}
+
+// Role permissions: what each role can do
+const ROLE_PERMISSIONS = {
+  viewer: new Set(["read"]),
+  operator: new Set(["read", "intervene", "approve", "control-daemon"]),
+  admin: new Set([
+    "read",
+    "intervene",
+    "approve",
+    "control-daemon",
+    "configure",
+    "manage-users",
+  ]),
+};
+
+function hasPermission(
+  role: "viewer" | "operator" | "admin",
+  permission: string,
+): boolean {
+  return ROLE_PERMISSIONS[role]?.has(permission) ?? false;
+}
+
+// ─── Audit Log ──────────────────────────────────────────────────────
+const AUDIT_LOG_FILE = join(HOME, ".shipwright", "audit-log.jsonl");
+
+function appendAuditLog(
+  action: string,
+  details: Record<string, unknown>,
+): void {
+  try {
+    const dir = join(HOME, ".shipwright");
+    if (!existsSync(dir)) mkdirSync(dir, { recursive: true });
+    const entry = JSON.stringify({
+      ts: new Date().toISOString(),
+      ts_epoch: Math.floor(Date.now() / 1000),
+      action,
+      ...details,
+    });
+    appendFileSync(AUDIT_LOG_FILE, entry + "\n");
+  } catch {}
 }
 
 // ─── WebSocket client tracking ───────────────────────────────────────
@@ -1936,6 +2123,10 @@ function startEventsWatcher(): void {
         if (wsClients.size > 0) {
           broadcastToClients(getFleetState());
         }
+        // Check for new events and send notifications
+        if (filename === "events.jsonl") {
+          checkAndNotifyNewEvents();
+        }
       }
     });
   } catch {
@@ -2079,6 +2270,7 @@ async function handleAuthCallback(url: URL): Promise<Response> {
     accessToken,
     avatarUrl: user.avatar_url,
     isAdmin,
+    role: resolveUserRole(user.login),
   });
 
   return new Response(null, {
@@ -2160,6 +2352,7 @@ async function handlePatLogin(req: Request): Promise<Response> {
     accessToken: "", // PAT mode doesn't give per-user tokens
     avatarUrl,
     isAdmin,
+    role: resolveUserRole(username),
   });
 
   return new Response(null, {
@@ -2325,8 +2518,8 @@ const server = Bun.serve({
       });
     }
 
-    // REST: pipeline detail for a specific issue
-    if (pathname.startsWith("/api/pipeline/")) {
+    // REST: pipeline detail for a specific issue (only exact /api/pipeline/:num)
+    if (/^\/api\/pipeline\/\d+$/.test(pathname)) {
       const issueNum = parseInt(pathname.split("/")[3] || "0");
       if (!issueNum || isNaN(issueNum)) {
         return new Response(JSON.stringify({ error: "Invalid issue number" }), {
@@ -2553,6 +2746,7 @@ const server = Bun.serve({
               headers: { "Content-Type": "application/json", ...CORS_HEADERS },
             });
         }
+        appendAuditLog("intervention", { action, issue: issueNum, pid });
         return new Response(
           JSON.stringify({ ok: true, action, issue: issueNum }),
           { headers: { "Content-Type": "application/json", ...CORS_HEADERS } },
@@ -2576,7 +2770,12 @@ const server = Bun.serve({
     if (pathname === "/api/me") {
       if (!isAuthEnabled()) {
         return new Response(
-          JSON.stringify({ username: "local", avatarUrl: "", isAdmin: true }),
+          JSON.stringify({
+            username: "local",
+            avatarUrl: "",
+            isAdmin: true,
+            role: "admin",
+          }),
           { headers: { "Content-Type": "application/json", ...CORS_HEADERS } },
         );
       }
@@ -2592,12 +2791,107 @@ const server = Bun.serve({
           username: session.githubUser,
           avatarUrl: session.avatarUrl,
           isAdmin: session.isAdmin,
+          role: session.role || "admin",
         }),
         { headers: { "Content-Type": "application/json", ...CORS_HEADERS } },
       );
     }
 
     // ── Phase 1: Pipeline Deep-Dive endpoints ─────────────────────
+
+    // SSE: Live log streaming for a pipeline
+    if (pathname.match(/^\/api\/logs\/\d+\/stream$/)) {
+      const issueNum = parseInt(pathname.split("/")[3] || "0");
+      if (!issueNum || isNaN(issueNum)) {
+        return new Response(JSON.stringify({ error: "Invalid issue number" }), {
+          status: 400,
+          headers: { "Content-Type": "application/json", ...CORS_HEADERS },
+        });
+      }
+      const logFile = join(LOGS_DIR, `issue-${issueNum}.log`);
+      if (!existsSync(logFile)) {
+        return new Response(JSON.stringify({ error: "Log file not found" }), {
+          status: 404,
+          headers: { "Content-Type": "application/json", ...CORS_HEADERS },
+        });
+      }
+
+      // Stream the log file via SSE
+      let lastSize = 0;
+      const encoder = new TextEncoder();
+      let sseWatcher: ReturnType<typeof watch> | null = null;
+      let sseHeartbeat: ReturnType<typeof setInterval> | null = null;
+
+      const sseCleanup = () => {
+        if (sseWatcher) {
+          try {
+            sseWatcher.close();
+          } catch {}
+          sseWatcher = null;
+        }
+        if (sseHeartbeat) {
+          clearInterval(sseHeartbeat);
+          sseHeartbeat = null;
+        }
+      };
+
+      const stream = new ReadableStream({
+        start(controller) {
+          // Send existing content first
+          try {
+            const existing = readFileSync(logFile, "utf-8");
+            lastSize = existing.length;
+            const lines = stripAnsi(existing).split("\n");
+            for (const line of lines) {
+              controller.enqueue(encoder.encode(`data: ${line}\n\n`));
+            }
+          } catch {
+            /* ignore */
+          }
+
+          // Watch for new content
+          sseWatcher = watch(logFile, (_event) => {
+            try {
+              const content = readFileSync(logFile, "utf-8");
+              if (content.length > lastSize) {
+                const newContent = content.slice(lastSize);
+                lastSize = content.length;
+                const lines = stripAnsi(newContent).split("\n");
+                for (const line of lines) {
+                  if (line)
+                    controller.enqueue(encoder.encode(`data: ${line}\n\n`));
+                }
+              }
+            } catch {
+              /* file may have been removed */
+            }
+          });
+
+          controller.enqueue(encoder.encode(":ok\n\n"));
+
+          // Keep connection alive with periodic heartbeat
+          sseHeartbeat = setInterval(() => {
+            try {
+              controller.enqueue(encoder.encode(":\n\n"));
+            } catch {
+              sseCleanup();
+            }
+          }, 15000);
+        },
+        cancel() {
+          sseCleanup();
+        },
+      });
+
+      return new Response(stream, {
+        headers: {
+          "Content-Type": "text/event-stream",
+          "Cache-Control": "no-cache",
+          Connection: "keep-alive",
+          ...CORS_HEADERS,
+        },
+      });
+    }
 
     // REST: Pipeline build logs
     if (pathname.startsWith("/api/logs/")) {
@@ -2611,6 +2905,208 @@ const server = Bun.serve({
       const logFile = join(LOGS_DIR, `issue-${issueNum}.log`);
       const raw = readFileOr(logFile, "");
       return new Response(JSON.stringify({ content: stripAnsi(raw) }), {
+        headers: { "Content-Type": "application/json", ...CORS_HEADERS },
+      });
+    }
+
+    // REST: Pipeline live diff (git diff from worktree)
+    if (/^\/api\/pipeline\/\d+\/diff$/.test(pathname)) {
+      const issueNum = parseInt(pathname.split("/")[3] || "0");
+      if (!issueNum || isNaN(issueNum)) {
+        return new Response(JSON.stringify({ error: "Invalid issue" }), {
+          status: 400,
+          headers: { "Content-Type": "application/json", ...CORS_HEADERS },
+        });
+      }
+      const worktreeBase = findWorktreeBase(issueNum);
+      let diff = "";
+      let stats = { files_changed: 0, insertions: 0, deletions: 0 };
+      if (worktreeBase && existsSync(worktreeBase)) {
+        try {
+          diff = execSync(
+            "git diff HEAD --no-color 2>/dev/null || git diff --no-color 2>/dev/null || echo ''",
+            {
+              encoding: "utf-8",
+              timeout: 10000,
+              cwd: worktreeBase,
+            },
+          ).trim();
+          const statRaw = execSync(
+            "git diff HEAD --stat --no-color 2>/dev/null || echo ''",
+            {
+              encoding: "utf-8",
+              timeout: 10000,
+              cwd: worktreeBase,
+            },
+          ).trim();
+          const statMatch = statRaw.match(
+            /(\d+) files? changed(?:, (\d+) insertions?[^,]*)?(?:, (\d+) deletions?)?/,
+          );
+          if (statMatch) {
+            stats.files_changed = parseInt(statMatch[1]) || 0;
+            stats.insertions = parseInt(statMatch[2]) || 0;
+            stats.deletions = parseInt(statMatch[3]) || 0;
+          }
+        } catch {}
+      }
+      return new Response(
+        JSON.stringify({ diff, stats, worktree: worktreeBase || "" }),
+        {
+          headers: { "Content-Type": "application/json", ...CORS_HEADERS },
+        },
+      );
+    }
+
+    // REST: Pipeline changed files list
+    if (/^\/api\/pipeline\/\d+\/files$/.test(pathname)) {
+      const issueNum = parseInt(pathname.split("/")[3] || "0");
+      if (!issueNum || isNaN(issueNum)) {
+        return new Response(JSON.stringify({ error: "Invalid issue" }), {
+          status: 400,
+          headers: { "Content-Type": "application/json", ...CORS_HEADERS },
+        });
+      }
+      const worktreeBase = findWorktreeBase(issueNum);
+      let files: Array<{ path: string; status: string }> = [];
+      if (worktreeBase && existsSync(worktreeBase)) {
+        try {
+          const raw = execSync(
+            "git diff HEAD --name-status --no-color 2>/dev/null || echo ''",
+            {
+              encoding: "utf-8",
+              timeout: 10000,
+              cwd: worktreeBase,
+            },
+          ).trim();
+          if (raw) {
+            for (const line of raw.split("\n")) {
+              const parts = line.split("\t");
+              if (parts.length >= 2) {
+                const statusCode = parts[0].trim();
+                const filePath = parts.slice(1).join("\t");
+                const status =
+                  statusCode === "A"
+                    ? "added"
+                    : statusCode === "D"
+                      ? "deleted"
+                      : statusCode === "M"
+                        ? "modified"
+                        : statusCode;
+                files.push({ path: filePath, status });
+              }
+            }
+          }
+        } catch {}
+      }
+      return new Response(JSON.stringify({ files }), {
+        headers: { "Content-Type": "application/json", ...CORS_HEADERS },
+      });
+    }
+
+    // REST: Pipeline test results
+    if (/^\/api\/pipeline\/\d+\/test-results$/.test(pathname)) {
+      const issueNum = parseInt(pathname.split("/")[3] || "0");
+      const worktreeBase = findWorktreeBase(issueNum);
+      let testResults: Record<string, unknown> = { available: false };
+      if (worktreeBase) {
+        const resultsPath = join(
+          worktreeBase,
+          ".claude",
+          "pipeline-artifacts",
+          "test-results.json",
+        );
+        if (existsSync(resultsPath)) {
+          try {
+            testResults = JSON.parse(readFileOr(resultsPath, "{}"));
+            testResults.available = true;
+          } catch {}
+        }
+      }
+      return new Response(JSON.stringify(testResults), {
+        headers: { "Content-Type": "application/json", ...CORS_HEADERS },
+      });
+    }
+
+    // REST: Pipeline reasoning (agent thinking/summary per stage)
+    if (/^\/api\/pipeline\/\d+\/reasoning$/.test(pathname)) {
+      const issueNum = parseInt(pathname.split("/")[3] || "0");
+      const worktreeBase = findWorktreeBase(issueNum);
+      let reasoning: Array<Record<string, unknown>> = [];
+      if (worktreeBase) {
+        const artifactsDir = join(
+          worktreeBase,
+          ".claude",
+          "pipeline-artifacts",
+        );
+        // Look for reasoning.json or individual stage reasoning files
+        const reasoningPath = join(artifactsDir, "reasoning.json");
+        if (existsSync(reasoningPath)) {
+          try {
+            const raw = JSON.parse(readFileOr(reasoningPath, "[]"));
+            reasoning = Array.isArray(raw) ? raw : [raw];
+          } catch {}
+        }
+        // Also look for stage-specific reasoning files
+        for (const stage of [
+          "intake",
+          "plan",
+          "design",
+          "build",
+          "test",
+          "review",
+          "merge",
+        ]) {
+          const stagePath = join(artifactsDir, `${stage}-reasoning.md`);
+          if (existsSync(stagePath)) {
+            reasoning.push({
+              stage,
+              content: readFileOr(stagePath, ""),
+              type: "markdown",
+            });
+          }
+        }
+      }
+      return new Response(JSON.stringify({ reasoning }), {
+        headers: { "Content-Type": "application/json", ...CORS_HEADERS },
+      });
+    }
+
+    // REST: Pipeline failure analysis
+    if (/^\/api\/pipeline\/\d+\/failures$/.test(pathname)) {
+      const issueNum = parseInt(pathname.split("/")[3] || "0");
+      let failures: Array<Record<string, unknown>> = [];
+      // Check memory directory for this issue
+      const memDir = join(HOME, ".shipwright", "memory");
+      if (existsSync(memDir)) {
+        try {
+          const dirs = readdirSync(memDir);
+          for (const d of dirs) {
+            const failPath = join(memDir, d, "failures.json");
+            if (existsSync(failPath)) {
+              try {
+                const data = JSON.parse(readFileOr(failPath, "[]"));
+                const items = Array.isArray(data) ? data : [data];
+                for (const item of items) {
+                  if (item.issue === issueNum || !item.issue) {
+                    failures.push(item);
+                  }
+                }
+              } catch {}
+            }
+          }
+        } catch {}
+      }
+      // Also check events for stage failures
+      const events = readEvents();
+      for (const evt of events) {
+        if (
+          (evt as Record<string, unknown>).issue === issueNum &&
+          String((evt as Record<string, unknown>).type || "").includes("failed")
+        ) {
+          failures.push(evt as Record<string, unknown>);
+        }
+      }
+      return new Response(JSON.stringify({ failures }), {
         headers: { "Content-Type": "application/json", ...CORS_HEADERS },
       });
     }
@@ -3430,6 +3926,121 @@ const server = Bun.serve({
       });
     }
 
+    // REST: Predictions for a pipeline (ETA, success probability, cost estimate)
+    if (pathname.match(/^\/api\/predictions\/\d+$/) && req.method === "GET") {
+      const issueNum = parseInt(pathname.split("/")[3] || "0");
+      if (!issueNum || isNaN(issueNum)) {
+        return new Response(JSON.stringify({ error: "Invalid issue" }), {
+          status: 400,
+          headers: { "Content-Type": "application/json", ...CORS_HEADERS },
+        });
+      }
+
+      try {
+        const fleetState = getFleetState();
+        const pipeline = fleetState.pipelines?.find(
+          (p: any) => p.issue === issueNum,
+        );
+
+        if (!pipeline) {
+          return new Response(JSON.stringify({}), {
+            headers: { "Content-Type": "application/json", ...CORS_HEADERS },
+          });
+        }
+
+        // Compute predictions from real historical data
+        const metricsHistory = getMetricsHistory(30);
+        const successRate =
+          metricsHistory.success_rate != null
+            ? metricsHistory.success_rate / 100
+            : 0.8;
+        const stagesDone = pipeline.stagesDone?.length || 0;
+
+        // Use real per-stage durations for ETA calculation
+        const stageDurations = metricsHistory.stage_durations || {};
+        const allStages = [
+          "intake",
+          "plan",
+          "design",
+          "build",
+          "test",
+          "review",
+          "merge",
+        ];
+        const currentStageIdx = allStages.indexOf(pipeline.stage || "intake");
+        let remainingTime = 0;
+
+        // Sum average durations for stages not yet completed
+        for (let i = currentStageIdx; i < allStages.length; i++) {
+          const stageName = allStages[i];
+          const stageDur = stageDurations[stageName];
+          if (typeof stageDur === "number" && stageDur > 0) {
+            remainingTime += stageDur;
+          } else {
+            // Fallback: use overall average divided by stage count
+            const avgDuration = metricsHistory.avg_duration_s || 600;
+            remainingTime += avgDuration / allStages.length;
+          }
+        }
+
+        // For the current stage, subtract time already spent
+        if (pipeline.elapsed_s && stagesDone > 0) {
+          const completedDurs = pipeline.stagesDone || [];
+          let completedTime = 0;
+          for (const sd of completedDurs) {
+            completedTime += (sd as any).duration_s || 0;
+          }
+          const currentStageElapsed = Math.max(
+            0,
+            (pipeline.elapsed_s || 0) - completedTime,
+          );
+          remainingTime = Math.max(0, remainingTime - currentStageElapsed);
+        }
+
+        const eta_s = Math.max(0, Math.round(remainingTime));
+        const progressPct =
+          currentStageIdx >= 0 ? currentStageIdx / allStages.length : 0;
+
+        // Success probability: starts at historical rate, decreases with iterations
+        const iterRatio =
+          (pipeline.iteration || 0) / (pipeline.maxIterations || 20);
+        const success_probability = Math.max(
+          0.05,
+          successRate * (1 - iterRatio * 0.5),
+        );
+
+        // Cost estimate: use real historical average cost per pipeline
+        const costInfo = getCostInfo();
+        const totalCompleted =
+          (metricsHistory.total_completed || 0) +
+          (metricsHistory.total_failed || 0);
+        const avgCostPerPipeline =
+          totalCompleted > 0
+            ? (costInfo.total_spent || 0) / totalCompleted
+            : 2.5; // only fall back to 2.5 if no history at all
+        const estimated_cost =
+          avgCostPerPipeline * (1 - progressPct) + (pipeline.cost || 0);
+
+        return new Response(
+          JSON.stringify({
+            eta_s: Math.round(eta_s),
+            success_probability: Math.round(success_probability * 100) / 100,
+            estimated_cost: Math.round(estimated_cost * 100) / 100,
+          }),
+          {
+            headers: {
+              "Content-Type": "application/json",
+              ...CORS_HEADERS,
+            },
+          },
+        );
+      } catch (err) {
+        return new Response(JSON.stringify({}), {
+          headers: { "Content-Type": "application/json", ...CORS_HEADERS },
+        });
+      }
+    }
+
     // REST: Emergency brake — pause all active pipelines + clear queue
     if (pathname === "/api/emergency-brake" && req.method === "POST") {
       try {
@@ -3454,6 +4065,7 @@ const server = Bun.serve({
           queued = ((daemonState.queued as Array<unknown>) || []).length;
         }
 
+        appendAuditLog("emergency-brake", { paused, queued });
         return new Response(JSON.stringify({ paused, queued }), {
           headers: { "Content-Type": "application/json", ...CORS_HEADERS },
         });
@@ -3816,6 +4428,7 @@ const server = Bun.serve({
           timeout: 10000,
           stdio: "pipe",
         });
+        appendAuditLog("daemon-control", { action: "start" });
         return new Response(JSON.stringify({ ok: true, action: "started" }), {
           headers: { "Content-Type": "application/json", ...CORS_HEADERS },
         });
@@ -3903,6 +4516,477 @@ const server = Bun.serve({
           headers: { "Content-Type": "application/json", ...CORS_HEADERS },
         });
       }
+    }
+
+    // GET /api/notifications/config — Return notification configuration
+    if (pathname === "/api/notifications/config" && req.method === "GET") {
+      return new Response(JSON.stringify(loadNotificationConfig()), {
+        headers: { "Content-Type": "application/json", ...CORS_HEADERS },
+      });
+    }
+
+    // POST /api/notifications/config — Update notification configuration
+    if (pathname === "/api/notifications/config" && req.method === "POST") {
+      try {
+        const body = (await req.json()) as Partial<NotificationConfig>;
+        const current = loadNotificationConfig();
+        if (body.enabled !== undefined) current.enabled = body.enabled;
+        if (body.webhooks) current.webhooks = body.webhooks;
+        saveNotificationConfig(current);
+        return new Response(JSON.stringify({ ok: true, config: current }), {
+          headers: { "Content-Type": "application/json", ...CORS_HEADERS },
+        });
+      } catch (err) {
+        return new Response(JSON.stringify({ error: String(err) }), {
+          status: 400,
+          headers: { "Content-Type": "application/json", ...CORS_HEADERS },
+        });
+      }
+    }
+
+    // POST /api/notifications/webhook — Add a single webhook
+    if (pathname === "/api/notifications/webhook" && req.method === "POST") {
+      try {
+        const body = (await req.json()) as {
+          url: string;
+          label?: string;
+          events?: string[];
+        };
+        if (!body.url) throw new Error("url is required");
+        const config = loadNotificationConfig();
+        config.webhooks.push({
+          url: body.url,
+          label: body.label || new URL(body.url).hostname,
+          events: body.events || ["all"],
+          created_at: new Date().toISOString(),
+        });
+        config.enabled = true;
+        saveNotificationConfig(config);
+        return new Response(JSON.stringify({ ok: true }), {
+          headers: { "Content-Type": "application/json", ...CORS_HEADERS },
+        });
+      } catch (err) {
+        return new Response(JSON.stringify({ error: String(err) }), {
+          status: 400,
+          headers: { "Content-Type": "application/json", ...CORS_HEADERS },
+        });
+      }
+    }
+
+    // DELETE /api/notifications/webhook — Remove a webhook by URL
+    if (pathname === "/api/notifications/webhook" && req.method === "DELETE") {
+      try {
+        const body = (await req.json()) as { url: string };
+        const config = loadNotificationConfig();
+        config.webhooks = config.webhooks.filter((w) => w.url !== body.url);
+        if (config.webhooks.length === 0) config.enabled = false;
+        saveNotificationConfig(config);
+        return new Response(JSON.stringify({ ok: true }), {
+          headers: { "Content-Type": "application/json", ...CORS_HEADERS },
+        });
+      } catch (err) {
+        return new Response(JSON.stringify({ error: String(err) }), {
+          status: 400,
+          headers: { "Content-Type": "application/json", ...CORS_HEADERS },
+        });
+      }
+    }
+
+    // POST /api/notifications/test — Send a test notification
+    if (pathname === "/api/notifications/test" && req.method === "POST") {
+      await sendNotifications("test", {
+        message: "Test notification from Fleet Command",
+      });
+      return new Response(JSON.stringify({ ok: true }), {
+        headers: { "Content-Type": "application/json", ...CORS_HEADERS },
+      });
+    }
+
+    // ─── RBAC Management ──────────────────────────────────────────
+    // GET /api/rbac — Get RBAC configuration
+    if (pathname === "/api/rbac" && req.method === "GET") {
+      return new Response(JSON.stringify(loadRBACConfig()), {
+        headers: { "Content-Type": "application/json", ...CORS_HEADERS },
+      });
+    }
+
+    // POST /api/rbac — Update RBAC configuration
+    if (pathname === "/api/rbac" && req.method === "POST") {
+      try {
+        const body = (await req.json()) as Partial<RBACConfig>;
+        const current = loadRBACConfig();
+        if (body.default_role) current.default_role = body.default_role;
+        if (body.users) current.users = { ...current.users, ...body.users };
+        saveRBACConfig(current);
+        appendAuditLog("rbac-update", { changes: body });
+        return new Response(JSON.stringify({ ok: true, config: current }), {
+          headers: { "Content-Type": "application/json", ...CORS_HEADERS },
+        });
+      } catch (err) {
+        return new Response(JSON.stringify({ error: String(err) }), {
+          status: 400,
+          headers: { "Content-Type": "application/json", ...CORS_HEADERS },
+        });
+      }
+    }
+
+    // ─── Audit Log ────────────────────────────────────────────────
+    // GET /api/audit-log — Read audit log entries
+    if (pathname === "/api/audit-log" && req.method === "GET") {
+      const entries: Array<Record<string, unknown>> = [];
+      if (existsSync(AUDIT_LOG_FILE)) {
+        try {
+          const content = readFileOr(AUDIT_LOG_FILE, "").trim();
+          if (content) {
+            for (const line of content.split("\n")) {
+              try {
+                entries.push(JSON.parse(line));
+              } catch {}
+            }
+          }
+        } catch {}
+      }
+      // Return newest first, limit to 100
+      entries.reverse();
+      return new Response(JSON.stringify({ entries: entries.slice(0, 100) }), {
+        headers: { "Content-Type": "application/json", ...CORS_HEADERS },
+      });
+    }
+
+    // ─── Approval Gates ──────────────────────────────────────────────
+    // GET /api/approval-gates — Get approval gate configuration
+    if (pathname === "/api/approval-gates" && req.method === "GET") {
+      const configPath = join(HOME, ".shipwright", "approval-gates.json");
+      const config = existsSync(configPath)
+        ? JSON.parse(
+            readFileOr(
+              configPath,
+              '{"enabled":false,"stages":[],"pending":[]}',
+            ),
+          )
+        : { enabled: false, stages: [], pending: [] };
+      return new Response(JSON.stringify(config), {
+        headers: { "Content-Type": "application/json", ...CORS_HEADERS },
+      });
+    }
+
+    // POST /api/approval-gates — Update gate configuration
+    if (pathname === "/api/approval-gates" && req.method === "POST") {
+      try {
+        const body = (await req.json()) as Record<string, unknown>;
+        const configPath = join(HOME, ".shipwright", "approval-gates.json");
+        const current = existsSync(configPath)
+          ? JSON.parse(
+              readFileOr(
+                configPath,
+                '{"enabled":false,"stages":[],"pending":[]}',
+              ),
+            )
+          : { enabled: false, stages: [], pending: [] };
+        if (body.enabled !== undefined) current.enabled = body.enabled;
+        if (body.stages) current.stages = body.stages;
+        const dir = join(HOME, ".shipwright");
+        if (!existsSync(dir)) mkdirSync(dir, { recursive: true });
+        const tmp = configPath + ".tmp";
+        writeFileSync(tmp, JSON.stringify(current, null, 2));
+        renameSync(tmp, configPath);
+        return new Response(JSON.stringify({ ok: true, config: current }), {
+          headers: { "Content-Type": "application/json", ...CORS_HEADERS },
+        });
+      } catch (err) {
+        return new Response(JSON.stringify({ error: String(err) }), {
+          status: 400,
+          headers: { "Content-Type": "application/json", ...CORS_HEADERS },
+        });
+      }
+    }
+
+    // POST /api/approval-gates/:issue/approve — Approve a stage transition
+    if (
+      /^\/api\/approval-gates\/\d+\/approve$/.test(pathname) &&
+      req.method === "POST"
+    ) {
+      const issueNum = parseInt(pathname.split("/")[3] || "0");
+      try {
+        const body = (await req.json()) as {
+          stage?: string;
+          approver?: string;
+        };
+        const configPath = join(HOME, ".shipwright", "approval-gates.json");
+        const current = existsSync(configPath)
+          ? JSON.parse(
+              readFileOr(
+                configPath,
+                '{"enabled":false,"stages":[],"pending":[]}',
+              ),
+            )
+          : { enabled: false, stages: [], pending: [] };
+        // Remove from pending
+        current.pending = (current.pending || []).filter(
+          (p: any) =>
+            !(p.issue === issueNum && (!body.stage || p.stage === body.stage)),
+        );
+        // Write approval signal to worktree
+        const worktreeBase = findWorktreeBase(issueNum);
+        if (worktreeBase) {
+          const artifactsDir = join(
+            worktreeBase,
+            ".claude",
+            "pipeline-artifacts",
+          );
+          if (!existsSync(artifactsDir))
+            mkdirSync(artifactsDir, { recursive: true });
+          writeFileSync(
+            join(artifactsDir, "human-approval.txt"),
+            JSON.stringify({
+              approved: true,
+              stage: body.stage,
+              approver: body.approver || "dashboard-user",
+              timestamp: new Date().toISOString(),
+            }),
+          );
+        }
+        const dir = join(HOME, ".shipwright");
+        if (!existsSync(dir)) mkdirSync(dir, { recursive: true });
+        const tmp = configPath + ".tmp";
+        writeFileSync(tmp, JSON.stringify(current, null, 2));
+        renameSync(tmp, configPath);
+        // Log the approval for audit
+        appendAuditLog("approval", {
+          issue: issueNum,
+          stage: body.stage,
+          approver: body.approver || "dashboard-user",
+        });
+        return new Response(JSON.stringify({ ok: true }), {
+          headers: { "Content-Type": "application/json", ...CORS_HEADERS },
+        });
+      } catch (err) {
+        return new Response(JSON.stringify({ error: String(err) }), {
+          status: 400,
+          headers: { "Content-Type": "application/json", ...CORS_HEADERS },
+        });
+      }
+    }
+
+    // POST /api/approval-gates/:issue/reject — Reject a stage transition
+    if (
+      /^\/api\/approval-gates\/\d+\/reject$/.test(pathname) &&
+      req.method === "POST"
+    ) {
+      const issueNum = parseInt(pathname.split("/")[3] || "0");
+      try {
+        const body = (await req.json()) as {
+          stage?: string;
+          reason?: string;
+          approver?: string;
+        };
+        const configPath = join(HOME, ".shipwright", "approval-gates.json");
+        const current = existsSync(configPath)
+          ? JSON.parse(
+              readFileOr(
+                configPath,
+                '{"enabled":false,"stages":[],"pending":[]}',
+              ),
+            )
+          : { enabled: false, stages: [], pending: [] };
+        current.pending = (current.pending || []).filter(
+          (p: any) =>
+            !(p.issue === issueNum && (!body.stage || p.stage === body.stage)),
+        );
+        // Write rejection signal
+        const worktreeBase = findWorktreeBase(issueNum);
+        if (worktreeBase) {
+          const artifactsDir = join(
+            worktreeBase,
+            ".claude",
+            "pipeline-artifacts",
+          );
+          if (!existsSync(artifactsDir))
+            mkdirSync(artifactsDir, { recursive: true });
+          writeFileSync(
+            join(artifactsDir, "human-approval.txt"),
+            JSON.stringify({
+              approved: false,
+              stage: body.stage,
+              reason: body.reason,
+              approver: body.approver || "dashboard-user",
+              timestamp: new Date().toISOString(),
+            }),
+          );
+        }
+        const dir = join(HOME, ".shipwright");
+        if (!existsSync(dir)) mkdirSync(dir, { recursive: true });
+        const tmp = configPath + ".tmp";
+        writeFileSync(tmp, JSON.stringify(current, null, 2));
+        renameSync(tmp, configPath);
+        appendAuditLog("rejection", {
+          issue: issueNum,
+          stage: body.stage,
+          reason: body.reason,
+        });
+        return new Response(JSON.stringify({ ok: true }), {
+          headers: { "Content-Type": "application/json", ...CORS_HEADERS },
+        });
+      } catch (err) {
+        return new Response(JSON.stringify({ error: String(err) }), {
+          status: 400,
+          headers: { "Content-Type": "application/json", ...CORS_HEADERS },
+        });
+      }
+    }
+
+    // ─── Quality Gates ─────────────────────────────────────────────
+    // GET /api/quality-gates — Get quality gate configuration
+    if (pathname === "/api/quality-gates" && req.method === "GET") {
+      const configPath = join(HOME, ".shipwright", "quality-gates.json");
+      const config = existsSync(configPath)
+        ? JSON.parse(readFileOr(configPath, '{"enabled":false,"rules":[]}'))
+        : {
+            enabled: false,
+            rules: [
+              {
+                name: "test_coverage",
+                operator: ">=",
+                threshold: 80,
+                unit: "%",
+              },
+              {
+                name: "lint_errors",
+                operator: "<=",
+                threshold: 0,
+                unit: "errors",
+              },
+              {
+                name: "type_errors",
+                operator: "<=",
+                threshold: 0,
+                unit: "errors",
+              },
+            ],
+          };
+      return new Response(JSON.stringify(config), {
+        headers: { "Content-Type": "application/json", ...CORS_HEADERS },
+      });
+    }
+
+    // POST /api/quality-gates — Update quality gate configuration
+    if (pathname === "/api/quality-gates" && req.method === "POST") {
+      try {
+        const body = (await req.json()) as Record<string, unknown>;
+        const configPath = join(HOME, ".shipwright", "quality-gates.json");
+        const dir = join(HOME, ".shipwright");
+        if (!existsSync(dir)) mkdirSync(dir, { recursive: true });
+        const tmp = configPath + ".tmp";
+        writeFileSync(tmp, JSON.stringify(body, null, 2));
+        renameSync(tmp, configPath);
+        return new Response(JSON.stringify({ ok: true }), {
+          headers: { "Content-Type": "application/json", ...CORS_HEADERS },
+        });
+      } catch (err) {
+        return new Response(JSON.stringify({ error: String(err) }), {
+          status: 400,
+          headers: { "Content-Type": "application/json", ...CORS_HEADERS },
+        });
+      }
+    }
+
+    // GET /api/pipeline/:issue/quality — Get quality metrics for a pipeline
+    if (
+      /^\/api\/pipeline\/\d+\/quality$/.test(pathname) &&
+      req.method === "GET"
+    ) {
+      const issueNum = parseInt(pathname.split("/")[3] || "0");
+      const worktreeBase = findWorktreeBase(issueNum);
+      const quality: Record<string, unknown> = {
+        test_coverage: null,
+        lint_errors: null,
+        type_errors: null,
+        tests_passing: null,
+        tests_total: null,
+      };
+
+      if (worktreeBase) {
+        // Check for quality metrics in artifacts
+        const artifactsDir = join(
+          worktreeBase,
+          ".claude",
+          "pipeline-artifacts",
+        );
+
+        // Test results
+        const testResultsPath = join(artifactsDir, "test-results.json");
+        if (existsSync(testResultsPath)) {
+          try {
+            const tr = JSON.parse(readFileOr(testResultsPath, "{}"));
+            quality.tests_passing = tr.passing ?? tr.numPassed ?? null;
+            quality.tests_total = tr.total ?? tr.numTests ?? null;
+            quality.test_coverage = tr.coverage ?? null;
+          } catch {}
+        }
+
+        // Coverage file
+        const coveragePath = join(artifactsDir, "coverage.json");
+        if (existsSync(coveragePath) && quality.test_coverage === null) {
+          try {
+            const cov = JSON.parse(readFileOr(coveragePath, "{}"));
+            quality.test_coverage =
+              cov.total?.lines?.pct ?? cov.percentage ?? null;
+          } catch {}
+        }
+
+        // Lint results
+        const lintPath = join(artifactsDir, "lint-results.json");
+        if (existsSync(lintPath)) {
+          try {
+            const lint = JSON.parse(readFileOr(lintPath, "{}"));
+            quality.lint_errors = lint.errorCount ?? lint.errors ?? null;
+          } catch {}
+        }
+
+        // Type check results
+        const typePath = join(artifactsDir, "type-check.json");
+        if (existsSync(typePath)) {
+          try {
+            const types = JSON.parse(readFileOr(typePath, "{}"));
+            quality.type_errors = types.errorCount ?? types.errors ?? null;
+          } catch {}
+        }
+      }
+
+      // Check quality rules
+      const configPath = join(HOME, ".shipwright", "quality-gates.json");
+      const gateConfig = existsSync(configPath)
+        ? JSON.parse(readFileOr(configPath, '{"enabled":false,"rules":[]}'))
+        : { enabled: false, rules: [] };
+
+      const results: Array<Record<string, unknown>> = [];
+      if (gateConfig.enabled && gateConfig.rules) {
+        for (const rule of gateConfig.rules) {
+          const value = quality[rule.name as string];
+          let passed = true;
+          if (value !== null && value !== undefined) {
+            const numVal = Number(value);
+            if (rule.operator === ">=" && numVal < rule.threshold)
+              passed = false;
+            if (rule.operator === "<=" && numVal > rule.threshold)
+              passed = false;
+            if (rule.operator === ">" && numVal <= rule.threshold)
+              passed = false;
+            if (rule.operator === "<" && numVal >= rule.threshold)
+              passed = false;
+          } else {
+            passed = true; // Can't evaluate = pass by default
+          }
+          results.push({ ...rule, value, passed });
+        }
+      }
+
+      return new Response(
+        JSON.stringify({ quality, gates: gateConfig, results }),
+        {
+          headers: { "Content-Type": "application/json", ...CORS_HEADERS },
+        },
+      );
     }
 
     // GET /api/daemon/config — Return daemon configuration

@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # ╔═══════════════════════════════════════════════════════════════════════════╗
 # ║  shipwright dashboard smoke test — validates dashboard structure        ║
-# ║  Checks server.ts, public/, routes, and syntax. No server startup.       ║
+# ║  Checks server.ts, public/, TypeScript src/, routes, and builds.        ║
 # ╚═══════════════════════════════════════════════════════════════════════════╝
 set -euo pipefail
 trap 'echo "ERROR: $BASH_SOURCE:$LINENO exited with status $?" >&2' ERR
@@ -12,7 +12,9 @@ DASHBOARD_DIR="$REPO_DIR/dashboard"
 SERVER_TS="$DASHBOARD_DIR/server.ts"
 PUBLIC_DIR="$DASHBOARD_DIR/public"
 INDEX_HTML="$PUBLIC_DIR/index.html"
-APP_JS="$PUBLIC_DIR/app.js"
+SRC_DIR="$DASHBOARD_DIR/src"
+MAIN_TS="$SRC_DIR/main.ts"
+TSCONFIG="$DASHBOARD_DIR/tsconfig.json"
 
 # ─── Colors (matches shipwright theme) ─────────────────────────────────────
 CYAN='\033[38;2;0;212;255m'
@@ -111,7 +113,6 @@ test_server_ts_exists() {
 }
 
 test_server_ts_valid_syntax_basic() {
-    # Basic syntax: must have valid import/export and no obvious parse errors
     assert_file_contains "$SERVER_TS" "^import " "has import statement" &&
     assert_file_contains "$SERVER_TS" "fetch\(req" "has fetch handler"
 }
@@ -124,8 +125,29 @@ test_index_html_exists() {
     assert_file_exists "$INDEX_HTML" "index.html exists"
 }
 
-test_app_js_exists() {
-    assert_file_exists "$APP_JS" "app.js exists"
+test_html_references_bundle() {
+    assert_file_contains "$INDEX_HTML" 'dist/main\.js' "HTML references dist/main.js"
+}
+
+test_src_dir_exists() {
+    assert_dir_exists "$SRC_DIR" "src/ directory exists"
+}
+
+test_main_ts_exists() {
+    assert_file_exists "$MAIN_TS" "main.ts entry point exists"
+}
+
+test_tsconfig_exists() {
+    assert_file_exists "$TSCONFIG" "tsconfig.json exists"
+}
+
+test_src_modules_exist() {
+    assert_dir_exists "$SRC_DIR/core" "src/core/ exists" &&
+    assert_dir_exists "$SRC_DIR/views" "src/views/ exists" &&
+    assert_dir_exists "$SRC_DIR/components" "src/components/ exists" &&
+    assert_dir_exists "$SRC_DIR/design" "src/design/ exists" &&
+    assert_dir_exists "$SRC_DIR/types" "src/types/ exists" &&
+    assert_dir_exists "$SRC_DIR/canvas" "src/canvas/ exists"
 }
 
 test_server_exports_api_routes() {
@@ -153,8 +175,32 @@ test_bun_check_passes() {
     return 1
 }
 
-test_html_references_app_js() {
-    assert_file_contains "$INDEX_HTML" 'app\.js' "HTML references app.js"
+test_frontend_build() {
+    if ! command -v bun &>/dev/null; then
+        echo -e "    ${DIM}(bun not installed, skipping)${RESET}"
+        return 0
+    fi
+    if bun build "$MAIN_TS" --target=browser --outdir="$PUBLIC_DIR/dist" --sourcemap=linked &>/dev/null; then
+        return 0
+    fi
+    echo -e "    ${RED}✗${RESET} bun build failed on frontend main.ts"
+    return 1
+}
+
+test_typescript_check() {
+    if ! command -v npx &>/dev/null; then
+        echo -e "    ${DIM}(npx not available, skipping)${RESET}"
+        return 0
+    fi
+    if ! [[ -d "$REPO_DIR/node_modules/typescript" ]]; then
+        echo -e "    ${DIM}(typescript not installed, skipping)${RESET}"
+        return 0
+    fi
+    if npx tsc --noEmit --project "$TSCONFIG" 2>/dev/null; then
+        return 0
+    fi
+    echo -e "    ${RED}✗${RESET} TypeScript type check failed"
+    return 1
 }
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -170,7 +216,10 @@ run_test "server.ts exists" test_server_ts_exists
 run_test "server.ts has valid structure (imports, fetch)" test_server_ts_valid_syntax_basic
 run_test "public/ directory exists" test_public_dir_exists
 run_test "index.html exists" test_index_html_exists
-run_test "app.js exists" test_app_js_exists
+run_test "src/ directory exists" test_src_dir_exists
+run_test "main.ts entry point exists" test_main_ts_exists
+run_test "tsconfig.json exists" test_tsconfig_exists
+run_test "src/ modules exist (core, views, components, design, types, canvas)" test_src_modules_exist
 echo ""
 
 echo -e "${PURPLE}${BOLD}Routes${RESET}"
@@ -180,7 +229,9 @@ echo ""
 
 echo -e "${PURPLE}${BOLD}Integrity${RESET}"
 run_test "bun check passes (if bun available)" test_bun_check_passes
-run_test "index.html references app.js" test_html_references_app_js
+run_test "index.html references dist/main.js" test_html_references_bundle
+run_test "Frontend bundle builds (if bun available)" test_frontend_build
+run_test "TypeScript type check passes (if tsc available)" test_typescript_check
 echo ""
 
 # ═══════════════════════════════════════════════════════════════════════════════

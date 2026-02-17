@@ -1,10 +1,12 @@
 // Shared TypeScript interfaces for all API responses
+// These types mirror the actual shapes returned by dashboard/server.ts
 
 export interface DaemonInfo {
   running: boolean;
+  pid: number | null;
+  uptime_s: number;
   maxParallel: number;
-  watchLabel?: string;
-  paused?: boolean;
+  pollInterval: number;
 }
 
 export interface PipelineInfo {
@@ -12,15 +14,15 @@ export interface PipelineInfo {
   title: string;
   stage: string;
   stagesDone: string[];
-  status: string;
   elapsed_s: number;
+  worktree?: string;
   iteration: number;
   maxIterations: number;
   linesWritten?: number;
-  testsPassing?: boolean | null;
-  worktree?: string;
+  testsPassing?: boolean;
   cost?: number;
   branch?: string;
+  status?: string;
 }
 
 export interface QueueItem {
@@ -54,6 +56,8 @@ export interface EventItem {
 }
 
 export interface ScaleInfo {
+  from?: number;
+  to?: number;
   cpuCores?: number;
   maxByCpu?: number;
   maxByMem?: number;
@@ -67,39 +71,54 @@ export interface MetricsSummary {
   cpuCores?: number;
 }
 
+export interface CostInfo {
+  today_spent: number;
+  daily_budget: number;
+  pct_used: number;
+}
+
+export interface DoraMetric {
+  value: number;
+  unit: string;
+  grade: string;
+}
+
+export interface DoraGrades {
+  deploy_freq: DoraMetric;
+  lead_time: DoraMetric;
+  cfr: DoraMetric;
+  mttr: DoraMetric;
+}
+
+export interface AgentInfo {
+  id: string;
+  issue: number;
+  title: string;
+  machine: string;
+  stage: string;
+  iteration: number;
+  activity: string;
+  memory_mb: number;
+  cpu_pct: number;
+  status: "active" | "idle" | "stale" | "dead";
+  heartbeat_age_s: number;
+  started_at: string;
+  elapsed_s: number;
+}
+
 export interface FleetState {
+  timestamp: string;
   daemon: DaemonInfo;
   pipelines: PipelineInfo[];
   queue: QueueItem[];
   events: EventItem[];
   scale: ScaleInfo;
   metrics: MetricsSummary;
-  agents?: AgentInfo[];
-  cost?: CostInfo;
+  agents: AgentInfo[];
+  machines: MachineInfo[];
+  cost: CostInfo;
+  dora: DoraGrades;
   team?: TeamData;
-}
-
-export interface AgentInfo {
-  issue: number;
-  title?: string;
-  stage: string;
-  status: string;
-  elapsed_s?: number;
-  cpu?: number;
-  memory?: number;
-  pid?: number;
-  worktree?: string;
-  lastActivity?: string;
-  selfHealing?: boolean;
-  iteration?: number;
-  maxIterations?: number;
-}
-
-export interface CostInfo {
-  total_24h?: number;
-  budget_remaining?: number;
-  daily_limit?: number;
-  burn_rate?: number;
 }
 
 export interface CostBreakdown {
@@ -110,70 +129,54 @@ export interface CostBreakdown {
   spent?: number;
 }
 
+export interface StageHistoryEntry {
+  stage: string;
+  duration_s: number;
+  ts: string;
+}
+
 export interface PipelineDetail {
   issue: number;
   title: string;
   stage: string;
-  stagesDone: string[];
-  status: string;
+  stageHistory: StageHistoryEntry[];
+  plan: string;
+  design: string;
+  dod: string;
+  intake: Record<string, unknown> | null;
   elapsed_s: number;
-  iteration: number;
-  maxIterations: number;
-  plan?: string;
-  design?: string;
-  dod?: string;
-  worktree?: string;
-  branch?: string;
-  cost?: number;
-  linesWritten?: number;
-  testsPassing?: boolean | null;
-  stages?: StageDetail[];
-}
-
-export interface StageDetail {
-  name: string;
-  status: string;
-  duration_s?: number;
-  started_at?: string;
-  completed_at?: string;
+  branch: string;
+  prLink: string;
 }
 
 export interface TimelineEntry {
   issue: number;
-  title?: string;
-  start: string;
-  end?: string;
-  stages: TimelineStage[];
-  status: string;
+  title: string;
+  segments: TimelineSegment[];
 }
 
-export interface TimelineStage {
-  name: string;
+export interface TimelineSegment {
+  stage: string;
   start: string;
-  end?: string;
-  status: string;
+  end: string | null;
+  status: "complete" | "running" | "failed";
 }
 
 export interface MetricsData {
   success_rate: number;
   avg_duration_s: number;
+  throughput_per_hour: number;
   total_completed: number;
   total_failed: number;
+  stage_durations: Record<string, number>;
   daily_counts: DailyCount[];
-  stage_breakdown: StageBreakdownItem[];
-  dora?: DoraMetrics;
+  dora_grades: DoraGrades;
 }
 
 export interface DailyCount {
   date: string;
   completed: number;
   failed: number;
-}
-
-export interface StageBreakdownItem {
-  stage: string;
-  avg_s: number;
-  count: number;
 }
 
 export interface DoraMetrics {
@@ -183,26 +186,24 @@ export interface DoraMetrics {
   mttr?: DoraMetric;
 }
 
-export interface DoraMetric {
-  grade: string;
-  value: number;
-  unit: string;
-}
-
 export interface MachineInfo {
   name: string;
   host: string;
   role: string;
-  status: string;
   max_workers: number;
   active_workers: number;
+  registered_at: string;
+  ssh_user?: string;
+  shipwright_path?: string;
+  status: "online" | "degraded" | "offline";
   health: MachineHealth;
+  join_token?: string;
 }
 
 export interface MachineHealth {
-  daemon_running?: boolean;
-  heartbeat_count?: number;
-  last_heartbeat_s_ago?: number;
+  daemon_running: boolean;
+  heartbeat_count: number;
+  last_heartbeat_s_ago: number;
 }
 
 export interface JoinToken {
@@ -217,6 +218,7 @@ export interface InsightsData {
   decisions: Decision[] | null;
   patrol: PatrolFinding[] | null;
   heatmap: HeatmapData | null;
+  globalLearnings: Array<Record<string, unknown>> | null;
 }
 
 export interface FailurePattern {
@@ -248,24 +250,15 @@ export interface PatrolFinding {
   file?: string;
 }
 
+// Heatmap from server: { heatmap: Record<stage, Record<date, count>> }
 export interface HeatmapData {
-  stages: string[];
-  days: string[];
-  cells: Record<string, number>;
+  heatmap: Record<string, Record<string, number>>;
 }
 
 export interface DaemonConfig {
   paused?: boolean;
-  config?: {
-    watch_label?: string;
-    max_workers?: number;
-    poll_interval?: number;
-    patrol?: { interval?: number };
-  };
-  budget?: {
-    remaining?: number;
-    daily_limit?: number;
-  };
+  config?: Record<string, unknown>;
+  budget?: Record<string, unknown>;
 }
 
 export interface AlertInfo {
@@ -273,6 +266,7 @@ export interface AlertInfo {
   message: string;
   type?: string;
   issue?: number;
+  actions?: string[];
 }
 
 export interface TeamData {
@@ -285,9 +279,14 @@ export interface TeamData {
 export interface TeamDeveloper {
   developer_id: string;
   machine_name: string;
+  hostname?: string;
+  platform?: string;
+  last_heartbeat?: number;
   daemon_running: boolean;
-  active_jobs: Array<{ issue: number; stage?: string }>;
-  queued: Array<{ issue: number }>;
+  daemon_pid?: number | null;
+  active_jobs: Array<{ issue: number; title?: string; stage?: string }>;
+  queued: number[];
+  events_since?: number;
   _presence?: string;
 }
 
@@ -311,9 +310,10 @@ export interface StagePerformance {
 }
 
 export interface UserInfo {
-  name?: string;
   username?: string;
-  avatar_url?: string;
+  avatarUrl?: string;
+  isAdmin?: boolean;
+  role?: "viewer" | "operator" | "admin";
 }
 
 export type TabId =

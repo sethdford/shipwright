@@ -13,7 +13,7 @@
   <a href="https://github.com/sethdford/shipwright/actions/workflows/test.yml"><img src="https://github.com/sethdford/shipwright/actions/workflows/test.yml/badge.svg" alt="Tests"></a>
   <a href="https://github.com/sethdford/shipwright/actions/workflows/shipwright-pipeline.yml"><img src="https://github.com/sethdford/shipwright/actions/workflows/shipwright-pipeline.yml/badge.svg" alt="Pipeline"></a>
   <img src="https://img.shields.io/badge/tests-103_suites_passing-4ade80?style=flat-square" alt="103 suites">
-  <img src="https://img.shields.io/badge/version-2.2.2-00d4ff?style=flat-square" alt="v2.2.2">
+  <img src="https://img.shields.io/badge/version-2.3.0-00d4ff?style=flat-square" alt="v2.3.0">
   <img src="https://img.shields.io/badge/license-MIT-green?style=flat-square" alt="MIT License">
   <img src="https://img.shields.io/badge/bash-3.2%2B-7c3aed?style=flat-square" alt="Bash 3.2+">
 </p>
@@ -23,7 +23,7 @@
 ## Table of Contents
 
 - [Shipwright Builds Itself](#shipwright-builds-itself)
-- [What's New in v2.2.2](#whats-new-in-v222)
+- [What's New in v2.3.0](#whats-new-in-v230)
 - [How It Works](#how-it-works)
 - [Install](#install)
 - [Quick Start](#quick-start)
@@ -46,7 +46,7 @@ This repo uses Shipwright to process its own issues. Label a GitHub issue with `
 
 ---
 
-## What's New in v2.2.2
+## What's New in v2.3.0
 
 **Docs & platform polish** — doc-fleet, shared libs, policy schema, release infra:
 

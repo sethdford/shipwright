@@ -59,9 +59,12 @@
       <div class="header-center" id="connection">
         <span class="connection-dot offline" id="connection-dot"></span>
         <span class="connection-text" id="connection-text">OFFLINE</span>
-        <span class="cost-ticker" id="cost-ticker"></span>
+        <span class="cost-ticker" id="cost-ticker">
+          <span id="cost-24h"></span>
+          <span id="cost-budget"></span>
+        </span>
       </div>
-      <div class="header-right">
+      <div class="header-right header-actions">
         <button
           class="emergency-brake-btn"
           id="emergency-brake"
@@ -86,6 +89,9 @@
           </button>
           <div class="user-dropdown" id="user-dropdown">
             <div class="dropdown-username" id="dropdown-username">—</div>
+            <button class="dropdown-link" id="open-notifications">
+              Notifications
+            </button>
             <a class="dropdown-link" href="/auth/logout">Sign out</a>
           </div>
         </div>
@@ -104,6 +110,9 @@
         <button class="tab-btn" data-tab="machines">Machines</button>
         <button class="tab-btn" data-tab="insights">Insights</button>
         <button class="tab-btn" data-tab="team">Team</button>
+        <button class="tab-btn" data-tab="fleet-map">Map</button>
+        <button class="tab-btn" data-tab="pipeline-theater">Theater</button>
+        <button class="tab-btn" data-tab="agent-cockpit">Cockpit</button>
         <div class="tab-indicator" id="tab-indicator"></div>
       </div>
     </nav>
@@ -122,6 +131,15 @@
 
     <!-- Main Content -->
     <main class="main" id="main-content">
+      <!-- Stale Data Banner -->
+      <div
+        class="stale-data-banner"
+        id="stale-data-banner"
+        style="display: none"
+      >
+        <span class="stale-icon">\u23F1</span>
+        Data last updated <span id="stale-data-age">?</span> ago
+      </div>
       <!-- ═══ OVERVIEW TAB ═══ -->
       <div class="tab-panel active" id="panel-overview">
         <!-- Stats Row -->
@@ -164,7 +182,6 @@
             <button
               class="btn btn-sm btn-start"
               id="daemon-btn-start"
-              onclick="daemonControl('start')"
               title="Start daemon"
             >
               Start
@@ -172,7 +189,6 @@
             <button
               class="btn btn-sm btn-stop"
               id="daemon-btn-stop"
-              onclick="daemonControl('stop')"
               title="Stop daemon"
             >
               Stop
@@ -180,7 +196,6 @@
             <button
               class="btn btn-sm btn-pause"
               id="daemon-btn-pause"
-              onclick="daemonControl('pause')"
               title="Pause/Resume daemon"
             >
               Pause
@@ -188,7 +203,6 @@
             <button
               class="btn btn-sm btn-patrol"
               id="daemon-btn-patrol"
-              onclick="daemonControl('patrol')"
               title="Run patrol now"
             >
               Run Patrol
@@ -477,6 +491,48 @@
           >
             <span class="metric-label">DORA GRADES</span>
           </div>
+
+          <!-- Bottleneck alerts -->
+          <div
+            class="metric-card metric-card-wide"
+            id="bottleneck-alert-container"
+          ></div>
+
+          <!-- Stage performance -->
+          <div
+            class="metric-card metric-card-wide"
+            id="stage-performance-container"
+          ></div>
+
+          <!-- Cost breakdown -->
+          <div
+            class="metric-card metric-card-wide"
+            id="cost-breakdown-container"
+          ></div>
+
+          <!-- Cost trend -->
+          <div
+            class="metric-card metric-card-wide"
+            id="cost-trend-container"
+          ></div>
+
+          <!-- DORA trend -->
+          <div
+            class="metric-card metric-card-wide"
+            id="dora-trend-container"
+          ></div>
+
+          <!-- Throughput trend -->
+          <div
+            class="metric-card metric-card-wide"
+            id="throughput-trend-container"
+          ></div>
+
+          <!-- Capacity forecast -->
+          <div
+            class="metric-card metric-card-wide"
+            id="capacity-forecast-container"
+          ></div>
         </div>
       </div>
 
@@ -564,6 +620,21 @@
           </div>
         </section>
 
+        <!-- Team Actions -->
+        <div
+          class="team-actions"
+          style="margin: 1rem 0; display: flex; gap: 0.5rem"
+        >
+          <button class="btn-primary" id="btn-create-invite">
+            Create Invite Link
+          </button>
+        </div>
+        <div
+          id="team-invite-result"
+          style="display: none"
+          class="invite-result"
+        ></div>
+
         <!-- Developer Cards -->
         <section class="section-header">
           <h2 class="section-label">CONNECTED DEVELOPERS</h2>
@@ -582,12 +653,87 @@
         <div class="team-activity" id="team-activity">
           <div class="empty-state">No team activity yet.</div>
         </div>
+
+        <!-- Integrations Status -->
+        <section class="section-header" style="margin-top: 2rem">
+          <h2 class="section-label">INTEGRATIONS</h2>
+        </section>
+        <div id="integrations-status" class="integrations-panel">
+          <div class="empty-state"><p>Loading...</p></div>
+        </div>
+
+        <!-- Admin/Debug Panel (admin only) -->
+        <section class="section-header" style="margin-top: 2rem">
+          <h2 class="section-label">ADMIN / DEBUG</h2>
+        </section>
+        <div id="admin-debug-panel" class="admin-debug-panel">
+          <div
+            class="admin-debug-controls"
+            style="display: flex; gap: 0.5rem; margin-bottom: 1rem"
+          >
+            <button class="btn-secondary btn-sm" id="btn-db-health">
+              DB Health
+            </button>
+            <button class="btn-secondary btn-sm" id="btn-db-events">
+              Recent Events
+            </button>
+            <button class="btn-secondary btn-sm" id="btn-db-jobs">Jobs</button>
+            <button class="btn-secondary btn-sm" id="btn-db-heartbeats">
+              Heartbeats
+            </button>
+            <button class="btn-secondary btn-sm" id="btn-db-costs">
+              Today's Costs
+            </button>
+          </div>
+          <div id="admin-debug-output" class="admin-debug-output">
+            <div class="empty-state">
+              <p>Click a button above to inspect</p>
+            </div>
+          </div>
+        </div>
+
+        <!-- Machine Claim/Release -->
+        <section class="section-header" style="margin-top: 2rem">
+          <h2 class="section-label">ISSUE CLAIM</h2>
+        </section>
+        <div id="claim-panel" class="claim-panel">
+          <div class="form-row" style="gap: 0.5rem; align-items: end">
+            <div class="form-group">
+              <label class="form-label" for="claim-issue">Issue #</label>
+              <input
+                type="number"
+                id="claim-issue"
+                class="form-input"
+                placeholder="123"
+                style="width: 100px"
+              />
+            </div>
+            <div class="form-group">
+              <label class="form-label" for="claim-machine">Machine</label>
+              <input
+                type="text"
+                id="claim-machine"
+                class="form-input"
+                placeholder="build-01"
+                style="width: 150px"
+              />
+            </div>
+            <button class="btn-primary btn-sm" id="btn-claim">Claim</button>
+            <button class="btn-secondary btn-sm" id="btn-release">
+              Release
+            </button>
+          </div>
+          <div
+            id="claim-result"
+            style="margin-top: 0.5rem; font-size: 0.85rem"
+          ></div>
+        </div>
       </div>
     </main>
 
     <!-- Footer -->
     <footer class="footer">
-      <span>Shipwright Fleet Command v2.2.2</span>
+      <span>Shipwright Fleet Command v2.3.0</span>
       <span>Dashboard refreshes via WebSocket</span>
     </footer>
 
@@ -638,6 +784,71 @@
           <button class="modal-btn modal-btn-danger" id="emergency-confirm">
             Pause Everything
           </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Notifications Settings Modal -->
+    <div class="modal-overlay" id="notifications-modal" style="display: none">
+      <div class="modal-card modal-wide">
+        <div class="modal-header">
+          <h3 class="modal-title">Notification Settings</h3>
+          <button class="modal-close" id="notif-modal-close">&times;</button>
+        </div>
+        <div class="modal-body">
+          <p class="text-muted">
+            Configure webhooks to receive alerts when pipelines complete, fail,
+            or trigger alerts.
+          </p>
+          <div class="form-row" style="margin-top: 1rem">
+            <div class="form-group" style="flex: 3">
+              <label class="form-label" for="notif-webhook-url"
+                >Webhook URL</label
+              >
+              <input
+                type="url"
+                id="notif-webhook-url"
+                class="form-input"
+                placeholder="https://hooks.slack.com/services/..."
+              />
+            </div>
+            <div class="form-group" style="flex: 1">
+              <label class="form-label" for="notif-webhook-label">Label</label>
+              <input
+                type="text"
+                id="notif-webhook-label"
+                class="form-input"
+                placeholder="Slack"
+              />
+            </div>
+          </div>
+          <div class="form-row" style="margin-top: 0.5rem">
+            <label class="form-label" style="margin-right: 0.5rem"
+              >Events:</label
+            >
+            <label
+              ><input type="checkbox" id="notif-evt-all" checked /> All</label
+            >
+            <label
+              ><input type="checkbox" id="notif-evt-completed" />
+              Completed</label
+            >
+            <label
+              ><input type="checkbox" id="notif-evt-failed" /> Failed</label
+            >
+            <label><input type="checkbox" id="notif-evt-alert" /> Alerts</label>
+          </div>
+          <button
+            class="btn-primary"
+            id="notif-add-webhook"
+            style="margin-top: 0.75rem"
+          >
+            Add Webhook
+          </button>
+          <div id="notif-webhook-list" style="margin-top: 1rem"></div>
+          <div style="margin-top: 1rem; display: flex; gap: 0.5rem">
+            <button class="btn-secondary" id="notif-test-btn">Send Test</button>
+          </div>
         </div>
       </div>
     </div>
@@ -811,6 +1022,11 @@
       </div>
     </div>
 
-    <script src="app.js"></script>
+    <!-- New visualization tab panels -->
+    <div class="tab-panel" id="panel-fleet-map"></div>
+    <div class="tab-panel" id="panel-pipeline-theater"></div>
+    <div class="tab-panel" id="panel-agent-cockpit"></div>
+
+    <script src="dist/main.js"></script>
   </body>
 </html>

@@ -5,13 +5,188 @@ import { escapeHtml, fmtNum } from "../core/helpers";
 import * as api from "../core/api";
 import type { FleetState, DaemonConfig } from "../types/api";
 
+let soundEnabled = false;
+let previousPipelineIds: Set<number> = new Set();
+
 export function setupHeader(): void {
   fetchUser();
   setupUserMenu();
   setupDaemonControlBar();
   setupEmergencyBrake();
+  setupSoundToggle();
+  setupThemeToggle();
+  setupAmbientIndicator();
+  setupNotificationsModal();
   fetchDaemonConfig();
   setInterval(fetchDaemonConfig, 30000);
+}
+
+function setupSoundToggle(): void {
+  const headerActions = document.querySelector(".header-actions");
+  if (!headerActions) return;
+
+  const btn = document.createElement("button");
+  btn.className = "sound-toggle";
+  btn.id = "sound-toggle";
+  btn.innerHTML = "\u{1F50A} Sound";
+  btn.addEventListener("click", () => {
+    soundEnabled = !soundEnabled;
+    btn.classList.toggle("active", soundEnabled);
+    btn.innerHTML = soundEnabled ? "\u{1F50A} Sound" : "\u{1F507} Mute";
+  });
+
+  // Insert before user avatar if possible
+  const userAvatar = document.getElementById("user-avatar");
+  if (userAvatar) {
+    headerActions.insertBefore(btn, userAvatar);
+  } else {
+    headerActions.appendChild(btn);
+  }
+}
+
+function setupThemeToggle(): void {
+  const headerActions = document.querySelector(".header-actions");
+  if (!headerActions) return;
+
+  const saved = localStorage.getItem("sw-theme");
+  if (saved === "light")
+    document.documentElement.setAttribute("data-theme", "light");
+
+  const btn = document.createElement("button");
+  btn.className = "theme-toggle";
+  btn.id = "theme-toggle";
+  const isDark = () =>
+    document.documentElement.getAttribute("data-theme") !== "light";
+  btn.innerHTML = isDark() ? "\u263E Dark" : "\u2600 Light";
+  btn.addEventListener("click", () => {
+    if (isDark()) {
+      document.documentElement.setAttribute("data-theme", "light");
+      localStorage.setItem("sw-theme", "light");
+      btn.innerHTML = "\u2600 Light";
+    } else {
+      document.documentElement.removeAttribute("data-theme");
+      localStorage.setItem("sw-theme", "dark");
+      btn.innerHTML = "\u263E Dark";
+    }
+  });
+
+  const soundBtn = document.getElementById("sound-toggle");
+  if (soundBtn) {
+    headerActions.insertBefore(btn, soundBtn);
+  } else {
+    const userAvatar = document.getElementById("user-avatar");
+    if (userAvatar) headerActions.insertBefore(btn, userAvatar);
+    else headerActions.appendChild(btn);
+  }
+}
+
+function setupAmbientIndicator(): void {
+  const indicator = document.createElement("div");
+  indicator.className = "ambient-indicator";
+  indicator.id = "ambient-indicator";
+  document.body.appendChild(indicator);
+}
+
+export function updateAmbientIndicator(data: FleetState): void {
+  const indicator = document.getElementById("ambient-indicator");
+  if (!indicator) return;
+
+  const active = data.pipelines?.length || 0;
+  const queue = data.queue?.length || 0;
+  const anyFailed = data.pipelines?.some((p) => p.status === "failed");
+
+  if (anyFailed) {
+    indicator.className = "ambient-indicator critical";
+  } else if (active > 0) {
+    indicator.className =
+      active > 3 ? "ambient-indicator busy" : "ambient-indicator";
+  } else {
+    indicator.style.display = "none";
+    return;
+  }
+  indicator.style.display = "";
+}
+
+export function detectCompletions(data: FleetState): void {
+  const currentIds = new Set(data.pipelines?.map((p) => p.issue) || []);
+
+  // Check for pipelines that disappeared (completed or failed)
+  for (const prevId of previousPipelineIds) {
+    if (!currentIds.has(prevId)) {
+      // Pipeline completed or failed - trigger visual effect
+      const completedEvent = data.events?.find(
+        (e) => e.issue === prevId && String(e.type || "").includes("completed"),
+      );
+      const failedEvent = data.events?.find(
+        (e) => e.issue === prevId && String(e.type || "").includes("failed"),
+      );
+
+      if (completedEvent && soundEnabled) {
+        playCompletionSound();
+      } else if (failedEvent && soundEnabled) {
+        playFailureSound();
+      }
+    }
+  }
+
+  previousPipelineIds = currentIds;
+}
+
+function playCompletionSound(): void {
+  try {
+    const audioCtx = new AudioContext();
+    const osc = audioCtx.createOscillator();
+    const gain = audioCtx.createGain();
+    osc.connect(gain);
+    gain.connect(audioCtx.destination);
+    osc.frequency.setValueAtTime(523.25, audioCtx.currentTime); // C5
+    osc.frequency.setValueAtTime(659.25, audioCtx.currentTime + 0.1); // E5
+    osc.frequency.setValueAtTime(783.99, audioCtx.currentTime + 0.2); // G5
+    gain.gain.setValueAtTime(0.1, audioCtx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.5);
+    osc.start(audioCtx.currentTime);
+    osc.stop(audioCtx.currentTime + 0.5);
+  } catch {}
+}
+
+function playFailureSound(): void {
+  try {
+    const audioCtx = new AudioContext();
+    const osc = audioCtx.createOscillator();
+    const gain = audioCtx.createGain();
+    osc.connect(gain);
+    gain.connect(audioCtx.destination);
+    osc.type = "sawtooth";
+    osc.frequency.setValueAtTime(200, audioCtx.currentTime);
+    osc.frequency.setValueAtTime(150, audioCtx.currentTime + 0.2);
+    gain.gain.setValueAtTime(0.08, audioCtx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.4);
+    osc.start(audioCtx.currentTime);
+    osc.stop(audioCtx.currentTime + 0.4);
+  } catch {}
+}
+
+function applyRoleRestrictions(role: string): void {
+  if (role === "viewer") {
+    // Hide all action buttons for viewers
+    const selectors = [
+      "#emergency-brake",
+      "#daemon-btn-start",
+      "#daemon-btn-stop",
+      "#daemon-btn-pause",
+      "#daemon-btn-patrol",
+      "#btn-add-machine",
+      "#btn-join-link",
+      "#btn-create-invite",
+      ".pipeline-checkbox",
+      ".bulk-actions",
+    ];
+    for (const sel of selectors) {
+      document.querySelectorAll(sel).forEach((el) => {
+        (el as HTMLElement).style.display = "none";
+      });
+    }
+  }
 }
 
 function fetchUser(): void {
@@ -22,19 +197,21 @@ function fetchUser(): void {
       const avatarBtn = document.getElementById("user-avatar");
       const usernameEl = document.getElementById("dropdown-username");
       const initialsEl = document.getElementById("avatar-initials");
+      const roleText = user.role ? ` (${user.role})` : "";
       if (usernameEl)
         usernameEl.textContent = escapeHtml(
-          user.name || user.username || "User",
+          (user.username || "User") + roleText,
         );
+      if (user.role) applyRoleRestrictions(user.role);
 
-      if (user.avatar_url && avatarBtn) {
+      if (user.avatarUrl && avatarBtn) {
         const img = document.createElement("img");
-        img.src = user.avatar_url;
-        img.alt = escapeHtml(user.name || "User");
+        img.src = user.avatarUrl;
+        img.alt = escapeHtml(user.username || "User");
         avatarBtn.innerHTML = "";
         avatarBtn.appendChild(img);
       } else if (initialsEl) {
-        const name = user.name || user.username || "?";
+        const name = user.username || "?";
         const parts = name.split(" ");
         const initials =
           parts.length >= 2
@@ -66,12 +243,12 @@ export function renderCostTicker(data: FleetState): void {
   if (!cost) return;
   const el24 = document.getElementById("cost-24h");
   const elBudget = document.getElementById("cost-budget");
-  if (el24 && cost.total_24h != null) {
-    el24.textContent = "$" + cost.total_24h.toFixed(2);
+  if (el24 && cost.today_spent != null) {
+    el24.textContent = "$" + cost.today_spent.toFixed(2);
   }
-  if (elBudget && cost.budget_remaining != null) {
-    elBudget.textContent =
-      "$" + cost.budget_remaining.toFixed(2) + " remaining";
+  if (elBudget && cost.daily_budget != null) {
+    const remaining = Math.max(0, cost.daily_budget - cost.today_spent);
+    elBudget.textContent = "$" + remaining.toFixed(2) + " remaining";
   }
 }
 
@@ -157,13 +334,11 @@ function handleAlertAction(e: Event): void {
       if (issue) api.sendIntervention(issue, "skip_stage");
       break;
     case "view-alert":
-      // Import switchTab dynamically to avoid circular deps
-      import("./header").then(() => {
-        const { switchTab } = require("../core/router");
-        if (issue) {
+      if (issue) {
+        import("../core/router").then(({ switchTab }) => {
           switchTab("pipelines");
-        }
-      });
+        });
+      }
       break;
   }
 }
@@ -181,7 +356,16 @@ function setupEmergencyBrake(): void {
 
   brakeBtn.addEventListener("click", () => {
     const modal = document.getElementById("emergency-modal");
-    if (modal) modal.style.display = "";
+    if (modal) {
+      const fleetState = store.get("fleetState");
+      const activeCount = document.getElementById("emergency-active-count");
+      const queueCount = document.getElementById("emergency-queue-count");
+      if (activeCount)
+        activeCount.textContent = String(fleetState?.pipelines?.length || 0);
+      if (queueCount)
+        queueCount.textContent = String(fleetState?.queue?.length || 0);
+      modal.style.display = "";
+    }
   });
 
   const confirmBtn = document.getElementById("emergency-confirm");
@@ -224,13 +408,26 @@ function fetchDaemonConfig(): void {
 }
 
 function setupDaemonControlBar(): void {
+  const startBtn = document.getElementById("daemon-btn-start");
+  const stopBtn = document.getElementById("daemon-btn-stop");
   const pauseBtn = document.getElementById("daemon-btn-pause");
+  const patrolBtn = document.getElementById("daemon-btn-patrol");
+
+  if (startBtn) {
+    startBtn.addEventListener("click", () => daemonControlAction("start"));
+  }
+  if (stopBtn) {
+    stopBtn.addEventListener("click", () => daemonControlAction("stop"));
+  }
   if (pauseBtn) {
     pauseBtn.addEventListener("click", () => {
       const badge = document.getElementById("daemon-status-badge");
       const action = badge?.classList.contains("paused") ? "resume" : "pause";
       daemonControlAction(action);
     });
+  }
+  if (patrolBtn) {
+    patrolBtn.addEventListener("click", () => daemonControlAction("patrol"));
   }
 }
 
@@ -245,6 +442,135 @@ async function daemonControlAction(action: string): Promise<void> {
   } finally {
     if (btn) (btn as HTMLButtonElement).disabled = false;
   }
+}
+
+function setupNotificationsModal(): void {
+  const openBtn = document.getElementById("open-notifications");
+  const modal = document.getElementById("notifications-modal");
+  const closeBtn = document.getElementById("notif-modal-close");
+  const addBtn = document.getElementById("notif-add-webhook");
+  const testBtn = document.getElementById("notif-test-btn");
+
+  if (openBtn && modal) {
+    openBtn.addEventListener("click", () => {
+      modal.style.display = "";
+      loadWebhookList();
+    });
+  }
+  if (closeBtn && modal) {
+    closeBtn.addEventListener("click", () => {
+      modal.style.display = "none";
+    });
+  }
+  if (modal) {
+    modal.addEventListener("click", (e) => {
+      if (e.target === modal) modal.style.display = "none";
+    });
+  }
+
+  if (addBtn) {
+    addBtn.addEventListener("click", () => {
+      const urlInput = document.getElementById(
+        "notif-webhook-url",
+      ) as HTMLInputElement;
+      const labelInput = document.getElementById(
+        "notif-webhook-label",
+      ) as HTMLInputElement;
+      const allEvt = (
+        document.getElementById("notif-evt-all") as HTMLInputElement
+      )?.checked;
+      const url = urlInput?.value.trim();
+      if (!url) return;
+      const events: string[] = [];
+      if (allEvt) {
+        events.push("all");
+      } else {
+        if (
+          (document.getElementById("notif-evt-completed") as HTMLInputElement)
+            ?.checked
+        )
+          events.push("pipeline.completed");
+        if (
+          (document.getElementById("notif-evt-failed") as HTMLInputElement)
+            ?.checked
+        )
+          events.push("pipeline.failed");
+        if (
+          (document.getElementById("notif-evt-alert") as HTMLInputElement)
+            ?.checked
+        )
+          events.push("alert");
+      }
+      api
+        .addWebhook(
+          url,
+          labelInput?.value.trim() || undefined,
+          events.length ? events : undefined,
+        )
+        .then(() => {
+          if (urlInput) urlInput.value = "";
+          if (labelInput) labelInput.value = "";
+          loadWebhookList();
+        });
+    });
+  }
+
+  if (testBtn) {
+    testBtn.addEventListener("click", () => {
+      testBtn.textContent = "Sending...";
+      api
+        .testNotification()
+        .then(() => {
+          testBtn.textContent = "Sent!";
+          setTimeout(() => {
+            testBtn.textContent = "Send Test";
+          }, 2000);
+        })
+        .catch(() => {
+          testBtn.textContent = "Failed";
+          setTimeout(() => {
+            testBtn.textContent = "Send Test";
+          }, 2000);
+        });
+    });
+  }
+}
+
+function loadWebhookList(): void {
+  const container = document.getElementById("notif-webhook-list");
+  if (!container) return;
+  container.innerHTML = '<div class="empty-state"><p>Loading...</p></div>';
+
+  api
+    .fetchNotificationConfig()
+    .then((config) => {
+      if (!config.webhooks || config.webhooks.length === 0) {
+        container.innerHTML =
+          '<div class="empty-state"><p>No webhooks configured</p></div>';
+        return;
+      }
+      let html = "";
+      for (const w of config.webhooks) {
+        html +=
+          `<div class="webhook-item">` +
+          `<span class="webhook-label">${escapeHtml(w.label)}</span>` +
+          `<span class="webhook-url">${escapeHtml(w.url.substring(0, 50))}${w.url.length > 50 ? "..." : ""}</span>` +
+          `<span class="webhook-events">${w.events.join(", ")}</span>` +
+          `<button class="btn-sm btn-danger" data-webhook-url="${escapeHtml(w.url)}">Remove</button>` +
+          "</div>";
+      }
+      container.innerHTML = html;
+      container.querySelectorAll("[data-webhook-url]").forEach((btn) => {
+        btn.addEventListener("click", () => {
+          const url = btn.getAttribute("data-webhook-url") || "";
+          api.removeWebhook(url).then(() => loadWebhookList());
+        });
+      });
+    })
+    .catch(() => {
+      container.innerHTML =
+        '<div class="empty-state"><p>Could not load config</p></div>';
+    });
 }
 
 function updateDaemonControlBar(data: DaemonConfig): void {
@@ -272,15 +598,18 @@ function updateDaemonControlBar(data: DaemonConfig): void {
   }
 
   if (data.config) {
-    if (workersEl)
-      workersEl.textContent = String(data.config.max_workers || "-");
-    if (pollEl) pollEl.textContent = String(data.config.poll_interval || "-");
-    if (patrolEl)
-      patrolEl.textContent = String(data.config.patrol?.interval || "-");
+    const cfg = data.config as Record<string, unknown>;
+    if (workersEl) workersEl.textContent = String(cfg.max_workers || "-");
+    if (pollEl) pollEl.textContent = String(cfg.poll_interval || "-");
+    if (patrolEl) {
+      const patrol = cfg.patrol as Record<string, unknown> | undefined;
+      patrolEl.textContent = String(patrol?.interval || "-");
+    }
   }
 
   if (data.budget && budgetEl) {
-    const remaining = data.budget.remaining ?? data.budget.daily_limit ?? "-";
+    const budget = data.budget as Record<string, unknown>;
+    const remaining = budget.remaining ?? budget.daily_limit ?? "-";
     budgetEl.textContent =
       typeof remaining === "number" ? remaining.toFixed(2) : String(remaining);
   }

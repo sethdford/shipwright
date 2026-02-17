@@ -391,14 +391,14 @@ function setVal(id: string, value: string): void {
 }
 
 function refreshMachines(): void {
-  // Trigger machines tab data refresh
-  const { switchTab } = require("../core/router") as any;
   const tab = store.get("activeTab");
   if (tab === "machines") {
-    // Re-fetch by dispatching machines tab init
-    api
-      .fetchMachines()
-      .then(({ machines }) => store.set("machinesCache", machines));
+    api.fetchMachines().then((data) => {
+      const machines = Array.isArray(data)
+        ? data
+        : ((data as any).machines ?? []);
+      store.set("machinesCache", machines);
+    });
     api
       .fetchJoinTokens()
       .then(({ tokens }) => store.set("joinTokensCache", tokens));
