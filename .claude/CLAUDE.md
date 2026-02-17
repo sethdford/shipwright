@@ -629,7 +629,8 @@ All scripts are bash (except the dashboard server in TypeScript). Grouped by lay
 | `scripts/sw-context-test.sh` | 239 | Context Engine for Pipeline Stages tests |
 | `scripts/sw-cost-test.sh` | 230 | Validate token usage & cost intelligence |
 | `scripts/sw-daemon-test.sh` | 1988 | Unit tests for daemon metrics, health, alerting |
-| `scripts/sw-dashboard-test.sh` | 203 | validates dashboard structure |
+| `scripts/sw-dashboard-e2e-test.sh` | 597 | full live validation |
+| `scripts/sw-dashboard-test.sh` | 254 | validates dashboard structure |
 | `scripts/sw-db-test.sh` | 980 | SQLite Persistence Layer Test Suite |
 | `scripts/sw-decompose-test.sh` | 160 | Intelligent Issue Decomposition tests |
 | `scripts/sw-deps-test.sh` | 186 | Automated Dependency Update Management tests |
