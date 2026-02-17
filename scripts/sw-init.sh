@@ -307,14 +307,14 @@ if [[ $_verify_fail -eq 0 ]]; then
 fi
 
 # ─── CLI Bootstrap (symlinks + PATH) ─────────────────────────────────────────
-# Install sw/shipwright/cct symlinks so the CLI works from anywhere
+# Install sw/shipwright symlinks so the CLI works from anywhere
 BIN_DIR="$HOME/.local/bin"
 mkdir -p "$BIN_DIR"
 
 SW_SRC="$SCRIPT_DIR/sw"
 if [[ -f "$SW_SRC" ]]; then
     _cli_changed=false
-    for _cmd in sw shipwright cct; do
+    for _cmd in sw shipwright; do
         _dest="$BIN_DIR/$_cmd"
         if [[ -L "$_dest" ]] && [[ "$(readlink "$_dest")" == "$SW_SRC" ]]; then
             continue
@@ -322,8 +322,13 @@ if [[ -f "$SW_SRC" ]]; then
         ln -sf "$SW_SRC" "$_dest"
         _cli_changed=true
     done
+    # Clean up legacy cct symlink if present
+    if [[ -L "$BIN_DIR/cct" ]]; then
+        rm -f "$BIN_DIR/cct"
+        _cli_changed=true
+    fi
     if [[ "$_cli_changed" == "true" ]]; then
-        success "CLI symlinks: sw, shipwright, cct → $BIN_DIR"
+        success "CLI symlinks: sw, shipwright → $BIN_DIR"
     else
         success "CLI symlinks already correct"
     fi

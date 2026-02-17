@@ -758,8 +758,8 @@ notify() {
             -d "$payload" "$SLACK_WEBHOOK" >/dev/null 2>&1 || true
     fi
 
-    # Custom webhook (env var SHIPWRIGHT_WEBHOOK_URL, with CCT_WEBHOOK_URL fallback)
-    local _webhook_url="${SHIPWRIGHT_WEBHOOK_URL:-${CCT_WEBHOOK_URL:-}}"
+    # Custom webhook (env var SHIPWRIGHT_WEBHOOK_URL)
+    local _webhook_url="${SHIPWRIGHT_WEBHOOK_URL:-}"
     if [[ -n "$_webhook_url" ]]; then
         local payload
         payload=$(jq -n \

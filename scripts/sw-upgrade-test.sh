@@ -318,12 +318,12 @@ echo "test" > "$TEMP_DIR/repo/scripts/sw-doctor.sh"
 output_rp=$(bash "$SCRIPT_DIR/sw-upgrade.sh" --repo-path "$TEMP_DIR/repo" 2>&1) || true
 assert_contains "find_repo uses --repo-path" "$output_rp" "$TEMP_DIR/repo"
 
-# ─── 21. find_repo respects CCT_REPO_PATH env ────────────────────────────────
+# ─── 21. find_repo respects SHIPWRIGHT_REPO_PATH env ──────────────────────────
 setup_env
 
 echo "test" > "$TEMP_DIR/repo/scripts/sw-doctor.sh"
-output_env=$(CCT_REPO_PATH="$TEMP_DIR/repo" bash "$SCRIPT_DIR/sw-upgrade.sh" 2>&1) || true
-assert_contains "find_repo uses CCT_REPO_PATH" "$output_env" "$TEMP_DIR/repo"
+output_env=$(SHIPWRIGHT_REPO_PATH="$TEMP_DIR/repo" bash "$SCRIPT_DIR/sw-upgrade.sh" 2>&1) || true
+assert_contains "find_repo uses SHIPWRIGHT_REPO_PATH" "$output_env" "$TEMP_DIR/repo"
 
 echo ""
 echo -e "${BOLD}Checksum logic${RESET}"

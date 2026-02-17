@@ -1,4 +1,4 @@
-#compdef shipwright sw cct
+#compdef shipwright sw
 # ╔═══════════════════════════════════════════════════════════════════════════╗
 # ║  Shipwright — Zsh tab completions                                       ║
 # ║  Auto-install to ~/.zsh/completions/ during shipwright init             ║

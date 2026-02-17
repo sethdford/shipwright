@@ -135,8 +135,7 @@ install() {
     mkdir -p "$INSTALL_DIR"
     ln -sf "$INSTALL_LIB/scripts/sw" "$INSTALL_DIR/shipwright"
     ln -sf "$INSTALL_LIB/scripts/sw" "$INSTALL_DIR/sw"
-    ln -sf "$INSTALL_LIB/scripts/sw" "$INSTALL_DIR/cct"
-    success "Created symlinks: ${BOLD}shipwright${RESET}, ${BOLD}sw${RESET}, ${BOLD}cct${RESET}"
+    success "Created symlinks: ${BOLD}shipwright${RESET}, ${BOLD}sw${RESET}"
 
     # Install shell completions if available
     if [[ -f "$INSTALL_LIB/scripts/install-completions.sh" ]]; then

@@ -4,7 +4,7 @@
 # Place in ~/.config/fish/completions/
 
 # Disable file completions by default
-for cmd in shipwright sw cct
+for cmd in shipwright sw
     complete -c $cmd -f
 
     # Top-level commands (includes groups and flat commands)

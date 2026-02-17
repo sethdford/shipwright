@@ -81,14 +81,14 @@ ensure_repo_setup() {
 }
 
 show_version() {
-    echo -e "${CYAN}${BOLD}shipwright${RESET} ${DIM}v${VERSION}${RESET} — Orchestrate AI Coding Teams  ${DIM}(aliases: sw, cct)${RESET}"
+    echo -e "${CYAN}${BOLD}shipwright${RESET} ${DIM}v${VERSION}${RESET} — Orchestrate AI Coding Teams  ${DIM}(alias: sw)${RESET}"
 }
 
 show_help() {
     show_version
     echo ""
     echo -e "${BOLD}USAGE${RESET}"
-    echo -e "  ${CYAN}shipwright${RESET} <command> [options]    ${DIM}(also: sw, cct)${RESET}"
+    echo -e "  ${CYAN}shipwright${RESET} <command> [options]    ${DIM}(alias: sw)${RESET}"
     echo ""
     echo -e "${BOLD}GETTING STARTED${RESET}"
     echo -e "  ${CYAN}init${RESET}                  One-command setup — tmux, CLI, templates, hooks"

@@ -7,7 +7,7 @@
 # ║  This is the single entry point. It checks prerequisites, then         ║
 # ║  delegates to `shipwright init` which handles everything:              ║
 # ║    tmux config + overlay + TPM + plugins                               ║
-# ║    CLI symlinks (sw, shipwright, cct) + PATH                           ║
+# ║    CLI symlinks (sw, shipwright) + PATH                                ║
 # ║    Claude Code settings + hooks + CLAUDE.md                            ║
 # ║    Team & pipeline templates + shell completions                       ║
 # ║    iTerm2 fixes + doctor validation                                    ║

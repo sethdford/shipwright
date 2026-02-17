@@ -13,7 +13,7 @@ _shipwright_completions() {
     local commands="agent quality observe release intel init setup session status ps logs templates doctor cleanup reaper upgrade loop pipeline worktree prep daemon fleet memory cost db fix dashboard jira linear tracker heartbeat checkpoint webhook decompose connect remote launchd intelligence optimize predict adversarial simulate architecture vitals docs tmux github checks deploys pr context help version"
 
     case "$prev" in
-        shipwright|sw|cct)
+        shipwright|sw)
             COMPREPLY=( $(compgen -W "$commands" -- "$cur") )
             return 0
             ;;
@@ -178,4 +178,3 @@ _shipwright_completions() {
 
 complete -F _shipwright_completions shipwright
 complete -F _shipwright_completions sw
-complete -F _shipwright_completions cct

@@ -70,8 +70,8 @@ find_repo() {
     fi
 
     # 2. Environment variable
-    if [[ -n "${CCT_REPO_PATH:-}" ]]; then
-        echo "$CCT_REPO_PATH"
+    if [[ -n "${SHIPWRIGHT_REPO_PATH:-}" ]]; then
+        echo "$SHIPWRIGHT_REPO_PATH"
         return
     fi
 
@@ -102,7 +102,7 @@ REPO_PATH="$(find_repo)" || {
     error "Cannot locate the Shipwright repo."
     echo ""
     echo -e "  Try one of:"
-    echo -e "    ${DIM}export CCT_REPO_PATH=/path/to/shipwright${RESET}"
+    echo -e "    ${DIM}export SHIPWRIGHT_REPO_PATH=/path/to/shipwright${RESET}"
     echo -e "    ${DIM}shipwright upgrade --repo-path /path/to/shipwright${RESET}"
     exit 1
 }

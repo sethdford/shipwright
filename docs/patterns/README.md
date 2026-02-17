@@ -85,7 +85,7 @@ Each agent writes its results to a markdown file in this directory. The team lea
 
 ## Quick Start
 
-Pick a pattern, then use `shipwright` (alias: `sw`, `cct`) to set up the team:
+Pick a pattern, then use `shipwright` (alias: `sw`) to set up the team:
 
 ```bash
 # Start a tmux session

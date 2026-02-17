@@ -51,11 +51,6 @@ class Shipwright < Formula
       exec "#{libexec}/scripts/sw" "$@"
     EOS
 
-    (bin/"cct").write <<~EOS
-      #!/usr/bin/env bash
-      exec "#{libexec}/scripts/sw" "$@"
-    EOS
-
     # Install team templates to share for post_install
     (share/"shipwright/templates").install Dir["tmux/templates/*.json"] if Dir.exist?("tmux/templates")
     (share/"shipwright/pipelines").install Dir["templates/pipelines/*.json"] if Dir.exist?("templates/pipelines")
@@ -92,11 +87,10 @@ class Shipwright < Formula
 
   def caveats
     <<~EOS
-      Shipwright is installed. Three commands are available:
+      Shipwright is installed. Two commands are available:
 
         shipwright <command>    Full name
         sw <command>            Short alias
-        cct <command>           Legacy alias
 
       Quick start:
 

@@ -4,8 +4,7 @@
   "description": "Orchestrate autonomous Claude Code agent teams in tmux",
   "bin": {
     "shipwright": "./scripts/sw",
-    "sw": "./scripts/sw",
-    "cct": "./scripts/sw"
+    "sw": "./scripts/sw"
   },
   "files": [
     "config/",

@@ -131,7 +131,7 @@ This compacts the conversation when it hits 70% of the context window (default i
 
 ### Watch all agents at once
 
-Use `shipwright status` (alias: `sw`, `cct`) to see a dashboard of running team sessions:
+Use `shipwright status` (alias: `sw`) to see a dashboard of running team sessions:
 
 ```bash
 shipwright status

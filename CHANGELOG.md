@@ -490,7 +490,7 @@ The project formerly known as `shipwright` is now **Shipwright** — a proper CL
 
 ### Added
 
-- **Brand identity**: Shipwright naming with `shipwright`, `sw`, and `cct` (legacy) as CLI entry points
+- **Brand identity**: Shipwright naming with `shipwright` and `sw` as CLI entry points
 - **npm distribution**: `npm install -g shipwright-cli` — bash scripts distributed via npm, zero Node dependencies at runtime
 - **curl installer**: `curl -fsSL https://raw.githubusercontent.com/sethdford/shipwright/main/scripts/install-remote.sh | sh` — self-contained, detects OS and architecture
 - **Homebrew tap**: `brew install sethdford/shipwright/shipwright`
@@ -504,7 +504,7 @@ The project formerly known as `shipwright` is now **Shipwright** — a proper CL
 ### Changed
 
 - CLI help and version output now show "Shipwright" branding with alias hints
-- `install.sh` rebranded — creates `shipwright` and `sw` symlinks alongside `cct`, copies templates to `~/.shipwright/`
+- `install.sh` rebranded — creates `shipwright` and `sw` symlinks, copies templates to `~/.shipwright/`
 - README rewritten with multi-method install section, updated CLI examples, and website link
 
 ---

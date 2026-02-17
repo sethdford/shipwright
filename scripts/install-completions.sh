@@ -48,7 +48,6 @@ case "$SHELL_NAME" in
         mkdir -p "$DEST"
         cp "$COMPLETIONS_DIR/shipwright.bash" "$DEST/shipwright"
         cp "$COMPLETIONS_DIR/shipwright.bash" "$DEST/sw"
-        cp "$COMPLETIONS_DIR/shipwright.bash" "$DEST/cct"
         success "Installed bash completions to $DEST"
         info "Restart your shell or run: ${DIM}source $DEST/shipwright${RESET}"
         ;;
@@ -58,7 +57,6 @@ case "$SHELL_NAME" in
         mkdir -p "$DEST"
         cp "$COMPLETIONS_DIR/_shipwright" "$DEST/_shipwright"
         cp "$COMPLETIONS_DIR/_shipwright" "$DEST/_sw"
-        cp "$COMPLETIONS_DIR/_shipwright" "$DEST/_cct"
         success "Installed zsh completions to $DEST"
         if ! echo "$FPATH" | tr ':' '\n' | grep -q "$DEST"; then
             warn "$DEST is not in your fpath"
@@ -72,7 +70,6 @@ case "$SHELL_NAME" in
         mkdir -p "$DEST"
         cp "$COMPLETIONS_DIR/shipwright.fish" "$DEST/shipwright.fish"
         cp "$COMPLETIONS_DIR/shipwright.fish" "$DEST/sw.fish"
-        cp "$COMPLETIONS_DIR/shipwright.fish" "$DEST/cct.fish"
         success "Installed fish completions to $DEST"
         info "Completions are available immediately in new fish shells"
         ;;
