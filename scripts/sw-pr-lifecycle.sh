@@ -67,7 +67,27 @@ get_pr_head_sha() {
 get_pr_checks_status() {
     local pr_number="$1"
     # Returns: success, failure, pending, or unknown
-    gh pr checks "$pr_number" 2>/dev/null | jq -r '.[] | select(.status == "completed") | .conclusion' | sort | uniq -c | sort -rn | head -1 || echo "unknown"
+    # gh pr checks requires --json flag to produce JSON output
+    local checks_json
+    checks_json=$(gh pr checks "$pr_number" --json name,state,conclusion 2>/dev/null || echo "[]")
+
+    # Handle empty or non-JSON response
+    if [[ -z "$checks_json" ]] || ! echo "$checks_json" | jq empty 2>/dev/null; then
+        echo "unknown"
+        return
+    fi
+
+    local total failed pending
+    total=$(echo "$checks_json" | jq 'length' 2>/dev/null || echo "0")
+    [[ "$total" -eq 0 ]] && { echo "unknown"; return; }
+
+    failed=$(echo "$checks_json" | jq '[.[] | select(.conclusion == "FAILURE" or .conclusion == "failure")] | length' 2>/dev/null || echo "0")
+    [[ "$failed" -gt 0 ]] && { echo "failure"; return; }
+
+    pending=$(echo "$checks_json" | jq '[.[] | select(.state == "PENDING" or .state == "QUEUED" or .state == "IN_PROGRESS")] | length' 2>/dev/null || echo "0")
+    [[ "$pending" -gt 0 ]] && { echo "pending"; return; }
+
+    echo "success"
 }
 
 has_merge_conflicts() {

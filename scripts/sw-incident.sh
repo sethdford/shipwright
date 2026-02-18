@@ -871,8 +871,21 @@ main() {
             cmd_gap "$@"
             ;;
         config)
-            error "config command not yet implemented"
-            return 1
+            local policy="${REPO_DIR}/config/policy.json"
+            if [[ ! -f "$policy" ]]; then
+                warn "No policy file found at ${policy}"
+                echo "  Use: shipwright init  to create one"
+                return 1
+            fi
+            echo -e "${BOLD}Incident & Harness Gap Configuration${RESET}"
+            echo ""
+            echo -e "  Policy file:             ${DIM}${policy}${RESET}"
+            echo -e "  Harness gap enabled:     $(jq -r '.harnessGapPolicy.enabled // false' "$policy" 2>/dev/null)"
+            echo -e "  P0 SLA (hours):          $(jq -r '.harnessGapPolicy.p0SlaHours // 24' "$policy" 2>/dev/null)"
+            echo -e "  P1 SLA (hours):          $(jq -r '.harnessGapPolicy.p1SlaHours // 72' "$policy" 2>/dev/null)"
+            echo -e "  P2 SLA (hours):          $(jq -r '.harnessGapPolicy.p2SlaHours // 168' "$policy" 2>/dev/null)"
+            echo -e "  Auto-create gap issues:  $(jq -r '.harnessGapPolicy.autoCreateGapIssue // true' "$policy" 2>/dev/null)"
+            echo -e "  Require test before close: $(jq -r '.harnessGapPolicy.requireTestCaseBeforeClose // true' "$policy" 2>/dev/null)"
             ;;
         help|--help|-h)
             show_help

@@ -70,12 +70,12 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          # Add ready-to-build label to any open auto-patrol issues so daemon picks them up
+          # Add shipwright label to any open auto-patrol issues so daemon picks them up
           ISSUES=$(gh issue list --label "auto-patrol" --state open --json number --jq '.[].number' 2>/dev/null || echo "")
           if [ -n "$ISSUES" ]; then
             echo "$ISSUES" | while read -r num; do
-              gh issue edit "$num" --repo "$GITHUB_REPOSITORY" --add-label "ready-to-build" 2>/dev/null || true
-              echo "Labeled issue #$num with ready-to-build"
+              gh issue edit "$num" --repo "$GITHUB_REPOSITORY" --add-label "shipwright" 2>/dev/null || true
+              echo "Labeled issue #$num with shipwright"
             done
           else
             echo "No open auto-patrol issues to label"

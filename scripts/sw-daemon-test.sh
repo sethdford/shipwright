@@ -62,7 +62,7 @@ setup_env() {
     export SLACK_WEBHOOK=""
     export POLL_INTERVAL=60
     export MAX_PARALLEL=2
-    export WATCH_LABEL="ready-to-build"
+    export WATCH_LABEL="shipwright"
 
     # Patrol defaults
     export PATROL_LABEL="auto-patrol"
@@ -831,7 +831,7 @@ test_metrics_json_output() {
 # ──────────────────────────────────────────────────────────────────────────────
 test_patrol_build_labels_enabled() {
     PATROL_AUTO_WATCH=true
-    WATCH_LABEL="ready-to-build"
+    WATCH_LABEL="shipwright"
     PATROL_LABEL="auto-patrol"
 
     local result
@@ -839,7 +839,7 @@ test_patrol_build_labels_enabled() {
 
     assert_contains "$result" "auto-patrol" "has patrol label" &&
     assert_contains "$result" "security" "has check label" &&
-    assert_contains "$result" "ready-to-build" "has watch label"
+    assert_contains "$result" "shipwright" "has watch label"
 }
 
 # ──────────────────────────────────────────────────────────────────────────────
@@ -847,7 +847,7 @@ test_patrol_build_labels_enabled() {
 # ──────────────────────────────────────────────────────────────────────────────
 test_patrol_build_labels_disabled() {
     PATROL_AUTO_WATCH=false
-    WATCH_LABEL="ready-to-build"
+    WATCH_LABEL="shipwright"
     PATROL_LABEL="auto-patrol"
 
     local result
@@ -855,7 +855,7 @@ test_patrol_build_labels_disabled() {
 
     assert_contains "$result" "auto-patrol" "has patrol label" &&
     assert_contains "$result" "security" "has check label" &&
-    assert_not_contains "$result" "ready-to-build" "no watch label when disabled"
+    assert_not_contains "$result" "shipwright" "no watch label when disabled"
 }
 
 # ──────────────────────────────────────────────────────────────────────────────

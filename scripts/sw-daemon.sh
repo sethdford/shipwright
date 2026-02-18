@@ -227,7 +227,7 @@ LOG_DIR=""
 WORKTREE_DIR=""
 
 # Config defaults (overridden by daemon-config.json; policy overrides when present)
-WATCH_LABEL="ready-to-build"
+WATCH_LABEL="shipwright"
 POLL_INTERVAL=60
 if type policy_get &>/dev/null 2>&1; then
     POLL_INTERVAL=$(policy_get ".daemon.poll_interval_seconds" "60")
@@ -237,7 +237,7 @@ PIPELINE_TEMPLATE="autonomous"
 SKIP_GATES=true
 MODEL="opus"
 BASE_BRANCH="main"
-ON_SUCCESS_REMOVE_LABEL="ready-to-build"
+ON_SUCCESS_REMOVE_LABEL="shipwright"
 ON_SUCCESS_ADD_LABEL="pipeline/complete"
 ON_SUCCESS_CLOSE_ISSUE=false
 ON_FAILURE_ADD_LABEL="pipeline/failed"
@@ -370,7 +370,7 @@ show_help() {
     echo -e "  ${DIM}shipwright daemon patrol --once${RESET}               # Run patrol once and exit"
     echo ""
     echo -e "${BOLD}CONFIG FILE${RESET}  ${DIM}(.claude/daemon-config.json)${RESET}"
-    echo -e "  ${DIM}watch_label${RESET}         GitHub label to watch for         ${DIM}(default: ready-to-build)${RESET}"
+    echo -e "  ${DIM}watch_label${RESET}         GitHub label to watch for         ${DIM}(default: shipwright)${RESET}"
     echo -e "  ${DIM}poll_interval${RESET}       Seconds between polls             ${DIM}(default: 60)${RESET}"
     echo -e "  ${DIM}max_parallel${RESET}        Max concurrent pipeline jobs      ${DIM}(default: 2)${RESET}"
     echo -e "  ${DIM}pipeline_template${RESET}   Pipeline template to use          ${DIM}(default: autonomous)${RESET}"
@@ -411,7 +411,7 @@ load_config() {
 
     info "Loading config: ${DIM}${config_file}${RESET}"
 
-    WATCH_LABEL=$(jq -r '.watch_label // "ready-to-build"' "$config_file")
+    WATCH_LABEL=$(jq -r '.watch_label // "shipwright"' "$config_file")
     POLL_INTERVAL=$(jq -r '.poll_interval // '"$(type policy_get &>/dev/null 2>&1 && policy_get ".daemon.poll_interval_seconds" "60" || echo "60")"'' "$config_file")
     MAX_PARALLEL=$(jq -r '.max_parallel // 2' "$config_file")
     PIPELINE_TEMPLATE=$(jq -r '.pipeline_template // "autonomous"' "$config_file")
@@ -420,7 +420,7 @@ load_config() {
     BASE_BRANCH=$(jq -r '.base_branch // "main"' "$config_file")
 
     # on_success settings
-    ON_SUCCESS_REMOVE_LABEL=$(jq -r '.on_success.remove_label // "ready-to-build"' "$config_file")
+    ON_SUCCESS_REMOVE_LABEL=$(jq -r '.on_success.remove_label // "shipwright"' "$config_file")
     ON_SUCCESS_ADD_LABEL=$(jq -r '.on_success.add_label // "pipeline/complete"' "$config_file")
     ON_SUCCESS_CLOSE_ISSUE=$(jq -r '.on_success.close_issue // false' "$config_file")
 
@@ -931,7 +931,7 @@ daemon_init() {
 
     cat > "$config_file" << 'CONFIGEOF'
 {
-  "watch_label": "ready-to-build",
+  "watch_label": "shipwright",
   "poll_interval": 60,
   "max_parallel": 2,
   "pipeline_template": "autonomous",
@@ -939,7 +939,7 @@ daemon_init() {
   "model": "opus",
   "base_branch": "main",
   "on_success": {
-    "remove_label": "ready-to-build",
+    "remove_label": "shipwright",
     "add_label": "pipeline/complete",
     "close_issue": false
   },

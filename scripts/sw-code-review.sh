@@ -335,17 +335,16 @@ auto_fix() {
     local backup="${target_file}.review-backup"
     cp "$target_file" "$backup"
 
-    # Fix 1: Run shellcheck and capture warnings
+    # Report shellcheck issues (informational — auto-fix is limited to whitespace)
     if command -v shellcheck &>/dev/null; then
-        local shellcheck_fixes=0
         local warnings_file
         warnings_file=$(mktemp)
         shellcheck -f json "$target_file" > "$warnings_file" 2>/dev/null || true
 
         if [[ -s "$warnings_file" ]]; then
-            shellcheck_fixes=$(jq 'length' "$warnings_file" 2>/dev/null || echo "0")
-            info "shellcheck found $shellcheck_fixes issues in $target_file"
-            fixed=$((fixed + shellcheck_fixes))
+            local shellcheck_count
+            shellcheck_count=$(jq 'length' "$warnings_file" 2>/dev/null || echo "0")
+            [[ "$shellcheck_count" -gt 0 ]] && info "shellcheck found $shellcheck_count issues in $target_file (manual review recommended)"
         fi
         rm -f "$warnings_file"
     fi
@@ -437,13 +436,12 @@ review_changes() {
     local review_output="{\"timestamp\":\"$(date -u +%Y-%m-%dT%H:%M:%SZ)\",\"scope\":\"$review_scope\",\"findings\":{}}"
     local total_issues=0
 
-    # Get changed files
+    # Get changed files (Bash 3.2 compatible — no mapfile)
     local changed_files=()
     if [[ "$review_scope" == "staged" ]]; then
-        mapfile -t changed_files < <(cd "$REPO_DIR" && git diff --cached --name-only 2>/dev/null || true)
+        while IFS= read -r _f; do [[ -n "$_f" ]] && changed_files+=("$_f"); done < <(cd "$REPO_DIR" && git diff --cached --name-only 2>/dev/null || true)
     else
-        # For PR: get diff against main
-        mapfile -t changed_files < <(cd "$REPO_DIR" && git diff main...HEAD --name-only 2>/dev/null || true)
+        while IFS= read -r _f; do [[ -n "$_f" ]] && changed_files+=("$_f"); done < <(cd "$REPO_DIR" && git diff main...HEAD --name-only 2>/dev/null || true)
     fi
 
     [[ ${#changed_files[@]} -eq 0 ]] && { success "No changes to review"; return 0; }
@@ -458,7 +456,7 @@ review_changes() {
     local semantic_issues=()
     if [[ -n "$diff_content" ]] && command -v claude &>/dev/null; then
         info "Running Claude semantic review (logic, race conditions, API usage)..."
-        mapfile -t semantic_issues < <(run_claude_semantic_review "$diff_content" "${REVIEW_REQUIREMENTS:-}" || true)
+        while IFS= read -r _si; do [[ -n "$_si" ]] && semantic_issues+=("$_si"); done < <(run_claude_semantic_review "$diff_content" "${REVIEW_REQUIREMENTS:-}" || true)
         if [[ ${#semantic_issues[@]} -gt 0 ]]; then
             total_issues=$((total_issues + ${#semantic_issues[@]}))
             review_output=$(echo "$review_output" | jq --argjson arr "$(printf '%s\n' "${semantic_issues[@]}" | jq -R . | jq -s .)" '.semantic_findings = $arr' 2>/dev/null || echo "$review_output")
@@ -476,10 +474,10 @@ review_changes() {
         local arch_issues=()
         local style_issues=()
 
-        mapfile -t smells < <(detect_code_smells "$file_path")
-        mapfile -t solids < <(check_solid_principles "$file_path")
-        mapfile -t arch_issues < <(check_architecture_boundaries "$file_path")
-        mapfile -t style_issues < <(check_style_consistency "$file_path")
+        while IFS= read -r _s; do [[ -n "$_s" ]] && smells+=("$_s"); done < <(detect_code_smells "$file_path")
+        while IFS= read -r _s; do [[ -n "$_s" ]] && solids+=("$_s"); done < <(check_solid_principles "$file_path")
+        while IFS= read -r _s; do [[ -n "$_s" ]] && arch_issues+=("$_s"); done < <(check_architecture_boundaries "$file_path")
+        while IFS= read -r _s; do [[ -n "$_s" ]] && style_issues+=("$_s"); done < <(check_style_consistency "$file_path")
 
         local file_issues=$((${#smells[@]} + ${#solids[@]} + ${#arch_issues[@]} + ${#style_issues[@]}))
         total_issues=$((total_issues + file_issues))

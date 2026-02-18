@@ -445,8 +445,8 @@ cmd_label() {
     labels_str=$(echo "$analysis" | jq -r '.suggested_labels | join(" ")')
 
     # Apply labels via gh CLI
-    local label_array
-    mapfile -t label_array <<< "$(echo "$labels_str" | tr ' ' '\n')"
+    local label_array=()
+    while IFS= read -r _l; do [[ -n "$_l" ]] && label_array+=("$_l"); done <<< "$(echo "$labels_str" | tr ' ' '\n')"
 
     for label in "${label_array[@]}"; do
         [[ -z "$label" ]] && continue

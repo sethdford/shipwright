@@ -31,7 +31,19 @@ test_skip() { ((SKIP++)); ((TOTAL++)); echo -e "  ${YELLOW}○${RESET} $1 (skipp
 MOCK_DIR="$(mktemp -d)"
 MOCK_SW="$MOCK_DIR/.shipwright"
 mkdir -p "$MOCK_SW"/{logs,heartbeats,memory,worktrees}
-TEST_PORT=18799
+
+# Skip gracefully if bun is not available
+if ! command -v bun &>/dev/null; then
+    echo -e "\033[38;2;250;204;21m⚠ bun not installed — skipping server API tests\033[0m"
+    echo ""
+    echo "━━━ Results ━━━"
+    echo "  Skipped: bun not available"
+    rm -rf "$MOCK_DIR"
+    exit 0
+fi
+
+# Use a dynamic port to avoid conflicts
+TEST_PORT=$(( (RANDOM % 10000) + 20000 ))
 
 # Create mock data
 echo '{"daemon":"running","active_pipelines":[{"issue":100,"stage":"build","status":"running"}],"queue":["ready-to-build:200"],"machines":["local"],"health":{"daemon":"healthy"}}' > "$MOCK_SW/daemon-state.json"

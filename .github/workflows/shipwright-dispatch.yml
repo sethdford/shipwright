@@ -1,6 +1,6 @@
 name: Shipwright Dispatch
 
-# Bridges ready-to-build labeled issues to pipeline dispatch.
+# Bridges shipwright labeled issues to pipeline dispatch.
 # Runs every 15 minutes — picks up issues that have been triaged and labeled.
 on:
   schedule:
@@ -25,21 +25,21 @@ jobs:
       GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
     steps:
-      - name: Scan and dispatch ready-to-build issues
+      - name: Scan and dispatch shipwright-labeled issues
         run: |
           echo "--- Shipwright Dispatch: $(date -u +%Y-%m-%dT%H:%M:%SZ) ---"
 
-          # Get all open issues with the 'ready-to-build' label
+          # Get all open issues with the 'shipwright' label
           ISSUES=$(gh issue list --repo "$GITHUB_REPOSITORY" \
-            --label ready-to-build --state open --json number,title \
+            --label shipwright --state open --json number,title \
             --jq '.[].number' 2>/dev/null || echo "")
 
           if [[ -z "$ISSUES" ]]; then
-            echo "No open ready-to-build issues found."
+            echo "No open shipwright-labeled issues found."
             exit 0
           fi
 
-          echo "Found ready-to-build issues: $ISSUES"
+          echo "Found shipwright-labeled issues: $ISSUES"
 
           DISPATCHED=0
           SKIPPED=0

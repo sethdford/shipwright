@@ -2,8 +2,8 @@
   "name": "policy-validation",
   "type": "cli",
   "passed": true,
-  "captured_at": "2026-02-17T11:50:21Z",
-  "captured_epoch": 1771329021,
+  "captured_at": "2026-02-18T00:14:09Z",
+  "captured_epoch": 1771373649,
   "details": {
     "command": "jq empty config/policy.json",
     "exit_code": 0,

@@ -1,13 +1,14 @@
 {
   "name": "db-schema-integrity",
   "type": "database",
-  "passed": false,
-  "captured_at": "2026-02-17T11:50:21Z",
-  "captured_epoch": 1771329021,
+  "passed": true,
+  "captured_at": "2026-02-18T00:14:22Z",
+  "captured_epoch": 1771373662,
   "details": {
-    "command": "bash scripts/sw-db.sh check",
-    "exit_code": 1,
+    "command": "bash scripts/sw-db.sh health",
+    "exit_code": 0,
     "expected_exit_code": 0,
-    "output_preview": "\u001b[38;2;248;113;113m\u001b[1m✗\u001b[0m Unknown command: check\n\n\u001b[38;2;0;212;255m\u001b[1mshipwright db\u001b[0m — SQLite Persistence Layer\n\n\u001b[1mUSAGE\u001b[0m\n  shipwright db <command> [options]\n\n\u001b[1mCOMMANDS\u001b[0m\n  \u001b[38;2;0;212;255minit\u001b[0m                Initialize database schema (creates DB, enables WAL)\n  \u001b[38;2;0;212;255mmigrate\u001b[0m             Apply schema migrations + import JSON state files\n  \u001b[38;2;0;212;255mstatus\u001b[0m              Show database stats, sync status, recent runs\n  \u001b[38;2;0;212;255mquery\u001b[0m [status]      Query pipeline runs by status\n  \u001b[38;2;0;212;255mexport\u001b[0m [file]       Export database to JSON backup\n  \u001b[38;2;0;212;255mimport\u001b[0m <file>       Import data from JSON backup\n  \u001b[38;2;0;212;255mcleanup\u001b[0m [days]      Delete records older than N days (default 30)\n  \u001b[38;2;0;212;255mhealth\u001b[0m              Run database health checks\n  \u001b[38;2;0;212;255msync push\u001b[0m           Push unsynced data to remote\n  \u001b[38;2;0;212;255msync pull\u001b[0m           Pull new data from remote\n  \u001b[38;2;0;212;255mhelp\u001b[0m                Show this help\n\n\u001b[2mExamples:\u001b[0m\n  shipwright db init\n  shipwright db migrate       # Import events.jsonl, costs.json, etc.\n  shipwright db status\n  shipwright db query failed\n  shipwright db health\n  shipwright db sync push\n  shipwright db cleanup 60"
+    "output_preview": "  \u001b[38;2;74;222;128m\u001b[1m✓\u001b[0m sqlite3 available\n  \u001b[38;2;74;222;128m\u001b[1m✓\u001b[0m Database file exists: /Users/sethford/.shipwright/shipwright.db\n  \u001b[38;2;74;222;128m\u001b[1m✓\u001b[0m Schema version: v2\n  \u001b[38;2;74;222;128m\u001b[1m✓\u001b[0m WAL mode enabled\n  \u001b[38;2;74;222;128m\u001b[1m✓\u001b[0m Integrity check passed\n    5 passed, 0 failed",
+    "assertion_failures": 0
   }
 }

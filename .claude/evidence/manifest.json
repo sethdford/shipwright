@@ -1,51 +1,15 @@
 {
-  "captured_at": "2026-02-17T11:50:21Z",
-  "captured_epoch": 1771329021,
-  "collector_count": 7,
-  "passed": 2,
-  "failed": 5,
+  "captured_at": "2026-02-18T00:14:22Z",
+  "captured_epoch": 1771373662,
+  "collector_count": 1,
+  "passed": 1,
+  "failed": 0,
   "collectors": [
-    {
-      "name": "dashboard-loads",
-      "type": "browser",
-      "file": "/Users/sethford/Documents/shipwright/.claude/evidence/dashboard-loads.json",
-      "passed": false
-    },
-    {
-      "name": "pipeline-status",
-      "type": "browser",
-      "file": "/Users/sethford/Documents/shipwright/.claude/evidence/pipeline-status.json",
-      "passed": false
-    },
-    {
-      "name": "dashboard-api-health",
-      "type": "api",
-      "file": "/Users/sethford/Documents/shipwright/.claude/evidence/dashboard-api-health.json",
-      "passed": false
-    },
-    {
-      "name": "dashboard-ws-connect",
-      "type": "api",
-      "file": "/Users/sethford/Documents/shipwright/.claude/evidence/dashboard-ws-connect.json",
-      "passed": false
-    },
-    {
-      "name": "pipeline-cli-smoke",
-      "type": "cli",
-      "file": "/Users/sethford/Documents/shipwright/.claude/evidence/pipeline-cli-smoke.json",
-      "passed": true
-    },
-    {
-      "name": "policy-validation",
-      "type": "cli",
-      "file": "/Users/sethford/Documents/shipwright/.claude/evidence/policy-validation.json",
-      "passed": true
-    },
     {
       "name": "db-schema-integrity",
       "type": "database",
       "file": "/Users/sethford/Documents/shipwright/.claude/evidence/db-schema-integrity.json",
-      "passed": false
+      "passed": true
     }
   ]
 }

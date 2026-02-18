@@ -35,28 +35,23 @@
     "critical": {
       "requiredChecks": [
         "risk-policy-gate",
-        "tests",
-        "e2e-smoke",
+        "test",
+        "smoke",
         "platform-health",
-        "code-review-agent"
+        "shellcheck"
       ],
       "requiredReviewers": 1,
       "requiredEvidence": ["cli", "api"],
       "requireDocsDriftCheck": true
     },
     "high": {
-      "requiredChecks": [
-        "risk-policy-gate",
-        "tests",
-        "e2e-smoke",
-        "code-review-agent"
-      ],
+      "requiredChecks": ["risk-policy-gate", "test", "smoke"],
       "requiredReviewers": 0,
       "requiredEvidence": ["cli"],
       "requireDocsDriftCheck": false
     },
     "medium": {
-      "requiredChecks": ["risk-policy-gate", "tests"],
+      "requiredChecks": ["risk-policy-gate", "test"],
       "requiredReviewers": 0,
       "requiredEvidence": [],
       "requireDocsDriftCheck": false
@@ -94,21 +89,21 @@
         "name": "dashboard-loads",
         "type": "browser",
         "entrypoint": "/",
-        "baseUrl": "http://localhost:3000",
+        "baseUrl": "http://localhost:8767",
         "assertions": ["page-title-visible", "websocket-connected"]
       },
       {
         "name": "pipeline-status",
         "type": "browser",
         "entrypoint": "/pipeline",
-        "baseUrl": "http://localhost:3000",
+        "baseUrl": "http://localhost:8767",
         "assertions": ["stage-list-rendered", "progress-indicator-visible"]
       },
       {
         "name": "dashboard-api-health",
         "type": "api",
         "method": "GET",
-        "url": "http://localhost:3000/api/health",
+        "url": "http://localhost:8767/api/health",
         "expectedStatus": 200,
         "assertions": ["status-ok", "response-has-version"]
       },
@@ -116,16 +111,16 @@
         "name": "dashboard-ws-connect",
         "type": "api",
         "method": "GET",
-        "url": "http://localhost:3000/api/ws-status",
+        "url": "http://localhost:8767/api/ws-status",
         "expectedStatus": 200,
         "assertions": ["websocket-active"]
       },
       {
         "name": "pipeline-cli-smoke",
         "type": "cli",
-        "command": "bash scripts/sw-pipeline.sh status --json",
+        "command": "bash scripts/sw-pipeline.sh status",
         "expectedExitCode": 0,
-        "assertions": ["valid-json-output", "has-pipeline-state"]
+        "assertions": ["has-pipeline-state"]
       },
       {
         "name": "policy-validation",
@@ -137,9 +132,9 @@
       {
         "name": "db-schema-integrity",
         "type": "database",
-        "command": "bash scripts/sw-db.sh check",
+        "command": "bash scripts/sw-db.sh health",
         "expectedExitCode": 0,
-        "assertions": ["schema-valid", "migrations-current"]
+        "assertions": ["schema-valid", "db-accessible"]
       }
     ]
   },

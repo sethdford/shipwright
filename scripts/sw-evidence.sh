@@ -84,6 +84,61 @@ get_require_fresh() {
 }
 
 # ═════════════════════════════════════════════════════════════════════════════
+# ASSERTION EVALUATION
+# Checks response body against assertions defined in policy.json.
+# Assertion names map to simple content checks (case-insensitive).
+# Returns the count of failed assertions (0 = all passed).
+# ═════════════════════════════════════════════════════════════════════════════
+
+evaluate_assertions() {
+    local collector_json="$1"
+    local response_body="$2"
+    local failed=0
+
+    local assertions
+    assertions=$(echo "$collector_json" | jq -r '.assertions[]? // empty' 2>/dev/null)
+    [[ -z "$assertions" ]] && { echo "0"; return; }
+
+    while IFS= read -r assertion; do
+        [[ -z "$assertion" ]] && continue
+        local check_passed="false"
+
+        case "$assertion" in
+            # Common assertion patterns — map names to body content checks
+            page-title-visible)
+                echo "$response_body" | grep -qi '<title>' && check_passed="true" ;;
+            websocket-connected|websocket-active)
+                echo "$response_body" | grep -qi 'websocket\|ws://' && check_passed="true" ;;
+            status-ok)
+                echo "$response_body" | grep -qi '"status"' && check_passed="true" ;;
+            response-has-version)
+                echo "$response_body" | grep -qi '"version"' && check_passed="true" ;;
+            valid-json-output|valid-json)
+                echo "$response_body" | jq empty 2>/dev/null && check_passed="true" ;;
+            has-pipeline-state)
+                echo "$response_body" | grep -qi 'pipeline\|status\|stage' && check_passed="true" ;;
+            stage-list-rendered)
+                echo "$response_body" | grep -qi 'stage\|pipeline' && check_passed="true" ;;
+            progress-indicator-visible)
+                echo "$response_body" | grep -qi 'progress\|percent\|stage' && check_passed="true" ;;
+            schema-valid|db-accessible)
+                echo "$response_body" | grep -qi 'schema\|version\|ok\|healthy' && check_passed="true" ;;
+            *)
+                # Generic: check if the assertion name (with hyphens as spaces) appears in body
+                local search_term="${assertion//-/ }"
+                echo "$response_body" | grep -qi "$search_term" && check_passed="true" ;;
+        esac
+
+        if [[ "$check_passed" != "true" ]]; then
+            warn "[assertion] '${assertion}' not satisfied" >&2
+            failed=$((failed + 1))
+        fi
+    done <<< "$assertions"
+
+    echo "$failed"
+}
+
+# ═════════════════════════════════════════════════════════════════════════════
 # TYPE-SPECIFIC COLLECTORS
 # Each returns a JSON evidence record written to EVIDENCE_DIR/<name>.json
 # ═════════════════════════════════════════════════════════════════════════════
@@ -118,9 +173,17 @@ collect_browser() {
     local passed="false"
     [[ "$http_status" -ge 200 && "$http_status" -lt 400 ]] && passed="true"
 
+    # Evaluate assertions against response body (if status check passed)
+    local assertion_failures=0
+    if [[ "$passed" == "true" && -n "$response_body" ]]; then
+        assertion_failures=$(evaluate_assertions "$collector_json" "$response_body")
+        [[ "$assertion_failures" -gt 0 ]] && passed="false"
+    fi
+
     write_evidence_record "$name" "browser" "$passed" \
         "$(jq -n --arg url "$url" --argjson status "$http_status" --argjson size "$response_size" \
-        '{url: $url, http_status: $status, response_size: $size}')"
+        --argjson assertion_failures "$assertion_failures" \
+        '{url: $url, http_status: $status, response_size: $size, assertion_failures: $assertion_failures}')"
 }
 
 # ─── API: REST/GraphQL endpoint verification ─────────────────────────────────
@@ -192,12 +255,19 @@ collect_api() {
         valid_json="true"
     fi
 
+    # Evaluate assertions against response body (if status check passed)
+    local assertion_failures=0
+    if [[ "$passed" == "true" && -n "$response_body" ]]; then
+        assertion_failures=$(evaluate_assertions "$collector_json" "$response_body")
+        [[ "$assertion_failures" -gt 0 ]] && passed="false"
+    fi
+
     write_evidence_record "$name" "api" "$passed" \
         "$(jq -n --arg url "$url" --arg method "$method" \
         --argjson status "$http_status" --argjson expected "$expected_status" \
         --argjson size "$response_size" --arg content_type "$content_type" \
-        --arg valid_json "$valid_json" \
-        '{url: $url, method: $method, http_status: $status, expected_status: $expected, response_size: $size, content_type: $content_type, valid_json: ($valid_json == "true")}')"
+        --arg valid_json "$valid_json" --argjson assertion_failures "$assertion_failures" \
+        '{url: $url, method: $method, http_status: $status, expected_status: $expected, response_size: $size, content_type: $content_type, valid_json: ($valid_json == "true"), assertion_failures: $assertion_failures}')"
 }
 
 # ─── CLI: Execute a command and check exit code ──────────────────────────────
@@ -234,6 +304,13 @@ collect_cli() {
     local valid_json="false"
     if echo "$output" | jq empty 2>/dev/null; then
         valid_json="true"
+    fi
+
+    # Evaluate assertions against command output (if exit code check passed)
+    local assertion_failures=0
+    if [[ "$passed" == "true" && -n "$output" ]]; then
+        assertion_failures=$(evaluate_assertions "$collector_json" "$output")
+        [[ "$assertion_failures" -gt 0 ]] && passed="false"
     fi
 
     local output_size=${#output}
@@ -274,12 +351,20 @@ collect_database() {
     local passed="false"
     [[ "$exit_code" -eq "$expected_exit" ]] && passed="true"
 
+    # Evaluate assertions against command output (if exit code check passed)
+    local assertion_failures=0
+    if [[ "$passed" == "true" && -n "$output" ]]; then
+        assertion_failures=$(evaluate_assertions "$collector_json" "$output")
+        [[ "$assertion_failures" -gt 0 ]] && passed="false"
+    fi
+
     local output_preview="${output:0:2000}"
 
     write_evidence_record "$name" "database" "$passed" \
         "$(jq -n --arg cmd "$command_str" --argjson exit_code "$exit_code" \
         --argjson expected "$expected_exit" --arg output_preview "$output_preview" \
-        '{command: $cmd, exit_code: $exit_code, expected_exit_code: $expected, output_preview: $output_preview}')"
+        --argjson assertion_failures "$assertion_failures" \
+        '{command: $cmd, exit_code: $exit_code, expected_exit_code: $expected, output_preview: $output_preview, assertion_failures: $assertion_failures}')"
 }
 
 # ─── Webhook: Issue a callback and verify response ───────────────────────────

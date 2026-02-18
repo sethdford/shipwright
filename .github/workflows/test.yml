@@ -116,4 +116,4 @@ jobs:
 
       - name: Lint scripts
         run: |
-          shellcheck -x scripts/sw scripts/sw-*.sh install.sh || true
+          shellcheck -x -S warning scripts/sw scripts/sw-*.sh install.sh

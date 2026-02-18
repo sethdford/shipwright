@@ -8,7 +8,7 @@ trap 'echo "ERROR: $BASH_SOURCE:$LINENO exited with status $?" >&2' ERR
 
 VERSION="2.4.0"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-REPO_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
+REPO_DIR="${SHIPWRIGHT_REPO_DIR:-$(cd "$SCRIPT_DIR/.." && pwd)}"
 
 # ─── Cross-platform compatibility ──────────────────────────────────────────
 # shellcheck source=lib/compat.sh
@@ -484,9 +484,9 @@ gather_context() {
 # ─── Show current bundle ───────────────────────────────────────────────────
 show_context() {
     if [[ ! -f "$CONTEXT_BUNDLE" ]]; then
-        warn "No context bundle found at ${CONTEXT_BUNDLE}"
-        echo "Run '${CYAN}shipwright context gather --goal \"...\" --stage plan${RESET}' first"
-        return 1
+        echo "Pipeline Context — No bundle generated yet"
+        echo "Run '${CYAN}shipwright context gather --goal \"...\" --stage plan${RESET}' to create one"
+        return 0
     fi
 
     cat "$CONTEXT_BUNDLE"
@@ -498,7 +498,7 @@ clear_context() {
         rm -f "$CONTEXT_BUNDLE"
         success "Context bundle cleared"
     else
-        warn "No context bundle to clear"
+        info "No context bundle to clear — already cleared"
     fi
 }
 

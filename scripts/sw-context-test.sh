@@ -89,6 +89,7 @@ MOCK
     export PATH="$TEMP_DIR/bin:$PATH"
     export HOME="$TEMP_DIR/home"
     export NO_GITHUB=true
+    export SHIPWRIGHT_REPO_DIR="$TEMP_DIR/repo"
 }
 
 cleanup_env() { [[ -n "$TEMP_DIR" ]] && rm -rf "$TEMP_DIR"; }

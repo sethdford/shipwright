@@ -204,14 +204,14 @@ jobs:
 
             RESPONSE=$(claude -p "$PROMPT_TEXT" --max-turns 1 --model claude-haiku-4-5-20251001 2>/dev/null || echo "")
 
-            # Fallback if response is empty
+            # Fail-safe: if Claude returns empty/garbage, reject (do not auto-approve)
             if [[ -z "$RESPONSE" ]]; then
-              RESPONSE="APPROVED: true
+              RESPONSE="APPROVED: false
           COMPLEXITY: standard
           TEMPLATE: standard
           MAX_ITERATIONS: 20
           ESTIMATED_MINUTES: 90
-          REASON: Claude triage call failed — defaulting to approved"
+          REASON: Claude triage call failed or returned empty — rejecting for safety"
             fi
           fi
 
@@ -220,10 +220,10 @@ jobs:
           COMPLEXITY=$(echo "$RESPONSE" | grep -i "^COMPLEXITY:" | head -1 | awk '{print $2}' | tr '[:upper:]' '[:lower:]')
           REASON=$(echo "$RESPONSE" | grep -i "^REASON:" | head -1 | sed 's/^REASON: *//')
 
-          # Defaults if parsing fails
-          APPROVED="${APPROVED:-true}"
+          # Fail-safe defaults: never auto-approve on parse failure
+          APPROVED="${APPROVED:-false}"
           COMPLEXITY="${COMPLEXITY:-standard}"
-          REASON="${REASON:-Could not parse triage response}"
+          REASON="${REASON:-Could not parse triage response — rejecting for safety}"
 
           echo "approved=$APPROVED" >> "$GITHUB_OUTPUT"
           echo "complexity=$COMPLEXITY" >> "$GITHUB_OUTPUT"
