@@ -489,7 +489,7 @@ All scripts are bash (except the dashboard server in TypeScript). Grouped by lay
 | `scripts/sw-checkpoint.sh` | 480 | Save and restore agent state mid-stage |
 | `scripts/sw-ci.sh` | 590 | GitHub Actions CI/CD Orchestration |
 | `scripts/sw-cleanup.sh` | 376 | Clean up orphaned Claude team sessions & artifacts |
-| `scripts/sw-code-review.sh` | 692 | Clean Code & Architecture Analysis |
+| `scripts/sw-code-review.sh` | 690 | Clean Code & Architecture Analysis |
 | `scripts/sw-connect.sh` | 630 | Sync local state to team dashboard |
 | `scripts/sw-context.sh` | 616 | Context Engine for Pipeline Stages |
 | `scripts/sw-cost.sh` | 955 | Token Usage & Cost Intelligence |
@@ -508,7 +508,7 @@ All scripts are bash (except the dashboard server in TypeScript). Grouped by lay
 | `scripts/sw-durable.sh` | 720 | Durable Workflow Engine |
 | `scripts/sw-e2e-orchestrator.sh` | 550 | Test suite registry & execution |
 | `scripts/sw-eventbus.sh` | 406 | Durable event bus for real-time inter-component |
-| `scripts/sw-evidence.sh` | 664 | Machine-Verifiable Proof for Agent Deliveries |
+| `scripts/sw-evidence.sh` | 749 | Machine-Verifiable Proof for Agent Deliveries |
 | `scripts/sw-feedback.sh` | 468 | Production Feedback Loop |
 | `scripts/sw-fix.sh` | 473 | Bulk Fix Across Multiple Repos |
 | `scripts/sw-fleet-discover.sh` | 556 | Auto-Discovery from GitHub Orgs |
@@ -517,7 +517,7 @@ All scripts are bash (except the dashboard server in TypeScript). Grouped by lay
 | `scripts/sw-guild.sh` | 562 | Knowledge Guilds & Cross-Team Learning |
 | `scripts/sw-heartbeat.sh` | 304 | File-based agent heartbeat protocol |
 | `scripts/sw-hygiene.sh` | 651 | Repository Organization & Cleanup |
-| `scripts/sw-incident.sh` | 890 | Autonomous Incident Detection & Response |
+| `scripts/sw-incident.sh` | 903 | Autonomous Incident Detection & Response |
 | `scripts/sw-init.sh` | 860 | Complete setup for Shipwright + Shipwright |
 | `scripts/sw-instrument.sh` | 693 | Pipeline Instrumentation & Feedback Loops |
 | `scripts/sw-intelligence.sh` | 1195 | AI-Powered Analysis & Decision Engine |
@@ -536,7 +536,7 @@ All scripts are bash (except the dashboard server in TypeScript). Grouped by lay
 | `scripts/sw-pipeline-vitals.sh` | 1080 | Pipeline Vitals Engine |
 | `scripts/sw-pipeline.sh` | 2437 | Autonomous Feature Delivery (Idea → Production) |
 | `scripts/sw-pm.sh` | 751 | Autonomous PM Agent for Team Orchestration |
-| `scripts/sw-pr-lifecycle.sh` | 682 | Autonomous PR Management |
+| `scripts/sw-pr-lifecycle.sh` | 702 | Autonomous PR Management |
 | `scripts/sw-predictive.sh` | 828 | Predictive & Proactive Intelligence |
 | `scripts/sw-prep.sh` | 1658 | Repository Preparation for Agent Teams |
 | `scripts/sw-ps.sh` | 186 | Show running agent process status |
@@ -630,10 +630,10 @@ All scripts are bash (except the dashboard server in TypeScript). Grouped by lay
 | `scripts/sw-cleanup-test.sh` | 186 | Clean up orphaned sessions & artifacts |
 | `scripts/sw-code-review-test.sh` | 229 | Clean code & architecture analysis tests |
 | `scripts/sw-connect-test.sh` | 831 | Validate dashboard connection, heartbeat |
-| `scripts/sw-context-test.sh` | 239 | Context Engine for Pipeline Stages tests |
+| `scripts/sw-context-test.sh` | 240 | Context Engine for Pipeline Stages tests |
 | `scripts/sw-cost-test.sh` | 230 | Validate token usage & cost intelligence |
 | `scripts/sw-daemon-test.sh` | 1988 | Unit tests for daemon metrics, health, alerting |
-| `scripts/sw-dashboard-e2e-test.sh` | 597 | full live validation |
+| `scripts/sw-dashboard-e2e-test.sh` | 600 | full live validation |
 | `scripts/sw-dashboard-test.sh` | 254 | validates dashboard structure |
 | `scripts/sw-db-test.sh` | 980 | SQLite Persistence Layer Test Suite |
 | `scripts/sw-decompose-test.sh` | 160 | Intelligent Issue Decomposition tests |
@@ -702,7 +702,7 @@ All scripts are bash (except the dashboard server in TypeScript). Grouped by lay
 | `scripts/sw-scale-test.sh` | 172 | Dynamic agent team scaling |
 | `scripts/sw-security-audit-test.sh` | 219 | Security auditing tests |
 | `scripts/sw-self-optimize-test.sh` | 725 | Unit tests for learning & tuning system |
-| `scripts/sw-server-api-test.sh` | 687 | Dashboard Server API Test Suite |
+| `scripts/sw-server-api-test.sh` | 699 | Dashboard Server API Test Suite |
 | `scripts/sw-session-test.sh` | 591 | E2E validation of session creation flow |
 | `scripts/sw-setup-test.sh` | 302 | Validate comprehensive onboarding wizard |
 | `scripts/sw-standup-test.sh` | 271 | Validate daily standup automation |
