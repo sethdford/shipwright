@@ -35,9 +35,9 @@
     },
     "d41d8cd98f00b204e9800998ecf8427e": {
       "result": {
-        "raw_response": "Mock claude response"
+        "raw_response": "# Implementation Plan\n\n## Files to Modify\n- src/auth.js\n\n### Task Checklist\n- [ ] Create auth module\n- [ ] Add JWT validation\n\n### Definition of Done\n- [ ] All tests pass"
       },
-      "timestamp": 1771276283,
+      "timestamp": 1771463847,
       "ttl": 3600
     },
     "efd5524ad1244fd20344bf3ff5d95233": {
@@ -256,6 +256,27 @@
       },
       "timestamp": 1771260287,
       "ttl": 1800
+    },
+    "": {
+      "result": [
+        {
+          "type": "result",
+          "result": "I am trying the same approach again.",
+          "usage": {
+            "input_tokens": 0,
+            "output_tokens": 0
+          }
+        }
+      ],
+      "timestamp": 1771462606,
+      "ttl": 1800
+    },
+    "fdbb7bc340414cf938cecd4b790fa9e2": {
+      "result": {
+        "raw_response": "ok"
+      },
+      "timestamp": 1771463517,
+      "ttl": 3600
     }
   }
 }
