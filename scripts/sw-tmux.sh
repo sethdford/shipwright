@@ -11,7 +11,7 @@
 # ║    shipwright tmux fix           — Auto-fix common issues              ║
 # ║    shipwright tmux reload        — Reload tmux config                  ║
 # ╚═══════════════════════════════════════════════════════════════════════════╝
-VERSION="2.5.0"
+VERSION="3.0.0"
 set -euo pipefail
 trap 'echo "ERROR: $BASH_SOURCE:$LINENO exited with status $?" >&2' ERR
 

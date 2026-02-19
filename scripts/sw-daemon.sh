@@ -9,7 +9,7 @@ trap 'echo "ERROR: $BASH_SOURCE:$LINENO exited with status $?" >&2' ERR
 # Allow spawning Claude CLI from within a Claude Code session (daemon, fleet, etc.)
 unset CLAUDECODE 2>/dev/null || true
 
-VERSION="2.5.0"
+VERSION="3.0.0"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
 

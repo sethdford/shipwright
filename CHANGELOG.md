@@ -7,7 +7,21 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ---
 
-## [Unreleased]
+## [3.0.0] — 2026-02-16
+
+### Architecture Overhaul
+
+- **Configuration System**: Centralized all ~200+ magic numbers into `config/defaults.json` + `lib/config.sh` with 4-layer precedence (env var > daemon-config > policy > defaults)
+- **Database as Source of Truth**: SQLite is now the primary read/write path for daemon state, heartbeats, costs, pipeline runs, and memory (file fallback preserved)
+- **Unified Event System**: Consolidated 3 event stores (`events.jsonl`, `eventbus.jsonl`, `durable/event-log/events.jsonl`) into single SQLite `events` table with consumer offset tracking
+- **Durable Workflows**: Pipeline stages save durable checkpoints to DB for crash recovery and resume
+- **Real-time Event Streaming**: New `/ws/events` WebSocket endpoint streams raw events to the dashboard
+- **Thompson Sampling**: Template selection uses Beta distribution sampling over historical success rates per complexity tier
+- **UCB1 Model Routing**: Model selection balances exploration/exploitation across stages using upper confidence bounds
+- **Semantic Memory Search**: Keyword-relevance search over `memory_embeddings` table with stop-word filtering and scoring
+- **Reasoning Traces**: Multi-step autonomous reasoning (complexity analysis, template selection, similar issues, failure prediction) stored in DB
+- **Adaptive Thresholds**: Quality and anomaly thresholds computed from historical metric distributions (mean + N\*stddev)
+- **Dead Code Removal**: Removed duplicate `emit_event`, color definitions, and helpers from 90+ scripts; removed hygiene scanner artificial limits
 
 ### Fixed
 

@@ -8,7 +8,7 @@
 # ║                                                                          ║
 # ║  --deploy  Detect platform and generate deployed.json template          ║
 # ╚═══════════════════════════════════════════════════════════════════════════╝
-VERSION="2.5.0"
+VERSION="3.0.0"
 set -euo pipefail
 trap 'echo "ERROR: $BASH_SOURCE:$LINENO exited with status $?" >&2' ERR
 trap 'rm -f "${tmp:-}"' EXIT

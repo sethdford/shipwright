@@ -8,7 +8,7 @@
 # Run after release artifacts are uploaded to GitHub Releases.
 set -euo pipefail
 
-VERSION="2.5.0"
+VERSION="3.0.0"
 VERSION_NUM="${VERSION#v}"
 REPO="${SHIPWRIGHT_GITHUB_REPO:-sethdford/shipwright}"
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"

@@ -9,7 +9,7 @@ set -euo pipefail
 HOME="${HOME:-${USERPROFILE:-$(eval echo ~$(id -un 2>/dev/null || whoami 2>/dev/null))}}"
 [[ -z "$HOME" ]] && { echo "Error: could not determine HOME directory"; exit 1; }
 
-VERSION="2.5.0"
+VERSION="3.0.0"
 REPO="${SHIPWRIGHT_GITHUB_REPO:-sethdford/shipwright}"
 INSTALL_DIR="${SHIPWRIGHT_INSTALL_DIR:-$HOME/.local/bin}"
 INSTALL_LIB="${SHIPWRIGHT_INSTALL_LIB:-$HOME/.local/lib/shipwright}"

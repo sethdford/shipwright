@@ -5,7 +5,7 @@
 # ║  Default: dry-run (shows what would be cleaned).                         ║
 # ║  Use --force to actually kill sessions and remove files.                 ║
 # ╚═══════════════════════════════════════════════════════════════════════════╝
-VERSION="2.5.0"
+VERSION="3.0.0"
 set -euo pipefail
 trap 'echo "ERROR: $BASH_SOURCE:$LINENO exited with status $?" >&2' ERR
 
