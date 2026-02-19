@@ -105,29 +105,29 @@ assert_eq "publish exits 0" "0" "$rc"
 assert_contains "publish confirms" "$output" "Published event"
 
 # ─── Test 6: eventbus file created ─────────────────────────────────────────
-if [[ -f "$HOME/.shipwright/eventbus.jsonl" ]]; then
-    assert_pass "eventbus.jsonl created"
+if [[ -f "$HOME/.shipwright/events.jsonl" ]]; then
+    assert_pass "events.jsonl created"
 else
-    assert_fail "eventbus.jsonl created"
+    assert_fail "events.jsonl created"
 fi
 
 # ─── Test 7: eventbus file has valid JSONL ─────────────────────────────────
-line=$(head -1 "$HOME/.shipwright/eventbus.jsonl" 2>/dev/null || echo "")
+line=$(head -1 "$HOME/.shipwright/events.jsonl" 2>/dev/null || echo "")
 if echo "$line" | grep -qF "stage.complete"; then
-    assert_pass "eventbus.jsonl contains published event type"
+    assert_pass "events.jsonl contains published event type"
 else
-    assert_fail "eventbus.jsonl contains published event type" "line: $line"
+    assert_fail "events.jsonl contains published event type" "line: $line"
 fi
 if echo "$line" | grep -qF "corr-123"; then
-    assert_pass "eventbus.jsonl contains correlation_id"
+    assert_pass "events.jsonl contains correlation_id"
 else
-    assert_fail "eventbus.jsonl contains correlation_id" "line: $line"
+    assert_fail "events.jsonl contains correlation_id" "line: $line"
 fi
 
 # ─── Test 8: publish multiple events ──────────────────────────────────────
 bash "$SCRIPT_DIR/sw-eventbus.sh" publish "stage.start" "daemon" "corr-456" '{}' >/dev/null 2>&1
 bash "$SCRIPT_DIR/sw-eventbus.sh" publish "pipeline.done" "loop" "corr-789" '{}' >/dev/null 2>&1
-line_count=$(wc -l < "$HOME/.shipwright/eventbus.jsonl" 2>/dev/null || echo 0)
+line_count=$(wc -l < "$HOME/.shipwright/events.jsonl" 2>/dev/null || echo 0)
 line_count=$(echo "$line_count" | tr -d ' ')
 if [[ "$line_count" -ge 3 ]]; then
     assert_pass "eventbus has 3+ events after multi-publish"

@@ -335,6 +335,37 @@ fi
 
 echo ""
 
+# ─── 9. Save-context / Restore-context ─────────────────────────────────────────
+echo -e "${BOLD}  Save-context / Restore-context${RESET}"
+
+# Create build context via save-context (SW_LOOP_* env vars)
+export SW_LOOP_GOAL="Fix the auth bug"
+export SW_LOOP_FINDINGS="Found issue in middleware"
+export SW_LOOP_MODIFIED="src/auth.ts,src/middleware.ts"
+export SW_LOOP_TEST_OUTPUT="1 test failed"
+export SW_LOOP_ITERATION="5"
+export SW_LOOP_STATUS="running"
+bash "$SRC" save-context --stage build 2>/dev/null || true
+CTX_FILE=".claude/pipeline-artifacts/checkpoints/build-claude-context.json"
+if [[ -f "$CTX_FILE" ]]; then
+    assert_pass "save-context creates claude-context.json"
+else
+    assert_fail "save-context creates claude-context.json"
+fi
+
+# Verify saved context contents
+CTX_GOAL=$(jq -r '.goal // empty' "$CTX_FILE" 2>/dev/null || echo "")
+CTX_ITER=$(jq -r '.iteration // 0' "$CTX_FILE" 2>/dev/null || echo "0")
+assert_eq "Context goal saved correctly" "Fix the auth bug" "$CTX_GOAL"
+assert_eq "Context iteration saved correctly" "5" "$CTX_ITER"
+
+# restore-context exports both RESTORED_* and SW_LOOP_* (run in subshell, eval exports)
+RESTORE_OUT=$(bash -c "source \"$SRC\" && checkpoint_restore_context build && echo \"RESTORED_GOAL=\$RESTORED_GOAL\" && echo \"SW_LOOP_GOAL=\$SW_LOOP_GOAL\"" 2>/dev/null) || true
+assert_contains "restore-context exports RESTORED_GOAL" "$RESTORE_OUT" "RESTORED_GOAL=Fix the auth bug"
+assert_contains "restore-context exports SW_LOOP_GOAL" "$RESTORE_OUT" "SW_LOOP_GOAL=Fix the auth bug"
+
+echo ""
+
 # ─── Results ─────────────────────────────────────────────────────────────────
 echo ""
 echo -e "${DIM}  ──────────────────────────────────────────${RESET}"

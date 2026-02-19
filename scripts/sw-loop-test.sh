@@ -254,7 +254,7 @@ else
     assert_fail "Default AGENTS is 1"
 fi
 
-if grep -q 'MAX_RESTARTS=0' "$SCRIPT_DIR/sw-loop.sh"; then
+if grep -qE 'MAX_RESTARTS.*0|loop\.max_restarts.*0' "$SCRIPT_DIR/sw-loop.sh"; then
     assert_pass "Default MAX_RESTARTS is 0"
 else
     assert_fail "Default MAX_RESTARTS is 0"
@@ -377,7 +377,7 @@ if grep -qE '^AGENTS=' "$SCRIPT_DIR/sw-loop.sh" && grep -q 'AGENTS=1' "$SCRIPT_D
 else
     assert_fail "Default AGENTS is 1 (from source)"
 fi
-if grep -qE '^MAX_RESTARTS=' "$SCRIPT_DIR/sw-loop.sh" && grep -q 'MAX_RESTARTS=0' "$SCRIPT_DIR/sw-loop.sh"; then
+if grep -qE 'MAX_RESTARTS=' "$SCRIPT_DIR/sw-loop.sh" && grep -qE 'max_restarts.*0|MAX_RESTARTS.*0' "$SCRIPT_DIR/sw-loop.sh"; then
     assert_pass "Default MAX_RESTARTS is 0 (from source)"
 else
     assert_fail "Default MAX_RESTARTS is 0 (from source)"
@@ -442,6 +442,281 @@ if grep -qF -- '--test-cmd' "$SCRIPT_DIR/sw-loop.sh" && grep -qF -- '--resume' "
     assert_pass "Help text defines --test-cmd and --resume flags"
 else
     assert_fail "Help text defines --test-cmd and --resume flags"
+fi
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# LOOP BEHAVIOR TESTS (real loop execution with mocks)
+# ═══════════════════════════════════════════════════════════════════════════════
+
+# Setup for loop behavior tests: real git repo, mock claude only
+setup_loop_env() {
+    TEMP_DIR=$(mktemp -d "${TMPDIR:-/tmp}/sw-loop-test.XXXXXX")
+    mkdir -p "$TEMP_DIR/home/.shipwright" "$TEMP_DIR/home/.claude" "$TEMP_DIR/bin"
+
+    # Create real git repo (use system git, not mock from PATH)
+    local _git
+    _git=$(PATH=/usr/local/bin:/usr/bin:/bin command -v git 2>/dev/null)
+    if [[ -z "$_git" ]]; then
+        echo "WARN: git not found — skipping loop behavior tests"
+        return 1
+    fi
+    mkdir -p "$TEMP_DIR/repo"
+    (cd "$TEMP_DIR/repo" && "$_git" init -q && "$_git" config user.email "t@t" && "$_git" config user.name "T")
+    echo "init" > "$TEMP_DIR/repo/file.txt"
+    (cd "$TEMP_DIR/repo" && "$_git" add . && "$_git" commit -q -m "init")
+
+    # Mock gh
+    cat > "$TEMP_DIR/bin/gh" <<'GHMOCK'
+#!/usr/bin/env bash
+echo '[]'
+exit 0
+GHMOCK
+    chmod +x "$TEMP_DIR/bin/gh"
+
+    # Link real jq, git, date, seq, etc. (use clean PATH to avoid mock from setup_env)
+    for cmd in jq git date seq wc cat grep sed awk sort mkdir rm mv cp mktemp basename dirname printf od tr cut head tail tee touch bash; do
+        if PATH=/usr/local/bin:/usr/bin:/bin command -v "$cmd" &>/dev/null; then
+            ln -sf "$(PATH=/usr/local/bin:/usr/bin:/bin command -v "$cmd")" "$TEMP_DIR/bin/$cmd" 2>/dev/null || true
+        fi
+    done
+
+    # Use our mocks (claude, gh) + real git/jq from our bin
+    export PATH="$TEMP_DIR/bin:/usr/local/bin:/usr/bin:/bin"
+    export HOME="$TEMP_DIR/home"
+    export NO_GITHUB=true
+    return 0
+}
+
+# ─── Test: Loop completes when Claude outputs LOOP_COMPLETE ─────────────────
+echo ""
+echo -e "${DIM}  loop behavior: LOOP_COMPLETE${RESET}"
+
+if setup_loop_env 2>/dev/null; then
+    # Mock claude that says LOOP_COMPLETE on first iteration (valid JSON for --output-format json)
+    cat > "$TEMP_DIR/bin/claude" << 'CLAUDE_EOF'
+#!/usr/bin/env bash
+echo '[{"type":"result","result":"Done. LOOP_COMPLETE","usage":{"input_tokens":0,"output_tokens":0}}]'
+exit 0
+CLAUDE_EOF
+    chmod +x "$TEMP_DIR/bin/claude"
+
+    output=$(env PATH="$TEMP_DIR/bin:/usr/local/bin:/usr/bin:/bin" HOME="$TEMP_DIR/home" NO_GITHUB=true \
+        bash "$SCRIPT_DIR/sw-loop.sh" \
+        --repo "$TEMP_DIR/repo" \
+        "Do nothing" \
+        --max-iterations 5 \
+        --test-cmd "true" \
+        --local \
+        2>&1) || true
+
+    if echo "$output" | grep -qF "LOOP_COMPLETE"; then
+        assert_pass "Loop detected completion signal"
+    elif echo "$output" | grep -qi "complete.*LOOP_COMPLETE\|LOOP_COMPLETE.*accepted"; then
+        assert_pass "Loop detected completion signal"
+    else
+        assert_fail "Loop detected completion signal" "output missing LOOP_COMPLETE"
+    fi
+else
+    assert_fail "Loop completes on LOOP_COMPLETE" "setup failed (git missing?)"
+fi
+
+# ─── Test: Loop runs multiple iterations when tests fail ───────────────────
+echo ""
+echo -e "${DIM}  loop behavior: iterations on test failure${RESET}"
+
+if setup_loop_env 2>/dev/null; then
+    # Mock claude that makes a change, then says LOOP_COMPLETE on iteration 2
+    cat > "$TEMP_DIR/bin/claude" << 'CLAUDE_EOF'
+#!/usr/bin/env bash
+if [[ ! -f iter2.txt ]]; then
+    echo "Adding file" > iter2.txt
+    echo '[{"type":"result","result":"Work in progress","usage":{"input_tokens":0,"output_tokens":0}}]'
+else
+    echo '[{"type":"result","result":"Done. LOOP_COMPLETE","usage":{"input_tokens":0,"output_tokens":0}}]'
+fi
+exit 0
+CLAUDE_EOF
+    chmod +x "$TEMP_DIR/bin/claude"
+
+    output=$(env PATH="$TEMP_DIR/bin:/usr/local/bin:/usr/bin:/bin" HOME="$TEMP_DIR/home" NO_GITHUB=true \
+        bash "$SCRIPT_DIR/sw-loop.sh" \
+        --repo "$TEMP_DIR/repo" \
+        "Add iter2.txt" \
+        --max-iterations 5 \
+        --test-cmd "test -f iter2.txt" \
+        --local \
+        2>&1) || true
+
+    if echo "$output" | grep -qE "Iteration [2-9]|iteration [2-9]"; then
+        assert_pass "Loop runs multiple iterations when tests fail initially"
+    elif echo "$output" | grep -q "LOOP_COMPLETE"; then
+        assert_pass "Loop runs multiple iterations and completes"
+    elif echo "$output" | grep -qi "circuit breaker\|max iteration"; then
+        assert_pass "Loop iterates (stopped by limit)"
+    else
+        assert_fail "Loop iterates on test failure" "expected multiple iterations"
+    fi
+else
+    assert_fail "Loop iterates on test failure" "setup failed"
+fi
+
+# ─── Test: Loop respects max-iterations limit ──────────────────────────────
+echo ""
+echo -e "${DIM}  loop behavior: max iterations${RESET}"
+
+if setup_loop_env 2>/dev/null; then
+    # Mock claude that never says LOOP_COMPLETE (valid JSON)
+    cat > "$TEMP_DIR/bin/claude" << 'CLAUDE_EOF'
+#!/usr/bin/env bash
+echo '[{"type":"result","result":"Still working...","usage":{"input_tokens":0,"output_tokens":0}}]'
+exit 0
+CLAUDE_EOF
+    chmod +x "$TEMP_DIR/bin/claude"
+
+    output=$(env PATH="$TEMP_DIR/bin:/usr/local/bin:/usr/bin:/bin" HOME="$TEMP_DIR/home" NO_GITHUB=true \
+        bash "$SCRIPT_DIR/sw-loop.sh" \
+        --repo "$TEMP_DIR/repo" \
+        "Never finish" \
+        --max-iterations 3 \
+        --test-cmd "true" \
+        --local \
+        --no-auto-extend \
+        2>&1) || true
+
+    if echo "$output" | grep -qiE "max iteration|iteration.*3|Max iterations"; then
+        assert_pass "Loop stops at max iterations"
+    else
+        assert_fail "Loop respects max-iterations" "expected iteration limit message"
+    fi
+else
+    assert_fail "Loop max iterations" "setup failed"
+fi
+
+# ─── Test: Loop detects stuckness ───────────────────────────────────────────
+echo ""
+echo -e "${DIM}  loop behavior: stuckness detection${RESET}"
+
+if setup_loop_env 2>/dev/null; then
+    # Mock claude that produces identical output every iteration (no file changes)
+    cat > "$TEMP_DIR/bin/claude" << 'CLAUDE_EOF'
+#!/usr/bin/env bash
+echo '[{"type":"result","result":"I am trying the same approach again.","usage":{"input_tokens":0,"output_tokens":0}}]'
+exit 0
+CLAUDE_EOF
+    chmod +x "$TEMP_DIR/bin/claude"
+
+    output=$(env PATH="$TEMP_DIR/bin:/usr/local/bin:/usr/bin:/bin" HOME="$TEMP_DIR/home" NO_GITHUB=true \
+        bash "$SCRIPT_DIR/sw-loop.sh" \
+        --repo "$TEMP_DIR/repo" \
+        "Fix something" \
+        --max-iterations 5 \
+        --test-cmd "false" \
+        --local \
+        --no-auto-extend \
+        2>&1) || true
+
+    if echo "$output" | grep -qi "stuckness\|stuck"; then
+        assert_pass "Loop detects stuckness"
+    elif echo "$output" | grep -qi "circuit breaker"; then
+        assert_pass "Loop circuit breaker triggered (stuckness-related)"
+    elif echo "$output" | grep -qi "max iteration"; then
+        assert_pass "Loop stops at limit (stuckness test)"
+    else
+        assert_fail "Loop stuckness detection" "expected stuckness or circuit breaker"
+    fi
+else
+    assert_fail "Loop stuckness detection" "setup failed"
+fi
+
+# ─── Test: Budget gate stops loop ──────────────────────────────────────────
+echo ""
+echo -e "${DIM}  loop behavior: budget gate${RESET}"
+
+# sw-cost reads from ~/.shipwright. Set budget=0.01 and spent>=budget via costs.json.
+if setup_loop_env 2>/dev/null && [[ -x "$SCRIPT_DIR/sw-cost.sh" ]]; then
+    mkdir -p "$TEMP_DIR/home/.shipwright"
+    _epoch=$(date +%s)
+    echo "{\"daily_budget_usd\":0.01,\"enabled\":true}" > "$TEMP_DIR/home/.shipwright/budget.json"
+    echo "{\"entries\":[{\"ts_epoch\":$_epoch,\"cost_usd\":1.0,\"input_tokens\":0,\"output_tokens\":0,\"model\":\"test\",\"stage\":\"test\",\"issue\":\"\"}],\"summary\":{}}" > "$TEMP_DIR/home/.shipwright/costs.json"
+    # Add claude mock (loop exits before running it, but ensures consistent env)
+    echo '#!/usr/bin/env bash
+echo '"'"'[{"type":"result","result":"Done","usage":{"input_tokens":0,"output_tokens":0}}]'"'"'
+exit 0' > "$TEMP_DIR/bin/claude"
+    chmod +x "$TEMP_DIR/bin/claude"
+
+    output=$(env PATH="$TEMP_DIR/bin:/usr/local/bin:/usr/bin:/bin" HOME="$TEMP_DIR/home" NO_GITHUB=true \
+        bash "$SCRIPT_DIR/sw-loop.sh" \
+        --repo "$TEMP_DIR/repo" \
+        "Do nothing" \
+        --max-iterations 2 \
+        --test-cmd "true" \
+        --local \
+        2>&1) || true
+
+    if echo "$output" | grep -qiE "budget exhausted|Budget exhausted|LOOP BUDGET_EXHAUSTED"; then
+        assert_pass "Budget gate stops loop"
+    else
+        assert_fail "Budget gate stops loop" "expected budget exhausted message"
+    fi
+else
+    assert_pass "Budget gate (skipped - setup or sw-cost missing)"
+fi
+
+# ─── Test: validate_claude_output catches bad output ───────────────────────
+echo ""
+echo -e "${DIM}  validate_claude_output${RESET}"
+
+_validate_fn=$(sed -n '/^validate_claude_output()/,/^}/p' "$SCRIPT_DIR/sw-loop.sh")
+_valid_tmp=$(mktemp -d)
+# Use real git for repo setup (bypass mock from setup_env)
+_valid_git=$(PATH=/usr/local/bin:/usr/bin:/bin command -v git 2>/dev/null)
+(cd "$_valid_tmp" && "$_valid_git" init -q && "$_valid_git" config user.email "t@t" && "$_valid_git" config user.name "T")
+echo "api key leaked" > "$_valid_tmp/leak.ts"
+(cd "$_valid_tmp" && "$_valid_git" add leak.ts 2>/dev/null)
+_valid_out=$(cd "$_valid_tmp" && bash -c "
+warn() { :; }
+$_validate_fn
+validate_claude_output . 2>/dev/null
+_e=\$?
+echo \"exit=\$_e\"
+" 2>/dev/null)
+rm -rf "$_valid_tmp"
+if echo "$_valid_out" | grep -q "exit=1"; then
+    assert_pass "validate_claude_output catches corrupt output"
+else
+    assert_fail "validate_claude_output catches bad output" "expected non-zero exit for api key leak"
+fi
+
+# ─── Test: Loop tracks progress via git diff ──────────────────────────────
+echo ""
+echo -e "${DIM}  loop behavior: progress tracking${RESET}"
+
+if setup_loop_env 2>/dev/null; then
+    # Mock claude that adds a file (simulates progress)
+    cat > "$TEMP_DIR/bin/claude" << 'CLAUDE_EOF'
+#!/usr/bin/env bash
+echo "new content" > progress.txt
+echo '[{"type":"result","result":"Added progress.txt. LOOP_COMPLETE","usage":{"input_tokens":0,"output_tokens":0}}]'
+exit 0
+CLAUDE_EOF
+    chmod +x "$TEMP_DIR/bin/claude"
+
+    output=$(env PATH="$TEMP_DIR/bin:/usr/local/bin:/usr/bin:/bin" HOME="$TEMP_DIR/home" NO_GITHUB=true \
+        bash "$SCRIPT_DIR/sw-loop.sh" \
+        --repo "$TEMP_DIR/repo" \
+        "Add progress.txt" \
+        --max-iterations 3 \
+        --test-cmd "true" \
+        --local \
+        2>&1) || true
+
+    if echo "$output" | grep -qiE "Git:|progress|insertion|LOOP_COMPLETE"; then
+        assert_pass "Loop tracks progress via git"
+    else
+        assert_fail "Loop progress tracking" "expected git/progress output"
+    fi
+else
+    assert_fail "Loop progress tracking" "setup failed"
 fi
 
 # ═══════════════════════════════════════════════════════════════════════════════

@@ -165,6 +165,7 @@ assert_contains "build_prompt includes rules" "$prompt_output" "Rules"
 assert_contains "build_prompt includes Current Codebase" "$prompt_output" "Current Codebase"
 assert_contains "build_prompt includes Recent Pipeline Performance" "$prompt_output" "Recent Pipeline Performance"
 assert_contains "build_prompt includes Platform Health" "$prompt_output" "Platform Health"
+assert_contains "build_prompt includes Past Strategic" "$prompt_output" "Past Strategic"
 
 # ─── Test 9: strategic_parse_and_create with mock response ───────────
 echo -e "${BOLD}  Parse & Create${RESET}"
@@ -203,6 +204,20 @@ output=$(strategic_status 2>&1) || true
 assert_contains "status with fixture shows Total created" "$output" "Total created"
 assert_contains "status with fixture shows Total cycles" "$output" "Total cycles"
 assert_contains "status with fixture shows Cooldown" "$output" "Cooldown"
+
+# ─── Test 11c: strategic outcomes command ───────────────────────────
+echo -e "${BOLD}  Outcomes${RESET}"
+output=$(bash "$REAL_SCRIPT_DIR/sw-strategic.sh" outcomes 2>&1) || true
+assert_contains "outcomes shows header" "$output" "Strategic Outcomes"
+assert_contains "outcomes with no data shows message" "$output" "No outcomes"
+
+# With fixture
+mkdir -p "$HOME/.shipwright/strategic"
+echo '{"issue":1,"title":"Shipped improvement","outcome":"shipped","success":true,"tracked_at":"2026-02-18T00:00:00Z"}' >> "$HOME/.shipwright/strategic/outcomes.jsonl"
+echo '{"issue":2,"title":"Failed attempt","outcome":"closed_unshipped","success":false,"tracked_at":"2026-02-18T00:00:00Z"}' >> "$HOME/.shipwright/strategic/outcomes.jsonl"
+output=$(bash "$REAL_SCRIPT_DIR/sw-strategic.sh" outcomes 2>&1) || true
+assert_contains "outcomes with fixture shows shipped" "$output" "Shipped"
+assert_contains "outcomes with fixture shows failed" "$output" "Closed unshipped"
 
 # ─── Test 12: Run without CLAUDE_CODE_OAUTH_TOKEN ────────────────────
 echo -e "${BOLD}  Run Guard${RESET}"
