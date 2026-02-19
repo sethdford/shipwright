@@ -39,8 +39,9 @@ setup_env() {
     # Copy script under test
     cp "$SCRIPT_DIR/sw-fleet-discover.sh" "$TEMP_DIR/repo/scripts/"
 
-    # Create compat.sh stub
+    # Create compat.sh stub and copy helpers for color/output
     touch "$TEMP_DIR/repo/scripts/lib/compat.sh"
+    [[ -f "$SCRIPT_DIR/lib/helpers.sh" ]] && cp "$SCRIPT_DIR/lib/helpers.sh" "$TEMP_DIR/repo/scripts/lib/"
 
     # Mock git
     cat > "$TEMP_DIR/bin/git" <<'MOCKEOF'

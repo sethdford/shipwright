@@ -39,6 +39,12 @@ setup_env() {
     # Copy the script under test
     cp "$SCRIPT_DIR/sw-connect.sh" "$TEMP_DIR/"
 
+    # Copy lib files so script can source helpers.sh and config.sh
+    mkdir -p "$TEMP_DIR/lib"
+    [[ -f "$SCRIPT_DIR/lib/compat.sh" ]] && cp "$SCRIPT_DIR/lib/compat.sh" "$TEMP_DIR/lib/" 2>/dev/null || true
+    [[ -f "$SCRIPT_DIR/lib/helpers.sh" ]] && cp "$SCRIPT_DIR/lib/helpers.sh" "$TEMP_DIR/lib/" 2>/dev/null || true
+    [[ -f "$SCRIPT_DIR/lib/config.sh" ]] && cp "$SCRIPT_DIR/lib/config.sh" "$TEMP_DIR/lib/" 2>/dev/null || true
+
     # Mock curl for dashboard requests
     cat > "$TEMP_DIR/bin/curl" <<'EOF'
 #!/usr/bin/env bash

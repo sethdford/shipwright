@@ -40,9 +40,10 @@ setup_env() {
     cp "$SCRIPT_DIR/sw-developer-simulation.sh" "$TEMP_DIR/repo/scripts/"
     cp "$SCRIPT_DIR/sw-intelligence.sh" "$TEMP_DIR/repo/scripts/"
 
-    # Create compat.sh stub
+    # Create compat.sh stub and copy helpers for color/output
     mkdir -p "$TEMP_DIR/repo/scripts/lib"
     touch "$TEMP_DIR/repo/scripts/lib/compat.sh"
+    [[ -f "$SCRIPT_DIR/lib/helpers.sh" ]] && cp "$SCRIPT_DIR/lib/helpers.sh" "$TEMP_DIR/repo/scripts/lib/"
 
     # Mock git
     cat > "$TEMP_DIR/bin/git" <<'MOCKEOF'

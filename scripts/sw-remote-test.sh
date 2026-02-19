@@ -35,8 +35,10 @@ setup_env() {
     mkdir -p "$TEMP_DIR/scripts"
     mkdir -p "$TEMP_DIR/home/.shipwright"
 
-    # Copy remote script
+    # Copy remote script and helpers for color/output
     cp "$SCRIPT_DIR/sw-remote.sh" "$TEMP_DIR/scripts/"
+    mkdir -p "$TEMP_DIR/scripts/lib"
+    [[ -f "$SCRIPT_DIR/lib/helpers.sh" ]] && cp "$SCRIPT_DIR/lib/helpers.sh" "$TEMP_DIR/scripts/lib/"
 
     # Create a mock shipwright installation structure for localhost checks
     mkdir -p "$TEMP_DIR/mock-install/scripts"

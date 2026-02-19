@@ -41,8 +41,10 @@ setup_env() {
     mkdir -p "$TEMP_DIR/scripts"
     mkdir -p "$TEMP_DIR/project"
 
-    # Copy the launchd script
+    # Copy the launchd script and helpers for color/output
     cp "$LAUNCHD_SCRIPT" "$TEMP_DIR/scripts/sw-launchd.sh"
+    mkdir -p "$TEMP_DIR/scripts/lib"
+    [[ -f "$SCRIPT_DIR/lib/helpers.sh" ]] && cp "$SCRIPT_DIR/lib/helpers.sh" "$TEMP_DIR/scripts/lib/"
 
     # Set environment variables
     export HOME="$TEMP_DIR/home"

@@ -36,9 +36,11 @@ TEST_TMUX_SESSION=""
 setup_env() {
     TEMP_DIR=$(mktemp -d "${TMPDIR:-/tmp}/sw-session-test.XXXXXX")
 
-    # ── Copy real session script ───────────────────────────────────────────
+    # ── Copy real session script and helpers for color/output ───────────────
     mkdir -p "$TEMP_DIR/scripts/adapters"
     cp "$REAL_SESSION_SCRIPT" "$TEMP_DIR/scripts/sw-session.sh"
+    mkdir -p "$TEMP_DIR/scripts/lib"
+    [[ -f "$SCRIPT_DIR/lib/helpers.sh" ]] && cp "$SCRIPT_DIR/lib/helpers.sh" "$TEMP_DIR/scripts/lib/"
 
     # ── Copy tmux templates ────────────────────────────────────────────────
     if [[ -d "$REPO_DIR/tmux/templates" ]]; then

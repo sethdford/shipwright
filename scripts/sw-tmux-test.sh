@@ -40,11 +40,11 @@ setup_env() {
     mkdir -p "$TEMP_DIR/bin"
     mkdir -p "$TEMP_DIR/mock-log"
 
-    # Copy the tmux script under test
+    # Copy the tmux script under test and helpers for color/output
     cp "$SCRIPT_DIR/sw-tmux.sh" "$TEMP_DIR/scripts/"
-
-    # Create compat.sh stub
+    mkdir -p "$TEMP_DIR/scripts/lib"
     touch "$TEMP_DIR/scripts/lib/compat.sh"
+    [[ -f "$SCRIPT_DIR/lib/helpers.sh" ]] && cp "$SCRIPT_DIR/lib/helpers.sh" "$TEMP_DIR/scripts/lib/"
 
     # Create fake tmux.conf and overlay for install tests
     echo "# fake tmux.conf" > "$TEMP_DIR/tmux/tmux.conf"
