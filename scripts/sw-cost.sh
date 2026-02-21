@@ -894,6 +894,8 @@ show_help() {
 }
 
 # ─── Command Router ─────────────────────────────────────────────────────────
+# Only run CLI when executed directly (not when sourced by sw-pipeline.sh)
+if [[ "${BASH_SOURCE[0]}" == "$0" ]]; then
 
 SUBCOMMAND="${1:-help}"
 shift 2>/dev/null || true
@@ -943,3 +945,5 @@ case "$SUBCOMMAND" in
         exit 1
         ;;
 esac
+
+fi  # end source guard

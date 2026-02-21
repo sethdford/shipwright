@@ -1546,6 +1546,28 @@ stage_pr() {
     local test_log="$ARTIFACTS_DIR/test-results.log"
     local review_file="$ARTIFACTS_DIR/review.md"
 
+    # ── Skip PR in local/no-github mode ──
+    if [[ "${NO_GITHUB:-false}" == "true" || "${SHIPWRIGHT_LOCAL:-}" == "1" || "${LOCAL_MODE:-false}" == "true" ]]; then
+        info "Skipping PR stage — running in local/no-github mode"
+        # Save a PR draft locally for reference
+        local branch_name
+        branch_name=$(git rev-parse --abbrev-ref HEAD 2>/dev/null || echo "unknown")
+        local commit_count
+        commit_count=$(git log --oneline "${BASE_BRANCH}..HEAD" 2>/dev/null | wc -l | xargs)
+        {
+            echo "# PR Draft (local mode)"
+            echo ""
+            echo "**Branch:** ${branch_name}"
+            echo "**Commits:** ${commit_count:-0}"
+            echo "**Goal:** ${GOAL:-N/A}"
+            echo ""
+            echo "## Changes"
+            git diff --stat "${BASE_BRANCH}...HEAD" 2>/dev/null || true
+        } > ".claude/pr-draft.md" 2>/dev/null || true
+        emit_event "pr.skipped" "issue=${ISSUE_NUMBER:-0}" "reason=local_mode"
+        return 0
+    fi
+
     # ── PR Hygiene Checks (informational) ──
     local hygiene_commit_count
     hygiene_commit_count=$(git log --oneline "${BASE_BRANCH}..HEAD" 2>/dev/null | wc -l | xargs)

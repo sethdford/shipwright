@@ -93,6 +93,12 @@ if [[ -f "$SCRIPT_DIR/sw-durable.sh" ]]; then
 fi
 # shellcheck source=sw-db.sh — for db_save_checkpoint/db_load_checkpoint (durable workflows)
 [[ -f "$SCRIPT_DIR/sw-db.sh" ]] && source "$SCRIPT_DIR/sw-db.sh"
+# Ensure DB schema exists so emit_event → db_add_event can write rows (CREATE IF NOT EXISTS is idempotent)
+if type init_schema >/dev/null 2>&1 && type check_sqlite3 >/dev/null 2>&1 && check_sqlite3 2>/dev/null; then
+    init_schema 2>/dev/null || true
+fi
+# shellcheck source=sw-cost.sh — for cost_record persistence to costs.json + DB
+[[ -f "$SCRIPT_DIR/sw-cost.sh" ]] && source "$SCRIPT_DIR/sw-cost.sh"
 
 # ─── GitHub API Modules (optional) ─────────────────────────────────────────
 # shellcheck source=sw-github-graphql.sh
@@ -2389,6 +2395,26 @@ pipeline_start() {
         if [[ -x "$SCRIPT_DIR/sw-recruit.sh" ]]; then
             bash "$SCRIPT_DIR/sw-recruit.sh" ingest-pipeline 1 2>/dev/null || true
         fi
+
+        # Capture success patterns to memory (learn what works — parallel the failure path)
+        if [[ -x "$SCRIPT_DIR/sw-memory.sh" ]]; then
+            bash "$SCRIPT_DIR/sw-memory.sh" capture "$STATE_FILE" "$ARTIFACTS_DIR" 2>/dev/null || true
+        fi
+        # Update memory baselines with successful run metrics
+        if type memory_update_metrics >/dev/null 2>&1; then
+            memory_update_metrics "build_duration_s" "${total_dur_s:-0}" 2>/dev/null || true
+            memory_update_metrics "total_cost_usd" "${total_cost:-0}" 2>/dev/null || true
+            memory_update_metrics "iterations" "$((SELF_HEAL_COUNT + 1))" 2>/dev/null || true
+        fi
+
+        # Record positive fix outcome if self-healing succeeded
+        if [[ "$SELF_HEAL_COUNT" -gt 0 && -x "$SCRIPT_DIR/sw-memory.sh" ]]; then
+            local _success_sig
+            _success_sig=$(tail -30 "$ARTIFACTS_DIR/test-results.log" 2>/dev/null | head -3 | tr '\n' ' ' | sed 's/^ *//;s/ *$//' || true)
+            if [[ -n "$_success_sig" ]]; then
+                bash "$SCRIPT_DIR/sw-memory.sh" fix-outcome "$_success_sig" "true" "true" 2>/dev/null || true
+            fi
+        fi
     else
         notify "Pipeline Failed" "Goal: ${GOAL}\nFailed at: ${CURRENT_STAGE_ID:-unknown}" "error"
         emit_event "pipeline.completed" \
@@ -2541,6 +2567,11 @@ pipeline_start() {
         "output_tokens=$TOTAL_OUTPUT_TOKENS" \
         "model=$model_key" \
         "cost_usd=$total_cost"
+
+    # Persist cost entry to costs.json + SQLite (was missing — tokens accumulated but never written)
+    if type cost_record >/dev/null 2>&1; then
+        cost_record "$TOTAL_INPUT_TOKENS" "$TOTAL_OUTPUT_TOKENS" "$model_key" "pipeline" "${ISSUE_NUMBER:-}" 2>/dev/null || true
+    fi
 
     # Record pipeline outcome for Thompson sampling / outcome-based learning
     if type db_record_outcome >/dev/null 2>&1; then
