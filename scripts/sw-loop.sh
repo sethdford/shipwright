@@ -496,16 +496,26 @@ _extract_text_from_json() {
     local first_char
     first_char=$(head -c1 "$json_file" 2>/dev/null || true)
 
-    # Case 2: Valid JSON array — extract .result from last element
-    if [[ "$first_char" == "[" ]] && command -v jq >/dev/null 2>&1; then
+    # Case 2: Valid JSON (array or object) — extract .result with jq
+    if [[ "$first_char" == "[" || "$first_char" == "{" ]] && command -v jq >/dev/null 2>&1; then
         local extracted
-        extracted=$(jq -r '.[-1].result // empty' "$json_file" 2>/dev/null) || true
+        if [[ "$first_char" == "[" ]]; then
+            # Array: extract .result from last element
+            extracted=$(jq -r '.[-1].result // empty' "$json_file" 2>/dev/null) || true
+        else
+            # Object: extract .result directly
+            extracted=$(jq -r '.result // empty' "$json_file" 2>/dev/null) || true
+        fi
         if [[ -n "$extracted" ]]; then
             echo "$extracted" > "$log_file"
             return 0
         fi
         # jq succeeded but result was null/empty — try .content or raw text
-        extracted=$(jq -r '.[].content // empty' "$json_file" 2>/dev/null | head -500) || true
+        if [[ "$first_char" == "[" ]]; then
+            extracted=$(jq -r '.[].content // empty' "$json_file" 2>/dev/null | head -500) || true
+        else
+            extracted=$(jq -r '.content // empty' "$json_file" 2>/dev/null | head -500) || true
+        fi
         if [[ -n "$extracted" ]]; then
             echo "$extracted" > "$log_file"
             return 0
@@ -1858,6 +1868,8 @@ ${stuckness_section}
 - If tests fail, fix them before ending
 - If stuck on the same issue for 2+ iterations, try a different approach
 - Do NOT output LOOP_COMPLETE unless the goal is genuinely achieved
+- Do NOT use the Task tool to spawn sub-agents — work directly in this session
+- If tests are slow, run them once per iteration (not repeatedly)
 PROMPT
 }
 
@@ -2177,6 +2189,10 @@ build_claude_flags() {
     if [[ -n "$MAX_TURNS" ]]; then
         flags+=("--max-turns" "$MAX_TURNS")
     fi
+
+    # Prevent sub-agent spawning — child agents inherit default permissions
+    # and cannot get user approval in non-interactive mode, causing hangs
+    flags+=("--disallowedTools" "Task")
 
     echo "${flags[*]}"
 }

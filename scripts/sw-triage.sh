@@ -346,7 +346,7 @@ cmd_analyze() {
 
     # Fetch issue via gh CLI
     local issue_json
-    issue_json=$(gh issue view "$issue" --json title,body,labels --format json 2>/dev/null || echo "{}")
+    issue_json=$(gh issue view "$issue" --json title,body,labels 2>/dev/null || echo "{}")
 
     if [[ "$issue_json" == "{}" ]]; then
         error "Failed to fetch issue ${CYAN}${issue}${RESET}"

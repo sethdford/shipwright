@@ -3,6 +3,32 @@
 [[ -n "${_PIPELINE_DETECTION_LOADED:-}" ]] && return 0
 _PIPELINE_DETECTION_LOADED=1
 
+# Detect best iOS Simulator destination by UUID.
+# Prefers: booted iPhone > iPhone Pro/Max on newest OS > any iPhone on newest OS > fallback
+_detect_ios_sim_dest() {
+    local sim_id="" all_iphones=""
+    all_iphones=$(xcrun simctl list devices available 2>/dev/null | grep -i "    iphone" || true)
+
+    # 1. Booted iPhone
+    sim_id=$(echo "$all_iphones" | grep -i "Booted" | head -1 | sed 's/.*(\([A-F0-9-]*\)).*/\1/' || true)
+
+    # 2. iPhone Pro or Pro Max on newest OS (tail = newest OS section)
+    if [[ -z "$sim_id" ]]; then
+        sim_id=$(echo "$all_iphones" | grep -i "pro" | tail -1 | sed 's/.*(\([A-F0-9-]*\)).*/\1/' || true)
+    fi
+
+    # 3. Any iPhone on newest OS
+    if [[ -z "$sim_id" ]]; then
+        sim_id=$(echo "$all_iphones" | tail -1 | sed 's/.*(\([A-F0-9-]*\)).*/\1/' || true)
+    fi
+
+    if [[ -n "$sim_id" ]]; then
+        echo "platform=iOS Simulator,id=${sim_id}"
+    else
+        echo "platform=iOS Simulator,name=Any iOS Simulator Device"
+    fi
+}
+
 detect_test_cmd() {
     local root="$PROJECT_ROOT"
 
@@ -66,6 +92,38 @@ detect_test_cmd() {
         echo "make test"; return
     fi
 
+    # iOS/macOS: Xcode project, Swift package, test harness, or workspace
+    # 1. .xcodeproj
+    local xc_project=""
+    xc_project=$(find "$root" -maxdepth 1 -name "*.xcodeproj" -print -quit 2>/dev/null || true)
+    if [[ -n "$xc_project" ]]; then
+        local proj_name scheme sim_dest
+        proj_name=$(basename "$xc_project")
+        scheme="${proj_name%.xcodeproj}"
+        sim_dest=$(_detect_ios_sim_dest)
+        echo "xcodebuild -project ${proj_name} -scheme ${scheme} -sdk iphonesimulator -destination '${sim_dest}' -enableCodeCoverage YES -resultBundlePath TestResults/\$(date +%Y%m%d-%H%M%S).xcresult test 2>&1"
+        return
+    fi
+    # 2. Swift Package Manager
+    if [[ -f "$root/Package.swift" ]]; then
+        echo "swift test"; return
+    fi
+    # 3. Test harness script
+    if [[ -f "$root/scripts/run-xcode-tests.sh" ]]; then
+        echo "./scripts/run-xcode-tests.sh 2>&1"; return
+    fi
+    # 4. .xcworkspace (exclude internal project.xcworkspace inside .xcodeproj)
+    local xc_workspace=""
+    xc_workspace=$(find "$root" -maxdepth 1 -name "*.xcworkspace" ! -path "*.xcodeproj/*" -print -quit 2>/dev/null || true)
+    if [[ -n "$xc_workspace" ]]; then
+        local ws_name scheme sim_dest
+        ws_name=$(basename "$xc_workspace")
+        scheme="${ws_name%.xcworkspace}"
+        sim_dest=$(_detect_ios_sim_dest)
+        echo "xcodebuild -workspace ${ws_name} -scheme ${scheme} -sdk iphonesimulator -destination '${sim_dest}' -enableCodeCoverage YES -resultBundlePath TestResults/\$(date +%Y%m%d-%H%M%S).xcresult test 2>&1"
+        return
+    fi
+
     # Fallback
     echo ""
 }
@@ -96,6 +154,10 @@ detect_project_lang() {
         detected="ruby"
     elif [[ -f "$root/pom.xml" || -f "$root/build.gradle" ]]; then
         detected="java"
+    elif ls "$root"/*.xcworkspace 1>/dev/null 2>&1 || ls "$root"/*.xcodeproj 1>/dev/null 2>&1; then
+        detected="swift"
+    elif [[ -f "$root/Package.swift" ]]; then
+        detected="swift"
     else
         detected="unknown"
     fi
