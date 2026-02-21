@@ -2,7 +2,7 @@
   "name": "fast",
   "description": "Quick fixes: intake → build → test → PR (all auto, no gates)",
   "defaults": {
-    "test_cmd": "npm test",
+    "test_cmd": "",
     "model": "sonnet",
     "agents": 1
   },

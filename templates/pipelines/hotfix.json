@@ -2,7 +2,7 @@
   "name": "hotfix",
   "description": "Urgent production fixes: intake → build → test → PR (all auto, minimal iteration)",
   "defaults": {
-    "test_cmd": "npm test",
+    "test_cmd": "",
     "model": "opus",
     "agents": 1
   },

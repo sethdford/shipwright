@@ -602,7 +602,7 @@ ci_post_stage_event() {
 
     local stage="$1" status="$2" elapsed="${3:-0s}"
     local comment="<!-- SHIPWRIGHT-STAGE: ${stage}:${status}:${elapsed} -->"
-    _timeout "$(_config_get_int "network.gh_timeout" 30 2>/dev/null || echo 30)" gh issue comment "$ISSUE_NUMBER" --body "$comment" 2>/dev/null || true
+    _timeout "$(_config_get_int "network.gh_timeout" 30 2>/dev/null || echo 30)" gh issue comment "$ISSUE_NUMBER" --body "$comment" >/dev/null 2>&1 || true
 }
 
 # ─── Signal Handling ───────────────────────────────────────────────────────
@@ -1169,7 +1169,26 @@ Focus on fixing the failing tests while keeping all passing tests working."
 
         # Tests failed — capture error for next cycle
         local test_log="$ARTIFACTS_DIR/test-results.log"
-        last_test_error=$(tail -30 "$test_log" 2>/dev/null || echo "Test command failed with no output")
+
+        # Detect infrastructure errors that self-healing cannot fix (no point cycling)
+        if grep -q "Unable to find a device matching" "$test_log" 2>/dev/null; then
+            error "Infrastructure error: simulator not found — self-healing cannot fix this"
+            error "Check 'xcrun simctl list devices available' and fix the test destination"
+            if [[ -n "${ISSUE_NUMBER:-}" ]]; then
+                gh_comment_issue "$ISSUE_NUMBER" "❌ **Infrastructure error**: simulator destination not found. This is a test configuration issue, not a code problem. Fix the simulator setup and re-run." >/dev/null 2>&1 || true
+            fi
+            mark_stage_failed "test"
+            return 1
+        fi
+
+        # Extract meaningful errors — skip simulator destination lists and boilerplate
+        last_test_error=$(grep -vE '^\s*\{ platform:|Available destinations|The requested device|no available devices' "$test_log" 2>/dev/null \
+            | grep -E 'error:|FAIL|fail:|assert|panic|xcodebuild: error|Build FAILED|Undefined symbol|cannot find|fatal' 2>/dev/null \
+            | tail -20 || true)
+        if [[ -z "$last_test_error" ]]; then
+            # Fallback: get last lines but still filter out sim list
+            last_test_error=$(grep -vE '^\s*\{ platform:|Available destinations|The requested device|no available devices' "$test_log" 2>/dev/null | tail -15 || echo "Test command failed with no output")
+        fi
         mark_stage_failed "test"
 
         # ── Convergence Detection ──

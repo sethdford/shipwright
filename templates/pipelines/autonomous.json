@@ -2,7 +2,7 @@
   "name": "autonomous",
   "description": "Fully autonomous pipeline with compound quality — zero human gates",
   "defaults": {
-    "test_cmd": "npm test",
+    "test_cmd": "",
     "model": "opus",
     "agents": 1
   },
