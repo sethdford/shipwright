@@ -492,7 +492,7 @@ All scripts are bash (except the dashboard server in TypeScript). Grouped by lay
 | `scripts/sw-code-review.sh` | 672 | Clean Code & Architecture Analysis |
 | `scripts/sw-connect.sh` | 623 | Sync local state to team dashboard |
 | `scripts/sw-context.sh` | 599 | Context Engine for Pipeline Stages |
-| `scripts/sw-cost.sh` | 945 | Token Usage & Cost Intelligence |
+| `scripts/sw-cost.sh` | 949 | Token Usage & Cost Intelligence |
 | `scripts/sw-daemon.sh` | 1356 | Autonomous GitHub Issue Watcher |
 | `scripts/sw-dashboard.sh` | 508 | Fleet Command Dashboard |
 | `scripts/sw-db.sh` | 1881 | SQLite Persistence Layer |
@@ -534,7 +534,7 @@ All scripts are bash (except the dashboard server in TypeScript). Grouped by lay
 | `scripts/sw-patrol-meta.sh` | 442 | Shipwright Self-Improvement Patrol |
 | `scripts/sw-pipeline-composer.sh` | 438 | Dynamic Pipeline Composition |
 | `scripts/sw-pipeline-vitals.sh` | 1070 | Pipeline Vitals Engine |
-| `scripts/sw-pipeline.sh` | 2793 | Autonomous Feature Delivery (Idea → Production) |
+| `scripts/sw-pipeline.sh` | 2824 | Autonomous Feature Delivery (Idea → Production) |
 | `scripts/sw-pm.sh` | 741 | Autonomous PM Agent for Team Orchestration |
 | `scripts/sw-pr-lifecycle.sh` | 684 | Autonomous PR Management |
 | `scripts/sw-predictive.sh` | 822 | Predictive & Proactive Intelligence |
