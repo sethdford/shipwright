@@ -5,8 +5,8 @@
       "pattern": "\u001b[38;2;74;222;128m\u001b[1m✓\u001b[0m reveal shows 1/3 pass count on failure",
       "root_cause": "sw-intent-analysis-test asserts analyze_intent's JSON output includes version, goal, and criteria fields, but the current schema/implementation omits one or more of them",
       "fix": "Update analyze_intent (or its schema) in sw-intent-analysis.sh to emit version, goal, and criteria fields matching the test's expected schema",
-      "seen_count": 58,
-      "last_seen": "2026-09-07T05:08:30Z",
+      "seen_count": 59,
+      "last_seen": "2026-09-10T20:05:48Z",
       "category": "test_failure"
     },
     {
@@ -14,8 +14,8 @@
       "pattern": "\u001b[2m  loop behavior: iterations on test failure\u001b[0m",
       "root_cause": "Test suite itself passed (all PASS, 0 FAIL) but the pipeline stage was flagged for iterating due to loop-behavior/RL logging noise being misread as failure signal",
       "fix": "Verify the actual test exit code rather than log content matching; ensure sw-autoresearch-e2e-test.sh output doesn't trigger false-positive failure pattern matching in the pipeline's error classifier",
-      "seen_count": 15,
-      "last_seen": "2026-09-10T19:25:27Z",
+      "seen_count": 14,
+      "last_seen": "2026-09-07T02:43:56Z",
       "category": "flaky"
     },
     {
@@ -157,19 +157,10 @@
     {
       "stage": "test",
       "pattern": "Results: \u001b[38;2;74;222;128m\u001b[1m123 PASS\u001b[0m | \u001b[38;2;248;113;113m\u001b[1m5 FAIL\u001b[0m",
-      "root_cause": "sw-e2e-integration-test and sw-intent-analysis-test failed, likely due to environment/API dependency issues or logic regressions in intent analysis",
-      "fix": "Inspect failing test output for sw-e2e-integration-test and sw-intent-analysis-test directly and patch the underlying assertion or mock mismatch",
+      "root_cause": "sw-e2e-integration-test failed because a prior pipeline lock (pipeline-4608) was left held, blocking the fast pipeline run, while sw-intent-analysis-test failed because analyze_intent's generated JSON is missing required schema fields (version, goal, criteria)",
+      "fix": "Release/clear stale pipeline locks before e2e-integration-test runs (or add lock cleanup in test setup/teardown), and update analyze_intent to emit version, goal, and criteria fields in its output schema",
       "seen_count": 1,
       "last_seen": "2026-09-07T03:33:29Z",
-      "category": "test_failure"
-    },
-    {
-      "stage": "test",
-      "pattern": "\u001b[38;2;0;212;255m▸\u001b[0m add_label surfaces a gh failure... \u001b[38;2;74;222;128m✓\u001b[0m",
-      "root_cause": "sw-intent-analysis-test failed (exit 1) after 33s, likely an assertion mismatch in intent classification logic; sw-e2e-integration-test also hit the 301s timeout waiting on a real network/API call",
-      "fix": "Run scripts/sw-intent-analysis-test.sh directly to isolate the failing assertion and inspect its diff output; guard sw-e2e-integration-test with a shorter timeout or skip in CI without live credentials",
-      "seen_count": 2,
-      "last_seen": "2026-09-10T20:46:08Z",
       "category": "test_failure"
     }
   ]
