@@ -5,8 +5,8 @@
       "pattern": "\u001b[38;2;74;222;128m\u001b[1m✓\u001b[0m reveal shows 1/3 pass count on failure",
       "root_cause": "sw-intent-analysis-test asserts analyze_intent's JSON output includes version, goal, and criteria fields, but the current schema/implementation omits one or more of them",
       "fix": "Update analyze_intent (or its schema) in sw-intent-analysis.sh to emit version, goal, and criteria fields matching the test's expected schema",
-      "seen_count": 58,
-      "last_seen": "2026-09-07T05:08:30Z",
+      "seen_count": 59,
+      "last_seen": "2026-09-10T20:12:05Z",
       "category": "test_failure"
     },
     {
@@ -96,8 +96,8 @@
       "pattern": "Results: \u001b[38;2;74;222;128m\u001b[1m126 PASS\u001b[0m | \u001b[38;2;248;113;113m\u001b[1m2 FAIL\u001b[0m",
       "root_cause": "sw-pipeline-test.sh mock plan-stage invocation no longer writes plan.md, cascading into review/E2E/resume/cleanup failures that depend on it, plus a jq parse error on a non-numeric complexity value in the intelligence low-complexity test",
       "fix": "Fix the mock plan stage in sw-pipeline-test.sh to create .claude/pipeline-artifacts/plan.md (and dod.md) before the dependent tests run, and quote/validate the complexity value before passing it to jq",
-      "seen_count": 5,
-      "last_seen": "2026-09-06T18:20:35Z",
+      "seen_count": 6,
+      "last_seen": "2026-09-10T19:28:36Z",
       "category": "test_failure"
     },
     {
@@ -157,8 +157,8 @@
     {
       "stage": "test",
       "pattern": "Results: \u001b[38;2;74;222;128m\u001b[1m123 PASS\u001b[0m | \u001b[38;2;248;113;113m\u001b[1m5 FAIL\u001b[0m",
-      "root_cause": "5 test assertions failed in suites not shown in the visible log tail (only passing suites with 0 FAIL are captured in the last 200 lines)",
-      "fix": "Re-run with full output or grep for '✗' / 'FAIL:' lines with non-zero counts to isolate which of the 102 suites contains the 5 failing assertions",
+      "root_cause": "sw-pipeline-test.sh mock plan stage doesn't write plan.md, so every downstream assertion depending on it (review, full E2E, resume, cleanup) fails; a separate jq parse error breaks the low-complexity intelligence skip test",
+      "fix": "fix the mock/plan stage in sw-pipeline-test.sh to actually create .claude/pipeline-artifacts/plan.md and dod.md, and quote/validate the numeric value passed to jq in the complexity check",
       "seen_count": 1,
       "last_seen": "2026-09-07T03:33:29Z",
       "category": "test_failure"
