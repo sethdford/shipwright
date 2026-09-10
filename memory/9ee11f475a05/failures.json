@@ -5,8 +5,8 @@
       "pattern": "\u001b[38;2;74;222;128m\u001b[1m✓\u001b[0m reveal shows 1/3 pass count on failure",
       "root_cause": "sw-intent-analysis-test asserts analyze_intent's JSON output includes version, goal, and criteria fields, but the current schema/implementation omits one or more of them",
       "fix": "Update analyze_intent (or its schema) in sw-intent-analysis.sh to emit version, goal, and criteria fields matching the test's expected schema",
-      "seen_count": 61,
-      "last_seen": "2026-09-10T22:46:54Z",
+      "seen_count": 60,
+      "last_seen": "2026-09-10T22:02:43Z",
       "category": "test_failure"
     },
     {
@@ -157,8 +157,8 @@
     {
       "stage": "test",
       "pattern": "Results: \u001b[38;2;74;222;128m\u001b[1m123 PASS\u001b[0m | \u001b[38;2;248;113;113m\u001b[1m5 FAIL\u001b[0m",
-      "root_cause": "sw-pipeline.sh's plan stage is not writing .claude/pipeline-artifacts/plan.md (and downstream review.md), cascading into E2E, resume, cleanup, and intelligence-skip test failures",
-      "fix": "fix the plan stage in scripts/sw-pipeline.sh to correctly generate and write plan.md/dod.md before the mock loop invocation completes",
+      "root_cause": "sw-cost-test.sh assertions expect cost entries and utilization data in the CONTEXT EFFICIENCY section, but the dashboard reports 'No cost entries in the last 30 day(s)' because the test fixture's costs.json entries fall outside the 30-day lookback window or were never seeded",
+      "fix": "Seed costs.json with entries timestamped within the last 30 days (or use a fixed/mocked 'now' in the test) before asserting on the CONTEXT EFFICIENCY output",
       "seen_count": 1,
       "last_seen": "2026-09-07T03:33:29Z",
       "category": "test_failure"
