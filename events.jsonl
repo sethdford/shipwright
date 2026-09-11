@@ -186,3 +186,6 @@
 {"ts":"2026-09-11T19:18:12Z","ts_epoch":1789154292,"type":"reasoning.trace","job_id":"pipeline-3499801-42","complexity":"medium","risk":50,"template":"standard"}
 {"ts":"2026-09-11T19:18:12Z","ts_epoch":1789154292,"type":"reasoning.trace","job_id":"pipeline-3500479-42","complexity":"medium","risk":50,"template":"standard"}
 {"ts":"2026-09-11T19:18:13Z","ts_epoch":1789154293,"type":"reasoning.trace","job_id":"pipeline-3501165-42","complexity":"medium","risk":50,"template":"standard"}
+{"ts":"2026-09-11T20:04:42Z","ts_epoch":1789157082,"type":"hygiene_platform_refactor","hardcoded":49,"fallback":69,"todo":51}
+{"ts":"2026-09-11T20:05:05Z","ts_epoch":1789157105,"type":"strategic.issue_created","title":"Escalate model/effort tier after N consecutive identical build failures","priority":"P0","complexity":"standard"}
+{"ts":"2026-09-11T20:05:05Z","ts_epoch":1789157105,"type":"strategic.cycle_complete","issues_created":1,"issues_skipped":2}
