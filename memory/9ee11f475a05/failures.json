@@ -6,7 +6,7 @@
       "root_cause": "sw-intent-analysis-test asserts analyze_intent's JSON output includes version, goal, and criteria fields, but the current schema/implementation omits one or more of them",
       "fix": "Update analyze_intent (or its schema) in sw-intent-analysis.sh to emit version, goal, and criteria fields matching the test's expected schema",
       "seen_count": 61,
-      "last_seen": "2026-09-11T00:56:01Z",
+      "last_seen": "2026-09-10T23:53:11Z",
       "category": "test_failure"
     },
     {
@@ -14,8 +14,8 @@
       "pattern": "\u001b[2m  loop behavior: iterations on test failure\u001b[0m",
       "root_cause": "Test suite itself passed (all PASS, 0 FAIL) but the pipeline stage was flagged for iterating due to loop-behavior/RL logging noise being misread as failure signal",
       "fix": "Verify the actual test exit code rather than log content matching; ensure sw-autoresearch-e2e-test.sh output doesn't trigger false-positive failure pattern matching in the pipeline's error classifier",
-      "seen_count": 16,
-      "last_seen": "2026-09-11T01:38:35Z",
+      "seen_count": 15,
+      "last_seen": "2026-09-11T01:08:58Z",
       "category": "flaky"
     },
     {
@@ -157,10 +157,19 @@
     {
       "stage": "test",
       "pattern": "Results: \u001b[38;2;74;222;128m\u001b[1m123 PASS\u001b[0m | \u001b[38;2;248;113;113m\u001b[1m5 FAIL\u001b[0m",
-      "root_cause": "sw-intent-analysis-test expects analyze_intent output to include version/goal/criteria fields but the generated JSON schema is missing them",
-      "fix": "Update analyze_intent in sw-intent-analysis.sh (or equivalent lib) to include version, goal, and criteria fields in its output JSON, matching the test's schema expectation",
+      "root_cause": "sw-e2e-integration-test and sw-intent-analysis-test failed (exit 1), likely due to missing/misconfigured Claude API credentials or intent-classification assertions drifting from expected output",
+      "fix": "Run the two failing suites in isolation with verbose output to capture the assertion diff, then fix the underlying test or code regression",
       "seen_count": 1,
       "last_seen": "2026-09-07T03:33:29Z",
+      "category": "test_failure"
+    },
+    {
+      "stage": "test",
+      "pattern": "FAIL: 0",
+      "root_cause": "sw-pipeline-test.sh mock pipeline stages (plan, review, cleanup) are not writing expected artifacts (plan.md, review.md) and a jq parse error on non-numeric complexity value breaks the intelligence low-complexity skip test, cascading into E2E/resume/cleanup failures",
+      "fix": "fix the mock plan/review stage generators to write plan.md and review.md to .claude/pipeline-artifacts/ and ensure complexity is emitted as a numeric JSON value (not quoted string) before jq parsing",
+      "seen_count": 1,
+      "last_seen": "2026-09-11T01:42:28Z",
       "category": "test_failure"
     }
   ]
