@@ -5,8 +5,8 @@
       "pattern": "\u001b[38;2;74;222;128m\u001b[1m✓\u001b[0m reveal shows 1/3 pass count on failure",
       "root_cause": "sw-intent-analysis-test asserts analyze_intent's JSON output includes version, goal, and criteria fields, but the current schema/implementation omits one or more of them",
       "fix": "Update analyze_intent (or its schema) in sw-intent-analysis.sh to emit version, goal, and criteria fields matching the test's expected schema",
-      "seen_count": 67,
-      "last_seen": "2026-09-11T13:15:56Z",
+      "seen_count": 68,
+      "last_seen": "2026-09-11T14:13:49Z",
       "category": "test_failure"
     },
     {
@@ -14,8 +14,8 @@
       "pattern": "\u001b[2m  loop behavior: iterations on test failure\u001b[0m",
       "root_cause": "Test suite itself passed (all PASS, 0 FAIL) but the pipeline stage was flagged for iterating due to loop-behavior/RL logging noise being misread as failure signal",
       "fix": "Verify the actual test exit code rather than log content matching; ensure sw-autoresearch-e2e-test.sh output doesn't trigger false-positive failure pattern matching in the pipeline's error classifier",
-      "seen_count": 15,
-      "last_seen": "2026-09-11T04:20:29Z",
+      "seen_count": 16,
+      "last_seen": "2026-09-11T10:29:23Z",
       "category": "flaky"
     },
     {
@@ -23,8 +23,8 @@
       "pattern": "Failed: 1",
       "root_cause": "sw-intent-analysis-test fails because analyze_intent's generated JSON omits required fields (version, goal, criteria); sw-e2e-integration-test fails as a side effect of a stale pipeline lock (pipeline-3749) left running from a prior test run, not a new regression",
       "fix": "add the missing version/goal/criteria fields to the intent-analysis JSON schema/generator, and clear/reset stale pipeline locks (or run `shipwright pipeline abort`) before the e2e-integration test suite starts",
-      "seen_count": 9,
-      "last_seen": "2026-09-11T03:09:53Z",
+      "seen_count": 10,
+      "last_seen": "2026-09-11T15:05:19Z",
       "category": "test_failure"
     },
     {
@@ -60,8 +60,8 @@
       "pattern": "Results: \u001b[38;2;74;222;128m\u001b[1m124 PASS\u001b[0m | \u001b[38;2;248;113;113m\u001b[1m4 FAIL\u001b[0m",
       "root_cause": "4 of 128 tests failed but the failing assertions are not present in the captured log excerpt (only passing output shown)",
       "fix": "Re-run with full output or grep for FAIL/✗ lines to identify which suite and assertion regressed before attempting a code fix",
-      "seen_count": 1,
-      "last_seen": "2026-09-03T10:38:19Z",
+      "seen_count": 2,
+      "last_seen": "2026-09-11T09:04:04Z",
       "category": "test_failure"
     },
     {
@@ -114,8 +114,8 @@
       "pattern": "\u001b[38;2;0;212;255m▸\u001b[0m Patrol recurring failures label construction... \u001b[38;2;74;222;128m✓\u001b[0m",
       "root_cause": "sw-e2e-integration-test failed because a stale pipeline lock (pipeline-4253) was already held from a prior run, blocking the fast pipeline test; sw-intent-analysis-test failed because analyze_intent's generated JSON is missing required schema fields (version, goal, criteria)",
       "fix": "Clear/release stale pipeline locks before the e2e-integration test runs (or have it auto-abort orphaned locks), and update analyze_intent to always populate version, goal, and criteria in its output schema",
-      "seen_count": 3,
-      "last_seen": "2026-09-11T00:16:36Z",
+      "seen_count": 2,
+      "last_seen": "2026-09-05T17:44:35Z",
       "category": "test_failure"
     },
     {
@@ -157,29 +157,29 @@
     {
       "stage": "test",
       "pattern": "Results: \u001b[38;2;74;222;128m\u001b[1m123 PASS\u001b[0m | \u001b[38;2;248;113;113m\u001b[1m5 FAIL\u001b[0m",
-      "root_cause": "sw-e2e-integration-test hit a stale pipeline lock (pipeline-4755 already running) and sw-intent-analysis-test's analyze_intent output is missing required schema fields (version, goal, criteria)",
-      "fix": "clear stale pipeline lock before e2e-integration test run and update analyze_intent to emit version/goal/criteria fields matching the schema",
+      "root_cause": "e2e-integration-test hit a stale pipeline lock from a concurrent/leftover run, and self-optimize-test's memory-promotion step passes malformed/empty data to `jq --argjson`, while intent-analysis-test's schema check expects version/goal/criteria fields the generator doesn't emit",
+      "fix": "clear stale pipeline locks before e2e-integration-test runs (or use --worktree isolation), guard the `jq --argjson` call in sw-self-optimize.sh with valid-JSON validation before use, and update analyze_intent's output schema to include version/goal/criteria",
       "seen_count": 1,
       "last_seen": "2026-09-07T03:33:29Z",
       "category": "test_failure"
     },
     {
       "stage": "test",
-      "pattern": "\u001b[38;2;74;222;128m✓\u001b[0m auditor invocation failure emits loop.audit_unavailable",
-      "root_cause": "sw-pipeline-test.sh assumes pipeline artifacts (plan.md, review.md) persist across the test/E2E flow, but a prior fix (0499af75/7578f584) changed artifact write timing or paths for the acceptance-criteria/plan/review stages, so downstream stages and resume/cleanup checks now find them missing",
-      "fix": "verify the plan and review stage functions in sw-pipeline.sh write to .claude/pipeline-artifacts/plan.md and review.md before marking those stages complete, and update sw-pipeline-test.sh mocks/assertions if the artifact path or format intentionally changed",
+      "pattern": "\u001b[38;2;248;113;113m\u001b[1m1 of 90 tests failed\u001b[0m",
+      "root_cause": "sw-pipeline-test.sh regression: mock stage scripts no longer write plan.md/review.md artifacts, cascading into E2E, resume, cleanup, and intelligence low-complexity test failures",
+      "fix": "Restore artifact-writing in the plan and review stage mocks (and fix the jq numeric-parse error in the low-complexity RL episode check) in sw-pipeline-test.sh",
       "seen_count": 1,
-      "last_seen": "2026-09-11T14:00:05Z",
+      "last_seen": "2026-09-11T06:01:49Z",
       "category": "test_failure"
     },
     {
       "stage": "test",
-      "pattern": "\u001b[1m  Error Handling\u001b[0m",
-      "root_cause": "No actual test failure occurred; all 161 suites passed, but the pipeline flagged the stage as failed based on matching the string 'Error Handling' which appears as a benign section header in test output",
-      "fix": "Refine the failure-detection pattern to require an actual failure indicator (e.g. non-zero exit code or 'FAIL'/'failed' count > 0) instead of matching substrings like 'Error Handling' that appear in passing test output",
+      "pattern": "\u001b[2moutput missing: Everything is clean\u001b[0m",
+      "root_cause": "test suite expected a 'Everything is clean' output marker that the corresponding command did not print, likely due to non-empty state or a changed success message",
+      "fix": "verify the code path that should emit 'Everything is clean' still runs and prints that exact string under test conditions; update the assertion or restore the message if it was renamed",
       "seen_count": 1,
-      "last_seen": "2026-09-11T15:00:56Z",
-      "category": "flaky"
+      "last_seen": "2026-09-11T15:35:57Z",
+      "category": "test_failure"
     }
   ]
 }
