@@ -171,6 +171,33 @@ daemon_cleanup_stale 2>/dev/null || true
 after_count=$(jq '.completed | length' "$STATE_FILE" 2>/dev/null || echo "0")
 assert_pass "daemon_cleanup_stale prunes old completed entries"
 
+# retry_counts and failure_signatures are both keyed by issue number and both
+# written on the retry path, so they must go stale together. Issue 1 is not in
+# active_jobs or queued, so it is stale; issue 2 is in flight and must survive.
+atomic_write_state "$(jq -n '{
+  version: 1,
+  active_jobs: [{issue: 2, pid: 1}],
+  queued: [],
+  completed: [],
+  retry_counts: {"1": 2, "2": 1},
+  failure_signatures: {
+    "1": {signature: "build_failure:deadbeef", count: 3, history: []},
+    "2": {signature: "api_error:cafebabe", count: 1, history: []}
+  }
+}')"
+STALE_REAPER_ENABLED=true daemon_cleanup_stale 2>/dev/null || true
+assert_eq "Stale retry count pruned" "null" "$(jq -r '.retry_counts["1"] // "null"' "$STATE_FILE")"
+assert_eq "Stale failure signature pruned" "null" "$(jq -r '.failure_signatures["1"] // "null"' "$STATE_FILE")"
+assert_eq "In-flight retry count kept" "1" "$(jq -r '.retry_counts["2"] // "null"' "$STATE_FILE")"
+assert_eq "In-flight failure signature kept" "api_error:cafebabe" "$(jq -r '.failure_signatures["2"].signature // "null"' "$STATE_FILE")"
+
+# A state file predating failure_signatures must not break the pruner.
+atomic_write_state "$(jq -n '{
+  version: 1, active_jobs: [], queued: [], completed: [], retry_counts: {"3": 1}
+}')"
+STALE_REAPER_ENABLED=true daemon_cleanup_stale 2>/dev/null || true
+assert_eq "Pruner tolerates state without failure_signatures" "null" "$(jq -r '.retry_counts["3"] // "null"' "$STATE_FILE")"
+
 # ═══════════════════════════════════════════════════════════════════════════════
 # Exponential Backoff Logic Tests (Critical Gap from audit)
 # ═══════════════════════════════════════════════════════════════════════════════
