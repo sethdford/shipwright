@@ -37,38 +37,38 @@ fi
 
 # Check that first event is pipeline.start
 first_event=$(head -1 "$ARTIFACTS_DIR/pipeline-audit.jsonl" 2>/dev/null || echo "")
-if echo "$first_event" | grep -q '"type":"pipeline.start"'; then
+if echo "$first_event" | grep '"type":"pipeline.start"' >/dev/null; then
     assert_pass "first event is pipeline.start"
 else
     assert_fail "first event is pipeline.start" "got: $first_event"
 fi
 
 # Check fields in pipeline.start event
-if echo "$first_event" | grep -q '"issue":"42"'; then
+if echo "$first_event" | grep '"issue":"42"' >/dev/null; then
     assert_pass "pipeline.start contains issue"
 else
     assert_fail "pipeline.start contains issue"
 fi
 
-if echo "$first_event" | grep -q '"goal":"Test goal"'; then
+if echo "$first_event" | grep '"goal":"Test goal"' >/dev/null; then
     assert_pass "pipeline.start contains goal"
 else
     assert_fail "pipeline.start contains goal"
 fi
 
-if echo "$first_event" | grep -q '"template":"standard"'; then
+if echo "$first_event" | grep '"template":"standard"' >/dev/null; then
     assert_pass "pipeline.start contains template"
 else
     assert_fail "pipeline.start contains template"
 fi
 
-if echo "$first_event" | grep -q '"model":"gpt-4"'; then
+if echo "$first_event" | grep '"model":"gpt-4"' >/dev/null; then
     assert_pass "pipeline.start contains model"
 else
     assert_fail "pipeline.start contains model"
 fi
 
-if echo "$first_event" | grep -q '"git_sha":"abc123def"'; then
+if echo "$first_event" | grep '"git_sha":"abc123def"' >/dev/null; then
     assert_pass "pipeline.start contains git_sha"
 else
     assert_fail "pipeline.start contains git_sha"
@@ -96,19 +96,19 @@ fi
 
 # Check the new event is valid JSON
 last_event=$(tail -1 "$ARTIFACTS_DIR/pipeline-audit.jsonl")
-if echo "$last_event" | grep -q '"type":"stage.start"'; then
+if echo "$last_event" | grep '"type":"stage.start"' >/dev/null; then
     assert_pass "emitted event has correct type"
 else
     assert_fail "emitted event has correct type"
 fi
 
-if echo "$last_event" | grep -q '"stage":"plan"'; then
+if echo "$last_event" | grep '"stage":"plan"' >/dev/null; then
     assert_pass "emitted event has stage field"
 else
     assert_fail "emitted event has stage field"
 fi
 
-if echo "$last_event" | grep -q '"duration_s":"0"'; then
+if echo "$last_event" | grep '"duration_s":"0"' >/dev/null; then
     assert_pass "emitted event has duration_s field"
 else
     assert_fail "emitted event has duration_s field"
@@ -118,7 +118,7 @@ fi
 audit_emit "test.event" "message=hello world" "path=/tmp/test space"
 
 last_event=$(tail -1 "$ARTIFACTS_DIR/pipeline-audit.jsonl")
-if echo "$last_event" | grep -q '"message":"hello world"'; then
+if echo "$last_event" | grep '"message":"hello world"' >/dev/null; then
     assert_pass "audit_emit handles spaces in values"
 else
     assert_fail "audit_emit handles spaces in values"
@@ -206,26 +206,26 @@ fi
 
 # Check JSON report content (allow spaces in JSON output)
 json_content=$(cat "$ARTIFACTS_DIR/pipeline-audit.json" 2>/dev/null || echo "{}")
-if echo "$json_content" | grep -qE '"outcome"\s*:\s*"success"'; then
+if echo "$json_content" | grep -E '"outcome"\s*:\s*"success"' >/dev/null; then
     assert_pass "JSON report contains outcome"
 else
     assert_fail "JSON report contains outcome"
 fi
 
-if echo "$json_content" | grep -qE '"issue"\s*:\s*"42"'; then
+if echo "$json_content" | grep -E '"issue"\s*:\s*"42"' >/dev/null; then
     assert_pass "JSON report contains issue"
 else
     assert_fail "JSON report contains issue"
 fi
 
-if echo "$json_content" | grep -qE '"template"\s*:\s*"standard"'; then
+if echo "$json_content" | grep -E '"template"\s*:\s*"standard"' >/dev/null; then
     assert_pass "JSON report contains template"
 else
     assert_fail "JSON report contains template"
 fi
 
 # Check that stages array is in JSON
-if echo "$json_content" | grep -qE '"stages"\s*:\s*\['; then
+if echo "$json_content" | grep -E '"stages"\s*:\s*\[' >/dev/null; then
     assert_pass "JSON report contains stages array"
 else
     assert_fail "JSON report contains stages array"
@@ -233,13 +233,13 @@ fi
 
 # Check markdown report content
 md_content=$(cat "$ARTIFACTS_DIR/pipeline-audit.md" 2>/dev/null || echo "")
-if echo "$md_content" | grep -q "Outcome.*success"; then
+if echo "$md_content" | grep "Outcome.*success" >/dev/null; then
     assert_pass "markdown report contains outcome"
 else
     assert_fail "markdown report contains outcome"
 fi
 
-if echo "$md_content" | grep -q "Issue.*42"; then
+if echo "$md_content" | grep "Issue.*42" >/dev/null; then
     assert_pass "markdown report contains issue"
 else
     assert_fail "markdown report contains issue"
@@ -302,7 +302,7 @@ audit_emit "test.quotes" "message=error: \"file not found\""
 
 last_event=$(tail -1 "$ARTIFACTS_DIR/pipeline-audit.jsonl")
 # The escaped quote should be \" in the output
-if echo "$last_event" | grep -q '\\"'; then
+if echo "$last_event" | grep '\\"' >/dev/null; then
     assert_pass "audit_emit escapes quotes in values"
 else
     assert_fail "audit_emit escapes quotes in values" "got: $last_event"

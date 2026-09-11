@@ -24,7 +24,7 @@ assert_equals() {
 
 assert_contains() {
     local haystack="$1" needle="$2" description="${3:-}"
-    if echo "$haystack" | grep -qF "$needle" 2>/dev/null; then
+    if echo "$haystack" | grep -F "$needle" >/dev/null 2>&1; then
         PASS=$((PASS + 1))
         echo -e "  \033[38;2;74;222;128m\033[1m✓\033[0m $description"
     else
@@ -259,7 +259,7 @@ test_inject_prompt_severity_filter() {
     output=$(constitutional_inject_prompt "" "critical")
     assert_contains "$output" "SEC-001" "Critical filter includes SEC-001"
     # QUA-001 is low severity, should NOT appear
-    if echo "$output" | grep -qF "QUA-001" 2>/dev/null; then
+    if echo "$output" | grep -F "QUA-001" >/dev/null 2>&1; then
         FAIL=$((FAIL + 1))
         echo -e "  \033[38;2;248;113;113m\033[1m✗\033[0m Critical filter excludes QUA-001 (low severity)"
     else

@@ -235,7 +235,7 @@ assert_contains "Apply mode shows Applying" "$apply_output" "Applying"
 
 # ─── 15. Apply completes without error ────────────────────────────────────────
 # In mock env, apply may not find real files to update, so just verify it ran
-if echo "$apply_output" | grep -qE '(Manifest updated|No changes|UP TO DATE|Applying)' 2>/dev/null; then
+if echo "$apply_output" | grep -E '(Manifest updated|No changes|UP TO DATE|Applying)' >/dev/null 2>&1; then
     assert_pass "Apply mode completes successfully"
 else
     assert_fail "Apply mode completes successfully" "unexpected output: $apply_output"

@@ -151,22 +151,22 @@ test_briefing_generation_produces_markdown() {
     local content
     content=$(cat "$briefing_file" 2>/dev/null || echo "")
 
-    if ! echo "$content" | grep -q "What's Done"; then
+    if ! echo "$content" | grep "What's Done" >/dev/null; then
         echo "FAIL: 'What's Done' section missing"
         return 1
     fi
 
-    if ! echo "$content" | grep -q "What's Failing"; then
+    if ! echo "$content" | grep "What's Failing" >/dev/null; then
         echo "FAIL: 'What's Failing' section missing"
         return 1
     fi
 
-    if ! echo "$content" | grep -q "What to Try Next"; then
+    if ! echo "$content" | grep "What to Try Next" >/dev/null; then
         echo "FAIL: 'What to Try Next' section missing"
         return 1
     fi
 
-    if ! echo "$content" | grep -q "What NOT to Try"; then
+    if ! echo "$content" | grep "What NOT to Try" >/dev/null; then
         echo "FAIL: 'What NOT to Try' section missing"
         return 1
     fi
@@ -235,7 +235,7 @@ test_strategy_suggestion_for_context_exhaustion() {
         return 1
     fi
 
-    if ! echo "$strategy" | grep -qi "context\|remaining\|tests"; then
+    if ! echo "$strategy" | grep -i "context\|remaining\|tests" >/dev/null; then
         echo "FAIL: Strategy doesn't mention context or remaining work"
         return 1
     fi
@@ -256,7 +256,7 @@ test_strategy_suggestion_for_stuck_loop() {
         return 1
     fi
 
-    if ! echo "$strategy" | grep -qi "different\|approach\|fundamental"; then
+    if ! echo "$strategy" | grep -i "different\|approach\|fundamental" >/dev/null; then
         echo "FAIL: Strategy doesn't mention trying a different approach"
         return 1
     fi
@@ -345,18 +345,18 @@ test_enhanced_progress_md_backward_compatible() {
     content=$(cat "$LOG_DIR/progress.md" 2>/dev/null || echo "")
 
     # Should still have original content
-    if ! echo "$content" | grep -q "Old content"; then
+    if ! echo "$content" | grep "Old content" >/dev/null; then
         echo "FAIL: Original content was lost"
         return 1
     fi
 
     # Should have new sections
-    if ! echo "$content" | grep -q "Status Summary"; then
+    if ! echo "$content" | grep "Status Summary" >/dev/null; then
         echo "FAIL: Status Summary section missing"
         return 1
     fi
 
-    if ! echo "$content" | grep -q "Tests.*PASSING"; then
+    if ! echo "$content" | grep "Tests.*PASSING" >/dev/null; then
         echo "FAIL: Test status missing"
         return 1
     fi
@@ -382,12 +382,12 @@ test_enhanced_progress_md_shows_antipatterns() {
     content=$(cat "$LOG_DIR/progress.md" 2>/dev/null || echo "")
 
     # Should detect anti-pattern
-    if ! echo "$content" | grep -q "Anti-Pattern"; then
+    if ! echo "$content" | grep "Anti-Pattern" >/dev/null; then
         echo "FAIL: Anti-pattern section missing"
         return 1
     fi
 
-    if ! echo "$content" | grep -qi "reconsider"; then
+    if ! echo "$content" | grep -i "reconsider" >/dev/null; then
         echo "FAIL: Anti-pattern advice missing"
         return 1
     fi

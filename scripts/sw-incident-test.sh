@@ -235,7 +235,7 @@ fi
 
 # ─── Test 12: gap subcommand output ────────────────────────────────────────────
 gap_out=$(bash "$SCRIPT_DIR/sw-incident.sh" gap list 2>&1); rc=$?
-if [[ $rc -eq 0 ]] && printf '%s\n' "$gap_out" | grep -q "gaps"; then
+if [[ $rc -eq 0 ]] && printf '%s\n' "$gap_out" | grep "gaps" >/dev/null; then
     assert_pass "gap list subcommand produces expected output"
 else
     assert_fail "gap list subcommand produces expected output" "rc=$rc"

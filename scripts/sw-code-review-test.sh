@@ -139,12 +139,12 @@ fi
     source "$SCRIPT_DIR/sw-code-review.sh"
     output=$(detect_code_smells "$TEST_TEMP_DIR/repo/scripts/sample.sh" 2>&1) || true
     # Clean file should have no LONG_FUNCTION or DEEP_NESTING
-    if echo "$output" | grep -q "LONG_FUNCTION"; then
+    if echo "$output" | grep "LONG_FUNCTION" >/dev/null; then
         echo "FAIL"
     else
         echo "PASS"
     fi
-) | grep -q "PASS"
+) | grep "PASS" >/dev/null
 if [[ $? -eq 0 ]]; then
     assert_pass "no false long function detection on small file"
 else
@@ -157,7 +157,7 @@ fi
     source "$SCRIPT_DIR/sw-code-review.sh"
     output=$(check_style_consistency "$TEST_TEMP_DIR/repo/scripts/sample.sh" 2>&1) || true
     echo "ran"
-) | grep -q "ran"
+) | grep "ran" >/dev/null
 assert_eq "style consistency check runs without crash" "0" "$?"
 
 # ─── Test 10: Architecture boundary check runs ───────────────────────────────
@@ -167,7 +167,7 @@ assert_eq "style consistency check runs without crash" "0" "$?"
     source "$SCRIPT_DIR/sw-code-review.sh"
     output=$(check_architecture_boundaries "$TEST_TEMP_DIR/repo/scripts/sample.sh" 2>&1) || true
     echo "ran"
-) | grep -q "ran"
+) | grep "ran" >/dev/null
 assert_eq "architecture boundary check runs without crash" "0" "$?"
 
 echo ""

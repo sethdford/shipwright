@@ -205,6 +205,7 @@ The build stage delegates to `shipwright loop` for autonomous multi-iteration de
 - **Fast test mode** (`--fast-test-cmd "cmd"`): Alternates between a fast subset test and the full suite. Full test runs on iteration 1, every N iterations (`--fast-test-interval`, default 5), and the final iteration.
 - **Agent roles** (`--roles "builder,reviewer,tester"`): In multi-agent mode, assigns specialization per agent. Built-in roles: `builder`, `reviewer`, `tester`, `optimizer`, `docs`, `security`.
 - **Context exhaustion detection**: When the daemon detects a build loop failed due to iteration exhaustion (not a code error), it tags the failure as `context_exhaustion` and boosts `--max-restarts` on retry.
+- **Bounded auditor fail-open** (`LOOP_AUDIT_UNAVAILABLE_LIMIT`, default `2`): when the audit agent process itself fails to run, its stderr is not review feedback, so the first failures are waved through rather than blocking completion on a tooling fault. After the limit, the streak becomes a blocking finding — "nobody reviewed this" is not "this passed review". The streak resets on any iteration where the auditor actually produces a verdict, and `loop.audit_unavailable` carries `streak` and `limit`.
 
 ## Pipeline Templates
 
@@ -1243,6 +1244,8 @@ Purple (`#7c3aed`) and Blue (`#0066ff`) are used only as gradient endpoints, nev
 - Atomic file writes: use tmp file + `mv`, not direct `echo > file`
 - JSON in bash: use `jq --arg` for proper escaping, never string interpolation
 - `cd` in helper functions changes caller's directory — use subshells `( cd dir && ... )`
+- `producer | grep -q PATTERN` under pipefail is a load-dependent flake: `grep -q` exits on the first match, the producer gets SIGPIPE, and pipefail turns the pipeline's status into 141 — so a *matching* pattern intermittently reads as "not found". Drop the `-q` on the consuming side and redirect instead: `producer | grep PATTERN >/dev/null`, which drains stdin and keeps the same exit status. (Reproduced at ~0.5% serially and far higher under `sw-test-all --jobs 4`.)
+- `date -u -r <epoch>` is BSD-only. On GNU, `-r` means "this *file's* mtime", so a `date -u -r "$epoch" || date -u` fallback silently yields **now**. Use `epoch_to_iso` from `lib/compat.sh`, which tries BSD `-r`, then GNU `-d @`, then python3.
 - Check `$NO_GITHUB` in any new GitHub API features
 
 ## Maintainer / Release (which script to call)

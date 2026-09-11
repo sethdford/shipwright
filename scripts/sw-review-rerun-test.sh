@@ -198,13 +198,13 @@ sha:abc123
 test_request_rerun_missing_pr_number() {
     local output
     output=$(export REPO_DIR="$REPO_DIR"; source "$SCRIPT_DIR/sw-review-rerun.sh" 2>/dev/null; request_rerun "" "abc123" 2>&1) || true
-    echo "$output" | grep -q "Usage\|pr_number\|Missing" || return 1
+    echo "$output" | grep "Usage\|pr_number\|Missing" >/dev/null || return 1
 }
 
 test_request_rerun_missing_sha() {
     local output
     output=$(export REPO_DIR="$REPO_DIR"; source "$SCRIPT_DIR/sw-review-rerun.sh" 2>/dev/null; request_rerun "42" "" 2>&1) || true
-    echo "$output" | grep -q "Usage\|head_sha\|Missing" || return 1
+    echo "$output" | grep "Usage\|head_sha\|Missing" >/dev/null || return 1
 }
 
 test_request_rerun_skips_when_already_requested() {
@@ -239,24 +239,24 @@ test_request_rerun_posts_when_not_requested() {
 test_request_rerun_gh_failure_graceful() {
     local output
     output=$(export REPO_DIR="$REPO_DIR" MOCK_GH_PR_VIEW_BODIES='other' MOCK_GH_FAIL=1; source "$SCRIPT_DIR/sw-review-rerun.sh" 2>/dev/null; request_rerun "1" "abc123" 2>&1) || true
-    echo "$output" | grep -q "Failed\|error\|Error" || return 1
+    echo "$output" | grep "Failed\|error\|Error" >/dev/null || return 1
 }
 
 test_check_rerun_state_missing_pr() {
     local output
     output=$(export REPO_DIR="$REPO_DIR"; source "$SCRIPT_DIR/sw-review-rerun.sh" 2>/dev/null; check_rerun_state "" 2>&1) || true
-    echo "$output" | grep -q "Could not get head SHA\|error\|Usage" || return 1
+    echo "$output" | grep "Could not get head SHA\|error\|Usage" >/dev/null || return 1
 }
 
 test_main_help() {
     output=$(bash "$SCRIPT_DIR/sw-review-rerun.sh" help 2>&1)
-    echo "$output" | grep -q "request\|check\|wait" || return 1
+    echo "$output" | grep "request\|check\|wait" >/dev/null || return 1
 }
 
 test_main_unknown_subcommand() {
     # shellcheck disable=SC2034
     output=$(bash "$SCRIPT_DIR/sw-review-rerun.sh" unknown_cmd 2>&1) || ec=$?
-    echo "$output" | grep -q "Unknown\|unknown" || return 1
+    echo "$output" | grep "Unknown\|unknown" >/dev/null || return 1
 }
 
 # ═══════════════════════════════════════════════════════════════════════════════

@@ -108,7 +108,7 @@ for f in d['failures']:
     if f['fix_effectiveness_rate'] >= 0.5:
         print(f'Known fix for \"{f[\"pattern\"]}\": {f[\"fix\"]} (effectiveness: {f[\"fix_effectiveness_rate\"]})')
 " 2>/dev/null) || inject=""
-    if echo "$inject" | grep -q 'Known fix'; then
+    if echo "$inject" | grep 'Known fix' >/dev/null; then
         assert_pass "Memory injection provides known fixes"
     else
         assert_fail "Memory injection provides known fixes" "No fixes found"
@@ -286,7 +286,7 @@ for line in open('$MOCK_SW/discoveries.jsonl'):
     except: pass
 print('\n'.join(lines))
 " 2>/dev/null) || inject=""
-    if echo "$inject" | grep -q 'Discovery from'; then
+    if echo "$inject" | grep 'Discovery from' >/dev/null; then
         assert_pass "Discovery injection produces readable context"
     else
         assert_fail "Discovery injection produces readable context" "Empty output"
@@ -319,7 +319,7 @@ for line in open('$MOCK_SW/discoveries.jsonl'):
             break
     except: pass
 " 2>/dev/null) || found=""
-    if echo "$found" | grep -q 'vitest'; then
+    if echo "$found" | grep 'vitest' >/dev/null; then
         assert_pass "Cross-pipeline learning: Pipeline B finds A's discovery"
     else
         assert_fail "Cross-pipeline learning" "Discovery not found: $found"
@@ -343,7 +343,7 @@ for line in open('$MOCK_SW/discoveries.jsonl'):
 # Check that both systems have data
 print(f'failures={len(failures)},discoveries={len(discoveries)}')
 " 2>/dev/null) || chain_result="error"
-    if echo "$chain_result" | grep -q 'failures=2.*discoveries='; then
+    if echo "$chain_result" | grep 'failures=2.*discoveries=' >/dev/null; then
         assert_pass "Memory-Discovery chain: both systems have data"
     else
         assert_fail "Memory-Discovery chain" "Got: $chain_result"
@@ -391,7 +391,7 @@ for o in outcomes:
 result = {t: round(v['success']/v['total'], 2) for t, v in by_template.items()}
 print(json.dumps(result))
 " 2>/dev/null) || weights="{}"
-    if echo "$weights" | grep -q 'standard\|fast'; then
+    if echo "$weights" | grep 'standard\|fast' >/dev/null; then
         assert_pass "Template weights computable from outcomes"
     else
         assert_fail "Template weights computable from outcomes" "Got: $weights"

@@ -92,7 +92,7 @@ assert_nonempty() {
 
 assert_contains() {
     local haystack="$1" needle="$2" description="$3"
-    if echo "$haystack" | grep -q "$needle" 2>/dev/null; then
+    if echo "$haystack" | grep "$needle" >/dev/null 2>&1; then
         pass "$description"
     else
         fail "$description" "Expected to contain: $needle"
@@ -205,7 +205,7 @@ assert_nonempty "$suggestion" "policy_suggest_strategy returns non-empty for ts:
 
 # Test 9: bandit_select_model returns a valid model name
 selected_model=$(bandit_select_model "build" 2>/dev/null || echo "")
-if echo "$selected_model" | grep -qE "^(haiku|sonnet|opus)$" 2>/dev/null; then
+if echo "$selected_model" | grep -E "^(haiku|sonnet|opus)$" >/dev/null 2>&1; then
     pass "bandit_select_model returns valid model: $selected_model"
 else
     # Accept any non-empty output (could be formatted differently)
@@ -291,7 +291,7 @@ assert_file_exists "$POLICY_LEARNED_FILE" "Convergence: learned-policy.json crea
 
 # Test 15: Policy should suggest add_tests_first for ts:feature:medium
 conv_suggestion=$(policy_suggest_strategy "ts" "feature" "medium" 2>/dev/null || echo "")
-if echo "$conv_suggestion" | grep -qi "add_tests_first" 2>/dev/null; then
+if echo "$conv_suggestion" | grep -i "add_tests_first" >/dev/null 2>&1; then
     pass "Convergence: policy suggests 'add_tests_first' for ts:feature:medium"
 else
     # Show what was suggested for debugging

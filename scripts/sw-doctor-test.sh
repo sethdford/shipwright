@@ -266,7 +266,7 @@ if [[ "$ver_output" == *"sw-doctor"* && "$ver_output" == *"3."* ]]; then
 else
     assert_fail "--version outputs sw-doctor and version" "got: $ver_output"
 fi
-bash "$SCRIPT_DIR/sw-doctor.sh" -V 2>&1 | grep -q "sw-doctor" && assert_pass "-V short flag works" || assert_fail "-V short flag works"
+bash "$SCRIPT_DIR/sw-doctor.sh" -V 2>&1 | grep "sw-doctor" >/dev/null && assert_pass "-V short flag works" || assert_fail "-V short flag works"
 
 # ─── Test 14: Doctor with missing jq in PATH ──────────────────────────────────
 echo ""

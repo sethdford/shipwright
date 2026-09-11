@@ -326,28 +326,28 @@ result=$(detect_test_commands)
 line_count=$(echo "$result" | wc -l | tr -d ' ')
 assert_eq "Heavyweight tests filtered: returns 3 commands" "3" "$line_count"
 assert_eq "Primary command first" "npm test" "$(echo "$result" | head -1)"
-if echo "$result" | grep -q "npm run test:unit"; then
+if echo "$result" | grep "npm run test:unit" >/dev/null; then
     assert_pass "test:unit included"
 else
     assert_fail "test:unit included"
 fi
-if echo "$result" | grep -q "npm run test:smoke"; then
+if echo "$result" | grep "npm run test:smoke" >/dev/null; then
     assert_pass "test:smoke included"
 else
     assert_fail "test:smoke included"
 fi
 # Integration/e2e/system should be excluded
-if echo "$result" | grep -q "npm run test:e2e"; then
+if echo "$result" | grep "npm run test:e2e" >/dev/null; then
     assert_fail "test:e2e excluded (heavyweight)"
 else
     assert_pass "test:e2e excluded (heavyweight)"
 fi
-if echo "$result" | grep -q "npm run test:integration"; then
+if echo "$result" | grep "npm run test:integration" >/dev/null; then
     assert_fail "test:integration excluded (heavyweight)"
 else
     assert_pass "test:integration excluded (heavyweight)"
 fi
-if echo "$result" | grep -q "npm run test:system"; then
+if echo "$result" | grep "npm run test:system" >/dev/null; then
     assert_fail "test:system excluded (heavyweight)"
 else
     assert_pass "test:system excluded (heavyweight)"
@@ -363,7 +363,7 @@ cat > "$PROJECT_ROOT/package.json" <<'JSON'
 {"scripts":{"test":"jest"}}
 JSON
 result=$(detect_test_commands)
-if echo "$result" | grep -q 'cd.*dashboard.*test'; then
+if echo "$result" | grep 'cd.*dashboard.*test' >/dev/null; then
     assert_pass "Subdirectory test runner discovered"
 else
     assert_fail "Subdirectory test runner discovered" "got: $result"
@@ -374,7 +374,7 @@ cat > "$PROJECT_ROOT/dashboard/package.json" <<'JSON'
 {"scripts":{"test":"echo \"Error: no test specified\" && exit 1"}}
 JSON
 result=$(detect_test_commands)
-if echo "$result" | grep -q 'dashboard'; then
+if echo "$result" | grep 'dashboard' >/dev/null; then
     assert_fail "Subdirectory with 'no test' excluded"
 else
     assert_pass "Subdirectory with 'no test' excluded"

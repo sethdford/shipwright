@@ -240,11 +240,11 @@ cat > "$TEST_TEMP_DIR/bin/claude" <<'MOCK'
 #!/usr/bin/env bash
 # Read stdin to get the prompt
 input=$(cat)
-if echo "$input" | grep -q "Logic Auditor"; then
+if echo "$input" | grep "Logic Auditor" >/dev/null; then
     echo '{"findings":[{"severity":"high","category":"logic","file":"foo.sh","line":10,"description":"Off by one","evidence":"i < n","suggestion":"Use <="}]}'
-elif echo "$input" | grep -q "Integration Auditor"; then
+elif echo "$input" | grep "Integration Auditor" >/dev/null; then
     echo '{"findings":[]}'
-elif echo "$input" | grep -q "Completeness Auditor"; then
+elif echo "$input" | grep "Completeness Auditor" >/dev/null; then
     echo '{"findings":[{"severity":"low","category":"completeness","file":"bar.sh","line":5,"description":"Missing test","evidence":"no test","suggestion":"Add test"}]}'
 else
     echo '{"findings":[]}'

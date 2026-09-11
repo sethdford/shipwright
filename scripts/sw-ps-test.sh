@@ -86,7 +86,7 @@ else
     assert_fail "set -euo pipefail present"
 fi
 
-if grep -q "bootstrap.sh" "$SRC" || grep -q "trap.*ERR" "$SRC"; then
+if grep -q "bootstrap.sh" "$SRC" || grep "trap.*ERR" "$SRC" >/dev/null; then
     assert_pass "ERR trap present (via bootstrap or inline)"
 else
     assert_fail "ERR trap present (via bootstrap or inline)"
@@ -213,13 +213,13 @@ echo ""
 echo -e "${BOLD}  Status Classification${RESET}"
 
 # Check that the script classifies claude process as running when idle < 300
-if grep -q 'claude.*node.*npm.*npx' "$SRC" || grep -q 'claude|node|npm|npx' "$SRC"; then
+if grep -q 'claude.*node.*npm.*npx' "$SRC" || grep 'claude|node|npm|npx' "$SRC" >/dev/null; then
     assert_pass "recognizes claude/node/npm/npx as active processes"
 else
     assert_fail "recognizes claude/node/npm/npx as active processes"
 fi
 
-if grep -q 'bash|zsh|fish|sh' "$SRC" || grep -q 'bash.*zsh.*fish' "$SRC"; then
+if grep -q 'bash|zsh|fish|sh' "$SRC" || grep 'bash.*zsh.*fish' "$SRC" >/dev/null; then
     assert_pass "recognizes shell processes as idle"
 else
     assert_fail "recognizes shell processes as idle"
@@ -248,7 +248,7 @@ else
     assert_fail "format_idle handles hours"
 fi
 
-if grep -q '"${seconds}s"' "$SRC" || grep -q 'echo.*s"' "$SRC"; then
+if grep -q '"${seconds}s"' "$SRC" || grep 'echo.*s"' "$SRC" >/dev/null; then
     assert_pass "format_idle handles seconds"
 else
     assert_fail "format_idle handles seconds"

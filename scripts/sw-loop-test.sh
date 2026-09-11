@@ -211,7 +211,7 @@ fi
 # ─── Test 11: JSON output format in claude flags ────────────────────────────
 echo ""
 echo -e "${DIM}  json output format${RESET}"
-if grep -q 'output-format.*json' "$SCRIPT_DIR/sw-loop.sh" || grep -q 'output-format.*json' "$SCRIPT_DIR/lib/loop-iteration.sh"; then
+if grep -q 'output-format.*json' "$SCRIPT_DIR/sw-loop.sh" || grep 'output-format.*json' "$SCRIPT_DIR/lib/loop-iteration.sh" >/dev/null; then
     assert_pass "build_claude_flags includes --output-format json"
 else
     assert_fail "build_claude_flags includes --output-format json"
@@ -333,7 +333,7 @@ else
 fi
 
 # ─── Test 16: run_claude_iteration separates stdout/stderr ───────────────────
-if grep -q '2>"$err_file"' "$SCRIPT_DIR/sw-loop.sh" || grep -q '2>"$err_file"' "$SCRIPT_DIR/lib/loop-iteration.sh"; then
+if grep -q '2>"$err_file"' "$SCRIPT_DIR/sw-loop.sh" || grep '2>"$err_file"' "$SCRIPT_DIR/lib/loop-iteration.sh" >/dev/null; then
     assert_pass "run_claude_iteration separates stdout from stderr"
 else
     assert_fail "run_claude_iteration separates stdout from stderr"
@@ -572,9 +572,9 @@ CLAUDE_EOF
         --local \
         2>&1) || true
 
-    if echo "$output" | grep -qF "LOOP_COMPLETE"; then
+    if echo "$output" | grep -F "LOOP_COMPLETE" >/dev/null; then
         assert_pass "Loop detected completion signal"
-    elif echo "$output" | grep -qi "complete.*LOOP_COMPLETE\|LOOP_COMPLETE.*accepted"; then
+    elif echo "$output" | grep -i "complete.*LOOP_COMPLETE\|LOOP_COMPLETE.*accepted" >/dev/null; then
         assert_pass "Loop detected completion signal"
     else
         assert_fail "Loop detected completion signal" "output missing LOOP_COMPLETE"
@@ -610,11 +610,11 @@ CLAUDE_EOF
         --local \
         2>&1) || true
 
-    if echo "$output" | grep -qE "Iteration [2-9]|iteration [2-9]"; then
+    if echo "$output" | grep -E "Iteration [2-9]|iteration [2-9]" >/dev/null; then
         assert_pass "Loop runs multiple iterations when tests fail initially"
-    elif echo "$output" | grep -q "LOOP_COMPLETE"; then
+    elif echo "$output" | grep "LOOP_COMPLETE" >/dev/null; then
         assert_pass "Loop runs multiple iterations and completes"
-    elif echo "$output" | grep -qi "circuit breaker\|max iteration"; then
+    elif echo "$output" | grep -i "circuit breaker\|max iteration" >/dev/null; then
         assert_pass "Loop iterates (stopped by limit)"
     else
         assert_fail "Loop iterates on test failure" "expected multiple iterations"
@@ -646,7 +646,7 @@ CLAUDE_EOF
         --no-auto-extend \
         2>&1) || true
 
-    if echo "$output" | grep -qiE "max iteration|iteration.*3|Max iterations"; then
+    if echo "$output" | grep -iE "max iteration|iteration.*3|Max iterations" >/dev/null; then
         assert_pass "Loop stops at max iterations"
     else
         assert_fail "Loop respects max-iterations" "expected iteration limit message"
@@ -678,11 +678,11 @@ CLAUDE_EOF
         --no-auto-extend \
         2>&1) || true
 
-    if echo "$output" | grep -qi "stuckness\|stuck"; then
+    if echo "$output" | grep -i "stuckness\|stuck" >/dev/null; then
         assert_pass "Loop detects stuckness"
-    elif echo "$output" | grep -qi "circuit breaker"; then
+    elif echo "$output" | grep -i "circuit breaker" >/dev/null; then
         assert_pass "Loop circuit breaker triggered (stuckness-related)"
-    elif echo "$output" | grep -qi "max iteration"; then
+    elif echo "$output" | grep -i "max iteration" >/dev/null; then
         assert_pass "Loop stops at limit (stuckness test)"
     else
         assert_fail "Loop stuckness detection" "expected stuckness or circuit breaker"
@@ -716,7 +716,7 @@ exit 0' > "$TEST_TEMP_DIR/bin/claude"
         --local \
         2>&1) || true
 
-    if echo "$output" | grep -qiE "budget exhausted|Budget exhausted|LOOP BUDGET_EXHAUSTED"; then
+    if echo "$output" | grep -iE "budget exhausted|Budget exhausted|LOOP BUDGET_EXHAUSTED" >/dev/null; then
         assert_pass "Budget gate stops loop"
     else
         assert_fail "Budget gate stops loop" "expected budget exhausted message"
@@ -744,7 +744,7 @@ _e=\$?
 echo \"exit=\$_e\"
 " 2>/dev/null)
 rm -rf "$_valid_tmp"
-if echo "$_valid_out" | grep -q "exit=1"; then
+if echo "$_valid_out" | grep "exit=1" >/dev/null; then
     assert_pass "validate_claude_output catches corrupt output"
 else
     assert_fail "validate_claude_output catches bad output" "expected non-zero exit for api key leak"
@@ -773,7 +773,7 @@ CLAUDE_EOF
         --local \
         2>&1) || true
 
-    if echo "$output" | grep -qiE "Git:|progress|insertion|LOOP_COMPLETE"; then
+    if echo "$output" | grep -iE "Git:|progress|insertion|LOOP_COMPLETE" >/dev/null; then
         assert_pass "Loop tracks progress via git"
     else
         assert_fail "Loop progress tracking" "expected git/progress output"
@@ -835,7 +835,7 @@ fi
 
 # Test: --help mentions --additional-test-cmds
 output=$(bash "$SCRIPT_DIR/sw-loop.sh" --help 2>&1 | sed $'s/\033\[[0-9;]*m//g') && rc=0 || rc=$?
-if echo "$output" | grep -q 'additional-test-cmds'; then
+if echo "$output" | grep 'additional-test-cmds' >/dev/null; then
     assert_pass "--help documents --additional-test-cmds"
 else
     assert_fail "--help documents --additional-test-cmds"

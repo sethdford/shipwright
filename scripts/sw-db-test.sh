@@ -440,7 +440,7 @@ test_cost_today() {
     local total
     total=$(db_cost_today)
     # Should be approximately 0.30 (0.10 + 0.20)
-    if ! echo "$total" | grep -qE '^0\.2[89]|^0\.3'; then
+    if ! echo "$total" | grep -E '^0\.2[89]|^0\.3' >/dev/null; then
         echo -e "    ${RED}✗${RESET} Cost total wrong (got $total)"
         return 1
     fi
@@ -461,7 +461,7 @@ test_budget() {
     budget=$(db_get_budget)
 
     # SQLite may format as 10.0 or 10.00 — match either
-    if ! echo "$budget" | grep -qE "10\.0"; then
+    if ! echo "$budget" | grep -E "10\.0" >/dev/null; then
         echo -e "    ${RED}✗${RESET} Budget not set correctly (got $budget)"
         return 1
     fi
@@ -664,7 +664,7 @@ EOF
     local budget
     budget=$(sqlite3 "$DB_FILE" "SELECT daily_budget_usd FROM budgets WHERE id=1;" 2>/dev/null || echo "0")
     # SQLite may format as 50, 50.0, or 50.00
-    if ! echo "$budget" | grep -qE '^50'; then
+    if ! echo "$budget" | grep -E '^50' >/dev/null; then
         echo -e "    ${RED}✗${RESET} Budget not migrated (got $budget)"
         return 1
     fi
@@ -686,7 +686,7 @@ test_health_check() {
     local output
     output=$(db_health_check 2>&1 || true)
 
-    if ! echo "$output" | grep -q "passed"; then
+    if ! echo "$output" | grep "passed" >/dev/null; then
         echo -e "    ${RED}✗${RESET} Health check failed"
         return 1
     fi

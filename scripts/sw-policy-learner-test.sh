@@ -24,7 +24,7 @@ assert_equals() {
 
 assert_contains() {
     local haystack="$1" needle="$2" description="${3:-}"
-    if echo "$haystack" | grep -q "$needle"; then
+    if echo "$haystack" | grep "$needle" >/dev/null; then
         PASS=$((PASS + 1))
         echo -e "  \033[38;2;74;222;128m\033[1m✓\033[0m $description"
     else

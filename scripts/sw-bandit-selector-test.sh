@@ -242,14 +242,14 @@ test_report_output() {
     bandit_update "model" "build:opus" "failure"
     local output
     output=$(bandit_report "model" 2>&1)
-    if echo "$output" | grep -q "build:opus"; then
+    if echo "$output" | grep "build:opus" >/dev/null; then
         PASS=$((PASS + 1))
         echo -e "  \033[38;2;74;222;128m\033[1m✓\033[0m bandit_report shows arm data"
     else
         FAIL=$((FAIL + 1))
         echo -e "  \033[38;2;248;113;113m\033[1m✗\033[0m bandit_report shows arm data"
     fi
-    if echo "$output" | grep -q "Exploration rate"; then
+    if echo "$output" | grep "Exploration rate" >/dev/null; then
         PASS=$((PASS + 1))
         echo -e "  \033[38;2;74;222;128m\033[1m✓\033[0m bandit_report shows exploration rate"
     else
@@ -362,7 +362,7 @@ test_report_filter() {
     bandit_update "model" "build:opus" "success"
     local output
     output=$(bandit_report "model" "build:" 2>&1)
-    if echo "$output" | grep -q "build:opus"; then
+    if echo "$output" | grep "build:opus" >/dev/null; then
         PASS=$((PASS + 1))
         echo -e "  \033[38;2;74;222;128m\033[1m✓\033[0m bandit_report filter includes matching arms"
     else

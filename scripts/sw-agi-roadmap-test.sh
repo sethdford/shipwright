@@ -45,7 +45,7 @@ test_failure_history_init() {
     # Verify the init_state function includes failure_history: [] (can be up to 50 lines into function)
     local _ctx
     _ctx="$(grep -A 50 'init_state()' "$SCRIPT_DIR/sw-daemon.sh" "$SCRIPT_DIR"/lib/daemon-*.sh 2>/dev/null || true)"
-    echo "$_ctx" | grep -q 'failure_history' || {
+    echo "$_ctx" | grep 'failure_history' >/dev/null || {
         echo "failure_history not in init_state function"
         return 1
     }
@@ -122,11 +122,11 @@ test_max_retries_per_class() {
         echo \"build=\$(get_max_retries_for_class build_failure)\"
         echo \"unknown=\$(get_max_retries_for_class unknown)\"
     " 2>/dev/null)
-    echo "$result" | grep -q "auth=0" || { echo "auth_error should be 0 retries, got: $result"; return 1; }
-    echo "$result" | grep -q "invalid=0" || { echo "invalid_issue should be 0 retries"; return 1; }
-    echo "$result" | grep -q "api=4" || { echo "api_error should be 4 retries"; return 1; }
-    echo "$result" | grep -q "context=2" || { echo "context_exhaustion should be 2 retries"; return 1; }
-    echo "$result" | grep -q "build=2" || { echo "build_failure should be 2 retries"; return 1; }
+    echo "$result" | grep "auth=0" >/dev/null || { echo "auth_error should be 0 retries, got: $result"; return 1; }
+    echo "$result" | grep "invalid=0" >/dev/null || { echo "invalid_issue should be 0 retries"; return 1; }
+    echo "$result" | grep "api=4" >/dev/null || { echo "api_error should be 4 retries"; return 1; }
+    echo "$result" | grep "context=2" >/dev/null || { echo "context_exhaustion should be 2 retries"; return 1; }
+    echo "$result" | grep "build=2" >/dev/null || { echo "build_failure should be 2 retries"; return 1; }
 }
 
 # ── 1.4 Daemon: exponential backoff math is correct ───────────────────────────
@@ -171,7 +171,7 @@ test_pm_learn_functional() {
     local out pm_home="$TEST_TMP/pm-home"
     mkdir -p "$pm_home/.shipwright"
     out=$(HOME="$pm_home" PM_STATE_DIR="$pm_home/.shipwright" NO_GITHUB=true bash "$SCRIPT_DIR/sw-pm.sh" learn 42 success 2>&1 || true)
-    echo "$out" | grep -qi "recorded\|captured\|success" || { echo "learn should confirm recording: $out"; return 1; }
+    echo "$out" | grep -i "recorded\|captured\|success" >/dev/null || { echo "learn should confirm recording: $out"; return 1; }
 }
 
 # ── 1.8 Daemon: PM integration in triage (wiring check) ──────────────────────
@@ -229,7 +229,7 @@ test_predictive_inject_prevention() {
     grep -q 'inject-prevention' "$SCRIPT_DIR/sw-predictive.sh" || { echo "inject-prevention command missing from sw-predictive.sh"; return 1; }
     # Verify the predict_inject_prevention function exists and accepts stage + issue_json
     grep -q 'predict_inject_prevention()' "$SCRIPT_DIR/sw-predictive.sh" || { echo "predict_inject_prevention function missing"; return 1; }
-    grep -A 5 'predict_inject_prevention()' "$SCRIPT_DIR/sw-predictive.sh" | grep -q 'stage' || { echo "predict_inject_prevention doesn't accept stage parameter"; return 1; }
+    grep -A 5 'predict_inject_prevention()' "$SCRIPT_DIR/sw-predictive.sh" | grep 'stage' >/dev/null || { echo "predict_inject_prevention doesn't accept stage parameter"; return 1; }
 }
 
 # ── 2.5 Pipeline: predictive anomaly wired into mark_stage_complete ──────────
@@ -280,7 +280,7 @@ test_oversight_gate_json_safety() {
     jq -e '.' "$review_file" >/dev/null 2>&1 || { echo "Invalid JSON in review file"; return 1; }
     local desc
     desc=$(jq -r '.description' "$review_file")
-    echo "$desc" | grep -q "special" || { echo "Description lost content"; return 1; }
+    echo "$desc" | grep "special" >/dev/null || { echo "Description lost content"; return 1; }
 }
 
 # ── 2.10 Pipeline: oversight gate wired into stage_review ────────────────────
@@ -290,7 +290,7 @@ test_pipeline_oversight_wiring() {
     # Line structure: if [[ -x oversight.sh ]] && [[ SKIP_GATES != true ]]; then ... gate ...
     local _ctx
     _ctx="$(grep -B 10 'sw-oversight.sh.*gate' "$SCRIPT_DIR/sw-pipeline.sh" 2>/dev/null || true; grep -B 10 'sw-oversight.sh.*gate' "$SCRIPT_DIR"/lib/pipeline-*.sh 2>/dev/null || true)"
-    echo "$_ctx" | grep -q 'SKIP_GATES' || {
+    echo "$_ctx" | grep 'SKIP_GATES' >/dev/null || {
         echo "Oversight gate does not respect SKIP_GATES"
         return 1
     }
@@ -346,7 +346,7 @@ test_triage_offline_fallback() {
     # Verify triage team no longer calls check_gh at the top
     local team_section
     team_section=$(sed -n '/^cmd_team/,/^cmd_/p' "$SCRIPT_DIR/sw-triage.sh" | head -10)
-    if echo "$team_section" | grep -q 'check_gh'; then
+    if echo "$team_section" | grep 'check_gh' >/dev/null; then
         echo "cmd_team still calls check_gh at the top (blocks offline)"
         return 1
     fi
@@ -387,7 +387,7 @@ test_recruit_meta_loop() {
     # Verify reflect calls meta-validation (check both main script and libraries)
     local reflect_section
     reflect_section=$(sed -n '/_recruit_reflect()/,/^}/p' "$SCRIPT_DIR/sw-recruit.sh" "$SCRIPT_DIR"/lib/recruit-*.sh 2>/dev/null || true)
-    echo "$reflect_section" | grep -q '_recruit_meta_validate_self_tune' || {
+    echo "$reflect_section" | grep '_recruit_meta_validate_self_tune' >/dev/null || {
         echo "reflect does not call meta-validation"
         return 1
     }
@@ -439,11 +439,11 @@ test_autonomous_claude_redirect() {
 # ── 2.13 Autonomous: dual PR branch check in update_finding_outcomes ─────────
 test_autonomous_dual_branch_check() {
     # Verify both pipeline/ and daemon/ branches are checked separately
-    grep -c 'gh pr list --head "pipeline/issue-' "$SCRIPT_DIR/sw-autonomous.sh" | grep -q '[1-9]' || {
+    grep -c 'gh pr list --head "pipeline/issue-' "$SCRIPT_DIR/sw-autonomous.sh" | grep '[1-9]' >/dev/null || {
         echo "Missing pipeline/issue- branch check"
         return 1
     }
-    grep -c 'gh pr list --head "daemon/issue-' "$SCRIPT_DIR/sw-autonomous.sh" | grep -q '[1-9]' || {
+    grep -c 'gh pr list --head "daemon/issue-' "$SCRIPT_DIR/sw-autonomous.sh" | grep '[1-9]' >/dev/null || {
         echo "Missing daemon/issue- branch check"
         return 1
     }
@@ -452,8 +452,8 @@ test_autonomous_dual_branch_check() {
 # ── 2.14 Autonomous: run_scheduler exists and has sleep loop ─────────────────
 test_autonomous_scheduler() {
     grep -q 'run_scheduler()' "$SCRIPT_DIR/sw-autonomous.sh" || { echo "run_scheduler function not found"; return 1; }
-    grep -A 20 'run_scheduler()' "$SCRIPT_DIR/sw-autonomous.sh" | grep -q 'while true' || { echo "Scheduler missing loop"; return 1; }
-    grep -A 20 'run_scheduler()' "$SCRIPT_DIR/sw-autonomous.sh" | grep -q 'sleep' || { echo "Scheduler missing sleep"; return 1; }
+    grep -A 20 'run_scheduler()' "$SCRIPT_DIR/sw-autonomous.sh" | grep 'while true' >/dev/null || { echo "Scheduler missing loop"; return 1; }
+    grep -A 20 'run_scheduler()' "$SCRIPT_DIR/sw-autonomous.sh" | grep 'sleep' >/dev/null || { echo "Scheduler missing sleep"; return 1; }
 }
 
 # ── 2.15 Autonomous: trigger_pipeline_for_finding exists ─────────────────────
@@ -462,7 +462,7 @@ test_autonomous_pipeline_trigger() {
         echo "trigger_pipeline_for_finding function not found"
         return 1
     }
-    grep -A 10 'trigger_pipeline_for_finding()' "$SCRIPT_DIR/sw-autonomous.sh" | grep -q 'sw-pipeline.sh' || {
+    grep -A 10 'trigger_pipeline_for_finding()' "$SCRIPT_DIR/sw-autonomous.sh" | grep 'sw-pipeline.sh' >/dev/null || {
         echo "trigger_pipeline_for_finding doesn't call sw-pipeline.sh"
         return 1
     }
@@ -470,7 +470,7 @@ test_autonomous_pipeline_trigger() {
 
 # ── 2.16 Incident: create_hotfix_issue echoes issue number ──────────────────
 test_incident_issue_echo() {
-    grep -A 35 'create_hotfix_issue()' "$SCRIPT_DIR/sw-incident.sh" | grep -q 'echo "$issue_num"' || {
+    grep -A 35 'create_hotfix_issue()' "$SCRIPT_DIR/sw-incident.sh" | grep 'echo "$issue_num"' >/dev/null || {
         echo "create_hotfix_issue doesn't echo issue number"
         return 1
     }
@@ -479,7 +479,7 @@ test_incident_issue_echo() {
 # ── 2.17 Incident: trigger_pipeline wires --template hotfix ─────────────────
 test_incident_pipeline_hotfix() {
     grep -q 'trigger_pipeline_for_incident()' "$SCRIPT_DIR/sw-incident.sh" || { echo "trigger_pipeline_for_incident missing"; return 1; }
-    grep -A 15 'trigger_pipeline_for_incident()' "$SCRIPT_DIR/sw-incident.sh" | grep -q '\-\-template hotfix' || {
+    grep -A 15 'trigger_pipeline_for_incident()' "$SCRIPT_DIR/sw-incident.sh" | grep '\-\-template hotfix' >/dev/null || {
         echo "trigger_pipeline_for_incident missing --template hotfix"
         return 1
     }
@@ -488,7 +488,7 @@ test_incident_pipeline_hotfix() {
 # ── 2.18 Incident: trigger_rollback wires sw-feedback.sh ────────────────────
 test_incident_rollback_wiring() {
     grep -q 'trigger_rollback_for_incident()' "$SCRIPT_DIR/sw-incident.sh" || { echo "trigger_rollback_for_incident missing"; return 1; }
-    grep -A 10 'trigger_rollback_for_incident()' "$SCRIPT_DIR/sw-incident.sh" | grep -q 'sw-feedback.sh.*rollback' || {
+    grep -A 10 'trigger_rollback_for_incident()' "$SCRIPT_DIR/sw-incident.sh" | grep 'sw-feedback.sh.*rollback' >/dev/null || {
         echo "trigger_rollback_for_incident doesn't call sw-feedback.sh rollback"
         return 1
     }
@@ -505,7 +505,7 @@ test_code_review_semantic() {
         return 1
     }
     # Verify it checks for logic, race conditions, API usage
-    grep -A 30 'run_claude_semantic_review()' "$SCRIPT_DIR/sw-code-review.sh" | grep -qi 'logic\|race.*condition\|API' || {
+    grep -A 30 'run_claude_semantic_review()' "$SCRIPT_DIR/sw-code-review.sh" | grep -i 'logic\|race.*condition\|API' >/dev/null || {
         echo "Semantic review doesn't check for logic/race/API issues"
         return 1
     }
@@ -645,7 +645,7 @@ test_stage_self_awareness_hint() {
     while IFS= read -r line; do
         [[ -z "$line" ]] && continue
         total=$((total + 1))
-        echo "$line" | grep -q '"outcome":"failed"' && failures=$((failures + 1)) || true
+        echo "$line" | grep '"outcome":"failed"' >/dev/null && failures=$((failures + 1)) || true
     done <<< "$recent"
     local rate=$((failures * 100 / total))
     [[ "$total" -ge 3 ]] || { echo "Expected total >= 3, got $total"; return 1; }
@@ -663,13 +663,13 @@ test_effectiveness_both_paths() {
     # mark_stage_complete calls record_stage_effectiveness (can be up to 15 lines in)
     local _complete_ctx
     _complete_ctx="$(grep -A 15 'mark_stage_complete()' "$SCRIPT_DIR/sw-pipeline.sh" 2>/dev/null || true; grep -A 15 'mark_stage_complete()' "$SCRIPT_DIR"/lib/pipeline-*.sh 2>/dev/null || true)"
-    echo "$_complete_ctx" | grep -q 'record_stage_effectiveness.*complete' || {
+    echo "$_complete_ctx" | grep 'record_stage_effectiveness.*complete' >/dev/null || {
         echo "record_stage_effectiveness not called on mark_stage_complete"
         return 1
     }
     local _failed_ctx
     _failed_ctx="$(grep -A 10 'mark_stage_failed()' "$SCRIPT_DIR/sw-pipeline.sh" 2>/dev/null || true; grep -A 10 'mark_stage_failed()' "$SCRIPT_DIR"/lib/pipeline-*.sh 2>/dev/null || true)"
-    echo "$_failed_ctx" | grep -q 'record_stage_effectiveness.*failed' || {
+    echo "$_failed_ctx" | grep 'record_stage_effectiveness.*failed' >/dev/null || {
         echo "record_stage_effectiveness not called on mark_stage_failed"
         return 1
     }
@@ -710,7 +710,7 @@ test_integration_claude_skip_path() {
         echo "integration-claude-test should exit 0 when skipping"
         return 1
     }
-    echo "$out" | grep -q "Skipping integration-claude" || {
+    echo "$out" | grep "Skipping integration-claude" >/dev/null || {
         echo "Expected 'Skipping integration-claude' message, got: $out"
         return 1
     }

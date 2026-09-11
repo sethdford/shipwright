@@ -61,7 +61,7 @@ set -e
 # swallowed.
 combined_output="$(cat "$out_file" "$err_file" 2>/dev/null || true)"
 if [[ "$exit_code" -ne 0 ]] && printf '%s' "$combined_output" \
-        | grep -qiE 'weekly limit|usage limit|rate limit|rate_limit_error|overloaded_error'; then
+        | grep -iE 'weekly limit|usage limit|rate limit|rate_limit_error|overloaded_error' >/dev/null; then
     echo "SKIP: Claude account quota reached, not a code failure — the gate cannot"
     echo "      run until it resets. Reported by the CLI as:"
     printf '        %s\n' "$combined_output"

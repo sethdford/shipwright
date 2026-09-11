@@ -272,7 +272,7 @@ test_report_output() {
     report=$(timeout_report 2>&1)
 
     # Verify it contains expected elements
-    if printf '%s' "$report" | grep -q "Adaptive Stage Timeout Report"; then
+    if printf '%s' "$report" | grep "Adaptive Stage Timeout Report" >/dev/null; then
         success "$TEST_NAME: Report output contains header"
         PASS=$((PASS + 1))
     else
@@ -280,7 +280,7 @@ test_report_output() {
         FAIL=$((FAIL + 1))
     fi
 
-    if printf '%s' "$report" | grep -q "build"; then
+    if printf '%s' "$report" | grep "build" >/dev/null; then
         success "$TEST_NAME: Report output contains stage data"
         PASS=$((PASS + 1))
     else
@@ -353,7 +353,7 @@ test_recording_with_metadata() {
     local recorded
     recorded=$(cat "$TIMEOUT_HISTORY_FILE")
 
-    if printf '%s' "$recorded" | grep -q '"pipeline_template":"full"'; then
+    if printf '%s' "$recorded" | grep '"pipeline_template":"full"' >/dev/null; then
         success "$TEST_NAME: Pipeline template metadata recorded"
         PASS=$((PASS + 1))
     else
@@ -361,7 +361,7 @@ test_recording_with_metadata() {
         FAIL=$((FAIL + 1))
     fi
 
-    if printf '%s' "$recorded" | grep -q '"complexity":"critical"'; then
+    if printf '%s' "$recorded" | grep '"complexity":"critical"' >/dev/null; then
         success "$TEST_NAME: Complexity metadata recorded"
         PASS=$((PASS + 1))
     else

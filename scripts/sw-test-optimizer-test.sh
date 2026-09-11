@@ -234,7 +234,7 @@ if [[ "$first_test" == "test_b.sh" ]]; then
     assert_pass "Prioritize places high-fail test first"
 else
     # May have newlines in output, just check if test_b is in result before test_a
-    if echo "$prioritized" | grep -q "test_b"; then
+    if echo "$prioritized" | grep "test_b" >/dev/null; then
         assert_pass "Prioritize places high-fail test first"
     else
         assert_fail "Prioritize places high-fail test first" "got $first_test"

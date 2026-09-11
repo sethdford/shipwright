@@ -136,8 +136,8 @@ test_config_defaults() {
     config_output=$(bash "$TEST_TEMP_DIR/scripts/sw-stall-detector.sh" config 2>/dev/null || true)
 
     # Check that key config values are present in output
-    echo "$config_output" | grep -q "stall_timeout_seconds" || return 1
-    echo "$config_output" | grep -q "300" || return 1
+    echo "$config_output" | grep "stall_timeout_seconds" >/dev/null || return 1
+    echo "$config_output" | grep "300" >/dev/null || return 1
 
     return 0
 }
@@ -223,7 +223,7 @@ test_status_no_detector() {
     cd "$TEST_TEMP_DIR/project" || return 1
     status_output=$(bash "$TEST_TEMP_DIR/scripts/sw-stall-detector.sh" status 2>/dev/null)
 
-    echo "$status_output" | grep -q "not running" || return 1
+    echo "$status_output" | grep "not running" >/dev/null || return 1
 }
 
 test_help_command() {
@@ -232,16 +232,16 @@ test_help_command() {
 
     help_output=$(bash "$TEST_TEMP_DIR/scripts/sw-stall-detector.sh" help 2>/dev/null)
 
-    echo "$help_output" | grep -q "USAGE" || return 1
-    echo "$help_output" | grep -q "check" || return 1
-    echo "$help_output" | grep -q "watch" || return 1
-    echo "$help_output" | grep -q "abort" || return 1
+    echo "$help_output" | grep "USAGE" >/dev/null || return 1
+    echo "$help_output" | grep "check" >/dev/null || return 1
+    echo "$help_output" | grep "watch" >/dev/null || return 1
+    echo "$help_output" | grep "abort" >/dev/null || return 1
 }
 
 test_abort_no_heartbeat() {
     # Test abort fails gracefully when no heartbeat found
     cd "$TEST_TEMP_DIR/project" || return 1
-    bash "$TEST_TEMP_DIR/scripts/sw-stall-detector.sh" abort nonexistent 2>&1 | grep -q "No heartbeat" || return 0  # Either error is ok
+    bash "$TEST_TEMP_DIR/scripts/sw-stall-detector.sh" abort nonexistent 2>&1 | grep "No heartbeat" >/dev/null || return 0  # Either error is ok
     return 0
 }
 

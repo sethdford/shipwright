@@ -55,7 +55,7 @@ assert_contains() {
     local needle="$2"
     local msg="${3:-}"
 
-    if echo "$haystack" | grep -q "$needle"; then
+    if echo "$haystack" | grep "$needle" >/dev/null; then
         success "String contains assertion passed"
         (( PASS++ ))
     else

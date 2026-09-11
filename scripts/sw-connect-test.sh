@@ -226,7 +226,7 @@ test_resolve_developer_id_from_env() {
         return 1
     fi
     # Check it uses DEVELOPER_ID env var
-    if ! grep -A 5 "resolve_developer_id()" "$TEST_TEMP_DIR/sw-connect.sh" | grep -q "DEVELOPER_ID"; then
+    if ! grep -A 5 "resolve_developer_id()" "$TEST_TEMP_DIR/sw-connect.sh" | grep "DEVELOPER_ID" >/dev/null; then
         echo -e "    ${RED}✗${RESET} Function doesn't check DEVELOPER_ID"
         return 1
     fi
@@ -263,7 +263,7 @@ test_resolve_machine_name_from_env() {
         echo -e "    ${RED}✗${RESET} resolve_machine_name() not defined"
         return 1
     fi
-    if ! grep -A 5 "resolve_machine_name()" "$TEST_TEMP_DIR/sw-connect.sh" | grep -q "MACHINE_NAME"; then
+    if ! grep -A 5 "resolve_machine_name()" "$TEST_TEMP_DIR/sw-connect.sh" | grep "MACHINE_NAME" >/dev/null; then
         echo -e "    ${RED}✗${RESET} Function doesn't check MACHINE_NAME"
         return 1
     fi
@@ -444,7 +444,7 @@ test_status_shows_connected() {
             bash "$TEST_TEMP_DIR/sw-connect.sh" status 2>/dev/null
     )
 
-    if ! echo "$output" | grep -q "connected"; then
+    if ! echo "$output" | grep "connected" >/dev/null; then
         echo -e "    ${RED}✗${RESET} Status output missing 'connected' indicator"
         echo "    Output: $output"
         return 1
@@ -468,9 +468,9 @@ test_status_shows_disconnected() {
     )
 
     # Check for either "disconnected" or RED colored status
-    if ! echo "$output" | grep -q -E "(disconnected|Status.*disconnected)"; then
+    if ! echo "$output" | grep -E "(disconnected|Status.*disconnected)" >/dev/null; then
         # Maybe it shows the default but doesn't show a PID
-        if ! echo "$output" | grep -q "Status"; then
+        if ! echo "$output" | grep "Status" >/dev/null; then
             echo -e "    ${RED}✗${RESET} Status output missing status line"
             return 1
         fi
@@ -541,9 +541,9 @@ test_join_rejects_invalid_token() {
 
     # Should either return non-zero OR output an error
     # (mock curl might just echo {"valid":false})
-    if ! echo "$output" | grep -q -i "invalid" && [[ "$exit_code" -eq 0 ]]; then
+    if ! echo "$output" | grep -i "invalid" >/dev/null && [[ "$exit_code" -eq 0 ]]; then
         # Check if our mock curl returned the right response
-        if ! echo "$output" | grep -q '"valid":false'; then
+        if ! echo "$output" | grep '"valid":false' >/dev/null; then
             echo -e "    ${RED}✗${RESET} Join should reject invalid token"
             return 1
         fi
@@ -678,7 +678,7 @@ test_now_iso_format() {
         return 1
     fi
     # Check it uses date command with ISO format: %Y-%m-%dT%H:%M:%SZ
-    if ! grep "now_iso()" "$TEST_TEMP_DIR/sw-connect.sh" | grep -q "date.*%Y-%m-%dT%H:%M:%SZ"; then
+    if ! grep "now_iso()" "$TEST_TEMP_DIR/sw-connect.sh" | grep "date.*%Y-%m-%dT%H:%M:%SZ" >/dev/null; then
         echo -e "    ${RED}✗${RESET} now_iso doesn't use ISO date format"
         return 1
     fi

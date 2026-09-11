@@ -209,7 +209,7 @@ test_find_auto_files() {
     output=$(run_docs check 2>&1 || true)
     # The check command internally calls docs_find_auto_files, so verify
     # it found our CLAUDE.md by checking it processed sections
-    if ! echo "$output" | grep -q "Documentation Status"; then
+    if ! echo "$output" | grep "Documentation Status" >/dev/null; then
         return 1
     fi
     return 0
@@ -257,23 +257,23 @@ test_gen_architecture_table() {
     ' "$TEST_TEMP_DIR/.claude/CLAUDE.md")
 
     # Should have table headers
-    if ! echo "$content" | grep -q "| File | Lines | Purpose |"; then
+    if ! echo "$content" | grep "| File | Lines | Purpose |" >/dev/null; then
         return 1
     fi
     # Should include sw-alpha.sh (non-test, non-github)
-    if ! echo "$content" | grep -q "sw-alpha.sh"; then
+    if ! echo "$content" | grep "sw-alpha.sh" >/dev/null; then
         return 1
     fi
     # Should include sw-beta.sh
-    if ! echo "$content" | grep -q "sw-beta.sh"; then
+    if ! echo "$content" | grep "sw-beta.sh" >/dev/null; then
         return 1
     fi
     # Should NOT include test file
-    if echo "$content" | grep -q "sw-alpha-test.sh"; then
+    if echo "$content" | grep "sw-alpha-test.sh" >/dev/null; then
         return 1
     fi
     # Should NOT include github module
-    if echo "$content" | grep -q "sw-github-thing.sh"; then
+    if echo "$content" | grep "sw-github-thing.sh" >/dev/null; then
         return 1
     fi
     return 0
@@ -293,10 +293,10 @@ test_gen_table_includes_cli_router() {
         capture { print }
     ' "$TEST_TEMP_DIR/.claude/CLAUDE.md")
 
-    if ! echo "$content" | grep -q "scripts/sw"; then
+    if ! echo "$content" | grep "scripts/sw" >/dev/null; then
         return 1
     fi
-    if ! echo "$content" | grep -q "CLI router"; then
+    if ! echo "$content" | grep "CLI router" >/dev/null; then
         return 1
     fi
     return 0
@@ -316,19 +316,19 @@ test_gen_feature_flags() {
     ' "$TEST_TEMP_DIR/.claude/CLAUDE.md")
 
     # Should have table header
-    if ! echo "$content" | grep -q "| Flag | Default | Purpose |"; then
+    if ! echo "$content" | grep "| Flag | Default | Purpose |" >/dev/null; then
         return 1
     fi
     # Should have intelligence.enabled
-    if ! echo "$content" | grep -q "intelligence.enabled"; then
+    if ! echo "$content" | grep "intelligence.enabled" >/dev/null; then
         return 1
     fi
     # Should have intelligence.cache_ttl_seconds
-    if ! echo "$content" | grep -q "intelligence.cache_ttl_seconds"; then
+    if ! echo "$content" | grep "intelligence.cache_ttl_seconds" >/dev/null; then
         return 1
     fi
     # Should have intelligence.anomaly_threshold
-    if ! echo "$content" | grep -q "intelligence.anomaly_threshold"; then
+    if ! echo "$content" | grep "intelligence.anomaly_threshold" >/dev/null; then
         return 1
     fi
     return 0
@@ -348,7 +348,7 @@ test_gen_test_suites_table() {
     ' "$TEST_TEMP_DIR/.claude/CLAUDE.md")
 
     # Should have sw-alpha-test.sh in the test suites section
-    if ! echo "$content" | grep -q "sw-alpha-test.sh"; then
+    if ! echo "$content" | grep "sw-alpha-test.sh" >/dev/null; then
         return 1
     fi
     return 0
@@ -540,7 +540,7 @@ test_docs_sync_idempotent() {
     local output
     output=$(run_docs sync 2>&1 || true)
 
-    if ! echo "$output" | grep -qi "fresh"; then
+    if ! echo "$output" | grep -i "fresh" >/dev/null; then
         return 1
     fi
     return 0
@@ -559,7 +559,7 @@ test_help_output() {
 
     local missing=""
     for cmd in sync check wiki report help; do
-        if ! echo "$output" | grep -q "$cmd"; then
+        if ! echo "$output" | grep "$cmd" >/dev/null; then
             missing="${missing} ${cmd}"
         fi
     done
@@ -590,7 +590,7 @@ test_default_shows_help() {
     local output
     output=$(run_docs 2>&1 || true)
 
-    if ! echo "$output" | grep -q "COMMANDS"; then
+    if ! echo "$output" | grep "COMMANDS" >/dev/null; then
         return 1
     fi
     return 0
@@ -653,13 +653,13 @@ MARKDOWN
     flag_content=$(awk '/<!-- AUTO:feature-flags -->/{c=1;next}/<!-- \/AUTO:feature-flags -->/{c=0}c' "$TEST_TEMP_DIR/.claude/CLAUDE.md")
 
     # None should still say "stale"
-    if echo "$core_content" | grep -q "^stale$"; then
+    if echo "$core_content" | grep "^stale$" >/dev/null; then
         return 1
     fi
-    if echo "$test_content" | grep -q "^also stale$"; then
+    if echo "$test_content" | grep "^also stale$" >/dev/null; then
         return 1
     fi
-    if echo "$flag_content" | grep -q "^stale flags$"; then
+    if echo "$flag_content" | grep "^stale flags$" >/dev/null; then
         return 1
     fi
 
@@ -680,11 +680,11 @@ test_purpose_extraction() {
     content=$(awk '/<!-- AUTO:core-scripts -->/{c=1;next}/<!-- \/AUTO:core-scripts -->/{c=0}c' "$TEST_TEMP_DIR/.claude/CLAUDE.md")
 
     # sw-alpha.sh header says "Alpha Feature Module"
-    if ! echo "$content" | grep -q "Alpha Feature Module"; then
+    if ! echo "$content" | grep "Alpha Feature Module" >/dev/null; then
         return 1
     fi
     # sw-beta.sh header says "Beta Feature Module"
-    if ! echo "$content" | grep -q "Beta Feature Module"; then
+    if ! echo "$content" | grep "Beta Feature Module" >/dev/null; then
         return 1
     fi
     return 0

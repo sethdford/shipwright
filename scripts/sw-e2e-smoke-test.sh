@@ -132,7 +132,7 @@ while [[ $# -gt 0 ]]; do
     esac
 done
 
-if echo "$prompt" | grep -qiE "implementation plan|task checklist|create a.*plan"; then
+if echo "$prompt" | grep -iE "implementation plan|task checklist|create a.*plan" >/dev/null; then
     cat <<'PLAN'
 # Implementation Plan
 
@@ -148,7 +148,7 @@ if echo "$prompt" | grep -qiE "implementation plan|task checklist|create a.*plan
 - [ ] All tests pass
 - [ ] Code reviewed
 PLAN
-elif echo "$prompt" | grep -qiE "review|reviewer|diff"; then
+elif echo "$prompt" | grep -iE "review|reviewer|diff" >/dev/null; then
     cat <<'REVIEW'
 # Code Review
 
@@ -214,7 +214,7 @@ ISSUE_JSON
         esac
         ;;
     api)
-        if echo "$*" | grep -q "comments"; then
+        if echo "$*" | grep "comments" >/dev/null; then
             echo '{"id": 12345}'
         fi
         exit 0
@@ -366,7 +366,7 @@ assert_exit_code_nonzero() {
 
 assert_output_contains() {
     local pattern="$1" label="${2:-output match}"
-    if printf '%s\n' "$PIPELINE_OUTPUT" | grep -qiE "$pattern" 2>/dev/null; then
+    if printf '%s\n' "$PIPELINE_OUTPUT" | grep -iE "$pattern" >/dev/null 2>&1; then
         return 0
     fi
     echo -e "    ${RED}✗${RESET} Output missing pattern: $pattern ($label)"
@@ -377,7 +377,7 @@ assert_output_contains() {
 
 assert_output_not_contains() {
     local pattern="$1" label="${2:-output exclusion}"
-    if ! printf '%s\n' "$PIPELINE_OUTPUT" | grep -qiE "$pattern" 2>/dev/null; then
+    if ! printf '%s\n' "$PIPELINE_OUTPUT" | grep -iE "$pattern" >/dev/null 2>&1; then
         return 0
     fi
     echo -e "    ${RED}✗${RESET} Output unexpectedly contains: $pattern ($label)"
@@ -422,7 +422,7 @@ assert_branch_exists() {
     local pattern="$1" label="${2:-branch exists}"
     local branches
     branches=$(cd "$TEST_TEMP_DIR/project" && git branch --list 2>/dev/null)
-    if printf '%s\n' "$branches" | grep -qE "$pattern" 2>/dev/null; then
+    if printf '%s\n' "$branches" | grep -E "$pattern" >/dev/null 2>&1; then
         return 0
     fi
     echo -e "    ${RED}✗${RESET} No branch matching: $pattern ($label)"
@@ -618,7 +618,7 @@ test_no_branches_after_dryrun() {
     branches=$(cd "$TEST_TEMP_DIR/project" && git branch --list | sed 's/^\* //' | tr -d ' ' || true)
     local has_feat=false
     while IFS= read -r b; do
-        if echo "$b" | grep -qiE "^feat/"; then
+        if echo "$b" | grep -iE "^feat/" >/dev/null; then
             has_feat=true
         fi
     done <<< "$branches"
@@ -695,7 +695,7 @@ test_issue_number_in_state() {
     assert_exit_code 0 "dry-run should succeed" &&
     # Issue number should appear in output or state
     (
-        if printf '%s\n' "$PIPELINE_OUTPUT" | grep -q "42" 2>/dev/null; then
+        if printf '%s\n' "$PIPELINE_OUTPUT" | grep "42" >/dev/null 2>&1; then
             return 0
         fi
         if [[ -f "$TEST_TEMP_DIR/project/.claude/pipeline-state.md" ]] && grep -q "42" "$TEST_TEMP_DIR/project/.claude/pipeline-state.md"; then

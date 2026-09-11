@@ -29,7 +29,7 @@ assert_eq() {
 assert_contains() {
     local label="$1" needle="$2" haystack="$3"
     TOTAL=$((TOTAL + 1))
-    if echo "$haystack" | grep -q "$needle"; then
+    if echo "$haystack" | grep "$needle" >/dev/null; then
         PASS=$((PASS + 1))
         echo -e "  ${GREEN}${BOLD}✓${RESET} $label"
     else

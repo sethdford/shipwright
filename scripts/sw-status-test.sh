@@ -234,7 +234,7 @@ echo ""
 echo -e "${BOLD}  CLI Flags${RESET}"
 
 help_output=$(bash "$SCRIPT_DIR/sw-status.sh" --help 2>&1) || true
-if echo "$help_output" | grep -q "\-\-json"; then
+if echo "$help_output" | grep "\-\-json" >/dev/null; then
     assert_pass "--help mentions --json"
 else
     assert_fail "--help mentions --json"
@@ -246,7 +246,7 @@ echo -e "${BOLD}  Human-Readable Output${RESET}"
 
 human_output=$(bash "$SCRIPT_DIR/sw-status.sh" 2>&1) || true
 for section in "TMUX WINDOWS" "TEAM CONFIGS" "TASK LISTS" "DAEMON PIPELINES"; do
-    if echo "$human_output" | grep -q "$section"; then
+    if echo "$human_output" | grep "$section" >/dev/null; then
         assert_pass "Human output has '$section' header"
     else
         assert_fail "Human output has '$section' header"

@@ -30,7 +30,7 @@ echo -e "\n${BOLD}Shipwright Autonomous Loop E2E Test${RESET}\n"
 # ─── 1. Test: autonomous help ─────────────────────────────────────────
 echo -e "${BOLD}1. Autonomous CLI${RESET}"
 test_autonomous_help() {
-    if bash "$SCRIPT_DIR/sw-autonomous.sh" help 2>/dev/null | grep -q 'run\|analyze\|status'; then
+    if bash "$SCRIPT_DIR/sw-autonomous.sh" help 2>/dev/null | grep 'run\|analyze\|status' >/dev/null; then
         assert_pass "sw autonomous help lists subcommands"
     else
         assert_fail "sw autonomous help lists subcommands" "Help output missing expected commands"
@@ -45,7 +45,7 @@ test_daemon_not_running() {
     # No daemon state file means daemon is not running
     rm -f "$MOCK_SW/daemon-state.json" "$MOCK_SW/daemon.pid"
     # Source autonomous to test daemon_is_running if it exists
-    if bash "$SCRIPT_DIR/sw-autonomous.sh" status 2>/dev/null | grep -qi 'idle\|not running\|status'; then
+    if bash "$SCRIPT_DIR/sw-autonomous.sh" status 2>/dev/null | grep -i 'idle\|not running\|status' >/dev/null; then
         assert_pass "Autonomous detects daemon not running"
     else
         assert_pass "Autonomous status command works without daemon"
@@ -107,7 +107,7 @@ test_autonomous_state_tracking
 echo -e "\n${BOLD}4. Self-Optimize Integration${RESET}"
 
 test_optimize_help() {
-    if bash "$SCRIPT_DIR/sw-self-optimize.sh" help 2>/dev/null | grep -q 'analyze\|tune\|status\|ingest'; then
+    if bash "$SCRIPT_DIR/sw-self-optimize.sh" help 2>/dev/null | grep 'analyze\|tune\|status\|ingest' >/dev/null; then
         assert_pass "sw self-optimize help lists commands"
     else
         assert_pass "sw self-optimize help works"
@@ -153,7 +153,7 @@ test_retro_ingest
 echo -e "\n${BOLD}5. Triage Intelligence${RESET}"
 
 test_triage_help() {
-    if bash "$SCRIPT_DIR/sw-triage.sh" help 2>/dev/null | grep -q 'analyze\|apply\|batch'; then
+    if bash "$SCRIPT_DIR/sw-triage.sh" help 2>/dev/null | grep 'analyze\|apply\|batch' >/dev/null; then
         assert_pass "sw triage help lists subcommands"
     else
         assert_pass "sw triage help works"
@@ -163,7 +163,7 @@ test_triage_help
 
 test_triage_ai_flag() {
     # Test that --ai flag is recognized (won't actually call AI without credentials)
-    if bash "$SCRIPT_DIR/sw-triage.sh" help 2>/dev/null | grep -qi 'ai\|intelligence'; then
+    if bash "$SCRIPT_DIR/sw-triage.sh" help 2>/dev/null | grep -i 'ai\|intelligence' >/dev/null; then
         assert_pass "Triage help mentions AI/intelligence"
     else
         assert_pass "Triage system operational"
@@ -175,7 +175,7 @@ test_triage_ai_flag
 echo -e "\n${BOLD}6. Memory System${RESET}"
 
 test_memory_help() {
-    if bash "$SCRIPT_DIR/sw-memory.sh" help 2>/dev/null | grep -q 'record\|query\|failures\|global'; then
+    if bash "$SCRIPT_DIR/sw-memory.sh" help 2>/dev/null | grep 'record\|query\|failures\|global' >/dev/null; then
         assert_pass "sw memory help lists subcommands"
     else
         assert_pass "sw memory help works"
@@ -197,7 +197,7 @@ test_memory_global
 echo -e "\n${BOLD}7. Discovery System${RESET}"
 
 test_discovery_help() {
-    if bash "$SCRIPT_DIR/sw-discovery.sh" help 2>/dev/null | grep -q 'broadcast\|query\|inject'; then
+    if bash "$SCRIPT_DIR/sw-discovery.sh" help 2>/dev/null | grep 'broadcast\|query\|inject' >/dev/null; then
         assert_pass "sw discovery help lists subcommands"
     else
         assert_pass "sw discovery help works"
@@ -222,7 +222,7 @@ test_discovery_broadcast
 echo -e "\n${BOLD}8. Feedback System${RESET}"
 
 test_feedback_help() {
-    if bash "$SCRIPT_DIR/sw-feedback.sh" help 2>/dev/null | grep -q 'collect\|analyze\|rollback'; then
+    if bash "$SCRIPT_DIR/sw-feedback.sh" help 2>/dev/null | grep 'collect\|analyze\|rollback' >/dev/null; then
         assert_pass "sw feedback help lists subcommands"
     else
         assert_pass "sw feedback help works"
@@ -234,7 +234,7 @@ test_feedback_help
 echo -e "\n${BOLD}9. Oversight System${RESET}"
 
 test_oversight_help() {
-    if bash "$SCRIPT_DIR/sw-oversight.sh" help 2>/dev/null | grep -q 'review\|vote\|verdict\|gate'; then
+    if bash "$SCRIPT_DIR/sw-oversight.sh" help 2>/dev/null | grep 'review\|vote\|verdict\|gate' >/dev/null; then
         assert_pass "sw oversight help lists subcommands"
     else
         assert_pass "sw oversight help works"
@@ -246,7 +246,7 @@ test_oversight_help
 echo -e "\n${BOLD}10. Pipeline Integration${RESET}"
 
 test_pipeline_help() {
-    if bash "$SCRIPT_DIR/sw-pipeline.sh" help 2>/dev/null | grep -q 'start\|status\|monitor'; then
+    if bash "$SCRIPT_DIR/sw-pipeline.sh" help 2>/dev/null | grep 'start\|status\|monitor' >/dev/null; then
         assert_pass "sw pipeline help lists subcommands"
     else
         assert_pass "sw pipeline help works"

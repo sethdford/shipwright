@@ -78,7 +78,7 @@ echo -e "  ${CYAN}analyze subcommand${RESET}"
         echo "ANALYZE_OK"
     else
         # Try alternate: maybe output contains the fields inline
-        if echo "$result" | grep -qF '"issue"'; then
+        if echo "$result" | grep -F '"issue"' >/dev/null; then
             echo "ANALYZE_OK"
         else
             echo "ANALYZE_FAIL:$(echo "$result" | head -3)"
@@ -86,7 +86,7 @@ echo -e "  ${CYAN}analyze subcommand${RESET}"
     fi
 ) > "$TEST_TEMP_DIR/analyze_out" 2>/dev/null
 analyze_result=$(cat "$TEST_TEMP_DIR/analyze_out")
-if echo "$analyze_result" | grep -qF "ANALYZE_OK"; then
+if echo "$analyze_result" | grep -F "ANALYZE_OK" >/dev/null; then
     assert_pass "analyze_issue returns JSON with issue field"
 else
     assert_fail "analyze_issue returns JSON with issue field" "got: $analyze_result"
@@ -114,7 +114,7 @@ output=$(bash "$SCRIPT_DIR/sw-pm.sh" team 42 2>&1) && rc=0 || rc=$?
     fi
 ) > "$TEST_TEMP_DIR/team_out" 2>/dev/null
 team_result=$(cat "$TEST_TEMP_DIR/team_out")
-if echo "$team_result" | grep -qF "TEAM_OK"; then
+if echo "$team_result" | grep -F "TEAM_OK" >/dev/null; then
     assert_pass "recommend_team returns JSON with roles"
 else
     assert_fail "recommend_team returns JSON with roles" "got: $team_result"
@@ -135,7 +135,7 @@ echo -e "  ${CYAN}orchestrate subcommand${RESET}"
     fi
 ) > "$TEST_TEMP_DIR/orch_out" 2>/dev/null
 orch_result=$(cat "$TEST_TEMP_DIR/orch_out")
-if echo "$orch_result" | grep -qF "ORCH_OK"; then
+if echo "$orch_result" | grep -F "ORCH_OK" >/dev/null; then
     assert_pass "orchestrate_stages returns JSON with stages"
 else
     assert_fail "orchestrate_stages returns JSON with stages" "got: $orch_result"
@@ -157,7 +157,7 @@ echo -e "  ${CYAN}recommend combined${RESET}"
     fi
 ) > "$TEST_TEMP_DIR/rec_out" 2>/dev/null
 rec_result=$(cat "$TEST_TEMP_DIR/rec_out")
-if echo "$rec_result" | grep -qF "RECOMMEND_OK"; then
+if echo "$rec_result" | grep -F "RECOMMEND_OK" >/dev/null; then
     assert_pass "recommend pipeline produces valid team + stages"
 else
     assert_fail "recommend pipeline produces valid team + stages" "got: $rec_result"

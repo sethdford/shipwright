@@ -140,14 +140,14 @@ HELTEST
         fi
     fi
     echo '[{"result":"Implemented helper functions. All tests pass. LOOP_COMPLETE","usage":{"input_tokens":100,"output_tokens":50},"total_cost_usd":0.01}]'
-elif echo "$prompt" | grep -qiE "implementation plan|task checklist|create a.*plan"; then
+elif echo "$prompt" | grep -iE "implementation plan|task checklist|create a.*plan" >/dev/null; then
     echo "# Plan
 
 ## Steps
 1. Create src/helper.sh with helper_add and helper_greet
 2. Add tests in src/helper-test.sh
 3. Verify"
-elif echo "$prompt" | grep -qiE "review|reviewer|diff"; then
+elif echo "$prompt" | grep -iE "review|reviewer|diff" >/dev/null; then
     echo "# Code Review
 
 ## Findings

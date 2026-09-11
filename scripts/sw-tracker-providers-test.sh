@@ -123,24 +123,24 @@ for i in $(seq 1 $#); do
         break
     fi
 done
-if echo "$*" | grep -q "api.linear.app"; then
-    if echo "$payload" | grep -q "issue(id:" 2>/dev/null; then
+if echo "$*" | grep "api.linear.app" >/dev/null; then
+    if echo "$payload" | grep "issue(id:" >/dev/null 2>&1; then
         echo '{"data":{"issue":{"id":"linear-1","title":"Linear issue","description":"Body","labels":{"nodes":[{"name":"bug"}]},"state":{"name":"Started"}}}}'
-    elif echo "$payload" | grep -q "issueCreate" 2>/dev/null; then
+    elif echo "$payload" | grep "issueCreate" >/dev/null 2>&1; then
         echo '{"data":{"issueCreate":{"issue":{"id":"linear-new-123"}}}}'
     else
         echo '{"data":{"team":{"issues":{"nodes":[{"id":"linear-1","title":"Linear issue","labels":{"nodes":[{"name":"bug"}]},"state":{"name":"Started"}}]}}}}'
     fi
-elif echo "$*" | grep -q "atlassian.net\|jira"; then
-    if echo "$*" | grep -q "statuses"; then
+elif echo "$*" | grep "atlassian.net\|jira" >/dev/null; then
+    if echo "$*" | grep "statuses" >/dev/null; then
         echo '[{"statuses":[{"name":"In Progress","statusCategory":{"key":"indeterminate"}},{"name":"Done","statusCategory":{"key":"done"}}]}]'
-    elif echo "$*" | grep -q "search"; then
+    elif echo "$*" | grep "search" >/dev/null; then
         echo '{"issues":[{"key":"PROJ-1","fields":{"summary":"Jira issue","labels":[{"name":"bug"}],"status":{"name":"In Progress"}}}]}'
-    elif echo "$*" | grep -q "transitions"; then
+    elif echo "$*" | grep "transitions" >/dev/null; then
         echo '{"transitions":[{"id":"1","name":"Done"}]}'
-    elif echo "$*" | grep -q "issue/"; then
+    elif echo "$*" | grep "issue/" >/dev/null; then
         echo '{"key":"PROJ-1","fields":{"summary":"Jira issue","description":"Body","labels":[{"name":"bug"}],"status":{"name":"In Progress"}}}'
-    elif echo "$*" | grep -q "rest/api/3/issue" && ! echo "$*" | grep -q "issue/PROJ\|issue/[A-Z]"; then
+    elif echo "$*" | grep "rest/api/3/issue" >/dev/null && ! echo "$*" | grep "issue/PROJ\|issue/[A-Z]" >/dev/null; then
         echo '{"key":"PROJ-99","id":"12345"}'
     else
         echo '{"key":"PROJ-1","fields":{"summary":"Jira issue","description":"Body"}}'
@@ -205,7 +205,7 @@ test_github_provider_discover_calls_gh_list() {
     (
         cd "$TEMP_DIR"
         source "$SCRIPT_DIR/sw-tracker-github.sh"
-        provider_discover_issues "bug" "open" 25 2>/dev/null >/dev/null || true
+        provider_discover_issues "bug" "open" 25 >/dev/null 2>&1 || true
     )
     grep -q "issue list" "$GH_CALLS" || return 1
     grep -q "open" "$GH_CALLS" || return 1
@@ -219,7 +219,7 @@ test_github_provider_get_issue_calls_gh_view() {
     (
         cd "$TEMP_DIR"
         source "$SCRIPT_DIR/sw-tracker-github.sh"
-        provider_get_issue "42" 2>/dev/null >/dev/null || true
+        provider_get_issue "42" >/dev/null 2>&1 || true
     )
     grep -q "issue view" "$GH_CALLS" || return 1
     grep -q "42" "$GH_CALLS" || return 1
@@ -230,7 +230,7 @@ test_github_provider_create_calls_gh_create() {
     (
         cd "$TEMP_DIR"
         source "$SCRIPT_DIR/sw-tracker-github.sh"
-        provider_create_issue "New Issue" "Body text" "label1,label2" 2>/dev/null >/dev/null || true
+        provider_create_issue "New Issue" "Body text" "label1,label2" >/dev/null 2>&1 || true
     )
     grep -q "issue create" "$GH_CALLS" || return 1
     grep -q "New Issue" "$GH_CALLS" || return 1
@@ -374,8 +374,8 @@ EOF
     content=$(cat "$CURL_CALLS" 2>/dev/null)
     [[ -n "$content" ]] || return 1
     # ARGS line has -d and graphql URL
-    echo "$content" | grep -qF -- "-d" || return 1
-    echo "$content" | grep -q "graphql" || return 1
+    echo "$content" | grep -F -- "-d" >/dev/null || return 1
+    echo "$content" | grep "graphql" >/dev/null || return 1
 }
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -405,7 +405,7 @@ EOF
     (
         cd "$TEMP_DIR"
         source "$SCRIPT_DIR/sw-tracker-jira.sh"
-        provider_discover_issues "" "open" 20 2>/dev/null >/dev/null || true
+        provider_discover_issues "" "open" 20 >/dev/null 2>&1 || true
     )
     grep -q "atlassian.net\|jira" "$CURL_CALLS" || return 1
 }
@@ -418,7 +418,7 @@ EOF
     (
         cd "$TEMP_DIR"
         source "$SCRIPT_DIR/sw-tracker-jira.sh"
-        provider_discover_issues "" "open" 5 2>/dev/null >/dev/null || true
+        provider_discover_issues "" "open" 5 >/dev/null 2>&1 || true
     )
     grep -q "rest/api/3" "$CURL_CALLS" || return 1
     grep -q "search" "$CURL_CALLS" || return 1
@@ -442,7 +442,7 @@ EOF
     (
         cd "$TEMP_DIR"
         source "$SCRIPT_DIR/sw-tracker-jira.sh"
-        provider_get_issue "PROJ-1" 2>/dev/null >/dev/null || true
+        provider_get_issue "PROJ-1" >/dev/null 2>&1 || true
     )
     grep -q "issue/PROJ-1" "$CURL_CALLS" || return 1
 }
@@ -465,7 +465,7 @@ EOF
     (
         cd "$TEMP_DIR"
         source "$SCRIPT_DIR/sw-tracker-jira.sh"
-        provider_create_issue "New task" "Description" 2>/dev/null >/dev/null || true
+        provider_create_issue "New task" "Description" >/dev/null 2>&1 || true
     )
     grep -q "rest/api/3" "$CURL_CALLS" || return 1
 }

@@ -75,7 +75,7 @@ setup_env
 
 # ─── Test 1: Help output ─────────────────────────────────────────────────────
 output=$(bash "$SCRIPT_DIR/sw-swarm.sh" help 2>&1) || true
-if echo "$output" | grep -q "shipwright swarm"; then
+if echo "$output" | grep "shipwright swarm" >/dev/null; then
     assert_pass "help shows usage text"
 else
     assert_fail "help shows usage text"

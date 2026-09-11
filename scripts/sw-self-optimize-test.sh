@@ -452,6 +452,33 @@ test_memory_strengthening() {
 }
 
 # ──────────────────────────────────────────────────────────────────────────────
+# 11b. Prune cutoff is a real 30-day-old timestamp, not "now"
+# Regression: the cutoff was built with `date -u -r <epoch> || date -u`, and on
+# GNU date `-r` means "this file's mtime", so the fallback produced the current
+# second. Everything not written in that exact second was pruned.
+# ──────────────────────────────────────────────────────────────────────────────
+test_memory_prune_cutoff_is_not_now() {
+    local mem_dir="$TEST_TEMP_DIR/.shipwright/memory/repo1"
+    mkdir -p "$mem_dir"
+
+    # One hour old: far inside the 30-day window, but not the current second.
+    local hour_old
+    hour_old=$(epoch_to_iso "$(( $(now_epoch) - 3600 ))")
+
+    jq -n --arg ts "$hour_old" \
+        '{failures: [{pattern: "hour old error", stage: "build", seen_count: 1, last_seen: $ts}]}' \
+        > "$mem_dir/failures.json"
+
+    echo '{"common_patterns":[],"cross_repo_learnings":[]}' > "$TEST_TEMP_DIR/.shipwright/memory/global.json"
+
+    optimize_evolve_memory > /dev/null 2>&1
+
+    local count
+    count=$(jq '.failures | length' "$mem_dir/failures.json")
+    [[ "$count" -eq 1 ]] || return 1
+}
+
+# ──────────────────────────────────────────────────────────────────────────────
 # 12. Memory promotion copies cross-repo patterns to global.json
 # ──────────────────────────────────────────────────────────────────────────────
 test_memory_promotion() {
@@ -506,9 +533,9 @@ test_report_with_data() {
     output=$(optimize_report 2>&1)
 
     # Should contain key report sections
-    echo "$output" | grep -q "Last 7 Days" || return 1
-    echo "$output" | grep -q "Pipelines:" || return 1
-    echo "$output" | grep -q "Success rate:" || return 1
+    echo "$output" | grep "Last 7 Days" >/dev/null || return 1
+    echo "$output" | grep "Pipelines:" >/dev/null || return 1
+    echo "$output" | grep "Success rate:" >/dev/null || return 1
 }
 
 # ──────────────────────────────────────────────────────────────────────────────
@@ -517,7 +544,7 @@ test_report_with_data() {
 test_report_empty() {
     local output
     output=$(optimize_report 2>&1)
-    echo "$output" | grep -q "No outcomes data" || return 1
+    echo "$output" | grep "No outcomes data" >/dev/null || return 1
 }
 
 # ──────────────────────────────────────────────────────────────────────────────
@@ -651,7 +678,7 @@ test_context_efficiency_no_events() {
 
     local output
     output=$(optimize_tune_context_efficiency 2>&1)
-    echo "$output" | grep -q "No events file\|No context efficiency\|skipping" || return 1
+    echo "$output" | grep "No events file\|No context efficiency\|skipping" >/dev/null || return 1
 }
 
 # ──────────────────────────────────────────────────────────────────────────────
@@ -671,7 +698,7 @@ test_context_efficiency_high_utilization() {
     output=$(optimize_tune_context_efficiency 2>&1)
 
     # Should recommend increasing budget
-    echo "$output" | grep -q "Budget utilization high" || { echo "Expected budget increase recommendation"; return 1; }
+    echo "$output" | grep "Budget utilization high" >/dev/null || { echo "Expected budget increase recommendation"; return 1; }
 
     # Should emit recommendation event
     grep -q "optimize.context_recommendation" "$EVENTS_FILE" || { echo "Expected recommendation event"; return 1; }
@@ -702,7 +729,7 @@ test_context_efficiency_high_trim() {
     output=$(optimize_tune_context_efficiency 2>&1)
 
     # Should recommend reducing verbose context
-    echo "$output" | grep -q "Trim ratio high" || { echo "Expected trim reduction recommendation"; return 1; }
+    echo "$output" | grep "Trim ratio high" >/dev/null || { echo "Expected trim reduction recommendation"; return 1; }
 }
 
 # ──────────────────────────────────────────────────────────────────────────────
@@ -722,7 +749,7 @@ test_context_efficiency_healthy() {
     output=$(optimize_tune_context_efficiency 2>&1)
 
     # Should report healthy
-    echo "$output" | grep -q "healthy" || { echo "Expected healthy status"; return 1; }
+    echo "$output" | grep "healthy" >/dev/null || { echo "Expected healthy status"; return 1; }
 
     # Summary should have 0 recommendations
     local summary_file="$OPTIMIZATION_DIR/context-efficiency.json"
@@ -785,6 +812,7 @@ main() {
         "test_model_routing_insufficient_data:Model routing keeps opus with few sonnet samples"
         "test_memory_pruning:Memory pruning removes old patterns"
         "test_memory_strengthening:Memory strengthening boosts confirmed patterns"
+        "test_memory_prune_cutoff_is_not_now:Memory prune cutoff is 30 days back, not now"
         "test_memory_promotion:Memory promotion copies cross-repo patterns"
         "test_full_analysis_empty:Full analysis runs on empty data"
         "test_report_with_data:Report generates output with data"

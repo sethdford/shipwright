@@ -104,7 +104,7 @@ else
     assert_fail "set -euo pipefail present"
 fi
 
-if grep -q "bootstrap.sh" "$SCRIPT_DIR/sw-reaper.sh" || grep -q "trap.*ERR" "$SCRIPT_DIR/sw-reaper.sh"; then
+if grep -q "bootstrap.sh" "$SCRIPT_DIR/sw-reaper.sh" || grep "trap.*ERR" "$SCRIPT_DIR/sw-reaper.sh" >/dev/null; then
     assert_pass "ERR trap present (via bootstrap or inline)"
 else
     assert_fail "ERR trap present (via bootstrap or inline)"

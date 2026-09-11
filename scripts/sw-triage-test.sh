@@ -98,7 +98,7 @@ echo -e "  ${CYAN}internal analysis functions${RESET}"
     fi
 ) > "$TEST_TEMP_DIR/type_output" 2>/dev/null
 type_result=$(cat "$TEST_TEMP_DIR/type_output")
-if echo "$type_result" | grep -qF "TYPE_SECURITY_OK"; then
+if echo "$type_result" | grep -F "TYPE_SECURITY_OK" >/dev/null; then
     assert_pass "analyze_type detects security"
 else
     assert_fail "analyze_type detects security" "got: $type_result"
@@ -116,7 +116,7 @@ fi
     fi
 ) > "$TEST_TEMP_DIR/type_output2" 2>/dev/null
 type_result2=$(cat "$TEST_TEMP_DIR/type_output2")
-if echo "$type_result2" | grep -qF "TYPE_BUG_OK"; then
+if echo "$type_result2" | grep -F "TYPE_BUG_OK" >/dev/null; then
     assert_pass "analyze_type detects bug"
 else
     assert_fail "analyze_type detects bug" "got: $type_result2"
@@ -134,7 +134,7 @@ fi
     fi
 ) > "$TEST_TEMP_DIR/type_output3" 2>/dev/null
 type_result3=$(cat "$TEST_TEMP_DIR/type_output3")
-if echo "$type_result3" | grep -qF "TYPE_FEATURE_OK"; then
+if echo "$type_result3" | grep -F "TYPE_FEATURE_OK" >/dev/null; then
     assert_pass "analyze_type detects feature"
 else
     assert_fail "analyze_type detects feature" "got: $type_result3"
@@ -213,7 +213,7 @@ if [[ "$rc" -eq 0 ]]; then
     assert_pass "team works offline with recruit (exit 0)"
 else
     # Even if non-zero, check if it produced a recommendation
-    if echo "$output" | grep -q "pipeline_template"; then
+    if echo "$output" | grep "pipeline_template" >/dev/null; then
         assert_pass "team works offline with recruit (produced recommendation)"
     else
         assert_fail "team works offline with recruit" "exit=$rc output=$(echo "$output" | tail -3)"
@@ -221,15 +221,15 @@ else
 fi
 
 # Verify team output contains expected fields
-if echo "$output" | grep -q "pipeline_template"; then
+if echo "$output" | grep "pipeline_template" >/dev/null; then
     assert_pass "team offline output has pipeline_template"
 else
     assert_fail "team offline output has pipeline_template" "got: $(echo "$output" | tail -5)"
 fi
 
-if echo "$output" | grep -q '"source": "recruit"'; then
+if echo "$output" | grep '"source": "recruit"' >/dev/null; then
     assert_pass "team offline uses recruit source"
-elif echo "$output" | grep -q '"source": "heuristic"'; then
+elif echo "$output" | grep '"source": "heuristic"' >/dev/null; then
     assert_pass "team offline falls back to heuristic source"
 else
     assert_fail "team offline has source field" "got: $(echo "$output" | tail -5)"
@@ -238,7 +238,7 @@ fi
 # ─── Test 15: team offline without recruit falls to defaults ──────────
 rm -f "$TEST_TEMP_DIR/bin/sw-recruit.sh"
 output=$(NO_GITHUB=1 SCRIPT_DIR="$TEST_TEMP_DIR/bin" bash "$TEST_TEMP_DIR/bin/sw-triage.sh" team 42 2>&1) && rc=0 || rc=$?
-if echo "$output" | grep -q "pipeline_template"; then
+if echo "$output" | grep "pipeline_template" >/dev/null; then
     assert_pass "team offline without recruit uses heuristic defaults"
 else
     assert_fail "team offline without recruit uses heuristic defaults" "exit=$rc output=$(echo "$output" | tail -3)"

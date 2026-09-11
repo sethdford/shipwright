@@ -154,6 +154,11 @@ AUDIT_AGENT_ENABLED=false
 DOD_FILE=""
 QUALITY_GATES_ENABLED=false
 AUDIT_RESULT=""
+# Consecutive iterations where the auditor process itself failed to run.
+# Fail-open is bounded by AUDIT_UNAVAILABLE_LIMIT so a permanently broken
+# auditor cannot silently wave every iteration through the completion gate.
+AUDIT_UNAVAILABLE_STREAK=0
+AUDIT_UNAVAILABLE_LIMIT="${LOOP_AUDIT_UNAVAILABLE_LIMIT:-2}"
 COMPLETION_REJECTED=false
 QUALITY_GATE_PASSED=true
 
@@ -1273,15 +1278,27 @@ AUDIT_PROMPT
 
     if grep -q "AUDIT_PASS" "$audit_log" 2>/dev/null; then
         AUDIT_RESULT="pass"
+        AUDIT_UNAVAILABLE_STREAK=0
         echo -e "  ${GREEN}✓${RESET} Audit: passed"
     elif [[ $exit_code -ne 0 ]]; then
         # The auditor never ran (CLI/flag/auth failure). Its stderr is not a
         # review of the agent's work, so do not feed it back as findings —
-        # that blocks completion forever on a tooling fault.
-        AUDIT_RESULT="pass"
-        echo -e "  ${YELLOW}⚠${RESET} Audit: skipped (auditor unavailable, exit ${exit_code})"
-        emit_event "loop.audit_unavailable" "iteration=$ITERATION" "exit_code=$exit_code"
+        # that would block completion forever on a tooling fault. But fail-open
+        # is bounded: a transient failure is waved through, a persistently
+        # broken auditor becomes a blocking finding, because "nobody reviewed
+        # this" is not the same as "this passed review".
+        AUDIT_UNAVAILABLE_STREAK=$(( AUDIT_UNAVAILABLE_STREAK + 1 ))
+        emit_event "loop.audit_unavailable" "iteration=$ITERATION" "exit_code=$exit_code" \
+            "streak=$AUDIT_UNAVAILABLE_STREAK" "limit=$AUDIT_UNAVAILABLE_LIMIT"
+        if [[ $AUDIT_UNAVAILABLE_STREAK -le $AUDIT_UNAVAILABLE_LIMIT ]]; then
+            AUDIT_RESULT="pass"
+            echo -e "  ${YELLOW}⚠${RESET} Audit: skipped (auditor unavailable, exit ${exit_code}; ${AUDIT_UNAVAILABLE_STREAK}/${AUDIT_UNAVAILABLE_LIMIT})"
+        else
+            AUDIT_RESULT="Audit agent has been unavailable for ${AUDIT_UNAVAILABLE_STREAK} consecutive iterations (last exit ${exit_code}). The work is unreviewed, not approved. Fix the auditor invocation (see ${audit_log}) before completing."
+            echo -e "  ${RED}✗${RESET} Audit: unavailable ${AUDIT_UNAVAILABLE_STREAK}x — treating as blocking"
+        fi
     else
+        AUDIT_UNAVAILABLE_STREAK=0
         AUDIT_RESULT="$(grep -v '^$' "$audit_log" | tail -20 | head -10 2>/dev/null || echo "Audit returned no output")"
         echo -e "  ${YELLOW}⚠${RESET} Audit: issues found"
     fi

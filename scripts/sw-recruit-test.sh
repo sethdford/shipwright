@@ -51,7 +51,7 @@ setup_clean_state
 # Test: roles command shows all built-in roles
 test_case "roles command"
 output=$("$RECRUIT_SCRIPT" roles || true)
-if echo "$output" | grep -q "architect" && echo "$output" | grep -q "builder"; then
+if echo "$output" | grep "architect" >/dev/null && echo "$output" | grep "builder" >/dev/null; then
     pass
 else
     fail "Missing roles in output"
@@ -69,7 +69,7 @@ fi
 # Test: match command recommends builder
 test_case "match command for build task"
 match_output=$("$RECRUIT_SCRIPT" match "Build new feature" || true)
-if echo "$match_output" | grep -q "builder"; then
+if echo "$match_output" | grep "builder" >/dev/null; then
     pass
 else
     fail "Did not recommend builder for build task"
@@ -78,7 +78,7 @@ fi
 # Test: match recommends architect for design task
 test_case "match command for architecture task"
 match_output=$("$RECRUIT_SCRIPT" match "Design system architecture" || true)
-if echo "$match_output" | grep -q "architect"; then
+if echo "$match_output" | grep "architect" >/dev/null; then
     pass
 else
     fail "Did not recommend architect for design task"
@@ -87,7 +87,7 @@ fi
 # Test: match recommends security-auditor for security
 test_case "match command for security task"
 match_output=$("$RECRUIT_SCRIPT" match "Security vulnerability audit" || true)
-if echo "$match_output" | grep -q "security-auditor"; then
+if echo "$match_output" | grep "security-auditor" >/dev/null; then
     pass
 else
     fail "Did not recommend security-auditor"
@@ -96,7 +96,7 @@ fi
 # Test: match shows confidence and method
 test_case "match shows confidence and method"
 match_output=$("$RECRUIT_SCRIPT" match "Write unit tests" || true)
-if echo "$match_output" | grep -q "confidence:" && echo "$match_output" | grep -q "method:"; then
+if echo "$match_output" | grep "confidence:" >/dev/null && echo "$match_output" | grep "method:" >/dev/null; then
     pass
 else
     fail "Missing confidence or method in match output"
@@ -105,7 +105,7 @@ fi
 # Test: team command shows team composition
 test_case "team command"
 team_output=$("$RECRUIT_SCRIPT" team "Build new feature" || true)
-if echo "$team_output" | grep -q "builder" && echo "$team_output" | grep -q "Estimated Team Cost"; then
+if echo "$team_output" | grep "builder" >/dev/null && echo "$team_output" | grep "Estimated Team Cost" >/dev/null; then
     pass
 else
     fail "Missing team composition details"
@@ -114,7 +114,7 @@ fi
 # Test: team adds security for security tasks
 test_case "team composition for security issue"
 team_output=$("$RECRUIT_SCRIPT" team "Security fix and refactoring" || true)
-if echo "$team_output" | grep -q "security-auditor"; then
+if echo "$team_output" | grep "security-auditor" >/dev/null; then
     pass
 else
     fail "Did not include security-auditor in team"
@@ -123,7 +123,7 @@ fi
 # Test: profiles command (empty initially)
 test_case "profiles command with no data"
 profiles_output=$("$RECRUIT_SCRIPT" profiles || true)
-if echo "$profiles_output" | grep -q "No performance profiles"; then
+if echo "$profiles_output" | grep "No performance profiles" >/dev/null; then
     pass
 else
     fail "Expected empty profiles message"
@@ -132,7 +132,7 @@ fi
 # Test: stats command
 test_case "stats command"
 stats_output=$("$RECRUIT_SCRIPT" stats || true)
-if echo "$stats_output" | grep -q "Roles Defined" && echo "$stats_output" | grep -q "10"; then
+if echo "$stats_output" | grep "Roles Defined" >/dev/null && echo "$stats_output" | grep "10" >/dev/null; then
     pass
 else
     fail "Stats missing expected output"
@@ -141,7 +141,7 @@ fi
 # Test: evaluate command with no data
 test_case "evaluate command with missing data"
 eval_output=$("$RECRUIT_SCRIPT" evaluate test-agent || true)
-if echo "$eval_output" | grep -q "No evaluation history" || echo "$eval_output" | grep -q "Performance Metrics"; then
+if echo "$eval_output" | grep "No evaluation history" >/dev/null || echo "$eval_output" | grep "Performance Metrics" >/dev/null; then
     pass
 else
     fail "Expected evaluation output"
@@ -150,7 +150,7 @@ fi
 # Test: onboard command for architect
 test_case "onboard command for architect"
 onboard_output=$("$RECRUIT_SCRIPT" onboard architect || true)
-if echo "$onboard_output" | grep -q "Role Profile" && echo "$onboard_output" | grep -q "Architect"; then
+if echo "$onboard_output" | grep "Role Profile" >/dev/null && echo "$onboard_output" | grep "Architect" >/dev/null; then
     pass
 else
     fail "Missing onboarding context for architect"
@@ -159,7 +159,7 @@ fi
 # Test: onboard command for builder
 test_case "onboard command for builder"
 onboard_output=$("$RECRUIT_SCRIPT" onboard builder || true)
-if echo "$onboard_output" | grep -q "Builder"; then
+if echo "$onboard_output" | grep "Builder" >/dev/null; then
     pass
 else
     fail "Missing onboarding context for builder"
@@ -168,7 +168,7 @@ fi
 # Test: help command
 test_case "help command"
 help_output=$("$RECRUIT_SCRIPT" help || true)
-if echo "$help_output" | grep -q "CORE COMMANDS" && echo "$help_output" | grep -q "AGI-LEVEL"; then
+if echo "$help_output" | grep "CORE COMMANDS" >/dev/null && echo "$help_output" | grep "AGI-LEVEL" >/dev/null; then
     pass
 else
     fail "Missing help output sections"
@@ -233,7 +233,7 @@ test_case "record-outcome calculates success rate"
 sr=$(jq '."agent-test-001".success_rate' "${HOME}/.shipwright/recruitment/profiles.json" 2>/dev/null || echo "0")
 # shellcheck disable=SC2034
 expected="66.7"
-if echo "$sr" | grep -q "66"; then
+if echo "$sr" | grep "66" >/dev/null; then
     pass
 else
     fail "Expected ~66.7% success rate, got $sr"
@@ -242,7 +242,7 @@ fi
 # Test: profiles shows recorded data
 test_case "profiles shows recorded agents"
 profiles_output=$("$RECRUIT_SCRIPT" profiles || true)
-if echo "$profiles_output" | grep -q "agent-test-001"; then
+if echo "$profiles_output" | grep "agent-test-001" >/dev/null; then
     pass
 else
     fail "Agent not in profiles output"
@@ -251,7 +251,7 @@ fi
 # Test: evaluate uses profile data
 test_case "evaluate uses recorded profile"
 eval_output=$("$RECRUIT_SCRIPT" evaluate agent-test-001 || true)
-if echo "$eval_output" | grep -q "Performance Metrics" && echo "$eval_output" | grep -q "Tasks Completed"; then
+if echo "$eval_output" | grep "Performance Metrics" >/dev/null && echo "$eval_output" | grep "Tasks Completed" >/dev/null; then
     pass
 else
     fail "Evaluation not using profile data"
@@ -260,7 +260,7 @@ fi
 # Test: promote evaluates agent
 test_case "promote evaluates recorded agent"
 promote_output=$("$RECRUIT_SCRIPT" promote agent-test-001 || true)
-if echo "$promote_output" | grep -q "agent-test-001"; then
+if echo "$promote_output" | grep "agent-test-001" >/dev/null; then
     pass
 else
     fail "Promote not recognizing agent"
@@ -303,7 +303,7 @@ fi
 # Test: new role appears in roles listing
 test_case "custom role in roles listing"
 output=$("$RECRUIT_SCRIPT" roles || true)
-if echo "$output" | grep -q "data-engineer"; then
+if echo "$output" | grep "data-engineer" >/dev/null; then
     pass
 else
     fail "Custom role not in roles output"
@@ -312,7 +312,7 @@ fi
 # Test: stats shows custom role count
 test_case "stats reflects custom roles"
 stats_output=$("$RECRUIT_SCRIPT" stats || true)
-if echo "$stats_output" | grep -q "custom: 1"; then
+if echo "$stats_output" | grep "custom: 1" >/dev/null; then
     pass
 else
     fail "Stats not counting custom roles"
@@ -407,7 +407,7 @@ echo -e "\n${CYAN}${BOLD}═══ Section 5: Population-Aware Evaluation ══
 # Test: stats shows population statistics
 test_case "stats shows population stats"
 stats_output=$("$RECRUIT_SCRIPT" stats || true)
-if echo "$stats_output" | grep -q "Mean Success Rate"; then
+if echo "$stats_output" | grep "Mean Success Rate" >/dev/null; then
     pass
 else
     fail "Population stats not shown in stats output"
@@ -416,7 +416,7 @@ fi
 # Test: evaluate mentions population threshold
 test_case "evaluate mentions population thresholds"
 eval_output=$("$RECRUIT_SCRIPT" evaluate agent-star || true)
-if echo "$eval_output" | grep -q "threshold\|population\|Excellent\|promotion"; then
+if echo "$eval_output" | grep "threshold\|population\|Excellent\|promotion" >/dev/null; then
     pass
 else
     fail "Evaluate not using population-aware thresholds"
@@ -425,7 +425,7 @@ fi
 # Test: specializations command
 test_case "specializations command"
 spec_output=$("$RECRUIT_SCRIPT" specializations || true)
-if echo "$spec_output" | grep -q "agent-star" && echo "$spec_output" | grep -q "Population Statistics"; then
+if echo "$spec_output" | grep "agent-star" >/dev/null && echo "$spec_output" | grep "Population Statistics" >/dev/null; then
     pass
 else
     fail "Specializations output incomplete"
@@ -440,7 +440,7 @@ echo -e "\n${CYAN}${BOLD}═══ Section 6: AGI-Level Features ═══${RESE
 # Test: evolve command runs (may be empty)
 test_case "evolve command"
 evolve_output=$("$RECRUIT_SCRIPT" evolve || true)
-if echo "$evolve_output" | grep -qiE "evolution|usage|Not enough"; then
+if echo "$evolve_output" | grep -iE "evolution|usage|Not enough" >/dev/null; then
     pass
 else
     fail "Evolve command not producing expected output"
@@ -449,7 +449,7 @@ fi
 # Test: reflect command runs
 test_case "reflect command"
 reflect_output=$("$RECRUIT_SCRIPT" reflect || true)
-if echo "$reflect_output" | grep -qiE "reflection|accuracy|No match history|meta-learning"; then
+if echo "$reflect_output" | grep -iE "reflection|accuracy|No match history|meta-learning" >/dev/null; then
     pass
 else
     fail "Reflect command not producing expected output"
@@ -458,7 +458,7 @@ fi
 # Test: mind command (no agent)
 test_case "mind command without agent"
 mind_output=$("$RECRUIT_SCRIPT" mind || true)
-if echo "$mind_output" | grep -qiE "Theory of Mind|No agent mind"; then
+if echo "$mind_output" | grep -iE "Theory of Mind|No agent mind" >/dev/null; then
     pass
 else
     fail "Mind command without agent not working"
@@ -467,7 +467,7 @@ fi
 # Test: mind command with agent
 test_case "mind command with agent"
 mind_output=$("$RECRUIT_SCRIPT" mind agent-star || true)
-if echo "$mind_output" | grep -qiE "theory of mind|Mind profile|Building"; then
+if echo "$mind_output" | grep -iE "theory of mind|Mind profile|Building" >/dev/null; then
     pass
 else
     fail "Mind command with agent not working"
@@ -484,7 +484,7 @@ fi
 # Test: decompose command (fallback mode)
 test_case "decompose command (fallback)"
 decompose_output=$("$RECRUIT_SCRIPT" decompose "Make the product better" || true)
-if echo "$decompose_output" | grep -qiE "Decompos|sub-task|architect\|builder"; then
+if echo "$decompose_output" | grep -iE "Decompos|sub-task|architect\|builder" >/dev/null; then
     pass
 else
     fail "Decompose not producing output"
@@ -497,7 +497,7 @@ for task in "Build the login" "Build the signup" "Deploy to staging" "Review aut
     "$RECRUIT_SCRIPT" match "$task" >/dev/null 2>&1 || true
 done
 tune_output=$("$RECRUIT_SCRIPT" self-tune || true)
-if echo "$tune_output" | grep -qiE "Self-tun|keyword|heuristic|matches"; then
+if echo "$tune_output" | grep -iE "Self-tun|keyword|heuristic|matches" >/dev/null; then
     pass
 else
     fail "Self-tune command not producing output"
@@ -506,7 +506,7 @@ fi
 # Test: route command
 test_case "route command"
 route_output=$("$RECRUIT_SCRIPT" route "Fix a critical production bug" || true)
-if echo "$route_output" | grep -qiE "Smart routing|Role:|Model:"; then
+if echo "$route_output" | grep -iE "Smart routing|Role:|Model:" >/dev/null; then
     pass
 else
     fail "Route command not producing expected output"
@@ -515,7 +515,7 @@ fi
 # Test: invent command runs (may find nothing)
 test_case "invent command"
 invent_output=$("$RECRUIT_SCRIPT" invent || true)
-if echo "$invent_output" | grep -qiE "Scanning|unmatched|role|covered\|No match history"; then
+if echo "$invent_output" | grep -iE "Scanning|unmatched|role|covered\|No match history" >/dev/null; then
     pass
 else
     fail "Invent command not producing output"
@@ -530,7 +530,7 @@ echo -e "\n${CYAN}${BOLD}═══ Section 7: Extended Matching ═══${RESET
 # Test: optimizer role matching with new keywords
 test_case "match optimizer for speed task"
 match_output=$("$RECRUIT_SCRIPT" match "Make the login faster and reduce latency" || true)
-if echo "$match_output" | grep -q "optimizer"; then
+if echo "$match_output" | grep "optimizer" >/dev/null; then
     pass
 else
     fail "Did not recommend optimizer for speed/latency task"
@@ -539,7 +539,7 @@ fi
 # Test: devops role matching with new keywords
 test_case "match devops for docker task"
 match_output=$("$RECRUIT_SCRIPT" match "Set up docker kubernetes deployment" || true)
-if echo "$match_output" | grep -q "devops"; then
+if echo "$match_output" | grep "devops" >/dev/null; then
     pass
 else
     fail "Did not recommend devops for docker/kubernetes task"
@@ -548,7 +548,7 @@ fi
 # Test: incident-responder for outage
 test_case "match incident-responder for outage"
 match_output=$("$RECRUIT_SCRIPT" match "Critical outage in production" || true)
-if echo "$match_output" | grep -q "incident-responder"; then
+if echo "$match_output" | grep "incident-responder" >/dev/null; then
     pass
 else
     fail "Did not recommend incident-responder for outage"
@@ -606,7 +606,7 @@ fi
 # Test: roles have origin field
 test_case "builtin roles have origin field"
 origins=$(jq '[.[] | .origin // "missing"] | unique' "${HOME}/.shipwright/recruitment/roles.json" 2>/dev/null || echo "[]")
-if echo "$origins" | grep -q "builtin"; then
+if echo "$origins" | grep "builtin" >/dev/null; then
     pass
 else
     fail "Built-in roles missing origin field"
@@ -615,7 +615,7 @@ fi
 # Test: version is 3.0.0
 test_case "version is 3.0.0"
 version_output=$("$RECRUIT_SCRIPT" help || true)
-if echo "$version_output" | grep -q "v3\.0\.0"; then
+if echo "$version_output" | grep "v3\.0\.0" >/dev/null; then
     pass
 else
     fail "Version not updated to 3.0.0"
@@ -630,7 +630,7 @@ echo -e "\n${CYAN}${BOLD}═══ Section 9: Adaptive Onboarding ═══${RES
 # Test: onboard shows onboarding style
 test_case "onboard shows onboarding style"
 onboard_output=$("$RECRUIT_SCRIPT" onboard builder || true)
-if echo "$onboard_output" | grep -q "Onboarding Style"; then
+if echo "$onboard_output" | grep "Onboarding Style" >/dev/null; then
     pass
 else
     fail "Onboarding style not shown"
@@ -639,7 +639,7 @@ fi
 # Test: onboard unknown role fails
 test_case "onboard unknown role fails"
 onboard_output=$("$RECRUIT_SCRIPT" onboard nonexistent-role 2>&1 || true)
-if echo "$onboard_output" | grep -q "Unknown role"; then
+if echo "$onboard_output" | grep "Unknown role" >/dev/null; then
     pass
 else
     fail "Expected error for unknown role"
@@ -654,70 +654,70 @@ echo -e "\n${CYAN}${BOLD}═══ Section 10: Help Coverage ═══${RESET}\n
 help_output=$("$RECRUIT_SCRIPT" help || true)
 
 test_case "help lists create-role command"
-if echo "$help_output" | grep -q "create-role"; then
+if echo "$help_output" | grep "create-role" >/dev/null; then
     pass
 else
     fail "create-role not in help"
 fi
 
 test_case "help lists record-outcome command"
-if echo "$help_output" | grep -q "record-outcome"; then
+if echo "$help_output" | grep "record-outcome" >/dev/null; then
     pass
 else
     fail "record-outcome not in help"
 fi
 
 test_case "help lists evolve command"
-if echo "$help_output" | grep -q "evolve"; then
+if echo "$help_output" | grep "evolve" >/dev/null; then
     pass
 else
     fail "evolve not in help"
 fi
 
 test_case "help lists reflect command"
-if echo "$help_output" | grep -q "reflect"; then
+if echo "$help_output" | grep "reflect" >/dev/null; then
     pass
 else
     fail "reflect not in help"
 fi
 
 test_case "help lists invent command"
-if echo "$help_output" | grep -q "invent"; then
+if echo "$help_output" | grep "invent" >/dev/null; then
     pass
 else
     fail "invent not in help"
 fi
 
 test_case "help lists mind command"
-if echo "$help_output" | grep -q "mind"; then
+if echo "$help_output" | grep "mind" >/dev/null; then
     pass
 else
     fail "mind not in help"
 fi
 
 test_case "help lists decompose command"
-if echo "$help_output" | grep -q "decompose"; then
+if echo "$help_output" | grep "decompose" >/dev/null; then
     pass
 else
     fail "decompose not in help"
 fi
 
 test_case "help lists self-tune command"
-if echo "$help_output" | grep -q "self-tune"; then
+if echo "$help_output" | grep "self-tune" >/dev/null; then
     pass
 else
     fail "self-tune not in help"
 fi
 
 test_case "help lists route command"
-if echo "$help_output" | grep -q "route"; then
+if echo "$help_output" | grep "route" >/dev/null; then
     pass
 else
     fail "route not in help"
 fi
 
 test_case "help lists ingest-pipeline command"
-if echo "$help_output" | grep -q "ingest-pipeline"; then
+if echo "$help_output" | grep "ingest-pipeline" >/dev/null; then
     pass
 else
     fail "ingest-pipeline not in help"
@@ -740,7 +740,7 @@ cat > "$events_file" <<EOF
 {"ts":"2026-02-15T12:10:00Z","ts_epoch":${now_e},"type":"pipeline.completed","result":"success","agent_id":"agent-ingest-2","duration_s":90}
 EOF
 ingest_output=$("$RECRUIT_SCRIPT" ingest-pipeline 7 || true)
-if echo "$ingest_output" | grep -q "Ingested"; then
+if echo "$ingest_output" | grep "Ingested" >/dev/null; then
     pass
 else
     fail "Ingest did not report ingested count"
@@ -764,7 +764,7 @@ echo -e "\n${CYAN}${BOLD}═══ Section 12: Error Paths ═══${RESET}\n"
 # Test: match with no args fails
 test_case "match with no args fails"
 match_err=$("$RECRUIT_SCRIPT" match 2>&1 || true)
-if echo "$match_err" | grep -qiE "Usage|error"; then
+if echo "$match_err" | grep -iE "Usage|error" >/dev/null; then
     pass
 else
     fail "Expected usage error for empty match"
@@ -773,7 +773,7 @@ fi
 # Test: evaluate with no args fails
 test_case "evaluate with no args fails"
 eval_err=$("$RECRUIT_SCRIPT" evaluate 2>&1 || true)
-if echo "$eval_err" | grep -qiE "Usage|error"; then
+if echo "$eval_err" | grep -iE "Usage|error" >/dev/null; then
     pass
 else
     fail "Expected usage error for empty evaluate"
@@ -782,7 +782,7 @@ fi
 # Test: record-outcome with missing args fails
 test_case "record-outcome with missing args fails"
 rec_err=$("$RECRUIT_SCRIPT" record-outcome 2>&1 || true)
-if echo "$rec_err" | grep -qiE "Usage|error"; then
+if echo "$rec_err" | grep -iE "Usage|error" >/dev/null; then
     pass
 else
     fail "Expected usage error for empty record-outcome"
@@ -791,7 +791,7 @@ fi
 # Test: decompose with no args fails
 test_case "decompose with no args fails"
 dec_err=$("$RECRUIT_SCRIPT" decompose 2>&1 || true)
-if echo "$dec_err" | grep -qiE "Usage|error"; then
+if echo "$dec_err" | grep -iE "Usage|error" >/dev/null; then
     pass
 else
     fail "Expected usage error for empty decompose"
@@ -800,7 +800,7 @@ fi
 # Test: unknown command fails
 test_case "unknown command fails"
 unk_err=$("$RECRUIT_SCRIPT" nonexistent-command 2>&1 || true)
-if echo "$unk_err" | grep -qiE "Unknown command"; then
+if echo "$unk_err" | grep -iE "Unknown command" >/dev/null; then
     pass
 else
     fail "Expected unknown command error"
@@ -822,7 +822,7 @@ jq '."agent-expert-builder".role = "builder"' "${HOME}/.shipwright/recruitment/p
 
 test_case "route finds best experienced agent"
 route_output=$("$RECRUIT_SCRIPT" route "Build a new authentication feature" || true)
-if echo "$route_output" | grep -q "Best agent"; then
+if echo "$route_output" | grep "Best agent" >/dev/null; then
     pass
 else
     fail "Route did not find experienced builder agent"
@@ -1006,7 +1006,7 @@ tmp_e2e=$(mktemp)
 jq '."e2e-agent-sec".role = "security-auditor"' "${HOME}/.shipwright/recruitment/profiles.json" > "$tmp_e2e" && mv "$tmp_e2e" "${HOME}/.shipwright/recruitment/profiles.json"
 
 route_out=$("$RECRUIT_SCRIPT" route "security audit vulnerability scan" || true)
-if echo "$route_out" | grep -q "e2e-agent-sec"; then
+if echo "$route_out" | grep "e2e-agent-sec" >/dev/null; then
     pass
 else
     fail "Route did not suggest e2e-agent-sec for security task"
@@ -1321,7 +1321,7 @@ fi
 
 test_case "audit runs and produces score"
 audit_out=$("$RECRUIT_SCRIPT" audit 2>&1 || true)
-if echo "$audit_out" | grep -q "AUDIT SCORE:"; then
+if echo "$audit_out" | grep "AUDIT SCORE:" >/dev/null; then
     pass
 else
     fail "audit did not produce a score"
@@ -1347,35 +1347,35 @@ else
 fi
 
 test_case "audit checks data stores"
-if echo "$audit_out" | grep -q "DATA STORES"; then
+if echo "$audit_out" | grep "DATA STORES" >/dev/null; then
     pass
 else
     fail "audit does not check data stores"
 fi
 
 test_case "audit checks feedback loops"
-if echo "$audit_out" | grep -q "FEEDBACK LOOPS"; then
+if echo "$audit_out" | grep "FEEDBACK LOOPS" >/dev/null; then
     pass
 else
     fail "audit does not check feedback loops"
 fi
 
 test_case "audit checks integration wiring"
-if echo "$audit_out" | grep -q "INTEGRATION WIRING"; then
+if echo "$audit_out" | grep "INTEGRATION WIRING" >/dev/null; then
     pass
 else
     fail "audit does not check integration wiring"
 fi
 
 test_case "audit checks policy governance"
-if echo "$audit_out" | grep -q "POLICY GOVERNANCE"; then
+if echo "$audit_out" | grep "POLICY GOVERNANCE" >/dev/null; then
     pass
 else
     fail "audit does not check policy governance"
 fi
 
 test_case "audit checks automation triggers"
-if echo "$audit_out" | grep -q "AUTOMATION TRIGGERS"; then
+if echo "$audit_out" | grep "AUTOMATION TRIGGERS" >/dev/null; then
     pass
 else
     fail "audit does not check automation triggers"

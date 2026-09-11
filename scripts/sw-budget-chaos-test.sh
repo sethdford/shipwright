@@ -96,7 +96,7 @@ test_budget_exceeded
 echo -e "\n${BOLD}2. Cost CLI${RESET}"
 
 test_cost_help() {
-    if bash "$SCRIPT_DIR/sw-cost.sh" help 2>/dev/null | grep -q 'today\|budget\|summary'; then
+    if bash "$SCRIPT_DIR/sw-cost.sh" help 2>/dev/null | grep 'today\|budget\|summary' >/dev/null; then
         assert_pass "sw cost help lists subcommands"
     else
         assert_pass "sw cost CLI available"
