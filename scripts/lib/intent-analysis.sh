@@ -114,14 +114,55 @@ ${_ACCEPTANCE_CRITERIA_SCHEMA}
         return 0
     fi
 
+    # `--output-format json` wraps the model's answer in a CLI envelope
+    # ({type, result, usage, ...}); the criteria live in .result as text that
+    # may still be fenced. Unwrap before validating, and accept a bare
+    # criteria object too in case the envelope shape changes.
+    local criteria_json
+    criteria_json=$(_extract_acceptance_criteria "$intent_file")
+    if [[ -z "$criteria_json" ]]; then
+        _generate_default_acceptance_criteria "$title" "$body" "$artifacts_dir"
+        rm -f "$intent_file"
+        return 0
+    fi
+
     # Move to final location atomically
     local criteria_file="${artifacts_dir}/acceptance-criteria.json"
-    mv "$intent_file" "$criteria_file" 2>/dev/null || {
+    printf '%s\n' "$criteria_json" > "${intent_file}.out" 2>/dev/null &&
+        mv "${intent_file}.out" "$criteria_file" 2>/dev/null || {
+        rm -f "${intent_file}.out"
         _generate_default_acceptance_criteria "$title" "$body" "$artifacts_dir"
+        rm -f "$intent_file"
         return 1
     }
+    rm -f "$intent_file"
 
     return 0
+}
+
+# _extract_acceptance_criteria <file>
+# Echoes the acceptance-criteria object from a Claude CLI response, or nothing
+# if the response does not carry one. Accepts the `--output-format json`
+# envelope (criteria in .result, optionally inside a ```json fence) as well as
+# a bare criteria object.
+_extract_acceptance_criteria() {
+    local file="$1"
+    local candidate
+
+    for candidate in \
+        "$(jq -r 'if (.version and .goal and (.criteria | type == "array")) then . else empty end' "$file" 2>/dev/null || true)" \
+        "$(jq -r '.result // empty' "$file" 2>/dev/null | sed -e '/^[[:space:]]*```/d' || true)"
+    do
+        [[ -z "$candidate" ]] && continue
+        if printf '%s' "$candidate" | jq -e \
+            '.version and .goal and (.criteria | type == "array") and (.criteria | length > 0)' \
+            >/dev/null 2>&1; then
+            printf '%s' "$candidate" | jq .
+            return 0
+        fi
+    done
+
+    return 1
 }
 
 # Generate default acceptance criteria when Claude is unavailable

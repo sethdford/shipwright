@@ -409,6 +409,112 @@ EOF
 }
 
 # ───────────────────────────────────────────────────────────────
+# Test: the `--output-format json` envelope is unwrapped
+# ───────────────────────────────────────────────────────────────
+# Installs a mock `claude` that answers the way the real CLI does: the model's
+# text sits in .result, fenced. Without unwrapping, the envelope itself landed
+# in acceptance-criteria.json and every consumer saw no version/goal/criteria.
+_mock_claude() {
+    local mock_dir="$1"
+    local payload="$2"
+    mkdir -p "$mock_dir"
+    cat > "$mock_dir/claude" <<MOCKEOF
+#!/usr/bin/env bash
+cat <<'PAYLOAD'
+${payload}
+PAYLOAD
+exit 0
+MOCKEOF
+    chmod +x "$mock_dir/claude"
+}
+
+_criteria_fixture() {
+    cat <<'EOF'
+{"version":1,"goal":"Unwrap the envelope","generated_at":"2026-01-01T00:00:00Z","criteria":[{"id":"ac-1","description":"Envelope is unwrapped","type":"functional","verifiable":true}]}
+EOF
+}
+
+test_envelope_unwrapped() {
+    local test_dir="$TEMP_DIR/envelope-test"
+    local mock_dir="$TEMP_DIR/envelope-bin"
+    mkdir -p "$test_dir"
+
+    local envelope
+    envelope=$(jq -n --arg result "$(printf '```json\n%s\n```' "$(_criteria_fixture)")" \
+        '{type: "result", subtype: "success", is_error: false, result: $result}')
+    _mock_claude "$mock_dir" "$envelope"
+
+    local old_path="$PATH"
+    export PATH="$mock_dir:$PATH"
+    analyze_intent "Unwrap the envelope" "body" "" "$test_dir" >/dev/null 2>&1 || true
+    export PATH="$old_path"
+
+    local goal criteria
+    goal=$(jq -r '.goal // empty' "$test_dir/acceptance-criteria.json" 2>/dev/null || true)
+    criteria=$(jq -r '.criteria | length' "$test_dir/acceptance-criteria.json" 2>/dev/null || echo 0)
+
+    if [[ "$goal" == "Unwrap the envelope" && "${criteria:-0}" -gt 0 ]]; then
+        test_pass "CLI json envelope is unwrapped into acceptance criteria"
+        return 0
+    fi
+
+    test_fail "CLI json envelope should be unwrapped (goal='$goal', criteria=$criteria)"
+    return 1
+}
+
+# ───────────────────────────────────────────────────────────────
+# Test: a bare criteria object (no envelope) is accepted as-is
+# ───────────────────────────────────────────────────────────────
+test_bare_criteria_accepted() {
+    local test_dir="$TEMP_DIR/bare-test"
+    local mock_dir="$TEMP_DIR/bare-bin"
+    mkdir -p "$test_dir"
+
+    _mock_claude "$mock_dir" "$(_criteria_fixture)"
+
+    local old_path="$PATH"
+    export PATH="$mock_dir:$PATH"
+    analyze_intent "Unwrap the envelope" "body" "" "$test_dir" >/dev/null 2>&1 || true
+    export PATH="$old_path"
+
+    if [[ "$(jq -r '.goal // empty' "$test_dir/acceptance-criteria.json" 2>/dev/null || true)" == "Unwrap the envelope" ]]; then
+        test_pass "bare criteria object is accepted without an envelope"
+        return 0
+    fi
+
+    test_fail "bare criteria object should be accepted"
+    return 1
+}
+
+# ───────────────────────────────────────────────────────────────
+# Test: an off-schema response falls back to defaults
+# ───────────────────────────────────────────────────────────────
+test_offschema_response_falls_back() {
+    local test_dir="$TEMP_DIR/offschema-test"
+    local mock_dir="$TEMP_DIR/offschema-bin"
+    mkdir -p "$test_dir"
+
+    _mock_claude "$mock_dir" '{"type":"result","result":"I could not produce criteria."}'
+
+    local old_path="$PATH"
+    export PATH="$mock_dir:$PATH"
+    analyze_intent "Offschema title" "body" "" "$test_dir" >/dev/null 2>&1 || true
+    export PATH="$old_path"
+
+    local goal criteria
+    goal=$(jq -r '.goal // empty' "$test_dir/acceptance-criteria.json" 2>/dev/null || true)
+    criteria=$(jq -r '.criteria | length' "$test_dir/acceptance-criteria.json" 2>/dev/null || echo 0)
+
+    if [[ "$goal" == "Offschema title" && "${criteria:-0}" -gt 0 ]]; then
+        test_pass "off-schema response falls back to default criteria"
+        return 0
+    fi
+
+    test_fail "off-schema response should fall back to defaults (goal='$goal', criteria=$criteria)"
+    return 1
+}
+
+# ───────────────────────────────────────────────────────────────
 # Main test runner
 # ───────────────────────────────────────────────────────────────
 main() {
@@ -428,6 +534,9 @@ main() {
     test_format_criteria_for_prompt
     test_load_acceptance_criteria
     test_analyze_intent_fallback
+    test_envelope_unwrapped
+    test_bare_criteria_accepted
+    test_offschema_response_falls_back
     test_inject_failure_mode_analysis
     test_failure_mode_validation_status
 
