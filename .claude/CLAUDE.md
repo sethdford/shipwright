@@ -341,6 +341,58 @@ Tune the build loop's resilience and restart behavior:
 | `hard_restart_cap`          | `5`     | Absolute maximum restarts regardless of cause     |
 | `max_restarts`              | `3`     | Default restart limit for daemon-driven loops     |
 
+`hard_restart_cap` is enforced on the daemon retry path too: the context-exhaustion
+boost to `--max-restarts` is clamped to it rather than to a hardcoded ceiling.
+
+### Retry Escalation on Repeated Failure Signatures
+
+Retry escalation used to be keyed on the retry *count* alone — retry 1 raised the
+model, retry 2 switched to the `full` template — regardless of whether the pipeline
+hit a new bug each time or ran into the identical one twice. The daemon now also
+fingerprints *what* failed.
+
+After each retryable failure, `normalize_failure_signature()` builds a
+`<class>:<8 hex>` fingerprint from the log tail. Normalization strips everything
+that varies between two runs of the same defect: ANSI colour, timestamps, absolute
+directories (the basename is kept — the file is part of the identity), and all
+digits (line numbers, PIDs, durations). Two runs of the same defect therefore
+produce the same signature; a different defect produces a different one.
+
+The signature is persisted per issue under `.failure_signatures[<issue>]` in the
+daemon state file (`{signature, count, last_seen, history}`, history capped at 5),
+so the streak survives a daemon restart. It is cleared when the issue succeeds.
+
+When the same signature is seen `repeat_threshold` times in a row, the retry spawns
+with the `model_routing.high_risk` model and effort one rung up the
+`low→medium→high→xhigh→max` ladder. The effort base is the `build` stage's own level
+when `effort_level` is unset, since build is the stage that produced the failure.
+Escalating at the top of both ladders is a logged no-op, never an error.
+
+```json
+{
+  "escalation": {
+    "on_repeat_signature": 1,
+    "repeat_threshold": 2
+  }
+}
+```
+
+| Key                   | Default | Purpose                                                        |
+| --------------------- | ------- | -------------------------------------------------------------- |
+| `on_repeat_signature` | `1`     | Enable signature tracking and escalation (`0` disables)        |
+| `repeat_threshold`    | `2`     | Consecutive identical signatures required before escalating    |
+
+Env overrides: `SW_ESCALATION_ON_REPEAT_SIGNATURE`, `SW_ESCALATION_REPEAT_THRESHOLD`.
+Setting `RETRY_ESCALATION=false` disables the retry path entirely, signatures included.
+
+Both decisions are observable in `events.jsonl`:
+
+| Event                      | Fields                                                                                     |
+| -------------------------- | ------------------------------------------------------------------------------------------ |
+| `daemon.failure_signature` | `issue`, `signature`, `consecutive`, `retry` — emitted on every retry                      |
+| `daemon.escalation`        | `issue`, `result=escalated`, `signature`, `consecutive`, `from_model`/`to_model`, `from_effort`/`to_effort` |
+| `daemon.escalation`        | `issue`, `result=at_ceiling`, `signature`, `consecutive`, `model`, `effort`                |
+
 ## Constitutional AI
 
 Code quality principles are defined in `config/code-constitution.json`. The constitution provides machine-checkable rules across five categories:

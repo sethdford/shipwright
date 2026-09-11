@@ -22,6 +22,12 @@ export EVENTS_FILE="$TEST_TEMP_DIR/home/.shipwright/events.jsonl"
 export PAUSE_FLAG="$TEST_TEMP_DIR/home/.shipwright/daemon.pause"
 export NO_GITHUB=true
 export REPO_DIR="$TEST_TEMP_DIR/project"
+# Hermetic config: the escalation path reads effort/model routing through
+# _smart_* helpers, which fall back to ./.claude/daemon-config.json. Point them at
+# an empty test-owned file so these tests assert the documented defaults rather
+# than whatever this repo happens to be configured with today.
+export DAEMON_CONFIG="$TEST_TEMP_DIR/daemon-config.json"
+echo '{}' > "$DAEMON_CONFIG"
 mkdir -p "$LOG_DIR" "$WORKTREE_DIR"
 
 # Provide stub functions that daemon-failure.sh depends on
@@ -30,11 +36,24 @@ now_epoch() { date +%s; }
 epoch_to_iso() { date -u -r "$1" +"%Y-%m-%dT%H:%M:%SZ" 2>/dev/null || date -u -d "@$1" +"%Y-%m-%dT%H:%M:%SZ" 2>/dev/null || echo "1970-01-01T00:00:00Z"; }
 emit_event() { :; }
 daemon_log() { :; }
-locked_state_update() { :; }
-daemon_spawn_pipeline() { :; }
+# Real (unlocked) state mutation so signature persistence is genuinely exercised.
+locked_state_update() {
+    [[ -f "$STATE_FILE" ]] || return 0
+    local _tmp
+    _tmp=$(mktemp "${TMPDIR:-/tmp}/sw-state.XXXXXX") || return 1
+    if jq "$@" "$STATE_FILE" > "$_tmp" 2>/dev/null; then mv "$_tmp" "$STATE_FILE"; else rm -f "$_tmp"; return 1; fi
+}
+SPAWN_LOG="$TEST_TEMP_DIR/spawn.log"
+daemon_spawn_pipeline() {
+    echo "issue=$1 template=$PIPELINE_TEMPLATE model=$MODEL effort=${EFFORT_LEVEL:-} args=${*:4}" >> "$SPAWN_LOG"
+}
 record_pipeline_duration() { :; }
 record_scaling_outcome() { :; }
 notify() { :; }
+
+# compat.sh supplies _smart_int/_smart_model/_smart_effort, which the escalation
+# path reads config through. It is sourced by bootstrap at daemon runtime.
+source "$SCRIPT_DIR/lib/compat.sh"
 
 # Source the lib (clear guard)
 _DAEMON_FAILURE_LOADED=""
@@ -209,5 +228,261 @@ assert_eq "API error takes priority over build error" "api_error" "$result"
 touch "$LOG_DIR/issue-703.log"
 result=$(classify_failure 703)
 assert_eq "Empty log → unknown" "unknown" "$result"
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# normalize_failure_signature
+# ═══════════════════════════════════════════════════════════════════════════════
+print_test_section "normalize_failure_signature"
+
+assert_eq "Missing log → :none" "build_failure:none" "$(normalize_failure_signature 9999 build_failure)"
+
+touch "$LOG_DIR/issue-800.log"
+assert_eq "Empty log → :none" "unknown:none" "$(normalize_failure_signature 800 unknown)"
+
+(
+    LOG_DIR=""
+    normalize_failure_signature 1 api_error
+) > "$TEST_TEMP_DIR/sig_nologdir" 2>/dev/null
+assert_eq "Empty LOG_DIR → :none" "api_error:none" "$(cat "$TEST_TEMP_DIR/sig_nologdir")"
+
+cat > "$LOG_DIR/issue-801.log" <<'LOG'
+FAIL scripts/sw-foo-test.sh
+  Error: expected 3 but got 4
+LOG
+sig_801=$(normalize_failure_signature 801 build_failure)
+assert_contains "Signature is prefixed with the class" "$sig_801" "build_failure:"
+if [[ "$sig_801" =~ ^build_failure:[0-9a-f]{8}$ ]]; then
+    assert_eq "Signature is class:8-hex" "ok" "ok"
+else
+    assert_eq "Signature is class:8-hex" "ok" "got $sig_801"
+fi
+assert_eq "Signature is stable across calls" "$sig_801" "$(normalize_failure_signature 801 build_failure)"
+
+# Same defect, different run: different absolute path, line numbers, timestamp,
+# ANSI colour. Must produce the SAME signature.
+printf '2026-09-11T12:00:00Z \033[31mFAIL\033[0m /home/runner/work/x/scripts/sw-foo-test.sh\n  Error: expected 37 but got 412\n' \
+    > "$LOG_DIR/issue-802.log"
+assert_eq "Path/digit/timestamp/ANSI noise does not change the signature" \
+    "$sig_801" "$(normalize_failure_signature 802 build_failure)"
+
+# A genuinely different error must differ.
+cat > "$LOG_DIR/issue-803.log" <<'LOG'
+FAIL scripts/sw-bar-test.sh
+  Error: undefined variable BAZ
+LOG
+sig_803=$(normalize_failure_signature 803 build_failure)
+if [[ "$sig_803" != "$sig_801" ]]; then
+    assert_eq "Different error → different signature" "differs" "differs"
+else
+    assert_eq "Different error → different signature" "differs" "collided"
+fi
+
+# Same text, different class → different signature (class is part of identity).
+cp "$LOG_DIR/issue-801.log" "$LOG_DIR/issue-804.log"
+sig_804=$(normalize_failure_signature 804 api_error)
+if [[ "$sig_804" != "$sig_801" ]]; then
+    assert_eq "Class is part of the signature" "differs" "differs"
+else
+    assert_eq "Class is part of the signature" "differs" "collided"
+fi
+
+# No error-shaped lines → falls back to the raw tail, still a real signature.
+echo "just some quiet output" > "$LOG_DIR/issue-805.log"
+sig_805=$(normalize_failure_signature 805 unknown)
+if [[ "$sig_805" =~ ^unknown:[0-9a-f]{8}$ ]]; then
+    assert_eq "Non-error log falls back to tail" "ok" "ok"
+else
+    assert_eq "Non-error log falls back to tail" "ok" "got $sig_805"
+fi
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# escalate_effort_level / escalate_model_tier
+# ═══════════════════════════════════════════════════════════════════════════════
+print_test_section "Escalation ladders"
+
+assert_eq "low → medium" "medium" "$(escalate_effort_level low)"
+assert_eq "medium → high" "high" "$(escalate_effort_level medium)"
+assert_eq "high → xhigh" "xhigh" "$(escalate_effort_level high)"
+assert_eq "xhigh → max" "max" "$(escalate_effort_level xhigh)"
+assert_eq "max is the ceiling (idempotent)" "max" "$(escalate_effort_level max)"
+assert_eq "Unknown level normalizes to high" "high" "$(escalate_effort_level banana)"
+assert_eq "Empty level normalizes to high" "high" "$(escalate_effort_level "")"
+
+assert_eq "sonnet escalates to the high-risk model" "opus" "$(escalate_model_tier sonnet)"
+assert_eq "haiku escalates to the high-risk model" "opus" "$(escalate_model_tier haiku)"
+assert_eq "Already high-risk is the ceiling" "opus" "$(escalate_model_tier opus)"
+assert_eq "high_risk routing is honored" "sonnet" "$(SW_MODEL_HIGH_RISK=sonnet escalate_model_tier opus)"
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# record_failure_signature
+# ═══════════════════════════════════════════════════════════════════════════════
+print_test_section "record_failure_signature"
+
+mkdir -p "$(dirname "$STATE_FILE")"
+echo '{"completed":[],"retry_counts":{}}' > "$STATE_FILE"
+
+assert_eq "First sighting counts 1" "1" "$(record_failure_signature 900 "build_failure:aaaaaaaa")"
+assert_eq "Identical signature counts 2" "2" "$(record_failure_signature 900 "build_failure:aaaaaaaa")"
+assert_eq "Identical signature counts 3" "3" "$(record_failure_signature 900 "build_failure:aaaaaaaa")"
+assert_eq "A different signature resets to 1" "1" "$(record_failure_signature 900 "build_failure:bbbbbbbb")"
+assert_eq "Counts are per-issue" "1" "$(record_failure_signature 901 "build_failure:aaaaaaaa")"
+
+hist_len=$(jq -r '.failure_signatures["900"].history | length' "$STATE_FILE")
+assert_eq "History is recorded" "4" "$hist_len"
+for _ in 1 2 3; do record_failure_signature 900 "build_failure:cccccccc" >/dev/null; done
+hist_len=$(jq -r '.failure_signatures["900"].history | length' "$STATE_FILE")
+assert_eq "History is capped at 5" "5" "$hist_len"
+
+clear_failure_signature 900
+assert_eq "clear_failure_signature drops the issue" "null" "$(jq -r '.failure_signatures["900"] // "null"' "$STATE_FILE")"
+assert_eq "clear_failure_signature leaves other issues alone" "1" "$(jq -r '.failure_signatures["901"].count' "$STATE_FILE")"
+
+reset_failure_tracking 901
+assert_eq "reset_failure_tracking <issue> clears its signature" "null" "$(jq -r '.failure_signatures["901"] // "null"' "$STATE_FILE")"
+
+# Missing state file degrades to 1 rather than erroring
+(
+    STATE_FILE="$TEST_TEMP_DIR/does-not-exist.json"
+    record_failure_signature 902 "build_failure:dddddddd"
+) > "$TEST_TEMP_DIR/sig_nostate" 2>/dev/null
+assert_eq "No state file → count 1" "1" "$(cat "$TEST_TEMP_DIR/sig_nostate")"
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# daemon_on_failure escalation (integration)
+# ═══════════════════════════════════════════════════════════════════════════════
+print_test_section "Retry escalation on repeated signatures"
+
+ESC_EVENTS="$TEST_TEMP_DIR/esc-events.log"
+emit_event() { echo "$*" >> "$ESC_EVENTS"; }
+SCRIPT_DIR_ORIG="$SCRIPT_DIR"
+
+# daemon_on_failure sleeps for backoff; make retries instant.
+sleep() { :; }
+
+run_failure() {
+    # run_failure <issue> <log_body>
+    local num="$1" body="$2"
+    printf '%s\n' "$body" > "$LOG_DIR/issue-${num}.log"
+    : > "$ESC_EVENTS"
+    : > "$SPAWN_LOG"
+    _retry_spawned_for=""
+    daemon_on_failure "$num" 1 "1m 0s" >/dev/null 2>>"$TEST_TEMP_DIR/failure-stderr.log" || true
+}
+
+export RETRY_ESCALATION=true
+export MAX_RETRIES=3
+export MAX_RETRIES_BUILD=3
+MODEL="sonnet"
+EFFORT_LEVEL=""
+PIPELINE_TEMPLATE="standard"
+echo '{"completed":[],"retry_counts":{}}' > "$STATE_FILE"
+
+FAIL_A='npm ERR! Test suite failed
+Error: expected 3 but got 4'
+FAIL_B='npm ERR! Test suite failed
+Error: undefined variable BAZ'
+
+# First failure — signature seen once, no escalation.
+run_failure 950 "$FAIL_A"
+assert_contains "Signature event emitted on first retry" "$(cat "$ESC_EVENTS")" "daemon.failure_signature"
+assert_contains "First failure records consecutive=1" "$(cat "$ESC_EVENTS")" "consecutive=1"
+if grep -q "result=escalated" "$ESC_EVENTS"; then
+    assert_eq "No escalation on a first-seen signature" "no" "escalated"
+else
+    assert_eq "No escalation on a first-seen signature" "no" "no"
+fi
+
+# Different signature next — count resets, still no escalation.
+run_failure 950 "$FAIL_B"
+assert_contains "Distinct signature resets consecutive to 1" "$(cat "$ESC_EVENTS")" "consecutive=1"
+if grep -q "result=escalated" "$ESC_EVENTS"; then
+    assert_eq "No escalation on distinct signatures" "no" "escalated"
+else
+    assert_eq "No escalation on distinct signatures" "no" "no"
+fi
+
+# Same signature twice in a row — escalation fires.
+run_failure 950 "$FAIL_B"
+assert_contains "Second identical signature escalates" "$(cat "$ESC_EVENTS")" "result=escalated"
+assert_contains "Escalation reports consecutive=2" "$(cat "$ESC_EVENTS")" "consecutive=2"
+assert_contains "Escalation targets the high-risk model" "$(cat "$ESC_EVENTS")" "to_model=opus"
+assert_contains "Escalation raises effort a rung" "$(cat "$ESC_EVENTS")" "to_effort=max"
+assert_contains "Spawn receives the escalated effort" "$(cat "$SPAWN_LOG")" "effort=max"
+assert_contains "Spawn receives the escalated model" "$(cat "$SPAWN_LOG")" "model=opus"
+
+# EFFORT_LEVEL is restored after the escalated respawn.
+assert_eq "EFFORT_LEVEL restored after retry" "" "${EFFORT_LEVEL}"
+assert_eq "MODEL restored after retry" "sonnet" "${MODEL}"
+
+# Ceiling: already at the top of both ladders → logged no-op, not an error.
+echo '{"completed":[],"retry_counts":{}}' > "$STATE_FILE"
+MODEL="opus"
+EFFORT_LEVEL="max"
+run_failure 951 "$FAIL_A"
+run_failure 951 "$FAIL_A"
+assert_contains "At-ceiling escalation is a logged no-op" "$(cat "$ESC_EVENTS")" "result=at_ceiling"
+if grep -q "result=escalated" "$ESC_EVENTS"; then
+    assert_eq "Ceiling does not report a fake escalation" "no" "escalated"
+else
+    assert_eq "Ceiling does not report a fake escalation" "no" "no"
+fi
+MODEL="sonnet"
+EFFORT_LEVEL=""
+
+# Disabled via config → no signature tracking at all.
+echo '{"completed":[],"retry_counts":{}}' > "$STATE_FILE"
+SW_ESCALATION_ON_REPEAT_SIGNATURE=0 run_failure 952 "$FAIL_A"
+if grep -q "daemon.failure_signature" "$ESC_EVENTS"; then
+    assert_eq "on_repeat_signature=0 disables tracking" "off" "on"
+else
+    assert_eq "on_repeat_signature=0 disables tracking" "off" "off"
+fi
+
+# Threshold is configurable: 3 means two identical failures are not enough.
+echo '{"completed":[],"retry_counts":{}}' > "$STATE_FILE"
+export SW_ESCALATION_REPEAT_THRESHOLD=3
+run_failure 953 "$FAIL_A"
+run_failure 953 "$FAIL_A"
+if grep -q "result=escalated" "$ESC_EVENTS"; then
+    assert_eq "Threshold=3 holds off at 2 repeats" "no" "escalated"
+else
+    assert_eq "Threshold=3 holds off at 2 repeats" "no" "no"
+fi
+run_failure 953 "$FAIL_A"
+assert_contains "Threshold=3 escalates at 3 repeats" "$(cat "$ESC_EVENTS")" "result=escalated"
+unset SW_ESCALATION_REPEAT_THRESHOLD
+
+# RETRY_ESCALATION=false skips the whole retry path.
+echo '{"completed":[],"retry_counts":{}}' > "$STATE_FILE"
+RETRY_ESCALATION=false run_failure 954 "$FAIL_A"
+if grep -q "daemon.failure_signature" "$ESC_EVENTS"; then
+    assert_eq "RETRY_ESCALATION=false skips signature tracking" "off" "on"
+else
+    assert_eq "RETRY_ESCALATION=false skips signature tracking" "off" "off"
+fi
+
+# ── hard_restart_cap clamps --max-restarts on the context-exhaustion path ──
+print_test_section "hard_restart_cap"
+
+mkdir -p "$WORKTREE_DIR/daemon-issue-960/.claude/loop-logs"
+cat > "$WORKTREE_DIR/daemon-issue-960/.claude/loop-logs/progress.md" <<'MD'
+## Progress
+Iteration: 9
+Tests passing: false
+MD
+echo '{"completed":[],"retry_counts":{}}' > "$STATE_FILE"
+MAX_RESTARTS_CFG=9
+SW_LOOP_HARD_RESTART_CAP=4 run_failure 960 "context ran out"
+assert_contains "max-restarts clamped to hard_restart_cap" "$(cat "$SPAWN_LOG")" "--max-restarts 4"
+
+echo '{"completed":[],"retry_counts":{}}' > "$STATE_FILE"
+MAX_RESTARTS_CFG=1
+SW_LOOP_HARD_RESTART_CAP=9 run_failure 960 "context ran out"
+assert_contains "Below the cap, the boosted value is used" "$(cat "$SPAWN_LOG")" "--max-restarts 2"
+unset MAX_RESTARTS_CFG
+
+# Restore stubs for any later sections
+unset -f sleep
+emit_event() { :; }
 
 print_test_results

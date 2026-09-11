@@ -588,8 +588,9 @@ daemon_on_success() {
     local gh_timeout
     gh_timeout=$(_smart_int "daemon.gh_timeout_seconds" 30)
 
-    # Reset consecutive failure tracking on any success
-    reset_failure_tracking
+    # Reset consecutive failure tracking on any success. Passing the issue also
+    # drops its persisted failure signature — the streak ended here.
+    reset_failure_tracking "$issue_num"
 
     daemon_log SUCCESS "Pipeline completed for issue #${issue_num} (${duration:-unknown})"
 
@@ -620,7 +621,9 @@ daemon_on_success() {
             duration: $dur,
             completed_at: $completed_at
         }] | .completed = .completed[-500:]
-        | del(.retry_counts[($num | tostring)])'
+        | del(.retry_counts[($num | tostring)])
+        | if (.failure_signatures | type) == "object"
+          then del(.failure_signatures[($num | tostring)]) else . end'
 
     if [[ "$NO_GITHUB" != "true" ]]; then
         # Remove watch label, add success label

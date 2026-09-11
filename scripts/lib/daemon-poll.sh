@@ -469,10 +469,12 @@ daemon_cleanup_stale() {
         fi
     fi
 
-    # ── 5. Prune stale retry_counts (issues no longer in flight or queued) ──
+    # ── 5. Prune stale retry_counts + failure_signatures (issues no longer in
+    #      flight or queued). Both are keyed by issue number and both are written
+    #      on the retry path, so they go stale together. ──
     if [[ -f "$STATE_FILE" ]]; then
         local retry_keys
-        retry_keys=$(jq -r '.retry_counts // {} | keys[]' "$STATE_FILE" 2>/dev/null || true)
+        retry_keys=$(jq -r '((.retry_counts // {}) + (.failure_signatures // {})) | keys[]' "$STATE_FILE" 2>/dev/null || true)
         local stale_keys=()
         while IFS= read -r key; do
             [[ -z "$key" ]] && continue
@@ -482,7 +484,10 @@ daemon_cleanup_stale() {
         done <<< "$retry_keys"
         if [[ ${#stale_keys[@]} -gt 0 ]]; then
             for sk in "${stale_keys[@]}"; do
-                locked_state_update --arg k "$sk" 'del(.retry_counts[$k])' 2>/dev/null || continue
+                locked_state_update --arg k "$sk" '
+                    del(.retry_counts[$k])
+                    | if (.failure_signatures | type) == "object" then del(.failure_signatures[$k]) else . end
+                ' 2>/dev/null || continue
             done
             daemon_log INFO "Pruned ${#stale_keys[@]} stale retry count(s)"
             cleaned=$((cleaned + ${#stale_keys[@]}))

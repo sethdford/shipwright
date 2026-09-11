@@ -382,6 +382,7 @@ init_state() {
                 queued: [],
                 completed: [],
                 retry_counts: {},
+                failure_signatures: {},
                 failure_history: [],
                 priority_lane_active: [],
                 titles: {}

@@ -562,6 +562,13 @@
       "required": [],
       "optional": []
     },
+    "daemon.escalation": {
+      "required": [],
+      "optional": [
+        "issue",
+        "result"
+      ]
+    },
     "daemon.failure": {
       "required": [
         "issue"
@@ -575,6 +582,12 @@
       "required": [],
       "optional": [
         "class",
+        "issue"
+      ]
+    },
+    "daemon.failure_signature": {
+      "required": [],
+      "optional": [
         "issue"
       ]
     },
