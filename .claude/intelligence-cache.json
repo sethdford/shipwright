@@ -1699,23 +1699,24 @@
     },
     "9ffec5a1b4309a58b33c35c65fa98a84": {
       "result": {
-        "complexity": 2,
+        "complexity": 3,
         "risk_level": "low",
-        "success_probability": 98,
+        "success_probability": 88,
         "recommended_template": "fast",
         "issue_type": "testing",
         "key_risks": [
-          "Automated test artifact - may not represent actionable work",
-          "README modification could conflict with concurrent documentation changes",
-          "Test may be transient or designed to be closed without action"
+          "Test flakiness from race conditions in async operations",
+          "Environment-specific file system state affecting test isolation",
+          "Stale README state from previous test runs causing assertion failures"
         ],
         "implementation_hints": [
-          "Issue is marked as safe to close - verify if actual work is needed or if this is a synthetic test",
-          "Trivial change if execution is required (single comment addition to README)",
-          "Check recent commits for context on what this E2E test validates"
+          "Use a fresh/clean README fixture or reset it before each run",
+          "Add deterministic wait/retry logic for file write operations",
+          "Validate that the comment was actually persisted to disk before assertion",
+          "Run in isolated worktree to avoid concurrent test interference"
         ]
       },
-      "timestamp": 1789131686,
+      "timestamp": 1789137807,
       "ttl": 3600
     },
     "4ed0420a3eea916da7ddf033f9c76fff": {
@@ -1746,14 +1747,14 @@
     "f9c9e8b2bd49e68005879dc608624768": {
       "result": {
         "issue_type": "testing",
-        "confidence": 0.95,
+        "confidence": 0.88,
         "secondary_domains": [
           "automation",
-          "integration"
+          "infrastructure"
         ],
         "complexity_assessment": {
-          "score": 4,
-          "reasoning": "Automated E2E test with narrow scope (README comment addition via pipeline). Main complexity is ensuring test reliability and comprehensive flow coverage, not implementation difficulty."
+          "score": 6,
+          "reasoning": "E2E integration test with moderate complexity: must coordinate with external systems (Git, file I/O), ensure proper isolation, and validate end-to-end workflow. Main risks are state pollution, flakiness, and cleanup reliability."
         },
         "skill_plan": {
           "plan": [
@@ -1762,19 +1763,20 @@
           ],
           "design": [
             "testing-strategy",
-            "validation-thoroughness"
+            "e2e-test-isolation-and-cleanup"
           ],
           "build": [
-            "testing-strategy"
+            "testing-strategy",
+            "e2e-test-isolation-and-cleanup"
           ],
           "review": [
-            "two-stage-review",
-            "adversarial-quality",
-            "pr-quality"
+            "testing-strategy",
+            "validation-thoroughness",
+            "two-stage-review"
           ],
           "compound_quality": [
-            "validation-thoroughness",
-            "adversarial-quality"
+            "adversarial-quality",
+            "test-parallelization-detection"
           ],
           "pr": [
             "pr-quality"
@@ -1783,72 +1785,76 @@
             "deploy-safety"
           ],
           "validate": [
-            "validation-thoroughness",
-            "observability"
+            "validation-thoroughness"
           ],
-          "monitor": [
-            "observability"
-          ]
+          "monitor": []
         },
         "skill_rationale": {
-          "testing-strategy": "Defines E2E test structure and assertion patterns that validate the complete pipeline→README comment flow end-to-end without mocking intermediates.",
-          "brainstorming": "Challenges assumptions about edge cases (concurrent edits, file locks, large README files, permission errors) before implementation to maximize realistic coverage.",
-          "validation-thoroughness": "Ensures the E2E test validates actual user experience (README file actually modified correctly) rather than just checking exit codes or log messages.",
-          "two-stage-review": "E2E tests need careful dual-pass review for correctness (does it test the right thing) and reliability (will it remain stable under CI/CD environment variations).",
-          "adversarial-quality": "Identifies test brittleness (timing assumptions, state leaks, hardcoded paths) and feature weaknesses (what breaks if README is symlinked, read-only, or concurrently modified).",
-          "pr-quality": "Makes the test implementation reviewable in 5 minutes by clarifying the E2E scenario, assertion logic, and any test fixtures or cleanup.",
-          "deploy-safety": "Treats the passing E2E test as a deploy gate—only merge if the test consistently validates the feature integrates correctly with the system.",
-          "observability": "Monitors test execution patterns to detect flakiness signatures (intermittent failures at specific times) and production divergence (test passes but feature breaks live)."
+          "testing-strategy": "E2E tests require clear definitions of what workflows to validate, assertion strategies, and both happy-path and error-case coverage to prevent false positives and false negatives.",
+          "brainstorming": "Challenge implicit assumptions: Does this test need to validate actual file writes to disk or can it mock Git? Should error recovery (e.g., conflicted README, permissions denied) be tested? Prevents incomplete test design.",
+          "e2e-test-isolation-and-cleanup": "This test modifies README and runs in CI—must ensure it doesn't pollute shared state, leaves no artifacts between runs, and restores Git working directory to pre-test state even on failure.",
+          "validation-thoroughness": "Automated E2E tests often test code paths without validating actual user experience; verify the test observes the real outcome (README actually modified, comment visible, rollback successful).",
+          "two-stage-review": "E2E tests are integration points where subtle timing issues and environment-specific failures hide; two-pass review catches flakiness that single-pass review misses.",
+          "adversarial-quality": "Test robustness against adversarial conditions: what if README is already locked by another process, Git is in a detached state, or the file encoding is non-UTF-8? Test should fail gracefully.",
+          "test-parallelization-detection": "E2E tests that modify files are parallelization hazards; verify this test can run concurrently without race conditions on temp directories, Git state, or test artifacts.",
+          "pr-quality": "E2E tests are hard to understand from code alone; PR must document what workflow this validates, why it's necessary, and which user scenarios it covers.",
+          "deploy-safety": "E2E tests are a deployment validation gate; verify they run reliably in CI environment and don't create intermittent false-positive/negative results that would block real deployments."
         },
-        "generated_skills": [],
+        "generated_skills": [
+          {
+            "name": "e2e-test-isolation-and-cleanup",
+            "reason": "No existing skill addresses the specific challenge of E2E test state management: ensuring test artifacts (modified files, Git state, temp directories) don't pollute subsequent runs or other tests running in parallel. This is critical for CI reliability.",
+            "content": "## E2E Test Isolation and Cleanup\n\nE2E tests that mutate external state (file I/O, Git, databases) must be bulletproof about isolation and cleanup. Flaky test suites that leave artifacts behind erode team trust and cause cascading failures.\n\n### Test Design Principles\n\n**Hermetic Isolation**\n- Clone/setup fresh state at test start (separate worktree, temp directory, or test fixture)\n- Use immutable inputs: never modify shared fixtures or baseline data\n- Each test must be runnable in any order and any quantity (1, 100, 1000x)\n- Declare dependencies explicitly: if test B requires output from test A, use shared fixtures, not implicit ordering\n\n**Cleanup Guarantee**\n- Cleanup runs even on test failure: wrap setup/assertion in try/finally equivalent\n- Delete test-created files, revert Git state, close file handles, kill processes\n- Use trap handlers (bash) or finally blocks (other languages) to ensure cleanup runs\n- Verify cleanup actually succeeded: check that temp files are gone, working directory is clean\n\n**Parallel Safety**\n- Tests must not fight over temp directories, lock files, or Git branches\n- Use unique IDs per test run (UUID, PID, timestamp) to namespace artifacts\n- Test both sequential and parallel execution locally before pushing\n- Document any known parallelization limits in the test file header\n\n**Failure Investigation**\n- On test failure, preserve artifacts for debugging: temp dir, Git state, logs\n- Write detailed error messages: which assertion failed, what state did cleanup leave behind\n- Use structured error output (JSON, line-per-fact) so dashboards can detect patterns\n- Flakiness detector: tag failures as `flaky` or `environment_dependent` if they don't reproduce locally\n\n### Implementation Checklist\n\n- [ ] Test creates isolated state (worktree, temp dir, fixture)\n- [ ] Cleanup runs unconditionally, even on assertion failure\n- [ ] Cleanup verifies itself: asserts temp files are gone, Git is clean\n- [ ] Test uses unique IDs (UUID/PID) to namespace artifacts if parallelizable\n- [ ] Test passes 5x sequentially and 3x in parallel before merge\n- [ ] Test failure message includes Git state and artifact paths for debugging\n- [ ] README or test file documents parallelization assumptions\n\n### Red Flags\n\n- `rm -rf /tmp/mytest` without checking success\n- Hardcoded paths instead of `${TMPDIR}` or temp file generation\n- No cleanup section or cleanup runs before assertions\n- Tests that depend on previous test's output without explicit setup\n- No verification that cleanup actually succeeded"
+          }
+        ],
         "review_focus": [
-          "Does the test verify the README file was actually modified with the expected comment content?",
-          "Are there race conditions or state cleanup issues if tests run in parallel?",
-          "Does the test validate both happy path (comment added) and error paths (permission denied, file missing)?",
-          "Is the assertion logic checking file content, not just pipeline logs?",
-          "Are test assertions resilient to whitespace, line ending, and encoding variations?"
+          "Test isolation: verify test creates fresh state and doesn't pollute shared fixtures or other concurrent tests",
+          "Cleanup reliability: ensure cleanup runs even on failure and is verified to succeed (e.g., Git working directory is actually clean after test ends)",
+          "Flakiness prevention: check for race conditions, timing assumptions, or environment-specific paths that could cause intermittent failures in CI",
+          "Error case validation: does test only check happy path or does it also validate failure recovery (e.g., what if README is locked or Git is in detached state)?",
+          "CI environment compatibility: verify test assumptions about permissions, file system, and Git config work in CI sandbox"
         ],
         "risk_areas": [
-          "Test flakiness: timing-dependent assertions, unclean state between runs, or CI environment differences",
-          "Coverage gap: test might pass without actually validating README was modified (e.g., mocking I/O)",
-          "Environment fragility: test may fail unpredictably if file permissions, disk state, or git user config change",
-          "False confidence: passing test could mask subtle issues (encoding bugs, line ending mismatches, concurrent edits) that only surface in production"
+          "Test artifact cleanup on failure: if test crashes mid-execution, does it leave behind Git state, temp files, or uncommitted changes that block subsequent tests?",
+          "Parallelization safety: E2E test that modifies README in shared repo can race with other tests; need unique isolation (worktree or temp fixture) per test run",
+          "Flakiness from timing/environment: E2E tests are sensitive to file system latency, Git performance, and CI environment—false positives/negatives erode CI reliability",
+          "State leakage into main branch: if cleanup fails partially, modified README or uncommitted changes could end up in the repo state that other workflows see"
         ]
       },
-      "timestamp": 1789131754,
+      "timestamp": 1789137878,
       "ttl": 3600
     },
     "61c5f4a9ce6598c2f1fc048e0a7ce958": {
       "result": {
         "results": [
           {
-            "file": "failures.json (detailed multi-failure)",
+            "file": "failures.json (second one - detailed patterns)",
             "relevance": 95,
-            "summary": "Contains 11 documented test failures including sw-e2e-integration-test hangs, sw-intent-analysis-test schema issues, and sw-loop-test flakiness. Directly applicable to E2E test debugging; most failures captured within hours of current build attempt (2026-09-11)."
+            "summary": "Contains extensive E2E test failure patterns (sw-e2e-integration-test hangs, sw-intent-analysis-test schema issues, sw-loop-test iterations), and test stage strategies directly applicable to debugging this E2E test build."
           },
           {
             "file": "patterns.json",
-            "relevance": 88,
-            "summary": "Project baseline showing Node.js + vitest + npm configuration with test_pattern: *.test.js and commonjs imports. Establishes conventions needed to structure the README E2E test correctly for this repo."
+            "relevance": 90,
+            "summary": "Project metadata (Node/vitest/npm/commonjs conventions) is essential context for understanding what this build stage should produce and test execution requirements."
           },
           {
             "file": "metrics.json",
-            "relevance": 62,
-            "summary": "Baseline performance metrics (build_duration_s: 3526, test_duration_s: 1163) establish expectations for the build stage iteration performance and help detect anomalies if current build exceeds baselines."
+            "relevance": 70,
+            "summary": "Build duration baseline (3526s) and test duration baseline (1163s) help calibrate expectations and detect anomalies during this E2E test build."
           },
           {
             "file": "retry-outcomes.json",
-            "relevance": 58,
-            "summary": "Shows build_failure class with model_escalation strategy achieving 100% success rate across 5 attempts. Validates retry escalation pattern applicable if current build iteration encounters failures."
+            "relevance": 65,
+            "summary": "Shows model escalation strategy achieved 100% success rate on build_failure class; directly applicable recovery tactic if this build stage encounters failures."
           },
           {
-            "file": "knowledge.json (KB entries)",
-            "relevance": 52,
-            "summary": "Contains 5 KB entries documenting test setup failures (mktemp paths, sw-cleanup output, test JSON schema issues). Provides debugging patterns relevant to resolving test environment issues during build stage."
+            "file": "success-patterns.json (second one - Add authentication feature)",
+            "relevance": 60,
+            "summary": "Feature work requiring 3 iterations with npm test strategy and standard template provides a worked precedent for similar complexity feature builds."
           }
         ]
       },
-      "timestamp": 1789134616,
+      "timestamp": 1789137916,
       "ttl": 1800
     },
     "762629229fd469b97db745aef64871fc": {
@@ -2136,6 +2142,53 @@
         }
       ],
       "timestamp": 1789137347,
+      "ttl": 1800
+    },
+    "a4f6237ee760b706f52de6348ee2a33f": {
+      "result": {
+        "raw_response": "Mock claude: ok"
+      },
+      "timestamp": 1789137802,
+      "ttl": 1800
+    },
+    "01954fdbe3eb235016cd75ccfaf51bb8": {
+      "result": {
+        "estimated_iterations": 2
+      },
+      "timestamp": 1789137816,
+      "ttl": 1800
+    },
+    "d164e26a93d05d5a489369be2f8fb26c": {
+      "result": {
+        "estimated_cost_usd": 0.42,
+        "estimated_iterations": 1.2,
+        "estimated_tokens": 4200,
+        "likely_failure_stage": "test",
+        "confidence": 78,
+        "breakdown": {
+          "intake": 0.02,
+          "build": 0.12,
+          "test": 0.18,
+          "pr": 0.08,
+          "review_overhead": 0.04
+        },
+        "rationale": "Low-complexity testing issue with high success probability (88%) using fast template. Single iteration most likely; second iteration accounts for flakiness risk around file system isolation and README state. Test stage carries highest failure risk per issue hints."
+      },
+      "timestamp": 1789137824,
+      "ttl": 3600
+    },
+    "ecce35149e105fc3eb382e44b28efb7d": {
+      "result": [
+        {
+          "type": "result",
+          "result": "I am trying the same approach again.",
+          "usage": {
+            "input_tokens": 0,
+            "output_tokens": 0
+          }
+        }
+      ],
+      "timestamp": 1789137911,
       "ttl": 1800
     }
   }
