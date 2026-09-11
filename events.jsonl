@@ -336,3 +336,6 @@
 {"ts":"2026-09-10T23:12:43Z","ts_epoch":1789081963,"type":"stage.failed","event_id":"evt-1789081963-2029924287","payload":"{\"stage\":\"design\",\"issue\":\"4590\",\"timing\":\"2m 27s\"}"}
 {"ts":"2026-09-10T23:12:43Z","ts_epoch":1789081963,"type":"stage.failed","issue":4590,"stage":"design","duration_s":149,"error":"unknown","error_class":"unknown"}
 {"ts":"2026-09-10T23:12:43Z","ts_epoch":1789081963,"type":"vitals.snapshot","issue":4590,"stage":"design","iteration":0,"diff_lines":0,"no_progress":0}
+{"ts":"2026-09-11T00:13:47Z","ts_epoch":1789085627,"type":"hygiene_platform_refactor","hardcoded":49,"fallback":69,"todo":51}
+{"ts":"2026-09-11T00:14:12Z","ts_epoch":1789085652,"type":"strategic.issue_created","title":"Reduce hardcoded thresholds in sw-loop.sh by moving them to config/policy.json","priority":"P6","complexity":"standard"}
+{"ts":"2026-09-11T00:14:12Z","ts_epoch":1789085652,"type":"strategic.cycle_complete","issues_created":1,"issues_skipped":2}
