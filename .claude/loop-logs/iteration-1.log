@@ -1,19 +1,3 @@
-The goal is fully implemented and verified.
-
-**What shipped**
-
-Retry escalation was keyed on the retry *count* alone — retry 1 raised the model, retry 2 switched to the `full` template — regardless of whether the pipeline hit a new bug each time or the identical one twice. `classify_failure()` couldn't distinguish them (two unrelated bugs both return `build_failure`), so the daemon now also fingerprints *what* failed.
-
-- `normalize_failure_signature()` (`scripts/lib/daemon-failure.sh`) builds a `<class>:<8 hex>` fingerprint from the log tail, stripping ANSI colour, timestamps, absolute directories (basename kept — the file is part of the identity), and all digits. Same defect → same signature; different defect → different one.
-- `record_failure_signature()` persists it per issue in daemon state (`{signature, count, last_seen, history[-5:]}`), with the count re-read from state so a streak survives a daemon restart. Cleared on success, pruned when the issue goes stale.
-- On the 2nd consecutive identical signature (`escalation.repeat_threshold`), the retry spawns with `model_routing.high_risk` and effort one rung up the `low→medium→high→xhigh→max` ladder. With `effort_level` unset the base is the `build` stage's own level — build is the stage that produced the failure. At the top of both ladders it's a logged no-op (`result=at_ceiling`), never an error.
-- `daemon.failure_signature` and `daemon.escalation` land in `events.jsonl`; both registered in `config/event-schema.json`.
-
-**Two bugs found on the way** — worth flagging since neither was in scope:
-
-1. `record_scaling_outcome "$MAX_PARALLEL"` had no `:-` default, so under `set -u` the daemon died *mid-failure-handling* whenever `MAX_PARALLEL` wasn't exported. That line had no test reaching it until now.
-2. The context-exhaustion restart boost clamped to a hardcoded `5` rather than `loop.hard_restart_cap`, which the config documents as the absolute ceiling.
-
-**Verification**: `npm test` — 162 suites passed, 0 failed (run twice, after each code change). The daemon-failure suite went 63 → 87 tests; the poll suite's cleanup coverage previously `assert_pass`'d unconditionally, so the new pruning tests assert real state rather than just that the function returned.
+The goal — adding a comment to README as an automated E2E test — is complete, verified with the docs test suite (18/18 passing), and committed.
 
 LOOP_COMPLETE
