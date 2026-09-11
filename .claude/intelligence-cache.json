@@ -1626,33 +1626,33 @@
       "result": {
         "results": [
           {
-            "file": "retry-outcomes.json",
-            "relevance": 95,
-            "summary": "Shows build_failure class with model_escalation recovery strategy achieving 100% success rate (5/5 attempts) — directly applicable to build stage error handling and retry strategy"
-          },
-          {
             "file": "success-patterns.json",
-            "relevance": 85,
-            "summary": "Contains two successful build patterns with detailed approach chains, iteration counts, duration, files changed, and cost metrics — provides concrete patterns for what works during build execution"
+            "relevance": 95,
+            "summary": "Contains 2 successful build patterns showing iteration counts (3), duration (45-150s), file change patterns, test strategy, and cost. Directly applicable to understanding what approaches work in build stage."
           },
           {
-            "file": "patterns.json",
+            "file": "retry-outcomes.json",
             "relevance": 80,
-            "summary": "Defines project conventions (node/vitest/npm/commonjs) and environment baseline that directly impact build stage execution and test runner behavior"
+            "summary": "Shows model escalation strategy achieved 100% success rate (5/5 attempts) for build_failure class. Relevant for recovery strategy when build stage encounters issues."
           },
           {
             "file": "metrics.json",
             "relevance": 70,
-            "summary": "Provides build_duration_s baseline (3526s) and test_duration_s (1163s) for performance expectations during build stage execution"
+            "summary": "Provides baseline build duration (3526s) and test duration (1163s). Essential context for understanding expected build performance and timeout thresholds."
           },
           {
-            "file": "knowledge.json",
-            "relevance": 45,
-            "summary": "Contains failure patterns including mktemp test environment setup issues and cleanup detection — relevant for build-stage test environment reliability but mostly test-stage focused"
+            "file": "patterns.json",
+            "relevance": 60,
+            "summary": "Project metadata: node + vitest, commonjs imports, src/ directory, test pattern *.test.js. Required for understanding build environment and test execution context."
+          },
+          {
+            "file": "issues.json",
+            "relevance": 40,
+            "summary": "One resolved daemon timeout issue shows past gotcha (check backoff). Tangentially relevant for understanding potential build stage failure patterns and recovery approaches."
           }
         ]
       },
-      "timestamp": 1789137026,
+      "timestamp": 1789138870,
       "ttl": 1800
     },
     "4a972b1550f67326738f55769401d8bc": {
@@ -2273,6 +2273,27 @@
         }
       ],
       "timestamp": 1789138611,
+      "ttl": 1800
+    },
+    "9ef50c0c258ba87414b2c6c14d3f0ad4": {
+      "result": {
+        "raw_response": "Mock claude: ok"
+      },
+      "timestamp": 1789138917,
+      "ttl": 1800
+    },
+    "807c7761d1a459b872b3bded8c9062e7": {
+      "result": [
+        {
+          "type": "result",
+          "result": "I am trying the same approach again.",
+          "usage": {
+            "input_tokens": 0,
+            "output_tokens": 0
+          }
+        }
+      ],
+      "timestamp": 1789139010,
       "ttl": 1800
     }
   }
