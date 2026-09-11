@@ -30,15 +30,9 @@
     },
     "d41d8cd98f00b204e9800998ecf8427e": {
       "result": {
-        "primary_role": "builder",
-        "secondary_roles": [
-          "architect",
-          "tester"
-        ],
-        "confidence": 0.85,
-        "reasoning": "Implement failure signature detection and model/effort escalation logic for daemon retries, with architectural validation and test coverage"
+        "raw_response": "Mock claude response"
       },
-      "timestamp": 1789129349,
+      "timestamp": 1789133484,
       "ttl": 3600
     },
     "efd5524ad1244fd20344bf3ff5d95233": {
@@ -1904,6 +1898,41 @@
         }
       ],
       "timestamp": 1789132210,
+      "ttl": 1800
+    },
+    "ca32a92a8c752acc111949833cb685a8": {
+      "result": [
+        {
+          "type": "result",
+          "result": "I am trying the same approach again.",
+          "usage": {
+            "input_tokens": 0,
+            "output_tokens": 0
+          }
+        }
+      ],
+      "timestamp": 1789132747,
+      "ttl": 1800
+    },
+    "700808276f5210882ad101b7f3bf8a69": {
+      "result": {
+        "raw_response": "Mock claude: ok"
+      },
+      "timestamp": 1789133056,
+      "ttl": 1800
+    },
+    "c1b88fd1d983d05b402b84b96046343c": {
+      "result": [
+        {
+          "type": "result",
+          "result": "I am trying the same approach again.",
+          "usage": {
+            "input_tokens": 0,
+            "output_tokens": 0
+          }
+        }
+      ],
+      "timestamp": 1789133287,
       "ttl": 1800
     }
   }

@@ -1,5 +1,5 @@
 {
-  "timestamp": "2026-09-11T13:07:31Z",
+  "timestamp": "2026-09-11T13:24:53Z",
   "repository": "shipwright",
   "counts": {
     "hardcoded": 49,
@@ -467,7 +467,7 @@
     },
     {
       "file": "scripts/sw-e2e-integration-test.sh",
-      "line": 222
+      "line": 237
     },
     {
       "file": "scripts/sw-adapters-test.sh",
@@ -519,19 +519,19 @@
     },
     {
       "file": "scripts/sw-loop.sh",
-      "line": 1300
+      "line": 1314
     },
     {
       "file": "scripts/sw-loop.sh",
-      "line": 1304
+      "line": 1318
     },
     {
       "file": "scripts/sw-loop.sh",
-      "line": 1307
+      "line": 1321
     },
     {
       "file": "scripts/sw-loop.sh",
-      "line": 1563
+      "line": 1577
     },
     {
       "file": "scripts/sw-pr-lifecycle-test.sh",
@@ -661,7 +661,7 @@
   "script_size_hotspots": [
     {
       "script": "sw-loop.sh",
-      "lines": 2713
+      "lines": 2727
     },
     {
       "script": "sw-memory.sh",
