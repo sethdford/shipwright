@@ -1628,31 +1628,31 @@
           {
             "file": "failures.json",
             "relevance": 95,
-            "summary": "Directly relevant: Contains 11 detailed test failure patterns with root causes and fixes. Covers sw-intent-analysis-test, sw-e2e-integration-test, sw-loop-test, and pipeline lock issues that recur frequently (seen_count 1-66). Build stage will encounter these same failures."
+            "summary": "11 documented test failure patterns with root causes and fixes. Directly applicable to build stage since most failures occur in test phase; patterns include missing schema fields (intent-analysis), stale locks (e2e-integration), and flaky suites"
           },
           {
             "file": "success-patterns.json",
-            "relevance": 90,
-            "summary": "Highly relevant: Documents 2 successful build approaches with iterations, file patterns, cost, and strategy. Shows what worked (loop iteration strategy, fix patterns) and file change patterns to expect during build."
+            "relevance": 85,
+            "summary": "2 previous success patterns showing working approaches, iterations, files changed, and test strategy. Build stage can apply same loop iteration counts and file patterns from successful runs"
+          },
+          {
+            "file": "metrics.json",
+            "relevance": 80,
+            "summary": "Baseline metrics: build_duration_s (3526s) and test_duration_s (1163s). Provides performance expectations and timeout/deadline context for build stage decisions"
           },
           {
             "file": "knowledge.json",
-            "relevance": 80,
-            "summary": "Relevant: Contains 5 failure signatures with fix strategies (mktemp /tmp/claude issues, cleanup output format, regression detection JSON). These are specific test environment gotchas that build stage may encounter."
+            "relevance": 75,
+            "summary": "5 failure entries with specific error signatures (mktemp paths, cleanup output format, regression detection JSON) and proven fixes. Build stage can avoid these known issues proactively"
           },
           {
             "file": "retry-outcomes.json",
             "relevance": 70,
-            "summary": "Somewhat relevant: Shows model_escalation strategy achieved 100% success rate (5/5) on build_failure class. Useful for understanding escalation effectiveness if current iteration fails."
-          },
-          {
-            "file": "metrics.json",
-            "relevance": 65,
-            "summary": "Somewhat relevant: Provides baseline expectations (build_duration_s: 3526, test_duration_s: 1163). Useful for setting realistic timeout expectations and detecting stalls during build execution."
+            "summary": "Shows model_escalation retry strategy for build_failure class with 100% success rate (5/5). If build fails, this escalation approach has validated track record"
           }
         ]
       },
-      "timestamp": 1789131811,
+      "timestamp": 1789134631,
       "ttl": 1800
     },
     "4a972b1550f67326738f55769401d8bc": {
@@ -1722,7 +1722,7 @@
       "result": {
         "estimated_iterations": 1
       },
-      "timestamp": 1789131694,
+      "timestamp": 1789134549,
       "ttl": 1800
     },
     "e72e6e386712fae214d49e424658088e": {
@@ -1822,33 +1822,33 @@
       "result": {
         "results": [
           {
-            "file": "failures.json (test stage failures)",
-            "relevance": 92,
-            "summary": "Contains 11 documented test failures with root causes and fixes. Highly relevant for build stage: covers loop behavior anomalies, intent-analysis schema mismatches, pipeline lock stalling, flaky test detection, and context exhaustion. Directly applicable to preventing and recovering from test failures during E2E build."
+            "file": "failures.json (detailed multi-failure)",
+            "relevance": 95,
+            "summary": "Contains 11 documented test failures including sw-e2e-integration-test hangs, sw-intent-analysis-test schema issues, and sw-loop-test flakiness. Directly applicable to E2E test debugging; most failures captured within hours of current build attempt (2026-09-11)."
           },
           {
             "file": "patterns.json",
             "relevance": 88,
-            "summary": "Project metadata: Node runtime, vitest test runner, npm package manager, commonjs imports, source in src/, test pattern *.test.js. Essential configuration for executing build stage commands and understanding project structure for E2E automation."
-          },
-          {
-            "file": "success-patterns.json (bug fixes / auth features)",
-            "relevance": 75,
-            "summary": "Two successful multi-iteration build patterns: 3 iterations each, moderate complexity (60-65), cost $2.50. Shows loop-logs artifacts, .claude file patterns, and test_strategy='npm test'. Demonstrates proven build-loop iteration approach applicable to similar E2E automated tasks."
-          },
-          {
-            "file": "retry-outcomes.json",
-            "relevance": 68,
-            "summary": "Model escalation strategy for build_failure class: 5 attempts, 5 successes, 100% success rate. Directly applicable if build stage encounters failures—provides escalation precedent for recovery."
+            "summary": "Project baseline showing Node.js + vitest + npm configuration with test_pattern: *.test.js and commonjs imports. Establishes conventions needed to structure the README E2E test correctly for this repo."
           },
           {
             "file": "metrics.json",
             "relevance": 62,
-            "summary": "Baseline durations: build 3526s (58.8m), test 1163s (19.4m). Useful for setting SLA expectations and detecting anomalies during E2E build execution; provides ground truth for timeout/stall detection."
+            "summary": "Baseline performance metrics (build_duration_s: 3526, test_duration_s: 1163) establish expectations for the build stage iteration performance and help detect anomalies if current build exceeds baselines."
+          },
+          {
+            "file": "retry-outcomes.json",
+            "relevance": 58,
+            "summary": "Shows build_failure class with model_escalation strategy achieving 100% success rate across 5 attempts. Validates retry escalation pattern applicable if current build iteration encounters failures."
+          },
+          {
+            "file": "knowledge.json (KB entries)",
+            "relevance": 52,
+            "summary": "Contains 5 KB entries documenting test setup failures (mktemp paths, sw-cleanup output, test JSON schema issues). Provides debugging patterns relevant to resolving test environment issues during build stage."
           }
         ]
       },
-      "timestamp": 1789131796,
+      "timestamp": 1789134616,
       "ttl": 1800
     },
     "762629229fd469b97db745aef64871fc": {
@@ -1933,6 +1933,62 @@
         }
       ],
       "timestamp": 1789133287,
+      "ttl": 1800
+    },
+    "b7b1f3f855eb17b35d0dad105db959ff": {
+      "result": {
+        "raw_response": "Mock claude: ok"
+      },
+      "timestamp": 1789134555,
+      "ttl": 1800
+    },
+    "90ae839c9440cbbb8f405883dcd35360": {
+      "result": [
+        {
+          "type": "result",
+          "result": "I am trying the same approach again.",
+          "usage": {
+            "input_tokens": 0,
+            "output_tokens": 0
+          }
+        }
+      ],
+      "timestamp": 1789134700,
+      "ttl": 1800
+    },
+    "600b6c2d82dd248aad09ba8d9288cd6b": {
+      "result": {
+        "raw_response": "Mock claude: ok"
+      },
+      "timestamp": 1789134777,
+      "ttl": 1800
+    },
+    "1f6ef1674f8e20c233af9aaae0e15408": {
+      "result": [
+        {
+          "type": "result",
+          "result": "I am trying the same approach again.",
+          "usage": {
+            "input_tokens": 0,
+            "output_tokens": 0
+          }
+        }
+      ],
+      "timestamp": 1789135018,
+      "ttl": 1800
+    },
+    "8819ff3c7bc5d7eda8a0ad48169a3405": {
+      "result": [
+        {
+          "type": "result",
+          "result": "I am trying the same approach again.",
+          "usage": {
+            "input_tokens": 0,
+            "output_tokens": 0
+          }
+        }
+      ],
+      "timestamp": 1789135049,
       "ttl": 1800
     }
   }
