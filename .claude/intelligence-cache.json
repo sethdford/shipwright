@@ -32,7 +32,7 @@
       "result": {
         "raw_response": "Mock claude response"
       },
-      "timestamp": 1789133484,
+      "timestamp": 1789137126,
       "ttl": 3600
     },
     "efd5524ad1244fd20344bf3ff5d95233": {
@@ -1626,33 +1626,33 @@
       "result": {
         "results": [
           {
-            "file": "failures.json",
+            "file": "retry-outcomes.json",
             "relevance": 95,
-            "summary": "11 documented test failure patterns with root causes and fixes. Directly applicable to build stage since most failures occur in test phase; patterns include missing schema fields (intent-analysis), stale locks (e2e-integration), and flaky suites"
+            "summary": "Shows build_failure class with model_escalation recovery strategy achieving 100% success rate (5/5 attempts) — directly applicable to build stage error handling and retry strategy"
           },
           {
             "file": "success-patterns.json",
             "relevance": 85,
-            "summary": "2 previous success patterns showing working approaches, iterations, files changed, and test strategy. Build stage can apply same loop iteration counts and file patterns from successful runs"
+            "summary": "Contains two successful build patterns with detailed approach chains, iteration counts, duration, files changed, and cost metrics — provides concrete patterns for what works during build execution"
+          },
+          {
+            "file": "patterns.json",
+            "relevance": 80,
+            "summary": "Defines project conventions (node/vitest/npm/commonjs) and environment baseline that directly impact build stage execution and test runner behavior"
           },
           {
             "file": "metrics.json",
-            "relevance": 80,
-            "summary": "Baseline metrics: build_duration_s (3526s) and test_duration_s (1163s). Provides performance expectations and timeout/deadline context for build stage decisions"
+            "relevance": 70,
+            "summary": "Provides build_duration_s baseline (3526s) and test_duration_s (1163s) for performance expectations during build stage execution"
           },
           {
             "file": "knowledge.json",
-            "relevance": 75,
-            "summary": "5 failure entries with specific error signatures (mktemp paths, cleanup output format, regression detection JSON) and proven fixes. Build stage can avoid these known issues proactively"
-          },
-          {
-            "file": "retry-outcomes.json",
-            "relevance": 70,
-            "summary": "Shows model_escalation retry strategy for build_failure class with 100% success rate (5/5). If build fails, this escalation approach has validated track record"
+            "relevance": 45,
+            "summary": "Contains failure patterns including mktemp test environment setup issues and cleanup detection — relevant for build-stage test environment reliability but mostly test-stage focused"
           }
         ]
       },
-      "timestamp": 1789134631,
+      "timestamp": 1789137026,
       "ttl": 1800
     },
     "4a972b1550f67326738f55769401d8bc": {
@@ -2087,6 +2087,55 @@
         }
       ],
       "timestamp": 1789136751,
+      "ttl": 1800
+    },
+    "1f026aae4dcc27d5b2122f0a9c80a267": {
+      "result": {
+        "raw_response": "Mock claude: ok"
+      },
+      "timestamp": 1789136922,
+      "ttl": 1800
+    },
+    "38ac5c11f5cb5f1615c3514693c8e46f": {
+      "result": {
+        "raw_response": "Mock claude: ok"
+      },
+      "timestamp": 1789137075,
+      "ttl": 1800
+    },
+    "30af4ab428a2aca1411747fab4a984ae": {
+      "result": [
+        {
+          "type": "result",
+          "result": "I am trying the same approach again.",
+          "usage": {
+            "input_tokens": 0,
+            "output_tokens": 0
+          }
+        }
+      ],
+      "timestamp": 1789137171,
+      "ttl": 1800
+    },
+    "344ed387124f950bac722cc44f0621c2": {
+      "result": {
+        "raw_response": "Mock claude: ok"
+      },
+      "timestamp": 1789137251,
+      "ttl": 1800
+    },
+    "d79f34c85385de4bac6d0ae8335756fc": {
+      "result": [
+        {
+          "type": "result",
+          "result": "I am trying the same approach again.",
+          "usage": {
+            "input_tokens": 0,
+            "output_tokens": 0
+          }
+        }
+      ],
+      "timestamp": 1789137347,
       "ttl": 1800
     }
   }
