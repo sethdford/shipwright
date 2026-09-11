@@ -32,15 +32,13 @@
       "result": {
         "primary_role": "builder",
         "secondary_roles": [
-          "tester",
-          "reviewer"
+          "architect",
+          "tester"
         ],
-        "confidence": 0.95,
-        "reasoning": "Bug fix requiring debugging JSON parsing logic, implementing improved error messaging, and testing edge cases (object vs array output). Builder handles implementation; tester validates the fix; reviewer ensures accuracy.",
-        "new_role_needed": false,
-        "suggested_role": null
+        "confidence": 0.85,
+        "reasoning": "Implement failure signature detection and model/effort escalation logic for daemon retries, with architectural validation and test coverage"
       },
-      "timestamp": 1775316059,
+      "timestamp": 1789129349,
       "ttl": 3600
     },
     "efd5524ad1244fd20344bf3ff5d95233": {
@@ -1401,6 +1399,309 @@
       },
       "timestamp": 1775344537,
       "ttl": 3600
+    },
+    "029e9d48081ac19f27d877fda21e4707": {
+      "result": {
+        "complexity": 6,
+        "risk_level": "medium",
+        "success_probability": 78,
+        "recommended_template": "standard",
+        "issue_type": "infrastructure",
+        "key_risks": [
+          "Over-aggressive signature matching creates false positive escalations",
+          "Escalation logic exhausts hard_restart_cap before resolving the underlying issue",
+          "Aggressive model tier escalation exhausts daily budget on problematic builds",
+          "Error signature normalization misses error type variations or message permutations",
+          "Regression in daemon retry behavior affects existing issue processing"
+        ],
+        "implementation_hints": [
+          "Normalize failure signatures to (file, line, error_class, message_pattern) tuple for comparison",
+          "Store previous attempt's failure signature in pipeline-state.md for cross-attempt access",
+          "Escalate model to model_routing.high_risk when same signature appears twice consecutively",
+          "Escalate effort level by exactly one step (low→medium, medium→high, high→xhigh, xhigh→max)",
+          "Guard escalation with restart_count < hard_restart_cap to prevent infinite loops",
+          "Emit escalation event to events.jsonl with matched_signature, attempt_count, and new_model",
+          "Unit tests must cover: different signatures (no escalation), 2x identical (escalation triggered), hard_restart_cap boundary",
+          "Use existing error-log.jsonl schema for reference; consider caching signatures in memory during retry sequence"
+        ]
+      },
+      "timestamp": 1789128730,
+      "ttl": 3600
+    },
+    "e62964f2837ca4897a0d778b64cebc41": {
+      "result": {
+        "estimated_iterations": 6
+      },
+      "timestamp": 1789128738,
+      "ttl": 1800
+    },
+    "babb60d16e8d6bdee428a10cf578de46": {
+      "result": {
+        "estimated_cost_usd": 4.75,
+        "estimated_iterations": 3,
+        "estimated_tokens": 128000,
+        "likely_failure_stage": "test",
+        "confidence": 72,
+        "breakdown": {
+          "plan": {
+            "cost_usd": 0.35,
+            "tokens": 15000
+          },
+          "build_iter_1": {
+            "cost_usd": 1.45,
+            "tokens": 38000
+          },
+          "build_iter_2": {
+            "cost_usd": 1.20,
+            "tokens": 32000
+          },
+          "build_iter_3": {
+            "cost_usd": 0.85,
+            "tokens": 22000
+          },
+          "review": {
+            "cost_usd": 0.65,
+            "tokens": 17000
+          },
+          "test_execution": {
+            "cost_usd": 0.25,
+            "tokens": 4000
+          }
+        },
+        "risk_factors": [
+          "Signature matching edge cases (permutations, normalization) likely to cause test failures",
+          "Hard restart cap boundary testing complex; off-by-one errors probable",
+          "Model/effort escalation logic interacts with budget constraints (may cascade failures)",
+          "Daemon regression testing difficult without full integration suite"
+        ],
+        "success_factors": [
+          "Clear implementation hints provided reduce design iteration risk",
+          "Existing error-log.jsonl schema simplifies reference implementation",
+          "Unit test focus areas well-defined (different signatures, 2x identical, boundary cases)"
+        ]
+      },
+      "timestamp": 1789128751,
+      "ttl": 3600
+    },
+    "d265a1e083f1d114257a69ef0fd5ae9a": {
+      "result": {
+        "results": [
+          {
+            "file": "failures.json (second entry - comprehensive failure log)",
+            "relevance": 92,
+            "summary": "Contains extensive tracking of repeated failure signatures with seen_count fields (66, 15, 9, etc.), root causes, fixes, and categories. Directly models how to identify and escalate repeated identical failure patterns. Includes examples like 'This error has occurred 19 times. The previous approach is not working. Try a FUNDAMENTALLY DIFFERENT approach' — core escalation logic."
+          },
+          {
+            "file": "retry-outcomes.json",
+            "relevance": 90,
+            "summary": "Demonstrates model_escalation strategy for build_failures with 5 attempts achieving 100% success rate. Directly shows the retry/escalation outcome tracking structure needed for the feature, including success metrics and strategy classification."
+          },
+          {
+            "file": "success-patterns.json (second entry - auth feature)",
+            "relevance": 68,
+            "summary": "Shows complex pattern with 3 iterations, multiple file changes, and detailed approach tracking. Relevant for understanding what successful patterns look like when escalation/retries occur, and how to capture reusable patterns across similar issues."
+          },
+          {
+            "file": "success-patterns.json (first entry - fix bug)",
+            "relevance": 65,
+            "summary": "Demonstrates pattern capture with iteration tracking (3 iterations), cost data, and file change signatures. Provides template for storing patterns that succeeded through multiple retries, useful for future daemon escalation decisions."
+          },
+          {
+            "file": "issues.json",
+            "relevance": 52,
+            "summary": "Shows daemon retry scenario (timeout bug fix in sw-daemon.sh) with success outcome and gotcha tracking ('check backoff'). Relevant for understanding retry patterns specific to daemon operations that would benefit from escalation."
+          }
+        ]
+      },
+      "timestamp": 1789128911,
+      "ttl": 1800
+    },
+    "14a918a110faf4d59523fe1c15e3b5b2": {
+      "result": {
+        "results": [
+          {
+            "file": "retry-outcomes.json",
+            "relevance": 95,
+            "summary": "Direct evidence that model_escalation strategy has been implemented and is successful (5/5 successes on build_failure class). Demonstrates the exact retry mechanism the feature aims to improve."
+          },
+          {
+            "file": "failures.json (large detailed patterns)",
+            "relevance": 78,
+            "summary": "Contains 11+ detailed failure patterns with signatures, root causes, and fixes tracked over time. Critical for understanding how repeated identical failure signatures are currently captured and handled before escalation."
+          },
+          {
+            "file": "success-patterns.json (comprehensive 2026-06-21)",
+            "relevance": 68,
+            "summary": "Shows successful resolution patterns from past issues including iterations needed, cost, and approach. Provides baseline for evaluating when model/effort escalation should be triggered vs standard retry."
+          }
+        ]
+      },
+      "timestamp": 1789129108,
+      "ttl": 1800
+    },
+    "18c9bb5a31e6d4e6e1496b2ecbf0a461": {
+      "result": {
+        "results": [
+          {
+            "file": "retry-outcomes.json",
+            "relevance": 95,
+            "summary": "Directly tracks model_escalation strategy outcomes for build_failure class with 100% success rate across 5 attempts. Core data for the escalation feature."
+          },
+          {
+            "file": "failures.json (detailed version)",
+            "relevance": 88,
+            "summary": "Tracks repeated failure signatures with seen_count (up to 66 occurrences), root causes, and categories. Essential for identifying patterns that trigger escalation."
+          },
+          {
+            "file": "retry-strategies.json",
+            "relevance": 80,
+            "summary": "Schema for storing retry strategies by failure class. Currently empty but defines the intended structure for strategy configuration during escalation."
+          },
+          {
+            "file": "success-patterns.json (sethdford/shipwright)",
+            "relevance": 75,
+            "summary": "Tracks successful patterns with iterations needed, approach variations, and cost. Useful for comparing what model/effort combinations worked for similar failures."
+          },
+          {
+            "file": "knowledge.json",
+            "relevance": 70,
+            "summary": "Contains failure signatures with occurrence metrics, fix strategies, and success rates. Provides historical context for designing escalation thresholds."
+          }
+        ]
+      },
+      "timestamp": 1789129148,
+      "ttl": 1800
+    },
+    "798c7fc253f18baba647d849398ce60f": {
+      "result": {
+        "results": [
+          {
+            "file": "retry-outcomes.json",
+            "relevance": 98,
+            "summary": "Directly demonstrates model_escalation strategy for build_failure class with 100% success rate (5/5). Shows the exact pattern being designed: detecting failure classes and escalating model effort on retries."
+          },
+          {
+            "file": "failures.json (comprehensive version with 11+ entries)",
+            "relevance": 88,
+            "summary": "Contains repeated failure signatures with seen_count field (e.g., 'cannot read property' seen 66 times, sw-intent-analysis-test failures repeated 9+ times). Shows what repeated identical failures look like in practice and their root causes."
+          },
+          {
+            "file": "knowledge.json",
+            "relevance": 75,
+            "summary": "Tracks failure patterns with error signatures, occurrence counts, and fix strategies. Provides historical data on which failures repeat and how they were successfully resolved, informing decisions about when/how to escalate."
+          }
+        ]
+      },
+      "timestamp": 1789129164,
+      "ttl": 1800
+    },
+    "cf24a41a368c98f1b0e1e793d163cc56": {
+      "result": {
+        "results": [
+          {
+            "file": "retry-outcomes.json",
+            "relevance": 95,
+            "summary": "Directly tracks model_escalation strategy for build_failure class with 5 attempts achieving 100% success rate. Core data structure for retry escalation outcomes."
+          },
+          {
+            "file": "failures.json",
+            "relevance": 90,
+            "summary": "Extensive failure pattern log with seen_count tracking (up to 66 repetitions) and root causes. Documents the repeated identical failure signatures that trigger escalation logic."
+          },
+          {
+            "file": "issues.json",
+            "relevance": 65,
+            "summary": "Real daemon issues with success outcomes and gotchas. Shows how failure patterns from issues map to solutions, providing context for daemon retry handling."
+          },
+          {
+            "file": "knowledge.json",
+            "relevance": 60,
+            "summary": "KB entries document test failures with error signatures and fix strategies. Provides historical failure documentation relevant to identifying repeated patterns."
+          },
+          {
+            "file": "success-patterns.json",
+            "relevance": 55,
+            "summary": "First pattern shows timeout bug requiring 3 iterations. Demonstrates multi-iteration resolution that mirrors escalation behavior on repeated failures."
+          }
+        ]
+      },
+      "timestamp": 1789129318,
+      "ttl": 1800
+    },
+    "47c1451f50b4a8f9faa0f8012f6b922e": {
+      "result": {
+        "results": [
+          {
+            "file": "retry-outcomes.json",
+            "relevance": 95,
+            "summary": "Shows model_escalation strategy with 100% success rate (5/5) on build_failure class. Directly relevant to the pipeline goal of escalating model/effort on repeated identical failures."
+          },
+          {
+            "file": "success-patterns.json",
+            "relevance": 85,
+            "summary": "Contains documented successful build patterns with iteration counts (3-4), durations, files changed, and approaches. Provides reference for effective build strategies and complexity handling."
+          },
+          {
+            "file": "metrics.json",
+            "relevance": 75,
+            "summary": "Contains build_duration_s baseline (3526s). Essential for understanding build performance expectations and detecting when iterations exceed normal time budgets."
+          },
+          {
+            "file": "patterns.json",
+            "relevance": 70,
+            "summary": "Project metadata (node, vitest, javascript, commonjs imports, src/ convention). Provides essential context about test_runner and build environment during build stage execution."
+          },
+          {
+            "file": "failures.json",
+            "relevance": 60,
+            "summary": "Documents build loop iteration patterns, stall detection, and error handling. Mostly test stage failures but includes insights on loop behavior, circuit breaker logic, and context exhaustion handling."
+          }
+        ]
+      },
+      "timestamp": 1789129336,
+      "ttl": 1800
+    },
+    "4a972b1550f67326738f55769401d8bc": {
+      "result": {
+        "raw_response": "Mock claude: ok"
+      },
+      "timestamp": 1789129784,
+      "ttl": 1800
+    },
+    "5a13936cb5991f1ef12fe87135046595": {
+      "result": [
+        {
+          "type": "result",
+          "result": "I am trying the same approach again.",
+          "usage": {
+            "input_tokens": 0,
+            "output_tokens": 0
+          }
+        }
+      ],
+      "timestamp": 1789130017,
+      "ttl": 1800
+    },
+    "79b0acc02216ff60df3e1f7924a7f8f9": {
+      "result": {
+        "raw_response": "Mock claude: ok"
+      },
+      "timestamp": 1789130457,
+      "ttl": 1800
+    },
+    "a4bc6d5fcd768d33900340a2de6fa27f": {
+      "result": [
+        {
+          "type": "result",
+          "result": "I am trying the same approach again.",
+          "usage": {
+            "input_tokens": 0,
+            "output_tokens": 0
+          }
+        }
+      ],
+      "timestamp": 1789130690,
+      "ttl": 1800
     }
   }
 }
