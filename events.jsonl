@@ -376,3 +376,6 @@
 {"ts":"2026-09-11T15:05:20Z","type":"adaptive_model.recorded","iteration":"0","model":"opus","test_result":"pass","reason":"first_iteration","escalated":"false","downgraded":"false"}
 {"ts":"2026-09-11T15:05:20Z","type":"adaptive_model.recorded","iteration":"1","model":"opus","test_result":"fail","reason":"already_at_maximum_model","escalated":"false","downgraded":"false"}
 {"ts":"2026-09-11T15:05:20Z","type":"adaptive_model.learned","escalation_rate":"0","downgrade_rate":"0"}
+{"ts":"2026-09-11T16:05:26Z","ts_epoch":1789142726,"type":"hygiene_platform_refactor","hardcoded":49,"fallback":69,"todo":51}
+{"ts":"2026-09-11T16:05:48Z","ts_epoch":1789142748,"type":"strategic.issue_created","title":"`shipwright dora` flags stages with change-failure-rate above the STRATEGY.md target","priority":"P0","complexity":"fast"}
+{"ts":"2026-09-11T16:05:48Z","ts_epoch":1789142748,"type":"strategic.cycle_complete","issues_created":1,"issues_skipped":2}
