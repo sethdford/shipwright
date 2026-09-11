@@ -6,7 +6,7 @@
       "root_cause": "sw-intent-analysis-test asserts analyze_intent's JSON output includes version, goal, and criteria fields, but the current schema/implementation omits one or more of them",
       "fix": "Update analyze_intent (or its schema) in sw-intent-analysis.sh to emit version, goal, and criteria fields matching the test's expected schema",
       "seen_count": 67,
-      "last_seen": "2026-09-11T15:13:20Z",
+      "last_seen": "2026-09-11T13:15:56Z",
       "category": "test_failure"
     },
     {
@@ -157,29 +157,38 @@
     {
       "stage": "test",
       "pattern": "Results: \u001b[38;2;74;222;128m\u001b[1m123 PASS\u001b[0m | \u001b[38;2;248;113;113m\u001b[1m5 FAIL\u001b[0m",
-      "root_cause": "e2e-integration-test failed on a stale pipeline lock (pipeline-4769 already running) and intent-analysis-test's generated JSON is missing required schema fields (version, goal, criteria)",
-      "fix": "Clear/reset the leftover pipeline lock before the e2e-integration suite runs and update analyze_intent's prompt/schema validation to always emit version, goal, and criteria fields",
+      "root_cause": "sw-e2e-integration-test hit a stale pipeline lock (pipeline-4755 already running) and sw-intent-analysis-test's analyze_intent output is missing required schema fields (version, goal, criteria)",
+      "fix": "clear stale pipeline lock before e2e-integration test run and update analyze_intent to emit version/goal/criteria fields matching the schema",
       "seen_count": 1,
       "last_seen": "2026-09-07T03:33:29Z",
       "category": "test_failure"
     },
     {
       "stage": "test",
-      "pattern": "Results: \u001b[38;2;74;222;128m\u001b[1m122 PASS\u001b[0m | \u001b[38;2;248;113;113m\u001b[1m6 FAIL\u001b[0m",
-      "root_cause": "sw-pipeline.sh's plan stage no longer writes .claude/pipeline-artifacts/plan.md, cascading failures into review, resume, e2e, and cleanup tests that depend on it",
-      "fix": "restore plan stage output to write plan.md (and review stage to write review.md) at the expected artifact paths before marking the stage complete",
+      "pattern": "\u001b[38;2;74;222;128m✓\u001b[0m auditor invocation failure emits loop.audit_unavailable",
+      "root_cause": "sw-pipeline-test.sh assumes pipeline artifacts (plan.md, review.md) persist across the test/E2E flow, but a prior fix (0499af75/7578f584) changed artifact write timing or paths for the acceptance-criteria/plan/review stages, so downstream stages and resume/cleanup checks now find them missing",
+      "fix": "verify the plan and review stage functions in sw-pipeline.sh write to .claude/pipeline-artifacts/plan.md and review.md before marking those stages complete, and update sw-pipeline-test.sh mocks/assertions if the artifact path or format intentionally changed",
       "seen_count": 1,
-      "last_seen": "2026-09-11T16:02:15Z",
+      "last_seen": "2026-09-11T14:00:05Z",
       "category": "test_failure"
     },
     {
       "stage": "test",
-      "pattern": "⚠ Attempt 1/2 failed (exit 1), retrying in 1s...",
-      "root_cause": "sw-e2e-integration-test timed out at 301s and sw-intent-analysis-test/sw-lib-helpers-test exited 1, likely due to a hung external call or unmocked dependency plus a genuine assertion failure",
-      "fix": "Investigate sw-intent-analysis-test and sw-lib-helpers-test failure output directly and add/adjust a timeout or mock for the blocking call in sw-e2e-integration-test",
+      "pattern": "\u001b[1m  Error Handling\u001b[0m",
+      "root_cause": "No actual test failure occurred; all 161 suites passed, but the pipeline flagged the stage as failed based on matching the string 'Error Handling' which appears as a benign section header in test output",
+      "fix": "Refine the failure-detection pattern to require an actual failure indicator (e.g. non-zero exit code or 'FAIL'/'failed' count > 0) instead of matching substrings like 'Error Handling' that appear in passing test output",
       "seen_count": 1,
-      "last_seen": "2026-09-11T17:07:03Z",
-      "category": "test_failure"
+      "last_seen": "2026-09-11T15:00:56Z",
+      "category": "flaky"
+    },
+    {
+      "stage": "test",
+      "pattern": "161 passed  0 failed  0 timed out  (161 suites, 599s)",
+      "root_cause": "No actual test failure occurred; all 161 suites passed",
+      "fix": "Re-check the failure classifier — this log shows a clean pass and should not have been flagged as a pipeline failure",
+      "seen_count": 1,
+      "last_seen": "2026-09-11T15:57:05Z",
+      "category": "unknown"
     }
   ]
 }
