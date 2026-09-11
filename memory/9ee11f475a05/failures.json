@@ -5,8 +5,8 @@
       "pattern": "\u001b[38;2;74;222;128m\u001b[1m✓\u001b[0m reveal shows 1/3 pass count on failure",
       "root_cause": "sw-intent-analysis-test asserts analyze_intent's JSON output includes version, goal, and criteria fields, but the current schema/implementation omits one or more of them",
       "fix": "Update analyze_intent (or its schema) in sw-intent-analysis.sh to emit version, goal, and criteria fields matching the test's expected schema",
-      "seen_count": 64,
-      "last_seen": "2026-09-11T08:11:24Z",
+      "seen_count": 65,
+      "last_seen": "2026-09-11T09:07:55Z",
       "category": "test_failure"
     },
     {
@@ -14,8 +14,8 @@
       "pattern": "\u001b[2m  loop behavior: iterations on test failure\u001b[0m",
       "root_cause": "Test suite itself passed (all PASS, 0 FAIL) but the pipeline stage was flagged for iterating due to loop-behavior/RL logging noise being misread as failure signal",
       "fix": "Verify the actual test exit code rather than log content matching; ensure sw-autoresearch-e2e-test.sh output doesn't trigger false-positive failure pattern matching in the pipeline's error classifier",
-      "seen_count": 17,
-      "last_seen": "2026-09-11T06:23:21Z",
+      "seen_count": 15,
+      "last_seen": "2026-09-11T01:07:52Z",
       "category": "flaky"
     },
     {
@@ -60,8 +60,8 @@
       "pattern": "Results: \u001b[38;2;74;222;128m\u001b[1m124 PASS\u001b[0m | \u001b[38;2;248;113;113m\u001b[1m4 FAIL\u001b[0m",
       "root_cause": "4 of 128 tests failed but the failing assertions are not present in the captured log excerpt (only passing output shown)",
       "fix": "Re-run with full output or grep for FAIL/✗ lines to identify which suite and assertion regressed before attempting a code fix",
-      "seen_count": 1,
-      "last_seen": "2026-09-03T10:38:19Z",
+      "seen_count": 2,
+      "last_seen": "2026-09-11T08:18:06Z",
       "category": "test_failure"
     },
     {
@@ -157,28 +157,19 @@
     {
       "stage": "test",
       "pattern": "Results: \u001b[38;2;74;222;128m\u001b[1m123 PASS\u001b[0m | \u001b[38;2;248;113;113m\u001b[1m5 FAIL\u001b[0m",
-      "root_cause": "sw-e2e-integration-test and sw-intent-analysis-test failed (exit 1), likely due to missing/misconfigured Claude API credentials or intent-classification assertions drifting from expected output",
-      "fix": "Run the two failing suites in isolation with verbose output to capture the assertion diff, then fix the underlying test or code regression",
+      "root_cause": "e2e-integration-test hit a stale pipeline lock from a concurrent/leftover run, and self-optimize-test's memory-promotion step passes malformed/empty data to `jq --argjson`, while intent-analysis-test's schema check expects version/goal/criteria fields the generator doesn't emit",
+      "fix": "clear stale pipeline locks before e2e-integration-test runs (or use --worktree isolation), guard the `jq --argjson` call in sw-self-optimize.sh with valid-JSON validation before use, and update analyze_intent's output schema to include version/goal/criteria",
       "seen_count": 1,
       "last_seen": "2026-09-07T03:33:29Z",
       "category": "test_failure"
     },
     {
       "stage": "test",
-      "pattern": "FAIL: 0",
-      "root_cause": "sw-cost-test.sh seeds a cost entry timestamped outside the dashboard's 30-day lookback window, so the CONTEXT EFFICIENCY section renders 'No cost entries' instead of the expected event data",
-      "fix": "Update the test fixture to write cost/context_efficiency entries with a current timestamp (or extend the dashboard's lookback window) so the seeded entry falls within the 30-day range checked by sw-cost.sh",
+      "pattern": "\u001b[38;2;248;113;113m\u001b[1m1 of 90 tests failed\u001b[0m",
+      "root_cause": "One test failed elsewhere in the suite (not shown in this truncated log excerpt, which only captures fully-passing suites); the actual assertion diff is outside the last 200 lines shown",
+      "fix": "Re-run with full output (e.g. `npm test -- --reporter=verbose` or grep the full log for 'FAIL:' lines >0) to locate and inspect the specific failing assertion before patching",
       "seen_count": 1,
-      "last_seen": "2026-09-11T01:42:28Z",
-      "category": "test_failure"
-    },
-    {
-      "stage": "test",
-      "pattern": "Results: \u001b[38;2;74;222;128m\u001b[1m125 PASS\u001b[0m | \u001b[38;2;248;113;113m\u001b[1m3 FAIL\u001b[0m",
-      "root_cause": "sw-intent-analysis-test exited 1 (unrelated to the e2e-integration timeout, likely an assertion mismatch in intent-analysis scoring/output), while sw-e2e-integration-test hit the 300s job timeout waiting on a real external call",
-      "fix": "Fix or update the failing assertion(s) in scripts/sw-intent-analysis-test.sh, and split sw-e2e-integration-test into its own longer-timeout/opt-in job or mock its external dependency",
-      "seen_count": 1,
-      "last_seen": "2026-09-11T07:31:17Z",
+      "last_seen": "2026-09-11T06:01:49Z",
       "category": "test_failure"
     }
   ]
