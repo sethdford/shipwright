@@ -5,8 +5,8 @@
       "pattern": "\u001b[38;2;74;222;128m\u001b[1m✓\u001b[0m reveal shows 1/3 pass count on failure",
       "root_cause": "sw-intent-analysis-test asserts analyze_intent's JSON output includes version, goal, and criteria fields, but the current schema/implementation omits one or more of them",
       "fix": "Update analyze_intent (or its schema) in sw-intent-analysis.sh to emit version, goal, and criteria fields matching the test's expected schema",
-      "seen_count": 65,
-      "last_seen": "2026-09-11T09:44:06Z",
+      "seen_count": 66,
+      "last_seen": "2026-09-11T10:16:26Z",
       "category": "test_failure"
     },
     {
@@ -15,7 +15,7 @@
       "root_cause": "Test suite itself passed (all PASS, 0 FAIL) but the pipeline stage was flagged for iterating due to loop-behavior/RL logging noise being misread as failure signal",
       "fix": "Verify the actual test exit code rather than log content matching; ensure sw-autoresearch-e2e-test.sh output doesn't trigger false-positive failure pattern matching in the pipeline's error classifier",
       "seen_count": 15,
-      "last_seen": "2026-09-11T01:07:52Z",
+      "last_seen": "2026-09-11T04:20:29Z",
       "category": "flaky"
     },
     {
@@ -24,7 +24,7 @@
       "root_cause": "sw-intent-analysis-test fails because analyze_intent's generated JSON omits required fields (version, goal, criteria); sw-e2e-integration-test fails as a side effect of a stale pipeline lock (pipeline-3749) left running from a prior test run, not a new regression",
       "fix": "add the missing version/goal/criteria fields to the intent-analysis JSON schema/generator, and clear/reset stale pipeline locks (or run `shipwright pipeline abort`) before the e2e-integration test suite starts",
       "seen_count": 9,
-      "last_seen": "2026-09-11T08:19:00Z",
+      "last_seen": "2026-09-11T03:09:53Z",
       "category": "test_failure"
     },
     {
@@ -60,8 +60,8 @@
       "pattern": "Results: \u001b[38;2;74;222;128m\u001b[1m124 PASS\u001b[0m | \u001b[38;2;248;113;113m\u001b[1m4 FAIL\u001b[0m",
       "root_cause": "4 of 128 tests failed but the failing assertions are not present in the captured log excerpt (only passing output shown)",
       "fix": "Re-run with full output or grep for FAIL/✗ lines to identify which suite and assertion regressed before attempting a code fix",
-      "seen_count": 2,
-      "last_seen": "2026-09-11T09:04:04Z",
+      "seen_count": 1,
+      "last_seen": "2026-09-03T10:38:19Z",
       "category": "test_failure"
     },
     {
@@ -114,8 +114,8 @@
       "pattern": "\u001b[38;2;0;212;255m▸\u001b[0m Patrol recurring failures label construction... \u001b[38;2;74;222;128m✓\u001b[0m",
       "root_cause": "sw-e2e-integration-test failed because a stale pipeline lock (pipeline-4253) was already held from a prior run, blocking the fast pipeline test; sw-intent-analysis-test failed because analyze_intent's generated JSON is missing required schema fields (version, goal, criteria)",
       "fix": "Clear/release stale pipeline locks before the e2e-integration test runs (or have it auto-abort orphaned locks), and update analyze_intent to always populate version, goal, and criteria in its output schema",
-      "seen_count": 2,
-      "last_seen": "2026-09-05T17:44:35Z",
+      "seen_count": 3,
+      "last_seen": "2026-09-11T00:16:36Z",
       "category": "test_failure"
     },
     {
@@ -157,20 +157,11 @@
     {
       "stage": "test",
       "pattern": "Results: \u001b[38;2;74;222;128m\u001b[1m123 PASS\u001b[0m | \u001b[38;2;248;113;113m\u001b[1m5 FAIL\u001b[0m",
-      "root_cause": "e2e-integration-test hit a stale pipeline lock from a concurrent/leftover run, and self-optimize-test's memory-promotion step passes malformed/empty data to `jq --argjson`, while intent-analysis-test's schema check expects version/goal/criteria fields the generator doesn't emit",
-      "fix": "clear stale pipeline locks before e2e-integration-test runs (or use --worktree isolation), guard the `jq --argjson` call in sw-self-optimize.sh with valid-JSON validation before use, and update analyze_intent's output schema to include version/goal/criteria",
+      "root_cause": "5 test failures reported in the summary line are not visible in the truncated log, which only shows the full 161-suite run passing cleanly — the actual failing suite output was cut off before this log window",
+      "fix": "Re-run the test stage and capture the untruncated failure output (specific suite names/assertions) before attempting a code fix",
       "seen_count": 1,
       "last_seen": "2026-09-07T03:33:29Z",
-      "category": "test_failure"
-    },
-    {
-      "stage": "test",
-      "pattern": "\u001b[38;2;248;113;113m\u001b[1m1 of 90 tests failed\u001b[0m",
-      "root_cause": "Cross-repo memory promotion test likely asserts on a fixed pattern/repo-hash path or count that drifted from actual sw-self-optimize.sh promotion logic (e.g. filtering or confidence threshold mismatch)",
-      "fix": "Inspect scripts/sw-self-optimize-test.sh 'Memory promotion copies cross-repo patterns' assertion and compare against the promote function's actual filter/threshold in scripts/sw-self-optimize.sh, then align the test fixture or the implementation",
-      "seen_count": 1,
-      "last_seen": "2026-09-11T06:01:49Z",
-      "category": "test_failure"
+      "category": "unknown"
     }
   ]
 }
