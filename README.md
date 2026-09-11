@@ -1,4 +1,4 @@
-<!-- E2E test: automated comment added by shipwright pipeline (issue #4763) -->
+<!-- E2E test: automated comment added by shipwright pipeline (issue #4765) -->
 <p align="center">
   <img src="website/src/assets/logo-dark.svg" alt="Shipwright" width="200">
 </p>
