@@ -1,5 +1,4 @@
 {
-  "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://shipwright.dev/schemas/specification.json",
   "title": "Shipwright Specification",
   "description": "Structured specification for agent-driven development. Captures intent, constraints, and acceptance criteria so agents work from specs, not just natural language issues.",

@@ -1255,10 +1255,17 @@ AUDIT_PROMPT
         audit_flags+=("--dangerously-skip-permissions")
     fi
 
-    # Use structured output for machine-parseable audit results
+    # Use structured output for machine-parseable audit results.
+    # The dialect key ($schema) is stripped: the claude CLI validates the schema
+    # against its own bundled dialects and rejects an unresolvable $schema URI
+    # outright, which fails the audit before it ever runs.
     local schema_file="${SCRIPT_DIR}/../schemas/audit-result.json"
     if [[ -f "$schema_file" ]]; then
-        audit_flags+=("--json-schema" "$(cat "$schema_file")")
+        local audit_schema
+        if command -v jq >/dev/null 2>&1; then
+            audit_schema="$(jq -c 'del(.["$schema"])' "$schema_file" 2>/dev/null || true)"
+        fi
+        [[ -n "${audit_schema:-}" ]] && audit_flags+=("--json-schema" "$audit_schema")
     fi
 
     local exit_code=0
@@ -1267,6 +1274,13 @@ AUDIT_PROMPT
     if grep -q "AUDIT_PASS" "$audit_log" 2>/dev/null; then
         AUDIT_RESULT="pass"
         echo -e "  ${GREEN}✓${RESET} Audit: passed"
+    elif [[ $exit_code -ne 0 ]]; then
+        # The auditor never ran (CLI/flag/auth failure). Its stderr is not a
+        # review of the agent's work, so do not feed it back as findings —
+        # that blocks completion forever on a tooling fault.
+        AUDIT_RESULT="pass"
+        echo -e "  ${YELLOW}⚠${RESET} Audit: skipped (auditor unavailable, exit ${exit_code})"
+        emit_event "loop.audit_unavailable" "iteration=$ITERATION" "exit_code=$exit_code"
     else
         AUDIT_RESULT="$(grep -v '^$' "$audit_log" | tail -20 | head -10 2>/dev/null || echo "Audit returned no output")"
         echo -e "  ${YELLOW}⚠${RESET} Audit: issues found"

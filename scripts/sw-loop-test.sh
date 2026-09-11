@@ -903,6 +903,56 @@ else
 fi
 
 # ═══════════════════════════════════════════════════════════════════════════════
+# AUDIT SCHEMA TESTS
+# ═══════════════════════════════════════════════════════════════════════════════
+echo ""
+echo -e "${DIM}  audit output schema${RESET}"
+
+# Test: no schema passed to `claude --json-schema` carries a dialect key.
+# The CLI resolves $schema against its bundled dialects and rejects an
+# unresolvable URI, which kills the audit before it runs.
+schema_dialect_offenders=""
+for _schema in "$SCRIPT_DIR/../schemas"/*.json; do
+    [[ -f "$_schema" ]] || continue
+    if jq -e 'has("$schema")' "$_schema" >/dev/null 2>&1; then
+        schema_dialect_offenders="$schema_dialect_offenders $(basename "$_schema")"
+    fi
+done
+if [[ -z "$schema_dialect_offenders" ]]; then
+    assert_pass "no schema declares an unresolvable \$schema dialect"
+else
+    assert_fail "no schema declares an unresolvable \$schema dialect (offenders:$schema_dialect_offenders)"
+fi
+
+# Test: every schema is still valid JSON with a type
+schema_invalid=""
+for _schema in "$SCRIPT_DIR/../schemas"/*.json; do
+    [[ -f "$_schema" ]] || continue
+    if ! jq -e '.type != null' "$_schema" >/dev/null 2>&1; then
+        schema_invalid="$schema_invalid $(basename "$_schema")"
+    fi
+done
+if [[ -z "$schema_invalid" ]]; then
+    assert_pass "every schema is valid JSON declaring a type"
+else
+    assert_fail "every schema is valid JSON declaring a type (bad:$schema_invalid)"
+fi
+
+# Test: run_audit_agent strips the dialect key defensively before passing it on
+if grep -q "jq -c 'del(.\[\"\$schema\"\])'" "$SCRIPT_DIR/sw-loop.sh"; then
+    assert_pass "run_audit_agent strips \$schema before --json-schema"
+else
+    assert_fail "run_audit_agent strips \$schema before --json-schema"
+fi
+
+# Test: an auditor that fails to run is not reported as audit findings
+if grep -q 'loop.audit_unavailable' "$SCRIPT_DIR/sw-loop.sh"; then
+    assert_pass "auditor invocation failure emits loop.audit_unavailable"
+else
+    assert_fail "auditor invocation failure emits loop.audit_unavailable"
+fi
+
+# ═══════════════════════════════════════════════════════════════════════════════
 # RESULTS
 # ═══════════════════════════════════════════════════════════════════════════════
 
