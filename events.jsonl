@@ -387,3 +387,7 @@
 {"ts":"2026-09-11T10:35:28Z","ts_epoch":1789122928,"type":"reasoning.trace","job_id":"pipeline-1597611-42","complexity":"medium","risk":50,"template":"standard"}
 {"ts":"2026-09-11T10:35:29Z","ts_epoch":1789122929,"type":"reasoning.trace","job_id":"pipeline-1598297-42","complexity":"medium","risk":50,"template":"standard"}
 {"ts":"2026-09-11T10:35:30Z","ts_epoch":1789122930,"type":"reasoning.trace","job_id":"pipeline-1598983-42","complexity":"medium","risk":50,"template":"standard"}
+{"ts":"2026-09-11T12:07:49Z","ts_epoch":1789128469,"type":"hygiene_platform_refactor","hardcoded":49,"fallback":69,"todo":51}
+{"ts":"2026-09-11T12:08:30Z","ts_epoch":1789128510,"type":"strategic.issue_created","title":"Escalate model/effort on repeated identical failure signatures during daemon retries","priority":"P0","complexity":"standard"}
+{"ts":"2026-09-11T12:08:35Z","ts_epoch":1789128515,"type":"strategic.issue_created","title":"Add cost-per-issue and pipeline-duration trend charts to `shipwright dora`","priority":"P4","complexity":"standard"}
+{"ts":"2026-09-11T12:08:35Z","ts_epoch":1789128515,"type":"strategic.cycle_complete","issues_created":2,"issues_skipped":1}
