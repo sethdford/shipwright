@@ -32,6 +32,21 @@ if ! gh auth status &>/dev/null 2>&1; then
     echo -e "${YELLOW}⚠ Skipping integration tests: gh not authenticated${RESET}"
     exit 0
 fi
+# This suite drives the real pipeline in this repo and its cleanup removes
+# .claude/pipeline-state.md and .claude/pipeline-artifacts/. Running it while a
+# pipeline holds that state both fails (the pipeline refuses to start twice) and
+# destroys the live run's artifacts, so stand down instead.
+_e2e_state_file="$REPO_DIR/.claude/pipeline-state.md"
+if [[ -f "$_e2e_state_file" ]]; then
+    _e2e_status=$(sed -n 's/^status: *//p' "$_e2e_state_file" | head -1)
+    case "$_e2e_status" in
+        running | paused | interrupted)
+            echo -e "${YELLOW}⚠ Skipping integration tests: a pipeline is already in progress (status: $_e2e_status)${RESET}"
+            echo "This suite needs exclusive use of .claude/pipeline-state.md"
+            exit 0
+            ;;
+    esac
+fi
 
 # ─── Configuration ────────────────────────────────────────────────────────
 MAX_BUDGET_USD="1.00"
