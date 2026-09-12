@@ -1616,33 +1616,33 @@
       "result": {
         "results": [
           {
-            "file": "retry-outcomes.json",
-            "relevance": 90,
-            "summary": "Shows build_failure class with model_escalation strategy at 100% success rate (5/5). Direct guidance for handling build failures during this stage."
-          },
-          {
-            "file": "metrics.json",
-            "relevance": 85,
-            "summary": "Contains baseline build_duration_s of 7095s. Critical for understanding expected build performance and timeout thresholds for the autonomous pipeline."
-          },
-          {
             "file": "success-patterns.json",
-            "relevance": 78,
-            "summary": "Shows successful build approaches with iteration counts, durations, and cost data. Provides patterns for how builds complete in 3-4 iterations using standard template."
+            "relevance": 95,
+            "summary": "Contains successful build approaches with iteration counts, file patterns, test strategies, and cost metrics. Directly informs current build strategy and helps avoid past mistakes."
           },
           {
             "file": "patterns.json",
-            "relevance": 72,
-            "summary": "Project metadata (Node, vitest, npm, commonjs). Essential context for understanding the build environment and test strategy this stage will transition to."
+            "relevance": 88,
+            "summary": "Project metadata (node, vitest, commonjs) and build conventions. Essential context for understanding the build environment and test runner configuration."
+          },
+          {
+            "file": "metrics.json",
+            "relevance": 82,
+            "summary": "Build and test duration baselines (7095s build, 1459s test). Critical for understanding performance expectations and detecting regressions in build pipeline."
           },
           {
             "file": "knowledge.json",
+            "relevance": 70,
+            "summary": "Learned failure patterns including mktemp setup issues and test environment pitfalls. Helps avoid build setup failures and test infrastructure problems."
+          },
+          {
+            "file": "failures.json",
             "relevance": 65,
-            "summary": "Contains mktemp failures and test setup issues that affect the downstream test stage. Relevant for understanding potential build→test transition blockers."
+            "summary": "Recent test stage failures with root causes and fixes (missing schema fields, stale locks, flaky tests). Informs test failure detection and recovery strategies."
           }
         ]
       },
-      "timestamp": 1789237042,
+      "timestamp": 1789239209,
       "ttl": 1800
     },
     "48fc285a5067c1f36a2a78b5e90391af": {
@@ -1854,6 +1854,27 @@
         }
       ],
       "timestamp": 1789238862,
+      "ttl": 1800
+    },
+    "25d270f81a71c99ca08bea5a49dd9e45": {
+      "result": {
+        "raw_response": "Mock claude: ok"
+      },
+      "timestamp": 1789239296,
+      "ttl": 1800
+    },
+    "6f577d22bad8c1e5e5100398d5edd6f6": {
+      "result": [
+        {
+          "type": "result",
+          "result": "I am trying the same approach again.",
+          "usage": {
+            "input_tokens": 0,
+            "output_tokens": 0
+          }
+        }
+      ],
+      "timestamp": 1789239535,
       "ttl": 1800
     }
   }
