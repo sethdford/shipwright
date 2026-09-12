@@ -5,12 +5,11 @@
       "pattern": "\u001b[38;2;74;222;128m\u001b[1m✓\u001b[0m reveal shows 1/3 pass count on failure",
       "root_cause": "sw-intent-analysis-test asserts analyze_intent's JSON output includes version, goal, and criteria fields, but the current schema/implementation omits one or more of them",
       "fix": "Update analyze_intent (or its schema) in sw-intent-analysis.sh to emit version, goal, and criteria fields matching the test's expected schema",
-      "seen_count": 73,
-      "last_seen": "2026-09-12T05:18:58Z",
+      "seen_count": 72,
+      "last_seen": "2026-09-12T03:00:46Z",
       "category": "test_failure",
-      "signature_hash": "5e5d801bf8cace4d",
-      "signature": "✓ reveal shows <n><path> pass count on failure",
-      "schema_version": 2
+      "signature_hash": "e1a285258fe63781b7370b0d086ad87b",
+      "signature": "\u001b[<n>;2;<n>;<n>;<n>m\u001b[1m✓\u001b[0m reveal shows <path> pass count on failure"
     },
     {
       "stage": "test",
@@ -18,11 +17,10 @@
       "root_cause": "Test suite itself passed (all PASS, 0 FAIL) but the pipeline stage was flagged for iterating due to loop-behavior/RL logging noise being misread as failure signal",
       "fix": "Verify the actual test exit code rather than log content matching; ensure sw-autoresearch-e2e-test.sh output doesn't trigger false-positive failure pattern matching in the pipeline's error classifier",
       "seen_count": 18,
-      "last_seen": "2026-09-12T04:36:51Z",
+      "last_seen": "2026-09-12T04:36:59Z",
       "category": "flaky",
-      "signature_hash": "2828e65a36cd7381",
-      "signature": "loop behavior: iterations on test failure",
-      "schema_version": 2
+      "signature_hash": "579381c41e2fb77269fb772481550f1d",
+      "signature": "\u001b[2m loop behavior: iterations on test failure\u001b[0m"
     },
     {
       "stage": "test",
@@ -225,8 +223,8 @@
     {
       "stage": "test",
       "pattern": "Results: \u001b[38;2;74;222;128m\u001b[1m125 PASS\u001b[0m | \u001b[38;2;248;113;113m\u001b[1m3 FAIL\u001b[0m",
-      "root_cause": "sw-pipeline-test.sh plan stage no longer writes .claude/pipeline-artifacts/plan.md (and review stage similarly no longer writes review.md), breaking downstream tests that depend on those artifacts",
-      "fix": "restore plan.md/review.md artifact generation in the plan and review pipeline stages (or update tests if the artifact path/name intentionally changed)",
+      "root_cause": "sw-cost-test.sh asserts non-empty cost dashboard output but the test's mock costs.json entries aren't within the dashboard's 30-day lookback window, so it reports 'No cost entries'",
+      "fix": "Ensure test fixtures write cost entries with timestamps within the dashboard's lookback window (or make the mock clock match entry dates) so CONTEXT EFFICIENCY section renders",
       "seen_count": 1,
       "last_seen": "2026-09-11T17:54:27Z",
       "category": "test_failure",
