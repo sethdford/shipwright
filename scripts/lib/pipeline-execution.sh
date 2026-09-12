@@ -36,6 +36,13 @@ elif [[ -f "$SCRIPT_DIR/lib/pipeline-intelligence-skip.sh" ]]; then
     source "$SCRIPT_DIR/lib/pipeline-intelligence-skip.sh" 2>/dev/null || true
 fi
 
+# Ensure adaptive timeout module is loaded (provides timeout_record, timeout_for_attempt)
+if [[ -f "$SCRIPT_DIR/adaptive-timeout.sh" ]]; then
+    source "$SCRIPT_DIR/adaptive-timeout.sh" 2>/dev/null || true
+elif [[ -f "$SCRIPT_DIR/lib/adaptive-timeout.sh" ]]; then
+    source "$SCRIPT_DIR/lib/adaptive-timeout.sh" 2>/dev/null || true
+fi
+
 # ─── Stage Execution with Retry Logic ──────────────────────────────
 run_stage_with_retry() {
     local stage_id="$1"
@@ -793,6 +800,10 @@ run_pipeline() {
             timing=$(get_stage_timing "$id")
             stage_dur_s=$(( $(now_epoch) - stage_start_epoch ))
             success "Stage ${BOLD}$id${RESET} complete ${DIM}(${timing})${RESET}"
+            # Record stage duration for adaptive timeout tuning
+            if type timeout_record >/dev/null 2>&1; then
+                timeout_record "$id" "$stage_dur_s" "${PIPELINE_TEMPLATE:-standard}" "${ISSUE_COMPLEXITY:-medium}" "success" 2>/dev/null || true
+            fi
             emit_event "stage.completed" "issue=${ISSUE_NUMBER:-0}" "stage=$id" "duration_s=$stage_dur_s" "result=success"
             # Audit: stage complete
             if type audit_emit >/dev/null 2>&1; then
@@ -826,6 +837,15 @@ run_pipeline() {
             local stage_dur_s
             stage_dur_s=$(( $(now_epoch) - stage_start_epoch ))
             error "Pipeline failed at stage: ${BOLD}$id${RESET}"
+            # Record stage duration, tagging timeouts/infrastructure failures separately
+            if type timeout_record >/dev/null 2>&1; then
+                local result_type="failure"
+                # Map error class to result type: infrastructure errors get "timeout", others get "failure"
+                if [[ "${LAST_STAGE_ERROR_CLASS:-unknown}" == "infrastructure" ]]; then
+                    result_type="timeout"
+                fi
+                timeout_record "$id" "$stage_dur_s" "${PIPELINE_TEMPLATE:-standard}" "${ISSUE_COMPLEXITY:-medium}" "$result_type" 2>/dev/null || true
+            fi
             update_status "failed" "$id"
             emit_event "stage.failed" \
                 "issue=${ISSUE_NUMBER:-0}" \
