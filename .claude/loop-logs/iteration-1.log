@@ -1,1 +1,17 @@
+Done — committed `fa5754b1`.
+
+**What changed:** appended `<!-- E2E test marker: automated pipeline verification (issue #4944) -->` to the end of `README.md`. That is the whole of the stated goal.
+
+**Verification run:**
+- `sw version check` → consistent at 3.3.0
+- `sw docs check` → 5 fresh / 1 stale; the stale section (`.claude/CLAUDE.md#test-suites`, line counts) was already stale before this change and is unrelated to README
+- `scripts/sw-docs-test.sh` → 18 passed, 0 failed
+
+I did not run the full 125-suite `npm test` — a README HTML comment cannot affect shell suite behavior, and the docs suite is the one that actually reads README/doc markers. Flagging that explicitly rather than claiming a green full run.
+
+**Testing-strategy sections (required by the active skill):**
+1. **Test Pyramid Breakdown** — skipped as not applicable: this change adds no code paths, so no new unit/integration/E2E tests are warranted. The change *is* the payload of an existing E2E pipeline test; test coverage for it lives in the pipeline harness, not in a new suite.
+2. **Coverage Targets** — skipped: no executable lines or branches added. Existing coverage is unaffected.
+3. **Critical Paths to Test** — skipped for new tests; the one path exercised (docs parsing still works with an HTML comment present in README) is covered by `sw-docs-test.sh`, which passed.
+
 LOOP_COMPLETE

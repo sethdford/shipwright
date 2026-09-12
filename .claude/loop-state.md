@@ -1,45 +1,10 @@
 ---
-goal: "Add a pipeline-stage timeout escalation policy driven by historical stage duration, not fixed constants
+goal: "E2E test: add comment to README [automated]
 
-## Plan Summary
-Plan written to `.claude/pipeline-artifacts/plan.md` (466 lines).
-
-## The key finding that reshaped this plan
-
-**`scripts/lib/adaptive-timeout.sh` already implements the entire p95 engine — and it is dead code.** `scripts/sw-pipeline.sh:46` sources it, but `timeout_get`/`timeout_record` have *no callers outside the test file*. Its 26 tests pass (I ran them: 26/0) against a library nothing uses. Meanwhile `run_stage_with_retry` (`scripts/lib/pipeline-execution.sh:40`) calls `"stage_${stage_id}"` bare — **the pipeline enforces no stage timeout at all**, and retries reuse the identical budget, so a timeout retry times out identically.
-
-So the goal is ~90% wiring, 10% new policy. The genuinely new part is the escalation ladder.
-
-I also found three defects worth fixing in the same change:
-
-- **`TIMEOUT_HISTORY_LOOKBACK` is a no-op.** `timeout_calculate_p95` (line 209) greps the *whole* history; only the never-executed awk fallback applies the window. Ancient durations skew p95 forever. Subtlety: since `timeout_record` prepends newest-first, the fix is `head`, not `tail`.
-- **`timeout_record` is O(n) per call** — rewrites up to 10 000 entries on every stage completion.
-- **An orphaned consumer.** `get_adaptive_heartbeat_timeout` (`daemon-adaptive.sh:114`) reads `stage-durations.**json**` (aggregate p90) — **nothing writes that file**, so the daemon's per-stage heartbeat silently falls back to constants. Writing the aggregate fixes that for free.
-
-## Design decision worth flagging
-
-I rejected the obvious approach of wrapping stages in `timeout(1)`: stage functions mutate parent-shell state the pipeline depends on (`set_stage_status`, `LAST_STAGE_ERROR_CLASS`, `completed`), so a subshell would corrupt the state file mid-run. Instead the budget is *injected* — `sw-loop.sh:461` already honours `CLAUDE_TIMEOUT` as an env override, and `loop-iteration.sh:635` wraps the real `claude` call in it, so setting it from the adaptive budget bounds the actual cost centre without touching stage control flow. A pure-bash watchdog adds the hard backstop (also covering the case where `_timeout` silently degrades to a no-op on hosts lacking `timeout`/`gtimeout`).
-
-The most critical failure mode is a **self-reinforcing ratchet**: budget → timeout → recorded as a duration → higher p95 → higher budget, pinning everything at the 7200s ceiling. It's silent — it looks like normal cost drift, not a bug. Addressed structurally by tagging rows with `result` and excluding timeout-killed samples from p95, sequenced as a prerequisite so recording can't land before the guard.
-[... full plan in .claude/pipeline-artifacts/plan.md]
-
-## Key Design Decisions
-# ADR: Pipeline-Stage Timeout Escalation Policy Driven by Historical Duration
-## Context
-## Decision
-### Data Flow
-### Component Decomposition
-## Interface Contracts
-### Timeout History & Analytics
-### Escalation Engine
-### Budget Enforcement
-### Pipeline Integration
-[... full design in .claude/pipeline-artifacts/design.md]
-
-## Specification: Add a pipeline-stage timeout escalation policy driven by historical stage duration, not fixed constants
+## Specification: E2E test: add comment to README [automated]
 
 ### Goals
-- Add a pipeline-stage timeout escalation policy driven by historical stage duration, not fixed constants
+- E2E test: add comment to README [automated]
 
 ### Acceptance Criteria
 - [testable] All existing tests continue to pass
@@ -48,36 +13,39 @@ Historical context (lessons from previous pipelines):
 {
   "results": [
     {
-      "file": "success-patterns.json (first entry)",
+      "file": "failures.json (comprehensive with test-stage patterns)",
+      "relevance": 95,
+      "summary": "Contains 9 documented test-stage failures including e2e-integration-test, sw-loop-test, and sw-intent-analysis-test with root causes and fixes. Directly applicable to E2E testing; failures include stale locks, timeout issues, and schema mismatches."
+    },
+    {
+      "file": "patterns.json",
       "relevance": 85,
-      "summary": "Contains a prior successful 'Fix timeout' pattern with approach 'Add handler v2' applied to scripts/sw-daemon.sh; directly relevant to implementing timeout escalation logic in the daemon"
+      "summary": "Project metadata shows node/vitest/npm/JavaScript setup. Critical for understanding how tests are run in build stage and expected test patterns."
     },
     {
-      "file": "issues.json",
-      "relevance": 80,
-      "summary": "Tracks successful timeout bug fix in sw-daemon.sh and daemon-dispatch.sh using 'added semaphore' approach; provides proven implementation pattern for timeout handling"
-    },
-    {
-      "file": "metrics.json",
-      "relevance": 75,
-      "summary": "Contains historical baseline durations (build_duration_s: 7095, test_duration_s: 1459) essential for driving the escalation policy with actual stage performance data"
-    },
-    {
-      "file": "failures.json (second entry)",
-      "relevance": 60,
-      "summary": "Contains timeout-related test failures including sw-e2e-integration-test hang at 301s timeout; provides edge cases and failure modes for timeout escalation validation"
+      "file": "success-patterns.json (detailed patterns with iterations)",
+      "relevance": 82,
+      "summary": "Contains 2 documented successful builds with 3-4 iterations, test strategies, duration (45-150s), and file change patterns. Shows iterative build approach and cost tracking (~$2.50) relevant to current pipeline execution."
     },
     {
       "file": "retry-outcomes.json",
-      "relevance": 55,
-      "summary": "Shows successful model escalation retry strategy with 100% success rate; demonstrates escalation pattern approach applicable to timeout escalation policy design"
+      "relevance": 70,
+      "summary": "Shows build_failure recovery with model escalation strategy achieving 100% success rate over 5 attempts. Demonstrates effective error recovery pattern for build stage."
+    },
+    {
+      "file": "metrics.json",
+      "relevance": 65,
+      "summary": "Provides baseline expectations: build_duration_s=7095s, test_duration_s=1459s. Useful for understanding expected timing and detecting anomalies in current build execution."
     }
   ]
 }
 
 Discoveries from other pipelines:
-✓ Injected 1 new discoveries
+✓ Injected 4 new discoveries
+[spec_generation] Stage spec_generation completed — Resolution: 
 [design] Design completed for Add a pipeline-stage timeout escalation policy driven by historical stage duration, not fixed constants — Resolution: 
+[intake] Stage intake completed — Resolution: 
+[spec_generation] Stage spec_generation completed — Resolution: 
 
 Task tracking (check off items as you complete them):
 # Pipeline Tasks — Add a pipeline-stage timeout escalation policy driven by historical stage duration, not fixed constants
@@ -108,21 +76,74 @@ Task tracking (check off items as you complete them):
 - Pipeline: autonomous
 - Branch: ci/issue-4854
 - Issue: none
-- Generated: 2026-09-12T18:14:04Z"
+- Generated: 2026-09-12T18:14:04Z
+
+## Skill Guidance (testing issue, AI-selected)
+### Why these skills were selected (AI-analyzed):
+- **testing-strategy**: E2E tests need consistent patterns for setup/execution/teardown and must be designed to catch regressions, not just exercise happy paths
+
+## Testing Strategy Expertise
+
+Apply these testing patterns:
+
+### Test Pyramid
+- **Unit tests** (70%): Test individual functions/methods in isolation
+- **Integration tests** (20%): Test component interactions and boundaries
+- **E2E tests** (10%): Test critical user flows end-to-end
+
+### What to Test
+- Happy path: the expected successful flow
+- Error cases: what happens when things go wrong?
+- Edge cases: empty inputs, maximum values, concurrent access
+- Boundary conditions: off-by-one, empty collections, null/undefined
+
+### Test Quality
+- Each test should verify ONE behavior
+- Test names should describe the expected behavior, not the implementation
+- Tests should be independent — no shared mutable state between tests
+- Tests should be deterministic — same result every run
+
+### Coverage Strategy
+- Aim for meaningful coverage, not 100% line coverage
+- Focus coverage on business logic and error handling
+- Don't test framework code or simple getters/setters
+- Cover the branches, not just the lines
+
+### Mocking Guidelines
+- Mock external dependencies (APIs, databases, file system)
+- Don't mock the code under test
+- Use realistic test data — edge cases reveal bugs
+- Verify mock interactions when the side effect IS the behavior
+
+### Regression Testing
+- Write a failing test FIRST that reproduces the bug
+- Then fix the bug and verify the test passes
+- Keep regression tests — they prevent the bug from recurring
+
+### Required Output (Mandatory)
+
+Your output MUST include these sections when this skill is active:
+
+1. **Test Pyramid Breakdown**: Explicit count of unit/integration/E2E tests and their coverage targets (e.g., "70 unit tests covering business logic, 12 integration tests for API boundaries, 3 E2E tests for critical paths")
+2. **Coverage Targets**: Target coverage percentage per layer and which critical paths MUST be tested
+3. **Critical Paths to Test**: Specific test cases for the happy path, 2+ error cases, and 2+ edge cases
+
+If any section is not applicable, explicitly state why it's skipped.
+"
 iteration: 0
-max_iterations: 20
+max_iterations: 3
 status: running
 test_cmd: "npm test"
-model: haiku
+model: opus
 agents: 1
-started_at: 2026-09-12T18:17:35Z
-last_iteration_at: 2026-09-12T18:17:35Z
+started_at: 2026-09-12T18:40:48Z
+last_iteration_at: 2026-09-12T18:40:48Z
 consecutive_failures: 0
 total_commits: 0
 audit_enabled: true
 audit_agent_enabled: true
 quality_gates_enabled: true
-dod_file: "/home/runner/work/shipwright/shipwright/.claude/pipeline-artifacts/dod.md"
+dod_file: ""
 auto_extend: true
 extension_count: 0
 max_extensions: 3
