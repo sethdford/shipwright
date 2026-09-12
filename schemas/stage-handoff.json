@@ -1,4 +1,5 @@
 {
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
   "title": "Pipeline Stage Handoff",
   "type": "object",
   "required": ["from_stage", "to_stage", "summary"],

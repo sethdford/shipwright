@@ -248,7 +248,7 @@ timeout_sample_count() {
     [[ ! -f "$TIMEOUT_HISTORY_FILE" ]] && echo "0" && return 0
 
     # Count lines where .stage == arg1
-    grep -c "\"stage\":\"$stage\"" "$TIMEOUT_HISTORY_FILE" 2>/dev/null || echo "0"
+    grep -c "\"stage\":\"$stage\"" "$TIMEOUT_HISTORY_FILE" 2>/dev/null | xargs || echo "0"
 }
 
 # timeout_calculate_p95(stage) — Calculate P95 duration from historical data.
