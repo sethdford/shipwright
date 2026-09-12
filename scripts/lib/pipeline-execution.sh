@@ -147,6 +147,22 @@ run_stage_with_retry() {
         info "Backing off ${total_sleep}s before retry..."
         sleep "$total_sleep"
 
+        # Escalate timeout on infrastructure failures (timeouts, network, OOM)
+        # Only escalate for retryable error classes
+        if [[ "$error_class" == "infrastructure" ]] && type timeout_for_attempt >/dev/null 2>&1; then
+            local escalated_timeout
+            escalated_timeout=$(timeout_for_attempt "$stage_id" "$((attempt + 1))" 2>/dev/null) || escalated_timeout=""
+            if [[ -n "$escalated_timeout" && "$escalated_timeout" -gt 0 ]]; then
+                export CLAUDE_TIMEOUT="$escalated_timeout"
+                info "Escalating timeout for $stage_id: attempt $((attempt + 1)) → ${escalated_timeout}s"
+                emit_event "timeout.escalated" \
+                    "issue=${ISSUE_NUMBER:-0}" \
+                    "stage=$stage_id" \
+                    "attempt=$((attempt + 1))" \
+                    "timeout_s=$escalated_timeout"
+            fi
+        fi
+
         # Write debugging context for the retry attempt to consume
         local _retry_ctx_file="${ARTIFACTS_DIR}/.retry-context-${stage_id}.md"
         {
