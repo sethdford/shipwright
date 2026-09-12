@@ -370,6 +370,109 @@ test_recording_with_metadata() {
     fi
 }
 
+test_lookback_window() {
+    TEST_NAME="test_lookback_window"
+    timeout_reset
+
+    # Insert 150 values, way beyond TIMEOUT_HISTORY_LOOKBACK (100)
+    for i in {1..150}; do
+        timeout_record "build" "$((i * 10))" "standard" "medium"
+    done
+
+    # P95 should be calculated from only the last 100 entries (newest-first)
+    # Latest entries are: 1500, 1490, 1480, ..., 1010 (100 entries)
+    # P95 of last 100 should be around 1510 (high values dominate)
+    local p95
+    p95=$(timeout_calculate_p95 "build")
+    local sample_count
+    sample_count=$(timeout_sample_count "build")
+
+    if [[ "$sample_count" -eq 150 ]]; then
+        success "$TEST_NAME: Total samples recorded ($sample_count)"
+        PASS=$((PASS + 1))
+    else
+        error "$TEST_NAME: Expected 150 samples, got $sample_count"
+        FAIL=$((FAIL + 1))
+    fi
+
+    # P95 should not be from the earliest entries (small numbers)
+    if [[ "$p95" -gt 1200 ]]; then
+        success "$TEST_NAME: P95 respects lookback window (got $p95, expected >1200)"
+        PASS=$((PASS + 1))
+    else
+        error "$TEST_NAME: P95 doesn't respect lookback (got $p95, expected >1200)"
+        FAIL=$((FAIL + 1))
+    fi
+}
+
+test_timeout_result_filtering() {
+    TEST_NAME="test_timeout_result_filtering"
+    timeout_reset
+
+    # Insert mixed success and timeout results
+    # Success durations: 100, 200, 300, 400, 500 (should dominate p95)
+    timeout_record "build" "100" "standard" "medium" "success"
+    timeout_record "build" "200" "standard" "medium" "success"
+    timeout_record "build" "300" "standard" "medium" "success"
+    timeout_record "build" "400" "standard" "medium" "success"
+    timeout_record "build" "500" "standard" "medium" "success"
+
+    # Timeout results: 7200 (should be excluded from p95)
+    timeout_record "build" "7200" "standard" "medium" "timeout"
+    timeout_record "build" "7200" "standard" "medium" "timeout"
+    timeout_record "build" "7200" "standard" "medium" "timeout"
+
+    # P95 should be around 500 (from successes), NOT 7200 (from timeouts)
+    local p95
+    p95=$(timeout_calculate_p95 "build")
+
+    if [[ "$p95" -le 500 && "$p95" -gt 0 ]]; then
+        success "$TEST_NAME: P95 excludes timeout results (got $p95, expected ≤500)"
+        PASS=$((PASS + 1))
+    else
+        error "$TEST_NAME: P95 incorrectly includes timeouts (got $p95, expected ≤500)"
+        FAIL=$((FAIL + 1))
+    fi
+}
+
+test_result_field_in_jsonl() {
+    TEST_NAME="test_result_field_in_jsonl"
+    timeout_reset
+
+    # Record with different result types
+    timeout_record "build" "100" "standard" "medium" "success"
+    timeout_record "build" "7200" "standard" "medium" "timeout"
+    timeout_record "build" "200" "standard" "medium" "failure"
+
+    # Verify all result types are present in JSONL
+    local recorded
+    recorded=$(cat "$TIMEOUT_HISTORY_FILE")
+
+    if printf '%s' "$recorded" | grep -q '"result":"success"'; then
+        success "$TEST_NAME: Success result recorded"
+        PASS=$((PASS + 1))
+    else
+        error "$TEST_NAME: Success result not found"
+        FAIL=$((FAIL + 1))
+    fi
+
+    if printf '%s' "$recorded" | grep -q '"result":"timeout"'; then
+        success "$TEST_NAME: Timeout result recorded"
+        PASS=$((PASS + 1))
+    else
+        error "$TEST_NAME: Timeout result not found"
+        FAIL=$((FAIL + 1))
+    fi
+
+    if printf '%s' "$recorded" | grep -q '"result":"failure"'; then
+        success "$TEST_NAME: Failure result recorded"
+        PASS=$((PASS + 1))
+    else
+        error "$TEST_NAME: Failure result not found"
+        FAIL=$((FAIL + 1))
+    fi
+}
+
 # ─── Run All Tests ──────────────────────────────────────────────────────────
 
 echo ""
@@ -388,6 +491,9 @@ test_report_output
 test_history_rotation
 test_p95_nonuniform
 test_recording_with_metadata
+test_lookback_window
+test_timeout_result_filtering
+test_result_field_in_jsonl
 
 echo "│"
 echo "╭─ Test Results ──────────────────────────────────────────────────────"

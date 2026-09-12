@@ -119,18 +119,20 @@ timeout_get() {
 
 # ─── Duration Recording ────────────────────────────────────────────────────
 
-# timeout_record(stage, duration_seconds) — Record a stage duration.
+# timeout_record(stage, duration_seconds, [pipeline_template], [complexity], [result]) — Record a stage duration.
 # Appends JSONL entry to history. Rotates file when it reaches TIMEOUT_ROTATION_ENTRIES.
 # $1: stage name
 # $2: duration in seconds
 # $3: (optional) pipeline_template (fast/standard/full/hotfix/autonomous/enterprise/cost-aware/deployed)
 # $4: (optional) complexity (simple/medium/complex/critical)
+# $5: (optional) result (success/timeout/failure) — default: success
 # Returns: 0 on success
 timeout_record() {
     local stage="${1:-unknown}"
     local duration_seconds="${2:-0}"
     local pipeline_template="${3:-standard}"
     local complexity="${4:-medium}"
+    local result="${5:-success}"
 
     # Validate inputs
     if ! [[ "$duration_seconds" =~ ^[0-9]+$ ]]; then
@@ -144,13 +146,13 @@ timeout_record() {
     # Ensure initialization
     timeout_init
 
-    # Create JSON entry
+    # Create JSON entry (include result field for exclusion filtering)
     local timestamp
     timestamp=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
 
     local entry
-    entry=$(printf '{"stage":"%s","duration_s":%d,"timestamp":"%s","pipeline_template":"%s","complexity":"%s"}\n' \
-        "$stage" "$duration_seconds" "$timestamp" "$pipeline_template" "$complexity")
+    entry=$(printf '{"stage":"%s","duration_s":%d,"timestamp":"%s","pipeline_template":"%s","complexity":"%s","result":"%s"}\n' \
+        "$stage" "$duration_seconds" "$timestamp" "$pipeline_template" "$complexity" "$result")
 
     # Atomic write (mktemp + mv pattern for safety under pipefail)
     local tmpfile
@@ -194,6 +196,7 @@ timeout_sample_count() {
 
 # timeout_calculate_p95(stage) — Calculate P95 duration from historical data.
 # Uses jq to extract durations, sort, and compute the 95th percentile.
+# Applies TIMEOUT_HISTORY_LOOKBACK to use only the N most recent samples.
 # $1: stage name
 # Returns: P95 duration in seconds (or empty string on error)
 timeout_calculate_p95() {
@@ -203,19 +206,23 @@ timeout_calculate_p95() {
 
     # Extract durations for this stage, sort, and get P95
     # P95 is the value at index (count * 0.95) rounded down
+    # Entries are prepended newest-first, so head -n gets the most recent samples
     local p95
 
     # Method 1: Pure jq with proper slurping of each JSON object's duration_s field
+    # Apply lookback window with head (newest-first ordering)
+    # Exclude timeout-killed runs (result != "timeout") from p95 calculation
     p95=$(grep "\"stage\":\"$stage\"" "$TIMEOUT_HISTORY_FILE" 2>/dev/null | \
-        jq -s 'map(.duration_s) | sort |
+        head -n "$TIMEOUT_HISTORY_LOOKBACK" | \
+        jq -s 'map(select(.result != "timeout" or .result == null) | .duration_s) | sort |
                 (length * 0.95 | floor) as $idx |
                 if .[$idx] then .[$idx] else empty end' 2>/dev/null) || p95=""
 
     # Fallback: if jq pipeline fails, try awk approach
     if [[ -z "$p95" ]]; then
         p95=$(grep "\"stage\":\"$stage\"" "$TIMEOUT_HISTORY_FILE" 2>/dev/null | \
-            tail -n "$TIMEOUT_HISTORY_LOOKBACK" | \
-            jq -r '.duration_s' 2>/dev/null | \
+            head -n "$TIMEOUT_HISTORY_LOOKBACK" | \
+            jq -r 'select(.result != "timeout" or .result == null) | .duration_s' 2>/dev/null | \
             awk '{arr[NR]=$1} END {
                 count=length(arr);
                 if (count==0) exit 1;
@@ -261,10 +268,10 @@ timeout_report() {
             # Calculate P50 and P95
             local p50 p95 adaptive_timeout
 
-            # P50 (median)
+            # P50 (median), excluding timeout-killed runs
             p50=$(grep "\"stage\":\"$stage\"" "$TIMEOUT_HISTORY_FILE" 2>/dev/null | \
-                jq -r '.duration_s' 2>/dev/null | \
-                jq -nR -s '[inputs | tonumber] | sort |
+                head -n "$TIMEOUT_HISTORY_LOOKBACK" | \
+                jq -s 'map(select(.result != "timeout" or .result == null) | .duration_s) | sort |
                            (length * 0.5 | floor) as $idx |
                            if .[$idx] then .[$idx] else empty end' 2>/dev/null)
             p50="${p50:-—}"

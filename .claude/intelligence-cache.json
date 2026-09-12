@@ -30,17 +30,17 @@
     },
     "d41d8cd98f00b204e9800998ecf8427e": {
       "result": {
-        "primary_role": "builder",
+        "primary_role": "architect",
         "secondary_roles": [
-          "tester",
-          "reviewer"
+          "builder",
+          "optimizer"
         ],
-        "confidence": 0.95,
-        "reasoning": "Bug fix requiring debugging JSON parsing logic, implementing improved error messaging, and testing edge cases (object vs array output). Builder handles implementation; tester validates the fix; reviewer ensures accuracy.",
+        "confidence": 0.85,
+        "reasoning": "Requires system design for policy architecture, implementation of the escalation logic, and data-driven optimization based on historical stage duration patterns.",
         "new_role_needed": false,
         "suggested_role": null
       },
-      "timestamp": 1775316059,
+      "timestamp": 1789237053,
       "ttl": 3600
     },
     "efd5524ad1244fd20344bf3ff5d95233": {
@@ -1401,6 +1401,249 @@
       },
       "timestamp": 1775344537,
       "ttl": 3600
+    },
+    "bc8e2190963ec54caa701e95b88f40d9": {
+      "result": {
+        "complexity": 5,
+        "risk_level": "medium",
+        "success_probability": 75,
+        "recommended_template": "standard",
+        "issue_type": "infrastructure",
+        "key_risks": [
+          "Incorrect statistical calculations could produce timeouts that are too tight (killing legitimate builds) or too loose (wasting MTTR)",
+          "Insufficient historical data during initial deployment could lead to poor timeout decisions before enough samples exist",
+          "Configuration validation gaps (e.g., floor > ceiling) could cause runtime failures",
+          "Inefficient events.jsonl reads on every stage timeout computation could create pipeline latency",
+          "Edge case handling: empty history, malformed event data, or missing stage keys in config"
+        ],
+        "implementation_hints": [
+          "Start with jq-based filtering of events.jsonl by stage name and status=success to extract historical durations",
+          "Compute rolling median (using sorted array logic) and stddev as: timeout = median + 2*stddev, then clamp(timeout, floor, ceiling)",
+          "Add validation in daemon-config.json schema to enforce floor <= ceiling and reasonable bounds (e.g., 30s–3600s)",
+          "Cache computed timeouts per stage to avoid repeated file reads during a pipeline run",
+          "Add unit tests with mock events.jsonl containing various scenarios: no history, N samples, outliers, all failures",
+          "Integration point: identify where static timeouts live in sw-loop.sh/sw-pipeline.sh and inject the adaptive lookup there",
+          "Include telemetry logging so operators see computed timeout, sample count, and fallback reason in pipeline output",
+          "Consider time decay: weight recent samples (e.g., last 30 days) more heavily than older data to adapt to repo changes"
+        ]
+      },
+      "timestamp": 1789236493,
+      "ttl": 3600
+    },
+    "8e41722801c8512f7333aeab92a3362b": {
+      "result": {
+        "estimated_iterations": 8
+      },
+      "timestamp": 1789236505,
+      "ttl": 1800
+    },
+    "30e49811172856bf7e3b6ed8266d2a3c": {
+      "result": {
+        "estimated_cost_usd": 22.50,
+        "estimated_iterations": 2,
+        "estimated_tokens": 285000,
+        "likely_failure_stage": "test",
+        "confidence": 78,
+        "cost_breakdown": {
+          "intake": 0.30,
+          "plan": 2.50,
+          "build_iteration_1": 4.50,
+          "build_iteration_2": 4.00,
+          "test": 2.50,
+          "review": 5.00,
+          "pr_merge": 0.70,
+          "contingency": 3.00
+        },
+        "token_distribution": {
+          "plan_design": 50000,
+          "build_iter_1": 70000,
+          "build_iter_2": 65000,
+          "test": 35000,
+          "review": 50000,
+          "pr_merge": 15000
+        },
+        "rationale": "Medium-complexity infrastructure feature requiring statistical validation. Two build iterations expected due to event-log parsing and timeout calculation logic needing refinement. Test stage high-risk due to edge cases (empty history, malformed data, outliers). Standard template chosen to include design phase before build. 75% base success probability reflects configuration validation gaps and insufficient historical data risk."
+      },
+      "timestamp": 1789236518,
+      "ttl": 3600
+    },
+    "db4e0d0082402ab25b1619c17a917096": {
+      "result": {
+        "results": [
+          {
+            "file": "metrics.json",
+            "relevance": 95,
+            "summary": "Contains historical baseline durations (build_duration_s: 7095, test_duration_s: 1459). Essential reference data for designing stage timeout escalation policy driven by historical stage performance."
+          },
+          {
+            "file": "success-patterns.json (id: 3acfa67...)",
+            "relevance": 86,
+            "summary": "Successfully fixed timeout bug in daemon over 3 iterations (changed sw-daemon.sh, completed in ~1200s). Demonstrates working timeout handling approach and relevant precedent."
+          },
+          {
+            "file": "failures.json (detailed multi-entry)",
+            "relevance": 82,
+            "summary": "Documents timeout-related failures including e2e-integration-test hang (301s timeout) and proposes escalation solutions: 'increase per-suite timeout' and 'add internal iteration timeout/kill to loop harness'. Shows real failure patterns and proposed fixes."
+          },
+          {
+            "file": "issues.json",
+            "relevance": 74,
+            "summary": "Records daemon timeout bug with gotcha 'check backoff'. Provides context on importance of backoff mechanisms in daemon timeout handling and escalation."
+          },
+          {
+            "file": "retry-outcomes.json",
+            "relevance": 62,
+            "summary": "Shows successful escalation strategy (model_escalation: 5/5 success rate). While not directly timeout-focused, demonstrates escalation architecture pattern applicable to timeout policy design."
+          }
+        ]
+      },
+      "timestamp": 1789236572,
+      "ttl": 1800
+    },
+    "ccf24657b98eb1f94f9897927dbf2b17": {
+      "result": {
+        "results": [
+          {
+            "file": "metrics.json",
+            "relevance": 95,
+            "summary": "Contains baseline stage durations (build_duration_s: 7095s, test_duration_s: 1459s). Essential for implementing timeout escalation driven by historical stage duration rather than fixed constants."
+          },
+          {
+            "file": "issues.json",
+            "relevance": 88,
+            "summary": "Records a prior timeout bug fix in daemon with experience handling backoff and timeouts. Shows which files were involved (sw-daemon.sh, daemon-dispatch.sh) and lessons learned about timeout handling."
+          },
+          {
+            "file": "success-patterns.json (first with 'Fix timeout')",
+            "relevance": 82,
+            "summary": "Completed success pattern for a timeout fix in sw-daemon.sh requiring 3 iterations. Shows approach, files changed, completion time (1200s), and cost. Provides template for similar timeout policy work."
+          }
+        ]
+      },
+      "timestamp": 1789236860,
+      "ttl": 1800
+    },
+    "d538aa8346cf68e783d458d904c8cd6f": {
+      "result": {
+        "results": [
+          {
+            "file": "metrics.json",
+            "relevance": 85,
+            "summary": "Contains historical baseline data for build_duration_s (7095s) and test_duration_s (1459s). This is exactly the historical stage duration data the escalation policy should be based on."
+          },
+          {
+            "file": "retry-outcomes.json",
+            "relevance": 78,
+            "summary": "Demonstrates a successful escalation strategy pattern (model_escalation with 100% success rate). Directly relevant to designing an escalation policy architecture."
+          },
+          {
+            "file": "success-patterns.json (Fix timeout)",
+            "relevance": 68,
+            "summary": "Previous timeout fix in sw-daemon.sh with 3 iterations and documented approach. Shows timeout handling patterns and complexity estimates relevant to design decisions."
+          },
+          {
+            "file": "issues.json",
+            "relevance": 55,
+            "summary": "Records prior timeout bug in daemon with specific file context (sw-daemon.sh, sw-lib/daemon-dispatch.sh). Provides domain context for where escalation policies matter."
+          },
+          {
+            "file": "patterns.json",
+            "relevance": 35,
+            "summary": "Project structure metadata (node, vitest, commonjs). Provides baseline conventions but less directly relevant to timeout escalation policy design than duration data."
+          }
+        ]
+      },
+      "timestamp": 1789236912,
+      "ttl": 1800
+    },
+    "14541559a8784f21bf64a266da672e53": {
+      "result": {
+        "results": [
+          {
+            "file": "success-patterns.json",
+            "relevance": 85,
+            "summary": "Contains 'Fix timeout' pattern that modified sw-daemon.sh with iterative approach (3 iterations, 1200s completion). Shows prior timeout handling work and stage-execution logic relevant to timeout escalation."
+          },
+          {
+            "file": "issues.json",
+            "relevance": 80,
+            "summary": "Documents timeout bug fix in daemon with 'check backoff' gotcha. Directly addresses timeout handling in sw-daemon.sh and related modules for stage execution."
+          },
+          {
+            "file": "metrics.json",
+            "relevance": 75,
+            "summary": "Provides historical baseline metrics (build_duration_s: 7095, test_duration_s: 1459) that serve as the historical stage duration data needed to drive adaptive timeout escalation policy."
+          }
+        ]
+      },
+      "timestamp": 1789236925,
+      "ttl": 1800
+    },
+    "acf601a5aefae612286550f6741301db": {
+      "result": {
+        "results": [
+          {
+            "file": "success-patterns.json (first entry)",
+            "relevance": 85,
+            "summary": "Contains a prior successful 'Fix timeout' pattern with approach 'Add handler v2' applied to scripts/sw-daemon.sh; directly relevant to implementing timeout escalation logic in the daemon"
+          },
+          {
+            "file": "issues.json",
+            "relevance": 80,
+            "summary": "Tracks successful timeout bug fix in sw-daemon.sh and daemon-dispatch.sh using 'added semaphore' approach; provides proven implementation pattern for timeout handling"
+          },
+          {
+            "file": "metrics.json",
+            "relevance": 75,
+            "summary": "Contains historical baseline durations (build_duration_s: 7095, test_duration_s: 1459) essential for driving the escalation policy with actual stage performance data"
+          },
+          {
+            "file": "failures.json (second entry)",
+            "relevance": 60,
+            "summary": "Contains timeout-related test failures including sw-e2e-integration-test hang at 301s timeout; provides edge cases and failure modes for timeout escalation validation"
+          },
+          {
+            "file": "retry-outcomes.json",
+            "relevance": 55,
+            "summary": "Shows successful model escalation retry strategy with 100% success rate; demonstrates escalation pattern approach applicable to timeout escalation policy design"
+          }
+        ]
+      },
+      "timestamp": 1789237029,
+      "ttl": 1800
+    },
+    "47c1451f50b4a8f9faa0f8012f6b922e": {
+      "result": {
+        "results": [
+          {
+            "file": "retry-outcomes.json",
+            "relevance": 90,
+            "summary": "Shows build_failure class with model_escalation strategy at 100% success rate (5/5). Direct guidance for handling build failures during this stage."
+          },
+          {
+            "file": "metrics.json",
+            "relevance": 85,
+            "summary": "Contains baseline build_duration_s of 7095s. Critical for understanding expected build performance and timeout thresholds for the autonomous pipeline."
+          },
+          {
+            "file": "success-patterns.json",
+            "relevance": 78,
+            "summary": "Shows successful build approaches with iteration counts, durations, and cost data. Provides patterns for how builds complete in 3-4 iterations using standard template."
+          },
+          {
+            "file": "patterns.json",
+            "relevance": 72,
+            "summary": "Project metadata (Node, vitest, npm, commonjs). Essential context for understanding the build environment and test strategy this stage will transition to."
+          },
+          {
+            "file": "knowledge.json",
+            "relevance": 65,
+            "summary": "Contains mktemp failures and test setup issues that affect the downstream test stage. Relevant for understanding potential build→test transition blockers."
+          }
+        ]
+      },
+      "timestamp": 1789237042,
+      "ttl": 1800
     }
   }
 }
