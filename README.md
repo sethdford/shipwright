@@ -590,3 +590,5 @@ npm test    # 125 shell suites + 16 dashboard test files (141 total), E2E system
 ## License
 
 MIT — Seth Ford, 2026.
+
+<!-- E2E test marker: automated pipeline verification (issue #4944) -->
