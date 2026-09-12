@@ -5,11 +5,11 @@
       "pattern": "\u001b[38;2;74;222;128m\u001b[1m✓\u001b[0m reveal shows 1/3 pass count on failure",
       "root_cause": "sw-intent-analysis-test asserts analyze_intent's JSON output includes version, goal, and criteria fields, but the current schema/implementation omits one or more of them",
       "fix": "Update analyze_intent (or its schema) in sw-intent-analysis.sh to emit version, goal, and criteria fields matching the test's expected schema",
-      "seen_count": 75,
-      "last_seen": "2026-09-12T11:31:21Z",
+      "seen_count": 76,
+      "last_seen": "2026-09-12T11:35:31Z",
       "category": "test_failure",
       "signature_hash": "e1a285258fe63781b7370b0d086ad87b",
-      "signature": "9e76aecf167c5d22",
+      "signature": "597fcab86f71",
       "normalized": "✓ reveal shows <n>/<n> pass count on failure"
     },
     {
@@ -138,8 +138,8 @@
       "pattern": "\u001b[38;2;0;212;255m▸\u001b[0m Patrol recurring failures label construction... \u001b[38;2;74;222;128m✓\u001b[0m",
       "root_cause": "sw-e2e-integration-test failed because a stale pipeline lock (pipeline-4253) was already held from a prior run, blocking the fast pipeline test; sw-intent-analysis-test failed because analyze_intent's generated JSON is missing required schema fields (version, goal, criteria)",
       "fix": "Clear/release stale pipeline locks before the e2e-integration test runs (or have it auto-abort orphaned locks), and update analyze_intent to always populate version, goal, and criteria in its output schema",
-      "seen_count": 4,
-      "last_seen": "2026-09-12T09:20:41Z",
+      "seen_count": 3,
+      "last_seen": "2026-09-12T06:20:11Z",
       "category": "test_failure",
       "signature_hash": "06f0abb7562df2c6e4651882933d3b25",
       "signature": "8f98ec93f49d",
@@ -238,21 +238,10 @@
       "pattern": "\u001b[38;2;248;113;113m\u001b[1m1 of 77 tests failed\u001b[0m",
       "signature": "7e42ab6d7603",
       "normalized": "<n> of <n> tests failed",
-      "root_cause": "sw-pipeline-test.sh plan-stage mock fails to write plan.md, cascading failures into review, full E2E, resume, and cleanup tests plus an intelligence test with a jq numeric parse error on the reward-episode JSON",
-      "fix": "fix the plan-stage mock/function to actually create .claude/pipeline-artifacts/plan.md before dependent stages run, and sanitize the RL episode value passed to jq so it's valid JSON",
+      "root_cause": "One test assertion in the 77-test suite failed but its output was truncated from the visible log window, so the specific failing check isn't captured here",
+      "fix": "Re-run the failing suite alone with verbose output to capture the exact assertion, then fix the code or test causing the mismatch",
       "seen_count": 2,
       "last_seen": "2026-09-12T08:34:49Z",
-      "category": "test_failure"
-    },
-    {
-      "stage": "test",
-      "pattern": "\u001b[38;2;74;222;128m✓\u001b[0m Loop runs multiple iterations when tests fail initially",
-      "signature": "3b825e9820ffc4f1",
-      "normalized": "✓ loop runs multiple iterations when tests fail initially",
-      "root_cause": "Memory promotion test expects cross-repo patterns to be copied, but the promotion logic likely fails a repo-hash/path or threshold check so no pattern is copied",
-      "fix": "Inspect sw-self-optimize-test.sh assertion for 'Memory promotion copies cross-repo patterns' and the promote_memory function in sw-self-optimize.sh to fix the mismatched key/threshold causing zero patterns copied",
-      "seen_count": 1,
-      "last_seen": "2026-09-12T10:45:02Z",
       "category": "test_failure"
     }
   ]
