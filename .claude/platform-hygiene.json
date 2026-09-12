@@ -1,10 +1,10 @@
 {
-  "timestamp": "2026-09-12T18:23:05Z",
+  "timestamp": "2026-09-12T19:23:35Z",
   "repository": "shipwright",
   "counts": {
     "hardcoded": 49,
     "fallback": 70,
-    "todo": 51,
+    "todo": 52,
     "fixme": 25,
     "hack": 20
   },
@@ -28,6 +28,10 @@
     {
       "file": "scripts/sw-ci.sh",
       "line": 467
+    },
+    {
+      "file": "scripts/sw-adaptive-timeout-test.sh",
+      "line": 612
     },
     {
       "file": "scripts/sw-adversarial-review-test.sh",
@@ -183,11 +187,11 @@
     },
     {
       "file": "scripts/lib/pipeline-execution.sh",
-      "line": 233
+      "line": 249
     },
     {
       "file": "scripts/lib/pipeline-execution.sh",
-      "line": 248
+      "line": 264
     },
     {
       "file": "scripts/lib/pipeline-commands.sh",
