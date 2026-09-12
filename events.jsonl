@@ -644,3 +644,6 @@
 {"ts":"2026-09-12T19:42:47Z","type":"adaptive_model.recorded","iteration":"0","model":"opus","test_result":"pass","reason":"first_iteration","escalated":"false","downgraded":"false"}
 {"ts":"2026-09-12T19:42:47Z","type":"adaptive_model.recorded","iteration":"1","model":"opus","test_result":"fail","reason":"already_at_maximum_model","escalated":"false","downgraded":"false"}
 {"ts":"2026-09-12T19:42:47Z","type":"adaptive_model.learned","escalation_rate":"0","downgrade_rate":"0"}
+{"ts":"2026-09-12T20:04:41Z","ts_epoch":1789243481,"type":"hygiene_platform_refactor","hardcoded":49,"fallback":69,"todo":51}
+{"ts":"2026-09-12T20:05:08Z","ts_epoch":1789243508,"type":"strategic.issue_created","title":"Surface hardcoded-value refactor candidates as auto-filed hygiene issues, ranked by churn","priority":"P6","complexity":"standard"}
+{"ts":"2026-09-12T20:05:09Z","ts_epoch":1789243509,"type":"strategic.cycle_complete","issues_created":1,"issues_skipped":2}
