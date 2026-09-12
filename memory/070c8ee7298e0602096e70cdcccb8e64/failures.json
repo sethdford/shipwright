@@ -1,0 +1,34 @@
+{
+  "failures": [
+    {
+      "pattern": "timeout after 3.2s at line 42",
+      "stage": "test",
+      "timestamp": 1694500000,
+      "root_cause": "unbounded loop",
+      "fix": "add timeout wrapper",
+      "fix_applied": true,
+      "resolved": true,
+      "seen_count": 1
+    },
+    {
+      "pattern": "timeout after 2.8s at line 43",
+      "stage": "test", 
+      "timestamp": 1694500100,
+      "root_cause": "unbounded loop",
+      "fix": "add timeout wrapper",
+      "fix_applied": true,
+      "resolved": true,
+      "seen_count": 1
+    },
+    {
+      "pattern": "database connection refused",
+      "stage": "test",
+      "timestamp": 1694500200,
+      "root_cause": "db not started",
+      "fix": "start db service first",
+      "fix_applied": false,
+      "resolved": false,
+      "seen_count": 2
+    }
+  ]
+}
