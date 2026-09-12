@@ -803,6 +803,8 @@ run_pipeline() {
             # Record stage duration for adaptive timeout tuning
             if type timeout_record >/dev/null 2>&1; then
                 timeout_record "$id" "$stage_dur_s" "${PIPELINE_TEMPLATE:-standard}" "${ISSUE_COMPLEXITY:-medium}" "success" 2>/dev/null || true
+                # Update aggregate file for daemon consumption
+                type timeout_record_aggregate >/dev/null 2>&1 && timeout_record_aggregate 2>/dev/null || true
             fi
             emit_event "stage.completed" "issue=${ISSUE_NUMBER:-0}" "stage=$id" "duration_s=$stage_dur_s" "result=success"
             # Audit: stage complete
@@ -845,6 +847,8 @@ run_pipeline() {
                     result_type="timeout"
                 fi
                 timeout_record "$id" "$stage_dur_s" "${PIPELINE_TEMPLATE:-standard}" "${ISSUE_COMPLEXITY:-medium}" "$result_type" 2>/dev/null || true
+                # Update aggregate file for daemon consumption
+                type timeout_record_aggregate >/dev/null 2>&1 && timeout_record_aggregate 2>/dev/null || true
             fi
             update_status "failed" "$id"
             emit_event "stage.failed" \

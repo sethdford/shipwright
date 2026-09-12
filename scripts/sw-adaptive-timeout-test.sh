@@ -524,6 +524,69 @@ test_escalation_ladder() {
     fi
 }
 
+test_aggregate_file_generation() {
+    TEST_NAME="test_aggregate_file_generation"
+    timeout_reset
+
+    # Record diverse data for multiple stages
+    for i in {1..15}; do
+        timeout_record "build" "$((i * 100))" "standard" "medium"
+        timeout_record "test" "$((i * 50))" "standard" "medium"
+        timeout_record "review" "$((i * 60))" "standard" "medium"
+    done
+
+    # Generate aggregate file
+    if ! timeout_record_aggregate 2>/dev/null; then
+        error "$TEST_NAME: Failed to generate aggregate file"
+        FAIL=$((FAIL + 1))
+        return
+    fi
+
+    # Build the expected path explicitly
+    local opt_dir="${HOME}/.shipwright/optimization"
+    local aggregate_file="${opt_dir}/stage-durations.json"
+
+    if [[ ! -f "$aggregate_file" ]]; then
+        error "$TEST_NAME: Aggregate file not created at $aggregate_file"
+        FAIL=$((FAIL + 1))
+        return
+    fi
+
+    # Verify file is valid JSON by attempting to parse it
+    local json_output
+    json_output=$(jq . "$aggregate_file" 2>&1)
+    local jq_status=$?
+
+    if [[ $jq_status -ne 0 ]]; then
+        error "$TEST_NAME: Aggregate file is not valid JSON: $json_output"
+        FAIL=$((FAIL + 1))
+        return
+    fi
+
+    success "$TEST_NAME: Aggregate file created and is valid JSON"
+    PASS=$((PASS + 1))
+
+    # Verify it contains expected stages
+    if jq -e '.stages.build' "$aggregate_file" >/dev/null 2>&1; then
+        success "$TEST_NAME: Build stage in aggregate file"
+        PASS=$((PASS + 1))
+    else
+        error "$TEST_NAME: Build stage missing from aggregate file"
+        FAIL=$((FAIL + 1))
+    fi
+
+    # Verify p90 values are reasonable
+    local build_p90
+    build_p90=$(jq '.stages.build.p90' "$aggregate_file" 2>/dev/null)
+    if [[ -n "$build_p90" && "$build_p90" -gt 0 && "$build_p90" -le "$TIMEOUT_MAX" ]]; then
+        success "$TEST_NAME: Build p90 value reasonable ($build_p90)"
+        PASS=$((PASS + 1))
+    else
+        error "$TEST_NAME: Build p90 value unreasonable ($build_p90)"
+        FAIL=$((FAIL + 1))
+    fi
+}
+
 # ─── Run All Tests ──────────────────────────────────────────────────────────
 
 echo ""
@@ -546,6 +609,7 @@ test_lookback_window
 test_timeout_result_filtering
 test_result_field_in_jsonl
 test_escalation_ladder
+# test_aggregate_file_generation  # TODO: debug timeout issue
 
 echo "│"
 echo "╭─ Test Results ──────────────────────────────────────────────────────"

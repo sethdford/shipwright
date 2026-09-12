@@ -294,6 +294,77 @@ timeout_calculate_p95() {
     [[ -n "$p95" ]] && echo "$p95" || return 1
 }
 
+# timeout_record_aggregate() — Generate aggregate stage-durations.json for daemon consumption.
+# Writes p90 percentile for each stage to a single JSON file.
+# The daemon's heartbeat timeout uses this to adapt per-stage timeouts.
+# Returns: 0 on success
+timeout_record_aggregate() {
+    # Ensure initialization
+    timeout_init
+
+    [[ ! -f "$TIMEOUT_HISTORY_FILE" ]] && return 1
+
+    # Build JSON object with per-stage p90 values
+    local stages=(intake plan design spec_generation build test review spec_verification compound_quality pr merge deploy validate monitor)
+    local json_parts=()
+
+    for stage in "${stages[@]}"; do
+        local sample_count
+        sample_count=$(timeout_sample_count "$stage")
+
+        if [[ "$sample_count" -lt "$TIMEOUT_MIN_SAMPLES" ]]; then
+            # Not enough samples — use default
+            local default_timeout
+            default_timeout=$(_timeout_default "$stage")
+            json_parts+=("\"$stage\": {\"p90\": $default_timeout, \"samples\": $sample_count, \"using_default\": true}")
+        else
+            # Calculate P90 (similar to P95, but at 0.9 instead of 0.95)
+            local p90
+            p90=$(grep "\"stage\":\"$stage\"" "$TIMEOUT_HISTORY_FILE" 2>/dev/null | \
+                head -n "$TIMEOUT_HISTORY_LOOKBACK" | \
+                jq -s 'map(select(.result != "timeout" or .result == null) | .duration_s) | sort |
+                        (length * 0.9 | floor) as $idx |
+                        if .[$idx] then .[$idx] else empty end' 2>/dev/null) || p90=""
+
+            if [[ -z "$p90" ]]; then
+                local default_timeout
+                default_timeout=$(_timeout_default "$stage")
+                p90="$default_timeout"
+            fi
+
+            json_parts+=("\"$stage\": {\"p90\": $p90, \"samples\": $sample_count, \"using_default\": false}")
+        fi
+    done
+
+    # Write atomic JSON file
+    local aggregate_file="${HOME}/.shipwright/optimization/stage-durations.json"
+    local tmpfile
+    tmpfile=$(mktemp) || return 1
+    trap "rm -f '$tmpfile'" RETURN
+
+    # Build and write JSON
+    {
+        printf '{\n'
+        printf '  "timestamp": "%s",\n' "$(date -u +"%Y-%m-%dT%H:%M:%SZ")"
+        printf '  "lookback_samples": %d,\n' "$TIMEOUT_HISTORY_LOOKBACK"
+        printf '  "stages": {\n'
+        for i in "${!json_parts[@]}"; do
+            printf '    %s' "${json_parts[$i]}"
+            if [[ $((i + 1)) -lt ${#json_parts[@]} ]]; then
+                printf ','
+            fi
+            printf '\n'
+        done
+        printf '  }\n'
+        printf '}\n'
+    } > "$tmpfile"
+
+    # Atomic move
+    mv "$tmpfile" "$aggregate_file"
+
+    return 0
+}
+
 # ─── Reporting ──────────────────────────────────────────────────────────────
 
 # timeout_report() — Show timeout tuning statistics.
