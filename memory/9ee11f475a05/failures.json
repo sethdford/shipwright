@@ -5,8 +5,8 @@
       "pattern": "\u001b[38;2;74;222;128m\u001b[1m✓\u001b[0m reveal shows 1/3 pass count on failure",
       "root_cause": "sw-intent-analysis-test asserts analyze_intent's JSON output includes version, goal, and criteria fields, but the current schema/implementation omits one or more of them",
       "fix": "Update analyze_intent (or its schema) in sw-intent-analysis.sh to emit version, goal, and criteria fields matching the test's expected schema",
-      "seen_count": 74,
-      "last_seen": "2026-09-12T02:06:36Z",
+      "seen_count": 75,
+      "last_seen": "2026-09-12T03:09:34Z",
       "category": "test_failure"
     },
     {
@@ -184,8 +184,8 @@
     {
       "stage": "test",
       "pattern": "Results: \u001b[38;2;74;222;128m\u001b[1m125 PASS\u001b[0m | \u001b[38;2;248;113;113m\u001b[1m3 FAIL\u001b[0m",
-      "root_cause": "sw-intent-analysis-test fails a schema validation assertion (missing version/goal/criteria fields) while sw-e2e-integration-test hangs and hits the 301s timeout",
-      "fix": "Add the required version/goal/criteria fields to the intent analysis JSON schema/output, and investigate why sw-e2e-integration-test is not completing within timeout (likely a hung Claude CLI call or missing mock)",
+      "root_cause": "sw-cost-test.sh expects a CONTEXT EFFICIENCY section rendered from loop.context_efficiency events, but the test fixture has no cost entries in the 30-day window, so the dashboard renders the empty-state message instead",
+      "fix": "seed a cost entry (or context_efficiency event) within the test's lookback window in sw-cost-test.sh fixture setup before invoking the dashboard render assertions",
       "seen_count": 1,
       "last_seen": "2026-09-11T17:54:27Z",
       "category": "test_failure"
