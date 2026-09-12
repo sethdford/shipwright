@@ -7,14 +7,6 @@
       "fix_effectiveness_rate": 75,
       "seen_count": 3,
       "category": "code_bug"
-    },
-    {
-      "stage": "test",
-      "pattern": "FAIL tests/auth.test.js",
-      "root_cause": "",
-      "fix": "",
-      "seen_count": 30,
-      "last_seen": "2026-09-12T06:02:34Z"
     }
   ]
 }

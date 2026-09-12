@@ -5,19 +5,20 @@
       "pattern": "\u001b[38;2;74;222;128m\u001b[1m✓\u001b[0m reveal shows 1/3 pass count on failure",
       "root_cause": "sw-intent-analysis-test asserts analyze_intent's JSON output includes version, goal, and criteria fields, but the current schema/implementation omits one or more of them",
       "fix": "Update analyze_intent (or its schema) in sw-intent-analysis.sh to emit version, goal, and criteria fields matching the test's expected schema",
-      "seen_count": 72,
-      "last_seen": "2026-09-12T03:00:46Z",
+      "seen_count": 73,
+      "last_seen": "2026-09-12T07:03:44Z",
       "category": "test_failure",
       "signature_hash": "e1a285258fe63781b7370b0d086ad87b",
-      "signature": "\u001b[<n>;2;<n>;<n>;<n>m\u001b[1m✓\u001b[0m reveal shows <path> pass count on failure"
+      "signature": "597fcab86f71",
+      "normalized": "✓ reveal shows <n>/<n> pass count on failure"
     },
     {
       "stage": "test",
       "pattern": "\u001b[2m  loop behavior: iterations on test failure\u001b[0m",
       "root_cause": "Test suite itself passed (all PASS, 0 FAIL) but the pipeline stage was flagged for iterating due to loop-behavior/RL logging noise being misread as failure signal",
       "fix": "Verify the actual test exit code rather than log content matching; ensure sw-autoresearch-e2e-test.sh output doesn't trigger false-positive failure pattern matching in the pipeline's error classifier",
-      "seen_count": 20,
-      "last_seen": "2026-09-12T08:02:04Z",
+      "seen_count": 19,
+      "last_seen": "2026-09-12T05:03:53Z",
       "category": "flaky",
       "signature_hash": "579381c41e2fb77269fb772481550f1d",
       "signature": "\u001b[2m loop behavior: iterations on test failure\u001b[0m"
@@ -137,11 +138,12 @@
       "pattern": "\u001b[38;2;0;212;255m▸\u001b[0m Patrol recurring failures label construction... \u001b[38;2;74;222;128m✓\u001b[0m",
       "root_cause": "sw-e2e-integration-test failed because a stale pipeline lock (pipeline-4253) was already held from a prior run, blocking the fast pipeline test; sw-intent-analysis-test failed because analyze_intent's generated JSON is missing required schema fields (version, goal, criteria)",
       "fix": "Clear/release stale pipeline locks before the e2e-integration test runs (or have it auto-abort orphaned locks), and update analyze_intent to always populate version, goal, and criteria in its output schema",
-      "seen_count": 2,
-      "last_seen": "2026-09-05T17:44:35Z",
+      "seen_count": 3,
+      "last_seen": "2026-09-12T06:20:11Z",
       "category": "test_failure",
       "signature_hash": "06f0abb7562df2c6e4651882933d3b25",
-      "signature": "\u001b[<n>;2;0;<n>;<n>m▸\u001b[0m patrol recurring failures label construction... \u001b[<n>;2;<n>;<n>;<n>m✓\u001b[0m"
+      "signature": "8f98ec93f49d",
+      "normalized": "▸ patrol recurring failures label construction... ✓"
     },
     {
       "stage": "test",
@@ -223,13 +225,24 @@
     {
       "stage": "test",
       "pattern": "Results: \u001b[38;2;74;222;128m\u001b[1m125 PASS\u001b[0m | \u001b[38;2;248;113;113m\u001b[1m3 FAIL\u001b[0m",
-      "root_cause": "sw-e2e-integration-test failed because a stale pipeline lock (pipeline-4852) from a prior run was still held, blocking the fast pipeline test; sw-intent-analysis-test failed because analyze_intent's generated JSON is missing required schema fields (version, goal, criteria)",
-      "fix": "Clear/expire stale pipeline locks before e2e-integration-test runs (or have it use a unique issue/lock per run), and update analyze_intent to include version, goal, and criteria in its output schema",
+      "root_cause": "sw-pipeline-test.sh E2E tests fail because the plan stage doesn't write .claude/pipeline-artifacts/plan.md, cascading into dependent review/resume/full-pipeline/cleanup test failures",
+      "fix": "fix the plan stage to always create plan.md (and dod.md) before marking the stage complete, ensuring downstream stages find the expected artifacts",
       "seen_count": 1,
       "last_seen": "2026-09-11T17:54:27Z",
       "category": "test_failure",
       "signature_hash": "68bf86c61dcab9bc2a7a788f83deb05b",
       "signature": "results: \u001b[<n>;2;<n>;<n>;<n>m\u001b[1m<n> pass\u001b[0m | \u001b[<n>;2;<n>;<n>;<n>m\u001b[1m3 fail\u001b[0m"
+    },
+    {
+      "stage": "test",
+      "pattern": "\u001b[38;2;248;113;113m\u001b[1m1 of 77 tests failed\u001b[0m",
+      "signature": "7e42ab6d7603",
+      "normalized": "<n> of <n> tests failed",
+      "root_cause": "Memory promotion test expects cross-repo pattern copy but promotion logic likely fails a threshold/path check in sw-self-optimize.sh, so no pattern is copied",
+      "fix": "Inspect the 'Memory promotion copies cross-repo patterns' assertion in sw-self-optimize-test.sh and the promote_memory function for a mismatched confidence threshold or repo-hash path condition, then align them",
+      "seen_count": 2,
+      "last_seen": "2026-09-12T08:34:49Z",
+      "category": "test_failure"
     }
   ]
 }
