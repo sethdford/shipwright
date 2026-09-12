@@ -1608,33 +1608,33 @@
       "result": {
         "results": [
           {
+            "file": "success-patterns.json",
+            "relevance": 95,
+            "summary": "Contains two successful build workflows with proven iterations (3), durations (45-150s), file patterns, and commit strategies. Directly applicable as reference patterns for build stage execution."
+          },
+          {
             "file": "retry-outcomes.json",
-            "relevance": 90,
-            "summary": "Shows build_failure class with model_escalation strategy at 100% success rate (5/5). Direct guidance for handling build failures during this stage."
+            "relevance": 85,
+            "summary": "Shows build_failure recovery strategy (model_escalation) with 100% success rate across 5 attempts. Critical for understanding what works when the build stage encounters failures."
           },
           {
             "file": "metrics.json",
-            "relevance": 85,
-            "summary": "Contains baseline build_duration_s of 7095s. Critical for understanding expected build performance and timeout thresholds for the autonomous pipeline."
+            "relevance": 70,
+            "summary": "Baseline durations (build: 7095s, test: 1459s) provide expectations for stage timing and resource allocation decisions during build execution."
           },
           {
-            "file": "success-patterns.json",
-            "relevance": 78,
-            "summary": "Shows successful build approaches with iteration counts, durations, and cost data. Provides patterns for how builds complete in 3-4 iterations using standard template."
+            "file": "failures.json",
+            "relevance": 65,
+            "summary": "Test-stage failures reveal downstream issues (stale locks, schema mismatches, timeouts) that often originate from build stage logic—e.g., pipeline lock staleness and intent-analysis schema issues."
           },
           {
             "file": "patterns.json",
-            "relevance": 72,
-            "summary": "Project metadata (Node, vitest, npm, commonjs). Essential context for understanding the build environment and test strategy this stage will transition to."
-          },
-          {
-            "file": "knowledge.json",
-            "relevance": 65,
-            "summary": "Contains mktemp failures and test setup issues that affect the downstream test stage. Relevant for understanding potential build→test transition blockers."
+            "relevance": 60,
+            "summary": "Project structure (node/vitest/commonjs) and conventions (src/ directory, test patterns) inform how the build stage should configure test execution and import handling."
           }
         ]
       },
-      "timestamp": 1789237042,
+      "timestamp": 1789241587,
       "ttl": 1800
     },
     "48fc285a5067c1f36a2a78b5e90391af": {
@@ -1748,6 +1748,34 @@
         }
       ],
       "timestamp": 1789241205,
+      "ttl": 1800
+    },
+    "687007558a4bf0f55b4b1c84f51663f7": {
+      "result": {
+        "raw_response": "Mock claude: ok"
+      },
+      "timestamp": 1789241707,
+      "ttl": 1800
+    },
+    "ed5294bad0ff6ebe5469b7c1c53dd6c2": {
+      "result": {
+        "raw_response": "Mock claude: ok"
+      },
+      "timestamp": 1789241928,
+      "ttl": 1800
+    },
+    "1fe553fe5c80abaa459988a5a033324f": {
+      "result": [
+        {
+          "type": "result",
+          "result": "I am trying the same approach again.",
+          "usage": {
+            "input_tokens": 0,
+            "output_tokens": 0
+          }
+        }
+      ],
+      "timestamp": 1789241952,
       "ttl": 1800
     }
   }
