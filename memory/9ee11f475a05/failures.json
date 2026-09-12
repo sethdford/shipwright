@@ -16,8 +16,8 @@
       "pattern": "\u001b[2m  loop behavior: iterations on test failure\u001b[0m",
       "root_cause": "Test suite itself passed (all PASS, 0 FAIL) but the pipeline stage was flagged for iterating due to loop-behavior/RL logging noise being misread as failure signal",
       "fix": "Verify the actual test exit code rather than log content matching; ensure sw-autoresearch-e2e-test.sh output doesn't trigger false-positive failure pattern matching in the pipeline's error classifier",
-      "seen_count": 19,
-      "last_seen": "2026-09-12T05:03:53Z",
+      "seen_count": 20,
+      "last_seen": "2026-09-12T08:02:04Z",
       "category": "flaky",
       "signature_hash": "579381c41e2fb77269fb772481550f1d",
       "signature": "\u001b[2m loop behavior: iterations on test failure\u001b[0m"
@@ -223,8 +223,8 @@
     {
       "stage": "test",
       "pattern": "Results: \u001b[38;2;74;222;128m\u001b[1m125 PASS\u001b[0m | \u001b[38;2;248;113;113m\u001b[1m3 FAIL\u001b[0m",
-      "root_cause": "sw-pipeline-test.sh's plan stage no longer writes plan.md (and downstream review.md), so every test depending on that artifact—including E2E, resume, and cleanup flows—cascades to failure",
-      "fix": "restore/fix plan-stage artifact generation in sw-pipeline.sh so plan.md and review.md are written to .claude/pipeline-artifacts/ before dependent stages run",
+      "root_cause": "sw-e2e-integration-test failed because a stale pipeline lock (pipeline-4852) from a prior run was still held, blocking the fast pipeline test; sw-intent-analysis-test failed because analyze_intent's generated JSON is missing required schema fields (version, goal, criteria)",
+      "fix": "Clear/expire stale pipeline locks before e2e-integration-test runs (or have it use a unique issue/lock per run), and update analyze_intent to include version, goal, and criteria in its output schema",
       "seen_count": 1,
       "last_seen": "2026-09-11T17:54:27Z",
       "category": "test_failure",
