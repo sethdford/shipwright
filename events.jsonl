@@ -158,3 +158,7 @@
 {"ts":"2026-09-11T23:06:10Z","ts_epoch":1789167970,"type":"reasoning.trace","job_id":"pipeline-1323435-42","complexity":"medium","risk":50,"template":"standard"}
 {"ts":"2026-09-11T23:06:10Z","ts_epoch":1789167970,"type":"reasoning.trace","job_id":"pipeline-1324113-42","complexity":"medium","risk":50,"template":"standard"}
 {"ts":"2026-09-11T23:06:11Z","ts_epoch":1789167971,"type":"reasoning.trace","job_id":"pipeline-1324813-42","complexity":"medium","risk":50,"template":"standard"}
+{"ts":"2026-09-12T00:12:54Z","ts_epoch":1789171974,"type":"hygiene_platform_refactor","hardcoded":49,"fallback":69,"todo":51}
+{"ts":"2026-09-12T00:13:33Z","ts_epoch":1789172013,"type":"strategic.issue_created","title":"Cluster repeated build-failure signatures in memory and surface a suggested fix","priority":"P0","complexity":"standard"}
+{"ts":"2026-09-12T00:13:37Z","ts_epoch":1789172017,"type":"strategic.issue_created","title":"Benchmark `shipwright dora` metrics against industry DORA tiers (Elite/High/Medium/Low)","priority":"P4","complexity":"fast"}
+{"ts":"2026-09-12T00:13:37Z","ts_epoch":1789172017,"type":"strategic.cycle_complete","issues_created":2,"issues_skipped":1}
