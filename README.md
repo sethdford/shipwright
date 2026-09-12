@@ -593,3 +593,4 @@ MIT — Seth Ford, 2026.
 
 <!-- E2E test marker: automated pipeline verification (issue #4944) -->
 <!-- E2E test marker: automated pipeline verification (issue #4946) -->
+<!-- E2E test marker: automated pipeline verification (issue #4947) -->
