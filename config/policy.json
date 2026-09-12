@@ -181,7 +181,17 @@
     "coverage_threshold_percent": 60,
     "quality_gate_score_threshold": 70,
     "memory_baseline_fallback_percent": 20,
-    "memory_inject_fallback_percent": 30
+    "memory_inject_fallback_percent": 30,
+    "timeout_escalation": {
+      "enabled": true,
+      "description": "Escalate stage timeout budgets on infrastructure failure retries (timeout/network/OOM). Disabled for logic/config errors. Capped at TIMEOUT_MAX (7200s).",
+      "min_timeout_seconds": 30,
+      "max_timeout_seconds": 7200,
+      "buffer_percent": 20,
+      "lookback_window_samples": 100,
+      "min_samples_for_adaptive": 10,
+      "escalation_ladder": "30:50:100"
+    }
   },
   "quality": {
     "coverage_threshold": 60,
