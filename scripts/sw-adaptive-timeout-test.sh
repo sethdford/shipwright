@@ -473,6 +473,57 @@ test_result_field_in_jsonl() {
     fi
 }
 
+test_escalation_ladder() {
+    TEST_NAME="test_escalation_ladder"
+    timeout_reset
+
+    # Record baseline data
+    timeout_record "build" "600" "standard" "medium"
+    timeout_record "build" "700" "standard" "medium"
+    timeout_record "build" "800" "standard" "medium"
+
+    # Baseline should be around P95 + 20% buffer of (600, 700, 800) = 800 + 20% = 960
+    local baseline attempt2 attempt3 attempt4
+    baseline=$(timeout_for_attempt "build" 1)
+    attempt2=$(timeout_for_attempt "build" 2)
+    attempt3=$(timeout_for_attempt "build" 3)
+    attempt4=$(timeout_for_attempt "build" 4)
+
+    # Escalation: baseline < +30% < +50% < +100%
+    if [[ "$attempt2" -gt "$baseline" ]]; then
+        success "$TEST_NAME: Attempt 2 ($attempt2) > baseline ($baseline)"
+        PASS=$((PASS + 1))
+    else
+        error "$TEST_NAME: Attempt 2 ($attempt2) should exceed baseline ($baseline)"
+        FAIL=$((FAIL + 1))
+    fi
+
+    if [[ "$attempt3" -gt "$attempt2" ]]; then
+        success "$TEST_NAME: Attempt 3 ($attempt3) > attempt 2 ($attempt2)"
+        PASS=$((PASS + 1))
+    else
+        error "$TEST_NAME: Attempt 3 ($attempt3) should exceed attempt 2 ($attempt2)"
+        FAIL=$((FAIL + 1))
+    fi
+
+    if [[ "$attempt4" -gt "$attempt3" ]]; then
+        success "$TEST_NAME: Attempt 4 ($attempt4) > attempt 3 ($attempt3)"
+        PASS=$((PASS + 1))
+    else
+        error "$TEST_NAME: Attempt 4 ($attempt4) should exceed attempt 3 ($attempt3)"
+        FAIL=$((FAIL + 1))
+    fi
+
+    # Verify escalation respects TIMEOUT_MAX
+    if [[ "$attempt4" -le "$TIMEOUT_MAX" ]]; then
+        success "$TEST_NAME: Escalation capped at TIMEOUT_MAX ($attempt4 ≤ $TIMEOUT_MAX)"
+        PASS=$((PASS + 1))
+    else
+        error "$TEST_NAME: Escalation exceeded TIMEOUT_MAX ($attempt4 > $TIMEOUT_MAX)"
+        FAIL=$((FAIL + 1))
+    fi
+}
+
 # ─── Run All Tests ──────────────────────────────────────────────────────────
 
 echo ""
@@ -494,6 +545,7 @@ test_recording_with_metadata
 test_lookback_window
 test_timeout_result_filtering
 test_result_field_in_jsonl
+test_escalation_ladder
 
 echo "│"
 echo "╭─ Test Results ──────────────────────────────────────────────────────"

@@ -37,6 +37,13 @@ TIMEOUT_MIN=30
 TIMEOUT_MAX=7200
 TIMEOUT_BUFFER_PCT=20  # Add 20% buffer to P95
 
+# Escalation policy: increasing budgets per retry attempt
+# Attempt 1: baseline (p95 + 20%)
+# Attempt 2: escalate by +30%
+# Attempt 3: escalate by +50%
+# Attempt 4+: escalate by +100% (double, capped at TIMEOUT_MAX)
+TIMEOUT_ESCALATION_LADDER="30:50:100"  # Comma-separated escalation percentages
+
 # Historical data thresholds
 TIMEOUT_MIN_SAMPLES=10  # Require N samples before using adaptive timeout
 TIMEOUT_HISTORY_LOOKBACK=100  # Use last N samples for P95 calculation
@@ -114,6 +121,56 @@ timeout_get() {
     fi
 
     echo "$adaptive_timeout"
+    return 0
+}
+
+# timeout_for_attempt(stage, attempt_number) — Get escalated timeout for a retry attempt.
+# Implements escalation ladder: attempt 1 = baseline, attempt 2 = +30%, attempt 3 = +50%, etc.
+# $1: stage name
+# $2: attempt number (1-based: 1 = baseline, 2 = first retry, etc.)
+# Returns: timeout in seconds (escalated, enforced within TIMEOUT_MIN/MAX)
+timeout_for_attempt() {
+    local stage="${1:-unknown}"
+    local attempt="${2:-1}"
+
+    # Get baseline timeout for this stage
+    local baseline
+    baseline=$(timeout_get "$stage") || baseline=$(_timeout_default "$stage")
+
+    # Attempt 1 uses baseline as-is
+    if [[ "$attempt" -le 1 ]]; then
+        echo "$baseline"
+        return 0
+    fi
+
+    # Parse escalation ladder (30:50:100 by default)
+    local ladder="$TIMEOUT_ESCALATION_LADDER"
+    local ladder_idx=$((attempt - 2))  # Index into ladder (attempt 2 = index 0)
+
+    local escalation_pct
+    if [[ "$ladder_idx" -lt 0 ]]; then
+        escalation_pct=0
+    else
+        # Extract the Nth element from comma-separated list
+        escalation_pct=$(echo "$ladder" | awk -F: "{print \$$(( ladder_idx + 1 ))}" 2>/dev/null) || escalation_pct=""
+        if [[ -z "$escalation_pct" ]]; then
+            # Fallback: use last element for all remaining attempts
+            escalation_pct=$(echo "$ladder" | awk -F: '{print $NF}' 2>/dev/null) || escalation_pct="100"
+        fi
+    fi
+
+    # Calculate escalated timeout: baseline * (1 + escalation_pct/100)
+    local escalated
+    escalated=$(( baseline + (baseline * escalation_pct / 100) ))
+
+    # Enforce bounds
+    if [[ "$escalated" -lt "$TIMEOUT_MIN" ]]; then
+        escalated=$TIMEOUT_MIN
+    elif [[ "$escalated" -gt "$TIMEOUT_MAX" ]]; then
+        escalated=$TIMEOUT_MAX
+    fi
+
+    echo "$escalated"
     return 0
 }
 
