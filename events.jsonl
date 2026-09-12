@@ -228,3 +228,5 @@
 {"ts":"2026-09-12T15:08:03Z","ts_epoch":1789225683,"type":"intelligence.analysis","complexity":2,"risk_level":"low","success_probability":88,"recommended_template":"fast","issue_type":"testing"}
 {"ts":"2026-09-12T15:08:03Z","ts_epoch":1789225683,"type":"reasoning.trace","job_id":"pipeline-3412053-4917","complexity":"medium","risk":50,"template":"standard"}
 {"ts":"2026-09-12T15:08:05Z","ts_epoch":1789225685,"type":"reasoning.trace","job_id":"pipeline-3427896-42","complexity":"medium","risk":50,"template":"standard"}
+{"ts":"2026-09-12T16:05:02Z","ts_epoch":1789229102,"type":"hygiene_platform_refactor","hardcoded":49,"fallback":69,"todo":51}
+{"ts":"2026-09-12T16:05:27Z","ts_epoch":1789229127,"type":"strategic.cycle_complete","issues_created":0,"issues_skipped":3}
