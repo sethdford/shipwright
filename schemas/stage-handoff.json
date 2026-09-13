@@ -1,23 +1,47 @@
 {
-  "$schema": "https://json-schema.org/draft/2020-12/schema",
   "title": "Pipeline Stage Handoff",
   "type": "object",
-  "required": ["from_stage", "to_stage", "summary"],
+  "required": [
+    "from_stage",
+    "to_stage",
+    "summary"
+  ],
   "properties": {
-    "from_stage": { "type": "string" },
-    "to_stage": { "type": "string" },
-    "summary": { "type": "string", "maxLength": 1000 },
-    "artifacts": { "type": "array", "items": { "type": "string" } },
+    "from_stage": {
+      "type": "string"
+    },
+    "to_stage": {
+      "type": "string"
+    },
+    "summary": {
+      "type": "string",
+      "maxLength": 1000
+    },
+    "artifacts": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
     "decisions": {
       "type": "array",
       "items": {
         "type": "object",
         "properties": {
-          "decision": { "type": "string" },
-          "rationale": { "type": "string" }
+          "decision": {
+            "type": "string"
+          },
+          "rationale": {
+            "type": "string"
+          }
         }
       }
     },
-    "risks": { "type": "array", "items": { "type": "string" } }
+    "risks": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    }
   }
 }

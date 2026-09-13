@@ -110,6 +110,12 @@ trend_arrow() {
     esac
 }
 
+# When true, pipeline runs for issues the daemon quarantined as synthetic
+# (auto-generated E2E-test noise) are dropped before any metric is computed.
+# Set by --exclude-synthetic or DORA_EXCLUDE_SYNTHETIC=1.
+EXCLUDE_SYNTHETIC="${DORA_EXCLUDE_SYNTHETIC:-false}"
+[[ "$EXCLUDE_SYNTHETIC" == "1" ]] && EXCLUDE_SYNTHETIC=true
+
 # Calculate DORA metrics for time window
 calculate_dora() {
     local window_days="${1:-7}"
@@ -131,9 +137,21 @@ calculate_dora() {
     local window_end=$((now_e - offset_days * 86400))
     local window_start=$((window_end - window_days * 86400))
 
-    jq -s --argjson start "$window_start" --argjson end "$window_end" '
+    local exclude_synthetic="false"
+    [[ "$EXCLUDE_SYNTHETIC" == "true" ]] && exclude_synthetic="true"
+
+    # The quarantine set is built from the WHOLE event log, not the window: an
+    # issue is usually quarantined on an earlier poll than the run it produced.
+    jq -s --argjson start "$window_start" --argjson end "$window_end" \
+       --argjson exclude_synthetic "$exclude_synthetic" '
+        [.[] | select(.type == "daemon.issue_quarantined") | .issue | tostring]
+            as $quarantined |
         [.[] | select(.ts_epoch >= $start and .ts_epoch < $end)] as $events |
-        [$events[] | select(.type == "pipeline.completed")] as $completed |
+        [$events[]
+         | select(.type == "pipeline.completed")
+         | select(($exclude_synthetic | not)
+                  or ((.issue | tostring) as $i | ($quarantined | index($i)) == null))]
+            as $completed |
         ($completed | length) as $total |
         [$completed[] | select(.result == "success")] as $successes |
         [$completed[] | select(.result == "failure")] as $failures |
@@ -540,8 +558,15 @@ ${BOLD}SUBCOMMANDS${RESET}
   export            Export all metrics as JSON
   help              Show this help message
 
+${BOLD}OPTIONS${RESET}
+  --exclude-synthetic   Drop runs for issues the daemon quarantined as
+                        synthetic (auto-generated E2E-test noise) so they
+                        do not dilute deploy frequency or the failure rate.
+                        Equivalent to DORA_EXCLUDE_SYNTHETIC=1.
+
 ${BOLD}EXAMPLES${RESET}
   ${DIM}shipwright dora show${RESET}              # Display DORA dashboard
+  ${DIM}shipwright dora show --exclude-synthetic${RESET}  # Ignore quarantined noise
   ${DIM}shipwright dora trends 30${RESET}         # Show 30-day trends
   ${DIM}shipwright dora compare 7 14${RESET}      # Compare last 7 days vs previous 14
   ${DIM}shipwright dora export | jq .${RESET}    # Export metrics as JSON
@@ -564,6 +589,17 @@ EOF
 # ─── Main Entry Point ────────────────────────────────────────────────────────
 
 main() {
+    # Strip the global flag from anywhere in the argv so it composes with the
+    # positional day counts that `trends` and `compare` take.
+    local argv=() a
+    for a in "$@"; do
+        case "$a" in
+            --exclude-synthetic) EXCLUDE_SYNTHETIC=true ;;
+            *) argv+=("$a") ;;
+        esac
+    done
+    set -- ${argv[@]+"${argv[@]}"}
+
     local cmd="${1:-show}"
 
     case "$cmd" in

@@ -1,21 +1,44 @@
 {
-  "$schema": "https://json-schema.org/draft/2020-12/schema",
   "title": "Audit Result",
   "type": "object",
-  "required": ["passed", "findings"],
+  "required": [
+    "passed",
+    "findings"
+  ],
   "properties": {
-    "passed": { "type": "boolean" },
-    "score": { "type": "integer", "minimum": 0, "maximum": 100 },
+    "passed": {
+      "type": "boolean"
+    },
+    "score": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 100
+    },
     "findings": {
       "type": "array",
       "items": {
         "type": "object",
-        "required": ["severity", "message"],
+        "required": [
+          "severity",
+          "message"
+        ],
         "properties": {
-          "severity": { "enum": ["critical", "warning", "info"] },
-          "message": { "type": "string" },
-          "file": { "type": "string" },
-          "line": { "type": "integer" }
+          "severity": {
+            "enum": [
+              "critical",
+              "warning",
+              "info"
+            ]
+          },
+          "message": {
+            "type": "string"
+          },
+          "file": {
+            "type": "string"
+          },
+          "line": {
+            "type": "integer"
+          }
         }
       }
     }

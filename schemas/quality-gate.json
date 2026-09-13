@@ -1,18 +1,33 @@
 {
-  "$schema": "https://json-schema.org/draft/2020-12/schema",
   "title": "Quality Gate Result",
   "type": "object",
-  "required": ["gate", "passed", "reason"],
+  "required": [
+    "gate",
+    "passed",
+    "reason"
+  ],
   "properties": {
-    "gate": { "type": "string" },
-    "passed": { "type": "boolean" },
-    "reason": { "type": "string" },
+    "gate": {
+      "type": "string"
+    },
+    "passed": {
+      "type": "boolean"
+    },
+    "reason": {
+      "type": "string"
+    },
     "metrics": {
       "type": "object",
       "properties": {
-        "coverage": { "type": "number" },
-        "lint_errors": { "type": "integer" },
-        "test_failures": { "type": "integer" }
+        "coverage": {
+          "type": "number"
+        },
+        "lint_errors": {
+          "type": "integer"
+        },
+        "test_failures": {
+          "type": "integer"
+        }
       }
     }
   }

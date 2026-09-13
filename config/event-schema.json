@@ -601,6 +601,14 @@
         "findings"
       ]
     },
+    "daemon.issue_quarantined": {
+      "required": [],
+      "optional": [
+        "issue",
+        "pattern",
+        "score"
+      ]
+    },
     "daemon.log_rotated": {
       "required": [],
       "optional": [
@@ -773,6 +781,12 @@
         "elapsed_s",
         "pid",
         "reason"
+      ]
+    },
+    "daemon.synthetic_dequeued": {
+      "required": [],
+      "optional": [
+        "issue"
       ]
     },
     "daemon.triage": {

@@ -54,29 +54,10 @@ MOCKEOF
 
 trap cleanup_test_env EXIT
 
-assert_pass() {
-    local desc="$1"
-    echo -e "  ${GREEN}✓${RESET} ${desc}"
-}
-
-assert_fail() {
-    local desc="$1"
-    local detail="${2:-}"
-    FAILURES+=("$desc")
-    echo -e "  ${RED}✗${RESET} ${desc}"
-    [[ -n "$detail" ]] && echo -e "    ${DIM}${detail}${RESET}"
-}
-
-assert_contains() {
-    local desc="$1" haystack="$2" needle="$3"
-    local _count
-    _count=$(printf '%s\n' "$haystack" | grep -cF -- "$needle" 2>/dev/null) || true
-    if [[ "${_count:-0}" -gt 0 ]]; then
-        assert_pass "$desc"
-    else
-        assert_fail "$desc" "output missing: $needle"
-    fi
-}
+# Assertions come from lib/test-helpers.sh. This suite used to shadow
+# assert_pass/assert_fail/assert_contains with copies that never touched
+# TOTAL/PASS/FAIL, so print_test_results always reported "All 0 tests passed"
+# and exited 0 — every failure here was silently green.
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # TESTS
@@ -223,6 +204,42 @@ assert_contains "Elite band classification" "$_src" "Elite"
 assert_contains "High band classification" "$_src" "High"
 assert_contains "Medium band classification" "$_src" "Medium"
 assert_contains "Low band classification" "$_src" "Low"
+
+echo ""
+
+# ─── 11b. Synthetic exclusion ───────────────────────────────────────────────
+echo -e "${BOLD}Synthetic Exclusion${RESET}"
+
+# Two completed runs in the window; one is for an issue the daemon quarantined
+# on an EARLIER poll, so the quarantine event sits outside the metric window.
+_now=$(date +%s)
+{
+    printf '{"type":"daemon.issue_quarantined","issue":"5077","pattern":"e2e-test-comment","ts_epoch":%s}\n' "$((_now - 40 * 86400))"
+    printf '{"type":"pipeline.completed","issue":"5077","result":"failure","duration_s":10,"ts_epoch":%s}\n' "$((_now - 3600))"
+    printf '{"type":"pipeline.completed","issue":"42","result":"success","duration_s":20,"ts_epoch":%s}\n' "$((_now - 3600))"
+} > "$HOME/.shipwright/events.jsonl"
+
+incl_out=$(bash "$SUT" export 2>&1) || true
+assert_eq "default counts quarantined runs" "2" \
+    "$(echo "$incl_out" | jq -r '.current_period.total_runs' 2>/dev/null || echo "?")"
+assert_eq "default change failure rate is diluted by noise" "50" \
+    "$(echo "$incl_out" | jq -r '.current_period.cfr' 2>/dev/null || echo "?")"
+
+excl_out=$(bash "$SUT" export --exclude-synthetic 2>&1) || true
+assert_eq "--exclude-synthetic drops the quarantined run" "1" \
+    "$(echo "$excl_out" | jq -r '.current_period.total_runs' 2>/dev/null || echo "?")"
+assert_eq "--exclude-synthetic clears the diluted failure rate" "0" \
+    "$(echo "$excl_out" | jq -r '.current_period.cfr' 2>/dev/null || echo "?")"
+
+env_out=$(DORA_EXCLUDE_SYNTHETIC=1 bash "$SUT" export 2>&1) || true
+assert_eq "DORA_EXCLUDE_SYNTHETIC=1 matches the flag" "1" \
+    "$(echo "$env_out" | jq -r '.current_period.total_runs' 2>/dev/null || echo "?")"
+
+# The flag must survive alongside the positional day counts.
+compare_flag_out=$(bash "$SUT" compare 7 7 --exclude-synthetic 2>&1) || true
+assert_contains "flag composes with positional args" "$compare_flag_out" "Period Comparison"
+
+rm -f "$HOME/.shipwright/events.jsonl"
 
 echo ""
 

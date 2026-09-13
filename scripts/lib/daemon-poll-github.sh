@@ -21,6 +21,28 @@ SLACK_WEBHOOK="${SLACK_WEBHOOK:-}"
 BACKOFF_SECS="${BACKOFF_SECS:-0}"
 POLL_CYCLE_COUNT="${POLL_CYCLE_COUNT:-0}"
 
+# daemon_quarantine_if_synthetic <issue_json> <issue_key> <issue_num> <score>
+#   Routes an auto-generated issue into the synthetic lane.
+#   exit 0 → quarantined, caller must skip the issue
+#   exit 1 → real work (also the answer when the classifier is unavailable or
+#            the issue JSON could not be extracted — failing open toward "real"
+#            wastes a slot, failing the other way silently buries real work)
+daemon_quarantine_if_synthetic() {
+    local issue_json="${1:-}" issue_key="${2:-}" issue_num="${3:-}" score="${4:-0}"
+
+    [[ -n "$issue_json" ]] || return 1
+    type is_synthetic_issue >/dev/null 2>&1 || return 1
+
+    local synthetic_pattern
+    synthetic_pattern=$(is_synthetic_issue "$issue_json" 2>/dev/null || true)
+    [[ -n "$synthetic_pattern" ]] || return 1
+
+    daemon_log INFO "Issue #${issue_num} matched synthetic pattern '${synthetic_pattern}' — quarantining"
+    emit_event "daemon.issue_quarantined" "issue=$issue_num" "pattern=$synthetic_pattern" "score=$score"
+    enqueue_issue "$issue_key" synthetic
+    return 0
+}
+
 daemon_poll_issues() {
     if [[ "$NO_GITHUB" == "true" ]]; then
         daemon_log INFO "Polling skipped (--no-github)"
@@ -246,6 +268,16 @@ daemon_poll_issues() {
 
         # Skip if already inflight
         if daemon_is_inflight "$issue_key"; then
+            continue
+        fi
+
+        # Quarantine auto-generated noise into the synthetic lane before it can
+        # consume a MAX_PARALLEL slot, a priority-lane slot, or a machine claim.
+        # It is drained by dequeue_next only once the standard queue is empty.
+        local issue_full_json
+        issue_full_json=$(echo "$issues_json" | jq -c --argjson n "$issue_num" --arg repo "$repo_name" \
+            'map(select(.number == $n) | select($repo == "" or (.repository.nameWithOwner // "") == $repo)) | .[0] // empty' 2>/dev/null || true)
+        if daemon_quarantine_if_synthetic "$issue_full_json" "$issue_key" "$issue_num" "$score"; then
             continue
         fi
 

@@ -162,6 +162,10 @@ _DAEMON_FAILURE_LOADED=""
 source "$SCRIPT_DIR/lib/daemon-failure.sh"
 _DAEMON_DISPATCH_LOADED=""
 source "$SCRIPT_DIR/lib/daemon-dispatch.sh"
+_DAEMON_TRIAGE_LOADED=""
+source "$SCRIPT_DIR/lib/daemon-triage.sh"
+_DAEMON_POLL_GITHUB_LOADED=""
+source "$SCRIPT_DIR/lib/daemon-poll-github.sh"
 
 # ─── Tests: daemon_track_job ───────────────────────────────────────────────
 print_test_section "daemon_track_job"
@@ -301,6 +305,79 @@ third=$(dequeue_next)
 assert_eq "Dequeue returns third" "72" "$third"
 fourth=$(dequeue_next)
 assert_eq "Dequeue empty returns nothing" "" "$fourth"
+
+# ─── Tests: Synthetic quarantine lane ──────────────────────────────────────
+print_test_section "Synthetic quarantine lane"
+
+init_daemon_state
+assert_eq "Fresh state has an empty synthetic lane" "0" "$(get_synthetic_queue_count)"
+
+enqueue_issue "80" synthetic
+assert_eq "Synthetic enqueue stays out of the standard queue" "0" \
+    "$(jq '.queued | length' "$STATE_FILE")"
+assert_eq "Synthetic enqueue lands in the synthetic lane" "1" "$(get_synthetic_queue_count)"
+
+# Real work must come out first even though it was queued second.
+enqueue_issue "81"
+assert_eq "Real work dequeues ahead of quarantined work" "81" "$(dequeue_next)"
+assert_eq "Synthetic lane untouched while real work remains" "1" "$(get_synthetic_queue_count)"
+assert_eq "Synthetic drains once the standard queue is empty" "80" "$(dequeue_next)"
+assert_eq "Synthetic lane drained" "0" "$(get_synthetic_queue_count)"
+assert_eq "Both lanes empty returns nothing" "" "$(dequeue_next)"
+
+# Deduplication: re-polling the same open issue must not stack the lane.
+init_daemon_state
+enqueue_issue "82" synthetic
+enqueue_issue "82" synthetic
+assert_eq "Repeated quarantine does not duplicate" "1" "$(get_synthetic_queue_count)"
+assert_eq "Quarantined issue counts as inflight" "0" \
+    "$(daemon_is_inflight "82" && echo 0 || echo 1)"
+assert_eq "Unrelated issue is not inflight" "1" \
+    "$(daemon_is_inflight "83" && echo 0 || echo 1)"
+
+# An unknown lane name must not silently quarantine real work.
+init_daemon_state
+enqueue_issue "84" bogus-lane
+assert_eq "Unknown lane falls back to the standard queue" "1" \
+    "$(jq '.queued | length' "$STATE_FILE")"
+assert_eq "Unknown lane does not touch the synthetic lane" "0" "$(get_synthetic_queue_count)"
+
+# State files written before the lane existed have no .synthetic_queue key.
+init_daemon_state
+locked_state_update 'del(.synthetic_queue)'
+assert_eq "Legacy state reports an empty lane" "0" "$(get_synthetic_queue_count)"
+enqueue_issue "85" synthetic
+assert_eq "Legacy state accepts a quarantine" "1" "$(get_synthetic_queue_count)"
+assert_eq "Legacy state drains the lane" "85" "$(dequeue_next)"
+
+# ─── Tests: Poll-time quarantine routing ───────────────────────────────────
+print_test_section "Quarantine routing (classify → lane → drain)"
+
+# End-to-end over the seam the poll loop uses: a real issue payload goes in,
+# the lane it lands in comes out. Exercises the shipped default pattern.
+SYNTHETIC_JSON='{"number":90,"title":"E2E test: add comment to README","body":"[automated] smoke run","labels":[{"name":"automated"}]}'
+REAL_JSON='{"number":91,"title":"Fix auth token refresh","body":"Tokens expire early","labels":[{"name":"bug"}]}'
+
+init_daemon_state
+rc=0; daemon_quarantine_if_synthetic "$SYNTHETIC_JSON" "90" "90" "50" || rc=$?
+assert_exit_code "Synthetic issue is quarantined" 0 "$rc"
+assert_eq "Quarantined issue is in the synthetic lane" "1" "$(get_synthetic_queue_count)"
+assert_eq "Quarantined issue never entered the standard queue" "0" \
+    "$(jq '.queued | length' "$STATE_FILE")"
+
+rc=0; daemon_quarantine_if_synthetic "$REAL_JSON" "91" "91" "50" || rc=$?
+assert_exit_code "Real issue is not quarantined" 1 "$rc"
+assert_eq "Real issue left both lanes untouched" "1" \
+    "$(( $(get_synthetic_queue_count) + $(jq '.queued | length' "$STATE_FILE") ))"
+
+# The poll loop passes an empty string when the issue cannot be extracted from
+# the listing; that must read as "real", not as a silent quarantine.
+rc=0; daemon_quarantine_if_synthetic "" "92" "92" "50" || rc=$?
+assert_exit_code "Missing issue JSON fails open to real" 1 "$rc"
+assert_eq "Missing issue JSON did not touch the lane" "1" "$(get_synthetic_queue_count)"
+
+# With no real work outstanding, the quarantined issue still gets drained.
+assert_eq "Quarantined issue drains when the daemon is idle" "90" "$(dequeue_next)"
 
 # ─── Tests: Priority ordering (queued structure) ──────────────────────────
 print_test_section "Queue priority"

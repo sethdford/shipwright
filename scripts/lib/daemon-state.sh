@@ -380,6 +380,7 @@ init_state() {
                 },
                 active_jobs: [],
                 queued: [],
+                synthetic_queue: [],
                 completed: [],
                 retry_counts: {},
                 failure_history: [],
@@ -455,6 +456,15 @@ daemon_is_inflight() {
         return 0
     fi
 
+    # Check the synthetic lane (same key format as .queued)
+    local synthetic_match
+    synthetic_match=$(jq -r --arg key "$issue_key" \
+        '(.synthetic_queue // [])[] | select(. == $key)' \
+        "$STATE_FILE" 2>/dev/null || true)
+    if [[ -n "$synthetic_match" ]]; then
+        return 0
+    fi
+
     return 1
 }
 
@@ -501,14 +511,36 @@ locked_get_active_count() {
 
 # ─── Queue Management ───────────────────────────────────────────────────────
 
+# enqueue_issue <issue_key> [lane]
+#   lane "synthetic" parks the issue in a separate low-priority lane that is
+#   only drained once the standard queue is empty. Anything else (including an
+#   omitted lane) uses the standard queue and the old behaviour.
 enqueue_issue() {
     local issue_key="$1"
+    local lane="${2:-standard}"
+
+    if [[ "$lane" == "synthetic" ]]; then
+        # Deliberately NOT mirrored into the SQLite queue: db_dequeue_next has
+        # no notion of lanes, so a synthetic key stored there would come back
+        # ahead of real work and defeat the quarantine.
+        locked_state_update --arg key "$issue_key" \
+            '.synthetic_queue = ((.synthetic_queue // []) + [$key] | unique)'
+        daemon_log INFO "Quarantined issue ${issue_key} (synthetic lane)"
+        return
+    fi
+
     locked_state_update --arg key "$issue_key" \
         '.queued += [$key] | .queued |= unique'
     if type db_enqueue_issue >/dev/null 2>&1; then
         db_enqueue_issue "$issue_key" 2>/dev/null || true
     fi
     daemon_log INFO "Queued issue ${issue_key} (at capacity)"
+}
+
+# Number of issues parked in the synthetic lane.
+get_synthetic_queue_count() {
+    [[ -f "$STATE_FILE" ]] || { echo 0; return; }
+    jq -r '(.synthetic_queue // []) | length' "$STATE_FILE" 2>/dev/null || echo 0
 }
 
 dequeue_next() {
@@ -537,6 +569,16 @@ dequeue_next() {
         if type db_remove_from_queue >/dev/null 2>&1; then
             db_remove_from_queue "$next" 2>/dev/null || true
         fi
+        echo "$next"
+        return
+    fi
+
+    # Standard queue is empty — only now release a quarantined issue, so
+    # synthetic noise can never delay real work but still makes progress.
+    next=$(jq -r '(.synthetic_queue // [])[0] // empty' "$STATE_FILE" 2>/dev/null || true)
+    if [[ -n "$next" ]]; then
+        locked_state_update '.synthetic_queue = (.synthetic_queue // [])[1:]'
+        emit_event "daemon.synthetic_dequeued" "issue=$next" 2>/dev/null || true
         echo "$next"
     fi
 }

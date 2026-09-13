@@ -1,5 +1,5 @@
 {
-  "timestamp": "2026-09-13T10:40:02Z",
+  "timestamp": "2026-09-13T11:08:09Z",
   "repository": "shipwright",
   "counts": {
     "hardcoded": 49,
@@ -295,7 +295,7 @@
     },
     {
       "file": "scripts/lib/daemon-state.sh",
-      "line": 647
+      "line": 689
     },
     {
       "file": "scripts/lib/pipeline-util.sh",

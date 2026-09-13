@@ -1,15 +1,47 @@
 {
-  "$schema": "https://json-schema.org/draft/2020-12/schema",
   "title": "Loop Iteration Result",
   "type": "object",
-  "required": ["iteration", "status", "summary"],
+  "required": [
+    "iteration",
+    "status",
+    "summary"
+  ],
   "properties": {
-    "iteration": { "type": "integer" },
-    "status": { "enum": ["in_progress", "complete", "blocked", "failed"] },
-    "summary": { "type": "string", "maxLength": 500 },
-    "files_changed": { "type": "array", "items": { "type": "string" } },
-    "tests_passing": { "type": "boolean" },
-    "remaining_work": { "type": "array", "items": { "type": "string" } },
-    "blockers": { "type": "array", "items": { "type": "string" } }
+    "iteration": {
+      "type": "integer"
+    },
+    "status": {
+      "enum": [
+        "in_progress",
+        "complete",
+        "blocked",
+        "failed"
+      ]
+    },
+    "summary": {
+      "type": "string",
+      "maxLength": 500
+    },
+    "files_changed": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "tests_passing": {
+      "type": "boolean"
+    },
+    "remaining_work": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "blockers": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    }
   }
 }

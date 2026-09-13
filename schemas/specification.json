@@ -1,10 +1,14 @@
 {
-  "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://shipwright.dev/schemas/specification.json",
   "title": "Shipwright Specification",
   "description": "Structured specification for agent-driven development. Captures intent, constraints, and acceptance criteria so agents work from specs, not just natural language issues.",
   "type": "object",
-  "required": ["version", "title", "goals", "acceptance_criteria"],
+  "required": [
+    "version",
+    "title",
+    "goals",
+    "acceptance_criteria"
+  ],
   "properties": {
     "version": {
       "type": "string",
@@ -23,11 +27,23 @@
       "properties": {
         "type": {
           "type": "string",
-          "enum": ["github_issue", "goal", "manual", "decomposed"]
+          "enum": [
+            "github_issue",
+            "goal",
+            "manual",
+            "decomposed"
+          ]
         },
-        "issue_number": { "type": "integer" },
-        "url": { "type": "string", "format": "uri" },
-        "parent_spec": { "type": "string" }
+        "issue_number": {
+          "type": "integer"
+        },
+        "url": {
+          "type": "string",
+          "format": "uri"
+        },
+        "parent_spec": {
+          "type": "string"
+        }
       }
     },
     "goals": {
@@ -53,7 +69,10 @@
       "minItems": 1,
       "items": {
         "type": "object",
-        "required": ["criterion", "testable"],
+        "required": [
+          "criterion",
+          "testable"
+        ],
         "properties": {
           "criterion": {
             "type": "string",
@@ -82,13 +101,25 @@
       "type": "array",
       "items": {
         "type": "object",
-        "required": ["scenario", "expected_behavior"],
+        "required": [
+          "scenario",
+          "expected_behavior"
+        ],
         "properties": {
-          "scenario": { "type": "string" },
-          "expected_behavior": { "type": "string" },
+          "scenario": {
+            "type": "string"
+          },
+          "expected_behavior": {
+            "type": "string"
+          },
           "priority": {
             "type": "string",
-            "enum": ["critical", "high", "medium", "low"],
+            "enum": [
+              "critical",
+              "high",
+              "medium",
+              "low"
+            ],
             "default": "medium"
           }
         }
@@ -107,36 +138,64 @@
     "performance_requirements": {
       "type": "object",
       "properties": {
-        "max_latency_ms": { "type": "integer" },
-        "max_memory_mb": { "type": "integer" },
-        "throughput_rps": { "type": "integer" },
-        "notes": { "type": "string" }
+        "max_latency_ms": {
+          "type": "integer"
+        },
+        "max_memory_mb": {
+          "type": "integer"
+        },
+        "throughput_rps": {
+          "type": "integer"
+        },
+        "notes": {
+          "type": "string"
+        }
       },
       "description": "Performance bounds (optional)"
     },
     "affected_files": {
       "type": "array",
-      "items": { "type": "string" },
+      "items": {
+        "type": "string"
+      },
       "default": [],
       "description": "Files expected to be modified (from analysis)"
     },
     "dependencies": {
       "type": "array",
-      "items": { "type": "string" },
+      "items": {
+        "type": "string"
+      },
       "default": [],
       "description": "Other specs or issues this depends on"
     },
     "metadata": {
       "type": "object",
       "properties": {
-        "created_at": { "type": "string", "format": "date-time" },
-        "updated_at": { "type": "string", "format": "date-time" },
+        "created_at": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "updated_at": {
+          "type": "string",
+          "format": "date-time"
+        },
         "complexity": {
           "type": "string",
-          "enum": ["trivial", "simple", "moderate", "complex", "very_complex"]
+          "enum": [
+            "trivial",
+            "simple",
+            "moderate",
+            "complex",
+            "very_complex"
+          ]
         },
-        "estimated_files": { "type": "integer" },
-        "language": { "type": "string" }
+        "estimated_files": {
+          "type": "integer"
+        },
+        "language": {
+          "type": "string"
+        }
       }
     }
   }

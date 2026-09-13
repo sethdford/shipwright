@@ -284,6 +284,56 @@ precisely to drop stale context and re-orient from `progress.md`.
 Note `shipwright loop --resume` is unrelated: that re-reads
 `.claude/loop-state.md`, it does not continue a Claude session.
 
+## Synthetic Issue Quarantine
+
+E2E test runs file issues against the repo. Those reach daemon triage
+indistinguishable from real work: they burn `MAX_PARALLEL` slots and land in
+DORA as deploys, so the success rate reads as noise. The daemon classifies them
+at poll time and parks them in a second, lower-priority queue lane.
+
+`triage.synthetic_patterns` in `daemon-config.json` (defaults in
+`config/defaults.json`) is a list of patterns:
+
+```json
+{
+  "triage": {
+    "synthetic_patterns": [
+      {
+        "name": "e2e-test-comment",
+        "titleRegex": "^[Ee]2[Ee] [Tt]est",
+        "bodyRegex": "\\[automated\\]",
+        "labels": ["automated"],
+        "authors": ["shipwright[bot]"]
+      }
+    ]
+  }
+}
+```
+
+- Semantics are **AND within a pattern, OR across patterns**. A pattern with no
+  criteria matches nothing — an all-wildcard pattern would quarantine the whole
+  backlog.
+- Matching **fails open toward "real"** (invalid regex, malformed JSON, missing
+  `jq`): a false negative wastes one slot, a false positive silently buries real
+  work.
+- The shipped default needs three signals, not one, because "E2E test" in a
+  title is exactly what a human files when an E2E test is broken.
+- Patterns are read per call, so config edits take effect on the next poll with
+  no daemon restart.
+
+Routing: `daemon_quarantine_if_synthetic()` runs before the machine claim and
+before the priority lane, so noise can never take a priority slot.
+`enqueue_issue <key> synthetic` writes to `.synthetic_queue` in the daemon state
+(deliberately **not** mirrored into the SQLite queue, which has no lane concept).
+`dequeue_next()` drains `.queued` to empty first and only then releases one
+synthetic issue — quarantined work still makes progress on idle cycles, but
+never ahead of real work. Events: `daemon.issue_quarantined`,
+`daemon.synthetic_dequeued`.
+
+Metrics: `shipwright dora <cmd> --exclude-synthetic` (or
+`DORA_EXCLUDE_SYNTHETIC=1`) drops runs whose issue was ever quarantined, so
+deploy frequency and change failure rate reflect real delivery only.
+
 ## Intelligent Defaults
 
 Pipeline behavior is config-driven via `daemon-config.json`. Three helper functions in `scripts/lib/compat.sh` provide intelligent configuration chaining (env var → daemon-config.json → user config → hardcoded default):
