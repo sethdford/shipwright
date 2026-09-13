@@ -161,3 +161,7 @@
 {"ts":"2026-09-12T23:14:13Z","ts_epoch":1789254853,"type":"reasoning.trace","job_id":"pipeline-3024348-42","complexity":"medium","risk":50,"template":"standard"}
 {"ts":"2026-09-12T23:14:13Z","ts_epoch":1789254853,"type":"reasoning.trace","job_id":"pipeline-3025018-42","complexity":"medium","risk":50,"template":"standard"}
 {"ts":"2026-09-12T23:14:14Z","ts_epoch":1789254854,"type":"reasoning.trace","job_id":"pipeline-3026285-42","complexity":"medium","risk":50,"template":"standard"}
+{"ts":"2026-09-13T00:14:59Z","ts_epoch":1789258499,"type":"hygiene_platform_refactor","hardcoded":49,"fallback":69,"todo":51}
+{"ts":"2026-09-13T00:15:22Z","ts_epoch":1789258522,"type":"strategic.issue_created","title":"Cluster recurring test-flake signatures and auto-quarantine flaky tests in CI","priority":"P0","complexity":"standard"}
+{"ts":"2026-09-13T00:15:26Z","ts_epoch":1789258526,"type":"strategic.issue_created","title":"Add a build-loop pre-flight check for missing env vars and dependencies","priority":"P0","complexity":"fast"}
+{"ts":"2026-09-13T00:15:26Z","ts_epoch":1789258526,"type":"strategic.cycle_complete","issues_created":2,"issues_skipped":1}
