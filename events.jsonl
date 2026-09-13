@@ -122,3 +122,5 @@
 {"ts":"2026-09-13T04:00:38Z","ts_epoch":1789272038,"type":"stage.failed","event_id":"evt-1789272038-3609538185","payload":"{\"stage\":\"design\",\"issue\":\"4970\",\"timing\":\"1m 49s\"}"}
 {"ts":"2026-09-13T04:00:38Z","ts_epoch":1789272038,"type":"stage.failed","issue":4970,"stage":"design","duration_s":112,"error":"unknown","error_class":"unknown"}
 {"ts":"2026-09-13T04:00:38Z","ts_epoch":1789272038,"type":"vitals.snapshot","issue":4970,"stage":"design","iteration":0,"diff_lines":0,"no_progress":0}
+{"ts":"2026-09-13T04:06:10Z","ts_epoch":1789272370,"type":"hygiene_platform_refactor","hardcoded":49,"fallback":69,"todo":51}
+{"ts":"2026-09-13T04:06:30Z","ts_epoch":1789272390,"type":"strategic.cycle_complete","issues_created":0,"issues_skipped":3}
