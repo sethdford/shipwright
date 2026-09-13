@@ -124,3 +124,42 @@
 {"ts":"2026-09-13T04:00:38Z","ts_epoch":1789272038,"type":"vitals.snapshot","issue":4970,"stage":"design","iteration":0,"diff_lines":0,"no_progress":0}
 {"ts":"2026-09-13T04:06:10Z","ts_epoch":1789272370,"type":"hygiene_platform_refactor","hardcoded":49,"fallback":69,"todo":51}
 {"ts":"2026-09-13T04:06:30Z","ts_epoch":1789272390,"type":"strategic.cycle_complete","issues_created":0,"issues_skipped":3}
+{"ts":"2026-09-13T04:07:11Z","ts_epoch":1789272431,"type":"intelligence.cache_hit","cache_key":"analyze_issue_def9395dab2ac12e48e8a5e51fa4f0a9"}
+{"ts":"2026-09-13T04:07:11Z","ts_epoch":1789272431,"type":"intelligence.analysis","complexity":3,"risk_level":"low","success_probability":85,"recommended_template":"fast","issue_type":"testing"}
+{"ts":"2026-09-13T04:07:11Z","ts_epoch":1789272431,"type":"reasoning.trace","job_id":"pipeline-3823-4970","complexity":"medium","risk":50,"template":"standard"}
+{"ts":"2026-09-13T04:07:13Z","ts_epoch":1789272433,"type":"intelligence.cache_hit","cache_key":"analyze_issue_def9395dab2ac12e48e8a5e51fa4f0a9"}
+{"ts":"2026-09-13T04:07:13Z","ts_epoch":1789272433,"type":"intelligence.analysis","complexity":3,"risk_level":"low","success_probability":85,"recommended_template":"fast","issue_type":"testing"}
+{"ts":"2026-09-13T04:07:13Z","ts_epoch":1789272433,"type":"intelligence.cache_hit","cache_key":"estimate_iterations_0765d86b316d2d07b69755326b2946f5"}
+{"ts":"2026-09-13T04:07:13Z","ts_epoch":1789272433,"type":"intelligence.estimate_iterations","estimate":2,"complexity":5,"source":"claude"}
+{"ts":"2026-09-13T04:07:13Z","ts_epoch":1789272433,"type":"intelligence.cache_hit","cache_key":"predict_cost_c96553da9ab56496da85899149a2ff61"}
+{"ts":"2026-09-13T04:07:13Z","ts_epoch":1789272433,"type":"intelligence.prediction","estimated_cost":0.42,"estimated_iterations":2,"complexity":5}
+{"ts":"2026-09-13T04:07:17Z","ts_epoch":1789272437,"type":"checks.pipeline_start","stages":13}
+{"ts":"2026-09-13T04:07:17Z","ts_epoch":1789272437,"type":"pipeline.started","issue":4970,"template":"autonomous","complexity":5,"machine":"runnervmlun5p","pipeline":"autonomous","model":"opus","goal":"Add a build-loop pre-flight check for missing env vars and dependencies"}
+{"ts":"2026-09-13T04:07:17Z","ts_epoch":1789272437,"type":"pipeline.started","event_id":"evt-1789272437-405951085","payload":"{\"issue\":\"4970\",\"pipeline\":\"autonomous\",\"goal\":\"Add a build-loop pre-flight check for missing env vars and dependencies\"}"}
+{"ts":"2026-09-13T04:07:17Z","ts_epoch":1789272437,"type":"stage.skipped","issue":4970,"stage":"intake","reason":"ci_resume"}
+{"ts":"2026-09-13T04:07:17Z","ts_epoch":1789272437,"type":"intelligence.model","stage":"spec_generation","complexity":5,"model":"haiku","source":"heuristic"}
+{"ts":"2026-09-13T04:07:17Z","ts_epoch":1789272437,"type":"intelligence.model_ab","issue":4970,"stage":"spec_generation","recommended":"haiku","applied":"opus","ab_group":"control","ab_ratio":20}
+{"ts":"2026-09-13T04:07:17Z","ts_epoch":1789272437,"type":"stage.started","issue":4970,"stage":"spec_generation"}
+{"ts":"2026-09-13T04:07:18Z","ts_epoch":1789272438,"type":"spec_generated","file":"/home/runner/work/shipwright/shipwright/.claude/pipeline-artifacts/specs/add-a-build-loop-pre-flight-check-for-missing-env-vars-and-d.json","complexity":"simple","issue":4970}
+{"ts":"2026-09-13T04:07:40Z","ts_epoch":1789272460,"type":"spec_generation.completed","issue":4970,"criteria":1,"edge_cases":0,"security":0,"affected_files":0}
+{"ts":"2026-09-13T04:07:41Z","ts_epoch":1789272461,"type":"stage.complete","event_id":"evt-1789272461-1245943971","payload":"{\"stage\":\"spec_generation\",\"issue\":\"4970\",\"timing\":\"23s\"}"}
+{"ts":"2026-09-13T04:07:41Z","ts_epoch":1789272461,"type":"stage.completed","issue":4970,"stage":"spec_generation","duration_s":24,"result":"success"}
+{"ts":"2026-09-13T04:07:41Z","ts_epoch":1789272461,"type":"vitals.snapshot","issue":4970,"stage":"spec_generation","iteration":0,"diff_lines":0,"no_progress":0}
+{"ts":"2026-09-13T04:07:42Z","ts_epoch":1789272462,"type":"stage.artifact_miss","issue":4970,"stage":"plan"}
+{"ts":"2026-09-13T04:07:42Z","ts_epoch":1789272462,"type":"intelligence.model","stage":"plan","complexity":5,"model":"haiku","source":"heuristic"}
+{"ts":"2026-09-13T04:07:42Z","ts_epoch":1789272462,"type":"intelligence.model_ab","issue":4970,"stage":"plan","recommended":"haiku","applied":"opus","ab_group":"control","ab_ratio":20}
+{"ts":"2026-09-13T04:07:42Z","ts_epoch":1789272462,"type":"stage.started","issue":4970,"stage":"plan"}
+{"ts":"2026-09-13T04:07:43Z","ts_epoch":1789272463,"type":"intelligence.cache_hit","cache_key":"search_memory_3f11f1f968fe3db03d652d44a6e5fffd"}
+{"ts":"2026-09-13T04:11:15Z","ts_epoch":1789272675,"type":"retry.skipped_existing_artifact","issue":4970,"stage":"plan","artifact_lines":514}
+{"ts":"2026-09-13T04:11:16Z","ts_epoch":1789272676,"type":"stage.complete","event_id":"evt-1789272676-1084163729","payload":"{\"stage\":\"plan\",\"issue\":\"4970\",\"timing\":\"3m 33s\"}"}
+{"ts":"2026-09-13T04:11:17Z","ts_epoch":1789272677,"type":"stage.completed","issue":4970,"stage":"plan","duration_s":215,"result":"success"}
+{"ts":"2026-09-13T04:11:17Z","ts_epoch":1789272677,"type":"vitals.snapshot","issue":4970,"stage":"plan","iteration":0,"diff_lines":0,"no_progress":0}
+{"ts":"2026-09-13T04:11:17Z","ts_epoch":1789272677,"type":"stage.artifact_miss","issue":4970,"stage":"design"}
+{"ts":"2026-09-13T04:11:17Z","ts_epoch":1789272677,"type":"intelligence.model","stage":"design","complexity":5,"model":"haiku","source":"heuristic"}
+{"ts":"2026-09-13T04:11:17Z","ts_epoch":1789272677,"type":"intelligence.model_ab","issue":4970,"stage":"design","recommended":"haiku","applied":"opus","ab_group":"control","ab_ratio":20}
+{"ts":"2026-09-13T04:11:17Z","ts_epoch":1789272677,"type":"stage.started","issue":4970,"stage":"design"}
+{"ts":"2026-09-13T04:11:17Z","ts_epoch":1789272677,"type":"intelligence.cache_hit","cache_key":"search_memory_22db820d5188bf979bf01c5e7c45043c"}
+{"ts":"2026-09-13T04:11:18Z","ts_epoch":1789272678,"type":"intelligence.cache_hit","cache_key":"search_memory_e2329b602e9f7cc26c4171ee6f747993"}
+{"ts":"2026-09-13T04:13:28Z","ts_epoch":1789272808,"type":"stage.failed","event_id":"evt-1789272808-4092840996","payload":"{\"stage\":\"design\",\"issue\":\"4970\",\"timing\":\"2m 9s\"}"}
+{"ts":"2026-09-13T04:13:28Z","ts_epoch":1789272808,"type":"stage.failed","issue":4970,"stage":"design","duration_s":131,"error":"unknown","error_class":"unknown"}
+{"ts":"2026-09-13T04:13:29Z","ts_epoch":1789272809,"type":"vitals.snapshot","issue":4970,"stage":"design","iteration":0,"diff_lines":0,"no_progress":0}
