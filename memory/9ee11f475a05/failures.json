@@ -5,8 +5,8 @@
       "pattern": "\u001b[38;2;74;222;128m\u001b[1m✓\u001b[0m reveal shows 1/3 pass count on failure",
       "root_cause": "sw-intent-analysis-test asserts analyze_intent's JSON output includes version, goal, and criteria fields, but the current schema/implementation omits one or more of them",
       "fix": "Update analyze_intent (or its schema) in sw-intent-analysis.sh to emit version, goal, and criteria fields matching the test's expected schema",
-      "seen_count": 84,
-      "last_seen": "2026-09-13T01:53:03Z",
+      "seen_count": 83,
+      "last_seen": "2026-09-12T22:45:24Z",
       "category": "test_failure",
       "signature_hash": "e1a285258fe63781b7370b0d086ad87b",
       "signature": "\u001b[<n>;2;<n>;<n>;<n>m\u001b[1m✓\u001b[0m reveal shows <path> pass count on failure"
@@ -16,8 +16,8 @@
       "pattern": "\u001b[2m  loop behavior: iterations on test failure\u001b[0m",
       "root_cause": "Test suite itself passed (all PASS, 0 FAIL) but the pipeline stage was flagged for iterating due to loop-behavior/RL logging noise being misread as failure signal",
       "fix": "Verify the actual test exit code rather than log content matching; ensure sw-autoresearch-e2e-test.sh output doesn't trigger false-positive failure pattern matching in the pipeline's error classifier",
-      "seen_count": 20,
-      "last_seen": "2026-09-12T21:56:08Z",
+      "seen_count": 21,
+      "last_seen": "2026-09-13T01:40:39Z",
       "category": "flaky",
       "signature_hash": "579381c41e2fb77269fb772481550f1d",
       "signature": "\u001b[2m loop behavior: iterations on test failure\u001b[0m"
@@ -28,7 +28,7 @@
       "root_cause": "sw-intent-analysis-test fails because analyze_intent's generated JSON omits required fields (version, goal, criteria); sw-e2e-integration-test fails as a side effect of a stale pipeline lock (pipeline-3749) left running from a prior test run, not a new regression",
       "fix": "add the missing version/goal/criteria fields to the intent-analysis JSON schema/generator, and clear/reset stale pipeline locks (or run `shipwright pipeline abort`) before the e2e-integration test suite starts",
       "seen_count": 14,
-      "last_seen": "2026-09-13T02:42:07Z",
+      "last_seen": "2026-09-13T02:51:23Z",
       "category": "test_failure",
       "signature_hash": "0ffe097d3b7a598c5b9ebe8e3cd8d7e4",
       "signature": "failed: 1"
@@ -50,8 +50,8 @@
       "signature": "results: \u001b[<n>;2;<n>;<n>;<n>m\u001b[1m<n> pass\u001b[0m | \u001b[<n>;2;<n>;<n>;<n>m\u001b[1m1 fail\u001b[0m",
       "root_cause": "sw-e2e-integration-test failed because a stale pipeline lock from a prior run (pipeline-3854) was left in 'running' state, blocking the new pipeline start; sw-intent-analysis-test failed because analyze_intent's generated JSON is missing the required version/goal/criteria schema fields",
       "fix": "Clear/release stale pipeline locks before the e2e-integration test runs (or add lock staleness detection/cleanup), and update analyze_intent to always emit version, goal, and criteria fields in its output schema",
-      "seen_count": 3,
-      "last_seen": "2026-09-06T02:28:14Z",
+      "seen_count": 4,
+      "last_seen": "2026-09-13T03:23:34Z",
       "category": "test_failure",
       "signature_hash": "af7df127e4c98031cbe09f6b0646ac68"
     },
@@ -115,8 +115,8 @@
       "pattern": "Results: \u001b[38;2;74;222;128m\u001b[1m126 PASS\u001b[0m | \u001b[38;2;248;113;113m\u001b[1m2 FAIL\u001b[0m",
       "root_cause": "sw-pipeline-test.sh mock plan-stage invocation no longer writes plan.md, cascading into review/E2E/resume/cleanup failures that depend on it, plus a jq parse error on a non-numeric complexity value in the intelligence low-complexity test",
       "fix": "Fix the mock plan stage in sw-pipeline-test.sh to create .claude/pipeline-artifacts/plan.md (and dod.md) before the dependent tests run, and quote/validate the complexity value before passing it to jq",
-      "seen_count": 6,
-      "last_seen": "2026-09-11T18:25:37Z",
+      "seen_count": 7,
+      "last_seen": "2026-09-13T02:14:42Z",
       "category": "test_failure",
       "signature_hash": "a4dd00948c6625a595d0ee2b91698d06",
       "signature": "results: \u001b[<n>;2;<n>;<n>;<n>m\u001b[1m<n> pass\u001b[0m | \u001b[<n>;2;<n>;<n>;<n>m\u001b[1m2 fail\u001b[0m"
@@ -223,8 +223,8 @@
     {
       "stage": "test",
       "pattern": "Results: \u001b[38;2;74;222;128m\u001b[1m125 PASS\u001b[0m | \u001b[38;2;248;113;113m\u001b[1m3 FAIL\u001b[0m",
-      "root_cause": "sw-intent-analysis-test failed (exit 1) and sw-e2e-integration-test hung/timed out after 302s, indicating a hang or unhandled error path in intent analysis and integration test setup",
-      "fix": "review sw-intent-analysis-test.sh assertion output for the exact failing case and add a timeout/mock guard in sw-e2e-integration-test to prevent hangs on missing API credentials",
+      "root_cause": "Memory promotion test expects cross-repo pattern copy but promotion logic or fixture data doesn't match updated schema/threshold",
+      "fix": "Inspect sw-self-optimize.sh memory promotion function and its test fixture for schema/threshold mismatch, then align them",
       "seen_count": 1,
       "last_seen": "2026-09-11T17:54:27Z",
       "category": "test_failure",
