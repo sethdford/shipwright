@@ -1401,6 +1401,140 @@
       },
       "timestamp": 1775344537,
       "ttl": 3600
+    },
+    "a13e4e362713c193708b6e7a68443b38": {
+      "result": {
+        "complexity": 3,
+        "risk_level": "low",
+        "success_probability": 85,
+        "recommended_template": "fast",
+        "issue_type": "testing",
+        "key_risks": [
+          "Accurate parsing of test/build commands to extract env vars and binaries across different shell syntaxes",
+          "False positives from vars in comments or non-essential command portions",
+          "Cross-platform differences in binary locations and PATH resolution",
+          "Handling complex nested or conditional command structures"
+        ],
+        "implementation_hints": [
+          "Extract env var references using regex for $VAR_NAME and ${VAR_NAME} patterns in test command",
+          "Parse executable names from command string using word splitting (handle pipes, semicolons, logical operators)",
+          "Use 'command -v' builtin for portable binary existence checks across POSIX shells",
+          "Collect all missing items before reporting for better UX (show all failures at once, not sequential)",
+          "Add loop.preflight_checks boolean gate to daemon-config.json (default true)",
+          "Implement as early exit in sw-loop.sh before iteration 1 loop begins",
+          "Match error reporting style of existing sw-loop.sh patterns for consistency",
+          "Add test cases in sw-loop-test.sh for missing env vars and missing binaries scenarios"
+        ]
+      },
+      "timestamp": 1789270740,
+      "ttl": 3600
+    },
+    "ea88f863034ad19f382e6f57a941aa4c": {
+      "result": {
+        "estimated_iterations": 2
+      },
+      "timestamp": 1789270749,
+      "ttl": 1800
+    },
+    "1427b8a1b75789b99492bcad01aef410": {
+      "result": {
+        "estimated_cost_usd": 0.42,
+        "estimated_iterations": 2,
+        "estimated_tokens": 58000,
+        "likely_failure_stage": "build",
+        "confidence": 82
+      },
+      "timestamp": 1789270756,
+      "ttl": 3600
+    },
+    "f652942c448369a2c408e7694c74dd18": {
+      "result": {
+        "results": [
+          {
+            "file": "failures.json",
+            "relevance": 85,
+            "summary": "Contains build-loop failure patterns including timeout during iteration and integration test issues; directly informs what pre-flight checks should prevent (e.g., hung iterations, missing environment state)"
+          },
+          {
+            "file": "patterns.json",
+            "relevance": 75,
+            "summary": "Shows project type (Node.js/npm/vitest); essential context for planning environment and dependency checks specific to this tech stack"
+          },
+          {
+            "file": "success-patterns.json",
+            "relevance": 70,
+            "summary": "Demonstrates build-loop iteration patterns and multi-iteration workflows; helps understand scope and typical iteration patterns for build-loop features"
+          },
+          {
+            "file": "issues.json",
+            "relevance": 55,
+            "summary": "Shows past timeout and infrastructure issues in scripts; contextualizes robustness concerns that pre-flight checks should address"
+          },
+          {
+            "file": "metrics.json",
+            "relevance": 50,
+            "summary": "Provides build and test duration baselines (~7095s build, ~1459s test); helps understand when pre-flight checks should run and acceptable overhead"
+          }
+        ]
+      },
+      "timestamp": 1789270802,
+      "ttl": 1800
+    },
+    "200a4efc8c1f3dd90863920bfc90eb11": {
+      "result": {
+        "results": [
+          {
+            "file": "failures.json",
+            "relevance": 85,
+            "summary": "Explicitly documents 'Missing dependency installation' failure with root cause and fix ('Run npm install'). Directly applicable to designing pre-flight dependency validation."
+          },
+          {
+            "file": "knowledge.json",
+            "relevance": 75,
+            "summary": "Contains environment setup failure patterns (mktemp failures, missing /tmp/claude directory) and fix strategies. Relevant for designing pre-flight environment validation checks."
+          },
+          {
+            "file": "patterns.json",
+            "relevance": 70,
+            "summary": "Provides project conventions and structure (source_dir, test_pattern, package_manager: npm, test_runner: vitest). Needed to design pre-flight checks appropriate for the project type."
+          },
+          {
+            "file": "issues.json",
+            "relevance": 65,
+            "summary": "Documents a past daemon timeout issue with root cause and workaround pattern. Relevant for understanding what environment/dependency state the build loop needs validated."
+          },
+          {
+            "file": "metrics.json",
+            "relevance": 60,
+            "summary": "Provides baseline build/test duration metrics (7095s build, 1459s test). Useful for setting pre-flight check timeout thresholds and understanding performance expectations."
+          }
+        ]
+      },
+      "timestamp": 1789271039,
+      "ttl": 1800
+    },
+    "056b6e4e0a6b66378efe097698071b31": {
+      "result": {
+        "results": [
+          {
+            "file": "failures.json",
+            "relevance": 92,
+            "summary": "Detailed test failure patterns documenting loop behavior false positives, timeout issues, error detection anti-patterns, and environment setup problems — directly informs what not to do in pre-flight checks"
+          },
+          {
+            "file": "knowledge.json",
+            "relevance": 88,
+            "summary": "Failure knowledge base with specific anti-patterns: assuming /tmp/claude exists (mktemp), incomplete validation in cleanup, missing schema fields — shows environment dependency pitfalls to avoid"
+          },
+          {
+            "file": "success-patterns.json",
+            "relevance": 72,
+            "summary": "Fix timeout pattern shows successful daemon handler approach (3 iterations, sw-daemon.sh changes) — provides contrast for what effective strategies look like vs rejected approaches"
+          }
+        ]
+      },
+      "timestamp": 1789271069,
+      "ttl": 1800
     }
   }
 }
