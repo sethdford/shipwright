@@ -76,7 +76,11 @@
   },
   "intelligence": {
     "cache_ttl": 3600,
-    "complexity_bands": { "low": 3, "medium": 6, "high": 10 },
+    "complexity_bands": {
+      "low": 3,
+      "medium": 6,
+      "high": 10
+    },
     "miss_rate_high": 30,
     "miss_rate_low": 5,
     "anomaly_threshold": 3.0,
@@ -117,9 +121,15 @@
     "ready_to_build": "ready-to-build",
     "hotfix": "hotfix",
     "claimed_prefix": "claimed:",
-    "incident": ["hotfix", "shipwright"],
+    "incident": [
+      "hotfix",
+      "shipwright"
+    ],
     "incident_labels": "hotfix,shipwright",
-    "harness_gap": ["harness-gap", "shipwright"],
+    "harness_gap": [
+      "harness-gap",
+      "shipwright"
+    ],
     "harness_gap_labels": "harness-gap,shipwright"
   },
   "limits": {
@@ -130,5 +140,23 @@
     "log_tail_lines": 100,
     "function_scan_limit": 0,
     "dependency_scan_limit": 0
+  },
+  "triage": {
+    "synthetic_patterns": [
+      {
+        "name": "e2e-test-comment",
+        "titleRegex": "^[Ee]2[Ee] [Tt]est",
+        "bodyRegex": "\\[automated\\]",
+        "labels": [
+          "automated"
+        ]
+      }
+    ]
+  },
+  "quarantine": {
+    "enabled": true,
+    "drain": true,
+    "max_drain_per_poll": 1,
+    "warn_depth": 100
   }
 }

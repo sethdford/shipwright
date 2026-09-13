@@ -264,4 +264,89 @@ assert_eq "Template weights → best template (fast)" "fast" "$result"
 
 rm -f "$HOME/.shipwright/optimization/template-weights.json"
 
+# ═══════════════════════════════════════════════════════════════════════════════
+# is_synthetic_issue
+# ═══════════════════════════════════════════════════════════════════════════════
+print_test_section "is_synthetic_issue — shipped default pattern"
+
+SYNTHETIC_ISSUE='{"number":1,"title":"E2E test: add comment","body":"[automated] smoke run","labels":[{"name":"automated"}]}'
+HUMAN_E2E_ISSUE='{"number":2,"title":"E2E test: fix timeout in user flow","body":"The login flow times out","labels":[{"name":"bug"}]}'
+
+unset SHIPWRIGHT_TRIAGE_SYNTHETIC_PATTERNS 2>/dev/null || true
+
+rc=0; result=$(is_synthetic_issue "$SYNTHETIC_ISSUE") || rc=$?
+assert_exit_code "Marked E2E test issue classified synthetic" 0 "$rc"
+assert_eq "Matched pattern name is reported" "e2e-test-comment" "$result"
+
+rc=0; is_synthetic_issue "$HUMAN_E2E_ISSUE" >/dev/null || rc=$?
+assert_exit_code "Human issue titled 'E2E test' is NOT synthetic (AND semantics)" 1 "$rc"
+
+# Each AND term is load-bearing: drop one signal at a time, expect no match.
+rc=0; is_synthetic_issue '{"number":3,"title":"E2E test: x","body":"[automated]","labels":[]}' >/dev/null || rc=$?
+assert_exit_code "Missing required label defeats the match" 1 "$rc"
+
+rc=0; is_synthetic_issue '{"number":4,"title":"E2E test: x","body":"manual","labels":[{"name":"automated"}]}' >/dev/null || rc=$?
+assert_exit_code "Missing body marker defeats the match" 1 "$rc"
+
+rc=0; is_synthetic_issue '{"number":5,"title":"Refactor auth","body":"[automated]","labels":[{"name":"automated"}]}' >/dev/null || rc=$?
+assert_exit_code "Non-matching title defeats the match" 1 "$rc"
+
+print_test_section "is_synthetic_issue — malformed input"
+
+for bad_input in '{}' 'not json' '' '[]' 'null'; do
+    rc=0; is_synthetic_issue "$bad_input" >/dev/null || rc=$?
+    assert_exit_code "Malformed input '${bad_input:-<empty>}' is not synthetic" 1 "$rc"
+done
+
+print_test_section "is_synthetic_issue — pattern edge cases"
+
+# A pattern with no criteria must match nothing — an all-wildcard pattern would
+# quarantine the entire backlog.
+export SHIPWRIGHT_TRIAGE_SYNTHETIC_PATTERNS='[{},{"name":"nameonly"},{"name":"empties","labels":[],"authors":[]}]'
+rc=0; is_synthetic_issue '{"number":6,"title":"anything","body":"anything"}' >/dev/null || rc=$?
+assert_exit_code "Criteria-less patterns match nothing" 1 "$rc"
+
+export SHIPWRIGHT_TRIAGE_SYNTHETIC_PATTERNS='[]'
+rc=0; is_synthetic_issue "$SYNTHETIC_ISSUE" >/dev/null || rc=$?
+assert_exit_code "Empty pattern list disables classification" 1 "$rc"
+
+export SHIPWRIGHT_TRIAGE_SYNTHETIC_PATTERNS='{"not":"an array"}'
+rc=0; is_synthetic_issue "$SYNTHETIC_ISSUE" >/dev/null || rc=$?
+assert_exit_code "Non-array pattern config is ignored" 1 "$rc"
+
+# OR across patterns: the second pattern is the one that matches.
+export SHIPWRIGHT_TRIAGE_SYNTHETIC_PATTERNS='[{"name":"never","titleRegex":"^ZZZ"},{"name":"bot-author","authors":["shipwright[bot]"]}]'
+rc=0; result=$(is_synthetic_issue '{"number":7,"title":"whatever","user":{"login":"shipwright[bot]"}}') || rc=$?
+assert_exit_code "OR across patterns — later pattern matches" 0 "$rc"
+assert_eq "Reports the pattern that actually matched" "bot-author" "$result"
+
+rc=0; is_synthetic_issue '{"number":8,"title":"whatever","user":{"login":"a-human"}}' >/dev/null || rc=$?
+assert_exit_code "Author mismatch is not synthetic" 1 "$rc"
+
+# String labels (gh --jq join form) as well as object labels.
+export SHIPWRIGHT_TRIAGE_SYNTHETIC_PATTERNS='[{"name":"lbl","labels":["automated","ci"]}]'
+rc=0; is_synthetic_issue '{"number":9,"title":"x","labels":["automated","ci","bug"]}' >/dev/null || rc=$?
+assert_exit_code "All required labels present (string label form)" 0 "$rc"
+
+rc=0; is_synthetic_issue '{"number":10,"title":"x","labels":["automated"]}' >/dev/null || rc=$?
+assert_exit_code "Partial label match is not enough (AND over labels)" 1 "$rc"
+
+print_test_section "is_synthetic_issue — invalid regex fails open and logs once"
+
+_BAD_REGEX_LOG="$TEST_TEMP_DIR/bad-regex.log"
+daemon_log() { echo "$*" >> "$_BAD_REGEX_LOG"; }
+_SW_BAD_REGEX_SEEN=""
+export SHIPWRIGHT_TRIAGE_SYNTHETIC_PATTERNS='[{"name":"broken","titleRegex":"[abc"}]'
+
+rc=0; is_synthetic_issue '{"number":11,"title":"anything"}' >/dev/null || rc=$?
+assert_exit_code "Invalid regex fails open (treated as real)" 1 "$rc"
+rc=0; is_synthetic_issue '{"number":12,"title":"anything else"}' >/dev/null || rc=$?
+assert_exit_code "Invalid regex still fails open on second issue" 1 "$rc"
+
+log_lines=$(wc -l < "$_BAD_REGEX_LOG" | tr -d ' ')
+assert_eq "Invalid regex warns exactly once, not once per issue" "1" "$log_lines"
+daemon_log() { :; }
+
+unset SHIPWRIGHT_TRIAGE_SYNTHETIC_PATTERNS
+
 print_test_results

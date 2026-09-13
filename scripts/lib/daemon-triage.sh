@@ -9,6 +9,9 @@ REPO_DIR="${REPO_DIR:-$(cd "$SCRIPT_DIR/.." && pwd)}"
 PIPELINE_TEMPLATE="${PIPELINE_TEMPLATE:-autonomous}"
 NO_GITHUB="${NO_GITHUB:-false}"
 
+# Config reader (provides _config_get_json for synthetic pattern lookup)
+[[ -f "$SCRIPT_DIR/lib/config.sh" ]] && source "$SCRIPT_DIR/lib/config.sh"
+
 # Extract dependency issue numbers from issue text
 extract_issue_dependencies() {
     local text="$1"
@@ -519,4 +522,128 @@ daemon_triage_show() {
     echo ""
     echo -e "  ${DIM}${issue_count} issue(s) scored  |  Higher score = higher processing priority${RESET}"
     echo ""
+}
+
+# ─── Synthetic Issue Classification ─────────────────────────────────────────
+#
+# Auto-generated issues (E2E test comments, bot smoke checks) look identical to
+# real work at triage time. Classifying them lets the daemon quarantine the
+# noise instead of spending MAX_PARALLEL slots and polluting DORA metrics.
+#
+# Pattern semantics: AND within a pattern, OR across patterns. A pattern with no
+# criteria matches nothing — an all-wildcard pattern would quarantine the whole
+# backlog. Matching fails open toward "real": a false negative wastes one slot,
+# a false positive silently buries real work.
+#
+# is_synthetic_issue <issue_json>
+#   exit 0 → synthetic; the matched pattern name is printed on stdout
+#   exit 1 → real, unknown, or unparseable
+_SW_BAD_REGEX_SEEN=""
+
+_synthetic_regex_match() {
+    # _synthetic_regex_match <regex> <text> <pattern_name> <field>
+    # Returns 0 on match, 1 on no-match, 1 on invalid regex (logged once).
+    local regex="$1" text="$2" pattern_name="$3" field="$4"
+    local truncated
+    truncated=$(printf '%s' "$text" | cut -c1-4096)
+
+    local rc=0
+    printf '%s' "$truncated" | grep -qE -- "$regex" 2>/dev/null || rc=$?
+    case "$rc" in
+        0) return 0 ;;
+        1) return 1 ;;
+        *)
+            # grep exit >1 == invalid regex (or read error). Warn once per pattern/field.
+            local marker="|${pattern_name}:${field}|"
+            if [[ "$_SW_BAD_REGEX_SEEN" != *"$marker"* ]]; then
+                _SW_BAD_REGEX_SEEN="${_SW_BAD_REGEX_SEEN}${marker}"
+                daemon_log WARN "Synthetic pattern '${pattern_name}' has an invalid ${field}: ${regex} — ignoring"
+            fi
+            return 1
+            ;;
+    esac
+}
+
+is_synthetic_issue() {
+    local issue_json="${1:-}"
+
+    command -v jq >/dev/null 2>&1 || return 1
+    [[ -n "$issue_json" ]] || return 1
+    printf '%s' "$issue_json" | jq -e 'type == "object" and (. != {})' >/dev/null 2>&1 || return 1
+
+    local patterns
+    patterns=$(_config_get_json "triage.synthetic_patterns" "[]" 2>/dev/null || echo "[]")
+    printf '%s' "$patterns" | jq -e 'type == "array" and length > 0' >/dev/null 2>&1 || return 1
+
+    local issue_title issue_body issue_author labels_csv
+    issue_title=$(printf '%s' "$issue_json" | jq -r '.title // ""' 2>/dev/null || echo "")
+    issue_body=$(printf '%s' "$issue_json" | jq -r '.body // ""' 2>/dev/null || echo "")
+    issue_author=$(printf '%s' "$issue_json" | jq -r '.user.login // .author.login // ""' 2>/dev/null || echo "")
+    labels_csv=$(printf '%s' "$issue_json" | jq -r '[(.labels // [])[] | if type == "object" then (.name // "") else . end] | join(",")' 2>/dev/null || echo "")
+
+    local pattern
+    # Process substitution (not a pipe): a pipe would run the loop in a subshell,
+    # making `return 0` return from the subshell and never from this function.
+    while IFS= read -r pattern; do
+        [[ -n "$pattern" ]] || continue
+
+        local pattern_name
+        pattern_name=$(printf '%s' "$pattern" | jq -r '.name // ""' 2>/dev/null || echo "")
+        [[ -n "$pattern_name" ]] || pattern_name="unnamed"
+
+        # A pattern with no criteria matches nothing.
+        local has_criteria
+        has_criteria=$(printf '%s' "$pattern" | jq -r '
+            [(.titleRegex // empty), (.bodyRegex // empty),
+             ((.labels // []) | select(length > 0) | "l"),
+             ((.authors // []) | select(length > 0) | "a")] | length' 2>/dev/null || echo "0")
+        [[ "${has_criteria:-0}" -gt 0 ]] || continue
+
+        local matched=true
+
+        local title_re
+        title_re=$(printf '%s' "$pattern" | jq -r '.titleRegex // ""' 2>/dev/null || echo "")
+        if [[ -n "$title_re" ]]; then
+            _synthetic_regex_match "$title_re" "$issue_title" "$pattern_name" "titleRegex" || matched=false
+        fi
+
+        if [[ "$matched" == "true" ]]; then
+            local body_re
+            body_re=$(printf '%s' "$pattern" | jq -r '.bodyRegex // ""' 2>/dev/null || echo "")
+            if [[ -n "$body_re" ]]; then
+                _synthetic_regex_match "$body_re" "$issue_body" "$pattern_name" "bodyRegex" || matched=false
+            fi
+        fi
+
+        # All listed labels must be present on the issue.
+        if [[ "$matched" == "true" ]]; then
+            local required_label
+            while IFS= read -r required_label; do
+                [[ -n "$required_label" ]] || continue
+                if [[ ",${labels_csv}," != *",${required_label},"* ]]; then
+                    matched=false
+                    break
+                fi
+            done < <(printf '%s' "$pattern" | jq -r '(.labels // [])[]' 2>/dev/null || true)
+        fi
+
+        # Author must be one of the listed authors.
+        if [[ "$matched" == "true" ]]; then
+            local author_count
+            author_count=$(printf '%s' "$pattern" | jq -r '(.authors // []) | length' 2>/dev/null || echo "0")
+            if [[ "${author_count:-0}" -gt 0 ]]; then
+                if ! printf '%s' "$pattern" | jq -e --arg a "$issue_author" \
+                    '[(.authors // [])[]] | index($a) != null' >/dev/null 2>&1; then
+                    matched=false
+                fi
+            fi
+        fi
+
+        if [[ "$matched" == "true" ]]; then
+            echo "$pattern_name"
+            return 0
+        fi
+    done < <(printf '%s' "$patterns" | jq -c '.[]' 2>/dev/null || true)
+
+    return 1
 }
