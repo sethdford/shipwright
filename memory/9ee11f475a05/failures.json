@@ -5,8 +5,8 @@
       "pattern": "\u001b[38;2;74;222;128m\u001b[1m✓\u001b[0m reveal shows 1/3 pass count on failure",
       "root_cause": "sw-intent-analysis-test asserts analyze_intent's JSON output includes version, goal, and criteria fields, but the current schema/implementation omits one or more of them",
       "fix": "Update analyze_intent (or its schema) in sw-intent-analysis.sh to emit version, goal, and criteria fields matching the test's expected schema",
-      "seen_count": 85,
-      "last_seen": "2026-09-13T05:52:15Z",
+      "seen_count": 84,
+      "last_seen": "2026-09-13T06:20:05Z",
       "category": "test_failure",
       "signature_hash": "e1a285258fe63781b7370b0d086ad87b",
       "signature": "\u001b[<n>;2;<n>;<n>;<n>m\u001b[1m✓\u001b[0m reveal shows <path> pass count on failure"
@@ -27,8 +27,8 @@
       "pattern": "Failed: 1",
       "root_cause": "sw-intent-analysis-test fails because analyze_intent's generated JSON omits required fields (version, goal, criteria); sw-e2e-integration-test fails as a side effect of a stale pipeline lock (pipeline-3749) left running from a prior test run, not a new regression",
       "fix": "add the missing version/goal/criteria fields to the intent-analysis JSON schema/generator, and clear/reset stale pipeline locks (or run `shipwright pipeline abort`) before the e2e-integration test suite starts",
-      "seen_count": 14,
-      "last_seen": "2026-09-13T02:51:23Z",
+      "seen_count": 15,
+      "last_seen": "2026-09-13T05:00:41Z",
       "category": "test_failure",
       "signature_hash": "0ffe097d3b7a598c5b9ebe8e3cd8d7e4",
       "signature": "failed: 1"
@@ -137,8 +137,8 @@
       "pattern": "\u001b[38;2;0;212;255m▸\u001b[0m Patrol recurring failures label construction... \u001b[38;2;74;222;128m✓\u001b[0m",
       "root_cause": "sw-e2e-integration-test failed because a stale pipeline lock (pipeline-4253) was already held from a prior run, blocking the fast pipeline test; sw-intent-analysis-test failed because analyze_intent's generated JSON is missing required schema fields (version, goal, criteria)",
       "fix": "Clear/release stale pipeline locks before the e2e-integration test runs (or have it auto-abort orphaned locks), and update analyze_intent to always populate version, goal, and criteria in its output schema",
-      "seen_count": 4,
-      "last_seen": "2026-09-13T06:41:27Z",
+      "seen_count": 3,
+      "last_seen": "2026-09-12T10:18:53Z",
       "category": "test_failure",
       "signature_hash": "06f0abb7562df2c6e4651882933d3b25",
       "signature": "\u001b[<n>;2;0;<n>;<n>m▸\u001b[0m patrol recurring failures label construction... \u001b[<n>;2;<n>;<n>;<n>m✓\u001b[0m"
@@ -223,13 +223,22 @@
     {
       "stage": "test",
       "pattern": "Results: \u001b[38;2;74;222;128m\u001b[1m125 PASS\u001b[0m | \u001b[38;2;248;113;113m\u001b[1m3 FAIL\u001b[0m",
-      "root_cause": "sw-intent-analysis-test and sw-loop-test failed (exit 1), and sw-e2e-integration-test hit the 302s timeout, likely due to flaky/slow integration behavior in the loop harness rather than a single deterministic assertion break",
-      "fix": "Re-run the three failing suites in isolation with verbose output to capture the actual assertion diffs, and increase or split the e2e-integration-test timeout if it's consistently borderline",
+      "root_cause": "sw-e2e-integration-test and sw-intent-analysis-test failed (exit 1), likely due to missing external credentials/API access or environment-dependent integration assumptions rather than a code regression",
+      "fix": "Run the two failing suites locally with verbose output to inspect assertions; if failures stem from missing API keys/network access, gate them behind env checks or mock the dependency, otherwise fix the underlying logic bug",
       "seen_count": 1,
       "last_seen": "2026-09-11T17:54:27Z",
-      "category": "flaky",
+      "category": "test_failure",
       "signature_hash": "68bf86c61dcab9bc2a7a788f83deb05b",
       "signature": "results: \u001b[<n>;2;<n>;<n>;<n>m\u001b[1m<n> pass\u001b[0m | \u001b[<n>;2;<n>;<n>;<n>m\u001b[1m3 fail\u001b[0m"
+    },
+    {
+      "stage": "test",
+      "pattern": "\u001b[38;2;74;222;128m✓\u001b[0m Preflight fails on an unset env var",
+      "root_cause": "Build-loop pre-flight check aborted before iteration 1 because a required env var referenced by --test-cmd/--fast-test-cmd was unset",
+      "fix": "Export the missing env var in the pipeline/daemon environment or add it to preflight_ignore in daemon-config.json if it is genuinely optional",
+      "seen_count": 1,
+      "last_seen": "2026-09-13T05:45:13Z",
+      "category": "config"
     }
   ]
 }
