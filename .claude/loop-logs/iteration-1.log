@@ -1,3 +1,1 @@
-The goal — adding/updating the E2E test verification comment in README — is fully achieved: the marker now references issue #5095, the docs test suite passes, and the change stays idempotent (single marker, no unbounded growth).
-
-LOOP_COMPLETE
+You've hit your weekly limit · resets Sep 17, 6pm (UTC)

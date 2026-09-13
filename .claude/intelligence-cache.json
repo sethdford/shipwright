@@ -30,16 +30,9 @@
     },
     "d41d8cd98f00b204e9800998ecf8427e": {
       "result": {
-        "primary_role": "tester",
-        "secondary_roles": [
-          "builder"
-        ],
-        "confidence": 0.85,
-        "reasoning": "E2E test task requires test automation and validation expertise; builder as secondary for test implementation if needed",
-        "new_role_needed": false,
-        "suggested_role": null
+        "raw_response": "Mock claude response"
       },
-      "timestamp": 1789299229,
+      "timestamp": 1789303193,
       "ttl": 3600
     },
     "efd5524ad1244fd20344bf3ff5d95233": {
@@ -2037,6 +2030,41 @@
       },
       "timestamp": 1789302277,
       "ttl": 3600
+    },
+    "4b47c71284c2d0e4e6d760f11c3ba44f": {
+      "result": {
+        "raw_response": "Mock claude: ok"
+      },
+      "timestamp": 1789303133,
+      "ttl": 1800
+    },
+    "45bdfba1aa756dfde001d744021a26fa": {
+      "result": [
+        {
+          "type": "result",
+          "result": "I am trying the same approach again.",
+          "usage": {
+            "input_tokens": 0,
+            "output_tokens": 0
+          }
+        }
+      ],
+      "timestamp": 1789303242,
+      "ttl": 1800
+    },
+    "d8703aa2c20ebcd381d5d385ed6d382d": {
+      "result": [
+        {
+          "type": "result",
+          "result": "I am trying the same approach again.",
+          "usage": {
+            "input_tokens": 0,
+            "output_tokens": 0
+          }
+        }
+      ],
+      "timestamp": 1789303565,
+      "ttl": 1800
     }
   }
 }
