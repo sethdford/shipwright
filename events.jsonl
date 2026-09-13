@@ -184,3 +184,5 @@
 {"ts":"2026-09-13T00:33:25Z","ts_epoch":1789259605,"type":"patrol.finding","check":"untested_script","script":"sw-tmux-role-color.sh","lines":81,"usage":1}
 {"ts":"2026-09-13T00:33:25Z","ts_epoch":1789259605,"type":"patrol.finding","check":"untested_script","script":"sw-test-all.sh","lines":199,"usage":0}
 {"ts":"2026-09-13T00:33:25Z","ts_epoch":1789259605,"type":"patrol.finding","check":"untested_script","script":"sw-event-schema-sync.sh","lines":93,"usage":0}
+{"ts":"2026-09-13T03:12:27Z","ts_epoch":1789269147,"type":"optimize.memory_pruned","pruned":21,"strengthened":0,"promoted":0}
+{"ts":"2026-09-13T03:12:28Z","ts_epoch":1789269148,"type":"optimize.memory_pruned","pruned":0,"strengthened":0,"promoted":0}
