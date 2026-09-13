@@ -1,13 +1,1 @@
-Iteration 1 complete — committed `2e447cf8`.
-
-**What I built (chunk 1 of the design: classification foundation)**
-
-- `scripts/lib/config.sh` — new `_config_get_json <dotpath> [default]`. The existing `_config_get` renders values through `jq -r '<path> // ""'`, so reading an *array* yields multi-line pretty-printed JSON that's unusable in `$( )`. The new reader uses `jq -c` over the same 4-level precedence chain and skips any level whose value won't parse rather than propagating it into a jq expression.
-- `scripts/lib/daemon-triage.sh` — `is_synthetic_issue <issue_json>`, exit 0 = synthetic with the matched pattern name on stdout. AND within a pattern, OR across patterns; fields `titleRegex`, `bodyRegex`, `labels[]`, `authors[]`. Uses `done < <(...)` not `| while` — a piped loop's `return 0` returns from the subshell and the function would always fall through to "real".
-- `config/defaults.json` — `triage.synthetic_patterns` (default requires **three** signals: `^E2E test` title AND `[automated]` body AND `automated` label) plus the `quarantine.*` block the next chunk consumes. `.claude/daemon-config.json` is untouched, so a repo with no `triage` key behaves exactly as before.
-
-**Test results** — `sw-lib-daemon-triage-test.sh`: 44/44 pass (20 new). Pyramid for this chunk is 20 unit tests, 0 integration, 0 E2E — the lane routing and DORA filtering that integration tests would cover aren't written yet, so those tests come with those chunks. Critical paths covered: happy path (marked E2E issue), five negative cases proving each AND term is load-bearing, five malformed-input cases, criteria-less/empty/non-array pattern configs, OR-across-patterns, both label encodings, and invalid-regex fail-open asserting the warning fires exactly once rather than once per issue.
-
-`sw-policy-e2e-test`, `sw-lib-compat-test`, `sw-lib-daemon-{state,dispatch,poll}-test` all still pass (219 tests).
-
-**Not done yet** — the goal is not achieved; nothing is quarantined yet. Remaining, per the design: the `.quarantined[]` state lane + `daemon_is_inflight` fix (without it, an issue is re-quarantined every poll), the poll-loop gate before the priority-lane block plus `drain_quarantine_lane()` (this is the part that actually delivers "no synthetic issue starts while any real issue is runnable" — the incoming plan's `enqueue_issue()` hook could not, since that path is only reached at capacity), `SW_ISSUE_SYNTHETIC` tagging on `pipeline.completed`, the DORA filter, and the three new event types in `config/event-schema.json`.
+The README change is in; the full suite is running in the background. Waiting for it before committing.
