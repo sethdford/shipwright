@@ -5,8 +5,8 @@
       "pattern": "\u001b[38;2;74;222;128m\u001b[1m✓\u001b[0m reveal shows 1/3 pass count on failure",
       "root_cause": "sw-intent-analysis-test asserts analyze_intent's JSON output includes version, goal, and criteria fields, but the current schema/implementation omits one or more of them",
       "fix": "Update analyze_intent (or its schema) in sw-intent-analysis.sh to emit version, goal, and criteria fields matching the test's expected schema",
-      "seen_count": 86,
-      "last_seen": "2026-09-13T07:49:39Z",
+      "seen_count": 88,
+      "last_seen": "2026-09-13T12:12:33Z",
       "category": "test_failure",
       "signature_hash": "e1a285258fe63781b7370b0d086ad87b",
       "signature": "\u001b[<n>;2;<n>;<n>;<n>m\u001b[1m✓\u001b[0m reveal shows <path> pass count on failure"
@@ -27,8 +27,8 @@
       "pattern": "Failed: 1",
       "root_cause": "sw-intent-analysis-test fails because analyze_intent's generated JSON omits required fields (version, goal, criteria); sw-e2e-integration-test fails as a side effect of a stale pipeline lock (pipeline-3749) left running from a prior test run, not a new regression",
       "fix": "add the missing version/goal/criteria fields to the intent-analysis JSON schema/generator, and clear/reset stale pipeline locks (or run `shipwright pipeline abort`) before the e2e-integration test suite starts",
-      "seen_count": 14,
-      "last_seen": "2026-09-13T02:51:23Z",
+      "seen_count": 15,
+      "last_seen": "2026-09-13T12:50:48Z",
       "category": "test_failure",
       "signature_hash": "0ffe097d3b7a598c5b9ebe8e3cd8d7e4",
       "signature": "failed: 1"
@@ -234,8 +234,8 @@
     {
       "stage": "test",
       "pattern": "\u001b[38;2;0;212;255merror handling\u001b[0m",
-      "root_cause": "sw-intent-analysis-test and sw-loop-test failed (exit 1) and sw-e2e-integration-test hit the 300s suite timeout, likely due to an unhandled error path or hung subprocess in loop/intent-analysis logic",
-      "fix": "Rerun the failing suites with verbose output to capture the failing assertion, check sw-loop-test for a hung background process causing the e2e-integration timeout, and add proper error handling/cleanup in sw-intent-analysis-test",
+      "root_cause": "sw-pipeline-test.sh: plan stage never writes .claude/pipeline-artifacts/plan.md (mock plan generation step missing/broken), cascading into review.md, full E2E, resume, and cleanup test failures",
+      "fix": "Fix the plan stage handler in sw-pipeline.sh (or its mock in sw-pipeline-test.sh) to actually write plan.md/dod.md/tasks before proceeding, then rerun dependent review/E2E/resume/cleanup tests",
       "seen_count": 1,
       "last_seen": "2026-09-13T08:56:06Z",
       "category": "test_failure"
