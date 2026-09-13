@@ -16,8 +16,8 @@
       "pattern": "\u001b[2m  loop behavior: iterations on test failure\u001b[0m",
       "root_cause": "Test suite itself passed (all PASS, 0 FAIL) but the pipeline stage was flagged for iterating due to loop-behavior/RL logging noise being misread as failure signal",
       "fix": "Verify the actual test exit code rather than log content matching; ensure sw-autoresearch-e2e-test.sh output doesn't trigger false-positive failure pattern matching in the pipeline's error classifier",
-      "seen_count": 21,
-      "last_seen": "2026-09-13T01:40:39Z",
+      "seen_count": 22,
+      "last_seen": "2026-09-13T09:25:32Z",
       "category": "flaky",
       "signature_hash": "579381c41e2fb77269fb772481550f1d",
       "signature": "\u001b[2m loop behavior: iterations on test failure\u001b[0m"
@@ -234,8 +234,8 @@
     {
       "stage": "test",
       "pattern": "\u001b[38;2;74;222;128m✓\u001b[0m Preflight fails on an unset env var",
-      "root_cause": "Build-loop pre-flight check aborted before iteration 1 because a required env var referenced by --test-cmd/--fast-test-cmd was unset",
-      "fix": "Export the missing env var in the pipeline/daemon environment or add it to preflight_ignore in daemon-config.json if it is genuinely optional",
+      "root_cause": "sw-e2e-integration-test and sw-intent-analysis-test fail because a required environment variable is unset during preflight checks",
+      "fix": "export the missing env var (e.g. ANTHROPIC_API_KEY or test-specific config) in CI before running sw-test-all.sh, or guard the preflight check to skip gracefully when running without live credentials",
       "seen_count": 1,
       "last_seen": "2026-09-13T05:45:13Z",
       "category": "config"
