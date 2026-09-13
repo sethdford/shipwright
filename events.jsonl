@@ -367,3 +367,8 @@
 {"ts":"2026-09-13T07:17:50Z","ts_epoch":1789283870,"type":"model.outcome","issue":0,"stage":"intake","model":"opus","success":"true"}
 {"ts":"2026-09-13T07:17:50Z","ts_epoch":1789283870,"type":"model.outcome","issue":0,"stage":"plan","model":"opus","success":"true"}
 {"ts":"2026-09-13T07:17:50Z","ts_epoch":1789283870,"type":"pipeline.cost","input_tokens":0,"output_tokens":0,"model":"sonnet","cost_usd":0.0000}
+{"ts":"2026-09-13T08:06:04Z","ts_epoch":1789286764,"type":"hygiene_platform_refactor","hardcoded":49,"fallback":69,"todo":51}
+{"ts":"2026-09-13T08:06:31Z","ts_epoch":1789286791,"type":"strategic.issue_created","title":"Cluster and quarantine E2E-test-comment noise to unblock signal in daemon triage","priority":"P0","complexity":"fast"}
+{"ts":"2026-09-13T08:06:35Z","ts_epoch":1789286795,"type":"strategic.issue_created","title":"Auto-file hygiene issues for scripts exceeding a size threshold, ranked by churn","priority":"P6","complexity":"standard"}
+{"ts":"2026-09-13T08:06:39Z","ts_epoch":1789286799,"type":"strategic.issue_created","title":"Add a \"flaky vs. real failure\" classifier feeding into build-loop retry decisions","priority":"P0","complexity":"standard"}
+{"ts":"2026-09-13T08:06:39Z","ts_epoch":1789286799,"type":"strategic.cycle_complete","issues_created":3,"issues_skipped":0}
