@@ -1,1 +1,5 @@
-Invalid API key · Fix external API key
+
+⚠ Sandbox disabled: sandbox is enabled but dependencies are missing: bubblewrap (bwrap) not installed, socat not installed · install missing tools (e.g. apt install bubblewrap socat) or see https://code.claude.com/docs/en/sandboxing
+  Commands will run WITHOUT sandboxing. Network and filesystem restrictions will NOT be enforced.
+
+{"passed":false,"findings":[{"severity":"critical","message":"npm test times out (exit 124 after 900s) — full test suite hangs, blocking merge","file":"test harness"},{"severity":"critical","message":"npm run test:fast fails (exit 1 after 318s) — specific test failure not diagnosed","file":"test harness"},{"severity":"warning","message":"Discrepancy between agent's reported test results (162/162 pass, 588s) and harness results (124, 1 exit codes)","file":"test execution"},{"severity":"warning","message":"sw-dora-test.sh assertion fix exposed hidden test failures — verify the 39-test count is accurate and regressions are not masked","file":"scripts/sw-dora-test.sh","line":63},{"severity":"info","message":"Task 14 (manual daemon run on live GitHub) skipped as environment-not-runnable — integration tests compensate but full E2E not proven","file":".claude/CLAUDE.md"}],"score":45}
