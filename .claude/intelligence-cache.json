@@ -1680,33 +1680,33 @@
       "result": {
         "results": [
           {
-            "file": "patterns.json",
-            "relevance": 95,
-            "summary": "Defines project structure (node/vitest/npm/commonjs), source directory, test patterns, and conventions — essential for build stage execution"
-          },
-          {
-            "file": "metrics.json",
-            "relevance": 87,
-            "summary": "Contains build_duration_s and test_duration_s baselines — directly relevant for understanding build performance expectations and stage timeouts"
-          },
-          {
-            "file": "flaky-tests.json",
-            "relevance": 78,
-            "summary": "Lists flaky tests with confidence levels — affects build reliability and determines which test failures are environmental vs. regression"
-          },
-          {
             "file": "failures.json",
-            "relevance": 68,
-            "summary": "Test stage failures with patterns and root causes — provides context on what can break during the pipeline's test phase, relevant for build iteration strategy"
+            "relevance": 85,
+            "summary": "Documents 92 test failures with root causes and fixes; most recent failures show missing schema fields in analyze_intent and stale pipeline locks blocking builds"
           },
           {
             "file": "success-patterns.json",
-            "relevance": 62,
-            "summary": "Successful fix approaches with file patterns, iteration counts, and templates — informs what strategies work for similar build problems"
+            "relevance": 82,
+            "summary": "Captures 2 successful build patterns with iteration counts, file change patterns, and strategies; shows 'loop: iteration N' approach works for bug fixes and features"
+          },
+          {
+            "file": "knowledge.json",
+            "relevance": 78,
+            "summary": "Contains 5 failure fix strategies including mktemp path issues and sw-cleanup.sh output formatting; provides actionable approaches for common build failures"
+          },
+          {
+            "file": "flaky-tests.json",
+            "relevance": 75,
+            "summary": "Identifies test-auth (90% confidence) and test-1 (85% confidence) as consistently flaky; helps anticipate and skip unreliable tests during build"
+          },
+          {
+            "file": "retry-outcomes.json",
+            "relevance": 72,
+            "summary": "Shows model_escalation strategy succeeded 5/5 times (100%) on build_failure class; indicates when to escalate to higher reasoning effort"
           }
         ]
       },
-      "timestamp": 1789577570,
+      "timestamp": 1789579883,
       "ttl": 1800
     },
     "b9c7aa5eba4a981b95a803ff85aad725": {
@@ -2514,6 +2514,83 @@
         }
       ],
       "timestamp": 1789579800,
+      "ttl": 1800
+    },
+    "dbb70482ee7ea0f5b2f578409c0080af": {
+      "result": [
+        {
+          "type": "result",
+          "result": "I am trying the same approach again.",
+          "usage": {
+            "input_tokens": 0,
+            "output_tokens": 0
+          }
+        }
+      ],
+      "timestamp": 1789579878,
+      "ttl": 1800
+    },
+    "e18c9e66648db64b21b59c8d66f151a3": {
+      "result": {
+        "raw_response": "Mock claude: ok"
+      },
+      "timestamp": 1789579948,
+      "ttl": 1800
+    },
+    "dd2b11f52108c7c24f3e62f7519c9c1f": {
+      "result": [
+        {
+          "type": "result",
+          "result": "I am trying the same approach again.",
+          "usage": {
+            "input_tokens": 0,
+            "output_tokens": 0
+          }
+        }
+      ],
+      "timestamp": 1789580061,
+      "ttl": 1800
+    },
+    "ee558838573af2c5c7c126bde4003232": {
+      "result": {
+        "raw_response": "Mock claude: ok"
+      },
+      "timestamp": 1789580243,
+      "ttl": 1800
+    },
+    "15b880b0d93bdb874b3b1d585a4581a8": {
+      "result": {
+        "raw_response": "Mock claude: ok"
+      },
+      "timestamp": 1789580292,
+      "ttl": 1800
+    },
+    "effb8bbf7bcf0d1866ee37292f8e7c40": {
+      "result": [
+        {
+          "type": "result",
+          "result": "I am trying the same approach again.",
+          "usage": {
+            "input_tokens": 0,
+            "output_tokens": 0
+          }
+        }
+      ],
+      "timestamp": 1789580386,
+      "ttl": 1800
+    },
+    "ae509b8ce57e0943f7b1337756a8fbb8": {
+      "result": [
+        {
+          "type": "result",
+          "result": "I am trying the same approach again.",
+          "usage": {
+            "input_tokens": 0,
+            "output_tokens": 0
+          }
+        }
+      ],
+      "timestamp": 1789580430,
       "ttl": 1800
     }
   }
