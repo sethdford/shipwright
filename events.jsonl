@@ -811,3 +811,7 @@
 {"ts":"2026-09-16T18:29:57Z","ts_epoch":1789583397,"type":"model.outcome","issue":0,"stage":"intake","model":"opus","success":"true"}
 {"ts":"2026-09-16T18:29:57Z","ts_epoch":1789583397,"type":"model.outcome","issue":0,"stage":"plan","model":"opus","success":"true"}
 {"ts":"2026-09-16T18:29:57Z","ts_epoch":1789583397,"type":"pipeline.cost","input_tokens":0,"output_tokens":0,"model":"sonnet","cost_usd":0.0000}
+{"ts":"2026-09-16T20:05:27Z","ts_epoch":1789589127,"type":"hygiene_platform_refactor","hardcoded":49,"fallback":69,"todo":51}
+{"ts":"2026-09-16T20:05:52Z","ts_epoch":1789589152,"type":"strategic.issue_created","title":"Add a build-loop pre-flight validation gate before iterations start","priority":"P0","complexity":"standard"}
+{"ts":"2026-09-16T20:05:55Z","ts_epoch":1789589155,"type":"strategic.issue_created","title":"Auto-file hygiene issues for the top 3 largest untested-adjacent scripts by churn","priority":"P6","complexity":"fast"}
+{"ts":"2026-09-16T20:05:55Z","ts_epoch":1789589155,"type":"strategic.cycle_complete","issues_created":2,"issues_skipped":0}
