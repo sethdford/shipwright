@@ -14,37 +14,39 @@ Historical context (lessons from previous pipelines):
   "results": [
     {
       "file": "failures.json",
-      "relevance": 95,
-      "summary": "Contains detailed test failure patterns with root causes and fixes from recent runs (Sept 13-16). Includes timeout issues, schema validation failures, stale pipeline locks, and flaky test patterns essential for diagnosing E2E test failures."
+      "relevance": 90,
+      "summary": "Multiple entries document E2E integration test failures, flakiness, and loop iteration issues; directly applicable to debugging E2E test build stage behavior"
     },
     {
       "file": "patterns.json",
-      "relevance": 90,
-      "summary": "Defines project structure: Node.js with vitest test runner, npm package manager, commonjs imports. Critical for understanding how tests execute in this environment."
+      "relevance": 82,
+      "summary": "Describes project structure (node type, vitest runner, commonjs imports) — essential context for understanding how this repo builds and tests"
     },
     {
       "file": "retry-outcomes.json",
-      "relevance": 80,
-      "summary": "Shows model escalation strategy has 100% success rate (5/5) on build_failure class. Provides recovery option if build stage encounters issues."
+      "relevance": 72,
+      "summary": "Documents successful model escalation recovery strategy for build failures (100% success rate across 5 attempts) — applicable if current build needs recovery"
     },
     {
-      "file": "flaky-tests.json",
-      "relevance": 75,
-      "summary": "Identifies known flaky tests (test-1 with 85% confidence, test-auth with 90% confidence). Helps predict which tests may fail during E2E test run."
+      "file": "success-patterns.json",
+      "relevance": 68,
+      "summary": "Shows pattern of 3-iteration fixes using npm test strategy on similar automation tasks — provides reference for expected iteration count and test approach"
     },
     {
-      "file": "knowledge.json",
-      "relevance": 70,
-      "summary": "Contains common bootstrap failures: mktemp /tmp/claude directory creation errors and npm install issues. Relevant for test environment setup phase."
+      "file": "metrics.json",
+      "relevance": 65,
+      "summary": "Establishes baseline expectations: build duration 7095s, test duration 1459s — helps set realistic time budgets for current build stage execution"
     }
   ]
 }
 
 Discoveries from other pipelines:
-✓ Injected 7 new discoveries
+✓ Injected 9 new discoveries
 [intake] Stage intake completed — Resolution: 
 [spec_generation] Stage spec_generation completed — Resolution: 
 [design] Design completed for Cluster and quarantine E2E-test-comment noise to unblock signal in daemon triage — Resolution: 
+[intake] Stage intake completed — Resolution: 
+[spec_generation] Stage spec_generation completed — Resolution: 
 [intake] Stage intake completed — Resolution: 
 [spec_generation] Stage spec_generation completed — Resolution: 
 [intake] Stage intake completed — Resolution: 
@@ -174,8 +176,8 @@ status: running
 test_cmd: "npm test"
 model: opus
 agents: 1
-started_at: 2026-09-16T16:27:41Z
-last_iteration_at: 2026-09-16T16:27:41Z
+started_at: 2026-09-16T16:42:56Z
+last_iteration_at: 2026-09-16T16:42:56Z
 consecutive_failures: 0
 total_commits: 0
 audit_enabled: true

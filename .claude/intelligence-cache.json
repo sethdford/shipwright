@@ -1835,32 +1835,32 @@
         "results": [
           {
             "file": "failures.json",
-            "relevance": 95,
-            "summary": "Contains detailed test failure patterns with root causes and fixes from recent runs (Sept 13-16). Includes timeout issues, schema validation failures, stale pipeline locks, and flaky test patterns essential for diagnosing E2E test failures."
+            "relevance": 90,
+            "summary": "Multiple entries document E2E integration test failures, flakiness, and loop iteration issues; directly applicable to debugging E2E test build stage behavior"
           },
           {
             "file": "patterns.json",
-            "relevance": 90,
-            "summary": "Defines project structure: Node.js with vitest test runner, npm package manager, commonjs imports. Critical for understanding how tests execute in this environment."
+            "relevance": 82,
+            "summary": "Describes project structure (node type, vitest runner, commonjs imports) — essential context for understanding how this repo builds and tests"
           },
           {
             "file": "retry-outcomes.json",
-            "relevance": 80,
-            "summary": "Shows model escalation strategy has 100% success rate (5/5) on build_failure class. Provides recovery option if build stage encounters issues."
+            "relevance": 72,
+            "summary": "Documents successful model escalation recovery strategy for build failures (100% success rate across 5 attempts) — applicable if current build needs recovery"
           },
           {
-            "file": "flaky-tests.json",
-            "relevance": 75,
-            "summary": "Identifies known flaky tests (test-1 with 85% confidence, test-auth with 90% confidence). Helps predict which tests may fail during E2E test run."
+            "file": "success-patterns.json",
+            "relevance": 68,
+            "summary": "Shows pattern of 3-iteration fixes using npm test strategy on similar automation tasks — provides reference for expected iteration count and test approach"
           },
           {
-            "file": "knowledge.json",
-            "relevance": 70,
-            "summary": "Contains common bootstrap failures: mktemp /tmp/claude directory creation errors and npm install issues. Relevant for test environment setup phase."
+            "file": "metrics.json",
+            "relevance": 65,
+            "summary": "Establishes baseline expectations: build duration 7095s, test duration 1459s — helps set realistic time budgets for current build stage execution"
           }
         ]
       },
-      "timestamp": 1789575021,
+      "timestamp": 1789576974,
       "ttl": 1800
     },
     "8f32d1909b0f1fad1fe7e32caf014900": {
@@ -2218,7 +2218,7 @@
       "result": {
         "estimated_iterations": 1
       },
-      "timestamp": 1789574902,
+      "timestamp": 1789576910,
       "ttl": 1800
     },
     "e3a2193b70300c33ecb80f856ffe5b68": {
@@ -2307,6 +2307,62 @@
         }
       ],
       "timestamp": 1789575910,
+      "ttl": 1800
+    },
+    "5c6643f02cafd28cfb2046f0e55cc16e": {
+      "result": {
+        "raw_response": "Mock claude: ok"
+      },
+      "timestamp": 1789576914,
+      "ttl": 1800
+    },
+    "0417090fb59f5ff09c1eeedfa0d05e6a": {
+      "result": [
+        {
+          "type": "result",
+          "result": "I am trying the same approach again.",
+          "usage": {
+            "input_tokens": 0,
+            "output_tokens": 0
+          }
+        }
+      ],
+      "timestamp": 1789577038,
+      "ttl": 1800
+    },
+    "2b7273f6c66e7747d1e21b554bc014ed": {
+      "result": {
+        "raw_response": "Mock claude: ok"
+      },
+      "timestamp": 1789577126,
+      "ttl": 1800
+    },
+    "eb4dfd1dd9630b2379dbf96e8d53f7e4": {
+      "result": [
+        {
+          "type": "result",
+          "result": "I am trying the same approach again.",
+          "usage": {
+            "input_tokens": 0,
+            "output_tokens": 0
+          }
+        }
+      ],
+      "timestamp": 1789577376,
+      "ttl": 1800
+    },
+    "9c742754e1c5ab44cdab9c9ea76ed953": {
+      "result": [
+        {
+          "type": "result",
+          "result": "I am trying the same approach again.",
+          "usage": {
+            "input_tokens": 0,
+            "output_tokens": 0
+          }
+        }
+      ],
+      "timestamp": 1789577413,
       "ttl": 1800
     }
   }
