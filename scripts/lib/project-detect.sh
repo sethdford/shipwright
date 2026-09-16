@@ -45,6 +45,13 @@ _has_glob() {
     find "$root" -maxdepth 1 -name "$pattern" -type f 2>/dev/null | grep -q .
 }
 
+# ─── Helper: Parse ISO 8601 timestamp to Unix seconds (cross-platform) ───────
+_iso_to_unix() {
+    local iso="$1"
+    # Try Linux date -d first, fall back to macOS date -j
+    date -d "$iso" +%s 2>/dev/null || date -j -f "%Y-%m-%dT%H:%M:%SZ" "$iso" +%s 2>/dev/null || echo 0
+}
+
 # ═══════════════════════════════════════════════════════════════════════════
 # project_detect_type(root)
 # ─────────────────────────────────────────────────────────────────────────────
@@ -600,7 +607,7 @@ project_detect_all() {
 
         if [[ -n "$cached_at" ]]; then
             local cache_age
-            cache_age=$(($(date +%s) - $(date -j -f "%Y-%m-%dT%H:%M:%SZ" "$cached_at" +%s 2>/dev/null || echo 0)))
+            cache_age=$(($(date +%s) - $(_iso_to_unix "$cached_at")))
 
             if [[ "$cache_age" -lt "$cache_ttl" ]]; then
                 cat "$cache_file"
