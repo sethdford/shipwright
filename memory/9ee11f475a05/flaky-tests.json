@@ -1,0 +1,21 @@
+{
+  "version": "1",
+  "tests": {
+    "test-1": {
+      "test_name": "test-1",
+      "error_message": "error",
+      "occurrence_count": 5,
+      "confidence": 85,
+      "last_seen": 1789564322,
+      "first_seen": 1789564322
+    },
+    "test-auth": {
+      "test_name": "test-auth",
+      "error_message": "connection timeout error",
+      "occurrence_count": 8,
+      "confidence": 90,
+      "last_seen": 1789564363,
+      "first_seen": 1789564356
+    }
+  }
+}
