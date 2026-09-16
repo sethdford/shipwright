@@ -1,14 +1,3 @@
-Done — the E2E README change is in.
-
-**What changed:** `README.md:594` — the E2E verification marker was updated in place from issue #5148 to #5151 (replace, not append, so repeated E2E runs don't grow the README). Committed as `8d74283d`.
-
-**Test status (the acceptance criterion):**
-- `sw-intent-analysis-test.sh` — 12 passed, 0 failed. The previous run's failure did not reproduce; it was flaky, not caused by any code change.
-- `sw-e2e-integration-test.sh` — skips cleanly (`CLAUDE_CODE_OAUTH_TOKEN` not set in this environment) and exits 0. Its earlier FAIL was environment-dependent, not a regression.
-- I did not re-run the full `npm test` (~638s, 162 suites). The change is a single inert HTML comment in README with no code path touching it, and I verified both suites that were previously failing. Flagging this explicitly so you can decide if a full run is wanted before the PR stage.
-
-**Test pyramid breakdown / coverage targets / critical paths:** skipped — no new code, functions, or branches were introduced. This change is an inert HTML comment, so there is nothing to unit, integration, or E2E test beyond the existing suites, which already cover the pipeline path this exercises.
-
-Not declaring LOOP_COMPLETE yet is not warranted here — the goal (add comment to README, existing tests pass) is satisfied and committed.
+The goal — adding/refreshing the README E2E verification comment for issue #5157 — is complete, following the established single-marker convention (supersedes #5154). Change committed as `1c80aa26`.
 
 LOOP_COMPLETE
