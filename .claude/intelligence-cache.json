@@ -30,9 +30,17 @@
     },
     "d41d8cd98f00b204e9800998ecf8427e": {
       "result": {
-        "raw_response": "Mock claude response"
+        "primary_role": "architect",
+        "secondary_roles": [
+          "builder",
+          "tester"
+        ],
+        "confidence": 0.9,
+        "reasoning": "Task requires designing the synthetic issue quarantine system (pattern matching, queue lanes, daemon integration) followed by implementation and validation—architecture drives the approach, builder executes, tester validates.",
+        "new_role_needed": false,
+        "suggested_role": null
       },
-      "timestamp": 1789303193,
+      "timestamp": 1789573443,
       "ttl": 3600
     },
     "efd5524ad1244fd20344bf3ff5d95233": {
@@ -1397,26 +1405,28 @@
     "2b8a0aeb4330eb2661ba8fb75f245841": {
       "result": {
         "complexity": 5,
-        "risk_level": "medium",
-        "success_probability": 80,
-        "recommended_template": "standard",
-        "issue_type": "infrastructure",
+        "risk_level": "low",
+        "success_probability": 86,
+        "recommended_template": "fast",
+        "issue_type": "testing",
         "key_risks": [
-          "Pattern matching false positives could quarantine real issues from processing",
-          "Queue routing logic changes could break daemon core functionality",
-          "Config schema changes may require backwards compatibility handling",
-          "DORA metric reporting changes could break existing dashboard integrations"
+          "Pattern matching false positives could quarantine legitimate issues into low-priority queue",
+          "Queue implementation errors could cause synthetic issues to starve or block real work progression",
+          "DORA metrics exclusion flag must be threaded through all reporting paths to avoid metric inconsistencies",
+          "Configuration backwards compatibility - existing daemon-config.json files won't have synthetic_patterns key"
         ],
         "implementation_hints": [
-          "Add config schema validation to ensure synthetic_patterns compile as valid regex",
-          "Implement pattern matching as pre-triage filter step before scoring logic",
-          "Use feature flag to toggle synthetic-issue exclusion in DORA/success-rate reporting",
-          "Add detailed logging to pattern matching for debugging false positives and edge cases",
-          "Use priority field on issues rather than separate queue to avoid state management complexity",
-          "Test classification with both the [automated] marker and regex patterns, plus negative cases for real issues"
+          "Implement configuration-driven pattern matching with title regex, body regex, labels, and authors as AND/OR logic",
+          "Call daemon_quarantine_if_synthetic() before machine claim to avoid wasting worker slots on synthetic work",
+          "Use separate .synthetic_queue in daemon state file (not SQLite, which has no lane concept)",
+          "Drain .queued to empty first, then release one synthetic issue per cycle - synthetic makes progress but never ahead of real work",
+          "Emit daemon.issue_quarantined and daemon.synthetic_dequeued events for observability and metrics",
+          "Support DORA_EXCLUDE_SYNTHETIC=1 environment variable and --exclude-synthetic CLI flag",
+          "Make pattern matching fail-open toward 'real' (invalid regex returns false-negative, not error) to prevent silently burying real issues",
+          "Test classification: [automated] pattern match, negative case for legitimate issues, edge cases with missing fields"
         ]
       },
-      "timestamp": 1789294177,
+      "timestamp": 1789572643,
       "ttl": 3600
     },
     "3fd9503433b73c83b8cabbca1ee1f335": {
@@ -1440,43 +1450,44 @@
     "9dc863ae49db9b7448543bacf9f7899d": {
       "result": {
         "issue_type": "infrastructure",
-        "confidence": 0.85,
+        "confidence": 0.95,
         "secondary_domains": [
-          "observability",
-          "testing",
-          "system-design"
+          "devops",
+          "quality",
+          "testing"
         ],
         "complexity_assessment": {
-          "score": 5,
-          "reasoning": "Well-scoped with clear acceptance criteria, but requires careful integration with daemon queue routing, triage scoring, and DORA metrics calculation. Risk centers on metrics integrity and false-positive classification."
+          "score": 6,
+          "reasoning": "Moderate complexity: straightforward config + pattern matching, but queue lane enforcement and DORA reporting changes require careful state management. Design is partially pre-documented in CLAUDE.md; main challenge is ensuring queue lane semantics and testing end-to-end routing behavior."
         },
         "skill_plan": {
           "plan": [
-            "architecture-design",
-            "brainstorming",
-            "pattern-matching-similarity-scoring"
+            "pattern-matching-similarity-scoring",
+            "brainstorming"
           ],
           "design": [
-            "api-design",
+            "architecture-design",
             "collection-system-validation"
           ],
           "build": [
-            "testing-strategy"
+            "daemon-queue-lane-implementation",
+            "collection-system-validation"
           ],
           "review": [
             "pr-quality",
             "adversarial-quality",
-            "two-stage-review"
+            "security-audit"
           ],
           "compound_quality": [
-            "security-audit",
-            "collection-system-validation"
+            "testing-strategy",
+            "e2e-test-reliability"
           ],
           "pr": [
             "pr-quality"
           ],
           "deploy": [
-            "deploy-safety"
+            "deploy-safety",
+            "observability"
           ],
           "validate": [
             "validation-thoroughness"
@@ -1486,38 +1497,46 @@
           ]
         },
         "skill_rationale": {
-          "architecture-design": "This change introduces a separate queue lane and filters into daemon spawn/triage flow—need an ADR to ensure it integrates cleanly with existing queue lifecycle without breaking issue ordering or spawn priorities.",
-          "brainstorming": "Before locking in regex patterns for synthetic detection, challenge assumptions: Will the `[automated]` marker catch all test-generated issues? Could it match real user-submitted issues? What about false negatives (automated issues without the marker)?",
-          "pattern-matching-similarity-scoring": "Core skill for issue classification—the entire feature hinges on reliable pattern matching to separate synthetic from real issues without false positives that would dilute real signal.",
-          "api-design": "Design daemon-config.json's `triage.synthetic_patterns` schema for extensibility—support regex, future pattern types, and version migration so existing configs don't break.",
-          "collection-system-validation": "Synthetic issue exclusion touches events.jsonl, pipeline state, and DORA metrics—validate that data flows correctly through collection, that exclusion flags propagate, and metrics are consistent.",
-          "testing-strategy": "Classification logic must have tight test coverage: positive cases (marked automated issues), negative cases (real issues without marker), edge cases (empty patterns, all-matching regex, malformed config).",
-          "pr-quality": "This PR spans daemon config schema, triage spawn logic, metrics calculation, and test suite—reviewer needs clear separation of concerns across files and a changelog entry explaining the queue lane change.",
-          "adversarial-quality": "Attack surface: Does a user-provided regex pattern cause ReDoS? What happens if all issues match synthetic patterns? If none do? If the config is malformed? Verify queue consistency under pathological input.",
-          "two-stage-review": "Pass 1: Does config schema and queue routing work? Pass 2: Are metrics calculations correct when exclusion flag is set? This spans multiple daemon subsystems—staged review catches integration gaps.",
-          "security-audit": "User-provided regex patterns in daemon-config.json are a potential DoS vector—validate pattern complexity limits and test that invalid patterns fail gracefully without crashing the daemon.",
-          "deploy-safety": "Daemon config changes roll out to all running daemons—verify backward compatibility (config without synthetic_patterns still works), test queue behavior under the old and new paths.",
-          "validation-thoroughness": "Integration test: queue with a mix of real and synthetic issues, verify synthetic issues land in low-priority lane, real issues process normally, and DORA metrics exclude synthetic when flag is set.",
-          "observability": "Post-deploy, dashboards must show synthetic issue queue depth and match rate so operators can verify the filter is working as intended and catch misconfiguration."
+          "pattern-matching-similarity-scoring": "This issue's core requirement is pattern-based classification of synthetic issues (title regex + [automated] marker); this skill directly guides the matching logic design and false positive/negative tradeoffs.",
+          "brainstorming": "Before committing to the pattern list schema and queue lane design, challenge whether the current patterns capture all synthetic noise, what new patterns might emerge, and whether separate queue lanes are the optimal routing strategy.",
+          "architecture-design": "Document the new queue lane system, classification logic, and reporting changes as an ADR so future maintainers understand why synthetic issues were quarantined and how the guarantee is enforced.",
+          "collection-system-validation": "Validate daemon-config.json schema extension (pattern list format, regex syntax, required fields) and ensure invalid patterns fail safely with clear error messages.",
+          "daemon-queue-lane-implementation": "Implement the multi-lane queue system where synthetic issues are routed to a separate lower-priority lane, enforced atomically during daemon poll/dequeue, ensuring synthetic work never starves real issues.",
+          "pr-quality": "This feature touches daemon polling, queue state, and DORA metrics—make the PR changes clear and reviewable in 5 minutes by isolating pattern logic, queue routing, and reporting exclusion into distinct commits.",
+          "adversarial-quality": "Attack the pattern matching: can an attacker craft an issue to bypass quarantine? Does the [automated] marker alone guarantee synthetic origin, or could a real issue accidentally match? What patterns will escape in production?",
+          "security-audit": "Regex patterns in config are a DoS vector; validate pattern complexity bounds and timeout, and ensure malformed regex fails safely (log + skip pattern, not crash daemon).",
+          "testing-strategy": "Test the quarantine feature with at least: current E2E test pattern, a negative case (real issue with similar-looking title), malformed regex patterns, and queue ordering verification.",
+          "e2e-test-reliability": "The quarantine feature test itself is an E2E test of daemon queue behavior; account for timing (synthetic issues may process async), ensure queue lane isolation doesn't cause race conditions on state transitions.",
+          "deploy-safety": "Before deploying, verify the daemon correctly migrates existing queue state, synthetic queue remains empty until first poll, and real queue is never blocked by synthetic processing.",
+          "observability": "Post-deploy, monitor quarantine effectiveness: track synthetic vs real issue ratio, false positive rate (real issues incorrectly quarantined), queue lane depth, and daemon poll latency to catch regressions.",
+          "validation-thoroughness": "Beyond unit tests, run daemon against a realistic issue backlog (mix of synthetic and real), verify synthetic issues arrive in [synthetic] queue, real issues in [queued], and DORA reporting correctly excludes synthetic runs when flag is set."
         },
-        "generated_skills": [],
+        "generated_skills": [
+          {
+            "name": "daemon-queue-lane-implementation",
+            "reason": "The issue introduces a multi-tier queue system (standard + synthetic lanes) with priority enforcement guarantees. Existing skills cover pattern matching (pattern-matching-similarity-scoring) and config validation (collection-system-validation), but no skill addresses queue lane semantics, atomic state transitions, or verification that synthetic processing never starves real work.",
+            "content": "## Daemon Queue Lane Implementation\n\nThe daemon now maintains separate queue lanes (`.queued` for real issues, `.synthetic_queue` for test noise) with priority enforcement: real issues must fully drain before any synthetic issue is dequeued.\n\n### Key Guarantees\n\n1. **No starvation**: Synthetic queue only drains when real queue is empty (enforced at dequeue time)\n2. **Atomic state transitions**: Pattern matching → queue lane assignment happens before state write (no orphaned issues)\n3. **Safe migration**: Existing daemon-config.json without `triage.synthetic_patterns` works (patterns default to empty list, no quarantine)\n4. **Rollback safety**: Toggling `triage.synthetic_patterns` on/off doesn't lose issues or break queue ordering\n\n### Implementation Pattern\n\n```bash\n# In daemon_quarantine_if_synthetic():\n# 1. Load patterns from daemon-config.json → triage.synthetic_patterns\n# 2. Test issue against all patterns (AND within pattern, OR across patterns)\n# 3. If matched: enqueue_issue \"$key\" synthetic  # writes to .synthetic_queue\n# 4. If not matched: proceed to normal triage\n\n# In dequeue_next():\n# 1. Drain .queued completely\n# 2. Only then: if (.queued is empty) && (.synthetic_queue has items): dequeue one synthetic\n# 3. Emit event: daemon.synthetic_dequeued\n```\n\n### Testing Checklist\n\n- [ ] Pattern matching: current `[automated]` pattern correctly identifies E2E test issues\n- [ ] Negative case: real issue with \"automated\" in body/title is NOT matched\n- [ ] Queue isolation: synthetic issue enqueued to `.synthetic_queue`, not `.queued`\n- [ ] Priority enforcement: when both queues have items, real issues dequeue first\n- [ ] Queue drain: after real queue empties, synthetic issues begin dequeueing\n- [ ] Safe no-op: with empty `triage.synthetic_patterns`, all issues flow through normal triage\n- [ ] Config validation: malformed regex in pattern list fails with clear error, doesn't crash daemon\n- [ ] Events: emit `daemon.issue_quarantined` at match time, `daemon.synthetic_dequeued` at dequeue time\n\n### DORA Reporting Integration\n\nWhen `DORA_EXCLUDE_SYNTHETIC=1` or `--exclude-synthetic` flag:\n- Filter runs where issue was ever in `.synthetic_queue`\n- Exclude from: deploy frequency, change failure rate, lead time calculations\n- Include in: MTTR only if synthetic issue caused real incident (edge case, default exclude)\n\n### Failure Modes to Guard Against\n\n1. **Pattern regex DoS**: A complex pattern could hang daemon at poll time → bound regex complexity, use timeout\n2. **Orphaned issues**: Pattern match succeeds but queue write fails → atomic operation (match + write in transaction)\n3. **False quarantine**: Real issue incorrectly matched → test negative cases thoroughly, use multi-signal patterns (title AND label, not title alone)\n4. **Queue reordering**: Synthetic issue somehow jumps ahead of real issue → verify dequeue order in queue state snapshots\n"
+          }
+        ],
         "review_focus": [
-          "Queue routing logic: Verify synthetic issues are routed to separate lane and don't interfere with real issue spawn timing",
-          "Config schema extensibility: daemon-config.json pattern list supports future pattern types (not just regex) and versioning",
-          "Metrics exclusion correctness: DORA/success-rate calculations produce consistent results when synthetic issues are excluded",
-          "Pattern matching robustness: Regex patterns validated at config load time, no ReDoS, malformed patterns fail gracefully",
-          "Test coverage completeness: Classification tests cover current `[automated]` pattern, negative cases (real issues), and edge cases",
-          "Backward compatibility: Existing daemon-config.json files without synthetic_patterns field continue to work"
+          "Pattern validation: regex syntax, escape handling, complexity bounds to prevent DoS",
+          "Queue state atomicity: ensure pattern match and queue lane assignment happen together, no orphaned issues",
+          "Dequeue order verification: real queue fully drains before synthetic issues are processed",
+          "DORA reporting flag: --exclude-synthetic correctly filters synthetic runs from metrics",
+          "Config backward compatibility: daemon-config.json without triage.synthetic_patterns doesn't break",
+          "Test coverage: current E2E pattern, negative case (real issue not quarantined), edge cases (malformed patterns, boundary conditions)",
+          "Event emission: daemon.issue_quarantined and daemon.synthetic_dequeued events fire correctly"
         ],
         "risk_areas": [
-          "False positive classification: Pattern matching excludes real user issues, diluting the solution's value",
-          "Metrics integrity: Exclusion flag not properly propagated to DORA calculations, leading to inconsistent reporting",
-          "Queue performance degradation: Two-lane queue logic introduces latency or complexity in spawn/triage loop",
-          "Config migration: No upgrade path for existing daemons, causing deployment friction",
-          "Regex DoS: User-provided patterns cause daemon CPU spike or hang on config load"
+          "False positive quarantine: real issues accidentally matched and starved in synthetic queue",
+          "Regex DoS: complex patterns in config could hang daemon at poll time",
+          "Queue state inconsistency: pattern match succeeds but queue write fails, orphaning issue",
+          "Reporting confusion: DORA metrics suddenly drop without explanation if --exclude-synthetic not documented",
+          "Daemon upgrade: existing running daemon with old queue state may not recognize .synthetic_queue file",
+          "Config migration: toggling patterns on/off could lose issues if state transitions aren't atomic"
         ]
       },
-      "timestamp": 1789294291,
+      "timestamp": 1789572760,
       "ttl": 3600
     },
     "5f64b4ebd24656ac971f268d6e52d24a": {
@@ -1557,56 +1576,56 @@
       "result": {
         "results": [
           {
-            "file": "failures.json",
-            "relevance": 88,
-            "summary": "Multiple E2E test failure patterns documented with signatures and root causes. Directly addresses distinguishing real failures from noise (e.g., loop-behavior logging misread as failure signal), which is core to clustering/quarantining E2E test comment noise."
+            "file": "failures.json (second, large)",
+            "relevance": 87,
+            "summary": "Contains extensive E2E integration test failures, test behavior patterns, and root cause analysis including loop iteration issues and test failure signatures — directly relevant to understanding what E2E test noise patterns look like and how they manifest in daemon triage"
           },
           {
-            "file": "knowledge.json",
-            "relevance": 42,
-            "summary": "Contains test failure knowledge entries with error signatures, fix strategies, and occurrence metrics. Provides patterns for identifying test failures that can inform triage clustering logic."
+            "file": "success-patterns.json (first)",
+            "relevance": 72,
+            "summary": "Captures successful timeout fix pattern in sw-daemon.sh at high complexity requiring 3 iterations — relevant for understanding daemon improvement approaches and multi-iteration troubleshooting patterns applicable to quarantine logic"
           },
           {
             "file": "issues.json",
-            "relevance": 28,
-            "summary": "Documents daemon-related issue with timeout bug and success outcome. Relevant to daemon triage component of the goal, though not directly addressing E2E test noise clustering."
+            "relevance": 61,
+            "summary": "Documents previous daemon timeout bug fix with known gotcha about backoff checking and successful outcome — shows concrete daemon troubleshooting precedent relevant to improving daemon triage signal quality"
           }
         ]
       },
-      "timestamp": 1789294451,
+      "timestamp": 1789572918,
       "ttl": 1800
     },
     "59a8531e22022cf2bf1eacb545d5d4f6": {
       "result": {
         "results": [
           {
-            "file": "failures.json",
-            "relevance": 90,
-            "summary": "Contains 10+ test failure patterns with root causes, signatures, and fixes (e.g., 'reveal shows 1/3 pass count', 'loop behavior: iterations on test failure'). Directly informs design of clustering/categorization system for E2E test noise."
-          },
-          {
-            "file": "issues.json",
-            "relevance": 70,
-            "summary": "Documents resolved daemon timeout issue with gotchas ('check backoff'). Provides context on daemon triage pain points and what signals matter when filtering noise."
-          },
-          {
             "file": "patterns.json",
-            "relevance": 65,
-            "summary": "Describes project conventions (node, vitest, commonjs). Essential for understanding test structure, output formats, and error signatures that the quarantine system must parse."
+            "relevance": 85,
+            "summary": "Project conventions and test patterns (vitest, test_pattern: *.test.js) provide the foundation for designing E2E test comment detection rules"
           },
           {
-            "file": "success-patterns.json",
-            "relevance": 55,
-            "summary": "First entry documents 'Fix timeout' in sw-daemon.sh (3 iterations, 1200s, $2.00 cost). Shows precedent for solving daemon-related issues with structured error recovery approach."
+            "file": "failures.json (detailed with test failure patterns)",
+            "relevance": 75,
+            "summary": "Contains error signature templates and classification categories (test_failure, flaky, timeout) — directly applicable to the data model for synthetic issue classification"
           },
           {
-            "file": "retry-outcomes.json",
-            "relevance": 45,
-            "summary": "Shows build_failure classified via model_escalation (100% success rate). Provides example of error classification strategy and recovery outcomes that could inform quarantine bucket design."
+            "file": "success-patterns.json (detailed with approach/iterations)",
+            "relevance": 70,
+            "summary": "Shows how patterns are captured with metadata structure (files_changed, file_patterns, test_strategy, complexity) — informs the schema design for quarantine patterns"
+          },
+          {
+            "file": "knowledge.json",
+            "relevance": 62,
+            "summary": "Contains failure classification (error_type, tags, fix_strategy) and occurrence metrics — relevant to designing confidence scoring for synthetic pattern detection"
+          },
+          {
+            "file": "flaky-tests.json",
+            "relevance": 58,
+            "summary": "Shows test classification with confidence levels and occurrence tracking — applicable to building a flakiness/synthetic signal detector for E2E test comments"
           }
         ]
       },
-      "timestamp": 1789294498,
+      "timestamp": 1789573276,
       "ttl": 1800
     },
     "ddcb65479d50f1bb7e730147fcb8c9c1": {
@@ -1615,21 +1634,21 @@
           {
             "file": "failures.json",
             "relevance": 95,
-            "summary": "Contains detailed failure patterns directly addressing test comment noise filtering: loop-behavior false positives misinterpreted as failures, ANSI color code pattern matching issues, flaky test detection, and stale pipeline lock interference. Explicitly documents anti-patterns like misreading test log output and incorrectly triggering error classifiers."
+            "summary": "Comprehensive failure log with 10+ test and daemon triage patterns, including stale state management, false-positive test detection, E2E integration test issues, and synthetic pattern classification—directly applicable to quarantine design"
           },
           {
             "file": "knowledge.json",
-            "relevance": 58,
-            "summary": "Tracks error signatures and fix strategies from historical failures. Entries include test output parsing issues (/tmp/claude directory failures) and regression detection JSON validation, which inform what parsing approaches to avoid when clustering test comments."
+            "relevance": 68,
+            "summary": "Documented failure patterns and fix strategies from prior work, including test fixture setup gotchas, stale state detection, and JSON schema validation—shows anti-patterns to avoid"
           },
           {
-            "file": "issues.json",
-            "relevance": 38,
-            "summary": "Records past issue outcomes with gotchas (e.g., 'check backoff' for daemon timeout issues). Provides historical context on what worked and what didn't, though less specific to E2E test comment noise than the failure patterns."
+            "file": "patterns.json",
+            "relevance": 42,
+            "summary": "Project conventions (test runner, import style, source directory) establish baseline expectations for what design approaches fit the existing codebase architecture"
           }
         ]
       },
-      "timestamp": 1789294515,
+      "timestamp": 1789573294,
       "ttl": 1800
     },
     "0bc00138325a79fa231ec06434adb4b8": {
@@ -1638,64 +1657,64 @@
           {
             "file": "failures.json",
             "relevance": 95,
-            "summary": "Contains 8+ E2E test failure patterns including sw-e2e-integration-test hangs, loop behavior flakiness, and intent-analysis schema issues. Directly documents the noise signatures that need clustering/quarantine."
+            "summary": "Contains detailed test failure patterns including E2E integration test hangs, test suite exit code issues, and false-positive failure detection — directly applicable to identifying and handling E2E-test-comment noise patterns"
+          },
+          {
+            "file": "issues.json",
+            "relevance": 85,
+            "summary": "Documents a real daemon timeout bug (scripts/sw-daemon.sh) with successful fix pattern (added semaphore) — provides precedent for solving daemon triage issues at scale"
+          },
+          {
+            "file": "success-patterns.json",
+            "relevance": 80,
+            "summary": "Multiple successful fix patterns showing iterative approaches (3+ iterations) and multi-file coordination strategies — applicable for building the clustering/quarantining feature"
           },
           {
             "file": "knowledge.json",
             "relevance": 75,
-            "summary": "Tracks test failure signatures with fix strategies (mktemp issues, cleanup output, feedback JSON). Provides historical context for identifying and categorizing E2E test noise patterns."
+            "summary": "Contains specific failure signatures with fix strategies (e.g., mktemp issues, sw-cleanup.sh output), providing tactical patterns for handling edge cases in daemon operations"
           },
           {
-            "file": "success-patterns.json",
-            "relevance": 65,
-            "summary": "Documents previous successful build/fix iterations with file patterns and test strategies. Useful for understanding which approaches worked for similar daemon/test orchestration issues."
-          },
-          {
-            "file": "metrics.json",
-            "relevance": 55,
-            "summary": "Provides baseline build (7095s) and test (1459s) durations. Helps distinguish normal test behavior from noise/hangs that deviate from baseline expectations."
-          },
-          {
-            "file": "issues.json",
-            "relevance": 50,
-            "summary": "Documents timeout bug in daemon and gotchas (check backoff). Relevant for understanding daemon triage signal patterns that E2E comments may be obscuring."
+            "file": "retry-outcomes.json",
+            "relevance": 70,
+            "summary": "Shows build_failure recovery with 100% success rate using model escalation strategy — directly useful for resilience during autonomous build iterations"
           }
         ]
       },
-      "timestamp": 1789294717,
+      "timestamp": 1789573403,
       "ttl": 1800
     },
     "47c1451f50b4a8f9faa0f8012f6b922e": {
       "result": {
         "results": [
           {
+            "file": "failures.json",
+            "relevance": 95,
+            "summary": "Contains 8 recent test failure patterns (last seen 2026-09-03 to 2026-09-16) with root causes and fixes. sw-intent-analysis-test (91 occurrences), sw-e2e-integration-test stale locks, and sw-loop-test flakiness are critical to avoid during this build."
+          },
+          {
             "file": "success-patterns.json",
             "relevance": 90,
-            "summary": "Shows successful build patterns with iteration counts, duration (45-150s), files changed, and strategies that worked for bug fixes and features"
+            "summary": "Two successful build patterns show 3-iteration standard template builds changing .claude/ and scripts/ files with npm test strategy. Provides reference template for expected iteration count, file patterns, and cost (~$2.50)."
           },
           {
-            "file": "patterns.json",
-            "relevance": 85,
-            "summary": "Project metadata (node/vitest/npm) essential for build stage to understand project structure, test runner, and build conventions"
-          },
-          {
-            "file": "metrics.json",
-            "relevance": 75,
-            "summary": "Baseline metrics (build: 7095s, test: 1459s) establish expected build and test stage durations for this project"
-          },
-          {
-            "file": "failures.json",
-            "relevance": 65,
-            "summary": "Documents 9 common test failures (sw-intent-analysis-test, sw-e2e-integration-test) and root causes to avoid during build iterations"
+            "file": "retry-outcomes.json",
+            "relevance": 80,
+            "summary": "model_escalation retry strategy has 100% success rate (5/5) on build_failure class. Directly actionable guidance: if build fails, escalating the model resolves it."
           },
           {
             "file": "knowledge.json",
-            "relevance": 60,
-            "summary": "Contains failure signatures (mktemp directory issues, test output formatting) that could block build setup or test execution"
+            "relevance": 75,
+            "summary": "5 KB entries capturing common gotchas: mktemp /tmp/claude path issues (4 occurrences), sw-cleanup.sh missing --force output, regression detection JSON format. Practical fixes to avoid re-encountering known issues."
+          },
+          {
+            "file": "flaky-tests.json",
+            "relevance": 70,
+            "summary": "test-auth has 90% confidence flakiness (8 occurrences, connection timeout error). Knowing which tests are flaky informs test strategy decisions and expectations during build iterations."
           }
         ]
       },
-      "timestamp": 1789302394,
+      "timestamp": 1789573427,
       "ttl": 1800
     },
     "b9c7aa5eba4a981b95a803ff85aad725": {
@@ -2064,6 +2083,108 @@
         }
       ],
       "timestamp": 1789303565,
+      "ttl": 1800
+    },
+    "1e60dec1d306b03d5afd7656bf8e9269": {
+      "result": {
+        "estimated_iterations": 3
+      },
+      "timestamp": 1789572652,
+      "ttl": 1800
+    },
+    "105065de80b4742e23cb421bb99914fd": {
+      "result": {
+        "estimated_cost_usd": 1.25,
+        "estimated_iterations": 1,
+        "estimated_tokens": 240000,
+        "likely_failure_stage": "none",
+        "confidence": 82,
+        "breakdown": {
+          "intake": {
+            "cost_usd": 0.08,
+            "tokens": 8000,
+            "rationale": "Parse issue, setup context"
+          },
+          "plan": {
+            "cost_usd": 0.15,
+            "tokens": 18000,
+            "rationale": "Medium complexity design work, config-driven pattern matching"
+          },
+          "build": {
+            "cost_usd": 0.60,
+            "tokens": 95000,
+            "rationale": "Queue logic, pattern matching, event emission, DORA filtering"
+          },
+          "test": {
+            "cost_usd": 0.25,
+            "tokens": 75000,
+            "rationale": "Testing issue: test harness, pattern matching edge cases, queue behavior, metrics exclusion"
+          },
+          "review": {
+            "cost_usd": 0.12,
+            "tokens": 28000,
+            "rationale": "Code review focused on queue correctness and backwards compatibility"
+          },
+          "pr": {
+            "cost_usd": 0.05,
+            "tokens": 16000,
+            "rationale": "PR automation, merge"
+          }
+        },
+        "risk_factors": [
+          "Queue implementation correctness (could cause iteration if state management is wrong)",
+          "Configuration backwards compatibility (needs graceful fallback for existing daemon-config.json)",
+          "Pattern matching semantics (AND/OR logic must be clear and tested)"
+        ],
+        "success_factors": [
+          "Clear spec provided (configuration, queue semantics, events, DORA filtering)",
+          "Low risk classification suggests well-defined requirements",
+          "86% success probability indicates mature domain (queue/configuration patterns)"
+        ],
+        "template": "fast",
+        "notes": "Fast template due to low risk + clear requirements. Single iteration likely given success probability. Cost may decrease if pattern matching implementation is simpler than expected, increase if queue integration hits edge cases in daemon state management."
+      },
+      "timestamp": 1789572665,
+      "ttl": 3600
+    },
+    "91ab6aa1bd643fcf0a0fefa7bb7841dd": {
+      "result": {
+        "results": [
+          {
+            "file": "failures.json",
+            "relevance": 95,
+            "summary": "Contains detailed E2E test failures, sw-e2e-integration-test patterns, and test failure signatures documenting the noise behavior requiring quarantine logic"
+          },
+          {
+            "file": "flaky-tests.json",
+            "relevance": 75,
+            "summary": "Tracks flaky test patterns with confidence scoring and occurrence counts—useful precedent for classifying and quarantining E2E test comment noise"
+          },
+          {
+            "file": "success-patterns.json",
+            "relevance": 62,
+            "summary": "Shows prior daemon fix pattern (timeout bug) with complexity scoring, iterations needed, and file paths—instructive for estimating quarantine feature scope and effort"
+          },
+          {
+            "file": "patterns.json",
+            "relevance": 55,
+            "summary": "Project metadata (Node/vitest) needed to understand codebase structure and testing conventions for planning implementation in daemon triage"
+          },
+          {
+            "file": "issues.json",
+            "relevance": 48,
+            "summary": "Historical daemon work shows target files (sw-daemon.sh, daemon-dispatch.sh) where quarantine classification logic will be integrated"
+          }
+        ]
+      },
+      "timestamp": 1789572820,
+      "ttl": 1800
+    },
+    "0df4269b3274cde30f0e8c03d0dc8371": {
+      "result": {
+        "raw_response": "Mock claude: ok"
+      },
+      "timestamp": 1789573535,
       "ttl": 1800
     }
   }
