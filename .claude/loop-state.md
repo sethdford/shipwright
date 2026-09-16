@@ -13,38 +13,40 @@ Historical context (lessons from previous pipelines):
 {
   "results": [
     {
-      "file": "failures.json",
-      "relevance": 90,
-      "summary": "Multiple entries document E2E integration test failures, flakiness, and loop iteration issues; directly applicable to debugging E2E test build stage behavior"
+      "file": "patterns.json",
+      "relevance": 95,
+      "summary": "Defines project conventions (node, vitest, npm, javascript, src/ source directory) that are essential for the build stage to function correctly"
     },
     {
-      "file": "patterns.json",
-      "relevance": 82,
-      "summary": "Describes project structure (node type, vitest runner, commonjs imports) — essential context for understanding how this repo builds and tests"
+      "file": "failures.json (second)",
+      "relevance": 85,
+      "summary": "Documents recent test failures (2026-09-16) with root causes and fixes including test suite issues, flaky patterns, and timeouts that could inform debugging if the E2E test fails"
+    },
+    {
+      "file": "success-patterns.json (second)",
+      "relevance": 80,
+      "summary": "Shows 2 successful patterns with similar complexity, iterations (3-4), test strategies (npm test), and file patterns that provide a reference model for this E2E test build"
     },
     {
       "file": "retry-outcomes.json",
-      "relevance": 72,
-      "summary": "Documents successful model escalation recovery strategy for build failures (100% success rate across 5 attempts) — applicable if current build needs recovery"
-    },
-    {
-      "file": "success-patterns.json",
-      "relevance": 68,
-      "summary": "Shows pattern of 3-iteration fixes using npm test strategy on similar automation tasks — provides reference for expected iteration count and test approach"
+      "relevance": 75,
+      "summary": "Demonstrates that model_escalation strategy achieves 100% success rate (5/5) for build_failure class, providing a proven recovery strategy if the build fails"
     },
     {
       "file": "metrics.json",
       "relevance": 65,
-      "summary": "Establishes baseline expectations: build duration 7095s, test duration 1459s — helps set realistic time budgets for current build stage execution"
+      "summary": "Establishes performance baselines (build: 7095s, test: 1459s) that set expectations for how long this E2E test build and verification should take"
     }
   ]
 }
 
 Discoveries from other pipelines:
-✓ Injected 11 new discoveries
+✓ Injected 13 new discoveries
 [intake] Stage intake completed — Resolution: 
 [spec_generation] Stage spec_generation completed — Resolution: 
 [design] Design completed for Cluster and quarantine E2E-test-comment noise to unblock signal in daemon triage — Resolution: 
+[intake] Stage intake completed — Resolution: 
+[spec_generation] Stage spec_generation completed — Resolution: 
 [intake] Stage intake completed — Resolution: 
 [spec_generation] Stage spec_generation completed — Resolution: 
 [intake] Stage intake completed — Resolution: 
@@ -87,8 +89,8 @@ Task tracking (check off items as you complete them):
 
 ## Skill Guidance (testing issue, AI-selected)
 ### Why these skills were selected (AI-analyzed):
-- **e2e-test-reliability**: E2E tests are inherently flaky with filesystem and timing dependencies—this skill ensures the synthetic test executes reliably without false failures masking actual reliability issues.
-- **testing-strategy**: Apply systematic patterns for test execution, output validation, and safe completion—critical for synthetic tests that must not contaminate real DORA metrics or consume real issue-processing capacity.
+- **e2e-test-reliability**: E2E tests are inherently flaky; this test must survive async timing, filesystem state races, and parallel CI runs—requires explicit isolation and determinism patterns.
+- **test-parallelization-detection**: Detect hidden shared state (temp directories, cached modules, file locks) that cause the test to fail when run in parallel with other tests; critical for daemon reliability.
 
 ## E2E Test Reliability & Flakiness Prevention
 
@@ -124,53 +126,71 @@ E2E tests are inherently flaky: they touch real filesystems, have timing depende
 - Use deterministic test data (no timestamps, UUIDs, or random content)
 - If the test modifies README, restore it using `git checkout` in cleanup
 
-## Testing Strategy Expertise
+## Test Parallelization Detection & Coordination
 
-Apply these testing patterns:
+### Problem
+Test parallelization is dangerous: undetected shared state (temp files, global state, database connections) causes race conditions and flaky failures. This skill provides a systematic approach to detect parallelizable test suites and coordinate their execution safely.
 
-### Test Pyramid
-- **Unit tests** (70%): Test individual functions/methods in isolation
-- **Integration tests** (20%): Test component interactions and boundaries
-- **E2E tests** (10%): Test critical user flows end-to-end
+### Shared State Detection Heuristics
 
-### What to Test
-- Happy path: the expected successful flow
-- Error cases: what happens when things go wrong?
-- Edge cases: empty inputs, maximum values, concurrent access
-- Boundary conditions: off-by-one, empty collections, null/undefined
+**Static Analysis (file scanning):**
+- Scan test file imports for singleton patterns (db connections, file handles, global state modules)
+- Detect hardcoded file paths (temp dirs) and network ports — tests using fixed resources conflict
+- Check for `beforeAll`/`afterAll` hooks that modify global state
+- Identify test files importing shared fixtures/setup modules
 
-### Test Quality
-- Each test should verify ONE behavior
-- Test names should describe the expected behavior, not the implementation
-- Tests should be independent — no shared mutable state between tests
-- Tests should be deterministic — same result every run
+**Dynamic Analysis (test execution):**
+- Run test suite with `--detectOpenHandles` (Node.js) or equivalent to catch file/port leaks
+- Track temp directory usage per test file — any overlap = unsafe to parallelize
+- Monitor for test isolation violations (tests passing in isolation but failing when run together)
 
-### Coverage Strategy
-- Aim for meaningful coverage, not 100% line coverage
-- Focus coverage on business logic and error handling
-- Don't test framework code or simple getters/setters
-- Cover the branches, not just the lines
+**Safety Levels:**
+- **Green (parallelizable)**: No shared state detected, no fixture conflicts, passes isolation tests
+- **Yellow (conditional)**: Shared fixtures but isolated datasets, parallel execution with coordination (e.g., separate DB schemas)
+- **Red (sequential)**: Database transaction rollback, process spawning, hardware resource contention — must run serially
 
-### Mocking Guidelines
-- Mock external dependencies (APIs, databases, file system)
-- Don't mock the code under test
-- Use realistic test data — edge cases reveal bugs
-- Verify mock interactions when the side effect IS the behavior
+### Affected-Test Detection via Git Diff
 
-### Regression Testing
-- Write a failing test FIRST that reproduces the bug
-- Then fix the bug and verify the test passes
-- Keep regression tests — they prevent the bug from recurring
+**Module Dependency Tracking:**
+1. Build module-to-test mapping (which tests exercise which modules)
+2. On each commit, run `git diff --name-only HEAD~1` to identify changed modules
+3. Find all tests that import/test those modules
+4. Prioritize affected tests first in execution order (fail-fast on functionality regression)
+5. Cache mapping per commit to avoid re-scanning on retries
 
-### Required Output (Mandatory)
+**False Negatives to Handle:**
+- Integration tests that cross module boundaries (require broader analysis)
+- Tests that exercise shared utilities or base classes (conservative: mark as affected if any parent module changed)
+- Dynamic imports and string-based test discovery (fallback: scan test code for patterns)
 
-Your output MUST include these sections when this skill is active:
+### Parallel Execution Coordination
 
-1. **Test Pyramid Breakdown**: Explicit count of unit/integration/E2E tests and their coverage targets (e.g., "70 unit tests covering business logic, 12 integration tests for API boundaries, 3 E2E tests for critical paths")
-2. **Coverage Targets**: Target coverage percentage per layer and which critical paths MUST be tested
-3. **Critical Paths to Test**: Specific test cases for the happy path, 2+ error cases, and 2+ edge cases
+**Scheduler:**
+- Detect CPU core count, default to `cores - 1` (reserve 1 for OS)
+- Group parallelizable tests into batches, run batches in parallel
+- Within each batch, respect test file order (some test runners depend on execution order)
+- Run non-parallelizable (red) tests serially, either before or after parallel batches (configurable)
 
-If any section is not applicable, explicitly state why it's skipped.
+**Fast-Fail Policy:**
+- Critical failures: assertion errors, uncaught exceptions → abort immediately
+- Flaky failures: timeout, process exit, known-flaky markers → retry up to N times before aborting
+- Aggregate results across parallel workers before reporting
+- Time tracking: measure wall-clock time for each batch, report parallelization efficiency (theoretical vs actual speedup)
+
+### Dashboard Integration
+
+- Display parallel execution summary: N tests in M workers, X% speedup
+- Visualize test dependency graph (which tests block which)
+- Alert on shared-state violations (test passed alone, failed in parallel)
+- Trend: parallelization efficiency over time (detect regressions where new tests add serial bottlenecks)
+
+### Key Decisions for This Issue
+
+1. **Minimum Parallelization Threshold**: What's the smallest safe granularity? (per file, per suite, per test?)
+2. **Flaky Detection**: How many retries before marking as critical failure? (recommend 3)
+3. **Shared-State Confidence**: Are heuristics sufficient, or require explicit opt-in per test file?
+4. **Fast-Fail Behavior**: Abort on first critical failure globally, or let all workers finish for faster feedback iteration?
+5. **Fallback**: If parallelization detection is uncertain, run serial — safety over speed.
 "
 iteration: 0
 max_iterations: 3
@@ -178,8 +198,8 @@ status: running
 test_cmd: "npm test"
 model: sonnet
 agents: 1
-started_at: 2026-09-16T17:01:50Z
-last_iteration_at: 2026-09-16T17:01:50Z
+started_at: 2026-09-16T17:18:07Z
+last_iteration_at: 2026-09-16T17:18:07Z
 consecutive_failures: 0
 total_commits: 0
 audit_enabled: true

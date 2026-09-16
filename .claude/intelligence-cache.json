@@ -1720,22 +1720,20 @@
       "result": {
         "complexity": 2,
         "risk_level": "low",
-        "success_probability": 92,
+        "success_probability": 95,
         "recommended_template": "fast",
         "issue_type": "testing",
         "key_risks": [
-          "Synthetic test issue should be quarantined by daemon to not consume pipeline slots",
-          "README file state assumptions (may be modified between test runs)",
-          "Test artifact cleanup and idempotency"
+          "README file structure may have unexpected formatting",
+          "Comment insertion point needs to be idempotent"
         ],
         "implementation_hints": [
-          "This is a synthetic E2E test - matches daemon quarantine pattern and should not consume MAX_PARALLEL slots",
-          "Use unique/timestamped comment for safe cleanup and deduplication",
-          "Verify README modification succeeded and roll back after test completes",
-          "Safe to close as-is per issue body - no delivery action needed"
+          "Locate README.md and identify E2E verification marker section",
+          "Add or update comment using standard markdown format",
+          "Verify no merge conflicts with concurrent documentation changes"
         ]
       },
-      "timestamp": 1789574892,
+      "timestamp": 1789578961,
       "ttl": 3600
     },
     "d471dcca0bfeb656b08d76737c143be3": {
@@ -1759,100 +1757,103 @@
     "f9c9e8b2bd49e68005879dc608624768": {
       "result": {
         "issue_type": "testing",
-        "confidence": 0.95,
+        "confidence": 0.98,
         "secondary_domains": [
           "automation",
-          "e2e-testing",
-          "synthetic-test-handling"
+          "ci-cd"
         ],
         "complexity_assessment": {
           "score": 2,
-          "reasoning": "Synthetic E2E test meant for automated execution and closure. Minimal implementation complexity, but requires careful verification that test executed without side effects and proper quarantine from real work."
+          "reasoning": "Synthetic E2E test with minimal scope—labeled 'safe to close', meaning it's a generated test artifact verifying a narrow feature (README comment addition) that requires only test harness integration, not complex implementation."
         },
         "skill_plan": {
-          "plan": [],
-          "design": [],
-          "build": [
+          "plan": [
+            "synthetic-test-quarantine",
+            "testing-strategy"
+          ],
+          "design": [
             "e2e-test-reliability",
             "testing-strategy"
           ],
-          "review": [
-            "validation-thoroughness",
-            "two-stage-review"
+          "build": [
+            "e2e-test-reliability",
+            "test-parallelization-detection"
           ],
-          "compound_quality": [
+          "review": [
+            "two-stage-review",
             "e2e-test-reliability"
           ],
-          "pr": [],
+          "compound_quality": [
+            "validation-thoroughness",
+            "e2e-test-reliability"
+          ],
+          "pr": [
+            "pr-quality"
+          ],
           "deploy": [],
           "validate": [
-            "validation-thoroughness"
+            "validation-thoroughness",
+            "e2e-test-reliability"
           ],
-          "monitor": [
-            "observability"
-          ]
+          "monitor": []
         },
         "skill_rationale": {
-          "e2e-test-reliability": "E2E tests are inherently flaky with filesystem and timing dependencies—this skill ensures the synthetic test executes reliably without false failures masking actual reliability issues.",
-          "testing-strategy": "Apply systematic patterns for test execution, output validation, and safe completion—critical for synthetic tests that must not contaminate real DORA metrics or consume real issue-processing capacity.",
-          "validation-thoroughness": "Synthetic test issues require rigorous post-execution validation to confirm the test actually completed, produced expected output, and left no stale branches or dangling side effects.",
-          "two-stage-review": "Execute two-pass validation: (1) verify test setup and execution succeeded, (2) confirm no metrics pollution or resource exhaustion occurred during synthetic test processing."
+          "synthetic-test-quarantine": "This IS a synthetic test—correctly routing it to the daemon's `.synthetic_queue` prevents test noise from consuming worker slots meant for real issues, directly addressing the resource-waste problem.",
+          "testing-strategy": "E2E tests need explicit scope definition; clarify what 'add comment to README' validates (feature correctness, CI integration, automation loop closure) so reviewers assess completeness.",
+          "e2e-test-reliability": "E2E tests are inherently flaky; this test must survive async timing, filesystem state races, and parallel CI runs—requires explicit isolation and determinism patterns.",
+          "test-parallelization-detection": "Detect hidden shared state (temp directories, cached modules, file locks) that cause the test to fail when run in parallel with other tests; critical for daemon reliability.",
+          "two-stage-review": "Pass 1 validates test implementation and isolation; Pass 2 confirms the test actually exercises README-comment logic end-to-end, catching vacuous/noop tests that pass but prove nothing.",
+          "pr-quality": "Help reviewers understand in 5 minutes: What does this test verify? What behavior would fail if broken? How does it integrate with the automation loop?",
+          "validation-thoroughness": "Smoke tests that the test harness runs are insufficient; manually validate the test actually adds a comment to README in a real clone and verifies it exists—catch false positives."
         },
-        "generated_skills": [
-          {
-            "name": "synthetic-test-quarantine",
-            "reason": "No existing skill addresses the complete synthetic test lifecycle: pattern matching, queue-lane isolation, metrics-safe execution, and safe auto-close without side effects.",
-            "content": "## Synthetic Test Quarantine & Safe Lifecycle\n\nAutomated E2E tests file issues indistinguishable from real work, creating three problems: (1) resource waste—synthetic tests consume MAX_PARALLEL daemon slots, delaying real issues; (2) metrics noise—test runs inflate DORA metrics (deploy frequency, CFR, MTTR), obscuring signal; (3) false signals—incorrect pattern matching could quarantine real bugs.\n\n### Pattern Matching (High Confidence)\n\nIdentify synthetic issues using AND logic (require 3+ signals to reduce false positives):\n- **Title**: `^[Ee]2[Ee] [Tt]est`, `test:`, `automated test`, or similar keywords\n- **Body**: `\\[automated\\]`, `synthetic`, or explicit \"E2E test\" markers\n- **Labels**: `e2e-test`, `automated`, `synthetic`\n- **Author**: bot accounts (`shipwright[bot]`, GitHub Actions runner accounts)\n\n### Queue Lane Isolation\n\nMaintain two-tier processing:\n- **Primary lane** (`.queued`): Real issues—processed first, always have capacity\n- **Synthetic lane** (`.synthetic_queue`): Test noise—drained only after primary is empty\n\nEnforce: synthetic jobs NEVER starve real work. If budget exhausted, skip synthetic entirely.\n\n### Metrics-Safe Execution\n\n- Run with `--local-mode` or `--no-github` to prevent real PR/deployment creation\n- Tag all artifacts (logs, state, events) with `synthetic: true` for post-hoc filtering\n- Exclude from DORA dashboards: `shipwright dora --exclude-synthetic` removes all runs where issue was ever quarantined\n- Track synthetic test harness reliability separately (test infrastructure health, not product health)\n\n### Safe Auto-Close Protocol\n\nOnly auto-close if ALL conditions met:\n1. Test execution exited cleanly (exit 0)\n2. No unintended side effects: no stale branches, no orphaned PRs, no uncommitted state\n3. Pattern matched with high confidence (3+ signals)\n4. Grace period elapsed (allow manual override window)\n5. Log close reason: `\"closed: synthetic test completed, no side effects detected\"`\n\n### Monitoring & Observability\n\nEmit events: `daemon.issue_quarantined`, `daemon.synthetic_dequeued`, `daemon.synthetic_completed`. Track metrics: synthetic test execution rate, success rate, average runtime. Alerts on anomalies (test suddenly timing out = real issue)."
-          }
-        ],
+        "generated_skills": [],
         "review_focus": [
-          "Verify test execution completed successfully with clear PASS output (not just exit code 0)",
-          "Confirm synthetic quarantine applied correctly—issue was processed in lower-priority lane, not consuming real issue capacity",
-          "Check that no stale git branches, uncommitted changes, or dangling PRs were left behind after test execution",
-          "Validate test did NOT create real GitHub PRs or pollute DORA metrics (run with --local-mode or --no-github)"
+          "Test isolation: does the test clean up README state before/after (no cross-test pollution)?",
+          "Determinism: will this test pass reliably when run 10× in sequence, in parallel, in CI, and locally?",
+          "Scope clarity: does the test verify the actual README comment feature, or just that a subprocess ran?",
+          "Quarantine routing: is the test marked `[automated]` so the daemon correctly parks it in synthetic queue?"
         ],
         "risk_areas": [
-          "Test flakiness: Filesystem and timing dependencies cause intermittent failures—synthetic test failures must not trigger pipeline retries that consume budget",
-          "Metrics pollution: If test execution is not properly isolated, it inflates deploy frequency and change failure rate, masking real engineering signals",
-          "Pattern matching false positives: Incorrect synthetic detection could quarantine actual bugs filed with 'E2E test' in the title by humans",
-          "Side effect escape: Test execution could leak state (branches, PRs, commits) if cleanup is incomplete, requiring manual remediation",
-          "Resource starvation: Even low-priority synthetic tests should not block real issue processing when queue is full"
+          "Test flakiness: E2E tests touching real filesystem often fail on timing, missing tools, or stale state—verify cleanup hooks run before/after",
+          "Resource waste: without proper quarantine labeling, synthetic tests consume daemon worker slots, degrading real-issue throughput",
+          "False positives: test passing when feature is actually broken (e.g., test checks only that command ran, not that README changed)",
+          "Cross-test interference: README state from previous test runs could cause this test to fail non-deterministically"
         ]
       },
-      "timestamp": 1789574984,
+      "timestamp": 1789579041,
       "ttl": 3600
     },
     "61c5f4a9ce6598c2f1fc048e0a7ce958": {
       "result": {
         "results": [
           {
-            "file": "failures.json",
-            "relevance": 90,
-            "summary": "Multiple entries document E2E integration test failures, flakiness, and loop iteration issues; directly applicable to debugging E2E test build stage behavior"
+            "file": "patterns.json",
+            "relevance": 95,
+            "summary": "Defines project conventions (node, vitest, npm, javascript, src/ source directory) that are essential for the build stage to function correctly"
           },
           {
-            "file": "patterns.json",
-            "relevance": 82,
-            "summary": "Describes project structure (node type, vitest runner, commonjs imports) — essential context for understanding how this repo builds and tests"
+            "file": "failures.json (second)",
+            "relevance": 85,
+            "summary": "Documents recent test failures (2026-09-16) with root causes and fixes including test suite issues, flaky patterns, and timeouts that could inform debugging if the E2E test fails"
+          },
+          {
+            "file": "success-patterns.json (second)",
+            "relevance": 80,
+            "summary": "Shows 2 successful patterns with similar complexity, iterations (3-4), test strategies (npm test), and file patterns that provide a reference model for this E2E test build"
           },
           {
             "file": "retry-outcomes.json",
-            "relevance": 72,
-            "summary": "Documents successful model escalation recovery strategy for build failures (100% success rate across 5 attempts) — applicable if current build needs recovery"
-          },
-          {
-            "file": "success-patterns.json",
-            "relevance": 68,
-            "summary": "Shows pattern of 3-iteration fixes using npm test strategy on similar automation tasks — provides reference for expected iteration count and test approach"
+            "relevance": 75,
+            "summary": "Demonstrates that model_escalation strategy achieves 100% success rate (5/5) for build_failure class, providing a proven recovery strategy if the build fails"
           },
           {
             "file": "metrics.json",
             "relevance": 65,
-            "summary": "Establishes baseline expectations: build duration 7095s, test duration 1459s — helps set realistic time budgets for current build stage execution"
+            "summary": "Establishes performance baselines (build: 7095s, test: 1459s) that set expectations for how long this E2E test build and verification should take"
           }
         ]
       },
-      "timestamp": 1789576974,
+      "timestamp": 1789579085,
       "ttl": 1800
     },
     "8f32d1909b0f1fad1fe7e32caf014900": {
@@ -2418,6 +2419,52 @@
         "raw_response": "Mock claude: ok"
       },
       "timestamp": 1789578209,
+      "ttl": 1800
+    },
+    "707363891e01e1892bab70c3feef922d": {
+      "result": {
+        "raw_response": "Mock claude: ok"
+      },
+      "timestamp": 1789578954,
+      "ttl": 1800
+    },
+    "7d258b9928a4cd0642e0e27e639ec0b1": {
+      "result": {
+        "estimated_iterations": 1
+      },
+      "timestamp": 1789578974,
+      "ttl": 1800
+    },
+    "ca1c7a4fead89ca6784e9dc003364d42": {
+      "result": {
+        "estimated_cost_usd": 0.15,
+        "estimated_iterations": 1,
+        "estimated_tokens": 4500,
+        "likely_failure_stage": "none",
+        "confidence": 88
+      },
+      "timestamp": 1789578985,
+      "ttl": 3600
+    },
+    "c0e5863823622042c0aa1de71a2314f9": {
+      "result": [
+        {
+          "type": "result",
+          "result": "I am trying the same approach again.",
+          "usage": {
+            "input_tokens": 0,
+            "output_tokens": 0
+          }
+        }
+      ],
+      "timestamp": 1789579080,
+      "ttl": 1800
+    },
+    "f4b3d8366ad08288a758b9d3872eeb10": {
+      "result": {
+        "raw_response": "Mock claude: ok"
+      },
+      "timestamp": 1789579197,
       "ttl": 1800
     }
   }
