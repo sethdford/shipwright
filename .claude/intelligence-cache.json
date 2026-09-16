@@ -1688,33 +1688,33 @@
       "result": {
         "results": [
           {
-            "file": "failures.json",
-            "relevance": 95,
-            "summary": "Contains 8 recent test failure patterns (last seen 2026-09-03 to 2026-09-16) with root causes and fixes. sw-intent-analysis-test (91 occurrences), sw-e2e-integration-test stale locks, and sw-loop-test flakiness are critical to avoid during this build."
+            "file": "retry-outcomes.json",
+            "relevance": 100,
+            "summary": "Shows successful recovery strategies for build failures (model_escalation achieved 100% success rate). Directly applicable to handling build stage failures."
           },
           {
             "file": "success-patterns.json",
+            "relevance": 95,
+            "summary": "Contains proven successful build patterns with iterations, duration, files changed, cost, and test strategies. Shows what approaches worked for bug fixes and features."
+          },
+          {
+            "file": "failures.json",
             "relevance": 90,
-            "summary": "Two successful build patterns show 3-iteration standard template builds changing .claude/ and scripts/ files with npm test strategy. Provides reference template for expected iteration count, file patterns, and cost (~$2.50)."
+            "summary": "Documents test failures and root causes with fixes. Critical for understanding failure modes during build and preventing regressions (intent-analysis schema, stale locks, etc.)."
           },
           {
-            "file": "retry-outcomes.json",
-            "relevance": 80,
-            "summary": "model_escalation retry strategy has 100% success rate (5/5) on build_failure class. Directly actionable guidance: if build fails, escalating the model resolves it."
-          },
-          {
-            "file": "knowledge.json",
+            "file": "metrics.json",
             "relevance": 75,
-            "summary": "5 KB entries capturing common gotchas: mktemp /tmp/claude path issues (4 occurrences), sw-cleanup.sh missing --force output, regression detection JSON format. Practical fixes to avoid re-encountering known issues."
+            "summary": "Provides baseline build duration (7095s) and test duration (1459s). Useful for setting timeouts and performance expectations during build stage."
           },
           {
             "file": "flaky-tests.json",
             "relevance": 70,
-            "summary": "test-auth has 90% confidence flakiness (8 occurrences, connection timeout error). Knowing which tests are flaky informs test strategy decisions and expectations during build iterations."
+            "summary": "Lists flaky tests (test-auth at 90% confidence, test-1 at 85%) that may fail intermittently. Important for build stage to handle or isolate unreliable tests."
           }
         ]
       },
-      "timestamp": 1789573427,
+      "timestamp": 1789575549,
       "ttl": 1800
     },
     "b9c7aa5eba4a981b95a803ff85aad725": {
@@ -2279,6 +2279,20 @@
         }
       ],
       "timestamp": 1789575396,
+      "ttl": 1800
+    },
+    "915903fbac5e93a1347444e4be132241": {
+      "result": {
+        "raw_response": "Mock claude: ok"
+      },
+      "timestamp": 1789575648,
+      "ttl": 1800
+    },
+    "f0fa4951763c7a91c9111b6b6cba20aa": {
+      "result": {
+        "raw_response": "Mock claude: ok"
+      },
+      "timestamp": 1789575761,
       "ttl": 1800
     }
   }
