@@ -5,8 +5,8 @@
       "pattern": "\u001b[38;2;74;222;128m\u001b[1m✓\u001b[0m reveal shows 1/3 pass count on failure",
       "root_cause": "sw-intent-analysis-test asserts analyze_intent's JSON output includes version, goal, and criteria fields, but the current schema/implementation omits one or more of them",
       "fix": "Update analyze_intent (or its schema) in sw-intent-analysis.sh to emit version, goal, and criteria fields matching the test's expected schema",
-      "seen_count": 90,
-      "last_seen": "2026-09-16T14:24:42Z",
+      "seen_count": 92,
+      "last_seen": "2026-09-16T15:21:30Z",
       "category": "test_failure",
       "signature_hash": "e1a285258fe63781b7370b0d086ad87b",
       "signature": "\u001b[<n>;2;<n>;<n>;<n>m\u001b[1m✓\u001b[0m reveal shows <path> pass count on failure"
@@ -16,8 +16,8 @@
       "pattern": "\u001b[2m  loop behavior: iterations on test failure\u001b[0m",
       "root_cause": "Test suite itself passed (all PASS, 0 FAIL) but the pipeline stage was flagged for iterating due to loop-behavior/RL logging noise being misread as failure signal",
       "fix": "Verify the actual test exit code rather than log content matching; ensure sw-autoresearch-e2e-test.sh output doesn't trigger false-positive failure pattern matching in the pipeline's error classifier",
-      "seen_count": 24,
-      "last_seen": "2026-09-16T14:59:28Z",
+      "seen_count": 21,
+      "last_seen": "2026-09-13T01:40:39Z",
       "category": "flaky",
       "signature_hash": "579381c41e2fb77269fb772481550f1d",
       "signature": "\u001b[2m loop behavior: iterations on test failure\u001b[0m"
@@ -234,8 +234,8 @@
     {
       "stage": "test",
       "pattern": "\u001b[38;2;0;212;255merror handling\u001b[0m",
-      "root_cause": "sw-self-optimize-test.sh: 'Memory promotion copies cross-repo patterns' assertion fails, likely a cross-repo memory promotion path/condition regression",
-      "fix": "inspect the memory promotion function in sw-self-optimize.sh and the test's expected file path/content to fix the mismatch",
+      "root_cause": "analyze_intent output JSON is missing required schema fields (version, goal, criteria)",
+      "fix": "update analyze_intent to populate version, goal, and criteria fields in the generated JSON",
       "seen_count": 1,
       "last_seen": "2026-09-13T08:56:06Z",
       "category": "test_failure"
