@@ -5,8 +5,8 @@
       "pattern": "\u001b[38;2;74;222;128m\u001b[1m✓\u001b[0m reveal shows 1/3 pass count on failure",
       "root_cause": "sw-intent-analysis-test asserts analyze_intent's JSON output includes version, goal, and criteria fields, but the current schema/implementation omits one or more of them",
       "fix": "Update analyze_intent (or its schema) in sw-intent-analysis.sh to emit version, goal, and criteria fields matching the test's expected schema",
-      "seen_count": 92,
-      "last_seen": "2026-09-16T15:21:30Z",
+      "seen_count": 91,
+      "last_seen": "2026-09-16T15:24:08Z",
       "category": "test_failure",
       "signature_hash": "e1a285258fe63781b7370b0d086ad87b",
       "signature": "\u001b[<n>;2;<n>;<n>;<n>m\u001b[1m✓\u001b[0m reveal shows <path> pass count on failure"
@@ -234,11 +234,20 @@
     {
       "stage": "test",
       "pattern": "\u001b[38;2;0;212;255merror handling\u001b[0m",
-      "root_cause": "analyze_intent output JSON is missing required schema fields (version, goal, criteria)",
-      "fix": "update analyze_intent to populate version, goal, and criteria fields in the generated JSON",
+      "root_cause": "sw-e2e-integration-test hit a stale pipeline lock from a prior run (status: running) causing the fast-pipeline test to abort, and sw-intent-analysis-test's analyze_intent output is missing required schema fields (version, goal, criteria)",
+      "fix": "clear/release the leftover pipeline lock before the e2e-integration suite runs (or have the test abort any in-progress pipeline first), and update analyze_intent to emit version, goal, and criteria fields per the schema",
       "seen_count": 1,
       "last_seen": "2026-09-13T08:56:06Z",
       "category": "test_failure"
+    },
+    {
+      "stage": "test",
+      "pattern": "\u001b[38;2;74;222;128m✓\u001b[0m loop_inline_schema prints nothing for a missing file",
+      "root_cause": "sw-e2e-integration-test hung and hit the 300s harness timeout, likely blocked on a real network/Claude/GitHub call instead of failing fast",
+      "fix": "add a timeout/mock guard around external calls in sw-e2e-integration-test.sh so it fails fast instead of hanging to the suite timeout",
+      "seen_count": 1,
+      "last_seen": "2026-09-16T14:23:13Z",
+      "category": "timeout"
     }
   ]
 }
