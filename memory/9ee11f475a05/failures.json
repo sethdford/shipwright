@@ -6,7 +6,7 @@
       "root_cause": "sw-intent-analysis-test asserts analyze_intent's JSON output includes version, goal, and criteria fields, but the current schema/implementation omits one or more of them",
       "fix": "Update analyze_intent (or its schema) in sw-intent-analysis.sh to emit version, goal, and criteria fields matching the test's expected schema",
       "seen_count": 93,
-      "last_seen": "2026-09-16T21:19:50Z",
+      "last_seen": "2026-09-16T21:25:21Z",
       "category": "test_failure",
       "signature_hash": "e1a285258fe63781b7370b0d086ad87b",
       "signature": "\u001b[<n>;2;<n>;<n>;<n>m\u001b[1m✓\u001b[0m reveal shows <path> pass count on failure"
@@ -27,8 +27,8 @@
       "pattern": "Failed: 1",
       "root_cause": "sw-intent-analysis-test fails because analyze_intent's generated JSON omits required fields (version, goal, criteria); sw-e2e-integration-test fails as a side effect of a stale pipeline lock (pipeline-3749) left running from a prior test run, not a new regression",
       "fix": "add the missing version/goal/criteria fields to the intent-analysis JSON schema/generator, and clear/reset stale pipeline locks (or run `shipwright pipeline abort`) before the e2e-integration test suite starts",
-      "seen_count": 15,
-      "last_seen": "2026-09-13T11:32:12Z",
+      "seen_count": 16,
+      "last_seen": "2026-09-16T20:55:48Z",
       "category": "test_failure",
       "signature_hash": "0ffe097d3b7a598c5b9ebe8e3cd8d7e4",
       "signature": "failed: 1"
@@ -51,7 +51,7 @@
       "root_cause": "sw-e2e-integration-test failed because a stale pipeline lock from a prior run (pipeline-3854) was left in 'running' state, blocking the new pipeline start; sw-intent-analysis-test failed because analyze_intent's generated JSON is missing the required version/goal/criteria schema fields",
       "fix": "Clear/release stale pipeline locks before the e2e-integration test runs (or add lock staleness detection/cleanup), and update analyze_intent to always emit version, goal, and criteria fields in its output schema",
       "seen_count": 6,
-      "last_seen": "2026-09-16T19:54:06Z",
+      "last_seen": "2026-09-16T23:00:47Z",
       "category": "test_failure",
       "signature_hash": "af7df127e4c98031cbe09f6b0646ac68"
     },
@@ -137,8 +137,8 @@
       "pattern": "\u001b[38;2;0;212;255m▸\u001b[0m Patrol recurring failures label construction... \u001b[38;2;74;222;128m✓\u001b[0m",
       "root_cause": "sw-e2e-integration-test failed because a stale pipeline lock (pipeline-4253) was already held from a prior run, blocking the fast pipeline test; sw-intent-analysis-test failed because analyze_intent's generated JSON is missing required schema fields (version, goal, criteria)",
       "fix": "Clear/release stale pipeline locks before the e2e-integration test runs (or have it auto-abort orphaned locks), and update analyze_intent to always populate version, goal, and criteria in its output schema",
-      "seen_count": 5,
-      "last_seen": "2026-09-16T16:54:26Z",
+      "seen_count": 6,
+      "last_seen": "2026-09-16T22:26:14Z",
       "category": "test_failure",
       "signature_hash": "06f0abb7562df2c6e4651882933d3b25",
       "signature": "\u001b[<n>;2;0;<n>;<n>m▸\u001b[0m patrol recurring failures label construction... \u001b[<n>;2;<n>;<n>;<n>m✓\u001b[0m"
@@ -243,11 +243,20 @@
     {
       "stage": "test",
       "pattern": "\u001b[38;2;74;222;128m✓\u001b[0m loop_inline_schema prints nothing for a missing file",
-      "root_cause": "sw-intent-analysis-test fails because analyze_intent's generated JSON is missing required fields (version, goal, criteria) in its schema output",
-      "fix": "Update analyze_intent to populate version, goal, and criteria fields in the generated intent JSON before schema validation",
+      "root_cause": "sw-pipeline.sh stage handlers no longer write expected artifacts (plan.md, review.md) and the fast/low-complexity path emits a malformed non-JSON reward line consumed by jq, breaking downstream E2E pipeline test assertions",
+      "fix": "restore plan/review artifact writes in the plan and review stage functions and ensure RL/episode logging emits valid JSON before piping to jq",
       "seen_count": 1,
       "last_seen": "2026-09-16T14:23:13Z",
       "category": "test_failure"
+    },
+    {
+      "stage": "test",
+      "pattern": "\u001b[38;2;74;222;128m✓\u001b[0m Missing git repository fails pre-flight",
+      "root_cause": "Test suite output shows all tests passing (12/12, 16/16, 15/15, 7/7, 25/25) with no visible failure in the connect/predictive/pipeline-composer suites; the reported 'Missing git repository fails pre-flight' check succeeded (✓) and is not an actual failure — likely a false-positive flagged by log truncation or a downstream suite not shown in the captured 200 lines.",
+      "fix": "Re-run the test stage with full untruncated logs to identify the actual failing suite/assertion past the shown window before making code changes.",
+      "seen_count": 1,
+      "last_seen": "2026-09-16T21:55:17Z",
+      "category": "unknown"
     }
   ]
 }
