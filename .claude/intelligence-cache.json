@@ -32,7 +32,7 @@
       "result": {
         "raw_response": "Mock claude response"
       },
-      "timestamp": 1789577569,
+      "timestamp": 1789581497,
       "ttl": 3600
     },
     "efd5524ad1244fd20344bf3ff5d95233": {
@@ -1680,33 +1680,33 @@
       "result": {
         "results": [
           {
-            "file": "failures.json",
-            "relevance": 85,
-            "summary": "Documents 92 test failures with root causes and fixes; most recent failures show missing schema fields in analyze_intent and stale pipeline locks blocking builds"
+            "file": "retry-outcomes.json",
+            "relevance": 95,
+            "summary": "Shows model_escalation strategy has 100% success rate for build_failure class — directly applicable to build stage failure recovery"
+          },
+          {
+            "file": "metrics.json",
+            "relevance": 90,
+            "summary": "Establishes baselines for build_duration_s (7095s) and test_duration_s (1459s) — critical for understanding performance expectations and timeouts"
           },
           {
             "file": "success-patterns.json",
-            "relevance": 82,
-            "summary": "Captures 2 successful build patterns with iteration counts, file change patterns, and strategies; shows 'loop: iteration N' approach works for bug fixes and features"
+            "relevance": 85,
+            "summary": "Documents successful build approaches (loop iterations, test strategies, commit patterns) and typical file changes — informs which strategies work"
           },
           {
-            "file": "knowledge.json",
-            "relevance": 78,
-            "summary": "Contains 5 failure fix strategies including mktemp path issues and sw-cleanup.sh output formatting; provides actionable approaches for common build failures"
+            "file": "patterns.json",
+            "relevance": 80,
+            "summary": "Defines project structure (Node, vitest, npm, CommonJS) and test patterns — essential context for build stage to compile correctly"
           },
           {
             "file": "flaky-tests.json",
-            "relevance": 75,
-            "summary": "Identifies test-auth (90% confidence) and test-1 (85% confidence) as consistently flaky; helps anticipate and skip unreliable tests during build"
-          },
-          {
-            "file": "retry-outcomes.json",
-            "relevance": 72,
-            "summary": "Shows model_escalation strategy succeeded 5/5 times (100%) on build_failure class; indicates when to escalate to higher reasoning effort"
+            "relevance": 70,
+            "summary": "Identifies unreliable tests (test-auth 90% confidence, test-1 85%) — helps distinguish real build failures from test flakiness"
           }
         ]
       },
-      "timestamp": 1789579883,
+      "timestamp": 1789581702,
       "ttl": 1800
     },
     "b9c7aa5eba4a981b95a803ff85aad725": {
@@ -2598,6 +2598,48 @@
         "raw_response": "Mock claude: ok"
       },
       "timestamp": 1789580977,
+      "ttl": 1800
+    },
+    "0355d1f22ad8e58f9b8abf52f128610f": {
+      "result": [
+        {
+          "type": "result",
+          "result": "I am trying the same approach again.",
+          "usage": {
+            "input_tokens": 0,
+            "output_tokens": 0
+          }
+        }
+      ],
+      "timestamp": 1789581070,
+      "ttl": 1800
+    },
+    "f8d36304f683064b2ac5883953100e4b": {
+      "result": {
+        "raw_response": "Mock claude: ok"
+      },
+      "timestamp": 1789581449,
+      "ttl": 1800
+    },
+    "3dcf0cce294086e54ebf36aec9c789cb": {
+      "result": [
+        {
+          "type": "result",
+          "result": "I am trying the same approach again.",
+          "usage": {
+            "input_tokens": 0,
+            "output_tokens": 0
+          }
+        }
+      ],
+      "timestamp": 1789581543,
+      "ttl": 1800
+    },
+    "e30ff9c30daa34fe5b16b8fad416dd6a": {
+      "result": {
+        "raw_response": "Mock claude: ok"
+      },
+      "timestamp": 1789581754,
       "ttl": 1800
     }
   }
