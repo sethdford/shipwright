@@ -591,7 +591,7 @@ npm test    # 125 shell suites + 16 dashboard test files (141 total), E2E system
 
 MIT — Seth Ford, 2026.
 
-<!-- E2E pipeline verification marker — issue #5157, 2026-09-16. Inert HTML comment;
+<!-- E2E pipeline verification marker — issue #5159, 2026-09-16. Inert HTML comment;
      proves the autonomous pipeline can edit, test, and ship a README change end to end.
-     Supersedes the #5154 marker: one marker is kept, not one per run, so repeated E2E
+     Supersedes the #5157 marker: one marker is kept, not one per run, so repeated E2E
      runs cannot grow the README without bound. -->
