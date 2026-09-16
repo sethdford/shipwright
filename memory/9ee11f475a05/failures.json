@@ -5,8 +5,8 @@
       "pattern": "\u001b[38;2;74;222;128m\u001b[1m✓\u001b[0m reveal shows 1/3 pass count on failure",
       "root_cause": "sw-intent-analysis-test asserts analyze_intent's JSON output includes version, goal, and criteria fields, but the current schema/implementation omits one or more of them",
       "fix": "Update analyze_intent (or its schema) in sw-intent-analysis.sh to emit version, goal, and criteria fields matching the test's expected schema",
-      "seen_count": 91,
-      "last_seen": "2026-09-16T15:24:08Z",
+      "seen_count": 92,
+      "last_seen": "2026-09-16T17:31:10Z",
       "category": "test_failure",
       "signature_hash": "e1a285258fe63781b7370b0d086ad87b",
       "signature": "\u001b[<n>;2;<n>;<n>;<n>m\u001b[1m✓\u001b[0m reveal shows <path> pass count on failure"
@@ -16,8 +16,8 @@
       "pattern": "\u001b[2m  loop behavior: iterations on test failure\u001b[0m",
       "root_cause": "Test suite itself passed (all PASS, 0 FAIL) but the pipeline stage was flagged for iterating due to loop-behavior/RL logging noise being misread as failure signal",
       "fix": "Verify the actual test exit code rather than log content matching; ensure sw-autoresearch-e2e-test.sh output doesn't trigger false-positive failure pattern matching in the pipeline's error classifier",
-      "seen_count": 21,
-      "last_seen": "2026-09-13T01:40:39Z",
+      "seen_count": 23,
+      "last_seen": "2026-09-16T16:52:33Z",
       "category": "flaky",
       "signature_hash": "579381c41e2fb77269fb772481550f1d",
       "signature": "\u001b[2m loop behavior: iterations on test failure\u001b[0m"
@@ -243,11 +243,11 @@
     {
       "stage": "test",
       "pattern": "\u001b[38;2;74;222;128m✓\u001b[0m loop_inline_schema prints nothing for a missing file",
-      "root_cause": "sw-e2e-integration-test hung and hit the 300s harness timeout, likely blocked on a real network/Claude/GitHub call instead of failing fast",
-      "fix": "add a timeout/mock guard around external calls in sw-e2e-integration-test.sh so it fails fast instead of hanging to the suite timeout",
+      "root_cause": "sw-intent-analysis-test failed (exit 1) partway through the suite, likely an assertion mismatch such as loop_inline_schema output-on-missing-file check",
+      "fix": "run scripts/sw-intent-analysis-test.sh directly to isolate the failing assertion and correct the expected vs actual output handling for missing-file input",
       "seen_count": 1,
       "last_seen": "2026-09-16T14:23:13Z",
-      "category": "timeout"
+      "category": "test_failure"
     }
   ]
 }
