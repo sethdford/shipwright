@@ -229,7 +229,7 @@ test_predictive_inject_prevention() {
     grep -q 'inject-prevention' "$SCRIPT_DIR/sw-predictive.sh" || { echo "inject-prevention command missing from sw-predictive.sh"; return 1; }
     # Verify the predict_inject_prevention function exists and accepts stage + issue_json
     grep -q 'predict_inject_prevention()' "$SCRIPT_DIR/sw-predictive.sh" || { echo "predict_inject_prevention function missing"; return 1; }
-    grep -A 5 'predict_inject_prevention()' "$SCRIPT_DIR/sw-predictive.sh" | grep -q 'stage' || { echo "predict_inject_prevention doesn't accept stage parameter"; return 1; }
+    grep_ctx_q -A5 'predict_inject_prevention()' 'stage' "$SCRIPT_DIR/sw-predictive.sh" || { echo "predict_inject_prevention doesn't accept stage parameter"; return 1; }
 }
 
 # ── 2.5 Pipeline: predictive anomaly wired into mark_stage_complete ──────────
@@ -452,8 +452,8 @@ test_autonomous_dual_branch_check() {
 # ── 2.14 Autonomous: run_scheduler exists and has sleep loop ─────────────────
 test_autonomous_scheduler() {
     grep -q 'run_scheduler()' "$SCRIPT_DIR/sw-autonomous.sh" || { echo "run_scheduler function not found"; return 1; }
-    grep -A 20 'run_scheduler()' "$SCRIPT_DIR/sw-autonomous.sh" | grep -q 'while true' || { echo "Scheduler missing loop"; return 1; }
-    grep -A 20 'run_scheduler()' "$SCRIPT_DIR/sw-autonomous.sh" | grep -q 'sleep' || { echo "Scheduler missing sleep"; return 1; }
+    grep_ctx_q -A20 'run_scheduler()' 'while true' "$SCRIPT_DIR/sw-autonomous.sh" || { echo "Scheduler missing loop"; return 1; }
+    grep_ctx_q -A20 'run_scheduler()' 'sleep' "$SCRIPT_DIR/sw-autonomous.sh" || { echo "Scheduler missing sleep"; return 1; }
 }
 
 # ── 2.15 Autonomous: trigger_pipeline_for_finding exists ─────────────────────
@@ -462,7 +462,7 @@ test_autonomous_pipeline_trigger() {
         echo "trigger_pipeline_for_finding function not found"
         return 1
     }
-    grep -A 10 'trigger_pipeline_for_finding()' "$SCRIPT_DIR/sw-autonomous.sh" | grep -q 'sw-pipeline.sh' || {
+    grep_ctx_q -A10 'trigger_pipeline_for_finding()' 'sw-pipeline.sh' "$SCRIPT_DIR/sw-autonomous.sh" || {
         echo "trigger_pipeline_for_finding doesn't call sw-pipeline.sh"
         return 1
     }
@@ -470,7 +470,7 @@ test_autonomous_pipeline_trigger() {
 
 # ── 2.16 Incident: create_hotfix_issue echoes issue number ──────────────────
 test_incident_issue_echo() {
-    grep -A 35 'create_hotfix_issue()' "$SCRIPT_DIR/sw-incident.sh" | grep -q 'echo "$issue_num"' || {
+    grep_ctx_q -A35 'create_hotfix_issue()' 'echo "$issue_num"' "$SCRIPT_DIR/sw-incident.sh" || {
         echo "create_hotfix_issue doesn't echo issue number"
         return 1
     }
@@ -479,7 +479,7 @@ test_incident_issue_echo() {
 # ── 2.17 Incident: trigger_pipeline wires --template hotfix ─────────────────
 test_incident_pipeline_hotfix() {
     grep -q 'trigger_pipeline_for_incident()' "$SCRIPT_DIR/sw-incident.sh" || { echo "trigger_pipeline_for_incident missing"; return 1; }
-    grep -A 15 'trigger_pipeline_for_incident()' "$SCRIPT_DIR/sw-incident.sh" | grep -q '\-\-template hotfix' || {
+    grep_ctx_q -A15 'trigger_pipeline_for_incident()' '\-\-template hotfix' "$SCRIPT_DIR/sw-incident.sh" || {
         echo "trigger_pipeline_for_incident missing --template hotfix"
         return 1
     }
@@ -488,7 +488,7 @@ test_incident_pipeline_hotfix() {
 # ── 2.18 Incident: trigger_rollback wires sw-feedback.sh ────────────────────
 test_incident_rollback_wiring() {
     grep -q 'trigger_rollback_for_incident()' "$SCRIPT_DIR/sw-incident.sh" || { echo "trigger_rollback_for_incident missing"; return 1; }
-    grep -A 10 'trigger_rollback_for_incident()' "$SCRIPT_DIR/sw-incident.sh" | grep -q 'sw-feedback.sh.*rollback' || {
+    grep_ctx_q -A10 'trigger_rollback_for_incident()' 'sw-feedback.sh.*rollback' "$SCRIPT_DIR/sw-incident.sh" || {
         echo "trigger_rollback_for_incident doesn't call sw-feedback.sh rollback"
         return 1
     }
@@ -505,7 +505,7 @@ test_code_review_semantic() {
         return 1
     }
     # Verify it checks for logic, race conditions, API usage
-    grep -A 30 'run_claude_semantic_review()' "$SCRIPT_DIR/sw-code-review.sh" | grep -qi 'logic\|race.*condition\|API' || {
+    grep_ctx_q -i -A30 'run_claude_semantic_review()' 'logic\|race.*condition\|API' "$SCRIPT_DIR/sw-code-review.sh" || {
         echo "Semantic review doesn't check for logic/race/API issues"
         return 1
     }

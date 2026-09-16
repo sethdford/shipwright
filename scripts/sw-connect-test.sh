@@ -226,7 +226,7 @@ test_resolve_developer_id_from_env() {
         return 1
     fi
     # Check it uses DEVELOPER_ID env var
-    if ! grep -A 5 "resolve_developer_id()" "$TEST_TEMP_DIR/sw-connect.sh" | grep -q "DEVELOPER_ID"; then
+    if ! grep_ctx_q -A5 "resolve_developer_id()" "DEVELOPER_ID" "$TEST_TEMP_DIR/sw-connect.sh"; then
         echo -e "    ${RED}✗${RESET} Function doesn't check DEVELOPER_ID"
         return 1
     fi
@@ -263,7 +263,7 @@ test_resolve_machine_name_from_env() {
         echo -e "    ${RED}✗${RESET} resolve_machine_name() not defined"
         return 1
     fi
-    if ! grep -A 5 "resolve_machine_name()" "$TEST_TEMP_DIR/sw-connect.sh" | grep -q "MACHINE_NAME"; then
+    if ! grep_ctx_q -A5 "resolve_machine_name()" "MACHINE_NAME" "$TEST_TEMP_DIR/sw-connect.sh"; then
         echo -e "    ${RED}✗${RESET} Function doesn't check MACHINE_NAME"
         return 1
     fi

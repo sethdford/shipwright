@@ -256,3 +256,28 @@ print_test_results() {
     echo ""
     exit "$FAIL"
 }
+
+# ─── Source-inspection helpers ──────────────────────────────────────────────
+# Match a regex inside a grep context window, without a pipeline.
+#
+# `grep -A N anchor files | grep -q needle` races under `set -o pipefail`:
+# grep -q exits at its first match, the upstream grep then dies on SIGPIPE
+# (141), and pipefail promotes that to a pipeline failure — so the assertion
+# fails intermittently even though the needle is present. Capture the window
+# first, then match a here-string so there is no pipe to break.
+#
+# Usage: grep_ctx_q [-i] -A60 'anchor_pattern' 'needle_pattern' file [file...]
+# A leading -i makes the needle match case-insensitive (the anchor stays exact).
+grep_ctx_q() {
+    local needle_opts=""
+    if [[ "${1:-}" == "-i" ]]; then
+        needle_opts="-i"
+        shift
+    fi
+    local ctx_flag="$1" anchor="$2" needle="$3"
+    shift 3
+    local window
+    window=$(grep "$ctx_flag" "$anchor" "$@" 2>/dev/null || true)
+    [[ -n "$window" ]] || return 1
+    grep -q $needle_opts "$needle" <<<"$window"
+}

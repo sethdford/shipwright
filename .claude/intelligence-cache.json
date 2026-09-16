@@ -30,17 +30,9 @@
     },
     "d41d8cd98f00b204e9800998ecf8427e": {
       "result": {
-        "primary_role": "architect",
-        "secondary_roles": [
-          "builder",
-          "tester"
-        ],
-        "confidence": 0.9,
-        "reasoning": "Task requires designing the synthetic issue quarantine system (pattern matching, queue lanes, daemon integration) followed by implementation and validation—architecture drives the approach, builder executes, tester validates.",
-        "new_role_needed": false,
-        "suggested_role": null
+        "raw_response": "Mock claude response"
       },
-      "timestamp": 1789573443,
+      "timestamp": 1789577569,
       "ttl": 3600
     },
     "efd5524ad1244fd20344bf3ff5d95233": {
@@ -1688,33 +1680,33 @@
       "result": {
         "results": [
           {
-            "file": "retry-outcomes.json",
-            "relevance": 100,
-            "summary": "Shows successful recovery strategies for build failures (model_escalation achieved 100% success rate). Directly applicable to handling build stage failures."
-          },
-          {
-            "file": "success-patterns.json",
+            "file": "patterns.json",
             "relevance": 95,
-            "summary": "Contains proven successful build patterns with iterations, duration, files changed, cost, and test strategies. Shows what approaches worked for bug fixes and features."
-          },
-          {
-            "file": "failures.json",
-            "relevance": 90,
-            "summary": "Documents test failures and root causes with fixes. Critical for understanding failure modes during build and preventing regressions (intent-analysis schema, stale locks, etc.)."
+            "summary": "Defines project structure (node/vitest/npm/commonjs), source directory, test patterns, and conventions — essential for build stage execution"
           },
           {
             "file": "metrics.json",
-            "relevance": 75,
-            "summary": "Provides baseline build duration (7095s) and test duration (1459s). Useful for setting timeouts and performance expectations during build stage."
+            "relevance": 87,
+            "summary": "Contains build_duration_s and test_duration_s baselines — directly relevant for understanding build performance expectations and stage timeouts"
           },
           {
             "file": "flaky-tests.json",
-            "relevance": 70,
-            "summary": "Lists flaky tests (test-auth at 90% confidence, test-1 at 85%) that may fail intermittently. Important for build stage to handle or isolate unreliable tests."
+            "relevance": 78,
+            "summary": "Lists flaky tests with confidence levels — affects build reliability and determines which test failures are environmental vs. regression"
+          },
+          {
+            "file": "failures.json",
+            "relevance": 68,
+            "summary": "Test stage failures with patterns and root causes — provides context on what can break during the pipeline's test phase, relevant for build iteration strategy"
+          },
+          {
+            "file": "success-patterns.json",
+            "relevance": 62,
+            "summary": "Successful fix approaches with file patterns, iteration counts, and templates — informs what strategies work for similar build problems"
           }
         ]
       },
-      "timestamp": 1789575549,
+      "timestamp": 1789577570,
       "ttl": 1800
     },
     "b9c7aa5eba4a981b95a803ff85aad725": {
@@ -2363,6 +2355,48 @@
         }
       ],
       "timestamp": 1789577413,
+      "ttl": 1800
+    },
+    "e369116a7b724d26c677281d1bac2bea": {
+      "result": {
+        "raw_response": "Mock claude: ok"
+      },
+      "timestamp": 1789577628,
+      "ttl": 1800
+    },
+    "cdce6d085deb7d2f26ba0ea9df8e8e9d": {
+      "result": [
+        {
+          "type": "result",
+          "result": "I am trying the same approach again.",
+          "usage": {
+            "input_tokens": 0,
+            "output_tokens": 0
+          }
+        }
+      ],
+      "timestamp": 1789577733,
+      "ttl": 1800
+    },
+    "ba71982c3ce80412da1d0c42b196f40d": {
+      "result": [
+        {
+          "type": "result",
+          "result": "I am trying the same approach again.",
+          "usage": {
+            "input_tokens": 0,
+            "output_tokens": 0
+          }
+        }
+      ],
+      "timestamp": 1789577872,
+      "ttl": 1800
+    },
+    "2bfe8e3b17f751b02bde59c9bc7796c8": {
+      "result": {
+        "raw_response": "Mock claude: ok"
+      },
+      "timestamp": 1789577920,
       "ttl": 1800
     }
   }
