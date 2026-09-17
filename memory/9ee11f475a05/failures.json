@@ -5,8 +5,8 @@
       "pattern": "\u001b[38;2;74;222;128m\u001b[1m✓\u001b[0m reveal shows 1/3 pass count on failure",
       "root_cause": "sw-intent-analysis-test asserts analyze_intent's JSON output includes version, goal, and criteria fields, but the current schema/implementation omits one or more of them",
       "fix": "Update analyze_intent (or its schema) in sw-intent-analysis.sh to emit version, goal, and criteria fields matching the test's expected schema",
-      "seen_count": 98,
-      "last_seen": "2026-09-17T01:50:20Z",
+      "seen_count": 100,
+      "last_seen": "2026-09-17T03:37:02Z",
       "category": "test_failure",
       "signature_hash": "e1a285258fe63781b7370b0d086ad87b",
       "signature": "\u001b[<n>;2;<n>;<n>;<n>m\u001b[1m✓\u001b[0m reveal shows <path> pass count on failure"
@@ -28,7 +28,7 @@
       "root_cause": "sw-intent-analysis-test fails because analyze_intent's generated JSON omits required fields (version, goal, criteria); sw-e2e-integration-test fails as a side effect of a stale pipeline lock (pipeline-3749) left running from a prior test run, not a new regression",
       "fix": "add the missing version/goal/criteria fields to the intent-analysis JSON schema/generator, and clear/reset stale pipeline locks (or run `shipwright pipeline abort`) before the e2e-integration test suite starts",
       "seen_count": 16,
-      "last_seen": "2026-09-17T02:30:08Z",
+      "last_seen": "2026-09-17T01:28:16Z",
       "category": "test_failure",
       "signature_hash": "0ffe097d3b7a598c5b9ebe8e3cd8d7e4",
       "signature": "failed: 1"
@@ -137,8 +137,8 @@
       "pattern": "\u001b[38;2;0;212;255m▸\u001b[0m Patrol recurring failures label construction... \u001b[38;2;74;222;128m✓\u001b[0m",
       "root_cause": "sw-e2e-integration-test failed because a stale pipeline lock (pipeline-4253) was already held from a prior run, blocking the fast pipeline test; sw-intent-analysis-test failed because analyze_intent's generated JSON is missing required schema fields (version, goal, criteria)",
       "fix": "Clear/release stale pipeline locks before the e2e-integration test runs (or have it auto-abort orphaned locks), and update analyze_intent to always populate version, goal, and criteria in its output schema",
-      "seen_count": 5,
-      "last_seen": "2026-09-17T00:58:51Z",
+      "seen_count": 4,
+      "last_seen": "2026-09-13T06:41:27Z",
       "category": "test_failure",
       "signature_hash": "06f0abb7562df2c6e4651882933d3b25",
       "signature": "\u001b[<n>;2;0;<n>;<n>m▸\u001b[0m patrol recurring failures label construction... \u001b[<n>;2;<n>;<n>;<n>m✓\u001b[0m"
@@ -243,11 +243,11 @@
     {
       "stage": "test",
       "pattern": "\u001b[38;2;74;222;128m✓\u001b[0m loop_inline_schema prints nothing for a missing file",
-      "root_cause": "loop_inline_schema test output was truncated in the log before its PASS/FAIL result, but all subsequent suites report FAIL: 0, indicating the named check itself passed and failure is likely a false-positive pattern match on the checkmark line rather than an actual test failure",
-      "fix": "Confirm actual FAIL count for sw-loop-test.sh (or the suite containing loop_inline_schema) is 0; if so, adjust the failure-detection pattern to require a trailing FAIL>0 rather than matching any line containing the test name",
+      "root_cause": "sw-self-optimize.sh memory promotion test expects cross-repo patterns to be copied, but the promotion function likely filters on a repo-hash or confidence threshold that the test fixture doesn't satisfy",
+      "fix": "inspect sw-self-optimize-test.sh 'Memory promotion copies cross-repo patterns' case and the promote_memory function in sw-self-optimize.sh to align the fixture's pattern confidence/repo fields with the promotion criteria",
       "seen_count": 1,
       "last_seen": "2026-09-16T14:23:13Z",
-      "category": "flaky"
+      "category": "test_failure"
     }
   ]
 }
