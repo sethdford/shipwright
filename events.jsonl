@@ -202,3 +202,6 @@
 {"ts":"2026-09-16T23:35:08Z","ts_epoch":1789601708,"type":"stage.failed","event_id":"evt-1789601708-3036206041","payload":"{\"stage\":\"design\",\"issue\":\"5184\",\"timing\":\"2m 8s\"}"}
 {"ts":"2026-09-16T23:35:08Z","ts_epoch":1789601708,"type":"stage.failed","issue":5184,"stage":"design","duration_s":130,"error":"unknown","error_class":"unknown"}
 {"ts":"2026-09-16T23:35:08Z","ts_epoch":1789601708,"type":"vitals.snapshot","issue":5184,"stage":"design","iteration":0,"diff_lines":0,"no_progress":0}
+{"ts":"2026-09-17T00:12:24Z","ts_epoch":1789603944,"type":"hygiene_platform_refactor","hardcoded":49,"fallback":69,"todo":51}
+{"ts":"2026-09-17T00:12:50Z","ts_epoch":1789603970,"type":"strategic.issue_created","title":"Reduce sw-loop.sh size via extraction of iteration/session-management logic","priority":"P6","complexity":"full"}
+{"ts":"2026-09-17T00:12:50Z","ts_epoch":1789603970,"type":"strategic.cycle_complete","issues_created":1,"issues_skipped":2}
