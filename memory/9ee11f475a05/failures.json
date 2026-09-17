@@ -5,8 +5,8 @@
       "pattern": "\u001b[38;2;74;222;128m\u001b[1m✓\u001b[0m reveal shows 1/3 pass count on failure",
       "root_cause": "sw-intent-analysis-test asserts analyze_intent's JSON output includes version, goal, and criteria fields, but the current schema/implementation omits one or more of them",
       "fix": "Update analyze_intent (or its schema) in sw-intent-analysis.sh to emit version, goal, and criteria fields matching the test's expected schema",
-      "seen_count": 99,
-      "last_seen": "2026-09-17T20:12:05Z",
+      "seen_count": 101,
+      "last_seen": "2026-09-17T21:10:44Z",
       "category": "test_failure",
       "signature_hash": "e1a285258fe63781b7370b0d086ad87b",
       "signature": "\u001b[<n>;2;<n>;<n>;<n>m\u001b[1m✓\u001b[0m reveal shows <path> pass count on failure"
@@ -16,8 +16,8 @@
       "pattern": "\u001b[2m  loop behavior: iterations on test failure\u001b[0m",
       "root_cause": "Test suite itself passed (all PASS, 0 FAIL) but the pipeline stage was flagged for iterating due to loop-behavior/RL logging noise being misread as failure signal",
       "fix": "Verify the actual test exit code rather than log content matching; ensure sw-autoresearch-e2e-test.sh output doesn't trigger false-positive failure pattern matching in the pipeline's error classifier",
-      "seen_count": 24,
-      "last_seen": "2026-09-17T19:00:31Z",
+      "seen_count": 23,
+      "last_seen": "2026-09-17T00:29:58Z",
       "category": "flaky",
       "signature_hash": "579381c41e2fb77269fb772481550f1d",
       "signature": "\u001b[2m loop behavior: iterations on test failure\u001b[0m"
@@ -192,8 +192,8 @@
       "pattern": "Results: \u001b[38;2;74;222;128m\u001b[1m123 PASS\u001b[0m | \u001b[38;2;248;113;113m\u001b[1m5 FAIL\u001b[0m",
       "root_cause": "e2e-integration-test hit a stale pipeline lock from a concurrent/leftover run, and self-optimize-test's memory-promotion step passes malformed/empty data to `jq --argjson`, while intent-analysis-test's schema check expects version/goal/criteria fields the generator doesn't emit",
       "fix": "clear stale pipeline locks before e2e-integration-test runs (or use --worktree isolation), guard the `jq --argjson` call in sw-self-optimize.sh with valid-JSON validation before use, and update analyze_intent's output schema to include version/goal/criteria",
-      "seen_count": 2,
-      "last_seen": "2026-09-17T03:37:21Z",
+      "seen_count": 3,
+      "last_seen": "2026-09-17T19:03:20Z",
       "category": "test_failure",
       "signature_hash": "c0a59012e88ccd251204dd28916c22a2",
       "signature": "results: \u001b[<n>;2;<n>;<n>;<n>m\u001b[1m<n> pass\u001b[0m | \u001b[<n>;2;<n>;<n>;<n>m\u001b[1m5 fail\u001b[0m"
@@ -252,8 +252,8 @@
     {
       "stage": "test",
       "pattern": "\u001b[38;2;74;222;128m✓\u001b[0m Missing git repository fails pre-flight",
-      "root_cause": "sw-e2e-integration-test failed because a stale pipeline lock (pipeline-5363) from a prior run was already 'running', blocking the fast pipeline test; sw-intent-analysis-test and sw-loop-test failed on separate, unrelated assertion regressions (missing schema fields and loop stuckness detection)",
-      "fix": "Clear/reset stale pipeline locks before the e2e-integration test runs (or add lock cleanup in test teardown), and fix the intent-analysis schema generator to include version/goal/criteria plus the loop stuckness detection logic",
+      "root_cause": "Cross-repo memory promotion test fails because it copies patterns without correctly filtering by source repo, likely a stale/incorrect fixture or comparison in sw-self-optimize-test.sh",
+      "fix": "Inspect the 'Memory promotion copies cross-repo patterns' test case in sw-self-optimize-test.sh and the promote_memory_pattern function in sw-self-optimize.sh for a mismatched repo-hash key or path comparison",
       "seen_count": 1,
       "last_seen": "2026-09-16T21:55:17Z",
       "category": "test_failure"
