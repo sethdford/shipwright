@@ -1404,28 +1404,29 @@
     },
     "4810be0e31c205018525382d8942a79d": {
       "result": {
-        "complexity": 4,
+        "complexity": 5,
         "risk_level": "medium",
-        "success_probability": 85,
+        "success_probability": 78,
         "recommended_template": "standard",
-        "issue_type": "testing",
+        "issue_type": "infrastructure",
         "key_risks": [
-          "Overly strict validation could break existing workflows with non-standard or minimal setups",
-          "False positives in dependency detection across heterogeneous development environments",
-          "Ensuring preflight error classification doesn't interfere with existing circuit breaker logic or alerting",
-          "Config schema migration for daemon-config.json if adding new loop.preflight_enabled option"
+          "False positives rejecting valid configurations if env var/dependency checks are too strict",
+          "Incomplete detection of actual runtime failures during pre-flight (missed edge cases)",
+          "Test command resolution complexity in shell environments",
+          "Over-validation blocking legitimate workflows that bypass certain checks",
+          "Configuration drift if preflight_enabled flag behavior diverges across daemon/loop invocations"
         ],
         "implementation_hints": [
-          "Create separate preflight_check() function to keep loop logic clean and testable",
-          "Use command -v for test command resolution with fallback to direct execution test",
-          "Build env var check against configurable list in daemon-config.json (e.g., loop.required_env_vars)",
-          "Emit distinctive preflight event type to separate from iteration errors in logging/events.jsonl",
-          "Test edge cases: unresolvable commands, missing node_modules, broken git state, locked test processes",
-          "Make error messages actionable with specific recovery steps: install commands, env var names, docs links",
-          "Log preflight results to error-summary.json so intelligent restart logic can handle preflight vs runtime failures differently"
+          "Isolate each pre-flight check into separate, testable functions (env vars, test cmd, deps, working tree)",
+          "Define explicitly which env vars are 'required' vs. 'optional' in config schema",
+          "Use 'command -v' or similar for test command validation; avoid executing test command itself",
+          "Create distinct error classification (e.g. 'preflight_failure') separate from 'test_failure' so circuit_breaker_threshold excludes pre-flight",
+          "Add verbose logging with actionable remediation steps (e.g. 'export FOO=bar' suggestions)",
+          "Consider --skip-preflight or SKIP_PREFLIGHT env var escape hatch for power users",
+          "Test with missing node_modules, missing .env, unresolvable npm test commands, and broken git state"
         ]
       },
-      "timestamp": 1789600505,
+      "timestamp": 1789624293,
       "ttl": 3600
     },
     "122da270dd47928d1f859d141c2f87b9": {
@@ -1448,167 +1449,185 @@
     },
     "1d14d4eb04093d23b25a36ba730c21f2": {
       "result": {
-        "issue_type": "testing/infrastructure",
-        "confidence": 0.89,
+        "issue_type": "infrastructure",
+        "confidence": 0.88,
         "secondary_domains": [
+          "testing",
           "reliability",
-          "error-handling",
-          "build-automation"
+          "shell-scripting"
         ],
         "complexity_assessment": {
-          "score": 5,
-          "reasoning": "Well-scoped task with clear acceptance criteria. Primary complexity is in designing distinct error classification and ensuring pre-flight checks don't have false positives; implementation of individual checks is straightforward."
+          "score": 4,
+          "reasoning": "Well-scoped feature with clear acceptance criteria; straightforward shell validation logic, but integration with error classification and circuit breaker logic requires careful implementation to avoid false positives or missed edge cases."
         },
         "skill_plan": {
           "plan": [
-            "testing-strategy",
-            "brainstorming"
+            "brainstorming",
+            "preflight-validation-design"
           ],
           "design": [
-            "architecture-design",
-            "preflight-validation-design"
+            "preflight-validation-design",
+            "architecture-design"
           ],
           "build": [],
           "review": [
             "adversarial-quality",
-            "security-audit"
+            "pr-quality"
           ],
           "compound_quality": [
-            "validation-thoroughness",
-            "testing-strategy"
+            "testing-strategy",
+            "validation-thoroughness"
           ],
           "pr": [
             "pr-quality"
           ],
           "deploy": [],
-          "validate": [],
-          "monitor": []
+          "validate": [
+            "validation-thoroughness"
+          ],
+          "monitor": [
+            "observability"
+          ]
         },
         "skill_rationale": {
-          "testing-strategy": "Must plan what pre-flight checks to include (env vars, test command, working tree state) and design test cases that cover missing env var, unresolvable command, and healthy pass-through scenarios.",
-          "brainstorming": "Challenge scope assumptions early: what constitutes 'required' env vars vs optional ones? Where's the boundary between pre-flight and mid-loop validation? Should pre-flight check dependency installed state or just command availability?",
-          "architecture-design": "This validation gate is a new architectural component in the loop harness; an ADR captures why checks run before iteration 1, how error classification distinguishes pre-flight from mid-loop failures, and why config gating is essential.",
-          "preflight-validation-design": "Dedicated guidance on structuring validation gates with distinct error classification, config gating patterns, non-secret-leaking error messages, and ensuring pre-flight checks don't have false positives that block valid builds.",
-          "adversarial-quality": "Pre-flight checks can fail in unexpected ways: what if env vars are set but empty? What if test command exists but isn't executable? What if the working tree is locked? Find edge cases that crash the gate or produce confusing errors.",
-          "security-audit": "Env var validation touches secrets and credentials; ensure error messages never log secret values, handle credential leakage in error paths, and validate that missing-env errors don't expose which secrets are expected.",
-          "validation-thoroughness": "Pre-flight validation itself must be thorough—verify that checks catch genuine problems (e.g., test command actually failing) without false positives (e.g., rejecting valid but unusual directory structures).",
-          "pr-quality": "Changes span sw-loop.sh (pre-flight logic), sw-loop-test.sh (unit tests), and config schema updates; write a PR reviewable in 5 minutes by separating pre-flight check implementation, distinct error logging, config gating, and tests into logical chunks with clear commit messages."
+          "brainstorming": "Challenge assumptions about validation scope: which env vars are actually required, what counts as 'working tree state,' and which failures are preflight vs mid-loop—ensuring the gate doesn't block legitimate scenarios or miss real issues.",
+          "preflight-validation-design": "Core pattern for designing lightweight validation gates; guides structuring checks (env vars, test command resolvability, dependencies), error classification (preflight vs mid-loop), and config gating to fail fast without burning iterations.",
+          "architecture-design": "Document ADR explaining how preflight errors integrate with circuit_breaker_threshold (should be excluded), config-driven behavior (loop.preflight_enabled), error logging strategy, and interaction with existing error handling in sw-loop.sh.",
+          "adversarial-quality": "Attack the validation logic to find edge cases: commands with arguments/pipes, partially-missing env vars, permission errors on test command, false positives when dependencies are installed but misconfigured, and ways to craft error messages that truly guide users.",
+          "pr-quality": "Write PR description that clearly separates this from issue #4590, explains the P0 impact (fail fast prevents wasted iterations), documents the config flag, and justifies why preflight errors bypass circuit breaker logic.",
+          "testing-strategy": "Design comprehensive unit test matrix covering: missing env var case, unresolvable test command case, healthy pass-through case, disabled via config case, and edge cases (empty env var, command with args, relative vs absolute paths).",
+          "validation-thoroughness": "Validate end-to-end across real project types (Node/Go/Python) to ensure preflight catches actual missing deps, catches real env var omissions, and provides actionable error messages that users can act on without guessing.",
+          "observability": "Post-deploy monitoring: track how often preflight gates fire (by error type), false positive rate, how much time/iteration savings they provide, and whether error messages are actually helping users fix issues or causing confusion."
         },
-        "generated_skills": [
-          {
-            "name": "preflight-validation-design",
-            "reason": "The issue requires designing a preflight validation gate with specific requirements (distinct error classification, config gating, non-leaking error messages, and unit test coverage) that aren't covered by existing skills. This pattern is generalizable to other build system components.",
-            "content": "## Preflight Validation Gate Design\n\nWhen adding preflight validation to build harnesses or similar systems, follow these principles:\n\n### 1. Error Classification & Logging\n- **Pre-flight failures** (env var missing, test command unresolvable, working tree broken) are **distinct** from mid-loop test failures.\n- Log pre-flight failures to a separate channel or with a distinct prefix (e.g., `[PREFLIGHT]`) so they don't pollute build metrics.\n- Pre-flight failures must **not** increment `circuit_breaker_threshold` counters; they're setup errors, not code errors.\n- Implement this by capturing pre-flight failures in a separate error classification before entering the main loop logic.\n\n### 2. Scope Clarity\nDefine what belongs in preflight vs. mid-loop validation:\n- **Preflight**: Static checks that don't require running code—env var existence, command resolution via `command -v`, basic dependency presence checks, working tree accessibility.\n- **Mid-loop**: Dynamic checks that require execution—test output parsing, compilation verification, runtime errors.\n\n### 3. Config Gating\n- Gate pre-flight behavior with a config option (e.g., `loop.preflight_enabled`, default `true`).\n- Allow disabling without code changes; this is critical for emergency bypasses or unusual environments.\n- Store the config in `.claude/daemon-config.json` or equivalent; read it early in the script.\n\n### 4. Error Messages\n- **Actionable**: Tell the user exactly what's missing and how to fix it. \"TEST_CMD is not set: export TEST_CMD='npm test'\" beats \"validation failed\".\n- **Secret-safe**: Never echo env var values in error messages (even if they're not secrets). Use \"TEST_CMD\" not \"TEST_CMD=secret_value\".\n- **Non-blocking on edge cases**: If a check has a genuine false-positive risk (e.g., unusual directory layouts), make it a warning, not a hard failure, and log it distinctly.\n\n### 5. Performance\n- Pre-flight checks must complete in <1 second. Avoid spawning heavy processes or waiting for long operations.\n- Use `command -v` to check command existence (instant). Avoid actually running the test command just to validate it.\n\n### 6. Testing Pre-flight Validation\nTest cases must cover:\n- **Missing env var**: Pre-flight fails with actionable message, does not enter loop.\n- **Unresolvable command**: Pre-flight catches missing test command, fails cleanly.\n- **Healthy pass-through**: All checks pass, loop proceeds normally.\n- **Partial setup** (optional): Some env vars missing, but `preflight_enabled=false` allows bypass (tests this gating).\n- **False positive guards** (if applicable): Unusual but valid setups are not rejected.\n\n### 7. Integration with Loop State\n- Pre-flight runs **before** any state files are created (e.g., before `progress.md` is written).\n- If pre-flight fails, leave the working tree unmodified; a human can retry or debug.\n- Log pre-flight results to a distinct field in error logs so CI/dashboards can trend pre-flight vs. runtime failures separately."
-          }
-        ],
+        "generated_skills": [],
         "review_focus": [
-          "Distinct error classification: pre-flight failures don't increment circuit_breaker_threshold and are logged separately",
-          "Secret safety: env var error messages never expose values, even non-secret ones",
-          "Comprehensive pre-flight checks: covers env vars, test command resolution, and working tree state without false positives",
-          "Config gating: loop.preflight_enabled is read correctly and allows disabling without code changes",
-          "Unit test coverage: test cases for missing env var, unresolvable command, healthy pass-through, and config gating",
-          "Error message clarity: actionable messages that tell users exactly what's missing and how to fix it",
-          "Performance: pre-flight checks complete in <1 second and don't hang the harness"
+          "Error classification logic: verify preflight failures are logged distinctly and do NOT increment circuit_breaker_threshold counter",
+          "Validation completeness: ensure env var checks are exhaustive, test command resolvability handles edge cases (quoted args, pipes, relative paths), and working tree checks are robust",
+          "Configuration gating: loop.preflight_enabled is checked consistently at preflight entry point and respected (not bypassed in any code path)",
+          "Error message clarity: each failure type provides actionable next steps (e.g., 'missing $BUILD_CMD env var—set it to: npm test')",
+          "Unit test coverage: all three acceptance criteria test cases present, plus edge cases (empty env, permission denied, command not found, malformed config)",
+          "Integration with existing state tracking: progress.md, error-summary.json, and circuit breaker logic correctly omit preflight failures"
         ],
         "risk_areas": [
-          "False positives in working tree health checks could block valid builds; ensure checks are permissive on edge cases",
-          "Secret leakage in error messages if env vars contain credentials; audit all error output paths",
-          "Pre-flight checks inadvertently affecting circuit_breaker_threshold if error classification logic has bugs",
-          "Config gating not working correctly, preventing emergency bypass when preflight validation causes issues",
-          "Pre-flight checks becoming a bottleneck if they do too much work (e.g., running test command just to verify it); keep checks fast and static"
+          "Over-validation causing false positives that block legitimate runs with real dependencies present but in non-standard locations",
+          "Insufficient validation (e.g., checking command existence but not execution rights) that misses real issues until iteration 1",
+          "Error classification not properly isolated—preflight failures accidentally counted against circuit_breaker_threshold, defeating the early-exit goal",
+          "Config gating not respected: preflight_enabled=false is somehow bypassed, or feature activates when config says to disable",
+          "Test command resolvability checking too simplistic: commands with arguments (npm test --coverage), pipes (npm test | tee), or environment-dependent paths fail",
+          "Env var list hardcoded or incomplete: misses required vars that vary by project type (e.g., some need DATABASE_URL, others don't)",
+          "Error messages cryptic or not actionable: 'test command failed' leaves user guessing vs 'npm test not found—did you npm install?'",
+          "Integration bugs: preflight failures interfere with restart/resume logic or progress tracking"
         ]
       },
-      "timestamp": 1789600610,
+      "timestamp": 1789624401,
       "ttl": 3600
     },
     "0d9679c3405e0d293d608bb442112a39": {
       "result": {
         "results": [
           {
-            "file": "failures.json",
+            "file": "failures.json (second, detailed)",
+            "relevance": 90,
+            "summary": "Directly relevant: contains extensive loop iteration failure patterns, error-summary.json structure, and build-loop behavior analysis. Addresses timeout issues, test iteration failures, and structured error feedback mechanisms that a pre-flight validation gate must understand."
+          },
+          {
+            "file": "success-patterns.json (second)",
             "relevance": 85,
-            "summary": "Contains loop behavior failure patterns ('iterations on test failure'), stale pipeline lock detection, error-summary.json usage, and timeout scenarios — directly relevant to pre-flight gate requirements"
-          },
-          {
-            "file": "knowledge.json",
-            "relevance": 55,
-            "summary": "Documents systematic failure patterns with fix strategies and occurrence metrics, provides evidence-based approach to what validation checks would prevent known failure modes"
-          },
-          {
-            "file": "issues.json",
-            "relevance": 50,
-            "summary": "Shows real-world issues benefiting from pre-flight validation: daemon synchronization, timeout bugs, and documented gotchas that gates should detect"
-          },
-          {
-            "file": "success-patterns.json",
-            "relevance": 45,
-            "summary": "Demonstrates multi-iteration patterns, post-audit cleanup, and autonomous loop progress tracking relevant to understanding build loop lifecycle before gates execute"
+            "summary": "High relevance: demonstrates successful multi-iteration patterns (3-4 iterations typical) and approach strategies for fixing bugs and adding features. Shows what build-loop execution should achieve, informing pre-flight validation criteria."
           },
           {
             "file": "metrics.json",
-            "relevance": 40,
-            "summary": "Establishes baseline build (7095s) and test (1459s) durations that can inform pre-flight validation timeout thresholds and resource requirement checks"
+            "relevance": 80,
+            "summary": "Medium-high relevance: provides build duration baseline (7095s) and test duration baseline (1459s). A pre-flight validation gate should consider these baselines for timeout and performance gates before iterations start."
+          },
+          {
+            "file": "knowledge.json",
+            "relevance": 75,
+            "summary": "Medium relevance: contains failure patterns and fix strategies including test environment setup issues, error signatures, and recovery approaches. Informs what conditions should be validated in pre-flight checks."
+          },
+          {
+            "file": "retry-outcomes.json",
+            "relevance": 70,
+            "summary": "Medium relevance: shows build_failure recovery with model_escalation strategy achieving 100% success rate on retry. Relevant for understanding when pre-flight validation should allow retries vs. abort."
           }
         ]
       },
-      "timestamp": 1789600670,
+      "timestamp": 1789624457,
       "ttl": 1800
     },
     "305c946af01bbb882919a153de6d2fa8": {
       "result": {
         "results": [
           {
+            "file": "success-patterns.json",
+            "relevance": 65,
+            "summary": "Pattern for 'Fix timeout' with high complexity (3 iterations, daemon.sh changes) demonstrates iteration management and gate-worthy patterns in build execution. Directly applicable to pre-flight validation gate design."
+          },
+          {
+            "file": "failures.json",
+            "relevance": 60,
+            "summary": "Contains 'loop behavior: iterations on test failure' pattern showing how loop detects failures before iteration. Demonstrates validation patterns relevant to pre-flight gates and error detection strategies."
+          },
+          {
+            "file": "success-patterns.json",
+            "relevance": 50,
+            "summary": "Patterns for 'Fix bug' and 'Add authentication feature' show architectural iteration patterns, post-audit cleanup strategies, and loop iteration management applicable to gate design."
+          },
+          {
+            "file": "metrics.json",
+            "relevance": 40,
+            "summary": "Provides baseline performance metrics (build: 7095s, test: 1459s) essential for setting pre-flight validation timeouts and gate performance expectations."
+          },
+          {
             "file": "issues.json",
-            "relevance": 80,
-            "summary": "Documents a daemon timeout fix using 'added semaphore' — a direct gate/synchronization pattern applicable to pre-flight validation architecture; semaphores are the canonical locking mechanism for pre-flight gates."
-          },
-          {
-            "file": "success-patterns.json (Fix timeout)",
-            "relevance": 72,
-            "summary": "Successful pattern for daemon issue resolution requiring 3 iterations; shows how to structure multi-iteration fixes and understanding of loop control flow, relevant for designing pre-flight validation into the loop initialization."
-          },
-          {
-            "file": "failures.json (test stage array)",
-            "relevance": 70,
-            "summary": "Multiple failure patterns for build-loop iteration behavior (e.g. 'loop behavior: iterations on test failure', stale pipeline locks, hang timeouts) — identifying what conditions the pre-flight gate should detect and prevent before iterations start."
-          },
-          {
-            "file": "success-patterns.json (Fix bug)",
-            "relevance": 62,
-            "summary": "Multi-iteration bug fix pattern with outcome-feedback and post-audit cleanup; demonstrates iteration lifecycle management and error handling patterns relevant to designing validation stages."
-          },
-          {
-            "file": "patterns.json",
-            "relevance": 55,
-            "summary": "Project type, test runner (vitest), and module conventions (commonjs) provide structural context for designing pre-flight validation that respects existing tooling and patterns."
+            "relevance": 35,
+            "summary": "Tracks daemon timeout bug resolution with semaphore pattern, demonstrating reliability patterns and synchronization strategies applicable to pre-flight validation gate implementation."
           }
         ]
       },
-      "timestamp": 1789600948,
+      "timestamp": 1789624732,
       "ttl": 1800
     },
     "c516c7825f8e5d9d81c7e7113864ff2f": {
       "result": {
         "results": [
           {
-            "file": "failures.json",
-            "relevance": 95,
-            "summary": "Contains detailed anti-patterns: false-positive failure detection by misreading logs (loop behavior test), loop hanging/timeout issues (error-summary.json), stale pipeline lock state management, and flaky test suite interactions. Directly relevant to preflight validation gate design to avoid these anti-patterns."
+            "file": "failures.json (second, extensive)",
+            "relevance": 78,
+            "summary": "Contains 10 loop and build test failure patterns including loop iteration behavior, context exhaustion, timeout scenarios, and stale lock issues. Directly informs what conditions the pre-flight validation gate must detect before iterations start (e.g., stale locks, missing schema fields, context efficiency)."
           },
           {
-            "file": "issues.json",
-            "relevance": 75,
-            "summary": "Documents timeout bug in daemon with fix strategy (added semaphore). Relevant anti-pattern: missing synchronization that causes hangs. Informs preflight validation gate design to detect/prevent similar concurrency issues before iterations start."
+            "file": "success-patterns.json (first)",
+            "relevance": 62,
+            "summary": "Shows successful timeout fix pattern with 3 iterations on sw-daemon.sh using handler v2 approach. Demonstrates what a validated pre-iteration state looks like and informs gate design by showing completion patterns."
           },
           {
             "file": "retry-outcomes.json",
-            "relevance": 70,
-            "summary": "Shows model escalation recovery strategy with 100% success rate across 5 attempts. Relevant anti-pattern: naive single-attempt approach. Informs validation gate recovery strategy when preflight checks fail."
+            "relevance": 48,
+            "summary": "Tracks retry strategy effectiveness (100% success on model escalation). Shows that fallback/escalation strategies are viable when conditions aren't met, informing what actions the pre-flight gate should trigger on validation failure."
           }
         ]
       },
-      "timestamp": 1789600974,
+      "timestamp": 1789624750,
       "ttl": 1800
+    },
+    "32e947394dabd303965ea147a82e4f0a": {
+      "result": {
+        "estimated_iterations": 6
+      },
+      "timestamp": 1789624303,
+      "ttl": 1800
+    },
+    "c98dd5e3456ae43008a2be4c35640808": {
+      "result": {
+        "estimated_cost_usd": 5.50,
+        "estimated_iterations": 2,
+        "estimated_tokens": 65000,
+        "likely_failure_stage": "test",
+        "confidence": 70
+      },
+      "timestamp": 1789624312,
+      "ttl": 3600
     }
   }
 }
