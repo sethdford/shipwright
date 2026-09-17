@@ -538,3 +538,6 @@
 {"ts":"2026-09-17T03:44:22Z","ts_epoch":1789616662,"type":"plan.validation_failure","issue":0,"attempt":2,"failure_mode":"unknown"}
 {"ts":"2026-09-17T03:44:22Z","ts_epoch":1789616662,"type":"plan.validated","issue":0,"valid":"false","attempts":2}
 {"ts":"2026-09-17T03:44:22Z","ts_epoch":1789616662,"type":"stage.completed","issue":0,"stage":"plan","duration_s":1,"result":"success"}
+{"ts":"2026-09-17T04:05:59Z","ts_epoch":1789617959,"type":"hygiene_platform_refactor","hardcoded":49,"fallback":69,"todo":51}
+{"ts":"2026-09-17T04:06:27Z","ts_epoch":1789617987,"type":"strategic.issue_created","title":"Add cost-per-issue tracking breakdown to `shipwright cost show`","priority":"P3","complexity":"fast"}
+{"ts":"2026-09-17T04:06:27Z","ts_epoch":1789617987,"type":"strategic.cycle_complete","issues_created":1,"issues_skipped":2}
