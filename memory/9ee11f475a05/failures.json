@@ -5,8 +5,8 @@
       "pattern": "\u001b[38;2;74;222;128m\u001b[1m✓\u001b[0m reveal shows 1/3 pass count on failure",
       "root_cause": "sw-intent-analysis-test asserts analyze_intent's JSON output includes version, goal, and criteria fields, but the current schema/implementation omits one or more of them",
       "fix": "Update analyze_intent (or its schema) in sw-intent-analysis.sh to emit version, goal, and criteria fields matching the test's expected schema",
-      "seen_count": 108,
-      "last_seen": "2026-09-18T13:16:06Z",
+      "seen_count": 107,
+      "last_seen": "2026-09-18T12:55:23Z",
       "category": "test_failure",
       "signature_hash": "e1a285258fe63781b7370b0d086ad87b",
       "signature": "\u001b[<n>;2;<n>;<n>;<n>m\u001b[1m✓\u001b[0m reveal shows <path> pass count on failure"
@@ -16,8 +16,8 @@
       "pattern": "\u001b[2m  loop behavior: iterations on test failure\u001b[0m",
       "root_cause": "Test suite itself passed (all PASS, 0 FAIL) but the pipeline stage was flagged for iterating due to loop-behavior/RL logging noise being misread as failure signal",
       "fix": "Verify the actual test exit code rather than log content matching; ensure sw-autoresearch-e2e-test.sh output doesn't trigger false-positive failure pattern matching in the pipeline's error classifier",
-      "seen_count": 27,
-      "last_seen": "2026-09-18T10:41:55Z",
+      "seen_count": 28,
+      "last_seen": "2026-09-18T10:23:49Z",
       "category": "flaky",
       "signature_hash": "579381c41e2fb77269fb772481550f1d",
       "signature": "\u001b[2m loop behavior: iterations on test failure\u001b[0m"
@@ -50,8 +50,8 @@
       "signature": "results: \u001b[<n>;2;<n>;<n>;<n>m\u001b[1m<n> pass\u001b[0m | \u001b[<n>;2;<n>;<n>;<n>m\u001b[1m1 fail\u001b[0m",
       "root_cause": "sw-e2e-integration-test failed because a stale pipeline lock from a prior run (pipeline-3854) was left in 'running' state, blocking the new pipeline start; sw-intent-analysis-test failed because analyze_intent's generated JSON is missing the required version/goal/criteria schema fields",
       "fix": "Clear/release stale pipeline locks before the e2e-integration test runs (or add lock staleness detection/cleanup), and update analyze_intent to always emit version, goal, and criteria fields in its output schema",
-      "seen_count": 7,
-      "last_seen": "2026-09-18T03:42:36Z",
+      "seen_count": 8,
+      "last_seen": "2026-09-18T09:23:18Z",
       "category": "test_failure",
       "signature_hash": "af7df127e4c98031cbe09f6b0646ac68"
     },
@@ -252,10 +252,19 @@
     {
       "stage": "test",
       "pattern": "\u001b[38;2;74;222;128m✓\u001b[0m Missing git repository fails pre-flight",
-      "root_cause": "Cost dashboard's CONTEXT EFFICIENCY section reads loop.context_efficiency events but the test's cost entries fixture has no matching event data in the last 30-day window, so it reports 'No cost entries' instead of rendering utilization stats",
-      "fix": "Ensure sw-cost-test.sh seeds cost entries/events with a current timestamp within the 30-day lookback before asserting on the CONTEXT EFFICIENCY output",
+      "root_cause": "Pipeline stage scripts (plan, review, cleanup) fail to write expected artifact files (plan.md, review.md) under the mock/test harness, likely due to a missing or misconfigured git repository state during preflight causing early exit before artifact generation",
+      "fix": "Ensure the E2E test harness initializes a valid mock git repository before running plan/review stages, and verify pipeline_stage functions write artifacts even when preflight checks pass with mocks",
       "seen_count": 1,
       "last_seen": "2026-09-16T21:55:17Z",
+      "category": "test_failure"
+    },
+    {
+      "stage": "test",
+      "pattern": "\u001b[38;2;0;212;255m▸\u001b[0m Missing template returns error... \u001b[38;2;74;222;128m✓\u001b[0m",
+      "root_cause": "sw-pipeline-test.sh mocks/fixtures don't write plan.md, review.md, and related artifacts, so downstream stage-artifact checks (plan, review, full E2E, resume, cleanup) fail on file-not-found and jq parse errors on empty output",
+      "fix": "Fix the mock claude/sw-loop binaries or stage functions in sw-pipeline-test.sh to actually emit .claude/pipeline-artifacts/plan.md and review.md, and guard jq calls against empty/non-numeric input",
+      "seen_count": 1,
+      "last_seen": "2026-09-18T09:53:21Z",
       "category": "test_failure"
     }
   ]
