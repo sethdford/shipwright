@@ -99,3 +99,24 @@
 {"ts":"2026-09-18T04:05:57Z","ts_epoch":1789704357,"type":"hygiene_platform_refactor","hardcoded":49,"fallback":69,"todo":51}
 {"ts":"2026-09-18T04:06:21Z","ts_epoch":1789704381,"type":"strategic.issue_created","title":"Move build-loop circuit breaker and restart thresholds to config/policy.json","priority":"P6","complexity":"fast"}
 {"ts":"2026-09-18T04:06:21Z","ts_epoch":1789704381,"type":"strategic.cycle_complete","issues_created":1,"issues_skipped":2}
+{"ts":"2026-09-18T06:18:30Z","ts_epoch":1789712310,"type":"patrol.started","dry_run":"false"}
+{"ts":"2026-09-18T06:18:33Z","ts_epoch":1789712313,"type":"patrol.issue_created","check":"dead_code","count":1}
+{"ts":"2026-09-18T06:18:37Z","ts_epoch":1789712317,"type":"patrol.finding","check":"recurring_failure","pattern":"[38;2;74;222;128m[1m✓[0m reveal shows 1/3 pass count on","seen_count":103}
+{"ts":"2026-09-18T06:18:38Z","ts_epoch":1789712318,"type":"patrol.issue_created","check":"recurring_failure","pattern":"[38;2;74;222;128m[1m✓[0m reveal shows 1/3 pass count on"}
+{"ts":"2026-09-18T06:18:38Z","ts_epoch":1789712318,"type":"patrol.finding","check":"recurring_failure","pattern":"[2m  loop behavior: iterations on test failure[0m","seen_count":24}
+{"ts":"2026-09-18T06:18:39Z","ts_epoch":1789712319,"type":"patrol.issue_created","check":"recurring_failure","pattern":"[2m  loop behavior: iterations on test failure[0m"}
+{"ts":"2026-09-18T06:18:39Z","ts_epoch":1789712319,"type":"patrol.finding","check":"recurring_failure","pattern":"Failed: 1","seen_count":17}
+{"ts":"2026-09-18T06:18:40Z","ts_epoch":1789712320,"type":"patrol.issue_created","check":"recurring_failure","pattern":"Failed: 1"}
+{"ts":"2026-09-18T06:18:40Z","ts_epoch":1789712320,"type":"patrol.finding","check":"recurring_failure","pattern":"Results: [38;2;74;222;128m[1m126 PASS[0m | [38;2;248;113","seen_count":8}
+{"ts":"2026-09-18T06:18:41Z","ts_epoch":1789712321,"type":"patrol.issue_created","check":"recurring_failure","pattern":"Results: [38;2;74;222;128m[1m126 PASS[0m | [38;2;248;113"}
+{"ts":"2026-09-18T06:18:42Z","ts_epoch":1789712322,"type":"patrol.finding","check":"recurring_failure","pattern":"[38;2;0;212;255m▸[0m Patrol recurring failures label con","seen_count":8}
+{"ts":"2026-09-18T06:18:42Z","ts_epoch":1789712322,"type":"patrol.finding","check":"recurring_failure","pattern":"Results: [38;2;74;222;128m[1m127 PASS[0m | [38;2;248;113","seen_count":7}
+{"ts":"2026-09-18T06:18:42Z","ts_epoch":1789712322,"type":"patrol.finding","check":"recurring_failure","pattern":"Results: [38;2;74;222;128m[1m124 PASS[0m | [38;2;248;113","seen_count":5}
+{"ts":"2026-09-18T06:18:43Z","ts_epoch":1789712323,"type":"patrol.finding","check":"recurring_failure","pattern":"Results: [38;2;74;222;128m[1m123 PASS[0m | [38;2;248;113","seen_count":3}
+{"ts":"2026-09-18T06:18:44Z","ts_epoch":1789712324,"type":"patrol.finding","check":"untested_script","script":"sw-tracker-linear.sh","lines":568,"usage":7}
+{"ts":"2026-09-18T06:18:44Z","ts_epoch":1789712324,"type":"patrol.finding","check":"untested_script","script":"sw-tracker-jira.sh","lines":474,"usage":7}
+{"ts":"2026-09-18T06:18:44Z","ts_epoch":1789712324,"type":"patrol.finding","check":"untested_script","script":"sw-tracker-github.sh","lines":212,"usage":3}
+{"ts":"2026-09-18T06:18:44Z","ts_epoch":1789712324,"type":"patrol.finding","check":"untested_script","script":"sw-tmux-status.sh","lines":151,"usage":1}
+{"ts":"2026-09-18T06:18:44Z","ts_epoch":1789712324,"type":"patrol.finding","check":"untested_script","script":"sw-tmux-role-color.sh","lines":81,"usage":1}
+{"ts":"2026-09-18T06:18:44Z","ts_epoch":1789712324,"type":"patrol.finding","check":"untested_script","script":"sw-test-all.sh","lines":199,"usage":0}
+{"ts":"2026-09-18T06:18:44Z","ts_epoch":1789712324,"type":"patrol.finding","check":"untested_script","script":"sw-event-schema-sync.sh","lines":93,"usage":0}
