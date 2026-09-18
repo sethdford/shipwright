@@ -96,3 +96,6 @@
 {"ts":"2026-09-18T03:44:09Z","type":"adaptive_model.recorded","iteration":"0","model":"opus","test_result":"pass","reason":"first_iteration","escalated":"false","downgraded":"false"}
 {"ts":"2026-09-18T03:44:09Z","type":"adaptive_model.recorded","iteration":"1","model":"opus","test_result":"fail","reason":"already_at_maximum_model","escalated":"false","downgraded":"false"}
 {"ts":"2026-09-18T03:44:09Z","type":"adaptive_model.learned","escalation_rate":"0","downgrade_rate":"0"}
+{"ts":"2026-09-18T04:05:57Z","ts_epoch":1789704357,"type":"hygiene_platform_refactor","hardcoded":49,"fallback":69,"todo":51}
+{"ts":"2026-09-18T04:06:21Z","ts_epoch":1789704381,"type":"strategic.issue_created","title":"Move build-loop circuit breaker and restart thresholds to config/policy.json","priority":"P6","complexity":"fast"}
+{"ts":"2026-09-18T04:06:21Z","ts_epoch":1789704381,"type":"strategic.cycle_complete","issues_created":1,"issues_skipped":2}
