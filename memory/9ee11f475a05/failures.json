@@ -5,8 +5,8 @@
       "pattern": "\u001b[38;2;74;222;128m\u001b[1m✓\u001b[0m reveal shows 1/3 pass count on failure",
       "root_cause": "sw-intent-analysis-test asserts analyze_intent's JSON output includes version, goal, and criteria fields, but the current schema/implementation omits one or more of them",
       "fix": "Update analyze_intent (or its schema) in sw-intent-analysis.sh to emit version, goal, and criteria fields matching the test's expected schema",
-      "seen_count": 114,
-      "last_seen": "2026-09-18T22:45:43Z",
+      "seen_count": 113,
+      "last_seen": "2026-09-18T22:13:22Z",
       "category": "test_failure",
       "signature_hash": "e1a285258fe63781b7370b0d086ad87b",
       "signature": "\u001b[<n>;2;<n>;<n>;<n>m\u001b[1m✓\u001b[0m reveal shows <path> pass count on failure"
@@ -50,8 +50,8 @@
       "signature": "results: \u001b[<n>;2;<n>;<n>;<n>m\u001b[1m<n> pass\u001b[0m | \u001b[<n>;2;<n>;<n>;<n>m\u001b[1m1 fail\u001b[0m",
       "root_cause": "sw-e2e-integration-test failed because a stale pipeline lock from a prior run (pipeline-3854) was left in 'running' state, blocking the new pipeline start; sw-intent-analysis-test failed because analyze_intent's generated JSON is missing the required version/goal/criteria schema fields",
       "fix": "Clear/release stale pipeline locks before the e2e-integration test runs (or add lock staleness detection/cleanup), and update analyze_intent to always emit version, goal, and criteria fields in its output schema",
-      "seen_count": 6,
-      "last_seen": "2026-09-16T23:00:47Z",
+      "seen_count": 7,
+      "last_seen": "2026-09-18T21:28:51Z",
       "category": "test_failure",
       "signature_hash": "af7df127e4c98031cbe09f6b0646ac68"
     },
@@ -252,11 +252,11 @@
     {
       "stage": "test",
       "pattern": "\u001b[38;2;74;222;128m✓\u001b[0m Missing git repository fails pre-flight",
-      "root_cause": "sw-intent-analysis-test and sw-recruit-test have unrelated assertion failures (missing schema fields, recruit audit checks), while sw-e2e-integration-test hung past the 301s timeout during a Claude-CLI-driven build loop iteration",
-      "fix": "Fix the intent-analysis schema to include version/goal/criteria fields, investigate the recruit-test failing assertion, and raise or profile the e2e-integration-test timeout to find why iteration 1 stalled",
+      "root_cause": "test suite output was truncated/incomplete and did not capture a real assertion failure for the git pre-flight check",
+      "fix": "re-run the test with full logging to confirm actual pass/fail state before treating this as a failure",
       "seen_count": 1,
       "last_seen": "2026-09-16T21:55:17Z",
-      "category": "test_failure"
+      "category": "flaky"
     }
   ]
 }
