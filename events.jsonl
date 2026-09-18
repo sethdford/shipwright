@@ -528,3 +528,6 @@
 {"ts":"2026-09-18T07:09:15Z","ts_epoch":1789715355,"type":"risk.outcome","issue":0,"predicted_risk":0,"actual_failure":"false"}
 {"ts":"2026-09-18T07:09:15Z","ts_epoch":1789715355,"type":"model.outcome","issue":0,"stage":"intake","model":"haiku","success":"true"}
 {"ts":"2026-09-18T07:09:15Z","ts_epoch":1789715355,"type":"pipeline.cost","input_tokens":0,"output_tokens":0,"model":"sonnet","cost_usd":0.0000}
+{"ts":"2026-09-18T08:06:38Z","ts_epoch":1789718798,"type":"hygiene_platform_refactor","hardcoded":49,"fallback":69,"todo":51}
+{"ts":"2026-09-18T08:07:04Z","ts_epoch":1789718824,"type":"strategic.issue_created","title":"Split sw-loop.sh restart/session-continuity logic into scripts/lib/loop-session.sh","priority":"P6","complexity":"standard"}
+{"ts":"2026-09-18T08:07:04Z","ts_epoch":1789718824,"type":"strategic.cycle_complete","issues_created":1,"issues_skipped":2}
