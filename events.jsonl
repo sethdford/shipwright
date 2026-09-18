@@ -10074,3 +10074,7 @@
 {"ts":"2026-09-17T21:21:13Z","ts_epoch":1789680073,"type":"recruit_role_created","role":"noise-role-28789","method":"manual","title":"noise"}
 {"ts":"2026-09-17T21:21:14Z","ts_epoch":1789680074,"type":"recruit_role_created","role":"noise-role-8059","method":"manual","title":"noise"}
 {"ts":"2026-09-17T21:21:15Z","ts_epoch":1789680075,"type":"recruit_role_created","role":"noise-role-18641","method":"manual","title":"noise"}
+{"ts":"2026-09-18T00:13:13Z","ts_epoch":1789690393,"type":"hygiene_platform_refactor","hardcoded":49,"fallback":69,"todo":51}
+{"ts":"2026-09-18T00:13:46Z","ts_epoch":1789690426,"type":"strategic.issue_created","title":"Add pipeline template auto-recommendation based on issue content","priority":"P1","complexity":"standard"}
+{"ts":"2026-09-18T00:13:51Z","ts_epoch":1789690431,"type":"strategic.issue_created","title":"Split sw-loop.sh iteration/session-management into a library module","priority":"P6","complexity":"full"}
+{"ts":"2026-09-18T00:13:51Z","ts_epoch":1789690431,"type":"strategic.cycle_complete","issues_created":2,"issues_skipped":1}
