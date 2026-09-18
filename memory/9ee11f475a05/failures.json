@@ -6,7 +6,7 @@
       "root_cause": "sw-intent-analysis-test asserts analyze_intent's JSON output includes version, goal, and criteria fields, but the current schema/implementation omits one or more of them",
       "fix": "Update analyze_intent (or its schema) in sw-intent-analysis.sh to emit version, goal, and criteria fields matching the test's expected schema",
       "seen_count": 111,
-      "last_seen": "2026-09-18T18:20:19Z",
+      "last_seen": "2026-09-18T18:53:50Z",
       "category": "test_failure",
       "signature_hash": "e1a285258fe63781b7370b0d086ad87b",
       "signature": "\u001b[<n>;2;<n>;<n>;<n>m\u001b[1m✓\u001b[0m reveal shows <path> pass count on failure"
@@ -16,8 +16,8 @@
       "pattern": "\u001b[2m  loop behavior: iterations on test failure\u001b[0m",
       "root_cause": "Test suite itself passed (all PASS, 0 FAIL) but the pipeline stage was flagged for iterating due to loop-behavior/RL logging noise being misread as failure signal",
       "fix": "Verify the actual test exit code rather than log content matching; ensure sw-autoresearch-e2e-test.sh output doesn't trigger false-positive failure pattern matching in the pipeline's error classifier",
-      "seen_count": 27,
-      "last_seen": "2026-09-18T18:54:28Z",
+      "seen_count": 26,
+      "last_seen": "2026-09-18T12:26:13Z",
       "category": "flaky",
       "signature_hash": "579381c41e2fb77269fb772481550f1d",
       "signature": "\u001b[2m loop behavior: iterations on test failure\u001b[0m"
@@ -252,8 +252,8 @@
     {
       "stage": "test",
       "pattern": "\u001b[38;2;74;222;128m✓\u001b[0m Missing git repository fails pre-flight",
-      "root_cause": "sw-pipeline-test.sh mock artifacts (plan.md, review.md) are not being written by the mocked pipeline stages, cascading into E2E/resume/cleanup test failures, plus a jq parse error on non-numeric complexity value in intelligence complexity-skip test",
-      "fix": "Fix mock plan/review stage functions in sw-pipeline-test.sh to write plan.md/dod.md/tasks and review.md artifacts before assertions run, and quote/validate the complexity value before passing to jq to avoid parse errors",
+      "root_cause": "e2e-integration-test failed because a prior pipeline lock (pipeline-5625) was left held from a concurrent/previous run, so the new pipeline start hit 'already in progress' instead of a clean pre-flight state",
+      "fix": "release/clear stale pipeline locks before the e2e test suite runs (or have the test use a unique/isolated pipeline id) and fix sw-intent-analysis-test's schema validation to include version, goal, and criteria fields",
       "seen_count": 1,
       "last_seen": "2026-09-16T21:55:17Z",
       "category": "test_failure"
