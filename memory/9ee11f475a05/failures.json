@@ -5,8 +5,8 @@
       "pattern": "\u001b[38;2;74;222;128m\u001b[1m✓\u001b[0m reveal shows 1/3 pass count on failure",
       "root_cause": "sw-intent-analysis-test asserts analyze_intent's JSON output includes version, goal, and criteria fields, but the current schema/implementation omits one or more of them",
       "fix": "Update analyze_intent (or its schema) in sw-intent-analysis.sh to emit version, goal, and criteria fields matching the test's expected schema",
-      "seen_count": 127,
-      "last_seen": "2026-09-19T21:11:48Z",
+      "seen_count": 125,
+      "last_seen": "2026-09-19T21:29:28Z",
       "category": "test_failure",
       "signature_hash": "e1a285258fe63781b7370b0d086ad87b",
       "signature": "\u001b[<n>;2;<n>;<n>;<n>m\u001b[1m✓\u001b[0m reveal shows <path> pass count on failure"
@@ -16,8 +16,8 @@
       "pattern": "\u001b[2m  loop behavior: iterations on test failure\u001b[0m",
       "root_cause": "Test suite itself passed (all PASS, 0 FAIL) but the pipeline stage was flagged for iterating due to loop-behavior/RL logging noise being misread as failure signal",
       "fix": "Verify the actual test exit code rather than log content matching; ensure sw-autoresearch-e2e-test.sh output doesn't trigger false-positive failure pattern matching in the pipeline's error classifier",
-      "seen_count": 28,
-      "last_seen": "2026-09-19T16:46:38Z",
+      "seen_count": 27,
+      "last_seen": "2026-09-19T14:08:28Z",
       "category": "flaky",
       "signature_hash": "579381c41e2fb77269fb772481550f1d",
       "signature": "\u001b[2m loop behavior: iterations on test failure\u001b[0m"
@@ -27,8 +27,8 @@
       "pattern": "Failed: 1",
       "root_cause": "sw-intent-analysis-test fails because analyze_intent's generated JSON omits required fields (version, goal, criteria); sw-e2e-integration-test fails as a side effect of a stale pipeline lock (pipeline-3749) left running from a prior test run, not a new regression",
       "fix": "add the missing version/goal/criteria fields to the intent-analysis JSON schema/generator, and clear/reset stale pipeline locks (or run `shipwright pipeline abort`) before the e2e-integration test suite starts",
-      "seen_count": 18,
-      "last_seen": "2026-09-19T09:38:42Z",
+      "seen_count": 19,
+      "last_seen": "2026-09-19T18:13:14Z",
       "category": "test_failure",
       "signature_hash": "0ffe097d3b7a598c5b9ebe8e3cd8d7e4",
       "signature": "failed: 1"
@@ -50,8 +50,8 @@
       "signature": "results: \u001b[<n>;2;<n>;<n>;<n>m\u001b[1m<n> pass\u001b[0m | \u001b[<n>;2;<n>;<n>;<n>m\u001b[1m1 fail\u001b[0m",
       "root_cause": "sw-e2e-integration-test failed because a stale pipeline lock from a prior run (pipeline-3854) was left in 'running' state, blocking the new pipeline start; sw-intent-analysis-test failed because analyze_intent's generated JSON is missing the required version/goal/criteria schema fields",
       "fix": "Clear/release stale pipeline locks before the e2e-integration test runs (or add lock staleness detection/cleanup), and update analyze_intent to always emit version, goal, and criteria fields in its output schema",
-      "seen_count": 8,
-      "last_seen": "2026-09-19T18:43:42Z",
+      "seen_count": 7,
+      "last_seen": "2026-09-19T15:03:24Z",
       "category": "test_failure",
       "signature_hash": "af7df127e4c98031cbe09f6b0646ac68"
     },
@@ -71,8 +71,8 @@
       "pattern": "Results: \u001b[38;2;74;222;128m\u001b[1m124 PASS\u001b[0m | \u001b[38;2;248;113;113m\u001b[1m4 FAIL\u001b[0m",
       "root_cause": "4 of 128 tests failed but the failing assertions are not present in the captured log excerpt (only passing output shown)",
       "fix": "Re-run with full output or grep for FAIL/✗ lines to identify which suite and assertion regressed before attempting a code fix",
-      "seen_count": 6,
-      "last_seen": "2026-09-19T19:14:46Z",
+      "seen_count": 5,
+      "last_seen": "2026-09-18T02:05:54Z",
       "category": "test_failure",
       "signature_hash": "a938d8f63c9361dfd3082073022633ae",
       "signature": "results: \u001b[<n>;2;<n>;<n>;<n>m\u001b[1m<n> pass\u001b[0m | \u001b[<n>;2;<n>;<n>;<n>m\u001b[1m4 fail\u001b[0m"
@@ -261,10 +261,19 @@
     {
       "stage": "test",
       "pattern": "\u001b[38;2;0;212;255m▸\u001b[0m Missing template returns error... \u001b[38;2;74;222;128m✓\u001b[0m",
-      "root_cause": "sw-e2e-integration-test failed because a stale pipeline lock (pipeline-5861) was already running, blocking the fast pipeline test; sw-intent-analysis-test failed because analyze_intent's generated JSON is missing required schema fields (version, goal, criteria)",
-      "fix": "Clear/reset the stale pipeline lock before the e2e-integration test runs (or add lock cleanup in test setup), and update the intent-analysis prompt/schema validator so analyze_intent always emits version, goal, and criteria fields",
+      "root_cause": "The captured log tail shows only passing assertions (PASS/FAIL 0 across all suites); the actual failing assertion is not present in the last 200 lines, indicating either output truncation before the real failure or a transient/flaky non-deterministic test run",
+      "fix": "Re-run the test stage and capture full untruncated output (or increase log tail size) to locate the actual failing assertion before attempting a code fix",
       "seen_count": 1,
       "last_seen": "2026-09-18T23:17:29Z",
+      "category": "flaky"
+    },
+    {
+      "stage": "test",
+      "pattern": "\u001b[38;2;0;212;255m▸\u001b[0m Cleanup: Failure handler removes watch label... \u001b[38;2;74;222;128m✓\u001b[0m",
+      "root_cause": "sw-pipeline-test.sh mock stage handlers no longer write plan.md/review.md artifacts (or a jq-parsing regression breaks downstream stage/artifact generation), cascading into full-pipeline, resume, and cleanup test failures",
+      "fix": "check the plan/review stage functions in sw-pipeline.sh and the RL/complexity jq invocation for a numeric literal that isn't being quoted/extracted correctly, then restore artifact writes so plan.md and review.md are created",
+      "seen_count": 1,
+      "last_seen": "2026-09-19T20:48:59Z",
       "category": "test_failure"
     }
   ]
