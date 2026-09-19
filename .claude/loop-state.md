@@ -13,37 +13,39 @@ Historical context (lessons from previous pipelines):
 {
   "results": [
     {
-      "file": "failures.json",
-      "relevance": 90,
-      "summary": "Comprehensive test failure analysis with patterns from sw-intent-analysis-test, sw-e2e-integration-test, sw-loop-test, and sw-cost-test; includes root causes and fixes directly applicable to diagnosing build stage failures"
-    },
-    {
       "file": "retry-outcomes.json",
-      "relevance": 85,
-      "summary": "Shows model_escalation retry strategy achieved 100% success rate (5/5) for build_failure class; highly relevant for recovery strategy selection during build stage"
+      "relevance": 95,
+      "summary": "build_failure recovery strategy with 100% success rate (5/5 attempts succeeded) — directly applicable to autonomous build recovery for this stage"
     },
     {
       "file": "patterns.json",
+      "relevance": 90,
+      "summary": "Project configuration (node type, vitest test runner, npm package manager) — essential context for understanding build and test environment setup"
+    },
+    {
+      "file": "flaky-tests.json",
+      "relevance": 85,
+      "summary": "Flaky test patterns (test-auth with 90% confidence timeout error, test-1 with 85% confidence) — E2E tests are prone to flakiness; these patterns inform expected failure modes"
+    },
+    {
+      "file": "failures.json (second detailed entry)",
       "relevance": 80,
-      "summary": "Project configuration (Node.js, vitest, npm, commonjs imports) provides essential context for understanding build and test runner behavior"
+      "summary": "Multiple test failure patterns including sw-e2e-integration-test hangs and sw-intent-analysis-test schema issues — directly relevant to E2E test build failures and fixes"
     },
     {
-      "file": "metrics.json",
+      "file": "fleet-shared-patterns.json",
       "relevance": 75,
-      "summary": "Build and test duration baselines (7095s build, 1459s test) help establish expected performance and detect anomalies during the build stage"
-    },
-    {
-      "file": "knowledge.json",
-      "relevance": 70,
-      "summary": "Contains actionable fixes for common build failures (mktemp directory issues, missing dependencies, npm install requirements) frequently encountered in test setup"
+      "summary": "Cross-repo build error pattern (Cannot find module → npm i fix) seen in build/test stages — applicable recovery strategy for dependency issues in autonomous builds"
     }
   ]
 }
 
 Discoveries from other pipelines:
-✓ Injected 6 new discoveries
+✓ Injected 8 new discoveries
 [spec_generation] Stage spec_generation completed — Resolution: 
 [design] Design completed for Auto-file hygiene issue when a script exceeds 2000 lines — Resolution: 
+[intake] Stage intake completed — Resolution: 
+[spec_generation] Stage spec_generation completed — Resolution: 
 [intake] Stage intake completed — Resolution: 
 [spec_generation] Stage spec_generation completed — Resolution: 
 [intake] Stage intake completed — Resolution: 
@@ -205,8 +207,8 @@ status: running
 test_cmd: "npm test"
 model: sonnet
 agents: 1
-started_at: 2026-09-19T18:49:08Z
-last_iteration_at: 2026-09-19T18:49:08Z
+started_at: 2026-09-19T19:04:15Z
+last_iteration_at: 2026-09-19T19:04:15Z
 consecutive_failures: 0
 total_commits: 0
 audit_enabled: true

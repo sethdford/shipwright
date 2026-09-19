@@ -1659,33 +1659,33 @@
       "result": {
         "results": [
           {
-            "file": "failures.json",
+            "file": "metrics.json",
             "relevance": 95,
-            "summary": "Direct test failure patterns with root causes and fixes (intent-analysis schema, pipeline locks, e2e-integration timeouts). Highly relevant for diagnosing and preventing build failures during this stage."
-          },
-          {
-            "file": "knowledge.json",
-            "relevance": 82,
-            "summary": "Knowledge base entries for test failures (mktemp /tmp/claude path issues, cleanup.sh output formatting, regression detection). Practical fixes for build environment issues."
-          },
-          {
-            "file": "success-patterns.json",
-            "relevance": 78,
-            "summary": "Captured successful build patterns for bug fixes and features (3-iteration builds, standard template, file change patterns). Provides proven approaches for this build type."
+            "summary": "Baseline build/test durations (7095s build, 1459s test) set performance expectations and help predict stage completion times"
           },
           {
             "file": "retry-outcomes.json",
-            "relevance": 72,
-            "summary": "Model escalation retry strategy with 100% success rate on build_failure class. Demonstrates effective recovery mechanism when builds fail."
+            "relevance": 85,
+            "summary": "Proven model_escalation retry strategy with 100% success rate on build_failure class — directly applicable if this build stage encounters failures"
           },
           {
-            "file": "flaky-tests.json",
-            "relevance": 68,
-            "summary": "Identifies unstable tests (test-auth with 90% confidence connection timeout). Helps distinguish build failures due to code vs. environmental flakiness."
+            "file": "success-patterns.json",
+            "relevance": 80,
+            "summary": "Two successful delivery patterns show iteration counts (3 iterations), file change patterns, test strategies, and costs ($2.50 typical) — templates for current build approach"
+          },
+          {
+            "file": "patterns.json",
+            "relevance": 75,
+            "summary": "Project fundamentals essential for build: Node type, vitest test runner, commonjs imports, src/ source directory — build stage must respect these conventions"
+          },
+          {
+            "file": "failures.json",
+            "relevance": 70,
+            "summary": "Test-stage failures (intent-analysis JSON schema, stale pipeline locks, flaky suite timeouts) inform test infrastructure risks discovered during this build's test execution phase"
           }
         ]
       },
-      "timestamp": 1789842008,
+      "timestamp": 1789844653,
       "ttl": 1800
     },
     "d01f3e6a86452b056f96b40c161a2d15": {
@@ -1846,33 +1846,33 @@
       "result": {
         "results": [
           {
-            "file": "failures.json",
-            "relevance": 90,
-            "summary": "Comprehensive test failure analysis with patterns from sw-intent-analysis-test, sw-e2e-integration-test, sw-loop-test, and sw-cost-test; includes root causes and fixes directly applicable to diagnosing build stage failures"
-          },
-          {
             "file": "retry-outcomes.json",
-            "relevance": 85,
-            "summary": "Shows model_escalation retry strategy achieved 100% success rate (5/5) for build_failure class; highly relevant for recovery strategy selection during build stage"
+            "relevance": 95,
+            "summary": "build_failure recovery strategy with 100% success rate (5/5 attempts succeeded) — directly applicable to autonomous build recovery for this stage"
           },
           {
             "file": "patterns.json",
+            "relevance": 90,
+            "summary": "Project configuration (node type, vitest test runner, npm package manager) — essential context for understanding build and test environment setup"
+          },
+          {
+            "file": "flaky-tests.json",
+            "relevance": 85,
+            "summary": "Flaky test patterns (test-auth with 90% confidence timeout error, test-1 with 85% confidence) — E2E tests are prone to flakiness; these patterns inform expected failure modes"
+          },
+          {
+            "file": "failures.json (second detailed entry)",
             "relevance": 80,
-            "summary": "Project configuration (Node.js, vitest, npm, commonjs imports) provides essential context for understanding build and test runner behavior"
+            "summary": "Multiple test failure patterns including sw-e2e-integration-test hangs and sw-intent-analysis-test schema issues — directly relevant to E2E test build failures and fixes"
           },
           {
-            "file": "metrics.json",
+            "file": "fleet-shared-patterns.json",
             "relevance": 75,
-            "summary": "Build and test duration baselines (7095s build, 1459s test) help establish expected performance and detect anomalies during the build stage"
-          },
-          {
-            "file": "knowledge.json",
-            "relevance": 70,
-            "summary": "Contains actionable fixes for common build failures (mktemp directory issues, missing dependencies, npm install requirements) frequently encountered in test setup"
+            "summary": "Cross-repo build error pattern (Cannot find module → npm i fix) seen in build/test stages — applicable recovery strategy for dependency issues in autonomous builds"
           }
         ]
       },
-      "timestamp": 1789841994,
+      "timestamp": 1789844636,
       "ttl": 1800
     },
     "de317c1cb906aee7626e264101bb529b": {
@@ -2271,6 +2271,13 @@
         }
       ],
       "timestamp": 1789843833,
+      "ttl": 1800
+    },
+    "a77ea172ac34dc183d31a7683b4f2886": {
+      "result": {
+        "raw_response": "Mock claude: ok"
+      },
+      "timestamp": 1789844594,
       "ttl": 1800
     }
   }
