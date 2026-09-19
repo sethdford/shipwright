@@ -85,3 +85,6 @@
 {"ts":"2026-09-19T15:40:32Z","ts_epoch":1789832432,"type":"reasoning.trace","job_id":"pipeline-470237-42","complexity":"medium","risk":50,"template":"standard"}
 {"ts":"2026-09-19T15:40:33Z","ts_epoch":1789832433,"type":"reasoning.trace","job_id":"pipeline-470907-42","complexity":"medium","risk":50,"template":"standard"}
 {"ts":"2026-09-19T15:40:33Z","ts_epoch":1789832433,"type":"reasoning.trace","job_id":"pipeline-471579-42","complexity":"medium","risk":50,"template":"standard"}
+{"ts":"2026-09-19T16:04:20Z","ts_epoch":1789833860,"type":"hygiene_platform_refactor","hardcoded":49,"fallback":69,"todo":51}
+{"ts":"2026-09-19T16:04:44Z","ts_epoch":1789833884,"type":"strategic.issue_created","title":"Auto-file hygiene issue when a script exceeds 2000 lines","priority":"P6","complexity":"fast"}
+{"ts":"2026-09-19T16:04:44Z","ts_epoch":1789833884,"type":"strategic.cycle_complete","issues_created":1,"issues_skipped":2}
