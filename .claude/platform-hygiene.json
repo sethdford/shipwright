@@ -1,5 +1,5 @@
 {
-  "timestamp": "2026-09-19T16:42:43Z",
+  "timestamp": "2026-09-19T16:53:00Z",
   "repository": "shipwright",
   "counts": {
     "hardcoded": 49,
@@ -523,19 +523,19 @@
     },
     {
       "file": "scripts/sw-loop.sh",
+      "line": 1296
+    },
+    {
+      "file": "scripts/sw-loop.sh",
       "line": 1300
     },
     {
       "file": "scripts/sw-loop.sh",
-      "line": 1304
+      "line": 1303
     },
     {
       "file": "scripts/sw-loop.sh",
-      "line": 1307
-    },
-    {
-      "file": "scripts/sw-loop.sh",
-      "line": 1563
+      "line": 1559
     },
     {
       "file": "scripts/sw-pr-lifecycle-test.sh",
@@ -665,7 +665,7 @@
   "script_size_hotspots": [
     {
       "script": "sw-loop.sh",
-      "lines": 2713
+      "lines": 2709
     },
     {
       "script": "sw-memory.sh",
@@ -727,7 +727,7 @@
   "oversized_scripts": [
     {
       "script": "sw-loop.sh",
-      "lines": 2713
+      "lines": 2709
     },
     {
       "script": "sw-memory.sh",
