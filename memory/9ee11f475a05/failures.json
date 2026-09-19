@@ -5,8 +5,8 @@
       "pattern": "\u001b[38;2;74;222;128m\u001b[1m✓\u001b[0m reveal shows 1/3 pass count on failure",
       "root_cause": "sw-intent-analysis-test asserts analyze_intent's JSON output includes version, goal, and criteria fields, but the current schema/implementation omits one or more of them",
       "fix": "Update analyze_intent (or its schema) in sw-intent-analysis.sh to emit version, goal, and criteria fields matching the test's expected schema",
-      "seen_count": 114,
-      "last_seen": "2026-09-18T22:38:33Z",
+      "seen_count": 117,
+      "last_seen": "2026-09-19T01:54:54Z",
       "category": "test_failure",
       "signature_hash": "e1a285258fe63781b7370b0d086ad87b",
       "signature": "\u001b[<n>;2;<n>;<n>;<n>m\u001b[1m✓\u001b[0m reveal shows <path> pass count on failure"
@@ -261,11 +261,11 @@
     {
       "stage": "test",
       "pattern": "\u001b[38;2;0;212;255m▸\u001b[0m Missing template returns error... \u001b[38;2;74;222;128m✓\u001b[0m",
-      "root_cause": "sw-self-optimize.sh memory promotion logic fails to copy cross-repo patterns, likely due to a path/filter mismatch in the promotion function",
-      "fix": "inspect the 'Memory promotion copies cross-repo patterns' test in sw-self-optimize-test.sh and the promote function in sw-self-optimize.sh for incorrect repo-hash matching or missing write step",
+      "root_cause": "false-positive match — log shows all tests passing (PASS: 29/33/24/26, FAIL: 0) with no actual failure",
+      "fix": "no code fix needed; refine failure-pattern matcher to not flag benign log lines like '▸ Missing template returns error... ✓'",
       "seen_count": 1,
       "last_seen": "2026-09-18T23:17:29Z",
-      "category": "test_failure"
+      "category": "flaky"
     }
   ]
 }
