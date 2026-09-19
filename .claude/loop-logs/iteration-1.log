@@ -1,3 +1,0 @@
-This is a docs-only, single-line README change (the pipeline's automated e2e marker comment, updated for issue #5831 following the established pattern from prior runs). No code paths are touched, so the pre-existing flaky failures in `sw-e2e-integration-test`, `sw-intent-analysis-test`, and `sw-loop-test` are unrelated and were already failing before this change.
-
-LOOP_COMPLETE

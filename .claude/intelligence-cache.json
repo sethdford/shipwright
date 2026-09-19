@@ -32,7 +32,7 @@
       "result": {
         "raw_response": "Mock claude response"
       },
-      "timestamp": 1789842554,
+      "timestamp": 1789846159,
       "ttl": 3600
     },
     "efd5524ad1244fd20344bf3ff5d95233": {
@@ -1659,33 +1659,33 @@
       "result": {
         "results": [
           {
-            "file": "metrics.json",
+            "file": "failures.json",
             "relevance": 95,
-            "summary": "Baseline build/test durations (7095s build, 1459s test) set performance expectations and help predict stage completion times"
+            "summary": "Contains detailed test failure patterns, root causes, and fixes for recurring issues (intent-analysis-test, e2e-integration-test, loop behavior). Critical for build stage to avoid repeating known failures."
           },
           {
-            "file": "retry-outcomes.json",
-            "relevance": 85,
-            "summary": "Proven model_escalation retry strategy with 100% success rate on build_failure class — directly applicable if this build stage encounters failures"
+            "file": "flaky-tests.json",
+            "relevance": 90,
+            "summary": "Identifies known flaky tests (test-auth with 90% confidence, test-1 with 85% confidence) with error signatures. Essential context to manage build reliability and timeouts."
           },
           {
             "file": "success-patterns.json",
+            "relevance": 85,
+            "summary": "Shows successful build approaches with iteration strategies, file change patterns, and test execution methods. Provides proven templates for current build work."
+          },
+          {
+            "file": "knowledge.json",
             "relevance": 80,
-            "summary": "Two successful delivery patterns show iteration counts (3 iterations), file change patterns, test strategies, and costs ($2.50 typical) — templates for current build approach"
+            "summary": "Contains failure signatures and fix strategies for common build issues (mktemp directory creation, cleanup output, regression detection). Directly applicable to build debugging."
           },
           {
             "file": "patterns.json",
-            "relevance": 75,
-            "summary": "Project fundamentals essential for build: Node type, vitest test runner, commonjs imports, src/ source directory — build stage must respect these conventions"
-          },
-          {
-            "file": "failures.json",
             "relevance": 70,
-            "summary": "Test-stage failures (intent-analysis JSON schema, stale pipeline locks, flaky suite timeouts) inform test infrastructure risks discovered during this build's test execution phase"
+            "summary": "Project conventions (source_dir, test_pattern, import_style, vitest runner). Foundation for understanding project structure and test execution during build stage."
           }
         ]
       },
-      "timestamp": 1789844653,
+      "timestamp": 1789847150,
       "ttl": 1800
     },
     "d01f3e6a86452b056f96b40c161a2d15": {
@@ -2327,6 +2327,111 @@
         }
       ],
       "timestamp": 1789845077,
+      "ttl": 1800
+    },
+    "bb0a86b5db5b5149351d5ad871859354": {
+      "result": {
+        "raw_response": "Mock claude: ok"
+      },
+      "timestamp": 1789845420,
+      "ttl": 1800
+    },
+    "6961a24f33aa87beb2a6deaf7391f622": {
+      "result": [
+        {
+          "type": "result",
+          "result": "I am trying the same approach again.",
+          "usage": {
+            "input_tokens": 0,
+            "output_tokens": 0
+          }
+        }
+      ],
+      "timestamp": 1789845517,
+      "ttl": 1800
+    },
+    "1d2a1eb30dec89b1a3f7cc5ee1468e55": {
+      "result": {
+        "raw_response": "Mock claude: ok"
+      },
+      "timestamp": 1789846110,
+      "ttl": 1800
+    },
+    "1a60fc50024980653709195a4a9a9886": {
+      "result": [
+        {
+          "type": "result",
+          "result": "I am trying the same approach again.",
+          "usage": {
+            "input_tokens": 0,
+            "output_tokens": 0
+          }
+        }
+      ],
+      "timestamp": 1789846207,
+      "ttl": 1800
+    },
+    "e724a736023a0d658e232f1998a748c6": {
+      "result": {
+        "raw_response": "Mock claude: ok"
+      },
+      "timestamp": 1789846418,
+      "ttl": 1800
+    },
+    "412b94c8df3b0154667d78522fc1a62f": {
+      "result": [
+        {
+          "type": "result",
+          "result": "I am trying the same approach again.",
+          "usage": {
+            "input_tokens": 0,
+            "output_tokens": 0
+          }
+        }
+      ],
+      "timestamp": 1789846515,
+      "ttl": 1800
+    },
+    "e947d9f8b29d5bca612e44f5062c999f": {
+      "result": {
+        "raw_response": "Mock claude: ok"
+      },
+      "timestamp": 1789846715,
+      "ttl": 1800
+    },
+    "af94bde942ffe0b3bad6a89c2ccbbd70": {
+      "result": [
+        {
+          "type": "result",
+          "result": "I am trying the same approach again.",
+          "usage": {
+            "input_tokens": 0,
+            "output_tokens": 0
+          }
+        }
+      ],
+      "timestamp": 1789846937,
+      "ttl": 1800
+    },
+    "eb3a666e282c86ab8fa8aa8d7d58ef93": {
+      "result": {
+        "raw_response": "Mock claude: ok"
+      },
+      "timestamp": 1789847195,
+      "ttl": 1800
+    },
+    "ebcc201e293d08d9fbb7f755d21ab320": {
+      "result": [
+        {
+          "type": "result",
+          "result": "I am trying the same approach again.",
+          "usage": {
+            "input_tokens": 0,
+            "output_tokens": 0
+          }
+        }
+      ],
+      "timestamp": 1789847292,
       "ttl": 1800
     }
   }

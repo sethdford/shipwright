@@ -1,5 +1,5 @@
 {
-  "timestamp": "2026-09-19T19:09:08Z",
+  "timestamp": "2026-09-19T19:50:01Z",
   "repository": "shipwright",
   "counts": {
     "hardcoded": 49,
@@ -395,7 +395,7 @@
     },
     {
       "file": "scripts/sw-daemon-test.sh",
-      "line": 1934
+      "line": 1948
     },
     {
       "file": "scripts/sw-pr-lifecycle.sh",
@@ -673,7 +673,7 @@
     },
     {
       "script": "sw-daemon-test.sh",
-      "lines": 1985
+      "lines": 1999
     },
     {
       "script": "sw-pipeline-test.sh",
@@ -735,7 +735,7 @@
     },
     {
       "script": "sw-daemon-test.sh",
-      "lines": 1985
+      "lines": 1999
     },
     {
       "script": "sw-pipeline-test.sh",
