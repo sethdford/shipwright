@@ -305,3 +305,8 @@
 {"ts":"2026-09-19T18:49:58Z","ts_epoch":1789843798,"type":"model.outcome","issue":0,"stage":"intake","model":"opus","success":"true"}
 {"ts":"2026-09-19T18:49:58Z","ts_epoch":1789843798,"type":"model.outcome","issue":0,"stage":"plan","model":"opus","success":"true"}
 {"ts":"2026-09-19T18:49:58Z","ts_epoch":1789843798,"type":"pipeline.cost","input_tokens":0,"output_tokens":0,"model":"sonnet","cost_usd":0.0000}
+{"ts":"2026-09-19T20:04:43Z","ts_epoch":1789848283,"type":"hygiene_platform_refactor","hardcoded":49,"fallback":69,"todo":51}
+{"ts":"2026-09-19T20:05:11Z","ts_epoch":1789848311,"type":"strategic.issue_created","title":"Fix hygiene scan false positives on the word \"hardcoded\" instead of numeric literals","priority":"P6","complexity":"fast"}
+{"ts":"2026-09-19T20:05:15Z","ts_epoch":1789848315,"type":"strategic.issue_created","title":"Split sw-daemon-test.sh (1985 lines) into per-concern test files","priority":"P6","complexity":"standard"}
+{"ts":"2026-09-19T20:05:19Z","ts_epoch":1789848319,"type":"strategic.issue_created","title":"Add pre-build static validation step to catch obvious build failures before iteration burn","priority":"P0","complexity":"standard"}
+{"ts":"2026-09-19T20:05:19Z","ts_epoch":1789848319,"type":"strategic.cycle_complete","issues_created":3,"issues_skipped":1}
