@@ -113,3 +113,6 @@
 {"ts":"2026-09-19T06:17:06Z","ts_epoch":1789798626,"type":"patrol.finding","check":"untested_script","script":"sw-tmux-role-color.sh","lines":81,"usage":1}
 {"ts":"2026-09-19T06:17:06Z","ts_epoch":1789798626,"type":"patrol.finding","check":"untested_script","script":"sw-test-all.sh","lines":199,"usage":0}
 {"ts":"2026-09-19T06:17:06Z","ts_epoch":1789798626,"type":"patrol.finding","check":"untested_script","script":"sw-event-schema-sync.sh","lines":93,"usage":0}
+{"ts":"2026-09-19T08:06:12Z","ts_epoch":1789805172,"type":"hygiene_platform_refactor","hardcoded":49,"fallback":69,"todo":51}
+{"ts":"2026-09-19T08:06:36Z","ts_epoch":1789805196,"type":"strategic.issue_created","title":"Add scripts/sw-tracker-github.sh test suite","priority":"P1","complexity":"fast"}
+{"ts":"2026-09-19T08:06:36Z","ts_epoch":1789805196,"type":"strategic.cycle_complete","issues_created":1,"issues_skipped":2}
