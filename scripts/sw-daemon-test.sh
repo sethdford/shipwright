@@ -1729,15 +1729,22 @@ test_api_error_extended_backoff() {
 }
 
 test_preflight_auth_check() {
-    local daemon_src
+    local daemon_src block wired
     daemon_src="$(dirname "$DAEMON_SCRIPT")/sw-daemon.sh"
-    grep -q 'daemon_preflight_auth_check()' "$daemon_src" $DAEMON_LIB_GLOB || \
+    # Capture each grep once instead of piping into `grep -q`: under pipefail,
+    # `grep -q` exits at its first match and SIGPIPEs the upstream grep (141),
+    # so the pipeline reports failure even though the match was found. That
+    # raced intermittently under `sw-test-all.sh --jobs 4`. `grep -c >/dev/null`
+    # consumes all of its input, so there is no early close to race with.
+    block=$(grep -A 60 'daemon_preflight_auth_check()' "$daemon_src" $DAEMON_LIB_GLOB || true)
+    [[ -n "$block" ]] || \
         { echo "daemon_preflight_auth_check function not found"; return 1; }
-    grep -A 60 'daemon_preflight_auth_check()' "$daemon_src" $DAEMON_LIB_GLOB | grep -q 'gh auth status' || \
+    echo "$block" | grep -c 'gh auth status' >/dev/null || \
         { echo "Missing gh auth check"; return 1; }
-    grep -A 60 'daemon_preflight_auth_check()' "$daemon_src" $DAEMON_LIB_GLOB | grep -q 'claude.*--print' || \
+    echo "$block" | grep -c 'claude.*--print' >/dev/null || \
         { echo "Missing claude auth check"; return 1; }
-    grep -B 5 'daemon_poll_issues' "$daemon_src" $DAEMON_LIB_GLOB | grep -q 'daemon_preflight_auth_check' || \
+    wired=$(grep -B 5 'daemon_poll_issues' "$daemon_src" $DAEMON_LIB_GLOB || true)
+    echo "$wired" | grep -c 'daemon_preflight_auth_check' >/dev/null || \
         { echo "Auth check not wired into poll loop"; return 1; }
 }
 
@@ -1800,15 +1807,22 @@ test_api_error_extended_backoff() {
 }
 
 test_preflight_auth_check() {
-    local daemon_src
+    local daemon_src block wired
     daemon_src="$(dirname "$DAEMON_SCRIPT")/sw-daemon.sh"
-    grep -q 'daemon_preflight_auth_check()' "$daemon_src" $DAEMON_LIB_GLOB || \
+    # Capture each grep once instead of piping into `grep -q`: under pipefail,
+    # `grep -q` exits at its first match and SIGPIPEs the upstream grep (141),
+    # so the pipeline reports failure even though the match was found. That
+    # raced intermittently under `sw-test-all.sh --jobs 4`. `grep -c >/dev/null`
+    # consumes all of its input, so there is no early close to race with.
+    block=$(grep -A 60 'daemon_preflight_auth_check()' "$daemon_src" $DAEMON_LIB_GLOB || true)
+    [[ -n "$block" ]] || \
         { echo "daemon_preflight_auth_check function not found"; return 1; }
-    grep -A 60 'daemon_preflight_auth_check()' "$daemon_src" $DAEMON_LIB_GLOB | grep -q 'gh auth status' || \
+    echo "$block" | grep -c 'gh auth status' >/dev/null || \
         { echo "Missing gh auth check"; return 1; }
-    grep -A 60 'daemon_preflight_auth_check()' "$daemon_src" $DAEMON_LIB_GLOB | grep -q 'claude.*--print' || \
+    echo "$block" | grep -c 'claude.*--print' >/dev/null || \
         { echo "Missing claude auth check"; return 1; }
-    grep -B 5 'daemon_poll_issues' "$daemon_src" $DAEMON_LIB_GLOB | grep -q 'daemon_preflight_auth_check' || \
+    wired=$(grep -B 5 'daemon_poll_issues' "$daemon_src" $DAEMON_LIB_GLOB || true)
+    echo "$wired" | grep -c 'daemon_preflight_auth_check' >/dev/null || \
         { echo "Auth check not wired into poll loop"; return 1; }
 }
 
