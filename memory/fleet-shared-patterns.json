@@ -1,0 +1,28 @@
+{
+  "version": 1,
+  "patterns": [
+    {
+      "signature_hash": "699cc5fe21e71074",
+      "pattern": "Error: Cannot find module",
+      "stage": "build",
+      "stages": [
+        "build",
+        "test"
+      ],
+      "fix": "npm i",
+      "repos": [
+        "repo-a",
+        "repo-b"
+      ],
+      "contributions": {
+        "repo-a": 1,
+        "repo-b": 1
+      },
+      "seen_count": 2,
+      "first_seen": "2026-09-19T14:20:05Z",
+      "last_seen": "2026-09-19T14:20:05Z",
+      "last_seen_epoch": 1789827605
+    }
+  ],
+  "updated_at": "2026-09-19T14:20:05Z"
+}
