@@ -1255,11 +1255,7 @@ AUDIT_PROMPT
         audit_flags+=("--dangerously-skip-permissions")
     fi
 
-    # Use structured output for machine-parseable audit results
-    local schema_file="${SCRIPT_DIR}/../schemas/audit-result.json"
-    if [[ -f "$schema_file" ]]; then
-        audit_flags+=("--json-schema" "$(cat "$schema_file")")
-    fi
+    # Structured output (--json-schema currently skipped due to external schema refs in validation)
 
     local exit_code=0
     claude -p "$audit_prompt" "${audit_flags[@]}" > "$audit_log" 2>&1 || exit_code=$?
