@@ -1034,6 +1034,36 @@ Intelligence defaults to **auto** (enabled when Claude CLI is available). Config
 
 The daemon calls into the intelligence layer at spawn time. The `intelligence` and `predict` CLI commands can also be run standalone.
 
+## Daemon Patrol: Oversized Scripts
+
+The daemon patrol auto-files a GitHub issue when any `scripts/*.sh` exceeds a
+line threshold. Detection is shared with `shipwright hygiene script-size` via
+`scripts/lib/hygiene-size.sh` (`hygiene_oversized_scripts <threshold> <dir>`),
+so the CLI report and the patrol can never drift apart.
+
+Two thresholds, deliberately separate — an advisory warning and opening a
+tracked issue are different severities:
+
+| Key | Default | Effect |
+| --- | ------: | ------ |
+| `hygiene.max_script_lines` (`config/policy.json`) | `1500` | Advisory only — what `hygiene script-size` reports |
+| `hygiene.oversized_issue_threshold` (`config/policy.json`) | `2000` | Files an issue |
+| `patrol.checks.oversized_scripts.enabled` (`daemon-config.json`) | `true` | Toggles the check |
+| `patrol.checks.oversized_scripts.threshold` (`daemon-config.json`) | — | Per-repo override of the issue threshold |
+
+Behavior:
+
+- Strict `>` comparison — a script *at* the threshold is not flagged.
+- One **aggregate** issue per cycle listing every oversized script, labeled
+  `<PATROL_LABEL>,hygiene`, subject to `PATROL_MAX_ISSUES`.
+- `NO_GITHUB=true`, `--dry-run`, and `enabled: false` each suppress filing.
+- With `DECISION_ENGINE_ENABLED=true` it writes a signal to
+  `~/.shipwright/signals/pending.jsonl` instead of filing directly.
+- **Dedup fails closed.** The patrol runs hourly, so the `gh issue list` dedup
+  query is only trusted on an affirmative `"0"`. An empty or failed query is
+  treated as "unknown — do not file" and logged as a WARN, because swallowing
+  the error into `0` would turn this check into an hourly issue generator.
+
 ## Custom Agents
 
 Specialized agent definitions in `.claude/agents/` are loaded automatically by Claude Code when agents are spawned:

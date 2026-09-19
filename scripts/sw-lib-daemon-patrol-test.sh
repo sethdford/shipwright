@@ -340,4 +340,124 @@ export PATROL_DRY_RUN="true"
 daemon_patrol_security_scan 2>/dev/null || true
 assert_pass "Patrol respects DRY_RUN flag"
 
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# patrol_oversized_scripts
+# ═══════════════════════════════════════════════════════════════════════════════
+print_test_section "patrol_oversized_scripts"
+
+REAL_SCRIPT_DIR="$SCRIPT_DIR"
+FAKE_SCRIPTS_DIR="$TEST_TEMP_DIR/fake-scripts"
+mkdir -p "$FAKE_SCRIPTS_DIR"
+# One clearly oversized script and one clearly under the threshold
+awk 'BEGIN { for (i = 0; i < 2500; i++) print "# line" }' > "$FAKE_SCRIPTS_DIR/sw-huge.sh"
+awk 'BEGIN { for (i = 0; i < 100; i++) print "# line" }' > "$FAKE_SCRIPTS_DIR/sw-small.sh"
+
+export GH_CALL_LOG="$TEST_TEMP_DIR/gh-calls.log"
+: > "$GH_CALL_LOG"
+# mock_binary writes its body through an UNQUOTED heredoc, so runtime
+# variables must be escaped to survive into the mock script itself.
+mock_binary "gh" 'if [[ "${1:-}" == "issue" && "${2:-}" == "list" ]]; then
+  [[ -n "${GH_LIST_RESULT:-}" ]] && echo "$GH_LIST_RESULT"
+  exit "${GH_LIST_EXIT:-0}"
+fi
+if [[ "${1:-}" == "issue" && "${2:-}" == "create" ]]; then
+  echo "create $*" >> "$GH_CALL_LOG"
+  exit 0
+fi
+exit 0'
+
+# Record emitted findings instead of discarding them
+PATROL_TEST_EVENTS="$TEST_TEMP_DIR/patrol-events.log"
+emit_event() { echo "$*" >> "$PATROL_TEST_EVENTS"; }
+
+run_oversized() {
+    # Fresh per-call state mirroring daemon_patrol's locals
+    total_findings=0
+    issues_created=0
+    : > "$PATROL_TEST_EVENTS"
+    : > "$GH_CALL_LOG"
+    SCRIPT_DIR="$FAKE_SCRIPTS_DIR"
+    patrol_oversized_scripts >/dev/null 2>&1 || true
+    SCRIPT_DIR="$REAL_SCRIPT_DIR"
+}
+
+export PATROL_OVERSIZED_ENABLED="true"
+export PATROL_OVERSIZED_THRESHOLD="2000"
+export PATROL_DRY_RUN="false"
+export NO_GITHUB=true
+# An earlier section leaves the decision engine on — pin it off here
+export DECISION_ENGINE_ENABLED="false"
+
+# Test 1: flags a script over the threshold
+run_oversized
+assert_contains "Flags script over threshold" "$(cat "$PATROL_TEST_EVENTS")" "script=sw-huge.sh"
+assert_eq "Counts exactly one finding" "1" "$total_findings"
+
+# Test 2: ignores a script at or under the threshold
+assert_eq "Ignores script under threshold" "" "$(grep 'sw-small.sh' "$PATROL_TEST_EVENTS" || true)"
+
+# Test 3: boundary — a script exactly at the threshold is not flagged
+PATROL_OVERSIZED_THRESHOLD=2500
+run_oversized
+assert_eq "Script exactly at threshold is not flagged" "0" "$total_findings"
+PATROL_OVERSIZED_THRESHOLD=2000
+
+# Test 4: NO_GITHUB suppresses issue creation
+run_oversized
+assert_eq "NO_GITHUB=true creates no issue" "" "$(cat "$GH_CALL_LOG")"
+
+# Test 5: dry-run suppresses issue creation
+export NO_GITHUB=false
+export PATROL_DRY_RUN="true"
+export GH_LIST_RESULT="0"
+run_oversized
+assert_eq "Dry-run creates no issue" "" "$(cat "$GH_CALL_LOG")"
+export PATROL_DRY_RUN="false"
+
+# Test 6: files exactly one aggregate issue when none exists
+run_oversized
+assert_eq "Files exactly one aggregate issue" "1" "$(grep -c '^create ' "$GH_CALL_LOG" || true)"
+assert_contains "Issue is labeled hygiene" "$(cat "$GH_CALL_LOG")" "hygiene"
+assert_eq "Increments issues_created once" "1" "$issues_created"
+
+# Test 7: dedup — an existing open issue suppresses a second filing
+export GH_LIST_RESULT="1"
+run_oversized
+assert_eq "Existing open issue suppresses duplicate" "" "$(cat "$GH_CALL_LOG")"
+
+# Test 8: dedup fails closed when the gh query errors
+export GH_LIST_RESULT=""
+export GH_LIST_EXIT="1"
+run_oversized
+assert_eq "Failed dedup query files nothing (fails closed)" "" "$(cat "$GH_CALL_LOG")"
+export GH_LIST_EXIT="0"
+export GH_LIST_RESULT="0"
+
+# Test 9: disabled flag short-circuits the whole check
+export PATROL_OVERSIZED_ENABLED="false"
+run_oversized
+assert_eq "Disabled flag skips the check" "0" "$total_findings"
+assert_eq "Disabled flag creates no issue" "" "$(cat "$GH_CALL_LOG")"
+export PATROL_OVERSIZED_ENABLED="true"
+
+# Test 10: decision-engine mode writes a signal instead of an issue
+export DECISION_ENGINE_ENABLED="true"
+SIGNALS_PENDING_FILE="$TEST_TEMP_DIR/pending.jsonl"
+: > "$SIGNALS_PENDING_FILE"
+run_oversized
+assert_eq "Decision-engine mode creates no issue" "" "$(cat "$GH_CALL_LOG")"
+assert_contains "Decision-engine mode writes a pending signal" "$(cat "$SIGNALS_PENDING_FILE")" "oversized_scripts"
+export DECISION_ENGINE_ENABLED="false"
+
+# Test 11: missing scripts directory is handled gracefully
+total_findings=0
+SCRIPT_DIR="$TEST_TEMP_DIR/does-not-exist"
+patrol_oversized_scripts >/dev/null 2>&1 || true
+SCRIPT_DIR="$REAL_SCRIPT_DIR"
+assert_eq "Missing scripts directory is a no-op" "0" "$total_findings"
+
+export NO_GITHUB=true
+emit_event() { :; }
+
 print_test_results

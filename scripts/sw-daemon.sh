@@ -246,6 +246,8 @@ PATROL_DORA_ENABLED=true
 PATROL_UNTESTED_ENABLED=true
 PATROL_RETRY_ENABLED=true
 PATROL_RETRY_THRESHOLD=2
+PATROL_OVERSIZED_ENABLED=true
+PATROL_OVERSIZED_THRESHOLD=2000
 LAST_PATROL_EPOCH=0
 
 # Team dashboard coordination
@@ -425,6 +427,11 @@ load_config() {
     PATROL_UNTESTED_ENABLED=$(jq -r '.patrol.checks.untested_scripts.enabled // true' "$config_file")
     PATROL_RETRY_ENABLED=$(jq -r '.patrol.checks.retry_exhaustion.enabled // true' "$config_file")
     PATROL_RETRY_THRESHOLD=$(jq -r '.patrol.checks.retry_exhaustion.threshold // 2' "$config_file")
+    PATROL_OVERSIZED_ENABLED=$(jq -r '.patrol.checks.oversized_scripts.enabled // true' "$config_file")
+    PATROL_OVERSIZED_THRESHOLD=$(jq -r '.patrol.checks.oversized_scripts.threshold // empty' "$config_file")
+    # Fall back to config/policy.json, then the built-in default; reject non-integers
+    [[ -n "$PATROL_OVERSIZED_THRESHOLD" ]] || PATROL_OVERSIZED_THRESHOLD=$(_config_get_int "hygiene.oversized_issue_threshold" 2000 2>/dev/null || echo 2000)
+    [[ "$PATROL_OVERSIZED_THRESHOLD" =~ ^[0-9]+$ ]] && [[ "$PATROL_OVERSIZED_THRESHOLD" -gt 0 ]] || PATROL_OVERSIZED_THRESHOLD=2000
 
     # adaptive template selection
     AUTO_TEMPLATE=$(jq -r '.auto_template // false' "$config_file")

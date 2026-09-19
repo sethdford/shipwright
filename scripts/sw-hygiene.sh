@@ -6,7 +6,7 @@
 set -euo pipefail
 trap 'echo "ERROR: $BASH_SOURCE:$LINENO exited with status $?" >&2' ERR
 
-VERSION="3.4.0"
+VERSION="3.5.0"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_DIR="${REPO_DIR:-$(cd "$SCRIPT_DIR/.." && pwd)}"
 
@@ -18,6 +18,9 @@ REPO_DIR="${REPO_DIR:-$(cd "$SCRIPT_DIR/.." && pwd)}"
 # Canonical helpers (colors, output, events)
 [[ -f "$SCRIPT_DIR/lib/helpers.sh" ]] && source "$SCRIPT_DIR/lib/helpers.sh"
 [[ -f "$SCRIPT_DIR/lib/config.sh" ]] && source "$SCRIPT_DIR/lib/config.sh"
+# Shared script-size scanning (also used by the daemon patrol)
+# shellcheck source=lib/hygiene-size.sh
+[[ -f "$SCRIPT_DIR/lib/hygiene-size.sh" ]] && source "$SCRIPT_DIR/lib/hygiene-size.sh"
 # Fallback when helpers.sh not loaded
 [[ "$(type -t info 2>/dev/null)" == "function" ]]    || info()    { echo -e "\033[38;2;0;212;255m\033[1m▸\033[0m $*"; }
 [[ "$(type -t success 2>/dev/null)" == "function" ]] || success() { echo -e "\033[38;2;74;222;128m\033[1m✓\033[0m $*"; }
@@ -404,32 +407,7 @@ list_stale_branches() {
 
 # ─── Script Size Helpers ────────────────────────────────────────────────────
 
-_emit_script_sizes() {
-    local scripts_dir="${1:-$REPO_DIR/scripts}"
-    [[ -d "$scripts_dir" ]] || return 0
-    local f lines
-    while IFS= read -r f; do
-        [[ -n "$f" ]] || continue
-        lines=$(wc -l < "$f" 2>/dev/null || true)
-        lines="${lines//[^0-9]/}"
-        lines="${lines:-0}"
-        printf '{"script":"%s","lines":%s}\n' "$(basename "$f")" "$lines"
-    done < <(find "$scripts_dir" -maxdepth 1 -name "*.sh" -type f 2>/dev/null || true)
-}
-
-check_script_sizes() {
-    local threshold="${1:-$MAX_SCRIPT_LINES}"
-    local scripts_dir="${REPO_DIR}/scripts"
-    local raw_file json
-    raw_file=$(mktemp "${TMPDIR:-/tmp}/sw-hygiene-sizes.XXXXXX")
-
-    _emit_script_sizes "$scripts_dir" > "$raw_file" 2>/dev/null || true
-    json=$(jq -s --argjson t "$threshold" \
-        '[ .[] | select(.lines > $t) ] | sort_by(-.lines)' "$raw_file" 2>/dev/null || echo "[]")
-    rm -f "$raw_file"
-    [[ -n "$json" ]] || json="[]"
-    echo "$json"
-}
+# _emit_script_sizes / check_script_sizes live in lib/hygiene-size.sh
 
 report_script_sizes() {
     local threshold="$MAX_SCRIPT_LINES" oversized count

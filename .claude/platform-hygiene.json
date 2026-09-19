@@ -1,5 +1,5 @@
 {
-  "timestamp": "2026-09-19T17:27:27Z",
+  "timestamp": "2026-09-19T17:49:00Z",
   "repository": "shipwright",
   "counts": {
     "hardcoded": 49,
@@ -39,11 +39,43 @@
     },
     {
       "file": "scripts/sw-hygiene.sh",
-      "line": 64
+      "line": 67
     },
     {
       "file": "scripts/sw-hygiene.sh",
-      "line": 504
+      "line": 482
+    },
+    {
+      "file": "scripts/sw-hygiene.sh",
+      "line": 485
+    },
+    {
+      "file": "scripts/sw-hygiene.sh",
+      "line": 491
+    },
+    {
+      "file": "scripts/sw-hygiene.sh",
+      "line": 492
+    },
+    {
+      "file": "scripts/sw-hygiene.sh",
+      "line": 493
+    },
+    {
+      "file": "scripts/sw-hygiene.sh",
+      "line": 494
+    },
+    {
+      "file": "scripts/sw-hygiene.sh",
+      "line": 495
+    },
+    {
+      "file": "scripts/sw-hygiene.sh",
+      "line": 496
+    },
+    {
+      "file": "scripts/sw-hygiene.sh",
+      "line": 497
     },
     {
       "file": "scripts/sw-hygiene.sh",
@@ -51,51 +83,19 @@
     },
     {
       "file": "scripts/sw-hygiene.sh",
-      "line": 513
+      "line": 547
     },
     {
       "file": "scripts/sw-hygiene.sh",
-      "line": 514
+      "line": 557
     },
     {
       "file": "scripts/sw-hygiene.sh",
-      "line": 515
-    },
-    {
-      "file": "scripts/sw-hygiene.sh",
-      "line": 516
-    },
-    {
-      "file": "scripts/sw-hygiene.sh",
-      "line": 517
-    },
-    {
-      "file": "scripts/sw-hygiene.sh",
-      "line": 518
-    },
-    {
-      "file": "scripts/sw-hygiene.sh",
-      "line": 519
-    },
-    {
-      "file": "scripts/sw-hygiene.sh",
-      "line": 529
+      "line": 564
     },
     {
       "file": "scripts/sw-hygiene.sh",
       "line": 569
-    },
-    {
-      "file": "scripts/sw-hygiene.sh",
-      "line": 579
-    },
-    {
-      "file": "scripts/sw-hygiene.sh",
-      "line": 586
-    },
-    {
-      "file": "scripts/sw-hygiene.sh",
-      "line": 591
     },
     {
       "file": "scripts/sw-regression.sh",
@@ -701,7 +701,7 @@
     },
     {
       "script": "sw-daemon.sh",
-      "lines": 1420
+      "lines": 1427
     },
     {
       "script": "sw-recruit-test.sh",

@@ -21,6 +21,13 @@ PATROL_DORA_ENABLED="${PATROL_DORA_ENABLED:-true}"
 PATROL_UNTESTED_ENABLED="${PATROL_UNTESTED_ENABLED:-true}"
 PATROL_RETRY_ENABLED="${PATROL_RETRY_ENABLED:-true}"
 PATROL_RETRY_THRESHOLD="${PATROL_RETRY_THRESHOLD:-2}"
+PATROL_OVERSIZED_ENABLED="${PATROL_OVERSIZED_ENABLED:-true}"
+PATROL_OVERSIZED_THRESHOLD="${PATROL_OVERSIZED_THRESHOLD:-2000}"
+
+# Shared script-size scanner (also backs `shipwright hygiene script-size`).
+_HYGIENE_SIZE_LIB="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/hygiene-size.sh"
+# shellcheck source=hygiene-size.sh
+[[ -f "$_HYGIENE_SIZE_LIB" ]] && source "$_HYGIENE_SIZE_LIB"
 
 # ─── Decision Engine Signal Mode ─────────────────────────────────────────────
 # When DECISION_ENGINE_ENABLED=true, patrol writes candidates to the pending
@@ -53,6 +60,91 @@ patrol_build_labels() {
     echo "$labels"
 }
 
+# ─── Oversized Script Detection ──────────────────────────────────────────────
+# Top-level (not nested in daemon_patrol) so it is directly unit-testable.
+# When called from daemon_patrol it reads that function's locals via bash
+# dynamic scoping; standalone callers get the ${...:-} defaults below.
+patrol_oversized_scripts() {
+    if [[ "$PATROL_OVERSIZED_ENABLED" != "true" ]]; then return; fi
+    local threshold="$PATROL_OVERSIZED_THRESHOLD"
+    [[ "$threshold" =~ ^[0-9]+$ ]] && [[ "$threshold" -gt 0 ]] || threshold=2000
+    daemon_log INFO "Patrol: checking for scripts over ${threshold} lines"
+
+    local scripts_dir="$SCRIPT_DIR"
+    if [[ ! -d "$scripts_dir" ]]; then
+        daemon_log INFO "Patrol: scripts directory not found — skipping"
+        return
+    fi
+    if ! type hygiene_oversized_scripts >/dev/null 2>&1; then
+        daemon_log WARN "Patrol: lib/hygiene-size.sh not loaded — skipping oversized-script check"
+        return
+    fi
+
+    local oversized findings
+    oversized=$(hygiene_oversized_scripts "$threshold" "$scripts_dir")
+    findings=$(echo "$oversized" | jq 'length' 2>/dev/null || true)
+    findings="${findings:-0}"
+    [[ "$findings" =~ ^[0-9]+$ ]] || findings=0
+
+    if [[ "$findings" -eq 0 ]]; then
+        daemon_log INFO "Patrol: no scripts exceed ${threshold} lines"
+        return
+    fi
+
+    local oversized_list=""
+    while IFS='|' read -r script lines; do
+        [[ -n "$script" ]] || continue
+        oversized_list="${oversized_list}\n- \`${script}\` (${lines} lines)"
+        emit_event "patrol.finding" "check=oversized_script" "script=$script" "lines=$lines"
+        if [[ "${dry_run:-$PATROL_DRY_RUN}" == "true" ]] || [[ "$NO_GITHUB" == "true" ]]; then
+            echo -e "    ${YELLOW}●${RESET} ${CYAN}${script}${RESET} (${lines} lines)"
+        fi
+    done < <(echo "$oversized" | jq -r '.[] | "\(.script)|\(.lines)"' 2>/dev/null)
+
+    total_findings=$(( ${total_findings:-0} + findings ))
+
+    if [[ "${DECISION_ENGINE_ENABLED:-false}" == "true" ]]; then
+        _patrol_emit_signal "hygiene-oversized-${findings}" "hygiene" "oversized_scripts" \
+            "Decompose ${findings} oversized script(s)" \
+            "Scripts exceeding ${threshold} lines" \
+            35 "0.95" "hygiene:oversized:${threshold}"
+    elif [[ "$NO_GITHUB" != "true" ]] && [[ "${dry_run:-$PATROL_DRY_RUN}" != "true" ]]; then
+        # Dedup fails closed: this patrol runs hourly, so an errored `gh`
+        # query must never be read as "nothing filed yet" — that would turn
+        # the check into an hourly issue generator. Only an affirmative "0"
+        # authorizes filing.
+        local existing
+        existing=$(gh issue list --label "$PATROL_LABEL" --label "hygiene" \
+            --search "Decompose oversized scripts" --json number -q 'length' 2>/dev/null || true)
+        if [[ "$existing" != "0" ]]; then
+            daemon_log WARN "Patrol: oversized-script dedup query returned '${existing:-<empty>}' (expected \"0\") — not filing"
+        elif [[ "${issues_created:-0}" -lt "$PATROL_MAX_ISSUES" ]]; then
+            gh issue create \
+                --title "Decompose oversized scripts (${findings} over ${threshold} lines)" \
+                --body "## Decompose oversized scripts
+
+The following scripts exceed the ${threshold}-line hygiene threshold:
+$(echo -e "$oversized_list")
+
+### Why this matters
+Large scripts are harder to review, test, and reason about. Extract cohesive
+sections into \`scripts/lib/*.sh\` modules with a load guard, sourced by the
+original script — see \`scripts/lib/hygiene-size.sh\` for the pattern.
+
+### Verifying
+\`\`\`
+shipwright hygiene script-size --max-script-lines ${threshold}
+\`\`\`
+
+Auto-detected by \`shipwright daemon patrol\` on $(now_iso)." \
+                --label "$(patrol_build_labels "hygiene")" 2>/dev/null || true
+            issues_created=$(( ${issues_created:-0} + 1 ))
+            emit_event "patrol.issue_created" "check=oversized_scripts" "count=$findings"
+        fi
+    fi
+
+    daemon_log INFO "Patrol: found ${findings} script(s) over ${threshold} lines"
+}
 # ─── Proactive Patrol Mode ───────────────────────────────────────────────────
 
 daemon_patrol() {
@@ -1087,6 +1179,14 @@ Auto-detected by \`shipwright daemon patrol\` on $(now_iso)." \
     patrol_retry_exhaustion
     if [[ "$total_findings" -gt "$pre_check_findings" ]]; then
         patrol_findings_summary="${patrol_findings_summary}retry_exhaustion: $((total_findings - pre_check_findings)) finding(s); "
+    fi
+    echo ""
+
+    echo -e "  ${BOLD}Oversized Scripts${RESET}"
+    pre_check_findings=$total_findings
+    patrol_oversized_scripts
+    if [[ "$total_findings" -gt "$pre_check_findings" ]]; then
+        patrol_findings_summary="${patrol_findings_summary}oversized_scripts: $((total_findings - pre_check_findings)) finding(s); "
     fi
     echo ""
 

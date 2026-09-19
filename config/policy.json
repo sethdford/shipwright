@@ -209,7 +209,8 @@
   },
   "hygiene": {
     "artifact_age_days": 7,
-    "max_script_lines": 1500
+    "max_script_lines": 1500,
+    "oversized_issue_threshold": 2000
   },
   "recruit": {
     "self_tune_min_matches": 5,
