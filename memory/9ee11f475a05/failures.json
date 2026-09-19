@@ -5,8 +5,8 @@
       "pattern": "\u001b[38;2;74;222;128m\u001b[1m✓\u001b[0m reveal shows 1/3 pass count on failure",
       "root_cause": "sw-intent-analysis-test asserts analyze_intent's JSON output includes version, goal, and criteria fields, but the current schema/implementation omits one or more of them",
       "fix": "Update analyze_intent (or its schema) in sw-intent-analysis.sh to emit version, goal, and criteria fields matching the test's expected schema",
-      "seen_count": 126,
-      "last_seen": "2026-09-19T23:09:46Z",
+      "seen_count": 127,
+      "last_seen": "2026-09-19T23:19:17Z",
       "category": "test_failure",
       "signature_hash": "e1a285258fe63781b7370b0d086ad87b",
       "signature": "\u001b[<n>;2;<n>;<n>;<n>m\u001b[1m✓\u001b[0m reveal shows <path> pass count on failure"
@@ -261,8 +261,8 @@
     {
       "stage": "test",
       "pattern": "\u001b[38;2;0;212;255m▸\u001b[0m Missing template returns error... \u001b[38;2;74;222;128m✓\u001b[0m",
-      "root_cause": "analyze_intent's generated JSON output is missing the required version, goal, and criteria fields for the schema validation test",
-      "fix": "Update analyze_intent (or its template) to always populate version, goal, and criteria fields in the returned JSON",
+      "root_cause": "sw-intent-analysis-test expects analyze_intent output to include version, goal, and criteria fields, but the JSON schema/template it generates is missing them",
+      "fix": "Update the intent analysis JSON template/schema in sw-intent-analysis.sh (or equivalent) to include the required version, goal, and criteria fields",
       "seen_count": 1,
       "last_seen": "2026-09-18T23:17:29Z",
       "category": "test_failure"
