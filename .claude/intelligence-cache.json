@@ -1660,32 +1660,32 @@
         "results": [
           {
             "file": "failures.json",
-            "relevance": 95,
-            "summary": "Contains detailed test failure patterns, root causes, and fixes for recurring issues (intent-analysis-test, e2e-integration-test, loop behavior). Critical for build stage to avoid repeating known failures."
-          },
-          {
-            "file": "flaky-tests.json",
-            "relevance": 90,
-            "summary": "Identifies known flaky tests (test-auth with 90% confidence, test-1 with 85% confidence) with error signatures. Essential context to manage build reliability and timeouts."
+            "relevance": 100,
+            "summary": "Contains 8 test failure patterns from build/test stage with specific root causes (missing JSON fields, stale locks, timeouts) and fixes—directly applicable to debugging build failures"
           },
           {
             "file": "success-patterns.json",
-            "relevance": 85,
-            "summary": "Shows successful build approaches with iteration strategies, file change patterns, and test execution methods. Provides proven templates for current build work."
+            "relevance": 95,
+            "summary": "Captures two successful build patterns showing iteration counts (3-4), duration (45-150s), files changed, and test strategy—provides template for how builds should progress"
+          },
+          {
+            "file": "retry-outcomes.json",
+            "relevance": 80,
+            "summary": "Shows model_escalation strategy for build_failure class with 100% success rate across 5 attempts—relevant recovery strategy if build encounters failures"
           },
           {
             "file": "knowledge.json",
-            "relevance": 80,
-            "summary": "Contains failure signatures and fix strategies for common build issues (mktemp directory creation, cleanup output, regression detection). Directly applicable to build debugging."
+            "relevance": 75,
+            "summary": "Contains 4 knowledge base entries about mktemp failures, cleanup output formatting, and regression detection—common build/test setup issues with documented fixes"
           },
           {
-            "file": "patterns.json",
+            "file": "flaky-tests.json",
             "relevance": 70,
-            "summary": "Project conventions (source_dir, test_pattern, import_style, vitest runner). Foundation for understanding project structure and test execution during build stage."
+            "summary": "Lists 2 flaky tests (test-auth with 90% confidence) with error messages (connection timeout)—useful for predicting build instability and expected failure modes"
           }
         ]
       },
-      "timestamp": 1789847150,
+      "timestamp": 1789849232,
       "ttl": 1800
     },
     "d01f3e6a86452b056f96b40c161a2d15": {
@@ -2504,6 +2504,27 @@
         }
       ],
       "timestamp": 1789848964,
+      "ttl": 1800
+    },
+    "d325ee4c3248f28fa85ca51d0eff5362": {
+      "result": {
+        "raw_response": "Mock claude: ok"
+      },
+      "timestamp": 1789849327,
+      "ttl": 1800
+    },
+    "fe88fd0c452064caf0530e0315d6d6ef": {
+      "result": [
+        {
+          "type": "result",
+          "result": "I am trying the same approach again.",
+          "usage": {
+            "input_tokens": 0,
+            "output_tokens": 0
+          }
+        }
+      ],
+      "timestamp": 1789849558,
       "ttl": 1800
     }
   }
