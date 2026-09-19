@@ -32,15 +32,15 @@
       "result": {
         "primary_role": "builder",
         "secondary_roles": [
-          "tester",
-          "reviewer"
+          "architect",
+          "tester"
         ],
-        "confidence": 0.95,
-        "reasoning": "Bug fix requiring debugging JSON parsing logic, implementing improved error messaging, and testing edge cases (object vs array output). Builder handles implementation; tester validates the fix; reviewer ensures accuracy.",
+        "confidence": 0.85,
+        "reasoning": "Feature implementation to detect scripts over 2000 lines and file issues; requires coding, architecture decisions on integration, and comprehensive test coverage.",
         "new_role_needed": false,
         "suggested_role": null
       },
-      "timestamp": 1775316059,
+      "timestamp": 1789834667,
       "ttl": 3600
     },
     "efd5524ad1244fd20344bf3ff5d95233": {
@@ -1401,6 +1401,319 @@
       },
       "timestamp": 1775344537,
       "ttl": 3600
+    },
+    "cb471576a4733bef7827fce088047aa8": {
+      "result": {
+        "complexity": 3,
+        "risk_level": "low",
+        "success_probability": 87,
+        "recommended_template": "fast",
+        "issue_type": "refactor",
+        "key_risks": [
+          "Config reading fails if daemon-config.json missing or malformed",
+          "Line counting may include comments/blanks - need consistent methodology",
+          "Integration point unclear if platform-hygiene.json structure differs from existing checks",
+          "Performance degradation on large repos with many scripts"
+        ],
+        "implementation_hints": [
+          "Find all shell scripts in scripts/ directory and count lines via wc -l",
+          "Read hygiene.max_script_lines from daemon-config.json with fallback to 1500",
+          "Sort results descending by line count, feed into platform-hygiene.json alongside hardcoded/fallback/TODO counts",
+          "Study existing checks in sw-hygiene.sh for config-reading patterns and JSON output format",
+          "Use jq for safe JSON merging to preserve other platform-health data",
+          "Add tests covering: missing config, zero threshold, multiple scripts exceeding threshold, boundary cases"
+        ]
+      },
+      "timestamp": 1789834112,
+      "ttl": 3600
+    },
+    "c5d4fffc43cee3d25af1d1526f7da02d": {
+      "result": {
+        "estimated_iterations": 2
+      },
+      "timestamp": 1789834120,
+      "ttl": 1800
+    },
+    "1162eb260fc2ed50b6ad5d561d377d39": {
+      "result": {
+        "estimated_cost_usd": 0.12,
+        "estimated_iterations": 1,
+        "estimated_tokens": 35000,
+        "likely_failure_stage": "none",
+        "confidence": 87
+      },
+      "timestamp": 1789834127,
+      "ttl": 3600
+    },
+    "1a794247e0e1ba5f31237c7439710018": {
+      "result": {
+        "issue_type": "refactor",
+        "confidence": 0.85,
+        "secondary_domains": [
+          "infrastructure",
+          "platform-engineering",
+          "automation"
+        ],
+        "complexity_assessment": {
+          "score": 4,
+          "reasoning": "Straightforward feature addition: read/count script lines, compare threshold, output JSON, add configuration option, and extend test coverage. Well-scoped with clear acceptance criteria and no architectural complexity."
+        },
+        "skill_plan": {
+          "plan": [
+            "brainstorming",
+            "systematic-debugging"
+          ],
+          "design": [
+            "architecture-design",
+            "collection-system-validation"
+          ],
+          "build": [],
+          "review": [
+            "pr-quality"
+          ],
+          "compound_quality": [
+            "testing-strategy",
+            "adversarial-quality"
+          ],
+          "pr": [
+            "pr-quality"
+          ],
+          "deploy": [],
+          "validate": [
+            "validation-thoroughness"
+          ],
+          "monitor": [
+            "observability"
+          ]
+        },
+        "skill_rationale": {
+          "brainstorming": "Challenge whether 1500 lines is the right threshold and whether this check alone prevents future monoliths without enforcer patterns.",
+          "systematic-debugging": "If a previous version of this check was attempted (#5396, #5244, #5471 context), understand what barriers prevented adoption before to avoid repeating mistakes.",
+          "architecture-design": "Document the integration pattern between daemon-config.json (configuration), sw-hygiene.sh (implementation), and platform-hygiene.json (output) for platform self-improvement feedback loops.",
+          "collection-system-validation": "Ensure platform-hygiene.json schema remains consistent and valid as new metrics are aggregated, so downstream strategic agents can reliably consume the data.",
+          "pr-quality": "This change feeds into the strategic agent's platform-health dashboard—the PR must clearly explain why this decomposition threshold matters and how it drives platform decisions.",
+          "testing-strategy": "Cover line-counting edge cases (symlinks, binary files, different line endings) and configuration parsing (missing config, invalid values, different thresholds).",
+          "adversarial-quality": "Test failure modes: scripts with unusual formatting, symlink loops, permission errors, and pathological input that could break the aggregation logic.",
+          "validation-thoroughness": "Verify that scripts currently exceeding 1500 lines (sw-loop.sh, sw-memory.sh) are correctly flagged and that the output actually drives decomposition priorities in the strategic agent.",
+          "observability": "Track whether the new platform-hygiene.json metrics lead to actual decomposition work or remain a non-actionable warning signal."
+        },
+        "generated_skills": [],
+        "review_focus": [
+          "Line-counting correctness: handle symlinks, binary files, different line endings (CRLF vs LF), and empty files",
+          "Configuration integration: default value (1500) parsing from daemon-config.json, fallback behavior if config missing",
+          "JSON schema stability: verify platform-hygiene.json structure remains backward-compatible and validates against schema",
+          "Test coverage: edge cases (permission errors, nonexistent directories), configuration overrides, sorting order (descending by line count)",
+          "Strategic agent integration: confirm platform-hygiene.json output is actually consumed by strategic intelligence to drive decomposition priorities"
+        ],
+        "risk_areas": [
+          "Line-counting accuracy across different shell script conventions and editor line-ending formats could produce incorrect thresholds",
+          "Default threshold of 1500 may not align with actual maintainability limits—risk of false positives (flagging good refactoring work) or false negatives (missing real maintenance debt)",
+          "Performance: if scripts/ directory contains many large files, the scanning step could become a bottleneck in the daemon hygiene patrol",
+          "Breaking change to platform-hygiene.json if new fields are not additive—downstream consumers (strategic agent, dashboard) could break",
+          "Lack of feedback mechanism: if the check runs but the platform doesn't act on it, the metric becomes noise rather than actionable signal"
+        ]
+      },
+      "timestamp": 1789834201,
+      "ttl": 3600
+    },
+    "0006ab7ad2911877d8620ae4dd785767": {
+      "result": {
+        "results": [
+          {
+            "file": "patterns.json",
+            "relevance": 85,
+            "summary": "Project structure (Node/vitest/commonjs) and conventions are essential context for planning feature implementation architecture"
+          },
+          {
+            "file": "success-patterns.json (Add authentication feature)",
+            "relevance": 75,
+            "summary": "Feature development pattern showing 3 iterations, file patterns, test strategy, and commit approach—directly applicable to planning similar feature work"
+          },
+          {
+            "file": "metrics.json",
+            "relevance": 60,
+            "summary": "Baseline build and test durations provide reference estimates for planning effort and schedule"
+          },
+          {
+            "file": "issues.json",
+            "relevance": 50,
+            "summary": "Shows how issues are recorded with outcomes, patterns, and gotchas—informs planning for issue filing automation"
+          },
+          {
+            "file": "knowledge.json",
+            "relevance": 45,
+            "summary": "Failure patterns (mktemp issues, template errors) highlight edge cases and gotchas to avoid during implementation"
+          }
+        ]
+      },
+      "timestamp": 1789834244,
+      "ttl": 1800
+    },
+    "5ca3339709382d78269b49aaa277414a": {
+      "result": {
+        "results": [
+          {
+            "file": "failures.json",
+            "relevance": 95,
+            "summary": "Contains 9 documented test-stage validation failures with root causes and fixes (sw-intent-analysis-test, sw-e2e-integration-test, sw-loop-test). Directly applicable to diagnosing why plan validation was rejected."
+          },
+          {
+            "file": "knowledge.json",
+            "relevance": 75,
+            "summary": "KB entries document recurring test failures (mktemp directory issues, sw-cleanup output format, regression detection JSON) with fix strategies. Provides patterns for debugging validation issues."
+          },
+          {
+            "file": "retry-outcomes.json",
+            "relevance": 65,
+            "summary": "Shows build_failure recovery with model_escalation strategy (100% success rate). Demonstrates retry patterns for handling rejected validations and escalation tactics."
+          }
+        ]
+      },
+      "timestamp": 1789834451,
+      "ttl": 1800
+    },
+    "c3f51b0e50d9afdef2c0619fd572d3a3": {
+      "result": {
+        "results": [
+          {
+            "file": "patterns.json",
+            "relevance": 95,
+            "summary": "Project structure and conventions (Node/vitest/npm/JavaScript/commonjs) essential for understanding the codebase where the file hygiene feature will operate"
+          },
+          {
+            "file": "knowledge.json",
+            "relevance": 75,
+            "summary": "Contains failure patterns for cleanup operations (sw-cleanup.sh) and related hygiene workflows; directly applicable to designing file hygiene detection and issue filing"
+          },
+          {
+            "file": "success-patterns.json (Fix bug - outcome-feedback)",
+            "relevance": 65,
+            "summary": "Shows successful 3-iteration pattern with test strategy (npm test), file patterns (.claude/*.json, scripts/lib/*.sh), and iterative debugging approach for shell-heavy features"
+          },
+          {
+            "file": "success-patterns.json (Fix timeout - daemon.sh)",
+            "relevance": 60,
+            "summary": "Demonstrates successful pattern for fixing shell script issues in daemon context with clear test strategy and root cause identification approach"
+          },
+          {
+            "file": "metrics.json",
+            "relevance": 55,
+            "summary": "Baseline build duration (7095s) and test duration (1459s) provide performance context for pipeline expectations when designing automated hygiene detection"
+          }
+        ]
+      },
+      "timestamp": 1789834502,
+      "ttl": 1800
+    },
+    "03b6684d146a1c9b3ad571f09d7ccded": {
+      "result": {
+        "results": [
+          {
+            "file": "failures.json (comprehensive test patterns)",
+            "relevance": 35,
+            "summary": "Contains root cause analysis of test failures including architecture/schema mismatches (sw-intent-analysis-test missing fields, sw-e2e-integration-test lock management). These reveal design anti-patterns: incomplete schemas, stale state management, and timing issues that would inform what NOT to do in file-hygiene design."
+          },
+          {
+            "file": "knowledge.json",
+            "relevance": 25,
+            "summary": "Captures failure signatures and fix strategies from prior work (mktemp path issues, cleanup output formatting, regression detection JSON). While not directly about file-hygiene, the failure patterns demonstrate common anti-patterns in file system operations and state management relevant to designing a script hygiene checker."
+          },
+          {
+            "file": "patterns.json",
+            "relevance": 15,
+            "summary": "Project structure metadata (node/vitest/commonjs). Provides baseline understanding of project conventions, but has minimal relevance to rejected design approaches for the specific feature since it contains only format/framework info, not architectural decisions."
+          }
+        ]
+      },
+      "timestamp": 1789834516,
+      "ttl": 1800
+    },
+    "0617abc2054c3ef5a42169b8485f09d8": {
+      "result": {
+        "results": [
+          {
+            "file": "failures.json",
+            "relevance": 85,
+            "summary": "Recent test failures from 2026-09-19 including intent-analysis-test, loop behavior, cost test, and e2e-integration-test failures. Directly relevant since build stage will need to pass these tests. Shows current failure patterns and fixes needed."
+          },
+          {
+            "file": "retry-outcomes.json",
+            "relevance": 75,
+            "summary": "Build failure recovery with model escalation strategy shows 5/5 success rate (100%). Relevant for understanding proven recovery strategies when build encounters failures during implementation."
+          },
+          {
+            "file": "success-patterns.json",
+            "relevance": 72,
+            "summary": "Second entry shows 'Add authentication feature' pattern with 3-4 iterations, similar complexity to feature work. Demonstrates iterative approach, file patterns affected, test strategy (npm test), and cost expectations for feature builds."
+          },
+          {
+            "file": "patterns.json",
+            "relevance": 65,
+            "summary": "Project structure metadata (node, vitest, npm, javascript, commonjs imports). Essential baseline context for understanding how to write code and tests for this specific project during build stage."
+          },
+          {
+            "file": "knowledge.json",
+            "relevance": 60,
+            "summary": "Accumulated knowledge base with failure signatures and fix strategies. Though dated (2026-05-22), provides historical context on recurring issues like mktemp failures and test setup problems that may recur."
+          }
+        ]
+      },
+      "timestamp": 1789834641,
+      "ttl": 1800
+    },
+    "47c1451f50b4a8f9faa0f8012f6b922e": {
+      "result": {
+        "results": [
+          {
+            "file": "failures.json",
+            "relevance": 95,
+            "summary": "122+ test failure patterns with root causes and fixes; directly addresses build-stage test failures (intent-analysis-test, e2e-integration-test, loop-test) with actionable remediation"
+          },
+          {
+            "file": "knowledge.json",
+            "relevance": 90,
+            "summary": "Captured failure patterns (mktemp directory, cleanup/regression detection) with fix strategies; provides tested recovery approaches for recurring build issues"
+          },
+          {
+            "file": "flaky-tests.json",
+            "relevance": 88,
+            "summary": "Identifies unstable tests (test-1 at 85% confidence, test-auth at 90%) to distinguish real failures from flakiness; critical for build reliability"
+          },
+          {
+            "file": "success-patterns.json",
+            "relevance": 85,
+            "summary": "Two successful build examples show typical iteration counts (3), test strategies (npm test), duration (45-150s), and file patterns; sets precedent for this build"
+          },
+          {
+            "file": "retry-outcomes.json",
+            "relevance": 70,
+            "summary": "Model escalation strategy achieved 100% success rate across 5 attempts; provides proven recovery tactic if current build iteration fails"
+          }
+        ]
+      },
+      "timestamp": 1789834658,
+      "ttl": 1800
+    },
+    "d01f3e6a86452b056f96b40c161a2d15": {
+      "result": {
+        "raw_response": "Mock claude: ok"
+      },
+      "timestamp": 1789834816,
+      "ttl": 1800
+    },
+    "348c1746620af37792d0192e0cd826d5": {
+      "result": [
+        {
+          "type": "result",
+          "result": "I am trying the same approach again.",
+          "usage": {
+            "input_tokens": 0,
+            "output_tokens": 0
+          }
+        }
+      ],
+      "timestamp": 1789835043,
+      "ttl": 1800
     }
   }
 }
