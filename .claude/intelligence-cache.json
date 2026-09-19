@@ -32,7 +32,7 @@
       "result": {
         "raw_response": "Mock claude response"
       },
-      "timestamp": 1789838480,
+      "timestamp": 1789842554,
       "ttl": 3600
     },
     "efd5524ad1244fd20344bf3ff5d95233": {
@@ -1661,31 +1661,31 @@
           {
             "file": "failures.json",
             "relevance": 95,
-            "summary": "Test failure patterns with root causes and fixes (e.g., sw-intent-analysis-test schema issues, stale pipeline locks); directly informs build debugging and recovery strategies"
-          },
-          {
-            "file": "success-patterns.json",
-            "relevance": 90,
-            "summary": "Successful build patterns showing typical iterations (3-4), duration (~45-150s), affected files, and test strategy; provides baseline expectations for current build"
-          },
-          {
-            "file": "flaky-tests.json",
-            "relevance": 85,
-            "summary": "Identifies flaky tests (test-1 85%, test-auth 90% confidence) with error messages; helps predict which tests may intermittently fail during build"
+            "summary": "Direct test failure patterns with root causes and fixes (intent-analysis schema, pipeline locks, e2e-integration timeouts). Highly relevant for diagnosing and preventing build failures during this stage."
           },
           {
             "file": "knowledge.json",
-            "relevance": 80,
-            "summary": "Knowledge base with failure signatures and fix strategies (mktemp errors, cleanup output format, regression detection); provides proven remedies for common build issues"
+            "relevance": 82,
+            "summary": "Knowledge base entries for test failures (mktemp /tmp/claude path issues, cleanup.sh output formatting, regression detection). Practical fixes for build environment issues."
           },
           {
-            "file": "patterns.json",
-            "relevance": 75,
-            "summary": "Project configuration (node/vitest, commonjs imports, src/ directory) and test pattern conventions; essential context for build setup and test discovery"
+            "file": "success-patterns.json",
+            "relevance": 78,
+            "summary": "Captured successful build patterns for bug fixes and features (3-iteration builds, standard template, file change patterns). Provides proven approaches for this build type."
+          },
+          {
+            "file": "retry-outcomes.json",
+            "relevance": 72,
+            "summary": "Model escalation retry strategy with 100% success rate on build_failure class. Demonstrates effective recovery mechanism when builds fail."
+          },
+          {
+            "file": "flaky-tests.json",
+            "relevance": 68,
+            "summary": "Identifies unstable tests (test-auth with 90% confidence connection timeout). Helps distinguish build failures due to code vs. environmental flakiness."
           }
         ]
       },
-      "timestamp": 1789837922,
+      "timestamp": 1789842008,
       "ttl": 1800
     },
     "d01f3e6a86452b056f96b40c161a2d15": {
@@ -1713,21 +1713,21 @@
       "result": {
         "complexity": 2,
         "risk_level": "low",
-        "success_probability": 90,
+        "success_probability": 95,
         "recommended_template": "fast",
         "issue_type": "testing",
         "key_risks": [
-          "Issue is vague - unclear what specific comment should be added",
-          "May be a stale automated test artifact from a previous pipeline run",
-          "README location and format requirements not specified"
+          "automated test artifact - may be outdated or obsolete",
+          "unclear actual validation objective",
+          "could indicate stale test infrastructure"
         ],
         "implementation_hints": [
-          "Check recent git commits and pipeline artifacts for context on expected comment content",
-          "Identify target README file and appropriate location for the comment",
-          "Consider whether this is a test verification task that should simply be closed"
+          "verify this test is still needed in active CI pipeline",
+          "check if test fixture needs cleanup rather than implementation",
+          "confirm README comment format matches project conventions"
         ]
       },
-      "timestamp": 1789835803,
+      "timestamp": 1789841885,
       "ttl": 3600
     },
     "13eac0bbc7df52ee3d96517740ca1295": {
@@ -1770,32 +1770,34 @@
     "f9c9e8b2bd49e68005879dc608624768": {
       "result": {
         "issue_type": "testing",
-        "confidence": 0.95,
+        "confidence": 0.78,
         "secondary_domains": [
-          "integration-testing",
-          "automation"
+          "automation",
+          "integration-testing"
         ],
         "complexity_assessment": {
-          "score": 3,
-          "reasoning": "Straightforward E2E test task - set up test scenario, execute the action (add comment to README), verify result. No complex business logic or dependencies to untangle."
+          "score": 4,
+          "reasoning": "E2E test for a straightforward operation (adding comment to README), but E2E tests inherently present challenges around flakiness, environment dependencies, and parallelization safety."
         },
         "skill_plan": {
           "plan": [
-            "testing-strategy"
-          ],
-          "design": [
-            "testing-strategy"
-          ],
-          "build": [
-            "testing-strategy"
-          ],
-          "review": [
             "testing-strategy",
-            "pr-quality",
             "validation-thoroughness"
           ],
-          "compound_quality": [
+          "design": [
+            "architecture-design"
+          ],
+          "build": [
+            "testing-strategy",
+            "test-parallelization-detection"
+          ],
+          "review": [
+            "two-stage-review",
             "adversarial-quality"
+          ],
+          "compound_quality": [
+            "adversarial-quality",
+            "validation-thoroughness"
           ],
           "pr": [
             "pr-quality"
@@ -1806,32 +1808,38 @@
           "validate": [
             "validation-thoroughness"
           ],
-          "monitor": []
+          "monitor": [
+            "observability"
+          ]
         },
         "skill_rationale": {
-          "testing-strategy": "E2E tests require careful scenario design—need clear test setup, execution flow, assertions, and cleanup for the README comment-adding workflow across all stages.",
-          "pr-quality": "Test code is production code—test PR needs clear naming, organized setup/teardown, and documentation so future maintainers understand what the test validates and why.",
-          "validation-thoroughness": "Verify the test actually works end-to-end: not just that README exists, but that the comment was added correctly, formatting preserved, and file remains valid.",
-          "adversarial-quality": "Think like a chaos engineer: What if README is missing, read-only, has unusual encoding, or contains existing comments? Can the test itself fail spuriously due to timing?",
-          "deploy-safety": "Test infrastructure is deployed code—ensure test fixtures don't pollute other environments, test runs don't interfere with concurrent executions, and cleanup is reliable."
+          "testing-strategy": "E2E tests require clear patterns for automation setup, test data lifecycle, pass/fail criteria, and CI/CD integration—critical for reliable test execution.",
+          "validation-thoroughness": "E2E tests must validate actual file modifications and system behavior end-to-end, not just API responses or mock behaviors.",
+          "architecture-design": "Understanding how the comment-adding mechanism integrates with the file system and pipeline architecture is essential for designing a robust test.",
+          "test-parallelization-detection": "Tests that modify shared resources (README files) are vulnerable to race conditions when run in parallel; detection and synchronization patterns are mandatory.",
+          "two-stage-review": "E2E tests need two-pass review: first for test logic and isolation, second for coverage completeness and edge case handling.",
+          "adversarial-quality": "E2E tests are brittle; adversarial review exposes flakiness from timing assumptions, environment-specific behavior, and test data pollution.",
+          "pr-quality": "E2E test PRs must clearly document what is being validated and why—helps reviewers assess test necessity and scope.",
+          "deploy-safety": "E2E tests serve as pre-deploy validation gates; failure on deploy stage indicates integration issues that should block promotion.",
+          "observability": "Post-deployment E2E test health tracking reveals systemic flakiness, environment-specific failures, and real-world integration issues."
         },
         "generated_skills": [],
         "review_focus": [
-          "Test isolation and cleanup: does test properly initialize and restore README state between runs",
-          "Assertion depth: verifies actual comment content and formatting, not just file existence",
-          "Error handling: gracefully handles missing README, permission errors, encoding edge cases",
-          "Idempotency: test can run repeatedly without manual intervention or state cleanup",
-          "Documentation: test purpose, scenario, and expected behavior are clearly explained for maintainability"
+          "Test isolation: does not depend on execution order or prior test state",
+          "No timing assumptions: no sleep() calls or race-condition-prone assertions",
+          "File state verification: confirms README was actually modified, not just API success",
+          "Idempotency: test can run multiple times without cleanup between runs",
+          "Error messages are actionable: failures pinpoint what broke, not just 'test failed'"
         ],
         "risk_areas": [
-          "Test flakiness: file system timing issues, race conditions if tests run in parallel",
-          "README state pollution: test leaves orphaned comments or assumes specific initial state",
-          "Hard-coded paths or fixtures: test breaks when run in different environments or working directories",
-          "Brittle assertions: overly specific formatting checks make test fragile to benign README changes",
-          "Missing cleanup: test fixtures linger in repository after execution, affecting subsequent tests"
+          "Flakiness from environment-specific file system behavior or permissions",
+          "Race conditions if parallel test execution writes to the same README file",
+          "Test data cleanup failures causing state pollution for subsequent runs",
+          "Timing-dependent assertions that timeout in slower CI environments",
+          "Hard-coded file paths or assumptions about working directory structure"
         ]
       },
-      "timestamp": 1789835887,
+      "timestamp": 1789841959,
       "ttl": 3600
     },
     "61c5f4a9ce6598c2f1fc048e0a7ce958": {
@@ -1839,32 +1847,32 @@
         "results": [
           {
             "file": "failures.json",
-            "relevance": 95,
-            "summary": "Contains 122+ documented test failures with root causes and fixes (intent-analysis schema, loop behavior flakiness, integration test locks). Directly applicable to current build stage's test execution."
-          },
-          {
-            "file": "patterns.json",
             "relevance": 90,
-            "summary": "Project metadata: Node.js, vitest test runner, npm package manager, commonjs imports. Essential for understanding build environment and test strategy."
+            "summary": "Comprehensive test failure analysis with patterns from sw-intent-analysis-test, sw-e2e-integration-test, sw-loop-test, and sw-cost-test; includes root causes and fixes directly applicable to diagnosing build stage failures"
           },
           {
             "file": "retry-outcomes.json",
             "relevance": 85,
-            "summary": "Shows 100% success rate (5/5 attempts) for model_escalation strategy on build_failure class. Proven recovery approach if this build fails."
+            "summary": "Shows model_escalation retry strategy achieved 100% success rate (5/5) for build_failure class; highly relevant for recovery strategy selection during build stage"
+          },
+          {
+            "file": "patterns.json",
+            "relevance": 80,
+            "summary": "Project configuration (Node.js, vitest, npm, commonjs imports) provides essential context for understanding build and test runner behavior"
           },
           {
             "file": "metrics.json",
-            "relevance": 78,
-            "summary": "Baseline durations: build 7095s, tests 1459s. Sets expectations for current build/test iteration time and helps detect hangs or anomalies."
+            "relevance": 75,
+            "summary": "Build and test duration baselines (7095s build, 1459s test) help establish expected performance and detect anomalies during the build stage"
           },
           {
-            "file": "flaky-tests.json",
-            "relevance": 72,
-            "summary": "Identifies test-1 (85% confidence) and test-auth (90% confidence) as flaky with documented errors. Useful for filtering false negatives during build."
+            "file": "knowledge.json",
+            "relevance": 70,
+            "summary": "Contains actionable fixes for common build failures (mktemp directory issues, missing dependencies, npm install requirements) frequently encountered in test setup"
           }
         ]
       },
-      "timestamp": 1789837908,
+      "timestamp": 1789841994,
       "ttl": 1800
     },
     "de317c1cb906aee7626e264101bb529b": {
@@ -2081,6 +2089,87 @@
         }
       ],
       "timestamp": 1789840323,
+      "ttl": 1800
+    },
+    "b2a5e6a72ff04abf121ccbd0288fbedb": {
+      "result": {
+        "raw_response": "Mock claude: ok"
+      },
+      "timestamp": 1789841892,
+      "ttl": 1800
+    },
+    "32b9f357e1bb80a0c7eaec78fec59577": {
+      "result": {
+        "estimated_iterations": 2
+      },
+      "timestamp": 1789841896,
+      "ttl": 1800
+    },
+    "69e68d4b82f6e1ffb8e4d3564c09f7f0": {
+      "result": {
+        "estimated_cost_usd": 0.012,
+        "estimated_iterations": 1,
+        "estimated_tokens": 5800,
+        "likely_failure_stage": "none",
+        "confidence": 88,
+        "cost_breakdown": {
+          "intake": 0.0004,
+          "build": 0.0075,
+          "test": 0.0045,
+          "pr": 0.0008
+        },
+        "reasoning": "Low complexity (2/10), fast template (4 stages), 95% success probability. Minimal iteration expected. Cost assumes haiku for mechanical stages (intake/pr) and sonnet for agentic work (build/test). No failures anticipated given risk profile."
+      },
+      "timestamp": 1789841905,
+      "ttl": 3600
+    },
+    "b83b88478ff9cae600a810dd86a8ad54": {
+      "result": [
+        {
+          "type": "result",
+          "result": "I am trying the same approach again.",
+          "usage": {
+            "input_tokens": 0,
+            "output_tokens": 0
+          }
+        }
+      ],
+      "timestamp": 1789842019,
+      "ttl": 1800
+    },
+    "e701041b04f46c7fdac7f8a92d3ba61e": {
+      "result": {
+        "raw_response": "Mock claude: ok"
+      },
+      "timestamp": 1789842125,
+      "ttl": 1800
+    },
+    "29efec70662925ea17873421e49214e9": {
+      "result": [
+        {
+          "type": "result",
+          "result": "I am trying the same approach again.",
+          "usage": {
+            "input_tokens": 0,
+            "output_tokens": 0
+          }
+        }
+      ],
+      "timestamp": 1789842355,
+      "ttl": 1800
+    },
+    "ad2d52de613ff3f85cd38f505fdc96e6": {
+      "result": [
+        {
+          "type": "result",
+          "result": "I am trying the same approach again.",
+          "usage": {
+            "input_tokens": 0,
+            "output_tokens": 0
+          }
+        }
+      ],
+      "timestamp": 1789842379,
       "ttl": 1800
     }
   }
