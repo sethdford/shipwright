@@ -208,7 +208,8 @@
     "stuck_retry_max_iterations": 30
   },
   "hygiene": {
-    "artifact_age_days": 7
+    "artifact_age_days": 7,
+    "max_script_lines": 1500
   },
   "recruit": {
     "self_tune_min_matches": 5,

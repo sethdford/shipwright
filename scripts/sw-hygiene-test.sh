@@ -174,7 +174,51 @@ else
     assert_fail "platform-refactor creates platform-hygiene.json with counts"
 fi
 
-# ─── Test 12: policy read (config/policy.json via policy_get) ───
+# ─── Test 12: script-size subcommand ─────────────────────────────────────
+echo ""
+echo -e "  ${CYAN}script-size subcommand${RESET}"
+size_tmp=$(mktemp -d "${TMPDIR:-/tmp}/sw-hygiene-size.XXXXXX")
+mkdir -p "$size_tmp/scripts" "$size_tmp/.claude"
+for i in $(seq 1 10);  do echo "# line $i"; done > "$size_tmp/scripts/small.sh"
+for i in $(seq 1 120); do echo "# line $i"; done > "$size_tmp/scripts/big.sh"
+for i in $(seq 1 300); do echo "# line $i"; done > "$size_tmp/scripts/huge.sh"
+
+# Test with low threshold so test files are flagged
+output=$(REPO_DIR="$size_tmp" bash "$SCRIPT_DIR/sw-hygiene.sh" script-size --max-script-lines 100 2>&1) && rc=0 || rc=$?
+assert_eq "script-size exits 0" "0" "$rc"
+assert_contains "flags oversized script" "$output" "big.sh"
+assert_contains "flags largest script" "$output" "huge.sh"
+
+# Test with high threshold (nothing flagged)
+output=$(REPO_DIR="$size_tmp" bash "$SCRIPT_DIR/sw-hygiene.sh" script-size --max-script-lines 5000 2>&1) && rc=0 || rc=$?
+assert_eq "high threshold exits 0" "0" "$rc"
+assert_contains "no scripts exceed high threshold" "$output" "No scripts exceed"
+
+# Test with malformed config (must not crash)
+output=$(REPO_DIR="$size_tmp" SHIPWRIGHT_HYGIENE_MAX_SCRIPT_LINES="not-a-number" bash "$SCRIPT_DIR/sw-hygiene.sh" script-size --max-script-lines 100 2>&1) && rc=0 || rc=$?
+assert_eq "invalid threshold falls back, exits 0" "0" "$rc"
+
+# Test descending sort order on JSON output
+json=$(REPO_DIR="$size_tmp" bash "$SCRIPT_DIR/sw-hygiene.sh" script-size --max-script-lines 100 --json 2>/dev/null | jq -r '.[0].script')
+assert_eq "sorted descending by lines" "huge.sh" "$json"
+
+# Test empty scripts directory
+empty_tmp=$(mktemp -d "${TMPDIR:-/tmp}/sw-hygiene-empty.XXXXXX")
+mkdir -p "$empty_tmp/scripts"
+output=$(REPO_DIR="$empty_tmp" bash "$SCRIPT_DIR/sw-hygiene.sh" script-size 2>&1) && rc=0 || rc=$?
+assert_eq "empty scripts dir exits 0" "0" "$rc"
+rm -rf "$empty_tmp" "$size_tmp"
+
+# Test that platform-refactor includes new keys
+echo ""
+echo -e "  ${CYAN}platform-refactor with oversized scripts${RESET}"
+if jq -e '.counts.oversized_scripts != null and (.oversized_scripts | type) == "array" and .thresholds.max_script_lines != null' "$platform_hygiene_file" >/dev/null 2>&1; then
+    assert_pass "platform-refactor reports oversized_scripts + threshold"
+else
+    assert_fail "platform-refactor reports oversized_scripts + threshold"
+fi
+
+# ─── Test 13: policy read (config/policy.json via policy_get) ───
 echo ""
 echo -e "  ${CYAN}policy read (policy_get from config)${RESET}"
 policy_tmp=$(mktemp -d "${TMPDIR:-/tmp}/sw-policy-test.XXXXXX")

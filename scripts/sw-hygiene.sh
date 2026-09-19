@@ -6,9 +6,9 @@
 set -euo pipefail
 trap 'echo "ERROR: $BASH_SOURCE:$LINENO exited with status $?" >&2' ERR
 
-VERSION="3.3.0"
+VERSION="3.4.0"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-REPO_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
+REPO_DIR="${REPO_DIR:-$(cd "$SCRIPT_DIR/.." && pwd)}"
 
 # ─── Cross-platform compatibility ──────────────────────────────────────────
 # shellcheck source=lib/compat.sh
@@ -39,6 +39,9 @@ SUBCOMMAND="${1:-help}"
 AUTO_FIX=false
 VERBOSE=false
 ARTIFACT_AGE_DAYS=$(_config_get_int "cleanup.artifact_age_days" 7)
+MAX_SCRIPT_LINES=$(_config_get_int "hygiene.max_script_lines" 1500)
+MAX_SCRIPT_LINES=${MAX_SCRIPT_LINES:-1500}
+[[ "$MAX_SCRIPT_LINES" =~ ^[0-9]+$ ]] && [[ "$MAX_SCRIPT_LINES" -gt 0 ]] || MAX_SCRIPT_LINES=1500
 JSON_OUTPUT=false
 
 # ─── Help ───────────────────────────────────────────────────────────────────
@@ -57,23 +60,27 @@ show_help() {
     echo -e "  ${CYAN}naming${RESET}        Check naming conventions (files, functions, vars)"
     echo -e "  ${CYAN}branches${RESET}      List stale and merged remote branches"
     echo -e "  ${CYAN}size${RESET}          Size analysis and bloat detection"
+    echo -e "  ${CYAN}script-size${RESET}   Flag scripts exceeding size threshold (for decomposition)"
     echo -e "  ${CYAN}platform-refactor${RESET}  Scan for hardcoded/fallback/TODO/FIXME — for AGI-level self-improvement"
     echo -e "  ${CYAN}fix${RESET}           Auto-fix safe issues (naming, whitespace)"
     echo -e "  ${CYAN}report${RESET}        Generate comprehensive hygiene report"
     echo -e "  ${CYAN}help${RESET}          Show this help message"
     echo ""
     echo -e "${BOLD}OPTIONS${RESET}"
-    echo -e "  ${CYAN}--fix${RESET}           Auto-fix issues (use with caution)"
-    echo -e "  ${CYAN}--verbose, -v${RESET}   Verbose output"
-    echo -e "  ${CYAN}--json${RESET}          JSON output format"
-    echo -e "  ${CYAN}--artifact-age${RESET}  Max age for artifacts in days (default: 7)"
-    echo -e "  ${CYAN}--help, -h${RESET}      Show this help"
+    echo -e "  ${CYAN}--fix${RESET}               Auto-fix issues (use with caution)"
+    echo -e "  ${CYAN}--verbose, -v${RESET}       Verbose output"
+    echo -e "  ${CYAN}--json${RESET}              JSON output format"
+    echo -e "  ${CYAN}--artifact-age${RESET}      Max age for artifacts in days (default: 7)"
+    echo -e "  ${CYAN}--max-script-lines${RESET}  Script size threshold for decomposition (default: 1500)"
+    echo -e "  ${CYAN}--help, -h${RESET}          Show this help"
     echo ""
     echo -e "${BOLD}EXAMPLES${RESET}"
-    echo -e "  ${DIM}shipwright hygiene scan${RESET}                # Full scan"
-    echo -e "  ${DIM}shipwright hygiene dead-code${RESET}           # Find unused code"
-    echo -e "  ${DIM}shipwright hygiene fix${RESET}                 # Auto-fix safe issues"
-    echo -e "  ${DIM}shipwright hygiene report --json${RESET}       # JSON report"
+    echo -e "  ${DIM}shipwright hygiene scan${RESET}                           # Full scan"
+    echo -e "  ${DIM}shipwright hygiene dead-code${RESET}                      # Find unused code"
+    echo -e "  ${DIM}shipwright hygiene script-size${RESET}                    # Check script sizes"
+    echo -e "  ${DIM}shipwright hygiene script-size --max-script-lines 2000${RESET}  # Custom threshold"
+    echo -e "  ${DIM}shipwright hygiene fix${RESET}                            # Auto-fix safe issues"
+    echo -e "  ${DIM}shipwright hygiene report --json${RESET}                  # JSON report"
     echo ""
 }
 
@@ -395,6 +402,64 @@ list_stale_branches() {
     return 0
 }
 
+# ─── Script Size Helpers ────────────────────────────────────────────────────
+
+_emit_script_sizes() {
+    local scripts_dir="${1:-$REPO_DIR/scripts}"
+    [[ -d "$scripts_dir" ]] || return 0
+    local f lines
+    while IFS= read -r f; do
+        [[ -n "$f" ]] || continue
+        lines=$(wc -l < "$f" 2>/dev/null || true)
+        lines="${lines//[^0-9]/}"
+        lines="${lines:-0}"
+        printf '{"script":"%s","lines":%s}\n' "$(basename "$f")" "$lines"
+    done < <(find "$scripts_dir" -maxdepth 1 -name "*.sh" -type f 2>/dev/null || true)
+}
+
+check_script_sizes() {
+    local threshold="${1:-$MAX_SCRIPT_LINES}"
+    local scripts_dir="${REPO_DIR}/scripts"
+    local raw_file json
+    raw_file=$(mktemp "${TMPDIR:-/tmp}/sw-hygiene-sizes.XXXXXX")
+
+    _emit_script_sizes "$scripts_dir" > "$raw_file" 2>/dev/null || true
+    json=$(jq -s --argjson t "$threshold" \
+        '[ .[] | select(.lines > $t) ] | sort_by(-.lines)' "$raw_file" 2>/dev/null || echo "[]")
+    rm -f "$raw_file"
+    [[ -n "$json" ]] || json="[]"
+    echo "$json"
+}
+
+report_script_sizes() {
+    local threshold="$MAX_SCRIPT_LINES" oversized count
+
+    if [[ "$JSON_OUTPUT" != true ]]; then
+        info "Checking script sizes (threshold: ${threshold} lines)..."
+    fi
+
+    oversized=$(check_script_sizes "$threshold")
+    count=$(echo "$oversized" | jq 'length' 2>/dev/null || echo "0")
+    count=${count:-0}
+
+    if [[ "$JSON_OUTPUT" == true ]]; then
+        echo "$oversized" | jq .
+    else
+        if [[ "$count" -eq 0 ]]; then
+            success "No scripts exceed ${threshold} lines"
+        else
+            warn "${count} script(s) exceed ${threshold} lines — decomposition candidates:"
+            echo "$oversized" | jq -r '.[] | "  \(.lines)\t\(.script)"' 2>/dev/null | \
+                while IFS=$'\t' read -r lines script; do
+                    echo -e "  ${DIM}${lines} lines${RESET}  ${script}"
+                done
+        fi
+    fi
+
+    emit_event "hygiene_script_size" "threshold=$threshold" "oversized=$count"
+    return 0
+}
+
 # ─── Size Analysis ─────────────────────────────────────────────────────────
 
 analyze_size() {
@@ -483,17 +548,17 @@ scan_platform_refactor() {
     rm -f "$findings_file" "$findings_file.raw" "$findings_raw"
 
     # Script sizes (lines) for hotspot detection
-    local sizes_file
+    local sizes_file script_sizes
     sizes_file=$(mktemp)
-    find "$scripts_dir" -maxdepth 1 -name "*.sh" -type f 2>/dev/null | while read -r f; do
-        local lines
-        lines=$(wc -l < "$f" 2>/dev/null || true)
-        lines="${lines:-0}"
-        printf '{"script":"%s","lines":%s}\n' "$(basename "$f")" "$lines"
-    done | jq -s 'sort_by(-.lines) | .[0:15]' 2>/dev/null > "$sizes_file"
-    local script_sizes
+    _emit_script_sizes "$scripts_dir" | jq -s 'sort_by(-.lines) | .[0:15]' 2>/dev/null > "$sizes_file"
     script_sizes=$(cat "$sizes_file" 2>/dev/null || echo "[]")
     rm -f "$sizes_file"
+
+    # Oversized scripts (exceeding threshold)
+    local oversized oversized_count
+    oversized=$(check_script_sizes "$MAX_SCRIPT_LINES")
+    oversized_count=$(echo "$oversized" | jq 'length' 2>/dev/null || echo "0")
+    oversized_count=${oversized_count:-0}
 
     local timestamp
     timestamp=$(date -u +%Y-%m-%dT%H:%M:%SZ)
@@ -508,19 +573,22 @@ scan_platform_refactor() {
         --argjson hack "$hack_count" \
         --argjson findings "$findings" \
         --argjson script_sizes "$script_sizes" \
-        '{timestamp:$ts,repository:$repo,counts:{hardcoded:$hc,fallback:$fb,todo:$todo,fixme:$fixme,hack:$hack},findings_sample:$findings,script_size_hotspots:$script_sizes}' 2>/dev/null)
+        --argjson oversized "$oversized" \
+        --argjson oc "$oversized_count" \
+        --argjson threshold "$MAX_SCRIPT_LINES" \
+        '{timestamp:$ts,repository:$repo,counts:{hardcoded:$hc,fallback:$fb,todo:$todo,fixme:$fixme,hack:$hack,oversized_scripts:$oc},thresholds:{max_script_lines:$threshold},findings_sample:$findings,script_size_hotspots:$script_sizes,oversized_scripts:$oversized}' 2>/dev/null)
     if [[ -n "$report" ]]; then
-        echo "$report" > "$out_file"
+        printf '%s\n' "$report" > "$out_file.tmp" && mv -f "$out_file.tmp" "$out_file"
         success "Platform refactor scan saved to: $out_file"
         if [[ "$JSON_OUTPUT" == true ]]; then
             echo "$report" | jq .
         else
-            info "  hardcoded: $hardcoded_count  fallback: $fallback_count  TODO: $todo_count  FIXME: $fixme_count  HACK/KLUDGE: $hack_count"
+            info "  hardcoded: $hardcoded_count  fallback: $fallback_count  TODO: $todo_count  FIXME: $fixme_count  HACK/KLUDGE: $hack_count  oversized: $oversized_count"
         fi
     else
         warn "Could not build platform-hygiene JSON (jq missing?)"
     fi
-    emit_event "hygiene_platform_refactor" "hardcoded=$hardcoded_count" "fallback=$fallback_count" "todo=$todo_count"
+    emit_event "hygiene_platform_refactor" "hardcoded=$hardcoded_count" "fallback=$fallback_count" "todo=$todo_count" "oversized=$oversized_count"
     return 0
 }
 
@@ -650,6 +718,7 @@ run_full_scan() {
     check_naming
     list_stale_branches
     analyze_size
+    report_script_sizes
     scan_platform_refactor
 
     echo -e "${CYAN}${BOLD}╰────────────────────────────────────────────────────────────────╯${RESET}"
@@ -660,14 +729,18 @@ run_full_scan() {
 # ─── Main ───────────────────────────────────────────────────────────────────
 
 main() {
+    # Shift off the subcommand to allow option parsing
+    shift || true
+
     # Parse global options
     while [[ $# -gt 0 ]]; do
         case "$1" in
-            --fix)       AUTO_FIX=true; shift ;;
-            --verbose|-v) VERBOSE=true; shift ;;
-            --json)      JSON_OUTPUT=true; shift ;;
-            --artifact-age) ARTIFACT_AGE_DAYS="$2"; shift 2 ;;
-            *)           break ;;
+            --fix)              AUTO_FIX=true; shift ;;
+            --verbose|-v)       VERBOSE=true; shift ;;
+            --json)             JSON_OUTPUT=true; shift ;;
+            --artifact-age)     ARTIFACT_AGE_DAYS="$2"; shift 2 ;;
+            --max-script-lines) MAX_SCRIPT_LINES="$2"; shift 2 ;;
+            *)                  break ;;
         esac
     done
 
@@ -693,6 +766,9 @@ main() {
             ;;
         size)
             analyze_size
+            ;;
+        script-size|script-sizes)
+            report_script_sizes
             ;;
         platform-refactor)
             scan_platform_refactor
