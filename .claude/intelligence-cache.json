@@ -1717,17 +1717,16 @@
         "recommended_template": "fast",
         "issue_type": "testing",
         "key_risks": [
-          "automated test artifact - may be outdated or obsolete",
-          "unclear actual validation objective",
-          "could indicate stale test infrastructure"
+          "test automation flakiness",
+          "README state assumptions"
         ],
         "implementation_hints": [
-          "verify this test is still needed in active CI pipeline",
-          "check if test fixture needs cleanup rather than implementation",
-          "confirm README comment format matches project conventions"
+          "verify README exists and is in expected state",
+          "ensure comment is added at the correct location",
+          "validate automation runs successfully"
         ]
       },
-      "timestamp": 1789841885,
+      "timestamp": 1789848467,
       "ttl": 3600
     },
     "13eac0bbc7df52ee3d96517740ca1295": {
@@ -1770,30 +1769,30 @@
     "f9c9e8b2bd49e68005879dc608624768": {
       "result": {
         "issue_type": "testing",
-        "confidence": 0.78,
+        "confidence": 0.92,
         "secondary_domains": [
-          "automation",
-          "integration-testing"
+          "infrastructure",
+          "documentation"
         ],
         "complexity_assessment": {
-          "score": 4,
-          "reasoning": "E2E test for a straightforward operation (adding comment to README), but E2E tests inherently present challenges around flakiness, environment dependencies, and parallelization safety."
+          "score": 5,
+          "reasoning": "E2E test validation is moderately complex—requires test isolation, state management, and validation of autonomous behavior, but the scope is focused on a single feature (README commenting)."
         },
         "skill_plan": {
           "plan": [
             "testing-strategy",
-            "validation-thoroughness"
+            "brainstorming"
           ],
           "design": [
-            "architecture-design"
+            "testing-strategy"
           ],
           "build": [
-            "testing-strategy",
-            "test-parallelization-detection"
+            "testing-strategy"
           ],
           "review": [
-            "two-stage-review",
-            "adversarial-quality"
+            "pr-quality",
+            "testing-strategy",
+            "validation-thoroughness"
           ],
           "compound_quality": [
             "adversarial-quality",
@@ -1802,77 +1801,76 @@
           "pr": [
             "pr-quality"
           ],
-          "deploy": [
-            "deploy-safety"
-          ],
+          "deploy": [],
           "validate": [
-            "validation-thoroughness"
+            "validation-thoroughness",
+            "test-parallelization-detection"
           ],
-          "monitor": [
-            "observability"
-          ]
+          "monitor": []
         },
         "skill_rationale": {
-          "testing-strategy": "E2E tests require clear patterns for automation setup, test data lifecycle, pass/fail criteria, and CI/CD integration—critical for reliable test execution.",
-          "validation-thoroughness": "E2E tests must validate actual file modifications and system behavior end-to-end, not just API responses or mock behaviors.",
-          "architecture-design": "Understanding how the comment-adding mechanism integrates with the file system and pipeline architecture is essential for designing a robust test.",
-          "test-parallelization-detection": "Tests that modify shared resources (README files) are vulnerable to race conditions when run in parallel; detection and synchronization patterns are mandatory.",
-          "two-stage-review": "E2E tests need two-pass review: first for test logic and isolation, second for coverage completeness and edge case handling.",
-          "adversarial-quality": "E2E tests are brittle; adversarial review exposes flakiness from timing assumptions, environment-specific behavior, and test data pollution.",
-          "pr-quality": "E2E test PRs must clearly document what is being validated and why—helps reviewers assess test necessity and scope.",
-          "deploy-safety": "E2E tests serve as pre-deploy validation gates; failure on deploy stage indicates integration issues that should block promotion.",
-          "observability": "Post-deployment E2E test health tracking reveals systemic flakiness, environment-specific failures, and real-world integration issues."
+          "testing-strategy": "E2E tests require clear scenarios and assertions; this skill ensures test coverage is comprehensive and edge cases (timing, state cleanup, idempotency) are addressed.",
+          "brainstorming": "Before implementing, clarify what 'add comment to README' means in Shipwright's context—is this documentation generation, issue response, or autonomous task completion? Challenge assumptions about acceptance criteria.",
+          "pr-quality": "E2E tests are often a source of flakiness; reviewers need to quickly understand test intent, setup/teardown logic, and why each assertion exists.",
+          "validation-thoroughness": "Smoke tests pass but real automation may fail; validate the test actually exercises the autonomous agent's behavior end-to-end, not just a code path.",
+          "adversarial-quality": "Attack the test design: What if README is read-only? What if the comment already exists? What if concurrent agents try to comment? Find failure modes before production.",
+          "test-parallelization-detection": "If this test runs alongside others in the CI suite, ensure no shared state (temp files, fixtures, README mutations) causes race conditions or flakiness."
         },
-        "generated_skills": [],
+        "generated_skills": [
+          {
+            "name": "e2e-autonomy-validation",
+            "reason": "E2E tests for autonomous agent systems require validating that agents make real decisions and execute real workflows, not just that test assertions pass. Standard testing patterns don't account for agent-specific concerns like retry logic, state consistency across agent boundaries, and proof that autonomy actually occurred.",
+            "content": "## E2E Autonomy Validation\n\nWhen testing autonomous agent systems (like Shipwright), E2E tests must validate not just that code executes, but that agents made real decisions and performed autonomous actions.\n\n### Core Validation Points\n\n**Proof of Autonomy**\n- Assert the agent spawned (check heartbeat, process state, or log markers)\n- Verify the agent made a decision (log entry with reasoning, not just execution)\n- Confirm the action was self-driven, not scripted (e.g., agent chose to retry vs. always retrying)\n\n**State Consistency Across Boundaries**\n- Validate persistent state before, during, and after agent execution\n- For multi-agent scenarios, ensure agents don't interfere (use worktree isolation per agent)\n- Verify side effects are transactional (all-or-nothing, not partial)\n\n**Real Behavior Under Constraints**\n- Test with realistic cost/token budgets (not unlimited)\n- Simulate rate limits and API failures the agent must handle\n- Validate the agent converges (doesn't loop forever or give up too early)\n\n**Isolation & Cleanup**\n- Each test must leave zero artifacts (no temp files, no dangling processes, no state leaks)\n- Use git worktrees or sandboxes to isolate agent operations\n- Verify cleanup happens even if the agent fails mid-execution\n\n### Anti-Patterns to Avoid\n- Asserting the test passed without checking agent logs (false positive)\n- Assuming synchronous execution—agents are asynchronous; use polling with timeouts\n- Hardcoding expected output instead of validating agent-generated output\n- Running tests serially because you assume they conflict; use proper isolation instead\n\n### Checklist\n- [ ] Test asserts agent was spawned and ran\n- [ ] State before/after is verified, not just final result\n- [ ] Test is idempotent (can run twice with same result)\n- [ ] Timeout is realistic but prevents hang (not instant, not 10min)\n- [ ] Cleanup removes all artifacts, even on failure\n"
+          }
+        ],
         "review_focus": [
-          "Test isolation: does not depend on execution order or prior test state",
-          "No timing assumptions: no sleep() calls or race-condition-prone assertions",
-          "File state verification: confirms README was actually modified, not just API success",
-          "Idempotency: test can run multiple times without cleanup between runs",
-          "Error messages are actionable: failures pinpoint what broke, not just 'test failed'"
+          "Test isolation—does setup/teardown properly reset state so tests don't interfere?",
+          "Timeout handling—does the test wait long enough for autonomous operations but fail fast on hang?",
+          "Assertion clarity—is each assertion testing agent behavior, not just code execution?",
+          "Fixture data—is the README state properly initialized; can the test run multiple times?",
+          "Edge cases—what happens if the comment already exists, README is read-only, or the agent retries?"
         ],
         "risk_areas": [
-          "Flakiness from environment-specific file system behavior or permissions",
-          "Race conditions if parallel test execution writes to the same README file",
-          "Test data cleanup failures causing state pollution for subsequent runs",
-          "Timing-dependent assertions that timeout in slower CI environments",
-          "Hard-coded file paths or assumptions about working directory structure"
+          "Test flakiness from race conditions or timing assumptions about asynchronous agent execution",
+          "False positives—test passes but agent actually failed or behaved unexpectedly",
+          "State leakage—if tests run in parallel, README mutations from one test interfere with another",
+          "Incomplete cleanup—orphaned processes or temp files from test failure block subsequent runs"
         ]
       },
-      "timestamp": 1789841959,
+      "timestamp": 1789848542,
       "ttl": 3600
     },
     "61c5f4a9ce6598c2f1fc048e0a7ce958": {
       "result": {
         "results": [
           {
-            "file": "retry-outcomes.json",
-            "relevance": 95,
-            "summary": "build_failure recovery strategy with 100% success rate (5/5 attempts succeeded) — directly applicable to autonomous build recovery for this stage"
+            "file": "success-patterns.json",
+            "relevance": 90,
+            "summary": "Shows successful build patterns with npm test, standard template, 3-4 iterations, and practical approaches (e.g., 'Fix bug' pattern: 45s, 2.50 cost). Directly applicable to building the E2E test."
           },
           {
             "file": "patterns.json",
-            "relevance": 90,
-            "summary": "Project configuration (node type, vitest test runner, npm package manager) — essential context for understanding build and test environment setup"
-          },
-          {
-            "file": "flaky-tests.json",
             "relevance": 85,
-            "summary": "Flaky test patterns (test-auth with 90% confidence timeout error, test-1 with 85% confidence) — E2E tests are prone to flakiness; these patterns inform expected failure modes"
+            "summary": "Project context: vitest test runner, npm package manager, javascript language, test pattern '*.test.js'. Essential for understanding the build environment for the E2E test."
           },
           {
-            "file": "failures.json (second detailed entry)",
-            "relevance": 80,
-            "summary": "Multiple test failure patterns including sw-e2e-integration-test hangs and sw-intent-analysis-test schema issues — directly relevant to E2E test build failures and fixes"
-          },
-          {
-            "file": "fleet-shared-patterns.json",
+            "file": "failures.json",
             "relevance": 75,
-            "summary": "Cross-repo build error pattern (Cannot find module → npm i fix) seen in build/test stages — applicable recovery strategy for dependency issues in autonomous builds"
+            "summary": "Detailed test failure patterns (sw-intent-analysis-test, sw-e2e-integration-test, sw-loop-test) with root causes and fixes. Helps anticipate and handle test failures during build stage."
+          },
+          {
+            "file": "metrics.json",
+            "relevance": 65,
+            "summary": "Baseline metrics: build_duration_s=7095, test_duration_s=1459. Provides timing expectations to identify if the E2E test build is taking abnormally long."
+          },
+          {
+            "file": "retry-outcomes.json",
+            "relevance": 60,
+            "summary": "Shows build_failure recovery with model_escalation strategy at 100% success rate. Relevant for handling build failures if they occur during the E2E test execution."
           }
         ]
       },
-      "timestamp": 1789844636,
+      "timestamp": 1789848580,
       "ttl": 1800
     },
     "de317c1cb906aee7626e264101bb529b": {
@@ -2432,6 +2430,45 @@
         }
       ],
       "timestamp": 1789847292,
+      "ttl": 1800
+    },
+    "d54cbd598b33ea37ad34f4c82644369d": {
+      "result": {
+        "raw_response": "Mock claude: ok"
+      },
+      "timestamp": 1789848475,
+      "ttl": 1800
+    },
+    "bc5644a53eb3f0f0e317eb55038effb3": {
+      "result": {
+        "estimated_iterations": 2
+      },
+      "timestamp": 1789848475,
+      "ttl": 1800
+    },
+    "51e35ad6b7342f414f8b6e95352330d0": {
+      "result": {
+        "estimated_cost_usd": 0.22,
+        "estimated_iterations": 1,
+        "estimated_tokens": 35000,
+        "likely_failure_stage": "none",
+        "confidence": 80
+      },
+      "timestamp": 1789848486,
+      "ttl": 3600
+    },
+    "3f8a8a18e90e3da3d2892f7f5b726c2c": {
+      "result": [
+        {
+          "type": "result",
+          "result": "I am trying the same approach again.",
+          "usage": {
+            "input_tokens": 0,
+            "output_tokens": 0
+          }
+        }
+      ],
+      "timestamp": 1789848604,
       "ttl": 1800
     }
   }
