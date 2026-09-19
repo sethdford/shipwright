@@ -5,8 +5,8 @@
       "pattern": "\u001b[38;2;74;222;128m\u001b[1m✓\u001b[0m reveal shows 1/3 pass count on failure",
       "root_cause": "sw-intent-analysis-test asserts analyze_intent's JSON output includes version, goal, and criteria fields, but the current schema/implementation omits one or more of them",
       "fix": "Update analyze_intent (or its schema) in sw-intent-analysis.sh to emit version, goal, and criteria fields matching the test's expected schema",
-      "seen_count": 123,
-      "last_seen": "2026-09-19T17:24:47Z",
+      "seen_count": 126,
+      "last_seen": "2026-09-19T20:23:56Z",
       "category": "test_failure",
       "signature_hash": "e1a285258fe63781b7370b0d086ad87b",
       "signature": "\u001b[<n>;2;<n>;<n>;<n>m\u001b[1m✓\u001b[0m reveal shows <path> pass count on failure"
@@ -50,8 +50,8 @@
       "signature": "results: \u001b[<n>;2;<n>;<n>;<n>m\u001b[1m<n> pass\u001b[0m | \u001b[<n>;2;<n>;<n>;<n>m\u001b[1m1 fail\u001b[0m",
       "root_cause": "sw-e2e-integration-test failed because a stale pipeline lock from a prior run (pipeline-3854) was left in 'running' state, blocking the new pipeline start; sw-intent-analysis-test failed because analyze_intent's generated JSON is missing the required version/goal/criteria schema fields",
       "fix": "Clear/release stale pipeline locks before the e2e-integration test runs (or add lock staleness detection/cleanup), and update analyze_intent to always emit version, goal, and criteria fields in its output schema",
-      "seen_count": 9,
-      "last_seen": "2026-09-19T20:20:20Z",
+      "seen_count": 8,
+      "last_seen": "2026-09-19T18:43:42Z",
       "category": "test_failure",
       "signature_hash": "af7df127e4c98031cbe09f6b0646ac68"
     },
@@ -72,7 +72,7 @@
       "root_cause": "4 of 128 tests failed but the failing assertions are not present in the captured log excerpt (only passing output shown)",
       "fix": "Re-run with full output or grep for FAIL/✗ lines to identify which suite and assertion regressed before attempting a code fix",
       "seen_count": 6,
-      "last_seen": "2026-09-19T19:15:31Z",
+      "last_seen": "2026-09-19T19:14:46Z",
       "category": "test_failure",
       "signature_hash": "a938d8f63c9361dfd3082073022633ae",
       "signature": "results: \u001b[<n>;2;<n>;<n>;<n>m\u001b[1m<n> pass\u001b[0m | \u001b[<n>;2;<n>;<n>;<n>m\u001b[1m4 fail\u001b[0m"
@@ -261,11 +261,11 @@
     {
       "stage": "test",
       "pattern": "\u001b[38;2;0;212;255m▸\u001b[0m Missing template returns error... \u001b[38;2;74;222;128m✓\u001b[0m",
-      "root_cause": "sw-e2e-integration-test, sw-intent-analysis-test, and sw-recruit-test failed (exit 1), likely due to missing template handling or environment-dependent assertions not met in CI",
-      "fix": "Run the three failing suites locally with verbose output to isolate the failing assertion, then add/fix the missing template or mock the missing dependency",
+      "root_cause": "Log shows all test suites passing (0 failures across composer, self-optimize, predictive, frontier, connect suites) with no actual assertion failure captured for the named pattern",
+      "fix": "Re-run the test stage in isolation and capture full non-truncated output to identify the actual failing assertion, since the provided log shows no failures",
       "seen_count": 1,
       "last_seen": "2026-09-18T23:17:29Z",
-      "category": "test_failure"
+      "category": "unknown"
     }
   ]
 }
