@@ -1,3 +1,7 @@
-The goal — adding a comment to README as an E2E test — is complete, verified by passing docs tests, with no AUTO-section conflicts.
+That's the stale watcher expiring — no action needed. I'd already read the `npm test` results directly from the background task (161/162 suites, the one failure being the pre-existing cleanup race in `sw-lib-daemon-dispatch-test`), so the monitor had nothing left to report.
+
+Work is complete and committed:
+- `ee77bbab` — the feature
+- `2f8b70cc` — reverting my incorrect VERSION bump
 
 LOOP_COMPLETE

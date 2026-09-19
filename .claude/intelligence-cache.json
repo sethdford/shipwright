@@ -1398,25 +1398,27 @@
       "result": {
         "complexity": 3,
         "risk_level": "low",
-        "success_probability": 87,
+        "success_probability": 90,
         "recommended_template": "fast",
         "issue_type": "refactor",
         "key_risks": [
-          "Config reading fails if daemon-config.json missing or malformed",
-          "Line counting may include comments/blanks - need consistent methodology",
-          "Integration point unclear if platform-hygiene.json structure differs from existing checks",
-          "Performance degradation on large repos with many scripts"
+          "Configuration key mismatch between daemon-config.json schema and actual defaults",
+          "Output JSON structure compatibility with existing .claude/platform-hygiene.json fields",
+          "Edge cases: symlinks, permission-denied errors, non-executable scripts",
+          "Strategic agent integration may require schema coordination"
         ],
         "implementation_hints": [
-          "Find all shell scripts in scripts/ directory and count lines via wc -l",
+          "Iterate scripts/*.sh with wc -l to count lines, filter to executable scripts only",
           "Read hygiene.max_script_lines from daemon-config.json with fallback to 1500",
-          "Sort results descending by line count, feed into platform-hygiene.json alongside hardcoded/fallback/TODO counts",
-          "Study existing checks in sw-hygiene.sh for config-reading patterns and JSON output format",
-          "Use jq for safe JSON merging to preserve other platform-health data",
-          "Add tests covering: missing config, zero threshold, multiple scripts exceeding threshold, boundary cases"
+          "Exclude *-test.sh files or mark separately to avoid inflating platform metrics",
+          "Sort results descending by line count for immediate visibility of worst offenders",
+          "Output as JSON array [{path, lines, exceeds_threshold, category}, ...] or structured object",
+          "Merge hygiene check output into .claude/platform-hygiene.json atomically (temp file + mv)",
+          "Add sw-hygiene-test.sh cases: threshold crossing, config override, JSON format validation",
+          "Consider daemon patrol integration so this runs continuously and feeds strategic agent"
         ]
       },
-      "timestamp": 1789834112,
+      "timestamp": 1789839254,
       "ttl": 3600
     },
     "c5d4fffc43cee3d25af1d1526f7da02d": {
@@ -1513,32 +1515,32 @@
         "results": [
           {
             "file": "patterns.json",
-            "relevance": 85,
-            "summary": "Project structure (Node/vitest/commonjs) and conventions are essential context for planning feature implementation architecture"
+            "relevance": 95,
+            "summary": "Defines project structure (Node, vitest, npm, commonjs) and conventions (src/, *.test.js imports). Essential for planning implementation approach and test strategy for the hygiene feature."
           },
           {
-            "file": "success-patterns.json (Add authentication feature)",
-            "relevance": 75,
-            "summary": "Feature development pattern showing 3 iterations, file patterns, test strategy, and commit approach—directly applicable to planning similar feature work"
-          },
-          {
-            "file": "metrics.json",
-            "relevance": 60,
-            "summary": "Baseline build and test durations provide reference estimates for planning effort and schedule"
-          },
-          {
-            "file": "issues.json",
-            "relevance": 50,
-            "summary": "Shows how issues are recorded with outcomes, patterns, and gotchas—informs planning for issue filing automation"
+            "file": "success-patterns.json (with Fix bug + Add authentication)",
+            "relevance": 88,
+            "summary": "Shows successful feature delivery patterns: 3-iteration complexity handling, file patterns (scripts/ and .claude/), test strategy (npm test), and standard template. Directly applicable to planning similar automation work."
           },
           {
             "file": "knowledge.json",
-            "relevance": 45,
-            "summary": "Failure patterns (mktemp issues, template errors) highlight edge cases and gotchas to avoid during implementation"
+            "relevance": 82,
+            "summary": "Captures failure patterns and fixes (mktemp issues, test output formatting). Helps plan around known infrastructure gotchas and test environment issues to avoid in the hygiene feature."
+          },
+          {
+            "file": "metrics.json",
+            "relevance": 72,
+            "summary": "Provides baseline performance metrics (build: 7095s, test: 1459s). Useful for setting realistic time/resource estimates when planning the feature's build and test phases."
+          },
+          {
+            "file": "failures.json (second, with test failures)",
+            "relevance": 68,
+            "summary": "Documents common test failure patterns in this repo (intent-analysis schema, stale locks, flaky suites). Informs planning decisions on test robustness and potential failure modes for the new feature."
           }
         ]
       },
-      "timestamp": 1789834244,
+      "timestamp": 1789839325,
       "ttl": 1800
     },
     "5ca3339709382d78269b49aaa277414a": {
@@ -1546,22 +1548,22 @@
         "results": [
           {
             "file": "failures.json",
-            "relevance": 95,
-            "summary": "Contains 9 documented test-stage validation failures with root causes and fixes (sw-intent-analysis-test, sw-e2e-integration-test, sw-loop-test). Directly applicable to diagnosing why plan validation was rejected."
+            "relevance": 90,
+            "summary": "Detailed failure patterns with root causes and fixes for test/validation failures across multiple stages (test, build). Directly relevant to understanding why plan validation was rejected and how to fix it."
+          },
+          {
+            "file": "success-patterns.json",
+            "relevance": 75,
+            "summary": "Successful completion patterns from past iterative work (bug fixes, feature additions) showing iterations needed, files changed, and cost. Provides context for what successful plan execution looks like."
           },
           {
             "file": "knowledge.json",
-            "relevance": 75,
-            "summary": "KB entries document recurring test failures (mktemp directory issues, sw-cleanup output format, regression detection JSON) with fix strategies. Provides patterns for debugging validation issues."
-          },
-          {
-            "file": "retry-outcomes.json",
-            "relevance": 65,
-            "summary": "Shows build_failure recovery with model_escalation strategy (100% success rate). Demonstrates retry patterns for handling rejected validations and escalation tactics."
+            "relevance": 70,
+            "summary": "Knowledge base tracking past failures with fix strategies and effectiveness metrics. Shows patterns from previous work that could help avoid similar validation issues or inform the current plan."
           }
         ]
       },
-      "timestamp": 1789834451,
+      "timestamp": 1789839509,
       "ttl": 1800
     },
     "c3f51b0e50d9afdef2c0619fd572d3a3": {
@@ -1569,88 +1571,88 @@
         "results": [
           {
             "file": "patterns.json",
-            "relevance": 95,
-            "summary": "Project structure and conventions (Node/vitest/npm/JavaScript/commonjs) essential for understanding the codebase where the file hygiene feature will operate"
-          },
-          {
-            "file": "knowledge.json",
-            "relevance": 75,
-            "summary": "Contains failure patterns for cleanup operations (sw-cleanup.sh) and related hygiene workflows; directly applicable to designing file hygiene detection and issue filing"
-          },
-          {
-            "file": "success-patterns.json (Fix bug - outcome-feedback)",
-            "relevance": 65,
-            "summary": "Shows successful 3-iteration pattern with test strategy (npm test), file patterns (.claude/*.json, scripts/lib/*.sh), and iterative debugging approach for shell-heavy features"
-          },
-          {
-            "file": "success-patterns.json (Fix timeout - daemon.sh)",
-            "relevance": 60,
-            "summary": "Demonstrates successful pattern for fixing shell script issues in daemon context with clear test strategy and root cause identification approach"
+            "relevance": 90,
+            "summary": "Project structure and conventions (Node, vitest, npm, JavaScript) are essential for designing the script hygiene detection mechanism and understanding where/how to implement the check"
           },
           {
             "file": "metrics.json",
+            "relevance": 70,
+            "summary": "Build and test duration baselines (7095s build, 1459s test) provide performance context for understanding overhead of adding new file-size checks to the pipeline"
+          },
+          {
+            "file": "success-patterns.json",
+            "relevance": 65,
+            "summary": "Past successful patterns show iteration counts, file change patterns, and testing strategies that can inform the design approach for the hygiene issue feature"
+          },
+          {
+            "file": "knowledge.json",
+            "relevance": 60,
+            "summary": "Captured failure patterns and fix strategies demonstrate how to structure robust solutions and avoid common pitfalls when adding new detection logic"
+          },
+          {
+            "file": "issues.json",
             "relevance": 55,
-            "summary": "Baseline build duration (7095s) and test duration (1459s) provide performance context for pipeline expectations when designing automated hygiene detection"
+            "summary": "Shows how past issues were recorded and resolved (files, errors, outcomes), providing a template for structuring the hygiene issue filing mechanism"
           }
         ]
       },
-      "timestamp": 1789834502,
+      "timestamp": 1789839550,
       "ttl": 1800
     },
     "03b6684d146a1c9b3ad571f09d7ccded": {
       "result": {
         "results": [
           {
-            "file": "failures.json (comprehensive test patterns)",
-            "relevance": 35,
-            "summary": "Contains root cause analysis of test failures including architecture/schema mismatches (sw-intent-analysis-test missing fields, sw-e2e-integration-test lock management). These reveal design anti-patterns: incomplete schemas, stale state management, and timing issues that would inform what NOT to do in file-hygiene design."
+            "file": "failures.json",
+            "relevance": 95,
+            "summary": "Contains 8 detailed failure patterns with root causes, stages, and signatures. Directly shows test failures, flakiness patterns, and what was rejected or didn't work—critical for understanding anti-patterns in script/pipeline design."
           },
           {
             "file": "knowledge.json",
-            "relevance": 25,
-            "summary": "Captures failure signatures and fix strategies from prior work (mktemp path issues, cleanup output formatting, regression detection JSON). While not directly about file-hygiene, the failure patterns demonstrate common anti-patterns in file system operations and state management relevant to designing a script hygiene checker."
+            "relevance": 72,
+            "summary": "Captures 5 failure patterns and fix strategies for scripting issues (mktemp directory issues, JSON output formatting, cleanup output). Provides actionable guidance on what to avoid when writing shell scripts."
           },
           {
-            "file": "patterns.json",
-            "relevance": 15,
-            "summary": "Project structure metadata (node/vitest/commonjs). Provides baseline understanding of project conventions, but has minimal relevance to rejected design approaches for the specific feature since it contains only format/framework info, not architectural decisions."
+            "file": "issues.json",
+            "relevance": 68,
+            "summary": "Documents a daemon timeout bug resolution with explicit gotchas ('check backoff'). Demonstrates anti-patterns to avoid when working with long-running scripts and provides context on successful fixes."
           }
         ]
       },
-      "timestamp": 1789834516,
+      "timestamp": 1789839567,
       "ttl": 1800
     },
     "0617abc2054c3ef5a42169b8485f09d8": {
       "result": {
         "results": [
           {
-            "file": "failures.json",
-            "relevance": 85,
-            "summary": "Recent test failures from 2026-09-19 including intent-analysis-test, loop behavior, cost test, and e2e-integration-test failures. Directly relevant since build stage will need to pass these tests. Shows current failure patterns and fixes needed."
+            "file": "patterns.json",
+            "relevance": 95,
+            "summary": "Project structure and conventions (node/vitest/npm/commonjs) directly inform build tooling, test patterns, and import/dependency management for this stage"
+          },
+          {
+            "file": "metrics.json",
+            "relevance": 78,
+            "summary": "Baseline build duration (7095s) and test duration (1459s) provide reference points for performance expectations and iteration timeouts during build"
+          },
+          {
+            "file": "failures.json (ENOENT/npm install)",
+            "relevance": 72,
+            "summary": "Common build failure pattern (missing dependencies) with high-effectiveness fix (npm install 95%) is directly applicable to build stage execution"
+          },
+          {
+            "file": "success-patterns.json (auth module, iteration 5)",
+            "relevance": 68,
+            "summary": "Demonstrates successful feature build pattern using iterative TDD approach with 300s duration and npm test strategy, applicable to similar build scenarios"
           },
           {
             "file": "retry-outcomes.json",
-            "relevance": 75,
-            "summary": "Build failure recovery with model escalation strategy shows 5/5 success rate (100%). Relevant for understanding proven recovery strategies when build encounters failures during implementation."
-          },
-          {
-            "file": "success-patterns.json",
-            "relevance": 72,
-            "summary": "Second entry shows 'Add authentication feature' pattern with 3-4 iterations, similar complexity to feature work. Demonstrates iterative approach, file patterns affected, test strategy (npm test), and cost expectations for feature builds."
-          },
-          {
-            "file": "patterns.json",
-            "relevance": 65,
-            "summary": "Project structure metadata (node, vitest, npm, javascript, commonjs imports). Essential baseline context for understanding how to write code and tests for this specific project during build stage."
-          },
-          {
-            "file": "knowledge.json",
-            "relevance": 60,
-            "summary": "Accumulated knowledge base with failure signatures and fix strategies. Though dated (2026-05-22), provides historical context on recurring issues like mktemp failures and test setup problems that may recur."
+            "relevance": 62,
+            "summary": "Model escalation retry strategy achieved 100% success rate on build failures, providing escalation precedent for this stage if initial attempts fail"
           }
         ]
       },
-      "timestamp": 1789834641,
+      "timestamp": 1789839712,
       "ttl": 1800
     },
     "47c1451f50b4a8f9faa0f8012f6b922e": {
@@ -1996,6 +1998,89 @@
         "raw_response": "Mock claude: ok"
       },
       "timestamp": 1789838810,
+      "ttl": 1800
+    },
+    "728b9c33a4e4bf65ce76a4d85734dfc7": {
+      "result": {
+        "estimated_iterations": 3
+      },
+      "timestamp": 1789839267,
+      "ttl": 1800
+    },
+    "36090098f4f1ab2ee6a46a78404f2aa6": {
+      "result": {
+        "estimated_cost_usd": 0.22,
+        "estimated_iterations": 2,
+        "estimated_tokens": 11500,
+        "likely_failure_stage": "test",
+        "confidence": 88,
+        "breakdown": {
+          "intake": {
+            "cost": 0.01,
+            "tokens": 800,
+            "model": "haiku"
+          },
+          "build": {
+            "cost": 0.15,
+            "tokens": 8200,
+            "model": "sonnet",
+            "notes": "Script enumeration, JSON generation, atomic writes"
+          },
+          "test": {
+            "cost": 0.04,
+            "tokens": 1800,
+            "model": "sonnet",
+            "notes": "JSON validation, config override testing, edge case coverage"
+          },
+          "pr": {
+            "cost": 0.02,
+            "tokens": 700,
+            "model": "haiku"
+          }
+        },
+        "risk_factors": {
+          "configuration_coordination": "medium",
+          "json_schema_validation": "medium",
+          "edge_case_coverage": "low",
+          "daemon_integration": "low"
+        },
+        "success_factors": [
+          "clear implementation hints provided",
+          "simple refactor (wc -l iteration)",
+          "low complexity (3/10)",
+          "test cases pre-designed",
+          "atomic write pattern established"
+        ],
+        "assumptions": {
+          "fast_template_routing": true,
+          "cached_daemon_config_schema": true,
+          "test_suite_coverage": "edge cases only",
+          "parallel_calls": true,
+          "context_efficiency": "high"
+        }
+      },
+      "timestamp": 1789839278,
+      "ttl": 3600
+    },
+    "a86964d0ca51ff2019b58de200519c80": {
+      "result": {
+        "raw_response": "Mock claude: ok"
+      },
+      "timestamp": 1789840104,
+      "ttl": 1800
+    },
+    "1e58c3b79054e83ca23710b03ca42949": {
+      "result": [
+        {
+          "type": "result",
+          "result": "I am trying the same approach again.",
+          "usage": {
+            "input_tokens": 0,
+            "output_tokens": 0
+          }
+        }
+      ],
+      "timestamp": 1789840323,
       "ttl": 1800
     }
   }
