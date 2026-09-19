@@ -2220,6 +2220,58 @@
       ],
       "timestamp": 1789843341,
       "ttl": 1800
+    },
+    "7f899e6d99700f8d0a9a61457acb9679": {
+      "result": {
+        "estimated_iterations": 1
+      },
+      "timestamp": 1789843699,
+      "ttl": 1800
+    },
+    "ae68b3e4cd17c573c0ef9ce300580849": {
+      "result": {
+        "estimated_cost_usd": 0.12,
+        "estimated_iterations": 1,
+        "estimated_tokens": 15000,
+        "likely_failure_stage": "none",
+        "confidence": 88,
+        "pipeline_template": "fast",
+        "stage_breakdown": {
+          "intake": {
+            "tokens": 2000,
+            "cost_usd": 0.01
+          },
+          "build": {
+            "tokens": 8000,
+            "cost_usd": 0.05
+          },
+          "test": {
+            "tokens": 3000,
+            "cost_usd": 0.02
+          },
+          "pr": {
+            "tokens": 2000,
+            "cost_usd": 0.01
+          }
+        },
+        "reasoning": "Complexity 2 with 95% success probability; fast template skips review stages; testing issue type is low-risk; single iteration expected; haiku-routed intake/test, sonnet for build"
+      },
+      "timestamp": 1789843710,
+      "ttl": 3600
+    },
+    "6a74378f813a11dc8bfc83b8294b7009": {
+      "result": [
+        {
+          "type": "result",
+          "result": "I am trying the same approach again.",
+          "usage": {
+            "input_tokens": 0,
+            "output_tokens": 0
+          }
+        }
+      ],
+      "timestamp": 1789843833,
+      "ttl": 1800
     }
   }
 }

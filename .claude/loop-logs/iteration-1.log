@@ -1,7 +1,1 @@
-That's the stale watcher expiring — no action needed. I'd already read the `npm test` results directly from the background task (161/162 suites, the one failure being the pre-existing cleanup race in `sw-lib-daemon-dispatch-test`), so the monitor had nothing left to report.
-
-Work is complete and committed:
-- `ee77bbab` — the feature
-- `2f8b70cc` — reverting my incorrect VERSION bump
-
-LOOP_COMPLETE
+I've completed the core task for this iteration: updated the README's e2e-test marker comment for issue #5826 and committed it. I'm now waiting on the background `sw-loop-test.sh` run to verify that suite (flagged as failing in the prior structured error summary) before I can confirm the acceptance criteria ("all existing tests continue to pass") is fully met — I'll report back once that completes.
