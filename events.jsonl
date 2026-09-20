@@ -361,3 +361,5 @@
 {"ts":"2026-09-20T01:48:35Z","ts_epoch":1789868915,"type":"model.outcome","issue":0,"stage":"intake","model":"opus","success":"true"}
 {"ts":"2026-09-20T01:48:35Z","ts_epoch":1789868915,"type":"model.outcome","issue":0,"stage":"plan","model":"opus","success":"true"}
 {"ts":"2026-09-20T01:48:35Z","ts_epoch":1789868915,"type":"pipeline.cost","input_tokens":0,"output_tokens":0,"model":"sonnet","cost_usd":0.0000}
+{"ts":"2026-09-20T03:12:31Z","ts_epoch":1789873951,"type":"optimize.memory_pruned","pruned":25,"strengthened":0,"promoted":0}
+{"ts":"2026-09-20T03:12:31Z","ts_epoch":1789873951,"type":"optimize.memory_pruned","pruned":0,"strengthened":0,"promoted":0}
