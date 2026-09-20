@@ -16,8 +16,8 @@
       "pattern": "\u001b[2m  loop behavior: iterations on test failure\u001b[0m",
       "root_cause": "Test suite itself passed (all PASS, 0 FAIL) but the pipeline stage was flagged for iterating due to loop-behavior/RL logging noise being misread as failure signal",
       "fix": "Verify the actual test exit code rather than log content matching; ensure sw-autoresearch-e2e-test.sh output doesn't trigger false-positive failure pattern matching in the pipeline's error classifier",
-      "seen_count": 28,
-      "last_seen": "2026-09-19T21:20:23Z",
+      "seen_count": 29,
+      "last_seen": "2026-09-20T01:26:48Z",
       "category": "flaky",
       "signature_hash": "4257c245052f",
       "signature": "\u001b[2m loop behavior: iterations on test failure\u001b[0m"
@@ -115,8 +115,8 @@
       "pattern": "Results: \u001b[38;2;74;222;128m\u001b[1m126 PASS\u001b[0m | \u001b[38;2;248;113;113m\u001b[1m2 FAIL\u001b[0m",
       "root_cause": "sw-pipeline-test.sh mock plan-stage invocation no longer writes plan.md, cascading into review/E2E/resume/cleanup failures that depend on it, plus a jq parse error on a non-numeric complexity value in the intelligence low-complexity test",
       "fix": "Fix the mock plan stage in sw-pipeline-test.sh to create .claude/pipeline-artifacts/plan.md (and dod.md) before the dependent tests run, and quote/validate the complexity value before passing it to jq",
-      "seen_count": 11,
-      "last_seen": "2026-09-19T04:56:53Z",
+      "seen_count": 12,
+      "last_seen": "2026-09-20T00:53:07Z",
       "category": "test_failure",
       "signature_hash": "a4dd00948c6625a595d0ee2b91698d06",
       "signature": "results: \u001b[<n>;2;<n>;<n>;<n>m\u001b[1m<n> pass\u001b[0m | \u001b[<n>;2;<n>;<n>;<n>m\u001b[1m2 fail\u001b[0m"
@@ -137,8 +137,8 @@
       "pattern": "\u001b[38;2;0;212;255m▸\u001b[0m Patrol recurring failures label construction... \u001b[38;2;74;222;128m✓\u001b[0m",
       "root_cause": "sw-e2e-integration-test failed because a stale pipeline lock (pipeline-4253) was already held from a prior run, blocking the fast pipeline test; sw-intent-analysis-test failed because analyze_intent's generated JSON is missing required schema fields (version, goal, criteria)",
       "fix": "Clear/release stale pipeline locks before the e2e-integration test runs (or have it auto-abort orphaned locks), and update analyze_intent to always populate version, goal, and criteria in its output schema",
-      "seen_count": 12,
-      "last_seen": "2026-09-20T01:18:10Z",
+      "seen_count": 10,
+      "last_seen": "2026-09-19T19:40:50Z",
       "category": "test_failure",
       "signature_hash": "06f0abb7562df2c6e4651882933d3b25",
       "signature": "\u001b[<n>;2;0;<n>;<n>m▸\u001b[0m patrol recurring failures label construction... \u001b[<n>;2;<n>;<n>;<n>m✓\u001b[0m"
@@ -261,8 +261,8 @@
     {
       "stage": "test",
       "pattern": "\u001b[38;2;0;212;255m▸\u001b[0m Missing template returns error... \u001b[38;2;74;222;128m✓\u001b[0m",
-      "root_cause": "sw-pipeline.sh's plan stage no longer writes .claude/pipeline-artifacts/plan.md (and review stage no longer writes review.md), so all downstream tests depending on those artifacts (E2E, resume, cleanup, intelligence complexity skip) cascade-fail",
-      "fix": "restore/fix the plan and review stage functions in sw-pipeline.sh to write plan.md and review.md artifacts, and fix the jq parse error on non-numeric complexity input in the intelligence complexity check",
+      "root_cause": "sw-intent-analysis-test failed (exit 1) and sw-e2e-integration-test hit the 301s timeout, indicating a broken assertion or hung external call in the test run",
+      "fix": "Inspect sw-intent-analysis-test.sh failure output directly and check sw-e2e-integration-test for a blocking network/API call needing a mock or increased timeout",
       "seen_count": 1,
       "last_seen": "2026-09-18T23:17:29Z",
       "category": "test_failure"
