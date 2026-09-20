@@ -16,8 +16,8 @@
       "pattern": "\u001b[2m  loop behavior: iterations on test failure\u001b[0m",
       "root_cause": "Test suite itself passed (all PASS, 0 FAIL) but the pipeline stage was flagged for iterating due to loop-behavior/RL logging noise being misread as failure signal",
       "fix": "Verify the actual test exit code rather than log content matching; ensure sw-autoresearch-e2e-test.sh output doesn't trigger false-positive failure pattern matching in the pipeline's error classifier",
-      "seen_count": 28,
-      "last_seen": "2026-09-19T21:20:23Z",
+      "seen_count": 29,
+      "last_seen": "2026-09-20T01:31:59Z",
       "category": "flaky",
       "signature_hash": "4257c245052f",
       "signature": "\u001b[2m loop behavior: iterations on test failure\u001b[0m"
@@ -261,8 +261,8 @@
     {
       "stage": "test",
       "pattern": "\u001b[38;2;0;212;255m▸\u001b[0m Missing template returns error... \u001b[38;2;74;222;128m✓\u001b[0m",
-      "root_cause": "sw-pipeline.sh's plan stage never writes .claude/pipeline-artifacts/plan.md, cascading to review.md and all downstream stages/tests that depend on it",
-      "fix": "Fix the plan stage in sw-pipeline.sh to actually generate and write plan.md (and dod.md/tasks) before proceeding, and check why review stage similarly fails to write review.md",
+      "root_cause": "sw-cost-test.sh seeds no cost entries before asserting the CONTEXT EFFICIENCY dashboard renders event-derived data, so 'No cost entries in the last 30 day(s)' is shown instead of utilization stats",
+      "fix": "In sw-cost-test.sh, write a fixture entry to costs.json (or emit a loop.context_efficiency event) before invoking the dashboard render step so real data is present for the assertions",
       "seen_count": 1,
       "last_seen": "2026-09-18T23:17:29Z",
       "category": "test_failure"
