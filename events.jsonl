@@ -197,3 +197,8 @@
 {"ts":"2026-09-19T23:43:52Z","ts_epoch":1789861432,"type":"reasoning.trace","job_id":"pipeline-997612-42","complexity":"medium","risk":50,"template":"standard"}
 {"ts":"2026-09-19T23:43:53Z","ts_epoch":1789861433,"type":"reasoning.trace","job_id":"pipeline-998406-42","complexity":"medium","risk":50,"template":"standard"}
 {"ts":"2026-09-19T23:49:31Z","ts_epoch":1789861771,"type":"reasoning.trace","job_id":"pipeline-1198868-0","complexity":"medium","risk":50,"template":"standard"}
+{"ts":"2026-09-20T00:15:18Z","ts_epoch":1789863318,"type":"hygiene_platform_refactor","hardcoded":49,"fallback":69,"todo":51}
+{"ts":"2026-09-20T00:15:54Z","ts_epoch":1789863354,"type":"strategic.issue_created","title":"Adaptive iteration budget based on historical issue complexity","priority":"P2","complexity":"standard"}
+{"ts":"2026-09-20T00:15:57Z","ts_epoch":1789863357,"type":"strategic.issue_created","title":"Split sw-memory.sh (2241 lines) into scripts/lib/memory-*.sh modules","priority":"P6","complexity":"standard"}
+{"ts":"2026-09-20T00:16:01Z","ts_epoch":1789863361,"type":"strategic.issue_created","title":"Add remediation hints to `shipwright doctor` failures","priority":"P1","complexity":"fast"}
+{"ts":"2026-09-20T00:16:01Z","ts_epoch":1789863361,"type":"strategic.cycle_complete","issues_created":3,"issues_skipped":0}
