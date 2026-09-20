@@ -350,3 +350,5 @@
 {"ts":"2026-09-20T15:40:31Z","ts_epoch":1789918831,"type":"model.outcome","issue":0,"stage":"intake","model":"opus","success":"true"}
 {"ts":"2026-09-20T15:40:31Z","ts_epoch":1789918831,"type":"model.outcome","issue":0,"stage":"plan","model":"opus","success":"true"}
 {"ts":"2026-09-20T15:40:31Z","ts_epoch":1789918831,"type":"pipeline.cost","input_tokens":0,"output_tokens":0,"model":"sonnet","cost_usd":0.0000}
+{"ts":"2026-09-20T16:04:48Z","ts_epoch":1789920288,"type":"hygiene_platform_refactor","hardcoded":49,"fallback":69,"todo":51}
+{"ts":"2026-09-20T16:05:09Z","ts_epoch":1789920309,"type":"strategic.cycle_complete","issues_created":0,"issues_skipped":3}
