@@ -312,3 +312,5 @@
 {"ts":"2026-09-20T06:16:56Z","ts_epoch":1789885016,"type":"patrol.finding","check":"untested_script","script":"sw-tmux-role-color.sh","lines":81,"usage":1}
 {"ts":"2026-09-20T06:16:56Z","ts_epoch":1789885016,"type":"patrol.finding","check":"untested_script","script":"sw-test-all.sh","lines":199,"usage":0}
 {"ts":"2026-09-20T06:16:56Z","ts_epoch":1789885016,"type":"patrol.finding","check":"untested_script","script":"sw-event-schema-sync.sh","lines":93,"usage":0}
+{"ts":"2026-09-20T08:06:29Z","ts_epoch":1789891589,"type":"hygiene_platform_refactor","hardcoded":49,"fallback":69,"todo":51}
+{"ts":"2026-09-20T08:06:49Z","ts_epoch":1789891609,"type":"strategic.cycle_complete","issues_created":0,"issues_skipped":3}
