@@ -6,7 +6,7 @@
       "root_cause": "sw-intent-analysis-test asserts analyze_intent's JSON output includes version, goal, and criteria fields, but the current schema/implementation omits one or more of them",
       "fix": "Update analyze_intent (or its schema) in sw-intent-analysis.sh to emit version, goal, and criteria fields matching the test's expected schema",
       "seen_count": 130,
-      "last_seen": "2026-09-20T08:17:38Z",
+      "last_seen": "2026-09-20T09:11:54Z",
       "category": "test_failure",
       "signature_hash": "e1a285258fe63781b7370b0d086ad87b",
       "signature": "\u001b[<n>;2;<n>;<n>;<n>m\u001b[1m✓\u001b[0m reveal shows <path> pass count on failure"
@@ -138,7 +138,7 @@
       "root_cause": "sw-e2e-integration-test failed because a stale pipeline lock (pipeline-4253) was already held from a prior run, blocking the fast pipeline test; sw-intent-analysis-test failed because analyze_intent's generated JSON is missing required schema fields (version, goal, criteria)",
       "fix": "Clear/release stale pipeline locks before the e2e-integration test runs (or have it auto-abort orphaned locks), and update analyze_intent to always populate version, goal, and criteria in its output schema",
       "seen_count": 11,
-      "last_seen": "2026-09-20T07:52:08Z",
+      "last_seen": "2026-09-20T07:44:05Z",
       "category": "test_failure",
       "signature_hash": "06f0abb7562df2c6e4651882933d3b25",
       "signature": "\u001b[<n>;2;0;<n>;<n>m▸\u001b[0m patrol recurring failures label construction... \u001b[<n>;2;<n>;<n>;<n>m✓\u001b[0m"
@@ -214,8 +214,8 @@
       "pattern": "\u001b[2moutput missing: Everything is clean\u001b[0m",
       "root_cause": "sw-cost-test.sh CONTEXT EFFICIENCY test expects loop.context_efficiency events in costs.json but none were seeded, so the dashboard reports 'No cost entries' instead of rendering the section",
       "fix": "Seed a loop.context_efficiency event fixture (or cost entry) in the test setup before invoking the cost dashboard so utilization/waste data is present to render",
-      "seen_count": 2,
-      "last_seen": "2026-09-20T09:06:44Z",
+      "seen_count": 1,
+      "last_seen": "2026-09-11T15:35:57Z",
       "category": "test_failure",
       "signature_hash": "32a872a49dbd0386b69ebc39bb8c1012",
       "signature": "\u001b[2moutput missing: everything is clean\u001b[0m"
@@ -261,8 +261,8 @@
     {
       "stage": "test",
       "pattern": "\u001b[38;2;0;212;255m▸\u001b[0m Missing template returns error... \u001b[38;2;74;222;128m✓\u001b[0m",
-      "root_cause": "Memory promotion test expects cross-repo patterns to be copied, but the promotion logic isn't matching/copying patterns correctly (likely a path or filter mismatch in sw-self-optimize.sh)",
-      "fix": "Debug sw-self-optimize-test.sh 'Memory promotion copies cross-repo patterns' assertion and the corresponding promote_cross_repo_patterns function for a path/jq filter bug",
+      "root_cause": "sw-intent-analysis-test asserts analyze_intent's JSON output includes version, goal, and criteria fields, but the schema/template it validates against is missing them",
+      "fix": "Add the required version, goal, and criteria fields to the intent analysis output schema/template in sw-intent-analysis.sh (or the corresponding lib) so it matches the test's expected schema",
       "seen_count": 1,
       "last_seen": "2026-09-18T23:17:29Z",
       "category": "test_failure"
