@@ -12,7 +12,7 @@
     },
     {
       "pattern": "timeout after 2.8s at line 43",
-      "stage": "test",
+      "stage": "test", 
       "timestamp": 1694500100,
       "root_cause": "unbounded loop",
       "fix": "add timeout wrapper",
