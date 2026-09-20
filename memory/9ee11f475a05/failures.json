@@ -5,8 +5,8 @@
       "pattern": "\u001b[38;2;74;222;128m\u001b[1m✓\u001b[0m reveal shows 1/3 pass count on failure",
       "root_cause": "sw-intent-analysis-test asserts analyze_intent's JSON output includes version, goal, and criteria fields, but the current schema/implementation omits one or more of them",
       "fix": "Update analyze_intent (or its schema) in sw-intent-analysis.sh to emit version, goal, and criteria fields matching the test's expected schema",
-      "seen_count": 127,
-      "last_seen": "2026-09-20T03:00:28Z",
+      "seen_count": 128,
+      "last_seen": "2026-09-20T05:08:36Z",
       "category": "test_failure",
       "signature_hash": "e1a285258fe63781b7370b0d086ad87b",
       "signature": "\u001b[<n>;2;<n>;<n>;<n>m\u001b[1m✓\u001b[0m reveal shows <path> pass count on failure"
@@ -265,6 +265,15 @@
       "fix": "Clear/reset stale pipeline lock state before e2e-integration-test runs (or add lock cleanup in test teardown), and fix analyze_intent to always emit version/goal/criteria fields matching the schema",
       "seen_count": 1,
       "last_seen": "2026-09-18T23:17:29Z",
+      "category": "test_failure"
+    },
+    {
+      "stage": "test",
+      "pattern": "\u001b[2m  error handling\u001b[0m",
+      "root_cause": "sw-pipeline-test.sh E2E subprocess tests fail because plan/review stage mocks don't write expected artifacts (plan.md, review.md), cascading into dependent E2E/resume/cleanup tests, plus a jq parse error on non-numeric complexity value in the low-complexity intelligence test",
+      "fix": "fix the mock plan/review stage handlers in sw-pipeline-test.sh to emit .claude/pipeline-artifacts/plan.md and review.md, and quote/validate the complexity value before passing to jq",
+      "seen_count": 1,
+      "last_seen": "2026-09-20T04:31:33Z",
       "category": "test_failure"
     }
   ]
