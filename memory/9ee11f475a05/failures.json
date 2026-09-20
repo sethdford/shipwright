@@ -6,7 +6,7 @@
       "root_cause": "sw-intent-analysis-test asserts analyze_intent's JSON output includes version, goal, and criteria fields, but the current schema/implementation omits one or more of them",
       "fix": "Update analyze_intent (or its schema) in sw-intent-analysis.sh to emit version, goal, and criteria fields matching the test's expected schema",
       "seen_count": 128,
-      "last_seen": "2026-09-20T05:08:36Z",
+      "last_seen": "2026-09-20T04:32:06Z",
       "category": "test_failure",
       "signature_hash": "e1a285258fe63781b7370b0d086ad87b",
       "signature": "\u001b[<n>;2;<n>;<n>;<n>m\u001b[1m✓\u001b[0m reveal shows <path> pass count on failure"
@@ -261,19 +261,19 @@
     {
       "stage": "test",
       "pattern": "\u001b[38;2;0;212;255m▸\u001b[0m Missing template returns error... \u001b[38;2;74;222;128m✓\u001b[0m",
-      "root_cause": "sw-e2e-integration-test hit a stale pipeline lock from a prior run ('pipeline-5941' already running), and sw-intent-analysis-test's generated JSON is missing required schema fields (version, goal, criteria)",
-      "fix": "Clear/reset stale pipeline lock state before e2e-integration-test runs (or add lock cleanup in test teardown), and fix analyze_intent to always emit version/goal/criteria fields matching the schema",
+      "root_cause": "e2e-integration-test failed because a prior pipeline lock (pipeline-5965) was left held, so the fast pipeline run under test found one already in progress; intent-analysis-test's schema check and self-optimize-test's memory promotion appear to be unrelated pre-existing failures (invalid JSON passed to jq --argjson, missing schema fields)",
+      "fix": "Ensure sw-e2e-integration-test cleans up/releases any stale pipeline lock before starting (or use a unique/isolated lock per test run); separately fix analyze_intent to emit version/goal/criteria fields and guard jq --argjson calls in sw-self-optimize.sh against empty/invalid JSON input",
       "seen_count": 1,
       "last_seen": "2026-09-18T23:17:29Z",
       "category": "test_failure"
     },
     {
       "stage": "test",
-      "pattern": "\u001b[2m  error handling\u001b[0m",
-      "root_cause": "sw-pipeline-test.sh E2E subprocess tests fail because plan/review stage mocks don't write expected artifacts (plan.md, review.md), cascading into dependent E2E/resume/cleanup tests, plus a jq parse error on non-numeric complexity value in the low-complexity intelligence test",
-      "fix": "fix the mock plan/review stage handlers in sw-pipeline-test.sh to emit .claude/pipeline-artifacts/plan.md and review.md, and quote/validate the complexity value before passing to jq",
+      "pattern": "✓ tracked-but-missing file is skipped, not failed (exit 0)",
+      "root_cause": "E2E fixtures never write plan.md/review.md so downstream artifact checks and the jq-based complexity/reward parsing fail on missing or non-numeric values",
+      "fix": "make plan/design and review stages actually emit .claude/pipeline-artifacts/plan.md and review.md in the test harness, and guard jq calls with numeric validation/defaults instead of failing on empty input",
       "seen_count": 1,
-      "last_seen": "2026-09-20T04:31:33Z",
+      "last_seen": "2026-09-20T05:24:22Z",
       "category": "test_failure"
     }
   ]
