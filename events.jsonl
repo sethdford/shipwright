@@ -263,3 +263,4 @@
 {"ts":"2026-09-22T18:14:29Z","ts_epoch":1790100869,"type":"patrol.finding","check":"untested_script","script":"sw-test-all.sh","lines":199,"usage":0}
 {"ts":"2026-09-22T18:14:29Z","ts_epoch":1790100869,"type":"patrol.finding","check":"untested_script","script":"sw-event-schema-sync.sh","lines":93,"usage":0}
 {"ts":"2026-09-22T20:04:39Z","ts_epoch":1790107479,"type":"hygiene_platform_refactor","hardcoded":49,"fallback":69,"todo":51}
+{"ts":"2026-09-23T00:12:55Z","ts_epoch":1790122375,"type":"hygiene_platform_refactor","hardcoded":49,"fallback":69,"todo":51}
