@@ -1662,33 +1662,33 @@
       "result": {
         "results": [
           {
-            "file": "retry-outcomes.json",
+            "file": "success-patterns.json",
             "relevance": 95,
-            "summary": "Build failure recovery strategy with 100% success rate using model escalation; directly applicable to handling build stage failures"
+            "summary": "Contains 2 proven successful patterns (bug fix, feature) showing iteration counts (3), duration, test strategies (npm test), and file patterns; directly applicable to build stage approach and expectations"
+          },
+          {
+            "file": "retry-outcomes.json",
+            "relevance": 85,
+            "summary": "Shows model_escalation retry strategy for build_failure class with 100% success rate; directly relevant for build error recovery and resilience during this stage"
+          },
+          {
+            "file": "metrics.json",
+            "relevance": 80,
+            "summary": "Provides baseline metrics for build_duration_s (7095s) and test_duration_s (1459s); essential for performance expectations and timeout tuning in current pipeline"
+          },
+          {
+            "file": "patterns.json",
+            "relevance": 75,
+            "summary": "Documents project structure (node/vitest/npm) and conventions (commonjs imports); essential context for understanding build environment and test harness behavior"
           },
           {
             "file": "flaky-tests.json",
-            "relevance": 90,
-            "summary": "Identifies flaky tests (test-1, test-auth) with known failure patterns; critical for diagnosing intermittent test failures during build"
-          },
-          {
-            "file": "success-patterns.json",
-            "relevance": 85,
-            "summary": "Two successful build patterns showing bug fix (3 iterations, 45s) and feature addition (3 iterations, 150s) with file patterns and commit counts"
-          },
-          {
-            "file": "failures.json",
-            "relevance": 80,
-            "summary": "Detailed test stage failure catalog with root causes, fixes, and signatures; essential context for understanding build/test regressions"
-          },
-          {
-            "file": "knowledge.json",
-            "relevance": 75,
-            "summary": "KB entries for test setup failures (mktemp directory issues) and cleanup output validation; practical fixes for common test suite problems"
+            "relevance": 70,
+            "summary": "Identifies 2 flaky tests (test-1 with 85% confidence, test-auth with 90% confidence); helps distinguish genuine build regressions from environmental flakiness during test phase"
           }
         ]
       },
-      "timestamp": 1790281007,
+      "timestamp": 1790282991,
       "ttl": 1800
     },
     "f3f66a303011d663805f53d798bdfd83": {
@@ -1731,6 +1731,224 @@
         }
       ],
       "timestamp": 1790281867,
+      "ttl": 1800
+    },
+    "9ffec5a1b4309a58b33c35c65fa98a84": {
+      "result": {
+        "complexity": 2,
+        "risk_level": "low",
+        "success_probability": 92,
+        "recommended_template": "fast",
+        "issue_type": "testing",
+        "key_risks": [
+          "Issue is marked as CI-generated test artifact - may need closure instead of implementation",
+          "Unclear what specific comment or content should be added to README",
+          "No acceptance criteria or example provided in issue body"
+        ],
+        "implementation_hints": [
+          "Verify this is not a stale automated test case that should simply be closed",
+          "Search codebase for related E2E test files that might define expected README changes",
+          "Check if this corresponds to a specific feature branch or PR that introduced the test",
+          "Implement minimal change: identify what comment/documentation is needed and add it to README"
+        ]
+      },
+      "timestamp": 1790282857,
+      "ttl": 3600
+    },
+    "2a9b6f8c36271cddd6b4a720f2718f56": {
+      "result": {
+        "raw_response": "Mock claude: ok"
+      },
+      "timestamp": 1790282863,
+      "ttl": 1800
+    },
+    "cba74279dfbedf5fcd8abc5fba6eab90": {
+      "result": {
+        "estimated_iterations": 1
+      },
+      "timestamp": 1790282865,
+      "ttl": 1800
+    },
+    "2bb1f2238920628d447a9b0c4a691af8": {
+      "result": {
+        "estimated_cost_usd": 0.45,
+        "estimated_iterations": 1,
+        "estimated_tokens": 5200,
+        "likely_failure_stage": "none",
+        "confidence": 92,
+        "breakdown": {
+          "intake": {
+            "tokens": 150,
+            "cost": 0.01
+          },
+          "build": {
+            "tokens": 2400,
+            "cost": 0.18
+          },
+          "test": {
+            "tokens": 1800,
+            "cost": 0.14
+          },
+          "pr": {
+            "tokens": 850,
+            "cost": 0.12
+          }
+        },
+        "rationale": "Low complexity testing issue (score 2/10) with 'fast' template: minimal stages, high success probability. Single iteration expected. Cost driven by build stage (focused code authoring), test execution, and PR workflow overhead. No review stage in fast template reduces cost by ~30% vs standard pipeline."
+      },
+      "timestamp": 1790282877,
+      "ttl": 3600
+    },
+    "f9c9e8b2bd49e68005879dc608624768": {
+      "result": {
+        "issue_type": "testing",
+        "confidence": 0.88,
+        "secondary_domains": [
+          "infrastructure",
+          "automation",
+          "documentation"
+        ],
+        "complexity_assessment": {
+          "score": 3,
+          "reasoning": "Simple E2E test adding a comment to README; main complexity is ensuring test isolation and that automated modifications don't pollute repository state or cause race conditions in parallel test runs."
+        },
+        "skill_plan": {
+          "plan": [
+            "testing-strategy",
+            "brainstorming"
+          ],
+          "design": [
+            "testing-strategy"
+          ],
+          "build": [
+            "testing-strategy"
+          ],
+          "review": [
+            "testing-strategy",
+            "pr-quality"
+          ],
+          "compound_quality": [
+            "adversarial-quality",
+            "validation-thoroughness"
+          ],
+          "pr": [
+            "pr-quality"
+          ],
+          "deploy": [],
+          "validate": [
+            "validation-thoroughness"
+          ],
+          "monitor": []
+        },
+        "skill_rationale": {
+          "testing-strategy": "E2E tests that modify repository files need structured patterns for isolated setup, atomic execution, and reliable cleanup; this ensures the README modification test doesn't become flaky or pollute the test environment.",
+          "brainstorming": "Challenge assumptions before implementation: Is this testing Shipwright's ability to modify documentation? Should changes be in an isolated branch? What happens if the test runs concurrently with other tests? How does cleanup work on failure?",
+          "adversarial-quality": "Think through failure modes and edge cases: What if README modification fails midway? Does the test properly revert state? Are there race conditions when E2E tests run in parallel? Can the test interfere with concurrent builds?",
+          "validation-thoroughness": "E2E tests must verify actual behavior, not just that code runs; confirm the README comment is genuinely added, formatted correctly, doesn't break downstream tooling, and is properly reverted after the test.",
+          "pr-quality": "Test code is production code; reviewers need clear explanation of what scenario this E2E test validates, why README modification is the verification strategy, and how cleanup is guaranteed."
+        },
+        "generated_skills": [
+          {
+            "name": "e2e-test-isolation",
+            "reason": "No existing skill addresses test isolation, atomic cleanup, and race condition prevention for E2E tests that modify repository state; this is critical for infrastructure tests that must run safely in parallel CI environments.",
+            "content": "## E2E Test Isolation & Cleanup\n\nE2E tests that modify repository state (files, README, branches, tags) must be strictly isolated to prevent flaky concurrent runs, test pollution, and hard-to-debug race conditions in CI pipelines.\n\n### Isolation Strategy\n- **Use separate branches or worktrees** — Never modify main repository state directly; create test-specific branches or isolated git worktrees per test run\n- **Unique namespacing** — Each concurrent E2E test run should use unique file paths, branch names, or temporary directories to avoid collisions\n- **Atomic transactions** — Use `git` transactions or file-level atomicity (temp file → move) to ensure changes are all-or-nothing\n\n### Cleanup & Reversibility\n- **Cleanup-on-exit guarantee** — Use shell traps (`trap`) or try/finally patterns to ensure cleanup runs even if the test fails mid-execution\n- **Verify cleanup** — Manually run the cleanup logic to confirm README changes are reverted and no orphaned state remains\n- **Document expected state** — Clearly specify what the repository state should be after the test completes\n\n### Concurrency Safety\n- **File locks or git locks** — If multiple E2E tests modify the same files, use lock files or `git update-ref` transactions to serialize access\n- **Separate test data** — Store test fixtures and expected output in isolated directories, not in shared test data\n- **Audit all modifications** — Log every file change during the test so failures can be traced and state can be manually recovered\n\n### Common Pitfalls\n- Creating files without cleanup handlers → use trap to ensure deletion even on error\n- Modifying shared branches (main, develop) → always use isolated branches with test-unique names\n- Assuming sequential execution → CI pipelines run tests in parallel; use locks or namespacing\n- Hard-coded paths or /tmp collisions → generate unique paths per test execution\n- Skipping cleanup verification → manually test the cleanup path before merging"
+          }
+        ],
+        "review_focus": [
+          "Test isolation: Does the test use a separate branch or isolated state, not modifying main repository or shared test state?",
+          "Cleanup verification: Are all README modifications atomically reverted after the test, even if intermediate steps fail?",
+          "Concurrency safety: Can multiple E2E tests run in parallel without race conditions, file conflicts, or shared state collisions?",
+          "Test clarity: Is it obvious what Shipwright feature or user behavior this E2E test validates by adding a README comment?"
+        ],
+        "risk_areas": [
+          "State pollution: If cleanup fails, test leaves README modified, breaking subsequent tests or polluting repository state",
+          "Race conditions: Concurrent E2E tests modifying the same README could cause conflicts, merge failures, or flaky results in parallel CI",
+          "Unclear automation purpose: Reviewers should understand specifically what behavior adding a README comment validates and why this approach was chosen"
+        ]
+      },
+      "timestamp": 1790282937,
+      "ttl": 3600
+    },
+    "61c5f4a9ce6598c2f1fc048e0a7ce958": {
+      "result": {
+        "results": [
+          {
+            "file": "fleet-shared-patterns.json",
+            "relevance": 75,
+            "summary": "Common build failure pattern 'Error: Cannot find module' with fix (npm i) seen in build and test stages across multiple repos. Practical for preventing module resolution failures during build."
+          },
+          {
+            "file": "index.json",
+            "relevance": 70,
+            "summary": "Test failure pattern indexed for build stage with specific fix (increase timeout value in test setup). Directly applicable to build stage troubleshooting."
+          },
+          {
+            "file": "failures.json",
+            "relevance": 60,
+            "summary": "Contains resolved timeout issues and database connection failures with documented fixes and resolutions. Useful for understanding common build/test failure modes."
+          },
+          {
+            "file": "success-patterns.json (test-repo-789)",
+            "relevance": 55,
+            "summary": "High-complexity timeout fix pattern executed in build stage with npm test strategy. Shows a 3-iteration solution that could inform similar build issues."
+          },
+          {
+            "file": "success-patterns.json (test-final-working)",
+            "relevance": 50,
+            "summary": "Medium-complexity daemon timeout handler pattern for build stage using npm test. Demonstrates completed build-stage fix with timeout logic."
+          }
+        ]
+      },
+      "timestamp": 1790282973,
+      "ttl": 1800
+    },
+    "222c8a8c566608f6bf7f2c66731d7acd": {
+      "result": [
+        {
+          "type": "result",
+          "result": "I am trying the same approach again.",
+          "usage": {
+            "input_tokens": 0,
+            "output_tokens": 0
+          }
+        }
+      ],
+      "timestamp": 1790282992,
+      "ttl": 1800
+    },
+    "953766bf8d003aa92b80fa8e4274e702": {
+      "result": {
+        "raw_response": "Mock claude: ok"
+      },
+      "timestamp": 1790283106,
+      "ttl": 1800
+    },
+    "2ade6bf3b0183a542981cbbc7a022227": {
+      "result": [
+        {
+          "type": "result",
+          "result": "I am trying the same approach again.",
+          "usage": {
+            "input_tokens": 0,
+            "output_tokens": 0
+          }
+        }
+      ],
+      "timestamp": 1790283362,
+      "ttl": 1800
+    },
+    "e09a10f3c3004228caa36bed14a331ba": {
+      "result": [
+        {
+          "type": "result",
+          "result": "I am trying the same approach again.",
+          "usage": {
+            "input_tokens": 0,
+            "output_tokens": 0
+          }
+        }
+      ],
+      "timestamp": 1790283368,
       "ttl": 1800
     }
   }
