@@ -442,3 +442,6 @@
 {"ts":"2026-09-24T18:14:17Z","ts_epoch":1790273657,"type":"patrol.finding","check":"untested_script","script":"sw-tmux-role-color.sh","lines":81,"usage":1}
 {"ts":"2026-09-24T18:14:17Z","ts_epoch":1790273657,"type":"patrol.finding","check":"untested_script","script":"sw-test-all.sh","lines":199,"usage":0}
 {"ts":"2026-09-24T18:14:17Z","ts_epoch":1790273657,"type":"patrol.finding","check":"untested_script","script":"sw-event-schema-sync.sh","lines":93,"usage":0}
+{"ts":"2026-09-24T20:05:38Z","ts_epoch":1790280338,"type":"hygiene_platform_refactor","hardcoded":49,"fallback":69,"todo":51}
+{"ts":"2026-09-24T20:06:14Z","ts_epoch":1790280374,"type":"strategic.issue_created","title":"Add test suites for the 3 remaining untested utility scripts","priority":"P0","complexity":"fast"}
+{"ts":"2026-09-24T20:06:14Z","ts_epoch":1790280374,"type":"strategic.cycle_complete","issues_created":1,"issues_skipped":2}
