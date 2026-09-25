@@ -1988,12 +1988,12 @@ PROMPT
     INSERTIONS="$(echo "$CHANGES" | grep -oE '[0-9]+ insertion' | grep -oE '[0-9]+' || echo 0)"
     if [[ "${INSERTIONS:-0}" -lt 5 ]]; then
         CONSECUTIVE_FAILURES=$(( CONSECUTIVE_FAILURES + 1 ))
-        echo -e "  ${YELLOW}⚠${RESET} Low progress (${CONSECUTIVE_FAILURES}/3)"
+        echo -e "  ${YELLOW}⚠${RESET} Low progress (${CONSECUTIVE_FAILURES}/__CIRCUIT_BREAKER_THRESHOLD__)"
     else
         CONSECUTIVE_FAILURES=0
     fi
 
-    if [[ "$CONSECUTIVE_FAILURES" -ge 3 ]]; then
+    if [[ "$CONSECUTIVE_FAILURES" -ge __CIRCUIT_BREAKER_THRESHOLD__ ]]; then
         # Attempt auto-recovery before tripping circuit breaker
         if type recovery_before_circuit_breaker >/dev/null 2>&1; then
             if recovery_before_circuit_breaker "" "$WORK_DIR" "$TEST_CMD"; then
@@ -2012,12 +2012,20 @@ done
 echo -e "\n${DIM}Agent ${AGENT_NUM} finished after ${ITERATION} iterations${RESET}"
 WORKEREOF
 
+    # Calculate adaptive circuit breaker threshold if enabled
+    local actual_threshold="$CIRCUIT_BREAKER_THRESHOLD"
+    if type compute_adaptive_threshold >/dev/null 2>&1; then
+        local error_log="${ARTIFACT_DIR}/error-log.jsonl"
+        actual_threshold=$(compute_adaptive_threshold "$error_log" "$CIRCUIT_BREAKER_THRESHOLD" 2>/dev/null || echo "$CIRCUIT_BREAKER_THRESHOLD")
+    fi
+
     # Replace placeholders — use awk for all values to avoid sed injection
     # (sed breaks on & | \ in paths and test commands)
     sed_i "s|__AGENT_NUM__|${agent_num}|g" "$worker_script"
     sed_i "s|__TOTAL_AGENTS__|${total_agents}|g" "$worker_script"
     sed_i "s|__MAX_ITERATIONS__|${MAX_ITERATIONS}|g" "$worker_script"
     sed_i "s|__SLEEP_BETWEEN_ITERATIONS__|$(_config_get_int "loop.sleep_between_iterations" 2 2>/dev/null || echo 2)|g" "$worker_script"
+    sed_i "s|__CIRCUIT_BREAKER_THRESHOLD__|${actual_threshold}|g" "$worker_script"
     # Paths and commands may contain sed-special chars — use awk
     awk -v val="$wt_path" '{gsub(/__WORK_DIR__/, val); print}' "$worker_script" > "${worker_script}.tmp" \
         && mv "${worker_script}.tmp" "$worker_script"
