@@ -5,8 +5,8 @@
       "pattern": "\u001b[38;2;74;222;128m\u001b[1m✓\u001b[0m reveal shows 1/3 pass count on failure",
       "root_cause": "sw-intent-analysis-test asserts analyze_intent's JSON output includes version, goal, and criteria fields, but the current schema/implementation omits one or more of them",
       "fix": "Update analyze_intent (or its schema) in sw-intent-analysis.sh to emit version, goal, and criteria fields matching the test's expected schema",
-      "seen_count": 147,
-      "last_seen": "2026-09-25T10:56:29Z",
+      "seen_count": 150,
+      "last_seen": "2026-09-25T12:37:31Z",
       "category": "test_failure",
       "signature_hash": "e1a285258fe63781b7370b0d086ad87b",
       "signature": "\u001b[<n>;2;<n>;<n>;<n>m\u001b[1m✓\u001b[0m reveal shows <path> pass count on failure"
@@ -50,8 +50,8 @@
       "signature": "results: \u001b[<n>;2;<n>;<n>;<n>m\u001b[1m<n> pass\u001b[0m | \u001b[<n>;2;<n>;<n>;<n>m\u001b[1m1 fail\u001b[0m",
       "root_cause": "sw-e2e-integration-test failed because a stale pipeline lock from a prior run (pipeline-3854) was left in 'running' state, blocking the new pipeline start; sw-intent-analysis-test failed because analyze_intent's generated JSON is missing the required version/goal/criteria schema fields",
       "fix": "Clear/release stale pipeline locks before the e2e-integration test runs (or add lock staleness detection/cleanup), and update analyze_intent to always emit version, goal, and criteria fields in its output schema",
-      "seen_count": 7,
-      "last_seen": "2026-09-19T15:03:24Z",
+      "seen_count": 8,
+      "last_seen": "2026-09-25T11:16:25Z",
       "category": "test_failure",
       "signature_hash": "af7df127e4c98031cbe09f6b0646ac68"
     },
@@ -82,8 +82,8 @@
       "pattern": "\u001b[38;2;0;212;255m▸\u001b[0m Progress detects repeated error loop... \u001b[38;2;74;222;128m✓\u001b[0m",
       "root_cause": "sw-cost-test.sh's context-efficiency assertions rely on loop.context_efficiency events being present in costs.json, but the test's mock environment has no cost entries in the last 30 days so the dashboard renders the empty-state message instead",
       "fix": "seed a mock cost entry (or synthetic loop.context_efficiency event) with a recent timestamp in the test fixture before invoking the cost dashboard render",
-      "seen_count": 3,
-      "last_seen": "2026-09-25T08:57:08Z",
+      "seen_count": 2,
+      "last_seen": "2026-09-25T06:04:22Z",
       "category": "test_failure",
       "signature_hash": "f417ed2418fab9d197740233d6d9cf46",
       "signature": "\u001b[<n>;2;0;<n>;<n>m▸\u001b[0m progress detects repeated error loop... \u001b[<n>;2;<n>;<n>;<n>m✓\u001b[0m"
@@ -261,11 +261,11 @@
     {
       "stage": "test",
       "pattern": "\u001b[38;2;0;212;255m▸\u001b[0m Missing template returns error... \u001b[38;2;74;222;128m✓\u001b[0m",
-      "root_cause": "sw-intent-analysis-test exited with status 1 after 31s, indicating a failing assertion in the intent analysis module",
-      "fix": "Run scripts/sw-intent-analysis-test.sh directly to capture the failing assertion output and fix the underlying logic or update the test expectation",
+      "root_cause": "Test suite completed successfully with all assertions passing; the reported failure pattern appears to be a false-positive match on log text rather than an actual test failure",
+      "fix": "Verify the failure-detection regex/pattern used to flag this stage isn't matching benign log lines like 'Missing template returns error' test names",
       "seen_count": 1,
       "last_seen": "2026-09-18T23:17:29Z",
-      "category": "test_failure"
+      "category": "flaky"
     }
   ]
 }
