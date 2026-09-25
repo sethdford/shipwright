@@ -1661,33 +1661,33 @@
       "result": {
         "results": [
           {
-            "file": "success-patterns.json",
+            "file": "failures.json",
             "relevance": 95,
-            "summary": "Contains successful build approaches with iteration counts, durations, test strategies, and file patterns. Directly applicable to planning and executing builds efficiently."
+            "summary": "Contains 8 detailed test stage failures with root causes and fixes, including intent-analysis schema issues, pipeline lock stale states, and timeout handling—directly applicable to diagnosing and preventing build failures"
           },
           {
-            "file": "failures.json",
+            "file": "success-patterns.json",
             "relevance": 90,
-            "summary": "Detailed test and build failures with root causes and fixes from 148+ recorded incidents. Most failures are from test stage with specific remediation strategies applicable to build recovery."
+            "summary": "Two success patterns showing how fix/feature builds completed in 3 iterations with specific files changed, test strategies, and commit patterns—provides templates for build iteration and test execution"
           },
           {
             "file": "retry-outcomes.json",
             "relevance": 85,
-            "summary": "Shows model_escalation strategy for build_failure has 100% success rate across 5 attempts. Directly applicable recovery tactic when build stage encounters issues."
+            "summary": "Model escalation strategy for build_failure class with 100% success rate across 5 attempts—directly informs build resilience and fallback model selection during build stages"
           },
           {
             "file": "flaky-tests.json",
-            "relevance": 80,
-            "summary": "Lists known flaky tests (test-1: 5 occurrences, test-auth: 8 occurrences, 85-90% confidence). Critical for distinguishing genuine failures from environmental flakiness during build testing."
+            "relevance": 75,
+            "summary": "Lists 2 flaky tests (test-1 and test-auth) with error messages, occurrence counts, and confidence scores—build stage must account for these when evaluating test success"
           },
           {
-            "file": "metrics.json",
-            "relevance": 75,
-            "summary": "Provides baseline performance metrics: build_duration_s=7095, test_duration_s=1459. Useful for evaluating build stage performance and timeout tuning."
+            "file": "patterns.json",
+            "relevance": 70,
+            "summary": "Project detection data (vitest test runner, npm package manager, node project type) and file patterns—needed to invoke correct build commands and understand project structure"
           }
         ]
       },
-      "timestamp": 1790335002,
+      "timestamp": 1790337130,
       "ttl": 1800
     },
     "caa198e3f75d561978df16d963ccf99e": {
@@ -1993,6 +1993,48 @@
         }
       ],
       "timestamp": 1790336781,
+      "ttl": 1800
+    },
+    "3d5a8415c40b3f95d42ffbeda9e61eb3": {
+      "result": {
+        "raw_response": "Mock claude: ok"
+      },
+      "timestamp": 1790337225,
+      "ttl": 1800
+    },
+    "5864806d6e796cf5556d57c784979cbf": {
+      "result": [
+        {
+          "type": "result",
+          "result": "I am trying the same approach again.",
+          "usage": {
+            "input_tokens": 0,
+            "output_tokens": 0
+          }
+        }
+      ],
+      "timestamp": 1790337290,
+      "ttl": 1800
+    },
+    "b598c94081d13ea4f5211649e8bc4c3c": {
+      "result": {
+        "raw_response": "Mock claude: ok"
+      },
+      "timestamp": 1790337505,
+      "ttl": 1800
+    },
+    "e62305cd777134a54c1de4d94d2a4915": {
+      "result": [
+        {
+          "type": "result",
+          "result": "I am trying the same approach again.",
+          "usage": {
+            "input_tokens": 0,
+            "output_tokens": 0
+          }
+        }
+      ],
+      "timestamp": 1790337729,
       "ttl": 1800
     }
   }

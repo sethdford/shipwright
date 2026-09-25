@@ -1,5 +1,5 @@
 {
-  "timestamp": "2026-09-25T11:44:09Z",
+  "timestamp": "2026-09-25T11:59:01Z",
   "repository": "shipwright",
   "counts": {
     "hardcoded": 49,
@@ -661,7 +661,7 @@
   "script_size_hotspots": [
     {
       "script": "sw-loop.sh",
-      "lines": 2729
+      "lines": 2737
     },
     {
       "script": "sw-memory.sh",

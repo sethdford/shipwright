@@ -1,10 +1,46 @@
 ---
-goal: "E2E test: add comment to README [automated]
+goal: "Adaptive circuit breaker threshold based on failure signature similarity
 
-## Specification: E2E test: add comment to README [automated]
+## Plan Summary
+# Implementation Plan: Adaptive Circuit Breaker Threshold Based on Failure Signature Similarity
+
+## Executive Summary
+
+**Goal**: Make the circuit breaker threshold (currently hardcoded to 4 consecutive failures) adapt dynamically based on whether failures share the same root cause (signature similarity).
+
+**Key Insight**: When consecutive loop failures have identical or very similar error signatures, they likely stem from the same root cause (e.g., "test setup timeout"). The user should get more chances to fix the underlying issue before the circuit breaker trips. Different signatures indicate unrelated problems and should trip faster.
+
+**Approach**: Create a new utility script (`sw-circuit-breaker.sh`) that analyzes recent failure signatures and returns an adjusted threshold. Integrate this into `sw-loop.sh`'s circuit breaker decision point.
+
+---
+
+## Requirements Clarity
+
+### Minimum Viable Change
+Modify the circuit breaker logic in `sw-loop.sh` to call a new scoring function that:
+1. Examines the last N failures in `.claude/pipeline-artifacts/error-log.jsonl`
+2. Extracts their error signatures (error type + stage)
+3. Calculates similarity percentage between consecutive failures
+4. Returns an adjusted threshold: higher if failures are similar, lower if diverse
+[... full plan in .claude/pipeline-artifacts/plan.md]
+
+## Key Design Decisions
+# Architecture Decision Record: Adaptive Circuit Breaker Threshold Based on Failure Signature Similarity
+## Context
+## Decision
+## Alternatives Considered
+### Alternative 1: Inline Loop Modification
+### Alternative 2: Memory System Integration
+### Alternative 3: Dedicated Circuit Breaker Script ✅ CHOSEN
+## Component Diagram
+## Interface Contracts
+### Core Scorer Functions (in `sw-circuit-breaker.sh`)
+[... full design in .claude/pipeline-artifacts/design.md]
+
+## Specification: Adaptive circuit breaker threshold based on failure signature similarity
 
 ### Goals
-- E2E test: add comment to README [automated]
+- Adaptive circuit breaker threshold based on failure signature similarity
 
 ### Acceptance Criteria
 - [testable] All existing tests continue to pass
@@ -13,41 +49,36 @@ Historical context (lessons from previous pipelines):
 {
   "results": [
     {
+      "file": "failures.json",
+      "relevance": 90,
+      "summary": "Contains explicit failure signatures with patterns, root causes, seen counts, and resolution status. Directly applicable to building failure signature similarity detection for circuit breaker thresholds."
+    },
+    {
       "file": "index.json",
-      "relevance": 85,
-      "summary": "Direct build stage pattern with test_failure signature; includes concrete fix (increase timeout in test setup) applicable to build-stage test failures"
+      "relevance": 80,
+      "summary": "Indexes failure patterns by signature with stage metadata and fixes. Shows how failure patterns are currently tracked and categorized in the system."
     },
     {
       "file": "fleet-shared-patterns.json",
-      "relevance": 80,
-      "summary": "Cross-repo shared pattern: 'Cannot find module' error in build stage with fix 'npm i'; common build failure resolved in multiple repos"
+      "relevance": 70,
+      "summary": "Demonstrates signature hashing and cross-repo pattern tracking with seen counts and metadata. Relevant for understanding pattern similarity and aggregation across distributed failures."
     },
     {
-      "file": "success-patterns.json (test-repo-789)",
-      "relevance": 68,
-      "summary": "Build stage success pattern with high complexity (3 iterations); shows npm test strategy and timeout-related fix approach"
-    },
-    {
-      "file": "success-patterns.json (test-final-working)",
-      "relevance": 65,
-      "summary": "Build stage success pattern with 2 iterations; demonstrates npm test strategy for daemon-related build tasks"
-    },
-    {
-      "file": "failures.json (with data)",
+      "file": "success-patterns.json (Fix timeout, repo: test-repo-789)",
       "relevance": 55,
-      "summary": "Actual observed build/test failures with root causes and fixes; shows timeout patterns and resolution strategies"
+      "summary": "Build stage pattern for daemon timeout fix shows relevant context on timeout handling, error signatures array, and build stage execution patterns."
+    },
+    {
+      "file": "fleet-patterns.json",
+      "relevance": 40,
+      "summary": "Structured pattern storage format (though currently empty) provides schema for how patterns should be stored for fleet-wide circuit breaker decisions."
     }
   ]
 }
 
 Discoveries from other pipelines:
-✓ Injected 6 new discoveries
-[spec_generation] Stage spec_generation completed — Resolution: 
+✓ Injected 1 new discoveries
 [design] Design completed for Adaptive circuit breaker threshold based on failure signature similarity — Resolution: 
-[intake] Stage intake completed — Resolution: 
-[spec_generation] Stage spec_generation completed — Resolution: 
-[intake] Stage intake completed — Resolution: 
-[spec_generation] Stage spec_generation completed — Resolution: 
 
 Task tracking (check off items as you complete them):
 # Pipeline Tasks — Adaptive circuit breaker threshold based on failure signature similarity
@@ -80,76 +111,35 @@ Task tracking (check off items as you complete them):
 - Issue: none
 - Generated: 2026-09-25T10:42:30Z
 
-## Skill Guidance (testing issue, AI-selected)
-### Why these skills were selected (AI-analyzed):
-- **testing-strategy**: Define test success criteria: comment is added to README, correct format, proper placement, and persists across subsequent builds
-
-## Testing Strategy Expertise
-
-Apply these testing patterns:
-
-### Test Pyramid
-- **Unit tests** (70%): Test individual functions/methods in isolation
-- **Integration tests** (20%): Test component interactions and boundaries
-- **E2E tests** (10%): Test critical user flows end-to-end
-
-### What to Test
-- Happy path: the expected successful flow
-- Error cases: what happens when things go wrong?
-- Edge cases: empty inputs, maximum values, concurrent access
-- Boundary conditions: off-by-one, empty collections, null/undefined
-
-### Test Quality
-- Each test should verify ONE behavior
-- Test names should describe the expected behavior, not the implementation
-- Tests should be independent — no shared mutable state between tests
-- Tests should be deterministic — same result every run
-
-### Coverage Strategy
-- Aim for meaningful coverage, not 100% line coverage
-- Focus coverage on business logic and error handling
-- Don't test framework code or simple getters/setters
-- Cover the branches, not just the lines
-
-### Mocking Guidelines
-- Mock external dependencies (APIs, databases, file system)
-- Don't mock the code under test
-- Use realistic test data — edge cases reveal bugs
-- Verify mock interactions when the side effect IS the behavior
-
-### Regression Testing
-- Write a failing test FIRST that reproduces the bug
-- Then fix the bug and verify the test passes
-- Keep regression tests — they prevent the bug from recurring
-
-### Required Output (Mandatory)
-
-Your output MUST include these sections when this skill is active:
-
-1. **Test Pyramid Breakdown**: Explicit count of unit/integration/E2E tests and their coverage targets (e.g., "70 unit tests covering business logic, 12 integration tests for API boundaries, 3 E2E tests for critical paths")
-2. **Coverage Targets**: Target coverage percentage per layer and which critical paths MUST be tested
-3. **Critical Paths to Test**: Specific test cases for the happy path, 2+ error cases, and 2+ edge cases
-
-If any section is not applicable, explicitly state why it's skipped.
-"
-iteration: 0
-max_iterations: 3
+## Failure Diagnosis (Iteration 2)
+Classification: unknown
+Strategy: retry_with_context
+Repeat count: 0"
+iteration: 2
+max_iterations: 20
 status: running
 test_cmd: "npm test"
-model: opus
+model: haiku
 agents: 1
-started_at: 2026-09-25T11:25:19Z
-last_iteration_at: 2026-09-25T11:25:19Z
+started_at: 2026-09-25T11:51:53Z
+last_iteration_at: 2026-09-25T11:51:53Z
 consecutive_failures: 0
-total_commits: 0
+total_commits: 2
 audit_enabled: true
 audit_agent_enabled: true
 quality_gates_enabled: true
-dod_file: ""
+dod_file: "/home/runner/work/shipwright/shipwright/.claude/pipeline-artifacts/dod.md"
 auto_extend: true
 extension_count: 0
 max_extensions: 3
 ---
 
 ## Log
+### Iteration 1 (2026-09-25T11:16:22Z)
+✅ Integration verified with loop-convergence.sh  
+✅ Manual testing confirms:
+  - Repeated test timeouts: threshold 3 → 5 ✓
+
+### Iteration 2 (2026-09-25T11:51:53Z)
+LOOP_COMPLETE
 
