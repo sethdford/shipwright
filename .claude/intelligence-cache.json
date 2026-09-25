@@ -2095,6 +2095,62 @@
       ],
       "timestamp": 1790339196,
       "ttl": 1800
+    },
+    "9ba228fbe43c7efba14c5e408479c3d6": {
+      "result": {
+        "raw_response": "Mock claude: ok"
+      },
+      "timestamp": 1790339337,
+      "ttl": 1800
+    },
+    "30319d167ac0a582bafcedfb7b621068": {
+      "result": {
+        "raw_response": "Mock claude: ok"
+      },
+      "timestamp": 1790339489,
+      "ttl": 1800
+    },
+    "710413fbea1ce391659aa50b992d85b8": {
+      "result": [
+        {
+          "type": "result",
+          "result": "I am trying the same approach again.",
+          "usage": {
+            "input_tokens": 0,
+            "output_tokens": 0
+          }
+        }
+      ],
+      "timestamp": 1790339600,
+      "ttl": 1800
+    },
+    "688ef637788241a6f8f84e892da9b3d1": {
+      "result": {
+        "raw_response": "Mock claude: ok"
+      },
+      "timestamp": 1790339682,
+      "ttl": 1800
+    },
+    "580405166c3b3e08d6af2ff8a5b3935f": {
+      "result": {
+        "raw_response": "Mock claude: ok"
+      },
+      "timestamp": 1790339707,
+      "ttl": 1800
+    },
+    "3c29bcf7fa1be2f249b0a7c4657ccb79": {
+      "result": [
+        {
+          "type": "result",
+          "result": "I am trying the same approach again.",
+          "usage": {
+            "input_tokens": 0,
+            "output_tokens": 0
+          }
+        }
+      ],
+      "timestamp": 1790339775,
+      "ttl": 1800
     }
   }
 }
