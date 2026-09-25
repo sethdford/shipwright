@@ -289,3 +289,6 @@
 {"ts":"2026-09-25T07:07:27Z","ts_epoch":1790320047,"type":"intelligence.cache_hit","cache_key":"search_memory_82ea7560e91989ce3cb658229a6d20f3"}
 {"ts":"2026-09-25T07:07:27Z","ts_epoch":1790320047,"type":"loop.context_efficiency","iteration":6,"raw_prompt_chars":26919,"trimmed_prompt_chars":26919,"trim_ratio":0.0,"budget_utilization":13.5,"budget_chars":200000,"job_id":"standard"}
 {"ts":"2026-09-25T07:07:31Z","ts_epoch":1790320051,"type":"memory.analyze","stage":"test","category":"flaky"}
+{"ts":"2026-09-25T08:07:09Z","ts_epoch":1790323629,"type":"hygiene_platform_refactor","hardcoded":49,"fallback":69,"todo":51}
+{"ts":"2026-09-25T08:07:46Z","ts_epoch":1790323666,"type":"strategic.issue_created","title":"Detect flaky (non-deterministic) test failures to avoid wasted build-loop retries","priority":"P0","complexity":"standard"}
+{"ts":"2026-09-25T08:07:46Z","ts_epoch":1790323666,"type":"strategic.cycle_complete","issues_created":1,"issues_skipped":2}
