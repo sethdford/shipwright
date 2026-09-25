@@ -600,7 +600,11 @@ project_detect_all() {
 
         if [[ -n "$cached_at" ]]; then
             local cache_age
-            cache_age=$(($(date +%s) - $(date -j -f "%Y-%m-%dT%H:%M:%SZ" "$cached_at" +%s 2>/dev/null || echo 0)))
+            # GNU date -d first, BSD date -j -f fallback (BSD-only parsing never hit on Linux)
+            local cached_epoch
+            cached_epoch=$(date -u -d "$cached_at" +%s 2>/dev/null || \
+                date -u -j -f "%Y-%m-%dT%H:%M:%SZ" "$cached_at" +%s 2>/dev/null || echo 0)
+            cache_age=$(($(date +%s) - cached_epoch))
 
             if [[ "$cache_age" -lt "$cache_ttl" ]]; then
                 cat "$cache_file"

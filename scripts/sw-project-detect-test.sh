@@ -357,7 +357,9 @@ else
     assert_fail "Cache file created at .claude/project-detection.json"
 fi
 
-# Second call should use cache
+# Second call should use cache — sleep past a second boundary so a cache miss
+# (fresh cached_at timestamp) can't produce an identical result by accident
+sleep 1
 result2=$(project_detect_all "$test_proj")
 
 if [[ "$result1" == "$result2" ]]; then
