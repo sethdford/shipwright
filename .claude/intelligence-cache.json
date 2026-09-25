@@ -1670,33 +1670,33 @@
       "result": {
         "results": [
           {
-            "file": "failures.json",
+            "file": "success-patterns.json",
             "relevance": 95,
-            "summary": "148 test failures with root causes and fixes; directly relevant to build stage test execution (intent-analysis, e2e-integration, cost-test failures; flaky patterns)"
+            "summary": "Contains successful build approaches with iteration counts, durations, test strategies, and file patterns. Directly applicable to planning and executing builds efficiently."
           },
           {
-            "file": "success-patterns.json",
+            "file": "failures.json",
             "relevance": 90,
-            "summary": "2 successful build patterns showing iteration counts (3-4), file change patterns, test strategies (npm test), and duration (45-150s); directly applicable to current build work"
+            "summary": "Detailed test and build failures with root causes and fixes from 148+ recorded incidents. Most failures are from test stage with specific remediation strategies applicable to build recovery."
           },
           {
             "file": "retry-outcomes.json",
-            "relevance": 78,
-            "summary": "Build failure retry strategy shows model escalation achieves 100% success rate (5/5 attempts); relevant for recovery if build fails"
+            "relevance": 85,
+            "summary": "Shows model_escalation strategy for build_failure has 100% success rate across 5 attempts. Directly applicable recovery tactic when build stage encounters issues."
           },
           {
             "file": "flaky-tests.json",
-            "relevance": 72,
-            "summary": "Identifies flaky test patterns (test-1, test-auth) with confidence scores and error messages; helps predict test instability during build"
+            "relevance": 80,
+            "summary": "Lists known flaky tests (test-1: 5 occurrences, test-auth: 8 occurrences, 85-90% confidence). Critical for distinguishing genuine failures from environmental flakiness during build testing."
           },
           {
-            "file": "knowledge.json",
-            "relevance": 55,
-            "summary": "4 failure knowledge entries document mktemp directory issues, cleanup output format, and regression detection; partially relevant to test setup/execution"
+            "file": "metrics.json",
+            "relevance": 75,
+            "summary": "Provides baseline performance metrics: build_duration_s=7095, test_duration_s=1459. Useful for evaluating build stage performance and timeout tuning."
           }
         ]
       },
-      "timestamp": 1790333182,
+      "timestamp": 1790335002,
       "ttl": 1800
     },
     "caa198e3f75d561978df16d963ccf99e": {
@@ -1890,6 +1890,13 @@
         }
       ],
       "timestamp": 1790334753,
+      "ttl": 1800
+    },
+    "eeb548c0a9f8eb0967a793d81ea224b1": {
+      "result": {
+        "raw_response": "Mock claude: ok"
+      },
+      "timestamp": 1790335104,
       "ttl": 1800
     }
   }
