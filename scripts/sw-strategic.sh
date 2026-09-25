@@ -414,7 +414,7 @@ ${failed:-  (none yet)}"
     if [[ -f "${repo_dir}/.claude/platform-hygiene.json" ]]; then
         local ph_summary
         ph_summary=$(jq -r '
-            "Counts: hardcoded=\(.counts.hardcoded // 0), fallback=\(.counts.fallback // 0), TODO=\(.counts.todo // 0), FIXME=\(.counts.fixme // 0), HACK/KLUDGE=\(.counts.hack // 0). " +
+            "Counts: hardcoded=\(.counts.hardcoded // 0), literal_defaults=\(.counts.literal_defaults // 0), fallback=\(.counts.fallback // 0), TODO=\(.counts.todo // 0), FIXME=\(.counts.fixme // 0), HACK/KLUDGE=\(.counts.hack // 0). " +
             "Largest scripts (lines): " + ((.script_size_hotspots // [] | .[0:5] | map("\(.script):\(.lines)") | join(", ")) // "none") + ". " +
             "Sample findings: " + (((.findings_sample // [] | length) | tostring) + " file:line entries.")
         ' "${repo_dir}/.claude/platform-hygiene.json" 2>/dev/null || echo "")

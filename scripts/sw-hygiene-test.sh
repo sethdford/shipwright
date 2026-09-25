@@ -162,17 +162,89 @@ assert_eq "dependencies exits 0" "0" "$rc"
 assert_contains "dependencies shows auditing" "$output" "Auditing"
 
 # ─── Test 11: platform-refactor subcommand (AGI-level self-improvement) ───
+# Scans the fixture repo so the test never writes into the real repo's .claude/
 echo ""
 echo -e "  ${CYAN}platform-refactor subcommand${RESET}"
-output=$(bash "$SCRIPT_DIR/sw-hygiene.sh" platform-refactor 2>&1) && rc=0 || rc=$?
+output=$(SW_HYGIENE_REPO_DIR="$TEST_TEMP_DIR/repo" bash "$SCRIPT_DIR/sw-hygiene.sh" platform-refactor 2>&1) && rc=0 || rc=$?
 assert_eq "platform-refactor exits 0" "0" "$rc"
 assert_contains "platform-refactor scans for hardcoded/fallback" "$output" "hardcoded"
-platform_hygiene_file="$(cd "$SCRIPT_DIR/.." && pwd)/.claude/platform-hygiene.json"
+platform_hygiene_file="$TEST_TEMP_DIR/repo/.claude/platform-hygiene.json"
 if [[ -f "$platform_hygiene_file" ]] && jq -e '.counts' "$platform_hygiene_file" >/dev/null 2>&1; then
     assert_pass "platform-refactor creates platform-hygiene.json with counts"
 else
     assert_fail "platform-refactor creates platform-hygiene.json with counts"
 fi
+
+# ─── Test 11b: "hardcoded" counts numeric thresholds, not the word (#5846) ───
+echo ""
+echo -e "  ${CYAN}platform-refactor counts numeric literals, not the word${RESET}"
+hc_fx=$(mktemp -d "${TMPDIR:-/tmp}/sw-hygiene-hc.XXXXXX")
+mkdir -p "$hc_fx/scripts/lib"
+cat > "$hc_fx/scripts/a.sh" <<'FIXTURE'
+#!/usr/bin/env bash
+# hardcoded values here
+echo "no hardcoded thresholds"
+if [[ "$n" -ge 3 ]]; then echo big; fi
+(( retries > 5 )) && echo many
+[[ $rc -eq 124 ]] && echo timeout
+[[ $? -ne 2 ]] && echo odd
+[[ $# -lt 2 ]] && echo usage
+[[ "$x" -eq 0 ]] && echo zero
+[[ "$y" -gt 1 ]] && echo more
+[[ "$z" -gt 2.5 ]] && echo decimal
+#   [[ "$n" -ge 7 ]] commented-out code
+local t="${LIMIT:-30}"
+FIXTURE
+printf '[[ "$n" -ge 9 ]]\n' > "$hc_fx/scripts/a-test.sh"
+printf 'echo nothing to see\n' > "$hc_fx/scripts/lib/empty.sh"
+hc_scan() { SW_HYGIENE_REPO_DIR="$hc_fx" bash "$SCRIPT_DIR/sw-hygiene.sh" platform-refactor >/dev/null 2>&1; }
+hc_count() { jq -r ".counts.$1" "$hc_fx/.claude/platform-hygiene.json" 2>/dev/null; }
+
+hc_scan && rc=0 || rc=$?
+assert_eq "fixture scan exits 0" "0" "$rc"
+assert_eq "hardcoded counts only threshold literals >=2 (-ge 3, > 5)" "2" "$(hc_count hardcoded)"
+assert_eq "literal_defaults counts \${VAR:-N} defaults" "1" "$(hc_count literal_defaults)"
+assert_eq "hardcoded_mentions keeps the word count" "2" "$(hc_count hardcoded_mentions)"
+sample_len=$(jq '.findings_sample | length' "$hc_fx/.claude/platform-hygiene.json" 2>/dev/null)
+assert_eq "findings_sample lists the literal lines" "2" "$sample_len"
+assert_eq "findings_sample entries carry no line content" "0" \
+    "$(jq '[.findings_sample[] | select(has("content") or has("text"))] | length' "$hc_fx/.claude/platform-hygiene.json" 2>/dev/null)"
+assert_eq "findings_sample entries are tagged kind=literal" "literal" \
+    "$(jq -r '.findings_sample[0].kind' "$hc_fx/.claude/platform-hygiene.json" 2>/dev/null)"
+
+# Mentioning the word must not move the metric
+echo '# more hardcoded prose, still not a literal' >> "$hc_fx/scripts/a.sh"
+hc_scan || true
+assert_eq "adding the word 'hardcoded' leaves hardcoded unchanged" "2" "$(hc_count hardcoded)"
+assert_eq "adding the word 'hardcoded' raises hardcoded_mentions" "3" "$(hc_count hardcoded_mentions)"
+
+# Migrating a literal to an env-overridable default must lower the metric
+sed 's/"\$n" -ge 3/"$n" -ge "${LIMIT_N:-3}"/' "$hc_fx/scripts/a.sh" > "$hc_fx/scripts/a.sh.new"
+mv "$hc_fx/scripts/a.sh.new" "$hc_fx/scripts/a.sh"
+hc_scan || true
+assert_eq "migrating -ge 3 to \${LIMIT_N:-3} lowers hardcoded" "1" "$(hc_count hardcoded)"
+assert_eq "migrating -ge 3 to \${LIMIT_N:-3} raises literal_defaults" "2" "$(hc_count literal_defaults)"
+
+# No matches at all: pipefail must not abort the scan
+rm -f "$hc_fx/scripts/a.sh" "$hc_fx/scripts/a-test.sh"
+hc_scan && rc=0 || rc=$?
+assert_eq "scan with no matches exits 0" "0" "$rc"
+assert_eq "scan with no matches reports hardcoded=0" "0" "$(hc_count hardcoded)"
+assert_eq "scan with no matches reports an empty findings_sample" "0" \
+    "$(jq '.findings_sample | length' "$hc_fx/.claude/platform-hygiene.json" 2>/dev/null)"
+
+# Sample is capped at 25 and keeps room for markers when literals abound
+for i in 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20 21 22 23 24 25 26 27 28 29 30 31; do
+    printf '[[ "$v" -gt %s ]] && echo x\n' "$i"
+done > "$hc_fx/scripts/many.sh"
+printf '# TODO: one\n# FIXME: two\n' > "$hc_fx/scripts/markers.sh"
+hc_scan || true
+assert_eq "hardcoded counts all 30 literal lines" "30" "$(hc_count hardcoded)"
+assert_eq "findings_sample is capped at 25" "25" \
+    "$(jq '.findings_sample | length' "$hc_fx/.claude/platform-hygiene.json" 2>/dev/null)"
+assert_eq "findings_sample keeps the TODO/FIXME markers" "2" \
+    "$(jq '[.findings_sample[] | select(.kind == "marker")] | length' "$hc_fx/.claude/platform-hygiene.json" 2>/dev/null)"
+rm -rf "$hc_fx"
 
 # ─── Test 12: policy read (config/policy.json via policy_get) ───
 echo ""

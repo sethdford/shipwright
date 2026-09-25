@@ -8,7 +8,8 @@ trap 'echo "ERROR: $BASH_SOURCE:$LINENO exited with status $?" >&2' ERR
 
 VERSION="3.3.0"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-REPO_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
+# SW_HYGIENE_REPO_DIR lets tests point the scanner at a fixture repo
+REPO_DIR="${SW_HYGIENE_REPO_DIR:-$(cd "$SCRIPT_DIR/.." && pwd)}"
 
 # ─── Cross-platform compatibility ──────────────────────────────────────────
 # shellcheck source=lib/compat.sh
@@ -57,7 +58,7 @@ show_help() {
     echo -e "  ${CYAN}naming${RESET}        Check naming conventions (files, functions, vars)"
     echo -e "  ${CYAN}branches${RESET}      List stale and merged remote branches"
     echo -e "  ${CYAN}size${RESET}          Size analysis and bloat detection"
-    echo -e "  ${CYAN}platform-refactor${RESET}  Scan for hardcoded/fallback/TODO/FIXME — for AGI-level self-improvement"
+    echo -e "  ${CYAN}platform-refactor${RESET}  Scan for hardcoded numeric thresholds/fallback/TODO/FIXME — for AGI-level self-improvement"
     echo -e "  ${CYAN}fix${RESET}           Auto-fix safe issues (naming, whitespace)"
     echo -e "  ${CYAN}report${RESET}        Generate comprehensive hygiene report"
     echo -e "  ${CYAN}help${RESET}          Show this help message"
@@ -437,50 +438,89 @@ analyze_size() {
 }
 
 # ─── Platform Refactor / Hardcoded Scan (AGI-Level Self-Improvement) ───
+# "hardcoded" means an integer literal used as a threshold, not the English
+# word: counting the word measured comments and test names, so moving a
+# literal into config never lowered it (#5469, #5846). ERE only — no \b or -P,
+# which BSD grep on macOS lacks. Patterns start with "-", so always pass -e.
+# 0 and 1 are excluded: they are boolean/empty/grep -c guards, not thresholds.
+# Integer >=2 as the RHS of a test comparison, e.g. [[ "$n" -ge 3 ]]
+_HC_CMP_RE='-(lt|gt|ge|le|eq|ne)[[:space:]]+"?([2-9]|[1-9][0-9]+)([^0-9.]|$)'
+# Integer >=2 compared inside (( )), e.g. (( n > 5 ))
+_HC_ARITH_RE='\(\([^)]*[<>]=?[[:space:]]*([2-9]|[1-9][0-9]+)([^0-9.]|$)'
+# ${var:-N} default with N >=2 — env-overridable, so reported, not counted as hardcoded
+_HC_DEFAULT_RE='\$\{[A-Za-z_][A-Za-z0-9_]*:-([2-9]|[1-9][0-9]+)\}'
+# Exit-code and argument-count comparisons are not tunable thresholds
+_HC_EXIT_RE='\$\?|\$#|(^|[^A-Za-z_])(rc|exit_code|exit_status|ret|status)"?[[:space:]]+-(eq|ne)'
+
+# Print file:line:content for code lines in <dir> matching <pattern>, skipping
+# *-test.sh files, full-line comments and exit-code/arg-count comparisons. Never fails:
+# an empty grep under pipefail must not abort the scan.
+_hygiene_literal_lines() {
+    local dir="$1" pattern="$2"
+    { grep -rnE -e "$pattern" "$dir" --include='*.sh' --exclude='*-test.sh' 2>/dev/null || true; } \
+        | { grep -vE -e '^[^:]+:[0-9]+:[[:space:]]*#' || true; } \
+        | { grep -vE -e "$_HC_EXIT_RE" || true; }
+}
+
 # Outputs JSON to REPO_DIR/.claude/platform-hygiene.json for strategic agent.
 scan_platform_refactor() {
-    info "Scanning for hardcoded/static/platform-refactor signals..."
+    info "Scanning for hardcoded numeric thresholds/fallback/platform-refactor signals..."
 
     mkdir -p "$REPO_DIR/.claude"
     local out_file="$REPO_DIR/.claude/platform-hygiene.json"
     local scripts_dir="${REPO_DIR}/scripts"
 
-    local hardcoded_count fallback_count todo_count fixme_count hack_count
-    hardcoded_count=$(grep -rE "hardcoded|Hardcoded|HARDCODED" "$scripts_dir" --include="*.sh" 2>/dev/null | wc -l | tr -d ' ')
-    fallback_count=$(grep -rE "Fallback:|fallback:" "$scripts_dir" --include="*.sh" 2>/dev/null | wc -l | tr -d ' ')
-    todo_count=$(grep -rE "TODO" "$scripts_dir" --include="*.sh" 2>/dev/null | wc -l | tr -d ' ')
-    fixme_count=$(grep -rE "FIXME" "$scripts_dir" --include="*.sh" 2>/dev/null | wc -l | tr -d ' ')
-    hack_count=$(grep -rE "HACK|KLUDGE" "$scripts_dir" --include="*.sh" 2>/dev/null | wc -l | tr -d ' ')
+    local literal_lines
+    literal_lines=$(mktemp)
+    { _hygiene_literal_lines "$scripts_dir" "$_HC_CMP_RE"
+      _hygiene_literal_lines "$scripts_dir" "$_HC_ARITH_RE"; } | sort -u > "$literal_lines" || true
+
+    local hardcoded_count literal_defaults_count hardcoded_mentions_count
+    local fallback_count todo_count fixme_count hack_count
+    hardcoded_count=$(wc -l < "$literal_lines" | tr -d ' ')
+    literal_defaults_count=$(_hygiene_literal_lines "$scripts_dir" "$_HC_DEFAULT_RE" | wc -l | tr -d ' ')
+    hardcoded_mentions_count=$({ grep -rE "hardcoded|Hardcoded|HARDCODED" "$scripts_dir" --include="*.sh" 2>/dev/null || true; } | wc -l | tr -d ' ')
+    fallback_count=$({ grep -rE "Fallback:|fallback:" "$scripts_dir" --include="*.sh" 2>/dev/null || true; } | wc -l | tr -d ' ')
+    todo_count=$({ grep -rE "TODO" "$scripts_dir" --include="*.sh" 2>/dev/null || true; } | wc -l | tr -d ' ')
+    fixme_count=$({ grep -rE "FIXME" "$scripts_dir" --include="*.sh" 2>/dev/null || true; } | wc -l | tr -d ' ')
+    hack_count=$({ grep -rE "HACK|KLUDGE" "$scripts_dir" --include="*.sh" 2>/dev/null || true; } | wc -l | tr -d ' ')
     hardcoded_count=${hardcoded_count:-0}
+    literal_defaults_count=${literal_defaults_count:-0}
+    hardcoded_mentions_count=${hardcoded_mentions_count:-0}
     fallback_count=${fallback_count:-0}
     todo_count=${todo_count:-0}
     fixme_count=${fixme_count:-0}
     hack_count=${hack_count:-0}
 
-    # Sample findings: file:line (first 25) for strategic context (grep -n gives file:line:content)
-    local findings_file findings_raw
-    findings_file=$(mktemp)
+    # Sample findings: {file,line,kind} (first 25) for strategic context.
+    # Line content is deliberately left out so nothing sensitive reaches the prompt.
+    # Up to 10 slots go to markers; literals fill the rest.
+    local findings_raw markers_raw findings marker_n
     findings_raw=$(mktemp)
-    grep -rnE "hardcoded|Hardcoded|Fallback:|fallback:|TODO|FIXME|HACK|KLUDGE" "$scripts_dir" --include="*.sh" 2>/dev/null > "$findings_raw" || true
-    while IFS= read -r line; do
+    markers_raw=$(mktemp)
+    { grep -rnE "Fallback:|fallback:|TODO|FIXME|HACK|KLUDGE" "$scripts_dir" --include="*.sh" 2>/dev/null || true; } \
+        | { head -10 || true; } | sed 's/^/marker:/' > "$markers_raw" || true
+    marker_n=$(wc -l < "$markers_raw" | tr -d ' ')
+    { { head -n $((25 - ${marker_n:-0})) "$literal_lines" || true; } | sed 's/^/literal:/'
+      cat "$markers_raw"; } > "$findings_raw" || true
+    rm -f "$literal_lines" "$markers_raw"
+    findings=$(while IFS= read -r line; do
         [[ -z "$line" ]] && continue
         # Split across statements: in a single `local a=… b="${a}"`, bash
         # declares every name first and only then evaluates the right-hand
         # sides, so "$rest" resolved to the newly-declared *unset* local and
         # aborted the function with "rest: unbound variable" under `set -u`.
-        # The loop redirects stderr to /dev/null, so this failed silently and
-        # `hygiene platform-refactor` just exited 1 with no message.
         # SC2318 is exactly this warning — it was suppressed here rather than fixed.
-        local f="${line%%:*}"
+        local kind="${line%%:*}"
         local rest="${line#*:}"
+        local f="${rest%%:*}"
+        rest="${rest#*:}"
         local ln="${rest%%:*}"
-        ln="${ln:-0}"
-        printf '{"file":"%s","line":%s}\n' "${f#$REPO_DIR/}" "$ln"
-    done < "$findings_raw" > "$findings_file.raw" 2>/dev/null || true
-    jq -s '.' "$findings_file.raw" 2>/dev/null > "$findings_file" || echo "[]" > "$findings_file"
-    local findings
-    findings=$(cat "$findings_file" 2>/dev/null || echo "[]")
-    rm -f "$findings_file" "$findings_file.raw" "$findings_raw"
+        case "$ln" in ''|*[!0-9]*) ln=0 ;; esac
+        jq -nc --arg f "${f#"$REPO_DIR"/}" --argjson ln "$ln" --arg k "$kind" '{file:$f,line:$ln,kind:$k}'
+    done < "$findings_raw" | jq -s '.[0:25]' 2>/dev/null) || true
+    [[ -z "$findings" ]] && findings="[]"
+    rm -f "$findings_raw"
 
     # Script sizes (lines) for hotspot detection
     local sizes_file
@@ -502,25 +542,30 @@ scan_platform_refactor() {
         --arg ts "$timestamp" \
         --arg repo "$(basename "$REPO_DIR")" \
         --argjson hc "$hardcoded_count" \
+        --argjson ld "$literal_defaults_count" \
+        --argjson hm "$hardcoded_mentions_count" \
         --argjson fb "$fallback_count" \
         --argjson todo "$todo_count" \
         --argjson fixme "$fixme_count" \
         --argjson hack "$hack_count" \
         --argjson findings "$findings" \
         --argjson script_sizes "$script_sizes" \
-        '{timestamp:$ts,repository:$repo,counts:{hardcoded:$hc,fallback:$fb,todo:$todo,fixme:$fixme,hack:$hack},findings_sample:$findings,script_size_hotspots:$script_sizes}' 2>/dev/null)
+        '{timestamp:$ts,repository:$repo,counts:{hardcoded:$hc,literal_defaults:$ld,hardcoded_mentions:$hm,fallback:$fb,todo:$todo,fixme:$fixme,hack:$hack},findings_sample:$findings,script_size_hotspots:$script_sizes}' 2>/dev/null)
     if [[ -n "$report" ]]; then
-        echo "$report" > "$out_file"
+        # Atomic write: doctor/strategic may read this file concurrently
+        local tmp_out
+        tmp_out=$(mktemp "$REPO_DIR/.claude/.platform-hygiene.XXXXXX")
+        echo "$report" > "$tmp_out" && mv "$tmp_out" "$out_file"
         success "Platform refactor scan saved to: $out_file"
         if [[ "$JSON_OUTPUT" == true ]]; then
             echo "$report" | jq .
         else
-            info "  hardcoded: $hardcoded_count  fallback: $fallback_count  TODO: $todo_count  FIXME: $fixme_count  HACK/KLUDGE: $hack_count"
+            info "  hardcoded: $hardcoded_count  literal_defaults: $literal_defaults_count  hardcoded_mentions: $hardcoded_mentions_count  fallback: $fallback_count  TODO: $todo_count  FIXME: $fixme_count  HACK/KLUDGE: $hack_count"
         fi
     else
         warn "Could not build platform-hygiene JSON (jq missing?)"
     fi
-    emit_event "hygiene_platform_refactor" "hardcoded=$hardcoded_count" "fallback=$fallback_count" "todo=$todo_count"
+    emit_event "hygiene_platform_refactor" "hardcoded=$hardcoded_count" "literal_defaults=$literal_defaults_count" "hardcoded_mentions=$hardcoded_mentions_count" "fallback=$fallback_count" "todo=$todo_count"
     return 0
 }
 
