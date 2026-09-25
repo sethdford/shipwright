@@ -30,18 +30,9 @@
     },
     "d41d8cd98f00b204e9800998ecf8427e": {
       "result": {
-        "primary_role": "architect",
-        "secondary_roles": [
-          "builder",
-          "tester",
-          "optimizer"
-        ],
-        "confidence": 0.85,
-        "reasoning": "Task requires designing failure signature similarity detection and adaptive threshold algorithm before implementation; Architect leads design phase, Builder executes, Tester validates edge cases, Optimizer tunes performance.",
-        "new_role_needed": false,
-        "suggested_role": null
+        "raw_response": "Mock claude response"
       },
-      "timestamp": 1790333193,
+      "timestamp": 1790336960,
       "ttl": 3600
     },
     "efd5524ad1244fd20344bf3ff5d95233": {
@@ -1925,6 +1916,83 @@
         }
       ],
       "timestamp": 1790335337,
+      "ttl": 1800
+    },
+    "740dc4b8b2386c8a87e465f0f18e0f54": {
+      "result": {
+        "raw_response": "Mock claude: ok"
+      },
+      "timestamp": 1790335616,
+      "ttl": 1800
+    },
+    "b07e3b76a9906e4856d92ca53156e4fb": {
+      "result": {
+        "raw_response": "Mock claude: ok"
+      },
+      "timestamp": 1790335804,
+      "ttl": 1800
+    },
+    "f457b867d4baed80a37a38eb10868ca1": {
+      "result": [
+        {
+          "type": "result",
+          "result": "I am trying the same approach again.",
+          "usage": {
+            "input_tokens": 0,
+            "output_tokens": 0
+          }
+        }
+      ],
+      "timestamp": 1790335854,
+      "ttl": 1800
+    },
+    "ec8262bee066380529ff935683b2f92a": {
+      "result": [
+        {
+          "type": "result",
+          "result": "I am trying the same approach again.",
+          "usage": {
+            "input_tokens": 0,
+            "output_tokens": 0
+          }
+        }
+      ],
+      "timestamp": 1790336070,
+      "ttl": 1800
+    },
+    "ec76cca2eb426bef9d7c31b92e3cad84": {
+      "result": {
+        "raw_response": "Mock claude: ok"
+      },
+      "timestamp": 1790336369,
+      "ttl": 1800
+    },
+    "a2d90c8f78750524bc4c11d92b6ea2bd": {
+      "result": [
+        {
+          "type": "result",
+          "result": "I am trying the same approach again.",
+          "usage": {
+            "input_tokens": 0,
+            "output_tokens": 0
+          }
+        }
+      ],
+      "timestamp": 1790336478,
+      "ttl": 1800
+    },
+    "575b8156b9120ec14755095e1ff8614c": {
+      "result": [
+        {
+          "type": "result",
+          "result": "I am trying the same approach again.",
+          "usage": {
+            "input_tokens": 0,
+            "output_tokens": 0
+          }
+        }
+      ],
+      "timestamp": 1790336781,
       "ttl": 1800
     }
   }
