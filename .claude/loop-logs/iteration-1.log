@@ -1,31 +1,3 @@
-The hygiene scan's `hardcoded` count now measures numeric thresholds in code instead of the word "hardcoded". It's committed as `bb3596cd`.
-
-**What changed in `scripts/sw-hygiene.sh`:**
-- **New meaning:** `counts.hardcoded` now counts whole numbers of 2 or more used as a comparison limit, like `[[ $n -ge 3 ]]` or `(( n > 5 ))`. It skips comments, `*-test.sh` files, exit-code checks (`$?`, `$rc -eq 124`) and argument-count checks (`$#`). On this repo the count went from 49 (word hits, mostly in comments) to **567**. The expected lines are in: `lib/session-restart.sh:215/350/398/403` and `lib/loop-restart.sh:176`. The exit-code lines at `sw-test-all.sh:121` and `sw-e2e-orchestrator.sh:348` are out.
-- **New counters:** `literal_defaults` (151) counts `${VAR:-N}` defaults, which are the fixed form, so moving a number into one lowers `hardcoded` and raises this. `hardcoded_mentions` keeps the old word count.
-- **Fixed a hidden crash:** the existing `fallback`/`TODO`/`FIXME`/`HACK` counts made the scan exit 1 on a repo with no matches. It never showed before because this repo always has some.
-- **Findings sample:** capped at 25 entries, with up to 10 slots for TODO/FIXME-style markers. Each entry is tagged `literal` or `marker` and holds only file and line, no code text.
-- **Smaller changes:** a new `SW_HYGIENE_REPO_DIR` setting lets tests scan a throwaway repo, and the JSON file is now written to a temp file and moved into place.
-
-`sw-strategic.sh` now includes `literal_defaults` in its summary. Doctor and strategic still read `counts.hardcoded`, and both handle older JSON without the new keys.
-
-**Test pyramid breakdown**
-- **Unit tests (16 new, in `sw-hygiene-test.sh` Test 11b):** each pins an exact count against a small test repo.
-- **Integration tests (1 changed):** Test 11 now scans a test repo instead of writing into the real `.claude/`.
-- **End-to-end:** I ran the scan on the real repo and checked the lines listed above by hand. The existing doctor and strategic suites were the regression check.
-
-**Coverage targets:** every counting rule (each include and each exclude) has at least one test line. That covers all branches of the new counting code.
-
-**Critical paths tested:**
-- **Happy path:** only `-ge 3` and `> 5` count, giving 2; one `${LIMIT:-30}` default is counted separately.
-- **Error cases:** a repo with no matches exits 0 and reports 0 with an empty sample (this is the crash above); adding the word "hardcoded" doesn't change the count.
-- **Edge cases:** 0/1 checks, decimals like `2.5`, commented-out code, exit-code and `$#` checks, and `*-test.sh` files are all excluded. Rewriting `-ge 3` as `${LIMIT_N:-3}` lowers `hardcoded` by 1. The sample stays at 25 with 30 matching lines.
-
-**Test results:**
-- The hygiene suite passes (43/43) and strategic passes (30/30). Doctor matches `main` exactly (33 ✓, 0 ✗); its "All 0 tests passed" summary line is wrong on `main` too.
-- `npm test`: 161 of 162 suites passed. `sw-lib-daemon-dispatch-test` failed once: all 33 of its checks passed, but a temp-directory cleanup step (`rm`) errored at teardown. It passed twice when re-run alone and doesn't touch hygiene code.
-- Not yet run on macOS. I avoided the grep features BSD grep lacks, but only CI will confirm it.
-
-The count jumping to 567 may lead the strategic agent to open more "reduce hardcoding" issues. That's the accurate number now; if it's too many, adjusting the strategic prompt can be a follow-up.
+The goal—adding a comment to README as an automated E2E test—is complete and committed, with the relevant docs test suite passing.
 
 LOOP_COMPLETE

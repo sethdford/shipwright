@@ -1709,6 +1709,185 @@
       ],
       "timestamp": 1790320322,
       "ttl": 1800
+    },
+    "9ffec5a1b4309a58b33c35c65fa98a84": {
+      "result": {
+        "complexity": 1,
+        "risk_level": "low",
+        "success_probability": 98,
+        "recommended_template": "fast",
+        "issue_type": "testing",
+        "key_risks": [
+          "README merge conflicts from concurrent PRs",
+          "Automated test may close before processing"
+        ],
+        "implementation_hints": [
+          "Add simple comment or marker line to README.md",
+          "This tests the full pipeline end-to-end",
+          "Ensure PR is created, reviewed, and merged to validate pipeline stages"
+        ]
+      },
+      "timestamp": 1790321348,
+      "ttl": 3600
+    },
+    "8d5f92abf9730f4827cbfcbdcdc72c07": {
+      "result": {
+        "raw_response": "Mock claude: ok"
+      },
+      "timestamp": 1790321350,
+      "ttl": 1800
+    },
+    "6c3330ca358cb8fd4875ec4ec7703dc1": {
+      "result": {
+        "estimated_iterations": 1
+      },
+      "timestamp": 1790321355,
+      "ttl": 1800
+    },
+    "3016c9f6575823604e3f3331a0ca3337": {
+      "result": {
+        "estimated_cost_usd": 0.18,
+        "estimated_iterations": 1,
+        "estimated_tokens": 8500,
+        "likely_failure_stage": "none",
+        "confidence": 85,
+        "breakdown": {
+          "intake": {
+            "tokens": 600,
+            "cost_usd": 0.01
+          },
+          "build": {
+            "tokens": 3500,
+            "cost_usd": 0.06
+          },
+          "test": {
+            "tokens": 2000,
+            "cost_usd": 0.04
+          },
+          "pr": {
+            "tokens": 1800,
+            "cost_usd": 0.04
+          },
+          "overhead": {
+            "tokens": 600,
+            "cost_usd": 0.03
+          }
+        },
+        "rationale": "Complexity 1 with 98% success probability and fast template. Simple marker/comment addition to README triggers full pipeline validation. Single iteration expected due to high success rate. Estimated on Haiku + Sonnet routing (cost-aware). No retry loops anticipated."
+      },
+      "timestamp": 1790321368,
+      "ttl": 3600
+    },
+    "f9c9e8b2bd49e68005879dc608624768": {
+      "result": {
+        "issue_type": "testing",
+        "confidence": 0.82,
+        "secondary_domains": [
+          "documentation",
+          "automation"
+        ],
+        "complexity_assessment": {
+          "score": 4,
+          "reasoning": "E2E test with simple scope (add comment to README), but requires careful isolation, cleanup, and flakiness prevention"
+        },
+        "skill_plan": {
+          "plan": [
+            "testing-strategy"
+          ],
+          "design": [
+            "testing-strategy"
+          ],
+          "build": [
+            "testing-strategy"
+          ],
+          "review": [
+            "pr-quality",
+            "adversarial-quality"
+          ],
+          "compound_quality": [
+            "validation-thoroughness",
+            "adversarial-quality"
+          ],
+          "pr": [
+            "pr-quality"
+          ],
+          "deploy": [],
+          "validate": [
+            "validation-thoroughness"
+          ],
+          "monitor": []
+        },
+        "skill_rationale": {
+          "testing-strategy": "E2E tests require careful pattern design to avoid flakiness; this skill ensures proper test structure, setup/teardown, and assertion clarity for testing README mutations",
+          "pr-quality": "A clear PR explanation of what this E2E test validates (and why) is critical for reviewer understanding, especially given the vague issue description",
+          "adversarial-quality": "E2E tests are prone to failure: find race conditions, cleanup gaps, and edge cases (e.g., comment already exists, README locked, concurrent edits)",
+          "validation-thoroughness": "Verify the test actually validates real behavior (README was modified) rather than mocking the filesystem or relying on implementation details"
+        },
+        "generated_skills": [],
+        "review_focus": [
+          "Test isolation: Does it use a temporary README copy or proper setup/teardown to avoid interfering with actual repo?",
+          "Assertion specificity: What exactly is verified? (comment presence, exact text, formatting, position in file)",
+          "Cleanup robustness: Will cleanup happen even if the test fails mid-execution?",
+          "Documentation clarity: Is it obvious why this E2E test exists and what Shipwright capability it validates?",
+          "Idempotency: Can the test run multiple times safely, or will it fail on re-runs due to duplicate comments?"
+        ],
+        "risk_areas": [
+          "E2E test flakiness: README I/O or file locking could cause intermittent failures",
+          "Merge conflict risk: Uncontrolled README mutations across parallel test runs could create conflicts",
+          "Incomplete cleanup: Failed test mid-execution might leave stale comments or temp files in the repo",
+          "Test-implementation coupling: Test might rely on internal Shipwright APIs rather than user-facing behavior",
+          "Vague specification: Issue title and body don't clarify what 'add comment to README' means or which README (the project's own, or a test fixture)"
+        ]
+      },
+      "timestamp": 1790321419,
+      "ttl": 3600
+    },
+    "61c5f4a9ce6598c2f1fc048e0a7ce958": {
+      "result": {
+        "results": [
+          {
+            "file": "index.json",
+            "relevance": 90,
+            "summary": "Contains build stage pattern for test_failure with known fix (increase timeout). Directly applicable to E2E test execution."
+          },
+          {
+            "file": "fleet-shared-patterns.json",
+            "relevance": 85,
+            "summary": "Common build stage error pattern (Cannot find module) with npm i fix, seen in 2 repos. Prevents common build failures."
+          },
+          {
+            "file": "failures.json",
+            "relevance": 75,
+            "summary": "Contains resolved and unresolved build-related failures (timeouts, missing dependencies) with root causes and fixes applied."
+          },
+          {
+            "file": "success-patterns.json (test-repo-comptime)",
+            "relevance": 65,
+            "summary": "Recent success pattern with build stage included, shows approach for multi-stage builds with npm test strategy."
+          },
+          {
+            "file": "success-patterns.json (test-final-working)",
+            "relevance": 60,
+            "summary": "Build stage success pattern for daemon-related fix, shows low iteration count and test strategy applicable to build context."
+          }
+        ]
+      },
+      "timestamp": 1790321457,
+      "ttl": 1800
+    },
+    "ebeda397e930d8298dfb0b7ef2107e22": {
+      "result": [
+        {
+          "type": "result",
+          "result": "I am trying the same approach again.",
+          "usage": {
+            "input_tokens": 0,
+            "output_tokens": 0
+          }
+        }
+      ],
+      "timestamp": 1790321476,
+      "ttl": 1800
     }
   }
 }
