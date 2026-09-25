@@ -1708,25 +1708,22 @@
     },
     "9ffec5a1b4309a58b33c35c65fa98a84": {
       "result": {
-        "complexity": 4,
+        "complexity": 1,
         "risk_level": "low",
-        "success_probability": 88,
-        "recommended_template": "autonomous",
-        "issue_type": "testing",
+        "success_probability": 98,
+        "recommended_template": "fast",
+        "issue_type": "documentation",
         "key_risks": [
-          "README merge conflicts if file was recently modified",
-          "Automated test re-runs may create duplicate comments",
-          "Test cleanup artifacts left behind",
-          "Branch/commit history pollution from repeated test runs"
+          "concurrent README modifications",
+          "markdown formatting consistency"
         ],
         "implementation_hints": [
-          "Idempotently add comment (check if it exists first)",
-          "Use atomic git operations for file modifications",
-          "Clean up test branches after successful run",
-          "Verify README formatting is preserved after modification"
+          "single comment addition to README",
+          "verify markdown syntax",
+          "minimal changeset"
         ]
       },
-      "timestamp": 1790338700,
+      "timestamp": 1790363705,
       "ttl": 3600
     },
     "4cb8e9b7fff70e5bfa540652e7e1f60d": {
@@ -1759,87 +1756,102 @@
         "issue_type": "testing",
         "confidence": 0.95,
         "secondary_domains": [
-          "documentation",
-          "infrastructure"
+          "automation",
+          "documentation"
         ],
         "complexity_assessment": {
-          "score": 2,
-          "reasoning": "Automated test closure with no implementation required. The issue explicitly states 'Safe to close', indicating this is test infrastructure housekeeping, not a feature or bug fix."
+          "score": 3,
+          "reasoning": "Automated E2E test with a single, straightforward goal (verify a comment can be added to README). Low code complexity, but requires careful attention to test reliability, environment isolation, and assertion robustness to prevent flakiness."
         },
         "skill_plan": {
           "plan": [
-            "testing-strategy"
+            "testing-strategy",
+            "brainstorming"
           ],
           "design": [
-            "documentation"
+            "testing-strategy"
           ],
-          "build": [],
+          "build": [
+            "testing-strategy"
+          ],
           "review": [
+            "testing-strategy",
+            "two-stage-review"
+          ],
+          "compound_quality": [
+            "adversarial-quality",
             "validation-thoroughness"
           ],
-          "compound_quality": [],
           "pr": [
             "pr-quality"
           ],
           "deploy": [],
-          "validate": [
-            "validation-thoroughness"
-          ],
+          "validate": [],
           "monitor": []
         },
         "skill_rationale": {
-          "testing-strategy": "Clarify what this E2E test was validating and confirm it's appropriate to close rather than archive or refactor.",
-          "documentation": "The issue mentions 'add comment to README' — document why this test existed and why it's now closed to prevent future confusion.",
-          "validation-thoroughness": "Before closing an E2E test, verify it actually runs and passes, not just assume it's stale.",
-          "pr-quality": "If documenting the test closure in a PR, ensure the rationale is clear for future developers who might search git history."
+          "testing-strategy": "E2E tests require explicit scenario design (setup → action → assertion) and clear definition of what 'add comment to README' means and what success criteria are—without this, tests become flaky and hard to debug",
+          "brainstorming": "Challenge implicit assumptions: Does the README need to exist first? What's the exact comment format? What permissions are required? What happens if two tests run concurrently? Edge cases directly determine test reliability",
+          "two-stage-review": "Pass 1: Review test code structure (setup/teardown, assertions, cleanup logic). Pass 2: Verify test exercises real code path end-to-end, not mocked components—E2E tests fail silently when they're accidentally isolated from production code",
+          "adversarial-quality": "E2E tests are integration points vulnerable to race conditions, timing assumptions, and environment-specific failures—think like a chaos engineer about what can go wrong (permission errors, missing files, concurrent access, cleanup failures)",
+          "validation-thoroughness": "E2E tests must validate actual observable behavior (file written, content exact, permissions correct), not just that code executed—smoke tests that pass but don't verify real state hide production bugs",
+          "pr-quality": "Document the test scenario, why it matters for end-to-end validation, environment prerequisites, and any automation-specific concerns (parallelization risks, cleanup requirements, expected runtime)"
         },
-        "generated_skills": [],
+        "generated_skills": [
+          {
+            "name": "e2e-test-reliability",
+            "reason": "E2E tests have failure modes distinct from unit tests (flakiness, environment isolation, timing). Generic testing-strategy doesn't cover E2E-specific reliability patterns like ephemeral environments, diagnostic output on failure, and flakiness detection.",
+            "content": "## E2E Test Reliability\n\nE2E tests verify real user workflows end-to-end by running against actual systems. They catch integration bugs unit tests miss, but are fragile: timing assumptions, environment dependencies, and race conditions cause silent failures or intermittent flakiness. This skill builds reliable, reproducible E2E tests.\n\n### Isolation & Cleanup\n\n**Ephemeral Environments**\n- Use temp directories, isolated databases, fresh instances—never shared state or fixtures\n- Document environment assumptions: OS, Node version, git config, file permissions, PATH\n- Each test must run independently; don't rely on test execution order\n- Cleanup MUST run on failure: use try/finally, trap handlers, or destructors—never conditional cleanup\n- Verify cleanup completed: check temp files don't leak, processes don't linger, database is empty\n\n### Assertion Robustness\n\n**Verify Actual End-State**\n- Assert the real artifact (file contents, HTTP response body, database record)—not \"code ran successfully\"\n- Use exact string matching for content assertions; substring matches hide truncation and encoding issues\n- Include unique IDs or timestamps in assertions to catch stale data being re-read\n- For file operations: diff expected vs actual on failure, showing exact bytes that differ\n- Verify side effects explicitly: if a comment is added to README, read the file and verify the exact text is present\n\n### Timeout & Deadline Handling\n\n**Explicit Waits with Diagnostics**\n- Set timeout on all waits (never infinite loops). Distinguish \"still waiting\" (retry) from \"timed out\" (fail hard).\n- Log elapsed time and what was being waited for; include diagnostic state (file contents, process status) when timeout fires\n- For CI: increase timeouts 2x over local (account for slower hardware, higher variance)\n- Fail fast on unrecoverable errors (file not found, permission denied)—don't retry those\n\n### Flakiness Detection & Prevention\n\n**Before Merge**\n- Run each E2E test locally 10 times in sequence; if any fails, investigate before merging\n- In CI: re-run failed tests 2-3 times; if they pass on retry, log as \"flaky\" and file follow-up\n- Common sources: timing assumptions, file I/O race conditions, process startup delays, garbage collector pauses\n- Instrument tests with timing telemetry to catch performance regressions that trigger timeouts\n\n### Diagnostic Output\n\n**On Failure, Capture Full Context**\n- Output: file contents, environment variables, git status, last N log lines, process list\n- Use structured output (JSON) for machine-readability\n- Include \"what was I trying to do\" context in every error message\n- For parallel test runs: include test ID in all log output so failures can be correlated to the right test\n\n### Parallelization Safety\n\n**When Tests Run Concurrently**\n- Use separate temp directories per test (`$TMPDIR/test-$PID-$RANDOM`)\n- Use separate port ranges per test (no hardcoded 3000/5000)\n- Lock access to shared resources (git repos, databases); never assume exclusive access\n- Avoid global state in configuration files; use per-test config files\n"
+          }
+        ],
         "review_focus": [
-          "Verify the E2E test actually exists and runs (check test registry, CI logs)",
-          "Confirm the README comment explains WHY the test is closed (not just THAT it is)",
-          "Check if any other tests or infrastructure depend on this test",
-          "Ensure the issue closure is idempotent (safe to retry)"
+          "Assertion accuracy: does test verify actual comment was written to README file, not just that code executed?",
+          "Isolation & cleanup: no cross-test state contamination; cleanup runs even on failure",
+          "Timeout behavior: explicit deadlines on all waits; diagnostic output when timeouts occur",
+          "Flakiness risk: are there timing assumptions, race conditions, or environment dependencies that could cause intermittent failures?",
+          "Environment assumptions: clearly documented OS, Node version, git config, permissions, and any CI-specific setup needed"
         ],
         "risk_areas": [
-          "Test infrastructure decay: stale tests left in the codebase without documentation become technical debt",
-          "Silent test disabling: if this test was checking a real integration point, closing it without replacement could hide regressions",
-          "Git archaeology: future developers will search for this test; the commit message and README comment must explain the context"
+          "Flaky E2E tests: timing assumptions in async code, file I/O races, or process startup delays often hide until CI runs",
+          "Environment-specific failures: test might pass locally but fail in CI due to different permissions, slower hardware, or missing tools",
+          "Parallel execution issues: if this test runs alongside others, temp file collisions or port conflicts could cause race conditions",
+          "Silent test failures: assertions might pass (README modified) but with corrupted content, encoding issues, or partial writes—verify exact end-state, not just existence"
         ]
       },
-      "timestamp": 1790338762,
+      "timestamp": 1790363796,
       "ttl": 3600
     },
     "61c5f4a9ce6598c2f1fc048e0a7ce958": {
       "result": {
         "results": [
           {
-            "file": "fleet-shared-patterns.json",
+            "file": "failures.json",
             "relevance": 85,
-            "summary": "Common build-stage error pattern ('Cannot find module' → 'npm i') seen across multiple repos. Highly applicable to build failures in any test automation context."
+            "summary": "Contains actual failure patterns from build/test stages with proven fixes (timeout wrappers, database connection handling), directly applicable to troubleshooting build issues"
           },
           {
-            "file": "failures.json (with timeout/database patterns)",
-            "relevance": 80,
-            "summary": "Actual failure signatures from test stage with root causes (timeout, unbounded loops) and documented fixes. Directly relevant to build-stage test failures."
-          },
-          {
-            "file": "success-patterns.json (test-repo-ranking)",
-            "relevance": 75,
-            "summary": "Two documented build-stage patterns using npm test strategy. Generic but directly applicable to E2E test automation build execution."
+            "file": "fleet-shared-patterns.json",
+            "relevance": 78,
+            "summary": "Common 'Cannot find module' error in build stage with fix 'npm i', observed across multiple repos—directly relevant to build environment setup"
           },
           {
             "file": "index.json",
-            "relevance": 70,
-            "summary": "Test failure pattern indexed for build stage with specific fix (increase timeout in test setup). Relevant to handling test execution issues."
+            "relevance": 72,
+            "summary": "Contains test_failure pattern specifically in build stage with known fix (increase timeout), applicable to build-stage test execution"
           },
           {
-            "file": "success-patterns.json (test-repo-outcomes)",
-            "relevance": 65,
-            "summary": "Pattern for 'Test outcome' goal in build stage with npm test strategy and single iteration. Applicable to simple test build scenarios."
+            "file": "success-patterns.json",
+            "relevance": 64,
+            "summary": "Pattern 'Timed fix' executed across intake→build→test with npm test strategy, demonstrates successful multi-stage build workflow"
+          },
+          {
+            "file": "success-patterns.json",
+            "relevance": 58,
+            "summary": "Pattern 'Fix daemon timeout' from build stage with timeout handler approach, provides strategy for handling build-stage timeouts"
           }
         ]
       },
-      "timestamp": 1790337876,
+      "timestamp": 1790363832,
       "ttl": 1800
     },
     "787af305167a35c6737dd386269d4cb3": {
@@ -2301,6 +2313,52 @@
         }
       ],
       "timestamp": 1790362962,
+      "ttl": 1800
+    },
+    "ffb194f0f9b141fbca776303e41e2307": {
+      "result": {
+        "raw_response": "Mock claude: ok"
+      },
+      "timestamp": 1790363709,
+      "ttl": 1800
+    },
+    "eba4342b44b3c80b3c5d9ec6a8877ba8": {
+      "result": {
+        "estimated_iterations": 1
+      },
+      "timestamp": 1790363712,
+      "ttl": 1800
+    },
+    "7ff5f5af15e88661e4c876d570faac8b": {
+      "result": {
+        "estimated_cost_usd": 0.02,
+        "estimated_iterations": 1,
+        "estimated_tokens": 8000,
+        "likely_failure_stage": "none",
+        "confidence": 97
+      },
+      "timestamp": 1790363721,
+      "ttl": 3600
+    },
+    "d91f24bb952c4fe6aa13252c92425584": {
+      "result": [
+        {
+          "type": "result",
+          "result": "I am trying the same approach again.",
+          "usage": {
+            "input_tokens": 0,
+            "output_tokens": 0
+          }
+        }
+      ],
+      "timestamp": 1790363825,
+      "ttl": 1800
+    },
+    "676a2efd1a3d4b2ea9910279fcef7f03": {
+      "result": {
+        "raw_response": "Mock claude: ok"
+      },
+      "timestamp": 1790363928,
       "ttl": 1800
     }
   }

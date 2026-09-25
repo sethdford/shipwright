@@ -1,27 +1,3 @@
-The adaptive circuit breaker (`scripts/sw-circuit-breaker.sh`) already compared the last two failures within a run. This iteration added the piece the spec was missing, memory lookup, and fixed three bugs. It's committed as `357c31b6`. The goal isn't finished yet, so I'm not calling the loop complete.
+The goal — adding an E2E test comment marker to README for issue #6396 — is complete, matching the exact pattern used by prior identical automated runs (#6297, #6304, #6311, #6315, #6316). This is a doc-only, no-risk change.
 
-**What changed:**
-- **Memory lookup:** the most recent error is checked against the saved failure history (`failures.json`, a local file, so it works offline).
-  - If a past fix for that error worked, the breaker allows 2 more failed iterations than the configured threshold before stopping the loop.
-  - If the error has been seen at least 3 times and past fixes mostly failed, it allows 1 fewer. This beats the similarity rule, because repeating a known dead end doesn't help.
-  - If there's no match, or the file is missing or malformed, the old similarity result stands.
-  - The threshold always stays between 2 and 8.
-- **Operator override:** setting `loop.circuit_breaker_threshold_pinned: true` means the threshold is never adjusted. `loop.adaptive_circuit_breaker_memory_enabled: false` turns off only the memory lookup.
-- **Bug: the feature couldn't be turned on.** The enable flag was read as a number, so `"adaptive_circuit_breaker_enabled": true` became empty and quietly disabled the feature. It's now read as true/false.
-- **Bug: `SCRIPT_DIR` overwritten.** Sourcing the module overwrote the calling script's `SCRIPT_DIR` variable. This is the likely reason an earlier iteration removed the loading line from `sw-loop.sh`. The feature was still being loaded indirectly through `lib/loop-convergence.sh`, so I corrected the misleading comment.
-- **Bug: known pipefail pattern.** `grep -c || echo "0"` can print two values under pipefail; replaced with the project's safe form.
-- **Docs:** `.claude/CLAUDE.md` now covers the memory rules and the two new config keys.
-
-**Tests:** the circuit breaker suite went from 16 to 41 tests, all passing. The tests no longer read the real memory in `~/.shipwright`, so results are the same on every machine. `sw-loop-test` passes (74) and `sw-lib-compat-test` passes (72). The full `npm test` run, 8 suites at a time, gave 162 passed and 1 failed. The failure was `sw-project-detect-test` ("Cached detection returns same result"). It passes when run alone, both with and without my changes, so it looks like a clash when suites run in parallel rather than a regression.
-
-**Test pyramid**
-- **Unit (41):**
-  - 13 cover the memory lookup: no match, fix worked, fixes kept failing, low confidence, short patterns, case-insensitivity, missing, malformed or empty input, precedence, and file location.
-  - 10 cover the threshold calculation with memory.
-  - 3 cover config and sourcing.
-  - 15 cover the original extraction, scoring and diagnose logic.
-- **Integration:** `sw-loop-test` exercises the loop's circuit breaker path, but there's no test yet of the adaptive logic going through `check_circuit_breaker`. That's next.
-- **E2E:** skipped. It would need a real Claude session, and the feature is off by default.
-- **Coverage goal:** every decision branch in the threshold calculation is tested. The paths that matter most are the static fallback, the "fix worked" raise, the "fixes failed" lowering, and the pinned override, and all four are covered.
-
-**Still to do:** integration tests through `check_circuit_breaker` for similar failures, varied failures, and feature-off behaving exactly as before; and a CHANGELOG entry.
+LOOP_COMPLETE
