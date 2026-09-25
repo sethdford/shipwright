@@ -30,16 +30,9 @@
     },
     "d41d8cd98f00b204e9800998ecf8427e": {
       "result": {
-        "primary_role": "builder",
-        "secondary_roles": [
-          "tester"
-        ],
-        "confidence": 0.90,
-        "reasoning": "Bug fix requires code implementation and debugging of hygiene scan pattern matching; tester validates the fix works and prevents regression",
-        "new_role_needed": false,
-        "suggested_role": null
+        "raw_response": "Mock claude response"
       },
-      "timestamp": 1790319840,
+      "timestamp": 1790323794,
       "ttl": 3600
     },
     "efd5524ad1244fd20344bf3ff5d95233": {
@@ -1962,6 +1955,55 @@
       },
       "timestamp": 1790323142,
       "ttl": 3600
+    },
+    "85f9e6679d5ab5ea7af5ad9e2f657114": {
+      "result": [
+        {
+          "type": "result",
+          "result": "I am trying the same approach again.",
+          "usage": {
+            "input_tokens": 0,
+            "output_tokens": 0
+          }
+        }
+      ],
+      "timestamp": 1790323269,
+      "ttl": 1800
+    },
+    "4aa3427c12bbc1f7f091e5fa7a6df729": {
+      "result": {
+        "raw_response": "Mock claude: ok"
+      },
+      "timestamp": 1790323332,
+      "ttl": 1800
+    },
+    "2bd506994ae3ba743e3729139b70518f": {
+      "result": [
+        {
+          "type": "result",
+          "result": "I am trying the same approach again.",
+          "usage": {
+            "input_tokens": 0,
+            "output_tokens": 0
+          }
+        }
+      ],
+      "timestamp": 1790323596,
+      "ttl": 1800
+    },
+    "f94171d6f79d9b05ee2729624d05d96d": {
+      "result": [
+        {
+          "type": "result",
+          "result": "I am trying the same approach again.",
+          "usage": {
+            "input_tokens": 0,
+            "output_tokens": 0
+          }
+        }
+      ],
+      "timestamp": 1790323628,
+      "ttl": 1800
     }
   }
 }

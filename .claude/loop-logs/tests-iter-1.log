@@ -7,118 +7,118 @@
   ──────────────────────────────────────────
   162 suites · 300s timeout · 1 job(s)
 
-  ✓ sw-activity-test                               1s
+  ✓ sw-activity-test                               0s
   ✓ sw-adapters-test                               0s
   ✓ sw-adaptive-model-test                         1s
-  ✓ sw-adaptive-test                               0s
-  ✓ sw-adaptive-timeout-test                       3s
-  ✓ sw-adversarial-review-test                     0s
-  ✓ sw-adversarial-test                            1s
-  ✓ sw-agi-roadmap-test                            1s
-  ✓ sw-architecture-enforcer-test                  2s
+  ✓ sw-adaptive-test                               1s
+  ✓ sw-adaptive-timeout-test                       2s
+  ✓ sw-adversarial-review-test                     1s
+  ✓ sw-adversarial-test                            0s
+  ✓ sw-agi-roadmap-test                            2s
+  ✓ sw-architecture-enforcer-test                  1s
   ✓ sw-auth-test                                   0s
   ✓ sw-auto-recovery-test                          1s
   ✓ sw-autonomous-e2e-test                         1s
   ✓ sw-autonomous-test                             1s
   ✓ sw-autoresearch-e2e-test                       4s
-  ✓ sw-bandit-selector-test                        10s
-  ✓ sw-budget-chaos-test                           1s
-  ✓ sw-changelog-test                              1s
-  ✓ sw-chaos-test                                  0s
-  ✓ sw-checkpoint-test                             1s
-  ✓ sw-ci-test                                     0s
+  ✓ sw-bandit-selector-test                        9s
+  ✓ sw-budget-chaos-test                           2s
+  ✓ sw-changelog-test                              0s
+  ✓ sw-chaos-test                                  1s
+  ✓ sw-checkpoint-test                             0s
+  ✓ sw-ci-test                                     1s
   ✓ sw-cleanup-test                                1s
   ✓ sw-code-review-test                            0s
   ✓ sw-connect-test                                1s
   ✓ sw-constitutional-test                         1s
   ✓ sw-context-budget-test                         0s
   ✓ sw-context-test                                1s
-  ✓ sw-convergence-test                            0s
-  ✓ sw-cost-optimizer-test                         1s
+  ✓ sw-convergence-test                            1s
+  ✓ sw-cost-optimizer-test                         0s
   ✓ sw-cost-test                                   0s
   ✓ sw-daemon-test                                 4s
   ✓ sw-dashboard-e2e-test                          0s
   ✓ sw-dashboard-test                              0s
-  ✓ sw-db-test                                     2s
+  ✓ sw-db-test                                     3s
   ✓ sw-decide-test                                 2s
   ✓ sw-decompose-test                              1s
   ✓ sw-deps-test                                   0s
-  ✓ sw-developer-simulation-test                   1s
-  ✓ sw-discovery-test                              0s
+  ✓ sw-developer-simulation-test                   0s
+  ✓ sw-discovery-test                              1s
   ✓ sw-doc-fleet-test                              4s
-  ✓ sw-docs-agent-test                             11s
-  ✓ sw-docs-test                                   2s
-  ✓ sw-doctor-test                                 4s
+  ✓ sw-docs-agent-test                             15s
+  ✓ sw-docs-test                                   3s
+  ✓ sw-doctor-test                                 7s
   ✓ sw-dod-scorecard-test                          1s
-  ✓ sw-dora-test                                   0s
-  ✓ sw-durable-test                                1s
-  ✗ sw-e2e-integration-test                        exit 1 3s
+  ✓ sw-dora-test                                   1s
+  ✓ sw-durable-test                                0s
+  ✗ sw-e2e-integration-test                        exit 1 4s
   ✓ sw-e2e-orchestrator-test                       0s
-  ✓ sw-e2e-smoke-test                              14s
-  ✓ sw-e2e-system-test                             13s
-  ✓ sw-eventbus-test                               1s
-  ✓ sw-evidence-test                               1s
-  ✓ sw-feedback-test                               8s
+  ✓ sw-e2e-smoke-test                              19s
+  ✓ sw-e2e-system-test                             19s
+  ✓ sw-eventbus-test                               0s
+  ✓ sw-evidence-test                               2s
+  ✓ sw-feedback-test                               9s
   ✓ sw-fix-test                                    3s
-  ✓ sw-fleet-discover-test                         1s
-  ✓ sw-fleet-test                                  5s
-  ✓ sw-fleet-viz-test                              1s
-  ✓ sw-formal-spec-test                            0s
+  ✓ sw-fleet-discover-test                         0s
+  ✓ sw-fleet-test                                  6s
+  ✓ sw-fleet-viz-test                              0s
+  ✓ sw-formal-spec-test                            1s
   ✓ sw-frontier-test                               1s
-  ✓ sw-github-app-test                             1s
-  ✓ sw-github-checks-test                          0s
+  ✓ sw-github-app-test                             0s
+  ✓ sw-github-checks-test                          1s
   ✓ sw-github-deploy-test                          0s
   ✓ sw-github-graphql-test                         1s
   ✓ sw-guild-test                                  0s
   ✓ sw-heartbeat-test                              1s
   ✓ sw-hello-test                                  0s
-  ✓ sw-hygiene-test                                10s
-  ✓ sw-incident-test                               0s
-  ✓ sw-init-test                                   69s
+  ✓ sw-hygiene-test                                11s
+  ✓ sw-incident-test                               1s
+  ✓ sw-init-test                                   71s
   ✓ sw-instrument-test                             0s
   ✓ sw-integration-claude-test                     7s
-  ✓ sw-intelligence-test                           1s
-  ✗ sw-intent-analysis-test                        exit 1 37s
+  ✓ sw-intelligence-test                           2s
+  ✗ sw-intent-analysis-test                        exit 1 31s
   ✓ sw-jira-test                                   0s
   ✓ sw-launchd-test                                1s
   ✓ sw-lib-audit-trail-test                        0s
-  ✓ sw-lib-compat-test                             0s
-  ✓ sw-lib-compound-audit-test                     1s
+  ✓ sw-lib-compat-test                             1s
+  ✓ sw-lib-compound-audit-test                     0s
   ✓ sw-lib-daemon-dispatch-test                    32s
   ✓ sw-lib-daemon-failure-test                     0s
   ✓ sw-lib-daemon-patrol-test                      0s
-  ✓ sw-lib-daemon-poll-test                        0s
-  ✓ sw-lib-daemon-state-test                       1s
+  ✓ sw-lib-daemon-poll-test                        1s
+  ✓ sw-lib-daemon-state-test                       0s
   ✓ sw-lib-daemon-triage-test                      2s
   ✓ sw-lib-error-actionability-test                0s
-  ✓ sw-lib-helpers-test                            2s
-  ✓ sw-lib-pipeline-detection-test                 1s
+  ✓ sw-lib-helpers-test                            3s
+  ✓ sw-lib-pipeline-detection-test                 0s
   ✓ sw-lib-pipeline-intelligence-test              0s
   ✓ sw-lib-pipeline-quality-checks-test            1s
-  ✓ sw-lib-pipeline-stages-test                    8s
+  ✓ sw-lib-pipeline-stages-test                    9s
   ✓ sw-lib-pipeline-state-test                     0s
   ✓ sw-linear-test                                 1s
   ✓ sw-logs-test                                   0s
-  ✓ sw-loop-test                                   166s
-  ✓ sw-memory-discovery-e2e-test                   0s
+  ✓ sw-loop-test                                   165s
+  ✓ sw-memory-discovery-e2e-test                   1s
   ✓ sw-memory-effectiveness-test                   5s
   ✓ sw-memory-test                                 7s
   ✓ sw-mission-control-test                        0s
   ✓ sw-model-router-test                           3s
-  ✓ sw-mutation-executor-test                      0s
-  ✓ sw-otel-test                                   1s
-  ✓ sw-outcome-feedback-test                       0s
-  ✓ sw-oversight-test                              1s
+  ✓ sw-mutation-executor-test                      1s
+  ✓ sw-otel-test                                   0s
+  ✓ sw-outcome-feedback-test                       1s
+  ✓ sw-oversight-test                              0s
   ✓ sw-patrol-meta-test                            0s
   ✓ sw-pipeline-composer-test                      0s
-  ✓ sw-pipeline-test                               74s
+  ✓ sw-pipeline-test                               78s
   ✓ sw-pipeline-vitals-test                        0s
   ✓ sw-pm-test                                     1s
   ✓ sw-policy-e2e-test                             0s
   ✓ sw-policy-learner-test                         1s
   ✓ sw-pr-lifecycle-test                           0s
   ✓ sw-predictive-test                             1s
-  ✓ sw-prep-test                                   6s
+  ✓ sw-prep-test                                   7s
   ✓ sw-process-reward-test                         0s
   ✓ sw-project-detect-test                         1s
   ✓ sw-ps-test                                     0s
@@ -126,16 +126,16 @@
   ✓ sw-quality-profile-test                        1s
   ✓ sw-quality-test                                1s
   ✓ sw-reaper-test                                 0s
-  ✓ sw-recruit-test                                16s
-  ✓ sw-regression-test                             20s
+  ✓ sw-recruit-test                                17s
+  ✓ sw-regression-test                             22s
   ✓ sw-release-manager-test                        0s
-  ✓ sw-release-test                                1s
+  ✓ sw-release-test                                0s
   ✓ sw-remote-test                                 0s
-  ✓ sw-replay-test                                 0s
-  ✓ sw-retro-test                                  1s
-  ✓ sw-review-rerun-test                           0s
-  ✓ sw-reward-aggregator-test                      1s
-  ✓ sw-rl-optimizer-test                           0s
+  ✓ sw-replay-test                                 1s
+  ✓ sw-retro-test                                  0s
+  ✓ sw-review-rerun-test                           1s
+  ✓ sw-reward-aggregator-test                      0s
+  ✓ sw-rl-optimizer-test                           1s
   ✓ sw-root-cause-test                             1s
   ✓ sw-scale-test                                  0s
   ✓ sw-scope-enforcement-test                      1s
@@ -144,31 +144,31 @@
   ✓ sw-server-api-test                             0s
   ✓ sw-session-restart-test                        1s
   ✓ sw-session-test                                14s
-  ✓ sw-setup-test                                  0s
+  ✓ sw-setup-test                                  1s
   ✓ sw-spec-driven-test                            0s
-  ✓ sw-spec-pipeline-test                          1s
-  ✓ sw-stall-detector-test                         0s
-  ✓ sw-standup-test                                1s
-  ✓ sw-status-test                                 0s
+  ✓ sw-spec-pipeline-test                          0s
+  ✓ sw-stall-detector-test                         1s
+  ✓ sw-standup-test                                0s
+  ✓ sw-status-test                                 1s
   ✓ sw-strategic-test                              0s
-  ✓ sw-stream-test                                 1s
-  ✓ sw-swarm-test                                  0s
+  ✓ sw-stream-test                                 0s
+  ✓ sw-swarm-test                                  1s
   ✓ sw-team-stages-test                            0s
   ✓ sw-templates-test                              2s
   ✓ sw-test-holdout-test                           1s
   ✓ sw-test-optimizer-test                         1s
   ✓ sw-testgen-test                                0s
   ✓ sw-tmux-pipeline-test                          0s
-  ✓ sw-tmux-test                                   1s
-  ✓ sw-trace-test                                  1s
+  ✓ sw-tmux-test                                   2s
+  ✓ sw-trace-test                                  0s
   ✓ sw-tracker-providers-test                      1s
   ✓ sw-tracker-test                                0s
-  ✓ sw-triage-test                                 0s
+  ✓ sw-triage-test                                 1s
   ✓ sw-upgrade-test                                1s
-  ✓ sw-ux-test                                     1s
+  ✓ sw-ux-test                                     0s
   ✓ sw-webhook-test                                0s
   ✓ sw-widgets-test                                1s
-  ✓ sw-worktree-test                               0s
+  ✓ sw-worktree-test                               1s
 
   ══════════════════════════════════════════
 
@@ -180,7 +180,7 @@
     
       ▸ Budget: Set $1.00 daily limit... ✓
       ▸ GitHub: Create test issue... ✓
-      ▸ Pipeline: Run fast pipeline on test issue... ✓ Lock acquired for: pipeline-6232
+      ▸ Pipeline: Run fast pipeline on test issue... ✓ Lock acquired for: pipeline-6241
     ⚠ A pipeline is already in progress (status: running)
       Resume it: shipwright pipeline resume
       Abort it:  shipwright pipeline abort
@@ -197,7 +197,7 @@
     
     
     ━━━ Cleanup ━━━
-      Closing issue #6232
+      Closing issue #6241
       Cleanup complete
 
 ━━━ sw-intent-analysis-test (FAIL:1) — last 25 lines ━━━
@@ -213,5 +213,5 @@
     sw-e2e-integration-test                        FAIL:1
     sw-intent-analysis-test                        FAIL:1
 
-  160 passed  2 failed  0 timed out  (162 suites, 638s)
+  160 passed  2 failed  0 timed out  (162 suites, 668s)
 
