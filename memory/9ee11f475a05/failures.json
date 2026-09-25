@@ -5,8 +5,8 @@
       "pattern": "\u001b[38;2;74;222;128m\u001b[1m✓\u001b[0m reveal shows 1/3 pass count on failure",
       "root_cause": "sw-intent-analysis-test asserts analyze_intent's JSON output includes version, goal, and criteria fields, but the current schema/implementation omits one or more of them",
       "fix": "Update analyze_intent (or its schema) in sw-intent-analysis.sh to emit version, goal, and criteria fields matching the test's expected schema",
-      "seen_count": 144,
-      "last_seen": "2026-09-25T08:16:47Z",
+      "seen_count": 148,
+      "last_seen": "2026-09-25T09:53:26Z",
       "category": "test_failure",
       "signature_hash": "e1a285258fe63781b7370b0d086ad87b",
       "signature": "\u001b[<n>;2;<n>;<n>;<n>m\u001b[1m✓\u001b[0m reveal shows <path> pass count on failure"
@@ -50,8 +50,8 @@
       "signature": "results: \u001b[<n>;2;<n>;<n>;<n>m\u001b[1m<n> pass\u001b[0m | \u001b[<n>;2;<n>;<n>;<n>m\u001b[1m1 fail\u001b[0m",
       "root_cause": "sw-e2e-integration-test failed because a stale pipeline lock from a prior run (pipeline-3854) was left in 'running' state, blocking the new pipeline start; sw-intent-analysis-test failed because analyze_intent's generated JSON is missing the required version/goal/criteria schema fields",
       "fix": "Clear/release stale pipeline locks before the e2e-integration test runs (or add lock staleness detection/cleanup), and update analyze_intent to always emit version, goal, and criteria fields in its output schema",
-      "seen_count": 8,
-      "last_seen": "2026-09-25T09:25:45Z",
+      "seen_count": 7,
+      "last_seen": "2026-09-19T15:03:24Z",
       "category": "test_failure",
       "signature_hash": "af7df127e4c98031cbe09f6b0646ac68"
     },
@@ -82,8 +82,8 @@
       "pattern": "\u001b[38;2;0;212;255m▸\u001b[0m Progress detects repeated error loop... \u001b[38;2;74;222;128m✓\u001b[0m",
       "root_cause": "sw-cost-test.sh's context-efficiency assertions rely on loop.context_efficiency events being present in costs.json, but the test's mock environment has no cost entries in the last 30 days so the dashboard renders the empty-state message instead",
       "fix": "seed a mock cost entry (or synthetic loop.context_efficiency event) with a recent timestamp in the test fixture before invoking the cost dashboard render",
-      "seen_count": 1,
-      "last_seen": "2026-09-03T13:22:58Z",
+      "seen_count": 2,
+      "last_seen": "2026-09-25T06:04:22Z",
       "category": "test_failure",
       "signature_hash": "f417ed2418fab9d197740233d6d9cf46",
       "signature": "\u001b[<n>;2;0;<n>;<n>m▸\u001b[0m progress detects repeated error loop... \u001b[<n>;2;<n>;<n>;<n>m✓\u001b[0m"
@@ -138,7 +138,7 @@
       "root_cause": "sw-e2e-integration-test failed because a stale pipeline lock (pipeline-4253) was already held from a prior run, blocking the fast pipeline test; sw-intent-analysis-test failed because analyze_intent's generated JSON is missing required schema fields (version, goal, criteria)",
       "fix": "Clear/release stale pipeline locks before the e2e-integration test runs (or have it auto-abort orphaned locks), and update analyze_intent to always populate version, goal, and criteria in its output schema",
       "seen_count": 15,
-      "last_seen": "2026-09-25T08:48:07Z",
+      "last_seen": "2026-09-25T07:07:26Z",
       "category": "test_failure",
       "signature_hash": "06f0abb7562df2c6e4651882933d3b25",
       "signature": "\u001b[<n>;2;0;<n>;<n>m▸\u001b[0m patrol recurring failures label construction... \u001b[<n>;2;<n>;<n>;<n>m✓\u001b[0m"
@@ -261,29 +261,11 @@
     {
       "stage": "test",
       "pattern": "\u001b[38;2;0;212;255m▸\u001b[0m Missing template returns error... \u001b[38;2;74;222;128m✓\u001b[0m",
-      "root_cause": "sw-intent-analysis-test failed (exit 1) and sw-e2e-integration-test hit the 301s timeout, blocking the full suite",
-      "fix": "run sw-intent-analysis-test.sh directly to see the failing assertion and fix the underlying logic; increase or investigate sw-e2e-integration-test's timeout/mocking since it hung for the full 300s",
+      "root_cause": "Visible log tail shows all suites passing (FAIL: 0) with no failing assertion captured; the actual failing test output was truncated before the last 200 lines",
+      "fix": "Re-run with full untruncated log or increase captured tail length to locate the actual failing assertion near 'Missing template returns error'",
       "seen_count": 1,
       "last_seen": "2026-09-18T23:17:29Z",
-      "category": "test_failure"
-    },
-    {
-      "stage": "test",
-      "pattern": "33 passed, 0 failed",
-      "root_cause": "no failure occurred — 33 passed, 0 failed is a passing result misclassified as a pipeline failure",
-      "fix": "check the pipeline stage's exit-code/parsing logic for the test stage so an all-pass run isn't flagged as failed",
-      "seen_count": 3,
-      "last_seen": "2026-09-25T06:04:13Z",
       "category": "unknown"
-    },
-    {
-      "stage": "test",
-      "pattern": "\u001b[38;2;74;222;128m✓\u001b[0m Loop runs multiple iterations when tests fail initially",
-      "root_cause": "Memory promotion test fails because cross-repo pattern copy logic doesn't correctly transfer or validate promoted patterns between repo memory stores",
-      "fix": "Review sw-self-optimize.sh memory promotion function for correct source/destination path handling and data validation during cross-repo copy",
-      "seen_count": 1,
-      "last_seen": "2026-09-25T06:35:04Z",
-      "category": "test_failure"
     }
   ]
 }
