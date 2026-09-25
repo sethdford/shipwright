@@ -6,6 +6,7 @@
 <!-- E2E test: automated pipeline comment (issue #6396). Safe to remove. -->
 <!-- E2E test: automated pipeline comment (issue #6397). Safe to remove. -->
 <!-- E2E test: automated pipeline comment (issue #6400). Safe to remove. -->
+<!-- E2E test: automated pipeline comment (issue #6405). Safe to remove. -->
 <p align="center">
   <img src="website/src/assets/logo-dark.svg" alt="Shipwright" width="200">
 </p>
