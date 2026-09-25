@@ -5,8 +5,8 @@
       "pattern": "\u001b[38;2;74;222;128m\u001b[1m✓\u001b[0m reveal shows 1/3 pass count on failure",
       "root_cause": "sw-intent-analysis-test asserts analyze_intent's JSON output includes version, goal, and criteria fields, but the current schema/implementation omits one or more of them",
       "fix": "Update analyze_intent (or its schema) in sw-intent-analysis.sh to emit version, goal, and criteria fields matching the test's expected schema",
-      "seen_count": 143,
-      "last_seen": "2026-09-25T08:13:00Z",
+      "seen_count": 144,
+      "last_seen": "2026-09-25T09:30:55Z",
       "category": "test_failure",
       "signature_hash": "e1a285258fe63781b7370b0d086ad87b",
       "signature": "\u001b[<n>;2;<n>;<n>;<n>m\u001b[1m✓\u001b[0m reveal shows <path> pass count on failure"
@@ -16,8 +16,8 @@
       "pattern": "\u001b[2m  loop behavior: iterations on test failure\u001b[0m",
       "root_cause": "Test suite itself passed (all PASS, 0 FAIL) but the pipeline stage was flagged for iterating due to loop-behavior/RL logging noise being misread as failure signal",
       "fix": "Verify the actual test exit code rather than log content matching; ensure sw-autoresearch-e2e-test.sh output doesn't trigger false-positive failure pattern matching in the pipeline's error classifier",
-      "seen_count": 34,
-      "last_seen": "2026-09-25T07:39:00Z",
+      "seen_count": 33,
+      "last_seen": "2026-09-25T03:18:27Z",
       "category": "flaky",
       "signature_hash": "4257c245052f",
       "signature": "\u001b[2m loop behavior: iterations on test failure\u001b[0m"
@@ -27,8 +27,8 @@
       "pattern": "Failed: 1",
       "root_cause": "sw-intent-analysis-test fails because analyze_intent's generated JSON omits required fields (version, goal, criteria); sw-e2e-integration-test fails as a side effect of a stale pipeline lock (pipeline-3749) left running from a prior test run, not a new regression",
       "fix": "add the missing version/goal/criteria fields to the intent-analysis JSON schema/generator, and clear/reset stale pipeline locks (or run `shipwright pipeline abort`) before the e2e-integration test suite starts",
-      "seen_count": 21,
-      "last_seen": "2026-09-24T22:12:50Z",
+      "seen_count": 22,
+      "last_seen": "2026-09-25T08:12:36Z",
       "category": "test_failure",
       "signature_hash": "0ffe097d3b7a598c5b9ebe8e3cd8d7e4",
       "signature": "failed: 1"
@@ -71,8 +71,8 @@
       "pattern": "Results: \u001b[38;2;74;222;128m\u001b[1m124 PASS\u001b[0m | \u001b[38;2;248;113;113m\u001b[1m4 FAIL\u001b[0m",
       "root_cause": "4 of 128 tests failed but the failing assertions are not present in the captured log excerpt (only passing output shown)",
       "fix": "Re-run with full output or grep for FAIL/✗ lines to identify which suite and assertion regressed before attempting a code fix",
-      "seen_count": 5,
-      "last_seen": "2026-09-18T02:05:54Z",
+      "seen_count": 6,
+      "last_seen": "2026-09-25T07:33:50Z",
       "category": "test_failure",
       "signature_hash": "a938d8f63c9361dfd3082073022633ae",
       "signature": "results: \u001b[<n>;2;<n>;<n>;<n>m\u001b[1m<n> pass\u001b[0m | \u001b[<n>;2;<n>;<n>;<n>m\u001b[1m4 fail\u001b[0m"
@@ -279,8 +279,8 @@
     {
       "stage": "test",
       "pattern": "\u001b[38;2;74;222;128m✓\u001b[0m Loop runs multiple iterations when tests fail initially",
-      "root_cause": "sw-pipeline-test.sh mocked stage scripts no longer write plan.md/review.md artifacts, so downstream E2E/resume/cleanup/intelligence assertions checking for those files fail",
-      "fix": "update pipeline plan/review stage mocks (or real stage scripts) to write .claude/pipeline-artifacts/plan.md and review.md, and fix the jq numeric-literal parse error in the low-complexity RL episode test",
+      "root_cause": "Memory promotion test expects cross-repo pattern copy but promotion logic or fixture data doesn't match updated schema/threshold",
+      "fix": "Inspect sw-self-optimize.sh memory promotion function and its test fixtures to align expected pattern count/confidence threshold with actual copy logic",
       "seen_count": 1,
       "last_seen": "2026-09-25T06:35:04Z",
       "category": "test_failure"
