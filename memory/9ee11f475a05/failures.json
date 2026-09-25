@@ -16,8 +16,8 @@
       "pattern": "\u001b[2m  loop behavior: iterations on test failure\u001b[0m",
       "root_cause": "Test suite itself passed (all PASS, 0 FAIL) but the pipeline stage was flagged for iterating due to loop-behavior/RL logging noise being misread as failure signal",
       "fix": "Verify the actual test exit code rather than log content matching; ensure sw-autoresearch-e2e-test.sh output doesn't trigger false-positive failure pattern matching in the pipeline's error classifier",
-      "seen_count": 32,
-      "last_seen": "2026-09-20T19:42:51Z",
+      "seen_count": 35,
+      "last_seen": "2026-09-25T02:59:26Z",
       "category": "flaky",
       "signature_hash": "4257c245052f",
       "signature": "\u001b[2m loop behavior: iterations on test failure\u001b[0m"
@@ -50,8 +50,8 @@
       "signature": "results: \u001b[<n>;2;<n>;<n>;<n>m\u001b[1m<n> pass\u001b[0m | \u001b[<n>;2;<n>;<n>;<n>m\u001b[1m1 fail\u001b[0m",
       "root_cause": "sw-e2e-integration-test failed because a stale pipeline lock from a prior run (pipeline-3854) was left in 'running' state, blocking the new pipeline start; sw-intent-analysis-test failed because analyze_intent's generated JSON is missing the required version/goal/criteria schema fields",
       "fix": "Clear/release stale pipeline locks before the e2e-integration test runs (or add lock staleness detection/cleanup), and update analyze_intent to always emit version, goal, and criteria fields in its output schema",
-      "seen_count": 7,
-      "last_seen": "2026-09-19T15:03:24Z",
+      "seen_count": 8,
+      "last_seen": "2026-09-25T01:49:19Z",
       "category": "test_failure",
       "signature_hash": "af7df127e4c98031cbe09f6b0646ac68"
     },
@@ -261,8 +261,8 @@
     {
       "stage": "test",
       "pattern": "\u001b[38;2;0;212;255m▸\u001b[0m Missing template returns error... \u001b[38;2;74;222;128m✓\u001b[0m",
-      "root_cause": "Memory promotion test expects cross-repo patterns to be copied, but the promotion logic likely filters on a repo-hash/confidence condition not met by the test fixture",
-      "fix": "Inspect sw-self-optimize.sh memory promotion function and align its matching/threshold logic with what sw-self-optimize-test.sh sets up, or update the test fixture to match expected promotion criteria",
+      "root_cause": "Memory promotion test expects cross-repo pattern copy but the promotion logic or test fixture path/threshold doesn't match, so no pattern is copied",
+      "fix": "Inspect sw-self-optimize-test.sh 'Memory promotion copies cross-repo patterns' assertion and the promote_memory function in sw-self-optimize.sh for a mismatched confidence threshold or file path, then align them",
       "seen_count": 1,
       "last_seen": "2026-09-18T23:17:29Z",
       "category": "test_failure"
