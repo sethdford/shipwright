@@ -1672,31 +1672,31 @@
           {
             "file": "failures.json",
             "relevance": 95,
-            "summary": "Contains 9 recent test-stage failures with root causes and fixes; directly applicable to preventing and fixing build failures (sw-intent-analysis-test schema issues, stale pipeline locks, e2e-integration timeouts)"
+            "summary": "Most recent test failures with root causes and fixes; latest entries from 2026-09-25 show specific test failures (intent-analysis, integration tests) with actionable remedies"
           },
           {
-            "file": "success-patterns.json",
-            "relevance": 92,
-            "summary": "Documents two successful builds: 'Fix bug' (3 iterations, 45s) and 'Add authentication' (3 iterations, 150s) using standard template and npm test; provides timing expectations and proven approaches"
+            "file": "retry-outcomes.json",
+            "relevance": 95,
+            "summary": "Proven recovery strategy: model_escalation for build failures has 100% success rate (5/5 attempts), directly applicable to failed build recovery"
           },
           {
             "file": "flaky-tests.json",
             "relevance": 90,
-            "summary": "Identifies 2 unstable tests (test-1 with 85% confidence, test-auth with 90% confidence) that cause intermittent build failures; helps predict which tests may fail during this build"
+            "summary": "Known flaky tests with high confidence (test-auth 90%, test-1 85%) and occurrence counts; helps predict which tests may fail during build stage"
+          },
+          {
+            "file": "success-patterns.json",
+            "relevance": 85,
+            "summary": "Two successful build patterns showing iteration counts (3), typical duration (45-150s), file patterns, and test strategy (npm test) for bug fixes and feature work"
           },
           {
             "file": "knowledge.json",
-            "relevance": 82,
-            "summary": "Captures 5 historical test failure patterns with fixes: mktemp /tmp/claude issues, sw-cleanup output missing --force hint, and regression detection JSON formatting; directly reusable for fixing build failures"
-          },
-          {
-            "file": "retry-outcomes.json",
             "relevance": 75,
-            "summary": "Shows model_escalation retry strategy for build_failure with 100% success rate (5/5); validates that escalating to a stronger model recovers failed builds"
+            "summary": "Failure knowledge base with specific test fixes (mktemp path issues, test setup problems) and retry strategies documented from prior runs"
           }
         ]
       },
-      "timestamp": 1790366293,
+      "timestamp": 1790368495,
       "ttl": 1800
     },
     "caa198e3f75d561978df16d963ccf99e": {
@@ -1708,22 +1708,22 @@
     },
     "9ffec5a1b4309a58b33c35c65fa98a84": {
       "result": {
-        "complexity": 1,
+        "complexity": 2,
         "risk_level": "low",
-        "success_probability": 98,
+        "success_probability": 95,
         "recommended_template": "fast",
-        "issue_type": "documentation",
+        "issue_type": "testing",
         "key_risks": [
-          "concurrent README modifications",
-          "markdown formatting consistency"
+          "Test infrastructure state dependencies",
+          "README format validation brittleness"
         ],
         "implementation_hints": [
-          "single comment addition to README",
-          "verify markdown syntax",
-          "minimal changeset"
+          "Verify automated E2E test runner passes",
+          "Confirm README modification is idempotent",
+          "Check for any hardcoded paths or references in test"
         ]
       },
-      "timestamp": 1790363705,
+      "timestamp": 1790368366,
       "ttl": 3600
     },
     "4cb8e9b7fff70e5bfa540652e7e1f60d": {
@@ -1760,65 +1760,59 @@
           "documentation"
         ],
         "complexity_assessment": {
-          "score": 3,
-          "reasoning": "Automated E2E test with a single, straightforward goal (verify a comment can be added to README). Low code complexity, but requires careful attention to test reliability, environment isolation, and assertion robustness to prevent flakiness."
+          "score": 4,
+          "reasoning": "Straightforward E2E test with well-scoped objective (add comment to README). Marked safe to close. Low risk, deterministic implementation expected."
         },
         "skill_plan": {
           "plan": [
-            "testing-strategy",
-            "brainstorming"
+            "testing-strategy"
           ],
           "design": [
+            "e2e-test-reliability",
             "testing-strategy"
           ],
           "build": [
-            "testing-strategy"
+            "e2e-test-reliability"
           ],
           "review": [
-            "testing-strategy",
-            "two-stage-review"
+            "e2e-test-reliability",
+            "validation-thoroughness"
           ],
           "compound_quality": [
-            "adversarial-quality",
-            "validation-thoroughness"
+            "adversarial-quality"
           ],
           "pr": [
             "pr-quality"
           ],
           "deploy": [],
-          "validate": [],
+          "validate": [
+            "validation-thoroughness"
+          ],
           "monitor": []
         },
         "skill_rationale": {
-          "testing-strategy": "E2E tests require explicit scenario design (setup → action → assertion) and clear definition of what 'add comment to README' means and what success criteria are—without this, tests become flaky and hard to debug",
-          "brainstorming": "Challenge implicit assumptions: Does the README need to exist first? What's the exact comment format? What permissions are required? What happens if two tests run concurrently? Edge cases directly determine test reliability",
-          "two-stage-review": "Pass 1: Review test code structure (setup/teardown, assertions, cleanup logic). Pass 2: Verify test exercises real code path end-to-end, not mocked components—E2E tests fail silently when they're accidentally isolated from production code",
-          "adversarial-quality": "E2E tests are integration points vulnerable to race conditions, timing assumptions, and environment-specific failures—think like a chaos engineer about what can go wrong (permission errors, missing files, concurrent access, cleanup failures)",
-          "validation-thoroughness": "E2E tests must validate actual observable behavior (file written, content exact, permissions correct), not just that code executed—smoke tests that pass but don't verify real state hide production bugs",
-          "pr-quality": "Document the test scenario, why it matters for end-to-end validation, environment prerequisites, and any automation-specific concerns (parallelization risks, cleanup requirements, expected runtime)"
+          "testing-strategy": "Plan the E2E test flow (setup → execute automation → verify README state → cleanup) and define assertion strategy",
+          "e2e-test-reliability": "Ensure the test is deterministic, handles environment variations gracefully, and avoids common E2E pitfalls like flakiness or race conditions",
+          "validation-thoroughness": "Verify the E2E test actually exercises the real end-to-end workflow and catches integration issues that unit tests would miss",
+          "adversarial-quality": "Identify failure modes: concurrent test execution collisions, incomplete cleanup, file permission issues, partial comment insertion",
+          "pr-quality": "Document the E2E test clearly so reviewers understand what automation path is being verified and why it matters"
         },
-        "generated_skills": [
-          {
-            "name": "e2e-test-reliability",
-            "reason": "E2E tests have failure modes distinct from unit tests (flakiness, environment isolation, timing). Generic testing-strategy doesn't cover E2E-specific reliability patterns like ephemeral environments, diagnostic output on failure, and flakiness detection.",
-            "content": "## E2E Test Reliability\n\nE2E tests verify real user workflows end-to-end by running against actual systems. They catch integration bugs unit tests miss, but are fragile: timing assumptions, environment dependencies, and race conditions cause silent failures or intermittent flakiness. This skill builds reliable, reproducible E2E tests.\n\n### Isolation & Cleanup\n\n**Ephemeral Environments**\n- Use temp directories, isolated databases, fresh instances—never shared state or fixtures\n- Document environment assumptions: OS, Node version, git config, file permissions, PATH\n- Each test must run independently; don't rely on test execution order\n- Cleanup MUST run on failure: use try/finally, trap handlers, or destructors—never conditional cleanup\n- Verify cleanup completed: check temp files don't leak, processes don't linger, database is empty\n\n### Assertion Robustness\n\n**Verify Actual End-State**\n- Assert the real artifact (file contents, HTTP response body, database record)—not \"code ran successfully\"\n- Use exact string matching for content assertions; substring matches hide truncation and encoding issues\n- Include unique IDs or timestamps in assertions to catch stale data being re-read\n- For file operations: diff expected vs actual on failure, showing exact bytes that differ\n- Verify side effects explicitly: if a comment is added to README, read the file and verify the exact text is present\n\n### Timeout & Deadline Handling\n\n**Explicit Waits with Diagnostics**\n- Set timeout on all waits (never infinite loops). Distinguish \"still waiting\" (retry) from \"timed out\" (fail hard).\n- Log elapsed time and what was being waited for; include diagnostic state (file contents, process status) when timeout fires\n- For CI: increase timeouts 2x over local (account for slower hardware, higher variance)\n- Fail fast on unrecoverable errors (file not found, permission denied)—don't retry those\n\n### Flakiness Detection & Prevention\n\n**Before Merge**\n- Run each E2E test locally 10 times in sequence; if any fails, investigate before merging\n- In CI: re-run failed tests 2-3 times; if they pass on retry, log as \"flaky\" and file follow-up\n- Common sources: timing assumptions, file I/O race conditions, process startup delays, garbage collector pauses\n- Instrument tests with timing telemetry to catch performance regressions that trigger timeouts\n\n### Diagnostic Output\n\n**On Failure, Capture Full Context**\n- Output: file contents, environment variables, git status, last N log lines, process list\n- Use structured output (JSON) for machine-readability\n- Include \"what was I trying to do\" context in every error message\n- For parallel test runs: include test ID in all log output so failures can be correlated to the right test\n\n### Parallelization Safety\n\n**When Tests Run Concurrently**\n- Use separate temp directories per test (`$TMPDIR/test-$PID-$RANDOM`)\n- Use separate port ranges per test (no hardcoded 3000/5000)\n- Lock access to shared resources (git repos, databases); never assume exclusive access\n- Avoid global state in configuration files; use per-test config files\n"
-          }
-        ],
+        "generated_skills": [],
         "review_focus": [
-          "Assertion accuracy: does test verify actual comment was written to README file, not just that code executed?",
-          "Isolation & cleanup: no cross-test state contamination; cleanup runs even on failure",
-          "Timeout behavior: explicit deadlines on all waits; diagnostic output when timeouts occur",
-          "Flakiness risk: are there timing assumptions, race conditions, or environment dependencies that could cause intermittent failures?",
-          "Environment assumptions: clearly documented OS, Node version, git config, permissions, and any CI-specific setup needed"
+          "Test determinism: does the test pass reliably when run multiple times in sequence?",
+          "Concurrency safety: can this test run in parallel with other tests without state collisions on the README?",
+          "State cleanup: does the test leave README in a consistent state for the next test run?",
+          "Assertion specificity: does the test verify the comment was actually added (not just that the process completed)?",
+          "CI/CD visibility: are test results clearly reported as pass/fail in pipeline checks?"
         ],
         "risk_areas": [
-          "Flaky E2E tests: timing assumptions in async code, file I/O races, or process startup delays often hide until CI runs",
-          "Environment-specific failures: test might pass locally but fail in CI due to different permissions, slower hardware, or missing tools",
-          "Parallel execution issues: if this test runs alongside others, temp file collisions or port conflicts could cause race conditions",
-          "Silent test failures: assertions might pass (README modified) but with corrupted content, encoding issues, or partial writes—verify exact end-state, not just existence"
+          "README file state conflicts if multiple parallel E2E tests target the same file",
+          "Incomplete rollback or cleanup leaving test artifacts in the repository",
+          "Flaky assertions on file I/O or timing-dependent comment placement",
+          "Test passing while actual automation feature is broken (false positive)"
         ]
       },
-      "timestamp": 1790363796,
+      "timestamp": 1790368442,
       "ttl": 3600
     },
     "61c5f4a9ce6598c2f1fc048e0a7ce958": {
@@ -1826,32 +1820,32 @@
         "results": [
           {
             "file": "fleet-shared-patterns.json",
+            "relevance": 95,
+            "summary": "Most recent (2026-09-19), contains real build-stage error pattern 'Cannot find module' with npm fix. Directly applicable to any build process."
+          },
+          {
+            "file": "index.json",
             "relevance": 70,
-            "summary": "Shows 'Error: Cannot find module' → 'npm i' pattern seen in build stage across multiple repos. Most common build failure; directly applicable to prevent module loading issues in E2E build."
+            "summary": "Indexed build-stage patterns including test_failure with timeout fixes. Provides cross-repo patterns relevant to build stage work."
+          },
+          {
+            "file": "failures.json (with timeout data)",
+            "relevance": 60,
+            "summary": "Contains resolved test-stage failures (timeouts, database issues) with applied fixes. Shows what can go wrong and how fixes work."
           },
           {
             "file": "success-patterns.json (test-repo-ranking)",
             "relevance": 55,
-            "summary": "Two successful low-complexity build patterns with npm test strategy. Both single-iteration builds similar to adding README comment—demonstrates expected build profile for simple tasks."
-          },
-          {
-            "file": "index.json",
-            "relevance": 48,
-            "summary": "Captures test failure pattern in build stage context. Suggests timeout issues in test setup—relevant to understand potential build/test transition issues for E2E verification."
+            "summary": "Has 2 build-stage success patterns with 1 iteration completion. Demonstrates successful build strategies."
           },
           {
             "file": "success-patterns.json (test-repo-comptime)",
-            "relevance": 45,
-            "summary": "Multi-stage pattern including build stage. Shows a complete workflow cycle; provides context on build-to-test progression and overall completion time expectations (1234s, $3.75)."
-          },
-          {
-            "file": "failures.json (with timeout/db content)",
-            "relevance": 40,
-            "summary": "Tracks resolved test-stage failures (timeouts, db issues). Useful reference for understanding failure modes that may surface after build succeeds in an E2E test cycle."
+            "relevance": 50,
+            "summary": "Multi-stage pattern covering intake, build, and test stages. Shows complete build flow with timing/cost data."
           }
         ]
       },
-      "timestamp": 1790366276,
+      "timestamp": 1790368477,
       "ttl": 1800
     },
     "787af305167a35c6737dd386269d4cb3": {
@@ -2469,6 +2463,24 @@
       ],
       "timestamp": 1790368242,
       "ttl": 1800
+    },
+    "4acd0d850ebc65b0aefbb8b6051ec89d": {
+      "result": {
+        "estimated_iterations": 1
+      },
+      "timestamp": 1790368375,
+      "ttl": 1800
+    },
+    "da04cc068eab117cac95b70f9a9e34ed": {
+      "result": {
+        "estimated_cost_usd": 1.20,
+        "estimated_iterations": 1,
+        "estimated_tokens": 9000,
+        "likely_failure_stage": "none",
+        "confidence": 72
+      },
+      "timestamp": 1790368390,
+      "ttl": 3600
     }
   }
 }
