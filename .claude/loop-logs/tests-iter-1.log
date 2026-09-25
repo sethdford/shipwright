@@ -116,3 +116,131 @@
   ✓ sw-pipeline-vitals-test                        0s
   ✓ sw-pm-test                                     1s
   ✓ sw-policy-e2e-test                             0s
+  ✓ sw-policy-learner-test                         1s
+  ✓ sw-pr-lifecycle-test                           0s
+  ✓ sw-predictive-test                             1s
+  ✓ sw-prep-test                                   8s
+  ✓ sw-process-reward-test                         0s
+  ✓ sw-project-detect-test                         1s
+  ✓ sw-ps-test                                     0s
+  ✓ sw-public-dashboard-test                       0s
+  ✓ sw-quality-profile-test                        1s
+  ✓ sw-quality-test                                1s
+  ✓ sw-reaper-test                                 0s
+  ✓ sw-recruit-test                                23s
+  ✓ sw-regression-test                             41s
+  ✓ sw-release-manager-test                        0s
+  ✓ sw-release-test                                1s
+  ✓ sw-remote-test                                 0s
+  ✓ sw-replay-test                                 1s
+  ✓ sw-retro-test                                  0s
+  ✓ sw-review-rerun-test                           0s
+  ✓ sw-reward-aggregator-test                      1s
+  ✓ sw-rl-optimizer-test                           1s
+  ✓ sw-root-cause-test                             0s
+  ✓ sw-scale-test                                  1s
+  ✓ sw-scope-enforcement-test                      1s
+  ✓ sw-security-audit-test                         0s
+  ✗ sw-self-optimize-test                          exit 1 5s
+  ✓ sw-server-api-test                             0s
+  ✓ sw-session-restart-test                        1s
+  ✓ sw-session-test                                14s
+  ✓ sw-setup-test                                  0s
+  ✓ sw-spec-driven-test                            1s
+  ✓ sw-spec-pipeline-test                          0s
+  ✓ sw-stall-detector-test                         1s
+  ✓ sw-standup-test                                0s
+  ✓ sw-status-test                                 0s
+  ✓ sw-strategic-test                              1s
+  ✓ sw-stream-test                                 0s
+  ✓ sw-swarm-test                                  0s
+  ✓ sw-team-stages-test                            1s
+  ✓ sw-templates-test                              2s
+  ✓ sw-test-holdout-test                           1s
+  ✓ sw-test-optimizer-test                         1s
+  ✓ sw-testgen-test                                0s
+  ✓ sw-tmux-pipeline-test                          0s
+  ✓ sw-tmux-test                                   1s
+  ✓ sw-trace-test                                  1s
+  ✓ sw-tracker-providers-test                      1s
+  ✓ sw-tracker-test                                1s
+  ✓ sw-triage-test                                 0s
+  ✓ sw-upgrade-test                                1s
+  ✓ sw-ux-test                                     1s
+  ✓ sw-webhook-test                                0s
+  ✓ sw-widgets-test                                1s
+  ✓ sw-worktree-test                               1s
+
+  ══════════════════════════════════════════
+
+
+━━━ sw-e2e-integration-test (FAIL:1) — last 25 lines ━━━
+    ╔═══════════════════════════════════════════════════════════════╗
+    ║  Shipwright E2E Integration Tests                            ║
+    ╚═══════════════════════════════════════════════════════════════╝
+    
+      ▸ Budget: Set $1.00 daily limit... ✓
+      ▸ GitHub: Create test issue... ✓
+      ▸ Pipeline: Run fast pipeline on test issue... ✓ Lock acquired for: pipeline-6318
+    ⚠ A pipeline is already in progress (status: running)
+      Resume it: shipwright pipeline resume
+      Abort it:  shipwright pipeline abort
+    ✗ FAILED
+      ⚠ Skipping remaining tests: pipeline failed
+    
+    ━━━ Results ━━━
+      Passed: 2
+      Failed: 1
+      Total:  3
+    
+    Failed tests:
+      ✗ Pipeline: Run fast pipeline on test issue
+    
+    
+    ━━━ Cleanup ━━━
+      Closing issue #6318
+      Cleanup complete
+
+━━━ sw-intent-analysis-test (FAIL:1) — last 25 lines ━━━
+    
+    ╔════════════════════════════════════════════════════════════╗
+    ║        Intent Analysis Module Test Suite v3.3.0        ║
+    ╚════════════════════════════════════════════════════════════╝
+    
+    ✓ analyze_intent generates valid JSON
+    ✗ Schema missing required fields (version, goal, criteria)
+
+━━━ sw-self-optimize-test (FAIL:1) — last 25 lines ━━━
+    ✓
+      ▸ Full analysis creates last-report.txt... jq: invalid JSON text passed to --argjson
+    Use jq --help for help with command-line options,
+    or see the jq manpage, or online docs  at https://jqlang.github.io/jq
+    jq: invalid JSON text passed to --argjson
+    Use jq --help for help with command-line options,
+    or see the jq manpage, or online docs  at https://jqlang.github.io/jq
+    jq: invalid JSON text passed to --argjson
+    Use jq --help for help with command-line options,
+    or see the jq manpage, or online docs  at https://jqlang.github.io/jq
+    ✓
+      ▸ Context efficiency skips with no events... ✓
+      ▸ Context efficiency detects high budget utilization... ✓
+      ▸ Context efficiency detects high trim ratio... ✓
+      ▸ Context efficiency reports healthy when metrics normal... ✓
+      ▸ Full analysis includes context efficiency... ✓
+    
+    ━━━ Results ━━━
+      Passed: 24
+      Failed: 1
+      Total:  25
+    
+    Failed tests:
+      ✗ Memory promotion copies cross-repo patterns
+    
+
+  FAILING SUITES
+    sw-e2e-integration-test                        FAIL:1
+    sw-intent-analysis-test                        FAIL:1
+    sw-self-optimize-test                          FAIL:1
+
+  160 passed  3 failed  0 timed out  (163 suites, 717s)
+
