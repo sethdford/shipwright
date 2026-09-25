@@ -629,3 +629,6 @@
 {"ts":"2026-09-25T03:36:41Z","ts_epoch":1790307401,"type":"stage.skipped","issue":0,"stage":"build","reason":"human_skip"}
 {"ts":"2026-09-25T03:36:42Z","ts_epoch":1790307402,"type":"pipeline.cleanup","issue":0,"cleaned":5,"type":"post_completion"}
 {"ts":"2026-09-25T03:36:42Z","ts_epoch":1790307402,"type":"pipeline.completed","issue":0,"result":"success","duration_s":3,"iterations":1,"template":"standard","complexity":5,"stages_passed":2,"slowest_stage":"plan","pr_url":"","agent_id":"pipeline-2495327","input_tokens":0,"output_tokens":0,"total_cost":0.0000,"self_heal_count":0}
+{"ts":"2026-09-25T04:05:52Z","ts_epoch":1790309152,"type":"hygiene_platform_refactor","hardcoded":49,"fallback":69,"todo":51}
+{"ts":"2026-09-25T04:06:17Z","ts_epoch":1790309177,"type":"strategic.issue_created","title":"Adaptive circuit breaker threshold based on failure signature similarity","priority":"P2","complexity":"standard"}
+{"ts":"2026-09-25T04:06:17Z","ts_epoch":1790309177,"type":"strategic.cycle_complete","issues_created":1,"issues_skipped":2}
