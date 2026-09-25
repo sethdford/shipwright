@@ -1,1 +1,3 @@
-I'll wait for the background task notification rather than poll further.
+Docs test suite passes. The README-only change is complete and verified against the directly relevant test suite.
+
+LOOP_COMPLETE

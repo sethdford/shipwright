@@ -1663,31 +1663,31 @@
           {
             "file": "failures.json",
             "relevance": 95,
-            "summary": "Contains 8 detailed test stage failures with root causes and fixes, including intent-analysis schema issues, pipeline lock stale states, and timeout handling—directly applicable to diagnosing and preventing build failures"
-          },
-          {
-            "file": "success-patterns.json",
-            "relevance": 90,
-            "summary": "Two success patterns showing how fix/feature builds completed in 3 iterations with specific files changed, test strategies, and commit patterns—provides templates for build iteration and test execution"
+            "summary": "Documents 149+ test failures with root causes and fixes; directly applicable to build stage test execution and debugging"
           },
           {
             "file": "retry-outcomes.json",
-            "relevance": 85,
-            "summary": "Model escalation strategy for build_failure class with 100% success rate across 5 attempts—directly informs build resilience and fallback model selection during build stages"
-          },
-          {
-            "file": "flaky-tests.json",
-            "relevance": 75,
-            "summary": "Lists 2 flaky tests (test-1 and test-auth) with error messages, occurrence counts, and confidence scores—build stage must account for these when evaluating test success"
+            "relevance": 90,
+            "summary": "Build failure retry strategy with model_escalation showing 100% success rate across 5 attempts; directly guides build recovery"
           },
           {
             "file": "patterns.json",
-            "relevance": 70,
-            "summary": "Project detection data (vitest test runner, npm package manager, node project type) and file patterns—needed to invoke correct build commands and understand project structure"
+            "relevance": 88,
+            "summary": "Project conventions (vitest, npm, Node, JavaScript, test patterns); essential for understanding build environment and test execution"
+          },
+          {
+            "file": "success-patterns.json",
+            "relevance": 75,
+            "summary": "Two successful build patterns showing iterations, durations, and file changes; provides reference for effective build strategies"
+          },
+          {
+            "file": "knowledge.json",
+            "relevance": 65,
+            "summary": "KB entries for test failures (mktemp, cleanup, regression detection) with fix strategies; applicable to build/test debugging"
           }
         ]
       },
-      "timestamp": 1790337130,
+      "timestamp": 1790339222,
       "ttl": 1800
     },
     "caa198e3f75d561978df16d963ccf99e": {
@@ -2080,6 +2080,20 @@
         "raw_response": "Mock claude: ok"
       },
       "timestamp": 1790338908,
+      "ttl": 1800
+    },
+    "ba3133e710d79635a19c90a26b8352c2": {
+      "result": [
+        {
+          "type": "result",
+          "result": "I am trying the same approach again.",
+          "usage": {
+            "input_tokens": 0,
+            "output_tokens": 0
+          }
+        }
+      ],
+      "timestamp": 1790339196,
       "ttl": 1800
     }
   }
