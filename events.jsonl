@@ -282,3 +282,6 @@
 {"ts":"2026-09-25T00:05:07Z","ts_epoch":1790294707,"type":"session.progress_enhanced","progress_file":"/tmp/sw-session-restart-test.d6aZCo/project/.claude/loop-logs/progress.md","iteration":2}
 {"ts":"2026-09-25T00:05:07Z","ts_epoch":1790294707,"type":"session.restart_capture","state_file":"/tmp/sw-session-restart-test.iAye4U/project/.claude/artifacts/restart-state.json","iteration":3,"restart":1}
 {"ts":"2026-09-25T00:05:07Z","ts_epoch":1790294707,"type":"session.briefing_generated","briefing_file":"/tmp/sw-session-restart-test.81WPYg/project/.claude/artifacts/restart-briefing.md","iteration":0}
+{"ts":"2026-09-25T00:13:28Z","ts_epoch":1790295208,"type":"hygiene_platform_refactor","hardcoded":49,"fallback":69,"todo":51}
+{"ts":"2026-09-25T00:13:51Z","ts_epoch":1790295231,"type":"strategic.issue_created","title":"Reduce hygiene-scan false-positive noise in hardcoded/fallback counters","priority":"P6","complexity":"fast"}
+{"ts":"2026-09-25T00:13:51Z","ts_epoch":1790295231,"type":"strategic.cycle_complete","issues_created":1,"issues_skipped":2}
