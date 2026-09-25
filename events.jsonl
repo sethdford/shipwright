@@ -276,3 +276,5 @@
 {"ts":"2026-09-25T15:45:54Z","ts_epoch":1790351154,"type":"session.progress_enhanced","progress_file":"/tmp/sw-session-restart-test.A1yIUl/project/.claude/loop-logs/progress.md","iteration":2}
 {"ts":"2026-09-25T15:45:54Z","ts_epoch":1790351154,"type":"session.restart_capture","state_file":"/tmp/sw-session-restart-test.2nQI0r/project/.claude/artifacts/restart-state.json","iteration":3,"restart":1}
 {"ts":"2026-09-25T15:45:55Z","ts_epoch":1790351155,"type":"session.briefing_generated","briefing_file":"/tmp/sw-session-restart-test.d7CaWg/project/.claude/artifacts/restart-briefing.md","iteration":0}
+{"ts":"2026-09-25T16:05:49Z","ts_epoch":1790352349,"type":"hygiene_platform_refactor","hardcoded":49,"fallback":69,"todo":51}
+{"ts":"2026-09-25T16:06:09Z","ts_epoch":1790352369,"type":"strategic.cycle_complete","issues_created":0,"issues_skipped":3}
