@@ -1,14 +1,46 @@
 ---
-goal: "Misleading "jq not available" warning when Claude outputs JSON object instead of array
+goal: "Adaptive circuit breaker threshold based on failure signature similarity
 
-## Specification: Misleading "jq not available" warning when Claude outputs JSON object instead of array
+## Plan Summary
+# Implementation Plan: Adaptive Circuit Breaker Threshold Based on Failure Signature Similarity
+
+## Executive Summary
+
+**Goal**: Make the circuit breaker threshold (currently hardcoded to 4 consecutive failures) adapt dynamically based on whether failures share the same root cause (signature similarity).
+
+**Key Insight**: When consecutive loop failures have identical or very similar error signatures, they likely stem from the same root cause (e.g., "test setup timeout"). The user should get more chances to fix the underlying issue before the circuit breaker trips. Different signatures indicate unrelated problems and should trip faster.
+
+**Approach**: Create a new utility script (`sw-circuit-breaker.sh`) that analyzes recent failure signatures and returns an adjusted threshold. Integrate this into `sw-loop.sh`'s circuit breaker decision point.
+
+---
+
+## Requirements Clarity
+
+### Minimum Viable Change
+Modify the circuit breaker logic in `sw-loop.sh` to call a new scoring function that:
+1. Examines the last N failures in `.claude/pipeline-artifacts/error-log.jsonl`
+2. Extracts their error signatures (error type + stage)
+3. Calculates similarity percentage between consecutive failures
+4. Returns an adjusted threshold: higher if failures are similar, lower if diverse
+[... full plan in .claude/pipeline-artifacts/plan.md]
+
+## Key Design Decisions
+# Architecture Decision Record: Adaptive Circuit Breaker Threshold Based on Failure Signature Similarity
+## Context
+## Decision
+## Alternatives Considered
+### Alternative 1: Inline Loop Modification
+### Alternative 2: Memory System Integration
+### Alternative 3: Dedicated Circuit Breaker Script ✅ CHOSEN
+## Component Diagram
+## Interface Contracts
+### Core Scorer Functions (in `sw-circuit-breaker.sh`)
+[... full design in .claude/pipeline-artifacts/design.md]
+
+## Specification: Adaptive circuit breaker threshold based on failure signature similarity
 
 ### Goals
-- *jq IS available.** The actual issue is that Claude's `--output-format json` sometimes outputs a JSON **object** (`{...}`) instead of a JSON **array** (`[...]`), and the parsing code only handles arrays.
-- *Option A**: Extend Case 2 to handle both formats:
-- *Option B**: At minimum, fix the warning message in Case 3:
-- Warning is cosmetic only — the loop functions correctly using the raw JSON
-- But it's confusing during debugging (we spent time investigating jq availability when the real issue was elsewhere)
+- Adaptive circuit breaker threshold based on failure signature similarity
 
 ### Acceptance Criteria
 - [testable] All existing tests continue to pass
@@ -18,86 +50,84 @@ Historical context (lessons from previous pipelines):
   "results": [
     {
       "file": "failures.json",
-      "relevance": 95,
-      "summary": "Contains detailed jq parse error patterns matching the issue: 'jq: parse error' on malformed JSON and mock claude outputting wrong JSON schema (object vs array). Root cause and fix directly address the 'jq not available' warning problem."
+      "relevance": 90,
+      "summary": "Contains explicit failure signatures with patterns, root causes, seen counts, and resolution status. Directly applicable to building failure signature similarity detection for circuit breaker thresholds."
     },
     {
-      "file": "patterns.json",
+      "file": "index.json",
+      "relevance": 80,
+      "summary": "Indexes failure patterns by signature with stage metadata and fixes. Shows how failure patterns are currently tracked and categorized in the system."
+    },
+    {
+      "file": "fleet-shared-patterns.json",
+      "relevance": 70,
+      "summary": "Demonstrates signature hashing and cross-repo pattern tracking with seen counts and metadata. Relevant for understanding pattern similarity and aggregation across distributed failures."
+    },
+    {
+      "file": "success-patterns.json (Fix timeout, repo: test-repo-789)",
+      "relevance": 55,
+      "summary": "Build stage pattern for daemon timeout fix shows relevant context on timeout handling, error signatures array, and build stage execution patterns."
+    },
+    {
+      "file": "fleet-patterns.json",
       "relevance": 40,
-      "summary": "Project detection data (nodejs, vitest test runner) provides context about the build environment and testing setup for this pipeline stage."
-    },
-    {
-      "file": "metrics.json",
-      "relevance": 8,
-      "summary": "Build duration baselines (17827s) provide context on typical build stage timing, useful for understanding if this issue impacts build performance."
-    },
-    {
-      "file": "metrics.json",
-      "relevance": 5,
-      "summary": "Earlier build duration baseline (147s) is outdated but shows historical performance context."
-    },
-    {
-      "file": "global.json",
-      "relevance": 0,
-      "summary": "Empty cross-repo learnings, no relevant content for this specific jq/JSON issue."
+      "summary": "Structured pattern storage format (though currently empty) provides schema for how patterns should be stored for fleet-wide circuit breaker decisions."
     }
   ]
 }
 
 Discoveries from other pipelines:
-[38;2;74;222;128m[1m✓[0m Injected 128 new discoveries
-[intake] Stage intake completed — Resolution: 
-[intake] Stage intake completed — Resolution: 
-[intake] Stage intake completed — Resolution: 
-[compound_quality] Stage compound_quality completed — Resolution: 
-[intake] Stage intake completed — Resolution: 
-[pr] Stage pr completed — Resolution: 
-[pipeline_success] Pipeline success for issue #0 (fast template, stage=validate) — Resolution: success
-[intake] Stage intake completed — Resolution: 
-[pr] Stage pr completed — Resolution: 
-[intake] Stage intake completed — Resolution: 
-[compound_quality] Stage compound_quality completed — Resolution: 
-[pr] Stage pr completed — Resolution: 
-[intake] Stage intake completed — Resolution: 
-[compound_quality] Stage compound_quality completed — Resolution: 
-[pr] Stage pr completed — Resolution: 
-[intake] Stage intake completed — Resolution: 
-[design] Design completed for Build a production-grade todo application. TypeScript + React frontend with Vite, Express REST API backend, SQLite persistence with Drizzle ORM, JWT authentication (register/login), full CRUD for todos with filtering (all/active/completed), drag-and-drop reorder, due dates, priorities (low/medium/high), dark mode, responsive design. Include comprehensive test suite (unit + integration + e2e). Production-ready: error handling, input validation, rate limiting, CORS, environment config. — Resolution: 
-[intake] Stage intake completed — Resolution: 
-[intake] Stage intake completed — Resolution: 
+✓ Injected 1 new discoveries
+[design] Design completed for Adaptive circuit breaker threshold based on failure signature similarity — Resolution: 
 
-## Failure Diagnosis (Iteration 2)
-Classification: unknown
-Strategy: retry_with_context
-Repeat count: 0
+Task tracking (check off items as you complete them):
+# Pipeline Tasks — Adaptive circuit breaker threshold based on failure signature similarity
 
-## Failure Diagnosis (Iteration 3)
-Classification: unknown
-Strategy: retry_with_context
-Repeat count: 1"
-iteration: 3
-max_iterations: 10
-status: complete
+## Implementation Checklist
+- [ ] Circuit breaker threshold increases when consecutive failures share identical error signature
+- [ ] Circuit breaker threshold decreases when failures have different signatures  
+- [ ] Threshold respects hard bounds: min=2, max=8
+- [ ] Feature can be disabled via config flag (default: false during rollout)
+- [ ] Feature works offline (no external API calls)
+- [ ] Backward compatible: existing loops unaffected when feature disabled
+- [ ] `sw-circuit-breaker.sh` follows Shipwright conventions (set -euo pipefail, VERSION, event logging)
+- [ ] All functions documented with comment block (inputs, outputs, side effects)
+- [ ] Error handling for all edge cases (missing files, malformed JSON, empty signature data)
+- [ ] No hardcoded paths (all use config vars from daemon-config.json)
+- [ ] Unit test suite: 20+ tests covering signature extraction, similarity matching, threshold calculation
+- [ ] Integration test: loop with adaptive enabled processes similar failures correctly
+- [ ] Integration test: loop with adaptive enabled processes diverse failures correctly
+- [ ] Backward compat test: loop with adaptive disabled behaves identically to current version
+- [ ] All existing loop tests pass (no regressions)
+- [ ] Test suite registered in package.json and runs via `npm test`
+- [ ] CLAUDE.md updated with algorithm explanation and config examples
+- [ ] Code comments explain scoring heuristics and edge cases
+- [ ] Error messages are actionable (e.g., "adaptive circuit breaker: signature extraction failed, falling back to default")
+- [ ] README or CHANGELOG mention new feature
+
+## Context
+- Pipeline: autonomous
+- Branch: ci/issue-6176
+- Issue: none
+- Generated: 2026-09-25T10:42:30Z"
+iteration: 0
+max_iterations: 20
+status: running
 test_cmd: "npm test"
-model: sonnet
+model: haiku
 agents: 1
-started_at: 2026-04-04T17:41:42Z
-last_iteration_at: 2026-04-04T17:41:42Z
+started_at: 2026-09-25T10:46:34Z
+last_iteration_at: 2026-09-25T10:46:34Z
 consecutive_failures: 0
-total_commits: 3
-audit_enabled: false
-audit_agent_enabled: false
-quality_gates_enabled: false
-dod_file: ""
+total_commits: 0
+audit_enabled: true
+audit_agent_enabled: true
+quality_gates_enabled: true
+dod_file: "/home/runner/work/shipwright/shipwright/.claude/pipeline-artifacts/dod.md"
 auto_extend: true
 extension_count: 0
 max_extensions: 3
 ---
 
 ## Log
-### Iteration 1 (2026-04-04T15:25:20Z)
-{"type":"result","subtype":"success","is_error":false,"duration_ms":227709,"duration_api_ms":143263,"num_turns":22,"resu
-
-### Iteration 2 (2026-04-04T16:25:53Z)
-{"type":"result","subtype":"success","is_error":false,"duration_ms":9837,"duration_api_ms":311675,"num_turns":2,"result"
 

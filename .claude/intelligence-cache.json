@@ -30,17 +30,18 @@
     },
     "d41d8cd98f00b204e9800998ecf8427e": {
       "result": {
-        "primary_role": "builder",
+        "primary_role": "architect",
         "secondary_roles": [
+          "builder",
           "tester",
-          "reviewer"
+          "optimizer"
         ],
-        "confidence": 0.95,
-        "reasoning": "Bug fix requiring debugging JSON parsing logic, implementing improved error messaging, and testing edge cases (object vs array output). Builder handles implementation; tester validates the fix; reviewer ensures accuracy.",
+        "confidence": 0.85,
+        "reasoning": "Task requires designing failure signature similarity detection and adaptive threshold algorithm before implementation; Architect leads design phase, Builder executes, Tester validates edge cases, Optimizer tunes performance.",
         "new_role_needed": false,
         "suggested_role": null
       },
-      "timestamp": 1775316059,
+      "timestamp": 1790333193,
       "ttl": 3600
     },
     "efd5524ad1244fd20344bf3ff5d95233": {
@@ -1401,6 +1402,309 @@
       },
       "timestamp": 1775344537,
       "ttl": 3600
+    },
+    "639a24a1e84c3ccb4b6bfcaf78f7a6c1": {
+      "result": {
+        "complexity": 6,
+        "risk_level": "medium",
+        "success_probability": 76,
+        "recommended_template": "standard",
+        "issue_type": "performance",
+        "key_risks": [
+          "Similarity scoring inaccuracy could trigger suboptimal threshold decisions",
+          "Memory data gaps or staleness reduce pattern matching effectiveness",
+          "Threshold oscillation or thrashing could destabilize the loop if bounds are miscalibrated",
+          "Explicit config override not being respected would break backward compatibility",
+          "Fallback logic must handle memory disabled, empty, or corrupted gracefully"
+        ],
+        "implementation_hints": [
+          "Implement similarity scoring with high confidence threshold (e.g., only adjust if confidence > 0.8)",
+          "Enforce bounded range strictly (2-6) with gradual threshold shifts, not jumps",
+          "Add detailed logging of every threshold adjustment decision for auditing and debugging",
+          "Test with synthetic failure patterns covering unrecoverable, self-resolved, and novel signatures",
+          "Time-weight historical patterns so recent failures influence threshold more than old ones",
+          "Validate all memory query results before using; degrade to static config on any error or absence",
+          "Preserve explicit CLI/config overrides as immutable; only apply adaptive logic to defaults"
+        ]
+      },
+      "timestamp": 1790332784,
+      "ttl": 3600
+    },
+    "a243cddbea8737c087defa82d28f88b6": {
+      "result": {
+        "estimated_iterations": 5
+      },
+      "timestamp": 1790332793,
+      "ttl": 1800
+    },
+    "ff2ed078394e2c49953b543298c454da": {
+      "result": {
+        "estimated_cost_usd": 24.50,
+        "estimated_iterations": 5,
+        "estimated_tokens": 285000,
+        "likely_failure_stage": "test",
+        "confidence": 76,
+        "breakdown": {
+          "design_phase": {
+            "cost_usd": 3.80,
+            "tokens": 45000,
+            "duration_minutes": 12
+          },
+          "implementation_phase": {
+            "cost_usd": 9.20,
+            "tokens": 110000,
+            "duration_minutes": 28,
+            "iterations": 2
+          },
+          "testing_phase": {
+            "cost_usd": 7.50,
+            "tokens": 90000,
+            "duration_minutes": 22,
+            "iterations": 2
+          },
+          "review_phase": {
+            "cost_usd": 4.00,
+            "tokens": 40000,
+            "duration_minutes": 10
+          }
+        },
+        "risk_adjusted_metrics": {
+          "cost_usd_pessimistic": 32.00,
+          "cost_usd_optimistic": 18.00,
+          "failure_probability": 0.24,
+          "context_exhaustion_risk": 0.15
+        },
+        "stage_estimates": {
+          "intake": {
+            "cost_usd": 0.40,
+            "tokens": 5000
+          },
+          "plan": {
+            "cost_usd": 1.20,
+            "tokens": 15000
+          },
+          "design": {
+            "cost_usd": 2.40,
+            "tokens": 30000
+          },
+          "build": {
+            "cost_usd": 9.80,
+            "tokens": 120000
+          },
+          "test": {
+            "cost_usd": 6.00,
+            "tokens": 75000
+          },
+          "review": {
+            "cost_usd": 3.50,
+            "tokens": 35000
+          },
+          "pr": {
+            "cost_usd": 1.30,
+            "tokens": 10000
+          }
+        },
+        "model_routing": {
+          "planning": "haiku",
+          "design": "opus",
+          "build": "opus",
+          "test": "sonnet",
+          "review": "opus"
+        },
+        "recommendation": {
+          "template": "standard",
+          "effort_level": "high",
+          "max_restarts": 2,
+          "fast_test_interval": 4
+        }
+      },
+      "timestamp": 1790332806,
+      "ttl": 3600
+    },
+    "316d0f8eb050279de2193d8944ecd4ed": {
+      "result": {
+        "results": [
+          {
+            "file": "failures.json",
+            "relevance": 92,
+            "summary": "Real failure patterns with signatures (timeout, database connection), root causes, and resolution tracking directly inform circuit breaker threshold calibration and failure signature similarity detection"
+          },
+          {
+            "file": "success-patterns.json",
+            "relevance": 86,
+            "summary": "Historical patterns with error_signatures field, complexity scores, and completion metrics establish baseline thresholds and provide training data for failure signature matching algorithms"
+          },
+          {
+            "file": "fleet-shared-patterns.json",
+            "relevance": 79,
+            "summary": "Cross-repo failure signature hashes with contribution counts and temporal data enable fleet-wide adaptive threshold tuning based on signature similarity and failure frequency"
+          },
+          {
+            "file": "index.json",
+            "relevance": 71,
+            "summary": "Pattern metadata with failure signatures, stages, and fixes provide categorized failure examples for designing threshold decision logic and signature classification"
+          },
+          {
+            "file": "architecture.json",
+            "relevance": 38,
+            "summary": "Provides structural rules context for where circuit breaker fits in system architecture, helping determine integration points and rule enforcement scope"
+          }
+        ]
+      },
+      "timestamp": 1790332850,
+      "ttl": 1800
+    },
+    "23d218c08baaf22575ca038317470067": {
+      "result": {
+        "results": [
+          {
+            "file": "failures.json",
+            "relevance": 90,
+            "summary": "Contains multiple timeout failure signatures (3.2s, 2.8s at different lines) with shared root cause (unbounded loop) and common fix (timeout wrapper). Demonstrates failure signature similarity and resolved/unresolved tracking—directly applicable to circuit breaker threshold decisions."
+          },
+          {
+            "file": "success-patterns.json (daemon timeout - issue 699)",
+            "relevance": 72,
+            "summary": "Pattern for fixing daemon timeout with handler approach in sw-daemon.sh. Daemon circuit breaker logic and timeout management are core to adaptive threshold implementation."
+          },
+          {
+            "file": "index.json",
+            "relevance": 58,
+            "summary": "Shows pattern classification across stages with failure signatures and fixes (e.g., test_failure → timeout increase). Provides foundational model for grouping similar failures and their remedies."
+          }
+        ]
+      },
+      "timestamp": 1790332972,
+      "ttl": 1800
+    },
+    "5848ffe98477613d955783f0c9a2bc9c": {
+      "result": {
+        "results": [
+          {
+            "file": "failures.json",
+            "relevance": 92,
+            "summary": "Contains actual failure signatures with patterns (e.g., multiple timeouts at different times showing similarity), root causes, and resolution status. Directly informs failure signature analysis and similarity detection logic for the circuit breaker."
+          },
+          {
+            "file": "fleet-shared-patterns.json",
+            "relevance": 80,
+            "summary": "Demonstrates fleet-wide failure pattern tracking with signature hashes, seen counts, and cross-repo contributions. Shows how to represent and aggregate similar failures across multiple sources—key for adaptive threshold design."
+          },
+          {
+            "file": "index.json",
+            "relevance": 72,
+            "summary": "Provides indexed failure patterns organized by signature type and stage with fix recommendations. Offers a structured approach to organizing and retrieving failure signatures by pattern type."
+          },
+          {
+            "file": "architecture.json",
+            "relevance": 58,
+            "summary": "Contains architectural rules and design patterns. Provides foundational architecture constraints that should guide the circuit breaker design stage."
+          },
+          {
+            "file": "success-patterns.json",
+            "relevance": 42,
+            "summary": "Historical pattern metadata showing complexity, iterations, and stages. Less directly relevant to failure signature similarity, but provides context for pattern structure and complexity estimation."
+          }
+        ]
+      },
+      "timestamp": 1790333042,
+      "ttl": 1800
+    },
+    "ce8ec78eb8122ff69002f8b819f1f0bb": {
+      "result": {
+        "results": [
+          {
+            "file": "failures.json",
+            "relevance": 95,
+            "summary": "Contains concrete failure signature patterns (timeout after 3.2s vs 2.8s, database connection refused) with root causes and resolution tracking. Directly demonstrates failure signature similarity matching needed for adaptive circuit breaker design."
+          },
+          {
+            "file": "index.json",
+            "relevance": 75,
+            "summary": "Shows failure patterns indexed by stage, pattern_type, and frequency. Demonstrates how failures are classified and tracked across stages—foundational for designing a circuit breaker's failure signature similarity matching logic."
+          },
+          {
+            "file": "success-patterns.json",
+            "relevance": 62,
+            "summary": "Multiple daemon timeout patterns (Fix daemon timeout: 2 iterations, Fix timeout: 3 iterations) demonstrate iterative approaches to timeout handling in background services. Relevant for understanding what timeout-related design approaches have succeeded or required rework."
+          }
+        ]
+      },
+      "timestamp": 1790333062,
+      "ttl": 1800
+    },
+    "63254a3337b012f289c5fc2cd0275f1c": {
+      "result": {
+        "results": [
+          {
+            "file": "failures.json",
+            "relevance": 90,
+            "summary": "Contains explicit failure signatures with patterns, root causes, seen counts, and resolution status. Directly applicable to building failure signature similarity detection for circuit breaker thresholds."
+          },
+          {
+            "file": "index.json",
+            "relevance": 80,
+            "summary": "Indexes failure patterns by signature with stage metadata and fixes. Shows how failure patterns are currently tracked and categorized in the system."
+          },
+          {
+            "file": "fleet-shared-patterns.json",
+            "relevance": 70,
+            "summary": "Demonstrates signature hashing and cross-repo pattern tracking with seen counts and metadata. Relevant for understanding pattern similarity and aggregation across distributed failures."
+          },
+          {
+            "file": "success-patterns.json (Fix timeout, repo: test-repo-789)",
+            "relevance": 55,
+            "summary": "Build stage pattern for daemon timeout fix shows relevant context on timeout handling, error signatures array, and build stage execution patterns."
+          },
+          {
+            "file": "fleet-patterns.json",
+            "relevance": 40,
+            "summary": "Structured pattern storage format (though currently empty) provides schema for how patterns should be stored for fleet-wide circuit breaker decisions."
+          }
+        ]
+      },
+      "timestamp": 1790333169,
+      "ttl": 1800
+    },
+    "47c1451f50b4a8f9faa0f8012f6b922e": {
+      "result": {
+        "results": [
+          {
+            "file": "failures.json",
+            "relevance": 95,
+            "summary": "148 test failures with root causes and fixes; directly relevant to build stage test execution (intent-analysis, e2e-integration, cost-test failures; flaky patterns)"
+          },
+          {
+            "file": "success-patterns.json",
+            "relevance": 90,
+            "summary": "2 successful build patterns showing iteration counts (3-4), file change patterns, test strategies (npm test), and duration (45-150s); directly applicable to current build work"
+          },
+          {
+            "file": "retry-outcomes.json",
+            "relevance": 78,
+            "summary": "Build failure retry strategy shows model escalation achieves 100% success rate (5/5 attempts); relevant for recovery if build fails"
+          },
+          {
+            "file": "flaky-tests.json",
+            "relevance": 72,
+            "summary": "Identifies flaky test patterns (test-1, test-auth) with confidence scores and error messages; helps predict test instability during build"
+          },
+          {
+            "file": "knowledge.json",
+            "relevance": 55,
+            "summary": "4 failure knowledge entries document mktemp directory issues, cleanup output format, and regression detection; partially relevant to test setup/execution"
+          }
+        ]
+      },
+      "timestamp": 1790333182,
+      "ttl": 1800
+    },
+    "caa198e3f75d561978df16d963ccf99e": {
+      "result": {
+        "raw_response": "Mock claude: ok"
+      },
+      "timestamp": 1790333475,
+      "ttl": 1800
     }
   }
 }

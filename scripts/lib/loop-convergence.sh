@@ -8,6 +8,12 @@ _LOOP_CONVERGENCE_LOADED=1
 _CONVERGENCE_SCRIPT_DIR="${_CONVERGENCE_SCRIPT_DIR:-$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)}"
 [[ -f "${_CONVERGENCE_SCRIPT_DIR}/auto-recovery.sh" ]] && source "${_CONVERGENCE_SCRIPT_DIR}/auto-recovery.sh"
 
+# ─── Adaptive Circuit Breaker Integration ────────────────────────────────────
+# Source the adaptive circuit breaker for dynamic threshold adjustment based on
+# failure signature similarity.
+_PARENT_SCRIPT_DIR="${_PARENT_SCRIPT_DIR:-$(cd "${_CONVERGENCE_SCRIPT_DIR}/.." && pwd)}"
+[[ -f "${_PARENT_SCRIPT_DIR}/sw-circuit-breaker.sh" ]] && source "${_PARENT_SCRIPT_DIR}/sw-circuit-breaker.sh" 2>/dev/null || true
+
 # ─── Convergence Detection ────────────────────────────────────────────────────
 
 track_iteration_velocity() {
@@ -87,8 +93,15 @@ check_circuit_breaker() {
         fi
     fi
 
+    # ─── Adaptive Circuit Breaker: adjust threshold based on failure signatures
+    local effective_threshold="$CIRCUIT_BREAKER_THRESHOLD"
+    if type compute_adaptive_threshold >/dev/null 2>&1; then
+        local error_log="${ARTIFACTS_DIR:-${PROJECT_ROOT:-.}/.claude/pipeline-artifacts}/error-log.jsonl"
+        effective_threshold=$(compute_adaptive_threshold "$error_log" "$CIRCUIT_BREAKER_THRESHOLD" 2>/dev/null || echo "$CIRCUIT_BREAKER_THRESHOLD")
+    fi
+
     # ─── Auto-Recovery: attempt fix before aborting ────────────────────────
-    if [[ "$CONSECUTIVE_FAILURES" -ge "$CIRCUIT_BREAKER_THRESHOLD" ]]; then
+    if [[ "$CONSECUTIVE_FAILURES" -ge "$effective_threshold" ]]; then
         if type recovery_before_circuit_breaker >/dev/null 2>&1; then
             local error_log="${ARTIFACTS_DIR:-${PROJECT_ROOT:-.}/.claude/pipeline-artifacts}/error-log.jsonl"
             if recovery_before_circuit_breaker "$error_log" "${PROJECT_ROOT:-.}" "${TEST_CMD:-}"; then
@@ -97,7 +110,7 @@ check_circuit_breaker() {
                 return 0
             fi
         fi
-        error "Circuit breaker tripped: ${CIRCUIT_BREAKER_THRESHOLD} consecutive iterations with no meaningful progress."
+        error "Circuit breaker tripped: ${effective_threshold} consecutive iterations with no meaningful progress (base: ${CIRCUIT_BREAKER_THRESHOLD})."
         STATUS="circuit_breaker"
         return 1
     fi
