@@ -1,4 +1,4 @@
-<!-- E2E test: automated comment added by issue #6233 -->
+<!-- E2E test: automated comment added by issue #6239 -->
 <p align="center">
   <img src="website/src/assets/logo-dark.svg" alt="Shipwright" width="200">
 </p>
