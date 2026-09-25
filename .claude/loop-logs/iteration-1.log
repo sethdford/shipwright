@@ -1,3 +1,3 @@
-The goal — adding an E2E test comment marker to README for issue #6396 — is complete, matching the exact pattern used by prior identical automated runs (#6297, #6304, #6311, #6315, #6316). This is a doc-only, no-risk change.
+The goal — adding the E2E test comment to README for issue #6397 — is complete, and the previously-flaky test suites (sw-e2e-integration-test, sw-intent-analysis-test, sw-self-optimize-test) now pass or skip as expected (missing API token). All existing tests continue to pass.
 
 LOOP_COMPLETE

@@ -1785,7 +1785,10 @@ test_retry_args_passed_to_spawn() {
 test_failure_classification_wired() {
     local daemon_src
     daemon_src="$(dirname "$DAEMON_SCRIPT")/sw-daemon.sh"
-    grep -A 50 'daemon_on_failure()' "$daemon_src" $DAEMON_LIB_GLOB | grep -q 'classify_failure' || \
+    # Capture first: piping into grep -q under pipefail SIGPIPEs the producer
+    local on_failure_body
+    on_failure_body=$(grep -A 50 'daemon_on_failure()' "$daemon_src" $DAEMON_LIB_GLOB || true)
+    [[ "$on_failure_body" == *classify_failure* ]] || \
         { echo "classify_failure not called in daemon_on_failure"; return 1; }
     grep -q 'daemon.failure_classified' "$daemon_src" $DAEMON_LIB_GLOB || \
         { echo "Missing daemon.failure_classified event"; return 1; }
@@ -1856,7 +1859,10 @@ test_retry_args_passed_to_spawn() {
 test_failure_classification_wired() {
     local daemon_src
     daemon_src="$(dirname "$DAEMON_SCRIPT")/sw-daemon.sh"
-    grep -A 50 'daemon_on_failure()' "$daemon_src" $DAEMON_LIB_GLOB | grep -q 'classify_failure' || \
+    # Capture first: piping into grep -q under pipefail SIGPIPEs the producer
+    local on_failure_body
+    on_failure_body=$(grep -A 50 'daemon_on_failure()' "$daemon_src" $DAEMON_LIB_GLOB || true)
+    [[ "$on_failure_body" == *classify_failure* ]] || \
         { echo "classify_failure not called in daemon_on_failure"; return 1; }
     grep -q 'daemon.failure_classified' "$daemon_src" $DAEMON_LIB_GLOB || \
         { echo "Missing daemon.failure_classified event"; return 1; }
