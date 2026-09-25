@@ -2434,6 +2434,41 @@
       ],
       "timestamp": 1790367575,
       "ttl": 1800
+    },
+    "d9560e8296cad189d3546d8725833d7b": {
+      "result": {
+        "raw_response": "Mock claude: ok"
+      },
+      "timestamp": 1790368011,
+      "ttl": 1800
+    },
+    "b3f4e7d9bc26884c11abe5fe99f80189": {
+      "result": [
+        {
+          "type": "result",
+          "result": "I am trying the same approach again.",
+          "usage": {
+            "input_tokens": 0,
+            "output_tokens": 0
+          }
+        }
+      ],
+      "timestamp": 1790368194,
+      "ttl": 1800
+    },
+    "3a16d200f09c95476b75165e97f38e8a": {
+      "result": [
+        {
+          "type": "result",
+          "result": "I am trying the same approach again.",
+          "usage": {
+            "input_tokens": 0,
+            "output_tokens": 0
+          }
+        }
+      ],
+      "timestamp": 1790368242,
+      "ttl": 1800
     }
   }
 }
