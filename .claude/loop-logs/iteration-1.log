@@ -1,1 +1,1 @@
-I've committed the README change for this iteration (added the E2E test comment for issue #6311). The full test suite (`npm test`) is running in the background — I'll wait for its completion notification before confirming everything passes and deciding whether to output LOOP_COMPLETE.
+I'll wait for the background task notification rather than poll further.
