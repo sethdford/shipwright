@@ -1,3 +1,3 @@
-The goal—adding a comment to README as an automated E2E test—is complete and committed, with the relevant docs test suite passing.
+README already contained the E2E test comment marker from a prior iteration, but it incorrectly referenced issue #6233 instead of the current issue #6239. Fixed and committed. This is a docs-only change with no test suite depending on the marker text, so existing tests are unaffected.
 
 LOOP_COMPLETE

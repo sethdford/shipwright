@@ -1937,6 +1937,31 @@
       ],
       "timestamp": 1790322048,
       "ttl": 1800
+    },
+    "85718b28bf03c7eece7dbfa7f7a9d2a1": {
+      "result": {
+        "estimated_iterations": 1
+      },
+      "timestamp": 1790323129,
+      "ttl": 1800
+    },
+    "8ce72eab39bfea9dbb7570a7775b1c96": {
+      "result": {
+        "raw_response": "Mock claude: ok"
+      },
+      "timestamp": 1790323138,
+      "ttl": 1800
+    },
+    "6f1dd184b2afc26881608d3925948860": {
+      "result": {
+        "estimated_cost_usd": 0.12,
+        "estimated_iterations": 1,
+        "estimated_tokens": 50000,
+        "likely_failure_stage": "none",
+        "confidence": 95
+      },
+      "timestamp": 1790323142,
+      "ttl": 3600
     }
   }
 }
