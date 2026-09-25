@@ -361,6 +361,19 @@ The algorithm extracts error signatures from `.claude/pipeline-artifacts/error-l
 
 Similarity ≥ 75% → increase threshold. Similarity < 50% → decrease threshold. All results clamp to [2, 8].
 
+The latest failure is also looked up in memory (`failures.json` from `sw-memory.sh`, read locally — works offline). Memory is cross-run evidence, so its verdict takes precedence over similarity:
+
+- **Resolved match** (past fix worked, `fix_effectiveness_rate` ≥ 50%): threshold = base + 2
+- **Unrecoverable match** (seen ≥ 3 times, fixes applied but `fix_effectiveness_rate` ≤ 20%): threshold = base − 1, even if signatures are similar
+- **No match / memory missing or malformed**: the similarity result stands (static base if that is neutral too)
+
+| Key                                             | Default | Purpose                                                        |
+| ----------------------------------------------- | ------- | -------------------------------------------------------------- |
+| `loop.adaptive_circuit_breaker_memory_enabled`  | `true`  | Set `false` to use only within-run similarity                  |
+| `loop.circuit_breaker_threshold_pinned`         | `false` | Explicit override — adaptive logic never changes the threshold |
+
+Inspect a verdict with `scripts/sw-circuit-breaker.sh memory <failures.json> "<error>"`.
+
 ## Constitutional AI
 
 Code quality principles are defined in `config/code-constitution.json`. The constitution provides machine-checkable rules across five categories:

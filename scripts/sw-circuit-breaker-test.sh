@@ -14,6 +14,9 @@ run_tests() {
     # Source the circuit breaker module (with pipefail enabled)
     source "$SCRIPT_DIR/sw-circuit-breaker.sh" || return 1
 
+    # Isolate from the real ~/.shipwright memory so results are deterministic
+    CIRCUIT_BREAKER_MEMORY_FILE="$TEST_DIR/no-memory.json"
+
     # Test result tracking
     local PASS=0
     local FAIL=0
@@ -207,6 +210,145 @@ EOF
         echo "  ✗ respects maximum threshold (expected <= 8, got $result)"
         FAIL=$((FAIL + 1))
     fi
+
+    # ─── Test: Memory Signature Lookup ──────────────────────────────────────────
+
+    echo ""
+    echo "Testing: query_memory_signature_match()"
+
+    cat > "$TEST_DIR/failures.json" <<'JSON'
+{"failures":[
+  {"stage":"test","pattern":"ModuleNotFoundError: No module named 'requests'","fix":"pip install requests","seen_count":4,"times_fix_applied":3,"times_fix_resolved":3,"fix_effectiveness_rate":100},
+  {"stage":"build","pattern":"Segmentation fault in native extension","fix":"rebuild","seen_count":5,"times_fix_applied":4,"times_fix_resolved":0,"fix_effectiveness_rate":0},
+  {"stage":"build","pattern":"Flaky socket timeout on port 8080","fix":"","seen_count":1,"times_fix_applied":1,"times_fix_resolved":0,"fix_effectiveness_rate":0},
+  {"stage":"test","pattern":"error","seen_count":9,"times_fix_applied":5,"times_fix_resolved":0,"fix_effectiveness_rate":0}
+]}
+JSON
+
+    assert_eq() {
+        local desc="$1" expected="$2" actual="$3"
+        if [[ "$actual" == "$expected" ]]; then
+            echo "  ✓ $desc"
+            PASS=$((PASS + 1))
+        else
+            echo "  ✗ $desc (expected: $expected, got: $actual)"
+            FAIL=$((FAIL + 1))
+        fi
+    }
+
+    assert_eq "no match returns none" "none" \
+        "$(query_memory_signature_match "$TEST_DIR/failures.json" "TypeError: x is not a function")"
+    assert_eq "resolved match (effective past fix) returns resolved" "resolved" \
+        "$(query_memory_signature_match "$TEST_DIR/failures.json" "Traceback: ModuleNotFoundError: No module named 'requests'")"
+    assert_eq "matching is case-insensitive" "resolved" \
+        "$(query_memory_signature_match "$TEST_DIR/failures.json" "MODULENOTFOUNDERROR: NO MODULE NAMED 'REQUESTS'")"
+    assert_eq "unrecoverable match (fixes kept failing) returns unrecoverable" "unrecoverable" \
+        "$(query_memory_signature_match "$TEST_DIR/failures.json" "Segmentation fault in native extension (core dumped)")"
+    assert_eq "low-confidence match (seen once) returns none" "none" \
+        "$(query_memory_signature_match "$TEST_DIR/failures.json" "Flaky socket timeout on port 8080")"
+    assert_eq "short patterns are ignored (no match on 'error')" "none" \
+        "$(query_memory_signature_match "$TEST_DIR/failures.json" "some unrelated error happened")"
+    assert_eq "missing memory file returns none" "none" \
+        "$(query_memory_signature_match "$TEST_DIR/missing.json" "Segmentation fault in native extension")"
+    echo "{not json" > "$TEST_DIR/malformed.json"
+    assert_eq "malformed memory file returns none" "none" \
+        "$(query_memory_signature_match "$TEST_DIR/malformed.json" "Segmentation fault in native extension")"
+    assert_eq "empty error message returns none" "none" \
+        "$(query_memory_signature_match "$TEST_DIR/failures.json" "")"
+
+    cat > "$TEST_DIR/both.json" <<'JSON'
+{"failures":[
+  {"pattern":"Segmentation fault in native extension","seen_count":5,"times_fix_applied":4,"times_fix_resolved":0,"fix_effectiveness_rate":0},
+  {"pattern":"Segmentation fault in native","seen_count":2,"times_fix_applied":2,"times_fix_resolved":2,"fix_effectiveness_rate":100}
+]}
+JSON
+    assert_eq "resolved match wins over unrecoverable match" "resolved" \
+        "$(query_memory_signature_match "$TEST_DIR/both.json" "Segmentation fault in native extension")"
+
+    CIRCUIT_BREAKER_MEMORY_FILE="" MEMORY_ROOT="$TEST_DIR/memroot" \
+        SHIPWRIGHT_LOOP_ADAPTIVE_CIRCUIT_BREAKER_MEMORY_ENABLED=false \
+        bash -c 'source "$1"; [[ -z "$(resolve_memory_failures_file)" ]]' _ "$SCRIPT_DIR/sw-circuit-breaker.sh"
+    assert_eq "memory lookup disabled via config returns no file" "0" "$?"
+
+    result=$(CIRCUIT_BREAKER_MEMORY_FILE="" MEMORY_ROOT="$TEST_DIR/memroot" \
+        bash -c 'source "$1"; resolve_memory_failures_file' _ "$SCRIPT_DIR/sw-circuit-breaker.sh")
+    if [[ "$result" == "$TEST_DIR/memroot/"*"/failures.json" ]]; then
+        echo "  ✓ memory file resolves under MEMORY_ROOT/<repo_hash>/"
+        PASS=$((PASS + 1))
+    else
+        echo "  ✗ memory file resolves under MEMORY_ROOT/<repo_hash>/ (got: $result)"
+        FAIL=$((FAIL + 1))
+    fi
+
+    # ─── Test: Memory-Informed Threshold ────────────────────────────────────────
+
+    echo ""
+    echo "Testing: compute_adaptive_threshold() with memory"
+
+    ADAPTIVE_ENABLED=1
+    CIRCUIT_BREAKER_MEMORY_FILE="$TEST_DIR/failures.json"
+
+    cat > "$TEST_DIR/mem_single_resolved.jsonl" <<'JSONL'
+{"error":"ModuleNotFoundError: No module named 'requests'","type":"test","stage":"test"}
+JSONL
+    assert_eq "resolved memory match raises threshold with a single failure" "5" \
+        "$(compute_adaptive_threshold "$TEST_DIR/mem_single_resolved.jsonl" 3)"
+
+    cat > "$TEST_DIR/mem_diverse_resolved.jsonl" <<'JSONL'
+{"error":"ENOENT: file missing","type":"io","stage":"build","timestamp":"2026-09-25T10:00:00Z"}
+{"error":"ModuleNotFoundError: No module named 'requests'","type":"test","stage":"test","timestamp":"2026-09-25T11:00:00Z"}
+JSONL
+    assert_eq "resolved memory match overrides diverse-signature decrease" "5" \
+        "$(compute_adaptive_threshold "$TEST_DIR/mem_diverse_resolved.jsonl" 3)"
+
+    cat > "$TEST_DIR/mem_similar_unrec.jsonl" <<'JSONL'
+{"error":"Segmentation fault in native extension","type":"crash","stage":"build","timestamp":"2026-09-25T10:00:00Z"}
+{"error":"Segmentation fault in native extension","type":"crash","stage":"build","timestamp":"2026-09-25T10:01:00Z"}
+JSONL
+    assert_eq "unrecoverable memory match lowers threshold despite similar signatures" "2" \
+        "$(compute_adaptive_threshold "$TEST_DIR/mem_similar_unrec.jsonl" 3)"
+
+    assert_eq "unrecoverable match still respects minimum bound" "2" \
+        "$(compute_adaptive_threshold "$TEST_DIR/mem_similar_unrec.jsonl" 2)"
+
+    assert_eq "resolved match still respects maximum bound" "8" \
+        "$(compute_adaptive_threshold "$TEST_DIR/mem_single_resolved.jsonl" 7)"
+
+    assert_eq "no memory match falls back to similarity result (similar → +2)" "5" \
+        "$(compute_adaptive_threshold "$TEST_DIR/similar.jsonl" 3)"
+
+    assert_eq "no memory match and single failure falls back to static base" "3" \
+        "$(compute_adaptive_threshold "$TEST_DIR/single.jsonl" 3)"
+
+    CIRCUIT_BREAKER_MEMORY_FILE="$TEST_DIR/missing.json"
+    assert_eq "missing memory file falls back to static base" "3" \
+        "$(compute_adaptive_threshold "$TEST_DIR/mem_single_resolved.jsonl" 3)"
+    CIRCUIT_BREAKER_MEMORY_FILE="$TEST_DIR/failures.json"
+
+    assert_eq "pinned threshold is never overridden" "3" \
+        "$(SHIPWRIGHT_LOOP_CIRCUIT_BREAKER_THRESHOLD_PINNED=true compute_adaptive_threshold "$TEST_DIR/mem_similar_unrec.jsonl" 3)"
+
+    ADAPTIVE_ENABLED=0
+    assert_eq "disabled feature ignores memory entirely" "3" \
+        "$(compute_adaptive_threshold "$TEST_DIR/mem_single_resolved.jsonl" 3)"
+    ADAPTIVE_ENABLED=1
+    CIRCUIT_BREAKER_MEMORY_FILE="$TEST_DIR/missing.json"
+
+    # ─── Test: Config & Sourcing Safety ─────────────────────────────────────────
+
+    echo ""
+    echo "Testing: configuration and sourcing"
+
+    result=$(SHIPWRIGHT_LOOP_ADAPTIVE_CIRCUIT_BREAKER_ENABLED=true \
+        bash -c 'source "$1"; echo "$ADAPTIVE_ENABLED"' _ "$SCRIPT_DIR/sw-circuit-breaker.sh")
+    assert_eq "enabled flag accepts boolean 'true'" "1" "$result"
+
+    result=$(SHIPWRIGHT_LOOP_ADAPTIVE_CIRCUIT_BREAKER_ENABLED=0 \
+        bash -c 'source "$1"; echo "$ADAPTIVE_ENABLED"' _ "$SCRIPT_DIR/sw-circuit-breaker.sh")
+    assert_eq "enabled flag accepts '0' as disabled" "0" "$result"
+
+    result=$(bash -c 'SCRIPT_DIR=/caller/dir; source "$1"; echo "$SCRIPT_DIR"' _ "$SCRIPT_DIR/sw-circuit-breaker.sh")
+    assert_eq "sourcing does not clobber caller's SCRIPT_DIR" "/caller/dir" "$result"
 
     # ─── Test: Diagnostic Functions ─────────────────────────────────────────────
 

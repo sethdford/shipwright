@@ -51,8 +51,8 @@ fi
 # Autonomous error recovery with model escalation
 # shellcheck source=lib/auto-recovery.sh
 [[ -f "$SCRIPT_DIR/lib/auto-recovery.sh" ]] && source "$SCRIPT_DIR/lib/auto-recovery.sh" 2>/dev/null || true
-# NOTE: Circuit breaker adaptive features are in sw-circuit-breaker.sh but not sourced here
-# to avoid test environment issues. The feature is available as a library for explicit use.
+# Adaptive circuit breaker (sw-circuit-breaker.sh) is sourced by lib/loop-convergence.sh,
+# which owns check_circuit_breaker.
 # Test execution optimization (issue #200)
 # shellcheck source=lib/test-optimizer.sh
 [[ -f "$SCRIPT_DIR/lib/test-optimizer.sh" ]] && source "$SCRIPT_DIR/lib/test-optimizer.sh" 2>/dev/null || true
