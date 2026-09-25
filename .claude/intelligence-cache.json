@@ -1660,33 +1660,33 @@
       "result": {
         "results": [
           {
-            "file": "failures.json",
-            "relevance": 95,
-            "summary": "Documents test stage failures with root causes and fixes (intent-analysis schema issues, stale pipeline locks, flaky suites). Critical for understanding what breaks during build and test iterations."
-          },
-          {
             "file": "retry-outcomes.json",
-            "relevance": 85,
-            "summary": "Shows model_escalation retry strategy for build_failure with 100% success rate (5/5). Directly applicable if current build fails and needs escalation."
+            "relevance": 95,
+            "summary": "Directly tracks build_failure retry outcomes with 100% success rate using model escalation—critical for understanding how build failures are recovered"
           },
           {
             "file": "success-patterns.json",
             "relevance": 80,
-            "summary": "Contains successful bug-fix patterns with iteration counts (3 iterations), test strategies (npm test), and file change patterns. Shows what successful builds look like for similar complexity."
+            "summary": "Contains successful build approaches with iterations, file patterns, test strategies, and costs—provides templates for similar build-stage work"
+          },
+          {
+            "file": "metrics.json",
+            "relevance": 72,
+            "summary": "Baseline build duration (7095s) and test duration metrics for performance comparison during this build stage"
           },
           {
             "file": "patterns.json",
-            "relevance": 70,
-            "summary": "Documents project structure (node/vitest/npm/javascript). Essential for understanding build environment and how to run tests during the build stage."
+            "relevance": 65,
+            "summary": "Project structure (Node, vitest, npm, CommonJS)—essential metadata for determining build and test execution approach"
           },
           {
-            "file": "flaky-tests.json",
-            "relevance": 65,
-            "summary": "Identifies flaky tests (test-1 85% confidence, test-auth 90% confidence). Helps distinguish real failures from environment noise during build/test phase."
+            "file": "knowledge.json",
+            "relevance": 50,
+            "summary": "Test setup failures (mktemp, directory creation) that can block build pipelines—relevant failure patterns from previous runs"
           }
         ]
       },
-      "timestamp": 1790319832,
+      "timestamp": 1790321955,
       "ttl": 1800
     },
     "2ddeb4984a4de78ae085bfea05168207": {
@@ -1922,6 +1922,20 @@
         }
       ],
       "timestamp": 1790321845,
+      "ttl": 1800
+    },
+    "9175bff228fe9191b81293891d9abac1": {
+      "result": [
+        {
+          "type": "result",
+          "result": "I am trying the same approach again.",
+          "usage": {
+            "input_tokens": 0,
+            "output_tokens": 0
+          }
+        }
+      ],
+      "timestamp": 1790322048,
       "ttl": 1800
     }
   }
