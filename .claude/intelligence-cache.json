@@ -2481,6 +2481,13 @@
       },
       "timestamp": 1790368390,
       "ttl": 3600
+    },
+    "157b3a3b8085b098bf80629e7cb710fa": {
+      "result": {
+        "raw_response": "Mock claude: ok"
+      },
+      "timestamp": 1790369232,
+      "ttl": 1800
     }
   }
 }

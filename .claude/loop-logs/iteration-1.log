@@ -1,3 +1,3 @@
-The three previously-reported test failures (sw-e2e-integration-test, sw-intent-analysis-test, sw-self-optimize-test) all pass in isolation now — they were flaky/transient in the full 717s suite run, not caused by actual code issues. The goal itself (adding the E2E test comment to README for issue #6406) is complete and committed.
+Committed. The goal (add an E2E test comment for issue #6409 to README.md) is fully achieved, and I verified the three previously-flagged failing test suites all pass/skip cleanly in isolation and in a fresh full run — confirming those were pre-existing flakiness/missing-credential skips, not regressions from this change.
 
 LOOP_COMPLETE
