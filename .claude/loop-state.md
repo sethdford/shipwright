@@ -13,38 +13,40 @@ Historical context (lessons from previous pipelines):
 {
   "results": [
     {
-      "file": "failures.json",
-      "relevance": 85,
-      "summary": "Contains actual failure patterns from build/test stages with proven fixes (timeout wrappers, database connection handling), directly applicable to troubleshooting build issues"
+      "file": "fleet-shared-patterns.json",
+      "relevance": 70,
+      "summary": "Shows 'Error: Cannot find module' → 'npm i' pattern seen in build stage across multiple repos. Most common build failure; directly applicable to prevent module loading issues in E2E build."
     },
     {
-      "file": "fleet-shared-patterns.json",
-      "relevance": 78,
-      "summary": "Common 'Cannot find module' error in build stage with fix 'npm i', observed across multiple repos—directly relevant to build environment setup"
+      "file": "success-patterns.json (test-repo-ranking)",
+      "relevance": 55,
+      "summary": "Two successful low-complexity build patterns with npm test strategy. Both single-iteration builds similar to adding README comment—demonstrates expected build profile for simple tasks."
     },
     {
       "file": "index.json",
-      "relevance": 72,
-      "summary": "Contains test_failure pattern specifically in build stage with known fix (increase timeout), applicable to build-stage test execution"
+      "relevance": 48,
+      "summary": "Captures test failure pattern in build stage context. Suggests timeout issues in test setup—relevant to understand potential build/test transition issues for E2E verification."
     },
     {
-      "file": "success-patterns.json",
-      "relevance": 64,
-      "summary": "Pattern 'Timed fix' executed across intake→build→test with npm test strategy, demonstrates successful multi-stage build workflow"
+      "file": "success-patterns.json (test-repo-comptime)",
+      "relevance": 45,
+      "summary": "Multi-stage pattern including build stage. Shows a complete workflow cycle; provides context on build-to-test progression and overall completion time expectations (1234s, $3.75)."
     },
     {
-      "file": "success-patterns.json",
-      "relevance": 58,
-      "summary": "Pattern 'Fix daemon timeout' from build stage with timeout handler approach, provides strategy for handling build-stage timeouts"
+      "file": "failures.json (with timeout/db content)",
+      "relevance": 40,
+      "summary": "Tracks resolved test-stage failures (timeouts, db issues). Useful reference for understanding failure modes that may surface after build succeeds in an E2E test cycle."
     }
   ]
 }
 
 Discoveries from other pipelines:
-✓ Injected 7 new discoveries
+✓ Injected 9 new discoveries
 [intake] Stage intake completed — Resolution: 
 [spec_generation] Stage spec_generation completed — Resolution: 
 [design] Design completed for Adaptive circuit breaker threshold based on failure signature similarity — Resolution: 
+[intake] Stage intake completed — Resolution: 
+[spec_generation] Stage spec_generation completed — Resolution: 
 [intake] Stage intake completed — Resolution: 
 [spec_generation] Stage spec_generation completed — Resolution: 
 [intake] Stage intake completed — Resolution: 
@@ -139,8 +141,8 @@ status: running
 test_cmd: "npm test"
 model: sonnet
 agents: 1
-started_at: 2026-09-25T19:20:59Z
-last_iteration_at: 2026-09-25T19:20:59Z
+started_at: 2026-09-25T19:58:24Z
+last_iteration_at: 2026-09-25T19:58:24Z
 consecutive_failures: 0
 total_commits: 0
 audit_enabled: true

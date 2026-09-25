@@ -30,17 +30,17 @@
     },
     "d41d8cd98f00b204e9800998ecf8427e": {
       "result": {
-        "primary_role": "builder",
+        "primary_role": "tester",
         "secondary_roles": [
-          "architect",
-          "tester"
+          "builder",
+          "reviewer"
         ],
         "confidence": 0.85,
-        "reasoning": "Adaptive circuit breaker requires implementing failure signature similarity detection and dynamic threshold adjustment (builder), designing the algorithm architecture (architect), and testing diverse failure patterns (tester).",
+        "reasoning": "Task is explicitly E2E test creation and validation; requires test strategy, test case generation, and quality validation. Builder assists with implementation, reviewer ensures test quality.",
         "new_role_needed": false,
         "suggested_role": null
       },
-      "timestamp": 1790362507,
+      "timestamp": 1790366303,
       "ttl": 3600
     },
     "efd5524ad1244fd20344bf3ff5d95233": {
@@ -1672,31 +1672,31 @@
           {
             "file": "failures.json",
             "relevance": 95,
-            "summary": "Documents test stage failures with root causes and fixes (intent-analysis schema issues, e2e-integration stale locks, loop-behavior flakiness). Directly applicable to diagnosing build-stage test failures."
+            "summary": "Contains 9 recent test-stage failures with root causes and fixes; directly applicable to preventing and fixing build failures (sw-intent-analysis-test schema issues, stale pipeline locks, e2e-integration timeouts)"
           },
           {
             "file": "success-patterns.json",
-            "relevance": 90,
-            "summary": "Two successful build patterns recorded (bug fix: 3 iterations/45s, feature: 3 iterations/150s). Shows typical iteration counts, test strategies, and file patterns that succeeded previously."
-          },
-          {
-            "file": "retry-outcomes.json",
-            "relevance": 90,
-            "summary": "Explicitly documents build_failure recovery using model_escalation strategy with 100% success rate (5/5 attempts). Direct guidance for handling build stage failures."
+            "relevance": 92,
+            "summary": "Documents two successful builds: 'Fix bug' (3 iterations, 45s) and 'Add authentication' (3 iterations, 150s) using standard template and npm test; provides timing expectations and proven approaches"
           },
           {
             "file": "flaky-tests.json",
-            "relevance": 75,
-            "summary": "Identifies known flaky tests (test-1: 5 occurrences, test-auth: 8 occurrences with connection timeout). Helps predict which tests may fail during build/test stage execution."
+            "relevance": 90,
+            "summary": "Identifies 2 unstable tests (test-1 with 85% confidence, test-auth with 90% confidence) that cause intermittent build failures; helps predict which tests may fail during this build"
           },
           {
             "file": "knowledge.json",
-            "relevance": 70,
-            "summary": "Documents specific test setup failures (mktemp /tmp/claude issues, sw-cleanup.sh dry-run output, feedback.sh JSON generation). Provides actionable fixes for common test harness problems."
+            "relevance": 82,
+            "summary": "Captures 5 historical test failure patterns with fixes: mktemp /tmp/claude issues, sw-cleanup output missing --force hint, and regression detection JSON formatting; directly reusable for fixing build failures"
+          },
+          {
+            "file": "retry-outcomes.json",
+            "relevance": 75,
+            "summary": "Shows model_escalation retry strategy for build_failure with 100% success rate (5/5); validates that escalating to a stronger model recovers failed builds"
           }
         ]
       },
-      "timestamp": 1790362497,
+      "timestamp": 1790366293,
       "ttl": 1800
     },
     "caa198e3f75d561978df16d963ccf99e": {
@@ -1825,33 +1825,33 @@
       "result": {
         "results": [
           {
-            "file": "failures.json",
-            "relevance": 85,
-            "summary": "Contains actual failure patterns from build/test stages with proven fixes (timeout wrappers, database connection handling), directly applicable to troubleshooting build issues"
+            "file": "fleet-shared-patterns.json",
+            "relevance": 70,
+            "summary": "Shows 'Error: Cannot find module' → 'npm i' pattern seen in build stage across multiple repos. Most common build failure; directly applicable to prevent module loading issues in E2E build."
           },
           {
-            "file": "fleet-shared-patterns.json",
-            "relevance": 78,
-            "summary": "Common 'Cannot find module' error in build stage with fix 'npm i', observed across multiple repos—directly relevant to build environment setup"
+            "file": "success-patterns.json (test-repo-ranking)",
+            "relevance": 55,
+            "summary": "Two successful low-complexity build patterns with npm test strategy. Both single-iteration builds similar to adding README comment—demonstrates expected build profile for simple tasks."
           },
           {
             "file": "index.json",
-            "relevance": 72,
-            "summary": "Contains test_failure pattern specifically in build stage with known fix (increase timeout), applicable to build-stage test execution"
+            "relevance": 48,
+            "summary": "Captures test failure pattern in build stage context. Suggests timeout issues in test setup—relevant to understand potential build/test transition issues for E2E verification."
           },
           {
-            "file": "success-patterns.json",
-            "relevance": 64,
-            "summary": "Pattern 'Timed fix' executed across intake→build→test with npm test strategy, demonstrates successful multi-stage build workflow"
+            "file": "success-patterns.json (test-repo-comptime)",
+            "relevance": 45,
+            "summary": "Multi-stage pattern including build stage. Shows a complete workflow cycle; provides context on build-to-test progression and overall completion time expectations (1234s, $3.75)."
           },
           {
-            "file": "success-patterns.json",
-            "relevance": 58,
-            "summary": "Pattern 'Fix daemon timeout' from build stage with timeout handler approach, provides strategy for handling build-stage timeouts"
+            "file": "failures.json (with timeout/db content)",
+            "relevance": 40,
+            "summary": "Tracks resolved test-stage failures (timeouts, db issues). Useful reference for understanding failure modes that may surface after build succeeds in an E2E test cycle."
           }
         ]
       },
-      "timestamp": 1790363832,
+      "timestamp": 1790366276,
       "ttl": 1800
     },
     "787af305167a35c6737dd386269d4cb3": {
@@ -2365,7 +2365,7 @@
       "result": {
         "estimated_iterations": 1
       },
-      "timestamp": 1790364008,
+      "timestamp": 1790366211,
       "ttl": 1800
     },
     "8ddc561b044ae1baed6947b74fb90d70": {
