@@ -1727,9 +1727,9 @@
     },
     "339d21f04618a0da4790b6cc8b602750": {
       "result": {
-        "estimated_iterations": 2
+        "estimated_iterations": 1
       },
-      "timestamp": 1790334255,
+      "timestamp": 1790337817,
       "ttl": 1800
     },
     "08f43a926796ef0a8eae385ebec8226e": {
@@ -1805,33 +1805,33 @@
       "result": {
         "results": [
           {
-            "file": "index.json",
-            "relevance": 85,
-            "summary": "Direct build stage pattern with test_failure signature; includes concrete fix (increase timeout in test setup) applicable to build-stage test failures"
-          },
-          {
             "file": "fleet-shared-patterns.json",
+            "relevance": 85,
+            "summary": "Common build-stage error pattern ('Cannot find module' → 'npm i') seen across multiple repos. Highly applicable to build failures in any test automation context."
+          },
+          {
+            "file": "failures.json (with timeout/database patterns)",
             "relevance": 80,
-            "summary": "Cross-repo shared pattern: 'Cannot find module' error in build stage with fix 'npm i'; common build failure resolved in multiple repos"
+            "summary": "Actual failure signatures from test stage with root causes (timeout, unbounded loops) and documented fixes. Directly relevant to build-stage test failures."
           },
           {
-            "file": "success-patterns.json (test-repo-789)",
-            "relevance": 68,
-            "summary": "Build stage success pattern with high complexity (3 iterations); shows npm test strategy and timeout-related fix approach"
+            "file": "success-patterns.json (test-repo-ranking)",
+            "relevance": 75,
+            "summary": "Two documented build-stage patterns using npm test strategy. Generic but directly applicable to E2E test automation build execution."
           },
           {
-            "file": "success-patterns.json (test-final-working)",
+            "file": "index.json",
+            "relevance": 70,
+            "summary": "Test failure pattern indexed for build stage with specific fix (increase timeout in test setup). Relevant to handling test execution issues."
+          },
+          {
+            "file": "success-patterns.json (test-repo-outcomes)",
             "relevance": 65,
-            "summary": "Build stage success pattern with 2 iterations; demonstrates npm test strategy for daemon-related build tasks"
-          },
-          {
-            "file": "failures.json (with data)",
-            "relevance": 55,
-            "summary": "Actual observed build/test failures with root causes and fixes; shows timeout patterns and resolution strategies"
+            "summary": "Pattern for 'Test outcome' goal in build stage with npm test strategy and single iteration. Applicable to simple test build scenarios."
           }
         ]
       },
-      "timestamp": 1790334372,
+      "timestamp": 1790337876,
       "ttl": 1800
     },
     "787af305167a35c6737dd386269d4cb3": {
