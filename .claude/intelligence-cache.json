@@ -1653,33 +1653,33 @@
       "result": {
         "results": [
           {
-            "file": "retry-outcomes.json",
-            "relevance": 95,
-            "summary": "Directly tracks build_failure retry outcomes with 100% success rate using model escalation—critical for understanding how build failures are recovered"
-          },
-          {
             "file": "success-patterns.json",
-            "relevance": 80,
-            "summary": "Contains successful build approaches with iterations, file patterns, test strategies, and costs—provides templates for similar build-stage work"
+            "relevance": 95,
+            "summary": "Documents successful build patterns including iteration counts (3), files changed, test strategy (npm test), template (standard), and cost/duration metrics—directly shows what works in build stage"
           },
           {
-            "file": "metrics.json",
-            "relevance": 72,
-            "summary": "Baseline build duration (7095s) and test duration metrics for performance comparison during this build stage"
+            "file": "failures.json",
+            "relevance": 90,
+            "summary": "Contains test stage failures with root causes and fixes (intent-analysis schema, pipeline locks, flaky suites)—directly relevant since build stage runs tests and may encounter these same failures"
+          },
+          {
+            "file": "retry-outcomes.json",
+            "relevance": 85,
+            "summary": "Shows build_failure retry strategy with model_escalation achieving 100% success rate across 5 attempts—directly applicable recovery pattern for build failures"
           },
           {
             "file": "patterns.json",
-            "relevance": 65,
-            "summary": "Project structure (Node, vitest, npm, CommonJS)—essential metadata for determining build and test execution approach"
+            "relevance": 75,
+            "summary": "Project metadata (Node/vitest/npm) and conventions define the build environment and test execution method—essential context for understanding how builds operate"
           },
           {
-            "file": "knowledge.json",
-            "relevance": 50,
-            "summary": "Test setup failures (mktemp, directory creation) that can block build pipelines—relevant failure patterns from previous runs"
+            "file": "flaky-tests.json",
+            "relevance": 72,
+            "summary": "Lists flaky tests (test-1 with 85% confidence, test-auth with 90% confidence) that may fail during build execution—useful for predicting/tolerating test failures in this stage"
           }
         ]
       },
-      "timestamp": 1790321955,
+      "timestamp": 1790323995,
       "ttl": 1800
     },
     "2ddeb4984a4de78ae085bfea05168207": {
