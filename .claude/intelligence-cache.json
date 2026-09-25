@@ -30,9 +30,17 @@
     },
     "d41d8cd98f00b204e9800998ecf8427e": {
       "result": {
-        "raw_response": "Mock claude response"
+        "primary_role": "builder",
+        "secondary_roles": [
+          "architect",
+          "tester"
+        ],
+        "confidence": 0.85,
+        "reasoning": "Adaptive circuit breaker requires implementing failure signature similarity detection and dynamic threshold adjustment (builder), designing the algorithm architecture (architect), and testing diverse failure patterns (tester).",
+        "new_role_needed": false,
+        "suggested_role": null
       },
-      "timestamp": 1790336960,
+      "timestamp": 1790362507,
       "ttl": 3600
     },
     "efd5524ad1244fd20344bf3ff5d95233": {
@@ -1396,29 +1404,30 @@
     },
     "639a24a1e84c3ccb4b6bfcaf78f7a6c1": {
       "result": {
-        "complexity": 6,
+        "complexity": 5,
         "risk_level": "medium",
-        "success_probability": 76,
+        "success_probability": 78,
         "recommended_template": "standard",
         "issue_type": "performance",
         "key_risks": [
-          "Similarity scoring inaccuracy could trigger suboptimal threshold decisions",
-          "Memory data gaps or staleness reduce pattern matching effectiveness",
-          "Threshold oscillation or thrashing could destabilize the loop if bounds are miscalibrated",
-          "Explicit config override not being respected would break backward compatibility",
-          "Fallback logic must handle memory disabled, empty, or corrupted gracefully"
+          "Similarity scoring algorithm could misclassify failure patterns, causing premature exits or wasted iterations",
+          "Circuit breaker thresholds may miss edge cases where failure patterns recur in new contexts",
+          "Memory data may not exist for new repos or fresh runs, degrading to static config",
+          "Performance overhead from querying memory on every iteration could slow loop execution",
+          "Bounded range (2-6) may be too conservative or aggressive depending on actual failure distribution"
         ],
         "implementation_hints": [
-          "Implement similarity scoring with high confidence threshold (e.g., only adjust if confidence > 0.8)",
-          "Enforce bounded range strictly (2-6) with gradual threshold shifts, not jumps",
-          "Add detailed logging of every threshold adjustment decision for auditing and debugging",
-          "Test with synthetic failure patterns covering unrecoverable, self-resolved, and novel signatures",
-          "Time-weight historical patterns so recent failures influence threshold more than old ones",
-          "Validate all memory query results before using; degrade to static config on any error or absence",
-          "Preserve explicit CLI/config overrides as immutable; only apply adaptive logic to defaults"
+          "Query existing memory schema first to understand how failure signatures are stored and formatted",
+          "Start with simple similarity metrics (error type match, first N chars of message) before complex algorithms",
+          "Log all threshold adjustments with similarity score and reasoning for debugging",
+          "Cache similarity scores within a run to avoid repeated memory lookups",
+          "Verify fallback to static config works correctly when memory is disabled or empty",
+          "Test with repos having no prior failure history to confirm graceful degradation",
+          "Use strict bounds checking to prevent threshold drift outside [2,6] range",
+          "Consider configuration knobs for similarity confidence thresholds (e.g., 70% for unrecoverable patterns)"
         ]
       },
-      "timestamp": 1790332784,
+      "timestamp": 1790361836,
       "ttl": 3600
     },
     "a243cddbea8737c087defa82d28f88b6": {
@@ -1517,32 +1526,32 @@
         "results": [
           {
             "file": "failures.json",
-            "relevance": 92,
-            "summary": "Real failure patterns with signatures (timeout, database connection), root causes, and resolution tracking directly inform circuit breaker threshold calibration and failure signature similarity detection"
-          },
-          {
-            "file": "success-patterns.json",
-            "relevance": 86,
-            "summary": "Historical patterns with error_signatures field, complexity scores, and completion metrics establish baseline thresholds and provide training data for failure signature matching algorithms"
-          },
-          {
-            "file": "fleet-shared-patterns.json",
-            "relevance": 79,
-            "summary": "Cross-repo failure signature hashes with contribution counts and temporal data enable fleet-wide adaptive threshold tuning based on signature similarity and failure frequency"
+            "relevance": 95,
+            "summary": "Contains actual failure signatures with patterns, stages, root causes, and resolution tracking. Directly demonstrates the failure signature data structure needed for adaptive circuit breaker similarity analysis (e.g., timeout patterns, categorization by stage)."
           },
           {
             "file": "index.json",
-            "relevance": 71,
-            "summary": "Pattern metadata with failure signatures, stages, and fixes provide categorized failure examples for designing threshold decision logic and signature classification"
+            "relevance": 75,
+            "summary": "Shows failure pattern indexing by signature with associated fixes and affected stages. Demonstrates how failure signatures are catalogued and linked to solutions, informing threshold adjustment logic."
+          },
+          {
+            "file": "fleet-shared-patterns.json",
+            "relevance": 70,
+            "summary": "Contains signature-based pattern deduplication across repos with seen_count and contribution tracking. Relevant for understanding how similar failure signatures are identified and aggregated fleet-wide."
+          },
+          {
+            "file": "success-patterns.json (from test-repo-comptime)",
+            "relevance": 50,
+            "summary": "Demonstrates pattern schema including error_signatures array, stages_executed, and iterative resolution tracking. Shows data structure for correlating failure signatures with outcome metrics."
           },
           {
             "file": "architecture.json",
-            "relevance": 38,
-            "summary": "Provides structural rules context for where circuit breaker fits in system architecture, helping determine integration points and rule enforcement scope"
+            "relevance": 15,
+            "summary": "Generic rule definitions with no specific relevance to circuit breaker threshold adaptation or failure signature analysis."
           }
         ]
       },
-      "timestamp": 1790332850,
+      "timestamp": 1790361971,
       "ttl": 1800
     },
     "23d218c08baaf22575ca038317470067": {
@@ -1550,22 +1559,22 @@
         "results": [
           {
             "file": "failures.json",
-            "relevance": 90,
-            "summary": "Contains multiple timeout failure signatures (3.2s, 2.8s at different lines) with shared root cause (unbounded loop) and common fix (timeout wrapper). Demonstrates failure signature similarity and resolved/unresolved tracking—directly applicable to circuit breaker threshold decisions."
-          },
-          {
-            "file": "success-patterns.json (daemon timeout - issue 699)",
-            "relevance": 72,
-            "summary": "Pattern for fixing daemon timeout with handler approach in sw-daemon.sh. Daemon circuit breaker logic and timeout management are core to adaptive threshold implementation."
+            "relevance": 92,
+            "summary": "Contains actual failure patterns with signatures ('timeout after 3.2s', 'timeout after 2.8s', 'database connection refused') showing similarity analysis needs. Demonstrates root causes and fixes—directly relevant to understanding failure signature similarity for adaptive circuit breaker thresholding."
           },
           {
             "file": "index.json",
+            "relevance": 76,
+            "summary": "Shows indexed failure patterns with counts and sources. Contains pattern tracking mechanism ('pattern_type': 'failure') that forms the foundation for detecting similar failure signatures and aggregating failure data across stages."
+          },
+          {
+            "file": "fleet-shared-patterns.json",
             "relevance": 58,
-            "summary": "Shows pattern classification across stages with failure signatures and fixes (e.g., test_failure → timeout increase). Provides foundational model for grouping similar failures and their remedies."
+            "summary": "Demonstrates cross-repo pattern aggregation with contribution counts and recurrence data. Relevant because adaptive circuit breaker needs to recognize when failure signatures repeat across different contexts and repositories."
           }
         ]
       },
-      "timestamp": 1790332972,
+      "timestamp": 1790362258,
       "ttl": 1800
     },
     "5848ffe98477613d955783f0c9a2bc9c": {
@@ -1573,32 +1582,32 @@
         "results": [
           {
             "file": "failures.json",
-            "relevance": 92,
-            "summary": "Contains actual failure signatures with patterns (e.g., multiple timeouts at different times showing similarity), root causes, and resolution status. Directly informs failure signature analysis and similarity detection logic for the circuit breaker."
-          },
-          {
-            "file": "fleet-shared-patterns.json",
-            "relevance": 80,
-            "summary": "Demonstrates fleet-wide failure pattern tracking with signature hashes, seen counts, and cross-repo contributions. Shows how to represent and aggregate similar failures across multiple sources—key for adaptive threshold design."
+            "relevance": 90,
+            "summary": "Contains actual failure patterns with signatures and timestamps showing similar failures grouped together (e.g., multiple timeout patterns). Core data for understanding failure signature similarity matching."
           },
           {
             "file": "index.json",
-            "relevance": 72,
-            "summary": "Provides indexed failure patterns organized by signature type and stage with fix recommendations. Offers a structured approach to organizing and retrieving failure signatures by pattern type."
+            "relevance": 80,
+            "summary": "Defines pattern structure with 'signature', 'stage', 'pattern_type', and 'fix' fields. Shows how failures are categorized and mapped to solutions—essential reference for adaptive threshold design."
+          },
+          {
+            "file": "success-patterns.json (test-final-working)",
+            "relevance": 70,
+            "summary": "Tracks daemon timeout fix (issue #699, sw-daemon.sh) with completion timing. Directly relevant since adaptive circuit breaker lives in sw-daemon.sh and needs timing-based thresholds."
+          },
+          {
+            "file": "fleet-shared-patterns.json",
+            "relevance": 60,
+            "summary": "Shows cross-repo pattern sharing with signature hashing and seen-count tracking. Informs multi-repo circuit breaker design decisions and failure signature normalization."
           },
           {
             "file": "architecture.json",
-            "relevance": 58,
-            "summary": "Contains architectural rules and design patterns. Provides foundational architecture constraints that should guide the circuit breaker design stage."
-          },
-          {
-            "file": "success-patterns.json",
-            "relevance": 42,
-            "summary": "Historical pattern metadata showing complexity, iterations, and stages. Less directly relevant to failure signature similarity, but provides context for pattern structure and complexity estimation."
+            "relevance": 50,
+            "summary": "Generic architecture rules baseline. While minimal, provides structural foundation for integrating adaptive circuit breaker into existing architecture layers."
           }
         ]
       },
-      "timestamp": 1790333042,
+      "timestamp": 1790362305,
       "ttl": 1800
     },
     "ce8ec78eb8122ff69002f8b819f1f0bb": {
@@ -1607,21 +1616,21 @@
           {
             "file": "failures.json",
             "relevance": 95,
-            "summary": "Contains concrete failure signature patterns (timeout after 3.2s vs 2.8s, database connection refused) with root causes and resolution tracking. Directly demonstrates failure signature similarity matching needed for adaptive circuit breaker design."
+            "summary": "Contains concrete failure patterns with timestamps, stages, and root causes. Demonstrates multiple similar failures (two timeout patterns at different times) with identical root cause and fix, which directly informs adaptive threshold signature similarity detection—shows what failure patterns a circuit breaker must distinguish."
           },
           {
             "file": "index.json",
-            "relevance": 75,
-            "summary": "Shows failure patterns indexed by stage, pattern_type, and frequency. Demonstrates how failures are classified and tracked across stages—foundational for designing a circuit breaker's failure signature similarity matching logic."
+            "relevance": 78,
+            "summary": "Demonstrates failure pattern indexing organized by signature, stage, and pattern type with fix associations. Relevant to how adaptive circuit breaker would structure failure signature tracking and threshold adjustment logic across stages."
           },
           {
-            "file": "success-patterns.json",
-            "relevance": 62,
-            "summary": "Multiple daemon timeout patterns (Fix daemon timeout: 2 iterations, Fix timeout: 3 iterations) demonstrate iterative approaches to timeout handling in background services. Relevant for understanding what timeout-related design approaches have succeeded or required rework."
+            "file": "success-patterns.json (test-final-working)",
+            "relevance": 72,
+            "summary": "Shows a daemon timeout handling pattern that required 2 iterations to resolve. Relevant to understanding timeout-related failure modes in daemon processes that an adaptive circuit breaker must handle, and demonstrates iteration cost of fixing vs. aborting after threshold."
           }
         ]
       },
-      "timestamp": 1790333062,
+      "timestamp": 1790362320,
       "ttl": 1800
     },
     "63254a3337b012f289c5fc2cd0275f1c": {
@@ -1630,31 +1639,31 @@
           {
             "file": "failures.json",
             "relevance": 90,
-            "summary": "Contains explicit failure signatures with patterns, root causes, seen counts, and resolution status. Directly applicable to building failure signature similarity detection for circuit breaker thresholds."
-          },
-          {
-            "file": "index.json",
-            "relevance": 80,
-            "summary": "Indexes failure patterns by signature with stage metadata and fixes. Shows how failure patterns are currently tracked and categorized in the system."
+            "summary": "Contains explicit failure signatures with similar patterns (timeout failures at 3.2s and 2.8s on consecutive lines, both with 'unbounded loop' root cause), directly demonstrating failure signature similarity that adaptive circuit breaker must detect and respond to"
           },
           {
             "file": "fleet-shared-patterns.json",
+            "relevance": 75,
+            "summary": "Shows signature hashing, pattern deduplication, and cross-repo tracking with seen_count metrics; directly relevant to identifying and comparing similar failure signatures across builds"
+          },
+          {
+            "file": "index.json",
             "relevance": 70,
-            "summary": "Demonstrates signature hashing and cross-repo pattern tracking with seen counts and metadata. Relevant for understanding pattern similarity and aggregation across distributed failures."
+            "summary": "Demonstrates pattern indexing by stage and type with build stage patterns; relevant for organizing and efficiently retrieving failure signatures during threshold adaptation"
           },
           {
-            "file": "success-patterns.json (Fix timeout, repo: test-repo-789)",
-            "relevance": 55,
-            "summary": "Build stage pattern for daemon timeout fix shows relevant context on timeout handling, error signatures array, and build stage execution patterns."
+            "file": "success-patterns.json",
+            "relevance": 65,
+            "summary": "Contains pattern from 'Fix daemon timeout' (repo: test-final-working) targeting scripts/sw-daemon.sh in build stage; relevant because circuit breaker logic typically resides in daemon process"
           },
           {
-            "file": "fleet-patterns.json",
-            "relevance": 40,
-            "summary": "Structured pattern storage format (though currently empty) provides schema for how patterns should be stored for fleet-wide circuit breaker decisions."
+            "file": "success-patterns.json",
+            "relevance": 60,
+            "summary": "Shows multiple tracked patterns with confidence and success_rate metrics (repo: test-repo-ranking); relevant for understanding pattern prioritization and ranking during adaptive threshold tuning"
           }
         ]
       },
-      "timestamp": 1790333169,
+      "timestamp": 1790362479,
       "ttl": 1800
     },
     "47c1451f50b4a8f9faa0f8012f6b922e": {
@@ -1663,31 +1672,31 @@
           {
             "file": "failures.json",
             "relevance": 95,
-            "summary": "Documents 149+ test failures with root causes and fixes; directly applicable to build stage test execution and debugging"
+            "summary": "Documents test stage failures with root causes and fixes (intent-analysis schema issues, e2e-integration stale locks, loop-behavior flakiness). Directly applicable to diagnosing build-stage test failures."
+          },
+          {
+            "file": "success-patterns.json",
+            "relevance": 90,
+            "summary": "Two successful build patterns recorded (bug fix: 3 iterations/45s, feature: 3 iterations/150s). Shows typical iteration counts, test strategies, and file patterns that succeeded previously."
           },
           {
             "file": "retry-outcomes.json",
             "relevance": 90,
-            "summary": "Build failure retry strategy with model_escalation showing 100% success rate across 5 attempts; directly guides build recovery"
+            "summary": "Explicitly documents build_failure recovery using model_escalation strategy with 100% success rate (5/5 attempts). Direct guidance for handling build stage failures."
           },
           {
-            "file": "patterns.json",
-            "relevance": 88,
-            "summary": "Project conventions (vitest, npm, Node, JavaScript, test patterns); essential for understanding build environment and test execution"
-          },
-          {
-            "file": "success-patterns.json",
+            "file": "flaky-tests.json",
             "relevance": 75,
-            "summary": "Two successful build patterns showing iterations, durations, and file changes; provides reference for effective build strategies"
+            "summary": "Identifies known flaky tests (test-1: 5 occurrences, test-auth: 8 occurrences with connection timeout). Helps predict which tests may fail during build/test stage execution."
           },
           {
             "file": "knowledge.json",
-            "relevance": 65,
-            "summary": "KB entries for test failures (mktemp, cleanup, regression detection) with fix strategies; applicable to build/test debugging"
+            "relevance": 70,
+            "summary": "Documents specific test setup failures (mktemp /tmp/claude issues, sw-cleanup.sh dry-run output, feedback.sh JSON generation). Provides actionable fixes for common test harness problems."
           }
         ]
       },
-      "timestamp": 1790339222,
+      "timestamp": 1790362497,
       "ttl": 1800
     },
     "caa198e3f75d561978df16d963ccf99e": {
@@ -2171,6 +2180,127 @@
         }
       ],
       "timestamp": 1790340122,
+      "ttl": 1800
+    },
+    "2696d647dc8505ece2a83dec2ad275ae": {
+      "result": {
+        "estimated_iterations": 6
+      },
+      "timestamp": 1790361849,
+      "ttl": 1800
+    },
+    "2bd7cb75e4200c5e635cd529f261a12e": {
+      "result": {
+        "estimated_cost_usd": 28.50,
+        "estimated_iterations": 3,
+        "estimated_tokens": 425000,
+        "likely_failure_stage": "build",
+        "confidence": 72
+      },
+      "timestamp": 1790361858,
+      "ttl": 3600
+    },
+    "6de5a606ff97e6650466e181034ce2b6": {
+      "result": {
+        "issue_type": "infrastructure",
+        "confidence": 0.88,
+        "secondary_domains": [
+          "refactoring",
+          "performance",
+          "observability"
+        ],
+        "complexity_assessment": {
+          "score": 5,
+          "reasoning": "Well-scoped adaptive algorithm integrating existing memory system; straightforward failure signature matching with bounded output; standard complexity for Shipwright standards"
+        },
+        "skill_plan": {
+          "plan": [
+            "pattern-matching-similarity-scoring",
+            "architecture-design"
+          ],
+          "design": [
+            "pattern-matching-similarity-scoring",
+            "architecture-design"
+          ],
+          "build": [
+            "testing-strategy"
+          ],
+          "review": [
+            "two-stage-review",
+            "adversarial-quality"
+          ],
+          "compound_quality": [
+            "validation-thoroughness"
+          ],
+          "pr": [
+            "pr-quality"
+          ],
+          "deploy": [],
+          "validate": [],
+          "monitor": []
+        },
+        "skill_rationale": {
+          "pattern-matching-similarity-scoring": "This issue is fundamentally about matching failure signatures against historical patterns to make adaptive decisions—this skill directly covers design and implementation of pattern-based proactive failure prevention.",
+          "architecture-design": "The adaptive circuit breaker modifies core loop behavior; an ADR ensures future maintainers understand why similarity scoring exists, when it applies, and how it integrates with the static config override system.",
+          "testing-strategy": "The three acceptance criteria (no match, unrecoverable match, resolved match) each require distinct test scenarios; this skill ensures comprehensive coverage of the similarity scoring logic before review.",
+          "two-stage-review": "Similarity scoring and bounded-range enforcement involve probabilistic logic that benefits from structured two-pass review: first pass on algorithm correctness, second on edge cases and memory integration.",
+          "adversarial-quality": "Think like chaos: what if memory is empty? What if all patterns fail to match? What if error signatures are malformed? This stage finds failure modes in the fallback logic.",
+          "validation-thoroughness": "Integration tests must verify the adapter works end-to-end: that a failing loop actually trips at the adaptive threshold (not static), and that explicit config overrides always win.",
+          "pr-quality": "Explain the similarity scoring algorithm clearly: how error signatures are extracted, how the 75%/50% thresholds work, and why the [2, 8] bound prevents both thrashing and infinite loops."
+        },
+        "generated_skills": [],
+        "review_focus": [
+          "Similarity scoring algorithm: Do error type, message, stage, and timestamp proximity weights produce correct [0–100]% scores? Are the 75% and 50% thresholds evidence-based?",
+          "Bounded range enforcement: Verify threshold clamps to [2, 8]. Confirm explicit config overrides are never bypassed by adaptive logic.",
+          "Memory integration: Query error-log.jsonl correctly? Handle missing/empty logs? Fall back cleanly to static config when memory is disabled?",
+          "Unit test coverage: All three scenarios (no match → static fallback, high-confidence unrecoverable → lower threshold, high-confidence resolved → raise threshold) must pass.",
+          "Performance: Is similarity scoring called on every circuit breaker check? If so, is it cheap enough? Consider caching scores if called frequently.",
+          "Fallback behavior: When memory is disabled, circuit breaker behaves identically to current behavior (static threshold)."
+        ],
+        "risk_areas": [
+          "Noisy similarity scoring could cause threshold oscillation, leading to unpredictable loop behavior (fail fast then allow retries then fail fast again).",
+          "Memory system bugs or corrupted error-log.jsonl could cause adaptive logic to make wrong decisions (e.g., lower threshold for an actually-recoverable error).",
+          "Error signature extraction reliability: If error types/messages are inconsistent across runs, similarity scoring will misclassify patterns.",
+          "Config override bypass: Explicit config value should always win; adaptive thresholds should only apply when no override is set.",
+          "Performance regression: If similarity scoring is expensive and called on every iteration, it could slow down loop execution for all builds."
+        ]
+      },
+      "timestamp": 1790361926,
+      "ttl": 3600
+    },
+    "d34dd32bbf4c8781546cfca3ec9d2195": {
+      "result": [
+        {
+          "type": "result",
+          "result": "I am trying the same approach again.",
+          "usage": {
+            "input_tokens": 0,
+            "output_tokens": 0
+          }
+        }
+      ],
+      "timestamp": 1790362736,
+      "ttl": 1800
+    },
+    "ac63786f3cd644925f1ae9a9b4f9375e": {
+      "result": {
+        "raw_response": "Mock claude: ok"
+      },
+      "timestamp": 1790362879,
+      "ttl": 1800
+    },
+    "78117e8f5b2ce66c5d974e9a4bb900ba": {
+      "result": [
+        {
+          "type": "result",
+          "result": "I am trying the same approach again.",
+          "usage": {
+            "input_tokens": 0,
+            "output_tokens": 0
+          }
+        }
+      ],
+      "timestamp": 1790362962,
       "ttl": 1800
     }
   }
