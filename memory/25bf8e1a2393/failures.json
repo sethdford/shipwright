@@ -4,13 +4,9 @@
       "signature": "TypeError: Cannot read property 'x' of undefined at <PATH>/main.js:<L>",
       "pattern": "TypeError: Cannot read property 'x' of undefined",
       "fix": "Add null check before accessing property",
-      "fix_effectiveness_rate": 0,
+      "fix_effectiveness_rate": 75,
       "seen_count": 3,
-      "category": "code_bug",
-      "times_fix_suggested": 1,
-      "times_fix_applied": 1,
-      "times_fix_resolved": 0,
-      "last_outcome_at": "2026-09-26T08:18:11Z"
+      "category": "code_bug"
     }
   ]
 }
