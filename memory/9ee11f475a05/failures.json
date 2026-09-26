@@ -17,7 +17,7 @@
       "root_cause": "Test suite itself passed (all PASS, 0 FAIL) but the pipeline stage was flagged for iterating due to loop-behavior/RL logging noise being misread as failure signal",
       "fix": "Verify the actual test exit code rather than log content matching; ensure sw-autoresearch-e2e-test.sh output doesn't trigger false-positive failure pattern matching in the pipeline's error classifier",
       "seen_count": 41,
-      "last_seen": "2026-09-26T13:33:13Z",
+      "last_seen": "2026-09-26T12:45:52Z",
       "category": "flaky",
       "signature_hash": "4257c245052f",
       "signature": "\u001b[2m loop behavior: iterations on test failure\u001b[0m"
@@ -50,8 +50,8 @@
       "signature": "results: \u001b[<n>;2;<n>;<n>;<n>m\u001b[1m<n> pass\u001b[0m | \u001b[<n>;2;<n>;<n>;<n>m\u001b[1m1 fail\u001b[0m",
       "root_cause": "sw-e2e-integration-test failed because a stale pipeline lock from a prior run (pipeline-3854) was left in 'running' state, blocking the new pipeline start; sw-intent-analysis-test failed because analyze_intent's generated JSON is missing the required version/goal/criteria schema fields",
       "fix": "Clear/release stale pipeline locks before the e2e-integration test runs (or add lock staleness detection/cleanup), and update analyze_intent to always emit version, goal, and criteria fields in its output schema",
-      "seen_count": 9,
-      "last_seen": "2026-09-26T12:46:11Z",
+      "seen_count": 8,
+      "last_seen": "2026-09-25T11:16:25Z",
       "category": "test_failure",
       "signature_hash": "af7df127e4c98031cbe09f6b0646ac68"
     },
@@ -270,10 +270,19 @@
     {
       "stage": "test",
       "pattern": "\u001b[38;2;74;222;128m\u001b[1m✓\u001b[0m missing log returns base",
-      "root_cause": "sw-patrol-meta-test.sh reports 'All 0 tests passed' because its test counter/log variable was not returned or incremented despite checks running, masking the real failures in sw-pipeline-test.sh (missing plan.md/review.md artifacts and jq parse errors)",
-      "fix": "Fix the pipeline stage functions to actually write plan.md and review.md artifacts, and correct the RL episode JSON output causing jq parse errors; also fix the patrol-meta test harness's return/count logic so it reports actual test totals instead of 0",
+      "root_cause": "sw-e2e-integration-test exited 1, likely due to a missing or malformed log return in an integration path (e2e integration test asserts on log output that isn't present)",
+      "fix": "run scripts/sw-e2e-integration-test.sh directly to capture the specific assertion failure and fix the missing log return in the relevant integration code path",
       "seen_count": 2,
       "last_seen": "2026-09-25T17:40:52Z",
+      "category": "test_failure"
+    },
+    {
+      "stage": "test",
+      "pattern": "Testing CONTRACT: pm can parse recruit team --json for team/agents/model... ERROR: scripts/sw-recruit-test.sh:1131 exited with status 5",
+      "root_cause": "sw-recruit-test.sh line 1131 asserts parsing of `pm can parse recruit team --json for team/agents/model` but the JSON output structure/fields don't match what jq expects, causing exit status 5",
+      "fix": "Inspect scripts/sw-recruit-test.sh:1131 and the actual `pm recruit team --json` output to align expected keys (team/agents/model) with the real JSON schema produced by sw-recruit.sh",
+      "seen_count": 1,
+      "last_seen": "2026-09-26T13:23:20Z",
       "category": "test_failure"
     }
   ]
