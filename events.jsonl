@@ -286,3 +286,8 @@
 {"ts":"2026-09-26T06:35:14Z","ts_epoch":1790404514,"type":"reasoning.trace","job_id":"pipeline-1968277-42","complexity":"medium","risk":50,"template":"standard"}
 {"ts":"2026-09-26T06:35:15Z","ts_epoch":1790404515,"type":"reasoning.trace","job_id":"pipeline-1968947-42","complexity":"medium","risk":50,"template":"standard"}
 {"ts":"2026-09-26T06:35:16Z","ts_epoch":1790404516,"type":"reasoning.trace","job_id":"pipeline-1969625-42","complexity":"medium","risk":50,"template":"standard"}
+{"ts":"2026-09-26T08:06:43Z","ts_epoch":1790410003,"type":"hygiene_platform_refactor","hardcoded":49,"fallback":69,"todo":51}
+{"ts":"2026-09-26T08:09:41Z","ts_epoch":1790410181,"type":"strategic.issue_created","title":"Validate daemon-config.json schema and warn on unknown/deprecated keys at daemon startup","priority":"P0","complexity":"fast"}
+{"ts":"2026-09-26T08:09:45Z","ts_epoch":1790410185,"type":"strategic.issue_created","title":"Move sw-loop.sh's hardcoded circuit-breaker and iteration thresholds into config/policy.json","priority":"P6","complexity":"standard"}
+{"ts":"2026-09-26T08:09:49Z","ts_epoch":1790410189,"type":"strategic.issue_created","title":"Add fleet-wide failure pattern sharing so one repo's learned fix propagates to others","priority":"P2","complexity":"standard"}
+{"ts":"2026-09-26T08:09:49Z","ts_epoch":1790410189,"type":"strategic.cycle_complete","issues_created":3,"issues_skipped":0}
