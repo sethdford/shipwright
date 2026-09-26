@@ -5,8 +5,8 @@
       "pattern": "\u001b[38;2;74;222;128m\u001b[1m✓\u001b[0m reveal shows 1/3 pass count on failure",
       "root_cause": "sw-intent-analysis-test asserts analyze_intent's JSON output includes version, goal, and criteria fields, but the current schema/implementation omits one or more of them",
       "fix": "Update analyze_intent (or its schema) in sw-intent-analysis.sh to emit version, goal, and criteria fields matching the test's expected schema",
-      "seen_count": 161,
-      "last_seen": "2026-09-26T13:34:15Z",
+      "seen_count": 162,
+      "last_seen": "2026-09-26T19:19:56Z",
       "category": "test_failure",
       "signature_hash": "e1a285258fe63781b7370b0d086ad87b",
       "signature": "\u001b[<n>;2;<n>;<n>;<n>m\u001b[1m✓\u001b[0m reveal shows <path> pass count on failure"
@@ -27,8 +27,8 @@
       "pattern": "Failed: 1",
       "root_cause": "sw-intent-analysis-test fails because analyze_intent's generated JSON omits required fields (version, goal, criteria); sw-e2e-integration-test fails as a side effect of a stale pipeline lock (pipeline-3749) left running from a prior test run, not a new regression",
       "fix": "add the missing version/goal/criteria fields to the intent-analysis JSON schema/generator, and clear/reset stale pipeline locks (or run `shipwright pipeline abort`) before the e2e-integration test suite starts",
-      "seen_count": 22,
-      "last_seen": "2026-09-26T17:12:58Z",
+      "seen_count": 23,
+      "last_seen": "2026-09-26T20:02:07Z",
       "category": "test_failure",
       "signature_hash": "0ffe097d3b7a598c5b9ebe8e3cd8d7e4",
       "signature": "failed: 1"
@@ -283,6 +283,15 @@
       "fix": "Inspect sw-self-optimize.sh memory promotion function and its test fixture to confirm repo-hash keys and confidence threshold align",
       "seen_count": 1,
       "last_seen": "2026-09-26T15:17:12Z",
+      "category": "test_failure"
+    },
+    {
+      "stage": "test",
+      "pattern": "Testing CONTRACT: pipeline can parse recruit match --json for model... \u001b[38;2;248;113;113m\u001b[1mFAIL\u001b[0m: match --json missing .model field (pipeline needs this)",
+      "root_cause": "recruit match --json output does not include a .model field that the pipeline requires",
+      "fix": "add the model field to the JSON output of recruit match --json in sw-recruit.sh",
+      "seen_count": 1,
+      "last_seen": "2026-09-26T18:32:05Z",
       "category": "test_failure"
     }
   ]
