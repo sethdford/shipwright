@@ -207,6 +207,126 @@ The build stage delegates to `shipwright loop` for autonomous multi-iteration de
 - **Context exhaustion detection**: When the daemon detects a build loop failed due to iteration exhaustion (not a code error), it tags the failure as `context_exhaustion` and boosts `--max-restarts` on retry.
 - **Pre-build validation** (`--pre-build-validate`, default on): Before iteration 1, validates environment (detects missing dependencies, syntax errors, test runner startup issues). Fixes are fed as structured context to iteration 1; fatal issues abort without restart. Prevents wasted iterations on broken environments.
 
+### Pre-Build Validation
+
+Pre-build validation runs automated checks on your project environment _before_ the first iteration, catching broken environments that would otherwise waste Claude iterations. It detects:
+
+- **Missing dependencies**: toolchain (Node.js, Python, Rust, etc.), package managers (npm, pip, cargo), missing module dependencies
+- **Syntax errors**: in changed files (Bash, JavaScript, JSON, Python)
+- **Broken test runner**: failures at startup (load-time errors, missing test frameworks)
+
+Return codes control loop behavior:
+
+- **RC 0 (passed/skipped)**: Environment is ready, proceed to iteration 1
+- **RC 1 (fixable)**: Non-fatal issues detected; error details written to `error-summary.json` and injected into iteration 1 context
+- **RC 2 (fatal)**: Fatal environment issue (e.g., Node.js not installed); loop aborts immediately without restart
+
+#### Configuration
+
+Enable/disable in `.claude/daemon-config.json`:
+
+```json
+{
+  "loop": {
+    "pre_build_validate": true, // Enable pre-build checks (default)
+    "pre_build_timeout": 15, // Timeout per check in seconds
+    "pre_build_auto_fix": false // Auto-fix missing dependencies (experimental)
+  }
+}
+```
+
+Or via CLI flags:
+
+```bash
+shipwright loop --pre-build-validate           # enable (default)
+shipwright loop --no-pre-build-validate        # disable
+shipwright loop --pre-build-timeout=30         # 30s timeout
+```
+
+Or environment variables:
+
+```bash
+export LOOP_PRE_BUILD_VALIDATE=1
+export LOOP_PRE_BUILD_TIMEOUT=30
+export LOOP_PRE_BUILD_AUTO_FIX=1
+```
+
+#### Auto-Fix (Experimental)
+
+When `pre_build_auto_fix` is enabled and dependencies fail to resolve, pre-build validation automatically attempts `npm install` (or equivalent for other package managers). This can save iterations when dependencies are simply missing rather than locked.
+
+```bash
+# Enable auto-fix
+shipwright loop --pre-build-auto-fix
+```
+
+Auto-fix is attempted for:
+
+- **Node.js**: `npm install` (or configured package manager)
+- **Python**: `pip install` (if `requirements.txt` present)
+- **Rust**: `cargo fetch`
+- **Go**: `go mod download`
+
+Auto-fix respects the `pre_build_timeout` setting.
+
+#### Output and Debugging
+
+Pre-build validation writes two files to the log directory:
+
+**`pre-build-validation.json`** — Summary of all checks:
+
+```json
+{
+  "status": "pass|fail|skipped",
+  "aborted": false,
+  "duration_ms": 412,
+  "first_failure_category": "deps",
+  "error_count": 1,
+  "checks_passed": 2,
+  "checks_failed": 1,
+  "checks_skipped": 0
+}
+```
+
+**`error-summary.json`** — (written only on failure) Machine-readable errors injected into iteration 1:
+
+```json
+{
+  "iteration": 0,
+  "timestamp": "2026-09-26T12:14:20Z",
+  "error_count": 1,
+  "error_lines": ["[pre-build:deps] npm install check failed"],
+  "source": "pre_build",
+  "category": "deps",
+  "fatal": false
+}
+```
+
+#### Troubleshooting
+
+**Q: Validation times out**
+A: Increase `pre_build_timeout` (default 15s). For slow networks, use:
+
+```bash
+shipwright loop --pre-build-timeout=45
+```
+
+**Q: Auto-fix keeps failing**
+A: Pre-build auto-fix is experimental. Disable it and let the build loop handle installation:
+
+```bash
+export LOOP_PRE_BUILD_AUTO_FIX=0
+```
+
+**Q: False positive on test runner (runner starts but tests fail)**
+A: Pre-build only checks if the test runner starts; it doesn't run actual tests. This is intentional — test failures are caught by the build loop. If the runner starts but every test fails, the pre-build check passes (RC 0).
+
+**Q: How do I skip pre-build validation?**
+A: Disable it with `--no-pre-build-validate`, or set `pre_build_validate: false` in config.
+
+**Q: Pre-build validation reports syntax errors, but tests pass**
+A: Pre-build checks changed files only (detected via git diff). If you're working on the current branch, ensure your files are committed or staged. Also, pre-build checks are best-effort — not all linters are available in all environments.
+
 ## Pipeline Templates
 
 | Template     | Stages                                     | Gates                             | Use Case                 |

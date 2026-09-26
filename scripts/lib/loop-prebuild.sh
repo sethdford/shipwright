@@ -27,6 +27,9 @@ _LOOP_PREBUILD_LOADED=1
 # Checks to run (space-separated: deps, syntax, test_runner)
 : "${PRE_BUILD_CHECKS:=deps syntax test_runner}"
 
+# Auto-fix for fixable issues (e.g., npm install for missing dependencies)
+: "${PRE_BUILD_AUTO_FIX:=${LOOP_PRE_BUILD_AUTO_FIX:-false}}"
+
 # ─── Fallback output helpers (in case loop libs haven't loaded) ──────────────
 
 _pbv_info() {
@@ -38,6 +41,28 @@ _pbv_error() {
 }
 
 # ─── Helper: Resolve base ref for git diff ──────────────────────────────────
+
+_pbv_auto_fix_nodejs_deps() {
+    local root="${1:-.}"
+    local build_tool="${2:-npm}"
+
+    if [[ "$PRE_BUILD_AUTO_FIX" != "true" && "$PRE_BUILD_AUTO_FIX" != "1" ]]; then
+        return 1  # not enabled
+    fi
+
+    if [[ ! -f "$root/package.json" ]]; then
+        return 1  # no project file
+    fi
+
+    _pbv_info "Attempting to auto-fix missing dependencies with: $build_tool install"
+    if timeout "$PRE_BUILD_TIMEOUT" bash -c "cd '$root' && $build_tool install" >/dev/null 2>&1; then
+        _pbv_info "Auto-fixed: $build_tool install completed successfully"
+        return 0  # fixed
+    fi
+
+    _pbv_error "Auto-fix failed: $build_tool install did not complete within $PRE_BUILD_TIMEOUT seconds"
+    return 1  # failed to fix
+}
 
 _pbv_resolve_base_ref() {
     local root="${1:-.}"
@@ -137,6 +162,10 @@ _pbv_check_deps() {
             if [[ -f "$root/package.json" ]]; then
                 local install_test_cmd="$build_tool install --dry-run"
                 if ! timeout "$PRE_BUILD_TIMEOUT" bash -c "cd '$root' && $install_test_cmd" >/dev/null 2>&1; then
+                    # Try auto-fix if enabled
+                    if _pbv_auto_fix_nodejs_deps "$root" "$build_tool"; then
+                        return 0  # fixed successfully
+                    fi
                     echo "[pre-build:deps] dependency installation check failed (missing deps or lockfile corruption)"
                     return 1  # fixable
                 fi

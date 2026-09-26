@@ -32,15 +32,15 @@
       "result": {
         "primary_role": "devops",
         "secondary_roles": [
-          "architect",
-          "builder"
+          "builder",
+          "tester"
         ],
-        "confidence": 0.88,
-        "reasoning": "Pre-build validation is infrastructure/pipeline work requiring environment diagnostics and deployment pipeline design; DevOps Engineer leads with Architect for validation framework design and Builder for implementation.",
+        "confidence": 0.85,
+        "reasoning": "Pre-build validation is infrastructure/CI-CD pipeline work (DevOps primary), requiring implementation (Builder) and validation strategy (Tester) to catch broken environments before build iterations.",
         "new_role_needed": false,
         "suggested_role": null
       },
-      "timestamp": 1790382497,
+      "timestamp": 1790424859,
       "ttl": 3600
     },
     "efd5524ad1244fd20344bf3ff5d95233": {
@@ -1599,22 +1599,22 @@
         "results": [
           {
             "file": "failures.json",
-            "relevance": 85,
-            "summary": "Contains concrete environment/build failures (database connection refused, unbounded loops) with root causes and resolutions. Directly informs what pre-build validation checks should catch to prevent broken environments."
+            "relevance": 92,
+            "summary": "Contains concrete environmental failure patterns including 'database connection refused' and timeouts—exactly the broken environment conditions pre-build validation should detect before the build loop starts"
           },
           {
             "file": "fleet-shared-patterns.json",
-            "relevance": 80,
-            "summary": "Shows 'Cannot find module' error pattern during build stages across multiple repos. This is a classic pre-build environment issue (missing dependencies) that validation checks should detect early."
+            "relevance": 85,
+            "summary": "Shows 'Cannot find module' errors requiring 'npm i' as a fix—a classic pre-build environment issue (missing dependencies) that validation checks should catch early"
           },
           {
             "file": "index.json",
-            "relevance": 55,
-            "summary": "Contains test failure patterns and fix signatures that could inform what validation checks are needed, though less specific to pre-build environment validation than other entries."
+            "relevance": 58,
+            "summary": "Contains test_failure patterns with timeout issues and build-stage failures that could indicate environmental problems, though less directly applicable to pre-build validation specifics"
           }
         ]
       },
-      "timestamp": 1790382303,
+      "timestamp": 1790424678,
       "ttl": 1800
     },
     "b5e57b61997d6d42efffcb69ce6a9f02": {
@@ -1677,66 +1677,66 @@
       "result": {
         "results": [
           {
-            "file": "fleet-shared-patterns.json",
-            "relevance": 88,
-            "summary": "Contains 'Error: Cannot find module' pattern in build stage with fix 'npm i' - directly relevant to catching broken build environments before the build loop starts"
+            "file": "failures.json (detailed)",
+            "relevance": 95,
+            "summary": "Contains failure patterns with root causes: database connection refused (db not started), unbounded loop timeouts. These are exactly the environment issues pre-build validation should catch (missing services, resource constraints)."
           },
           {
-            "file": "failures.json",
-            "relevance": 72,
-            "summary": "Documents actual build/test failures including database connection issues and timeouts - shows types of environment problems that pre-build validation should detect"
+            "file": "fleet-shared-patterns.json",
+            "relevance": 90,
+            "summary": "Tracks 'Error: Cannot find module' with fix 'npm i' in build stage across repos. Missing dependencies are a primary pre-build validation concern — this pattern shows a recurring environment issue."
           },
           {
             "file": "index.json",
-            "relevance": 58,
-            "summary": "Contains build stage test_failure patterns with test setup issues - represents environment-related failures during build"
+            "relevance": 70,
+            "summary": "Contains test_failure pattern in build stage with root cause related to test setup and timeout configuration. Relevant to build-time environment setup validation."
           },
           {
             "file": "success-patterns.json (test-final-working)",
-            "relevance": 42,
-            "summary": "Build stage success pattern for daemon timeout handling - shows previous build-stage fixes but not directly about environment validation"
+            "relevance": 65,
+            "summary": "Shows daemon timeout issue in sw-daemon.sh resolved in 2 iterations. Indicates build environment problems and timeout handling, relevant context for pre-build validation design."
           },
           {
             "file": "success-patterns.json (test-repo-789)",
-            "relevance": 38,
-            "summary": "Build stage pattern for timeout fix in sw-daemon.sh - related to build reliability but focused on timeout logic rather than pre-build validation"
+            "relevance": 60,
+            "summary": "Contains 'Fix timeout' pattern in build stage with high complexity. Shows timeout issues that could be prevented by pre-build environment validation."
           }
         ]
       },
-      "timestamp": 1790382473,
+      "timestamp": 1790424827,
       "ttl": 1800
     },
     "47c1451f50b4a8f9faa0f8012f6b922e": {
       "result": {
         "results": [
           {
-            "file": "failures.json",
-            "relevance": 95,
-            "summary": "Detailed test failure patterns, root causes, and fixes directly relevant to build stage test execution; includes flaky test detection and failure signature tracking"
+            "file": "retry-outcomes.json",
+            "relevance": 90,
+            "summary": "model_escalation retry strategy has 100% success rate (5/5) on build failures; directly applicable for handling build stage failures"
           },
           {
             "file": "success-patterns.json",
-            "relevance": 90,
-            "summary": "Captured successful build patterns showing iterations, duration, test strategies, and file change patterns; directly applicable to understanding what works in build stage"
-          },
-          {
-            "file": "retry-outcomes.json",
-            "relevance": 85,
-            "summary": "Tracks build failure retry strategies (model_escalation) with 100% success rate; directly applicable to build stage resilience and recovery"
-          },
-          {
-            "file": "metrics.json",
             "relevance": 80,
-            "summary": "Baseline performance metrics for build (7095s) and test (1459s) stages; provides context for expected duration and performance regression detection"
+            "summary": "2 success patterns for bug fix (complexity 60) and feature (complexity 65) showing 3-iteration builds with npm test; provides proven approach templates"
           },
           {
             "file": "patterns.json",
-            "relevance": 75,
-            "summary": "Project conventions including test runner (vitest), test pattern (*.test.js), and import style; essential for understanding how build stage discovers and executes tests"
+            "relevance": 70,
+            "summary": "Project conventions: node type, vitest runner, npm, src/ source dir, *.test.js pattern; essential for correct build strategy"
+          },
+          {
+            "file": "failures.json",
+            "relevance": 68,
+            "summary": "159 occurrences of intent-analysis schema failures, test timeouts, and flaky tests; identifies blockers that may surface during build"
+          },
+          {
+            "file": "metrics.json",
+            "relevance": 62,
+            "summary": "Baselines: 7095s build duration, 1459s test duration; sets expectations for build/test cycle timing"
           }
         ]
       },
-      "timestamp": 1790390191,
+      "timestamp": 1790424848,
       "ttl": 1800
     },
     "fc3501364150c61feff75a6010d5998a": {
@@ -1833,6 +1833,53 @@
       },
       "timestamp": 1790423575,
       "ttl": 3600
+    },
+    "ea7abdefeb17bb0b59936d1d273789f8": {
+      "result": {
+        "results": [
+          {
+            "file": "failures.json",
+            "relevance": 95,
+            "summary": "Contains environmental failures like 'database connection refused' (db not started) and timeout patterns with root causes. Pre-build validation should catch these exact issues before wasting iterations."
+          },
+          {
+            "file": "fleet-shared-patterns.json",
+            "relevance": 90,
+            "summary": "Has 'Error: Cannot find module' failure pattern with fix 'npm i'. Missing dependencies are a classic pre-build environment issue that validation should detect early."
+          },
+          {
+            "file": "index.json",
+            "relevance": 75,
+            "summary": "Contains test failure signatures with patterns and suggested fixes (e.g., timeout setup issues). Indicates environment setup problems that pre-build validation could catch."
+          },
+          {
+            "file": "success-patterns.json (test-repo-comptime)",
+            "relevance": 65,
+            "summary": "Shows 'Timed fix' pattern with stages including 'intake,build,test' and completion timing (1234s). Demonstrates multi-stage progression that pre-build validation could optimize by catching issues at intake."
+          },
+          {
+            "file": "success-patterns.json (test-repo-789)",
+            "relevance": 60,
+            "summary": "Contains 'Fix timeout' pattern requiring 3 iterations. Historical timeout issues suggest pre-build validation should check for timeout-prone environments and configuration."
+          }
+        ]
+      },
+      "timestamp": 1790424589,
+      "ttl": 1800
+    },
+    "2b50a94c1ff507cd2cdc0d37dbe258fd": {
+      "result": {
+        "raw_response": "Mock claude: ok"
+      },
+      "timestamp": 1790424951,
+      "ttl": 1800
+    },
+    "f4e29a3b4eb808aac9491071d04519b8": {
+      "result": {
+        "raw_response": "Mock claude: ok"
+      },
+      "timestamp": 1790425117,
+      "ttl": 1800
     }
   }
 }
