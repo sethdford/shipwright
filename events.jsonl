@@ -471,3 +471,24 @@
 {"ts":"2026-09-26T00:13:29Z","ts_epoch":1790381609,"type":"strategic.issue_created","title":"Split sw-loop.sh (2713 lines) into focused library modules under scripts/lib/","priority":"P6","complexity":"full"}
 {"ts":"2026-09-26T00:13:32Z","ts_epoch":1790381612,"type":"strategic.issue_created","title":"Recommend a pipeline template based on detected project type during `shipwright prep`","priority":"P1","complexity":"standard"}
 {"ts":"2026-09-26T00:13:32Z","ts_epoch":1790381612,"type":"strategic.cycle_complete","issues_created":3,"issues_skipped":0}
+{"ts":"2026-09-26T00:28:55Z","ts_epoch":1790382535,"type":"patrol.started","dry_run":"false"}
+{"ts":"2026-09-26T00:28:59Z","ts_epoch":1790382539,"type":"patrol.issue_created","check":"dead_code","count":1}
+{"ts":"2026-09-26T00:29:04Z","ts_epoch":1790382544,"type":"patrol.finding","check":"recurring_failure","pattern":"[38;2;74;222;128m[1m✓[0m reveal shows 1/3 pass count on","seen_count":155}
+{"ts":"2026-09-26T00:29:05Z","ts_epoch":1790382545,"type":"patrol.issue_created","check":"recurring_failure","pattern":"[38;2;74;222;128m[1m✓[0m reveal shows 1/3 pass count on"}
+{"ts":"2026-09-26T00:29:05Z","ts_epoch":1790382545,"type":"patrol.finding","check":"recurring_failure","pattern":"[2m  loop behavior: iterations on test failure[0m","seen_count":35}
+{"ts":"2026-09-26T00:29:06Z","ts_epoch":1790382546,"type":"patrol.issue_created","check":"recurring_failure","pattern":"[2m  loop behavior: iterations on test failure[0m"}
+{"ts":"2026-09-26T00:29:06Z","ts_epoch":1790382546,"type":"patrol.finding","check":"recurring_failure","pattern":"Failed: 1","seen_count":21}
+{"ts":"2026-09-26T00:29:07Z","ts_epoch":1790382547,"type":"patrol.issue_created","check":"recurring_failure","pattern":"Failed: 1"}
+{"ts":"2026-09-26T00:29:07Z","ts_epoch":1790382547,"type":"patrol.finding","check":"recurring_failure","pattern":"[38;2;0;212;255m▸[0m Patrol recurring failures label con","seen_count":17}
+{"ts":"2026-09-26T00:29:08Z","ts_epoch":1790382548,"type":"patrol.issue_created","check":"recurring_failure","pattern":"[38;2;0;212;255m▸[0m Patrol recurring failures label con"}
+{"ts":"2026-09-26T00:29:08Z","ts_epoch":1790382548,"type":"patrol.finding","check":"recurring_failure","pattern":"Results: [38;2;74;222;128m[1m126 PASS[0m | [38;2;248;113","seen_count":11}
+{"ts":"2026-09-26T00:29:08Z","ts_epoch":1790382548,"type":"patrol.finding","check":"recurring_failure","pattern":"Results: [38;2;74;222;128m[1m127 PASS[0m | [38;2;248;113","seen_count":8}
+{"ts":"2026-09-26T00:29:08Z","ts_epoch":1790382548,"type":"patrol.finding","check":"recurring_failure","pattern":"Results: [38;2;74;222;128m[1m124 PASS[0m | [38;2;248;113","seen_count":5}
+{"ts":"2026-09-26T00:29:09Z","ts_epoch":1790382549,"type":"patrol.finding","check":"recurring_failure","pattern":"Results: [38;2;74;222;128m[1m123 PASS[0m | [38;2;248;113","seen_count":4}
+{"ts":"2026-09-26T00:29:10Z","ts_epoch":1790382550,"type":"patrol.finding","check":"untested_script","script":"sw-tracker-linear.sh","lines":568,"usage":7}
+{"ts":"2026-09-26T00:29:10Z","ts_epoch":1790382550,"type":"patrol.finding","check":"untested_script","script":"sw-tracker-jira.sh","lines":474,"usage":7}
+{"ts":"2026-09-26T00:29:10Z","ts_epoch":1790382550,"type":"patrol.finding","check":"untested_script","script":"sw-tracker-github.sh","lines":212,"usage":3}
+{"ts":"2026-09-26T00:29:10Z","ts_epoch":1790382550,"type":"patrol.finding","check":"untested_script","script":"sw-tmux-status.sh","lines":151,"usage":1}
+{"ts":"2026-09-26T00:29:10Z","ts_epoch":1790382550,"type":"patrol.finding","check":"untested_script","script":"sw-tmux-role-color.sh","lines":81,"usage":1}
+{"ts":"2026-09-26T00:29:10Z","ts_epoch":1790382550,"type":"patrol.finding","check":"untested_script","script":"sw-test-all.sh","lines":199,"usage":0}
+{"ts":"2026-09-26T00:29:10Z","ts_epoch":1790382550,"type":"patrol.finding","check":"untested_script","script":"sw-event-schema-sync.sh","lines":93,"usage":0}
