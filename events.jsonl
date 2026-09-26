@@ -466,3 +466,7 @@
 {"ts":"2026-09-26T18:12:30Z","ts_epoch":1790446350,"type":"patrol.finding","check":"untested_script","script":"sw-tmux-role-color.sh","lines":81,"usage":1}
 {"ts":"2026-09-26T18:12:30Z","ts_epoch":1790446350,"type":"patrol.finding","check":"untested_script","script":"sw-test-all.sh","lines":199,"usage":0}
 {"ts":"2026-09-26T18:12:30Z","ts_epoch":1790446350,"type":"patrol.finding","check":"untested_script","script":"sw-event-schema-sync.sh","lines":93,"usage":0}
+{"ts":"2026-09-26T20:04:36Z","ts_epoch":1790453076,"type":"hygiene_platform_refactor","hardcoded":49,"fallback":69,"todo":51}
+{"ts":"2026-09-26T20:05:05Z","ts_epoch":1790453105,"type":"strategic.issue_created","title":"Add missing test suites for 5 untested scripts (sw-event-schema-sync, sw-test-all, sw-tmux-role-color, sw-tmux-status, sw-tracker-github)","priority":"P1","complexity":"standard"}
+{"ts":"2026-09-26T20:05:09Z","ts_epoch":1790453109,"type":"strategic.issue_created","title":"Audit and resolve HACK/KLUDGE markers in the top 5 largest scripts","priority":"P6","complexity":"standard"}
+{"ts":"2026-09-26T20:05:09Z","ts_epoch":1790453109,"type":"strategic.cycle_complete","issues_created":2,"issues_skipped":1}
