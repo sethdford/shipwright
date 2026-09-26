@@ -160,6 +160,10 @@ PRE_BUILD_VALIDATE="${LOOP_PRE_BUILD_VALIDATE:-$(_config_get_int "loop.pre_build
 
 PRE_BUILD_TIMEOUT="${LOOP_PRE_BUILD_TIMEOUT:-$(_config_get_int "loop.pre_build_timeout" 15 2>/dev/null || echo 15)}"
 PRE_BUILD_CHECKS="${LOOP_PRE_BUILD_CHECKS:-deps syntax test_runner}"
+PRE_BUILD_AUTO_FIX="${LOOP_PRE_BUILD_AUTO_FIX:-$(_config_get_int "loop.pre_build_auto_fix" 0 2>/dev/null || echo 0)}"
+[[ "$PRE_BUILD_AUTO_FIX" == "true" ]] && PRE_BUILD_AUTO_FIX=1
+[[ "$PRE_BUILD_AUTO_FIX" == "false" ]] && PRE_BUILD_AUTO_FIX=0
+export PRE_BUILD_AUTO_FIX
 
 # ─── Audit & Quality Gate Defaults ───────────────────────────────────────────
 AUDIT_ENABLED=false
@@ -209,6 +213,7 @@ show_help() {
     echo -e "  ${CYAN}--pre-build-validate${RESET}      Enable environment checks before iteration 1 (default: on)"
     echo -e "  ${CYAN}--no-pre-build-validate${RESET}   Disable environment checks before iteration 1"
     echo -e "  ${CYAN}--pre-build-timeout${RESET} N     Timeout for pre-build checks in seconds (default: 15)"
+    echo -e "  ${CYAN}--pre-build-auto-fix${RESET}      Auto-fix missing dependencies (default: off)"
     echo -e "  ${CYAN}--verbose${RESET}                 Show full Claude output (default: summary)"
     echo -e "  ${CYAN}--help${RESET}                    Show this help"
     echo ""
@@ -309,6 +314,8 @@ while [[ $# -gt 0 ]]; do
         --pre-build-validate) PRE_BUILD_VALIDATE=1; shift ;;
         --no-pre-build-validate) PRE_BUILD_VALIDATE=0; shift ;;
         --pre-build-timeout=*) PRE_BUILD_TIMEOUT="${1#--pre-build-timeout=}"; shift ;;
+        --pre-build-auto-fix) PRE_BUILD_AUTO_FIX=1; shift ;;
+        --no-pre-build-auto-fix) PRE_BUILD_AUTO_FIX=0; shift ;;
         --verbose) VERBOSE=true; shift ;;
         --audit) AUDIT_ENABLED=true; shift ;;
         --audit-agent) AUDIT_AGENT_ENABLED=true; shift ;;
