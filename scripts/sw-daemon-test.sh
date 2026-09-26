@@ -1735,7 +1735,7 @@ test_preflight_auth_check() {
         { echo "daemon_preflight_auth_check function not found"; return 1; }
     grep -A 60 'daemon_preflight_auth_check()' "$daemon_src" $DAEMON_LIB_GLOB | grep -q 'gh auth status' || \
         { echo "Missing gh auth check"; return 1; }
-    grep -A 60 'daemon_preflight_auth_check()' "$daemon_src" $DAEMON_LIB_GLOB | grep -q 'claude.*--print' || \
+    grep -A 60 'daemon_preflight_auth_check()' "$daemon_src" $DAEMON_LIB_GLOB | grep -q 'claude.*--version' || \
         { echo "Missing claude auth check"; return 1; }
     grep -B 5 'daemon_poll_issues' "$daemon_src" $DAEMON_LIB_GLOB | grep -q 'daemon_preflight_auth_check' || \
         { echo "Auth check not wired into poll loop"; return 1; }
@@ -1806,7 +1806,7 @@ test_preflight_auth_check() {
         { echo "daemon_preflight_auth_check function not found"; return 1; }
     grep -A 60 'daemon_preflight_auth_check()' "$daemon_src" $DAEMON_LIB_GLOB | grep -q 'gh auth status' || \
         { echo "Missing gh auth check"; return 1; }
-    grep -A 60 'daemon_preflight_auth_check()' "$daemon_src" $DAEMON_LIB_GLOB | grep -q 'claude.*--print' || \
+    grep -A 60 'daemon_preflight_auth_check()' "$daemon_src" $DAEMON_LIB_GLOB | grep -q 'claude.*--version' || \
         { echo "Missing claude auth check"; return 1; }
     grep -B 5 'daemon_poll_issues' "$daemon_src" $DAEMON_LIB_GLOB | grep -q 'daemon_preflight_auth_check' || \
         { echo "Auth check not wired into poll loop"; return 1; }
