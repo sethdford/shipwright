@@ -13,37 +13,39 @@ Historical context (lessons from previous pipelines):
 {
   "results": [
     {
-      "file": "index.json",
-      "relevance": 75,
-      "summary": "Direct build stage pattern index with test_failure signature and test setup recommendations. Relevant for understanding common build stage issues."
+      "file": "fleet-shared-patterns.json",
+      "relevance": 72,
+      "summary": "Common 'Error: Cannot find module' pattern in build/test stages with 'npm i' fix; recently seen (2026-09-19), applicable to module resolution failures during build"
     },
     {
-      "file": "fleet-shared-patterns.json",
-      "relevance": 70,
-      "summary": "Recent cross-repo build pattern (2026-09-19): 'Error: Cannot find module' with npm install fix. Practical reference for common build dependency issues."
+      "file": "index.json",
+      "relevance": 65,
+      "summary": "Explicit build stage test_failure pattern with actionable fix (increase timeout); directly addresses build-stage failures"
+    },
+    {
+      "file": "failures.json",
+      "relevance": 55,
+      "summary": "Resolved test failures with root causes and fixes (timeouts, db connection issues); provides build/test stage troubleshooting patterns"
     },
     {
       "file": "success-patterns.json (test-repo-ranking)",
-      "relevance": 60,
-      "summary": "Low-complexity build stage patterns with 1-iteration completions. Relevant reference for simple automated test implementations."
-    },
-    {
-      "file": "failures.json (detailed)",
-      "relevance": 55,
-      "summary": "Common test stage failure patterns (timeouts, database issues) with documented root causes and fixes. Useful for anticipating build/test failures."
+      "relevance": 42,
+      "summary": "Multiple build-stage success patterns demonstrating iteration and fix approaches; generic patterns for build problem-solving"
     },
     {
       "file": "success-patterns.json (test-repo-comptime)",
-      "relevance": 50,
-      "summary": "Pattern spanning intake→build→test stages with npm test strategy. Shows execution profile and cost for multi-stage builds."
+      "relevance": 38,
+      "summary": "Pattern covering intake → build → test stages; shows multi-stage execution experience but lacks specificity to current README task"
     }
   ]
 }
 
 Discoveries from other pipelines:
-✓ Injected 6 new discoveries
+✓ Injected 8 new discoveries
 [spec_generation] Stage spec_generation completed — Resolution: 
 [design] Design completed for Add pre-build validation checks to catch broken environments before the build loop starts — Resolution: 
+[intake] Stage intake completed — Resolution: 
+[spec_generation] Stage spec_generation completed — Resolution: 
 [intake] Stage intake completed — Resolution: 
 [spec_generation] Stage spec_generation completed — Resolution: 
 [intake] Stage intake completed — Resolution: 
@@ -182,8 +184,8 @@ status: running
 test_cmd: "npm test"
 model: sonnet
 agents: 1
-started_at: 2026-09-26T13:01:15Z
-last_iteration_at: 2026-09-26T13:01:15Z
+started_at: 2026-09-26T13:16:39Z
+last_iteration_at: 2026-09-26T13:16:39Z
 consecutive_failures: 0
 total_commits: 0
 audit_enabled: true
