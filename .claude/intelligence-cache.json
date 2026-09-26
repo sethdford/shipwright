@@ -1708,31 +1708,31 @@
           {
             "file": "failures.json",
             "relevance": 95,
-            "summary": "155 recent test stage failures with root causes (intent-analysis schema, stale locks, flaky suites) and proven fixes; directly applicable to debugging current build/test issues"
+            "summary": "Detailed test failure patterns, root causes, and fixes directly relevant to build stage test execution; includes flaky test detection and failure signature tracking"
+          },
+          {
+            "file": "success-patterns.json",
+            "relevance": 90,
+            "summary": "Captured successful build patterns showing iterations, duration, test strategies, and file change patterns; directly applicable to understanding what works in build stage"
           },
           {
             "file": "retry-outcomes.json",
             "relevance": 85,
-            "summary": "100% success rate on model escalation strategy for build_failure class (5/5 attempts); proven recovery tactic for build stage failures"
-          },
-          {
-            "file": "flaky-tests.json",
-            "relevance": 80,
-            "summary": "Known flaky tests (test-1: 5 occurrences, test-auth: 8 occurrences with connection timeout) help distinguish environmental failures from real regressions during build"
-          },
-          {
-            "file": "knowledge.json",
-            "relevance": 70,
-            "summary": "Captured build/test setup failures (mktemp /tmp/claude path issues, sw-cleanup.sh heartbeat detection) with fix strategies for test environment configuration"
+            "summary": "Tracks build failure retry strategies (model_escalation) with 100% success rate; directly applicable to build stage resilience and recovery"
           },
           {
             "file": "metrics.json",
-            "relevance": 65,
-            "summary": "Build duration baseline (7095s) and test duration baseline (1459s) provide performance targets for evaluating build loop efficiency"
+            "relevance": 80,
+            "summary": "Baseline performance metrics for build (7095s) and test (1459s) stages; provides context for expected duration and performance regression detection"
+          },
+          {
+            "file": "patterns.json",
+            "relevance": 75,
+            "summary": "Project conventions including test runner (vitest), test pattern (*.test.js), and import style; essential for understanding how build stage discovers and executes tests"
           }
         ]
       },
-      "timestamp": 1790382488,
+      "timestamp": 1790390191,
       "ttl": 1800
     },
     "fc3501364150c61feff75a6010d5998a": {
@@ -1768,6 +1768,48 @@
         }
       ],
       "timestamp": 1790383259,
+      "ttl": 1800
+    },
+    "0b14b26af8dd4687b6e3a13fa79eb749": {
+      "result": {
+        "raw_response": "Mock claude: ok"
+      },
+      "timestamp": 1790390263,
+      "ttl": 1800
+    },
+    "5ca9ba7d5cdd7787a3a44d79de06e09b": {
+      "result": {
+        "raw_response": "Mock claude: ok"
+      },
+      "timestamp": 1790390360,
+      "ttl": 1800
+    },
+    "cf5a8825b67f0882c5f1f4dac4c6d93d": {
+      "result": [
+        {
+          "type": "result",
+          "result": "I am trying the same approach again.",
+          "usage": {
+            "input_tokens": 0,
+            "output_tokens": 0
+          }
+        }
+      ],
+      "timestamp": 1790390436,
+      "ttl": 1800
+    },
+    "cb9df4b7bf7b5dc55d599f0d5dc6bcc9": {
+      "result": {
+        "raw_response": "Mock claude: ok"
+      },
+      "timestamp": 1790390508,
+      "ttl": 1800
+    },
+    "4fa22e8eca396a3f50691ed8828db20f": {
+      "result": {
+        "raw_response": "Mock claude: ok"
+      },
+      "timestamp": 1790390578,
       "ttl": 1800
     }
   }
