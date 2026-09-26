@@ -38,6 +38,8 @@ fi
 [[ -f "$SCRIPT_DIR/lib/loop-convergence.sh" ]] && source "$SCRIPT_DIR/lib/loop-convergence.sh"
 [[ -f "$SCRIPT_DIR/lib/loop-restart.sh" ]] && source "$SCRIPT_DIR/lib/loop-restart.sh"
 [[ -f "$SCRIPT_DIR/lib/loop-progress.sh" ]] && source "$SCRIPT_DIR/lib/loop-progress.sh"
+# Pre-build validation checks (catches broken environments before iteration 1)
+[[ -f "$SCRIPT_DIR/lib/loop-prebuild.sh" ]] && source "$SCRIPT_DIR/lib/loop-prebuild.sh"
 # Intelligent session restart with enhanced briefings and cross-session tracking
 [[ -f "$SCRIPT_DIR/lib/session-restart.sh" ]] && source "$SCRIPT_DIR/lib/session-restart.sh"
 # Context window budget monitoring (issue #209)
@@ -148,6 +150,17 @@ SESSION_CONTINUITY="${LOOP_SESSION_CONTINUITY:-$(_config_get_int "loop.session_c
 [[ "$SESSION_CONTINUITY" == "true" ]] && SESSION_CONTINUITY=1
 LOOP_SESSION_ID=""
 
+# ─── Pre-Build Validation Defaults ───────────────────────────────────────────
+# Run validation checks before first build iteration to catch broken environments.
+# Can be disabled via --no-pre-build-validate, LOOP_PRE_BUILD_VALIDATE=0,
+# or loop.pre_build_validate: false in config.
+PRE_BUILD_VALIDATE="${LOOP_PRE_BUILD_VALIDATE:-$(_config_get_int "loop.pre_build_validate" 1 2>/dev/null || echo 1)}"
+[[ "$PRE_BUILD_VALIDATE" == "true" ]] && PRE_BUILD_VALIDATE=1
+[[ "$PRE_BUILD_VALIDATE" == "false" ]] && PRE_BUILD_VALIDATE=0
+
+PRE_BUILD_TIMEOUT="${LOOP_PRE_BUILD_TIMEOUT:-$(_config_get_int "loop.pre_build_timeout" 15 2>/dev/null || echo 15)}"
+PRE_BUILD_CHECKS="${LOOP_PRE_BUILD_CHECKS:-deps syntax test_runner}"
+
 # ─── Audit & Quality Gate Defaults ───────────────────────────────────────────
 AUDIT_ENABLED=false
 AUDIT_AGENT_ENABLED=false
@@ -192,6 +205,10 @@ show_help() {
     echo -e "  ${CYAN}--max-turns${RESET} N             Max API turns per Claude session"
     echo -e "  ${CYAN}--resume${RESET}                  Resume from existing .claude/loop-state.md"
     echo -e "  ${CYAN}--max-restarts${RESET} N          Max session restarts on exhaustion (default: 0)"
+    echo -e "  ${CYAN}--session-continuity${RESET}      Reuse one Claude session across iterations (experimental)"
+    echo -e "  ${CYAN}--pre-build-validate${RESET}      Enable environment checks before iteration 1 (default: on)"
+    echo -e "  ${CYAN}--no-pre-build-validate${RESET}   Disable environment checks before iteration 1"
+    echo -e "  ${CYAN}--pre-build-timeout${RESET} N     Timeout for pre-build checks in seconds (default: 15)"
     echo -e "  ${CYAN}--verbose${RESET}                 Show full Claude output (default: summary)"
     echo -e "  ${CYAN}--help${RESET}                    Show this help"
     echo ""
@@ -289,6 +306,9 @@ while [[ $# -gt 0 ]]; do
         # This is different: it continues one *Claude* session across iterations.
         --session-continuity) SESSION_CONTINUITY=1; shift ;;
         --no-session-continuity) SESSION_CONTINUITY=0; shift ;;
+        --pre-build-validate) PRE_BUILD_VALIDATE=1; shift ;;
+        --no-pre-build-validate) PRE_BUILD_VALIDATE=0; shift ;;
+        --pre-build-timeout=*) PRE_BUILD_TIMEOUT="${1#--pre-build-timeout=}"; shift ;;
         --verbose) VERBOSE=true; shift ;;
         --audit) AUDIT_ENABLED=true; shift ;;
         --audit-agent) AUDIT_AGENT_ENABLED=true; shift ;;
@@ -2185,6 +2205,46 @@ run_single_agent_loop() {
 
     show_banner
 
+    # Pre-build validation: catch broken environments before iteration 1
+    # Skipped on session restarts (environment was already validated in prior session)
+    if [[ "$SESSION_RESTART" != "true" && "$PRE_BUILD_VALIDATE" == "1" ]]; then
+        pre_build_rc=0
+        pre_build_validate "$PROJECT_ROOT" "$LOG_DIR" || pre_build_rc=$?
+
+        if [[ $pre_build_rc -eq 2 ]]; then
+            # Fatal environment failure — abort without restart
+            STATUS="pre_build_failed"
+            write_state
+            write_progress
+
+            # Emit failure event
+            if type emit_event >/dev/null 2>&1; then
+                emit_event "loop.pre_build_abort" \
+                    "reason=fatal_environment_error" \
+                    "job_id=${PIPELINE_JOB_ID:-loop-$$}"
+            fi
+
+            error "Pre-build validation failed (fatal environment issue) — aborting loop"
+            show_summary
+            return 2
+        elif [[ $pre_build_rc -eq 1 ]]; then
+            # Fixable failure — continue to iteration 1 with error context
+            if type emit_event >/dev/null 2>&1; then
+                emit_event "loop.pre_build_validate" \
+                    "status=failed" \
+                    "fixable=true" \
+                    "job_id=${PIPELINE_JOB_ID:-loop-$$}"
+            fi
+        else
+            # Passed or skipped
+            if type emit_event >/dev/null 2>&1; then
+                emit_event "loop.pre_build_validate" \
+                    "status=passed" \
+                    "job_id=${PIPELINE_JOB_ID:-loop-$$}"
+            fi
+        fi
+    fi
+
     while true; do
         # Reset environment variables at start of each iteration
         # Prevents previous iterations from affecting model selection or API keys
@@ -2582,6 +2642,12 @@ run_loop_with_restarts() {
             return 0
         fi
 
+        # Pre-build failure: fatal environment issue — abort without restart
+        if [[ "$STATUS" == "pre_build_failed" ]]; then
+            error "Pre-build validation failed — environment is broken, stopping without restart"
+            return "$loop_exit"
+        fi
+
         # Context exhaustion: treat as restart, not failure (unless restart limit hit)
         if [[ "$STATUS" == "context_exhaustion_restart" ]]; then
             if [[ "$CONTEXT_RESTART_COUNT" -lt "$CONTEXT_RESTART_LIMIT" ]]; then
@@ -2703,6 +2769,48 @@ main() {
             initialize_state
         fi
         show_banner
+
+        # Pre-build validation for multi-agent mode
+        if [[ "$PRE_BUILD_VALIDATE" == "1" ]]; then
+            pre_build_rc=0
+            pre_build_validate "$PROJECT_ROOT" "$LOG_DIR" || pre_build_rc=$?
+
+            if [[ $pre_build_rc -eq 2 ]]; then
+                # Fatal environment failure — abort before launching agents
+                STATUS="pre_build_failed"
+                write_state
+                write_progress
+
+                if type emit_event >/dev/null 2>&1; then
+                    emit_event "loop.pre_build_abort" \
+                        "reason=fatal_environment_error" \
+                        "agents=$AGENTS" \
+                        "job_id=${PIPELINE_JOB_ID:-loop-$$}"
+                fi
+
+                error "Pre-build validation failed (fatal environment issue) — aborting loop"
+                show_summary
+                return 2
+            elif [[ $pre_build_rc -eq 1 ]]; then
+                # Fixable failure — continue with error context
+                if type emit_event >/dev/null 2>&1; then
+                    emit_event "loop.pre_build_validate" \
+                        "status=failed" \
+                        "fixable=true" \
+                        "agents=$AGENTS" \
+                        "job_id=${PIPELINE_JOB_ID:-loop-$$}"
+                fi
+            else
+                # Passed or skipped
+                if type emit_event >/dev/null 2>&1; then
+                    emit_event "loop.pre_build_validate" \
+                        "status=passed" \
+                        "agents=$AGENTS" \
+                        "job_id=${PIPELINE_JOB_ID:-loop-$$}"
+                fi
+            fi
+        fi
+
         launch_multi_agent
         show_summary
     else
