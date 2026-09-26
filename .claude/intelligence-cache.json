@@ -1711,31 +1711,31 @@
           {
             "file": "failures.json",
             "relevance": 95,
-            "summary": "160+ recent test failures with root causes and fixes; directly addresses test-stage issues like intent-analysis schema, pipeline locks, and flaky suites that will block builds"
-          },
-          {
-            "file": "flaky-tests.json",
-            "relevance": 90,
-            "summary": "Identifies test-1 (85% confidence) and test-auth (90% confidence) as flaky; critical for avoiding false build failures during iteration"
+            "summary": "161 documented test failures with root causes, fixes, and recency (last_seen 2026-09-26). Most failures are in test stage, directly impacting build success; includes flaky test patterns and environment issues critical for debugging build issues."
           },
           {
             "file": "success-patterns.json",
+            "relevance": 90,
+            "summary": "Two successful build patterns (bug fix: 3 iterations/45s, feature: 3 iterations/150s) showing file patterns, test strategies, templates, and commit counts. Directly applicable for understanding what works in build stage iterations."
+          },
+          {
+            "file": "patterns.json",
             "relevance": 85,
-            "summary": "Two successful build patterns (bug fix complexity 60, auth feature complexity 65) showing file patterns, iteration counts, and test strategies that worked"
+            "summary": "Project conventions captured 2026-09-26: Node.js/vitest/npm/src directory structure. Essential context for understanding build environment, test patterns (*.test.js), and import style (commonjs)."
           },
           {
             "file": "retry-outcomes.json",
             "relevance": 80,
-            "summary": "Model escalation strategy has 100% success rate (5/5) for build_failure class; provides proven recovery technique for build stage iterations"
+            "summary": "Model escalation strategy for build failures with 100% success rate (5/5 attempts). Directly relevant for understanding build failure recovery; demonstrates effective retry approach for build-stage issues."
           },
           {
-            "file": "knowledge.json",
+            "file": "metrics.json",
             "relevance": 70,
-            "summary": "Four failure patterns with fixes (mktemp path issues, cleanup output format, JSON schema problems); practical troubleshooting for test environment setup"
+            "summary": "Build duration baseline (7095s) and test duration baseline (1459s). Provides performance expectations for build stage, though data is somewhat stale (2026-07-31)."
           }
         ]
       },
-      "timestamp": 1790427187,
+      "timestamp": 1790429425,
       "ttl": 1800
     },
     "fc3501364150c61feff75a6010d5998a": {
@@ -2199,6 +2199,27 @@
         }
       ],
       "timestamp": 1790429030,
+      "ttl": 1800
+    },
+    "451382397a9084564e5c95b89aa565c0": {
+      "result": {
+        "raw_response": "Mock claude: ok"
+      },
+      "timestamp": 1790429468,
+      "ttl": 1800
+    },
+    "b70567139e9faec3ba3a30232c52c8b4": {
+      "result": [
+        {
+          "type": "result",
+          "result": "I am trying the same approach again.",
+          "usage": {
+            "input_tokens": 0,
+            "output_tokens": 0
+          }
+        }
+      ],
+      "timestamp": 1790429562,
       "ttl": 1800
     }
   }
