@@ -44,7 +44,10 @@
     "max_extensions": 3,
     "context_restart_limit": 3,
     "hard_restart_cap": 5,
-    "max_restarts": 3
+    "max_restarts": 3,
+    "pre_build_validate": true,
+    "pre_build_timeout": 15,
+    "pre_build_auto_fix": false
   },
   "max_turns": {
     "pipeline_stage": 30
