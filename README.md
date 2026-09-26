@@ -1,3 +1,4 @@
+<!-- E2E test: automated comment added to verify pipeline delivery (issue #6556) -->
 <p align="center">
   <img src="website/src/assets/logo-dark.svg" alt="Shipwright" width="200">
 </p>
