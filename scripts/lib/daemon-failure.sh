@@ -48,9 +48,28 @@ classify_failure() {
         echo "invalid_issue"
         return
     fi
-    # Context exhaustion — check progress file
+    # Environment error — check progress file and failure-reason.txt
     local issue_worktree_path="${WORKTREE_DIR:-${REPO_DIR}/.worktrees}/daemon-issue-${issue_num}"
     local progress_file="${issue_worktree_path}/.claude/loop-logs/progress.md"
+    local failure_reason_file="${issue_worktree_path}/.claude/pipeline-artifacts/failure-reason.txt"
+    if [[ -f "$failure_reason_file" ]]; then
+        local failure_reason
+        failure_reason=$(cat "$failure_reason_file" 2>/dev/null || true)
+        if [[ "$failure_reason" == "environment_error" ]]; then
+            echo "environment_error"
+            return
+        fi
+    fi
+    # Also check progress file for pre_build_failed status
+    if [[ -f "$progress_file" ]]; then
+        local prog_status
+        prog_status=$(grep -oE 'Status: [a-z_]+' "$progress_file" 2>/dev/null | awk '{print $NF}' || echo "")
+        if [[ "$prog_status" == "pre_build_failed" ]]; then
+            echo "environment_error"
+            return
+        fi
+    fi
+    # Context exhaustion — check progress file
     if [[ -f "$progress_file" ]]; then
         local cf_iter
         cf_iter=$(grep -oE 'Iteration: [0-9]+' "$progress_file" 2>/dev/null | tail -1 | grep -oE '[0-9]+' || echo "0")
@@ -80,6 +99,7 @@ get_max_retries_for_class() {
     local class="${1:-unknown}"
     case "$class" in
         auth_error|invalid_issue) echo 0 ;;
+        environment_error)        echo "${MAX_RETRIES_ENVIRONMENT:-1}" ;;
         api_error)                echo "${MAX_RETRIES_API_ERROR:-4}" ;;
         context_exhaustion)       echo "${MAX_RETRIES_CONTEXT_EXHAUSTION:-2}" ;;
         build_failure)           echo "${MAX_RETRIES_BUILD:-2}" ;;

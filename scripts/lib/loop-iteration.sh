@@ -106,14 +106,29 @@ $TEST_OUTPUT"
     local error_summary_section=""
     local error_json="$LOG_DIR/error-summary.json"
     if [[ -f "$error_json" ]]; then
-        local err_count err_lines
+        local err_count err_lines err_source err_category
         err_count=$(jq -r '.error_count // 0' "$error_json" 2>/dev/null || echo "0")
         err_lines=$(jq -r '.error_lines[]? // empty' "$error_json" 2>/dev/null | head -10 || true)
+        err_source=$(jq -r '.source // ""' "$error_json" 2>/dev/null || echo "")
+        err_category=$(jq -r '.category // ""' "$error_json" 2>/dev/null || echo "")
+
         if [[ "$err_count" -gt 0 ]] && [[ -n "$err_lines" ]]; then
-            error_summary_section="## Structured Error Summary (${err_count} errors detected)
+            # Distinguish pre-build validation failures from test failures
+            if [[ "$err_source" == "pre_build" ]]; then
+                error_summary_section="## Pre-Build Environment Issues (${err_count} issue(s) detected)
+
+**Your environment has issues that must be fixed before the code build can proceed.**
+The pre-build validation caught ${err_category} problems. Fix these and re-run:
+
+${err_lines}
+
+Once these environment issues are resolved, the build loop can proceed. These are NOT code errors—they are environmental setup problems."
+            else
+                error_summary_section="## Structured Error Summary (${err_count} errors detected)
 ${err_lines}
 
 Fix these specific errors. Each line above is one distinct error from the test output."
+            fi
         fi
     fi
 

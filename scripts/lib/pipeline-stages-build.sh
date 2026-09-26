@@ -459,8 +459,24 @@ ${_skill_prompts}
         local _loop_exit=$?
         parse_claude_tokens "$_token_log"
 
-        # Detect context exhaustion from progress file
+        # Detect pre-build environment failure from progress file
         local _progress_file="${PWD}/.claude/loop-logs/progress.md"
+        local _loop_status=""
+        if [[ -f "$_progress_file" ]]; then
+            _loop_status=$(grep -oE 'Status: [a-z_]+' "$_progress_file" 2>/dev/null | awk '{print $NF}' || echo "")
+        fi
+
+        if [[ "$_loop_status" == "pre_build_failed" ]]; then
+            warn "Pre-build validation failed (fatal environment issue) — not retrying"
+            emit_event "pipeline.environment_error" "issue=${ISSUE_NUMBER:-0}" "stage=build"
+            # Write flag for daemon retry logic (1 max retry for environment errors)
+            mkdir -p "$ARTIFACTS_DIR" 2>/dev/null || true
+            echo "environment_error" > "$ARTIFACTS_DIR/failure-reason.txt" 2>/dev/null || true
+            error "Build loop failed due to environment issue (not retrying)"
+            return 1
+        fi
+
+        # Detect context exhaustion from progress file
         if [[ -f "$_progress_file" ]]; then
             local _prog_tests
             _prog_tests=$(grep -oE 'Tests passing: (true|false)' "$_progress_file" 2>/dev/null | awk '{print $NF}' || echo "unknown")
