@@ -5,8 +5,8 @@
       "pattern": "\u001b[38;2;74;222;128m\u001b[1m✓\u001b[0m reveal shows 1/3 pass count on failure",
       "root_cause": "sw-intent-analysis-test asserts analyze_intent's JSON output includes version, goal, and criteria fields, but the current schema/implementation omits one or more of them",
       "fix": "Update analyze_intent (or its schema) in sw-intent-analysis.sh to emit version, goal, and criteria fields matching the test's expected schema",
-      "seen_count": 159,
-      "last_seen": "2026-09-26T10:45:19Z",
+      "seen_count": 160,
+      "last_seen": "2026-09-26T13:09:09Z",
       "category": "test_failure",
       "signature_hash": "e1a285258fe63781b7370b0d086ad87b",
       "signature": "\u001b[<n>;2;<n>;<n>;<n>m\u001b[1m✓\u001b[0m reveal shows <path> pass count on failure"
@@ -16,8 +16,8 @@
       "pattern": "\u001b[2m  loop behavior: iterations on test failure\u001b[0m",
       "root_cause": "Test suite itself passed (all PASS, 0 FAIL) but the pipeline stage was flagged for iterating due to loop-behavior/RL logging noise being misread as failure signal",
       "fix": "Verify the actual test exit code rather than log content matching; ensure sw-autoresearch-e2e-test.sh output doesn't trigger false-positive failure pattern matching in the pipeline's error classifier",
-      "seen_count": 41,
-      "last_seen": "2026-09-26T12:45:52Z",
+      "seen_count": 40,
+      "last_seen": "2026-09-26T11:12:56Z",
       "category": "flaky",
       "signature_hash": "4257c245052f",
       "signature": "\u001b[2m loop behavior: iterations on test failure\u001b[0m"
@@ -137,8 +137,8 @@
       "pattern": "\u001b[38;2;0;212;255m▸\u001b[0m Patrol recurring failures label construction... \u001b[38;2;74;222;128m✓\u001b[0m",
       "root_cause": "sw-e2e-integration-test failed because a stale pipeline lock (pipeline-4253) was already held from a prior run, blocking the fast pipeline test; sw-intent-analysis-test failed because analyze_intent's generated JSON is missing required schema fields (version, goal, criteria)",
       "fix": "Clear/release stale pipeline locks before the e2e-integration test runs (or have it auto-abort orphaned locks), and update analyze_intent to always populate version, goal, and criteria in its output schema",
-      "seen_count": 18,
-      "last_seen": "2026-09-26T08:10:27Z",
+      "seen_count": 19,
+      "last_seen": "2026-09-26T12:30:24Z",
       "category": "test_failure",
       "signature_hash": "06f0abb7562df2c6e4651882933d3b25",
       "signature": "\u001b[<n>;2;0;<n>;<n>m▸\u001b[0m patrol recurring failures label construction... \u001b[<n>;2;<n>;<n>;<n>m✓\u001b[0m"
@@ -270,19 +270,10 @@
     {
       "stage": "test",
       "pattern": "\u001b[38;2;74;222;128m\u001b[1m✓\u001b[0m missing log returns base",
-      "root_cause": "sw-e2e-integration-test exited 1, likely due to a missing or malformed log return in an integration path (e2e integration test asserts on log output that isn't present)",
-      "fix": "run scripts/sw-e2e-integration-test.sh directly to capture the specific assertion failure and fix the missing log return in the relevant integration code path",
+      "root_cause": "sw-pipeline-test.sh mocks (plan/review stage mocks) aren't writing plan.md/review.md/dod.md into .claude/pipeline-artifacts/, so downstream assertions and the RL/jq episode logging read empty/malformed data causing cascading E2E and cleanup failures",
+      "fix": "Fix the plan/review stage mock or pipeline_run_stage artifact-write path in sw-pipeline-test.sh to actually create plan.md, dod.md, tasks, and review.md before assertions run",
       "seen_count": 2,
       "last_seen": "2026-09-25T17:40:52Z",
-      "category": "test_failure"
-    },
-    {
-      "stage": "test",
-      "pattern": "Testing CONTRACT: pm can parse recruit team --json for team/agents/model... ERROR: scripts/sw-recruit-test.sh:1131 exited with status 5",
-      "root_cause": "sw-recruit-test.sh line 1131 asserts parsing of `pm can parse recruit team --json for team/agents/model` but the JSON output structure/fields don't match what jq expects, causing exit status 5",
-      "fix": "Inspect scripts/sw-recruit-test.sh:1131 and the actual `pm recruit team --json` output to align expected keys (team/agents/model) with the real JSON schema produced by sw-recruit.sh",
-      "seen_count": 1,
-      "last_seen": "2026-09-26T13:23:20Z",
       "category": "test_failure"
     }
   ]
