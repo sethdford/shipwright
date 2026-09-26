@@ -71,8 +71,8 @@
       "pattern": "Results: \u001b[38;2;74;222;128m\u001b[1m124 PASS\u001b[0m | \u001b[38;2;248;113;113m\u001b[1m4 FAIL\u001b[0m",
       "root_cause": "4 of 128 tests failed but the failing assertions are not present in the captured log excerpt (only passing output shown)",
       "fix": "Re-run with full output or grep for FAIL/✗ lines to identify which suite and assertion regressed before attempting a code fix",
-      "seen_count": 6,
-      "last_seen": "2026-09-26T08:58:32Z",
+      "seen_count": 7,
+      "last_seen": "2026-09-26T15:09:32Z",
       "category": "test_failure",
       "signature_hash": "a938d8f63c9361dfd3082073022633ae",
       "signature": "results: \u001b[<n>;2;<n>;<n>;<n>m\u001b[1m<n> pass\u001b[0m | \u001b[<n>;2;<n>;<n>;<n>m\u001b[1m4 fail\u001b[0m"
@@ -115,8 +115,8 @@
       "pattern": "Results: \u001b[38;2;74;222;128m\u001b[1m126 PASS\u001b[0m | \u001b[38;2;248;113;113m\u001b[1m2 FAIL\u001b[0m",
       "root_cause": "sw-pipeline-test.sh mock plan-stage invocation no longer writes plan.md, cascading into review/E2E/resume/cleanup failures that depend on it, plus a jq parse error on a non-numeric complexity value in the intelligence low-complexity test",
       "fix": "Fix the mock plan stage in sw-pipeline-test.sh to create .claude/pipeline-artifacts/plan.md (and dod.md) before the dependent tests run, and quote/validate the complexity value before passing it to jq",
-      "seen_count": 11,
-      "last_seen": "2026-09-19T04:56:53Z",
+      "seen_count": 12,
+      "last_seen": "2026-09-26T16:19:27Z",
       "category": "test_failure",
       "signature_hash": "a4dd00948c6625a595d0ee2b91698d06",
       "signature": "results: \u001b[<n>;2;<n>;<n>;<n>m\u001b[1m<n> pass\u001b[0m | \u001b[<n>;2;<n>;<n>;<n>m\u001b[1m2 fail\u001b[0m"
@@ -137,8 +137,8 @@
       "pattern": "\u001b[38;2;0;212;255m▸\u001b[0m Patrol recurring failures label construction... \u001b[38;2;74;222;128m✓\u001b[0m",
       "root_cause": "sw-e2e-integration-test failed because a stale pipeline lock (pipeline-4253) was already held from a prior run, blocking the fast pipeline test; sw-intent-analysis-test failed because analyze_intent's generated JSON is missing required schema fields (version, goal, criteria)",
       "fix": "Clear/release stale pipeline locks before the e2e-integration test runs (or have it auto-abort orphaned locks), and update analyze_intent to always populate version, goal, and criteria in its output schema",
-      "seen_count": 18,
-      "last_seen": "2026-09-26T08:10:27Z",
+      "seen_count": 19,
+      "last_seen": "2026-09-26T15:40:44Z",
       "category": "test_failure",
       "signature_hash": "06f0abb7562df2c6e4651882933d3b25",
       "signature": "\u001b[<n>;2;0;<n>;<n>m▸\u001b[0m patrol recurring failures label construction... \u001b[<n>;2;<n>;<n>;<n>m✓\u001b[0m"
@@ -270,8 +270,8 @@
     {
       "stage": "test",
       "pattern": "\u001b[38;2;74;222;128m\u001b[1m✓\u001b[0m missing log returns base",
-      "root_cause": "sw-pipeline-test.sh E2E tests fail because plan/review stage artifacts (plan.md, review.md) are never written, cascading into downstream failures (full E2E, resume, cleanup) plus a jq parse error on non-numeric complexity output in the low-complexity skip test",
-      "fix": "Fix the plan and review pipeline stage functions to actually write .claude/pipeline-artifacts/plan.md and review.md, and sanitize/validate the complexity value before piping to jq in the intelligence skip-stage logic",
+      "root_cause": "sw-reward-aggregator-test.sh 'missing log returns base' assertion failed because get_baseline (or similar) did not return the expected default/base reward value when the rewards log file was absent or empty",
+      "fix": "Ensure the reward-aggregator function short-circuits and returns the documented base value (e.g. 0.5) when the rewards log file is missing, before attempting to read/parse it",
       "seen_count": 2,
       "last_seen": "2026-09-25T17:40:52Z",
       "category": "test_failure"
