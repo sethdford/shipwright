@@ -1405,31 +1405,29 @@
     "6d264ea5a338e797fb543b64ca338151": {
       "result": {
         "complexity": 6,
-        "risk_level": "medium",
-        "success_probability": 72,
+        "risk_level": "low",
+        "success_probability": 80,
         "recommended_template": "standard",
         "issue_type": "testing",
         "key_risks": [
-          "False positive validation checks could block legitimate builds",
-          "error-summary.json format inconsistency between pre-check and loop errors",
-          "Validation timeout optimization - must complete quickly or defeats purpose",
-          "Cross-project type compatibility (npm, Go, Python, Rust, etc)",
-          "Test runner detection fragility across different frameworks",
-          "Different dependency managers and their failure modes"
+          "False positives blocking valid builds when environment checks are too strict",
+          "Missing edge cases in dependency/syntax detection across project types",
+          "Performance overhead if validation checks are too thorough",
+          "Cross-platform compatibility issues with shell commands",
+          "error-summary.json format mismatch causing loop parsing failures"
         ],
         "implementation_hints": [
-          "Reuse existing error-summary.json writing logic to ensure format consistency",
-          "Modularize detection into separate functions per check type (deps, syntax, test-runner)",
-          "Add config knob in daemon-config.json under pre_build_validate section with enable/disable flags",
-          "Set strict timeout (e.g., 30-60s) on validation - kill if it exceeds and log as warning, not error",
-          "Detect project type first (package.json presence, go.mod, requirements.txt, etc) then run appropriate checks",
-          "Test with mock project layouts covering: healthy project, missing deps, syntax errors, failing test runner",
-          "Document check behavior and how to disable specific checks in CLAUDE.md build loop section",
-          "Consider making individual checks optional/configurable for different workflows",
-          "Use existing shipwright scripts where possible (test runner invocation already exists)"
+          "Study sw-loop.sh error-summary.json structure and error injection pattern before implementation",
+          "Implement checks in order: dependency install → syntax validation → test runner smoke test",
+          "Make all checks fast by using minimal scope (changed files for syntax, light dependency check)",
+          "Test with mock project layouts: missing node_modules, syntax errors in source/tests, broken test runner",
+          "Use existing shell compatibility layer to ensure Bash 3.2 compatibility",
+          "Wire pre-build failures into loop's structured error context to avoid duplicate iteration",
+          "Add clear config toggle in daemon-config.json: pre_build_validate (boolean) and pre_build_timeout (seconds)",
+          "Capture validation output to .claude/pipeline-artifacts/ for debugging failed pre-checks"
         ]
       },
-      "timestamp": 1790381922,
+      "timestamp": 1790423551,
       "ttl": 3600
     },
     "bd141dcd871aafa8253152be510a8a55": {
@@ -1481,113 +1479,119 @@
     },
     "ab4fef86267c4261eb75cf4e467b932f": {
       "result": {
-        "issue_type": "testing",
-        "confidence": 0.88,
+        "issue_type": "infrastructure",
+        "confidence": 0.90,
         "secondary_domains": [
-          "infrastructure",
+          "testing",
           "reliability",
-          "documentation"
+          "devops"
         ],
         "complexity_assessment": {
-          "score": 6,
-          "reasoning": "Well-defined scope with clear acceptance criteria; moderate complexity lies in integrating pre-build validation with existing error-feedback path and build-loop config system, not in individual components."
+          "score": 5,
+          "reasoning": "Focused utility function with clear acceptance criteria, but requires careful integration with existing loop error-feedback paths and comprehensive test coverage for detection edge cases"
         },
         "skill_plan": {
           "plan": [
             "architecture-design",
-            "testing-strategy",
-            "validation-thoroughness"
+            "systematic-debugging",
+            "brainstorming"
           ],
           "design": [
-            "architecture-design",
+            "build-environment-validation",
             "testing-strategy"
           ],
           "build": [
-            "build-environment-validation",
-            "testing-strategy",
-            "observability"
+            "build-environment-validation"
           ],
           "review": [
-            "pr-quality",
             "adversarial-quality",
-            "testing-strategy"
+            "pr-quality"
           ],
           "compound_quality": [
-            "adversarial-quality",
-            "validation-thoroughness"
+            "validation-thoroughness",
+            "testing-strategy"
           ],
           "pr": [
             "pr-quality"
           ],
           "deploy": [],
-          "validate": [],
+          "validate": [
+            "validation-thoroughness"
+          ],
           "monitor": []
         },
         "skill_rationale": {
-          "architecture-design": "The pre_build_validate() function must integrate cleanly with the build loop's error-feedback path; an ADR ensures future extensions don't break this contract.",
-          "testing-strategy": "Smoke test design matters: tests must fail fast on real environment issues (broken deps, syntax) but pass reliably in CI; wrong test selection wastes iterations or misses failures.",
-          "validation-thoroughness": "Smoke tests alone are insufficient—must verify that dependency install actually works, lint catches real syntax errors in changed files, and test runner starts; avoid false negatives.",
-          "build-environment-validation": "Pre-build validation is a distinct pattern requiring structured error reporting into error-summary.json and conditional skipping; no existing skill covers Shipwright's error-feedback integration.",
-          "observability": "Validation results must feed into the build loop's existing error-context system so downstream stages (retry logic, logs) see pre-flight failures the same way as loop failures.",
-          "adversarial-quality": "Attack scenarios: validation passes but build fails anyway (stale cache), validation blocks false positives (lock file race), syntax check misses dynamic errors—adversarial review hardens the checks.",
-          "pr-quality": "Pre-build validation touches core build loop infrastructure; PR must clearly show the integration point, error-summary.json shape, and config option so reviewers can reason about side effects."
+          "architecture-design": "Establish where pre-build validation fits in pipeline sequencing (after intake, before build iteration 1), how it integrates with existing error-feedback path, and API contract for error-summary.json",
+          "systematic-debugging": "The WIP commit (ea12c4a8) shows a previous attempt failed; analyze what went wrong to avoid repeating the mistake and understand integration blockers with loop infrastructure",
+          "brainstorming": "Challenge assumptions on validation scope (all files vs changed files?), timeout strategy (15-30s ceiling?), failure mode (block vs warn?), and whether pre-check should run only at iteration 0 or every iteration",
+          "build-environment-validation": "This skill directly addresses the core requirement: designing checks for missing/broken dependency install, syntax errors in changed files, and test-runner startup failures that exit before iteration 1",
+          "testing-strategy": "Design realistic test cases covering both pass and fail scenarios with mock project layouts matching real-world broken environments (missing deps, syntax errors, test-runner crashes)",
+          "adversarial-quality": "Think like an attacker: pre-check passes but loop still fails (silent incompatibility), detect edge cases the loop wouldn't catch alone, identify false positives that block legitimate builds",
+          "pr-quality": "The PR must clearly document integration points, error-summary.json format compatibility, config wiring, and include before/after examples showing how pre-check prevents wasted iterations",
+          "validation-thoroughness": "Pre-build validation is a smoke test; verify it doesn't create false confidence, test actual integration with loop error deserialization, validate with real-world environments",
+          "cli-version-management": "Version detection may be needed to understand test-runner startup behavior, match version strings in error reporting, and handle version mismatches gracefully"
         },
         "generated_skills": [
           {
             "name": "build-environment-validation",
-            "reason": "No existing skill covers Shipwright's specific pattern of pre-flight checks that produce structured error feedback (error-summary.json) consumable by the build loop's retry logic. This pattern requires understanding the loop's error context injection and config-driven feature toggling.",
-            "content": "## Build Environment Validation Pattern\n\nPre-build validation catches environment failures (broken dependencies, syntax errors, test-runner startup) before wasting a full loop iteration. The pattern integrates tightly with the build loop's error-feedback system.\n\n### Core Contract\n\n**Inputs:**\n- Changed files (from git diff)\n- Project type detection (package.json, Cargo.toml, etc.)\n- Config flag `loop.pre_build_validate_enabled` (default: true)\n\n**Outputs on failure:**\n- `error-summary.json` matching the shape the loop already reads\n- Each error entry: `{\"line\": \"...\", \"message\": \"...\"}`\n- Exit code 1 (non-fatal; loop treats it as a failed pre-flight, not a fatal error)\n\n**Outputs on success:**\n- Clean exit code 0\n- Optional validation log file for observability\n\n### Check Categories\n\n1. **Dependency Install** — Run package manager (npm ci, cargo fetch, pip install --dry-run) with a short timeout (10s). Catches missing deps, lockfile corruption, network issues.\n\n2. **Syntax Check** — Lint only changed files using the project's existing linter (eslint, cargo check, mypy) if available. Skip if no linter configured. Report first 5 errors to avoid overwhelming context.\n\n3. **Test Runner Startup** — Run test command with `--help` or `--list` (or equivalent) to verify the test runner even starts. Catches test config errors without running actual tests.\n\n### Integration Points\n\n- **Error Feedback**: When validation fails, `sw-loop.sh` reads `error-summary.json` and injects it as structured context into the next iteration. Pre-flight failures surface the same way as loop errors.\n\n- **Conditional Execution**: Check `daemon-config.json` for `loop.pre_build_validate_enabled`. Respect the flag; allow skipping for environments where pre-flight is not applicable.\n\n- **No Retry**: Pre-flight failures don't auto-retry the validation itself. The loop's normal retry logic handles re-attempts on the full build.\n\n### Implementation Checklist\n\n- [ ] Read project type from context (already available in loop)\n- [ ] Implement `pre_build_validate()` in sw-loop.sh\n- [ ] Generate `error-summary.json` on failure with full file path + error message per check\n- [ ] Add `pre_build_validate_enabled` config flag (default true)\n- [ ] Test with mock projects: working env, missing deps, syntax error, broken test config\n- [ ] Document in CLAUDE.md Build Loop section: \"Pre-Build Validation\" subsection\n- [ ] Wire into loop's error injection: `pre_build_validate() || { cat error-summary.json | inject_to_prompt; }`\n\n### Failure Handling\n\nPre-flight failures are logged but not fatal—the loop enters with the validation error as structured context, giving the agent a chance to fix and retry. If pre-flight fails 3 times in a row, the loop's circuit-breaker trips as normal (treating it like any other error)."
+            "reason": "This issue is literally about validating the pre-build environment; no generic skill covers the specific patterns of dependency detection, syntax validation, and test-runner smoke testing",
+            "content": "## Pre-Build Environment Validation\n\nValidate build environment BEFORE the first iteration to catch infrastructure failures in seconds, not iterations.\n\n### Three Detection Categories\n\n**1. Dependency Validation**\n- Run `npm install --dry-run` (or equivalent for your package manager) to detect missing deps, version conflicts, or broken lockfiles\n- Exit code 0 = dependencies resolvable; non-zero = report error with package manager output\n- Timeout: 10-15 seconds (dependency resolution can be slow with many packages)\n\n**2. Syntax Validation**\n- Parse changed files for syntax errors ONLY (use `node --check` for JS/TS, `python -m py_compile` for Python, etc.)\n- Detect via: `git diff --name-only HEAD...origin/main` to target changed files (not entire codebase)\n- Report: file path, line number, error message from the parser\n- Timeout: 5-10 seconds\n\n**3. Test Runner Smoke Test**\n- Invoke test runner with `--version` or `--help` to verify it can START (not run tests, just exit cleanly)\n- Example: `vitest --version` should exit 0 with version output\n- If custom test script, invoke with a timeout flag (e.g., `npm run test -- --timeout 5s`) on a single trivial test\n- Timeout: 3-5 seconds (just startup, no test execution)\n\n### Error Output Format\n\nWrite `error-summary.json` with the same shape the loop already deserializes:\n\n```json\n{\n  \"phase\": \"pre-build\",\n  \"iteration\": 0,\n  \"errors\": [\n    {\n      \"type\": \"dependency_install_failed\",\n      \"message\": \"npm ERR! ...\",\n      \"file\": null,\n      \"line\": null\n    },\n    {\n      \"type\": \"syntax_error\",\n      \"message\": \"SyntaxError: Unexpected token }\",\n      \"file\": \"src/index.js\",\n      \"line\": 42\n    }\n  ]\n}\n```\n\n### Configuration & Skipping\n\nRead from daemon-config.json:\n```json\n{\n  \"loop\": {\n    \"pre_build_validate\": true,\n    \"pre_build_timeout\": 15\n  }\n}\n```\n\nAllow override: `PRE_BUILD_VALIDATE=false` disables entirely, `PRE_BUILD_TIMEOUT=30` raises ceiling.\n\n### Integration with Loop Error Context\n\nThe loop's existing error-recovery system (inject error-summary.json into iteration 1 prompt) should consume pre-build failures as-is. No wasted iteration; the agent immediately sees structured error context.\n\n### Testing Strategy\n\n- Mock project with missing dependency: pre-check should detect and report\n- Mock project with syntax error in src/: pre-check should parse and report file+line\n- Mock project with broken test runner: pre-check should fail startup, report\n- Happy path: all three checks pass, error-summary.json is empty (or not written)\n- Timeout test: dependency install hangs, pre-check times out gracefully with diagnostic\n\n### Performance Target\n\nTotal pre-build time should be <20 seconds. If it exceeds this, it's not saving iterations—it's adding overhead."
           }
         ],
         "review_focus": [
-          "error-summary.json schema matches loop's existing error-injection format exactly",
-          "pre_build_validate() respects config flag and is skippable without breaking downstream stages",
-          "smoke tests fail fast on real issues (broken deps, syntax) but don't produce false positives in CI",
-          "integration with daemon-config.json doesn't introduce new config brittleness or validation order dependencies",
-          "documentation in CLAUDE.md is clear on when/why pre-build validation runs and how errors surface to the loop"
+          "error-summary.json format is byte-for-byte compatible with what loop's error deserialization expects",
+          "pre-check timeout (15s default) is enforced and surfaces gracefully (doesn't hang the pipeline)",
+          "config option pre_build_validate=true/false is properly threaded from daemon-config.json into loop startup",
+          "git diff command for changed files works in all repo states (detached HEAD, merge conflicts, fresh clone)",
+          "test runner detection uses --version/--help pattern, not running actual tests (performance critical)",
+          "syntax check uses appropriate language-specific parser (node --check for JS, pylint for Python, etc.)",
+          "unit tests include both passing and failing mock project layouts with realistic error outputs",
+          "CLAUDE.md build loop section documents pre-build validation, when it runs, config options, and error-feedback integration"
         ],
         "risk_areas": [
-          "Pre-flight validation could mask real issues if checks are too lenient (e.g., syntax check only on JS, not on generated/dynamic code)",
-          "Timeout handling on slow CI machines—10s may be too aggressive for npm ci on a cold cache",
-          "False positives: linter complaining about code that's actually valid, blocking legitimate builds",
-          "Config flag precedence unclear—if enabled in daemon-config but loop.sh has a hardcoded disable, confusion ensues",
-          "Error-summary.json written but not consumed if loop doesn't recognize the pre-flight error shape"
+          "Previous WIP attempt (ea12c4a8) indicates integration complexity—prior blockers must be understood before re-implementation",
+          "Pre-check performance: if validation takes >20s, it adds overhead instead of saving iterations",
+          "False negatives: pre-check passes but loop fails immediately (undetected transitive dependency, obscure syntax issue)",
+          "Error format mismatch: if error-summary.json doesn't deserialize, loop crashes instead of recovering gracefully",
+          "File detection edge case: git diff may not work as expected in shallow clones, detached HEAD, or after merge conflicts",
+          "Timeout hang: if pre-check command hangs, does circuit breaker prevent pipeline stall?",
+          "Test runner detection fragility: --version works for some runners (vitest, jest) but not others—need fallback strategy"
         ]
       },
-      "timestamp": 1790382011,
+      "timestamp": 1790423668,
       "ttl": 3600
     },
     "d7d325013be128304a8d47af223b4058": {
       "result": {
         "results": [
           {
-            "file": "failures.json",
+            "file": "fleet-shared-patterns.json",
             "relevance": 95,
-            "summary": "Shows actual failure signatures including database connection refused and timeout issues that indicate environmental problems — exactly the type of broken environments pre-build validation should detect early"
+            "summary": "Shows 'Cannot find module' errors with fix 'npm i'. Pre-build validation should catch missing dependencies before build starts."
           },
           {
-            "file": "fleet-shared-patterns.json",
-            "relevance": 80,
-            "summary": "Contains 'Cannot find module' error pattern across build stage — indicates dependency/environment setup issues that pre-build validation could catch before the build loop starts"
+            "file": "failures.json",
+            "relevance": 85,
+            "summary": "Documents failure patterns with root causes (timeouts, database connection refused, unbounded loops). Informs what environmental checks to add before build."
           },
           {
             "file": "index.json",
-            "relevance": 72,
-            "summary": "Documents test failure patterns from build stage with fixes (timeout increases) — shows environmental constraints that validation checks should verify upfront"
+            "relevance": 75,
+            "summary": "Contains build/test stage failure signatures and fixes. Patterns like test timeouts inform pre-build validation strategy."
           },
           {
-            "file": "success-patterns.json (test-final-working)",
-            "relevance": 58,
-            "summary": "Daemon timeout fix pattern shows multi-stage dependencies — somewhat relevant for understanding build loop environmental requirements"
+            "file": "success-patterns.json",
+            "relevance": 50,
+            "summary": "Contains past successful solutions including build/test patterns, but less directly relevant to pre-build environment validation."
           },
           {
-            "file": "success-patterns.json (test-repo-comptime)",
-            "relevance": 48,
-            "summary": "Multi-stage execution pattern (intake, build, test) with timing data — provides context on build loop stages but limited direct relevance to pre-build validation"
+            "file": "architecture.json",
+            "relevance": 15,
+            "summary": "Generic architecture rules with no specific content relating to pre-build validation checks or environment validation."
           }
         ]
       },
-      "timestamp": 1790382058,
+      "timestamp": 1790423724,
       "ttl": 1800
     },
     "c39fc3132b090cd382db2315d0cf8069": {
@@ -1617,56 +1621,56 @@
       "result": {
         "results": [
           {
-            "file": "failures.json",
-            "relevance": 85,
-            "summary": "Contains concrete environmental failures (database connection refused, unbounded loops, timeouts) that pre-build validation should detect early before build loop starts"
-          },
-          {
             "file": "fleet-shared-patterns.json",
-            "relevance": 80,
-            "summary": "Shows 'Cannot find module' errors across build/test stages indicating missing dependencies—a key environmental issue pre-build validation should catch at validation time"
+            "relevance": 85,
+            "summary": "Shows cross-repo 'Cannot find module' pattern with 'npm i' fix—direct example of environment dependency issues pre-build validation should catch before build loop starts"
           },
           {
-            "file": "index.json",
-            "relevance": 65,
-            "summary": "Contains test failure patterns and stage information (build, test) with remediation strategies relevant to designing validation check architecture"
+            "file": "failures.json",
+            "relevance": 80,
+            "summary": "Contains 'database connection refused' (unresolved) and timeout patterns—environment-state failures that pre-build checks could detect and fail fast rather than wasting build iterations"
           },
           {
             "file": "success-patterns.json (test-repo-comptime)",
+            "relevance": 70,
+            "summary": "Shows multi-stage pattern (intake→build→test) with 'npm test' strategy; intake stage placement informs pre-build validation architecture decision to check environment before iterations begin"
+          },
+          {
+            "file": "index.json",
             "relevance": 60,
-            "summary": "Shows multi-stage execution pattern (intake→build→test) that informs where pre-build validation should be positioned in the pipeline architecture"
+            "summary": "Documents 'test_failure' pattern with 'Increase timeout in test setup' fix—shows class of failures that arise from misconfigured environments, informing what pre-build checks should validate"
           },
           {
             "file": "success-patterns.json (test-final-working)",
             "relevance": 55,
-            "summary": "Daemon-related timeout handling pattern shows architectural approach to environment validation and error handling relevant to pre-build check design"
+            "summary": "Daemon timeout pattern in sw-daemon.sh shows similar root-cause handling approach (timeout wrapper) that could guide pre-build timeout validation architecture"
           }
         ]
       },
-      "timestamp": 1790382332,
+      "timestamp": 1790424035,
       "ttl": 1800
     },
     "fc7f3c05479541534c67da7ae7fb614c": {
       "result": {
         "results": [
           {
-            "file": "fleet-shared-patterns.json",
-            "relevance": 72,
-            "summary": "Contains 'Error: Cannot find module' pattern with fix 'npm i' - directly relevant to detecting broken environments (missing dependencies) before build starts"
+            "file": "failures.json",
+            "relevance": 42,
+            "summary": "Contains failure patterns including 'database connection refused' with root cause 'db not started', directly relevant to environment validation that pre-build checks should catch. Shows concrete anti-patterns: failures that could be prevented by pre-build validation."
           },
           {
-            "file": "failures.json",
-            "relevance": 68,
-            "summary": "Tracks 'database connection refused' failure with root cause 'db not started' - anti-pattern showing what happens when pre-build validation is skipped, needs environment checks"
+            "file": "fleet-shared-patterns.json",
+            "relevance": 28,
+            "summary": "Tracks cross-repo failure patterns including 'Cannot find module' errors seen during build/test stages. Represents environment/dependency issues that pre-build validation could detect and prevent."
           },
           {
             "file": "index.json",
-            "relevance": 38,
-            "summary": "Generic failure pattern index including test_failure signatures and timeout handling - tangentially related to build-time environment issues but lacks specificity"
+            "relevance": 18,
+            "summary": "Contains pattern index for test_failure signatures in build stage with recommended fix. Generic pattern tracking but minimally relevant to pre-build environment validation design approaches."
           }
         ]
       },
-      "timestamp": 1790382345,
+      "timestamp": 1790424050,
       "ttl": 1800
     },
     "072ea6d09ed45df90d5334e8a8ab6796": {
@@ -1811,6 +1815,24 @@
       },
       "timestamp": 1790390578,
       "ttl": 1800
+    },
+    "178b555da2c6f4ad62a5be6d7ba777bf": {
+      "result": {
+        "estimated_iterations": 3
+      },
+      "timestamp": 1790423559,
+      "ttl": 1800
+    },
+    "f0f2e226a2e561ea71a87bf66b342c88": {
+      "result": {
+        "estimated_cost_usd": 1.85,
+        "estimated_iterations": 2,
+        "estimated_tokens": 105000,
+        "likely_failure_stage": "test",
+        "confidence": 78
+      },
+      "timestamp": 1790423575,
+      "ttl": 3600
     }
   }
 }
