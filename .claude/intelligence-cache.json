@@ -1710,33 +1710,33 @@
       "result": {
         "results": [
           {
-            "file": "retry-outcomes.json",
+            "file": "failures.json",
+            "relevance": 95,
+            "summary": "160+ recent test failures with root causes and fixes; directly addresses test-stage issues like intent-analysis schema, pipeline locks, and flaky suites that will block builds"
+          },
+          {
+            "file": "flaky-tests.json",
             "relevance": 90,
-            "summary": "model_escalation retry strategy has 100% success rate (5/5) on build failures; directly applicable for handling build stage failures"
+            "summary": "Identifies test-1 (85% confidence) and test-auth (90% confidence) as flaky; critical for avoiding false build failures during iteration"
           },
           {
             "file": "success-patterns.json",
+            "relevance": 85,
+            "summary": "Two successful build patterns (bug fix complexity 60, auth feature complexity 65) showing file patterns, iteration counts, and test strategies that worked"
+          },
+          {
+            "file": "retry-outcomes.json",
             "relevance": 80,
-            "summary": "2 success patterns for bug fix (complexity 60) and feature (complexity 65) showing 3-iteration builds with npm test; provides proven approach templates"
+            "summary": "Model escalation strategy has 100% success rate (5/5) for build_failure class; provides proven recovery technique for build stage iterations"
           },
           {
-            "file": "patterns.json",
+            "file": "knowledge.json",
             "relevance": 70,
-            "summary": "Project conventions: node type, vitest runner, npm, src/ source dir, *.test.js pattern; essential for correct build strategy"
-          },
-          {
-            "file": "failures.json",
-            "relevance": 68,
-            "summary": "159 occurrences of intent-analysis schema failures, test timeouts, and flaky tests; identifies blockers that may surface during build"
-          },
-          {
-            "file": "metrics.json",
-            "relevance": 62,
-            "summary": "Baselines: 7095s build duration, 1459s test duration; sets expectations for build/test cycle timing"
+            "summary": "Four failure patterns with fixes (mktemp path issues, cleanup output format, JSON schema problems); practical troubleshooting for test environment setup"
           }
         ]
       },
-      "timestamp": 1790424848,
+      "timestamp": 1790427187,
       "ttl": 1800
     },
     "fc3501364150c61feff75a6010d5998a": {
@@ -2109,6 +2109,27 @@
         }
       ],
       "timestamp": 1790426841,
+      "ttl": 1800
+    },
+    "b70588f2298afd66fc12075302ead3ce": {
+      "result": {
+        "raw_response": "Mock claude: ok"
+      },
+      "timestamp": 1790427272,
+      "ttl": 1800
+    },
+    "6f3bd6598d173fa1fafa6957a81ae5cf": {
+      "result": [
+        {
+          "type": "result",
+          "result": "I am trying the same approach again.",
+          "usage": {
+            "input_tokens": 0,
+            "output_tokens": 0
+          }
+        }
+      ],
+      "timestamp": 1790427515,
       "ttl": 1800
     }
   }
