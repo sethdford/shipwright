@@ -5,8 +5,8 @@
       "pattern": "\u001b[38;2;74;222;128m\u001b[1m✓\u001b[0m reveal shows 1/3 pass count on failure",
       "root_cause": "sw-intent-analysis-test asserts analyze_intent's JSON output includes version, goal, and criteria fields, but the current schema/implementation omits one or more of them",
       "fix": "Update analyze_intent (or its schema) in sw-intent-analysis.sh to emit version, goal, and criteria fields matching the test's expected schema",
-      "seen_count": 156,
-      "last_seen": "2026-09-26T02:04:27Z",
+      "seen_count": 157,
+      "last_seen": "2026-09-26T03:00:59Z",
       "category": "test_failure",
       "signature_hash": "e1a285258fe63781b7370b0d086ad87b",
       "signature": "\u001b[<n>;2;<n>;<n>;<n>m\u001b[1m✓\u001b[0m reveal shows <path> pass count on failure"
@@ -16,8 +16,8 @@
       "pattern": "\u001b[2m  loop behavior: iterations on test failure\u001b[0m",
       "root_cause": "Test suite itself passed (all PASS, 0 FAIL) but the pipeline stage was flagged for iterating due to loop-behavior/RL logging noise being misread as failure signal",
       "fix": "Verify the actual test exit code rather than log content matching; ensure sw-autoresearch-e2e-test.sh output doesn't trigger false-positive failure pattern matching in the pipeline's error classifier",
-      "seen_count": 35,
-      "last_seen": "2026-09-25T21:43:58Z",
+      "seen_count": 36,
+      "last_seen": "2026-09-26T01:47:21Z",
       "category": "flaky",
       "signature_hash": "4257c245052f",
       "signature": "\u001b[2m loop behavior: iterations on test failure\u001b[0m"
@@ -50,8 +50,8 @@
       "signature": "results: \u001b[<n>;2;<n>;<n>;<n>m\u001b[1m<n> pass\u001b[0m | \u001b[<n>;2;<n>;<n>;<n>m\u001b[1m1 fail\u001b[0m",
       "root_cause": "sw-e2e-integration-test failed because a stale pipeline lock from a prior run (pipeline-3854) was left in 'running' state, blocking the new pipeline start; sw-intent-analysis-test failed because analyze_intent's generated JSON is missing the required version/goal/criteria schema fields",
       "fix": "Clear/release stale pipeline locks before the e2e-integration test runs (or add lock staleness detection/cleanup), and update analyze_intent to always emit version, goal, and criteria fields in its output schema",
-      "seen_count": 10,
-      "last_seen": "2026-09-26T03:09:35Z",
+      "seen_count": 8,
+      "last_seen": "2026-09-25T11:16:25Z",
       "category": "test_failure",
       "signature_hash": "af7df127e4c98031cbe09f6b0646ac68"
     },
@@ -270,8 +270,8 @@
     {
       "stage": "test",
       "pattern": "\u001b[38;2;74;222;128m\u001b[1m✓\u001b[0m missing log returns base",
-      "root_cause": "Multiple test suites (sw-e2e-integration-test, sw-intent-analysis-test, sw-recruit-test) failed with exit 1, likely due to a missing or malformed log return value expected by assertions",
-      "fix": "Inspect the failing suites' output for the 'missing log returns base' assertion and ensure the underlying function returns the expected log/base value before merging",
+      "root_cause": "sw-intent-analysis-test exited 1 and sw-e2e-integration-test hit the 301s timeout, likely due to a hung/blocking call awaiting a missing log/return value",
+      "fix": "Investigate sw-intent-analysis-test failure output directly and add a timeout guard or fix the missing return path in the intent analysis logic; re-run sw-e2e-integration-test in isolation to capture its hang point",
       "seen_count": 2,
       "last_seen": "2026-09-25T17:40:52Z",
       "category": "test_failure"
