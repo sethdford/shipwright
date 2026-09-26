@@ -6,7 +6,7 @@
       "root_cause": "sw-intent-analysis-test asserts analyze_intent's JSON output includes version, goal, and criteria fields, but the current schema/implementation omits one or more of them",
       "fix": "Update analyze_intent (or its schema) in sw-intent-analysis.sh to emit version, goal, and criteria fields matching the test's expected schema",
       "seen_count": 156,
-      "last_seen": "2026-09-26T01:03:34Z",
+      "last_seen": "2026-09-26T02:04:27Z",
       "category": "test_failure",
       "signature_hash": "e1a285258fe63781b7370b0d086ad87b",
       "signature": "\u001b[<n>;2;<n>;<n>;<n>m\u001b[1m✓\u001b[0m reveal shows <path> pass count on failure"
@@ -50,8 +50,8 @@
       "signature": "results: \u001b[<n>;2;<n>;<n>;<n>m\u001b[1m<n> pass\u001b[0m | \u001b[<n>;2;<n>;<n>;<n>m\u001b[1m1 fail\u001b[0m",
       "root_cause": "sw-e2e-integration-test failed because a stale pipeline lock from a prior run (pipeline-3854) was left in 'running' state, blocking the new pipeline start; sw-intent-analysis-test failed because analyze_intent's generated JSON is missing the required version/goal/criteria schema fields",
       "fix": "Clear/release stale pipeline locks before the e2e-integration test runs (or add lock staleness detection/cleanup), and update analyze_intent to always emit version, goal, and criteria fields in its output schema",
-      "seen_count": 8,
-      "last_seen": "2026-09-25T11:16:25Z",
+      "seen_count": 10,
+      "last_seen": "2026-09-26T03:09:35Z",
       "category": "test_failure",
       "signature_hash": "af7df127e4c98031cbe09f6b0646ac68"
     },
@@ -137,8 +137,8 @@
       "pattern": "\u001b[38;2;0;212;255m▸\u001b[0m Patrol recurring failures label construction... \u001b[38;2;74;222;128m✓\u001b[0m",
       "root_cause": "sw-e2e-integration-test failed because a stale pipeline lock (pipeline-4253) was already held from a prior run, blocking the fast pipeline test; sw-intent-analysis-test failed because analyze_intent's generated JSON is missing required schema fields (version, goal, criteria)",
       "fix": "Clear/release stale pipeline locks before the e2e-integration test runs (or have it auto-abort orphaned locks), and update analyze_intent to always populate version, goal, and criteria in its output schema",
-      "seen_count": 19,
-      "last_seen": "2026-09-26T02:06:12Z",
+      "seen_count": 17,
+      "last_seen": "2026-09-25T19:20:41Z",
       "category": "test_failure",
       "signature_hash": "06f0abb7562df2c6e4651882933d3b25",
       "signature": "\u001b[<n>;2;0;<n>;<n>m▸\u001b[0m patrol recurring failures label construction... \u001b[<n>;2;<n>;<n>;<n>m✓\u001b[0m"
@@ -270,8 +270,8 @@
     {
       "stage": "test",
       "pattern": "\u001b[38;2;74;222;128m\u001b[1m✓\u001b[0m missing log returns base",
-      "root_cause": "reward-aggregator test expects a log line for missing rewards file but the function returns silently without emitting the expected message",
-      "fix": "add the missing log statement (or update the assertion to match current output) when get_history/reward lookup encounters a missing rewards.jsonl file",
+      "root_cause": "Multiple test suites (sw-e2e-integration-test, sw-intent-analysis-test, sw-recruit-test) failed with exit 1, likely due to a missing or malformed log return value expected by assertions",
+      "fix": "Inspect the failing suites' output for the 'missing log returns base' assertion and ensure the underlying function returns the expected log/base value before merging",
       "seen_count": 2,
       "last_seen": "2026-09-25T17:40:52Z",
       "category": "test_failure"
