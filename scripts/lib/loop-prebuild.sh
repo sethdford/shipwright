@@ -346,8 +346,8 @@ _pbv_check_test_runner() {
 # ─── Orchestrator: Run all checks and write results ──────────────────────────
 
 pre_build_validate() {
-    local project_root="${1:=${PROJECT_ROOT:-.}}"
-    local log_dir="${2:=${LOG_DIR:-.}}"
+    local project_root="${1:-${PROJECT_ROOT:-.}}"
+    local log_dir="${2:-${LOG_DIR:-.}}"
 
     # Check if validation is disabled
     if [[ "$PRE_BUILD_VALIDATE" != "true" && "$PRE_BUILD_VALIDATE" != "1" ]]; then
