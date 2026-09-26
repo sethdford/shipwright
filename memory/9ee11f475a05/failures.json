@@ -5,8 +5,8 @@
       "pattern": "\u001b[38;2;74;222;128m\u001b[1m✓\u001b[0m reveal shows 1/3 pass count on failure",
       "root_cause": "sw-intent-analysis-test asserts analyze_intent's JSON output includes version, goal, and criteria fields, but the current schema/implementation omits one or more of them",
       "fix": "Update analyze_intent (or its schema) in sw-intent-analysis.sh to emit version, goal, and criteria fields matching the test's expected schema",
-      "seen_count": 158,
-      "last_seen": "2026-09-26T06:05:42Z",
+      "seen_count": 159,
+      "last_seen": "2026-09-26T10:50:01Z",
       "category": "test_failure",
       "signature_hash": "e1a285258fe63781b7370b0d086ad87b",
       "signature": "\u001b[<n>;2;<n>;<n>;<n>m\u001b[1m✓\u001b[0m reveal shows <path> pass count on failure"
@@ -270,8 +270,8 @@
     {
       "stage": "test",
       "pattern": "\u001b[38;2;74;222;128m\u001b[1m✓\u001b[0m missing log returns base",
-      "root_cause": "reward-aggregator test expects get_history/log entries to include a 'base' field that the reward log writer omits when missing history",
-      "fix": "ensure reward-aggregator.sh always writes a 'base' key (e.g. default to computed baseline or 0.5) when constructing the log entry before persisting",
+      "root_cause": "sw-e2e-integration-test failed because a stale pipeline lock (pipeline-6525) was already running, and sw-intent-analysis-test failed because analyze_intent's output JSON is missing required schema fields (version, goal, criteria)",
+      "fix": "Clear/expire stale pipeline locks before e2e integration test runs (or auto-abort conflicting in-progress pipelines in test setup), and update analyze_intent to always emit version, goal, and criteria fields in its JSON output",
       "seen_count": 2,
       "last_seen": "2026-09-25T17:40:52Z",
       "category": "test_failure"
