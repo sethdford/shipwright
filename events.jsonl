@@ -466,3 +466,8 @@
 {"ts":"2026-09-26T00:06:06Z","ts_epoch":1790381166,"type":"spec_generated","file":"/tmp/sw-pipeline-test.MMFwDc/project/.claude/pipeline-artifacts/specs/simple-typo-fix.json","complexity":"simple","issue":"none"}
 {"ts":"2026-09-26T00:06:06Z","ts_epoch":1790381166,"type":"plan.validation_failure","issue":0,"attempt":2,"failure_mode":"unknown"}
 {"ts":"2026-09-26T00:06:06Z","ts_epoch":1790381166,"type":"plan.validated","issue":0,"valid":"false","attempts":2}
+{"ts":"2026-09-26T00:12:58Z","ts_epoch":1790381578,"type":"hygiene_platform_refactor","hardcoded":49,"fallback":69,"todo":51}
+{"ts":"2026-09-26T00:13:26Z","ts_epoch":1790381606,"type":"strategic.issue_created","title":"Add pre-build validation checks to catch broken environments before the build loop starts","priority":"P0","complexity":"standard"}
+{"ts":"2026-09-26T00:13:29Z","ts_epoch":1790381609,"type":"strategic.issue_created","title":"Split sw-loop.sh (2713 lines) into focused library modules under scripts/lib/","priority":"P6","complexity":"full"}
+{"ts":"2026-09-26T00:13:32Z","ts_epoch":1790381612,"type":"strategic.issue_created","title":"Recommend a pipeline template based on detected project type during `shipwright prep`","priority":"P1","complexity":"standard"}
+{"ts":"2026-09-26T00:13:32Z","ts_epoch":1790381612,"type":"strategic.cycle_complete","issues_created":3,"issues_skipped":0}
