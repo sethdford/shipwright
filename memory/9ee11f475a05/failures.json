@@ -5,8 +5,8 @@
       "pattern": "\u001b[38;2;74;222;128m\u001b[1m✓\u001b[0m reveal shows 1/3 pass count on failure",
       "root_cause": "sw-intent-analysis-test asserts analyze_intent's JSON output includes version, goal, and criteria fields, but the current schema/implementation omits one or more of them",
       "fix": "Update analyze_intent (or its schema) in sw-intent-analysis.sh to emit version, goal, and criteria fields matching the test's expected schema",
-      "seen_count": 153,
-      "last_seen": "2026-09-25T21:01:15Z",
+      "seen_count": 155,
+      "last_seen": "2026-09-25T22:56:54Z",
       "category": "test_failure",
       "signature_hash": "e1a285258fe63781b7370b0d086ad87b",
       "signature": "\u001b[<n>;2;<n>;<n>;<n>m\u001b[1m✓\u001b[0m reveal shows <path> pass count on failure"
@@ -16,8 +16,8 @@
       "pattern": "\u001b[2m  loop behavior: iterations on test failure\u001b[0m",
       "root_cause": "Test suite itself passed (all PASS, 0 FAIL) but the pipeline stage was flagged for iterating due to loop-behavior/RL logging noise being misread as failure signal",
       "fix": "Verify the actual test exit code rather than log content matching; ensure sw-autoresearch-e2e-test.sh output doesn't trigger false-positive failure pattern matching in the pipeline's error classifier",
-      "seen_count": 34,
-      "last_seen": "2026-09-25T14:39:17Z",
+      "seen_count": 35,
+      "last_seen": "2026-09-25T21:43:58Z",
       "category": "flaky",
       "signature_hash": "4257c245052f",
       "signature": "\u001b[2m loop behavior: iterations on test failure\u001b[0m"
@@ -270,8 +270,8 @@
     {
       "stage": "test",
       "pattern": "\u001b[38;2;74;222;128m\u001b[1m✓\u001b[0m missing log returns base",
-      "root_cause": "sw-pipeline-test.sh E2E tests fail because plan/review/other stage artifacts (plan.md, review.md) are never written, cascading into the full E2E, resume, complexity-skip, and cleanup tests",
-      "fix": "Ensure the plan and review pipeline stages actually create .claude/pipeline-artifacts/plan.md and review.md before mark_stage_complete runs",
+      "root_cause": "sw-reward-aggregator-test.sh 'missing log returns base' assertion failed, likely because reading a nonexistent rewards.jsonl no longer returns the fallback base reward (e.g. jq/cat error or changed default-handling in get_baseline/get_history path)",
+      "fix": "Ensure reward-aggregator.sh's log-read function returns the base/default reward value (guard with [ -f file ] || echo default, or jq -e fallback) when the rewards log file does not exist",
       "seen_count": 2,
       "last_seen": "2026-09-25T17:40:52Z",
       "category": "test_failure"
