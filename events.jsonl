@@ -63,3 +63,8 @@
 {"ts":"2026-09-27T06:18:48Z","ts_epoch":1790489928,"type":"patrol.finding","check":"untested_script","script":"sw-tmux-role-color.sh","lines":81,"usage":1}
 {"ts":"2026-09-27T06:18:48Z","ts_epoch":1790489928,"type":"patrol.finding","check":"untested_script","script":"sw-test-all.sh","lines":199,"usage":0}
 {"ts":"2026-09-27T06:18:48Z","ts_epoch":1790489928,"type":"patrol.finding","check":"untested_script","script":"sw-event-schema-sync.sh","lines":93,"usage":0}
+{"ts":"2026-09-27T08:06:18Z","ts_epoch":1790496378,"type":"hygiene_platform_refactor","hardcoded":49,"fallback":69,"todo":51}
+{"ts":"2026-09-27T08:06:45Z","ts_epoch":1790496405,"type":"strategic.issue_created","title":"Detect flaky vs. genuine build-loop failures using error-signature history","priority":"P0","complexity":"standard"}
+{"ts":"2026-09-27T08:06:49Z","ts_epoch":1790496409,"type":"strategic.issue_created","title":"Add `shipwright dora --forecast` trend-based success-rate projection","priority":"P4","complexity":"standard"}
+{"ts":"2026-09-27T08:06:52Z","ts_epoch":1790496412,"type":"strategic.issue_created","title":"Split sw-daemon.sh's inline patrol scheduling into scripts/lib/daemon-patrol-scheduler.sh","priority":"P6","complexity":"standard"}
+{"ts":"2026-09-27T08:06:52Z","ts_epoch":1790496412,"type":"strategic.cycle_complete","issues_created":3,"issues_skipped":0}
