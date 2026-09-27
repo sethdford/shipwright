@@ -137,8 +137,8 @@
       "pattern": "\u001b[38;2;0;212;255m▸\u001b[0m Patrol recurring failures label construction... \u001b[38;2;74;222;128m✓\u001b[0m",
       "root_cause": "sw-e2e-integration-test failed because a stale pipeline lock (pipeline-4253) was already held from a prior run, blocking the fast pipeline test; sw-intent-analysis-test failed because analyze_intent's generated JSON is missing required schema fields (version, goal, criteria)",
       "fix": "Clear/release stale pipeline locks before the e2e-integration test runs (or have it auto-abort orphaned locks), and update analyze_intent to always populate version, goal, and criteria in its output schema",
-      "seen_count": 18,
-      "last_seen": "2026-09-26T08:10:27Z",
+      "seen_count": 19,
+      "last_seen": "2026-09-27T15:03:19Z",
       "category": "test_failure",
       "signature_hash": "06f0abb7562df2c6e4651882933d3b25",
       "signature": "\u001b[<n>;2;0;<n>;<n>m▸\u001b[0m patrol recurring failures label construction... \u001b[<n>;2;<n>;<n>;<n>m✓\u001b[0m"
@@ -306,8 +306,8 @@
     {
       "stage": "test",
       "pattern": "\u001b[2m  flaky failure classification\u001b[0m",
-      "root_cause": "All 163 test suites passed with 0 failures; the reported error pattern is a log-level label from flaky classification tooling, not an actual test failure",
-      "fix": "No fix needed — treat this as a false-positive trigger and adjust the failure detector to ignore benign flaky-classification log lines when suite exit code is 0",
+      "root_cause": "Test log was truncated mid-run with no failing assertion visible, indicating the suite likely hit the 300s overall timeout or was killed rather than hitting a genuine assertion failure",
+      "fix": "Re-run the full suite in isolation and check for a specific hung/slow suite near the truncation point; increase timeout or add retry-on-timeout logic if it recurs",
       "seen_count": 1,
       "last_seen": "2026-09-27T11:33:44Z",
       "category": "flaky"
