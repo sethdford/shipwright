@@ -353,6 +353,14 @@ _doctor_check_overlay_sourced() {
     [[ -f "$tmux_conf" ]] && grep -q "shipwright-overlay" "$tmux_conf"
 }
 
+_doctor_check_scaffold() {
+    [[ -d ".claude" && -f ".claude/daemon-config.json" && -f ".claude/settings.json" && -d "$HOME/.shipwright" && -f "$HOME/.shipwright/budget.json" ]]
+}
+
+doctor_fix_scaffold() {
+    doctor_fix_missing_dirs && doctor_fix_missing_config
+}
+
 # ─── doctor_fix_path: Add ~/.local/bin to PATH in shell rc file ──────────────
 doctor_fix_path() {
     [[ -n "$HOME" ]] || { error "HOME not set"; return 1; }
@@ -658,6 +666,18 @@ fi
 echo ""
 echo -e "${PURPLE}${BOLD}  INSTALLED FILES${RESET}"
 echo -e "${DIM}  ──────────────────────────────────────────${RESET}"
+
+# Project scaffold (.claude directories and default configs) — only check in --fix mode
+if [[ "$DOCTOR_FIX_MODE" == "true" ]]; then
+    if _doctor_check_scaffold; then
+        check_pass "Project scaffold: .claude/ and ~/.shipwright/"
+    elif doctor_try_fix "Project scaffold: .claude/ and ~/.shipwright/" doctor_fix_scaffold _doctor_check_scaffold; then
+        check_pass "Project scaffold: .claude/ and ~/.shipwright/ (auto-fixed)"
+    else
+        check_warn "Project scaffold: .claude/ and ~/.shipwright/"
+        doctor_not_fixable "Project scaffold: .claude/ and ~/.shipwright/"
+    fi
+fi
 
 # tmux overlay
 if [[ -f "$HOME/.tmux/shipwright-overlay.conf" ]]; then
