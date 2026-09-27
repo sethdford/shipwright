@@ -38,6 +38,31 @@ WARN=0
 FAIL=0
 SKIP_PLATFORM_SCAN=false
 
+
+show_help() {
+    cat <<'EOF'
+Usage: shipwright doctor [OPTIONS]
+
+Validate Shipwright setup and optionally apply auto-remediation for common issues.
+
+Options:
+  --fix                 Apply auto-fixes to failing checks and re-check each one
+  --fix-dry             Preview what would be fixed without making changes
+  --help, -h            Show this help message
+  --version, -V         Show version
+  --skip-platform-scan  Skip platform-specific checks
+  --intelligence        Run intelligence analysis only
+
+Examples:
+  shipwright doctor                # Diagnostic run only
+  shipwright doctor --fix          # Apply fixes and verify
+  shipwright doctor --fix-dry      # Preview fixes without changing anything
+
+For more info: https://github.com/sethdford/shipwright
+
+EOF
+}
+
 # Parse doctor flags
 INTELLIGENCE_ONLY=false
 DOCTOR_FIX_MODE=false
@@ -110,29 +135,6 @@ doctor_not_fixable() {
 }
 
 # ─── Help output ───────────────────────────────────────────────────────────
-show_help() {
-    cat <<'EOF'
-Usage: shipwright doctor [OPTIONS]
-
-Validate Shipwright setup and optionally apply auto-remediation for common issues.
-
-Options:
-  --fix                 Apply auto-fixes to failing checks and re-check each one
-  --fix-dry             Preview what would be fixed without making changes
-  --help, -h            Show this help message
-  --version, -V         Show version
-  --skip-platform-scan  Skip platform-specific checks
-  --intelligence        Run intelligence analysis only
-
-Examples:
-  shipwright doctor                # Diagnostic run only
-  shipwright doctor --fix          # Apply fixes and verify
-  shipwright doctor --fix-dry      # Preview fixes without changing anything
-
-For more info: https://github.com/sethdford/shipwright
-
-EOF
-}
 
 # ─── Auto-fix helper functions ──────────────────────────────────────────────
 doctor_fix_missing_dirs() {
