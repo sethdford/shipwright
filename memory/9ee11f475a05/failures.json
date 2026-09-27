@@ -5,8 +5,8 @@
       "pattern": "\u001b[38;2;74;222;128m\u001b[1m✓\u001b[0m reveal shows 1/3 pass count on failure",
       "root_cause": "sw-intent-analysis-test asserts analyze_intent's JSON output includes version, goal, and criteria fields, but the current schema/implementation omits one or more of them",
       "fix": "Update analyze_intent (or its schema) in sw-intent-analysis.sh to emit version, goal, and criteria fields matching the test's expected schema",
-      "seen_count": 166,
-      "last_seen": "2026-09-27T05:48:56Z",
+      "seen_count": 167,
+      "last_seen": "2026-09-27T08:55:29Z",
       "category": "test_failure",
       "signature_hash": "e1a285258fe63781b7370b0d086ad87b",
       "signature": "\u001b[<n>;2;<n>;<n>;<n>m\u001b[1m✓\u001b[0m reveal shows <path> pass count on failure"
@@ -297,8 +297,8 @@
     {
       "stage": "test",
       "pattern": "\u001b[38;2;74;222;128m✓\u001b[0m gh failure yields empty array",
-      "root_cause": "sw-intent-analysis-test failure — a mocked `gh` command failure path returns an empty array instead of the expected error handling/fallback value",
-      "fix": "Update the intent-analysis code to explicitly handle non-zero gh exit codes and return the documented fallback, then adjust the test assertion for the empty-array case if that is actually correct",
+      "root_cause": "sw-e2e-integration-test failed because a stale pipeline lock from a prior run left the pipeline in 'running' state, blocking the fast-pipeline test from starting; sw-intent-analysis-test failed because analyze_intent's output JSON is missing required schema fields (version, goal, criteria)",
+      "fix": "clear/reset the stale pipeline lock (or add lock cleanup in test setup) before running sw-e2e-integration-test, and update analyze_intent to emit version, goal, and criteria fields in its JSON output",
       "seen_count": 2,
       "last_seen": "2026-09-27T01:34:28Z",
       "category": "test_failure"
