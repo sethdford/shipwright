@@ -1912,6 +1912,27 @@
       ],
       "timestamp": 1790542785,
       "ttl": 1800
+    },
+    "5ca5605c76b77fb65d015328106c3bc9": {
+      "result": [
+        {
+          "type": "result",
+          "result": "I am trying the same approach again.",
+          "usage": {
+            "input_tokens": 0,
+            "output_tokens": 0
+          }
+        }
+      ],
+      "timestamp": 1790542985,
+      "ttl": 1800
+    },
+    "b43433af74607b01b89d52166d514615": {
+      "result": {
+        "raw_response": "Mock claude: ok"
+      },
+      "timestamp": 1790543127,
+      "ttl": 1800
     }
   }
 }
