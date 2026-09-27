@@ -16,8 +16,8 @@
       "pattern": "\u001b[2m  loop behavior: iterations on test failure\u001b[0m",
       "root_cause": "Test suite itself passed (all PASS, 0 FAIL) but the pipeline stage was flagged for iterating due to loop-behavior/RL logging noise being misread as failure signal",
       "fix": "Verify the actual test exit code rather than log content matching; ensure sw-autoresearch-e2e-test.sh output doesn't trigger false-positive failure pattern matching in the pipeline's error classifier",
-      "seen_count": 44,
-      "last_seen": "2026-09-27T18:29:23Z",
+      "seen_count": 45,
+      "last_seen": "2026-09-27T21:01:25Z",
       "category": "flaky",
       "signature_hash": "4257c245052f",
       "signature": "\u001b[2m loop behavior: iterations on test failure\u001b[0m"
@@ -306,8 +306,8 @@
     {
       "stage": "test",
       "pattern": "\u001b[2m  flaky failure classification\u001b[0m",
-      "root_cause": "sw-e2e-integration-test hung/timed out waiting on a live Claude API call in iteration 1 while sw-intent-analysis-test failed a schema assertion (missing version/goal/criteria fields) unrelated to the timeout",
-      "fix": "increase or mock the e2e-integration timeout to avoid live API waits and fix analyze_intent to always emit version/goal/criteria fields in its JSON schema",
+      "root_cause": "Cost dashboard's CONTEXT EFFICIENCY section finds no cost entries in the isolated test's 30-day window, so it can't render event-derived utilization stats",
+      "fix": "Seed costs.json/loop.context_efficiency test fixtures with a recent-dated entry before invoking the dashboard, or make the dashboard read the mocked events file instead of relying on real cost entries",
       "seen_count": 1,
       "last_seen": "2026-09-27T11:33:44Z",
       "category": "flaky"
