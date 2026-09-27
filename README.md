@@ -1,3 +1,4 @@
+<!-- Automated E2E test marker (issue #6941): verifies the pipeline can make a trivial docs edit. -->
 <p align="center">
   <img src="website/src/assets/logo-dark.svg" alt="Shipwright" width="200">
 </p>
