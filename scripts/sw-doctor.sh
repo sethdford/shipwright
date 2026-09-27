@@ -166,14 +166,12 @@ doctor_fix_permissions() {
         return 1
     fi
 
-    local fixed=false
     for script in "$script_dir"/sw-*.sh; do
         if [[ -f "$script" && ! -x "$script" ]]; then
             if ! chmod +x "$script" 2>/dev/null; then
                 return 1
             fi
             doctor_record_change "chmod +x" "$script"
-            fixed=true
         fi
     done
 
@@ -939,7 +937,7 @@ BIN_DIR="$HOME/.local/bin"
 
 if _doctor_check_path; then
     check_pass "${BIN_DIR} is in PATH"
-elif doctor_try_fix "~/.local/bin in PATH" doctor_fix_path _doctor_check_path; then
+elif doctor_try_fix "$HOME/.local/bin in PATH" doctor_fix_path _doctor_check_path; then
     check_pass "${BIN_DIR} is in PATH (auto-fixed)"
 else
     check_warn "${BIN_DIR} is NOT in PATH"
@@ -947,7 +945,7 @@ else
         echo -e "    ${DIM}Add to ~/.zshrc or ~/.bashrc:${RESET}"
         echo -e "    ${DIM}export PATH=\"\$HOME/.local/bin:\$PATH\"${RESET}"
     else
-        doctor_not_fixable "~/.local/bin in PATH"
+        doctor_not_fixable "$HOME/.local/bin in PATH"
     fi
 fi
 
