@@ -1685,31 +1685,31 @@
           {
             "file": "retry-outcomes.json",
             "relevance": 95,
-            "summary": "Build failure retry strategies with 100% success rate using model escalation—directly applicable to recovery in build stage"
-          },
-          {
-            "file": "metrics.json",
-            "relevance": 90,
-            "summary": "Baseline metrics for build duration (7095s) and test duration (1459s)—provides expected performance bounds for the current build"
-          },
-          {
-            "file": "knowledge.json",
-            "relevance": 85,
-            "summary": "Documented failure patterns from tests including mktemp issues and cleanup output problems—directly applicable to debugging build failures"
-          },
-          {
-            "file": "flaky-tests.json",
-            "relevance": 75,
-            "summary": "Tracked flaky tests (test-1, test-auth) with confidence scores—identifies potential build instability issues to watch for"
+            "summary": "Shows build_failure recovery with model_escalation strategy achieving 100% success rate — directly applicable to build stage error recovery"
           },
           {
             "file": "success-patterns.json",
+            "relevance": 90,
+            "summary": "Contains captured successful build patterns with iterations, test strategies, file changes, and durations — direct reference for build execution"
+          },
+          {
+            "file": "flaky-tests.json",
+            "relevance": 85,
+            "summary": "Tracks flaky tests (test-1, test-auth) with confidence scores and occurrence counts — critical for understanding build test reliability issues"
+          },
+          {
+            "file": "knowledge.json",
+            "relevance": 75,
+            "summary": "Contains failure signatures for mktemp path issues and test setup failures, with documented fix strategies applicable to build stage"
+          },
+          {
+            "file": "patterns.json",
             "relevance": 70,
-            "summary": "Successful build patterns showing 3-4 iterations with standard template, test strategy, and file change patterns—provides reference for expected iteration counts"
+            "summary": "Defines project configuration (vitest test runner, npm package manager, commonjs imports) — essential context for build execution"
           }
         ]
       },
-      "timestamp": 1790481006,
+      "timestamp": 1790482910,
       "ttl": 1800
     },
     "d271a56b1e43d77160270ec08c020aba": {
@@ -1935,6 +1935,69 @@
         }
       ],
       "timestamp": 1790482829,
+      "ttl": 1800
+    },
+    "f729c5844bffbf05fa9f4d505291ba03": {
+      "result": {
+        "raw_response": "Mock claude: ok"
+      },
+      "timestamp": 1790482997,
+      "ttl": 1800
+    },
+    "77c9ba56700e8b4a96f04985be929071": {
+      "result": [
+        {
+          "type": "result",
+          "result": "I am trying the same approach again.",
+          "usage": {
+            "input_tokens": 0,
+            "output_tokens": 0
+          }
+        }
+      ],
+      "timestamp": 1790483002,
+      "ttl": 1800
+    },
+    "0dbc391996fb1f635f0b8663f50105f1": {
+      "result": {
+        "raw_response": "Mock claude: ok"
+      },
+      "timestamp": 1790483137,
+      "ttl": 1800
+    },
+    "1033951d01f8666781fc14b70131653e": {
+      "result": [
+        {
+          "type": "result",
+          "result": "I am trying the same approach again.",
+          "usage": {
+            "input_tokens": 0,
+            "output_tokens": 0
+          }
+        }
+      ],
+      "timestamp": 1790483224,
+      "ttl": 1800
+    },
+    "bc6fbe106475a643eed1e8788405df0f": {
+      "result": {
+        "raw_response": "Mock claude: ok"
+      },
+      "timestamp": 1790483307,
+      "ttl": 1800
+    },
+    "36f2cd0411c4311206d0ec36133f17ac": {
+      "result": [
+        {
+          "type": "result",
+          "result": "I am trying the same approach again.",
+          "usage": {
+            "input_tokens": 0,
+            "output_tokens": 0
+          }
+        }
+      ],
+      "timestamp": 1790483529,
       "ttl": 1800
     }
   }
