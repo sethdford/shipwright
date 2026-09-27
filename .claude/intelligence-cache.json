@@ -30,17 +30,17 @@
     },
     "d41d8cd98f00b204e9800998ecf8427e": {
       "result": {
-        "primary_role": "builder",
+        "primary_role": "devops",
         "secondary_roles": [
-          "tester",
-          "reviewer"
+          "builder",
+          "architect"
         ],
-        "confidence": 0.95,
-        "reasoning": "Bug fix requiring debugging JSON parsing logic, implementing improved error messaging, and testing edge cases (object vs array output). Builder handles implementation; tester validates the fix; reviewer ensures accuracy.",
+        "confidence": 0.88,
+        "reasoning": "Auto-remediation of setup failures is DevOps work—fixing environment/prerequisites/config. Architect designs remediation strategy; builder implements.",
         "new_role_needed": false,
         "suggested_role": null
       },
-      "timestamp": 1775316059,
+      "timestamp": 1790481018,
       "ttl": 3600
     },
     "efd5524ad1244fd20344bf3ff5d95233": {
@@ -1401,6 +1401,316 @@
       },
       "timestamp": 1775344537,
       "ttl": 3600
+    },
+    "f30396d7efb1ae539f9d926790707f36": {
+      "result": {
+        "complexity": 5,
+        "risk_level": "medium",
+        "success_probability": 87,
+        "recommended_template": "fast",
+        "issue_type": "infrastructure",
+        "key_risks": [
+          "Modifying shell rc files (.bashrc, .zshrc, .profile) could break user environment if PATH logic is incorrect",
+          "Symlink creation may fail on certain filesystems or with insufficient permissions",
+          "Detecting the correct shell rc file to modify requires robust detection logic across different shells",
+          "Non-idempotent operations (creating dirs/symlinks twice) could fail without proper existence checks"
+        ],
+        "implementation_hints": [
+          "Add --fix flag parsing to sw-doctor.sh command router; create separate _try_fix_<check_name>() functions for each auto-fixable check",
+          "Use atomic file operations for shell rc modifications: write to temp file, validate syntax, then mv atomically",
+          "Implement exit code stratification: 0=fixed, 1=not-fixable/skipped, 2=error; track summary of actions taken",
+          "For shell rc detection, read $SHELL and cross-check existence of ~/.bashrc, ~/.zshrc, ~/.profile; prefer the one in use",
+          "Ensure idempotency: check if dir exists before mkdir, check if symlink target before ln -s, validate PATH before modifying",
+          "Add comprehensive test scenarios: successful fix (missing dir created), fix skipped (already exists or not auto-fixable), and error cases",
+          "Document which checks are auto-fixable vs diagnostic-only; consider a config-driven approach for future extensibility"
+        ]
+      },
+      "timestamp": 1790480560,
+      "ttl": 3600
+    },
+    "824d64fd43be239bff40c62a7a711bce": {
+      "result": {
+        "estimated_iterations": 2
+      },
+      "timestamp": 1790480569,
+      "ttl": 1800
+    },
+    "4788dc3880c3c8c2e04ad592f74026cf": {
+      "result": {
+        "estimated_cost_usd": 0.028,
+        "estimated_iterations": 2,
+        "estimated_tokens": 31000,
+        "likely_failure_stage": "test",
+        "confidence": 76
+      },
+      "timestamp": 1790480578,
+      "ttl": 3600
+    },
+    "ade5c2e3d47638fee8f9c15ec7a24d68": {
+      "result": {
+        "issue_type": "infrastructure",
+        "confidence": 0.88,
+        "secondary_domains": [
+          "cli",
+          "automation",
+          "testing"
+        ],
+        "complexity_assessment": {
+          "score": 6,
+          "reasoning": "Straightforward CLI flag addition and refactoring of existing checks, but auto-remediation is safety-critical requiring atomic file operations, idempotency guarantees, and verification loops; shell rc file handling and cross-platform concerns add complexity despite issue marking as 'fast'"
+        },
+        "skill_plan": {
+          "plan": [
+            "brainstorming",
+            "architecture-design"
+          ],
+          "design": [
+            "api-design",
+            "architecture-design"
+          ],
+          "build": [
+            "shell-script-remediation-patterns"
+          ],
+          "review": [
+            "security-audit",
+            "two-stage-review",
+            "pr-quality"
+          ],
+          "compound_quality": [
+            "adversarial-quality",
+            "testing-strategy"
+          ],
+          "pr": [
+            "pr-quality"
+          ],
+          "deploy": [],
+          "validate": [
+            "validation-thoroughness"
+          ],
+          "monitor": [
+            "observability"
+          ]
+        },
+        "skill_rationale": {
+          "brainstorming": "Challenge assumptions about what's safely auto-fixable without breaking existing setups; identify hidden risks in shell rc modification across bash/zsh/fish",
+          "architecture-design": "Create ADR documenting the auto-fixable taxonomy (directories, symlinks, PATH vs non-fixable checks) to ensure consistent future maintenance and developer decision-making",
+          "api-design": "Design the --fix flag CLI interface to be intuitive and fully explored; consider --fix --dry-run, --fix --verbose, and clear before/after reporting of all changes",
+          "shell-script-remediation-patterns": "Auto-remediation in bash requires atomic writes (temp + mv), idempotency guarantees, backup/rollback patterns, and verification loops—generated skill provides battle-tested safe patterns",
+          "security-audit": "Auto-remediation is a security boundary: fixes must not corrupt configs, symlink attacks must be prevented, shell rc modifications must preserve user intent, and permission errors must fail safely",
+          "two-stage-review": "Safety-critical code deserves deliberate multi-pass review; Pass 1 validates safety and correctness, Pass 2 examines edge cases and test coverage verification",
+          "pr-quality": "Clear PR describing which checks are auto-fixable vs diagnostic, fix verification strategy, and edge case handling; reviewers need high confidence in safety before merge",
+          "adversarial-quality": "Attack from operator perspective: what breaks if --fix runs on stale configs, partial installations, non-standard shells, or interrupted executions?",
+          "testing-strategy": "Design test suite covering successful fix + re-verification, idempotent re-runs, non-fixable check skipping, shell rc backup/restore, and permission error handling",
+          "validation-thoroughness": "Unit tests verify logic in isolation; validation must confirm actual end-to-end --fix workflow on realistic broken setups (missing dirs, stale symlinks, corrupted PATH entries)",
+          "observability": "Post-deploy monitoring tracks --fix adoption, success/skip/failure rates per check type, and any user reports of configs damaged by auto-remediation"
+        },
+        "generated_skills": [
+          {
+            "name": "shell-script-remediation-patterns",
+            "reason": "No existing skill covers safe auto-remediation in shell scripts—auto-remediation requires atomic file writes, idempotency guarantees, backup/rollback strategies, and verification loops essential for this safety-critical feature to avoid corrupting user configurations",
+            "content": "## Shell Script Auto-Remediation Safety Patterns\n\nAuto-remediation must be non-destructive, idempotent, and verifiable. These patterns prevent corrupting user state.\n\n### Core Principles\n\n**1. Atomic Writes**: Never modify files in-place; use temp file + mv pattern:\n```bash\ntmpfile=$(mktemp)\n# populate tmpfile\nmv \"$tmpfile\" \"$target\"  # atomic, all-or-nothing, crash-safe\n```\n\n**2. Idempotency**: Fix must be safe to run twice. Structure as:\n```bash\nif ! check_passes; then\n  apply_fix\n  if check_passes; then\n    echo \"FIXED: check now passes\"\n  else\n    echo \"SKIPPED: fix attempted but check still fails\" >&2\n    return 1  # leave unchanged if fix fails\n  fi\nelse\n  echo \"ALREADY_OK: check already passes\"\nfi\n```\n\n**3. Verification Loop**: Re-run check after every fix. Never assume fix succeeded.\n\n**4. Shell RC Backups**: When editing .bashrc/.zshrc/.config/fish/config.fish:\n```bash\nbackup_rc=\"${rc_file}.bak.$(date +%s)\"\ncp \"$rc_file\" \"$backup_rc\"\necho \"Backup: $backup_rc\"\n# make changes to $rc_file\nif verification_fails; then\n  mv \"$backup_rc\" \"$rc_file\"\n  echo \"Restored from backup\"\nelse\n  rm \"$backup_rc\"  # only if truly fixed\nfi\n```\n\n**5. Permission Checks**: Verify write access before attempting fixes:\n```bash\nif ! [ -w \"$target_dir\" ]; then\n  echo \"DIAGNOSTIC: cannot write to $target_dir, skipping auto-fix\" >&2\n  return 1\nfi\n```\n\n**6. Clear Reporting**: Report exactly what changed:\n- File created/modified/deleted\n- Bytes added/removed\n- Verification result (pass/fail)\n- Backup location if applicable\n\n### Fixable Checks (Auto-Remediate)\n- Create missing `.claude/` directories\n- Install missing hook symlinks (with verification)\n- Add missing PATH entries to shell rc files\n- Create missing config skeleton files\n- Fix symlink targets (if safe)\n\n### Diagnostic-Only Checks (Never Auto-Fix)\n- Missing system binaries (tmux, jq, node) — requires package manager\n- Permission errors on system paths — requires chmod/sudo\n- GitHub/API access issues — requires OAuth, cannot automate safely\n- Version mismatches on installed tools — requires manual update\n- Corrupt or conflicting configs — too risky to auto-remediate\n\n### Test Patterns\n- Test 1: Fix applied, check passes on re-run\n- Test 2: Running --fix again makes no changes (idempotency)\n- Test 3: Non-fixable check skipped with diagnostic message\n- Test 4: Shell rc backed up, verified, restored if fix failed\n- Test 5: Permission error caught, reported, no modification attempted"
+          }
+        ],
+        "review_focus": [
+          "Safety boundary validation: ensure --fix never modifies files outside `.claude/`, shell rc files, or Shipwright state dirs",
+          "Atomic file modification: verify all file edits use temp file + mv pattern to prevent corruption on crashes",
+          "Idempotency verification: run --fix multiple times on same broken setup, confirm no state drift and identical results",
+          "Verification loop correctness: each fix must re-run its check; if check still fails, must report diagnostic reason",
+          "Shell rc compatibility: test PATH/profile modifications on bash, zsh, and fish if supported; preserve existing user config",
+          "Non-fixable check clarity: ensure users understand why a check cannot be auto-fixed (missing binary vs permission vs unsupported)",
+          "Test coverage completeness: verify sw-doctor-test.sh covers at least 2 auto-fix scenarios plus edge cases (backup/restore, permission errors)",
+          "Dry-run capability: consider adding --fix --dry-run to preview changes without applying (improves user confidence)"
+        ],
+        "risk_areas": [
+          "Corrupting shell rc files: overly aggressive sed/awk on .bashrc/.zshrc can break user shells permanently",
+          "Non-idempotent PATH modifications: appending to PATH without checking for duplicates, running --fix twice could break PATH",
+          "Missing permission checks: attempting to fix symlinks/directories without first verifying write access leads to partial failures",
+          "Test coverage gaps: if tests only cover happy path, production encounters edge cases (interrupted --fix, stale backups, locked files)",
+          "Cross-shell incompatibility: bash PATH syntax differs from fish; rc file formats are shell-specific",
+          "Partial failure recovery: if --fix completes some fixes but not others, state may be inconsistent; unclear how user recovers",
+          "Backup file cleanup: stale .bak files accumulate if --fix run many times; need clear cleanup strategy or retention policy"
+        ]
+      },
+      "timestamp": 1790480680,
+      "ttl": 3600
+    },
+    "968bbd1a9cad811be071b32dbb611178": {
+      "result": {
+        "results": [
+          {
+            "file": "failures.json",
+            "relevance": 88,
+            "summary": "Documents failure patterns with root causes and applied fixes (timeouts, database issues). Directly applicable to designing remediation strategies for doctor --fix."
+          },
+          {
+            "file": "fleet-shared-patterns.json",
+            "relevance": 85,
+            "summary": "Fleet-wide error patterns including 'Cannot find module' setup failures with documented fixes ('npm i'). Shows common setup issues across repos that doctor --fix should handle."
+          },
+          {
+            "file": "index.json",
+            "relevance": 72,
+            "summary": "Indexed failure patterns with fixes including test timeouts. Provides a structured reference for common failure signatures and their remediations."
+          },
+          {
+            "file": "success-patterns.json",
+            "relevance": 62,
+            "summary": "Patterns from test-final-working showing daemon timeout fixes with approach metadata. Demonstrates what fix strategies have succeeded previously."
+          },
+          {
+            "file": "pattern-outcomes.json",
+            "relevance": 48,
+            "summary": "Tracks outcomes of pattern-based fixes. Useful for measuring effectiveness of auto-remediation, though current entries are mostly empty."
+          }
+        ]
+      },
+      "timestamp": 1790480729,
+      "ttl": 1800
+    },
+    "a46f05d61ff9005316eb0ab995fcb2c3": {
+      "result": {
+        "results": [
+          {
+            "file": "failures.json",
+            "relevance": 85,
+            "summary": "Contains concrete failure patterns with root causes and applied fixes (timeouts, db connection). Demonstrates the structure of setup failures and remediation approaches directly applicable to auto-remediation logic."
+          },
+          {
+            "file": "fleet-shared-patterns.json",
+            "relevance": 75,
+            "summary": "Cross-repo failure patterns (e.g., 'Cannot find module' → 'npm i') showing common setup failures across multiple repos. Informs which setup failures are endemic and what fixes are proven effective."
+          },
+          {
+            "file": "index.json",
+            "relevance": 65,
+            "summary": "Pattern index with failure signatures and fixes for common build/test issues. Provides structured pattern-to-fix mapping that could inform auto-remediation decision trees."
+          }
+        ]
+      },
+      "timestamp": 1790480840,
+      "ttl": 1800
+    },
+    "49e6f9c34f2508082c5be27499fd840d": {
+      "result": {
+        "results": [
+          {
+            "file": "failures.json",
+            "relevance": 92,
+            "summary": "Contains concrete failure patterns (timeout, database connection refused) with root causes and fix strategies, directly informing remediation logic design"
+          },
+          {
+            "file": "fleet-shared-patterns.json",
+            "relevance": 85,
+            "summary": "Cross-repo pattern data showing common setup failures ('Cannot find module') and their fixes ('npm i'), informing auto-remediation coverage for widespread issues"
+          },
+          {
+            "file": "index.json",
+            "relevance": 80,
+            "summary": "Pattern indexing structure with signatures, stages, and fix strategies showing how to organize and query failure patterns for remediation architecture"
+          },
+          {
+            "file": "success-patterns.json (test-repo-789)",
+            "relevance": 72,
+            "summary": "Historical successful fix approaches with file patterns modified, root causes identified, and iterations needed - informs design of remediation strategies"
+          },
+          {
+            "file": "pattern-outcomes.json (5112be9beb60c83d179285b6415c4968)",
+            "relevance": 65,
+            "summary": "Outcome tracking structure for patterns, informing design of how to measure and validate auto-remediation effectiveness"
+          }
+        ]
+      },
+      "timestamp": 1790480873,
+      "ttl": 1800
+    },
+    "2432a42bb3d2fbc5485544aa39ea862d": {
+      "result": {
+        "results": [
+          {
+            "file": "failures.json",
+            "relevance": 85,
+            "summary": "Contains actual failure patterns with root causes, fix attempts, and resolution status. Shows timeout loops and db connection failures with applied/unapplied fixes - directly informs what anti-patterns to avoid in auto-remediation design."
+          },
+          {
+            "file": "fleet-shared-patterns.json",
+            "relevance": 75,
+            "summary": "Cross-repo setup failure patterns (e.g., 'Cannot find module' → 'npm i') seen multiple times across repos. Shows real setup issues that doctor --fix should handle and validated fixes."
+          },
+          {
+            "file": "index.json",
+            "relevance": 70,
+            "summary": "Indexed failure signatures with recommended fixes ('test_failure' → timeout increase). Shows patterns that have recurred and their solutions, informing design decisions for what approaches work."
+          }
+        ]
+      },
+      "timestamp": 1790480886,
+      "ttl": 1800
+    },
+    "dac9e912470eb6073ca3f3a18049f2a4": {
+      "result": {
+        "results": [
+          {
+            "file": "fleet-shared-patterns.json",
+            "relevance": 95,
+            "summary": "Contains cross-repo failure pattern 'Error: Cannot find module' with fix 'npm i' seen in build/test stages. Directly applicable to auto-remediation of common setup failures across the fleet."
+          },
+          {
+            "file": "failures.json",
+            "relevance": 90,
+            "summary": "Contains resolved and unresolved failure patterns with root causes and fixes (timeout issues, db connection refused). Provides templates for remediation patterns that doctor --fix would apply."
+          },
+          {
+            "file": "success-patterns.json (test-final-working)",
+            "relevance": 85,
+            "summary": "Specific pattern for 'Fix daemon timeout' in scripts/sw-daemon.sh with build stage execution and 'Add timeout handler' approach. Directly relevant to shipwright doctor's daemon-related fixes."
+          },
+          {
+            "file": "index.json",
+            "relevance": 80,
+            "summary": "Pattern index showing 'test_failure' in build stage with concrete fix suggestion 'Increase timeout value in test setup'. Relevant to common build-phase setup failures."
+          },
+          {
+            "file": "success-patterns.json (test-repo-789)",
+            "relevance": 75,
+            "summary": "Pattern for 'Fix timeout' in scripts/sw-daemon.sh requiring 3 iterations in build stage. Provides precedent for daemon remediation complexity and approach."
+          }
+        ]
+      },
+      "timestamp": 1790480994,
+      "ttl": 1800
+    },
+    "47c1451f50b4a8f9faa0f8012f6b922e": {
+      "result": {
+        "results": [
+          {
+            "file": "retry-outcomes.json",
+            "relevance": 95,
+            "summary": "Build failure retry strategies with 100% success rate using model escalation—directly applicable to recovery in build stage"
+          },
+          {
+            "file": "metrics.json",
+            "relevance": 90,
+            "summary": "Baseline metrics for build duration (7095s) and test duration (1459s)—provides expected performance bounds for the current build"
+          },
+          {
+            "file": "knowledge.json",
+            "relevance": 85,
+            "summary": "Documented failure patterns from tests including mktemp issues and cleanup output problems—directly applicable to debugging build failures"
+          },
+          {
+            "file": "flaky-tests.json",
+            "relevance": 75,
+            "summary": "Tracked flaky tests (test-1, test-auth) with confidence scores—identifies potential build instability issues to watch for"
+          },
+          {
+            "file": "success-patterns.json",
+            "relevance": 70,
+            "summary": "Successful build patterns showing 3-4 iterations with standard template, test strategy, and file change patterns—provides reference for expected iteration counts"
+          }
+        ]
+      },
+      "timestamp": 1790481006,
+      "ttl": 1800
     }
   }
 }

@@ -49,6 +49,7 @@ for _arg in "$@"; do
         --fix) DOCTOR_FIX_MODE=true ;;
         --fix-dry) DOCTOR_FIX_DRY_RUN=true; DOCTOR_FIX_MODE=true ;;
         --version|-V) echo "sw-doctor $VERSION"; exit 0 ;;
+        --help|-h) show_help; exit 0 ;;
     esac
 done
 
@@ -56,9 +57,85 @@ check_pass() { success "$*"; PASS=$((PASS + 1)); }
 check_warn() { warn "$*"; WARN=$((WARN + 1)); }
 check_fail() { error "$*"; FAIL=$((FAIL + 1)); }
 
+# ─── Auto-fix tracking (T1) ────────────────────────────────────────────────
+DOCTOR_CHANGES=()
+DOCTOR_UNFIXABLE=()
+FIXED=0
+FIX_FAILED=0
+
+doctor_record_change() {
+    local action="$1" path="$2"
+    DOCTOR_CHANGES+=("${action} ${path}")
+    echo "    ${DIM}changed:${RESET} ${action} ${path}"
+    emit_event "doctor_fix" "type=${action}" "path=${path}"
+}
+
+doctor_try_fix() {
+    local label="$1" fix_fn="$2" check_fn="$3"
+
+    # If --fix is off, return failure immediately (caller keeps existing warn/fail)
+    if [[ "$DOCTOR_FIX_MODE" != "true" ]]; then
+        return 1
+    fi
+
+    # If --fix-dry, print preview and return failure (no mutation)
+    if [[ "$DOCTOR_FIX_DRY_RUN" == "true" ]]; then
+        info "  [DRY] would fix: ${label}"
+        return 1
+    fi
+
+    # --fix is on: attempt the fix, then re-check
+    if "$fix_fn"; then
+        # Fix succeeded, now re-check
+        if "$check_fn" >/dev/null 2>&1; then
+            FIXED=$((FIXED + 1))
+            return 0
+        else
+            FIX_FAILED=$((FIX_FAILED + 1))
+            error "  auto-fix failed: ${label}"
+            return 1
+        fi
+    else
+        FIX_FAILED=$((FIX_FAILED + 1))
+        error "  auto-fix failed: ${label}"
+        return 1
+    fi
+}
+
+doctor_not_fixable() {
+    local label="$1"
+    if [[ "$DOCTOR_FIX_MODE" == "true" ]]; then
+        DOCTOR_UNFIXABLE+=("${label}")
+    fi
+}
+
+# ─── Help output ───────────────────────────────────────────────────────────
+show_help() {
+    cat <<'EOF'
+Usage: shipwright doctor [OPTIONS]
+
+Validate Shipwright setup and optionally apply auto-remediation for common issues.
+
+Options:
+  --fix                 Apply auto-fixes to failing checks and re-check each one
+  --fix-dry             Preview what would be fixed without making changes
+  --help, -h            Show this help message
+  --version, -V         Show version
+  --skip-platform-scan  Skip platform-specific checks
+  --intelligence        Run intelligence analysis only
+
+Examples:
+  shipwright doctor                # Diagnostic run only
+  shipwright doctor --fix          # Apply fixes and verify
+  shipwright doctor --fix-dry      # Preview fixes without changing anything
+
+For more info: https://github.com/sethdford/shipwright
+
+EOF
+}
+
 # ─── Auto-fix helper functions ──────────────────────────────────────────────
 doctor_fix_missing_dirs() {
-    local result="fixed"
     local dirs=(
         "$HOME/.shipwright"
         "$HOME/.shipwright/optimization"
@@ -71,58 +148,44 @@ doctor_fix_missing_dirs() {
 
     for dir in "${dirs[@]}"; do
         if [[ ! -d "$dir" ]]; then
-            if [[ "$DOCTOR_FIX_DRY_RUN" == "true" ]]; then
-                info "  [DRY] Would create directory: $dir"
-            else
-                if ! mkdir -p "$dir" 2>/dev/null; then
-                    result="skipped"
-                else
-                    emit_event "doctor_fix" "type=mkdir" "path=$dir"
-                fi
+            if ! mkdir -p "$dir" 2>/dev/null; then
+                return 1
             fi
+            doctor_record_change "created" "$dir"
         fi
     done
-    echo "$result"
+    return 0
 }
 
 doctor_fix_permissions() {
-    local result="fixed"
     local script_dir="${1:-.}"
 
     if [[ ! -d "$script_dir" ]]; then
-        echo "skipped"
-        return
+        return 1
     fi
 
-    # Fix script permissions
+    local fixed=false
     for script in "$script_dir"/sw-*.sh; do
         if [[ -f "$script" && ! -x "$script" ]]; then
-            if [[ "$DOCTOR_FIX_DRY_RUN" == "true" ]]; then
-                info "  [DRY] Would chmod +x: $script"
-            else
-                chmod +x "$script"
-                emit_event "doctor_fix" "type=chmod" "path=$script"
+            if ! chmod +x "$script" 2>/dev/null; then
+                return 1
             fi
+            doctor_record_change "chmod +x" "$script"
+            fixed=true
         fi
     done
 
-    echo "$result"
+    return 0
 }
 
 doctor_fix_missing_config() {
-    local result="fixed"
-
-    # Ensure .claude directory exists
-    mkdir -p .claude 2>/dev/null || { result="skipped"; echo "$result"; return; }
+    mkdir -p .claude 2>/dev/null || return 1
 
     # Create .claude/daemon-config.json
     local daemon_cfg=".claude/daemon-config.json"
     if [[ ! -f "$daemon_cfg" ]]; then
-        if [[ "$DOCTOR_FIX_DRY_RUN" == "true" ]]; then
-            info "  [DRY] Would create: $daemon_cfg"
-        else
-            local tmp_cfg="${daemon_cfg}.tmp.$$"
-            cat > "$tmp_cfg" <<'EOF'
+        local tmp_cfg="${daemon_cfg}.tmp.$$"
+        cat > "$tmp_cfg" <<'EOF'
 {
   "max_parallel": 2,
   "auto_scale": false,
@@ -148,19 +211,15 @@ doctor_fix_missing_config() {
   }
 }
 EOF
-            mv "$tmp_cfg" "$daemon_cfg"
-            emit_event "doctor_fix" "type=create_config" "path=$daemon_cfg"
-        fi
+        mv "$tmp_cfg" "$daemon_cfg" || return 1
+        doctor_record_change "created" "$daemon_cfg"
     fi
 
     # Create .claude/settings.json
     local settings_cfg=".claude/settings.json"
     if [[ ! -f "$settings_cfg" ]]; then
-        if [[ "$DOCTOR_FIX_DRY_RUN" == "true" ]]; then
-            info "  [DRY] Would create: $settings_cfg"
-        else
-            local tmp_cfg="${settings_cfg}.tmp.$$"
-            cat > "$tmp_cfg" <<'EOF'
+        local tmp_cfg="${settings_cfg}.tmp.$$"
+        cat > "$tmp_cfg" <<'EOF'
 {
   "hooks": {
     "pre-tool-use": ".claude/hooks/pre-tool-use.sh",
@@ -169,175 +228,243 @@ EOF
   }
 }
 EOF
-            mv "$tmp_cfg" "$settings_cfg"
-            emit_event "doctor_fix" "type=create_config" "path=$settings_cfg"
-        fi
+        mv "$tmp_cfg" "$settings_cfg" || return 1
+        doctor_record_change "created" "$settings_cfg"
     fi
 
     # Create ~/.shipwright/budget.json
     local budget_file="$HOME/.shipwright/budget.json"
     if [[ ! -f "$budget_file" ]]; then
-        if [[ "$DOCTOR_FIX_DRY_RUN" == "true" ]]; then
-            info "  [DRY] Would create: $budget_file"
-        else
-            local tmp_file="${budget_file}.tmp.$$"
-            cat > "$tmp_file" <<'EOF'
+        local tmp_file="${budget_file}.tmp.$$"
+        cat > "$tmp_file" <<'EOF'
 {
   "daily_limit_usd": 10.0,
   "reset_hour_utc": 0,
   "enabled": true
 }
 EOF
-            mkdir -p "$(dirname "$budget_file")"
-            mv "$tmp_file" "$budget_file"
-            emit_event "doctor_fix" "type=create_config" "path=$budget_file"
-        fi
+        mkdir -p "$(dirname "$budget_file")" || return 1
+        mv "$tmp_file" "$budget_file" || return 1
+        doctor_record_change "created" "$budget_file"
     fi
 
-    echo "$result"
+    return 0
 }
 
 doctor_fix_tmux_config() {
-    local result="fixed"
-    local home_tmux_conf="$HOME/.tmux.conf"
-
-    # Check if overlay exists
     local overlay_path="$HOME/.tmux/shipwright-overlay.conf"
+
     if [[ ! -f "$overlay_path" ]]; then
-        # Try to find it in the Shipwright repo
         local repo_overlay="${SCRIPT_DIR}/../tmux/shipwright-overlay.conf"
-        if [[ -f "$repo_overlay" ]]; then
-            if [[ "$DOCTOR_FIX_DRY_RUN" == "true" ]]; then
-                info "  [DRY] Would copy tmux overlay to: $overlay_path"
-            else
-                mkdir -p "$(dirname "$overlay_path")"
-                cp "$repo_overlay" "$overlay_path"
-                emit_event "doctor_fix" "type=copy_tmux" "path=$overlay_path"
-            fi
-        else
-            result="skipped"
+        if [[ ! -f "$repo_overlay" ]]; then
+            return 1
         fi
+        mkdir -p "$(dirname "$overlay_path")" || return 1
+        cp "$repo_overlay" "$overlay_path" || return 1
+        doctor_record_change "created" "$overlay_path"
     fi
 
-    # Check if .tmux.conf sources the overlay
+    local home_tmux_conf="$HOME/.tmux.conf"
     if [[ -f "$home_tmux_conf" ]] && ! grep -q "shipwright-overlay" "$home_tmux_conf"; then
-        if [[ "$DOCTOR_FIX_DRY_RUN" == "true" ]]; then
-            info "  [DRY] Would update .tmux.conf to source overlay"
-        else
-            # Backup existing config
-            cp "$home_tmux_conf" "${home_tmux_conf}.bak"
-            echo "source-file ~/.tmux/shipwright-overlay.conf" >> "$home_tmux_conf"
-            emit_event "doctor_fix" "type=update_tmux" "path=$home_tmux_conf"
+        local backup="${home_tmux_conf}.shipwright.bak"
+        if [[ ! -f "$backup" ]]; then
+            cp "$home_tmux_conf" "$backup" || return 1
+            doctor_record_change "created" "$backup"
         fi
+        echo "source-file -q ~/.tmux/shipwright-overlay.conf" >> "$home_tmux_conf" || return 1
+        doctor_record_change "modified" "$home_tmux_conf"
     fi
 
-    echo "$result"
+    return 0
 }
 
 doctor_fix_hooks() {
-    local result="fixed"
-    local hooks_dir=".claude/hooks"
+    local hooks_dir="$HOME/.claude/hooks"
 
-    mkdir -p "$hooks_dir" 2>/dev/null || true
+    mkdir -p "$hooks_dir" 2>/dev/null || return 1
 
-    # Try to copy hooks from Shipwright repo templates
-    local repo_hooks="${SCRIPT_DIR}/../templates/hooks"
-    if [[ -d "$repo_hooks" ]]; then
-        for hook_file in "$repo_hooks"/*.sh; do
-            if [[ -f "$hook_file" ]]; then
-                local hook_name
-                hook_name="$(basename "$hook_file")"
-                local dest_hook="$hooks_dir/$hook_name"
-                if [[ ! -f "$dest_hook" ]]; then
-                    if [[ "$DOCTOR_FIX_DRY_RUN" == "true" ]]; then
-                        info "  [DRY] Would install hook: $dest_hook"
-                    else
-                        cp "$hook_file" "$dest_hook"
-                        chmod +x "$dest_hook"
-                        emit_event "doctor_fix" "type=install_hook" "hook=$hook_name"
-                    fi
-                fi
-            fi
-        done
-    else
-        result="skipped"
+    local repo_hooks="${SCRIPT_DIR}/../claude-code/hooks"
+    if [[ ! -d "$repo_hooks" ]]; then
+        repo_hooks="${SCRIPT_DIR}/../.claude/hooks"
     fi
 
-    echo "$result"
+    if [[ ! -d "$repo_hooks" ]]; then
+        return 1
+    fi
+
+    for hook_file in "$repo_hooks"/*.sh; do
+        if [[ -f "$hook_file" ]]; then
+            local hook_name
+            hook_name="$(basename "$hook_file")"
+            local dest_hook="$hooks_dir/$hook_name"
+            if [[ ! -f "$dest_hook" ]]; then
+                cp "$hook_file" "$dest_hook" || return 1
+                chmod +x "$dest_hook" || return 1
+                doctor_record_change "created" "$dest_hook"
+            fi
+        fi
+    done
+
+    return 0
 }
 
-doctor_auto_fix() {
+doctor_fix_hooks_exec() {
+    local hooks_dir="$HOME/.claude/hooks"
+
+    if [[ ! -d "$hooks_dir" ]]; then
+        return 1
+    fi
+
+    for hook_file in "$hooks_dir"/*.sh; do
+        if [[ -f "$hook_file" && ! -x "$hook_file" ]]; then
+            if ! chmod +x "$hook_file" 2>/dev/null; then
+                return 1
+            fi
+            doctor_record_change "chmod +x" "$hook_file"
+        fi
+    done
+
+    return 0
+}
+
+# ─── Check predicates (T3-T4) ──────────────────────────────────────────────
+_doctor_check_path() {
+    [[ -n "$HOME" ]] || return 1
+    grep -qxF "$HOME/.local/bin" <(echo "$PATH" | tr ':' '\n')
+}
+
+_doctor_check_hooks_exec() {
+    local hooks_dir="$HOME/.claude/hooks"
+    [[ -d "$hooks_dir" ]] || return 1
+    for hook in "$hooks_dir"/*.sh; do
+        [[ -f "$hook" && -x "$hook" ]] || return 1
+    done
+    return 0
+}
+
+_doctor_check_overlay() {
+    [[ -f "$HOME/.tmux/shipwright-overlay.conf" ]]
+}
+
+_doctor_check_overlay_sourced() {
+    local tmux_conf="$HOME/.tmux.conf"
+    [[ -f "$tmux_conf" ]] && grep -q "shipwright-overlay" "$tmux_conf"
+}
+
+# ─── doctor_fix_path: Add ~/.local/bin to PATH in shell rc file ──────────────
+doctor_fix_path() {
+    [[ -n "$HOME" ]] || { error "HOME not set"; return 1; }
+
+    local shell_rc
+    case "${SHELL:-/bin/bash}" in
+        *fish)
+            shell_rc="$HOME/.config/fish/conf.d/shipwright.fish"
+            mkdir -p "$(dirname "$shell_rc")" || return 1
+            if ! grep -qF "fish_add_path -g $HOME/.local/bin" "$shell_rc" 2>/dev/null; then
+                printf '%s\n' "fish_add_path -g $HOME/.local/bin" >> "$shell_rc" || return 1
+                doctor_record_change "modified" "$shell_rc"
+            fi
+            ;;
+        *zsh)
+            shell_rc="$HOME/.zshrc"
+            if [[ ! -f "$shell_rc" ]]; then
+                touch "$shell_rc" || return 1
+            fi
+            if ! grep -qF "Added by Shipwright" "$shell_rc" 2>/dev/null; then
+                local backup="${shell_rc}.shipwright.bak"
+                [[ -f "$backup" ]] || cp "$shell_rc" "$backup" || return 1
+                doctor_record_change "created" "$backup"
+                {
+                    echo ""
+                    echo "# Added by Shipwright"
+                    echo "export PATH=\"\$HOME/.local/bin:\$PATH\""
+                } >> "$shell_rc" || return 1
+                doctor_record_change "modified" "$shell_rc"
+            fi
+            ;;
+        *bash)
+            if [[ -f "$HOME/.bash_profile" ]]; then
+                shell_rc="$HOME/.bash_profile"
+            else
+                shell_rc="$HOME/.bashrc"
+            fi
+            if [[ ! -f "$shell_rc" ]]; then
+                touch "$shell_rc" || return 1
+            fi
+            if ! grep -qF "Added by Shipwright" "$shell_rc" 2>/dev/null; then
+                local backup="${shell_rc}.shipwright.bak"
+                [[ -f "$backup" ]] || cp "$shell_rc" "$backup" || return 1
+                doctor_record_change "created" "$backup"
+                {
+                    echo ""
+                    echo "# Added by Shipwright"
+                    echo "export PATH=\"\$HOME/.local/bin:\$PATH\""
+                } >> "$shell_rc" || return 1
+                doctor_record_change "modified" "$shell_rc"
+            fi
+            ;;
+        *)
+            shell_rc="$HOME/.profile"
+            if [[ ! -f "$shell_rc" ]]; then
+                touch "$shell_rc" || return 1
+            fi
+            if ! grep -qF "Added by Shipwright" "$shell_rc" 2>/dev/null; then
+                local backup="${shell_rc}.shipwright.bak"
+                [[ -f "$backup" ]] || cp "$shell_rc" "$backup" || return 1
+                doctor_record_change "created" "$backup"
+                {
+                    echo ""
+                    echo "# Added by Shipwright"
+                    echo "export PATH=\"\$HOME/.local/bin:\$PATH\""
+                } >> "$shell_rc" || return 1
+                doctor_record_change "modified" "$shell_rc"
+            fi
+            ;;
+    esac
+
+    export PATH="$HOME/.local/bin:$PATH"
+    warn "  (open a new shell or source $shell_rc to apply)"
+    return 0
+}
+
+doctor_print_fix_summary() {
+    if [[ "$DOCTOR_FIX_MODE" != "true" ]]; then
+        return
+    fi
+
     echo ""
     echo -e "${PURPLE}${BOLD}  AUTO-FIX SUMMARY${RESET}"
     echo -e "${DIM}  ──────────────────────────────────────────${RESET}"
     echo ""
 
-    local fixes_applied=0
-    local fixes_skipped=0
+    if [[ $FIXED -gt 0 || $FIX_FAILED -gt 0 || ${#DOCTOR_UNFIXABLE[@]} -gt 0 ]]; then
+        if [[ $FIXED -gt 0 || $FIX_FAILED -gt 0 ]]; then
+            echo -e "  ${GREEN}${BOLD}${FIXED}${RESET} fixed · ${YELLOW}${BOLD}${FIX_FAILED}${RESET} could not be fixed · ${DIM}${#DOCTOR_UNFIXABLE[@]} not auto-fixable${RESET}"
+            echo ""
+        fi
 
-    # Fix 1: Missing directories
-    info "Creating missing directories..."
-    result=$(doctor_fix_missing_dirs)
-    if [[ "$result" == "fixed" ]]; then
-        success "  Directories created/verified"
-        fixes_applied=$((fixes_applied + 1))
+        if [[ ${#DOCTOR_CHANGES[@]} -gt 0 ]]; then
+            echo "  Changes made:"
+            for change in "${DOCTOR_CHANGES[@]}"; do
+                echo "    ${DIM}${change}${RESET}"
+            done
+            echo ""
+        fi
+
+        if [[ ${#DOCTOR_UNFIXABLE[@]} -gt 0 ]]; then
+            echo "  Not auto-fixable (manual action required):"
+            for label in "${DOCTOR_UNFIXABLE[@]}"; do
+                echo "    • ${label}"
+            done
+            echo ""
+        fi
     else
-        warn "  Some directories could not be created"
-        fixes_skipped=$((fixes_skipped + 1))
+        echo "  No changes were needed"
+        echo ""
     fi
-
-    # Fix 2: Permissions
-    info "Fixing script permissions..."
-    result=$(doctor_fix_permissions "${SCRIPT_DIR}")
-    if [[ "$result" == "fixed" ]]; then
-        success "  Script permissions fixed"
-        fixes_applied=$((fixes_applied + 1))
-    else
-        warn "  Could not fix some permissions"
-        fixes_skipped=$((fixes_skipped + 1))
-    fi
-
-    # Fix 3: Missing config files
-    info "Creating missing config files..."
-    result=$(doctor_fix_missing_config)
-    if [[ "$result" == "fixed" ]]; then
-        success "  Config files created"
-        fixes_applied=$((fixes_applied + 1))
-    else
-        warn "  Could not create some config files"
-        fixes_skipped=$((fixes_skipped + 1))
-    fi
-
-    # Fix 4: tmux configuration
-    info "Configuring tmux..."
-    result=$(doctor_fix_tmux_config)
-    if [[ "$result" == "fixed" ]]; then
-        success "  tmux configured"
-        fixes_applied=$((fixes_applied + 1))
-    elif [[ "$result" == "skipped" ]]; then
-        warn "  tmux configuration skipped (overlay not found)"
-        fixes_skipped=$((fixes_skipped + 1))
-    fi
-
-    # Fix 5: Install hooks
-    info "Installing hooks..."
-    result=$(doctor_fix_hooks)
-    if [[ "$result" == "fixed" ]]; then
-        success "  Hooks installed"
-        fixes_applied=$((fixes_applied + 1))
-    elif [[ "$result" == "skipped" ]]; then
-        warn "  Hooks skipped (templates not found)"
-        fixes_skipped=$((fixes_skipped + 1))
-    fi
-
-    echo ""
-    echo -e "  ${GREEN}${BOLD}${fixes_applied}${RESET} fixes applied  ${YELLOW}${BOLD}${fixes_skipped}${RESET} skipped"
-    echo ""
 
     if [[ "$DOCTOR_FIX_DRY_RUN" == "true" ]]; then
-        info "Dry-run complete — no changes made"
-    else
-        info "Re-running doctor checks to verify fixes..."
+        echo -e "  ${DIM}Dry-run — no changes made${RESET}"
         echo ""
     fi
 }
@@ -767,12 +894,18 @@ echo -e "${DIM}  ─────────────────────
 
 BIN_DIR="$HOME/.local/bin"
 
-if echo "$PATH" | tr ':' '\n' | grep -q "$BIN_DIR"; then
+if _doctor_check_path; then
     check_pass "${BIN_DIR} is in PATH"
+elif doctor_try_fix "~/.local/bin in PATH" doctor_fix_path _doctor_check_path; then
+    check_pass "${BIN_DIR} is in PATH (auto-fixed)"
 else
     check_warn "${BIN_DIR} is NOT in PATH"
-    echo -e "    ${DIM}Add to ~/.zshrc or ~/.bashrc:${RESET}"
-    echo -e "    ${DIM}export PATH=\"\$HOME/.local/bin:\$PATH\"${RESET}"
+    if [[ "$DOCTOR_FIX_MODE" != "true" ]]; then
+        echo -e "    ${DIM}Add to ~/.zshrc or ~/.bashrc:${RESET}"
+        echo -e "    ${DIM}export PATH=\"\$HOME/.local/bin:\$PATH\"${RESET}"
+    else
+        doctor_not_fixable "~/.local/bin in PATH"
+    fi
 fi
 
 # Check sw subcommands are installed alongside the router
@@ -1595,24 +1728,9 @@ else
 fi
 
 # ═════════════════════════════════════════════════════════════════════════════
-# Auto-fix (if enabled)
+# Auto-fix summary (if enabled)
 # ═════════════════════════════════════════════════════════════════════════════
-if [[ "$DOCTOR_FIX_MODE" == "true" ]]; then
-    doctor_auto_fix
-
-    # Re-run checks after fixes if not in dry-run mode
-    if [[ "$DOCTOR_FIX_DRY_RUN" != "true" ]]; then
-        info "Re-running doctor checks..."
-        # Reset counters
-        PASS=0
-        WARN=0
-        FAIL=0
-        # Re-execute the doctor script to get fresh results
-        # We'll just continue with a message for now
-        echo ""
-        echo -e "${DIM}  (Running full doctor check with fixes applied)${RESET}"
-    fi
-fi
+doctor_print_fix_summary
 
 # ═════════════════════════════════════════════════════════════════════════════
 # Summary
