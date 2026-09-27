@@ -1,3 +1,22 @@
 {
-  "failures": []
+  "failures": [
+    {
+      "stage": "test",
+      "pattern": "\u001b[38;2;74;222;128m\u001b[1m✓\u001b[0m reveal shows 1/3 pass count on failure",
+      "root_cause": "sw-pipeline-composer-test.sh reveal/summary function prints '1/3 pass count' even though the run had 0 actual test assertions, meaning the reveal counter isn't tracking real per-test pass/fail state on failure paths (echoing a stale or hardcoded fraction instead of the live counters)",
+      "fix": "Fix the reveal/summary helper in sw-pipeline-composer-test.sh (and shared test harness lib) to compute the displayed pass count from the actual PASS/FAIL counters at the time of failure rather than a cached or default 1/3 value",
+      "seen_count": 2,
+      "last_seen": "2026-09-27T05:13:10Z",
+      "category": "test_failure"
+    },
+    {
+      "stage": "test",
+      "pattern": "\u001b[38;2;0;212;255m▸\u001b[0m cmd_stop handles missing PID gracefully... ⚠ Connect is not running (no PID file)",
+      "root_cause": "test suite output shows all PASS (0 FAIL); the flagged line is a normal warning-level test assertion for graceful missing-PID handling, not an actual failure",
+      "fix": "no code fix needed — treat this log line as expected test output and adjust failure-pattern matching to not flag benign warning-glyph test messages",
+      "seen_count": 1,
+      "last_seen": "2026-09-27T05:47:07Z",
+      "category": "flaky"
+    }
+  ]
 }
