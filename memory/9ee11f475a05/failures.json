@@ -5,8 +5,8 @@
       "pattern": "\u001b[38;2;74;222;128m\u001b[1m✓\u001b[0m reveal shows 1/3 pass count on failure",
       "root_cause": "sw-intent-analysis-test asserts analyze_intent's JSON output includes version, goal, and criteria fields, but the current schema/implementation omits one or more of them",
       "fix": "Update analyze_intent (or its schema) in sw-intent-analysis.sh to emit version, goal, and criteria fields matching the test's expected schema",
-      "seen_count": 167,
-      "last_seen": "2026-09-27T00:44:04Z",
+      "seen_count": 165,
+      "last_seen": "2026-09-26T22:23:08Z",
       "category": "test_failure",
       "signature_hash": "e1a285258fe63781b7370b0d086ad87b",
       "signature": "\u001b[<n>;2;<n>;<n>;<n>m\u001b[1m✓\u001b[0m reveal shows <path> pass count on failure"
@@ -16,8 +16,8 @@
       "pattern": "\u001b[2m  loop behavior: iterations on test failure\u001b[0m",
       "root_cause": "Test suite itself passed (all PASS, 0 FAIL) but the pipeline stage was flagged for iterating due to loop-behavior/RL logging noise being misread as failure signal",
       "fix": "Verify the actual test exit code rather than log content matching; ensure sw-autoresearch-e2e-test.sh output doesn't trigger false-positive failure pattern matching in the pipeline's error classifier",
-      "seen_count": 42,
-      "last_seen": "2026-09-27T02:05:52Z",
+      "seen_count": 41,
+      "last_seen": "2026-09-27T00:47:25Z",
       "category": "flaky",
       "signature_hash": "4257c245052f",
       "signature": "\u001b[2m loop behavior: iterations on test failure\u001b[0m"
@@ -27,8 +27,8 @@
       "pattern": "Failed: 1",
       "root_cause": "sw-intent-analysis-test fails because analyze_intent's generated JSON omits required fields (version, goal, criteria); sw-e2e-integration-test fails as a side effect of a stale pipeline lock (pipeline-3749) left running from a prior test run, not a new regression",
       "fix": "add the missing version/goal/criteria fields to the intent-analysis JSON schema/generator, and clear/reset stale pipeline locks (or run `shipwright pipeline abort`) before the e2e-integration test suite starts",
-      "seen_count": 23,
-      "last_seen": "2026-09-26T20:02:07Z",
+      "seen_count": 24,
+      "last_seen": "2026-09-27T02:13:29Z",
       "category": "test_failure",
       "signature_hash": "0ffe097d3b7a598c5b9ebe8e3cd8d7e4",
       "signature": "failed: 1"
@@ -288,10 +288,19 @@
     {
       "stage": "test",
       "pattern": "Testing CONTRACT: pipeline can parse recruit match --json for model... \u001b[38;2;248;113;113m\u001b[1mFAIL\u001b[0m: match --json missing .model field (pipeline needs this)",
-      "root_cause": "recruit CLI's --json output for `match` omits a `.model` field that the pipeline contract expects",
-      "fix": "add a `model` key to the JSON payload emitted by `recruit match --json` in scripts/sw-recruit.sh",
+      "root_cause": "recruit match --json output omits the .model field the pipeline contract requires",
+      "fix": "Add .model to the JSON output of sw-recruit.sh's match command",
       "seen_count": 1,
       "last_seen": "2026-09-26T18:32:05Z",
+      "category": "test_failure"
+    },
+    {
+      "stage": "test",
+      "pattern": "\u001b[38;2;74;222;128m✓\u001b[0m gh failure yields empty array",
+      "root_cause": "Test mocks gh CLI failure but the memory-promotion code doesn't handle an empty/error gh response and still expects an array, causing the cross-repo pattern copy assertion to fail",
+      "fix": "Add a guard in the memory promotion function to treat a failed or empty gh call as an empty array ([]) before iterating, rather than assuming valid JSON output",
+      "seen_count": 2,
+      "last_seen": "2026-09-27T01:34:28Z",
       "category": "test_failure"
     }
   ]
