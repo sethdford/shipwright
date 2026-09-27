@@ -811,3 +811,5 @@
 {"ts":"2026-09-26T22:49:07Z","ts_epoch":1790462947,"type":"stage.started","issue":0,"stage":"review"}
 {"ts":"2026-09-26T22:49:07Z","ts_epoch":1790462947,"type":"spec_compliance_checked","spec":"/tmp/sw-pipeline-test.FDmuhO/project/.claude/pipeline-artifacts/spec.json","verdict":"compliant","criteria":1}
 {"ts":"2026-09-26T22:49:07Z","ts_epoch":1790462947,"type":"review.spec_complete","issue":0,"gaps":0}
+{"ts":"2026-09-27T00:15:29Z","ts_epoch":1790468129,"type":"hygiene_platform_refactor","hardcoded":49,"fallback":69,"todo":51}
+{"ts":"2026-09-27T00:15:51Z","ts_epoch":1790468151,"type":"strategic.cycle_complete","issues_created":0,"issues_skipped":3}
