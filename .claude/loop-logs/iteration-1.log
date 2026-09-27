@@ -1,3 +1,3 @@
-The goal — adding an automated E2E comment marker to README.md for this pipeline run (#6736) — is complete, and the relevant docs test suite (18/18) passes with no regression from this change.
+The change matches the established pattern exactly (four prior identical commits for previous pipeline runs). This is a README-only documentation change with no code impact, so the shell/dashboard test suites are unaffected. The goal is fully achieved.
 
 LOOP_COMPLETE
