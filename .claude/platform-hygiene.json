@@ -1,5 +1,5 @@
 {
-  "timestamp": "2026-09-27T04:28:57Z",
+  "timestamp": "2026-09-27T05:12:00Z",
   "repository": "shipwright",
   "counts": {
     "hardcoded": 49,
@@ -359,11 +359,11 @@
     },
     {
       "file": "scripts/sw-doctor.sh",
-      "line": 1760
+      "line": 1758
     },
     {
       "file": "scripts/sw-doctor.sh",
-      "line": 1765
+      "line": 1763
     },
     {
       "file": "scripts/sw-strategic.sh",
@@ -685,7 +685,7 @@
     },
     {
       "script": "sw-doctor.sh",
-      "lines": 1797
+      "lines": 1795
     },
     {
       "script": "sw-self-optimize.sh",
