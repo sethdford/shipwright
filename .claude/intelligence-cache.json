@@ -1683,33 +1683,33 @@
       "result": {
         "results": [
           {
+            "file": "patterns.json",
+            "relevance": 95,
+            "summary": "Defines project type (node), package manager (npm), test runner (vitest), and source structure — essential for understanding build requirements and conventions"
+          },
+          {
             "file": "retry-outcomes.json",
-            "relevance": 85,
-            "summary": "Direct build failure recovery with model_escalation strategy showing 100% success rate across 5 attempts—directly applicable to current build stage resilience"
+            "relevance": 90,
+            "summary": "Shows proven recovery strategies for build_failure class with 100% success rate using model escalation — directly applicable to build stage recovery"
           },
           {
             "file": "success-patterns.json",
-            "relevance": 82,
-            "summary": "Proven successful build patterns at similar complexity (60-65) with iteration counts, file change patterns, and test strategies that succeeded in standard pipeline template"
+            "relevance": 85,
+            "summary": "Contains 2 successful patterns with iterations, durations, files changed, and test strategies — provides templates for how builds should be approached in this repo"
           },
           {
             "file": "metrics.json",
-            "relevance": 70,
-            "summary": "Build duration baseline (7095s) and test duration (1459s) provide performance expectations and iteration planning constraints"
-          },
-          {
-            "file": "flaky-tests.json",
-            "relevance": 62,
-            "summary": "Known flaky tests (test-1, test-auth) with high confidence (85-90%) and error patterns that could cause build failures during test execution"
+            "relevance": 75,
+            "summary": "Provides baseline build_duration_s (7095s) and test_duration_s (1459s) — useful for understanding expected build performance and detecting anomalies"
           },
           {
             "file": "knowledge.json",
-            "relevance": 58,
-            "summary": "Historical test/build failures (mktemp directory issues, missing output) with fix strategies and success rates to avoid regression"
+            "relevance": 30,
+            "summary": "Contains infrastructure failure patterns (mktemp, test environment setup) — some indirect relevance to build environment setup, but primarily test-focused"
           }
         ]
       },
-      "timestamp": 1790484955,
+      "timestamp": 1790486884,
       "ttl": 1800
     },
     "d271a56b1e43d77160270ec08c020aba": {
