@@ -596,3 +596,4 @@ MIT — Seth Ford, 2026.
 <!-- E2E test: automated comment added by pipeline run #6741 -->
 <!-- E2E test: automated comment added by pipeline run #6746 -->
 <!-- E2E test: automated comment added by pipeline run #6756 -->
+<!-- E2E test: automated comment added by pipeline run #6761 -->
