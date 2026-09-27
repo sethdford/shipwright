@@ -402,3 +402,7 @@
 {"ts":"2026-09-27T19:58:36Z","ts_epoch":1790539116,"type":"reasoning.trace","job_id":"pipeline-4027630-42","complexity":"medium","risk":50,"template":"standard"}
 {"ts":"2026-09-27T19:58:37Z","ts_epoch":1790539117,"type":"reasoning.trace","job_id":"pipeline-4028308-42","complexity":"medium","risk":50,"template":"standard"}
 {"ts":"2026-09-27T19:58:38Z","ts_epoch":1790539118,"type":"reasoning.trace","job_id":"pipeline-4028978-42","complexity":"medium","risk":50,"template":"standard"}
+{"ts":"2026-09-27T20:05:08Z","ts_epoch":1790539508,"type":"hygiene_platform_refactor","hardcoded":49,"fallback":69,"todo":51}
+{"ts":"2026-09-27T20:05:46Z","ts_epoch":1790539546,"type":"strategic.issue_created","title":"Quarantine issues that repeatedly fail the build loop to stop wasted daemon cycles","priority":"P0","complexity":"standard"}
+{"ts":"2026-09-27T20:05:50Z","ts_epoch":1790539550,"type":"strategic.issue_created","title":"Budget-aware pipeline template selection","priority":"P3","complexity":"standard"}
+{"ts":"2026-09-27T20:05:50Z","ts_epoch":1790539550,"type":"strategic.cycle_complete","issues_created":2,"issues_skipped":1}
