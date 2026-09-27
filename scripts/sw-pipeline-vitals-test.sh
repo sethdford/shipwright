@@ -38,18 +38,7 @@ MOCKEOF
 
 trap cleanup_test_env EXIT
 
-assert_pass() {
-    local desc="$1"
-    echo -e "  ${GREEN}✓${RESET} ${desc}"
-}
 
-assert_fail() {
-    local desc="$1"
-    local detail="${2:-}"
-    FAILURES+=("$desc")
-    echo -e "  ${RED}✗${RESET} ${desc}"
-    [[ -n "$detail" ]] && echo -e "    ${DIM}${detail}${RESET}"
-}
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # TESTS
