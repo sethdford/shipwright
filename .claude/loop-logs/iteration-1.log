@@ -1,3 +1,3 @@
-The change matches the established pattern exactly (four prior identical commits for previous pipeline runs). This is a README-only documentation change with no code impact, so the shell/dashboard test suites are unaffected. The goal is fully achieved.
+The goal — adding an E2E test comment marker to README.md for pipeline run #6761 — is fully achieved, following the exact same pattern as prior runs (#6734, #6736, #6741, #6746, #6756). This is a trivial documentation-only change with no code logic, so the acceptance criterion "all existing tests continue to pass" is satisfied since no test-relevant files were touched.
 
 LOOP_COMPLETE
