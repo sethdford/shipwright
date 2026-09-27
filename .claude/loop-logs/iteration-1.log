@@ -1,56 +1,5 @@
-Excellent! All verifications pass. Let me create a final summary document:
+Docs test suite passes cleanly. This confirms the README change (outside any AUTO-synced section) doesn't break documentation tooling.
 
-## Summary: Iteration 1 Complete
-
-I have successfully implemented the core auto-remediation infrastructure for `shipwright doctor --fix`. Here's what was accomplished:
-
-### ✓ Completed Implementation Tasks
-
-**T1-T2: Core Infrastructure**
-- Added fix-tracking primitives (arrays and counters for changes, unfixable checks, fixed/failed counts)
-- Implemented `doctor_try_fix()` wrapper for consistent fix-and-recheck pattern
-- Implemented `doctor_record_change()` for transparent change tracking
-- Converted all fix helpers from echo-based returns to proper exit codes
-- Added comprehensive `--help` and `-h` flag support
-
-**T3-T4: Checks and Fixes**
-- Implemented `_doctor_check_path` predicate for PATH validation
-- Implemented `doctor_fix_path()` with multi-shell support (bash, zsh, fish, fallback)
-- Implemented overlay check predicates and fixes
-- Implemented hooks executable check and fix (`doctor_fix_hooks_exec`)
-- Created project scaffold check that only runs with `--fix`
-
-**T5: Wiring Checks to Auto-Remediation**
-- PATH check wired to `doctor_try_fix`
-- Project scaffold check (directories + configs)
-- Overlay installed and sourced checks
-- Hooks executable check
-- Proper non-fixable handling with guidance text preserved
-
-**T7: Summary Output**
-- Implemented `doctor_print_fix_summary()` showing fixes applied, changes made, and non-fixable items
-
-### ✓ Acceptance Criteria Met
-
-1. **Re-check after fix**: Each check is re-run immediately after fix application ✓
-2. **Change tracking**: All file modifications printed as "changed: <action> <path>" ✓  
-3. **Idempotency**: Running `--fix` twice produces identical results ✓
-4. **Dry-run mode**: `--fix-dry` previews without mutation ✓
-5. **No regression**: Plain `doctor` output unchanged ✓
-6. **Tests passing**: 0 test failures, all doctor tests pass ✓
-
-### Test Results
-- `sw-doctor-test.sh`: All tests passing
-- Full test suite: Exit code 0
-- Syntax validation: `bash -n` passes
-- Verified: 3 checks auto-fixed, 13 file changes tracked
-
-### Commits (4 total)
-1. Core auto-remediation infrastructure (T1-T2)
-2. Move show_help before parser
-3. Add project scaffold check
-4. Wire overlay and hooks checks
-
-Ready for next iteration to complete remaining tasks (T6-T11).
+The task—adding a comment to README as an automated E2E test—is complete and committed. Since this was a small, isolated documentation change with no functional code impact, and the relevant test suite passes:
 
 LOOP_COMPLETE
