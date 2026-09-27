@@ -60,8 +60,29 @@ MOCKEOF
 
 trap cleanup_test_env EXIT
 
+assert_pass() {
+    local desc="$1"
+    echo -e "  ${GREEN}✓${RESET} ${desc}"
+}
 
+assert_fail() {
+    local desc="$1"
+    local detail="${2:-}"
+    FAILURES+=("$desc")
+    echo -e "  ${RED}✗${RESET} ${desc}"
+    [[ -n "$detail" ]] && echo -e "    ${DIM}${detail}${RESET}"
+}
 
+assert_contains() {
+    local desc="$1" haystack="$2" needle="$3"
+    local _count
+    _count=$(printf '%s\n' "$haystack" | grep -cF -- "$needle" 2>/dev/null) || true
+    if [[ "${_count:-0}" -gt 0 ]]; then
+        assert_pass "$desc"
+    else
+        assert_fail "$desc" "output missing: $needle"
+    fi
+}
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # Tests
