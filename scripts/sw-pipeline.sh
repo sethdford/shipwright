@@ -133,6 +133,9 @@ fi
 # ─── Pipeline Decomposed Modules ────────────────────────────────────────────
 # shellcheck source=lib/pipeline-cli.sh
 [[ -f "$SCRIPT_DIR/lib/pipeline-cli.sh" ]] && source "$SCRIPT_DIR/lib/pipeline-cli.sh"
+# Budget-aware template selection (requires helpers and compat already sourced)
+# shellcheck source=lib/budget-template.sh
+[[ -f "$SCRIPT_DIR/lib/budget-template.sh" ]] && source "$SCRIPT_DIR/lib/budget-template.sh"
 # shellcheck source=lib/pipeline-util.sh
 [[ -f "$SCRIPT_DIR/lib/pipeline-util.sh" ]] && source "$SCRIPT_DIR/lib/pipeline-util.sh"
 # shellcheck source=lib/pipeline-execution.sh
@@ -144,6 +147,7 @@ fi
 GOAL=""
 ISSUE_NUMBER=""
 PIPELINE_NAME="standard"
+PIPELINE_NAME_EXPLICIT=false
 PIPELINE_CONFIG=""
 TEST_CMD=""
 MODEL=""

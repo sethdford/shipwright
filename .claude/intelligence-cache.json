@@ -30,17 +30,18 @@
     },
     "d41d8cd98f00b204e9800998ecf8427e": {
       "result": {
-        "primary_role": "builder",
+        "primary_role": "architect",
         "secondary_roles": [
-          "tester",
-          "reviewer"
+          "builder",
+          "optimizer",
+          "devops"
         ],
-        "confidence": 0.95,
-        "reasoning": "Bug fix requiring debugging JSON parsing logic, implementing improved error messaging, and testing edge cases (object vs array output). Builder handles implementation; tester validates the fix; reviewer ensures accuracy.",
+        "confidence": 0.85,
+        "reasoning": "Requires system design for budget-aware template selection, cost routing decisions, and pipeline composition—core architecture work with implementation and cost optimization as secondary concerns",
         "new_role_needed": false,
         "suggested_role": null
       },
-      "timestamp": 1775316059,
+      "timestamp": 1790541210,
       "ttl": 3600
     },
     "efd5524ad1244fd20344bf3ff5d95233": {
@@ -1401,6 +1402,308 @@
       },
       "timestamp": 1775344537,
       "ttl": 3600
+    },
+    "a0d8231c42617433aaf0e32cf0619b15": {
+      "result": {
+        "complexity": 6,
+        "risk_level": "medium",
+        "success_probability": 78,
+        "recommended_template": "cost-aware",
+        "issue_type": "infrastructure",
+        "key_risks": [
+          "Auto-downgrade logic misconfiguration causing unexpected pipeline failures or deferrals",
+          "Race condition between cost tracking update and pipeline start decision window",
+          "Explicit --template flag not properly short-circuiting budget evaluation",
+          "Event emission overhead if budget check runs in hot path for daemon polls"
+        ],
+        "implementation_hints": [
+          "Query remaining budget via 'shipwright cost remaining-budget' CLI before template selection logic",
+          "Build template downgrade hierarchy: enterprise → full → standard → fast → defer with clear tier definitions",
+          "Add 'budget.auto_downgrade_enabled' and 'budget.downgrade_threshold_usd' keys to daemon-config.json with sensible defaults",
+          "Emit structured event {type: 'template_downgrade', from: X, to: Y, remaining_budget: Z} for observability and auditing",
+          "Check explicit --template flag first in pipeline start before entering budget evaluation path",
+          "Parameterize test suite with low/medium/high/zero budget scenarios using mocked cost data files"
+        ]
+      },
+      "timestamp": 1790540698,
+      "ttl": 3600
+    },
+    "c66113495f170db12e85f66aadeb4645": {
+      "result": {
+        "estimated_iterations": 5
+      },
+      "timestamp": 1790540711,
+      "ttl": 1800
+    },
+    "de3d9c89d7e332a6d513856426808108": {
+      "result": {
+        "estimated_cost_usd": 10.50,
+        "estimated_iterations": 3,
+        "estimated_tokens": 182000,
+        "likely_failure_stage": "test",
+        "confidence": 76
+      },
+      "timestamp": 1790540720,
+      "ttl": 3600
+    },
+    "31e370b886709a9bb22f5917d1fb6cfd": {
+      "result": {
+        "issue_type": "infrastructure",
+        "confidence": 0.88,
+        "secondary_domains": [
+          "cost-optimization",
+          "cli-behavior",
+          "configuration-management"
+        ],
+        "complexity_assessment": {
+          "score": 6,
+          "reasoning": "Moderate complexity: multiple integration points (pipeline start, daemon config, cost tracking), conditional logic with override precedence, boundary condition testing, and configuration schema changes."
+        },
+        "skill_plan": {
+          "plan": [
+            "product-thinking",
+            "brainstorming"
+          ],
+          "design": [
+            "architecture-design",
+            "api-design"
+          ],
+          "build": [
+            "testing-strategy"
+          ],
+          "review": [
+            "security-audit",
+            "adversarial-quality"
+          ],
+          "compound_quality": [
+            "validation-thoroughness"
+          ],
+          "pr": [
+            "pr-quality"
+          ],
+          "deploy": [],
+          "validate": [
+            "observability"
+          ],
+          "monitor": [
+            "observability"
+          ]
+        },
+        "skill_rationale": {
+          "product-thinking": "Understand the end-user need for budget control and the failure modes (budget overrun mid-pipeline) that this feature prevents.",
+          "brainstorming": "Challenge assumptions about threshold percentages, downgrade tier definitions, and edge cases (negative budget, cost-tracking unavailable, threshold exactly at boundary).",
+          "architecture-design": "Design the decision tree for template downgrade logic, config schema changes, and how this integrates with existing daemon config and cost tracking systems.",
+          "api-design": "Define the daemon-config.json schema for budget threshold, downgrade tier mappings, and the event structure that captures budget-based downgrade decisions.",
+          "testing-strategy": "This feature has three distinct code paths (low-budget downgrade, explicit override, normal-budget no-op) plus boundary conditions that demand comprehensive test matrix coverage.",
+          "security-audit": "Budget calculations must be accurate and not bypassable; cost tracking integration must not allow backdoor template selection that circumvents budget limits.",
+          "adversarial-quality": "Find the breaking cases: what if budget is negative or zero, cost show fails mid-pipeline, threshold is misconfigured, or explicit flag is passed but budget is exhausted?",
+          "validation-thoroughness": "Validate actual pipeline behavior across all scenarios—low/at/high budget, explicit override, event logging completeness—not just unit test coverage.",
+          "pr-quality": "Cross-component changes (pipeline start, daemon config, cost tracking, event emission) require clear PR description of precedence rules and test coverage.",
+          "observability": "Track whether budget-aware downgrades are occurring in production, ensure cost tracking stays accurate after downgrade, and flag anomalies (e.g., downgrades despite high budget)."
+        },
+        "generated_skills": [
+          {
+            "name": "cost-aware-feature-downgrade",
+            "reason": "No existing skill covers the specific pattern of gracefully degrading pipeline capabilities (template selection) based on real-time cost constraints, with override precedence and event auditing.",
+            "content": "# Cost-Aware Feature Downgrade Logic\n\nWhen a system must gracefully constrain behavior due to budget or resource limits, implement feature downgrade in three layers:\n\n## 1. Precedence is Absolute\nExplicit user input (e.g., `--template full`) ALWAYS wins over automatic downgrade. Budget-aware logic is a fallback, not a constraint on explicit requests. Implement as a guard at the entry point:\n\n```\nif (explicit_template_flag) {\n  use explicit_template\n  return\n}\n// Only then check budget\nselected_template = budget_aware_select()\n```\n\nInvariant: No code path should override an explicit flag.\n\n## 2. Downgrade Tiers and Thresholds\nDefine clear tier mappings (e.g., `full` → `standard` → `fast`) and threshold percentages in config:\n\n```json\n{\n  \"cost\": {\n    \"budget_threshold_percent\": 20,\n    \"downgrade_tiers\": {\n      \"full\": \"standard\",\n      \"standard\": \"fast\",\n      \"fast\": \"fast\"\n    }\n  }\n}\n```\n\nThreshold represents: \"if remaining_budget / daily_budget < threshold, downgrade.\" Test exact boundary (at 20%, just below, just above).\n\n## 3. Event Auditing\nEvery downgrade decision must emit a structured event with:\n- Original template (what was requested or would have been selected)\n- Selected template (after budget logic)\n- Reason (explicit override, budget downgrade, normal selection)\n- Remaining budget and threshold at decision time\n\nExample event:\n```json\n{\n  \"type\": \"template_selected\",\n  \"requested_template\": \"full\",\n  \"selected_template\": \"standard\",\n  \"reason\": \"budget_downgrade\",\n  \"remaining_budget_usd\": 4.50,\n  \"daily_budget_usd\": 25.00,\n  \"threshold_percent\": 20,\n  \"timestamp\": \"2026-09-27T20:30:00Z\"\n}\n```\n\n## 4. Edge Case Handling\n- **Cost tracking unavailable**: Log a warning and proceed with default template (do not hard-fail the pipeline). Document as a known degradation.\n- **Negative or zero budget**: Downgrade to cheapest tier (typically `fast` or `hotfix`).\n- **Threshold zero or negative**: Disable budget-aware logic (treat as explicit `--no-budget-check`).\n\n## 5. Testing Pattern\nTest matrix:\n1. Explicit flag always wins: `--template full` with 5% remaining → uses `full` (not downgraded)\n2. Low budget triggers downgrade: No flag, 15% remaining (below 20% threshold) → uses downgraded tier\n3. High budget is a no-op: No flag, 50% remaining → uses normal/requested tier\n4. Boundary at exact threshold: 20% remaining (exactly at threshold) → test both sides\n5. Cost tracking failure: Mock cost show returning error → logs warning, proceeds with default\n"
+          }
+        ],
+        "review_focus": [
+          "Precedence logic: explicit --template flag must always override budget-aware logic",
+          "Boundary conditions: behavior at exactly threshold, just above, and just below",
+          "Event emission: all template decisions logged with budget context for audit trail",
+          "Daemon config schema: backward compatibility with existing configs that lack budget_threshold",
+          "Integration with cost tracking: failure mode when shipwright cost show is unavailable",
+          "Test coverage: three main paths (low-budget downgrade, explicit override, normal no-op) fully exercised"
+        ],
+        "risk_areas": [
+          "Budget calculation precision: off-by-one errors in threshold comparison could cause unexpected downgrades",
+          "Precedence bug: if budget logic executes after explicit flag, it could override user intent",
+          "Silent failures: if cost tracking is unavailable, pipeline must not silently proceed without logging why downgrade was skipped",
+          "Daemon config rollout: existing daemons running old config without budget_threshold must handle gracefully",
+          "Event logging completeness: downgrades not logged mean no audit trail for cost optimization decisions"
+        ]
+      },
+      "timestamp": 1790540801,
+      "ttl": 3600
+    },
+    "805d7c256ae328630b2ef5ae9d20d73e": {
+      "result": {
+        "results": [
+          {
+            "file": "success-patterns.json (test-repo-comptime)",
+            "relevance": 85,
+            "summary": "Contains explicit cost data ($3.75), completion time (1234s), and multiple stage execution (intake, build, test). Directly relevant for understanding resource usage and cost metrics needed for budget-aware template selection."
+          },
+          {
+            "file": "success-patterns.json (test-repo-ranking)",
+            "relevance": 75,
+            "summary": "Two patterns with cost tracking ($0.50 each) showing variability in resource usage. Demonstrates how complexity affects cost and completion, informing template selection criteria."
+          },
+          {
+            "file": "success-patterns.json (test-repo-789)",
+            "relevance": 70,
+            "summary": "Shows relationship between complexity (high), iterations needed (3), and cost ($2.00). Illustrates cost-to-complexity mapping needed for budget-aware routing."
+          },
+          {
+            "file": "index.json",
+            "relevance": 65,
+            "summary": "Patterns indexed by stage and type with failure signatures. Useful for understanding stage-based template design and which templates should handle which failure scenarios within budget constraints."
+          },
+          {
+            "file": "architecture.json",
+            "relevance": 60,
+            "summary": "Contains architectural rules that would inform implementation planning decisions and constraints for the budget-aware template selection feature."
+          }
+        ]
+      },
+      "timestamp": 1790540857,
+      "ttl": 1800
+    },
+    "3bded0859fb58ce13adab686356a99a9": {
+      "result": {
+        "results": [
+          {
+            "file": "failures.json",
+            "relevance": 80,
+            "summary": "Contains actual failure patterns (timeouts, connection refused) with root causes and resolution status. Directly relevant for understanding what types of validation failures occur and how they were resolved."
+          },
+          {
+            "file": "success-patterns.json (test-repo-comptime)",
+            "relevance": 70,
+            "summary": "Tracks a completed 'Timed fix' with actual cost ($3.75) and timing data (1234s execution). Directly relevant to budget-aware template selection and understanding cost implications of pipeline decisions."
+          },
+          {
+            "file": "index.json",
+            "relevance": 55,
+            "summary": "Contains indexed failure patterns including test_failure type with fix recommendations. Useful for understanding failure signatures and applicable solutions, though less detailed than failures.json."
+          }
+        ]
+      },
+      "timestamp": 1790541010,
+      "ttl": 1800
+    },
+    "54ad5e17f07b121ee045a0d1607d84bb": {
+      "result": {
+        "results": [
+          {
+            "file": "architecture.json",
+            "relevance": 95,
+            "summary": "Defines core architecture rules directly applicable to designing budget-aware template selection patterns"
+          },
+          {
+            "file": "success-patterns.json (test-repo-comptime)",
+            "relevance": 70,
+            "summary": "Contains timing and cost metrics ($3.75, 1234s) across multiple stages (intake, build, test), informing budget-aware template design decisions"
+          },
+          {
+            "file": "success-patterns.json (test-repo-ranking)",
+            "relevance": 65,
+            "summary": "Multiple success patterns with consistent metrics enable comparison and pattern extraction for template selection logic"
+          },
+          {
+            "file": "index.json",
+            "relevance": 50,
+            "summary": "Pattern index with stage metadata provides structural understanding of what pattern types exist for template mapping"
+          },
+          {
+            "file": "failures.json",
+            "relevance": 45,
+            "summary": "Resolved and unresolved failure patterns inform architectural constraints and error handling in template selection"
+          }
+        ]
+      },
+      "timestamp": 1790541048,
+      "ttl": 1800
+    },
+    "a07c76f79db9cb97b9fb232b21b00938": {
+      "result": {
+        "results": [
+          {
+            "file": "failures.json",
+            "relevance": 88,
+            "summary": "Contains documented failure anti-patterns (timeouts, unbounded loops, uninitialized services) with root causes and resolutions. Directly illustrates what approaches fail and should be rejected when designing budget-aware template selection."
+          },
+          {
+            "file": "success-patterns.json (test-repo-789)",
+            "relevance": 72,
+            "summary": "Shows high-complexity approach requiring 3 iterations costing $2.00 to fix timeout. Illustrates expensive solutions that a budget-aware template selector should identify and avoid or downgrade."
+          },
+          {
+            "file": "fleet-shared-patterns.json",
+            "relevance": 63,
+            "summary": "Documents common anti-pattern ('Cannot find module' error) seen across multiple repos with seen_count=2. Represents systematic failures that template selection should account for across fleet operations."
+          }
+        ]
+      },
+      "timestamp": 1790541069,
+      "ttl": 1800
+    },
+    "fc97e7e3043a3c45fea8818c8b1124b3": {
+      "result": {
+        "results": [
+          {
+            "file": "success-patterns.json (test-repo-comptime)",
+            "relevance": 75,
+            "summary": "Contains cost and timing metrics (1234s, $3.75) for multi-stage patterns including build. Directly relevant to budget-aware template selection decisions."
+          },
+          {
+            "file": "fleet-shared-patterns.json",
+            "relevance": 72,
+            "summary": "Captures common build/test stage errors ('Cannot find module') across multiple repos with fixes. High-value pattern for avoiding known build failures."
+          },
+          {
+            "file": "failures.json (second entry)",
+            "relevance": 65,
+            "summary": "Documents build/test stage failures with root causes and resolution patterns. Helps identify timeout and dependency issues common in builds."
+          },
+          {
+            "file": "index.json",
+            "relevance": 60,
+            "summary": "Provides build stage test failure patterns with established fixes. Useful for selecting appropriate pipeline templates based on failure history."
+          },
+          {
+            "file": "success-patterns.json (test-repo-789)",
+            "relevance": 55,
+            "summary": "Build stage timeout pattern with 3 iterations needed and specific file targets. Useful for complexity estimation in budget-aware template selection."
+          }
+        ]
+      },
+      "timestamp": 1790541184,
+      "ttl": 1800
+    },
+    "47c1451f50b4a8f9faa0f8012f6b922e": {
+      "result": {
+        "results": [
+          {
+            "file": "failures.json",
+            "relevance": 95,
+            "summary": "Contains 8 test stage failures with root causes, fixes, and occurrence counts. Directly applicable to identifying and resolving build/test failures in current stage."
+          },
+          {
+            "file": "success-patterns.json",
+            "relevance": 90,
+            "summary": "Captures 2 successful build patterns showing iteration counts (3), durations, files changed, test strategies, and costs. Provides template for how to approach similar builds."
+          },
+          {
+            "file": "retry-outcomes.json",
+            "relevance": 85,
+            "summary": "Shows model_escalation strategy has 100% success rate (5/5) for build_failure class. Directly applicable recovery tactic if build stage encounters issues."
+          },
+          {
+            "file": "flaky-tests.json",
+            "relevance": 75,
+            "summary": "Identifies 2 flaky tests (test-auth with 90% confidence, test-1 with 85% confidence) that will affect build reliability. Relevant for test outcome prediction."
+          },
+          {
+            "file": "knowledge.json",
+            "relevance": 70,
+            "summary": "Contains 5 test-related failure patterns (mktemp failures, cleanup output issues) with fixes and occurrence counts. Provides lessons learned from previous test runs."
+          }
+        ]
+      },
+      "timestamp": 1790541198,
+      "ttl": 1800
     }
   }
 }

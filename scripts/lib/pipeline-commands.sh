@@ -710,8 +710,14 @@ pipeline_start() {
     # Generate reasoning trace (complexity analysis, template selection, failure predictions)
     local user_specified_pipeline="$PIPELINE_NAME"
     generate_reasoning_trace 2>/dev/null || true
-    if [[ -n "${PIPELINE_TEMPLATE:-}" && "$user_specified_pipeline" == "standard" ]]; then
+    if [[ -n "${PIPELINE_TEMPLATE:-}" && "$user_specified_pipeline" == "standard" && "$PIPELINE_NAME_EXPLICIT" != "true" ]]; then
         PIPELINE_NAME="$PIPELINE_TEMPLATE"
+    fi
+
+    # Budget-aware template selection: check remaining budget and downgrade if needed
+    # This is only applied when template was not explicitly set via --template/--pipeline
+    if type budget_select_template >/dev/null 2>&1; then
+        PIPELINE_NAME="$(budget_select_template "$PIPELINE_NAME" "$PIPELINE_NAME_EXPLICIT" pipeline)"
     fi
 
     # Check for existing pipeline

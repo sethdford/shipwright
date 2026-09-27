@@ -3,6 +3,9 @@
 [[ -n "${_DAEMON_DISPATCH_LOADED:-}" ]] && return 0
 _DAEMON_DISPATCH_LOADED=1
 
+# Source budget-aware template selection (requires helpers.sh first)
+[[ -f "${SCRIPT_DIR:-}/lib/budget-template.sh" ]] && source "${SCRIPT_DIR:-}/lib/budget-template.sh"
+
 # Defaults for variables normally set by sw-daemon.sh (safe under set -u).
 DAEMON_DIR="${DAEMON_DIR:-${HOME}/.shipwright}"
 SCRIPT_DIR="${SCRIPT_DIR:-$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)}"
@@ -221,13 +224,23 @@ daemon_spawn_pipeline() {
         fi
     fi
 
+    # Apply budget-aware template selection: downgrade if remaining budget is low
+    # This does NOT modify the global PIPELINE_TEMPLATE; it only affects the args
+    # passed to the spawned pipeline process, which will receive it as explicit --pipeline
+    local _spawn_template
+    if type budget_select_template >/dev/null 2>&1; then
+        _spawn_template="$(budget_select_template "${PIPELINE_TEMPLATE:-standard}" false daemon 2>/dev/null)" || _spawn_template="${PIPELINE_TEMPLATE:-standard}"
+    else
+        _spawn_template="${PIPELINE_TEMPLATE:-standard}"
+    fi
+
     # Build pipeline args
     # Every optional knob is read with a :- default. Under `set -u` a bare
     # "$SKIP_GATES" aborts the whole daemon when the caller has not exported the
     # var, which is exactly how the spawn path died when invoked outside a fully
     # initialised daemon config. MAX_RESTARTS_CFG/FAST_TEST_CMD_CFG below already
     # did this; these were the inconsistent ones.
-    local pipeline_args=("start" "--issue" "$issue_num" "--pipeline" "${PIPELINE_TEMPLATE:-standard}")
+    local pipeline_args=("start" "--issue" "$issue_num" "--pipeline" "$_spawn_template")
     if [[ "${SKIP_GATES:-false}" == "true" ]]; then
         pipeline_args+=("--skip-gates")
     fi

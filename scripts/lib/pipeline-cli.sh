@@ -137,7 +137,7 @@ parse_args() {
             --issue)       ISSUE_NUMBER="$2"; shift 2 ;;
             --repo)        REPO_OVERRIDE="$2"; shift 2 ;;
             --local)       NO_GITHUB=true; NO_GITHUB_LABEL=true; shift ;;
-            --pipeline|--template) PIPELINE_NAME="$2"; shift 2 ;;
+            --pipeline|--template) PIPELINE_NAME="$2"; PIPELINE_NAME_EXPLICIT=true; shift 2 ;;
             --test-cmd)    TEST_CMD="$2"; shift 2 ;;
             --model)       MODEL="$2"; shift 2 ;;
             --agents)      AGENTS="$2"; shift 2 ;;
