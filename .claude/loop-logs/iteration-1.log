@@ -1,5 +1,3 @@
-Docs test suite passes cleanly. This confirms the README change (outside any AUTO-synced section) doesn't break documentation tooling.
-
-The task—adding a comment to README as an automated E2E test—is complete and committed. Since this was a small, isolated documentation change with no functional code impact, and the relevant test suite passes:
+The goal — adding an automated E2E comment marker to README.md for this pipeline run (#6736) — is complete, and the relevant docs test suite (18/18) passes with no regression from this change.
 
 LOOP_COMPLETE
