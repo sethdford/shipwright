@@ -2198,6 +2198,41 @@
       },
       "timestamp": 1790488313,
       "ttl": 1800
+    },
+    "271bdf8247ab15b990b6603d344df051": {
+      "result": [
+        {
+          "type": "result",
+          "result": "I am trying the same approach again.",
+          "usage": {
+            "input_tokens": 0,
+            "output_tokens": 0
+          }
+        }
+      ],
+      "timestamp": 1790488372,
+      "ttl": 1800
+    },
+    "90b215776c913f37b367c705b1a4589c": {
+      "result": {
+        "raw_response": "Mock claude: ok"
+      },
+      "timestamp": 1790488390,
+      "ttl": 1800
+    },
+    "083f2d671e6cf0bdd7c8668dd16cf00a": {
+      "result": {
+        "raw_response": "Mock claude: ok"
+      },
+      "timestamp": 1790488469,
+      "ttl": 1800
+    },
+    "a632d648e9e244723801bbf5bf0ad003": {
+      "result": {
+        "raw_response": "Mock claude: ok"
+      },
+      "timestamp": 1790488471,
+      "ttl": 1800
     }
   }
 }
