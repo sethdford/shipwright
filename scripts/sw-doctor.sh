@@ -680,23 +680,36 @@ if [[ "$DOCTOR_FIX_MODE" == "true" ]]; then
 fi
 
 # tmux overlay
-if [[ -f "$HOME/.tmux/shipwright-overlay.conf" ]]; then
+if _doctor_check_overlay; then
     check_pass "Overlay: ~/.tmux/shipwright-overlay.conf"
+elif doctor_try_fix "tmux overlay installed" doctor_fix_tmux_config _doctor_check_overlay; then
+    check_pass "Overlay: ~/.tmux/shipwright-overlay.conf (auto-fixed)"
 else
     check_fail "Overlay not found: ~/.tmux/shipwright-overlay.conf"
-    echo -e "    ${DIM}Re-run install.sh to install it${RESET}"
+    if [[ "$DOCTOR_FIX_MODE" != "true" ]]; then
+        echo -e "    ${DIM}Re-run install.sh to install it${RESET}"
+    else
+        doctor_not_fixable "tmux overlay installed"
+    fi
 fi
 
 # Overlay sourced in tmux.conf
-if [[ -f "$HOME/.tmux.conf" ]]; then
-    if grep -q "shipwright-overlay" "$HOME/.tmux.conf" 2>/dev/null; then
-        check_pass "Overlay sourced in ~/.tmux.conf"
-    else
-        check_warn "Overlay not sourced in ~/.tmux.conf"
+if _doctor_check_overlay_sourced; then
+    check_pass "Overlay sourced in ~/.tmux.conf"
+elif doctor_try_fix "overlay sourced in tmux.conf" doctor_fix_tmux_config _doctor_check_overlay_sourced; then
+    check_pass "Overlay sourced in ~/.tmux.conf (auto-fixed)"
+elif [[ -f "$HOME/.tmux.conf" ]]; then
+    check_warn "Overlay not sourced in ~/.tmux.conf"
+    if [[ "$DOCTOR_FIX_MODE" != "true" ]]; then
         echo -e "    ${DIM}Add: source-file -q ~/.tmux/shipwright-overlay.conf${RESET}"
+    else
+        doctor_not_fixable "overlay sourced in tmux.conf"
     fi
 else
     check_warn "No ~/.tmux.conf found"
+    if [[ "$DOCTOR_FIX_MODE" == "true" ]]; then
+        doctor_not_fixable "no ~/.tmux.conf"
+    fi
 fi
 
 # Claude settings
@@ -750,8 +763,16 @@ if [[ -d "$HOOKS_DIR" ]]; then
     if [[ $hook_count -gt 0 && $non_exec -eq 0 ]]; then
         check_pass "Hooks: ${hook_count} scripts, all executable"
     elif [[ $hook_count -gt 0 && $non_exec -gt 0 ]]; then
-        check_warn "Hooks: ${non_exec}/${hook_count} scripts not executable"
-        echo -e "    ${DIM}chmod +x ~/.claude/hooks/*.sh${RESET}"
+        if doctor_try_fix "hooks are executable" doctor_fix_hooks_exec _doctor_check_hooks_exec; then
+            check_pass "Hooks: ${hook_count} scripts, all executable (auto-fixed)"
+        else
+            check_warn "Hooks: ${non_exec}/${hook_count} scripts not executable"
+            if [[ "$DOCTOR_FIX_MODE" != "true" ]]; then
+                echo -e "    ${DIM}chmod +x ~/.claude/hooks/*.sh${RESET}"
+            else
+                doctor_not_fixable "hooks are executable"
+            fi
+        fi
     else
         check_warn "Hooks dir exists but no .sh scripts found"
     fi
