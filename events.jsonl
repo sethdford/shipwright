@@ -5420,3 +5420,6 @@
 {"ts":"2026-09-27T12:13:10Z","ts_epoch":1790511190,"type":"reasoning.trace","job_id":"pipeline-2139029-42","complexity":"medium","risk":50,"template":"standard"}
 {"ts":"2026-09-27T12:13:11Z","ts_epoch":1790511191,"type":"reasoning.trace","job_id":"pipeline-2139715-42","complexity":"medium","risk":50,"template":"standard"}
 {"ts":"2026-09-27T12:13:12Z","ts_epoch":1790511192,"type":"reasoning.trace","job_id":"pipeline-2140385-42","complexity":"medium","risk":50,"template":"standard"}
+{"ts":"2026-09-27T12:23:47Z","ts_epoch":1790511827,"type":"hygiene_platform_refactor","hardcoded":49,"fallback":69,"todo":51}
+{"ts":"2026-09-27T12:24:15Z","ts_epoch":1790511855,"type":"strategic.issue_created","title":"Detect and auto-recover from stuck/zero pipelines in daemon health check","priority":"P0","complexity":"standard"}
+{"ts":"2026-09-27T12:24:16Z","ts_epoch":1790511856,"type":"strategic.cycle_complete","issues_created":1,"issues_skipped":2}
