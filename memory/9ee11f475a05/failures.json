@@ -6,7 +6,7 @@
       "root_cause": "sw-intent-analysis-test asserts analyze_intent's JSON output includes version, goal, and criteria fields, but the current schema/implementation omits one or more of them",
       "fix": "Update analyze_intent (or its schema) in sw-intent-analysis.sh to emit version, goal, and criteria fields matching the test's expected schema",
       "seen_count": 175,
-      "last_seen": "2026-09-27T22:52:30Z",
+      "last_seen": "2026-09-27T22:26:12Z",
       "category": "test_failure",
       "signature_hash": "e1a285258fe63781b7370b0d086ad87b",
       "signature": "\u001b[<n>;2;<n>;<n>;<n>m\u001b[1m✓\u001b[0m reveal shows <path> pass count on failure"
@@ -306,8 +306,8 @@
     {
       "stage": "test",
       "pattern": "\u001b[2m  flaky failure classification\u001b[0m",
-      "root_cause": "Multiple unrelated suites (sw-e2e-integration-test, sw-intent-analysis-test, sw-loop-test) failed together with no code changes implicating them, consistent with environment/timing-sensitive flakiness rather than a real regression",
-      "fix": "Re-run the failed suites in isolation; if they pass, mark as flaky and add retry/backoff or increase timeouts for sw-loop-test (167s) and sw-intent-analysis-test (40s)",
+      "root_cause": "sw-e2e-integration-test failed due to a stale/held pipeline lock from a concurrent or previous run (pipeline-6955 already 'running'), not a code defect; other suite failures (sw-project-detect-test cache staleness, sw-recruit-test, sw-self-optimize-test jq --argjson on malformed JSON, sw-intent-analysis-test schema fields) are pre-existing intermittent/environmental failures unrelated to this change",
+      "fix": "add lock cleanup/retry in sw-e2e-integration-test setup (or run with --worktree isolation) and fix sw-self-optimize-test's jq --argjson input construction; re-run the failing suites in isolation to confirm flakiness before treating as a real regression",
       "seen_count": 1,
       "last_seen": "2026-09-27T11:33:44Z",
       "category": "flaky"
