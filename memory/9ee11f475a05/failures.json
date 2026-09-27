@@ -6,7 +6,7 @@
       "root_cause": "sw-intent-analysis-test asserts analyze_intent's JSON output includes version, goal, and criteria fields, but the current schema/implementation omits one or more of them",
       "fix": "Update analyze_intent (or its schema) in sw-intent-analysis.sh to emit version, goal, and criteria fields matching the test's expected schema",
       "seen_count": 175,
-      "last_seen": "2026-09-27T21:07:50Z",
+      "last_seen": "2026-09-27T21:04:48Z",
       "category": "test_failure",
       "signature_hash": "e1a285258fe63781b7370b0d086ad87b",
       "signature": "\u001b[<n>;2;<n>;<n>;<n>m\u001b[1m✓\u001b[0m reveal shows <path> pass count on failure"
@@ -306,11 +306,11 @@
     {
       "stage": "test",
       "pattern": "\u001b[2m  flaky failure classification\u001b[0m",
-      "root_cause": "sw-e2e-integration-test hit a stale pipeline lock from a concurrent/leftover run and sw-project-detect-test's cache-behavior assertion is order/state-dependent, while sw-intent-analysis-test's schema check fails on missing required fields",
-      "fix": "clear stale pipeline lock before e2e-integration-test, fix analyze_intent to include version/goal/criteria in schema, and make project_detect_all cache test isolate/reset state between runs",
+      "root_cause": "sw-intent-analysis-test asserts analyze_intent JSON output includes version/goal/criteria fields that the current schema doesn't emit",
+      "fix": "Update analyze_intent to include version, goal, and criteria fields in its JSON output (or align the test's expected schema with the current output)",
       "seen_count": 1,
       "last_seen": "2026-09-27T11:33:44Z",
-      "category": "flaky"
+      "category": "test_failure"
     }
   ]
 }
