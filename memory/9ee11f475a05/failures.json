@@ -6,7 +6,7 @@
       "root_cause": "sw-intent-analysis-test asserts analyze_intent's JSON output includes version, goal, and criteria fields, but the current schema/implementation omits one or more of them",
       "fix": "Update analyze_intent (or its schema) in sw-intent-analysis.sh to emit version, goal, and criteria fields matching the test's expected schema",
       "seen_count": 176,
-      "last_seen": "2026-09-28T01:11:57Z",
+      "last_seen": "2026-09-28T01:16:14Z",
       "category": "test_failure",
       "signature_hash": "e1a285258fe63781b7370b0d086ad87b",
       "signature": "\u001b[<n>;2;<n>;<n>;<n>m\u001b[1m✓\u001b[0m reveal shows <path> pass count on failure"
@@ -306,11 +306,11 @@
     {
       "stage": "test",
       "pattern": "\u001b[2m  flaky failure classification\u001b[0m",
-      "root_cause": "sw-cost-test.sh:226 expects a CONTEXT EFFICIENCY report populated from loop.context_efficiency events, but the test's cost dashboard finds no cost entries within the 30-day lookback window, so the assertions on rendered event data and avg budget utilization fail",
-      "fix": "ensure the test fixture seeds costs.json/events with timestamps inside the dashboard's 30-day window before invoking cost show, or make the lookback window configurable/mockable in the test setup",
+      "root_cause": "Three unrelated pre-existing failures: e2e-integration-test hit a stale pipeline lock from a prior run, intent-analysis-test expects schema fields not yet emitted by analyze_intent, and self-optimize-test's memory promotion test feeds malformed JSON to jq --argjson",
+      "fix": "Clear/reset the pipeline lock before the e2e-integration test runs, add version/goal/criteria to the analyze_intent JSON schema output, and fix the cross-repo memory promotion fixture to emit valid JSON before jq --argjson consumes it",
       "seen_count": 1,
       "last_seen": "2026-09-27T11:33:44Z",
-      "category": "flaky"
+      "category": "test_failure"
     }
   ]
 }
