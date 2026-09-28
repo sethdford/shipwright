@@ -5,8 +5,8 @@
       "pattern": "\u001b[38;2;74;222;128m\u001b[1m✓\u001b[0m reveal shows 1/3 pass count on failure",
       "root_cause": "sw-intent-analysis-test asserts analyze_intent's JSON output includes version, goal, and criteria fields, but the current schema/implementation omits one or more of them",
       "fix": "Update analyze_intent (or its schema) in sw-intent-analysis.sh to emit version, goal, and criteria fields matching the test's expected schema",
-      "seen_count": 175,
-      "last_seen": "2026-09-27T22:17:51Z",
+      "seen_count": 176,
+      "last_seen": "2026-09-28T01:11:57Z",
       "category": "test_failure",
       "signature_hash": "e1a285258fe63781b7370b0d086ad87b",
       "signature": "\u001b[<n>;2;<n>;<n>;<n>m\u001b[1m✓\u001b[0m reveal shows <path> pass count on failure"
@@ -306,11 +306,11 @@
     {
       "stage": "test",
       "pattern": "\u001b[2m  flaky failure classification\u001b[0m",
-      "root_cause": "sw-pipeline-test.sh's stage 'artifact' mocks (plan.md/review.md) are being written to a path the assertions no longer check, and an unrelated jq parse error in the RL/intelligence complexity test corrupts JSON output, cascading into resume/cleanup/full-E2E failures",
-      "fix": "fix plan/review artifact write paths in sw-pipeline.sh to match test expectations and quote/validate numeric fields before piping to jq in the intelligence complexity test",
+      "root_cause": "sw-cost-test.sh:226 expects a CONTEXT EFFICIENCY report populated from loop.context_efficiency events, but the test's cost dashboard finds no cost entries within the 30-day lookback window, so the assertions on rendered event data and avg budget utilization fail",
+      "fix": "ensure the test fixture seeds costs.json/events with timestamps inside the dashboard's 30-day window before invoking cost show, or make the lookback window configurable/mockable in the test setup",
       "seen_count": 1,
       "last_seen": "2026-09-27T11:33:44Z",
-      "category": "test_failure"
+      "category": "flaky"
     }
   ]
 }
