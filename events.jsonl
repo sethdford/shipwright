@@ -84,3 +84,7 @@
 {"ts":"2026-09-27T23:12:55Z","ts_epoch":1790550775,"type":"reasoning.trace","job_id":"pipeline-4091328-42","complexity":"medium","risk":50,"template":"standard"}
 {"ts":"2026-09-27T23:12:55Z","ts_epoch":1790550775,"type":"reasoning.trace","job_id":"pipeline-4092015-42","complexity":"medium","risk":50,"template":"standard"}
 {"ts":"2026-09-27T23:12:56Z","ts_epoch":1790550776,"type":"reasoning.trace","job_id":"pipeline-4092702-42","complexity":"medium","risk":50,"template":"standard"}
+{"ts":"2026-09-28T00:15:54Z","ts_epoch":1790554554,"type":"hygiene_platform_refactor","hardcoded":49,"fallback":69,"todo":51}
+{"ts":"2026-09-28T00:16:18Z","ts_epoch":1790554578,"type":"strategic.issue_created","title":"Add build-loop pre-flight checks for missing test/lint commands before burning iterations","priority":"P0","complexity":"standard"}
+{"ts":"2026-09-28T00:16:23Z","ts_epoch":1790554583,"type":"strategic.issue_created","title":"Track and surface cost-per-successful-pipeline against the <$5 target in `shipwright cost show`","priority":"P3","complexity":"fast"}
+{"ts":"2026-09-28T00:16:23Z","ts_epoch":1790554583,"type":"strategic.cycle_complete","issues_created":2,"issues_skipped":1}
