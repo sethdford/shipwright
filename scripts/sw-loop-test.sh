@@ -903,6 +903,220 @@ else
 fi
 
 # ═══════════════════════════════════════════════════════════════════════════════
+# PRE-FLIGHT: static test-command sanity check (lib/loop-preflight.sh)
+# ═══════════════════════════════════════════════════════════════════════════════
+
+echo ""
+echo -e "${DIM}  pre-flight checks${RESET}"
+
+# shellcheck source=lib/loop-preflight.sh
+source "$SCRIPT_DIR/lib/loop-preflight.sh"
+
+PF_DIR="$TEST_TEMP_DIR/preflight"
+mkdir -p "$PF_DIR/sub" "$PF_DIR/node_modules/.bin"
+echo '{"scripts":{"test":"vitest","lint":"eslint ."}}' > "$PF_DIR/package.json"
+echo '{"scripts":{"test":"echo \"Error: no test specified\" && exit 1"}}' > "$PF_DIR/sub/package.json"
+printf '#!/usr/bin/env bash\nexit 0\n' > "$PF_DIR/run-tests.sh"
+chmod +x "$PF_DIR/run-tests.sh"
+: > "$PF_DIR/node_modules/.bin/vitest"
+
+# pf_check <cmd> — prints "ok" or "fail: <reason>", evaluated from $PF_DIR
+pf_check() {
+    ( cd "$PF_DIR" && if _preflight_check_cmd "$1"; then echo "ok"; else echo "fail: $PREFLIGHT_REASON"; fi )
+}
+
+# Commands that must pass
+for pf_cmd in "true" "test -f x" "npm test" "npm run lint" "FOO=1 npm test" "env CI=1 npm test" \
+              "./run-tests.sh" "bash run-tests.sh" "npx vitest run" "npm test 2>&1" \
+              "a-missing-cmd | tee out.log" "npm --prefix sub test" "cd sub && true" ""; do
+    pf_out=$(pf_check "$pf_cmd")
+    if [[ "$pf_out" == "ok" ]]; then
+        assert_pass "Pre-flight passes: '${pf_cmd}'"
+    else
+        assert_fail "Pre-flight passes: '${pf_cmd}'" "$pf_out"
+    fi
+done
+
+# Commands that must fail, with the expected reason fragment
+pf_expect_fail() {
+    local cmd="$1" want="$2" out
+    out=$(pf_check "$cmd")
+    if [[ "$out" == fail:*"$want"* ]]; then
+        assert_pass "Pre-flight rejects '${cmd}' (${want})"
+    else
+        assert_fail "Pre-flight rejects '${cmd}' (${want})" "got: $out"
+    fi
+}
+pf_expect_fail "nonexistent-runner-xyz --run" "not found on PATH"
+pf_expect_fail "if then fi" "syntax error"
+pf_expect_fail "./missing.sh" "does not exist"
+pf_expect_fail "bash missing.sh" "does not exist"
+pf_expect_fail "npm run nope" "no \"nope\" script"
+pf_expect_fail "make test" "no Makefile"
+pf_expect_fail "npx jest" "not installed"
+pf_expect_fail "cd sub && npm test" "no test specified"
+pf_expect_fail "cd nodir && npm test" "directory 'nodir' does not exist"
+pf_expect_fail "npm test && missing-lint-xyz" "not found on PATH"
+
+pf_out=$(cd "$TEST_TEMP_DIR" && if _preflight_check_cmd "npm test"; then echo ok; else echo "fail: $PREFLIGHT_REASON"; fi)
+if [[ "$pf_out" == fail:*"no package.json"* ]]; then
+    assert_pass "Pre-flight rejects 'npm test' without package.json"
+else
+    assert_fail "Pre-flight rejects 'npm test' without package.json" "got: $pf_out"
+fi
+
+# loop_preflight_check: walks every configured command and writes preflight.json
+pf_run() {
+    # pf_run <TEST_CMD> <FAST_TEST_CMD> <LOOP_PREFLIGHT> [additional...]
+    (
+        cd "$PF_DIR" || exit 2
+        LOG_DIR="$PF_DIR/logs"; mkdir -p "$LOG_DIR"
+        TEST_CMD="$1"; FAST_TEST_CMD="$2"; LOOP_PREFLIGHT="$3"; shift 3
+        ADDITIONAL_TEST_CMDS=("$@")
+        emit_event() { :; }
+        loop_preflight_check 2>&1
+    )
+}
+
+pf_out=$(pf_run "" "" true) && pf_rc=0 || pf_rc=$?
+if [[ "$pf_rc" -eq 0 ]] && [[ "$(jq -r .status "$PF_DIR/logs/preflight.json")" == "passed" ]]; then
+    assert_pass "loop_preflight_check passes with no test command configured"
+else
+    assert_fail "loop_preflight_check passes with no test command configured" "rc=$pf_rc"
+fi
+
+pf_out=$(pf_run "npm test" "fast-missing-xyz" true) && pf_rc=0 || pf_rc=$?
+if [[ "$pf_rc" -ne 0 ]] && echo "$pf_out" | grep -qF "fast-missing-xyz" \
+    && [[ "$(jq -r .status "$PF_DIR/logs/preflight.json")" == "failed" ]] \
+    && [[ "$(jq -r .command "$PF_DIR/logs/preflight.json")" == "fast-missing-xyz" ]]; then
+    assert_pass "loop_preflight_check names a broken FAST_TEST_CMD and records it"
+else
+    assert_fail "loop_preflight_check names a broken FAST_TEST_CMD and records it" "rc=$pf_rc out=$pf_out"
+fi
+
+pf_out=$(pf_run "npm test" "" true "true" "extra-missing-xyz") && pf_rc=0 || pf_rc=$?
+if [[ "$pf_rc" -ne 0 ]] && echo "$pf_out" | grep -qF "extra-missing-xyz"; then
+    assert_pass "loop_preflight_check checks ADDITIONAL_TEST_CMDS"
+else
+    assert_fail "loop_preflight_check checks ADDITIONAL_TEST_CMDS" "rc=$pf_rc out=$pf_out"
+fi
+
+pf_out=$(pf_run "npm test" "" true) && pf_rc=0 || pf_rc=$?
+if [[ "$pf_rc" -eq 0 ]] && [[ "$(jq -r .status "$PF_DIR/logs/preflight.json")" == "passed" ]]; then
+    assert_pass "preflight.json is overwritten with 'passed' after an earlier failure"
+else
+    assert_fail "preflight.json is overwritten with 'passed' after an earlier failure" "rc=$pf_rc"
+fi
+
+pf_out=$(pf_run "missing-xyz" "" false) && pf_rc=0 || pf_rc=$?
+if [[ "$pf_rc" -eq 0 ]] && [[ "$(jq -r .status "$PF_DIR/logs/preflight.json")" == "skipped" ]]; then
+    assert_pass "LOOP_PREFLIGHT=false bypasses the check and records 'skipped'"
+else
+    assert_fail "LOOP_PREFLIGHT=false bypasses the check and records 'skipped'" "rc=$pf_rc"
+fi
+
+if grep -qF -- '--no-preflight) LOOP_PREFLIGHT=false' "$SCRIPT_DIR/sw-loop.sh" \
+    && grep -qF -- '--no-preflight' <(sed -n '/^show_help()/,/^}/p' "$SCRIPT_DIR/sw-loop.sh"); then
+    assert_pass "--no-preflight is parsed and documented in help"
+else
+    assert_fail "--no-preflight is parsed and documented in help"
+fi
+
+if sed -n '/^main() {/,/^}/p' "$SCRIPT_DIR/sw-loop.sh" | grep -q 'loop_preflight_check'; then
+    assert_pass "main() runs loop_preflight_check before either loop mode"
+else
+    assert_fail "main() runs loop_preflight_check before either loop mode"
+fi
+
+# ─── End-to-end: a broken test command fails fast, Claude never runs ────────
+echo ""
+echo -e "${DIM}  loop behavior: pre-flight fail-fast${RESET}"
+
+if setup_loop_env 2>/dev/null; then
+    # Own HOME: the budget-gate test above leaves an exhausted budget behind
+    PF_HOME="$TEST_TEMP_DIR/pf-home"
+    mkdir -p "$PF_HOME/.shipwright" "$PF_HOME/.claude"
+    rm -f "$TEST_TEMP_DIR/claude-called"
+    cat > "$TEST_TEMP_DIR/bin/claude" << CLAUDE_EOF
+#!/usr/bin/env bash
+touch "$TEST_TEMP_DIR/claude-called"
+echo '[{"type":"result","result":"Done. LOOP_COMPLETE","usage":{"input_tokens":0,"output_tokens":0}}]'
+exit 0
+CLAUDE_EOF
+    chmod +x "$TEST_TEMP_DIR/bin/claude"
+
+    pf_rc=0
+    output=$(env PATH="$TEST_TEMP_DIR/bin:/usr/local/bin:/usr/bin:/bin" HOME="$PF_HOME" NO_GITHUB=true \
+        bash "$SCRIPT_DIR/sw-loop.sh" \
+        --repo "$TEST_TEMP_DIR/repo" \
+        "Do nothing" \
+        --max-iterations 3 \
+        --test-cmd "definitely-missing-cmd-xyz --run" \
+        --local \
+        2>&1) || pf_rc=$?
+
+    if [[ "$pf_rc" -ne 0 ]]; then
+        assert_pass "Broken test command makes the loop exit nonzero"
+    else
+        assert_fail "Broken test command makes the loop exit nonzero" "exit 0"
+    fi
+    assert_contains "Pre-flight error names the broken command" "$output" "definitely-missing-cmd-xyz"
+    if [[ ! -f "$TEST_TEMP_DIR/claude-called" ]]; then
+        assert_pass "Pre-flight failure spends no Claude call"
+    else
+        assert_fail "Pre-flight failure spends no Claude call" "mock claude was invoked"
+    fi
+    if ! echo "$output" | grep -q "Iteration 1"; then
+        assert_pass "Pre-flight failure consumes no iteration"
+    else
+        assert_fail "Pre-flight failure consumes no iteration" "output shows Iteration 1"
+    fi
+
+    # --no-preflight restores the old behavior: the loop runs anyway (capped —
+    # uncapped, a missing command burns every iteration, extension and restart)
+    rm -f "$TEST_TEMP_DIR/claude-called"
+    output=$(env PATH="$TEST_TEMP_DIR/bin:/usr/local/bin:/usr/bin:/bin" HOME="$PF_HOME" NO_GITHUB=true \
+        bash "$SCRIPT_DIR/sw-loop.sh" \
+        --repo "$TEST_TEMP_DIR/repo" \
+        "Do nothing" \
+        --max-iterations 1 \
+        --no-auto-extend \
+        --max-restarts 0 \
+        --test-cmd "definitely-missing-cmd-xyz --run" \
+        --no-preflight \
+        --local \
+        2>&1) || true
+    if [[ -f "$TEST_TEMP_DIR/claude-called" ]]; then
+        assert_pass "--no-preflight bypasses the check and runs the loop"
+    else
+        assert_fail "--no-preflight bypasses the check and runs the loop" "mock claude never invoked: $(echo "$output" | tail -5)"
+    fi
+
+    # ─── End-to-end: a working command leaves the loop unchanged ─────────────
+    rm -f "$TEST_TEMP_DIR/claude-called"
+    output=$(env PATH="$TEST_TEMP_DIR/bin:/usr/local/bin:/usr/bin:/bin" HOME="$PF_HOME" NO_GITHUB=true \
+        bash "$SCRIPT_DIR/sw-loop.sh" \
+        --repo "$TEST_TEMP_DIR/repo" \
+        "Do nothing" \
+        --max-iterations 3 \
+        --test-cmd "true" \
+        --local \
+        2>&1) || true
+    if [[ -f "$TEST_TEMP_DIR/claude-called" ]] && echo "$output" | grep -qF "LOOP_COMPLETE"; then
+        assert_pass "Working test command: loop runs and completes as before"
+    else
+        assert_fail "Working test command: loop runs and completes as before" "claude not called or no LOOP_COMPLETE: $(echo "$output" | tail -5)"
+    fi
+    if [[ "$(jq -r .status "$TEST_TEMP_DIR/repo/.claude/loop-logs/preflight.json" 2>/dev/null)" == "passed" ]]; then
+        assert_pass "Passing pre-flight records status=passed"
+    else
+        assert_fail "Passing pre-flight records status=passed"
+    fi
+else
+    assert_fail "Pre-flight end-to-end tests" "setup failed (git missing?)"
+fi
+
+# ═══════════════════════════════════════════════════════════════════════════════
 # RESULTS
 # ═══════════════════════════════════════════════════════════════════════════════
 

@@ -459,6 +459,24 @@ ${_skill_prompts}
         local _loop_exit=$?
         parse_claude_tokens "$_token_log"
 
+        # Pre-flight failure: the test command itself is broken. Retrying with
+        # more restarts can't help, so don't let a stale progress.md below tag
+        # this as context exhaustion.
+        local _preflight_file="${PWD}/.claude/loop-logs/preflight.json"
+        local _preflight_status=""
+        if [[ -f "$_preflight_file" ]]; then
+            _preflight_status=$(jq -r '.status // empty' "$_preflight_file" 2>/dev/null || true)
+        fi
+        if [[ "$_preflight_status" == "failed" ]]; then
+            local _preflight_cmd
+            _preflight_cmd=$(jq -r '.command // empty' "$_preflight_file" 2>/dev/null || true)
+            emit_event "pipeline.preflight_failed" "issue=${ISSUE_NUMBER:-0}" "stage=build" "cmd=${_preflight_cmd}"
+            mkdir -p "$ARTIFACTS_DIR" 2>/dev/null || true
+            echo "preflight_failed" > "$ARTIFACTS_DIR/failure-reason.txt" 2>/dev/null || true
+            error "Build loop pre-flight failed: test command '${_preflight_cmd}' is broken"
+            return 1
+        fi
+
         # Detect context exhaustion from progress file
         local _progress_file="${PWD}/.claude/loop-logs/progress.md"
         if [[ -f "$_progress_file" ]]; then

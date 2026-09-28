@@ -48,8 +48,18 @@ classify_failure() {
         echo "invalid_issue"
         return
     fi
-    # Context exhaustion — check progress file
     local issue_worktree_path="${WORKTREE_DIR:-${REPO_DIR}/.worktrees}/daemon-issue-${issue_num}"
+    # Pre-flight failure — the test command is broken; retrying can't fix it
+    local preflight_file="${issue_worktree_path}/.claude/loop-logs/preflight.json"
+    if [[ -f "$preflight_file" ]]; then
+        local pf_status
+        pf_status=$(jq -r '.status // empty' "$preflight_file" 2>/dev/null || true)
+        if [[ "$pf_status" == "failed" ]]; then
+            echo "preflight_failed"
+            return
+        fi
+    fi
+    # Context exhaustion — check progress file
     local progress_file="${issue_worktree_path}/.claude/loop-logs/progress.md"
     if [[ -f "$progress_file" ]]; then
         local cf_iter
@@ -79,7 +89,7 @@ DAEMON_CONSECUTIVE_FAILURE_COUNT=0
 get_max_retries_for_class() {
     local class="${1:-unknown}"
     case "$class" in
-        auth_error|invalid_issue) echo 0 ;;
+        auth_error|invalid_issue|preflight_failed) echo 0 ;;
         api_error)                echo "${MAX_RETRIES_API_ERROR:-4}" ;;
         context_exhaustion)       echo "${MAX_RETRIES_CONTEXT_EXHAUSTION:-2}" ;;
         build_failure)           echo "${MAX_RETRIES_BUILD:-2}" ;;

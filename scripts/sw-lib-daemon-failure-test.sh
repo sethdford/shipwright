@@ -130,6 +130,19 @@ echo "Some general output" > "$LOG_DIR/issue-502.log"
 result=$(classify_failure 502)
 assert_eq "Context exhaustion with unknown tests" "context_exhaustion" "$result"
 
+# Pre-flight failure wins over a stale progress.md (retrying can't fix a broken test command)
+mkdir -p "$WORKTREE_DIR/daemon-issue-503/.claude/loop-logs"
+printf '## Progress\nIteration: 4\nTests passing: false\n' > "$WORKTREE_DIR/daemon-issue-503/.claude/loop-logs/progress.md"
+echo '{"status":"failed","command":"npm test","reason":"no package.json"}' > "$WORKTREE_DIR/daemon-issue-503/.claude/loop-logs/preflight.json"
+echo "Build loop pre-flight failed" > "$LOG_DIR/issue-503.log"
+result=$(classify_failure 503)
+assert_eq "Pre-flight failure classified" "preflight_failed" "$result"
+
+# A passed pre-flight falls through to the normal classification
+echo '{"status":"passed","command":"","reason":""}' > "$WORKTREE_DIR/daemon-issue-503/.claude/loop-logs/preflight.json"
+result=$(classify_failure 503)
+assert_eq "Passed pre-flight falls through to context_exhaustion" "context_exhaustion" "$result"
+
 # Generic unknown
 echo "something happened" > "$LOG_DIR/issue-601.log"
 result=$(classify_failure 601)
@@ -142,6 +155,7 @@ print_test_section "get_max_retries_for_class"
 
 assert_eq "auth_error: 0 retries" "0" "$(get_max_retries_for_class auth_error)"
 assert_eq "invalid_issue: 0 retries" "0" "$(get_max_retries_for_class invalid_issue)"
+assert_eq "preflight_failed: 0 retries" "0" "$(get_max_retries_for_class preflight_failed)"
 assert_eq "api_error: default 4 retries" "4" "$(get_max_retries_for_class api_error)"
 assert_eq "context_exhaustion: 2 retries" "2" "$(get_max_retries_for_class context_exhaustion)"
 assert_eq "build_failure: 2 retries" "2" "$(get_max_retries_for_class build_failure)"

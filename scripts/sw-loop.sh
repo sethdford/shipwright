@@ -38,6 +38,8 @@ fi
 [[ -f "$SCRIPT_DIR/lib/loop-convergence.sh" ]] && source "$SCRIPT_DIR/lib/loop-convergence.sh"
 [[ -f "$SCRIPT_DIR/lib/loop-restart.sh" ]] && source "$SCRIPT_DIR/lib/loop-restart.sh"
 [[ -f "$SCRIPT_DIR/lib/loop-progress.sh" ]] && source "$SCRIPT_DIR/lib/loop-progress.sh"
+# Static sanity check of test commands before iteration 1
+[[ -f "$SCRIPT_DIR/lib/loop-preflight.sh" ]] && source "$SCRIPT_DIR/lib/loop-preflight.sh"
 # Intelligent session restart with enhanced briefings and cross-session tracking
 [[ -f "$SCRIPT_DIR/lib/session-restart.sh" ]] && source "$SCRIPT_DIR/lib/session-restart.sh"
 # Context window budget monitoring (issue #209)
@@ -160,6 +162,11 @@ QUALITY_GATE_PASSED=true
 # ─── Multi-Test Defaults ──────────────────────────────────────────────────
 ADDITIONAL_TEST_CMDS=()   # Array of extra test commands (from --additional-test-cmds)
 
+# ─── Pre-Flight ──────────────────────────────────────────────────────────────
+# Static check that the test commands are runnable before iteration 1.
+# Bypass with --no-preflight, LOOP_PREFLIGHT=false, or loop.preflight=false.
+LOOP_PREFLIGHT="${LOOP_PREFLIGHT:-true}"
+
 # ─── Context Budget ──────────────────────────────────────────────────────────
 CONTEXT_BUDGET_CHARS="${CONTEXT_BUDGET_CHARS:-200000}"  # Max prompt chars before trimming
 
@@ -193,6 +200,7 @@ show_help() {
     echo -e "  ${CYAN}--resume${RESET}                  Resume from existing .claude/loop-state.md"
     echo -e "  ${CYAN}--max-restarts${RESET} N          Max session restarts on exhaustion (default: 0)"
     echo -e "  ${CYAN}--verbose${RESET}                 Show full Claude output (default: summary)"
+    echo -e "  ${CYAN}--no-preflight${RESET}            Skip the test-command sanity check before iteration 1"
     echo -e "  ${CYAN}--help${RESET}                    Show this help"
     echo ""
     echo -e "${BOLD}AUDIT & QUALITY${RESET}"
@@ -290,6 +298,7 @@ while [[ $# -gt 0 ]]; do
         --session-continuity) SESSION_CONTINUITY=1; shift ;;
         --no-session-continuity) SESSION_CONTINUITY=0; shift ;;
         --verbose) VERBOSE=true; shift ;;
+        --no-preflight) LOOP_PREFLIGHT=false; shift ;;
         --audit) AUDIT_ENABLED=true; shift ;;
         --audit-agent) AUDIT_AGENT_ENABLED=true; shift ;;
         --definition-of-done)
@@ -2696,6 +2705,13 @@ run_loop_with_restarts() {
 # ─── Main: Entry Point ───────────────────────────────────────────────────────
 
 main() {
+    # Runs once, before any Claude call — a broken test command should cost
+    # nothing, not an iteration (or a restart cycle) to discover.
+    if type loop_preflight_check >/dev/null 2>&1 && ! loop_preflight_check; then
+        STATUS="preflight_failed"
+        exit 1
+    fi
+
     if [[ "$AGENTS" -gt 1 ]]; then
         if $RESUME; then
             resume_state
