@@ -33,14 +33,14 @@
         "primary_role": "builder",
         "secondary_roles": [
           "tester",
-          "reviewer"
+          "devops"
         ],
         "confidence": 0.95,
-        "reasoning": "Bug fix requiring debugging JSON parsing logic, implementing improved error messaging, and testing edge cases (object vs array output). Builder handles implementation; tester validates the fix; reviewer ensures accuracy.",
+        "reasoning": "Feature implementation to add pre-flight validation logic in build loop system; requires coding, testing integration, and pipeline mechanics understanding.",
         "new_role_needed": false,
         "suggested_role": null
       },
-      "timestamp": 1775316059,
+      "timestamp": 1790580283,
       "ttl": 3600
     },
     "efd5524ad1244fd20344bf3ff5d95233": {
@@ -1401,6 +1401,476 @@
       },
       "timestamp": 1775344537,
       "ttl": 3600
+    },
+    "091ac08d00feb6e5c4503aeb81911efa": {
+      "result": {
+        "complexity": 5,
+        "risk_level": "low",
+        "success_probability": 78,
+        "recommended_template": "standard",
+        "issue_type": "testing",
+        "key_risks": [
+          "Dry-run modes vary significantly across test frameworks (vitest, jest, mocha, etc.); a single check approach may miss framework-specific failures",
+          "Preflight check could introduce startup latency, especially if test suite discovery is slow",
+          "Error messages from test command dry-runs may be cryptic or unhelpful without additional wrapping",
+          "False positives in preflight check could block valid builds (e.g., test frameworks that exit non-zero on --dry-run or --collect-only)"
+        ],
+        "implementation_hints": [
+          "Create a dedicated preflight check function in sw-loop.sh that accepts the test command and runs it with framework-specific flags (--collect-only for vitest, --listTests for jest, etc.)",
+          "Use a short timeout (5-10s) for the preflight check to avoid blocking on slow test suites",
+          "Wrap test command errors with context: show the actual command that failed, the exit code, and stderr, with a suggestion to run it manually",
+          "Add test coverage in sw-loop-test.sh with mock test runners that fail/pass to verify loop exits cleanly without consuming iterations",
+          "Log preflight check status at loop start (info level when passing, error level when failing) for observability"
+        ]
+      },
+      "timestamp": 1790579841,
+      "ttl": 3600
+    },
+    "f04057ca500ef34c7249cb1295148b7f": {
+      "result": {
+        "estimated_iterations": 2
+      },
+      "timestamp": 1790579850,
+      "ttl": 1800
+    },
+    "b5cc40c22fd128481c965a8346aee574": {
+      "result": {
+        "estimated_cost_usd": 0.12,
+        "estimated_iterations": 2,
+        "estimated_tokens": 4800,
+        "likely_failure_stage": "build",
+        "confidence": 72,
+        "breakdown": {
+          "model_distribution": {
+            "opus": 0.08,
+            "sonnet": 0.03,
+            "haiku": 0.01
+          },
+          "stage_costs": {
+            "intake": 0.008,
+            "plan": 0.015,
+            "build": 0.035,
+            "test": 0.032,
+            "review": 0.028,
+            "pr": 0.003
+          },
+          "iteration_risk_factors": {
+            "preflight_latency": 0.15,
+            "framework_variance": 0.22,
+            "false_positive_blocking": 0.18
+          }
+        },
+        "notes": "Testing infrastructure changes with moderate complexity; 78% success probability suggests one iteration likely sufficient but preflight check edge cases may require retry. Standard template appropriate. Dominant cost in build/test phases due to Opus reasoning for framework-specific logic."
+      },
+      "timestamp": 1790579862,
+      "ttl": 3600
+    },
+    "8963f44afe7036db16153f89dca087b0": {
+      "result": {
+        "issue_type": "infrastructure",
+        "confidence": 0.88,
+        "secondary_domains": [
+          "testing",
+          "reliability",
+          "observability"
+        ],
+        "complexity_assessment": {
+          "score": 4,
+          "reasoning": "Narrow scope (test/lint command validation only), clear acceptance criteria, but requires handling diverse test runner patterns (npm, pytest, cargo, etc.) and careful error message design to avoid false positives."
+        },
+        "skill_plan": {
+          "plan": [
+            "testing-strategy",
+            "brainstorming"
+          ],
+          "design": [
+            "architecture-design",
+            "testing-strategy"
+          ],
+          "build": [
+            "systematic-debugging"
+          ],
+          "review": [
+            "adversarial-quality",
+            "pr-quality"
+          ],
+          "compound_quality": [
+            "testing-strategy",
+            "validation-thoroughness"
+          ],
+          "pr": [
+            "pr-quality"
+          ],
+          "deploy": [],
+          "validate": [],
+          "monitor": []
+        },
+        "skill_rationale": {
+          "testing-strategy": "Pre-flight validation requires understanding test runner patterns, failure modes, and how different frameworks respond to dry-run/syntax checks across the ecosystem",
+          "brainstorming": "Challenge core assumptions about what constitutes 'sanity' across npm test, pytest, cargo test, and other runners before committing to a single validation approach",
+          "architecture-design": "Document the pre-flight check as a distinct build-loop lifecycle stage with clear error handling contracts, so future contributors understand when/why it runs",
+          "systematic-debugging": "This issue stems from iterative discovery of environment problems; systematic analysis of failure patterns determines what the sanity check must validate",
+          "adversarial-quality": "Attack the sanity check design: how do valid test commands fail gracefully? What edge cases (--help, --version, missing optional deps) produce false failures?",
+          "pr-quality": "The PR must clearly explain the new pre-flight behavior and link test coverage, so reviewers understand the iteration-cost savings and behavioral guarantee",
+          "validation-thoroughness": "Confirm the sanity check catches real environment issues (missing test deps, broken command, no lockfile) without rejecting valid commands or adding false overhead"
+        },
+        "generated_skills": [],
+        "review_focus": [
+          "Does the sanity check properly validate test commands across npm, pytest, cargo, vitest, and other common runners?",
+          "Are failure messages actionable (specifically name the broken command and suggest fixes)?",
+          "Does the new test coverage in sw-loop-test.sh verify both success and failure paths for multiple test frameworks?",
+          "Are there false positives (e.g., legitimate commands that exit non-zero on --help)?",
+          "Is the sanity check fast enough (<1s) to not add meaningful overhead to loop startup?"
+        ],
+        "risk_areas": [
+          "Over-strict validation rejects legitimate test command patterns for niche frameworks",
+          "Error message clarity: confusing or vague errors defeat the fail-fast purpose",
+          "Test command diversity: npm test, pytest, cargo test, vitest, pytest-watch all have different syntax and exit behavior",
+          "Backward compatibility: existing working build loops must not be affected by the new check",
+          "False negatives: sanity check passes but command still fails on iteration 1 due to environment issues it didn't catch"
+        ]
+      },
+      "timestamp": 1790579916,
+      "ttl": 3600
+    },
+    "330b8f177e5a1ff018d959220619c424": {
+      "result": {
+        "results": [
+          {
+            "file": "failures.json",
+            "relevance": 85,
+            "summary": "Shows concrete test stage failures (timeout, DB connection) with root causes and fixes. Directly illustrates what pre-flight checks should validate before build-loop iterations begin."
+          },
+          {
+            "file": "index.json",
+            "relevance": 70,
+            "summary": "Contains test_failure pattern signature for build stage with fix recommendation. Relevant for understanding failure patterns pre-flight checks should detect."
+          },
+          {
+            "file": "fleet-shared-patterns.json",
+            "relevance": 65,
+            "summary": "Shows 'Cannot find module' error pattern common in build/test stages. Demonstrates missing dependency scenarios that pre-flight checks could catch before loop iterations."
+          },
+          {
+            "file": "success-patterns.json (test-final-working)",
+            "relevance": 55,
+            "summary": "Daemon timeout fix pattern touching build stage. Contextually relevant to build-loop/daemon behavior and how issues are resolved."
+          },
+          {
+            "file": "success-patterns.json (test-repo-comptime)",
+            "relevance": 45,
+            "summary": "Timed fix pattern spanning intake/build/test stages. Tangentially relevant for understanding cross-stage timing and test strategies in build context."
+          }
+        ]
+      },
+      "timestamp": 1790579962,
+      "ttl": 1800
+    },
+    "3efa7b722357e73e1d287495f51df3bf": {
+      "result": {
+        "results": [
+          {
+            "file": "fleet-shared-patterns.json",
+            "relevance": 85,
+            "summary": "Shows 'Error: Cannot find module' pattern across build/test stages with fix 'npm i'. Directly relevant to detecting missing dependencies before burning build-loop iterations."
+          },
+          {
+            "file": "failures.json",
+            "relevance": 65,
+            "summary": "Captures resolved and unresolved test stage failures (timeouts, database connection refused). Understanding common failure modes informs what pre-flight checks should validate."
+          },
+          {
+            "file": "index.json",
+            "relevance": 55,
+            "summary": "Documents test_failure patterns in build stage with fix guidance. Provides context on test setup issues that could be caught by pre-flight validation."
+          }
+        ]
+      },
+      "timestamp": 1790580081,
+      "ttl": 1800
+    },
+    "c2d76ada6c84b7a7e0932527a5a8f76f": {
+      "result": {
+        "results": [
+          {
+            "file": "fleet-shared-patterns.json",
+            "relevance": 85,
+            "summary": "Contains 'Cannot find module' error pattern affecting build/test stages. Directly relevant to pre-flight validation of missing dependencies and commands before execution."
+          },
+          {
+            "file": "failures.json",
+            "relevance": 70,
+            "summary": "Tracks timeout failures in test stage with root causes (unbounded loops). Relevant to understanding build loop failure modes that pre-flight checks should prevent."
+          },
+          {
+            "file": "index.json",
+            "relevance": 65,
+            "summary": "Contains test_failure pattern in build stage with fix strategy. Provides context on common build failures that early validation could catch."
+          },
+          {
+            "file": "success-patterns.json (test-repo-comptime)",
+            "relevance": 60,
+            "summary": "Pattern spanning intake/build/test stages with npm test strategy. Relevant to multi-stage build loop execution and test command handling."
+          },
+          {
+            "file": "success-patterns.json (test-final-working)",
+            "relevance": 55,
+            "summary": "Daemon timeout fix pattern in build stage. Relevant to build loop optimization and preventing wasted iterations on timeout scenarios."
+          }
+        ]
+      },
+      "timestamp": 1790580112,
+      "ttl": 1800
+    },
+    "a42ab2d936c54aeaf4b82503e8806dca": {
+      "result": {
+        "results": [
+          {
+            "file": "failures.json",
+            "relevance": 75,
+            "summary": "Contains failure patterns including 'database connection refused' with root_cause 'db not started' — directly demonstrates prerequisites not being checked before execution, exactly what pre-flight checks prevent"
+          },
+          {
+            "file": "fleet-shared-patterns.json",
+            "relevance": 55,
+            "summary": "Contains 'Error: Cannot find module' pattern with fix 'npm i' — shows dependency/module detection failures that pre-flight checks could catch before wasting iterations"
+          },
+          {
+            "file": "index.json",
+            "relevance": 42,
+            "summary": "Contains test_failure patterns and mentions test setup configuration — demonstrates test configuration issues that pre-flight validation could prevent"
+          }
+        ]
+      },
+      "timestamp": 1790580130,
+      "ttl": 1800
+    },
+    "23e28459a47048006c6cf8d8f61c6562": {
+      "result": {
+        "results": [
+          {
+            "file": "fleet-shared-patterns.json",
+            "relevance": 75,
+            "summary": "Contains 'Error: Cannot find module' pattern occurring in build/test stages across multiple repos. Directly relevant to pre-flight checks that validate missing commands/dependencies before iteration starts."
+          },
+          {
+            "file": "index.json",
+            "relevance": 50,
+            "summary": "Build-stage test_failure pattern with timeout-related fix. Shows common build-stage issues and test execution strategies that pre-flight checks should validate."
+          },
+          {
+            "file": "failures.json",
+            "relevance": 45,
+            "summary": "Contains timeout and database connection failures in test stage with root causes. Demonstrates failures that pre-flight checks could prevent by detecting missing or misconfigured test/lint commands."
+          },
+          {
+            "file": "success-patterns.json (test-repo-789)",
+            "relevance": 38,
+            "summary": "Build-stage pattern for sw-daemon.sh timeout fix with high complexity (3 iterations). Indicates build loop challenges that could benefit from pre-flight validation."
+          },
+          {
+            "file": "success-patterns.json (test-final-working)",
+            "relevance": 36,
+            "summary": "Build-stage daemon timeout handler pattern. Related to build loop reliability, showing the kind of failures that pre-flight checks aim to prevent."
+          }
+        ]
+      },
+      "timestamp": 1790580261,
+      "ttl": 1800
+    },
+    "47c1451f50b4a8f9faa0f8012f6b922e": {
+      "result": {
+        "results": [
+          {
+            "file": "success-patterns.json",
+            "relevance": 95,
+            "summary": "Contains successful build patterns showing iterations, duration, file changes, test strategy, and cost. Directly applicable to current build approach and iteration planning."
+          },
+          {
+            "file": "retry-outcomes.json",
+            "relevance": 85,
+            "summary": "Shows retry strategies for build failures with 100% success rate on model escalation. Provides proven recovery approach when build stage encounters errors."
+          },
+          {
+            "file": "metrics.json",
+            "relevance": 70,
+            "summary": "Contains baseline metrics (build: 7095s, test: 1459s) for understanding expected build performance and identifying anomalies."
+          },
+          {
+            "file": "patterns.json",
+            "relevance": 65,
+            "summary": "Project metadata (Node.js, vitest, npm, src/ layout) needed to understand project structure and how to execute build commands correctly."
+          },
+          {
+            "file": "flaky-tests.json",
+            "relevance": 60,
+            "summary": "Identifies flaky tests (test-auth with 90% confidence, test-1 with 85% confidence) that may cause intermittent build failures."
+          }
+        ]
+      },
+      "timestamp": 1790582101,
+      "ttl": 1800
+    },
+    "d9d4e6638d1b7915d97da6dc6b51c5c7": {
+      "result": [
+        {
+          "type": "result",
+          "result": "I am trying the same approach again.",
+          "usage": {
+            "input_tokens": 0,
+            "output_tokens": 0
+          }
+        }
+      ],
+      "timestamp": 1790580507,
+      "ttl": 1800
+    },
+    "d45ad5047df83da4de4831b692a51e6f": {
+      "result": [
+        {
+          "type": "result",
+          "result": "I am trying the same approach again.",
+          "usage": {
+            "input_tokens": 0,
+            "output_tokens": 0
+          }
+        }
+      ],
+      "timestamp": 1790580688,
+      "ttl": 1800
+    },
+    "63e4074eaaaafbc36361af63d9225cdf": {
+      "result": [
+        {
+          "type": "result",
+          "result": "I am trying the same approach again.",
+          "usage": {
+            "input_tokens": 0,
+            "output_tokens": 0
+          }
+        }
+      ],
+      "timestamp": 1790580860,
+      "ttl": 1800
+    },
+    "1cf6b399a7c4631484327cc8cf473aed": {
+      "result": [
+        {
+          "type": "result",
+          "result": "Done. LOOP_COMPLETE",
+          "usage": {
+            "input_tokens": 0,
+            "output_tokens": 0
+          }
+        }
+      ],
+      "timestamp": 1790580954,
+      "ttl": 1800
+    },
+    "1645cc78a69fed8b2378d8c5ecb03a2f": {
+      "result": [
+        {
+          "type": "result",
+          "result": "Done. LOOP_COMPLETE",
+          "usage": {
+            "input_tokens": 0,
+            "output_tokens": 0
+          }
+        }
+      ],
+      "timestamp": 1790581316,
+      "ttl": 1800
+    },
+    "60a23a138ac9d78cb151a6d69af55209": {
+      "result": [
+        {
+          "type": "result",
+          "result": "I am trying the same approach again.",
+          "usage": {
+            "input_tokens": 0,
+            "output_tokens": 0
+          }
+        }
+      ],
+      "timestamp": 1790581576,
+      "ttl": 1800
+    },
+    "bdaa6171b3f70f9736f6c8a8a76ba51e": {
+      "result": [
+        {
+          "type": "result",
+          "result": "Done. LOOP_COMPLETE",
+          "usage": {
+            "input_tokens": 0,
+            "output_tokens": 0
+          }
+        }
+      ],
+      "timestamp": 1790581669,
+      "ttl": 1800
+    },
+    "2b4100a56cc188a0e33651a3f1bf9369": {
+      "result": {
+        "raw_response": "Mock claude: ok"
+      },
+      "timestamp": 1790581754,
+      "ttl": 1800
+    },
+    "6e533c283c05e9a6161675c771748f8f": {
+      "result": [
+        {
+          "type": "result",
+          "result": "I am trying the same approach again.",
+          "usage": {
+            "input_tokens": 0,
+            "output_tokens": 0
+          }
+        }
+      ],
+      "timestamp": 1790581964,
+      "ttl": 1800
+    },
+    "b334bc93dba75c8e602e0cfc2023012f": {
+      "result": [
+        {
+          "type": "result",
+          "result": "Done. LOOP_COMPLETE",
+          "usage": {
+            "input_tokens": 0,
+            "output_tokens": 0
+          }
+        }
+      ],
+      "timestamp": 1790582057,
+      "ttl": 1800
+    },
+    "179aa0567b55acc259955a3bf57a9c7c": {
+      "result": [
+        {
+          "type": "result",
+          "result": "I am trying the same approach again.",
+          "usage": {
+            "input_tokens": 0,
+            "output_tokens": 0
+          }
+        }
+      ],
+      "timestamp": 1790582172,
+      "ttl": 1800
+    },
+    "81a11eb14f15dad4c1bf5a0bd003650c": {
+      "result": [
+        {
+          "type": "result",
+          "result": "Done. LOOP_COMPLETE",
+          "usage": {
+            "input_tokens": 0,
+            "output_tokens": 0
+          }
+        }
+      ],
+      "timestamp": 1790582265,
+      "ttl": 1800
     }
   }
 }
