@@ -392,3 +392,7 @@
 {"ts":"2026-09-28T06:32:51Z","ts_epoch":1790577171,"type":"model.outcome","issue":0,"stage":"intake","model":"opus","success":"true"}
 {"ts":"2026-09-28T06:32:51Z","ts_epoch":1790577171,"type":"model.outcome","issue":0,"stage":"plan","model":"opus","success":"true"}
 {"ts":"2026-09-28T06:32:51Z","ts_epoch":1790577171,"type":"pipeline.cost","input_tokens":0,"output_tokens":0,"model":"sonnet","cost_usd":0.0000}
+{"ts":"2026-09-28T08:13:43Z","ts_epoch":1790583223,"type":"hygiene_platform_refactor","hardcoded":49,"fallback":69,"todo":51}
+{"ts":"2026-09-28T08:14:06Z","ts_epoch":1790583246,"type":"strategic.issue_created","title":"Split sw-loop.sh into focused lib modules under scripts/lib/","priority":"P6","complexity":"full"}
+{"ts":"2026-09-28T08:14:10Z","ts_epoch":1790583250,"type":"strategic.issue_created","title":"Surface cost-per-successful-pipeline trend and budget headroom in dashboard","priority":"P3","complexity":"standard"}
+{"ts":"2026-09-28T08:14:10Z","ts_epoch":1790583250,"type":"strategic.cycle_complete","issues_created":2,"issues_skipped":1}
