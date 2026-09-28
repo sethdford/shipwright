@@ -6,7 +6,7 @@
       "root_cause": "sw-intent-analysis-test asserts analyze_intent's JSON output includes version, goal, and criteria fields, but the current schema/implementation omits one or more of them",
       "fix": "Update analyze_intent (or its schema) in sw-intent-analysis.sh to emit version, goal, and criteria fields matching the test's expected schema",
       "seen_count": 176,
-      "last_seen": "2026-09-28T00:18:33Z",
+      "last_seen": "2026-09-28T00:57:04Z",
       "category": "test_failure",
       "signature_hash": "e1a285258fe63781b7370b0d086ad87b",
       "signature": "\u001b[<n>;2;<n>;<n>;<n>m\u001b[1m✓\u001b[0m reveal shows <path> pass count on failure"
@@ -17,7 +17,7 @@
       "root_cause": "Test suite itself passed (all PASS, 0 FAIL) but the pipeline stage was flagged for iterating due to loop-behavior/RL logging noise being misread as failure signal",
       "fix": "Verify the actual test exit code rather than log content matching; ensure sw-autoresearch-e2e-test.sh output doesn't trigger false-positive failure pattern matching in the pipeline's error classifier",
       "seen_count": 47,
-      "last_seen": "2026-09-28T00:52:50Z",
+      "last_seen": "2026-09-28T00:12:29Z",
       "category": "flaky",
       "signature_hash": "4257c245052f",
       "signature": "\u001b[2m loop behavior: iterations on test failure\u001b[0m"
@@ -306,11 +306,11 @@
     {
       "stage": "test",
       "pattern": "\u001b[2m  flaky failure classification\u001b[0m",
-      "root_cause": "sw-pipeline-test.sh failures are pre-existing test-harness issues (plan.md/review.md artifact paths, jq parse errors on non-numeric complexity values, checkpoint cleanup) unrelated to the current change",
-      "fix": "fix sw-pipeline-test.sh mock artifact paths and guard jq calls against non-numeric complexity fields; safe to retry as these failures are consistent/reproducible on main, not induced by this diff",
+      "root_cause": "sw-pipeline-test.sh: mock plan/review stage handlers no longer write .claude/pipeline-artifacts/plan.md and review.md, cascading into E2E/resume/cleanup test failures, plus a jq numeric-parse error in the intelligence complexity-skip test",
+      "fix": "restore artifact-writing in the plan/review stage mocks (or pipeline plan/review functions) and quote/validate the value passed to jq in the complexity-skip test",
       "seen_count": 1,
       "last_seen": "2026-09-27T11:33:44Z",
-      "category": "flaky"
+      "category": "test_failure"
     }
   ]
 }
