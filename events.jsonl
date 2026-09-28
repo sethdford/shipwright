@@ -28,3 +28,6 @@
 {"ts":"2026-09-28T03:31:07Z","ts_epoch":1790566267,"type":"recruit_reflect","accuracy":100.0,"corrections":0}
 {"ts":"2026-09-28T03:31:07Z","ts_epoch":1790566267,"type":"recruit_meta_warning","accuracy":100.0,"trend":"declining","first_half":87.66666666666667,"second_half":68.75}
 {"ts":"2026-09-28T03:31:07Z","ts_epoch":1790566267,"type":"recruit_audit","score":80.0,"passed":24,"failed":6,"warnings":1,"total":30}
+{"ts":"2026-09-28T04:06:54Z","ts_epoch":1790568414,"type":"hygiene_platform_refactor","hardcoded":49,"fallback":69,"todo":51}
+{"ts":"2026-09-28T04:07:29Z","ts_epoch":1790568449,"type":"strategic.issue_created","title":"Auto-remediation mode for `shipwright doctor`","priority":"P1","complexity":"standard"}
+{"ts":"2026-09-28T04:07:29Z","ts_epoch":1790568449,"type":"strategic.cycle_complete","issues_created":1,"issues_skipped":0}
