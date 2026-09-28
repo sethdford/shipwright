@@ -5,8 +5,8 @@
       "pattern": "\u001b[38;2;74;222;128m\u001b[1m✓\u001b[0m reveal shows 1/3 pass count on failure",
       "root_cause": "sw-intent-analysis-test asserts analyze_intent's JSON output includes version, goal, and criteria fields, but the current schema/implementation omits one or more of them",
       "fix": "Update analyze_intent (or its schema) in sw-intent-analysis.sh to emit version, goal, and criteria fields matching the test's expected schema",
-      "seen_count": 178,
-      "last_seen": "2026-09-28T08:38:51Z",
+      "seen_count": 184,
+      "last_seen": "2026-09-28T08:43:55Z",
       "category": "test_failure",
       "signature_hash": "e1a285258fe63781b7370b0d086ad87b",
       "signature": "\u001b[<n>;2;<n>;<n>;<n>m\u001b[1m✓\u001b[0m reveal shows <path> pass count on failure"
@@ -16,8 +16,8 @@
       "pattern": "\u001b[2m  loop behavior: iterations on test failure\u001b[0m",
       "root_cause": "Test suite itself passed (all PASS, 0 FAIL) but the pipeline stage was flagged for iterating due to loop-behavior/RL logging noise being misread as failure signal",
       "fix": "Verify the actual test exit code rather than log content matching; ensure sw-autoresearch-e2e-test.sh output doesn't trigger false-positive failure pattern matching in the pipeline's error classifier",
-      "seen_count": 49,
-      "last_seen": "2026-09-28T05:16:49Z",
+      "seen_count": 47,
+      "last_seen": "2026-09-28T00:51:22Z",
       "category": "flaky",
       "signature_hash": "4257c245052f",
       "signature": "\u001b[2m loop behavior: iterations on test failure\u001b[0m"
@@ -27,8 +27,8 @@
       "pattern": "Failed: 1",
       "root_cause": "sw-intent-analysis-test fails because analyze_intent's generated JSON omits required fields (version, goal, criteria); sw-e2e-integration-test fails as a side effect of a stale pipeline lock (pipeline-3749) left running from a prior test run, not a new regression",
       "fix": "add the missing version/goal/criteria fields to the intent-analysis JSON schema/generator, and clear/reset stale pipeline locks (or run `shipwright pipeline abort`) before the e2e-integration test suite starts",
-      "seen_count": 25,
-      "last_seen": "2026-09-28T04:32:41Z",
+      "seen_count": 26,
+      "last_seen": "2026-09-28T04:43:01Z",
       "category": "test_failure",
       "signature_hash": "0ffe097d3b7a598c5b9ebe8e3cd8d7e4",
       "signature": "failed: 1"
@@ -306,20 +306,11 @@
     {
       "stage": "test",
       "pattern": "\u001b[2m  flaky failure classification\u001b[0m",
-      "root_cause": "sw-pipeline-test.sh failures are pre-existing test/fixture bugs (missing plan.md/review.md artifacts, jq numeric parse errors, missing intelligence-skip output pattern) unrelated to the current change",
-      "fix": "Fix the pipeline-test.sh fixtures/mocks to emit plan.md, dod.md, review.md and valid JSON for the intelligence complexity check, then rerun the failing subset",
+      "root_cause": "Test log shows all suites passing (PASS: 29/33/24/26, FAIL: 0) with no actual failing assertion or error trace present in output",
+      "fix": "Re-run the test stage in isolation to capture the actual failing assertion; likely a transient/non-deterministic failure unrelated to code changes",
       "seen_count": 1,
       "last_seen": "2026-09-27T11:33:44Z",
       "category": "flaky"
-    },
-    {
-      "stage": "test",
-      "pattern": "Testing recruit reads policy.json recruit section... \u001b[38;2;248;113;113m\u001b[1mFAIL\u001b[0m: config/policy.json not found",
-      "root_cause": "sw-recruit-test.sh expects config/policy.json to exist but the file was never created/committed in the repo (or a prior stage that generates it didn't run before this test stage)",
-      "fix": "Create/commit a default config/policy.json (or have the test setup generate one via policy_learn_from_history/init before running sw-recruit-test.sh) so the recruit-policy-reading test finds it",
-      "seen_count": 1,
-      "last_seen": "2026-09-28T02:39:15Z",
-      "category": "config"
     }
   ]
 }
