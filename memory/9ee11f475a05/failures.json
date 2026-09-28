@@ -17,7 +17,7 @@
       "root_cause": "Test suite itself passed (all PASS, 0 FAIL) but the pipeline stage was flagged for iterating due to loop-behavior/RL logging noise being misread as failure signal",
       "fix": "Verify the actual test exit code rather than log content matching; ensure sw-autoresearch-e2e-test.sh output doesn't trigger false-positive failure pattern matching in the pipeline's error classifier",
       "seen_count": 48,
-      "last_seen": "2026-09-28T02:40:48Z",
+      "last_seen": "2026-09-28T03:15:42Z",
       "category": "flaky",
       "signature_hash": "4257c245052f",
       "signature": "\u001b[2m loop behavior: iterations on test failure\u001b[0m"
@@ -306,11 +306,20 @@
     {
       "stage": "test",
       "pattern": "\u001b[2m  flaky failure classification\u001b[0m",
-      "root_cause": "Cost dashboard test asserts CONTEXT EFFICIENCY/budget-utilization output but the isolated test environment has no cost entries in the last 30 days, so sw-cost.sh prints the 'No cost entries' fallback instead of the expected report",
-      "fix": "Seed the test fixture with a cost entry (and matching loop.context_efficiency event) within the 30-day window before invoking the dashboard, or widen the lookback window used by the test setup",
+      "root_cause": "sw-pipeline-test.sh failures are pre-existing test/fixture bugs (missing plan.md/review.md artifacts, jq numeric parse errors, missing intelligence-skip output pattern) unrelated to the current change",
+      "fix": "Fix the pipeline-test.sh fixtures/mocks to emit plan.md, dod.md, review.md and valid JSON for the intelligence complexity check, then rerun the failing subset",
       "seen_count": 1,
       "last_seen": "2026-09-27T11:33:44Z",
       "category": "flaky"
+    },
+    {
+      "stage": "test",
+      "pattern": "Testing recruit reads policy.json recruit section... \u001b[38;2;248;113;113m\u001b[1mFAIL\u001b[0m: config/policy.json not found",
+      "root_cause": "sw-recruit-test.sh expects config/policy.json but the file doesn't exist in the test environment/repo checkout",
+      "fix": "Create config/policy.json with the expected schema (or have the test generate a fixture policy.json in its temp setup) before the recruit policy-reading test runs",
+      "seen_count": 1,
+      "last_seen": "2026-09-28T02:39:15Z",
+      "category": "config"
     }
   ]
 }
