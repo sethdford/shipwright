@@ -16,8 +16,8 @@
       "pattern": "\u001b[2m  loop behavior: iterations on test failure\u001b[0m",
       "root_cause": "Test suite itself passed (all PASS, 0 FAIL) but the pipeline stage was flagged for iterating due to loop-behavior/RL logging noise being misread as failure signal",
       "fix": "Verify the actual test exit code rather than log content matching; ensure sw-autoresearch-e2e-test.sh output doesn't trigger false-positive failure pattern matching in the pipeline's error classifier",
-      "seen_count": 49,
-      "last_seen": "2026-09-28T05:16:49Z",
+      "seen_count": 51,
+      "last_seen": "2026-09-28T08:30:21Z",
       "category": "flaky",
       "signature_hash": "4257c245052f",
       "signature": "\u001b[2m loop behavior: iterations on test failure\u001b[0m"
@@ -315,8 +315,8 @@
     {
       "stage": "test",
       "pattern": "Testing recruit reads policy.json recruit section... \u001b[38;2;248;113;113m\u001b[1mFAIL\u001b[0m: config/policy.json not found",
-      "root_cause": "sw-recruit-test.sh expects config/policy.json to exist but the file was never created/committed in the repo (or a prior stage that generates it didn't run before this test stage)",
-      "fix": "Create/commit a default config/policy.json (or have the test setup generate one via policy_learn_from_history/init before running sw-recruit-test.sh) so the recruit-policy-reading test finds it",
+      "root_cause": "sw-recruit-test.sh reads config/policy.json but the file doesn't exist in the test sandbox/working directory",
+      "fix": "Have the test copy or seed config/policy.json into its temp sandbox before invoking recruit, or make the recruit policy loader fall back gracefully when policy.json is missing",
       "seen_count": 1,
       "last_seen": "2026-09-28T02:39:15Z",
       "category": "config"
