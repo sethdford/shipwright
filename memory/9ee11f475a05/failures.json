@@ -6,7 +6,7 @@
       "root_cause": "sw-intent-analysis-test asserts analyze_intent's JSON output includes version, goal, and criteria fields, but the current schema/implementation omits one or more of them",
       "fix": "Update analyze_intent (or its schema) in sw-intent-analysis.sh to emit version, goal, and criteria fields matching the test's expected schema",
       "seen_count": 177,
-      "last_seen": "2026-09-28T05:37:13Z",
+      "last_seen": "2026-09-28T06:09:45Z",
       "category": "test_failure",
       "signature_hash": "e1a285258fe63781b7370b0d086ad87b",
       "signature": "\u001b[<n>;2;<n>;<n>;<n>m\u001b[1m✓\u001b[0m reveal shows <path> pass count on failure"
@@ -16,8 +16,8 @@
       "pattern": "\u001b[2m  loop behavior: iterations on test failure\u001b[0m",
       "root_cause": "Test suite itself passed (all PASS, 0 FAIL) but the pipeline stage was flagged for iterating due to loop-behavior/RL logging noise being misread as failure signal",
       "fix": "Verify the actual test exit code rather than log content matching; ensure sw-autoresearch-e2e-test.sh output doesn't trigger false-positive failure pattern matching in the pipeline's error classifier",
-      "seen_count": 48,
-      "last_seen": "2026-09-28T03:15:42Z",
+      "seen_count": 49,
+      "last_seen": "2026-09-28T05:16:49Z",
       "category": "flaky",
       "signature_hash": "4257c245052f",
       "signature": "\u001b[2m loop behavior: iterations on test failure\u001b[0m"
@@ -27,8 +27,8 @@
       "pattern": "Failed: 1",
       "root_cause": "sw-intent-analysis-test fails because analyze_intent's generated JSON omits required fields (version, goal, criteria); sw-e2e-integration-test fails as a side effect of a stale pipeline lock (pipeline-3749) left running from a prior test run, not a new regression",
       "fix": "add the missing version/goal/criteria fields to the intent-analysis JSON schema/generator, and clear/reset stale pipeline locks (or run `shipwright pipeline abort`) before the e2e-integration test suite starts",
-      "seen_count": 24,
-      "last_seen": "2026-09-27T02:13:29Z",
+      "seen_count": 25,
+      "last_seen": "2026-09-28T04:32:41Z",
       "category": "test_failure",
       "signature_hash": "0ffe097d3b7a598c5b9ebe8e3cd8d7e4",
       "signature": "failed: 1"
@@ -50,8 +50,8 @@
       "signature": "results: \u001b[<n>;2;<n>;<n>;<n>m\u001b[1m<n> pass\u001b[0m | \u001b[<n>;2;<n>;<n>;<n>m\u001b[1m1 fail\u001b[0m",
       "root_cause": "sw-e2e-integration-test failed because a stale pipeline lock from a prior run (pipeline-3854) was left in 'running' state, blocking the new pipeline start; sw-intent-analysis-test failed because analyze_intent's generated JSON is missing the required version/goal/criteria schema fields",
       "fix": "Clear/release stale pipeline locks before the e2e-integration test runs (or add lock staleness detection/cleanup), and update analyze_intent to always emit version, goal, and criteria fields in its output schema",
-      "seen_count": 10,
-      "last_seen": "2026-09-28T06:12:26Z",
+      "seen_count": 9,
+      "last_seen": "2026-09-26T16:36:19Z",
       "category": "test_failure",
       "signature_hash": "af7df127e4c98031cbe09f6b0646ac68"
     },
@@ -315,8 +315,8 @@
     {
       "stage": "test",
       "pattern": "Testing recruit reads policy.json recruit section... \u001b[38;2;248;113;113m\u001b[1mFAIL\u001b[0m: config/policy.json not found",
-      "root_cause": "config/policy.json referenced by sw-recruit-test.sh does not exist in the repo/worktree",
-      "fix": "Create/commit config/policy.json with the expected recruit section, or update sw-recruit.sh to fall back to config/defaults.json when policy.json is missing",
+      "root_cause": "sw-recruit-test.sh expects config/policy.json to exist but the file was never created/committed in the repo (or a prior stage that generates it didn't run before this test stage)",
+      "fix": "Create/commit a default config/policy.json (or have the test setup generate one via policy_learn_from_history/init before running sw-recruit-test.sh) so the recruit-policy-reading test finds it",
       "seen_count": 1,
       "last_seen": "2026-09-28T02:39:15Z",
       "category": "config"
