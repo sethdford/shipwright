@@ -88,3 +88,25 @@
 {"ts":"2026-09-28T00:16:18Z","ts_epoch":1790554578,"type":"strategic.issue_created","title":"Add build-loop pre-flight checks for missing test/lint commands before burning iterations","priority":"P0","complexity":"standard"}
 {"ts":"2026-09-28T00:16:23Z","ts_epoch":1790554583,"type":"strategic.issue_created","title":"Track and surface cost-per-successful-pipeline against the <$5 target in `shipwright cost show`","priority":"P3","complexity":"fast"}
 {"ts":"2026-09-28T00:16:23Z","ts_epoch":1790554583,"type":"strategic.cycle_complete","issues_created":2,"issues_skipped":1}
+{"ts":"2026-09-28T00:34:29Z","ts_epoch":1790555669,"type":"patrol.started","dry_run":"false"}
+{"ts":"2026-09-28T00:34:34Z","ts_epoch":1790555674,"type":"patrol.issue_created","check":"dead_code","count":1}
+{"ts":"2026-09-28T00:34:38Z","ts_epoch":1790555678,"type":"patrol.finding","check":"recurring_failure","pattern":"[38;2;74;222;128m[1m✓[0m reveal shows 1/3 pass count on","seen_count":175}
+{"ts":"2026-09-28T00:34:39Z","ts_epoch":1790555679,"type":"patrol.issue_created","check":"recurring_failure","pattern":"[38;2;74;222;128m[1m✓[0m reveal shows 1/3 pass count on"}
+{"ts":"2026-09-28T00:34:39Z","ts_epoch":1790555679,"type":"patrol.finding","check":"recurring_failure","pattern":"[2m  loop behavior: iterations on test failure[0m","seen_count":46}
+{"ts":"2026-09-28T00:34:41Z","ts_epoch":1790555681,"type":"patrol.issue_created","check":"recurring_failure","pattern":"[2m  loop behavior: iterations on test failure[0m"}
+{"ts":"2026-09-28T00:34:41Z","ts_epoch":1790555681,"type":"patrol.finding","check":"recurring_failure","pattern":"Failed: 1","seen_count":24}
+{"ts":"2026-09-28T00:34:42Z","ts_epoch":1790555682,"type":"patrol.issue_created","check":"recurring_failure","pattern":"Failed: 1"}
+{"ts":"2026-09-28T00:34:42Z","ts_epoch":1790555682,"type":"patrol.finding","check":"recurring_failure","pattern":"[38;2;0;212;255m▸[0m Patrol recurring failures label con","seen_count":19}
+{"ts":"2026-09-28T00:34:43Z","ts_epoch":1790555683,"type":"patrol.issue_created","check":"recurring_failure","pattern":"[38;2;0;212;255m▸[0m Patrol recurring failures label con"}
+{"ts":"2026-09-28T00:34:43Z","ts_epoch":1790555683,"type":"patrol.finding","check":"recurring_failure","pattern":"Results: [38;2;74;222;128m[1m126 PASS[0m | [38;2;248;113","seen_count":11}
+{"ts":"2026-09-28T00:34:44Z","ts_epoch":1790555684,"type":"patrol.finding","check":"recurring_failure","pattern":"Results: [38;2;74;222;128m[1m127 PASS[0m | [38;2;248;113","seen_count":9}
+{"ts":"2026-09-28T00:34:45Z","ts_epoch":1790555685,"type":"patrol.finding","check":"recurring_failure","pattern":"Results: [38;2;74;222;128m[1m124 PASS[0m | [38;2;248;113","seen_count":6}
+{"ts":"2026-09-28T00:34:46Z","ts_epoch":1790555686,"type":"patrol.finding","check":"recurring_failure","pattern":"Results: [38;2;74;222;128m[1m123 PASS[0m | [38;2;248;113","seen_count":4}
+{"ts":"2026-09-28T00:34:46Z","ts_epoch":1790555686,"type":"patrol.finding","check":"recurring_failure","pattern":"[38;2;0;212;255m▸[0m Progress detects repeated error loo","seen_count":3}
+{"ts":"2026-09-28T00:34:47Z","ts_epoch":1790555687,"type":"patrol.finding","check":"untested_script","script":"sw-tracker-linear.sh","lines":568,"usage":7}
+{"ts":"2026-09-28T00:34:47Z","ts_epoch":1790555687,"type":"patrol.finding","check":"untested_script","script":"sw-tracker-jira.sh","lines":474,"usage":7}
+{"ts":"2026-09-28T00:34:48Z","ts_epoch":1790555688,"type":"patrol.finding","check":"untested_script","script":"sw-tracker-github.sh","lines":212,"usage":3}
+{"ts":"2026-09-28T00:34:48Z","ts_epoch":1790555688,"type":"patrol.finding","check":"untested_script","script":"sw-tmux-status.sh","lines":151,"usage":1}
+{"ts":"2026-09-28T00:34:48Z","ts_epoch":1790555688,"type":"patrol.finding","check":"untested_script","script":"sw-tmux-role-color.sh","lines":81,"usage":1}
+{"ts":"2026-09-28T00:34:48Z","ts_epoch":1790555688,"type":"patrol.finding","check":"untested_script","script":"sw-test-all.sh","lines":199,"usage":0}
+{"ts":"2026-09-28T00:34:48Z","ts_epoch":1790555688,"type":"patrol.finding","check":"untested_script","script":"sw-event-schema-sync.sh","lines":93,"usage":0}
