@@ -1405,27 +1405,27 @@
     },
     "a0d8231c42617433aaf0e32cf0619b15": {
       "result": {
-        "complexity": 6,
+        "complexity": 5,
         "risk_level": "medium",
         "success_probability": 78,
         "recommended_template": "cost-aware",
         "issue_type": "infrastructure",
         "key_risks": [
-          "Auto-downgrade logic misconfiguration causing unexpected pipeline failures or deferrals",
-          "Race condition between cost tracking update and pipeline start decision window",
-          "Explicit --template flag not properly short-circuiting budget evaluation",
-          "Event emission overhead if budget check runs in hot path for daemon polls"
+          "Auto-downgrade may surprise users expecting a certain template tier without explicit opt-in messaging",
+          "Race condition: remaining budget could change between check and pipeline start in concurrent scenarios",
+          "Budget threshold configuration requires tuning to avoid over-aggressive or under-aggressive downgrades",
+          "Integration across multiple entry points (CLI pipeline start, daemon spawn) needs consistency to prevent surprises",
+          "Cost data freshness: if cost tracking lags, downgrade decision may be based on stale budget information"
         ],
         "implementation_hints": [
-          "Query remaining budget via 'shipwright cost remaining-budget' CLI before template selection logic",
-          "Build template downgrade hierarchy: enterprise → full → standard → fast → defer with clear tier definitions",
-          "Add 'budget.auto_downgrade_enabled' and 'budget.downgrade_threshold_usd' keys to daemon-config.json with sensible defaults",
-          "Emit structured event {type: 'template_downgrade', from: X, to: Y, remaining_budget: Z} for observability and auditing",
-          "Check explicit --template flag first in pipeline start before entering budget evaluation path",
-          "Parameterize test suite with low/medium/high/zero budget scenarios using mocked cost data files"
+          "Create shared helper function in scripts/lib/compat.sh (similar to _smart_model/_smart_int) to suggest template tier from remaining budget",
+          "Add budget_threshold_usd and budget_downgrade_strategy to daemon-config.json with sensible defaults tied to model cost profiles",
+          "Emit 'template_auto_downgraded' event with (original_template, suggested_template, remaining_budget_usd) for observability and cost auditing",
+          "Call budget check in pipeline.sh start flow and daemon spawn flow before template selection to ensure both paths honor budget",
+          "Test matrix: sufficient budget (no-op), below threshold (downgrade), explicit --template (override), negative/near-zero budget (defer or halt)"
         ]
       },
-      "timestamp": 1790540698,
+      "timestamp": 1790563619,
       "ttl": 3600
     },
     "c66113495f170db12e85f66aadeb4645": {
@@ -1449,82 +1449,79 @@
     "31e370b886709a9bb22f5917d1fb6cfd": {
       "result": {
         "issue_type": "infrastructure",
-        "confidence": 0.88,
+        "confidence": 0.87,
         "secondary_domains": [
           "cost-optimization",
-          "cli-behavior",
-          "configuration-management"
+          "system-configuration",
+          "testing"
         ],
         "complexity_assessment": {
-          "score": 6,
-          "reasoning": "Moderate complexity: multiple integration points (pipeline start, daemon config, cost tracking), conditional logic with override precedence, boundary condition testing, and configuration schema changes."
+          "score": 5,
+          "reasoning": "Well-scoped feature integrating cost API with template selection, requiring config management and comprehensive test coverage for multiple scenarios"
         },
         "skill_plan": {
           "plan": [
-            "product-thinking",
-            "brainstorming"
+            "architecture-design",
+            "brainstorming",
+            "product-thinking"
           ],
           "design": [
-            "architecture-design",
+            "cost-aware-feature-downgrade",
             "api-design"
           ],
-          "build": [
-            "testing-strategy"
-          ],
+          "build": [],
           "review": [
+            "adversarial-quality",
             "security-audit",
-            "adversarial-quality"
-          ],
-          "compound_quality": [
-            "validation-thoroughness"
-          ],
-          "pr": [
             "pr-quality"
           ],
-          "deploy": [],
-          "validate": [
+          "compound_quality": [
+            "testing-strategy",
+            "validation-thoroughness"
+          ],
+          "pr": [],
+          "deploy": [
+            "deploy-safety",
             "observability"
           ],
+          "validate": [],
           "monitor": [
             "observability"
           ]
         },
         "skill_rationale": {
-          "product-thinking": "Understand the end-user need for budget control and the failure modes (budget overrun mid-pipeline) that this feature prevents.",
-          "brainstorming": "Challenge assumptions about threshold percentages, downgrade tier definitions, and edge cases (negative budget, cost-tracking unavailable, threshold exactly at boundary).",
-          "architecture-design": "Design the decision tree for template downgrade logic, config schema changes, and how this integrates with existing daemon config and cost tracking systems.",
-          "api-design": "Define the daemon-config.json schema for budget threshold, downgrade tier mappings, and the event structure that captures budget-based downgrade decisions.",
-          "testing-strategy": "This feature has three distinct code paths (low-budget downgrade, explicit override, normal-budget no-op) plus boundary conditions that demand comprehensive test matrix coverage.",
-          "security-audit": "Budget calculations must be accurate and not bypassable; cost tracking integration must not allow backdoor template selection that circumvents budget limits.",
-          "adversarial-quality": "Find the breaking cases: what if budget is negative or zero, cost show fails mid-pipeline, threshold is misconfigured, or explicit flag is passed but budget is exhausted?",
-          "validation-thoroughness": "Validate actual pipeline behavior across all scenarios—low/at/high budget, explicit override, event logging completeness—not just unit test coverage.",
-          "pr-quality": "Cross-component changes (pipeline start, daemon config, cost tracking, event emission) require clear PR description of precedence rules and test coverage.",
-          "observability": "Track whether budget-aware downgrades are occurring in production, ensure cost tracking stays accurate after downgrade, and flag anomalies (e.g., downgrades despite high budget)."
+          "architecture-design": "Design how budget checking integrates into the existing template selection pipeline and daemon startup flow without breaking current behavior",
+          "brainstorming": "Challenge assumptions about budget threshold values, downgrade strategy (which tiers degrade to which), and how to handle edge cases like exactly-at-threshold or zero-budget scenarios",
+          "product-thinking": "Understand user expectations when pipelines are auto-downgraded due to budget constraints and when explicit --template overrides should succeed or fail",
+          "cost-aware-feature-downgrade": "Core pattern for implementing graceful behavior degradation based on budget constraints, with clear override semantics and audit trail",
+          "api-design": "Design the public API for template selection that accepts explicit --template flags and budget thresholds, ensuring clear precedence and error handling",
+          "adversarial-quality": "Find failure modes in the budget logic: what if cost data is stale, threshold is misconfigured, or budget exhausts mid-pipeline?",
+          "security-audit": "Ensure the budget-check logic cannot be exploited to bypass security-critical pipeline stages or manipulated via config injection",
+          "pr-quality": "Ensure the PR clearly documents how template downgrading works, the new config threshold setting, and the audit events emitted for debugging",
+          "testing-strategy": "Comprehensive test coverage for: low-budget auto-downgrade, explicit --template override precedence, normal-budget no-op, threshold boundary conditions, and misconfigurations",
+          "validation-thoroughness": "Validate actual pipeline behavior when budget is constrained: verify correct template is selected, audit events are emitted, and cost tracking remains accurate",
+          "deploy-safety": "Daemon config changes affect all pipeline runs; validate that the new budget threshold setting has sensible defaults and doesn't break existing deployments",
+          "observability": "Track and emit events when budget triggers template downgrade, enabling audit trail, alerting on budget exhaustion, and debugging of template selection decisions"
         },
-        "generated_skills": [
-          {
-            "name": "cost-aware-feature-downgrade",
-            "reason": "No existing skill covers the specific pattern of gracefully degrading pipeline capabilities (template selection) based on real-time cost constraints, with override precedence and event auditing.",
-            "content": "# Cost-Aware Feature Downgrade Logic\n\nWhen a system must gracefully constrain behavior due to budget or resource limits, implement feature downgrade in three layers:\n\n## 1. Precedence is Absolute\nExplicit user input (e.g., `--template full`) ALWAYS wins over automatic downgrade. Budget-aware logic is a fallback, not a constraint on explicit requests. Implement as a guard at the entry point:\n\n```\nif (explicit_template_flag) {\n  use explicit_template\n  return\n}\n// Only then check budget\nselected_template = budget_aware_select()\n```\n\nInvariant: No code path should override an explicit flag.\n\n## 2. Downgrade Tiers and Thresholds\nDefine clear tier mappings (e.g., `full` → `standard` → `fast`) and threshold percentages in config:\n\n```json\n{\n  \"cost\": {\n    \"budget_threshold_percent\": 20,\n    \"downgrade_tiers\": {\n      \"full\": \"standard\",\n      \"standard\": \"fast\",\n      \"fast\": \"fast\"\n    }\n  }\n}\n```\n\nThreshold represents: \"if remaining_budget / daily_budget < threshold, downgrade.\" Test exact boundary (at 20%, just below, just above).\n\n## 3. Event Auditing\nEvery downgrade decision must emit a structured event with:\n- Original template (what was requested or would have been selected)\n- Selected template (after budget logic)\n- Reason (explicit override, budget downgrade, normal selection)\n- Remaining budget and threshold at decision time\n\nExample event:\n```json\n{\n  \"type\": \"template_selected\",\n  \"requested_template\": \"full\",\n  \"selected_template\": \"standard\",\n  \"reason\": \"budget_downgrade\",\n  \"remaining_budget_usd\": 4.50,\n  \"daily_budget_usd\": 25.00,\n  \"threshold_percent\": 20,\n  \"timestamp\": \"2026-09-27T20:30:00Z\"\n}\n```\n\n## 4. Edge Case Handling\n- **Cost tracking unavailable**: Log a warning and proceed with default template (do not hard-fail the pipeline). Document as a known degradation.\n- **Negative or zero budget**: Downgrade to cheapest tier (typically `fast` or `hotfix`).\n- **Threshold zero or negative**: Disable budget-aware logic (treat as explicit `--no-budget-check`).\n\n## 5. Testing Pattern\nTest matrix:\n1. Explicit flag always wins: `--template full` with 5% remaining → uses `full` (not downgraded)\n2. Low budget triggers downgrade: No flag, 15% remaining (below 20% threshold) → uses downgraded tier\n3. High budget is a no-op: No flag, 50% remaining → uses normal/requested tier\n4. Boundary at exact threshold: 20% remaining (exactly at threshold) → test both sides\n5. Cost tracking failure: Mock cost show returning error → logs warning, proceeds with default\n"
-          }
-        ],
+        "generated_skills": [],
         "review_focus": [
-          "Precedence logic: explicit --template flag must always override budget-aware logic",
-          "Boundary conditions: behavior at exactly threshold, just above, and just below",
-          "Event emission: all template decisions logged with budget context for audit trail",
-          "Daemon config schema: backward compatibility with existing configs that lack budget_threshold",
-          "Integration with cost tracking: failure mode when shipwright cost show is unavailable",
-          "Test coverage: three main paths (low-budget downgrade, explicit override, normal no-op) fully exercised"
+          "Budget threshold logic and downgrade decision tree correctness",
+          "Explicit --template flag precedence over budget-based auto-selection",
+          "Edge cases: threshold boundary conditions, zero budget, stale cost data",
+          "Config validation: ensuring budget_threshold in daemon-config.json is read correctly and has sensible defaults",
+          "Event emission: audit trail for debugging template selection decisions",
+          "Backwards compatibility: pipelines/daemons without the new config setting still work"
         ],
         "risk_areas": [
-          "Budget calculation precision: off-by-one errors in threshold comparison could cause unexpected downgrades",
-          "Precedence bug: if budget logic executes after explicit flag, it could override user intent",
-          "Silent failures: if cost tracking is unavailable, pipeline must not silently proceed without logging why downgrade was skipped",
-          "Daemon config rollout: existing daemons running old config without budget_threshold must handle gracefully",
-          "Event logging completeness: downgrades not logged mean no audit trail for cost optimization decisions"
+          "Cost API consistency: if shipwright cost show returns stale data, template selection decisions may be incorrect",
+          "Threshold misconfiguration: if threshold is too low or high, templates degrade too often or not at all",
+          "Mid-pipeline budget exhaustion: what happens if budget runs out during a long-running pipeline?",
+          "Interaction with explicit template flag: need clear error messaging if user requests full template but budget is very low",
+          "Daemon vs manual pipeline inconsistency: both code paths must use the same logic",
+          "Test coverage gaps: need integration tests with actual cost tracking system, not just mocks"
         ]
       },
-      "timestamp": 1790540801,
+      "timestamp": 1790563725,
       "ttl": 3600
     },
     "805d7c256ae328630b2ef5ae9d20d73e": {
@@ -1533,31 +1530,31 @@
           {
             "file": "success-patterns.json (test-repo-comptime)",
             "relevance": 85,
-            "summary": "Contains explicit cost data ($3.75), completion time (1234s), and multiple stage execution (intake, build, test). Directly relevant for understanding resource usage and cost metrics needed for budget-aware template selection."
+            "summary": "Directly relevant: tracks cost ($3.75) and completion time (1234s) for patterns. Essential for budget-aware template selection logic to estimate costs."
           },
           {
             "file": "success-patterns.json (test-repo-ranking)",
             "relevance": 75,
-            "summary": "Two patterns with cost tracking ($0.50 each) showing variability in resource usage. Demonstrates how complexity affects cost and completion, informing template selection criteria."
+            "summary": "Shows cost patterns across multiple issues ($0.50 each) with complexity and iteration tracking. Demonstrates cost consistency needed for budget modeling."
+          },
+          {
+            "file": "failures.json (with data)",
+            "relevance": 70,
+            "summary": "Contains failure patterns with resolution status and frequency. Relevant for understanding which failure types consume budget and which remain unresolved."
           },
           {
             "file": "success-patterns.json (test-repo-789)",
-            "relevance": 70,
-            "summary": "Shows relationship between complexity (high), iterations needed (3), and cost ($2.00). Illustrates cost-to-complexity mapping needed for budget-aware routing."
+            "relevance": 65,
+            "summary": "Shows high-complexity pattern requiring 3 iterations at $2.00 cost. Demonstrates complexity-to-cost mapping critical for template selection."
           },
           {
             "file": "index.json",
-            "relevance": 65,
-            "summary": "Patterns indexed by stage and type with failure signatures. Useful for understanding stage-based template design and which templates should handle which failure scenarios within budget constraints."
-          },
-          {
-            "file": "architecture.json",
-            "relevance": 60,
-            "summary": "Contains architectural rules that would inform implementation planning decisions and constraints for the budget-aware template selection feature."
+            "relevance": 55,
+            "summary": "Pattern indexing by signature, stage, and fix. Provides metadata structure for how patterns would be categorized and selected by budget-aware logic."
           }
         ]
       },
-      "timestamp": 1790540857,
+      "timestamp": 1790563783,
       "ttl": 1800
     },
     "3bded0859fb58ce13adab686356a99a9": {
@@ -1933,6 +1930,24 @@
       },
       "timestamp": 1790543127,
       "ttl": 1800
+    },
+    "fb7cb30ed4d4742fac5917e02e651296": {
+      "result": {
+        "estimated_iterations": 3
+      },
+      "timestamp": 1790563632,
+      "ttl": 1800
+    },
+    "3f91c19b329b75568976975faace1d97": {
+      "result": {
+        "estimated_cost_usd": 0.31,
+        "estimated_iterations": 2,
+        "estimated_tokens": 135000,
+        "likely_failure_stage": "test",
+        "confidence": 72
+      },
+      "timestamp": 1790563642,
+      "ttl": 3600
     }
   }
 }
