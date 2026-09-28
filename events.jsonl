@@ -106,3 +106,25 @@
 {"ts":"2026-09-28T12:19:10Z","ts_epoch":1790597950,"type":"patrol.finding","check":"untested_script","script":"sw-test-all.sh","lines":199,"usage":0}
 {"ts":"2026-09-28T12:19:10Z","ts_epoch":1790597950,"type":"patrol.finding","check":"untested_script","script":"sw-event-schema-sync.sh","lines":93,"usage":0}
 {"ts":"2026-09-28T16:05:49Z","ts_epoch":1790611549,"type":"hygiene_platform_refactor","hardcoded":49,"fallback":69,"todo":51}
+{"ts":"2026-09-28T18:14:47Z","ts_epoch":1790619287,"type":"patrol.started","dry_run":"false"}
+{"ts":"2026-09-28T18:14:51Z","ts_epoch":1790619291,"type":"patrol.issue_created","check":"dead_code","count":1}
+{"ts":"2026-09-28T18:14:56Z","ts_epoch":1790619296,"type":"patrol.finding","check":"recurring_failure","pattern":"[38;2;74;222;128m[1m✓[0m reveal shows 1/3 pass count on","seen_count":184}
+{"ts":"2026-09-28T18:14:57Z","ts_epoch":1790619297,"type":"patrol.issue_created","check":"recurring_failure","pattern":"[38;2;74;222;128m[1m✓[0m reveal shows 1/3 pass count on"}
+{"ts":"2026-09-28T18:14:57Z","ts_epoch":1790619297,"type":"patrol.finding","check":"recurring_failure","pattern":"[2m  loop behavior: iterations on test failure[0m","seen_count":47}
+{"ts":"2026-09-28T18:14:59Z","ts_epoch":1790619299,"type":"patrol.issue_created","check":"recurring_failure","pattern":"[2m  loop behavior: iterations on test failure[0m"}
+{"ts":"2026-09-28T18:14:59Z","ts_epoch":1790619299,"type":"patrol.finding","check":"recurring_failure","pattern":"Failed: 1","seen_count":26}
+{"ts":"2026-09-28T18:15:00Z","ts_epoch":1790619300,"type":"patrol.issue_created","check":"recurring_failure","pattern":"Failed: 1"}
+{"ts":"2026-09-28T18:15:00Z","ts_epoch":1790619300,"type":"patrol.finding","check":"recurring_failure","pattern":"[38;2;0;212;255m▸[0m Patrol recurring failures label con","seen_count":19}
+{"ts":"2026-09-28T18:15:01Z","ts_epoch":1790619301,"type":"patrol.issue_created","check":"recurring_failure","pattern":"[38;2;0;212;255m▸[0m Patrol recurring failures label con"}
+{"ts":"2026-09-28T18:15:02Z","ts_epoch":1790619302,"type":"patrol.finding","check":"recurring_failure","pattern":"Results: [38;2;74;222;128m[1m126 PASS[0m | [38;2;248;113","seen_count":11}
+{"ts":"2026-09-28T18:15:02Z","ts_epoch":1790619302,"type":"patrol.finding","check":"recurring_failure","pattern":"Results: [38;2;74;222;128m[1m127 PASS[0m | [38;2;248;113","seen_count":9}
+{"ts":"2026-09-28T18:15:03Z","ts_epoch":1790619303,"type":"patrol.finding","check":"recurring_failure","pattern":"Results: [38;2;74;222;128m[1m124 PASS[0m | [38;2;248;113","seen_count":6}
+{"ts":"2026-09-28T18:15:04Z","ts_epoch":1790619304,"type":"patrol.finding","check":"recurring_failure","pattern":"Results: [38;2;74;222;128m[1m123 PASS[0m | [38;2;248;113","seen_count":4}
+{"ts":"2026-09-28T18:15:04Z","ts_epoch":1790619304,"type":"patrol.finding","check":"recurring_failure","pattern":"[38;2;0;212;255m▸[0m Progress detects repeated error loo","seen_count":3}
+{"ts":"2026-09-28T18:15:06Z","ts_epoch":1790619306,"type":"patrol.finding","check":"untested_script","script":"sw-tracker-linear.sh","lines":568,"usage":7}
+{"ts":"2026-09-28T18:15:06Z","ts_epoch":1790619306,"type":"patrol.finding","check":"untested_script","script":"sw-tracker-jira.sh","lines":474,"usage":7}
+{"ts":"2026-09-28T18:15:06Z","ts_epoch":1790619306,"type":"patrol.finding","check":"untested_script","script":"sw-tracker-github.sh","lines":212,"usage":3}
+{"ts":"2026-09-28T18:15:06Z","ts_epoch":1790619306,"type":"patrol.finding","check":"untested_script","script":"sw-tmux-status.sh","lines":151,"usage":1}
+{"ts":"2026-09-28T18:15:06Z","ts_epoch":1790619306,"type":"patrol.finding","check":"untested_script","script":"sw-tmux-role-color.sh","lines":81,"usage":1}
+{"ts":"2026-09-28T18:15:06Z","ts_epoch":1790619306,"type":"patrol.finding","check":"untested_script","script":"sw-test-all.sh","lines":199,"usage":0}
+{"ts":"2026-09-28T18:15:06Z","ts_epoch":1790619306,"type":"patrol.finding","check":"untested_script","script":"sw-event-schema-sync.sh","lines":93,"usage":0}
