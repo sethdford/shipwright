@@ -5,8 +5,8 @@
       "pattern": "\u001b[38;2;74;222;128m\u001b[1m✓\u001b[0m reveal shows 1/3 pass count on failure",
       "root_cause": "sw-intent-analysis-test asserts analyze_intent's JSON output includes version, goal, and criteria fields, but the current schema/implementation omits one or more of them",
       "fix": "Update analyze_intent (or its schema) in sw-intent-analysis.sh to emit version, goal, and criteria fields matching the test's expected schema",
-      "seen_count": 176,
-      "last_seen": "2026-09-28T00:20:05Z",
+      "seen_count": 177,
+      "last_seen": "2026-09-28T02:27:45Z",
       "category": "test_failure",
       "signature_hash": "e1a285258fe63781b7370b0d086ad87b",
       "signature": "\u001b[<n>;2;<n>;<n>;<n>m\u001b[1m✓\u001b[0m reveal shows <path> pass count on failure"
@@ -306,8 +306,8 @@
     {
       "stage": "test",
       "pattern": "\u001b[2m  flaky failure classification\u001b[0m",
-      "root_cause": "sw-pipeline-test.sh failures are pre-existing test/fixture bugs (missing plan.md/review.md artifacts, jq numeric parse errors, missing intelligence-skip output pattern) unrelated to the current change",
-      "fix": "Fix the pipeline-test.sh fixtures/mocks to emit plan.md, dod.md, review.md and valid JSON for the intelligence complexity check, then rerun the failing subset",
+      "root_cause": "sw-e2e-integration-test failed due to a leftover pipeline lock from a prior run, not new code — a stale 'pipeline-7015' lock caused 'already in progress' rather than a genuine assertion failure",
+      "fix": "Ensure test setup/teardown releases the pipeline lock (rm lock file or run 'shipwright pipeline abort') before starting a fresh run, and add lock cleanup to test isolation",
       "seen_count": 1,
       "last_seen": "2026-09-27T11:33:44Z",
       "category": "flaky"
