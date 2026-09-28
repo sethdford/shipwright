@@ -1401,6 +1401,257 @@
       },
       "timestamp": 1775344537,
       "ttl": 3600
+    },
+    "0dc01d6e34162c35b08dfd9e0b419202": {
+      "result": {
+        "complexity": 6,
+        "risk_level": "medium",
+        "success_probability": 72,
+        "recommended_template": "standard",
+        "issue_type": "frontend",
+        "key_risks": [
+          "Cost data freshness and historical availability from sw-cost.sh for trending",
+          "Frontend sparkline rendering performance with accumulated cost records",
+          "Budget calculation correctness under edge cases (day boundaries, resets)",
+          "API endpoint scalability if cost aggregation happens per request",
+          "Data consistency between cost tracking and dashboard state"
+        ],
+        "implementation_hints": [
+          "Leverage existing sw-cost.sh data sourcing; consider caching trends in dashboard server",
+          "Define rolling window clearly (last 7/30 days) to match strategy review cycle",
+          "Use recharts or existing dashboard charting library for sparkline widget",
+          "Add cost aggregation routine separate from main dashboard loop to avoid blocking",
+          "Source $5 target from daemon-config.json strategy section, not hardcoded",
+          "Provide mock cost data generator for testing before historical data accumulates",
+          "Extend sw-server-api-test.sh with scenario: sparse data, zero costs, budget exhaustion"
+        ]
+      },
+      "timestamp": 1790583492,
+      "ttl": 3600
+    },
+    "f1520bdfb3267ca306ca549f1fc402b4": {
+      "result": {
+        "estimated_iterations": 5
+      },
+      "timestamp": 1790583502,
+      "ttl": 1800
+    },
+    "6807810b5bb615d84594866c59c899c4": {
+      "result": {
+        "estimated_cost_usd": 6.50,
+        "estimated_iterations": 3,
+        "estimated_tokens": 180000,
+        "likely_failure_stage": "test",
+        "confidence": 68,
+        "reasoning": {
+          "cost_basis": "Complexity 6/10 with standard template: 3 iterations × Opus build stage ($1.50-2.00/iter) + Sonnet other stages",
+          "iteration_basis": "Frontend work + cost data handling typically requires 2-3 cycles: initial implementation, performance/data consistency fixes, edge case coverage",
+          "token_basis": "Build stage ~60k/iter (Opus), other stages ~20k/iter (Sonnet), 3 iterations total",
+          "failure_risk": "Test stage most likely (72% base success rate + risks in budget calculations, data consistency, performance verification)",
+          "confidence_basis": "Empty historical data, inferred from complexity score, medium risk level, and similar frontend feature estimates"
+        }
+      },
+      "timestamp": 1790583513,
+      "ttl": 3600
+    },
+    "f02a58622a0baae198994986247b7d20": {
+      "result": {
+        "issue_type": "frontend",
+        "confidence": 0.88,
+        "secondary_domains": [
+          "api",
+          "data-pipeline",
+          "observability",
+          "testing"
+        ],
+        "complexity_assessment": {
+          "score": 5,
+          "reasoning": "Straightforward data integration: expose cost-per-successful-pipeline from sw-cost.sh via a new API endpoint, render as a sparkline widget with target line and budget headroom. Main risk is test coverage completeness and data staleness handling, not algorithmic complexity."
+        },
+        "skill_plan": {
+          "plan": [
+            "product-thinking",
+            "brainstorming",
+            "api-design"
+          ],
+          "design": [
+            "api-design",
+            "frontend-design",
+            "architecture-design"
+          ],
+          "build": [],
+          "review": [
+            "adversarial-quality",
+            "validation-thoroughness"
+          ],
+          "compound_quality": [
+            "testing-strategy"
+          ],
+          "pr": [
+            "pr-quality"
+          ],
+          "deploy": [
+            "deploy-safety"
+          ],
+          "validate": [
+            "validation-thoroughness"
+          ],
+          "monitor": [
+            "observability"
+          ]
+        },
+        "skill_rationale": {
+          "product-thinking": "Clarify the operator's actual need: catching cost regressions *proactively* (before budget exhaustion) vs. reactive monitoring—this framing shapes API design and refresh cadence.",
+          "brainstorming": "Challenge: Is this polled or real-time? What's the meaningful time window (N days)? How often do operators actually check? These answers drive polling frequency and data retention policy.",
+          "api-design": "Define the `/api/cost-trend` contract (pagination, time range, error responses) and data schema before implementation to avoid rework when frontend integrates.",
+          "frontend-design": "Sparklines without proper context can mislead; guide widget design to show target line ($5), scale, recent trend direction, and make budget headroom visually salient.",
+          "architecture-design": "Document how cost data flows from sw-cost.sh → dashboard/server.ts → frontend, including update frequency, staleness detection, and fallback behavior.",
+          "adversarial-quality": "Cost visibility is only useful if the data is trustworthy; think like an operator with stale/incorrect cost data and identify failure modes (missing timestamps, off-by-one in budget calculation, schema changes in cost.json).",
+          "validation-thoroughness": "In staging, simulate a cost regression scenario (e.g., pipeline cost suddenly doubles) and verify operators can spot it from the dashboard trend before daily budget exhaustion alert fires.",
+          "testing-strategy": "Extend sw-dashboard-e2e-test.sh and sw-server-api-test.sh with coverage for endpoint correctness (cost-per-successful-pipeline calculation, time range filtering) and widget rendering (target line, budget headroom display).",
+          "pr-quality": "Commits should separately cover: (1) endpoint + cost data loading, (2) frontend widget, (3) tests. Each should have a clear message explaining the cost-visibility purpose.",
+          "deploy-safety": "Graceful degradation is critical: if the `/api/cost-trend` endpoint is slow/unavailable, the dashboard must not break—show cached data or hide the widget rather than error.",
+          "observability": "Monitor endpoint latency (should be <500ms for interactive dashboard), cost data staleness (timestamp + age check), and widget load/engagement to catch real-world issues (e.g., stale cost data causing operator confusion)."
+        },
+        "generated_skills": [
+          {
+            "name": "cost-data-dashboard-integration",
+            "reason": "No existing skill covers the specific challenge of safely integrating CLI tool cost data (sw-cost.sh output) into a real-time web dashboard without staleness, sync, or calculation errors—this is a distinct concern from generic API/data-pipeline skills.",
+            "content": "## Cost Data Dashboard Integration\n\n### Problem\nCost data lives in sw-cost.sh (CLI tool writing to ~/.shipwright/costs.json) but operators need visibility in the web dashboard. Safe integration requires:\n1. Data freshness guarantees (timestamps, staleness detection)\n2. Calculation correctness (cost-per-successful-pipeline must match CLI output)\n3. Graceful degradation when cost data is unavailable\n4. Schema evolution (if costs.json format changes)\n\n### Approach\n\n**Data Loading**\n- Read costs.json and check timestamp; if >1 hour old, mark as stale\n- Emit staleness warning in API response (`costDataAge`, `isStale` fields)\n- If file missing/unreadable, return 202 (success) with empty data; don't error—let widget render gracefully\n\n**Calculation Verification**\n- Replicate cost-per-successful-pipeline calculation in dashboard/server.ts\n- Add a comment linking to sw-cost.sh line number where the same calc happens\n- Unit-test calculation against fixed sw-cost.sh outputs to catch drift\n\n**API Contract**\n```typescript\nGET /api/cost-trend?days=30\n{\n  \"costPerPipeline\": [{ \"date\": \"2026-09-28\", \"value\": 4.23 }],\n  \"costDataTimestamp\": \"2026-09-28T08:00:00Z\",\n  \"costDataAgeSecs\": 3600,\n  \"isStale\": false,\n  \"dailyBudget\": 100,\n  \"budgetRemaining\": 23.45,\n  \"budgetWarning\": null\n}\n```\n\n**Staleness Handling**\n- Frontend checks `isStale` and shows muted/grayed widget + timestamp\n- If cost data >24h old, show warning: \"Cost data not refreshed; pipeline costs may have changed\"\n- Widget still renders (don't break the dashboard), but clearly signals data is stale\n\n**Testing**\n- Mock costs.json with known values; verify endpoint calc matches\n- Test staleness detection: create file, wait, check timestamp\n- Test schema evolution: if cost.json ever changes, endpoint returns 202 + unchanged frontend behavior\n- E2E: trigger a real pipeline run, wait for sw-cost.sh update, verify dashboard reflects new cost\n"
+          }
+        ],
+        "review_focus": [
+          "Cost-per-successful-pipeline calculation matches sw-cost.sh (verify via unit test against sw-cost.sh output, not just logic review)",
+          "Staleness detection and graceful degradation when cost data unavailable or >1h old",
+          "Budget remaining calculation correctness (off-by-one errors can mislead operators)",
+          "Sparkline widget visual clarity: target line ($5) salient, trend direction obvious, no misleading scales",
+          "Test coverage completeness: edge cases (no cost data, cost spike, budget exceeded, stale data)",
+          "API endpoint latency acceptable for interactive dashboard (target <500ms)",
+          "Dashboard doesn't break if `/api/cost-trend` is slow/unavailable (graceful degradation)"
+        ],
+        "risk_areas": [
+          "Cost data staleness: if sw-cost.sh hasn't run recently, dashboard shows false confidence in budget health; needs clear timestamp + staleness warnings",
+          "Calculation drift: cost-per-successful-pipeline in dashboard diverges from CLI `sw-cost.sh` output due to schema/rounding differences; catch with synchronized unit tests",
+          "Sparkline misleading visualization: sparkline without scale context or outlier flagging can obscure real cost trends; needs design review for visual accuracy",
+          "Budget calculation error: off-by-one or rounding mistake in 'budget remaining' could flip operator decision (spend/freeze); needs rigorous validation",
+          "Missing edge case tests: no coverage for partial days, budget reset, pipeline with zero cost, cost data schema changes",
+          "Real-time polling overhead: if frontend polls too often, wastes bandwidth; if too rarely, stale data; needs documented cadence"
+        ]
+      },
+      "timestamp": 1790583595,
+      "ttl": 3600
+    },
+    "bd67a70b7822c1f5c513a668bcdab809": {
+      "result": {
+        "results": [
+          {
+            "file": "success-patterns.json (test-repo-comptime)",
+            "relevance": 85,
+            "summary": "Contains comprehensive cost_usd, completion_time_seconds, and multi-stage execution data (intake, build, test). Best example of available cost tracking data structure for dashboard planning."
+          },
+          {
+            "file": "success-patterns.json (test-repo-ranking)",
+            "relevance": 75,
+            "summary": "Shows multiple patterns with consistent cost tracking across different issues. Demonstrates pattern system reliability and cost data availability across diverse problem types."
+          },
+          {
+            "file": "index.json",
+            "relevance": 60,
+            "summary": "Demonstrates pattern indexing and categorization by signature, stage, and pattern type. Relevant for organizing cost/budget data hierarchically in dashboard."
+          },
+          {
+            "file": "success-patterns.json (test-repo-outcomes)",
+            "relevance": 55,
+            "summary": "Simple example with cost tracking (cost_usd: 0.50). Shows basic cost data availability and structure for feature baseline."
+          },
+          {
+            "file": "success-patterns.json (test-repo-789)",
+            "relevance": 50,
+            "summary": "Contains cost_usd, complexity, and iterations_needed fields showing relationship between effort metrics and costs. Useful for understanding budget trend drivers."
+          }
+        ]
+      },
+      "timestamp": 1790583654,
+      "ttl": 1800
+    },
+    "d374e321b02d4fdf0646c8c34f1925e0": {
+      "result": {
+        "results": [
+          {
+            "file": "failures.json",
+            "relevance": 35,
+            "summary": "Tracks resolved and unresolved failures with root causes and fixes. Most recent entry shows database connection issues with diagnostic patterns. Potentially useful for understanding failure categorization and remediation."
+          },
+          {
+            "file": "index.json",
+            "relevance": 28,
+            "summary": "Contains failure pattern signatures with stage context and fixes. Shows general approach to classifying failures and applying remedies. Could inform debugging methodology for validation failures."
+          },
+          {
+            "file": "fleet-shared-patterns.json",
+            "relevance": 22,
+            "summary": "Demonstrates cross-repo pattern capture and sharing mechanism. Shows how common failures are tracked across multiple repositories, though current data is about npm module issues, not dashboard/cost features."
+          }
+        ]
+      },
+      "timestamp": 1790583792,
+      "ttl": 1800
+    },
+    "ca10222216173fcaf10e6c937095b81d": {
+      "result": {
+        "results": [
+          {
+            "file": "success-patterns.json (test-repo-comptime)",
+            "relevance": 95,
+            "summary": "Contains realistic cost ($3.75) and completion time (1234s) data with multiple stages (intake, build, test) — directly informs cost-per-pipeline metric design"
+          },
+          {
+            "file": "success-patterns.json (test-repo-789)",
+            "relevance": 85,
+            "summary": "Shows cost tracking ($2.00, 1200s) across build stage with high complexity — provides pattern data for successful pipeline cost calculations"
+          },
+          {
+            "file": "fleet-shared-patterns.json",
+            "relevance": 70,
+            "summary": "Multi-repo pattern tracking with contributions per repo — informs dashboard design for fleet-wide cost trends and budget headroom across repositories"
+          },
+          {
+            "file": "failures.json",
+            "relevance": 60,
+            "summary": "Tracks failure patterns with resolution status and root causes — helps define 'successful pipeline' boundaries and budget impact of failed runs"
+          },
+          {
+            "file": "success-patterns.json (test-repo-ranking)",
+            "relevance": 55,
+            "summary": "Multiple patterns with cost data ($0.50 each) — demonstrates pattern aggregation needed for dashboard trend calculations"
+          }
+        ]
+      },
+      "timestamp": 1790583828,
+      "ttl": 1800
+    },
+    "2654301c5ac3e912685ced4f89d6de78": {
+      "result": {
+        "results": [
+          {
+            "file": "failures.json",
+            "relevance": 28,
+            "summary": "Shows resolved and unresolved failure patterns (anti-patterns) including database connection refused, which demonstrates what approaches don't work and why"
+          },
+          {
+            "file": "success-patterns.json (test-repo-ranking)",
+            "relevance": 22,
+            "summary": "Tracks multiple patterns with cost_usd and stage metadata, relevant because the feature requires cost tracking and metric visualization in dashboards"
+          },
+          {
+            "file": "index.json",
+            "relevance": 18,
+            "summary": "Contains pattern metadata structure with stage and pattern_type classification, provides framework for organizing design patterns and failure signatures"
+          }
+        ]
+      },
+      "timestamp": 1790583857,
+      "ttl": 1800
     }
   }
 }
