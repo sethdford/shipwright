@@ -1401,6 +1401,171 @@
       },
       "timestamp": 1775344537,
       "ttl": 3600
+    },
+    "68eef15ab6c289f48908df1add8a315d": {
+      "result": {
+        "complexity": 8,
+        "risk_level": "medium",
+        "success_probability": 72,
+        "recommended_template": "standard",
+        "issue_type": "refactor",
+        "key_risks": [
+          "Behavioral changes introduced during logic extraction despite intent to preserve CLI behavior",
+          "Incomplete test coverage of edge cases in session-continuity and restart logic",
+          "Complex interdependencies between extracted modules difficult to cleanly separate",
+          "Internal API breakage affecting other scripts or loop callers",
+          "Performance or behavior regression in error-summary generation or progress persistence"
+        ],
+        "implementation_hints": [
+          "Extract session-continuity module first (most self-contained) to validate extraction pattern before tackling iteration/progress",
+          "Create end-to-end integration test exercising full loop with all new modules before incremental unit tests",
+          "Map all loop flags and environment variables to target modules before extraction to identify hidden dependencies",
+          "Preserve loop.sh wrapper script logic exactly during refactor; test flag forwarding to extracted modules with existing test suite",
+          "Generate module boundary diagram documenting data flow between iteration/session/progress/restart before coding"
+        ]
+      },
+      "timestamp": 1790583464,
+      "ttl": 3600
+    },
+    "2fb191d9bd1a78e6c2cc8807b7197bc1": {
+      "result": {
+        "estimated_iterations": 8
+      },
+      "timestamp": 1790583476,
+      "ttl": 1800
+    },
+    "8b3f532f7eab7c66d5005a37861062ec": {
+      "result": {
+        "estimated_cost_usd": 13.50,
+        "estimated_iterations": 4,
+        "estimated_tokens": 285000,
+        "likely_failure_stage": "build",
+        "confidence": 68
+      },
+      "timestamp": 1790583484,
+      "ttl": 3600
+    },
+    "a38746002e574cd27650140cecb08ba7": {
+      "result": {
+        "issue_type": "refactor",
+        "confidence": 0.88,
+        "secondary_domains": [
+          "infrastructure",
+          "testing",
+          "documentation"
+        ],
+        "complexity_assessment": {
+          "score": 7,
+          "reasoning": "High-risk monolith decomposition of critical loop infrastructure (2713 lines) requiring strict API compatibility, comprehensive test parity, and careful module boundary design. Complexity is manageable with clear scope but demands meticulous execution."
+        },
+        "skill_plan": {
+          "plan": [
+            "architecture-design",
+            "testing-strategy"
+          ],
+          "design": [
+            "architecture-design",
+            "testing-strategy"
+          ],
+          "build": [],
+          "review": [
+            "adversarial-quality",
+            "architecture-design"
+          ],
+          "compound_quality": [
+            "testing-strategy",
+            "adversarial-quality"
+          ],
+          "pr": [
+            "pr-quality"
+          ],
+          "deploy": [],
+          "validate": [
+            "testing-strategy"
+          ],
+          "monitor": []
+        },
+        "skill_rationale": {
+          "architecture-design": "Define module boundaries for iteration/session/progress/restart logic to prevent leakage between concerns and establish clear APIs that future loop modifications can extend.",
+          "testing-strategy": "Plan test migration strategy and verify parity between existing sw-loop-test.sh assertions and new modular test files to catch regressions in session continuity, restart logic, and error handling.",
+          "adversarial-quality": "Storm test the new modules for edge cases in session persistence, context window boundary conditions, and restart recovery—loop failures cause pipeline failures.",
+          "pr-quality": "Write a PR that clearly explains the module decomposition rationale, shows before/after module responsibilities, and demonstrates CLI compatibility through test passing.",
+          "bash-refactoring-safety": "Safely decompose bash monoliths while preserving sourcing semantics, avoiding circular dependencies, and maintaining bash 3.2 compatibility—critical for scripts/lib/ modules."
+        },
+        "generated_skills": [
+          {
+            "name": "bash-refactoring-safety",
+            "reason": "No existing skill covers safe decomposition of large shell scripts into modular sourced libraries while maintaining backward compatibility and bash 3.2 constraints.",
+            "content": "## Bash Monolith Decomposition & Refactoring Safety\n\nWhen splitting a large shell script (>1000 lines) into sourced lib modules, three mistakes cause silent failures:\n\n### 1. Circular Dependency Trap\n**Problem**: Module A sources module B, which sources module A (direct or indirect). Bash silently re-executes initialization code, corrupts variables.\n\n**Prevention**:\n- Map module dependencies upfront (draw a DAG).\n- Each function has ONE owner module; never duplicate across modules.\n- Source order in orchestrator must be topological (leaf modules first).\n- Add guard clauses: `[[ -n \"${_lib_loop_iteration_loaded:-}\" ]] && return` at module start.\n\n### 2. Variable Scope & Mutation\n**Problem**: Helper functions in new modules assume globals exist (set by orchestrator). When sourced independently for testing, globals are undefined.\n\n**Prevention**:\n- Every function must declare its dependencies as comments: `# requires: global_var, _internal_state`\n- Prefix internal module state with `_<module>_` (e.g., `_loop_iteration_counter`)\n- Test modules in isolation first (source only the lib module, not orchestrator)\n\n### 3. Bash 3.2 Incompatibility in New Code\n**Problem**: Developers use `declare -A` (associative arrays, bash 4.0+) in new lib modules; scripts fail on macOS (bash 3.2).\n\n**Prevention**:\n- Add pre-commit hook check: grep for bash 4.0+ syntax in new lib files\n- Use `[[ $(bash --version | head -1) == \"GNU bash, version 3.2\" ]] && echo incompatible`\n- Approved alternatives for bash 3.2:\n  - No: `${var,,}` (lowercase) → Yes: `echo \"$var\" | tr A-Z a-z`\n  - No: `readarray` → Yes: `while read line; done < file`\n  - No: `declare -A assoc` (maps) → Yes: use `eval` with namespaced vars or flat files (line-based)\n\n### 4. Test Parity Across Monolith → Modular Split\n**Problem**: Old monolithic test runs all functions together; modular tests run each function in isolation. Edge cases like \"state leakage between iterations\" only show in integrated tests.\n\n**Prevention**:\n- Keep original monolithic test file unchanged (sw-loop-test.sh) and passing\n- New modular test files test each module in isolation\n- Add integration test file (sw-lib-loop-integration-test.sh) that sources all modules and runs end-to-end scenarios\n- Integration test must cover: loop across 3+ iterations, session restart, error recovery\n\n### 5. Sourcing vs. Subshell Behavior\n**Problem**: Sourced modules run in parent shell (inherit/mutate globals); subshells don't. `( cd dir && cmd )` subshell loses state; sourced `source dir/lib.sh` doesn't.\n\n**Prevention**:\n- Be explicit: sourced modules CAN mutate caller state → document what they mutate\n- If you need to isolate execution, spawn a new `bash -c` subshell explicitly, not via sourcing\n- Test: write a function in the new module that mutates a global, verify it stays mutated after sourcing\n\n### Checklist for sw-loop.sh → scripts/lib/loop-* decomposition\n\n- [ ] Dependency DAG drawn and validated (no cycles)\n- [ ] Each function owns one module only\n- [ ] Guard clauses in each module to prevent double-sourcing\n- [ ] All globals and internal state prefixed correctly\n- [ ] grep -r for bash 4.0+ syntax in new lib files (exit 1 if found)\n- [ ] Original sw-loop-test.sh passes unchanged (backward compatibility)\n- [ ] Each new lib module has isolated unit test (sw-lib-loop-*-test.sh)\n- [ ] Integration test runs end-to-end loop scenarios with all modules\n- [ ] Source order in sw-loop.sh orchestrator matches dependency order\n- [ ] Pre-commit hook rejects new lib files with bash 4.0+ syntax"
+          }
+        ],
+        "review_focus": [
+          "Module boundaries are cohesive and non-overlapping (iteration vs. session vs. progress vs. restart)",
+          "All assertions and edge cases from sw-loop-test.sh are replicated in new modular test files",
+          "No circular module dependencies; source order in orchestrator matches topological dependency order",
+          "Bash 3.2 compatibility maintained (no declare -A, readarray, lowercase/uppercase expansions)",
+          "Session continuity and restart recovery logic correctly extracted and tested",
+          "Global variable mutation and scoping is explicit and tested in isolation",
+          "CLI flags and behavior unchanged; full backward compatibility verified",
+          "CLAUDE.md core-scripts and test-suites AUTO sections accurately reflect new files and line counts"
+        ],
+        "risk_areas": [
+          "Session continuity logic is complex and critical to build loop—breaking this causes all pipelines to fail",
+          "Restart logic manages context window state and Claude session reuse—incorrect extraction could leak state across iterations",
+          "Test parity must be verified exhaustively; incomplete test migration masks behavioral regressions",
+          "Circular module dependencies or variable scoping issues cause silent failures in bash sourcing",
+          "Bash 3.2 incompatibility introduced in new modules breaks macOS (CI would catch, but user experience on Intel Macs is poor)"
+        ]
+      },
+      "timestamp": 1790583562,
+      "ttl": 3600
+    },
+    "bc1882357a226aa99c65815aff2a8be8": {
+      "result": {
+        "results": [
+          {
+            "file": "failures.json",
+            "relevance": 70,
+            "summary": "Contains unbounded loop timeout patterns and failures—directly relevant to understanding sw-loop.sh issues before refactoring into focused lib modules"
+          },
+          {
+            "file": "fleet-shared-patterns.json",
+            "relevance": 52,
+            "summary": "Documents 'Cannot find module' errors and npm install fixes—critical for module loading when splitting sw-loop into scripts/lib/ modules"
+          },
+          {
+            "file": "success-patterns.json (test-repo-789)",
+            "relevance": 42,
+            "summary": "Shows successful refactoring patterns in scripts/ directory (sw-daemon.sh), demonstrating approach for script-level changes and complexity estimation"
+          },
+          {
+            "file": "index.json",
+            "relevance": 35,
+            "summary": "Captures test failure patterns and timeout fixes relevant to planning test strategy for the refactored module components"
+          },
+          {
+            "file": "success-patterns.json (test-repo-comptime)",
+            "relevance": 28,
+            "summary": "Documents timing and cost for multi-stage refactoring work (intake→build→test), useful for estimating effort for sw-loop decomposition"
+          }
+        ]
+      },
+      "timestamp": 1790583626,
+      "ttl": 1800
+    },
+    "ae247cf625bedc564532fc8f199bed66": {
+      "result": [
+        {
+          "type": "result",
+          "result": "I am trying the same approach again.",
+          "usage": {
+            "input_tokens": 0,
+            "output_tokens": 0
+          }
+        }
+      ],
+      "timestamp": 1790583715,
+      "ttl": 1800
     }
   }
 }
