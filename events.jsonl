@@ -223,3 +223,4 @@
 {"ts":"2026-09-29T18:14:47Z","ts_epoch":1790705687,"type":"patrol.finding","check":"untested_script","script":"sw-test-all.sh","lines":199,"usage":0}
 {"ts":"2026-09-29T18:14:47Z","ts_epoch":1790705687,"type":"patrol.finding","check":"untested_script","script":"sw-event-schema-sync.sh","lines":93,"usage":0}
 {"ts":"2026-09-29T20:05:46Z","ts_epoch":1790712346,"type":"hygiene_platform_refactor","hardcoded":49,"fallback":69,"todo":51}
+{"ts":"2026-09-30T00:15:01Z","ts_epoch":1790727301,"type":"hygiene_platform_refactor","hardcoded":49,"fallback":69,"todo":51}
