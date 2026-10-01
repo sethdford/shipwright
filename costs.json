@@ -1,1 +1,13 @@
-{"entries":[],"summary":{}}
+{
+  "entries": [
+    {"ts_epoch": 1790278400, "cost_usd": 1.50, "model": "sonnet", "stage": "build", "issue": "42", "input_tokens": 1000, "output_tokens": 500},
+    {"ts_epoch": 1790282000, "cost_usd": 1.55, "model": "sonnet", "stage": "build", "issue": "42", "input_tokens": 1000, "output_tokens": 500},
+    {"ts_epoch": 1790285600, "cost_usd": 1.60, "model": "sonnet", "stage": "build", "issue": "43", "input_tokens": 1000, "output_tokens": 500},
+    {"ts_epoch": 1790289200, "cost_usd": 1.65, "model": "sonnet", "stage": "build", "issue": "43", "input_tokens": 1000, "output_tokens": 500},
+    {"ts_epoch": 1790292800, "cost_usd": 1.50, "model": "sonnet", "stage": "build", "issue": "44", "input_tokens": 1000, "output_tokens": 500},
+    {"ts_epoch": 1790296400, "cost_usd": 10.00, "model": "opus", "stage": "build", "issue": "44", "input_tokens": 2000, "output_tokens": 3000},
+    {"ts_epoch": 1790300000, "cost_usd": 1.50, "model": "sonnet", "stage": "intake", "issue": "45", "input_tokens": 500, "output_tokens": 200},
+    {"ts_epoch": 1790303600, "cost_usd": 1.55, "model": "sonnet", "stage": "build", "issue": "45", "input_tokens": 1000, "output_tokens": 500}
+  ],
+  "summary": {}
+}
