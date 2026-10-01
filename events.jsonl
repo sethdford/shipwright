@@ -355,3 +355,5 @@
 {"ts":"2026-10-01T19:50:13Z","ts_epoch":1790884213,"type":"plan.validation_failure","issue":0,"attempt":2,"failure_mode":"unknown"}
 {"ts":"2026-10-01T19:50:13Z","ts_epoch":1790884213,"type":"plan.validated","issue":0,"valid":"false","attempts":2}
 {"ts":"2026-10-01T19:50:14Z","ts_epoch":1790884214,"type":"stage.completed","issue":0,"stage":"plan","duration_s":1,"result":"success"}
+{"ts":"2026-10-01T20:06:01Z","ts_epoch":1790885161,"type":"hygiene_platform_refactor","hardcoded":49,"fallback":69,"todo":51}
+{"ts":"2026-10-01T20:06:24Z","ts_epoch":1790885184,"type":"strategic.cycle_complete","issues_created":0,"issues_skipped":3}
