@@ -6,7 +6,7 @@
       "root_cause": "sw-intent-analysis-test asserts analyze_intent's JSON output includes version, goal, and criteria fields, but the current schema/implementation omits one or more of them",
       "fix": "Update analyze_intent (or its schema) in sw-intent-analysis.sh to emit version, goal, and criteria fields matching the test's expected schema",
       "seen_count": 200,
-      "last_seen": "2026-10-02T19:29:57Z",
+      "last_seen": "2026-10-02T20:40:51Z",
       "category": "test_failure",
       "signature_hash": "e1a285258fe63781b7370b0d086ad87b",
       "signature": "\u001b[<n>;2;<n>;<n>;<n>m\u001b[1m✓\u001b[0m reveal shows <path> pass count on failure"
@@ -16,8 +16,8 @@
       "pattern": "\u001b[2m  loop behavior: iterations on test failure\u001b[0m",
       "root_cause": "Test suite itself passed (all PASS, 0 FAIL) but the pipeline stage was flagged for iterating due to loop-behavior/RL logging noise being misread as failure signal",
       "fix": "Verify the actual test exit code rather than log content matching; ensure sw-autoresearch-e2e-test.sh output doesn't trigger false-positive failure pattern matching in the pipeline's error classifier",
-      "seen_count": 49,
-      "last_seen": "2026-10-02T09:37:06Z",
+      "seen_count": 50,
+      "last_seen": "2026-10-02T19:31:20Z",
       "category": "flaky",
       "signature_hash": "4257c245052f",
       "signature": "\u001b[2m loop behavior: iterations on test failure\u001b[0m"
@@ -324,11 +324,11 @@
     {
       "stage": "test",
       "pattern": "\u001b[38;2;74;222;128m✓\u001b[0m Uses set -euo pipefail",
-      "root_cause": "The logs shown all pass (PASS/FAIL: 0 failures across the policy-learner, bandit-selector, reward and autoresearch e2e suites). The matched pattern '✓ Uses set -euo pipefail' is a passing check, not an error. The real failing test is outside the last 200 lines.",
-      "fix": "Search the full test output for 'FAIL:' counts above 0 or '✗' markers (e.g. grep -E 'FAIL: [1-9]|✗') to find the actual failing suite, and ignore the passing 'Uses set -euo pipefail' line.",
+      "root_cause": "sw-intent-analysis-test failed with exit 1 after 30s (a test assertion such as 'Uses set -euo pipefail' failing or hitting a timeout waiting on Claude), and sw-e2e-integration-test separately timed out after 301s; the visible log is truncated before the suite summary.",
+      "fix": "Run scripts/sw-intent-analysis-test.sh directly to see the failing assertion and fix the script or test; mock the claude CLI in the e2e-integration test or raise its timeout.",
       "seen_count": 1,
       "last_seen": "2026-10-02T01:21:14Z",
-      "category": "unknown"
+      "category": "test_failure"
     }
   ]
 }
