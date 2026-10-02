@@ -92,3 +92,6 @@
 {"ts":"2026-10-02T03:44:24Z","ts_epoch":1790912664,"type":"reasoning.trace","job_id":"pipeline-3698964-42","complexity":"medium","risk":50,"template":"standard"}
 {"ts":"2026-10-02T03:44:25Z","ts_epoch":1790912665,"type":"reasoning.trace","job_id":"pipeline-3699642-42","complexity":"medium","risk":50,"template":"standard"}
 {"ts":"2026-10-02T03:44:26Z","ts_epoch":1790912666,"type":"reasoning.trace","job_id":"pipeline-3700312-42","complexity":"medium","risk":50,"template":"standard"}
+{"ts":"2026-10-02T04:06:04Z","ts_epoch":1790913964,"type":"hygiene_platform_refactor","hardcoded":49,"fallback":69,"todo":51}
+{"ts":"2026-10-02T04:06:30Z","ts_epoch":1790913990,"type":"strategic.issue_created","title":"Surface stale AUTO-doc sections and hygiene counts as a daemon health signal","priority":"P4","complexity":"fast"}
+{"ts":"2026-10-02T04:06:30Z","ts_epoch":1790913990,"type":"strategic.cycle_complete","issues_created":1,"issues_skipped":2}
