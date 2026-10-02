@@ -432,3 +432,6 @@
 {"ts":"2026-10-02T14:55:41Z","ts_epoch":1790952941,"type":"risk.outcome","issue":0,"predicted_risk":0,"actual_failure":"false"}
 {"ts":"2026-10-02T14:55:41Z","ts_epoch":1790952941,"type":"model.outcome","issue":0,"stage":"intake","model":"opus","success":"true"}
 {"ts":"2026-10-02T14:55:41Z","ts_epoch":1790952941,"type":"pipeline.cost","input_tokens":0,"output_tokens":0,"model":"sonnet","cost_usd":0.0000}
+{"ts":"2026-10-02T16:14:06Z","ts_epoch":1790957646,"type":"hygiene_platform_refactor","hardcoded":49,"fallback":69,"todo":51}
+{"ts":"2026-10-02T16:14:29Z","ts_epoch":1790957669,"type":"strategic.issue_created","title":"Classify context-exhaustion vs. genuine code-error failures in daemon metrics","priority":"P0","complexity":"standard"}
+{"ts":"2026-10-02T16:14:29Z","ts_epoch":1790957669,"type":"strategic.cycle_complete","issues_created":1,"issues_skipped":2}
