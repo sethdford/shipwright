@@ -362,3 +362,7 @@
 {"ts":"2026-10-01T23:36:24Z","ts_epoch":1790897784,"type":"reasoning.trace","job_id":"pipeline-3547386-42","complexity":"medium","risk":50,"template":"standard"}
 {"ts":"2026-10-01T23:36:25Z","ts_epoch":1790897785,"type":"reasoning.trace","job_id":"pipeline-3548056-42","complexity":"medium","risk":50,"template":"standard"}
 {"ts":"2026-10-01T23:36:26Z","ts_epoch":1790897786,"type":"reasoning.trace","job_id":"pipeline-3549097-42","complexity":"medium","risk":50,"template":"standard"}
+{"ts":"2026-10-02T00:14:52Z","ts_epoch":1790900092,"type":"hygiene_platform_refactor","hardcoded":49,"fallback":69,"todo":51}
+{"ts":"2026-10-02T00:15:16Z","ts_epoch":1790900116,"type":"strategic.issue_created","title":"Pre-build validation gate: fail fast when test/lint commands are missing or broken","priority":"P0","complexity":"standard"}
+{"ts":"2026-10-02T00:15:20Z","ts_epoch":1790900120,"type":"strategic.issue_created","title":"Surface per-stage failure classification accuracy in `shipwright dora`","priority":"P0","complexity":"standard"}
+{"ts":"2026-10-02T00:15:20Z","ts_epoch":1790900120,"type":"strategic.cycle_complete","issues_created":2,"issues_skipped":1}
