@@ -1,8 +1,1 @@
-[
-  {"issue": 100, "stage": "build", "cost_usd": 0.50},
-  {"issue": 100, "stage": "test", "cost_usd": 0.25},
-  {"issue": 101, "stage": "build", "cost_usd": 0.75},
-  {"issue": 101, "stage": "test", "cost_usd": 0.30},
-  {"issue": 102, "stage": "build", "cost_usd": 0.60},
-  {"issue": 102, "stage": "review", "cost_usd": 0.40}
-]
+{"entries":[],"summary":{}}
