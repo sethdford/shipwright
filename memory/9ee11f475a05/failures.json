@@ -5,8 +5,8 @@
       "pattern": "\u001b[38;2;74;222;128m\u001b[1m✓\u001b[0m reveal shows 1/3 pass count on failure",
       "root_cause": "sw-intent-analysis-test asserts analyze_intent's JSON output includes version, goal, and criteria fields, but the current schema/implementation omits one or more of them",
       "fix": "Update analyze_intent (or its schema) in sw-intent-analysis.sh to emit version, goal, and criteria fields matching the test's expected schema",
-      "seen_count": 200,
-      "last_seen": "2026-10-02T20:49:31Z",
+      "seen_count": 201,
+      "last_seen": "2026-10-02T20:58:11Z",
       "category": "test_failure",
       "signature_hash": "e1a285258fe63781b7370b0d086ad87b",
       "signature": "\u001b[<n>;2;<n>;<n>;<n>m\u001b[1m✓\u001b[0m reveal shows <path> pass count on failure"
@@ -16,8 +16,8 @@
       "pattern": "\u001b[2m  loop behavior: iterations on test failure\u001b[0m",
       "root_cause": "Test suite itself passed (all PASS, 0 FAIL) but the pipeline stage was flagged for iterating due to loop-behavior/RL logging noise being misread as failure signal",
       "fix": "Verify the actual test exit code rather than log content matching; ensure sw-autoresearch-e2e-test.sh output doesn't trigger false-positive failure pattern matching in the pipeline's error classifier",
-      "seen_count": 50,
-      "last_seen": "2026-10-02T20:09:20Z",
+      "seen_count": 49,
+      "last_seen": "2026-10-02T09:37:06Z",
       "category": "flaky",
       "signature_hash": "4257c245052f",
       "signature": "\u001b[2m loop behavior: iterations on test failure\u001b[0m"
@@ -27,8 +27,8 @@
       "pattern": "Failed: 1",
       "root_cause": "sw-intent-analysis-test fails because analyze_intent's generated JSON omits required fields (version, goal, criteria); sw-e2e-integration-test fails as a side effect of a stale pipeline lock (pipeline-3749) left running from a prior test run, not a new regression",
       "fix": "add the missing version/goal/criteria fields to the intent-analysis JSON schema/generator, and clear/reset stale pipeline locks (or run `shipwright pipeline abort`) before the e2e-integration test suite starts",
-      "seen_count": 32,
-      "last_seen": "2026-10-02T19:28:06Z",
+      "seen_count": 31,
+      "last_seen": "2026-10-02T17:37:29Z",
       "category": "test_failure",
       "signature_hash": "0ffe097d3b7a598c5b9ebe8e3cd8d7e4",
       "signature": "failed: 1"
@@ -324,8 +324,8 @@
     {
       "stage": "test",
       "pattern": "\u001b[38;2;74;222;128m✓\u001b[0m Uses set -euo pipefail",
-      "root_cause": "Two test suites fail: sw-daemon-test asserts classify_failure is called inside daemon_on_failure (the retry logic was refactored/moved, so the grep check no longer matches), and sw-intent-analysis-test asserts the generated intent schema contains version/goal/criteria fields that the analyzer's output or schema no longer provides.",
-      "fix": "Update the daemon test's grep to look where classify_failure is now invoked (or restore the call in daemon_on_failure), and make the intent-analysis schema/output include the required version, goal, and criteria fields (or update the test's expectations to match the current schema).",
+      "root_cause": "Two test suites fail: sw-intent-analysis-test fails its schema check (generated intent JSON missing required fields version/goal/criteria), and sw-loop-test fails its 'Loop stuckness detection' test, probably because recent loop changes (stable prompt prefix, session continuity) altered the code it greps for.",
+      "fix": "Check what the schema assertion in sw-intent-analysis-test.sh expects against the schema in the intent-analysis lib and align them. Then see which pattern the 'Loop stuckness detection' test greps for in sw-loop.sh and restore it or update the test to match the refactor. Re-run both suites.",
       "seen_count": 1,
       "last_seen": "2026-10-02T01:21:14Z",
       "category": "test_failure"
