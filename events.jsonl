@@ -378,3 +378,5 @@
 {"ts":"2026-10-02T07:09:09Z","type":"adaptive_model.recorded","iteration":"0","model":"opus","test_result":"pass","reason":"first_iteration","escalated":"false","downgraded":"false"}
 {"ts":"2026-10-02T07:09:09Z","type":"adaptive_model.recorded","iteration":"1","model":"opus","test_result":"fail","reason":"already_at_maximum_model","escalated":"false","downgraded":"false"}
 {"ts":"2026-10-02T07:09:09Z","type":"adaptive_model.learned","escalation_rate":"0","downgrade_rate":"0"}
+{"ts":"2026-10-02T08:43:11Z","ts_epoch":1790930591,"type":"hygiene_platform_refactor","hardcoded":49,"fallback":69,"todo":51}
+{"ts":"2026-10-02T08:43:36Z","ts_epoch":1790930616,"type":"strategic.cycle_complete","issues_created":0,"issues_skipped":1}
