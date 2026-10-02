@@ -1,6 +1,6 @@
 {
   "repo": "sethdford/shipwright",
-  "captured_at": "2026-10-01T23:34:20Z",
+  "captured_at": "2026-10-02T00:25:57Z",
   "project": {
     "type": "node",
     "framework": "",
@@ -10,7 +10,7 @@
   },
   "conventions": {
     "source_dir": "src/",
-    "test_pattern": "*.test.js",
+    "test_pattern": "*.test.ts",
     "import_style": "commonjs"
   }
 }
