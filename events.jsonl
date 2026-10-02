@@ -64,3 +64,25 @@
 {"ts":"2026-10-02T06:02:47Z","type":"adaptive_model.recorded","iteration":"3","model":"sonnet","test_result":"fail","reason":"low_convergence_score_escalate_haiku_to_sonnet","escalated":"true","downgraded":"false"}
 {"ts":"2026-10-02T06:02:47Z","type":"adaptive_model.init","artifacts_dir":"/tmp/tmp.JV7ljhmSwq/artifacts"}
 {"ts":"2026-10-02T06:02:47Z","type":"adaptive_model.recorded","iteration":"0","model":"opus","test_result":"fail","reason":"test_failure_with_reason","escalated":"true","downgraded":"false"}
+{"ts":"2026-10-02T06:24:34Z","ts_epoch":1790922274,"type":"patrol.started","dry_run":"false"}
+{"ts":"2026-10-02T06:24:37Z","ts_epoch":1790922277,"type":"patrol.issue_created","check":"dead_code","count":1}
+{"ts":"2026-10-02T06:24:41Z","ts_epoch":1790922281,"type":"patrol.finding","check":"recurring_failure","pattern":"[38;2;74;222;128m[1m✓[0m reveal shows 1/3 pass count on","seen_count":188}
+{"ts":"2026-10-02T06:24:42Z","ts_epoch":1790922282,"type":"patrol.issue_created","check":"recurring_failure","pattern":"[38;2;74;222;128m[1m✓[0m reveal shows 1/3 pass count on"}
+{"ts":"2026-10-02T06:24:42Z","ts_epoch":1790922282,"type":"patrol.finding","check":"recurring_failure","pattern":"[2m  loop behavior: iterations on test failure[0m","seen_count":51}
+{"ts":"2026-10-02T06:24:43Z","ts_epoch":1790922283,"type":"patrol.issue_created","check":"recurring_failure","pattern":"[2m  loop behavior: iterations on test failure[0m"}
+{"ts":"2026-10-02T06:24:43Z","ts_epoch":1790922283,"type":"patrol.finding","check":"recurring_failure","pattern":"Failed: 1","seen_count":27}
+{"ts":"2026-10-02T06:24:45Z","ts_epoch":1790922285,"type":"patrol.issue_created","check":"recurring_failure","pattern":"Failed: 1"}
+{"ts":"2026-10-02T06:24:45Z","ts_epoch":1790922285,"type":"patrol.finding","check":"recurring_failure","pattern":"[38;2;0;212;255m▸[0m Patrol recurring failures label con","seen_count":20}
+{"ts":"2026-10-02T06:24:46Z","ts_epoch":1790922286,"type":"patrol.issue_created","check":"recurring_failure","pattern":"[38;2;0;212;255m▸[0m Patrol recurring failures label con"}
+{"ts":"2026-10-02T06:24:46Z","ts_epoch":1790922286,"type":"patrol.finding","check":"recurring_failure","pattern":"Results: [38;2;74;222;128m[1m126 PASS[0m | [38;2;248;113","seen_count":11}
+{"ts":"2026-10-02T06:24:46Z","ts_epoch":1790922286,"type":"patrol.finding","check":"recurring_failure","pattern":"Results: [38;2;74;222;128m[1m127 PASS[0m | [38;2;248;113","seen_count":9}
+{"ts":"2026-10-02T06:24:47Z","ts_epoch":1790922287,"type":"patrol.finding","check":"recurring_failure","pattern":"Results: [38;2;74;222;128m[1m124 PASS[0m | [38;2;248;113","seen_count":6}
+{"ts":"2026-10-02T06:24:47Z","ts_epoch":1790922287,"type":"patrol.finding","check":"recurring_failure","pattern":"Results: [38;2;74;222;128m[1m123 PASS[0m | [38;2;248;113","seen_count":4}
+{"ts":"2026-10-02T06:24:48Z","ts_epoch":1790922288,"type":"patrol.finding","check":"recurring_failure","pattern":"[38;2;0;212;255m▸[0m Progress detects repeated error loo","seen_count":3}
+{"ts":"2026-10-02T06:24:49Z","ts_epoch":1790922289,"type":"patrol.finding","check":"untested_script","script":"sw-tracker-linear.sh","lines":568,"usage":7}
+{"ts":"2026-10-02T06:24:49Z","ts_epoch":1790922289,"type":"patrol.finding","check":"untested_script","script":"sw-tracker-jira.sh","lines":474,"usage":7}
+{"ts":"2026-10-02T06:24:49Z","ts_epoch":1790922289,"type":"patrol.finding","check":"untested_script","script":"sw-tracker-github.sh","lines":212,"usage":3}
+{"ts":"2026-10-02T06:24:49Z","ts_epoch":1790922289,"type":"patrol.finding","check":"untested_script","script":"sw-tmux-status.sh","lines":151,"usage":1}
+{"ts":"2026-10-02T06:24:49Z","ts_epoch":1790922289,"type":"patrol.finding","check":"untested_script","script":"sw-tmux-role-color.sh","lines":81,"usage":1}
+{"ts":"2026-10-02T06:24:49Z","ts_epoch":1790922289,"type":"patrol.finding","check":"untested_script","script":"sw-test-all.sh","lines":199,"usage":0}
+{"ts":"2026-10-02T06:24:49Z","ts_epoch":1790922289,"type":"patrol.finding","check":"untested_script","script":"sw-event-schema-sync.sh","lines":93,"usage":0}
