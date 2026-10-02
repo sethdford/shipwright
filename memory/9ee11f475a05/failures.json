@@ -5,8 +5,8 @@
       "pattern": "\u001b[38;2;74;222;128m\u001b[1m✓\u001b[0m reveal shows 1/3 pass count on failure",
       "root_cause": "sw-intent-analysis-test asserts analyze_intent's JSON output includes version, goal, and criteria fields, but the current schema/implementation omits one or more of them",
       "fix": "Update analyze_intent (or its schema) in sw-intent-analysis.sh to emit version, goal, and criteria fields matching the test's expected schema",
-      "seen_count": 190,
-      "last_seen": "2026-10-02T00:11:58Z",
+      "seen_count": 188,
+      "last_seen": "2026-10-01T23:17:49Z",
       "category": "test_failure",
       "signature_hash": "e1a285258fe63781b7370b0d086ad87b",
       "signature": "\u001b[<n>;2;<n>;<n>;<n>m\u001b[1m✓\u001b[0m reveal shows <path> pass count on failure"
@@ -16,8 +16,8 @@
       "pattern": "\u001b[2m  loop behavior: iterations on test failure\u001b[0m",
       "root_cause": "Test suite itself passed (all PASS, 0 FAIL) but the pipeline stage was flagged for iterating due to loop-behavior/RL logging noise being misread as failure signal",
       "fix": "Verify the actual test exit code rather than log content matching; ensure sw-autoresearch-e2e-test.sh output doesn't trigger false-positive failure pattern matching in the pipeline's error classifier",
-      "seen_count": 47,
-      "last_seen": "2026-09-28T00:51:22Z",
+      "seen_count": 48,
+      "last_seen": "2026-10-01T23:45:59Z",
       "category": "flaky",
       "signature_hash": "4257c245052f",
       "signature": "\u001b[2m loop behavior: iterations on test failure\u001b[0m"
@@ -27,8 +27,8 @@
       "pattern": "Failed: 1",
       "root_cause": "sw-intent-analysis-test fails because analyze_intent's generated JSON omits required fields (version, goal, criteria); sw-e2e-integration-test fails as a side effect of a stale pipeline lock (pipeline-3749) left running from a prior test run, not a new regression",
       "fix": "add the missing version/goal/criteria fields to the intent-analysis JSON schema/generator, and clear/reset stale pipeline locks (or run `shipwright pipeline abort`) before the e2e-integration test suite starts",
-      "seen_count": 27,
-      "last_seen": "2026-10-01T20:55:32Z",
+      "seen_count": 28,
+      "last_seen": "2026-10-02T00:19:50Z",
       "category": "test_failure",
       "signature_hash": "0ffe097d3b7a598c5b9ebe8e3cd8d7e4",
       "signature": "failed: 1"
@@ -315,11 +315,11 @@
     {
       "stage": "test",
       "pattern": "\u001b[38;2;74;222;128m✓\u001b[0m Pre-flight rejects 'nonexistent-runner-xyz --run' (not found on PATH)",
-      "root_cause": "The log shown is all passing suites; the quoted error pattern is a passing '✓' pre-flight check line, not a failure, so the real failing test is not in the last 200 lines (likely a later suite or a non-zero exit/timeout after the output was truncated).",
-      "fix": "Re-run `npm test` capturing the full output and grep for 'FAIL|✗|Failed: [1-9]' to find the actual failing suite, since the pre-flight 'nonexistent-runner-xyz' line is an expected-rejection test that passed.",
+      "root_cause": "sw-self-optimize-test fails 'Memory promotion copies cross-repo patterns' (jq --argjson receives invalid JSON during full analysis), and sw-e2e-integration-test timed out at 302s because it runs a real Claude build loop.",
+      "fix": "Validate or default the JSON passed to jq --argjson in sw-self-optimize.sh (e.g. fall back to '{}' or '0' when empty) and fix memory promotion; skip or raise the timeout for sw-e2e-integration-test when no real Claude/GitHub is available.",
       "seen_count": 1,
       "last_seen": "2026-10-01T19:40:38Z",
-      "category": "unknown"
+      "category": "test_failure"
     }
   ]
 }
