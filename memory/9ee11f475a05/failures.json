@@ -5,8 +5,8 @@
       "pattern": "\u001b[38;2;74;222;128m\u001b[1m✓\u001b[0m reveal shows 1/3 pass count on failure",
       "root_cause": "sw-intent-analysis-test asserts analyze_intent's JSON output includes version, goal, and criteria fields, but the current schema/implementation omits one or more of them",
       "fix": "Update analyze_intent (or its schema) in sw-intent-analysis.sh to emit version, goal, and criteria fields matching the test's expected schema",
-      "seen_count": 192,
-      "last_seen": "2026-10-02T05:34:43Z",
+      "seen_count": 191,
+      "last_seen": "2026-10-02T05:09:34Z",
       "category": "test_failure",
       "signature_hash": "e1a285258fe63781b7370b0d086ad87b",
       "signature": "\u001b[<n>;2;<n>;<n>;<n>m\u001b[1m✓\u001b[0m reveal shows <path> pass count on failure"
@@ -16,8 +16,8 @@
       "pattern": "\u001b[2m  loop behavior: iterations on test failure\u001b[0m",
       "root_cause": "Test suite itself passed (all PASS, 0 FAIL) but the pipeline stage was flagged for iterating due to loop-behavior/RL logging noise being misread as failure signal",
       "fix": "Verify the actual test exit code rather than log content matching; ensure sw-autoresearch-e2e-test.sh output doesn't trigger false-positive failure pattern matching in the pipeline's error classifier",
-      "seen_count": 48,
-      "last_seen": "2026-10-01T23:45:59Z",
+      "seen_count": 49,
+      "last_seen": "2026-10-02T05:39:12Z",
       "category": "flaky",
       "signature_hash": "4257c245052f",
       "signature": "\u001b[2m loop behavior: iterations on test failure\u001b[0m"
@@ -324,10 +324,19 @@
     {
       "stage": "test",
       "pattern": "\u001b[38;2;74;222;128m✓\u001b[0m Uses set -euo pipefail",
-      "root_cause": "sw-pipeline-test.sh E2E tests fail: plan/review stages don't produce plan.md/review.md artifacts in the mock environment (mock claude output not yielding expected files), plus a jq parse error on non-JSON output in the intelligence complexity path, causing the pipeline to exit 1. The README-comment change is unrelated.",
-      "fix": "Check the mock claude binary and plan/review stage output handling in sw-pipeline-test.sh and scripts/lib/pipeline-stages.sh so the artifacts get written, and guard the jq call that parses non-JSON log lines (e.g. the RL episode output) in the complexity/intelligence path; rerun with ./scripts/sw-pipeline-test.sh.",
+      "root_cause": "The 'error pattern' is just the ANSI-colored passing output line '✓ Uses set -euo pipefail' from a test; the logged suites (composer, self-optimize, predictive, frontier, connect) all report 0 failures, so no real failure is visible in the last 200 lines.",
+      "fix": "Look earlier in the full test log for a genuine failing suite or non-zero exit, and make the failure detector ignore passing '✓' lines (strip ANSI codes and match only '✗'/'FAIL'/'Failed: N>0').",
       "seen_count": 1,
       "last_seen": "2026-10-02T01:21:14Z",
+      "category": "unknown"
+    },
+    {
+      "stage": "test",
+      "pattern": "\u001b[38;2;0;212;255m▸\u001b[0m Intelligence: Consecutive failure auto-pause (3 threshold)... \u001b[38;2;74;222;128m✓\u001b[0m",
+      "root_cause": "sw-intent-analysis-test fails because the generated intent JSON schema lacks required fields (version, goal, criteria), and sw-e2e-integration-test times out at 302s since it runs a real Claude loop; the 'consecutive failure auto-pause' line is only an informational message, not the cause.",
+      "fix": "Update the intent analysis schema/output in the intent analysis module to include version, goal, and criteria (or fix the test's expectation), and skip or raise the timeout for the real-Claude e2e-integration test in CI.",
+      "seen_count": 1,
+      "last_seen": "2026-10-02T04:36:21Z",
       "category": "test_failure"
     }
   ]
