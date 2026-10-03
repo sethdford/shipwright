@@ -1666,33 +1666,33 @@
       "result": {
         "results": [
           {
-            "file": "success-patterns.json",
+            "file": "patterns.json",
             "relevance": 95,
-            "summary": "Contains 2 proven build/fix patterns with iteration counts, test strategies, file patterns, and cost data; directly applicable to similar build stage executions"
+            "summary": "Defines project structure (Node, vitest test runner, npm package manager, CommonJS imports, src/ source dir). Essential for understanding how to run builds and tests."
           },
           {
             "file": "retry-outcomes.json",
             "relevance": 90,
-            "summary": "Tracks model escalation retry strategy with 100% success rate (5/5) on build failures; critical for build failure recovery"
+            "summary": "Documents build_failure retry strategy (model_escalation) with 100% success rate across 5 attempts. Critical for handling build failures intelligently."
           },
           {
-            "file": "flaky-tests.json",
-            "relevance": 82,
-            "summary": "Identifies 2 flaky tests (test-1: 5 occurrences, test-auth: 8 occurrences) with high confidence; helps predict test stage instability during build"
+            "file": "metrics.json",
+            "relevance": 85,
+            "summary": "Baseline performance metrics: build_duration_s=7095, test_duration_s=1459. Essential reference for detecting performance regressions and setting timeouts."
           },
           {
             "file": "failures.json",
             "relevance": 78,
-            "summary": "Documents 8 test stage failures with root causes and fixes; build stage should be aware of sw-intent-analysis-test and sw-e2e-integration-test failures"
+            "summary": "Documents 9 test-stage failures with root causes (schema mismatches, stale locks, flaky suites) and fixes. Directly applicable to diagnosing and fixing build test failures."
           },
           {
-            "file": "knowledge.json",
-            "relevance": 72,
-            "summary": "Contains 4 test failure patterns (mktemp, cleanup output, regression JSON) with fix strategies; provides specific remediation approaches for build-stage test failures"
+            "file": "success-patterns.json",
+            "relevance": 70,
+            "summary": "Two successful patterns: bug fix (3 iterations, 45s, 6 commits, $2.50) and feature addition (3 iterations, 150s, 5 commits, $2.50). Reference for build approach and iteration strategy."
           }
         ]
       },
-      "timestamp": 1791030053,
+      "timestamp": 1791032045,
       "ttl": 1800
     },
     "32be68ec4b903951556509691ae3c64d": {
@@ -1907,6 +1907,75 @@
       ],
       "timestamp": 1791031954,
       "ttl": 1800
+    },
+    "620838f6a81c359ed067d1cff1dcd9bd": {
+      "result": {
+        "complexity": 6,
+        "risk_level": "low",
+        "success_probability": 78,
+        "recommended_template": "standard",
+        "issue_type": "infrastructure",
+        "key_risks": [
+          "False positives aborting valid pipelines due to overly strict validation",
+          "Incomplete validation missing real environment issues",
+          "Integration regressions with existing sw-pipeline.sh behavior",
+          "Config flag default handling breaking existing daemon-config.json structures"
+        ],
+        "implementation_hints": [
+          "Reuse existing validation logic from sw-prep.sh and sw-daemon.sh to avoid duplication",
+          "Make each validation check independent and loggable to error-log.jsonl with clear remediation steps",
+          "Use dry-run mode for dependency checks (npm ci --dry-run, etc.) instead of actual installs",
+          "Test against monorepo edge cases (nested package managers, workspace configs)",
+          "Consider mocking package manager availability in tests to avoid CI environment dependencies"
+        ]
+      },
+      "timestamp": 1791032194,
+      "ttl": 3600
+    },
+    "30be25c9cbbbcbe5e63a2cb24ccbea78": {
+      "result": {
+        "raw_response": "Mock claude: ok"
+      },
+      "timestamp": 1791032290,
+      "ttl": 1800
+    },
+    "a7bc511cffe520d802d0674b2221e1ef": {
+      "result": [
+        {
+          "type": "result",
+          "result": "I am trying the same approach again.",
+          "usage": {
+            "input_tokens": 0,
+            "output_tokens": 0
+          }
+        }
+      ],
+      "timestamp": 1791032502,
+      "ttl": 1800
+    },
+    "24c102b9fed3297221bfe2e7d1e32aa6": {
+      "result": {
+        "complexity": 2,
+        "risk_level": "low",
+        "success_probability": 88,
+        "recommended_template": "fast",
+        "issue_type": "testing",
+        "key_risks": [
+          "Misclassification of restart causes if edge cases exist in context_exhaustion detection logic",
+          "Off-by-one errors in accumulating restart counts across multiple restart cycles",
+          "Summary line format inconsistencies with existing loop output structure",
+          "Missing restart scenarios (e.g., partial restarts, session-continuity edge cases)"
+        ],
+        "implementation_hints": [
+          "Audit existing context_exhaustion detection logic in sw-loop.sh to understand classification mechanism before reuse",
+          "Track restart counts per cause during loop execution, accumulating from restart events rather than parsing logs retroactively",
+          "Emit summary line only when total restarts > 0; omit entirely when zero to avoid output clutter",
+          "Add test cases for: zero restarts (line omitted), context-exhaustion only, code-error only, mixed restarts, and boundary cases",
+          "Verify summary line placement doesn't interfere with existing pipeline output parsing or downstream consumption"
+        ]
+      },
+      "timestamp": 1791032741,
+      "ttl": 3600
     }
   }
 }
