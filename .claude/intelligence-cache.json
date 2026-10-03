@@ -1401,6 +1401,51 @@
       },
       "timestamp": 1775344537,
       "ttl": 3600
+    },
+    "3af277e09dfb147a1a3df25fefaebea9": {
+      "result": {
+        "complexity": 4,
+        "risk_level": "low",
+        "success_probability": 87,
+        "recommended_template": "fast",
+        "issue_type": "infrastructure",
+        "key_risks": [
+          "Pipeline composition edge cases not handled in dry-run mode",
+          "Cost estimation inaccuracy due to incomplete historical data",
+          "Output format clarity for new users",
+          "Varying pipeline template scenarios may not be fully represented"
+        ],
+        "implementation_hints": [
+          "Leverage existing sw-pipeline-composer.sh logic to resolve pipeline config",
+          "Extract cost computation from sw-cost.sh and build reusable cost range function",
+          "Build output formatting as separate function for independent testability",
+          "Add --dry-run flag to CLI router in scripts/sw and scripts/sw-pipeline.sh",
+          "Create helper to compute estimated cost from ~/.shipwright/costs.json with graceful degradation",
+          "Use mocked cost data in test suite to ensure deterministic results",
+          "Update help text in scripts/sw-pipeline.sh to document --dry-run behavior",
+          "Test both paths: with and without historical data to verify 'no historical data' fallback"
+        ]
+      },
+      "timestamp": 1791012549,
+      "ttl": 3600
+    },
+    "7746817c52c3da51a4ef9ebcee419553": {
+      "result": {
+        "estimated_iterations": 3
+      },
+      "timestamp": 1791012557,
+      "ttl": 1800
+    },
+    "ca60d649dbb64a24de4baaa4eacc149e": {
+      "result": {
+        "estimated_cost_usd": 0.35,
+        "estimated_iterations": 1.2,
+        "estimated_tokens": 18500,
+        "likely_failure_stage": "none",
+        "confidence": 87
+      },
+      "timestamp": 1791012567,
+      "ttl": 3600
     }
   }
 }
