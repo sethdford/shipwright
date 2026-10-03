@@ -5,8 +5,8 @@
       "pattern": "\u001b[38;2;74;222;128m\u001b[1m✓\u001b[0m reveal shows 1/3 pass count on failure",
       "root_cause": "sw-intent-analysis-test asserts analyze_intent's JSON output includes version, goal, and criteria fields, but the current schema/implementation omits one or more of them",
       "fix": "Update analyze_intent (or its schema) in sw-intent-analysis.sh to emit version, goal, and criteria fields matching the test's expected schema",
-      "seen_count": 211,
-      "last_seen": "2026-10-03T17:53:27Z",
+      "seen_count": 209,
+      "last_seen": "2026-10-03T18:22:42Z",
       "category": "test_failure",
       "signature_hash": "e1a285258fe63781b7370b0d086ad87b",
       "signature": "\u001b[<n>;2;<n>;<n>;<n>m\u001b[1m✓\u001b[0m reveal shows <path> pass count on failure"
@@ -27,8 +27,8 @@
       "pattern": "Failed: 1",
       "root_cause": "sw-intent-analysis-test fails because analyze_intent's generated JSON omits required fields (version, goal, criteria); sw-e2e-integration-test fails as a side effect of a stale pipeline lock (pipeline-3749) left running from a prior test run, not a new regression",
       "fix": "add the missing version/goal/criteria fields to the intent-analysis JSON schema/generator, and clear/reset stale pipeline locks (or run `shipwright pipeline abort`) before the e2e-integration test suite starts",
-      "seen_count": 31,
-      "last_seen": "2026-10-02T17:37:29Z",
+      "seen_count": 33,
+      "last_seen": "2026-10-03T17:56:39Z",
       "category": "test_failure",
       "signature_hash": "0ffe097d3b7a598c5b9ebe8e3cd8d7e4",
       "signature": "failed: 1"
@@ -50,8 +50,8 @@
       "signature": "results: \u001b[<n>;2;<n>;<n>;<n>m\u001b[1m<n> pass\u001b[0m | \u001b[<n>;2;<n>;<n>;<n>m\u001b[1m1 fail\u001b[0m",
       "root_cause": "sw-e2e-integration-test failed because a stale pipeline lock from a prior run (pipeline-3854) was left in 'running' state, blocking the new pipeline start; sw-intent-analysis-test failed because analyze_intent's generated JSON is missing the required version/goal/criteria schema fields",
       "fix": "Clear/release stale pipeline locks before the e2e-integration test runs (or add lock staleness detection/cleanup), and update analyze_intent to always emit version, goal, and criteria fields in its output schema",
-      "seen_count": 10,
-      "last_seen": "2026-10-02T20:31:32Z",
+      "seen_count": 11,
+      "last_seen": "2026-10-03T18:59:20Z",
       "category": "test_failure",
       "signature_hash": "af7df127e4c98031cbe09f6b0646ac68"
     },
@@ -324,10 +324,19 @@
     {
       "stage": "test",
       "pattern": "\u001b[38;2;74;222;128m✓\u001b[0m Uses set -euo pipefail",
-      "root_cause": "The self-optimize test 'Memory promotion copies cross-repo patterns' failed (15/16 passed). The failure is in the cross-repo memory promotion step, likely because it depends on the test's temp HOME/repo-hash memory directories or on environment state. The 'Uses set -euo pipefail' pattern is only a passing check from another suite, not the cause.",
-      "fix": "Run scripts/sw-self-optimize-test.sh and look at the promotion test. Make sure the test sets up isolated memory dirs for two distinct repo hashes. Make sure the promotion function in sw-self-optimize.sh doesn't exit early under set -e or pipefail (for example on grep or jq returning non-zero) before it copies the patterns.",
+      "root_cause": "The 'Memory promotion copies cross-repo patterns' test in sw-self-optimize-test.sh failed (15/16 passed); the other suites in the log passed. The 'Uses set -euo pipefail' error pattern is a passing ✓ check, not the failure. The likely cause is that the test depends on shared state or on the repo-hash and memory directory paths, as in the earlier stale /tmp/mock-repo fix.",
+      "fix": "Run scripts/sw-self-optimize-test.sh on its own, inspect the promotion test's assertion, and isolate its HOME and memory dirs and mock repo in a fresh mktemp dir so it doesn't read stale shared state.",
+      "seen_count": 1,
+      "last_seen": "2026-10-02T01:21:14Z",
+      "category": "test_failure"
+    },
+    {
+      "stage": "test",
+      "pattern": "\u001b[38;2;0;212;255m▸\u001b[0m Vitals: Convergence with decreasing errors... \u001b[38;2;74;222;128m✓\u001b[0m",
+      "root_cause": "Two suites failed: sw-intent-analysis-test (generated intent JSON schema lacks required fields version/goal/criteria) and sw-self-optimize-test (memory promotion of cross-repo patterns fails after jq --argjson receives invalid JSON). The 'Convergence with decreasing errors' line is only a vitals status message, not the error.",
+      "fix": "In sw-intent-analysis, make the analyze_intent output/schema include version, goal and criteria. In sw-self-optimize, validate or default the JSON passed to jq --argjson (e.g. '${var:-{}}' or jq -e check) in the memory promotion path.",
       "seen_count": 2,
-      "last_seen": "2026-10-03T12:53:51Z",
+      "last_seen": "2026-10-03T13:41:16Z",
       "category": "test_failure"
     }
   ]
