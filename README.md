@@ -1,3 +1,4 @@
+<!-- E2E test: automated comment added to README -->
 <p align="center">
   <img src="website/src/assets/logo-dark.svg" alt="Shipwright" width="200">
 </p>
