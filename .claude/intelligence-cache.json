@@ -1404,26 +1404,26 @@
     },
     "fcba5461da02dfcb191607639231fd97": {
       "result": {
-        "complexity": 4,
+        "complexity": 3,
         "risk_level": "low",
-        "success_probability": 87,
+        "success_probability": 88,
         "recommended_template": "fast",
         "issue_type": "testing",
         "key_risks": [
-          "Script paths or names may differ from issue description (e.g., sw-tracker-github.sh existence)",
-          "Test suite conventions must match existing patterns exactly for npm test registry",
-          "Edge cases may be incomplete if script behavior is underdocumented"
+          "Incomplete test coverage for script functionality and edge cases",
+          "Scripts may have latent bugs exposed during test authoring",
+          "Mock binary environment setup inconsistencies across test suites"
         ],
         "implementation_hints": [
-          "Study existing test suites (e.g., sw-pipeline-test.sh, sw-db-test.sh, sw-daemon-test.sh) for exact structure and PASS/FAIL counter patterns",
-          "For each small script, identify primary functions and one failure/edge case scenario",
-          "Verify all 5 script names exist in scripts/ directory before writing tests",
-          "Use mock binaries in temp directories following existing convention",
-          "Add test file entries to package.json test script list and verify npm test runs all 105 suites",
-          "Test incrementally: write and run each suite individually before final npm test run"
+          "Start with the smallest scripts first (sw-event-schema-sync.sh is 93 lines)",
+          "Reference existing test suites (50+ examples available in scripts/) for exact harness pattern and conventions",
+          "Ensure PASS/FAIL counters and ERR traps follow the established convention from similar test files",
+          "Create minimal mock binaries only if those scripts invoke external commands; most utility scripts won't need mocks",
+          "Register all 5 test suites in package.json under the test script before running npm test",
+          "Test at least one failure/edge case per script (e.g., invalid input, missing file, permission error)"
         ]
       },
-      "timestamp": 1791029668,
+      "timestamp": 1791034110,
       "ttl": 3600
     },
     "1e2337b993ce55dcd51c6b0ab43b868a": {
@@ -1983,6 +1983,107 @@
       },
       "timestamp": 1791033949,
       "ttl": 1800
+    },
+    "ba93a668f295894da8b3800e147eacbf": {
+      "result": [
+        {
+          "type": "result",
+          "result": "I am trying the same approach again.",
+          "usage": {
+            "input_tokens": 0,
+            "output_tokens": 0
+          }
+        }
+      ],
+      "timestamp": 1791034061,
+      "ttl": 1800
+    },
+    "c6e681e8cf49f2bb58e5b60227615d9e": {
+      "result": {
+        "raw_response": "Mock claude: ok"
+      },
+      "timestamp": 1791034117,
+      "ttl": 1800
+    },
+    "694379df4ee7e47f1b1c74141e47dffc": {
+      "result": [
+        {
+          "type": "result",
+          "result": "I am trying the same approach again.",
+          "usage": {
+            "input_tokens": 0,
+            "output_tokens": 0
+          }
+        }
+      ],
+      "timestamp": 1791034357,
+      "ttl": 1800
+    },
+    "c4bc84086b9564a19de3fffff9de0ef1": {
+      "result": [
+        {
+          "type": "result",
+          "result": "I am trying the same approach again.",
+          "usage": {
+            "input_tokens": 0,
+            "output_tokens": 0
+          }
+        }
+      ],
+      "timestamp": 1791034421,
+      "ttl": 1800
+    },
+    "0e1d6c1ae0377b0346b95fc0a5f36593": {
+      "result": {
+        "complexity": 8,
+        "risk_level": "medium",
+        "success_probability": 78,
+        "recommended_template": "standard",
+        "issue_type": "refactor",
+        "key_risks": [
+          "Module sourcing order and initialization dependencies causing logic breakage",
+          "Shared state/variables between extracted modules creating hidden coupling",
+          "Edge cases in session-restart and continuity logic lost during extraction",
+          "Existing sw-loop-test.sh suite regressions due to module boundary changes",
+          "Progress.md/error-summary.json format compatibility issues across module boundaries"
+        ],
+        "implementation_hints": [
+          "Analyze sw-loop.sh control flow first to identify clear boundaries: iteration loop core → session/restart logic → progress file writing",
+          "Extract functions into lib modules one concern at a time, preserving internal function signatures to avoid test breakage",
+          "Create module stub structure with `set -euo pipefail` and VERSION variables before migrating logic",
+          "Maintain all CLI flags, env vars, and file formats unchanged—test coverage will verify this",
+          "Build unit tests (sw-lib-loop-core-test.sh, sw-lib-loop-session-test.sh, sw-lib-loop-progress-test.sh) in parallel with extraction",
+          "Run full sw-loop-test.sh suite after each module extraction milestone to catch regressions early",
+          "Document module boundaries in header comments: which module owns session continuity state, which owns progress writes, etc.",
+          "Use subshell isolation in tests to avoid state leakage between test cases"
+        ]
+      },
+      "timestamp": 1791034601,
+      "ttl": 3600
+    },
+    "4fab949b522c6f1ecbcb956bb932edea": {
+      "result": {
+        "complexity": 5,
+        "risk_level": "low",
+        "success_probability": 85,
+        "recommended_template": "standard",
+        "issue_type": "infrastructure",
+        "key_risks": [
+          "Data format inconsistency in events.jsonl/error-log.jsonl",
+          "Sparse or missing failure classification metadata in historical events",
+          "Performance impact when aggregating large event logs",
+          "Schema evolution breaking existing event parsing"
+        ],
+        "implementation_hints": [
+          "Reference sw-cost.sh pattern for reading and aggregating events.jsonl",
+          "Use jq for filtering by classification type and stage",
+          "Cache aggregated results to improve dora command performance",
+          "Add input validation for event data format before processing",
+          "Ensure graceful degradation if classification field is missing from older events"
+        ]
+      },
+      "timestamp": 1791034658,
+      "ttl": 3600
     }
   }
 }
