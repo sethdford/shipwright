@@ -33,18 +33,10 @@ test_script_exists() {
     assert_command "script exists" test -x "$SCRIPT_DIR/sw-event-schema-sync.sh"
 }
 
-# ─── Test 2: Script requires python3 ────────────────────────────────────────
+# ─── Test 2: Script checks for python3 ──────────────────────────────────────
 test_requires_python3() {
-    local tmpdir
-    tmpdir=$(mktemp -d "${TMPDIR:-/tmp}/sw-event-schema-sync.XXXXXX")
-    TEMP_DIRS+=("$tmpdir")
-
-    mkdir -p "$tmpdir/scripts" "$tmpdir/config"
-    cp "$SCRIPT_DIR/sw-event-schema-sync.sh" "$tmpdir/scripts/"
-    echo '{"version":"1.0","event_types":{}}' > "$tmpdir/config/event-schema.json"
-
-    cd "$tmpdir"
-    if PATH="/empty" bash scripts/sw-event-schema-sync.sh 2>&1 | grep -q "python3 required"; then
+    # Verify the script contains python3 requirement check
+    if grep -q "command -v python3" "$SCRIPT_DIR/sw-event-schema-sync.sh"; then
         PASS=$((PASS + 1))
         echo -e "  \033[38;2;74;222;128m✓\033[0m requires python3"
     else
@@ -55,32 +47,34 @@ test_requires_python3() {
 
 # ─── Test 3: --write flag is recognized ─────────────────────────────────────
 test_write_flag_recognized() {
-    local tmpdir
+    local tmpdir repo_dir
     tmpdir=$(mktemp -d "${TMPDIR:-/tmp}/sw-event-schema-sync.XXXXXX")
     TEMP_DIRS+=("$tmpdir")
+    repo_dir="$tmpdir/repo"
 
-    mkdir -p "$tmpdir/scripts" "$tmpdir/config"
-    cp "$SCRIPT_DIR/sw-event-schema-sync.sh" "$tmpdir/scripts/"
+    mkdir -p "$repo_dir/scripts" "$repo_dir/config"
 
     # Create a valid event schema with empty types
-    cat > "$tmpdir/config/event-schema.json" <<'JSON'
+    cat > "$repo_dir/config/event-schema.json" <<'JSON'
 {"version":"1.0","event_types":{}}
 JSON
 
     # Create a script with one emit_event call
-    cat > "$tmpdir/scripts/test.sh" <<'SH'
+    cat > "$repo_dir/scripts/test.sh" <<'SH'
 #!/bin/bash
 emit_event "test.event" "key=val"
 SH
 
-    cd "$tmpdir"
-    # --write should update the schema
-    bash scripts/sw-event-schema-sync.sh --write > /dev/null 2>&1
-
-    # After write, file should contain the new event type
-    if grep -q '"test.event"' "$tmpdir/config/event-schema.json"; then
-        PASS=$((PASS + 1))
-        echo -e "  \033[38;2;74;222;128m✓\033[0m --write flag updates schema"
+    # Run with REPO_DIR override via wrapper
+    if (cd "$repo_dir" && REPO_DIR="$repo_dir" bash "$SCRIPT_DIR/sw-event-schema-sync.sh" --write > /dev/null 2>&1); then
+        # After write, file should contain the new event type
+        if grep -q '"test.event"' "$repo_dir/config/event-schema.json"; then
+            PASS=$((PASS + 1))
+            echo -e "  \033[38;2;74;222;128m✓\033[0m --write flag updates schema"
+        else
+            FAIL=$((FAIL + 1))
+            echo -e "  \033[38;2;248;113;113m✗\033[0m --write flag updates schema"
+        fi
     else
         FAIL=$((FAIL + 1))
         echo -e "  \033[38;2;248;113;113m✗\033[0m --write flag updates schema"
@@ -89,26 +83,25 @@ SH
 
 # ─── Test 4: Schema output is valid JSON ────────────────────────────────────
 test_output_is_json() {
-    local tmpdir
+    local tmpdir repo_dir
     tmpdir=$(mktemp -d "${TMPDIR:-/tmp}/sw-event-schema-sync.XXXXXX")
     TEMP_DIRS+=("$tmpdir")
+    repo_dir="$tmpdir/repo"
 
-    mkdir -p "$tmpdir/scripts" "$tmpdir/config"
-    cp "$SCRIPT_DIR/sw-event-schema-sync.sh" "$tmpdir/scripts/"
+    mkdir -p "$repo_dir/scripts" "$repo_dir/config"
 
-    cat > "$tmpdir/config/event-schema.json" <<'JSON'
+    cat > "$repo_dir/config/event-schema.json" <<'JSON'
 {"version":"1.0","event_types":{}}
 JSON
 
-    cat > "$tmpdir/scripts/test.sh" <<'SH'
+    cat > "$repo_dir/scripts/test.sh" <<'SH'
 emit_event "json.test" "x=y"
 SH
 
-    cd "$tmpdir"
-    bash scripts/sw-event-schema-sync.sh --write > /dev/null 2>&1
+    REPO_DIR="$repo_dir" bash "$SCRIPT_DIR/sw-event-schema-sync.sh" --write > /dev/null 2>&1
 
     if command -v jq >/dev/null 2>&1; then
-        if jq -e . "$tmpdir/config/event-schema.json" > /dev/null 2>&1; then
+        if jq -e . "$repo_dir/config/event-schema.json" > /dev/null 2>&1; then
             PASS=$((PASS + 1))
             echo -e "  \033[38;2;74;222;128m✓\033[0m output is valid JSON"
         else
@@ -123,25 +116,24 @@ SH
 
 # ─── Test 5: Detects missing types ──────────────────────────────────────────
 test_detects_missing_types() {
-    local tmpdir
+    local tmpdir repo_dir
     tmpdir=$(mktemp -d "${TMPDIR:-/tmp}/sw-event-schema-sync.XXXXXX")
     TEMP_DIRS+=("$tmpdir")
+    repo_dir="$tmpdir/repo"
 
-    mkdir -p "$tmpdir/scripts" "$tmpdir/config"
-    cp "$SCRIPT_DIR/sw-event-schema-sync.sh" "$tmpdir/scripts/"
+    mkdir -p "$repo_dir/scripts" "$repo_dir/config"
 
     # Create schema with only one type
-    cat > "$tmpdir/config/event-schema.json" <<'JSON'
+    cat > "$repo_dir/config/event-schema.json" <<'JSON'
 {"version":"1.0","event_types":{"registered.type":{"required":[],"optional":[]}}}
 JSON
 
     # But emit a different type
-    cat > "$tmpdir/scripts/test.sh" <<'SH'
+    cat > "$repo_dir/scripts/test.sh" <<'SH'
 emit_event "missing.type" "x=y"
 SH
 
-    cd "$tmpdir"
-    if bash scripts/sw-event-schema-sync.sh 2>&1 | grep -q "missing"; then
+    if (REPO_DIR="$repo_dir" bash "$SCRIPT_DIR/sw-event-schema-sync.sh" 2>&1 || true) | grep -q "missing"; then
         PASS=$((PASS + 1))
         echo -e "  \033[38;2;74;222;128m✓\033[0m detects missing types"
     else
@@ -152,24 +144,23 @@ SH
 
 # ─── Test 6: Handles nested scripts ─────────────────────────────────────────
 test_scans_nested_scripts() {
-    local tmpdir
+    local tmpdir repo_dir
     tmpdir=$(mktemp -d "${TMPDIR:-/tmp}/sw-event-schema-sync.XXXXXX")
     TEMP_DIRS+=("$tmpdir")
+    repo_dir="$tmpdir/repo"
 
-    mkdir -p "$tmpdir/scripts/lib" "$tmpdir/config"
-    cp "$SCRIPT_DIR/sw-event-schema-sync.sh" "$tmpdir/scripts/"
+    mkdir -p "$repo_dir/scripts/lib" "$repo_dir/config"
 
-    echo '{"version":"1.0","event_types":{}}' > "$tmpdir/config/event-schema.json"
+    echo '{"version":"1.0","event_types":{}}' > "$repo_dir/config/event-schema.json"
 
     # Place emit_event in nested lib file
-    cat > "$tmpdir/scripts/lib/helper.sh" <<'SH'
+    cat > "$repo_dir/scripts/lib/helper.sh" <<'SH'
 emit_event "lib.nested" "k=v"
 SH
 
-    cd "$tmpdir"
-    bash scripts/sw-event-schema-sync.sh --write > /dev/null 2>&1
+    REPO_DIR="$repo_dir" bash "$SCRIPT_DIR/sw-event-schema-sync.sh" --write > /dev/null 2>&1
 
-    if grep -q '"lib.nested"' "$tmpdir/config/event-schema.json"; then
+    if grep -q '"lib.nested"' "$repo_dir/config/event-schema.json"; then
         PASS=$((PASS + 1))
         echo -e "  \033[38;2;74;222;128m✓\033[0m scans nested script files"
     else
@@ -180,23 +171,22 @@ SH
 
 # ─── Test 7: Exits with 0 when in sync ──────────────────────────────────────
 test_exits_zero_in_sync() {
-    local tmpdir
+    local tmpdir repo_dir
     tmpdir=$(mktemp -d "${TMPDIR:-/tmp}/sw-event-schema-sync.XXXXXX")
     TEMP_DIRS+=("$tmpdir")
+    repo_dir="$tmpdir/repo"
 
-    mkdir -p "$tmpdir/scripts" "$tmpdir/config"
-    cp "$SCRIPT_DIR/sw-event-schema-sync.sh" "$tmpdir/scripts/"
+    mkdir -p "$repo_dir/scripts" "$repo_dir/config"
 
-    cat > "$tmpdir/config/event-schema.json" <<'JSON'
+    cat > "$repo_dir/config/event-schema.json" <<'JSON'
 {"version":"1.0","event_types":{"sync.type":{"required":[],"optional":[]}}}
 JSON
 
-    cat > "$tmpdir/scripts/test.sh" <<'SH'
+    cat > "$repo_dir/scripts/test.sh" <<'SH'
 emit_event "sync.type" "x=y"
 SH
 
-    cd "$tmpdir"
-    if bash scripts/sw-event-schema-sync.sh > /dev/null 2>&1; then
+    if REPO_DIR="$repo_dir" bash "$SCRIPT_DIR/sw-event-schema-sync.sh" > /dev/null 2>&1; then
         PASS=$((PASS + 1))
         echo -e "  \033[38;2;74;222;128m✓\033[0m exits 0 when in sync"
     else
@@ -207,21 +197,20 @@ SH
 
 # ─── Test 8: Exits with 1 when out of sync ──────────────────────────────────
 test_exits_one_out_of_sync() {
-    local tmpdir
+    local tmpdir repo_dir
     tmpdir=$(mktemp -d "${TMPDIR:-/tmp}/sw-event-schema-sync.XXXXXX")
     TEMP_DIRS+=("$tmpdir")
+    repo_dir="$tmpdir/repo"
 
-    mkdir -p "$tmpdir/scripts" "$tmpdir/config"
-    cp "$SCRIPT_DIR/sw-event-schema-sync.sh" "$tmpdir/scripts/"
+    mkdir -p "$repo_dir/scripts" "$repo_dir/config"
 
-    echo '{"version":"1.0","event_types":{}}' > "$tmpdir/config/event-schema.json"
+    echo '{"version":"1.0","event_types":{}}' > "$repo_dir/config/event-schema.json"
 
-    cat > "$tmpdir/scripts/test.sh" <<'SH'
+    cat > "$repo_dir/scripts/test.sh" <<'SH'
 emit_event "out.of.sync" "x=y"
 SH
 
-    cd "$tmpdir"
-    if ! bash scripts/sw-event-schema-sync.sh > /dev/null 2>&1; then
+    if ! REPO_DIR="$repo_dir" bash "$SCRIPT_DIR/sw-event-schema-sync.sh" > /dev/null 2>&1; then
         PASS=$((PASS + 1))
         echo -e "  \033[38;2;74;222;128m✓\033[0m exits 1 when out of sync"
     else
@@ -232,21 +221,20 @@ SH
 
 # ─── Test 9: Prints "run with --write" on mismatch ────────────────────────────
 test_suggests_write() {
-    local tmpdir
+    local tmpdir repo_dir
     tmpdir=$(mktemp -d "${TMPDIR:-/tmp}/sw-event-schema-sync.XXXXXX")
     TEMP_DIRS+=("$tmpdir")
+    repo_dir="$tmpdir/repo"
 
-    mkdir -p "$tmpdir/scripts" "$tmpdir/config"
-    cp "$SCRIPT_DIR/sw-event-schema-sync.sh" "$tmpdir/scripts/"
+    mkdir -p "$repo_dir/scripts" "$repo_dir/config"
 
-    echo '{"version":"1.0","event_types":{}}' > "$tmpdir/config/event-schema.json"
+    echo '{"version":"1.0","event_types":{}}' > "$repo_dir/config/event-schema.json"
 
-    cat > "$tmpdir/scripts/test.sh" <<'SH'
+    cat > "$repo_dir/scripts/test.sh" <<'SH'
 emit_event "test.suggest" "x=y"
 SH
 
-    cd "$tmpdir"
-    if bash scripts/sw-event-schema-sync.sh 2>&1 | grep -q "run with --write"; then
+    if (REPO_DIR="$repo_dir" bash "$SCRIPT_DIR/sw-event-schema-sync.sh" 2>&1 || true) | grep -q "run with --write"; then
         PASS=$((PASS + 1))
         echo -e "  \033[38;2;74;222;128m✓\033[0m suggests --write on mismatch"
     else

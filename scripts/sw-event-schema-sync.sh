@@ -26,8 +26,8 @@
 set -uo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-REPO_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
-SCHEMA="$REPO_DIR/config/event-schema.json"
+REPO_DIR="${REPO_DIR:-$(cd "$SCRIPT_DIR/.." && pwd)}"
+SCHEMA="${SCHEMA:-$REPO_DIR/config/event-schema.json}"
 
 WRITE=0
 [[ "${1:-}" == "--write" ]] && WRITE=1
