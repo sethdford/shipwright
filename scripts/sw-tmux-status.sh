@@ -91,9 +91,14 @@ pipeline_widget() {
 
     [[ -f "$state_file" ]] || return 0
 
-    # Extract current stage — look for "Stage:" or "## Stage:" pattern
+    # Extract current stage — prefer "current_stage:", fall back to "Stage:"
     local stage=""
-    stage="$(grep -iE '^\*?\*?(current )?stage:?\*?\*?' "$state_file" 2>/dev/null | head -1 | sed 's/.*: *//' | tr -d '*' | tr '[:upper:]' '[:lower:]' | tr -d ' ')" || true
+    # First try to find "current_stage:" line
+    stage="$(grep -i '^current_stage:' "$state_file" 2>/dev/null | head -1 | sed 's/^[^:]*: *//' | tr '[:upper:]' '[:lower:]' | tr -d ' ' || true)"
+    # If not found, try "Stage:" format
+    if [[ -z "$stage" ]]; then
+        stage="$(grep -iE '^[*]*stage:' "$state_file" 2>/dev/null | head -1 | sed 's/^[^:]*: *//' | tr -d '*' | tr '[:upper:]' '[:lower:]' | tr -d ' ' || true)"
+    fi
 
     [[ -n "$stage" ]] || return 0
 

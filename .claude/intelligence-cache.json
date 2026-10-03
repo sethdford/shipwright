@@ -30,17 +30,17 @@
     },
     "d41d8cd98f00b204e9800998ecf8427e": {
       "result": {
-        "primary_role": "builder",
+        "primary_role": "tester",
         "secondary_roles": [
-          "tester",
+          "builder",
           "reviewer"
         ],
         "confidence": 0.95,
-        "reasoning": "Bug fix requiring debugging JSON parsing logic, implementing improved error messaging, and testing edge cases (object vs array output). Builder handles implementation; tester validates the fix; reviewer ensures accuracy.",
+        "reasoning": "Task explicitly requires creating test suites for untested scripts; Test Specialist excels at test case generation, automation, and coverage analysis. Builder aids implementation, reviewer ensures quality.",
         "new_role_needed": false,
         "suggested_role": null
       },
-      "timestamp": 1775316059,
+      "timestamp": 1791030061,
       "ttl": 3600
     },
     "efd5524ad1244fd20344bf3ff5d95233": {
@@ -1401,6 +1401,299 @@
       },
       "timestamp": 1775344537,
       "ttl": 3600
+    },
+    "fcba5461da02dfcb191607639231fd97": {
+      "result": {
+        "complexity": 4,
+        "risk_level": "low",
+        "success_probability": 87,
+        "recommended_template": "fast",
+        "issue_type": "testing",
+        "key_risks": [
+          "Script paths or names may differ from issue description (e.g., sw-tracker-github.sh existence)",
+          "Test suite conventions must match existing patterns exactly for npm test registry",
+          "Edge cases may be incomplete if script behavior is underdocumented"
+        ],
+        "implementation_hints": [
+          "Study existing test suites (e.g., sw-pipeline-test.sh, sw-db-test.sh, sw-daemon-test.sh) for exact structure and PASS/FAIL counter patterns",
+          "For each small script, identify primary functions and one failure/edge case scenario",
+          "Verify all 5 script names exist in scripts/ directory before writing tests",
+          "Use mock binaries in temp directories following existing convention",
+          "Add test file entries to package.json test script list and verify npm test runs all 105 suites",
+          "Test incrementally: write and run each suite individually before final npm test run"
+        ]
+      },
+      "timestamp": 1791029668,
+      "ttl": 3600
+    },
+    "1e2337b993ce55dcd51c6b0ab43b868a": {
+      "result": {
+        "estimated_iterations": 3
+      },
+      "timestamp": 1791029677,
+      "ttl": 1800
+    },
+    "8b3ea6e9d072a756c45af94f4173d552": {
+      "result": {
+        "estimated_cost_usd": 3.2,
+        "estimated_iterations": 3,
+        "estimated_tokens": 78000,
+        "likely_failure_stage": "test",
+        "confidence": 78
+      },
+      "timestamp": 1791029685,
+      "ttl": 3600
+    },
+    "effab049a272487aa04e22d597ecd697": {
+      "result": {
+        "issue_type": "testing",
+        "confidence": 0.89,
+        "secondary_domains": [
+          "shell-scripting",
+          "quality-assurance"
+        ],
+        "complexity_assessment": {
+          "score": 5,
+          "reasoning": "Straightforward test suite creation following established patterns; all 5 target scripts are small (<200 lines); main complexity is ensuring comprehensive edge case coverage and parallel test safety with 105+ concurrent suites."
+        },
+        "skill_plan": {
+          "plan": [
+            "testing-strategy"
+          ],
+          "design": [
+            "testing-strategy",
+            "shell-script-test-harness-design"
+          ],
+          "build": [
+            "shell-script-test-harness-design",
+            "test-parallelization-detection"
+          ],
+          "review": [
+            "adversarial-quality",
+            "test-parallelization-detection",
+            "pr-quality"
+          ],
+          "compound_quality": [
+            "collection-system-validation"
+          ],
+          "pr": [
+            "pr-quality"
+          ],
+          "deploy": [],
+          "validate": [],
+          "monitor": []
+        },
+        "skill_rationale": {
+          "testing-strategy": "Requires designing test case matrices for 5 heterogeneous scripts (schema sync, test aggregator, tmux formatters, tracker) with different edge cases and failure modes.",
+          "shell-script-test-harness-design": "The codebase uses specific conventions (mock binaries in temp dirs, PASS/FAIL counters, ERR traps, colored output) that must be applied consistently across 5 new suites to avoid drift.",
+          "test-parallelization-detection": "Adding 5 new test suites to a suite of 100+ existing tests requires detecting shared state issues (temp file conflicts, global variables, singleton state) that would cause race conditions.",
+          "adversarial-quality": "Test suites for infrastructure/utility scripts must cover failure paths and edge cases that production will encounter—attack the tests to find gaps in error handling and unusual inputs.",
+          "collection-system-validation": "The acceptance criteria explicitly require validating the 'scripts-with-tests' metric reaches 105/105; this skill covers heterogeneous data collection validation (package.json registration + test discovery).",
+          "pr-quality": "Five new test files (~600 LOC total) plus package.json changes need clear organization and documentation so reviewers can verify coverage and harness compliance in one pass."
+        },
+        "generated_skills": [
+          {
+            "name": "shell-script-test-harness-design",
+            "reason": "The codebase uses a specific shell test harness pattern (mock binaries, temp isolation, PASS/FAIL counters, ERR traps, colored output) with bash 3.2 compatibility—no existing skill guides application of this concrete pattern to new test suites.",
+            "content": "## Shell Script Test Harness Design\n\nShipwright test suites follow a strict pattern for consistency, parallelism, and compatibility. This skill guides creation of new test suites that fit seamlessly into the existing 100+ suite ecosystem.\n\n### Core Pattern\n\nEach test file (`scripts/sw-NAME-test.sh`) implements these elements:\n\n1. **Header**: `#!/bin/bash`, `set -euo pipefail`, VERSION constant, source `scripts/lib/compat.sh`\n2. **Mock binaries**: Temporary `$TMPDIR/bin/` directory prepended to PATH; mocks match real command signatures\n3. **Test functions**: Named `test_<case>()`, each returns success/failure; no output on success\n4. **Counter tracking**: Global `PASS=0 FAIL=0` counters incremented in trap handlers\n5. **Output format**: Colored `PASS test_name` / `FAIL test_name` at end; one line per test\n6. **Cleanup**: ERR trap calls `cleanup()` which removes `$TMPDIR`; exit code = FAIL count\n\n### Mock Binary Strategy\n\n- Store in `TMPDIR/bin/mockbin.sh` wrapper that routes calls by `$1` to stubbed functions\n- Each mock must replicate the real command's exit code and output signature\n- Use `echo` to stdout, `echo >&2` to stderr; match exact text if tests depend on it\n- Example: `mock_git()` must support `git status --porcelain`, `git log`, `git diff` with real-looking output\n\n### Edge Cases & Failure Paths\n\nFor each script being tested, identify:\n- **Happy path**: Expected inputs, expected outputs\n- **Missing input**: Required arguments omitted (e.g., missing repo path)\n- **Permission error**: File/dir not readable (mock with `exit 1` + error message)\n- **Invalid data**: Malformed JSON, empty files, unexpected format\n- **External command failure**: Dependency missing or broken (mock exits 127)\n- **Boundary**: Empty string, very large input, special characters\n\nAt least 3-4 test cases per script, covering happy path + 1-2 critical failures.\n\n### Parallelism & Isolation\n\n- Each test function creates its own `$TMPDIR/test_$RANDOM` subdirectory\n- Never write to `/tmp` directly or use predictable temp names\n- Source files from the repo read-only (no modification)\n- Mock binaries are temporary and local to that test run\n- No global state shared between test functions\n\n### Bash 3.2 Compatibility\n\n- No `declare -A` (associative arrays)\n- No `readarray` or `mapfile`\n- No `${var,,}` or `${var^^}` (case conversion)\n- No `[[ =~ ]]` regex (use `[[ == ]]` + glob patterns or `grep`)\n- No `printf %q` (use `printf %s` + manual escaping for JSON)\n- Test with: `bash --version` reports 3.2+ before shipping\n\n### Test Registration\n\nAdd to `package.json` `\"test\"` script:\n```json\n\"test\": \"npm run test:all\",\n\"test:all\": \"./scripts/sw-test-all.sh\",\n...\n\"test:NAME\": \"./scripts/sw-NAME-test.sh\"\n```\n\n`sw-test-all.sh` discovers all `*-test.sh` files and runs them sequentially, summing PASS/FAIL counts.\n\n### Debugging Failed Tests\n\n- Run `./scripts/sw-NAME-test.sh` directly to see colored PASS/FAIL output\n- Add `set -x` at top to trace execution\n- Check `$TMPDIR/test_*/` contents after failure (don't clean up yet)\n- Verify mock binary routing with `bash -x scripts/sw-NAME-test.sh 2>&1 | grep mock`"
+          }
+        ],
+        "review_focus": [
+          "Edge case and failure path coverage—each test suite must exercise at least one error condition and a boundary case (empty input, missing file, invalid format).",
+          "Mock binary fidelity—mocks must accurately replicate exit codes, output format, and error messages of real commands to prevent false positives.",
+          "Parallel test isolation—verify temp directories are unique per test and no global state is shared (no hardcoded paths, no singleton files in /tmp).",
+          "Bash 3.2 compatibility—no associative arrays, no readarray, no ${var,,} case conversion, no [[ =~ ]] regex.",
+          "Package.json registration—all 5 new test files must be discoverable by npm test and sw-test-all.sh; verify scripts section entry.",
+          "Output format consistency—PASS/FAIL counters, colored output, and exit codes must match existing test suite patterns (see sw-loop-test.sh, sw-daemon-test.sh as references)."
+        ],
+        "risk_areas": [
+          "Incomplete coverage of failure paths—test suites may miss edge cases that surface in production (e.g., missing env vars, concurrent access).",
+          "Shared state in parallel execution—105 test suites running concurrently could conflict on temp files or global state; ERR traps may not fire if background processes linger.",
+          "Metric accuracy—'scripts-with-tests = 105/105' assumes correct test discovery; misconfigured package.json entries or missing test files will break this metric.",
+          "Mock binary complexity—as the 5 scripts being tested have different dependencies (jq, git, tmux, npm), mocks must accurately stub these without over-complicating test setup.",
+          "Bash 3.2 compliance—test files written in modern bash (4.x+) may accidentally use syntax that breaks CI on bash 3.2 (e.g., ${BASH_VERSION[@]})."
+        ]
+      },
+      "timestamp": 1791029770,
+      "ttl": 3600
+    },
+    "11bfa588ed0cdb07915a45727ec2968f": {
+      "result": {
+        "results": [
+          {
+            "file": "failures.json",
+            "relevance": 85,
+            "summary": "Contains 3 test-stage failure patterns: timeouts (unbounded loops) and database connection issues. Shows real failure signatures, root causes, and applied fixes—critical for anticipating test failures when designing new test suites."
+          },
+          {
+            "file": "index.json",
+            "relevance": 78,
+            "summary": "Documents test_failure patterns in build stage with npm test strategy and timeout fixes. Provides test setup best practices and common issues relevant to planning test suite design."
+          },
+          {
+            "file": "fleet-shared-patterns.json",
+            "relevance": 68,
+            "summary": "Shows cross-repo pattern for 'Cannot find module' errors during build/test stages affecting multiple repos. Indicates common setup issues to prevent when adding new test suites."
+          },
+          {
+            "file": "success-patterns.json (test-repo-comptime)",
+            "relevance": 62,
+            "summary": "Pattern demonstrating multi-stage execution (intake/build/test) touching test.sh with npm test strategy. Shows realistic test workflow for planning purposes."
+          },
+          {
+            "file": "success-patterns.json (test-repo-ranking)",
+            "relevance": 58,
+            "summary": "Two low-complexity test patterns with npm test strategy. Demonstrates test pattern diversity and simple iteration counts useful for planning lightweight test suite additions."
+          }
+        ]
+      },
+      "timestamp": 1791029823,
+      "ttl": 1800
+    },
+    "6ce26165fe33e5bb9b711280988d7d37": {
+      "result": {
+        "results": [
+          {
+            "file": "failures.json",
+            "relevance": 92,
+            "summary": "Contains actual failure patterns (timeouts at specific lines, database connection issues) with root causes and applied fixes. Directly informs what edge cases and failure modes should be tested in new test suites."
+          },
+          {
+            "file": "index.json",
+            "relevance": 78,
+            "summary": "Shows test_failure patterns with recommended fix ('Increase timeout value in test setup'). Provides concrete guidance for timeout handling and test configuration when designing new test suites."
+          },
+          {
+            "file": "fleet-shared-patterns.json",
+            "relevance": 65,
+            "summary": "Documents common build/test stage error ('Cannot find module' with 'npm i' fix). Relevant for understanding dependency setup issues to catch in new test suite validation."
+          }
+        ]
+      },
+      "timestamp": 1791029920,
+      "ttl": 1800
+    },
+    "1d90e722201e050f4facee1bfcb75926": {
+      "result": {
+        "results": [
+          {
+            "file": "success-patterns.json (test-repo-ranking)",
+            "relevance": 85,
+            "summary": "Contains two successful patterns specifically for test files (test.sh, test2.sh) with low complexity, npm test strategy, and completion patterns. Directly relevant for designing test suite architecture."
+          },
+          {
+            "file": "fleet-shared-patterns.json",
+            "relevance": 75,
+            "summary": "Shows common 'Cannot find module' error pattern across build/test stages with documented 'npm i' fix. Relevant for understanding test infrastructure and dependency handling patterns in multi-repo context."
+          },
+          {
+            "file": "index.json",
+            "relevance": 70,
+            "summary": "Contains test_failure patterns from api/cli sources with 'Increase timeout value in test setup' fix. Relevant for understanding failure modes and test configuration patterns."
+          },
+          {
+            "file": "failures.json (second entry with 3 records)",
+            "relevance": 65,
+            "summary": "Contains resolved test-stage timeout failures and unresolved database connection issues with root causes. Relevant for designing robust test suites that handle async/timing issues."
+          },
+          {
+            "file": "success-patterns.json (test-repo-789)",
+            "relevance": 60,
+            "summary": "Shows npm test strategy applied to scripts/sw-daemon.sh with 3 iterations needed. Relevant for understanding test execution patterns and iteration requirements for script testing."
+          }
+        ]
+      },
+      "timestamp": 1791029956,
+      "ttl": 1800
+    },
+    "e02122aac653b6eba0cc30d3182936da": {
+      "result": {
+        "results": [
+          {
+            "file": "failures.json",
+            "relevance": 90,
+            "summary": "Contains actual test-stage failures with root causes (timeouts, unbounded loops, database connection issues) and applied fixes. Directly informs what edge cases the new test suites should cover."
+          },
+          {
+            "file": "index.json",
+            "relevance": 82,
+            "summary": "Documents test failure patterns (test_failure signature in build stage) with specific fixes like 'Increase timeout value in test setup'. Shows anti-patterns to avoid in new test design."
+          },
+          {
+            "file": "fleet-shared-patterns.json",
+            "relevance": 78,
+            "summary": "Shows 'Cannot find module' error seen in build and test stages. Common failure mode that new test suites should catch and handle to prevent in untested scripts."
+          }
+        ]
+      },
+      "timestamp": 1791029967,
+      "ttl": 1800
+    },
+    "b611ba278cc4e6b1bf2f6dbf01ccc1b1": {
+      "result": {
+        "results": [
+          {
+            "file": "index.json",
+            "relevance": 95,
+            "summary": "Contains test_failure pattern directly for build stage with fix guidance; most relevant for understanding test-related failures during build"
+          },
+          {
+            "file": "success-patterns.json (test-repo-ranking)",
+            "relevance": 85,
+            "summary": "Two successful patterns for build stage work on test scripts with npm test strategy; directly shows how test-related work succeeds"
+          },
+          {
+            "file": "fleet-shared-patterns.json",
+            "relevance": 75,
+            "summary": "Shows common build stage error ('Cannot find module') with fix ('npm i'); fleet-wide pattern for build failures across repos"
+          },
+          {
+            "file": "success-patterns.json (test-repo-outcomes)",
+            "relevance": 70,
+            "summary": "Pattern for test.sh work in build stage with npm test strategy; direct example of test-file modifications in build"
+          },
+          {
+            "file": "success-patterns.json (test-repo-comptime)",
+            "relevance": 65,
+            "summary": "Pattern including build and test stages with test.sh files; shows multi-stage test-related work and completion time metrics"
+          }
+        ]
+      },
+      "timestamp": 1791030041,
+      "ttl": 1800
+    },
+    "47c1451f50b4a8f9faa0f8012f6b922e": {
+      "result": {
+        "results": [
+          {
+            "file": "success-patterns.json",
+            "relevance": 95,
+            "summary": "Contains 2 proven build/fix patterns with iteration counts, test strategies, file patterns, and cost data; directly applicable to similar build stage executions"
+          },
+          {
+            "file": "retry-outcomes.json",
+            "relevance": 90,
+            "summary": "Tracks model escalation retry strategy with 100% success rate (5/5) on build failures; critical for build failure recovery"
+          },
+          {
+            "file": "flaky-tests.json",
+            "relevance": 82,
+            "summary": "Identifies 2 flaky tests (test-1: 5 occurrences, test-auth: 8 occurrences) with high confidence; helps predict test stage instability during build"
+          },
+          {
+            "file": "failures.json",
+            "relevance": 78,
+            "summary": "Documents 8 test stage failures with root causes and fixes; build stage should be aware of sw-intent-analysis-test and sw-e2e-integration-test failures"
+          },
+          {
+            "file": "knowledge.json",
+            "relevance": 72,
+            "summary": "Contains 4 test failure patterns (mktemp, cleanup output, regression JSON) with fix strategies; provides specific remediation approaches for build-stage test failures"
+          }
+        ]
+      },
+      "timestamp": 1791030053,
+      "ttl": 1800
     }
   }
 }

@@ -42,8 +42,8 @@ provider_discover_issues() {
     local state="${2:-open}"
     local limit="${3:-50}"
 
-    # Check $NO_GITHUB env var
-    [[ "${NO_GITHUB:-}" == "1" ]] && return 0
+    # Check $NO_GITHUB env var (accept "1" or "true")
+    [[ "${NO_GITHUB:-}" == "1" || "${NO_GITHUB:-}" == "true" ]] && return 0
 
     local gh_args=()
     gh_args+=(issue list)
@@ -75,7 +75,7 @@ provider_get_issue() {
     local issue_id="$1"
 
     [[ -z "$issue_id" ]] && return 1
-    [[ "${NO_GITHUB:-}" == "1" ]] && return 0
+    [[ "${NO_GITHUB:-}" == "1" || "${NO_GITHUB:-}" == "true" ]] && return 0
 
     local response
     response=$(gh issue view "$issue_id" --json number,title,body,labels,state 2>/dev/null) || {
@@ -93,7 +93,7 @@ provider_get_issue_body() {
     local issue_id="$1"
 
     [[ -z "$issue_id" ]] && return 1
-    [[ "${NO_GITHUB:-}" == "1" ]] && return 0
+    [[ "${NO_GITHUB:-}" == "1" || "${NO_GITHUB:-}" == "true" ]] && return 0
 
     gh issue view "$issue_id" --json body --jq '.body' 2>/dev/null || return 1
 }
@@ -106,7 +106,7 @@ provider_add_label() {
     local label="$2"
 
     [[ -z "$issue_id" || -z "$label" ]] && return 1
-    [[ "${NO_GITHUB:-}" == "1" ]] && return 0
+    [[ "${NO_GITHUB:-}" == "1" || "${NO_GITHUB:-}" == "true" ]] && return 0
 
     gh issue edit "$issue_id" --add-label "$label" 2>/dev/null || return 1
 }
@@ -119,7 +119,7 @@ provider_remove_label() {
     local label="$2"
 
     [[ -z "$issue_id" || -z "$label" ]] && return 1
-    [[ "${NO_GITHUB:-}" == "1" ]] && return 0
+    [[ "${NO_GITHUB:-}" == "1" || "${NO_GITHUB:-}" == "true" ]] && return 0
 
     gh issue edit "$issue_id" --remove-label "$label" 2>/dev/null || return 1
 }
@@ -132,7 +132,7 @@ provider_comment() {
     local body="$2"
 
     [[ -z "$issue_id" || -z "$body" ]] && return 1
-    [[ "${NO_GITHUB:-}" == "1" ]] && return 0
+    [[ "${NO_GITHUB:-}" == "1" || "${NO_GITHUB:-}" == "true" ]] && return 0
 
     gh issue comment "$issue_id" --body "$body" 2>/dev/null || return 1
 }
@@ -144,7 +144,7 @@ provider_close_issue() {
     local issue_id="$1"
 
     [[ -z "$issue_id" ]] && return 1
-    [[ "${NO_GITHUB:-}" == "1" ]] && return 0
+    [[ "${NO_GITHUB:-}" == "1" || "${NO_GITHUB:-}" == "true" ]] && return 0
 
     gh issue close "$issue_id" 2>/dev/null || return 1
 }
@@ -158,7 +158,7 @@ provider_create_issue() {
     local labels="${3:-}"
 
     [[ -z "$title" ]] && return 1
-    [[ "${NO_GITHUB:-}" == "1" ]] && return 0
+    [[ "${NO_GITHUB:-}" == "1" || "${NO_GITHUB:-}" == "true" ]] && return 0
 
     local gh_args=(issue create)
     gh_args+=(--title "$title")
