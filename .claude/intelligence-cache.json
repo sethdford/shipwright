@@ -1657,33 +1657,33 @@
       "result": {
         "results": [
           {
-            "file": "failures.json",
-            "relevance": 95,
-            "summary": "Comprehensive test/build failure patterns with root causes and fixes; directly applicable to diagnosing build stage issues (207 occurrences of intent-analysis-test failures, flaky loop-behavior tests, timeout issues)"
-          },
-          {
-            "file": "success-patterns.json",
-            "relevance": 90,
-            "summary": "Two proven success patterns showing how to solve similar build issues: iteration counts, file patterns, test strategies, and commit approaches that worked in 3 iterations with 2.5 USD cost"
-          },
-          {
             "file": "retry-outcomes.json",
-            "relevance": 85,
-            "summary": "Shows model_escalation retry strategy for build_failure class with 100% success rate (5/5 attempts); directly applicable when build stage encounters failures"
+            "relevance": 92,
+            "summary": "Tracks build failure retry strategies with model escalation achieving 100% success rate; directly applicable for recovery during build stage failures"
+          },
+          {
+            "file": "failures.json",
+            "relevance": 88,
+            "summary": "Detailed test failure patterns with root causes and fixes; test failures directly impact build stage outcome and iteration count"
+          },
+          {
+            "file": "flaky-tests.json",
+            "relevance": 82,
+            "summary": "Identifies unstable tests (test-1, test-auth) with confidence scores; flaky tests cause build instability and repeated iterations"
           },
           {
             "file": "knowledge.json",
             "relevance": 75,
-            "summary": "Knowledge base entries on test setup failures (mktemp /tmp/claude path issues) and regression detection; helps avoid common test environment pitfalls during build"
+            "summary": "Knowledge base entries on common test/build failures including mktemp directory issues and test setup problems encountered during builds"
           },
           {
-            "file": "flaky-tests.json",
+            "file": "metrics.json",
             "relevance": 70,
-            "summary": "Identifies known flaky tests (test-1 with 85% confidence, test-auth with 90% confidence) that regress build stage; useful for understanding which tests need retry logic or quarantine"
+            "summary": "Baseline metrics for build duration (7095s) and test duration (1459s); useful for understanding build performance expectations"
           }
         ]
       },
-      "timestamp": 1791038794,
+      "timestamp": 1791050344,
       "ttl": 1800
     },
     "32be68ec4b903951556509691ae3c64d": {
