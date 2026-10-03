@@ -5,8 +5,8 @@
       "pattern": "\u001b[38;2;74;222;128m\u001b[1m✓\u001b[0m reveal shows 1/3 pass count on failure",
       "root_cause": "sw-intent-analysis-test asserts analyze_intent's JSON output includes version, goal, and criteria fields, but the current schema/implementation omits one or more of them",
       "fix": "Update analyze_intent (or its schema) in sw-intent-analysis.sh to emit version, goal, and criteria fields matching the test's expected schema",
-      "seen_count": 203,
-      "last_seen": "2026-10-03T07:31:43Z",
+      "seen_count": 204,
+      "last_seen": "2026-10-03T08:35:49Z",
       "category": "test_failure",
       "signature_hash": "e1a285258fe63781b7370b0d086ad87b",
       "signature": "\u001b[<n>;2;<n>;<n>;<n>m\u001b[1m✓\u001b[0m reveal shows <path> pass count on failure"
@@ -324,8 +324,8 @@
     {
       "stage": "test",
       "pattern": "\u001b[38;2;74;222;128m✓\u001b[0m Uses set -euo pipefail",
-      "root_cause": "sw-pipeline-test.sh E2E tests fail because the mocked claude outputs for plan/review stages don't produce plan.md/review.md (artifacts missing), plus jq parse errors from non-JSON output (RL episode/policy logging polluting stdout) and the intelligence skip/cleanup checks not matching expected output.",
-      "fix": "Debug the failing plan/review stages in the mock environment to see why artifacts aren't written (likely mock claude output or stage change), and ensure RL/policy log lines go to stderr or are filtered so jq parses only JSON; then update the test expectations for the dry-run pipeline name and intelligence skip patterns.",
+      "root_cause": "Four suites failed: sw-e2e-integration-test hit a stale pipeline lock (a pipeline was already running); sw-intent-analysis-test found a schema missing required fields (version, goal, criteria); sw-self-optimize-test passed invalid JSON to jq --argjson in memory promotion of cross-repo patterns; sw-session-restart-test failed to create the briefing file, leaving an empty path.",
+      "fix": "Fix the briefing generation and the intent schema, validate JSON before jq --argjson in memory promotion, and clear stale pipeline locks or isolate the e2e test's state dir so it doesn't collide with a running pipeline.",
       "seen_count": 1,
       "last_seen": "2026-10-02T01:21:14Z",
       "category": "test_failure"
