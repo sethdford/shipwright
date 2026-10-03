@@ -5,8 +5,8 @@
       "pattern": "\u001b[38;2;74;222;128m\u001b[1m✓\u001b[0m reveal shows 1/3 pass count on failure",
       "root_cause": "sw-intent-analysis-test asserts analyze_intent's JSON output includes version, goal, and criteria fields, but the current schema/implementation omits one or more of them",
       "fix": "Update analyze_intent (or its schema) in sw-intent-analysis.sh to emit version, goal, and criteria fields matching the test's expected schema",
-      "seen_count": 204,
-      "last_seen": "2026-10-03T08:35:49Z",
+      "seen_count": 207,
+      "last_seen": "2026-10-03T10:49:28Z",
       "category": "test_failure",
       "signature_hash": "e1a285258fe63781b7370b0d086ad87b",
       "signature": "\u001b[<n>;2;<n>;<n>;<n>m\u001b[1m✓\u001b[0m reveal shows <path> pass count on failure"
@@ -324,11 +324,11 @@
     {
       "stage": "test",
       "pattern": "\u001b[38;2;74;222;128m✓\u001b[0m Uses set -euo pipefail",
-      "root_cause": "Four suites failed: sw-e2e-integration-test hit a stale pipeline lock (a pipeline was already running); sw-intent-analysis-test found a schema missing required fields (version, goal, criteria); sw-self-optimize-test passed invalid JSON to jq --argjson in memory promotion of cross-repo patterns; sw-session-restart-test failed to create the briefing file, leaving an empty path.",
-      "fix": "Fix the briefing generation and the intent schema, validate JSON before jq --argjson in memory promotion, and clear stale pipeline locks or isolate the e2e test's state dir so it doesn't collide with a running pipeline.",
+      "root_cause": "The shown log output contains only passing tests (all PASS with FAIL: 0); the 'error pattern' is a passing check '✓ Uses set -euo pipefail', so the actual failing suite is not within the last 200 lines (likely an earlier suite failed or the run hit a timeout/non-zero exit).",
+      "fix": "Re-run `npm test` and grep the full output for 'FAIL: [1-9]' or '✗' to find the real failing suite, then fix that suite rather than the passing 'set -euo pipefail' check.",
       "seen_count": 1,
       "last_seen": "2026-10-02T01:21:14Z",
-      "category": "test_failure"
+      "category": "unknown"
     }
   ]
 }
