@@ -490,3 +490,7 @@
 {"ts":"2026-10-02T21:10:39Z","ts_epoch":1790975439,"type":"model.outcome","issue":0,"stage":"intake","model":"opus","success":"true"}
 {"ts":"2026-10-02T21:10:39Z","ts_epoch":1790975439,"type":"model.outcome","issue":0,"stage":"plan","model":"opus","success":"true"}
 {"ts":"2026-10-02T21:10:39Z","ts_epoch":1790975439,"type":"pipeline.cost","input_tokens":0,"output_tokens":0,"model":"sonnet","cost_usd":0.0000}
+{"ts":"2026-10-03T00:16:44Z","ts_epoch":1790986604,"type":"hygiene_platform_refactor","hardcoded":49,"fallback":69,"todo":51}
+{"ts":"2026-10-03T00:17:08Z","ts_epoch":1790986628,"type":"strategic.issue_created","title":"Split sw-loop.sh into build-loop core, restart/session, and progress-reporting modules","priority":"P6","complexity":"full"}
+{"ts":"2026-10-03T00:17:11Z","ts_epoch":1790986631,"type":"strategic.issue_created","title":"Surface context-exhaustion vs. code-error restart outcomes in `shipwright loop` summary","priority":"P0","complexity":"fast"}
+{"ts":"2026-10-03T00:17:11Z","ts_epoch":1790986631,"type":"strategic.cycle_complete","issues_created":2,"issues_skipped":1}
