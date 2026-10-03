@@ -1658,32 +1658,32 @@
         "results": [
           {
             "file": "retry-outcomes.json",
-            "relevance": 92,
-            "summary": "Tracks build failure retry strategies with model escalation achieving 100% success rate; directly applicable for recovery during build stage failures"
-          },
-          {
-            "file": "failures.json",
             "relevance": 88,
-            "summary": "Detailed test failure patterns with root causes and fixes; test failures directly impact build stage outcome and iteration count"
+            "summary": "Build failure recovery strategy with 100% success rate using model escalation; directly applicable to handling build stage failures"
           },
           {
-            "file": "flaky-tests.json",
+            "file": "success-patterns.json",
             "relevance": 82,
-            "summary": "Identifies unstable tests (test-1, test-auth) with confidence scores; flaky tests cause build instability and repeated iterations"
+            "summary": "Historical successful builds showing complexity, iteration count, duration, file patterns, and test strategies; patterns for similar complexity builds"
           },
           {
-            "file": "knowledge.json",
-            "relevance": 75,
-            "summary": "Knowledge base entries on common test/build failures including mktemp directory issues and test setup problems encountered during builds"
+            "file": "patterns.json",
+            "relevance": 72,
+            "summary": "Project conventions including test runner (vitest), package manager (npm), test patterns; build environment configuration"
           },
           {
             "file": "metrics.json",
-            "relevance": 70,
-            "summary": "Baseline metrics for build duration (7095s) and test duration (1459s); useful for understanding build performance expectations"
+            "relevance": 62,
+            "summary": "Build duration baseline (7095s) and test duration baseline (1459s); performance benchmarks for timeout/iteration estimation"
+          },
+          {
+            "file": "flaky-tests.json",
+            "relevance": 52,
+            "summary": "Flaky test detection (test-1, test-auth with connection timeout); build stability assessment and potential iteration signals"
           }
         ]
       },
-      "timestamp": 1791050344,
+      "timestamp": 1791052297,
       "ttl": 1800
     },
     "32be68ec4b903951556509691ae3c64d": {
@@ -2440,6 +2440,13 @@
         }
       ],
       "timestamp": 1791051382,
+      "ttl": 1800
+    },
+    "0199d5d0ff728bcb2c566d6ecbd004c9": {
+      "result": {
+        "raw_response": "Mock claude: ok"
+      },
+      "timestamp": 1791052064,
       "ttl": 1800
     }
   }
