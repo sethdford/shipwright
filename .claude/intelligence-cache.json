@@ -33,14 +33,14 @@
         "primary_role": "tester",
         "secondary_roles": [
           "builder",
-          "reviewer"
+          "devops"
         ],
-        "confidence": 0.95,
-        "reasoning": "Task explicitly requires creating test suites for untested scripts; Test Specialist excels at test case generation, automation, and coverage analysis. Builder aids implementation, reviewer ensures quality.",
+        "confidence": 0.85,
+        "reasoning": "E2E test automation requires test specialist for test strategy and validation, builder for implementation, and DevOps for CI/CD integration.",
         "new_role_needed": false,
         "suggested_role": null
       },
-      "timestamp": 1791030061,
+      "timestamp": 1791034031,
       "ttl": 3600
     },
     "efd5524ad1244fd20344bf3ff5d95233": {
@@ -1666,33 +1666,33 @@
       "result": {
         "results": [
           {
-            "file": "patterns.json",
-            "relevance": 95,
-            "summary": "Defines project structure (Node, vitest test runner, npm package manager, CommonJS imports, src/ source dir). Essential for understanding how to run builds and tests."
-          },
-          {
             "file": "retry-outcomes.json",
-            "relevance": 90,
-            "summary": "Documents build_failure retry strategy (model_escalation) with 100% success rate across 5 attempts. Critical for handling build failures intelligently."
-          },
-          {
-            "file": "metrics.json",
-            "relevance": 85,
-            "summary": "Baseline performance metrics: build_duration_s=7095, test_duration_s=1459. Essential reference for detecting performance regressions and setting timeouts."
-          },
-          {
-            "file": "failures.json",
-            "relevance": 78,
-            "summary": "Documents 9 test-stage failures with root causes (schema mismatches, stale locks, flaky suites) and fixes. Directly applicable to diagnosing and fixing build test failures."
+            "relevance": 92,
+            "summary": "Shows model_escalation strategy for build failures has 100% success rate (5/5 attempts). Directly applicable retry guidance during build stage."
           },
           {
             "file": "success-patterns.json",
-            "relevance": 70,
-            "summary": "Two successful patterns: bug fix (3 iterations, 45s, 6 commits, $2.50) and feature addition (3 iterations, 150s, 5 commits, $2.50). Reference for build approach and iteration strategy."
+            "relevance": 88,
+            "summary": "Captures two successful build patterns: bug fix (complexity 60, 3 iterations) and feature (complexity 65, 3 iterations). Provides proven iteration counts, file patterns, and test strategies for similar goals."
+          },
+          {
+            "file": "metrics.json",
+            "relevance": 72,
+            "summary": "Baseline performance metrics: build_duration_s=7095 (~2h), test_duration_s=1459. Useful for build timeout expectations and performance validation."
+          },
+          {
+            "file": "patterns.json",
+            "relevance": 68,
+            "summary": "Project conventions: Node.js, vitest test runner, npm package manager, javascript language. Critical for configuring build and test environment correctly."
+          },
+          {
+            "file": "flaky-tests.json",
+            "relevance": 62,
+            "summary": "Tracks flaky tests: test-auth (90% confidence, connection timeout). Test instability can mask build issues or cause false negatives during build validation."
           }
         ]
       },
-      "timestamp": 1791032045,
+      "timestamp": 1791034023,
       "ttl": 1800
     },
     "32be68ec4b903951556509691ae3c64d": {
@@ -1734,7 +1734,7 @@
       "result": {
         "estimated_iterations": 1
       },
-      "timestamp": 1791031574,
+      "timestamp": 1791033944,
       "ttl": 1800
     },
     "314918b1ae1605e269f10dc7bab1eb15": {
@@ -1819,33 +1819,33 @@
       "result": {
         "results": [
           {
-            "file": "fleet-shared-patterns.json",
-            "relevance": 85,
-            "summary": "Shared fleet pattern: 'Cannot find module' error in build stage with 'npm i' fix. Widely applicable to build failures across multiple repos."
-          },
-          {
             "file": "index.json",
-            "relevance": 70,
-            "summary": "Build stage test_failure pattern with specific fix: 'Increase timeout value in test setup'. Directly applicable to build stage issues."
+            "relevance": 75,
+            "summary": "Contains build-stage failure patterns with test_failure signature and timeout fixes; directly applicable to troubleshooting build issues"
           },
           {
-            "file": "failures.json",
-            "relevance": 65,
-            "summary": "Documented build/test stage failures including timeout and database issues with applied fixes. Provides resolved build failure context."
+            "file": "fleet-shared-patterns.json",
+            "relevance": 70,
+            "summary": "Fleet-wide build error pattern ('Cannot find module') seen 2x across repos; common npm/node dependency issue during build stage"
           },
           {
             "file": "success-patterns.json (test-repo-789)",
             "relevance": 55,
-            "summary": "Successful build stage execution pattern with timeout handling approach. Example of completed build iteration with 3 iterations needed."
+            "summary": "Success pattern executed in build stage with completion time/cost data; demonstrates build-stage workflow even if domain unrelated"
           },
           {
-            "file": "success-patterns.json (test-final-working)",
+            "file": "success-patterns.json (test-repo-ranking)",
             "relevance": 50,
-            "summary": "Successful build stage pattern for daemon timeout fix in 2 iterations. Examples of build stage completion patterns."
+            "summary": "Two generic build-stage success patterns with standard npm test strategy; minimal specific guidance but covers build execution"
+          },
+          {
+            "file": "success-patterns.json (test-repo-comptime)",
+            "relevance": 45,
+            "summary": "Build-stage pattern with timing/cost data and multiple stages executed (intake→build→test); useful for understanding build phase duration"
           }
         ]
       },
-      "timestamp": 1791031667,
+      "timestamp": 1791034008,
       "ttl": 1800
     },
     "84e4a49b5ef1fcfe2b9b61ec3bf0b0f8": {
@@ -1976,6 +1976,13 @@
       },
       "timestamp": 1791032741,
       "ttl": 3600
+    },
+    "94c59a17535a96d8fd0a166af48da3e3": {
+      "result": {
+        "raw_response": "Mock claude: ok"
+      },
+      "timestamp": 1791033949,
+      "ttl": 1800
     }
   }
 }
