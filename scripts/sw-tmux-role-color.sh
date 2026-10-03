@@ -50,21 +50,24 @@ TITLE_LOWER="$(echo "$PANE_TITLE" | tr '[:upper:]' '[:lower:]')"
 COLOR="#00d4ff"  # default: cyan
 
 # shellcheck disable=SC2221,SC2222
+# Note: Patterns are ordered by specificity. More specific patterns come first
+# to avoid false matches. E.g., "security-auditor" should match *secur* (red)
+# not *audit* (orange), and "code-reviewer" should match *review* not *code*.
 case "$TITLE_LOWER" in
     *leader*|*lead*|*pm*|*manager*|*orchestrat*)
         COLOR="#00d4ff"  # cyan — command & control
         ;;
-    *build*|*dev*|*implement*|*code*|*engineer*)
-        COLOR="#0066ff"  # blue — implementation
+    *secur*|*vuln*|*threat*|*pentest*)
+        COLOR="#ef4444"  # red — vigilance
         ;;
-    *review*|*audit*|*inspect*|*oversight*)
+    *review*|*inspect*|*oversight*)
         COLOR="#f97316"  # orange — scrutiny
         ;;
     *test*|*qa*|*validat*|*verify*)
         COLOR="#facc15"  # yellow — validation
         ;;
-    *secur*|*vuln*|*threat*|*pentest*)
-        COLOR="#ef4444"  # red — vigilance
+    *build*|*dev*|*implement*|*code*|*engineer*)
+        COLOR="#0066ff"  # blue — implementation
         ;;
     *doc*|*writ*|*readme*|*changelog*)
         COLOR="#a78bfa"  # violet — documentation

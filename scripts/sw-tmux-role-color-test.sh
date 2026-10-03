@@ -249,7 +249,9 @@ test_no_tmux() {
     setup_test_env
     export MOCK_PANE_TITLE="builder"
 
-    if PATH="$TEST_TEMP_DIR/bin-empty:$TEST_TEMP_DIR/bin" SCRIPT_DIR="$TEST_TEMP_DIR/scripts" bash "$TEST_TEMP_DIR/scripts/sw-tmux-role-color.sh" >/dev/null 2>&1; then
+    # Remove tmux mock from PATH but keep /bin:/usr/bin so bash can run
+    local original_path="$PATH"
+    if PATH="/bin:/usr/bin:/usr/local/bin" SCRIPT_DIR="$TEST_TEMP_DIR/scripts" bash "$TEST_TEMP_DIR/scripts/sw-tmux-role-color.sh" >/dev/null 2>&1; then
         PASS=$((PASS + 1))
         echo -e "  \033[38;2;74;222;128m✓\033[0m missing tmux exits 0"
     else
