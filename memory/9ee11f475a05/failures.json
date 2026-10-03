@@ -5,8 +5,8 @@
       "pattern": "\u001b[38;2;74;222;128m\u001b[1m✓\u001b[0m reveal shows 1/3 pass count on failure",
       "root_cause": "sw-intent-analysis-test asserts analyze_intent's JSON output includes version, goal, and criteria fields, but the current schema/implementation omits one or more of them",
       "fix": "Update analyze_intent (or its schema) in sw-intent-analysis.sh to emit version, goal, and criteria fields matching the test's expected schema",
-      "seen_count": 201,
-      "last_seen": "2026-10-03T03:15:23Z",
+      "seen_count": 202,
+      "last_seen": "2026-10-03T04:47:45Z",
       "category": "test_failure",
       "signature_hash": "e1a285258fe63781b7370b0d086ad87b",
       "signature": "\u001b[<n>;2;<n>;<n>;<n>m\u001b[1m✓\u001b[0m reveal shows <path> pass count on failure"
@@ -17,7 +17,7 @@
       "root_cause": "Test suite itself passed (all PASS, 0 FAIL) but the pipeline stage was flagged for iterating due to loop-behavior/RL logging noise being misread as failure signal",
       "fix": "Verify the actual test exit code rather than log content matching; ensure sw-autoresearch-e2e-test.sh output doesn't trigger false-positive failure pattern matching in the pipeline's error classifier",
       "seen_count": 51,
-      "last_seen": "2026-10-03T01:55:38Z",
+      "last_seen": "2026-10-03T05:28:36Z",
       "category": "flaky",
       "signature_hash": "4257c245052f",
       "signature": "\u001b[2m loop behavior: iterations on test failure\u001b[0m"
@@ -137,8 +137,8 @@
       "pattern": "\u001b[38;2;0;212;255m▸\u001b[0m Patrol recurring failures label construction... \u001b[38;2;74;222;128m✓\u001b[0m",
       "root_cause": "sw-e2e-integration-test failed because a stale pipeline lock (pipeline-4253) was already held from a prior run, blocking the fast pipeline test; sw-intent-analysis-test failed because analyze_intent's generated JSON is missing required schema fields (version, goal, criteria)",
       "fix": "Clear/release stale pipeline locks before the e2e-integration test runs (or have it auto-abort orphaned locks), and update analyze_intent to always populate version, goal, and criteria in its output schema",
-      "seen_count": 22,
-      "last_seen": "2026-10-03T04:37:47Z",
+      "seen_count": 20,
+      "last_seen": "2026-10-02T14:51:41Z",
       "category": "test_failure",
       "signature_hash": "06f0abb7562df2c6e4651882933d3b25",
       "signature": "\u001b[<n>;2;0;<n>;<n>m▸\u001b[0m patrol recurring failures label construction... \u001b[<n>;2;<n>;<n>;<n>m✓\u001b[0m"
@@ -324,20 +324,11 @@
     {
       "stage": "test",
       "pattern": "\u001b[38;2;74;222;128m✓\u001b[0m Uses set -euo pipefail",
-      "root_cause": "sw-cost-test.sh 'context efficiency' tests fail because the cost dashboard prints 'No cost entries in the last 30 days' and exits before rendering the CONTEXT EFFICIENCY section; the test seeds only loop.context_efficiency events and no cost entries (the 'Uses set -euo pipefail' line is a passing check, not the failure).",
-      "fix": "Make the cost dashboard render the CONTEXT EFFICIENCY section even when there are no cost entries (don't early-return), or seed a cost entry in the test fixture before running the dashboard.",
+      "root_cause": "The shown log output has no failure: every suite in the tail passed with FAIL: 0. The flagged pattern is a passing check ('✓ Uses set -euo pipefail') that was matched as an error because of its ANSI-coloured output. The real failure is probably earlier in the log, or the run was killed (timeout or an exit-code problem) after these suites finished.",
+      "fix": "Make the error-pattern matcher ignore ✓ lines and strip ANSI codes. Then rerun `npm test` and read the first line containing 'FAIL:' with a non-zero count or an '✗' marker, which the truncated 200-line tail does not include.",
       "seen_count": 1,
       "last_seen": "2026-10-02T01:21:14Z",
-      "category": "test_failure"
-    },
-    {
-      "stage": "test",
-      "pattern": "\u001b[38;2;74;222;128m✓\u001b[0m archive_session_artifacts moves logs and copies progress/error summary",
-      "root_cause": "Pipeline E2E test suite (sw-pipeline-test.sh) fails 6 tests: plan.md/review.md artifacts are not generated in the mock environment (plan/review stages produce no files), and the intelligence skip output hits jq parse errors from non-JSON lines (RL episode log output) in a polluted shared state, so the pipeline exits 1.",
-      "fix": "Debug the plan and review stage mocks in sw-pipeline-test.sh (ensure mock claude emits plan/review content and artifacts land in .claude/pipeline-artifacts), isolate RL/episode state (HOME/SHIPWRIGHT dir) per test, and guard jq calls against non-JSON log lines.",
-      "seen_count": 1,
-      "last_seen": "2026-10-03T05:08:50Z",
-      "category": "test_failure"
+      "category": "unknown"
     }
   ]
 }
