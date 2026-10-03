@@ -332,11 +332,11 @@
     },
     {
       "stage": "test",
-      "pattern": "\u001b[38;2;0;212;255m▸\u001b[0m Vitals: Convergence with decreasing errors... \u001b[38;2;74;222;128m✓\u001b[0m",
-      "root_cause": "Three test suites failed (sw-e2e-integration-test, sw-intent-analysis-test, sw-pipeline-test), most likely because they need a real Claude/GitHub environment or are slow enough to hit timing limits in CI. The 'Vitals: Convergence' line matched as the error pattern is only a success log line, not the actual failure.",
-      "fix": "Run the three failing suites individually (e.g. bash scripts/sw-pipeline-test.sh) to read the failing assertions, then fix the code or mock setup. Skip or mock the real-API e2e-integration test in CI.",
+      "pattern": "\u001b[2m  ══════════════════════════════════════════\u001b[0m",
+      "root_cause": "Two suites failed: sw-e2e-integration-test hit a pipeline lock/'already in progress' state (needs real GitHub/Claude and was likely contaminated by stale pipeline state from the running pipeline), and sw-intent-analysis-test fails its schema check because the generated intent JSON lacks required fields (version, goal, criteria).",
+      "fix": "Make the e2e integration test use an isolated temp state dir/lock (or skip when a pipeline is already running), and fix analyze_intent's output or the schema in sw-intent-analysis-test so version, goal and criteria are present.",
       "seen_count": 1,
-      "last_seen": "2026-10-03T05:14:25Z",
+      "last_seen": "2026-10-03T05:16:46Z",
       "category": "test_failure"
     }
   ]
