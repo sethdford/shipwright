@@ -1401,6 +1401,49 @@
       },
       "timestamp": 1775344537,
       "ttl": 3600
+    },
+    "61765cd462ddfe163998c45da8f6c2c5": {
+      "result": {
+        "complexity": 5,
+        "risk_level": "low",
+        "success_probability": 88,
+        "recommended_template": "standard",
+        "issue_type": "refactor",
+        "key_risks": [
+          "Project detection logic may misclassify edge cases, leading to unhelpful template recommendations",
+          "Template mapping may need updates as new templates or project types are discovered",
+          "Documentation may drift if recommendation logic is changed without updating README/CLAUDE.md",
+          "Performance impact if project detection is expensive on large monorepos"
+        ],
+        "implementation_hints": [
+          "Extract project detection into a reusable function and call before template selection logic",
+          "Build a mapping table (project_type → template + one-line rationale) as a shell function",
+          "Check for explicit --template flag first to short-circuit detection when user overrides",
+          "Write unit tests covering at least: CLI/script project, web app (React/Vue), and deploy-configured repo (Dockerfile/k8s)",
+          "Print recommendation to stderr with format: 'Recommended: <template> (<rationale>) — use --template to override'",
+          "Add test case for --template override to verify recommendations are suppressed"
+        ]
+      },
+      "timestamp": 1791012567,
+      "ttl": 3600
+    },
+    "4cf4578a660c16c59e92e314bdb7a0c8": {
+      "result": {
+        "estimated_iterations": 3
+      },
+      "timestamp": 1791012579,
+      "ttl": 1800
+    },
+    "5a252030fab923a6855b5da7ae47ad79": {
+      "result": {
+        "estimated_cost_usd": 3.50,
+        "estimated_iterations": 1.2,
+        "estimated_tokens": 1050000,
+        "likely_failure_stage": "none",
+        "confidence": 72
+      },
+      "timestamp": 1791012587,
+      "ttl": 3600
     }
   }
 }
