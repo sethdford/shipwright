@@ -51,3 +51,7 @@
 {"ts":"2026-10-03T10:50:04Z","ts_epoch":1791024604,"type":"intelligence.cache_hit","cache_key":"search_memory_82ea7560e91989ce3cb658229a6d20f3"}
 {"ts":"2026-10-03T10:50:05Z","ts_epoch":1791024605,"type":"loop.context_efficiency","iteration":5,"raw_prompt_chars":20745,"trimmed_prompt_chars":20745,"trim_ratio":0.0,"budget_utilization":10.4,"budget_chars":200000,"job_id":"autonomous"}
 {"ts":"2026-10-03T10:50:11Z","ts_epoch":1791024611,"type":"memory.analyze","stage":"test","category":"test_failure"}
+{"ts":"2026-10-03T13:38:03Z","ts_epoch":1791034683,"type":"hygiene_platform_refactor","hardcoded":49,"fallback":69,"todo":51}
+{"ts":"2026-10-03T13:38:28Z","ts_epoch":1791034708,"type":"strategic.issue_created","title":"Classify and surface flatlining build-loop iterations distinct from context exhaustion","priority":"P0","complexity":"standard"}
+{"ts":"2026-10-03T13:38:33Z","ts_epoch":1791034713,"type":"strategic.issue_created","title":"Split sw-memory.sh into capture, query, and pattern-aggregation modules","priority":"P6","complexity":"standard"}
+{"ts":"2026-10-03T13:38:33Z","ts_epoch":1791034713,"type":"strategic.cycle_complete","issues_created":2,"issues_skipped":1}
