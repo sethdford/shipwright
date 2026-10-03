@@ -329,6 +329,15 @@
       "seen_count": 1,
       "last_seen": "2026-10-02T01:21:14Z",
       "category": "test_failure"
+    },
+    {
+      "stage": "test",
+      "pattern": "\u001b[38;2;0;212;255m▸\u001b[0m Vitals: Convergence with decreasing errors... \u001b[38;2;74;222;128m✓\u001b[0m",
+      "root_cause": "Three test suites failed (sw-e2e-integration-test, sw-intent-analysis-test, sw-pipeline-test), most likely because they need a real Claude/GitHub environment or are slow enough to hit timing limits in CI. The 'Vitals: Convergence' line matched as the error pattern is only a success log line, not the actual failure.",
+      "fix": "Run the three failing suites individually (e.g. bash scripts/sw-pipeline-test.sh) to read the failing assertions, then fix the code or mock setup. Skip or mock the real-API e2e-integration test in CI.",
+      "seen_count": 1,
+      "last_seen": "2026-10-03T05:14:25Z",
+      "category": "test_failure"
     }
   ]
 }
