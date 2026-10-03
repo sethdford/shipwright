@@ -2091,6 +2091,34 @@
       },
       "timestamp": 1791034788,
       "ttl": 1800
+    },
+    "9e32f021b93869d9814b4160220a752a": {
+      "result": {
+        "raw_response": "Mock claude: ok"
+      },
+      "timestamp": 1791034888,
+      "ttl": 1800
+    },
+    "8f482ec2082751967ca0dabbd5cef659": {
+      "result": {
+        "raw_response": "Mock claude: ok"
+      },
+      "timestamp": 1791035019,
+      "ttl": 1800
+    },
+    "b3516b7dd5305521739063e7c49abc4c": {
+      "result": [
+        {
+          "type": "result",
+          "result": "I am trying the same approach again.",
+          "usage": {
+            "input_tokens": 0,
+            "output_tokens": 0
+          }
+        }
+      ],
+      "timestamp": 1791035231,
+      "ttl": 1800
     }
   }
 }
