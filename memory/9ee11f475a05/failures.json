@@ -5,8 +5,8 @@
       "pattern": "\u001b[38;2;74;222;128m\u001b[1m✓\u001b[0m reveal shows 1/3 pass count on failure",
       "root_cause": "sw-intent-analysis-test asserts analyze_intent's JSON output includes version, goal, and criteria fields, but the current schema/implementation omits one or more of them",
       "fix": "Update analyze_intent (or its schema) in sw-intent-analysis.sh to emit version, goal, and criteria fields matching the test's expected schema",
-      "seen_count": 202,
-      "last_seen": "2026-10-03T04:47:45Z",
+      "seen_count": 203,
+      "last_seen": "2026-10-03T07:15:28Z",
       "category": "test_failure",
       "signature_hash": "e1a285258fe63781b7370b0d086ad87b",
       "signature": "\u001b[<n>;2;<n>;<n>;<n>m\u001b[1m✓\u001b[0m reveal shows <path> pass count on failure"
@@ -324,11 +324,11 @@
     {
       "stage": "test",
       "pattern": "\u001b[38;2;74;222;128m✓\u001b[0m Uses set -euo pipefail",
-      "root_cause": "The shown log output has no failure: every suite in the tail passed with FAIL: 0. The flagged pattern is a passing check ('✓ Uses set -euo pipefail') that was matched as an error because of its ANSI-coloured output. The real failure is probably earlier in the log, or the run was killed (timeout or an exit-code problem) after these suites finished.",
-      "fix": "Make the error-pattern matcher ignore ✓ lines and strip ANSI codes. Then rerun `npm test` and read the first line containing 'FAIL:' with a non-zero count or an '✗' marker, which the truncated 200-line tail does not include.",
+      "root_cause": "sw-cost-test.sh 'context efficiency' dashboard tests fail because the seeded loop.context_efficiency events fall outside the 30-day window (or no cost entries exist), so the dashboard prints 'No cost entries in the last 30 day(s)' and skips the CONTEXT EFFICIENCY section.",
+      "fix": "Seed the test with cost entries and loop.context_efficiency events timestamped within the last 30 days (use current date), or have the dashboard render the context efficiency section even when there are no cost entries.",
       "seen_count": 1,
       "last_seen": "2026-10-02T01:21:14Z",
-      "category": "unknown"
+      "category": "test_failure"
     }
   ]
 }
