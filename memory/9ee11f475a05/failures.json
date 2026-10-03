@@ -5,8 +5,8 @@
       "pattern": "\u001b[38;2;74;222;128m\u001b[1m✓\u001b[0m reveal shows 1/3 pass count on failure",
       "root_cause": "sw-intent-analysis-test asserts analyze_intent's JSON output includes version, goal, and criteria fields, but the current schema/implementation omits one or more of them",
       "fix": "Update analyze_intent (or its schema) in sw-intent-analysis.sh to emit version, goal, and criteria fields matching the test's expected schema",
-      "seen_count": 206,
-      "last_seen": "2026-10-03T10:40:07Z",
+      "seen_count": 205,
+      "last_seen": "2026-10-03T10:32:11Z",
       "category": "test_failure",
       "signature_hash": "e1a285258fe63781b7370b0d086ad87b",
       "signature": "\u001b[<n>;2;<n>;<n>;<n>m\u001b[1m✓\u001b[0m reveal shows <path> pass count on failure"
@@ -16,8 +16,8 @@
       "pattern": "\u001b[2m  loop behavior: iterations on test failure\u001b[0m",
       "root_cause": "Test suite itself passed (all PASS, 0 FAIL) but the pipeline stage was flagged for iterating due to loop-behavior/RL logging noise being misread as failure signal",
       "fix": "Verify the actual test exit code rather than log content matching; ensure sw-autoresearch-e2e-test.sh output doesn't trigger false-positive failure pattern matching in the pipeline's error classifier",
-      "seen_count": 51,
-      "last_seen": "2026-10-03T05:28:36Z",
+      "seen_count": 52,
+      "last_seen": "2026-10-03T09:48:42Z",
       "category": "flaky",
       "signature_hash": "4257c245052f",
       "signature": "\u001b[2m loop behavior: iterations on test failure\u001b[0m"
@@ -324,8 +324,8 @@
     {
       "stage": "test",
       "pattern": "\u001b[38;2;74;222;128m✓\u001b[0m Uses set -euo pipefail",
-      "root_cause": "sw-pipeline-test.sh E2E mock environment fails: the plan and review stages don't produce plan.md/review.md (mock claude output not matching, likely due to jq parse errors on intelligence/RL JSON), cascading into the full E2E, resume, and cleanup tests. The intelligence-skip and dry-run output-pattern checks also no longer match the current output.",
-      "fix": "Debug plan/review stage under the mock claude in sw-pipeline-test.sh (check the mock's response format and the jq parse errors from the RL/intelligence JSON output), restore plan.md/review.md generation, and update the dry-run and complexity-skip expected patterns to match the current output.",
+      "root_cause": "sw-pipeline-test.sh E2E tests fail because plan.md/review.md artifacts aren't generated (mock Claude plan/review output not produced), plus a jq parse error from RL episode output polluting the intelligence skip test and a dry-run output pattern mismatch; also a patrol-meta suite reports 'All 0 tests passed' due to broken counting",
+      "fix": "Debug the mocked plan/review stages in sw-pipeline-test.sh (ensure the mock claude emits plan/review content and the artifacts dir path matches), fix the jq parse of non-JSON RL output lines, and correct the test pass-counter in the patrol-meta test",
       "seen_count": 1,
       "last_seen": "2026-10-02T01:21:14Z",
       "category": "test_failure"
