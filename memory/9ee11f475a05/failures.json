@@ -5,8 +5,8 @@
       "pattern": "\u001b[38;2;74;222;128m\u001b[1m✓\u001b[0m reveal shows 1/3 pass count on failure",
       "root_cause": "sw-intent-analysis-test asserts analyze_intent's JSON output includes version, goal, and criteria fields, but the current schema/implementation omits one or more of them",
       "fix": "Update analyze_intent (or its schema) in sw-intent-analysis.sh to emit version, goal, and criteria fields matching the test's expected schema",
-      "seen_count": 201,
-      "last_seen": "2026-10-03T00:02:49Z",
+      "seen_count": 200,
+      "last_seen": "2026-10-02T19:29:57Z",
       "category": "test_failure",
       "signature_hash": "e1a285258fe63781b7370b0d086ad87b",
       "signature": "\u001b[<n>;2;<n>;<n>;<n>m\u001b[1m✓\u001b[0m reveal shows <path> pass count on failure"
@@ -71,8 +71,8 @@
       "pattern": "Results: \u001b[38;2;74;222;128m\u001b[1m124 PASS\u001b[0m | \u001b[38;2;248;113;113m\u001b[1m4 FAIL\u001b[0m",
       "root_cause": "4 of 128 tests failed but the failing assertions are not present in the captured log excerpt (only passing output shown)",
       "fix": "Re-run with full output or grep for FAIL/✗ lines to identify which suite and assertion regressed before attempting a code fix",
-      "seen_count": 7,
-      "last_seen": "2026-10-02T02:26:47Z",
+      "seen_count": 8,
+      "last_seen": "2026-10-02T23:54:45Z",
       "category": "test_failure",
       "signature_hash": "a938d8f63c9361dfd3082073022633ae",
       "signature": "results: \u001b[<n>;2;<n>;<n>;<n>m\u001b[1m<n> pass\u001b[0m | \u001b[<n>;2;<n>;<n>;<n>m\u001b[1m4 fail\u001b[0m"
@@ -324,8 +324,8 @@
     {
       "stage": "test",
       "pattern": "\u001b[38;2;74;222;128m✓\u001b[0m Uses set -euo pipefail",
-      "root_cause": "Multiple unrelated suites failed: sw-e2e-integration-test hit a stale pipeline lock (another pipeline already running), while sw-intent-analysis-test (schema missing required fields), sw-loop-test (stuckness detection) and sw-project-detect-test (cached detection mismatch) failed their own assertions.",
-      "fix": "Run each failing suite individually to separate environment-related failures (stale pipeline lock/state, concurrent runs) from real assertion failures, then fix the intent schema required fields, loop stuckness detection and project-detect cache comparison.",
+      "root_cause": "The sw-cost-test.sh 'context efficiency' tests fail because the cost dashboard prints 'No cost entries in the last 30 days' and skips the CONTEXT EFFICIENCY section when only loop.context_efficiency events are seeded and no cost entries exist, so the test's expected output is never rendered.",
+      "fix": "Either seed at least one cost entry in the test's costs.json fixture alongside the context_efficiency events, or change sw-cost.sh to render the CONTEXT EFFICIENCY section before the early return on empty cost entries.",
       "seen_count": 1,
       "last_seen": "2026-10-02T01:21:14Z",
       "category": "test_failure"
