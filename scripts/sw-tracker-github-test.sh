@@ -201,11 +201,11 @@ test_get_issue_normalize() {
     local output
     cd "$TEST_TEMP_DIR"
     output=$(
-        PATH="$TEST_TEMP_DIR/bin:$PATH" bash -c '
+        GH_LOG="$GH_LOG" PATH="$TEST_TEMP_DIR/bin:$PATH" bash -c '
             source ./sw-tracker-github.sh
             provider_get_issue "789"
         '
-    )
+    ) || true
 
     if echo "$output" | grep -q '"id": 789'; then
         PASS=$((PASS + 1))
