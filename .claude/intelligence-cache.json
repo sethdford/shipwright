@@ -2473,6 +2473,47 @@
       },
       "timestamp": 1791052385,
       "ttl": 3600
+    },
+    "4cbeb023d22755aeaafd29bf23cb1b3f": {
+      "result": {
+        "estimated_iterations": 2
+      },
+      "timestamp": 1791053241,
+      "ttl": 1800
+    },
+    "d68e6a25943261cdc426d4cc6cf374c2": {
+      "result": {
+        "estimated_cost_usd": 0.18,
+        "estimated_iterations": 2,
+        "estimated_tokens": 12000,
+        "likely_failure_stage": "intake",
+        "confidence": 82,
+        "reasoning": {
+          "cost_breakdown": {
+            "intake": 0.03,
+            "build": 0.08,
+            "test": 0.04,
+            "pr": 0.03
+          },
+          "factors": [
+            "low_complexity_documentation_issue",
+            "fast_template_minimal_stages",
+            "unclear_intent_risk_increases_intake_failure_probability",
+            "no_deployment_or_complex_review_needed"
+          ],
+          "adjusted_success_probability": 0.82,
+          "confidence_reduction_reason": "issue_intent_ambiguity_and_automation_artifact_uncertainty"
+        }
+      },
+      "timestamp": 1791053250,
+      "ttl": 3600
+    },
+    "92538f357fcbc7d2bb43f03346d59f6e": {
+      "result": {
+        "raw_response": "Mock claude: ok"
+      },
+      "timestamp": 1791053252,
+      "ttl": 1800
     }
   }
 }
