@@ -1,5 +1,5 @@
 {
-  "timestamp": "2026-10-04T16:03:30Z",
+  "timestamp": "2026-10-04T16:13:30Z",
   "repository": "shipwright",
   "counts": {
     "hardcoded": 49,
@@ -87,7 +87,7 @@
     },
     {
       "file": "scripts/lib/loop-iteration.sh",
-      "line": 482
+      "line": 495
     },
     {
       "file": "scripts/lib/pipeline-intelligence-compound.sh",
@@ -661,7 +661,7 @@
   "script_size_hotspots": [
     {
       "script": "sw-loop.sh",
-      "lines": 2733
+      "lines": 2760
     },
     {
       "script": "sw-memory.sh",

@@ -1585,33 +1585,33 @@
       "result": {
         "results": [
           {
-            "file": "flaky-tests.json",
+            "file": "success-patterns.json",
             "relevance": 95,
-            "summary": "Lists known flaky tests (test-1, test-auth) with confidence levels and error messages. Directly helps build stage avoid false failures from known flaky tests."
+            "summary": "Contains proven successful build patterns with iteration counts, test strategies, duration, files changed, and template used — directly applicable for understanding what works in this codebase's build stage"
           },
           {
             "file": "retry-outcomes.json",
-            "relevance": 90,
-            "summary": "Documents model_escalation retry strategy with 100% success rate on build failures. Directly applicable to handling build stage failures."
-          },
-          {
-            "file": "knowledge.json",
             "relevance": 85,
-            "summary": "Contains detailed failure patterns and fixes for test environment issues (mktemp failures, test output formatting). Directly relevant to build/test stage debugging."
+            "summary": "Captures build_failure recovery strategy with model escalation showing 100% success rate — directly relevant for handling build failures and choosing recovery tactics"
           },
           {
-            "file": "success-patterns.json",
+            "file": "patterns.json",
             "relevance": 80,
-            "summary": "Shows two successful patterns for bug fixes and features with iteration counts, file patterns, test strategies, and cost data. Provides reference for build approach and resource expectations."
+            "summary": "Defines project configuration (node/vitest/npm/commonjs) and source/test conventions — essential context for understanding build environment and test discovery"
+          },
+          {
+            "file": "flaky-tests.json",
+            "relevance": 70,
+            "summary": "Identifies flaky tests (test-auth with 90% confidence, connection timeout errors) that impact build reliability and may require retry strategies"
           },
           {
             "file": "metrics.json",
-            "relevance": 75,
-            "summary": "Provides baseline build_duration_s (7095s) and test_duration_s (1459s). Useful for detecting build performance regressions."
+            "relevance": 65,
+            "summary": "Provides baseline build duration (7095s) and test duration (1459s) expectations for performance monitoring and timeout tuning"
           }
         ]
       },
-      "timestamp": 1791128125,
+      "timestamp": 1791130194,
       "ttl": 1800
     },
     "82884b010f1379485257cd91f828ebdc": {
@@ -1895,6 +1895,55 @@
         }
       ],
       "timestamp": 1791129943,
+      "ttl": 1800
+    },
+    "3f157bab4233f293c8f1b4adddc76daf": {
+      "result": {
+        "raw_response": "Mock claude: ok"
+      },
+      "timestamp": 1791130373,
+      "ttl": 1800
+    },
+    "6d797c2281b0ab2ed9d864cb5d50b7e7": {
+      "result": [
+        {
+          "type": "result",
+          "result": "I am trying the same approach again.",
+          "usage": {
+            "input_tokens": 0,
+            "output_tokens": 0
+          }
+        }
+      ],
+      "timestamp": 1791130408,
+      "ttl": 1800
+    },
+    "1a54ded30cb79f2d36f11f1a40baf246": {
+      "result": [
+        {
+          "type": "result",
+          "result": "I am trying the same approach again.",
+          "usage": {
+            "input_tokens": 0,
+            "output_tokens": 0
+          }
+        }
+      ],
+      "timestamp": 1791130597,
+      "ttl": 1800
+    },
+    "47846a5f3dc7c71e7ed0da230e8f6f62": {
+      "result": [
+        {
+          "type": "result",
+          "result": "I am trying the same approach again.",
+          "usage": {
+            "input_tokens": 0,
+            "output_tokens": 0
+          }
+        }
+      ],
+      "timestamp": 1791130956,
       "ttl": 1800
     }
   }
