@@ -1,13 +1,1 @@
-This iteration added the flatline classifier. It isn't hooked up to anything yet, so loop behavior hasn't changed. The full `npm test` run passed: 163 of 163 suites, including the new one.
-
-**What's in it (commit `39590bb1`):**
-- **`scripts/lib/loop-flatline.sh`** (new) labels each iteration `productive`, `flat` or `context_exhaustion`.
-  - An iteration counts as `flat` only when nothing changed, tests aren't passing, and it failed the same way as the previous iteration.
-  - "Nothing changed" means HEAD didn't move and no source files have uncommitted edits. This matters because the existing progress check compares against the previous commit, so an iteration that commits nothing still looks productive.
-  - "Same failure" is judged from the error lines in `error-summary.json`, with numbers stripped so different timings don't make it look like a new error. A repeated non-zero exit code also counts. An empty error record never counts as a match.
-  - It also decides one exit class per loop (`complete`, `context_exhaustion`, `flatline`, `iteration_exhaustion`, or the loop's status passed through). The threshold is `loop.flatline_threshold`, defaulting to 3. If anything is missing or broken, it falls back to `productive`.
-- **`scripts/sw-loop-flatline-test.sh`** (new, 39 checks against a temporary git repo) covers flatline detection, streak resets, context exhaustion taking priority, passing tests never counting as flat, exit-class order, the `flatline.json` file, failure-tolerant behaviour and the threshold config. It's also listed in `package.json`.
-
-**Change from the design:** the design captured the classifier's result with `cls=$(flatline_classify_iteration ...)`. That runs the function in a subshell, so the streak counters would be lost. The classifier now sets `LAST_ITERATION_CLASS` instead, and the call sites added next must read that variable.
-
-**Next:** task 2, hooking the classifier into `sw-loop.sh`. It has to run after the per-iteration auto-commit and emit the `loop.iteration_classified` and `loop.flatline` events. After that come the `progress.md` lines, the restart reason and strategy fixes, and the pipeline and daemon changes. Tasks 2–10, 12 and 13 are still open, so the goal isn't complete.
+You've hit your session limit · resets 6:10pm (UTC)
