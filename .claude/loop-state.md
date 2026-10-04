@@ -1,14 +1,45 @@
 ---
-goal: "Misleading "jq not available" warning when Claude outputs JSON object instead of array
+goal: "Classify and surface flatlining build-loop iterations distinct from context exhaustion
 
-## Specification: Misleading "jq not available" warning when Claude outputs JSON object instead of array
+## Plan Summary
+# Plan: Tell flatlining build-loop iterations apart from context exhaustion
+
+## Summary
+
+**The problem.** Today "context exhaustion" is a catch-all for any build loop that ends without passing tests. There are three places where this happens:
+
+| Location | Current logic | What goes wrong |
+|---|---|---|
+| `scripts/lib/daemon-failure.sh:51-64` (`classify_failure`) | `progress.md` shows iteration > 0 and tests `false` or `unknown`, so it returns `context_exhaustion` | Any non-passing loop is labelled context exhaustion |
+| `scripts/lib/pipeline-stages-build.sh:461-474` | Loop exit is non-zero and tests aren't `true`, so it writes `context_exhaustion` to `failure-reason.txt` | Same mislabel, and the daemon reads it |
+| `scripts/lib/session-restart.sh:205-213` (`restart_detect_reason`) | Iteration count is at the maximum, so it returns `context_exhaustion` | Running out of iterations is reported as running out of context. The `iteration_limit` branch below it can never run because it has the identical condition |
+
+**Why it matters.** The daemon treats context exhaustion by raising `--max-restarts` (`daemon-failure.sh:285-292`). That helps when the context window really filled up. It does nothing for a **flatlining** loop, where iterations keep running but produce no code changes and the same error every time. More fresh sessions just repeat the same failure.
+
+**What already exists.**
+- `sw-loop.sh:2298` detects real context exhaustion by matching `CONTEXT_EXHAUSTION_PATTERNS` in the iteration log.
+- `loop-convergence.sh` records `diff_hash|error_hash|exit_code` per iteration in `stuckness-tracking.txt`.
+- `check_progress` uses `MIN_PROGRESS_LINES`.
+- `STUCKNESS_COUNT >= 3` sets `STATUS=stuck_restart`.
+[... full plan in .claude/pipeline-artifacts/plan.md]
+
+## Key Design Decisions
+# Design: Classify and surface flatlining build-loop iterations distinct from context exhaustion
+## Context
+## Decision
+### Component diagram
+### Interface contracts
+### Classification rules
+### Data flow
+### Error boundaries
+### Design decisions worth recording
+## Alternatives Considered
+[... full design in .claude/pipeline-artifacts/design.md]
+
+## Specification: Classify and surface flatlining build-loop iterations distinct from context exhaustion
 
 ### Goals
-- *jq IS available.** The actual issue is that Claude's `--output-format json` sometimes outputs a JSON **object** (`{...}`) instead of a JSON **array** (`[...]`), and the parsing code only handles arrays.
-- *Option A**: Extend Case 2 to handle both formats:
-- *Option B**: At minimum, fix the warning message in Case 3:
-- Warning is cosmetic only — the loop functions correctly using the raw JSON
-- But it's confusing during debugging (we spent time investigating jq availability when the real issue was elsewhere)
+- Classify and surface flatlining build-loop iterations distinct from context exhaustion
 
 ### Acceptance Criteria
 - [testable] All existing tests continue to pass
@@ -19,85 +50,76 @@ Historical context (lessons from previous pipelines):
     {
       "file": "failures.json",
       "relevance": 95,
-      "summary": "Contains detailed jq parse error patterns matching the issue: 'jq: parse error' on malformed JSON and mock claude outputting wrong JSON schema (object vs array). Root cause and fix directly address the 'jq not available' warning problem."
+      "summary": "Contains actual failure records with root causes, seen_count, and resolved status. Flatlining would show repeated failures with resolved=false; helps distinguish from context exhaustion."
     },
     {
-      "file": "patterns.json",
-      "relevance": 40,
-      "summary": "Project detection data (nodejs, vitest test runner) provides context about the build environment and testing setup for this pipeline stage."
+      "file": "success-patterns.json (test-repo-comptime)",
+      "relevance": 80,
+      "summary": "Includes iterations_needed, completion_time_seconds, and stages_executed for build stage. Provides baseline metrics to detect when iteration count exceeds normal completion patterns, indicating flatlining."
     },
     {
-      "file": "metrics.json",
-      "relevance": 8,
-      "summary": "Build duration baselines (17827s) provide context on typical build stage timing, useful for understanding if this issue impacts build performance."
+      "file": "index.json",
+      "relevance": 75,
+      "summary": "Contains indexed failure patterns with total_seen frequency counts in build stage. High recurrence of same pattern (seen=5) indicates flatlining vs context exhaustion (new errors)."
     },
     {
-      "file": "metrics.json",
-      "relevance": 5,
-      "summary": "Earlier build duration baseline (147s) is outdated but shows historical performance context."
+      "file": "fleet-shared-patterns.json",
+      "relevance": 70,
+      "summary": "Tracks cross-repo failure patterns with seen_count, timestamps, and fix status. Helps identify whether failures are systematic flatlining or environmental context issues."
     },
     {
-      "file": "global.json",
-      "relevance": 0,
-      "summary": "Empty cross-repo learnings, no relevant content for this specific jq/JSON issue."
+      "file": "success-patterns.json (test-repo-ranking)",
+      "relevance": 65,
+      "summary": "Multiple patterns with iterations_needed=1 and consistent completion times. Provides comparison baseline to detect when builds exceed expected iteration count, signaling flatlining."
     }
   ]
 }
 
 Discoveries from other pipelines:
-[38;2;74;222;128m[1m✓[0m Injected 128 new discoveries
-[intake] Stage intake completed — Resolution: 
-[intake] Stage intake completed — Resolution: 
-[intake] Stage intake completed — Resolution: 
-[compound_quality] Stage compound_quality completed — Resolution: 
-[intake] Stage intake completed — Resolution: 
-[pr] Stage pr completed — Resolution: 
-[pipeline_success] Pipeline success for issue #0 (fast template, stage=validate) — Resolution: success
-[intake] Stage intake completed — Resolution: 
-[pr] Stage pr completed — Resolution: 
-[intake] Stage intake completed — Resolution: 
-[compound_quality] Stage compound_quality completed — Resolution: 
-[pr] Stage pr completed — Resolution: 
-[intake] Stage intake completed — Resolution: 
-[compound_quality] Stage compound_quality completed — Resolution: 
-[pr] Stage pr completed — Resolution: 
-[intake] Stage intake completed — Resolution: 
-[design] Design completed for Build a production-grade todo application. TypeScript + React frontend with Vite, Express REST API backend, SQLite persistence with Drizzle ORM, JWT authentication (register/login), full CRUD for todos with filtering (all/active/completed), drag-and-drop reorder, due dates, priorities (low/medium/high), dark mode, responsive design. Include comprehensive test suite (unit + integration + e2e). Production-ready: error handling, input validation, rate limiting, CORS, environment config. — Resolution: 
-[intake] Stage intake completed — Resolution: 
-[intake] Stage intake completed — Resolution: 
+✓ Injected 1 new discoveries
+[design] Design completed for Classify and surface flatlining build-loop iterations distinct from context exhaustion — Resolution: 
 
-## Failure Diagnosis (Iteration 2)
-Classification: unknown
-Strategy: retry_with_context
-Repeat count: 0
+Task tracking (check off items as you complete them):
+# Pipeline Tasks — Classify and surface flatlining build-loop iterations distinct from context exhaustion
 
-## Failure Diagnosis (Iteration 3)
-Classification: unknown
-Strategy: retry_with_context
-Repeat count: 1"
-iteration: 3
-max_iterations: 10
-status: complete
+## Implementation Checklist
+- [ ] 1. Create `lib/loop-flatline.sh` with the classifier, exit-class resolver and atomic artifact writer
+- [ ] 2. Source and call it from `sw-loop.sh` per iteration; emit `loop.iteration_classified` and `loop.flatline` *(depends on 1)*
+- [ ] 3. Add `Exit class` and `Flatline streak` to `progress.md` and `show_summary` *(depends on 1)*
+- [ ] 4. Tag `stuck_restart` and flatline restarts with a reason and inject the flatline strategy *(depends on 2, 6)*
+- [ ] 5. Fix the unreachable `iteration_limit` branch and add flatline in `restart_detect_reason`
+- [ ] 6. Add the `flatline` strategy in `restart_suggest_strategy`
+- [ ] 7. Pipeline build stage: write `flatline` vs `context_exhaustion` to `failure-reason.txt` *(depends on 3)*
+- [ ] 8. Daemon `classify_failure`, retry limits and escalation for `flatline` without the restart boost *(depends on 3, 7)*
+- [ ] 9. Add the `flatline` category in `root-cause.sh`
+- [ ] 10. Event schema entries plus sync
+- [ ] 11. New `sw-loop-flatline-test.sh`, registered in `package.json`
+- [ ] 12. Extend the daemon-failure, session-restart and loop tests
+- [ ] 13. Update the CLAUDE.md docs
+
+## Context
+- Pipeline: autonomous
+- Branch: ci/issue-7689
+- Issue: none
+- Generated: 2026-10-04T14:54:07Z"
+iteration: 0
+max_iterations: 20
+status: running
 test_cmd: "npm test"
-model: sonnet
+model: opus
 agents: 1
-started_at: 2026-04-04T17:41:42Z
-last_iteration_at: 2026-04-04T17:41:42Z
+started_at: 2026-10-04T14:57:57Z
+last_iteration_at: 2026-10-04T14:57:57Z
 consecutive_failures: 0
-total_commits: 3
-audit_enabled: false
-audit_agent_enabled: false
-quality_gates_enabled: false
-dod_file: ""
+total_commits: 0
+audit_enabled: true
+audit_agent_enabled: true
+quality_gates_enabled: true
+dod_file: "/home/runner/work/shipwright/shipwright/.claude/pipeline-artifacts/dod.md"
 auto_extend: true
 extension_count: 0
 max_extensions: 3
 ---
 
 ## Log
-### Iteration 1 (2026-04-04T15:25:20Z)
-{"type":"result","subtype":"success","is_error":false,"duration_ms":227709,"duration_api_ms":143263,"num_turns":22,"resu
-
-### Iteration 2 (2026-04-04T16:25:53Z)
-{"type":"result","subtype":"success","is_error":false,"duration_ms":9837,"duration_api_ms":311675,"num_turns":2,"result"
 
