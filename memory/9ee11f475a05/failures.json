@@ -3,10 +3,19 @@
     {
       "stage": "test",
       "pattern": "\u001b[38;2;74;222;128m\u001b[1m✓\u001b[0m reveal shows 1/3 pass count on failure",
-      "root_cause": "sw-pipeline-test.sh E2E tests fail because the mock Claude plan/review stages don't produce plan.md/review.md artifacts (and intelligence/cleanup stages exit non-zero, with jq parse errors on non-JSON output), while the harness also reports a misleading 'All 0 tests passed' for a suite whose counters never increment.",
-      "fix": "Fix the mock claude binary in sw-pipeline-test.sh to emit valid output that the plan/review stages write to plan.md/review.md (and valid JSON for intelligence jq calls), and make test suites exit non-zero when the pass count is 0 or failures exist.",
-      "seen_count": 3,
-      "last_seen": "2026-10-04T16:52:08Z",
+      "root_cause": "sw-cost-test.sh 'CONTEXT EFFICIENCY' dashboard tests fail because the cost dashboard prints 'No cost entries in the last 30 days' and exits early, never rendering the context-efficiency section from the seeded loop.context_efficiency events (test seeds only events, no cost entries).",
+      "fix": "Make the cost dashboard render the CONTEXT EFFICIENCY section even when there are no cost entries (or have the test seed a cost entry/use an events path the dashboard reads) so the avg budget utilization assertions pass.",
+      "seen_count": 2,
+      "last_seen": "2026-10-04T16:53:19Z",
+      "category": "test_failure"
+    },
+    {
+      "stage": "test",
+      "pattern": "Failed: 1",
+      "root_cause": "sw-pipeline-test.sh E2E tests fail (6 of 58): plan.md/review.md artifacts are not generated in the mock environment, and the low-complexity skip and cleanup tests fail too. Likely the mock claude/plan stage produces no output after recent pipeline changes. The log also shows jq parse errors from malformed RL episode data, and the tests ran against a shared state dir with 188 accumulated episodes.",
+      "fix": "Run ./scripts/sw-pipeline-test.sh locally and debug the plan and review stage mocks so they write plan.md and review.md. Isolate the RL/policy state dir in the test env, and check the jq parse error on the episode data.",
+      "seen_count": 1,
+      "last_seen": "2026-10-04T16:09:38Z",
       "category": "test_failure"
     }
   ]
