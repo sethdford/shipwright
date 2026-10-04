@@ -5,26 +5,35 @@
       "pattern": "\u001b[38;2;74;222;128m\u001b[1m✓\u001b[0m reveal shows 1/3 pass count on failure",
       "root_cause": "sw-cost-test.sh 'CONTEXT EFFICIENCY' dashboard tests fail because the cost dashboard prints 'No cost entries in the last 30 days' and exits early, never rendering the context-efficiency section from the seeded loop.context_efficiency events (test seeds only events, no cost entries).",
       "fix": "Make the cost dashboard render the CONTEXT EFFICIENCY section even when there are no cost entries (or have the test seed a cost entry/use an events path the dashboard reads) so the avg budget utilization assertions pass.",
-      "seen_count": 5,
-      "last_seen": "2026-10-04T21:55:33Z",
+      "seen_count": 3,
+      "last_seen": "2026-10-04T21:28:30Z",
       "category": "test_failure"
     },
     {
       "stage": "test",
       "pattern": "Failed: 1",
-      "root_cause": "sw-pipeline-test.sh E2E tests fail (6 of 58): plan.md/review.md artifacts are not generated in the mock environment, and the low-complexity skip and cleanup tests fail too. Likely the mock claude/plan stage produces no output after recent pipeline changes. The log also shows jq parse errors from malformed RL episode data, and the tests ran against a shared state dir with 188 accumulated episodes.",
-      "fix": "Run ./scripts/sw-pipeline-test.sh locally and debug the plan and review stage mocks so they write plan.md and review.md. Isolate the RL/policy state dir in the test env, and check the jq parse error on the episode data.",
-      "seen_count": 1,
-      "last_seen": "2026-10-04T16:09:38Z",
+      "root_cause": "Two suites failed: sw-e2e-integration-test hit a stale pipeline lock/state ('pipeline already in progress') left by the outer pipeline run, and sw-intent-analysis-test failed its schema check for required fields (version, goal, criteria).",
+      "fix": "Make the e2e integration test run with isolated state/lock dir (or skip when a pipeline is already running), and update the intent analysis schema or the analyze_intent output so they agree on the required fields.",
+      "seen_count": 2,
+      "last_seen": "2026-10-04T20:12:22Z",
       "category": "test_failure"
     },
     {
       "stage": "test",
-      "pattern": "\u001b[2m  loop behavior: iterations on test failure\u001b[0m",
-      "root_cause": "sw-loop-test 'Loop stuckness detection' test fails (1 of 74); the other 162 suites pass, so it is likely a timing-sensitive or flaky loop-behavior assertion. The suite also took 178s, which suggests load or timing sensitivity. I did not read the full failure output.",
-      "fix": "Re-run sw-loop-test alone to see if it fails again. If it does, read the stuckness-detection assertion and make it deterministic (mock the clock or iteration state, no real timing).",
+      "pattern": "\u001b[38;2;248;113;113m\u001b[1m1 of 78 tests failed\u001b[0m",
+      "root_cause": "sw-intent-analysis-test.sh failed with 1 of 78 tests failing (exit 1 after 38s); sw-e2e-integration-test also timed out at 301s, likely because it needs real Claude/GitHub access",
+      "fix": "Run scripts/sw-intent-analysis-test.sh directly to identify the failing assertion and fix it; separately skip or mock sw-e2e-integration-test in CI so it can't hit the 300s timeout",
       "seen_count": 1,
-      "last_seen": "2026-10-04T20:01:30Z",
+      "last_seen": "2026-10-04T20:45:20Z",
+      "category": "test_failure"
+    },
+    {
+      "stage": "test",
+      "pattern": "Results: \u001b[38;2;74;222;128m\u001b[1m127 PASS\u001b[0m | \u001b[38;2;248;113;113m\u001b[1m1 FAIL\u001b[0m",
+      "root_cause": "sw-intent-analysis-test failed (exit 1, 1 FAIL of 128 assertions) after 39s, likely a test relying on a real Claude call or timing/environment; sw-e2e-integration-test also timed out at 301s (needs real Claude/GitHub).",
+      "fix": "Run scripts/sw-intent-analysis-test.sh locally to identify the failing assertion and mock the Claude/network dependency or fix the assertion; skip or mock sw-e2e-integration-test in CI.",
+      "seen_count": 1,
+      "last_seen": "2026-10-04T22:06:57Z",
       "category": "flaky"
     }
   ]
