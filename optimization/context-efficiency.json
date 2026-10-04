@@ -1,11 +1,11 @@
 {
-  "avg_budget_utilization": 7.2,
+  "avg_budget_utilization": 9.8,
   "avg_trim_ratio": 0.0,
-  "avg_raw_chars": 14441,
-  "avg_trimmed_chars": 14441,
+  "avg_raw_chars": 19606,
+  "avg_trimmed_chars": 19606,
   "current_budget_chars": 200000,
-  "sample_count": 3,
+  "sample_count": 4,
   "recommendation_count": 0,
   "recommendations": "",
-  "updated_at": "2026-08-30T03:12:28Z"
+  "updated_at": "2026-10-04T04:10:42Z"
 }
