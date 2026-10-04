@@ -1740,6 +1740,17 @@ show_summary() {
     if [[ "$LOOP_INPUT_TOKENS" -gt 0 || "$LOOP_OUTPUT_TOKENS" -gt 0 ]]; then
         echo -e "  ${BOLD}Tokens:${RESET}      in=${LOOP_INPUT_TOKENS} out=${LOOP_OUTPUT_TOKENS}"
     fi
+    if type loop_resolve_exit_class >/dev/null 2>&1; then
+        local exit_class="${LOOP_EXIT_CLASS:-}"
+        [[ -z "$exit_class" ]] && exit_class=$(loop_resolve_exit_class)
+        local exit_display="$exit_class"
+        case "$exit_class" in
+            flatline)           exit_display="${RED}flatline${RESET} ${DIM}(no code change, same error)${RESET}" ;;
+            context_exhaustion) exit_display="${YELLOW}context_exhaustion${RESET}" ;;
+        esac
+        echo -e "  ${BOLD}Exit class:${RESET}  $exit_display"
+        echo -e "  ${BOLD}Flatline:${RESET}    streak ${FLATLINE_STREAK:-0}/${FLATLINE_THRESHOLD:-3}, total ${FLATLINE_TOTAL:-0}"
+    fi
     echo ""
     echo -e "  ${DIM}State: $STATE_FILE${RESET}"
     echo -e "  ${DIM}Logs:  $LOG_DIR/${RESET}"
@@ -2577,7 +2588,11 @@ HUMAN FEEDBACK (received after iteration $ITERATION): $human_msg"
             STATUS="stuck_restart"
             write_state
             write_progress
-            warn "Stuckness detected 3+ times — triggering session restart"
+            if [[ "${FLATLINE_STREAK:-0}" -ge "${FLATLINE_THRESHOLD:-3}" ]]; then
+                warn "Stuckness detected 3+ times (flatline: ${FLATLINE_STREAK} iterations with no code change, same error) — triggering session restart"
+            else
+                warn "Stuckness detected 3+ times — triggering session restart"
+            fi
             break
         fi
 
@@ -2628,6 +2643,8 @@ run_loop_with_restarts() {
                 TEST_OUTPUT=""
                 TEST_LOG_FILE=""
                 GOAL="$ORIGINAL_GOAL"
+                LOOP_EXIT_CLASS=""
+                type flatline_reset_session >/dev/null 2>&1 && flatline_reset_session
 
                 # Archive old artifacts
                 local restart_archive="$LOG_DIR/restart-${RESTART_COUNT}"
@@ -2671,13 +2688,21 @@ run_loop_with_restarts() {
 
         RESTART_COUNT=$(( RESTART_COUNT + 1 ))
 
+        # Pin the exit class so the restart briefing picks the matching strategy
+        # (a flatline needs a different approach, not just fresh context)
+        local _restart_reason="${STATUS:-unknown}"
+        if type loop_resolve_exit_class >/dev/null 2>&1; then
+            LOOP_EXIT_CLASS=$(loop_resolve_exit_class)
+            _restart_reason="$LOOP_EXIT_CLASS"
+        fi
+
         # Capture comprehensive state and generate briefing before restart
         if type restart_before_restart >/dev/null 2>&1; then
             restart_before_restart || warn "Failed to prepare restart briefing (continuing anyway)"
         fi
 
         if type emit_event >/dev/null 2>&1; then
-            emit_event "loop.restart" "restart=$RESTART_COUNT" "max=$MAX_RESTARTS" "iteration=$ITERATION"
+            emit_event "loop.restart" "restart=$RESTART_COUNT" "max=$MAX_RESTARTS" "iteration=$ITERATION" "reason=$_restart_reason"
         fi
         info "Session restart ${RESTART_COUNT}/${MAX_RESTARTS} — resetting iteration counter"
 
@@ -2695,6 +2720,8 @@ run_loop_with_restarts() {
         TEST_LOG_FILE=""
         # Reset GOAL to original — prevent unbounded growth from memory/human injections
         GOAL="$ORIGINAL_GOAL"
+        LOOP_EXIT_CLASS=""
+        type flatline_reset_session >/dev/null 2>&1 && flatline_reset_session
 
         # Archive old artifacts so they don't get overwritten or pollute new session
         local restart_archive="$LOG_DIR/restart-${RESTART_COUNT}"
