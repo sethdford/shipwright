@@ -129,3 +129,13 @@
 {"ts":"2026-10-04T04:10:42Z","ts_epoch":1791087042,"type":"optimize.memory_pruned","pruned":33,"strengthened":0,"promoted":0}
 {"ts":"2026-10-04T04:10:42Z","ts_epoch":1791087042,"type":"optimize.memory_pruned","pruned":0,"strengthened":0,"promoted":0}
 {"ts":"2026-10-04T05:24:54Z","ts_epoch":1791091494,"type":"hygiene_platform_refactor","hardcoded":49,"fallback":69,"todo":51}
+{"ts":"2026-10-04T08:03:54Z","ts_epoch":1791101034,"type":"patrol.started","dry_run":"false"}
+{"ts":"2026-10-04T08:03:58Z","ts_epoch":1791101038,"type":"patrol.issue_created","check":"dead_code","count":1}
+{"ts":"2026-10-04T08:04:04Z","ts_epoch":1791101044,"type":"patrol.finding","check":"untested_script","script":"sw-tracker-linear.sh","lines":568,"usage":7}
+{"ts":"2026-10-04T08:04:04Z","ts_epoch":1791101044,"type":"patrol.finding","check":"untested_script","script":"sw-tracker-jira.sh","lines":474,"usage":7}
+{"ts":"2026-10-04T08:04:04Z","ts_epoch":1791101044,"type":"patrol.finding","check":"untested_script","script":"sw-tracker-github.sh","lines":212,"usage":3}
+{"ts":"2026-10-04T08:04:04Z","ts_epoch":1791101044,"type":"patrol.finding","check":"untested_script","script":"sw-tmux-status.sh","lines":151,"usage":1}
+{"ts":"2026-10-04T08:04:04Z","ts_epoch":1791101044,"type":"patrol.finding","check":"untested_script","script":"sw-tmux-role-color.sh","lines":81,"usage":1}
+{"ts":"2026-10-04T08:04:04Z","ts_epoch":1791101044,"type":"patrol.finding","check":"untested_script","script":"sw-test-all.sh","lines":199,"usage":0}
+{"ts":"2026-10-04T08:04:04Z","ts_epoch":1791101044,"type":"patrol.finding","check":"untested_script","script":"sw-event-schema-sync.sh","lines":93,"usage":0}
+{"ts":"2026-10-04T08:04:05Z","ts_epoch":1791101045,"type":"patrol.issue_created","check":"untested_scripts","count":7}
