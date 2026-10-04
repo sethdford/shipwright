@@ -140,3 +140,7 @@
 {"ts":"2026-10-04T08:04:04Z","ts_epoch":1791101044,"type":"patrol.finding","check":"untested_script","script":"sw-event-schema-sync.sh","lines":93,"usage":0}
 {"ts":"2026-10-04T08:04:05Z","ts_epoch":1791101045,"type":"patrol.issue_created","check":"untested_scripts","count":7}
 {"ts":"2026-10-04T10:07:04Z","ts_epoch":1791108424,"type":"hygiene_platform_refactor","hardcoded":49,"fallback":69,"todo":51}
+{"ts":"2026-10-04T13:50:11Z","ts_epoch":1791121811,"type":"hygiene_platform_refactor","hardcoded":49,"fallback":69,"todo":51}
+{"ts":"2026-10-04T13:50:38Z","ts_epoch":1791121838,"type":"strategic.issue_created","title":"Add pre-build dependency/tooling check to pipeline intake stage","priority":"P0","complexity":"fast"}
+{"ts":"2026-10-04T13:50:43Z","ts_epoch":1791121843,"type":"strategic.issue_created","title":"Track and surface session-continuity cost savings in `shipwright cost show`","priority":"P3","complexity":"fast"}
+{"ts":"2026-10-04T13:50:43Z","ts_epoch":1791121843,"type":"strategic.cycle_complete","issues_created":2,"issues_skipped":1}
