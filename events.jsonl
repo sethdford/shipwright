@@ -144,3 +144,13 @@
 {"ts":"2026-10-04T13:50:38Z","ts_epoch":1791121838,"type":"strategic.issue_created","title":"Add pre-build dependency/tooling check to pipeline intake stage","priority":"P0","complexity":"fast"}
 {"ts":"2026-10-04T13:50:43Z","ts_epoch":1791121843,"type":"strategic.issue_created","title":"Track and surface session-continuity cost savings in `shipwright cost show`","priority":"P3","complexity":"fast"}
 {"ts":"2026-10-04T13:50:43Z","ts_epoch":1791121843,"type":"strategic.cycle_complete","issues_created":2,"issues_skipped":1}
+{"ts":"2026-10-04T13:58:51Z","ts_epoch":1791122331,"type":"patrol.started","dry_run":"false"}
+{"ts":"2026-10-04T13:58:54Z","ts_epoch":1791122334,"type":"patrol.issue_created","check":"dead_code","count":1}
+{"ts":"2026-10-04T13:59:00Z","ts_epoch":1791122340,"type":"patrol.finding","check":"untested_script","script":"sw-tracker-linear.sh","lines":568,"usage":7}
+{"ts":"2026-10-04T13:59:00Z","ts_epoch":1791122340,"type":"patrol.finding","check":"untested_script","script":"sw-tracker-jira.sh","lines":474,"usage":7}
+{"ts":"2026-10-04T13:59:00Z","ts_epoch":1791122340,"type":"patrol.finding","check":"untested_script","script":"sw-tracker-github.sh","lines":212,"usage":3}
+{"ts":"2026-10-04T13:59:00Z","ts_epoch":1791122340,"type":"patrol.finding","check":"untested_script","script":"sw-tmux-status.sh","lines":151,"usage":1}
+{"ts":"2026-10-04T13:59:00Z","ts_epoch":1791122340,"type":"patrol.finding","check":"untested_script","script":"sw-tmux-role-color.sh","lines":81,"usage":1}
+{"ts":"2026-10-04T13:59:00Z","ts_epoch":1791122340,"type":"patrol.finding","check":"untested_script","script":"sw-test-all.sh","lines":199,"usage":0}
+{"ts":"2026-10-04T13:59:00Z","ts_epoch":1791122340,"type":"patrol.finding","check":"untested_script","script":"sw-event-schema-sync.sh","lines":93,"usage":0}
+{"ts":"2026-10-04T13:59:01Z","ts_epoch":1791122341,"type":"patrol.issue_created","check":"untested_scripts","count":7}
