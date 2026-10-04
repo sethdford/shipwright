@@ -1615,33 +1615,33 @@
       "result": {
         "results": [
           {
-            "file": "success-patterns.json",
+            "file": "flaky-tests.json",
             "relevance": 95,
-            "summary": "Contains proven build patterns with iterations, duration, test strategy, and files changed. Directly applicable to current build stage execution."
+            "summary": "Lists known flaky tests (test-1, test-auth) with confidence levels and error messages. Directly helps build stage avoid false failures from known flaky tests."
           },
           {
             "file": "retry-outcomes.json",
-            "relevance": 85,
-            "summary": "Tracks model escalation retry strategy for build failures with 100% success rate. Critical for handling build recovery scenarios."
+            "relevance": 90,
+            "summary": "Documents model_escalation retry strategy with 100% success rate on build failures. Directly applicable to handling build stage failures."
           },
           {
-            "file": "flaky-tests.json",
+            "file": "knowledge.json",
+            "relevance": 85,
+            "summary": "Contains detailed failure patterns and fixes for test environment issues (mktemp failures, test output formatting). Directly relevant to build/test stage debugging."
+          },
+          {
+            "file": "success-patterns.json",
             "relevance": 80,
-            "summary": "Documents flaky tests (test-1, test-auth) with occurrence counts and confidence scores. Directly impacts build stage test reliability."
+            "summary": "Shows two successful patterns for bug fixes and features with iteration counts, file patterns, test strategies, and cost data. Provides reference for build approach and resource expectations."
           },
           {
             "file": "metrics.json",
-            "relevance": 65,
-            "summary": "Provides baseline build duration (7095s) and test duration (1459s) metrics for performance comparison and iteration estimation."
-          },
-          {
-            "file": "patterns.json",
-            "relevance": 60,
-            "summary": "Captures project structure (Node, vitest, npm, CommonJS) needed to configure and execute build and test stages correctly."
+            "relevance": 75,
+            "summary": "Provides baseline build_duration_s (7095s) and test_duration_s (1459s). Useful for detecting build performance regressions."
           }
         ]
       },
-      "timestamp": 1791125860,
+      "timestamp": 1791128125,
       "ttl": 1800
     },
     "82884b010f1379485257cd91f828ebdc": {
@@ -1691,6 +1691,27 @@
         }
       ],
       "timestamp": 1791127781,
+      "ttl": 1800
+    },
+    "5e3c20cc6674629c0b74a914dee99b2f": {
+      "result": {
+        "raw_response": "Mock claude: ok"
+      },
+      "timestamp": 1791128296,
+      "ttl": 1800
+    },
+    "297b32e5a3c147c9768b029a28a383c7": {
+      "result": [
+        {
+          "type": "result",
+          "result": "I am trying the same approach again.",
+          "usage": {
+            "input_tokens": 0,
+            "output_tokens": 0
+          }
+        }
+      ],
+      "timestamp": 1791128518,
       "ttl": 1800
     }
   }

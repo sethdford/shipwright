@@ -102,16 +102,16 @@ Task tracking (check off items as you complete them):
 - Branch: ci/issue-7689
 - Issue: none
 - Generated: 2026-10-04T14:54:07Z"
-iteration: 0
+iteration: 1
 max_iterations: 20
 status: running
 test_cmd: "npm test"
 model: opus
 agents: 1
-started_at: 2026-10-04T14:57:57Z
-last_iteration_at: 2026-10-04T14:57:57Z
+started_at: 2026-10-04T15:35:11Z
+last_iteration_at: 2026-10-04T15:35:11Z
 consecutive_failures: 0
-total_commits: 0
+total_commits: 1
 audit_enabled: true
 audit_agent_enabled: true
 quality_gates_enabled: true
@@ -122,4 +122,8 @@ max_extensions: 3
 ---
 
 ## Log
+### Iteration 1 (2026-10-04T15:35:11Z)
+  - "Same failure" is judged from the error lines in `error-summary.json`, with numbers stripped so different timings do
+  - It also decides one exit class per loop (`complete`, `context_exhaustion`, `flatline`, `iteration_exhaustion`, or th
+- **`scripts/sw-loop-flatline-test.sh`** (new, 39 checks against a temporary git repo) covers flatline detection, streak
 
