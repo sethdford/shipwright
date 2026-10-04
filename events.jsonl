@@ -128,3 +128,4 @@
 {"ts":"2026-10-04T01:15:48Z","ts_epoch":1791076548,"type":"patrol.finding","check":"untested_script","script":"sw-event-schema-sync.sh","lines":93,"usage":0}
 {"ts":"2026-10-04T04:10:42Z","ts_epoch":1791087042,"type":"optimize.memory_pruned","pruned":33,"strengthened":0,"promoted":0}
 {"ts":"2026-10-04T04:10:42Z","ts_epoch":1791087042,"type":"optimize.memory_pruned","pruned":0,"strengthened":0,"promoted":0}
+{"ts":"2026-10-04T05:24:54Z","ts_epoch":1791091494,"type":"hygiene_platform_refactor","hardcoded":49,"fallback":69,"todo":51}
