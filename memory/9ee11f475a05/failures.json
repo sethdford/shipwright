@@ -5,8 +5,8 @@
       "pattern": "\u001b[38;2;74;222;128m\u001b[1m✓\u001b[0m reveal shows 1/3 pass count on failure",
       "root_cause": "sw-cost-test.sh 'CONTEXT EFFICIENCY' dashboard tests fail because the cost dashboard prints 'No cost entries in the last 30 days' and exits early, never rendering the context-efficiency section from the seeded loop.context_efficiency events (test seeds only events, no cost entries).",
       "fix": "Make the cost dashboard render the CONTEXT EFFICIENCY section even when there are no cost entries (or have the test seed a cost entry/use an events path the dashboard reads) so the avg budget utilization assertions pass.",
-      "seen_count": 2,
-      "last_seen": "2026-10-04T16:53:19Z",
+      "seen_count": 5,
+      "last_seen": "2026-10-04T21:55:33Z",
       "category": "test_failure"
     },
     {
@@ -20,12 +20,12 @@
     },
     {
       "stage": "test",
-      "pattern": "\u001b[38;2;0;212;255m▸\u001b[0m Patrol recurring failures label construction... \u001b[38;2;74;222;128m✓\u001b[0m",
-      "root_cause": "sw-pipeline-test.sh E2E tests fail: plan.md/review.md artifacts not generated (mock claude output not producing files) and jq parse errors from ANSI-colored/non-JSON output in intelligence skip and cleanup paths",
-      "fix": "Inspect the mock claude/plan and review stage in sw-pipeline-test.sh to ensure mocks write plan.md/review.md, and make the RL/reward episode output go to stderr or strip ANSI so jq only parses JSON",
-      "seen_count": 2,
-      "last_seen": "2026-10-04T22:05:35Z",
-      "category": "test_failure"
+      "pattern": "\u001b[2m  loop behavior: iterations on test failure\u001b[0m",
+      "root_cause": "sw-loop-test 'Loop stuckness detection' test fails (1 of 74); the other 162 suites pass, so it is likely a timing-sensitive or flaky loop-behavior assertion. The suite also took 178s, which suggests load or timing sensitivity. I did not read the full failure output.",
+      "fix": "Re-run sw-loop-test alone to see if it fails again. If it does, read the stuckness-detection assertion and make it deterministic (mock the clock or iteration state, no real timing).",
+      "seen_count": 1,
+      "last_seen": "2026-10-04T20:01:30Z",
+      "category": "flaky"
     }
   ]
 }
