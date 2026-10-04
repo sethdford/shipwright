@@ -95,3 +95,6 @@
 {"ts":"2026-10-04T19:02:35Z","ts_epoch":1791140555,"type":"patrol.finding","check":"untested_script","script":"sw-test-all.sh","lines":199,"usage":0}
 {"ts":"2026-10-04T19:02:35Z","ts_epoch":1791140555,"type":"patrol.finding","check":"untested_script","script":"sw-event-schema-sync.sh","lines":93,"usage":0}
 {"ts":"2026-10-04T19:02:36Z","ts_epoch":1791140556,"type":"patrol.issue_created","check":"untested_scripts","count":7}
+{"ts":"2026-10-04T20:41:48Z","ts_epoch":1791146508,"type":"hygiene_platform_refactor","hardcoded":49,"fallback":69,"todo":51}
+{"ts":"2026-10-04T20:42:15Z","ts_epoch":1791146535,"type":"strategic.issue_created","title":"Split sw-daemon.sh into dispatch, state, and patrol modules","priority":"P6","complexity":"full"}
+{"ts":"2026-10-04T20:42:15Z","ts_epoch":1791146535,"type":"strategic.cycle_complete","issues_created":1,"issues_skipped":2}
