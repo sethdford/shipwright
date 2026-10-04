@@ -84,3 +84,4 @@
 {"ts":"2026-10-04T16:53:46Z","ts_epoch":1791132826,"type":"loop.context_efficiency","iteration":1,"raw_prompt_chars":11555,"trimmed_prompt_chars":11555,"trim_ratio":0.0,"budget_utilization":5.8,"budget_chars":200000,"job_id":"autonomous"}
 {"ts":"2026-10-04T16:53:49Z","ts_epoch":1791132829,"type":"pipeline.context_exhaustion","issue":7689,"stage":"build"}
 {"ts":"2026-10-04T16:53:51Z","ts_epoch":1791132831,"type":"stage.failed","event_id":"evt-1791132831-612791417","payload":"{\"stage\":\"build\",\"issue\":\"7689\",\"timing\":\"1h 56m 39s\"}"}
+{"ts":"2026-10-04T17:20:17Z","ts_epoch":1791134417,"type":"hygiene_platform_refactor","hardcoded":49,"fallback":69,"todo":51}
