@@ -58,7 +58,15 @@ classify_failure() {
         local cf_tests
         cf_tests=$(grep -oE 'Tests passing: (true|false)' "$progress_file" 2>/dev/null | awk '{print $NF}' || echo "unknown")
         if [[ "${cf_iter:-0}" -gt 0 ]] && { [[ "$cf_tests" == "false" ]] || [[ "$cf_tests" == "unknown" ]]; }; then
-            echo "context_exhaustion"
+            # A flatlined loop (no code change, same error) is not context exhaustion:
+            # more restarts would only repeat it
+            local cf_exit_class
+            cf_exit_class=$(grep -oE 'Exit class: [a-z_]+' "$progress_file" 2>/dev/null | tail -1 | awk '{print $NF}' || true)
+            if [[ "$cf_exit_class" == "flatline" ]]; then
+                echo "flatline"
+            else
+                echo "context_exhaustion"
+            fi
             return
         fi
     fi
@@ -82,6 +90,7 @@ get_max_retries_for_class() {
         auth_error|invalid_issue) echo 0 ;;
         api_error)                echo "${MAX_RETRIES_API_ERROR:-4}" ;;
         context_exhaustion)       echo "${MAX_RETRIES_CONTEXT_EXHAUSTION:-2}" ;;
+        flatline)                 echo "${MAX_RETRIES_FLATLINE:-1}" ;;
         build_failure)           echo "${MAX_RETRIES_BUILD:-2}" ;;
         *)                       echo "${MAX_RETRIES:-2}" ;;
     esac
@@ -290,6 +299,14 @@ daemon_on_failure() {
                         fi
                         extra_args+=("--max-restarts" "$boosted_restarts")
                         daemon_log INFO "Boosting max-restarts to $boosted_restarts (context exhaustion)"
+                    fi
+
+                    # Flatline: fresh sessions repeat the same failure, so skip the
+                    # restart boost and escalate straight to the full template
+                    if [[ "$failure_class" == "flatline" ]]; then
+                        retry_template="full"
+                        retry_model="opus"
+                        daemon_log INFO "Flatline: escalating to template=full without a restart boost"
                     fi
 
                     # Exponential backoff (per-class base); cap at 1h

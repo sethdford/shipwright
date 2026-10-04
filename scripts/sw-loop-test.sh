@@ -902,6 +902,34 @@ else
     assert_fail "Mid-build test file discovery integrated"
 fi
 
+# Test: flatline classification is wired into the loop
+if grep -q 'flatline_classify_iteration' "$SCRIPT_DIR/sw-loop.sh" && grep -q 'emit_event "loop.flatline"' "$SCRIPT_DIR/sw-loop.sh"; then
+    assert_pass "Per-iteration flatline classification wired in"
+else
+    assert_fail "Per-iteration flatline classification wired in"
+fi
+
+# Test: restarts carry their reason and reset per-session flatline state
+if grep -q '"reason=$_restart_reason"' "$SCRIPT_DIR/sw-loop.sh" && [[ "$(grep -c 'flatline_reset_session' "$SCRIPT_DIR/sw-loop.sh")" -ge 2 ]]; then
+    assert_pass "Restarts tagged with reason and reset flatline state"
+else
+    assert_fail "Restarts tagged with reason and reset flatline state"
+fi
+
+# Test: summary surfaces the exit class
+if grep -q 'Exit class:' "$SCRIPT_DIR/sw-loop.sh" && grep -q 'Exit class:' "$SCRIPT_DIR/lib/loop-progress.sh"; then
+    assert_pass "Exit class shown in summary and progress.md"
+else
+    assert_fail "Exit class shown in summary and progress.md"
+fi
+
+# Test: a flatlined restart injects the change-approach strategy
+if grep -q 'FLATLINE — CHANGE YOUR APPROACH' "$SCRIPT_DIR/lib/loop-iteration.sh"; then
+    assert_pass "Flatline restart strategy injected into prompt"
+else
+    assert_fail "Flatline restart strategy injected into prompt"
+fi
+
 # ═══════════════════════════════════════════════════════════════════════════════
 # RESULTS
 # ═══════════════════════════════════════════════════════════════════════════════

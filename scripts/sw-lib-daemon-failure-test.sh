@@ -130,6 +130,42 @@ echo "Some general output" > "$LOG_DIR/issue-502.log"
 result=$(classify_failure 502)
 assert_eq "Context exhaustion with unknown tests" "context_exhaustion" "$result"
 
+# Flatline: the loop records Exit class: flatline — must not be called context exhaustion
+mkdir -p "$WORKTREE_DIR/daemon-issue-503/.claude/loop-logs"
+cat > "$WORKTREE_DIR/daemon-issue-503/.claude/loop-logs/progress.md" <<'MD'
+## Status
+- Iteration: 6/20
+- Tests passing: false
+- Status: circuit_breaker
+- Exit class: flatline
+- Flatline streak: 3/3
+MD
+echo "Some general output" > "$LOG_DIR/issue-503.log"
+result=$(classify_failure 503)
+assert_eq "Flatline exit class classified as flatline" "flatline" "$result"
+
+# Iteration exhaustion keeps the context_exhaustion class (restart boost still helps)
+mkdir -p "$WORKTREE_DIR/daemon-issue-504/.claude/loop-logs"
+cat > "$WORKTREE_DIR/daemon-issue-504/.claude/loop-logs/progress.md" <<'MD'
+- Iteration: 20/20
+- Tests passing: false
+- Exit class: iteration_exhaustion
+MD
+echo "Some general output" > "$LOG_DIR/issue-504.log"
+result=$(classify_failure 504)
+assert_eq "Iteration exhaustion stays context_exhaustion" "context_exhaustion" "$result"
+
+# Flatline with passing tests is not a loop failure class
+mkdir -p "$WORKTREE_DIR/daemon-issue-505/.claude/loop-logs"
+cat > "$WORKTREE_DIR/daemon-issue-505/.claude/loop-logs/progress.md" <<'MD'
+- Iteration: 4/20
+- Tests passing: true
+- Exit class: flatline
+MD
+echo "Some general output" > "$LOG_DIR/issue-505.log"
+result=$(classify_failure 505)
+assert_eq "Flatline with passing tests not classified flatline" "unknown" "$result"
+
 # Generic unknown
 echo "something happened" > "$LOG_DIR/issue-601.log"
 result=$(classify_failure 601)
@@ -141,6 +177,8 @@ assert_eq "Generic failure → unknown" "unknown" "$result"
 print_test_section "get_max_retries_for_class"
 
 assert_eq "auth_error: 0 retries" "0" "$(get_max_retries_for_class auth_error)"
+assert_eq "flatline: 1 retry by default" "1" "$(get_max_retries_for_class flatline)"
+assert_eq "flatline: MAX_RETRIES_FLATLINE override" "3" "$(MAX_RETRIES_FLATLINE=3 get_max_retries_for_class flatline)"
 assert_eq "invalid_issue: 0 retries" "0" "$(get_max_retries_for_class invalid_issue)"
 assert_eq "api_error: default 4 retries" "4" "$(get_max_retries_for_class api_error)"
 assert_eq "context_exhaustion: 2 retries" "2" "$(get_max_retries_for_class context_exhaustion)"

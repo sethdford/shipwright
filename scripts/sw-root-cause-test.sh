@@ -49,6 +49,15 @@ test_classify_context_exhaustion() {
 }
 test_classify_context_exhaustion
 
+test_classify_flatline() {
+    local result
+    result=$(rootcause_classify "Build loop flatlined — iterations stopped changing code and repeated the same error" "build" "1")
+    local category
+    category=$(echo "$result" | jq -r '.category')
+    assert_eq "classify flatline (not context_exhaustion)" "flatline" "$category"
+}
+test_classify_flatline
+
 test_classify_infra_issue() {
     local result
     result=$(rootcause_classify "Error: ETIMEDOUT - connection timed out" "test" "1")
@@ -177,6 +186,16 @@ test_suggest_fix_context_exhaustion() {
     assert_contains "context_exhaustion suggestion has max-restarts" "$suggestions" "max-restarts"
 }
 test_suggest_fix_context_exhaustion
+
+test_suggest_fix_flatline() {
+    local result
+    result=$(rootcause_suggest_fix "flatline" "same error" "build")
+    local suggestions
+    suggestions=$(echo "$result" | jq -r '.suggestions')
+    assert_contains "flatline suggestion points at the repeated error" "$suggestions" "error-summary.json"
+    assert_contains "flatline suggestion warns against restarts" "$suggestions" "fresh session repeats"
+}
+test_suggest_fix_flatline
 
 test_suggest_fix_infra_issue() {
     local result

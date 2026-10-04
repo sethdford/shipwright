@@ -297,6 +297,19 @@ $(cat "$LOG_DIR/progress.md")
 You are starting a FRESH session after the previous one exhausted its iterations.
 Read the progress above and continue from where it left off. Do NOT repeat work already done."
         fi
+
+        # A flatlined session needs a change of approach, not just fresh context
+        local strategy_file="${ARTIFACTS_DIR:-${LOG_DIR}}/restart-strategy.json"
+        if [[ -n "$restart_section" && -f "$strategy_file" ]] &&
+           [[ "$(jq -r '.reason // ""' "$strategy_file" 2>/dev/null || true)" == "flatline" ]]; then
+            restart_section="${restart_section}
+
+## FLATLINE — CHANGE YOUR APPROACH
+The previous session flatlined: its last iterations changed no code and hit the same failure.
+- Strategy: $(jq -r '.strategy // ""' "$strategy_file" 2>/dev/null || true)
+- Focus: $(jq -r '.focus // ""' "$strategy_file" 2>/dev/null || true)
+- Avoid: $(jq -r '.avoid // ""' "$strategy_file" 2>/dev/null || true)"
+        fi
     fi
 
     # Resume-from-checkpoint context — reconstruct Claude context for meaningful resume

@@ -205,6 +205,7 @@ The build stage delegates to `shipwright loop` for autonomous multi-iteration de
 - **Fast test mode** (`--fast-test-cmd "cmd"`): Alternates between a fast subset test and the full suite. Full test runs on iteration 1, every N iterations (`--fast-test-interval`, default 5), and the final iteration.
 - **Agent roles** (`--roles "builder,reviewer,tester"`): In multi-agent mode, assigns specialization per agent. Built-in roles: `builder`, `reviewer`, `tester`, `optimizer`, `docs`, `security`.
 - **Context exhaustion detection**: When the daemon detects a build loop failed due to iteration exhaustion (not a code error), it tags the failure as `context_exhaustion` and boosts `--max-restarts` on retry.
+- **Flatline detection** (`scripts/lib/loop-flatline.sh`): Each iteration is classified as `productive`, `flat` (no code change, same error fingerprint, same exit code) or `context_exhaustion`. After `loop.flatline_threshold` (default 3) flat iterations in a row the loop is **flatlining**, which is different from running out of context: fresh sessions just repeat the failure. Each loop gets one exit class (`complete`, `context_exhaustion`, `flatline`, `iteration_exhaustion`, ...), shown in the summary and written to `progress.md` (`Exit class:` and `Flatline streak:` lines) and `loop-logs/flatline.json`. The pipeline writes `flatline` to `failure-reason.txt`. The daemon classifies the failure as `flatline` (`MAX_RETRIES_FLATLINE`, default 1) and escalates to the `full` template **without** the restart boost. A restarted session receives the "change your approach" flatline strategy. Events: `loop.iteration_classified`, `loop.flatline`, `pipeline.flatline`, and `loop.restart` with `reason=`.
 
 ## Pipeline Templates
 
@@ -326,7 +327,8 @@ Tune the build loop's resilience and restart behavior:
     "max_extensions": 3,
     "context_restart_limit": 3,
     "hard_restart_cap": 5,
-    "max_restarts": 3
+    "max_restarts": 3,
+    "flatline_threshold": 3
   }
 }
 ```
@@ -340,6 +342,7 @@ Tune the build loop's resilience and restart behavior:
 | `context_restart_limit`     | `3`     | Max restarts due to context exhaustion            |
 | `hard_restart_cap`          | `5`     | Absolute maximum restarts regardless of cause     |
 | `max_restarts`              | `3`     | Default restart limit for daemon-driven loops     |
+| `flatline_threshold`        | `3`     | Flat iterations in a row before a loop is flatlining |
 
 ## Constitutional AI
 
@@ -676,7 +679,7 @@ All scripts are bash (except the dashboard server in TypeScript). Grouped by lay
 | `scripts/sw-launchd.sh` | 703 | Process supervision (macOS + Linux) |
 | `scripts/sw-linear.sh` | 643 | Linear ↔ GitHub Bidirectional Sync |
 | `scripts/sw-logs.sh` | 353 | View and search agent pane logs |
-| `scripts/sw-loop.sh` | 2713 | Continuous agent loop harness for Claude Code |
+| `scripts/sw-loop.sh` | 2760 | Continuous agent loop harness for Claude Code |
 | `scripts/sw-memory.sh` | 2241 | Persistent Learning & Context System |
 | `scripts/sw-mission-control.sh` | 473 | Terminal-based pipeline mission control |
 | `scripts/sw-model-router.sh` | 1056 | Intelligent Model Routing & Cost Optimization |
@@ -846,7 +849,7 @@ All scripts are bash (except the dashboard server in TypeScript). Grouped by lay
 | `scripts/sw-lib-compat-test.sh` | 357 | Unit tests for cross-platform helpers |
 | `scripts/sw-lib-compound-audit-test.sh` | 281 |  |
 | `scripts/sw-lib-daemon-dispatch-test.sh` | 421 | Unit tests for spawn/reap/queue |
-| `scripts/sw-lib-daemon-failure-test.sh` | 213 | Unit tests for failure handling |
+| `scripts/sw-lib-daemon-failure-test.sh` | 251 | Unit tests for failure handling |
 | `scripts/sw-lib-daemon-patrol-test.sh` | 343 | Unit tests for all patrol functions |
 | `scripts/sw-lib-daemon-poll-test.sh` | 344 | Unit tests for poll, health, cleanup |
 | `scripts/sw-lib-daemon-state-test.sh` | 383 | Unit tests for state management |
@@ -860,7 +863,8 @@ All scripts are bash (except the dashboard server in TypeScript). Grouped by lay
 | `scripts/sw-lib-pipeline-state-test.sh` | 309 | Unit tests for pipeline state |
 | `scripts/sw-linear-test.sh` | 300 | Validate Linear ↔ GitHub bidirectional sync |
 | `scripts/sw-logs-test.sh` | 281 | Validate agent pane log viewing, searching, |
-| `scripts/sw-loop-test.sh` | 911 | Validate continuous agent loop harness |
+| `scripts/sw-loop-flatline-test.sh` | 207 | Flatline vs context exhaustion classification |
+| `scripts/sw-loop-test.sh` | 939 | Validate continuous agent loop harness |
 | `scripts/sw-memory-discovery-e2e-test.sh` | 411 | Memory & Discovery E2E Test |
 | `scripts/sw-memory-effectiveness-test.sh` | 495 | Unit tests |
 | `scripts/sw-memory-test.sh` | 898 | Unit tests for memory system & cost tracking |
@@ -897,13 +901,13 @@ All scripts are bash (except the dashboard server in TypeScript). Grouped by lay
 | `scripts/sw-review-rerun-test.sh` | 317 | SHA-deduped rerun comment writer |
 | `scripts/sw-reward-aggregator-test.sh` | 355 | Reward Aggregator Test Suite |
 | `scripts/sw-rl-optimizer-test.sh` | 350 | RL Optimizer Test Suite (Phase 7) |
-| `scripts/sw-root-cause-test.sh` | 374 |  |
+| `scripts/sw-root-cause-test.sh` | 393 |  |
 | `scripts/sw-scale-test.sh` | 151 | Dynamic agent team scaling |
 | `scripts/sw-scope-enforcement-test.sh` | 441 | Test suite for scope enforcement |
 | `scripts/sw-security-audit-test.sh` | 162 | Security auditing tests |
 | `scripts/sw-self-optimize-test.sh` | 837 | Unit tests for learning & tuning system |
 | `scripts/sw-server-api-test.sh` | 713 | Dashboard Server API Test Suite |
-| `scripts/sw-session-restart-test.sh` | 520 | Intelligent restart briefing system |
+| `scripts/sw-session-restart-test.sh` | 601 | Intelligent restart briefing system |
 | `scripts/sw-session-test.sh` | 586 | E2E validation of session creation flow |
 | `scripts/sw-setup-test.sh` | 262 | Validate comprehensive onboarding wizard |
 | `scripts/sw-spec-driven-test.sh` | 218 | Specification-Driven Development Test Suite |

@@ -7,6 +7,7 @@
 # ║  - infra_issue: Infrastructure problems (timeouts, disk, network)
 # ║  - rate_limit: API rate limiting (Claude, GitHub)
 # ║  - context_exhaustion: Claude context window exceeded
+# ║  - flatline: Build loop stopped changing code and repeated the same error
 # ║  - platform_bug: Shipwright script errors, missing functions
 # ║  - config_error: Invalid pipeline/environment configuration
 # ║  - external_dep: Dependency failures (npm, pip, cargo, etc.)
@@ -60,6 +61,11 @@ rootcause_classify() {
         evidence+=("Explicit rate limit message detected")
         [[ "$error_message" =~ claude ]] && evidence+=("Claude API rate limit")
         [[ "$error_message" =~ github ]] && evidence+=("GitHub API rate limit")
+    # ─── Flatline (no code change, same error — not context exhaustion) ────────
+    elif echo "$error_message" | grep -qiE '(flatline|flatlined|no code change.*same error|same error.*no code change)'; then
+        category="flatline"
+        confidence=85
+        evidence+=("Build loop flatlined: iterations repeated the same error without changing code")
     # ─── Context Exhaustion ──────────────────────────────────────────────────────
     elif echo "$error_message" | grep -qiE '(context window|context.*exceed|token.*limit|auto-compact|maximum context|context.*exhaust)'; then
         category="context_exhaustion"
@@ -268,6 +274,10 @@ rootcause_suggest_fix() {
         context_exhaustion)
             suggestions="Context window exhausted. Suggested fixes: Increase max-restarts for fresh session, reduce codebase context via .claudeignore, simplify pipeline goal or break into subtasks, check memory usage with shipwright memory show"
             actionability=75
+            ;;
+        flatline)
+            suggestions="Build loop flatlined (same error, no code change). Suggested fixes: Do not just add restarts, a fresh session repeats the failure; read the repeated error in .claude/loop-logs/error-summary.json, change approach or narrow the goal, check whether the test itself is wrong, escalate to the full template or a stronger model"
+            actionability=80
             ;;
         infra_issue)
             suggestions="Infrastructure problem. Suggested fixes: Check disk space with df -h, check memory with free -h or vm_stat, check network connectivity with ping github.com, restart daemon, check system load with uptime"

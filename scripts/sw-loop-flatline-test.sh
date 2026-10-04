@@ -187,6 +187,21 @@ assert_eq "3" "$(SW_LOOP_FLATLINE_THRESHOLD=abc _flatline_threshold)" "garbage f
 echo '{"loop":{"flatline_threshold":4}}' > "$TEST_TMP/cfg.json"
 assert_eq "4" "$(DAEMON_CONFIG="$TEST_TMP/cfg.json" _flatline_threshold)" "daemon-config value honored"
 
+# ─── progress.md surfaces the exit class ─────────────────────────────────────
+echo "progress.md"
+source "$SCRIPT_DIR/lib/loop-progress.sh"
+PROJECT_ROOT="$TEST_TMP/not-a-repo"
+LOG_DIR="$TEST_TMP/progress-logs"; mkdir -p "$LOG_DIR"
+GOAL="g"; ITERATION=6; MAX_ITERATIONS=20; TEST_PASSED="false"; STATUS="circuit_breaker"
+LOOP_EXIT_CLASS=""; FLATLINE_STREAK=3; FLATLINE_THRESHOLD=3; LAST_ITERATION_CLASS="flatline"
+write_progress
+assert_eq "1" "$(grep -c '^- Exit class: flatline$' "$LOG_DIR/progress.md" || true)" "progress.md records Exit class: flatline"
+assert_eq "1" "$(grep -c '^- Flatline streak: 3/3$' "$LOG_DIR/progress.md" || true)" "progress.md records flatline streak"
+assert_eq "1" "$(grep -c '^- Tests passing: false$' "$LOG_DIR/progress.md" || true)" "existing Tests passing line unchanged"
+FLATLINE_STREAK=0; LAST_ITERATION_CLASS="context_exhaustion"; STATUS="context_exhaustion_fatal"
+write_progress
+assert_eq "1" "$(grep -c '^- Exit class: context_exhaustion$' "$LOG_DIR/progress.md" || true)" "progress.md records Exit class: context_exhaustion"
+
 echo ""
 echo "Results: $PASS passed, $FAIL failed"
 [[ "$FAIL" -eq 0 ]]

@@ -1697,12 +1697,28 @@
         "trimmed"
       ]
     },
+    "loop.flatline": {
+      "required": [],
+      "optional": [
+        "iteration",
+        "streak",
+        "threshold"
+      ]
+    },
     "loop.iteration": {
       "required": [
         "iteration"
       ],
       "optional": [
         "test_result"
+      ]
+    },
+    "loop.iteration_classified": {
+      "required": [],
+      "optional": [
+        "iteration",
+        "class",
+        "flatline_streak"
       ]
     },
     "loop.iteration_complete": {
@@ -2247,7 +2263,8 @@
       "required": [],
       "optional": [
         "issue",
-        "stage"
+        "stage",
+        "exit_class"
       ]
     },
     "pipeline.cost": {
@@ -2273,6 +2290,13 @@
       ],
       "optional": [
         "error",
+        "stage"
+      ]
+    },
+    "pipeline.flatline": {
+      "required": [],
+      "optional": [
+        "issue",
         "stage"
       ]
     },

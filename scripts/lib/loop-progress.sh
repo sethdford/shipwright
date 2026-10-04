@@ -17,6 +17,13 @@ write_progress() {
         last_error=$(tail -10 "$prev_test_log" 2>/dev/null || true)
     fi
 
+    # Exit class distinguishes flatline from context exhaustion for the daemon
+    local exit_class="${LOOP_EXIT_CLASS:-}"
+    if [[ -z "$exit_class" ]] && type loop_resolve_exit_class >/dev/null 2>&1; then
+        exit_class=$(loop_resolve_exit_class)
+    fi
+    exit_class="${exit_class:-${STATUS:-running}}"
+
     # Use printf to avoid heredoc delimiter injection from GOAL content
     local tmp_progress="${progress_file}.tmp.$$"
     {
@@ -26,7 +33,9 @@ write_progress() {
         printf -- '- Iteration: %s/%s\n' "${ITERATION}" "${MAX_ITERATIONS}"
         printf -- '- Session restart: %s/%s\n' "${RESTART_COUNT:-0}" "${MAX_RESTARTS:-0}"
         printf -- '- Tests passing: %s\n' "${TEST_PASSED:-unknown}"
-        printf -- '- Status: %s\n\n' "${STATUS:-running}"
+        printf -- '- Status: %s\n' "${STATUS:-running}"
+        printf -- '- Exit class: %s\n' "$exit_class"
+        printf -- '- Flatline streak: %s/%s\n\n' "${FLATLINE_STREAK:-0}" "${FLATLINE_THRESHOLD:-3}"
         printf '## Recent Commits\n%s\n\n' "${recent_commits}"
         printf '## Changed Files\n%s\n\n' "${changed_files}"
         if [[ -n "$last_error" ]]; then
