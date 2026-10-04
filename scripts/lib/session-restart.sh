@@ -201,11 +201,20 @@ restart_detect_reason() {
         reason="manual"
         evidence="User triggered restart via signal or command"
         classification="manual"
-    # Check for context exhaustion (loop completed all iterations)
-    elif [[ "$iteration" -ge "$max_iterations" ]] && [[ "$max_iterations" -gt 0 ]]; then
+    # Context exhaustion needs evidence (the classifier matched the window-full
+    # patterns) — running out of iterations alone is not running out of context
+    elif [[ "${LAST_ITERATION_CLASS:-}" == "context_exhaustion" ]] ||
+         [[ "${LOOP_EXIT_CLASS:-}" == "context_exhaustion" ]] ||
+         [[ "${STATUS:-}" == context_exhaustion* ]]; then
         reason="context_exhaustion"
-        evidence="Reached iteration $iteration/$max_iterations"
+        evidence="Context window exhaustion detected at iteration $iteration/$max_iterations"
         classification="context_exhaustion"
+    # Flatline: iterations ran but changed nothing and failed the same way
+    elif [[ "${LOOP_EXIT_CLASS:-}" == "flatline" ]] ||
+         { [[ "${FLATLINE_STREAK:-0}" =~ ^[0-9]+$ ]] && [[ "${FLATLINE_STREAK:-0}" -ge "${FLATLINE_THRESHOLD:-3}" ]]; }; then
+        reason="flatline"
+        evidence="${FLATLINE_STREAK:-0} consecutive iterations with no code change and the same failure"
+        classification="flatline"
     # Check for iteration limit hit
     elif [[ "$iteration" -ge "$max_iterations" ]] && [[ "$max_iterations" -gt 0 ]]; then
         reason="iteration_limit"
@@ -266,6 +275,12 @@ restart_suggest_strategy() {
             priority="high"
             focus="Most critical features for goal completion"
             avoid="Low-impact improvements, refactoring"
+            ;;
+        flatline)
+            strategy="Stop repeating the last attempt — recent iterations changed no code and hit the same failure. Re-read the exact error and try a different approach"
+            priority="critical"
+            focus="The single repeated failure and the assumption behind the failed attempts"
+            avoid="Re-running the same fix, exploring without committing a change"
             ;;
         stuck_loop)
             strategy="Try a fundamentally different approach to the current problem"

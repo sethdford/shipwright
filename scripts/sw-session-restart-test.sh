@@ -179,11 +179,67 @@ test_restart_reason_context_exhaustion() {
     setup_test_env
     echo -n "Testing restart reason detection for context exhaustion... "
 
+    # Only classifier evidence counts as context exhaustion
     local reason
-    reason=$(restart_detect_reason 10 10 "true" 0 "false")
+    reason=$(LAST_ITERATION_CLASS="context_exhaustion"; restart_detect_reason 4 10 "false" 0 "false")
 
     if [[ "$reason" != "context_exhaustion" ]]; then
         echo "FAIL: Expected 'context_exhaustion', got '$reason'"
+        return 1
+    fi
+
+    echo "PASS"
+    return 0
+}
+
+test_restart_reason_iteration_limit() {
+    setup_test_env
+    echo -n "Testing iteration limit is not reported as context exhaustion... "
+
+    # Previously unreachable: running out of iterations was always context_exhaustion
+    local reason
+    reason=$(LAST_ITERATION_CLASS=""; LOOP_EXIT_CLASS=""; STATUS=""; FLATLINE_STREAK=0
+             restart_detect_reason 10 10 "true" 0 "false")
+
+    if [[ "$reason" != "iteration_limit" ]]; then
+        echo "FAIL: Expected 'iteration_limit', got '$reason'"
+        return 1
+    fi
+
+    echo "PASS"
+    return 0
+}
+
+test_restart_reason_flatline() {
+    setup_test_env
+    echo -n "Testing restart reason detection for flatline... "
+
+    local reason
+    reason=$(LAST_ITERATION_CLASS="flat"; FLATLINE_STREAK=3; FLATLINE_THRESHOLD=3
+             restart_detect_reason 10 10 "false" 3 "false")
+    if [[ "$reason" != "flatline" ]]; then
+        echo "FAIL: Expected 'flatline' from streak, got '$reason'"
+        return 1
+    fi
+
+    reason=$(LOOP_EXIT_CLASS="flatline"; FLATLINE_STREAK=0; restart_detect_reason 6 10 "false" 0 "false")
+    if [[ "$reason" != "flatline" ]]; then
+        echo "FAIL: Expected 'flatline' from exit class, got '$reason'"
+        return 1
+    fi
+
+    # Below threshold falls through to stuck_loop
+    reason=$(FLATLINE_STREAK=2; FLATLINE_THRESHOLD=3; restart_detect_reason 5 10 "false" 3 "false")
+    if [[ "$reason" != "stuck_loop" ]]; then
+        echo "FAIL: Expected 'stuck_loop' below flatline threshold, got '$reason'"
+        return 1
+    fi
+
+    # Context exhaustion evidence wins over a flatline streak
+    reason=$(LAST_ITERATION_CLASS="context_exhaustion"; FLATLINE_STREAK=5
+             restart_detect_reason 10 10 "false" 0 "false")
+    if [[ "$reason" != "context_exhaustion" ]]; then
+        echo "FAIL: Expected 'context_exhaustion' to take precedence, got '$reason'"
         return 1
     fi
 
@@ -258,6 +314,28 @@ test_strategy_suggestion_for_stuck_loop() {
 
     if ! echo "$strategy" | grep -qi "different\|approach\|fundamental"; then
         echo "FAIL: Strategy doesn't mention trying a different approach"
+        return 1
+    fi
+
+    echo "PASS"
+    return 0
+}
+
+test_strategy_suggestion_for_flatline() {
+    setup_test_env
+    echo -n "Testing strategy suggestion for flatline... "
+
+    local strategy
+    strategy=$(restart_suggest_strategy "flatline" "Test goal" "false")
+
+    if ! echo "$strategy" | grep -qi "different approach"; then
+        echo "FAIL: Strategy doesn't ask for a different approach: $strategy"
+        return 1
+    fi
+
+    local strat_file="${ARTIFACTS_DIR:-${LOG_DIR}}/restart-strategy.json"
+    if [[ ! -f "$strat_file" ]] || [[ "$(jq -r '.priority' "$strat_file")" != "critical" ]]; then
+        echo "FAIL: Flatline strategy should be written with critical priority"
         return 1
     fi
 
@@ -486,10 +564,13 @@ TESTS=(
     "test_state_capture_creates_valid_json"
     "test_briefing_generation_produces_markdown"
     "test_restart_reason_context_exhaustion"
+    "test_restart_reason_iteration_limit"
+    "test_restart_reason_flatline"
     "test_restart_reason_stuck_loop"
     "test_restart_reason_manual"
     "test_strategy_suggestion_for_context_exhaustion"
     "test_strategy_suggestion_for_stuck_loop"
+    "test_strategy_suggestion_for_flatline"
     "test_cross_session_tracking_appends_history"
     "test_enhanced_progress_md_backward_compatible"
     "test_enhanced_progress_md_shows_antipatterns"
