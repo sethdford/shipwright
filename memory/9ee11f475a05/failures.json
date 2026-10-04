@@ -17,6 +17,15 @@
       "seen_count": 1,
       "last_seen": "2026-10-04T16:09:38Z",
       "category": "test_failure"
+    },
+    {
+      "stage": "test",
+      "pattern": "\u001b[38;2;0;212;255m▸\u001b[0m Patrol recurring failures label construction... \u001b[38;2;74;222;128m✓\u001b[0m",
+      "root_cause": "sw-pipeline-test.sh E2E tests fail: plan.md/review.md artifacts not generated (mock claude output not producing files) and jq parse errors from ANSI-colored/non-JSON output in intelligence skip and cleanup paths",
+      "fix": "Inspect the mock claude/plan and review stage in sw-pipeline-test.sh to ensure mocks write plan.md/review.md, and make the RL/reward episode output go to stderr or strip ANSI so jq only parses JSON",
+      "seen_count": 2,
+      "last_seen": "2026-10-04T22:05:35Z",
+      "category": "test_failure"
     }
   ]
 }
