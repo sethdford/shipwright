@@ -38,6 +38,7 @@ fi
 [[ -f "$SCRIPT_DIR/lib/loop-convergence.sh" ]] && source "$SCRIPT_DIR/lib/loop-convergence.sh"
 [[ -f "$SCRIPT_DIR/lib/loop-restart.sh" ]] && source "$SCRIPT_DIR/lib/loop-restart.sh"
 [[ -f "$SCRIPT_DIR/lib/loop-progress.sh" ]] && source "$SCRIPT_DIR/lib/loop-progress.sh"
+[[ -f "$SCRIPT_DIR/lib/loop-flatline.sh" ]] && source "$SCRIPT_DIR/lib/loop-flatline.sh"
 # Intelligent session restart with enhanced briefings and cross-session tracking
 [[ -f "$SCRIPT_DIR/lib/session-restart.sh" ]] && source "$SCRIPT_DIR/lib/session-restart.sh"
 # Context window budget monitoring (issue #209)
@@ -2497,7 +2498,26 @@ ${GOAL}"
         fi
 
         # Check progress (circuit breaker)
-        if check_progress; then
+        local made_progress=true
+        check_progress || made_progress=false
+        if type flatline_classify_iteration >/dev/null 2>&1; then
+            local prev_flat_streak="${FLATLINE_STREAK:-0}"
+            flatline_classify_iteration "$log_file" "$made_progress" "$exit_code"
+            flatline_write_artifact
+            if type emit_event >/dev/null 2>&1; then
+                emit_event "loop.iteration_classified" \
+                    "iteration=$ITERATION" \
+                    "class=${LAST_ITERATION_CLASS:-productive}" \
+                    "flatline_streak=${FLATLINE_STREAK:-0}"
+                if [[ "${FLATLINE_STREAK:-0}" -ge "${FLATLINE_THRESHOLD:-3}" && "${FLATLINE_STREAK:-0}" -gt "$prev_flat_streak" ]]; then
+                    emit_event "loop.flatline" \
+                        "iteration=$ITERATION" \
+                        "streak=${FLATLINE_STREAK:-0}" \
+                        "threshold=${FLATLINE_THRESHOLD:-3}"
+                fi
+            fi
+        fi
+        if [[ "$made_progress" == "true" ]]; then
             CONSECUTIVE_FAILURES=0
             # Reset auto-recovery state on progress (tests passing, code advancing)
             if type recovery_reset >/dev/null 2>&1; then

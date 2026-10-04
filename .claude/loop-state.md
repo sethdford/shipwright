@@ -1,45 +1,10 @@
 ---
-goal: "Classify and surface flatlining build-loop iterations distinct from context exhaustion
+goal: "E2E test: add comment to README [automated]
 
-## Plan Summary
-# Plan: Tell flatlining build-loop iterations apart from context exhaustion
-
-## Summary
-
-**The problem.** Today "context exhaustion" is a catch-all for any build loop that ends without passing tests. There are three places where this happens:
-
-| Location | Current logic | What goes wrong |
-|---|---|---|
-| `scripts/lib/daemon-failure.sh:51-64` (`classify_failure`) | `progress.md` shows iteration > 0 and tests `false` or `unknown`, so it returns `context_exhaustion` | Any non-passing loop is labelled context exhaustion |
-| `scripts/lib/pipeline-stages-build.sh:461-474` | Loop exit is non-zero and tests aren't `true`, so it writes `context_exhaustion` to `failure-reason.txt` | Same mislabel, and the daemon reads it |
-| `scripts/lib/session-restart.sh:205-213` (`restart_detect_reason`) | Iteration count is at the maximum, so it returns `context_exhaustion` | Running out of iterations is reported as running out of context. The `iteration_limit` branch below it can never run because it has the identical condition |
-
-**Why it matters.** The daemon treats context exhaustion by raising `--max-restarts` (`daemon-failure.sh:285-292`). That helps when the context window really filled up. It does nothing for a **flatlining** loop, where iterations keep running but produce no code changes and the same error every time. More fresh sessions just repeat the same failure.
-
-**What already exists.**
-- `sw-loop.sh:2298` detects real context exhaustion by matching `CONTEXT_EXHAUSTION_PATTERNS` in the iteration log.
-- `loop-convergence.sh` records `diff_hash|error_hash|exit_code` per iteration in `stuckness-tracking.txt`.
-- `check_progress` uses `MIN_PROGRESS_LINES`.
-- `STUCKNESS_COUNT >= 3` sets `STATUS=stuck_restart`.
-[... full plan in .claude/pipeline-artifacts/plan.md]
-
-## Key Design Decisions
-# Design: Classify and surface flatlining build-loop iterations distinct from context exhaustion
-## Context
-## Decision
-### Component diagram
-### Interface contracts
-### Classification rules
-### Data flow
-### Error boundaries
-### Design decisions worth recording
-## Alternatives Considered
-[... full design in .claude/pipeline-artifacts/design.md]
-
-## Specification: Classify and surface flatlining build-loop iterations distinct from context exhaustion
+## Specification: E2E test: add comment to README [automated]
 
 ### Goals
-- Classify and surface flatlining build-loop iterations distinct from context exhaustion
+- E2E test: add comment to README [automated]
 
 ### Acceptance Criteria
 - [testable] All existing tests continue to pass
@@ -48,52 +13,57 @@ Historical context (lessons from previous pipelines):
 {
   "results": [
     {
-      "file": "failures.json",
-      "relevance": 95,
-      "summary": "Contains actual failure records with root causes, seen_count, and resolved status. Flatlining would show repeated failures with resolved=false; helps distinguish from context exhaustion."
-    },
-    {
-      "file": "success-patterns.json (test-repo-comptime)",
-      "relevance": 80,
-      "summary": "Includes iterations_needed, completion_time_seconds, and stages_executed for build stage. Provides baseline metrics to detect when iteration count exceeds normal completion patterns, indicating flatlining."
-    },
-    {
       "file": "index.json",
       "relevance": 75,
-      "summary": "Contains indexed failure patterns with total_seen frequency counts in build stage. High recurrence of same pattern (seen=5) indicates flatlining vs context exhaustion (new errors)."
+      "summary": "Contains build stage failure pattern with test_failure signature and concrete fix ('Increase timeout value in test setup'). Only entry with structured build-stage metadata across 5 occurrences."
     },
     {
       "file": "fleet-shared-patterns.json",
       "relevance": 70,
-      "summary": "Tracks cross-repo failure patterns with seen_count, timestamps, and fix status. Helps identify whether failures are systematic flatlining or environmental context issues."
+      "summary": "Common 'Cannot find module' pattern affecting build/test stages across multiple repos with fix 'npm i'. Directly applicable to build stage issues."
     },
     {
       "file": "success-patterns.json (test-repo-ranking)",
       "relevance": 65,
-      "summary": "Multiple patterns with iterations_needed=1 and consistent completion times. Provides comparison baseline to detect when builds exceed expected iteration count, signaling flatlining."
+      "summary": "Contains 2 successful build-stage patterns with low complexity and 1 iteration needed. Multiple patterns provide broader coverage for build stage scenarios."
+    },
+    {
+      "file": "success-patterns.json (test-repo-789)",
+      "relevance": 60,
+      "summary": "High-complexity build-stage timeout fix pattern (3 iterations, $2.00 cost) with script files changed. Relevant for understanding build stage complexity estimation."
+    },
+    {
+      "file": "success-patterns.json (test-repo-comptime)",
+      "relevance": 50,
+      "summary": "Build-stage pattern included in multi-stage sequence (intake→build→test). Lower specificity but demonstrates build stage within broader pipeline context."
     }
   ]
 }
 
 Discoveries from other pipelines:
-✓ Injected 1 new discoveries
+✓ Injected 6 new discoveries
+[spec_generation] Stage spec_generation completed — Resolution: 
 [design] Design completed for Classify and surface flatlining build-loop iterations distinct from context exhaustion — Resolution: 
+[intake] Stage intake completed — Resolution: 
+[spec_generation] Stage spec_generation completed — Resolution: 
+[intake] Stage intake completed — Resolution: 
+[spec_generation] Stage spec_generation completed — Resolution: 
 
 Task tracking (check off items as you complete them):
 # Pipeline Tasks — Classify and surface flatlining build-loop iterations distinct from context exhaustion
 
 ## Implementation Checklist
-- [ ] 1. Create `lib/loop-flatline.sh` with the classifier, exit-class resolver and atomic artifact writer
+- [x] 1. Create `lib/loop-flatline.sh` with the classifier, exit-class resolver and atomic artifact writer
 - [ ] 2. Source and call it from `sw-loop.sh` per iteration; emit `loop.iteration_classified` and `loop.flatline` *(depends on 1)*
 - [ ] 3. Add `Exit class` and `Flatline streak` to `progress.md` and `show_summary` *(depends on 1)*
 - [ ] 4. Tag `stuck_restart` and flatline restarts with a reason and inject the flatline strategy *(depends on 2, 6)*
-- [ ] 5. Fix the unreachable `iteration_limit` branch and add flatline in `restart_detect_reason`
-- [ ] 6. Add the `flatline` strategy in `restart_suggest_strategy`
+- [x] 5. Fix the unreachable `iteration_limit` branch and add flatline in `restart_detect_reason`
+- [x] 6. Add the `flatline` strategy in `restart_suggest_strategy`
 - [ ] 7. Pipeline build stage: write `flatline` vs `context_exhaustion` to `failure-reason.txt` *(depends on 3)*
 - [ ] 8. Daemon `classify_failure`, retry limits and escalation for `flatline` without the restart boost *(depends on 3, 7)*
 - [ ] 9. Add the `flatline` category in `root-cause.sh`
 - [ ] 10. Event schema entries plus sync
-- [ ] 11. New `sw-loop-flatline-test.sh`, registered in `package.json`
+- [x] 11. New `sw-loop-flatline-test.sh`, registered in `package.json`
 - [ ] 12. Extend the daemon-failure, session-restart and loop tests
 - [ ] 13. Update the CLAUDE.md docs
 
@@ -101,29 +71,78 @@ Task tracking (check off items as you complete them):
 - Pipeline: autonomous
 - Branch: ci/issue-7689
 - Issue: none
-- Generated: 2026-10-04T14:54:07Z"
-iteration: 1
-max_iterations: 20
+- Generated: 2026-10-04T14:54:07Z
+
+## Skill Guidance (testing issue, AI-selected)
+### Why these skills were selected (AI-analyzed):
+- **testing-strategy**: E2E tests require careful scenario design, test isolation, and verification that real behavior (not mocks) is being validated—essential across all stages from planning through implementation and review.
+
+## Testing Strategy Expertise
+
+Apply these testing patterns:
+
+### Test Pyramid
+- **Unit tests** (70%): Test individual functions/methods in isolation
+- **Integration tests** (20%): Test component interactions and boundaries
+- **E2E tests** (10%): Test critical user flows end-to-end
+
+### What to Test
+- Happy path: the expected successful flow
+- Error cases: what happens when things go wrong?
+- Edge cases: empty inputs, maximum values, concurrent access
+- Boundary conditions: off-by-one, empty collections, null/undefined
+
+### Test Quality
+- Each test should verify ONE behavior
+- Test names should describe the expected behavior, not the implementation
+- Tests should be independent — no shared mutable state between tests
+- Tests should be deterministic — same result every run
+
+### Coverage Strategy
+- Aim for meaningful coverage, not 100% line coverage
+- Focus coverage on business logic and error handling
+- Don't test framework code or simple getters/setters
+- Cover the branches, not just the lines
+
+### Mocking Guidelines
+- Mock external dependencies (APIs, databases, file system)
+- Don't mock the code under test
+- Use realistic test data — edge cases reveal bugs
+- Verify mock interactions when the side effect IS the behavior
+
+### Regression Testing
+- Write a failing test FIRST that reproduces the bug
+- Then fix the bug and verify the test passes
+- Keep regression tests — they prevent the bug from recurring
+
+### Required Output (Mandatory)
+
+Your output MUST include these sections when this skill is active:
+
+1. **Test Pyramid Breakdown**: Explicit count of unit/integration/E2E tests and their coverage targets (e.g., "70 unit tests covering business logic, 12 integration tests for API boundaries, 3 E2E tests for critical paths")
+2. **Coverage Targets**: Target coverage percentage per layer and which critical paths MUST be tested
+3. **Critical Paths to Test**: Specific test cases for the happy path, 2+ error cases, and 2+ edge cases
+
+If any section is not applicable, explicitly state why it's skipped.
+"
+iteration: 0
+max_iterations: 3
 status: running
 test_cmd: "npm test"
-model: opus
+model: sonnet
 agents: 1
-started_at: 2026-10-04T15:35:11Z
-last_iteration_at: 2026-10-04T15:35:11Z
+started_at: 2026-10-04T15:59:34Z
+last_iteration_at: 2026-10-04T15:59:34Z
 consecutive_failures: 0
-total_commits: 1
+total_commits: 0
 audit_enabled: true
 audit_agent_enabled: true
 quality_gates_enabled: true
-dod_file: "/home/runner/work/shipwright/shipwright/.claude/pipeline-artifacts/dod.md"
+dod_file: ""
 auto_extend: true
 extension_count: 0
 max_extensions: 3
 ---
 
 ## Log
-### Iteration 1 (2026-10-04T15:35:11Z)
-  - "Same failure" is judged from the error lines in `error-summary.json`, with numbers stripped so different timings do
-  - It also decides one exit class per loop (`complete`, `context_exhaustion`, `flatline`, `iteration_exhaustion`, or th
-- **`scripts/sw-loop-flatline-test.sh`** (new, 39 checks against a temporary git repo) covers flatline detection, streak
 
