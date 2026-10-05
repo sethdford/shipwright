@@ -90,3 +90,5 @@
 {"ts":"2026-10-05T06:30:20Z","ts_epoch":1791181820,"type":"patrol.finding","check":"untested_script","script":"sw-test-all.sh","lines":199,"usage":0}
 {"ts":"2026-10-05T06:30:20Z","ts_epoch":1791181820,"type":"patrol.finding","check":"untested_script","script":"sw-event-schema-sync.sh","lines":93,"usage":0}
 {"ts":"2026-10-05T06:30:21Z","ts_epoch":1791181821,"type":"patrol.issue_created","check":"untested_scripts","count":7}
+{"ts":"2026-10-05T08:14:57Z","ts_epoch":1791188097,"type":"hygiene_platform_refactor","hardcoded":49,"fallback":69,"todo":51}
+{"ts":"2026-10-05T08:15:15Z","ts_epoch":1791188115,"type":"strategic.cycle_complete","issues_created":0,"issues_skipped":3}
