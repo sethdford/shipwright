@@ -1672,33 +1672,33 @@
       "result": {
         "results": [
           {
+            "file": "retry-outcomes.json",
+            "relevance": 95,
+            "summary": "Contains build_failure retry strategy with 100% success rate using model_escalation; directly applicable to handling build stage failures"
+          },
+          {
             "file": "failures.json",
-            "relevance": 98,
-            "summary": "5 test stage failures from Oct 4-5 with root causes (cost dashboard, pipeline lock, intent analysis schema, timeouts). Directly applicable to current build stage."
+            "relevance": 90,
+            "summary": "Documents 5 test/build stage failures with root causes and fixes; recent patterns from build runs show timeout and schema validation issues"
           },
           {
             "file": "flaky-tests.json",
-            "relevance": 92,
-            "summary": "2 flaky tests (test-auth 90% confidence, test-1 85% confidence) with error messages and occurrence counts. Critical for build reliability."
+            "relevance": 85,
+            "summary": "Tracks known flaky tests (test-1, test-auth) with 85-90% confidence; critical for predicting and handling intermittent build failures"
           },
           {
-            "file": "success-patterns.json",
-            "relevance": 82,
-            "summary": "2 recent successful patterns showing 3-iteration builds, test strategy (npm test), files changed patterns, and cost tracking ($2.50 avg). Blueprints for current work."
-          },
-          {
-            "file": "retry-outcomes.json",
-            "relevance": 76,
-            "summary": "build_failure class with model_escalation strategy at 100% success rate (5/5). Proven recovery technique for build stage."
+            "file": "metrics.json",
+            "relevance": 80,
+            "summary": "Provides build_duration_s (7095s) and test_duration_s (1459s) baselines; essential for timeout tuning and performance expectations during build"
           },
           {
             "file": "knowledge.json",
-            "relevance": 68,
-            "summary": "4 KB entries on test failures: mktemp path issues (4 occurrences), cleanup dry-run output (2 occurrences), regression detection JSON (2 occurrences). Specific test environment gotchas."
+            "relevance": 75,
+            "summary": "Knowledge base of test stage failures (mktemp directory issues, cleanup output, regression detection); documents 4 common error signatures with fixes"
           }
         ]
       },
-      "timestamp": 1791183950,
+      "timestamp": 1791185922,
       "ttl": 1800
     },
     "43802e3c13334fdb1de225451784f6d1": {
@@ -1921,6 +1921,13 @@
         }
       ],
       "timestamp": 1791185594,
+      "ttl": 1800
+    },
+    "c3291897e763a651c3fb2c0093807960": {
+      "result": {
+        "raw_response": "Mock claude: ok"
+      },
+      "timestamp": 1791185995,
       "ttl": 1800
     }
   }
