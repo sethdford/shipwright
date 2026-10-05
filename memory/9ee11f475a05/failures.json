@@ -5,8 +5,8 @@
       "pattern": "\u001b[38;2;74;222;128m\u001b[1m✓\u001b[0m reveal shows 1/3 pass count on failure",
       "root_cause": "sw-cost-test.sh 'CONTEXT EFFICIENCY' dashboard tests fail because the cost dashboard prints 'No cost entries in the last 30 days' and exits early, never rendering the context-efficiency section from the seeded loop.context_efficiency events (test seeds only events, no cost entries).",
       "fix": "Make the cost dashboard render the CONTEXT EFFICIENCY section even when there are no cost entries (or have the test seed a cost entry/use an events path the dashboard reads) so the avg budget utilization assertions pass.",
-      "seen_count": 8,
-      "last_seen": "2026-10-05T10:53:18Z",
+      "seen_count": 9,
+      "last_seen": "2026-10-05T13:02:38Z",
       "category": "test_failure"
     },
     {
@@ -48,8 +48,8 @@
     {
       "stage": "test",
       "pattern": "Results: \u001b[38;2;74;222;128m\u001b[1m125 PASS\u001b[0m | \u001b[38;2;248;113;113m\u001b[1m3 FAIL\u001b[0m",
-      "root_cause": "Two test suites failed (sw-intent-analysis-test exit 1 after 33s, sw-project-detect-test exit 1 after 1s), plus sw-e2e-integration-test timed out at 301s (a real Claude/GitHub test); 3 assertion failures total across the failing suites.",
-      "fix": "Run sw-intent-analysis-test.sh and sw-project-detect-test.sh individually to read the failing assertions and fix the code; skip or mock the real-network sw-e2e-integration-test in CI.",
+      "root_cause": "Three suites failed: sw-cleanup-test (dry-run/force 'clean' assertions fail, likely due to leftover orphaned sessions/artifacts in the CI environment), sw-e2e-integration-test (needs real Claude/GitHub and hit a stale 'pipeline already in progress' lock), and sw-intent-analysis-test (analyze_intent output lacks the required schema fields version/goal/criteria).",
+      "fix": "Make sw-cleanup-test isolate HOME/state dirs so the 'nothing to clean' assertions are deterministic, skip or clear locks in sw-e2e-integration-test when no live credentials are available, and fix analyze_intent (or its schema check) so the output includes version, goal and criteria.",
       "seen_count": 1,
       "last_seen": "2026-10-05T11:32:31Z",
       "category": "test_failure"
