@@ -1,5 +1,5 @@
-The README already has the comment. Commit 9b9c7bf4 added it on line 1. It's an HTML comment, so it doesn't change how the page renders. It points to `shipwright version bump` and `shipwright version check`.
+The README already has the requested comment. It's an HTML comment on line 1, added in commit `9b9c7bf4`. I made no new changes this iteration.
 
-I didn't run `npm test` this iteration. The version consistency check passes (3.3.0), and no files changed this iteration.
+I only ran the version-consistency check, which passes (3.3.0). I did not run `npm test`. The comment is the only change and is invisible when rendered, so the existing tests shouldn't be affected.
 
 LOOP_COMPLETE

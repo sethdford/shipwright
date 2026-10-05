@@ -41,10 +41,12 @@ Historical context (lessons from previous pipelines):
 }
 
 Discoveries from other pipelines:
-✓ Injected 13 new discoveries
+✓ Injected 15 new discoveries
 [intake] Stage intake completed — Resolution: 
 [spec_generation] Stage spec_generation completed — Resolution: 
 [design] Design completed for Split sw-memory.sh into capture, query, and pattern-aggregation modules — Resolution: 
+[intake] Stage intake completed — Resolution: 
+[spec_generation] Stage spec_generation completed — Resolution: 
 [intake] Stage intake completed — Resolution: 
 [spec_generation] Stage spec_generation completed — Resolution: 
 [intake] Stage intake completed — Resolution: 
@@ -168,8 +170,8 @@ status: running
 test_cmd: "npm test"
 model: sonnet
 agents: 1
-started_at: 2026-10-05T08:50:09Z
-last_iteration_at: 2026-10-05T08:50:09Z
+started_at: 2026-10-05T09:03:49Z
+last_iteration_at: 2026-10-05T09:03:49Z
 consecutive_failures: 0
 total_commits: 0
 audit_enabled: true
