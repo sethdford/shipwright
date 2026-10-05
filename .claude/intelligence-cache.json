@@ -30,18 +30,9 @@
     },
     "d41d8cd98f00b204e9800998ecf8427e": {
       "result": {
-        "primary_role": "architect",
-        "secondary_roles": [
-          "builder",
-          "tester",
-          "reviewer"
-        ],
-        "confidence": 0.85,
-        "reasoning": "Modularization requires upfront architectural design of interfaces and responsibilities; architect leads design phase, builder implements, tester validates.",
-        "new_role_needed": false,
-        "suggested_role": null
+        "raw_response": "Mock claude response"
       },
-      "timestamp": 1791183959,
+      "timestamp": 1791187857,
       "ttl": 3600
     },
     "efd5524ad1244fd20344bf3ff5d95233": {
@@ -1752,9 +1743,9 @@
     },
     "952394a3060f62e70b57bf00c9a7a863": {
       "result": {
-        "estimated_iterations": 2
+        "estimated_iterations": 1
       },
-      "timestamp": 1791185096,
+      "timestamp": 1791187269,
       "ttl": 1800
     },
     "24f80862cd27f1676d6f57ff9c07faab": {
@@ -1847,31 +1838,31 @@
           {
             "file": "index.json",
             "relevance": 90,
-            "summary": "Contains build stage test_failure pattern with fix suggestion (increase timeout); directly applicable to debugging E2E test execution in build stage"
-          },
-          {
-            "file": "success-patterns.json (test-repo-ranking)",
-            "relevance": 85,
-            "summary": "Two complete build stage success patterns with npm test strategy and concrete metrics (complexity, iterations, files); demonstrates proven build approaches"
+            "summary": "Contains build-stage test_failure pattern with concrete fix (increase timeout). Directly applicable to E2E test debugging."
           },
           {
             "file": "fleet-shared-patterns.json",
-            "relevance": 80,
-            "summary": "Contains 'npm i' fix for 'Cannot find module' errors in build stage across multiple repos; common blocker for E2E test execution"
+            "relevance": 75,
+            "summary": "Tracks 'Cannot find module' build errors across repos with npm install fix. Common blocker in E2E test setup phases."
           },
           {
-            "file": "success-patterns.json (test-final-working)",
-            "relevance": 75,
-            "summary": "Build stage pattern with npm test strategy and timeout handling; demonstrates working timeout approach for build execution"
+            "file": "failures.json",
+            "relevance": 70,
+            "summary": "Documents timeout and database connection failures with root causes and fixes. Timeout patterns directly relevant to E2E test reliability."
           },
           {
             "file": "success-patterns.json (test-repo-comptime)",
-            "relevance": 70,
-            "summary": "Pattern spanning build and test stages with npm test strategy and timing data; shows stages_executed sequence relevant to E2E workflow"
+            "relevance": 60,
+            "summary": "Multi-stage pattern (intake→build→test) showing completion time (1234s) and cost tracking. Provides baseline for E2E test execution estimation."
+          },
+          {
+            "file": "success-patterns.json (test-repo-ranking)",
+            "relevance": 50,
+            "summary": "Two build-stage patterns with npm test strategy. Generic templates for build phase patterns, applicable to readme comment E2E scenario."
           }
         ]
       },
-      "timestamp": 1791185202,
+      "timestamp": 1791187325,
       "ttl": 1800
     },
     "080588966eb310d165b516f73f5a4c4d": {
@@ -1928,6 +1919,62 @@
         "raw_response": "Mock claude: ok"
       },
       "timestamp": 1791185995,
+      "ttl": 1800
+    },
+    "6a8a4a803b367d4cb1a676801165f538": {
+      "result": {
+        "raw_response": "Mock claude: ok"
+      },
+      "timestamp": 1791187269,
+      "ttl": 1800
+    },
+    "e4a442934815815e180127e3001b36ba": {
+      "result": [
+        {
+          "type": "result",
+          "result": "I am trying the same approach again.",
+          "usage": {
+            "input_tokens": 0,
+            "output_tokens": 0
+          }
+        }
+      ],
+      "timestamp": 1791187386,
+      "ttl": 1800
+    },
+    "5afc2923f333cf3cf9a6a4bce9ed06d1": {
+      "result": {
+        "raw_response": "Mock claude: ok"
+      },
+      "timestamp": 1791187432,
+      "ttl": 1800
+    },
+    "238be16f07f2f14f1ba31a06fc429d9f": {
+      "result": [
+        {
+          "type": "result",
+          "result": "I am trying the same approach again.",
+          "usage": {
+            "input_tokens": 0,
+            "output_tokens": 0
+          }
+        }
+      ],
+      "timestamp": 1791187677,
+      "ttl": 1800
+    },
+    "93a099d4c9aa458656b75fb5e34b9fa7": {
+      "result": [
+        {
+          "type": "result",
+          "result": "I am trying the same approach again.",
+          "usage": {
+            "input_tokens": 0,
+            "output_tokens": 0
+          }
+        }
+      ],
+      "timestamp": 1791187774,
       "ttl": 1800
     }
   }
