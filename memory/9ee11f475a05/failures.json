@@ -5,8 +5,8 @@
       "pattern": "\u001b[38;2;74;222;128m\u001b[1m✓\u001b[0m reveal shows 1/3 pass count on failure",
       "root_cause": "sw-cost-test.sh 'CONTEXT EFFICIENCY' dashboard tests fail because the cost dashboard prints 'No cost entries in the last 30 days' and exits early, never rendering the context-efficiency section from the seeded loop.context_efficiency events (test seeds only events, no cost entries).",
       "fix": "Make the cost dashboard render the CONTEXT EFFICIENCY section even when there are no cost entries (or have the test seed a cost entry/use an events path the dashboard reads) so the avg budget utilization assertions pass.",
-      "seen_count": 13,
-      "last_seen": "2026-10-05T15:55:05Z",
+      "seen_count": 14,
+      "last_seen": "2026-10-05T18:42:49Z",
       "category": "test_failure"
     },
     {
@@ -14,8 +14,8 @@
       "pattern": "Failed: 1",
       "root_cause": "Two suites failed: sw-e2e-integration-test hit a stale pipeline lock/state ('pipeline already in progress') left by the outer pipeline run, and sw-intent-analysis-test failed its schema check for required fields (version, goal, criteria).",
       "fix": "Make the e2e integration test run with isolated state/lock dir (or skip when a pipeline is already running), and update the intent analysis schema or the analyze_intent output so they agree on the required fields.",
-      "seen_count": 4,
-      "last_seen": "2026-10-05T09:44:52Z",
+      "seen_count": 5,
+      "last_seen": "2026-10-05T16:45:31Z",
       "category": "test_failure"
     },
     {
@@ -32,8 +32,8 @@
       "pattern": "Results: \u001b[38;2;74;222;128m\u001b[1m127 PASS\u001b[0m | \u001b[38;2;248;113;113m\u001b[1m1 FAIL\u001b[0m",
       "root_cause": "sw-e2e-integration-test timed out after 301s (300s suite limit) because it makes real Claude/GitHub calls that hang or run too slowly in CI, causing the single FAIL among 128 suites",
       "fix": "Skip or mock sw-e2e-integration-test in CI (gate on API credentials), or raise its per-suite timeout above 300s",
-      "seen_count": 1,
-      "last_seen": "2026-10-04T22:06:57Z",
+      "seen_count": 2,
+      "last_seen": "2026-10-05T17:58:32Z",
       "category": "timeout"
     },
     {
@@ -57,11 +57,20 @@
     {
       "stage": "test",
       "pattern": "\u001b[2m  loop behavior: iterations on test failure\u001b[0m",
-      "root_cause": "The visible log shows every test suite passing (12, 16, 15, 7, 25 tests, all with 0 failures); the 'loop behavior: iterations on test failure' error pattern matches a test-case label in the loop test suite output, not an actual failure in the shown tail.",
-      "fix": "Check the full test log (.claude/loop-logs/tests-iter-1.log) for an actual failing assertion or non-zero exit in an earlier suite (e.g. sw-loop-test.sh), and if the 'iterations on test failure' loop test is flaky, make it deterministic or rerun.",
+      "root_cause": "sw-cost-test.sh 'context efficiency' assertions fail because the cost dashboard reports 'No cost entries in the last 30 days' and exits before rendering the CONTEXT EFFICIENCY section from the seeded loop.context_efficiency events (test events/timestamps are not seen, or the section is skipped when costs.json is empty).",
+      "fix": "In sw-cost-test.sh, seed at least one cost entry (and events with current timestamps in the events file the script reads) before running the dashboard, or change sw-cost.sh to render the CONTEXT EFFICIENCY section even when there are no cost entries.",
       "seen_count": 1,
       "last_seen": "2026-10-05T14:43:29Z",
-      "category": "flaky"
+      "category": "test_failure"
+    },
+    {
+      "stage": "test",
+      "pattern": "\u001b[38;2;0;212;255m▸\u001b[0m Progress detects repeated error loop... \u001b[38;2;74;222;128m✓\u001b[0m",
+      "root_cause": "sw-self-optimize-test 'Memory promotion copies cross-repo patterns' fails (15/16 passed); the test likely depends on the real ~/.shipwright memory dir or repo-hash state not isolated in the temp test environment, so promotion doesn't copy patterns.",
+      "fix": "Isolate the test's HOME/memory dir (as done for sw-recruit-test) and verify the promotion function's source/destination paths and seeded cross-repo pattern fixtures in sw-self-optimize-test.sh.",
+      "seen_count": 1,
+      "last_seen": "2026-10-05T17:18:58Z",
+      "category": "test_failure"
     }
   ]
 }
