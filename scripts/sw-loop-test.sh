@@ -563,7 +563,7 @@ exit 0
 CLAUDE_EOF
     chmod +x "$TEST_TEMP_DIR/bin/claude"
 
-    output=$(env PATH="$TEST_TEMP_DIR/bin:/usr/local/bin:/usr/bin:/bin" HOME="$TEST_TEMP_DIR/home" NO_GITHUB=true \
+    output=$(timeout 10 env PATH="$TEST_TEMP_DIR/bin:/usr/local/bin:/usr/bin:/bin" HOME="$TEST_TEMP_DIR/home" NO_GITHUB=true \
         bash "$SCRIPT_DIR/sw-loop.sh" \
         --repo "$TEST_TEMP_DIR/repo" \
         "Do nothing" \
@@ -601,7 +601,7 @@ exit 0
 CLAUDE_EOF
     chmod +x "$TEST_TEMP_DIR/bin/claude"
 
-    output=$(env PATH="$TEST_TEMP_DIR/bin:/usr/local/bin:/usr/bin:/bin" HOME="$TEST_TEMP_DIR/home" NO_GITHUB=true \
+    output=$(timeout 10 env PATH="$TEST_TEMP_DIR/bin:/usr/local/bin:/usr/bin:/bin" HOME="$TEST_TEMP_DIR/home" NO_GITHUB=true \
         bash "$SCRIPT_DIR/sw-loop.sh" \
         --repo "$TEST_TEMP_DIR/repo" \
         "Add iter2.txt" \
@@ -636,7 +636,7 @@ exit 0
 CLAUDE_EOF
     chmod +x "$TEST_TEMP_DIR/bin/claude"
 
-    output=$(env PATH="$TEST_TEMP_DIR/bin:/usr/local/bin:/usr/bin:/bin" HOME="$TEST_TEMP_DIR/home" NO_GITHUB=true \
+    output=$(timeout 10 env PATH="$TEST_TEMP_DIR/bin:/usr/local/bin:/usr/bin:/bin" HOME="$TEST_TEMP_DIR/home" NO_GITHUB=true \
         bash "$SCRIPT_DIR/sw-loop.sh" \
         --repo "$TEST_TEMP_DIR/repo" \
         "Never finish" \
@@ -668,7 +668,7 @@ exit 0
 CLAUDE_EOF
     chmod +x "$TEST_TEMP_DIR/bin/claude"
 
-    output=$(env PATH="$TEST_TEMP_DIR/bin:/usr/local/bin:/usr/bin:/bin" HOME="$TEST_TEMP_DIR/home" NO_GITHUB=true \
+    output=$(timeout 20 env PATH="$TEST_TEMP_DIR/bin:/usr/local/bin:/usr/bin:/bin" HOME="$TEST_TEMP_DIR/home" NO_GITHUB=true \
         bash "$SCRIPT_DIR/sw-loop.sh" \
         --repo "$TEST_TEMP_DIR/repo" \
         "Fix something" \
@@ -705,7 +705,7 @@ echo '"'"'[{"type":"result","result":"Done","usage":{"input_tokens":0,"output_to
 exit 0' > "$TEST_TEMP_DIR/bin/claude"
     chmod +x "$TEST_TEMP_DIR/bin/claude"
 
-    output=$(env PATH="$TEST_TEMP_DIR/bin:/usr/local/bin:/usr/bin:/bin" HOME="$TEST_TEMP_DIR/home" NO_GITHUB=true \
+    output=$(timeout 10 env PATH="$TEST_TEMP_DIR/bin:/usr/local/bin:/usr/bin:/bin" HOME="$TEST_TEMP_DIR/home" NO_GITHUB=true \
         bash "$SCRIPT_DIR/sw-loop.sh" \
         --repo "$TEST_TEMP_DIR/repo" \
         "Do nothing" \
@@ -762,7 +762,7 @@ exit 0
 CLAUDE_EOF
     chmod +x "$TEST_TEMP_DIR/bin/claude"
 
-    output=$(env PATH="$TEST_TEMP_DIR/bin:/usr/local/bin:/usr/bin:/bin" HOME="$TEST_TEMP_DIR/home" NO_GITHUB=true \
+    output=$(timeout 10 env PATH="$TEST_TEMP_DIR/bin:/usr/local/bin:/usr/bin:/bin" HOME="$TEST_TEMP_DIR/home" NO_GITHUB=true \
         bash "$SCRIPT_DIR/sw-loop.sh" \
         --repo "$TEST_TEMP_DIR/repo" \
         "Add progress.txt" \

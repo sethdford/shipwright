@@ -1598,33 +1598,33 @@
       "result": {
         "results": [
           {
-            "file": "retry-outcomes.json",
-            "relevance": 90,
-            "summary": "Directly applicable to build stage: contains build_failure class with model_escalation strategy showing 100% success rate across 5 attempts, exact recovery pattern for build failures"
-          },
-          {
             "file": "success-patterns.json",
-            "relevance": 85,
-            "summary": "Shows two successful build patterns (bug fix complexity 60, auth feature complexity 65) with file patterns, test strategies, iterations, and duration benchmarks applicable to similar goals"
+            "relevance": 95,
+            "summary": "Contains successful build patterns with iterations, test strategies, file changes, templates, and commit patterns from past 'Fix bug' and 'Add authentication feature' builds—directly applicable approach templates"
           },
           {
             "file": "patterns.json",
-            "relevance": 83,
-            "summary": "Project conventions essential for build: test_runner=vitest, package_manager=npm, test_pattern=*.test.js, import_style=commonjs; defines build environment baseline"
+            "relevance": 90,
+            "summary": "Project metadata (node type, vitest test runner, npm package manager, commonjs imports) establishes baseline build environment and conventions"
           },
           {
-            "file": "failures.json",
-            "relevance": 82,
-            "summary": "Multiple test failures (sw-cost-test, sw-intent-analysis-test, sw-e2e-integration-test) with root causes and fixes; test failures directly impact build validation and iteration decisions"
+            "file": "retry-outcomes.json",
+            "relevance": 85,
+            "summary": "Documents build_failure retry strategy with model escalation approach (100% success rate on 5 attempts)—relevant for handling build failures"
           },
           {
             "file": "flaky-tests.json",
-            "relevance": 78,
-            "summary": "Documents flaky tests (test-1, test-auth) with 85-90% confidence and error signatures; identifies build reliability issues that require retry or test isolation strategies"
+            "relevance": 70,
+            "summary": "Identifies flaky tests (test-1, test-auth with 85-90% confidence) that affect build validation and may need special handling during test phase"
+          },
+          {
+            "file": "knowledge.json",
+            "relevance": 65,
+            "summary": "Knowledge base captures test-related failures (mktemp directory issues, sw-cleanup output, regression JSON validation) that can surface during build validation"
           }
         ]
       },
-      "timestamp": 1791197616,
+      "timestamp": 1791199966,
       "ttl": 1800
     },
     "82884b010f1379485257cd91f828ebdc": {
@@ -2632,6 +2632,132 @@
         }
       ],
       "timestamp": 1791199689,
+      "ttl": 1800
+    },
+    "0af802c7ebf9f77330c7a461deeec808": {
+      "result": {
+        "raw_response": "Mock claude: ok"
+      },
+      "timestamp": 1791200054,
+      "ttl": 1800
+    },
+    "db365eb0b95878b8969d1e29d7c7c38e": {
+      "result": {
+        "raw_response": "Mock claude: ok"
+      },
+      "timestamp": 1791200107,
+      "ttl": 1800
+    },
+    "20afcf937414ae47a67b6bad9124d500": {
+      "result": {
+        "raw_response": "Mock claude: ok"
+      },
+      "timestamp": 1791200197,
+      "ttl": 1800
+    },
+    "38fa857911a4c5280d42cb373fa573bb": {
+      "result": [
+        {
+          "type": "result",
+          "result": "I am trying the same approach again.",
+          "usage": {
+            "input_tokens": 0,
+            "output_tokens": 0
+          }
+        }
+      ],
+      "timestamp": 1791200386,
+      "ttl": 1800
+    },
+    "6dac63feb2d3319ef8121d923135fa45": {
+      "result": [
+        {
+          "type": "result",
+          "result": "I am trying the same approach again.",
+          "usage": {
+            "input_tokens": 0,
+            "output_tokens": 0
+          }
+        }
+      ],
+      "timestamp": 1791200533,
+      "ttl": 1800
+    },
+    "b8ff61d28cdc14cd6441cd32f423468e": {
+      "result": [
+        {
+          "type": "result",
+          "result": "I am trying the same approach again.",
+          "usage": {
+            "input_tokens": 0,
+            "output_tokens": 0
+          }
+        }
+      ],
+      "timestamp": 1791200766,
+      "ttl": 1800
+    },
+    "00c3cbbd171e4d53311036e5872cef6d": {
+      "result": [
+        {
+          "type": "result",
+          "result": "I am trying the same approach again.",
+          "usage": {
+            "input_tokens": 0,
+            "output_tokens": 0
+          }
+        }
+      ],
+      "timestamp": 1791200820,
+      "ttl": 1800
+    },
+    "d6a1868089221d771b411a5c7d49d36b": {
+      "result": [
+        {
+          "type": "result",
+          "result": "I am trying the same approach again.",
+          "usage": {
+            "input_tokens": 0,
+            "output_tokens": 0
+          }
+        }
+      ],
+      "timestamp": 1791200852,
+      "ttl": 1800
+    },
+    "69639a8fd5e756973503289463435346": {
+      "result": [
+        {
+          "type": "result",
+          "result": "I am trying the same approach again.",
+          "usage": {
+            "input_tokens": 0,
+            "output_tokens": 0
+          }
+        }
+      ],
+      "timestamp": 1791200906,
+      "ttl": 1800
+    },
+    "1034e9131b55caeda3acf09f8208cce9": {
+      "result": {
+        "raw_response": "Mock claude: ok"
+      },
+      "timestamp": 1791200986,
+      "ttl": 1800
+    },
+    "ca8c6bfb79b7716a9f06bc6856f42223": {
+      "result": [
+        {
+          "type": "result",
+          "result": "I am trying the same approach again.",
+          "usage": {
+            "input_tokens": 0,
+            "output_tokens": 0
+          }
+        }
+      ],
+      "timestamp": 1791201083,
       "ttl": 1800
     }
   }
