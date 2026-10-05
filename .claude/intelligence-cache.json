@@ -1665,31 +1665,31 @@
           {
             "file": "retry-outcomes.json",
             "relevance": 95,
-            "summary": "Tracks build failure recovery with model escalation strategy showing 100% success rate (5/5) — directly applicable when build stage encounters failures"
+            "summary": "Build failure recovery strategy with 100% success rate using model escalation — directly applicable to handling build stage failures"
           },
           {
             "file": "success-patterns.json",
             "relevance": 90,
-            "summary": "Historical successful build patterns showing loop iterations, file changes, test strategies, and costs — provides proven approaches for fixing bugs and features with similar complexity"
+            "summary": "Two proven success patterns for bug fixes and features showing iterations, test strategies, file patterns, and cost — provides build approach templates"
+          },
+          {
+            "file": "metrics.json",
+            "relevance": 85,
+            "summary": "Build duration baseline (7095s) and test duration (1459s) — establishes performance expectations for the build stage"
+          },
+          {
+            "file": "patterns.json",
+            "relevance": 80,
+            "summary": "Project conventions including test_runner (vitest), test_pattern (*.test.js), and language (javascript) — defines build environment requirements"
           },
           {
             "file": "flaky-tests.json",
-            "relevance": 85,
-            "summary": "Identifies flaky tests (test-1 at 85% confidence, test-auth at 90%) that block builds — essential to know which tests may require retries or investigation"
-          },
-          {
-            "file": "failures.json",
-            "relevance": 80,
-            "summary": "Recent test stage failures (sw-cost-test, sw-pipeline-test, sw-e2e-integration-test) with root causes and fixes — informs build approach to avoid same failures"
-          },
-          {
-            "file": "knowledge.json",
             "relevance": 75,
-            "summary": "Common failure signatures (mktemp directory issues, missing cleanup output, JSON parsing errors) with fix strategies — prevents build setup and test execution failures"
+            "summary": "Flaky test detection for test-1 (85% confidence) and test-auth (90% confidence) — identifies test reliability issues impacting build verification"
           }
         ]
       },
-      "timestamp": 1791189807,
+      "timestamp": 1791191871,
       "ttl": 1800
     },
     "43802e3c13334fdb1de225451784f6d1": {
@@ -2167,6 +2167,20 @@
         }
       ],
       "timestamp": 1791191498,
+      "ttl": 1800
+    },
+    "09230bdd2ad0b241dc124f0bff21cdb9": {
+      "result": {
+        "raw_response": "Mock claude: ok"
+      },
+      "timestamp": 1791191945,
+      "ttl": 1800
+    },
+    "4a1f8ac567842131a492f731d4225c50": {
+      "result": {
+        "raw_response": "Mock claude: ok"
+      },
+      "timestamp": 1791192048,
       "ttl": 1800
     }
   }
