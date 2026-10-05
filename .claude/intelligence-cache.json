@@ -1600,32 +1600,32 @@
         "results": [
           {
             "file": "retry-outcomes.json",
-            "relevance": 95,
-            "summary": "Tracks build failure retry strategies and their success rates (100% success with model escalation); directly applicable to build stage recovery logic"
-          },
-          {
-            "file": "flaky-tests.json",
-            "relevance": 92,
-            "summary": "Identifies flaky tests (test-1: 85% confidence, test-auth: 90% confidence with connection timeouts) that will likely fail during build iterations"
+            "relevance": 90,
+            "summary": "Directly applicable to build stage: contains build_failure class with model_escalation strategy showing 100% success rate across 5 attempts, exact recovery pattern for build failures"
           },
           {
             "file": "success-patterns.json",
-            "relevance": 88,
-            "summary": "Captures successful bug fix and feature approaches including iteration counts (3 iterations), test strategies (npm test), file patterns, and typical duration (45-150s); directly guides build stage approach"
+            "relevance": 85,
+            "summary": "Shows two successful build patterns (bug fix complexity 60, auth feature complexity 65) with file patterns, test strategies, iterations, and duration benchmarks applicable to similar goals"
+          },
+          {
+            "file": "patterns.json",
+            "relevance": 83,
+            "summary": "Project conventions essential for build: test_runner=vitest, package_manager=npm, test_pattern=*.test.js, import_style=commonjs; defines build environment baseline"
           },
           {
             "file": "failures.json",
-            "relevance": 86,
-            "summary": "Recent test failures with root causes (sw-cost-test dashboard, sw-e2e-integration-test timeouts, sw-intent-analysis-test schema issues) and fixes applicable to current build stage"
+            "relevance": 82,
+            "summary": "Multiple test failures (sw-cost-test, sw-intent-analysis-test, sw-e2e-integration-test) with root causes and fixes; test failures directly impact build validation and iteration decisions"
           },
           {
-            "file": "metrics.json",
-            "relevance": 76,
-            "summary": "Baseline build duration (118 min) and test duration (24 min) establish performance expectations to detect anomalies in build stage execution"
+            "file": "flaky-tests.json",
+            "relevance": 78,
+            "summary": "Documents flaky tests (test-1, test-auth) with 85-90% confidence and error signatures; identifies build reliability issues that require retry or test isolation strategies"
           }
         ]
       },
-      "timestamp": 1791195471,
+      "timestamp": 1791197616,
       "ttl": 1800
     },
     "82884b010f1379485257cd91f828ebdc": {
@@ -2514,6 +2514,69 @@
         }
       ],
       "timestamp": 1791197236,
+      "ttl": 1800
+    },
+    "b1c5a6167408d3f487b1c6d49d63a336": {
+      "result": {
+        "raw_response": "Mock claude: ok"
+      },
+      "timestamp": 1791197703,
+      "ttl": 1800
+    },
+    "9c9ebf142f749701d694086726258b5e": {
+      "result": {
+        "raw_response": "Mock claude: ok"
+      },
+      "timestamp": 1791197854,
+      "ttl": 1800
+    },
+    "cc11918dc7fa053b8bb908c9b1f399b6": {
+      "result": [
+        {
+          "type": "result",
+          "result": "I am trying the same approach again.",
+          "usage": {
+            "input_tokens": 0,
+            "output_tokens": 0
+          }
+        }
+      ],
+      "timestamp": 1791197953,
+      "ttl": 1800
+    },
+    "82a8d87eda499a376f5a0abef0a424f0": {
+      "result": [
+        {
+          "type": "result",
+          "result": "I am trying the same approach again.",
+          "usage": {
+            "input_tokens": 0,
+            "output_tokens": 0
+          }
+        }
+      ],
+      "timestamp": 1791197973,
+      "ttl": 1800
+    },
+    "12c27fa56280b79174108942909bf5e5": {
+      "result": {
+        "raw_response": "Mock claude: ok"
+      },
+      "timestamp": 1791198088,
+      "ttl": 1800
+    },
+    "ce9467bbee7d883feea7ab5148e5b31c": {
+      "result": [
+        {
+          "type": "result",
+          "result": "I am trying the same approach again.",
+          "usage": {
+            "input_tokens": 0,
+            "output_tokens": 0
+          }
+        }
+      ],
+      "timestamp": 1791198110,
       "ttl": 1800
     }
   }
