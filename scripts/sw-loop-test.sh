@@ -572,9 +572,9 @@ CLAUDE_EOF
         --local \
         2>&1) || true
 
-    if echo "$output" | grep -qF "LOOP_COMPLETE"; then
+    if grep -qF "LOOP_COMPLETE" <<< "$output"; then
         assert_pass "Loop detected completion signal"
-    elif echo "$output" | grep -qi "complete.*LOOP_COMPLETE\|LOOP_COMPLETE.*accepted"; then
+    elif grep -qi "complete.*LOOP_COMPLETE\|LOOP_COMPLETE.*accepted" <<< "$output"; then
         assert_pass "Loop detected completion signal"
     else
         assert_fail "Loop detected completion signal" "output missing LOOP_COMPLETE"
@@ -610,11 +610,11 @@ CLAUDE_EOF
         --local \
         2>&1) || true
 
-    if echo "$output" | grep -qE "Iteration [2-9]|iteration [2-9]"; then
+    if grep -qE "Iteration [2-9]|iteration [2-9]" <<< "$output"; then
         assert_pass "Loop runs multiple iterations when tests fail initially"
-    elif echo "$output" | grep -q "LOOP_COMPLETE"; then
+    elif grep -q "LOOP_COMPLETE" <<< "$output"; then
         assert_pass "Loop runs multiple iterations and completes"
-    elif echo "$output" | grep -qi "circuit breaker\|max iteration"; then
+    elif grep -qi "circuit breaker\|max iteration" <<< "$output"; then
         assert_pass "Loop iterates (stopped by limit)"
     else
         assert_fail "Loop iterates on test failure" "expected multiple iterations"
@@ -646,7 +646,7 @@ CLAUDE_EOF
         --no-auto-extend \
         2>&1) || true
 
-    if echo "$output" | grep -qiE "max iteration|iteration.*3|Max iterations"; then
+    if grep -qiE "max iteration|iteration.*3|Max iterations" <<< "$output"; then
         assert_pass "Loop stops at max iterations"
     else
         assert_fail "Loop respects max-iterations" "expected iteration limit message"
@@ -678,14 +678,12 @@ CLAUDE_EOF
         --no-auto-extend \
         2>&1) || true
 
-    if echo "$output" | grep -qi "stuckness\|stuck"; then
-        assert_pass "Loop detects stuckness"
-    elif echo "$output" | grep -qi "circuit breaker"; then
-        assert_pass "Loop circuit breaker triggered (stuckness-related)"
-    elif echo "$output" | grep -qi "max iteration"; then
-        assert_pass "Loop stops at limit (stuckness test)"
+    # No code change + same failing test every iteration is a flatline, and
+    # the summary must say so rather than just "max iterations".
+    if grep -qE "Exit class:[[:space:]]+flatline" <<< "$output"; then
+        assert_pass "Loop classifies repeated no-progress iterations as flatline"
     else
-        assert_fail "Loop stuckness detection" "expected stuckness or circuit breaker"
+        assert_fail "Loop stuckness detection" "expected 'Exit class: flatline' in summary"
     fi
 else
     assert_fail "Loop stuckness detection" "setup failed"
@@ -716,7 +714,7 @@ exit 0' > "$TEST_TEMP_DIR/bin/claude"
         --local \
         2>&1) || true
 
-    if echo "$output" | grep -qiE "budget exhausted|Budget exhausted|LOOP BUDGET_EXHAUSTED"; then
+    if grep -qiE "budget exhausted|Budget exhausted|LOOP BUDGET_EXHAUSTED" <<< "$output"; then
         assert_pass "Budget gate stops loop"
     else
         assert_fail "Budget gate stops loop" "expected budget exhausted message"
@@ -773,7 +771,7 @@ CLAUDE_EOF
         --local \
         2>&1) || true
 
-    if echo "$output" | grep -qiE "Git:|progress|insertion|LOOP_COMPLETE"; then
+    if grep -qiE "Git:|progress|insertion|LOOP_COMPLETE" <<< "$output"; then
         assert_pass "Loop tracks progress via git"
     else
         assert_fail "Loop progress tracking" "expected git/progress output"
@@ -835,7 +833,7 @@ fi
 
 # Test: --help mentions --additional-test-cmds
 output=$(bash "$SCRIPT_DIR/sw-loop.sh" --help 2>&1 | sed $'s/\033\[[0-9;]*m//g') && rc=0 || rc=$?
-if echo "$output" | grep -q 'additional-test-cmds'; then
+if grep -q 'additional-test-cmds' <<< "$output"; then
     assert_pass "--help documents --additional-test-cmds"
 else
     assert_fail "--help documents --additional-test-cmds"
