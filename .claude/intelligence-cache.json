@@ -30,17 +30,18 @@
     },
     "d41d8cd98f00b204e9800998ecf8427e": {
       "result": {
-        "primary_role": "builder",
+        "primary_role": "architect",
         "secondary_roles": [
+          "builder",
           "tester",
           "reviewer"
         ],
-        "confidence": 0.95,
-        "reasoning": "Bug fix requiring debugging JSON parsing logic, implementing improved error messaging, and testing edge cases (object vs array output). Builder handles implementation; tester validates the fix; reviewer ensures accuracy.",
+        "confidence": 0.85,
+        "reasoning": "Modularization requires upfront architectural design of interfaces and responsibilities; architect leads design phase, builder implements, tester validates.",
         "new_role_needed": false,
         "suggested_role": null
       },
-      "timestamp": 1775316059,
+      "timestamp": 1791183959,
       "ttl": 3600
     },
     "efd5524ad1244fd20344bf3ff5d95233": {
@@ -1401,6 +1402,325 @@
       },
       "timestamp": 1775344537,
       "ttl": 3600
+    },
+    "7d8c55303a6494468bdc7f88bb84c6e2": {
+      "result": {
+        "complexity": 6,
+        "risk_level": "medium",
+        "success_probability": 75,
+        "recommended_template": "standard",
+        "issue_type": "refactor",
+        "key_risks": [
+          "Breaking backward compatibility of shipwright memory commands",
+          "Integration failures between split modules due to function dependencies",
+          "Source/loading order issues causing failures in module initialization",
+          "Bash 3.2 compatibility regressions in refactored code",
+          "Test coverage gaps if module boundaries not cleanly separated"
+        ],
+        "implementation_hints": [
+          "Reference sw-loop.sh decomposition (#7525) as proven pattern for splitting monolithic scripts",
+          "Map existing memory.sh functions into three clean groups: capture (failure writing), query (lookup/injection), aggregate (cross-pipeline stats)",
+          "Keep CLI dispatcher (sw-memory.sh) thin - only route to appropriate module based on subcommand",
+          "Use consistent source loading pattern across modules: source \"${SCRIPT_DIR}/sw-memory-*.sh\" before function calls",
+          "Run full sw-memory-test.sh suite against each module independently before integration to validate module isolation",
+          "Validate Bash 3.2 compatibility: test with 'bash --version' on systems running 3.2, no associative arrays or readarray"
+        ]
+      },
+      "timestamp": 1791183411,
+      "ttl": 3600
+    },
+    "cdd3e80041b47d65a37c905ddb62bf36": {
+      "result": {
+        "estimated_iterations": 4
+      },
+      "timestamp": 1791183420,
+      "ttl": 1800
+    },
+    "1d35a39cd176521a5d7e299426283f63": {
+      "result": {
+        "estimated_cost_usd": 13.50,
+        "estimated_iterations": 4,
+        "estimated_tokens": 90000,
+        "likely_failure_stage": "test",
+        "confidence": 70
+      },
+      "timestamp": 1791183438,
+      "ttl": 3600
+    },
+    "db8cc61f978be00a6c0257985a50fb51": {
+      "result": {
+        "issue_type": "refactor",
+        "confidence": 0.88,
+        "secondary_domains": [
+          "infrastructure",
+          "platform-health"
+        ],
+        "complexity_assessment": {
+          "score": 6,
+          "reasoning": "Structured refactoring with clear acceptance criteria; challenge is preserving all existing behavior and CLI semantics while splitting 2241 lines into focused modules. Validated pattern from sw-loop.sh split reduces risk."
+        },
+        "skill_plan": {
+          "plan": [
+            "architecture-design",
+            "bash-script-modularization"
+          ],
+          "design": [
+            "architecture-design",
+            "testing-strategy"
+          ],
+          "build": [
+            "bash-script-modularization"
+          ],
+          "review": [
+            "adversarial-quality",
+            "two-stage-review"
+          ],
+          "compound_quality": [
+            "validation-thoroughness",
+            "testing-strategy"
+          ],
+          "pr": [
+            "pr-quality"
+          ],
+          "deploy": [],
+          "validate": [],
+          "monitor": []
+        },
+        "skill_rationale": {
+          "architecture-design": "Define module boundaries (capture writes patterns, query reads/injects, aggregate computes stats) and their interfaces; create ADR documenting the split rationale and how submodules interact—critical for maintainability given this is part of AGI-readiness platform hygiene.",
+          "bash-script-modularization": "Refactoring a 2241-line bash script into 3 ~800-line modules while preserving backwards compatibility requires systematic patterns: shared function extraction, test harness updates, and CLI dispatcher design—this skill encodes lessons from sw-loop.sh decomposition.",
+          "testing-strategy": "Design test harness changes so sw-memory-test.sh passes unmodified except for sourcing updates; plan cross-module integration testing to catch failures at split boundaries.",
+          "adversarial-quality": "Imagine ways the CLI dispatcher could route commands incorrectly, how shared state could corrupt between modules, and edge cases where the old monolithic behavior masked module interaction bugs that now surface.",
+          "two-stage-review": "Pass 1: Verify the split structure and CLI dispatcher correctness. Pass 2: Confirm all existing `shipwright memory` commands work identically and test coverage is complete.",
+          "validation-thoroughness": "Benchmark memory lookup performance before/after split, test with real failure pattern data, verify no silent data loss or corruption in pattern aggregation across module boundaries.",
+          "pr-quality": "PR must clearly map old functions to new modules, show the CLI dispatcher design, and demonstrate test suite passes unchanged—reviewers need to understand the split rationale in 5 minutes."
+        },
+        "generated_skills": [
+          {
+            "name": "bash-script-modularization",
+            "reason": "No existing skill covers the specific pattern of splitting large bash scripts (2000+ lines) into focused modules while preserving backwards-compatible CLI behavior and Bash 3.2 compatibility—this is a core platform refactoring pattern being validated across multiple scripts (sw-loop.sh, now sw-memory.sh).",
+            "content": "## Bash Script Modularization: Splitting Monoliths into Focused Modules\n\nWhen decomposing large bash scripts (1500+ lines), follow this pattern used successfully in sw-loop.sh:\n\n### 1. Module Boundaries\n- **Identify cohesive responsibilities**: Group related functions (e.g., pattern capture logic, query/lookup logic, aggregation/stats logic)\n- **Minimize cross-module dependencies**: Each module should own its data and transformations; prefer passing JSON/stdout over shared state\n- **Keep CLI dispatcher thin**: The parent script routes commands to submodules; logic stays in the modules, not the dispatcher\n\n### 2. Shared State & Functions\n- **Extract common utilities early**: Logging, JSON parsing, file operations go to a `lib/` directory sourced by all modules\n- **Namespace function names**: Prefix functions by module (`memory_capture_*`, `memory_query_*`) to avoid collisions when all are sourced\n- **Avoid global state**: Use function arguments and return values; globals are hard to trace across modules\n\n### 3. Bash 3.2 Compatibility (Hard Constraint)\n- **No associative arrays** (`declare -A`) — use flat JSON or multiple parallel arrays if needed\n- **No `readarray`** — use `while read` loops\n- **No parameter expansion** like `${var,,}` (lowercase) — use `tr '[A-Z]' '[a-z]'`\n- **Test on bash 3.2**: CI should verify `bash --version` reports 3.2.x compatibility\n\n### 4. Test Harness Updates\n- **Keep test structure**: Old test suite should pass with minimal changes (sourcing updates only)\n- **Source new modules**: Instead of sourcing monolith, source CLI dispatcher which sources submodules\n- **Test module boundaries**: Add tests that verify each module works in isolation (unit tests) and together (integration tests)\n- **Mock cross-module calls**: When testing one module, mock its dependencies on others to isolate failures\n\n### 5. CLI Dispatcher Pattern\n```bash\n#!/usr/bin/env bash\nset -euo pipefail\nVERSION=<from-parent>\n\nsource \"$(dirname \"$0\")/lib/memory-common.sh\"  # Shared utilities\nsource \"$(dirname \"$0\")/sw-memory-capture.sh\"  # Capture module\nsource \"$(dirname \"$0\")/sw-memory-query.sh\"    # Query module\nsource \"$(dirname \"$0\")/sw-memory-aggregate.sh\" # Aggregate module\n\ncase \"$1\" in\n  capture)    memory_capture_\"${2:-}\" \"${@:3}\" ;;\n  query)      memory_query_\"${2:-}\" \"${@:3}\" ;;\n  aggregate)  memory_aggregate_\"${2:-}\" \"${@:3}\" ;;\n  show)       memory_query_show \"${@:2}\" ;;  # Backwards compat\n  *)          echo \"Unknown command: $1\" >&2; exit 1 ;;\nesac\n```\n\n### 6. Version & Documentation\n- **Keep VERSION in dispatcher**: Single source of truth for `shipwright memory --version`\n- **Update CLAUDE.md**: Document the new module structure and responsibilities in the Architecture section\n- **Preserve command help**: `shipwright memory --help` must list all subcommands; delegate to modules if needed\n\n### 7. Performance & Debugging\n- **Lazy loading** (if performance-critical): Source modules only when their commands are invoked\n- **Trace mode**: Add `SW_TRACE=1 shipwright memory ...` to see which module executed which function\n- **Benchmarks**: Compare memory lookup/aggregation speed before/after split; if slower, profile and optimize at module boundaries\n\n### 8. Common Pitfalls\n- **Circular sourcing**: Module A sources Module B sources Module A → sourcing loop. Use explicit exports or a lib file only.\n- **Subshell bugs**: `cmd | while read` in a module runs in a subshell; variables modified in the loop are lost. Use `while read; done < <(cmd)`.\n- **Atomic file writes**: If modules write shared state (e.g., pattern files), use atomic writes (tmp file + mv) to avoid corruption.\n- **Test isolation**: If tests modify shared files (memory patterns), clean them up after each test so modules don't interfere.\n\n### Validation Checklist\n- All `shipwright memory <cmd>` routes correctly to the right module\n- Existing test suite passes (sw-memory-test.sh) with only sourcing changes\n- No module exceeds 800 lines (excluding tests and comments)\n- Bash 3.2 compatibility verified (no modern syntax)\n- Performance regression < 5% on typical operations (lookup, aggregation)\n- Module interfaces documented (function signatures, expected inputs/outputs)"
+          }
+        ],
+        "review_focus": [
+          "CLI dispatcher routes all `shipwright memory` commands to correct submodules without logic duplication",
+          "Module boundaries are clean: capture owns write paths, query owns lookup/injection, aggregate owns stats computation",
+          "Bash 3.2 compatibility verified: no associative arrays, no readarray, no parameter expansion shortcuts",
+          "Cross-module dependencies minimal and explicit; shared state (pattern files) accessed atomically",
+          "Test harness updated to source new modules; sw-memory-test.sh passes unmodified except sourcing",
+          "No performance regression in memory pattern lookup or aggregation operations",
+          "Version string centralized in dispatcher; help text lists all subcommands"
+        ],
+        "risk_areas": [
+          "CLI dispatcher bugs routing commands to wrong module or failing to route internal aliases (e.g., 'show' -> 'query show')",
+          "Circular sourcing or missing dependencies between modules causing initialization failures",
+          "Bash 3.2 incompatibility introduced during refactoring (e.g., modern syntax in extracted functions)",
+          "Test harness unable to mock module dependencies, leading to brittle cross-module tests",
+          "Atomicity loss if multiple modules write to shared pattern files concurrently; data corruption in edge cases",
+          "Silent behavior change in edge cases (e.g., pattern matching order, aggregation tie-breaking) discovered only after deployment"
+        ]
+      },
+      "timestamp": 1791183508,
+      "ttl": 3600
+    },
+    "050dfa9266c0842655292690dd815166": {
+      "result": {
+        "results": [
+          {
+            "file": "fleet-shared-patterns.json",
+            "relevance": 85,
+            "summary": "Shows pattern aggregation structure across repos with signatures, stages, fixes, contributions, and metadata—directly relevant to pattern-aggregation module design"
+          },
+          {
+            "file": "fleet-knowledge.json",
+            "relevance": 80,
+            "summary": "Demonstrates query/aggregation metrics (publishes, queries, matches, injections, time saved)—essential for understanding query module requirements and outcomes tracking"
+          },
+          {
+            "file": "index.json",
+            "relevance": 75,
+            "summary": "Illustrates pattern indexing by signature, stage, and type with fix metadata—informs query module's pattern lookup and filtering capabilities"
+          },
+          {
+            "file": "success-patterns.json",
+            "relevance": 70,
+            "summary": "Shows captured pattern structure (goal, complexity, iterations, files changed, stages, test strategy, cost)—defines what capture module must persist and query module must retrieve"
+          },
+          {
+            "file": "failures.json",
+            "relevance": 65,
+            "summary": "Contains failure pattern structures with root causes, fixes, and resolution tracking—informs capture module's failure pattern schema and aggregation requirements"
+          }
+        ]
+      },
+      "timestamp": 1791183561,
+      "ttl": 1800
+    },
+    "8b58f508436f2cd68dba5c3580cffbe3": {
+      "result": {
+        "results": [
+          {
+            "file": "failures.json",
+            "relevance": 72,
+            "summary": "Contains resolved timeout and unresolved database connection failures. Timeout patterns are relevant to debugging why plan validation failed during sw-memory.sh refactoring."
+          },
+          {
+            "file": "fleet-shared-patterns.json",
+            "relevance": 68,
+            "summary": "Tracks cross-repo 'Cannot find module' errors in build/test stages. Directly relevant to module splitting refactoring where import paths may break during the capture/query/pattern-aggregation split."
+          },
+          {
+            "file": "index.json",
+            "relevance": 58,
+            "summary": "Contains test_failure pattern signatures with build stage fixes (timeout handling). Generic but relevant to understanding failure categories that could trigger plan validation rejection."
+          }
+        ]
+      },
+      "timestamp": 1791183723,
+      "ttl": 1800
+    },
+    "2b016744bc1d14b79cb37ddb008420ac": {
+      "result": {
+        "results": [
+          {
+            "file": "failures.json",
+            "relevance": 95,
+            "summary": "Contains resolved and unresolved failure patterns with root causes and fixes (timeouts, database issues). Essential for understanding what pattern-capture module needs to handle."
+          },
+          {
+            "file": "fleet-shared-patterns.json",
+            "relevance": 90,
+            "summary": "Shows aggregated fleet-wide pattern structure with signature_hash, contribution tracking, seen_count, and temporal metadata. Directly informs pattern-aggregation module output design."
+          },
+          {
+            "file": "index.json",
+            "relevance": 85,
+            "summary": "Demonstrates pattern indexing schema with signature, stage, pattern_type, sources, and fix. Informs design of pattern indexing and querying interfaces."
+          },
+          {
+            "file": "success-patterns.json",
+            "relevance": 75,
+            "summary": "Contains successful patterns from sw-daemon.sh (e.g., 'Fix timeout') showing how patterns are currently structured with goals, iterations, cost, and file impact metadata."
+          },
+          {
+            "file": "fleet-knowledge.json",
+            "relevance": 70,
+            "summary": "Shows fleet knowledge tracking with metrics on injections, queries, and time saved. Indicates system integration points for pattern-aggregation output."
+          }
+        ]
+      },
+      "timestamp": 1791183773,
+      "ttl": 1800
+    },
+    "b13534414da1788ba005092ce392a82a": {
+      "result": {
+        "results": [
+          {
+            "file": "failures.json",
+            "relevance": 62,
+            "summary": "Contains failure patterns with root causes (unbounded loops, connection issues) that inform what anti-patterns to avoid in modularization"
+          },
+          {
+            "file": "fleet-shared-patterns.json",
+            "relevance": 45,
+            "summary": "Tracks patterns seen across multiple repos with fixes; helps identify common anti-patterns across codebases"
+          },
+          {
+            "file": "index.json",
+            "relevance": 38,
+            "summary": "Pattern index with failure signatures and fixes; provides historical context on what approaches have failed"
+          }
+        ]
+      },
+      "timestamp": 1791183786,
+      "ttl": 1800
+    },
+    "5aff3dace0cb47f6f6bdbafc0d3935ca": {
+      "result": {
+        "results": [
+          {
+            "file": "success-patterns.json (test-repo-comptime)",
+            "relevance": 75,
+            "summary": "Multi-stage build pattern with build, test, intake stages; shows realistic completion time (1234s) and cost ($3.75) for script-based work"
+          },
+          {
+            "file": "failures.json",
+            "relevance": 70,
+            "summary": "Contains resolved timeout and unresolved connection failures with root causes and attempted fixes; directly applicable to understanding build failures during refactoring"
+          },
+          {
+            "file": "fleet-shared-patterns.json",
+            "relevance": 65,
+            "summary": "Captures 'Cannot find module' npm error pattern seen in build/test stages; common issue during script refactoring and modularization"
+          },
+          {
+            "file": "success-patterns.json (test-repo-ranking)",
+            "relevance": 60,
+            "summary": "Multiple successful build patterns showing consistent completion metrics and test strategy; provides baseline for build stage execution"
+          },
+          {
+            "file": "index.json",
+            "relevance": 55,
+            "summary": "Contains build stage test failure pattern with documented fix approach; offers generic failure signature matching for common issues"
+          }
+        ]
+      },
+      "timestamp": 1791183934,
+      "ttl": 1800
+    },
+    "47c1451f50b4a8f9faa0f8012f6b922e": {
+      "result": {
+        "results": [
+          {
+            "file": "failures.json",
+            "relevance": 98,
+            "summary": "5 test stage failures from Oct 4-5 with root causes (cost dashboard, pipeline lock, intent analysis schema, timeouts). Directly applicable to current build stage."
+          },
+          {
+            "file": "flaky-tests.json",
+            "relevance": 92,
+            "summary": "2 flaky tests (test-auth 90% confidence, test-1 85% confidence) with error messages and occurrence counts. Critical for build reliability."
+          },
+          {
+            "file": "success-patterns.json",
+            "relevance": 82,
+            "summary": "2 recent successful patterns showing 3-iteration builds, test strategy (npm test), files changed patterns, and cost tracking ($2.50 avg). Blueprints for current work."
+          },
+          {
+            "file": "retry-outcomes.json",
+            "relevance": 76,
+            "summary": "build_failure class with model_escalation strategy at 100% success rate (5/5). Proven recovery technique for build stage."
+          },
+          {
+            "file": "knowledge.json",
+            "relevance": 68,
+            "summary": "4 KB entries on test failures: mktemp path issues (4 occurrences), cleanup dry-run output (2 occurrences), regression detection JSON (2 occurrences). Specific test environment gotchas."
+          }
+        ]
+      },
+      "timestamp": 1791183950,
+      "ttl": 1800
+    },
+    "43802e3c13334fdb1de225451784f6d1": {
+      "result": {
+        "raw_response": "Mock claude: ok"
+      },
+      "timestamp": 1791184043,
+      "ttl": 1800
+    },
+    "fc6586f17659b885c9f955277228a916": {
+      "result": [
+        {
+          "type": "result",
+          "result": "I am trying the same approach again.",
+          "usage": {
+            "input_tokens": 0,
+            "output_tokens": 0
+          }
+        }
+      ],
+      "timestamp": 1791184281,
+      "ttl": 1800
     }
   }
 }
