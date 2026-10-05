@@ -1600,31 +1600,31 @@
           {
             "file": "success-patterns.json",
             "relevance": 95,
-            "summary": "Contains successful build patterns with iterations, test strategies, file changes, templates, and commit patterns from past 'Fix bug' and 'Add authentication feature' builds—directly applicable approach templates"
-          },
-          {
-            "file": "patterns.json",
-            "relevance": 90,
-            "summary": "Project metadata (node type, vitest test runner, npm package manager, commonjs imports) establishes baseline build environment and conventions"
+            "summary": "Contains two successful build patterns showing test strategies (npm test), iterations needed (3), typical file changes, and cost metrics. Directly informs what successful builds look like and validates approach for bug fixes and features."
           },
           {
             "file": "retry-outcomes.json",
-            "relevance": 85,
-            "summary": "Documents build_failure retry strategy with model escalation approach (100% success rate on 5 attempts)—relevant for handling build failures"
+            "relevance": 90,
+            "summary": "Tracks build_failure recovery with model_escalation strategy at 100% success rate (5/5 attempts). Critical for understanding how to recover when build fails with code execution or model issues."
           },
           {
-            "file": "flaky-tests.json",
-            "relevance": 70,
-            "summary": "Identifies flaky tests (test-1, test-auth with 85-90% confidence) that affect build validation and may need special handling during test phase"
+            "file": "metrics.json",
+            "relevance": 80,
+            "summary": "Provides baseline build duration (7095s) and test duration (1459s) expectations. Helps detect anomalies or stalls during build/test execution and set realistic timeouts."
+          },
+          {
+            "file": "failures.json",
+            "relevance": 75,
+            "summary": "6 test stage failure patterns with root causes and fixes, including schema issues, test isolation problems, and flaky tests. Helps anticipate and prevent test failures that occur during build."
           },
           {
             "file": "knowledge.json",
-            "relevance": 65,
-            "summary": "Knowledge base captures test-related failures (mktemp directory issues, sw-cleanup output, regression JSON validation) that can surface during build validation"
+            "relevance": 70,
+            "summary": "4 technical knowledge entries on test failures (mktemp directory issues, sw-cleanup dry-run output, regression detection JSON formatting). Provides specific fixes for common test setup and execution problems."
           }
         ]
       },
-      "timestamp": 1791199966,
+      "timestamp": 1791201787,
       "ttl": 1800
     },
     "82884b010f1379485257cd91f828ebdc": {
@@ -2758,6 +2758,48 @@
         }
       ],
       "timestamp": 1791201083,
+      "ttl": 1800
+    },
+    "2a2c909cb4d9f81016c572a479a90d45": {
+      "result": {
+        "raw_response": "Mock claude: ok"
+      },
+      "timestamp": 1791201441,
+      "ttl": 1800
+    },
+    "34fd263dd625eb867e79c626268b7ff9": {
+      "result": [
+        {
+          "type": "result",
+          "result": "I am trying the same approach again.",
+          "usage": {
+            "input_tokens": 0,
+            "output_tokens": 0
+          }
+        }
+      ],
+      "timestamp": 1791201611,
+      "ttl": 1800
+    },
+    "58c5af3aa8d0cb146cb6689e3e331666": {
+      "result": {
+        "raw_response": "Mock claude: ok"
+      },
+      "timestamp": 1791201835,
+      "ttl": 1800
+    },
+    "dfbc7687fd2fd3a77d58d9137b62a480": {
+      "result": [
+        {
+          "type": "result",
+          "result": "I am trying the same approach again.",
+          "usage": {
+            "input_tokens": 0,
+            "output_tokens": 0
+          }
+        }
+      ],
+      "timestamp": 1791201879,
       "ttl": 1800
     }
   }
