@@ -80,6 +80,7 @@ These settings use the normal config chain (`SHIPWRIGHT_*` env → `.claude/daem
   ```
 
 - **`intake.json`.** Gains a `prebuild_status` field.
+- **Progress comment.** The GitHub progress comment shows an `**Environment:**` line listing the critical and warning ids whenever the status is not `pass`.
 - **Events.** `prebuild_check.completed` (status and the count of each severity) or `prebuild_check.failed` (the critical ids).
 - **Hard-fail marker.** On a hard failure, intake logs `PREBUILD_ENV_ERROR: <ids>` and fails. The daemon classifies this as `environment_error` and does **not** retry it, because a retry can't install a toolchain.
 

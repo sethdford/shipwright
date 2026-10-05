@@ -316,6 +316,20 @@ wait "$pid2" || true
 assert_json_key "concurrent run 1 valid" "$(cat "$TEST_TEMP_DIR/a1/prebuild-check.json")" ".status" "pass"
 assert_json_key "concurrent run 2 valid" "$(cat "$TEST_TEMP_DIR/a2/prebuild-check.json")" ".status" "fail"
 
+# ═══════════════════════════════════════════════════════════════════════════════
+print_test_section "Progress comment line"
+
+source "$SCRIPT_DIR/lib/pipeline-github.sh"
+reset_case
+assert_eq "no artifact → no environment line" "" "$(_gh_prebuild_line)"
+run_check unknown
+assert_eq "pass → no environment line" "" "$(_gh_prebuild_line)"
+export SHIPWRIGHT_PIPELINE_PREBUILD_MODE=warn
+run_check go
+line=$(_gh_prebuild_line)
+assert_contains "warn → environment line" "$line" "**Environment:** ⚠️ prebuild warn"
+assert_contains "warn line lists critical ids" "$line" '`runtime_missing`'
+
 # Bash 3.2 compatibility of the lib itself
 if grep -nE 'declare -A|readarray|mapfile|\$\{[a-zA-Z_]+(,,|\^\^)\}' "$SCRIPT_DIR/lib/prebuild-check.sh" >/dev/null; then
     assert_fail "lib is bash 3.2 compatible"

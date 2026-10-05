@@ -126,6 +126,16 @@ gh_get_issue_meta() {
     _timeout 30 gh issue view "$issue_num" --json title,body,labels,milestone,assignees,comments,number,state 2>/dev/null || true
 }
 
+# _gh_prebuild_line — one markdown line summarizing non-passing prebuild findings (empty otherwise)
+_gh_prebuild_line() {
+    local f="${ARTIFACTS_DIR:-.claude/pipeline-artifacts}/prebuild-check.json"
+    [[ -f "$f" ]] || return 0
+    jq -r 'select(.status != "pass") |
+        "\n**Environment:** \(if .status == "fail" then "❌" else "⚠️" end) prebuild \(.status) — " +
+        ([.findings[] | select(.severity != "info") | "`\(.id)`"] | join(", "))' \
+        "$f" 2>/dev/null || true
+}
+
 # Build a progress table for GitHub comment
 # Usage: gh_build_progress_body
 gh_build_progress_body() {
@@ -135,6 +145,7 @@ gh_build_progress_body() {
     local body="## 🤖 Pipeline Progress — \`${PIPELINE_NAME}\`
 
 **Delivering:** ${escaped_goal}
+$(_gh_prebuild_line)
 
 | Stage | Status | Duration | |
 |-------|--------|----------|-|"
