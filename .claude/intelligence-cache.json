@@ -2333,6 +2333,41 @@
       ],
       "timestamp": 1791168073,
       "ttl": 1800
+    },
+    "a788d6e89a340877526adcbc4957615e": {
+      "result": {
+        "raw_response": "Mock claude: ok"
+      },
+      "timestamp": 1791169328,
+      "ttl": 1800
+    },
+    "b2cd2d3718f1a0a21f29fb3ba1777e64": {
+      "result": [
+        {
+          "type": "result",
+          "result": "I am trying the same approach again.",
+          "usage": {
+            "input_tokens": 0,
+            "output_tokens": 0
+          }
+        }
+      ],
+      "timestamp": 1791169445,
+      "ttl": 1800
+    },
+    "29527f2f11bf9a36ee35aba618bbca34": {
+      "result": [
+        {
+          "type": "result",
+          "result": "I am trying the same approach again.",
+          "usage": {
+            "input_tokens": 0,
+            "output_tokens": 0
+          }
+        }
+      ],
+      "timestamp": 1791169748,
+      "ttl": 1800
     }
   }
 }
