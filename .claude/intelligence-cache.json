@@ -30,16 +30,17 @@
     },
     "d41d8cd98f00b204e9800998ecf8427e": {
       "result": {
-        "primary_role": "tester",
+        "primary_role": "architect",
         "secondary_roles": [
-          "builder"
+          "builder",
+          "optimizer"
         ],
-        "confidence": 0.9,
-        "reasoning": "E2E test task requires test automation and implementation expertise; likely involves writing/running a test that verifies adding comments to README works end-to-end",
+        "confidence": 0.85,
+        "reasoning": "Task requires designing a classification system to distinguish loop failure modes (flatline vs context exhaustion), then implementing and surfacing the results—classic system architecture with metrics analysis",
         "new_role_needed": false,
         "suggested_role": null
       },
-      "timestamp": 1791166518,
+      "timestamp": 1791195484,
       "ttl": 3600
     },
     "efd5524ad1244fd20344bf3ff5d95233": {
@@ -1407,24 +1408,28 @@
         "risk_level": "medium",
         "success_probability": 78,
         "recommended_template": "standard",
-        "issue_type": "infrastructure",
+        "issue_type": "refactor",
         "key_risks": [
-          "Incorrect classification logic could misidentify stall reasons and trigger wrong recovery strategy",
-          "Backward compatibility issues if existing runs lack stall_reason field causing daemon confusion",
-          "Daemon retry policy changes may cause excessive restarts or premature aborts on real failures",
-          "Race condition between loop iteration classification and daemon retry decision window",
-          "Test edge cases (borderline flatline threshold, partial error repeats, context near-limit)"
+          "Backward compatibility: existing progress.md without stall_reason must be handled gracefully",
+          "Misclassification of stall reasons could lead to wrong retry strategies (infinite restart loops)",
+          "Changes to daemon retry logic could regress existing context-exhaustion handling",
+          "Schema changes in progress.md and error-summary.json may break downstream consumers",
+          "State synchronization between loop and daemon during rapid failures"
         ],
         "implementation_hints": [
-          "Extend existing flatline_threshold logic in sw-loop.sh to emit stall_reason (flatline/repeating-error/context-exhaustion) after each iteration",
-          "Make stall_reason field optional with null/undefined defaults in progress.md and error-summary.json for backward compatibility",
-          "Add stall_reason to loop.iterate_classified event emission alongside existing loop.iteration_classified event",
-          "Update daemon retry policy (sw-daemon.sh) to consume stall_reason and choose: flatline→abort, repeating-error→extend, context-exhaustion→restart",
-          "Test with three separate test scenarios in sw-loop-test.sh: flatline streak, same error repeating, context limit approaching",
-          "Use emit_event for telemetry so fleet dashboard can surface stall patterns across all running loops"
+          "Define stall_reason as enum: 'flatlining' | 'repeating-error' | 'context-exhaustion' | 'unknown'",
+          "Emit stall_reason in both progress.md (human-readable) and error-summary.json (structured)",
+          "Detect flatlining by comparing: changed_lines < min_progress_lines AND same error fingerprint for N consecutive iterations",
+          "Detect repeating-error by tracking error signatures across iterations (use error-summary.json)",
+          "Update sw-daemon.sh retry logic to consume stall_reason and branch on it (extend vs restart vs abort)",
+          "Ensure loop.flatline_threshold from daemon-config.json drives the detection logic",
+          "Add unit tests for each detection branch in sw-loop-test.sh covering edge cases",
+          "Add daemon retry decision tests in sw-lib-daemon-failure-test.sh for each stall_reason",
+          "Test backward compatibility: absent stall_reason field should default to safe behavior",
+          "Verify progress.md remains human-readable with new field (place at end, use comment format)"
         ]
       },
-      "timestamp": 1791161620,
+      "timestamp": 1791195061,
       "ttl": 3600
     },
     "1847be7bdafb80b63a51fc706550220b": {
@@ -1450,32 +1455,32 @@
         "results": [
           {
             "file": "failures.json",
-            "relevance": 55,
-            "summary": "Contains tracked failure patterns with root causes and resolution status. Essential for distinguishing flatline (repeated failure signatures) from context exhaustion (resource-limited failures). Shows timeout patterns as key signal."
-          },
-          {
-            "file": "pattern-outcomes.json",
-            "relevance": 50,
-            "summary": "Designed to track iteration outcomes with metadata. The feature is literally about classifying iteration outcomes (flatline vs context exhaustion). Provides the structural foundation for storing iteration classifications."
+            "relevance": 95,
+            "summary": "Tracks resolved/unresolved errors with seen_count. The 'resolved: false' and 'seen_count: 2' fields directly support flatline detection—identifying when the same error repeats without progress."
           },
           {
             "file": "success-patterns.json",
-            "relevance": 45,
-            "summary": "Tracks completion_time_seconds and iterations_needed per pattern. These metrics are critical signals: long completion times indicate potential context exhaustion, iteration counts help detect flatline loops."
+            "relevance": 75,
+            "summary": "Shows iterations_needed and completion_time_seconds across multiple patterns. Establishes baseline for recognizing progress vs stalled iterations, and helps distinguish context exhaustion (slower) from flatline (no code change, same error)."
           },
           {
             "file": "index.json",
-            "relevance": 25,
-            "summary": "Pattern index with failure signatures indexed by stage. Provides structure for how failures are cataloged, useful for understanding failure fingerprinting needed to detect repeated flatlines."
+            "relevance": 70,
+            "summary": "Error pattern classification by type and stage with total_seen aggregation. Supports error fingerprint tracking and recurrence counting, core to detecting flatline (same signature repeated) vs context exhaustion (new errors)."
           },
           {
             "file": "fleet-shared-patterns.json",
-            "relevance": 20,
-            "summary": "Fleet-wide pattern sharing with seen_count and timestamp tracking. Relevant if flatline detection needs cross-repo awareness or fleet-level insights into iteration failure modes."
+            "relevance": 65,
+            "summary": "Cross-repo pattern tracking with signature_hash and seen_count. Helps identify commonly repeated errors across iterations that indicate flatline conditions rather than isolated context-exhaustion failures."
+          },
+          {
+            "file": "pattern-outcomes.json",
+            "relevance": 35,
+            "summary": "Framework for tracking iteration-level outcomes (currently empty). Could be extended to record whether each iteration is productive, flat, or context-exhausted for classification analysis."
           }
         ]
       },
-      "timestamp": 1791161799,
+      "timestamp": 1791195164,
       "ttl": 1800
     },
     "688771ea3589b967331fba0ec3bbb4d3": {
@@ -1483,55 +1488,55 @@
         "results": [
           {
             "file": "failures.json",
-            "relevance": 85,
-            "summary": "Directly shows how failures are classified by pattern, stage, root cause, and resolved status. Most relevant for understanding the failure classification system that underpins flatline vs context_exhaustion distinction."
+            "relevance": 95,
+            "summary": "Tracks failure patterns by stage with root_cause and resolved status. Directly relevant for classifying failure types (timeouts, unbounded loops, infrastructure issues) vs actual progress blockers, which informs flatline vs context exhaustion distinction."
           },
           {
-            "file": "success-patterns.json (test-repo-comptime)",
-            "relevance": 75,
-            "summary": "Shows build-loop completion metrics including iterations_needed, stages_executed, and timing data (1234s). Provides baseline for what success looks like, essential for comparing against flatlining patterns."
+            "file": "success-patterns.json (test-repo-ranking)",
+            "relevance": 72,
+            "summary": "Contains multiple success patterns with iterations_needed, stages_executed, and completion_time fields. Relevant for understanding typical build loop iteration counts and patterns that indicate productive progress vs flatlining."
           },
           {
-            "file": "fleet-shared-patterns.json",
-            "relevance": 65,
-            "summary": "Demonstrates cross-repo pattern tracking with signatures, stages, seen_count, and fix information. Relevant for understanding how failure patterns should be surfaced and aggregated across the pipeline."
+            "file": "index.json",
+            "relevance": 58,
+            "summary": "Shows build stage failure patterns with root causes and fixes (e.g., timeout handling). Provides context on build-stage-specific failures that could be misclassified as flatlines but may indicate recoverable issues."
           }
         ]
       },
-      "timestamp": 1791161888,
+      "timestamp": 1791195270,
       "ttl": 1800
     },
     "3c314bc83e10c896ed08abf3270879a2": {
       "result": {
         "results": [
           {
-            "file": "failures.json (with timeout data)",
-            "relevance": 85,
-            "summary": "Demonstrates concrete failure classification with root causes, resolution status, and seen_count tracking. Directly applicable to modeling how iterations are classified (flatline vs resolved vs unresolved)."
+            "file": "failures.json",
+            "relevance": 95,
+            "summary": "Shows failure pattern structure with root_cause, resolved status, and seen_count tracking - essential for designing classifiers to distinguish between repeated failures (flatline) and context exhaustion"
           },
           {
             "file": "fleet-shared-patterns.json",
-            "relevance": 70,
-            "summary": "Shows structured pattern format with signature_hash, stages array, seen_count, and first_seen/last_seen timestamps. Provides architectural model for tracking iteration patterns across repos."
-          },
-          {
-            "file": "success-patterns.json (test-repo-comptime)",
-            "relevance": 60,
-            "summary": "Tracks iterations_needed, stages_executed through pipeline, and completion metrics. Useful for understanding how to model progress through multiple loop iterations."
+            "relevance": 88,
+            "summary": "Demonstrates pattern deduplication via signature_hash and recurrence tracking with seen_count and first_seen/last_seen timestamps - directly informs architecture for detecting flatline iterations (same signature, repeated occurrences)"
           },
           {
             "file": "index.json",
-            "relevance": 55,
-            "summary": "Contains pattern_type, stage, and pattern classification metadata. Demonstrates how to categorize failure patterns, relevant for designing flatline classification schema."
+            "relevance": 82,
+            "summary": "Provides pattern catalog structure with pattern_type field for classification and total_seen for recurrence - useful for designing indexing and surfacing mechanisms for classified iterations"
           },
           {
-            "file": "success-patterns.json (test-final-working)",
-            "relevance": 50,
-            "summary": "Shows daemon timeout handling patterns with iterations_needed field. Relevant for understanding loop iteration behavior and how to track fixes over multiple attempts."
+            "file": "success-patterns.json",
+            "relevance": 76,
+            "summary": "Tracks iterations_needed, completion_time_seconds, and stages_executed metrics - these distinguish between flatline (no progress over iterations) and context_exhaustion (ran out of context mid-stage)"
+          },
+          {
+            "file": "pattern-outcomes.json",
+            "relevance": 70,
+            "summary": "Structure for tracking outcomes of patterns with metadata - supports detection of flatline iterations where same pattern produces identical outcome repeatedly"
           }
         ]
       },
-      "timestamp": 1791161952,
+      "timestamp": 1791195344,
       "ttl": 1800
     },
     "76fc5d3046faccb779be02a078213faf": {
@@ -1539,22 +1544,22 @@
         "results": [
           {
             "file": "failures.json",
-            "relevance": 75,
-            "summary": "Contains concrete failure patterns with root causes and resolution status. Shows timeout failures (unbounded loop anti-pattern) and unresolved issues. Directly exemplifies failure classification and what NOT to do."
-          },
-          {
-            "file": "success-patterns.json (daemon timeout, issue 699)",
-            "relevance": 62,
-            "summary": "Demonstrates successful approach to daemon timeout handling. Shows what worked (timeout handler approach) on build stage, providing positive contrast to anti-patterns."
+            "relevance": 85,
+            "summary": "Contains failure patterns with root causes (timeout, unbounded loop) and resolution tracking. Key anti-patterns: repeated identical errors with same root cause indicate flatlining, while escalating token consumption would indicate context exhaustion. Distinguishing factor: 'seen_count' and 'resolved' status track iteration behavior."
           },
           {
             "file": "index.json",
-            "relevance": 48,
-            "summary": "Example of failure pattern classification (test_failure type) with stage tracking and fix mapping. Demonstrates how failures are categorized, relevant to flatline vs context-exhaustion classification design."
+            "relevance": 70,
+            "summary": "Tracks failure pattern signatures by stage with frequency ('total_seen': 5). Pattern repetition without variation is a marker of flatlining. Useful for detecting when the loop cycles through the same error states vs. degrading progressively (context exhaustion symptom)."
+          },
+          {
+            "file": "fleet-shared-patterns.json",
+            "relevance": 60,
+            "summary": "Shows cross-repo pattern tracking with 'seen_count', 'first_seen', 'last_seen'. The temporal and frequency data helps distinguish between a stuck loop (flatlining) and a loop that exhausts resources over time (context exhaustion). Absence of escalation in pattern characteristics suggests flatline."
           }
         ]
       },
-      "timestamp": 1791161972,
+      "timestamp": 1791195358,
       "ttl": 1800
     },
     "b4dfcd7306b0b8fb6964f98b65205a4c": {
@@ -1562,65 +1567,65 @@
         "results": [
           {
             "file": "failures.json",
-            "relevance": 85,
-            "summary": "Tracks failure patterns with root causes, resolution status, and timestamps. Critical for distinguishing between different failure modes (timeouts, logic errors, unresolved issues) that could indicate flatline vs context exhaustion."
+            "relevance": 95,
+            "summary": "Contains failure patterns with timestamps, root causes, and resolution tracking (timeouts, database issues). Critical for detecting iteration-level failures and distinguishing resolved vs unresolved patterns—key indicators of flatlining vs transient failures."
           },
           {
             "file": "index.json",
-            "relevance": 80,
-            "summary": "Indexes build-stage failure patterns including test timeouts with fix strategies. Directly relevant for identifying timeout-related failures in the build loop that might indicate flatline behavior."
+            "relevance": 85,
+            "summary": "Build stage-specific failure patterns with signatures and fixes. Shows classification of test_failure pattern type with 5 occurrences—directly applicable to categorizing build iteration failures."
           },
           {
             "file": "fleet-shared-patterns.json",
-            "relevance": 70,
-            "summary": "Tracks cross-repo patterns seen in build and test stages. Shows common failure signatures and their frequency, useful for distinguishing between common build issues and flatline-specific behaviors."
+            "relevance": 75,
+            "summary": "Cross-repo failure patterns with seen_count and contribution tracking. The 'Cannot find module' pattern appearing in both build and test stages helps identify recurring issues—indicators of flatlining vs one-off context failures."
           },
           {
-            "file": "success-patterns.json (test-repo-comptime)",
+            "file": "success-patterns.json",
             "relevance": 65,
-            "summary": "Shows a completed pattern spanning multiple stages including build, with timing and iteration metrics. Useful for comparing normal iteration behavior against flatline patterns where iterations produce no progress."
+            "summary": "Contains iterations_needed and stages_executed fields across patterns. Shows what successful builds require (1-3 iterations typically)—provides baseline for detecting when iterations exceed expected count, signaling flatlining."
           },
           {
-            "file": "success-patterns.json (test-final-working)",
-            "relevance": 60,
-            "summary": "Demonstrates a daemon-related build timeout pattern that completed in 2 iterations. Provides baseline for iteration count and timeout handling that can be compared against flatline detection thresholds."
+            "file": "pattern-outcomes.json",
+            "relevance": 55,
+            "summary": "Empty outcome tracking structure but metadata shows repo_hash correlation capability. Designed for tracking iteration outcomes by repo—infrastructure for surface classification of flatlining vs exhaustion by iteration."
           }
         ]
       },
-      "timestamp": 1791162074,
+      "timestamp": 1791195456,
       "ttl": 1800
     },
     "47c1451f50b4a8f9faa0f8012f6b922e": {
       "result": {
         "results": [
           {
-            "file": "success-patterns.json",
-            "relevance": 92,
-            "summary": "Contains two success patterns with test strategies, iteration counts, files changed, and duration estimates. Directly applicable for understanding what build/test approaches worked in the past."
-          },
-          {
             "file": "retry-outcomes.json",
-            "relevance": 87,
-            "summary": "Documents build_failure class with model_escalation strategy showing 100% success rate across 5 attempts. Critical for understanding how to recover from build failures."
+            "relevance": 95,
+            "summary": "Tracks build failure retry strategies and their success rates (100% success with model escalation); directly applicable to build stage recovery logic"
           },
           {
-            "file": "metrics.json",
-            "relevance": 82,
-            "summary": "Provides baseline metrics: build_duration_s (7095s) and test_duration_s (1459s). Essential for setting performance expectations during the build stage."
+            "file": "flaky-tests.json",
+            "relevance": 92,
+            "summary": "Identifies flaky tests (test-1: 85% confidence, test-auth: 90% confidence with connection timeouts) that will likely fail during build iterations"
           },
           {
-            "file": "patterns.json",
-            "relevance": 78,
-            "summary": "Documents project conventions including test_runner (vitest), test_pattern (*.test.js), and source structure. Relevant for understanding build/test infrastructure expectations."
+            "file": "success-patterns.json",
+            "relevance": 88,
+            "summary": "Captures successful bug fix and feature approaches including iteration counts (3 iterations), test strategies (npm test), file patterns, and typical duration (45-150s); directly guides build stage approach"
           },
           {
             "file": "failures.json",
+            "relevance": 86,
+            "summary": "Recent test failures with root causes (sw-cost-test dashboard, sw-e2e-integration-test timeouts, sw-intent-analysis-test schema issues) and fixes applicable to current build stage"
+          },
+          {
+            "file": "metrics.json",
             "relevance": 76,
-            "summary": "Contains 4 recent test failures with root causes and fixes. Relevant because test failures commonly occur during or after the build stage."
+            "summary": "Baseline build duration (118 min) and test duration (24 min) establish performance expectations to detect anomalies in build stage execution"
           }
         ]
       },
-      "timestamp": 1791168376,
+      "timestamp": 1791195471,
       "ttl": 1800
     },
     "82884b010f1379485257cd91f828ebdc": {
@@ -2367,6 +2372,69 @@
         }
       ],
       "timestamp": 1791169748,
+      "ttl": 1800
+    },
+    "233e42dcb53756f576e2cba85e771f40": {
+      "result": {
+        "estimated_iterations": 7,
+        "reasoning": {
+          "complexity_base": 6,
+          "adjustment_factors": [
+            "Medium risk level suggests potential regressions in retry logic",
+            "Backward compatibility handling adds validation overhead",
+            "Schema changes require careful testing across multiple consumers",
+            "High success probability (78%) indicates well-understood requirements",
+            "Refactor type typically needs fewer iterations than new features",
+            "Multiple subsystems (loop, daemon, progress tracking) need coordination"
+          ],
+          "breakdown": {
+            "iteration_1_2": "Detection logic implementation + schema changes",
+            "iteration_3_4": "Backward compatibility + daemon retry integration",
+            "iteration_5_6": "Unit and integration tests + edge cases",
+            "iteration_7": "Final validation and cleanup"
+          }
+        }
+      },
+      "timestamp": 1791195075,
+      "ttl": 1800
+    },
+    "4ef90ebbd13bfdaab1a570af9c0aa59e": {
+      "result": {
+        "estimated_cost_usd": 4.20,
+        "estimated_iterations": 3,
+        "estimated_tokens": 220000,
+        "likely_failure_stage": "test",
+        "confidence": 72
+      },
+      "timestamp": 1791195086,
+      "ttl": 3600
+    },
+    "fef6608c698cb037049c1f019c9914a1": {
+      "result": {
+        "raw_response": "Mock claude: ok"
+      },
+      "timestamp": 1791195576,
+      "ttl": 1800
+    },
+    "cad0c97f21a9ff3855fcb00808d9ba9d": {
+      "result": [
+        {
+          "type": "result",
+          "result": "I am trying the same approach again.",
+          "usage": {
+            "input_tokens": 0,
+            "output_tokens": 0
+          }
+        }
+      ],
+      "timestamp": 1791195733,
+      "ttl": 1800
+    },
+    "17f539404fbddc190673a383e6ceb9ad": {
+      "result": {
+        "raw_response": "Mock claude: ok"
+      },
+      "timestamp": 1791195918,
       "ttl": 1800
     }
   }
