@@ -234,3 +234,6 @@
 {"ts":"2026-10-05T12:05:57Z","ts_epoch":1791201957,"type":"mutation.report","score":0,"total":1,"killed":0,"survived":1}
 {"ts":"2026-10-05T12:05:57Z","ts_epoch":1791201957,"type":"test.mutation_complete","issue":0,"killed":0,"survived":1,"total":1}
 {"ts":"2026-10-05T12:05:58Z","ts_epoch":1791201958,"type":"convergence.tests_passed","issue":0,"cycle":1}
+{"ts":"2026-10-05T12:08:55Z","ts_epoch":1791202135,"type":"hygiene_platform_refactor","hardcoded":49,"fallback":69,"todo":51}
+{"ts":"2026-10-05T12:09:20Z","ts_epoch":1791202160,"type":"strategic.issue_created","title":"Add fast-fail detection for missing/invalid API credentials before pipeline start","priority":"P0","complexity":"fast"}
+{"ts":"2026-10-05T12:09:20Z","ts_epoch":1791202160,"type":"strategic.cycle_complete","issues_created":1,"issues_skipped":2}
