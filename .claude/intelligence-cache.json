@@ -1431,9 +1431,9 @@
     },
     "f2644929e7731973005d091d02599567": {
       "result": {
-        "estimated_iterations": 3
+        "estimated_iterations": 2
       },
-      "timestamp": 1791203014,
+      "timestamp": 1791205023,
       "ttl": 1800
     },
     "84e78db2cef2bff7932f88533cbbb04c": {
@@ -1562,33 +1562,33 @@
       "result": {
         "results": [
           {
-            "file": "architecture.json",
-            "relevance": 100,
-            "summary": "Architecture rules and patterns directly applicable to designing credential validation infrastructure at pipeline startup"
-          },
-          {
-            "file": "success-patterns.json (daemon timeout fix, issue 699)",
-            "relevance": 68,
-            "summary": "Shows daemon initialization and timeout handling patterns; relevant for designing early-fail validation logic in pipeline startup sequence"
-          },
-          {
             "file": "failures.json",
-            "relevance": 62,
-            "summary": "Documents resolved and unresolved failure patterns including connection errors; provides failure mode examples for credential validation design"
+            "relevance": 80,
+            "summary": "Contains connection failure patterns (database connection refused, timeouts) that closely mirror credential validation failure modes and early-detection scenarios needed for fast-fail architecture"
           },
           {
-            "file": "index.json",
+            "file": "success-patterns.json (test-repo-comptime)",
+            "relevance": 62,
+            "summary": "Pattern spans intake→build→test stages with multi-stage execution, showing successful early-stage architecture that could inform credential validation design before pipeline start"
+          },
+          {
+            "file": "success-patterns.json (test-repo-789)",
             "relevance": 55,
-            "summary": "Tracks pipeline stage patterns and failure signatures; shows how other infrastructure detection patterns are captured and fixed"
+            "summary": "Daemon script patterns (sw-daemon.sh) indicate startup/initialization logic which is where credential checks would typically occur in pipeline lifecycle"
+          },
+          {
+            "file": "success-patterns.json (test-final-working)",
+            "relevance": 52,
+            "summary": "Daemon timeout handler pattern shows initialization error handling during early pipeline stages, relevant for credential validation error paths"
           },
           {
             "file": "fleet-shared-patterns.json",
             "relevance": 40,
-            "summary": "Cross-repo error detection and fixing patterns; demonstrates error discovery methodology applicable to credential validation"
+            "summary": "Cross-repo build failure patterns provide architectural context for detecting and handling configuration/environment issues early in pipeline execution"
           }
         ]
       },
-      "timestamp": 1791203294,
+      "timestamp": 1791205260,
       "ttl": 1800
     },
     "b05242b2679e83a2b8fcda20fa4b0ce5": {
@@ -1596,22 +1596,55 @@
         "results": [
           {
             "file": "failures.json",
-            "relevance": 22,
-            "summary": "Contains connection validation failure pattern ('database connection refused'). Relevant to understanding validation failure modes and their root causes, though focused on DB rather than API credentials specifically."
+            "relevance": 35,
+            "summary": "Contains failure patterns with root causes and resolution status. Shows 'database connection refused' marked as unresolved, providing insight into what approaches failed and what issues remain unsolved—most relevant to understanding rejected approaches."
           },
           {
             "file": "index.json",
-            "relevance": 8,
-            "summary": "Tracks failure patterns and fixes at stage level, but focuses on test timeouts rather than credential validation. Minimal relevance to design approach evaluation."
+            "relevance": 20,
+            "summary": "Documents patterns with fix approaches across stages. Shows what has been attempted and how, providing context for design decisions even if not specifically about credential validation."
           },
           {
-            "file": "architecture.json",
-            "relevance": 3,
-            "summary": "Contains generic rule structure with no specific content related to credential validation or design anti-patterns. Not actionable for this context."
+            "file": "fleet-shared-patterns.json",
+            "relevance": 15,
+            "summary": "Cross-repo pattern data showing 'Error: Cannot find module' with fix 'npm i'. While not credentials-specific, demonstrates common initialization failures that could inform fast-fail strategy design."
           }
         ]
       },
-      "timestamp": 1791203310,
+      "timestamp": 1791205278,
+      "ttl": 1800
+    },
+    "bf8d557af62de0749d0be2d4d243b590": {
+      "result": {
+        "results": [
+          {
+            "file": "success-patterns_issue-699_fix-daemon-timeout",
+            "relevance": 75,
+            "summary": "Pattern for fixing daemon timeout in sw-daemon.sh; directly relevant to pipeline initialization and early error detection before startup"
+          },
+          {
+            "file": "success-patterns_issue-2_fix-timeout",
+            "relevance": 70,
+            "summary": "Pattern for timeout handler in sw-daemon.sh; addresses error detection and early failure before pipeline stages execute"
+          },
+          {
+            "file": "failures_connection-refused",
+            "relevance": 55,
+            "summary": "Connection validation failure pattern showing how to detect and handle credential/connection errors; applicable to API credential validation"
+          },
+          {
+            "file": "success-patterns_test-repo-comptime_timed-fix",
+            "relevance": 48,
+            "summary": "Pattern covering intake stage which is where pipeline initialization and fast-fail detection should occur before main execution"
+          },
+          {
+            "file": "index.json",
+            "relevance": 40,
+            "summary": "Test failure detection patterns and validation strategy; shows systematic approach to identifying errors early in pipeline stages"
+          }
+        ]
+      },
+      "timestamp": 1791205096,
       "ttl": 1800
     }
   }
