@@ -1,3 +1,4 @@
+<!-- Shipwright README — keep version badges in sync via `shipwright version bump`; verify with `shipwright version check`. -->
 <p align="center">
   <img src="website/src/assets/logo-dark.svg" alt="Shipwright" width="200">
 </p>
