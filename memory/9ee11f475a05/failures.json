@@ -5,8 +5,8 @@
       "pattern": "\u001b[38;2;74;222;128m\u001b[1m✓\u001b[0m reveal shows 1/3 pass count on failure",
       "root_cause": "sw-cost-test.sh 'CONTEXT EFFICIENCY' dashboard tests fail because the cost dashboard prints 'No cost entries in the last 30 days' and exits early, never rendering the context-efficiency section from the seeded loop.context_efficiency events (test seeds only events, no cost entries).",
       "fix": "Make the cost dashboard render the CONTEXT EFFICIENCY section even when there are no cost entries (or have the test seed a cost entry/use an events path the dashboard reads) so the avg budget utilization assertions pass.",
-      "seen_count": 9,
-      "last_seen": "2026-10-05T13:02:38Z",
+      "seen_count": 13,
+      "last_seen": "2026-10-05T15:55:05Z",
       "category": "test_failure"
     },
     {
@@ -39,20 +39,29 @@
     {
       "stage": "test",
       "pattern": "\u001b[38;2;0;212;255m▸\u001b[0m Patrol recurring failures label construction... \u001b[38;2;74;222;128m✓\u001b[0m",
-      "root_cause": "sw-e2e-integration-test failed because a pipeline lock/state was already running (concurrent pipeline in progress, 'pipeline-7897' lock conflict with the outer pipeline), and sw-intent-analysis-test failed because the generated intent JSON schema is missing required fields (version, goal, criteria).",
-      "fix": "Isolate the e2e integration test from the active pipeline state (use a separate temp STATE_DIR/lock and skip when a pipeline is running), and fix analyze_intent output/schema in the intent-analysis module so it emits version, goal and criteria fields.",
-      "seen_count": 1,
-      "last_seen": "2026-10-05T02:50:15Z",
+      "root_cause": "sw-cost-test.sh 'context efficiency' dashboard test fails: `shipwright cost show` prints 'No cost entries in the last 30 day(s)' and exits early, so the CONTEXT EFFICIENCY section built from loop.context_efficiency events is never rendered (test seeds only events, no cost entries).",
+      "fix": "Make sw-cost.sh render the CONTEXT EFFICIENCY section even when there are no cost entries (don't return early), or have the test seed a cost entry alongside the loop.context_efficiency events.",
+      "seen_count": 2,
+      "last_seen": "2026-10-05T13:35:46Z",
       "category": "test_failure"
     },
     {
       "stage": "test",
-      "pattern": "Results: \u001b[38;2;74;222;128m\u001b[1m125 PASS\u001b[0m | \u001b[38;2;248;113;113m\u001b[1m3 FAIL\u001b[0m",
-      "root_cause": "Three suites failed: sw-cleanup-test (dry-run/force 'clean' assertions fail, likely due to leftover orphaned sessions/artifacts in the CI environment), sw-e2e-integration-test (needs real Claude/GitHub and hit a stale 'pipeline already in progress' lock), and sw-intent-analysis-test (analyze_intent output lacks the required schema fields version/goal/criteria).",
-      "fix": "Make sw-cleanup-test isolate HOME/state dirs so the 'nothing to clean' assertions are deterministic, skip or clear locks in sw-e2e-integration-test when no live credentials are available, and fix analyze_intent (or its schema check) so the output includes version, goal and criteria.",
+      "pattern": "Results: \u001b[38;2;74;222;128m\u001b[1m126 PASS\u001b[0m | \u001b[38;2;248;113;113m\u001b[1m2 FAIL\u001b[0m",
+      "root_cause": "The E2E pipeline test suite (sw-pipeline-test.sh) fails 6 tests: plan.md and review.md artifacts are not generated (the mocked claude call isn't producing them), and the intelligence-skip and cleanup tests fail on jq parse errors from non-JSON output and a non-zero pipeline exit.",
+      "fix": "Fix the mock claude/plan and review stage setup so plan.md and review.md are written to .claude/pipeline-artifacts, and make the intelligence/RL code emit valid JSON (or have the test filter ANSI/non-JSON lines) so jq parsing and pipeline exit 0 succeed.",
       "seen_count": 1,
-      "last_seen": "2026-10-05T11:32:31Z",
+      "last_seen": "2026-10-05T14:09:15Z",
       "category": "test_failure"
+    },
+    {
+      "stage": "test",
+      "pattern": "\u001b[2m  loop behavior: iterations on test failure\u001b[0m",
+      "root_cause": "The visible log shows every test suite passing (12, 16, 15, 7, 25 tests, all with 0 failures); the 'loop behavior: iterations on test failure' error pattern matches a test-case label in the loop test suite output, not an actual failure in the shown tail.",
+      "fix": "Check the full test log (.claude/loop-logs/tests-iter-1.log) for an actual failing assertion or non-zero exit in an earlier suite (e.g. sw-loop-test.sh), and if the 'iterations on test failure' loop test is flaky, make it deterministic or rerun.",
+      "seen_count": 1,
+      "last_seen": "2026-10-05T14:43:29Z",
+      "category": "flaky"
     }
   ]
 }
