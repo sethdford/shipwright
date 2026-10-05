@@ -1,5 +1,5 @@
 {
-  "timestamp": "2026-10-05T07:07:55Z",
+  "timestamp": "2026-10-05T07:30:37Z",
   "repository": "shipwright",
   "counts": {
     "hardcoded": 49,
@@ -664,10 +664,6 @@
       "lines": 2713
     },
     {
-      "script": "sw-memory.sh",
-      "lines": 2241
-    },
-    {
       "script": "sw-daemon-test.sh",
       "lines": 1985
     },
@@ -718,6 +714,10 @@
     {
       "script": "sw-evidence.sh",
       "lines": 1101
+    },
+    {
+      "script": "sw-pipeline-vitals.sh",
+      "lines": 1076
     }
   ]
 }
