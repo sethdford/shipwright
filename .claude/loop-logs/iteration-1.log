@@ -1,9 +1,7 @@
-I added an HTML comment to the end of `README.md` and committed it as `ba58e2fa`. The comment is `<!-- E2E test: automated comment added by the Shipwright pipeline -->`. It doesn't show up when the README is rendered.
+The README comment is already in the repo. Commit `ba58e2fa` added it as `<!-- E2E test: automated comment added by the Shipwright pipeline -->` at line 594, below the License section. I made no new changes this iteration.
 
-I did not run the full `npm test` suite, which has over 100 suites. I ran only the checks that read the README:
-- **Version consistency:** `scripts/check-version-consistency.sh` reports 3.3.0 everywhere.
-- **Docs suite:** `scripts/sw-docs-test.sh` passes 18 of 18.
+For acceptance, I ran only the docs suite, `scripts/sw-docs-test.sh`, which passes (18 passed, 0 failed). I did not run the full `npm test`, so "all existing tests continue to pass" is checked only for that suite. A README-only HTML comment shouldn't affect the other suites.
 
-The change touches no scripts or config, so I expect the other suites to be unaffected.
+The task checklist in the prompt is for the prebuild-check feature and is unrelated to this goal. I left it alone.
 
 LOOP_COMPLETE
