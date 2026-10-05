@@ -1663,33 +1663,33 @@
       "result": {
         "results": [
           {
-            "file": "failures.json",
+            "file": "retry-outcomes.json",
             "relevance": 95,
-            "summary": "Recent test-stage failures (last seen 2026-10-05) with documented root causes and fixes; directly impacts build success"
+            "summary": "Tracks build failure recovery with model escalation strategy showing 100% success rate (5/5) — directly applicable when build stage encounters failures"
           },
           {
-            "file": "retry-outcomes.json",
+            "file": "success-patterns.json",
             "relevance": 90,
-            "summary": "Build failure recovery strategy (model_escalation) with 100% success rate across 5 attempts; directly applicable to build stage resilience"
+            "summary": "Historical successful build patterns showing loop iterations, file changes, test strategies, and costs — provides proven approaches for fixing bugs and features with similar complexity"
           },
           {
             "file": "flaky-tests.json",
             "relevance": 85,
-            "summary": "Specific flaky test data (test-1: 5 occurrences, test-auth: 8 timeouts at 90% confidence); identifies test stability risks during build"
+            "summary": "Identifies flaky tests (test-1 at 85% confidence, test-auth at 90%) that block builds — essential to know which tests may require retries or investigation"
+          },
+          {
+            "file": "failures.json",
+            "relevance": 80,
+            "summary": "Recent test stage failures (sw-cost-test, sw-pipeline-test, sw-e2e-integration-test) with root causes and fixes — informs build approach to avoid same failures"
           },
           {
             "file": "knowledge.json",
-            "relevance": 80,
-            "summary": "KB entries for recurring test failures (mktemp 4x, cleanup output 2x, regression JSON 2x) with fix strategies; prevents repeating known issues"
-          },
-          {
-            "file": "metrics.json",
             "relevance": 75,
-            "summary": "Build duration baseline (7095s) and test duration baseline (1459s); provides performance context for build optimization"
+            "summary": "Common failure signatures (mktemp directory issues, missing cleanup output, JSON parsing errors) with fix strategies — prevents build setup and test execution failures"
           }
         ]
       },
-      "timestamp": 1791187891,
+      "timestamp": 1791189807,
       "ttl": 1800
     },
     "43802e3c13334fdb1de225451784f6d1": {
@@ -2081,6 +2081,13 @@
         }
       ],
       "timestamp": 1791189483,
+      "ttl": 1800
+    },
+    "af48a0e82c357f4313804b4f008333df": {
+      "result": {
+        "raw_response": "Mock claude: ok"
+      },
+      "timestamp": 1791189882,
       "ttl": 1800
     }
   }
