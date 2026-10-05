@@ -5,8 +5,8 @@
       "pattern": "\u001b[38;2;74;222;128m\u001b[1m✓\u001b[0m reveal shows 1/3 pass count on failure",
       "root_cause": "sw-cost-test.sh 'CONTEXT EFFICIENCY' dashboard tests fail because the cost dashboard prints 'No cost entries in the last 30 days' and exits early, never rendering the context-efficiency section from the seeded loop.context_efficiency events (test seeds only events, no cost entries).",
       "fix": "Make the cost dashboard render the CONTEXT EFFICIENCY section even when there are no cost entries (or have the test seed a cost entry/use an events path the dashboard reads) so the avg budget utilization assertions pass.",
-      "seen_count": 6,
-      "last_seen": "2026-10-05T08:21:53Z",
+      "seen_count": 7,
+      "last_seen": "2026-10-05T09:02:28Z",
       "category": "test_failure"
     },
     {
@@ -14,8 +14,8 @@
       "pattern": "Failed: 1",
       "root_cause": "Two suites failed: sw-e2e-integration-test hit a stale pipeline lock/state ('pipeline already in progress') left by the outer pipeline run, and sw-intent-analysis-test failed its schema check for required fields (version, goal, criteria).",
       "fix": "Make the e2e integration test run with isolated state/lock dir (or skip when a pipeline is already running), and update the intent analysis schema or the analyze_intent output so they agree on the required fields.",
-      "seen_count": 3,
-      "last_seen": "2026-10-05T01:36:37Z",
+      "seen_count": 4,
+      "last_seen": "2026-10-05T09:44:52Z",
       "category": "test_failure"
     },
     {
@@ -39,11 +39,11 @@
     {
       "stage": "test",
       "pattern": "\u001b[38;2;0;212;255m▸\u001b[0m Patrol recurring failures label construction... \u001b[38;2;74;222;128m✓\u001b[0m",
-      "root_cause": "sw-self-optimize-test 'Memory strengthening boosts confirmed patterns' failed; the log shows jq 'invalid JSON text passed to --argjson' errors, meaning an empty or non-JSON value reaches --argjson in the self-optimize memory-strengthening/analysis path. This is inferred from the log tail only; the test and script were not inspected.",
-      "fix": "In scripts/sw-self-optimize.sh, validate or default the value before it reaches jq --argjson (for example `${var:-0}` or `jq -e . <<<\"$var\" || var=null`), then re-run sw-self-optimize-test.sh to confirm the memory-strengthening test passes.",
+      "root_cause": "sw-e2e-integration-test timed out after 301s (300s suite limit) and sw-intent-analysis-test exited 1; the e2e test needs real Claude/GitHub and hangs in the CI environment, so the suite run fails (the 'Patrol recurring failures label construction' line is just passing output).",
+      "fix": "Skip or mock sw-e2e-integration-test when no real Claude/GitHub credentials are available (or raise its timeout), and run sw-intent-analysis-test alone to fix its failing assertion.",
       "seen_count": 1,
       "last_seen": "2026-10-05T02:50:15Z",
-      "category": "test_failure"
+      "category": "timeout"
     }
   ]
 }
