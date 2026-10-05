@@ -6,7 +6,7 @@
       "root_cause": "sw-cost-test.sh 'CONTEXT EFFICIENCY' dashboard tests fail because the cost dashboard prints 'No cost entries in the last 30 days' and exits early, never rendering the context-efficiency section from the seeded loop.context_efficiency events (test seeds only events, no cost entries).",
       "fix": "Make the cost dashboard render the CONTEXT EFFICIENCY section even when there are no cost entries (or have the test seed a cost entry/use an events path the dashboard reads) so the avg budget utilization assertions pass.",
       "seen_count": 4,
-      "last_seen": "2026-10-05T02:28:58Z",
+      "last_seen": "2026-10-05T03:14:42Z",
       "category": "test_failure"
     },
     {
@@ -14,8 +14,8 @@
       "pattern": "Failed: 1",
       "root_cause": "Two suites failed: sw-e2e-integration-test hit a stale pipeline lock/state ('pipeline already in progress') left by the outer pipeline run, and sw-intent-analysis-test failed its schema check for required fields (version, goal, criteria).",
       "fix": "Make the e2e integration test run with isolated state/lock dir (or skip when a pipeline is already running), and update the intent analysis schema or the analyze_intent output so they agree on the required fields.",
-      "seen_count": 3,
-      "last_seen": "2026-10-05T01:36:37Z",
+      "seen_count": 2,
+      "last_seen": "2026-10-04T20:12:22Z",
       "category": "test_failure"
     },
     {
@@ -23,27 +23,18 @@
       "pattern": "\u001b[38;2;248;113;113m\u001b[1m1 of 78 tests failed\u001b[0m",
       "root_cause": "sw-intent-analysis-test.sh failed with 1 of 78 tests failing (exit 1 after 38s); sw-e2e-integration-test also timed out at 301s, likely because it needs real Claude/GitHub access",
       "fix": "Run scripts/sw-intent-analysis-test.sh directly to identify the failing assertion and fix it; separately skip or mock sw-e2e-integration-test in CI so it can't hit the 300s timeout",
-      "seen_count": 1,
-      "last_seen": "2026-10-04T20:45:20Z",
+      "seen_count": 3,
+      "last_seen": "2026-10-05T02:24:17Z",
       "category": "test_failure"
     },
     {
       "stage": "test",
       "pattern": "Results: \u001b[38;2;74;222;128m\u001b[1m127 PASS\u001b[0m | \u001b[38;2;248;113;113m\u001b[1m1 FAIL\u001b[0m",
-      "root_cause": "sw-e2e-integration-test timed out after 301s (300s suite limit) because it makes real Claude/GitHub calls that hang or run too slowly in CI, causing the single FAIL among 128 suites",
-      "fix": "Skip or mock sw-e2e-integration-test in CI (gate on API credentials), or raise its per-suite timeout above 300s",
+      "root_cause": "sw-intent-analysis-test.sh failed (exit 1 after 34s) and sw-e2e-integration-test timed out at 301s (it needs real Claude/GitHub); the log shows the failure but is truncated before the failing assertion, so the exact assertion is unknown.",
+      "fix": "Run scripts/sw-intent-analysis-test.sh alone to find the failing assertion and fix it. Separately, skip sw-e2e-integration-test in CI or give it mocks or credentials so it stops timing out.",
       "seen_count": 1,
       "last_seen": "2026-10-04T22:06:57Z",
-      "category": "timeout"
-    },
-    {
-      "stage": "test",
-      "pattern": "\u001b[38;2;0;212;255m▸\u001b[0m Patrol recurring failures label construction... \u001b[38;2;74;222;128m✓\u001b[0m",
-      "root_cause": "sw-e2e-integration-test (real Claude + real GitHub) hung and hit the 300s suite timeout; the 'Patrol recurring failures label construction' line is just the last passing step, not the failure.",
-      "fix": "Skip or mock sw-e2e-integration-test in CI (it needs real Claude/GitHub credentials), or raise its timeout and add per-step timeouts so it can't hang.",
-      "seen_count": 1,
-      "last_seen": "2026-10-05T02:50:15Z",
-      "category": "timeout"
+      "category": "test_failure"
     }
   ]
 }
