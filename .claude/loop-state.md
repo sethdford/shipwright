@@ -1,14 +1,45 @@
 ---
-goal: "Misleading "jq not available" warning when Claude outputs JSON object instead of array
+goal: "Add pre-build dependency/tooling check to pipeline intake stage
 
-## Specification: Misleading "jq not available" warning when Claude outputs JSON object instead of array
+## Plan Summary
+Perfect! I've created a comprehensive implementation plan. Let me provide you with a summary of what's been documented:
+
+## Summary
+
+I've generated a detailed **Implementation Plan** for adding pre-build dependency/tooling checks to the pipeline intake stage. Here's what's included:
+
+### 📋 Plan Structure
+
+**Filename**: `.claude/pipeline-artifacts/plan.md`
+
+### Key Sections
+
+1. **Problem Statement** — Current intake stage doesn't validate build prerequisites, causing expensive build-stage failures
+
+2. **Design Decision** — Chose a separate reusable module (`sw-prebuild-check.sh`) over inline code because it:
+   - Enables independent testing
+   - Allows reuse by daemon and other commands  
+   - Provides configurability and extensibility
+   - Follows Shipwright's modular architecture
+[... full plan in .claude/pipeline-artifacts/plan.md]
+
+## Key Design Decisions
+# Design: Add pre-build dependency/tooling check to pipeline intake stage
+## Context
+## Decision
+### Component Diagram
+### Interface Contracts
+### Configuration (in the existing chain; no new file)
+### Data Flow
+### Error Boundaries
+## Alternatives Considered
+## Implementation Plan
+[... full design in .claude/pipeline-artifacts/design.md]
+
+## Specification: Add pre-build dependency/tooling check to pipeline intake stage
 
 ### Goals
-- *jq IS available.** The actual issue is that Claude's `--output-format json` sometimes outputs a JSON **object** (`{...}`) instead of a JSON **array** (`[...]`), and the parsing code only handles arrays.
-- *Option A**: Extend Case 2 to handle both formats:
-- *Option B**: At minimum, fix the warning message in Case 3:
-- Warning is cosmetic only — the loop functions correctly using the raw JSON
-- But it's confusing during debugging (we spent time investigating jq availability when the real issue was elsewhere)
+- Add pre-build dependency/tooling check to pipeline intake stage
 
 ### Acceptance Criteria
 - [testable] All existing tests continue to pass
@@ -17,87 +48,85 @@ Historical context (lessons from previous pipelines):
 {
   "results": [
     {
-      "file": "failures.json",
+      "file": "fleet-shared-patterns.json",
       "relevance": 95,
-      "summary": "Contains detailed jq parse error patterns matching the issue: 'jq: parse error' on malformed JSON and mock claude outputting wrong JSON schema (object vs array). Root cause and fix directly address the 'jq not available' warning problem."
+      "summary": "Contains dependency/tooling pattern: 'Cannot find module' error fixed by 'npm i', directly relevant to pre-build dependency checking across multiple repos"
     },
     {
-      "file": "patterns.json",
-      "relevance": 40,
-      "summary": "Project detection data (nodejs, vitest test runner) provides context about the build environment and testing setup for this pipeline stage."
+      "file": "success-patterns.json (test-repo-comptime)",
+      "relevance": 85,
+      "summary": "Only pattern showing both intake and build stages executed ([intake,build,test]), demonstrates stage flow relevant to adding intake-stage checks"
     },
     {
-      "file": "metrics.json",
-      "relevance": 8,
-      "summary": "Build duration baselines (17827s) provide context on typical build stage timing, useful for understanding if this issue impacts build performance."
+      "file": "failures.json",
+      "relevance": 75,
+      "summary": "Contains database connection and unbounded loop timeout failures that a pre-build tooling check could detect and prevent (db service startup, resource validation)"
     },
     {
-      "file": "metrics.json",
-      "relevance": 5,
-      "summary": "Earlier build duration baseline (147s) is outdated but shows historical performance context."
+      "file": "index.json",
+      "relevance": 70,
+      "summary": "Test failure pattern in build stage with timeout fix, relevant context for understanding build stage validation and potential dependency/tooling failures"
     },
     {
-      "file": "global.json",
-      "relevance": 0,
-      "summary": "Empty cross-repo learnings, no relevant content for this specific jq/JSON issue."
+      "file": "success-patterns.json (test-repo-789)",
+      "relevance": 60,
+      "summary": "Build stage pattern modifying sw-daemon.sh with timeout handler, shows common build stage modifications that might benefit from pre-build verification"
     }
   ]
 }
 
 Discoveries from other pipelines:
-[38;2;74;222;128m[1m✓[0m Injected 128 new discoveries
-[intake] Stage intake completed — Resolution: 
-[intake] Stage intake completed — Resolution: 
-[intake] Stage intake completed — Resolution: 
-[compound_quality] Stage compound_quality completed — Resolution: 
-[intake] Stage intake completed — Resolution: 
-[pr] Stage pr completed — Resolution: 
-[pipeline_success] Pipeline success for issue #0 (fast template, stage=validate) — Resolution: success
-[intake] Stage intake completed — Resolution: 
-[pr] Stage pr completed — Resolution: 
-[intake] Stage intake completed — Resolution: 
-[compound_quality] Stage compound_quality completed — Resolution: 
-[pr] Stage pr completed — Resolution: 
-[intake] Stage intake completed — Resolution: 
-[compound_quality] Stage compound_quality completed — Resolution: 
-[pr] Stage pr completed — Resolution: 
-[intake] Stage intake completed — Resolution: 
-[design] Design completed for Build a production-grade todo application. TypeScript + React frontend with Vite, Express REST API backend, SQLite persistence with Drizzle ORM, JWT authentication (register/login), full CRUD for todos with filtering (all/active/completed), drag-and-drop reorder, due dates, priorities (low/medium/high), dark mode, responsive design. Include comprehensive test suite (unit + integration + e2e). Production-ready: error handling, input validation, rate limiting, CORS, environment config. — Resolution: 
-[intake] Stage intake completed — Resolution: 
-[intake] Stage intake completed — Resolution: 
+✓ Injected 1 new discoveries
+[design] Design completed for Add pre-build dependency/tooling check to pipeline intake stage — Resolution: 
 
-## Failure Diagnosis (Iteration 2)
-Classification: unknown
-Strategy: retry_with_context
-Repeat count: 0
+Task tracking (check off items as you complete them):
+# Pipeline Tasks — Add pre-build dependency/tooling check to pipeline intake stage
 
-## Failure Diagnosis (Iteration 3)
-Classification: unknown
-Strategy: retry_with_context
-Repeat count: 1"
-iteration: 3
-max_iterations: 10
-status: complete
+## Implementation Checklist
+- [ ] **Task 6**: Implement `check_required_tools()` — check optional tools from config (git, jq, etc.)
+- [ ] **Task 7**: Implement `prebuild_check()` orchestrator — call all checks, save results atomically, emit events
+- [ ] **Task 8**: Create `scripts/sw-prebuild-check-test.sh` — ≥15 test cases covering all scenarios
+- [ ] **Task 9**: Modify `scripts/lib/pipeline-stages-intake.sh` — call prebuild_check() early, handle results
+- [ ] **Task 10**: Create `.claude/prebuild-config.json` — sensible defaults, documentation
+- [ ] **Task 11**: Update `.claude/CLAUDE.md` — add to AUTO sections (core-scripts, test-suites)
+- [ ] **Task 12**: Update `package.json` — add test to npm test script
+- [ ] **Task 13**: Create documentation — `docs/prebuild-checks.md` with examples and recovery steps
+- [ ] **Task 14**: End-to-end validation — run full pipeline, verify intake completes successfully
+- [ ] Module exists at `scripts/sw-prebuild-check.sh` with all 6 check functions
+- [ ] Test suite exists at `scripts/sw-prebuild-check-test.sh` with ≥15 test cases
+- [ ] **All tests pass**: `bash scripts/sw-prebuild-check-test.sh` → 0 failures
+- [ ] Integrated into intake stage: `pipeline-stages-intake.sh` calls `prebuild_check()`
+- [ ] Configuration template exists: `.claude/prebuild-config.json`
+- [ ] Backward compatible: existing pipelines run without changes
+- [ ] Error messages clear and actionable
+- [ ] Events emitted: `prebuild_check.completed`, `prebuild_check.failed`
+- [ ] Offline support: works with `--local` flag, skips network checks when `$NO_GITHUB=true`
+- [ ] Results in artifacts: `.claude/pipeline-artifacts/prebuild-check.json`
+- [ ] GitHub integration: intake comment includes prebuild status
+
+## Context
+- Pipeline: autonomous
+- Branch: ci/issue-7767
+- Issue: none
+- Generated: 2026-10-05T10:15:44Z"
+iteration: 0
+max_iterations: 20
+status: running
 test_cmd: "npm test"
-model: sonnet
+model: opus
 agents: 1
-started_at: 2026-04-04T17:41:42Z
-last_iteration_at: 2026-04-04T17:41:42Z
+started_at: 2026-10-05T10:19:48Z
+last_iteration_at: 2026-10-05T10:19:48Z
 consecutive_failures: 0
-total_commits: 3
-audit_enabled: false
-audit_agent_enabled: false
-quality_gates_enabled: false
-dod_file: ""
+total_commits: 0
+audit_enabled: true
+audit_agent_enabled: true
+quality_gates_enabled: true
+dod_file: "/home/runner/work/shipwright/shipwright/.claude/pipeline-artifacts/dod.md"
 auto_extend: true
 extension_count: 0
 max_extensions: 3
 ---
 
 ## Log
-### Iteration 1 (2026-04-04T15:25:20Z)
-{"type":"result","subtype":"success","is_error":false,"duration_ms":227709,"duration_api_ms":143263,"num_turns":22,"resu
-
-### Iteration 2 (2026-04-04T16:25:53Z)
-{"type":"result","subtype":"success","is_error":false,"duration_ms":9837,"duration_api_ms":311675,"num_turns":2,"result"
 

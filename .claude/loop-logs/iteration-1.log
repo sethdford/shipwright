@@ -1,1 +1,34 @@
-{"type":"result","subtype":"success","is_error":false,"duration_ms":227709,"duration_api_ms":143263,"num_turns":22,"result":"The fix is complete. Here's a summary of what was done:\n\n**Root cause:** `_extract_text_from_json()` in `sw-loop.sh` only handled JSON arrays (`[`) in Case 2 (the jq-powered path). When Claude outputs a JSON object (`{`), the code fell through to Case 3, which emits \"JSON output but jq not available\" — even when jq is fully functional.\n\n**Fix:** Extended Case 2 to handle both JSON arrays and objects when jq is available:\n- Arrays: extract `.result` from last element, fall back to `.content` \n- Objects: extract `.result` directly, fall back to `.content`\n- Case 3 now only triggers when jq is genuinely absent\n\n**Tests added** (3 new assertions in `sw-loop-test.sh`):\n- JSON object with `.result` field extracts correctly\n- JSON object with `.content` field extracts correctly  \n- No spurious \"jq not available\" warning emitted for JSON objects\n\nAll 68 loop tests pass. The pre-existing `sw-cost-test.sh` failure is unrelated to this change.\n\nLOOP_COMPLETE","stop_reason":"end_turn","session_id":"2141a2b8-fd6d-4710-b7f2-430b292cdd49","total_cost_usd":0.7620769,"usage":{"input_tokens":24,"cache_creation_input_tokens":54992,"cache_read_input_tokens":1567133,"output_tokens":5225,"server_tool_use":{"web_search_requests":0,"web_fetch_requests":0},"service_tier":"standard","cache_creation":{"ephemeral_1h_input_tokens":54992,"ephemeral_5m_input_tokens":0},"inference_geo":"","iterations":[],"speed":"standard"},"modelUsage":{"claude-sonnet-4-6":{"inputTokens":24,"outputTokens":5225,"cacheReadInputTokens":1567133,"cacheCreationInputTokens":54992,"webSearchRequests":0,"costUSD":0.7548069000000001,"contextWindow":200000,"maxOutputTokens":32000},"claude-haiku-4-5-20251001":{"inputTokens":6090,"outputTokens":236,"cacheReadInputTokens":0,"cacheCreationInputTokens":0,"webSearchRequests":0,"costUSD":0.00727,"contextWindow":200000,"maxOutputTokens":32000}},"permission_denials":[],"terminal_reason":"completed","fast_mode_state":"off","uuid":"a1b2c9a4-1f15-4b3d-aa7d-fd46394eeb52"}
+The intake stage now checks the target project's toolchain before it touches anything, and that work is committed in `641395db` and `b0c4d77e`. A missing runtime or wrong Node version now fails in seconds instead of after a paid build loop.
+
+The full `npm test` run passed 162 of 163 suites. The exception was `sw-lib-daemon-dispatch-test`, which hit a temp-directory cleanup error. That run may have been disturbed by a brief `git stash` I ran while it was going; the suite passed 33/33 when I re-ran it alone. After the second commit I re-ran the pipeline and intake suites, not the full set; all passed.
+
+**What it does**
+- **Where it runs:** at the very top of `stage_intake`, before the issue is assigned or labelled and before the branch is created. A hard failure leaves no stray label or branch behind.
+- **What it checks:**
+  - **Node projects** (the deepest checks): that `node` is installed, and that its version meets `engines.node`, falling back to `.nvmrc` and then `.node-version`. It also checks that the package manager the lockfile implies is installed, that `node_modules` exists, and runs `npm ls` with a time limit.
+  - **Rust, Go, Python, Ruby and Java:** the runtime plus the build tool (respecting `mvnw`/`gradlew` wrappers).
+- **Blocking rules:** the default mode, `enforce`, blocks only on critical findings: missing runtime, definite version mismatch, or missing package manager. Everything else is a warning or info. Version ranges it can't parse, such as `>=18 <21`, never block, and neither do errors inside the check itself.
+- **Settings:** set `pipeline.prebuild.mode` to `off`, `warn` or `enforce` in the existing config, or override per run with `SHIPWRIGHT_PIPELINE_PREBUILD_MODE`.
+- **On a hard failure:** intake logs `PREBUILD_ENV_ERROR: <ids>` and stops. The daemon treats this as a new `environment_error` class and doesn't retry it, since a retry can't install a missing tool.
+- **Outputs:** a `prebuild-check.json` artifact, a `prebuild_status` field in `intake.json`, two new events registered in the event schema, and an "Environment" line in the GitHub progress comment when the check isn't a clean pass.
+
+**Where I departed from the task list.** I followed the design doc's revisions rather than the original plan:
+- The check is a library, `scripts/lib/prebuild-check.sh`, not a standalone `sw-prebuild-check.sh` command.
+- Settings live in `config/defaults.json`, not a new `.claude/prebuild-config.json`.
+- I didn't edit `package.json`, because test suites are found automatically.
+- It doesn't re-check `git` or `jq`, which the existing pre-flight checks already cover.
+
+**Tests**
+- New suite `scripts/sw-lib-prebuild-check-test.sh` has 80 cases, all passing. It hides the runner's real `node`/`npm`/`cargo` so it gives the same result on any machine.
+- Added cases for intake ordering, the `intake.json` field and the daemon's new failure class; those suites pass.
+- The pipeline and end-to-end smoke suites pass unchanged.
+
+**Limits**
+- Only the project root is checked, not each package in a monorepo.
+- On hosts without a `timeout` command (stock macOS), the `npm ls` step is skipped rather than run without a limit.
+
+Both are written up in `docs/prebuild-checks.md`.
+
+`shipwright docs check` reports stale auto-generated sections, but it did so on the base commit too, before my changes; the CI docs workflow normally regenerates them on main.
+
+LOOP_COMPLETE
