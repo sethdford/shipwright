@@ -1594,33 +1594,33 @@
       "result": {
         "results": [
           {
-            "file": "failures.json",
-            "relevance": 95,
-            "summary": "Contains 4 test failures with root causes and fixes directly applicable to build stage testing (sw-cost-test, sw-e2e-integration-test, sw-intent-analysis-test)"
-          },
-          {
-            "file": "flaky-tests.json",
-            "relevance": 85,
-            "summary": "Identifies flaky tests (test-1, test-auth) with confidence scores and error patterns that could cause build stage failures"
+            "file": "success-patterns.json",
+            "relevance": 92,
+            "summary": "Contains two success patterns with test strategies, iteration counts, files changed, and duration estimates. Directly applicable for understanding what build/test approaches worked in the past."
           },
           {
             "file": "retry-outcomes.json",
-            "relevance": 80,
-            "summary": "Contains build_failure retry strategy (model_escalation) with 100% success rate across 5 attempts; directly applicable if build fails"
+            "relevance": 87,
+            "summary": "Documents build_failure class with model_escalation strategy showing 100% success rate across 5 attempts. Critical for understanding how to recover from build failures."
           },
           {
-            "file": "knowledge.json",
-            "relevance": 70,
-            "summary": "Contains KB entries about test environment issues (mktemp directory creation, cleanup detection) that frequently cause build failures"
+            "file": "metrics.json",
+            "relevance": 82,
+            "summary": "Provides baseline metrics: build_duration_s (7095s) and test_duration_s (1459s). Essential for setting performance expectations during the build stage."
           },
           {
-            "file": "success-patterns.json",
-            "relevance": 65,
-            "summary": "Shows two successful patterns with test strategies, iteration counts, and file patterns; demonstrates cost-effective approaches for similar issues"
+            "file": "patterns.json",
+            "relevance": 78,
+            "summary": "Documents project conventions including test_runner (vitest), test_pattern (*.test.js), and source structure. Relevant for understanding build/test infrastructure expectations."
+          },
+          {
+            "file": "failures.json",
+            "relevance": 76,
+            "summary": "Contains 4 recent test failures with root causes and fixes. Relevant because test failures commonly occur during or after the build stage."
           }
         ]
       },
-      "timestamp": 1791166508,
+      "timestamp": 1791168376,
       "ttl": 1800
     },
     "82884b010f1379485257cd91f828ebdc": {
@@ -2255,6 +2255,83 @@
         }
       ],
       "timestamp": 1791166950,
+      "ttl": 1800
+    },
+    "3ee2e00d8e7d8f7af0752b8c69dfe8ad": {
+      "result": [
+        {
+          "type": "result",
+          "result": "I am trying the same approach again.",
+          "usage": {
+            "input_tokens": 0,
+            "output_tokens": 0
+          }
+        }
+      ],
+      "timestamp": 1791167077,
+      "ttl": 1800
+    },
+    "09c606d61af37372e86507118c9f5788": {
+      "result": [
+        {
+          "type": "result",
+          "result": "I am trying the same approach again.",
+          "usage": {
+            "input_tokens": 0,
+            "output_tokens": 0
+          }
+        }
+      ],
+      "timestamp": 1791167245,
+      "ttl": 1800
+    },
+    "e337b34c78e14a48c98db5c51fdbaee3": {
+      "result": [
+        {
+          "type": "result",
+          "result": "I am trying the same approach again.",
+          "usage": {
+            "input_tokens": 0,
+            "output_tokens": 0
+          }
+        }
+      ],
+      "timestamp": 1791167410,
+      "ttl": 1800
+    },
+    "6979ba9c4e98934b5eb50386ed2a3593": {
+      "result": [
+        {
+          "type": "result",
+          "result": "I am trying the same approach again.",
+          "usage": {
+            "input_tokens": 0,
+            "output_tokens": 0
+          }
+        }
+      ],
+      "timestamp": 1791167599,
+      "ttl": 1800
+    },
+    "a37da3f9b94b671ee38f091b297ef0d7": {
+      "result": {
+        "raw_response": "Mock claude: ok"
+      },
+      "timestamp": 1791167853,
+      "ttl": 1800
+    },
+    "2fd74b059bf1afd24489b47319b45163": {
+      "result": [
+        {
+          "type": "result",
+          "result": "I am trying the same approach again.",
+          "usage": {
+            "input_tokens": 0,
+            "output_tokens": 0
+          }
+        }
+      ],
+      "timestamp": 1791168073,
       "ttl": 1800
     }
   }
