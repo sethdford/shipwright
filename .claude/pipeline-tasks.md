@@ -1,22 +1,29 @@
 # Pipeline Tasks — Classify and surface flatlining build-loop iterations distinct from context exhaustion
 
 ## Implementation Checklist
-- [x] 1. Create `lib/loop-flatline.sh` with the classifier, exit-class resolver and atomic artifact writer
-- [x] 2. Source and call it from `sw-loop.sh` per iteration; emit `loop.iteration_classified` and `loop.flatline` *(depends on 1)*
-- [x] 3. Add `Exit class` and `Flatline streak` to `progress.md` and `show_summary` *(depends on 1)*
-- [x] 4. Tag `stuck_restart` and flatline restarts with a reason and inject the flatline strategy *(depends on 2, 6)*
-- [x] 5. Fix the unreachable `iteration_limit` branch and add flatline in `restart_detect_reason`
-- [x] 6. Add the `flatline` strategy in `restart_suggest_strategy`
-- [x] 7. Pipeline build stage: write `flatline` vs `context_exhaustion` to `failure-reason.txt` *(depends on 3)*
-- [x] 8. Daemon `classify_failure`, retry limits and escalation for `flatline` without the restart boost *(depends on 3, 7)*
-- [x] 9. Add the `flatline` category in `root-cause.sh`
-- [x] 10. Event schema entries plus sync
-- [x] 11. New `sw-loop-flatline-test.sh`, registered in `package.json`
-- [x] 12. Extend the daemon-failure, session-restart and loop tests
-- [x] 13. Update the CLAUDE.md docs
+- [ ] **Task 1**: Add `compute_stall_reason()` function to `scripts/lib/loop-flatline.sh` with logic for all four cases
+- [ ] **Task 2**: Read `flatline.json` and error history in `compute_stall_reason()` to determine streak and error signatures
+- [ ] **Task 3**: Call `compute_stall_reason()` in `scripts/sw-loop.sh` after loop termination, store in `LOOP_STALL_REASON`
+- [ ] **Task 4**: Update `progress.md` write logic to include `Stall reason:` line (after `Exit class:`)
+- [ ] **Task 5**: Update `error-summary.json` write logic to include `"stall_reason"` field
+- [ ] **Task 6**: Create `_retry_action_for_stall_reason()` function in `scripts/sw-daemon.sh` with decision logic
+- [ ] **Task 7**: Update `_should_restart()` in `scripts/sw-daemon.sh` to read stall_reason and call new function
+- [ ] **Task 8**: Add max-retry config per stall_reason (optional: `loop.max_retries_by_reason` in daemon-config.json)
+- [ ] **Task 9**: Write unit test for `compute_stall_reason()` in `sw-loop-test.sh` covering all cases
+- [ ] **Task 10**: Write unit test for daemon retry logic in `sw-lib-daemon-failure-test.sh` covering all cases
+- [ ] **Task 11**: Write backward-compatibility test (missing stall_reason field) in both test suites
+- [ ] **Task 12**: Update documentation in CLAUDE.md: `loop.max_retries_by_reason` config section
+- [ ] **Task 13**: Run full test suite (`npm test`) and verify no regressions
+- [ ] **Task 14**: Manual smoke test: trigger loop failure, check progress.md/error-summary.json for stall_reason
+- [ ] **Task 15**: Verify daemon restart logic respects stall_reason in live daemon run (or via e2e test)
+- [ ] `compute_stall_reason()` function exists in loop-flatline.sh and handles all four cases
+- [ ] `stall_reason` field written to progress.md and error-summary.json on loop termination
+- [ ] Daemon reads `stall_reason` and uses it in retry/restart/abort decision
+- [ ] No hardcoded stall_reason values (all derived from loop state)
+- [ ] sw-loop-test.sh has 4+ unit tests for classification (all cases covered)
 
 ## Context
-- Pipeline: autonomous
-- Branch: ci/issue-7689
-- Issue: none
-- Generated: 2026-10-04T14:54:07Z
+- Pipeline: standard
+- Branch: feat/classify-and-surface-flatlining-build-lo-7689
+- Issue: #7689
+- Generated: 2026-10-05T00:57:46Z

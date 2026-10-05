@@ -1,5 +1,5 @@
 {
-  "timestamp": "2026-10-04T16:45:27Z",
+  "timestamp": "2026-10-05T01:05:09Z",
   "repository": "shipwright",
   "counts": {
     "hardcoded": 49,
@@ -63,7 +63,7 @@
     },
     {
       "file": "scripts/lib/pipeline-stages-build.sh",
-      "line": 73
+      "line": 76
     },
     {
       "file": "scripts/lib/pipeline-quality-checks.sh",
