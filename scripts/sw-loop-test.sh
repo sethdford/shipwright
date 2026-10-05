@@ -855,6 +855,59 @@ else
     assert_fail "run_audit_agent reads structured test evidence"
 fi
 
+# ─── Test: audit structured output (schema + result parsing) ──────────────
+echo ""
+echo -e "${DIM}  audit structured output${RESET}"
+
+_audit_fns=$(sed -n '/^_audit_cli_schema()/,/^}/p; /^_audit_log_passed()/,/^}/p; /^_audit_log_findings()/,/^}/p' "$SCRIPT_DIR/sw-loop.sh")
+_audit_tmp=$(mktemp -d "${TMPDIR:-/tmp}/sw-loop-audit-test.XXXXXX")
+_audit_run() { bash -c "$_audit_fns
+$1" 2>/dev/null; }
+
+# The CLI rejects draft/2020-12 as an unknown meta-schema ref
+_audit_schema=$(_audit_run "_audit_cli_schema '$SCRIPT_DIR/../schemas/audit-result.json'")
+if [[ -n "$_audit_schema" ]] && echo "$_audit_schema" | jq -e 'has("$schema") | not' >/dev/null 2>&1 \
+   && echo "$_audit_schema" | jq -e '.required == ["passed","findings"]' >/dev/null 2>&1; then
+    assert_pass "audit schema passed to CLI has \$schema stripped, body intact"
+else
+    assert_fail "audit schema passed to CLI has \$schema stripped, body intact" "got: $_audit_schema"
+fi
+
+if [[ -z "$(_audit_run "_audit_cli_schema '$_audit_tmp/missing.json'")" ]]; then
+    assert_pass "missing audit schema yields no --json-schema value"
+else
+    assert_fail "missing audit schema yields no --json-schema value"
+fi
+
+echo '{"passed":true,"findings":[]}' > "$_audit_tmp/pass.json"
+echo '{"type":"result","structured_output":{"passed":true,"findings":[]}}' > "$_audit_tmp/envelope.json"
+printf 'Looks good.\nAUDIT_PASS\n' > "$_audit_tmp/text.log"
+echo '{"passed":false,"findings":[{"severity":"critical","message":"tests fail","file":"a.sh","line":3}]}' > "$_audit_tmp/fail.json"
+echo 'Error: --json-schema is not a valid JSON Schema' > "$_audit_tmp/error.log"
+: > "$_audit_tmp/empty.log"
+
+_audit_ok=true
+for _f in pass.json envelope.json text.log; do
+    _audit_run "_audit_log_passed '$_audit_tmp/$_f'" || { _audit_ok=false; echo "    expected pass: $_f"; }
+done
+for _f in fail.json error.log empty.log; do
+    _audit_run "_audit_log_passed '$_audit_tmp/$_f'" && { _audit_ok=false; echo "    expected fail: $_f"; }
+done
+if $_audit_ok; then
+    assert_pass "audit pass detected from structured JSON, envelope, and AUDIT_PASS text"
+else
+    assert_fail "audit pass detected from structured JSON, envelope, and AUDIT_PASS text"
+fi
+
+_audit_findings=$(_audit_run "_audit_log_findings '$_audit_tmp/fail.json'")
+if [[ "$_audit_findings" == "[critical] tests fail (a.sh:3)" ]] \
+   && [[ -z "$(_audit_run "_audit_log_findings '$_audit_tmp/error.log'")" ]]; then
+    assert_pass "structured audit findings rendered one per line"
+else
+    assert_fail "structured audit findings rendered one per line" "got: $_audit_findings"
+fi
+rm -rf "$_audit_tmp"
+
 # ═══════════════════════════════════════════════════════════════════════════════
 # VERIFICATION GAP TESTS
 # ═══════════════════════════════════════════════════════════════════════════════

@@ -1257,20 +1257,54 @@ AUDIT_PROMPT
 
     # Use structured output for machine-parseable audit results
     local schema_file="${SCRIPT_DIR}/../schemas/audit-result.json"
-    if [[ -f "$schema_file" ]]; then
-        audit_flags+=("--json-schema" "$(cat "$schema_file")")
+    local audit_schema
+    audit_schema="$(_audit_cli_schema "$schema_file")"
+    if [[ -n "$audit_schema" ]]; then
+        audit_flags+=("--json-schema" "$audit_schema")
     fi
 
     local exit_code=0
     claude -p "$audit_prompt" "${audit_flags[@]}" > "$audit_log" 2>&1 || exit_code=$?
 
-    if grep -q "AUDIT_PASS" "$audit_log" 2>/dev/null; then
+    if _audit_log_passed "$audit_log"; then
         AUDIT_RESULT="pass"
         echo -e "  ${GREEN}✓${RESET} Audit: passed"
     else
-        AUDIT_RESULT="$(grep -v '^$' "$audit_log" | tail -20 | head -10 2>/dev/null || echo "Audit returned no output")"
+        AUDIT_RESULT="$(_audit_log_findings "$audit_log")"
+        [[ -z "$AUDIT_RESULT" ]] && AUDIT_RESULT="$(grep -v '^$' "$audit_log" 2>/dev/null | tail -20 | head -10 || true)"
+        [[ -z "$AUDIT_RESULT" ]] && AUDIT_RESULT="Audit returned no output"
         echo -e "  ${YELLOW}⚠${RESET} Audit: issues found"
     fi
+}
+
+# The claude CLI validates --json-schema against meta-schemas it bundles, and it
+# rejects "$schema": ".../draft/2020-12/schema" as an unknown ref. The schema
+# files keep their $schema for editors and docs, so strip it before passing.
+# Prints nothing when the file is missing or isn't valid JSON.
+_audit_cli_schema() {
+    local schema_file="$1"
+    [[ -f "$schema_file" ]] || return 0
+    jq -c 'del(."$schema")' "$schema_file" 2>/dev/null || true
+}
+
+# Structured audit output is JSON ({"passed": true, ...}), possibly wrapped in
+# a result envelope; the plain-text fallback prints AUDIT_PASS. Accept either.
+_audit_log_passed() {
+    local log="$1"
+    [[ -s "$log" ]] || return 1
+    grep -q "AUDIT_PASS" "$log" 2>/dev/null && return 0
+    jq -e -s 'any(.[]; (.passed // .structured_output.passed // false) == true)' \
+        "$log" >/dev/null 2>&1
+}
+
+# Render structured findings as one line each; prints nothing for non-JSON logs.
+_audit_log_findings() {
+    local log="$1"
+    [[ -s "$log" ]] || return 0
+    jq -r -s '[.[] | (.findings // .structured_output.findings // [])[]]
+        | .[] | "[\(.severity // "info")] \(.message // "")"
+          + (if .file then " (\(.file)\(if .line then ":\(.line)" else "" end))" else "" end)' \
+        "$log" 2>/dev/null | head -10 || true
 }
 
 # ─── Quality Gates ───────────────────────────────────────────────────────────

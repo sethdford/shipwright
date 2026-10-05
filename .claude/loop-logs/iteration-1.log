@@ -1,7 +1,0 @@
-The README comment is already in the repo. Commit `ba58e2fa` added it as `<!-- E2E test: automated comment added by the Shipwright pipeline -->` at line 594, below the License section. I made no new changes this iteration.
-
-For acceptance, I ran only the docs suite, `scripts/sw-docs-test.sh`, which passes (18 passed, 0 failed). I did not run the full `npm test`, so "all existing tests continue to pass" is checked only for that suite. A README-only HTML comment shouldn't affect the other suites.
-
-The task checklist in the prompt is for the prebuild-check feature and is unrelated to this goal. I left it alone.
-
-LOOP_COMPLETE

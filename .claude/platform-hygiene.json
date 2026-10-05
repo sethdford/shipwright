@@ -1,5 +1,5 @@
 {
-  "timestamp": "2026-10-05T11:15:50Z",
+  "timestamp": "2026-10-05T11:56:25Z",
   "repository": "shipwright",
   "counts": {
     "hardcoded": 49,
@@ -319,7 +319,7 @@
     },
     {
       "file": "scripts/sw-daemon-test.sh",
-      "line": 1934
+      "line": 1929
     },
     {
       "file": "scripts/sw-pipeline-vitals.sh",
@@ -543,19 +543,19 @@
     },
     {
       "file": "scripts/sw-loop.sh",
-      "line": 1300
+      "line": 1334
     },
     {
       "file": "scripts/sw-loop.sh",
-      "line": 1304
+      "line": 1338
     },
     {
       "file": "scripts/sw-loop.sh",
-      "line": 1307
+      "line": 1341
     },
     {
       "file": "scripts/sw-loop.sh",
-      "line": 1563
+      "line": 1597
     },
     {
       "file": "scripts/sw-quality.sh",
@@ -661,7 +661,7 @@
   "script_size_hotspots": [
     {
       "script": "sw-loop.sh",
-      "lines": 2713
+      "lines": 2747
     },
     {
       "script": "sw-memory.sh",
@@ -669,7 +669,7 @@
     },
     {
       "script": "sw-daemon-test.sh",
-      "lines": 1985
+      "lines": 1980
     },
     {
       "script": "sw-pipeline-test.sh",

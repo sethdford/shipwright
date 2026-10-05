@@ -1105,7 +1105,7 @@ optimize_evolve_memory() {
 
         # Prune entries not seen within prune window
         local pruned_json
-        pruned_json=$(jq --arg cutoff "$(date -u -r "$prune_cutoff" +"%Y-%m-%dT%H:%M:%SZ" 2>/dev/null || date -u +"%Y-%m-%dT%H:%M:%SZ")" \
+        pruned_json=$(jq --arg cutoff "$(epoch_to_iso "$prune_cutoff")" \
             '[.failures[] | select(.last_seen >= $cutoff or .last_seen == null)]' \
             "$failures_file" 2>/dev/null || echo "[]")
 
@@ -1116,7 +1116,7 @@ optimize_evolve_memory() {
 
         # Strengthen entries seen N+ times within boost window (adaptive thresholds)
         pruned_json=$(echo "$pruned_json" | jq \
-            --arg cutoff_b "$(date -u -r "$boost_cutoff" +"%Y-%m-%dT%H:%M:%SZ" 2>/dev/null || date -u +"%Y-%m-%dT%H:%M:%SZ")" \
+            --arg cutoff_b "$(epoch_to_iso "$boost_cutoff")" \
             --argjson st "$strength_threshold" '
             [.[] | if (.seen_count >= $st and .last_seen >= $cutoff_b) then
                 .weight = ((.weight // 1.0) * 1.5)
@@ -1492,7 +1492,7 @@ optimize_report() {
     now_e=$(now_epoch)
     seven_days_ago=$((now_e - 604800))
     local cutoff_iso
-    cutoff_iso=$(date -u -r "$seven_days_ago" +"%Y-%m-%dT%H:%M:%SZ" 2>/dev/null || date -u +"%Y-%m-%dT%H:%M:%SZ")
+    cutoff_iso=$(epoch_to_iso "$seven_days_ago")
 
     # Count outcomes in last 7 days
     local total_recent=0

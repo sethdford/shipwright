@@ -1589,32 +1589,32 @@
         "results": [
           {
             "file": "retry-outcomes.json",
-            "relevance": 95,
-            "summary": "Directly documents build_failure retry strategies with model escalation achieving 100% success rate across 5 attempts"
+            "relevance": 90,
+            "summary": "Build-failure retry strategies with 100% success rate using model escalation—directly applicable when builds fail during this stage"
           },
           {
             "file": "success-patterns.json",
-            "relevance": 95,
-            "summary": "Captures successful build patterns with iteration counts (3), file change patterns, test strategies, and cost metrics for similar complexity issues"
+            "relevance": 85,
+            "summary": "Past successful build approaches showing iteration counts, file patterns, test strategies, and templates—provides proven patterns for similar complexity levels"
           },
           {
             "file": "failures.json",
-            "relevance": 92,
-            "summary": "Documents test stage failures and timeouts that directly block build stage completion, with root causes and fixes"
+            "relevance": 80,
+            "summary": "Test-stage failure patterns and root causes with fixes—helps avoid repeating known issues that can cause build validation failures"
           },
           {
             "file": "flaky-tests.json",
-            "relevance": 90,
-            "summary": "Tracks flaky test occurrences (5-8 times) with error messages and confidence scores critical to build reliability"
+            "relevance": 75,
+            "summary": "Flaky test catalog with error messages and confidence levels—identifies unreliable tests that may fail during build validation"
           },
           {
-            "file": "knowledge.json",
-            "relevance": 85,
-            "summary": "Provides actionable test failure patterns (mktemp, JSON schema, regression detection) and fix strategies for build validation phase"
+            "file": "metrics.json",
+            "relevance": 65,
+            "summary": "Build and test duration baselines (7095s and 1459s)—provides context for expected performance and timeout configuration"
           }
         ]
       },
-      "timestamp": 1791197466,
+      "timestamp": 1791201202,
       "ttl": 1800
     },
     "55a5f65c9fb861dc1d1e591efadb191f": {
@@ -1915,6 +1915,111 @@
         }
       ],
       "timestamp": 1791199087,
+      "ttl": 1800
+    },
+    "453e1111236a34533d0d1ba1ba4e56c3": {
+      "result": {
+        "raw_response": "Mock claude: ok"
+      },
+      "timestamp": 1791199507,
+      "ttl": 1800
+    },
+    "955415ae89a9eb726ee456f6ebd1b2b5": {
+      "result": [
+        {
+          "type": "result",
+          "result": "I am trying the same approach again.",
+          "usage": {
+            "input_tokens": 0,
+            "output_tokens": 0
+          }
+        }
+      ],
+      "timestamp": 1791199729,
+      "ttl": 1800
+    },
+    "392aa399623f42ab0446df98c1fc4bdf": {
+      "result": [
+        {
+          "type": "result",
+          "result": "I am trying the same approach again.",
+          "usage": {
+            "input_tokens": 0,
+            "output_tokens": 0
+          }
+        }
+      ],
+      "timestamp": 1791200102,
+      "ttl": 1800
+    },
+    "9eaf041ea4ca6e46ee29b755404adc41": {
+      "result": {
+        "raw_response": "Mock claude: ok"
+      },
+      "timestamp": 1791200265,
+      "ttl": 1800
+    },
+    "4cb9ee355ce61cc87d32180763552cab": {
+      "result": [
+        {
+          "type": "result",
+          "result": "I am trying the same approach again.",
+          "usage": {
+            "input_tokens": 0,
+            "output_tokens": 0
+          }
+        }
+      ],
+      "timestamp": 1791200486,
+      "ttl": 1800
+    },
+    "7ad5981186f372dd7684b5b1eca2301c": {
+      "result": {
+        "raw_response": "Mock claude: ok"
+      },
+      "timestamp": 1791200884,
+      "ttl": 1800
+    },
+    "88678a5fb774dea628e387a067aad240": {
+      "result": [
+        {
+          "type": "result",
+          "result": "I am trying the same approach again.",
+          "usage": {
+            "input_tokens": 0,
+            "output_tokens": 0
+          }
+        }
+      ],
+      "timestamp": 1791201106,
+      "ttl": 1800
+    },
+    "d1a37ed7e72c1e37f835399f932b16ca": {
+      "result": {
+        "raw_response": "Mock claude: ok"
+      },
+      "timestamp": 1791201271,
+      "ttl": 1800
+    },
+    "6c226e21612be0e4babc02d0948dbbf0": {
+      "result": {
+        "raw_response": "Mock claude: ok"
+      },
+      "timestamp": 1791201372,
+      "ttl": 1800
+    },
+    "e8cfbd2e66ac29d62c7f672d8ddc8e9d": {
+      "result": [
+        {
+          "type": "result",
+          "result": "I am trying the same approach again.",
+          "usage": {
+            "input_tokens": 0,
+            "output_tokens": 0
+          }
+        }
+      ],
+      "timestamp": 1791201458,
       "ttl": 1800
     }
   }
