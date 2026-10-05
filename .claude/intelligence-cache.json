@@ -1597,31 +1597,31 @@
           {
             "file": "failures.json",
             "relevance": 95,
-            "summary": "Direct test stage failures with root causes and fixes; includes cost dashboard, intent analysis schema, and integration test issues relevant to build execution"
+            "summary": "Contains test stage failures with root causes (intent-analysis schema, e2e integration state issues, cost dashboard) and fixes—directly applicable to avoiding build regressions"
           },
           {
-            "file": "retry-outcomes.json",
+            "file": "success-patterns.json",
             "relevance": 90,
-            "summary": "Proven build_failure retry strategy (model_escalation) with 100% success rate across 5 attempts; directly applicable to build stage recovery"
+            "summary": "Captures successful build patterns with test strategy (npm test), iteration counts, files changed, and cost data—directly applicable to planning this build's approach"
           },
           {
             "file": "flaky-tests.json",
             "relevance": 85,
-            "summary": "Identifies flaky tests (test-auth with 90% confidence, test-1 with 85% confidence) that cause build instability; essential for test reliability"
+            "summary": "Lists known flaky tests (test-auth with 90% confidence connection timeout, test-1 with 85% confidence error) that may fail during build—allows proactive mitigation"
           },
           {
-            "file": "success-patterns.json",
-            "relevance": 80,
-            "summary": "Two successful builds showing approach, 3 iterations, npm test strategy, standard template, and file patterns; directly comparable to current build context"
+            "file": "retry-outcomes.json",
+            "relevance": 75,
+            "summary": "Documents build_failure retry strategy (model_escalation) with 100% success rate across 5 attempts—directly applicable if build fails and needs retry"
           },
           {
-            "file": "knowledge.json",
+            "file": "metrics.json",
             "relevance": 70,
-            "summary": "Common test failures (mktemp directory issues, cleanup output format, regression detection) with fix strategies applicable to test environment setup"
+            "summary": "Contains baseline build_duration_s (7095) and test_duration_s (1459)—provides expectations for build/test performance and timeout thresholds"
           }
         ]
       },
-      "timestamp": 1791162086,
+      "timestamp": 1791164038,
       "ttl": 1800
     },
     "82884b010f1379485257cd91f828ebdc": {
@@ -2112,6 +2112,69 @@
         }
       ],
       "timestamp": 1791163916,
+      "ttl": 1800
+    },
+    "506cfe64fdd131d2bc0f36135e267d6c": {
+      "result": [
+        {
+          "type": "result",
+          "result": "I am trying the same approach again.",
+          "usage": {
+            "input_tokens": 0,
+            "output_tokens": 0
+          }
+        }
+      ],
+      "timestamp": 1791164056,
+      "ttl": 1800
+    },
+    "83ebded1c6cecdd4747015f9afb6cbf6": {
+      "result": [
+        {
+          "type": "result",
+          "result": "I am trying the same approach again.",
+          "usage": {
+            "input_tokens": 0,
+            "output_tokens": 0
+          }
+        }
+      ],
+      "timestamp": 1791164212,
+      "ttl": 1800
+    },
+    "96df1738c85fd9e36fbef2cd6ed09163": {
+      "result": [
+        {
+          "type": "result",
+          "result": "I am trying the same approach again.",
+          "usage": {
+            "input_tokens": 0,
+            "output_tokens": 0
+          }
+        }
+      ],
+      "timestamp": 1791164526,
+      "ttl": 1800
+    },
+    "85b488e7be65c21d19049b3ba0d2a3b5": {
+      "result": {
+        "raw_response": "Mock claude: ok"
+      },
+      "timestamp": 1791164706,
+      "ttl": 1800
+    },
+    "a12f4df3fa394ad5d4c9fe540b9f6a3a": {
+      "result": [
+        {
+          "type": "result",
+          "result": "I am trying the same approach again.",
+          "usage": {
+            "input_tokens": 0,
+            "output_tokens": 0
+          }
+        }
+      ],
+      "timestamp": 1791164928,
       "ttl": 1800
     }
   }
