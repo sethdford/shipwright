@@ -1,34 +1,9 @@
-The intake stage now checks the target project's toolchain before it touches anything, and that work is committed in `641395db` and `b0c4d77e`. A missing runtime or wrong Node version now fails in seconds instead of after a paid build loop.
+I added an HTML comment to the end of `README.md` and committed it as `ba58e2fa`. The comment is `<!-- E2E test: automated comment added by the Shipwright pipeline -->`. It doesn't show up when the README is rendered.
 
-The full `npm test` run passed 162 of 163 suites. The exception was `sw-lib-daemon-dispatch-test`, which hit a temp-directory cleanup error. That run may have been disturbed by a brief `git stash` I ran while it was going; the suite passed 33/33 when I re-ran it alone. After the second commit I re-ran the pipeline and intake suites, not the full set; all passed.
+I did not run the full `npm test` suite, which has over 100 suites. I ran only the checks that read the README:
+- **Version consistency:** `scripts/check-version-consistency.sh` reports 3.3.0 everywhere.
+- **Docs suite:** `scripts/sw-docs-test.sh` passes 18 of 18.
 
-**What it does**
-- **Where it runs:** at the very top of `stage_intake`, before the issue is assigned or labelled and before the branch is created. A hard failure leaves no stray label or branch behind.
-- **What it checks:**
-  - **Node projects** (the deepest checks): that `node` is installed, and that its version meets `engines.node`, falling back to `.nvmrc` and then `.node-version`. It also checks that the package manager the lockfile implies is installed, that `node_modules` exists, and runs `npm ls` with a time limit.
-  - **Rust, Go, Python, Ruby and Java:** the runtime plus the build tool (respecting `mvnw`/`gradlew` wrappers).
-- **Blocking rules:** the default mode, `enforce`, blocks only on critical findings: missing runtime, definite version mismatch, or missing package manager. Everything else is a warning or info. Version ranges it can't parse, such as `>=18 <21`, never block, and neither do errors inside the check itself.
-- **Settings:** set `pipeline.prebuild.mode` to `off`, `warn` or `enforce` in the existing config, or override per run with `SHIPWRIGHT_PIPELINE_PREBUILD_MODE`.
-- **On a hard failure:** intake logs `PREBUILD_ENV_ERROR: <ids>` and stops. The daemon treats this as a new `environment_error` class and doesn't retry it, since a retry can't install a missing tool.
-- **Outputs:** a `prebuild-check.json` artifact, a `prebuild_status` field in `intake.json`, two new events registered in the event schema, and an "Environment" line in the GitHub progress comment when the check isn't a clean pass.
-
-**Where I departed from the task list.** I followed the design doc's revisions rather than the original plan:
-- The check is a library, `scripts/lib/prebuild-check.sh`, not a standalone `sw-prebuild-check.sh` command.
-- Settings live in `config/defaults.json`, not a new `.claude/prebuild-config.json`.
-- I didn't edit `package.json`, because test suites are found automatically.
-- It doesn't re-check `git` or `jq`, which the existing pre-flight checks already cover.
-
-**Tests**
-- New suite `scripts/sw-lib-prebuild-check-test.sh` has 80 cases, all passing. It hides the runner's real `node`/`npm`/`cargo` so it gives the same result on any machine.
-- Added cases for intake ordering, the `intake.json` field and the daemon's new failure class; those suites pass.
-- The pipeline and end-to-end smoke suites pass unchanged.
-
-**Limits**
-- Only the project root is checked, not each package in a monorepo.
-- On hosts without a `timeout` command (stock macOS), the `npm ls` step is skipped rather than run without a limit.
-
-Both are written up in `docs/prebuild-checks.md`.
-
-`shipwright docs check` reports stale auto-generated sections, but it did so on the base commit too, before my changes; the CI docs workflow normally regenerates them on main.
+The change touches no scripts or config, so I expect the other suites to be unaffected.
 
 LOOP_COMPLETE
