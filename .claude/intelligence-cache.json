@@ -1763,107 +1763,112 @@
     "f9c9e8b2bd49e68005879dc608624768": {
       "result": {
         "issue_type": "testing",
-        "confidence": 0.82,
+        "confidence": 0.95,
         "secondary_domains": [
           "automation",
-          "documentation"
+          "integration",
+          "test-reliability"
         ],
         "complexity_assessment": {
-          "score": 3,
-          "reasoning": "Narrow scope E2E test validating a single workflow (README comment addition); automation is pre-defined; marked safe to close indicating straightforward intent"
+          "score": 4,
+          "reasoning": "E2E test for a simple file operation (add comment to README), but success depends on proper test isolation and clean state management. Operationally sensitive despite low algorithmic complexity."
         },
         "skill_plan": {
           "plan": [
-            "testing-strategy"
+            "testing-strategy",
+            "brainstorming"
           ],
           "design": [
-            "testing-strategy"
+            "e2e-test-reliability",
+            "architecture-design"
           ],
           "build": [
-            "testing-strategy",
-            "bash-script-modularization"
-          ],
-          "review": [
-            "validation-thoroughness",
-            "testing-strategy"
-          ],
-          "compound_quality": [
-            "validation-thoroughness"
-          ],
-          "pr": [
-            "pr-quality",
+            "e2e-test-reliability",
             "documentation"
           ],
-          "deploy": [],
-          "validate": [
-            "validation-thoroughness"
+          "review": [
+            "adversarial-quality",
+            "e2e-test-reliability"
           ],
-          "monitor": []
+          "compound_quality": [
+            "validation-thoroughness",
+            "adversarial-quality"
+          ],
+          "pr": [
+            "pr-quality"
+          ],
+          "deploy": [
+            "deploy-safety"
+          ],
+          "validate": [
+            "e2e-test-reliability"
+          ],
+          "monitor": [
+            "observability"
+          ]
         },
         "skill_rationale": {
-          "testing-strategy": "E2E tests need clear objectives, proper isolation, and reproducibility—this skill ensures the test validates the README comment workflow reliably across environments",
-          "bash-script-modularization": "If the E2E test harness is bash-based, modularize setup/teardown and test cases to avoid brittle, monolithic test code that fails on minor changes",
-          "validation-thoroughness": "README modifications can have unintended side effects; verify the test doesn't just pass but actually proves the comment was added correctly and the system recovered clean state",
-          "pr-quality": "An E2E test PR must clearly state what workflow is being validated and why it matters—reviewers need to understand the test's purpose in 5 minutes",
-          "documentation": "Document the test's setup requirements, expected behavior, and how to debug failures; a test without clear intent becomes a maintenance burden"
+          "testing-strategy": "E2E tests require a deliberate strategy around setup/teardown, assertion scope, and reproducibility—this test must verify that adding a comment actually persists in the README without side effects.",
+          "brainstorming": "Challenge assumptions early: Does the test verify the comment persists after a full pipeline cycle? Does it handle concurrent README modifications? Should it test rollback/undo?",
+          "e2e-test-reliability": "Critical for this issue—README tests are prone to state pollution and cleanup failures; proper test isolation is the difference between a flaky test that passes locally and one that passes consistently in CI.",
+          "architecture-design": "The test harness must clearly separate setup (clone/stage README), execution (add comment), verification (check state), and teardown (restore original)—an ADR clarifies this for future maintainers.",
+          "adversarial-quality": "Attack the test: What if the README file is locked? What if a previous test left a stale comment? What if network interrupts during restore? Adversarial review catches these fragilities.",
+          "validation-thoroughness": "Smoke tests might miss that the comment was added to the wrong location or with wrong formatting; this test must verify the actual user experience (comment is visible, formatted correctly, in the right place).",
+          "documentation": "The test itself should be self-documenting with clear assertions and comments explaining why each step matters—future developers will debug this test and need to understand its intent.",
+          "pr-quality": "E2E tests are easy to misunderstand; the PR description must explain what user behavior is being tested and why this particular approach (vs. unit or integration test) is necessary.",
+          "deploy-safety": "README E2E tests can fail unpredictably in CI due to filesystem permissions, concurrent file access, or timing issues; deploy with safety controls (retry logic, failure isolation).",
+          "observability": "Post-deployment, track test execution time, pass/fail rates, and failure modes to catch chronic flakiness early—this reveals if the test is fragile or if something in the infrastructure changed."
         },
-        "generated_skills": [
-          {
-            "name": "e2e-test-reliability",
-            "reason": "No existing skill addresses E2E test flakiness prevention—a critical concern for automation tests that modify README and must pass consistently in CI without race conditions or state leakage",
-            "content": "## E2E Test Reliability Patterns\n\n**Test Isolation**: Each E2E test run must start from a clean state and leave no artifacts behind. For README modifications:\n- Use a temporary branch or separate test file, never modify the canonical README directly\n- Restore original state in teardown, even on test failure (use trap handlers in bash)\n- Verify idempotency: running the test twice should produce the same result\n\n**Environment Detection**: E2E tests behave differently in CI vs. local development.\n- Detect CI environment (`$CI`, `$GITHUB_ACTIONS`) and skip cleanup assertions that require git push access\n- Mock or stub external dependencies (GitHub API calls) when running locally\n- Log environment context (OS, shell version, git version) to failures for debugging\n\n**Flakiness Signatures**: These patterns indicate your E2E test will fail randomly:\n- Hardcoded file paths (use `$TMPDIR` or temp directories)\n- Time-dependent assertions (sleep, timestamp checks) without jitter tolerance\n- Concurrent test runs sharing state (temp files, git branches)\n- Network calls without retry logic (GitHub API rate limits, DNS latency)\n\n**Debugging E2E Failures**: When a test passes locally but fails in CI:\n1. Capture full stdout/stderr before cleanup (write to artifact directory)\n2. Log the git state: `git status`, `git log --oneline -5`\n3. Print environment: `env | grep -E 'CI|GITHUB|PATH'`\n4. Re-run the test in CI with `--verbose` if available; CI logs > local reproduction\n\n**Test Structure**: Prefer a three-phase pattern:\n```bash\n# Phase 1: Setup (idempotent)\n# Phase 2: Execute (the actual workflow being tested)\n# Phase 3: Verify + Cleanup (always runs, even on error)\n```"
-          }
-        ],
+        "generated_skills": [],
         "review_focus": [
-          "Test setup and teardown: does cleanup run even if test fails? Does README restore to original state?",
-          "Isolation: does the test use a temporary branch/file or risk corrupting canonical README?",
-          "Idempotency: will running the test twice produce the same result, or does it fail on second run?",
-          "CI vs. local: does the test work in both environments? Are external API calls mocked in CI?",
-          "Logging: if the test fails in CI, can developers debug from the logs? Are git state and environment captured?",
-          "Test readability: can a new team member understand what workflow is being validated within 2 minutes?"
+          "Test isolation and setup/teardown correctness—does each run start from a clean state and leave no artifacts?",
+          "README state management—how is the original README backed up and restored? What if restoration fails midway?",
+          "Assertion specificity—does the test verify the comment was added to the correct location with correct formatting, or just check file existence?",
+          "Reproducibility—does the test pass consistently on CI, or only locally? Are there environment dependencies (file permissions, temp directory location)?",
+          "Failure diagnostics—when this test fails, can a developer quickly understand why (e.g., is the original README state captured in logs)?"
         ],
         "risk_areas": [
-          "README modification persisting after test failure, corrupting the actual README",
-          "Flaky test that passes locally but fails in CI due to environment differences or timing issues",
-          "Hardcoded paths or assumptions that break on different systems or CI containers",
-          "Missing cleanup causing subsequent E2E runs to fail (git branch conflicts, temp file conflicts)",
-          "Test validates only happy path; missing edge cases (permission errors, concurrent modifications)"
+          "Test flakiness due to shared README state or concurrent test execution creating race conditions",
+          "README file corruption or failed restoration leaving the repo in a bad state for subsequent tests",
+          "Test passes but the actual feature is broken (gap between test's simplified environment and real deployment conditions)",
+          "Hard-to-debug test failures because setup/teardown errors are masked or unclear",
+          "Interdependencies with other E2E tests (e.g., if multiple tests modify README, one test's failure pollutes others)"
         ]
       },
-      "timestamp": 1791185159,
+      "timestamp": 1791190174,
       "ttl": 3600
     },
     "61c5f4a9ce6598c2f1fc048e0a7ce958": {
       "result": {
         "results": [
           {
-            "file": "index.json",
-            "relevance": 90,
-            "summary": "Contains build-stage test_failure pattern with concrete fix (increase timeout). Directly applicable to E2E test debugging."
-          },
-          {
             "file": "fleet-shared-patterns.json",
             "relevance": 75,
-            "summary": "Tracks 'Cannot find module' build errors across repos with npm install fix. Common blocker in E2E test setup phases."
+            "summary": "Contains 'Cannot find module' error pattern with 'npm i' fix in build/test stages. Common blocker for build stage execution that could prevent E2E test from running."
           },
           {
-            "file": "failures.json",
-            "relevance": 70,
-            "summary": "Documents timeout and database connection failures with root causes and fixes. Timeout patterns directly relevant to E2E test reliability."
+            "file": "failures.json (with timeout data)",
+            "relevance": 65,
+            "summary": "Contains resolved timeout failures and unresolved database connection issues from test execution. E2E tests often encounter timeout and resource initialization issues during build."
+          },
+          {
+            "file": "index.json",
+            "relevance": 60,
+            "summary": "Documents test_failure pattern in build stage with timeout issues and fix to increase timeout value. Directly applicable to build stage troubleshooting."
+          },
+          {
+            "file": "success-patterns.json (test-repo-outcomes)",
+            "relevance": 45,
+            "summary": "Generic test outcome pattern with build stage and npm test strategy. Basic reference for E2E test execution approach in build stage."
           },
           {
             "file": "success-patterns.json (test-repo-comptime)",
-            "relevance": 60,
-            "summary": "Multi-stage pattern (intake→build→test) showing completion time (1234s) and cost tracking. Provides baseline for E2E test execution estimation."
-          },
-          {
-            "file": "success-patterns.json (test-repo-ranking)",
-            "relevance": 50,
-            "summary": "Two build-stage patterns with npm test strategy. Generic templates for build phase patterns, applicable to readme comment E2E scenario."
+            "relevance": 40,
+            "summary": "Timed fix pattern with build/test stages and npm test execution. Relevant for understanding timing constraints in E2E test builds."
           }
         ]
       },
-      "timestamp": 1791187325,
+      "timestamp": 1791190207,
       "ttl": 1800
     },
     "080588966eb310d165b516f73f5a4c4d": {
@@ -2089,6 +2094,24 @@
       },
       "timestamp": 1791189882,
       "ttl": 1800
+    },
+    "dd534163934c45c181e0c3f1a5d36995": {
+      "result": {
+        "estimated_iterations": 2
+      },
+      "timestamp": 1791190116,
+      "ttl": 1800
+    },
+    "d7f11fcf5d55eb9572b90e830122703a": {
+      "result": {
+        "estimated_cost_usd": 0.22,
+        "estimated_iterations": 1,
+        "estimated_tokens": 7200,
+        "likely_failure_stage": "none",
+        "confidence": 78
+      },
+      "timestamp": 1791190125,
+      "ttl": 3600
     }
   }
 }
