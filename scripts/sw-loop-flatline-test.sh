@@ -114,6 +114,7 @@ assert_eq "productive" "$LAST_ITERATION_CLASS" "a new failure is movement, not f
 
 # ─── No fingerprint and exit 0 is never flat ─────────────────────────────────
 setup_repo nofp
+TEST_PASSED=""
 flatline_classify_iteration "$LOG_FILE" false 0
 flatline_classify_iteration "$LOG_FILE" false 0
 flatline_classify_iteration "$LOG_FILE" false 0
@@ -125,6 +126,27 @@ setup_repo exitcode
 flatline_classify_iteration "$LOG_FILE" false 1
 flatline_classify_iteration "$LOG_FILE" false 1
 assert_eq "flat" "$LAST_ITERATION_CLASS" "same non-zero exit code + no change is flat"
+
+# ─── Commits touching only .claude/ bookkeeping are not code changes ─────────
+setup_repo bookkeeping
+write_errors "FAIL test_login"
+flatline_classify_iteration "$LOG_FILE" true 0
+echo "iter 2" > "$LOG_DIR/progress.md"
+git -C "$PROJECT_ROOT" add -A && git -C "$PROJECT_ROOT" commit -qm "loop: iteration 2"
+flatline_classify_iteration "$LOG_FILE" true 0
+assert_eq "flat" "$LAST_ITERATION_CLASS" ".claude/-only auto-commit + same failure is flat"
+echo "real" >> "$PROJECT_ROOT/a.txt"
+echo "iter 3" > "$LOG_DIR/progress.md"
+git -C "$PROJECT_ROOT" add -A && git -C "$PROJECT_ROOT" commit -qm "loop: iteration 3"
+flatline_classify_iteration "$LOG_FILE" true 0
+assert_eq "productive" "$LAST_ITERATION_CLASS" "commit with a source change is productive"
+
+# ─── A test that fails silently, repeatedly, with no change is flat ──────────
+setup_repo silent
+rm -f "$LOG_DIR/error-summary.json"
+flatline_classify_iteration "$LOG_FILE" true 0
+flatline_classify_iteration "$LOG_FILE" true 0
+assert_eq "flat" "$LAST_ITERATION_CLASS" "silent test failure with no change is flat"
 
 # ─── Passing tests are never flat ────────────────────────────────────────────
 setup_repo passing

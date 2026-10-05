@@ -65,6 +65,11 @@ flatline_error_fingerprint() {
     if [[ -z "$lines" && -n "${TEST_OUTPUT:-}" ]]; then
         lines=$(printf '%s\n' "$TEST_OUTPUT" | grep -iE '(error|fail|assert|exception|panic)' 2>/dev/null | tail -10 | sort || true)
     fi
+    # A test command that failed without printing anything recognizable is still
+    # a failure, and failing silently twice in a row is the same failure.
+    if [[ -z "$lines" && "${TEST_PASSED:-}" == "false" ]]; then
+        lines="test command failed with no recognizable error output"
+    fi
     [[ -z "$lines" ]] && { echo ""; return 0; }
 
     local fp
@@ -112,10 +117,15 @@ flatline_classify_iteration() {
         local no_change=false
         if [[ "$made_progress" == "false" ]]; then
             no_change=true
-        elif [[ -n "$head" && "$head" == "$FLATLINE_LAST_HEAD" ]]; then
+        elif [[ -n "$head" && -n "${FLATLINE_LAST_HEAD:-}" ]]; then
+            # HEAD moves every iteration because git_auto_commit also commits the
+            # loop's own .claude/ bookkeeping, so compare the code outside it.
             local dirty=""
             dirty=$(git -C "$root" status --porcelain -- . ':(exclude).claude' 2>/dev/null || echo "unknown")
-            [[ -z "$dirty" ]] && no_change=true
+            if [[ -z "$dirty" ]] &&
+               git -C "$root" diff --quiet "$FLATLINE_LAST_HEAD" "$head" -- . ':(exclude).claude' 2>/dev/null; then
+                no_change=true
+            fi
         fi
 
         # 2b. Repeated failure: same meaningful fingerprint, or same non-zero exit code
