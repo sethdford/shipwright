@@ -435,3 +435,37 @@
 {"ts":"2026-10-05T13:48:39Z","ts_epoch":1791208119,"type":"stage.failed","event_id":"evt-1791208119-1796467513","payload":"{\"stage\":\"design\",\"issue\":\"7920\",\"timing\":\"1m 13s\"}"}
 {"ts":"2026-10-05T13:48:40Z","ts_epoch":1791208120,"type":"stage.failed","issue":7920,"stage":"design","duration_s":75,"error":"unknown","error_class":"unknown"}
 {"ts":"2026-10-05T13:48:40Z","ts_epoch":1791208120,"type":"vitals.snapshot","issue":7920,"stage":"design","iteration":0,"diff_lines":0,"no_progress":0}
+{"ts":"2026-10-05T14:09:31Z","ts_epoch":1791209371,"type":"intelligence.cache_hit","cache_key":"analyze_issue_bf0c110c2e0b2ba09d48c4a159b62a48"}
+{"ts":"2026-10-05T14:09:31Z","ts_epoch":1791209371,"type":"intelligence.analysis","complexity":3,"risk_level":"low","success_probability":82,"recommended_template":"fast","issue_type":"infrastructure"}
+{"ts":"2026-10-05T14:09:31Z","ts_epoch":1791209371,"type":"reasoning.trace","job_id":"pipeline-3933-7920","complexity":"medium","risk":50,"template":"standard"}
+{"ts":"2026-10-05T14:09:34Z","ts_epoch":1791209374,"type":"intelligence.cache_hit","cache_key":"analyze_issue_bf0c110c2e0b2ba09d48c4a159b62a48"}
+{"ts":"2026-10-05T14:09:34Z","ts_epoch":1791209374,"type":"intelligence.analysis","complexity":3,"risk_level":"low","success_probability":82,"recommended_template":"fast","issue_type":"infrastructure"}
+{"ts":"2026-10-05T14:09:42Z","ts_epoch":1791209382,"type":"intelligence.estimate_iterations","estimate":2,"complexity":5,"source":"claude"}
+{"ts":"2026-10-05T14:09:43Z","ts_epoch":1791209383,"type":"intelligence.cache_hit","cache_key":"predict_cost_223f3d5a0eae577ae994550720ea3350"}
+{"ts":"2026-10-05T14:09:43Z","ts_epoch":1791209383,"type":"intelligence.prediction","estimated_cost":0.05,"estimated_iterations":2,"complexity":5}
+{"ts":"2026-10-05T14:09:47Z","ts_epoch":1791209387,"type":"checks.pipeline_start","stages":13}
+{"ts":"2026-10-05T14:09:47Z","ts_epoch":1791209387,"type":"pipeline.started","issue":7920,"template":"autonomous","complexity":5,"machine":"runnervm8df0l","pipeline":"autonomous","model":"opus","goal":"Add fast-fail detection for missing/invalid API credentials before pipeline start"}
+{"ts":"2026-10-05T14:09:48Z","ts_epoch":1791209388,"type":"pipeline.started","event_id":"evt-1791209387-2106439305","payload":"{\"issue\":\"7920\",\"pipeline\":\"autonomous\",\"goal\":\"Add fast-fail detection for missing/invalid API credentials before pipeline start\"}"}
+{"ts":"2026-10-05T14:09:48Z","ts_epoch":1791209388,"type":"stage.skipped","issue":7920,"stage":"intake","reason":"ci_resume"}
+{"ts":"2026-10-05T14:09:48Z","ts_epoch":1791209388,"type":"intelligence.model","stage":"spec_generation","complexity":5,"model":"haiku","source":"heuristic"}
+{"ts":"2026-10-05T14:09:48Z","ts_epoch":1791209388,"type":"intelligence.model_ab","issue":7920,"stage":"spec_generation","recommended":"haiku","applied":"opus","ab_group":"control","ab_ratio":20}
+{"ts":"2026-10-05T14:09:48Z","ts_epoch":1791209388,"type":"stage.started","issue":7920,"stage":"spec_generation"}
+{"ts":"2026-10-05T14:09:48Z","ts_epoch":1791209388,"type":"spec_generated","file":"/home/runner/work/shipwright/shipwright/.claude/pipeline-artifacts/specs/add-fast-fail-detection-for-missinginvalid-api-credentials-b.json","complexity":"simple","issue":7920}
+{"ts":"2026-10-05T14:10:09Z","ts_epoch":1791209409,"type":"spec_generation.completed","issue":7920,"criteria":1,"edge_cases":0,"security":0,"affected_files":0}
+{"ts":"2026-10-05T14:10:11Z","ts_epoch":1791209411,"type":"stage.complete","event_id":"evt-1791209411-139286341","payload":"{\"stage\":\"spec_generation\",\"issue\":\"7920\",\"timing\":\"21s\"}"}
+{"ts":"2026-10-05T14:10:11Z","ts_epoch":1791209411,"type":"stage.completed","issue":7920,"stage":"spec_generation","duration_s":23,"result":"success"}
+{"ts":"2026-10-05T14:10:11Z","ts_epoch":1791209411,"type":"vitals.snapshot","issue":7920,"stage":"spec_generation","iteration":0,"diff_lines":0,"no_progress":0}
+{"ts":"2026-10-05T14:10:11Z","ts_epoch":1791209411,"type":"stage.artifact_miss","issue":7920,"stage":"plan"}
+{"ts":"2026-10-05T14:10:11Z","ts_epoch":1791209411,"type":"intelligence.model","stage":"plan","complexity":5,"model":"haiku","source":"heuristic"}
+{"ts":"2026-10-05T14:10:11Z","ts_epoch":1791209411,"type":"intelligence.model_ab","issue":7920,"stage":"plan","recommended":"haiku","applied":"opus","ab_group":"control","ab_ratio":20}
+{"ts":"2026-10-05T14:10:11Z","ts_epoch":1791209411,"type":"stage.started","issue":7920,"stage":"plan"}
+{"ts":"2026-10-05T14:12:41Z","ts_epoch":1791209561,"type":"retry.skipped_existing_artifact","issue":7920,"stage":"plan","artifact_lines":230}
+{"ts":"2026-10-05T14:12:43Z","ts_epoch":1791209563,"type":"stage.complete","event_id":"evt-1791209563-3108483015","payload":"{\"stage\":\"plan\",\"issue\":\"7920\",\"timing\":\"2m 30s\"}"}
+{"ts":"2026-10-05T14:12:43Z","ts_epoch":1791209563,"type":"stage.completed","issue":7920,"stage":"plan","duration_s":152,"result":"success"}
+{"ts":"2026-10-05T14:12:43Z","ts_epoch":1791209563,"type":"vitals.snapshot","issue":7920,"stage":"plan","iteration":0,"diff_lines":0,"no_progress":0}
+{"ts":"2026-10-05T14:12:43Z","ts_epoch":1791209563,"type":"intelligence.model","stage":"design","complexity":5,"model":"haiku","source":"heuristic"}
+{"ts":"2026-10-05T14:12:43Z","ts_epoch":1791209563,"type":"intelligence.model_ab","issue":7920,"stage":"design","recommended":"haiku","applied":"opus","ab_group":"control","ab_ratio":20}
+{"ts":"2026-10-05T14:12:43Z","ts_epoch":1791209563,"type":"stage.started","issue":7920,"stage":"design"}
+{"ts":"2026-10-05T14:14:54Z","ts_epoch":1791209694,"type":"stage.failed","event_id":"evt-1791209694-2651831152","payload":"{\"stage\":\"design\",\"issue\":\"7920\",\"timing\":\"2m 8s\"}"}
+{"ts":"2026-10-05T14:14:54Z","ts_epoch":1791209694,"type":"stage.failed","issue":7920,"stage":"design","duration_s":131,"error":"unknown","error_class":"unknown"}
+{"ts":"2026-10-05T14:14:54Z","ts_epoch":1791209694,"type":"vitals.snapshot","issue":7920,"stage":"design","iteration":0,"diff_lines":0,"no_progress":0}
