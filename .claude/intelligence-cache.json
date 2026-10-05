@@ -1596,33 +1596,33 @@
       "result": {
         "results": [
           {
-            "file": "failures.json",
-            "relevance": 95,
-            "summary": "Documents build/test stage failures with root causes and fixes (cost dashboard context issues, e2e integration test timeouts, schema validation failures). Directly applicable to debugging current build stage issues."
-          },
-          {
             "file": "retry-outcomes.json",
-            "relevance": 85,
-            "summary": "Shows build_failure retry strategy (model escalation) with 100% success rate across 5 attempts. Directly relevant for handling build failures and recovery strategies."
-          },
-          {
-            "file": "knowledge.json",
-            "relevance": 80,
-            "summary": "Contains kb entries documenting common build/test environment issues (mktemp directory creation, test output formatting, schema validation). Prevents repeating known failures during build."
+            "relevance": 95,
+            "summary": "Directly documents build_failure retry strategies with model escalation achieving 100% success rate across 5 attempts"
           },
           {
             "file": "success-patterns.json",
-            "relevance": 70,
-            "summary": "Captures successful bug fix and feature patterns with iteration counts, file changes, test strategies (npm test), and cost metrics. Shows proven approaches for similar complexity builds."
+            "relevance": 95,
+            "summary": "Captures successful build patterns with iteration counts (3), file change patterns, test strategies, and cost metrics for similar complexity issues"
+          },
+          {
+            "file": "failures.json",
+            "relevance": 92,
+            "summary": "Documents test stage failures and timeouts that directly block build stage completion, with root causes and fixes"
           },
           {
             "file": "flaky-tests.json",
-            "relevance": 65,
-            "summary": "Documents flaky tests (test-auth with 90% confidence, connection timeout errors) occurring during build/test stages. Helps identify tests that may fail spuriously."
+            "relevance": 90,
+            "summary": "Tracks flaky test occurrences (5-8 times) with error messages and confidence scores critical to build reliability"
+          },
+          {
+            "file": "knowledge.json",
+            "relevance": 85,
+            "summary": "Provides actionable test failure patterns (mktemp, JSON schema, regression detection) and fix strategies for build validation phase"
           }
         ]
       },
-      "timestamp": 1791195577,
+      "timestamp": 1791197466,
       "ttl": 1800
     },
     "55a5f65c9fb861dc1d1e591efadb191f": {
@@ -1832,6 +1832,41 @@
         "raw_response": "Mock claude: ok"
       },
       "timestamp": 1791197357,
+      "ttl": 1800
+    },
+    "e9f422d307804fb28e3f6a003d4dd45c": {
+      "result": {
+        "raw_response": "Mock claude: ok"
+      },
+      "timestamp": 1791197548,
+      "ttl": 1800
+    },
+    "f8eca7a29ca8f80953a5f7de270fb56b": {
+      "result": [
+        {
+          "type": "result",
+          "result": "I am trying the same approach again.",
+          "usage": {
+            "input_tokens": 0,
+            "output_tokens": 0
+          }
+        }
+      ],
+      "timestamp": 1791197613,
+      "ttl": 1800
+    },
+    "de58e6a93264a4f63be43a55cbef9d41": {
+      "result": [
+        {
+          "type": "result",
+          "result": "I am trying the same approach again.",
+          "usage": {
+            "input_tokens": 0,
+            "output_tokens": 0
+          }
+        }
+      ],
+      "timestamp": 1791197632,
       "ttl": 1800
     }
   }

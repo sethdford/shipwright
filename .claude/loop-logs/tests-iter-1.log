@@ -74,3 +74,41 @@
   ✓ sw-hello-test                                  0s
   ✓ sw-hygiene-test                                8s
   ✓ sw-incident-test                               0s
+  ✓ sw-init-test                                   73s
+  ✓ sw-instrument-test                             0s
+  ✓ sw-integration-claude-test                     3s
+  ✓ sw-intelligence-test                           1s
+  ✗ sw-intent-analysis-test                        exit 1 29s
+  ✓ sw-jira-test                                   0s
+  ✓ sw-launchd-test                                1s
+  ✓ sw-lib-audit-trail-test                        0s
+  ✓ sw-lib-compat-test                             0s
+  ✓ sw-lib-compound-audit-test                     0s
+  ✓ sw-lib-daemon-dispatch-test                    32s
+  ✓ sw-lib-daemon-failure-test                     0s
+  ✓ sw-lib-daemon-patrol-test                      1s
+  ✓ sw-lib-daemon-poll-test                        0s
+  ✓ sw-lib-daemon-state-test                       1s
+  ✓ sw-lib-daemon-triage-test                      2s
+  ✓ sw-lib-error-actionability-test                0s
+  ✓ sw-lib-helpers-test                            3s
+  ✓ sw-lib-pipeline-detection-test                 0s
+  ✓ sw-lib-pipeline-intelligence-test              0s
+  ✓ sw-lib-pipeline-quality-checks-test            1s
+  ✓ sw-lib-pipeline-stages-test                    11s
+  ✓ sw-lib-pipeline-state-test                     1s
+  ✓ sw-lib-prebuild-check-test                     4s
+  ✓ sw-linear-test                                 0s
+  ✓ sw-logs-test                                   1s
+  ✓ sw-loop-test                                   161s
+  ✓ sw-memory-discovery-e2e-test                   0s
+  ✓ sw-memory-effectiveness-test                   4s
+  ✓ sw-memory-test                                 5s
+  ✓ sw-mission-control-test                        0s
+  ✓ sw-model-router-test                           2s
+  ✓ sw-mutation-executor-test                      1s
+  ✓ sw-otel-test                                   0s
+  ✓ sw-outcome-feedback-test                       0s
+  ✓ sw-oversight-test                              1s
+  ✓ sw-patrol-meta-test                            0s
+  ✓ sw-pipeline-composer-test                      0s
