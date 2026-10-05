@@ -5,8 +5,8 @@
       "pattern": "\u001b[38;2;74;222;128m\u001b[1m✓\u001b[0m reveal shows 1/3 pass count on failure",
       "root_cause": "sw-cost-test.sh 'CONTEXT EFFICIENCY' dashboard tests fail because the cost dashboard prints 'No cost entries in the last 30 days' and exits early, never rendering the context-efficiency section from the seeded loop.context_efficiency events (test seeds only events, no cost entries).",
       "fix": "Make the cost dashboard render the CONTEXT EFFICIENCY section even when there are no cost entries (or have the test seed a cost entry/use an events path the dashboard reads) so the avg budget utilization assertions pass.",
-      "seen_count": 7,
-      "last_seen": "2026-10-05T09:02:28Z",
+      "seen_count": 8,
+      "last_seen": "2026-10-05T11:22:51Z",
       "category": "test_failure"
     },
     {
@@ -39,11 +39,11 @@
     {
       "stage": "test",
       "pattern": "\u001b[38;2;0;212;255m▸\u001b[0m Patrol recurring failures label construction... \u001b[38;2;74;222;128m✓\u001b[0m",
-      "root_cause": "sw-e2e-integration-test timed out after 301s (300s suite limit) and sw-intent-analysis-test exited 1; the e2e test needs real Claude/GitHub and hangs in the CI environment, so the suite run fails (the 'Patrol recurring failures label construction' line is just passing output).",
-      "fix": "Skip or mock sw-e2e-integration-test when no real Claude/GitHub credentials are available (or raise its timeout), and run sw-intent-analysis-test alone to fix its failing assertion.",
-      "seen_count": 1,
-      "last_seen": "2026-10-05T02:50:15Z",
-      "category": "timeout"
+      "root_cause": "Pipeline E2E test (sw-pipeline-test.sh) fails because plan/review stages don't produce plan.md/review.md artifacts under the mock environment (mock claude output not generating files), cascading into full E2E, resume, and cleanup failures; the low-complexity intelligence test also hits jq parse errors from non-JSON output in the mock RL/intelligence path",
+      "fix": "Debug the plan and review stages in the mock env: make the mock claude binary write plan.md/review.md (or fix the stage's output-capture path), and guard the jq calls in the intelligence/RL path against non-JSON input such as the colored log lines mixed into the output",
+      "seen_count": 2,
+      "last_seen": "2026-10-05T10:50:46Z",
+      "category": "test_failure"
     }
   ]
 }
