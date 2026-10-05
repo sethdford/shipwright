@@ -40,7 +40,12 @@
       "deploy",
       "validate",
       "monitor"
-    ]
+    ],
+    "prebuild": {
+      "mode": "enforce",
+      "check_timeout_seconds": 5,
+      "deps_check": true
+    }
   },
   "loop": {
     "claude_timeout": 1800,

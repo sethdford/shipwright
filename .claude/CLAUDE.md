@@ -193,6 +193,7 @@ intake → plan → design → spec_generation → build → test → review →
 ```
 
 - **spec_generation**: After design, generates `spec.json` with acceptance criteria, edge cases, security requirements. Disabled via `SPEC_DRIVEN_ENABLED=false`.
+- **intake prebuild check**: Before any GitHub/git side effects, intake verifies the target project's toolchain (runtime, engine version, lockfile package manager, installed deps) via `scripts/lib/prebuild-check.sh`. `pipeline.prebuild.mode` = `off|warn|enforce` (default `enforce`, blocks only on critical findings). Hard failures log `PREBUILD_ENV_ERROR`, which the daemon classifies as `environment_error` (no retries). See `docs/prebuild-checks.md`.
 - **spec_verification**: After review, verifies implementation compliance against spec criteria. Emits compliance score and metrics.
 
 The build stage delegates to `shipwright loop` for autonomous multi-iteration development. Self-healing: when tests fail, the pipeline re-enters the build loop with error context.

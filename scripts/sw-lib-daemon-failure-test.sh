@@ -109,6 +109,11 @@ echo "compile error: undefined variable" > "$LOG_DIR/issue-403.log"
 result=$(classify_failure 403)
 assert_eq "Compile error classified" "build_failure" "$result"
 
+# Environment error (prebuild check) wins even when remedy text looks like other classes
+printf 'PREBUILD_ENV_ERROR: runtime_missing\nnpm ERR! timeout exit code 1\n' > "$LOG_DIR/issue-451.log"
+result=$(classify_failure 451)
+assert_eq "Prebuild env error classified before api/build" "environment_error" "$result"
+
 # Context exhaustion
 mkdir -p "$WORKTREE_DIR/daemon-issue-501/.claude/loop-logs"
 cat > "$WORKTREE_DIR/daemon-issue-501/.claude/loop-logs/progress.md" <<'MD'
@@ -142,6 +147,7 @@ print_test_section "get_max_retries_for_class"
 
 assert_eq "auth_error: 0 retries" "0" "$(get_max_retries_for_class auth_error)"
 assert_eq "invalid_issue: 0 retries" "0" "$(get_max_retries_for_class invalid_issue)"
+assert_eq "environment_error: 0 retries" "0" "$(get_max_retries_for_class environment_error)"
 assert_eq "api_error: default 4 retries" "4" "$(get_max_retries_for_class api_error)"
 assert_eq "context_exhaustion: 2 retries" "2" "$(get_max_retries_for_class context_exhaustion)"
 assert_eq "build_failure: 2 retries" "2" "$(get_max_retries_for_class build_failure)"

@@ -2465,6 +2465,21 @@
       "required": [],
       "optional": []
     },
+    "prebuild_check.completed": {
+      "required": [],
+      "optional": [
+        "language",
+        "mode",
+        "status"
+      ]
+    },
+    "prebuild_check.failed": {
+      "required": [],
+      "optional": [
+        "critical_ids",
+        "language"
+      ]
+    },
     "prediction.anomaly": {
       "required": [],
       "optional": []

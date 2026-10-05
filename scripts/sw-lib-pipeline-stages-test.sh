@@ -179,6 +179,29 @@ rm -f "$ARTIFACTS_DIR/intake.json"
 stage_intake 2>/dev/null || true
 [[ -f "$ARTIFACTS_DIR/intake.json" ]] && assert_pass "Intake inline artifact" || assert_pass "Intake attempted"
 
+# Prebuild hard-fail stops intake before any side effects
+export GOAL="Add rate limiting"
+export ISSUE_NUMBER=""
+rm -f "$ARTIFACTS_DIR/intake.json"
+branches_before=$(cd "$PROJECT_ROOT" && git branch --list | wc -l | tr -d ' ')
+prebuild_check() { PREBUILD_CRITICAL_IDS="runtime_missing"; PREBUILD_STATUS="fail"; return 1; }
+set +e
+intake_out=$(stage_intake 2>&1)
+intake_rc=$?
+set -e
+assert_eq "stage_intake fails on prebuild critical" "1" "$intake_rc"
+assert_contains "PREBUILD_ENV_ERROR marker logged" "$intake_out" "PREBUILD_ENV_ERROR: runtime_missing"
+assert_file_not_exists "No intake artifact after prebuild failure" "$ARTIFACTS_DIR/intake.json"
+assert_eq "No branch created after prebuild failure" "$branches_before" \
+    "$(cd "$PROJECT_ROOT" && git branch --list | wc -l | tr -d ' ')"
+prebuild_check() { PREBUILD_STATUS="warn"; return 0; }
+stage_intake >/dev/null 2>&1 || true
+assert_eq "prebuild_status recorded in intake.json" "warn" \
+    "$(jq -r '.prebuild_status' "$ARTIFACTS_DIR/intake.json" 2>/dev/null)"
+unset -f prebuild_check
+_PREBUILD_CHECK_LOADED=""
+source "$SCRIPT_DIR/lib/prebuild-check.sh"
+
 # ─── Tests: stage_plan ──────────────────────────────────────────────────────
 print_test_section "stage_plan"
 

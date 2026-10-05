@@ -13,6 +13,17 @@ stage_intake() {
     project_lang=$(detect_project_lang)
     info "Project: ${BOLD}$project_lang${RESET}"
 
+    # 0. Pre-build toolchain check — before any GitHub/git side effects, so an
+    # unbuildable environment fails here instead of after a paid build loop.
+    local prebuild_status="skipped"
+    if type prebuild_check >/dev/null 2>&1; then
+        if ! prebuild_check "$project_lang" "${PROJECT_ROOT:-.}"; then
+            error "PREBUILD_ENV_ERROR: ${PREBUILD_CRITICAL_IDS:-unknown} — fix the environment, then: shipwright pipeline resume"
+            return 1
+        fi
+        prebuild_status="${PREBUILD_STATUS:-skipped}"
+    fi
+
     # 1. Fetch issue metadata if --issue provided
     if [[ -n "$ISSUE_NUMBER" ]]; then
         local meta
@@ -109,9 +120,11 @@ stage_intake() {
         --arg issue "${GITHUB_ISSUE:-}" --arg lang "$project_lang" \
         --arg test_cmd "${TEST_CMD:-}" --arg labels "${ISSUE_LABELS:-}" \
         --arg milestone "${ISSUE_MILESTONE:-}" --arg body "${ISSUE_BODY:-}" \
+        --arg prebuild "$prebuild_status" \
         '{goal:$goal, type:$type, template:$template, branch:$branch,
           issue:$issue, language:$lang, test_cmd:$test_cmd,
-          labels:$labels, milestone:$milestone, body:$body}' 2>/dev/null)" || true
+          labels:$labels, milestone:$milestone, body:$body,
+          prebuild_status:$prebuild}' 2>/dev/null)" || true
 
     # 7. AI-powered skill analysis (replaces static classification when available)
     if type skill_analyze_issue >/dev/null 2>&1; then

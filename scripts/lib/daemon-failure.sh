@@ -33,6 +33,12 @@ classify_failure() {
     local tail_content
     tail_content=$(tail -200 "$log_path" 2>/dev/null || true)
 
+    # Environment errors (prebuild check) — retrying cannot install a missing toolchain.
+    # Checked first: remedy text may contain words like "timeout" or "exit code".
+    if echo "$tail_content" | grep -qE 'PREBUILD_ENV_ERROR'; then
+        echo "environment_error"
+        return
+    fi
     # Auth errors
     if echo "$tail_content" | grep -qiE 'not logged in|unauthorized|auth.*fail|401 |invalid.*token|CLAUDE_CODE_OAUTH_TOKEN|api key.*invalid|authentication required'; then
         echo "auth_error"
@@ -79,7 +85,7 @@ DAEMON_CONSECUTIVE_FAILURE_COUNT=0
 get_max_retries_for_class() {
     local class="${1:-unknown}"
     case "$class" in
-        auth_error|invalid_issue) echo 0 ;;
+        auth_error|invalid_issue|environment_error) echo 0 ;;
         api_error)                echo "${MAX_RETRIES_API_ERROR:-4}" ;;
         context_exhaustion)       echo "${MAX_RETRIES_CONTEXT_EXHAUSTION:-2}" ;;
         build_failure)           echo "${MAX_RETRIES_BUILD:-2}" ;;

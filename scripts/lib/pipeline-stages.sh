@@ -26,6 +26,8 @@ _SKILL_MEMORY_SH="${SCRIPT_DIR}/lib/skill-memory.sh"
 [[ -f "$SCRIPT_DIR/lib/reward-aggregator.sh" ]] && source "$SCRIPT_DIR/lib/reward-aggregator.sh" 2>/dev/null || true
 [[ -f "$SCRIPT_DIR/lib/bandit-selector.sh" ]] && source "$SCRIPT_DIR/lib/bandit-selector.sh" 2>/dev/null || true
 [[ -f "$SCRIPT_DIR/lib/policy-learner.sh" ]] && source "$SCRIPT_DIR/lib/policy-learner.sh" 2>/dev/null || true
+# Pre-build toolchain check, run at the top of intake
+[[ -f "$SCRIPT_DIR/lib/prebuild-check.sh" ]] && source "$SCRIPT_DIR/lib/prebuild-check.sh" 2>/dev/null || true
 
 # Defaults for variables normally set by sw-pipeline.sh (safe under set -u).
 ARTIFACTS_DIR="${ARTIFACTS_DIR:-.claude/pipeline-artifacts}"
