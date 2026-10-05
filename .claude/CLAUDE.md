@@ -240,14 +240,14 @@ stay cheap (lower effort there means fewer, more consolidated tool calls and
 less preamble, which is what you want from intake/pr/merge). One `xhigh` review
 pass is preferred over adding more review rounds.
 
-| Stage                            | Default Effort | Rationale                                  |
-| -------------------------------- | -------------- | ------------------------------------------ |
-| intake, pr, merge                | low            | Mechanical/formatting tasks                |
-| test, deploy, validate, monitor  | medium         | Standard development work                  |
-| plan, design                     | high           | Complex reasoning, not code authoring      |
-| spec_generation, spec_verification | high         | Specification analysis                     |
-| build                            | xhigh          | Agentic coding — the stage that writes code |
-| review, compound_quality         | xhigh          | One deep pass beats several cheaper rounds |
+| Stage                              | Default Effort | Rationale                                   |
+| ---------------------------------- | -------------- | ------------------------------------------- |
+| intake, pr, merge                  | low            | Mechanical/formatting tasks                 |
+| test, deploy, validate, monitor    | medium         | Standard development work                   |
+| plan, design                       | high           | Complex reasoning, not code authoring       |
+| spec_generation, spec_verification | high           | Specification analysis                      |
+| build                              | xhigh          | Agentic coding — the stage that writes code |
+| review, compound_quality           | xhigh          | One deep pass beats several cheaper rounds  |
 
 `max` is deliberately not a default anywhere: it shows diminishing returns and
 can overthink. Reach for it per-run via `EFFORT_LEVEL_OVERRIDE` when
@@ -269,10 +269,10 @@ Two loop-level controls that affect cost rather than behavior. Both target the
 same thing: the build loop used to start a **cold Claude session every
 iteration**, recomposing the prompt and re-paying cache writes.
 
-| Control | Default | Effect |
-| ------- | ------- | ------ |
-| `LOOP_STABLE_PROMPT_PREFIX` | `true` | Passes `--exclude-dynamic-system-prompt-sections`, moving per-machine sections (cwd, env, memory paths, **git status**) out of the system prompt. Prompt caching is a prefix match, and git status changes constantly mid-loop — leaving it in the prefix invalidated everything after it on every iteration. Set `false` to restore the old behavior. |
-| `--session-continuity` / `LOOP_SESSION_CONTINUITY=1` / `loop.session_continuity` | **off** | Reuses one `--session-id` across iterations so they continue a single conversation instead of cold-starting. |
+| Control                                                                          | Default | Effect                                                                                                                                                                                                                                                                                                                                                 |
+| -------------------------------------------------------------------------------- | ------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `LOOP_STABLE_PROMPT_PREFIX`                                                      | `true`  | Passes `--exclude-dynamic-system-prompt-sections`, moving per-machine sections (cwd, env, memory paths, **git status**) out of the system prompt. Prompt caching is a prefix match, and git status changes constantly mid-loop — leaving it in the prefix invalidated everything after it on every iteration. Set `false` to restore the old behavior. |
+| `--session-continuity` / `LOOP_SESSION_CONTINUITY=1` / `loop.session_continuity` | **off** | Reuses one `--session-id` across iterations so they continue a single conversation instead of cold-starting.                                                                                                                                                                                                                                           |
 
 Session continuity is **opt-in on purpose**. It changes conversation semantics —
 the model carries prior turns rather than being re-briefed from `progress.md` —
@@ -677,7 +677,7 @@ All scripts are bash (except the dashboard server in TypeScript). Grouped by lay
 | `scripts/sw-linear.sh` | 643 | Linear ↔ GitHub Bidirectional Sync |
 | `scripts/sw-logs.sh` | 353 | View and search agent pane logs |
 | `scripts/sw-loop.sh` | 2713 | Continuous agent loop harness for Claude Code |
-| `scripts/sw-memory.sh` | 2241 | Persistent Learning & Context System |
+| `scripts/sw-memory.sh` | 168 | Persistent Learning & Context System |
 | `scripts/sw-mission-control.sh` | 473 | Terminal-based pipeline mission control |
 | `scripts/sw-model-router.sh` | 1056 | Intelligent Model Routing & Cost Optimization |
 | `scripts/sw-otel.sh` | 609 | OpenTelemetry Observability |
@@ -724,7 +724,7 @@ All scripts are bash (except the dashboard server in TypeScript). Grouped by lay
 | `scripts/sw-trace.sh` | 480 | E2E Traceability (Issue → Commit → PR → Deploy) |
 | `scripts/sw-tracker.sh` | 517 | Provider Router for Issue Tracker Integration |
 | `scripts/sw-triage.sh` | 812 | Intelligent Issue Labeling & Prioritization |
-| `scripts/sw-upgrade.sh` | 477 | Detect and apply updates from the repo |
+| `scripts/sw-upgrade.sh` | 482 | Detect and apply updates from the repo |
 | `scripts/sw-ux.sh` | 685 | Premium UX Enhancement Layer |
 | `scripts/sw-webhook.sh` | 621 | GitHub Webhook Receiver for Instant Issue Processing |
 | `scripts/sw-widgets.sh` | 528 | Embeddable Status Widgets |
@@ -758,9 +758,26 @@ All scripts are bash (except the dashboard server in TypeScript). Grouped by lay
 
 ### Shared Libraries
 
-| File                    | Lines | Purpose                            |
-| ----------------------- | ----: | ---------------------------------- |
-| `scripts/lib/compat.sh` |     — | Cross-platform compatibility shims |
+| File                              | Lines | Purpose                                                         |
+| --------------------------------- | ----: | --------------------------------------------------------------- |
+| `scripts/lib/compat.sh`           |     — | Cross-platform compatibility shims                              |
+| `scripts/lib/memory-common.sh`    |    89 | Memory system: shared paths, repo identity, embedding utilities |
+| `scripts/lib/memory-capture.sh`   |   669 | Memory system: pipeline/failure/pattern/decision/metric capture |
+| `scripts/lib/memory-query.sh`     |   532 | Memory system: searches, semantic injection, ranked queries     |
+| `scripts/lib/memory-aggregate.sh` |   492 | Memory system: A/B testing, global rollup, DORA, decay          |
+| `scripts/lib/memory-admin.sh`     |   336 | Memory system: show, search, forget, export/import              |
+
+#### Memory System Architecture
+
+`scripts/sw-memory.sh` (168 lines) is a thin dispatcher that routes commands to modularized memory subsystems:
+
+- **Capture Module** (`memory-capture.sh`): Records pipeline learnings, failure patterns, design decisions, and metrics
+- **Query Module** (`memory-query.sh`): Searches memory, performs semantic injection, retrieves ranked patterns
+- **Aggregation Module** (`memory-aggregate.sh`): A/B testing, global rollup, DORA metrics, pattern decay
+- **Admin Module** (`memory-admin.sh`): User-facing CLI (show, search, forget, export/import)
+- **Common Module** (`memory-common.sh`): Shared constants, utilities, embedding functions
+
+All modules use double-source guards to prevent re-initialization on re-sourcing. See ADR-0007 for design rationale and backwards-compatibility details.
 
 ### Test Suites
 
@@ -853,6 +870,7 @@ All scripts are bash (except the dashboard server in TypeScript). Grouped by lay
 | `scripts/sw-lib-daemon-triage-test.sh` | 267 | Unit tests for triage scoring |
 | `scripts/sw-lib-error-actionability-test.sh` | 213 |  |
 | `scripts/sw-lib-helpers-test.sh` | 229 | Unit tests for shared helper functions |
+| `scripts/sw-lib-memory-modules-test.sh` | 86 |  |
 | `scripts/sw-lib-pipeline-detection-test.sh` | 391 | Unit tests for detection fns |
 | `scripts/sw-lib-pipeline-intelligence-test.sh` | 410 | Unit tests for intelligence |
 | `scripts/sw-lib-pipeline-quality-checks-test.sh` | 193 | Unit tests for quality |
@@ -970,6 +988,7 @@ All scripts are bash (except the dashboard server in TypeScript). Grouped by lay
 - Check run IDs: `.claude/pipeline-artifacts/check-run-ids.json`
 - Deployment tracking: `.claude/pipeline-artifacts/deployment.json`
 - Error log: `.claude/pipeline-artifacts/error-log.jsonl`
+
 <!-- /AUTO:runtime-state -->
 
 ## GitHub Integration
