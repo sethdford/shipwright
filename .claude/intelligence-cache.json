@@ -1556,33 +1556,33 @@
       "result": {
         "results": [
           {
-            "file": "architecture.json",
-            "relevance": 45,
-            "summary": "Directly addresses architecture rules; relevant for design stage pattern definitions, though entries are generic placeholders"
+            "file": "failures.json",
+            "relevance": 28,
+            "summary": "Contains resolved service connection failure patterns (database connection refused). Demonstrates architecture for detecting availability issues before proceeding—conceptually similar to credential validation fast-fail."
+          },
+          {
+            "file": "fleet-shared-patterns.json",
+            "relevance": 18,
+            "summary": "Shows error pattern detection structure across build and test stages. Relevant for understanding how to surface and categorize validation failures across pipeline stages."
           },
           {
             "file": "index.json",
-            "relevance": 35,
-            "summary": "Provides pattern classification structure and metadata; useful for understanding how to organize architecture patterns for credential validation logic"
+            "relevance": 12,
+            "summary": "Pattern indexing structure with stage association and fixes. Provides template for organizing validation rules by pipeline stage."
           },
           {
-            "file": "success-patterns.json (first: test-repo-789)",
-            "relevance": 30,
-            "summary": "Demonstrates approach patterns and completion strategies; shows how complex features were designed and implemented across stages"
+            "file": "architecture.json",
+            "relevance": 8,
+            "summary": "References architectural rules. Minimal content, but demonstrates rule-based architecture approach suitable for credential validation policies."
           },
           {
-            "file": "failures.json (second: with database connection refused)",
-            "relevance": 28,
-            "summary": "Contains connection failure patterns (database/auth-adjacent); relevant for understanding failure modes that fast-fail detection should catch"
-          },
-          {
-            "file": "success-patterns.json (second: test-final-working)",
-            "relevance": 25,
-            "summary": "Shows daemon-related problem-solving; relevant for understanding how to handle validation before pipeline execution"
+            "file": "success-patterns.json (test-repo-comptime)",
+            "relevance": 5,
+            "summary": "Shows multi-stage execution pattern (intake, build, test). Tangentially relevant for understanding when credential checks should occur in pipeline lifecycle."
           }
         ]
       },
-      "timestamp": 1791207101,
+      "timestamp": 1791209579,
       "ttl": 1800
     },
     "b05242b2679e83a2b8fcda20fa4b0ce5": {
@@ -1590,62 +1590,62 @@
         "results": [
           {
             "file": "failures.json",
-            "relevance": 15,
-            "summary": "Demonstrates failure pattern tracking structure with root causes and fixes, but content (timeouts, db connection) unrelated to credential validation anti-patterns"
+            "relevance": 35,
+            "summary": "Contains resolved and unresolved failure patterns including 'database connection refused' — shows connection/credential-related failures and their resolution strategies, informing what anti-patterns to avoid"
           },
           {
             "file": "index.json",
-            "relevance": 12,
-            "summary": "Shows pattern tracking methodology and failure signatures, but patterns are about test timeouts, not credential validation approaches"
+            "relevance": 22,
+            "summary": "Pattern index with test failure signatures tracked across stages — useful for understanding common failure modes that fast-fail detection should catch early"
           },
           {
-            "file": "fleet-shared-patterns.json",
-            "relevance": 8,
-            "summary": "Contains cross-repo pattern analysis structure, but patterns are about npm module errors, not credential detection anti-patterns"
+            "file": "success-patterns.json (test-repo-comptime)",
+            "relevance": 15,
+            "summary": "Shows successful fix for 'Timed fix' spanning intake/build/test stages — by contrast, helps identify what approaches worked vs rejected for early validation"
           }
         ]
       },
-      "timestamp": 1791207113,
+      "timestamp": 1791209593,
       "ttl": 1800
     },
     "bf8d557af62de0749d0be2d4d243b590": {
       "result": {
         "results": [
           {
-            "file": "failures.json",
+            "file": "failures.json (database connection entry)",
+            "relevance": 75,
+            "summary": "Contains pattern for 'database connection refused' with root cause analysis and fix. Directly applicable to credential/connection validation before operations start. Pattern: prerequisite checks before proceeding."
+          },
+          {
+            "file": "success-patterns.json (test-final-working)",
             "relevance": 55,
-            "summary": "Contains structured failure patterns with root causes (including 'database connection refused') and applied fixes; most relevant for understanding connection/credential-related failure modes during planning"
+            "summary": "Pattern for 'Fix daemon timeout' in scripts/sw-daemon.sh at pipeline startup. Relevant context for daemon initialization and early validation logic during pipeline start phase."
           },
           {
-            "file": "index.json",
-            "relevance": 45,
-            "summary": "Shows pattern indexing structure and metadata tracking; helps understand how failure signatures are organized and what diagnostic data was captured in previous issues"
-          },
-          {
-            "file": "architecture.json",
-            "relevance": 40,
-            "summary": "Provides architectural rules and constraints; useful for understanding where pre-flight validation should integrate in the system architecture"
-          },
-          {
-            "file": "fleet-shared-patterns.json",
-            "relevance": 25,
-            "summary": "Cross-repo error patterns; could reveal if credential/missing-module errors are common across the fleet during build/test stages"
+            "file": "success-patterns.json (test-repo-789)",
+            "relevance": 50,
+            "summary": "Pattern for daemon timeout handling in scripts/sw-daemon.sh. Touches pipeline initialization code where credential validation would naturally fit."
           },
           {
             "file": "success-patterns.json (test-repo-comptime)",
-            "relevance": 20,
-            "summary": "Shows multi-stage execution (intake→build→test) with cost/complexity metrics; useful for estimating effort and planning implementation scope"
+            "relevance": 38,
+            "summary": "Pattern includes 'intake' stage in stages_executed, which is the phase where pre-flight validation typically occurs before pipeline operations."
+          },
+          {
+            "file": "index.json",
+            "relevance": 30,
+            "summary": "Contains test failure patterns related to setup and initialization. Provides patterns on detection and remediation of pre-execution issues."
           }
         ]
       },
-      "timestamp": 1791206926,
+      "timestamp": 1791209433,
       "ttl": 1800
     },
     "f623359e677e3b6ad148782d7e7df767": {
       "result": {
         "estimated_iterations": 2
       },
-      "timestamp": 1791206789,
+      "timestamp": 1791209382,
       "ttl": 1800
     },
     "0384ce944d0bdef6b39122d0bdbe62ec": {
