@@ -168,6 +168,11 @@ FILES=(
     "sw-remote-test.sh|scripts/sw-remote-test.sh|$BIN_DIR/sw-remote-test.sh|false|true"
     # Shared libraries
     "compat.sh|scripts/lib/compat.sh|$BIN_DIR/lib/compat.sh|false|false"
+    "memory-common.sh|scripts/lib/memory-common.sh|$BIN_DIR/lib/memory-common.sh|false|false"
+    "memory-capture.sh|scripts/lib/memory-capture.sh|$BIN_DIR/lib/memory-capture.sh|false|false"
+    "memory-query.sh|scripts/lib/memory-query.sh|$BIN_DIR/lib/memory-query.sh|false|false"
+    "memory-aggregate.sh|scripts/lib/memory-aggregate.sh|$BIN_DIR/lib/memory-aggregate.sh|false|false"
+    "memory-admin.sh|scripts/lib/memory-admin.sh|$BIN_DIR/lib/memory-admin.sh|false|false"
     "CLAUDE.md.shipwright|claude-code/CLAUDE.md.shipwright|$HOME/.claude/CLAUDE.md|true|false"
     "teammate-idle.sh|claude-code/hooks/teammate-idle.sh|$HOME/.claude/hooks/teammate-idle.sh|false|true"
     "task-completed.sh|claude-code/hooks/task-completed.sh|$HOME/.claude/hooks/task-completed.sh|false|true"
