@@ -1698,23 +1698,21 @@
       "result": {
         "complexity": 2,
         "risk_level": "low",
-        "success_probability": 92,
+        "success_probability": 95,
         "recommended_template": "fast",
-        "issue_type": "testing",
+        "issue_type": "documentation",
         "key_risks": [
-          "Issue may already be resolved or is a placeholder artifact",
-          "E2E test environment setup and isolation",
-          "README file synchronization in concurrent workflows",
-          "Test cleanup and state management"
+          "Vague specification - no details on which comment or location",
+          "May be a self-closing test verification task"
         ],
         "implementation_hints": [
-          "Verify test completion status in recent commits before proceeding",
-          "Use git worktrees or temp directories for test isolation",
-          "Implement idempotent test setup and teardown",
-          "Consider closing if test is already passing or marked complete"
+          "This appears to be E2E test proof-of-execution",
+          "Look for test automation context or hooks that define the expected comment",
+          "The comment likely serves as verification that an automated test ran successfully",
+          "Safe to close marker suggests this is low-priority cleanup work"
         ]
       },
-      "timestamp": 1791129457,
+      "timestamp": 1791163425,
       "ttl": 3600
     },
     "4d6496b39b9ff208de40107cf134cb6a": {
@@ -1745,14 +1743,14 @@
     "f9c9e8b2bd49e68005879dc608624768": {
       "result": {
         "issue_type": "testing",
-        "confidence": 0.95,
+        "confidence": 0.82,
         "secondary_domains": [
           "automation",
           "documentation"
         ],
         "complexity_assessment": {
-          "score": 5,
-          "reasoning": "E2E test for a single feature (README comment) is straightforward in scope but requires careful validation of end-to-end flow, test isolation, and reliability"
+          "score": 3,
+          "reasoning": "E2E test for a narrow feature scope (adding a comment to README). Marked 'safe to close' suggests ephemeral or temporary validation test. Main challenge is ensuring test reliability, idempotency, and proper cleanup rather than implementation complexity."
         },
         "skill_plan": {
           "plan": [
@@ -1760,95 +1758,87 @@
             "testing-strategy"
           ],
           "design": [
-            "testing-strategy",
-            "documentation"
+            "testing-strategy"
           ],
           "build": [
-            "testing-strategy"
+            "testing-strategy",
+            "test-parallelization-detection"
           ],
           "review": [
             "testing-strategy",
-            "pr-quality",
-            "two-stage-review"
+            "pr-quality"
           ],
           "compound_quality": [
-            "validation-thoroughness",
-            "adversarial-quality"
+            "adversarial-quality",
+            "validation-thoroughness"
           ],
           "pr": [
             "pr-quality"
           ],
-          "deploy": [
-            "deploy-safety"
-          ],
+          "deploy": [],
           "validate": [
             "validation-thoroughness"
           ],
-          "monitor": [
-            "observability"
-          ]
+          "monitor": []
         },
         "skill_rationale": {
-          "brainstorming": "Challenge assumptions about what scenarios the E2E test must validate—is it testing just the happy path, or edge cases like concurrent writes, special characters, and comment formatting?",
-          "testing-strategy": "E2E tests require careful scenario design, test isolation, and verification that real behavior (not mocks) is being validated—essential across all stages from planning through implementation and review.",
-          "documentation": "E2E tests are living documentation of expected behavior; clear test names and comments ensure future maintainers understand what flow is being validated and why.",
-          "pr-quality": "Test code is production code; ensure the test is readable, maintainable, and communicates intent clearly so reviewers can validate coverage in 5 minutes.",
-          "two-stage-review": "E2E tests require structural review (coverage, scenarios) and behavioral review (does it actually test what it claims); two passes catch gaps neither alone would.",
-          "validation-thoroughness": "Verify the test doesn't just pass—confirm it validates real user behavior, not mocked/stubbed behavior, and covers critical paths like README parsing and comment injection.",
-          "adversarial-quality": "Think like an attacker: what if the comment contains escape sequences, or README parsing fails, or concurrent comments race? Adversarial review surfaces edge cases E2E tests often miss.",
-          "deploy-safety": "Before merging into CI, ensure the test can run safely (no flakiness, proper cleanup, no test pollution), fails deterministically on breakage, and doesn't introduce brittleness to the pipeline.",
-          "observability": "Post-deploy, monitor whether the test is flaky, slow, or detecting real failures—E2E tests often degrade over time as environments change."
+          "brainstorming": "Clarify test intent before implementation: what does 'adding a comment' mean (inline code comment? commit comment? documentation annotation?), what environment state does it assume, and what constitutes success vs. failure?",
+          "testing-strategy": "E2E tests require explicit patterns for setup, execution, assertions, and teardown to remain reliable and maintainable; establish and follow patterns consistently across build, review, and design stages.",
+          "test-parallelization-detection": "E2E tests interacting with README files may cause race conditions if run in parallel; proactively identify shared state vectors (file locks, temp fixtures, git state) before they cause flakiness.",
+          "pr-quality": "Test PRs must be reviewable in minutes with clear naming, documented test scenarios, and rationale; this is especially important for E2E tests that are less obvious than unit tests.",
+          "adversarial-quality": "Find brittle assumptions E2E tests hide: missing README, permission denied, concurrent modifications, malformed input, or state pollution from previous test runs.",
+          "validation-thoroughness": "Verify the test actually exercises the full user path; a smoke test (file was modified) misses real problems like corrupted file encoding, lost formatting, or incomplete writes."
         },
         "generated_skills": [],
         "review_focus": [
-          "Test validates actual README parsing and comment injection, not stubbed behavior",
-          "All critical scenarios covered: empty comments, special characters, concurrent writes, malformed README",
-          "Test is non-flaky: no timing dependencies, proper setup/teardown, isolated state",
-          "Test fails deterministically when the feature breaks (not false positives or false negatives)",
-          "Test code is readable: clear names, comments explaining why each assertion matters, minimal test setup boilerplate"
+          "Idempotency and cleanup: can the test run multiple times consecutively without leaving state behind or failing on retry?",
+          "Scope definition: is it clear what README file the test targets (repo root, docs/, etc.) and whether the test is specific or generic?",
+          "Flakiness risk: are there hardcoded timeouts, polling loops, or implicit ordering assumptions that could cause intermittent failures?",
+          "Documentation clarity: is the test's purpose, preconditions (what state must exist), and assertions clearly documented for future maintainers?",
+          "Isolation and teardown: does the test clean up after itself or rely on other tests/jobs to do cleanup?"
         ],
         "risk_areas": [
-          "Flakiness: E2E tests depending on file I/O, timing, or external state often fail intermittently",
-          "False positives: Test passes even when core feature is broken (insufficient assertions or stubbed dependencies)",
-          "Test pollution: Concurrent test runs or improper cleanup leave state that breaks subsequent runs",
-          "Brittleness: Test tightly coupled to implementation details rather than user behavior, breaks on refactors",
-          "Coverage gaps: Happy path passes but edge cases (special characters, encoding, concurrent writes) not validated"
+          "Test flakiness: E2E tests interacting with file systems are prone to race conditions, timing issues, and environment-dependent failures.",
+          "State leakage: if README is not properly reset or cleaned up, subsequent test runs may fail or corrupt the repository state.",
+          "Permission and environment assumptions: test may assume specific file permissions, working directory, or git state that differs across environments.",
+          "Parallel test conflicts: if multiple E2E tests modify README concurrently, they may interfere with each other or cause git merge conflicts.",
+          "Maintenance burden: test tightly coupled to README location or format may break silently if repository structure is refactored."
         ]
       },
-      "timestamp": 1791129522,
+      "timestamp": 1791163493,
       "ttl": 3600
     },
     "61c5f4a9ce6598c2f1fc048e0a7ce958": {
       "result": {
         "results": [
           {
-            "file": "index.json",
-            "relevance": 75,
-            "summary": "Contains build stage failure pattern with test_failure signature and concrete fix ('Increase timeout value in test setup'). Only entry with structured build-stage metadata across 5 occurrences."
+            "file": "failures.json",
+            "relevance": 40,
+            "summary": "Contains documented test stage failures (timeouts, connection issues) with root causes and fixes; timeout patterns directly applicable to E2E test execution troubleshooting"
           },
           {
             "file": "fleet-shared-patterns.json",
-            "relevance": 70,
-            "summary": "Common 'Cannot find module' pattern affecting build/test stages across multiple repos with fix 'npm i'. Directly applicable to build stage issues."
+            "relevance": 32,
+            "summary": "Cross-repo pattern for 'Error: Cannot find module' appearing in build/test stages across multiple repos; npm install fix is common prerequisite for E2E tests"
           },
           {
-            "file": "success-patterns.json (test-repo-ranking)",
-            "relevance": 65,
-            "summary": "Contains 2 successful build-stage patterns with low complexity and 1 iteration needed. Multiple patterns provide broader coverage for build stage scenarios."
-          },
-          {
-            "file": "success-patterns.json (test-repo-789)",
-            "relevance": 60,
-            "summary": "High-complexity build-stage timeout fix pattern (3 iterations, $2.00 cost) with script files changed. Relevant for understanding build stage complexity estimation."
+            "file": "index.json",
+            "relevance": 26,
+            "summary": "Test failure pattern in build stage with timeout increase fix; demonstrates common build stage issues and resolutions for test execution"
           },
           {
             "file": "success-patterns.json (test-repo-comptime)",
-            "relevance": 50,
-            "summary": "Build-stage pattern included in multi-stage sequence (intake→build→test). Lower specificity but demonstrates build stage within broader pipeline context."
+            "relevance": 20,
+            "summary": "Shows successful intake→build→test multi-stage flow with timing data; provides template for build stage execution patterns in similar test scenarios"
+          },
+          {
+            "file": "success-patterns.json (test-repo-ranking)",
+            "relevance": 15,
+            "summary": "Multiple build stage patterns showing successful completions; low specificity but may inform general build strategy for test execution"
           }
         ]
       },
-      "timestamp": 1791129571,
+      "timestamp": 1791163533,
       "ttl": 1800
     },
     "b9633b60c85f9b38945898f118146831": {
@@ -2048,6 +2038,80 @@
         }
       ],
       "timestamp": 1791162494,
+      "ttl": 1800
+    },
+    "f896b458de450678d0c2c02d9c342244": {
+      "result": {
+        "raw_response": "Mock claude: ok"
+      },
+      "timestamp": 1791163431,
+      "ttl": 1800
+    },
+    "e15ec6ee688c8840426846dedc2928a3": {
+      "result": {
+        "estimated_iterations": 2
+      },
+      "timestamp": 1791163435,
+      "ttl": 1800
+    },
+    "421bca6c01377b0406276fe39136d146": {
+      "result": {
+        "estimated_cost_usd": 1.85,
+        "estimated_iterations": 1,
+        "estimated_tokens": 18500,
+        "likely_failure_stage": "none",
+        "confidence": 88
+      },
+      "timestamp": 1791163441,
+      "ttl": 3600
+    },
+    "818cd9c94c6eb548b482a311196bca4b": {
+      "result": [
+        {
+          "type": "result",
+          "result": "I am trying the same approach again.",
+          "usage": {
+            "input_tokens": 0,
+            "output_tokens": 0
+          }
+        }
+      ],
+      "timestamp": 1791163558,
+      "ttl": 1800
+    },
+    "1fe8f784d8d4a2bb62625e2e854d68f1": {
+      "result": {
+        "raw_response": "Mock claude: ok"
+      },
+      "timestamp": 1791163643,
+      "ttl": 1800
+    },
+    "235cfc1e5c05bdd14481d7b04b100cbb": {
+      "result": [
+        {
+          "type": "result",
+          "result": "I am trying the same approach again.",
+          "usage": {
+            "input_tokens": 0,
+            "output_tokens": 0
+          }
+        }
+      ],
+      "timestamp": 1791163871,
+      "ttl": 1800
+    },
+    "d69734ad5912ca91b80c2a0591bd2a19": {
+      "result": [
+        {
+          "type": "result",
+          "result": "I am trying the same approach again.",
+          "usage": {
+            "input_tokens": 0,
+            "output_tokens": 0
+          }
+        }
+      ],
+      "timestamp": 1791163916,
       "ttl": 1800
     }
   }
