@@ -21,3 +21,15 @@
 {"ts":"2026-10-04T22:27:17Z","ts_epoch":1791152837,"type":"recruit_self_tune","keywords_updated":2,"total_matches":15}
 {"ts":"2026-10-05T00:15:29Z","ts_epoch":1791159329,"type":"hygiene_platform_refactor","hardcoded":49,"fallback":69,"todo":51}
 {"ts":"2026-10-05T00:15:49Z","ts_epoch":1791159349,"type":"strategic.cycle_complete","issues_created":0,"issues_skipped":3}
+{"ts":"2026-10-05T00:34:20Z","ts_epoch":1791160460,"type":"patrol.started","dry_run":"false"}
+{"ts":"2026-10-05T00:34:23Z","ts_epoch":1791160463,"type":"patrol.issue_created","check":"dead_code","count":1}
+{"ts":"2026-10-05T00:34:27Z","ts_epoch":1791160467,"type":"patrol.finding","check":"recurring_failure","pattern":"[38;2;74;222;128m[1m✓[0m reveal shows 1/3 pass count on","seen_count":3}
+{"ts":"2026-10-05T00:34:28Z","ts_epoch":1791160468,"type":"patrol.issue_created","check":"recurring_failure","pattern":"[38;2;74;222;128m[1m✓[0m reveal shows 1/3 pass count on"}
+{"ts":"2026-10-05T00:34:28Z","ts_epoch":1791160468,"type":"patrol.finding","check":"untested_script","script":"sw-tracker-linear.sh","lines":568,"usage":7}
+{"ts":"2026-10-05T00:34:28Z","ts_epoch":1791160468,"type":"patrol.finding","check":"untested_script","script":"sw-tracker-jira.sh","lines":474,"usage":7}
+{"ts":"2026-10-05T00:34:28Z","ts_epoch":1791160468,"type":"patrol.finding","check":"untested_script","script":"sw-tracker-github.sh","lines":212,"usage":3}
+{"ts":"2026-10-05T00:34:29Z","ts_epoch":1791160469,"type":"patrol.finding","check":"untested_script","script":"sw-tmux-status.sh","lines":151,"usage":1}
+{"ts":"2026-10-05T00:34:29Z","ts_epoch":1791160469,"type":"patrol.finding","check":"untested_script","script":"sw-tmux-role-color.sh","lines":81,"usage":1}
+{"ts":"2026-10-05T00:34:29Z","ts_epoch":1791160469,"type":"patrol.finding","check":"untested_script","script":"sw-test-all.sh","lines":199,"usage":0}
+{"ts":"2026-10-05T00:34:29Z","ts_epoch":1791160469,"type":"patrol.finding","check":"untested_script","script":"sw-event-schema-sync.sh","lines":93,"usage":0}
+{"ts":"2026-10-05T00:34:30Z","ts_epoch":1791160470,"type":"patrol.issue_created","check":"untested_scripts","count":7}
