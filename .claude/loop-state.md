@@ -1,46 +1,10 @@
 ---
-goal: "Classify and surface flatlining build-loop iterations distinct from context exhaustion
+goal: "E2E test: add comment to README [automated]
 
-## Plan Summary
-# Implementation Plan: Classify and Surface Flatlining Build-Loop Iterations
-
-## Problem Analysis
-
-The goal is to **improve distinction and visibility** between two failure modes in the build loop:
-
-1. **Flatline**: Loop gets stuck (same error, no code changes) for N consecutive iterations
-2. **Context Exhaustion**: Loop runs out of model context mid-execution
-
-Current state (from CLAUDE.md):
-- Basic flatline detection exists with `flatline_threshold` (default 3)
-- Exit class is written to `progress.md` and `failure-reason.txt`
-- Daemon reads it via `loop_read_exit_class` for retry decisions
-- **Gap**: Classification logic is scattered; not clearly surfaced to users/operators; unclear how flatline streak counter works
-
-## Requirements Analysis
-
-### Minimum Viable Change
-Create a **unified, observable flatline classification system** that:
-- Accurately tracks iteration-by-iteration progress (code changes, error signatures)
-[... full plan in .claude/pipeline-artifacts/plan.md]
-
-## Key Design Decisions
-# Architecture Decision Record: Classify and Surface Flatlining Build-Loop Iterations
-## Context
-## Decision
-### Why This Approach
-## Alternatives Considered
-### Alternative 1: Inline Classification in `sw-loop.sh` ❌
-### Alternative 2: Post-Hoc Classification Stage ❌
-### Alternative 3: Lightweight Heuristic (No Fingerprinting) ❌
-## Component Architecture
-### Components & Responsibilities
-[... full design in .claude/pipeline-artifacts/design.md]
-
-## Specification: Classify and surface flatlining build-loop iterations distinct from context exhaustion
+## Specification: E2E test: add comment to README [automated]
 
 ### Goals
-- Classify and surface flatlining build-loop iterations distinct from context exhaustion
+- E2E test: add comment to README [automated]
 
 ### Acceptance Criteria
 - [testable] All existing tests continue to pass
@@ -49,36 +13,39 @@ Historical context (lessons from previous pipelines):
 {
   "results": [
     {
-      "file": "failures.json",
-      "relevance": 95,
-      "summary": "Contains failure patterns with timestamps, root causes, and resolution tracking (timeouts, database issues). Critical for detecting iteration-level failures and distinguishing resolved vs unresolved patterns—key indicators of flatlining vs transient failures."
+      "file": "fleet-shared-patterns.json",
+      "relevance": 85,
+      "summary": "Common \"Cannot find module\" error in build/test stages across multiple repos. High relevance for E2E tests which often fail on dependency issues."
+    },
+    {
+      "file": "failures.json (with timeout and db patterns)",
+      "relevance": 75,
+      "summary": "Contains resolved timeout patterns in test stage and database connection issues. Timeouts are common in build/test phases."
     },
     {
       "file": "index.json",
-      "relevance": 85,
-      "summary": "Build stage-specific failure patterns with signatures and fixes. Shows classification of test_failure pattern type with 5 occurrences—directly applicable to categorizing build iteration failures."
+      "relevance": 70,
+      "summary": "Test failure pattern with build stage context and timeout fix. Directly applicable to build stage problem resolution."
     },
     {
-      "file": "fleet-shared-patterns.json",
-      "relevance": 75,
-      "summary": "Cross-repo failure patterns with seen_count and contribution tracking. The 'Cannot find module' pattern appearing in both build and test stages helps identify recurring issues—indicators of flatlining vs one-off context failures."
-    },
-    {
-      "file": "success-patterns.json",
-      "relevance": 65,
-      "summary": "Contains iterations_needed and stages_executed fields across patterns. Shows what successful builds require (1-3 iterations typically)—provides baseline for detecting when iterations exceed expected count, signaling flatlining."
-    },
-    {
-      "file": "pattern-outcomes.json",
+      "file": "success-patterns.json (test-repo-comptime)",
       "relevance": 55,
-      "summary": "Empty outcome tracking structure but metadata shows repo_hash correlation capability. Designed for tracking iteration outcomes by repo—infrastructure for surface classification of flatlining vs exhaustion by iteration."
+      "summary": "Shows successful build/test completion with timing metrics. Includes npm test strategy relevant to E2E testing."
+    },
+    {
+      "file": "success-patterns.json (test-repo-ranking)",
+      "relevance": 50,
+      "summary": "Multiple build stage success patterns demonstrating proven completion approaches for npm-based builds."
     }
   ]
 }
 
 Discoveries from other pipelines:
-✓ Injected 1 new discoveries
+✓ Injected 4 new discoveries
+[spec_generation] Stage spec_generation completed — Resolution: 
 [design] Design completed for Classify and surface flatlining build-loop iterations distinct from context exhaustion — Resolution: 
+[intake] Stage intake completed — Resolution: 
+[spec_generation] Stage spec_generation completed — Resolution: 
 
 Task tracking (check off items as you complete them):
 # Pipeline Tasks — Classify and surface flatlining build-loop iterations distinct from context exhaustion
@@ -109,21 +76,130 @@ Task tracking (check off items as you complete them):
 - Pipeline: autonomous
 - Branch: ci/issue-7689
 - Issue: none
-- Generated: 2026-10-05T10:14:10Z"
+- Generated: 2026-10-05T10:14:10Z
+
+## Skill Guidance (testing issue, AI-selected)
+### Why these skills were selected (AI-analyzed):
+- **e2e-test-automation**: This skill guides the entire lifecycle of automaton feature testing—from designing validation points that catch real failures (not just 'code runs') through implementation and review focused on test reliability and isolation.
+- **testing-strategy**: E2E tests require careful design around test sequencing, cleanup, and determinism; this skill ensures patterns like fixture setup/teardown and idempotency are applied.
+
+## E2E Test Automation Patterns
+
+End-to-end tests that verify automation features (like Shipwright's ability to modify files, add comments, or update documentation) have unique requirements:
+
+### Test Lifecycle
+
+**Setup Phase**
+- Verify clean git state before test starts (no uncommitted changes)
+- Create isolated test fixtures (temp dirs, test files) that won't interfere with other tests
+- Document what automation you expect to trigger
+
+**Execution Phase**
+- Trigger the automation being tested (e.g., call the comment-adding function with known inputs)
+- Capture all side effects: file modifications, git changes, API calls
+- Record timestamps for any time-sensitive operations
+
+**Verification Phase**
+- Assert file contents match expected format exactly (including whitespace, line endings, ANSI codes)
+- Verify git state changes are correct (staged files, commit messages, branch state)
+- Check idempotency: run the same automation twice and verify same results (no duplicates, no corrupted state)
+- Validate integration checkpoints: if automation calls other systems, verify those calls succeeded
+
+**Teardown Phase**
+- Clean up test fixtures completely (remove temp files, reset git state)
+- Use trap handlers to guarantee cleanup even on test failure
+- Verify no orphaned processes or file handles
+
+### Common Failure Modes
+
+- **Race conditions**: File I/O during automation can race with test assertions; use flock or atomic file operations
+- **Comment duplication**: Idempotency bugs cause the automation to add comments twice; always test re-runs
+- **Formatting mismatches**: ANSI codes, line endings, or markdown escaping differ from expected; use `od -c` to debug
+- **Git state leakage**: Test leaves uncommitted changes or wrong branch; always reset HEAD and verify clean status
+- **Path assumptions**: Automation hardcodes paths that don't exist in test environment; use relative paths or env vars
+
+### Assertion Patterns
+
+```bash
+# Verify file was modified with exact content
+assert_file_contains "path/to/file" "expected string"
+
+# Verify git shows expected changes
+assert_git_status "path/to/file" "modified"
+
+# Verify automation is idempotent
+run_automation
+run_automation  # Run twice
+assert_file_line_count "path/to/file" "expected_lines"  # Should not double
+
+# Verify cleanup
+assert_git_clean  # No uncommitted changes after test teardown
+```
+
+E2E tests of automation are integration tests—they verify the full pipeline works, not just individual functions. Invest in clear setup/teardown and comprehensive verification of side effects.
+
+## Testing Strategy Expertise
+
+Apply these testing patterns:
+
+### Test Pyramid
+- **Unit tests** (70%): Test individual functions/methods in isolation
+- **Integration tests** (20%): Test component interactions and boundaries
+- **E2E tests** (10%): Test critical user flows end-to-end
+
+### What to Test
+- Happy path: the expected successful flow
+- Error cases: what happens when things go wrong?
+- Edge cases: empty inputs, maximum values, concurrent access
+- Boundary conditions: off-by-one, empty collections, null/undefined
+
+### Test Quality
+- Each test should verify ONE behavior
+- Test names should describe the expected behavior, not the implementation
+- Tests should be independent — no shared mutable state between tests
+- Tests should be deterministic — same result every run
+
+### Coverage Strategy
+- Aim for meaningful coverage, not 100% line coverage
+- Focus coverage on business logic and error handling
+- Don't test framework code or simple getters/setters
+- Cover the branches, not just the lines
+
+### Mocking Guidelines
+- Mock external dependencies (APIs, databases, file system)
+- Don't mock the code under test
+- Use realistic test data — edge cases reveal bugs
+- Verify mock interactions when the side effect IS the behavior
+
+### Regression Testing
+- Write a failing test FIRST that reproduces the bug
+- Then fix the bug and verify the test passes
+- Keep regression tests — they prevent the bug from recurring
+
+### Required Output (Mandatory)
+
+Your output MUST include these sections when this skill is active:
+
+1. **Test Pyramid Breakdown**: Explicit count of unit/integration/E2E tests and their coverage targets (e.g., "70 unit tests covering business logic, 12 integration tests for API boundaries, 3 E2E tests for critical paths")
+2. **Coverage Targets**: Target coverage percentage per layer and which critical paths MUST be tested
+3. **Critical Paths to Test**: Specific test cases for the happy path, 2+ error cases, and 2+ edge cases
+
+If any section is not applicable, explicitly state why it's skipped.
+"
 iteration: 0
-max_iterations: 20
+max_iterations: 3
 status: running
 test_cmd: "npm test"
-model: haiku
+model: opus
 agents: 1
-started_at: 2026-10-05T10:18:06Z
-last_iteration_at: 2026-10-05T10:18:06Z
+started_at: 2026-10-05T10:40:45Z
+last_iteration_at: 2026-10-05T10:40:45Z
 consecutive_failures: 0
 total_commits: 0
 audit_enabled: true
 audit_agent_enabled: true
 quality_gates_enabled: true
-dod_file: "/home/runner/work/shipwright/shipwright/.claude/pipeline-artifacts/dod.md"
+dod_file: ""
 auto_extend: true
 extension_count: 0
 max_extensions: 3

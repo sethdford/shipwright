@@ -1704,19 +1704,20 @@
         "risk_level": "low",
         "success_probability": 95,
         "recommended_template": "fast",
-        "issue_type": "documentation",
+        "issue_type": "testing",
         "key_risks": [
-          "Vague specification - no details on which comment or location",
-          "May be a self-closing test verification task"
+          "Issue is marked as automated test artifact — may be obsolete or intended for closure only",
+          "Concurrent README modifications could cause merge conflicts",
+          "Missing specification of what comment should be added"
         ],
         "implementation_hints": [
-          "This appears to be E2E test proof-of-execution",
-          "Look for test automation context or hooks that define the expected comment",
-          "The comment likely serves as verification that an automated test ran successfully",
-          "Safe to close marker suggests this is low-priority cleanup work"
+          "Verify this is not a stale automated test artifact before implementing",
+          "Check current README for existing markers or placeholder sections",
+          "Review test framework to understand expected comment format and location",
+          "Consider closing without implementation if this is a test-only artifact"
         ]
       },
-      "timestamp": 1791163425,
+      "timestamp": 1791196733,
       "ttl": 3600
     },
     "4d6496b39b9ff208de40107cf134cb6a": {
@@ -1747,30 +1748,33 @@
     "f9c9e8b2bd49e68005879dc608624768": {
       "result": {
         "issue_type": "testing",
-        "confidence": 0.82,
+        "confidence": 0.95,
         "secondary_domains": [
           "automation",
+          "integration",
           "documentation"
         ],
         "complexity_assessment": {
-          "score": 3,
-          "reasoning": "E2E test for a narrow feature scope (adding a comment to README). Marked 'safe to close' suggests ephemeral or temporary validation test. Main challenge is ensuring test reliability, idempotency, and proper cleanup rather than implementation complexity."
+          "score": 4,
+          "reasoning": "Focused E2E test validating a single automation capability (adding README comments). Straightforward verification, but requires attention to test isolation and brittleness."
         },
         "skill_plan": {
           "plan": [
-            "brainstorming",
-            "testing-strategy"
+            "e2e-test-automation",
+            "testing-strategy",
+            "brainstorming"
           ],
           "design": [
-            "testing-strategy"
+            "e2e-test-automation",
+            "validation-thoroughness"
           ],
           "build": [
-            "testing-strategy",
-            "test-parallelization-detection"
+            "e2e-test-automation",
+            "testing-strategy"
           ],
           "review": [
-            "testing-strategy",
-            "pr-quality"
+            "pr-quality",
+            "e2e-test-automation"
           ],
           "compound_quality": [
             "adversarial-quality",
@@ -1781,68 +1785,69 @@
           ],
           "deploy": [],
           "validate": [
-            "validation-thoroughness"
+            "validation-thoroughness",
+            "e2e-test-automation"
           ],
           "monitor": []
         },
         "skill_rationale": {
-          "brainstorming": "Clarify test intent before implementation: what does 'adding a comment' mean (inline code comment? commit comment? documentation annotation?), what environment state does it assume, and what constitutes success vs. failure?",
-          "testing-strategy": "E2E tests require explicit patterns for setup, execution, assertions, and teardown to remain reliable and maintainable; establish and follow patterns consistently across build, review, and design stages.",
-          "test-parallelization-detection": "E2E tests interacting with README files may cause race conditions if run in parallel; proactively identify shared state vectors (file locks, temp fixtures, git state) before they cause flakiness.",
-          "pr-quality": "Test PRs must be reviewable in minutes with clear naming, documented test scenarios, and rationale; this is especially important for E2E tests that are less obvious than unit tests.",
-          "adversarial-quality": "Find brittle assumptions E2E tests hide: missing README, permission denied, concurrent modifications, malformed input, or state pollution from previous test runs.",
-          "validation-thoroughness": "Verify the test actually exercises the full user path; a smoke test (file was modified) misses real problems like corrupted file encoding, lost formatting, or incomplete writes."
+          "e2e-test-automation": "This skill guides the entire lifecycle of automaton feature testing—from designing validation points that catch real failures (not just 'code runs') through implementation and review focused on test reliability and isolation.",
+          "testing-strategy": "E2E tests require careful design around test sequencing, cleanup, and determinism; this skill ensures patterns like fixture setup/teardown and idempotency are applied.",
+          "validation-thoroughness": "A test that passes but misses failure modes is worthless; this skill ensures the test actually validates the README comment was added correctly, not just that automation ran.",
+          "adversarial-quality": "Think through how the automation could fail partially (file locked, concurrent writes, permission errors) so the test design handles or catches these edge cases.",
+          "brainstorming": "Clarify assumptions upfront: Does 'add comment' mean append, insert at specific line, or update existing comment? What's the expected format? Wrong assumptions waste build time.",
+          "pr-quality": "The test code itself must be clear and maintainable; a reviewer should understand in 5 minutes what the test validates and why each assertion matters."
         },
         "generated_skills": [],
         "review_focus": [
-          "Idempotency and cleanup: can the test run multiple times consecutively without leaving state behind or failing on retry?",
-          "Scope definition: is it clear what README file the test targets (repo root, docs/, etc.) and whether the test is specific or generic?",
-          "Flakiness risk: are there hardcoded timeouts, polling loops, or implicit ordering assumptions that could cause intermittent failures?",
-          "Documentation clarity: is the test's purpose, preconditions (what state must exist), and assertions clearly documented for future maintainers?",
-          "Isolation and teardown: does the test clean up after itself or rely on other tests/jobs to do cleanup?"
+          "Does the test validate the README comment was actually added (file content check) or just that no error occurred?",
+          "Are edge cases handled: missing README, permission errors, concurrent modifications, partial writes?",
+          "Is the test deterministic and isolated (no flaky timing, no dependency on test execution order)?",
+          "Does the test clean up after itself and restore any modified state?",
+          "Is the test code clear about what it's verifying (comments should explain the WHY, not the WHAT)?"
         ],
         "risk_areas": [
-          "Test flakiness: E2E tests interacting with file systems are prone to race conditions, timing issues, and environment-dependent failures.",
-          "State leakage: if README is not properly reset or cleaned up, subsequent test runs may fail or corrupt the repository state.",
-          "Permission and environment assumptions: test may assume specific file permissions, working directory, or git state that differs across environments.",
-          "Parallel test conflicts: if multiple E2E tests modify README concurrently, they may interfere with each other or cause git merge conflicts.",
-          "Maintenance burden: test tightly coupled to README location or format may break silently if repository structure is refactored."
+          "Test brittleness: timing-dependent assertions or reliance on file system state could cause flaky failures",
+          "Incomplete validation: test might pass when README was partially modified or validation skipped a step",
+          "Isolation failure: test modifies shared README and doesn't clean up, affecting other tests or environments",
+          "Over-mocking: test might verify internal code paths but miss real failure modes in the actual automation flow",
+          "Documentation drift: if README format or location changes, test breaks without clear root cause"
         ]
       },
-      "timestamp": 1791163493,
+      "timestamp": 1791196801,
       "ttl": 3600
     },
     "61c5f4a9ce6598c2f1fc048e0a7ce958": {
       "result": {
         "results": [
           {
-            "file": "failures.json",
-            "relevance": 72,
-            "summary": "Contains resolved build/test failures with root causes and fixes (timeouts, db issues). Provides patterns for debugging test execution problems that may occur during E2E test setup."
+            "file": "fleet-shared-patterns.json",
+            "relevance": 85,
+            "summary": "Common \"Cannot find module\" error in build/test stages across multiple repos. High relevance for E2E tests which often fail on dependency issues."
           },
           {
-            "file": "fleet-shared-patterns.json",
-            "relevance": 68,
-            "summary": "Tracks cross-repo build failures including 'Cannot find module' error during build stage with 'npm i' fix. Relevant for catching dependency issues that could affect E2E test execution."
+            "file": "failures.json (with timeout and db patterns)",
+            "relevance": 75,
+            "summary": "Contains resolved timeout patterns in test stage and database connection issues. Timeouts are common in build/test phases."
           },
           {
             "file": "index.json",
-            "relevance": 62,
-            "summary": "Indexes build-stage test failures with timeout pattern and timeout increase fix. Directly relevant to understanding test execution issues in the build stage."
-          },
-          {
-            "file": "success-patterns.json (test-repo-ranking)",
-            "relevance": 55,
-            "summary": "Contains two successful build-stage patterns using npm test strategy with low complexity. Shows patterns of working test execution that can guide E2E test implementation."
+            "relevance": 70,
+            "summary": "Test failure pattern with build stage context and timeout fix. Directly applicable to build stage problem resolution."
           },
           {
             "file": "success-patterns.json (test-repo-comptime)",
-            "relevance": 48,
-            "summary": "Records build-stage execution with npm test strategy, includes timing and cost metrics. Useful for understanding typical build iteration costs and durations for automated tests."
+            "relevance": 55,
+            "summary": "Shows successful build/test completion with timing metrics. Includes npm test strategy relevant to E2E testing."
+          },
+          {
+            "file": "success-patterns.json (test-repo-ranking)",
+            "relevance": 50,
+            "summary": "Multiple build stage success patterns demonstrating proven completion approaches for npm-based builds."
           }
         ]
       },
-      "timestamp": 1791165645,
+      "timestamp": 1791196843,
       "ttl": 1800
     },
     "b9633b60c85f9b38945898f118146831": {
@@ -2435,6 +2440,80 @@
         "raw_response": "Mock claude: ok"
       },
       "timestamp": 1791195918,
+      "ttl": 1800
+    },
+    "3c67c559d4705a2add59b0608ac04c37": {
+      "result": {
+        "raw_response": "Mock claude: ok"
+      },
+      "timestamp": 1791196741,
+      "ttl": 1800
+    },
+    "0ee1d4952d1929a1bad40c2d4789b95f": {
+      "result": {
+        "estimated_iterations": 2
+      },
+      "timestamp": 1791196741,
+      "ttl": 1800
+    },
+    "73eb1329c0e692eae11382537e50651d": {
+      "result": {
+        "estimated_cost_usd": 0.09,
+        "estimated_iterations": 1,
+        "estimated_tokens": 11000,
+        "likely_failure_stage": "none",
+        "confidence": 70
+      },
+      "timestamp": 1791196757,
+      "ttl": 3600
+    },
+    "d043af889a400bf088d83d72df10d63e": {
+      "result": [
+        {
+          "type": "result",
+          "result": "I am trying the same approach again.",
+          "usage": {
+            "input_tokens": 0,
+            "output_tokens": 0
+          }
+        }
+      ],
+      "timestamp": 1791196868,
+      "ttl": 1800
+    },
+    "573cbb0e66dd54d252732b4725c23008": {
+      "result": {
+        "raw_response": "Mock claude: ok"
+      },
+      "timestamp": 1791196963,
+      "ttl": 1800
+    },
+    "7a0774849955f52655126614ce627d41": {
+      "result": [
+        {
+          "type": "result",
+          "result": "I am trying the same approach again.",
+          "usage": {
+            "input_tokens": 0,
+            "output_tokens": 0
+          }
+        }
+      ],
+      "timestamp": 1791197206,
+      "ttl": 1800
+    },
+    "ec816c0a1aa0b8c16fccb18ce4c1d567": {
+      "result": [
+        {
+          "type": "result",
+          "result": "I am trying the same approach again.",
+          "usage": {
+            "input_tokens": 0,
+            "output_tokens": 0
+          }
+        }
+      ],
+      "timestamp": 1791197236,
       "ttl": 1800
     }
   }
