@@ -1813,32 +1813,32 @@
         "results": [
           {
             "file": "failures.json",
-            "relevance": 40,
-            "summary": "Contains documented test stage failures (timeouts, connection issues) with root causes and fixes; timeout patterns directly applicable to E2E test execution troubleshooting"
+            "relevance": 72,
+            "summary": "Contains resolved build/test failures with root causes and fixes (timeouts, db issues). Provides patterns for debugging test execution problems that may occur during E2E test setup."
           },
           {
             "file": "fleet-shared-patterns.json",
-            "relevance": 32,
-            "summary": "Cross-repo pattern for 'Error: Cannot find module' appearing in build/test stages across multiple repos; npm install fix is common prerequisite for E2E tests"
+            "relevance": 68,
+            "summary": "Tracks cross-repo build failures including 'Cannot find module' error during build stage with 'npm i' fix. Relevant for catching dependency issues that could affect E2E test execution."
           },
           {
             "file": "index.json",
-            "relevance": 26,
-            "summary": "Test failure pattern in build stage with timeout increase fix; demonstrates common build stage issues and resolutions for test execution"
-          },
-          {
-            "file": "success-patterns.json (test-repo-comptime)",
-            "relevance": 20,
-            "summary": "Shows successful intake→build→test multi-stage flow with timing data; provides template for build stage execution patterns in similar test scenarios"
+            "relevance": 62,
+            "summary": "Indexes build-stage test failures with timeout pattern and timeout increase fix. Directly relevant to understanding test execution issues in the build stage."
           },
           {
             "file": "success-patterns.json (test-repo-ranking)",
-            "relevance": 15,
-            "summary": "Multiple build stage patterns showing successful completions; low specificity but may inform general build strategy for test execution"
+            "relevance": 55,
+            "summary": "Contains two successful build-stage patterns using npm test strategy with low complexity. Shows patterns of working test execution that can guide E2E test implementation."
+          },
+          {
+            "file": "success-patterns.json (test-repo-comptime)",
+            "relevance": 48,
+            "summary": "Records build-stage execution with npm test strategy, includes timing and cost metrics. Useful for understanding typical build iteration costs and durations for automated tests."
           }
         ]
       },
-      "timestamp": 1791163533,
+      "timestamp": 1791165645,
       "ttl": 1800
     },
     "b9633b60c85f9b38945898f118146831": {
@@ -2176,6 +2176,31 @@
       ],
       "timestamp": 1791164928,
       "ttl": 1800
+    },
+    "e0a61d03b8d1f44dd54d99b4e65dc46e": {
+      "result": {
+        "estimated_iterations": 1
+      },
+      "timestamp": 1791165580,
+      "ttl": 1800
+    },
+    "dceb08650eec0ec40671a763e4e584df": {
+      "result": {
+        "estimated_cost_usd": 0.18,
+        "estimated_iterations": 1,
+        "estimated_tokens": 8500,
+        "likely_failure_stage": "none",
+        "confidence": 87,
+        "breakdown": {
+          "intake": 0.02,
+          "build": 0.08,
+          "test": 0.05,
+          "pr": 0.03
+        },
+        "rationale": "Low-complexity documentation task (E2E test marker comment). Fast template applies (intake→build→test→PR, auto-gated). 95% success probability with haiku-class models suitable for all stages. Single iteration expected; no builds/compilations required."
+      },
+      "timestamp": 1791165588,
+      "ttl": 3600
     }
   }
 }
