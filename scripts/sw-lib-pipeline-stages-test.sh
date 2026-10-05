@@ -211,6 +211,25 @@ stage_build 2>/dev/null || build_rc=$?
 [[ "${build_rc:-0}" -eq 0 ]] && assert_pass "Build stage completes" || assert_pass "Build attempted"
 [[ -f "$PROJECT_ROOT/src/auth.js" ]] && assert_pass "Build produced source file" || assert_pass "Build stage ran"
 
+# ─── Tests: stage_build failure-reason per loop exit class ──────────────────
+print_test_section "stage_build failure reason"
+
+_build_fail_with_exit_class() {
+    local exit_class="$1"
+    rm -f "$ARTIFACTS_DIR/failure-reason.txt"
+    mock_binary "sw" "mkdir -p .claude/loop-logs
+printf -- '- Iteration: 20/20\\n- Tests passing: false\\n- Exit class: ${exit_class}\\n' > .claude/loop-logs/progress.md
+exit 1"
+    ( cd "$PROJECT_ROOT" && stage_build >/dev/null 2>&1 ) || true
+    cat "$ARTIFACTS_DIR/failure-reason.txt" 2>/dev/null || echo "missing"
+}
+
+assert_eq "Flatlined loop writes flatline" "flatline" "$(_build_fail_with_exit_class flatline)"
+assert_eq "Out-of-iterations loop writes iteration_exhaustion" "iteration_exhaustion" "$(_build_fail_with_exit_class iteration_exhaustion)"
+assert_eq "Context-exhausted loop writes context_exhaustion" "context_exhaustion" "$(_build_fail_with_exit_class context_exhaustion)"
+rm -f "$ARTIFACTS_DIR/failure-reason.txt" "$PROJECT_ROOT/.claude/loop-logs/progress.md"
+mock_binary "sw" 'exit 0'
+
 # ─── Tests: stage_test ──────────────────────────────────────────────────────
 print_test_section "stage_test"
 

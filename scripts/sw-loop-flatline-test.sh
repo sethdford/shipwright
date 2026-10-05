@@ -202,6 +202,16 @@ FLATLINE_STREAK=0; LAST_ITERATION_CLASS="context_exhaustion"; STATUS="context_ex
 write_progress
 assert_eq "1" "$(grep -c '^- Exit class: context_exhaustion$' "$LOG_DIR/progress.md" || true)" "progress.md records Exit class: context_exhaustion"
 
+# ─── loop_read_exit_class: the shared progress.md parser ─────────────────────
+echo "loop_read_exit_class"
+assert_eq "" "$(loop_read_exit_class "$TEST_TMP/no-such-progress.md")" "missing file reads as empty"
+assert_eq "" "$(loop_read_exit_class "")" "no argument reads as empty"
+printf -- '- Iteration: 3/20\n- Tests passing: false\n' > "$TEST_TMP/legacy-progress.md"
+assert_eq "" "$(loop_read_exit_class "$TEST_TMP/legacy-progress.md")" "legacy progress.md without the line reads as empty"
+printf -- '- Exit class: context_exhaustion\n- Exit class: iteration_exhaustion\n' > "$TEST_TMP/multi-progress.md"
+assert_eq "iteration_exhaustion" "$(loop_read_exit_class "$TEST_TMP/multi-progress.md")" "last Exit class line wins"
+assert_eq "context_exhaustion" "$(loop_read_exit_class "$LOG_DIR/progress.md")" "reads what write_progress wrote"
+
 echo ""
 echo "Results: $PASS passed, $FAIL failed"
 [[ "$FAIL" -eq 0 ]]

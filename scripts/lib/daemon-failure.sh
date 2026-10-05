@@ -19,6 +19,22 @@ ON_FAILURE_LOG_LINES="${ON_FAILURE_LOG_LINES:-50}"
 NO_GITHUB="${NO_GITHUB:-false}"
 EVENTS_FILE="${EVENTS_FILE:-${DAEMON_DIR}/events.jsonl}"
 
+# shellcheck source=loop-flatline.sh
+[[ -f "$(dirname "${BASH_SOURCE[0]}")/loop-flatline.sh" ]] && source "$(dirname "${BASH_SOURCE[0]}")/loop-flatline.sh"
+
+# Map a build-loop exit class (progress.md "Exit class:") to a daemon failure class.
+# Only real context exhaustion earns the restart boost; flatline and iteration
+# exhaustion get their own classes. A missing line (legacy progress.md) keeps the
+# pre-flatline behaviour; an unrecognised class is treated as a build failure.
+_failure_class_from_exit_class() {
+    case "${1:-}" in
+        flatline)                 echo "flatline" ;;
+        iteration_exhaustion)     echo "iteration_exhaustion" ;;
+        context_exhaustion|"")    echo "context_exhaustion" ;;
+        *)                        echo "build_failure" ;;
+    esac
+}
+
 classify_failure() {
     local issue_num="$1"
     if [[ -z "${LOG_DIR:-}" ]]; then
@@ -56,17 +72,15 @@ classify_failure() {
         cf_iter=$(grep -oE 'Iteration: [0-9]+' "$progress_file" 2>/dev/null | tail -1 | grep -oE '[0-9]+' || echo "0")
         if ! [[ "${cf_iter:-0}" =~ ^[0-9]+$ ]]; then cf_iter="0"; fi
         local cf_tests
-        cf_tests=$(grep -oE 'Tests passing: (true|false)' "$progress_file" 2>/dev/null | awk '{print $NF}' || echo "unknown")
+        cf_tests=$(grep -oE 'Tests passing: (true|false)' "$progress_file" 2>/dev/null | tail -1 | awk '{print $NF}' || echo "unknown")
         if [[ "${cf_iter:-0}" -gt 0 ]] && { [[ "$cf_tests" == "false" ]] || [[ "$cf_tests" == "unknown" ]]; }; then
             # A flatlined loop (no code change, same error) is not context exhaustion:
             # more restarts would only repeat it
-            local cf_exit_class
-            cf_exit_class=$(grep -oE 'Exit class: [a-z_]+' "$progress_file" 2>/dev/null | tail -1 | awk '{print $NF}' || true)
-            if [[ "$cf_exit_class" == "flatline" ]]; then
-                echo "flatline"
-            else
-                echo "context_exhaustion"
+            local cf_exit_class=""
+            if type loop_read_exit_class >/dev/null 2>&1; then
+                cf_exit_class=$(loop_read_exit_class "$progress_file")
             fi
+            _failure_class_from_exit_class "$cf_exit_class"
             return
         fi
     fi
@@ -91,6 +105,7 @@ get_max_retries_for_class() {
         api_error)                echo "${MAX_RETRIES_API_ERROR:-4}" ;;
         context_exhaustion)       echo "${MAX_RETRIES_CONTEXT_EXHAUSTION:-2}" ;;
         flatline)                 echo "${MAX_RETRIES_FLATLINE:-1}" ;;
+        iteration_exhaustion)     echo "${MAX_RETRIES_ITERATION_EXHAUSTION:-2}" ;;
         build_failure)           echo "${MAX_RETRIES_BUILD:-2}" ;;
         *)                       echo "${MAX_RETRIES:-2}" ;;
     esac

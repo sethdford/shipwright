@@ -144,7 +144,7 @@ echo "Some general output" > "$LOG_DIR/issue-503.log"
 result=$(classify_failure 503)
 assert_eq "Flatline exit class classified as flatline" "flatline" "$result"
 
-# Iteration exhaustion keeps the context_exhaustion class (restart boost still helps)
+# Iteration exhaustion is its own class: no context-exhaustion restart boost
 mkdir -p "$WORKTREE_DIR/daemon-issue-504/.claude/loop-logs"
 cat > "$WORKTREE_DIR/daemon-issue-504/.claude/loop-logs/progress.md" <<'MD'
 - Iteration: 20/20
@@ -153,7 +153,32 @@ cat > "$WORKTREE_DIR/daemon-issue-504/.claude/loop-logs/progress.md" <<'MD'
 MD
 echo "Some general output" > "$LOG_DIR/issue-504.log"
 result=$(classify_failure 504)
-assert_eq "Iteration exhaustion stays context_exhaustion" "context_exhaustion" "$result"
+assert_eq "Iteration exhaustion classified as iteration_exhaustion" "iteration_exhaustion" "$result"
+
+# After a restart, the last Exit class line wins
+mkdir -p "$WORKTREE_DIR/daemon-issue-506/.claude/loop-logs"
+cat > "$WORKTREE_DIR/daemon-issue-506/.claude/loop-logs/progress.md" <<'MD'
+- Iteration: 4/20
+- Tests passing: false
+- Exit class: context_exhaustion
+- Iteration: 9/20
+- Tests passing: false
+- Exit class: flatline
+MD
+echo "Some general output" > "$LOG_DIR/issue-506.log"
+result=$(classify_failure 506)
+assert_eq "Last Exit class line wins after restart" "flatline" "$result"
+
+# An unrecognised exit class (e.g. circuit_breaker) is a build failure, not context exhaustion
+mkdir -p "$WORKTREE_DIR/daemon-issue-507/.claude/loop-logs"
+cat > "$WORKTREE_DIR/daemon-issue-507/.claude/loop-logs/progress.md" <<'MD'
+- Iteration: 7/20
+- Tests passing: false
+- Exit class: circuit_breaker
+MD
+echo "Some general output" > "$LOG_DIR/issue-507.log"
+result=$(classify_failure 507)
+assert_eq "Unrecognised exit class classified as build_failure" "build_failure" "$result"
 
 # Flatline with passing tests is not a loop failure class
 mkdir -p "$WORKTREE_DIR/daemon-issue-505/.claude/loop-logs"
@@ -172,6 +197,18 @@ result=$(classify_failure 601)
 assert_eq "Generic failure → unknown" "unknown" "$result"
 
 # ═══════════════════════════════════════════════════════════════════════════════
+# _failure_class_from_exit_class
+# ═══════════════════════════════════════════════════════════════════════════════
+print_test_section "_failure_class_from_exit_class"
+
+assert_eq "flatline → flatline" "flatline" "$(_failure_class_from_exit_class flatline)"
+assert_eq "context_exhaustion → context_exhaustion" "context_exhaustion" "$(_failure_class_from_exit_class context_exhaustion)"
+assert_eq "iteration_exhaustion → iteration_exhaustion" "iteration_exhaustion" "$(_failure_class_from_exit_class iteration_exhaustion)"
+assert_eq "missing (legacy progress.md) → context_exhaustion" "context_exhaustion" "$(_failure_class_from_exit_class "")"
+assert_eq "circuit_breaker → build_failure" "build_failure" "$(_failure_class_from_exit_class circuit_breaker)"
+assert_eq "garbage → build_failure" "build_failure" "$(_failure_class_from_exit_class 'not a class')"
+
+# ═══════════════════════════════════════════════════════════════════════════════
 # get_max_retries_for_class
 # ═══════════════════════════════════════════════════════════════════════════════
 print_test_section "get_max_retries_for_class"
@@ -179,6 +216,8 @@ print_test_section "get_max_retries_for_class"
 assert_eq "auth_error: 0 retries" "0" "$(get_max_retries_for_class auth_error)"
 assert_eq "flatline: 1 retry by default" "1" "$(get_max_retries_for_class flatline)"
 assert_eq "flatline: MAX_RETRIES_FLATLINE override" "3" "$(MAX_RETRIES_FLATLINE=3 get_max_retries_for_class flatline)"
+assert_eq "iteration_exhaustion: 2 retries by default" "2" "$(get_max_retries_for_class iteration_exhaustion)"
+assert_eq "iteration_exhaustion: MAX_RETRIES_ITERATION_EXHAUSTION override" "1" "$(MAX_RETRIES_ITERATION_EXHAUSTION=1 get_max_retries_for_class iteration_exhaustion)"
 assert_eq "invalid_issue: 0 retries" "0" "$(get_max_retries_for_class invalid_issue)"
 assert_eq "api_error: default 4 retries" "4" "$(get_max_retries_for_class api_error)"
 assert_eq "context_exhaustion: 2 retries" "2" "$(get_max_retries_for_class context_exhaustion)"

@@ -177,6 +177,16 @@ loop_resolve_exit_class() {
     return 0
 }
 
+# Read the last "Exit class:" from a progress.md. The one parser shared by the
+# pipeline and the daemon so they cannot drift apart. Echoes "" when the file
+# or the line is missing (pre-flatline progress files); never fails.
+loop_read_exit_class() {
+    local progress_file="${1:-}"
+    [[ -n "$progress_file" && -f "$progress_file" ]] || return 0
+    grep -oE 'Exit class: [a-z_]+' "$progress_file" 2>/dev/null | tail -1 | awk '{print $NF}' || true
+    return 0
+}
+
 # Atomically write $LOG_DIR/flatline.json. Diagnostic only — never fails the loop.
 flatline_write_artifact() {
     [[ -z "${LOG_DIR:-}" || ! -d "${LOG_DIR:-}" ]] && return 0

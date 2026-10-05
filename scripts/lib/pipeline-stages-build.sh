@@ -3,6 +3,9 @@
 [[ -n "${_PIPELINE_STAGES_BUILD_LOADED:-}" ]] && return 0
 _PIPELINE_STAGES_BUILD_LOADED=1
 
+# shellcheck source=loop-flatline.sh
+[[ -f "$(dirname "${BASH_SOURCE[0]}")/loop-flatline.sh" ]] && source "$(dirname "${BASH_SOURCE[0]}")/loop-flatline.sh"
+
 # Map pipeline stage to effort level (when no explicit --effort override)
 _stage_effort_level() {
     local stage="$1"
@@ -463,21 +466,31 @@ ${_skill_prompts}
         # change, same error) needs a different retry than context exhaustion
         local _progress_file="${PWD}/.claude/loop-logs/progress.md"
         if [[ -f "$_progress_file" ]]; then
-            local _prog_tests _prog_exit_class
-            _prog_tests=$(grep -oE 'Tests passing: (true|false)' "$_progress_file" 2>/dev/null | awk '{print $NF}' || echo "unknown")
-            _prog_exit_class=$(grep -oE 'Exit class: [a-z_]+' "$_progress_file" 2>/dev/null | tail -1 | awk '{print $NF}' || true)
+            local _prog_tests _prog_exit_class=""
+            _prog_tests=$(grep -oE 'Tests passing: (true|false)' "$_progress_file" 2>/dev/null | tail -1 | awk '{print $NF}' || echo "unknown")
+            if type loop_read_exit_class >/dev/null 2>&1; then
+                _prog_exit_class=$(loop_read_exit_class "$_progress_file")
+            fi
             if [[ "$_prog_tests" != "true" ]]; then
                 mkdir -p "$ARTIFACTS_DIR" 2>/dev/null || true
-                if [[ "$_prog_exit_class" == "flatline" ]]; then
-                    warn "Build loop flatlined — iterations stopped changing code and repeated the same error"
-                    emit_event "pipeline.flatline" "issue=${ISSUE_NUMBER:-0}" "stage=build"
-                    echo "flatline" > "$ARTIFACTS_DIR/failure-reason.txt" 2>/dev/null || true
-                else
-                    warn "Build loop exhausted with failing tests (context exhaustion)"
-                    emit_event "pipeline.context_exhaustion" "issue=${ISSUE_NUMBER:-0}" "stage=build" "exit_class=${_prog_exit_class:-unknown}"
-                    # Write flag for daemon retry logic
-                    echo "context_exhaustion" > "$ARTIFACTS_DIR/failure-reason.txt" 2>/dev/null || true
-                fi
+                case "$_prog_exit_class" in
+                    flatline)
+                        warn "Build loop flatlined — iterations stopped changing code and repeated the same error"
+                        emit_event "pipeline.flatline" "issue=${ISSUE_NUMBER:-0}" "stage=build"
+                        echo "flatline" > "$ARTIFACTS_DIR/failure-reason.txt" 2>/dev/null || true
+                        ;;
+                    iteration_exhaustion)
+                        warn "Build loop ran out of iterations with failing tests (iteration exhaustion)"
+                        emit_event "pipeline.context_exhaustion" "issue=${ISSUE_NUMBER:-0}" "stage=build" "exit_class=iteration_exhaustion"
+                        echo "iteration_exhaustion" > "$ARTIFACTS_DIR/failure-reason.txt" 2>/dev/null || true
+                        ;;
+                    *)
+                        warn "Build loop exhausted with failing tests (context exhaustion)"
+                        emit_event "pipeline.context_exhaustion" "issue=${ISSUE_NUMBER:-0}" "stage=build" "exit_class=${_prog_exit_class:-unknown}"
+                        # Write flag for daemon retry logic
+                        echo "context_exhaustion" > "$ARTIFACTS_DIR/failure-reason.txt" 2>/dev/null || true
+                        ;;
+                esac
             fi
         fi
 
