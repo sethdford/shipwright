@@ -1401,6 +1401,218 @@
       },
       "timestamp": 1775344537,
       "ttl": 3600
+    },
+    "51784e5afc401129988eac832c0c4ad0": {
+      "result": {
+        "complexity": 4,
+        "risk_level": "low",
+        "success_probability": 87,
+        "recommended_template": "fast",
+        "issue_type": "infrastructure",
+        "key_risks": [
+          "GitHub token scope validation might not cover all required scopes if scope list is incomplete",
+          "False positives could block valid pipelines with edge-case auth scenarios",
+          "Performance constraint: must complete in <2s without network timeouts or retries",
+          "Claude CLI auth check may not catch all failure modes (expired tokens, invalid config paths)",
+          "Integration testing with real GitHub/Claude services required for full coverage"
+        ],
+        "implementation_hints": [
+          "Use GitHub API lightweight endpoint (GET /user or check response headers for scopes) for token validation",
+          "Call 'claude --version' or 'claude models list' as low-cost CLI auth probe",
+          "Create pre-intake validation stage or safety hook to run checks before pipeline stages begin",
+          "Structure error messages with actionable details: which credential failed, missing scope name, remediation URL",
+          "Mock GitHub API and Claude CLI in unit tests; use fixture tokens to avoid rate limits",
+          "Cache validation results per session to avoid repeated checks in daemon/loop scenarios",
+          "Store validation metadata (token scope list, CLI version, check timestamp) in pipeline state for debugging"
+        ]
+      },
+      "timestamp": 1791203006,
+      "ttl": 3600
+    },
+    "f2644929e7731973005d091d02599567": {
+      "result": {
+        "estimated_iterations": 3
+      },
+      "timestamp": 1791203014,
+      "ttl": 1800
+    },
+    "84e78db2cef2bff7932f88533cbbb04c": {
+      "result": {
+        "estimated_cost_usd": 0.24,
+        "estimated_iterations": 1,
+        "estimated_tokens": 8500,
+        "likely_failure_stage": "test",
+        "confidence": 85
+      },
+      "timestamp": 1791203022,
+      "ttl": 3600
+    },
+    "13785e0cf99ad9ef3de9302081a2a841": {
+      "result": {
+        "issue_type": "infrastructure",
+        "confidence": 0.94,
+        "secondary_domains": [
+          "security",
+          "testing"
+        ],
+        "complexity_assessment": {
+          "score": 5,
+          "reasoning": "Straightforward auth validation logic with multiple credential scenarios to test, but no complex algorithms or architectural changes needed. Complexity is primarily in test coverage completeness and error message safety."
+        },
+        "skill_plan": {
+          "plan": [
+            "brainstorming",
+            "security-audit"
+          ],
+          "design": [
+            "security-audit",
+            "architecture-design",
+            "auth-validation-infrastructure"
+          ],
+          "build": [
+            "performance",
+            "auth-validation-infrastructure"
+          ],
+          "review": [
+            "security-audit",
+            "adversarial-quality"
+          ],
+          "compound_quality": [
+            "testing-strategy",
+            "validation-thoroughness"
+          ],
+          "pr": [
+            "pr-quality"
+          ],
+          "deploy": [],
+          "validate": [],
+          "monitor": []
+        },
+        "skill_rationale": {
+          "brainstorming": "Challenge assumptions about which GitHub scopes are non-negotiable, whether missing Claude auth should hard-fail or warn, and how to sequence checks for best user experience.",
+          "security-audit": "Credential validation is security-critical; error messages must never expose tokens, and validation logic itself must not introduce new attack vectors or unintended API calls.",
+          "architecture-design": "Decide whether validation runs synchronously at pipeline startup, as a separate pre-flight check, or integrated into the intake stage—this affects error handling and user feedback timing.",
+          "performance": "The <2s overhead constraint is explicit; auth checks must use lightweight mechanisms (token introspection, local CLI checks) without triggering billable API calls.",
+          "auth-validation-infrastructure": "This is domain-specific auth infrastructure work; need patterns for safe credential validation, actionable error messaging, and testing edge cases not covered by generic skills.",
+          "adversarial-quality": "Think like an attacker: can invalid tokens crash the pipeline, leak info in error logs, cause timeout loops, or bypass the check entirely?",
+          "testing-strategy": "Every credential scenario must be covered in unit tests: expired token, missing token, insufficient scopes, malformed token, network timeout during check.",
+          "validation-thoroughness": "Unit tests alone miss integration issues; validate end-to-end that expired credentials fail gracefully at startup, not mid-pipeline.",
+          "pr-quality": "Infrastructure changes like this need crystal-clear rationale; explain which checks run, what errors surface to users, and why this improves reliability attribution."
+        },
+        "generated_skills": [
+          {
+            "name": "auth-validation-infrastructure",
+            "reason": "No existing skill covers safe credential validation patterns, error message design for auth failures, or the specific challenge of performing lightweight auth checks within a hard performance constraint.",
+            "content": "# Auth Validation Infrastructure\n\n## Safe Credential Validation Patterns\n\n### Error Message Design\nNever expose secrets or bearer tokens in error output. Instead:\n- Reference the *source* of the credential (\"GitHub token from GITHUB_TOKEN env var\", not the token itself)\n- Name the specific scope or permission missing (\"Missing 'repo' scope\")\n- Provide actionable next steps (\"Run `gh auth status` to check your token\" or \"Set CLAUDE_API_KEY environment variable\")\n- Log full details to a debug file separate from user-facing output\n\n### Lightweight Auth Checks (No Billable Calls)\n- **GitHub**: Call `gh auth status` (local CLI check, ~100ms) or inspect token format + cached scope data, not the GitHub API\n- **Claude CLI**: Call `claude auth` status check (local, ~50ms)\n- Avoid calling GitHub GraphQL or REST API just to validate credentials—those are billable and slow\n\n### Token Scope Validation\nFor GitHub:\n- Parse token's cached scope metadata if available (from `gh auth status --show-token`)\n- Cross-reference against required scopes (typically `repo`, `workflow`, `read:org`)\n- Clearly communicate which scope(s) are missing, not a generic \"insufficient permissions\" error\n\n### Sequencing and Fallback\n- Run checks sequentially: GitHub first (more likely to fail), Claude CLI second\n- If GitHub check fails, stop and report; don't continue to Claude CLI\n- If Claude CLI check fails but GitHub passed, warn but allow pipeline start (may fail later in build stage, but provides better diagnostics)\n- Cache results locally for <2s subsequent checks (don't re-run auth checks on retries)\n\n### Testing Edge Cases\n- **Expired token**: Token format valid, but `gh auth status` returns \"token expired\"\n- **Missing token**: Environment variable not set or empty string\n- **Insufficient scope**: Token valid but lacks required permissions (e.g., no `repo` scope)\n- **Malformed token**: Invalid format that CLI rejects immediately\n- **Network failure during check**: Timeouts or DNS errors—decide: fail hard or warn?\n- **Partial failure**: GitHub token valid but Claude CLI not installed or unconfigured\n\n### Performance Optimization\n- Measure auth check time; target <1s total (leaves 1s buffer in the <2s overhead constraint)\n- Batch checks where possible (both checks can run in parallel if needed)\n- Cache results in memory for the duration of pipeline startup\n- Log timing: which check took how long, to catch regressions\n\n### Integration into Pipeline Startup\nAuth validation should run:\n1. Before `intake` stage (fail early, not after several stages)\n2. *After* CLI argument parsing (know which credentials are needed)\n3. *Before* any GitHub API calls or Claude CLI invocations\n4. Output clear status: \"✓ GitHub auth valid (scopes: repo, workflow)\" or \"✗ GitHub token missing\"\n"
+          }
+        ],
+        "review_focus": [
+          "Error messages contain no token/secret material—check all stderr, stdout, logs, and error objects",
+          "Auth check latency meets <2s constraint—measure and report timing for GitHub and Claude CLI checks",
+          "Test coverage of all credential failure modes: expired, missing, insufficient-scope, malformed, network timeout",
+          "Graceful degradation: if one auth check fails, does the pipeline fail immediately with a clear message, or continue with a warning?",
+          "Integration point: does this run at the right place in pipeline startup (after arg parsing, before API calls)?",
+          "No billable API calls triggered by the validation itself (use local CLI checks, not GitHub API)"
+        ],
+        "risk_areas": [
+          "Token exposure: error messages or logs accidentally leak bearer tokens or API keys",
+          "Performance regression: auth checks take >2s, slowing down every pipeline start",
+          "False positives: valid credentials rejected due to overly strict validation or edge cases missed in tests",
+          "Incomplete test coverage: credential scenarios not covered (partial failures, timeouts, malformed tokens)",
+          "Integration failure: validation runs too late (after pipeline has already started stages) or too early (before credentials are loaded)"
+        ]
+      },
+      "timestamp": 1791203108,
+      "ttl": 3600
+    },
+    "a0bcd840fe4fb84204fc20080db5f337": {
+      "result": {
+        "results": [
+          {
+            "file": "failures.json",
+            "relevance": 45,
+            "summary": "Contains prerequisite-checking pattern ('database connection refused' with root cause 'db not started' and fix 'start db service first') - directly analogous to early credential validation before pipeline start"
+          },
+          {
+            "file": "fleet-shared-patterns.json",
+            "relevance": 30,
+            "summary": "Demonstrates cross-repo pattern detection and fix propagation - useful for understanding how to systematize credential validation failures across team pipelines"
+          },
+          {
+            "file": "index.json",
+            "relevance": 25,
+            "summary": "Shows failure detection patterns with stage context and fixes - informs approach to detecting and signaling credential validation failures early"
+          },
+          {
+            "file": "architecture.json",
+            "relevance": 15,
+            "summary": "Contains rule definitions that could inform structural approach to credential validation rules in the fast-fail detection system"
+          },
+          {
+            "file": "success-patterns.json (test-repo-comptime)",
+            "relevance": 10,
+            "summary": "Shows multi-stage execution context (intake→build→test) - provides pattern for where credential validation should gate in pipeline flow"
+          }
+        ]
+      },
+      "timestamp": 1791203165,
+      "ttl": 1800
+    },
+    "050ffdeba54d55a716544aa1e851f82f": {
+      "result": {
+        "results": [
+          {
+            "file": "architecture.json",
+            "relevance": 100,
+            "summary": "Architecture rules and patterns directly applicable to designing credential validation infrastructure at pipeline startup"
+          },
+          {
+            "file": "success-patterns.json (daemon timeout fix, issue 699)",
+            "relevance": 68,
+            "summary": "Shows daemon initialization and timeout handling patterns; relevant for designing early-fail validation logic in pipeline startup sequence"
+          },
+          {
+            "file": "failures.json",
+            "relevance": 62,
+            "summary": "Documents resolved and unresolved failure patterns including connection errors; provides failure mode examples for credential validation design"
+          },
+          {
+            "file": "index.json",
+            "relevance": 55,
+            "summary": "Tracks pipeline stage patterns and failure signatures; shows how other infrastructure detection patterns are captured and fixed"
+          },
+          {
+            "file": "fleet-shared-patterns.json",
+            "relevance": 40,
+            "summary": "Cross-repo error detection and fixing patterns; demonstrates error discovery methodology applicable to credential validation"
+          }
+        ]
+      },
+      "timestamp": 1791203294,
+      "ttl": 1800
+    },
+    "b05242b2679e83a2b8fcda20fa4b0ce5": {
+      "result": {
+        "results": [
+          {
+            "file": "failures.json",
+            "relevance": 22,
+            "summary": "Contains connection validation failure pattern ('database connection refused'). Relevant to understanding validation failure modes and their root causes, though focused on DB rather than API credentials specifically."
+          },
+          {
+            "file": "index.json",
+            "relevance": 8,
+            "summary": "Tracks failure patterns and fixes at stage level, but focuses on test timeouts rather than credential validation. Minimal relevance to design approach evaluation."
+          },
+          {
+            "file": "architecture.json",
+            "relevance": 3,
+            "summary": "Contains generic rule structure with no specific content related to credential validation or design anti-patterns. Not actionable for this context."
+          }
+        ]
+      },
+      "timestamp": 1791203310,
+      "ttl": 1800
     }
   }
 }
