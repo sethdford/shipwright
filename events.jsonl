@@ -4757,3 +4757,4 @@
 {"ts":"2026-10-06T12:17:03Z","ts_epoch":1791289023,"type":"patrol.finding","check":"untested_script","script":"sw-test-all.sh","lines":199,"usage":0}
 {"ts":"2026-10-06T12:17:03Z","ts_epoch":1791289023,"type":"patrol.finding","check":"untested_script","script":"sw-event-schema-sync.sh","lines":93,"usage":0}
 {"ts":"2026-10-06T12:17:04Z","ts_epoch":1791289024,"type":"patrol.issue_created","check":"untested_scripts","count":7}
+{"ts":"2026-10-06T16:06:10Z","ts_epoch":1791302770,"type":"hygiene_platform_refactor","hardcoded":49,"fallback":69,"todo":51}
