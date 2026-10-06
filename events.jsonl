@@ -4711,3 +4711,4 @@
 {"ts":"2026-10-05T18:56:50Z","ts_epoch":1791226610,"type":"session.progress_enhanced","progress_file":"/tmp/sw-session-restart-test.MTtWey/project/.claude/loop-logs/progress.md","iteration":2}
 {"ts":"2026-10-05T18:56:50Z","ts_epoch":1791226610,"type":"session.restart_capture","state_file":"/tmp/sw-session-restart-test.hmr7Vf/project/.claude/artifacts/restart-state.json","iteration":3,"restart":1}
 {"ts":"2026-10-05T18:56:50Z","ts_epoch":1791226610,"type":"session.briefing_generated","briefing_file":"/tmp/sw-session-restart-test.vETNbo/project/.claude/artifacts/restart-briefing.md","iteration":0}
+{"ts":"2026-10-06T00:14:12Z","ts_epoch":1791245652,"type":"hygiene_platform_refactor","hardcoded":49,"fallback":69,"todo":51}
