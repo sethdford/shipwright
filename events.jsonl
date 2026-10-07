@@ -4803,3 +4803,4 @@
 {"ts":"2026-10-07T06:18:44Z","ts_epoch":1791353924,"type":"patrol.finding","check":"untested_script","script":"sw-event-schema-sync.sh","lines":93,"usage":0}
 {"ts":"2026-10-07T06:18:45Z","ts_epoch":1791353925,"type":"patrol.issue_created","check":"untested_scripts","count":7}
 {"ts":"2026-10-07T08:11:09Z","ts_epoch":1791360669,"type":"hygiene_platform_refactor","hardcoded":49,"fallback":69,"todo":51}
+{"ts":"2026-10-07T12:09:03Z","ts_epoch":1791374943,"type":"hygiene_platform_refactor","hardcoded":49,"fallback":69,"todo":51}
