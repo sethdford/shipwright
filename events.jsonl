@@ -4895,3 +4895,6 @@
 {"ts":"2026-10-08T18:14:16Z","ts_epoch":1791483256,"type":"patrol.finding","check":"untested_script","script":"sw-test-all.sh","lines":199,"usage":0}
 {"ts":"2026-10-08T18:14:16Z","ts_epoch":1791483256,"type":"patrol.finding","check":"untested_script","script":"sw-event-schema-sync.sh","lines":93,"usage":0}
 {"ts":"2026-10-08T18:14:17Z","ts_epoch":1791483257,"type":"patrol.issue_created","check":"untested_scripts","count":7}
+{"ts":"2026-10-08T20:05:33Z","ts_epoch":1791489933,"type":"hygiene_platform_refactor","hardcoded":49,"fallback":69,"todo":51}
+{"ts":"2026-10-08T20:05:57Z","ts_epoch":1791489957,"type":"strategic.issue_created","title":"Split sw-pipeline-vitals.sh into scoring, trend-tracking, and reporting modules","priority":"P6","complexity":"standard"}
+{"ts":"2026-10-08T20:05:58Z","ts_epoch":1791489958,"type":"strategic.cycle_complete","issues_created":1,"issues_skipped":2}
