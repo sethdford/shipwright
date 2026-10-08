@@ -4835,3 +4835,17 @@
 {"ts":"2026-10-07T18:14:42Z","ts_epoch":1791396882,"type":"patrol.issue_created","check":"untested_scripts","count":7}
 {"ts":"2026-10-07T20:05:47Z","ts_epoch":1791403547,"type":"hygiene_platform_refactor","hardcoded":49,"fallback":69,"todo":51}
 {"ts":"2026-10-08T00:13:48Z","ts_epoch":1791418428,"type":"hygiene_platform_refactor","hardcoded":49,"fallback":69,"todo":51}
+{"ts":"2026-10-08T00:31:39Z","ts_epoch":1791419499,"type":"patrol.started","dry_run":"false"}
+{"ts":"2026-10-08T00:31:42Z","ts_epoch":1791419502,"type":"patrol.issue_created","check":"dead_code","count":1}
+{"ts":"2026-10-08T00:31:47Z","ts_epoch":1791419507,"type":"patrol.finding","check":"recurring_failure","pattern":"[38;2;74;222;128m[1m✓[0m reveal shows 1/3 pass count on","seen_count":14}
+{"ts":"2026-10-08T00:31:48Z","ts_epoch":1791419508,"type":"patrol.issue_created","check":"recurring_failure","pattern":"[38;2;74;222;128m[1m✓[0m reveal shows 1/3 pass count on"}
+{"ts":"2026-10-08T00:31:48Z","ts_epoch":1791419508,"type":"patrol.finding","check":"recurring_failure","pattern":"Failed: 1","seen_count":5}
+{"ts":"2026-10-08T00:31:49Z","ts_epoch":1791419509,"type":"patrol.issue_created","check":"recurring_failure","pattern":"Failed: 1"}
+{"ts":"2026-10-08T00:31:50Z","ts_epoch":1791419510,"type":"patrol.finding","check":"untested_script","script":"sw-tracker-linear.sh","lines":568,"usage":7}
+{"ts":"2026-10-08T00:31:50Z","ts_epoch":1791419510,"type":"patrol.finding","check":"untested_script","script":"sw-tracker-jira.sh","lines":474,"usage":7}
+{"ts":"2026-10-08T00:31:50Z","ts_epoch":1791419510,"type":"patrol.finding","check":"untested_script","script":"sw-tracker-github.sh","lines":212,"usage":3}
+{"ts":"2026-10-08T00:31:50Z","ts_epoch":1791419510,"type":"patrol.finding","check":"untested_script","script":"sw-tmux-status.sh","lines":151,"usage":1}
+{"ts":"2026-10-08T00:31:50Z","ts_epoch":1791419510,"type":"patrol.finding","check":"untested_script","script":"sw-tmux-role-color.sh","lines":81,"usage":1}
+{"ts":"2026-10-08T00:31:50Z","ts_epoch":1791419510,"type":"patrol.finding","check":"untested_script","script":"sw-test-all.sh","lines":199,"usage":0}
+{"ts":"2026-10-08T00:31:50Z","ts_epoch":1791419510,"type":"patrol.finding","check":"untested_script","script":"sw-event-schema-sync.sh","lines":93,"usage":0}
+{"ts":"2026-10-08T00:31:51Z","ts_epoch":1791419511,"type":"patrol.issue_created","check":"untested_scripts","count":7}
