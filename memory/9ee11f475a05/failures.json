@@ -5,8 +5,8 @@
       "pattern": "\u001b[38;2;74;222;128m\u001b[1m✓\u001b[0m reveal shows 1/3 pass count on failure",
       "root_cause": "sw-cost-test.sh 'CONTEXT EFFICIENCY' dashboard tests fail because the cost dashboard prints 'No cost entries in the last 30 days' and exits early, never rendering the context-efficiency section from the seeded loop.context_efficiency events (test seeds only events, no cost entries).",
       "fix": "Make the cost dashboard render the CONTEXT EFFICIENCY section even when there are no cost entries (or have the test seed a cost entry/use an events path the dashboard reads) so the avg budget utilization assertions pass.",
-      "seen_count": 14,
-      "last_seen": "2026-10-05T18:42:49Z",
+      "seen_count": 18,
+      "last_seen": "2026-10-08T22:45:19Z",
       "category": "test_failure"
     },
     {
@@ -66,8 +66,8 @@
     {
       "stage": "test",
       "pattern": "\u001b[38;2;0;212;255m▸\u001b[0m Progress detects repeated error loop... \u001b[38;2;74;222;128m✓\u001b[0m",
-      "root_cause": "sw-self-optimize-test 'Memory promotion copies cross-repo patterns' fails (15/16 passed); the test likely depends on the real ~/.shipwright memory dir or repo-hash state not isolated in the temp test environment, so promotion doesn't copy patterns.",
-      "fix": "Isolate the test's HOME/memory dir (as done for sw-recruit-test) and verify the promotion function's source/destination paths and seeded cross-repo pattern fixtures in sw-self-optimize-test.sh.",
+      "root_cause": "The self-optimize test 'Memory promotion copies cross-repo patterns' fails (15/16 passed); the cross-repo memory promotion logic in sw-self-optimize.sh likely depends on environment/state (e.g. repo hash or HOME/memory dir paths) that the test doesn't set up correctly.",
+      "fix": "Run scripts/sw-self-optimize-test.sh and inspect the promotion test's assertion; fix the promotion function or the test's temp HOME/memory directory fixture so patterns are copied to the global memory location.",
       "seen_count": 1,
       "last_seen": "2026-10-05T17:18:58Z",
       "category": "test_failure"
