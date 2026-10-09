@@ -5,8 +5,8 @@
       "pattern": "\u001b[38;2;74;222;128m\u001b[1m✓\u001b[0m reveal shows 1/3 pass count on failure",
       "root_cause": "sw-cost-test.sh 'CONTEXT EFFICIENCY' dashboard tests fail because the cost dashboard prints 'No cost entries in the last 30 days' and exits early, never rendering the context-efficiency section from the seeded loop.context_efficiency events (test seeds only events, no cost entries).",
       "fix": "Make the cost dashboard render the CONTEXT EFFICIENCY section even when there are no cost entries (or have the test seed a cost entry/use an events path the dashboard reads) so the avg budget utilization assertions pass.",
-      "seen_count": 24,
-      "last_seen": "2026-10-09T08:39:25Z",
+      "seen_count": 27,
+      "last_seen": "2026-10-09T11:30:07Z",
       "category": "test_failure"
     },
     {
@@ -42,7 +42,7 @@
       "root_cause": "sw-cost-test.sh 'context efficiency' dashboard test fails: `shipwright cost show` prints 'No cost entries in the last 30 day(s)' and exits early, so the CONTEXT EFFICIENCY section built from loop.context_efficiency events is never rendered (test seeds only events, no cost entries).",
       "fix": "Make sw-cost.sh render the CONTEXT EFFICIENCY section even when there are no cost entries (don't return early), or have the test seed a cost entry alongside the loop.context_efficiency events.",
       "seen_count": 4,
-      "last_seen": "2026-10-09T08:55:48Z",
+      "last_seen": "2026-10-09T09:21:00Z",
       "category": "test_failure"
     },
     {
@@ -59,27 +59,18 @@
       "pattern": "\u001b[2m  loop behavior: iterations on test failure\u001b[0m",
       "root_cause": "sw-cost-test.sh 'context efficiency' assertions fail because the cost dashboard reports 'No cost entries in the last 30 days' and exits before rendering the CONTEXT EFFICIENCY section from the seeded loop.context_efficiency events (test events/timestamps are not seen, or the section is skipped when costs.json is empty).",
       "fix": "In sw-cost-test.sh, seed at least one cost entry (and events with current timestamps in the events file the script reads) before running the dashboard, or change sw-cost.sh to render the CONTEXT EFFICIENCY section even when there are no cost entries.",
-      "seen_count": 3,
-      "last_seen": "2026-10-09T06:34:44Z",
+      "seen_count": 6,
+      "last_seen": "2026-10-09T10:34:35Z",
       "category": "test_failure"
     },
     {
       "stage": "test",
       "pattern": "\u001b[38;2;0;212;255m▸\u001b[0m Progress detects repeated error loop... \u001b[38;2;74;222;128m✓\u001b[0m",
-      "root_cause": "sw-pipeline-test.sh E2E tests fail because the mocked plan/review stages don't produce plan.md/review.md artifacts (mock claude output not consumed), plus jq parse errors from non-JSON (ANSI-colored) output in the intelligence complexity path and a pipeline that exits 1 in the cleanup test",
-      "fix": "Make the mock claude binary emit the expected plan/review content (and strip ANSI/non-JSON output before jq in the complexity-skip path), then rerun sw-pipeline-test.sh to verify artifacts are written and exit code is 0",
+      "root_cause": "The self-optimize test 'Memory promotion copies cross-repo patterns' failed (15/16 passed); the promotion step likely did not copy patterns to the global memory location, probably due to environment or state dependence such as repo-hash or HOME path, or a missing cross-repo fixture in the test sandbox. The other suites in the log passed. The 'repeated error loop' line is a passing progress test and not the failure.",
+      "fix": "Run scripts/sw-self-optimize-test.sh and inspect the memory promotion test and the promote function in sw-self-optimize.sh. Check that the test's fixture patterns are seen in 2+ repos and that the destination path uses the sandboxed HOME, and fix whichever side is wrong.",
       "seen_count": 1,
       "last_seen": "2026-10-05T17:18:58Z",
       "category": "test_failure"
-    },
-    {
-      "stage": "test",
-      "pattern": "Tests:       Failing",
-      "root_cause": "The log shows all 167 suites passed (0 failed, 0 timed out), so the 'Tests: Failing' pattern does not match this output. It is likely a false positive from the error-pattern matcher, or the failure came from a different step such as a vitest run or a non-zero exit code after the suite finished.",
-      "fix": "Check the actual exit code of `npm test` and look for a 'Tests: Failing' string in another stage's output. Fix the pattern matcher so it does not flag a run that reports '0 failed'. If the exit code was non-zero, re-run `bash scripts/sw-test-all.sh` and inspect the summary.",
-      "seen_count": 1,
-      "last_seen": "2026-10-09T03:09:24Z",
-      "category": "flaky"
     }
   ]
 }
