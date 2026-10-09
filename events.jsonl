@@ -41,3 +41,8 @@
 {"ts":"2026-10-08T23:08:18Z","ts_epoch":1791500898,"type":"session.progress_enhanced","progress_file":"/tmp/sw-session-restart-test.C3nZjc/project/.claude/loop-logs/progress.md","iteration":2}
 {"ts":"2026-10-08T23:08:18Z","ts_epoch":1791500898,"type":"session.restart_capture","state_file":"/tmp/sw-session-restart-test.2Ows8P/project/.claude/artifacts/restart-state.json","iteration":3,"restart":1}
 {"ts":"2026-10-08T23:08:18Z","ts_epoch":1791500898,"type":"session.briefing_generated","briefing_file":"/tmp/sw-session-restart-test.7AJMLV/project/.claude/artifacts/restart-briefing.md","iteration":0}
+{"ts":"2026-10-09T00:15:04Z","ts_epoch":1791504904,"type":"hygiene_platform_refactor","hardcoded":49,"fallback":69,"todo":51}
+{"ts":"2026-10-09T00:15:31Z","ts_epoch":1791504931,"type":"strategic.issue_created","title":"Add missing test suites for sw-event-schema-sync.sh, sw-test-all.sh, sw-tmux-role-color.sh, sw-tmux-status.sh, sw-tracker-github.sh","priority":"P0","complexity":"standard"}
+{"ts":"2026-10-09T00:15:35Z","ts_epoch":1791504935,"type":"strategic.issue_created","title":"Move hardcoded loop/retry thresholds into config/policy.json with env override","priority":"P6","complexity":"standard"}
+{"ts":"2026-10-09T00:15:39Z","ts_epoch":1791504939,"type":"strategic.issue_created","title":"Add a pipeline-run cost-vs-outcome report to `shipwright cost show`","priority":"P3","complexity":"standard"}
+{"ts":"2026-10-09T00:15:39Z","ts_epoch":1791504939,"type":"strategic.cycle_complete","issues_created":3,"issues_skipped":0}
