@@ -6,7 +6,7 @@
       "root_cause": "sw-cost-test.sh 'CONTEXT EFFICIENCY' dashboard tests fail because the cost dashboard prints 'No cost entries in the last 30 days' and exits early, never rendering the context-efficiency section from the seeded loop.context_efficiency events (test seeds only events, no cost entries).",
       "fix": "Make the cost dashboard render the CONTEXT EFFICIENCY section even when there are no cost entries (or have the test seed a cost entry/use an events path the dashboard reads) so the avg budget utilization assertions pass.",
       "seen_count": 27,
-      "last_seen": "2026-10-09T15:49:50Z",
+      "last_seen": "2026-10-09T15:48:06Z",
       "category": "test_failure"
     },
     {
@@ -41,8 +41,8 @@
       "pattern": "\u001b[38;2;0;212;255m▸\u001b[0m Patrol recurring failures label construction... \u001b[38;2;74;222;128m✓\u001b[0m",
       "root_cause": "sw-cost-test.sh 'context efficiency' dashboard test fails: `shipwright cost show` prints 'No cost entries in the last 30 day(s)' and exits early, so the CONTEXT EFFICIENCY section built from loop.context_efficiency events is never rendered (test seeds only events, no cost entries).",
       "fix": "Make sw-cost.sh render the CONTEXT EFFICIENCY section even when there are no cost entries (don't return early), or have the test seed a cost entry alongside the loop.context_efficiency events.",
-      "seen_count": 4,
-      "last_seen": "2026-10-09T08:55:48Z",
+      "seen_count": 5,
+      "last_seen": "2026-10-09T14:04:10Z",
       "category": "test_failure"
     },
     {
@@ -59,8 +59,8 @@
       "pattern": "\u001b[2m  loop behavior: iterations on test failure\u001b[0m",
       "root_cause": "sw-cost-test.sh 'context efficiency' assertions fail because the cost dashboard reports 'No cost entries in the last 30 days' and exits before rendering the CONTEXT EFFICIENCY section from the seeded loop.context_efficiency events (test events/timestamps are not seen, or the section is skipped when costs.json is empty).",
       "fix": "In sw-cost-test.sh, seed at least one cost entry (and events with current timestamps in the events file the script reads) before running the dashboard, or change sw-cost.sh to render the CONTEXT EFFICIENCY section even when there are no cost entries.",
-      "seen_count": 7,
-      "last_seen": "2026-10-09T14:19:20Z",
+      "seen_count": 6,
+      "last_seen": "2026-10-09T12:39:20Z",
       "category": "test_failure"
     },
     {
@@ -75,19 +75,19 @@
     {
       "stage": "test",
       "pattern": "Tests:       Failing",
-      "root_cause": "The visible log excerpt shows every test passing (PASS counts with FAIL: 0 in the last suites), so the real failing suite is outside the last 200 lines; the 'Tests: Failing' summary comes from an earlier suite that is not shown.",
-      "fix": "Re-run `npm test` and capture the full output, then search it for 'FAIL:' counts above 0 or '✗' lines to find the failing suite and fix that assertion.",
+      "root_cause": "The visible log tail shows every suite passing (PASS/FAIL: 0 in all shown suites), so the 'Tests: Failing' marker comes from an earlier suite outside the last 200 lines. The cause can't be identified from this output.",
+      "fix": "Run `npm test` and grep the full output for 'FAIL: [1-9]' or '✗' to find the failing suite, then fix that suite's code. Re-run it alone first, then the full suite.",
       "seen_count": 1,
       "last_seen": "2026-10-09T03:09:24Z",
       "category": "unknown"
     },
     {
       "stage": "test",
-      "pattern": "|   Tests:       Failing",
-      "root_cause": "The self-optimize test 'Memory promotion copies cross-repo patterns' failed (15/16 passed). The cause is likely a test-environment issue, such as the repo hash or memory directory setup for the cross-repo promotion. I haven't inspected the script or test, so this is inferred from the log only.",
-      "fix": "Run scripts/sw-self-optimize-test.sh and read the output for the failing test. Check that the promotion step finds the patterns in the mock repo's memory dir and writes them to the global memory dir under the temp HOME. Fix the code or the test setup, whichever is wrong.",
+      "pattern": "\u001b[38;2;0;212;255m▸\u001b[0m Creates baseline file if missing... \u001b[38;2;74;222;128m✓\u001b[0m",
+      "root_cause": "The self-optimize test 'Memory promotion copies cross-repo patterns' fails (15/16 pass); the promotion step likely depends on environment state such as the repo hash, HOME or memory directory, or the CI runner's git remote, so no patterns get copied across repos.",
+      "fix": "Run scripts/sw-self-optimize-test.sh and inspect the promotion test. Make it set HOME and the memory dirs and use two distinct repo hashes inside its temp dir, instead of relying on the real git remote or environment.",
       "seen_count": 1,
-      "last_seen": "2026-10-09T16:31:55Z",
+      "last_seen": "2026-10-09T16:26:21Z",
       "category": "test_failure"
     }
   ]
