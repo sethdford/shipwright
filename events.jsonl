@@ -46,3 +46,17 @@
 {"ts":"2026-10-09T00:15:35Z","ts_epoch":1791504935,"type":"strategic.issue_created","title":"Move hardcoded loop/retry thresholds into config/policy.json with env override","priority":"P6","complexity":"standard"}
 {"ts":"2026-10-09T00:15:39Z","ts_epoch":1791504939,"type":"strategic.issue_created","title":"Add a pipeline-run cost-vs-outcome report to `shipwright cost show`","priority":"P3","complexity":"standard"}
 {"ts":"2026-10-09T00:15:39Z","ts_epoch":1791504939,"type":"strategic.cycle_complete","issues_created":3,"issues_skipped":0}
+{"ts":"2026-10-09T00:33:39Z","ts_epoch":1791506019,"type":"patrol.started","dry_run":"false"}
+{"ts":"2026-10-09T00:33:44Z","ts_epoch":1791506024,"type":"patrol.issue_created","check":"dead_code","count":1}
+{"ts":"2026-10-09T00:33:48Z","ts_epoch":1791506028,"type":"patrol.finding","check":"recurring_failure","pattern":"[38;2;74;222;128m[1m✓[0m reveal shows 1/3 pass count on","seen_count":18}
+{"ts":"2026-10-09T00:33:49Z","ts_epoch":1791506029,"type":"patrol.issue_created","check":"recurring_failure","pattern":"[38;2;74;222;128m[1m✓[0m reveal shows 1/3 pass count on"}
+{"ts":"2026-10-09T00:33:49Z","ts_epoch":1791506029,"type":"patrol.finding","check":"recurring_failure","pattern":"Failed: 1","seen_count":5}
+{"ts":"2026-10-09T00:33:50Z","ts_epoch":1791506030,"type":"patrol.issue_created","check":"recurring_failure","pattern":"Failed: 1"}
+{"ts":"2026-10-09T00:33:51Z","ts_epoch":1791506031,"type":"patrol.finding","check":"untested_script","script":"sw-tracker-linear.sh","lines":568,"usage":7}
+{"ts":"2026-10-09T00:33:51Z","ts_epoch":1791506031,"type":"patrol.finding","check":"untested_script","script":"sw-tracker-jira.sh","lines":474,"usage":7}
+{"ts":"2026-10-09T00:33:51Z","ts_epoch":1791506031,"type":"patrol.finding","check":"untested_script","script":"sw-tracker-github.sh","lines":212,"usage":3}
+{"ts":"2026-10-09T00:33:51Z","ts_epoch":1791506031,"type":"patrol.finding","check":"untested_script","script":"sw-tmux-status.sh","lines":151,"usage":1}
+{"ts":"2026-10-09T00:33:51Z","ts_epoch":1791506031,"type":"patrol.finding","check":"untested_script","script":"sw-tmux-role-color.sh","lines":81,"usage":1}
+{"ts":"2026-10-09T00:33:51Z","ts_epoch":1791506031,"type":"patrol.finding","check":"untested_script","script":"sw-test-all.sh","lines":199,"usage":0}
+{"ts":"2026-10-09T00:33:51Z","ts_epoch":1791506031,"type":"patrol.finding","check":"untested_script","script":"sw-event-schema-sync.sh","lines":93,"usage":0}
+{"ts":"2026-10-09T00:33:52Z","ts_epoch":1791506032,"type":"patrol.issue_created","check":"untested_scripts","count":7}
