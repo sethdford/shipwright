@@ -509,3 +509,6 @@
 {"ts":"2026-10-09T06:50:32Z","ts_epoch":1791528632,"type":"model.outcome","issue":0,"stage":"intake","model":"opus","success":"true"}
 {"ts":"2026-10-09T06:50:32Z","ts_epoch":1791528632,"type":"model.outcome","issue":0,"stage":"plan","model":"opus","success":"true"}
 {"ts":"2026-10-09T06:50:32Z","ts_epoch":1791528632,"type":"pipeline.cost","input_tokens":0,"output_tokens":0,"model":"sonnet","cost_usd":0.0000}
+{"ts":"2026-10-09T08:08:41Z","ts_epoch":1791533321,"type":"hygiene_platform_refactor","hardcoded":49,"fallback":69,"todo":51}
+{"ts":"2026-10-09T08:09:10Z","ts_epoch":1791533350,"type":"strategic.issue_created","title":"Add a `shipwright doctor` pre-flight check for missing/stale AUTO-doc sections and hygiene thresholds","priority":"P1","complexity":"fast"}
+{"ts":"2026-10-09T08:09:10Z","ts_epoch":1791533350,"type":"strategic.cycle_complete","issues_created":1,"issues_skipped":2}
