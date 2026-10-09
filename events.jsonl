@@ -556,3 +556,6 @@
 {"ts":"2026-10-09T11:42:26Z","ts_epoch":1791546146,"type":"reasoning.trace","job_id":"pipeline-4056776-42","complexity":"medium","risk":50,"template":"standard"}
 {"ts":"2026-10-09T11:42:26Z","ts_epoch":1791546146,"type":"reasoning.trace","job_id":"pipeline-4057470-42","complexity":"medium","risk":50,"template":"standard"}
 {"ts":"2026-10-09T11:42:27Z","ts_epoch":1791546147,"type":"reasoning.trace","job_id":"pipeline-4058148-42","complexity":"medium","risk":50,"template":"standard"}
+{"ts":"2026-10-09T12:07:51Z","ts_epoch":1791547671,"type":"hygiene_platform_refactor","hardcoded":49,"fallback":69,"todo":51}
+{"ts":"2026-10-09T12:08:18Z","ts_epoch":1791547698,"type":"strategic.issue_created","title":"Add pipeline success-rate breakdown by template to `shipwright dora`","priority":"P1","complexity":"standard"}
+{"ts":"2026-10-09T12:08:18Z","ts_epoch":1791547698,"type":"strategic.cycle_complete","issues_created":1,"issues_skipped":2}
