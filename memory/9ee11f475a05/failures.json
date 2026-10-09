@@ -5,8 +5,8 @@
       "pattern": "\u001b[38;2;74;222;128m\u001b[1m✓\u001b[0m reveal shows 1/3 pass count on failure",
       "root_cause": "sw-cost-test.sh 'CONTEXT EFFICIENCY' dashboard tests fail because the cost dashboard prints 'No cost entries in the last 30 days' and exits early, never rendering the context-efficiency section from the seeded loop.context_efficiency events (test seeds only events, no cost entries).",
       "fix": "Make the cost dashboard render the CONTEXT EFFICIENCY section even when there are no cost entries (or have the test seed a cost entry/use an events path the dashboard reads) so the avg budget utilization assertions pass.",
-      "seen_count": 27,
-      "last_seen": "2026-10-09T11:30:07Z",
+      "seen_count": 24,
+      "last_seen": "2026-10-09T08:39:25Z",
       "category": "test_failure"
     },
     {
@@ -42,7 +42,7 @@
       "root_cause": "sw-cost-test.sh 'context efficiency' dashboard test fails: `shipwright cost show` prints 'No cost entries in the last 30 day(s)' and exits early, so the CONTEXT EFFICIENCY section built from loop.context_efficiency events is never rendered (test seeds only events, no cost entries).",
       "fix": "Make sw-cost.sh render the CONTEXT EFFICIENCY section even when there are no cost entries (don't return early), or have the test seed a cost entry alongside the loop.context_efficiency events.",
       "seen_count": 4,
-      "last_seen": "2026-10-09T09:21:00Z",
+      "last_seen": "2026-10-09T08:55:48Z",
       "category": "test_failure"
     },
     {
@@ -59,17 +59,35 @@
       "pattern": "\u001b[2m  loop behavior: iterations on test failure\u001b[0m",
       "root_cause": "sw-cost-test.sh 'context efficiency' assertions fail because the cost dashboard reports 'No cost entries in the last 30 days' and exits before rendering the CONTEXT EFFICIENCY section from the seeded loop.context_efficiency events (test events/timestamps are not seen, or the section is skipped when costs.json is empty).",
       "fix": "In sw-cost-test.sh, seed at least one cost entry (and events with current timestamps in the events file the script reads) before running the dashboard, or change sw-cost.sh to render the CONTEXT EFFICIENCY section even when there are no cost entries.",
-      "seen_count": 6,
-      "last_seen": "2026-10-09T10:34:35Z",
+      "seen_count": 5,
+      "last_seen": "2026-10-09T11:51:29Z",
       "category": "test_failure"
     },
     {
       "stage": "test",
       "pattern": "\u001b[38;2;0;212;255m▸\u001b[0m Progress detects repeated error loop... \u001b[38;2;74;222;128m✓\u001b[0m",
-      "root_cause": "The self-optimize test 'Memory promotion copies cross-repo patterns' failed (15/16 passed); the promotion step likely did not copy patterns to the global memory location, probably due to environment or state dependence such as repo-hash or HOME path, or a missing cross-repo fixture in the test sandbox. The other suites in the log passed. The 'repeated error loop' line is a passing progress test and not the failure.",
-      "fix": "Run scripts/sw-self-optimize-test.sh and inspect the memory promotion test and the promote function in sw-self-optimize.sh. Check that the test's fixture patterns are seen in 2+ repos and that the destination path uses the sandboxed HOME, and fix whichever side is wrong.",
+      "root_cause": "sw-pipeline-test.sh E2E tests fail because the mocked plan/review stages don't produce plan.md/review.md artifacts (mock claude output not consumed), plus jq parse errors from non-JSON (ANSI-colored) output in the intelligence complexity path and a pipeline that exits 1 in the cleanup test",
+      "fix": "Make the mock claude binary emit the expected plan/review content (and strip ANSI/non-JSON output before jq in the complexity-skip path), then rerun sw-pipeline-test.sh to verify artifacts are written and exit code is 0",
       "seen_count": 1,
       "last_seen": "2026-10-05T17:18:58Z",
+      "category": "test_failure"
+    },
+    {
+      "stage": "test",
+      "pattern": "Tests:       Failing",
+      "root_cause": "sw-pipeline-test.sh E2E tests fail because plan.md and review.md artifacts are never generated (mock Claude plan/review output not produced), plus intelligence skip output and cleanup exit code mismatches in the mock environment",
+      "fix": "Debug the mock claude binary and plan/review stages in sw-pipeline-test.sh to ensure plan.md/review.md are written (check recent pipeline stage or policy/config changes that altered artifact paths or output), and update the intelligence-skip and dry-run output assertions to match current output",
+      "seen_count": 1,
+      "last_seen": "2026-10-09T03:09:24Z",
+      "category": "test_failure"
+    },
+    {
+      "stage": "test",
+      "pattern": "Results: \u001b[38;2;74;222;128m\u001b[1m124 PASS\u001b[0m | \u001b[38;2;248;113;113m\u001b[1m4 FAIL\u001b[0m",
+      "root_cause": "Two suites failed: sw-e2e-integration-test (exit 1 after 5s, requires real Claude and GitHub access, unavailable in CI) and sw-intent-analysis-test (exit 1 after 34s, likely a timing-dependent or Claude-dependent assertion). Together they account for the 4 FAIL results. The log was truncated before the final summary, so the exact failing assertions are not visible.",
+      "fix": "Run sw-intent-analysis-test.sh locally to find the failing assertions and fix or mock them. Make sw-e2e-integration-test skip itself when Claude or GitHub credentials are unavailable, or exclude it from the default npm test run.",
+      "seen_count": 1,
+      "last_seen": "2026-10-09T12:59:35Z",
       "category": "test_failure"
     }
   ]
