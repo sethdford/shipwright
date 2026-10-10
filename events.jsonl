@@ -158,3 +158,5 @@
 {"ts":"2026-10-09T22:12:37Z","ts_epoch":1791583957,"type":"reasoning.trace","job_id":"pipeline-1505-42","complexity":"medium","risk":50,"template":"standard"}
 {"ts":"2026-10-09T22:12:38Z","ts_epoch":1791583958,"type":"reasoning.trace","job_id":"pipeline-2239-42","complexity":"medium","risk":50,"template":"standard"}
 {"ts":"2026-10-09T22:12:38Z","ts_epoch":1791583958,"type":"reasoning.trace","job_id":"pipeline-2918-42","complexity":"medium","risk":50,"template":"standard"}
+{"ts":"2026-10-10T00:14:42Z","ts_epoch":1791591282,"type":"hygiene_platform_refactor","hardcoded":49,"fallback":69,"todo":51}
+{"ts":"2026-10-10T00:15:03Z","ts_epoch":1791591303,"type":"strategic.cycle_complete","issues_created":0,"issues_skipped":1}
