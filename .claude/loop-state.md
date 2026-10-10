@@ -318,16 +318,16 @@ When score > threshold (at pipeline spawn time, before plan stage):
 - Patterns from > 180 days ago with < 5 uses → mark for review
 - Dashboard should surface "patterns never injected" for root cause analysis
 "
-iteration: 0
+iteration: 1
 max_iterations: 20
 status: running
 test_cmd: "npm test"
 model: opus
 agents: 1
-started_at: 2026-10-10T18:26:41Z
-last_iteration_at: 2026-10-10T18:26:41Z
+started_at: 2026-10-10T19:03:59Z
+last_iteration_at: 2026-10-10T19:03:59Z
 consecutive_failures: 0
-total_commits: 0
+total_commits: 1
 audit_enabled: true
 audit_agent_enabled: true
 quality_gates_enabled: true
@@ -338,4 +338,6 @@ max_extensions: 3
 ---
 
 ## Log
+### Iteration 1 (2026-10-10T19:03:59Z)
+That notification is the background wait that was watching the same `npm test` run. It confirms the result I already rep
 

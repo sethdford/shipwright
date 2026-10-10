@@ -1668,33 +1668,33 @@
       "result": {
         "results": [
           {
-            "file": "retry-outcomes.json",
-            "relevance": 90,
-            "summary": "Records build_failure retry outcomes (model_escalation at 100% success over 5 attempts), which directly informs how the build stage should retry failures."
+            "file": "success-patterns.json",
+            "relevance": 80,
+            "summary": "Captures prior successful build-loop approaches (loop iteration commits, files changed, template) directly matching the build stage and the current branch's loop-driven workflow."
           },
           {
             "file": "failures.json",
-            "relevance": 80,
-            "summary": "Lists recurring test-stage failures with root causes and fixes (e.g., cost dashboard early exit, e2e timeouts). Build changes must avoid repeating these."
+            "relevance": 72,
+            "summary": "Recorded test-stage failure root causes and fixes; the build stage feeds into test, and these recurring failures (cost dashboard, pipeline mock artifacts, e2e timeouts) are likely to resurface during build verification."
           },
           {
-            "file": "success-patterns.json",
-            "relevance": 75,
-            "summary": "Captures approaches and file patterns from past successful runs (iterations, test strategy, template), which can guide how the build loop proceeds."
+            "file": "retry-outcomes.json",
+            "relevance": 65,
+            "summary": "Shows build_failure retries succeed via model_escalation at 100%, directly informing how a failing build stage should be retried."
           },
           {
             "file": "metrics.json",
-            "relevance": 65,
-            "summary": "Gives the build_duration_s baseline (7095s) to judge whether the current build stage is running within expected time."
+            "relevance": 55,
+            "summary": "Build duration baseline (7095s) and test duration baseline give timing expectations for the build stage."
           },
           {
             "file": "knowledge.json",
-            "relevance": 60,
-            "summary": "Holds failure entries with fix strategies and success rates (e.g., mktemp /tmp/claude path issue), useful when build-stage tests hit known errors."
+            "relevance": 45,
+            "summary": "Contains a mktemp /tmp/claude failure entry with a concrete fix, a recurring build/test environment pitfall that can break build-stage test runs."
           }
         ]
       },
-      "timestamp": 1791656796,
+      "timestamp": 1791659047,
       "ttl": 1800
     },
     "4dd2d96f6283c1d553b71f875abaaa65": {
