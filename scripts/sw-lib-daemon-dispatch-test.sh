@@ -67,14 +67,14 @@ case "${1:-}" in
     worktree)
         case "${2:-}" in
             add)
-                # Create the worktree directory
-                wt_path="$4"
+                # Create the worktree directory (git worktree add <path> -b <branch> <base>)
+                wt_path="$3"
                 mkdir -p "$wt_path"
                 touch "$wt_path/.git"
                 exit 0
                 ;;
             remove)
-                rm -rf "$4" 2>/dev/null || true
+                rm -rf "$3" 2>/dev/null || true
                 exit 0
                 ;;
             *) exit 0 ;;
@@ -198,6 +198,33 @@ init_daemon_state
 ( cd "$REPO_DIR" && daemon_spawn_pipeline 100 "Add auth" "" 2>/dev/null ) || true
 job_count=$(jq '.active_jobs | length' "$STATE_FILE" 2>/dev/null || echo "0")
 [[ "$job_count" -ge 1 ]] && assert_pass "Spawn tracked job" || assert_pass "Spawn attempted (track tested separately)"
+
+# ─── Tests: daemon_spawn_pipeline — fleet triage ──────────────────────────
+print_test_section "daemon_spawn_pipeline fleet triage"
+_FLEET_PATTERNS_LOADED=""
+source "$SCRIPT_DIR_SAVE/lib/fleet-patterns.sh"
+FLEET_STORE="$TEST_TEMP_DIR/home/.shipwright/fleet-patterns.json"
+FLEET_ERR_A="FAIL /home/a/repoA/src/auth.test.js:12:5 TypeError: Cannot read properties of undefined (reading 'token')"
+FLEET_ERR_B="FAIL /Users/b/repoB/lib/auth.test.js:80:9 TypeError: Cannot read properties of undefined (reading 'token')"
+fleet_sig=$(fleet_pattern_signature "$FLEET_ERR_A")
+(
+    export SHIPWRIGHT_FLEET_PATTERNS_FILE="$FLEET_STORE"
+    fleet_pattern_record "$fleet_sig" test_failure "$FLEET_ERR_A" acme/repoA test
+    fleet_pattern_update_fix "$fleet_sig" "token unset in test env" "stub the auth token in setup" test_failure acme/repoA
+)
+# A retry: the previous run's log in this repo shows the same failure
+printf '%s\n' "running" "$FLEET_ERR_B" > "$LOG_DIR/issue-101.log"
+init_daemon_state
+( export SHIPWRIGHT_FLEET_PATTERNS_FILE="$FLEET_STORE"; cd "$REPO_DIR" && daemon_spawn_pipeline 101 "Fix auth tests" "" >/dev/null 2>&1 ) || true
+fleet_artifact="$WORKTREE_DIR/daemon-issue-101/.claude/fleet-known-fix.json"
+assert_file_exists "Fleet hit written into the worktree before the pipeline starts" "$fleet_artifact"
+assert_eq "Fleet hit carries the known fix" "stub the auth token in setup" "$(jq -r '.fix' "$fleet_artifact" 2>/dev/null)"
+assert_contains "Daemon log surfaces the fleet fix" "$(cat "$LOG_FILE")" "Fleet known fix for issue #101"
+
+# Fleet mode off: no lookup, no artifact
+init_daemon_state
+( unset SHIPWRIGHT_FLEET_PATTERNS_FILE; cd "$REPO_DIR" && daemon_spawn_pipeline 101 "Fix auth tests" "" >/dev/null 2>&1 ) || true
+assert_file_not_exists "No fleet artifact with fleet mode off" "$fleet_artifact"
 export SCRIPT_DIR="$SCRIPT_DIR_SAVE"
 
 # ─── Tests: daemon_spawn_pipeline — disk space check ───────────────────────

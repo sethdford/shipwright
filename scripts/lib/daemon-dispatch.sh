@@ -127,10 +127,11 @@ daemon_spawn_pipeline() {
     fi
 
     # Extract goal text from issue (title + first line of body)
-    local issue_goal="$issue_title"
+    local issue_goal="$issue_title" issue_body=""
     if [[ "$NO_GITHUB" != "true" ]]; then
         local issue_body_first
-        issue_body_first=$(_timeout "$gh_timeout" gh issue view "$issue_num" --json body --jq '.body' 2>/dev/null | head -3 | tr '\n' ' ' | cut -c1-200 || true)
+        issue_body=$(_timeout "$gh_timeout" gh issue view "$issue_num" --json body --jq '.body' 2>/dev/null | head -200 || true)
+        issue_body_first=$(printf '%s\n' "$issue_body" | head -3 | tr '\n' ' ' | cut -c1-200 || true)
         if [[ -n "$issue_body_first" ]]; then
             issue_goal="${issue_title}: ${issue_body_first}"
         fi
@@ -221,6 +222,19 @@ daemon_spawn_pipeline() {
         fi
     fi
 
+    # ── Fleet triage: surface a fix another fleet repo already learned ──
+    # The hit goes to <work_dir>/.claude/fleet-known-fix.json, which the build
+    # stage's memory injection renders. A file survives the tmux hop; env doesn't.
+    rm -f "${work_dir}/.claude/fleet-known-fix.json" 2>/dev/null || true
+    if type fleet_patterns_enabled >/dev/null 2>&1 && fleet_patterns_enabled; then
+        local fleet_hit
+        fleet_hit=$(fleet_triage_known_fix "$issue_num" "${issue_title}
+${issue_body}" "$LOG_DIR/issue-${issue_num}.log" "$work_dir" 2>/dev/null || true)
+        if [[ -n "$fleet_hit" ]]; then
+            daemon_log INFO "Fleet known fix for issue #${issue_num} (from $(printf '%s' "$fleet_hit" | jq -r '.fix_source_repo // "unknown"' 2>/dev/null || echo unknown)): $(printf '%s' "$fleet_hit" | jq -r '.fix // ""' 2>/dev/null | cut -c1-160 || true)"
+        fi
+    fi
+
     # Build pipeline args
     # Every optional knob is read with a :- default. Under `set -u` a bare
     # "$SKIP_GATES" aborts the whole daemon when the caller has not exported the
@@ -275,6 +289,10 @@ daemon_spawn_pipeline() {
         fi
         tmux new-window -t "$_tmux_session" -n "$_tmux_win" 2>/dev/null || true
         local _tmux_cmd="cd '${work_dir}' && '${SCRIPT_DIR}/sw-pipeline.sh' ${pipeline_args[*]} 2>&1 | tee -a '${LOG_DIR}/issue-${issue_num}.log'"
+        # tmux windows inherit the tmux server's env, not ours — carry fleet mode over
+        if [[ -n "${SHIPWRIGHT_FLEET_PATTERNS_FILE:-}" ]]; then
+            _tmux_cmd="export SHIPWRIGHT_FLEET_PATTERNS_FILE=$(printf '%q' "$SHIPWRIGHT_FLEET_PATTERNS_FILE") SHIPWRIGHT_FLEET_NAME=$(printf '%q' "${SHIPWRIGHT_FLEET_NAME:-}") && ${_tmux_cmd}"
+        fi
         tmux send-keys -t "${_tmux_session}:${_tmux_win}" "$_tmux_cmd" Enter 2>/dev/null || true
         # Store heartbeat
         local _hb_dir="$HOME/.shipwright/heartbeats"

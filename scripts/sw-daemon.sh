@@ -47,6 +47,8 @@ fi
 [[ -f "$SCRIPT_DIR/lib/daemon-triage.sh" ]] && source "$SCRIPT_DIR/lib/daemon-triage.sh"
 # shellcheck source=lib/daemon-failure.sh
 [[ -f "$SCRIPT_DIR/lib/daemon-failure.sh" ]] && source "$SCRIPT_DIR/lib/daemon-failure.sh"
+# shellcheck source=lib/fleet-patterns.sh
+[[ -f "$SCRIPT_DIR/lib/fleet-patterns.sh" ]] && source "$SCRIPT_DIR/lib/fleet-patterns.sh"
 # shellcheck source=lib/daemon-dispatch.sh
 [[ -f "$SCRIPT_DIR/lib/daemon-dispatch.sh" ]] && source "$SCRIPT_DIR/lib/daemon-dispatch.sh"
 # shellcheck source=lib/daemon-patrol.sh
