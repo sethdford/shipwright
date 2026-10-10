@@ -32,15 +32,14 @@
       "result": {
         "primary_role": "builder",
         "secondary_roles": [
-          "tester",
-          "reviewer"
+          "tester"
         ],
-        "confidence": 0.95,
-        "reasoning": "Bug fix requiring debugging JSON parsing logic, implementing improved error messaging, and testing edge cases (object vs array output). Builder handles implementation; tester validates the fix; reviewer ensures accuracy.",
+        "confidence": 0.85,
+        "reasoning": "Wiring failure classification into daemon retry backoff is a focused feature implementation in existing code, and it needs test coverage for the new backoff paths.",
         "new_role_needed": false,
         "suggested_role": null
       },
-      "timestamp": 1775316059,
+      "timestamp": 1791659517,
       "ttl": 3600
     },
     "efd5524ad1244fd20344bf3ff5d95233": {
@@ -1401,6 +1400,227 @@
       },
       "timestamp": 1775344537,
       "ttl": 3600
+    },
+    "4e1dbe0d34a0b1036e5eab4653b8ed1e": {
+      "result": {
+        "complexity": 5,
+        "risk_level": "medium",
+        "success_probability": 72,
+        "recommended_template": "standard",
+        "issue_type": "backend",
+        "key_risks": [
+          "Retry delays that are too long can stall the daemon queue or push out urgent issues",
+          "Misclassified failures (for example, a rate limit read as a code error) would get the wrong backoff, and tests on synthetic inputs may not catch it",
+          "Backoff values must be configurable through the same env-over-config chain as other settings, or the override behavior will drift",
+          "Bash 3.2 constraints (no associative arrays) make per-class lookup tables awkward and easy to get wrong",
+          "The backoff must be recorded in events or metrics, or the auditability requirement is not met"
+        ],
+        "implementation_hints": [
+          "Reuse the existing failure classification output in scripts/sw-lib-daemon-failure.sh and map each class to a delay with a case statement rather than a new classifier",
+          "Add a retry_backoff section to daemon-config.json with per-class defaults, read through _smart_int() with SW_RETRY_BACKOFF_<CLASS> env overrides",
+          "Emit an event such as retry_backoff with class, delay_seconds, and attempt via emit_event so sw-daemon metrics and logs can show the applied backoff",
+          "Add cases to scripts/sw-lib-daemon-failure-test.sh asserting distinct delays for rate-limit, context-exhaustion, and code-error, plus the env override and the fallback default",
+          "Keep the existing fixed backoff as the fallback for unknown classes so behavior is unchanged when the new config is absent"
+        ]
+      },
+      "timestamp": 1791659234,
+      "ttl": 3600
+    },
+    "8f877c6bbf21502da3f1b0213b839d23": {
+      "result": {
+        "estimated_iterations": 6
+      },
+      "timestamp": 1791659236,
+      "ttl": 1800
+    },
+    "a0780ce941d92bd6b823901e17ae5c0e": {
+      "result": {
+        "estimated_cost_usd": 4.2,
+        "estimated_iterations": 3,
+        "estimated_tokens": 850000,
+        "likely_failure_stage": "test",
+        "confidence": 55
+      },
+      "timestamp": 1791659241,
+      "ttl": 3600
+    },
+    "520a577595824ea49212ffe5ff1de6cb": {
+      "result": {
+        "results": [
+          {
+            "file": "failures.json",
+            "relevance": 90,
+            "summary": "Recorded timeout and connection failures with stage, root_cause, fix, and resolved status. This is the closest existing data for classifying failures before choosing a retry backoff."
+          },
+          {
+            "file": "test-failures.json",
+            "relevance": 60,
+            "summary": "Failure signature store, the structure a failure classifier would key on. It is empty here, so it shows where classification data belongs but holds none yet."
+          },
+          {
+            "file": "index.json",
+            "relevance": 55,
+            "summary": "Failure patterns keyed by signature, stage, and pattern_type, with a recorded fix. Useful for mapping failure types to retry behavior."
+          },
+          {
+            "file": "success-patterns.json",
+            "relevance": 45,
+            "summary": "Pattern tied to scripts/sw-daemon.sh with a timeout-fix goal. Touches the daemon code and timeout handling that the backoff change would modify."
+          },
+          {
+            "file": "fleet-shared-patterns.json",
+            "relevance": 40,
+            "summary": "Cross-repo failure signatures with stage, seen_count, and fix. Relevant if backoff should depend on how often a failure recurs across repos."
+          }
+        ]
+      },
+      "timestamp": 1791659273,
+      "ttl": 1800
+    },
+    "bf44ab5579ed5db79a225c79af7c92cb": {
+      "result": {
+        "results": [
+          {
+            "file": "failures.json",
+            "relevance": 75,
+            "summary": "Recorded failures with pattern, stage, root_cause, fix, and resolved flags, including timeout failures. These are the closest match to classifying failures to drive retry backoff."
+          },
+          {
+            "file": "success-patterns.json",
+            "relevance": 60,
+            "summary": "A 'Fix daemon timeout' pattern touching scripts/sw-daemon.sh, the daemon file this plan would modify, with timeout root cause and approach."
+          },
+          {
+            "file": "index.json",
+            "relevance": 45,
+            "summary": "Failure-pattern index keyed by signature and stage (test_failure in build), with a fix field. Relevant to failure classification, but generic and not daemon-specific."
+          }
+        ]
+      },
+      "timestamp": 1791659386,
+      "ttl": 1800
+    },
+    "2158fce82cccfa6a5b5e7679f45b6da6": {
+      "result": {
+        "results": [
+          {
+            "file": "failures.json",
+            "relevance": 85,
+            "summary": "Failure records with timeout/stage/resolved fields (test-stage timeouts, seen_count) are the closest raw data for classifying failure types to drive retry backoff in the daemon."
+          },
+          {
+            "file": "index.json",
+            "relevance": 70,
+            "summary": "Failure-pattern index keyed by signature, stage, and pattern_type; provides the classification taxonomy that adaptive backoff would key on."
+          },
+          {
+            "file": "test-failures.json",
+            "relevance": 60,
+            "summary": "Signature-keyed failure store, the mechanism that would hold classified failure signatures for retry decisions, though currently empty."
+          },
+          {
+            "file": "success-patterns.json",
+            "relevance": 45,
+            "summary": "Mined success patterns including daemon-related fixes (scripts/sw-daemon.sh), useful context for daemon retry behavior, but not about classification or backoff."
+          },
+          {
+            "file": "fleet-shared-patterns.json",
+            "relevance": 35,
+            "summary": "Cross-repo shared failure signatures with seen_count and stage data, loosely relevant to failure classification across repos."
+          }
+        ]
+      },
+      "timestamp": 1791659406,
+      "ttl": 1800
+    },
+    "0654e87bbbee2548d43414a4bb03b81e": {
+      "result": {
+        "results": [
+          {
+            "file": "failures.json",
+            "relevance": 88,
+            "summary": "Records timeout/retry-style failures with classification fields (stage, root_cause, fix, resolved, seen_count), the closest raw data for deciding per-class backoff in the daemon."
+          },
+          {
+            "file": "fleet-shared-patterns.json",
+            "relevance": 72,
+            "summary": "Fleet-wide shared failure signatures with seen_count and stage data; useful for classifying recurring errors across repos to inform retry policy."
+          },
+          {
+            "file": "index.json",
+            "relevance": 60,
+            "summary": "Failure pattern index keyed by signature, stage, and total_seen; a classification lookup that could drive backoff tiers, though it lacks retry-timing fields."
+          }
+        ]
+      },
+      "timestamp": 1791659409,
+      "ttl": 1800
+    },
+    "9e8bb45738c6ecc5db7c4d9b29c10ea9": {
+      "result": {
+        "results": [
+          {
+            "file": "failures.json",
+            "relevance": 90,
+            "summary": "Holds timeout and connection-refused failure records with classification-like fields (root_cause, fix_applied, resolved, seen_count), directly relevant to classifying failures for retry backoff."
+          },
+          {
+            "file": "fleet-shared-patterns.json",
+            "relevance": 60,
+            "summary": "Cross-repo failure signatures with stage, seen_count and fix; useful for recurring-failure classification that could drive backoff tiers."
+          },
+          {
+            "file": "index.json",
+            "relevance": 50,
+            "summary": "Failure pattern index keyed by signature and stage (test_failure in build) with total_seen counts, a possible input for classifying failures."
+          },
+          {
+            "file": "success-patterns.json",
+            "relevance": 35,
+            "summary": "Build-stage success patterns with iterations and completion times that could inform retry expectations, though not about failure classification or backoff."
+          },
+          {
+            "file": "test-failures.json",
+            "relevance": 30,
+            "summary": "Empty signature store for test failures; a likely place to record classified failures, though currently holds no data."
+          }
+        ]
+      },
+      "timestamp": 1791659506,
+      "ttl": 1800
+    },
+    "47c1451f50b4a8f9faa0f8012f6b922e": {
+      "result": {
+        "results": [
+          {
+            "file": "retry-outcomes.json",
+            "relevance": 95,
+            "summary": "Records retry strategy outcomes per failure class (build_failure with model_escalation at 100% success), which directly informs choosing retry behavior by failure classification."
+          },
+          {
+            "file": "retry-strategies.json",
+            "relevance": 90,
+            "summary": "Holds the per-class retry strategy store that adaptive backoff would read and write, though it is currently empty, so it is the target structure for this goal."
+          },
+          {
+            "file": "failures.json",
+            "relevance": 62,
+            "summary": "Stage-tagged failures with category fields (test_failure, timeout, unknown) are the raw inputs a failure classifier would need to map to retry classes."
+          },
+          {
+            "file": "issues.json",
+            "relevance": 58,
+            "summary": "A prior daemon timeout fix that touches scripts/sw-daemon.sh and daemon-dispatch.sh, with a 'check backoff' gotcha, is directly adjacent to daemon retry backoff work."
+          },
+          {
+            "file": "metrics.json",
+            "relevance": 52,
+            "summary": "Build and test duration baselines give the build stage its timing reference, which bears on setting backoff and timeout thresholds."
+          }
+        ]
+      },
+      "timestamp": 1791659513,
+      "ttl": 1800
     }
   }
 }

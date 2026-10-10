@@ -675,6 +675,7 @@
     "daemon.retry": {
       "required": [],
       "optional": [
+        "backoff_s",
         "class",
         "issue",
         "max",

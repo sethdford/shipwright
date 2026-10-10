@@ -152,6 +152,80 @@ MAX_RETRIES_API_ERROR=6 assert_eq "Custom api_error retries" "6" "$(MAX_RETRIES_
 MAX_RETRIES=5 assert_eq "Custom default retries" "5" "$(MAX_RETRIES=5 get_max_retries_for_class unknown)"
 
 # ═══════════════════════════════════════════════════════════════════════════════
+# get_retry_backoff_for_class
+# ═══════════════════════════════════════════════════════════════════════════════
+print_test_section "get_retry_backoff_for_class"
+
+# Deterministic policy with jitter off
+export RETRY_BACKOFF_JITTER=0
+unset RETRY_BACKOFF_CFG 2>/dev/null || true
+
+assert_eq "auth_error: no backoff" "0" "$(get_retry_backoff_for_class auth_error 1)"
+assert_eq "invalid_issue: no backoff" "0" "$(get_retry_backoff_for_class invalid_issue 3)"
+
+# api_error keeps the historical 300 → 600 → 1200 → 2400 → 3600 ladder
+assert_eq "api_error retry 1: 300s" "300" "$(get_retry_backoff_for_class api_error 1)"
+assert_eq "api_error retry 2: 600s" "600" "$(get_retry_backoff_for_class api_error 2)"
+assert_eq "api_error retry 3: 1200s" "1200" "$(get_retry_backoff_for_class api_error 3)"
+assert_eq "api_error retry 4: 2400s" "2400" "$(get_retry_backoff_for_class api_error 4)"
+assert_eq "api_error retry 5: capped at 3600s" "3600" "$(get_retry_backoff_for_class api_error 5)"
+assert_eq "api_error huge retry: no overflow, capped" "3600" "$(get_retry_backoff_for_class api_error 500)"
+
+# Consecutive api_error failures boost the wait (shared outage), still capped
+assert_eq "api_error consecutive=2 doubles" "600" "$(get_retry_backoff_for_class api_error 1 2)"
+assert_eq "api_error consecutive=3 quadruples" "1200" "$(get_retry_backoff_for_class api_error 1 3)"
+assert_eq "api_error consecutive boost clamps at x8" "2400" "$(get_retry_backoff_for_class api_error 1 20)"
+assert_eq "api_error boost respects cap" "3600" "$(get_retry_backoff_for_class api_error 3 4)"
+
+# Other classes
+assert_eq "build_failure retry 1: 30s" "30" "$(get_retry_backoff_for_class build_failure 1)"
+assert_eq "build_failure retry 2: 60s" "60" "$(get_retry_backoff_for_class build_failure 2)"
+assert_eq "build_failure capped at 600s" "600" "$(get_retry_backoff_for_class build_failure 10)"
+assert_eq "build_failure ignores consecutive" "30" "$(get_retry_backoff_for_class build_failure 1 5)"
+assert_eq "context_exhaustion flat 15s" "15" "$(get_retry_backoff_for_class context_exhaustion 3)"
+assert_eq "unknown retry 1: 60s" "60" "$(get_retry_backoff_for_class unknown 1)"
+assert_eq "unknown retry 2: 120s" "120" "$(get_retry_backoff_for_class unknown 2)"
+assert_eq "unrecognised class uses unknown policy" "60" "$(get_retry_backoff_for_class weird_class 1)"
+
+# Bad input never fails
+assert_eq "non-numeric retry treated as 1" "300" "$(get_retry_backoff_for_class api_error abc)"
+assert_eq "retry 0 treated as 1" "30" "$(get_retry_backoff_for_class build_failure 0)"
+assert_eq "non-numeric consecutive treated as 1" "300" "$(get_retry_backoff_for_class api_error 1 xyz)"
+assert_eq "no args: unknown retry 1" "60" "$(get_retry_backoff_for_class)"
+
+# Overrides: env beats config beats default
+assert_eq "env override base_secs" "100" "$(RETRY_BACKOFF_BUILD_FAILURE_BASE_SECS=100 get_retry_backoff_for_class build_failure 1)"
+assert_eq "env override cap_secs" "45" "$(RETRY_BACKOFF_BUILD_FAILURE_CAP_SECS=45 get_retry_backoff_for_class build_failure 3)"
+assert_eq "env override factor" "270" "$(RETRY_BACKOFF_BUILD_FAILURE_FACTOR=3 get_retry_backoff_for_class build_failure 3)"
+assert_eq "config override base_secs" "10" \
+    "$(RETRY_BACKOFF_CFG='{"api_error":{"base_secs":10,"cap_secs":100}}' get_retry_backoff_for_class api_error 1)"
+assert_eq "config override cap_secs" "100" \
+    "$(RETRY_BACKOFF_CFG='{"api_error":{"base_secs":10,"cap_secs":100}}' get_retry_backoff_for_class api_error 9)"
+assert_eq "env beats config" "20" \
+    "$(RETRY_BACKOFF_API_ERROR_BASE_SECS=20 RETRY_BACKOFF_CFG='{"api_error":{"base_secs":10}}' get_retry_backoff_for_class api_error 1)"
+assert_eq "invalid env value falls back to default" "30" "$(RETRY_BACKOFF_BUILD_FAILURE_BASE_SECS=-5 get_retry_backoff_for_class build_failure 1)"
+assert_eq "invalid config value falls back to default" "300" \
+    "$(RETRY_BACKOFF_CFG='{"api_error":{"base_secs":"lots"}}' get_retry_backoff_for_class api_error 1)"
+assert_eq "malformed config JSON falls back to default" "300" \
+    "$(RETRY_BACKOFF_CFG='not json' get_retry_backoff_for_class api_error 1)"
+assert_eq "unknown-class config key applies to unrecognised classes" "7" \
+    "$(RETRY_BACKOFF_CFG='{"unknown":{"base_secs":7}}' get_retry_backoff_for_class weird_class 1)"
+
+# Jitter stays within ±pct and within the cap
+jitter_ok=true
+for _ in 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20; do
+    v=$(RETRY_BACKOFF_JITTER=20 get_retry_backoff_for_class api_error 1)
+    if [[ "$v" -lt 240 || "$v" -gt 360 ]]; then jitter_ok=false; fi
+    v=$(RETRY_BACKOFF_JITTER=20 get_retry_backoff_for_class api_error 9)
+    if [[ "$v" -lt 2880 || "$v" -gt 3600 ]]; then jitter_ok=false; fi
+done
+if $jitter_ok; then assert_pass "Jitter stays within ±20% and never exceeds cap"; else assert_fail "Jitter stays within ±20% and never exceeds cap"; fi
+assert_eq "invalid jitter falls back without failing" "1" \
+    "$(v=$(RETRY_BACKOFF_JITTER=bogus get_retry_backoff_for_class api_error 1); [[ "$v" -ge 240 && "$v" -le 360 ]] && echo 1 || echo 0)"
+
+unset RETRY_BACKOFF_JITTER
+
+# ═══════════════════════════════════════════════════════════════════════════════
 # record_failure_class / reset_failure_tracking
 # ═══════════════════════════════════════════════════════════════════════════════
 print_test_section "Failure tracking"

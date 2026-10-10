@@ -87,6 +87,80 @@ get_max_retries_for_class() {
     esac
 }
 
+# ─── Adaptive Retry Backoff (per failure class) ──────────────────────────────
+
+# Read one backoff field for a class.
+# Chain: env RETRY_BACKOFF_<CLASS>_<FIELD> → RETRY_BACKOFF_CFG.<class>.<field> → default.
+# Anything that is not a non-negative integer falls back to the default.
+_retry_backoff_cfg() {
+    local cls="$1" field="$2" dflt="$3"
+    local env_name val=""
+    env_name="RETRY_BACKOFF_$(echo "${cls}_${field}" | tr '[:lower:]' '[:upper:]')"
+    val="${!env_name:-}"
+    if [[ -z "$val" && -n "${RETRY_BACKOFF_CFG:-}" ]]; then
+        val=$(echo "$RETRY_BACKOFF_CFG" | jq -r --arg c "$cls" --arg f "$field" \
+            'if type == "object" then (.[$c][$f] // empty) else empty end' 2>/dev/null || true)
+    fi
+    if [[ "$val" =~ ^[0-9]+$ ]]; then
+        echo "$val"
+    else
+        echo "$dflt"
+    fi
+}
+
+# Seconds to wait before retry <retry_count> of a failure of <class>.
+# api_error is boosted when the same class keeps failing (consecutive count),
+# because a provider outage is shared by every job. ±RETRY_BACKOFF_JITTER%
+# (default 20) spreads simultaneous retries apart. Always prints an integer.
+get_retry_backoff_for_class() {
+    local cls="${1:-unknown}" retry="${2:-1}" consecutive="${3:-1}"
+    [[ "$retry" =~ ^[0-9]+$ && "$retry" -ge 1 ]] || retry=1
+    [[ "$consecutive" =~ ^[0-9]+$ && "$consecutive" -ge 1 ]] || consecutive=1
+
+    local d_base d_factor d_cap
+    case "$cls" in
+        auth_error|invalid_issue) echo 0; return 0 ;;
+        api_error)          d_base=300; d_factor=2; d_cap=3600 ;;
+        build_failure)      d_base=30;  d_factor=2; d_cap=600 ;;
+        context_exhaustion) d_base=15;  d_factor=1; d_cap=60 ;;
+        *)                  cls="unknown"; d_base=60; d_factor=2; d_cap=1800 ;;
+    esac
+
+    local base factor cap
+    base=$(_retry_backoff_cfg "$cls" base_secs "$d_base")
+    factor=$(_retry_backoff_cfg "$cls" factor "$d_factor")
+    cap=$(_retry_backoff_cfg "$cls" cap_secs "$d_cap")
+
+    # Exponential growth; stop once the cap is reached so it cannot overflow
+    local secs="$base" i=1
+    while [[ "$i" -lt "$retry" && "$secs" -lt "$cap" ]]; do
+        secs=$((secs * factor))
+        i=$((i + 1))
+    done
+    [[ "$secs" -gt "$cap" ]] && secs="$cap"
+
+    # Shared-outage boost: × 2^min(consecutive-1, 3)
+    if [[ "$cls" == "api_error" && "$consecutive" -gt 1 ]]; then
+        local boost=$((consecutive - 1))
+        [[ "$boost" -gt 3 ]] && boost=3
+        secs=$((secs * (1 << boost)))
+    fi
+
+    local jitter="${RETRY_BACKOFF_JITTER:-20}"
+    [[ "$jitter" =~ ^[0-9]+$ ]] || jitter=20
+    [[ "$jitter" -gt 100 ]] && jitter=100
+    if [[ "$jitter" -gt 0 && "$secs" -gt 0 ]]; then
+        local span=$((secs * jitter / 100))
+        if [[ "$span" -gt 0 ]]; then
+            secs=$((secs - span + RANDOM % (2 * span + 1)))
+        fi
+    fi
+
+    [[ "$secs" -lt 0 ]] && secs=0
+    [[ "$secs" -gt "$cap" ]] && secs="$cap"
+    echo "$secs"
+}
+
 # Append failure to persisted history and compute consecutive count; smart pause with exponential backoff
 record_failure_class() {
     local failure_class="$1"
@@ -246,8 +320,12 @@ daemon_on_failure() {
                             "UPDATE daemon_state SET retry_count = ${retry_count} WHERE issue_number = ${issue_num} AND status = 'active';" 2>/dev/null || true
                     fi
 
-                    daemon_log WARN "Auto-retry #${retry_count}/${effective_max} for issue #${issue_num} (class: ${failure_class})"
-                    emit_event "daemon.retry" "issue=$issue_num" "retry=$retry_count" "max=$effective_max" "class=$failure_class"
+                    # Adaptive backoff driven by the failure class
+                    local backoff_secs
+                    backoff_secs=$(get_retry_backoff_for_class "$failure_class" "$retry_count" "${DAEMON_CONSECUTIVE_FAILURE_COUNT:-1}")
+
+                    daemon_log WARN "Auto-retry #${retry_count}/${effective_max} for issue #${issue_num} (class: ${failure_class}, backoff: ${backoff_secs}s)"
+                    emit_event "daemon.retry" "issue=$issue_num" "retry=$retry_count" "max=$effective_max" "class=$failure_class" "backoff_s=$backoff_secs"
 
                     # Check for checkpoint to enable resume-from-checkpoint
                     local checkpoint_args=()
@@ -292,12 +370,6 @@ daemon_on_failure() {
                         daemon_log INFO "Boosting max-restarts to $boosted_restarts (context exhaustion)"
                     fi
 
-                    # Exponential backoff (per-class base); cap at 1h
-                    local base_secs=30
-                    [[ "$failure_class" == "api_error" ]] && base_secs=300
-                    local backoff_secs=$((base_secs * (1 << (retry_count - 1))))
-                    [[ "$backoff_secs" -gt 3600 ]] && backoff_secs=3600
-                    [[ "$failure_class" == "api_error" ]] && daemon_log INFO "API error — exponential backoff ${backoff_secs}s"
 
                     if [[ "$NO_GITHUB" != "true" ]]; then
                         gh issue comment "$issue_num" --body "## 🔄 Auto-Retry #${retry_count}
@@ -306,8 +378,9 @@ Pipeline failed (${failure_class}) — retrying with escalated strategy.
 
 | Field | Value |
 |-------|-------|
-| Retry | ${retry_count} / ${MAX_RETRIES:-2} |
+| Retry | ${retry_count} / ${effective_max} |
 | Failure | \`${failure_class}\` |
+| Backoff | ${backoff_secs}s |
 | Template | \`${retry_template}\` |
 | Model | \`${retry_model}\` |
 | Started | $(now_iso) |

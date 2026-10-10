@@ -433,6 +433,11 @@ load_config() {
     # auto-retry with escalation
     MAX_RETRIES=$(jq -r '.max_retries // 2' "$config_file")
     RETRY_ESCALATION=$(jq -r '.retry_escalation // true' "$config_file")
+    # per-class retry backoff overrides: {"api_error": {"base_secs": 300, "factor": 2, "cap_secs": 3600}}
+    RETRY_BACKOFF_CFG=$(jq -c '.retry_backoff // {} | if type == "object" then . else {} end' "$config_file" 2>/dev/null || echo "{}")
+    if [[ -z "${RETRY_BACKOFF_JITTER:-}" ]]; then
+        RETRY_BACKOFF_JITTER=$(jq -r '.retry_backoff_jitter // 20' "$config_file" 2>/dev/null || echo "20")
+    fi
 
     # session restart + fast test passthrough
     MAX_RESTARTS_CFG=$(jq -r '.max_restarts // 3' "$config_file" 2>/dev/null || echo "3")
