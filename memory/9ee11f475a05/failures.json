@@ -5,8 +5,8 @@
       "pattern": "\u001b[38;2;74;222;128m\u001b[1m✓\u001b[0m reveal shows 1/3 pass count on failure",
       "root_cause": "sw-cost-test.sh 'CONTEXT EFFICIENCY' dashboard tests fail because the cost dashboard prints 'No cost entries in the last 30 days' and exits early, never rendering the context-efficiency section from the seeded loop.context_efficiency events (test seeds only events, no cost entries).",
       "fix": "Make the cost dashboard render the CONTEXT EFFICIENCY section even when there are no cost entries (or have the test seed a cost entry/use an events path the dashboard reads) so the avg budget utilization assertions pass.",
-      "seen_count": 39,
-      "last_seen": "2026-10-10T09:02:56Z",
+      "seen_count": 44,
+      "last_seen": "2026-10-10T10:22:38Z",
       "category": "test_failure"
     },
     {
@@ -14,8 +14,8 @@
       "pattern": "Failed: 1",
       "root_cause": "Two suites failed: sw-e2e-integration-test hit a stale pipeline lock/state ('pipeline already in progress') left by the outer pipeline run, and sw-intent-analysis-test failed its schema check for required fields (version, goal, criteria).",
       "fix": "Make the e2e integration test run with isolated state/lock dir (or skip when a pipeline is already running), and update the intent analysis schema or the analyze_intent output so they agree on the required fields.",
-      "seen_count": 7,
-      "last_seen": "2026-10-09T20:40:54Z",
+      "seen_count": 8,
+      "last_seen": "2026-10-10T05:53:42Z",
       "category": "test_failure"
     },
     {
@@ -32,8 +32,8 @@
       "pattern": "Results: \u001b[38;2;74;222;128m\u001b[1m127 PASS\u001b[0m | \u001b[38;2;248;113;113m\u001b[1m1 FAIL\u001b[0m",
       "root_cause": "sw-e2e-integration-test timed out after 301s (300s suite limit) because it makes real Claude/GitHub calls that hang or run too slowly in CI, causing the single FAIL among 128 suites",
       "fix": "Skip or mock sw-e2e-integration-test in CI (gate on API credentials), or raise its per-suite timeout above 300s",
-      "seen_count": 4,
-      "last_seen": "2026-10-10T08:19:38Z",
+      "seen_count": 3,
+      "last_seen": "2026-10-09T21:47:47Z",
       "category": "timeout"
     },
     {
@@ -59,8 +59,8 @@
       "pattern": "\u001b[2m  loop behavior: iterations on test failure\u001b[0m",
       "root_cause": "sw-cost-test.sh 'context efficiency' assertions fail because the cost dashboard reports 'No cost entries in the last 30 days' and exits before rendering the CONTEXT EFFICIENCY section from the seeded loop.context_efficiency events (test events/timestamps are not seen, or the section is skipped when costs.json is empty).",
       "fix": "In sw-cost-test.sh, seed at least one cost entry (and events with current timestamps in the events file the script reads) before running the dashboard, or change sw-cost.sh to render the CONTEXT EFFICIENCY section even when there are no cost entries.",
-      "seen_count": 12,
-      "last_seen": "2026-10-10T09:53:03Z",
+      "seen_count": 10,
+      "last_seen": "2026-10-10T05:20:35Z",
       "category": "test_failure"
     },
     {
@@ -75,11 +75,20 @@
     {
       "stage": "test",
       "pattern": "\u001b[38;2;74;222;128m✓\u001b[0m Unknown measurement fails open as progress",
-      "root_cause": "The visible log shows only passing tests (all suites PASS, FAIL: 0); the 'error pattern' is a passing assertion ('Unknown measurement fails open as progress') from a test suite not shown, so the real failure is in an earlier, truncated part of the log or a suite's non-zero exit not captured in the last 200 lines.",
-      "fix": "Re-run the full test suite (npm test) and inspect the complete output for the first FAIL/non-zero exit; check the suite containing 'Unknown measurement fails open as progress' (likely the loop/convergence tests) for the actual failing assertion.",
+      "root_cause": "The shown log is only passing output (the matched 'Unknown measurement fails open as progress' line is a ✓ passing test from the flatline-detection suite); all visible suites report FAIL: 0, so the real failure is in a suite not shown (truncated) or a non-test exit/timeout of the test stage.",
+      "fix": "Re-run the full test stage and grep the complete log for '✗' or 'FAIL: [1-9]' (e.g. via sw-test-all.sh) to find the actual failing suite; check sw-loop-test.sh and sw-lib-compat-test.sh flatline cases first.",
       "seen_count": 1,
       "last_seen": "2026-10-09T19:08:19Z",
       "category": "unknown"
+    },
+    {
+      "stage": "test",
+      "pattern": "\u001b[38;2;74;222;128m✓\u001b[0m tests going from failing to passing resets the streak",
+      "root_cause": "The 'Memory promotion copies cross-repo patterns' test in sw-self-optimize-test.sh fails (15/16 passed); the other failing-pattern text is just a passing '✓' line from an unrelated suite. Likely the promotion step doesn't copy patterns to the global memory location in the test environment.",
+      "fix": "Run ./scripts/sw-self-optimize-test.sh and inspect the 'Memory promotion' test's assertion, then fix the promotion logic (or the test's fixture and HOME/memory path setup) in sw-self-optimize.sh so cross-repo patterns get copied.",
+      "seen_count": 1,
+      "last_seen": "2026-10-10T02:14:27Z",
+      "category": "test_failure"
     }
   ]
 }
