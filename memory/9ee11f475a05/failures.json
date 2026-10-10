@@ -5,8 +5,8 @@
       "pattern": "\u001b[38;2;74;222;128m\u001b[1m✓\u001b[0m reveal shows 1/3 pass count on failure",
       "root_cause": "sw-cost-test.sh 'CONTEXT EFFICIENCY' dashboard tests fail because the cost dashboard prints 'No cost entries in the last 30 days' and exits early, never rendering the context-efficiency section from the seeded loop.context_efficiency events (test seeds only events, no cost entries).",
       "fix": "Make the cost dashboard render the CONTEXT EFFICIENCY section even when there are no cost entries (or have the test seed a cost entry/use an events path the dashboard reads) so the avg budget utilization assertions pass.",
-      "seen_count": 40,
-      "last_seen": "2026-10-10T07:01:14Z",
+      "seen_count": 38,
+      "last_seen": "2026-10-10T06:25:54Z",
       "category": "test_failure"
     },
     {
@@ -59,8 +59,8 @@
       "pattern": "\u001b[2m  loop behavior: iterations on test failure\u001b[0m",
       "root_cause": "sw-cost-test.sh 'context efficiency' assertions fail because the cost dashboard reports 'No cost entries in the last 30 days' and exits before rendering the CONTEXT EFFICIENCY section from the seeded loop.context_efficiency events (test events/timestamps are not seen, or the section is skipped when costs.json is empty).",
       "fix": "In sw-cost-test.sh, seed at least one cost entry (and events with current timestamps in the events file the script reads) before running the dashboard, or change sw-cost.sh to render the CONTEXT EFFICIENCY section even when there are no cost entries.",
-      "seen_count": 9,
-      "last_seen": "2026-10-09T17:14:28Z",
+      "seen_count": 11,
+      "last_seen": "2026-10-10T07:01:43Z",
       "category": "test_failure"
     },
     {
@@ -75,8 +75,8 @@
     {
       "stage": "test",
       "pattern": "\u001b[38;2;74;222;128m✓\u001b[0m Unknown measurement fails open as progress",
-      "root_cause": "The 'Memory promotion copies cross-repo patterns' test in sw-self-optimize-test.sh failed (15/16 passed); the promotion step did not copy patterns to the global memory location, likely due to test-environment or HOME/path state issues. The 'Unknown measurement fails open as progress' line is only a passing check and not the actual failure.",
-      "fix": "Run scripts/sw-self-optimize-test.sh alone, inspect the memory-promotion assertion, and fix the cross-repo pattern copy logic or the test's temp HOME/memory dir setup so the promoted file exists.",
+      "root_cause": "The 'Memory promotion copies cross-repo patterns' test in sw-self-optimize-test.sh fails (15/16 passed), likely because the promotion step depends on repo-hash/HOME paths or global memory state in the test environment. This is unrelated to the 'Unknown measurement fails open as progress' pattern.",
+      "fix": "Run ./scripts/sw-self-optimize-test.sh alone and inspect the promotion assertion. Make the test hermetic by setting HOME and the memory dir to a temp dir, and make sure the source patterns it creates are valid for the promotion threshold.",
       "seen_count": 1,
       "last_seen": "2026-10-09T19:08:19Z",
       "category": "test_failure"
