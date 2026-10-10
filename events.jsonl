@@ -3708,3 +3708,5 @@
 {"ts":"2026-10-10T15:10:47Z","ts_epoch":1791645047,"type":"mutation.executed","total":1,"killed":0,"survived":1,"errors":0}
 {"ts":"2026-10-10T15:10:47Z","ts_epoch":1791645047,"type":"mutation.report","score":0,"total":1,"killed":0,"survived":1}
 {"ts":"2026-10-10T15:10:47Z","ts_epoch":1791645047,"type":"test.mutation_complete","issue":0,"killed":0,"survived":1,"total":1}
+{"ts":"2026-10-10T16:05:22Z","ts_epoch":1791648322,"type":"hygiene_platform_refactor","hardcoded":49,"fallback":69,"todo":51}
+{"ts":"2026-10-10T16:05:43Z","ts_epoch":1791648343,"type":"strategic.cycle_complete","issues_created":0,"issues_skipped":3}
