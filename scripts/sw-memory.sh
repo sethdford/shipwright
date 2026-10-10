@@ -47,6 +47,10 @@ fi
 # shellcheck source=lib/memory-effectiveness.sh
 [[ -f "$SCRIPT_DIR/lib/memory-effectiveness.sh" ]] && source "$SCRIPT_DIR/lib/memory-effectiveness.sh"
 
+# ─── Fleet-wide Pattern Store (active only under sw-fleet) ──────────────────
+# shellcheck source=lib/fleet-patterns.sh
+[[ -f "$SCRIPT_DIR/lib/fleet-patterns.sh" ]] && source "$SCRIPT_DIR/lib/fleet-patterns.sh"
+
 # ─── Memory Storage Paths ──────────────────────────────────────────────────
 MEMORY_ROOT="${HOME}/.shipwright/memory"
 GLOBAL_MEMORY="${MEMORY_ROOT}/global.json"
@@ -390,6 +394,14 @@ memory_capture_failure() {
         return 0
     fi
 
+    # Repo-independent signature (paths, line numbers, timestamps stripped) —
+    # lets the same failure match across fleet repos. "" when no error line.
+    local signature="" error_type=""
+    if type fleet_pattern_signature >/dev/null 2>&1; then
+        error_type=$(fleet_error_type "$(fleet_normalize_error "$error_output")" 2>/dev/null || true)
+        signature=$(fleet_pattern_signature "$error_output" "$error_type" 2>/dev/null || true)
+    fi
+
     # Check for duplicate — increment seen_count if pattern already exists
     local existing_idx
     existing_idx=$(jq --arg pat "$pattern" \
@@ -409,16 +421,20 @@ memory_capture_failure() {
             # Update existing entry
             jq --argjson idx "$existing_idx" \
                --arg ts "$(now_iso)" \
-               '.failures[$idx].seen_count += 1 | .failures[$idx].last_seen = $ts' \
+               --arg sig "$signature" \
+               '.failures[$idx].seen_count += 1 | .failures[$idx].last_seen = $ts
+                | if $sig != "" then .failures[$idx].signature = $sig else . end' \
                "$failures_file" > "$tmp_file" && mv "$tmp_file" "$failures_file" || rm -f "$tmp_file"
         else
             # Add new failure entry
             jq --arg stage "$stage" \
                --arg pattern "$pattern" \
                --arg ts "$(now_iso)" \
+               --arg sig "$signature" \
                '.failures += [{
                    stage: $stage,
                    pattern: $pattern,
+                   signature: $sig,
                    root_cause: "",
                    fix: "",
                    seen_count: 1,
@@ -436,6 +452,11 @@ memory_capture_failure() {
     fi
 
     memory_store_for_embedding "failure" "$pattern" "$(repo_hash)" 2>/dev/null || true
+
+    # Fleet mode: also publish under the signature so other repos can match it
+    if [[ -n "$signature" ]] && type fleet_patterns_enabled >/dev/null 2>&1 && fleet_patterns_enabled; then
+        fleet_pattern_record "$signature" "$error_type" "$pattern" "$(fleet_repo_id "${REPO_DIR:-.}")" "$stage" || true
+    fi
 
     emit_event "memory.failure" "stage=${stage}" "pattern=${pattern:0:80}"
 }
@@ -498,6 +519,14 @@ memory_record_fix_outcome() {
             .failures[$idx].last_outcome_at = $ts' \
            "$failures_file" > "$tmp_file" && mv "$tmp_file" "$failures_file" || rm -f "$tmp_file"
     ) 200>"${failures_file}.lock"
+
+    # Fleet mode: feed the outcome back so fixes that keep failing get demoted
+    if [[ "$fix_applied" == "true" ]] && type fleet_patterns_enabled >/dev/null 2>&1 && fleet_patterns_enabled; then
+        local fleet_sig
+        fleet_sig=$(jq -r --argjson idx "$match_idx" '.failures[$idx].signature // ""' \
+            "$failures_file" 2>/dev/null || true)
+        [[ -n "$fleet_sig" ]] && fleet_pattern_record_outcome "$fleet_sig" "$fix_resolved"
+    fi
 
     emit_event "memory.fix_outcome" \
         "pattern=${pattern_match:0:60}" \
@@ -807,6 +836,16 @@ Return JSON only, no markdown fences, no explanation."
        '.failures[-1].root_cause = $rc | .failures[-1].fix = $fix | .failures[-1].category = $cat' \
        "$failures_file" > "$tmp_file" && mv "$tmp_file" "$failures_file"
 
+    # Fleet mode: attach the fix to the shared pattern so other repos get it
+    if type fleet_patterns_enabled >/dev/null 2>&1 && fleet_patterns_enabled; then
+        local fleet_sig
+        fleet_sig=$(jq -r '.failures[-1].signature // ""' "$failures_file" 2>/dev/null || true)
+        if [[ -n "$fleet_sig" ]]; then
+            fleet_pattern_update_fix "$fleet_sig" "$root_cause" "$fix" "$category" \
+                "$(fleet_repo_id "${REPO_DIR:-.}")" || true
+        fi
+    fi
+
     emit_event "memory.analyze" "stage=${stage}" "category=${category}"
 
     success "Failure analyzed: ${PURPLE}[${category}]${RESET} ${root_cause}"
@@ -974,6 +1013,27 @@ memory_capture_pattern() {
 # memory_inject_context <stage_id>
 # Returns a text block of relevant memory for a given pipeline stage.
 # When intelligence engine is available, uses AI-ranked search for better relevance.
+# _memory_fleet_known_fix_section <stage> — renders the known fix that daemon triage
+# matched from another fleet repo (.claude/fleet-known-fix.json), or nothing.
+_memory_fleet_known_fix_section() {
+    case "${1:-}" in
+        plan|build|test|"") ;;
+        *) return 0 ;;
+    esac
+    local hit_file="${REPO_DIR:-.}/.claude/fleet-known-fix.json"
+    [[ -f "$hit_file" ]] || return 0
+    jq -e '.fix // "" | length > 0' "$hit_file" >/dev/null 2>&1 || return 0
+    echo ""
+    echo "## Known Fix From Fleet (matched during triage)"
+    jq -r '"This failure signature (\(.signature)) was already seen in: \((.repos // []) | join(", "))",
+           "- Matched error: \(.matched_line // "")",
+           "- Root cause: \(.root_cause // "unknown")",
+           "- Fix (from \(.fix_source_repo // "another repo")): \(.fix)",
+           "- Track record: resolved \(.fix_resolved // 0) of \(.fix_applied // 0) attempts",
+           "Try this fix first; verify it applies to this codebase before relying on it."' \
+        "$hit_file" 2>/dev/null || true
+}
+
 memory_inject_context() {
     local stage_id="${1:-}"
 
@@ -989,6 +1049,7 @@ memory_inject_context() {
             ranked_result=$(intelligence_search_memory "$stage_id stage context" "$(repo_memory_dir)" 5 2>/dev/null || echo "")
             if [[ -n "$ranked_result" ]] && [[ "$ranked_result" != *'"error"'* ]]; then
                 echo "$ranked_result"
+                _memory_fleet_known_fix_section "$stage_id"
                 return 0
             fi
         fi
@@ -1010,6 +1071,7 @@ memory_inject_context() {
     if [[ "$has_memory" == "false" ]]; then
         info "No memory available for repo (${mem_dir}) — first pipeline run will seed it"
         echo "# No memory available for this repository yet."
+        _memory_fleet_known_fix_section "$stage_id"
         return 0
     fi
 
@@ -1017,6 +1079,8 @@ memory_inject_context() {
     echo "# Injected at: $(now_iso)"
     echo "# Stage: ${stage_id}"
     echo ""
+
+    _memory_fleet_known_fix_section "$stage_id"
 
     case "$stage_id" in
         plan|design)

@@ -1,3 +1,4 @@
+#!/usr/bin/env bash
 # fleet-patterns.sh — Fleet-wide failure pattern store (shared across repos)
 #
 # A failure learned in one fleet repo is stored under a normalized, repo-

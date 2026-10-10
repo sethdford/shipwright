@@ -224,4 +224,86 @@ assert_eq "prune removes patterns older than N days" "1" "$(fleet_pattern_prune 
 assert_eq "recent pattern survives prune" "1" "$(jq '.patterns | length' "$STORE")"
 assert_eq "prune rejects a non-integer" "0" "$(fleet_pattern_prune abc 2>/dev/null)"
 
+# ═══════════════════════════════════════════════════════════════════════════════
+print_test_section "End to end through sw-memory.sh (repoA learns, repoB triages)"
+# ═══════════════════════════════════════════════════════════════════════════════
+reset_store
+make_repo() {
+    local dir="$1" url="$2"
+    mkdir -p "$dir"
+    git -C "$dir" init -q
+    git -C "$dir" remote add origin "$url"
+}
+REPO_A="$TEST_TEMP_DIR/e2e/repoA"; REPO_B="$TEST_TEMP_DIR/e2e/repoB"
+make_repo "$REPO_A" "git@github.com:acme/repoA.git"
+make_repo "$REPO_B" "https://github.com/acme/repoB.git"
+printf '%s\n' "running tests" "$ERR_A" > "$TEST_TEMP_DIR/e2e/repoA-test.log"
+
+# The memory library runs in a subshell per repo, the way two fleet daemons would.
+(
+    export SHIPWRIGHT_FLEET_PATTERNS_FILE="$STORE"
+    cd "$REPO_A"
+    export REPO_DIR="$REPO_A"
+    source "$SCRIPT_DIR/sw-memory.sh"
+    emit_event() { echo "$*" >> "$EVENTS_LOG"; }
+    claude() { echo '{"root_cause":"session can be null after logout","fix":"guard null session before reading id","category":"test_failure"}'; }
+    memory_capture_failure test "$ERR_A" >/dev/null 2>&1
+    memory_analyze_failure "$TEST_TEMP_DIR/e2e/repoA-test.log" test >/dev/null 2>&1
+    jq -c '.failures[-1]' "$(repo_memory_dir)/failures.json" > "$TEST_TEMP_DIR/e2e/repoA-failure.json"
+)
+sig_e2e=$(fleet_pattern_signature "$ERR_A")
+assert_eq "repoA failure still lands in its own failures.json" "$ERR_A" "$(jq -r '.pattern' "$TEST_TEMP_DIR/e2e/repoA-failure.json" | sed 's/^ *//')"
+assert_eq "repoA failure entry carries the signature" "$sig_e2e" "$(jq -r '.signature' "$TEST_TEMP_DIR/e2e/repoA-failure.json")"
+assert_eq "capture published the pattern fleet-wide" '["acme/repoA"]' "$(jq -c --arg s "$sig_e2e" '.patterns[$s].repos' "$STORE")"
+assert_eq "analysis published the fix fleet-wide" "guard null session before reading id" "$(jq -r --arg s "$sig_e2e" '.patterns[$s].fix' "$STORE")"
+
+hit=$(fleet_triage_known_fix 77 "Bug: CI is red
+$ERR_B" "" "$REPO_B")
+assert_eq "repoB triage surfaces repoA's fix" "guard null session before reading id" "$(printf '%s' "$hit" | jq -r '.fix')"
+assert_eq "hit names the source repo" "acme/repoA" "$(printf '%s' "$hit" | jq -r '.fix_source_repo')"
+assert_file_exists "triage wrote the known-fix artifact in repoB" "$REPO_B/.claude/fleet-known-fix.json"
+
+ctx=$(
+    cd "$REPO_B"
+    export REPO_DIR="$REPO_B"
+    source "$SCRIPT_DIR/sw-memory.sh"
+    memory_inject_context build 2>/dev/null
+)
+assert_contains "repoB build context includes the fleet fix" "$ctx" "Known Fix From Fleet"
+assert_contains "repoB build context names the fix" "$ctx" "guard null session before reading id"
+ctx_review=$(
+    cd "$REPO_B"
+    export REPO_DIR="$REPO_B"
+    source "$SCRIPT_DIR/sw-memory.sh"
+    memory_inject_context review 2>/dev/null
+)
+case "$ctx_review" in
+    *"Known Fix From Fleet"*) assert_fail "review context leaves the fleet fix out" ;;
+    *) assert_pass "review context leaves the fleet fix out" ;;
+esac
+
+# Outcomes flow back: a fix that keeps failing in repoA is demoted fleet-wide.
+(
+    export SHIPWRIGHT_FLEET_PATTERNS_FILE="$STORE"
+    cd "$REPO_A"
+    export REPO_DIR="$REPO_A"
+    source "$SCRIPT_DIR/sw-memory.sh"
+    emit_event() { :; }
+    for _ in 1 2 3; do memory_record_fix_outcome "TypeError" true false >/dev/null 2>&1; done
+)
+assert_eq "fix outcomes recorded fleet-wide" "3/0" "$(jq -r --arg s "$sig_e2e" '.patterns[$s] | "\(.fix_applied)/\(.fix_resolved)"' "$STORE")"
+assert_eq "a repeatedly failing fix is no longer surfaced" "" "$(fleet_triage_known_fix 78 "$ERR_B" "" "")"
+
+# Fleet mode off: memory behaves as before and the shared store is untouched.
+reset_store
+(
+    unset SHIPWRIGHT_FLEET_PATTERNS_FILE
+    cd "$REPO_A"
+    export REPO_DIR="$REPO_A"
+    source "$SCRIPT_DIR/sw-memory.sh"
+    emit_event() { :; }
+    memory_capture_failure test "$ERR_A" >/dev/null 2>&1
+)
+assert_file_not_exists "fleet mode off → no shared store written" "$STORE"
+
 print_test_results
