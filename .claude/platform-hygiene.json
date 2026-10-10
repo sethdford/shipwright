@@ -1,5 +1,5 @@
 {
-  "timestamp": "2026-10-10T18:56:26Z",
+  "timestamp": "2026-10-10T19:30:04Z",
   "repository": "shipwright",
   "counts": {
     "hardcoded": 49,
@@ -155,7 +155,7 @@
     },
     {
       "file": "scripts/lib/daemon-dispatch.sh",
-      "line": 291
+      "line": 309
     },
     {
       "file": "scripts/lib/pipeline-intelligence.sh",
@@ -665,7 +665,7 @@
     },
     {
       "script": "sw-memory.sh",
-      "lines": 2241
+      "lines": 2305
     },
     {
       "script": "sw-daemon-test.sh",
@@ -697,7 +697,7 @@
     },
     {
       "script": "sw-daemon.sh",
-      "lines": 1420
+      "lines": 1422
     },
     {
       "script": "sw-recruit-test.sh",

@@ -30,17 +30,9 @@
     },
     "d41d8cd98f00b204e9800998ecf8427e": {
       "result": {
-        "primary_role": "architect",
-        "secondary_roles": [
-          "builder",
-          "docs-writer"
-        ],
-        "confidence": 0.7,
-        "reasoning": "Cross-repo failure-pattern sharing is a system design problem (data model, fleet-wide learning boundaries, triage integration), with builder needed for implementation and docs-writer for the new behavior.",
-        "new_role_needed": false,
-        "suggested_role": null
+        "raw_response": "Mock claude response"
       },
-      "timestamp": 1791656800,
+      "timestamp": 1791660939,
       "ttl": 3600
     },
     "efd5524ad1244fd20344bf3ff5d95233": {
@@ -1891,6 +1883,41 @@
         ]
       },
       "timestamp": 1791659492,
+      "ttl": 1800
+    },
+    "2b0b9692b1b47deb813a248bd9d56726": {
+      "result": {
+        "raw_response": "Mock claude: ok"
+      },
+      "timestamp": 1791660322,
+      "ttl": 1800
+    },
+    "32d9ab280c0b37fe4a1f15c66473fcd5": {
+      "result": [
+        {
+          "type": "result",
+          "result": "I am trying the same approach again.",
+          "usage": {
+            "input_tokens": 0,
+            "output_tokens": 0
+          }
+        }
+      ],
+      "timestamp": 1791660430,
+      "ttl": 1800
+    },
+    "c8331e52d26006eb8f28dfc741acfbf7": {
+      "result": [
+        {
+          "type": "result",
+          "result": "I am trying the same approach again.",
+          "usage": {
+            "input_tokens": 0,
+            "output_tokens": 0
+          }
+        }
+      ],
+      "timestamp": 1791660758,
       "ttl": 1800
     }
   }
