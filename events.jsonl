@@ -421,3 +421,8 @@
 {"ts":"2026-10-10T10:44:38Z","ts_epoch":1791629078,"type":"stage.completed","issue":0,"stage":"plan","duration_s":1,"result":"success"}
 {"ts":"2026-10-10T10:44:38Z","ts_epoch":1791629078,"type":"stage.started","issue":0,"stage":"design"}
 {"ts":"2026-10-10T10:44:39Z","ts_epoch":1791629079,"type":"stage.completed","issue":0,"stage":"design","duration_s":1,"result":"success"}
+{"ts":"2026-10-10T12:07:07Z","ts_epoch":1791634027,"type":"hygiene_platform_refactor","hardcoded":49,"fallback":69,"todo":51}
+{"ts":"2026-10-10T12:07:48Z","ts_epoch":1791634068,"type":"strategic.issue_created","title":"Detect flaky test failures and exclude them from circuit-breaker/failure counts","priority":"P0","complexity":"standard"}
+{"ts":"2026-10-10T12:07:52Z","ts_epoch":1791634072,"type":"strategic.issue_created","title":"Add `shipwright doctor --fix` auto-remediation for common setup issues","priority":"P1","complexity":"standard"}
+{"ts":"2026-10-10T12:07:57Z","ts_epoch":1791634077,"type":"strategic.issue_created","title":"Share failure patterns fleet-wide so daemon triage in one repo benefits from another repo's learnings","priority":"P2","complexity":"standard"}
+{"ts":"2026-10-10T12:07:57Z","ts_epoch":1791634077,"type":"strategic.cycle_complete","issues_created":3,"issues_skipped":0}
