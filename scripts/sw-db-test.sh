@@ -31,6 +31,10 @@ setup_env() {
 
     # Copy sw-db.sh under test
     cp "$SCRIPT_DIR/sw-db.sh" "$TEST_TEMP_DIR/"
+    # ...and its modules (compat.sh/helpers.sh deliberately not copied, so the
+    # helper fallbacks stay covered)
+    mkdir -p "$TEST_TEMP_DIR/lib"
+    cp "$SCRIPT_DIR"/lib/db-schema.sh "$SCRIPT_DIR"/lib/db-migrate.sh "$SCRIPT_DIR"/lib/db-query.sh "$TEST_TEMP_DIR/lib/"
 
     # Set up mock environment
     export HOME="$TEST_TEMP_DIR/home"
@@ -842,6 +846,101 @@ test_pipeline_run_update() {
     return 0
 }
 
+# ─────────────────────────────────────────────────────────────────────────────
+# Module split (lib/db-schema.sh, lib/db-migrate.sh, lib/db-query.sh)
+# ─────────────────────────────────────────────────────────────────────────────
+
+# T1: db-query.sh sourced alone pulls in db-schema.sh and the helper fallbacks
+test_module_query_standalone() {
+    local home="$TEST_TEMP_DIR/t1-home" out
+    mkdir -p "$home"
+    out=$(env -i HOME="$home" PATH="$PATH" bash -c '
+        set -euo pipefail
+        source "$1/lib/db-query.sh"
+        type _db_exec db_add_event now_iso >/dev/null
+        init_schema
+        db_add_event "module.test" "k=v"
+        sqlite3 "$DB_FILE" "SELECT COUNT(*) FROM events WHERE type = '\''module.test'\'';"
+    ' _ "$TEST_TEMP_DIR" 2>&1) || { echo -e "    ${RED}✗${RESET} standalone source failed: $out"; return 1; }
+    if [[ "$out" != "1" ]]; then
+        echo -e "    ${RED}✗${RESET} Expected 1 event row, got: $out"
+        return 1
+    fi
+}
+
+# T2: a missing module degrades to "no database" when sourced, fails when executed
+test_module_missing_degrades() {
+    local dir="$TEST_TEMP_DIR/t2" home="$TEST_TEMP_DIR/t2-home" out err rc=0
+    mkdir -p "$dir/lib" "$home"
+    cp "$TEST_TEMP_DIR/sw-db.sh" "$dir/"
+    cp "$TEST_TEMP_DIR/lib/db-schema.sh" "$TEST_TEMP_DIR/lib/db-migrate.sh" "$dir/lib/"
+    out=$(env -i HOME="$home" PATH="$PATH" bash -c '
+        set -euo pipefail
+        source "$1/sw-db.sh"
+        db_available || echo FALLBACK
+        db_query_events_since 0 | jq length
+    ' _ "$dir" 2>"$dir/stderr") || rc=$?
+    err=$(cat "$dir/stderr")
+    if [[ "$rc" -ne 0 || "$out" != $'FALLBACK\n0' ]]; then
+        echo -e "    ${RED}✗${RESET} Sourced degradation: rc=$rc out=$out"
+        return 1
+    fi
+    if [[ "$err" != *"db-query.sh"* ]]; then
+        echo -e "    ${RED}✗${RESET} Missing module not reported on stderr: $err"
+        return 1
+    fi
+    if HOME="$home" bash "$dir/sw-db.sh" status >/dev/null 2>&1; then
+        echo -e "    ${RED}✗${RESET} Executing with a missing module should exit non-zero"
+        return 1
+    fi
+}
+
+# T3: re-sourcing after clearing the guard re-reads config against the new HOME
+test_module_resource_reload() {
+    local home2="$TEST_TEMP_DIR/t3-home" out
+    mkdir -p "$home2"
+    out=$(env -i HOME="$HOME" PATH="$PATH" bash -c '
+        set -euo pipefail
+        source "$1/sw-db.sh"
+        HOME="$2"
+        _SW_DB_LOADED=""
+        source "$1/sw-db.sh"
+        echo "$DB_FILE"
+    ' _ "$TEST_TEMP_DIR" "$home2" 2>&1) || { echo -e "    ${RED}✗${RESET} re-source failed: $out"; return 1; }
+    if [[ "$out" != "$home2/.shipwright/shipwright.db" ]]; then
+        echo -e "    ${RED}✗${RESET} DB_FILE did not follow HOME: $out"
+        return 1
+    fi
+}
+
+# T4: CLI smoke run through the façade
+test_module_cli_smoke() {
+    local home="$TEST_TEMP_DIR/t4-home" cmd
+    mkdir -p "$home"
+    for cmd in init status health help; do
+        if ! env -i HOME="$home" PATH="$PATH" bash "$TEST_TEMP_DIR/sw-db.sh" "$cmd" >/dev/null 2>&1; then
+            echo -e "    ${RED}✗${RESET} 'sw-db.sh $cmd' exited non-zero"
+            return 1
+        fi
+    done
+}
+
+# T5: db-migrate.sh sourced alone migrates a fresh DB to SCHEMA_VERSION
+test_module_migrate_standalone() {
+    local home="$TEST_TEMP_DIR/t5-home" out
+    mkdir -p "$home"
+    out=$(env -i HOME="$home" PATH="$PATH" bash -c '
+        set -euo pipefail
+        source "$1/lib/db-migrate.sh"
+        migrate_schema >/dev/null
+        echo "$(sqlite3 "$DB_FILE" "SELECT MAX(version) FROM _schema;") $SCHEMA_VERSION"
+    ' _ "$TEST_TEMP_DIR" 2>&1) || { echo -e "    ${RED}✗${RESET} standalone migrate failed: $out"; return 1; }
+    if [[ "$out" != "6 6" ]]; then
+        echo -e "    ${RED}✗${RESET} Expected schema version 6, got: $out"
+        return 1
+    fi
+}
+
 # ════════════════════════════════════════════════════════════════════════════════════
 # RUN ALL TESTS
 # ════════════════════════════════════════════════════════════════════════════════════
@@ -949,6 +1048,15 @@ echo ""
 echo -e "${PURPLE}${BOLD}Pipeline Run Tracking${RESET}"
 run_test "add_pipeline_run creates entry" test_pipeline_run
 run_test "update_pipeline_status updates run" test_pipeline_run_update
+echo ""
+
+# Module split tests
+echo -e "${PURPLE}${BOLD}Module Split${RESET}"
+run_test "db-query.sh sources standalone" test_module_query_standalone
+run_test "Missing module degrades gracefully" test_module_missing_degrades
+run_test "Re-source reloads config for new HOME" test_module_resource_reload
+run_test "CLI init/status/health/help via façade" test_module_cli_smoke
+run_test "db-migrate.sh migrates standalone" test_module_migrate_standalone
 echo ""
 
 # ═════════════════════════════════════════════════════════════════════════════════

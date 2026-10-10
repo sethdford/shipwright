@@ -1,103 +1,104 @@
 ---
-goal: "Misleading "jq not available" warning when Claude outputs JSON object instead of array
+goal: "Split sw-db.sh into schema/connection, query, and migration modules
 
-## Specification: Misleading "jq not available" warning when Claude outputs JSON object instead of array
+## Plan Summary
+# Plan: split `scripts/sw-db.sh` into schema/connection, query, and migration modules
+
+## Current state
+
+`scripts/sw-db.sh` is 1,939 lines and does five jobs: it holds configuration and connection primitives, defines the DDL, runs migrations, provides about 60 query functions, and serves as the `shipwright db` CLI. It reaches the rest of the system in three ways:
+
+- **15 callers source it as a library:** `sw-daemon`, `sw-pipeline`, `sw-loop`, `sw-cost`, `sw-memory`, `sw-heartbeat`, `sw-eventbus`, `sw-durable`, `sw-incident`, `sw-intelligence`, `sw-adaptive`, `sw-self-optimize`, `sw-retro`, `sw-replay` and `lib/daemon-state.sh`. Most use `[[ -f "$SCRIPT_DIR/sw-db.sh" ]] && source …`. `sw-cost` and `sw-loop` add `|| true`.
+- **`lib/helpers.sh`'s `emit_event` calls `db_add_event`** when that function is defined.
+- **`scripts/sw` runs it directly** for `shipwright db …`.
+- **`sw-db-test.sh` (31 tests) copies only `sw-db.sh`** into a temp directory, then re-sources it after clearing `_SW_DB_LOADED`.
+
+Cross-section dependencies I checked:
+
+- The query section never calls `init_schema`, `migrate_schema` or `migrate_json_data`.
+- `migrate_json_data` only uses the primitives (`_db_exec`, `ensure_db_dir`, `check_sqlite3`) plus `migrate_schema`.
+- Sync push/pull only use `db_available`, `_db_exec`, `_db_query` and `curl`.
+
+So the dependency graph has no cycles. Both the query and migration modules depend only on the schema module.
+
+## Module boundaries (line ranges are in today's `sw-db.sh`)
+[... full plan in .claude/pipeline-artifacts/plan.md]
+
+## Key Design Decisions
+# Design: Split sw-db.sh into schema/connection, query, and migration modules
+## Context
+## Decision
+### Component diagram
+### Module contents (L = line ranges in today's file)
+### Amendments to the plan
+### Module rules
+### Interface contracts (TS-style notation for bash functions; the exit status is the error channel)
+### Data flow
+### Error boundaries
+[... full design in .claude/pipeline-artifacts/design.md]
+
+## Specification: Split sw-db.sh into schema/connection, query, and migration modules
 
 ### Goals
-- *jq IS available.** The actual issue is that Claude's `--output-format json` sometimes outputs a JSON **object** (`{...}`) instead of a JSON **array** (`[...]`), and the parsing code only handles arrays.
-- *Option A**: Extend Case 2 to handle both formats:
-- *Option B**: At minimum, fix the warning message in Case 3:
-- Warning is cosmetic only — the loop functions correctly using the raw JSON
-- But it's confusing during debugging (we spent time investigating jq availability when the real issue was elsewhere)
+- Split sw-db.sh into schema/connection, query, and migration modules
 
 ### Acceptance Criteria
 - [testable] All existing tests continue to pass
 
 Historical context (lessons from previous pipelines):
-{
-  "results": [
-    {
-      "file": "failures.json",
-      "relevance": 95,
-      "summary": "Contains detailed jq parse error patterns matching the issue: 'jq: parse error' on malformed JSON and mock claude outputting wrong JSON schema (object vs array). Root cause and fix directly address the 'jq not available' warning problem."
-    },
-    {
-      "file": "patterns.json",
-      "relevance": 40,
-      "summary": "Project detection data (nodejs, vitest test runner) provides context about the build environment and testing setup for this pipeline stage."
-    },
-    {
-      "file": "metrics.json",
-      "relevance": 8,
-      "summary": "Build duration baselines (17827s) provide context on typical build stage timing, useful for understanding if this issue impacts build performance."
-    },
-    {
-      "file": "metrics.json",
-      "relevance": 5,
-      "summary": "Earlier build duration baseline (147s) is outdated but shows historical performance context."
-    },
-    {
-      "file": "global.json",
-      "relevance": 0,
-      "summary": "Empty cross-repo learnings, no relevant content for this specific jq/JSON issue."
-    }
-  ]
-}
+{"results":[{"file":"architecture.json","relevance":35,"summary":"Only placeholder rules (rule1-3); weakly relevant as a possible architecture reference for splitting sw-db.sh into modules, but contains no real content."},{"file":"failures.json","relevance":30,"summary":"Recorded failures in the test stage involving timeouts and database connection refused; the 'database connection refused' entry touches the db layer that sw-db.sh handles."},{"file":"index.json","relevance":25,"summary":"Build-stage failure pattern with a fix recipe; general, not specific to refactoring a shell script into modules."},{"file":"success-patterns.json","relevance":20,"summary":"Build-stage success patterns for sw-daemon.sh timeout fixes; shows the repo's shell-script build pattern but for an unrelated change."},{"file":"fleet-shared-patterns.json","relevance":15,"summary":"Cross-repo 'Cannot find module' build pattern; only loosely connected to a shell-module split."}]}
 
 Discoveries from other pipelines:
-[38;2;74;222;128m[1m✓[0m Injected 128 new discoveries
-[intake] Stage intake completed — Resolution: 
-[intake] Stage intake completed — Resolution: 
-[intake] Stage intake completed — Resolution: 
-[compound_quality] Stage compound_quality completed — Resolution: 
-[intake] Stage intake completed — Resolution: 
-[pr] Stage pr completed — Resolution: 
-[pipeline_success] Pipeline success for issue #0 (fast template, stage=validate) — Resolution: success
-[intake] Stage intake completed — Resolution: 
-[pr] Stage pr completed — Resolution: 
-[intake] Stage intake completed — Resolution: 
-[compound_quality] Stage compound_quality completed — Resolution: 
-[pr] Stage pr completed — Resolution: 
-[intake] Stage intake completed — Resolution: 
-[compound_quality] Stage compound_quality completed — Resolution: 
-[pr] Stage pr completed — Resolution: 
-[intake] Stage intake completed — Resolution: 
-[design] Design completed for Build a production-grade todo application. TypeScript + React frontend with Vite, Express REST API backend, SQLite persistence with Drizzle ORM, JWT authentication (register/login), full CRUD for todos with filtering (all/active/completed), drag-and-drop reorder, due dates, priorities (low/medium/high), dark mode, responsive design. Include comprehensive test suite (unit + integration + e2e). Production-ready: error handling, input validation, rate limiting, CORS, environment config. — Resolution: 
-[intake] Stage intake completed — Resolution: 
-[intake] Stage intake completed — Resolution: 
+✓ Injected 1 new discoveries
+[design] Design completed for Split sw-db.sh into schema/connection, query, and migration modules — Resolution: 
 
-## Failure Diagnosis (Iteration 2)
-Classification: unknown
-Strategy: retry_with_context
-Repeat count: 0
+Task tracking (check off items as you complete them):
+# Pipeline Tasks — Split sw-db.sh into schema/connection, query, and migration modules
 
-## Failure Diagnosis (Iteration 3)
-Classification: unknown
-Strategy: retry_with_context
-Repeat count: 1"
-iteration: 3
-max_iterations: 10
-status: complete
+## Implementation Checklist
+- [ ] Task 1: Record baseline test pass counts and the `declare -f` digest of every sw-db function
+- [ ] Task 2: Create `scripts/lib/db-schema.sh` (config, connection helpers, `init_schema`) with a load guard
+- [ ] Task 3: Create `scripts/lib/db-migrate.sh` (`migrate_schema`, `migrate_json_data`) with a schema dependency guard
+- [ ] Task 4: Create `scripts/lib/db-query.sh` (all `db_*` query functions, `add_event`, pipeline-run functions)
+- [ ] Task 5: Replace the moved code in `sw-db.sh` with the module loader and its graceful-degradation branch
+- [ ] Task 6: Confirm the function set and bodies are identical before and after (parity script)
+- [ ] Task 7: Make `sw-db-test.sh` copy `lib/db-*.sh` into its temp dir
+- [ ] Task 8: Add tests for direct module sourcing, the missing-module degradation, re-source reload and the CLI smoke run
+- [ ] Task 9: Run `bash -n`, shellcheck and the Bash 3.2 grep on the new files
+- [ ] Task 10: Run downstream suites (daemon-state, heartbeat, cost, eventbus, memory, pipeline, loop, e2e-smoke) and `npm test`
+- [ ] Task 11: Update `.claude/CLAUDE.md` and run `shipwright docs sync` / `version check`
+- [ ] `scripts/lib/db-schema.sh`, `db-migrate.sh` and `db-query.sh` exist, and each has a load guard and a header comment stating its dependencies
+- [ ] `sw-db.sh` contains no `CREATE TABLE`, no `migrate_*` definitions and no `db_*` query definitions, and is ≤ ~550 lines
+- [ ] The set of functions defined after `source scripts/sw-db.sh` is identical to the baseline, with byte-identical bodies
+- [ ] No caller file changed. `shipwright db init|status|health|migrate|sync|export|import|cleanup` behave as before.
+- [ ] `sw-db-test.sh` passes with all 31 existing tests plus T1–T4
+- [ ] The downstream suites and `npm test` show no new failures against baseline
+- [ ] The new files pass `bash -n`, shellcheck and the Bash 3.2 checks
+- [ ] `shipwright version check` passes, and `.claude/CLAUDE.md` lists the new modules
+
+## Context
+- Pipeline: autonomous
+- Branch: ci/issue-8228
+- Issue: none
+- Generated: 2026-10-10T19:09:39Z"
+iteration: 1
+max_iterations: 20
+status: error
 test_cmd: "npm test"
-model: sonnet
+model: opus
 agents: 1
-started_at: 2026-04-04T17:41:42Z
-last_iteration_at: 2026-04-04T17:41:42Z
+started_at: 2026-10-10T19:13:51Z
+last_iteration_at: 2026-10-10T19:13:51Z
 consecutive_failures: 0
-total_commits: 3
-audit_enabled: false
-audit_agent_enabled: false
-quality_gates_enabled: false
-dod_file: ""
+total_commits: 0
+audit_enabled: true
+audit_agent_enabled: true
+quality_gates_enabled: true
+dod_file: "/home/runner/work/shipwright/shipwright/.claude/pipeline-artifacts/dod.md"
 auto_extend: true
 extension_count: 0
 max_extensions: 3
 ---
 
 ## Log
-### Iteration 1 (2026-04-04T15:25:20Z)
-{"type":"result","subtype":"success","is_error":false,"duration_ms":227709,"duration_api_ms":143263,"num_turns":22,"resu
-
-### Iteration 2 (2026-04-04T16:25:53Z)
-{"type":"result","subtype":"success","is_error":false,"duration_ms":9837,"duration_api_ms":311675,"num_turns":2,"result"
 

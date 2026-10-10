@@ -32,15 +32,15 @@
       "result": {
         "primary_role": "builder",
         "secondary_roles": [
-          "tester",
-          "reviewer"
+          "architect",
+          "tester"
         ],
-        "confidence": 0.95,
-        "reasoning": "Bug fix requiring debugging JSON parsing logic, implementing improved error messaging, and testing edge cases (object vs array output). Builder handles implementation; tester validates the fix; reviewer ensures accuracy.",
+        "confidence": 0.8,
+        "reasoning": "The work is mostly code restructuring of a 1939-line bash module into schema/connection, query, and migration files, so a builder leads, with architect for module boundaries and tester to confirm the existing sw-db-test.sh suite still passes.",
         "new_role_needed": false,
         "suggested_role": null
       },
-      "timestamp": 1775316059,
+      "timestamp": 1791659530,
       "ttl": 3600
     },
     "efd5524ad1244fd20344bf3ff5d95233": {
@@ -1401,6 +1401,228 @@
       },
       "timestamp": 1775344537,
       "ttl": 3600
+    },
+    "33af3121659ed5ff458d72c71e5b2f5d": {
+      "result": {
+        "complexity": 6,
+        "risk_level": "medium",
+        "success_probability": 70,
+        "recommended_template": "standard",
+        "issue_type": "refactor",
+        "key_risks": [
+          "Behavioral drift in CLI subcommand output or exit codes during extraction, which sw-db-test.sh may not fully cover",
+          "Sourcing order and shared global state (DB path, env defaults) breaking when functions move into separate modules",
+          "Other scripts or tests calling internal sw-db.sh functions that move or get renamed",
+          "Bash 3.2 incompatibilities in the new module files",
+          "Missing VERSION variables or AUTO:core-scripts doc entries for the new modules, which would fail the docs check"
+        ],
+        "implementation_hints": [
+          "Map each function in sw-db.sh to a group (connection/schema, query helpers, migrations) before moving code, and move one group per commit with sw-db-test.sh run after each",
+          "Follow the existing scripts/lib/compat.sh sourcing pattern, with a source guard so each module can be sourced on its own",
+          "Keep sw-db.sh as a thin dispatcher that only parses subcommands and delegates, leaving the case statement and output strings untouched",
+          "Grep the repo for callers of sw-db.sh functions (for example via source or direct invocation) before moving anything",
+          "Add a VERSION variable to each new module, then run `shipwright docs sync` and `shipwright version check`"
+        ],
+        "dummy": null
+      },
+      "timestamp": 1791659212,
+      "ttl": 3600
+    },
+    "71a99dc580e0f96f1ad23fa9054460c2": {
+      "result": {
+        "estimated_iterations": 6
+      },
+      "timestamp": 1791659214,
+      "ttl": 1800
+    },
+    "49aadc0e8dd5b1ab89fe6cf531eb4bf4": {
+      "result": {
+        "estimated_cost_usd": 7.5,
+        "estimated_iterations": 3,
+        "estimated_tokens": 1400000,
+        "likely_failure_stage": "test",
+        "confidence": 55
+      },
+      "timestamp": 1791659219,
+      "ttl": 3600
+    },
+    "0e4f4bd98d6a9423c2f120f22cd68011": {
+      "result": {
+        "results": [
+          {
+            "file": "architecture.json",
+            "relevance": 80,
+            "summary": "Architecture rules are directly relevant to deciding module boundaries for splitting sw-db.sh during the plan stage, though this entry only holds placeholder rules."
+          },
+          {
+            "file": "failures.json",
+            "relevance": 45,
+            "summary": "The populated failures.json logs a 'database connection refused' failure, which bears on the db layer that the split touches."
+          },
+          {
+            "file": "fleet-shared-patterns.json",
+            "relevance": 30,
+            "summary": "Its 'Error: Cannot find module' pattern with fix 'npm i' flags a likely risk when sourcing the new split modules."
+          },
+          {
+            "file": "success-patterns.json",
+            "relevance": 25,
+            "summary": "Success patterns for refactoring and file-pattern changes in scripts, though the entries concern sw-daemon.sh rather than sw-db.sh."
+          },
+          {
+            "file": "index.json",
+            "relevance": 15,
+            "summary": "General failure-pattern index with a generic test_failure signature; only loosely related to a script refactor."
+          }
+        ]
+      },
+      "timestamp": 1791659259,
+      "ttl": 1800
+    },
+    "1992c473ee7ae3ce286cfc513037831e": {
+      "result": {
+        "results": [
+          {
+            "file": "architecture.json",
+            "relevance": 45,
+            "summary": "Holds the repo's architecture rules, which a plan to split sw-db.sh into schema, query, and migration modules would have to satisfy. Its rules are placeholders, so it is only a loose match."
+          },
+          {
+            "file": "failures.json",
+            "relevance": 25,
+            "summary": "Records captured pipeline failures, including a database-related one (connection refused, db not started). Could show a recurring failure mode for sw-db work, but it does not cover plan validation."
+          },
+          {
+            "file": "index.json",
+            "relevance": 15,
+            "summary": "Indexes failure patterns by stage with fixes. Its build-stage test_failure entry is only loosely related to a rejected plan."
+          }
+        ]
+      },
+      "timestamp": 1791659387,
+      "ttl": 1800
+    },
+    "a53ee793be0f71a59422e612dfa065cf": {
+      "result": {
+        "results": [
+          {
+            "file": "architecture.json",
+            "relevance": 55,
+            "summary": "Only entry about architecture rules, which is the closest match to designing module boundaries for the sw-db.sh split. Its content is placeholder rules (rule1-rule3), so it offers little concrete guidance."
+          },
+          {
+            "file": "success-patterns.json",
+            "relevance": 20,
+            "summary": "Records a past successful pattern for a shell script under scripts/ (sw-daemon.sh, a 'build' stage fix). It shows how this repo handles script-level changes, but it is not about splitting modules."
+          },
+          {
+            "file": "index.json",
+            "relevance": 15,
+            "summary": "Holds a generic build-stage failure signature with a fix (increase a test timeout). It is loosely related to testing a refactor but does not cover module structure."
+          },
+          {
+            "file": "failures.json",
+            "relevance": 10,
+            "summary": "Lists test-stage timeout and database connection failures. A split of sw-db.sh could hit the database-connection failure mode, but the entries don't address design."
+          },
+          {
+            "file": "fleet-shared-patterns.json",
+            "relevance": 8,
+            "summary": "Shared fleet pattern about a missing-module error fixed with npm install. Only tangentially related to a shell module split."
+          }
+        ]
+      },
+      "timestamp": 1791659408,
+      "ttl": 1800
+    },
+    "fbd9dd7f52bd48f541ec7161c88a32ce": {
+      "result": {
+        "results": [
+          {
+            "file": "success-patterns.json",
+            "relevance": 12,
+            "summary": "Only loosely related: one of several near-empty pattern records (sw-daemon.sh timeout fix). Nothing about module splitting, schema/connection/query/migration design, or rejected approaches."
+          },
+          {
+            "file": "failures.json",
+            "relevance": 10,
+            "summary": "Generic failure log (timeouts, db connection refused). The db-related entry is tangential to sw-db.sh refactoring and does not record any rejected design."
+          },
+          {
+            "file": "index.json",
+            "relevance": 8,
+            "summary": "Pattern index with a single test_failure signature. No design or refactoring anti-patterns are recorded."
+          }
+        ]
+      },
+      "timestamp": 1791659412,
+      "ttl": 1800
+    },
+    "30aa58cc32da0db3c9db34265db1de55": {
+      "result": {
+        "results": [
+          {
+            "file": "architecture.json",
+            "relevance": 35,
+            "summary": "Only placeholder rules (rule1-3); weakly relevant as a possible architecture reference for splitting sw-db.sh into modules, but contains no real content."
+          },
+          {
+            "file": "failures.json",
+            "relevance": 30,
+            "summary": "Recorded failures in the test stage involving timeouts and database connection refused; the 'database connection refused' entry touches the db layer that sw-db.sh handles."
+          },
+          {
+            "file": "index.json",
+            "relevance": 25,
+            "summary": "Build-stage failure pattern with a fix recipe; general, not specific to refactoring a shell script into modules."
+          },
+          {
+            "file": "success-patterns.json",
+            "relevance": 20,
+            "summary": "Build-stage success patterns for sw-daemon.sh timeout fixes; shows the repo's shell-script build pattern but for an unrelated change."
+          },
+          {
+            "file": "fleet-shared-patterns.json",
+            "relevance": 15,
+            "summary": "Cross-repo 'Cannot find module' build pattern; only loosely connected to a shell-module split."
+          }
+        ]
+      },
+      "timestamp": 1791659520,
+      "ttl": 1800
+    },
+    "47c1451f50b4a8f9faa0f8012f6b922e": {
+      "result": {
+        "results": [
+          {
+            "file": "retry-outcomes.json",
+            "relevance": 90,
+            "summary": "Records build_failure retries with model_escalation at 5/5 successes, which directly informs how the build stage should recover from failures."
+          },
+          {
+            "file": "success-patterns.json",
+            "relevance": 80,
+            "summary": "Captures past loop-iteration approaches, files changed, and iteration counts for build-like goals, useful for planning the build loop."
+          },
+          {
+            "file": "metrics.json",
+            "relevance": 70,
+            "summary": "Holds the build_duration_s baseline (7095s), which sets expectations for how long the build stage should run."
+          },
+          {
+            "file": "failures.json",
+            "relevance": 60,
+            "summary": "Logs recurring failure patterns with root causes and fixes; mostly test-stage, but relevant to build-time failure triage."
+          },
+          {
+            "file": "knowledge.json",
+            "relevance": 45,
+            "summary": "Stores failure signatures and fix strategies (e.g., mktemp path issues) that can recur during build and test setup."
+          }
+        ]
+      },
+      "timestamp": 1791659526,
+      "ttl": 1800
     }
   }
 }
