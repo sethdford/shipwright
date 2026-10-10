@@ -5,8 +5,8 @@
       "pattern": "\u001b[38;2;74;222;128m\u001b[1m✓\u001b[0m reveal shows 1/3 pass count on failure",
       "root_cause": "sw-cost-test.sh 'CONTEXT EFFICIENCY' dashboard tests fail because the cost dashboard prints 'No cost entries in the last 30 days' and exits early, never rendering the context-efficiency section from the seeded loop.context_efficiency events (test seeds only events, no cost entries).",
       "fix": "Make the cost dashboard render the CONTEXT EFFICIENCY section even when there are no cost entries (or have the test seed a cost entry/use an events path the dashboard reads) so the avg budget utilization assertions pass.",
-      "seen_count": 38,
-      "last_seen": "2026-10-10T03:53:08Z",
+      "seen_count": 40,
+      "last_seen": "2026-10-10T07:01:14Z",
       "category": "test_failure"
     },
     {
@@ -75,20 +75,11 @@
     {
       "stage": "test",
       "pattern": "\u001b[38;2;74;222;128m✓\u001b[0m Unknown measurement fails open as progress",
-      "root_cause": "The shown log is only passing output (the matched 'Unknown measurement fails open as progress' line is a ✓ passing test from the flatline-detection suite); all visible suites report FAIL: 0, so the real failure is in a suite not shown (truncated) or a non-test exit/timeout of the test stage.",
-      "fix": "Re-run the full test stage and grep the complete log for '✗' or 'FAIL: [1-9]' (e.g. via sw-test-all.sh) to find the actual failing suite; check sw-loop-test.sh and sw-lib-compat-test.sh flatline cases first.",
+      "root_cause": "The 'Memory promotion copies cross-repo patterns' test in sw-self-optimize-test.sh failed (15/16 passed); the promotion step did not copy patterns to the global memory location, likely due to test-environment or HOME/path state issues. The 'Unknown measurement fails open as progress' line is only a passing check and not the actual failure.",
+      "fix": "Run scripts/sw-self-optimize-test.sh alone, inspect the memory-promotion assertion, and fix the cross-repo pattern copy logic or the test's temp HOME/memory dir setup so the promoted file exists.",
       "seen_count": 1,
       "last_seen": "2026-10-09T19:08:19Z",
-      "category": "unknown"
-    },
-    {
-      "stage": "test",
-      "pattern": "\u001b[38;2;74;222;128m✓\u001b[0m tests going from failing to passing resets the streak",
-      "root_cause": "The matched line '✓ tests going from failing to passing resets the streak' is a passing test assertion (from the flatline/streak detection suite), not a failure; the log shown contains only passing suites (PASS counts with FAIL: 0), so the real failure is in an earlier, truncated part of the output not captured here.",
-      "fix": "Re-run the full test suite (npm test) and inspect the full log for the first line containing '✗' or 'FAIL: N' with N>0, rather than keying failure detection on the '✓' line; make the error-pattern extractor ignore lines with the ✓ success marker.",
-      "seen_count": 1,
-      "last_seen": "2026-10-10T02:14:27Z",
-      "category": "unknown"
+      "category": "test_failure"
     }
   ]
 }
