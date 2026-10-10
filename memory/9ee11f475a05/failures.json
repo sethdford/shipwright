@@ -5,8 +5,8 @@
       "pattern": "\u001b[38;2;74;222;128m\u001b[1m✓\u001b[0m reveal shows 1/3 pass count on failure",
       "root_cause": "sw-cost-test.sh 'CONTEXT EFFICIENCY' dashboard tests fail because the cost dashboard prints 'No cost entries in the last 30 days' and exits early, never rendering the context-efficiency section from the seeded loop.context_efficiency events (test seeds only events, no cost entries).",
       "fix": "Make the cost dashboard render the CONTEXT EFFICIENCY section even when there are no cost entries (or have the test seed a cost entry/use an events path the dashboard reads) so the avg budget utilization assertions pass.",
-      "seen_count": 52,
-      "last_seen": "2026-10-10T18:45:47Z",
+      "seen_count": 51,
+      "last_seen": "2026-10-10T18:56:59Z",
       "category": "test_failure"
     },
     {
@@ -41,8 +41,8 @@
       "pattern": "\u001b[38;2;0;212;255m▸\u001b[0m Patrol recurring failures label construction... \u001b[38;2;74;222;128m✓\u001b[0m",
       "root_cause": "sw-cost-test.sh 'context efficiency' dashboard test fails: `shipwright cost show` prints 'No cost entries in the last 30 day(s)' and exits early, so the CONTEXT EFFICIENCY section built from loop.context_efficiency events is never rendered (test seeds only events, no cost entries).",
       "fix": "Make sw-cost.sh render the CONTEXT EFFICIENCY section even when there are no cost entries (don't return early), or have the test seed a cost entry alongside the loop.context_efficiency events.",
-      "seen_count": 4,
-      "last_seen": "2026-10-09T09:21:00Z",
+      "seen_count": 5,
+      "last_seen": "2026-10-10T17:36:46Z",
       "category": "test_failure"
     },
     {
@@ -84,10 +84,19 @@
     {
       "stage": "test",
       "pattern": "\u001b[38;2;74;222;128m✓\u001b[0m tests going from failing to passing resets the streak",
-      "root_cause": "sw-pipeline-test.sh mock claude/environment no longer produces expected artifacts (plan.md, review.md) and output patterns, so 6 E2E tests fail; the mock is likely out of sync with recent pipeline changes (e.g. plan/review stage output, intelligence skip messages, jq parse errors from RL episode output).",
-      "fix": "Update the mock claude binary and test expectations in scripts/sw-pipeline-test.sh to match current plan/review artifact paths and output, and fix the jq parse error caused by non-JSON RL episode output in the intelligence skip path.",
+      "root_cause": "Multiple test suites failed (sw-daemon-test, sw-e2e-integration-test needing real Claude/GitHub, sw-intent-analysis-test); the matched 'tests going from failing to passing resets the streak' line is just a passing-test log line, so the actual failures are exit 1 in those suites, likely environment-dependent or flaky",
+      "fix": "Run sw-daemon-test.sh and sw-intent-analysis-test.sh individually to read the failing assertions, and skip or mock sw-e2e-integration-test when no real Claude/GitHub credentials are available in CI",
       "seen_count": 1,
       "last_seen": "2026-10-10T02:14:27Z",
+      "category": "test_failure"
+    },
+    {
+      "stage": "test",
+      "pattern": "Results: \u001b[38;2;74;222;128m\u001b[1m124 PASS\u001b[0m | \u001b[38;2;248;113;113m\u001b[1m4 FAIL\u001b[0m",
+      "root_cause": "The test suite run reported 4 FAIL (124 PASS) in total, but the visible log tail only shows suites with 0 failures (reward-aggregator, bandit-selector, policy-learner, autoresearch-e2e), so the failing suite/assertions are earlier in the output and cannot be identified from this excerpt.",
+      "fix": "Re-run `npm test` (or grep the full log for the ✗ marker / 'FAIL:' lines with non-zero counts) to find the specific suite with 4 failures, then fix that code or test.",
+      "seen_count": 1,
+      "last_seen": "2026-10-10T18:13:42Z",
       "category": "test_failure"
     }
   ]
