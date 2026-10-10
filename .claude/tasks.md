@@ -4,13 +4,13 @@
 Pipeline: standard | Branch: feat/share-failure-patterns-fleet-wide-so-dae-8328
 
 ## Checklist
-- [ ] 1. Signature and normalization functions in `lib/fleet-patterns.sh`
-- [ ] 2. Locked, atomic store read/write (record, update_fix, record_outcome, lookup, init/corruption recovery, caps)
-- [ ] 3. `fleet_triage_known_fix` with the demotion rule and artifact write
-- [ ] 4. `sw-memory.sh` capture hook plus `signature` field on failures
-- [ ] 5. `sw-memory.sh` analyze and outcome hooks (fix propagation)
-- [ ] 6. `memory_inject_context` renders `fleet-known-fix.json`
-- [ ] 7. `daemon-dispatch.sh` triage call and `sw-daemon.sh` sourcing
+- [x] 1. Signature and normalization functions in `lib/fleet-patterns.sh`
+- [x] 2. Locked, atomic store read/write (record, update_fix, record_outcome, lookup, init/corruption recovery, caps)
+- [x] 3. `fleet_triage_known_fix` with the demotion rule and artifact write
+- [x] 4. `sw-memory.sh` capture hook plus `signature` field on failures
+- [x] 5. `sw-memory.sh` analyze and outcome hooks (fix propagation)
+- [x] 6. `memory_inject_context` renders `fleet-known-fix.json`
+- [x] 7. `daemon-dispatch.sh` triage call and `sw-daemon.sh` sourcing
 - [ ] 8. `sw-fleet.sh` env export plus the `patterns` subcommand and help
 - [ ] 9. Unit, cross-repo and concurrency tests in `sw-lib-fleet-patterns-test.sh`, plus the `sw-fleet-test.sh` assertion
 - [ ] 10. Event schema, docs and full `npm test` run
