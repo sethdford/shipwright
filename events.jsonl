@@ -374,3 +374,8 @@
 {"ts":"2026-10-10T01:17:14Z","ts_epoch":1791595034,"type":"reasoning.trace","job_id":"pipeline-2905619-0","complexity":"medium","risk":50,"template":"standard"}
 {"ts":"2026-10-10T01:17:15Z","ts_epoch":1791595035,"type":"reasoning.trace","job_id":"pipeline-2906333-0","complexity":"medium","risk":50,"template":"standard"}
 {"ts":"2026-10-10T01:17:15Z","ts_epoch":1791595035,"type":"pipeline.started","issue":0,"template":"standard","complexity":1,"machine":"runnervmmprz5","pipeline":"standard","model":"opus","goal":"Add JWT auth"}
+{"ts":"2026-10-10T04:07:19Z","ts_epoch":1791605239,"type":"hygiene_platform_refactor","hardcoded":49,"fallback":69,"todo":51}
+{"ts":"2026-10-10T04:08:02Z","ts_epoch":1791605282,"type":"strategic.issue_created","title":"Recommend pipeline template based on detected project type during `shipwright prep`","priority":"P1","complexity":"standard"}
+{"ts":"2026-10-10T04:08:06Z","ts_epoch":1791605286,"type":"strategic.issue_created","title":"Use failure classification to set adaptive retry backoff in the daemon","priority":"P0","complexity":"standard"}
+{"ts":"2026-10-10T04:08:10Z","ts_epoch":1791605290,"type":"strategic.issue_created","title":"Split sw-db.sh into schema/connection, query, and migration modules","priority":"P6","complexity":"standard"}
+{"ts":"2026-10-10T04:08:10Z","ts_epoch":1791605290,"type":"strategic.cycle_complete","issues_created":3,"issues_skipped":0}
