@@ -5,8 +5,8 @@
       "pattern": "\u001b[38;2;74;222;128m\u001b[1m✓\u001b[0m reveal shows 1/3 pass count on failure",
       "root_cause": "sw-cost-test.sh 'CONTEXT EFFICIENCY' dashboard tests fail because the cost dashboard prints 'No cost entries in the last 30 days' and exits early, never rendering the context-efficiency section from the seeded loop.context_efficiency events (test seeds only events, no cost entries).",
       "fix": "Make the cost dashboard render the CONTEXT EFFICIENCY section even when there are no cost entries (or have the test seed a cost entry/use an events path the dashboard reads) so the avg budget utilization assertions pass.",
-      "seen_count": 45,
-      "last_seen": "2026-10-10T12:55:47Z",
+      "seen_count": 52,
+      "last_seen": "2026-10-10T16:52:26Z",
       "category": "test_failure"
     },
     {
@@ -14,8 +14,8 @@
       "pattern": "Failed: 1",
       "root_cause": "Two suites failed: sw-e2e-integration-test hit a stale pipeline lock/state ('pipeline already in progress') left by the outer pipeline run, and sw-intent-analysis-test failed its schema check for required fields (version, goal, criteria).",
       "fix": "Make the e2e integration test run with isolated state/lock dir (or skip when a pipeline is already running), and update the intent analysis schema or the analyze_intent output so they agree on the required fields.",
-      "seen_count": 9,
-      "last_seen": "2026-10-10T14:08:15Z",
+      "seen_count": 8,
+      "last_seen": "2026-10-10T05:53:42Z",
       "category": "test_failure"
     },
     {
@@ -59,8 +59,8 @@
       "pattern": "\u001b[2m  loop behavior: iterations on test failure\u001b[0m",
       "root_cause": "sw-cost-test.sh 'context efficiency' assertions fail because the cost dashboard reports 'No cost entries in the last 30 days' and exits before rendering the CONTEXT EFFICIENCY section from the seeded loop.context_efficiency events (test events/timestamps are not seen, or the section is skipped when costs.json is empty).",
       "fix": "In sw-cost-test.sh, seed at least one cost entry (and events with current timestamps in the events file the script reads) before running the dashboard, or change sw-cost.sh to render the CONTEXT EFFICIENCY section even when there are no cost entries.",
-      "seen_count": 10,
-      "last_seen": "2026-10-10T05:20:35Z",
+      "seen_count": 11,
+      "last_seen": "2026-10-10T16:13:28Z",
       "category": "test_failure"
     },
     {
@@ -84,8 +84,8 @@
     {
       "stage": "test",
       "pattern": "\u001b[38;2;74;222;128m✓\u001b[0m tests going from failing to passing resets the streak",
-      "root_cause": "The test run failed because sw-intent-analysis-test and sw-project-detect-test exited 1. The log is truncated before either suite's output, so the specific assertions are not visible. The failing text 'tests going from failing to passing resets the streak' is a passing check from the circuit-breaker/flaky-detect tests and is not the cause. sw-e2e-integration-test also timed out after 301s, probably because it calls real Claude/GitHub.",
-      "fix": "Run `bash scripts/sw-intent-analysis-test.sh` and `bash scripts/sw-project-detect-test.sh` individually to see the failing assertions, then fix the code. Also check why sw-e2e-integration-test exceeds the 300s timeout, or skip it when no API credentials are available.",
+      "root_cause": "sw-intent-analysis-test failed with exit 1 (the 'tests going from failing to passing resets the streak' case) after 31s; sw-e2e-integration-test also timed out at 301s, likely because it makes real Claude/GitHub calls",
+      "fix": "Run scripts/sw-intent-analysis-test.sh alone to see the failing assertion on the streak-reset case and fix the streak logic or its mock setup; skip or mock sw-e2e-integration-test in CI",
       "seen_count": 1,
       "last_seen": "2026-10-10T02:14:27Z",
       "category": "test_failure"
