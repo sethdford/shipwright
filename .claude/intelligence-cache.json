@@ -32,15 +32,14 @@
       "result": {
         "primary_role": "builder",
         "secondary_roles": [
-          "tester",
-          "reviewer"
+          "tester"
         ],
-        "confidence": 0.95,
-        "reasoning": "Bug fix requiring debugging JSON parsing logic, implementing improved error messaging, and testing edge cases (object vs array output). Builder handles implementation; tester validates the fix; reviewer ensures accuracy.",
+        "confidence": 0.86,
+        "reasoning": "Core work is implementing flaky-test detection and changing circuit-breaker/failure-count logic in shell code, which is builder territory; tester is secondary for validating retry and flaky classification edge cases.",
         "new_role_needed": false,
         "suggested_role": null
       },
-      "timestamp": 1775316059,
+      "timestamp": 1791656862,
       "ttl": 3600
     },
     "efd5524ad1244fd20344bf3ff5d95233": {
@@ -1401,6 +1400,338 @@
       },
       "timestamp": 1775344537,
       "ttl": 3600
+    },
+    "df366478e25dace9ad4aa0c2169ccd8d": {
+      "result": {
+        "complexity": 6,
+        "risk_level": "high",
+        "success_probability": 65,
+        "recommended_template": "standard",
+        "issue_type": "testing",
+        "key_risks": [
+          "A rerun that passes can hide a real regression, so genuine bugs may be misclassified as flaky and excluded from the circuit breaker",
+          "Extracting the failing test name from output is brittle across runners (vitest, jest, shell test harnesses), and the isolated rerun may not reproduce order-dependent flakiness",
+          "Changing error-summary.json or the circuit-breaker path could break existing consumers in sw-loop.sh, sw-daemon.sh, and metrics if the schema is not kept backward compatible",
+          "Extra reruns add time and cost to every test failure in the build loop"
+        ],
+        "implementation_hints": [
+          "Put the detector in scripts/lib (for example a flaky-detect helper) that takes the failing test name and a test command with a filter argument, and returns flaky or regression",
+          "Classify in sw-loop.sh before the circuit-breaker failure counter increments, and add a backward-compatible classification field to error-summary.json plus a separate flaky list",
+          "Only rerun when exactly one test is identified as failing, and emit an event such as flaky_detected so daemon failure metrics can separate flaky from regression",
+          "Write unit tests in the existing test harness with a mock test command that fails then passes (expect excluded from count) and one that fails twice (expect counted), and keep the code Bash 3.2 compatible"
+        ]
+      },
+      "timestamp": 1791656475,
+      "ttl": 3600
+    },
+    "ea99b88a0479c76fc38f4c4c82430a82": {
+      "result": {
+        "estimated_iterations": 5
+      },
+      "timestamp": 1791656478,
+      "ttl": 1800
+    },
+    "af9859a7640f8b278d34f9be21f0415f": {
+      "result": {
+        "estimated_cost_usd": 6.5,
+        "estimated_iterations": 3,
+        "estimated_tokens": 1200000,
+        "likely_failure_stage": "test",
+        "confidence": 40
+      },
+      "timestamp": 1791656482,
+      "ttl": 3600
+    },
+    "f9aba270ef630a5dee3780085f59cc3d": {
+      "result": {
+        "issue_type": "backend",
+        "confidence": 0.8,
+        "secondary_domains": [
+          "testing",
+          "reliability",
+          "observability"
+        ],
+        "complexity_assessment": {
+          "score": 5,
+          "reasoning": "Adds a flaky-test detector to the build loop and daemon failure classification in shell scripts. The change touches circuit-breaker counting, error-summary.json schema, and daemon metrics, so several components must agree. The scope is bounded to one new lib function plus classification wiring and unit tests."
+        },
+        "skill_plan": {
+          "plan": [
+            "brainstorming"
+          ],
+          "design": [
+            "architecture-design"
+          ],
+          "build": [
+            "testing-strategy"
+          ],
+          "review": [
+            "two-stage-review",
+            "adversarial-quality"
+          ],
+          "compound_quality": [
+            "test-parallelization-detection"
+          ],
+          "pr": [
+            "pr-quality"
+          ],
+          "deploy": [],
+          "validate": [
+            "validation-thoroughness"
+          ],
+          "monitor": [
+            "observability"
+          ]
+        },
+        "skill_rationale": {
+          "brainstorming": "The rerun-in-isolation policy has open questions: what counts as a single-test failure when the runner has no per-test filter, and whether a rerun that passes should be trusted. These should be settled before the circuit-breaker logic changes.",
+          "architecture-design": "The `flaky` vs `regression` tag must flow from a new lib function into error-summary.json, the circuit-breaker counter, and daemon metrics. An ADR should record where that classification lives so the three consumers stay consistent.",
+          "testing-strategy": "The acceptance criteria name two required unit tests: a flaky pass on rerun is excluded from the count, and a genuine failure is still counted. Both branches need coverage, and the rerun path needs a mocked test command.",
+          "two-stage-review": "The change alters when the circuit breaker trips. Pass 1 should check the spec-level behavior, and Pass 2 should check the shell-level edge cases such as bash 3.2 compatibility and unquoted paths.",
+          "adversarial-quality": "A detector that reruns failures can mask real regressions. The reviewer should try to construct a test that is genuinely broken but passes on a second run, and confirm it still gets counted.",
+          "test-parallelization-detection": "Rerunning a test in isolation is only meaningful if the first failure did not leave shared state (temp files, lock files, ports) behind. This skill helps detect the shared-state causes behind the flakiness the detector is meant to tolerate.",
+          "pr-quality": "The PR changes failure-counting behavior that operators depend on. The description needs to explain the new `flaky` tag and why it does not count toward the breaker.",
+          "validation-thoroughness": "Unit tests with mocked runners do not show that the real build loop tolerates a flaky test. Validation should run a deliberately flaky test through the loop and confirm the breaker does not trip.",
+          "observability": "Daemon metrics must separate flaky-detected failures from regressions after deploy. Monitoring should confirm the new classification appears in the metrics output and that flaky counts are not silently dropped."
+        },
+        "generated_skills": [],
+        "review_focus": [
+          "The rerun must run the same failing test in isolation, not the full suite, so a pass really means the test is flaky",
+          "A flaky result must not increment the circuit-breaker counter, while a failing rerun must still increment it normally",
+          "error-summary.json gets a new classification field without breaking existing readers",
+          "Classification output in daemon metrics distinguishes flaky from regression",
+          "Shell code stays bash 3.2 compatible and uses atomic writes for the summary file"
+        ],
+        "risk_areas": [
+          "A true regression that is intermittent could be labeled flaky and hidden from the circuit breaker",
+          "Rerunning a test with shared state may pass only because the first run cleaned up the state, so the detector reports flaky incorrectly",
+          "Test runners without per-test filtering cannot truly run a single test, so the isolation claim may not hold for some project types",
+          "Rerun doubles the cost and time of each failing test, which could slow the build loop",
+          "Existing consumers of error-summary.json may break if the schema changes incompatibly"
+        ]
+      },
+      "timestamp": 1791656518,
+      "ttl": 3600
+    },
+    "3c1d60a4af9332211b4b1e3ea9f9fe45": {
+      "result": {
+        "results": [
+          {
+            "file": "failures.json",
+            "relevance": 78,
+            "summary": "Holds test-stage failure records with seen_count, fix_applied and resolved flags, the raw material for telling recurring flaky failures apart from real ones."
+          },
+          {
+            "file": "test-failures.json",
+            "relevance": 65,
+            "summary": "Dedicated test-failure signature store, directly relevant to flaky-test detection, though its signatures map is currently empty."
+          },
+          {
+            "file": "index.json",
+            "relevance": 52,
+            "summary": "Records a build-stage test_failure pattern with total_seen and a suggested fix, useful for deciding when a failure has recurred enough to classify as flaky."
+          },
+          {
+            "file": "success-patterns.json",
+            "relevance": 40,
+            "summary": "A 'Fix timeout' pattern touching scripts/sw-daemon.sh, relevant to the daemon's failure-counting and circuit-breaker logic."
+          },
+          {
+            "file": "fleet-shared-patterns.json",
+            "relevance": 28,
+            "summary": "Cross-repo shared failure signatures with seen counts; tangentially useful for signature-based failure classification."
+          }
+        ]
+      },
+      "timestamp": 1791656558,
+      "ttl": 1800
+    },
+    "f87bc4ee2b44136cf51e1009d9449bfc": {
+      "result": {
+        "results": [
+          {
+            "file": "failures.json",
+            "relevance": 72,
+            "summary": "The failures list with 'timeout after' entries in the test stage, some marked resolved with seen_count, is the closest match for recurring, possibly intermittent test failures that flaky detection would need to classify."
+          },
+          {
+            "file": "test-failures.json",
+            "relevance": 55,
+            "summary": "Holds a signatures store meant for test failure tracking, which is the data structure flaky detection would extend, though it is currently empty."
+          },
+          {
+            "file": "index.json",
+            "relevance": 40,
+            "summary": "Has a test_failure pattern in the build stage with a recorded fix, giving some context on how test failure signatures are indexed."
+          }
+        ]
+      },
+      "timestamp": 1791656708,
+      "ttl": 1800
+    },
+    "641b1a6f69e08e2e4d46ab6e7be86abf": {
+      "result": {
+        "results": [
+          {
+            "file": "success-patterns.json",
+            "relevance": 30,
+            "summary": "Only file with a non-empty daemon-related pattern (scripts/sw-daemon.sh, timeout fix, build stage); loosely related to flaky/failure handling but no flakiness content."
+          },
+          {
+            "file": "failures.json",
+            "relevance": 25,
+            "summary": "Contains recorded test-stage failures with timeouts and resolved/unresolved flags; closest to the failure-counting domain the task targets, though it has no flaky-detection data."
+          },
+          {
+            "file": "index.json",
+            "relevance": 15,
+            "summary": "Lists a test_failure signature at the build stage with a timeout-related fix; a generic failure-pattern index with weak relevance."
+          },
+          {
+            "file": "test-failures.json",
+            "relevance": 12,
+            "summary": "Failure signature store, but it is empty, so it offers no concrete data for flaky-test detection."
+          },
+          {
+            "file": "architecture.json",
+            "relevance": 8,
+            "summary": "Placeholder architecture rules with no real content; only marginally relevant to a design-stage architecture question."
+          }
+        ]
+      },
+      "timestamp": 1791656731,
+      "ttl": 1800
+    },
+    "68c907628b587a3d1172491891fc1534": {
+      "result": {
+        "results": [
+          {
+            "file": "failures.json",
+            "relevance": 72,
+            "summary": "The failures.json entry with three timeout records (seen_count, resolved, fix_applied) is the closest match, since it tracks repeated failures and their resolution, which is what the failure-count exclusion would change."
+          },
+          {
+            "file": "test-failures.json",
+            "relevance": 55,
+            "summary": "Keyed by test failure signatures, so it is where flaky-failure detection would record and dedupe signatures. Its signatures map is empty, so it shows no prior approach."
+          },
+          {
+            "file": "index.json",
+            "relevance": 40,
+            "summary": "Has a test_failure pattern with a timeout-increase fix. That is a shallow, quick-fix approach to flakiness, a possible anti-pattern to reject rather than a design to follow."
+          }
+        ]
+      },
+      "timestamp": 1791656737,
+      "ttl": 1800
+    },
+    "6ec246eee8a9c5d72f1b4028bad7ca77": {
+      "result": {
+        "results": [
+          {
+            "file": "test-failures.json",
+            "relevance": 80,
+            "summary": "Stores test failure signatures, the store a flaky-failure detector would need to recognize repeated versus one-off failures. Its signatures map is currently empty."
+          },
+          {
+            "file": "failures.json",
+            "relevance": 75,
+            "summary": "Test-stage failures with seen_count and resolved flags (repeated timeouts, a db connection refusal), the kind of history needed to classify flaky failures and decide what counts toward the circuit breaker."
+          },
+          {
+            "file": "index.json",
+            "relevance": 60,
+            "summary": "Pattern index with a build-stage test_failure signature seen 5 times, relevant to how recurring test failures are categorized and counted."
+          },
+          {
+            "file": "success-patterns.json",
+            "relevance": 45,
+            "summary": "Prior successful fix for a daemon timeout in scripts/sw-daemon.sh, a nearby area where failure handling and circuit-breaker logic likely live."
+          },
+          {
+            "file": "fleet-shared-patterns.json",
+            "relevance": 35,
+            "summary": "Build-stage failure signatures shared across repos with fix suggestions, loosely related to recurring failure tracking across runs."
+          }
+        ]
+      },
+      "timestamp": 1791656852,
+      "ttl": 1800
+    },
+    "47c1451f50b4a8f9faa0f8012f6b922e": {
+      "result": {
+        "results": [
+          {
+            "file": "flaky-tests.json",
+            "relevance": 95,
+            "summary": "Directly about the current goal: it records flaky test occurrences with confidence scores, which the build stage needs in order to tell flaky failures apart from real ones."
+          },
+          {
+            "file": "failures.json",
+            "relevance": 80,
+            "summary": "Recorded test-stage failures, including one with category 'flaky', showing how failures are classified and what fixes were tried. Relevant to excluding flaky failures from failure counts."
+          },
+          {
+            "file": "retry-outcomes.json",
+            "relevance": 70,
+            "summary": "Tracks retry outcomes for the build_failure class with model escalation, so it bears on how build-stage retries and circuit-breaker counting behave."
+          },
+          {
+            "file": "success-patterns.json",
+            "relevance": 60,
+            "summary": "Prior successful bug-fix build loops with iteration counts, durations, and approaches. Useful precedent for the build stage's iteration strategy."
+          },
+          {
+            "file": "metrics.json",
+            "relevance": 50,
+            "summary": "Holds the build_duration_s baseline (7095s) for comparing the current build stage's duration against the historical norm."
+          }
+        ]
+      },
+      "timestamp": 1791656858,
+      "ttl": 1800
+    },
+    "bfff76b139cf01dee9ee8dc993761079": {
+      "result": {
+        "raw_response": "Mock claude: ok"
+      },
+      "timestamp": 1791657171,
+      "ttl": 1800
+    },
+    "da4e17a98a6bc026762fdbc9db02f022": {
+      "result": [
+        {
+          "type": "result",
+          "result": "I am trying the same approach again.",
+          "usage": {
+            "input_tokens": 0,
+            "output_tokens": 0
+          }
+        }
+      ],
+      "timestamp": 1791657384,
+      "ttl": 1800
+    },
+    "0010946af71d286107e4841c876f5432": {
+      "result": {
+        "raw_response": "Mock claude: ok"
+      },
+      "timestamp": 1791657722,
+      "ttl": 1800
+    },
+    "b83a60c9a3a657be7afa7991b8f05ad5": {
+      "result": [
+        {
+          "type": "result",
+          "result": "I am trying the same approach again.",
+          "usage": {
+            "input_tokens": 0,
+            "output_tokens": 0
+          }
+        }
+      ],
+      "timestamp": 1791657934,
+      "ttl": 1800
     }
   }
 }
