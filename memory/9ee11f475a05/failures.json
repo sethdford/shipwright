@@ -6,7 +6,7 @@
       "root_cause": "sw-cost-test.sh 'CONTEXT EFFICIENCY' dashboard tests fail because the cost dashboard prints 'No cost entries in the last 30 days' and exits early, never rendering the context-efficiency section from the seeded loop.context_efficiency events (test seeds only events, no cost entries).",
       "fix": "Make the cost dashboard render the CONTEXT EFFICIENCY section even when there are no cost entries (or have the test seed a cost entry/use an events path the dashboard reads) so the avg budget utilization assertions pass.",
       "seen_count": 48,
-      "last_seen": "2026-10-10T21:40:39Z",
+      "last_seen": "2026-10-10T22:55:17Z",
       "category": "test_failure"
     },
     {
@@ -60,8 +60,8 @@
       "pattern": "\u001b[2m  loop behavior: iterations on test failure\u001b[0m",
       "root_cause": "sw-cost-test.sh 'context efficiency' assertions fail because the cost dashboard reports 'No cost entries in the last 30 days' and exits before rendering the CONTEXT EFFICIENCY section from the seeded loop.context_efficiency events (test events/timestamps are not seen, or the section is skipped when costs.json is empty).",
       "fix": "In sw-cost-test.sh, seed at least one cost entry (and events with current timestamps in the events file the script reads) before running the dashboard, or change sw-cost.sh to render the CONTEXT EFFICIENCY section even when there are no cost entries.",
-      "seen_count": 12,
-      "last_seen": "2026-10-10T20:53:28Z",
+      "seen_count": 11,
+      "last_seen": "2026-10-10T15:57:53Z",
       "category": "test_failure"
     },
     {
@@ -94,20 +94,20 @@
     {
       "stage": "test",
       "pattern": "\u001b[38;2;74;222;128m✓\u001b[0m Lone failure passing on rerun is flaky and TEST_PASSED stays false",
-      "root_cause": "sw-pipeline-test.sh E2E tests fail because the mock plan/review stages don't produce plan.md/review.md artifacts, and jq parse errors from non-JSON output (RL episode/policy logs written to stdout) break intelligence and cleanup assertions; these failures are in the test harness and unrelated to the README-only change.",
-      "fix": "Make the mock claude/plan/review stages write plan.md and review.md, send RL/learned-policy log output to stderr or a file so jq only sees valid JSON, then rerun sw-pipeline-test.sh to confirm the 6 failures are gone.",
+      "root_cause": "Three unrelated suites failed: sw-e2e-integration-test hit a stale 'pipeline already in progress' lock (pipeline-8429) against a live GitHub issue, sw-intent-analysis-test hit a schema field check, and sw-self-optimize-test hit invalid JSON passed to jq --argjson in the memory strengthening step. The 'lone failure passing on rerun' pattern did not apply because 3 suites failed.",
+      "fix": "Make the e2e integration test clear pipeline locks and state before running (or skip it without real GitHub/Claude); fix the intent-analysis schema required fields (version, goal, criteria); guard the --argjson inputs in the self-optimize memory strengthening code with a '// {}' default or validation.",
       "seen_count": 1,
       "last_seen": "2026-10-10T17:27:54Z",
       "category": "test_failure"
     },
     {
       "stage": "test",
-      "pattern": "\u001b[38;2;74;222;128m✓\u001b[0m Loop runs multiple iterations when tests fail initially",
-      "root_cause": "The log excerpt shows all test suites passing (PASS/FAIL: 0 failures); the flagged pattern is just a passing '✓ Loop runs multiple iterations when tests fail initially' check from sw-loop-test.sh, so the real failure is not in the shown output (likely a later suite or a timeout/flaky run).",
-      "fix": "Inspect the full test output for the first 'FAIL' or '✗' line (or a non-zero exit/timeout in a suite after sw-autoresearch-e2e-test.sh) and re-run that suite individually; the error-pattern matcher should also exclude lines starting with ✓.",
-      "seen_count": 1,
-      "last_seen": "2026-10-10T22:39:58Z",
-      "category": "flaky"
+      "pattern": "\u001b[2m  error-signature dedup (behavioral)\u001b[0m",
+      "root_cause": "sw-e2e-integration-test (real Claude + real GitHub pipeline run) exceeded the 300s suite timeout; the build loop's full-test step runs `npm test` recursively, so the nested run is slow and the suite hangs until killed. All other 161 suites passed.",
+      "fix": "Skip or gate sw-e2e-integration-test in the default `npm test` run (it requires real Claude/GitHub), or raise its per-suite timeout and make the nested loop use a fast test command rather than `npm test`.",
+      "seen_count": 2,
+      "last_seen": "2026-10-10T22:10:05Z",
+      "category": "timeout"
     }
   ]
 }
