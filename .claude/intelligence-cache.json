@@ -30,17 +30,17 @@
     },
     "d41d8cd98f00b204e9800998ecf8427e": {
       "result": {
-        "primary_role": "builder",
+        "primary_role": "architect",
         "secondary_roles": [
-          "tester",
-          "reviewer"
+          "builder",
+          "docs-writer"
         ],
-        "confidence": 0.95,
-        "reasoning": "Bug fix requiring debugging JSON parsing logic, implementing improved error messaging, and testing edge cases (object vs array output). Builder handles implementation; tester validates the fix; reviewer ensures accuracy.",
+        "confidence": 0.7,
+        "reasoning": "Cross-repo failure-pattern sharing is a system design problem (data model, fleet-wide learning boundaries, triage integration), with builder needed for implementation and docs-writer for the new behavior.",
         "new_role_needed": false,
         "suggested_role": null
       },
-      "timestamp": 1775316059,
+      "timestamp": 1791656800,
       "ttl": 3600
     },
     "efd5524ad1244fd20344bf3ff5d95233": {
@@ -1401,6 +1401,322 @@
       },
       "timestamp": 1775344537,
       "ttl": 3600
+    },
+    "9fb9af378b529d70a238990db2e54279": {
+      "result": {
+        "complexity": 6,
+        "risk_level": "medium",
+        "success_probability": 65,
+        "recommended_template": "standard",
+        "issue_type": "backend",
+        "key_risks": [
+          "Shared fleet store may leak repo-specific error text or paths into other repos, so signatures must be normalized and sanitized before storage",
+          "Overly loose failure signatures could match unrelated failures and surface a wrong known fix, which would mislead triage",
+          "Concurrent daemons or fleet workers writing one shared store could corrupt it or lose updates without atomic writes and locking",
+          "Scope creep: the issue mixes fleet writes, daemon triage lookup, and signature design, so the change could sprawl across sw-memory.sh, sw-fleet.sh, and sw-daemon.sh"
+        ],
+        "implementation_hints": [
+          "Compute the signature from error type plus a fingerprint with paths, line numbers, timestamps, and hashes stripped, and keep the normalization in one shared function that both writers and readers call",
+          "Store the fleet index in a single location (for example under ~/.shipwright) and write it with tmp file plus mv, as the repo's shell standards require, to avoid partial writes across workers",
+          "Keep the per-repo memory store as the source of truth and treat the fleet store as an index that only adds matched signatures, so existing per-repo behavior is unchanged when fleet mode is off",
+          "Add a unit test in the memory or daemon-triage test suite that points the store at a temp dir, records a pattern under repo A, and asserts that triage in simulated repo B returns the known fix before a build loop would start"
+        ]
+      },
+      "timestamp": 1791656460,
+      "ttl": 3600
+    },
+    "b5b8f7d9a47d889190b3d46ef743266a": {
+      "result": {
+        "estimated_iterations": 6
+      },
+      "timestamp": 1791656463,
+      "ttl": 1800
+    },
+    "a48a1cfc46fe475247ea3ac112c6413b": {
+      "result": {
+        "estimated_cost_usd": 3.4,
+        "estimated_iterations": 3,
+        "estimated_tokens": 420000,
+        "likely_failure_stage": "test",
+        "confidence": 55
+      },
+      "timestamp": 1791656467,
+      "ttl": 3600
+    },
+    "1a5937f811ada8b0fef00b5b69763e89": {
+      "result": {
+        "issue_type": "backend",
+        "confidence": 0.85,
+        "secondary_domains": [
+          "data",
+          "testing",
+          "infrastructure"
+        ],
+        "complexity_assessment": {
+          "score": 6,
+          "reasoning": "Adds a fleet-scoped pattern store alongside the per-repo memory in bash, changes daemon triage to consult it before a build loop starts, and needs a signature scheme (error type plus stack/log fingerprint) that matches across repos. Cross-cutting, but the surface is limited to sw-memory.sh, sw-fleet.sh, and triage, with unit tests as the acceptance bar."
+        },
+        "skill_plan": {
+          "plan": [
+            "brainstorming",
+            "architecture-design"
+          ],
+          "design": [
+            "architecture-design",
+            "pattern-matching-similarity-scoring"
+          ],
+          "build": [
+            "data-pipeline",
+            "pattern-matching-similarity-scoring"
+          ],
+          "review": [
+            "two-stage-review",
+            "adversarial-quality"
+          ],
+          "compound_quality": [
+            "testing-strategy"
+          ],
+          "pr": [
+            "pr-quality"
+          ],
+          "deploy": [],
+          "validate": [
+            "validation-thoroughness"
+          ],
+          "monitor": [
+            "observability"
+          ]
+        },
+        "skill_rationale": {
+          "brainstorming": "The issue assumes failure signatures from different repos are comparable. Stack traces contain paths and line numbers that differ per repo, so the fingerprint definition needs challenging before any code is written.",
+          "architecture-design": "A shared fleet store sits beside the per-repo store and is read during triage. The ADR should settle where the store lives, how writes from concurrent daemons are serialized, and how it relates to sw-memory.sh.",
+          "data-pipeline": "Patterns are written by one repo's pipeline and read by another's triage. Atomic writes (tmp file plus mv), idempotent upserts keyed by signature, and schema versioning are needed so concurrent fleet workers do not corrupt or duplicate entries.",
+          "pattern-matching-similarity-scoring": "Acceptance requires a match on failure signature rather than repo path. Normalizing error type and log fingerprint, and setting a match threshold, decides whether a known fix surfaces for a genuinely similar failure or for noise.",
+          "two-stage-review": "The change touches fleet orchestration and daemon triage. Pass 1 should check the correctness of the signature keying and the store writes; Pass 2 should check triage behavior and the fallback when the store is empty or unreadable.",
+          "adversarial-quality": "Shared state across repos fails in unusual ways: a poisoned or stale pattern could send a repo down a wrong fix path, and concurrent writes from several workers could race. Those cases need to be tried deliberately.",
+          "testing-strategy": "The acceptance criterion is a unit test that learns a pattern in one simulated repo and surfaces it during triage in a second. The strategy should cover the positive match, the negative case where signatures differ, and the isolation of per-repo memory.",
+          "pr-quality": "The PR changes shared fleet behavior that other repos rely on, so the description must explain the signature scheme, the store location, and how the per-repo store is unaffected.",
+          "validation-thoroughness": "Unit tests with simulated repos do not prove that triage in a live fleet surfaces the right fix. Validation should run the daemon triage path against two real repo configurations and confirm the surfaced pattern.",
+          "observability": "Once shared patterns influence triage, the team needs to see which patterns were surfaced, how often they were applied, and whether they helped. Without that, a bad shared pattern could spread silently across the fleet."
+        },
+        "generated_skills": [],
+        "review_focus": [
+          "Failure signature normalization: repo-specific paths, line numbers, and temp names must be stripped so the same error matches across repos",
+          "Concurrent writes to the shared store from multiple fleet workers (atomic tmp+mv, no lost updates)",
+          "Triage fallback: a missing, empty, or corrupt shared store must not block or break triage",
+          "Per-repo memory store behavior is unchanged when fleet mode is off",
+          "Bash 3.2 compatibility (no declare -A, no readarray) in new fleet and memory code",
+          "Match threshold: a surfaced pattern is advisory, not auto-applied"
+        ],
+        "risk_areas": [
+          "A false-positive signature match surfaces an incorrect fix for an unrelated failure in another repo",
+          "Stale or poisoned shared patterns propagate a bad mitigation to every repo in the fleet",
+          "Store growth and read cost during triage if patterns are not pruned or indexed",
+          "Fleet-wide shared state introduces a single point of failure or contention for the worker pool",
+          "Signature fingerprinting over log text may leak repo-private paths or content into a store read by other repos"
+        ]
+      },
+      "timestamp": 1791656506,
+      "ttl": 3600
+    },
+    "588b7d88f5c6531212e523311d896d95": {
+      "result": {
+        "results": [
+          {
+            "file": "fleet-shared-patterns.json",
+            "relevance": 95,
+            "summary": "Already holds cross-repo failure patterns with repos, contributions, and seen counts, which is the core data structure this feature extends."
+          },
+          {
+            "file": "fleet-knowledge.json",
+            "relevance": 85,
+            "summary": "Fleet-level knowledge store with publish and query metrics, directly tied to sharing learnings between repos."
+          },
+          {
+            "file": "fleet-patterns.json",
+            "relevance": 80,
+            "summary": "Fleet-scoped pattern file (currently empty), the likely target for fleet-wide pattern storage and its schema."
+          },
+          {
+            "file": "failures.json",
+            "relevance": 70,
+            "summary": "Per-repo failure records with root cause, fix, and resolved flags, the source data that would be shared fleet-wide to inform daemon triage."
+          },
+          {
+            "file": "index.json",
+            "relevance": 60,
+            "summary": "Pattern index with signature, stage, and sources, relevant to matching and triaging failures across repos."
+          }
+        ]
+      },
+      "timestamp": 1791656546,
+      "ttl": 1800
+    },
+    "9adc5284257a8482bc0d673d2b1592ed": {
+      "result": {
+        "results": [
+          {
+            "file": "fleet-shared-patterns.json",
+            "relevance": 95,
+            "summary": "Already holds failure patterns (signature, stage, fix) aggregated across repos with per-repo contributions, which is the cross-repo sharing the goal describes."
+          },
+          {
+            "file": "failures.json",
+            "relevance": 80,
+            "summary": "Per-repo failure records with root_cause, fix, and resolved flags. These are the failure patterns that would need to be shared fleet-wide for daemon triage to reuse them."
+          },
+          {
+            "file": "fleet-patterns.json",
+            "relevance": 72,
+            "summary": "The fleet-level patterns store, currently empty, so it is the likely destination for shared patterns and the place the feature would write to and read from."
+          }
+        ]
+      },
+      "timestamp": 1791656679,
+      "ttl": 1800
+    },
+    "6b3b02aa1e930d162cc710d32001032e": {
+      "result": {
+        "results": [
+          {
+            "file": "fleet-shared-patterns.json",
+            "relevance": 95,
+            "summary": "Directly implements fleet-wide sharing of failure patterns: signatures, fixes, and contributing repos, which is what the goal asks for."
+          },
+          {
+            "file": "fleet-knowledge.json",
+            "relevance": 80,
+            "summary": "Fleet knowledge store with publish/query metrics and injection counts, the cross-repo learning mechanism the design would extend."
+          },
+          {
+            "file": "fleet-patterns.json",
+            "relevance": 75,
+            "summary": "Fleet-level pattern index (currently empty), a likely target for daemon triage to read shared patterns from."
+          },
+          {
+            "file": "failures.json",
+            "relevance": 60,
+            "summary": "Per-repo failure records with root cause, fix, and resolution state, the raw input that would be shared across repos for triage."
+          },
+          {
+            "file": "index.json",
+            "relevance": 50,
+            "summary": "Cross-source pattern index recording signature, stage, sources, and fix, relevant to merging learnings from multiple repos."
+          }
+        ]
+      },
+      "timestamp": 1791656702,
+      "ttl": 1800
+    },
+    "55c419f80914292aabfb68dee4f33d9f": {
+      "result": {
+        "results": [
+          {
+            "file": "fleet-shared-patterns.json",
+            "relevance": 95,
+            "summary": "Already stores failure patterns keyed by signature and shared across repos (repo-a, repo-b), with contributions and seen counts. This is the cross-repo sharing mechanism the goal describes, so its structure matters most for avoiding rejected designs."
+          },
+          {
+            "file": "fleet-knowledge.json",
+            "relevance": 80,
+            "summary": "Tracks fleet-level publish, query, match, and injection metrics. It shows how cross-repo learnings are published and consumed, which bears on whether one repo's triage actually benefits from another's."
+          },
+          {
+            "file": "fleet-patterns.json",
+            "relevance": 65,
+            "summary": "A fleet-level patterns file with an empty patterns array and an updated_at timestamp. It is the likely target store for fleet-wide patterns, though it holds no data yet."
+          }
+        ]
+      },
+      "timestamp": 1791656708,
+      "ttl": 1800
+    },
+    "6eb0d701cdc328b145ed8049b414e20d": {
+      "result": {
+        "results": [
+          {
+            "file": "fleet-shared-patterns.json",
+            "relevance": 95,
+            "summary": "Already stores failure signatures shared across repos (repo-a, repo-b) with fixes and contribution counts, which is the cross-repo sharing mechanism the goal describes."
+          },
+          {
+            "file": "fleet-knowledge.json",
+            "relevance": 85,
+            "summary": "Fleet-level store with publish, query, match, and injection metrics, the likely place cross-repo learnings get published and consumed by daemon triage."
+          },
+          {
+            "file": "fleet-patterns.json",
+            "relevance": 80,
+            "summary": "Fleet-wide patterns file, currently empty, so it is where shared failure patterns would land once populated; relevant to the fleet-wide sharing work."
+          },
+          {
+            "file": "failures.json",
+            "relevance": 70,
+            "summary": "Per-repo failure records with pattern, stage, root_cause, and fix fields; the populated copy shows the raw failure data that would need to be shared fleet-wide."
+          },
+          {
+            "file": "index.json",
+            "relevance": 60,
+            "summary": "Pattern index with signature, stage, failure type, sources, and fix, a compact shape that a fleet-wide index could reuse for triage lookups."
+          }
+        ]
+      },
+      "timestamp": 1791656789,
+      "ttl": 1800
+    },
+    "47c1451f50b4a8f9faa0f8012f6b922e": {
+      "result": {
+        "results": [
+          {
+            "file": "retry-outcomes.json",
+            "relevance": 90,
+            "summary": "Records build_failure retry outcomes (model_escalation at 100% success over 5 attempts), which directly informs how the build stage should retry failures."
+          },
+          {
+            "file": "failures.json",
+            "relevance": 80,
+            "summary": "Lists recurring test-stage failures with root causes and fixes (e.g., cost dashboard early exit, e2e timeouts). Build changes must avoid repeating these."
+          },
+          {
+            "file": "success-patterns.json",
+            "relevance": 75,
+            "summary": "Captures approaches and file patterns from past successful runs (iterations, test strategy, template), which can guide how the build loop proceeds."
+          },
+          {
+            "file": "metrics.json",
+            "relevance": 65,
+            "summary": "Gives the build_duration_s baseline (7095s) to judge whether the current build stage is running within expected time."
+          },
+          {
+            "file": "knowledge.json",
+            "relevance": 60,
+            "summary": "Holds failure entries with fix strategies and success rates (e.g., mktemp /tmp/claude path issue), useful when build-stage tests hit known errors."
+          }
+        ]
+      },
+      "timestamp": 1791656796,
+      "ttl": 1800
+    },
+    "4dd2d96f6283c1d553b71f875abaaa65": {
+      "result": {
+        "raw_response": "Mock claude: ok"
+      },
+      "timestamp": 1791657095,
+      "ttl": 1800
+    },
+    "67398d5cccaa57c51535f9656502f4df": {
+      "result": [
+        {
+          "type": "result",
+          "result": "I am trying the same approach again.",
+          "usage": {
+            "input_tokens": 0,
+            "output_tokens": 0
+          }
+        }
+      ],
+      "timestamp": 1791657344,
+      "ttl": 1800
     }
   }
 }

@@ -1,14 +1,53 @@
 ---
-goal: "Misleading "jq not available" warning when Claude outputs JSON object instead of array
+goal: "Share failure patterns fleet-wide so daemon triage in one repo benefits from another repo's learnings
 
-## Specification: Misleading "jq not available" warning when Claude outputs JSON object instead of array
+## Plan Summary
+# Plan: share failure patterns across the fleet (#8328)
+
+The daemon currently learns about failures per repo only. This plan adds a fleet-wide store keyed by a normalized failure signature. `sw-fleet.sh` turns it on for every daemon it starts, `sw-memory.sh` writes to it, and the daemon checks it before spawning a build loop.
+
+## Codebase findings that shape the design
+
+- **Per-repo store.** `memory_capture_failure` (`scripts/sw-memory.sh:367`) dedupes on the exact first error line, which is raw text. That text still contains absolute paths and `:line:col`, so the same failure in two repos never matches. Signatures have to be computed from normalized text.
+- **Where fixes come from.** `memory_analyze_failure` (`scripts/sw-memory.sh:~795`) fills in `root_cause/fix/category` on `failures[-1]`. `memory_record_fix_outcome` (`:446`) tracks whether a fix worked. Both are called from `sw-loop.sh:2224/2267/2384`.
+- **Existing cross-repo path.** `_memory_aggregate_global` (`:617`) copies patterns into `global.json`, but only once they've been seen 3 times. It drops the fix and is never read during triage. It can't serve as the fleet store.
+- **Fleet daemon launch.** `fleet_start` (`scripts/sw-fleet.sh:~852`) starts each daemon with `tmux new-session ... "cd '$repo_path' && sw-daemon.sh start $config_flag"`. If the repo has its own daemon config, that config is used unchanged. So "fleet mode" must be signalled by an env var on that command line, not by a config key.
+- **Dispatch point.** `daemon_spawn_pipeline` (`scripts/lib/daemon-dispatch.sh:44`) is the last point before the pipeline starts. It already has `issue_goal`, `work_dir` and `LOG_DIR/issue-N.log`, and the log is still there on retries. The pipeline may run in tmux, which doesn't reliably pass env vars on. The fix hint therefore has to go through a file in `work_dir`.
+- **No existing fleet pattern code.** The `fleet-shared-patterns.json`, `fleet-knowledge.json` and `fleet-patterns.json` files mentioned in the historical context are not referenced anywhere in `scripts/`. This is new code, with no migration needed.
+- **Tests.** `npm test` runs `scripts/sw-test-all.sh`, which picks up every `scripts/*-test.sh` automatically. A new test file needs no registration.
+
+## Alternatives considered
+
+| Option | Pros | Cons | Verdict |
+|---|---|---|---|
+| **A. Extend `global.json`** (lower the promotion threshold, add fix fields) | Few new files | `global.json` is shared by all repos on the machine, fleet or not. It's keyed by raw text, only promotes after 3 sightings, and its readers (`memory_inject_context`, `memory_show`) expect the current shape. Large blast radius. | Rejected |
+| **B. SQLite (`sw-db.sh`) table** | Real concurrency control, queryable | `db_*` is optional and may be missing; every caller degrades to `\|\| true`. A fleet feature that silently does nothing without sqlite isn't acceptable. Needs a schema migration. | Rejected for v1. Could be a later dual-write. |
+[... full plan in .claude/pipeline-artifacts/plan.md]
+
+## Key Design Decisions
+# Design: Share failure patterns fleet-wide so daemon triage in one repo benefits from another repo's learnings
+## Context
+## Decision
+### Component diagram
+### Interface contracts
+### Store schema
+### Signature and match policy
+### Data flow
+### Error boundaries
+## Alternatives Considered
+[... full design in .claude/pipeline-artifacts/design.md]
+
+## Specification: Share failure patterns fleet-wide so daemon triage in one repo benefits from another repo's learnings
 
 ### Goals
-- *jq IS available.** The actual issue is that Claude's `--output-format json` sometimes outputs a JSON **object** (`{...}`) instead of a JSON **array** (`[...]`), and the parsing code only handles arrays.
-- *Option A**: Extend Case 2 to handle both formats:
-- *Option B**: At minimum, fix the warning message in Case 3:
-- Warning is cosmetic only — the loop functions correctly using the raw JSON
-- But it's confusing during debugging (we spent time investigating jq availability when the real issue was elsewhere)
+- - Fleet mode writes failure patterns to a shared store in addition to the per-repo memory store
+- - Daemon triage in any fleet repo checks the shared store and surfaces a matching pattern's known fix before starting a fresh build loop
+- - Shared patterns are namespaced by failure signature (error type + stack/log fingerprint), not by repo, to enable cross-repo matches
+- - Unit tests verify a pattern learned in one simulated repo is surfaced during triage of a second simulated repo in the same fleet
+- **Priority**: P2
+- **Complexity**: standard
+- **Generated by**: Strategic Intelligence Agent
+- **Strategy alignment**: P2: Intelligence & Learning
 
 ### Acceptance Criteria
 - [testable] All existing tests continue to pass
@@ -17,87 +56,286 @@ Historical context (lessons from previous pipelines):
 {
   "results": [
     {
-      "file": "failures.json",
+      "file": "fleet-shared-patterns.json",
       "relevance": 95,
-      "summary": "Contains detailed jq parse error patterns matching the issue: 'jq: parse error' on malformed JSON and mock claude outputting wrong JSON schema (object vs array). Root cause and fix directly address the 'jq not available' warning problem."
+      "summary": "Already stores failure signatures shared across repos (repo-a, repo-b) with fixes and contribution counts, which is the cross-repo sharing mechanism the goal describes."
     },
     {
-      "file": "patterns.json",
-      "relevance": 40,
-      "summary": "Project detection data (nodejs, vitest test runner) provides context about the build environment and testing setup for this pipeline stage."
+      "file": "fleet-knowledge.json",
+      "relevance": 85,
+      "summary": "Fleet-level store with publish, query, match, and injection metrics, the likely place cross-repo learnings get published and consumed by daemon triage."
     },
     {
-      "file": "metrics.json",
-      "relevance": 8,
-      "summary": "Build duration baselines (17827s) provide context on typical build stage timing, useful for understanding if this issue impacts build performance."
+      "file": "fleet-patterns.json",
+      "relevance": 80,
+      "summary": "Fleet-wide patterns file, currently empty, so it is where shared failure patterns would land once populated; relevant to the fleet-wide sharing work."
     },
     {
-      "file": "metrics.json",
-      "relevance": 5,
-      "summary": "Earlier build duration baseline (147s) is outdated but shows historical performance context."
+      "file": "failures.json",
+      "relevance": 70,
+      "summary": "Per-repo failure records with pattern, stage, root_cause, and fix fields; the populated copy shows the raw failure data that would need to be shared fleet-wide."
     },
     {
-      "file": "global.json",
-      "relevance": 0,
-      "summary": "Empty cross-repo learnings, no relevant content for this specific jq/JSON issue."
+      "file": "index.json",
+      "relevance": 60,
+      "summary": "Pattern index with signature, stage, failure type, sources, and fix, a compact shape that a fleet-wide index could reuse for triage lookups."
     }
   ]
 }
 
 Discoveries from other pipelines:
-[38;2;74;222;128m[1m✓[0m Injected 128 new discoveries
-[intake] Stage intake completed — Resolution: 
-[intake] Stage intake completed — Resolution: 
-[intake] Stage intake completed — Resolution: 
-[compound_quality] Stage compound_quality completed — Resolution: 
-[intake] Stage intake completed — Resolution: 
-[pr] Stage pr completed — Resolution: 
-[pipeline_success] Pipeline success for issue #0 (fast template, stage=validate) — Resolution: success
-[intake] Stage intake completed — Resolution: 
-[pr] Stage pr completed — Resolution: 
-[intake] Stage intake completed — Resolution: 
-[compound_quality] Stage compound_quality completed — Resolution: 
-[pr] Stage pr completed — Resolution: 
-[intake] Stage intake completed — Resolution: 
-[compound_quality] Stage compound_quality completed — Resolution: 
-[pr] Stage pr completed — Resolution: 
-[intake] Stage intake completed — Resolution: 
-[design] Design completed for Build a production-grade todo application. TypeScript + React frontend with Vite, Express REST API backend, SQLite persistence with Drizzle ORM, JWT authentication (register/login), full CRUD for todos with filtering (all/active/completed), drag-and-drop reorder, due dates, priorities (low/medium/high), dark mode, responsive design. Include comprehensive test suite (unit + integration + e2e). Production-ready: error handling, input validation, rate limiting, CORS, environment config. — Resolution: 
-[intake] Stage intake completed — Resolution: 
-[intake] Stage intake completed — Resolution: 
+✓ Injected 1 new discoveries
+[design] Design completed for Share failure patterns fleet-wide so daemon triage in one repo benefits from another repo's learnings — Resolution: 
 
-## Failure Diagnosis (Iteration 2)
-Classification: unknown
-Strategy: retry_with_context
-Repeat count: 0
+Task tracking (check off items as you complete them):
+# Pipeline Tasks — Share failure patterns fleet-wide so daemon triage in one repo benefits from another repo's learnings
 
-## Failure Diagnosis (Iteration 3)
-Classification: unknown
-Strategy: retry_with_context
-Repeat count: 1"
-iteration: 3
-max_iterations: 10
-status: complete
+## Implementation Checklist
+- [ ] 1. Signature and normalization functions in `lib/fleet-patterns.sh`
+- [ ] 2. Locked, atomic store read/write (record, update_fix, record_outcome, lookup, init/corruption recovery, caps)
+- [ ] 3. `fleet_triage_known_fix` with the demotion rule and artifact write
+- [ ] 4. `sw-memory.sh` capture hook plus `signature` field on failures
+- [ ] 5. `sw-memory.sh` analyze and outcome hooks (fix propagation)
+- [ ] 6. `memory_inject_context` renders `fleet-known-fix.json`
+- [ ] 7. `daemon-dispatch.sh` triage call and `sw-daemon.sh` sourcing
+- [ ] 8. `sw-fleet.sh` env export plus the `patterns` subcommand and help
+- [ ] 9. Unit, cross-repo and concurrency tests in `sw-lib-fleet-patterns-test.sh`, plus the `sw-fleet-test.sh` assertion
+- [ ] 10. Event schema, docs and full `npm test` run
+- [ ] With fleet mode on, a failure captured in any repo appears in `~/.shipwright/fleet-patterns.json` under its signature, and is still written to that repo's `failures.json`.
+- [ ] Signatures follow `<error_type>:<hash>` and match across repos for the same failure even when paths and line numbers differ.
+- [ ] `daemon_spawn_pipeline` surfaces a matching known fix (log line, `fleet.pattern_hit` event, `fleet-known-fix.json`) before the pipeline or loop starts, and build-stage memory injection includes it.
+- [ ] The cross-repo unit test passes: learned in repoA, surfaced during triage of repoB.
+- [ ] With fleet mode off, behaviour is the same as before (existing suites stay green).
+- [ ] `shipwright fleet patterns list` and `lookup --text` work.
+- [ ] Bash 3.2 safe, `set -euo pipefail` clean, writes are atomic and locked, and `npm test` is green.
+
+## Context
+- Pipeline: standard
+- Branch: feat/share-failure-patterns-fleet-wide-so-dae-8328
+- Issue: #8328
+- Generated: 2026-10-10T18:24:31Z
+
+## Skill Guidance (backend issue, AI-selected)
+### Why these skills were selected (AI-analyzed):
+- **data-pipeline**: Patterns are written by one repo's pipeline and read by another's triage. Atomic writes (tmp file plus mv), idempotent upserts keyed by signature, and schema versioning are needed so concurrent fleet workers do not corrupt or duplicate entries.
+- **pattern-matching-similarity-scoring**: Acceptance requires a match on failure signature rather than repo path. Normalizing error type and log fingerprint, and setting a match threshold, decides whether a known fix surfaces for a genuinely similar failure or for noise.
+
+## Data Pipeline Expertise
+
+Apply these data engineering patterns:
+
+### Schema Design
+- Define schemas explicitly — never rely on implicit structure
+- Use migrations for all schema changes (never manual ALTER TABLE)
+- Add indexes for frequently queried columns
+- Consider denormalization for read-heavy paths
+
+### Data Integrity
+- Use transactions for multi-step operations
+- Implement idempotency keys for operations that could be retried
+- Validate data at ingestion — reject bad data early
+- Use constraints (NOT NULL, UNIQUE, FOREIGN KEY) in the database layer
+
+### Query Patterns
+- Avoid N+1 queries — use JOINs or batch loading
+- Use EXPLAIN to verify query plans for complex queries
+- Paginate large result sets — never SELECT * without LIMIT
+- Use parameterized queries — never string concatenation for SQL
+
+### Migration Safety
+- Migrations must be reversible (include rollback steps)
+- Test migrations on a copy of production data
+- Add new columns as nullable, then backfill, then add NOT NULL
+- Never drop columns in the same deploy as code changes
+
+### Backpressure & Resilience
+- Implement circuit breakers for external data sources
+- Use dead letter queues for failed processing
+- Set timeouts on all external calls
+- Monitor queue depths and processing latency
+
+### Required Output (Mandatory)
+
+Your output MUST include these sections when this skill is active:
+
+1. **Schema Changes**: Full migration SQL with both forward and rollback scripts, plus data backfill strategy if required
+2. **Data Flow Diagram**: Text diagram showing data ingestion → processing → output with failure points marked
+3. **Idempotency Strategy**: How the system handles duplicate requests (idempotency keys, deduplication, side-effect safety)
+4. **Rollback Plan**: Step-by-step process to revert schema changes and restore data consistency
+
+If any section is not applicable, explicitly state why it's skipped.
+
+# Pattern Matching & Failure Prevention Scoring
+
+## Overview
+
+This skill guides design and implementation of pattern-based proactive failure prevention: matching incoming issues against captured failure patterns, scoring similarity, injecting relevant context, and measuring whether patterns actually prevent repeat failures.
+
+## Similarity Scoring Algorithm (0-100 scale)
+
+For each incoming issue, compute a composite similarity score against each known failure pattern:
+
+### Component 1: Title Similarity (40% weight)
+- Fuzzy string matching using token overlap or Levenshtein distance normalized by string length
+- Captures semantic closeness of the problem description
+- Example: "API timeout on user endpoint" vs "Timeout in auth middleware" → ~0.7 similarity → 28 points
+
+### Component 2: File Overlap (35% weight)
+- Compare changed files in original failure vs incoming issue
+- Score = (overlapping_files / max(original_files, incoming_files)) * 100
+- Files touching the same components are more likely to have similar root causes
+- Example: Both touched `scripts/sw-daemon.sh` and `scripts/lib/daemon-dispatch.sh` → 35 points if full overlap
+
+### Component 3: Error Signature Match (25% weight)
+- Check if error message substrings or error codes appear in both
+- Extract from error-summary.json or stack trace (structured format preferred)
+- Example: Both contain "pipefail" or "ENOENT" → 25 points
+
+**Formula: score = (title_score * 0.4) + (file_score * 0.35) + (error_score * 0.25)**
+
+## Injection Thresholds
+
+- **Below 60**: Pattern not relevant, no injection
+- **60-80**: Inject with confidence tag ("medium confidence match")
+- **80-100**: Inject with high confidence ("strong pattern match")
+- **Configurable threshold**: daemon-config.json `memory_pattern_matching.similarity_threshold`
+
+## Proactive Injection Strategy
+
+When score > threshold (at pipeline spawn time, before plan stage):
+
+1. Extract relevant context from memory pattern:
+   - Root cause description
+   - Applied fix(es)
+   - Environment/version context if present
+   - What worked vs what didn't
+
+2. Inject into pipeline prompt:
+   ```
+   Similar pattern found (confidence: 85%): Issue #123 "API timeout on user endpoint"
+   Root cause: Unbounded goroutine creation in event loop
+   Applied fix: Add semaphore to limit concurrent handlers
+   Files affected: scripts/sw-daemon.sh, internal/loop.go
+[... skills truncated: 9968→8000 chars ...]
+**Aggregate metrics:**
+- **Overall Memory Injection ROI**: sum(successful_injections) / sum(total_injections)
+- **Patterns Needing Refinement**: patterns with > 30% usage but < 40% success rate (candidates for root cause re-analysis)
+- **Trending**: success rate on 7-day and 30-day windows; alert if trending down
+- **Pattern Lifecycle**: which patterns are becoming obsolete (< 1% usage in 90 days)?
+
+## Integration Points
+
+1. **sw-memory.sh**
+   - Call `memory_get_patterns()` to retrieve all patterns with timestamps, failure_type, root_cause
+   - Call `memory_add_outcome_tracking()` to record success/failure outcome
+
+2. **sw-intelligence.sh**
+   - Integrate pattern scoring into `intake` stage
+   - Score issue at pipeline spawn time (before plan stage)
+   - Return top 3 matching patterns sorted by score
+
+3. **Pipeline prompt composition**
+   - Add `memory_pattern_context` section to prompt if score > threshold
+   - Include confidence score so agent is aware this is a suggestion, not a fact
+
+4. **Pipeline state tracking**
+   - Add `memory_patterns` section to pipeline-state.md with injected pattern details
+   - Track injection_score, outcome_recorded=true/false
+
+5. **Loop iteration context**
+   - If issue re-runs in build loop, re-score with new error context
+   - Emerging error signatures may match different patterns on retry
+
+## Testing Strategy
+
+**Unit tests:**
+- Similarity scoring against known issue pairs with ground truth
+- Threshold boundary behavior (59, 60, 61)
+- Weight adjustment: verify 0.4 + 0.35 + 0.25 = 1.0
+
+**Edge cases:**
+- Empty pattern database → score undefined, no injection
+- Identical issues with different outcomes → verify both outcomes tracked
+- Pattern with malformed error_signature → graceful fallback
+- Very high similarity (> 95%) → verify no over-confidence
+
+**Integration tests:**
+- Inject pattern, verify it appears in pipeline prompt
+- Run build, record outcome, verify outcome_tracking fires
+- Query dashboard, verify metrics match recorded outcomes
+
+**Effectiveness validation:**
+- Mock a failure type, populate patterns database, run scoring
+- Verify pattern was injected at expected score
+- Mock outcome (failure_prevented=true/false), verify metrics compute correctly
+
+## Configuration Example
+
+```json
+{
+  "memory_pattern_matching": {
+    "enabled": true,
+    "similarity_threshold": 60,
+    "weights": {
+      "title_similarity": 0.4,
+      "file_overlap": 0.35,
+      "error_signature": 0.25
+    },
+    "confidence_tiers": {
+      "high": 80,
+      "medium": 60,
+      "low": 30
+    },
+    "max_patterns_to_inject": 3,
+    "metrics_retention_days": 90,
+    "anomaly_detection_enabled": true
+  }
+}
+```
+
+## Risk Mitigation
+
+**Risk 1: False positive injection**
+- Monitoring: alert if false_positive_rate > 15%
+- Mitigation: lower threshold, disable for specific pattern types, or retire pattern
+
+**Risk 2: Outcome attribution confusion**
+- Always show confidence_in_prevention as a float (0.0-1.0), never binary
+- Document that "prevented" is inferred, not measured
+- Quarterly review of patterns with low confidence
+
+**Risk 3: Circular reasoning**
+- Patterns must capture ROOT CAUSE, not just "solution"
+- Red flag: if pattern root_cause is identical to another pattern → merge
+- Quarterly audit of pattern root_cause quality
+
+**Risk 4: Performance at scale**
+- Scoring 100+ patterns should be < 500ms
+- Use cached similarity scores if possible
+- Parallel scoring if pattern database grows beyond 500
+
+**Risk 5: Stale patterns**
+- Patterns from > 180 days ago with < 5 uses → mark for review
+- Dashboard should surface "patterns never injected" for root cause analysis
+"
+iteration: 0
+max_iterations: 20
+status: running
 test_cmd: "npm test"
-model: sonnet
+model: opus
 agents: 1
-started_at: 2026-04-04T17:41:42Z
-last_iteration_at: 2026-04-04T17:41:42Z
+started_at: 2026-10-10T18:26:41Z
+last_iteration_at: 2026-10-10T18:26:41Z
 consecutive_failures: 0
-total_commits: 3
-audit_enabled: false
-audit_agent_enabled: false
-quality_gates_enabled: false
-dod_file: ""
+total_commits: 0
+audit_enabled: true
+audit_agent_enabled: true
+quality_gates_enabled: true
+dod_file: "/home/runner/work/shipwright/shipwright/.claude/pipeline-artifacts/dod.md"
 auto_extend: true
 extension_count: 0
 max_extensions: 3
 ---
 
 ## Log
-### Iteration 1 (2026-04-04T15:25:20Z)
-{"type":"result","subtype":"success","is_error":false,"duration_ms":227709,"duration_api_ms":143263,"num_turns":22,"resu
-
-### Iteration 2 (2026-04-04T16:25:53Z)
-{"type":"result","subtype":"success","is_error":false,"duration_ms":9837,"duration_api_ms":311675,"num_turns":2,"result"
 

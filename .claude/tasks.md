@@ -1,0 +1,27 @@
+# Tasks — Share failure patterns fleet-wide so daemon triage in one repo benefits from another repo's learnings
+
+## Status: In Progress
+Pipeline: standard | Branch: feat/share-failure-patterns-fleet-wide-so-dae-8328
+
+## Checklist
+- [ ] 1. Signature and normalization functions in `lib/fleet-patterns.sh`
+- [ ] 2. Locked, atomic store read/write (record, update_fix, record_outcome, lookup, init/corruption recovery, caps)
+- [ ] 3. `fleet_triage_known_fix` with the demotion rule and artifact write
+- [ ] 4. `sw-memory.sh` capture hook plus `signature` field on failures
+- [ ] 5. `sw-memory.sh` analyze and outcome hooks (fix propagation)
+- [ ] 6. `memory_inject_context` renders `fleet-known-fix.json`
+- [ ] 7. `daemon-dispatch.sh` triage call and `sw-daemon.sh` sourcing
+- [ ] 8. `sw-fleet.sh` env export plus the `patterns` subcommand and help
+- [ ] 9. Unit, cross-repo and concurrency tests in `sw-lib-fleet-patterns-test.sh`, plus the `sw-fleet-test.sh` assertion
+- [ ] 10. Event schema, docs and full `npm test` run
+- [ ] With fleet mode on, a failure captured in any repo appears in `~/.shipwright/fleet-patterns.json` under its signature, and is still written to that repo's `failures.json`.
+- [ ] Signatures follow `<error_type>:<hash>` and match across repos for the same failure even when paths and line numbers differ.
+- [ ] `daemon_spawn_pipeline` surfaces a matching known fix (log line, `fleet.pattern_hit` event, `fleet-known-fix.json`) before the pipeline or loop starts, and build-stage memory injection includes it.
+- [ ] The cross-repo unit test passes: learned in repoA, surfaced during triage of repoB.
+- [ ] With fleet mode off, behaviour is the same as before (existing suites stay green).
+- [ ] `shipwright fleet patterns list` and `lookup --text` work.
+- [ ] Bash 3.2 safe, `set -euo pipefail` clean, writes are atomic and locked, and `npm test` is green.
+
+## Notes
+- Generated from pipeline plan at 2026-10-10T18:24:32Z
+- Pipeline will update status as tasks complete
