@@ -5,8 +5,8 @@
       "pattern": "\u001b[38;2;74;222;128m\u001b[1m✓\u001b[0m reveal shows 1/3 pass count on failure",
       "root_cause": "sw-cost-test.sh 'CONTEXT EFFICIENCY' dashboard tests fail because the cost dashboard prints 'No cost entries in the last 30 days' and exits early, never rendering the context-efficiency section from the seeded loop.context_efficiency events (test seeds only events, no cost entries).",
       "fix": "Make the cost dashboard render the CONTEXT EFFICIENCY section even when there are no cost entries (or have the test seed a cost entry/use an events path the dashboard reads) so the avg budget utilization assertions pass.",
-      "seen_count": 46,
-      "last_seen": "2026-10-10T16:45:12Z",
+      "seen_count": 52,
+      "last_seen": "2026-10-10T18:45:47Z",
       "category": "test_failure"
     },
     {
@@ -14,8 +14,8 @@
       "pattern": "Failed: 1",
       "root_cause": "Two suites failed: sw-e2e-integration-test hit a stale pipeline lock/state ('pipeline already in progress') left by the outer pipeline run, and sw-intent-analysis-test failed its schema check for required fields (version, goal, criteria).",
       "fix": "Make the e2e integration test run with isolated state/lock dir (or skip when a pipeline is already running), and update the intent analysis schema or the analyze_intent output so they agree on the required fields.",
-      "seen_count": 9,
-      "last_seen": "2026-10-10T14:08:15Z",
+      "seen_count": 8,
+      "last_seen": "2026-10-10T05:53:42Z",
       "category": "test_failure"
     },
     {
@@ -60,7 +60,7 @@
       "root_cause": "sw-cost-test.sh 'context efficiency' assertions fail because the cost dashboard reports 'No cost entries in the last 30 days' and exits before rendering the CONTEXT EFFICIENCY section from the seeded loop.context_efficiency events (test events/timestamps are not seen, or the section is skipped when costs.json is empty).",
       "fix": "In sw-cost-test.sh, seed at least one cost entry (and events with current timestamps in the events file the script reads) before running the dashboard, or change sw-cost.sh to render the CONTEXT EFFICIENCY section even when there are no cost entries.",
       "seen_count": 11,
-      "last_seen": "2026-10-10T15:57:53Z",
+      "last_seen": "2026-10-10T15:55:29Z",
       "category": "test_failure"
     },
     {
@@ -84,20 +84,11 @@
     {
       "stage": "test",
       "pattern": "\u001b[38;2;74;222;128m✓\u001b[0m tests going from failing to passing resets the streak",
-      "root_cause": "sw-pipeline-test.sh E2E tests fail because the mock environment's plan/review stages don't produce plan.md/review.md artifacts (mock claude output unparseable; jq parse errors from polluted RL/intelligence output), causing cascading failures in plan, review, full E2E, resume, dry-run pattern, low-complexity skip, and cleanup tests",
-      "fix": "Make the mock claude/intelligence stubs in sw-pipeline-test.sh emit valid output so plan.md and review.md get written, and isolate the test from the real RL episode/policy data (the 188 accumulated episodes) that produces non-JSON stdout and breaks jq parsing",
+      "root_cause": "sw-pipeline-test.sh mock claude/environment no longer produces expected artifacts (plan.md, review.md) and output patterns, so 6 E2E tests fail; the mock is likely out of sync with recent pipeline changes (e.g. plan/review stage output, intelligence skip messages, jq parse errors from RL episode output).",
+      "fix": "Update the mock claude binary and test expectations in scripts/sw-pipeline-test.sh to match current plan/review artifact paths and output, and fix the jq parse error caused by non-JSON RL episode output in the intelligence skip path.",
       "seen_count": 1,
       "last_seen": "2026-10-10T02:14:27Z",
       "category": "test_failure"
-    },
-    {
-      "stage": "test",
-      "pattern": "\u001b[38;2;74;222;128m✓\u001b[0m Lone failure passing on rerun is flaky and TEST_PASSED stays false",
-      "root_cause": "The matched line is a passing test ('Lone failure passing on rerun is flaky and TEST_PASSED stays false'), not a failure. The log shows all suites passing (PASS/FAIL: 0), so the stage failure is likely from the flaky-classification logic leaving TEST_PASSED false, or from an unlisted suite failing earlier than the last 200 lines.",
-      "fix": "Check the full test log for a real FAIL line, and verify the flaky-rerun path sets TEST_PASSED=true when the rerun passes, or treat the pattern match as a false positive.",
-      "seen_count": 1,
-      "last_seen": "2026-10-10T17:27:54Z",
-      "category": "flaky"
     }
   ]
 }
