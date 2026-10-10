@@ -53,7 +53,11 @@
     "context_trim_memory_chars": 20000,
     "context_trim_git_entries": 10,
     "context_trim_hotspot_files": 5,
-    "context_trim_test_lines": 50
+    "context_trim_test_lines": 50,
+    "flaky_detection": true,
+    "flaky_max_rerun_tests": 1,
+    "flaky_rerun_timeout": 180,
+    "flaky_max_repeats": 2
   },
   "dashboard": {
     "port": 8767,
