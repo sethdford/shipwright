@@ -28,3 +28,5 @@
 {"ts":"2026-10-10T07:41:53Z","ts_epoch":1791618113,"type":"recruit_reflect","accuracy":100.0,"corrections":0}
 {"ts":"2026-10-10T07:41:53Z","ts_epoch":1791618113,"type":"recruit_meta_warning","accuracy":100.0,"trend":"declining","first_half":87.66666666666667,"second_half":68.75}
 {"ts":"2026-10-10T07:41:53Z","ts_epoch":1791618113,"type":"recruit_audit","score":80.0,"passed":24,"failed":6,"warnings":1,"total":30}
+{"ts":"2026-10-10T08:06:36Z","ts_epoch":1791619596,"type":"hygiene_platform_refactor","hardcoded":49,"fallback":69,"todo":51}
+{"ts":"2026-10-10T08:06:54Z","ts_epoch":1791619614,"type":"strategic.cycle_complete","issues_created":0,"issues_skipped":3}
