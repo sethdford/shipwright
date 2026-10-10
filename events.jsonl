@@ -68,3 +68,8 @@
 {"ts":"2026-10-10T19:37:02Z","ts_epoch":1791661022,"type":"loop.context_efficiency","iteration":1,"raw_prompt_chars":22774,"trimmed_prompt_chars":22774,"trim_ratio":0.0,"budget_utilization":11.4,"budget_chars":200000,"job_id":"standard"}
 {"ts":"2026-10-10T19:37:05Z","ts_epoch":1791661025,"type":"pipeline.context_exhaustion","issue":8328,"stage":"build"}
 {"ts":"2026-10-10T19:37:08Z","ts_epoch":1791661028,"type":"stage.failed","event_id":"evt-1791661028-1608448805","payload":"{\"stage\":\"build\",\"issue\":\"8328\",\"timing\":\"1h 10m 42s\"}"}
+{"ts":"2026-10-10T20:05:17Z","ts_epoch":1791662717,"type":"hygiene_platform_refactor","hardcoded":49,"fallback":69,"todo":51}
+{"ts":"2026-10-10T20:06:00Z","ts_epoch":1791662760,"type":"strategic.issue_created","title":"Deduplicate identical build-loop errors across iterations to stop wasted retries","priority":"P0","complexity":"standard"}
+{"ts":"2026-10-10T20:06:05Z","ts_epoch":1791662765,"type":"strategic.issue_created","title":"Split sw-loop.sh into iteration-execution, convergence-detection, and session-management modules","priority":"P6","complexity":"standard"}
+{"ts":"2026-10-10T20:06:09Z","ts_epoch":1791662769,"type":"strategic.issue_created","title":"Add per-OS install hints to shipwright doctor failures for missing dependencies","priority":"P1","complexity":"fast"}
+{"ts":"2026-10-10T20:06:09Z","ts_epoch":1791662769,"type":"strategic.cycle_complete","issues_created":3,"issues_skipped":0}
