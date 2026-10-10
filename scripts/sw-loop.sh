@@ -38,6 +38,8 @@ fi
 [[ -f "$SCRIPT_DIR/lib/loop-convergence.sh" ]] && source "$SCRIPT_DIR/lib/loop-convergence.sh"
 [[ -f "$SCRIPT_DIR/lib/loop-restart.sh" ]] && source "$SCRIPT_DIR/lib/loop-restart.sh"
 [[ -f "$SCRIPT_DIR/lib/loop-progress.sh" ]] && source "$SCRIPT_DIR/lib/loop-progress.sh"
+# shellcheck source=lib/test-flakiness.sh
+[[ -f "$SCRIPT_DIR/lib/test-flakiness.sh" ]] && source "$SCRIPT_DIR/lib/test-flakiness.sh"
 # Intelligent session restart with enhanced briefings and cross-session tracking
 [[ -f "$SCRIPT_DIR/lib/session-restart.sh" ]] && source "$SCRIPT_DIR/lib/session-restart.sh"
 # Context window budget monitoring (issue #209)
@@ -749,6 +751,7 @@ START_EPOCH=""
 STATUS="running"
 TEST_PASSED=""
 TEST_OUTPUT=""
+TEST_FAILURE_CLASS=""
 LOG_ENTRIES=""
 
 
@@ -995,6 +998,9 @@ INSTRUCTION: This error has occurred $repeat_count times. The previous approach 
 # ─── Test Gate ────────────────────────────────────────────────────────────────
 
 run_test_gate() {
+    TEST_FAILURE_CLASS=""
+    # Classification results are per-iteration; never let a stale one leak in
+    rm -f "$LOG_DIR/flaky-iter-${ITERATION}.json" "$LOG_DIR"/flaky-extra-iter-"${ITERATION}"-*.json 2>/dev/null || true
     if [[ -z "$TEST_CMD" ]] && [[ ${#ADDITIONAL_TEST_CMDS[@]} -eq 0 ]]; then
         TEST_PASSED=""
         TEST_OUTPUT=""
@@ -1018,6 +1024,7 @@ run_test_gate() {
     local all_passed=true
     local test_results="[]"
     local combined_output=""
+    local failure_classes=""
     local test_timeout="${SW_TEST_TIMEOUT:-900}"
 
     # Run primary test command
@@ -1038,13 +1045,16 @@ run_test_gate() {
         bash -c "$test_wrapper" > "$test_log" 2>&1 || exit_code=$?
         local duration=$(( $(date +%s) - start_ts ))
 
-        if command -v jq >/dev/null 2>&1; then
-            test_results=$(echo "$test_results" | jq --arg cmd "$active_test_cmd" \
-                --argjson exit "$exit_code" --argjson dur "$duration" \
-                '. + [{"command": $cmd, "exit_code": $exit, "duration_s": $dur}]')
+        local flaky_cls=""
+        if [[ "$exit_code" -ne 0 ]]; then
+            flaky_cls="$(_loop_classify_test_failure "$test_log" "$active_test_cmd" \
+                "$LOG_DIR/flaky-iter-${ITERATION}.json")"
+            failure_classes="${failure_classes} ${flaky_cls}"
         fi
+        test_results="$(_loop_append_test_evidence "$test_results" "$active_test_cmd" \
+            "$exit_code" "$duration" "$flaky_cls")"
 
-        [[ "$exit_code" -ne 0 ]] && all_passed=false
+        [[ "$exit_code" -ne 0 && "$flaky_cls" != "flaky" ]] && all_passed=false
         combined_output+="$(cat "$test_log" 2>/dev/null)"$'\n'
     fi
 
@@ -1058,9 +1068,13 @@ run_test_gate() {
     fi
     local all_extra=("${ADDITIONAL_TEST_CMDS[@]+"${ADDITIONAL_TEST_CMDS[@]}"}" "${mid_build_cmds[@]+"${mid_build_cmds[@]}"}")
 
+    local extra_n=0
     for extra_cmd in "${all_extra[@]+"${all_extra[@]}"}"; do
         [[ -z "$extra_cmd" ]] && continue
+        extra_n=$((extra_n + 1))
         local extra_log="${LOG_DIR}/tests-extra-iter-${ITERATION}.log"
+        # Per-command log so flaky detection only parses this command's output
+        local extra_cmd_log="${LOG_DIR}/tests-extra-iter-${ITERATION}-${extra_n}.log"
         echo -e "  ${DIM}Running additional: ${extra_cmd}${RESET}"
 
         local extra_wrapper="$extra_cmd"
@@ -1072,17 +1086,22 @@ run_test_gate() {
 
         local start_ts exit_code=0
         start_ts=$(date +%s)
-        bash -c "$extra_wrapper" >> "$extra_log" 2>&1 || exit_code=$?
+        bash -c "$extra_wrapper" > "$extra_cmd_log" 2>&1 || exit_code=$?
         local duration=$(( $(date +%s) - start_ts ))
+        cat "$extra_cmd_log" >> "$extra_log" 2>/dev/null || true
 
-        if command -v jq >/dev/null 2>&1; then
-            test_results=$(echo "$test_results" | jq --arg cmd "$extra_cmd" \
-                --argjson exit "$exit_code" --argjson dur "$duration" \
-                '. + [{"command": $cmd, "exit_code": $exit, "duration_s": $dur}]')
+        local flaky_cls=""
+        if [[ "$exit_code" -ne 0 ]]; then
+            flaky_cls="$(_loop_classify_test_failure "$extra_cmd_log" "$extra_cmd" \
+                "$LOG_DIR/flaky-extra-iter-${ITERATION}-${extra_n}.json")"
+            failure_classes="${failure_classes} ${flaky_cls}"
         fi
+        test_results="$(_loop_append_test_evidence "$test_results" "$extra_cmd" \
+            "$exit_code" "$duration" "$flaky_cls")"
 
-        [[ "$exit_code" -ne 0 ]] && all_passed=false
-        combined_output+="$(cat "$extra_log" 2>/dev/null)"$'\n'
+        [[ "$exit_code" -ne 0 && "$flaky_cls" != "flaky" ]] && all_passed=false
+        combined_output+="$(cat "$extra_cmd_log" 2>/dev/null)"$'\n'
+        rm -f "$extra_cmd_log" 2>/dev/null || true
     done
 
     # Write structured test evidence
@@ -1098,8 +1117,54 @@ run_test_gate() {
             "all_passed=$all_passed" "evidence_path=test-evidence-iter-${ITERATION}.json" || true
     fi
 
+    # shellcheck disable=SC2086
+    if [[ -n "$failure_classes" ]] && type flaky_gate_aggregate >/dev/null 2>&1; then
+        TEST_FAILURE_CLASS="$(flaky_gate_aggregate $failure_classes)"
+    fi
+    if [[ "$TEST_FAILURE_CLASS" == "flaky" ]]; then
+        echo -e "  ${YELLOW}⚠${RESET} Test failure was flaky (passed on isolated rerun) — not counted"
+    fi
+
     TEST_PASSED=$all_passed
     TEST_OUTPUT="$(echo "$combined_output" | tail -50)"
+}
+
+# record_low_progress_iteration — count a stagnant iteration toward the circuit
+# breaker, unless the iteration's only test failure was flaky (not the agent's fault).
+record_low_progress_iteration() {
+    if [[ "${TEST_FAILURE_CLASS:-}" == "flaky" ]]; then
+        echo -e "  ${YELLOW}⚠${RESET} Low progress, but the only test failure was flaky — not counted (${CONSECUTIVE_FAILURES}/${CIRCUIT_BREAKER_THRESHOLD})"
+        type emit_event >/dev/null 2>&1 && emit_event "loop.flaky_excluded_from_breaker" \
+            "iteration=$ITERATION" "consecutive_failures=$CONSECUTIVE_FAILURES" 2>/dev/null || true
+        return 0
+    fi
+    CONSECUTIVE_FAILURES=$(( CONSECUTIVE_FAILURES + 1 ))
+    echo -e "  ${YELLOW}⚠${RESET} Low progress (${CONSECUTIVE_FAILURES}/${CIRCUIT_BREAKER_THRESHOLD} before circuit breaker)"
+}
+
+# _loop_classify_test_failure <test_log> <test_cmd> <result_json>
+# Echoes flaky|regression|unclassified. Without the flakiness lib (or with
+# detection disabled) every failure is "unclassified" — counted as before.
+_loop_classify_test_failure() {
+    local test_log="$1" test_cmd="$2" result_json="$3"
+    if ! type detect_flaky_failure >/dev/null 2>&1; then
+        echo "unclassified"; return 0
+    fi
+    local cls
+    cls="$(detect_flaky_failure "$test_log" "$test_cmd" "$PROJECT_ROOT" "$result_json" 2>/dev/null || echo "unclassified")"
+    [[ -z "$cls" ]] && cls="unclassified"
+    echo "$cls"
+}
+
+# _loop_append_test_evidence <results_json> <cmd> <exit_code> <duration> <failure_class>
+# Appends one command's evidence entry; failure_class is recorded only when set.
+_loop_append_test_evidence() {
+    local results="$1" cmd="$2" exit_code="$3" duration="$4" cls="$5"
+    command -v jq >/dev/null 2>&1 || { echo "$results"; return 0; }
+    echo "$results" | jq --arg cmd "$cmd" --argjson exit "$exit_code" \
+        --argjson dur "$duration" --arg cls "$cls" \
+        '. + [{"command": $cmd, "exit_code": $exit, "duration_s": $dur}
+              + (if $cls == "" then {} else {failure_class: $cls, flaky: ($cls == "flaky")} end)]'
 }
 
 write_error_summary() {
@@ -1107,7 +1172,9 @@ write_error_summary() {
 
     # Write on test failure OR build failure (non-zero exit from Claude iteration)
     local build_log="$LOG_DIR/iteration-${ITERATION}.log"
-    if [[ "${TEST_PASSED:-}" != "false" ]]; then
+    local flaky_rescue=false
+    [[ "${TEST_FAILURE_CLASS:-}" == "flaky" ]] && flaky_rescue=true
+    if [[ "${TEST_PASSED:-}" != "false" ]] && [[ "$flaky_rescue" != "true" ]]; then
         # Check for build-level failures (Claude iteration exited non-zero or produced errors)
         local build_had_errors=false
         if [[ -f "$build_log" ]]; then
@@ -1138,6 +1205,34 @@ write_error_summary() {
     if [[ -n "$error_lines_raw" ]]; then
         error_count=$(echo "$error_lines_raw" | wc -l | tr -d ' ')
     fi
+    # A flaky rescue left the gate green: record it, but give the agent nothing to "fix"
+    if [[ "$flaky_rescue" == "true" ]]; then
+        error_lines_raw=""
+        error_count=0
+    fi
+
+    # Flaky/regression classification (merged across every classified command)
+    local failure_class="${TEST_FAILURE_CLASS:-}"
+    if [[ -z "$failure_class" ]]; then
+        if [[ "${TEST_PASSED:-}" == "false" ]]; then failure_class="unclassified"; else failure_class="build_error"; fi
+    fi
+    local counted=true
+    if type flaky_counts_toward_breaker >/dev/null 2>&1 && ! flaky_counts_toward_breaker "$failure_class"; then
+        counted=false
+    fi
+    local flaky_json='{"flaky_tests":[],"regression_tests":[],"rerun":null}'
+    local result_files=()
+    local _rf
+    for _rf in "$LOG_DIR/flaky-iter-${ITERATION}.json" "$LOG_DIR"/flaky-extra-iter-"${ITERATION}"-*.json; do
+        [[ -f "$_rf" ]] && result_files+=("$_rf")
+    done
+    if [[ ${#result_files[@]} -gt 0 ]] && command -v jq >/dev/null 2>&1; then
+        flaky_json=$(jq -sc '{
+                flaky_tests: (map(.flaky_tests // []) | add | unique),
+                regression_tests: (map(.regression_tests // []) | add | unique),
+                rerun: (map(.rerun | select(. != null)) | if length == 0 then null else .[0] end)
+            }' "${result_files[@]}" 2>/dev/null || echo '{"flaky_tests":[],"regression_tests":[],"rerun":null}')
+    fi
 
     local tmp_json="${error_json}.tmp.$$"
 
@@ -1149,12 +1244,20 @@ write_error_summary() {
             --argjson error_count "${error_count:-0}" \
             --arg error_lines "$error_lines_raw" \
             --arg test_cmd "${TEST_CMD:-}" \
+            --arg failure_class "$failure_class" \
+            --argjson counted "$counted" \
+            --argjson flaky "$flaky_json" \
             '{
                 iteration: $iteration,
                 timestamp: $timestamp,
                 error_count: $error_count,
                 error_lines: ($error_lines | split("\n") | map(select(length > 0))),
-                test_cmd: $test_cmd
+                test_cmd: $test_cmd,
+                failure_class: $failure_class,
+                flaky_tests: $flaky.flaky_tests,
+                regression_tests: $flaky.regression_tests,
+                rerun: $flaky.rerun,
+                counted_toward_circuit_breaker: $counted
             }' > "$tmp_json" 2>/dev/null && mv "$tmp_json" "$error_json" || rm -f "$tmp_json" 2>/dev/null
     else
         # Fallback: write plain-text error summary (still machine-parseable)
@@ -2505,8 +2608,7 @@ ${GOAL}"
             fi
             echo -e "  ${GREEN}✓${RESET} Progress detected — continuing"
         else
-            CONSECUTIVE_FAILURES=$(( CONSECUTIVE_FAILURES + 1 ))
-            echo -e "  ${YELLOW}⚠${RESET} Low progress (${CONSECUTIVE_FAILURES}/${CIRCUIT_BREAKER_THRESHOLD} before circuit breaker)"
+            record_low_progress_iteration
         fi
 
         # Extract summary and update state
@@ -2607,6 +2709,7 @@ run_loop_with_restarts() {
                 TEST_PASSED=""
                 TEST_OUTPUT=""
                 TEST_LOG_FILE=""
+                TEST_FAILURE_CLASS=""  # flaky-history.json is kept across restarts
                 GOAL="$ORIGINAL_GOAL"
 
                 # Archive old artifacts
@@ -2673,6 +2776,7 @@ run_loop_with_restarts() {
         TEST_PASSED=""
         TEST_OUTPUT=""
         TEST_LOG_FILE=""
+        TEST_FAILURE_CLASS=""  # flaky-history.json is kept across restarts
         # Reset GOAL to original — prevent unbounded growth from memory/human injections
         GOAL="$ORIGINAL_GOAL"
 

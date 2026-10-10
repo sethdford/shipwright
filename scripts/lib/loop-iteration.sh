@@ -97,6 +97,14 @@ compose_prompt() {
         test_section="No test results yet (first iteration). Test command: $TEST_CMD"
     elif $TEST_PASSED; then
         test_section="$TEST_OUTPUT"
+        if [[ "${TEST_FAILURE_CLASS:-}" == "flaky" ]]; then
+            local flaky_ids=""
+            [[ -f "$LOG_DIR/error-summary.json" ]] && \
+                flaky_ids=$(jq -r '(.flaky_tests // []) | join(", ")' "$LOG_DIR/error-summary.json" 2>/dev/null || true)
+            test_section="TESTS PASSED after an isolated rerun — a flaky test failed once and passed on rerun${flaky_ids:+ (${flaky_ids})}.
+Do NOT treat it as a regression or spend this iteration on it.
+$TEST_OUTPUT"
+        fi
     else
         test_section="TESTS FAILED — fix these before proceeding:
 $TEST_OUTPUT"

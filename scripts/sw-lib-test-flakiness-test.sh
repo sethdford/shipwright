@@ -296,4 +296,96 @@ assert_eq "aggregate: all flaky" "flaky" "$(flaky_gate_aggregate flaky flaky)"
 assert_eq "aggregate: any regression wins" "regression" "$(flaky_gate_aggregate flaky regression unclassified)"
 assert_eq "aggregate: flaky + unclassified" "unclassified" "$(flaky_gate_aggregate flaky unclassified)"
 
+# ═══════════════════════════════════════════════════════════════════════════════
+print_test_section "Loop integration: test gate, error summary, breaker"
+# ═══════════════════════════════════════════════════════════════════════════════
+
+# Pull the real functions out of sw-loop.sh rather than re-implementing them
+for _fn in run_test_gate record_low_progress_iteration _loop_classify_test_failure \
+    _loop_append_test_evidence write_error_summary; do
+    eval "$(sed -n "/^${_fn}() {/,/^}/p" "$SCRIPT_DIR/sw-loop.sh")"
+done
+YELLOW=""; RESET=""; DIM=""
+LOG_DIR="$TEST_TEMP_DIR/loop-logs"; mkdir -p "$LOG_DIR"
+PROJECT_ROOT="$WORK"; mkdir -p "$WORK"
+FAST_TEST_CMD=""; FAST_TEST_INTERVAL=5; MAX_ITERATIONS=20; CIRCUIT_BREAKER_THRESHOLD=4
+ADDITIONAL_TEST_CMDS=(); LOOP_START_COMMIT=""
+export SW_FLAKY_HISTORY_FILE="$TEST_TEMP_DIR/loop-history.json"
+
+# Gate command: prints one vitest failure and exits 1
+GATE_LOG_SRC="$LOGS/gate-src.log"
+write_vitest_log "$GATE_LOG_SRC" "src/gate.test.ts > y"
+
+run_gate_iteration() {
+    ITERATION="$1"; CONSECUTIVE_FAILURES="$2"
+    TEST_CMD="cat $GATE_LOG_SRC; exit 1"
+    run_test_gate >/dev/null 2>&1
+    write_error_summary
+    record_low_progress_iteration >/dev/null
+}
+
+reset_state
+rm -f "$SW_FLAKY_HISTORY_FILE"
+run_gate_iteration 1 1
+assert_eq "flaky gate: class flaky" "flaky" "$TEST_FAILURE_CLASS"
+assert_eq "flaky gate: TEST_PASSED true" "true" "$TEST_PASSED"
+assert_eq "flaky gate: breaker count unchanged" "1" "$CONSECUTIVE_FAILURES"
+es="$(cat "$LOG_DIR/error-summary.json" 2>/dev/null || echo '{}')"
+assert_json_key "error-summary kept on flaky rescue" "$es" ".failure_class" "flaky"
+assert_json_key "error-summary flaky_tests" "$es" ".flaky_tests[0]" "src/gate.test.ts > y"
+assert_json_key "error-summary nothing to fix" "$es" ".error_count" "0"
+assert_json_key "error-summary not counted" "$es" ".counted_toward_circuit_breaker" "false"
+assert_json_key "error-summary rerun exit" "$es" ".rerun.exit_code" "0"
+ev="$(cat "$LOG_DIR/test-evidence-iter-1.json")"
+assert_json_key "evidence marks flaky" "$ev" ".[0].flaky" "true"
+assert_json_key "evidence keeps real exit code" "$ev" ".[0].exit_code" "1"
+
+reset_state
+rm -f "$SW_FLAKY_HISTORY_FILE"
+export STUB_MODE=fail
+run_gate_iteration 2 1
+assert_eq "regression gate: class regression" "regression" "$TEST_FAILURE_CLASS"
+assert_eq "regression gate: TEST_PASSED false" "false" "$TEST_PASSED"
+assert_eq "regression gate: breaker counted" "2" "$CONSECUTIVE_FAILURES"
+es="$(cat "$LOG_DIR/error-summary.json" 2>/dev/null || echo '{}')"
+assert_json_key "error-summary regression class" "$es" ".failure_class" "regression"
+assert_json_key "error-summary regression_tests" "$es" ".regression_tests[0]" "src/gate.test.ts > y"
+assert_json_key "error-summary counted" "$es" ".counted_toward_circuit_breaker" "true"
+assert_json_key "error-summary still has error lines" "$es" ".error_count > 0" "true"
+assert_eq "regression gate: test was actually rerun" "1" "$(rerun_count)"
+
+# Same iteration number re-run (session restart): the old flaky result must not leak
+reset_state
+rm -f "$SW_FLAKY_HISTORY_FILE"
+export STUB_MODE=fail
+run_gate_iteration 1 0
+es="$(cat "$LOG_DIR/error-summary.json" 2>/dev/null || echo '{}')"
+assert_json_key "restart: stale flaky result discarded" "$es" ".flaky_tests | length" "0"
+assert_json_key "restart: fresh regression recorded" "$es" ".failure_class" "regression"
+
+# Repeat offender: a test excused once is not excused again
+reset_state
+rm -f "$SW_FLAKY_HISTORY_FILE"
+run_gate_iteration 5 0
+reset_state
+run_gate_iteration 6 0
+assert_eq "repeat offender: second flake counted" "regression" "$TEST_FAILURE_CLASS"
+assert_eq "repeat offender: breaker counted" "1" "$CONSECUTIVE_FAILURES"
+
+reset_state
+export SW_FLAKY_DETECTION=false
+run_gate_iteration 3 0
+assert_eq "disabled: no rerun" "0" "$(rerun_count)"
+assert_eq "disabled: gate fails as before" "false" "$TEST_PASSED"
+assert_eq "disabled: breaker counted" "1" "$CONSECUTIVE_FAILURES"
+es="$(cat "$LOG_DIR/error-summary.json" 2>/dev/null || echo '{}')"
+assert_json_key "disabled: unclassified" "$es" ".failure_class" "unclassified"
+
+reset_state
+TEST_CMD="true"; ITERATION=4
+run_test_gate >/dev/null 2>&1
+write_error_summary
+assert_eq "passing gate: no class" "" "$TEST_FAILURE_CLASS"
+assert_file_not_exists "passing gate: summary cleared" "$LOG_DIR/error-summary.json"
+
 print_test_results

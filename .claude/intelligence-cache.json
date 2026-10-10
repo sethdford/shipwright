@@ -1662,33 +1662,33 @@
       "result": {
         "results": [
           {
-            "file": "flaky-tests.json",
+            "file": "failures.json",
             "relevance": 95,
-            "summary": "Directly about the current goal: it records flaky test occurrences with confidence scores, which the build stage needs in order to tell flaky failures apart from real ones."
+            "summary": "Build-stage test failures in sw-cost-test.sh and sw-e2e tests with recorded root causes and fixes; directly relevant to a build stage fixing test failures on a flaky-test branch."
           },
           {
-            "file": "failures.json",
-            "relevance": 80,
-            "summary": "Recorded test-stage failures, including one with category 'flaky', showing how failures are classified and what fixes were tried. Relevant to excluding flaky failures from failure counts."
+            "file": "flaky-tests.json",
+            "relevance": 90,
+            "summary": "Tracks flaky tests with occurrence counts and confidence, which matches the branch's work on detecting flaky test failures and excluding them."
+          },
+          {
+            "file": "knowledge.json",
+            "relevance": 70,
+            "summary": "Failure entries for test-stage errors (mktemp /tmp/claude paths, heartbeat and regression JSON) with suggested fix strategies usable during the build stage."
           },
           {
             "file": "retry-outcomes.json",
-            "relevance": 70,
-            "summary": "Tracks retry outcomes for the build_failure class with model escalation, so it bears on how build-stage retries and circuit-breaker counting behave."
+            "relevance": 60,
+            "summary": "Shows build_failure retries with model_escalation strategy at 100% success, relevant to how the build stage recovers from failures."
           },
           {
             "file": "success-patterns.json",
-            "relevance": 60,
-            "summary": "Prior successful bug-fix build loops with iteration counts, durations, and approaches. Useful precedent for the build stage's iteration strategy."
-          },
-          {
-            "file": "metrics.json",
-            "relevance": 50,
-            "summary": "Holds the build_duration_s baseline (7095s) for comparing the current build stage's duration against the historical norm."
+            "relevance": 45,
+            "summary": "Prior successful build approaches for bug and feature goals, with file patterns and test strategy useful as build-stage precedent."
           }
         ]
       },
-      "timestamp": 1791656858,
+      "timestamp": 1791659330,
       "ttl": 1800
     },
     "bfff76b139cf01dee9ee8dc993761079": {
@@ -1806,6 +1806,20 @@
         }
       ],
       "timestamp": 1791659121,
+      "ttl": 1800
+    },
+    "519bdaf12815d2e5448f483e5b2b6f86": {
+      "result": [
+        {
+          "type": "result",
+          "result": "I am trying the same approach again.",
+          "usage": {
+            "input_tokens": 0,
+            "output_tokens": 0
+          }
+        }
+      ],
+      "timestamp": 1791659589,
       "ttl": 1800
     }
   }

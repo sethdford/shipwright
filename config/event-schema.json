@@ -1697,6 +1697,22 @@
         "trimmed"
       ]
     },
+    "loop.flaky_excluded_from_breaker": {
+      "required": [],
+      "optional": [
+        "iteration",
+        "consecutive_failures"
+      ]
+    },
+    "loop.flaky_test_detected": {
+      "required": [],
+      "optional": [
+        "test_id",
+        "runner",
+        "iteration",
+        "reason"
+      ]
+    },
     "loop.iteration": {
       "required": [
         "iteration"
@@ -1749,6 +1765,15 @@
       "required": [],
       "optional": [
         "issue",
+        "iteration",
+        "reason"
+      ]
+    },
+    "loop.test_regression_confirmed": {
+      "required": [],
+      "optional": [
+        "test_id",
+        "runner",
         "iteration",
         "reason"
       ]
