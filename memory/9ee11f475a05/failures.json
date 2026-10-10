@@ -5,8 +5,8 @@
       "pattern": "\u001b[38;2;74;222;128m\u001b[1m✓\u001b[0m reveal shows 1/3 pass count on failure",
       "root_cause": "sw-cost-test.sh 'CONTEXT EFFICIENCY' dashboard tests fail because the cost dashboard prints 'No cost entries in the last 30 days' and exits early, never rendering the context-efficiency section from the seeded loop.context_efficiency events (test seeds only events, no cost entries).",
       "fix": "Make the cost dashboard render the CONTEXT EFFICIENCY section even when there are no cost entries (or have the test seed a cost entry/use an events path the dashboard reads) so the avg budget utilization assertions pass.",
-      "seen_count": 46,
-      "last_seen": "2026-10-10T16:45:12Z",
+      "seen_count": 47,
+      "last_seen": "2026-10-10T19:04:02Z",
       "category": "test_failure"
     },
     {
@@ -15,8 +15,9 @@
       "root_cause": "Two suites failed: sw-e2e-integration-test hit a stale pipeline lock/state ('pipeline already in progress') left by the outer pipeline run, and sw-intent-analysis-test failed its schema check for required fields (version, goal, criteria).",
       "fix": "Make the e2e integration test run with isolated state/lock dir (or skip when a pipeline is already running), and update the intent analysis schema or the analyze_intent output so they agree on the required fields.",
       "seen_count": 10,
-      "last_seen": "2026-10-10T19:08:46Z",
-      "category": "test_failure"
+      "last_seen": "2026-10-10T19:36:34Z",
+      "category": "test_failure",
+      "signature": "unknown:cede96e649db9be5"
     },
     {
       "stage": "test",
@@ -93,8 +94,8 @@
     {
       "stage": "test",
       "pattern": "\u001b[38;2;74;222;128m✓\u001b[0m Lone failure passing on rerun is flaky and TEST_PASSED stays false",
-      "root_cause": "Two unrelated suites failed: sw-e2e-integration-test hit a stale pipeline lock/state ('pipeline already in progress') from a real-GitHub run, and sw-intent-analysis-test failed its schema check (missing version/goal/criteria fields in the analyze_intent output). Neither is related to the flakiness classifier change, whose own test passed.",
-      "fix": "Clear stale pipeline state/lock before the e2e integration test (or skip it when no real Claude/GitHub is available), and fix analyze_intent or its schema check so the output includes version, goal and criteria.",
+      "root_cause": "Three unrelated suites failed: sw-e2e-integration-test hit a stale 'pipeline already in progress' lock (pipeline-8429) against a live GitHub issue, sw-intent-analysis-test hit a schema field check, and sw-self-optimize-test hit invalid JSON passed to jq --argjson in the memory strengthening step. The 'lone failure passing on rerun' pattern did not apply because 3 suites failed.",
+      "fix": "Make the e2e integration test clear pipeline locks and state before running (or skip it without real GitHub/Claude); fix the intent-analysis schema required fields (version, goal, criteria); guard the --argjson inputs in the self-optimize memory strengthening code with a '// {}' default or validation.",
       "seen_count": 1,
       "last_seen": "2026-10-10T17:27:54Z",
       "category": "test_failure"
