@@ -1401,6 +1401,152 @@
       },
       "timestamp": 1775344537,
       "ttl": 3600
+    },
+    "72db8a00ab4f4f91bd41760192ad43a8": {
+      "result": {
+        "complexity": 6,
+        "risk_level": "medium",
+        "success_probability": 72,
+        "recommended_template": "standard",
+        "issue_type": "backend",
+        "key_risks": [
+          "False positives: legitimate iterative refinement (e.g., touching the same file across iterations while tests go red then green) could be tagged as thrashing, causing unnecessary restarts or aborts",
+          "Overlap with the open flatlining work (#8155, #7689, #7553) may produce duplicate or conflicting restart classifications unless the reason precedence is defined",
+          "Bash 3.2 constraints (no associative arrays) make per-file signature tracking across a rolling window harder to implement cleanly",
+          "Changing restart-reason values and daemon metrics schema may break consumers that expect the existing reason set"
+        ],
+        "implementation_hints": [
+          "Store a rolling window of per-iteration signatures (sorted changed-file list plus test pass/fail map) in a tmp file written atomically with tmp+mv, and reset it on session restart",
+          "Detect thrashing as a file or test whose state alternates (edited-then-reverted, or pass/fail flipping) across 3+ consecutive iterations, and require net-zero change over the window before tagging it",
+          "Define precedence explicitly: context_exhaustion and flatlining checks run first, and thrashing is tagged only when the iteration would otherwise be classified as a failure",
+          "Surface thrashing as its own counter in the loop summary and daemon metrics output, and emit it via emit_event so dashboards and sw-dora pick it up",
+          "Add unit tests in scripts/sw-loop-test.sh with synthetic histories covering a true positive (A-B-A flip over 3 iterations) and a true negative (monotonic refinement that reaches green), following the existing PASS/FAIL harness"
+        ]
+      },
+      "timestamp": 1791691903,
+      "ttl": 3600
+    },
+    "c166851407acf1aeeebc9e93ddff30d4": {
+      "result": {
+        "estimated_iterations": 6
+      },
+      "timestamp": 1791691905,
+      "ttl": 1800
+    },
+    "aa8b3505addee543786e4b5d47601925": {
+      "result": {
+        "estimated_cost_usd": 6.5,
+        "estimated_iterations": 4,
+        "estimated_tokens": 1400000,
+        "likely_failure_stage": "build",
+        "confidence": 40
+      },
+      "timestamp": 1791691910,
+      "ttl": 3600
+    },
+    "b45428bd6e86629ccb57111803b4d6e9": {
+      "result": {
+        "issue_type": "backend",
+        "confidence": 0.85,
+        "secondary_domains": [
+          "observability",
+          "testing"
+        ],
+        "complexity_assessment": {
+          "score": 5,
+          "reasoning": "Adds a rolling-window oscillation detector to the bash build loop, a new restart-reason classification alongside context_exhaustion and flatlining, and new counters in loop summary and daemon metrics. The logic is self-contained, but it touches the restart path and metrics output, and the acceptance criteria require true-negative tests for legitimate refinement."
+        },
+        "skill_plan": {
+          "plan": [
+            "brainstorming",
+            "architecture-design"
+          ],
+          "design": [
+            "architecture-design"
+          ],
+          "build": [
+            "testing-strategy"
+          ],
+          "review": [
+            "adversarial-quality",
+            "two-stage-review"
+          ],
+          "compound_quality": [
+            "testing-strategy"
+          ],
+          "pr": [
+            "pr-quality"
+          ],
+          "deploy": [],
+          "validate": [
+            "validation-thoroughness"
+          ],
+          "monitor": [
+            "observability"
+          ]
+        },
+        "skill_rationale": {
+          "brainstorming": "Thrashing must be separated from legitimate refinement, which also edits the same file repeatedly. Defining the signature (file edit vs. test flip, and the window size) up front determines whether the detector produces false positives.",
+          "architecture-design": "The restart reason must be classified with a defined precedence among thrashing, flatlining, and context_exhaustion, and the rolling-window state must persist across restarts via progress.md. An ADR keeps that decision explicit for future loop work.",
+          "testing-strategy": "The acceptance criteria call for synthetic iteration histories, including a true-negative case for iterative refinement. Without those fixtures, the detector can't be shown to avoid flagging normal work.",
+          "adversarial-quality": "Adversarial review should look for ways the detector misfires: flaky tests that flip without any code change, reverts that are legitimate, and windows that span a context restart.",
+          "two-stage-review": "The change spans the detector, restart tagging, and metrics surfacing, so a spec-compliance pass against the acceptance criteria should come before the code-quality pass.",
+          "pr-quality": "The PR changes loop restart semantics and metrics schema, so a reviewer needs to see the classification rules and the test evidence quickly.",
+          "validation-thoroughness": "Unit tests on synthetic histories don't prove the summary and daemon metrics show thrashing counts in a real run. The validation should exercise an actual loop and check the surfaced output.",
+          "observability": "Thrashing counts are only useful if they reach dashboards and metrics without silently breaking existing consumers of the restart reason field."
+        },
+        "generated_skills": [],
+        "review_focus": [
+          "Signature definition for a changed file or test: a line-level diff versus a file-level hash, and whether whitespace-only or formatting edits count",
+          "Window size and threshold: the 3+ consecutive iteration rule, and whether it is applied per file or across the whole window",
+          "Precedence when thrashing, flatlining, and context_exhaustion all match in the same iteration",
+          "Bash 3.2 compatibility: no associative arrays for per-file state, so use files or delimited strings",
+          "Persistence of the rolling window across session restarts so the detector does not reset on a fresh session",
+          "Backward compatibility of the restart reason field and daemon metrics schema for existing consumers"
+        ],
+        "risk_areas": [
+          "False positives on legitimate iterative refinement, such as a file edited repeatedly while converging on a fix",
+          "Flaky tests that flip pass/fail without code changes, which would be tagged as thrashing when the cause is the environment",
+          "Overlap with the existing flatlining detection (#8155, #7689, #7553), which could cause duplicate or conflicting classifications",
+          "Window state lost on context-exhaustion restart, leading to missed or incorrect detections",
+          "Metrics schema change breaking the daemon dashboard or downstream readers of loop summary output"
+        ]
+      },
+      "timestamp": 1791691948,
+      "ttl": 3600
+    },
+    "6c5a867f835ad5e9f2fbb9397bd561c7": {
+      "result": {
+        "results": [
+          {
+            "file": "failures.json",
+            "relevance": 85,
+            "summary": "Contains timeout/unbounded-loop failure records with root causes and fixes; closest to a loop-iteration failure history that thrashing detection would need to distinguish from flatlining."
+          },
+          {
+            "file": "success-patterns.json",
+            "relevance": 60,
+            "summary": "Stores iterations_needed, completion and approach data per build run, the metrics needed to tell oscillating iterations apart from a stalled or converging loop."
+          },
+          {
+            "file": "pattern-outcomes.json",
+            "relevance": 40,
+            "summary": "Tracks outcomes of injected patterns; relevant to measuring whether a thrash-detection signal led to a successful recovery, though currently empty."
+          },
+          {
+            "file": "index.json",
+            "relevance": 30,
+            "summary": "Indexes failure signatures by stage with fix text, a loose match for categorizing recurring build-loop failure modes in the build stage."
+          },
+          {
+            "file": "architecture.json",
+            "relevance": 15,
+            "summary": "Architecture rules placeholder; only marginally relevant to where a new detector would sit in the loop's architecture."
+          }
+        ]
+      },
+      "timestamp": 1791691991,
+      "ttl": 1800
     }
   }
 }
