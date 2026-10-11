@@ -335,3 +335,5 @@
 {"ts":"2026-10-11T02:31:04Z","ts_epoch":1791685864,"type":"model.outcome","issue":0,"stage":"review","model":"opus","success":"true"}
 {"ts":"2026-10-11T02:31:04Z","ts_epoch":1791685864,"type":"model.outcome","issue":0,"stage":"pr","model":"opus","success":"true"}
 {"ts":"2026-10-11T02:31:04Z","ts_epoch":1791685864,"type":"pipeline.cost","input_tokens":0,"output_tokens":0,"model":"sonnet","cost_usd":0.0000}
+{"ts":"2026-10-11T03:17:40Z","ts_epoch":1791688660,"type":"optimize.memory_pruned","pruned":12,"strengthened":0,"promoted":0}
+{"ts":"2026-10-11T03:17:40Z","ts_epoch":1791688660,"type":"optimize.memory_pruned","pruned":0,"strengthened":0,"promoted":0}
