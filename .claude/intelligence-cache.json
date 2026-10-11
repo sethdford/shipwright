@@ -1660,32 +1660,32 @@
         "results": [
           {
             "file": "retry-outcomes.json",
-            "relevance": 92,
-            "summary": "Tracks build_failure retries and the model_escalation strategy with a 100% success rate, which bears directly on how the build stage recovers from failures."
-          },
-          {
-            "file": "failures.json",
-            "relevance": 85,
-            "summary": "Recorded failure patterns with root causes and fixes, mostly from the test stage that the build loop re-enters when tests fail. Useful for avoiding repeated build-time failures."
-          },
-          {
-            "file": "success-patterns.json",
-            "relevance": 75,
-            "summary": "Captured successful build-loop approaches (iteration counts, files changed, test strategy) for bug fixes and features, which can guide the current build."
+            "relevance": 90,
+            "summary": "Records build_failure retries via model_escalation with 5/5 successes, which directly matches the build stage's retry and self-healing behavior."
           },
           {
             "file": "metrics.json",
+            "relevance": 75,
+            "summary": "Holds build_duration_s baseline (7095s), useful for judging whether the current build iterations are running normally."
+          },
+          {
+            "file": "failures.json",
             "relevance": 70,
-            "summary": "Holds the build_duration_s baseline (7095s) that build-stage runtime and timeouts are measured against."
+            "summary": "Captures recurring failure patterns and fixes (e.g., cost dashboard and e2e lock issues) that build-loop agents should avoid repeating, though most entries are test-stage."
+          },
+          {
+            "file": "success-patterns.json",
+            "relevance": 60,
+            "summary": "Stores prior successful fix-bug approaches with iteration counts and files changed, guiding how the build loop should structure its iterations."
           },
           {
             "file": "knowledge.json",
-            "relevance": 60,
-            "summary": "Contains test-stage failure signatures and fix strategies (e.g. mktemp path issues) that builds may hit again."
+            "relevance": 45,
+            "summary": "Contains a build-adjacent fix for mktemp failing on a missing /tmp/claude directory, which can recur during build and test setup."
           }
         ]
       },
-      "timestamp": 1791689810,
+      "timestamp": 1791692015,
       "ttl": 1800
     },
     "9de257595491c672ef0603b521583ee1": {
@@ -1971,6 +1971,13 @@
         }
       ],
       "timestamp": 1791690789,
+      "ttl": 1800
+    },
+    "413ec1cf0b361300f66f0209cbef5f81": {
+      "result": {
+        "raw_response": "Mock claude: ok"
+      },
+      "timestamp": 1791691977,
       "ttl": 1800
     }
   }

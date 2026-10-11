@@ -41,10 +41,12 @@ Historical context (lessons from previous pipelines):
 }
 
 Discoveries from other pipelines:
-✓ Injected 7 new discoveries
+✓ Injected 9 new discoveries
 [intake] Stage intake completed — Resolution: 
 [spec_generation] Stage spec_generation completed — Resolution: 
 [design] Design completed for Deduplicate identical build-loop errors across iterations to stop wasted retries — Resolution: 
+[intake] Stage intake completed — Resolution: 
+[spec_generation] Stage spec_generation completed — Resolution: 
 [intake] Stage intake completed — Resolution: 
 [spec_generation] Stage spec_generation completed — Resolution: 
 [intake] Stage intake completed — Resolution: 
@@ -129,8 +131,8 @@ status: running
 test_cmd: "npm test"
 model: sonnet
 agents: 1
-started_at: 2026-10-11T03:59:05Z
-last_iteration_at: 2026-10-11T03:59:05Z
+started_at: 2026-10-11T04:13:36Z
+last_iteration_at: 2026-10-11T04:13:36Z
 consecutive_failures: 0
 total_commits: 0
 audit_enabled: true
