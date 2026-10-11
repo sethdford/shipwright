@@ -1,7 +1,5 @@
-I added an HTML comment as the first line of `README.md` and committed it as `fec7f6ff`. The comment is `<!-- E2E test: comment added by automated pipeline (#8512) -->`. It doesn't show up in the rendered README.
+I added an HTML comment to `README.md` (line 2, `<!-- E2E test: comment added by automated pipeline (#8522) -->`) and committed it. I did not run `npm test` or any other test.
 
-I did not run `npm test`. I ran the two checks a README edit could break: the version consistency check (3.3.0, consistent) and `sw-docs-test.sh` (18 passed, 0 failed).
+The five suites that failed in the previous run (`sw-daemon-test`, `sw-e2e-integration-test`, `sw-intent-analysis-test`, `sw-loop-test`, `sw-self-optimize-test`) were failing before this edit. I haven't looked at why, and a comment in `README.md` shouldn't affect any of them, so I left them alone. The "all existing tests continue to pass" criterion is therefore not confirmed.
 
-The task list in the prompt is for a different feature, build-loop error deduplication (#8438). I left it alone. It looks like the previous commit, `d17891ce`, already addressed #8438. I didn't check whether that checklist is actually complete.
-
-LOOP_COMPLETE
+I'm not outputting LOOP_COMPLETE, because that criterion is unmet.

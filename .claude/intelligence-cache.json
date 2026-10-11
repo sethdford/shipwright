@@ -1759,9 +1759,9 @@
     },
     "bcd679cb7a3d1a6317dacb4401ef8935": {
       "result": {
-        "estimated_iterations": 1
+        "estimated_iterations": 2
       },
-      "timestamp": 1791688982,
+      "timestamp": 1791691099,
       "ttl": 1800
     },
     "58979cfd0da2629c31e6c400beefacfe": {
@@ -1832,33 +1832,33 @@
       "result": {
         "results": [
           {
-            "file": "index.json",
+            "file": "fleet-shared-patterns.json",
             "relevance": 35,
-            "summary": "Only entry with a build-stage pattern and a concrete fix recommendation, though it is generic and not about docs or README changes."
+            "summary": "Only entry with a build-stage fix that applies to a fresh build (npm dependency install), though it does not mention README or docs changes."
           },
           {
-            "file": "fleet-shared-patterns.json",
+            "file": "index.json",
             "relevance": 30,
-            "summary": "Build-stage failure pattern (Cannot find module, fix: npm i) that could recur during any build, but it is cross-repo and unrelated to docs."
+            "summary": "Build-stage failure pattern with a concrete, reusable fix, but it covers test timeouts rather than documentation edits."
           },
           {
             "file": "success-patterns.json",
             "relevance": 25,
-            "summary": "Build-only success pattern ('Fix daemon timeout', one file changed, npm test strategy), a loose match for a small single-file build."
+            "summary": "Records prior successful build-stage runs with npm test strategy and small file changes, a loose match for a one-file docs edit. Several copies exist with different repo hashes, so the match is ambiguous."
           },
           {
             "file": "failures.json",
-            "relevance": 20,
-            "summary": "Resolved failure records (unbounded loop, add timeout wrapper), but they are test-stage failures, not build or documentation work."
+            "relevance": 15,
+            "summary": "Logs resolved test-stage timeouts and an unresolved database failure. Only tangentially related to a README comment change."
           },
           {
             "file": "architecture.json",
-            "relevance": 10,
-            "summary": "Placeholder rules only (rule1-rule3), so it has little bearing on a README comment change."
+            "relevance": 5,
+            "summary": "Placeholder rules only (rule1–rule3) with no repo-specific guidance for a documentation change."
           }
         ]
       },
-      "timestamp": 1791689041,
+      "timestamp": 1791691143,
       "ttl": 1800
     },
     "6a0829d3a5850bbdd86aa389ad94e32f": {
