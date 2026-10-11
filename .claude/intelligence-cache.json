@@ -30,17 +30,17 @@
     },
     "d41d8cd98f00b204e9800998ecf8427e": {
       "result": {
-        "primary_role": "builder",
+        "primary_role": "architect",
         "secondary_roles": [
-          "tester",
+          "builder",
           "reviewer"
         ],
-        "confidence": 0.95,
-        "reasoning": "Bug fix requiring debugging JSON parsing logic, implementing improved error messaging, and testing edge cases (object vs array output). Builder handles implementation; tester validates the fix; reviewer ensures accuracy.",
+        "confidence": 0.8,
+        "reasoning": "Splitting a 2713-line bash script into well-bounded modules is a structural design task needing module boundaries and interface decisions, with builder and reviewer covering the mechanical extraction and verification.",
         "new_role_needed": false,
         "suggested_role": null
       },
-      "timestamp": 1775316059,
+      "timestamp": 1791687488,
       "ttl": 3600
     },
     "efd5524ad1244fd20344bf3ff5d95233": {
@@ -1401,6 +1401,369 @@
       },
       "timestamp": 1775344537,
       "ttl": 3600
+    },
+    "e6c03c458dff9bc19c4f6a83e04c06bc": {
+      "result": {
+        "complexity": 6,
+        "risk_level": "medium",
+        "success_probability": 72,
+        "recommended_template": "standard",
+        "issue_type": "refactor",
+        "key_risks": [
+          "Shared global state and config variables used across iteration, convergence, and session logic may break when functions move into separate files",
+          "Sourcing order and function visibility could change, causing undefined-function failures that only appear at runtime",
+          "Tests may depend on internal function names or on sw-loop.sh's file layout, so they may need changes despite the 'unchanged' acceptance criterion",
+          "Recent session-continuity and prompt-cache changes to sw-loop.sh (commits 736a8b94, 4f84686b) raise merge-conflict risk if this refactor runs in parallel with other loop work",
+          "Installers, upgrade paths, and package file lists may not copy the new lib modules, so the installed tool could break",
+          "Bash 3.2 compatibility must hold in the new modules, and the platform hygiene line-count target is not directly testable"
+        ],
+        "implementation_hints": [
+          "Map each function in sw-loop.sh to iteration, convergence, or session before moving code, and move functions without changing their bodies",
+          "Keep sw-loop.sh as a thin entrypoint that resolves its own directory and sources the new lib modules in a fixed order before dispatching commands",
+          "Move shared globals and config reads into the entrypoint or a small shared section so every module sees them after sourcing",
+          "Run sw-loop-test.sh and sw-convergence-test.sh on the untouched code first to get a baseline, then re-run after each module extraction",
+          "Check install.sh, sw-upgrade.sh, and any file manifests so the new lib files ship with the tool",
+          "Follow the existing decomposition pattern used for sw-db.sh and sw-memory.sh so the module naming and loader style match"
+        ],
+        "estimated_cost_note": null
+      },
+      "timestamp": 1791686915,
+      "ttl": 3600
+    },
+    "9197bdbd2eb42f5812b9480b6cc89b2f": {
+      "result": {
+        "estimated_iterations": 8
+      },
+      "timestamp": 1791686918,
+      "ttl": 1800
+    },
+    "91d9278f5167925217528107c1752b70": {
+      "result": {
+        "estimated_cost_usd": 4.8,
+        "estimated_iterations": 4,
+        "estimated_tokens": 650000,
+        "likely_failure_stage": "build",
+        "confidence": 60
+      },
+      "timestamp": 1791686921,
+      "ttl": 3600
+    },
+    "bc601a6781e9d462c1325ebcf34f9bf9": {
+      "result": {
+        "issue_type": "refactor",
+        "confidence": 0.93,
+        "secondary_domains": [
+          "testing",
+          "documentation",
+          "infrastructure"
+        ],
+        "complexity_assessment": {
+          "score": 6,
+          "reasoning": "Pure mechanical split of a 2713-line bash script into three lib modules plus a thin entrypoint. Risk is concentrated in sourcing order, shared globals and function visibility under set -euo pipefail, and bash 3.2 compatibility, rather than in new logic. Existing test suites must pass unchanged, which constrains the boundaries."
+        },
+        "skill_plan": {
+          "plan": [
+            "architecture-design",
+            "brainstorming"
+          ],
+          "design": [
+            "architecture-design",
+            "api-design"
+          ],
+          "build": [
+            "systematic-debugging",
+            "testing-strategy"
+          ],
+          "review": [
+            "two-stage-review",
+            "adversarial-quality"
+          ],
+          "compound_quality": [
+            "validation-thoroughness"
+          ],
+          "pr": [
+            "pr-quality"
+          ],
+          "deploy": [],
+          "validate": [
+            "validation-thoroughness"
+          ],
+          "monitor": []
+        },
+        "skill_rationale": {
+          "architecture-design": "The split needs a recorded boundary map (which functions go to iteration, convergence, and session modules, and what shared state they depend on) so future readers know where new loop logic belongs.",
+          "brainstorming": "Challenges the assumed boundaries before code moves, e.g. whether convergence and stall detection truly separate from iteration execution, or whether session-restart logic leaks into both.",
+          "api-design": "The sourced modules expose functions to the thin entrypoint and to other scripts; keeping the CLI surface and function names stable is the core constraint of this refactor.",
+          "systematic-debugging": "Sourcing order and globals under set -euo pipefail are where a pure refactor usually breaks; a failure at this stage should be investigated, not retried blindly.",
+          "testing-strategy": "sw-loop-test.sh and sw-convergence-test.sh must pass unchanged, so the test harness's mock and PATH assumptions must still hold after functions move into new files.",
+          "two-stage-review": "Pass 1 checks that every function moved exactly once with identical bodies; pass 2 checks sourcing order, globals, and bash 3.2 compatibility of the new files.",
+          "adversarial-quality": "Actively hunts for functions that are called before their module is sourced, variables that were implicitly shared within the monolith, and duplicated definitions that silently override each other.",
+          "validation-thoroughness": "The acceptance criteria require the platform hygiene scan to stop ranking sw-loop.sh as the top script, and the loop must still behave identically from the CLI, which smoke tests alone won't prove.",
+          "pr-quality": "A 2713-line file split into several modules is only reviewable if the PR explains the boundary map and states explicitly that no behavior changed."
+        },
+        "generated_skills": [],
+        "review_focus": [
+          "Every function from the original sw-loop.sh appears in exactly one new module, with no duplicates or omissions",
+          "Module sourcing order in the entrypoint: functions used at source time or in top-level variable initialization must be defined before use",
+          "Global variables and readonly declarations that were shared implicitly inside the monolith now cross file boundaries",
+          "set -euo pipefail behavior is preserved in each new file, and no new file changes shell options globally",
+          "Bash 3.2 compatibility: no associative arrays, readarray, or case-conversion expansions in moved code",
+          "sw-loop-test.sh and sw-convergence-test.sh run unchanged and pass on both macOS and Linux",
+          "CLI flags and exit codes of `shipwright loop` are identical before and after",
+          "VERSION variable and emit_event calls remain at the same points in the flow",
+          "Other scripts that source or invoke sw-loop.sh functions (for example, the daemon or pipeline build stage) still resolve them"
+        ],
+        "risk_areas": [
+          "Sourced module path resolution: if a module is located relative to the caller's cwd rather than the script directory, running from a worktree or from another repo will fail",
+          "Functions moved to a module that is not sourced by the test harness will cause sw-loop-test.sh to fail with command-not-found, which can look like a flaky test",
+          "Hidden coupling between convergence detection and session restart (both read iteration counters or progress.md), so a naive split can introduce stale copies of state",
+          "Changes to the sw-loop.sh line count may move other scripts (such as sw-daemon.sh at 1420 lines) into the top-ranked position in the hygiene scan, failing acceptance criterion 4",
+          "The file-based test harness in sw-loop-test.sh may grep the source of sw-loop.sh for specific strings; those assertions will break after the split even though behavior is unchanged"
+        ]
+      },
+      "timestamp": 1791686965,
+      "ttl": 3600
+    },
+    "719d8761487614c7c5a81e2aed3e8c4f": {
+      "result": {
+        "results": [
+          {
+            "file": "architecture.json",
+            "relevance": 55,
+            "summary": "Holds architecture rules, the closest match to a plan for splitting sw-loop.sh into modules, though its contents are placeholder rules (rule1-rule3)."
+          },
+          {
+            "file": "failures.json",
+            "relevance": 30,
+            "summary": "Records an unbounded-loop timeout root cause and fix in the test stage. The build loop being split is the same area, but the entries are generic."
+          },
+          {
+            "file": "success-patterns.json",
+            "relevance": 20,
+            "summary": "Contains a past daemon-timeout fix with stages and file patterns. It shows how a similar change was done, but it targets sw-daemon.sh, not the loop."
+          },
+          {
+            "file": "index.json",
+            "relevance": 12,
+            "summary": "Lists a generic test_failure pattern with a timeout-setting fix, which only loosely applies to a refactor plan."
+          },
+          {
+            "file": "fleet-shared-patterns.json",
+            "relevance": 8,
+            "summary": "Holds a single cross-repo module-not-found fix (npm i). It is unrelated to modularizing a shell script."
+          }
+        ]
+      },
+      "timestamp": 1791687009,
+      "ttl": 1800
+    },
+    "29bd7cb5d6ce84c8cb72cb50f81e1018": {
+      "result": {
+        "results": [
+          {
+            "file": "architecture.json",
+            "relevance": 45,
+            "summary": "Holds architecture rules, which matter when validating a module split into new files. Its content is only placeholder rules (rule1-rule3), so it gives little concrete guidance."
+          },
+          {
+            "file": "failures.json",
+            "relevance": 25,
+            "summary": "Records recurring test-stage failures with root causes and fixes. Only loosely related to plan validation failures, and the entries are about timeouts and a missing database, not plan structure."
+          },
+          {
+            "file": "success-patterns.json",
+            "relevance": 15,
+            "summary": "Stores past successful build patterns with file_patterns and approaches. Its entries concern scripts/sw-daemon.sh and unrelated goals, so they only weakly match a refactor of sw-loop.sh. Several copies of this file exist, so it is ambiguous which one applies."
+          }
+        ]
+      },
+      "timestamp": 1791687281,
+      "ttl": 1800
+    },
+    "f92b5d26b4fe6baf6ec11b3dbbea7c2f": {
+      "result": {
+        "results": [
+          {
+            "file": "architecture.json",
+            "relevance": 90,
+            "summary": "Architecture model file is the most directly relevant to designing module boundaries for splitting sw-loop.sh, though its current content is only placeholder rules."
+          },
+          {
+            "file": "success-patterns.json",
+            "relevance": 45,
+            "summary": "Mined success patterns cover scripts/sw-daemon.sh and build-stage fixes; loosely related to refactoring a loop script into modules."
+          },
+          {
+            "file": "failures.json",
+            "relevance": 35,
+            "summary": "Recorded timeout and unbounded-loop failures relate to the loop's convergence and iteration logic that the split would separate out."
+          },
+          {
+            "file": "index.json",
+            "relevance": 25,
+            "summary": "Pattern index includes a build-stage test_failure fix, which is only weakly connected to modularizing a shell script."
+          },
+          {
+            "file": "fleet-shared-patterns.json",
+            "relevance": 15,
+            "summary": "Shared module-not-found fix pattern is tangentially related to splitting sourced shell modules."
+          }
+        ]
+      },
+      "timestamp": 1791687302,
+      "ttl": 1800
+    },
+    "fd8f616f44a8473325f68df585501a5f": {
+      "result": {
+        "results": [
+          {
+            "file": "architecture.json",
+            "relevance": 35,
+            "summary": "Only architecture-level entry; it is a placeholder with generic rules (rule1-rule3), so it is weakly relevant to designing module boundaries for the sw-loop.sh split but holds no concrete rejected approaches."
+          },
+          {
+            "file": "failures.json (the entry with timeout/unbounded-loop failures)",
+            "relevance": 25,
+            "summary": "Records an unbounded-loop root cause and a timeout-wrapper fix, the closest thing here to an anti-pattern in loop-heavy shell code that a loop split would touch. It does not mention sw-loop.sh or module splitting."
+          },
+          {
+            "file": "index.json",
+            "relevance": 15,
+            "summary": "Holds a generic test_failure pattern with a timeout-related fix, which is only loosely connected to refactoring sw-loop.sh into modules."
+          }
+        ]
+      },
+      "timestamp": 1791687308,
+      "ttl": 1800
+    },
+    "de8f096bf8ef026f9b326d38e616fb06": {
+      "result": {
+        "results": [
+          {
+            "file": "failures.json",
+            "relevance": 55,
+            "summary": "Entries with the 'unbounded loop' root cause and 'add timeout wrapper' fix (test stage). The refactor touches loop control code, so these failure patterns may apply."
+          },
+          {
+            "file": "index.json",
+            "relevance": 35,
+            "summary": "Build-stage failure pattern for test_failure with the fix 'Increase timeout value in test setup'. General build-stage guidance, not specific to the loop split."
+          },
+          {
+            "file": "architecture.json",
+            "relevance": 30,
+            "summary": "Architecture rules file, which could hold module-boundary constraints for splitting sw-loop.sh. It only contains placeholder rules (rule1-rule3), so it is weakly useful."
+          },
+          {
+            "file": "success-patterns.json",
+            "relevance": 20,
+            "summary": "Build-stage success pattern (repo test-repo-789) for a timeout fix in scripts/sw-daemon.sh. It is a shell-script refactor pattern, but for a different file and goal."
+          },
+          {
+            "file": "fleet-shared-patterns.json",
+            "relevance": 10,
+            "summary": "Shared build-stage pattern 'Error: Cannot find module' with fix 'npm i'. Could matter if the refactor breaks module sourcing, but it is generic."
+          }
+        ]
+      },
+      "timestamp": 1791687477,
+      "ttl": 1800
+    },
+    "47c1451f50b4a8f9faa0f8012f6b922e": {
+      "result": {
+        "results": [
+          {
+            "file": "retry-outcomes.json",
+            "relevance": 95,
+            "summary": "Records build_failure retries with model_escalation at 100% success over 5 attempts, which is directly about how the build stage recovers from failures."
+          },
+          {
+            "file": "success-patterns.json",
+            "relevance": 85,
+            "summary": "Captures loop-iteration approaches, files changed under loop-logs and loop-state, and test strategy for past build runs, matching the build loop this stage runs."
+          },
+          {
+            "file": "metrics.json",
+            "relevance": 80,
+            "summary": "Holds the build_duration_s baseline of 7095s, which gives the build stage its expected duration for comparison."
+          },
+          {
+            "file": "failures.json",
+            "relevance": 70,
+            "summary": "Lists recurring test-stage failures and their fixes, which the build loop's self-healing re-entry depends on when tests fail."
+          },
+          {
+            "file": "knowledge.json",
+            "relevance": 50,
+            "summary": "Contains concrete failure-to-fix entries for test setup problems (such as mktemp under /tmp/claude) that a build iteration could hit."
+          }
+        ]
+      },
+      "timestamp": 1791687485,
+      "ttl": 1800
+    },
+    "3aa06adb485bb3de03553d3ca0897dbe": {
+      "result": [
+        {
+          "type": "result",
+          "result": "I am trying the same approach again.",
+          "usage": {
+            "input_tokens": 0,
+            "output_tokens": 0
+          }
+        }
+      ],
+      "timestamp": 1791687561,
+      "ttl": 1800
+    },
+    "ef6154f4ae9a4105229a81a1a27f8e9c": {
+      "result": {
+        "raw_response": "Mock claude: ok"
+      },
+      "timestamp": 1791687693,
+      "ttl": 1800
+    },
+    "8f18c16ed4c8114f43bc846e0837b904": {
+      "result": [
+        {
+          "type": "result",
+          "result": "I am trying the same approach again.",
+          "usage": {
+            "input_tokens": 0,
+            "output_tokens": 0
+          }
+        }
+      ],
+      "timestamp": 1791687908,
+      "ttl": 1800
+    },
+    "26bab6a5d96356a045f9a8f1244d3972": {
+      "result": {
+        "raw_response": "Mock claude: ok"
+      },
+      "timestamp": 1791688040,
+      "ttl": 1800
+    },
+    "0aca269c86fc94ef16344c0a5294a16f": {
+      "result": {
+        "raw_response": "Mock claude: ok"
+      },
+      "timestamp": 1791688125,
+      "ttl": 1800
+    },
+    "40b6927a7d12ad3c3d699bafe75a3a1c": {
+      "result": [
+        {
+          "type": "result",
+          "result": "I am trying the same approach again.",
+          "usage": {
+            "input_tokens": 0,
+            "output_tokens": 0
+          }
+        }
+      ],
+      "timestamp": 1791688354,
+      "ttl": 1800
     }
   }
 }
