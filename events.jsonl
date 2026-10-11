@@ -564,3 +564,6 @@
 {"ts":"2026-10-10T23:17:37Z","ts_epoch":1791674257,"type":"recruit_evolve","analysis":""}
 {"ts":"2026-10-10T23:17:37Z","ts_epoch":1791674257,"type":"recruit_reflect","accuracy":0.0,"corrections":5}
 {"ts":"2026-10-10T23:17:38Z","ts_epoch":1791674258,"type":"recruit_mind","agent_id":"agent-star","method":"heuristic"}
+{"ts":"2026-10-11T00:16:21Z","ts_epoch":1791677781,"type":"hygiene_platform_refactor","hardcoded":49,"fallback":69,"todo":51}
+{"ts":"2026-10-11T00:16:44Z","ts_epoch":1791677804,"type":"strategic.issue_created","title":"Add `shipwright cost show --by-template` breakdown and surface cost-per-outcome ratio","priority":"P3","complexity":"fast"}
+{"ts":"2026-10-11T00:16:44Z","ts_epoch":1791677804,"type":"strategic.cycle_complete","issues_created":1,"issues_skipped":2}
