@@ -36,6 +36,7 @@ fi
 # Source loop sub-modules for modular iteration management
 [[ -f "$SCRIPT_DIR/lib/loop-iteration.sh" ]] && source "$SCRIPT_DIR/lib/loop-iteration.sh"
 [[ -f "$SCRIPT_DIR/lib/loop-convergence.sh" ]] && source "$SCRIPT_DIR/lib/loop-convergence.sh"
+[[ -f "$SCRIPT_DIR/lib/loop-error-signature.sh" ]] && source "$SCRIPT_DIR/lib/loop-error-signature.sh"
 [[ -f "$SCRIPT_DIR/lib/loop-restart.sh" ]] && source "$SCRIPT_DIR/lib/loop-restart.sh"
 [[ -f "$SCRIPT_DIR/lib/loop-progress.sh" ]] && source "$SCRIPT_DIR/lib/loop-progress.sh"
 # Intelligent session restart with enhanced briefings and cross-session tracking
@@ -123,6 +124,14 @@ EXTENSION_COUNT=0
 # ─── Circuit Breaker Defaults (config-driven) ─────────────────────────────
 CIRCUIT_BREAKER_THRESHOLD=$(_smart_int "loop.circuit_breaker_threshold" 3)
 MIN_PROGRESS_LINES=$(_smart_int "loop.min_progress_lines" 5)
+
+# ─── Error Signature Dedup (lib/loop-error-signature.sh) ──────────────────────
+# Escalate when consecutive iterations fail with the same normalized errors.
+# Sets ERROR_DEDUP_ENABLED (loop.error_dedup_enabled, LOOP_ERROR_DEDUP=0 to
+# disable) and ERROR_DEDUP_THRESHOLD (loop.error_dedup_threshold, min 2).
+ERROR_DEDUP_ENABLED=true
+ERROR_DEDUP_THRESHOLD=2
+type errsig_load_config >/dev/null 2>&1 && errsig_load_config
 
 # ─── Context Exhaustion Recovery ────────────────────────────────────────────────
 CONTEXT_EXHAUSTION_PATTERNS="context.length.exceeded|maximum context length|context_length_exceeded|prompt is too long"
@@ -2360,6 +2369,7 @@ ${GOAL}"
         # Test gate
         run_test_gate
         write_error_summary
+        errsig_update || true
         if [[ -n "$TEST_CMD" ]]; then
             if [[ "$TEST_PASSED" == "true" ]]; then
                 echo -e "  ${GREEN}✓${RESET} Tests: passed"
@@ -2561,6 +2571,17 @@ HUMAN FEEDBACK (received after iteration $ITERATION): $human_msg"
             break
         fi
 
+        # Same failure signature past the threshold: a fresh session beats
+        # another attempt from the same context (errsig_escalate decides).
+        if [[ "${ERRSIG_ACTION:-}" == "session_restart" ]]; then
+            ERRSIG_RESTARTED_HASHES="${ERRSIG_RESTARTED_HASHES} ${ERRSIG_LAST_HASH}"
+            STATUS="error_repeat_restart"
+            write_state
+            write_progress
+            warn "Same failure signature ${ERRSIG_REPEAT_COUNT} iterations in a row — triggering session restart"
+            break
+        fi
+
         sleep "$(_config_get_int "loop.sleep_between_iterations" 2 2>/dev/null || echo 2)"
     done
 
@@ -2602,6 +2623,7 @@ run_loop_with_restarts() {
                 CONSECUTIVE_FAILURES=0
                 EXTENSION_COUNT=0
                 STUCKNESS_COUNT=0
+                errsig_reset || true
                 STATUS="running"
                 LOG_ENTRIES=""
                 TEST_PASSED=""
@@ -2657,7 +2679,7 @@ run_loop_with_restarts() {
         fi
 
         if type emit_event >/dev/null 2>&1; then
-            emit_event "loop.restart" "restart=$RESTART_COUNT" "max=$MAX_RESTARTS" "iteration=$ITERATION"
+            emit_event "loop.restart" "restart=$RESTART_COUNT" "max=$MAX_RESTARTS" "reason=$STATUS" "iteration=$ITERATION"
         fi
         info "Session restart ${RESTART_COUNT}/${MAX_RESTARTS} — resetting iteration counter"
 
@@ -2668,6 +2690,7 @@ run_loop_with_restarts() {
         CONSECUTIVE_FAILURES=0
         EXTENSION_COUNT=0
         STUCKNESS_COUNT=0
+        errsig_reset || true
         STATUS="running"
         LOG_ENTRIES=""
         TEST_PASSED=""

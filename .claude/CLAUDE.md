@@ -204,6 +204,7 @@ The build stage delegates to `shipwright loop` for autonomous multi-iteration de
 - **Structured error feedback**: `error-summary.json` written after test failures with machine-readable error lines. Injected into the next iteration prompt as structured context.
 - **Fast test mode** (`--fast-test-cmd "cmd"`): Alternates between a fast subset test and the full suite. Full test runs on iteration 1, every N iterations (`--fast-test-interval`, default 5), and the final iteration.
 - **Agent roles** (`--roles "builder,reviewer,tester"`): In multi-agent mode, assigns specialization per agent. Built-in roles: `builder`, `reviewer`, `tester`, `optimizer`, `docs`, `security`.
+- **Repeated-failure dedup** (`loop.error_dedup_enabled`, default on): Each failing iteration's `error-summary.json` lines are normalized (timestamps, durations, ANSI, hex addresses, temp paths stripped; `file:line` and message kept) and hashed. When the same signature fails `loop.error_dedup_threshold` (default 2) iterations in a row, the loop emits `loop.error_signature_repeat`, injects a "Repeated Failure — Change Approach" section, widens failing test output to 200 lines, and rotates the continuity session if one is in use. One more repeat triggers an `error_repeat_restart` session restart when `--max-restarts` allows it (once per signature). Signatures are logged to `error-signatures.txt`. Disable with `LOOP_ERROR_DEDUP=0`.
 - **Context exhaustion detection**: When the daemon detects a build loop failed due to iteration exhaustion (not a code error), it tags the failure as `context_exhaustion` and boosts `--max-restarts` on retry.
 
 ## Pipeline Templates
@@ -326,7 +327,9 @@ Tune the build loop's resilience and restart behavior:
     "max_extensions": 3,
     "context_restart_limit": 3,
     "hard_restart_cap": 5,
-    "max_restarts": 3
+    "max_restarts": 3,
+    "error_dedup_enabled": true,
+    "error_dedup_threshold": 2
   }
 }
 ```
@@ -340,6 +343,8 @@ Tune the build loop's resilience and restart behavior:
 | `context_restart_limit`     | `3`     | Max restarts due to context exhaustion            |
 | `hard_restart_cap`          | `5`     | Absolute maximum restarts regardless of cause     |
 | `max_restarts`              | `3`     | Default restart limit for daemon-driven loops     |
+| `error_dedup_enabled`       | `true`  | Escalate on consecutive identical failure signatures |
+| `error_dedup_threshold`     | `2`     | Identical consecutive failures before escalating (min 2) |
 
 ## Constitutional AI
 

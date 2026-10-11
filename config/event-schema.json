@@ -1697,6 +1697,16 @@
         "trimmed"
       ]
     },
+    "loop.error_signature_repeat": {
+      "required": [],
+      "optional": [
+        "signature",
+        "repeat_count",
+        "threshold",
+        "action",
+        "iteration"
+      ]
+    },
     "loop.iteration": {
       "required": [
         "iteration"

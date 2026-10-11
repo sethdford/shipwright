@@ -98,8 +98,14 @@ compose_prompt() {
     elif $TEST_PASSED; then
         test_section="$TEST_OUTPUT"
     else
+        # Escalated repeat failure (lib/loop-error-signature.sh): the 50-line
+        # tail evidently wasn't enough to fix it, so show more of the log.
+        local failed_output="$TEST_OUTPUT"
+        if [[ -n "${ERRSIG_ACTION:-}" && -f "${TEST_LOG_FILE:-}" ]]; then
+            failed_output="$(tail -200 "$TEST_LOG_FILE" 2>/dev/null || echo "$TEST_OUTPUT")"
+        fi
         test_section="TESTS FAILED — fix these before proceeding:
-$TEST_OUTPUT"
+$failed_output"
     fi
 
     # Structured error context (machine-readable)
@@ -389,6 +395,9 @@ ${git_log}
 ## Test Results (Previous Iteration)
 ${test_section}
 
+${ERRSIG_HINT:+## Repeated Failure — Change Approach
+$ERRSIG_HINT
+}
 ${error_summary_section:+$error_summary_section
 }
 ${memory_section:+## Memory Context

@@ -903,6 +903,278 @@ else
 fi
 
 # ═══════════════════════════════════════════════════════════════════════════════
+# ERROR SIGNATURE DEDUP (lib/loop-error-signature.sh)
+# ═══════════════════════════════════════════════════════════════════════════════
+# Behavioral: each case sources the lib in a fresh shell under set -euo pipefail
+# with its own LOG_DIR and a stub emit_event that records to events.log.
+echo ""
+echo -e "${DIM}  error signature dedup${RESET}"
+
+_errsig_harness="$TEST_TEMP_DIR/errsig-harness.sh"
+cat > "$_errsig_harness" <<'HARNESS'
+set -euo pipefail
+source "$ERRSIG_SRC/lib/compat.sh" >/dev/null 2>&1
+source "$ERRSIG_SRC/lib/loop-error-signature.sh"
+LOG_DIR=$(mktemp -d "$ERRSIG_TMP/errsig.XXXXXX")
+ITERATION=0; TEST_PASSED=false; MAX_RESTARTS=0; RESTART_COUNT=0
+EVENTS="$LOG_DIR/events.log"; : > "$EVENTS"
+emit_event() { echo "$*" >> "$EVENTS"; }
+# _fail "line1" ["line2" ...] — one failing iteration with these error lines
+_fail() {
+    ITERATION=$((ITERATION + 1)); TEST_PASSED=false
+    printf '%s\n' "$@" | jq -R . | jq -s '{error_lines: .}' > "$LOG_DIR/error-summary.json"
+    errsig_update
+}
+_pass() { ITERATION=$((ITERATION + 1)); TEST_PASSED=true; errsig_update; }
+_events() { grep -c 'loop.error_signature_repeat' "$EVENTS" || true; }
+_hash_of() { printf '%s\n' "$@" | jq -R . | jq -s '{error_lines: .}' > "$LOG_DIR/h.json"; errsig_compute "$LOG_DIR/h.json"; }
+errsig_load_config
+HARNESS
+
+_errsig() {
+    ERRSIG_SRC="$SCRIPT_DIR" ERRSIG_TMP="$TEST_TEMP_DIR" \
+        bash -c 'source "$1"; eval "$2"' _ "$_errsig_harness" "$1" 2>/dev/null || echo "CRASH"
+}
+
+# ─── Signature extraction ───
+_out=$(_errsig 'errsig_normalize_line "$(printf "\033[31mFAIL\033[0m src/a.test.ts:12 boom (12 ms) at 2026-10-11T02:52:07Z ptr 0xDEADbeef in /tmp/tmp.Ab1/x.log")"')
+if [[ "$_out" == "fail src/a.test.ts:12 boom (<dur>) at <ts> ptr <addr> in <tmp>" ]]; then
+    assert_pass "normalize strips ANSI, timestamps, durations, addresses, temp paths"
+else
+    assert_fail "normalize strips ANSI, timestamps, durations, addresses, temp paths" "got: $_out"
+fi
+
+_out=$(_errsig '[[ "$(_hash_of "FAIL a.sh:3 boom (1.2s)")" == "$(_hash_of "FAIL  a.sh:3 boom (9.9s)")" ]] && echo same')
+if [[ "$_out" == "same" ]]; then
+    assert_pass "lines differing only in duration/whitespace share a signature"
+else
+    assert_fail "lines differing only in duration/whitespace share a signature" "got: $_out"
+fi
+
+_out=$(_errsig '[[ "$(_hash_of "FAIL a.sh:3 boom")" != "$(_hash_of "FAIL a.sh:4 boom")" ]] && echo differ')
+if [[ "$_out" == "differ" ]]; then
+    assert_pass "a different line number gives a different signature"
+else
+    assert_fail "a different line number gives a different signature" "got: $_out"
+fi
+
+_out=$(_errsig '[[ "$(_hash_of "FAIL x.sh:1 a" "FAIL y.sh:2 b")" == "$(_hash_of "FAIL y.sh:2 b" "FAIL x.sh:1 a")" ]] && echo same')
+if [[ "$_out" == "same" ]]; then
+    assert_pass "error line order does not change the signature"
+else
+    assert_fail "error line order does not change the signature" "got: $_out"
+fi
+
+_out=$(_errsig 'h=$(errsig_compute "$LOG_DIR/missing.json"); echo "[$h]"')
+if [[ "$_out" == "[]" ]]; then
+    assert_pass "missing error-summary.json gives an empty signature"
+else
+    assert_fail "missing error-summary.json gives an empty signature" "got: $_out"
+fi
+
+_out=$(_errsig 'echo "{not json" > "$LOG_DIR/error-summary.json"; h=$(errsig_compute "$LOG_DIR/error-summary.json"); echo "[$h]"')
+if [[ "$_out" == "[]" ]]; then
+    assert_pass "malformed JSON gives an empty signature without failing"
+else
+    assert_fail "malformed JSON gives an empty signature without failing" "got: $_out"
+fi
+
+_out=$(_errsig 'PATH=/nonexistent; _fail_nojq() { ITERATION=1; TEST_PASSED=false; echo "{\"error_lines\":[\"FAIL a.sh:1\"]}" > "$LOG_DIR/error-summary.json"; errsig_update; }; _fail_nojq; _fail_nojq; echo "$ERRSIG_REPEAT_COUNT|$ERRSIG_ACTION"')
+if [[ "$_out" == "0|" ]]; then
+    assert_pass "without jq dedup degrades to a no-op"
+else
+    assert_fail "without jq dedup degrades to a no-op" "got: $_out"
+fi
+
+_out=$(_errsig '_fail "   " ""; _fail "   " ""; echo "$ERRSIG_REPEAT_COUNT|$(_events)"')
+if [[ "$_out" == "0|0" ]]; then
+    assert_pass "blank error lines produce no signature and no escalation"
+else
+    assert_fail "blank error lines produce no signature and no escalation" "got: $_out"
+fi
+
+# ─── Repeat detection ───
+_out=$(_errsig '_fail "FAIL a.sh:3 boom"; echo "$ERRSIG_REPEAT_COUNT|$ERRSIG_ACTION|$(_events)"')
+if [[ "$_out" == "1||0" ]]; then
+    assert_pass "a single failure is not a repeat"
+else
+    assert_fail "a single failure is not a repeat" "got: $_out"
+fi
+
+_out=$(_errsig '_fail "FAIL a.sh:3 boom"; _fail "FAIL b.sh:9 other"; echo "$ERRSIG_REPEAT_COUNT|$ERRSIG_ACTION"')
+if [[ "$_out" == "1|" ]]; then
+    assert_pass "a different signature resets the count"
+else
+    assert_fail "a different signature resets the count" "got: $_out"
+fi
+
+_out=$(_errsig '_fail "FAIL a.sh:3 boom"; _pass; _fail "FAIL a.sh:3 boom"; echo "$ERRSIG_REPEAT_COUNT|$ERRSIG_ACTION|$(_events)"')
+if [[ "$_out" == "1||0" ]]; then
+    assert_pass "a passing iteration breaks the repeat chain"
+else
+    assert_fail "a passing iteration breaks the repeat chain" "got: $_out"
+fi
+
+# write_error_summary also writes on PASSING iterations whose log says "error".
+_out=$(_errsig 'for i in 1 2 3; do echo "{\"error_lines\":[\"error: noise\"]}" > "$LOG_DIR/error-summary.json"; _pass; done; echo "$ERRSIG_REPEAT_COUNT|$(_events)"')
+if [[ "$_out" == "0|0" ]]; then
+    assert_pass "error text on passing iterations is never counted"
+else
+    assert_fail "error text on passing iterations is never counted" "got: $_out"
+fi
+
+_out=$(_errsig '_fail "FAIL a.sh:3 boom"; _fail "FAIL a.sh:3 boom"; echo "$(cut -d"|" -f3 "$LOG_DIR/error-signatures.txt" | tr "\n" ,)|$(jq -r ".signature_repeat_count" "$LOG_DIR/error-summary.json")|$(jq -r ".signature | length" "$LOG_DIR/error-summary.json")|$(ls "$LOG_DIR" | grep -c "\.tmp\." || true)"')
+if [[ "$_out" == "1,2,|2|32|0" ]]; then
+    assert_pass "signatures recorded to error-signatures.txt and error-summary.json atomically"
+else
+    assert_fail "signatures recorded to error-signatures.txt and error-summary.json atomically" "got: $_out"
+fi
+
+# ─── Escalation trigger ───
+_out=$(_errsig '_fail "FAIL a.sh:3 boom"; _fail "FAIL a.sh:3 boom"; echo "$ERRSIG_REPEAT_COUNT|$ERRSIG_ACTION|$(_events)|$(grep -o "action=[a-z_]*" "$EVENTS")"')
+if [[ "$_out" == "2|widen_context|1|action=widen_context" ]]; then
+    assert_pass "two identical failures escalate to widen_context with one event"
+else
+    assert_fail "two identical failures escalate to widen_context with one event" "got: $_out"
+fi
+
+_out=$(_errsig '_fail "FAIL src/a.sh:3 boom"; _fail "FAIL src/a.sh:3 boom"; printf "%s" "$ERRSIG_HINT"')
+if [[ "$_out" == *"SAME error signature"* && "$_out" == *"src/a.sh:3"* && "$_out" == *"Full test log"* ]]; then
+    assert_pass "escalation hint names the repeat, the failing location and the log"
+else
+    assert_fail "escalation hint names the repeat, the failing location and the log" "got: $_out"
+fi
+
+_out=$(_errsig 'MAX_RESTARTS=2; for i in 1 2 3; do _fail "FAIL a.sh:3 boom"; done; echo "$ERRSIG_ACTION|$(tail -1 "$EVENTS" | grep -o "action=[a-z_]*")"')
+if [[ "$_out" == "session_restart|action=session_restart" ]]; then
+    assert_pass "a third identical failure requests a session restart"
+else
+    assert_fail "a third identical failure requests a session restart" "got: $_out"
+fi
+
+_out=$(_errsig 'MAX_RESTARTS=0; for i in 1 2 3; do _fail "FAIL a.sh:3 boom"; done; echo "$ERRSIG_ACTION|$(tail -1 "$EVENTS" | grep -o "action=[a-z_]*")"')
+if [[ "$_out" == "widen_context|action=restart_unavailable" ]]; then
+    assert_pass "no restart budget stays at widen_context (restart_unavailable)"
+else
+    assert_fail "no restart budget stays at widen_context (restart_unavailable)" "got: $_out"
+fi
+
+_out=$(_errsig 'MAX_RESTARTS=3; _fail "FAIL a.sh:3 boom"; ERRSIG_RESTARTED_HASHES=" $ERRSIG_LAST_HASH"; errsig_reset; for i in 1 2 3; do _fail "FAIL a.sh:3 boom"; done; echo "$ERRSIG_ACTION|$(tail -1 "$EVENTS" | grep -o "action=[a-z_]*")"')
+if [[ "$_out" == "widen_context|action=restart_exhausted" ]]; then
+    assert_pass "a signature that already restarted cannot restart again"
+else
+    assert_fail "a signature that already restarted cannot restart again" "got: $_out"
+fi
+
+_out=$(_errsig 'MAX_RESTARTS=2; for i in 1 2 3; do _fail "FAIL a.sh:3 boom"; done; errsig_reset; echo "$ERRSIG_REPEAT_COUNT|$ERRSIG_ACTION|[$ERRSIG_HINT]|[$ERRSIG_LAST_HASH]"')
+if [[ "$_out" == "0||[]|[]" ]]; then
+    assert_pass "errsig_reset clears per-session state"
+else
+    assert_fail "errsig_reset clears per-session state" "got: $_out"
+fi
+
+_out=$(_errsig 'LOOP_SESSION_ID=11111111-2222-4333-8444-555555555555; _fail "FAIL a.sh:3 boom"; _fail "FAIL a.sh:3 boom"; [[ "$LOOP_SESSION_ID" != 11111111-2222-4333-8444-555555555555 && -n "$LOOP_SESSION_ID" ]] && echo rotated')
+if [[ "$_out" == "rotated" ]]; then
+    assert_pass "escalation rotates the continuity session id"
+else
+    assert_fail "escalation rotates the continuity session id" "got: $_out"
+fi
+
+_out=$(_errsig '_fail "FAIL a.sh:3 boom"; _fail "FAIL a.sh:3 boom"; echo "[${LOOP_SESSION_ID:-}]"')
+if [[ "$_out" == "[]" ]]; then
+    assert_pass "escalation leaves continuity off when it was off"
+else
+    assert_fail "escalation leaves continuity off when it was off" "got: $_out"
+fi
+
+# ─── Gating ───
+_out=$(LOOP_ERROR_DEDUP=0 _errsig 'MAX_RESTARTS=2; for i in 1 2 3; do _fail "FAIL a.sh:3 boom"; done; echo "$ERROR_DEDUP_ENABLED|$ERRSIG_REPEAT_COUNT|[$ERRSIG_HINT]|$(_events)|$(ls "$LOG_DIR" | grep -c error-signatures || true)"')
+if [[ "$_out" == "false|0|[]|0|0" ]]; then
+    assert_pass "LOOP_ERROR_DEDUP=0 disables dedup entirely"
+else
+    assert_fail "LOOP_ERROR_DEDUP=0 disables dedup entirely" "got: $_out"
+fi
+
+_out=$(SW_LOOP_ERROR_DEDUP_ENABLED=false _errsig 'echo "$ERROR_DEDUP_ENABLED"')
+if [[ "$_out" == "false" ]]; then
+    assert_pass "loop.error_dedup_enabled=false disables dedup"
+else
+    assert_fail "loop.error_dedup_enabled=false disables dedup" "got: $_out"
+fi
+
+_out=$(SW_LOOP_ERROR_DEDUP_THRESHOLD=3 _errsig '_fail "FAIL a.sh:3 boom"; _fail "FAIL a.sh:3 boom"; a2="$ERRSIG_ACTION"; _fail "FAIL a.sh:3 boom"; echo "[$a2]|$ERRSIG_ACTION"')
+if [[ "$_out" == "[]|widen_context" ]]; then
+    assert_pass "loop.error_dedup_threshold=3 delays escalation to the third repeat"
+else
+    assert_fail "loop.error_dedup_threshold=3 delays escalation to the third repeat" "got: $_out"
+fi
+
+_out=$(SW_LOOP_ERROR_DEDUP_THRESHOLD=1 _errsig 'echo "$ERROR_DEDUP_ENABLED|$ERROR_DEDUP_THRESHOLD"')
+if [[ "$_out" == "true|2" ]]; then
+    assert_pass "dedup defaults on with threshold clamped to at least 2"
+else
+    assert_fail "dedup defaults on with threshold clamped to at least 2" "got: $_out"
+fi
+
+# ─── Wiring into the loop ───
+if grep -A1 '^ *write_error_summary$' "$SCRIPT_DIR/sw-loop.sh" | grep -q 'errsig_update'; then
+    assert_pass "errsig_update runs right after write_error_summary"
+else
+    assert_fail "errsig_update runs right after write_error_summary"
+fi
+
+_resets=$(grep -c '^ *errsig_reset' "$SCRIPT_DIR/sw-loop.sh" || true)
+if [[ "${_resets:-0}" -ge 2 ]]; then
+    assert_pass "errsig_reset runs in both restart paths"
+else
+    assert_fail "errsig_reset runs in both restart paths" "found ${_resets:-0}"
+fi
+
+if grep -q 'STATUS="error_repeat_restart"' "$SCRIPT_DIR/sw-loop.sh" \
+    && grep -q 'ERRSIG_RESTARTED_HASHES="${ERRSIG_RESTARTED_HASHES} ${ERRSIG_LAST_HASH}"' "$SCRIPT_DIR/sw-loop.sh"; then
+    assert_pass "session_restart breaks with error_repeat_restart and records the signature"
+else
+    assert_fail "session_restart breaks with error_repeat_restart and records the signature"
+fi
+
+# compose_prompt is invoked for real: the section must reach the prompt text.
+_compose_with() {
+    bash -c '
+        source "'"$SCRIPT_DIR"'/lib/compat.sh" >/dev/null 2>&1
+        source "'"$SCRIPT_DIR"'/lib/loop-iteration.sh" >/dev/null 2>&1
+        git_recent_log() { echo "abc123 commit"; }
+        compose_audit_section() { :; }; compose_audit_feedback_section() { :; }
+        GOAL="g"; ITERATION=3; MAX_ITERATIONS=5; LOG_ENTRIES=""; TEST_CMD="npm test"
+        TEST_PASSED=false; TEST_OUTPUT="short tail"; LOG_DIR="'"$TEST_TEMP_DIR"'"
+        PROJECT_ROOT="'"$TEST_TEMP_DIR"'"; STATE_DIR="'"$TEST_TEMP_DIR"'"
+        '"$1"'
+        compose_prompt
+    ' 2>/dev/null || true
+}
+_p=$(_compose_with 'ERRSIG_HINT="same failure twice"; ERRSIG_ACTION=widen_context')
+if [[ "$_p" == *"## Repeated Failure — Change Approach"*"same failure twice"* ]]; then
+    assert_pass "compose_prompt injects the repeated-failure hint"
+else
+    assert_fail "compose_prompt injects the repeated-failure hint"
+fi
+
+_p=$(_compose_with 'ERRSIG_HINT=""; ERRSIG_ACTION=""')
+if [[ -n "$_p" && "$_p" != *"Repeated Failure"* ]]; then
+    assert_pass "compose_prompt omits the hint when not escalated"
+else
+    assert_fail "compose_prompt omits the hint when not escalated"
+fi
+
+seq 1 300 | sed 's/^/log line /' > "$TEST_TEMP_DIR/errsig-tests.log"
+_p=$(_compose_with 'ERRSIG_HINT="h"; ERRSIG_ACTION=widen_context; TEST_LOG_FILE="'"$TEST_TEMP_DIR"'/errsig-tests.log"')
+if [[ "$_p" == *"log line 101"* && "$_p" != *"log line 100
+"* && "$_p" != *"short tail"* ]]; then
+    assert_pass "escalation widens failing test output to the last 200 log lines"
+else
+    assert_fail "escalation widens failing test output to the last 200 log lines"
+fi
+
+# ═══════════════════════════════════════════════════════════════════════════════
 # RESULTS
 # ═══════════════════════════════════════════════════════════════════════════════
 

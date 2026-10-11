@@ -48,6 +48,8 @@
     "max_restarts": 0,
     "fast_test_interval": 5,
     "convergence_threshold": 3,
+    "error_dedup_enabled": true,
+    "error_dedup_threshold": 2,
     "multi_agent_sleep": 5,
     "context_budget_chars": 180000,
     "context_trim_memory_chars": 20000,
