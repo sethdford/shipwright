@@ -1,1 +1,26 @@
-{"type":"result","subtype":"success","is_error":false,"duration_ms":9837,"duration_api_ms":311675,"num_turns":2,"result":"The same 6 failures exist without my changes — confirmed pre-existing. My changes introduced no regressions.\n\n**Final status:**\n- **Main goal** (commit `5641f7b`): Fixed misleading \"jq not available\" warning when Claude outputs a JSON object — `sw-loop.sh` now handles both arrays and objects in Case 2.\n- **Test fix** (commit `0d897c1`): Fixed `sw-cost-test.sh` by showing context efficiency even when no cost entries fall within the period.\n- **6 pre-existing failures** in `sw-pipeline-test.sh` (E2E pipeline tests requiring live Claude) — unrelated to this issue, present before and after my changes.\n\nLOOP_COMPLETE","stop_reason":"end_turn","session_id":"5b2ab48e-dc20-4503-8af1-9eaac1d19535","total_cost_usd":1.93753455,"usage":{"input_tokens":4,"cache_creation_input_tokens":761,"cache_read_input_tokens":191892,"output_tokens":294,"server_tool_use":{"web_search_requests":0,"web_fetch_requests":0},"service_tier":"standard","cache_creation":{"ephemeral_1h_input_tokens":761,"ephemeral_5m_input_tokens":0},"inference_geo":"","iterations":[],"speed":"standard"},"modelUsage":{"claude-sonnet-4-6":{"inputTokens":67,"outputTokens":12162,"cacheReadInputTokens":4878521,"cacheCreationInputTokens":72775,"webSearchRequests":0,"costUSD":1.9190935500000001,"contextWindow":200000,"maxOutputTokens":32000},"claude-haiku-4-5-20251001":{"inputTokens":15541,"outputTokens":580,"cacheReadInputTokens":0,"cacheCreationInputTokens":0,"webSearchRequests":0,"costUSD":0.018441,"contextWindow":200000,"maxOutputTokens":32000}},"permission_denials":[],"terminal_reason":"completed","fast_mode_state":"off","uuid":"d1ae553f-d751-4043-bbc4-a8ecb15508bb"}
+The split is finished and every acceptance check passes. Nothing needed fixing this iteration, so I made no new commit. The last iteration's failures were not real problems with the code.
+
+**Root Cause Hypothesis** (ranked)
+1. **Flaky under parallel load.** The suites that failed only fail when `npm test` runs all 162 at once, and they have nothing to do with the loop. Confirmed below.
+2. **A syntax error from the refactor.** Ruled out: `bash -n` is clean on `sw-loop.sh` and all `lib/loop-*.sh` modules.
+3. **A real problem in the code.** Ruled out: the audit finding was the review tool rejecting its own `--json-schema` argument, not a comment on the code.
+
+**Evidence Gathered**
+- The `sw-cost-test.sh:226` failure from last iteration: run alone, the suite exits 0. This branch doesn't touch `sw-cost*`.
+- In the full `npm test` run, 160 of 162 suites passed. The two failures were `sw-project-detect-test` and `sw-self-optimize-test`. Run alone, both pass on this branch and on `main`, and the branch doesn't touch either one.
+- The test files are unchanged: `git diff --exit-code main -- 'scripts/*-test.sh'` exits 0.
+
+**Fix Strategy**
+I changed no code. Changing passing code to chase failures that come from running suites in parallel would make things worse. The fix for that flakiness belongs in those suites, not in this refactor. I reverted two state files the test run had modified (`.claude/intelligence-cache.json` and `.claude/platform-hygiene.json`) so they don't show up in the diff.
+
+**Verification Plan and results**
+- **Targeted suites:** all exit 0. That covers loop (74 tests), convergence, heartbeat (17), recruit, agi-roadmap (53), autoresearch-e2e (25), session-restart, e2e-system (17), cost and lib-compat (72).
+- **File sizes:** `sw-loop.sh` is 1,208 lines. The largest script is now `sw-memory.sh` at 2,241, so `sw-loop.sh` is no longer at the top.
+- **`shipwright docs check`:** exits 0, with 6 of 6 sections fresh. The leftover-file problem from last iteration is gone.
+- **Missing-module guard:** with `lib/loop-session.sh` deleted, `sw-loop.sh` exits 1 with `ERROR: missing …/lib/loop-session.sh — reinstall shipwright`.
+
+**Test Pyramid Breakdown and Coverage Targets:** I added no tests. The goal requires the existing suites to pass unchanged, and they cover the loop's behaviour (`sw-loop-test`, `sw-convergence-test`), how it fits with other components (`sw-session-restart-test`, `sw-heartbeat-test`) and end-to-end runs (`sw-e2e-system-test`).
+
+**Critical Paths to Test:** The normal path is covered by the 74 loop-suite tests and the 17 end-to-end tests. Error cases covered are the missing-module guard (checked by hand above) and the convergence suite's circuit-breaker tests. Edge cases covered are session-continuity flag passthrough and restarts per agent.
+
+LOOP_COMPLETE
