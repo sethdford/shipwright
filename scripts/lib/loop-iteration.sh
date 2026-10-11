@@ -700,3 +700,555 @@ extract_summary() {
 
     echo "$summary"
 }
+
+# ─── Adaptive Model Selection ────────────────────────────────────────────────
+# Uses intelligence engine when available, falls back to defaults.
+select_adaptive_model() {
+    local role="${1:-build}"
+    local default_model="${2:-opus}"
+    # If user explicitly set --model, respect it
+    if [[ "$default_model" != "${SW_MODEL:-opus}" ]]; then
+        echo "$default_model"
+        return 0
+    fi
+    # Read learned model routing
+    local _routing_file="${HOME}/.shipwright/optimization/model-routing.json"
+    if [[ -f "$_routing_file" ]] && command -v jq >/dev/null 2>&1; then
+        local _routed_model
+        _routed_model=$(jq -r --arg r "$role" '.routes[$r].model // ""' "$_routing_file" 2>/dev/null) || true
+        if [[ -n "${_routed_model:-}" && "${_routed_model:-}" != "null" ]]; then
+            echo "${_routed_model}"
+            return 0
+        fi
+    fi
+
+    # Try intelligence-based recommendation
+    if type intelligence_recommend_model >/dev/null 2>&1; then
+        local rec
+        rec=$(intelligence_recommend_model "$role" "${COMPLEXITY:-5}" "${BUDGET:-0}" 2>/dev/null || echo "")
+        if [[ -n "$rec" ]]; then
+            local recommended
+            recommended=$(echo "$rec" | jq -r '.model // ""' 2>/dev/null || echo "")
+            if [[ -n "$recommended" && "$recommended" != "null" ]]; then
+                echo "$recommended"
+                return 0
+            fi
+        fi
+    fi
+    echo "$default_model"
+}
+
+# Select audit/DoD model — uses haiku if success rate is high enough, else sonnet
+select_audit_model() {
+    local default_model
+    default_model=$(_smart_model "audit" "haiku")
+    local opt_file="$HOME/.shipwright/optimization/audit-tuning.json"
+    if [[ -f "$opt_file" ]] && command -v jq >/dev/null 2>&1; then
+        local success_rate
+        success_rate=$(jq -r '.haiku_success_rate // 100' "$opt_file" 2>/dev/null || echo "100")
+        if [[ "${success_rate%%.*}" -lt 90 ]]; then
+            echo "sonnet"
+            return 0
+        fi
+    fi
+    echo "$default_model"
+}
+
+# ─── Timing Helpers ───────────────────────────────────────────────────────────
+format_duration() {
+    local secs="$1"
+    local mins=$(( secs / 60 ))
+    local remaining_secs=$(( secs % 60 ))
+    if [[ $mins -gt 0 ]]; then
+        printf "%dm %ds" "$mins" "$remaining_secs"
+    else
+        printf "%ds" "$remaining_secs"
+    fi
+}
+
+# ─── Git Helpers ──────────────────────────────────────────────────────────────
+git_commit_count() {
+    git -C "$PROJECT_ROOT" rev-list --count HEAD 2>/dev/null || echo 0
+}
+
+git_recent_log() {
+    git -C "$PROJECT_ROOT" log --oneline -20 2>/dev/null || echo "(no commits)"
+}
+
+git_diff_stat() {
+    git -C "$PROJECT_ROOT" diff --stat HEAD~1 2>/dev/null | tail -1 || echo ""
+}
+
+git_auto_commit() {
+    local work_dir="${1:-$PROJECT_ROOT}"
+    # Only commit if there are changes
+    if git -C "$work_dir" diff --quiet && git -C "$work_dir" diff --cached --quiet; then
+        # Check for untracked files
+        local untracked
+        untracked="$(git -C "$work_dir" ls-files --others --exclude-standard | head -1)"
+        if [[ -z "$untracked" ]]; then
+            return 1  # Nothing to commit
+        fi
+    fi
+
+    git -C "$work_dir" add -A 2>/dev/null || true
+
+    # Semantic validation before commit — skip commit if validation fails
+    if ! validate_claude_output "$work_dir"; then
+        warn "Validation failed — skipping commit for this iteration"
+        git -C "$work_dir" reset --hard HEAD 2>/dev/null || true
+        return 1
+    fi
+
+    git -C "$work_dir" commit -m "loop: iteration $ITERATION — autonomous progress" --no-verify 2>/dev/null || return 1
+    return 0
+}
+
+# ─── Audit Prompt Sections ────────────────────────────────────────────────────
+compose_audit_section() {
+    if ! $AUDIT_ENABLED; then
+        return
+    fi
+
+    # Try to inject audit items from past review feedback in memory
+    local memory_audit_items=""
+    if [[ -f "$SCRIPT_DIR/sw-memory.sh" ]]; then
+        local mem_dir_path
+        mem_dir_path="$HOME/.shipwright/memory"
+        # Look for review feedback in any repo memory
+        local repo_hash_val
+        repo_hash_val=$(git config --get remote.origin.url 2>/dev/null | shasum -a 256 2>/dev/null | cut -c1-12 || echo "")
+        if [[ -n "$repo_hash_val" && -f "$mem_dir_path/$repo_hash_val/failures.json" ]]; then
+            memory_audit_items=$(jq -r '.failures[] | select(.stage == "review" and .pattern != "") |
+                "- Check for: \(.pattern[:100])"' \
+                "$mem_dir_path/$repo_hash_val/failures.json" 2>/dev/null | head -5 || true)
+        fi
+    fi
+
+    echo "## Self-Audit Checklist"
+    echo "Before declaring LOOP_COMPLETE, critically evaluate your own work:"
+    echo "1. Does the implementation FULLY satisfy the goal, not just partially?"
+    echo "2. Are there any edge cases you haven't handled?"
+    echo "3. Did you leave any TODO, FIXME, HACK, or XXX comments in new code?"
+    echo "4. Are all new functions/modules tested (if a test command exists)?"
+    echo "5. Would a code reviewer approve this, or would they request changes?"
+    echo "6. Is the code clean, well-structured, and following project conventions?"
+    if [[ -n "$memory_audit_items" ]]; then
+        echo ""
+        echo "Common review findings from this repo's history:"
+        echo "$memory_audit_items"
+    fi
+    echo ""
+    echo "If ANY answer is \"no\", do NOT output LOOP_COMPLETE. Instead, fix the issues first."
+}
+
+compose_audit_feedback_section() {
+    if [[ -z "$AUDIT_RESULT" ]] || [[ "$AUDIT_RESULT" == "pass" ]]; then
+        return
+    fi
+    cat <<AUDIT_FEEDBACK
+## Audit Feedback (Previous Iteration)
+An independent audit of your last iteration found these issues:
+${AUDIT_RESULT}
+
+Address ALL audit findings before proceeding with new work.
+AUDIT_FEEDBACK
+}
+
+compose_rejection_notice_section() {
+    if ! $COMPLETION_REJECTED; then
+        return
+    fi
+    COMPLETION_REJECTED=false
+    cat <<'REJECTION'
+## ⚠ Completion Rejected
+Your previous LOOP_COMPLETE was REJECTED because quality gates did not pass.
+Review the audit feedback and test results above, fix the issues, then try again.
+Do NOT output LOOP_COMPLETE until all quality checks pass.
+REJECTION
+}
+
+# ─── Main: Single-Agent Loop ──────────────────────────────────────────────────
+run_single_agent_loop() {
+    # Save original environment variables before loop starts
+    local SAVED_CLAUDE_MODEL="${CLAUDE_MODEL:-}"
+    local SAVED_ANTHROPIC_API_KEY="${ANTHROPIC_API_KEY:-}"
+
+    # One session ID per entry; see loop_session_init (#816).
+    loop_session_init
+
+    if [[ "$SESSION_RESTART" == "true" ]]; then
+        # Restart: state already reset by run_loop_with_restarts, skip init
+        # Restore environment variables for clean iteration state
+        [[ -n "$SAVED_CLAUDE_MODEL" ]] && export CLAUDE_MODEL="$SAVED_CLAUDE_MODEL"
+        # Reset context exhaustion counter for this session (it tracks restarts WITHIN a single session)
+        CONTEXT_RESTART_COUNT=0
+        info "Session restart ${RESTART_COUNT}/${MAX_RESTARTS} — fresh context, reading progress"
+    elif $RESUME; then
+        resume_state
+    else
+        initialize_state
+    fi
+
+    # Ensure LOOP_START_COMMIT is set (may not be on resume/restart)
+    if [[ -z "${LOOP_START_COMMIT:-}" ]]; then
+        LOOP_START_COMMIT="$(git -C "$PROJECT_ROOT" rev-parse HEAD 2>/dev/null || echo "")"
+    fi
+
+    # Apply adaptive budget/model before showing banner
+    apply_adaptive_budget
+    MODEL="$(select_adaptive_model "build" "$MODEL")"
+
+    # Track applied memory fix patterns for outcome recording
+    _applied_fix_pattern=""
+    STUCKNESS_COUNT=0
+    STUCKNESS_TRACKING_FILE="$LOG_DIR/stuckness-tracking.txt"
+    : > "$STUCKNESS_TRACKING_FILE" 2>/dev/null || true
+    : > "${LOG_DIR}/strategy-attempts.txt" 2>/dev/null || true
+
+    show_banner
+
+    while true; do
+        # Reset environment variables at start of each iteration
+        # Prevents previous iterations from affecting model selection or API keys
+        [[ -n "$SAVED_CLAUDE_MODEL" ]] && export CLAUDE_MODEL="$SAVED_CLAUDE_MODEL"
+        [[ -n "$SAVED_ANTHROPIC_API_KEY" ]] && export ANTHROPIC_API_KEY="$SAVED_ANTHROPIC_API_KEY"
+
+        # Pre-checks (before incrementing — ITERATION tracks completed count)
+        check_circuit_breaker || break
+        check_max_iterations || break
+        check_budget_gate || {
+            STATUS="budget_exhausted"
+            write_state
+            write_progress
+            error "Budget exhausted — stopping pipeline"
+            show_summary
+            return 1
+        }
+        ITERATION=$(( ITERATION + 1 ))
+
+        # Emit iteration start event for pipeline visibility
+        if type emit_event >/dev/null 2>&1; then
+            emit_event "loop.iteration_start" \
+                "iteration=$ITERATION" \
+                "max=$MAX_ITERATIONS" \
+                "job_id=${PIPELINE_JOB_ID:-loop-$$}" \
+                "agent=${AGENT_NUM:-1}" \
+                "test_passed=${TEST_PASSED:-unknown}"
+        fi
+
+        # Root-cause diagnosis and memory-based fix on retry after test failure
+        if [[ "${TEST_PASSED:-}" == "false" ]]; then
+            # Source memory module for diagnosis and fix lookup
+            [[ -f "$SCRIPT_DIR/sw-memory.sh" ]] && source "$SCRIPT_DIR/sw-memory.sh" 2>/dev/null || true
+
+            # Capture failure for memory (enables memory_analyze_failure and future fix lookup)
+            if type memory_capture_failure &>/dev/null && [[ -n "${TEST_OUTPUT:-}" ]]; then
+                memory_capture_failure "test" "$TEST_OUTPUT" 2>/dev/null || true
+            fi
+
+            # Pattern-based diagnosis (no Claude needed) — inject into goal for smarter retry
+            local _changed_files=""
+            _changed_files=$(git diff --name-only HEAD 2>/dev/null | head -50 | tr '\n' ',' | sed 's/,$//')
+            local _diagnosis
+            _diagnosis=$(diagnose_failure "${TEST_OUTPUT:-}" "$_changed_files" "$ITERATION" 2>/dev/null || true)
+
+            if [[ -n "$_diagnosis" ]]; then
+                GOAL="${GOAL}
+
+${_diagnosis}"
+                info "Failure diagnosis injected (classification from error pattern)"
+            fi
+
+            # Memory-based fix suggestion (from past successful fixes)
+            local _last_error=""
+            local _prev_log="$LOG_DIR/iteration-$(( ITERATION - 1 )).log"
+            if [[ -f "$_prev_log" ]]; then
+                _last_error=$(tail -20 "$_prev_log" 2>/dev/null | grep -iE '(error|fail|exception)' | head -1 || true)
+            fi
+            [[ -z "$_last_error" ]] && _last_error=$(echo "${TEST_OUTPUT:-}" | head -3 | tr '\n' ' ')
+            local _fix_suggestion=""
+            if type memory_closed_loop_inject >/dev/null 2>&1 && [[ -n "${_last_error:-}" ]]; then
+                _fix_suggestion=$(memory_closed_loop_inject "$_last_error" 2>/dev/null) || true
+            fi
+            if [[ -n "${_fix_suggestion:-}" ]]; then
+                _applied_fix_pattern="${_last_error}"
+                GOAL="KNOWN FIX (from past success): ${_fix_suggestion}
+
+${GOAL}"
+                info "Memory fix injected: ${_fix_suggestion:0:80}"
+                # Track memory injection for effectiveness measurement
+                if type memeff_on_injection >/dev/null 2>&1; then
+                    memeff_on_injection "closed_loop_fix" "${PIPELINE_JOB_ID:-$$}" "build" 2>/dev/null || true
+                fi
+            fi
+
+            # Analyze failure via Claude (background, non-blocking) for richer root_cause/fix in memory
+            if type memory_analyze_failure &>/dev/null && [[ "${INTELLIGENCE_ENABLED:-auto}" != "false" ]]; then
+                local _test_log="${TEST_LOG_FILE:-$LOG_DIR/tests-iter-$(( ITERATION - 1 )).log}"
+                if [[ -f "$_test_log" ]]; then
+                    memory_analyze_failure "$_test_log" "test" 2>/dev/null &
+                fi
+            fi
+        fi
+
+        # Run Claude
+        local exit_code=0
+        run_claude_iteration || exit_code=$?
+
+        local log_file="$LOG_DIR/iteration-${ITERATION}.log"
+
+        # Record iteration data for stuckness detection (diff hash, error hash, exit code)
+        record_iteration_stuckness_data "$exit_code"
+
+        # Dark factory: score this iteration with process reward model
+        if type process_reward_score_iteration >/dev/null 2>&1; then
+            process_reward_score_iteration "$PROJECT_ROOT" "${TEST_OUTPUT:-}" "$ITERATION" 2>/dev/null || true
+        fi
+
+        # Detect fatal CLI errors (API key, auth, network) — abort immediately
+        if check_fatal_error "$log_file" "$exit_code"; then
+            STATUS="error"
+            write_state
+            write_progress
+            error "Fatal CLI error detected — aborting loop (see iteration log)"
+            show_summary
+            return 1
+        fi
+
+        # Detect context exhaustion and trigger intelligent restart
+        local log_content=""
+        [[ -f "$log_file" ]] && log_content=$(cat "$log_file" 2>/dev/null || true)
+        local stderr_file="${LOG_DIR}/iteration-${ITERATION}.stderr"
+        local stderr_content=""
+        [[ -f "$stderr_file" ]] && stderr_content=$(cat "$stderr_file" 2>/dev/null || true)
+
+        if echo "${log_content}${stderr_content}" | grep -qiE "$CONTEXT_EXHAUSTION_PATTERNS" 2>/dev/null; then
+            if [[ "${CONTEXT_RESTART_COUNT:-0}" -lt "${CONTEXT_RESTART_LIMIT:-2}" ]]; then
+                CONTEXT_RESTART_COUNT=$(( CONTEXT_RESTART_COUNT + 1 ))
+                STATUS="context_exhaustion_restart"
+                write_state
+                write_progress
+                warn "Context exhaustion detected (iteration $ITERATION) — triggering intelligent restart ($CONTEXT_RESTART_COUNT/$CONTEXT_RESTART_LIMIT)"
+                if type emit_event >/dev/null 2>&1; then
+                    emit_event "loop.context_exhaustion" "iteration=$ITERATION" "restart_count=$CONTEXT_RESTART_COUNT" "max_restarts=$MAX_RESTARTS"
+                fi
+                break
+            else
+                warn "Context exhaustion detected but restart limit ($CONTEXT_RESTART_LIMIT) reached"
+                STATUS="context_exhaustion_fatal"
+                write_state
+                write_progress
+            fi
+        fi
+
+        # Mid-loop memory refresh — re-query with current error context after iteration 3
+        if [[ "$ITERATION" -ge 3 ]] && type memory_inject_context >/dev/null 2>&1; then
+            local refresh_ctx
+            refresh_ctx=$(tail -20 "$log_file" 2>/dev/null || true)
+            if [[ -n "$refresh_ctx" ]]; then
+                local refreshed_memory
+                refreshed_memory=$(memory_inject_context "build" "$refresh_ctx" 2>/dev/null | head -5 || true)
+                if [[ -n "$refreshed_memory" ]]; then
+                    # Append to next iteration's memory context
+                    local memory_refresh_file="$LOG_DIR/memory-refresh-${ITERATION}.txt"
+                    echo "$refreshed_memory" > "$memory_refresh_file"
+                    # Track memory injection for effectiveness measurement
+                    if type memeff_on_injection >/dev/null 2>&1; then
+                        memeff_on_injection "context_refresh" "${PIPELINE_JOB_ID:-$$}" "build" 2>/dev/null || true
+                    fi
+                fi
+            fi
+        fi
+
+        # Auto-commit if Claude didn't
+        local commits_before
+        commits_before="$(git_commit_count)"
+        git_auto_commit "$PROJECT_ROOT" || true
+        local commits_after
+        commits_after="$(git_commit_count)"
+        local new_commits=$(( commits_after - commits_before ))
+        TOTAL_COMMITS=$(( TOTAL_COMMITS + new_commits ))
+
+        # Git diff stats
+        local diff_stat
+        diff_stat="$(git_diff_stat)"
+        if [[ -n "$diff_stat" ]]; then
+            echo -e "  ${GREEN}✓${RESET} Git: $diff_stat"
+        fi
+
+        # Track velocity for adaptive extension budget
+        track_iteration_velocity
+
+        # Test gate
+        run_test_gate
+        write_error_summary
+        if [[ -n "$TEST_CMD" ]]; then
+            if [[ "$TEST_PASSED" == "true" ]]; then
+                echo -e "  ${GREEN}✓${RESET} Tests: passed"
+            else
+                echo -e "  ${RED}✗${RESET} Tests: failed"
+            fi
+        fi
+
+        # Dark factory: update RL weights based on test outcome
+        if type rl_update_weights >/dev/null 2>&1; then
+            if [[ "${TEST_PASSED:-}" == "true" ]]; then
+                rl_update_weights "success" 2>/dev/null || true
+            elif [[ "${TEST_PASSED:-}" == "false" ]]; then
+                rl_update_weights "failure" 2>/dev/null || true
+            fi
+        fi
+
+        # Track fix outcome for memory effectiveness
+        if [[ -n "${_applied_fix_pattern:-}" ]]; then
+            if type memory_record_fix_outcome >/dev/null 2>&1; then
+                if [[ "${TEST_PASSED:-}" == "true" ]]; then
+                    memory_record_fix_outcome "$_applied_fix_pattern" "true" "true" 2>/dev/null || true
+                else
+                    memory_record_fix_outcome "$_applied_fix_pattern" "true" "false" 2>/dev/null || true
+                fi
+            fi
+            _applied_fix_pattern=""
+        fi
+
+        # Save Claude context for checkpoint resume (goal, findings, test output)
+        export SW_LOOP_GOAL="$GOAL"
+        export SW_LOOP_ITERATION="$ITERATION"
+        export SW_LOOP_STATUS="${STATUS:-running}"
+        export SW_LOOP_TEST_OUTPUT="${TEST_OUTPUT:-}"
+        export SW_LOOP_FINDINGS="${LOG_ENTRIES:-}"
+        # shellcheck disable=SC2155
+        export SW_LOOP_MODIFIED="$(git diff --name-only HEAD 2>/dev/null | head -50 | tr '\n' ',' | sed 's/,$//')"
+        "$SCRIPT_DIR/sw-checkpoint.sh" save-context --stage build 2>/dev/null || true
+
+        # Audit agent (reviews implementer's work)
+        run_audit_agent
+
+        # Verification gap detection: audit failed but tests passed
+        handle_verification_gap
+
+        # Auto-commit any remaining changes before quality gates
+        # (audit agent, verification handler, or test evidence may create files)
+        if ! git -C "$PROJECT_ROOT" diff --quiet 2>/dev/null || \
+           ! git -C "$PROJECT_ROOT" diff --cached --quiet 2>/dev/null || \
+           [[ -n "$(git -C "$PROJECT_ROOT" ls-files --others --exclude-standard 2>/dev/null | head -1)" ]]; then
+            git -C "$PROJECT_ROOT" add -A 2>/dev/null || true
+            git -C "$PROJECT_ROOT" commit -m "loop: iteration $ITERATION — post-audit cleanup" --no-verify 2>/dev/null || true
+        fi
+
+        # Quality gates (automated checks)
+        run_quality_gates
+
+        # Convergence detection (issue #203) — score iteration progress and detect convergence
+        if type convergence_integrate >/dev/null 2>&1; then
+            local conv_exit=0
+            convergence_integrate || conv_exit=$?
+            case "$conv_exit" in
+                1)
+                    # Converged — stop successfully
+                    info "Build loop converged — stopping"
+                    STATUS="complete"
+                    write_state
+                    write_progress
+                    show_summary
+                    return 0
+                    ;;
+                2)
+                    # Diverging — stop with failure
+                    warn "Build loop diverging — stopping (scores declining consistently)"
+                    STATUS="diverging"
+                    write_state
+                    write_progress
+                    show_summary
+                    return 1
+                    ;;
+                3)
+                    # Oscillating — escalate to manual review
+                    warn "Build loop oscillating — consider manual review or model escalation"
+                    ;;
+            esac
+        fi
+
+        # Guarded completion (replaces naive grep check)
+        if guard_completion; then
+            STATUS="complete"
+            write_state
+            write_progress
+            show_summary
+            return 0
+        fi
+
+        # Check progress (circuit breaker)
+        if check_progress; then
+            CONSECUTIVE_FAILURES=0
+            # Reset auto-recovery state on progress (tests passing, code advancing)
+            if type recovery_reset >/dev/null 2>&1; then
+                recovery_reset
+            fi
+            echo -e "  ${GREEN}✓${RESET} Progress detected — continuing"
+        else
+            CONSECUTIVE_FAILURES=$(( CONSECUTIVE_FAILURES + 1 ))
+            echo -e "  ${YELLOW}⚠${RESET} Low progress (${CONSECUTIVE_FAILURES}/${CIRCUIT_BREAKER_THRESHOLD} before circuit breaker)"
+        fi
+
+        # Extract summary and update state
+        local summary
+        summary="$(extract_summary "$log_file")"
+        append_log_entry "### Iteration $ITERATION ($(now_iso))
+$summary
+"
+        write_state
+        write_progress
+
+        # Emit iteration complete event for pipeline visibility
+        if type emit_event >/dev/null 2>&1; then
+            emit_event "loop.iteration_complete" \
+                "iteration=$ITERATION" \
+                "max=$MAX_ITERATIONS" \
+                "job_id=${PIPELINE_JOB_ID:-loop-$$}" \
+                "agent=${AGENT_NUM:-1}" \
+                "test_passed=${TEST_PASSED:-unknown}" \
+                "commits=$TOTAL_COMMITS" \
+                "status=${STATUS:-running}"
+        fi
+
+        # Update heartbeat
+        "$SCRIPT_DIR/sw-heartbeat.sh" write "${PIPELINE_JOB_ID:-loop-$$}" \
+            --pid $$ \
+            --stage "build" \
+            --iteration "$ITERATION" \
+            --activity "Loop iteration $ITERATION" 2>/dev/null || true
+
+        # Human intervention: check for human message between iterations
+        local human_msg_file="$STATE_DIR/pipeline-artifacts/human-message.txt"
+        if [[ -f "$human_msg_file" ]]; then
+            local human_msg
+            human_msg="$(cat "$human_msg_file" 2>/dev/null || true)"
+            if [[ -n "$human_msg" ]]; then
+                echo -e "  ${PURPLE}${BOLD}💬 Human message:${RESET} $human_msg"
+                # Inject human message as additional context for next iteration
+                GOAL="${GOAL}
+
+HUMAN FEEDBACK (received after iteration $ITERATION): $human_msg"
+                rm -f "$human_msg_file"
+            fi
+        fi
+
+        # Stuckness-triggered restart: if detected 3+ times, break to allow session restart
+        if [[ "${STUCKNESS_COUNT:-0}" -ge 3 ]]; then
+            STATUS="stuck_restart"
+            write_state
+            write_progress
+            warn "Stuckness detected 3+ times — triggering session restart"
+            break
+        fi
+
+        sleep "$(_config_get_int "loop.sleep_between_iterations" 2 2>/dev/null || echo 2)"
+    done
+
+    # Write final state after loop exits
+    write_state
+    write_progress
+    show_summary
+}

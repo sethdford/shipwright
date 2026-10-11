@@ -348,3 +348,394 @@ STUCK_SECTION
 
     return 1
 }
+
+# ─── Adaptive Iteration Budget ──────────────────────────────────────────────
+# Reads tuning config for smarter iteration/circuit-breaker thresholds.
+apply_adaptive_budget() {
+    local tuning_file="$HOME/.shipwright/optimization/loop-tuning.json"
+    if [[ -f "$tuning_file" ]] && command -v jq >/dev/null 2>&1; then
+        local tuned_max tuned_ext tuned_ext_count tuned_cb
+        tuned_max=$(jq -r '.max_iterations // ""' "$tuning_file" 2>/dev/null || echo "")
+        tuned_ext=$(jq -r '.extension_size // ""' "$tuning_file" 2>/dev/null || echo "")
+        tuned_ext_count=$(jq -r '.max_extensions // ""' "$tuning_file" 2>/dev/null || echo "")
+        tuned_cb=$(jq -r '.circuit_breaker_threshold // ""' "$tuning_file" 2>/dev/null || echo "")
+
+        # Only apply tuned values if user didn't explicitly set them
+        if ! $MAX_ITERATIONS_EXPLICIT && [[ -n "$tuned_max" && "$tuned_max" != "null" ]]; then
+            MAX_ITERATIONS="$tuned_max"
+        fi
+        [[ -n "$tuned_ext" && "$tuned_ext" != "null" ]] && EXTENSION_SIZE="$tuned_ext"
+        [[ -n "$tuned_ext_count" && "$tuned_ext_count" != "null" ]] && MAX_EXTENSIONS="$tuned_ext_count"
+        [[ -n "$tuned_cb" && "$tuned_cb" != "null" ]] && CIRCUIT_BREAKER_THRESHOLD="$tuned_cb"
+    fi
+
+    # Read learned iteration model
+    local _iter_model="${HOME}/.shipwright/optimization/iteration-model.json"
+    if [[ -f "$_iter_model" ]] && ! $MAX_ITERATIONS_EXPLICIT && command -v jq >/dev/null 2>&1; then
+        local _complexity="${ISSUE_COMPLEXITY:-${COMPLEXITY:-medium}}"
+        local _predicted_max
+        _predicted_max=$(jq -r --arg c "$_complexity" '.predictions[$c].max_iterations // ""' "$_iter_model" 2>/dev/null) || true
+        if [[ -n "${_predicted_max:-}" && "${_predicted_max:-}" != "null" && "${_predicted_max:-0}" -gt 0 ]]; then
+            MAX_ITERATIONS="${_predicted_max}"
+            info "Iteration model: ${_complexity} complexity → max ${_predicted_max} iterations"
+        fi
+    fi
+
+    # Try intelligence-based iteration estimate
+    if type intelligence_estimate_iterations >/dev/null 2>&1 && ! $MAX_ITERATIONS_EXPLICIT; then
+        local est
+        est=$(intelligence_estimate_iterations "${GOAL:-}" "${COMPLEXITY:-5}" 2>/dev/null || echo "")
+        if [[ -n "$est" && "$est" =~ ^[0-9]+$ ]]; then
+            MAX_ITERATIONS="$est"
+        fi
+    fi
+}
+
+# ─── Failure Diagnosis ────────────────────────────────────────────────────────
+# Pattern-based root-cause classification for smarter retries (no Claude needed).
+# Returns markdown context to inject into the next iteration's goal.
+diagnose_failure() {
+    local error_output="$1"
+    local changed_files="$2"
+    local iteration="$3"
+
+    local diagnosis=""
+    local strategy="retry_with_context"  # default
+
+    # Pattern-based classification (fast, no Claude needed)
+    if echo "$error_output" | grep -qiE 'import.*not found|cannot find module|no module named'; then
+        diagnosis="missing_import"
+        strategy="fix_imports"
+    elif echo "$error_output" | grep -qiE 'syntax error|unexpected token|parse error'; then
+        diagnosis="syntax_error"
+        strategy="fix_syntax"
+    elif echo "$error_output" | grep -qiE 'type.*not assignable|type error|TypeError'; then
+        diagnosis="type_error"
+        strategy="fix_types"
+    elif echo "$error_output" | grep -qiE 'undefined.*variable|not defined|ReferenceError'; then
+        diagnosis="undefined_reference"
+        strategy="fix_references"
+    elif echo "$error_output" | grep -qiE 'timeout|timed out|ETIMEDOUT'; then
+        diagnosis="timeout"
+        strategy="optimize_performance"
+    elif echo "$error_output" | grep -qiE 'assertion.*fail|expect.*to|AssertionError'; then
+        diagnosis="test_assertion"
+        strategy="fix_logic"
+    elif echo "$error_output" | grep -qiE 'permission denied|EACCES|forbidden'; then
+        diagnosis="permission_error"
+        strategy="fix_permissions"
+    elif echo "$error_output" | grep -qiE 'out of memory|heap|OOM|ENOMEM'; then
+        diagnosis="resource_error"
+        strategy="reduce_resource_usage"
+    else
+        diagnosis="unknown"
+        strategy="retry_with_context"
+    fi
+
+    # Check if we've seen this diagnosis before in this session
+    local diagnosis_file="${LOG_DIR}/diagnoses.txt"
+    local repeat_count=0
+    if [[ -f "$diagnosis_file" ]]; then
+        repeat_count=$(grep -c "^${diagnosis}$" "$diagnosis_file" 2>/dev/null || true)
+        repeat_count="${repeat_count:-0}"
+    fi
+    echo "$diagnosis" >> "$diagnosis_file"
+
+    # Escalate strategy if same diagnosis repeats
+    if [[ "$repeat_count" -ge 2 ]]; then
+        strategy="alternative_approach"
+    fi
+
+    # Try memory-based fix lookup
+    local known_fix=""
+    if type memory_query_fix_for_error &>/dev/null; then
+        local fix_json
+        fix_json=$(memory_query_fix_for_error "$error_output" 2>/dev/null || true)
+        if [[ -n "$fix_json" && "$fix_json" != "null" ]]; then
+            known_fix=$(echo "$fix_json" | jq -r '.fix // ""' 2>/dev/null | head -5)
+        fi
+    fi
+
+    # Build diagnosis context for Claude
+    local diagnosis_context="## Failure Diagnosis (Iteration $iteration)
+Classification: $diagnosis
+Strategy: $strategy
+Repeat count: $repeat_count"
+
+    if [[ -n "$known_fix" ]]; then
+        diagnosis_context+="
+Known fix from memory: $known_fix"
+    fi
+
+    # Strategy-specific guidance
+    case "$strategy" in
+        fix_imports)
+            diagnosis_context+="
+INSTRUCTION: The error is about missing imports/modules. Check that all imports are correct, packages are installed, and paths are right. Do NOT change the logic - just fix the imports."
+            ;;
+        fix_syntax)
+            diagnosis_context+="
+INSTRUCTION: This is a syntax error. Carefully check the exact line mentioned in the error. Look for missing brackets, semicolons, commas, or mismatched quotes."
+            ;;
+        fix_types)
+            diagnosis_context+="
+INSTRUCTION: Type mismatch error. Check the types at the error location. Ensure function signatures match their usage."
+            ;;
+        fix_logic)
+            diagnosis_context+="
+INSTRUCTION: Test assertion failure. The code logic is wrong, not the syntax. Re-read the test expectations and fix the implementation to match."
+            ;;
+        alternative_approach)
+            diagnosis_context+="
+INSTRUCTION: This error has occurred $repeat_count times. The previous approach is not working. Try a FUNDAMENTALLY DIFFERENT approach:
+- If you were modifying existing code, try rewriting the function from scratch
+- If you were using one library, try a different one
+- If you were adding to a file, try creating a new file instead
+- Step back and reconsider the requirements"
+            ;;
+    esac
+
+    echo "$diagnosis_context"
+}
+
+# ─── Quality Gates ────────────────────────────────────────────────────────────
+run_quality_gates() {
+    if ! $QUALITY_GATES_ENABLED; then
+        QUALITY_GATE_PASSED=true
+        return
+    fi
+
+    QUALITY_GATE_PASSED=true
+    local gate_failures=()
+
+    echo -e "  ${PURPLE}▸${RESET} Running quality gates..."
+
+    # Gate 1: Tests pass (if TEST_CMD set)
+    if [[ -n "$TEST_CMD" ]] && [[ "$TEST_PASSED" == "false" ]]; then
+        gate_failures+=("tests failing")
+    fi
+
+    # Gate 2: No uncommitted changes
+    if ! git -C "$PROJECT_ROOT" diff --quiet 2>/dev/null || \
+       ! git -C "$PROJECT_ROOT" diff --cached --quiet 2>/dev/null; then
+        gate_failures+=("uncommitted changes present")
+    fi
+
+    # Gate 3: No TODO/FIXME/HACK/XXX in new source code
+    # Exclude .claude/, docs/plans/, and markdown files (which legitimately contain task markers)
+    local todo_count
+    todo_count="$(git -C "$PROJECT_ROOT" diff HEAD~1 -- ':!.claude/' ':!docs/plans/' ':!*.md' 2>/dev/null \
+        | grep -cE '^\+.*(TODO|FIXME|HACK|XXX)' || true)"
+    todo_count="${todo_count:-0}"
+    if [[ "${todo_count:-0}" -gt 0 ]]; then
+        gate_failures+=("${todo_count} TODO/FIXME/HACK/XXX markers in new code")
+    fi
+
+    # Gate 4: Definition of Done (if DOD_FILE set)
+    if [[ -n "$DOD_FILE" ]]; then
+        if ! check_definition_of_done; then
+            gate_failures+=("definition of done not satisfied")
+        fi
+    fi
+
+    if [[ ${#gate_failures[@]} -gt 0 ]]; then
+        QUALITY_GATE_PASSED=false
+        local failures_str
+        failures_str="$(printf ', %s' "${gate_failures[@]}")"
+        failures_str="${failures_str:2}"  # trim leading ", "
+        echo -e "  ${RED}✗${RESET} Quality gates: FAILED (${failures_str})"
+    else
+        echo -e "  ${GREEN}✓${RESET} Quality gates: all passed"
+    fi
+}
+
+check_definition_of_done() {
+    if [[ ! -f "$DOD_FILE" ]]; then
+        warn "Definition of done file not found: $DOD_FILE"
+        return 1
+    fi
+
+    local dod_content
+    dod_content="$(cat "$DOD_FILE")"
+
+    # Use cumulative diff from loop start (not just HEAD~1) so the evaluator
+    # can see ALL work done across every iteration, not just the latest commit.
+    local diff_content
+    if [[ -n "${LOOP_START_COMMIT:-}" ]]; then
+        diff_content="$(git -C "$PROJECT_ROOT" diff --stat "${LOOP_START_COMMIT}..HEAD" 2>/dev/null || echo "(no diff)")"
+        diff_content="${diff_content}
+
+## Detailed Changes (cumulative diff, truncated to 200 lines)
+$(git -C "$PROJECT_ROOT" diff "${LOOP_START_COMMIT}..HEAD" 2>/dev/null | head -200 || echo "(no diff)")"
+    else
+        diff_content="$(git -C "$PROJECT_ROOT" diff HEAD~1 2>/dev/null || echo "(no diff)")"
+    fi
+
+    # Inject verified runtime facts so the evaluator doesn't have to guess
+    local runtime_facts=""
+    if [[ -n "$TEST_CMD" ]]; then
+        if [[ "${TEST_PASSED:-}" == "true" ]]; then
+            runtime_facts="## Verified Runtime Facts (from the loop harness, not from the agent)
+- Tests: ALL PASSING (verified by running '${TEST_CMD}' after this iteration)
+- Test output (last 10 lines):
+$(echo "${TEST_OUTPUT:-}" | tail -10)"
+        else
+            runtime_facts="## Verified Runtime Facts
+- Tests: FAILING (verified by running '${TEST_CMD}')
+- Test output (last 10 lines):
+$(echo "${TEST_OUTPUT:-}" | tail -10)"
+        fi
+    fi
+
+    local dod_prompt
+    read -r -d '' dod_prompt <<DOD_PROMPT || true
+You are evaluating whether a project satisfies a Definition of Done checklist.
+You are reviewing the CUMULATIVE work across all iterations, not just the latest commit.
+
+## Definition of Done
+${dod_content}
+
+${runtime_facts}
+
+## Cumulative Changes Made (git diff from start of loop to now)
+${diff_content}
+
+## Your Task
+For each item in the Definition of Done, determine if the project satisfies it.
+The runtime facts above are verified by the harness — trust them as ground truth.
+If ALL items are satisfied, output exactly: DOD_PASS
+Otherwise, list which items are NOT satisfied and why.
+DOD_PROMPT
+
+    local dod_log="$LOG_DIR/dod-iter-${ITERATION}.log"
+    local dod_model
+    dod_model="$(select_audit_model)"
+    local dod_flags=()
+    dod_flags+=("--model" "$dod_model")
+    if $SKIP_PERMISSIONS; then
+        dod_flags+=("--dangerously-skip-permissions")
+    fi
+
+    claude -p "$dod_prompt" "${dod_flags[@]}" > "$dod_log" 2>&1 || true
+
+    if grep -q "DOD_PASS" "$dod_log" 2>/dev/null; then
+        echo -e "  ${GREEN}✓${RESET} Definition of Done: satisfied"
+        return 0
+    else
+        echo -e "  ${YELLOW}⚠${RESET} Definition of Done: not satisfied"
+        return 1
+    fi
+}
+
+# ─── Guarded Completion ───────────────────────────────────────────────────────
+guard_completion() {
+    local log_file="$LOG_DIR/iteration-${ITERATION}.log"
+
+    # Check if LOOP_COMPLETE is in the log
+    if ! grep -q "LOOP_COMPLETE" "$log_file" 2>/dev/null; then
+        return 1  # No completion claim
+    fi
+
+    echo -e "  ${CYAN}▸${RESET} LOOP_COMPLETE detected — validating..."
+
+    local rejection_reasons=()
+
+    # Check quality gates
+    if ! $QUALITY_GATE_PASSED; then
+        rejection_reasons+=("quality gates failed")
+    fi
+
+    # Check audit agent
+    if $AUDIT_AGENT_ENABLED && [[ "$AUDIT_RESULT" != "pass" ]]; then
+        rejection_reasons+=("audit agent found issues")
+    fi
+
+    # Check tests
+    if [[ -n "$TEST_CMD" ]] && [[ "$TEST_PASSED" == "false" ]]; then
+        rejection_reasons+=("tests failing")
+    fi
+
+    # Holistic final gate: when all other gates pass, run a project-level assessment
+    # that evaluates the entire codebase against the goal (not just the latest diff)
+    if [[ ${#rejection_reasons[@]} -eq 0 ]]; then
+        if ! run_holistic_gate; then
+            rejection_reasons+=("holistic project assessment found gaps")
+        fi
+    fi
+
+    if [[ ${#rejection_reasons[@]} -gt 0 ]]; then
+        local reasons_str
+        reasons_str="$(printf ', %s' "${rejection_reasons[@]}")"
+        reasons_str="${reasons_str:2}"
+        echo -e "  ${RED}✗${RESET} Completion REJECTED: ${reasons_str}"
+        COMPLETION_REJECTED=true
+        return 1
+    fi
+
+    echo -e "  ${GREEN}${BOLD}✓ LOOP_COMPLETE accepted — all gates passed!${RESET}"
+    return 0
+}
+
+# Holistic gate: evaluates the full project against the original goal.
+# Only runs when all other gates pass (final checkpoint before acceptance).
+run_holistic_gate() {
+    # Skip if no starting commit (can't compute cumulative diff)
+    [[ -z "${LOOP_START_COMMIT:-}" ]] && return 0
+
+    local holistic_log="$LOG_DIR/holistic-iter-${ITERATION}.log"
+
+    # Build a project summary: file tree, test count, cumulative diff stats
+    local file_count
+    file_count=$(git -C "$PROJECT_ROOT" ls-files | wc -l | tr -d ' ')
+    local cumulative_stat
+    cumulative_stat="$(git -C "$PROJECT_ROOT" diff --stat "${LOOP_START_COMMIT}..HEAD" 2>/dev/null | tail -1 || echo "(no changes)")"
+    local test_summary=""
+    if [[ -n "${TEST_OUTPUT:-}" ]]; then
+        test_summary="$(echo "$TEST_OUTPUT" | tail -5)"
+    fi
+
+    local holistic_prompt
+    read -r -d '' holistic_prompt <<HOLISTIC_PROMPT || true
+You are a final quality gate evaluating whether an autonomous coding agent has FULLY achieved its goal.
+
+## Original Goal
+${GOAL}
+
+## Project Stats
+- Files in repo: ${file_count}
+- Iterations completed: ${ITERATION}
+- Cumulative changes: ${cumulative_stat}
+- Tests: ${TEST_PASSED:-unknown} (command: ${TEST_CMD:-none})
+${test_summary:+- Test output: ${test_summary}}
+
+## Cumulative Git Changes (diff --stat from start)
+$(git -C "$PROJECT_ROOT" diff --stat "${LOOP_START_COMMIT}..HEAD" 2>/dev/null | head -40 || echo "(none)")
+
+## Your Task
+Based on the goal and the cumulative work done:
+1. Has the goal been FULLY achieved (not partially)?
+2. Is there any critical gap that would make this unacceptable for production?
+
+If the goal is fully achieved, output exactly: HOLISTIC_PASS
+Otherwise, list the specific gaps remaining.
+HOLISTIC_PROMPT
+
+    echo -e "  ${PURPLE}▸${RESET} Running holistic project assessment..."
+
+    local hol_model
+    hol_model="$(select_audit_model)"
+    local hol_flags=("--model" "$hol_model")
+    if $SKIP_PERMISSIONS; then
+        hol_flags+=("--dangerously-skip-permissions")
+    fi
+
+    claude -p "$holistic_prompt" "${hol_flags[@]}" > "$holistic_log" 2>&1 || true
+
+    if grep -q "HOLISTIC_PASS" "$holistic_log" 2>/dev/null; then
+        echo -e "  ${GREEN}✓${RESET} Holistic assessment: passed"
+        return 0
+    else
+        echo -e "  ${YELLOW}⚠${RESET} Holistic assessment: gaps found"
+        return 1
+    fi
+}
