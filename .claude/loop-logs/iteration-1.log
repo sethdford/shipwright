@@ -1,34 +1,7 @@
-When consecutive iterations fail with the same errors, the build loop now notices and tries something different instead of re-sending the same prompt. It's committed as `80f940d9`. `sw-loop-test.sh` passes 105/105. `npm test` passed 161 of 162 suites; the failure was in `sw-project-detect-test.sh` ("Cached detection returns same result"). That suite doesn't touch anything I changed, and it passed 43/43 when I reran it alone, so it looks flaky.
+I added an HTML comment as the first line of `README.md` and committed it as `fec7f6ff`. The comment is `<!-- E2E test: comment added by automated pipeline (#8512) -->`. It doesn't show up in the rendered README.
 
-**How it works.** After each failing iteration, the error lines are normalized (timestamps, durations, colour codes, memory addresses and temp paths removed; file, line number and message kept), hashed, and compared with the previous iteration's hash:
+I did not run `npm test`. I ran the two checks a README edit could break: the version consistency check (3.3.0, consistent) and `sw-docs-test.sh` (18 passed, 0 failed).
 
-| Identical failures in a row | What the loop does |
-|---|---|
-| 1 | Nothing |
-| 2 (`loop.error_dedup_threshold`) | Emits `loop.error_signature_repeat` and adds a "Repeated Failure — Change Approach" section to the next prompt. That section lists the failing locations and points to the full test log. The prompt shows the last 200 lines of test output instead of 50. If session continuity is on, it switches to a new session. |
-| 3 | Ends the session with `STATUS=error_repeat_restart` and uses the existing restart path, if `--max-restarts` allows. Each distinct failure can trigger at most one restart; after that, or if no restarts are allowed, it stays at the level above. |
-
-**Things to know:**
-- Only test failures count. The existing error summary is also written on passing iterations whose log happens to contain the word "error", and those are ignored.
-- Because line numbers are part of the comparison, an edit that moves the failing line counts as a new failure. That means the loop sometimes escalates later than it could, but never on unrelated failures.
-- It's on by default. `LOOP_ERROR_DEDUP=0` or `loop.error_dedup_enabled=false` turns it off and the loop behaves exactly as before.
-- It only runs in single-agent mode, as planned.
-
-**Changes:**
-- The logic is in a new file, `scripts/lib/loop-error-signature.sh`.
-- `sw-loop.sh` calls it after each test run and resets it when a session restarts.
-- `compose_prompt` adds the new prompt section.
-- The two config keys are in `config/defaults.json`, the new event is registered in `config/event-schema.json`, and `.claude/CLAUDE.md` documents it.
-
-**Tests:** 31 new tests, all run against the real code.
-- **25 unit tests:**
-  - Signature extraction and normalization: same failure despite different timing, different line number, line order, missing or broken summary file, `jq` unavailable, blank lines.
-  - Repeat detection: a single failure doesn't count, a different failure or a passing run resets the count, error text on passing runs is ignored, signatures are written to disk without leaving temp files.
-  - Each escalation level, including the "restart not allowed" and "already restarted once" cases, plus session switching.
-  - The on/off switch and the threshold setting.
-- **6 wiring tests:** the call order in `sw-loop.sh`, both reset points, the restart, and that the prompt really contains the new section and the 200-line output.
-- **0 end-to-end tests:** the existing pipeline and smoke suites already run this code path.
-
-Shellcheck is clean and the event schema is in sync. The `.claude/` state files that were already modified when I started are not part of the commit.
+The task list in the prompt is for a different feature, build-loop error deduplication (#8438). I left it alone. It looks like the previous commit, `d17891ce`, already addressed #8438. I didn't check whether that checklist is actually complete.
 
 LOOP_COMPLETE
