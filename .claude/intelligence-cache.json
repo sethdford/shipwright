@@ -1674,32 +1674,32 @@
         "results": [
           {
             "file": "retry-outcomes.json",
-            "relevance": 95,
-            "summary": "Records build_failure retries with model_escalation at 100% success over 5 attempts, which is directly about how the build stage recovers from failures."
-          },
-          {
-            "file": "success-patterns.json",
-            "relevance": 85,
-            "summary": "Captures loop-iteration approaches, files changed under loop-logs and loop-state, and test strategy for past build runs, matching the build loop this stage runs."
+            "relevance": 90,
+            "summary": "Records build_failure retries and their model_escalation strategy (5/5 successes), which directly bears on how the build stage recovers from failures."
           },
           {
             "file": "metrics.json",
             "relevance": 80,
-            "summary": "Holds the build_duration_s baseline of 7095s, which gives the build stage its expected duration for comparison."
+            "summary": "Holds the build_duration_s baseline (7095s), useful for judging how long the current build stage should take."
+          },
+          {
+            "file": "success-patterns.json",
+            "relevance": 72,
+            "summary": "Captures past build-loop approaches (iteration counts, files changed, test strategy) for similar goals, which can guide the current build."
           },
           {
             "file": "failures.json",
-            "relevance": 70,
-            "summary": "Lists recurring test-stage failures and their fixes, which the build loop's self-healing re-entry depends on when tests fail."
+            "relevance": 50,
+            "summary": "Lists recurring test-stage failures and their fixes. Mostly test-focused, but it shows what the build must avoid to pass the following test stage."
           },
           {
             "file": "knowledge.json",
-            "relevance": 50,
-            "summary": "Contains concrete failure-to-fix entries for test setup problems (such as mktemp under /tmp/claude) that a build iteration could hit."
+            "relevance": 40,
+            "summary": "Contains failure and pattern entries with fix strategies, including a mktemp /tmp/claude issue that can recur during build and test setup."
           }
         ]
       },
-      "timestamp": 1791687485,
+      "timestamp": 1791689377,
       "ttl": 1800
     },
     "3aa06adb485bb3de03553d3ca0897dbe": {
@@ -1763,6 +1763,177 @@
         }
       ],
       "timestamp": 1791688354,
+      "ttl": 1800
+    },
+    "9ffec5a1b4309a58b33c35c65fa98a84": {
+      "result": {
+        "complexity": 1,
+        "risk_level": "low",
+        "success_probability": 98,
+        "recommended_template": "fast",
+        "issue_type": "documentation",
+        "key_risks": [
+          "Change could conflict with concurrent edits to README.md on the target branch",
+          "Comment could land in a rendered section and affect Markdown display if placed carelessly"
+        ],
+        "implementation_hints": [
+          "Add a single HTML comment (<!-- ... -->) to README.md so it does not render",
+          "Keep the change to one file and one line to minimize merge surface",
+          "Verify with a Markdown render or git diff that only the README changed"
+        ]
+      },
+      "timestamp": 1791689307,
+      "ttl": 3600
+    },
+    "0ed2fa243b69e484d4039dd9b0b15573": {
+      "result": {
+        "estimated_iterations": 1
+      },
+      "timestamp": 1791689311,
+      "ttl": 1800
+    },
+    "b651236516dfba5ec3c932085cc2a3b4": {
+      "result": {
+        "estimated_cost_usd": 0.15,
+        "estimated_iterations": 1,
+        "estimated_tokens": 45000,
+        "likely_failure_stage": "none",
+        "confidence": 85
+      },
+      "timestamp": 1791689316,
+      "ttl": 3600
+    },
+    "5639e4f19013d307a1faa332c479f2d9": {
+      "result": {
+        "raw_response": "Mock claude: ok"
+      },
+      "timestamp": 1791689320,
+      "ttl": 1800
+    },
+    "f9c9e8b2bd49e68005879dc608624768": {
+      "result": {
+        "issue_type": "documentation",
+        "confidence": 0.95,
+        "secondary_domains": [
+          "testing"
+        ],
+        "complexity_assessment": {
+          "score": 1,
+          "reasoning": "The issue asks for a single comment added to README.md as an automated E2E check. No code logic, no runtime behavior, and no deploy impact."
+        },
+        "skill_plan": {
+          "plan": [],
+          "design": [],
+          "build": [
+            "documentation"
+          ],
+          "review": [],
+          "compound_quality": [],
+          "pr": [
+            "pr-quality"
+          ],
+          "deploy": [],
+          "validate": [],
+          "monitor": []
+        },
+        "skill_rationale": {
+          "documentation": "The change is a lightweight edit to README.md, so the documentation approach fits: keep the edit minimal and confined to the README without touching other files.",
+          "pr-quality": "Even a trivial automated PR should state plainly what changed (one comment line in README.md) and that it is an E2e test artifact, so a reviewer can close it quickly."
+        },
+        "generated_skills": [],
+        "review_focus": [
+          "Diff touches only README.md and adds a single comment (no unrelated files, such as .claude/intelligence-cache.json, which shows as modified in the working tree)",
+          "Comment uses the file's existing comment syntax and placement so it does not render as visible text",
+          "PR description states that it is an automated E2E test and is safe to close"
+        ],
+        "risk_areas": [
+          "Unrelated working-tree modification to .claude/intelligence-cache.json could leak into the commit if staged",
+          "An HTML comment placed inside a code block or table could break README rendering"
+        ]
+      },
+      "timestamp": 1791689344,
+      "ttl": 3600
+    },
+    "61c5f4a9ce6598c2f1fc048e0a7ce958": {
+      "result": {
+        "results": [
+          {
+            "file": "fleet-shared-patterns.json",
+            "relevance": 40,
+            "summary": "Build-stage pattern for a Node project (Cannot find module, fix: npm i) with a known fix, the closest match to a build stage run in a JS repo."
+          },
+          {
+            "file": "index.json",
+            "relevance": 35,
+            "summary": "Build-stage failure pattern with a documented fix, a generic signal for what can go wrong during build."
+          },
+          {
+            "file": "success-patterns.json",
+            "relevance": 30,
+            "summary": "Successful pattern (repo 5112be...) with build stage and npm test strategy, a low-complexity run similar to a simple README edit."
+          },
+          {
+            "file": "success-patterns.json",
+            "relevance": 30,
+            "summary": "Successful pattern (test-repo-comptime) covering intake, build and test stages, mirroring the stages this pipeline is running."
+          },
+          {
+            "file": "failures.json",
+            "relevance": 20,
+            "summary": "Recorded test-stage failures with root causes and fixes; only tangentially related since this task is a documentation change."
+          }
+        ]
+      },
+      "timestamp": 1791689369,
+      "ttl": 1800
+    },
+    "5a51e366dc057906be4d9db794924c7d": {
+      "result": [
+        {
+          "type": "result",
+          "result": "I am trying the same approach again.",
+          "usage": {
+            "input_tokens": 0,
+            "output_tokens": 0
+          }
+        }
+      ],
+      "timestamp": 1791689448,
+      "ttl": 1800
+    },
+    "dd0ee4716cf25953cab47251eec15a4d": {
+      "result": {
+        "raw_response": "Mock claude: ok"
+      },
+      "timestamp": 1791689504,
+      "ttl": 1800
+    },
+    "4b7d872880bca6075abcccf36982ae45": {
+      "result": [
+        {
+          "type": "result",
+          "result": "I am trying the same approach again.",
+          "usage": {
+            "input_tokens": 0,
+            "output_tokens": 0
+          }
+        }
+      ],
+      "timestamp": 1791689746,
+      "ttl": 1800
+    },
+    "ac48b921a4554160109c52a5e725a37c": {
+      "result": [
+        {
+          "type": "result",
+          "result": "I am trying the same approach again.",
+          "usage": {
+            "input_tokens": 0,
+            "output_tokens": 0
+          }
+        }
+      ],
+      "timestamp": 1791689816,
       "ttl": 1800
     }
   }
