@@ -1,27 +1,30 @@
 # Tasks — Share failure patterns fleet-wide so daemon triage in one repo benefits from another repo's learnings
 
 ## Status: In Progress
-Pipeline: standard | Branch: feat/share-failure-patterns-fleet-wide-so-dae-8328
+Pipeline: autonomous | Branch: ci/issue-8328
 
 ## Checklist
-- [x] 1. Signature and normalization functions in `lib/fleet-patterns.sh`
-- [x] 2. Locked, atomic store read/write (record, update_fix, record_outcome, lookup, init/corruption recovery, caps)
-- [x] 3. `fleet_triage_known_fix` with the demotion rule and artifact write
-- [x] 4. `sw-memory.sh` capture hook plus `signature` field on failures
-- [x] 5. `sw-memory.sh` analyze and outcome hooks (fix propagation)
-- [x] 6. `memory_inject_context` renders `fleet-known-fix.json`
-- [x] 7. `daemon-dispatch.sh` triage call and `sw-daemon.sh` sourcing
-- [ ] 8. `sw-fleet.sh` env export plus the `patterns` subcommand and help
-- [ ] 9. Unit, cross-repo and concurrency tests in `sw-lib-fleet-patterns-test.sh`, plus the `sw-fleet-test.sh` assertion
-- [ ] 10. Event schema, docs and full `npm test` run
-- [ ] With fleet mode on, a failure captured in any repo appears in `~/.shipwright/fleet-patterns.json` under its signature, and is still written to that repo's `failures.json`.
-- [ ] Signatures follow `<error_type>:<hash>` and match across repos for the same failure even when paths and line numbers differ.
-- [ ] `daemon_spawn_pipeline` surfaces a matching known fix (log line, `fleet.pattern_hit` event, `fleet-known-fix.json`) before the pipeline or loop starts, and build-stage memory injection includes it.
-- [ ] The cross-repo unit test passes: learned in repoA, surfaced during triage of repoB.
-- [ ] With fleet mode off, behaviour is the same as before (existing suites stay green).
-- [ ] `shipwright fleet patterns list` and `lookup --text` work.
-- [ ] Bash 3.2 safe, `set -euo pipefail` clean, writes are atomic and locked, and `npm test` is green.
+- [ ] Task 1: Add `fleet_patterns_stats` to `scripts/lib/fleet-patterns.sh` (always exits 0, works on empty or corrupt stores)
+- [ ] Task 2: Source `fleet-patterns.sh` in `sw-fleet.sh`; read `shared_patterns` and `shared_patterns_file`; build a `printf %q`-quoted env prefix
+- [ ] Task 3: Add the env prefix to the `tmux new-session` daemon command at `sw-fleet.sh:854`
+- [ ] Task 4: Prune at fleet start using `shared_patterns_retention_days` (default 90, validated)
+- [ ] Task 5: Record `shared_patterns` and `patterns_file` in `fleet-state.json` via `jq --arg`; add the field to `fleet.started`
+- [ ] Task 6: Show the shared-pattern summary line in `fleet status`
+- [ ] Task 7: Add the `fleet` key to the `fleet init` config template and its help text
+- [ ] Task 8: Add `shipwright memory fleet list|show|prune|stats` (with `--json` on `list`)
+- [ ] Task 9: Register the 5 `fleet.pattern*` events in `config/event-schema.json`; run the schema sync check
+- [ ] Task 10: Fleet tests for export, opt-out, quoting, state and prune
+- [ ] Task 11: Library tests for `stats`, the `memory fleet` command, and cross-repo A→B end-to-end through prompt injection
+- [ ] Task 12: Update `.claude/CLAUDE.md` (Fleet Mode, Memory commands, Runtime State) and any fleet docs page
+- [ ] Task 13: Run `bash -n`, the three targeted suites, then `npm test`
+- [ ] Every daemon started by `shipwright fleet start` has `SHIPWRIGHT_FLEET_PATTERNS_FILE` set, unless `shared_patterns: false`.
+- [ ] A fix learned in repo A appears as "Known Fix From Fleet" in repo B's build-stage memory injection when B's issue or log has the same normalized error (different path, line or timestamp). This is proven by an automated test.
+- [ ] `shared_patterns: false` turns sharing off for that fleet, and standalone `shipwright daemon start` behaves as before.
+- [ ] The store is pruned at fleet start, with a configurable retention period.
+- [ ] `shipwright memory fleet list|show|prune|stats` works with or without a running fleet.
+- [ ] No "Unknown event type" warning for the `fleet.pattern*` events.
+- [ ] Every changed script is Bash 3.2 compatible, survives `set -euo pipefail`, uses `jq --arg` for JSON, and writes files atomically.
 
 ## Notes
-- Generated from pipeline plan at 2026-10-10T18:24:32Z
+- Generated from pipeline plan at 2026-10-11T04:12:54Z
 - Pipeline will update status as tasks complete
