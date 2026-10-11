@@ -1401,6 +1401,204 @@
       },
       "timestamp": 1775344537,
       "ttl": 3600
+    },
+    "ee15c7abce89a42c5f096d828a3f5c73": {
+      "result": {
+        "complexity": 5,
+        "risk_level": "medium",
+        "success_probability": 72,
+        "recommended_template": "standard",
+        "issue_type": "infrastructure",
+        "key_risks": [
+          "Acceptance criteria conflict: a live Claude CLI auth check and network reachability probe add latency, so 'zero added latency' cannot hold literally. Scope it to a cached or time-boxed check.",
+          "False positives could block pipelines that would have succeeded (flaky network, offline or local mode, NO_GITHUB runs), so checks must be skippable and degrade to warnings where appropriate.",
+          "A live auth check may spend tokens or hit rate limits on every pipeline start; prefer a non-billable check such as CLI presence and config or credential file detection.",
+          "Bash 3.2 compatibility: no associative arrays or other newer shell features in the new check.",
+          "The issue title (classify and cap duplicate build-loop errors) does not match the body (intake pre-flight checks). Confirm the intended scope before building."
+        ],
+        "implementation_hints": [
+          "Reuse the existing checks in scripts/sw-doctor.sh (tmux, jq, Node, Claude CLI, env vars) rather than writing new detection logic.",
+          "Add the pre-flight as a function called from the intake stage in scripts/sw-pipeline.sh and exit before build with a message naming what is missing and how to fix it.",
+          "Gate network and GitHub checks on NO_GITHUB and SHIPWRIGHT_LOCAL, and wrap any network probe in a short timeout.",
+          "Write scripts/sw-preflight-test.sh with PASS/FAIL counters using mock binaries for the missing-credential, missing-tool, and happy-path cases, and register it in package.json's test script.",
+          "Add a test in scripts/sw-lib-compat-test.sh or the pipeline test suite to confirm the intake stage fails fast on a missing credential."
+        ]
+      },
+      "timestamp": 1791691886,
+      "ttl": 3600
+    },
+    "2011a3b6d881403a12b7cfd2c3501924": {
+      "result": {
+        "estimated_iterations": 6
+      },
+      "timestamp": 1791691889,
+      "ttl": 1800
+    },
+    "b1fe2b4344bce21f62bb753794ef1983": {
+      "result": {
+        "estimated_cost_usd": 5.0,
+        "estimated_iterations": 3,
+        "estimated_tokens": 1200000,
+        "likely_failure_stage": "test",
+        "confidence": 40
+      },
+      "timestamp": 1791691894,
+      "ttl": 3600
+    },
+    "c12a4953047f078343d2fc4223f55687": {
+      "result": {
+        "issue_type": "infrastructure",
+        "confidence": 0.78,
+        "secondary_domains": [
+          "security",
+          "testing",
+          "shell-scripting"
+        ],
+        "complexity_assessment": {
+          "score": 5,
+          "reasoning": "A contained intake-stage pre-flight check in bash: validate Claude CLI auth, required env vars, and git/network reachability, then fail fast with actionable messages. Needs a new test suite covering missing-credential, missing-tool, and happy-path cases, and must add zero latency when checks pass. The scope is clear, but the check touches auth handling and must not block legitimate pipelines, so it is more than a trivial change."
+        },
+        "skill_plan": {
+          "plan": [
+            "brainstorming"
+          ],
+          "design": [
+            "architecture-design"
+          ],
+          "build": [
+            "testing-strategy"
+          ],
+          "review": [
+            "two-stage-review",
+            "security-audit"
+          ],
+          "compound_quality": [
+            "validation-thoroughness"
+          ],
+          "pr": [
+            "pr-quality"
+          ],
+          "deploy": [],
+          "validate": [
+            "validation-thoroughness"
+          ],
+          "monitor": []
+        },
+        "skill_rationale": {
+          "brainstorming": "The issue asks for three different kinds of checks (auth, env, network). Deciding which failures are hard blockers and which should only warn, such as an offline run in local mode, needs to be settled before building.",
+          "architecture-design": "The pre-flight check has to fit the intake stage, respect local/no-GitHub mode and the existing config chain, and be easy to call from the daemon. An ADR-style note keeps those decisions findable later.",
+          "testing-strategy": "The acceptance criteria name three cases that must each be covered by a new suite. The suite also has to prove that a passing pre-flight adds no measurable latency, which the existing mock-binary harness can exercise.",
+          "two-stage-review": "The change alters pipeline entry behavior for every run. A spec-compliance pass against the four acceptance criteria, followed by a code-quality pass, catches both missed requirements and fragile shell.",
+          "security-audit": "The check reads credentials and probes auth. It must never echo secret values into logs or events.jsonl, and it should only report whether a credential is present.",
+          "validation-thoroughness": "Passing unit tests do not show that a real user with a missing key gets a clear message. Run the pipeline once with the key removed and once with it present to confirm the actual UX.",
+          "pr-quality": "The issue title (duplicate/near-duplicate error classification) does not match the body (pre-flight checks). The PR description must state clearly which scope it implements so reviewers are not misled."
+        },
+        "generated_skills": [],
+        "review_focus": [
+          "Scope mismatch: the title says classify and cap duplicate build-loop errors, but the body and acceptance criteria describe intake pre-flight checks. Confirm the intended scope before building.",
+          "Credential handling: verify that no secret value is printed, logged, or written to events or state files, and that the check reports presence only.",
+          "Zero-latency guarantee: the happy path must not add network calls or long timeouts. Network reachability needs a short timeout and should be skippable when NO_GITHUB or local mode is set.",
+          "Bash 3.2 compatibility and set -euo pipefail behavior in the new check functions, per the shell standards.",
+          "The fast-fail exit path must produce an actionable message and a non-zero exit, and must not leave the pipeline state stuck in running."
+        ],
+        "risk_areas": [
+          "A network reachability check could create false failures in air-gapped or local-mode runs, blocking pipelines that would otherwise succeed.",
+          "Claude CLI auth probing may consume tokens or time if it makes a real API call. Prefer a local auth-status check where one exists.",
+          "Adding the check to intake changes behavior for every pipeline, so regressions would be broad. Keep the new suite focused and run the existing pipeline tests to confirm nothing else changed.",
+          "The title and body describe different problems, so a PR could close the wrong issue or leave the duplicate-error cap unimplemented."
+        ]
+      },
+      "timestamp": 1791691936,
+      "ttl": 3600
+    },
+    "977de693d5fb6befc8f0de7f62f75eed": {
+      "result": {
+        "results": [
+          {
+            "file": "failures.json",
+            "relevance": 92,
+            "summary": "Holds near-duplicate build/test timeout failures (\"timeout after 3.2s at line 42\" and \"2.8s at line 43\") with seen_count and resolved flags, which is the exact problem of classifying and capping duplicate errors before retry."
+          },
+          {
+            "file": "fleet-shared-patterns.json",
+            "relevance": 70,
+            "summary": "Deduplicates error patterns by signature_hash and tracks seen_count across repos, which is the same signature-based grouping the feature needs for near-duplicate detection."
+          },
+          {
+            "file": "test-failures.json",
+            "relevance": 60,
+            "summary": "A keyed store of failure signatures, which is the natural place for a classifier to record duplicate counts, though it is currently empty."
+          },
+          {
+            "file": "index.json",
+            "relevance": 45,
+            "summary": "Indexes failure patterns by signature with stage, total_seen, and a suggested fix, giving a lookup for classifying a repeated error and its prior remedy."
+          },
+          {
+            "file": "success-patterns.json",
+            "relevance": 30,
+            "summary": "Stores build-stage patterns with an error_signatures field and iterations_needed, relevant to how retries and repeated error signatures are tracked, though the entries here have no signatures."
+          }
+        ]
+      },
+      "timestamp": 1791691973,
+      "ttl": 1800
+    },
+    "276f8f1ec2f41af71dec45e15cc40f03": {
+      "result": {
+        "results": [
+          {
+            "file": "architecture.json",
+            "relevance": 45,
+            "summary": "Only architecture-related memory in the set, but its rules are placeholders (rule1–rule3), so it offers the design stage little concrete guidance."
+          },
+          {
+            "file": "failures.json",
+            "relevance": 40,
+            "summary": "Holds near-duplicate timeout failures (same pattern, different line numbers, same root cause and fix), which directly matches the classify-and-cap-duplicates goal, though it is not architecture guidance."
+          },
+          {
+            "file": "fleet-shared-patterns.json",
+            "relevance": 30,
+            "summary": "Shared failure patterns keyed by signature_hash with seen_count and contributions across repos; relevant to deduplicating recurring build-loop errors at fleet scope."
+          },
+          {
+            "file": "index.json",
+            "relevance": 25,
+            "summary": "Failure pattern index with signature, stage, and total_seen counts, which is the kind of signature grouping a classify-and-cap design would build on."
+          },
+          {
+            "file": "test-failures.json",
+            "relevance": 20,
+            "summary": "Signature store for test failures, empty here, but the structure is the closest existing home for error-signature classification."
+          }
+        ]
+      },
+      "timestamp": 1791692103,
+      "ttl": 1800
+    },
+    "8cb19613355d0fb2959b42f174ee692d": {
+      "result": {
+        "results": [
+          {
+            "file": "failures.json",
+            "relevance": 88,
+            "summary": "Contains near-duplicate timeout entries (\"timeout after 3.2s at line 42\" and \"...2.8s at line 43\") with the same root cause and fix, which is the exact duplicate-error case the classify-and-cap design targets."
+          },
+          {
+            "file": "fleet-shared-patterns.json",
+            "relevance": 60,
+            "summary": "Stores errors keyed by signature_hash with seen_count and per-repo contributions, showing how repeated error signatures are deduplicated and counted across runs."
+          },
+          {
+            "file": "test-failures.json",
+            "relevance": 45,
+            "summary": "A keyed signatures map for test failures, the natural place to record error classes for duplicate detection, though it is currently empty."
+          }
+        ]
+      },
+      "timestamp": 1791692109,
+      "ttl": 1800
     }
   }
 }
