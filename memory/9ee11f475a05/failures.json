@@ -5,8 +5,8 @@
       "pattern": "\u001b[38;2;74;222;128m\u001b[1m✓\u001b[0m reveal shows 1/3 pass count on failure",
       "root_cause": "sw-cost-test.sh 'CONTEXT EFFICIENCY' dashboard tests fail because the cost dashboard prints 'No cost entries in the last 30 days' and exits early, never rendering the context-efficiency section from the seeded loop.context_efficiency events (test seeds only events, no cost entries).",
       "fix": "Make the cost dashboard render the CONTEXT EFFICIENCY section even when there are no cost entries (or have the test seed a cost entry/use an events path the dashboard reads) so the avg budget utilization assertions pass.",
-      "seen_count": 48,
-      "last_seen": "2026-10-10T22:55:17Z",
+      "seen_count": 49,
+      "last_seen": "2026-10-11T02:21:30Z",
       "category": "test_failure"
     },
     {
@@ -14,8 +14,8 @@
       "pattern": "Failed: 1",
       "root_cause": "Two suites failed: sw-e2e-integration-test hit a stale pipeline lock/state ('pipeline already in progress') left by the outer pipeline run, and sw-intent-analysis-test failed its schema check for required fields (version, goal, criteria).",
       "fix": "Make the e2e integration test run with isolated state/lock dir (or skip when a pipeline is already running), and update the intent analysis schema or the analyze_intent output so they agree on the required fields.",
-      "seen_count": 10,
-      "last_seen": "2026-10-10T19:36:34Z",
+      "seen_count": 11,
+      "last_seen": "2026-10-11T00:49:07Z",
       "category": "test_failure",
       "signature": "unknown:cede96e649db9be5"
     },
@@ -42,8 +42,8 @@
       "pattern": "\u001b[38;2;0;212;255m▸\u001b[0m Patrol recurring failures label construction... \u001b[38;2;74;222;128m✓\u001b[0m",
       "root_cause": "sw-cost-test.sh 'context efficiency' dashboard test fails: `shipwright cost show` prints 'No cost entries in the last 30 day(s)' and exits early, so the CONTEXT EFFICIENCY section built from loop.context_efficiency events is never rendered (test seeds only events, no cost entries).",
       "fix": "Make sw-cost.sh render the CONTEXT EFFICIENCY section even when there are no cost entries (don't return early), or have the test seed a cost entry alongside the loop.context_efficiency events.",
-      "seen_count": 4,
-      "last_seen": "2026-10-09T09:21:00Z",
+      "seen_count": 5,
+      "last_seen": "2026-10-11T01:23:56Z",
       "category": "test_failure"
     },
     {
@@ -60,8 +60,8 @@
       "pattern": "\u001b[2m  loop behavior: iterations on test failure\u001b[0m",
       "root_cause": "sw-cost-test.sh 'context efficiency' assertions fail because the cost dashboard reports 'No cost entries in the last 30 days' and exits before rendering the CONTEXT EFFICIENCY section from the seeded loop.context_efficiency events (test events/timestamps are not seen, or the section is skipped when costs.json is empty).",
       "fix": "In sw-cost-test.sh, seed at least one cost entry (and events with current timestamps in the events file the script reads) before running the dashboard, or change sw-cost.sh to render the CONTEXT EFFICIENCY section even when there are no cost entries.",
-      "seen_count": 14,
-      "last_seen": "2026-10-11T01:42:35Z",
+      "seen_count": 11,
+      "last_seen": "2026-10-10T15:57:53Z",
       "category": "test_failure"
     },
     {
@@ -103,8 +103,8 @@
     {
       "stage": "test",
       "pattern": "\u001b[2m  error-signature dedup (behavioral)\u001b[0m",
-      "root_cause": "The 'error-signature dedup (behavioral)' test in the post-tool-use hook/error-log test suite failed; the shown log tail contains only passing suites (reward-aggregator, bandit, policy-learner, autoresearch), so the failing assertion is not visible and is likely a timing/environment-dependent dedup check.",
-      "fix": "Run the suite containing 'error-signature dedup (behavioral)' directly (likely the hooks/error-log test) to see the exact assertion, then fix the dedup logic in the post-tool-use hook (or make the test's timestamp/window handling deterministic).",
+      "root_cause": "sw-project-detect-test fails at the 'Cached detection returns same result' assertion (line 366): the cached project detection output differs from the fresh result, likely because the cache includes a changing timestamp or the cache file isn't read back identically. The sw-e2e-integration-test also timed out after 301s, probably due to real Claude/GitHub calls.",
+      "fix": "Make the cache comparison in sw-project-detect-test.sh ignore the volatile timestamp field (e.g. compare via jq 'del(.cached_at)') or ensure project_detect_all returns the cached JSON verbatim; separately, skip or raise the timeout for the e2e-integration test when no real API access is available.",
       "seen_count": 2,
       "last_seen": "2026-10-10T22:10:05Z",
       "category": "test_failure"
