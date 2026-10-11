@@ -60,8 +60,8 @@
       "pattern": "\u001b[2m  loop behavior: iterations on test failure\u001b[0m",
       "root_cause": "sw-cost-test.sh 'context efficiency' assertions fail because the cost dashboard reports 'No cost entries in the last 30 days' and exits before rendering the CONTEXT EFFICIENCY section from the seeded loop.context_efficiency events (test events/timestamps are not seen, or the section is skipped when costs.json is empty).",
       "fix": "In sw-cost-test.sh, seed at least one cost entry (and events with current timestamps in the events file the script reads) before running the dashboard, or change sw-cost.sh to render the CONTEXT EFFICIENCY section even when there are no cost entries.",
-      "seen_count": 11,
-      "last_seen": "2026-10-10T15:57:53Z",
+      "seen_count": 14,
+      "last_seen": "2026-10-11T01:42:35Z",
       "category": "test_failure"
     },
     {
@@ -103,11 +103,11 @@
     {
       "stage": "test",
       "pattern": "\u001b[2m  error-signature dedup (behavioral)\u001b[0m",
-      "root_cause": "sw-e2e-integration-test (real Claude + real GitHub pipeline run) exceeded the 300s suite timeout; the build loop's full-test step runs `npm test` recursively, so the nested run is slow and the suite hangs until killed. All other 161 suites passed.",
-      "fix": "Skip or gate sw-e2e-integration-test in the default `npm test` run (it requires real Claude/GitHub), or raise its per-suite timeout and make the nested loop use a fast test command rather than `npm test`.",
+      "root_cause": "The 'error-signature dedup (behavioral)' test in the post-tool-use hook/error-log test suite failed; the shown log tail contains only passing suites (reward-aggregator, bandit, policy-learner, autoresearch), so the failing assertion is not visible and is likely a timing/environment-dependent dedup check.",
+      "fix": "Run the suite containing 'error-signature dedup (behavioral)' directly (likely the hooks/error-log test) to see the exact assertion, then fix the dedup logic in the post-tool-use hook (or make the test's timestamp/window handling deterministic).",
       "seen_count": 2,
       "last_seen": "2026-10-10T22:10:05Z",
-      "category": "timeout"
+      "category": "test_failure"
     }
   ]
 }
