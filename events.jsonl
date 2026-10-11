@@ -28,3 +28,7 @@
 {"ts":"2026-10-11T03:53:45Z","ts_epoch":1791690825,"type":"recruit_reflect","accuracy":100.0,"corrections":0}
 {"ts":"2026-10-11T03:53:46Z","ts_epoch":1791690826,"type":"recruit_meta_warning","accuracy":100.0,"trend":"declining","first_half":87.66666666666667,"second_half":68.75}
 {"ts":"2026-10-11T03:53:46Z","ts_epoch":1791690826,"type":"recruit_audit","score":80.0,"passed":24,"failed":6,"warnings":1,"total":30}
+{"ts":"2026-10-11T04:07:44Z","ts_epoch":1791691664,"type":"hygiene_platform_refactor","hardcoded":49,"fallback":69,"todo":51}
+{"ts":"2026-10-11T04:08:12Z","ts_epoch":1791691692,"type":"strategic.issue_created","title":"Classify and cap duplicate/near-duplicate build-loop errors before retry","priority":"P0","complexity":"standard"}
+{"ts":"2026-10-11T04:08:16Z","ts_epoch":1791691696,"type":"strategic.issue_created","title":"Detect and report thrashing (oscillating) build-loop iterations distinct from flatlining","priority":"P2","complexity":"standard"}
+{"ts":"2026-10-11T04:08:16Z","ts_epoch":1791691696,"type":"strategic.cycle_complete","issues_created":2,"issues_skipped":1}
