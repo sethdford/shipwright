@@ -1,14 +1,53 @@
 ---
-goal: "Misleading "jq not available" warning when Claude outputs JSON object instead of array
+goal: "Deduplicate identical build-loop errors across iterations to stop wasted retries
 
-## Specification: Misleading "jq not available" warning when Claude outputs JSON object instead of array
+## Plan Summary
+# Plan: Stop the build loop retrying the same failed attempt (#8438)
+
+## Findings in the current code
+
+- `write_error_summary()` (`scripts/sw-loop.sh:1105`) writes `error-summary.json`. It has `error_lines` but no signature, and nothing compares one iteration's summary with the previous one. `compose_prompt` (`scripts/lib/loop-iteration.sh:105-118`) puts the same "Structured Error Summary" block back into the prompt every iteration.
+- `detect_stuckness()` (`scripts/lib/loop-convergence.sh:183`) already has an "error repetition" signal (Signals 3 and 4). It hashes `pipeline-artifacts/error-log.jsonl`, which the `post-tool-use.sh` hook fills from failed Bash calls inside Claude. It does **not** look at the test-gate failures in `error-summary.json`. Even when it fires, a restart needs 2+ signals per iteration and `STUCKNESS_COUNT >= 3`. In practice that means 5–7 iterations of an identical failure before anything changes. That is the root cause.
+- `write_error_summary` also writes a summary when tests **pass**, if the last 30 lines of Claude's log contain the word "error". Hashing those would make false positives likely, so dedup must only run when `TEST_PASSED == "false"`.
+- The restart mechanism already exists: `run_loop_with_restarts` restarts on any non-`complete` status when `MAX_RESTARTS > 0`, and `stuck_restart` (line 2557) is the precedent. By default `MAX_RESTARTS` is 0 for manual runs and 3 under the daemon.
+- `sw-loop.sh` has no source guard (`main` runs on source), so the new logic has to go in a `scripts/lib/` module to be testable. `sw-loop-test.sh:236` already has the behavioural `bash -c 'source lib…'` pattern.
+- Helpers to reuse: `compute_md5 --string` (`compat.sh:322`), `_smart_int` (env `SW_LOOP_*` → daemon-config → default), and `emit_event`.
+
+## Design decisions
+
+| Question | Decision | Why |
+|---|---|---|
+| What counts as "the same error"? | The sorted, de-duplicated set of normalized `error_lines`. Normalizing strips ANSI codes, ISO timestamps, durations (`3.2s`, `(12 ms)`), hex addresses, `/tmp/…` and `/var/folders/…` paths, and runs of whitespace. `file:line` and the message text are **kept**. | The issue specifies file+line+message. Keeping line numbers means a code edit that moves the failing line produces a new signature. That errs toward escalating less, which is the cheap direction. Failure counts in lines like "3 failed" are kept, so a falling count is treated as progress. |
+| What does "repeat" mean? | The same hash in **consecutive** failing iterations. A passing iteration or a different signature resets the counter. | Matches "2 consecutive identical-signature failures". |
+| Threshold | `loop.error_dedup_threshold`, default **2** | Acceptance criteria. |
+| What does escalation do? | A two-level ladder (below). | A restart is expensive and not always available (`MAX_RESTARTS=0`), so the cheaper fix is tried first. |
+| Config flag | `loop.error_dedup_enabled`, default **true**. Env overrides: `LOOP_ERROR_DEDUP=0` / `SW_LOOP_ERROR_DEDUP_ENABLED=false`. | When disabled, every function returns immediately and behaviour is byte-identical to today. |
+[... full plan in .claude/pipeline-artifacts/plan.md]
+
+## Key Design Decisions
+# Design: Deduplicate identical build-loop errors across iterations to stop wasted retries
+## Context
+## Decision
+### Component Diagram
+### Interface Contracts
+### Data Flow
+### Error Boundaries
+### Key design decisions
+## Alternatives Considered
+## Implementation Plan
+[... full design in .claude/pipeline-artifacts/design.md]
+
+## Specification: Deduplicate identical build-loop errors across iterations to stop wasted retries
 
 ### Goals
-- *jq IS available.** The actual issue is that Claude's `--output-format json` sometimes outputs a JSON **object** (`{...}`) instead of a JSON **array** (`[...]`), and the parsing code only handles arrays.
-- *Option A**: Extend Case 2 to handle both formats:
-- *Option B**: At minimum, fix the warning message in Case 3:
-- Warning is cosmetic only — the loop functions correctly using the raw JSON
-- But it's confusing during debugging (we spent time investigating jq availability when the real issue was elsewhere)
+- - Error signatures (normalized file:line:message) are hashed and compared against prior iterations within the same loop run
+- - After 2 consecutive identical-signature failures, the loop logs an escalation event and changes approach (e.g., forces session restart or injects broader context) rather than repeating the same prompt
+- - Unit tests in sw-loop-test.sh cover signature extraction, repeat detection, and the escalation trigger
+- - Behavior is gated behind a config flag with a sane default so it degrades gracefully if disabled
+- **Priority**: P0
+- **Complexity**: standard
+- **Generated by**: Strategic Intelligence Agent
+- **Strategy alignment**: P0: Reliability
 
 ### Acceptance Criteria
 - [testable] All existing tests continue to pass
@@ -16,88 +55,118 @@ goal: "Misleading "jq not available" warning when Claude outputs JSON object ins
 Historical context (lessons from previous pipelines):
 {
   "results": [
-    {
-      "file": "failures.json",
-      "relevance": 95,
-      "summary": "Contains detailed jq parse error patterns matching the issue: 'jq: parse error' on malformed JSON and mock claude outputting wrong JSON schema (object vs array). Root cause and fix directly address the 'jq not available' warning problem."
-    },
-    {
-      "file": "patterns.json",
-      "relevance": 40,
-      "summary": "Project detection data (nodejs, vitest test runner) provides context about the build environment and testing setup for this pipeline stage."
-    },
-    {
-      "file": "metrics.json",
-      "relevance": 8,
-      "summary": "Build duration baselines (17827s) provide context on typical build stage timing, useful for understanding if this issue impacts build performance."
-    },
-    {
-      "file": "metrics.json",
-      "relevance": 5,
-      "summary": "Earlier build duration baseline (147s) is outdated but shows historical performance context."
-    },
-    {
-      "file": "global.json",
-      "relevance": 0,
-      "summary": "Empty cross-repo learnings, no relevant content for this specific jq/JSON issue."
-    }
+    {"file": "failures.json", "relevance": 92, "summary": "Contains repeated build/test timeout errors with identical root causes (unbounded loop, add timeout wrapper) across entries, which is the exact duplicate-error pattern the deduplication work targets."},
+    {"file": "success-patterns.json", "relevance": 70, "summary": "Holds build-stage success patterns with iteration counts and approaches, useful context for how build-loop retries converge and when they are wasted."},
+    {"file": "fleet-shared-patterns.json", "relevance": 58, "summary": "Stores cross-repo build-stage error signatures with seen_count and fixes, relevant to recognizing recurring identical errors across runs."},
+    {"file": "index.json", "relevance": 45, "summary": "Indexes failure patterns by signature and stage (build), including a fix entry, so it can inform how repeated errors are identified and grouped."},
+    {"file": "test-failures.json", "relevance": 30, "summary": "Keyed store of test failure signatures, which could hold the error signatures the deduplication logic compares, though it is currently empty."}
   ]
 }
 
 Discoveries from other pipelines:
-[38;2;74;222;128m[1m✓[0m Injected 128 new discoveries
-[intake] Stage intake completed — Resolution: 
-[intake] Stage intake completed — Resolution: 
-[intake] Stage intake completed — Resolution: 
-[compound_quality] Stage compound_quality completed — Resolution: 
-[intake] Stage intake completed — Resolution: 
-[pr] Stage pr completed — Resolution: 
-[pipeline_success] Pipeline success for issue #0 (fast template, stage=validate) — Resolution: success
-[intake] Stage intake completed — Resolution: 
-[pr] Stage pr completed — Resolution: 
-[intake] Stage intake completed — Resolution: 
-[compound_quality] Stage compound_quality completed — Resolution: 
-[pr] Stage pr completed — Resolution: 
-[intake] Stage intake completed — Resolution: 
-[compound_quality] Stage compound_quality completed — Resolution: 
-[pr] Stage pr completed — Resolution: 
-[intake] Stage intake completed — Resolution: 
-[design] Design completed for Build a production-grade todo application. TypeScript + React frontend with Vite, Express REST API backend, SQLite persistence with Drizzle ORM, JWT authentication (register/login), full CRUD for todos with filtering (all/active/completed), drag-and-drop reorder, due dates, priorities (low/medium/high), dark mode, responsive design. Include comprehensive test suite (unit + integration + e2e). Production-ready: error handling, input validation, rate limiting, CORS, environment config. — Resolution: 
-[intake] Stage intake completed — Resolution: 
-[intake] Stage intake completed — Resolution: 
+✓ Injected 1 new discoveries
+[design] Design completed for Deduplicate identical build-loop errors across iterations to stop wasted retries — Resolution: 
 
-## Failure Diagnosis (Iteration 2)
-Classification: unknown
-Strategy: retry_with_context
-Repeat count: 0
+Task tracking (check off items as you complete them):
+# Pipeline Tasks — Deduplicate identical build-loop errors across iterations to stop wasted retries
 
-## Failure Diagnosis (Iteration 3)
-Classification: unknown
-Strategy: retry_with_context
-Repeat count: 1"
-iteration: 3
-max_iterations: 10
-status: complete
+## Implementation Checklist
+- [ ] T1: Create `scripts/lib/loop-error-signature.sh` with guard, `errsig_normalize_line` and `errsig_compute`
+- [ ] T2: Add `errsig_update` (`TEST_PASSED=false` gate, consecutive counter, `error-signatures.txt` append, atomic enrichment of `error-summary.json`)
+- [ ] T3: Add the `errsig_escalate` ladder, including the "unavailable" and "exhausted" fallbacks and `emit_event`
+- [ ] T4: Add `errsig_reset` and the `ERRSIG_RESTARTED_HASHES` anti-thrash guard
+- [ ] T5: In `sw-loop.sh`, source the lib and read `ERROR_DEDUP_ENABLED` / `ERROR_DEDUP_THRESHOLD`, with validation
+- [ ] T6: In `sw-loop.sh`, call `errsig_update` after `write_error_summary`, add the `error_repeat_restart` break, and reset in both restart blocks
+- [ ] T7: Inject the `ERRSIG_HINT` section and use 200 lines of test output in `compose_prompt` when escalated
+- [ ] T8: Rotate `LOOP_SESSION_ID` on escalation when session continuity is enabled
+- [ ] T9: Add the `config/defaults.json` keys and register `loop.error_signature_repeat` in `event-schema.json`
+- [ ] T10: Write the unit tests in `sw-loop-test.sh` (signature extraction, repeat detection, escalation, gating)
+- [ ] T11: Write the wiring tests (call order, prompt section, restart status handled)
+- [ ] T12: Update the `.claude/CLAUDE.md` docs
+- [ ] T13: Run `./scripts/sw-loop-test.sh`, `npm test`, `shellcheck` and `sw-event-schema-sync.sh`
+- [ ] Normalized `file:line:message` signatures are hashed per failing iteration and compared with the previous iteration in the same run. Evidence: `error-signatures.txt` and the new `error-summary.json` fields.
+- [ ] Two consecutive identical-signature failures emit `loop.error_signature_repeat` and change the next prompt (hint plus wider context). A third triggers `error_repeat_restart` when restarts are available.
+- [ ] `sw-loop-test.sh` covers signature extraction, repeat detection and the escalation trigger, and passes.
+- [ ] `loop.error_dedup_enabled` (default true) and `loop.error_dedup_threshold` (default 2) work. When disabled, the loop is behaviourally unchanged (U14).
+- [ ] The code is Bash 3.2 compatible, safe under `set -euo pipefail`, uses `jq --arg` and tmp+`mv` writes, and `shellcheck` is clean.
+- [ ] `npm test` is green and the event schema is in sync.
+
+## Context
+- Pipeline: standard
+- Branch: fix/deduplicate-identical-build-loop-errors-8438
+- Issue: #8438
+- Generated: 2026-10-11T02:52:07Z
+
+## Skill Guidance (backend issue, AI-selected)
+### Why these skills were selected (AI-analyzed):
+- **testing-strategy**: The acceptance criteria name three test areas (signature extraction, repeat detection, escalation trigger) in sw-loop-test.sh. Testing the boundaries (1 vs. 2 identical failures, a changed line number, an empty summary) is where this feature is most likely to break.
+
+## Testing Strategy Expertise
+
+Apply these testing patterns:
+
+### Test Pyramid
+- **Unit tests** (70%): Test individual functions/methods in isolation
+- **Integration tests** (20%): Test component interactions and boundaries
+- **E2E tests** (10%): Test critical user flows end-to-end
+
+### What to Test
+- Happy path: the expected successful flow
+- Error cases: what happens when things go wrong?
+- Edge cases: empty inputs, maximum values, concurrent access
+- Boundary conditions: off-by-one, empty collections, null/undefined
+
+### Test Quality
+- Each test should verify ONE behavior
+- Test names should describe the expected behavior, not the implementation
+- Tests should be independent — no shared mutable state between tests
+- Tests should be deterministic — same result every run
+
+### Coverage Strategy
+- Aim for meaningful coverage, not 100% line coverage
+- Focus coverage on business logic and error handling
+- Don't test framework code or simple getters/setters
+- Cover the branches, not just the lines
+
+### Mocking Guidelines
+- Mock external dependencies (APIs, databases, file system)
+- Don't mock the code under test
+- Use realistic test data — edge cases reveal bugs
+- Verify mock interactions when the side effect IS the behavior
+
+### Regression Testing
+- Write a failing test FIRST that reproduces the bug
+- Then fix the bug and verify the test passes
+- Keep regression tests — they prevent the bug from recurring
+
+### Required Output (Mandatory)
+
+Your output MUST include these sections when this skill is active:
+
+1. **Test Pyramid Breakdown**: Explicit count of unit/integration/E2E tests and their coverage targets (e.g., "70 unit tests covering business logic, 12 integration tests for API boundaries, 3 E2E tests for critical paths")
+2. **Coverage Targets**: Target coverage percentage per layer and which critical paths MUST be tested
+3. **Critical Paths to Test**: Specific test cases for the happy path, 2+ error cases, and 2+ edge cases
+
+If any section is not applicable, explicitly state why it's skipped.
+"
+iteration: 0
+max_iterations: 20
+status: running
 test_cmd: "npm test"
-model: sonnet
+model: opus
 agents: 1
-started_at: 2026-04-04T17:41:42Z
-last_iteration_at: 2026-04-04T17:41:42Z
+started_at: 2026-10-11T02:54:53Z
+last_iteration_at: 2026-10-11T02:54:53Z
 consecutive_failures: 0
-total_commits: 3
-audit_enabled: false
-audit_agent_enabled: false
-quality_gates_enabled: false
-dod_file: ""
+total_commits: 0
+audit_enabled: true
+audit_agent_enabled: true
+quality_gates_enabled: true
+dod_file: "/home/runner/work/shipwright/shipwright/.claude/pipeline-artifacts/dod.md"
 auto_extend: true
 extension_count: 0
 max_extensions: 3
 ---
 
 ## Log
-### Iteration 1 (2026-04-04T15:25:20Z)
-{"type":"result","subtype":"success","is_error":false,"duration_ms":227709,"duration_api_ms":143263,"num_turns":22,"resu
-
-### Iteration 2 (2026-04-04T16:25:53Z)
-{"type":"result","subtype":"success","is_error":false,"duration_ms":9837,"duration_api_ms":311675,"num_turns":2,"result"
 

@@ -32,15 +32,14 @@
       "result": {
         "primary_role": "builder",
         "secondary_roles": [
-          "tester",
-          "reviewer"
+          "tester"
         ],
-        "confidence": 0.95,
-        "reasoning": "Bug fix requiring debugging JSON parsing logic, implementing improved error messaging, and testing edge cases (object vs array output). Builder handles implementation; tester validates the fix; reviewer ensures accuracy.",
+        "confidence": 0.88,
+        "reasoning": "The task is a bounded code change in the build loop's error handling (detect and collapse identical errors across iterations), which fits builder; tester is added to cover the regression tests for the dedup behavior.",
         "new_role_needed": false,
         "suggested_role": null
       },
-      "timestamp": 1775316059,
+      "timestamp": 1791687291,
       "ttl": 3600
     },
     "efd5524ad1244fd20344bf3ff5d95233": {
@@ -1401,6 +1400,349 @@
       },
       "timestamp": 1775344537,
       "ttl": 3600
+    },
+    "03b42ccdf1deb3dc3ed11539a461022a": {
+      "result": {
+        "complexity": 6,
+        "risk_level": "medium",
+        "success_probability": 72,
+        "recommended_template": "standard",
+        "issue_type": "backend",
+        "key_risks": [
+          "Signature normalization (file:line:message) may be brittle: line numbers shift between iterations, and messages can contain varying timestamps, paths, or counters, so identical failures may not hash equal and repeats go undetected.",
+          "Escalation could fire on legitimate repeated errors where the agent is making progress on a different part of the same test file, causing premature session restarts or strategy changes.",
+          "Bash 3.2 compatibility: no associative arrays, so the per-iteration signature history needs to live in a file or a simple delimited string rather than a map.",
+          "Interaction with existing context-exhaustion and restart logic in sw-loop.sh could double-trigger restarts or fight the circuit breaker, which already counts consecutive failures.",
+          "Config flag default must not change behavior for existing users; a default-on flag could alter loop outcomes in unexpected ways."
+        ],
+        "implementation_hints": [
+          "Normalize signatures before hashing: strip line numbers, timestamps, temp paths, and counters, then hash with a portable tool (cksum or shasum, with a fallback) so it works on both Linux and macOS.",
+          "Persist the signature history in the loop's progress or state directory, one line per iteration, and compare only against the previous N entries; this avoids associative arrays and survives session restarts.",
+          "Gate the escalation behind a config key such as loop.dedupe_error_signatures (default false) and read it with _smart_int or a matching helper so the existing config chain applies.",
+          "On the second consecutive identical signature, emit an event via emit_event and force the existing session-restart path with broadened error context, reusing the restart mechanism rather than adding a new one.",
+          "Add cases to sw-loop-test.sh covering signature extraction from a sample error-summary.json, repeat detection across consecutive iterations, non-repeat reset, and the escalation trigger with the flag both on and off."
+        ]
+      },
+      "timestamp": 1791686878,
+      "ttl": 3600
+    },
+    "cb29074d7afd55d60c46424c4318aa20": {
+      "result": {
+        "estimated_iterations": 7
+      },
+      "timestamp": 1791686881,
+      "ttl": 1800
+    },
+    "c55438ed58c7a8fb1fef39d5de6289dd": {
+      "result": {
+        "estimated_cost_usd": 4.2,
+        "estimated_iterations": 4,
+        "estimated_tokens": 1350000,
+        "likely_failure_stage": "build",
+        "confidence": 55
+      },
+      "timestamp": 1791686885,
+      "ttl": 3600
+    },
+    "c5c3d4742e4257126f0655272162e12d": {
+      "result": {
+        "issue_type": "backend",
+        "confidence": 0.85,
+        "secondary_domains": [
+          "reliability",
+          "testing",
+          "shell-tooling"
+        ],
+        "complexity_assessment": {
+          "score": 5,
+          "reasoning": "Adds signature hashing and repeat detection to the build loop in sw-loop.sh, plus an escalation branch (session restart or broader context) behind a config flag. The logic is contained, but it touches iteration control, restart behavior, and error-summary parsing, and needs unit tests in sw-loop-test.sh."
+        },
+        "skill_plan": {
+          "plan": [
+            "brainstorming"
+          ],
+          "design": [
+            "architecture-design"
+          ],
+          "build": [
+            "testing-strategy"
+          ],
+          "review": [
+            "two-stage-review",
+            "adversarial-quality"
+          ],
+          "compound_quality": [
+            "validation-thoroughness"
+          ],
+          "pr": [
+            "pr-quality"
+          ],
+          "deploy": [
+            "deploy-safety"
+          ],
+          "validate": [
+            "validation-thoroughness"
+          ],
+          "monitor": [
+            "observability"
+          ]
+        },
+        "skill_rationale": {
+          "brainstorming": "The acceptance criteria leave open what counts as the same error: whether line numbers are normalized, how many identical signatures trigger escalation, and which escalation to pick. These need settling before the signature format is fixed.",
+          "architecture-design": "The escalation policy (force session restart vs. widen context vs. switch strategy) and the flag that gates it are durable decisions that the loop's restart and iteration-budget logic depends on, so an ADR is worth writing.",
+          "testing-strategy": "The acceptance criteria name three test areas (signature extraction, repeat detection, escalation trigger) in sw-loop-test.sh. Testing the boundaries (1 vs. 2 identical failures, a changed line number, an empty summary) is where this feature is most likely to break.",
+          "two-stage-review": "Signature normalization and escalation are easy to get subtly wrong. A first pass for spec compliance against the acceptance criteria, then a second pass for correctness and bash 3.2 compatibility, catches different defects.",
+          "adversarial-quality": "The main failure modes are false positives (a legitimately changing error treated as stuck) and escalation loops that never terminate. Adversarial review should try to construct inputs that trigger both.",
+          "validation-thoroughness": "The flag-off path must behave exactly as before, and the flag-on path must actually change behavior on a real repeated failure. Passing unit tests alone will not show that the escalation reaches the prompt or the restart.",
+          "pr-quality": "The change touches core loop control flow, so the PR needs to show the signature format, the default for the config flag, and why the default is safe for existing daemon runs.",
+          "deploy-safety": "The feature ships behind a config flag. The default-off rollout should be verified in a daemon-driven run before enabling it for everyone, because a wrong escalation can waste or stall runs.",
+          "observability": "The acceptance criteria require an escalation event to be logged. Operators need to see repeat counts and escalations in events.jsonl and the dashboard to judge whether the trigger is firing too often."
+        },
+        "generated_skills": [],
+        "review_focus": [
+          "Signature normalization: strip or bucket line numbers and volatile paths so that a shifted line with the same message still matches, while distinct messages do not collide",
+          "Hashing portability: use an available hash tool (sha256sum, shasum, or md5) and fall back cleanly on macOS and Linux, with Bash 3.2 syntax only (no declare -A)",
+          "Escalation termination: confirm the escalation cannot re-trigger in a loop and that it respects max_restarts, context_restart_limit, and hard_restart_cap",
+          "Config gate: the flag must default to off or to a safe value, and the disabled path must leave existing behavior unchanged",
+          "Stale state: error-summary.json from a previous run or iteration must not be counted as a repeat"
+        ],
+        "risk_areas": [
+          "False-positive escalation: a test that fails for different reasons with the same summary line could trigger a session restart that discards useful progress",
+          "Empty or malformed error-summary.json should be treated as no signature, not as a repeat",
+          "Interaction with the existing circuit breaker (circuit_breaker_threshold) and the context-exhaustion tagging, which could double-count the same failure",
+          "Restart with a new session id on escalation must still resume from progress.md and must not lose git state",
+          "Hash tool missing on the runner image would make the feature fail silently; it needs an explicit fallback or a logged warning"
+        ]
+      },
+      "timestamp": 1791686929,
+      "ttl": 3600
+    },
+    "91ab62623d0b08aa96ac2b485311b930": {
+      "result": {
+        "results": [
+          {
+            "file": "failures.json",
+            "relevance": 85,
+            "summary": "Holds near-identical failure signatures (\"timeout after 3.2s at line 42\" and \"2.8s at line 43\") sharing one root cause, with seen_count and resolved fields. This is the closest example of the duplicate-error problem the plan must handle."
+          },
+          {
+            "file": "fleet-shared-patterns.json",
+            "relevance": 60,
+            "summary": "Keys patterns by signature_hash and tracks seen_count and contributions across repos. Shows how repeated error signatures are already aggregated instead of stored separately."
+          },
+          {
+            "file": "index.json",
+            "relevance": 55,
+            "summary": "Pattern index keyed by signature with total_seen, stage, and fix. Relevant to deduplicating errors by signature and counting repeats within the build stage."
+          },
+          {
+            "file": "test-failures.json",
+            "relevance": 40,
+            "summary": "Failure store keyed by signature (the signatures map is currently empty). Relevant to where a dedup key would be recorded, though it has no data yet."
+          },
+          {
+            "file": "success-patterns.json (repo_hash test-repo-789)",
+            "relevance": 35,
+            "summary": "Build-stage success pattern for scripts/sw-daemon.sh with error_signatures and iterations_needed. Touches the daemon and build-loop retry path that the fix would change."
+          }
+        ]
+      },
+      "timestamp": 1791686975,
+      "ttl": 1800
+    },
+    "5118f21affcd52a2fc6d7360f0a5dec1": {
+      "result": {
+        "results": [
+          {
+            "file": "failures.json",
+            "relevance": 90,
+            "summary": "Contains repeated near-identical build/test timeout errors (lines 42 and 43, same root cause and fix, seen_count tracked), the exact duplicate-error pattern this plan needs to collapse."
+          },
+          {
+            "file": "test-failures.json",
+            "relevance": 55,
+            "summary": "Keyed signature store for test failures; signature-based matching is the mechanism a dedup of repeated build-loop errors would rely on, though it is currently empty."
+          },
+          {
+            "file": "fleet-shared-patterns.json",
+            "relevance": 45,
+            "summary": "Stores error patterns by signature_hash with seen_count and per-repo contributions, showing how repeated errors are already aggregated rather than re-recorded."
+          }
+        ]
+      },
+      "timestamp": 1791687135,
+      "ttl": 1800
+    },
+    "0638a30181becc33167d9a76dabdbae1": {
+      "result": {
+        "results": [
+          {
+            "file": "failures.json",
+            "relevance": 85,
+            "summary": "Failure records keyed by pattern with seen_count, resolved and fix_applied fields. Two near-identical 'timeout after ... at line N' entries show the repeated-error problem that deduplication targets."
+          },
+          {
+            "file": "test-failures.json",
+            "relevance": 60,
+            "summary": "Signature-keyed failure store, the natural place to dedupe identical build-loop errors. Currently empty, so it shows the shape rather than real data."
+          },
+          {
+            "file": "index.json",
+            "relevance": 55,
+            "summary": "Build-stage failure patterns indexed by signature with total_seen counts. Useful for deciding how repeated errors should be collapsed into one entry."
+          },
+          {
+            "file": "fleet-shared-patterns.json",
+            "relevance": 50,
+            "summary": "Cross-repo patterns keyed by signature_hash with seen_count and contributions. Shows how identical error signatures are already merged across repos."
+          },
+          {
+            "file": "architecture.json",
+            "relevance": 35,
+            "summary": "Design-stage architecture file, but it holds only placeholder rules (rule1-rule3) with no real dedup design guidance."
+          }
+        ]
+      },
+      "timestamp": 1791687158,
+      "ttl": 1800
+    },
+    "b87d68ad11e682a561a9410145bc3b85": {
+      "result": {
+        "results": [
+          {
+            "file": "failures.json",
+            "relevance": 80,
+            "summary": "Holds near-duplicate failure records (\"timeout after 3.2s at line 42\" and \"... 2.8s at line 43\") with seen_count and resolved flags, which shows the repeated-error problem the dedup change targets and how fixes were recorded."
+          },
+          {
+            "file": "fleet-shared-patterns.json",
+            "relevance": 65,
+            "summary": "Uses signature_hash, seen_count and per-repo contributions to collapse repeated errors into one pattern, a working dedup mechanism to compare against when rejecting alternative designs."
+          },
+          {
+            "file": "index.json",
+            "relevance": 45,
+            "summary": "Indexes failure patterns by signature with total_seen and a fix field, a lookup-based way to recognize a recurring error instead of retrying it."
+          }
+        ]
+      },
+      "timestamp": 1791687164,
+      "ttl": 1800
+    },
+    "a14963f22722776ccf34a9d84787ee76": {
+      "result": {
+        "results": [
+          {
+            "file": "failures.json",
+            "relevance": 92,
+            "summary": "Contains repeated build/test timeout errors with identical root causes (unbounded loop, add timeout wrapper) across entries, which is the exact duplicate-error pattern the deduplication work targets."
+          },
+          {
+            "file": "success-patterns.json",
+            "relevance": 70,
+            "summary": "Holds build-stage success patterns with iteration counts and approaches, useful context for how build-loop retries converge and when they are wasted."
+          },
+          {
+            "file": "fleet-shared-patterns.json",
+            "relevance": 58,
+            "summary": "Stores cross-repo build-stage error signatures with seen_count and fixes, relevant to recognizing recurring identical errors across runs."
+          },
+          {
+            "file": "index.json",
+            "relevance": 45,
+            "summary": "Indexes failure patterns by signature and stage (build), including a fix entry, so it can inform how repeated errors are identified and grouped."
+          },
+          {
+            "file": "test-failures.json",
+            "relevance": 30,
+            "summary": "Keyed store of test failure signatures, which could hold the error signatures the deduplication logic compares, though it is currently empty."
+          }
+        ]
+      },
+      "timestamp": 1791687281,
+      "ttl": 1800
+    },
+    "47c1451f50b4a8f9faa0f8012f6b922e": {
+      "result": {
+        "results": [
+          {
+            "file": "retry-outcomes.json",
+            "relevance": 95,
+            "summary": "Records build_failure retries with model_escalation at 100% success, directly relevant to the build loop retry behavior this goal targets."
+          },
+          {
+            "file": "success-patterns.json",
+            "relevance": 80,
+            "summary": "Captures loop-iteration approaches and files changed for past bug fixes, showing how build iterations have previously succeeded."
+          },
+          {
+            "file": "metrics.json",
+            "relevance": 70,
+            "summary": "Holds the build_duration_s baseline (7095s) that build-stage runtime and wasted-retry savings can be measured against."
+          },
+          {
+            "file": "failures.json",
+            "relevance": 60,
+            "summary": "Logs captured failure patterns with root causes and fixes, though most entries are test-stage rather than build-stage."
+          },
+          {
+            "file": "knowledge.json",
+            "relevance": 40,
+            "summary": "Contains failure entries with fix strategies and occurrence metrics, mostly test-related but usable as general failure-handling guidance."
+          }
+        ]
+      },
+      "timestamp": 1791687287,
+      "ttl": 1800
+    },
+    "9de257595491c672ef0603b521583ee1": {
+      "result": [
+        {
+          "type": "result",
+          "result": "I am trying the same approach again.",
+          "usage": {
+            "input_tokens": 0,
+            "output_tokens": 0
+          }
+        }
+      ],
+      "timestamp": 1791687482,
+      "ttl": 1800
+    },
+    "f60fc5e32eca40d07148c9a5426f3f66": {
+      "result": [
+        {
+          "type": "result",
+          "result": "I am trying the same approach again.",
+          "usage": {
+            "input_tokens": 0,
+            "output_tokens": 0
+          }
+        }
+      ],
+      "timestamp": 1791687661,
+      "ttl": 1800
+    },
+    "8d389ea8fa8208b9282009136722875b": {
+      "result": {
+        "raw_response": "Mock claude: ok"
+      },
+      "timestamp": 1791687848,
+      "ttl": 1800
+    },
+    "b5b3d7b99196c63677e8bd35073fa223": {
+      "result": [
+        {
+          "type": "result",
+          "result": "I am trying the same approach again.",
+          "usage": {
+            "input_tokens": 0,
+            "output_tokens": 0
+          }
+        }
+      ],
+      "timestamp": 1791688082,
+      "ttl": 1800
     }
   }
 }

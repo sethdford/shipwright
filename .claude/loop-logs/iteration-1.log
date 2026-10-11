@@ -1,1 +1,34 @@
-{"type":"result","subtype":"success","is_error":false,"duration_ms":227709,"duration_api_ms":143263,"num_turns":22,"result":"The fix is complete. Here's a summary of what was done:\n\n**Root cause:** `_extract_text_from_json()` in `sw-loop.sh` only handled JSON arrays (`[`) in Case 2 (the jq-powered path). When Claude outputs a JSON object (`{`), the code fell through to Case 3, which emits \"JSON output but jq not available\" — even when jq is fully functional.\n\n**Fix:** Extended Case 2 to handle both JSON arrays and objects when jq is available:\n- Arrays: extract `.result` from last element, fall back to `.content` \n- Objects: extract `.result` directly, fall back to `.content`\n- Case 3 now only triggers when jq is genuinely absent\n\n**Tests added** (3 new assertions in `sw-loop-test.sh`):\n- JSON object with `.result` field extracts correctly\n- JSON object with `.content` field extracts correctly  \n- No spurious \"jq not available\" warning emitted for JSON objects\n\nAll 68 loop tests pass. The pre-existing `sw-cost-test.sh` failure is unrelated to this change.\n\nLOOP_COMPLETE","stop_reason":"end_turn","session_id":"2141a2b8-fd6d-4710-b7f2-430b292cdd49","total_cost_usd":0.7620769,"usage":{"input_tokens":24,"cache_creation_input_tokens":54992,"cache_read_input_tokens":1567133,"output_tokens":5225,"server_tool_use":{"web_search_requests":0,"web_fetch_requests":0},"service_tier":"standard","cache_creation":{"ephemeral_1h_input_tokens":54992,"ephemeral_5m_input_tokens":0},"inference_geo":"","iterations":[],"speed":"standard"},"modelUsage":{"claude-sonnet-4-6":{"inputTokens":24,"outputTokens":5225,"cacheReadInputTokens":1567133,"cacheCreationInputTokens":54992,"webSearchRequests":0,"costUSD":0.7548069000000001,"contextWindow":200000,"maxOutputTokens":32000},"claude-haiku-4-5-20251001":{"inputTokens":6090,"outputTokens":236,"cacheReadInputTokens":0,"cacheCreationInputTokens":0,"webSearchRequests":0,"costUSD":0.00727,"contextWindow":200000,"maxOutputTokens":32000}},"permission_denials":[],"terminal_reason":"completed","fast_mode_state":"off","uuid":"a1b2c9a4-1f15-4b3d-aa7d-fd46394eeb52"}
+When consecutive iterations fail with the same errors, the build loop now notices and tries something different instead of re-sending the same prompt. It's committed as `80f940d9`. `sw-loop-test.sh` passes 105/105. `npm test` passed 161 of 162 suites; the failure was in `sw-project-detect-test.sh` ("Cached detection returns same result"). That suite doesn't touch anything I changed, and it passed 43/43 when I reran it alone, so it looks flaky.
+
+**How it works.** After each failing iteration, the error lines are normalized (timestamps, durations, colour codes, memory addresses and temp paths removed; file, line number and message kept), hashed, and compared with the previous iteration's hash:
+
+| Identical failures in a row | What the loop does |
+|---|---|
+| 1 | Nothing |
+| 2 (`loop.error_dedup_threshold`) | Emits `loop.error_signature_repeat` and adds a "Repeated Failure — Change Approach" section to the next prompt. That section lists the failing locations and points to the full test log. The prompt shows the last 200 lines of test output instead of 50. If session continuity is on, it switches to a new session. |
+| 3 | Ends the session with `STATUS=error_repeat_restart` and uses the existing restart path, if `--max-restarts` allows. Each distinct failure can trigger at most one restart; after that, or if no restarts are allowed, it stays at the level above. |
+
+**Things to know:**
+- Only test failures count. The existing error summary is also written on passing iterations whose log happens to contain the word "error", and those are ignored.
+- Because line numbers are part of the comparison, an edit that moves the failing line counts as a new failure. That means the loop sometimes escalates later than it could, but never on unrelated failures.
+- It's on by default. `LOOP_ERROR_DEDUP=0` or `loop.error_dedup_enabled=false` turns it off and the loop behaves exactly as before.
+- It only runs in single-agent mode, as planned.
+
+**Changes:**
+- The logic is in a new file, `scripts/lib/loop-error-signature.sh`.
+- `sw-loop.sh` calls it after each test run and resets it when a session restarts.
+- `compose_prompt` adds the new prompt section.
+- The two config keys are in `config/defaults.json`, the new event is registered in `config/event-schema.json`, and `.claude/CLAUDE.md` documents it.
+
+**Tests:** 31 new tests, all run against the real code.
+- **25 unit tests:**
+  - Signature extraction and normalization: same failure despite different timing, different line number, line order, missing or broken summary file, `jq` unavailable, blank lines.
+  - Repeat detection: a single failure doesn't count, a different failure or a passing run resets the count, error text on passing runs is ignored, signatures are written to disk without leaving temp files.
+  - Each escalation level, including the "restart not allowed" and "already restarted once" cases, plus session switching.
+  - The on/off switch and the threshold setting.
+- **6 wiring tests:** the call order in `sw-loop.sh`, both reset points, the restart, and that the prompt really contains the new section and the 200-line output.
+- **0 end-to-end tests:** the existing pipeline and smoke suites already run this code path.
+
+Shellcheck is clean and the event schema is in sync. The `.claude/` state files that were already modified when I started are not part of the commit.
+
+LOOP_COMPLETE
