@@ -180,3 +180,4 @@
 {"ts":"2026-10-12T06:30:08Z","ts_epoch":1791786608,"type":"patrol.finding","check":"untested_script","script":"sw-test-all.sh","lines":199,"usage":0}
 {"ts":"2026-10-12T06:30:08Z","ts_epoch":1791786608,"type":"patrol.finding","check":"untested_script","script":"sw-event-schema-sync.sh","lines":93,"usage":0}
 {"ts":"2026-10-12T08:21:08Z","ts_epoch":1791793268,"type":"hygiene_platform_refactor","hardcoded":49,"fallback":69,"todo":51}
+{"ts":"2026-10-12T12:11:25Z","ts_epoch":1791807085,"type":"hygiene_platform_refactor","hardcoded":49,"fallback":69,"todo":51}
