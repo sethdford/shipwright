@@ -117,10 +117,16 @@ jobs:
       - name: Vet issue alignment and determine strategy
         if: steps.skip.conclusion == 'skipped'
         id: triage
+        # Untrusted issue text is passed via env, never interpolated into the script:
+        # ${{ }} is expanded before bash parses, so backticks/$() in a title would execute.
+        env:
+          ISSUE_TITLE: ${{ steps.issue.outputs.title }}
+          ISSUE_LABELS: ${{ steps.issue.outputs.labels }}
+          ISSUE_AUTHOR: ${{ steps.issue.outputs.author }}
         run: |
-          TITLE="${{ steps.issue.outputs.title }}"
-          LABELS="${{ steps.issue.outputs.labels }}"
-          AUTHOR="${{ steps.issue.outputs.author }}"
+          TITLE="$ISSUE_TITLE"
+          LABELS="$ISSUE_LABELS"
+          AUTHOR="$ISSUE_AUTHOR"
           BODY=$(cat /tmp/issue-body.txt 2>/dev/null || echo "")
 
           # Build triage prompt with strategy engine
@@ -260,8 +266,10 @@ jobs:
       - name: Map strategy from triage
         if: steps.skip.conclusion == 'skipped' && steps.triage.outputs.approved == 'true'
         id: strategy
+        env:
+          TRIAGE_COMPLEXITY: ${{ steps.triage.outputs.complexity }}
         run: |
-          COMPLEXITY="${{ steps.triage.outputs.complexity }}"
+          COMPLEXITY="$TRIAGE_COMPLEXITY"
 
           # Strategy mapping — deterministic, not AI-dependent
           # Default to autonomous template for compound quality (adversarial review,
@@ -314,8 +322,10 @@ jobs:
 
       - name: Comment on rejected issue
         if: steps.triage.outputs.approved == 'false'
+        env:
+          TRIAGE_REASON: ${{ steps.triage.outputs.reason }}
         run: |
-          REASON="${{ steps.triage.outputs.reason }}"
+          REASON="$TRIAGE_REASON"
           gh issue comment "$ISSUE_NUMBER" --body "$(cat <<EOF
           ⚓ **Shipwright Triage — Issue Declined**
 
