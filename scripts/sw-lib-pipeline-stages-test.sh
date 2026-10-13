@@ -99,8 +99,9 @@ mock_binary "claude" 'echo "# Implementation Plan
 
 # Use real git - we have a real project repo
 
-# Ensure jq works: copy /usr/bin/jq to avoid symlink resolution issues
-[[ -x /usr/bin/jq ]] && cp -f /usr/bin/jq "$TEST_TEMP_DIR/bin/jq" 2>/dev/null || true
+# jq: setup_test_env already symlinks the real jq into $TEST_TEMP_DIR/bin. Don't copy or
+# overwrite it — writing through that symlink hits the read-only system binary, and macOS
+# launch constraints SIGKILL Apple-signed binaries executed from a copied path.
 
 # ─── Stubs for optional pipeline modules ───────────────────────────────────
 get_stage_self_awareness_hint() { :; }

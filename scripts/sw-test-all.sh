@@ -58,7 +58,14 @@ done
 
 RESULTS_DIR="${TMPDIR:-/tmp}/sw-test-all.$$"
 mkdir -p "$RESULTS_DIR/logs"
-trap 'rm -rf "$RESULTS_DIR"' EXIT
+
+# Run every suite against a private tmux server. Several suites create and kill
+# windows; inherited $TMUX would point them at the developer's live session (and
+# whatever is running in it). TMUX_TMPDIR gives children their own socket dir.
+unset TMUX TMUX_PANE
+export TMUX_TMPDIR="$RESULTS_DIR/tmux"
+mkdir -p "$TMUX_TMPDIR"
+trap 'tmux kill-server 2>/dev/null; rm -rf "$RESULTS_DIR"' EXIT
 
 # ─── Discover suites ────────────────────────────────────────────────────────
 # Auto-discovery is the fix for orphaned tests: any scripts/*-test.sh is run,
