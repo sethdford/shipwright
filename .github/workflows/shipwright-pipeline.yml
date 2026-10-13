@@ -229,6 +229,12 @@ jobs:
           # Fail-safe defaults: never auto-approve on parse failure
           APPROVED="${APPROVED:-false}"
           COMPLEXITY="${COMPLEXITY:-standard}"
+          # COMPLEXITY is LLM output on a prompt built from issue text: allowlist it
+          # so only known values reach GITHUB_OUTPUT and downstream steps.
+          case "$COMPLEXITY" in
+            fast|standard|full) ;;
+            *) COMPLEXITY=standard ;;
+          esac
           REASON="${REASON:-Could not parse triage response — rejecting for safety}"
 
           echo "approved=$APPROVED" >> "$GITHUB_OUTPUT"
@@ -260,6 +266,14 @@ jobs:
             echo "Predictive script not found — skipping risk assessment"
           fi
 
+          # Values come from LLM JSON influenced by issue text: allowlist before
+          # writing to GITHUB_OUTPUT (also blocks newline-based output injection).
+          case "$RISK_LEVEL" in
+            low|medium|high|critical|unknown) ;;
+            *) RISK_LEVEL=unknown ;;
+          esac
+          [[ "$RISK_SCORE" =~ ^[0-9]{1,3}$ ]] || RISK_SCORE=0
+
           echo "risk_level=$RISK_LEVEL" >> "$GITHUB_OUTPUT"
           echo "risk_score=$RISK_SCORE" >> "$GITHUB_OUTPUT"
 
@@ -268,6 +282,7 @@ jobs:
         id: strategy
         env:
           TRIAGE_COMPLEXITY: ${{ steps.triage.outputs.complexity }}
+          TRIAGE_RISK_LEVEL: ${{ steps.risk.outputs.risk_level }}
         run: |
           COMPLEXITY="$TRIAGE_COMPLEXITY"
 
@@ -293,7 +308,7 @@ jobs:
           esac
 
           # Bump strategy if predictive risk is high
-          RISK_LEVEL="${{ steps.risk.outputs.risk_level }}"
+          RISK_LEVEL="$TRIAGE_RISK_LEVEL"
           if [[ "$RISK_LEVEL" == "high" || "$RISK_LEVEL" == "critical" ]]; then
             echo "High risk detected — escalating strategy"
             TEMPLATE="autonomous"
@@ -529,7 +544,12 @@ jobs:
         if: steps.claim_check.outputs.skip != 'true'
         env:
           TRIAGE_REASON: ${{ needs.triage.outputs.reason }}
+          TRIAGE_COMPLEXITY: ${{ needs.triage.outputs.complexity }}
+          TRIAGE_RISK_LEVEL: ${{ needs.triage.outputs.risk_level || 'N/A' }}
         run: |
+          # Defense in depth: re-allowlist values that originate from LLM output.
+          case "$TRIAGE_COMPLEXITY" in fast|standard|full) ;; *) TRIAGE_COMPLEXITY=standard ;; esac
+          case "$TRIAGE_RISK_LEVEL" in low|medium|high|critical|unknown|N/A) ;; *) TRIAGE_RISK_LEVEL=unknown ;; esac
           RESUME_NOTE=""
           if [[ -n "$COMPLETED_STAGES" ]]; then
             RESUME_NOTE="| Resume | Skipping: \`$COMPLETED_STAGES\` |"
@@ -541,11 +561,11 @@ jobs:
           | Field | Value |
           |-------|-------|
           | Template | \`$TEMPLATE\` |
-          | Complexity | \`${{ needs.triage.outputs.complexity }}\` |
+          | Complexity | \`$TRIAGE_COMPLEXITY\` |
           | Max Iterations | \`$MAX_ITERATIONS\` |
           | Triage | $TRIAGE_REASON |
           | Runner | \`ubuntu-latest\` |
-          | Risk Level | \`${{ needs.triage.outputs.risk_level || 'N/A' }}\` |
+          | Risk Level | \`$TRIAGE_RISK_LEVEL\` |
           | Workflow | [${{ github.run_id }}](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}) |
           ${RESUME_NOTE}
 

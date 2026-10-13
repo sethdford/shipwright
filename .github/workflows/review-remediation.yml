@@ -51,6 +51,10 @@ jobs:
           BRANCH=$(echo "$PR_JSON" | jq -r '.headRefName')
           HEAD_SHA=$(echo "$PR_JSON" | jq -r '.headRefOid')
 
+          # headRefName is attacker-chosen (any valid ref, e.g. containing `"`, `;`, `$`).
+          # Reject anything git would not accept as a branch name before it becomes an output.
+          git check-ref-format --branch "$BRANCH" >/dev/null || { echo "::error::invalid branch"; exit 1; }
+
           echo "branch=$BRANCH" >> "$GITHUB_OUTPUT"
           echo "head_sha=$HEAD_SHA" >> "$GITHUB_OUTPUT"
           echo "short_sha=${HEAD_SHA:0:7}" >> "$GITHUB_OUTPUT"
@@ -58,8 +62,12 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Checkout PR branch
+        # Branch name is untrusted: pass via env, never interpolate into the script.
+        env:
+          BRANCH: ${{ steps.pr.outputs.branch }}
         run: |
-          git checkout "${{ steps.pr.outputs.branch }}"
+          git check-ref-format --branch "$BRANCH" >/dev/null || { echo "::error::invalid branch"; exit 1; }
+          git checkout "$BRANCH"
 
       - name: Collect review findings
         id: findings
@@ -149,17 +157,23 @@ jobs:
           git config user.name "shipwright[bot]"
           git config user.email "shipwright[bot]@users.noreply.github.com"
           git add -A
-          git commit -m "fix: address review findings for $(echo ${{ steps.pr.outputs.short_sha }})
+          git commit -m "fix: address review findings for ${SHORT_SHA}
 
           Automated remediation by Shipwright Code Factory.
-          Findings: ${{ steps.findings.outputs.count }} inline comments addressed.
-          Original head: ${{ steps.pr.outputs.head_sha }}"
+          Findings: ${FINDING_COUNT} inline comments addressed.
+          Original head: ${HEAD_SHA}"
 
-          git push origin "${{ steps.pr.outputs.branch }}"
+          git check-ref-format --branch "$BRANCH" >/dev/null || { echo "::error::invalid branch"; exit 1; }
+          git push origin "$BRANCH"
 
           echo "Remediation commit pushed — PR synchronize will trigger rerun path"
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # Step outputs passed via env so they are data, not shell code.
+          BRANCH: ${{ steps.pr.outputs.branch }}
+          SHORT_SHA: ${{ steps.pr.outputs.short_sha }}
+          HEAD_SHA: ${{ steps.pr.outputs.head_sha }}
+          FINDING_COUNT: ${{ steps.findings.outputs.count }}
 
       - name: Request review rerun
         if: steps.findings.outputs.has_findings == 'true'

@@ -95,6 +95,15 @@ jobs:
 
           # Extract the last error message (look for common error patterns)
           LAST_ERROR=$(echo "$LOG_TAIL" | grep -iE "(error|fatal|fail|panic|exception)" | tail -1 || true)
+          # Sanitize once, here: LAST_ERROR is log text (influenced by issue content) that is
+          # later embedded in markdown table cells, inline code spans and a
+          # <!-- SHIPWRIGHT-ERROR-MSG: ... --> marker that this step reads back for
+          # fingerprinting. Strip CR/LF/tab, backticks, pipes and "-->" so it cannot break
+          # out of those contexts, and defang "SHIPWRIGHT-" so it cannot spoof markers
+          # (e.g. a trailing SHIPWRIGHT-RETRY: 0). Messages without these are unchanged.
+          LAST_ERROR=$(printf '%s' "$LAST_ERROR" | tr '\r\n\t' '   ' | tr -d '`' | tr '|' '/')
+          while [[ "$LAST_ERROR" == *"-->"* ]]; do LAST_ERROR="${LAST_ERROR//-->/->}"; done
+          LAST_ERROR="${LAST_ERROR//SHIPWRIGHT-/SHIPWRIGHT_}"
           # Truncate to 200 chars for comment readability
           if [[ ${#LAST_ERROR} -gt 200 ]]; then
             LAST_ERROR="${LAST_ERROR:0:200}..."
@@ -172,10 +181,11 @@ jobs:
           echo "failed_stage=${FAILED_STAGE:-unknown}" >> "$GITHUB_OUTPUT"
 
           # Multi-line outputs
+          d="ghadelim_$(openssl rand -hex 8)"
           {
-            echo "last_error<<EOF"
+            echo "last_error<<$d"
             echo "${LAST_ERROR:-No error message extracted}"
-            echo "EOF"
+            echo "$d"
           } >> "$GITHUB_OUTPUT"
 
       - name: Check retry count and determine strategy

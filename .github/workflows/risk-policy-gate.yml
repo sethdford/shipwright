@@ -28,17 +28,27 @@ jobs:
       - name: Get changed files
         id: changed
         run: |
-          CHANGED=$(gh pr diff "${{ github.event.pull_request.number }}" --name-only 2>/dev/null || git diff --name-only origin/${{ github.event.pull_request.base.ref }}...HEAD)
-          echo "files<<EOF" >> "$GITHUB_OUTPUT"
-          echo "$CHANGED" >> "$GITHUB_OUTPUT"
-          echo "EOF" >> "$GITHUB_OUTPUT"
+          CHANGED=$(gh pr diff "$PR_NUMBER" --name-only 2>/dev/null || git diff --name-only "origin/${BASE_REF}...HEAD")
+          # File names are PR-controlled: a fixed "EOF" delimiter lets a file named
+          # EOF terminate the value early and inject extra outputs (e.g. risk_tier=low).
+          d="ghadelim_$(openssl rand -hex 8)"
+          {
+            echo "files<<$d"
+            echo "$CHANGED"
+            echo "$d"
+          } >> "$GITHUB_OUTPUT"
           echo "--- Changed files ---"
           echo "$CHANGED"
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          BASE_REF: ${{ github.event.pull_request.base.ref }}
 
       - name: Classify risk tier from changed files
         id: classify
+        # Changed file paths are PR-controlled (e.g. `a$(id).sh`): pass via env.
+        env:
+          CHANGED_FILES: ${{ steps.changed.outputs.files }}
         run: |
           POLICY="config/policy.json"
           if [[ ! -f "$POLICY" ]]; then
@@ -48,7 +58,6 @@ jobs:
             exit 0
           fi
 
-          CHANGED_FILES="${{ steps.changed.outputs.files }}"
           RISK_TIER="low"
 
           # Match changed files against risk tier rules (highest tier wins)
@@ -94,9 +103,10 @@ jobs:
 
       - name: Check docs drift
         id: drift
+        env:
+          CHANGED_FILES: ${{ steps.changed.outputs.files }}
         run: |
           POLICY="config/policy.json"
-          CHANGED_FILES="${{ steps.changed.outputs.files }}"
           DRIFT_DETECTED="false"
           DRIFT_DETAILS=""
 
@@ -155,12 +165,13 @@ jobs:
 
       - name: Post gate summary
         if: always()
+        # required_checks is read from config/policy.json in the PR checkout: pass via env.
+        env:
+          RISK_TIER: ${{ steps.classify.outputs.risk_tier }}
+          REQUIRED_CHECKS: ${{ steps.classify.outputs.required_checks }}
+          DRIFT: ${{ steps.drift.outputs.drift_detected }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
         run: |
-          RISK_TIER="${{ steps.classify.outputs.risk_tier }}"
-          REQUIRED_CHECKS="${{ steps.classify.outputs.required_checks }}"
-          DRIFT="${{ steps.drift.outputs.drift_detected }}"
-          HEAD_SHA="${{ github.event.pull_request.head.sha }}"
-
           BODY="## Risk Policy Gate
 
           **SHA:** \`${HEAD_SHA}\`
