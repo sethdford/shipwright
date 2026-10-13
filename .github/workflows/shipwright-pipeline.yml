@@ -283,6 +283,8 @@ jobs:
         env:
           TRIAGE_COMPLEXITY: ${{ steps.triage.outputs.complexity }}
           TRIAGE_RISK_LEVEL: ${{ steps.risk.outputs.risk_level }}
+          INPUT_TEMPLATE: ${{ github.event.inputs.template }}
+          INPUT_ITERATIONS: ${{ github.event.inputs.max_iterations }}
         run: |
           COMPLEXITY="$TRIAGE_COMPLEXITY"
 
@@ -315,13 +317,21 @@ jobs:
             MAX_ITERATIONS=$((MAX_ITERATIONS + 5))
           fi
 
-          # Allow workflow_dispatch overrides
-          INPUT_TEMPLATE="${{ github.event.inputs.template }}"
+          # Allow workflow_dispatch overrides (passed via env; format-checked because
+          # they are written to GITHUB_OUTPUT and reused by the pipeline job)
+          if [[ -n "$INPUT_TEMPLATE" && ! "$INPUT_TEMPLATE" =~ ^[A-Za-z0-9_-]+$ ]]; then
+            echo "::warning::Ignoring invalid template input"
+            INPUT_TEMPLATE=""
+          fi
+          if [[ -n "$INPUT_ITERATIONS" && ! "$INPUT_ITERATIONS" =~ ^[0-9]+$ ]]; then
+            echo "::warning::Ignoring invalid max_iterations input"
+            INPUT_ITERATIONS=""
+          fi
+
           if [[ -n "$INPUT_TEMPLATE" && "$INPUT_TEMPLATE" != "autonomous" ]]; then
             TEMPLATE="$INPUT_TEMPLATE"
           fi
 
-          INPUT_ITERATIONS="${{ github.event.inputs.max_iterations }}"
           if [[ -n "$INPUT_ITERATIONS" && "$INPUT_ITERATIONS" != "0" ]]; then
             MAX_ITERATIONS="$INPUT_ITERATIONS"
           fi
@@ -566,11 +576,11 @@ jobs:
           | Triage | $TRIAGE_REASON |
           | Runner | \`ubuntu-latest\` |
           | Risk Level | \`$TRIAGE_RISK_LEVEL\` |
-          | Workflow | [${{ github.run_id }}](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}) |
+          | Workflow | [${GITHUB_RUN_ID}](${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}) |
           ${RESUME_NOTE}
 
           The autonomous pipeline is processing this issue. Updates will be posted as stages complete.
-          <!-- SHIPWRIGHT-RUN-ID: ${{ github.run_id }} -->
+          <!-- SHIPWRIGHT-RUN-ID: ${GITHUB_RUN_ID} -->
           EOF
           )"
 
@@ -582,7 +592,7 @@ jobs:
           if [ -n "${DASHBOARD_URL:-}" ]; then
             curl -s --max-time 5 -X POST "${DASHBOARD_URL}/api/webhook/ci" \
               -H "Content-Type: application/json" \
-              -d "{\"type\":\"ci.pipeline_started\",\"issue\":${ISSUE_NUMBER},\"run_id\":\"${{ github.run_id }}\",\"template\":\"${TEMPLATE}\"}" \
+              -d "{\"type\":\"ci.pipeline_started\",\"issue\":${ISSUE_NUMBER},\"run_id\":\"${GITHUB_RUN_ID}\",\"template\":\"${TEMPLATE}\"}" \
               2>/dev/null || true
           fi
 
@@ -663,9 +673,11 @@ jobs:
 
       - name: Comment on issue — pipeline result
         if: always() && steps.claim_check.outputs.skip != 'true'
+        env:
+          EXIT_CODE: ${{ steps.pipeline.outputs.exit_code }}
+          HEALTH_SCORE: ${{ steps.vitals.outputs.health_score }}
+          HEALTH_VERDICT: ${{ steps.vitals.outputs.health_verdict }}
         run: |
-          EXIT_CODE="${{ steps.pipeline.outputs.exit_code }}"
-
           # Extract current/failed stage from pipeline state
           LAST_STAGE=""
           STATE_STATUS=""
@@ -721,8 +733,6 @@ jobs:
           fi
 
           # Read vitals output
-          HEALTH_SCORE="${{ steps.vitals.outputs.health_score }}"
-          HEALTH_VERDICT="${{ steps.vitals.outputs.health_verdict }}"
           HEALTH_SCORE="${HEALTH_SCORE:-N/A}"
           HEALTH_VERDICT="${HEALTH_VERDICT:-unknown}"
 
@@ -735,8 +745,8 @@ jobs:
 
           | Health Score | ${HEALTH_SCORE} / 100 (${HEALTH_VERDICT}) |
 
-          [View full run](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }})
-          <!-- SHIPWRIGHT-RESULT: 0:${LAST_STAGE}:${{ github.run_id }} -->
+          [View full run](${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID})
+          <!-- SHIPWRIGHT-RESULT: 0:${LAST_STAGE}:${GITHUB_RUN_ID} -->
           EOF
           )"
           else
@@ -777,8 +787,8 @@ jobs:
           \`\`\`
           </details>
 
-          [View full run](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }})
-          <!-- SHIPWRIGHT-RESULT: ${EXIT_CODE}:${LAST_STAGE}:${{ github.run_id }} -->
+          [View full run](${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID})
+          <!-- SHIPWRIGHT-RESULT: ${EXIT_CODE}:${LAST_STAGE}:${GITHUB_RUN_ID} -->
           <!-- SHIPWRIGHT-FAILURE-ANALYSIS: stage=${LAST_STAGE:-unknown}:type=${ERROR_TYPE}:completed=${COMPLETED_LIST:-none} -->
           EOF
           )"
@@ -813,7 +823,7 @@ jobs:
           SW_STATE_DIR=$(mktemp -d)
           cd "$SW_STATE_DIR"
           git init
-          git remote add origin "https://x-access-token:${GITHUB_TOKEN}@github.com/${{ github.repository }}.git"
+          git remote add origin "https://x-access-token:${GITHUB_TOKEN}@github.com/${GITHUB_REPOSITORY}.git"
           if git fetch origin shipwright-data 2>/dev/null; then
             git checkout -b shipwright-data origin/shipwright-data
           else
@@ -862,22 +872,23 @@ jobs:
         if: always() && steps.claim_check.outputs.skip != 'true'
         env:
           DASHBOARD_URL: ${{ secrets.DASHBOARD_URL }}
+          EXIT_CODE: ${{ steps.pipeline.outputs.exit_code }}
         run: |
           if [ -n "${DASHBOARD_URL:-}" ]; then
-            EXIT_CODE="${{ steps.pipeline.outputs.exit_code }}"
             RESULT="success"
             if [ "${EXIT_CODE:-1}" != "0" ]; then RESULT="failure"; fi
             curl -s --max-time 5 -X POST "${DASHBOARD_URL}/api/webhook/ci" \
               -H "Content-Type: application/json" \
-              -d "{\"type\":\"ci.pipeline_completed\",\"issue\":${ISSUE_NUMBER},\"run_id\":\"${{ github.run_id }}\",\"result\":\"${RESULT}\",\"template\":\"${TEMPLATE}\"}" \
+              -d "{\"type\":\"ci.pipeline_completed\",\"issue\":${ISSUE_NUMBER},\"run_id\":\"${GITHUB_RUN_ID}\",\"result\":\"${RESULT}\",\"template\":\"${TEMPLATE}\"}" \
               2>/dev/null || true
           fi
 
       # Gatekeeper: ensure job fails if pipeline failed (triggers auto-retry)
       - name: Propagate pipeline exit code
         if: always() && steps.claim_check.outputs.skip != 'true'
+        env:
+          EXIT_CODE: ${{ steps.pipeline.outputs.exit_code }}
         run: |
-          EXIT_CODE="${{ steps.pipeline.outputs.exit_code }}"
           if [[ -n "$EXIT_CODE" && "$EXIT_CODE" != "0" ]]; then
             echo "Pipeline failed with exit code $EXIT_CODE — failing job to trigger auto-retry"
             exit 1

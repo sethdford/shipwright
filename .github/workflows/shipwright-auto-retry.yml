@@ -23,9 +23,10 @@ jobs:
     steps:
       - name: Extract issue number from failed run
         id: extract
+        env:
+          RUN_ID: ${{ github.event.workflow_run.id }}
+          CONCLUSION: ${{ github.event.workflow_run.conclusion }}
         run: |
-          RUN_ID="${{ github.event.workflow_run.id }}"
-          CONCLUSION="${{ github.event.workflow_run.conclusion }}"
           echo "run_id=$RUN_ID" >> "$GITHUB_OUTPUT"
           echo "conclusion=$CONCLUSION" >> "$GITHUB_OUTPUT"
 
@@ -80,11 +81,11 @@ jobs:
       - name: Categorize error from run logs
         if: steps.extract.outputs.issue_number != ''
         id: categorize
+        env:
+          RUN_ID: ${{ steps.extract.outputs.run_id }}
+          CONCLUSION: ${{ steps.extract.outputs.conclusion }}
+          ISSUE_NUMBER: ${{ steps.extract.outputs.issue_number }}
         run: |
-          RUN_ID="${{ steps.extract.outputs.run_id }}"
-          CONCLUSION="${{ steps.extract.outputs.conclusion }}"
-          ISSUE_NUMBER="${{ steps.extract.outputs.issue_number }}"
-
           # Fetch the last 200 lines of the failed run's log
           LOG_TAIL=$(gh run view "$RUN_ID" --repo "$GITHUB_REPOSITORY" --log 2>/dev/null | tail -200 || echo "")
 
@@ -191,11 +192,11 @@ jobs:
       - name: Check retry count and determine strategy
         if: steps.extract.outputs.issue_number != ''
         id: strategy
+        env:
+          ISSUE_NUMBER: ${{ steps.extract.outputs.issue_number }}
+          RUN_ID: ${{ steps.extract.outputs.run_id }}
+          ERROR_CATEGORY: ${{ steps.categorize.outputs.error_category }}
         run: |
-          ISSUE_NUMBER="${{ steps.extract.outputs.issue_number }}"
-          RUN_ID="${{ steps.extract.outputs.run_id }}"
-          ERROR_CATEGORY="${{ steps.categorize.outputs.error_category }}"
-
           # Read retry count from issue comments (hidden HTML marker)
           COMMENTS=$(gh issue view "$ISSUE_NUMBER" --repo "$GITHUB_REPOSITORY" \
             --json comments --jq '.comments[].body' 2>/dev/null || echo "")
@@ -294,18 +295,17 @@ jobs:
         if: steps.strategy.outputs.should_retry == 'true'
         env:
           LAST_ERROR: ${{ steps.categorize.outputs.last_error }}
+          ISSUE_NUMBER: ${{ steps.extract.outputs.issue_number }}
+          RETRY_COUNT: ${{ steps.strategy.outputs.retry_count }}
+          TEMPLATE: ${{ steps.strategy.outputs.template }}
+          MAX_ITERATIONS: ${{ steps.strategy.outputs.max_iterations }}
+          LAST_STAGE: ${{ steps.strategy.outputs.last_stage }}
+          COMPLETED_STAGES: ${{ steps.strategy.outputs.completed_stages }}
+          FAILED_RUN: ${{ steps.extract.outputs.run_id }}
+          CONCLUSION: ${{ steps.extract.outputs.conclusion }}
+          ERROR_CATEGORY: ${{ steps.categorize.outputs.error_category }}
+          FAILED_STAGE: ${{ steps.categorize.outputs.failed_stage }}
         run: |
-          ISSUE_NUMBER="${{ steps.extract.outputs.issue_number }}"
-          RETRY_COUNT="${{ steps.strategy.outputs.retry_count }}"
-          TEMPLATE="${{ steps.strategy.outputs.template }}"
-          MAX_ITERATIONS="${{ steps.strategy.outputs.max_iterations }}"
-          LAST_STAGE="${{ steps.strategy.outputs.last_stage }}"
-          COMPLETED_STAGES="${{ steps.strategy.outputs.completed_stages }}"
-          FAILED_RUN="${{ steps.extract.outputs.run_id }}"
-          CONCLUSION="${{ steps.extract.outputs.conclusion }}"
-          ERROR_CATEGORY="${{ steps.categorize.outputs.error_category }}"
-          FAILED_STAGE="${{ steps.categorize.outputs.failed_stage }}"
-
           # Build human-readable category label
           case "$ERROR_CATEGORY" in
             TRANSIENT)      CATEGORY_LABEL="Transient (timeout/network)" ;;
@@ -332,7 +332,7 @@ jobs:
           | Template | \`${TEMPLATE}\` |
           | Max Iterations | ${MAX_ITERATIONS} |
           | Resume Stages | \`${COMPLETED_STAGES:-none}\` |
-          | Failed Run | [${FAILED_RUN}](${{ github.server_url }}/${{ github.repository }}/actions/runs/${FAILED_RUN}) |
+          | Failed Run | [${FAILED_RUN}](${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${FAILED_RUN}) |
 
           ### Root Cause Analysis
 
@@ -372,14 +372,14 @@ jobs:
 
       - name: Dispatch retry pipeline
         if: steps.strategy.outputs.should_retry == 'true' && steps.budget.outputs.skip != 'true'
+        env:
+          ISSUE_NUMBER: ${{ steps.extract.outputs.issue_number }}
+          TEMPLATE: ${{ steps.strategy.outputs.template }}
+          MAX_ITERATIONS: ${{ steps.strategy.outputs.max_iterations }}
+          COMPLETED_STAGES: ${{ steps.strategy.outputs.completed_stages }}
+          RETRY_COUNT: ${{ steps.strategy.outputs.retry_count }}
         run: |
-          ISSUE_NUMBER="${{ steps.extract.outputs.issue_number }}"
-          TEMPLATE="${{ steps.strategy.outputs.template }}"
-          MAX_ITERATIONS="${{ steps.strategy.outputs.max_iterations }}"
-          COMPLETED_STAGES="${{ steps.strategy.outputs.completed_stages }}"
-
           # Backoff delay — avoid hammering the pipeline immediately after failure
-          RETRY_COUNT="${{ steps.strategy.outputs.retry_count }}"
           BACKOFF=$((RETRY_COUNT * 30))
           echo "Waiting ${BACKOFF}s before retry (attempt ${RETRY_COUNT})..."
           sleep "$BACKOFF"
@@ -403,12 +403,11 @@ jobs:
         if: steps.strategy.outputs.skip_reason == 'infra' && steps.extract.outputs.issue_number != ''
         env:
           LAST_ERROR: ${{ steps.categorize.outputs.last_error }}
+          ISSUE_NUMBER: ${{ steps.extract.outputs.issue_number }}
+          FAILED_RUN: ${{ steps.extract.outputs.run_id }}
+          ERROR_CATEGORY: ${{ steps.categorize.outputs.error_category }}
+          FAILED_STAGE: ${{ steps.categorize.outputs.failed_stage }}
         run: |
-          ISSUE_NUMBER="${{ steps.extract.outputs.issue_number }}"
-          FAILED_RUN="${{ steps.extract.outputs.run_id }}"
-          ERROR_CATEGORY="${{ steps.categorize.outputs.error_category }}"
-          FAILED_STAGE="${{ steps.categorize.outputs.failed_stage }}"
-
           # Add infra-issue label
           gh issue edit "$ISSUE_NUMBER" --repo "$GITHUB_REPOSITORY" \
             --add-label "shipwright-infra-issue" 2>/dev/null || true
@@ -423,7 +422,7 @@ jobs:
           | Error Category | **Infrastructure** |
           | Failed Stage | \`${FAILED_STAGE}\` |
           | Last Error | \`${LAST_ERROR}\` |
-          | Failed Run | [${FAILED_RUN}](${{ github.server_url }}/${{ github.repository }}/actions/runs/${FAILED_RUN}) |
+          | Failed Run | [${FAILED_RUN}](${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${FAILED_RUN}) |
 
           ### Likely Causes
           - Git permission or authentication error
@@ -431,7 +430,7 @@ jobs:
           - Network/filesystem infrastructure issue
 
           ### Action Required
-          1. Check the [run logs](${{ github.server_url }}/${{ github.repository }}/actions/runs/${FAILED_RUN}) for the infrastructure error
+          1. Check the [run logs](${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${FAILED_RUN}) for the infrastructure error
           2. Fix the underlying infrastructure issue
           3. Retry manually once resolved:
           \`\`\`
@@ -448,13 +447,12 @@ jobs:
         if: steps.strategy.outputs.skip_reason == 'exhausted' && steps.extract.outputs.issue_number != ''
         env:
           LAST_ERROR: ${{ steps.categorize.outputs.last_error }}
+          ISSUE_NUMBER: ${{ steps.extract.outputs.issue_number }}
+          RETRY_COUNT: ${{ steps.strategy.outputs.retry_count }}
+          FAILED_RUN: ${{ steps.extract.outputs.run_id }}
+          ERROR_CATEGORY: ${{ steps.categorize.outputs.error_category }}
+          FAILED_STAGE: ${{ steps.categorize.outputs.failed_stage }}
         run: |
-          ISSUE_NUMBER="${{ steps.extract.outputs.issue_number }}"
-          RETRY_COUNT="${{ steps.strategy.outputs.retry_count }}"
-          FAILED_RUN="${{ steps.extract.outputs.run_id }}"
-          ERROR_CATEGORY="${{ steps.categorize.outputs.error_category }}"
-          FAILED_STAGE="${{ steps.categorize.outputs.failed_stage }}"
-
           # Build a summary of all retry attempts from issue comments
           COMMENTS=$(gh issue view "$ISSUE_NUMBER" --repo "$GITHUB_REPOSITORY" \
             --json comments --jq '.comments[].body' 2>/dev/null || echo "")
@@ -483,7 +481,7 @@ jobs:
           | Error Category | **${ERROR_CATEGORY}** |
           | Failed Stage | \`${FAILED_STAGE}\` |
           | Last Error | \`${LAST_ERROR}\` |
-          | Failed Run | [${FAILED_RUN}](${{ github.server_url }}/${{ github.repository }}/actions/runs/${FAILED_RUN}) |
+          | Failed Run | [${FAILED_RUN}](${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${FAILED_RUN}) |
 
           ### Retry History
 
@@ -492,7 +490,7 @@ jobs:
           ${ATTEMPT_SUMMARY}
 
           ### What to check
-          1. Review the [workflow runs](${{ github.server_url }}/${{ github.repository }}/actions/workflows/shipwright-pipeline.yml) for error patterns
+          1. Review the [workflow runs](${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/workflows/shipwright-pipeline.yml) for error patterns
           2. Check if the issue requirements are achievable by the autonomous pipeline
           3. Consider breaking the issue into smaller sub-issues
 

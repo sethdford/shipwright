@@ -39,11 +39,12 @@ jobs:
       - name: Determine PR number
         id: pr
         run: |
-          if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
-            PR_NUMBER="${{ github.event.inputs.pr_number }}"
+          if [[ "$GITHUB_EVENT_NAME" == "workflow_dispatch" ]]; then
+            PR_NUMBER="$INPUT_PR_NUMBER"
           else
-            PR_NUMBER="${{ github.event.pull_request.number }}"
+            PR_NUMBER="$EVENT_PR_NUMBER"
           fi
+          [[ "$PR_NUMBER" =~ ^[0-9]+$ ]] || { echo "::error::invalid PR number"; exit 1; }
           echo "number=$PR_NUMBER" >> "$GITHUB_OUTPUT"
 
           # Get the PR branch and head SHA
@@ -60,6 +61,8 @@ jobs:
           echo "short_sha=${HEAD_SHA:0:7}" >> "$GITHUB_OUTPUT"
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          INPUT_PR_NUMBER: ${{ github.event.inputs.pr_number }}
+          EVENT_PR_NUMBER: ${{ github.event.pull_request.number }}
 
       - name: Checkout PR branch
         # Branch name is untrusted: pass via env, never interpolate into the script.
@@ -72,15 +75,12 @@ jobs:
       - name: Collect review findings
         id: findings
         run: |
-          PR_NUMBER="${{ steps.pr.outputs.number }}"
-          HEAD_SHA="${{ steps.pr.outputs.head_sha }}"
-
           # Collect review comments from the latest review
-          REVIEW_COMMENTS=$(gh api "repos/${{ github.repository }}/pulls/${PR_NUMBER}/reviews" \
+          REVIEW_COMMENTS=$(gh api "repos/${GITHUB_REPOSITORY}/pulls/${PR_NUMBER}/reviews" \
             --jq '[.[] | select(.state == "CHANGES_REQUESTED")] | last | .body // ""' 2>/dev/null || echo "")
 
           # Also get inline review comments
-          INLINE_COMMENTS=$(gh api "repos/${{ github.repository }}/pulls/${PR_NUMBER}/comments" \
+          INLINE_COMMENTS=$(gh api "repos/${GITHUB_REPOSITORY}/pulls/${PR_NUMBER}/comments" \
             --jq '[.[] | select(.commit_id == "'"${HEAD_SHA}"'")] | map({path: .path, line: .line, body: .body}) | tostring' 2>/dev/null || echo "[]")
 
           # Build remediation context
@@ -98,6 +98,8 @@ jobs:
           echo "has_findings=$([[ "$FINDING_COUNT" -gt 0 || -n "$REVIEW_COMMENTS" ]] && echo true || echo false)" >> "$GITHUB_OUTPUT"
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PR_NUMBER: ${{ steps.pr.outputs.number }}
+          HEAD_SHA: ${{ steps.pr.outputs.head_sha }}
 
       - name: Remediate with Claude
         if: steps.findings.outputs.has_findings == 'true'
@@ -115,7 +117,7 @@ jobs:
 
           FINDINGS=$(cat /tmp/review-findings.json)
 
-          PROMPT="You are remediating code review findings on PR #${{ steps.pr.outputs.number }}.
+          PROMPT="You are remediating code review findings on PR #${PR_NUMBER}.
 
           ## Review Findings
           ${FINDINGS}
@@ -134,6 +136,7 @@ jobs:
           }
         env:
           CLAUDE_CODE_OAUTH_TOKEN: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          PR_NUMBER: ${{ steps.pr.outputs.number }}
 
       - name: Run validation
         if: steps.findings.outputs.has_findings == 'true'
@@ -181,7 +184,8 @@ jobs:
           # Use the canonical rerun writer if available
           NEW_HEAD=$(git rev-parse HEAD)
           if [[ -f "./scripts/sw-review-rerun.sh" ]]; then
-            bash ./scripts/sw-review-rerun.sh request "${{ steps.pr.outputs.number }}" "$NEW_HEAD" "shipwright" || true
+            bash ./scripts/sw-review-rerun.sh request "$PR_NUMBER" "$NEW_HEAD" "shipwright" || true
           fi
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PR_NUMBER: ${{ steps.pr.outputs.number }}
