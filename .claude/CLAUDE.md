@@ -715,7 +715,7 @@ All scripts are bash (except the dashboard server in TypeScript). Grouped by lay
 | `scripts/sw-swarm.sh` | 684 | Dynamic agent swarm management |
 | `scripts/sw-team-stages.sh` | 500 | Multi-agent execution with leader/specialist roles |
 | `scripts/sw-templates.sh` | 228 | Browse and inspect team templates |
-| `scripts/sw-test-all.sh` | 199 | Run every test suite, report the FULL result |
+| `scripts/sw-test-all.sh` | 206 | Run every test suite, report the FULL result |
 | `scripts/sw-testgen.sh` | 567 | Autonomous test generation and coverage maintenance |
 | `scripts/sw-tmux-pipeline.sh` | 538 | Spawn and manage pipelines in tmux windows |
 | `scripts/sw-tmux-role-color.sh` | 81 | Set pane border color by agent role |
@@ -856,7 +856,7 @@ All scripts are bash (except the dashboard server in TypeScript). Grouped by lay
 | `scripts/sw-lib-pipeline-detection-test.sh` | 391 | Unit tests for detection fns |
 | `scripts/sw-lib-pipeline-intelligence-test.sh` | 410 | Unit tests for intelligence |
 | `scripts/sw-lib-pipeline-quality-checks-test.sh` | 193 | Unit tests for quality |
-| `scripts/sw-lib-pipeline-stages-test.sh` | 290 | Unit tests for stage functions |
+| `scripts/sw-lib-pipeline-stages-test.sh` | 291 | Unit tests for stage functions |
 | `scripts/sw-lib-pipeline-state-test.sh` | 309 | Unit tests for pipeline state |
 | `scripts/sw-linear-test.sh` | 300 | Validate Linear ↔ GitHub bidirectional sync |
 | `scripts/sw-logs-test.sh` | 281 | Validate agent pane log viewing, searching, |
@@ -904,7 +904,7 @@ All scripts are bash (except the dashboard server in TypeScript). Grouped by lay
 | `scripts/sw-self-optimize-test.sh` | 837 | Unit tests for learning & tuning system |
 | `scripts/sw-server-api-test.sh` | 713 | Dashboard Server API Test Suite |
 | `scripts/sw-session-restart-test.sh` | 520 | Intelligent restart briefing system |
-| `scripts/sw-session-test.sh` | 586 | E2E validation of session creation flow |
+| `scripts/sw-session-test.sh` | 595 | E2E validation of session creation flow |
 | `scripts/sw-setup-test.sh` | 262 | Validate comprehensive onboarding wizard |
 | `scripts/sw-spec-driven-test.sh` | 218 | Specification-Driven Development Test Suite |
 | `scripts/sw-spec-pipeline-test.sh` | 463 | Spec-Driven Pipeline Stages Test Suite |
