@@ -500,13 +500,15 @@ jobs:
 
       - name: Validate setup
         if: steps.claim_check.outputs.skip != 'true'
+        env:
+          TRIAGE_REASON: ${{ needs.triage.outputs.reason }}
         run: |
           echo "--- Environment ---"
           echo "Issue: #$ISSUE_NUMBER"
           echo "Template: $TEMPLATE"
           echo "Max Iterations: $MAX_ITERATIONS"
           echo "Completed Stages: ${COMPLETED_STAGES:-none}"
-          echo "Triage: ${{ needs.triage.outputs.reason }}"
+          echo "Triage: $TRIAGE_REASON"
           echo "Runner: $(uname -s) $(uname -m)"
           echo ""
 
@@ -525,6 +527,8 @@ jobs:
 
       - name: Comment on issue — pipeline starting
         if: steps.claim_check.outputs.skip != 'true'
+        env:
+          TRIAGE_REASON: ${{ needs.triage.outputs.reason }}
         run: |
           RESUME_NOTE=""
           if [[ -n "$COMPLETED_STAGES" ]]; then
@@ -539,7 +543,7 @@ jobs:
           | Template | \`$TEMPLATE\` |
           | Complexity | \`${{ needs.triage.outputs.complexity }}\` |
           | Max Iterations | \`$MAX_ITERATIONS\` |
-          | Triage | ${{ needs.triage.outputs.reason }} |
+          | Triage | $TRIAGE_REASON |
           | Runner | \`ubuntu-latest\` |
           | Risk Level | \`${{ needs.triage.outputs.risk_level || 'N/A' }}\` |
           | Workflow | [${{ github.run_id }}](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}) |

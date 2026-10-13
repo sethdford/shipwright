@@ -282,6 +282,8 @@ jobs:
 
       - name: Post retry comment with root cause
         if: steps.strategy.outputs.should_retry == 'true'
+        env:
+          LAST_ERROR: ${{ steps.categorize.outputs.last_error }}
         run: |
           ISSUE_NUMBER="${{ steps.extract.outputs.issue_number }}"
           RETRY_COUNT="${{ steps.strategy.outputs.retry_count }}"
@@ -293,7 +295,6 @@ jobs:
           CONCLUSION="${{ steps.extract.outputs.conclusion }}"
           ERROR_CATEGORY="${{ steps.categorize.outputs.error_category }}"
           FAILED_STAGE="${{ steps.categorize.outputs.failed_stage }}"
-          LAST_ERROR="${{ steps.categorize.outputs.last_error }}"
 
           # Build human-readable category label
           case "$ERROR_CATEGORY" in
@@ -390,12 +391,13 @@ jobs:
       # ── INFRA failure: don't retry, label and alert ──
       - name: Handle INFRA failure (no retry)
         if: steps.strategy.outputs.skip_reason == 'infra' && steps.extract.outputs.issue_number != ''
+        env:
+          LAST_ERROR: ${{ steps.categorize.outputs.last_error }}
         run: |
           ISSUE_NUMBER="${{ steps.extract.outputs.issue_number }}"
           FAILED_RUN="${{ steps.extract.outputs.run_id }}"
           ERROR_CATEGORY="${{ steps.categorize.outputs.error_category }}"
           FAILED_STAGE="${{ steps.categorize.outputs.failed_stage }}"
-          LAST_ERROR="${{ steps.categorize.outputs.last_error }}"
 
           # Add infra-issue label
           gh issue edit "$ISSUE_NUMBER" --repo "$GITHUB_REPOSITORY" \
@@ -434,13 +436,14 @@ jobs:
       # ── Max retries exhausted: post detailed analysis of all attempts ──
       - name: Mark issue as failed (max retries exhausted)
         if: steps.strategy.outputs.skip_reason == 'exhausted' && steps.extract.outputs.issue_number != ''
+        env:
+          LAST_ERROR: ${{ steps.categorize.outputs.last_error }}
         run: |
           ISSUE_NUMBER="${{ steps.extract.outputs.issue_number }}"
           RETRY_COUNT="${{ steps.strategy.outputs.retry_count }}"
           FAILED_RUN="${{ steps.extract.outputs.run_id }}"
           ERROR_CATEGORY="${{ steps.categorize.outputs.error_category }}"
           FAILED_STAGE="${{ steps.categorize.outputs.failed_stage }}"
-          LAST_ERROR="${{ steps.categorize.outputs.last_error }}"
 
           # Build a summary of all retry attempts from issue comments
           COMMENTS=$(gh issue view "$ISSUE_NUMBER" --repo "$GITHUB_REPOSITORY" \

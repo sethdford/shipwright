@@ -228,8 +228,10 @@ jobs:
 
       - name: Handle stuck issues
         if: steps.find.outputs.stuck != ''
+        env:
+          STUCK_ISSUES: ${{ steps.find.outputs.stuck }}
         run: |
-          echo "${{ steps.find.outputs.stuck }}" | while read -r issue; do
+          echo "$STUCK_ISSUES" | while read -r issue; do
             [[ -z "$issue" ]] && continue
             echo "Handling stuck issue #$issue..."
 

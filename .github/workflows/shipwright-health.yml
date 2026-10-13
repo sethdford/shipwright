@@ -113,6 +113,9 @@ jobs:
           } >> "$GITHUB_OUTPUT"
 
       - name: Update health issue
+        env:
+          STUCK_ISSUES: ${{ steps.metrics.outputs.stuck_issues }}
+          FAILURE_DETAIL: ${{ steps.metrics.outputs.failure_detail }}
         run: |
           TIMESTAMP="${{ steps.metrics.outputs.timestamp }}"
           TOTAL="${{ steps.metrics.outputs.total }}"
@@ -123,9 +126,7 @@ jobs:
           SUCCESS_RATE="${{ steps.metrics.outputs.success_rate }}"
           RATE_STATUS="${{ steps.metrics.outputs.rate_status }}"
           STUCK_COUNT="${{ steps.metrics.outputs.stuck_count }}"
-          STUCK_ISSUES="${{ steps.metrics.outputs.stuck_issues }}"
           BACKLOG="${{ steps.metrics.outputs.backlog }}"
-          FAILURE_DETAIL="${{ steps.metrics.outputs.failure_detail }}"
 
           # Status emoji
           if [[ "$RATE_STATUS" == "OK" ]]; then
@@ -193,10 +194,11 @@ jobs:
 
       - name: Alert on critical health
         if: steps.metrics.outputs.rate_status == 'CRITICAL' || steps.metrics.outputs.stuck_count != '0'
+        env:
+          STUCK_ISSUES: ${{ steps.metrics.outputs.stuck_issues }}
         run: |
           SUCCESS_RATE="${{ steps.metrics.outputs.success_rate }}"
           STUCK_COUNT="${{ steps.metrics.outputs.stuck_count }}"
-          STUCK_ISSUES="${{ steps.metrics.outputs.stuck_issues }}"
 
           ALERT_REASONS=""
           if [[ "${{ steps.metrics.outputs.rate_status }}" == "CRITICAL" ]]; then
