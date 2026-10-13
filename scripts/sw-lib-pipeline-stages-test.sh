@@ -99,8 +99,13 @@ mock_binary "claude" 'echo "# Implementation Plan
 
 # Use real git - we have a real project repo
 
-# Ensure jq works: copy /usr/bin/jq to avoid symlink resolution issues
-[[ -x /usr/bin/jq ]] && cp -f /usr/bin/jq "$TEST_TEMP_DIR/bin/jq" 2>/dev/null || true
+# Ensure jq works via an exec wrapper. Copying /usr/bin/jq is not an option: macOS
+# launch constraints SIGKILL Apple-signed system binaries run from another path.
+_real_jq=$(command -v jq 2>/dev/null || true)
+if [[ -n "$_real_jq" ]]; then
+    printf '#!/bin/sh\nexec "%s" "$@"\n' "$_real_jq" > "$TEST_TEMP_DIR/bin/jq"
+    chmod +x "$TEST_TEMP_DIR/bin/jq"
+fi
 
 # ─── Stubs for optional pipeline modules ───────────────────────────────────
 get_stage_self_awareness_hint() { :; }
