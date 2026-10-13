@@ -58,12 +58,13 @@ jobs:
 
       - name: Extract issue number from triggering run
         id: context
+        env:
+          RUN_ID: ${{ github.event.workflow_run.id }}
         run: |
-          if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
+          if [[ "${GITHUB_EVENT_NAME}" == "workflow_dispatch" ]]; then
             echo "Manual trigger — running full regression check"
             echo "issue_number=" >> "$GITHUB_OUTPUT"
           else
-            RUN_ID="${{ github.event.workflow_run.id }}"
             DISPLAY_TITLE=$(gh run view "$RUN_ID" --json displayTitle --jq '.displayTitle' 2>/dev/null || echo "")
             ISSUE_NUMBER=$(echo "$DISPLAY_TITLE" | grep -oE '#[0-9]+' | head -1 | tr -d '#' || true)
             echo "Triggering run: $RUN_ID — issue #${ISSUE_NUMBER:-?}"
@@ -82,9 +83,10 @@ jobs:
 
       - name: Create issue for regression
         if: steps.check.outputs.has_regression == 'true'
+        env:
+          ISSUE_NUMBER: ${{ steps.context.outputs.issue_number }}
         run: |
           set +e
-          ISSUE_NUMBER="${{ steps.context.outputs.issue_number }}"
           REPORT=$(bash ./scripts/sw-regression.sh report --markdown 2>/dev/null || echo "No details available")
           gh issue create \
             --title "Regression detected after pipeline #${ISSUE_NUMBER:-?}" \
@@ -108,7 +110,7 @@ jobs:
           SW_STATE_DIR=$(mktemp -d)
           cd "$SW_STATE_DIR"
           git init
-          git remote add origin "https://x-access-token:${GITHUB_TOKEN}@github.com/${{ github.repository }}.git"
+          git remote add origin "https://x-access-token:${GITHUB_TOKEN}@github.com/${GITHUB_REPOSITORY}.git"
           if git fetch origin shipwright-data 2>/dev/null; then
             git checkout -b shipwright-data origin/shipwright-data
           else

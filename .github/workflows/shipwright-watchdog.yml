@@ -123,11 +123,11 @@ jobs:
                 gh issue comment "$ISSUE_NUMBER" --repo "$GITHUB_REPOSITORY" --body "$(cat <<EOF
           :eye: **Shipwright Watchdog — Stale Pipeline Detected**
 
-          Run [$RUN_ID](${{ github.server_url }}/${{ github.repository }}/actions/runs/$RUN_ID) has had no progress signal for **${SILENT_MINS} minutes**.
+          Run [$RUN_ID](${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/$RUN_ID) has had no progress signal for **${SILENT_MINS} minutes**.
 
           | Field | Value |
           |-------|-------|
-          | Run | [$RUN_ID](${{ github.server_url }}/${{ github.repository }}/actions/runs/$RUN_ID) |
+          | Run | [$RUN_ID](${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/$RUN_ID) |
           | Elapsed | ${ELAPSED_MINS}m |
           | Silent | ${SILENT_MINS}m |
           | Last Signal | ${LAST_SIGNAL_DATE} |
@@ -155,11 +155,11 @@ jobs:
               gh issue comment "$ISSUE_NUMBER" --repo "$GITHUB_REPOSITORY" --body "$(cat <<EOF
           :rotating_light: **Shipwright Watchdog — Pipeline Cancelled (Stuck)**
 
-          Run [$RUN_ID](${{ github.server_url }}/${{ github.repository }}/actions/runs/$RUN_ID) was cancelled after **${SILENT_MINS} minutes** with no progress signal.
+          Run [$RUN_ID](${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/$RUN_ID) was cancelled after **${SILENT_MINS} minutes** with no progress signal.
 
           | Field | Value |
           |-------|-------|
-          | Run | [$RUN_ID](${{ github.server_url }}/${{ github.repository }}/actions/runs/$RUN_ID) |
+          | Run | [$RUN_ID](${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/$RUN_ID) |
           | Elapsed | ${ELAPSED_MINS}m |
           | Silent | ${SILENT_MINS}m |
           | Completed Stages | \`${COMPLETED_STAGES:-none}\` |
@@ -196,19 +196,19 @@ jobs:
             gh issue comment "$ISSUE_NUMBER" --repo "$GITHUB_REPOSITORY" --body "$(cat <<EOF
           :stop_sign: **Shipwright Watchdog — Pipeline Abandoned**
 
-          Run [$RUN_ID](${{ github.server_url }}/${{ github.repository }}/actions/runs/$RUN_ID) was cancelled after **${ELAPSED_MINS} minutes** with no progress for **${SILENT_MINS} minutes**.
+          Run [$RUN_ID](${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/$RUN_ID) was cancelled after **${ELAPSED_MINS} minutes** with no progress for **${SILENT_MINS} minutes**.
 
           This exceeds the 2-hour silence threshold. The pipeline will **not** be automatically retried.
 
           | Field | Value |
           |-------|-------|
-          | Run | [$RUN_ID](${{ github.server_url }}/${{ github.repository }}/actions/runs/$RUN_ID) |
+          | Run | [$RUN_ID](${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/$RUN_ID) |
           | Elapsed | ${ELAPSED_MINS}m |
           | Silent | ${SILENT_MINS}m |
           | Action | Cancelled — human review required |
 
           ### What to check
-          1. Review the [run logs](${{ github.server_url }}/${{ github.repository }}/actions/runs/$RUN_ID) for errors
+          1. Review the [run logs](${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/$RUN_ID) for errors
           2. Check if the issue is too complex for autonomous processing
           3. Consider breaking the issue into smaller sub-issues
 

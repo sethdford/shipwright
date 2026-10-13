@@ -52,10 +52,11 @@ jobs:
           fi
 
       - name: Report
+        env:
+          HC: ${{ steps.scan.outputs.hardcoded }}
+          FB: ${{ steps.scan.outputs.fallback }}
+          TODO: ${{ steps.scan.outputs.todo }}
         run: |
-          HC="${{ steps.scan.outputs.hardcoded }}"
-          FB="${{ steps.scan.outputs.fallback }}"
-          TODO="${{ steps.scan.outputs.todo }}"
           [[ -z "$HC" || ! "$HC" =~ ^[0-9]+$ ]] && HC=0
           [[ -z "$FB" || ! "$FB" =~ ^[0-9]+$ ]] && FB=0
           [[ -z "$TODO" || ! "$TODO" =~ ^[0-9]+$ ]] && TODO=0

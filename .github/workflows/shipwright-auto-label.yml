@@ -21,8 +21,8 @@ jobs:
       - name: Add shipwright label
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          ISSUE: ${{ github.event.issue.number }}
         run: |
-          ISSUE="${{ github.event.issue.number }}"
           # Check if shipwright label already exists
           HAS_LABEL=$(gh issue view "$ISSUE" --repo "$GITHUB_REPOSITORY" \
             --json labels --jq '[.labels[].name] | map(select(. == "shipwright")) | length')

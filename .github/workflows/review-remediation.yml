@@ -52,8 +52,10 @@ jobs:
           BRANCH=$(echo "$PR_JSON" | jq -r '.headRefName')
           HEAD_SHA=$(echo "$PR_JSON" | jq -r '.headRefOid')
 
-          # headRefName is attacker-chosen (any valid ref, e.g. containing `"`, `;`, `$`).
-          # Reject anything git would not accept as a branch name before it becomes an output.
+          # headRefName is attacker-chosen. check-ref-format does NOT reject shell
+          # metacharacters (`"`, `;`, `$`, `|` are all valid in ref names); it only
+          # rejects malformed names (e.g. leading "-"). Safety comes from passing
+          # BRANCH via env and always quoting it, never from this check.
           git check-ref-format --branch "$BRANCH" >/dev/null || { echo "::error::invalid branch"; exit 1; }
 
           echo "branch=$BRANCH" >> "$GITHUB_OUTPUT"
