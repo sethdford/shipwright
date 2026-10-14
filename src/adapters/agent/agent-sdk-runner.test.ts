@@ -491,6 +491,35 @@ describe("agentEnv", () => {
     });
   });
 
+  test("F9: never forwards a GitHub token, whatever else is set", () => {
+    const tokens = ["GH_TOKEN", "GITHUB_TOKEN", "GH_ENTERPRISE_TOKEN", "GITHUB_ENTERPRISE_TOKEN"];
+    const env = agentEnv({
+      PATH: "/bin",
+      ANTHROPIC_API_KEY: "k",
+      ...Object.fromEntries(tokens.map((t) => [t, "secret"])),
+    });
+    for (const t of tokens) expect(t in env).toBe(false);
+    expect(Object.values(env)).not.toContain("secret");
+  });
+
+  test("F9: a runner given a GitHub token refuses to start the agent", async () => {
+    const { fn, state } = fakeQuery([result({ subtype: "success", result: "x" })]);
+    const runner = new AgentSdkRunner({ PATH: "/bin", GH_TOKEN: "t" }, fn);
+    await expect(
+      runner.runTask({
+        prompt: "p",
+        cwd: "/w",
+        model: "m",
+        effort: "low",
+        allowedTools: [],
+        maxTurns: 1,
+        maxBudgetUsd: 1,
+        timeoutMs: 1000,
+      }),
+    ).rejects.toThrow(/F9/);
+    expect(state.iterated).toBe(false);
+  });
+
   test("includes ANTHROPIC_API_KEY only when present", () => {
     expect(agentEnv({ ANTHROPIC_API_KEY: "k" })).toMatchObject({ ANTHROPIC_API_KEY: "k" });
     expect("ANTHROPIC_API_KEY" in agentEnv({})).toBe(false);

@@ -1,0 +1,15 @@
+id: F9-agent-options-explicit
+valid:
+  - 'this.queryFn({ prompt, options: { ...options, env: { ...this.env }, abortController: c } });'
+  - 'query({ prompt, options: { env: agentEnv(source), permissionMode: "dontAsk" } });'
+  - 'const o = { permissionMode: "dontAsk", allowedTools: [] };'
+  - 'const rows = db.query("SELECT 1");'
+invalid:
+  - 'this.queryFn({ prompt, options: { ...options, abortController: c } });'
+  - 'query({ prompt, options });'
+  - 'query({ prompt, options: { env: process.env } });'
+  - 'const o = { env: { ...process.env, X: "1" } };'
+  - 'const o = { env: Bun.env };'
+  - 'const o = { permissionMode: mode };'
+  - 'const o = { permissionMode };'
+  - 'const o = { permissionMode: fast ? "dontAsk" : other };'

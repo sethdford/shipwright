@@ -1,0 +1,37 @@
+# F9: agents get no GitHub token and no permission bypass (spec §3.3).
+# Flags any string, template piece, identifier or key that contains a bypass spelling or a GitHub
+# token name, and string concatenations that spell one in pieces ("bypass" + "Permissions").
+# Unanchored on purpose: "--dangerously-skip-permissions=true" and `--dangerously-${x}` count.
+# Allowlist (pinned in tools/arch/meta.test.ts): tests, src/adapters/github/** (gh authenticates
+# there; it never builds an agent's env) and src/adapters/agent/privilege-guard.ts (the runtime
+# check that names what it refuses). Bash callers: F9-bash-* (ratcheted).
+id: F9-no-agent-privilege
+language: TypeScript
+severity: error
+message: "F9: agents never get a GitHub token or a permission bypass. Use permissionMode \"dontAsk\" with a per-stage allowedTools list, build the agent env with agentEnv() (src/adapters/agent/agent-sdk-runner.ts), and route GitHub writes through GithubWriter."
+metadata: { owner: "@sethdford", docs: "docs/architecture.md#fitness-rules" }
+files:
+  - "src/**/*.ts"
+  - "dashboard/**/*.ts"
+ignores:
+  - "**/*.test.ts"
+  - "src/adapters/github/**"
+  - "src/adapters/agent/privilege-guard.ts"
+rule:
+  any:
+    - all:
+        - any:
+            - kind: string_fragment
+            - kind: identifier
+            - kind: property_identifier
+            - kind: shorthand_property_identifier
+            - kind: shorthand_property_identifier_pattern
+        - regex: '(?i)dangerously|bypass_?permissions|skip[-_]?permissions|\b(GH|GITHUB)(_ENTERPRISE)?_TOKEN\b'
+    # A spelling split across `+` pieces. Only the innermost matching expression is reported.
+    - all:
+        - kind: binary_expression
+        - regex: '(?i)bypass\W*permissions|skip\W*permissions|dangerously'
+        - not:
+            has:
+              kind: binary_expression
+              regex: '(?i)bypass\W*permissions|skip\W*permissions|dangerously'

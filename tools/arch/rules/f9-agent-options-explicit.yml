@@ -1,0 +1,45 @@
+# F9 in the agent adapter: every SDK call states its environment and permission mode explicitly, so
+# a refactor cannot drop the env allowlist or thread a bypass mode through a variable. The runtime
+# twin is assertAgentOptions() in src/adapters/agent/privilege-guard.ts.
+id: F9-agent-options-explicit
+language: TypeScript
+severity: error
+message: "F9: pass query() an options object literal with env: built by agentEnv() (never process.env or Bun.env), and give permissionMode as a string literal such as \"dontAsk\"."
+metadata: { owner: "@sethdford", docs: "docs/architecture.md#fitness-rules" }
+files:
+  - "src/adapters/agent/**/*.ts"
+ignores:
+  - "**/*.test.ts"
+rule:
+  any:
+    # query(...) / this.queryFn(...) without `options: { …, env: … }`
+    - kind: call_expression
+      all:
+        - has: { field: function, regex: '(^|\.)(query|queryFn)$' }
+        - has:
+            field: arguments
+            has:
+              kind: object
+              not:
+                has:
+                  kind: pair
+                  all:
+                    - has: { field: key, regex: '^options$' }
+                    - has:
+                        field: value
+                        kind: object
+                        has:
+                          kind: pair
+                          has: { field: key, regex: '^env$' }
+    # env taken from the parent process
+    - kind: pair
+      all:
+        - has: { field: key, regex: '^env$' }
+        - has: { field: value, regex: '\b(process\.env|process\[|Bun\.env)' }
+    # permissionMode from anything but a string literal
+    - kind: pair
+      all:
+        - has: { field: key, regex: '^permissionMode$' }
+        - not: { has: { field: value, kind: string } }
+    - kind: shorthand_property_identifier
+      regex: '^permissionMode$'

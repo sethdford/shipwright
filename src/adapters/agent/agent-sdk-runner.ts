@@ -18,6 +18,7 @@ import type {
 } from "../../shared/kernel/ports";
 import { err, ok, type Result } from "../../shared/kernel/result";
 import { type Collected, failure, ZERO_USAGE } from "./agent-failure";
+import { assertAgentOptions } from "./privilege-guard";
 import { wrapUntrusted } from "./untrusted";
 
 export type QueryFn = (args: { prompt: string; options: Options }) => AsyncIterable<SDKMessage>;
@@ -199,6 +200,7 @@ export class AgentSdkRunner implements AgentRunner {
     signal: AbortSignal | undefined,
     options: Options,
   ): Promise<Result<{ result: Success; usage: AgentUsage }, AgentFailure>> {
+    assertAgentOptions({ ...options, env: this.env });
     const startedAt = Date.now();
     if (signal?.aborted) {
       return err({ kind: "aborted", message: "agent call aborted", usage: ZERO_USAGE });
