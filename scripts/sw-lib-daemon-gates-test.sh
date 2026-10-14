@@ -72,7 +72,17 @@ release_claim() { printf 'release %s %s\n' "$1" "$2" >> "$CALLS"; }
 GATE_RC=0
 safety_gates_ok() { printf 'gate %s\n' "$*" >> "$CALLS"; return "$GATE_RC"; }
 SPAWN_RC=1
-daemon_spawn_pipeline() { printf 'spawn %s\n' "$1" >> "$CALLS"; return "$SPAWN_RC"; }
+SPAWN_RCS=""   # per-issue overrides: "11=1 12=75"
+daemon_spawn_pipeline() {
+    printf 'spawn %s\n' "$1" >> "$CALLS"
+    local pair
+    for pair in $SPAWN_RCS; do
+        if [[ "${pair%%=*}" == "$1" ]]; then return "${pair#*=}"; fi
+    done
+    return "$SPAWN_RC"
+}
+spawns() { grep '^spawn' "$CALLS" | tr '\n' ' ' | sed 's/ $//'; }
+queued() { jq -r '.queued | join(" ")' "$STATE_FILE"; }
 
 reset_state() {
     rm -f "$STATE_FILE"
@@ -96,7 +106,7 @@ print_test_section "daemon_spawn_pipeline gate"
     echo "rc=$rc" >> "$CALLS"
 ) 2>/dev/null
 assert_contains "the retry count reaches the gate" "$(calls)" "gate 2"
-assert_contains "a refused spawn returns 1" "$(calls)" "rc=1"
+assert_contains "a gate refusal returns 75" "$(calls)" "rc=75"
 assert_contains "a missing Bun (127) is logged at ERROR with the rc" "$(calls)" "log ERROR Safety gates closed (rc=127)"
 assert_contains "the event carries the rc" "$(calls)" "event daemon.gates_closed issue=5 rc=127"
 
@@ -122,9 +132,12 @@ assert_contains "a blocked gate (1) is logged at WARN" "$(calls)" "log WARN Safe
     printf '#!/usr/bin/env bash\necho "child_retry=${DAEMON_RETRY_ATTEMPT:-unset}" >> "$CALLS"\necho 0\n' > "$SCRIPT_DIR/sw-cost.sh"
     chmod +x "$SCRIPT_DIR/sw-cost.sh"
     : > "$CALLS"
-    DAEMON_RETRY_ATTEMPT=2 daemon_spawn_pipeline 7 "t" "" || true
+    rc=0
+    DAEMON_RETRY_ATTEMPT=2 daemon_spawn_pipeline 7 "t" "" || rc=$?
+    echo "rc=$rc" >> "$CALLS"
 ) 2>/dev/null
 assert_contains "DAEMON_RETRY_ATTEMPT is not passed to child processes" "$(calls)" "child_retry=unset"
+assert_contains "an exhausted budget returns 75" "$(calls)" "rc=75"
 
 # ─── daemon_poll_issues: one gate per cycle ──────────────────────────────
 print_test_section "daemon_poll_issues cycle gate"
@@ -168,6 +181,52 @@ SPAWN_RC=0
 daemon_poll_issues 2>/dev/null || true
 assert_eq "a successful spawn keeps its claim" "0" "$(count_calls '^release')"
 assert_eq "a successful spawn staggers" "1" "$(count_calls '^sleep 7')"
+
+cat > "$TEST_TEMP_DIR/issues.json" <<'JSON'
+[{"number":3,"title":"a","labels":[{"name":"shipwright"}]},
+ {"number":5,"title":"b","labels":[{"name":"shipwright"}]}]
+JSON
+reset_state
+locked_state_update '.queued = ["40"]'
+: > "$CALLS"
+SPAWN_RC=75
+daemon_poll_issues 2>/dev/null || true
+# Triage order between 3 and 5 is not under test: whichever comes first is the only one touched
+first=$(grep -m1 '^spawn' "$CALLS" | awk '{print $2}' || true)
+assert_eq "a gate refusal (75) stops the cycle: nothing after it is spawned" "1" "$(count_calls '^spawn')"
+assert_eq "nothing after a gate refusal is claimed" "claim ${first} m1" "$(grep '^claim' "$CALLS" | tr '\n' ' ' | sed 's/ $//')"
+assert_contains "the refused issue's claim is released" "$(calls)" "release ${first} m1"
+assert_eq "the queue is not drained after a gate refusal" "40" "$(queued)"
+
+print_test_section "daemon_poll_issues priority lane"
+
+echo '[{"number":6,"title":"p","labels":[{"name":"shipwright"},{"name":"urgent"}]}]' > "$TEST_TEMP_DIR/issues.json"
+reset_state
+: > "$CALLS"
+PRIORITY_LANE=true PRIORITY_LANE_LABELS="urgent" PRIORITY_LANE_MAX=2 SPAWN_RC=1 daemon_poll_issues 2>/dev/null || true
+assert_eq "the priority lane spawns the issue" "spawn 6" "$(spawns)"
+assert_contains "a refused priority spawn releases its claim" "$(calls)" "release 6 m1"
+assert_eq "a refused priority spawn is not tracked in the lane" "0" "$(jq '.priority_lane_active // [] | length' "$STATE_FILE")"
+
+print_test_section "daemon_poll_issues finally-failed issues"
+
+echo '[{"number":3,"title":"a","labels":[{"name":"shipwright"}]}]' > "$TEST_TEMP_DIR/issues.json"
+reset_state
+locked_state_update '.final_failed = {"3": "2026-01-01T00:00:00Z", "9": "2026-01-01T00:00:00Z"}'
+: > "$CALLS"
+SPAWN_RC=0
+daemon_poll_issues 2>/dev/null || true
+assert_eq "a finally-failed issue still carrying the watch label is not dispatched" "" "$(spawns)"
+assert_eq "a finally-failed issue is not claimed" "0" "$(count_calls '^claim')"
+assert_eq "entries absent from a complete listing are cleared; present ones kept" \
+    "3" "$(jq -r '.final_failed | keys | join(" ")' "$STATE_FILE")"
+
+jq -n '[range(1;101) | {number: ., title: "t", labels: [{name: "shipwright"}, {name: "auto-patrol"}]}]' \
+    > "$TEST_TEMP_DIR/issues.json"
+reset_state
+locked_state_update '.final_failed = {"500": "2026-01-01T00:00:00Z"}'
+daemon_poll_issues 2>/dev/null || true
+assert_eq "a truncated listing clears nothing" "500" "$(jq -r '.final_failed | keys | join(" ")' "$STATE_FILE")"
 rm -f "$HOME/.shipwright/machines.json"
 
 # ─── daemon_poll_issues: queue drain ─────────────────────────────────────
@@ -179,23 +238,46 @@ cat > "$TEST_TEMP_DIR/issues.json" <<'JSON'
  {"number":13,"title":"c","labels":[{"name":"shipwright"},{"name":"auto-patrol"}]}]
 JSON
 
+echo '{"machines":[{"name":"m1","role":"primary"}]}' > "$HOME/.shipwright/machines.json"
+
 reset_state
 locked_state_update '.queued = ["10","13","11","12"]'
 : > "$CALLS"
-SPAWN_RC=1
+SPAWN_RC=75
 daemon_poll_issues 2>/dev/null || true
-assert_eq "drain spawns only eligible queued issues and stops at the first refusal" \
-    "spawn 11" "$(grep '^spawn' "$CALLS" | tr '\n' ' ' | sed 's/ $//')"
-assert_eq "refused issue is re-queued; ineligible ones are dropped" \
-    "11 12" "$(jq -r '.queued | sort | join(" ")' "$STATE_FILE")"
+assert_eq "drain skips ineligible issues and stops at a gate refusal" "spawn 11" "$(spawns)"
+assert_eq "the refused issue goes to the tail; dropped ones leave the queue" "12 11" "$(queued)"
+assert_contains "an issue absent from a complete listing releases its claim" "$(calls)" "release 10 m1"
+assert_contains "an ineligible queued issue releases its claim" "$(calls)" "release 13 m1"
+assert_eq "the gate-refused issue keeps its claim (still queued)" "0" "$(count_calls '^release 11')"
+
+reset_state
+locked_state_update '.queued = ["11","12"]'
+: > "$CALLS"
+SPAWN_RC=0
+SPAWN_RCS="11=1"
+daemon_poll_issues 2>/dev/null || true
+SPAWN_RCS=""
+assert_eq "an issue-specific refusal does not stop the drain" "spawn 11 spawn 12" "$(spawns)"
+assert_eq "the issue-specific refusal is re-queued at the tail" "11" "$(queued)"
 
 reset_state
 locked_state_update '.queued = ["11","12"]'
 : > "$CALLS"
 SPAWN_RC=0
 daemon_poll_issues 2>/dev/null || true
-assert_eq "drain spawns eligible issues while it has capacity" \
-    "spawn 11 spawn 12" "$(grep '^spawn' "$CALLS" | tr '\n' ' ' | sed 's/ $//')"
+assert_eq "drain spawns eligible issues while it has capacity" "spawn 11 spawn 12" "$(spawns)"
+
+jq -n '[range(1;101) | {number: ., title: "t", labels: [{name: "shipwright"}, {name: "auto-patrol"}]}]' \
+    > "$TEST_TEMP_DIR/issues.json"
+reset_state
+locked_state_update '.queued = ["500","501"]'
+: > "$CALLS"
+daemon_poll_issues 2>/dev/null || true
+assert_eq "absence from a truncated listing is unknown: nothing spawned" "" "$(spawns)"
+assert_eq "absence from a truncated listing keeps the issues queued, in order" "500 501" "$(queued)"
+assert_eq "absence from a truncated listing keeps the claims" "0" "$(count_calls '^release')"
+rm -f "$HOME/.shipwright/machines.json"
 
 # ─── daemon_reap_completed: the queue is left to the next poll ───────────
 print_test_section "daemon_reap_completed defers the queue"
@@ -217,6 +299,26 @@ SPAWN_RC=0
 daemon_reap_completed 2>/dev/null || true
 assert_eq "the reaper never spawns from the queue" "0" "$(count_calls '^spawn')"
 assert_eq "the queued issue stays queued for the next poll" "81" "$(jq -r '.queued | join(" ")' "$STATE_FILE")"
+assert_contains "a finished job releases its claim" "$(calls)" "release 80"
+
+reap_failed_job() {
+    reset_state
+    jq -n --arg wt "$WORKTREE_DIR/reap" --arg started "$(now_iso)" '{
+        version: 1,
+        active_jobs: [{issue: 82, pid: 99999996, worktree: $wt, started_at: $started, title: "R", repo: ""}],
+        queued: [], completed: [], retry_counts: {}, failure_history: [],
+        priority_lane_active: [], titles: {}
+    }' > "$STATE_FILE"
+    echo "boom" > "$LOG_DIR/issue-82.log"
+    daemon_reap_completed 2>/dev/null || true
+}
+daemon_on_failure() { printf 'failure %s\n' "$1" >> "$CALLS"; _retry_spawned_for="$1"; }
+reap_failed_job
+assert_contains "the failed job reached daemon_on_failure" "$(calls)" "failure 82"
+assert_eq "a job whose retry was spawned keeps its claim" "0" "$(count_calls '^release 82')"
+daemon_on_failure() { printf 'failure %s\n' "$1" >> "$CALLS"; }
+reap_failed_job
+assert_contains "a job that failed finally releases its claim" "$(calls)" "release 82"
 
 # ─── daemon_patrol: a refused filing is not counted as created ───────────
 print_test_section "daemon_patrol security site and the intake gate"

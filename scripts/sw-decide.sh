@@ -163,7 +163,7 @@ Auto-created by \`shipwright decide\` at $(now_iso)."
                 create_out=$(patrol_issue_create --intake-label "$intake_label" \
                     --title "$title" \
                     --body "$body" \
-                    --label "$labels" 2>/dev/null) || create_rc=$?
+                    --label "$labels") || create_rc=$?
                 issue_number=$(printf '%s' "$create_out" | grep -oE '[0-9]+$' || true)
                 if [[ "$create_rc" -eq 0 ]]; then
                     action="issue_created"
@@ -197,7 +197,7 @@ Proposed by \`shipwright decide\` at $(now_iso)."
                 create_out=$(patrol_issue_create --intake-label "$intake_label" \
                     --title "$title" \
                     --body "$body" \
-                    --label "$labels" 2>/dev/null) || create_rc=$?
+                    --label "$labels") || create_rc=$?
                 issue_number=$(printf '%s' "$create_out" | grep -oE '[0-9]+$' || true)
                 if [[ "$create_rc" -eq 0 ]]; then
                     action="issue_proposed"
@@ -235,7 +235,10 @@ Proposed by \`shipwright decide\` at $(now_iso)."
         --arg dedup "$dedup_key" \
         --arg ts "$(now_iso)" \
         --argjson epoch "$(now_epoch)" \
-        '{id:$id, title:$title, category:$category, tier:$tier, action:$action, issue_number:$issue, value_score:$score, dedup_key:$dedup, decided_at:$ts, epoch:$epoch, estimated_cost_usd: (if $tier == "auto" then 5.0 elif $tier == "propose" then 0.01 else 0 end)}')
+        '($action | endswith("_refused")) as $refused
+         | {id:$id, title:$title, category:$category, tier:$tier, action:$action, issue_number:$issue, value_score:$score,
+            dedup_key: (if $refused then "" else $dedup end), decided_at:$ts, epoch:$epoch,
+            estimated_cost_usd: (if $refused then 0 elif $tier == "auto" then 5.0 elif $tier == "propose" then 0.01 else 0 end)}')
 
     autonomy_record_decision "$decision_record"
     emit_event "decision.executed" "id=$id" "tier=$tier" "action=$action" "score=$value_score"
@@ -707,4 +710,7 @@ main() {
     esac
 }
 
-main "$@"
+# Run only when executed, so tests can source the functions
+if [[ "${BASH_SOURCE[0]}" == "$0" ]]; then
+    main "$@"
+fi

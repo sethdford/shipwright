@@ -18,6 +18,9 @@ REPO_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
 # Canonical helpers (colors, output, events)
 # shellcheck source=lib/helpers.sh
 [[ -f "$SCRIPT_DIR/lib/helpers.sh" ]] && source "$SCRIPT_DIR/lib/helpers.sh"
+# Issue intake caps for automated filings (ADR-0007); path is relative to this file
+# shellcheck source=lib/safety-gates.sh
+source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/lib/safety-gates.sh"
 # Fallbacks when helpers not loaded (e.g. test env with overridden SCRIPT_DIR)
 [[ "$(type -t info 2>/dev/null)" == "function" ]]    || info()    { echo -e "\033[38;2;0;212;255m\033[1m▸\033[0m $*"; }
 [[ "$(type -t success 2>/dev/null)" == "function" ]] || success() { echo -e "\033[38;2;74;222;128m\033[1m✓\033[0m $*"; }
@@ -484,7 +487,9 @@ create_issue_from_finding() {
 
     # Create GitHub issue; capture URL and parse issue number
     local create_out
-    create_out=$(gh issue create \
+    # Intake caps (ADR-0007): every autonomous issue carries the shipwright label, so the cap
+    # counts open shipwright issues (conservative: a large backlog stops new filings)
+    create_out=$(patrol_issue_create --intake-label "shipwright" \
         --title "$title" \
         --body "$description
 

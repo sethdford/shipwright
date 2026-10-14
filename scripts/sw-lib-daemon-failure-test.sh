@@ -240,34 +240,61 @@ assert_eq "DAEMON_RETRY_ATTEMPT does not leak past the retry spawn" \
 # ═══════════════════════════════════════════════════════════════════════════════
 print_test_section "Refused retry is a final failure"
 
-(
-    REFUSE_LOG="$TEST_TEMP_DIR/refuse.log"
-    : > "$REFUSE_LOG"
-    export REFUSE_LOG
-    mock_binary "gh" 'printf "gh %s\n" "$*" >> "$REFUSE_LOG"'
-    SCRIPT_DIR="$TEST_TEMP_DIR/refuse-scripts"
-    mkdir -p "$SCRIPT_DIR"
-    printf '#!/usr/bin/env bash\nexit 0\n' > "$SCRIPT_DIR/sw-tracker.sh"
-    chmod +x "$SCRIPT_DIR/sw-tracker.sh"
-    NO_GITHUB=false
-    daemon_spawn_pipeline() { echo "spawn $1 retry=${DAEMON_RETRY_ATTEMPT:-unset}" >> "$REFUSE_LOG"; return 1; }
-    daemon_log() { echo "log $1 ${*:2}" >> "$REFUSE_LOG"; }
-    sleep() { :; }
-    MODEL="sonnet"
-    PIPELINE_TEMPLATE="autonomous"
-    MAX_PARALLEL=1
-    _retry_spawned_for=""
-    echo '{"retry_counts":{"802":1}}' > "$STATE_FILE"
-    echo "some unclassified failure" > "$LOG_DIR/issue-802.log"
-    daemon_on_failure 802 1 "" >/dev/null 2>&1
-    echo "spawned_for=${_retry_spawned_for:-none} template=${PIPELINE_TEMPLATE} model=${MODEL}" >> "$REFUSE_LOG"
-) 2>/dev/null || true
+# run_refused_failure <issue> <gh-mock-script> — daemon_on_failure with a refused retry spawn,
+# real state updates and a gh mock; everything lands in $TEST_TEMP_DIR/refuse.log.
+run_refused_failure() {
+    local issue="$1" gh_script="$2"
+    (
+        REFUSE_LOG="$TEST_TEMP_DIR/refuse.log"
+        : > "$REFUSE_LOG"
+        export REFUSE_LOG
+        mock_binary "gh" "$gh_script"
+        SCRIPT_DIR="$TEST_TEMP_DIR/refuse-scripts"
+        mkdir -p "$SCRIPT_DIR"
+        printf '#!/usr/bin/env bash\nexit 0\n' > "$SCRIPT_DIR/sw-tracker.sh"
+        chmod +x "$SCRIPT_DIR/sw-tracker.sh"
+        NO_GITHUB=false
+        daemon_spawn_pipeline() { echo "spawn $1 retry=${DAEMON_RETRY_ATTEMPT:-unset}" >> "$REFUSE_LOG"; return 75; }
+        daemon_log() { echo "log $1 ${*:2}" >> "$REFUSE_LOG"; }
+        locked_state_update() {
+            local tmp
+            tmp=$(mktemp)
+            jq "$@" "$STATE_FILE" > "$tmp" && mv "$tmp" "$STATE_FILE"
+        }
+        sleep() { :; }
+        MODEL="sonnet"
+        PIPELINE_TEMPLATE="autonomous"
+        MAX_PARALLEL=1
+        _retry_spawned_for=""
+        jq -n --arg n "$issue" '{retry_counts: {($n): 1}}' > "$STATE_FILE"
+        echo "some unclassified failure" > "$LOG_DIR/issue-${issue}.log"
+        daemon_on_failure "$issue" 1 "" >/dev/null 2>&1
+        echo "spawned_for=${_retry_spawned_for:-none} template=${PIPELINE_TEMPLATE} model=${MODEL}" >> "$REFUSE_LOG"
+    ) 2>/dev/null || true
+}
+
+run_refused_failure 802 'printf "gh %s\n" "$*" >> "$REFUSE_LOG"'
 refuse_log="$(cat "$TEST_TEMP_DIR/refuse.log")"
 assert_contains "the retry spawn was attempted" "$refuse_log" "spawn 802 retry=2"
 assert_contains "refusal is logged as a final failure" "$refuse_log" "Retry #2 refused by safety gates — final failure"
-assert_contains "final failure labels the issue and removes the watch label" "$refuse_log" \
-    "gh issue edit 802 --add-label pipeline/failed --remove-label shipwright"
+assert_contains "final failure adds the failure label" "$refuse_log" "gh issue edit 802 --add-label pipeline/failed"
+assert_contains "final failure removes the watch label in its own call" "$refuse_log" "gh issue edit 802 --remove-label shipwright"
 assert_contains "no retry is recorded as spawned; template and model restored" "$refuse_log" \
     "spawned_for=none template=autonomous model=sonnet"
+assert_contains "the failure comment says the retry was refused, not exhausted" "$refuse_log" \
+    "| Retries | 2 / 2 (refused by safety gates) |"
+assert_eq "the issue is recorded as finally failed in daemon state" "true" \
+    "$(jq '.final_failed["802"] != null' "$STATE_FILE")"
+
+print_test_section "Final failure when gh cannot edit the issue"
+
+run_refused_failure 803 'printf "gh %s\n" "$*" >> "$REFUSE_LOG"; [[ "${1:-} ${2:-}" == "issue edit" ]] && exit 1; exit 0'
+refuse_log="$(cat "$TEST_TEMP_DIR/refuse.log")"
+assert_contains "a failed watch-label removal is logged at ERROR" "$refuse_log" \
+    "log ERROR Could not remove 'shipwright' from failed issue #803"
+assert_contains "it falls back to the shipwright-stuck label" "$refuse_log" \
+    "gh issue edit 803 --add-label shipwright-stuck"
+assert_eq "daemon state still records the final failure" "true" \
+    "$(jq '.final_failed["803"] != null' "$STATE_FILE")"
 
 print_test_results

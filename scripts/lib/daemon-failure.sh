@@ -198,6 +198,9 @@ daemon_on_failure() {
     emit_event "daemon.failure_classified" "issue=$issue_num" "class=$failure_class"
     record_failure_class "$failure_class"
 
+    # Why the issue failed finally: "exhausted" (or no retry) unless the gates refused a retry
+    local final_reason="exhausted"
+
     # ── Auto-retry with strategy escalation ──
     if [[ "${RETRY_ESCALATION:-true}" == "true" ]]; then
         local retry_count
@@ -347,6 +350,7 @@ _Escalation: $(if [[ "$retry_count" -eq 1 ]]; then echo "upgraded model + increa
                     # Refused (safety gates, budget, disk, ...): report a final failure so the issue
                     # loses the watch label instead of being re-polled as a first dispatch.
                     daemon_log WARN "Retry #${retry_count} refused by safety gates — final failure for issue #${issue_num}"
+                    final_reason="refused by safety gates"
                     emit_event "daemon.retry_refused" "issue=$issue_num" "retry=$retry_count"
                 else
                     daemon_log WARN "Max retries (${effective_max}) exhausted for issue #${issue_num}"
@@ -363,11 +367,23 @@ _Escalation: $(if [[ "$retry_count" -eq 1 ]]; then echo "upgraded model + increa
         bash "$SCRIPT_DIR/sw-pm.sh" learn "$issue_num" failure 2>/dev/null || true
     fi
 
+    # The poll loop never dispatches a finally-failed issue again until a human removes and
+    # re-adds the watch label (ADR-0007). Not pruned with retry_counts; the poll clears an entry
+    # once the issue is absent from a complete watch-label listing.
+    locked_state_update --arg num "$issue_num" --arg ts "$(now_iso)" \
+        '.final_failed[$num] = $ts' || \
+        daemon_log ERROR "Could not record final failure of issue #${issue_num} in daemon state"
+
     if [[ "$NO_GITHUB" != "true" ]]; then
-        # Add failure label and remove watch label (prevent re-processing)
-        gh issue edit "$issue_num" \
-            --add-label "$ON_FAILURE_ADD_LABEL" \
-            --remove-label "$WATCH_LABEL" 2>/dev/null || true
+        # Add the failure label and remove the watch label in separate calls: a missing failure
+        # label must not leave the watch label in place (the issue would be re-polled as new).
+        gh issue edit "$issue_num" --add-label "$ON_FAILURE_ADD_LABEL" 2>/dev/null || \
+            daemon_log WARN "Could not add '${ON_FAILURE_ADD_LABEL}' to failed issue #${issue_num}"
+        if ! gh issue edit "$issue_num" --remove-label "$WATCH_LABEL" 2>/dev/null; then
+            daemon_log ERROR "Could not remove '${WATCH_LABEL}' from failed issue #${issue_num} — adding shipwright-stuck"
+            gh issue edit "$issue_num" --add-label "shipwright-stuck" 2>/dev/null || \
+                daemon_log ERROR "Could not add shipwright-stuck to issue #${issue_num}; daemon state keeps it from being dispatched"
+        fi
 
         # Close any draft PR created for this issue (cleanup abandoned work)
         local draft_pr
@@ -391,7 +407,7 @@ _Escalation: $(if [[ "$retry_count" -eq 1 ]]; then echo "upgraded model + increa
             final_count=$(jq -r --arg num "$issue_num" \
                 '.retry_counts[$num] // 0' "$STATE_FILE" 2>/dev/null || echo "0")
             final_max=$(get_max_retries_for_class "$failure_class")
-            retry_info="| Retries | ${final_count} / ${final_max} (exhausted) |"
+            retry_info="| Retries | ${final_count} / ${final_max} (${final_reason}) |"
         fi
 
         gh issue comment "$issue_num" --body "## ❌ Pipeline Failed

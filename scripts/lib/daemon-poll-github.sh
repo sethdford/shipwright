@@ -23,6 +23,16 @@ SLACK_WEBHOOK="${SLACK_WEBHOOK:-}"
 BACKOFF_SECS="${BACKOFF_SECS:-0}"
 POLL_CYCLE_COUNT="${POLL_CYCLE_COUNT:-0}"
 
+# _poll_release_claim <issue> — gives back a distributed claim (taken only when machines.json
+# exists), resolving the machine name the same way the claim and the reaper do.
+_poll_release_claim() {
+    local issue_num="$1"
+    [[ -f "$HOME/.shipwright/machines.json" ]] || return 0
+    local machine_name
+    machine_name=$(jq -r '.machines[] | select(.role == "primary") | .name' "$HOME/.shipwright/machines.json" 2>/dev/null || hostname -s)
+    release_claim "$issue_num" "$machine_name" || true
+}
+
 daemon_poll_issues() {
     if [[ "$NO_GITHUB" == "true" ]]; then
         daemon_log INFO "Polling skipped (--no-github)"
@@ -70,6 +80,9 @@ daemon_poll_issues() {
     fi
 
     local issues_json
+    # list_limit: --limit of the listing. A listing that reached it may be truncated, so an
+    # issue missing from it is "unknown", not "gone".
+    local list_limit=100 raw_count=""
 
     # Select gh command wrapper: gh_retry for critical poll calls when enabled
     local gh_cmd="gh"
@@ -100,6 +113,9 @@ daemon_poll_issues() {
             return
         }
 
+        list_limit="${ISSUE_LIMIT:-100}"
+        raw_count=$(echo "$issues_json" | jq 'length' 2>/dev/null || echo "")
+
         # Filter by repo_filter regex if set
         if [[ -n "$REPO_FILTER" ]]; then
             issues_json=$(echo "$issues_json" | jq -c --arg filter "$REPO_FILTER" \
@@ -111,7 +127,7 @@ daemon_poll_issues() {
             --label "$WATCH_LABEL" \
             --state open \
             --json number,title,labels,body,createdAt \
-            --limit 100 2>/dev/null) || {
+            --limit "$list_limit" 2>/dev/null) || {
             # Handle rate limiting with exponential backoff
             if [[ $BACKOFF_SECS -eq 0 ]]; then
                 BACKOFF_SECS=30
@@ -133,9 +149,30 @@ daemon_poll_issues() {
     gh_record_success
 
     local issue_count
-    issue_count=$(echo "$issues_json" | jq 'length' 2>/dev/null || echo 0)
+    issue_count=$(echo "$issues_json" | jq 'length' 2>/dev/null || echo "")
+    [[ -z "$raw_count" ]] && raw_count="$issue_count"
 
-    if [[ "$issue_count" -eq 0 ]]; then
+    # Complete listing: readable, non-empty and below the limit. Only then does absence from it
+    # mean an issue no longer carries the watch label.
+    local listing_complete=false
+    if [[ "$issue_count" =~ ^[0-9]+$ && "$raw_count" =~ ^[0-9]+$ ]] \
+        && [[ "$issue_count" -gt 0 && "$raw_count" -lt "$list_limit" ]]; then
+        listing_complete=true
+    fi
+
+    # Finally-failed issues (daemon-failure.sh) are cleared once their watch label is gone, so a
+    # human re-adding it makes the issue dispatchable again.
+    if [[ "$listing_complete" == "true" ]]; then
+        local present_json
+        present_json=$(echo "$issues_json" | jq -c '[.[].number | tostring]' 2>/dev/null) || present_json=""
+        if [[ -n "$present_json" ]] && \
+            [[ "$(jq -r '(.final_failed // {}) | length' "$STATE_FILE" 2>/dev/null || echo 0)" != "0" ]]; then
+            locked_state_update --argjson present "$present_json" \
+                '.final_failed = ((.final_failed // {}) | with_entries(select(.key as $k | $present | index($k))))'
+        fi
+    fi
+
+    if [[ ! "$issue_count" =~ ^[0-9]+$ ]] || [[ "$issue_count" -eq 0 ]]; then
         return
     fi
 
@@ -238,6 +275,7 @@ daemon_poll_issues() {
 
     local active_count
     active_count=$(locked_get_active_count)
+    local cycle_refused=false
 
     # Process each issue in triage order (process substitution keeps state in current shell)
     while IFS='|' read -r score issue_num repo_name; do
@@ -259,6 +297,13 @@ daemon_poll_issues() {
 
         # Skip if already inflight
         if daemon_is_inflight "$issue_key"; then
+            continue
+        fi
+
+        # Finally failed (retries exhausted or refused) but the watch label could not be removed:
+        # wait until a human removes and re-adds it (ADR-0007)
+        if jq -e --arg n "$issue_num" '(.final_failed // {}) | has($n)' "$STATE_FILE" >/dev/null 2>&1; then
+            daemon_log INFO "Issue #${issue_num} failed finally — skipped until its '${WATCH_LABEL}' label is removed and re-added"
             continue
         fi
 
@@ -297,13 +342,19 @@ daemon_poll_issues() {
 
                 local orig_template="$PIPELINE_TEMPLATE"
                 PIPELINE_TEMPLATE="$template"
-                local priority_spawned=false
-                daemon_spawn_pipeline "$issue_num" "$issue_title" "$repo_name" && priority_spawned=true
+                local priority_rc=0
+                daemon_spawn_pipeline "$issue_num" "$issue_title" "$repo_name" || priority_rc=$?
                 PIPELINE_TEMPLATE="$orig_template"
-                if [[ "$priority_spawned" == "true" ]]; then
+                if [[ "$priority_rc" -eq 0 ]]; then
                     track_priority_job "$issue_num"
-                elif [[ -n "$claimed_machine" ]]; then
+                    continue
+                fi
+                if [[ -n "$claimed_machine" ]]; then
                     release_claim "$issue_num" "$claimed_machine"
+                fi
+                if [[ "$priority_rc" -eq "${DAEMON_SPAWN_REFUSED:-75}" ]]; then
+                    cycle_refused=true
+                    break
                 fi
                 continue
             fi
@@ -342,13 +393,18 @@ daemon_poll_issues() {
         # Spawn pipeline (template selection applied via PIPELINE_TEMPLATE override)
         local orig_template="$PIPELINE_TEMPLATE"
         PIPELINE_TEMPLATE="$template"
-        local spawned=false
-        daemon_spawn_pipeline "$issue_num" "$issue_title" "$repo_name" && spawned=true
+        local spawn_rc=0
+        daemon_spawn_pipeline "$issue_num" "$issue_title" "$repo_name" || spawn_rc=$?
         PIPELINE_TEMPLATE="$orig_template"
-        if [[ "$spawned" != "true" ]]; then
-            # Refused (safety gates, budget, disk, ...): give the claim back, no stagger
+        if [[ "$spawn_rc" -ne 0 ]]; then
+            # Refused: give the claim back, no stagger. A system-wide refusal (gates, budget)
+            # ends the cycle: nothing more is claimed, spawned or drained.
             if [[ -n "$claimed_machine" ]]; then
                 release_claim "$issue_num" "$claimed_machine"
+            fi
+            if [[ "$spawn_rc" -eq "${DAEMON_SPAWN_REFUSED:-75}" ]]; then
+                cycle_refused=true
+                break
             fi
             continue
         fi
@@ -362,9 +418,15 @@ daemon_poll_issues() {
 
     # ── Drain queue if we have capacity (prevents deadlock when queue is
     #    populated but no active jobs exist to trigger dequeue) ──
-    local drain_active
+    # Each queued entry is looked at most once per cycle (re-queued entries go to the tail).
+    local drain_active drain_budget=0
     drain_active=$(locked_get_active_count)
-    while [[ "$drain_active" -lt "$MAX_PARALLEL" ]]; do
+    if [[ "$cycle_refused" != "true" ]]; then
+        drain_budget=$(jq -r '(.queued // []) | length' "$STATE_FILE" 2>/dev/null || echo 0)
+        [[ "$drain_budget" =~ ^[0-9]+$ ]] || drain_budget=0
+    fi
+    while [[ "$drain_active" -lt "$MAX_PARALLEL" && "$drain_budget" -gt 0 ]]; do
+        drain_budget=$((drain_budget - 1))
         local drain_issue_key
         drain_issue_key=$(dequeue_next)
         [[ -z "$drain_issue_key" ]] && break
@@ -373,12 +435,29 @@ daemon_poll_issues() {
         local drain_title
         drain_title=$(jq -r --arg n "$drain_issue_key" '.titles[$n] // ""' "$STATE_FILE" 2>/dev/null || true)
 
+        # Is it still in the listing? 0 from a complete listing means the watch label is gone;
+        # anything else unreadable or a truncated listing is unknown: keep it queued.
+        local drain_present
+        drain_present=$(echo "$issues_json" | jq -r --argjson n "$drain_issue_num" --arg repo "$drain_repo" \
+            '[.[] | select(.number == $n) | select($repo == "" or (.repository.nameWithOwner // "") == $repo)] | length' 2>/dev/null || echo "")
+        if [[ "$drain_present" == "0" && "$listing_complete" == "true" ]]; then
+            daemon_log INFO "Dropping queued issue #${drain_issue_num}: no longer carries '${WATCH_LABEL}'"
+            _poll_release_claim "$drain_issue_num"
+            continue
+        fi
+        if [[ ! "$drain_present" =~ ^[1-9][0-9]*$ ]]; then
+            daemon_log INFO "Queued issue #${drain_issue_num} not in this (truncated or unreadable) listing — kept queued"
+            enqueue_issue "$drain_issue_key"
+            continue
+        fi
+
         local drain_labels drain_score drain_template
         drain_labels=$(echo "$issues_json" | jq -r --argjson n "$drain_issue_num" --arg repo "$drain_repo" \
             '.[] | select(.number == $n) | select($repo == "" or (.repository.nameWithOwner // "") == $repo) | [.labels[].name] | join(",")' 2>/dev/null || echo "")
-        # Not in this poll (watch label gone), auto-filed or stuck: drop it from the queue
+        # Auto-filed, stuck or unreadable labels: drop it from the queue
         if [[ -z "$drain_labels" ]] || ! dispatch_eligible "$drain_labels"; then
-            daemon_log INFO "Dropping queued issue #${drain_issue_num}: no longer eligible for dispatch"
+            daemon_log INFO "Dropping queued issue #${drain_issue_num}: not eligible for dispatch"
+            _poll_release_claim "$drain_issue_num"
             continue
         fi
         drain_score=$(echo "$sorted_order" | grep "|${drain_issue_num}|" | cut -d'|' -f1 || echo "50")
@@ -389,13 +468,17 @@ daemon_poll_issues() {
         daemon_log INFO "Draining queue: issue #${drain_issue_num}${drain_repo:+, repo=${drain_repo}}, template=${drain_template}"
         local orig_template="$PIPELINE_TEMPLATE"
         PIPELINE_TEMPLATE="$drain_template"
-        local drain_spawned=false
-        daemon_spawn_pipeline "$drain_issue_num" "$drain_title" "$drain_repo" && drain_spawned=true
+        local drain_rc=0
+        daemon_spawn_pipeline "$drain_issue_num" "$drain_title" "$drain_repo" || drain_rc=$?
         PIPELINE_TEMPLATE="$orig_template"
-        if [[ "$drain_spawned" != "true" ]]; then
+        if [[ "$drain_rc" -ne 0 ]]; then
             enqueue_issue "$drain_issue_key"
-            daemon_log WARN "Spawn refused for queued issue #${drain_issue_num} — re-queued; draining stops this cycle"
-            break
+            if [[ "$drain_rc" -eq "${DAEMON_SPAWN_REFUSED:-75}" ]]; then
+                daemon_log WARN "Spawn refused by gates for queued issue #${drain_issue_num} — re-queued; draining stops this cycle"
+                break
+            fi
+            daemon_log WARN "Spawn failed for queued issue #${drain_issue_num} (rc=${drain_rc}) — re-queued at the tail"
+            continue
         fi
         drain_active=$(locked_get_active_count)
     done

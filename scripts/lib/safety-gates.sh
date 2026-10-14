@@ -56,9 +56,11 @@ safety_gates_ok() {
 # patrol_issue_create [--intake-label LABEL] <gh issue create args...> — files the issue only
 # when the intake gate allows it (open issues with LABEL under the cap, no open issue with the
 # same title fingerprint). LABEL defaults to $PATROL_LABEL (auto-patrol); pass the label the
-# site actually applies when it differs. Newlines in the title become spaces. The title goes to
-# the gate as one argv element, never through a shell string. A refusal is logged with the
-# gate's exit code and returns 1.
+# site actually applies when it differs. The title must be given as `--title VALUE`; the
+# `--title=VALUE` and `-t` forms are refused (2) because the gate would not see the title.
+# `--repo R` / `-R R` scopes the gate to that repo (GH_REPO). Newlines in the title become
+# spaces. The title goes to the gate as one argv element, never through a shell string.
+# A refusal is logged with the gate's exit code and returns 1.
 patrol_issue_create() {
     local intake_label="${PATROL_LABEL:-auto-patrol}"
     if [[ "${1:-}" == "--intake-label" ]]; then
@@ -69,17 +71,41 @@ patrol_issue_create() {
         intake_label="$2"
         shift 2
     fi
-    local args=() title="" prev="" arg
+    local args=() title="" repo="" prev="" arg
     for arg in "$@"; do
-        if [[ "$prev" == "--title" ]]; then
-            arg="$(printf '%s' "$arg" | tr -s '\r\n' '  ' | sed 's/[[:space:]]*$//')"
-            title="$arg"
-        fi
+        case "$prev" in
+            --title)
+                arg="$(printf '%s' "$arg" | tr -s '\r\n' '  ' | sed 's/[[:space:]]*$//')"
+                title="$arg"
+                ;;
+            --repo | -R)
+                repo="$arg"
+                ;;
+            --body | --label | -b | -l | --assignee | -a | --milestone | -m | --project | -p) ;;
+            *)
+                case "$arg" in
+                    --title=* | -t | -t?*)
+                        _safety_gates_log ERROR "patrol_issue_create: use --title VALUE (got ${arg%%=*})"
+                        return 2
+                        ;;
+                    --repo=*) repo="${arg#--repo=}" ;;
+                esac
+                ;;
+        esac
         args+=("$arg")
-        prev="$arg"
+        # An option's value is never itself treated as an option
+        if [[ "$prev" =~ ^(--title|--repo|-R|--body|--label|-b|-l|--assignee|-a|--milestone|-m|--project|-p)$ ]]; then
+            prev=""
+        else
+            prev="$arg"
+        fi
     done
     local out="" rc=0
-    out="$(_sw_ts intake check --title "$title" --label "$intake_label" 2>&1)" || rc=$?
+    if [[ -n "$repo" ]]; then
+        out="$(GH_REPO="$repo" _sw_ts intake check --title "$title" --label "$intake_label" 2>&1)" || rc=$?
+    else
+        out="$(_sw_ts intake check --title "$title" --label "$intake_label" 2>&1)" || rc=$?
+    fi
     if [[ "$rc" -ne 0 ]]; then
         local reason
         reason="$(printf '%s\n' "$out" | grep -m1 '✗' || printf '%s\n' "$out" | head -1)"

@@ -503,8 +503,10 @@ locked_get_active_count() {
 
 enqueue_issue() {
     local issue_key="$1"
+    # Append to the tail (moving an existing entry there) without sorting: a re-queued issue
+    # that keeps failing must not stay at the head and block the rest of the queue.
     locked_state_update --arg key "$issue_key" \
-        '.queued += [$key] | .queued |= unique'
+        '.queued = (((.queued // []) - [$key]) + [$key])'
     if type db_enqueue_issue >/dev/null 2>&1; then
         db_enqueue_issue "$issue_key" 2>/dev/null || true
     fi

@@ -43,6 +43,11 @@ daemon_ensure_repo() {
 
 # ─── Spawn Pipeline ─────────────────────────────────────────────────────────
 
+# daemon_spawn_pipeline returns this when a system-wide gate (safety gates, budget) refuses the
+# spawn: callers stop dispatching for the rest of the cycle. Any other non-zero status is
+# specific to the issue, so callers move on to the next one. (75 = EX_TEMPFAIL)
+DAEMON_SPAWN_REFUSED=75
+
 daemon_spawn_pipeline() {
     local issue_num="$1"
     local issue_title="${2:-}"
@@ -110,7 +115,7 @@ daemon_spawn_pipeline() {
         [[ "$gate_rc" -eq 127 || "$gate_rc" -eq 2 ]] && gate_level=ERROR
         daemon_log "$gate_level" "Safety gates closed (rc=${gate_rc}) — not dispatching issue #${issue_num}"
         emit_event "daemon.gates_closed" "issue=${issue_num}" "rc=${gate_rc}"
-        return 1
+        return "$DAEMON_SPAWN_REFUSED"
     fi
 
     daemon_log INFO "Spawning pipeline for issue #${issue_num}: ${issue_title}"
@@ -123,7 +128,7 @@ daemon_spawn_pipeline() {
             if awk -v r="$remaining" 'BEGIN { exit !(r <= 0) }' 2>/dev/null; then
                 daemon_log WARN "Budget exhausted (remaining: \$${remaining}) — skipping issue #${issue_num}"
                 emit_event "daemon.budget_exhausted" "remaining=$remaining" "issue=$issue_num"
-                return 1
+                return "$DAEMON_SPAWN_REFUSED"
             fi
             if awk -v r="$remaining" 'BEGIN { exit !(r < 1.0) }' 2>/dev/null; then
                 daemon_log WARN "Budget low: \$${remaining} remaining"
@@ -547,10 +552,13 @@ daemon_reap_completed() {
         # Clean up progress tracking for this job
         daemon_clear_progress "$issue_num"
 
-        # Release claim lock (label-based coordination)
-        local reap_machine_name
-        reap_machine_name=$(jq -r '.machines[] | select(.role == "primary") | .name' "$HOME/.shipwright/machines.json" 2>/dev/null || hostname -s)
-        release_claim "$issue_num" "$reap_machine_name"
+        # Release claim lock (label-based coordination) — unless a retry was just spawned for
+        # this issue, which still holds it
+        if [[ "$_retry_spawned_for" != "$issue_num" ]]; then
+            local reap_machine_name
+            reap_machine_name=$(jq -r '.machines[] | select(.role == "primary") | .name' "$HOME/.shipwright/machines.json" 2>/dev/null || hostname -s)
+            release_claim "$issue_num" "$reap_machine_name"
+        fi
 
         # Always remove the OLD job entry from active_jobs to prevent
         # re-reaping of the dead PID on the next cycle.  When a retry was

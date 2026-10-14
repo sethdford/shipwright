@@ -127,6 +127,31 @@ assert_eq "newlines in the title are replaced for gh; the body keeps them" \
 assert_contains "a refusal is written to the daemon log with its exit code" \
     "$(cat "$TEST_TEMP_DIR/dlog")" "intake gate refused (rc=1)"
 
+: > "$BUN_LOG"
+: > "$GH_LOG"
+for form in "--title=t" "-t" "-tFoo"; do
+    rc=0
+    if [[ "$form" == "-t" ]]; then
+        patrol_issue_create "$form" "t" --body "b" 2>/dev/null || rc=$?
+    else
+        patrol_issue_create "$form" --body "b" 2>/dev/null || rc=$?
+    fi
+    assert_eq "unparsed title form '${form}' is rejected with 2" "2" "$rc"
+done
+assert_eq "rejected forms never reach the gate or gh" "" "$(cat "$BUN_LOG" "$GH_LOG")"
+rc=0
+patrol_issue_create --title "t" --body "-t" 2>/dev/null || rc=$?
+assert_eq "'-t' as an option value is not a title flag" "0" "$rc"
+
+: > "$BUN_LOG"
+mock_binary "bun" 'printf "%s\n" "$@" >> "$BUN_LOG"; printf "GH_REPO=%s\n" "${GH_REPO:-unset}" >> "$BUN_LOG"; printf -- "--\n" >> "$BUN_LOG"; exit "$BUN_EXIT"'
+patrol_issue_create --repo "o/r" --title "t" --body "b" 2>/dev/null
+assert_contains "--repo scopes the intake gate to that repo" "$(cat "$BUN_LOG")" "GH_REPO=o/r"
+: > "$BUN_LOG"
+patrol_issue_create --title "t" --body "b" 2>/dev/null
+assert_contains "without --repo the gate uses the current repo" "$(cat "$BUN_LOG")" "GH_REPO=unset"
+mock_binary "bun" 'printf "%s\n" "$@" >> "$BUN_LOG"; printf -- "--\n" >> "$BUN_LOG"; exit "$BUN_EXIT"'
+
 for code in 1 2 127; do
     : > "$GH_LOG"
     if BUN_EXIT="$code" patrol_issue_create --title "dup" --body "b" 2>/dev/null; then
