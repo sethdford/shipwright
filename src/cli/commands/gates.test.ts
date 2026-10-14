@@ -2,7 +2,7 @@ import { expect, test } from "bun:test";
 import type { SafetyPorts } from "../../contexts/orchestration";
 import { err, ok } from "../../shared/kernel/result";
 import { captureIO, commandContext } from "../../testing/cli-harness";
-import { fakeSafetyPorts, fixedLabel, fixedRuns } from "../../testing/fake-safety-ports";
+import { fakeSafetyPorts, fixedLabel, fixedRuns, NOW } from "../../testing/fake-safety-ports";
 import { gatesCommand, parseGateArgs } from "./gates";
 
 const run = (args: string[], ports: SafetyPorts = fakeSafetyPorts(), env = {}) => {
@@ -47,15 +47,42 @@ test("check exits 1 when safety ports cannot be built", async () => {
   expect(io.errLines[0]).toStartWith("✗ gates: cannot verify:");
 });
 
-test("--no-github and NO_GITHUB=true skip the GitHub gates", async () => {
+test("--no-github skips the GitHub gates and warns on stderr", async () => {
   const ports = fakeSafetyPorts({ runs: fixedRuns(err({ kind: "auth", message: "no gh" })) });
-  const flag = run(["check", "--retry", "0", "--no-github"], ports);
-  expect(await flag.code).toBe(0);
-  expect(flag.io.outLines[1]).toBe("- breaker: skipped (no GitHub)");
-  const env = run(["check", "--retry", "0"], ports, { NO_GITHUB: "true" });
-  expect(await env.code).toBe(0);
-  expect(env.io.outLines[3]).toBe("- review_wip: skipped (no GitHub)");
-  expect(await run(["check", "--retry", "0"], ports, { NO_GITHUB: "false" }).code).toBe(1);
+  const { io, code } = run(["check", "--retry", "0", "--no-github"], ports);
+  expect(await code).toBe(0);
+  expect(io.outLines[1]).toBe("- breaker: skipped (no GitHub)");
+  expect(io.outLines[3]).toBe("- review_wip: skipped (no GitHub)");
+  expect(io.errLines).toEqual([
+    "⚠ no-GitHub mode: not checked: breaker, review WIP, shipwright:pause label",
+  ]);
+});
+
+test("NO_GITHUB in the environment does not skip anything", async () => {
+  const ports = fakeSafetyPorts({ runs: fixedRuns(err({ kind: "auth", message: "no gh" })) });
+  const { io, code } = run(["check", "--retry", "0"], ports, { NO_GITHUB: "true" });
+  expect(await code).toBe(1);
+  expect(io.outLines.at(-1)).toBe("✗ breaker: cannot verify (auth): no gh");
+  expect(io.errLines).toEqual([]);
+});
+
+test("--no-github is refused on GitHub Actions", async () => {
+  const env = { GITHUB_ACTIONS: "true" };
+  const { io, code } = run(["check", "--retry", "0", "--no-github"], fakeSafetyPorts(), env);
+  expect(await code).toBe(2);
+  expect(io.errLines[0]).toBe("✗ no-GitHub mode is not allowed on GitHub Actions");
+  expect(await run(["check", "--retry", "0"], fakeSafetyPorts(), env).code).toBe(0);
+});
+
+test("a blocked gate carrying a warning shows ✗, not ⚠", async () => {
+  const today = Math.floor(NOW / 1000);
+  const costs = {
+    read: async () =>
+      ok({ budget: { limitUsd: 1 }, entries: [{ costUsd: 1, atEpochS: today }], present: false }),
+  };
+  const { io, code } = run(["check", "--retry", "0"], fakeSafetyPorts({ costs }));
+  expect(await code).toBe(1);
+  expect(io.outLines.at(-1)).toStartWith("✗ budget:");
 });
 
 test("no cost data is a warning, not a block", async () => {
@@ -130,8 +157,18 @@ test.each([
   expect(io.errLines[0]).toStartWith("✗ ");
 });
 
-test("--help exits 0 and documents the retry source", async () => {
-  const { io, code } = run(["check", "--help"]);
+test.each([[["--help"]], [["check", "-h"]]])("help alone %p exits 0", async (args) => {
+  const { io, code } = run(args);
   expect(await code).toBe(0);
   expect(io.outLines.join("\n")).toContain("--retry N");
+});
+
+test.each([
+  [["check", "--retry", "-h"]],
+  [["check", "--retry", "0", "--help"]],
+  [["check", "--retry", "9", "--help"]],
+  [["-h", "check"]],
+  [["check", "-h", "--retry", "0"]],
+])("help mixed with other arguments %p is a usage error", async (args) => {
+  expect(await run(args).code).toBe(2);
 });

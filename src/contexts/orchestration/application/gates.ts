@@ -6,7 +6,7 @@ import type { AdapterError } from "../../../shared/kernel/ports";
 import { describeBreaker } from "../domain/breaker";
 import { describeBudget } from "../domain/budget";
 import { DEFAULT_FLOW_POLICY, describeWip, fixLoopAllows, reviewWip } from "../domain/flow";
-import type { SafetyPorts } from "../ports";
+import type { RunHistory, SafetyPorts } from "../ports";
 import { checkBreaker, RUN_HISTORY_LIMIT } from "./breaker";
 import { checkBudget } from "./budget";
 import { readPause } from "./pause";
@@ -90,6 +90,8 @@ async function reviewGate(ports: SafetyPorts, o: GateOptions): Promise<GateResul
   ]);
   if (!pulls.ok) return unreadable("review_wip", pulls.error);
   if (!runs.ok) return unreadable("review_wip", runs.error);
+  // Only the newest RUN_HISTORY_LIMIT runs are seen: an unfinished run older than those is not
+  // counted. The all-unfinished check below catches the case where the window is saturated.
   const inFlight = runs.value.filter((r) => r.finished === null).length;
   // Every fetched run unfinished: the window may hide more in-flight runs, so the count is unknown.
   if (runs.value.length > 0 && inFlight === runs.value.length) {
@@ -124,10 +126,17 @@ async function guarded(gate: GateName, run: () => Promise<GateResult>): Promise<
   }
 }
 
+/** The breaker and review-WIP gates read the same history: fetch it at most once, lazily. */
+function sharingRuns(ports: SafetyPorts): SafetyPorts {
+  let cached: ReturnType<RunHistory["recentRuns"]> | undefined;
+  return { ...ports, runs: { recentRuns: (limit) => (cached ??= ports.runs.recentRuns(limit)) } };
+}
+
 export async function checkDispatchGates(
-  ports: SafetyPorts,
+  rawPorts: SafetyPorts,
   options: GateOptions,
 ): Promise<GatesReport> {
+  const ports = sharingRuns(rawPorts);
   const gates: Record<GateName, () => Promise<GateResult>> = {
     pause: () => pauseGate(ports, options),
     breaker: () => breakerGate(ports, options),
@@ -139,7 +148,10 @@ export async function checkDispatchGates(
   for (const name of GATE_ORDER) {
     const r = await guarded(name, gates[name]);
     results.push(r);
-    if (!gatePasses(r)) return { allowed: false, results };
+    if (!gatePasses(r)) break;
   }
-  return { allowed: true, results };
+  return {
+    allowed: results.length === GATE_ORDER.length && results.every(gatePasses),
+    results,
+  };
 }

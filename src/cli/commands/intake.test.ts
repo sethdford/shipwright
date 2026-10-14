@@ -90,3 +90,15 @@ test.each([
 ])("bad arguments %p exit 2", async (args) => {
   expect(await intakeCommand.run(args, commandContext(captureIO()))).toBe(2);
 });
+
+test.each([
+  [["-h", "check"]],
+  [["--help", "check", "--title", "x"]],
+  [["check", "--title", "x", "-h"]],
+])("help mixed with other arguments %p is a usage error", async (args) => {
+  expect(await intakeCommand.run(args, commandContext(captureIO()))).toBe(2);
+});
+
+test.each([[["-h"]], [["check", "--help"]]])("help alone %p exits 0", async (args) => {
+  expect(await intakeCommand.run(args, commandContext(captureIO()))).toBe(0);
+});

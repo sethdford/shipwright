@@ -224,3 +224,17 @@ test("without GitHub only the local gates run", async () => {
   ]);
   expect(github.calls).toHaveLength(0);
 });
+
+test("run history is fetched once and shared by the breaker and review WIP", async () => {
+  const limits: number[] = [];
+  const runs = {
+    recentRuns: async (limit: number) => {
+      limits.push(limit);
+      return ok([succeeded("a"), running("b")]);
+    },
+  };
+  const r = await checkDispatchGates(fakeSafetyPorts({ runs }), open);
+  expect(r.allowed).toBe(true);
+  expect(limits).toEqual([50]);
+  expect(r.results[3]?.detail).toBe("0 agent PRs awaiting review + 1 runs in flight (limit 5)");
+});

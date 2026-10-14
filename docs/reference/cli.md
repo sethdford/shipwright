@@ -88,7 +88,9 @@ OPTIONS
                  passes its retry count; auto-retry passes the number of its bot markers on
                  the issue. There is no default: an unknown count must not read as "first".
   --no-github    Skip the breaker and review-WIP gates and check only the local pause flag
-                 (not the shipwright:pause label). Also set by NO_GITHUB=true.
+                 (not the shipwright:pause label); a warning naming them goes to stderr.
+                 Only this flag enables it (NO_GITHUB is ignored), and it is refused (exit 2)
+                 when GITHUB_ACTIONS=true.
   --json         Print one JSON object: allowed, and each gate's verdict (allowed, blocked,
                  error, skipped or not_checked) and detail. Exit codes are unchanged.
 

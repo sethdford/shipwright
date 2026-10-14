@@ -4,9 +4,10 @@ import {
   type GateOptions,
   type GateResult,
   type GatesReport,
+  gatePasses,
 } from "../../contexts/orchestration";
 import type { CliIO, Command } from "../command";
-import { isHelp, usageError } from "../shared";
+import { isHelpRequest, usageError } from "../shared";
 
 const usage = `USAGE
   shipwright gates check --retry N [--no-github] [--json]
@@ -25,7 +26,9 @@ OPTIONS
                  passes its retry count; auto-retry passes the number of its bot markers on
                  the issue. There is no default: an unknown count must not read as "first".
   --no-github    Skip the breaker and review-WIP gates and check only the local pause flag
-                 (not the shipwright:pause label). Also set by NO_GITHUB=true.
+                 (not the shipwright:pause label); a warning naming them goes to stderr.
+                 Only this flag enables it (NO_GITHUB is ignored), and it is refused (exit 2)
+                 when GITHUB_ACTIONS=true.
   --json         Print one JSON object: allowed, and each gate's verdict (allowed, blocked,
                  error, skipped or not_checked) and detail. Exit codes are unchanged.
 
@@ -71,7 +74,8 @@ const marks: Record<GateResult["verdict"], string> = {
 
 function renderText(io: CliIO, report: GatesReport): void {
   for (const g of report.results) {
-    io.out(`${g.warning ? "⚠" : marks[g.verdict]} ${g.gate}: ${g.detail}`);
+    const mark = g.warning && gatePasses(g) ? "⚠" : marks[g.verdict];
+    io.out(`${mark} ${g.gate}: ${g.detail}`);
   }
 }
 
@@ -96,16 +100,21 @@ export const gatesCommand: Command = {
   usage,
   async run(args, { io, safety, env }) {
     const [sub, ...rest] = args;
-    if (args.some(isHelp)) {
+    if (isHelpRequest(args, ["check"])) {
       io.out(usage);
       return 0;
     }
-    const parsed = parseGateArgs(rest);
-    if (sub !== "check" || parsed === null) {
+    const options = parseGateArgs(rest);
+    if (sub !== "check" || options === null) {
       const got = args.join(" ") || "nothing";
       return usageError(io, usage, `Expected check --retry N [--no-github] [--json], got: ${got}`);
     }
-    const options = { ...parsed, github: parsed.github && env.NO_GITHUB !== "true" };
+    if (!options.github && env.GITHUB_ACTIONS === "true") {
+      return usageError(io, usage, "no-GitHub mode is not allowed on GitHub Actions");
+    }
+    if (!options.github) {
+      io.err("⚠ no-GitHub mode: not checked: breaker, review WIP, shipwright:pause label");
+    }
     try {
       const report = await checkDispatchGates(safety(), options);
       if (options.json) renderJson(io, report, options);

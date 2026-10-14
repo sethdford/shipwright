@@ -109,3 +109,10 @@ test("-h works in any position", async () => {
   expect(await breakerCommand.run(["check", "-h"], commandContext(io))).toBe(0);
   expect(io.outLines.join("\n")).toContain("USAGE");
 });
+
+test.each([[["check", "-h", "extra"]], [["status", "--json", "--help"]], [["-h", "check"]]])(
+  "help mixed with other arguments %p is a usage error",
+  async (args) => {
+    expect(await breakerCommand.run(args, commandContext(captureIO()))).toBe(2);
+  },
+);

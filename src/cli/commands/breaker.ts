@@ -5,7 +5,7 @@ import {
   describeBreaker,
 } from "../../contexts/orchestration";
 import type { Command } from "../command";
-import { adapterFailure, isHelp, usageError } from "../shared";
+import { adapterFailure, isHelpRequest, usageError } from "../shared";
 
 const usage = `USAGE
   shipwright breaker <status|check> [--json]
@@ -53,7 +53,7 @@ export const breakerCommand: Command = {
   summary: "Global circuit breaker: show it, or check it as a dispatch gate",
   usage,
   async run(args, { io, safety }) {
-    if (args.some(isHelp)) {
+    if (isHelpRequest(args, ["status", "check"])) {
       io.out(usage);
       return 0;
     }

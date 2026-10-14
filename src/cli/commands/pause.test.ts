@@ -105,3 +105,14 @@ test("paused --gate: exit 0 only when not paused; every other outcome is non-zer
   expect(await pausedCommand.run(["--gate", "--bogus"], clear)).toBe(2);
   expect(await pausedCommand.run(["--gate"], commandContext(captureIO(), throwingLabel))).toBe(1);
 });
+
+test.each([[["-h", "--gate"]], [["--help", "--gate", "--no-github"]]])(
+  "paused gate form with help mixed in %p is a usage error (non-zero)",
+  async (args) => {
+    expect(await pausedCommand.run(args, commandContext(captureIO()))).toBe(2);
+  },
+);
+
+test("paused --help alone exits 0", async () => {
+  expect(await pausedCommand.run(["--help"], commandContext(captureIO()))).toBe(0);
+});

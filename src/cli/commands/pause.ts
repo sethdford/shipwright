@@ -1,6 +1,6 @@
 import { pause, readPause, resume, sanitizeReason } from "../../contexts/orchestration";
 import type { Command } from "../command";
-import { adapterFailure, isHelp, usageError } from "../shared";
+import { adapterFailure, isHelp, isHelpRequest, usageError } from "../shared";
 
 const pauseUsage = `USAGE
   shipwright pause [REASON...]
@@ -84,7 +84,7 @@ export const pausedCommand: Command = {
   summary: "Exit 0 when dispatch is paused (flag or label), 1 when not",
   usage: pausedUsage,
   async run(args, { io, safety }) {
-    if (isHelp(args[0])) {
+    if (isHelpRequest(args)) {
       io.out(pausedUsage);
       return 0;
     }

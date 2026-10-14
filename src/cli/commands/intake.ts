@@ -1,6 +1,6 @@
 import { checkIntake, describeIntake } from "../../contexts/orchestration";
 import type { Command } from "../command";
-import { adapterFailure, isHelp, usageError } from "../shared";
+import { adapterFailure, isHelpRequest, usageError } from "../shared";
 
 const usage = `USAGE
   shipwright intake check [--title TITLE] [--label LABEL]
@@ -51,7 +51,7 @@ export const intakeCommand: Command = {
   usage,
   async run(args, { io, safety }) {
     const [sub, ...rest] = args;
-    if (isHelp(sub)) {
+    if (isHelpRequest(args, ["check"])) {
       io.out(usage);
       return 0;
     }

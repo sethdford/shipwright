@@ -84,3 +84,17 @@ test("usage documents the >= rule and the mis-set HOME caveat", () => {
   expect(budgetCommand.usage).toContain("HOME");
   expect(budgetCommand.usage).toContain("unless the files cannot be read");
 });
+
+test.each([
+  [["-h", "check"]],
+  [["check", "--estimate", "-h"]],
+  [["check", "--estimate", "1", "--help"]],
+])("help mixed with other arguments %p is a usage error", async (args) => {
+  expect(await budgetCommand.run(args, commandContext(captureIO()))).toBe(2);
+});
+
+test.each([[["--help"]], [["check", "-h"]]])("help alone %p exits 0", async (args) => {
+  const io = captureIO();
+  expect(await budgetCommand.run(args, commandContext(io))).toBe(0);
+  expect(io.outLines.join("\n")).toContain("USAGE");
+});
