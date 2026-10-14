@@ -42,7 +42,7 @@ test("lists open PRs as summaries", async () => {
     "--state",
     "open",
     "--limit",
-    "200",
+    "201",
     "--json",
     "number,author,labels,isDraft,reviewDecision",
   ]);
@@ -54,4 +54,43 @@ test("a gh failure is returned, classified", async () => {
   ]);
   const r = await new GhPullRequests(runner).open();
   expect(!r.ok && r.error.kind).toBe("auth");
+});
+
+test("a null reviewDecision means not approved", async () => {
+  const stdout = JSON.stringify([
+    { number: 1, author: { login: "a" }, labels: [], isDraft: false, reviewDecision: null },
+  ]);
+  const runner = new FakeProcessRunner([
+    { prefix: ["gh"], result: { exitCode: 0, stdout, stderr: "" } },
+  ]);
+  const r = await new GhPullRequests(runner).open();
+  expect(r.ok && r.value[0]?.approved).toBe(false);
+});
+
+test("more than 200 open PRs is an error, not a truncated count", async () => {
+  const rows = Array.from({ length: 201 }, (_, i) => ({
+    number: i + 1,
+    author: { login: "a" },
+    labels: [],
+    isDraft: false,
+    reviewDecision: "",
+  }));
+  const runner = new FakeProcessRunner([
+    { prefix: ["gh"], result: { exitCode: 0, stdout: JSON.stringify(rows), stderr: "" } },
+  ]);
+  const r = await new GhPullRequests(runner).open();
+  expect(!r.ok && r.error).toEqual({
+    kind: "failed",
+    message: "more than 200 open PRs; review WIP unknown",
+  });
+});
+
+test("a malformed author is an error", async () => {
+  const stdout = JSON.stringify([
+    { number: 1, author: null, labels: [], isDraft: false, reviewDecision: "" },
+  ]);
+  const runner = new FakeProcessRunner([
+    { prefix: ["gh"], result: { exitCode: 0, stdout, stderr: "" } },
+  ]);
+  expect((await new GhPullRequests(runner).open()).ok).toBe(false);
 });

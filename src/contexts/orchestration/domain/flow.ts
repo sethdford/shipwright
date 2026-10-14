@@ -2,7 +2,11 @@
 
 export interface PullSummary {
   readonly number: number;
-  /** gh login, e.g. "app/github-actions" for the Actions bot. */
+  /**
+   * The login as `gh pr list` prints it: `app/<slug>` for a GitHub App (the Actions bot is
+   * "app/github-actions"), the plain username for a user. A PR opened with a PAT or a custom app
+   * has another author and is counted only through the agent label.
+   */
   readonly author: string;
   readonly labels: readonly string[];
   readonly draft: boolean;
@@ -20,12 +24,23 @@ export interface FlowPolicy {
   readonly fixLoopCap: number;
 }
 
-export const DEFAULT_FLOW_POLICY: FlowPolicy = {
+/** Rejects a policy that would make the gates meaningless; mirrors `breakerPolicy`. */
+export function flowPolicy(policy: FlowPolicy): FlowPolicy {
+  if (!Number.isInteger(policy.reviewWipLimit) || policy.reviewWipLimit < 1) {
+    throw new Error(`review WIP limit must be an integer >= 1, got ${policy.reviewWipLimit}`);
+  }
+  if (!Number.isInteger(policy.fixLoopCap) || policy.fixLoopCap < 0) {
+    throw new Error(`fix-loop cap must be an integer >= 0, got ${policy.fixLoopCap}`);
+  }
+  return policy;
+}
+
+export const DEFAULT_FLOW_POLICY: FlowPolicy = flowPolicy({
   reviewWipLimit: 5,
   agentAuthors: ["app/github-actions"],
   agentLabel: "shipwright",
   fixLoopCap: 3,
-};
+});
 
 export interface WipVerdict {
   readonly allowed: boolean;
@@ -37,8 +52,14 @@ export interface WipVerdict {
 }
 
 const isAgentPr = (p: PullSummary, policy: FlowPolicy) =>
-  policy.agentAuthors.includes(p.author) || p.labels.includes(policy.agentLabel);
+  policy.agentAuthors.includes(p.author) ||
+  p.labels.some((l) => l.toLowerCase() === policy.agentLabel.toLowerCase());
 
+/**
+ * `inFlight` must be the number of pipeline runs with `RunRecord.finished === null`. The caller
+ * (Task 11) must also block when every fetched run is unfinished: the history window then cannot
+ * show how many more are in flight. An invalid `inFlight` blocks here (unknown is not allowed).
+ */
 export function reviewWip(
   pulls: readonly PullSummary[],
   inFlight: number,
@@ -47,7 +68,8 @@ export function reviewWip(
   const awaitingReview = pulls
     .filter((p) => isAgentPr(p, policy) && !p.draft && !p.approved)
     .map((p) => p.number);
-  const allowed = awaitingReview.length + inFlight < policy.reviewWipLimit;
+  const known = Number.isSafeInteger(inFlight) && inFlight >= 0;
+  const allowed = known && awaitingReview.length + inFlight < policy.reviewWipLimit;
   return { allowed, awaitingReview, inFlight, limit: policy.reviewWipLimit };
 }
 
@@ -56,7 +78,16 @@ export function describeWip(v: WipVerdict): string {
   return `${prs} + ${v.inFlight} runs in flight (limit ${v.limit})`;
 }
 
-/** `attempt` is the retry number (1 = first retry); null for a first dispatch. */
-export function fixLoopAllows(attempt: number | null, policy: FlowPolicy = DEFAULT_FLOW_POLICY) {
-  return attempt === null || attempt <= policy.fixLoopCap;
+/**
+ * `retry` is how many times this issue has already been retried: 0 for the first dispatch.
+ * Cap 3 allows the original run plus 3 retries. A missing or invalid count is unknown, so blocked.
+ */
+export function fixLoopAllows(
+  retry: number | null | undefined,
+  policy: FlowPolicy = DEFAULT_FLOW_POLICY,
+): boolean {
+  if (retry === null || retry === undefined || !Number.isSafeInteger(retry) || retry < 0) {
+    return false;
+  }
+  return retry <= policy.fixLoopCap;
 }

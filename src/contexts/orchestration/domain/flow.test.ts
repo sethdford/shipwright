@@ -1,5 +1,11 @@
 import { expect, test } from "bun:test";
-import { DEFAULT_FLOW_POLICY, fixLoopAllows, type PullSummary, reviewWip } from "./flow";
+import {
+  DEFAULT_FLOW_POLICY,
+  fixLoopAllows,
+  flowPolicy,
+  type PullSummary,
+  reviewWip,
+} from "./flow";
 
 const pr = (number: number, over: Partial<PullSummary> = {}): PullSummary => ({
   number,
@@ -35,8 +41,33 @@ test("the default limit is 5", () => {
   expect(reviewWip([...four, pr(5)], 0, DEFAULT_FLOW_POLICY).allowed).toBe(false);
 });
 
-test("the fix loop allows attempts 1-3 and stops the 4th", () => {
-  expect(fixLoopAllows(null, DEFAULT_FLOW_POLICY)).toBe(true);
+test("the fix loop allows the first dispatch and 3 retries, and blocks the 4th retry", () => {
+  expect(fixLoopAllows(0, DEFAULT_FLOW_POLICY)).toBe(true);
   expect(fixLoopAllows(3, DEFAULT_FLOW_POLICY)).toBe(true);
   expect(fixLoopAllows(4, DEFAULT_FLOW_POLICY)).toBe(false);
+});
+
+test("an unknown retry count is blocked", () => {
+  for (const bad of [null, undefined, -1, Number.NaN, 1.5, Number.POSITIVE_INFINITY]) {
+    expect(fixLoopAllows(bad, DEFAULT_FLOW_POLICY)).toBe(false);
+  }
+});
+
+test("an unknown in-flight count blocks", () => {
+  for (const bad of [-1, Number.NaN, 1.5, Number.POSITIVE_INFINITY]) {
+    expect(reviewWip([], bad, DEFAULT_FLOW_POLICY).allowed).toBe(false);
+  }
+});
+
+test("the agent label matches case-insensitively", () => {
+  expect(reviewWip([pr(1, { author: "x", labels: ["Shipwright"] })], 0, policy)).toMatchObject({
+    awaitingReview: [1],
+  });
+});
+
+test("flowPolicy rejects nonsense limits", () => {
+  expect(() => flowPolicy({ ...DEFAULT_FLOW_POLICY, reviewWipLimit: 0 })).toThrow();
+  expect(() => flowPolicy({ ...DEFAULT_FLOW_POLICY, reviewWipLimit: 1.5 })).toThrow();
+  expect(() => flowPolicy({ ...DEFAULT_FLOW_POLICY, fixLoopCap: -1 })).toThrow();
+  expect(flowPolicy({ ...DEFAULT_FLOW_POLICY, fixLoopCap: 0 }).fixLoopCap).toBe(0);
 });
