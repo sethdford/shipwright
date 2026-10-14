@@ -15,14 +15,14 @@ export const NOW = Date.parse("2026-10-14T12:00:00Z");
 
 export class MemoryPauseFlag implements PauseFlag {
   constructor(public flag: LocalPause | null = null) {}
-  async read() {
+  async read(): Promise<Result<LocalPause | null, AdapterError>> {
     return ok(this.flag);
   }
-  async write(reason: string, at: string) {
+  async write(reason: string, at: string): Promise<Result<void, AdapterError>> {
     this.flag = { reason, since: at, resumeAfter: null };
     return ok(undefined);
   }
-  async clear() {
+  async clear(): Promise<Result<void, AdapterError>> {
     this.flag = null;
     return ok(undefined);
   }
@@ -49,7 +49,7 @@ export const fixedLabel = (r: Result<readonly number[], AdapterError>): PauseLab
   labelled: async () => r,
 });
 
-/** Safety ports with harmless defaults: nothing running, paused, capped or awaiting review. */
+/** Safety ports with harmless defaults: no runs, no pause flag or label, a recording incident writer. */
 export function fakeSafetyPorts(over: Partial<SafetyPorts> = {}): SafetyPorts {
   return {
     now: () => NOW,

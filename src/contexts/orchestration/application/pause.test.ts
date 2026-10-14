@@ -38,3 +38,20 @@ test("an unreadable label is an error (callers fail closed)", async () => {
   const ports = fakeSafetyPorts({ pauseLabel: fixedLabel(err({ kind: "auth", message: "x" })) });
   expect((await readPause(ports, { github: true })).ok).toBe(false);
 });
+
+const authErr = { kind: "auth", message: "x" } as const;
+
+test("an unreadable pause flag is an error", async () => {
+  const pauseFlag = new MemoryPauseFlag();
+  pauseFlag.read = async () => err(authErr);
+  expect((await readPause(fakeSafetyPorts({ pauseFlag }), { github: false })).ok).toBe(false);
+});
+
+test("pause and resume surface write errors", async () => {
+  const pauseFlag = new MemoryPauseFlag();
+  pauseFlag.write = async () => err(authErr);
+  pauseFlag.clear = async () => err(authErr);
+  const ports = fakeSafetyPorts({ pauseFlag });
+  expect((await pause(ports, "r")).ok).toBe(false);
+  expect((await resume(ports)).ok).toBe(false);
+});
