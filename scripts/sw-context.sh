@@ -29,7 +29,8 @@ fi
 # ─── Paths ────────────────────────────────────────────────────────────────
 ARTIFACTS_DIR="${REPO_DIR}/.claude/pipeline-artifacts"
 CONTEXT_BUNDLE="${ARTIFACTS_DIR}/context-bundle.md"
-CLAUDE_CONFIG="${REPO_DIR}/.claude/CLAUDE.md"
+# Shipwright's own legacy conventions (moved out of .claude/CLAUDE.md in the TS migration)
+CLAUDE_CONFIG="${REPO_DIR}/docs/reference/legacy-guide.md"
 INTELLIGENCE_CACHE="${REPO_DIR}/.claude/intelligence-cache.json"
 MEMORY_ROOT="${HOME}/.shipwright/memory"
 
@@ -44,11 +45,11 @@ repo_memory_dir() {
     echo "${MEMORY_ROOT}/$(repo_hash)"
 }
 
-# ─── Extract codebase patterns from CLAUDE.md ──────────────────────────────
+# ─── Extract codebase patterns from the legacy guide────────────────────────────
 extract_codebase_patterns() {
     if [[ ! -f "$CLAUDE_CONFIG" ]]; then
         echo "# Codebase Patterns"
-        echo "(No CLAUDE.md found)"
+        echo "(No docs/reference/legacy-guide.md found)"
         return
     fi
 

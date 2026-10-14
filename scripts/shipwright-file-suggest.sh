@@ -15,6 +15,7 @@ for f in \
     ".claude/settings.json" \
     ".claude/CLAUDE.md" \
     "CLAUDE.md" \
+    "AGENTS.md" \
     "CHANGELOG.md"; do
     [[ -f "$PROJECT_ROOT/$f" ]] && echo "$f"
 done

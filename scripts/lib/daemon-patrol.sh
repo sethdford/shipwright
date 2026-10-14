@@ -450,19 +450,27 @@ Auto-detected by \`shipwright daemon patrol\` on $(now_iso)." \
             fi
         fi
 
-        # Check CLAUDE.md staleness (same pattern as README)
-        if [[ -f ".claude/CLAUDE.md" ]]; then
+        # Check conventions-file staleness (same pattern as README)
+        local claudemd_file="" _conv_file
+        # Repo conventions: .claude/CLAUDE.md, then CLAUDE.md, then AGENTS.md (skip @-import-only stubs)
+        for _conv_file in ".claude/CLAUDE.md" "CLAUDE.md" "AGENTS.md"; do
+            if [[ -f "$_conv_file" ]] && grep -qvE '^[[:space:]]*(@[^[:space:]]+)?[[:space:]]*$' "$_conv_file" 2>/dev/null; then
+                claudemd_file="$_conv_file"
+                break
+            fi
+        done
+        if [[ -n "$claudemd_file" ]]; then
             local claudemd_epoch claudemd_src_epoch
             claudemd_src_epoch=$(git log -1 --format=%ct -- "*.ts" "*.js" "*.py" "*.go" "*.rs" "*.sh" 2>/dev/null || echo "0")
-            claudemd_epoch=$(git log -1 --format=%ct -- ".claude/CLAUDE.md" 2>/dev/null || echo "0")
+            claudemd_epoch=$(git log -1 --format=%ct -- "$claudemd_file" 2>/dev/null || echo "0")
             if [[ "$claudemd_src_epoch" -gt 0 ]] && [[ "$claudemd_epoch" -gt 0 ]]; then
                 local claude_drift=$((claudemd_src_epoch - claudemd_epoch))
                 if [[ "$claude_drift" -gt 2592000 ]]; then
                     findings=$((findings + 1))
                     local claude_days_behind=$((claude_drift / 86400))
-                    stale_docs="${stale_docs}\n- \`.claude/CLAUDE.md\`: ${claude_days_behind} days behind source code"
+                    stale_docs="${stale_docs}\n- \`${claudemd_file}\`: ${claude_days_behind} days behind source code"
                     if [[ "$dry_run" == "true" ]] || [[ "$NO_GITHUB" == "true" ]]; then
-                        echo -e "    ${YELLOW}●${RESET} CLAUDE.md is ${claude_days_behind} days behind source code"
+                        echo -e "    ${YELLOW}●${RESET} ${claudemd_file} is ${claude_days_behind} days behind source code"
                     fi
                 fi
             fi

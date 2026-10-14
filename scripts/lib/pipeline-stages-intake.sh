@@ -734,8 +734,15 @@ ${rejected_plans}
             fi
 
             # Inject repo conventions contextually
-            local claudemd="$PROJECT_ROOT/.claude/CLAUDE.md"
-            if [[ -f "$claudemd" ]]; then
+            local claudemd="" _conv_file
+            # Repo conventions: .claude/CLAUDE.md, then CLAUDE.md, then AGENTS.md (skip @-import-only stubs)
+            for _conv_file in "$PROJECT_ROOT/.claude/CLAUDE.md" "$PROJECT_ROOT/CLAUDE.md" "$PROJECT_ROOT/AGENTS.md"; do
+                if [[ -f "$_conv_file" ]] && grep -qvE '^[[:space:]]*(@[^[:space:]]+)?[[:space:]]*$' "$_conv_file" 2>/dev/null; then
+                    claudemd="$_conv_file"
+                    break
+                fi
+            done
+            if [[ -n "$claudemd" ]]; then
                 local conventions_summary
                 conventions_summary=$(head -100 "$claudemd" 2>/dev/null | grep -E '^##|^-|^\*' | head -15 || true)
                 if [[ -n "$conventions_summary" ]]; then
