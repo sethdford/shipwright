@@ -4,26 +4,48 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { findInjections, scan } from "./workflow-injection";
 
+/** Builds a GitHub expression without a literal template placeholder in source. */
+const x = (expr: string) => `$\{{ ${expr} }}`;
+
 const wf = `
 jobs:
   triage:
     steps:
       - name: Vet
         env:
-          TITLE: \${{ steps.issue.outputs.title }}
+          TITLE: ${x("steps.issue.outputs.title")}
         run: echo "$TITLE"
       - name: Bad
         run: |
-          REASON="\${{ steps.triage.outputs.reason }}"
-          echo "\${{ github.event.issue.title }}"
+          REASON="${x("steps.triage.outputs.reason")}"
+          echo "${x("github.event.issue.title")}"
       - name: Fine
-        run: echo "\${{ github.event_name }}"
+        run: echo "$GITHUB_EVENT_NAME"
 `;
 
-test("flags untrusted expressions inside run blocks, not inside env", () => {
+test("flags expressions inside run blocks, not inside env", () => {
   expect(findInjections("wf.yml", wf)).toEqual([
-    "wf.yml:triage:Bad:${{ steps.triage.outputs.reason }}",
-    "wf.yml:triage:Bad:${{ github.event.issue.title }}",
+    `wf.yml:triage:Bad:${x("steps.triage.outputs.reason")}`,
+    `wf.yml:triage:Bad:${x("github.event.issue.title")}`,
+  ]);
+});
+
+test("flags ANY expression in a run script, even a seemingly safe one", () => {
+  const text = `
+jobs:
+  j:
+    steps:
+      - name: Safe-looking
+        run: echo ${x("github.run_id")}
+      - name: Inputs
+        run: echo "${x("inputs.name")}"
+      - name: Compact
+        run: echo ${"$"}{{github.sha}}
+`;
+  expect(findInjections("wf.yml", text)).toEqual([
+    `wf.yml:j:Safe-looking:${x("github.run_id")}`,
+    `wf.yml:j:Inputs:${x("inputs.name")}`,
+    `wf.yml:j:Compact:${"$"}{{github.sha}}`,
   ]);
 });
 
@@ -34,14 +56,14 @@ runs:
   steps:
     - name: Bad
       shell: bash
-      run: echo "\${{ github.event.comment.body }}"
+      run: echo "${x("github.event.comment.body")}"
 `;
   expect(findInjections(".github/actions/x/action.yml", action)).toEqual([
-    ".github/actions/x/action.yml:action:Bad:${{ github.event.comment.body }}",
+    `.github/actions/x/action.yml:action:Bad:${x("github.event.comment.body")}`,
   ]);
 });
 
-test("flags untrusted expressions in actions/github-script with.script", () => {
+test("flags expressions in actions/github-script with.script", () => {
   const text = `
 jobs:
   j:
@@ -50,42 +72,30 @@ jobs:
         uses: actions/github-script@v7
         with:
           script: |
-            const t = "\${{ github.event.issue.title }}";
+            const t = "${x("github.run_id")}";
       - name: Safe script
         uses: actions/github-script@v7
         with:
           script: core.info(process.env.TITLE)
         env:
-          TITLE: \${{ github.event.issue.title }}
+          TITLE: ${x("github.event.issue.title")}
 `;
-  expect(findInjections("wf.yml", text)).toEqual([
-    "wf.yml:j:Script:${{ github.event.issue.title }}",
-  ]);
+  expect(findInjections("wf.yml", text)).toEqual([`wf.yml:j:Script:${x("github.run_id")}`]);
 });
 
-test("flags workflow_run and head_commit attacker-controlled fields", () => {
+test("expressions in env, with (non-script) and if are allowed", () => {
   const text = `
 jobs:
   j:
     steps:
-      - name: A
-        run: |
-          echo "\${{ github.event.workflow_run.head_branch }}"
-          echo "\${{ github.event.workflow_run.head_commit.message }}"
-          echo "\${{ github.event.workflow_run.display_title }}"
-          echo "\${{ github.event.head_commit.message }}"
-          echo "\${{ github.head_ref }}"
-`;
-  expect(findInjections("wf.yml", text)).toHaveLength(5);
-});
-
-test("does not flag inputs.* (known gap)", () => {
-  const text = `
-jobs:
-  j:
-    steps:
-      - name: A
-        run: echo "\${{ inputs.name }}"
+      - name: Ok
+        if: ${x("github.event_name == 'push'")}
+        uses: actions/checkout@v4
+        with:
+          ref: ${x("github.sha")}
+        env:
+          A: ${x("github.run_id")}
+        run: echo "$A"
 `;
   expect(findInjections("wf.yml", text)).toEqual([]);
 });
@@ -106,17 +116,16 @@ test("scan finds .yml, .yaml and composite action files inside the .github dot-d
   mkdirSync(join(root, ".github/workflows"), { recursive: true });
   mkdirSync(join(root, ".github/actions/a/b"), { recursive: true });
   const bad = (name: string) =>
-    `jobs:\n  j:\n    steps:\n      - name: ${name}\n        run: echo "\${{ github.event.issue.title }}"\n`;
+    `jobs:\n  j:\n    steps:\n      - name: ${name}\n        run: echo "${x("github.run_id")}"\n`;
   writeFileSync(join(root, ".github/workflows/one.yml"), bad("one"));
   writeFileSync(join(root, ".github/workflows/two.yaml"), bad("two"));
   writeFileSync(
     join(root, ".github/actions/a/b/action.yaml"),
-    'runs:\n  using: composite\n  steps:\n    - name: three\n      shell: bash\n      run: echo "${{ github.event.issue.title }}"\n',
+    `runs:\n  using: composite\n  steps:\n    - name: three\n      shell: bash\n      run: echo "${x("github.run_id")}"\n`,
   );
-  const found = (await scan(root)).sort();
-  expect(found).toEqual([
-    ".github/actions/a/b/action.yaml:action:three:${{ github.event.issue.title }}",
-    ".github/workflows/one.yml:j:one:${{ github.event.issue.title }}",
-    ".github/workflows/two.yaml:j:two:${{ github.event.issue.title }}",
+  expect((await scan(root)).sort()).toEqual([
+    `.github/actions/a/b/action.yaml:action:three:${x("github.run_id")}`,
+    `.github/workflows/one.yml:j:one:${x("github.run_id")}`,
+    `.github/workflows/two.yaml:j:two:${x("github.run_id")}`,
   ]);
 });

@@ -1,11 +1,9 @@
 import { Glob } from "bun";
 import { parse } from "yaml";
 
-const BASELINE = "tools/arch/workflow-injection-baseline.json";
 const SCAN_GLOBS = [".github/workflows/*.{yml,yaml}", ".github/actions/**/action.{yml,yaml}"];
-// Known gap: `inputs.*` is deliberately not flagged (callers may be trusted).
-const UNTRUSTED =
-  /\$\{\{\s*(?:github\.event\.(?:issue|pull_request|comment|review|discussion|head_commit|commits|pages)\b[^}]*|github\.event\.workflow_run\.(?:head_branch|head_commit|display_title)\b[^}]*|github\.head_ref|(?:steps|needs)\.[\w-]+\.outputs\.[\w-]+)\s*\}\}/g;
+// Any expression in a script is interpolated before the shell/JS parses it, so none are allowed.
+const EXPRESSION = /\$\{\{[\s\S]*?\}\}/g;
 
 interface Step {
   name?: string;
@@ -42,7 +40,7 @@ export function findInjections(file: string, text: string): string[] {
   if (Array.isArray(wf.runs?.steps)) groups.push(["action", wf.runs.steps]);
   return groups.flatMap(([job, steps]) =>
     steps.flatMap((step, i) =>
-      [...executable(step).matchAll(UNTRUSTED)].map(
+      [...executable(step).matchAll(EXPRESSION)].map(
         (m) => `${file}:${job}:${step.name ?? `step-${i}`}:${m[0]}`,
       ),
     ),
@@ -62,16 +60,10 @@ export async function scan(cwd = "."): Promise<string[]> {
 
 if (import.meta.main) {
   const found = await scan();
-  if (Bun.argv.includes("--write-baseline")) {
-    await Bun.write(BASELINE, `${JSON.stringify([...new Set(found)].sort(), null, 2)}\n`);
-    process.exit(0);
-  }
-  const allowed = new Set((await Bun.file(BASELINE).json()) as string[]);
-  const fresh = found.filter((f) => !allowed.has(f));
-  for (const f of fresh) {
+  for (const f of found) {
     console.error(
-      `WF ${f} — pass this value through the step's env: block and use "$VAR" in the script.`,
+      `WF ${f} — pass it via the step's env: block (or a $GITHUB_* built-in) and use "$VAR".`,
     );
   }
-  process.exit(fresh.length ? 1 : 0);
+  process.exit(found.length ? 1 : 0);
 }
