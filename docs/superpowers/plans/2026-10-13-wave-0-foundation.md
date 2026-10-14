@@ -19,6 +19,9 @@
 | `package.json`, `bunfig.toml`, `tsconfig.json`, `biome.json` | Tooling and `check` / `check:fast` scripts |
 | `src/shared/kernel/result.ts` | `Result<T, E>` type and constructors |
 | `src/shared/kernel/ports.ts` | Shared ports: `ProcessRunner`, `Paths`, `EventLog`, `Terminal`, `Vcs`, `IssueTracker`, `AgentRunner` and their types |
+| `src/shared/kernel/durability.ts` | Durability ports (spec §6.1): `WorkQueue`, `RunJournal`, `Signals`, `SideEffects`, `FenceToken`, `Lease`, `IdempotencyKey` — types only, no adapter |
+| `src/testing/in-memory-durability.ts`, `src/testing/in-memory-event-log.ts` | In-memory reference fakes held to the contract suites |
+| `src/testing/contracts/*.ts` | Contract suites every adapter must pass (durability, event log) |
 | `src/testing/test-env.ts` | `createTestEnv()` — temp HOME, state dir, tmux socket (rule F8) |
 | `src/testing/fake-process-runner.ts` | Scripted `ProcessRunner` for adapter tests |
 | `src/adapters/paths.ts` | Resolves `Paths` from an env map |
@@ -39,8 +42,8 @@
 | `tools/docs/gen-cli-reference.ts`, `docs/reference/cli.md` | Generated CLI reference |
 | `tools/port/*.ts`, `docs/plans/port/progress.json` | Migration tracking, router check, parity runner |
 | `AGENTS.md`, `CLAUDE.md`, `.claude/rules/*.md`, `.claude/agents/*.md`, `.claude/skills/*/SKILL.md`, `.claude/hooks/check-fast-on-stop.sh` | Agent-ready repo |
-| `docs/architecture.md`, `docs/adr/000{1..4}-*.md` | Architecture docs and ADRs |
-| `.github/workflows/ts-check.yml` | CI for `bun run check` |
+| `docs/architecture.md`, `docs/adr/000{1..5}-*.md` | Architecture docs and ADRs (0005: durability contract and deployment modes) |
+| `.github/workflows/ts-check.yml` | CI: the `bun run check` stages as named steps |
 
 ---
 
@@ -53,11 +56,13 @@
 ```bash
 cd ~/Documents/shipwright
 gh pr view 8531 --json state -q .state
+gh pr view 8533 --json state -q .state
 git fetch -q origin
 git merge-base --is-ancestor fix/hermetic-tests origin/main && echo hermetic-merged || echo hermetic-NOT-merged
+git merge-base --is-ancestor origin/fix/dashboard-claim-injection origin/main && echo claim-fix-merged || echo claim-fix-NOT-merged
 ```
 
-Expected: `MERGED` and `hermetic-merged`. If either is not merged, **stop and ask the user** — Task 11's workflow rule and Task 13's parity runner assume both fixes are on `main`.
+Expected: `MERGED`, `MERGED`, `hermetic-merged` and `claim-fix-merged`. If any is not merged, **stop and ask the user** — Task 11's workflow rule and Task 13's parity runner assume the first and third fixes are on `main`. PR #8533 (workflow script injection) and the dashboard `/api/claim` hotfix are Wave 0 prerequisites from spec §10 (added 2026-10-14); re-run this step before Task 19 pushes.
 
 - [ ] **Step 2: Rebase this branch on main**
 
@@ -2745,7 +2750,7 @@ git commit -m "chore(agents): add reviewer/verifier/porter subagents, porting sk
 ### Task 17: Architecture doc and ADRs
 
 **Files:**
-- Create: `docs/architecture.md`, `docs/adr/0001-typescript-on-bun.md`, `docs/adr/0002-modular-monolith.md`, `docs/adr/0003-claude-agent-sdk.md`, `docs/adr/0004-strangler-with-parity-oracle.md`
+- Create: `docs/architecture.md`, `docs/adr/0001-typescript-on-bun.md`, `docs/adr/0002-modular-monolith.md`, `docs/adr/0003-claude-agent-sdk.md`, `docs/adr/0004-strangler-with-parity-oracle.md`, `docs/adr/0005-durability-contract-and-deployment-modes.md`
 
 - [ ] **Step 1: Create `docs/architecture.md`**
 
@@ -2759,16 +2764,31 @@ Shipwright is a modular monolith in TypeScript on Bun, migrating from bash. Full
 
 | Context | Responsibility |
 |---|---|
-| delivery | Pipelines, build loop, stages, worktrees, checkpoints |
-| orchestration | Daemon, dispatch, fleet, scaling, remote workers |
-| planning | Triage, decomposition, strategy |
-| quality | Review, adversarial review, security audit, test generation, evidence |
-| learning | Memory, discovery, self-optimization, retros |
-| intelligence | Analysis, prediction, model routing, cost |
-| integrations | GitHub, trackers, CI, webhooks, PR lifecycle |
-| observability | Status, DORA, vitals, logs, traces, dashboard API |
-| teams | tmux sessions, team stages, swarms |
-| platform | Doctor, setup, init, prep, upgrade, docs, release |
+| delivery | Pipelines, build loop, stages, worktrees; runs on the durability contract |
+| orchestration | Daemon, dispatch, fleet, remote workers, connect, launchd — all on `WorkQueue` |
+| planning | Triage, in-run decomposition |
+| quality | One independent evaluator, holdout checks, test generation, evidence |
+| learning | Memory, discovery, retros, one gated optimizer |
+| intelligence | Cost, static per-stage model and effort table |
+| integrations | GitHub, tracker intake, CI, webhooks, PR lifecycle |
+| observability | Status, DORA, vitals, logs, traces, dashboard over the journal |
+| teams | tmux sessions (viewer only), team stages, reaper |
+| platform | Doctor, setup, init, prep, upgrade, release |
+
+Commands on the spec's don't-port list (§7.5) survive only as aliases or "removed" stubs.
+
+## Deployment modes
+
+One codebase, three modes; the mode is configuration (ADR-0005).
+
+| Mode | Durability adapter | Services |
+|---|---|---|
+| M1 local | SQLite (`bun:sqlite`, in-process) | none |
+| M2 server | Postgres | one Postgres |
+| M3 multi-machine | Postgres; workers pull over outbound connections | the same Postgres, over TLS or Tailscale |
+
+Port types: `src/shared/kernel/durability.ts`. Every adapter passes
+`src/testing/contracts/durability-contract.ts`.
 
 ## Layers and rules
 
@@ -2779,6 +2799,8 @@ Shipwright is a modular monolith in TypeScript on Bun, migrating from bash. Full
 - F1 domain is pure · F2 application never imports adapters/cli · F3 contexts meet only at index.ts
 - F4 no cycles · F5 I/O only in adapters · F6 Agent SDK only in adapters/agent
 - F7 size budgets with ratchet · F8 tests never touch the real machine
+- Planned: F9 agents get no GitHub token and no permission bypass (Wave 1) · F10 GitHub side
+  effects only through a fenced, idempotent adapter (Waves 1–2)
 - Workflows: no untrusted `${{ }}` in `run:` blocks
 
 ## Decisions
@@ -2787,9 +2809,10 @@ Shipwright is a modular monolith in TypeScript on Bun, migrating from bash. Full
 - [0002 Modular monolith with Clean Architecture](adr/0002-modular-monolith.md)
 - [0003 Claude Agent SDK behind one port](adr/0003-claude-agent-sdk.md)
 - [0004 Strangler migration with bash suites as parity oracle](adr/0004-strangler-with-parity-oracle.md)
+- [0005 Durability contract and three deployment modes](adr/0005-durability-contract-and-deployment-modes.md)
 ```
 
-- [ ] **Step 2: Create the four ADRs**
+- [ ] **Step 2: Create ADRs 0001–0004**
 
 `docs/adr/0001-typescript-on-bun.md`:
 
@@ -2876,11 +2899,634 @@ Every step ships and is reversible by one router line. Bash and TypeScript coexi
 Suites that assert implementation details are rewritten to assert behavior, and that is recorded.
 ```
 
-- [ ] **Step 3: Commit**
+- [ ] **Step 3: Create `docs/adr/0005-durability-contract-and-deployment-modes.md`**
+
+```markdown
+# 0005. Durability contract and three deployment modes
+
+Status: accepted · Date: 2026-10-14
+
+## Context
+Shipwright must run in three modes from one codebase:
+- M1, local with zero ops;
+- M2, a server daemon;
+- M3, several machines coordinating.
+
+Today's coordination is ad hoc. It uses `claimed:<machine>` labels, which are not atomic and consume
+GitHub's rate limit. It also uses SSH rebalance and event tail, `machine-health.json` failover, and
+file heartbeats and checkpoints. Nothing stops a laptop that wakes after a takeover from pushing or
+commenting twice.
+
+The engines don't fit yet:
+- Temporal and Restate each need a separate server, which breaks M1.
+- Temporal's Bun workers are experimental.
+- Restate pushes to workers, which fails behind NAT.
+- DBOS has no SQLite or Bun support yet.
+
+## Decision
+Own a small durability contract: four ports in `src/shared/kernel/durability.ts`.
+- `WorkQueue`: atomic claim with a lease, heartbeat and complete; dedupe key; `notBefore`.
+- `RunJournal`: append-only and fenced.
+- `Signals`: durable approvals and cancel.
+- `SideEffects`: a reconcile-then-act ledger keyed by `IdempotencyKey`.
+
+Every claim increments the item's lease epoch, which is its fence token. Every journal append and
+every external side effect checks the fence.
+
+Adapters are SQLite for M1 (Wave 1) and Postgres for M2/M3 (Wave 2). Both are held to one contract
+suite, together with the in-memory fake. Orchestration decisions stay in a pure
+`decide(state, event) → Command`, so an engine could interpret them later. No external workflow
+engine is used.
+
+## Consequences
+- About 600–1,000 lines of correctness-critical code that we own, guarded by the contract suite and
+  crash-injection tests.
+- M2 and M3 need one Postgres reachable from every machine. Workers pull over outbound connections,
+  so they work behind NAT.
+- Labels become a display mirror. SSH rebalance, SSH event tail and `machine-health.json` failover are
+  retired.
+
+Revisit (spec §9):
+- **Temporal, Cloud first,** if:
+  - M3 passes ~10 machines or spans organizations;
+  - runs need intra-stage sagas or fan-out;
+  - the owned code passes ~2,000 LOC or causes more than 2 correctness incidents;
+  - or Temporal ships GA Bun workers and a TypeScript Agent SDK integration.
+- **Temporal Cloud as the M3 service** if no shared Postgres will be run.
+- **DBOS** if it gains SQLite and Bun support.
+- **Restate** if it ships a self-hosted pull mode.
+```
+
+- [ ] **Step 4: Check that every ADR link resolves**
+
+```bash
+for f in $(grep -oE 'adr/[0-9a-z-]+\.md' docs/architecture.md); do test -f "docs/$f" || echo "missing $f"; done; echo links-checked
+```
+
+Expected: only `links-checked`.
+
+- [ ] **Step 5: Commit**
 
 ```bash
 git add docs/architecture.md docs/adr
-git commit -m "docs: add architecture overview and ADRs 0001-0004"
+git commit -m "docs: add architecture overview and ADRs 0001-0005"
+```
+
+---
+
+### Task 17b: Durability port types and contract suite
+
+Spec §6.1 and §8. This task adds **types and tests only**. The SQLite durability adapter is Wave 1
+and the Postgres adapter is Wave 2; each registers the same cases in its own test file. In Wave 0 the
+existing `bun:sqlite` store (`SqliteEventLog`) is held to the event-log contract. The durability
+contract runs against the in-memory reference fake.
+
+Bun silently drops `test()` calls made inside a helper module once a second test file imports that
+module. Contract modules therefore export **case lists**, and each test file registers them itself.
+
+**Files:**
+- Create: `src/shared/kernel/durability.ts`, `src/testing/contracts/durability-contract.ts`, `src/testing/contracts/event-log-contract.ts`, `src/testing/in-memory-durability.ts`, `src/testing/in-memory-event-log.ts`
+- Test: `src/testing/in-memory-durability.test.ts`, `src/adapters/store/sqlite-event-log.contract.test.ts`
+
+- [ ] **Step 1: Create the port types** — `src/shared/kernel/durability.ts`
+
+```ts
+import type { Result } from "./result";
+
+// Durability contract (spec §6.1, ADR-0005). Types plus one pure helper; no adapters here.
+// Adapters: SQLite (Wave 1, mode M1) and Postgres (Wave 2, modes M2/M3). Each must pass
+// src/testing/contracts/durability-contract.ts unchanged.
+
+/** Proof of the current lease on one work item. `epoch` grows on every successful claim. */
+export interface FenceToken {
+  readonly workId: string;
+  readonly epoch: number;
+}
+
+/** Stable key for one external side effect, e.g. `run-42:pr:open`. */
+export type IdempotencyKey = string & { readonly __brand: "IdempotencyKey" };
+export const idempotencyKey = (...parts: readonly string[]): IdempotencyKey =>
+  parts.join(":") as IdempotencyKey;
+
+export type DurabilityErrorKind =
+  | "stale_fence"
+  | "duplicate"
+  | "not_found"
+  | "transient"
+  | "failed";
+export interface DurabilityError {
+  readonly kind: DurabilityErrorKind;
+  readonly message: string;
+}
+type Durable<T> = Promise<Result<T, DurabilityError>>;
+type Json = Readonly<Record<string, unknown>>;
+
+// ── Work queue: atomic claim with lease and fence ────────────────────────────
+export interface NewWorkItem {
+  readonly pool: string;
+  /** Enqueueing while an unfinished item has the same key fails with `duplicate`. */
+  readonly dedupeKey: string;
+  readonly payload: Json;
+  /** Epoch milliseconds before which the item is not claimable. */
+  readonly notBefore?: number;
+}
+export interface Lease {
+  readonly fence: FenceToken;
+  readonly workerId: string;
+  readonly expiresAt: number;
+  readonly payload: Json;
+}
+export interface WorkQueue {
+  enqueue(item: NewWorkItem): Durable<string>;
+  /** Oldest ready, unleased (or lease-expired) item in `pool`; `null` when none. */
+  claim(pool: string, workerId: string, leaseMs: number): Durable<Lease | null>;
+  heartbeat(fence: FenceToken, leaseMs: number): Durable<Lease>;
+  complete(fence: FenceToken, outcome: "succeeded" | "failed"): Durable<void>;
+}
+
+// ── Run journal: append-only, fenced ─────────────────────────────────────────
+export interface JournalEntry {
+  readonly runId: string;
+  readonly seq: number;
+  readonly type: string;
+  readonly at: string;
+  readonly data: Json;
+}
+export interface RunJournal {
+  /** Fails with `stale_fence` unless `fence` is the live lease. */
+  append(fence: FenceToken, entry: Omit<JournalEntry, "seq">): Durable<JournalEntry>;
+  /** Entries for one run in `seq` order, after `afterSeq` when given. */
+  read(runId: string, afterSeq?: number): Durable<readonly JournalEntry[]>;
+}
+
+// ── Durable signals (approvals, cancel) ──────────────────────────────────────
+export interface Signal {
+  readonly runId: string;
+  readonly name: string;
+  readonly payload: Json;
+}
+export interface Signals {
+  /** Durable: a signal sent before anyone waits is still delivered, exactly once. */
+  send(signal: Signal): Durable<void>;
+  /** Takes the oldest undelivered signal with this name, or `null`. Never blocks. */
+  take(runId: string, name: string): Durable<Signal | null>;
+}
+
+// ── Side-effect ledger: reconcile, then act ──────────────────────────────────
+export interface SideEffectRecord {
+  readonly key: IdempotencyKey;
+  readonly state: "pending" | "done";
+  readonly result?: Json;
+}
+export interface SideEffects {
+  /** Records intent; a known key returns its existing record, so the caller reconciles instead of acting twice. */
+  begin(fence: FenceToken, key: IdempotencyKey): Durable<SideEffectRecord>;
+  finish(fence: FenceToken, key: IdempotencyKey, result: Json): Durable<SideEffectRecord>;
+}
+
+/** One store implements all four ports, so fence checks and writes share a transaction. */
+export interface Durability {
+  readonly queue: WorkQueue;
+  readonly journal: RunJournal;
+  readonly signals: Signals;
+  readonly sideEffects: SideEffects;
+}
+```
+
+Run: `bun run typecheck`
+Expected: exit 0.
+
+- [ ] **Step 2: Write the contract suites**
+
+`src/testing/contracts/durability-contract.ts`:
+
+```ts
+import { expect } from "bun:test";
+import { type Durability, idempotencyKey, type Lease } from "../../shared/kernel/durability";
+
+/**
+ * One contract case. Test files register cases themselves (`test(c.name, () => c.run(factory))`):
+ * Bun drops `test()` calls made inside a helper module that a second test file also imports.
+ */
+export interface ContractCase<F> {
+  readonly name: string;
+  run(factory: F): Promise<void>;
+}
+
+/** Builds a fresh, empty store whose notion of time is `now` (epoch ms). */
+export type DurabilityFactory = (now: () => number) => Durability | Promise<Durability>;
+
+interface Ctx {
+  readonly d: Durability;
+  advance(ms: number): void;
+  claimed(workerId: string): Promise<Lease>;
+}
+const item = { pool: "default", dedupeKey: "issue-1", payload: { issue: 1 } };
+const entry = { runId: "r1", type: "stage.started", at: "t", data: {} };
+const key = idempotencyKey("r1", "pr", "open");
+
+async function fresh(factory: DurabilityFactory): Promise<Ctx> {
+  let t = 1_000;
+  const d = await factory(() => t);
+  const advance = (ms: number) => {
+    t += ms;
+  };
+  const claimed = async (workerId: string): Promise<Lease> => {
+    const r = await d.queue.claim("default", workerId, 1_000);
+    if (!r.ok || !r.value) throw new Error(`${workerId} expected a lease`);
+    return r.value;
+  };
+  return { d, advance, claimed };
+}
+
+const queueCases: ContractCase<DurabilityFactory>[] = [
+  {
+    name: "of 10 concurrent claimers exactly one gets the item",
+    run: async (factory) => {
+      const { d } = await fresh(factory);
+      await d.queue.enqueue(item);
+      const claims = Array.from({ length: 10 }, (_, i) => d.queue.claim("default", `w${i}`, 1_000));
+      const results = await Promise.all(claims);
+      expect(results.filter((r) => r.ok && r.value !== null)).toHaveLength(1);
+    },
+  },
+  {
+    name: "a live lease blocks others; an expired lease is taken over with a higher epoch",
+    run: async (factory) => {
+      const ctx = await fresh(factory);
+      await ctx.d.queue.enqueue(item);
+      const first = await ctx.claimed("a");
+      expect(await ctx.d.queue.claim("default", "b", 1_000)).toEqual({ ok: true, value: null });
+      ctx.advance(1_001);
+      expect((await ctx.claimed("b")).fence.epoch).toBeGreaterThan(first.fence.epoch);
+    },
+  },
+  {
+    name: "notBefore delays claiming; an unfinished dedupe key is rejected",
+    run: async (factory) => {
+      const ctx = await fresh(factory);
+      await ctx.d.queue.enqueue({ ...item, notBefore: 1_500 });
+      expect(await ctx.d.queue.claim("default", "a", 1_000)).toEqual({ ok: true, value: null });
+      ctx.advance(500);
+      await ctx.claimed("a");
+      const dup = await ctx.d.queue.enqueue(item);
+      expect(dup.ok ? "ok" : dup.error.kind).toBe("duplicate");
+    },
+  },
+];
+
+const fenceCases: ContractCase<DurabilityFactory>[] = [
+  {
+    name: "journal appends under a live fence are ordered by seq",
+    run: async (factory) => {
+      const ctx = await fresh(factory);
+      await ctx.d.queue.enqueue(item);
+      const { fence } = await ctx.claimed("a");
+      await ctx.d.journal.append(fence, entry);
+      await ctx.d.journal.append(fence, { ...entry, type: "stage.passed" });
+      const read = await ctx.d.journal.read("r1", 1);
+      expect(read.ok && read.value.map((e) => [e.seq, e.type])).toEqual([[2, "stage.passed"]]);
+    },
+  },
+  {
+    name: "after takeover every write with the old fence fails with stale_fence",
+    run: async (factory) => {
+      const ctx = await fresh(factory);
+      await ctx.d.queue.enqueue(item);
+      const old = (await ctx.claimed("a")).fence;
+      ctx.advance(1_001);
+      await ctx.claimed("b");
+      const writes = [
+        await ctx.d.journal.append(old, entry),
+        await ctx.d.queue.heartbeat(old, 1_000),
+        await ctx.d.queue.complete(old, "succeeded"),
+        await ctx.d.sideEffects.begin(old, key),
+      ];
+      expect(writes.map((w) => (w.ok ? "ok" : w.error.kind))).toEqual(Array(4).fill("stale_fence"));
+    },
+  },
+];
+
+const effectAndSignalCases: ContractCase<DurabilityFactory>[] = [
+  {
+    name: "a crashed holder's pending side effect is visible to the next holder",
+    run: async (factory) => {
+      const ctx = await fresh(factory);
+      await ctx.d.queue.enqueue(item);
+      await ctx.d.sideEffects.begin((await ctx.claimed("a")).fence, key);
+      ctx.advance(1_001);
+      const { fence } = await ctx.claimed("b");
+      const again = await ctx.d.sideEffects.begin(fence, key);
+      expect(again).toEqual({ ok: true, value: { key, state: "pending" } });
+      const done = await ctx.d.sideEffects.finish(fence, key, { pr: 7 });
+      expect(done.ok && done.value).toEqual({ key, state: "done", result: { pr: 7 } });
+    },
+  },
+  {
+    name: "a signal sent before anyone waits is delivered exactly once",
+    run: async (factory) => {
+      const { d } = await fresh(factory);
+      const signal = { runId: "r1", name: "approve:plan", payload: { by: "maintainer" } };
+      await d.signals.send(signal);
+      expect(await d.signals.take("r1", "approve:pr")).toEqual({ ok: true, value: null });
+      expect(await d.signals.take("r1", "approve:plan")).toEqual({ ok: true, value: signal });
+      expect(await d.signals.take("r1", "approve:plan")).toEqual({ ok: true, value: null });
+    },
+  },
+];
+
+/** Every durability adapter (in-memory, SQLite, Postgres) must pass these cases unchanged. */
+export const durabilityContract: readonly ContractCase<DurabilityFactory>[] = [
+  ...queueCases,
+  ...fenceCases,
+  ...effectAndSignalCases,
+];
+```
+
+`src/testing/contracts/event-log-contract.ts`:
+
+```ts
+import { expect } from "bun:test";
+import type { EventLog } from "../../shared/kernel/ports";
+import type { ContractCase } from "./durability-contract";
+
+/** Opens a fresh, empty log and a cleanup for it. */
+export type EventLogFactory = () => { readonly log: EventLog; cleanup(): void };
+
+async function withLog(factory: EventLogFactory, body: (log: EventLog) => void): Promise<void> {
+  const { log, cleanup } = factory();
+  try {
+    body(log);
+  } finally {
+    cleanup();
+  }
+}
+
+/** Every EventLog (in-memory fake, bun:sqlite store) must pass these cases unchanged. */
+export const eventLogContract: readonly ContractCase<EventLogFactory>[] = [
+  {
+    name: "lists one run's events oldest first, with data intact",
+    run: (factory) =>
+      withLog(factory, (log) => {
+        log.append({ runId: "r1", type: "a", at: "t1", data: { n: 1 } });
+        log.append({ runId: "r2", type: "b", at: "t2", data: {} });
+        log.append({ runId: "r1", type: "c", at: "t3", data: { n: 3 } });
+        expect(log.list("r1").map((e) => [e.type, e.data])).toEqual([
+          ["a", { n: 1 }],
+          ["c", { n: 3 }],
+        ]);
+      }),
+  },
+  {
+    name: "an unknown run has no events",
+    run: (factory) => withLog(factory, (log) => expect(log.list("missing")).toEqual([])),
+  },
+];
+```
+
+- [ ] **Step 3: Register the cases against the fakes and the SQLite store**
+
+`src/testing/in-memory-durability.test.ts`:
+
+```ts
+import { describe, test } from "bun:test";
+import { durabilityContract } from "./contracts/durability-contract";
+import { eventLogContract } from "./contracts/event-log-contract";
+import { createInMemoryDurability } from "./in-memory-durability";
+import { InMemoryEventLog } from "./in-memory-event-log";
+
+describe("durability contract: in-memory", () => {
+  for (const c of durabilityContract) test(c.name, () => c.run(createInMemoryDurability));
+});
+
+describe("event log contract: in-memory", () => {
+  const factory = () => ({ log: new InMemoryEventLog(), cleanup: () => {} });
+  for (const c of eventLogContract) test(c.name, () => c.run(factory));
+});
+```
+
+`src/adapters/store/sqlite-event-log.contract.test.ts`:
+
+```ts
+import { describe, test } from "bun:test";
+import { join } from "node:path";
+import { eventLogContract } from "../../testing/contracts/event-log-contract";
+import { createTestEnv } from "../../testing/test-env";
+import { SqliteEventLog } from "./sqlite-event-log";
+
+describe("event log contract: bun:sqlite", () => {
+  const factory = () => {
+    const env = createTestEnv();
+    return { log: SqliteEventLog.open(join(env.stateDir, "shipwright.db")), cleanup: env.cleanup };
+  };
+  for (const c of eventLogContract) test(c.name, () => c.run(factory));
+});
+```
+
+- [ ] **Step 4: Run to see it fail**
+
+Run: `bun test ./src/testing/in-memory-durability.test.ts`
+Expected: FAIL — `Cannot find module './in-memory-durability'`.
+
+- [ ] **Step 5: Implement the fakes**
+
+`src/testing/in-memory-event-log.ts`:
+
+```ts
+import type { EventLog, EventRecord } from "../shared/kernel/ports";
+
+/** In-memory EventLog for application tests; held to the same contract as SqliteEventLog. */
+export class InMemoryEventLog implements EventLog {
+  private readonly events: EventRecord[] = [];
+  append(event: EventRecord): void {
+    this.events.push(event);
+  }
+  list(runId: string): readonly EventRecord[] {
+    return this.events.filter((e) => e.runId === runId);
+  }
+}
+```
+
+`src/testing/in-memory-durability.ts`:
+
+```ts
+import type {
+  Durability,
+  DurabilityError,
+  FenceToken,
+  IdempotencyKey,
+  JournalEntry,
+  Lease,
+  NewWorkItem,
+  RunJournal,
+  SideEffectRecord,
+  SideEffects,
+  Signal,
+  Signals,
+  WorkQueue,
+} from "../shared/kernel/durability";
+import { err, ok, type Result } from "../shared/kernel/result";
+
+type R<T> = Promise<Result<T, DurabilityError>>;
+interface Item extends NewWorkItem {
+  readonly id: string;
+  epoch: number;
+  workerId: string;
+  expiresAt: number;
+  finished: boolean;
+}
+const fail = (kind: DurabilityError["kind"], message: string) => err({ kind, message });
+
+class Store {
+  readonly items: Item[] = [];
+  readonly entries: JournalEntry[] = [];
+  readonly signals: Signal[] = [];
+  readonly effects = new Map<IdempotencyKey, SideEffectRecord>();
+  constructor(readonly now: () => number) {}
+
+  /** The single fence check every fenced write goes through. */
+  live(fence: FenceToken): Result<Item, DurabilityError> {
+    const item = this.items.find((i) => i.id === fence.workId);
+    if (!item) return fail("not_found", `no work item ${fence.workId}`);
+    if (item.finished || item.epoch !== fence.epoch || item.expiresAt <= this.now()) {
+      return fail("stale_fence", `epoch ${fence.epoch} is not the live lease on ${fence.workId}`);
+    }
+    return ok(item);
+  }
+}
+
+const leaseOf = (item: Item): Lease => ({
+  fence: { workId: item.id, epoch: item.epoch },
+  workerId: item.workerId,
+  expiresAt: item.expiresAt,
+  payload: item.payload,
+});
+
+class MemoryQueue implements WorkQueue {
+  constructor(private readonly s: Store) {}
+  async enqueue(item: NewWorkItem): R<string> {
+    if (this.s.items.some((i) => !i.finished && i.dedupeKey === item.dedupeKey)) {
+      return fail("duplicate", `unfinished item with dedupe key ${item.dedupeKey}`);
+    }
+    const id = `w${this.s.items.length + 1}`;
+    this.s.items.push({ ...item, id, epoch: 0, workerId: "", expiresAt: 0, finished: false });
+    return ok(id);
+  }
+  async claim(pool: string, workerId: string, leaseMs: number): R<Lease | null> {
+    const t = this.s.now();
+    const item = this.s.items.find(
+      (i) => i.pool === pool && !i.finished && (i.notBefore ?? 0) <= t && i.expiresAt <= t,
+    );
+    if (!item) return ok(null);
+    Object.assign(item, { epoch: item.epoch + 1, workerId, expiresAt: t + leaseMs });
+    return ok(leaseOf(item));
+  }
+  async heartbeat(fence: FenceToken, leaseMs: number): R<Lease> {
+    const item = this.s.live(fence);
+    if (!item.ok) return item;
+    item.value.expiresAt = this.s.now() + leaseMs;
+    return ok(leaseOf(item.value));
+  }
+  async complete(fence: FenceToken): R<void> {
+    const item = this.s.live(fence);
+    if (!item.ok) return item;
+    item.value.finished = true;
+    return ok(undefined);
+  }
+}
+
+class MemoryJournal implements RunJournal {
+  constructor(private readonly s: Store) {}
+  async append(fence: FenceToken, entry: Omit<JournalEntry, "seq">): R<JournalEntry> {
+    const item = this.s.live(fence);
+    if (!item.ok) return item;
+    const stored = {
+      ...entry,
+      seq: this.s.entries.filter((e) => e.runId === entry.runId).length + 1,
+    };
+    this.s.entries.push(stored);
+    return ok(stored);
+  }
+  async read(runId: string, afterSeq = 0): R<readonly JournalEntry[]> {
+    return ok(this.s.entries.filter((e) => e.runId === runId && e.seq > afterSeq));
+  }
+}
+
+class MemorySignals implements Signals {
+  constructor(private readonly s: Store) {}
+  async send(signal: Signal): R<void> {
+    this.s.signals.push(signal);
+    return ok(undefined);
+  }
+  async take(runId: string, name: string): R<Signal | null> {
+    const index = this.s.signals.findIndex((x) => x.runId === runId && x.name === name);
+    return ok(index < 0 ? null : (this.s.signals.splice(index, 1)[0] ?? null));
+  }
+}
+
+class MemorySideEffects implements SideEffects {
+  constructor(private readonly s: Store) {}
+  async begin(fence: FenceToken, key: IdempotencyKey): R<SideEffectRecord> {
+    const item = this.s.live(fence);
+    if (!item.ok) return item;
+    const record = this.s.effects.get(key) ?? { key, state: "pending" };
+    this.s.effects.set(key, record);
+    return ok(record);
+  }
+  async finish(
+    fence: FenceToken,
+    key: IdempotencyKey,
+    result: Record<string, unknown>,
+  ): R<SideEffectRecord> {
+    const item = this.s.live(fence);
+    if (!item.ok) return item;
+    if (!this.s.effects.has(key)) return fail("not_found", `side effect ${key} was never begun`);
+    const record: SideEffectRecord = { key, state: "done", result };
+    this.s.effects.set(key, record);
+    return ok(record);
+  }
+}
+
+/** Reference implementation of the durability ports, for application tests and the contract suite. */
+export function createInMemoryDurability(now: () => number): Durability {
+  const store = new Store(now);
+  return {
+    queue: new MemoryQueue(store),
+    journal: new MemoryJournal(store),
+    signals: new MemorySignals(store),
+    sideEffects: new MemorySideEffects(store),
+  };
+}
+```
+
+- [ ] **Step 6: Run the contract suites**
+
+Run: `bun test ./src/testing/in-memory-durability.test.ts ./src/adapters/store/sqlite-event-log.contract.test.ts`
+Expected: 11 pass, 0 fail. That is 7 durability cases on the fake, plus 2 event-log cases each on the fake and on `bun:sqlite`.
+
+- [ ] **Step 7: Prove the suite bites**
+
+Temporarily delete `item.epoch !== fence.epoch || ` from `Store.live` in `in-memory-durability.ts`. Then run:
+
+```bash
+bun test ./src/testing/in-memory-durability.test.ts
+```
+
+Expected: 1 fail — `after takeover every write with the old fence fails with stale_fence`. Restore the line and re-run: 9 pass.
+
+- [ ] **Step 8: Run the fast definition of done**
+
+Run: `bun run check:fast`
+Expected: exit 0. In particular:
+- F1 allows the kernel file to import only `./result`;
+- F3 allows the `src/testing` imports, because they appear only in `*.test.ts`;
+- F7 reports no new size violations.
+
+- [ ] **Step 9: Commit**
+
+```bash
+git add src/shared/kernel/durability.ts src/testing src/adapters/store/sqlite-event-log.contract.test.ts
+git commit -m "feat(ts): add durability port types and contract suites"
 ```
 
 ---
@@ -2890,7 +3536,8 @@ git commit -m "docs: add architecture overview and ADRs 0001-0004"
 **Files:**
 - Create: `.github/workflows/ts-check.yml`
 
-- [ ] **Step 1: Create the workflow**
+- [ ] **Step 1: Create the workflow.** Steps run in the same order as `bun run check`, with one named
+  step per stage, so a failure shows which stage broke. If you change `check`, change this list too.
 
 ```yaml
 name: TypeScript check
@@ -2915,8 +3562,29 @@ jobs:
       - name: Install system tools used by parity suites
         run: sudo apt-get update -qq && sudo apt-get install -y -qq jq tmux
       - run: bun install --frozen-lockfile
-      - run: bun run check
+      - name: Typecheck
+        run: bun run typecheck
+      - name: Lint and format (Biome)
+        run: bun run lint
+      - name: Fitness rules (F1–F8, workflow rule)
+        run: bun run arch
+      - name: Unit, application and contract tests
+        run: bun test ./src ./tools
+      - name: Generated CLI reference is current
+        run: bun run docs:check
+      - name: Router points at TypeScript only for parity-green commands
+        run: bun run port:check
+      - name: Parity suites for ported commands
+        run: bun run parity
 ```
+
+`bun test` is always given explicit `./src ./tools` paths, as in `test:ts` (see `bunfig.toml`), so it
+does not pick up the unrelated JS fixtures under `tests/` and `website/`. The durability and
+event-log contract suites from Task 17b run in the test step.
+
+*Later wave, not Wave 0:* a nightly `durability-postgres` job runs the durability contract against a
+Postgres service container. It also runs on changes under `src/adapters/durability/**`. It is added
+with the Postgres adapter in Wave 2 (spec §8); Wave 0 adds no service container.
 
 - [ ] **Step 2: Lint the workflow and run the workflow rule on it**
 
@@ -2938,7 +3606,7 @@ Expected: every stage passes in under 60 s total.
 
 ```bash
 git add .github/workflows/ts-check.yml
-git commit -m "ci: run bun run check on pull requests and main"
+git commit -m "ci: run the bun run check stages on pull requests and main"
 ```
 
 ---
