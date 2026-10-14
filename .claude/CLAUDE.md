@@ -642,7 +642,7 @@ All scripts are bash (except the dashboard server in TypeScript). Grouped by lay
 | `scripts/sw-context.sh` | 600 | Context Engine for Pipeline Stages |
 | `scripts/sw-cost.sh` | 1070 | Token Usage & Cost Intelligence |
 | `scripts/sw-daemon.sh` | 1420 | Autonomous GitHub Issue Watcher |
-| `scripts/sw-dashboard.sh` | 510 | Fleet Command Dashboard |
+| `scripts/sw-dashboard.sh` | 519 | Fleet Command Dashboard |
 | `scripts/sw-db.sh` | 1939 | SQLite Persistence Layer |
 | `scripts/sw-decide.sh` | 691 | Shipwright Autonomous Decision Engine |
 | `scripts/sw-decompose.sh` | 864 | Intelligent Issue Decomposition |
