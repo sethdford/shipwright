@@ -2,6 +2,7 @@ id: dashboard-no-shell-from-data
 language: TypeScript
 severity: error
 message: "Dashboard: run subprocesses with execFileSync/spawn and an argv array. A shell command must be a constant string literal; never build one from data (#8534, spec §3.3 interim rule until the Wave 3 port)."
+metadata: { owner: "@sethdford", docs: "docs/architecture.md#fitness-rules" }
 files:
   - "dashboard/**/*.ts"
 ignores:

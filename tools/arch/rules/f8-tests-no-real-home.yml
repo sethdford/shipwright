@@ -1,7 +1,8 @@
 id: F8-tests-no-real-home
 language: TypeScript
 severity: error
-message: "Tests must use createTestEnv() paths, never the real home directory or environment."
+message: "F8: Tests must use createTestEnv() paths, never the real home directory or environment."
+metadata: { owner: "@sethdford", docs: "docs/architecture.md#fitness-rules" }
 files:
   - "src/**/*.test.ts"
   - "tools/**/*.test.ts"

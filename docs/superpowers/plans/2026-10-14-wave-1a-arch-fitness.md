@@ -1184,7 +1184,7 @@ bun test tools/arch/meta.test.ts 2>&1 | grep '(fail)'; rm tools/arch/rule-tests/
 cp scripts/lib/compat.sh "$TMPDIR/compat.bak"; echo 'eval "$1" # ast-grep-ignore' >> scripts/lib/compat.sh
 bun test tools/arch/meta.test.ts 2>&1 | grep '(fail)'; cp "$TMPDIR/compat.bak" scripts/lib/compat.sh
 # a widened allowlist
-cp tools/arch/rules/f6-agent-sdk-only-in-adapter.yml "$TMPDIR/f6.bak"; printf '  - "src/cli/**"\n' >> tools/arch/rules/f6-agent-sdk-only-in-adapter.yml
+cp tools/arch/rules/f6-agent-sdk-only-in-adapter.yml "$TMPDIR/f6.bak"; perl -0pi -e 's/^ignores:\n/ignores:\n  - "src\/cli\/**"\n/m' tools/arch/rules/f6-agent-sdk-only-in-adapter.yml
 bun test tools/arch/meta.test.ts 2>&1 | grep '(fail)'; cp "$TMPDIR/f6.bak" tools/arch/rules/f6-agent-sdk-only-in-adapter.yml
 # a dependency-cruiser rule whose path regex no longer matches
 cp .dependency-cruiser.cjs "$TMPDIR/dc.bak"

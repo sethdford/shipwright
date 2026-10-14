@@ -18,6 +18,7 @@ id: F10-github-writes-only-in-writer
 language: TypeScript
 severity: error
 message: "F10: GitHub writes go only through src/adapters/github/gh-github-writer.ts. Add an idempotent method (it takes an IdempotencyKey) to the GithubWriter port and call that."
+metadata: { owner: "@sethdford", docs: "docs/architecture.md#fitness-rules" }
 files:
   - "src/**/*.ts"
   - "src/**/*.tsx"

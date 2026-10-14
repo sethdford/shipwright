@@ -2,6 +2,7 @@ id: F5-io-only-in-adapters
 language: TypeScript
 severity: error
 message: "F5: I/O belongs in src/adapters. Define a port in the context and inject an adapter from main.ts. (A local variable named process, Bun or global trips this too: rename it, e.g. proc.)"
+metadata: { owner: "@sethdford", docs: "docs/architecture.md#fitness-rules" }
 files:
   - "src/**/*.ts"
 ignores:

@@ -5,6 +5,10 @@ id: F10-github-writes-only-in-writer-tsx
 language: Tsx
 severity: error
 message: "F10: GitHub writes go only through src/adapters/github/gh-github-writer.ts. Add an idempotent method (it takes an IdempotencyKey) to the GithubWriter port and call that."
+metadata:
+  owner: "@sethdford"
+  docs: "docs/architecture.md#fitness-rules"
+  preemptive: "src has no .tsx files yet; this keeps a rename to .tsx from escaping F10"
 files:
   - "src/**/*.tsx"
 ignores:

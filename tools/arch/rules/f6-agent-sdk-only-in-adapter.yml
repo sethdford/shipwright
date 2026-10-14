@@ -1,7 +1,8 @@
 id: F6-agent-sdk-only-in-adapter
 language: TypeScript
 severity: error
-message: "Use the AgentRunner port. Only src/adapters/agent may import the Claude Agent SDK."
+message: "F6: Use the AgentRunner port. Only src/adapters/agent may import the Claude Agent SDK."
+metadata: { owner: "@sethdford", docs: "docs/architecture.md#fitness-rules" }
 files:
   - "src/**/*.ts"
 ignores:
