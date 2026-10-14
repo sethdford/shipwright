@@ -36,6 +36,32 @@ EXAMPLES
   shipwright breaker check && gh workflow run shipwright-pipeline.yml -f issue_number=42
 ```
 
+## `budget`
+
+Daily budget guard: show it, or check it as a dispatch gate
+
+```text
+USAGE
+  shipwright budget <status|check> [--estimate USD]
+
+DESCRIPTION
+  Pre-dispatch budget guard (spec §6.2, ADR-0007). Reads the daily cap and today's spend (UTC)
+  from ~/.shipwright/budget.json and costs.json, written by `shipwright cost`.
+  When neither file exists (as on a CI runner) there is nothing to check: the command exits 0 and
+  prints "no cost data ... budget not enforced". A CI budget source is deferred to Wave 1b/1c.
+
+COMMANDS
+  status   Print today's spend against the cap. Exits 0.
+  check    Exit 0 when today's spend plus the estimate stays under the cap, 1 when it does not
+           or the files cannot be read. No cap configured means unlimited.
+
+OPTIONS
+  --estimate USD   Expected cost of the next run (default 0)
+
+EXAMPLES
+  shipwright budget check --estimate 2.50
+```
+
 ## `hello`
 
 Print hello world (CLI smoke test)

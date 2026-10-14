@@ -1,5 +1,8 @@
 import type { GithubWriter, IncidentOutcome, IncidentReport } from "../contexts/integrations";
 import type {
+  CostEntry,
+  CostLedger,
+  DailyBudget,
   LocalPause,
   PauseFlag,
   PauseLabel,
@@ -49,7 +52,12 @@ export const fixedLabel = (r: Result<readonly number[], AdapterError>): PauseLab
   labelled: async () => r,
 });
 
-/** Safety ports with harmless defaults: no runs, no pause flag or label, a recording incident writer. */
+export const fixedCosts = (
+  budget: DailyBudget | null,
+  entries: readonly CostEntry[] = [],
+): CostLedger => ({ read: async () => ok({ budget, entries, present: true }) });
+
+/** Safety ports with harmless defaults: no runs, no pause flag, label or cap, a recording incident writer. */
 export function fakeSafetyPorts(over: Partial<SafetyPorts> = {}): SafetyPorts {
   return {
     now: () => NOW,
@@ -57,6 +65,7 @@ export function fakeSafetyPorts(over: Partial<SafetyPorts> = {}): SafetyPorts {
     pauseFlag: new MemoryPauseFlag(),
     pauseLabel: fixedLabel(ok([])),
     github: new RecordingGithubWriter(),
+    costs: fixedCosts(null),
     ...over,
   };
 }

@@ -862,5 +862,14 @@
     "parity": null,
     "status": "parity-green",
     "notes": "New in Wave 1a (spec §6.2 kill switch); exit 0 when paused, for scripts."
+  },
+  {
+    "command": "budget",
+    "aliases": [],
+    "script": "sw-budget.sh",
+    "context": "orchestration",
+    "parity": null,
+    "status": "parity-green",
+    "notes": "New in Wave 1a (spec §6.2 budget guard); reads the files sw-cost.sh writes. No cost files (CI) reports no data and is not enforced."
   }
 ]

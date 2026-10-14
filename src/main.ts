@@ -6,6 +6,7 @@ import { GhRunHistory } from "./adapters/github/gh-run-history";
 import { resolvePaths } from "./adapters/paths";
 import { BunProcessRunner } from "./adapters/process/bun-process-runner";
 import { FilePauseFlag } from "./adapters/state/file-pause-flag";
+import { JsonCostLedger } from "./adapters/state/json-cost-ledger";
 import type { CliIO, Command } from "./cli/command";
 import { commands, findCommand } from "./cli/commands";
 import type { SafetyPorts } from "./contexts/orchestration";
@@ -31,6 +32,7 @@ export function buildSafetyPorts(
     pauseFlag: new FilePauseFlag(join(legacyDir, "daemon-pause.flag")),
     pauseLabel: new GhPauseLabel(runner),
     github: new GhGithubWriter(runner),
+    costs: new JsonCostLedger(legacyDir),
   };
 }
 

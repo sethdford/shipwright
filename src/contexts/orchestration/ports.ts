@@ -2,6 +2,7 @@ import type { AdapterError } from "../../shared/kernel/ports";
 import type { Result } from "../../shared/kernel/result";
 import type { GithubWriter } from "../integrations";
 import type { RunRecord } from "./domain/breaker";
+import type { CostEntry, DailyBudget } from "./domain/budget";
 import type { LocalPause } from "./domain/pause";
 
 /** Recent pipeline runs, shared by every machine (GitHub Actions history in Wave 1a). */
@@ -24,6 +25,22 @@ export interface PauseLabel {
   labelled(): Promise<Result<readonly number[], AdapterError>>;
 }
 
+/** Spend and the daily cap, as recorded by `shipwright cost` (read-only). */
+export interface CostLedger {
+  read(): Promise<
+    Result<
+      {
+        /** `null` when no cap is enabled. */
+        readonly budget: DailyBudget | null;
+        readonly entries: readonly CostEntry[];
+        /** False when no cost file exists at all (a CI runner): nothing was recorded to check. */
+        readonly present: boolean;
+      },
+      AdapterError
+    >
+  >;
+}
+
 /** Everything the safety gates read or write, wired in src/main.ts. */
 export interface SafetyPorts {
   readonly now: () => number;
@@ -31,4 +48,5 @@ export interface SafetyPorts {
   readonly pauseFlag: PauseFlag;
   readonly pauseLabel: PauseLabel;
   readonly github: GithubWriter;
+  readonly costs: CostLedger;
 }

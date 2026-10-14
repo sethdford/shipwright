@@ -632,6 +632,9 @@ main() {
         paused)
             run_ts paused "$@"
             ;;
+        budget)
+            run_ts budget "$@"
+            ;;
         *)
             error "Unknown command: ${cmd}"
             echo ""
