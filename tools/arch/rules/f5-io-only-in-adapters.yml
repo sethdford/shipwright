@@ -1,0 +1,23 @@
+id: F5-io-only-in-adapters
+language: TypeScript
+severity: error
+message: "I/O belongs in src/adapters. Define a port in the context and inject an adapter from main.ts."
+files:
+  - "src/**/*.ts"
+ignores:
+  - "src/adapters/**"
+  - "src/testing/**"
+  - "src/main.ts"
+  - "src/cli.ts"
+  - "src/**/*.test.ts"
+rule:
+  any:
+    - pattern: Bun.spawn($$$)
+    - pattern: Bun.$`$$$`
+    - pattern: fetch($$$)
+    - pattern: process.env
+    - kind: import_statement
+      has:
+        field: source
+        kind: string
+        regex: '^["''](node:)?(fs|fs/promises|child_process|net|http|https)["'']$'
