@@ -1,6 +1,6 @@
 import { expect, test } from "bun:test";
-import { contextFor } from "./contexts";
-import { parseRouter } from "./progress";
+import { CONTEXTS, type Context, contextFor } from "./contexts";
+import { ProgressEntry, parseRouter } from "./progress";
 
 const router = `
     case "$subcmd" in
@@ -49,6 +49,34 @@ test("keeps two different commands that route to the same script", () => {
   expect(parseRouter(text).map((e) => e.command)).toEqual(["status", "overview"]);
 });
 
+test("merges aliases when a command repeats, collapsing deploy/deploys", () => {
+  const text = `
+        deploy|deploys)   exec "$SCRIPT_DIR/sw-github-deploy.sh" "$@" ;;
+        strategic)    exec "$SCRIPT_DIR/sw-strategic.sh" "$@" ;;
+        release-manager)  exec "$SCRIPT_DIR/sw-release-manager.sh" "$@" ;;
+        strategic|strategy)
+            exec "$SCRIPT_DIR/sw-strategic.sh" "$@"
+            ;;
+        release-manager|rm)
+            exec "$SCRIPT_DIR/sw-release-manager.sh" "$@"
+            ;;
+        deploys|deployments)
+            exec "$SCRIPT_DIR/sw-github-deploy.sh" "$@"
+            ;;`;
+  expect(parseRouter(text)).toEqual([
+    { command: "deploy", aliases: ["deploys", "deployments"], script: "sw-github-deploy.sh" },
+    { command: "strategic", aliases: ["strategy"], script: "sw-strategic.sh" },
+    { command: "release-manager", aliases: ["rm"], script: "sw-release-manager.sh" },
+  ]);
+});
+
+test("a repeated identical entry does not duplicate aliases", () => {
+  const text = `
+        a|b)  exec "$SCRIPT_DIR/sw-a.sh" "$@" ;;
+        a|b)  exec "$SCRIPT_DIR/sw-a.sh" "$@" ;;`;
+  expect(parseRouter(text)).toEqual([{ command: "a", aliases: ["b"], script: "sw-a.sh" }]);
+});
+
 test("dedupes by command name, not by script", () => {
   const text = `
         a)  exec "$SCRIPT_DIR/sw-a.sh" "$@" ;;
@@ -66,6 +94,38 @@ test("maps scripts to bounded contexts", () => {
   expect(contextFor("sw-github-checks.sh")).toBe("integrations");
   expect(contextFor("sw-recruit.sh")).toBe("teams");
   expect(contextFor("sw-hello.sh")).toBe("platform");
+});
+
+const EXPECTED: [string, Context][] = [
+  ["sw-standup.sh", "teams"],
+  ["sw-autonomous.sh", "orchestration"],
+  ["sw-incident.sh", "orchestration"],
+  ["sw-context.sh", "delivery"],
+  ["sw-decide.sh", "intelligence"],
+  ["sw-e2e-orchestrator.sh", "quality"],
+];
+test.each(EXPECTED)("%s belongs to %s", (script, context) => {
+  expect(contextFor(script)).toBe(context);
+});
+
+test("every rule targets a known context", () => {
+  for (const script of ["sw-status.sh", "sw-loop.sh", "sw-daemon.sh", "sw-pm.sh"]) {
+    expect(CONTEXTS).toContain(contextFor(script));
+  }
+});
+
+test("progress entries reject unknown contexts and extra keys", () => {
+  const ok = {
+    command: "a",
+    aliases: [],
+    script: "sw-a.sh",
+    context: "platform",
+    parity: null,
+    status: "bash",
+  };
+  expect(ProgressEntry.safeParse(ok).success).toBe(true);
+  expect(ProgressEntry.safeParse({ ...ok, context: "nope" }).success).toBe(false);
+  expect(ProgressEntry.safeParse({ ...ok, extra: 1 }).success).toBe(false);
 });
 
 test("pipeline-vitals is observability, not delivery", () => {

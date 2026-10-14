@@ -19,7 +19,7 @@
     "command": "standup",
     "aliases": [],
     "script": "sw-standup.sh",
-    "context": "observability",
+    "context": "teams",
     "parity": "scripts/sw-standup-test.sh",
     "status": "bash"
   },
@@ -141,7 +141,9 @@
   },
   {
     "command": "release-manager",
-    "aliases": [],
+    "aliases": [
+      "rm"
+    ],
     "script": "sw-release-manager.sh",
     "context": "platform",
     "parity": "scripts/sw-release-manager-test.sh",
@@ -158,7 +160,8 @@
   {
     "command": "deploy",
     "aliases": [
-      "deploys"
+      "deploys",
+      "deployments"
     ],
     "script": "sw-github-deploy.sh",
     "context": "integrations",
@@ -191,7 +194,9 @@
   },
   {
     "command": "strategic",
-    "aliases": [],
+    "aliases": [
+      "strategy"
+    ],
     "script": "sw-strategic.sh",
     "context": "planning",
     "parity": "scripts/sw-strategic-test.sh",
@@ -325,7 +330,7 @@
       "auto"
     ],
     "script": "sw-autonomous.sh",
-    "context": "platform",
+    "context": "orchestration",
     "parity": "scripts/sw-autonomous-test.sh",
     "status": "bash"
   },
@@ -373,7 +378,7 @@
     "command": "incident",
     "aliases": [],
     "script": "sw-incident.sh",
-    "context": "platform",
+    "context": "orchestration",
     "parity": "scripts/sw-incident-test.sh",
     "status": "bash"
   },
@@ -666,16 +671,6 @@
     "status": "bash"
   },
   {
-    "command": "deploys",
-    "aliases": [
-      "deployments"
-    ],
-    "script": "sw-github-deploy.sh",
-    "context": "integrations",
-    "parity": "scripts/sw-github-deploy-test.sh",
-    "status": "bash"
-  },
-  {
     "command": "github-app",
     "aliases": [],
     "script": "sw-github-app.sh",
@@ -703,7 +698,7 @@
     "command": "context",
     "aliases": [],
     "script": "sw-context.sh",
-    "context": "platform",
+    "context": "delivery",
     "parity": "scripts/sw-context-test.sh",
     "status": "bash"
   },
@@ -761,7 +756,7 @@
     "command": "decide",
     "aliases": [],
     "script": "sw-decide.sh",
-    "context": "platform",
+    "context": "intelligence",
     "parity": "scripts/sw-decide-test.sh",
     "status": "bash"
   },
@@ -819,7 +814,7 @@
     "command": "e2e",
     "aliases": [],
     "script": "sw-e2e-orchestrator.sh",
-    "context": "platform",
+    "context": "quality",
     "parity": "scripts/sw-e2e-orchestrator-test.sh",
     "status": "bash"
   },

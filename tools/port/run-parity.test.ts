@@ -5,7 +5,11 @@ import { join } from "node:path";
 import type { ProgressEntry } from "./progress";
 import { gitChanged, parityTimeoutMs, runSuite, selectSuites, summarize } from "./run-parity";
 
-const entry = (command: string, status: ProgressEntry["status"], parity: string | null) => ({
+const entry = (
+  command: string,
+  status: ProgressEntry["status"],
+  parity: string | null,
+): ProgressEntry => ({
   command,
   aliases: [],
   script: `sw-${command}.sh`,

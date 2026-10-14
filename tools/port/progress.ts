@@ -1,19 +1,22 @@
 import { join, resolve } from "node:path";
 import { z } from "zod";
+import { CONTEXTS } from "./contexts";
 
 export const ROOT = resolve(import.meta.dir, "../..");
 export const ROUTER_FILE = join(ROOT, "scripts/sw");
 export const PROGRESS_FILE = join(ROOT, "docs/plans/port/progress.json");
 
 export const Status = z.enum(["bash", "porting", "parity-green", "bash-deleted"]);
-export const ProgressEntry = z.object({
-  command: z.string(),
-  aliases: z.array(z.string()),
-  script: z.string(),
-  context: z.string(),
-  parity: z.string().nullable(),
-  status: Status,
-});
+export const ProgressEntry = z
+  .object({
+    command: z.string(),
+    aliases: z.array(z.string()),
+    script: z.string(),
+    context: z.enum(CONTEXTS),
+    parity: z.string().nullable(),
+    status: Status,
+  })
+  .strict();
 export type ProgressEntry = z.infer<typeof ProgressEntry>;
 export const Progress = z.array(ProgressEntry);
 
@@ -42,9 +45,25 @@ function findTarget(lines: readonly string[], i: number, rest: string): string |
   return undefined;
 }
 
+/** Adds names to the entry for the same script that already uses one of them, else appends. */
+function addNames(out: RouterEntry[], names: string[], script: string): void {
+  const i = out.findIndex(
+    (e) => e.script === script && names.some((n) => n === e.command || e.aliases.includes(n)),
+  );
+  const existing = out[i];
+  if (!existing) {
+    const [command, ...aliases] = names;
+    out.push({ command: command as string, aliases, script });
+    return;
+  }
+  const known = new Set([existing.command, ...existing.aliases]);
+  const added = names.filter((n) => !known.has(n));
+  out[i] = { ...existing, aliases: [...existing.aliases, ...added] };
+}
+
 /**
  * Extracts `label) exec "$SCRIPT_DIR/sw-x.sh"` router entries, including multi-line bodies with guard calls before the exec.
- * Deduplicates by command name: two commands may share a script.
+ * A repeated name merges its aliases into the existing entry for that script; distinct commands may share a script.
  */
 export function parseRouter(text: string): RouterEntry[] {
   const lines = text.split("\n");
@@ -54,9 +73,8 @@ export function parseRouter(text: string): RouterEntry[] {
     if (!label) return;
     const script = findTarget(lines, i, label[2] ?? "");
     if (!script) return;
-    const [command, ...aliases] = (label[1] as string).replace(/^""\|/, "").split("|");
-    if (out.some((e) => e.command === command)) return;
-    out.push({ command: command as string, aliases, script });
+    const names = (label[1] as string).replace(/^""\|/, "").split("|");
+    addNames(out, names, script);
   });
   return out;
 }
