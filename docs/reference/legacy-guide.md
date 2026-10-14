@@ -639,7 +639,7 @@ All scripts are bash (except the dashboard server in TypeScript). Grouped by lay
 | `scripts/sw-cleanup.sh` | 350 | Clean up orphaned Claude team sessions & artifacts |
 | `scripts/sw-code-review.sh` | 699 | Clean Code & Architecture Analysis |
 | `scripts/sw-connect.sh` | 624 | Sync local state to team dashboard |
-| `scripts/sw-context.sh` | 600 | Context Engine for Pipeline Stages |
+| `scripts/sw-context.sh` | 601 | Context Engine for Pipeline Stages |
 | `scripts/sw-cost.sh` | 1070 | Token Usage & Cost Intelligence |
 | `scripts/sw-daemon.sh` | 1420 | Autonomous GitHub Issue Watcher |
 | `scripts/sw-dashboard.sh` | 519 | Fleet Command Dashboard |
@@ -729,7 +729,7 @@ All scripts are bash (except the dashboard server in TypeScript). Grouped by lay
 | `scripts/sw-webhook.sh` | 621 | GitHub Webhook Receiver for Instant Issue Processing |
 | `scripts/sw-widgets.sh` | 528 | Embeddable Status Widgets |
 | `scripts/sw-worktree.sh` | 421 | Git worktree management for multi-agent isolation |
-| `scripts/sw` | 623 | CLI router — dispatches subcommands via exec |
+| `scripts/sw` | 632 | CLI router — dispatches subcommands via exec |
 <!-- /AUTO:core-scripts -->
 
 ### GitHub API Modules
@@ -793,7 +793,7 @@ All scripts are bash (except the dashboard server in TypeScript). Grouped by lay
 | `scripts/sw-connect-test.sh` | 822 | Validate dashboard connection, heartbeat |
 | `scripts/sw-constitutional-test.sh` | 320 | Constitutional AI Test Suite |
 | `scripts/sw-context-budget-test.sh` | 335 | Context Window Budget Monitor tests |
-| `scripts/sw-context-test.sh` | 219 | Context Engine for Pipeline Stages tests |
+| `scripts/sw-context-test.sh` | 221 | Context Engine for Pipeline Stages tests |
 | `scripts/sw-convergence-test.sh` | 324 | Unit tests for convergence detection |
 | `scripts/sw-cost-optimizer-test.sh` | 466 | Test suite for cost optimization |
 | `scripts/sw-cost-test.sh` | 234 | Validate token usage & cost intelligence |
@@ -806,9 +806,9 @@ All scripts are bash (except the dashboard server in TypeScript). Grouped by lay
 | `scripts/sw-deps-test.sh` | 165 | Automated Dependency Update Management tests |
 | `scripts/sw-developer-simulation-test.sh` | 262 | Validate multi-persona |
 | `scripts/sw-discovery-test.sh` | 268 | Cross-Pipeline Real-Time Learning tests |
-| `scripts/sw-doc-fleet-test.sh` | 344 | Validate documentation fleet operations |
-| `scripts/sw-docs-agent-test.sh` | 182 | Validate documentation agent operations |
-| `scripts/sw-docs-test.sh` | 781 | Validate documentation keeper, AUTO sections, |
+| `scripts/sw-doc-fleet-test.sh` | 345 | Validate documentation fleet operations |
+| `scripts/sw-docs-agent-test.sh` | 183 | Validate documentation agent operations |
+| `scripts/sw-docs-test.sh` | 782 | Validate documentation keeper, AUTO sections, |
 | `scripts/sw-doctor-test.sh` | 420 | Validate setup diagnostics |
 | `scripts/sw-dod-scorecard-test.sh` | 434 | Machine-Verifiable DoD Scorecard Tests |
 | `scripts/sw-dora-test.sh` | 241 | Validate DORA metrics dashboard, DX metrics, |
