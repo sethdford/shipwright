@@ -88,6 +88,9 @@
     "node": ">=20",
     "bun": ">=1.2.19"
   },
+  "trustedDependencies": [
+    "@ast-grep/cli"
+  ],
   "devDependencies": {
     "@ast-grep/cli": "^0.50.0",
     "@biomejs/biome": "^2.5.15",

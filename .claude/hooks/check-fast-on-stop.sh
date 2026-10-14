@@ -5,6 +5,8 @@ input=$(cat)
 if [[ "$(printf '%s' "$input" | jq -r '.stop_hook_active // false')" == "true" ]]; then
   exit 0
 fi
+# No Bun (e.g. a bash-only checkout): nothing to check, never block the stop.
+command -v bun >/dev/null 2>&1 || exit 0
 cd "$(git rev-parse --show-toplevel)" || exit 0
 if output=$(bun run check:fast 2>&1); then
   exit 0

@@ -65,7 +65,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "jq -r '.tool_input.file_path' | xargs npx prettier --write 2>/dev/null || true"
+            "command": "f=$(jq -r '.tool_input.file_path // empty'); r=\"${CLAUDE_PROJECT_DIR:-$PWD}\"; case \"$f\" in ''|\"$r\"/src/*|\"$r\"/tools/*|src/*|tools/*) exit 0 ;; esac; npx prettier --write \"$f\" 2>/dev/null || true"
           }
         ]
       },
