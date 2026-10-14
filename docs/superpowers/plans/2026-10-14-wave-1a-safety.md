@@ -16,14 +16,18 @@
 
 ## Decisions this plan takes (recorded in ADR-0007, Task 17)
 
+The maintainer accepted these on 2026-10-14 (breaker 5-of-8 / 30 min with `cancelled` excluded, bot `github-actions[bot]` with the `SHIPWRIGHT_BOT_LOGIN` override, review WIP 5, the fence-less incident method, a 401 for a loopback dashboard with a token, the daemon failing closed without Bun, the CI budget deferred) and added two changes: dispatch skips auto-filed issues, and the watchdog no longer retries.
+
 | Control | Rule | Source of truth in 1a |
 |---|---|---|
 | Breaker | Opens when at least 5 of the last 8 *finished* runs failed. `failure`, `timed_out` and `startup_failure` count as failures; `cancelled`, `skipped`, `neutral`, `action_required` and `stale` are not counted. After a 30-minute cool-down, one probe is allowed: a run *created* after the cool-down. A probe success closes the breaker and a failure re-opens it. Runs in flight when it opened are ignored. | `gh run list --workflow shipwright-pipeline.yml --limit 50 --json databaseId,status,conclusion,createdAt,updatedAt` (`updatedAt` is the completion time) |
 | Incident | While the breaker is open, one open `shipwright:incident` issue: created, or commented on once per trip. The key `breaker:open:<opened-at-ms>` is stored in the issue as `<!-- shipwright-idempotency-key: … -->`. | `gh issue list --label shipwright:incident --json number,body,comments` |
 | Kill switch | The daemon's existing flag `~/.shipwright/daemon-pause.flag` (any file pauses; `resume_after` lapses it), or the `shipwright:pause` label on any open issue | the file, and `gh issue list --label shipwright:pause --json number` |
-| Budget | Today's spend (UTC) plus the estimate must stay under `daily_budget_usd`. A disabled cap or a cap of 0 is unlimited. | `~/.shipwright/budget.json` and `costs.json` (`entries[].cost_usd`, `ts_epoch`), as `scripts/sw-cost.sh` writes them |
+| Budget | Today's spend (UTC) plus the estimate must stay under `daily_budget_usd`. A disabled cap or a cap of 0 is unlimited. In CI the gate is a no-op (runners have no cost files); a CI budget source is deferred to Wave 1b/1c. | `~/.shipwright/budget.json` and `costs.json` (`entries[].cost_usd`, `ts_epoch`), as `scripts/sw-cost.sh` writes them |
 | Review WIP | Agent PRs awaiting review plus queued or running pipeline runs must be fewer than 5. An agent PR is open, not a draft, not `APPROVED`, and authored by `app/github-actions` or labelled `shipwright`. | `gh pr list --state open --json number,author,labels,isDraft,reviewDecision` |
 | Fix loop | Retry attempts 1–3 pass; the 4th is refused | `--attempt N` from the caller |
+| Auto-filed issues | The dispatch workflow and the daemon's selection loop skip every issue labelled `auto-patrol` (`$PATROL_LABEL`). A human opts one in by **removing** that label. `ready-to-build` cannot be the opt-in, because `sw-patrol-meta.sh` and `sw-strategic.sh` add it automatically, and nothing automated removes `auto-patrol`. Bulk-closing the backlog is out of scope. | `gh label list` (read-only, 2026-10-14): `auto-patrol`, `ready-to-build`, `shipwright` exist; no approval label does |
+| Retries | Auto-retry is the only retry path. The watchdog cancels stuck runs and comments; it never dispatches. For a run silent over 2 hours it labels `shipwright-stuck` and posts `SHIPWRIGHT-WATCHDOG-ABANDON: <run>` *before* cancelling, and auto-retry skips that run. | bot-authored comments |
 | Intake | Patrol files only while fewer than 25 `auto-patrol` issues are open and no open issue has the same title fingerprint (lowercase; each digit run becomes `0`; punctuation becomes a space) | `gh issue list --state open --limit 2000 --json number,title,labels` |
 | Bot markers | Workflows read `SHIPWRIGHT-*` markers only from comments whose `user.login` is `github-actions[bot]` **and** whose `user.type` is `Bot`. This uses REST; GraphQL reports the same account as `github-actions`. | `gh api --paginate repos/$GITHUB_REPOSITORY/issues/N/comments` |
 | Dashboard | Fleet routes (`/api/claim`, `/api/claim/release`, `/api/connect/*`, `/api/webhook/ci`) need `SHIPWRIGHT_FLEET_TOKEN` (header `X-Shipwright-Token` or `Authorization: Bearer`) or a signed-in session. Without a token configured they work only on loopback. Mutating requests must be `application/json` (except `/auth/*`), and a request that carries `Origin` must come from an allowed origin. CORS echoes only allowed origins: `http://localhost:<port>`, `http://127.0.0.1:<port>` and `SW_DASHBOARD_ORIGINS`. Startup refuses a non-loopback bind with auth `none` or without the token. | environment |
@@ -65,7 +69,7 @@ Exit codes for every gate command: `0` allowed; `1` blocked, or a source could n
 | `tools/arch/rules/f10-github-writes-only-in-writer.yml` and its rule test | F10 enforcement |
 | `tools/arch/rules/dashboard-no-shell-from-data.yml` and its rule test | The interim dashboard rule (spec §3.3) |
 | `scripts/lib/safety-gates.sh`, `scripts/sw-lib-safety-gates-test.sh` | Bash callers: `safety_gates_ok`, `patrol_issue_create`, `fleet_curl` |
-| `scripts/lib/daemon-{dispatch,failure,patrol,state}.sh`, `scripts/sw-connect.sh` | Minimal wiring of the gates and the fleet token |
+| `scripts/lib/daemon-{dispatch,failure,patrol,poll-github,state}.sh`, `scripts/sw-connect.sh` | Minimal wiring of the gates, the auto-patrol skip and the fleet token |
 | `scripts/ci/bot-comments.sh`, `scripts/sw-ci-bot-comments-test.sh` | Comments by the bot account only |
 | `.github/actions/safety-gates/action.yml` | Composite action: set up Bun, run `gates check`, output `allowed` |
 | `.github/workflows/shipwright-{dispatch,watchdog,auto-retry}.yml` | Gated, with bot-only markers |
@@ -5194,13 +5198,13 @@ Expected: one new commit; `git status --short` prints nothing.
 
 ---
 
-### Task 12: Bash: gate the daemon's dispatch, retries and patrol filing
+### Task 12: Bash: gate the daemon's dispatch, retries and patrol filing; skip auto-filed issues
 
 **Files:**
 - Create: `scripts/lib/safety-gates.sh`, `scripts/sw-lib-safety-gates-test.sh`
-- Modify: `scripts/lib/daemon-dispatch.sh`, `scripts/lib/daemon-failure.sh`, `scripts/lib/daemon-patrol.sh`
+- Modify: `scripts/lib/daemon-dispatch.sh`, `scripts/lib/daemon-failure.sh`, `scripts/lib/daemon-patrol.sh`, `scripts/lib/daemon-poll-github.sh`
 
-Minimal bash: one small library that only calls the TypeScript CLI (`bun src/cli.ts`, resolved relative to the library, so it works from any cwd), and three call sites. It fails closed: without Bun, `safety_gates_ok` returns 127 and nothing is dispatched or filed. The retry path passes its retry number for the fix-loop cap through `DAEMON_RETRY_ATTEMPT`. `daemon_spawn_pipeline` already returns 1 from its budget gate at the same point, so its callers handle the new early return. Verification is `bash -n`, shellcheck and hermetic suites only; the dispatch and patrol suites drive tmux and are not run (see Conventions).
+Minimal bash: one small library that only calls the TypeScript CLI (`bun src/cli.ts`, resolved relative to the library, so it works from any cwd), and four call sites. It also holds the dispatch-selection rule: an issue labelled `auto-patrol` (`$PATROL_LABEL`) is never dispatched until a human opts it in by removing that label. `ready-to-build` cannot be the opt-in, because `sw-patrol-meta.sh` and `sw-strategic.sh` add it automatically; nothing automated removes `auto-patrol`. `dispatch_eligible` serves the daemon's selection loop and `dispatchable_issue_numbers` the dispatch workflow (Task 14). It fails closed: without Bun, `safety_gates_ok` returns 127 and nothing is dispatched or filed. The retry path passes its retry number for the fix-loop cap through `DAEMON_RETRY_ATTEMPT`. `daemon_spawn_pipeline` already returns 1 from its budget gate at the same point, so its callers handle the new early return. Verification is `bash -n`, shellcheck and hermetic suites only; the dispatch and patrol suites drive tmux and are not run (see Conventions).
 
 - [ ] **Step 1: Write the failing suite**
 
@@ -5286,6 +5290,39 @@ fi
 assert_eq "nothing filed when refused" "" "$(cat "$GH_LOG")"
 export BUN_EXIT=0
 
+# ─── dispatch eligibility ─────────────────────────────────────────────────
+print_test_section "dispatch eligibility (auto-filed issues need a human opt-in)"
+
+if dispatch_eligible "shipwright,bug"; then
+    assert_pass "a human-filed issue is eligible"
+else
+    assert_fail "a human-filed issue is eligible"
+fi
+if dispatch_eligible "shipwright,auto-patrol,security"; then
+    assert_fail "an auto-patrol issue is skipped"
+else
+    assert_pass "an auto-patrol issue is skipped"
+fi
+if dispatch_eligible "shipwright,auto-patrol-meta"; then
+    assert_pass "only the exact label matches"
+else
+    assert_fail "only the exact label matches"
+fi
+if dispatch_eligible ""; then
+    assert_pass "an issue without labels is eligible"
+else
+    assert_fail "an issue without labels is eligible"
+fi
+if PATROL_LABEL="patrol" dispatch_eligible "shipwright,patrol"; then
+    assert_fail "honors a configured PATROL_LABEL"
+else
+    assert_pass "honors a configured PATROL_LABEL"
+fi
+issues='[{"number":1,"labels":[{"name":"shipwright"}]},
+ {"number":2,"labels":[{"name":"auto-patrol"},{"name":"shipwright"}]},
+ {"number":3,"labels":[]}]'
+assert_eq "filters gh issue list JSON" "1 3" "$(dispatchable_issue_numbers <<<"$issues" | tr '\n' ' ' | sed 's/ $//')"
+
 print_test_results
 ```
 
@@ -5352,13 +5389,31 @@ patrol_issue_create() {
     fi
     gh issue create "$@"
 }
+
+# Auto-filed issues (label $PATROL_LABEL, default auto-patrol) are never dispatched until a human
+# opts one in by removing that label (ADR-0007). Automation never removes it.
+
+# dispatch_eligible <labels-csv> — 0 when an issue with these labels may be dispatched.
+dispatch_eligible() {
+    case ",${1:-}," in
+        *",${PATROL_LABEL:-auto-patrol},"*) return 1 ;;
+    esac
+    return 0
+}
+
+# dispatchable_issue_numbers — reads `gh issue list --json number,labels` on stdin and prints the
+# numbers of the issues that may be dispatched, one per line.
+dispatchable_issue_numbers() {
+    jq -r --arg auto "${PATROL_LABEL:-auto-patrol}" \
+        '.[] | select([.labels[].name] | index($auto) | not) | .number'
+}
 ```
 
 ```bash
 bash scripts/sw-lib-safety-gates-test.sh
 ```
 
-Expected: `All 10 tests passed`.
+Expected: `All 16 tests passed`.
 
 - [ ] **Step 3: Gate `daemon_spawn_pipeline` in `scripts/lib/daemon-dispatch.sh`**
 
@@ -5445,11 +5500,55 @@ grep -c 'gh issue create' scripts/lib/daemon-patrol.sh || true
 
 Expected: `10`, then `0`.
 
-- [ ] **Step 6: Syntax, shellcheck and the hermetic suites**
+- [ ] **Step 6: Skip auto-filed issues in the daemon's selection loop (`scripts/lib/daemon-poll-github.sh`)**
+
+In `scripts/lib/daemon-poll-github.sh`, replace:
 
 ```bash
-for f in scripts/lib/safety-gates.sh scripts/lib/daemon-dispatch.sh scripts/lib/daemon-failure.sh scripts/lib/daemon-patrol.sh; do bash -n "$f" || echo "SYNTAX $f"; done
-shellcheck -x -S warning -e SC2034,SC1090,SC2148,SC2119,SC2120 scripts/lib/safety-gates.sh scripts/lib/daemon-failure.sh scripts/lib/daemon-patrol.sh scripts/sw-lib-safety-gates-test.sh; echo "shellcheck=$?"
+[[ -n "${_DAEMON_POLL_GITHUB_LOADED:-}" ]] && return 0
+_DAEMON_POLL_GITHUB_LOADED=1
+```
+
+with:
+
+```bash
+[[ -n "${_DAEMON_POLL_GITHUB_LOADED:-}" ]] && return 0
+_DAEMON_POLL_GITHUB_LOADED=1
+# shellcheck source=safety-gates.sh
+source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/safety-gates.sh"
+```
+
+In `scripts/lib/daemon-poll-github.sh`, replace:
+
+```bash
+        # Skip if already inflight
+        if daemon_is_inflight "$issue_key"; then
+            continue
+        fi
+```
+
+with:
+
+```bash
+        # Skip if already inflight
+        if daemon_is_inflight "$issue_key"; then
+            continue
+        fi
+
+        # Auto-filed issues wait for a human to remove the auto-patrol label (ADR-0007)
+        if ! dispatch_eligible "$labels_csv"; then
+            daemon_log INFO "Issue #${issue_num} is auto-filed — skipped until a human removes '${PATROL_LABEL:-auto-patrol}'"
+            continue
+        fi
+```
+
+The skip sits before the claim, the priority lane and the queue, so an auto-filed issue is never claimed, queued or spawned. (`sw-lib-daemon-poll-test` drives tmux, so this call site is verified by `bash -n` and shellcheck; the rule itself is covered by the suite.)
+
+- [ ] **Step 7: Syntax, shellcheck and the hermetic suites**
+
+```bash
+for f in scripts/lib/safety-gates.sh scripts/lib/daemon-dispatch.sh scripts/lib/daemon-failure.sh scripts/lib/daemon-patrol.sh scripts/lib/daemon-poll-github.sh; do bash -n "$f" || echo "SYNTAX $f"; done
+shellcheck -x -S warning -e SC2034,SC1090,SC2148,SC2119,SC2120 scripts/lib/safety-gates.sh scripts/lib/daemon-failure.sh scripts/lib/daemon-patrol.sh scripts/lib/daemon-poll-github.sh scripts/sw-lib-safety-gates-test.sh; echo "shellcheck=$?"
 shellcheck -x -S warning -e SC2034,SC1090,SC2148,SC2119,SC2120 scripts/lib/daemon-dispatch.sh | grep -c 'SC2155' || true
 bash scripts/sw-test-all.sh --pattern lib-safety-gates > /tmp/sw-gates.log 2>&1; echo "gates-suite=$?"
 bash scripts/sw-test-all.sh --pattern lib-daemon-failure > /tmp/sw-failure.log 2>&1; echo "failure-suite=$?"
@@ -5457,7 +5556,7 @@ bash scripts/sw-test-all.sh --pattern lib-daemon-failure > /tmp/sw-failure.log 2
 
 Expected: no `SYNTAX` lines; `shellcheck=0`; `2` (the two SC2155 warnings already in `daemon-dispatch.sh` on `export CLAUDE_MODEL=…` and `local job_id=…`; nothing new); `gates-suite=0`; `failure-suite=0` (that suite stubs `daemon_spawn_pipeline`, so it is hermetic).
 
-- [ ] **Step 7: Run the definition of done**
+- [ ] **Step 8: Run the definition of done**
 
 ```bash
 bun run format && git add -A scripts/lib scripts/sw-lib-safety-gates-test.sh && bun run check
@@ -5465,11 +5564,11 @@ bun run format && git add -A scripts/lib scripts/sw-lib-safety-gates-test.sh && 
 
 Expected: every stage passes (typecheck, Biome, `bun run arch`, tests, `docs:check`, `port:check`); the last lines are `✓ parity hello` and `1/1 parity suites passed`.
 
-- [ ] **Step 8: Commit**
+- [ ] **Step 9: Commit**
 
 ```bash
 git add -A scripts/lib scripts/sw-lib-safety-gates-test.sh
-git commit -m "feat(daemon): gate dispatch, retries and patrol filing"
+git commit -m "feat(daemon): gate dispatch, retries and patrol filing; skip auto-filed issues"
 ```
 
 Expected: one new commit; `git status --short` prints nothing.
@@ -5627,13 +5726,13 @@ Expected: one new commit; `git status --short` prints nothing.
 
 ---
 
-### Task 14: Gate the dispatch, watchdog and auto-retry workflows
+### Task 14: Gate dispatch and auto-retry; the watchdog only cancels
 
 **Files:**
 - Create: `.github/actions/safety-gates/action.yml`
 - Modify: `.github/workflows/shipwright-dispatch.yml`, `.github/workflows/shipwright-watchdog.yml`, `.github/workflows/shipwright-auto-retry.yml`
 
-The three workflows had no checkout; each now checks out (without persisted credentials), runs the composite action — set up Bun 1.2.19, `bun install --frozen-lockfile --ignore-scripts`, `bun src/cli.ts gates check`, output `allowed` — and acts only when it is `'true'`. Inside loops they re-run `bun src/cli.ts gates check` before each dispatch, because an earlier dispatch in the same run can close review WIP; dispatch also stops after `MAX_DISPATCH` (3) issues per run. `GH_REPO` is set at job level so the TypeScript `gh` calls target this repository. The watchdog still cancels stuck runs when a gate is closed; it only stops retrying. The auto-retry budget step (`shipwright cost remaining-budget`) is removed: the budget gate replaces it. No `${{ }}` appears inside any `run:` script (`bun run arch` checks the composite action too).
+The three workflows had no checkout; each now checks out (without persisted credentials) and sets `GH_REPO` at job level so the TypeScript `gh` calls target this repository. Dispatch and auto-retry run the composite action — set up Bun 1.2.19, `bun install --frozen-lockfile --ignore-scripts`, `bun src/cli.ts gates check`, output `allowed` — and act only when it is `'true'`. Dispatch re-runs `bun src/cli.ts gates check` before each issue, because an earlier dispatch in the same run can close review WIP; it stops after `MAX_DISPATCH` (3) issues per run, and it skips `auto-patrol` issues through `dispatchable_issue_numbers` (Task 12). **Auto-retry is the single retry path:** the watchdog only cancels stuck runs and comments; the cancelled run then triggers auto-retry, which applies the gates and the fix-loop cap. For a run silent over 2 hours the watchdog labels and comments (`SHIPWRIGHT-WATCHDOG-ABANDON`) *before* cancelling, and auto-retry skips any run carrying that bot marker. The auto-retry budget step (`shipwright cost remaining-budget`) is removed: the budget gate replaces it. No `${{ }}` appears inside any `run:` script (`bun run arch` checks the composite action too).
 
 - [ ] **Step 1: Create `.github/actions/safety-gates/action.yml`**
 
@@ -5678,7 +5777,7 @@ runs:
         fi
 ```
 
-- [ ] **Step 2: `shipwright-dispatch.yml` — checkout, gates, per-dispatch re-check and a per-run cap**
+- [ ] **Step 2: `shipwright-dispatch.yml` — checkout, gates, auto-patrol filter, per-dispatch re-check and a per-run cap**
 
 In `.github/workflows/shipwright-dispatch.yml`, replace:
 
@@ -5717,6 +5816,27 @@ with:
 In `.github/workflows/shipwright-dispatch.yml`, replace:
 
 ```yaml
+          # Get all open issues with the 'shipwright' label
+          ISSUES=$(gh issue list --repo "$GITHUB_REPOSITORY" \
+            --label shipwright --state open --json number,title \
+            --jq '.[].number' 2>/dev/null || echo "")
+```
+
+with:
+
+```yaml
+          # Open issues with the 'shipwright' label, minus auto-filed ones: an auto-patrol issue
+          # is dispatched only after a human removes that label (ADR-0007).
+          # shellcheck source=/dev/null
+          source scripts/lib/safety-gates.sh
+          ISSUES=$(gh issue list --repo "$GITHUB_REPOSITORY" \
+            --label shipwright --state open --limit 200 --json number,labels 2>/dev/null \
+            | dispatchable_issue_numbers 2>/dev/null || echo "")
+```
+
+In `.github/workflows/shipwright-dispatch.yml`, replace:
+
+```yaml
             # ── All checks passed — dispatch pipeline ──
 ```
 
@@ -5736,7 +5856,7 @@ with:
             # ── All checks passed — dispatch pipeline ──
 ```
 
-- [ ] **Step 3: `shipwright-watchdog.yml` — checkout, CLI setup, bot-only signals, gated retries**
+- [ ] **Step 3: `shipwright-watchdog.yml` — checkout, bot-only signals, cancel without retrying**
 
 In `.github/workflows/shipwright-watchdog.yml`, replace:
 
@@ -5756,13 +5876,11 @@ with:
       GH_REPO: ${{ github.repository }}
 
     steps:
+      # For scripts/ci/bot-comments.sh. The watchdog never dispatches: auto-retry is the only
+      # retry path (ADR-0007), so this job needs no safety gates.
       - uses: actions/checkout@v4
         with:
           persist-credentials: false
-
-      # Sets up the CLI; stuck runs are still cancelled when a gate is closed, only retries stop.
-      - name: Safety gates
-        uses: ./.github/actions/safety-gates
 
       - name: Monitor in-progress pipeline runs
 ```
@@ -5784,6 +5902,37 @@ with:
 In `.github/workflows/shipwright-watchdog.yml`, replace:
 
 ```yaml
+            # 45 min - 2h silence: cancel and retry
+            if [[ "$SILENT_MINS" -lt 120 ]]; then
+              echo "Status: STUCK (${SILENT_MINS}m silence) — cancelling and retrying"
+```
+
+with:
+
+```yaml
+            # 45 min - 2h silence: cancel. Retrying is auto-retry's job alone: it runs on the
+            # cancelled run, behind the safety gates and the fix-loop cap (ADR-0007).
+            if [[ "$SILENT_MINS" -lt 120 ]]; then
+              echo "Status: STUCK (${SILENT_MINS}m silence) — cancelling; auto-retry decides on a retry"
+```
+
+In `.github/workflows/shipwright-watchdog.yml`, replace:
+
+```yaml
+          | Action | Dispatching retry with resume |
+```
+
+with:
+
+```yaml
+          | Action | Cancelled — auto-retry decides whether to retry (safety gates, at most 3 retries) |
+```
+
+In `.github/workflows/shipwright-watchdog.yml`, delete the retry dispatch after the stuck comment — replace:
+
+```yaml
+          )" 2>/dev/null || true
+
               # Dispatch retry
               gh workflow run shipwright-pipeline.yml \
                 --repo "$GITHUB_REPOSITORY" \
@@ -5792,29 +5941,61 @@ In `.github/workflows/shipwright-watchdog.yml`, replace:
                 -f max_iterations="25" \
                 -f completed_stages="$COMPLETED_STAGES" \
                 -f skip_triage=true 2>/dev/null || echo "Failed to dispatch retry for #$ISSUE_NUMBER"
+              sleep 5
+              continue
 ```
 
 with:
 
 ```yaml
-              # Retry only through the safety gates. Attempt = earlier retries and watchdog
-              # cancels (bot markers) plus this one; the fix-loop cap stops the 4th.
-              PRIOR=$(echo "$COMMENTS_JSON" | jq -r '.body' 2>/dev/null | grep -cE 'SHIPWRIGHT-(RETRY|WATCHDOG-CANCEL):' || true)
-              ATTEMPT=$(( ${PRIOR:-0} + 1 ))
-              if bun src/cli.ts gates check --attempt "$ATTEMPT"; then
-                gh workflow run shipwright-pipeline.yml \
-                  --repo "$GITHUB_REPOSITORY" \
-                  -f issue_number="$ISSUE_NUMBER" \
-                  -f template=full \
-                  -f max_iterations="25" \
-                  -f completed_stages="$COMPLETED_STAGES" \
-                  -f skip_triage=true 2>/dev/null || echo "Failed to dispatch retry for #$ISSUE_NUMBER"
-              else
-                echo "Safety gates closed — not retrying #$ISSUE_NUMBER (attempt $ATTEMPT)"
-              fi
+          )" 2>/dev/null || true
+              continue
 ```
 
-- [ ] **Step 4: `shipwright-auto-retry.yml` — checkout and bot-only markers**
+In `.github/workflows/shipwright-watchdog.yml`, move the abandon branch's cancel after its comment — first replace:
+
+```yaml
+            # Cancel the run
+            gh run cancel "$RUN_ID" --repo "$GITHUB_REPOSITORY" 2>/dev/null || true
+
+            # Label as stuck
+```
+
+with:
+
+```yaml
+            # Label and comment BEFORE cancelling: auto-retry starts as soon as the run is
+            # cancelled, and skips it only when the SHIPWRIGHT-WATCHDOG-ABANDON marker exists.
+            # Label as stuck
+```
+
+then replace:
+
+```yaml
+          <!-- SHIPWRIGHT-WATCHDOG-ABANDON: $RUN_ID -->
+          EOF
+          )" 2>/dev/null || true
+```
+
+with:
+
+```yaml
+          <!-- SHIPWRIGHT-WATCHDOG-ABANDON: $RUN_ID -->
+          EOF
+          )" 2>/dev/null || true
+
+            # Cancel the run (after the marker exists)
+            gh run cancel "$RUN_ID" --repo "$GITHUB_REPOSITORY" 2>/dev/null || true
+```
+
+```bash
+grep -cE 'gh workflow run shipwright-pipeline.yml \\$' .github/workflows/shipwright-watchdog.yml || true
+grep -n 'gh run cancel' .github/workflows/shipwright-watchdog.yml
+```
+
+Expected: `0` (the watchdog dispatches nothing; the only `gh workflow run` left is the manual-retry hint inside the abandon comment), then two `gh run cancel` lines: the stuck branch's, and the abandon branch's, which now comes after its `SHIPWRIGHT-WATCHDOG-ABANDON` comment.
+
+- [ ] **Step 4: `shipwright-auto-retry.yml` — checkout, bot-only markers, skip abandoned runs**
 
 In `.github/workflows/shipwright-auto-retry.yml`, replace:
 
@@ -5894,6 +6075,14 @@ with:
             exit 0
           fi
           COMMENTS=$(echo "$BOT_JSON" | jq -r '.[].body')
+
+          # A run the watchdog abandoned (silent over 2h) is never retried automatically.
+          if echo "$COMMENTS" | grep -qF "SHIPWRIGHT-WATCHDOG-ABANDON: $RUN_ID"; then
+            echo "Run $RUN_ID was abandoned by the watchdog — not retrying"
+            echo "should_retry=false" >> "$GITHUB_OUTPUT"
+            echo "skip_reason=abandoned" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
 ```
 
 In `.github/workflows/shipwright-auto-retry.yml`, replace:
@@ -5989,7 +6178,7 @@ Expected: every stage passes (typecheck, Biome, `bun run arch`, tests, `docs:che
 
 ```bash
 git add -A .github
-git commit -m "ci: gate dispatch, watchdog and auto-retry; bot-only markers"
+git commit -m "ci: gate dispatch and auto-retry, skip auto-filed issues; watchdog only cancels"
 ```
 
 Expected: one new commit; `git status --short` prints nothing.
@@ -6761,7 +6950,7 @@ fleet_curl() {
 bash scripts/sw-lib-safety-gates-test.sh
 ```
 
-Expected: `All 13 tests passed`.
+Expected: `All 19 tests passed`.
 
 - [ ] **Step 3: Send the token from the daemon's claim and release**
 
@@ -6933,7 +7122,12 @@ auto-retry workflows call it through `.github/actions/safety-gates`; the bash da
 - **Fix loop:** retry attempts 1–3 pass; the 4th escalates to a human.
 - **Intake:** patrol files an issue only while fewer than 25 `auto-patrol` issues are open and no
   open issue has the same title fingerprint.
-- Workflows read `SHIPWRIGHT-*` markers only from comments by `github-actions[bot]` (type `Bot`).
+- **Auto-filed issues:** the dispatch workflow and the daemon skip any issue labelled `auto-patrol`.
+  A human opts one in by removing that label (`ready-to-build` cannot be the opt-in: automation adds it).
+- **Retries:** auto-retry is the only retry path. The watchdog cancels stuck runs and comments. For a
+  run silent over 2 hours it posts `SHIPWRIGHT-WATCHDOG-ABANDON` before cancelling; auto-retry skips it.
+- Workflows read `SHIPWRIGHT-*` markers only from comments by `github-actions[bot]` (type `Bot`),
+  or by `$SHIPWRIGHT_BOT_LOGIN` when a GitHub App token is used.
 - The thresholds are the `DEFAULT_*_POLICY` constants until the zod config adapter lands.
 
 The incident issue is the first F10 method: `GithubWriter.ensureIncident(key, report)` in
@@ -6950,7 +7144,8 @@ for listed origins, and refuses to bind a non-loopback address with auth `none` 
   one place.
 - Each check costs about five GitHub API calls; intake lists every open issue (~7 s).
 - Local daemon outcomes do not feed the breaker until the run journal exists (Wave 1b).
-- In CI the budget gate is a no-op, because runners have no cost files.
+- In CI the budget gate is a no-op, because runners have no cost files; a CI budget source is
+  deferred to Wave 1b/1c. The local gate stays.
 - A fingerprint misses paraphrased duplicates. A semantic dedupe replaces it later.
 ```
 
@@ -7027,7 +7222,7 @@ read `SHIPWRIGHT-*` markers only through `scripts/ci/bot-comments.sh` (ADR-0007)
 wc -l AGENTS.md docs/adr/0007-safety-controls.md
 ```
 
-Expected: `78 AGENTS.md` (≤ 150) and `52 docs/adr/0007-safety-controls.md` (≤ 60).
+Expected: `78 AGENTS.md` (≤ 150) and `58 docs/adr/0007-safety-controls.md` (≤ 60).
 
 - [ ] **Step 5: Run the definition of done**
 
@@ -7054,7 +7249,7 @@ Expected: one new commit; `git status --short` prints nothing.
 
 - [ ] **Step 1: Dispatch the `verifier` subagent**
 
-Prompt: "Verify Wave 1a on branch `wave1/safety` against `docs/superpowers/plans/2026-10-14-wave-1a-safety.md`. Run `bun run check`, `bunx vitest run --config dashboard/vitest.config.ts`, CI's shellcheck command, actionlint on the three workflows, and only the hermetic bash suites listed under Conventions. Try to break the gates: an unreadable source must block, a paused system must not write an incident, auto-retry must ignore a `SHIPWRIGHT-RETRY: 0` comment from a user, no `${{ }}` inside `run:`, no `gh` write outside `gh-github-writer.ts`." Expected: `PASS` with evidence. On `FAIL`, fix and re-run, up to three cycles; then report what remains.
+Prompt: "Verify Wave 1a on branch `wave1/safety` against `docs/superpowers/plans/2026-10-14-wave-1a-safety.md`. Run `bun run check`, `bunx vitest run --config dashboard/vitest.config.ts`, CI's shellcheck command, actionlint on the three workflows, and only the hermetic bash suites listed under Conventions. Try to break the gates: an unreadable source must block, a paused system must not write an incident, auto-retry must ignore a `SHIPWRIGHT-RETRY: 0` comment from a user and skip a run the watchdog abandoned, the watchdog must never dispatch, an `auto-patrol` issue must never be dispatched by the workflow or the daemon, no `${{ }}` inside `run:`, no `gh` write outside `gh-github-writer.ts`." Expected: `PASS` with evidence. On `FAIL`, fix and re-run, up to three cycles; then report what remains.
 
 - [ ] **Step 2: Dispatch the `reviewer` subagent on `git diff docs/ts-migration-spec...HEAD`**
 
