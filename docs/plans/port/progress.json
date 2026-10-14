@@ -826,5 +826,14 @@
     "context": "platform",
     "parity": "scripts/sw-hello-test.sh",
     "status": "parity-green"
+  },
+  {
+    "command": "breaker",
+    "aliases": [],
+    "script": "sw-breaker.sh",
+    "context": "orchestration",
+    "parity": null,
+    "status": "parity-green",
+    "notes": "New in Wave 1a (spec §6.2 global circuit breaker); no bash predecessor."
   }
 ]

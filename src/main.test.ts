@@ -1,6 +1,11 @@
 import { expect, test } from "bun:test";
+import { existsSync } from "node:fs";
+import { join } from "node:path";
 import type { Command } from "./cli/command";
-import { main } from "./main";
+import { commands } from "./cli/commands";
+import { buildSafetyPorts, main } from "./main";
+import { fakeSafetyPorts } from "./testing/fake-safety-ports";
+import { createTestEnv } from "./testing/test-env";
 
 function io() {
   const out: string[] = [];
@@ -88,4 +93,39 @@ test("args are forwarded to the command", async () => {
   const c = io();
   expect(await main(["hello", "--version"], c.io)).toBe(0);
   expect(c.out).toEqual(["3.3.0"]);
+});
+
+test("a command gets the injected safety factory; hello never calls it", async () => {
+  const c = io();
+  let built = 0;
+  const probe: Command = {
+    name: "probe",
+    aliases: [],
+    summary: "uses ports",
+    usage: "",
+    run: async (_args, ctx) => {
+      ctx.safety();
+      return 0;
+    },
+  };
+  const ports = fakeSafetyPorts();
+  const safety = () => {
+    built++;
+    return ports;
+  };
+  expect(await main(["hello"], c.io, [...commands, probe], safety)).toBe(0);
+  expect(built).toBe(0);
+  expect(await main(["probe"], c.io, [probe], safety)).toBe(0);
+  expect(built).toBe(1);
+});
+
+test("buildSafetyPorts keeps the pause flag where the bash daemon reads it", async () => {
+  const env = createTestEnv();
+  try {
+    const ports = buildSafetyPorts({ HOME: env.home, SHIPWRIGHT_STATE_DIR: join(env.root, "s") });
+    await ports.pauseFlag.write("test", "2026-10-14T00:00:00.000Z");
+    expect(existsSync(join(env.home, ".shipwright", "daemon-pause.flag"))).toBe(true);
+  } finally {
+    env.cleanup();
+  }
 });

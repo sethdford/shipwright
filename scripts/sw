@@ -620,6 +620,9 @@ main() {
         hello)
             run_ts hello "$@"
             ;;
+        breaker)
+            run_ts breaker "$@"
+            ;;
         *)
             error "Unknown command: ${cmd}"
             echo ""
