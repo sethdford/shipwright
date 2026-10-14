@@ -1,6 +1,7 @@
 /**
  * Anti-laundering for baselines (ADR-0008): compared with the merge base of a branch, no baseline
- * may gain an entry or a higher count. Used by `ast-scan.ts --against` and `size-ratchet.ts --against`.
+ * may gain an entry or a higher count, and no rule may lose its key. Used by `ast-scan.ts --against`
+ * and `size-ratchet.ts --against`.
  */
 type Grouped = Record<string, Record<string, number>>;
 
@@ -20,6 +21,16 @@ export function baselineAt(ref: string, path: string, root: string): Grouped | u
 /** Entries that are new or higher than at the base, within groups the base already has. */
 export function risesAgainst(base: Grouped, head: Grouped): string[] {
   const out: string[] = [];
+  // A group the base has and HEAD lacks: the rule was renamed or removed, so its debt left the
+  // baseline without being paid. Rules keep their key even at zero (an empty object), so this only
+  // fires on a rename or removal.
+  for (const group of Object.keys(base)) {
+    if (!(group in head)) {
+      out.push(
+        `${group} is missing from the baseline: a rule was renamed or removed. Keep its key (an empty object when it reached zero).`,
+      );
+    }
+  }
   for (const [group, entries] of Object.entries(head)) {
     const known = base[group];
     if (!known) continue;

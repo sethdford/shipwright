@@ -40,3 +40,12 @@ test("reads the baseline at the merge base; fails closed on an unknown ref", () 
   expect(baselineAt("main", "missing.json", dir)).toBeUndefined();
   expect(() => baselineAt("no-such-ref", "b.json", dir)).toThrow(/merge-base/);
 });
+
+test("a rule key the base has but HEAD lacks is a rename or removal, which launders debt", () => {
+  // Renaming a rule and re-seeding its findings under the new id must not pass --against.
+  expect(risesAgainst({ R1: { "a.sh": 2 }, R2: {} }, { R1: { "a.sh": 2 } })).toEqual([
+    "R2 is missing from the baseline: a rule was renamed or removed. Keep its key (an empty object when it reached zero).",
+  ]);
+  // A key that reached zero is still present, so it is not a removal.
+  expect(risesAgainst({ R1: { "a.sh": 2 } }, { R1: {} })).toEqual([]);
+});
