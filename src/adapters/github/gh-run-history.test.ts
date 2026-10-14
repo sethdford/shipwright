@@ -49,7 +49,11 @@ test.each([
   expect(toRunRecord(ghRun("completed", conclusion))?.finished?.outcome).toBe(outcome as never);
 });
 
-test.each([["cancelled"], ["skipped"], ["neutral"], ["action_required"], ["stale"]])(
+test("conclusion cancelled is kept as a cancelled outcome", () => {
+  expect(toRunRecord(ghRun("completed", "cancelled"))?.finished?.outcome).toBe("cancelled");
+});
+
+test.each([["skipped"], ["neutral"], ["action_required"], ["stale"]])(
   "conclusion %p is not counted",
   (conclusion) => {
     expect(toRunRecord(ghRun("completed", conclusion))).toBeNull();

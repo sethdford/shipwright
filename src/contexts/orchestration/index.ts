@@ -2,6 +2,7 @@ export {
   type BreakerPolicy,
   type BreakerState,
   breakerAllowsDispatch,
+  breakerPolicy,
   DEFAULT_BREAKER_POLICY,
   describeBreaker,
   evaluateBreaker,

@@ -1,7 +1,8 @@
 // Global circuit breaker (spec §6.2, ADR-0007). Pure: the state is recomputed from run history on
 // every check, so every caller (CI workflows, the daemon, any machine) reaches the same answer.
 
-export type RunOutcome = "success" | "failure";
+/** `cancelled` is neither a failure nor a success: it never enters the window or settles a probe. */
+export type RunOutcome = "success" | "failure" | "cancelled";
 
 export interface RunRecord {
   readonly id: string;
@@ -20,11 +21,26 @@ export interface BreakerPolicy {
   readonly coolDownMs: number;
 }
 
-export const DEFAULT_BREAKER_POLICY: BreakerPolicy = {
+/** Returns the policy, or throws if it could never behave sensibly. */
+export function breakerPolicy(policy: BreakerPolicy): BreakerPolicy {
+  const { window, maxFailures, coolDownMs } = policy;
+  if (!Number.isInteger(window) || window < 1) {
+    throw new Error(`breaker window must be an integer >= 1, got ${window}`);
+  }
+  if (!Number.isInteger(maxFailures) || maxFailures < 1 || maxFailures > window) {
+    throw new Error(`breaker maxFailures must be an integer in 1..${window}, got ${maxFailures}`);
+  }
+  if (!Number.isFinite(coolDownMs) || coolDownMs <= 0) {
+    throw new Error(`breaker coolDownMs must be > 0, got ${coolDownMs}`);
+  }
+  return policy;
+}
+
+export const DEFAULT_BREAKER_POLICY: BreakerPolicy = breakerPolicy({
   window: 8,
   maxFailures: 5,
   coolDownMs: 30 * 60 * 1000,
-};
+});
 
 export type BreakerState =
   | { readonly kind: "closed"; readonly failures: number; readonly considered: number }
@@ -40,6 +56,7 @@ const isFinished = (r: RunRecord): r is Finished => r.finished !== null;
 const failuresIn = (window: readonly RunOutcome[]) => window.filter((o) => o === "failure").length;
 
 function step(fold: Fold, run: Finished, policy: BreakerPolicy): Fold {
+  if (run.finished.outcome === "cancelled") return fold;
   if (fold.state === "closed") {
     const window = [...fold.window, run.finished.outcome].slice(-policy.window);
     return failuresIn(window) >= policy.maxFailures
@@ -53,13 +70,25 @@ function step(fold: Fold, run: Finished, policy: BreakerPolicy): Fold {
     : { state: "open", since: run.finished.at };
 }
 
-/** Folds finished runs in completion order, then applies the cool-down at `now`. */
+const byCompletion = (a: Finished, b: Finished) =>
+  a.finished.at - b.finished.at ||
+  a.startedAt - b.startedAt ||
+  (a.id < b.id ? -1 : a.id > b.id ? 1 : 0);
+
+/**
+ * Folds finished runs in completion order (ties: start time, then id), then applies the cool-down
+ * at `now`. `now` must come from the same clock as the run timestamps (GitHub server time), or
+ * skew moves the cool-down edges. Runs that were in flight when it opened are ignored: only a run
+ * created after the cool-down can be the probe. A probe still in flight after a further cool-down
+ * is treated as abandoned, so a stuck run cannot block dispatch forever.
+ */
 export function evaluateBreaker(
   runs: readonly RunRecord[],
   now: number,
-  policy: BreakerPolicy = DEFAULT_BREAKER_POLICY,
+  rawPolicy: BreakerPolicy = DEFAULT_BREAKER_POLICY,
 ): BreakerState {
-  const finished = runs.filter(isFinished).sort((a, b) => a.finished.at - b.finished.at);
+  const policy = breakerPolicy(rawPolicy);
+  const finished = runs.filter(isFinished).sort(byCompletion);
   const fold = finished.reduce<Fold>((f, run) => step(f, run, policy), {
     state: "closed",
     window: [],
@@ -69,7 +98,10 @@ export function evaluateBreaker(
   }
   const probeAfter = fold.since + policy.coolDownMs;
   if (now < probeAfter) return { kind: "open", since: fold.since, probeAfter };
-  const probing = runs.some((r) => r.finished === null && r.startedAt >= probeAfter);
+  const probing = runs.some(
+    (r) =>
+      r.finished === null && r.startedAt >= probeAfter && now - r.startedAt <= policy.coolDownMs,
+  );
   return { kind: "half_open", since: fold.since, probing };
 }
 

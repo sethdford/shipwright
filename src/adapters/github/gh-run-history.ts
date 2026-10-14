@@ -13,11 +13,12 @@ const GhRun = z.object({
 });
 type GhRun = z.infer<typeof GhRun>;
 
-/** Conclusions that count as a failed run. Cancelled, skipped and neutral runs are not counted. */
+/** Conclusions that count as a failed run. Skipped, neutral, stale and action_required runs are dropped. */
 const FAILED = new Set(["failure", "timed_out", "startup_failure"]);
 
 function outcomeOf(conclusion: string | null): RunOutcome | null {
   if (conclusion === "success") return "success";
+  if (conclusion === "cancelled") return "cancelled";
   return FAILED.has(conclusion ?? "") ? "failure" : null;
 }
 
