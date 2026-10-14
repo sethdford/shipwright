@@ -23,16 +23,41 @@ jobs:
 
     env:
       GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      GH_REPO: ${{ github.repository }}
 
     steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      # Fails the job unless every gate allows dispatch (ADR-0007).
+      - name: Safety gates
+        id: gates
+        uses: ./.github/actions/safety-gates
+        with:
+          retry: "0"
+
       - name: Scan and dispatch shipwright-labeled issues
+        if: steps.gates.outputs.allowed == 'true'
+        shell: bash
+        env:
+          MAX_DISPATCH: "3"
         run: |
           echo "--- Shipwright Dispatch: $(date -u +%Y-%m-%dT%H:%M:%SZ) ---"
 
-          # Get all open issues with the 'shipwright' label
-          ISSUES=$(gh issue list --repo "$GITHUB_REPOSITORY" \
-            --label shipwright --state open --json number,title \
-            --jq '.[].number' 2>/dev/null || echo "")
+          # Open issues with the 'shipwright' label, minus auto-filed (auto-patrol) and
+          # shipwright-stuck ones: those wait until a human removes that label (ADR-0007).
+          # shellcheck source=/dev/null
+          source scripts/lib/safety-gates.sh
+          if ! ISSUE_LIST=$(gh issue list --repo "$GITHUB_REPOSITORY" \
+            --label shipwright --state open --limit 200 --json number,labels); then
+            echo "::error::cannot list shipwright issues"
+            exit 1
+          fi
+          if ! ISSUES=$(dispatchable_issue_numbers <<<"$ISSUE_LIST"); then
+            echo "::error::cannot read the shipwright issue list"
+            exit 1
+          fi
 
           if [[ -z "$ISSUES" ]]; then
             echo "No open shipwright-labeled issues found."
@@ -105,6 +130,16 @@ jobs:
               echo "Issue #$issue: pipeline already completed with PR — skipping"
               SKIPPED=$((SKIPPED + 1))
               continue
+            fi
+
+            # ── Per-run cap, then the gates again: an earlier dispatch may have closed one ──
+            if [[ "$DISPATCHED" -ge "$MAX_DISPATCH" ]]; then
+              echo "Dispatched $DISPATCHED issue(s), the per-run cap — stopping"
+              break
+            fi
+            if ! bun src/cli.ts gates check --retry 0; then
+              echo "::warning::Safety gates no longer allow dispatch — stopping"
+              break
             fi
 
             # ── All checks passed — dispatch pipeline ──

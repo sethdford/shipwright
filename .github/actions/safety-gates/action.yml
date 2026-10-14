@@ -1,0 +1,41 @@
+name: Shipwright safety gates
+description: >-
+  Installs the Shipwright TypeScript CLI and runs `shipwright gates check` (pause, breaker,
+  budget, review WIP, fix loop; ADR-0007). Fails the step, and so the job, unless every gate
+  allows dispatch: a closed gate, an unreadable source, a usage error or a missing Bun all stop
+  the job. Output `allowed` is 'true' only on success. Requires actions/checkout first and
+  GITHUB_TOKEN and GH_REPO in the job env.
+inputs:
+  retry:
+    description: >-
+      The fix-loop count: 0 for a first dispatch, N for the Nth retry. Required with no
+      default, because an unknown count must not read as a first dispatch.
+    required: true
+outputs:
+  allowed:
+    description: "'true' when every gate allows dispatch (the step fails otherwise)"
+    value: ${{ steps.gates.outputs.allowed }}
+runs:
+  using: composite
+  steps:
+    - uses: oven-sh/setup-bun@v2
+      with:
+        bun-version: 1.2.19
+    - name: Install the Shipwright CLI dependencies
+      shell: bash
+      run: bun install --frozen-lockfile --ignore-scripts
+    - name: Check the dispatch gates
+      id: gates
+      shell: bash
+      env:
+        RETRY: ${{ inputs.retry }}
+      run: |
+        # Exit 0 is the only "allowed"; 1 (blocked or unverifiable), 2 (usage), 127 or a signal
+        # all stop the job. The report goes to the log.
+        if bun src/cli.ts gates check --retry "$RETRY"; then
+          echo "allowed=true" >> "$GITHUB_OUTPUT"
+        else
+          rc=$?
+          echo "::error::Shipwright safety gates did not allow dispatch (exit $rc); nothing dispatched"
+          exit 1
+        fi
