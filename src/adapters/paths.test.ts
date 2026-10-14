@@ -21,3 +21,15 @@ test("honours explicit overrides", () => {
 test("fails loudly without HOME rather than guessing", () => {
   expect(() => resolvePaths({})).toThrow(/HOME is not set/);
 });
+
+test("treats an empty override as unset", () => {
+  expect(resolvePaths({ HOME: "/h", SHIPWRIGHT_STATE_DIR: "" }).stateDir).toBe("/h/.shipwright");
+});
+
+test("rejects a relative HOME", () => {
+  expect(() => resolvePaths({ HOME: "h" })).toThrow(/absolute/);
+});
+
+test("rejects a relative state dir", () => {
+  expect(() => resolvePaths({ HOME: "/h", SHIPWRIGHT_STATE_DIR: "rel" })).toThrow(/absolute/);
+});

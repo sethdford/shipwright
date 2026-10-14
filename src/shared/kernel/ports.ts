@@ -13,11 +13,12 @@ export interface AdapterError {
 export interface ProcessRequest {
   readonly argv: readonly string[];
   readonly cwd?: string;
-  /** Replaces the child environment entirely. Omit to inherit the parent's environment. */
+  /** Replaces the child environment entirely. Omit to inherit the parent's environment. When replacing, pass PATH explicitly. */
   readonly env?: Readonly<Record<string, string>>;
   readonly stdin?: string;
   readonly timeoutMs?: number;
 }
+/** Check `timedOut` before `exitCode`: a timed-out child may still report 0. */
 export interface ProcessResult {
   readonly exitCode: number;
   readonly stdout: string;
