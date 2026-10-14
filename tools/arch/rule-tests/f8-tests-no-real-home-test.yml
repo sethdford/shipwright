@@ -1,0 +1,12 @@
+id: F8-tests-no-real-home
+valid:
+  - 'const env = createTestEnv(); const h = env.home;'
+  - 'const h = testEnv.homedir;'
+invalid:
+  - 'const h = homedir();'
+  - 'const h = os.homedir();'
+  - 'const e = process.env;'
+  - 'const e = process["env"];'
+  - "const e = process['env'];"
+  - 'const e = Bun.env;'
+  - 'const { env } = process;'
