@@ -50,26 +50,49 @@ Example path: `src/cli/commands/hello.ts` → `src/contexts/platform/index.ts` �
 ### Fitness rules
 
 Enforced by `bun run arch` (part of `bun run check`). Every failure names the rule and the fix.
+Why there are so many, and how ratchets work: [ADR-0008](adr/0008-fitness-functions-everywhere.md).
+The current import graph is generated: [`docs/reference/dependency-graph.md`](reference/dependency-graph.md).
 
 | # | Rule | Tool |
 |---|---|---|
 | F1 | Domain (and the kernel) is pure: no I/O, no Node or Bun built-ins | dependency-cruiser |
 | F2 | Application never imports `adapters/` or `cli/` | dependency-cruiser |
-| F3 | Contexts meet only at `index.ts`; production code never imports `src/testing/` | dependency-cruiser |
+| F3 | Contexts meet only at `index.ts`; production code never imports `src/testing/`; `src/` never imports `dashboard/` | dependency-cruiser |
 | F4 | No import cycles | dependency-cruiser |
-| F5 | I/O (`Bun.spawn`, `Bun.$`, other `Bun` members, `fetch`, `process.env`, `node:fs`, `node:process`, network modules) only in `src/adapters`, `src/main.ts`, `src/cli.ts` and `src/testing` | ast-grep |
+| F5 | I/O only in `src/adapters`, `src/main.ts`, `src/cli.ts` and `src/testing`: `Bun` members, `fetch`, `process.env`, `node:fs`, `node:os`, `node:process`, network modules; also `Bun`/`process`/`globalThis` used as values, `globalThis?.x`/`global.x`, `import.meta.env`, computed `import()`/`require()`, `eval`/`Function`, `new Worker`/`WebSocket` | ast-grep |
 | F6 | The Agent SDK is imported only by `adapters/agent/` | ast-grep |
 | F7 | Files ≤ 300 lines, functions ≤ 40; the baseline may only shrink | size ratchet |
 | F8 | Tests use `createTestEnv()` paths, never the real home or environment | ast-grep |
-| F10 (part) | `gh` write subcommands in `src/` only in `src/adapters/github/gh-github-writer.ts` | ast-grep |
-| — | `dashboard/**`: no shell command built from request data (interim, until the port) | ast-grep |
+| F9 | No permission-bypass spelling (substring, template or `+` pieces) and no GitHub token name in `src/` or `dashboard/` (tests, `adapters/github` and `adapters/agent/privilege-guard.ts` excepted); SDK calls pass a literal `env:` and a literal `permissionMode`; `assertAgentOptions()` refuses both at run time; `agentEnv()` drops the tokens. Bash: bypass flags and `claude` without `env -u GH_TOKEN -u GITHUB_TOKEN`, ratcheted | ast-grep, unit tests, findings ratchet |
+| F10 | `gh` write subcommands only in `src/adapters/github/gh-github-writer.ts`. Bash (`gh` writes, `gh api` writes, `git push`): ratcheted | ast-grep, findings ratchet |
+| F11 | Bash: no `eval`/`command eval`/`source /dev/stdin <<<` with an expansion; no `sh -c`, `"$SHELL" -c`, `python -c`, `node -e`, here-string into a shell or `ssh host "cmd $x"` built from data; no download run as code; no `${{` | ast-grep (Bash), findings ratchet |
+| F12 | Dashboard: browser bundle and server never import each other and neither imports `src/` (D1); `services/` is the bottom layer (D2); routes never import `server.ts` or each other (D3); no cycles (D4); processes are spawned only by allowlisted services; no shell command built from request data (`dashboard-no-shell-from-data`, ADR-0007) | dependency-cruiser, ast-grep, findings ratchet |
 
-Planned, follow them now:
-- **F9** (Wave 1): agents get no GitHub token and no permission bypass.
-- **F10** in full (run-scoped writes from Wave 1b; every integration by the end of Wave 2): GitHub
-  side effects go only through the fenced, idempotent `integrations` adapter, with an
-  `IdempotencyKey` and a `FenceToken` in the signature. The first method, `ensureIncident`, takes no
-  fence (no lease covers a system-wide incident; ADR-0007).
+Bash rules cover `scripts/**/*.sh`, `scripts/sw`, `.claude/hooks`, `claude-code/hooks`,
+`completions/*.bash` and `install.sh`.
+
+**Ratchets.** Existing violations of F9–F12 are counted per rule and file in
+[`findings-baseline.json`](../tools/arch/findings-baseline.json) by
+[`ast-scan.ts`](../tools/arch/ast-scan.ts), which runs every ast-grep rule over the files git knows
+(never a directory walk). Counts may only go down: a new file or a higher count fails, and so does a
+count that dropped without tightening the baseline. A rule that reaches zero keeps an empty entry,
+which fails the meta-test until the rule is promoted to `severity: error`. In CI,
+`--against origin/<base>` also fails when this baseline or `arch-baseline.json` gained an entry or a
+count against the merge base, so a baseline cannot be raised in the same PR that adds the debt.
+
+**Meta-checks** ([`meta.test.ts`](../tools/arch/meta.test.ts),
+[`depcruise-rules.test.ts`](../tools/arch/depcruise-rules.test.ts)): every ast-grep rule has a rule
+test with valid and invalid cases, a message that starts with its family and names a fix, an owner,
+a docs anchor here, and `files` that match a tracked file; the rule set, the ratcheted set and every
+allowlist (`ignores`) are pinned; no `ast-grep-ignore` comment exists; every dependency-cruiser rule
+fires on a fixture; `bun run arch` runs every checker. [`CODEOWNERS`](../.github/CODEOWNERS) puts
+`tools/arch/`, `sgconfig.yml`, the dependency-cruiser configs and `package.json` under the
+maintainer's review.
+
+F10 in full (run-scoped writes from Wave 1b; every integration by the end of Wave 2): GitHub side
+effects go only through the fenced, idempotent `integrations` adapter, with an `IdempotencyKey` and a
+`FenceToken` in the signature. The first method, `ensureIncident`, takes no fence (no lease covers a
+system-wide incident; ADR-0007).
 
 Workflows: no `${{ }}` expression of any kind inside a `run:` script or an `actions/github-script`
 `script:` body; values go through `env:`. This check is strict, with no baseline. A second check
@@ -77,8 +100,10 @@ fails a workflow that pipes, `||`-defaults or discards stderr of `gates check`, 
 `retry-state.sh` or `pipeline-active.sh`, runs `gates check --no-github`, or sets
 `continue-on-error` on the safety gates (fail closed, ADR-0007).
 
-Config: [`.dependency-cruiser.cjs`](../.dependency-cruiser.cjs), [`sgconfig.yml`](../sgconfig.yml)
-with [`tools/arch/rules/`](../tools/arch/rules), [`tools/arch/size-ratchet.ts`](../tools/arch/size-ratchet.ts)
+Config: [`.dependency-cruiser.cjs`](../.dependency-cruiser.cjs),
+[`.dependency-cruiser.dashboard.cjs`](../.dependency-cruiser.dashboard.cjs),
+[`sgconfig.yml`](../sgconfig.yml) with [`tools/arch/rules/`](../tools/arch/rules) and
+[`tools/arch/utils/`](../tools/arch/utils), [`tools/arch/size-ratchet.ts`](../tools/arch/size-ratchet.ts)
 with [`arch-baseline.json`](../tools/arch/arch-baseline.json),
 [`tools/arch/workflow-injection.ts`](../tools/arch/workflow-injection.ts),
 [`tools/arch/workflow-fail-closed.ts`](../tools/arch/workflow-fail-closed.ts).
@@ -163,5 +188,7 @@ suites against the TypeScript command in a sealed sandbox. Tooling: [`tools/port
 - [0005 Durability contract and three deployment modes](adr/0005-durability-contract-and-deployment-modes.md)
 - 0006 Credentials and capability separation (planned, Wave 1)
 - [0007 Safety controls gate every dispatch](adr/0007-safety-controls.md)
+- [0008 Fitness functions everywhere, with ratchets for legacy code](adr/0008-fitness-functions-everywhere.md)
 
-Generated reference: [`docs/reference/cli.md`](reference/cli.md) (`bun run docs:gen`).
+Generated reference: [`docs/reference/cli.md`](reference/cli.md) and
+[`docs/reference/dependency-graph.md`](reference/dependency-graph.md) (`bun run docs:gen`).

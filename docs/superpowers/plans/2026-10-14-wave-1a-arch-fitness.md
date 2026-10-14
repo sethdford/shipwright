@@ -3022,7 +3022,7 @@ From now on, a change that adds an import between layers also needs `bun run doc
 - Create: `docs/adr/0008-fitness-functions-everywhere.md`
 - Modify: `AGENTS.md`, `docs/architecture.md`, `docs/superpowers/specs/2026-10-13-shipwright-ts-migration-design.md`
 
-Each edit replaces a whole section, so it applies on top of Wave 1a Task 17's wording. Every rule's `metadata.docs` points at `docs/architecture.md#fitness-rules`; keep that heading (the meta-test checks the anchor).
+Each edit replaces a whole section, so it applies on top of Wave 1a Task 17's wording; the replacement text below already carries Task 17's additions (the workflow fail-closed check and its config link, F10 in full with the fence-less `ensureIncident`). Every rule's `metadata.docs` points at `docs/architecture.md#fitness-rules`; keep that heading (the meta-test checks the anchor).
 
 - [ ] **Step 1: Write `docs/adr/0008-fitness-functions-everywhere.md` (write-adr format, under 60 lines)**
 
@@ -3086,24 +3086,22 @@ Replace everything from the line `## Fitness rules (spec §3.3)` up to, not incl
 only via `index.ts`; `src/` and `dashboard/` never import each other · F4 no cycles · F5 I/O (also
 aliased globals, `node:os`, computed imports, `eval`) only in `src/adapters`, `src/main.ts`,
 `src/cli.ts`, `src/testing` · F6 Agent SDK only in `adapters/agent` · F7 files ≤ 300 lines,
-functions ≤ 40 · F8 tests use `createTestEnv()` · F9 no GitHub token or permission bypass for
-agents · F10 `gh` writes only in `src/adapters/github/gh-github-writer.ts` · F11 bash: no
-`eval`/`sh -c`/`python -c` with expansions, no `curl | sh`, no `${{` · F12 dashboard layers;
-subprocesses only in allowlisted services. Legacy bash and `dashboard/server.ts` debt is ratcheted
-in `tools/arch/findings-baseline.json`: never add a finding; after removing some, run
-`bun tools/arch/ast-scan.ts --write-baseline`. Never suppress a rule in place (`ast-grep-ignore` fails
-the meta-test); rules, allowlists and baselines are CODEOWNERS-reviewed. Enforced later: F10 in full
-(a `FenceToken` on run-scoped writes from Wave 1b; every integration by the end of Wave 2).
+functions ≤ 40 · F8 tests use `createTestEnv()` · F9 no GitHub token or permission bypass for agents ·
+F10 `gh` writes only in `src/adapters/github/gh-github-writer.ts` · F11 bash: no `eval`/`sh -c`/
+`python -c` with expansions, no `curl | sh`, no `${{` · F12 dashboard layers, subprocesses only in
+allowlisted services, no shell string from data · workflows never swallow gate or marker errors.
+Bash and `dashboard/server.ts` debt is ratcheted (`tools/arch/findings-baseline.json`): never add a
+finding; after removing some, run `bun tools/arch/ast-scan.ts --write-baseline`. Never suppress a rule
+in place. Enforced later: F10 in full (`FenceToken` on run-scoped writes, Wave 1b; all integrations, Wave 2).
 ```
 
 Then replace the last paragraph, `` `docs/architecture.md`, `docs/adr/`, generated `docs/reference/cli.md` (`bun run docs:gen`).``, with:
 
 ```markdown
-`docs/architecture.md`, `docs/adr/`, generated `docs/reference/cli.md` and
-`docs/reference/dependency-graph.md` (`bun run docs:gen`).
+`docs/architecture.md`, `docs/adr/`, generated `docs/reference/` (`bun run docs:gen`).
 ```
 
-Keep the `## Safety` bullets; the F9 bullet stays true.
+Keep the `## Safety` bullets; the F9 bullet stays true. The replacement keeps Task 17's items (the workflow fail-closed rule, F10 in full) and holds `AGENTS.md` at 80 lines.
 
 - [ ] **Step 3: Replace the fitness subsection of `docs/architecture.md`; link the ADR and the graph**
 
@@ -3129,7 +3127,7 @@ The current import graph is generated: [`docs/reference/dependency-graph.md`](re
 | F9 | No permission-bypass spelling (substring, template or `+` pieces) and no GitHub token name in `src/` or `dashboard/` (tests, `adapters/github` and `adapters/agent/privilege-guard.ts` excepted); SDK calls pass a literal `env:` and a literal `permissionMode`; `assertAgentOptions()` refuses both at run time; `agentEnv()` drops the tokens. Bash: bypass flags and `claude` without `env -u GH_TOKEN -u GITHUB_TOKEN`, ratcheted | ast-grep, unit tests, findings ratchet |
 | F10 | `gh` write subcommands only in `src/adapters/github/gh-github-writer.ts`. Bash (`gh` writes, `gh api` writes, `git push`): ratcheted | ast-grep, findings ratchet |
 | F11 | Bash: no `eval`/`command eval`/`source /dev/stdin <<<` with an expansion; no `sh -c`, `"$SHELL" -c`, `python -c`, `node -e`, here-string into a shell or `ssh host "cmd $x"` built from data; no download run as code; no `${{` | ast-grep (Bash), findings ratchet |
-| F12 | Dashboard: browser bundle and server never import each other and neither imports `src/` (D1); `services/` is the bottom layer (D2); routes never import `server.ts` or each other (D3); no cycles (D4); processes are spawned only by allowlisted services, and shell strings are constant | dependency-cruiser, ast-grep, findings ratchet |
+| F12 | Dashboard: browser bundle and server never import each other and neither imports `src/` (D1); `services/` is the bottom layer (D2); routes never import `server.ts` or each other (D3); no cycles (D4); processes are spawned only by allowlisted services; no shell command built from request data (`dashboard-no-shell-from-data`, ADR-0007) | dependency-cruiser, ast-grep, findings ratchet |
 
 Bash rules cover `scripts/**/*.sh`, `scripts/sw`, `.claude/hooks`, `claude-code/hooks`,
 `completions/*.bash` and `install.sh`.
@@ -3152,15 +3150,24 @@ fires on a fixture; `bun run arch` runs every checker. [`CODEOWNERS`](../.github
 `tools/arch/`, `sgconfig.yml`, the dependency-cruiser configs and `package.json` under the
 maintainer's review.
 
+F10 in full (run-scoped writes from Wave 1b; every integration by the end of Wave 2): GitHub side
+effects go only through the fenced, idempotent `integrations` adapter, with an `IdempotencyKey` and a
+`FenceToken` in the signature. The first method, `ensureIncident`, takes no fence (no lease covers a
+system-wide incident; ADR-0007).
+
 Workflows: no `${{ }}` expression of any kind inside a `run:` script or an `actions/github-script`
-`script:` body; values go through `env:`. This check is strict, with no baseline.
+`script:` body; values go through `env:`. This check is strict, with no baseline. A second check
+fails a workflow that pipes, `||`-defaults or discards stderr of `gates check`, `bot-comments.sh`,
+`retry-state.sh` or `pipeline-active.sh`, runs `gates check --no-github`, or sets
+`continue-on-error` on the safety gates (fail closed, ADR-0007).
 
 Config: [`.dependency-cruiser.cjs`](../.dependency-cruiser.cjs),
 [`.dependency-cruiser.dashboard.cjs`](../.dependency-cruiser.dashboard.cjs),
 [`sgconfig.yml`](../sgconfig.yml) with [`tools/arch/rules/`](../tools/arch/rules) and
 [`tools/arch/utils/`](../tools/arch/utils), [`tools/arch/size-ratchet.ts`](../tools/arch/size-ratchet.ts)
 with [`arch-baseline.json`](../tools/arch/arch-baseline.json),
-[`tools/arch/workflow-injection.ts`](../tools/arch/workflow-injection.ts).
+[`tools/arch/workflow-injection.ts`](../tools/arch/workflow-injection.ts),
+[`tools/arch/workflow-fail-closed.ts`](../tools/arch/workflow-fail-closed.ts).
 ```
 
 In the `## Decisions` list, add after the `0007` line:
@@ -3238,7 +3245,7 @@ for f in tools/arch/findings-baseline.json tools/arch/ast-scan.ts .dependency-cr
 ```
 
 Expected:
-- `AGENTS.md` about 80 lines (78 on the dry run, which lacked Task 17's two-line Safety bullet).
+- `80 AGENTS.md` (at most ~80; on top of Task 17's wording at `efa1e4704`).
 - `46 docs/adr/0008-fitness-functions-everywhere.md`.
 - `1`.
 - The meta-test still passes (the `fitness-rules` anchor exists): `0 fail`.

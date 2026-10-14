@@ -140,8 +140,16 @@ message names the rule and how to fix it.
 | F6 | `@anthropic-ai/claude-agent-sdk` is imported only by `adapters/agent/**`, and every call passes an output schema or a typed task spec. |
 | F7 | Size budgets: files ≤ 300 lines, functions ≤ 40 lines. Existing violations are baselined in `arch-baseline.json` and may only decrease (ratchet). |
 | F8 | Tests never resolve real user paths: adapters receive `HOME`, state directory and tmux socket from `TestEnv`. |
-| F9 | Agents get no GitHub token and no permission bypass (see below). *Enforced from Wave 1.* |
-| F10 | GitHub side effects go only through a fenced, idempotent adapter (see below). *Enforced from Wave 1 for the first GitHub-writing port method; covers every integration by the end of Wave 2.* |
+| F9 | Agents get no GitHub token and no permission bypass (see below). *Enforced from Wave 1a-arch; bash callers ratcheted.* |
+| F10 | GitHub side effects go only through a fenced, idempotent adapter (see below). *`gh` writes confined to the writer from Wave 1a; bash writes (`gh`, `gh api`, `git push`) ratcheted; every integration by the end of Wave 2.* |
+| F11 | Bash safety: no `eval`, `sh -c`, interpreter `-c`/`-e`, here-string or `ssh` command string built from an expansion; no download run as code; no `${{` in scripts, hooks, completions or `install.sh`. *Ratcheted from Wave 1a-arch.* |
+| F12 | Dashboard boundaries: browser bundle and server are separate and neither imports `src/`; `services/` is the bottom layer; routes are independent; no cycles; only allowlisted services spawn processes. *From Wave 1a-arch; `server.ts` ratcheted until the Wave 3 port.* |
+
+Every rule has a rule test with valid and invalid cases, a message that names the fix, an owner and
+a docs anchor, and every dependency-cruiser rule fires on a fixture (`tools/arch/meta.test.ts`,
+`tools/arch/depcruise-rules.test.ts`). Existing violations of F9–F12 are counted per rule and file in
+`tools/arch/findings-baseline.json` and may only go down, including against the PR's merge base
+(ADR-0008). Rules are never suppressed in place.
 
 **F9: no GitHub token and no permission bypass for agents.**
 - *What:* `adapters/agent/**` builds the agent's environment from an explicit allowlist and never
@@ -149,10 +157,17 @@ message names the rule and how to fix it.
 - *Banned:* `bypassPermissions`, `allowDangerouslySkipPermissions` and
   `--dangerously-skip-permissions`, anywhere in `src/` and in workflow files.
 - *How:*
-  - an ast-grep rule over `src/**` and `.github/workflows/**`, which bans those names and the token
-    names under `adapters/agent/**`;
-  - the `agentEnv` unit test, which asserts that tokens are dropped.
-- *Status:* the Wave 0 runner already uses an allowlist and `permissionMode: "dontAsk"`.
+  - `F9-no-agent-privilege` (ast-grep) flags any string, template piece, identifier or key that
+    contains a bypass spelling or a GitHub token name (`GH_TOKEN`, `GITHUB_TOKEN`,
+    `GH_ENTERPRISE_TOKEN`, `GITHUB_ENTERPRISE_TOKEN`), and `+` concatenations that spell one, in
+    `src/**` and `dashboard/**` except tests, `src/adapters/github/**` and the runtime guard;
+  - `F9-agent-options-explicit` requires every SDK call to pass a literal `env:` (never
+    `process.env`) and a string-literal `permissionMode`;
+  - `assertAgentOptions()` refuses a bypass or a token at run time, and the `agentEnv` unit test
+    asserts that every token is dropped;
+  - bash: `F9-bash-no-permission-bypass` and `F9-bash-claude-token-scrub`, ratcheted.
+- *Status:* enforced from Wave 1a-arch. Workflow files carry none of the names today; a workflow
+  check joins when one is needed.
 
 **F10: GitHub side effects only through a fenced, idempotent adapter.**
 - *What:* every `integrations` port method that causes a GitHub side effect (push, PR, comment,
@@ -168,7 +183,8 @@ message names the rule and how to fix it.
 Workflow files get one extra rule: no `${{ … }}` expression that reads issue, PR, comment or step
 output text inside a `run:` block (values go through `env:`). Until the dashboard is ported (Wave 3),
 `dashboard/**` gets a matching interim rule: no `execSync`, `spawn` with a shell or `Bun.$` built from
-request data. That rule lands with the dashboard hardening item (Wave 1).
+request data. That rule lands with the dashboard hardening item (Wave 1a); F12 adds the dashboard's
+layering and the subprocess allowlist (Wave 1a-arch).
 
 ### 3.4 Clean Code baseline
 
