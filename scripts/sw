@@ -623,6 +623,15 @@ main() {
         breaker)
             run_ts breaker "$@"
             ;;
+        pause)
+            run_ts pause "$@"
+            ;;
+        resume)
+            run_ts resume "$@"
+            ;;
+        paused)
+            run_ts paused "$@"
+            ;;
         *)
             error "Unknown command: ${cmd}"
             echo ""

@@ -46,3 +46,51 @@ EXAMPLES
   shipwright hello                 Print "hello world"
   shipwright hello --help          Show this help text
 ```
+
+## `pause`
+
+Kill switch: pause dispatch on this machine
+
+```text
+USAGE
+  shipwright pause [REASON...]
+
+DESCRIPTION
+  Kill switch (spec §6.2, ADR-0007): sets the local pause flag (~/.shipwright/daemon-pause.flag,
+  shared with the bash daemon). No dispatch happens on this machine until `shipwright resume`.
+  To stop every machine and CI, add the shipwright:pause label to any open issue.
+
+EXAMPLES
+  shipwright pause investigating the 2026-10-13 failure loop
+```
+
+## `paused`
+
+Exit 0 when dispatch is paused (flag or label), 1 when not
+
+```text
+USAGE
+  shipwright paused [--no-github]
+
+DESCRIPTION
+  Exits 0 when dispatch is paused (local flag or shipwright:pause label), 1 when it is not.
+  Fails closed: when the flag or the label cannot be read, it reports paused (exit 0).
+
+OPTIONS
+  --no-github   Check only the local flag
+
+EXAMPLES
+  shipwright paused || dispatch_next_issue
+```
+
+## `resume`
+
+Clear the local pause flag
+
+```text
+USAGE
+  shipwright resume
+
+DESCRIPTION
+  Clears the local pause flag. A shipwright:pause label on an open issue still pauses dispatch.
+```

@@ -1,8 +1,15 @@
 import type { Command } from "../command";
 import { breakerCommand } from "./breaker";
 import { helloCommand } from "./hello";
+import { pauseCommand, pausedCommand, resumeCommand } from "./pause";
 
-export const commands: readonly Command[] = [helloCommand, breakerCommand];
+export const commands: readonly Command[] = [
+  helloCommand,
+  breakerCommand,
+  pauseCommand,
+  resumeCommand,
+  pausedCommand,
+];
 
 export function findCommand(
   name: string,
