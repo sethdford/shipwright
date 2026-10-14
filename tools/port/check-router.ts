@@ -1,6 +1,7 @@
 import { loadProgress, type ProgressEntry, ROUTER_FILE } from "./progress";
 
-const TS_ROUTE = /bun "\$SCRIPT_DIR\/\.\.\/src\/cli\.ts" ([a-z0-9-]+)/g;
+// Matches both the inline form and the `run_ts <name>` helper form used in scripts/sw.
+const TS_ROUTE = /(?:bun "\$SCRIPT_DIR\/\.\.\/src\/cli\.ts"|\brun_ts) ([a-z0-9-]+)/g;
 const READY = new Set(["parity-green", "bash-deleted"]);
 
 export function routerProblems(router: string, progress: readonly ProgressEntry[]): string[] {

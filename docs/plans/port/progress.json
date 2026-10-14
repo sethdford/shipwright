@@ -824,6 +824,6 @@
     "script": "sw-hello.sh",
     "context": "platform",
     "parity": "scripts/sw-hello-test.sh",
-    "status": "bash"
+    "status": "parity-green"
   }
 ]

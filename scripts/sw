@@ -16,6 +16,15 @@ while [[ -L "$SOURCE" ]]; do
 done
 SCRIPT_DIR="$(cd "$(dirname "$SOURCE")" && pwd)"
 
+# Route a command to the TypeScript CLI (strangler migration; see docs/plans/port/progress.json).
+run_ts() {
+    command -v bun >/dev/null 2>&1 || {
+        echo "✗ shipwright: '$1' now requires Bun (https://bun.sh)" >&2
+        exit 1
+    }
+    exec bun "$SCRIPT_DIR/../src/cli.ts" "$@"
+}
+
 # ─── Colors (matches Seth's tmux theme) ─────────────────────────────────────
 CYAN='\033[38;2;0;212;255m'     # #00d4ff — primary accent
 PURPLE='\033[38;2;124;58;237m'  # #7c3aed — secondary
@@ -609,7 +618,7 @@ main() {
             show_version
             ;;
         hello)
-            exec "$SCRIPT_DIR/sw-hello.sh" "$@"
+            run_ts hello "$@"
             ;;
         *)
             error "Unknown command: ${cmd}"
