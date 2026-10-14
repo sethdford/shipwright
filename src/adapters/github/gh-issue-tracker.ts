@@ -7,6 +7,7 @@ import type {
   ProcessRunner,
 } from "../../shared/kernel/ports";
 import { err, ok, type Result } from "../../shared/kernel/result";
+import { runOrFail } from "../process/run-or-fail";
 
 const GhIssue = z.object({
   number: z.number(),
@@ -37,7 +38,7 @@ export class GhIssueTracker implements IssueTracker {
   constructor(private readonly runner: ProcessRunner) {}
 
   async getIssue(number: number): Promise<Result<Issue, AdapterError>> {
-    const r = await this.runner.run({
+    const r = await runOrFail(this.runner, {
       argv: [
         "gh",
         "issue",

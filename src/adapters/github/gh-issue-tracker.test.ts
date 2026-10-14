@@ -66,3 +66,8 @@ test("non-JSON stdout is a failed error, not a thrown SyntaxError", async () => 
   expect(!r.ok && r.error.kind).toBe("failed");
   expect(!r.ok && r.error.message).toMatch(/unexpected gh output/);
 });
+
+test("a spawn failure is a failed error, not a rejection", async () => {
+  const r = await new GhIssueTracker(new FakeProcessRunner([])).getIssue(1);
+  expect(!r.ok && r.error.kind).toBe("failed");
+});

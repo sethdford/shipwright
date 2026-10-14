@@ -5,8 +5,9 @@ import type {
   Terminal,
 } from "../../shared/kernel/ports";
 import { err, ok, type Result } from "../../shared/kernel/result";
+import { runOrFail } from "../process/run-or-fail";
 
-const NO_SERVER = /no server running|error connecting to/i;
+const NO_SERVER = /no server running|error connecting to .*\(No such file or directory\)/i;
 const NO_SESSION = /can't find session|session not found/i;
 
 /** All tmux access goes through one named socket; there is no "current server" fallback. */
@@ -40,7 +41,10 @@ export class TmuxTerminal implements Terminal {
   }
 
   private tmux(args: readonly string[]): Promise<ProcessResult> {
-    return this.runner.run({ argv: ["tmux", "-L", this.socketName, ...args], timeoutMs: 10_000 });
+    return runOrFail(this.runner, {
+      argv: ["tmux", "-L", this.socketName, ...args],
+      timeoutMs: 10_000,
+    });
   }
 }
 

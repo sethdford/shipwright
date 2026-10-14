@@ -30,3 +30,8 @@ test("outside a repository is not_found", async () => {
   const r = await new GitCli(runner).headSha("/tmp");
   expect(!r.ok && r.error.kind).toBe("not_found");
 });
+
+test("a spawn failure is a failed error, not a rejection", async () => {
+  const r = await new GitCli(new FakeProcessRunner([])).headSha("/repo");
+  expect(!r.ok && r.error.kind).toBe("failed");
+});

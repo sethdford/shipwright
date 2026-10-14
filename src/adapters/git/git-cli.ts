@@ -1,5 +1,6 @@
 import type { AdapterError, ProcessRunner, Vcs } from "../../shared/kernel/ports";
 import { err, ok, type Result } from "../../shared/kernel/result";
+import { runOrFail } from "../process/run-or-fail";
 
 export class GitCli implements Vcs {
   constructor(private readonly runner: ProcessRunner) {}
@@ -13,7 +14,7 @@ export class GitCli implements Vcs {
   }
 
   private async git(cwd: string, args: readonly string[]): Promise<Result<string, AdapterError>> {
-    const r = await this.runner.run({ argv: ["git", ...args], cwd, timeoutMs: 30_000 });
+    const r = await runOrFail(this.runner, { argv: ["git", ...args], cwd, timeoutMs: 30_000 });
     if (r.exitCode === 0 && !r.timedOut) return ok(r.stdout.trim());
     const message = r.stderr.trim() || `git ${args.join(" ")} exited ${r.exitCode}`;
     if (r.timedOut) return err({ kind: "transient", message });
