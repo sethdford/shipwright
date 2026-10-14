@@ -1,6 +1,7 @@
 name: TypeScript check
 
-# Mirrors `bun run check` stage by stage so a failure names the stage that broke.
+# Mirrors `bun run check` stage by stage so a failure names the stage that broke
+# (except `dashboard:test`, which test.yml runs).
 # If you change the `check` script in package.json, change this list too.
 
 on:

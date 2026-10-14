@@ -65,8 +65,7 @@ run through: the first run created after the cool-down is the probe.
 3. `gh workflow run shipwright-pipeline.yml -f issue_number=N` (add `-f template=full` if needed).
 
 Do not delete old pipeline or retry comments to make dispatch pick an issue up again: that also
-resets its retry count. (The pipeline's own failure comment still suggests it; that hint is a tracked
-follow-up.) For a daemon host, re-add the watch label (`shipwright`) after removing the failure labels.
+resets its retry count. For a daemon host, re-add the watch label (`shipwright`) after removing the failure labels.
 
 ## Re-enable the workflows (maintainer only)
 

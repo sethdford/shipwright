@@ -53,7 +53,6 @@ all stop dispatch. `--no-github` checks only the local flag, is refused on GitHu
 - Local daemon outcomes do not feed the breaker until the run journal exists (Wave 1b).
 - Gaps (tracked in the Wave 1a plan's follow-ups): `shipwright-pipeline.yml` starts ungated runs on
   `issues: labeled` (Wave 1c; bounded by the retry budget and the breaker); its per-issue
-  concurrency group can stall when unrelated labels queue a pending run; its "clear old pipeline
-  comments" hint resets the retry budget; team invite tokens travel in the URL path; the budget is
+  concurrency group can stall when unrelated labels queue a pending run; team invite tokens travel in the URL path; the budget is
   not enforced on CI (no cost data); org-mode `.final_failed` is keyed by issue number only;
   `actions/checkout` is pinned by tag. A title fingerprint misses paraphrased duplicates.

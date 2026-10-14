@@ -13,7 +13,7 @@ inputs:
       Required with no default, because an unknown count must not read as a first dispatch.
     required: true
   github-token:
-    description: Token for the gate check's read-only gh calls (pass secrets.GITHUB_TOKEN).
+    description: Token for the gate check's gh calls (pass secrets.GITHUB_TOKEN). Reads, plus opening the incident issue when the breaker trips.
     required: true
 outputs:
   allowed:

@@ -133,7 +133,7 @@ export function breakerIncident(
     body: [
       `The global circuit breaker opened at ${iso(state.since)}: at least ${policy.maxFailures} of the last ${policy.window} pipeline runs failed.`,
       "",
-      `Dispatch, auto-retry and watchdog retries are stopped. After ${minutes} minutes one probe run is allowed; if it succeeds the breaker closes, if it fails the breaker re-opens.`,
+      `Dispatch and auto-retry are stopped. After ${minutes} minutes one probe run is allowed; if it succeeds the breaker closes, if it fails the breaker re-opens.`,
       "",
       "To keep everything stopped while you investigate, add the `shipwright:pause` label to any open issue or run `shipwright pause`.",
     ].join("\n"),

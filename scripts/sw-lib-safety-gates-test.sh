@@ -32,7 +32,7 @@ bun_call() {
 print_test_section "safety_gates_ok"
 
 assert_file_exists "CLI path resolves to src/cli.ts" "$SW_TS_CLI"
-assert_eq "library is executable like its siblings" "755" "$(stat -f %Lp "$SCRIPT_DIR/lib/safety-gates.sh" 2>/dev/null || stat -c %a "$SCRIPT_DIR/lib/safety-gates.sh")"
+assert_eq "library is executable like its siblings" "755" "$(stat -c %a "$SCRIPT_DIR/lib/safety-gates.sh" 2>/dev/null || stat -f %Lp "$SCRIPT_DIR/lib/safety-gates.sh")"
 assert_eq "CLI path is the first bun argument" "$SW_TS_CLI" "$(cd / && : > "$BUN_LOG" && safety_gates_ok 0 2>/dev/null; head -1 "$BUN_LOG")"
 
 : > "$BUN_LOG"
