@@ -212,7 +212,7 @@ print_test_section "daemon_poll_issues finally-failed issues"
 
 echo '[{"number":3,"title":"a","labels":[{"name":"shipwright"}]}]' > "$TEST_TEMP_DIR/issues.json"
 reset_state
-locked_state_update '.final_failed = {"3": "2026-01-01T00:00:00Z", "9": "2026-01-01T00:00:00Z"}'
+locked_state_update '.final_failed = {"3": {ts: "t", marked: []}, "9": {ts: "t", marked: ["shipwright-stuck"]}}'
 : > "$CALLS"
 SPAWN_RC=0
 daemon_poll_issues 2>/dev/null || true
@@ -220,11 +220,27 @@ assert_eq "a finally-failed issue still carrying the watch label is not dispatch
 assert_eq "a finally-failed issue is not claimed" "0" "$(count_calls '^claim')"
 assert_eq "entries absent from a complete listing are cleared; present ones kept" \
     "3" "$(jq -r '.final_failed | keys | join(" ")' "$STATE_FILE")"
+assert_eq "an entry with no marked labels persists although the issue lacks them (fail closed)" \
+    "true" "$(jq '.final_failed | has("3")' "$STATE_FILE")"
+
+echo '[{"number":3,"title":"a","labels":[{"name":"shipwright"},{"name":"Shipwright-Stuck"}]}]' > "$TEST_TEMP_DIR/issues.json"
+reset_state
+locked_state_update '.final_failed = {"3": {ts: "t", marked: ["shipwright-stuck"]}}'
+daemon_poll_issues 2>/dev/null || true
+assert_eq "while a marked label is still on the issue it is not dispatched" "" "$(spawns)"
+assert_eq "while a marked label is still on the issue the entry stays" "true" "$(jq '.final_failed | has("3")' "$STATE_FILE")"
+
+echo '[{"number":3,"title":"a","labels":[{"name":"shipwright"}]}]' > "$TEST_TEMP_DIR/issues.json"
+reset_state
+locked_state_update '.final_failed = {"3": {ts: "t", marked: ["shipwright-stuck", "pipeline/failed"]}}'
+daemon_poll_issues 2>/dev/null || true
+assert_eq "once a human removed every marked label the entry is cleared" "false" "$(jq '.final_failed | has("3")' "$STATE_FILE")"
+assert_eq "and the issue is dispatchable again" "spawn 3" "$(spawns)"
 
 jq -n '[range(1;101) | {number: ., title: "t", labels: [{name: "shipwright"}, {name: "auto-patrol"}]}]' \
     > "$TEST_TEMP_DIR/issues.json"
 reset_state
-locked_state_update '.final_failed = {"500": "2026-01-01T00:00:00Z"}'
+locked_state_update '.final_failed = {"500": {ts: "t", marked: ["shipwright-stuck"]}}'
 daemon_poll_issues 2>/dev/null || true
 assert_eq "a truncated listing clears nothing" "500" "$(jq -r '.final_failed | keys | join(" ")' "$STATE_FILE")"
 rm -f "$HOME/.shipwright/machines.json"

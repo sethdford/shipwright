@@ -336,22 +336,26 @@ _Escalation: $(if [[ "$retry_count" -eq 1 ]]; then echo "upgraded model + increa
                     PIPELINE_TEMPLATE="$retry_template"
                     MODEL="$retry_model"
                     # The retry number feeds the fix-loop cap in the safety gates (ADR-0007).
-                    local retry_spawned=false
-                    if DAEMON_RETRY_ATTEMPT="$retry_count" \
-                        daemon_spawn_pipeline "$issue_num" "retry-${retry_count}" "" "${all_extra_args[@]}"; then
-                        retry_spawned=true
-                    fi
+                    local retry_rc=0
+                    DAEMON_RETRY_ATTEMPT="$retry_count" \
+                        daemon_spawn_pipeline "$issue_num" "retry-${retry_count}" "" "${all_extra_args[@]}" \
+                        || retry_rc=$?
                     PIPELINE_TEMPLATE="$orig_template"
                     MODEL="$orig_model"
-                    if [[ "$retry_spawned" == "true" ]]; then
+                    if [[ "$retry_rc" -eq 0 ]]; then
                         _retry_spawned_for="$issue_num"
                         return
                     fi
-                    # Refused (safety gates, budget, disk, ...): report a final failure so the issue
-                    # loses the watch label instead of being re-polled as a first dispatch.
-                    daemon_log WARN "Retry #${retry_count} refused by safety gates — final failure for issue #${issue_num}"
-                    final_reason="refused by safety gates"
-                    emit_event "daemon.retry_refused" "issue=$issue_num" "retry=$retry_count"
+                    # Not spawned: report a final failure so the issue loses the watch label
+                    # instead of being re-polled as a first dispatch.
+                    if [[ "$retry_rc" -eq "${DAEMON_SPAWN_REFUSED:-75}" ]]; then
+                        final_reason="refused by gates/budget"
+                        daemon_log WARN "Retry #${retry_count} refused by gates/budget — final failure for issue #${issue_num}"
+                    else
+                        final_reason="retry spawn failed (rc=${retry_rc})"
+                        daemon_log WARN "Retry #${retry_count} failed: ${final_reason} — final failure for issue #${issue_num}"
+                    fi
+                    emit_event "daemon.retry_refused" "issue=$issue_num" "retry=$retry_count" "rc=$retry_rc"
                 else
                     daemon_log WARN "Max retries (${effective_max}) exhausted for issue #${issue_num}"
                     emit_event "daemon.retry_exhausted" "issue=$issue_num" "retries=$retry_count"
@@ -367,22 +371,30 @@ _Escalation: $(if [[ "$retry_count" -eq 1 ]]; then echo "upgraded model + increa
         bash "$SCRIPT_DIR/sw-pm.sh" learn "$issue_num" failure 2>/dev/null || true
     fi
 
-    # The poll loop never dispatches a finally-failed issue again until a human removes and
-    # re-adds the watch label (ADR-0007). Not pruned with retry_counts; the poll clears an entry
-    # once the issue is absent from a complete watch-label listing.
-    locked_state_update --arg num "$issue_num" --arg ts "$(now_iso)" \
-        '.final_failed[$num] = $ts' || \
-        daemon_log ERROR "Could not record final failure of issue #${issue_num} in daemon state"
-
     if [[ "$NO_GITHUB" != "true" ]]; then
         # Add the failure label and remove the watch label in separate calls: a missing failure
         # label must not leave the watch label in place (the issue would be re-polled as new).
-        gh issue edit "$issue_num" --add-label "$ON_FAILURE_ADD_LABEL" 2>/dev/null || \
+        local marked_labels=()
+        if gh issue edit "$issue_num" --add-label "$ON_FAILURE_ADD_LABEL" 2>/dev/null; then
+            marked_labels+=("$ON_FAILURE_ADD_LABEL")
+        else
             daemon_log WARN "Could not add '${ON_FAILURE_ADD_LABEL}' to failed issue #${issue_num}"
+        fi
         if ! gh issue edit "$issue_num" --remove-label "$WATCH_LABEL" 2>/dev/null; then
             daemon_log ERROR "Could not remove '${WATCH_LABEL}' from failed issue #${issue_num} — adding shipwright-stuck"
-            gh issue edit "$issue_num" --add-label "shipwright-stuck" 2>/dev/null || \
+            if gh issue edit "$issue_num" --add-label "shipwright-stuck" 2>/dev/null; then
+                marked_labels+=("shipwright-stuck")
+            else
                 daemon_log ERROR "Could not add shipwright-stuck to issue #${issue_num}; daemon state keeps it from being dispatched"
+            fi
+            # The issue still carries the watch label: the poll loop skips it until a human
+            # removes every marked label (or the watch label). With nothing marked, the entry
+            # stays until the watch label is gone or the state is edited by hand (fail closed).
+            local marked_json
+            marked_json=$(printf '%s\n' ${marked_labels[@]+"${marked_labels[@]}"} | jq -R . | jq -s -c 'map(select(length > 0))')
+            locked_state_update --arg num "$issue_num" --arg ts "$(now_iso)" --argjson marked "$marked_json" \
+                '.final_failed[$num] = {ts: $ts, marked: $marked}' || \
+                daemon_log ERROR "Could not record final failure of issue #${issue_num} in daemon state"
         fi
 
         # Close any draft PR created for this issue (cleanup abandoned work)

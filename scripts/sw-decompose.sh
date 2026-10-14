@@ -50,8 +50,6 @@ COMPLEXITY_THRESHOLD=70          # Decompose if complexity > this
 # shellcheck disable=SC2034
 HOURS_THRESHOLD=8                # Decompose if estimated hours > this
 # shellcheck disable=SC2034
-MAX_SUBTASKS=5
-# shellcheck disable=SC2034
 MIN_SUBTASKS=3
 DECOMPOSE_LABEL="subtask"
 # At most this many subtask issues per parent; the rest are refused (logged)

@@ -160,8 +160,8 @@ daemon_poll_issues() {
         listing_complete=true
     fi
 
-    # Finally-failed issues (daemon-failure.sh) are cleared once their watch label is gone, so a
-    # human re-adding it makes the issue dispatchable again.
+    # Finally-failed entries (daemon-failure.sh) are also cleared once the watch label is gone,
+    # so a human re-adding it makes the issue dispatchable again.
     if [[ "$listing_complete" == "true" ]]; then
         local present_json
         present_json=$(echo "$issues_json" | jq -c '[.[].number | tostring]' 2>/dev/null) || present_json=""
@@ -300,11 +300,25 @@ daemon_poll_issues() {
             continue
         fi
 
-        # Finally failed (retries exhausted or refused) but the watch label could not be removed:
-        # wait until a human removes and re-adds it (ADR-0007)
+        # Finally failed but the watch label could not be removed (daemon-failure.sh): skip it
+        # while any label we marked it with is still on it. Once a human removed every marked
+        # label, the entry is cleared and the issue is dispatchable. An entry with nothing marked
+        # (or an unreadable one) stays until the watch label is gone (ADR-0007).
         if jq -e --arg n "$issue_num" '(.final_failed // {}) | has($n)' "$STATE_FILE" >/dev/null 2>&1; then
-            daemon_log INFO "Issue #${issue_num} failed finally — skipped until its '${WATCH_LABEL}' label is removed and re-added"
-            continue
+            local ff_cleared
+            ff_cleared=$(jq -r --arg n "$issue_num" --arg labels "$labels_csv" '
+                (.final_failed[$n].marked? // []) as $m
+                | ($labels | ascii_downcase | split(",")) as $have
+                | if ($m | type) == "array" and ($m | length) > 0
+                     and ([$m[] | ascii_downcase | select(. as $x | $have | index($x))] | length) == 0
+                  then "yes" else "no" end' "$STATE_FILE" 2>/dev/null || echo "no")
+            if [[ "$ff_cleared" == "yes" && -n "$labels_csv" ]]; then
+                locked_state_update --arg n "$issue_num" 'del(.final_failed[$n])'
+                daemon_log INFO "Issue #${issue_num}: failure labels removed by a human — dispatchable again"
+            else
+                daemon_log INFO "Issue #${issue_num} failed finally — skipped until its failure labels or '${WATCH_LABEL}' are removed"
+                continue
+            fi
         fi
 
         # Auto-filed and stuck issues wait for a human to remove the label (ADR-0007).
