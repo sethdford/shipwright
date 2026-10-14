@@ -20,7 +20,80 @@ describe("assertAgentOptions (F9 runtime guard)", () => {
       "GH_ENTERPRISE_TOKEN",
       "GITHUB_ENTERPRISE_TOKEN",
     ]) {
-      expect(() => assertAgentOptions({ env: { PATH: "/bin", [key]: "t" } })).toThrow(key);
+      expect(() =>
+        assertAgentOptions({ permissionMode: "dontAsk", env: { PATH: "/bin", [key]: "t" } }),
+      ).toThrow(key);
     }
+  });
+});
+
+describe("assertAgentOptions allowlist (F9 bypass paths)", () => {
+  const dontAsk = { permissionMode: "dontAsk" } as const;
+
+  test("refuses SDK options that can carry CLI flags (extraArgs, executableArgs)", () => {
+    expect(() =>
+      assertAgentOptions({ ...dontAsk, extraArgs: { "dangerously-skip-permissions": null } }),
+    ).toThrow(/F9/);
+    expect(() =>
+      assertAgentOptions({ ...dontAsk, extraArgs: { "permission-mode": "bypassPermissions" } }),
+    ).toThrow(/F9/);
+    expect(() =>
+      assertAgentOptions({ ...dontAsk, executableArgs: ["--dangerously-skip-permissions"] }),
+    ).toThrow(/F9/);
+  });
+
+  test("refuses settings, which can set permissions.defaultMode", () => {
+    expect(() =>
+      assertAgentOptions({
+        ...dontAsk,
+        settings: { permissions: { defaultMode: "bypassPermissions" } },
+      }),
+    ).toThrow(/F9/);
+    expect(() =>
+      assertAgentOptions({ ...dontAsk, settings: { permissions: { defaultMode: "dontAsk" } } }),
+    ).toThrow(/F9/);
+  });
+
+  test("refuses any option key outside the allowlist, including spellings of the bypass", () => {
+    expect(() => assertAgentOptions({ ...dontAsk, dangerouslySkipPermissions: true })).toThrow(
+      /F9/,
+    );
+    expect(() => assertAgentOptions({ ...dontAsk, allowDangerouslySkipPermissions: true })).toThrow(
+      /F9/,
+    );
+    expect(() => assertAgentOptions({ ...dontAsk, executable: "/tmp/evil" })).toThrow(/F9/);
+  });
+
+  test("permissionMode must be exactly dontAsk, however it is spelled", () => {
+    for (const mode of ["bypassPermissions", "acceptEdits", "default", "auto", "plan", ""]) {
+      expect(() => assertAgentOptions({ permissionMode: mode })).toThrow(/F9/);
+    }
+    // A concatenated or computed spelling reaches the guard as its runtime value.
+    expect(() =>
+      assertAgentOptions({ permissionMode: ["bypass", "Permissions"].join("") }),
+    ).toThrow(/F9/);
+    expect(() => assertAgentOptions({})).toThrow(/F9/);
+  });
+
+  test("accepts the option set the runner really passes", () => {
+    expect(() =>
+      assertAgentOptions({
+        model: "m",
+        effort: "low",
+        systemPrompt: "s",
+        permissionMode: "dontAsk",
+        tools: [],
+        allowedTools: [],
+        strictMcpConfig: true,
+        settingSources: ["project"],
+        persistSession: false,
+        maxTurns: 3,
+        maxBudgetUsd: 1,
+        outputFormat: { type: "json_schema", schema: {} },
+        cwd: "/repo",
+        env: { PATH: "/bin" },
+        abortController: new AbortController(),
+      }),
+    ).not.toThrow();
   });
 });
