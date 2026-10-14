@@ -1,0 +1,830 @@
+[
+  {
+    "command": "recruit",
+    "aliases": [],
+    "script": "sw-recruit.sh",
+    "context": "teams",
+    "parity": "scripts/sw-recruit-test.sh",
+    "status": "bash"
+  },
+  {
+    "command": "swarm",
+    "aliases": [],
+    "script": "sw-swarm.sh",
+    "context": "teams",
+    "parity": "scripts/sw-swarm-test.sh",
+    "status": "bash"
+  },
+  {
+    "command": "standup",
+    "aliases": [],
+    "script": "sw-standup.sh",
+    "context": "teams",
+    "parity": "scripts/sw-standup-test.sh",
+    "status": "bash"
+  },
+  {
+    "command": "guild",
+    "aliases": [],
+    "script": "sw-guild.sh",
+    "context": "learning",
+    "parity": "scripts/sw-guild-test.sh",
+    "status": "bash"
+  },
+  {
+    "command": "oversight",
+    "aliases": [],
+    "script": "sw-oversight.sh",
+    "context": "quality",
+    "parity": "scripts/sw-oversight-test.sh",
+    "status": "bash"
+  },
+  {
+    "command": "code-review",
+    "aliases": [],
+    "script": "sw-code-review.sh",
+    "context": "quality",
+    "parity": "scripts/sw-code-review-test.sh",
+    "status": "bash"
+  },
+  {
+    "command": "security-audit",
+    "aliases": [
+      "audit"
+    ],
+    "script": "sw-security-audit.sh",
+    "context": "quality",
+    "parity": "scripts/sw-security-audit-test.sh",
+    "status": "bash"
+  },
+  {
+    "command": "testgen",
+    "aliases": [],
+    "script": "sw-testgen.sh",
+    "context": "quality",
+    "parity": "scripts/sw-testgen-test.sh",
+    "status": "bash"
+  },
+  {
+    "command": "hygiene",
+    "aliases": [],
+    "script": "sw-hygiene.sh",
+    "context": "platform",
+    "parity": "scripts/sw-hygiene-test.sh",
+    "status": "bash"
+  },
+  {
+    "command": "validate",
+    "aliases": [
+      "gate"
+    ],
+    "script": "sw-quality.sh",
+    "context": "quality",
+    "parity": "scripts/sw-quality-test.sh",
+    "status": "bash"
+  },
+  {
+    "command": "vitals",
+    "aliases": [],
+    "script": "sw-pipeline-vitals.sh",
+    "context": "observability",
+    "parity": "scripts/sw-pipeline-vitals-test.sh",
+    "status": "bash"
+  },
+  {
+    "command": "dora",
+    "aliases": [],
+    "script": "sw-dora.sh",
+    "context": "observability",
+    "parity": "scripts/sw-dora-test.sh",
+    "status": "bash"
+  },
+  {
+    "command": "retro",
+    "aliases": [],
+    "script": "sw-retro.sh",
+    "context": "learning",
+    "parity": "scripts/sw-retro-test.sh",
+    "status": "bash"
+  },
+  {
+    "command": "stream",
+    "aliases": [],
+    "script": "sw-stream.sh",
+    "context": "observability",
+    "parity": "scripts/sw-stream-test.sh",
+    "status": "bash"
+  },
+  {
+    "command": "activity",
+    "aliases": [],
+    "script": "sw-activity.sh",
+    "context": "observability",
+    "parity": "scripts/sw-activity-test.sh",
+    "status": "bash"
+  },
+  {
+    "command": "replay",
+    "aliases": [],
+    "script": "sw-replay.sh",
+    "context": "observability",
+    "parity": "scripts/sw-replay-test.sh",
+    "status": "bash"
+  },
+  {
+    "command": "status",
+    "aliases": [],
+    "script": "sw-status.sh",
+    "context": "observability",
+    "parity": "scripts/sw-status-test.sh",
+    "status": "bash"
+  },
+  {
+    "command": "release-manager",
+    "aliases": [
+      "rm"
+    ],
+    "script": "sw-release-manager.sh",
+    "context": "platform",
+    "parity": "scripts/sw-release-manager-test.sh",
+    "status": "bash"
+  },
+  {
+    "command": "changelog",
+    "aliases": [],
+    "script": "sw-changelog.sh",
+    "context": "platform",
+    "parity": "scripts/sw-changelog-test.sh",
+    "status": "bash"
+  },
+  {
+    "command": "deploy",
+    "aliases": [
+      "deploys",
+      "deployments"
+    ],
+    "script": "sw-github-deploy.sh",
+    "context": "integrations",
+    "parity": "scripts/sw-github-deploy-test.sh",
+    "status": "bash"
+  },
+  {
+    "command": "release",
+    "aliases": [],
+    "script": "sw-release.sh",
+    "context": "platform",
+    "parity": "scripts/sw-release-test.sh",
+    "status": "bash"
+  },
+  {
+    "command": "predict",
+    "aliases": [],
+    "script": "sw-predictive.sh",
+    "context": "intelligence",
+    "parity": "scripts/sw-predictive-test.sh",
+    "status": "bash"
+  },
+  {
+    "command": "intelligence",
+    "aliases": [],
+    "script": "sw-intelligence.sh",
+    "context": "intelligence",
+    "parity": "scripts/sw-intelligence-test.sh",
+    "status": "bash"
+  },
+  {
+    "command": "strategic",
+    "aliases": [
+      "strategy"
+    ],
+    "script": "sw-strategic.sh",
+    "context": "planning",
+    "parity": "scripts/sw-strategic-test.sh",
+    "status": "bash"
+  },
+  {
+    "command": "optimize",
+    "aliases": [],
+    "script": "sw-self-optimize.sh",
+    "context": "learning",
+    "parity": "scripts/sw-self-optimize-test.sh",
+    "status": "bash"
+  },
+  {
+    "command": "session",
+    "aliases": [],
+    "script": "sw-session.sh",
+    "context": "teams",
+    "parity": "scripts/sw-session-test.sh",
+    "status": "bash"
+  },
+  {
+    "command": "mission-control",
+    "aliases": [
+      "mc"
+    ],
+    "script": "sw-mission-control.sh",
+    "context": "observability",
+    "parity": "scripts/sw-mission-control-test.sh",
+    "status": "bash"
+  },
+  {
+    "command": "ps",
+    "aliases": [],
+    "script": "sw-ps.sh",
+    "context": "observability",
+    "parity": "scripts/sw-ps-test.sh",
+    "status": "bash"
+  },
+  {
+    "command": "logs",
+    "aliases": [],
+    "script": "sw-logs.sh",
+    "context": "observability",
+    "parity": "scripts/sw-logs-test.sh",
+    "status": "bash"
+  },
+  {
+    "command": "templates",
+    "aliases": [],
+    "script": "sw-templates.sh",
+    "context": "teams",
+    "parity": "scripts/sw-templates-test.sh",
+    "status": "bash"
+  },
+  {
+    "command": "doctor",
+    "aliases": [],
+    "script": "sw-doctor.sh",
+    "context": "platform",
+    "parity": "scripts/sw-doctor-test.sh",
+    "status": "bash"
+  },
+  {
+    "command": "cleanup",
+    "aliases": [],
+    "script": "sw-cleanup.sh",
+    "context": "platform",
+    "parity": "scripts/sw-cleanup-test.sh",
+    "status": "bash"
+  },
+  {
+    "command": "reaper",
+    "aliases": [],
+    "script": "sw-reaper.sh",
+    "context": "teams",
+    "parity": "scripts/sw-reaper-test.sh",
+    "status": "bash"
+  },
+  {
+    "command": "upgrade",
+    "aliases": [],
+    "script": "sw-upgrade.sh",
+    "context": "platform",
+    "parity": "scripts/sw-upgrade-test.sh",
+    "status": "bash"
+  },
+  {
+    "command": "loop",
+    "aliases": [],
+    "script": "sw-loop.sh",
+    "context": "delivery",
+    "parity": "scripts/sw-loop-test.sh",
+    "status": "bash"
+  },
+  {
+    "command": "pipeline",
+    "aliases": [],
+    "script": "sw-pipeline.sh",
+    "context": "delivery",
+    "parity": "scripts/sw-pipeline-test.sh",
+    "status": "bash"
+  },
+  {
+    "command": "worktree",
+    "aliases": [],
+    "script": "sw-worktree.sh",
+    "context": "delivery",
+    "parity": "scripts/sw-worktree-test.sh",
+    "status": "bash"
+  },
+  {
+    "command": "prep",
+    "aliases": [],
+    "script": "sw-prep.sh",
+    "context": "platform",
+    "parity": "scripts/sw-prep-test.sh",
+    "status": "bash"
+  },
+  {
+    "command": "daemon",
+    "aliases": [],
+    "script": "sw-daemon.sh",
+    "context": "orchestration",
+    "parity": "scripts/sw-daemon-test.sh",
+    "status": "bash"
+  },
+  {
+    "command": "autonomous",
+    "aliases": [
+      "auto"
+    ],
+    "script": "sw-autonomous.sh",
+    "context": "orchestration",
+    "parity": "scripts/sw-autonomous-test.sh",
+    "status": "bash"
+  },
+  {
+    "command": "memory",
+    "aliases": [],
+    "script": "sw-memory.sh",
+    "context": "learning",
+    "parity": "scripts/sw-memory-test.sh",
+    "status": "bash"
+  },
+  {
+    "command": "instrument",
+    "aliases": [],
+    "script": "sw-instrument.sh",
+    "context": "observability",
+    "parity": "scripts/sw-instrument-test.sh",
+    "status": "bash"
+  },
+  {
+    "command": "cost",
+    "aliases": [],
+    "script": "sw-cost.sh",
+    "context": "intelligence",
+    "parity": "scripts/sw-cost-test.sh",
+    "status": "bash"
+  },
+  {
+    "command": "adaptive",
+    "aliases": [],
+    "script": "sw-adaptive.sh",
+    "context": "learning",
+    "parity": "scripts/sw-adaptive-test.sh",
+    "status": "bash"
+  },
+  {
+    "command": "regression",
+    "aliases": [],
+    "script": "sw-regression.sh",
+    "context": "quality",
+    "parity": "scripts/sw-regression-test.sh",
+    "status": "bash"
+  },
+  {
+    "command": "incident",
+    "aliases": [],
+    "script": "sw-incident.sh",
+    "context": "orchestration",
+    "parity": "scripts/sw-incident-test.sh",
+    "status": "bash"
+  },
+  {
+    "command": "db",
+    "aliases": [],
+    "script": "sw-db.sh",
+    "context": "platform",
+    "parity": "scripts/sw-db-test.sh",
+    "status": "bash"
+  },
+  {
+    "command": "deps",
+    "aliases": [],
+    "script": "sw-deps.sh",
+    "context": "integrations",
+    "parity": "scripts/sw-deps-test.sh",
+    "status": "bash"
+  },
+  {
+    "command": "fleet",
+    "aliases": [],
+    "script": "sw-fleet.sh",
+    "context": "orchestration",
+    "parity": "scripts/sw-fleet-test.sh",
+    "status": "bash"
+  },
+  {
+    "command": "fleet-viz",
+    "aliases": [],
+    "script": "sw-fleet-viz.sh",
+    "context": "observability",
+    "parity": "scripts/sw-fleet-viz-test.sh",
+    "status": "bash"
+  },
+  {
+    "command": "fix",
+    "aliases": [],
+    "script": "sw-fix.sh",
+    "context": "orchestration",
+    "parity": "scripts/sw-fix-test.sh",
+    "status": "bash"
+  },
+  {
+    "command": "init",
+    "aliases": [],
+    "script": "sw-init.sh",
+    "context": "platform",
+    "parity": "scripts/sw-init-test.sh",
+    "status": "bash"
+  },
+  {
+    "command": "setup",
+    "aliases": [],
+    "script": "sw-setup.sh",
+    "context": "platform",
+    "parity": "scripts/sw-setup-test.sh",
+    "status": "bash"
+  },
+  {
+    "command": "dashboard",
+    "aliases": [
+      "dash"
+    ],
+    "script": "sw-dashboard.sh",
+    "context": "observability",
+    "parity": "scripts/sw-dashboard-test.sh",
+    "status": "bash"
+  },
+  {
+    "command": "public-dashboard",
+    "aliases": [
+      "share"
+    ],
+    "script": "sw-public-dashboard.sh",
+    "context": "observability",
+    "parity": "scripts/sw-public-dashboard-test.sh",
+    "status": "bash"
+  },
+  {
+    "command": "jira",
+    "aliases": [],
+    "script": "sw-jira.sh",
+    "context": "integrations",
+    "parity": "scripts/sw-jira-test.sh",
+    "status": "bash"
+  },
+  {
+    "command": "linear",
+    "aliases": [],
+    "script": "sw-linear.sh",
+    "context": "integrations",
+    "parity": "scripts/sw-linear-test.sh",
+    "status": "bash"
+  },
+  {
+    "command": "model",
+    "aliases": [],
+    "script": "sw-model-router.sh",
+    "context": "intelligence",
+    "parity": "scripts/sw-model-router-test.sh",
+    "status": "bash"
+  },
+  {
+    "command": "tracker",
+    "aliases": [],
+    "script": "sw-tracker.sh",
+    "context": "integrations",
+    "parity": "scripts/sw-tracker-test.sh",
+    "status": "bash"
+  },
+  {
+    "command": "heartbeat",
+    "aliases": [],
+    "script": "sw-heartbeat.sh",
+    "context": "observability",
+    "parity": "scripts/sw-heartbeat-test.sh",
+    "status": "bash"
+  },
+  {
+    "command": "checkpoint",
+    "aliases": [],
+    "script": "sw-checkpoint.sh",
+    "context": "delivery",
+    "parity": "scripts/sw-checkpoint-test.sh",
+    "status": "bash"
+  },
+  {
+    "command": "stall-detector",
+    "aliases": [],
+    "script": "sw-stall-detector.sh",
+    "context": "observability",
+    "parity": "scripts/sw-stall-detector-test.sh",
+    "status": "bash"
+  },
+  {
+    "command": "durable",
+    "aliases": [],
+    "script": "sw-durable.sh",
+    "context": "delivery",
+    "parity": "scripts/sw-durable-test.sh",
+    "status": "bash"
+  },
+  {
+    "command": "webhook",
+    "aliases": [],
+    "script": "sw-webhook.sh",
+    "context": "integrations",
+    "parity": "scripts/sw-webhook-test.sh",
+    "status": "bash"
+  },
+  {
+    "command": "connect",
+    "aliases": [],
+    "script": "sw-connect.sh",
+    "context": "integrations",
+    "parity": "scripts/sw-connect-test.sh",
+    "status": "bash"
+  },
+  {
+    "command": "remote",
+    "aliases": [],
+    "script": "sw-remote.sh",
+    "context": "orchestration",
+    "parity": "scripts/sw-remote-test.sh",
+    "status": "bash"
+  },
+  {
+    "command": "launchd",
+    "aliases": [],
+    "script": "sw-launchd.sh",
+    "context": "orchestration",
+    "parity": "scripts/sw-launchd-test.sh",
+    "status": "bash"
+  },
+  {
+    "command": "auth",
+    "aliases": [],
+    "script": "sw-auth.sh",
+    "context": "integrations",
+    "parity": "scripts/sw-auth-test.sh",
+    "status": "bash"
+  },
+  {
+    "command": "adversarial",
+    "aliases": [],
+    "script": "sw-adversarial.sh",
+    "context": "quality",
+    "parity": "scripts/sw-adversarial-test.sh",
+    "status": "bash"
+  },
+  {
+    "command": "simulation",
+    "aliases": [],
+    "script": "sw-developer-simulation.sh",
+    "context": "quality",
+    "parity": "scripts/sw-developer-simulation-test.sh",
+    "status": "bash"
+  },
+  {
+    "command": "architecture",
+    "aliases": [],
+    "script": "sw-architecture-enforcer.sh",
+    "context": "quality",
+    "parity": "scripts/sw-architecture-enforcer-test.sh",
+    "status": "bash"
+  },
+  {
+    "command": "docs",
+    "aliases": [],
+    "script": "sw-docs.sh",
+    "context": "platform",
+    "parity": "scripts/sw-docs-test.sh",
+    "status": "bash"
+  },
+  {
+    "command": "docs-agent",
+    "aliases": [],
+    "script": "sw-docs-agent.sh",
+    "context": "platform",
+    "parity": "scripts/sw-docs-agent-test.sh",
+    "status": "bash"
+  },
+  {
+    "command": "doc-fleet",
+    "aliases": [],
+    "script": "sw-doc-fleet.sh",
+    "context": "platform",
+    "parity": "scripts/sw-doc-fleet-test.sh",
+    "status": "bash",
+    "notes": "scripts/sw-doc-fleet.sh reads .claude/agents/doc-fleet-agent.md; doc-fleet is on the spec §7.5 don't-port list"
+  },
+  {
+    "command": "review-rerun",
+    "aliases": [
+      "rr"
+    ],
+    "script": "sw-review-rerun.sh",
+    "context": "quality",
+    "parity": "scripts/sw-review-rerun-test.sh",
+    "status": "bash"
+  },
+  {
+    "command": "scale",
+    "aliases": [],
+    "script": "sw-scale.sh",
+    "context": "orchestration",
+    "parity": "scripts/sw-scale-test.sh",
+    "status": "bash"
+  },
+  {
+    "command": "tmux",
+    "aliases": [],
+    "script": "sw-tmux.sh",
+    "context": "teams",
+    "parity": "scripts/sw-tmux-test.sh",
+    "status": "bash"
+  },
+  {
+    "command": "tmux-pipeline",
+    "aliases": [],
+    "script": "sw-tmux-pipeline.sh",
+    "context": "delivery",
+    "parity": "scripts/sw-tmux-pipeline-test.sh",
+    "status": "bash"
+  },
+  {
+    "command": "github",
+    "aliases": [
+      "gh-context"
+    ],
+    "script": "sw-github-graphql.sh",
+    "context": "integrations",
+    "parity": "scripts/sw-github-graphql-test.sh",
+    "status": "bash"
+  },
+  {
+    "command": "checks",
+    "aliases": [],
+    "script": "sw-github-checks.sh",
+    "context": "integrations",
+    "parity": "scripts/sw-github-checks-test.sh",
+    "status": "bash"
+  },
+  {
+    "command": "ci",
+    "aliases": [],
+    "script": "sw-ci.sh",
+    "context": "integrations",
+    "parity": "scripts/sw-ci-test.sh",
+    "status": "bash"
+  },
+  {
+    "command": "github-app",
+    "aliases": [],
+    "script": "sw-github-app.sh",
+    "context": "integrations",
+    "parity": "scripts/sw-github-app-test.sh",
+    "status": "bash"
+  },
+  {
+    "command": "decompose",
+    "aliases": [],
+    "script": "sw-decompose.sh",
+    "context": "planning",
+    "parity": "scripts/sw-decompose-test.sh",
+    "status": "bash"
+  },
+  {
+    "command": "discovery",
+    "aliases": [],
+    "script": "sw-discovery.sh",
+    "context": "learning",
+    "parity": "scripts/sw-discovery-test.sh",
+    "status": "bash"
+  },
+  {
+    "command": "context",
+    "aliases": [],
+    "script": "sw-context.sh",
+    "context": "delivery",
+    "parity": "scripts/sw-context-test.sh",
+    "status": "bash"
+  },
+  {
+    "command": "trace",
+    "aliases": [],
+    "script": "sw-trace.sh",
+    "context": "observability",
+    "parity": "scripts/sw-trace-test.sh",
+    "status": "bash"
+  },
+  {
+    "command": "pr",
+    "aliases": [],
+    "script": "sw-pr-lifecycle.sh",
+    "context": "integrations",
+    "parity": "scripts/sw-pr-lifecycle-test.sh",
+    "status": "bash"
+  },
+  {
+    "command": "widgets",
+    "aliases": [],
+    "script": "sw-widgets.sh",
+    "context": "observability",
+    "parity": "scripts/sw-widgets-test.sh",
+    "status": "bash"
+  },
+  {
+    "command": "feedback",
+    "aliases": [],
+    "script": "sw-feedback.sh",
+    "context": "learning",
+    "parity": "scripts/sw-feedback-test.sh",
+    "status": "bash"
+  },
+  {
+    "command": "eventbus",
+    "aliases": [],
+    "script": "sw-eventbus.sh",
+    "context": "observability",
+    "parity": "scripts/sw-eventbus-test.sh",
+    "status": "bash"
+  },
+  {
+    "command": "evidence",
+    "aliases": [
+      "ev"
+    ],
+    "script": "sw-evidence.sh",
+    "context": "quality",
+    "parity": "scripts/sw-evidence-test.sh",
+    "status": "bash"
+  },
+  {
+    "command": "decide",
+    "aliases": [],
+    "script": "sw-decide.sh",
+    "context": "intelligence",
+    "parity": "scripts/sw-decide-test.sh",
+    "status": "bash"
+  },
+  {
+    "command": "otel",
+    "aliases": [],
+    "script": "sw-otel.sh",
+    "context": "observability",
+    "parity": "scripts/sw-otel-test.sh",
+    "status": "bash"
+  },
+  {
+    "command": "triage",
+    "aliases": [],
+    "script": "sw-triage.sh",
+    "context": "planning",
+    "parity": "scripts/sw-triage-test.sh",
+    "status": "bash"
+  },
+  {
+    "command": "pipeline-composer",
+    "aliases": [
+      "composer"
+    ],
+    "script": "sw-pipeline-composer.sh",
+    "context": "delivery",
+    "parity": "scripts/sw-pipeline-composer-test.sh",
+    "status": "bash"
+  },
+  {
+    "command": "pm",
+    "aliases": [],
+    "script": "sw-pm.sh",
+    "context": "planning",
+    "parity": "scripts/sw-pm-test.sh",
+    "status": "bash"
+  },
+  {
+    "command": "team-stages",
+    "aliases": [],
+    "script": "sw-team-stages.sh",
+    "context": "teams",
+    "parity": "scripts/sw-team-stages-test.sh",
+    "status": "bash"
+  },
+  {
+    "command": "ux",
+    "aliases": [],
+    "script": "sw-ux.sh",
+    "context": "platform",
+    "parity": "scripts/sw-ux-test.sh",
+    "status": "bash"
+  },
+  {
+    "command": "e2e",
+    "aliases": [],
+    "script": "sw-e2e-orchestrator.sh",
+    "context": "quality",
+    "parity": "scripts/sw-e2e-orchestrator-test.sh",
+    "status": "bash"
+  },
+  {
+    "command": "hello",
+    "aliases": [],
+    "script": "sw-hello.sh",
+    "context": "platform",
+    "parity": "scripts/sw-hello-test.sh",
+    "status": "parity-green"
+  }
+]

@@ -1,0 +1,4 @@
+ruleDirs:
+  - tools/arch/rules
+testConfigs:
+  - testDir: tools/arch/rule-tests

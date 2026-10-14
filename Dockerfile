@@ -56,6 +56,8 @@ COPY scripts/ scripts/
 COPY templates/ templates/
 COPY tmux/ tmux/
 COPY config/ config/
+# TypeScript CLI (tests and src/testing excluded via .dockerignore)
+COPY src/ src/
 COPY completions/ completions/
 COPY .claude/agents/ .claude/agents/
 COPY .claude/hooks/ .claude/hooks/

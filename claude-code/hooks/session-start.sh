@@ -17,8 +17,11 @@ if [[ -f "$CLAUDE_DIR/pipeline-state.md" ]]; then
 fi
 
 # Remind about project conventions
-if [[ -f "$CLAUDE_DIR/CLAUDE.md" ]]; then
-    echo "Project conventions available in .claude/CLAUDE.md"
-fi
+for f in CLAUDE.md "$CLAUDE_DIR/CLAUDE.md" AGENTS.md; do
+    if [[ -f "$f" ]]; then
+        echo "Project conventions available in $f"
+        break
+    fi
+done
 
 exit 0

@@ -1,0 +1,28 @@
+id: F6-agent-sdk-only-in-adapter
+language: TypeScript
+severity: error
+message: "Use the AgentRunner port. Only src/adapters/agent may import the Claude Agent SDK."
+files:
+  - "src/**/*.ts"
+ignores:
+  - "src/adapters/agent/**"
+rule:
+  any:
+    - all:
+        - any:
+            - kind: import_statement
+            - kind: export_statement
+        - has:
+            field: source
+            kind: string
+            regex: '^["'']@anthropic-ai/claude-agent-sdk(/.*)?["'']$'
+    - all:
+        - any:
+            - pattern: import($S)
+            - pattern: require($S)
+        - has:
+            field: arguments
+            kind: arguments
+            has:
+              kind: string
+              regex: '^["'']@anthropic-ai/claude-agent-sdk(/.*)?["'']$'

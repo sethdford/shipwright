@@ -3,6 +3,8 @@ dist/
 .git/
 *.tar.gz
 **/*-test.sh
+src/**/*.test.ts
+src/testing/
 scripts/build-release.sh
 scripts/update-version.sh
 scripts/install-remote.sh

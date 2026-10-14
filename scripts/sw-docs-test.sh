@@ -26,6 +26,7 @@ setup_env() {
     # Create repo structure
     mkdir -p "$TEST_TEMP_DIR/scripts/lib"
     mkdir -p "$TEST_TEMP_DIR/.claude"
+    mkdir -p "$TEST_TEMP_DIR/docs/reference"
     mkdir -p "$TEST_TEMP_DIR/home/.shipwright"
 
     # Copy the docs script under test
@@ -98,8 +99,8 @@ cat <<CONFIGEOF
 CONFIGEOF
 DAEMON
 
-    # Create .claude/CLAUDE.md with AUTO markers
-    cat > "$TEST_TEMP_DIR/.claude/CLAUDE.md" <<'MARKDOWN'
+    # Create docs/reference/legacy-guide.md with AUTO markers
+    cat > "$TEST_TEMP_DIR/docs/reference/legacy-guide.md" <<'MARKDOWN'
 # Test Docs
 
 ## Core Scripts
@@ -220,7 +221,7 @@ test_find_auto_files() {
 # ──────────────────────────────────────────────────────────────────────────────
 test_get_sections() {
     local sections
-    sections=$(grep -oE '<!-- AUTO:[a-z0-9_-]+ -->' "$TEST_TEMP_DIR/.claude/CLAUDE.md" | sed 's/<!-- AUTO://;s/ -->//')
+    sections=$(grep -oE '<!-- AUTO:[a-z0-9_-]+ -->' "$TEST_TEMP_DIR/docs/reference/legacy-guide.md" | sed 's/<!-- AUTO://;s/ -->//')
 
     local found_core=false found_test=false found_flags=false
     while IFS= read -r s; do
@@ -254,7 +255,7 @@ test_gen_architecture_table() {
         /<!-- AUTO:core-scripts -->/ { capture=1; next }
         /<!-- \/AUTO:core-scripts -->/ { capture=0 }
         capture { print }
-    ' "$TEST_TEMP_DIR/.claude/CLAUDE.md")
+    ' "$TEST_TEMP_DIR/docs/reference/legacy-guide.md")
 
     # Should have table headers
     if ! echo "$content" | grep -q "| File | Lines | Purpose |"; then
@@ -291,7 +292,7 @@ test_gen_table_includes_cli_router() {
         /<!-- AUTO:core-scripts -->/ { capture=1; next }
         /<!-- \/AUTO:core-scripts -->/ { capture=0 }
         capture { print }
-    ' "$TEST_TEMP_DIR/.claude/CLAUDE.md")
+    ' "$TEST_TEMP_DIR/docs/reference/legacy-guide.md")
 
     if ! echo "$content" | grep -q "scripts/sw"; then
         return 1
@@ -313,7 +314,7 @@ test_gen_feature_flags() {
         /<!-- AUTO:feature-flags -->/ { capture=1; next }
         /<!-- \/AUTO:feature-flags -->/ { capture=0 }
         capture { print }
-    ' "$TEST_TEMP_DIR/.claude/CLAUDE.md")
+    ' "$TEST_TEMP_DIR/docs/reference/legacy-guide.md")
 
     # Should have table header
     if ! echo "$content" | grep -q "| Flag | Default | Purpose |"; then
@@ -345,7 +346,7 @@ test_gen_test_suites_table() {
         /<!-- AUTO:test-suites -->/ { capture=1; next }
         /<!-- \/AUTO:test-suites -->/ { capture=0 }
         capture { print }
-    ' "$TEST_TEMP_DIR/.claude/CLAUDE.md")
+    ' "$TEST_TEMP_DIR/docs/reference/legacy-guide.md")
 
     # Should have sw-alpha-test.sh in the test suites section
     if ! echo "$content" | grep -q "sw-alpha-test.sh"; then
@@ -460,7 +461,7 @@ test_docs_check_stale() {
     rm -f "$TEST_TEMP_DIR/test-check.md" "$TEST_TEMP_DIR/test-replace.md"
 
     # Reset the CLAUDE.md with stale content
-    cat > "$TEST_TEMP_DIR/.claude/CLAUDE.md" <<'MARKDOWN'
+    cat > "$TEST_TEMP_DIR/docs/reference/legacy-guide.md" <<'MARKDOWN'
 # Test Docs
 
 ## Core Scripts
@@ -489,7 +490,7 @@ test_docs_sync_then_fresh() {
     rm -f "$TEST_TEMP_DIR/test-check.md" "$TEST_TEMP_DIR/test-replace.md"
 
     # Reset with stale content
-    cat > "$TEST_TEMP_DIR/.claude/CLAUDE.md" <<'MARKDOWN'
+    cat > "$TEST_TEMP_DIR/docs/reference/legacy-guide.md" <<'MARKDOWN'
 # Test Docs
 
 ## Core Scripts
@@ -608,7 +609,7 @@ test_no_auto_markers() {
     rm -f "$TEST_TEMP_DIR/test-check.md" "$TEST_TEMP_DIR/test-replace.md"
 
     # Overwrite CLAUDE.md with no markers
-    cat > "$TEST_TEMP_DIR/.claude/CLAUDE.md" <<'MARKDOWN'
+    cat > "$TEST_TEMP_DIR/docs/reference/legacy-guide.md" <<'MARKDOWN'
 # Plain Docs
 No auto markers here.
 MARKDOWN
@@ -626,7 +627,7 @@ MARKDOWN
 # 16. Multiple sections in one file all get processed
 # ──────────────────────────────────────────────────────────────────────────────
 test_multiple_sections() {
-    cat > "$TEST_TEMP_DIR/.claude/CLAUDE.md" <<'MARKDOWN'
+    cat > "$TEST_TEMP_DIR/docs/reference/legacy-guide.md" <<'MARKDOWN'
 # Multi Section Doc
 
 <!-- AUTO:core-scripts -->
@@ -648,9 +649,9 @@ MARKDOWN
 
     # Verify each section was updated
     local core_content test_content flag_content
-    core_content=$(awk '/<!-- AUTO:core-scripts -->/{c=1;next}/<!-- \/AUTO:core-scripts -->/{c=0}c' "$TEST_TEMP_DIR/.claude/CLAUDE.md")
-    test_content=$(awk '/<!-- AUTO:test-suites -->/{c=1;next}/<!-- \/AUTO:test-suites -->/{c=0}c' "$TEST_TEMP_DIR/.claude/CLAUDE.md")
-    flag_content=$(awk '/<!-- AUTO:feature-flags -->/{c=1;next}/<!-- \/AUTO:feature-flags -->/{c=0}c' "$TEST_TEMP_DIR/.claude/CLAUDE.md")
+    core_content=$(awk '/<!-- AUTO:core-scripts -->/{c=1;next}/<!-- \/AUTO:core-scripts -->/{c=0}c' "$TEST_TEMP_DIR/docs/reference/legacy-guide.md")
+    test_content=$(awk '/<!-- AUTO:test-suites -->/{c=1;next}/<!-- \/AUTO:test-suites -->/{c=0}c' "$TEST_TEMP_DIR/docs/reference/legacy-guide.md")
+    flag_content=$(awk '/<!-- AUTO:feature-flags -->/{c=1;next}/<!-- \/AUTO:feature-flags -->/{c=0}c' "$TEST_TEMP_DIR/docs/reference/legacy-guide.md")
 
     # None should still say "stale"
     if echo "$core_content" | grep -q "^stale$"; then
@@ -664,7 +665,7 @@ MARKDOWN
     fi
 
     # Verify middle text preserved
-    if ! grep -q "Middle text." "$TEST_TEMP_DIR/.claude/CLAUDE.md"; then
+    if ! grep -q "Middle text." "$TEST_TEMP_DIR/docs/reference/legacy-guide.md"; then
         return 1
     fi
     return 0
@@ -677,7 +678,7 @@ test_purpose_extraction() {
     run_docs sync >/dev/null 2>&1 || true
 
     local content
-    content=$(awk '/<!-- AUTO:core-scripts -->/{c=1;next}/<!-- \/AUTO:core-scripts -->/{c=0}c' "$TEST_TEMP_DIR/.claude/CLAUDE.md")
+    content=$(awk '/<!-- AUTO:core-scripts -->/{c=1;next}/<!-- \/AUTO:core-scripts -->/{c=0}c' "$TEST_TEMP_DIR/docs/reference/legacy-guide.md")
 
     # sw-alpha.sh header says "Alpha Feature Module"
     if ! echo "$content" | grep -q "Alpha Feature Module"; then

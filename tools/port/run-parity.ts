@@ -1,0 +1,116 @@
+import { mkdtempSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { BunProcessRunner } from "../../src/adapters/process/bun-process-runner";
+import { loadProgress, type ProgressEntry, ROOT } from "./progress";
+import {
+  buildSandbox,
+  cleanupSandbox,
+  gitSnapshot,
+  parityEnv,
+  planStubs,
+  suiteArgv,
+} from "./sandbox";
+
+const ACTIVE = new Set(["porting", "parity-green", "bash-deleted"]);
+const DEFAULT_TIMEOUT_MS = 900_000;
+
+// reapGroup: a suite's leftover background jobs must die when the suite ends.
+const runner = new BunProcessRunner({ reapGroup: true });
+
+export function selectSuites(progress: readonly ProgressEntry[]): ProgressEntry[] {
+  return progress.filter((e) => ACTIVE.has(e.status) && e.parity);
+}
+
+export function parityTimeoutMs(env: Record<string, string | undefined>): number {
+  const n = Number(env.SW_PARITY_TIMEOUT_MS);
+  return Number.isFinite(n) && n > 0 ? n : DEFAULT_TIMEOUT_MS;
+}
+
+export function summarize(total: number, failed: number) {
+  return { line: `${total - failed}/${total} parity suites passed`, exitCode: failed ? 1 : 0 };
+}
+
+export function gitChanged(before: string, after: string): boolean {
+  return before !== after;
+}
+
+export function runSuite(
+  argv: string[],
+  env: Record<string, string>,
+  timeoutMs: number,
+  cwd?: string,
+) {
+  return runner.run({ argv, env, cwd, timeoutMs });
+}
+
+function failureReport(entry: ProgressEntry, why: string, out: string, err: string): string {
+  const tail = `${out}\n${err}`.split("\n").slice(-30).join("\n");
+  return `✗ parity ${entry.command} (${entry.parity}) ${why}\n${tail}`;
+}
+
+let activeSandbox: string | undefined;
+
+/** Runs one suite in a fresh sandbox. Never throws: setup problems are that suite's failure. */
+export async function runOne(
+  entry: ProgressEntry,
+  all: readonly ProgressEntry[],
+): Promise<boolean> {
+  try {
+    planStubs(all, ROOT); // refuse unstubbable layouts before creating anything
+  } catch (err) {
+    console.error(failureReport(entry, (err as Error).message, "", ""));
+    return false;
+  }
+  const sandbox = mkdtempSync(join(tmpdir(), "sw-parity-"));
+  activeSandbox = sandbox;
+  try {
+    const repo = buildSandbox(sandbox, ROOT, all);
+    const before = gitSnapshot(ROOT);
+    const env = parityEnv(sandbox, Bun.env);
+    const r = await runSuite(suiteArgv(sandbox, entry), env, parityTimeoutMs(Bun.env), repo);
+    const dirty = gitChanged(before, gitSnapshot(ROOT));
+    const ok = r.exitCode === 0 && !r.timedOut && !dirty;
+    if (ok) console.log(`✓ parity ${entry.command}`);
+    else {
+      const why = r.timedOut
+        ? "TIMED OUT"
+        : dirty
+          ? "modified the real repo"
+          : `exit ${r.exitCode}`;
+      console.error(failureReport(entry, why, r.stdout, r.stderr));
+    }
+    return ok;
+  } finally {
+    cleanupSandbox(sandbox);
+    activeSandbox = undefined;
+  }
+}
+
+let stopping = false;
+
+async function onSignal(): Promise<void> {
+  if (stopping) return; // repeat signals while shutting down are ignored
+  stopping = true;
+  runner.killAll("SIGTERM");
+  await new Promise((r) => setTimeout(r, 2000));
+  runner.killAll("SIGKILL");
+  if (activeSandbox) cleanupSandbox(activeSandbox);
+  process.exit(130);
+}
+
+if (import.meta.main) {
+  process.on("SIGINT", onSignal);
+  process.on("SIGTERM", onSignal);
+  const all = await loadProgress();
+  const suites = selectSuites(all);
+  let failed = 0;
+  for (const entry of suites) {
+    if (stopping) break;
+    if (!(await runOne(entry, all))) failed++;
+  }
+  if (stopping) process.exit(130);
+  const { line, exitCode } = summarize(suites.length, failed);
+  console.log(line);
+  process.exit(exitCode);
+}

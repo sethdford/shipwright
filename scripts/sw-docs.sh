@@ -562,7 +562,7 @@ docs_report() {
 
     # File freshness
     echo -e "${BOLD}Document Freshness:${RESET}"
-    for doc in README.md .claude/CLAUDE.md CHANGELOG.md; do
+    for doc in README.md docs/reference/legacy-guide.md CHANGELOG.md; do
         local full_path="$REPO_DIR/$doc"
         [[ -f "$full_path" ]] || continue
         local last_modified

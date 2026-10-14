@@ -15,6 +15,7 @@ setup_env() {
     mkdir -p "$TEST_TEMP_DIR/repo/.claude/agents"
     mkdir -p "$TEST_TEMP_DIR/repo/.claude/pipeline-artifacts"
     mkdir -p "$TEST_TEMP_DIR/repo/docs/strategy"
+    mkdir -p "$TEST_TEMP_DIR/repo/docs/reference"
     mkdir -p "$TEST_TEMP_DIR/repo/docs/patterns"
     mkdir -p "$TEST_TEMP_DIR/repo/docs/tmux-research"
     mkdir -p "$TEST_TEMP_DIR/repo/claude-code"
@@ -130,7 +131,7 @@ DOC
     echo "# tmux Index" > "$TEST_TEMP_DIR/repo/docs/tmux-research/TMUX-RESEARCH-INDEX.md"
 
     # Create CLAUDE.md and agent definitions
-    cat > "$TEST_TEMP_DIR/repo/.claude/CLAUDE.md" <<'DOC'
+    cat > "$TEST_TEMP_DIR/repo/docs/reference/legacy-guide.md" <<'DOC'
 # Shipwright
 Commands and documentation
 <!-- AUTO:test-section -->

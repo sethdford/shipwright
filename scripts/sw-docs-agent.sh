@@ -312,7 +312,7 @@ show_coverage() {
         local script_name
         script_name=$(basename "$script" .sh | sed 's/^sw-//')
 
-        if grep -q "$script_name" "$REPO_DIR/.claude/CLAUDE.md" 2>/dev/null; then
+        if grep -q "$script_name" "$REPO_DIR/docs/reference/legacy-guide.md" 2>/dev/null; then
             documented_count=$((documented_count + 1))
         else
             undocumented_scripts="${undocumented_scripts}${script_name}\\n"
@@ -369,13 +369,13 @@ scan_gaps() {
     fi
 
     # Check CLAUDE.md
-    if [[ -f "$REPO_DIR/.claude/CLAUDE.md" ]]; then
+    if [[ -f "$REPO_DIR/docs/reference/legacy-guide.md" ]]; then
         local claude_sections
-        claude_sections=$(grep -o "<!-- AUTO:[a-z0-9_-]* -->" "$REPO_DIR/.claude/CLAUDE.md" 2>/dev/null | sed 's/<!-- AUTO://;s/ -->//' | sort -u)
+        claude_sections=$(grep -o "<!-- AUTO:[a-z0-9_-]* -->" "$REPO_DIR/docs/reference/legacy-guide.md" 2>/dev/null | sed 's/<!-- AUTO://;s/ -->//' | sort -u)
 
         for section in $claude_sections; do
             local freshness
-            freshness=$(score_freshness "$REPO_DIR/.claude/CLAUDE.md" "scripts/sw-*.sh")
+            freshness=$(score_freshness "$REPO_DIR/docs/reference/legacy-guide.md" "scripts/sw-*.sh")
 
             if [[ "$freshness" -lt 70 ]]; then
                 warn "Stale section in CLAUDE.md: $section (freshness: ${freshness}%)"
@@ -423,7 +423,7 @@ watch_mode() {
     local watch_paths=(
         "$REPO_DIR/scripts/sw-*.sh"
         "$REPO_DIR/README.md"
-        "$REPO_DIR/.claude/CLAUDE.md"
+        "$REPO_DIR/docs/reference/legacy-guide.md"
     )
 
     # Simple polling implementation

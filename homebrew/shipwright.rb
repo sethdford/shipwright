@@ -34,6 +34,9 @@ class Shipwright < Formula
     libexec.install "templates" if Dir.exist?("templates")
     libexec.install "tmux" if Dir.exist?("tmux")
     libexec.install "config" if Dir.exist?("config")
+    # TypeScript CLI (scripts/sw runs `bun SCRIPT_DIR/../src/cli.ts`; src/main.ts imports ../package.json)
+    libexec.install "src" if Dir.exist?("src")
+    libexec.install "package.json" if File.exist?("package.json")
     (libexec/".claude").install Dir[".claude/agents"] if Dir.exist?(".claude/agents")
     (libexec/".claude").install Dir[".claude/hooks"] if Dir.exist?(".claude/hooks")
 

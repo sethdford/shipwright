@@ -203,9 +203,16 @@ ${review_memory}
         fi
     fi
 
-    # Inject project conventions if CLAUDE.md exists
-    local claudemd="$PROJECT_ROOT/.claude/CLAUDE.md"
-    if [[ -f "$claudemd" ]]; then
+    # Inject project conventions if a conventions file exists
+    local claudemd="" _conv_file
+    # Repo conventions: .claude/CLAUDE.md, then CLAUDE.md, then AGENTS.md (skip @-import-only stubs)
+    for _conv_file in "$PROJECT_ROOT/.claude/CLAUDE.md" "$PROJECT_ROOT/CLAUDE.md" "$PROJECT_ROOT/AGENTS.md"; do
+        if [[ -f "$_conv_file" ]] && grep -qvE '^[[:space:]]*(@[^[:space:]]+)?[[:space:]]*$' "$_conv_file" 2>/dev/null; then
+            claudemd="$_conv_file"
+            break
+        fi
+    done
+    if [[ -n "$claudemd" ]]; then
         local conventions
         conventions=$(grep -A2 'Common Pitfalls\|Shell Standards\|Bash 3.2' "$claudemd" 2>/dev/null | head -20 || true)
         if [[ -n "$conventions" ]]; then

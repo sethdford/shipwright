@@ -1,0 +1,11 @@
+id: F6-agent-sdk-only-in-adapter
+valid:
+  - 'import type { AgentRunner } from "../shared/kernel/ports";'
+  - 'import { z } from "zod";'
+invalid:
+  - 'import { query } from "@anthropic-ai/claude-agent-sdk";'
+  - 'import type { Options } from "@anthropic-ai/claude-agent-sdk";'
+  - 'export { query } from "@anthropic-ai/claude-agent-sdk";'
+  - 'import { x } from "@anthropic-ai/claude-agent-sdk/sub";'
+  - 'const sdk = await import("@anthropic-ai/claude-agent-sdk");'
+  - 'const sdk = require("@anthropic-ai/claude-agent-sdk");'

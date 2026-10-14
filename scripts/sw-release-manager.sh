@@ -205,7 +205,7 @@ check_docs_updated() {
     info "Checking documentation status..."
 
     # Check if stale documentation markers exist
-    if grep -r "AUTO:" "$REPO_DIR/.claude/CLAUDE.md" 2>/dev/null | grep -qv "AUTO.*:"; then
+    if grep -r "AUTO:" "$REPO_DIR/docs/reference/legacy-guide.md" 2>/dev/null | grep -qv "AUTO.*:"; then
         warn "Documentation contains stale AUTO sections"
         return 1
     fi

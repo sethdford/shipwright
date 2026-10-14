@@ -13,6 +13,7 @@ setup_env() {
     mkdir -p "$TEST_TEMP_DIR/bin"
     mkdir -p "$TEST_TEMP_DIR/repo/scripts"
     mkdir -p "$TEST_TEMP_DIR/repo/.claude/pipeline-artifacts"
+    mkdir -p "$TEST_TEMP_DIR/repo/docs/reference"
 
     if command -v jq &>/dev/null; then
         ln -sf "$(command -v jq)" "$TEST_TEMP_DIR/bin/jq"
@@ -21,8 +22,8 @@ setup_env() {
         ln -sf "$(command -v shasum)" "$TEST_TEMP_DIR/bin/shasum"
     fi
 
-    # Create a mock CLAUDE.md
-    cat > "$TEST_TEMP_DIR/repo/.claude/CLAUDE.md" <<'MOCK_MD'
+    # Create a mock legacy guide (Shipwright's conventions; read by extract_codebase_patterns)
+    cat > "$TEST_TEMP_DIR/repo/docs/reference/legacy-guide.md" <<'MOCK_MD'
 # Shipwright
 
 ## Shell Standards
@@ -144,6 +145,7 @@ assert_contains "gather shows success" "$output" "Context bundle written"
 bundle_path="$TEST_TEMP_DIR/repo/.claude/pipeline-artifacts/context-bundle.md"
 if [[ -f "$bundle_path" ]]; then
     assert_pass "context-bundle.md created"
+    assert_contains "bundle includes pitfalls from the legacy guide" "$(cat "$bundle_path")" "grep -c under pipefail"
 else
     # Context engine uses REPO_DIR from script, not our temp, so check for success message
     assert_pass "context-bundle.md created (verified via output)"

@@ -1,0 +1,4 @@
+[test]
+# Tests are always invoked with explicit ./src ./tools paths (see package.json test:ts);
+# root tests/ and website/ hold unrelated JS fixtures.
+root = "."

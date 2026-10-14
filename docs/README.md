@@ -11,7 +11,7 @@ Navigation hub for all Shipwright docs. Start here or jump to a section.
 | [../README.md](../README.md)                 | Project overview, quick start, features             |
 | [../STRATEGY.md](../STRATEGY.md)             | Vision, priorities, technical principles            |
 | [../CHANGELOG.md](../CHANGELOG.md)           | Version history                                     |
-| [../.claude/CLAUDE.md](../.claude/CLAUDE.md) | 100+ commands, architecture, development guidelines |
+| [reference/legacy-guide.md](reference/legacy-guide.md) | 100+ commands, architecture, development guidelines |
 
 ---
 
@@ -72,7 +72,7 @@ Navigation hub for all Shipwright docs. Start here or jump to a section.
 | File                                                                 | Purpose                                                                 |
 | -------------------------------------------------------------------- | ----------------------------------------------------------------------- |
 | [../.claude/DEFINITION-OF-DONE.md](../.claude/DEFINITION-OF-DONE.md) | Pipeline completion checklist                                           |
-| [../.claude/agents/](../.claude/agents/)                             | Role definitions (pipeline-agent, code-reviewer, test-specialist, etc.) |
+| [../.claude/agents/](../.claude/agents/)                             | Subagents (reviewer, verifier, porter, doc-fleet-agent)                 |
 
 ---
 

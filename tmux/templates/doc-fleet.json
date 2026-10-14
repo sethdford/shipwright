@@ -19,7 +19,7 @@
     {
       "name": "claude-md",
       "role": "CLAUDE.md files, agent role definitions, AUTO sections, development guidelines",
-      "focus": ".claude/CLAUDE.md, .claude/agents/, claude-code/"
+      "focus": "docs/reference/legacy-guide.md, .claude/agents/, claude-code/"
     },
     {
       "name": "strategy-curator",

@@ -169,5 +169,5 @@ See also:
 
 - [docs/README.md](../README.md) — Documentation hub
 - [README.md](../../README.md) — Project overview
-- [.claude/CLAUDE.md](../../.claude/CLAUDE.md) — Technical documentation
+- [docs/reference/legacy-guide.md](../reference/legacy-guide.md) — Technical documentation
 - [.github/workflows/shipwright-pipeline.yml](../../.github/workflows/shipwright-pipeline.yml) — Production CI/CD
