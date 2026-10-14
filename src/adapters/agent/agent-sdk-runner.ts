@@ -105,6 +105,12 @@ function isCleanSuccess(r: SDKResultMessage | undefined): r is Success {
 /** Aborts the controller on timeout or when the caller's signal fires; `dispose` undoes both. */
 function armGuard(timeoutMs: number, signal: AbortSignal | undefined) {
   const controller = new AbortController();
+  const onAbort = () => controller.abort();
+  const timer = setTimeout(() => {
+    guard.timedOut = true;
+    controller.abort();
+  }, timeoutMs);
+  signal?.addEventListener("abort", onAbort, { once: true });
   const guard = {
     controller,
     timedOut: false,
@@ -113,12 +119,6 @@ function armGuard(timeoutMs: number, signal: AbortSignal | undefined) {
       signal?.removeEventListener("abort", onAbort);
     },
   };
-  const timer = setTimeout(() => {
-    guard.timedOut = true;
-    controller.abort();
-  }, timeoutMs);
-  const onAbort = () => controller.abort();
-  signal?.addEventListener("abort", onAbort, { once: true });
   return guard;
 }
 

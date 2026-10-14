@@ -373,6 +373,73 @@ describe("abort and timeout", () => {
   });
 });
 
+describe("guard cleanup", () => {
+  const spec = {
+    prompt: "p",
+    cwd: "/w",
+    model: "m",
+    effort: "low" as const,
+    allowedTools: [],
+    maxTurns: 1,
+    maxBudgetUsd: 1,
+    timeoutMs: 60_000,
+  };
+  const ok = () => [result({ subtype: "success", result: "x" })];
+  const controllerOf = (c: { options: Record<string, unknown> }) =>
+    c.options.abortController as AbortController;
+
+  test("removes its listener from the caller's signal after a run", async () => {
+    const { fn, captured } = fakeQuery(ok());
+    const caller = new AbortController();
+    const removed: string[] = [];
+    const original = caller.signal.removeEventListener.bind(caller.signal);
+    caller.signal.removeEventListener = ((...args: Parameters<typeof original>) => {
+      removed.push(String(args[0]));
+      return original(...args);
+    }) as typeof original;
+    const r = await runner(fn).runTask({ ...spec, signal: caller.signal });
+    expect(r.ok).toBe(true);
+    expect(removed).toEqual(["abort"]);
+    caller.abort();
+    expect(controllerOf(captured[0] as Captured).signal.aborted).toBe(false);
+  });
+
+  test("clears the timeout timer once the run completes", async () => {
+    const { fn, captured } = fakeQuery(ok());
+    const r = await runner(fn).runTask({ ...spec, timeoutMs: 30 });
+    expect(r.ok).toBe(true);
+    await new Promise((resolve) => setTimeout(resolve, 80));
+    expect(controllerOf(captured[0] as Captured).signal.aborted).toBe(false);
+  });
+
+  test("timeout wins when the caller also aborts", async () => {
+    const fn: QueryFn = (args) =>
+      (async function* () {
+        const ac = args.options.abortController as AbortController;
+        await new Promise<void>((resolve) => ac.signal.addEventListener("abort", () => resolve()));
+        await new Promise((resolve) => setTimeout(resolve, 60));
+        yield* [];
+        throw new Error("stopped");
+      })();
+    const caller = new AbortController();
+    setTimeout(() => caller.abort(), 5);
+    const r = await runner(fn).runTask({ ...spec, timeoutMs: 30, signal: caller.signal });
+    expect(!r.ok && r.error.kind).toBe("timeout");
+  });
+
+  test.each([
+    ["timeout", () => ({ timeoutMs: 20 })],
+    ["aborted", () => ({ signal: AbortSignal.timeout(20) })],
+  ] as const)("keeps the sessionId the SDK yielded on %s failures", async (kind, extra) => {
+    const { fn } = fakeQuery([result({ subtype: "error_during_execution", session_id: "s9" })], {
+      hang: true,
+    });
+    const r = await runner(fn).runTask({ ...spec, ...extra() });
+    expect(!r.ok && r.error.kind).toBe(kind);
+    expect(!r.ok && r.error.sessionId).toBe("s9");
+  });
+});
+
 describe("hardening options", () => {
   test("decide disables built-in tools and strict MCP", async () => {
     const { fn, captured } = fakeQuery([

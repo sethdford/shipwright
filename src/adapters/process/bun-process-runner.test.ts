@@ -115,3 +115,44 @@ test("timed-out run leaves no surviving grandchild that ignores SIGTERM", async 
     }
   }
 });
+
+async function withKillSpy<T>(
+  impl: (pid: number, signal?: string | number) => unknown,
+  body: () => Promise<T>,
+): Promise<T> {
+  const original = process.kill;
+  process.kill = impl as typeof process.kill;
+  try {
+    return await body();
+  } finally {
+    process.kill = original;
+  }
+}
+
+test("killAll does not signal a pid whose run has completed", async () => {
+  await runner.run({ argv: ["true"] });
+  const calls: number[] = [];
+  await withKillSpy(
+    (pid) => calls.push(pid),
+    async () => runner.killAll("SIGKILL"),
+  );
+  expect(calls).toEqual([]);
+});
+
+test("killAll swallows kill failures and still signals every in-flight run", async () => {
+  const a = timed(fast.run({ argv: ["sleep", "5"] }));
+  const b = timed(fast.run({ argv: ["sleep", "5"] }));
+  await new Promise((resolve) => setTimeout(resolve, 100));
+  const calls: number[] = [];
+  await withKillSpy(
+    (pid) => {
+      calls.push(pid);
+      throw Object.assign(new Error("kill ESRCH"), { code: "ESRCH" });
+    },
+    async () => fast.killAll("SIGTERM"),
+  );
+  expect(calls).toHaveLength(2);
+  expect(calls.every((pid) => pid < 0)).toBe(true);
+  fast.killAll("SIGKILL");
+  await Promise.all([a, b]);
+});
