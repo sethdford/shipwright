@@ -1,6 +1,19 @@
 import { expect } from "bun:test";
 import { type Durability, idempotencyKey, type Lease } from "../../shared/kernel/durability";
 
+// Invariants pinned here (every adapter must hold all of them):
+// - claims are exclusive: of N concurrent claimers exactly one gets an item;
+// - an expired lease can be re-claimed, and each claim raises the fence epoch;
+// - heartbeat extends the live lease, so other claimers stay blocked;
+// - a holder whose lease expired is stale even if nobody re-claimed the item;
+// - every write with a non-live fence (append, heartbeat, complete, begin, finish) fails stale_fence;
+// - a completed item is never claimed again, and its dedupe key is free for a new item;
+// - notBefore delays claiming; an unfinished dedupe key rejects enqueue with `duplicate`;
+// - journal seq is per run and ordered; read(afterSeq) returns only later entries;
+// - side effects are keyed: a pending or done record is returned, never re-begun;
+// - finishing a never-begun side effect is `not_found`;
+// - a signal sent before anyone waits is delivered exactly once.
+
 /**
  * One contract case. Test files register cases themselves (`test(c.name, () => c.run(factory))`):
  * Bun drops `test()` calls made inside a helper module that a second test file also imports.
@@ -134,9 +147,67 @@ const effectAndSignalCases: ContractCase<DurabilityFactory>[] = [
   },
 ];
 
+const leaseCases: ContractCase<DurabilityFactory>[] = [
+  {
+    name: "heartbeat extends the lease, so a claimer inside the new window is blocked",
+    run: async (factory) => {
+      const ctx = await fresh(factory);
+      await ctx.d.queue.enqueue(item);
+      const { fence } = await ctx.claimed("a");
+      ctx.advance(800);
+      expect((await ctx.d.queue.heartbeat(fence, 1_000)).ok).toBe(true);
+      ctx.advance(500);
+      expect(await ctx.d.queue.claim("default", "b", 1_000)).toEqual({ ok: true, value: null });
+      expect((await ctx.d.journal.append(fence, entry)).ok).toBe(true);
+    },
+  },
+  {
+    name: "an expired holder is stale even when nobody has re-claimed the item",
+    run: async (factory) => {
+      const ctx = await fresh(factory);
+      await ctx.d.queue.enqueue(item);
+      const { fence } = await ctx.claimed("a");
+      ctx.advance(1_000);
+      const writes = [
+        await ctx.d.journal.append(fence, entry),
+        await ctx.d.queue.heartbeat(fence, 1_000),
+        await ctx.d.queue.complete(fence, "succeeded"),
+        await ctx.d.sideEffects.begin(fence, key),
+      ];
+      expect(writes.map((w) => (w.ok ? "ok" : w.error.kind))).toEqual(Array(4).fill("stale_fence"));
+    },
+  },
+  {
+    name: "a completed item is never claimed again and frees its dedupe key",
+    run: async (factory) => {
+      const ctx = await fresh(factory);
+      await ctx.d.queue.enqueue(item);
+      const { fence } = await ctx.claimed("a");
+      expect(await ctx.d.queue.complete(fence, "succeeded")).toEqual({
+        ok: true,
+        value: undefined,
+      });
+      ctx.advance(1_001);
+      expect(await ctx.d.queue.claim("default", "b", 1_000)).toEqual({ ok: true, value: null });
+      expect((await ctx.d.queue.enqueue(item)).ok).toBe(true);
+    },
+  },
+  {
+    name: "finishing a side effect that was never begun is not_found",
+    run: async (factory) => {
+      const ctx = await fresh(factory);
+      await ctx.d.queue.enqueue(item);
+      const { fence } = await ctx.claimed("a");
+      const r = await ctx.d.sideEffects.finish(fence, key, { pr: 7 });
+      expect(r.ok ? "ok" : r.error.kind).toBe("not_found");
+    },
+  },
+];
+
 /** Every durability adapter (in-memory, SQLite, Postgres) must pass these cases unchanged. */
 export const durabilityContract: readonly ContractCase<DurabilityFactory>[] = [
   ...queueCases,
   ...fenceCases,
+  ...leaseCases,
   ...effectAndSignalCases,
 ];
