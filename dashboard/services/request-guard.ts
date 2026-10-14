@@ -1,5 +1,5 @@
 // Request guard for the dashboard (spec §6.2 "Dashboard exposure", #8534).
-// Pure: no environment reads and no I/O. server.ts builds the config at startup and calls
+// Pure: no environment reads and no I/O (node:crypto is used only for hashing). server.ts builds the config at startup and calls
 // guardRequest() before any route and withCors() on every response.
 //
 // Who authenticates how:
@@ -8,6 +8,10 @@
 // - Fleet workers (claim, connect, CI webhook): `X-Shipwright-Token` (or `Authorization: Bearer`)
 //   matching SHIPWRIGHT_FLEET_TOKEN / SHIPWRIGHT_FLEET_TOKEN_FILE. Never a query parameter.
 // - auth=none (no OAuth/PAT configured) is allowed only on a loopback bind.
+// - On a loopback bind the Host header must name a loopback host (or one from
+//   SW_DASHBOARD_ORIGINS): DNS rebinding gets 421. WebSocket upgrades from a foreign Origin get 403.
+
+import { createHash, timingSafeEqual } from "node:crypto";
 
 export interface GuardConfig {
   /** Shared fleet token (SHIPWRIGHT_FLEET_TOKEN). Empty when none is configured. */
@@ -16,6 +20,10 @@ export interface GuardConfig {
   readonly host: string;
   /** Exact origins allowed for CORS and for mutating browser requests. */
   readonly allowedOrigins: readonly string[];
+  /** Hostnames (with IPv6 brackets) a loopback-bound server answers to. */
+  readonly allowedHosts: readonly string[];
+  /** Mark the session cookie Secure (an https origin is allowed, or SW_DASHBOARD_SECURE_COOKIE=1). */
+  readonly secureCookie: boolean;
 }
 
 type Env = Readonly<Record<string, string | undefined>>;
@@ -23,6 +31,7 @@ type Env = Readonly<Record<string, string | undefined>>;
 export const TOKEN_HEADER = "x-shipwright-token";
 const MUTATING = new Set(["POST", "PUT", "PATCH", "DELETE"]);
 const LOOPBACK = new Set(["127.0.0.1", "localhost", "::1", "[::1]"]);
+const LOOPBACK_HOSTNAMES = ["localhost", "127.0.0.1", "[::1]"];
 
 export function isLoopbackHost(host: string): boolean {
   return LOOPBACK.has(host.toLowerCase());
@@ -46,7 +55,8 @@ export function readFleetToken(
   env: Env,
   readFile: (path: string) => string,
 ): { token: string; error?: undefined } | { token?: undefined; error: string } {
-  if (env.SHIPWRIGHT_FLEET_TOKEN) return { token: env.SHIPWRIGHT_FLEET_TOKEN };
+  const fromEnv = (env.SHIPWRIGHT_FLEET_TOKEN ?? "").trim();
+  if (fromEnv) return { token: fromEnv };
   const path = env.SHIPWRIGHT_FLEET_TOKEN_FILE;
   if (!path) return { token: "" };
   let token: string;
@@ -63,11 +73,31 @@ export function loadGuardConfig(env: Env, host: string, port: number): GuardConf
     .split(",")
     .map((o) => o.trim())
     .filter((o) => o.length > 0 && o !== "*");
+  const extraHosts: string[] = [];
+  for (const o of extra) {
+    try {
+      extraHosts.push(new URL(o).hostname.toLowerCase());
+    } catch {
+      // not a URL: it can never equal a browser Origin either, so it allows nothing
+    }
+  }
   return {
-    fleetToken: env.SHIPWRIGHT_FLEET_TOKEN ?? "",
+    fleetToken: (env.SHIPWRIGHT_FLEET_TOKEN ?? "").trim(),
     host,
-    allowedOrigins: [`http://localhost:${port}`, `http://127.0.0.1:${port}`, ...extra],
+    allowedOrigins: [
+      `http://localhost:${port}`,
+      `http://127.0.0.1:${port}`,
+      `http://[::1]:${port}`,
+      ...extra,
+    ],
+    allowedHosts: [...LOOPBACK_HOSTNAMES, ...extraHosts],
+    secureCookie: env.SW_DASHBOARD_SECURE_COOKIE === "1" || extra.some((o) => o.startsWith("https://")),
   };
+}
+
+/** Attributes for the `fleet_session` cookie (without Max-Age). */
+export function sessionCookieAttributes(cfg: GuardConfig): string {
+  return `Path=/; HttpOnly; SameSite=Lax${cfg.secureCookie ? "; Secure" : ""}`;
 }
 
 /** Why the server must not start with this config, or null. auth=none is loopback-only. */
@@ -86,16 +116,47 @@ export function startupProblem(cfg: GuardConfig, authEnabled: boolean): string |
 export function presentedToken(req: Request): string | null {
   const header = req.headers.get(TOKEN_HEADER);
   if (header) return header;
-  const auth = req.headers.get("authorization") ?? "";
-  return auth.startsWith("Bearer ") ? auth.slice("Bearer ".length) : null;
+  const match = /^bearer\s+(\S+)\s*$/i.exec(req.headers.get("authorization") ?? "");
+  return match?.[1] ?? null;
 }
 
-/** Constant-time comparison so response timing does not leak the token. Empty never matches. */
+const sha256 = (s: string): Buffer => createHash("sha256").update(s, "utf8").digest();
+
+/**
+ * Compares SHA-256 digests with timingSafeEqual: constant time, and the fixed digest length
+ * means the token's length does not leak either. Empty never matches.
+ */
 export function tokenMatches(expected: string, given: string | null): boolean {
-  if (!expected || given === null || given.length !== expected.length) return false;
-  let diff = 0;
-  for (let i = 0; i < expected.length; i++) diff |= expected.charCodeAt(i) ^ given.charCodeAt(i);
-  return diff === 0;
+  if (!expected || given === null) return false;
+  return timingSafeEqual(sha256(expected), sha256(given));
+}
+
+/** The request's hostname from the Host header (else the URL), lowercased, IPv6 in brackets. */
+function requestHostname(req: Request): string {
+  const host = req.headers.get("host");
+  try {
+    return (host ? new URL(`http://${host}`) : new URL(req.url)).hostname.toLowerCase();
+  } catch {
+    return "";
+  }
+}
+
+function isWebSocketUpgrade(req: Request, pathname: string): boolean {
+  return (
+    (req.headers.get("upgrade") ?? "").toLowerCase() === "websocket" ||
+    pathname === "/ws" ||
+    pathname === "/ws/events"
+  );
+}
+
+/**
+ * Whether a WebSocket upgrade may proceed: browsers always send Origin on a WebSocket handshake, so
+ * a present Origin must be allowlisted (the loopback origins on the bound port are). No Origin
+ * means a non-browser client, which the session/loopback checks in server.ts govern.
+ */
+export function wsOriginAllowed(req: Request, cfg: GuardConfig): boolean {
+  const origin = req.headers.get("origin");
+  return origin === null || cfg.allowedOrigins.includes(origin);
 }
 
 const reject = (status: number, error: string): Response =>
@@ -117,7 +178,8 @@ function fleetAuth(req: Request, cfg: GuardConfig, hasSession: boolean): Respons
 }
 
 /**
- * A rejection, or null when the request may be routed. A preflight or mutating request that names
+ * A rejection, or null when the request may be routed. On a loopback bind the Host must be an
+ * allowed host (421 otherwise: DNS rebinding). A WebSocket upgrade with a foreign Origin is 403. A preflight or mutating request that names
  * an origin must name an allowed one. Mutating requests must be JSON (so a cross-site form cannot
  * post without a CORS preflight); the login form under /auth/ is exempt. Fleet routes need the
  * fleet token or a signed-in session, except on loopback with no token configured.
@@ -125,6 +187,12 @@ function fleetAuth(req: Request, cfg: GuardConfig, hasSession: boolean): Respons
  */
 export function guardRequest(req: Request, cfg: GuardConfig, hasSession: boolean): Response | null {
   const { pathname } = new URL(req.url);
+  if (isLoopbackHost(cfg.host) && !cfg.allowedHosts.includes(requestHostname(req))) {
+    return reject(421, "misdirected request");
+  }
+  if (isWebSocketUpgrade(req, pathname) && !wsOriginAllowed(req, cfg)) {
+    return reject(403, "origin not allowed");
+  }
   if (req.method === "OPTIONS" || MUTATING.has(req.method)) {
     const origin = req.headers.get("origin");
     if (origin !== null && !cfg.allowedOrigins.includes(origin)) {

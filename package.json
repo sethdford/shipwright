@@ -66,7 +66,7 @@
     "port:check": "bun tools/port/check-router.ts",
     "parity": "bun tools/port/run-parity.ts",
     "check:fast": "bun run typecheck && bun run arch && bun run test:ts",
-    "check": "bun run typecheck && bun run lint && bun run arch && bun run test:ts && bun run docs:check && bun run port:check && bun run parity"
+    "check": "bun run typecheck && bun run lint && bun run arch && bun run test:ts && bun run dashboard:test && bun run docs:check && bun run port:check && bun run parity"
   },
   "keywords": [
     "claude",

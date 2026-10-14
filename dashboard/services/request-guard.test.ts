@@ -8,9 +8,11 @@ import {
   loadGuardConfig,
   presentedToken,
   readFleetToken,
+  sessionCookieAttributes,
   startupProblem,
   tokenMatches,
   withCors,
+  wsOriginAllowed,
 } from "./request-guard";
 
 const LOCAL = "http://localhost:8767";
@@ -19,10 +21,17 @@ const cfg = (over: Partial<GuardConfig> = {}): GuardConfig => ({
   fleetToken: "",
   host: "127.0.0.1",
   allowedOrigins: [LOCAL],
+  allowedHosts: ["localhost", "127.0.0.1", "[::1]"],
+  secureCookie: false,
   ...over,
 });
-const req = (method: string, path: string, headers: Record<string, string> = {}) =>
-  new Request(`http://127.0.0.1:8767${path}`, {
+const req = (
+  method: string,
+  path: string,
+  headers: Record<string, string> = {},
+  base = "http://127.0.0.1:8767",
+) =>
+  new Request(`${base}${path}`, {
     method,
     headers,
     body: method === "GET" || method === "OPTIONS" ? undefined : "{}",
@@ -40,8 +49,28 @@ describe("loadGuardConfig", () => {
     expect(c).toEqual({
       fleetToken: "t",
       host: "0.0.0.0",
-      allowedOrigins: ["http://localhost:9000", "http://127.0.0.1:9000", "https://a.example"],
+      allowedOrigins: [
+        "http://localhost:9000",
+        "http://127.0.0.1:9000",
+        "http://[::1]:9000",
+        "https://a.example",
+      ],
+      allowedHosts: ["localhost", "127.0.0.1", "[::1]", "a.example"],
+      secureCookie: true,
     });
+  });
+  it("trims the env token", () => {
+    expect(loadGuardConfig({ SHIPWRIGHT_FLEET_TOKEN: " t \n" }, "127.0.0.1", 1).fleetToken).toBe(
+      "t",
+    );
+  });
+  it("sets secureCookie only for an https origin or SW_DASHBOARD_SECURE_COOKIE=1", () => {
+    expect(loadGuardConfig({}, "127.0.0.1", 1).secureCookie).toBe(false);
+    expect(loadGuardConfig({ SW_DASHBOARD_SECURE_COOKIE: "1" }, "127.0.0.1", 1).secureCookie).toBe(
+      true,
+    );
+    const http = loadGuardConfig({ SW_DASHBOARD_ORIGINS: "http://box:1" }, "127.0.0.1", 1);
+    expect(http.secureCookie).toBe(false);
   });
   it("never allowlists the * wildcard", () => {
     const c = loadGuardConfig({ SW_DASHBOARD_ORIGINS: "*,https://a.example" }, "127.0.0.1", 9000);
@@ -56,6 +85,13 @@ describe("readFleetToken", () => {
     if (v === undefined) throw new Error("ENOENT");
     return v;
   };
+  it("trims SHIPWRIGHT_FLEET_TOKEN and falls back to the file when it is blank", () => {
+    expect(readFleetToken({ SHIPWRIGHT_FLEET_TOKEN: " envtok\n" }, read)).toEqual({
+      token: "envtok",
+    });
+    const blank = { SHIPWRIGHT_FLEET_TOKEN: "  ", SHIPWRIGHT_FLEET_TOKEN_FILE: "/etc/sw/token" };
+    expect(readFleetToken(blank, read)).toEqual({ token: "filetok" });
+  });
   it("prefers SHIPWRIGHT_FLEET_TOKEN", () => {
     const env = { SHIPWRIGHT_FLEET_TOKEN: "envtok", SHIPWRIGHT_FLEET_TOKEN_FILE: "/etc/sw/token" };
     expect(readFleetToken(env, read)).toEqual({ token: "envtok" });
@@ -163,6 +199,75 @@ describe("guardRequest", () => {
   });
 });
 
+describe("Host allowlist on loopback (DNS rebinding)", () => {
+  const rebound = (method: string, path: string, headers: Record<string, string> = {}) =>
+    req(method, path, headers, "http://evil.example:8767");
+  it("answers 421 to a foreign Host on a loopback bind, for GET and WebSocket", () => {
+    expect(guard(rebound("GET", "/api/status"))?.status).toBe(421);
+    expect(guard(rebound("GET", "/ws", { Upgrade: "websocket" }))?.status).toBe(421);
+    expect(guard(rebound("POST", "/api/daemon/pause", JSON_CT))?.status).toBe(421);
+  });
+  it("accepts localhost, 127.0.0.1 and [::1] on any port", () => {
+    expect(guard(req("GET", "/api/status", {}, "http://localhost:8767"))).toBeNull();
+    expect(guard(req("GET", "/api/status", {}, "http://[::1]:8767"))).toBeNull();
+    expect(guard(req("GET", "/api/status"))).toBeNull();
+  });
+  it("accepts a host named in SW_DASHBOARD_ORIGINS", () => {
+    const c = cfg({ allowedHosts: ["localhost", "127.0.0.1", "[::1]", "evil.example"] });
+    expect(guard(rebound("GET", "/api/status"), c)).toBeNull();
+  });
+  it("does not check Host on a public bind", () => {
+    const c = cfg({ host: "0.0.0.0", fleetToken: "t" });
+    expect(guard(rebound("GET", "/api/status"), c)).toBeNull();
+  });
+});
+
+describe("WebSocket origin (cross-site WebSocket hijacking)", () => {
+  const ws = { Upgrade: "websocket", Connection: "Upgrade" };
+  it.each(["/ws", "/ws/events"])("rejects a foreign Origin on %s with 403", (path) => {
+    const r = req("GET", path, { ...ws, Origin: "https://evil.example" });
+    expect(wsOriginAllowed(r, cfg())).toBe(false);
+    expect(guard(r)?.status).toBe(403);
+    const pub = cfg({ host: "0.0.0.0", fleetToken: "t" });
+    expect(guard(r, pub, true)?.status).toBe(403);
+  });
+  it.each(["/ws", "/ws/events"])("allows an allowed or loopback Origin on %s", (path) => {
+    expect(guard(req("GET", path, { ...ws, Origin: LOCAL }))).toBeNull();
+    const c = loadGuardConfig({}, "127.0.0.1", 8767);
+    for (const o of ["http://127.0.0.1:8767", "http://[::1]:8767", "http://localhost:8767"]) {
+      expect(wsOriginAllowed(req("GET", path, { ...ws, Origin: o }), c)).toBe(true);
+    }
+    expect(wsOriginAllowed(req("GET", path, { ...ws, Origin: "http://localhost:9999" }), c)).toBe(
+      false,
+    );
+  });
+  it("allows a non-browser client with no Origin", () => {
+    expect(guard(req("GET", "/ws", ws))).toBeNull();
+  });
+  it("checks any Upgrade: websocket request, not only /ws paths", () => {
+    const r = req("GET", "/anything", { ...ws, Origin: "https://evil.example" });
+    expect(guard(r)?.status).toBe(403);
+  });
+});
+
+describe("logout", () => {
+  it("rejects a cross-site logout POST", () => {
+    const form = { "Content-Type": "application/x-www-form-urlencoded", Origin: "https://e.x" };
+    expect(guard(req("POST", "/auth/logout", form))?.status).toBe(403);
+    const same = { "Content-Type": "application/x-www-form-urlencoded", Origin: LOCAL };
+    expect(guard(req("POST", "/auth/logout", same))).toBeNull();
+  });
+});
+
+describe("sessionCookieAttributes", () => {
+  it("adds Secure only when configured", () => {
+    expect(sessionCookieAttributes(cfg())).toBe("Path=/; HttpOnly; SameSite=Lax");
+    expect(sessionCookieAttributes(cfg({ secureCookie: true }))).toBe(
+      "Path=/; HttpOnly; SameSite=Lax; Secure",
+    );
+  });
+});
+
 describe("helpers", () => {
   it("classifies fleet routes", () => {
     expect(isFleetRoute("/api/connect/disconnect")).toBe(true);
@@ -172,6 +277,11 @@ describe("helpers", () => {
     const r = req("GET", "/", { "X-Shipwright-Token": "a", Authorization: "Bearer b" });
     expect(presentedToken(r)).toBe("a");
     expect(presentedToken(req("GET", "/"))).toBeNull();
+  });
+  it("accepts the Bearer scheme case-insensitively", () => {
+    expect(presentedToken(req("GET", "/", { Authorization: "bearer abc" }))).toBe("abc");
+    expect(presentedToken(req("GET", "/", { Authorization: "BEARER  abc" }))).toBe("abc");
+    expect(presentedToken(req("GET", "/", { Authorization: "Basic abc" }))).toBeNull();
   });
   it("compares tokens exactly", () => {
     expect(tokenMatches("abc", "abc")).toBe(true);

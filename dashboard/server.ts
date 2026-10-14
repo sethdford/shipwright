@@ -32,8 +32,10 @@ import {
   isLoopbackHost,
   loadGuardConfig,
   readFleetToken,
+  sessionCookieAttributes,
   startupProblem,
   withCors,
+  wsOriginAllowed,
 } from "./services/request-guard.js";
 import { Database } from "bun:sqlite";
 
@@ -362,7 +364,7 @@ function getSessionFromCookie(cookie: string | null): Session | null {
 }
 
 function sessionCookie(sessionId: string): string {
-  return `fleet_session=${sessionId}; Path=/; HttpOnly; SameSite=Lax; Max-Age=${Math.floor(SESSION_TTL_MS / 1000)}`;
+  return `fleet_session=${sessionId}; ${sessionCookieAttributes(GUARD)}; Max-Age=${Math.floor(SESSION_TTL_MS / 1000)}`;
 }
 
 function isLocalConnection(req: Request): boolean {
@@ -375,7 +377,7 @@ function isLocalConnection(req: Request): boolean {
 }
 
 function clearSessionCookie(): string {
-  return "fleet_session=; Path=/; HttpOnly; SameSite=Lax; Max-Age=0";
+  return `fleet_session=; ${sessionCookieAttributes(GUARD)}; Max-Age=0`;
 }
 
 // ─── File-backed Sessions ───────────────────────────────────────────
@@ -2537,6 +2539,16 @@ function handleAuthLogout(req: Request): Response {
   });
 }
 
+function logoutConfirmHTML(): string {
+  return `<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Sign out — Shipwright</title>
+<style>body{font-family:system-ui,sans-serif;background:#0b1020;color:#e6e8ef;display:flex;min-height:100vh;align-items:center;justify-content:center;margin:0}
+form{display:flex;flex-direction:column;gap:1rem;align-items:center}button{font:inherit;padding:.6rem 1.4rem;border-radius:6px;border:0;background:#3b82f6;color:#fff;cursor:pointer}a{color:#93c5fd}</style>
+</head><body><form method="POST" action="/auth/logout"><p>Sign out of Shipwright?</p>
+<button type="submit" autofocus>Sign out</button><a href="/">Cancel</a></form></body></html>`;
+}
+
 // ─── PAT-based login handler ─────────────────────────────────────────
 async function handlePatLogin(req: Request): Promise<Response> {
   // Parse form body
@@ -2755,13 +2767,29 @@ async function routeRequest(
       return handlePatLogin(req);
     }
 
+    // Logout changes state, so it is POST-only (guardRequest checks its Origin). The UI's
+    // "Sign out" links GET a page with a one-button form that POSTs here.
     if (pathname === "/auth/logout") {
-      return handleAuthLogout(req);
+      if (req.method === "POST") return handleAuthLogout(req);
+      if (req.method === "GET") {
+        return new Response(logoutConfirmHTML(), {
+          headers: { "Content-Type": "text/html; charset=utf-8" },
+        });
+      }
+      return new Response("Method Not Allowed", {
+        status: 405,
+        headers: { Allow: "GET, POST" },
+      });
     }
 
     // ── WebSocket Auth gate ──────────────────────────────────────
+    // A browser's foreign Origin is refused first (cross-site WebSocket hijacking); guardRequest
+    // already did this, repeated here so the loopback bypass below can never skip it.
     // WebSocket always requires authentication (unless local connection)
     if (pathname === "/ws" || pathname === "/ws/events") {
+      if (!wsOriginAllowed(req, GUARD)) {
+        return new Response("Forbidden", { status: 403 });
+      }
       const isLocal = isLoopbackHost(HOST) && isLocalConnection(req);
       if (!isLocal) {
         const session = getSession(req);

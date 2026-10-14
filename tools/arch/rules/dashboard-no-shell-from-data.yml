@@ -1,0 +1,40 @@
+id: dashboard-no-shell-from-data
+language: TypeScript
+severity: error
+message: "Dashboard: run subprocesses with execFileSync/spawn and an argv array. A shell command must be a constant string literal; never build one from data (#8534, spec §3.3 interim rule until the Wave 3 port)."
+files:
+  - "dashboard/**/*.ts"
+ignores:
+  - "dashboard/**/*.test.ts"
+  - "dashboard/src/**"
+rule:
+  any:
+    # execSync / exec with anything but a plain string literal as the command
+    - all:
+        - any:
+            - pattern: execSync($CMD, $$$)
+            - pattern: execSync($CMD)
+            - pattern: exec($CMD, $$$)
+            - pattern: exec($CMD)
+        - not:
+            has:
+              field: arguments
+              has:
+                nthChild: 1
+                kind: string
+    # spawn / execFile with shell: true
+    - all:
+        - any:
+            - pattern: spawn($$$)
+            - pattern: spawnSync($$$)
+            - pattern: execFile($$$)
+            - pattern: execFileSync($$$)
+        - has:
+            field: arguments
+            has:
+              kind: object
+              has:
+                kind: pair
+                regex: '^shell\s*:\s*true$'
+    # Bun shell
+    - pattern: Bun.$
