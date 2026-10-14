@@ -1,10 +1,15 @@
 # F9 in the agent adapter: every SDK call states its environment and permission mode explicitly, so
 # a refactor cannot drop the env allowlist or thread a bypass mode through a variable. The runtime
-# twin is assertAgentOptions() in src/adapters/agent/privilege-guard.ts.
+# twin is assertAgentOptions() in src/adapters/agent/privilege-guard.ts. Only agent-sdk-runner.ts may
+# import the SDK's query as a value (F9-sdk-query-single-importer), so this check sees every call.
+#
+# Known gap (ADR-0008): a variable passed as `options` (`options: sdkOptions`) is not inspected here.
+# The runner assigns it, asserts it with assertAgentOptions() and passes the same object; a meta-test
+# pins that. assertAgentOptions() is the run-time check on what is actually passed.
 id: F9-agent-options-explicit
 language: TypeScript
 severity: error
-message: "F9: pass query() an options object literal with env: built by agentEnv() (never process.env or Bun.env), and give permissionMode as a string literal such as \"dontAsk\"."
+message: "F9: call query() with { prompt, options } where options is an object literal with env: built by agentEnv() (never process.env or Bun.env), or a variable that assertAgentOptions() has checked. Give permissionMode as a string literal such as \"dontAsk\"."
 metadata: { owner: "@sethdford", docs: "docs/architecture.md#fitness-rules" }
 files:
   - "src/adapters/agent/**/*.ts"
@@ -12,22 +17,24 @@ ignores:
   - "**/*.test.ts"
 rule:
   any:
-    # query(...) / this.queryFn(...) without `options: { …, env: … }`
+    # query(...) / this.queryFn(...) (also .call/.apply; db.query(...) is not an SDK call) whose first object has no options with an env
+    # object literal or an identifier. `query(args)` and `query({ options: {} })` both fail here.
     - kind: call_expression
       all:
-        - has: { field: function, regex: '(^|\.)(query|queryFn)$' }
-        - has:
-            field: arguments
+        - has: { field: function, regex: '^(this\.)?(query|queryFn)(\.(call|apply))?$' }
+        - not:
             has:
-              kind: object
-              not:
-                has:
-                  kind: pair
-                  all:
-                    - has: { field: key, regex: '^options$' }
-                    - has:
-                        field: value
-                        kind: object
+              field: arguments
+              stopBy: end
+              has:
+                kind: pair
+                all:
+                - has: { field: key, regex: '^options$' }
+                - has:
+                    field: value
+                    any:
+                      - kind: identifier
+                      - kind: object
                         has:
                           kind: pair
                           has: { field: key, regex: '^env$' }
@@ -36,10 +43,13 @@ rule:
       all:
         - has: { field: key, regex: '^env$' }
         - has: { field: value, regex: '\b(process\.env|process\[|Bun\.env)' }
-    # permissionMode from anything but a string literal
+    # permissionMode from anything but a string literal (optionally `as const`)
     - kind: pair
       all:
         - has: { field: key, regex: '^permissionMode$' }
-        - not: { has: { field: value, kind: string } }
+        - not:
+            has:
+              field: value
+              regex: '^("[A-Za-z]+"|''[A-Za-z]+'')( as const)?$'
     - kind: shorthand_property_identifier
       regex: '^permissionMode$'

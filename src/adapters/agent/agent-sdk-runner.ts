@@ -200,19 +200,21 @@ export class AgentSdkRunner implements AgentRunner {
     signal: AbortSignal | undefined,
     options: Options,
   ): Promise<Result<{ result: Success; usage: AgentUsage }, AgentFailure>> {
-    assertAgentOptions({ ...options, env: this.env });
     const startedAt = Date.now();
     if (signal?.aborted) {
       return err({ kind: "aborted", message: "agent call aborted", usage: ZERO_USAGE });
     }
     const guard = armGuard(timeoutMs, signal);
     try {
-      const collected = await collect(
-        this.queryFn({
-          prompt,
-          options: { ...options, env: { ...this.env }, abortController: guard.controller },
-        }),
-      );
+      // The object query() receives is the one assertAgentOptions() checks (meta-tested in
+      // tools/arch/meta.test.ts), so no option can reach the SDK unchecked.
+      const sdkOptions: Options = {
+        ...options,
+        env: { ...this.env },
+        abortController: guard.controller,
+      };
+      assertAgentOptions(sdkOptions);
+      const collected = await collect(this.queryFn({ prompt, options: sdkOptions }));
       const usage = usageOf(collected.result, startedAt);
       if (isCleanSuccess(collected.result)) return ok({ result: collected.result, usage });
       const { timedOut } = guard;

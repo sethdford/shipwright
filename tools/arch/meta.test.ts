@@ -31,6 +31,10 @@ const PINNED: Record<string, { ratchet: boolean; ignores: string[] }> = {
   "F6-agent-sdk-only-in-adapter": { ratchet: false, ignores: ["src/adapters/agent/**"] },
   "F8-tests-no-real-home": { ratchet: false, ignores: ["src/testing/test-env.test.ts"] },
   "F9-agent-options-explicit": { ratchet: false, ignores: ["**/*.test.ts"] },
+  "F9-sdk-query-single-importer": {
+    ratchet: false,
+    ignores: ["src/adapters/agent/agent-sdk-runner.ts"],
+  },
   "F9-no-agent-privilege": {
     ratchet: false,
     ignores: ["**/*.test.ts", "src/adapters/github/**", "src/adapters/agent/privilege-guard.ts"],
@@ -193,6 +197,14 @@ test("the ignore ban reaches every file the Bash rules cover, including install.
   expect(covered.has("install.sh")).toBe(true);
   expect(covered.has("claude-code/hooks/notify-idle.sh")).toBe(true);
   expect(covered.has("scripts/sw")).toBe(true);
+});
+
+test("the SDK runner asserts the exact options object it passes to query (F9, ADR-0008)", async () => {
+  const src = await Bun.file(join(ROOT, "src/adapters/agent/agent-sdk-runner.ts")).text();
+  const assertAt = src.indexOf("assertAgentOptions(sdkOptions)");
+  const queryAt = src.indexOf("this.queryFn({ prompt, options: sdkOptions })");
+  expect(assertAt).toBeGreaterThan(-1);
+  expect(queryAt).toBeGreaterThan(assertAt);
 });
 
 test("bun run arch runs every checker", () => {
