@@ -106,3 +106,25 @@ test("killSession timeout is transient", async () => {
   const r = await new TmuxTerminal(tmux(143, "", "", true), "s").killSession("x");
   expect(!r.ok && r.error.kind).toBe("transient");
 });
+
+test("names tmux would rewrite are rejected without running tmux", async () => {
+  const runner = tmux(0, "");
+  const t = new TmuxTerminal(runner, "s");
+  for (const r of [
+    await t.newSession("a.b", "/w"),
+    await t.killSession("a.b"),
+    await t.killSession("a:b"),
+  ]) {
+    expect(!r.ok && r.error.kind).toBe("failed");
+    expect(!r.ok && r.error.message).toMatch(/invalid tmux session name/);
+  }
+  expect(runner.calls).toHaveLength(0);
+});
+
+test("a duplicate session is failed, never adopted", async () => {
+  const r = await new TmuxTerminal(tmux(1, "", "duplicate session: x\n"), "s").newSession(
+    "x",
+    "/w",
+  );
+  expect(!r.ok && r.error.kind).toBe("failed");
+});

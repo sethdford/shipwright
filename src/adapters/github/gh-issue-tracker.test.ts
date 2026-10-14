@@ -44,6 +44,13 @@ test.each([
   ["To get started with GitHub CLI, please run:  gh auth login", "auth"],
   ["HTTP 403: API rate limit exceeded for user", "transient"],
   ["HTTP 502: Bad Gateway", "transient"],
+  ["dial tcp: lookup api.github.com: no such host", "transient"],
+  ["could not resolve host: api.github.com", "transient"],
+  ["HTTP 429: Too Many Requests", "transient"],
+  ["HTTP 403: You have exceeded a secondary rate limit", "transient"],
+  ["HTTP 403: Resource not accessible by integration", "auth"],
+  ["GraphQL: Could not resolve to a Repository with the name 'o/r'.", "failed"],
+  ["HTTP 404: Not Found (https://api.github.com/repos/o/r)", "failed"],
   ["something unexpected", "failed"],
   ["gh: command not found", "failed"],
 ])("classifies gh error %p as %p", async (stderr, kind) => {
@@ -70,4 +77,11 @@ test("non-JSON stdout is a failed error, not a thrown SyntaxError", async () => 
 test("a spawn failure is a failed error, not a rejection", async () => {
   const r = await new GhIssueTracker(new FakeProcessRunner([])).getIssue(1);
   expect(!r.ok && r.error.kind).toBe("failed");
+});
+
+test("an invalid issue number fails without calling gh", async () => {
+  const runner = gh(0, "");
+  const r = await new GhIssueTracker(runner).getIssue(-1);
+  expect(!r.ok && r.error.kind).toBe("failed");
+  expect(runner.calls).toHaveLength(0);
 });

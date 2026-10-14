@@ -21,11 +21,16 @@ const GhIssue = z.object({
 export function classifyGhError(r: ProcessResult): AdapterError {
   const message = r.stderr.trim() || `gh exited ${r.exitCode}`;
   if (r.timedOut) return { kind: "transient", message };
-  // Deliberately no bare "not found": "gh: command not found" is a broken environment, not a missing issue.
-  if (/could not resolve to an? (issue|pull request)|HTTP 404/i.test(message)) {
+  // Deliberately no bare "not found" or HTTP 404: "gh: command not found" is a broken environment,
+  // and a 404 from a GraphQL call means a missing or invisible repo, not a missing issue.
+  if (/could not resolve to an? (issue|pull request)/i.test(message)) {
     return { kind: "not_found", message };
   }
-  if (/rate limit|HTTP 5\d\d|timed? ?out|connection (reset|refused)|EOF/i.test(message)) {
+  if (
+    /rate limit|HTTP (429|5\d\d)|timed? ?out|connection (reset|refused)|no such host|could not resolve host|dial tcp|EOF/i.test(
+      message,
+    )
+  ) {
     return { kind: "transient", message };
   }
   if (/HTTP 401|HTTP 403|bad credentials|gh auth login|authentication/i.test(message)) {
@@ -38,6 +43,9 @@ export class GhIssueTracker implements IssueTracker {
   constructor(private readonly runner: ProcessRunner) {}
 
   async getIssue(number: number): Promise<Result<Issue, AdapterError>> {
+    if (!Number.isSafeInteger(number) || number <= 0) {
+      return err({ kind: "failed", message: `invalid issue number: ${number}` });
+    }
     const r = await runOrFail(this.runner, {
       argv: [
         "gh",

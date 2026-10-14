@@ -8,6 +8,8 @@ import { err, ok, type Result } from "../../shared/kernel/result";
 import { runOrFail } from "../process/run-or-fail";
 
 const NO_SERVER = /no server running|error connecting to .*\(No such file or directory\)/i;
+// tmux rewrites "." and ":" in names, so a name containing them would target a different session.
+const VALID_NAME = /^[A-Za-z0-9_-]+$/;
 const NO_SESSION = /can't find session|session not found/i;
 
 /** All tmux access goes through one named socket; there is no "current server" fallback. */
@@ -20,6 +22,7 @@ export class TmuxTerminal implements Terminal {
   }
 
   async newSession(name: string, cwd: string): Promise<Result<void, AdapterError>> {
+    if (!VALID_NAME.test(name)) return err(invalidName(name));
     const r = await this.tmux(["new-session", "-d", "-s", name, "-c", cwd]);
     return r.exitCode === 0 && !r.timedOut ? ok(undefined) : err(failure(r));
   }
@@ -32,6 +35,7 @@ export class TmuxTerminal implements Terminal {
   }
 
   async killSession(name: string): Promise<Result<void, AdapterError>> {
+    if (!VALID_NAME.test(name)) return err(invalidName(name));
     const r = await this.tmux(["kill-session", "-t", `=${name}`]);
     if (r.exitCode === 0 && !r.timedOut) return ok(undefined);
     if (!r.timedOut && (NO_SERVER.test(r.stderr) || NO_SESSION.test(r.stderr))) {
@@ -51,4 +55,8 @@ export class TmuxTerminal implements Terminal {
 function failure(r: ProcessResult): AdapterError {
   const message = r.stderr.trim() || `tmux exited ${r.exitCode}`;
   return { kind: r.timedOut ? "transient" : "failed", message };
+}
+
+function invalidName(name: string): AdapterError {
+  return { kind: "failed", message: `invalid tmux session name: ${name}` };
 }

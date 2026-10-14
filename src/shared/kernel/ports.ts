@@ -53,6 +53,7 @@ export interface EventLog {
 
 // ── Terminal (tmux) ──────────────────────────────────────────────────────────
 export interface Terminal {
+  /** An existing session with the same name is `failed` (never adopted). */
   newSession(name: string, cwd: string): Promise<Result<void, AdapterError>>;
   /** No server running is not an error: it yields an empty list. */
   listSessions(): Promise<Result<readonly string[], AdapterError>>;
@@ -63,6 +64,7 @@ export interface Terminal {
 // ── Version control and issues ───────────────────────────────────────────────
 export interface Vcs {
   headSha(cwd: string): Promise<Result<string, AdapterError>>;
+  /** Detached HEAD yields "HEAD". */
   currentBranch(cwd: string): Promise<Result<string, AdapterError>>;
 }
 export interface Issue {
