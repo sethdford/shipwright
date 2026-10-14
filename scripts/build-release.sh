@@ -58,6 +58,8 @@ cp -R "$REPO_ROOT/claude-code" "$STAGING/"
 [[ -d "$REPO_ROOT/completions" ]] && cp -R "$REPO_ROOT/completions" "$STAGING/"
 [[ -d "$REPO_ROOT/docs" ]] && cp -R "$REPO_ROOT/docs" "$STAGING/"
 [[ -d "$REPO_ROOT/config" ]] && cp -R "$REPO_ROOT/config" "$STAGING/"
+# TypeScript CLI: scripts/sw routes ported commands to `bun src/cli.ts`
+cp -R "$REPO_ROOT/src" "$STAGING/"
 
 # Include repo-level agent definitions and hooks
 mkdir -p "$STAGING/.claude"
@@ -67,8 +69,10 @@ cp "$REPO_ROOT/LICENSE" "$STAGING/"
 cp "$REPO_ROOT/README.md" "$STAGING/"
 cp "$REPO_ROOT/package.json" "$STAGING/"
 
-# Remove test scripts from release
+# Remove test scripts and TypeScript tests/test helpers from release
 rm -f "$STAGING"/scripts/*-test.sh
+find "$STAGING/src" -name '*.test.ts' -type f -exec rm -f {} +
+rm -rf "$STAGING/src/testing"
 
 # Make scripts executable
 chmod +x "$STAGING"/scripts/*
