@@ -6,6 +6,8 @@ import type {
   LocalPause,
   PauseFlag,
   PauseLabel,
+  PullRequests,
+  PullSummary,
   RunHistory,
   RunRecord,
   SafetyPorts,
@@ -57,6 +59,10 @@ export const fixedCosts = (
   entries: readonly CostEntry[] = [],
 ): CostLedger => ({ read: async () => ok({ budget, entries, present: true }) });
 
+export const fixedPulls = (r: Result<readonly PullSummary[], AdapterError>): PullRequests => ({
+  open: async () => r,
+});
+
 /** Safety ports with harmless defaults: no runs, no pause flag, label or cap, a recording incident writer. */
 export function fakeSafetyPorts(over: Partial<SafetyPorts> = {}): SafetyPorts {
   return {
@@ -66,6 +72,7 @@ export function fakeSafetyPorts(over: Partial<SafetyPorts> = {}): SafetyPorts {
     pauseLabel: fixedLabel(ok([])),
     github: new RecordingGithubWriter(),
     costs: fixedCosts(null),
+    pulls: fixedPulls(ok([])),
     ...over,
   };
 }

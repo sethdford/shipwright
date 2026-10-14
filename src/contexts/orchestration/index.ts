@@ -25,6 +25,15 @@ export {
   evaluateBudget,
 } from "./domain/budget";
 export {
+  DEFAULT_FLOW_POLICY,
+  describeWip,
+  type FlowPolicy,
+  fixLoopAllows,
+  type PullSummary,
+  reviewWip,
+  type WipVerdict,
+} from "./domain/flow";
+export {
   type LocalPause,
   PAUSE_LABEL,
   type PauseStatus,
@@ -35,6 +44,7 @@ export type {
   CostLedger,
   PauseFlag,
   PauseLabel,
+  PullRequests,
   RunHistory,
   SafetyPorts,
 } from "./ports";

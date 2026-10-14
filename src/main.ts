@@ -2,6 +2,7 @@ import { join } from "node:path";
 import pkg from "../package.json";
 import { GhGithubWriter } from "./adapters/github/gh-github-writer";
 import { GhPauseLabel } from "./adapters/github/gh-pause-label";
+import { GhPullRequests } from "./adapters/github/gh-pull-requests";
 import { GhRunHistory } from "./adapters/github/gh-run-history";
 import { resolvePaths } from "./adapters/paths";
 import { BunProcessRunner } from "./adapters/process/bun-process-runner";
@@ -33,6 +34,7 @@ export function buildSafetyPorts(
     pauseLabel: new GhPauseLabel(runner),
     github: new GhGithubWriter(runner),
     costs: new JsonCostLedger(legacyDir),
+    pulls: new GhPullRequests(runner),
   };
 }
 
