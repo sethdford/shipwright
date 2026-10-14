@@ -1,5 +1,5 @@
 import { expect, test } from "bun:test";
-import { type LocalPause, pauseStatus } from "./pause";
+import { type LocalPause, pauseStatus, sanitizeReason } from "./pause";
 
 const flag = (resumeAfter: number | null = null): LocalPause => ({
   reason: "maintenance",
@@ -32,4 +32,14 @@ test("the shipwright:pause label pauses everything", () => {
 
 test("an unchecked label (no GitHub) only uses the flag", () => {
   expect(pauseStatus(null, null, 0)).toEqual({ paused: false, reasons: [] });
+});
+
+test("sanitizeReason strips control characters and caps the length", () => {
+  expect(sanitizeReason("a\u001b[31mred\u0000\n")).toBe("a[31mred");
+  expect(sanitizeReason("x".repeat(500))).toHaveLength(200);
+});
+
+test("pauseStatus sanitizes a flag reason read from disk", () => {
+  const dirty: LocalPause = { reason: "bad\u001b]0;x\u0007", since: "", resumeAfter: null };
+  expect(pauseStatus(dirty, null, 0).reasons[0]).toBe("local pause flag: bad]0;x");
 });

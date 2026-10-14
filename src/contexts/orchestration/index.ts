@@ -24,7 +24,13 @@ export {
   describeBudget,
   evaluateBudget,
 } from "./domain/budget";
-export { type LocalPause, PAUSE_LABEL, type PauseStatus, pauseStatus } from "./domain/pause";
+export {
+  type LocalPause,
+  PAUSE_LABEL,
+  type PauseStatus,
+  pauseStatus,
+  sanitizeReason,
+} from "./domain/pause";
 export type {
   CostLedger,
   PauseFlag,

@@ -10,7 +10,10 @@ export function usageError(io: CliIO, usage: string, message: string): number {
   return 2;
 }
 
-/** Gates fail closed: a source that cannot be read blocks, with exit 1. */
+/**
+ * Gates fail closed: a source that cannot be read blocks, with exit 1. Exception: `paused` has
+ * inverted semantics (0 = paused); scripts use `paused --gate` (0 = safe to dispatch).
+ */
 export function adapterFailure(io: CliIO, what: string, error: AdapterError): number {
   io.err(`✗ ${what}: cannot verify (${error.kind}): ${error.message}`);
   return 1;

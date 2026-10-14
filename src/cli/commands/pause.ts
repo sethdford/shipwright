@@ -1,4 +1,4 @@
-import { pause, readPause, resume } from "../../contexts/orchestration";
+import { pause, readPause, resume, sanitizeReason } from "../../contexts/orchestration";
 import type { Command } from "../command";
 import { adapterFailure, isHelp, usageError } from "../shared";
 
@@ -21,16 +21,20 @@ DESCRIPTION
 
 const pausedUsage = `USAGE
   shipwright paused [--no-github]
+  shipwright paused --gate [--no-github]
 
 DESCRIPTION
-  Exits 0 when dispatch is paused (local flag or shipwright:pause label), 1 when it is not.
-  Fails closed: when the flag or the label cannot be read, it reports paused (exit 0).
+  For humans: exits 0 when dispatch is paused (local flag or shipwright:pause label), 1 when
+  it is not. Fails closed: bad arguments or an unreadable flag or label report paused (exit 0).
+  For scripts use --gate, where exit 0 means NOT paused and anything else (paused, unreadable,
+  bad arguments, a missing shipwright) is non-zero, so a failure can never read as "go".
 
 OPTIONS
+  --gate        Gate form: exit 0 only when it is safe to dispatch
   --no-github   Check only the local flag
 
 EXAMPLES
-  shipwright paused || dispatch_next_issue`;
+  shipwright paused --gate && dispatch_next_issue`;
 
 export const pauseCommand: Command = {
   name: "pause",
@@ -42,7 +46,9 @@ export const pauseCommand: Command = {
       io.out(pauseUsage);
       return 0;
     }
-    const reason = args.join(" ").trim() || "paused with shipwright pause";
+    const option = args.find((a) => a.startsWith("--"));
+    if (option) return usageError(io, pauseUsage, `Unknown option: ${option}`);
+    const reason = sanitizeReason(args.join(" ").trim()) || "paused with shipwright pause";
     const r = await pause(safety(), reason);
     if (!r.ok) return adapterFailure(io, "pause", r.error);
     io.out(`✓ paused: ${reason}`);
@@ -61,9 +67,12 @@ export const resumeCommand: Command = {
       return 0;
     }
     if (args.length > 0) return usageError(io, resumeUsage, `Unknown arguments: ${args.join(" ")}`);
-    const r = await resume(safety());
+    const ports = safety();
+    const had = await ports.pauseFlag.read();
+    if (!had.ok) return adapterFailure(io, "resume", had.error);
+    const r = await resume(ports);
     if (!r.ok) return adapterFailure(io, "resume", r.error);
-    io.out("✓ local pause flag cleared");
+    io.out(had.value ? "✓ local pause flag cleared" : "✓ no local pause flag was set");
     io.out("  A shipwright:pause label on any open issue still pauses dispatch everywhere.");
     return 0;
   },
@@ -79,16 +88,29 @@ export const pausedCommand: Command = {
       io.out(pausedUsage);
       return 0;
     }
+    const gate = args.includes("--gate");
     const github = !args.includes("--no-github");
-    if (args.some((a) => a !== "--no-github")) {
-      return usageError(io, pausedUsage, `Unknown arguments: ${args.join(" ")}`);
+    if (args.some((a) => a !== "--no-github" && a !== "--gate")) {
+      // Gate form: usage error is non-zero (2). Human form fails closed (0 = paused).
+      usageError(io, pausedUsage, `Unknown arguments: ${args.join(" ")}`);
+      return gate ? 2 : 0;
     }
-    const r = await readPause(safety(), { github });
-    if (!r.ok) {
-      adapterFailure(io, "pause", r.error);
-      return 0; // fail closed: an unknown pause state counts as paused
+    try {
+      const r = await readPause(safety(), { github });
+      if (!r.ok) {
+        adapterFailure(io, "pause", r.error);
+        return gate ? 1 : 0; // fail closed: an unknown pause state counts as paused
+      }
+      const { paused, reasons } = r.value;
+      if (gate) {
+        io.out(paused ? `paused: ${reasons.join("; ")}` : "not paused");
+        return paused ? 1 : 0;
+      }
+      io.out(paused ? `paused: ${reasons.join("; ")}` : "not paused");
+      return paused ? 0 : 1;
+    } catch (e) {
+      io.err(`✗ pause: cannot verify: ${e instanceof Error ? e.message : String(e)}`);
+      return gate ? 1 : 0;
     }
-    io.out(r.value.paused ? `paused: ${r.value.reasons.join("; ")}` : "not paused");
-    return r.value.paused ? 0 : 1;
   },
 };

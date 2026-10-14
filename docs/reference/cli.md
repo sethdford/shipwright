@@ -106,16 +106,20 @@ Exit 0 when dispatch is paused (flag or label), 1 when not
 ```text
 USAGE
   shipwright paused [--no-github]
+  shipwright paused --gate [--no-github]
 
 DESCRIPTION
-  Exits 0 when dispatch is paused (local flag or shipwright:pause label), 1 when it is not.
-  Fails closed: when the flag or the label cannot be read, it reports paused (exit 0).
+  For humans: exits 0 when dispatch is paused (local flag or shipwright:pause label), 1 when
+  it is not. Fails closed: bad arguments or an unreadable flag or label report paused (exit 0).
+  For scripts use --gate, where exit 0 means NOT paused and anything else (paused, unreadable,
+  bad arguments, a missing shipwright) is non-zero, so a failure can never read as "go".
 
 OPTIONS
+  --gate        Gate form: exit 0 only when it is safe to dispatch
   --no-github   Check only the local flag
 
 EXAMPLES
-  shipwright paused || dispatch_next_issue
+  shipwright paused --gate && dispatch_next_issue
 ```
 
 ## `resume`

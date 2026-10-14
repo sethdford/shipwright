@@ -52,9 +52,6 @@ test("paused fails closed: an unreadable source counts as paused (exit 0)", asyn
   expect(io.errLines).toEqual(["✗ pause: cannot verify (auth): x"]);
 });
 
-test.each([
-  [resumeCommand, ["extra"]],
-  [pausedCommand, ["--bogus"]],
-])("bad arguments exit 2", async (command, args) => {
+test.each([[resumeCommand, ["extra"]]])("bad arguments exit 2", async (command, args) => {
   expect(await command.run(args, commandContext(captureIO()))).toBe(2);
 });
