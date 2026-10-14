@@ -1,2 +1,2 @@
-const { login } = require('../src/auth');
+const { login } = require('./auth');
 test('login', () => expect(login('admin', 'hunter2')).toBe(true));
