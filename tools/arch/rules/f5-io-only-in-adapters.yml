@@ -27,6 +27,8 @@ rule:
     - pattern: process["env"]
     - pattern: process['env']
     - pattern: const { $$$ } = process
+    - pattern: let { $$$ } = process
+    - pattern: var { $$$ } = process
     - all:
         - any:
             - pattern: import($S)
@@ -47,3 +49,8 @@ rule:
             regex: '^["''](bun:sqlite|(node:)?(fs|fs/promises|child_process|net|http|https|dns|tls|dgram|http2|worker_threads))["'']$'
         - not:
             regex: '^(import|export)\s+type\s'
+    - kind: import_require_clause
+      has:
+        field: source
+        kind: string
+        regex: '^["''](bun:sqlite|(node:)?(fs|fs/promises|child_process|net|http|https|dns|tls|dgram|http2|worker_threads))["'']$'
