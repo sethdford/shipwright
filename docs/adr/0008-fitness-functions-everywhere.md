@@ -15,8 +15,8 @@ be fixed first. F9 was a "follow now" rule with no check, and a rule an agent ca
 Everything that runs gets fitness functions in `bun run arch`, each with a message naming the fix:
 - `src/`: F5 also catches evasion (aliased globals, `globalThis?.x`, computed imports, `eval`,
   `node:os`). F9 is enforced statically (bypass spellings, token names, one module that imports the
-  SDK's `query` as a value, and each `query` call's options: an `env:` literal or a variable, a
-  literal `permissionMode`) and at run time (`assertAgentOptions`, which allowlists option keys and
+  SDK's `query` as a value, and each `query` call's options: an object literal whose `env:` is a
+  literal or a call, or a variable, and a literal `permissionMode`) and at run time (`assertAgentOptions`, which allowlists option keys and
   requires `permissionMode: "dontAsk"`).
 - Bash in `scripts/`, hooks, completions and `install.sh` (ast-grep's Bash grammar): F11 code
   injection, F9 bypass flags and token scrubbing for `claude`, F10 GitHub writes.
@@ -66,8 +66,8 @@ decision to allow the pattern.
 - Dashboard: the subprocess rule misses `Bun` aliasing, `Reflect.get`, `import {$ as sh}`,
   `createRequire` and a `require` built by concatenation. D2 checks direct imports only, and the
   raw-runner rule does not see a dynamic `import()` of `claims.ts`.
-- F9 options: a variable passed as `options` is checked at run time only, and `env` values from a
-  variable are checked for GitHub token names at run time only. The runner's
+- F9 options: a variable passed as `options` is checked at run time only (its `env` is checked for
+  GitHub token names there), and an `env:` built by a helper function is not inspected for contents. The runner's
   `settingSources: ["project"]` reads the repo's own `.claude/settings.json`, which can set
   `permissions`. The runner passes `permissionMode: "dontAsk"` explicitly, but that it overrides a
   project's `defaultMode` has not been verified against the SDK.

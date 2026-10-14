@@ -37,7 +37,10 @@ rule:
                       - kind: object
                         has:
                           kind: pair
-                          has: { field: key, regex: '^env$' }
+                          all:
+                            - has: { field: key, regex: '^env$' }
+                            # env: must be a literal or a call such as agentEnv(...), never a variable
+                            - not: { has: { field: value, kind: identifier } }
     # env taken from the parent process
     - kind: pair
       all:
