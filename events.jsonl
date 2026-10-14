@@ -376,3 +376,7 @@
 {"ts":"2026-10-14T18:13:34Z","ts_epoch":1792001614,"type":"patrol.finding","check":"untested_script","script":"sw-tmux-role-color.sh","lines":81,"usage":1}
 {"ts":"2026-10-14T18:13:34Z","ts_epoch":1792001614,"type":"patrol.finding","check":"untested_script","script":"sw-test-all.sh","lines":206,"usage":0}
 {"ts":"2026-10-14T18:13:34Z","ts_epoch":1792001614,"type":"patrol.finding","check":"untested_script","script":"sw-event-schema-sync.sh","lines":93,"usage":0}
+{"ts":"2026-10-14T20:05:05Z","ts_epoch":1792008305,"type":"hygiene_platform_refactor","hardcoded":49,"fallback":69,"todo":51}
+{"ts":"2026-10-14T20:05:32Z","ts_epoch":1792008332,"type":"strategic.issue_created","title":"Add context-exhaustion early-warning check to pre-build validation","priority":"P0","complexity":"standard"}
+{"ts":"2026-10-14T20:05:36Z","ts_epoch":1792008336,"type":"strategic.issue_created","title":"Add `shipwright doctor` check for untested scripts exceeding size/complexity threshold","priority":"P1","complexity":"fast"}
+{"ts":"2026-10-14T20:05:36Z","ts_epoch":1792008336,"type":"strategic.cycle_complete","issues_created":2,"issues_skipped":1}
