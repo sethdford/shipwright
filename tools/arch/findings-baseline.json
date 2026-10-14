@@ -125,5 +125,8 @@
     "scripts/sw-loop.sh": 5,
     "scripts/sw-pipeline-test.sh": 1,
     "scripts/sw-session.sh": 5
+  },
+  "dashboard-subprocess-only-in-services": {
+    "dashboard/server.ts": 12
   }
 }

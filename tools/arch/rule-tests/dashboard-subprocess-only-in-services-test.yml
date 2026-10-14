@@ -1,0 +1,23 @@
+id: dashboard-subprocess-only-in-services
+valid:
+  - 'db.exec("PRAGMA journal_mode=WAL;");'
+  - 'const r = regex.exec(line);'
+  - 'import { join } from "path";'
+  - 'import type { ExecFileSyncOptions } from "child_process";'
+  - 'const out = await runGh(["issue", "view", String(n)]);'
+  - 'particles.spawn(x, y);'
+  - 'const v = Bun.version;'
+invalid:
+  - 'import { execSync } from "child_process";'
+  - 'import { spawn } from "node:child_process";'
+  - 'const cp = require("child_process");'
+  - 'const cp = await import("node:child_process");'
+  - 'execSync("nproc");'
+  - 'execFileSync("gh", ["issue", "view", String(n)]);'
+  - 'const p = spawn("ssh", argv);'
+  - 'Bun.spawn(["git", "status"]);'
+  - 'await Bun.$`git log`;'
+  - 'const { spawn } = Bun;'
+  - 'const { spawnSync: run } = Bun;'
+  - 'Bun["spawn"](["git", "status"]);'
+  - "const run = Bun['spawnSync'];"

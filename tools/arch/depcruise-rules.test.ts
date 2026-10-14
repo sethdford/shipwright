@@ -35,15 +35,48 @@ const FIXTURES: Record<string, Record<string, string>> = {
     "src/adapters/x/uses-fake.ts": 'import "../../testing/fake";',
     "src/testing/fake.ts": "export {};",
   },
+  "F3-src-not-dashboard": {
+    "src/adapters/x/uses-dashboard.ts": 'import "../../../dashboard/services/svc";',
+    "dashboard/services/svc.ts": "export {};",
+  },
   "F4-no-cycles": {
     "src/adapters/y/c1.ts": 'import "./c2";',
     "src/adapters/y/c2.ts": 'import "./c1";',
+  },
+  "D1-browser-server-split": {
+    "dashboard/src/view.ts": 'import "../middleware/constants";',
+    "dashboard/middleware/constants.ts": "export {};",
+  },
+  "D1-server-browser-split": {
+    "dashboard/services/uses-view.ts": 'import "../src/widget";',
+    "dashboard/src/widget.ts": "export {};",
+  },
+  "D1-dashboard-not-src": {
+    "dashboard/services/uses-src.ts": 'import "../../src/shared/kernel/result";',
+    "src/shared/kernel/result.ts": "export {};",
+  },
+  "D2-services-are-the-bottom-layer": {
+    "dashboard/services/up.ts": 'import "../middleware/constants";',
+    "dashboard/middleware/constants.ts": "export {};",
+  },
+  "D2-middleware-not-routes": {
+    "dashboard/middleware/m.ts": 'import "../routes/r";',
+    "dashboard/routes/r.ts": "export {};",
+  },
+  "D3-routes-not-server": {
+    "dashboard/routes/a.ts": 'import "./b";',
+    "dashboard/routes/b.ts": "export {};",
+  },
+  "D4-no-cycles": {
+    "dashboard/types/t1.ts": 'import "./t2";',
+    "dashboard/types/t2.ts": 'import "./t1";',
   },
 };
 
 /** Config file → the directory it cruises in `bun run arch`. */
 const CONFIGS: Record<string, string> = {
   ".dependency-cruiser.cjs": "src",
+  ".dependency-cruiser.dashboard.cjs": "dashboard",
 };
 const FIX_VERB =
   /\b(use|move|add|pass|call|run|define|inject|split|fix|keep|port|replace|remove|break|talk|depend)\b/i;

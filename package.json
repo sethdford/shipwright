@@ -58,7 +58,7 @@
     "typecheck": "tsc -p tsconfig.json && tsc -p dashboard/tsconfig.server.json",
     "lint": "biome check src tools",
     "format": "biome check --write src tools",
-    "arch": "depcruise src --config .dependency-cruiser.cjs && bun tools/arch/ast-scan.ts && ast-grep test --skip-snapshot-tests --include-off && bun tools/arch/size-ratchet.ts && bun tools/arch/workflow-injection.ts && bun tools/arch/workflow-fail-closed.ts",
+    "arch": "depcruise src --config .dependency-cruiser.cjs && depcruise dashboard --config .dependency-cruiser.dashboard.cjs && bun tools/arch/ast-scan.ts && ast-grep test --skip-snapshot-tests --include-off && bun tools/arch/size-ratchet.ts && bun tools/arch/workflow-injection.ts && bun tools/arch/workflow-fail-closed.ts",
     "test:ts": "bun test ./src ./tools",
     "docs:gen": "bun tools/docs/gen-cli-reference.ts",
     "docs:check": "bun tools/docs/gen-cli-reference.ts --check",

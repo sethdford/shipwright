@@ -36,7 +36,7 @@
 | Bash scope | `scripts/**/*.sh`, `scripts/sw`, `.claude/hooks/**/*.sh`, `claude-code/hooks/**/*.sh`, `completions/**/*.bash`, `install.sh`. `completions/_shipwright` (zsh) and `completions/shipwright.fish` are not bash and are excluded. The meta-test keeps every Bash rule on this one list. |
 | F5 evasion | Also flagged: `Bun`, `process`, `globalThis` and `global` used as values; `eval` and `Function` used at all; `globalThis`/`global`/`window`/`self` `.process`/`.Bun`/`.fetch`/…, including `?.`; `import.meta.env`; `import()`/`require()` with a computed specifier; `new Worker`/`WebSocket`/`EventSource`/`XMLHttpRequest`; `os`/`node:os`. Declarations of locals or parameters named `process` are not flagged. A local passed as a value is, and the message says to rename it. |
 | Meta | Every ast-grep rule needs: one rule test with valid and invalid cases; a message starting with its family (`F11:`, `Dashboard:`) and naming a fix; `severity: error` or the ratchet marker; `metadata.owner` and a `metadata.docs` anchor that exists in `docs/architecture.md`; and `files` that match at least one tracked file, unless `metadata.preemptive` says why not (`F10-…-tsx`: `src` has no `.tsx` yet). Every dependency-cruiser rule fires on a fixture, and its comment starts with its family and names a fix. `bun run arch` must contain every checker. |
-| Dashboard | D1 now also covers `dashboard/` → `src/` (and F3 covers `src/` → `dashboard/`). Resolution goes through `dashboard/tsconfig.server.json`. The subprocess allowlist is `services/claims.ts` and `services/subprocess-guards.ts`. `server.ts` is ratcheted with 14 findings. The rule also catches `const { spawn } = Bun` and `Bun["spawn"]`. |
+| Dashboard | D1 now also covers `dashboard/` → `src/` (and F3 covers `src/` → `dashboard/`). Resolution goes through `dashboard/tsconfig.server.json`. The subprocess allowlist is `services/claims.ts` and `services/subprocess-guards.ts`. `server.ts` is ratcheted with 12 findings (at `efa1e4704`). The rule also catches `const { spawn } = Bun` and `Bun["spawn"]`. |
 | Dropped as infeasible | **A workflow F9 check:** the workflows contain none of the names, and ast-grep's YAML support adds little over a text search. **Taint tracking:** data reaching a shell through a file or a function argument, or a GraphQL mutation in a variable, cannot be caught syntactically. **A "named helper" exemption for `claude`:** no `sw_claude` helper exists yet, so the rule asks for one rather than whitelisting a name. A helper that runs `env -u … claude` passes by construction. |
 
 ## Conventions for every task
@@ -2485,7 +2485,7 @@ Expected:
 - Create: `.dependency-cruiser.dashboard.cjs`, `tools/arch/rules/dashboard-subprocess-only-in-services.yml` + test
 - Modify: `.dependency-cruiser.cjs`, `tools/arch/depcruise-rules.test.ts`, `tools/arch/meta.test.ts`, `tools/arch/findings-baseline.json`, `package.json`
 
-Inventory at `2aaa43fda`: `dashboard/` has a browser bundle (`src/`) and a Bun server: `server.ts` (5.9k lines) → `routes/auth.ts` → `middleware/{auth,constants}.ts`; `services/{claims,subprocess-guards,request-guard,db,config}.ts`; `types/`. Today's imports already follow the layering, so D1–D4 are strict. Processes are spawned by `services/claims.ts` (`execFileSync` with argv) and by `server.ts` (the `child_process` import and 13 `execSync`/`execFileSync` calls), so the subprocess allowlist is a ratchet. Wave 1a Task 15's `dashboard-no-shell-from-data` already forbids non-constant or concatenated shell strings and `shell: true`; this task does not repeat it.
+Inventory at `2aaa43fda`: `dashboard/` has a browser bundle (`src/`) and a Bun server: `server.ts` (5.9k lines) → `routes/auth.ts` → `middleware/{auth,constants}.ts`; `services/{claims,subprocess-guards,request-guard,auth-flow,db,config}.ts`; `types/`. Today's imports already follow the layering, so D1–D4 are strict. Processes are spawned by `services/claims.ts` (`execFileSync` with argv) and by `server.ts` (the `child_process` import and 11 `execSync`/`execFileSync` calls at `efa1e4704`; 13 at the dry-run base `2aaa43fda`), so the subprocess allowlist is a ratchet. Wave 1a Task 15's `dashboard-no-shell-from-data` already forbids non-constant or concatenated shell strings and `shell: true`; this task does not repeat it.
 
 - [ ] **Step 1: Add fixtures for the new rules (red)**
 
@@ -2736,7 +2736,7 @@ bun tools/arch/ast-scan.ts 2>&1 | grep '^RATCHET'
 ```
 
 Expected: `PASS dashboard-subprocess-only-in-services  ....................` and `test result: ok. 16 passed; 0 failed;`. The scan then fails with:
-- `RATCHET dashboard-subprocess-only-in-services dashboard/server.ts: 14 new finding(s). …`
+- `RATCHET dashboard-subprocess-only-in-services dashboard/server.ts: 12 new finding(s). …` (12 at `efa1e4704`; 14 at the dry-run base)
 - `RATCHET dashboard-subprocess-only-in-services has no baseline entry. Seed it: …`
 
 - [ ] **Step 5: Pin it, and wire D1–D4 into `bun run arch`**
@@ -2769,7 +2769,7 @@ git diff --stat tools/arch/findings-baseline.json
 jq '."dashboard-subprocess-only-in-services"' tools/arch/findings-baseline.json
 ```
 
-Expected: `exit=0`; the diff adds only the new block (`3 insertions(+)`); `{ "dashboard/server.ts": 14 }`.
+Expected: `exit=0`; the diff adds only the new block (`3 insertions(+)`); `{ "dashboard/server.ts": 12 }` at `efa1e4704`.
 
 - [ ] **Step 7: Run the definition of done**
 

@@ -53,6 +53,14 @@ module.exports = {
       to: { path: "^src/testing/" },
     },
     {
+      name: "F3-src-not-dashboard",
+      comment:
+        "F3: src/ never imports dashboard/ (a separate project until Wave 3). Port the piece you need into a context.",
+      severity: "error",
+      from: { path: "^src/" },
+      to: { path: "^dashboard/" },
+    },
+    {
       name: "F4-no-cycles",
       comment: "F4: break the cycle by moving the shared piece into a port or the kernel.",
       severity: "error",

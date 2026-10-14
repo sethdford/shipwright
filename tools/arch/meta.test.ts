@@ -56,6 +56,15 @@ const PINNED: Record<string, { ratchet: boolean; ignores: string[] }> = {
   "F11-bash-no-gha-expression": { ratchet: true, ignores: [] },
   "F11-bash-no-pipe-to-shell": { ratchet: true, ignores: [] },
   "F11-bash-no-shell-c-expansion": { ratchet: true, ignores: [] },
+  "dashboard-subprocess-only-in-services": {
+    ratchet: true,
+    ignores: [
+      "dashboard/**/*.test.ts",
+      "dashboard/src/**",
+      "dashboard/services/claims.ts",
+      "dashboard/services/subprocess-guards.ts",
+    ],
+  },
   "dashboard-no-shell-from-data": {
     ratchet: false,
     ignores: ["dashboard/**/*.test.ts", "dashboard/src/**"],
@@ -65,6 +74,7 @@ const PINNED: Record<string, { ratchet: boolean; ignores: string[] }> = {
 /** Every checker `bun run arch` must run. */
 const ARCH_STEPS = [
   "depcruise src --config .dependency-cruiser.cjs",
+  "depcruise dashboard --config .dependency-cruiser.dashboard.cjs",
   "bun tools/arch/ast-scan.ts",
   "ast-grep test --skip-snapshot-tests --include-off",
   "bun tools/arch/size-ratchet.ts",
