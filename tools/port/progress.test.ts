@@ -1,6 +1,6 @@
 import { expect, test } from "bun:test";
 import { CONTEXTS, type Context, contextFor } from "./contexts";
-import { ProgressEntry, parseRouter } from "./progress";
+import { loadProgress, ProgressEntry, parseRouter } from "./progress";
 
 const router = `
     case "$subcmd" in
@@ -126,6 +126,24 @@ test("progress entries reject unknown contexts and extra keys", () => {
   expect(ProgressEntry.safeParse(ok).success).toBe(true);
   expect(ProgressEntry.safeParse({ ...ok, context: "nope" }).success).toBe(false);
   expect(ProgressEntry.safeParse({ ...ok, extra: 1 }).success).toBe(false);
+});
+
+test("progress entries accept an optional string note", () => {
+  const ok = {
+    command: "a",
+    aliases: [],
+    script: "sw-a.sh",
+    context: "platform",
+    parity: null,
+    status: "bash",
+  };
+  expect(ProgressEntry.safeParse({ ...ok, notes: "why this entry is special" }).success).toBe(true);
+  expect(ProgressEntry.safeParse({ ...ok, notes: 1 }).success).toBe(false);
+});
+
+test("the doc-fleet entry records why it is not ported", async () => {
+  const entry = (await loadProgress()).find((e) => e.command === "doc-fleet");
+  expect(entry?.notes).toContain("§7.5 don't-port list");
 });
 
 test("pipeline-vitals is observability, not delivery", () => {

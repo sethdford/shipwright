@@ -608,7 +608,8 @@
     "script": "sw-doc-fleet.sh",
     "context": "platform",
     "parity": "scripts/sw-doc-fleet-test.sh",
-    "status": "bash"
+    "status": "bash",
+    "notes": "scripts/sw-doc-fleet.sh reads .claude/agents/doc-fleet-agent.md; doc-fleet is on the spec §7.5 don't-port list"
   },
   {
     "command": "review-rerun",

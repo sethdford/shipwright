@@ -15,6 +15,8 @@ export const ProgressEntry = z
     context: z.enum(CONTEXTS),
     parity: z.string().nullable(),
     status: Status,
+    /** Free-form context for a reviewer, e.g. why an entry will not be ported. */
+    notes: z.string().optional(),
   })
   .strict();
 export type ProgressEntry = z.infer<typeof ProgressEntry>;
