@@ -16,6 +16,7 @@ import {
 } from "fs";
 import { join, basename } from "path";
 import { execSync } from "child_process";
+import { USER_AGENTS, USER_HOOKS } from "./install-allowlist.mjs";
 
 const HOME = process.env.HOME || process.env.USERPROFILE;
 const PKG_DIR = join(import.meta.dirname, "..");
@@ -48,6 +49,19 @@ function copyDir(src, dest) {
   if (!existsSync(src)) return;
   ensureDir(dest);
   cpSync(src, dest, { recursive: true, force: false });
+}
+
+/** Copies the named files from src to dest without overwriting; returns how many exist in src. */
+function copyFiles(src, dest, names) {
+  let found = 0;
+  for (const name of names) {
+    const from = join(src, name);
+    if (!existsSync(from)) continue;
+    ensureDir(dest);
+    cpSync(from, join(dest, name), { force: false });
+    found++;
+  }
+  return found;
 }
 
 try {
@@ -84,21 +98,21 @@ try {
     success("Installed settings template");
   }
 
-  // Install agent definitions → ~/.claude/agents/
-  const agentsSrc = join(PKG_DIR, ".claude", "agents");
-  const agentsDest = join(CLAUDE_DIR, "agents");
-  if (existsSync(agentsSrc)) {
-    copyDir(agentsSrc, agentsDest);
-    success("Installed agent definitions");
-  }
-
-  // Install repo hooks → ~/.claude/hooks/
-  const hooksSrc = join(PKG_DIR, ".claude", "hooks");
-  const hooksDest = join(CLAUDE_DIR, "hooks");
-  if (existsSync(hooksSrc)) {
-    copyDir(hooksSrc, hooksDest);
-    success("Installed hooks");
-  }
+  // Install user-facing agent definitions and hooks → ~/.claude/{agents,hooks}/.
+  // Allowlisted (see install-allowlist.mjs): dev-only files in .claude/ must not be
+  // installed into users' ~/.claude.
+  const agentsCount = copyFiles(
+    join(PKG_DIR, ".claude", "agents"),
+    join(CLAUDE_DIR, "agents"),
+    USER_AGENTS,
+  );
+  if (agentsCount) success("Installed agent definitions");
+  const hooksCount = copyFiles(
+    join(PKG_DIR, ".claude", "hooks"),
+    join(CLAUDE_DIR, "hooks"),
+    USER_HOOKS,
+  );
+  if (hooksCount) success("Installed hooks");
 
   // Install CLAUDE.md agent instructions → ~/.claude/CLAUDE.md (idempotent)
   const claudeMdSrc = join(PKG_DIR, "claude-code", "CLAUDE.md.shipwright");
