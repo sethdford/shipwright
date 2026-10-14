@@ -1,6 +1,6 @@
 import { pause, readPause, resume, sanitizeReason } from "../../contexts/orchestration";
 import type { Command } from "../command";
-import { adapterFailure, isHelp, isHelpRequest, usageError } from "../shared";
+import { adapterFailure, allowNoGithub, isHelp, isHelpRequest, usageError } from "../shared";
 
 const pauseUsage = `USAGE
   shipwright pause [REASON...]
@@ -31,7 +31,9 @@ DESCRIPTION
 
 OPTIONS
   --gate        Gate form: exit 0 only when it is safe to dispatch
-  --no-github   Check only the local flag
+  --no-github   Check only the local flag (warns on stderr). Refused on GitHub Actions
+                (GITHUB_ACTIONS set to anything but empty or "false"): exit 2 with --gate,
+                0 (paused, fail closed) without it
 
 EXAMPLES
   shipwright paused --gate && dispatch_next_issue`;
@@ -83,7 +85,7 @@ export const pausedCommand: Command = {
   aliases: [],
   summary: "Exit 0 when dispatch is paused (flag or label), 1 when not",
   usage: pausedUsage,
-  async run(args, { io, safety }) {
+  async run(args, { io, safety, env }) {
     if (isHelpRequest(args)) {
       io.out(pausedUsage);
       return 0;
@@ -93,6 +95,9 @@ export const pausedCommand: Command = {
     if (args.some((a) => a !== "--no-github" && a !== "--gate")) {
       // Gate form: usage error is non-zero (2). Human form fails closed (0 = paused).
       usageError(io, pausedUsage, `Unknown arguments: ${args.join(" ")}`);
+      return gate ? 2 : 0;
+    }
+    if (!github && !allowNoGithub(io, pausedUsage, env, "shipwright:pause label")) {
       return gate ? 2 : 0;
     }
     try {

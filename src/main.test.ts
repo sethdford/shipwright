@@ -129,3 +129,14 @@ test("buildSafetyPorts keeps the pause flag where the bash daemon reads it", asy
     env.cleanup();
   }
 });
+
+test.each([
+  [["-h", "gates", "check", "--retry", "0"]],
+  [["--help", "breaker"]],
+  [["-v", "x"]],
+  [["--version", "gates"]],
+])("top-level help or version with more arguments %p exits 2", async (argv) => {
+  const c = io();
+  expect(await main(argv, c.io)).toBe(2);
+  expect(c.out).toEqual([]);
+});

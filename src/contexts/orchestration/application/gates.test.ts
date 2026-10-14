@@ -11,7 +11,7 @@ import {
 } from "../../../testing/fake-safety-ports";
 import type { RunRecord } from "../domain/breaker";
 import type { SafetyPorts } from "../ports";
-import { checkDispatchGates } from "./gates";
+import { checkDispatchGates, sharingRuns } from "./gates";
 
 const open = { github: true, retry: 0 };
 const failures: RunRecord[] = [0, 1, 2, 3, 4].map((i) => ({
@@ -237,4 +237,21 @@ test("run history is fetched once and shared by the breaker and review WIP", asy
   expect(r.allowed).toBe(true);
   expect(limits).toEqual([50]);
   expect(r.results[3]?.detail).toBe("0 agent PRs awaiting review + 1 runs in flight (limit 5)");
+});
+
+test("shared run history refuses a second, different limit", async () => {
+  let calls = 0;
+  const runs = {
+    recentRuns: async () => {
+      calls++;
+      return ok([]);
+    },
+  };
+  const ports = sharingRuns(fakeSafetyPorts({ runs }));
+  await ports.runs.recentRuns(50);
+  await ports.runs.recentRuns(50);
+  expect(calls).toBe(1);
+  expect(() => ports.runs.recentRuns(10)).toThrow(
+    "run history already fetched with limit 50, not 10",
+  );
 });

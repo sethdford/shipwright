@@ -98,3 +98,24 @@ test.each([[["--help"]], [["check", "-h"]]])("help alone %p exits 0", async (arg
   expect(await budgetCommand.run(args, commandContext(io))).toBe(0);
   expect(io.outLines.join("\n")).toContain("USAGE");
 });
+
+test.each([[""], ["0x10"], ["1e3"], [" 1"], ["1."], [".5"], ["01"], ["Infinity"], ["+1"]])(
+  "--estimate %p is not a plain decimal: exit 2",
+  async (value) => {
+    const io = captureIO();
+    const code = await budgetCommand.run(
+      ["check", "--estimate", value],
+      commandContext(io, ports(0)),
+    );
+    expect(code).toBe(2);
+  },
+);
+
+test.each([["0"], ["2.50"], ["10"], ["0.01"]])("--estimate %p is accepted", async (value) => {
+  const io = captureIO();
+  const code = await budgetCommand.run(
+    ["status", "--estimate", value],
+    commandContext(io, ports(0)),
+  );
+  expect(code).toBe(0);
+});

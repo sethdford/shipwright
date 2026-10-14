@@ -26,8 +26,8 @@ OPTIONS
            incidentError or error when they apply. Exit codes are unchanged.
 
 NOTES
-  Both commands read GitHub Actions. Without GitHub (--no-github / NO_GITHUB) the standalone
-  check fails closed (exit 1); \`shipwright gates check\` skips the breaker instead.
+  Both commands read GitHub Actions; if it cannot be read, check fails closed (exit 1).
+  Only \`shipwright gates check --no-github\` skips the breaker (never on GitHub Actions).
 
 EXAMPLES
   shipwright breaker status

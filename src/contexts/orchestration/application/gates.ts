@@ -126,10 +126,20 @@ async function guarded(gate: GateName, run: () => Promise<GateResult>): Promise<
   }
 }
 
-/** The breaker and review-WIP gates read the same history: fetch it at most once, lazily. */
-function sharingRuns(ports: SafetyPorts): SafetyPorts {
-  let cached: ReturnType<RunHistory["recentRuns"]> | undefined;
-  return { ...ports, runs: { recentRuns: (limit) => (cached ??= ports.runs.recentRuns(limit)) } };
+/**
+ * The breaker and review-WIP gates read the same history: fetch it at most once, lazily. A second
+ * request with another limit throws (an error verdict) rather than reuse a different window.
+ */
+export function sharingRuns(ports: SafetyPorts): SafetyPorts {
+  let cached: { limit: number; runs: ReturnType<RunHistory["recentRuns"]> } | undefined;
+  const recentRuns = (limit: number) => {
+    if (cached && cached.limit !== limit) {
+      throw new Error(`run history already fetched with limit ${cached.limit}, not ${limit}`);
+    }
+    cached ??= { limit, runs: ports.runs.recentRuns(limit) };
+    return cached.runs;
+  };
+  return { ...ports, runs: { recentRuns } };
 }
 
 export async function checkDispatchGates(

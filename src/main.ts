@@ -69,11 +69,13 @@ export async function main(
   env: Readonly<Record<string, string | undefined>> = process.env,
 ): Promise<number> {
   const [name, ...args] = argv;
-  if (name === undefined || name === "--help" || name === "-h") {
+  // Top-level help and version only when they are the whole request; anything more exits 2 below.
+  const alone = argv.length <= 1;
+  if (name === undefined || (alone && (name === "--help" || name === "-h"))) {
     io.out(renderHelp(registry));
     return 0;
   }
-  if (name === "--version" || name === "-v") {
+  if (alone && (name === "--version" || name === "-v")) {
     io.out(pkg.version);
     return 0;
   }

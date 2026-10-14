@@ -1,5 +1,5 @@
 import type { AdapterError } from "../shared/kernel/ports";
-import type { CliIO } from "./command";
+import type { CliIO, CommandContext } from "./command";
 
 export const isHelp = (arg: string | undefined): boolean => arg === "--help" || arg === "-h";
 
@@ -21,6 +21,33 @@ export function usageError(io: CliIO, usage: string, message: string): number {
   io.err(`✗ ${message}`);
   io.out(usage);
   return 2;
+}
+
+/**
+ * True on GitHub Actions: GITHUB_ACTIONS set to anything but empty or "false" (any case), so a
+ * mis-cased or unusual value never reads as "not on Actions".
+ */
+export function onGithubActions(env: CommandContext["env"]): boolean {
+  const value = (env.GITHUB_ACTIONS ?? "").trim().toLowerCase();
+  return value !== "" && value !== "false";
+}
+
+/**
+ * No-GitHub mode for a gate command. On Actions it is refused: prints the usage error and returns
+ * false. Elsewhere it warns on stderr which checks are skipped and returns true.
+ */
+export function allowNoGithub(
+  io: CliIO,
+  usage: string,
+  env: CommandContext["env"],
+  unchecked: string,
+): boolean {
+  if (onGithubActions(env)) {
+    usageError(io, usage, "no-GitHub mode is not allowed on GitHub Actions");
+    return false;
+  }
+  io.err(`⚠ no-GitHub mode: not checked: ${unchecked}`);
+  return true;
 }
 
 /**

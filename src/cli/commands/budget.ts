@@ -30,8 +30,8 @@ EXAMPLES
 function parseEstimate(rest: readonly string[]): number | null {
   if (rest.length === 0) return 0;
   if (rest.length !== 2 || rest[0] !== "--estimate") return null;
-  const n = Number(rest[1]);
-  return Number.isFinite(n) && n >= 0 ? n : null;
+  const value = rest[1] ?? "";
+  return /^(0|[1-9][0-9]*)(\.[0-9]+)?$/.test(value) ? Number(value) : null;
 }
 
 export const budgetCommand: Command = {

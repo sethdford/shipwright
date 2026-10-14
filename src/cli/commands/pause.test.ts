@@ -116,3 +116,30 @@ test.each([[["-h", "--gate"]], [["--help", "--gate", "--no-github"]]])(
 test("paused --help alone exits 0", async () => {
   expect(await pausedCommand.run(["--help"], commandContext(captureIO()))).toBe(0);
 });
+
+test.each([["true"], ["TRUE"], ["1"], ["yes"]])(
+  "paused --gate --no-github is refused when GITHUB_ACTIONS=%p",
+  async (value) => {
+    const io = captureIO();
+    const ctx = commandContext(io, fakeSafetyPorts(), { GITHUB_ACTIONS: value });
+    expect(await pausedCommand.run(["--gate", "--no-github"], ctx)).toBe(2);
+    expect(io.errLines[0]).toBe("✗ no-GitHub mode is not allowed on GitHub Actions");
+  },
+);
+
+test("paused --no-github (human form) on Actions fails closed as paused", async () => {
+  const ctx = commandContext(captureIO(), fakeSafetyPorts(), { GITHUB_ACTIONS: "true" });
+  expect(await pausedCommand.run(["--no-github"], ctx)).toBe(0);
+});
+
+test.each([[{}], [{ GITHUB_ACTIONS: "" }], [{ GITHUB_ACTIONS: "false" }]])(
+  "paused --gate --no-github off Actions (%p) skips the label and warns",
+  async (env) => {
+    const io = captureIO();
+    const ports = fakeSafetyPorts({ pauseLabel: fixedLabel(ok([3])) });
+    expect(await pausedCommand.run(["--gate", "--no-github"], commandContext(io, ports, env))).toBe(
+      0,
+    );
+    expect(io.errLines).toEqual(["⚠ no-GitHub mode: not checked: shipwright:pause label"]);
+  },
+);

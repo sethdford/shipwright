@@ -7,7 +7,7 @@ import {
   gatePasses,
 } from "../../contexts/orchestration";
 import type { CliIO, Command } from "../command";
-import { isHelpRequest, usageError } from "../shared";
+import { allowNoGithub, isHelpRequest, usageError } from "../shared";
 
 const usage = `USAGE
   shipwright gates check --retry N [--no-github] [--json]
@@ -28,7 +28,7 @@ OPTIONS
   --no-github    Skip the breaker and review-WIP gates and check only the local pause flag
                  (not the shipwright:pause label); a warning naming them goes to stderr.
                  Only this flag enables it (NO_GITHUB is ignored), and it is refused (exit 2)
-                 when GITHUB_ACTIONS=true.
+                 on GitHub Actions (GITHUB_ACTIONS set to anything but empty or "false").
   --json         Print one JSON object: allowed, and each gate's verdict (allowed, blocked,
                  error, skipped or not_checked) and detail. Exit codes are unchanged.
 
@@ -109,12 +109,8 @@ export const gatesCommand: Command = {
       const got = args.join(" ") || "nothing";
       return usageError(io, usage, `Expected check --retry N [--no-github] [--json], got: ${got}`);
     }
-    if (!options.github && env.GITHUB_ACTIONS === "true") {
-      return usageError(io, usage, "no-GitHub mode is not allowed on GitHub Actions");
-    }
-    if (!options.github) {
-      io.err("⚠ no-GitHub mode: not checked: breaker, review WIP, shipwright:pause label");
-    }
+    const unchecked = "breaker, review WIP, shipwright:pause label";
+    if (!options.github && !allowNoGithub(io, usage, env, unchecked)) return 2;
     try {
       const report = await checkDispatchGates(safety(), options);
       if (options.json) renderJson(io, report, options);

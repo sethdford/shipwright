@@ -74,6 +74,21 @@ test("--no-github is refused on GitHub Actions", async () => {
   expect(await run(["check", "--retry", "0"], fakeSafetyPorts(), env).code).toBe(0);
 });
 
+test.each([["TRUE"], ["True"], ["1"]])(
+  "--no-github is refused when GITHUB_ACTIONS=%p",
+  async (v) => {
+    const env = { GITHUB_ACTIONS: v };
+    const { io, code } = run(["check", "--retry", "0", "--no-github"], fakeSafetyPorts(), env);
+    expect(await code).toBe(2);
+    expect(io.errLines[0]).toBe("✗ no-GitHub mode is not allowed on GitHub Actions");
+  },
+);
+
+test("--no-github is allowed when GITHUB_ACTIONS=false", async () => {
+  const env = { GITHUB_ACTIONS: "false" };
+  expect(await run(["check", "--retry", "0", "--no-github"], fakeSafetyPorts(), env).code).toBe(0);
+});
+
 test("a blocked gate carrying a warning shows ✗, not ⚠", async () => {
   const today = Math.floor(NOW / 1000);
   const costs = {

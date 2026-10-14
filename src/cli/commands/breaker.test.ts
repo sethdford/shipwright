@@ -104,7 +104,7 @@ test("--json reports incidentError", async () => {
   expect(JSON.parse(io.outLines[0] as string).incidentError).toBe("HTTP 500");
 });
 
-test("-h works in any position", async () => {
+test("help after a subcommand prints usage", async () => {
   const io = captureIO();
   expect(await breakerCommand.run(["check", "-h"], commandContext(io))).toBe(0);
   expect(io.outLines.join("\n")).toContain("USAGE");
