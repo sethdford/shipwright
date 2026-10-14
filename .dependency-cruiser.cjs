@@ -39,10 +39,18 @@ module.exports = {
     },
     {
       name: "F3-outsiders-via-index",
-      comment: "cli/ and main.ts import a context only through its index.ts.",
+      comment:
+        "Every file outside src/contexts (cli, main.ts, adapters, testing, ...) imports a context only through its index.ts.",
       severity: "error",
-      from: { path: "^src/(cli/|main\\.ts)" },
+      from: { path: "^src/", pathNot: "^src/contexts/" },
       to: { path: "^src/contexts/[^/]+/.+", pathNot: "^src/contexts/[^/]+/index\\.ts$" },
+    },
+    {
+      name: "F3-no-test-fakes-in-production",
+      comment: "Production code must not import src/testing; inject fakes only from tests.",
+      severity: "error",
+      from: { path: "^src/", pathNot: "^src/testing/" },
+      to: { path: "^src/testing/" },
     },
     {
       name: "F4-no-cycles",
