@@ -10,7 +10,7 @@ Global circuit breaker: show it, or check it as a dispatch gate
 
 ```text
 USAGE
-  shipwright breaker <status|check>
+  shipwright breaker <status|check> [--json]
 
 DESCRIPTION
   Global circuit breaker over recent pipeline runs (spec §6.2, ADR-0007). It opens when at
@@ -18,9 +18,18 @@ DESCRIPTION
   allowed; its result closes or re-opens the breaker.
 
 COMMANDS
-  status   Print the breaker state. Never writes. Exits 0.
+  status   Print the breaker state. Never writes. Exits 0, or 1 if the run history cannot be
+           read.
   check    Exit 0 when dispatch is allowed, 1 when it is not or the run history cannot be
            read. While open, opens or updates the one shipwright:incident issue (once per trip).
+
+OPTIONS
+  --json   Print one JSON object: state, allowed, and since, probeAfter, incident,
+           incidentError or error when they apply. Exit codes are unchanged.
+
+NOTES
+  Both commands read GitHub Actions. Without GitHub (--no-github / NO_GITHUB) the standalone
+  check fails closed (exit 1); `shipwright gates check` skips the breaker instead.
 
 EXAMPLES
   shipwright breaker status

@@ -60,3 +60,52 @@ test("--help prints usage and exits 0", async () => {
   const io = captureIO();
   expect(await breakerCommand.run(["--help"], commandContext(io))).toBe(0);
 });
+
+test("an open breaker with a failing incident writer reports it on stderr and exits 1", async () => {
+  const io = captureIO();
+  const github = new RecordingGithubWriter(err({ kind: "failed", message: "HTTP 500" }));
+  const ports = fakeSafetyPorts({ github, runs: fixedRuns(ok(failures)) });
+  expect(await breakerCommand.run(["check"], commandContext(io, ports))).toBe(1);
+  expect(io.outLines).toHaveLength(1);
+  expect(io.errLines).toEqual(["  ✗ incident not recorded: HTTP 500"]);
+});
+
+test("--json prints one object and keeps the exit codes", async () => {
+  const open = fakeSafetyPorts({ runs: fixedRuns(ok(failures)) });
+  const io = captureIO();
+  expect(await breakerCommand.run(["check", "--json"], commandContext(io, open))).toBe(1);
+  expect(io.outLines).toHaveLength(1);
+  expect(JSON.parse(io.outLines[0] as string)).toEqual({
+    state: "open",
+    allowed: false,
+    since: NOW - 60_000,
+    probeAfter: NOW - 60_000 + 30 * 60_000,
+    incident: { issue: 900, action: "created" },
+  });
+
+  const io2 = captureIO();
+  expect(await breakerCommand.run(["--json", "status"], commandContext(io2, open))).toBe(0);
+  expect(JSON.parse(io2.outLines[0] as string).state).toBe("open");
+
+  const io3 = captureIO();
+  const bad = fakeSafetyPorts({ runs: fixedRuns(err({ kind: "auth", message: "HTTP 401" })) });
+  expect(await breakerCommand.run(["status", "--json"], commandContext(io3, bad))).toBe(1);
+  expect(JSON.parse(io3.outLines[0] as string)).toMatchObject({
+    allowed: false,
+    error: "HTTP 401",
+  });
+});
+
+test("--json reports incidentError", async () => {
+  const io = captureIO();
+  const github = new RecordingGithubWriter(err({ kind: "failed", message: "HTTP 500" }));
+  const ports = fakeSafetyPorts({ github, runs: fixedRuns(ok(failures)) });
+  expect(await breakerCommand.run(["check", "--json"], commandContext(io, ports))).toBe(1);
+  expect(JSON.parse(io.outLines[0] as string).incidentError).toBe("HTTP 500");
+});
+
+test("-h works in any position", async () => {
+  const io = captureIO();
+  expect(await breakerCommand.run(["check", "-h"], commandContext(io))).toBe(0);
+  expect(io.outLines.join("\n")).toContain("USAGE");
+});

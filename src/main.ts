@@ -9,22 +9,23 @@ import { FilePauseFlag } from "./adapters/state/file-pause-flag";
 import type { CliIO, Command } from "./cli/command";
 import { commands, findCommand } from "./cli/commands";
 import type { SafetyPorts } from "./contexts/orchestration";
+import { installShutdown } from "./shutdown";
 
 const consoleIO: CliIO = {
   out: (text) => process.stdout.write(`${text}\n`),
   err: (text) => process.stderr.write(`${text}\n`),
 };
 
-// TODO(signals, spec §5, Wave 1): install SIGINT/SIGTERM handlers that call runner.killAll once the
-// first command constructs a BunProcessRunner.
-
 /** Adapters for the safety commands (ADR-0007). */
-export function buildSafetyPorts(env: Readonly<Record<string, string | undefined>>): SafetyPorts {
+export function buildSafetyPorts(
+  env: Readonly<Record<string, string | undefined>>,
+): SafetyPorts & { readonly runner: BunProcessRunner } {
   // Files shared with the bash daemon live in ~/.shipwright, which bash uses even when
   // SHIPWRIGHT_STATE_DIR is set (spec §9); read them where bash writes them.
   const legacyDir = join(resolvePaths(env).home, ".shipwright");
   const runner = new BunProcessRunner();
   return {
+    runner,
     now: () => Date.now(),
     runs: new GhRunHistory(runner),
     pauseFlag: new FilePauseFlag(join(legacyDir, "daemon-pause.flag")),
@@ -54,7 +55,11 @@ export async function main(
   argv: readonly string[],
   io: CliIO = consoleIO,
   registry: readonly Command[] = commands,
-  safety: () => SafetyPorts = once(() => buildSafetyPorts(process.env)),
+  safety: () => SafetyPorts = once(() => {
+    const ports = buildSafetyPorts(process.env);
+    installShutdown(ports.runner, process);
+    return ports;
+  }),
 ): Promise<number> {
   const [name, ...args] = argv;
   if (name === undefined || name === "--help" || name === "-h") {
