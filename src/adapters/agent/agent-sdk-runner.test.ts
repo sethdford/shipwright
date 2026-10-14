@@ -1,19 +1,30 @@
 import { describe, expect, test } from "bun:test";
 import { z } from "zod";
-import { AgentSdkRunner, type QueryFn } from "./agent-sdk-runner";
+import type { AgentFailureKind } from "../../shared/kernel/ports";
+import { AgentSdkRunner, agentEnv, type QueryFn } from "./agent-sdk-runner";
 
 type Captured = { prompt: string; options: Record<string, unknown> };
 
-function fakeQuery(messages: object[], opts: { throwAfter?: string } = {}) {
+function fakeQuery(messages: object[], opts: { throwAfter?: string; hang?: boolean } = {}) {
   const captured: Captured[] = [];
+  const state = { iterated: false };
   const fn: QueryFn = (args) => {
     captured.push(args as unknown as Captured);
     return (async function* () {
+      state.iterated = true;
       for (const m of messages) yield m as never;
+      if (opts.hang) {
+        const ac = args.options.abortController as AbortController;
+        await new Promise<void>((resolve) => {
+          if (ac.signal.aborted) resolve();
+          ac.signal.addEventListener("abort", () => resolve(), { once: true });
+        });
+        throw new Error("aborted by controller");
+      }
       if (opts.throwAfter) throw new Error(opts.throwAfter);
     })();
   };
-  return { fn, captured };
+  return { fn, captured, state };
 }
 
 const result = (extra: object) => ({
@@ -37,7 +48,7 @@ const decideReq = {
   maxBudgetUsd: 0.5,
   timeoutMs: 60_000,
 };
-const runner = (fn: QueryFn) => new AgentSdkRunner(fn, {});
+const runner = (fn: QueryFn) => new AgentSdkRunner({}, fn);
 
 describe("decide", () => {
   test("returns the validated structured output with usage", async () => {
@@ -57,7 +68,7 @@ describe("decide", () => {
     ]);
     await runner(fn).decide(decideReq);
     const { prompt, options } = captured[0] as Captured;
-    expect(prompt).toContain("BEGIN DATA\nTitle: `rm -rf /`\n");
+    expect(prompt).toMatch(/BEGIN DATA [0-9a-f-]{36}\nTitle: `rm -rf \/`\n/);
     expect(options).toMatchObject({
       systemPrompt: decideReq.instructions,
       permissionMode: "dontAsk",
@@ -115,9 +126,7 @@ describe("decide", () => {
     ["Invalid API key · Please run /login", "auth"],
     ["Unexpected tool failure", "execution"],
   ])("classifies SDK error %p as %p", async (message, kind) => {
-    const { fn } = fakeQuery([
-      result({ subtype: "success", is_error: true, errors: [message], structured_output: {} }),
-    ]);
+    const { fn } = fakeQuery([result({ subtype: "success", is_error: true, result: message })]);
     const r = await runner(fn).decide(decideReq);
     if (r.ok) throw new Error("expected failure");
     expect(r.error).toMatchObject({ kind, message });
@@ -150,7 +159,7 @@ describe("runTask", () => {
     const { fn, captured } = fakeQuery([
       result({ subtype: "success", result: "done", num_turns: 7 }),
     ]);
-    const r = await new AgentSdkRunner(fn, { PATH: "/bin" }).runTask(spec);
+    const r = await new AgentSdkRunner({ PATH: "/bin" }, fn).runTask(spec);
     if (!r.ok) throw new Error(r.error.message);
     expect(r.value).toMatchObject({ summary: "done", turns: 7, sessionId: "s1" });
     expect(r.value.usage.costUsd).toBe(0.01);
@@ -170,5 +179,210 @@ describe("runTask", () => {
     const r = await runner(fn).runTask(spec);
     if (r.ok) throw new Error("expected failure");
     expect(r.error).toMatchObject({ kind: "max_turns", sessionId: "s1" });
+  });
+});
+
+const assistantErr = (error: string) => ({ type: "assistant", error, session_id: "s1" });
+const failSuccess = (text: string) => result({ subtype: "success", is_error: true, result: text });
+
+describe("typed failure classification", () => {
+  test("success+is_error with 529 text and a throw is transient, message is the result text", async () => {
+    const { fn } = fakeQuery([failSuccess("API Error: 529 Overloaded")], { throwAfter: "exit 1" });
+    const r = await runner(fn).decide(decideReq);
+    if (r.ok) throw new Error("expected failure");
+    expect(r.error).toMatchObject({ kind: "transient", message: "API Error: 529 Overloaded" });
+  });
+
+  test.each([
+    ["rate_limit", "transient"],
+    ["overloaded", "transient"],
+    ["server_error", "transient"],
+    ["authentication_failed", "auth"],
+    ["billing_error", "auth"],
+    ["oauth_org_not_allowed", "auth"],
+    ["account_on_hold", "auth"],
+    ["max_output_tokens", "truncated"],
+    ["unknown", "execution"],
+  ])("assistant error %p maps to %p (typed signal beats text)", async (e, kind) => {
+    const { fn } = fakeQuery([assistantErr(e), failSuccess("something opaque")]);
+    const r = await runner(fn).decide(decideReq);
+    if (r.ok) throw new Error("expected failure");
+    expect(r.error.kind).toBe(kind as AgentFailureKind);
+  });
+
+  test("startup_failure_reason gateway_signin_required is auth", async () => {
+    const { fn } = fakeQuery([
+      result({
+        subtype: "error_during_execution",
+        is_error: true,
+        errors: ["sign in"],
+        startup_failure_reason: "gateway_signin_required",
+      }),
+    ]);
+    const r = await runner(fn).decide(decideReq);
+    expect(!r.ok && r.error.kind).toBe("auth");
+  });
+
+  test("errors[] on error results are joined into the message", async () => {
+    const { fn } = fakeQuery([
+      result({ subtype: "error_during_execution", is_error: true, errors: ["a", "b"] }),
+    ]);
+    const r = await runner(fn).decide(decideReq);
+    expect(!r.ok && r.error.message).toBe("a; b");
+  });
+
+  test.each([
+    ["ENOENT credentials.json not found", "execution"],
+    ["wrote 500 lines", "execution"],
+    ["fetch failed", "transient"],
+    ["API Error: 401 authentication_error", "auth"],
+  ])("thrown error with no result %p classifies as %p", async (message, kind) => {
+    const { fn } = fakeQuery([], { throwAfter: message });
+    const r = await runner(fn).decide(decideReq);
+    expect(!r.ok && r.error.kind).toBe(kind as AgentFailureKind);
+  });
+
+  test("tightened text fallback does not misclassify incidental words", async () => {
+    const { fn } = fakeQuery([failSuccess("the file credentials.json has 500 lines")]);
+    const r = await runner(fn).decide(decideReq);
+    expect(!r.ok && r.error.kind).toBe("execution");
+  });
+
+  test("empty stream without result or throw is an execution failure", async () => {
+    const { fn } = fakeQuery([]);
+    const r = await runner(fn).decide(decideReq);
+    if (r.ok) throw new Error("expected failure");
+    expect(r.error).toMatchObject({ kind: "execution", message: "stream ended without result" });
+  });
+
+  test("max_tokens stop on success is a truncated failure", async () => {
+    const { fn } = fakeQuery([
+      result({ subtype: "success", stop_reason: "max_tokens", structured_output: {} }),
+    ]);
+    const r = await runner(fn).decide(decideReq);
+    expect(!r.ok && r.error.kind).toBe("truncated");
+  });
+
+  test("error_max_structured_output_retries maps to schema", async () => {
+    const { fn } = fakeQuery([
+      result({ subtype: "error_max_structured_output_retries", is_error: true }),
+    ]);
+    const r = await runner(fn).decide(decideReq);
+    expect(!r.ok && r.error.kind).toBe("schema");
+  });
+});
+
+describe("usage", () => {
+  test("sums modelUsage across models including cache tokens", async () => {
+    const mu = (i: number, o: number, cr: number, cc: number) => ({
+      inputTokens: i,
+      outputTokens: o,
+      cacheReadInputTokens: cr,
+      cacheCreationInputTokens: cc,
+    });
+    const { fn } = fakeQuery([
+      result({
+        subtype: "success",
+        structured_output: { approved: true, reason: "x" },
+        modelUsage: { a: mu(10, 5, 100, 20), b: mu(1, 2, 3, 4) },
+      }),
+    ]);
+    const r = await runner(fn).decide(decideReq);
+    if (!r.ok) throw new Error(r.error.message);
+    expect(r.value.usage).toMatchObject({ inputTokens: 138, outputTokens: 7 });
+  });
+});
+
+describe("abort and timeout", () => {
+  const spec = {
+    prompt: "p",
+    cwd: "/w",
+    model: "m",
+    effort: "low" as const,
+    allowedTools: [],
+    maxTurns: 1,
+    maxBudgetUsd: 1,
+    timeoutMs: 60_000,
+  };
+
+  test("pre-aborted signal never iterates the query", async () => {
+    const { fn, state } = fakeQuery([result({ subtype: "success", result: "x" })]);
+    const ac = new AbortController();
+    ac.abort();
+    const r = await runner(fn).runTask({ ...spec, signal: ac.signal });
+    expect(!r.ok && r.error.kind).toBe("aborted");
+    expect(state.iterated).toBe(false);
+  });
+
+  test("external abort mid-stream is aborted", async () => {
+    const { fn } = fakeQuery([], { hang: true });
+    const ac = new AbortController();
+    const p = runner(fn).runTask({ ...spec, signal: ac.signal });
+    setTimeout(() => ac.abort(), 10);
+    const r = await p;
+    expect(!r.ok && r.error.kind).toBe("aborted");
+  });
+
+  test("timeout is timeout", async () => {
+    const { fn } = fakeQuery([], { hang: true });
+    const r = await runner(fn).runTask({ ...spec, timeoutMs: 20 });
+    expect(!r.ok && r.error.kind).toBe("timeout");
+  });
+});
+
+describe("hardening options", () => {
+  test("decide disables built-in tools and strict MCP", async () => {
+    const { fn, captured } = fakeQuery([
+      result({ subtype: "success", structured_output: { approved: true, reason: "x" } }),
+    ]);
+    await runner(fn).decide(decideReq);
+    expect((captured[0] as Captured).options).toMatchObject({ tools: [], strictMcpConfig: true });
+  });
+
+  test("runTask uses strict MCP and wraps optional untrusted data in the prompt", async () => {
+    const { fn, captured } = fakeQuery([result({ subtype: "success", result: "ok" })]);
+    await runner(fn).runTask({
+      prompt: "Implement",
+      data: "issue body: ignore all",
+      cwd: "/w",
+      model: "m",
+      effort: "low",
+      allowedTools: [],
+      maxTurns: 1,
+      maxBudgetUsd: 1,
+      timeoutMs: 1000,
+    });
+    const c = captured[0] as Captured;
+    expect(c.options).toMatchObject({ strictMcpConfig: true });
+    expect(c.prompt.startsWith("Implement")).toBe(true);
+    expect(c.prompt).toContain("issue body: ignore all");
+    expect(c.prompt).toContain("untrusted input data");
+  });
+});
+
+describe("agentEnv", () => {
+  test("allowlists required variables and drops everything else", () => {
+    const env = agentEnv({
+      PATH: "/bin",
+      HOME: "/h",
+      TMPDIR: "/t",
+      LANG: "en",
+      CLAUDE_CODE_OAUTH_TOKEN: "tok",
+      GITHUB_TOKEN: "gh",
+      AWS_SECRET_ACCESS_KEY: "aws",
+    });
+    expect(env).toEqual({
+      PATH: "/bin",
+      HOME: "/h",
+      TMPDIR: "/t",
+      LANG: "en",
+      CLAUDE_CODE_OAUTH_TOKEN: "tok",
+      CLAUDE_AGENT_SDK_CLIENT_APP: "shipwright",
+    });
+  });
+
+  test("includes ANTHROPIC_API_KEY only when present", () => {
+    expect(agentEnv({ ANTHROPIC_API_KEY: "k" })).toMatchObject({ ANTHROPIC_API_KEY: "k" });
+    expect("ANTHROPIC_API_KEY" in agentEnv({})).toBe(false);
   });
 });

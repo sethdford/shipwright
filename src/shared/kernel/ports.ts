@@ -87,6 +87,7 @@ export type AgentFailureKind =
   | "max_turns"
   | "budget"
   | "schema"
+  | "truncated"
   | "timeout"
   | "aborted"
   | "transient"
@@ -126,7 +127,10 @@ export interface Decision<T> {
 }
 
 export interface TaskSpec {
+  /** Trusted instructions written by Shipwright. */
   readonly prompt: string;
+  /** Untrusted input (issue text, PR bodies); appended to the prompt as inert data. */
+  readonly data?: string;
   readonly cwd: string;
   readonly model: string;
   readonly effort: Effort;
