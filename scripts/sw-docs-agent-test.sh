@@ -14,6 +14,7 @@ setup_env() {
     mkdir -p "$TEST_TEMP_DIR/home/.claude"
     mkdir -p "$TEST_TEMP_DIR/repo/scripts"
     mkdir -p "$TEST_TEMP_DIR/repo/.claude"
+    mkdir -p "$TEST_TEMP_DIR/repo/docs/reference"
     if command -v jq &>/dev/null; then
         ln -sf "$(command -v jq)" "$TEST_TEMP_DIR/bin/jq"
     fi
@@ -81,7 +82,7 @@ show_help() { echo "Usage: ${name}"; }
 SCRIPT
     done
 
-    cat > "$TEST_TEMP_DIR/repo/.claude/CLAUDE.md" <<'DOC'
+    cat > "$TEST_TEMP_DIR/repo/docs/reference/legacy-guide.md" <<'DOC'
 # Test CLAUDE.md
 pipeline and daemon are documented here.
 <!-- AUTO:test-section -->

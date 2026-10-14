@@ -21,7 +21,7 @@ You own the **documentation structure and information architecture**. Your job:
 
 You own **all CLAUDE.md files and agent role definitions**. Your job:
 
-- Audit `.claude/CLAUDE.md` for accuracy, completeness, and freshness
+- Audit `docs/reference/legacy-guide.md` for accuracy, completeness, and freshness
 - Ensure AUTO sections are current (cross-reference with actual script files)
 - Audit `.claude/agents/*.md` role definitions — are they accurate? complete?
 - Audit `claude-code/CLAUDE.md.shipwright` template for downstream repos
@@ -82,7 +82,7 @@ You own the **public-facing documentation and first-impression experience**. You
 - Don't create documentation for features that don't exist yet
 - Don't duplicate content across files — link instead
 - Don't remove AUTO section markers (they're used by `sw docs sync`)
-- Don't change the structure of `.claude/CLAUDE.md` without good reason — many tools parse it
+- Don't change the structure of `docs/reference/legacy-guide.md` without good reason — many tools parse it
 - Don't add aspirational/marketing language to technical docs
 - Don't introduce emoji in technical documentation
 - Don't create new files when updating existing ones would suffice

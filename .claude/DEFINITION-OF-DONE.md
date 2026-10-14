@@ -28,7 +28,7 @@ Autonomous agents must verify all items before marking a task complete.
 
 ## Documentation
 
-- [ ] **CLAUDE.md Updated**: If behavior changes, update `.claude/CLAUDE.md`
+- [ ] **CLAUDE.md Updated**: If behavior changes, update `docs/reference/legacy-guide.md`
 - [ ] **Inline Comments**: Complex logic (jq filters, state machine transitions) has comments explaining intent
 - [ ] **Function Headers**: New functions include 1-2 line description of purpose
 - [ ] **CLI Help**: New commands registered in `scripts/sw` main() case statement with brief description

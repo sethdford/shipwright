@@ -105,11 +105,11 @@ cmd_audit() {
     # --- Check 2: CLAUDE.md freshness
     info "Checking CLAUDE.md freshness..."
     total_checks=$((total_checks + 1))
-    if [[ -f "${REPO_DIR}/.claude/CLAUDE.md" ]]; then
+    if [[ -f "${REPO_DIR}/docs/reference/legacy-guide.md" ]]; then
         local claude_age_days=0
         if command -v stat >/dev/null 2>&1; then
             local claude_mtime
-            claude_mtime=$(file_mtime "${REPO_DIR}/.claude/CLAUDE.md")
+            claude_mtime=$(file_mtime "${REPO_DIR}/docs/reference/legacy-guide.md")
             local now_epoch_val
             now_epoch_val=$(date +%s)
             claude_age_days=$(( (now_epoch_val - claude_mtime) / 86400 ))
@@ -122,7 +122,7 @@ cmd_audit() {
             success "CLAUDE.md is fresh (${claude_age_days} days old)"
         fi
     else
-        warn "No .claude/CLAUDE.md found"
+        warn "No docs/reference/legacy-guide.md found"
         issues_found=$((issues_found + 1))
     fi
 
@@ -340,8 +340,8 @@ cmd_launch() {
                 agent_focus="docs/ .claude/ README.md STRATEGY.md"
                 ;;
             claude-md)
-                agent_goal="Audit all CLAUDE.md files and agent role definitions. Ensure AUTO sections are current, command tables accurate, development guidelines match reality. Remove stale content. Focus: .claude/CLAUDE.md, .claude/agents/, claude-code/"
-                agent_focus=".claude/CLAUDE.md .claude/agents/ claude-code/"
+                agent_goal="Audit all CLAUDE.md files and agent role definitions. Ensure AUTO sections are current, command tables accurate, development guidelines match reality. Remove stale content. Focus: docs/reference/legacy-guide.md, .claude/agents/, claude-code/"
+                agent_focus="docs/reference/legacy-guide.md .claude/agents/ claude-code/"
                 ;;
             strategy-curator)
                 agent_goal="Audit strategic docs — STRATEGY.md, AGI-PLATFORM-PLAN.md, AGI-WHATS-NEXT.md, PLATFORM-TODO-BACKLOG.md, docs/strategy/. Mark completed items done, update metrics, remove aspirational content that is now reality. Focus: STRATEGY.md, docs/AGI-*, docs/PLATFORM-*, docs/strategy/"
@@ -596,7 +596,7 @@ cmd_manifest() {
             audiences: ["user", "contributor", "agent", "stakeholder", "operator"],
             structure: {
                 root: ["README.md", "STRATEGY.md", "CHANGELOG.md"],
-                claude: [".claude/CLAUDE.md", ".claude/agents/"],
+                claude: ["docs/reference/legacy-guide.md", ".claude/agents/"],
                 docs: ["docs/strategy/", "docs/patterns/", "docs/tmux-research/"],
                 config: ["docs/config-policy.md", "config/policy.json"]
             }

@@ -475,7 +475,7 @@ shipwright upgrade --apply
 shipwright --help
 ```
 
-See [.claude/CLAUDE.md](.claude/CLAUDE.md) for the complete 100+ command reference organized by workflow. Full documentation: [https://sethdford.github.io/shipwright](https://sethdford.github.io/shipwright).
+See [docs/reference/legacy-guide.md](docs/reference/legacy-guide.md) for the complete 100+ command reference organized by workflow. Full documentation: [https://sethdford.github.io/shipwright](https://sethdford.github.io/shipwright).
 
 ## Pipeline Templates for Teams
 

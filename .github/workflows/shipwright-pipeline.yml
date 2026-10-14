@@ -538,10 +538,14 @@ jobs:
           echo ""
 
           # Verify CLAUDE.md is present for build agent context
-          if [[ -f ".claude/CLAUDE.md" ]]; then
-            echo "CLAUDE.md: present ($(wc -l < .claude/CLAUDE.md) lines)"
+          claude_md=""
+          for f in CLAUDE.md .claude/CLAUDE.md AGENTS.md; do
+            if [[ -f "$f" ]]; then claude_md="$f"; break; fi
+          done
+          if [[ -n "$claude_md" ]]; then
+            echo "Agent instructions: $claude_md ($(wc -l < "$claude_md") lines)"
           else
-            echo "WARNING: .claude/CLAUDE.md not found — build agent will lack project context"
+            echo "WARNING: no CLAUDE.md, .claude/CLAUDE.md or AGENTS.md — build agent will lack project context"
           fi
 
           # Verify claude-code can find the project

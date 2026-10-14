@@ -377,6 +377,6 @@ SVG uses a 32x32 viewBox. No gradient fills in the logo mark — solid `--cyan` 
 4. `skipper/crates/skipper-api/static/css/components.css` — Updated component styles
 5. `skipper/crates/skipper-api/static/index_head.html` — Remove Google Fonts import
 6. `dashboard/public/` — Shipwright dashboard styles
-7. `.claude/CLAUDE.md` — Update color references
+7. `docs/reference/legacy-guide.md` — Update color references
 8. `README.md` — Update badge colors
 9. Shell scripts — Update ANSI color helpers if needed

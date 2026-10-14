@@ -1092,7 +1092,7 @@ shipwright docs wiki       # Generate/update GitHub wiki pages
 shipwright docs report     # Show documentation freshness report
 ```
 
-AUTO sections in `.claude/CLAUDE.md`: `core-scripts`, `github-modules`, `tracker-adapters`, `test-suites`, `feature-flags`, `runtime-state`. The daemon patrol auto-syncs stale sections. A GitHub Actions workflow (`shipwright-docs.yml`) runs on push to main and weekly.
+AUTO sections in `docs/reference/legacy-guide.md`: `core-scripts`, `github-modules`, `tracker-adapters`, `test-suites`, `feature-flags`, `runtime-state`. The daemon patrol auto-syncs stale sections. A GitHub Actions workflow (`shipwright-docs.yml`) runs on push to main and weekly.
 
 ## Context Engineering & Token Optimization
 

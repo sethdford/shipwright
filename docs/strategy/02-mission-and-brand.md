@@ -581,7 +581,7 @@ This document will evolve. Update it when:
 ## References & Related Documents
 
 - **README.md** — Overview and quick start
-- **.claude/CLAUDE.md** — Technical architecture and development guidelines
+- **docs/reference/legacy-guide.md** — Technical architecture and development guidelines
 - **DORA metrics dashboard** — Measuring delivery performance
 - **Daemon configuration** — Intelligence layer feature flags
 - **Community issue template** — How users request features

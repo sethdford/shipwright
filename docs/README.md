@@ -11,7 +11,7 @@ Navigation hub for all Shipwright docs. Start here or jump to a section.
 | [../README.md](../README.md)                 | Project overview, quick start, features             |
 | [../STRATEGY.md](../STRATEGY.md)             | Vision, priorities, technical principles            |
 | [../CHANGELOG.md](../CHANGELOG.md)           | Version history                                     |
-| [../.claude/CLAUDE.md](../.claude/CLAUDE.md) | 100+ commands, architecture, development guidelines |
+| [reference/legacy-guide.md](reference/legacy-guide.md) | 100+ commands, architecture, development guidelines |
 
 ---
 
