@@ -6,3 +6,7 @@
 /.dependency-cruiser.dashboard.cjs @sethdford
 /package.json                     @sethdford
 /.github/CODEOWNERS               @sethdford
+/.github/workflows/ts-check.yml   @sethdford
+/docs/architecture.md             @sethdford
+/dashboard/tsconfig.server.json   @sethdford
+/src/adapters/agent/privilege-guard.ts @sethdford
