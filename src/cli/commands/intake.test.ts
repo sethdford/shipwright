@@ -40,13 +40,45 @@ test("an unreadable issue list blocks (exit 1)", async () => {
   expect(await intakeCommand.run(["check"], commandContext(io, ports))).toBe(1);
 });
 
-test("an issue list that cannot be trusted never prints its titles", async () => {
+test("titles are never printed, on success, block or error paths", async () => {
+  const secret = "SECRETTITLE\u001b]0;pwned\u0007";
+  const rows = [{ number: 7, title: secret, labels: ["auto-patrol"] }];
+  const cases: [string[], ReturnType<typeof fakeSafetyPorts>][] = [
+    [["check", "--title", "other"], fakeSafetyPorts({ issues: fixedIssues(ok(rows)) })],
+    [["check", "--title", "secrettitle"], fakeSafetyPorts({ issues: fixedIssues(ok(rows)) })],
+    [
+      ["check", "--title", "x"],
+      fakeSafetyPorts({ issues: fixedIssues(err({ kind: "failed", message: "boom" })) }),
+    ],
+  ];
+  for (const [args, ports] of cases) {
+    const io = captureIO();
+    await intakeCommand.run(args, commandContext(io, ports));
+    const all = [...io.outLines, ...io.errLines].join("\n");
+    expect(all).not.toContain("SECRETTITLE");
+    expect(all).not.toContain("pwned");
+    // biome-ignore lint/suspicious/noControlCharactersInRegex: asserting none are printed
+    expect(all).not.toMatch(/[\u0000-\u0008\u000b-\u001f\u007f]/);
+  }
+});
+
+test("--label chooses the auto label", async () => {
   const io = captureIO();
-  const rows = [{ number: 7, title: "evil\u001b]0;pwned\u0007", labels: ["auto-patrol"] }];
+  const rows = [{ number: 1, title: "a", labels: ["bot-filed"] }];
   const ports = fakeSafetyPorts({ issues: fixedIssues(ok(rows)) });
-  await intakeCommand.run(["check", "--title", "evil"], commandContext(io, ports));
-  // biome-ignore lint/suspicious/noControlCharactersInRegex: asserting none are printed
-  expect(io.outLines.join("\n")).not.toMatch(/[\u0000-\u0008\u000b-\u001f\u007f]/);
+  const args = ["check", "--label", "bot-filed", "--title", "new"];
+  expect(await intakeCommand.run(args, commandContext(io, ports))).toBe(0);
+  expect(io.outLines).toEqual(["✓ intake: 1 of 25 open auto-patrol issues"]);
+});
+
+test.each([
+  [["check", "--label", ""]],
+  [["check", "--label"]],
+  [["check", "--label", "a\u0007b"]],
+  [["check", "--label", "x".repeat(51)]],
+  [["check", "--label", "a", "--label", "b"]],
+])("bad label arguments %p exit 2", async (args) => {
+  expect(await intakeCommand.run(args, commandContext(captureIO()))).toBe(2);
 });
 
 test.each([

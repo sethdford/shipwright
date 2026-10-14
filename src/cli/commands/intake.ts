@@ -3,7 +3,7 @@ import type { Command } from "../command";
 import { adapterFailure, isHelp, usageError } from "../shared";
 
 const usage = `USAGE
-  shipwright intake check [--title TITLE]
+  shipwright intake check [--title TITLE] [--label LABEL]
 
 DESCRIPTION
   Issue intake caps (spec §6.2, ADR-0007), consulted before automation files an issue.
@@ -13,16 +13,35 @@ DESCRIPTION
   bad arguments. Issue titles are never printed.
 
 OPTIONS
-  --title TITLE   Title of the issue about to be filed
+  --title TITLE   Title of the issue about to be filed. A title with no letters or digits is
+                  never treated as a duplicate.
+  --label LABEL   Label marking auto-filed issues (default auto-patrol; 1-50 printable chars)
 
 EXAMPLES
   shipwright intake check --title "Security: lodash 4.17.20 in package-lock"`;
 
-/** The --title value, null when absent, or undefined when the arguments are malformed. */
-function parseTitle(rest: readonly string[]): string | null | undefined {
-  if (rest.length === 0) return null;
-  if (rest.length !== 2 || rest[0] !== "--title") return undefined;
-  return rest[1]?.trim() ? rest[1] : undefined;
+interface IntakeArgs {
+  readonly title: string | null;
+  readonly label?: string;
+}
+
+// biome-ignore lint/suspicious/noControlCharactersInRegex: rejecting control characters
+const CONTROL = /[\u0000-\u001f\u007f-\u009f\u2028\u2029]/;
+
+/** Parsed `--title` and `--label` options, or undefined when the arguments are malformed. */
+function parseArgs(rest: readonly string[]): IntakeArgs | undefined {
+  let title: string | null = null;
+  let label: string | undefined;
+  for (let i = 0; i < rest.length; i += 2) {
+    const value = rest[i + 1];
+    if (value === undefined) return undefined;
+    if (rest[i] === "--title" && title === null && value.trim()) title = value;
+    else if (rest[i] === "--label" && label === undefined && value.length <= 50) {
+      if (!value.trim() || CONTROL.test(value)) return undefined;
+      label = value;
+    } else return undefined;
+  }
+  return { title, label };
 }
 
 export const intakeCommand: Command = {
@@ -36,11 +55,15 @@ export const intakeCommand: Command = {
       io.out(usage);
       return 0;
     }
-    const title = parseTitle(rest);
-    if (sub !== "check" || title === undefined) {
-      return usageError(io, usage, "Expected: check [--title TITLE] (TITLE must not be empty)");
+    const parsed = parseArgs(rest);
+    if (sub !== "check" || parsed === undefined) {
+      return usageError(
+        io,
+        usage,
+        "Expected: check [--title TITLE] [--label LABEL] (values must be valid and non-empty)",
+      );
     }
-    const r = await checkIntake(safety(), title);
+    const r = await checkIntake(safety(), parsed.title, parsed.label);
     if (!r.ok) return adapterFailure(io, "intake", r.error);
     io.out(`${r.value.allowed ? "✓" : "✗"} intake: ${describeIntake(r.value)}`);
     return r.value.allowed ? 0 : 1;

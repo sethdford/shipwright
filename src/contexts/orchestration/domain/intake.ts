@@ -24,9 +24,11 @@ export interface IntakeVerdict {
   readonly duplicateOf: number | null;
 }
 
+// Deliberately errs toward under-filing: near-duplicate titles merge into one fingerprint.
 /**
  * NFKC-normalised, lowercase, every run of numbers as 0, everything but letters and numbers
  * (punctuation, whitespace, control and bidi characters) as one space. Titles are untrusted.
+ * A title with no letters or digits fingerprints to "", which never counts as a duplicate.
  */
 export function titleFingerprint(title: string): string {
   return title

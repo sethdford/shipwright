@@ -50,3 +50,10 @@ test("blocks at the cap of open auto-filed issues, with or without a title", () 
   expect(evaluateIntake(open, null, policy)).toMatchObject({ allowed: false, openAuto: 2 });
   expect(evaluateIntake(open.slice(1), null, policy).allowed).toBe(true);
 });
+
+test("titles with no letters or digits are never duplicates of each other", () => {
+  const open = [issue(1, "!!!"), issue(2, "   "), issue(3, "—— ··")];
+  expect(titleFingerprint("!!! ——")).toBe("");
+  expect(evaluateIntake(open, "???", policy)).toMatchObject({ allowed: true, duplicateOf: null });
+  expect(evaluateIntake(open, "!!!", policy)).toMatchObject({ allowed: true, duplicateOf: null });
+});

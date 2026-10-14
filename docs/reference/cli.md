@@ -126,7 +126,7 @@ Issue intake caps: may automation file this issue?
 
 ```text
 USAGE
-  shipwright intake check [--title TITLE]
+  shipwright intake check [--title TITLE] [--label LABEL]
 
 DESCRIPTION
   Issue intake caps (spec §6.2, ADR-0007), consulted before automation files an issue.
@@ -136,7 +136,9 @@ DESCRIPTION
   bad arguments. Issue titles are never printed.
 
 OPTIONS
-  --title TITLE   Title of the issue about to be filed
+  --title TITLE   Title of the issue about to be filed. A title with no letters or digits is
+                  never treated as a duplicate.
+  --label LABEL   Label marking auto-filed issues (default auto-patrol; 1-50 printable chars)
 
 EXAMPLES
   shipwright intake check --title "Security: lodash 4.17.20 in package-lock"
