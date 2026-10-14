@@ -14,11 +14,14 @@ be fixed first. F9 was a "follow now" rule with no check, and a rule an agent ca
 ## Decision
 Everything that runs gets fitness functions in `bun run arch`, each with a message naming the fix:
 - `src/`: F5 also catches evasion (aliased globals, `globalThis?.x`, computed imports, `eval`,
-  `node:os`). F9 is enforced statically (bypass spellings, token names, literal `env:` and
-  `permissionMode` on SDK calls) and at run time (`assertAgentOptions`).
+  `node:os`). F9 is enforced statically (bypass spellings, token names, one module that imports the
+  SDK's `query` as a value, and each `query` call's options: an `env:` literal or a variable, a
+  literal `permissionMode`) and at run time (`assertAgentOptions`, which allowlists option keys and
+  requires `permissionMode: "dontAsk"`).
 - Bash in `scripts/`, hooks, completions and `install.sh` (ast-grep's Bash grammar): F11 code
   injection, F9 bypass flags and token scrubbing for `claude`, F10 GitHub writes.
-- `dashboard/` (F12): its own dependency-cruiser layering (D1–D4) and a subprocess allowlist.
+- `dashboard/` (F12): its own dependency-cruiser layering (D1–D4), a subprocess allowlist, and no
+  import or export of an allowlisted service's raw command runner.
 
 Where existing code violates a rule, the rule is a **ratchet**, never a warning: `severity: off` with
 `metadata: { ratchet: true }`. `tools/arch/ast-scan.ts` runs every ast-grep rule over the files git
@@ -36,11 +39,37 @@ every allowlist, and forbids `ast-grep-ignore`; every dependency-cruiser rule mu
 ## Consequences
 - An agent cannot add an `eval`, a `bash -c "$x"`, a bypass flag, a `gh` write or a
   `child_process` call to the ratcheted code, and porting a script shrinks the baseline.
-- Suppression is not an option for agents: there is no in-place ignore, and widening an allowlist,
+- Suppression is not an option for agents: there is no in-place ignore (no `ast-grep-ignore` marker in
+  any file a rule covers; `docs/` and root files outside the rules are not scanned), and widening an allowlist,
   raising a baseline or turning a rule off edits a CODEOWNERS file the maintainer must approve
   (once "require review from code owners" is on for `main`).
 - Renaming a file with ratcheted findings needs a reviewed baseline edit.
 - A ratchet counts, it does not locate: a fix can hide a new finding in the same file.
 - The rules are syntactic: data reaching a shell through a file or a function argument, or a
   GraphQL mutation held in a variable, is not caught.
-- `bun run arch` gains about 1.5 s (a second dependency-cruiser run, one scan of all rules).
+- `bun run arch` gains about 0.7 s (a second dependency-cruiser run, one scan of all rules). The
+  first estimate of 1.5 s was wrong; an independent verifier measured 0.7 s.
+
+### Known evasions (follow-up)
+
+Found by an independent verifier or in review, not yet closed. Each is a gap in a rule, not a
+decision to allow the pattern.
+- F5 misses `node:vm`, `node:module` `createRequire`, `bun:ffi`, `import.meta.require`,
+  `window`/`self` `["fetch"]` and the `Function` constructor reached through a value.
+- The meta-test pins a rule's `ignores` but not its `files`, so narrowing `files` passes it.
+- `ARCH_STEPS` is a substring check: a step followed by `|| true` still passes.
+- `.github/CODEOWNERS` does not cover the other `.github/workflows/*.yml` files or `scripts/postinstall.mjs`,
+  which no rule scans.
+- Bash F9, F10 and F11 are evaded by quoting, absolute paths (`/usr/bin/gh`), a `command` prefix,
+  variables, heredocs, pipes into an interpreter held in a variable, and `curl` to `api.github.com`
+  with a write method.
+- Dashboard: the subprocess rule misses `Bun` aliasing, `Reflect.get`, `import {$ as sh}`,
+  `createRequire` and a `require` built by concatenation. D2 checks direct imports only, and the
+  raw-runner rule does not see a dynamic `import()` of `claims.ts`.
+- F9 options: a variable passed as `options` is checked at run time only, and `env` values from a
+  variable are checked for GitHub token names at run time only. The runner's
+  `settingSources: ["project"]` reads the repo's own `.claude/settings.json`, which can set
+  `permissions`. The runner passes `permissionMode: "dontAsk"` explicitly, but that it overrides a
+  project's `defaultMode` has not been verified against the SDK.
+- `bun run check` has no `--against`: the baseline comparison runs only in PR CI.
+- `scripts/postinstall.mjs` is not scanned.

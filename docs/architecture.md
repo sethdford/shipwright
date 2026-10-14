@@ -63,10 +63,10 @@ The current import graph is generated: [`docs/reference/dependency-graph.md`](re
 | F6 | The Agent SDK is imported only by `adapters/agent/` | ast-grep |
 | F7 | Files ≤ 300 lines, functions ≤ 40; the baseline may only shrink | size ratchet |
 | F8 | Tests use `createTestEnv()` paths, never the real home or environment | ast-grep |
-| F9 | No permission-bypass spelling (substring, template or `+` pieces) and no GitHub token name in `src/` or `dashboard/` (tests, `adapters/github` and `adapters/agent/privilege-guard.ts` excepted); SDK calls pass a literal `env:` and a literal `permissionMode`; `assertAgentOptions()` refuses both at run time; `agentEnv()` drops the tokens. Bash: bypass flags and `claude` without `env -u GH_TOKEN -u GITHUB_TOKEN`, ratcheted | ast-grep, unit tests, findings ratchet |
+| F9 | No permission-bypass spelling (in one string, template or `+` chain of literals) and no GitHub token name in `src/` or `dashboard/` (tests, `adapters/github` and `adapters/agent/privilege-guard.ts` excepted). Only `adapters/agent/agent-sdk-runner.ts` imports the SDK as a value, so `query` has one call site. Each `query` call takes options that are an `env:` literal from `agentEnv()` or a variable, with a literal `permissionMode`. `assertAgentOptions()` allowlists option keys, requires `permissionMode: "dontAsk"` and refuses GitHub tokens in the env, and the runner asserts the same object it passes to `query`. `agentEnv()` drops the tokens. Bash: bypass flags and `claude` without `env -u GH_TOKEN -u GITHUB_TOKEN`, ratcheted | ast-grep, unit tests, findings ratchet |
 | F10 | `gh` write subcommands only in `src/adapters/github/gh-github-writer.ts`. Bash (`gh` writes, `gh api` writes, `git push`): ratcheted | ast-grep, findings ratchet |
 | F11 | Bash: no `eval`/`command eval`/`source /dev/stdin <<<` with an expansion; no `sh -c`, `"$SHELL" -c`, `python -c`, `node -e`, here-string into a shell or `ssh host "cmd $x"` built from data; no download run as code; no `${{` | ast-grep (Bash), findings ratchet |
-| F12 | Dashboard: browser bundle and server never import each other and neither imports `src/` (D1); `services/` is the bottom layer (D2); routes never import `server.ts` or each other (D3); no cycles (D4); processes are spawned only by allowlisted services; no shell command built from request data (`dashboard-no-shell-from-data`, ADR-0007) | dependency-cruiser, ast-grep, findings ratchet |
+| F12 | Dashboard: browser bundle and server never import each other and neither imports `src/` (D1); `services/` is the bottom layer (D2); routes never import `server.ts` or each other (D3); no cycles (D4); processes are spawned only by allowlisted services, and an allowlisted service's raw command runner (`defaultRunner` in `claims.ts`) is never imported or exported; no shell command built from request data (`dashboard-no-shell-from-data`, ADR-0007) | dependency-cruiser, ast-grep, findings ratchet |
 
 Bash rules cover `scripts/**/*.sh`, `scripts/sw`, `.claude/hooks`, `claude-code/hooks`,
 `completions/*.bash` and `install.sh`.
@@ -78,16 +78,20 @@ Bash rules cover `scripts/**/*.sh`, `scripts/sw`, `.claude/hooks`, `claude-code/
 count that dropped without tightening the baseline. A rule that reaches zero keeps an empty entry,
 which fails the meta-test until the rule is promoted to `severity: error`. In CI,
 `--against origin/<base>` also fails when this baseline or `arch-baseline.json` gained an entry or a
-count against the merge base, so a baseline cannot be raised in the same PR that adds the debt.
+count against the merge base, so a baseline cannot be raised in the same PR that adds the debt. A rule
+key that the merge-base baseline has and HEAD lacks also fails (a rename or removal would launder its
+debt); a rule keeps its key, empty when it reaches zero.
 
 **Meta-checks** ([`meta.test.ts`](../tools/arch/meta.test.ts),
 [`depcruise-rules.test.ts`](../tools/arch/depcruise-rules.test.ts)): every ast-grep rule has a rule
 test with valid and invalid cases, a message that starts with its family and names a fix, an owner,
 a docs anchor here, and `files` that match a tracked file; the rule set, the ratcheted set and every
-allowlist (`ignores`) are pinned; no `ast-grep-ignore` comment exists; every dependency-cruiser rule
+allowlist (`ignores`) are pinned; no `ast-grep-ignore` comment exists in any file a rule covers (the
+rules' `files` globs: `src/`, `dashboard/`, `scripts/`, the Bash hooks and completions, `install.sh`, the
+rule tests; `docs/` is not scanned); every dependency-cruiser rule
 fires on a fixture; `bun run arch` runs every checker. [`CODEOWNERS`](../.github/CODEOWNERS) puts
-`tools/arch/`, `sgconfig.yml`, the dependency-cruiser configs and `package.json` under the
-maintainer's review.
+`tools/arch/`, `sgconfig.yml`, the dependency-cruiser configs, `package.json`, the TS check workflow,
+this doc, `dashboard/tsconfig.server.json` and `privilege-guard.ts` under the maintainer's review.
 
 F10 in full (run-scoped writes from Wave 1b; every integration by the end of Wave 2): GitHub side
 effects go only through the fenced, idempotent `integrations` adapter, with an `IdempotencyKey` and a
