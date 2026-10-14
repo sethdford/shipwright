@@ -5,6 +5,7 @@ export {
   RUN_HISTORY_LIMIT,
 } from "./application/breaker";
 export { checkBudget } from "./application/budget";
+export { checkIntake } from "./application/intake";
 export { type PauseOptions, pause, readPause, resume } from "./application/pause";
 export {
   type BreakerPolicy,
@@ -34,6 +35,15 @@ export {
   type WipVerdict,
 } from "./domain/flow";
 export {
+  DEFAULT_INTAKE_POLICY,
+  describeIntake,
+  evaluateIntake,
+  type IntakePolicy,
+  type IntakeVerdict,
+  type IssueSummary,
+  titleFingerprint,
+} from "./domain/intake";
+export {
   type LocalPause,
   PAUSE_LABEL,
   type PauseStatus,
@@ -42,6 +52,7 @@ export {
 } from "./domain/pause";
 export type {
   CostLedger,
+  OpenIssues,
   PauseFlag,
   PauseLabel,
   PullRequests,

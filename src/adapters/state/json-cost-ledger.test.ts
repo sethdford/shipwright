@@ -39,7 +39,6 @@ test("reads the files sw-cost.sh writes", async () => {
         ts: "t",
         ts_epoch: 1760400000,
       },
-      { cost_usd: "oops", ts_epoch: 1760400001 },
     ],
     summary: {},
   });
@@ -68,4 +67,48 @@ test("a corrupt budget file is an error, not 'unlimited'", async () => {
   writeFileSync(join(env.stateDir, "budget.json"), "{not json");
   const r = await new JsonCostLedger(env.stateDir).read();
   expect(!r.ok && r.error.kind).toBe("failed");
+});
+
+const failed = async () => {
+  const r = await new JsonCostLedger((env as TestEnv).stateDir).read();
+  return !r.ok && r.error.kind === "failed" ? r.error.message : null;
+};
+
+test.each([[[]], [{}], [{ entrees: [] }], [null]])(
+  "a costs.json that is not {entries: [...]} (%p) is an error, not 'no spend'",
+  async (costs) => {
+    env = createTestEnv();
+    write("budget.json", { daily_budget_usd: 25, enabled: true });
+    write("costs.json", costs);
+    expect(await failed()).toContain("costs.json");
+  },
+);
+
+test("a budget.json holding JSON null is an error, not a missing file", async () => {
+  env = createTestEnv();
+  write("budget.json", null);
+  expect(await failed()).toContain("budget.json");
+});
+
+test("a malformed entry is an error naming its index", async () => {
+  env = createTestEnv();
+  write("costs.json", {
+    entries: [
+      { cost_usd: 1, ts_epoch: 1 },
+      { cost_usd: "oops", ts_epoch: 2 },
+    ],
+  });
+  expect(await failed()).toMatch(/entries.*1/);
+});
+
+test("a negative cost is an error", async () => {
+  env = createTestEnv();
+  write("costs.json", { entries: [{ cost_usd: -1, ts_epoch: 1 }] });
+  expect(await failed()).toContain("costs.json");
+});
+
+test("a negative daily budget is an error, not unlimited", async () => {
+  env = createTestEnv();
+  write("budget.json", { daily_budget_usd: -5, enabled: true });
+  expect(await failed()).toContain("budget.json");
 });

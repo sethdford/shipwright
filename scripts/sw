@@ -635,6 +635,9 @@ main() {
         budget)
             run_ts budget "$@"
             ;;
+        intake)
+            run_ts intake "$@"
+            ;;
         *)
             error "Unknown command: ${cmd}"
             echo ""

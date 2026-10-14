@@ -871,5 +871,14 @@
     "parity": null,
     "status": "parity-green",
     "notes": "New in Wave 1a (spec §6.2 budget guard); reads the files sw-cost.sh writes. No cost files (CI) reports no data and is not enforced."
+  },
+  {
+    "command": "intake",
+    "aliases": [],
+    "script": "sw-intake.sh",
+    "context": "orchestration",
+    "parity": null,
+    "status": "parity-green",
+    "notes": "New in Wave 1a (spec §6.2 patrol hygiene): cap and title-fingerprint dedupe; a gate (exit 0 only when filing is allowed)."
   }
 ]

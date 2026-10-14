@@ -21,7 +21,12 @@ export interface BudgetVerdict {
    * passes but nothing was checked, and every report says so. Absent otherwise.
    */
   readonly noData?: true;
+  /** Set when the ledger is full and starts today, so today's spend may be undercounted. */
+  readonly truncated?: true;
 }
+
+/** `sw-cost.sh` keeps only the newest 1000 entries in costs.json. */
+export const LEDGER_CAPACITY = 1000;
 
 export function utcDayStartEpochS(nowMs: number): number {
   const d = new Date(nowMs);
@@ -42,6 +47,18 @@ export function evaluateBudget(
   if (budget === null) {
     return { allowed: true, limitUsd: null, spentTodayUsd, remainingUsd: null };
   }
+  // A full ledger whose oldest kept entry is already today has dropped older entries of today,
+  // so the total is only a lower bound: block rather than guess.
+  const oldest = entries.reduce((m, e) => Math.min(m, e.atEpochS), Number.POSITIVE_INFINITY);
+  if (entries.length >= LEDGER_CAPACITY && oldest >= since) {
+    return {
+      allowed: false,
+      limitUsd: budget.limitUsd,
+      spentTodayUsd,
+      remainingUsd: budget.limitUsd - spentTodayUsd,
+      truncated: true,
+    };
+  }
   return {
     allowed: spentTodayUsd + estimateUsd < budget.limitUsd,
     limitUsd: budget.limitUsd,
@@ -56,6 +73,7 @@ export function describeBudget(v: BudgetVerdict): string {
   if (v.noData) {
     return "no cost data (no budget.json or costs.json found); budget not enforced";
   }
+  if (v.truncated) return "cost ledger truncated today; spend unknown";
   if (v.limitUsd === null || v.remainingUsd === null) {
     const spent = usd(v.spentTodayUsd);
     return `no daily cap (${spent} spent today); set one with: shipwright cost budget set <usd>`;

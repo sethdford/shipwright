@@ -4,6 +4,7 @@ import type { GithubWriter } from "../integrations";
 import type { RunRecord } from "./domain/breaker";
 import type { CostEntry, DailyBudget } from "./domain/budget";
 import type { PullSummary } from "./domain/flow";
+import type { IssueSummary } from "./domain/intake";
 import type { LocalPause } from "./domain/pause";
 
 /** Recent pipeline runs, shared by every machine (GitHub Actions history in Wave 1a). */
@@ -47,6 +48,11 @@ export interface PullRequests {
   open(): Promise<Result<readonly PullSummary[], AdapterError>>;
 }
 
+/** Open issues, for intake caps and dedupe. */
+export interface OpenIssues {
+  open(): Promise<Result<readonly IssueSummary[], AdapterError>>;
+}
+
 /** Everything the safety gates read or write, wired in src/main.ts. */
 export interface SafetyPorts {
   readonly now: () => number;
@@ -56,4 +62,5 @@ export interface SafetyPorts {
   readonly github: GithubWriter;
   readonly costs: CostLedger;
   readonly pulls: PullRequests;
+  readonly issues: OpenIssues;
 }

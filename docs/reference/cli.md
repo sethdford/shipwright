@@ -47,11 +47,15 @@ USAGE
 DESCRIPTION
   Pre-dispatch budget guard (spec §6.2, ADR-0007). Reads the daily cap and today's spend (UTC)
   from ~/.shipwright/budget.json and costs.json, written by `shipwright cost`.
+  It blocks at exactly the cap (spend + estimate >= cap), which is stricter than `shipwright cost`
+  (blocks only above it). Any file that exists but is malformed, and a full 1000-entry ledger that
+  starts today (spend unknown), also block.
   When neither file exists (as on a CI runner) there is nothing to check: the command exits 0 and
   prints "no cost data ... budget not enforced". A CI budget source is deferred to Wave 1b/1c.
+  A mis-set HOME also shows "no cost data", because the files are read from $HOME/.shipwright.
 
 COMMANDS
-  status   Print today's spend against the cap. Exits 0.
+  status   Print today's spend against the cap. Exits 0 unless the files cannot be read.
   check    Exit 0 when today's spend plus the estimate stays under the cap, 1 when it does not
            or the files cannot be read. No cap configured means unlimited.
 

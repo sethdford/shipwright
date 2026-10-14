@@ -1,6 +1,7 @@
 import { join } from "node:path";
 import pkg from "../package.json";
 import { GhGithubWriter } from "./adapters/github/gh-github-writer";
+import { GhOpenIssues } from "./adapters/github/gh-open-issues";
 import { GhPauseLabel } from "./adapters/github/gh-pause-label";
 import { GhPullRequests } from "./adapters/github/gh-pull-requests";
 import { GhRunHistory } from "./adapters/github/gh-run-history";
@@ -35,6 +36,7 @@ export function buildSafetyPorts(
     github: new GhGithubWriter(runner),
     costs: new JsonCostLedger(legacyDir),
     pulls: new GhPullRequests(runner),
+    issues: new GhOpenIssues(runner),
   };
 }
 

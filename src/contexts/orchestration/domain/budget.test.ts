@@ -40,3 +40,21 @@ test("a verdict with no cost data says so instead of reading as a pass", () => {
   expect(text).toContain("no cost data");
   expect(text).toContain("not enforced");
 });
+
+test("a full ledger whose oldest entry is today may hide spend: block", () => {
+  const entries = Array.from({ length: 1000 }, () => spent(0.01, TODAY + 60));
+  const v = evaluateBudget({ limitUsd: 1000 }, entries, NOW);
+  expect(v.allowed).toBe(false);
+  expect(v.truncated).toBe(true);
+  expect(describeBudget(v)).toContain("cost ledger truncated today; spend unknown");
+});
+
+test("a full ledger reaching back before today is complete for today", () => {
+  const entries = [spent(1, TODAY - 5), ...Array.from({ length: 999 }, () => spent(0.01, TODAY))];
+  expect(evaluateBudget({ limitUsd: 1000 }, entries, NOW).allowed).toBe(true);
+});
+
+test("truncation does not matter without a cap", () => {
+  const entries = Array.from({ length: 1000 }, () => spent(0.01, TODAY));
+  expect(evaluateBudget(null, entries, NOW).allowed).toBe(true);
+});

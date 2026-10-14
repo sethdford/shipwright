@@ -62,3 +62,25 @@ test.each([[[]], [["check", "--estimate"]], [["check", "--estimate", "-1"]], [["
     expect(await budgetCommand.run(args, commandContext(captureIO()))).toBe(2);
   },
 );
+
+test("a partial or fail-open-shaped ledger blocks check (exit 1)", async () => {
+  const costs = {
+    read: async () => err({ kind: "failed" as const, message: "costs.json: entries missing" }),
+  };
+  expect(
+    await budgetCommand.run(["check"], commandContext(captureIO(), fakeSafetyPorts({ costs }))),
+  ).toBe(1);
+});
+
+test("status exits 1 when the files cannot be read", async () => {
+  const costs = { read: async () => err({ kind: "failed" as const, message: "bad" }) };
+  expect(
+    await budgetCommand.run(["status"], commandContext(captureIO(), fakeSafetyPorts({ costs }))),
+  ).toBe(1);
+});
+
+test("usage documents the >= rule and the mis-set HOME caveat", () => {
+  expect(budgetCommand.usage).toContain("exactly the cap");
+  expect(budgetCommand.usage).toContain("HOME");
+  expect(budgetCommand.usage).toContain("unless the files cannot be read");
+});
