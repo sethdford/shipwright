@@ -69,17 +69,20 @@ export function readFleetToken(
 }
 
 export function loadGuardConfig(env: Env, host: string, port: number): GuardConfig {
-  const extra = (env.SW_DASHBOARD_ORIGINS ?? "")
-    .split(",")
-    .map((o) => o.trim())
-    .filter((o) => o.length > 0 && o !== "*");
+  // Normalized with new URL(o).origin: lowercase host, default port dropped, path removed.
+  // Entries that are not http(s) URLs (including "*") are dropped.
+  const extra: string[] = [];
   const extraHosts: string[] = [];
-  for (const o of extra) {
+  for (const raw of (env.SW_DASHBOARD_ORIGINS ?? "").split(",")) {
+    let url: URL;
     try {
-      extraHosts.push(new URL(o).hostname.toLowerCase());
+      url = new URL(raw.trim());
     } catch {
-      // not a URL: it can never equal a browser Origin either, so it allows nothing
+      continue;
     }
+    if (url.protocol !== "http:" && url.protocol !== "https:") continue;
+    if (!extra.includes(url.origin)) extra.push(url.origin);
+    if (!extraHosts.includes(url.hostname)) extraHosts.push(url.hostname);
   }
   return {
     fleetToken: (env.SHIPWRIGHT_FLEET_TOKEN ?? "").trim(),
@@ -91,7 +94,8 @@ export function loadGuardConfig(env: Env, host: string, port: number): GuardConf
       ...extra,
     ],
     allowedHosts: [...LOOPBACK_HOSTNAMES, ...extraHosts],
-    secureCookie: env.SW_DASHBOARD_SECURE_COOKIE === "1" || extra.some((o) => o.startsWith("https://")),
+    secureCookie:
+      env.SW_DASHBOARD_SECURE_COOKIE === "1" || extra.some((o) => o.startsWith("https://")),
   };
 }
 
@@ -100,14 +104,27 @@ export function sessionCookieAttributes(cfg: GuardConfig): string {
   return `Path=/; HttpOnly; SameSite=Lax${cfg.secureCookie ? "; Secure" : ""}`;
 }
 
-/** Why the server must not start with this config, or null. auth=none is loopback-only. */
+/**
+ * Whether the dashboard is reachable from beyond this machine: bound to a non-loopback address,
+ * or loopback behind a proxy (SW_DASHBOARD_ORIGINS names a non-loopback host).
+ */
+export function isExposed(cfg: GuardConfig): boolean {
+  return (
+    !isLoopbackHost(cfg.host) || cfg.allowedHosts.some((h) => !LOOPBACK_HOSTNAMES.includes(h))
+  );
+}
+
+/** Why the server must not start with this config, or null. auth=none is local-only. */
 export function startupProblem(cfg: GuardConfig, authEnabled: boolean): string | null {
-  if (isLoopbackHost(cfg.host)) return null;
+  if (!isExposed(cfg)) return null;
+  const where = isLoopbackHost(cfg.host)
+    ? `${cfg.host} behind a proxy (SW_DASHBOARD_ORIGINS names a non-loopback host)`
+    : cfg.host;
   if (!authEnabled) {
-    return `refusing to bind ${cfg.host} with auth=none: configure GITHUB_PAT + DASHBOARD_REPO (or OAuth), or bind 127.0.0.1`;
+    return `refusing to serve ${where} with auth=none: configure GITHUB_PAT + DASHBOARD_REPO (or OAuth), or bind 127.0.0.1 with no public origins`;
   }
   if (!cfg.fleetToken) {
-    return `refusing to bind ${cfg.host} without SHIPWRIGHT_FLEET_TOKEN (or SHIPWRIGHT_FLEET_TOKEN_FILE): /api/claim, /api/connect/* and /api/webhook/ci would be unauthenticated`;
+    return `refusing to serve ${where} without SHIPWRIGHT_FLEET_TOKEN (or SHIPWRIGHT_FLEET_TOKEN_FILE): /api/claim, /api/connect/* and /api/webhook/ci would be unauthenticated`;
   }
   return null;
 }
@@ -131,14 +148,33 @@ export function tokenMatches(expected: string, given: string | null): boolean {
   return timingSafeEqual(sha256(expected), sha256(given));
 }
 
-/** The request's hostname from the Host header (else the URL), lowercased, IPv6 in brackets. */
-function requestHostname(req: Request): string {
-  const host = req.headers.get("host");
+const HOST_HEADER = /^(?:[A-Za-z0-9](?:[A-Za-z0-9.-]*[A-Za-z0-9])?|\[[0-9A-Fa-f:.]+\])(?::\d{1,5})?$/;
+
+/** The hostname in a Host header (lowercased, IPv6 in brackets), or null when malformed. */
+export function parseHostHeader(host: string): string | null {
+  if (!HOST_HEADER.test(host)) return null;
   try {
-    return (host ? new URL(`http://${host}`) : new URL(req.url)).hostname.toLowerCase();
+    return new URL(`http://${host}`).hostname.toLowerCase();
   } catch {
-    return "";
+    return null;
   }
+}
+
+/** The request's hostname from the Host header (else the URL); null when the Host is malformed. */
+function requestHostname(req: Request): string | null {
+  const host = req.headers.get("host");
+  if (host !== null) return parseHostHeader(host);
+  try {
+    return new URL(req.url).hostname.toLowerCase();
+  } catch {
+    return null;
+  }
+}
+
+/** Whether the request names a loopback host (localhost, 127.0.0.1, [::1]) exactly. */
+export function isLoopbackRequest(req: Request): boolean {
+  const name = requestHostname(req);
+  return name !== null && LOOPBACK_HOSTNAMES.includes(name);
 }
 
 function isWebSocketUpgrade(req: Request, pathname: string): boolean {
@@ -170,26 +206,52 @@ function isJson(req: Request): boolean {
   return type.trim().toLowerCase() === "application/json";
 }
 
+/** Fetch metadata: only same-origin, none (typed URL, bookmark) or no header (curl, workers). */
+const FETCH_SITE_OK = new Set(["same-origin", "none"]);
+
+function isCrossSiteToSensitive(req: Request, pathname: string): boolean {
+  const site = req.headers.get("sec-fetch-site");
+  if (site === null || FETCH_SITE_OK.has(site.toLowerCase())) return false;
+  if (pathname === "/auth/callback") return false; // top-level navigation back from github.com
+  return (
+    pathname.startsWith("/api/") ||
+    pathname === "/ws" ||
+    pathname.startsWith("/ws/") ||
+    pathname.startsWith("/auth/")
+  );
+}
+
 function fleetAuth(req: Request, cfg: GuardConfig, hasSession: boolean): Response | null {
   if (hasSession) return null; // a signed-in dashboard user (team view claim/release)
-  if (!cfg.fleetToken && isLoopbackHost(cfg.host)) return null;
+  if (!cfg.fleetToken && !isExposed(cfg)) return null;
   // One opaque answer for "no token configured", "missing" and "wrong".
   return tokenMatches(cfg.fleetToken, presentedToken(req)) ? null : reject(401, "unauthorized");
 }
 
 /**
- * A rejection, or null when the request may be routed. On a loopback bind the Host must be an
- * allowed host (421 otherwise: DNS rebinding). A WebSocket upgrade with a foreign Origin is 403. A preflight or mutating request that names
- * an origin must name an allowed one. Mutating requests must be JSON (so a cross-site form cannot
+ * A rejection, or null when the request may be routed. A malformed Host is 400. On a loopback
+ * bind the Host must be an allowed host (421 otherwise: DNS rebinding). A browser request to
+ * /api, /ws or /auth whose Sec-Fetch-Site is not same-origin or none is 403 (the OAuth callback
+ * excepted). A WebSocket upgrade with a foreign Origin is 403. A preflight or mutating request
+ * that names an origin must name an allowed one. Mutating requests must be JSON (so a cross-site form cannot
  * post without a CORS preflight); the login form under /auth/ is exempt. Fleet routes need the
- * fleet token or a signed-in session, except on loopback with no token configured.
+ * fleet token or a signed-in session, except when not exposed (see isExposed) and no token is set.
  * `hasSession`: auth is enabled and the request carries a valid session.
  */
 export function guardRequest(req: Request, cfg: GuardConfig, hasSession: boolean): Response | null {
-  const { pathname } = new URL(req.url);
-  if (isLoopbackHost(cfg.host) && !cfg.allowedHosts.includes(requestHostname(req))) {
+  // Host first: Bun builds req.url from it, so a malformed Host makes the URL unparseable.
+  const hostname = requestHostname(req);
+  if (hostname === null) return reject(400, "bad host");
+  let pathname: string;
+  try {
+    pathname = new URL(req.url).pathname;
+  } catch {
+    return reject(400, "bad request");
+  }
+  if (isLoopbackHost(cfg.host) && !cfg.allowedHosts.includes(hostname)) {
     return reject(421, "misdirected request");
   }
+  if (isCrossSiteToSensitive(req, pathname)) return reject(403, "cross-site request");
   if (isWebSocketUpgrade(req, pathname) && !wsOriginAllowed(req, cfg)) {
     return reject(403, "origin not allowed");
   }

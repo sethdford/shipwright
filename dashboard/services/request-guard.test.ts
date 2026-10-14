@@ -4,8 +4,11 @@ import { describe, expect, it } from "vitest";
 import {
   type GuardConfig,
   guardRequest,
+  isExposed,
   isFleetRoute,
+  isLoopbackRequest,
   loadGuardConfig,
+  parseHostHeader,
   presentedToken,
   readFleetToken,
   sessionCookieAttributes,
@@ -72,6 +75,15 @@ describe("loadGuardConfig", () => {
     const http = loadGuardConfig({ SW_DASHBOARD_ORIGINS: "http://box:1" }, "127.0.0.1", 1);
     expect(http.secureCookie).toBe(false);
   });
+  it("normalizes SW_DASHBOARD_ORIGINS to origins and drops malformed entries", () => {
+    const c = loadGuardConfig(
+      { SW_DASHBOARD_ORIGINS: "https://Fleet.Example:443/path/, http://b.example:80, not a url" },
+      "127.0.0.1",
+      9000,
+    );
+    expect(c.allowedOrigins.slice(3)).toEqual(["https://fleet.example", "http://b.example"]);
+    expect(c.allowedHosts.slice(3)).toEqual(["fleet.example", "b.example"]);
+  });
   it("never allowlists the * wildcard", () => {
     const c = loadGuardConfig({ SW_DASHBOARD_ORIGINS: "*,https://a.example" }, "127.0.0.1", 9000);
     expect(c.allowedOrigins).not.toContain("*");
@@ -125,6 +137,14 @@ describe("startupProblem", () => {
   });
   it("accepts a public address with auth and a fleet token", () => {
     expect(startupProblem(cfg({ host: "0.0.0.0", fleetToken: "t" }), true)).toBeNull();
+  });
+  it("treats a loopback bind with a non-loopback SW_DASHBOARD_ORIGINS host as public", () => {
+    const proxied = cfg({ allowedHosts: ["localhost", "127.0.0.1", "[::1]", "fleet.example"] });
+    expect(isExposed(proxied)).toBe(true);
+    expect(isExposed(cfg())).toBe(false);
+    expect(startupProblem(proxied, false)).toMatch(/auth=none/);
+    expect(startupProblem(proxied, true)).toMatch(/SHIPWRIGHT_FLEET_TOKEN/);
+    expect(startupProblem({ ...proxied, fleetToken: "t" }, true)).toBeNull();
   });
   it("never puts the token in the message", () => {
     const msg = startupProblem(cfg({ host: "0.0.0.0", fleetToken: "s3cret" }), false) ?? "";
@@ -193,6 +213,10 @@ describe("guardRequest", () => {
     const r = guard(req("POST", "/api/claim", JSON_CT), cfg({ fleetToken: "s3cret" }));
     expect(await r?.json()).toEqual({ error: "unauthorized" });
   });
+  it("requires the fleet token behind a proxy even on a loopback bind", () => {
+    const proxied = cfg({ allowedHosts: ["localhost", "127.0.0.1", "[::1]", "fleet.example"] });
+    expect(guard(req("POST", "/api/claim", JSON_CT), proxied)?.status).toBe(401);
+  });
   it("lets a signed-in dashboard session use fleet routes without the token", () => {
     const c = cfg({ host: "0.0.0.0", fleetToken: "s3cret" });
     expect(guard(req("POST", "/api/claim", JSON_CT), c, true)).toBeNull();
@@ -219,6 +243,56 @@ describe("Host allowlist on loopback (DNS rebinding)", () => {
   it("does not check Host on a public bind", () => {
     const c = cfg({ host: "0.0.0.0", fleetToken: "t" });
     expect(guard(rebound("GET", "/api/status"), c)).toBeNull();
+  });
+});
+
+describe("Host parsing", () => {
+  it("parses hostnames and rejects malformed Host values", () => {
+    expect(parseHostHeader("LocalHost:8767")).toBe("localhost");
+    expect(parseHostHeader("[::1]:8767")).toBe("[::1]");
+    expect(parseHostHeader("127.0.0.1")).toBe("127.0.0.1");
+    expect(parseHostHeader("bad host")).toBeNull();
+    expect(parseHostHeader("a/b")).toBeNull();
+    expect(parseHostHeader("")).toBeNull();
+  });
+  it("answers 400 to a malformed Host header", () => {
+    expect(guard(req("GET", "/api/health", { Host: "bad host" }))?.status).toBe(400);
+    expect(guard(req("GET", "/api/health", { Host: "a/b" }))?.status).toBe(400);
+    const pub = cfg({ host: "0.0.0.0", fleetToken: "t" });
+    expect(guard(req("GET", "/api/health", { Host: "bad host" }), pub)?.status).toBe(400);
+  });
+  it("recognizes loopback requests by Host name only", () => {
+    expect(isLoopbackRequest(req("GET", "/", {}, "http://localhost:1"))).toBe(true);
+    expect(isLoopbackRequest(req("GET", "/", {}, "http://[::1]:1"))).toBe(true);
+    expect(isLoopbackRequest(req("GET", "/", {}, "http://127.0.0.1.evil.example:1"))).toBe(false);
+    expect(isLoopbackRequest(req("GET", "/", {}, "http://localhost.evil.example:1"))).toBe(false);
+  });
+});
+
+describe("Sec-Fetch-Site (cross-site GETs)", () => {
+  const site = (v: string) => ({ "Sec-Fetch-Site": v });
+  it.each([
+    "/api/status",
+    "/api/join/abc",
+    "/ws",
+    "/ws/events",
+    "/auth/logout",
+    "/auth/github",
+  ])("rejects cross-site and same-site requests to %s", (path) => {
+    expect(guard(req("GET", path, site("cross-site")))?.status).toBe(403);
+    expect(guard(req("GET", path, site("same-site")))?.status).toBe(403);
+  });
+  it("allows same-origin, none and an absent header", () => {
+    expect(guard(req("GET", "/api/status", site("same-origin")))).toBeNull();
+    expect(guard(req("GET", "/api/status", site("none")))).toBeNull();
+    expect(guard(req("GET", "/api/status"))).toBeNull();
+  });
+  it("allows the OAuth callback (a top-level navigation from github.com)", () => {
+    expect(guard(req("GET", "/auth/callback?code=x&state=y", site("cross-site")))).toBeNull();
+  });
+  it("leaves pages outside /api, /ws and /auth alone", () => {
+    expect(guard(req("GET", "/", site("cross-site")))).toBeNull();
+    expect(guard(req("GET", "/login", site("cross-site")))).toBeNull();
   });
 });
 

@@ -11,7 +11,8 @@ import {
   type FSWatcher,
 } from "fs";
 import { join, extname } from "path";
-import { execSync, execFileSync } from "child_process";
+import { availableParallelism, cpus } from "os";
+import { execSync, execFileSync, spawn } from "child_process";
 import {
   handleClaim,
   handleClaimRelease,
@@ -27,9 +28,16 @@ import {
   sshArgv,
 } from "./services/subprocess-guards.js";
 import {
+  OAUTH_STATE_COOKIE,
+  OAuthStateStore,
+  oauthStateFromCookie,
+  redeemJoinToken,
+} from "./services/auth-flow.js";
+import {
   guardRequest,
+  isExposed,
   isFleetRoute,
-  isLoopbackHost,
+  isLoopbackRequest,
   loadGuardConfig,
   readFleetToken,
   sessionCookieAttributes,
@@ -367,13 +375,10 @@ function sessionCookie(sessionId: string): string {
   return `fleet_session=${sessionId}; ${sessionCookieAttributes(GUARD)}; Max-Age=${Math.floor(SESSION_TTL_MS / 1000)}`;
 }
 
+// The Host header is client-controlled: trusted only when the dashboard is not exposed (see
+// isExposed), and then only for exact loopback names.
 function isLocalConnection(req: Request): boolean {
-  const host = req.headers.get("host") || "";
-  return (
-    host.startsWith("localhost:") ||
-    host.startsWith("127.0.0.1:") ||
-    host.startsWith("[::1]:")
-  );
+  return !isExposed(GUARD) && isLoopbackRequest(req);
 }
 
 function clearSessionCookie(): string {
@@ -939,15 +944,28 @@ const eventClients = new Set<import("bun").ServerWebSocket<unknown>>();
 let lastBroadcastEventId = 0;
 const startTime = Date.now();
 
+const WS_OPEN = 1;
+
+/** Sends only to an open socket; a socket that is closing or throws leaves `clients`. */
+function safeSend(
+  ws: import("bun").ServerWebSocket<unknown>,
+  payload: string,
+  clients: Set<import("bun").ServerWebSocket<unknown>>,
+): void {
+  if (ws.readyState !== WS_OPEN) {
+    clients.delete(ws);
+    return;
+  }
+  try {
+    ws.send(payload);
+  } catch {
+    clients.delete(ws);
+  }
+}
+
 function broadcastToClients(data: FleetState): void {
   const payload = JSON.stringify(data);
-  for (const ws of wsClients) {
-    try {
-      ws.send(payload);
-    } catch {
-      wsClients.delete(ws);
-    }
-  }
+  for (const ws of [...wsClients]) safeSend(ws, payload, wsClients);
 }
 
 function broadcastNewEvents(): void {
@@ -958,13 +976,7 @@ function broadcastNewEvents(): void {
     const newEvents = dbQueryEventsByIdGreaterThan(lastBroadcastEventId, 100);
     if (newEvents.length > 0) {
       const eventMsg = JSON.stringify({ type: "events", data: newEvents });
-      for (const ws of eventClients) {
-        try {
-          ws.send(eventMsg);
-        } catch {
-          eventClients.delete(ws);
-        }
-      }
+      for (const ws of [...eventClients]) safeSend(ws, eventMsg, eventClients);
       const lastRow = newEvents[newEvents.length - 1];
       const lastId = (lastRow?.id as number) | 0;
       if (lastId > 0) lastBroadcastEventId = lastId;
@@ -1052,25 +1064,18 @@ function readDaemonState(): Record<string, unknown> | null {
   }
 }
 
-function getCpuCores(): number {
+// Counted once, without a subprocess: getFleetState() runs inside the WebSocket open handler,
+// and on Bun 1.2.19 a synchronous spawn there segfaults the server when the client drops.
+const CPU_CORES = (() => {
   try {
-    if (process.platform === "darwin") {
-      return parseInt(
-        execSync("sysctl -n hw.ncpu", { encoding: "utf-8" }).trim(),
-      );
-    }
-    // Linux: read from /proc/cpuinfo
-    if (existsSync("/proc/cpuinfo")) {
-      const cpuinfo = readFileSync("/proc/cpuinfo", "utf-8");
-      const count = cpuinfo
-        .split("\n")
-        .filter((l) => l.startsWith("processor")).length;
-      if (count > 0) return count;
-    }
-    return parseInt(execSync("nproc", { encoding: "utf-8" }).trim());
+    return availableParallelism();
   } catch {
-    return 8;
+    return cpus().length || 8;
   }
+})();
+
+function getCpuCores(): number {
+  return CPU_CORES;
 }
 
 function readLogIterations(issue: number): {
@@ -2455,9 +2460,18 @@ async function checkRepoPermission(
 }
 
 // ─── Auth route handlers ────────────────────────────────────────────
+const oauthStates = new OAuthStateStore();
+
+function oauthStateCookie(value: string, maxAge: number): string {
+  return `${OAUTH_STATE_COOKIE}=${value}; ${sessionCookieAttributes(GUARD).replace("Path=/", "Path=/auth")}; Max-Age=${maxAge}`;
+}
+
 function handleAuthGitHub(): Response {
+  // CSRF on the callback: a random state, bound to this browser by an HttpOnly cookie, single use.
+  const state = oauthStates.issue(Date.now());
   const params = new URLSearchParams({
     client_id: GITHUB_CLIENT_ID,
+    state,
     scope: "read:org repo",
     redirect_uri: "", // GitHub uses the registered callback URL by default
   });
@@ -2468,11 +2482,23 @@ function handleAuthGitHub(): Response {
     status: 302,
     headers: {
       Location: `https://github.com/login/oauth/authorize?${params.toString()}`,
+      "Set-Cookie": oauthStateCookie(state, 600),
     },
   });
 }
 
-async function handleAuthCallback(url: URL): Promise<Response> {
+async function handleAuthCallback(url: URL, req: Request): Promise<Response> {
+  const stateOk = oauthStates.consume(
+    oauthStateFromCookie(req.headers.get("cookie")),
+    url.searchParams.get("state"),
+    Date.now(),
+  );
+  if (!stateOk) {
+    return new Response("Invalid or expired OAuth state; start sign-in again", {
+      status: 400,
+      headers: { "Set-Cookie": oauthStateCookie("", 0) },
+    });
+  }
   const code = url.searchParams.get("code");
   if (!code) {
     return new Response("Missing code parameter", { status: 400 });
@@ -2697,22 +2723,22 @@ async function routeRequest(
         } catch {
           tokens = [];
         }
-        const entry = tokens.find((t) => (t.token as string) === token);
-        if (!entry) {
+        // Single use: an unknown or already-redeemed token gets the same refusal (no replay).
+        const redeemed = redeemJoinToken(tokens, token, new Date().toISOString());
+        if (!redeemed.ok) {
           return new Response(
-            "#!/usr/bin/env bash\necho 'ERROR: Invalid or expired join token'\nexit 1\n",
+            "#!/usr/bin/env bash\necho 'ERROR: Invalid, expired or already-used join token'\nexit 1\n",
             {
+              status: 410,
               headers: { "Content-Type": "text/plain", ...CORS_HEADERS },
             },
           );
         }
+        const entry = redeemed.entry;
         const dashboardUrl = `${url.protocol}//${url.host}`;
         const maxWorkers = (entry.max_workers as number) || 4;
         const script = generateJoinScript(token, dashboardUrl, maxWorkers);
 
-        // Mark token as used
-        entry.used = true;
-        entry.used_at = new Date().toISOString();
         const dir = join(HOME, ".shipwright");
         if (!existsSync(dir)) mkdirSync(dir, { recursive: true });
         const tokensTmp = JOIN_TOKENS_FILE + ".tmp";
@@ -2722,9 +2748,10 @@ async function routeRequest(
         return new Response(script, {
           headers: { "Content-Type": "text/plain", ...CORS_HEADERS },
         });
-      } catch (err) {
+      } catch {
+        // Fixed text: never splice error data into a script the client pipes to bash.
         return new Response(
-          `#!/usr/bin/env bash\necho 'ERROR: ${String(err)}'\nexit 1\n`,
+          "#!/usr/bin/env bash\necho 'ERROR: dashboard could not issue the join script'\nexit 1\n",
           {
             status: 500,
             headers: { "Content-Type": "text/plain", ...CORS_HEADERS },
@@ -2757,7 +2784,7 @@ async function routeRequest(
       if (getAuthMode() !== "oauth") {
         return new Response("OAuth not configured", { status: 500 });
       }
-      return handleAuthCallback(url);
+      return handleAuthCallback(url, req);
     }
 
     if (pathname === "/auth/pat-login" && req.method === "POST") {
@@ -2790,7 +2817,7 @@ async function routeRequest(
       if (!wsOriginAllowed(req, GUARD)) {
         return new Response("Forbidden", { status: 403 });
       }
-      const isLocal = isLoopbackHost(HOST) && isLocalConnection(req);
+      const isLocal = isLocalConnection(req);
       if (!isLocal) {
         const session = getSession(req);
         if (!session) {
@@ -5454,12 +5481,15 @@ async function routeRequest(
     // POST /api/daemon/patrol — Trigger a one-off patrol run
     if (pathname === "/api/daemon/patrol" && req.method === "POST") {
       try {
-        // Run patrol in background (don't block the response)
-        execSync("nohup shipwright daemon patrol --once > /dev/null 2>&1 &", {
-          timeout: 5000,
-          stdio: "pipe",
-          shell: "/bin/bash",
+        // Run patrol in the background (don't block the response): argv, no shell, detached.
+        const patrol = spawn("shipwright", ["daemon", "patrol", "--once"], {
+          detached: true,
+          stdio: "ignore",
         });
+        patrol.on("error", () => {
+          // e.g. shipwright not on PATH: nothing to report after the response has gone
+        });
+        patrol.unref();
         return new Response(
           JSON.stringify({ ok: true, action: "patrol_triggered" }),
           {
@@ -5812,12 +5842,11 @@ const server = Bun.serve<WsData>({
         // Event clients get events via broadcastNewEvents; no initial state
       } else {
         wsClients.add(ws);
-        // Send initial state immediately on connect
-        try {
-          ws.send(JSON.stringify(getFleetState()));
-        } catch {
-          wsClients.delete(ws);
-        }
+        // Initial state goes out on the next tick, not inside open(): keep handler work minimal
+        // (see CPU_CORES), and skip it if the client already dropped.
+        setTimeout(() => {
+          if (wsClients.has(ws)) safeSend(ws, JSON.stringify(getFleetState()), wsClients);
+        }, 0);
       }
     },
     message(_ws, _message) {
