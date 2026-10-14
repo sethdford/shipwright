@@ -220,10 +220,13 @@ issues='[{"number":1,"labels":[{"name":"shipwright"}]},
  {"number":5,"labels":[{"name":"Auto-Patrol"}]},
  {"number":6,"labels":[{"name":"shipwright-failed"}]},
  {"number":7,"labels":[{"name":"Shipwright-Infra-Issue"},{"name":"shipwright"}]},
- {"number":8,"labels":[{"name":"shipwright-failed-meta"}]}]'
-assert_eq "filters gh issue list JSON (auto-patrol, stuck, failed, infra-issue)" "1 3 8" \
+ {"number":8,"labels":[{"name":"shipwright-failed-meta"}]},
+ {"number":9,"labels":[{"name":"claimed:host-a"},{"name":"shipwright"}]},
+ {"number":10,"labels":[{"name":"Claimed:Host-B"}]},
+ {"number":11,"labels":[{"name":"unclaimed:x"}]}]'
+assert_eq "filters gh issue list JSON (auto-patrol, stuck, failed, infra-issue, claimed:*)" "1 3 8 11" \
     "$(dispatchable_issue_numbers <<<"$issues" | tr '\n' ' ' | sed 's/ $//')"
-assert_eq "honors a configured PATROL_LABEL in the issue list" "1 2 3 5 8" \
+assert_eq "honors a configured PATROL_LABEL in the issue list" "1 2 3 5 8 11" \
     "$(PATROL_LABEL="patrol" dispatchable_issue_numbers <<<"$issues" | tr '\n' ' ' | sed 's/ $//')"
 if dispatchable_issue_numbers <<<'{"number":1}' >/dev/null 2>&1; then
     assert_fail "a non-array issue list fails"

@@ -13,8 +13,9 @@ permissions:
   pull-requests: read
 
 # One auto-retry at a time, so two failures cannot both read the same retry count. GitHub keeps
-# at most one pending run per group: a third concurrent failure replaces the pending one, which
-# then is not retried (fail-safe; the watchdog and sweep still label it).
+# at most one pending run per group: a third concurrent failure cancels the pending one. That
+# failed run is then never retried and nothing labels it (fail-safe, but silent): dispatch skips
+# the issue too (it carries SHIPWRIGHT-DISPATCHED), so a human must re-run it.
 concurrency:
   group: shipwright-auto-retry
   cancel-in-progress: false
@@ -47,9 +48,16 @@ jobs:
 
           echo "--- Auto-Retry: Analyzing failed run $RUN_ID ($CONCLUSION) ---"
 
-          # Get the run details to extract issue number from inputs or title
-          RUN_JSON=$(gh run view "$RUN_ID" --repo "$GITHUB_REPOSITORY" --json jobs,displayTitle 2>/dev/null || echo "{}")
-          DISPLAY_TITLE=$(echo "$RUN_JSON" | jq -r '.displayTitle // ""')
+          # Get the run details to extract issue number from inputs or title. A read failure fails
+          # the job (no retry, but visible), never reads as "no issue".
+          if ! RUN_JSON=$(gh run view "$RUN_ID" --repo "$GITHUB_REPOSITORY" --json jobs,displayTitle); then
+            echo "::error::cannot read run $RUN_ID; not retrying"
+            exit 1
+          fi
+          if ! DISPLAY_TITLE=$(jq -r '.displayTitle // ""' <<<"$RUN_JSON"); then
+            echo "::error::malformed details for run $RUN_ID; not retrying"
+            exit 1
+          fi
 
           # Try to extract issue number from run inputs
           # workflow_dispatch runs have inputs in the event payload
@@ -63,24 +71,31 @@ jobs:
 
           # Method 2: Check run logs for the issue number
           if [[ -z "$ISSUE_NUMBER" ]]; then
-            # (group || true: head closing the pipe early must not empty RUN_LOG under pipefail)
-            RUN_LOG=$({ gh run view "$RUN_ID" --repo "$GITHUB_REPOSITORY" --log 2>/dev/null || true; } | head -200)
+            if ! FULL_LOG=$(gh run view "$RUN_ID" --repo "$GITHUB_REPOSITORY" --log); then
+              echo "::error::cannot read the log of run $RUN_ID; not retrying"
+              exit 1
+            fi
+            RUN_LOG=$(head -200 <<<"$FULL_LOG")
             ISSUE_NUMBER=$(echo "$RUN_LOG" | grep -oE 'Issue: #[0-9]+' | head -1 | grep -oE '[0-9]+' || true)
           fi
 
           # Method 3: Look at recent shipwright-labeled issues with pipeline comments referencing this run
           if [[ -z "$ISSUE_NUMBER" ]]; then
-            OPEN_ISSUES=$(gh issue list --repo "$GITHUB_REPOSITORY" \
-              --label shipwright --state open --json number \
-              --jq '.[].number' 2>/dev/null || echo "")
+            if ! OPEN_ISSUES=$(gh issue list --repo "$GITHUB_REPOSITORY" \
+              --label shipwright --state open --limit 200 --json number --jq '.[].number'); then
+              echo "::error::cannot list shipwright issues; not retrying"
+              exit 1
+            fi
 
             for issue in $OPEN_ISSUES; do
-              # Bot-authored comments only (ADR-0007); RUN_ID goes to jq as data.
+              # Bot-authored comments only (ADR-0007); RUN_ID goes to jq as data, and only the
+              # whole marker line <!-- SHIPWRIGHT-RUN-ID: <id> --> counts (not any substring).
               if ! COMMENTS_JSON=$(scripts/ci/bot-comments.sh "$issue"); then
                 echo "::error::cannot read bot comments; refusing to retry"
                 exit 1
               fi
-              HAS_RUN=$(jq --arg run "$RUN_ID" '[.[] | select(.body | contains($run))] | length' <<<"$COMMENTS_JSON")
+              HAS_RUN=$(jq --arg m "<!-- SHIPWRIGHT-RUN-ID: ${RUN_ID} -->" \
+                '[.[] | .body | strings | split("\n")[] | rtrimstr("\r") | select(. == $m)] | length' <<<"$COMMENTS_JSON")
               if [[ "$HAS_RUN" -gt 0 ]]; then
                 ISSUE_NUMBER="$issue"
                 break
@@ -384,10 +399,9 @@ jobs:
         id: gates
         if: steps.strategy.outputs.should_retry == 'true'
         uses: ./.github/actions/safety-gates
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           retry: ${{ steps.strategy.outputs.retry_count }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Post retry comment with root cause
         id: comment

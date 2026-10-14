@@ -3,14 +3,17 @@ description: >-
   Installs the Shipwright TypeScript CLI and runs `shipwright gates check` (pause, breaker,
   budget, review WIP, fix loop; ADR-0007). Fails the step, and so the job, unless every gate
   allows dispatch: a closed gate, an unreadable source, a usage error or a missing Bun all stop
-  the job. Output `allowed` is 'true' only on success. Requires actions/checkout first,
-  GH_REPO in the job env and GITHUB_TOKEN in this step's env. oven-sh/setup-bun is pinned to
-  the v2 tag, not a commit SHA (none was available offline); pin it before re-enabling.
+  the job. Output `allowed` is 'true' only on success. Requires actions/checkout first and
+  GH_REPO in the job env. The token is an input and reaches only the gate check (as GH_TOKEN),
+  not the dependency install.
 inputs:
   retry:
     description: >-
-      The retry number about to be dispatched: 0 for a first dispatch, N for the Nth retry. Required with no
-      default, because an unknown count must not read as a first dispatch.
+      The retry number about to be dispatched: 0 for a first dispatch, N for the Nth retry.
+      Required with no default, because an unknown count must not read as a first dispatch.
+    required: true
+  github-token:
+    description: Token for the gate check's read-only gh calls (pass secrets.GITHUB_TOKEN).
     required: true
 outputs:
   allowed:
@@ -19,7 +22,7 @@ outputs:
 runs:
   using: composite
   steps:
-    - uses: oven-sh/setup-bun@v2
+    - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
       with:
         bun-version: 1.2.19
     - name: Install the Shipwright CLI dependencies
@@ -29,6 +32,7 @@ runs:
       id: gates
       shell: bash
       env:
+        GH_TOKEN: ${{ inputs.github-token }}
         RETRY: ${{ inputs.retry }}
       run: |
         # Exit 0 is the only "allowed"; 1 (blocked or unverifiable), 2 (usage), 127 or a signal

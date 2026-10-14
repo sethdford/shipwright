@@ -56,6 +56,7 @@ jobs:
           STALE_COUNT=0
           CANCELLED_COUNT=0
           READ_FAILURES=0
+          CANCEL_FAILURES=0
 
           while read -r run; do
             RUN_ID=$(echo "$run" | jq -r '.databaseId')
@@ -172,10 +173,13 @@ jobs:
             # cancelled run, behind the safety gates and the fix-loop cap (ADR-0007).
             if [[ "$SILENT_MINS" -lt 120 ]]; then
               echo "Status: STUCK (${SILENT_MINS}m silence) — cancelling; auto-retry decides on a retry"
+              # Cancel the run; a failed cancel is reported (and fails the job), with no comment.
+              if ! gh run cancel "$RUN_ID" --repo "$GITHUB_REPOSITORY"; then
+                echo "::error::could not cancel stuck run $RUN_ID (#$ISSUE_NUMBER)"
+                CANCEL_FAILURES=$((CANCEL_FAILURES + 1))
+                continue
+              fi
               CANCELLED_COUNT=$((CANCELLED_COUNT + 1))
-
-              # Cancel the run
-              gh run cancel "$RUN_ID" --repo "$GITHUB_REPOSITORY" 2>/dev/null || true
 
               # Extract completed stages from comments
               COMPLETED_STAGES=$(jq -r '.[].body' <<<"$COMMENTS_JSON" | grep -oE 'SHIPWRIGHT-STAGE: [a-z_]+:complete' | sed 's/SHIPWRIGHT-STAGE: //' | sed 's/:complete//' | tr '\n' ',' | sed 's/,$//' || true)
@@ -247,7 +251,11 @@ jobs:
             fi
 
             # Cancel the run (after the marker exists)
-            gh run cancel "$RUN_ID" --repo "$GITHUB_REPOSITORY" 2>/dev/null || true
+            if ! gh run cancel "$RUN_ID" --repo "$GITHUB_REPOSITORY"; then
+              echo "::error::could not cancel abandoned run $RUN_ID (#$ISSUE_NUMBER)"
+              CANCEL_FAILURES=$((CANCEL_FAILURES + 1))
+              continue
+            fi
             CANCELLED_COUNT=$((CANCELLED_COUNT + 1))
 
           done < <(echo "$RUNS" | jq -c '.[]')
@@ -258,6 +266,7 @@ jobs:
           echo "Stale (warned): $STALE_COUNT"
           echo "Cancelled: $CANCELLED_COUNT"
           echo "Read/marker failures: $READ_FAILURES"
-          if [[ "$READ_FAILURES" -gt 0 ]]; then
+          echo "Cancel failures: $CANCEL_FAILURES"
+          if [[ "$READ_FAILURES" -gt 0 || "$CANCEL_FAILURES" -gt 0 ]]; then
             exit 1
           fi

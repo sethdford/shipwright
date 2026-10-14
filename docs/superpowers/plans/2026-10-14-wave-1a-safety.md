@@ -7300,14 +7300,45 @@ Expected: the dispatch run logs show the five gate lines from `.github/actions/s
   failed runs open it. Route the labelled trigger through the gates (or make it enqueue for
   `shipwright-dispatch.yml`) in Wave 1c.
 - **Retry paths after Task 14.** `shipwright-auto-retry.yml` is the only workflow that retries.
-  `shipwright-sweep.yml` labels stuck issues and never dispatches; `shipwright-dispatch.yml`
-  dispatches an issue only before its first pipeline (no bot `Shipwright Pipeline` comment yet);
-  the watchdog only cancels. A "succeeded but no PR" re-dispatch no longer exists anywhere; it needs a
-  human, or a gated path in Wave 1c.
+  `shipwright-sweep.yml` labels stuck issues and never dispatches; the watchdog only cancels.
+  `shipwright-dispatch.yml` dispatches an issue once: it posts a bot
+  `<!-- SHIPWRIGHT-DISPATCHED: run-request <ISO ts> -->` marker before `gh workflow run` (no marker,
+  no dispatch) and skips any issue with a bot comment containing `SHIPWRIGHT-DISPATCHED`,
+  `SHIPWRIGHT-RETRY`, `Shipwright Pipeline` or `Pipeline Auth Failure`. That closes the loop for
+  runs that end before "Shipwright Pipeline Starting" (auth failure, triage error, claim skip,
+  setup failure). It also skips `claimed:*` issues. A "succeeded but no PR" re-dispatch no longer
+  exists anywhere; it needs a human, or a gated path in Wave 1c.
+- **2026-10-14 failures: expired `CLAUDE_CODE_OAUTH_TOKEN`.** The 288 failed runs stopped at
+  "Pre-flight auth check" and posted "Pipeline Auth Failure". Dispatch treats those issues as already
+  run, so re-enabling does not re-dispatch them; auto-retry may still retry a run that fails the same
+  way, up to the fix-loop cap, until the breaker opens. Rotate the token before re-enabling.
 - **Unused policy keys.** `config/policy.json` `sweep.retry_template`, `retry_max_iterations` and
   `stuck_retry_max_iterations` are no longer read; remove them with the policy schema work.
-- **Action pins.** `oven-sh/setup-bun@v2` in `.github/actions/safety-gates` and `ts-check.yml` is
-  a tag, not a commit SHA; pin both to a reviewed SHA.
 - **Auto-retry concurrency.** The `shipwright-auto-retry` group runs one retry at a time; GitHub keeps
-  only one pending run per group, so a third simultaneous failure drops the older pending retry
-  (fail-safe: that issue is not retried).
+  only one pending run per group, so a third simultaneous failure cancels the older pending retry.
+  That failed run is never retried and nothing labels it; dispatch skips it too (it carries the
+  dispatch marker), so a human must re-run it.
+- **Action pins.** `oven-sh/setup-bun` is pinned to `0c5077e51419868618aeaa5fe8019c62421857d6`
+  (v2.2.0) in `.github/actions/safety-gates` and `ts-check.yml`; `actions/checkout` is still on
+  version tags (`@v4`, `@v7` in sweep) — pin those with the Wave 1c workflow pass.
+
+### Re-enable checklist (supersedes the commands in Task 18; maintainer only)
+
+1. Rotate `CLAUDE_CODE_OAUTH_TOKEN` (`claude setup-token`) and confirm one manual pipeline run passes
+   "Pre-flight auth check".
+2. Merge this branch first. Until then, keep `shipwright-sweep.yml` disabled: the old version
+   re-dispatches failed issues. After the merge, confirm sweep and watchdog contain no
+   `gh workflow run` outside comment text.
+3. `bun src/cli.ts breaker status` (read-only): closed, or cooling down after today's failures.
+4. `gh label create shipwright:pause --color 000000 --description "Stops all Shipwright dispatch (ADR-0007)"`.
+5. Clear `shipwright-stuck`, `shipwright-failed`, `shipwright-infra-issue` or stale `claimed:*`
+   labels only on issues a human wants run again; an issue that already carries a dispatch, retry,
+   pipeline or auth-failure comment is never dispatched again automatically — re-run it with
+   `gh workflow run shipwright-pipeline.yml -f issue_number=N`.
+6. Enable one at a time, checking each first scheduled run: `shipwright-watchdog.yml`,
+   `shipwright-sweep.yml`, `shipwright-auto-retry.yml`, `shipwright-dispatch.yml`.
+7. In dispatch logs: the gate lines, at most 3 dispatches, a `SHIPWRIGHT-DISPATCHED` comment before
+   each, no read failures. In auto-retry: backoff before the gates; skips name `held`, `active`,
+   `abandoned` or `exhausted`.
+8. Until Wave 1c, labelling an issue `shipwright` starts an ungated run (breaker only): keep
+   `shipwright:pause` ready.

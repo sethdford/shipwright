@@ -50,6 +50,14 @@ runs in_progress '[{"displayTitle":"Pipeline #77"},{"displayTitle":"Pipeline #17
 assert_eq "#77, #17 and a bare 7 do not match #7" "false" "$(active 7)"
 
 print_test_section "fails closed"
+rm -f "$RUNS_DIR"/*.json
+runs queued "$(jq -cn '[range(200) | {displayTitle: "Other #\(. + 1000)"}]')"
+expect_exit "a listing that fills the limit (200) may be truncated: exit 1" 1 "$ACTIVE" 7
+runs queued "$(jq -cn '[range(199) | {displayTitle: "Other #\(. + 1000)"}]')"
+assert_eq "199 runs, none for #7: false" "false" "$(active 7)"
+grep -q -- "--limit 200" "$GH_ARGS" && assert_pass "asks for 200 runs per status" \
+    || assert_fail "asks for 200 runs per status"
+rm -f "$RUNS_DIR"/*.json
 expect_exit "rejects a non-numeric issue" 2 "$ACTIVE" "7|x"
 expect_exit "rejects a missing issue" 2 "$ACTIVE"
 expect_exit "rejects a bad GITHUB_REPOSITORY" 2 env GITHUB_REPOSITORY="o" "$ACTIVE" 7

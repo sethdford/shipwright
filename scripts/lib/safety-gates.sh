@@ -134,13 +134,14 @@ dispatch_eligible() {
 
 # dispatchable_issue_numbers — reads `gh issue list --json number,labels` on stdin and prints the
 # numbers of the issues the CI workflows may dispatch, one per line: not auto-filed, not
-# shipwright-stuck, and not shipwright-failed or shipwright-infra-issue (both wait for a human).
+# shipwright-stuck, not shipwright-failed or shipwright-infra-issue (both wait for a human), and
+# not claimed by a daemon (a claimed:<machine> label).
 # Anything but an array of issues exits non-zero.
 dispatchable_issue_numbers() {
     jq -r --arg auto "$(_sw_lower "${PATROL_LABEL:-auto-patrol}")" '
         [$auto, "shipwright-stuck", "shipwright-failed", "shipwright-infra-issue"] as $held
         | if type == "array" then .[] else error("issue list is not an array") end
-        | select(any(.labels[].name | ascii_downcase; IN($held[])) | not)
+        | select(any(.labels[].name | ascii_downcase; IN($held[]) or startswith("claimed:")) | not)
         | .number'
 }
 

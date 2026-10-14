@@ -34,10 +34,9 @@ jobs:
       - name: Safety gates
         id: gates
         uses: ./.github/actions/safety-gates
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           retry: "0"
+          github-token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Scan and dispatch shipwright-labeled issues
         if: steps.gates.outputs.allowed == 'true'
@@ -91,15 +90,29 @@ jobs:
             fi
 
             # ── Check 2: first dispatch only ──
-            # Once a pipeline has run, auto-retry is the only retry path (fix-loop cap, ADR-0007);
-            # bot-authored comments only, so a typed comment cannot change the decision.
+            # Once dispatch has asked for a run (SHIPWRIGHT-DISPATCHED, posted before every
+            # dispatch), or a pipeline or retry has commented, auto-retry is the only retry path
+            # (fix-loop cap, ADR-0007). The marker matters for runs that end before "Shipwright
+            # Pipeline Starting" (auth failure, triage error, claim skip, setup failure): without
+            # it they would be re-dispatched every 15 minutes. Bot-authored comments only.
             if ! COMMENTS_JSON=$(scripts/ci/bot-comments.sh "$issue"); then
               echo "::error::cannot read bot comments for #$issue; leaving it alone"
               READ_FAILURES=$((READ_FAILURES + 1))
               continue
             fi
-            if jq -e 'any(.[]; .body | contains("Shipwright Pipeline"))' <<<"$COMMENTS_JSON" >/dev/null; then
-              echo "Issue #$issue: a pipeline has already run — auto-retry owns any retry; skipping"
+            # jq -e: 0 = a marker exists, 1 = none, anything else = unreadable (fail closed).
+            HANDLED_RC=0
+            # "Pipeline Auth Failure" covers issues whose runs failed at the auth pre-flight before
+            # dispatch posted markers (the 2026-10-14 expired-token failures).
+            jq -e 'any(.[]; .body | test("SHIPWRIGHT-DISPATCHED|SHIPWRIGHT-RETRY|Shipwright Pipeline|Pipeline Auth Failure"))' \
+              <<<"$COMMENTS_JSON" >/dev/null || HANDLED_RC=$?
+            if [[ "$HANDLED_RC" -gt 1 ]]; then
+              echo "::error::cannot read the bot comments of #$issue (jq exit $HANDLED_RC); leaving it alone"
+              READ_FAILURES=$((READ_FAILURES + 1))
+              continue
+            fi
+            if [[ "$HANDLED_RC" -eq 0 ]]; then
+              echo "Issue #$issue: already dispatched or run — auto-retry owns any retry; skipping"
               SKIPPED=$((SKIPPED + 1))
               continue
             fi
@@ -114,7 +127,17 @@ jobs:
               break
             fi
 
-            # ── All checks passed — dispatch pipeline ──
+            # ── All checks passed — mark, then dispatch ──
+            # The marker goes first: if it cannot be posted, nothing is dispatched, so no run can
+            # exist that a later dispatch would not see.
+            REQUESTED_AT=$(date -u +%Y-%m-%dT%H:%M:%SZ)
+            if ! gh issue comment "$issue" --repo "$GITHUB_REPOSITORY" \
+              --body "Shipwright dispatch requested a pipeline run for this issue.
+
+          <!-- SHIPWRIGHT-DISPATCHED: run-request ${REQUESTED_AT} -->"; then
+              echo "::error::could not post the dispatch marker on #$issue; not dispatching — stopping"
+              exit 1
+            fi
             echo "Issue #$issue: dispatching pipeline..."
             if ! gh workflow run shipwright-pipeline.yml \
               --repo "$GITHUB_REPOSITORY" \
