@@ -19,13 +19,23 @@ The engines don't fit yet (2027 strategy research, durability note §0):
 
 ## Decision
 Own a small durability contract: four ports in `src/shared/kernel/durability.ts`.
-- `WorkQueue`: atomic claim with a lease, heartbeat and complete; dedupe key; `notBefore`.
+- `WorkQueue`: atomic claim with a lease, heartbeat and complete; dedupe key; `notBefore`, which is
+  also the timer wake; per-pool `maxActive` checked inside the claim.
 - `RunJournal`: append-only and fenced.
 - `Signals`: durable approvals, cancel and pause.
 - `SideEffects`: a reconcile-then-act ledger keyed by `IdempotencyKey`.
 
 Every claim increments the item's lease epoch, its fence token. Every journal append and every
 external side effect checks the fence; a stale fence fails.
+
+Each work item belongs to one run, and a run has at most one unfinished item. The journal derives
+the run from the fence, so a lease can append only to its own run. `complete` is terminal for both
+`succeeded` and `failed`, and the outcome is readable; retry policy lives above the queue, as a new
+item.
+
+The Wave 0 `EventLog` port (synchronous, backed by the existing `bun:sqlite` events table) is
+transitional. It has no production callers, and its synchronous API cannot be implemented on
+Postgres. `RunJournal` absorbs it in Wave 1; it never gets a Postgres adapter.
 
 Adapters: SQLite for M1 (Wave 1), Postgres for M2/M3 (Wave 2). Both, and the in-memory fake, are
 held to one suite, `src/testing/contracts/durability-contract.ts`. Orchestration decisions stay in

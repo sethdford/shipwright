@@ -1,4 +1,5 @@
 import type {
+  ClaimLimits,
   Durability,
   DurabilityError,
   FenceToken,
@@ -11,6 +12,7 @@ import type {
   SideEffects,
   Signal,
   Signals,
+  WorkOutcome,
   WorkQueue,
 } from "../shared/kernel/durability";
 import { err, ok, type Result } from "../shared/kernel/result";
@@ -21,7 +23,7 @@ interface Item extends NewWorkItem {
   epoch: number;
   workerId: string;
   expiresAt: number;
-  finished: boolean;
+  outcome: WorkOutcome | null;
 }
 const fail = (kind: DurabilityError["kind"], message: string) => err({ kind, message });
 
@@ -36,7 +38,7 @@ class Store {
   live(fence: FenceToken): Result<Item, DurabilityError> {
     const item = this.items.find((i) => i.id === fence.workId);
     if (!item) return fail("not_found", `no work item ${fence.workId}`);
-    if (item.finished || item.epoch !== fence.epoch || item.expiresAt <= this.now()) {
+    if (item.outcome || item.epoch !== fence.epoch || item.expiresAt <= this.now()) {
       return fail("stale_fence", `epoch ${fence.epoch} is not the live lease on ${fence.workId}`);
     }
     return ok(item);
@@ -45,6 +47,7 @@ class Store {
 
 const leaseOf = (item: Item): Lease => ({
   fence: { workId: item.id, epoch: item.epoch },
+  runId: item.runId,
   workerId: item.workerId,
   expiresAt: item.expiresAt,
   payload: item.payload,
@@ -53,18 +56,25 @@ const leaseOf = (item: Item): Lease => ({
 class MemoryQueue implements WorkQueue {
   constructor(private readonly s: Store) {}
   async enqueue(item: NewWorkItem): R<string> {
-    if (this.s.items.some((i) => !i.finished && i.dedupeKey === item.dedupeKey)) {
-      return fail("duplicate", `unfinished item with dedupe key ${item.dedupeKey}`);
-    }
+    const clash = this.s.items.find(
+      (i) => !i.outcome && (i.dedupeKey === item.dedupeKey || i.runId === item.runId),
+    );
+    if (clash) return fail("duplicate", `unfinished item ${clash.id} has this dedupe key or run`);
     const id = `w${this.s.items.length + 1}`;
-    this.s.items.push({ ...item, id, epoch: 0, workerId: "", expiresAt: 0, finished: false });
+    this.s.items.push({ ...item, id, epoch: 0, workerId: "", expiresAt: 0, outcome: null });
     return ok(id);
   }
-  async claim(pool: string, workerId: string, leaseMs: number): R<Lease | null> {
+  async claim(
+    pool: string,
+    workerId: string,
+    leaseMs: number,
+    limits?: ClaimLimits,
+  ): R<Lease | null> {
     const t = this.s.now();
-    const item = this.s.items.find(
-      (i) => i.pool === pool && !i.finished && (i.notBefore ?? 0) <= t && i.expiresAt <= t,
-    );
+    const open = this.s.items.filter((i) => i.pool === pool && !i.outcome);
+    const active = open.filter((i) => i.expiresAt > t).length;
+    if (limits?.maxActive !== undefined && active >= limits.maxActive) return ok(null);
+    const item = open.find((i) => (i.notBefore ?? 0) <= t && i.expiresAt <= t);
     if (!item) return ok(null);
     Object.assign(item, { epoch: item.epoch + 1, workerId, expiresAt: t + leaseMs });
     return ok(leaseOf(item));
@@ -75,23 +85,27 @@ class MemoryQueue implements WorkQueue {
     item.value.expiresAt = this.s.now() + leaseMs;
     return ok(leaseOf(item.value));
   }
-  async complete(fence: FenceToken): R<void> {
+  async complete(fence: FenceToken, outcome: WorkOutcome): R<void> {
     const item = this.s.live(fence);
     if (!item.ok) return item;
-    item.value.finished = true;
+    item.value.outcome = outcome;
     return ok(undefined);
+  }
+  async outcome(workId: string): R<WorkOutcome | null> {
+    const item = this.s.items.find((i) => i.id === workId);
+    return item ? ok(item.outcome) : fail("not_found", `no work item ${workId}`);
   }
 }
 
 class MemoryJournal implements RunJournal {
   constructor(private readonly s: Store) {}
-  async append(fence: FenceToken, entry: Omit<JournalEntry, "seq">): R<JournalEntry> {
+  async append(fence: FenceToken, entry: Omit<JournalEntry, "seq" | "runId">): R<JournalEntry> {
     const item = this.s.live(fence);
     if (!item.ok) return item;
-    const stored = {
-      ...entry,
-      seq: this.s.entries.filter((e) => e.runId === entry.runId).length + 1,
-    };
+    const { runId } = item.value;
+    const seq = this.s.entries.filter((e) => e.runId === runId).length + 1;
+    // Built field by field: the run is always the lease's, whatever else the caller's object carries.
+    const stored: JournalEntry = { type: entry.type, at: entry.at, data: entry.data, runId, seq };
     this.s.entries.push(stored);
     return ok(stored);
   }

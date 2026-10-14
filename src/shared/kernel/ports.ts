@@ -45,6 +45,10 @@ export interface EventRecord {
   readonly at: string;
   readonly data: Readonly<Record<string, unknown>>;
 }
+/**
+ * Transitional (ADR-0005): no production callers. Its synchronous API cannot be implemented on
+ * Postgres, so `RunJournal` absorbs it in Wave 1 and it is never given a Postgres adapter.
+ */
 export interface EventLog {
   append(event: EventRecord): void;
   /** Events for one run, oldest first. */

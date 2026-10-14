@@ -95,8 +95,9 @@ One codebase, three modes; the mode is configuration (ADR-0005).
 Run state goes through four ports in
 [`src/shared/kernel/durability.ts`](../src/shared/kernel/durability.ts), never through ad-hoc files:
 
-- `WorkQueue`: atomic claim with a lease, heartbeat, complete; dedupe key; `notBefore`.
-- `RunJournal`: append-only, per run.
+- `WorkQueue`: atomic claim with a lease, heartbeat, complete (terminal for both outcomes); dedupe
+  key; `notBefore` (the timer wake); per-pool `maxActive`.
+- `RunJournal`: append-only, per run; a lease appends only to its own run.
 - `Signals`: durable approvals, cancel and pause.
 - `SideEffects`: a reconcile-then-act ledger keyed by `IdempotencyKey`.
 
@@ -106,7 +107,9 @@ every side effect checks it, so a machine that lost its lease can no longer writ
 Every adapter must pass
 [`src/testing/contracts/durability-contract.ts`](../src/testing/contracts/durability-contract.ts).
 In Wave 0 the in-memory fake runs it, and the existing SQLite event-log store runs
-[`event-log-contract.ts`](../src/testing/contracts/event-log-contract.ts). The SQLite durability
+[`event-log-contract.ts`](../src/testing/contracts/event-log-contract.ts). That `EventLog` port is
+transitional: it is synchronous, so it cannot run on Postgres, and `RunJournal` absorbs it in
+Wave 1 (ADR-0005). The SQLite durability
 adapter joins in Wave 1; Postgres joins in Wave 2, nightly and on adapter changes.
 
 ### Delivery loop (Wave 1, planned)

@@ -301,8 +301,8 @@ write.
 
 | Port | Contract |
 |---|---|
-| `WorkQueue` | `enqueue` (dedupe key, `notBefore`, pool), atomic `claim` returning a lease with a fence token, `heartbeat`, `complete`; per-pool concurrency limits inside the claim transaction |
-| `RunJournal` | Append-only per-run entries; every append checks the fence |
+| `WorkQueue` | `enqueue` (run, dedupe key, `notBefore`, pool), atomic `claim` returning a lease with a fence token, `heartbeat`, `complete`, `outcome`. `notBefore` is the timer wake. Per-pool concurrency (`maxActive`) is checked inside the claim transaction. A run has at most one unfinished item. `succeeded` and `failed` are both terminal; retries are new items. |
+| `RunJournal` | Append-only per-run entries; every append checks the fence and writes to the fence's own run |
 | `Signals` | Durable, exactly-once delivery: approvals, cancel, pause |
 | `SideEffects` | Reconcile-then-act ledger keyed by `IdempotencyKey`, written under the fence |
 
@@ -323,7 +323,8 @@ write.
   - Worker health is lease liveness, not an SSH probe.
 - **Storage.** The same store holds runs, stages, the journal, memory and costs. It replaces
   `pipeline-state.md`, the scattered JSON files and `events.jsonl` (a one-time importer reads the old
-  files).
+  files). The Wave 0 `EventLog` port is transitional: its synchronous API cannot run on Postgres,
+  so `RunJournal` absorbs it in Wave 1 (ADR-0005).
 - **Checkpoints.** A checkpoint is a commit pushed to a per-attempt branch plus a journal entry.
   `resume` loads the run and re-enters its current stage.
 
@@ -437,7 +438,7 @@ that point to the replacement.
 | Domain unit | Pure functions and state machines with `bun test` | Majority of tests; milliseconds |
 | Application | Use cases with in-memory fakes (`FakeTracker`, scripted `FakeAgentRunner`, `FakeTerminal`, in-memory durability) | Fast |
 | Adapter contract | One spec run against the fake and the real adapter, so fakes cannot drift | Real side runs nightly or on adapter changes |
-| Durability contract | Claim atomicity under concurrent claimers, lease expiry and takeover, stale-fence rejection, idempotent side effects, crash between steps, signal delivery, timer wake | In `check`: the fake from Wave 0 (with the existing SQLite store held to its event-log contract), the SQLite adapter from Wave 1. Postgres (container) runs nightly and on adapter changes from Wave 2 |
+| Durability contract | Claim atomicity under concurrent claimers, per-pool limits, lease expiry and takeover, stale-fence rejection, run-bound appends, terminal outcomes, idempotent side effects, crash between steps, signal delivery, timer wake (`notBefore`) | In `check`: the fake from Wave 0 (with the existing SQLite store held to its event-log contract), the SQLite adapter from Wave 1. Postgres (container) runs nightly and on adapter changes from Wave 2 |
 | Parity | Old bash suites against ported commands (§7.2) | Per ported command |
 | Delivery evals | 20–50 past issues with known-good merged diffs, run at k=3. Reported: pass^3, cost per success and a mergeability proxy. Resources are pinned, and 5 transcripts are read per run. Triage and dedup evals are a subset. | Nightly and on prompt, model, effort or harness changes |
 | Crash injection | Kill a run between a side effect and its ledger write, then resume; assert exactly one PR | With the durability contract |

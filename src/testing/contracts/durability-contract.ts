@@ -1,5 +1,16 @@
 import { expect } from "bun:test";
-import { type Durability, idempotencyKey, type Lease } from "../../shared/kernel/durability";
+import {
+  type ContractCase,
+  type DurabilityFactory,
+  entry,
+  fresh,
+  item,
+  key,
+  kindOf,
+  nth,
+} from "./durability-fixture";
+
+export type { ContractCase, DurabilityFactory } from "./durability-fixture";
 
 // Invariants pinned here (every adapter must hold all of them):
 // - claims are exclusive: of N concurrent claimers exactly one gets an item;
@@ -7,47 +18,17 @@ import { type Durability, idempotencyKey, type Lease } from "../../shared/kernel
 // - heartbeat extends the live lease, so other claimers stay blocked;
 // - a holder whose lease expired is stale even if nobody re-claimed the item;
 // - every write with a non-live fence (append, heartbeat, complete, begin, finish) fails stale_fence;
-// - a completed item is never claimed again, and its dedupe key is free for a new item;
-// - notBefore delays claiming; an unfinished dedupe key rejects enqueue with `duplicate`;
+// - complete is terminal for both outcomes: the item is never claimed again, the outcome is
+//   readable, and its dedupe key and run are free for a new item (retries are new items);
+// - notBefore delays claiming (the timer wake); an unfinished dedupe key or run rejects enqueue
+//   with `duplicate`, so a run has at most one live lease;
+// - claim's maxActive caps live leases per pool, even under concurrent claimers; expired leases
+//   and other pools do not count;
+// - append writes to the fence's own run only: a live lease cannot write another run's journal;
 // - journal seq is per run and ordered; read(afterSeq) returns only later entries;
 // - side effects are keyed: a pending or done record is returned, never re-begun;
 // - finishing a never-begun side effect is `not_found`;
 // - a signal sent before anyone waits is delivered exactly once.
-
-/**
- * One contract case. Test files register cases themselves (`test(c.name, () => c.run(factory))`):
- * Bun drops `test()` calls made inside a helper module that a second test file also imports.
- */
-export interface ContractCase<F> {
-  readonly name: string;
-  run(factory: F): Promise<void>;
-}
-
-/** Builds a fresh, empty store whose notion of time is `now` (epoch ms). */
-export type DurabilityFactory = (now: () => number) => Durability | Promise<Durability>;
-
-interface Ctx {
-  readonly d: Durability;
-  advance(ms: number): void;
-  claimed(workerId: string): Promise<Lease>;
-}
-const item = { pool: "default", dedupeKey: "issue-1", payload: { issue: 1 } };
-const entry = { runId: "r1", type: "stage.started", at: "t", data: {} };
-const key = idempotencyKey("r1", "pr", "open");
-
-async function fresh(factory: DurabilityFactory): Promise<Ctx> {
-  let t = 1_000;
-  const d = await factory(() => t);
-  const advance = (ms: number) => {
-    t += ms;
-  };
-  const claimed = async (workerId: string): Promise<Lease> => {
-    const r = await d.queue.claim("default", workerId, 1_000);
-    if (!r.ok || !r.value) throw new Error(`${workerId} expected a lease`);
-    return r.value;
-  };
-  return { d, advance, claimed };
-}
 
 const queueCases: ContractCase<DurabilityFactory>[] = [
   {
@@ -72,15 +53,36 @@ const queueCases: ContractCase<DurabilityFactory>[] = [
     },
   },
   {
-    name: "notBefore delays claiming; an unfinished dedupe key is rejected",
+    name: "notBefore delays claiming; an unfinished dedupe key or run is rejected",
     run: async (factory) => {
       const ctx = await fresh(factory);
       await ctx.d.queue.enqueue({ ...item, notBefore: 1_500 });
       expect(await ctx.d.queue.claim("default", "a", 1_000)).toEqual({ ok: true, value: null });
       ctx.advance(500);
-      await ctx.claimed("a");
-      const dup = await ctx.d.queue.enqueue(item);
-      expect(dup.ok ? "ok" : dup.error.kind).toBe("duplicate");
+      expect((await ctx.claimed("a")).runId).toBe("r1");
+      expect(kindOf(await ctx.d.queue.enqueue(item))).toBe("duplicate");
+      expect(kindOf(await ctx.d.queue.enqueue({ ...item, dedupeKey: "other" }))).toBe("duplicate");
+    },
+  },
+  {
+    name: "maxActive caps live leases per pool, even under concurrent claimers",
+    run: async (factory) => {
+      const ctx = await fresh(factory);
+      for (const n of [1, 2, 3, 4]) await ctx.d.queue.enqueue(nth(n));
+      await ctx.d.queue.enqueue(nth(5, "other"));
+      const limits = { maxActive: 2 };
+      const claims = Array.from({ length: 6 }, (_, i) =>
+        ctx.d.queue.claim("default", `w${i}`, 1_000, limits),
+      );
+      const leases = (await Promise.all(claims)).filter((r) => r.ok && r.value !== null);
+      expect(leases).toHaveLength(2);
+      await ctx.claimed("x", "other", { maxActive: 1 });
+      const first = leases[0];
+      if (!first?.ok || !first.value) throw new Error("expected a lease");
+      await ctx.d.queue.complete(first.value.fence, "succeeded");
+      await ctx.claimed("y", "default", limits);
+      ctx.advance(1_001);
+      await ctx.claimed("z", "default", limits);
     },
   },
 ];
@@ -99,6 +101,20 @@ const fenceCases: ContractCase<DurabilityFactory>[] = [
     },
   },
   {
+    name: "a live lease appends only to its own run, never to a run it does not hold",
+    run: async (factory) => {
+      const ctx = await fresh(factory);
+      await ctx.d.queue.enqueue(nth(1));
+      await ctx.d.queue.enqueue(nth(2));
+      await ctx.claimed("a");
+      const b = await ctx.claimed("b");
+      const smuggled = { ...entry, runId: "r1" };
+      const wrote = await ctx.d.journal.append(b.fence, smuggled);
+      expect(wrote.ok && [wrote.value.runId, wrote.value.seq]).toEqual(["r2", 1]);
+      expect(await ctx.d.journal.read("r1")).toEqual({ ok: true, value: [] });
+    },
+  },
+  {
     name: "after takeover every write with the old fence fails with stale_fence",
     run: async (factory) => {
       const ctx = await fresh(factory);
@@ -113,36 +129,7 @@ const fenceCases: ContractCase<DurabilityFactory>[] = [
         await ctx.d.sideEffects.begin(old, key),
         await ctx.d.sideEffects.finish(old, key, {}),
       ];
-      expect(writes.map((w) => (w.ok ? "ok" : w.error.kind))).toEqual(Array(5).fill("stale_fence"));
-    },
-  },
-];
-
-const effectAndSignalCases: ContractCase<DurabilityFactory>[] = [
-  {
-    name: "a crashed holder's pending side effect is visible to the next holder",
-    run: async (factory) => {
-      const ctx = await fresh(factory);
-      await ctx.d.queue.enqueue(item);
-      await ctx.d.sideEffects.begin((await ctx.claimed("a")).fence, key);
-      ctx.advance(1_001);
-      const { fence } = await ctx.claimed("b");
-      const again = await ctx.d.sideEffects.begin(fence, key);
-      expect(again).toEqual({ ok: true, value: { key, state: "pending" } });
-      const done = await ctx.d.sideEffects.finish(fence, key, { pr: 7 });
-      expect(done.ok && done.value).toEqual({ key, state: "done", result: { pr: 7 } });
-      expect(await ctx.d.sideEffects.begin(fence, key)).toEqual(done);
-    },
-  },
-  {
-    name: "a signal sent before anyone waits is delivered exactly once",
-    run: async (factory) => {
-      const { d } = await fresh(factory);
-      const signal = { runId: "r1", name: "approve:plan", payload: { by: "maintainer" } };
-      await d.signals.send(signal);
-      expect(await d.signals.take("r1", "approve:pr")).toEqual({ ok: true, value: null });
-      expect(await d.signals.take("r1", "approve:plan")).toEqual({ ok: true, value: signal });
-      expect(await d.signals.take("r1", "approve:plan")).toEqual({ ok: true, value: null });
+      expect(writes.map(kindOf)).toEqual(Array(5).fill("stale_fence"));
     },
   },
 ];
@@ -174,22 +161,43 @@ const leaseCases: ContractCase<DurabilityFactory>[] = [
         await ctx.d.queue.complete(fence, "succeeded"),
         await ctx.d.sideEffects.begin(fence, key),
       ];
-      expect(writes.map((w) => (w.ok ? "ok" : w.error.kind))).toEqual(Array(4).fill("stale_fence"));
+      expect(writes.map(kindOf)).toEqual(Array(4).fill("stale_fence"));
     },
   },
   {
-    name: "a completed item is never claimed again and frees its dedupe key",
+    name: "succeeded and failed are both terminal, readable, and free the dedupe key and run",
+    run: async (factory) => {
+      const ctx = await fresh(factory);
+      for (const outcome of ["succeeded", "failed"] as const) {
+        const id = await ctx.d.queue.enqueue(item);
+        if (!id.ok) throw new Error("enqueue failed");
+        const { fence } = await ctx.claimed("a");
+        expect(await ctx.d.queue.outcome(id.value)).toEqual({ ok: true, value: null });
+        expect(await ctx.d.queue.complete(fence, outcome)).toEqual({ ok: true, value: undefined });
+        expect(await ctx.d.queue.outcome(id.value)).toEqual({ ok: true, value: outcome });
+        expect(kindOf(await ctx.d.queue.complete(fence, outcome))).toBe("stale_fence");
+        ctx.advance(1_001);
+        expect(await ctx.d.queue.claim("default", "b", 1_000)).toEqual({ ok: true, value: null });
+      }
+      expect(kindOf(await ctx.d.queue.outcome("missing"))).toBe("not_found");
+    },
+  },
+];
+
+const effectAndSignalCases: ContractCase<DurabilityFactory>[] = [
+  {
+    name: "a crashed holder's pending side effect is visible to the next holder",
     run: async (factory) => {
       const ctx = await fresh(factory);
       await ctx.d.queue.enqueue(item);
-      const { fence } = await ctx.claimed("a");
-      expect(await ctx.d.queue.complete(fence, "succeeded")).toEqual({
-        ok: true,
-        value: undefined,
-      });
+      await ctx.d.sideEffects.begin((await ctx.claimed("a")).fence, key);
       ctx.advance(1_001);
-      expect(await ctx.d.queue.claim("default", "b", 1_000)).toEqual({ ok: true, value: null });
-      expect((await ctx.d.queue.enqueue(item)).ok).toBe(true);
+      const { fence } = await ctx.claimed("b");
+      const again = await ctx.d.sideEffects.begin(fence, key);
+      expect(again).toEqual({ ok: true, value: { key, state: "pending" } });
+      const done = await ctx.d.sideEffects.finish(fence, key, { pr: 7 });
+      expect(done.ok && done.value).toEqual({ key, state: "done", result: { pr: 7 } });
+      expect(await ctx.d.sideEffects.begin(fence, key)).toEqual(done);
     },
   },
   {
@@ -198,8 +206,18 @@ const leaseCases: ContractCase<DurabilityFactory>[] = [
       const ctx = await fresh(factory);
       await ctx.d.queue.enqueue(item);
       const { fence } = await ctx.claimed("a");
-      const r = await ctx.d.sideEffects.finish(fence, key, { pr: 7 });
-      expect(r.ok ? "ok" : r.error.kind).toBe("not_found");
+      expect(kindOf(await ctx.d.sideEffects.finish(fence, key, { pr: 7 }))).toBe("not_found");
+    },
+  },
+  {
+    name: "a signal sent before anyone waits is delivered exactly once",
+    run: async (factory) => {
+      const { d } = await fresh(factory);
+      const signal = { runId: "r1", name: "approve:plan", payload: { by: "maintainer" } };
+      await d.signals.send(signal);
+      expect(await d.signals.take("r1", "approve:pr")).toEqual({ ok: true, value: null });
+      expect(await d.signals.take("r1", "approve:plan")).toEqual({ ok: true, value: signal });
+      expect(await d.signals.take("r1", "approve:plan")).toEqual({ ok: true, value: null });
     },
   },
 ];
