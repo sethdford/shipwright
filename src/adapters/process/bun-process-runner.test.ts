@@ -100,6 +100,17 @@ test("timed-out run leaves no surviving grandchild that ignores SIGTERM", async 
     await new Promise((resolve) => setTimeout(resolve, 100));
     expect(Bun.spawnSync(["pgrep", "-f", "sleep 41"]).exitCode).toBe(1);
   } finally {
-    Bun.spawnSync(["pkill", "-f", "sleep 41"]);
+    const pids = new TextDecoder()
+      .decode(Bun.spawnSync(["pgrep", "-f", "sleep 41"]).stdout)
+      .split("\n")
+      .map(Number)
+      .filter((pid) => pid > 0);
+    for (const pid of pids) {
+      try {
+        process.kill(pid, "SIGKILL");
+      } catch {
+        // ESRCH: already gone.
+      }
+    }
   }
 });
