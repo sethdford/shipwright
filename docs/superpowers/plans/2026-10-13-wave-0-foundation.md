@@ -204,129 +204,7 @@ export const ok = <T>(value: T): Ok<T> => ({ ok: true, value });
 export const err = <E>(error: E): Err<E> => ({ ok: false, error });
 ```
 
-- [ ] **Step 4: Create `src/shared/kernel/ports.ts`** (types only — no runtime code)
-
-```ts
-import type { ZodType } from "zod";
-import type { Result } from "./result";
-
-// ── Processes ────────────────────────────────────────────────────────────────
-export interface ProcessRequest {
-  readonly argv: readonly string[];
-  readonly cwd?: string;
-  readonly env?: Readonly<Record<string, string>>;
-  readonly stdin?: string;
-  readonly timeoutMs?: number;
-}
-export interface ProcessResult {
-  readonly exitCode: number;
-  readonly stdout: string;
-  readonly stderr: string;
-  readonly timedOut: boolean;
-}
-export interface ProcessRunner {
-  run(request: ProcessRequest): Promise<ProcessResult>;
-}
-
-// ── Locations (rule F8: always injected, never read from the real machine in tests) ─
-export interface Paths {
-  readonly home: string;
-  readonly stateDir: string;
-  readonly tmuxSocket: string;
-}
-
-// ── Events ───────────────────────────────────────────────────────────────────
-export interface EventRecord {
-  readonly runId: string;
-  readonly type: string;
-  readonly at: string;
-  readonly data: Readonly<Record<string, unknown>>;
-}
-export interface EventLog {
-  append(event: EventRecord): void;
-  list(runId: string): EventRecord[];
-}
-
-// ── Terminal (tmux) ──────────────────────────────────────────────────────────
-export interface Terminal {
-  newSession(name: string, cwd: string): Promise<Result<void, string>>;
-  listSessions(): Promise<string[]>;
-  killSession(name: string): Promise<void>;
-}
-
-// ── Version control and issues ───────────────────────────────────────────────
-export interface Vcs {
-  headSha(cwd: string): Promise<Result<string, string>>;
-  currentBranch(cwd: string): Promise<Result<string, string>>;
-}
-export interface Issue {
-  readonly number: number;
-  readonly title: string;
-  readonly body: string;
-  readonly labels: readonly string[];
-}
-export interface IssueTracker {
-  getIssue(number: number): Promise<Result<Issue, string>>;
-}
-
-// ── Agent runtime (rule F6: implemented only in src/adapters/agent) ──────────
-export type Effort = "low" | "medium" | "high" | "xhigh" | "max";
-
-export type AgentFailureKind =
-  | "refusal"
-  | "max_turns"
-  | "budget"
-  | "schema"
-  | "timeout"
-  | "aborted"
-  | "execution";
-
-export interface AgentFailure {
-  readonly kind: AgentFailureKind;
-  readonly message: string;
-  readonly costUsd: number;
-}
-
-export interface DecideRequest<T> {
-  /** Trusted instructions written by Shipwright. Becomes the system prompt. */
-  readonly instructions: string;
-  /** Untrusted input (issue text, PR bodies). Passed only as data. */
-  readonly data: string;
-  readonly schema: ZodType<T>;
-  readonly model: string;
-  readonly effort: Effort;
-  readonly maxBudgetUsd: number;
-  readonly timeoutMs: number;
-}
-export interface Decision<T> {
-  readonly value: T;
-  readonly costUsd: number;
-}
-
-export interface TaskSpec {
-  readonly prompt: string;
-  readonly cwd: string;
-  readonly model: string;
-  readonly effort: Effort;
-  /** Tools auto-approved for this task; everything else is denied. */
-  readonly allowedTools: readonly string[];
-  readonly maxTurns: number;
-  readonly maxBudgetUsd: number;
-  readonly timeoutMs: number;
-  readonly signal?: AbortSignal;
-}
-export interface TaskOutcome {
-  readonly summary: string;
-  readonly costUsd: number;
-  readonly turns: number;
-  readonly sessionId: string;
-}
-
-export interface AgentRunner {
-  decide<T>(request: DecideRequest<T>): Promise<Result<Decision<T>, AgentFailure>>;
-  runTask(spec: TaskSpec): Promise<Result<TaskOutcome, AgentFailure>>;
-}
-```
+- [ ] **Step 4: Create `src/shared/kernel/ports.ts`** (types only — no runtime code). The authoritative content is the file as committed on the branch (revised after code review to add `AdapterError`, `AgentUsage`, `Result`-returning `Terminal` methods, `Issue.state`/`author`, and `Paths.tmuxSocketName`).
 
 - [ ] **Step 5: Run tests and typecheck**
 
@@ -365,7 +243,7 @@ describe("createTestEnv", () => {
       expect(env.home).not.toBe(homedir());
       expect(env.stateDir.startsWith(env.home)).toBe(true);
       expect(existsSync(env.stateDir)).toBe(true);
-      expect(env.tmuxSocket).toMatch(/^sw-test-/);
+      expect(env.tmuxSocketName).toMatch(/^sw-test-/);
     } finally {
       env.cleanup();
     }
@@ -375,7 +253,7 @@ describe("createTestEnv", () => {
   test("two environments never share a tmux socket", () => {
     const a = createTestEnv();
     const b = createTestEnv();
-    expect(a.tmuxSocket).not.toBe(b.tmuxSocket);
+    expect(a.tmuxSocketName).not.toBe(b.tmuxSocketName);
     a.cleanup();
     b.cleanup();
   });
@@ -431,7 +309,7 @@ export function createTestEnv(): TestEnv {
     root,
     home,
     stateDir,
-    tmuxSocket: `sw-test-${basename(root)}`,
+    tmuxSocketName: `sw-test-${basename(root)}`,
     cleanup: () => rmSync(root, { recursive: true, force: true }),
   };
 }
@@ -493,7 +371,7 @@ test("defaults state dir and socket from HOME", () => {
   expect(resolvePaths({ HOME: "/h" })).toEqual({
     home: "/h",
     stateDir: "/h/.shipwright",
-    tmuxSocket: "shipwright",
+    tmuxSocketName: "shipwright",
   });
 });
 
@@ -503,7 +381,7 @@ test("honours explicit overrides", () => {
     SHIPWRIGHT_STATE_DIR: "/s",
     SHIPWRIGHT_TMUX_SOCKET: "sock",
   });
-  expect(paths).toEqual({ home: "/h", stateDir: "/s", tmuxSocket: "sock" });
+  expect(paths).toEqual({ home: "/h", stateDir: "/s", tmuxSocketName: "sock" });
 });
 
 test("fails loudly without HOME rather than guessing", () => {
@@ -557,7 +435,7 @@ export function resolvePaths(env: Readonly<Record<string, string | undefined>>):
   return {
     home,
     stateDir: env.SHIPWRIGHT_STATE_DIR ?? `${home}/.shipwright`,
-    tmuxSocket: env.SHIPWRIGHT_TMUX_SOCKET ?? "shipwright",
+    tmuxSocketName: env.SHIPWRIGHT_TMUX_SOCKET ?? "shipwright",
   };
 }
 ```
@@ -732,6 +610,8 @@ git commit -m "feat(ts): add bun:sqlite event log with migrations"
 - Create: `src/adapters/github/gh-issue-tracker.ts`, `src/adapters/git/git-cli.ts`, `src/adapters/tmux/tmux-terminal.ts`
 - Test: one `*.test.ts` beside each
 
+Errors are returned as the kernel's `AdapterError` (`not_found | auth | transient | failed`) so callers decide retries on `kind`, never on message text.
+
 - [ ] **Step 1: Write the failing tests**
 
 `src/adapters/github/gh-issue-tracker.test.ts`:
@@ -741,37 +621,57 @@ import { expect, test } from "bun:test";
 import { FakeProcessRunner } from "../../testing/fake-process-runner";
 import { GhIssueTracker } from "./gh-issue-tracker";
 
+const gh = (exitCode: number, stdout: string, stderr = "", timedOut = false) =>
+  new FakeProcessRunner([{ prefix: ["gh"], result: { exitCode, stdout, stderr, timedOut } }]);
+
 test("parses gh JSON into an Issue; a title with backticks stays data", async () => {
-  const runner = new FakeProcessRunner([
-    {
-      prefix: ["gh", "issue", "view", "7690"],
-      result: {
-        exitCode: 0,
-        stderr: "",
-        stdout: JSON.stringify({
-          number: 7690,
-          title: "Decompose `sw-memory.sh`",
-          body: "b",
-          labels: [{ name: "ready-to-build" }],
-        }),
-      },
-    },
-  ]);
-  const r = await new GhIssueTracker(runner).getIssue(7690);
-  expect(r).toEqual({
+  const runner = gh(
+    0,
+    JSON.stringify({
+      number: 7690,
+      title: "Decompose `sw-memory.sh`",
+      body: null,
+      state: "OPEN",
+      author: { login: "patrol-bot", is_bot: true },
+      labels: [{ name: "ready-to-build" }],
+    }),
+  );
+  expect(await new GhIssueTracker(runner).getIssue(7690)).toEqual({
     ok: true,
-    value: { number: 7690, title: "Decompose `sw-memory.sh`", body: "b", labels: ["ready-to-build"] },
+    value: {
+      number: 7690,
+      title: "Decompose `sw-memory.sh`",
+      body: "",
+      state: "open",
+      author: "patrol-bot",
+      labels: ["ready-to-build"],
+    },
   });
   expect(runner.calls[0]?.argv).toEqual([
-    "gh", "issue", "view", "7690", "--json", "number,title,body,labels",
+    "gh", "issue", "view", "7690", "--json", "number,title,body,state,author,labels",
   ]);
 });
 
-test("returns an error result when gh fails", async () => {
-  const runner = new FakeProcessRunner([
-    { prefix: ["gh"], result: { exitCode: 1, stdout: "", stderr: "not found" } },
-  ]);
-  expect(await new GhIssueTracker(runner).getIssue(1)).toEqual({ ok: false, error: "not found" });
+test.each([
+  ["GraphQL: Could not resolve to an issue or pull request with the number of 1.", "not_found"],
+  ["HTTP 401: Bad credentials", "auth"],
+  ["To get started with GitHub CLI, please run:  gh auth login", "auth"],
+  ["HTTP 403: API rate limit exceeded for user", "transient"],
+  ["HTTP 502: Bad Gateway", "transient"],
+  ["something unexpected", "failed"],
+])("classifies gh error %p as %p", async (stderr, kind) => {
+  const r = await new GhIssueTracker(gh(1, "", stderr)).getIssue(1);
+  expect(r).toEqual({ ok: false, error: { kind: kind as never, message: stderr } });
+});
+
+test("a timeout is transient", async () => {
+  const r = await new GhIssueTracker(gh(143, "", "", true)).getIssue(1);
+  expect(!r.ok && r.error.kind).toBe("transient");
+});
+
+test("unexpected JSON is a failed error, not a crash", async () => {
+  const r = await new GhIssueTracker(gh(0, JSON.stringify({ number: "x" }))).getIssue(1);
+  expect(!r.ok && r.error.kind).toBe("failed");
 });
 ```
 
@@ -784,16 +684,27 @@ import { GitCli } from "./git-cli";
 
 test("headSha and currentBranch trim git output", async () => {
   const runner = new FakeProcessRunner([
-    { prefix: ["git", "rev-parse", "HEAD"], result: { exitCode: 0, stdout: "abc\n", stderr: "" } },
     {
       prefix: ["git", "rev-parse", "--abbrev-ref", "HEAD"],
       result: { exitCode: 0, stdout: "main\n", stderr: "" },
     },
+    { prefix: ["git", "rev-parse", "HEAD"], result: { exitCode: 0, stdout: "abc\n", stderr: "" } },
   ]);
   const git = new GitCli(runner);
   expect(await git.headSha("/repo")).toEqual({ ok: true, value: "abc" });
   expect(await git.currentBranch("/repo")).toEqual({ ok: true, value: "main" });
   expect(runner.calls[0]?.cwd).toBe("/repo");
+});
+
+test("outside a repository is not_found", async () => {
+  const runner = new FakeProcessRunner([
+    {
+      prefix: ["git"],
+      result: { exitCode: 128, stdout: "", stderr: "fatal: not a git repository (or any of the parent directories): .git\n" },
+    },
+  ]);
+  const r = await new GitCli(runner).headSha("/tmp");
+  expect(!r.ok && r.error.kind).toBe("not_found");
 });
 ```
 
@@ -804,33 +715,48 @@ import { expect, test } from "bun:test";
 import { FakeProcessRunner } from "../../testing/fake-process-runner";
 import { TmuxTerminal } from "./tmux-terminal";
 
-test("refuses to operate without an explicit socket", () => {
-  expect(() => new TmuxTerminal(new FakeProcessRunner([]), "")).toThrow(/socket/);
+const tmux = (exitCode: number, stdout: string, stderr = "", timedOut = false) =>
+  new FakeProcessRunner([{ prefix: ["tmux"], result: { exitCode, stdout, stderr, timedOut } }]);
+
+test("refuses to operate without an explicit socket name", () => {
+  expect(() => new TmuxTerminal(tmux(0, ""), "")).toThrow(/socket/);
 });
 
 test("every command targets the private socket", async () => {
-  const runner = new FakeProcessRunner([
-    { prefix: ["tmux", "-L", "sw-test-x"], result: { exitCode: 0, stdout: "a\nb\n", stderr: "" } },
-  ]);
+  const runner = tmux(0, "a\nb\n");
   const t = new TmuxTerminal(runner, "sw-test-x");
-  expect(await t.listSessions()).toEqual(["a", "b"]);
+  expect(await t.listSessions()).toEqual({ ok: true, value: ["a", "b"] });
   await t.killSession("a");
   expect(runner.calls.every((c) => c.argv[1] === "-L" && c.argv[2] === "sw-test-x")).toBe(true);
 });
 
 test("killSession uses exact-name matching so it can never hit a prefix-matched session", async () => {
-  const runner = new FakeProcessRunner([
-    { prefix: ["tmux"], result: { exitCode: 0, stdout: "", stderr: "" } },
-  ]);
-  await new TmuxTerminal(runner, "s").killSession("claude-team");
+  const runner = tmux(0, "");
+  expect(await new TmuxTerminal(runner, "s").killSession("claude-team")).toEqual({ ok: true, value: undefined });
   expect(runner.calls[0]?.argv).toEqual(["tmux", "-L", "s", "kill-session", "-t", "=claude-team"]);
 });
 
-test("listSessions returns [] when no server is running", async () => {
-  const runner = new FakeProcessRunner([
-    { prefix: ["tmux"], result: { exitCode: 1, stdout: "", stderr: "no server running" } },
-  ]);
-  expect(await new TmuxTerminal(runner, "s").listSessions()).toEqual([]);
+test("no server running means no sessions, not a failure", async () => {
+  const t = new TmuxTerminal(tmux(1, "", "no server running on /tmp/tmux-501/s\n"), "s");
+  expect(await t.listSessions()).toEqual({ ok: true, value: [] });
+});
+
+test("killing an absent session is ok (idempotent)", async () => {
+  const t = new TmuxTerminal(tmux(1, "", "can't find session: =x\n"), "s");
+  expect(await t.killSession("x")).toEqual({ ok: true, value: undefined });
+});
+
+test("other failures are reported, so callers never mistake 'could not look' for 'nothing there'", async () => {
+  const t = new TmuxTerminal(tmux(1, "", "protocol version mismatch\n"), "s");
+  expect(await t.listSessions()).toEqual({
+    ok: false,
+    error: { kind: "failed", message: "protocol version mismatch" },
+  });
+});
+
+test("a timeout is transient", async () => {
+  const r = await new TmuxTerminal(tmux(143, "", "", true), "s").listSessions();
+  expect(!r.ok && r.error.kind).toBe("transient");
 });
 ```
 
@@ -843,29 +769,59 @@ Expected: FAIL — modules not found.
 
 ```ts
 import { z } from "zod";
-import type { Issue, IssueTracker, ProcessRunner } from "../../shared/kernel/ports";
+import type {
+  AdapterError,
+  Issue,
+  IssueTracker,
+  ProcessResult,
+  ProcessRunner,
+} from "../../shared/kernel/ports";
 import { err, ok, type Result } from "../../shared/kernel/result";
 
 const GhIssue = z.object({
   number: z.number(),
   title: z.string(),
-  body: z.string().nullable().transform((b) => b ?? ""),
+  body: z.string().nullable(),
+  state: z.enum(["OPEN", "CLOSED"]),
+  author: z.object({ login: z.string() }),
   labels: z.array(z.object({ name: z.string() })),
 });
+
+export function classifyGhError(r: ProcessResult): AdapterError {
+  const message = r.stderr.trim() || `gh exited ${r.exitCode}`;
+  if (r.timedOut) return { kind: "transient", message: message || "gh timed out" };
+  if (/could not resolve to an? (issue|pull request)|HTTP 404|not found/i.test(message)) {
+    return { kind: "not_found", message };
+  }
+  if (/rate limit|HTTP 5\d\d|timed? ?out|connection (reset|refused)|EOF/i.test(message)) {
+    return { kind: "transient", message };
+  }
+  if (/HTTP 401|HTTP 403|bad credentials|gh auth login|authentication/i.test(message)) {
+    return { kind: "auth", message };
+  }
+  return { kind: "failed", message };
+}
 
 export class GhIssueTracker implements IssueTracker {
   constructor(private readonly runner: ProcessRunner) {}
 
-  async getIssue(number: number): Promise<Result<Issue, string>> {
+  async getIssue(number: number): Promise<Result<Issue, AdapterError>> {
     const r = await this.runner.run({
-      argv: ["gh", "issue", "view", String(number), "--json", "number,title,body,labels"],
+      argv: ["gh", "issue", "view", String(number), "--json", "number,title,body,state,author,labels"],
       timeoutMs: 30_000,
     });
-    if (r.exitCode !== 0) return err(r.stderr.trim() || `gh exited ${r.exitCode}`);
+    if (r.exitCode !== 0 || r.timedOut) return err(classifyGhError(r));
     const parsed = GhIssue.safeParse(JSON.parse(r.stdout));
-    if (!parsed.success) return err(`unexpected gh output: ${parsed.error.message}`);
-    const { labels, ...rest } = parsed.data;
-    return ok({ ...rest, labels: labels.map((l) => l.name) });
+    if (!parsed.success) return err({ kind: "failed", message: `unexpected gh output: ${parsed.error.message}` });
+    const i = parsed.data;
+    return ok({
+      number: i.number,
+      title: i.title,
+      body: i.body ?? "",
+      state: i.state === "OPEN" ? "open" : "closed",
+      author: i.author.login,
+      labels: i.labels.map((l) => l.name),
+    });
   }
 }
 ```
@@ -873,23 +829,26 @@ export class GhIssueTracker implements IssueTracker {
 - [ ] **Step 4: Implement `src/adapters/git/git-cli.ts`**
 
 ```ts
-import type { ProcessRunner, Vcs } from "../../shared/kernel/ports";
+import type { AdapterError, ProcessRunner, Vcs } from "../../shared/kernel/ports";
 import { err, ok, type Result } from "../../shared/kernel/result";
 
 export class GitCli implements Vcs {
   constructor(private readonly runner: ProcessRunner) {}
 
-  headSha(cwd: string): Promise<Result<string, string>> {
+  headSha(cwd: string): Promise<Result<string, AdapterError>> {
     return this.git(cwd, ["rev-parse", "HEAD"]);
   }
 
-  currentBranch(cwd: string): Promise<Result<string, string>> {
+  currentBranch(cwd: string): Promise<Result<string, AdapterError>> {
     return this.git(cwd, ["rev-parse", "--abbrev-ref", "HEAD"]);
   }
 
-  private async git(cwd: string, args: readonly string[]): Promise<Result<string, string>> {
+  private async git(cwd: string, args: readonly string[]): Promise<Result<string, AdapterError>> {
     const r = await this.runner.run({ argv: ["git", ...args], cwd, timeoutMs: 30_000 });
-    return r.exitCode === 0 ? ok(r.stdout.trim()) : err(r.stderr.trim());
+    if (r.exitCode === 0 && !r.timedOut) return ok(r.stdout.trim());
+    const message = r.stderr.trim() || `git ${args.join(" ")} exited ${r.exitCode}`;
+    if (r.timedOut) return err({ kind: "transient", message });
+    return err({ kind: /not a git repository/i.test(message) ? "not_found" : "failed", message });
   }
 }
 ```
@@ -897,49 +856,61 @@ export class GitCli implements Vcs {
 - [ ] **Step 5: Implement `src/adapters/tmux/tmux-terminal.ts`**
 
 ```ts
-import type { ProcessRunner, Terminal } from "../../shared/kernel/ports";
+import type { AdapterError, ProcessResult, ProcessRunner, Terminal } from "../../shared/kernel/ports";
 import { err, ok, type Result } from "../../shared/kernel/result";
+
+const NO_SERVER = /no server running|error connecting to/i;
+const NO_SESSION = /can't find session|session not found/i;
 
 /** All tmux access goes through one named socket; there is no "current server" fallback. */
 export class TmuxTerminal implements Terminal {
   constructor(
     private readonly runner: ProcessRunner,
-    private readonly socket: string,
+    private readonly socketName: string,
   ) {
-    if (!socket) throw new Error("TmuxTerminal requires an explicit socket name");
+    if (!socketName) throw new Error("TmuxTerminal requires an explicit socket name");
   }
 
-  async newSession(name: string, cwd: string): Promise<Result<void, string>> {
+  async newSession(name: string, cwd: string): Promise<Result<void, AdapterError>> {
     const r = await this.tmux(["new-session", "-d", "-s", name, "-c", cwd]);
-    return r.exitCode === 0 ? ok(undefined) : err(r.stderr.trim());
+    return r.exitCode === 0 && !r.timedOut ? ok(undefined) : err(failure(r));
   }
 
-  async listSessions(): Promise<string[]> {
+  async listSessions(): Promise<Result<readonly string[], AdapterError>> {
     const r = await this.tmux(["list-sessions", "-F", "#{session_name}"]);
-    if (r.exitCode !== 0) return [];
-    return r.stdout.split("\n").filter(Boolean);
+    if (r.exitCode === 0 && !r.timedOut) return ok(r.stdout.split("\n").filter(Boolean));
+    if (!r.timedOut && NO_SERVER.test(r.stderr)) return ok([]);
+    return err(failure(r));
   }
 
-  async killSession(name: string): Promise<void> {
-    await this.tmux(["kill-session", "-t", `=${name}`]);
+  async killSession(name: string): Promise<Result<void, AdapterError>> {
+    const r = await this.tmux(["kill-session", "-t", `=${name}`]);
+    if (r.exitCode === 0 && !r.timedOut) return ok(undefined);
+    if (!r.timedOut && (NO_SERVER.test(r.stderr) || NO_SESSION.test(r.stderr))) return ok(undefined);
+    return err(failure(r));
   }
 
-  private tmux(args: readonly string[]) {
-    return this.runner.run({ argv: ["tmux", "-L", this.socket, ...args], timeoutMs: 10_000 });
+  private tmux(args: readonly string[]): Promise<ProcessResult> {
+    return this.runner.run({ argv: ["tmux", "-L", this.socketName, ...args], timeoutMs: 10_000 });
   }
+}
+
+function failure(r: ProcessResult): AdapterError {
+  const message = r.stderr.trim() || `tmux exited ${r.exitCode}`;
+  return { kind: r.timedOut ? "transient" : "failed", message };
 }
 ```
 
 - [ ] **Step 6: Run tests**
 
-Run: `bun test ./src/adapters`
-Expected: all adapter tests pass (7 new).
+Run: `bun test ./src/adapters && bun run typecheck`
+Expected: all adapter tests pass; typecheck exit 0.
 
 - [ ] **Step 7: Commit**
 
 ```bash
 git add src/adapters/github src/adapters/git src/adapters/tmux
-git commit -m "feat(ts): add gh, git and socket-scoped tmux adapters"
+git commit -m "feat(ts): add gh, git and socket-scoped tmux adapters with classified errors"
 ```
 
 ---
@@ -950,16 +921,17 @@ git commit -m "feat(ts): add gh, git and socket-scoped tmux adapters"
 - Create: `src/adapters/agent/untrusted.ts`, `src/adapters/agent/agent-sdk-runner.ts`
 - Test: `src/adapters/agent/untrusted.test.ts`, `src/adapters/agent/agent-sdk-runner.test.ts`
 
-SDK facts used here (confirmed against code.claude.com/docs/en/agent-sdk on 2026-10-13): `query({prompt, options})` yields messages; the final `type: "result"` message has `subtype` (`success`, `error_max_turns`, `error_max_budget_usd`, `error_during_execution`, `error_max_structured_output_retries`), `total_cost_usd`, `num_turns`, `session_id`, `stop_reason`, and on success `result` and `structured_output`. A single-shot `query()` throws after yielding an error result. `allowedTools` only auto-approves; `permissionMode: "dontAsk"` denies everything not pre-approved.
+SDK facts used here (confirmed against code.claude.com/docs/en/agent-sdk on 2026-10-13, SDK 0.3.296): `query({prompt, options})` yields messages; the final `type: "result"` message has `subtype` (`success`, `error_max_turns`, `error_max_budget_usd`, `error_during_execution`, `error_max_structured_output_retries`), `is_error`, `total_cost_usd`, `usage` (`input_tokens`, `output_tokens`), `num_turns`, `session_id`, `stop_reason`, `errors[]` on error results, and on success `result` and `structured_output`. A single-shot `query()` throws after yielding an error result. `allowedTools` only auto-approves; `permissionMode: "dontAsk"` denies everything not pre-approved.
 
 - [ ] **Step 0: Pin the Agent SDK exactly** (it is 0.x and releases every 1–2 days; a caret range drifts)
 
 ```bash
 bun add --exact @anthropic-ai/claude-agent-sdk@0.3.296
+npm install --package-lock-only --ignore-scripts
 jq -r '.dependencies["@anthropic-ai/claude-agent-sdk"]' package.json
 ```
 
-Expected: `0.3.296` (no `^`).
+Expected: `0.3.296` (no `^`); `package-lock.json` updated to match.
 
 - [ ] **Step 1: Write the failing tests**
 
@@ -990,13 +962,13 @@ import { AgentSdkRunner, type QueryFn } from "./agent-sdk-runner";
 
 type Captured = { prompt: string; options: Record<string, unknown> };
 
-function fakeQuery(messages: object[], opts: { throwAfter?: boolean } = {}) {
+function fakeQuery(messages: object[], opts: { throwAfter?: string } = {}) {
   const captured: Captured[] = [];
   const fn: QueryFn = (args) => {
     captured.push(args as unknown as Captured);
     return (async function* () {
       for (const m of messages) yield m as never;
-      if (opts.throwAfter) throw new Error("Claude Code process exited with code 1");
+      if (opts.throwAfter) throw new Error(opts.throwAfter);
     })();
   };
   return { fn, captured };
@@ -1004,7 +976,9 @@ function fakeQuery(messages: object[], opts: { throwAfter?: boolean } = {}) {
 
 const result = (extra: object) => ({
   type: "result",
+  is_error: false,
   total_cost_usd: 0.01,
+  usage: { input_tokens: 100, output_tokens: 20 },
   num_turns: 1,
   session_id: "s1",
   stop_reason: "end_turn",
@@ -1021,116 +995,132 @@ const decideReq = {
   maxBudgetUsd: 0.5,
   timeoutMs: 60_000,
 };
+const runner = (fn: QueryFn) => new AgentSdkRunner(fn, {});
 
 describe("decide", () => {
-  test("returns the validated structured output and cost", async () => {
+  test("returns the validated structured output with usage", async () => {
     const { fn } = fakeQuery([
       result({ subtype: "success", structured_output: { approved: true, reason: "fits" } }),
     ]);
-    const r = await new AgentSdkRunner(fn, {}).decide(decideReq);
-    expect(r).toEqual({ ok: true, value: { value: { approved: true, reason: "fits" }, costUsd: 0.01 } });
+    const r = await runner(fn).decide(decideReq);
+    if (!r.ok) throw new Error(r.error.message);
+    expect(r.value.value).toEqual({ approved: true, reason: "fits" });
+    expect(r.value.usage).toMatchObject({ costUsd: 0.01, inputTokens: 100, outputTokens: 20 });
+    expect(r.value.usage.durationMs).toBeGreaterThanOrEqual(0);
   });
 
   test("passes untrusted data only inside the data block, denies all tools, isolates settings", async () => {
     const { fn, captured } = fakeQuery([
       result({ subtype: "success", structured_output: { approved: false, reason: "no" } }),
     ]);
-    await new AgentSdkRunner(fn, {}).decide(decideReq);
+    await runner(fn).decide(decideReq);
     const { prompt, options } = captured[0] as Captured;
     expect(prompt).toContain("BEGIN DATA\nTitle: `rm -rf /`\n");
-    expect(options.systemPrompt).toBe(decideReq.instructions);
-    expect(options.permissionMode).toBe("dontAsk");
-    expect(options.allowedTools).toEqual([]);
-    expect(options.settingSources).toEqual([]);
-    expect(options.model).toBe("claude-haiku-5-5");
-    expect(options.effort).toBe("low");
-    expect(options.maxBudgetUsd).toBe(0.5);
-    expect((options.outputFormat as { type: string }).type).toBe("json_schema");
+    expect(options).toMatchObject({
+      systemPrompt: decideReq.instructions,
+      permissionMode: "dontAsk",
+      allowedTools: [],
+      settingSources: [],
+      persistSession: false,
+      model: "claude-haiku-5-5",
+      effort: "low",
+      maxBudgetUsd: 0.5,
+      outputFormat: { type: "json_schema" },
+    });
   });
 
-  test("schema mismatch becomes a typed failure, never a silent default", async () => {
+  test("schema mismatch is a typed failure carrying the session id", async () => {
     const { fn } = fakeQuery([result({ subtype: "success", structured_output: { approved: "yes" } })]);
-    const r = await new AgentSdkRunner(fn, {}).decide(decideReq);
+    const r = await runner(fn).decide(decideReq);
     expect(r.ok).toBe(false);
-    if (!r.ok) expect(r.error.kind).toBe("schema");
+    if (!r.ok) expect(r.error).toMatchObject({ kind: "schema", sessionId: "s1" });
+  });
+
+  test("a schema that cannot be expressed as JSON Schema fails before calling Claude", async () => {
+    const { fn, captured } = fakeQuery([]);
+    const r = await runner(fn).decide({ ...decideReq, schema: z.string().transform((s) => s.length) });
+    expect(!r.ok && r.error.kind).toBe("schema");
+    expect(captured).toHaveLength(0);
   });
 
   test("refusal is reported as refusal even though the SDK throws afterwards", async () => {
     const { fn } = fakeQuery(
-      [result({ subtype: "error_during_execution", stop_reason: "refusal" })],
-      { throwAfter: true },
+      [result({ subtype: "error_during_execution", is_error: true, stop_reason: "refusal" })],
+      { throwAfter: "Claude Code process exited with code 1" },
     );
-    const r = await new AgentSdkRunner(fn, {}).decide(decideReq);
-    expect(r).toEqual({
-      ok: false,
-      error: { kind: "refusal", message: "model refused", costUsd: 0.01 },
-    });
+    const r = await runner(fn).decide(decideReq);
+    if (r.ok) throw new Error("expected failure");
+    expect(r.error).toMatchObject({ kind: "refusal", message: "model refused", sessionId: "s1" });
+    expect(r.error.usage.costUsd).toBe(0.01);
   });
 
   test("budget exhaustion maps to budget", async () => {
-    const { fn } = fakeQuery([result({ subtype: "error_max_budget_usd" })], { throwAfter: true });
-    const r = await new AgentSdkRunner(fn, {}).decide(decideReq);
+    const { fn } = fakeQuery([result({ subtype: "error_max_budget_usd", is_error: true })], {
+      throwAfter: "budget",
+    });
+    const r = await runner(fn).decide(decideReq);
     expect(!r.ok && r.error.kind).toBe("budget");
   });
 
-  test("a success subtype flagged is_error is a failure, reported with the SDK's errors[]", async () => {
+  test.each([
+    ["API Error: 529 overloaded_error", "transient"],
+    ["API Error: 429 rate_limit_error", "transient"],
+    ["Invalid API key · Please run /login", "auth"],
+    ["Unexpected tool failure", "execution"],
+  ])("classifies SDK error %p as %p", async (message, kind) => {
     const { fn } = fakeQuery([
-      result({ subtype: "success", is_error: true, errors: ["API Error: overloaded"], structured_output: {} }),
+      result({ subtype: "success", is_error: true, errors: [message], structured_output: {} }),
     ]);
-    const r = await new AgentSdkRunner(fn, {}).decide(decideReq);
-    expect(r).toEqual({
-      ok: false,
-      error: { kind: "execution", message: "API Error: overloaded", costUsd: 0.01 },
-    });
+    const r = await runner(fn).decide(decideReq);
+    if (r.ok) throw new Error("expected failure");
+    expect(r.error).toMatchObject({ kind, message });
   });
 
-  test("decide does not persist a session to disk", async () => {
-    const { fn, captured } = fakeQuery([
-      result({ subtype: "success", structured_output: { approved: true, reason: "ok" } }),
-    ]);
-    await new AgentSdkRunner(fn, {}).decide(decideReq);
-    expect((captured[0] as Captured).options.persistSession).toBe(false);
-  });
-
-  test("a crash with no result message is an execution failure with zero cost", async () => {
-    const { fn } = fakeQuery([], { throwAfter: true });
-    const r = await new AgentSdkRunner(fn, {}).decide(decideReq);
-    expect(r).toEqual({
-      ok: false,
-      error: { kind: "execution", message: "Claude Code process exited with code 1", costUsd: 0 },
-    });
+  test("a crash with no result message is an execution failure with zero cost and no session", async () => {
+    const { fn } = fakeQuery([], { throwAfter: "Claude Code process exited with code 1" });
+    const r = await runner(fn).decide(decideReq);
+    if (r.ok) throw new Error("expected failure");
+    expect(r.error.kind).toBe("execution");
+    expect(r.error.message).toBe("Claude Code process exited with code 1");
+    expect(r.error.usage.costUsd).toBe(0);
+    expect(r.error.sessionId).toBeUndefined();
   });
 });
 
 describe("runTask", () => {
+  const spec = {
+    prompt: "Implement the plan",
+    cwd: "/wt/issue-1",
+    model: "claude-opus-5-5",
+    effort: "xhigh" as const,
+    allowedTools: ["Read", "Edit", "Bash(bun test *)"],
+    maxTurns: 40,
+    maxBudgetUsd: 5,
+    timeoutMs: 600_000,
+  };
+
   test("runs in the worktree with only the allowed tools and returns a summary", async () => {
     const { fn, captured } = fakeQuery([result({ subtype: "success", result: "done", num_turns: 7 })]);
-    const r = await new AgentSdkRunner(fn, { PATH: "/bin" }).runTask({
-      prompt: "Implement the plan",
+    const r = await new AgentSdkRunner(fn, { PATH: "/bin" }).runTask(spec);
+    if (!r.ok) throw new Error(r.error.message);
+    expect(r.value).toMatchObject({ summary: "done", turns: 7, sessionId: "s1" });
+    expect(r.value.usage.costUsd).toBe(0.01);
+    expect((captured[0] as Captured).options).toMatchObject({
       cwd: "/wt/issue-1",
-      model: "claude-opus-5-5",
-      effort: "xhigh",
+      permissionMode: "dontAsk",
       allowedTools: ["Read", "Edit", "Bash(bun test *)"],
-      maxTurns: 40,
-      maxBudgetUsd: 5,
-      timeoutMs: 600_000,
+      settingSources: ["project"],
+      env: { PATH: "/bin" },
     });
-    expect(r).toEqual({ ok: true, value: { summary: "done", costUsd: 0.01, turns: 7, sessionId: "s1" } });
-    const { options } = captured[0] as Captured;
-    expect(options.cwd).toBe("/wt/issue-1");
-    expect(options.permissionMode).toBe("dontAsk");
-    expect(options.allowedTools).toEqual(["Read", "Edit", "Bash(bun test *)"]);
-    expect(options.settingSources).toEqual(["project"]);
-    expect(options.env).toEqual({ PATH: "/bin" });
   });
 
-  test("max turns maps to max_turns", async () => {
-    const { fn } = fakeQuery([result({ subtype: "error_max_turns" })], { throwAfter: true });
-    const r = await new AgentSdkRunner(fn, {}).runTask({
-      prompt: "p", cwd: "/", model: "m", effort: "low", allowedTools: [],
-      maxTurns: 1, maxBudgetUsd: 1, timeoutMs: 1000,
+  test("max turns maps to max_turns and keeps the session id so the run can be resumed", async () => {
+    const { fn } = fakeQuery([result({ subtype: "error_max_turns", is_error: true })], {
+      throwAfter: "Reached maximum number of turns",
     });
-    expect(!r.ok && r.error.kind).toBe("max_turns");
+    const r = await runner(fn).runTask(spec);
+    if (r.ok) throw new Error("expected failure");
+    expect(r.error).toMatchObject({ kind: "max_turns", sessionId: "s1" });
   });
 });
 ```
@@ -1170,7 +1160,9 @@ import {
 import { z } from "zod";
 import type {
   AgentFailure,
+  AgentFailureKind,
   AgentRunner,
+  AgentUsage,
   Decision,
   DecideRequest,
   TaskOutcome,
@@ -1180,11 +1172,16 @@ import { err, ok, type Result } from "../../shared/kernel/result";
 import { wrapUntrusted } from "./untrusted";
 
 export type QueryFn = (args: { prompt: string; options: Options }) => AsyncIterable<SDKMessage>;
+type Success = SDKResultMessage & { subtype: "success" };
 
 interface Collected {
   readonly result?: SDKResultMessage;
   readonly error?: unknown;
 }
+
+const ZERO_USAGE: AgentUsage = { costUsd: 0, inputTokens: 0, outputTokens: 0, durationMs: 0 };
+const AUTH = /\b401\b|unauthori[sz]ed|invalid (api key|x-api-key)|authentication|run \/login|credentials/i;
+const TRANSIENT = /overloaded|rate.?limit|\b(429|500|502|503|529)\b|ECONNRESET|ETIMEDOUT|network|socket hang up/i;
 
 async function collect(stream: AsyncIterable<SDKMessage>): Promise<Collected> {
   let result: SDKResultMessage | undefined;
@@ -1197,26 +1194,44 @@ async function collect(stream: AsyncIterable<SDKMessage>): Promise<Collected> {
   return { result };
 }
 
-function failure(c: Collected, aborted: boolean, timedOut: boolean): AgentFailure {
-  const costUsd = c.result?.total_cost_usd ?? 0;
-  if (timedOut) return { kind: "timeout", message: "agent call timed out", costUsd };
-  if (aborted) return { kind: "aborted", message: "agent call aborted", costUsd };
-  if (c.result?.stop_reason === "refusal") return { kind: "refusal", message: "model refused", costUsd };
+function usageOf(r: SDKResultMessage | undefined, startedAt: number): AgentUsage {
+  return {
+    costUsd: r?.total_cost_usd ?? 0,
+    inputTokens: r?.usage?.input_tokens ?? 0,
+    outputTokens: r?.usage?.output_tokens ?? 0,
+    durationMs: Date.now() - startedAt,
+  };
+}
+
+function classify(message: string): AgentFailureKind {
+  if (AUTH.test(message)) return "auth";
+  if (TRANSIENT.test(message)) return "transient";
+  return "execution";
+}
+
+function errorMessage(c: Collected): string {
+  const sdkErrors = c.result && "errors" in c.result ? (c.result.errors as string[] | undefined) : undefined;
+  if (sdkErrors?.length) return sdkErrors.join("; ");
+  return c.error instanceof Error ? c.error.message : "agent run failed";
+}
+
+function failure(c: Collected, usage: AgentUsage, aborted: boolean, timedOut: boolean): AgentFailure {
+  const sessionId = c.result?.session_id;
+  const fail = (kind: AgentFailureKind, message: string): AgentFailure =>
+    sessionId ? { kind, message, usage, sessionId } : { kind, message, usage };
+  if (timedOut) return fail("timeout", "agent call timed out");
+  if (aborted) return fail("aborted", "agent call aborted");
+  if (c.result?.stop_reason === "refusal") return fail("refusal", "model refused");
   switch (c.result?.subtype) {
     case "error_max_turns":
-      return { kind: "max_turns", message: "reached max turns", costUsd };
+      return fail("max_turns", "reached max turns");
     case "error_max_budget_usd":
-      return { kind: "budget", message: "reached budget cap", costUsd };
+      return fail("budget", "reached budget cap");
     case "error_max_structured_output_retries":
-      return { kind: "schema", message: "no valid structured output", costUsd };
+      return fail("schema", "no valid structured output");
   }
-  const sdkErrors = c.result && "errors" in c.result ? (c.result.errors as string[] | undefined) : undefined;
-  const message = sdkErrors?.length
-    ? sdkErrors.join("; ")
-    : c.error instanceof Error
-      ? c.error.message
-      : "agent run failed";
-  return { kind: "execution", message, costUsd };
+  const message = errorMessage(c);
+  return fail(classify(message), message);
 }
 
 export class AgentSdkRunner implements AgentRunner {
@@ -1226,6 +1241,12 @@ export class AgentSdkRunner implements AgentRunner {
   ) {}
 
   async decide<T>(req: DecideRequest<T>): Promise<Result<Decision<T>, AgentFailure>> {
+    let schema: Record<string, unknown>;
+    try {
+      schema = z.toJSONSchema(req.schema) as Record<string, unknown>;
+    } catch (e) {
+      return err({ kind: "schema", message: `schema has no JSON Schema form: ${String(e)}`, usage: ZERO_USAGE });
+    }
     const run = await this.execute(wrapUntrusted(req.data), req.timeoutMs, undefined, {
       model: req.model,
       effort: req.effort,
@@ -1233,17 +1254,18 @@ export class AgentSdkRunner implements AgentRunner {
       permissionMode: "dontAsk",
       allowedTools: [],
       settingSources: [],
+      persistSession: false,
       maxTurns: 3,
       maxBudgetUsd: req.maxBudgetUsd,
-      persistSession: false,
-      outputFormat: { type: "json_schema", schema: z.toJSONSchema(req.schema) },
+      outputFormat: { type: "json_schema", schema },
     });
     if (!run.ok) return run;
-    const parsed = req.schema.safeParse(run.value.structured_output);
+    const { result, usage } = run.value;
+    const parsed = req.schema.safeParse(result.structured_output);
     if (!parsed.success) {
-      return err({ kind: "schema", message: parsed.error.message, costUsd: run.value.total_cost_usd });
+      return err({ kind: "schema", message: parsed.error.message, usage, sessionId: result.session_id });
     }
-    return ok({ value: parsed.data, costUsd: run.value.total_cost_usd });
+    return ok({ value: parsed.data, usage });
   }
 
   async runTask(spec: TaskSpec): Promise<Result<TaskOutcome, AgentFailure>> {
@@ -1258,13 +1280,8 @@ export class AgentSdkRunner implements AgentRunner {
       maxBudgetUsd: spec.maxBudgetUsd,
     });
     if (!run.ok) return run;
-    const r = run.value;
-    return ok({
-      summary: "result" in r ? String(r.result) : "",
-      costUsd: r.total_cost_usd,
-      turns: r.num_turns,
-      sessionId: r.session_id,
-    });
+    const { result, usage } = run.value;
+    return ok({ summary: result.result, usage, turns: result.num_turns, sessionId: result.session_id });
   }
 
   private async execute(
@@ -1272,7 +1289,8 @@ export class AgentSdkRunner implements AgentRunner {
     timeoutMs: number,
     signal: AbortSignal | undefined,
     options: Options,
-  ): Promise<Result<SDKResultMessage & { subtype: "success" }, AgentFailure>> {
+  ): Promise<Result<{ result: Success; usage: AgentUsage }, AgentFailure>> {
+    const startedAt = Date.now();
     const controller = new AbortController();
     let timedOut = false;
     const timer = setTimeout(() => {
@@ -1281,12 +1299,14 @@ export class AgentSdkRunner implements AgentRunner {
     }, timeoutMs);
     signal?.addEventListener("abort", () => controller.abort(), { once: true });
     try {
-      const collected = await collect(
-        this.queryFn({ prompt, options: { ...options, env: this.env, abortController: controller } }),
-      );
+      const options_ = { ...options, env: this.env, abortController: controller };
+      const collected = await collect(this.queryFn({ prompt, options: options_ }));
       const r = collected.result;
-      if (r && r.subtype === "success" && !r.is_error && r.stop_reason !== "refusal") return ok(r);
-      return err(failure(collected, controller.signal.aborted && !timedOut, timedOut));
+      const usage = usageOf(r, startedAt);
+      if (r?.subtype === "success" && !r.is_error && r.stop_reason !== "refusal") {
+        return ok({ result: r, usage });
+      }
+      return err(failure(collected, usage, controller.signal.aborted && !timedOut, timedOut));
     } finally {
       clearTimeout(timer);
     }
@@ -1297,13 +1317,13 @@ export class AgentSdkRunner implements AgentRunner {
 - [ ] **Step 5: Run tests and typecheck**
 
 Run: `bun test ./src/adapters/agent && bun run typecheck`
-Expected: 12 pass; typecheck exit 0. If typecheck reports an `Options` field name mismatch (e.g. `effort`, `outputFormat`), check the installed SDK's `Options` type with `grep -n "effort\|outputFormat\|maxBudgetUsd" node_modules/@anthropic-ai/claude-agent-sdk/*.d.ts`, fix the field name, and note it in the commit message.
+Expected: all pass; typecheck exit 0. If typecheck reports an SDK type mismatch (for example `usage` field names on `SDKResultMessage`, or `persistSession`), inspect `node_modules/@anthropic-ai/claude-agent-sdk/*.d.ts`, fix the access to match the installed types, and note it in the commit message.
 
 - [ ] **Step 6: Commit**
 
 ```bash
-git add src/adapters/agent
-git commit -m "feat(ts): add Agent SDK runner with typed decide/runTask and untrusted-data wrapping"
+git add src/adapters/agent package.json bun.lock package-lock.json
+git commit -m "feat(ts): add Agent SDK runner with typed decide/runTask, usage, classified failures"
 ```
 
 ---
