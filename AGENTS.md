@@ -7,7 +7,7 @@ It is being migrated from bash (`scripts/`) to TypeScript on Bun (`src/`). Desig
 
 ## Definition of done
 
-- `bun run check:fast` after each change (< 10 s).
+- `bun run check:fast` after each change (~10–25 s; a Stop hook runs it too).
 - `bun run check` before you call work done (< 60 s). CI runs the same command.
 
 A change is done when `bun run check` passes. Failure messages name the rule and the fix.
