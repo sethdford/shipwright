@@ -17,6 +17,8 @@ jobs:
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # the baseline check below needs the merge base
       - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
         with:
           bun-version: 1.2.19
@@ -27,8 +29,13 @@ jobs:
         run: bun run typecheck
       - name: Lint and format (Biome)
         run: bun run lint
-      - name: Fitness rules (F1–F8, workflow rule)
+      - name: Fitness rules (F1–F12, workflow rules)
         run: bun run arch
+      - name: Fitness baselines never grow against the base branch
+        if: github.event_name == 'pull_request'
+        run: |
+          bun tools/arch/ast-scan.ts --against "origin/$GITHUB_BASE_REF"
+          bun tools/arch/size-ratchet.ts --against "origin/$GITHUB_BASE_REF"
       - name: Unit, application and contract tests
         run: bun test ./src ./tools
       - name: Generated CLI reference is current

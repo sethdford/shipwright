@@ -1,0 +1,29 @@
+id: F11-bash-no-shell-c-expansion
+valid:
+  - "bash -c 'echo hi'"
+  - "bash -c 'run \"$1\"' _ \"$value\""
+  - 'bash "$script" "$arg"'
+  - 'bash -n "$file"'
+  - 'echo "bash -c $x"'
+  - "sh -c 'exit 0'"
+  - "python3 -c 'import sys; print(sys.argv[1])' \"$x\""
+  - 'node "$script" "$arg"'
+  - 'ssh "$host" uptime'
+  - 'ssh -o ConnectTimeout=5 "${user}@${host}" "uptime"'
+  - "bash <<< 'echo hi'"
+invalid:
+  - 'bash -c "$handler_cmd"'
+  - 'sh -c "echo $y"'
+  - 'bash -c $cmd'
+  - 'out=$(bash -c "source \"$SCRIPT_DIR/lib.sh\"; f")'
+  - 'timeout "$t" bash -c "$command_str"'
+  - 'zsh -lc "$cmd"'
+  - '/bin/sh -c "$(cat "$f")"'
+  - 'bash -ec "${steps[$i]}"'
+  - '"$SHELL" -c "$cmd"'
+  - 'python3 -c "import json; print(json.load(open(\"$f\")))"'
+  - 'node -e "console.log($x)"'
+  - 'perl -e "print $x"'
+  - 'bash <<< "$cmd"'
+  - 'sh <<<"$(cat "$f")"'
+  - 'ssh "$host" "cd $dir && shipwright status"'

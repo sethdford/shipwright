@@ -1,0 +1,14 @@
+# A bash node that is, or contains, a parameter expansion or a command substitution.
+id: bash-expansion
+language: Bash
+rule:
+  any:
+    - kind: simple_expansion
+    - kind: expansion
+    - kind: command_substitution
+    - has:
+        stopBy: end
+        any:
+          - kind: simple_expansion
+          - kind: expansion
+          - kind: command_substitution

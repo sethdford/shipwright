@@ -1,0 +1,14 @@
+# A bash node holding literal text: words, strings, heredoc bodies (comments are another kind).
+# Rules match the innermost one: `matches: bash-text`, a `regex`, and `not: { has: { regex } }`.
+id: bash-text
+language: Bash
+rule:
+  any:
+    - kind: heredoc_body
+    - kind: raw_string
+    - kind: ansi_c_string
+    - kind: string
+    - kind: string_content
+    - kind: word
+    - kind: concatenation
+    - kind: ERROR

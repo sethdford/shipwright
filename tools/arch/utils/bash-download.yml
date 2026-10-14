@@ -1,0 +1,6 @@
+# A command that downloads: curl or wget.
+id: bash-download
+language: Bash
+rule:
+  kind: command
+  has: { field: name, regex: '^(curl|wget)$' }

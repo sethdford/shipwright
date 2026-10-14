@@ -1,0 +1,18 @@
+# F9 for bash: agents never run with permission checks disabled. Ratcheted until each caller is
+# ported to the AgentRunner port (permissionMode "dontAsk" and a per-stage tool allowlist).
+id: F9-bash-no-permission-bypass
+language: Bash
+severity: off
+metadata: { ratchet: true, owner: "@sethdford", docs: "docs/architecture.md#fitness-rules" }
+message: "F9: agents never skip permission checks. Pass an explicit --allowedTools list (and --permission-mode dontAsk) instead of --dangerously-skip-permissions or bypassPermissions."
+files:
+  - "scripts/**/*.sh"
+  - "scripts/sw"
+  - ".claude/hooks/**/*.sh"
+  - "claude-code/hooks/**/*.sh"
+  - "completions/**/*.bash"
+  - "install.sh"
+rule:
+  matches: bash-text
+  regex: '(?i)dangerously-skip-permissions|bypassPermissions|allowDangerouslySkipPermissions'
+  not: { has: { regex: '(?i)dangerously-skip-permissions|bypassPermissions|allowDangerouslySkipPermissions' } }

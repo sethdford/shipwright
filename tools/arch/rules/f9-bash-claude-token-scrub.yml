@@ -1,0 +1,30 @@
+# F9 for bash: a claude process inherits the caller's environment, including GH_TOKEN. Every
+# invocation (direct, or behind timeout/nohup/exec/env/$TIMEOUT_CMD …) must unset the GitHub tokens
+# in the same command. `command -v claude` and log lines are not invocations. Ratcheted.
+id: F9-bash-claude-token-scrub
+language: Bash
+severity: off
+metadata: { ratchet: true, owner: "@sethdford", docs: "docs/architecture.md#fitness-rules" }
+message: "F9: claude must not inherit GitHub tokens. Run it as env -u GH_TOKEN -u GITHUB_TOKEN -u GH_ENTERPRISE_TOKEN claude …, or call a helper such as sw_claude() that does exactly that."
+files:
+  - "scripts/**/*.sh"
+  - "scripts/sw"
+  - ".claude/hooks/**/*.sh"
+  - "claude-code/hooks/**/*.sh"
+  - "completions/**/*.bash"
+  - "install.sh"
+rule:
+  kind: command
+  all:
+    - any:
+        - has: { field: name, regex: '^claude$' }
+        - all:
+            - has: { kind: word, regex: '^claude$' }
+            - not:
+                has:
+                  field: name
+                  regex: '^(command|type|which|hash|echo|printf|info|warn|error|success|log|debug|emit_event)$'
+    - not:
+        all:
+          - has: { kind: word, regex: '^(--unset=)?GH_TOKEN$' }
+          - has: { kind: word, regex: '^(--unset=)?GITHUB_TOKEN$' }

@@ -1,0 +1,18 @@
+id: F11-bash-no-gha-expression
+valid:
+  - 'echo "${HOME}"'
+  - 'echo "${x:-{}}"'
+  - '# never write ${{ github.event.issue.title }} in a run step'
+  - 'echo "$TITLE"'
+invalid:
+  - 'echo "${{ github.event.issue.title }}"'
+  - "echo '${{ secrets.TOKEN }}'"
+  - |
+    cat > "$wf" <<EOF
+          - run: echo \${{ matrix.os }}
+    EOF
+  - |
+    cat > "$wf" <<'EOF'
+        key: ${{ runner.os }}-node
+    EOF
+  - 'printf "%s\n" "runs-on: \${{ matrix.os }}"'

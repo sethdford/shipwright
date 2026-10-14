@@ -49,6 +49,13 @@ const PINNED: Record<string, { ratchet: boolean; ignores: string[] }> = {
       "src/adapters/github/gh-github-writer.test.ts",
     ],
   },
+  "F9-bash-claude-token-scrub": { ratchet: true, ignores: [] },
+  "F9-bash-no-permission-bypass": { ratchet: true, ignores: [] },
+  "F10-bash-github-writes": { ratchet: true, ignores: [] },
+  "F11-bash-no-eval-expansion": { ratchet: true, ignores: [] },
+  "F11-bash-no-gha-expression": { ratchet: true, ignores: [] },
+  "F11-bash-no-pipe-to-shell": { ratchet: true, ignores: [] },
+  "F11-bash-no-shell-c-expansion": { ratchet: true, ignores: [] },
   "dashboard-no-shell-from-data": {
     ratchet: false,
     ignores: ["dashboard/**/*.test.ts", "dashboard/src/**"],
@@ -58,7 +65,7 @@ const PINNED: Record<string, { ratchet: boolean; ignores: string[] }> = {
 /** Every checker `bun run arch` must run. */
 const ARCH_STEPS = [
   "depcruise src --config .dependency-cruiser.cjs",
-  "ast-grep scan",
+  "bun tools/arch/ast-scan.ts",
   "ast-grep test --skip-snapshot-tests --include-off",
   "bun tools/arch/size-ratchet.ts",
   "bun tools/arch/workflow-injection.ts",
@@ -141,6 +148,12 @@ describe("every fitness rule", () => {
       }
     });
   }
+});
+
+test("every Bash rule covers the same files (scripts, hooks, completions, install.sh)", () => {
+  const bash = rules.filter((r) => r.language === "Bash");
+  expect(bash.length).toBeGreaterThan(0);
+  for (const r of bash) expect(r.files).toEqual(bash[0]?.files ?? []);
 });
 
 test("every rule test belongs to a rule (ast-grep silently skips orphans)", () => {

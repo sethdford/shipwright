@@ -10,6 +10,7 @@ const RULE_TESTS_DIR = "tools/arch/rule-tests";
 export interface RuleDoc {
   readonly file: string;
   readonly id: string;
+  readonly language?: string;
   readonly severity?: string;
   readonly message?: string;
   readonly files?: readonly string[];

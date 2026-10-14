@@ -1,4 +1,9 @@
 ruleDirs:
   - tools/arch/rules
+utilDirs:
+  - tools/arch/utils
 testConfigs:
   - testDir: tools/arch/rule-tests
+# scripts/sw (the router) has no extension. Globs match the file name.
+languageGlobs:
+  bash: ["sw"]
