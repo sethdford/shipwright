@@ -32,6 +32,9 @@ import { Database } from "bun:sqlite";
 const PORT = parseInt(
   process.argv[2] || process.env.SHIPWRIGHT_DASHBOARD_PORT || "8767",
 );
+// Loopback by default: the API can pause/stop jobs and edit the machine registry.
+// Set SW_DASHBOARD_HOST=0.0.0.0 (or `shipwright dashboard --host 0.0.0.0`) for server/fleet mode.
+const HOST = process.env.SW_DASHBOARD_HOST || "127.0.0.1";
 const HOME = process.env.HOME || "";
 const EVENTS_FILE = join(HOME, ".shipwright", "events.jsonl");
 const DAEMON_STATE = join(HOME, ".shipwright", "daemon-state.json");
@@ -2592,6 +2595,7 @@ const CORS_HEADERS = {
 
 const server = Bun.serve({
   port: PORT,
+  hostname: HOST,
 
   async fetch(req, server) {
     const url = new URL(req.url);

@@ -71,6 +71,7 @@ show_help() {
     echo ""
     echo -e "${BOLD}OPTIONS${RESET}"
     echo -e "  ${CYAN}--port${RESET} <N>         Port to run on ${DIM}(default: ${DEFAULT_PORT})${RESET}"
+    echo -e "  ${CYAN}--host${RESET} <addr>      Bind address ${DIM}(default: 127.0.0.1; use 0.0.0.0 for server/fleet mode)${RESET}"
     echo -e "  ${CYAN}--foreground${RESET}       Run in foreground ${DIM}(don't daemonize)${RESET}"
     echo -e "  ${CYAN}--no-build${RESET}         Skip build check; start immediately"
     echo ""
@@ -459,6 +460,14 @@ while [[ $# -gt 0 ]]; do
                 exit 1
             fi
             PORT="$2"
+            shift 2
+            ;;
+        --host)
+            if [[ -z "${2:-}" ]]; then
+                error "--host requires a value"
+                exit 1
+            fi
+            export SW_DASHBOARD_HOST="$2"
             shift 2
             ;;
         --foreground|-f)
