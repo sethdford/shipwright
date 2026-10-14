@@ -2,6 +2,8 @@
 # Source from daemon-poll.sh. Requires daemon-health, state, dispatch, failure, patrol.
 [[ -n "${_DAEMON_POLL_GITHUB_LOADED:-}" ]] && return 0
 _DAEMON_POLL_GITHUB_LOADED=1
+# shellcheck source=safety-gates.sh
+source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/safety-gates.sh"
 
 # Defaults for variables normally set by sw-daemon.sh (safe under set -u).
 DAEMON_DIR="${DAEMON_DIR:-${HOME}/.shipwright}"
@@ -246,6 +248,12 @@ daemon_poll_issues() {
 
         # Skip if already inflight
         if daemon_is_inflight "$issue_key"; then
+            continue
+        fi
+
+        # Auto-filed and stuck issues wait for a human to remove the label (ADR-0007)
+        if ! dispatch_eligible "$labels_csv"; then
+            daemon_log INFO "Issue #${issue_num} is auto-filed or stuck — skipped until a human removes '${PATROL_LABEL:-auto-patrol}' / 'shipwright-stuck'"
             continue
         fi
 

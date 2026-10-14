@@ -332,7 +332,9 @@ _Escalation: $(if [[ "$retry_count" -eq 1 ]]; then echo "upgraded model + increa
                     local orig_model="$MODEL"
                     PIPELINE_TEMPLATE="$retry_template"
                     MODEL="$retry_model"
-                    daemon_spawn_pipeline "$issue_num" "retry-${retry_count}" "" "${all_extra_args[@]}"
+                    # The retry number feeds the fix-loop cap in the safety gates (ADR-0007).
+                    DAEMON_RETRY_ATTEMPT="$retry_count" \
+                        daemon_spawn_pipeline "$issue_num" "retry-${retry_count}" "" "${all_extra_args[@]}"
                     _retry_spawned_for="$issue_num"
                     PIPELINE_TEMPLATE="$orig_template"
                     MODEL="$orig_model"

@@ -2,6 +2,8 @@
 # Source from sw-daemon.sh. Requires state, helpers.
 [[ -n "${_DAEMON_PATROL_LOADED:-}" ]] && return 0
 _DAEMON_PATROL_LOADED=1
+# shellcheck source=safety-gates.sh
+source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/safety-gates.sh"
 
 # Ensure NO_GITHUB is set (parent sw-daemon.sh / sw-pipeline.sh normally sets it,
 # but under set -u bare references crash if this file is sourced standalone).
@@ -131,7 +133,7 @@ daemon_patrol() {
                         existing=$(gh issue list --label "$PATROL_LABEL" --label "security" \
                             --search "Security: $name" --json number -q 'length' 2>/dev/null || echo "0")
                         if [[ "${existing:-0}" -eq 0 ]] && [[ "$issues_created" -lt "$PATROL_MAX_ISSUES" ]]; then
-                            gh issue create \
+                            patrol_issue_create \
                                 --title "Security: ${title} in ${name}" \
                                 --body "## Dependency Security Finding
 
@@ -262,7 +264,7 @@ Auto-detected by \`shipwright daemon patrol\`." \
                     existing=$(gh issue list --label "$PATROL_LABEL" --label "dependencies" \
                         --search "Stale dependencies" --json number -q 'length' 2>/dev/null || echo "0")
                     if [[ "${existing:-0}" -eq 0 ]] && [[ "$issues_created" -lt "$PATROL_MAX_ISSUES" ]]; then
-                        gh issue create \
+                        patrol_issue_create \
                             --title "Update ${findings} stale dependencies" \
                             --body "## Stale Dependencies
 
@@ -324,7 +326,7 @@ Auto-detected by \`shipwright daemon patrol\` on $(now_iso)." \
             existing=$(gh issue list --label "$PATROL_LABEL" --label "tech-debt" \
                 --search "Dead code candidates" --json number -q 'length' 2>/dev/null || echo "0")
             if [[ "${existing:-0}" -eq 0 ]] && [[ "$issues_created" -lt "$PATROL_MAX_ISSUES" ]]; then
-                gh issue create \
+                patrol_issue_create \
                     --title "Dead code candidates (${findings} files)" \
                     --body "## Dead Code Detection
 
@@ -389,7 +391,7 @@ Auto-detected by \`shipwright daemon patrol\` on $(now_iso)." \
             existing=$(gh issue list --label "$PATROL_LABEL" --label "testing" \
                 --search "Test coverage gaps" --json number -q 'length' 2>/dev/null || echo "0")
             if [[ "${existing:-0}" -eq 0 ]] && [[ "$issues_created" -lt "$PATROL_MAX_ISSUES" ]]; then
-                gh issue create \
+                patrol_issue_create \
                     --title "Improve test coverage for ${findings} file(s)" \
                     --body "## Test Coverage Gaps
 
@@ -503,7 +505,7 @@ Auto-detected by \`shipwright daemon patrol\` on $(now_iso)." \
             existing=$(gh issue list --label "$PATROL_LABEL" --label "documentation" \
                 --search "Stale documentation" --json number -q 'length' 2>/dev/null || echo "0")
             if [[ "${existing:-0}" -eq 0 ]] && [[ "$issues_created" -lt "$PATROL_MAX_ISSUES" ]]; then
-                gh issue create \
+                patrol_issue_create \
                     --title "Stale documentation detected" \
                     --body "## Documentation Staleness
 
@@ -559,7 +561,7 @@ Auto-detected by \`shipwright daemon patrol\` on $(now_iso)." \
                         existing=$(gh issue list --label "$PATROL_LABEL" --label "performance" \
                             --search "Test suite performance regression" --json number -q 'length' 2>/dev/null || echo "0")
                         if [[ "${existing:-0}" -eq 0 ]]; then
-                            gh issue create \
+                            patrol_issue_create \
                                 --title "Test suite performance regression (${pct_slower}% slower)" \
                                 --body "## Performance Regression
 
@@ -644,7 +646,7 @@ Auto-detected by \`shipwright daemon patrol\` on $(now_iso)." \
                 existing=$(gh issue list --label "$PATROL_LABEL" --label "recurring-failure" \
                     --search "Fix recurring: ${short_pattern}" --json number -q 'length' 2>/dev/null || echo "0")
                 if [[ "${existing:-0}" -eq 0 ]] && [[ "$issues_created" -lt "$PATROL_MAX_ISSUES" ]]; then
-                    gh issue create \
+                    patrol_issue_create \
                         --title "Fix recurring: ${short_pattern}" \
                         --body "## Recurring Failure Pattern
 
@@ -822,7 +824,7 @@ Auto-detected by \`shipwright daemon patrol\`." \
             existing=$(gh issue list --label "$PATROL_LABEL" --label "dora-regression" \
                 --search "DORA regression" --json number -q 'length' 2>/dev/null || echo "0")
             if [[ "${existing:-0}" -eq 0 ]] && [[ "$issues_created" -lt "$PATROL_MAX_ISSUES" ]]; then
-                gh issue create \
+                patrol_issue_create \
                     --title "DORA regression: ${trimmed}" \
                     --body "## DORA Metric Degradation
 
@@ -914,7 +916,7 @@ Auto-detected by \`shipwright daemon patrol\` on $(now_iso)." \
             existing=$(gh issue list --label "$PATROL_LABEL" --label "test-coverage" \
                 --search "Add tests for untested scripts" --json number -q 'length' 2>/dev/null || echo "0")
             if [[ "${existing:-0}" -eq 0 ]] && [[ "$issues_created" -lt "$PATROL_MAX_ISSUES" ]]; then
-                gh issue create \
+                patrol_issue_create \
                     --title "Add tests for ${findings} untested script(s)" \
                     --body "## Untested Scripts
 
@@ -984,7 +986,7 @@ Auto-detected by \`shipwright daemon patrol\` on $(now_iso)." \
             existing=$(gh issue list --label "$PATROL_LABEL" --label "reliability" \
                 --search "Retry exhaustion pattern" --json number -q 'length' 2>/dev/null || echo "0")
             if [[ "${existing:-0}" -eq 0 ]] && [[ "$issues_created" -lt "$PATROL_MAX_ISSUES" ]]; then
-                gh issue create \
+                patrol_issue_create \
                     --title "Retry exhaustion pattern (${exhausted_count} in 7 days)" \
                     --body "## Retry Exhaustion Pattern
 

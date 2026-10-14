@@ -210,4 +210,26 @@ touch "$LOG_DIR/issue-703.log"
 result=$(classify_failure 703)
 assert_eq "Empty log → unknown" "unknown" "$result"
 
+# ═══════════════════════════════════════════════════════════════════════════════
+# Auto-retry passes its retry number to the safety gates (fix-loop cap)
+# ═══════════════════════════════════════════════════════════════════════════════
+print_test_section "Auto-retry passes its retry number"
+
+(
+    SPAWN_LOG="$TEST_TEMP_DIR/spawn.log"
+    : > "$SPAWN_LOG"
+    daemon_spawn_pipeline() { echo "issue=$1 title=$2 retry=${DAEMON_RETRY_ATTEMPT:-unset}" >> "$SPAWN_LOG"; }
+    sleep() { :; }
+    MODEL="sonnet"
+    PIPELINE_TEMPLATE="autonomous"
+    MAX_PARALLEL=1
+    echo '{"retry_counts":{"801":1}}' > "$STATE_FILE"
+    echo "some unclassified failure" > "$LOG_DIR/issue-801.log"
+    daemon_on_failure 801 1 "" >/dev/null 2>&1
+    cat "$SPAWN_LOG"
+) > "$TEST_TEMP_DIR/retry_spawn_result" 2>/dev/null || true
+assert_eq "second retry spawns with DAEMON_RETRY_ATTEMPT=2" \
+    "issue=801 title=retry-2 retry=2" "$(cat "$TEST_TEMP_DIR/retry_spawn_result")"
+assert_eq "DAEMON_RETRY_ATTEMPT does not leak to the caller" "unset" "${DAEMON_RETRY_ATTEMPT:-unset}"
+
 print_test_results

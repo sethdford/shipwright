@@ -2,6 +2,8 @@
 # Source from sw-daemon.sh. Requires state, failure, helpers.
 [[ -n "${_DAEMON_DISPATCH_LOADED:-}" ]] && return 0
 _DAEMON_DISPATCH_LOADED=1
+# shellcheck source=safety-gates.sh
+source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/safety-gates.sh"
 
 # Defaults for variables normally set by sw-daemon.sh (safe under set -u).
 DAEMON_DIR="${DAEMON_DIR:-${HOME}/.shipwright}"
@@ -94,6 +96,14 @@ daemon_spawn_pipeline() {
         daemon_log ERROR "Could not resolve WORKTREE_DIR path: ${WORKTREE_DIR}"
         return 1
     }
+
+    # ── Safety gates (ADR-0007): pause, breaker, budget, review WIP, fix-loop cap ──
+    # DAEMON_RETRY_ATTEMPT is set by the retry path in daemon-failure.sh; 0 = first dispatch.
+    if ! safety_gates_ok "${DAEMON_RETRY_ATTEMPT:-0}"; then
+        daemon_log WARN "Safety gates closed — not dispatching issue #${issue_num}"
+        emit_event "daemon.gates_closed" "issue=${issue_num}"
+        return 1
+    fi
 
     daemon_log INFO "Spawning pipeline for issue #${issue_num}: ${issue_title}"
 
