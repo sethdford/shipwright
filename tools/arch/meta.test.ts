@@ -171,14 +171,28 @@ test("every rule test belongs to a rule (ast-grep silently skips orphans)", () =
   expect(tests.filter((t) => !ids.has(t.id)).map((t) => t.file)).toEqual([]);
 });
 
-test("no rule is suppressed in place (no ast-grep ignore comment in src, dashboard, scripts or tools)", async () => {
+/**
+ * Every tracked file any rule covers. The ignore ban scans this set, so a rule's reach and the
+ * suppression check cannot drift apart (a Bash rule covering install.sh must ban ignores there too).
+ * docs/ is outside every rule and is not scanned, so this file's own prose does not trip the ban.
+ */
+const ruleCovered = (): string[] =>
+  tracked.filter((f) => rules.some((r) => (r.files ?? []).some((g) => new Bun.Glob(g).match(f))));
+
+test("no rule is suppressed in place (no ast-grep ignore comment in any file a rule covers)", async () => {
   const marker = ["ast", "grep", "ignore"].join("-");
-  const roots = ["src/", "dashboard/", "scripts/", "tools/"];
   const hits: string[] = [];
-  for (const f of tracked.filter((f) => roots.some((r) => f.startsWith(r)))) {
+  for (const f of ruleCovered()) {
     if ((await Bun.file(join(ROOT, f)).text()).includes(marker)) hits.push(f);
   }
   expect(hits).toEqual([]);
+});
+
+test("the ignore ban reaches every file the Bash rules cover, including install.sh and completions", () => {
+  const covered = new Set(ruleCovered());
+  expect(covered.has("install.sh")).toBe(true);
+  expect(covered.has("claude-code/hooks/notify-idle.sh")).toBe(true);
+  expect(covered.has("scripts/sw")).toBe(true);
 });
 
 test("bun run arch runs every checker", () => {
