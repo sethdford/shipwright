@@ -1,10 +1,19 @@
 import type { ZodType } from "zod";
 import type { Result } from "./result";
 
+// ── Errors from external systems ─────────────────────────────────────────────
+// Classified so callers decide retry/backoff on `kind`, never by matching message text.
+export type AdapterErrorKind = "not_found" | "auth" | "transient" | "failed";
+export interface AdapterError {
+  readonly kind: AdapterErrorKind;
+  readonly message: string;
+}
+
 // ── Processes ────────────────────────────────────────────────────────────────
 export interface ProcessRequest {
   readonly argv: readonly string[];
   readonly cwd?: string;
+  /** Replaces the child environment entirely. Omit to inherit the parent's environment. */
   readonly env?: Readonly<Record<string, string>>;
   readonly stdin?: string;
   readonly timeoutMs?: number;
@@ -16,6 +25,7 @@ export interface ProcessResult {
   readonly timedOut: boolean;
 }
 export interface ProcessRunner {
+  /** Throws if the program cannot be started (for example, it is not installed). */
   run(request: ProcessRequest): Promise<ProcessResult>;
 }
 
@@ -23,7 +33,8 @@ export interface ProcessRunner {
 export interface Paths {
   readonly home: string;
   readonly stateDir: string;
-  readonly tmuxSocket: string;
+  /** tmux socket *name* for `tmux -L`, not a filesystem path. */
+  readonly tmuxSocketName: string;
 }
 
 // ── Events ───────────────────────────────────────────────────────────────────
@@ -35,29 +46,34 @@ export interface EventRecord {
 }
 export interface EventLog {
   append(event: EventRecord): void;
-  list(runId: string): EventRecord[];
+  /** Events for one run, oldest first. */
+  list(runId: string): readonly EventRecord[];
 }
 
 // ── Terminal (tmux) ──────────────────────────────────────────────────────────
 export interface Terminal {
-  newSession(name: string, cwd: string): Promise<Result<void, string>>;
-  listSessions(): Promise<string[]>;
-  killSession(name: string): Promise<void>;
+  newSession(name: string, cwd: string): Promise<Result<void, AdapterError>>;
+  /** No server running is not an error: it yields an empty list. */
+  listSessions(): Promise<Result<readonly string[], AdapterError>>;
+  /** Idempotent: an absent session or server is ok. */
+  killSession(name: string): Promise<Result<void, AdapterError>>;
 }
 
 // ── Version control and issues ───────────────────────────────────────────────
 export interface Vcs {
-  headSha(cwd: string): Promise<Result<string, string>>;
-  currentBranch(cwd: string): Promise<Result<string, string>>;
+  headSha(cwd: string): Promise<Result<string, AdapterError>>;
+  currentBranch(cwd: string): Promise<Result<string, AdapterError>>;
 }
 export interface Issue {
   readonly number: number;
   readonly title: string;
   readonly body: string;
+  readonly state: "open" | "closed";
+  readonly author: string;
   readonly labels: readonly string[];
 }
 export interface IssueTracker {
-  getIssue(number: number): Promise<Result<Issue, string>>;
+  getIssue(number: number): Promise<Result<Issue, AdapterError>>;
 }
 
 // ── Agent runtime (rule F6: implemented only in src/adapters/agent) ──────────
@@ -70,12 +86,24 @@ export type AgentFailureKind =
   | "schema"
   | "timeout"
   | "aborted"
+  | "transient"
+  | "auth"
   | "execution";
+
+/** What one agent call consumed; callers write it to the run ledger (spec §5). */
+export interface AgentUsage {
+  readonly costUsd: number;
+  readonly inputTokens: number;
+  readonly outputTokens: number;
+  readonly durationMs: number;
+}
 
 export interface AgentFailure {
   readonly kind: AgentFailureKind;
   readonly message: string;
-  readonly costUsd: number;
+  readonly usage: AgentUsage;
+  /** Present when a session was created, so max_turns/budget failures can be resumed. */
+  readonly sessionId?: string;
 }
 
 export interface DecideRequest<T> {
@@ -91,7 +119,7 @@ export interface DecideRequest<T> {
 }
 export interface Decision<T> {
   readonly value: T;
-  readonly costUsd: number;
+  readonly usage: AgentUsage;
 }
 
 export interface TaskSpec {
@@ -108,7 +136,7 @@ export interface TaskSpec {
 }
 export interface TaskOutcome {
   readonly summary: string;
-  readonly costUsd: number;
+  readonly usage: AgentUsage;
   readonly turns: number;
   readonly sessionId: string;
 }
