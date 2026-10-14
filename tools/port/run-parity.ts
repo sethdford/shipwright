@@ -3,7 +3,14 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { BunProcessRunner } from "../../src/adapters/process/bun-process-runner";
 import { loadProgress, type ProgressEntry, ROOT } from "./progress";
-import { buildSandbox, killSandboxTmux, parityEnv, suiteArgv, sweepStragglers } from "./sandbox";
+import {
+  buildSandbox,
+  gitSnapshot,
+  killSandboxTmux,
+  parityEnv,
+  suiteArgv,
+  sweepStragglers,
+} from "./sandbox";
 
 const ACTIVE = new Set(["porting", "parity-green", "bash-deleted"]);
 const DEFAULT_TIMEOUT_MS = 900_000;
@@ -37,11 +44,6 @@ export function runSuite(
   return runner.run({ argv, env, cwd, timeoutMs });
 }
 
-function gitStatus(): string {
-  const r = Bun.spawnSync(["git", "-C", ROOT, "status", "--porcelain"], { stdout: "pipe" });
-  return new TextDecoder().decode(r.stdout);
-}
-
 function failureReport(entry: ProgressEntry, why: string, out: string, err: string): string {
   const tail = `${out}\n${err}`.split("\n").slice(-30).join("\n");
   return `✗ parity ${entry.command} (${entry.parity}) ${why}\n${tail}`;
@@ -60,10 +62,10 @@ async function runOne(entry: ProgressEntry, all: readonly ProgressEntry[]): Prom
   activeSandbox = sandbox;
   try {
     const repo = buildSandbox(sandbox, ROOT, all);
-    const before = gitStatus();
+    const before = gitSnapshot(ROOT);
     const env = parityEnv(sandbox, Bun.env);
     const r = await runSuite(suiteArgv(sandbox, entry), env, parityTimeoutMs(Bun.env), repo);
-    const dirty = gitChanged(before, gitStatus());
+    const dirty = gitChanged(before, gitSnapshot(ROOT));
     const ok = r.exitCode === 0 && !r.timedOut && !dirty;
     if (ok) console.log(`✓ parity ${entry.command}`);
     else {
@@ -81,7 +83,11 @@ async function runOne(entry: ProgressEntry, all: readonly ProgressEntry[]): Prom
   }
 }
 
+let stopping = false;
+
 async function onSignal(): Promise<void> {
+  if (stopping) return; // repeat signals while shutting down are ignored
+  stopping = true;
   runner.killAll("SIGTERM");
   await new Promise((r) => setTimeout(r, 2000));
   runner.killAll("SIGKILL");
@@ -95,7 +101,10 @@ if (import.meta.main) {
   const all = await loadProgress();
   const suites = selectSuites(all);
   let failed = 0;
-  for (const entry of suites) if (!(await runOne(entry, all))) failed++;
+  for (const entry of suites) {
+    if (stopping) break;
+    if (!(await runOne(entry, all))) failed++;
+  }
   const { line, exitCode } = summarize(suites.length, failed);
   console.log(line);
   process.exit(exitCode);
