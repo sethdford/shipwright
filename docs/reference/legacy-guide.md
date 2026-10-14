@@ -1038,14 +1038,12 @@ The daemon calls into the intelligence layer at spawn time. The `intelligence` a
 
 Specialized agent definitions in `.claude/agents/` are loaded automatically by Claude Code when agents are spawned:
 
-| Agent                   | File                         | Purpose                                                                   |
-| ----------------------- | ---------------------------- | ------------------------------------------------------------------------- |
-| Shell Script Specialist | `shell-script-specialist.md` | Bash 3.2 rules, pipefail safety, atomic writes, test harness patterns     |
-| Code Reviewer           | `code-reviewer.md`           | Review checklist, security, performance, architecture layer boundaries    |
-| Test Specialist         | `test-specialist.md`         | Test harness conventions, mock patterns, PASS/FAIL counting, coverage     |
-| DevOps Engineer         | `devops-engineer.md`         | GitHub Actions, pipeline workflows, GitHub API, worktree management       |
-| Pipeline Agent          | `pipeline-agent.md`          | Build loop context, memory injection, architecture rules, file hotspots   |
-| Doc Fleet Agent         | `doc-fleet-agent.md`         | Documentation fleet — audit, refactor, enhance docs (5 specialized roles) |
+| Agent           | File                 | Purpose                                                                       |
+| --------------- | -------------------- | ----------------------------------------------------------------------------- |
+| Reviewer        | `reviewer.md`        | Read-only diff review against fitness rules F1–F10 and the safety rules       |
+| Verifier        | `verifier.md`        | Independent PASS/FAIL check: `bun run check`, parity, one adversarial input   |
+| Porter          | `porter.md`          | Ports one bash command to TypeScript with the `port-bash-command` skill       |
+| Doc Fleet Agent | `doc-fleet-agent.md` | Documentation fleet role definition, read by `sw-doc-fleet.sh` agent briefs   |
 
 ## Hooks
 

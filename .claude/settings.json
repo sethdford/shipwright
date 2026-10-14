@@ -78,6 +78,16 @@
             "timeout": 10
           }
         ]
+      },
+      {
+        "matcher": "Edit|Write",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "cd \"${CLAUDE_PROJECT_DIR:-.}\" && ./node_modules/.bin/biome check --write src tools >/dev/null 2>&1 || true",
+            "timeout": 30
+          }
+        ]
       }
     ],
     "SessionStart": [
@@ -132,6 +142,17 @@
             "type": "command",
             "command": "~/.claude/hooks/config-change.sh",
             "timeout": 10
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "\"${CLAUDE_PROJECT_DIR:-.}\"/.claude/hooks/check-fast-on-stop.sh",
+            "timeout": 600
           }
         ]
       }
