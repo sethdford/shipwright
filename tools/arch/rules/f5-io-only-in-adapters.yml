@@ -16,6 +16,19 @@ rule:
     - pattern: Bun.$`$$$`
     - pattern: fetch($$$)
     - pattern: process.env
+    - pattern: Bun.file($$$)
+    - pattern: Bun.write($$$)
+    - pattern: Bun.serve($$$)
+    - all:
+        - any:
+            - pattern: import($S)
+            - pattern: require($S)
+        - has:
+            field: arguments
+            kind: arguments
+            has:
+              kind: string
+              regex: '^["''](node:)?(fs|fs/promises|child_process|net|http|https)["'']$'
     - kind: import_statement
       has:
         field: source
