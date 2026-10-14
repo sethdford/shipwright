@@ -13,12 +13,20 @@ ignores:
 rule:
   any:
     - pattern: Bun.spawn($$$)
+    - pattern: Bun.spawnSync($$$)
     - pattern: Bun.$`$$$`
-    - pattern: fetch($$$)
-    - pattern: process.env
     - pattern: Bun.file($$$)
     - pattern: Bun.write($$$)
     - pattern: Bun.serve($$$)
+    - pattern: Bun.connect($$$)
+    - pattern: Bun.listen($$$)
+    - pattern: Bun.env
+    - pattern: fetch($$$)
+    - pattern: globalThis.fetch($$$)
+    - pattern: process.env
+    - pattern: process["env"]
+    - pattern: process['env']
+    - pattern: const { $$$ } = process
     - all:
         - any:
             - pattern: import($S)
@@ -28,9 +36,14 @@ rule:
             kind: arguments
             has:
               kind: string
-              regex: '^["''](node:)?(fs|fs/promises|child_process|net|http|https)["'']$'
-    - kind: import_statement
-      has:
-        field: source
-        kind: string
-        regex: '^["''](node:)?(fs|fs/promises|child_process|net|http|https)["'']$'
+              regex: '^["''](bun:sqlite|(node:)?(fs|fs/promises|child_process|net|http|https|dns|tls|dgram|http2|worker_threads))["'']$'
+    - all:
+        - any:
+            - kind: import_statement
+            - kind: export_statement
+        - has:
+            field: source
+            kind: string
+            regex: '^["''](bun:sqlite|(node:)?(fs|fs/promises|child_process|net|http|https|dns|tls|dgram|http2|worker_threads))["'']$'
+        - not:
+            regex: '^(import|export)\s+type\s'

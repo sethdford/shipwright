@@ -11,4 +11,8 @@ rule:
   any:
     - pattern: homedir()
     - pattern: $OS.homedir()
-    - pattern: process.env.HOME
+    - pattern: process.env
+    - pattern: process["env"]
+    - pattern: process['env']
+    - pattern: Bun.env
+    - pattern: const { $$$ } = process

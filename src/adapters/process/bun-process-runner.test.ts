@@ -60,6 +60,7 @@ test("background grandchild cannot hold run() hostage without a timeout", async 
 test("env replaces the child environment when given", async () => {
   const r = await runner.run({
     argv: ["sh", "-c", "echo $FOO"],
+    // ast-grep-ignore: F8-tests-no-real-home
     env: { PATH: process.env.PATH ?? "/usr/bin:/bin", FOO: "bar" },
   });
   expect(r.stdout).toBe("bar\n");
