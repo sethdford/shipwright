@@ -1,0 +1,39 @@
+name: TypeScript check
+
+# Mirrors `bun run check` stage by stage so a failure names the stage that broke.
+# If you change the `check` script in package.json, change this list too.
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.2.19
+      - name: Install system tools used by parity suites
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq jq tmux
+      - run: bun install --frozen-lockfile
+      - name: Typecheck
+        run: bun run typecheck
+      - name: Lint and format (Biome)
+        run: bun run lint
+      - name: Fitness rules (F1–F8, workflow rule)
+        run: bun run arch
+      - name: Unit, application and contract tests
+        run: bun test ./src ./tools
+      - name: Generated CLI reference is current
+        run: bun run docs:check
+      - name: Router points at TypeScript only for parity-green commands
+        run: bun run port:check
+      - name: Parity suites for ported commands
+        run: bun run parity
