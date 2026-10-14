@@ -9,8 +9,11 @@ import { err, ok, type Result } from "../../shared/kernel/result";
 const FlagFile = z.object({
   reason: z.string().optional(),
   timestamp: z.string().optional(),
+  at: z.string().optional(), // the dashboard writes `at`
   resume_after: z.string().optional(),
 });
+
+const STRICT_ISO = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$/;
 
 /** Like the daemon, treats any existing flag file as a pause, even an unreadable one. */
 export function parsePauseFlag(text: string): LocalPause {
@@ -22,11 +25,16 @@ export function parsePauseFlag(text: string): LocalPause {
   }
   const parsed = FlagFile.safeParse(json);
   const data = parsed.success ? parsed.data : {};
-  const resumeAfter = data.resume_after ? Date.parse(data.resume_after) : Number.NaN;
+  // Only what bash's macOS parser accepts; anything else (or epoch 0, its failure fallback)
+  // stays paused rather than resuming earlier than bash would.
+  const resumeAfter =
+    data.resume_after && STRICT_ISO.test(data.resume_after)
+      ? Date.parse(data.resume_after)
+      : Number.NaN;
   return {
     reason: data.reason ?? "pause flag present",
-    since: data.timestamp ?? "",
-    resumeAfter: Number.isNaN(resumeAfter) ? null : resumeAfter,
+    since: data.timestamp ?? data.at ?? "",
+    resumeAfter: Number.isNaN(resumeAfter) || resumeAfter <= 0 ? null : resumeAfter,
   };
 }
 
@@ -50,8 +58,9 @@ export class FilePauseFlag implements PauseFlag {
     const json = JSON.stringify({ reason, timestamp: at, source: "shipwright pause" });
     try {
       await mkdir(dirname(this.path), { recursive: true });
-      await writeFile(`${this.path}.tmp`, `${json}\n`);
-      await rename(`${this.path}.tmp`, this.path);
+      const tmp = `${this.path}.${process.pid}.tmp`;
+      await writeFile(tmp, `${json}\n`);
+      await rename(tmp, this.path);
       return ok(undefined);
     } catch (e) {
       return err(failed(e));

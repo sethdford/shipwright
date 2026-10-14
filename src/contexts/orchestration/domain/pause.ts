@@ -16,7 +16,10 @@ export interface PauseStatus {
   readonly reasons: readonly string[];
 }
 
-/** `labelled` is null when the label was not checked (no GitHub access). */
+/**
+ * `labelled` is null only in no-GitHub mode (label not checked); callers must never map a gh
+ * error to null.
+ */
 export function pauseStatus(
   flag: LocalPause | null,
   labelled: readonly number[] | null,

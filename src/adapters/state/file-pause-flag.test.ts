@@ -1,5 +1,5 @@
 import { afterEach, expect, test } from "bun:test";
-import { existsSync, readFileSync, writeFileSync } from "node:fs";
+import { readdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { createTestEnv, type TestEnv } from "../../testing/test-env";
 import { FilePauseFlag, parsePauseFlag } from "./file-pause-flag";
@@ -37,7 +37,7 @@ test("written JSON has the keys the daemon reads", async () => {
     timestamp: "2026-10-14T10:00:00.000Z",
     source: "shipwright pause",
   });
-  expect(existsSync(`${flagIn(env)}.tmp`)).toBe(false);
+  expect(readdirSync(env.stateDir).filter((f) => f.endsWith(".tmp"))).toEqual([]);
 });
 
 test("reads flags written by the bash daemon", async () => {
@@ -62,4 +62,21 @@ test.each([
   ["", "pause flag present"],
 ])("any existing flag file pauses, even %p", (text, reason) => {
   expect(parsePauseFlag(text)).toEqual({ reason, since: "", resumeAfter: null });
+});
+
+test.each([
+  ["1970-01-01T00:00:00Z"],
+  ["2026-10-14"],
+  ["2026-10-14T11:00:00+02:00"],
+  ["2026-10-14T11:00:00.000Z"],
+])("an unparseable-by-bash resume_after %p stays paused", (resume) => {
+  expect(parsePauseFlag(JSON.stringify({ reason: "r", resume_after: resume })).resumeAfter).toBe(
+    null,
+  );
+});
+
+test("since falls back to the dashboard's `at` key", () => {
+  expect(parsePauseFlag('{"reason":"r","at":"2026-10-14T09:00:00Z"}').since).toBe(
+    "2026-10-14T09:00:00Z",
+  );
 });
