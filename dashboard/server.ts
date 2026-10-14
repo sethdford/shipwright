@@ -11,7 +11,21 @@ import {
   type FSWatcher,
 } from "fs";
 import { join, extname } from "path";
-import { execSync } from "child_process";
+import { execSync, execFileSync } from "child_process";
+import {
+  handleClaim,
+  handleClaimRelease,
+  releaseStaleClaims,
+} from "./services/claims.js";
+import {
+  signalPid,
+  isValidSshUser,
+  isValidSshHost,
+  isValidShipwrightPath,
+  isValidWorkerCount,
+  validateMachineFields,
+  sshArgv,
+} from "./services/subprocess-guards.js";
 import { Database } from "bun:sqlite";
 
 // ─── Config ──────────────────────────────────────────────────────────
@@ -2874,13 +2888,13 @@ const server = Bun.serve({
             }
             switch (action) {
               case "pause":
-                execSync(`kill -STOP ${pid}`);
+                signalPid(pid, "SIGSTOP");
                 break;
               case "resume":
-                execSync(`kill -CONT ${pid}`);
+                signalPid(pid, "SIGCONT");
                 break;
               case "abort":
-                execSync(`kill -TERM ${pid}`);
+                signalPid(pid, "SIGTERM");
                 break;
               default:
                 results.push({
@@ -2944,13 +2958,13 @@ const server = Bun.serve({
       try {
         switch (action) {
           case "pause":
-            if (pid) execSync(`kill -STOP ${pid}`);
+            if (pid) signalPid(pid, "SIGSTOP");
             break;
           case "resume":
-            if (pid) execSync(`kill -CONT ${pid}`);
+            if (pid) signalPid(pid, "SIGCONT");
             break;
           case "abort":
-            if (pid) execSync(`kill -TERM ${pid}`);
+            if (pid) signalPid(pid, "SIGTERM");
             break;
           case "message": {
             const body = (await req.json()) as { message?: string };
@@ -3404,12 +3418,27 @@ const server = Bun.serve({
       }
       const data = ghCached(`github-${issueNum}`, () => {
         try {
-          const issueRaw = execSync(
-            `gh issue view ${issueNum} --json title,state,labels,assignees,url`,
+          const issueRaw = execFileSync(
+            "gh",
+            [
+              "issue",
+              "view",
+              String(issueNum),
+              "--json",
+              "title,state,labels,assignees,url",
+            ],
             { encoding: "utf-8", timeout: 10000 },
           );
-          const prRaw = execSync(
-            `gh pr list --search "issue-${issueNum}" --json number,state,url,statusCheckRollup,reviews`,
+          const prRaw = execFileSync(
+            "gh",
+            [
+              "pr",
+              "list",
+              "--search",
+              `issue-${issueNum}`,
+              "--json",
+              "number,state,url,statusCheckRollup,reviews",
+            ],
             { encoding: "utf-8", timeout: 10000 },
           );
           const issue = JSON.parse(issueRaw);
@@ -4350,7 +4379,7 @@ const server = Bun.serve({
             const pid = (job.pid as number) || 0;
             if (pid) {
               try {
-                execSync(`kill -STOP ${pid}`);
+                signalPid(pid, "SIGSTOP");
                 paused++;
               } catch {
                 // process may already be gone
@@ -4388,6 +4417,13 @@ const server = Bun.serve({
               headers: { "Content-Type": "application/json", ...CORS_HEADERS },
             },
           );
+        }
+        const fieldError = validateMachineFields(body);
+        if (fieldError) {
+          return new Response(JSON.stringify({ error: fieldError }), {
+            status: 400,
+            headers: { "Content-Type": "application/json", ...CORS_HEADERS },
+          });
         }
         const data = readMachinesFile();
         if (data.machines.some((m) => (m.name as string) === name)) {
@@ -4450,6 +4486,13 @@ const server = Bun.serve({
       }
       try {
         const body = (await req.json()) as Record<string, unknown>;
+        const fieldError = validateMachineFields(body);
+        if (fieldError) {
+          return new Response(JSON.stringify({ error: fieldError }), {
+            status: 400,
+            headers: { "Content-Type": "application/json", ...CORS_HEADERS },
+          });
+        }
         const data = readMachinesFile();
         const idx = data.machines.findIndex(
           (m) => (m.name as string) === machineName,
@@ -4478,16 +4521,24 @@ const server = Bun.serve({
           const sshUser = (machine.ssh_user as string) || "";
           const mHost = (machine.host as string) || "";
           const swPath = (machine.shipwright_path as string) || "shipwright";
+          // Values may come from an older machines.json, so re-validate here.
           if (
-            sshUser &&
-            mHost &&
+            isValidSshUser(sshUser) &&
+            isValidSshHost(mHost) &&
+            isValidShipwrightPath(swPath) &&
+            isValidWorkerCount(body.max_workers) &&
             mHost !== "localhost" &&
             mHost !== "127.0.0.1"
           ) {
             try {
-              execSync(
-                `ssh -o ConnectTimeout=5 ${sshUser}@${mHost} "${swPath} daemon scale ${body.max_workers}" 2>/dev/null`,
-                { timeout: 10000 },
+              execFileSync(
+                "ssh",
+                sshArgv(
+                  sshUser,
+                  mHost,
+                  `${swPath} daemon scale ${body.max_workers}`,
+                ),
+                { timeout: 10000, stdio: ["pipe", "pipe", "ignore"] },
               );
             } catch {
               // Remote scale command failed — update saved anyway
@@ -4550,10 +4601,22 @@ const server = Bun.serve({
           } catch {
             // ignore
           }
-        } else if (sshUser) {
+        } else if (
+          isValidSshUser(sshUser) &&
+          isValidSshHost(mHost) &&
+          isValidShipwrightPath(swPath)
+        ) {
           try {
-            const result = execSync(
-              `ssh -o ConnectTimeout=5 -o BatchMode=yes ${sshUser}@${mHost} "${swPath} ps 2>/dev/null || echo OFFLINE"`,
+            // The quoted remote command is run by the remote shell (as before);
+            // its only variable part, swPath, is restricted to shell-inert chars.
+            const result = execFileSync(
+              "ssh",
+              sshArgv(
+                sshUser,
+                mHost,
+                `${swPath} ps 2>/dev/null || echo OFFLINE`,
+                ["-o", "BatchMode=yes"],
+              ),
               { timeout: 10000, encoding: "utf-8" },
             );
             reachable = true;
@@ -4749,7 +4812,7 @@ const server = Bun.serve({
         }
         if (pid > 0) {
           try {
-            execSync(`kill -TERM ${pid}`, { timeout: 5000, stdio: "pipe" });
+            signalPid(pid, "SIGTERM");
           } catch {
             // process may already be gone
           }
@@ -5517,141 +5580,16 @@ const server = Bun.serve({
     }
 
     // POST /api/claim — Label-based claim coordination
+    // Public route: input is validated and gh is invoked via argv (no shell)
+    // in services/claims.ts.
     if (pathname === "/api/claim" && req.method === "POST") {
       try {
-        const body = (await req.json()) as any;
-        const issue = body.issue as number;
-        const machine = (body.machine || body.machine_name) as string;
-        const repo = (body.repo as string) || "";
-
-        // Check for existing claimed:* label
-        const repoFlag = repo ? ` -R ${repo}` : "";
-        let labels = "";
-        try {
-          labels = execSync(
-            `gh issue view ${issue}${repoFlag} --json labels -q '.labels[].name'`,
-            {
-              encoding: "utf-8",
-              timeout: 10000,
-              stdio: ["pipe", "pipe", "pipe"],
-            },
-          ).trim();
-        } catch {
-          labels = "";
-        }
-
-        const claimedLabel = labels
-          .split("\n")
-          .find((l: string) => l.startsWith("claimed:"));
-        if (claimedLabel) {
-          return new Response(
-            JSON.stringify({
-              approved: false,
-              claimed_by: claimedLabel.replace("claimed:", ""),
-            }),
-            {
-              headers: { "Content-Type": "application/json", ...CORS_HEADERS },
-            },
-          );
-        }
-
-        // Ensure the claimed label exists (no-op if already created)
-        try {
-          execSync(
-            `gh label create "claimed:${machine}"${repoFlag} --color EDEDED --description "Claimed by ${machine}" --force`,
-            { timeout: 10000, stdio: ["pipe", "pipe", "pipe"] },
-          );
-        } catch {
-          /* label may already exist or gh label create not supported — fallback below */
-        }
-
-        // Add claimed:<machine> label
-        try {
-          execSync(
-            `gh issue edit ${issue}${repoFlag} --add-label "claimed:${machine}"`,
-            {
-              timeout: 10000,
-              stdio: ["pipe", "pipe", "pipe"],
-            },
-          );
-        } catch {
-          return new Response(
-            JSON.stringify({ approved: false, error: "Failed to set label" }),
-            {
-              status: 500,
-              headers: { "Content-Type": "application/json", ...CORS_HEADERS },
-            },
-          );
-        }
-
-        // VERIFY: re-read labels — if competing claimed:* labels exist, we lost the race
-        try {
-          const verifyLabels = execSync(
-            `gh issue view ${issue}${repoFlag} --json labels -q '.labels[].name'`,
-            {
-              encoding: "utf-8",
-              timeout: 10000,
-              stdio: ["pipe", "pipe", "pipe"],
-            },
-          )
-            .trim()
-            .split("\n")
-            .filter((l: string) => l.startsWith("claimed:"));
-          if (
-            verifyLabels.length !== 1 ||
-            verifyLabels[0] !== `claimed:${machine}`
-          ) {
-            // Competing claim — remove ours and reject
-            execSync(
-              `gh issue edit ${issue}${repoFlag} --remove-label "claimed:${machine}"`,
-              { timeout: 10000, stdio: ["pipe", "pipe", "pipe"] },
-            );
-            return new Response(
-              JSON.stringify({
-                approved: false,
-                claimed_by:
-                  verifyLabels[0]?.replace("claimed:", "") || "another machine",
-                error: "Claim race lost",
-              }),
-              {
-                headers: {
-                  "Content-Type": "application/json",
-                  ...CORS_HEADERS,
-                },
-              },
-            );
-          }
-        } catch {
-          // Verification failed — conservative: remove our label and reject
-          try {
-            execSync(
-              `gh issue edit ${issue}${repoFlag} --remove-label "claimed:${machine}"`,
-              { timeout: 10000, stdio: ["pipe", "pipe", "pipe"] },
-            );
-          } catch {
-            /* best-effort cleanup */
-          }
-          return new Response(
-            JSON.stringify({
-              approved: false,
-              error: "Claim verification failed",
-            }),
-            {
-              status: 500,
-              headers: {
-                "Content-Type": "application/json",
-                ...CORS_HEADERS,
-              },
-            },
-          );
-        }
-
-        return new Response(
-          JSON.stringify({ approved: true, claimed_by: machine }),
-          {
-            headers: { "Content-Type": "application/json", ...CORS_HEADERS },
-          },
-        );
+        const body = await req.json();
+        const result = handleClaim(body);
+        return new Response(JSON.stringify(result.body), {
+          status: result.status,
+          headers: { "Content-Type": "application/json", ...CORS_HEADERS },
+        });
       } catch (err) {
         return new Response(
           JSON.stringify({ approved: false, error: String(err) }),
@@ -5666,50 +5604,10 @@ const server = Bun.serve({
     // POST /api/claim/release — Remove claimed:* label from issue
     if (pathname === "/api/claim/release" && req.method === "POST") {
       try {
-        const body = (await req.json()) as any;
-        const issue = body.issue as number;
-        const machine = ((body.machine || body.machine_name) as string) || "";
-        const repo = (body.repo as string) || "";
-
-        const repoFlag = repo ? ` -R ${repo}` : "";
-        const label = machine ? `claimed:${machine}` : "";
-
-        // Find the actual claimed label if machine not specified
-        let targetLabel = label;
-        if (!targetLabel) {
-          try {
-            const labels = execSync(
-              `gh issue view ${issue}${repoFlag} --json labels -q '.labels[].name'`,
-              {
-                encoding: "utf-8",
-                timeout: 10000,
-                stdio: ["pipe", "pipe", "pipe"],
-              },
-            ).trim();
-            const found = labels
-              .split("\n")
-              .find((l: string) => l.startsWith("claimed:"));
-            targetLabel = found || "";
-          } catch {
-            /* ignore */
-          }
-        }
-
-        if (targetLabel) {
-          try {
-            execSync(
-              `gh issue edit ${issue}${repoFlag} --remove-label "${targetLabel}"`,
-              {
-                timeout: 10000,
-                stdio: ["pipe", "pipe", "pipe"],
-              },
-            );
-          } catch {
-            /* label may already be removed */
-          }
-        }
-
-        return new Response(JSON.stringify({ ok: true }), {
+        const body = await req.json();
+        const result = handleClaimRelease(body);
+        return new Response(JSON.stringify(result.body), {
+          status: result.status,
           headers: { "Content-Type": "application/json", ...CORS_HEADERS },
         });
       } catch (err) {
@@ -5870,29 +5768,11 @@ const staleClaimInterval = setInterval(
       const twoHoursAgo = Date.now() - 2 * 60 * 60 * 1000;
       for (const [key, dev] of developerRegistry) {
         if (dev.last_heartbeat < twoHoursAgo && dev.last_heartbeat > 0) {
-          // Check if this developer has claimed issues via labels
+          // Check if this developer has claimed issues via labels.
+          // machine_name comes from public /api/connect/* — releaseStaleClaims
+          // validates it and uses argv-based gh calls (no shell).
           try {
-            const result = execSync(
-              `gh issue list --label "claimed:${dev.machine_name}" --state open --json number -q '.[].number'`,
-              {
-                encoding: "utf-8",
-                timeout: 15000,
-                stdio: ["pipe", "pipe", "pipe"],
-              },
-            ).trim();
-            if (result) {
-              const issues = result.split("\n").filter(Boolean);
-              for (const issueNum of issues) {
-                try {
-                  execSync(
-                    `gh issue edit ${issueNum} --remove-label "claimed:${dev.machine_name}"`,
-                    { timeout: 10000, stdio: ["pipe", "pipe", "pipe"] },
-                  );
-                } catch {
-                  /* label may already be removed */
-                }
-              }
-            }
+            releaseStaleClaims(dev.machine_name);
           } catch {
             /* gh may not be available or no issues found */
           }
