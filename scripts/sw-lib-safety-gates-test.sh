@@ -217,9 +217,19 @@ issues='[{"number":1,"labels":[{"name":"shipwright"}]},
  {"number":2,"labels":[{"name":"auto-patrol"},{"name":"shipwright"}]},
  {"number":3,"labels":[]},
  {"number":4,"labels":[{"name":"shipwright-stuck"}]},
- {"number":5,"labels":[{"name":"Auto-Patrol"}]}]'
-assert_eq "filters gh issue list JSON" "1 3" \
+ {"number":5,"labels":[{"name":"Auto-Patrol"}]},
+ {"number":6,"labels":[{"name":"shipwright-failed"}]},
+ {"number":7,"labels":[{"name":"Shipwright-Infra-Issue"},{"name":"shipwright"}]},
+ {"number":8,"labels":[{"name":"shipwright-failed-meta"}]}]'
+assert_eq "filters gh issue list JSON (auto-patrol, stuck, failed, infra-issue)" "1 3 8" \
     "$(dispatchable_issue_numbers <<<"$issues" | tr '\n' ' ' | sed 's/ $//')"
+assert_eq "honors a configured PATROL_LABEL in the issue list" "1 2 3 5 8" \
+    "$(PATROL_LABEL="patrol" dispatchable_issue_numbers <<<"$issues" | tr '\n' ' ' | sed 's/ $//')"
+if dispatchable_issue_numbers <<<'{"number":1}' >/dev/null 2>&1; then
+    assert_fail "a non-array issue list fails"
+else
+    assert_pass "a non-array issue list fails"
+fi
 if dispatchable_issue_numbers <<<"not json" >/dev/null 2>&1; then
     assert_fail "malformed issue JSON fails"
 else

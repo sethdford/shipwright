@@ -10,6 +10,14 @@ permissions:
   contents: read
   issues: write
   actions: write
+  pull-requests: read
+
+# One auto-retry at a time, so two failures cannot both read the same retry count. GitHub keeps
+# at most one pending run per group: a third concurrent failure replaces the pending one, which
+# then is not retried (fail-safe; the watchdog and sweep still label it).
+concurrency:
+  group: shipwright-auto-retry
+  cancel-in-progress: false
 
 jobs:
   auto-retry:
@@ -19,7 +27,6 @@ jobs:
     timeout-minutes: 10
 
     env:
-      GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       GH_REPO: ${{ github.repository }}
 
     steps:
@@ -31,6 +38,7 @@ jobs:
         id: extract
         shell: bash
         env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           RUN_ID: ${{ github.event.workflow_run.id }}
           CONCLUSION: ${{ github.event.workflow_run.conclusion }}
         run: |
@@ -95,6 +103,7 @@ jobs:
         id: categorize
         shell: bash
         env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           RUN_ID: ${{ steps.extract.outputs.run_id }}
           CONCLUSION: ${{ steps.extract.outputs.conclusion }}
           ISSUE_NUMBER: ${{ steps.extract.outputs.issue_number }}
@@ -211,6 +220,7 @@ jobs:
         id: strategy
         shell: bash
         env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           ISSUE_NUMBER: ${{ steps.extract.outputs.issue_number }}
           RUN_ID: ${{ steps.extract.outputs.run_id }}
           ERROR_CATEGORY: ${{ steps.categorize.outputs.error_category }}
@@ -239,6 +249,36 @@ jobs:
           fi
 
           RETRY_COUNT=$(jq -r '.retry' <<<"$RETRY_STATE")
+
+          # Held issues (auto-patrol, shipwright-stuck, -failed, -infra-issue) wait for a human.
+          # shellcheck source=/dev/null
+          source scripts/lib/safety-gates.sh
+          if ! ISSUE_JSON=$(gh issue view "$ISSUE_NUMBER" --repo "$GITHUB_REPOSITORY" --json number,labels); then
+            echo "::error::cannot read the labels of #$ISSUE_NUMBER; refusing to retry"
+            exit 1
+          fi
+          if ! ELIGIBLE=$(jq -c '[.]' <<<"$ISSUE_JSON" | dispatchable_issue_numbers); then
+            echo "::error::cannot read the labels of #$ISSUE_NUMBER; refusing to retry"
+            exit 1
+          fi
+          if [[ "$ELIGIBLE" != "$ISSUE_NUMBER" ]]; then
+            echo "Issue #$ISSUE_NUMBER is held by a label — not retrying"
+            echo "should_retry=false" >> "$GITHUB_OUTPUT"
+            echo "skip_reason=held" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          # Another pipeline for this issue is already running or queued: nothing to retry.
+          if ! ACTIVE=$(scripts/ci/pipeline-active.sh "$ISSUE_NUMBER"); then
+            echo "::error::cannot list pipeline runs for #$ISSUE_NUMBER; refusing to retry"
+            exit 1
+          fi
+          if [[ "$ACTIVE" == "true" ]]; then
+            echo "A pipeline for #$ISSUE_NUMBER is already running or queued — not retrying"
+            echo "should_retry=false" >> "$GITHUB_OUTPUT"
+            echo "skip_reason=active" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
 
           echo "Current retry count: $RETRY_COUNT"
 
@@ -327,19 +367,34 @@ jobs:
           echo "Max Iterations: $MAX_ITERATIONS"
           echo "Resume from: ${COMPLETED_STAGES:-start}"
 
+      # Back off BEFORE the gates, so that they are read just before the dispatch.
+      - name: Back off before retrying
+        if: steps.strategy.outputs.should_retry == 'true'
+        shell: bash
+        env:
+          RETRY_COUNT: ${{ steps.strategy.outputs.retry_count }}
+        run: |
+          BACKOFF=$((RETRY_COUNT * 30))
+          echo "Waiting ${BACKOFF}s before retry ${RETRY_COUNT}..."
+          sleep "$BACKOFF"
+
       # Fails the job unless every gate allows dispatch (ADR-0007); retry is the retry
       # about to be dispatched (1-3), for the fix-loop cap.
       - name: Safety gates
         id: gates
         if: steps.strategy.outputs.should_retry == 'true'
         uses: ./.github/actions/safety-gates
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           retry: ${{ steps.strategy.outputs.retry_count }}
 
       - name: Post retry comment with root cause
+        id: comment
         if: steps.strategy.outputs.should_retry == 'true' && steps.gates.outputs.allowed == 'true'
         shell: bash
         env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           LAST_ERROR: ${{ steps.categorize.outputs.last_error }}
           ISSUE_NUMBER: ${{ steps.extract.outputs.issue_number }}
           RETRY_COUNT: ${{ steps.strategy.outputs.retry_count }}
@@ -352,6 +407,17 @@ jobs:
           ERROR_CATEGORY: ${{ steps.categorize.outputs.error_category }}
           FAILED_STAGE: ${{ steps.categorize.outputs.failed_stage }}
         run: |
+          # Re-check after the backoff: a pipeline may have started for this issue meanwhile.
+          if ! ACTIVE=$(scripts/ci/pipeline-active.sh "$ISSUE_NUMBER"); then
+            echo "::error::cannot list pipeline runs for #$ISSUE_NUMBER; not retrying"
+            exit 1
+          fi
+          if [[ "$ACTIVE" == "true" ]]; then
+            echo "A pipeline for #$ISSUE_NUMBER started meanwhile — not retrying"
+            echo "posted=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
           # Build human-readable category label
           case "$ERROR_CATEGORY" in
             TRANSIENT)      CATEGORY_LABEL="Transient (timeout/network)" ;;
@@ -401,32 +467,29 @@ jobs:
             echo "::error::could not post the retry marker on #$ISSUE_NUMBER; not retrying"
             exit 1
           fi
+          echo "posted=true" >> "$GITHUB_OUTPUT"
 
       - name: Dispatch retry pipeline
-        if: steps.strategy.outputs.should_retry == 'true' && steps.gates.outputs.allowed == 'true'
+        if: steps.strategy.outputs.should_retry == 'true' && steps.gates.outputs.allowed == 'true' && steps.comment.outputs.posted == 'true'
+        shell: bash
         env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           ISSUE_NUMBER: ${{ steps.extract.outputs.issue_number }}
           TEMPLATE: ${{ steps.strategy.outputs.template }}
           MAX_ITERATIONS: ${{ steps.strategy.outputs.max_iterations }}
           COMPLETED_STAGES: ${{ steps.strategy.outputs.completed_stages }}
-          RETRY_COUNT: ${{ steps.strategy.outputs.retry_count }}
         run: |
-          # Backoff delay — avoid hammering the pipeline immediately after failure
-          BACKOFF=$((RETRY_COUNT * 30))
-          echo "Waiting ${BACKOFF}s before retry (attempt ${RETRY_COUNT})..."
-          sleep "$BACKOFF"
-
           echo "Dispatching retry pipeline for issue #$ISSUE_NUMBER..."
-          gh workflow run shipwright-pipeline.yml \
+          if ! gh workflow run shipwright-pipeline.yml \
             --repo "$GITHUB_REPOSITORY" \
             -f issue_number="$ISSUE_NUMBER" \
             -f template="$TEMPLATE" \
             -f max_iterations="$MAX_ITERATIONS" \
             -f completed_stages="$COMPLETED_STAGES" \
-            -f skip_triage=true 2>&1 || {
-              echo "Failed to dispatch retry — will be caught by next sweep"
-              exit 0
-            }
+            -f skip_triage=true; then
+            echo "::error::failed to dispatch the retry for #$ISSUE_NUMBER (its retry marker is posted)"
+            exit 1
+          fi
 
           echo "Retry dispatched successfully"
 
@@ -434,6 +497,7 @@ jobs:
       - name: Handle INFRA failure (no retry)
         if: steps.strategy.outputs.skip_reason == 'infra' && steps.extract.outputs.issue_number != ''
         env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           LAST_ERROR: ${{ steps.categorize.outputs.last_error }}
           ISSUE_NUMBER: ${{ steps.extract.outputs.issue_number }}
           FAILED_RUN: ${{ steps.extract.outputs.run_id }}
@@ -479,6 +543,7 @@ jobs:
         if: steps.strategy.outputs.skip_reason == 'exhausted' && steps.extract.outputs.issue_number != ''
         shell: bash
         env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           LAST_ERROR: ${{ steps.categorize.outputs.last_error }}
           ISSUE_NUMBER: ${{ steps.extract.outputs.issue_number }}
           RETRY_COUNT: ${{ steps.strategy.outputs.retry_count }}

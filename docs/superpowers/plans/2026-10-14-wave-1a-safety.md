@@ -7289,3 +7289,25 @@ gh run list --workflow shipwright-dispatch.yml --limit 3
 ```
 
 Expected: the dispatch run logs show the five gate lines from `.github/actions/safety-gates`. While the breaker is open after the 2026-10-13 loop, dispatch skips and one `shipwright:incident` issue exists; the first probe after the cool-down decides whether it closes. Apply the `shipwright:pause` label (or run `shipwright pause` on a daemon host) to stop everything; remove it, or run `shipwright resume`, to lift it.
+
+---
+
+## Follow-ups (found in the Task 14 review; not in Wave 1a)
+
+- **Wave 1c: `shipwright-pipeline.yml` starts runs ungated on `issues: labeled`.** Adding the
+  `shipwright` label to an issue starts a pipeline directly, without `.github/actions/safety-gates`
+  (pause, budget, review WIP and fix loop are not consulted). Only the breaker bounds it, because
+  failed runs open it. Route the labelled trigger through the gates (or make it enqueue for
+  `shipwright-dispatch.yml`) in Wave 1c.
+- **Retry paths after Task 14.** `shipwright-auto-retry.yml` is the only workflow that retries.
+  `shipwright-sweep.yml` labels stuck issues and never dispatches; `shipwright-dispatch.yml`
+  dispatches an issue only before its first pipeline (no bot `Shipwright Pipeline` comment yet);
+  the watchdog only cancels. A "succeeded but no PR" re-dispatch no longer exists anywhere; it needs a
+  human, or a gated path in Wave 1c.
+- **Unused policy keys.** `config/policy.json` `sweep.retry_template`, `retry_max_iterations` and
+  `stuck_retry_max_iterations` are no longer read; remove them with the policy schema work.
+- **Action pins.** `oven-sh/setup-bun@v2` in `.github/actions/safety-gates` and `ts-check.yml` is
+  a tag, not a commit SHA; pin both to a reviewed SHA.
+- **Auto-retry concurrency.** The `shipwright-auto-retry` group runs one retry at a time; GitHub keeps
+  only one pending run per group, so a third simultaneous failure drops the older pending retry
+  (fail-safe: that issue is not retried).

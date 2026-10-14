@@ -36,7 +36,7 @@ test("bot-comments.sh piped, ||-defaulted or with stderr discarded is flagged", 
   );
   const found = findFailOpen("wf.yml", bad);
   expect(found).toHaveLength(6);
-  expect(found[0]).toStartWith("wf.yml:7: ");
+  expect(found[0]).toStartWith("wf.yml:j:S: ");
   expect(found[0]).toContain("bot-comments.sh");
 });
 
@@ -108,4 +108,83 @@ test("scan covers workflows and every file under .github/actions", async () => {
     ".github/actions/a/run.sh",
     ".github/workflows/w.yml",
   ]);
+});
+
+test("a multi-line $( ... ) followed by || or | is flagged", () => {
+  const bad = step(
+    [
+      "C=$(",
+      '  scripts/ci/bot-comments.sh "$I"',
+      ') || echo "[]"',
+      'S=$(scripts/ci/retry-state.sh "$I" "$R"',
+      "  ) | jq .",
+      "G=$(bun src/cli.ts gates check --retry 0",
+      ") || true",
+    ].join("\n"),
+  );
+  expect(findFailOpen("wf.yml", bad)).toHaveLength(3);
+  const ok = step(
+    ["if ! C=$(", '  scripts/ci/bot-comments.sh "$I"', "); then exit 1; fi"].join("\n"),
+  );
+  expect(findFailOpen("wf.yml", ok)).toEqual([]);
+});
+
+test("a folded (>) run scalar is checked as the joined script", () => {
+  const folded = `jobs:\n  j:\n    steps:\n      - name: F\n        shell: bash\n        run: >\n          C=$(scripts/ci/bot-comments.sh "$I"\n          | jq .)\n`;
+  expect(findFailOpen("wf.yml", folded)).toHaveLength(1);
+});
+
+test("local, export, readonly or declare X=$(marker or gate) masks the exit status", () => {
+  const bad = step(
+    [
+      'local C=$(scripts/ci/bot-comments.sh "$I")',
+      'export S="$(scripts/ci/retry-state.sh "$I" "$R")"',
+      "readonly G=$(bun src/cli.ts gates check --retry 0)",
+      'declare -r C2=$(scripts/ci/bot-comments.sh "$I")',
+    ].join("\n"),
+  );
+  expect(findFailOpen("wf.yml", bad)).toHaveLength(4);
+  expect(findFailOpen("wf.yml", step('C=$(scripts/ci/bot-comments.sh "$I")\nexport C'))).toEqual(
+    [],
+  );
+});
+
+test("set +e in a step that reads markers or checks gates is flagged", () => {
+  for (const off of ["set +e", "set +eu", "set +o errexit", "set +o pipefail"]) {
+    const bad = step(`${off}\nif ! C=$(scripts/ci/bot-comments.sh "$I"); then exit 1; fi`);
+    expect(findFailOpen("wf.yml", bad)).toHaveLength(1);
+  }
+  expect(findFailOpen("wf.yml", step("set +e\necho unrelated"))).toEqual([]);
+});
+
+test("continue-on-error on the safety-gates step, its job, or a gate step is flagged", () => {
+  const onStep = `jobs:\n  j:\n    steps:\n      - name: Safety gates\n        uses: ./.github/actions/safety-gates\n        continue-on-error: true\n`;
+  expect(findFailOpen("wf.yml", onStep)).toHaveLength(1);
+  const expr = onStep.replace("true", `$${"{{"} github.event_name == 'schedule' }}`);
+  expect(findFailOpen("wf.yml", expr)).toHaveLength(1);
+  const onJob = `jobs:\n  j:\n    continue-on-error: true\n    steps:\n      - uses: ./.github/actions/safety-gates\n        with:\n          retry: "0"\n`;
+  expect(findFailOpen("wf.yml", onJob)).toHaveLength(1);
+  const onRun = `jobs:\n  j:\n    steps:\n      - name: G\n        shell: bash\n        continue-on-error: true\n        run: if ! bun src/cli.ts gates check --retry 0; then exit 1; fi\n`;
+  expect(findFailOpen("wf.yml", onRun)).toHaveLength(1);
+  expect(findFailOpen("wf.yml", onStep.replace("true", "false"))).toEqual([]);
+  const other = `jobs:\n  j:\n    continue-on-error: true\n    steps:\n      - run: echo hi\n`;
+  expect(findFailOpen("wf.yml", other)).toEqual([]);
+});
+
+test("a full-line comment that mentions a marker script is ignored", () => {
+  expect(
+    findFailOpen("wf.yml", step("# bot-comments.sh output | jq is forbidden\necho ok")),
+  ).toEqual([]);
+});
+
+test("pipeline-active.sh is held to the same capture rule", () => {
+  expect(
+    findFailOpen(
+      "wf.yml",
+      step('A=$(scripts/ci/pipeline-active.sh "$I" 2>/dev/null || echo false)'),
+    ),
+  ).toHaveLength(1);
+  expect(
+    findFailOpen("wf.yml", step('if ! A=$(scripts/ci/pipeline-active.sh "$I"); then exit 1; fi')),
+  ).toEqual([]);
 });

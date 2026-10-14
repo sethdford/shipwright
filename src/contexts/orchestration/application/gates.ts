@@ -27,9 +27,9 @@ export interface GateOptions {
   /** False in no-GitHub mode: the breaker and review-WIP gates are skipped. */
   readonly github: boolean;
   /**
-   * How many times this issue has already been retried: 0 for a first dispatch. Callers must pass
-   * it explicitly (the daemon its retry count, auto-retry its bot-marker count); an invalid value
-   * closes the fix-loop gate.
+   * The retry number about to be dispatched: 0 for a first dispatch, N for the Nth retry. Callers
+   * must pass it explicitly (the daemon and auto-retry the retry they are about to start); an
+   * invalid value closes the fix-loop gate.
    */
   readonly retry: number;
 }

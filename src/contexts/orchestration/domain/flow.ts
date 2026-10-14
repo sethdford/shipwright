@@ -79,7 +79,7 @@ export function describeWip(v: WipVerdict): string {
 }
 
 /**
- * `retry` is how many times this issue has already been retried: 0 for the first dispatch.
+ * `retry` is the retry number about to be dispatched: 0 for the first dispatch, N for the Nth.
  * Cap 3 allows the original run plus 3 retries. A missing or invalid count is unknown, so blocked.
  */
 export function fixLoopAllows(

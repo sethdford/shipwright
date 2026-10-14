@@ -18,7 +18,6 @@ jobs:
     timeout-minutes: 10
 
     env:
-      GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       GH_REPO: ${{ github.repository }}
 
     steps:
@@ -30,16 +29,23 @@ jobs:
 
       - name: Monitor in-progress pipeline runs
         shell: bash
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           echo "--- Shipwright Watchdog: $(date -u +%Y-%m-%dT%H:%M:%SZ) ---"
           NOW_EPOCH=$(date +%s)
 
-          # Get all in-progress pipeline runs
-          RUNS=$(gh run list --repo "$GITHUB_REPOSITORY" \
+          # Get all in-progress pipeline runs (an unreadable list fails the job, never reads as none)
+          if ! RUNS=$(gh run list --repo "$GITHUB_REPOSITORY" \
             --workflow=shipwright-pipeline.yml --status in_progress \
-            --json databaseId,createdAt,displayTitle --limit 50 2>/dev/null || echo "[]")
-
-          RUN_COUNT=$(echo "$RUNS" | jq 'length')
+            --json databaseId,createdAt,displayTitle --limit 50); then
+            echo "::error::cannot list in-progress pipeline runs"
+            exit 1
+          fi
+          if ! RUN_COUNT=$(jq 'if type == "array" then length else error("not an array") end' <<<"$RUNS"); then
+            echo "::error::malformed pipeline run list"
+            exit 1
+          fi
           if [[ "$RUN_COUNT" -eq 0 ]]; then
             echo "No in-progress pipeline runs. All clear."
             exit 0
@@ -60,7 +66,12 @@ jobs:
             echo "--- Run $RUN_ID: $TITLE ---"
 
             # Calculate elapsed time in minutes
-            CREATED_EPOCH=$(date -d "$CREATED_AT" +%s 2>/dev/null || date -j -f "%Y-%m-%dT%H:%M:%SZ" "$CREATED_AT" +%s 2>/dev/null || echo "0")
+            # An unparseable date would read as 1970 and cancel the run: leave it alone, fail at the end.
+            if ! CREATED_EPOCH=$(date -d "$CREATED_AT" +%s); then
+              echo "::error::cannot parse the start time '$CREATED_AT' of run $RUN_ID; leaving it alone"
+              READ_FAILURES=$((READ_FAILURES + 1))
+              continue
+            fi
             ELAPSED_SECS=$((NOW_EPOCH - CREATED_EPOCH))
             ELAPSED_MINS=$((ELAPSED_SECS / 60))
             echo "Elapsed: ${ELAPSED_MINS}m"
@@ -113,7 +124,11 @@ jobs:
             fi
 
             # Calculate minutes since last signal
-            SIGNAL_EPOCH=$(date -d "$LAST_SIGNAL_DATE" +%s 2>/dev/null || date -j -f "%Y-%m-%dT%H:%M:%SZ" "$LAST_SIGNAL_DATE" +%s 2>/dev/null || echo "0")
+            if ! SIGNAL_EPOCH=$(date -d "$LAST_SIGNAL_DATE" +%s); then
+              echo "::error::cannot parse the signal time '$LAST_SIGNAL_DATE' of run $RUN_ID; leaving it alone"
+              READ_FAILURES=$((READ_FAILURES + 1))
+              continue
+            fi
             SILENT_MINS=$(( (NOW_EPOCH - SIGNAL_EPOCH) / 60 ))
             echo "Last signal: ${LAST_SIGNAL_DATE} (${SILENT_MINS}m ago)"
 
@@ -187,13 +202,16 @@ jobs:
 
             # > 2h silence: cancel, label stuck, DON'T retry
             echo "Status: ABANDONED (${SILENT_MINS}m silence, ${ELAPSED_MINS}m elapsed) — cancelling, no retry"
-            CANCELLED_COUNT=$((CANCELLED_COUNT + 1))
 
             # Label and comment BEFORE cancelling: auto-retry starts as soon as the run is
             # cancelled, and skips it only when the SHIPWRIGHT-WATCHDOG-ABANDON marker exists.
-            # Label as stuck (dispatch skips shipwright-stuck issues until a human clears it)
-            gh issue edit "$ISSUE_NUMBER" --repo "$GITHUB_REPOSITORY" \
-              --add-label "shipwright-stuck" 2>/dev/null || true
+            # Label as stuck (dispatch and auto-retry skip shipwright-stuck issues until a human
+            # clears it); without the label, do not cancel.
+            if ! gh issue edit "$ISSUE_NUMBER" --repo "$GITHUB_REPOSITORY" --add-label "shipwright-stuck"; then
+              echo "::error::could not label #$ISSUE_NUMBER shipwright-stuck; not cancelling run $RUN_ID"
+              READ_FAILURES=$((READ_FAILURES + 1))
+              continue
+            fi
 
             # Post the marker comment; without it, do not cancel (auto-retry would retry the run).
             if ! gh issue comment "$ISSUE_NUMBER" --repo "$GITHUB_REPOSITORY" --body "$(cat <<EOF
@@ -230,6 +248,7 @@ jobs:
 
             # Cancel the run (after the marker exists)
             gh run cancel "$RUN_ID" --repo "$GITHUB_REPOSITORY" 2>/dev/null || true
+            CANCELLED_COUNT=$((CANCELLED_COUNT + 1))
 
           done < <(echo "$RUNS" | jq -c '.[]')
 

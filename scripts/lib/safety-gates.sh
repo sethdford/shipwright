@@ -35,7 +35,7 @@ _sw_lower() {
 
 # safety_gates_ok <retry> — 0 only when dispatch is allowed; otherwise the CLI's exit code
 # (1 blocked or unverifiable, 2 usage, 127 no Bun, anything else). The report goes to stderr.
-# retry: how many times this issue has already been retried (0 = first dispatch). Required:
+# retry: the retry number about to be dispatched (0 = first dispatch, N = Nth retry). Required:
 # a missing or non-numeric count returns 2, because an unknown count must not read as "first".
 # --no-github is passed only when the daemon itself runs with NO_GITHUB=true.
 safety_gates_ok() {
@@ -133,8 +133,14 @@ dispatch_eligible() {
 }
 
 # dispatchable_issue_numbers — reads `gh issue list --json number,labels` on stdin and prints the
-# numbers of the issues that may be dispatched, one per line. Malformed JSON exits non-zero.
+# numbers of the issues the CI workflows may dispatch, one per line: not auto-filed, not
+# shipwright-stuck, and not shipwright-failed or shipwright-infra-issue (both wait for a human).
+# Anything but an array of issues exits non-zero.
 dispatchable_issue_numbers() {
-    jq -r --arg auto "$(_sw_lower "${PATROL_LABEL:-auto-patrol}")" --arg stuck "shipwright-stuck" \
-        '.[] | select([.labels[].name | ascii_downcase] | (index($auto) or index($stuck)) | not) | .number'
+    jq -r --arg auto "$(_sw_lower "${PATROL_LABEL:-auto-patrol}")" '
+        [$auto, "shipwright-stuck", "shipwright-failed", "shipwright-infra-issue"] as $held
+        | if type == "array" then .[] else error("issue list is not an array") end
+        | select(any(.labels[].name | ascii_downcase; IN($held[])) | not)
+        | .number'
 }
+

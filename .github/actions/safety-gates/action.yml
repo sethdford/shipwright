@@ -3,12 +3,13 @@ description: >-
   Installs the Shipwright TypeScript CLI and runs `shipwright gates check` (pause, breaker,
   budget, review WIP, fix loop; ADR-0007). Fails the step, and so the job, unless every gate
   allows dispatch: a closed gate, an unreadable source, a usage error or a missing Bun all stop
-  the job. Output `allowed` is 'true' only on success. Requires actions/checkout first and
-  GITHUB_TOKEN and GH_REPO in the job env.
+  the job. Output `allowed` is 'true' only on success. Requires actions/checkout first,
+  GH_REPO in the job env and GITHUB_TOKEN in this step's env. oven-sh/setup-bun is pinned to
+  the v2 tag, not a commit SHA (none was available offline); pin it before re-enabling.
 inputs:
   retry:
     description: >-
-      The fix-loop count: 0 for a first dispatch, N for the Nth retry. Required with no
+      The retry number about to be dispatched: 0 for a first dispatch, N for the Nth retry. Required with no
       default, because an unknown count must not read as a first dispatch.
     required: true
 outputs:

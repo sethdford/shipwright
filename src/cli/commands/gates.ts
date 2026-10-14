@@ -21,10 +21,10 @@ DESCRIPTION
   dispatching.
 
 OPTIONS
-  --retry N      Required. How many times this issue has already been retried: 0 for a first
-                 dispatch. The fix-loop cap allows the first run plus 3 retries. The daemon
-                 passes its retry count; auto-retry passes the number of its bot markers on
-                 the issue. There is no default: an unknown count must not read as "first".
+  --retry N      Required. The retry number about to be dispatched (0 = first dispatch,
+                 1 = first retry). The fix-loop cap allows the first run plus 3 retries, so
+                 --retry 4 is blocked. The daemon and auto-retry pass the retry they are about
+                 to start. There is no default: an unknown count must not read as "first".
   --no-github    Skip the breaker and review-WIP gates and check only the local pause flag
                  (not the shipwright:pause label); a warning naming them goes to stderr.
                  Only this flag enables it (NO_GITHUB is ignored), and it is refused (exit 2)
