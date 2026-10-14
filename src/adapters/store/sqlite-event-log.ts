@@ -7,32 +7,50 @@ const MIGRATIONS: readonly string[] = [
      run_id TEXT NOT NULL,
      type TEXT NOT NULL,
      at TEXT NOT NULL,
-     data TEXT NOT NULL
+     data TEXT NOT NULL CHECK (json_valid(data) AND json_type(data) = 'object')
    );
    CREATE INDEX events_run ON events(run_id, id);`,
 ];
 
-function migrate(db: Database): void {
-  db.run("CREATE TABLE IF NOT EXISTS schema_version (version INTEGER NOT NULL)");
-  const row = db.query<{ version: number }, []>("SELECT version FROM schema_version").get();
-  const current = row?.version ?? 0;
-  if (!row) db.run("INSERT INTO schema_version (version) VALUES (0)");
-  for (let v = current; v < MIGRATIONS.length; v++) {
-    db.transaction(() => {
-      db.run(MIGRATIONS[v] as string);
-      db.run("UPDATE schema_version SET version = ?", [v + 1]);
-    })();
-  }
+export const SCHEMA_VERSION = MIGRATIONS.length;
+
+function migrate(db: Database, migrations: readonly string[]): void {
+  db.transaction(() => {
+    const row = db.query<{ user_version: number }, []>("PRAGMA user_version").get();
+    const current = row?.user_version ?? 0;
+    if (current > migrations.length) {
+      throw new Error(`db schema v${current} is newer than this binary (v${migrations.length})`);
+    }
+    for (let v = current; v < migrations.length; v++) db.run(migrations[v] as string);
+    // PRAGMA does not accept bound parameters; the value is a trusted integer.
+    db.run(`PRAGMA user_version = ${migrations.length}`);
+  }).immediate();
 }
 
 export class SqliteEventLog implements EventLog {
   private constructor(private readonly db: Database) {}
 
-  static open(path: string): SqliteEventLog {
+  /** `migrations` is an internal seam for tests; production callers use the default. */
+  static open(path: string, migrations: readonly string[] = MIGRATIONS): SqliteEventLog {
     const db = new Database(path, { create: true });
-    db.run("PRAGMA journal_mode = WAL");
-    migrate(db);
+    try {
+      db.run("PRAGMA busy_timeout = 5000");
+      db.run("PRAGMA journal_mode = WAL");
+      db.run("PRAGMA synchronous = NORMAL");
+      migrate(db, migrations);
+    } catch (err) {
+      db.close();
+      throw err;
+    }
     return new SqliteEventLog(db);
+  }
+
+  close(): void {
+    this.db.close();
+  }
+
+  [Symbol.dispose](): void {
+    this.close();
   }
 
   append(event: EventRecord): void {
