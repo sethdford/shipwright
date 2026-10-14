@@ -41,3 +41,51 @@ test("a non-Error throw is still reported", async () => {
   expect(await main(["boom"], c.io, [boom("oops")])).toBe(1);
   expect(c.err).toEqual(["✗ oops"]);
 });
+
+test("top-level --version and -v print the package version", async () => {
+  for (const flag of ["--version", "-v"]) {
+    const c = io();
+    expect(await main([flag], c.io)).toBe(0);
+    expect(c.out).toEqual(["3.3.0"]);
+  }
+});
+
+test.each([[[]], [["--help"]], [["-h"]]])(
+  "top-level help %p lists commands and exits 0",
+  async (argv) => {
+    const c = io();
+    expect(await main(argv, c.io)).toBe(0);
+    const text = c.out.join("\n");
+    expect(text.startsWith("USAGE\n  shipwright <command> [args]\n\nCOMMANDS")).toBe(true);
+    expect(text).toContain("hello");
+  },
+);
+
+const aliased: Command = {
+  name: "status",
+  aliases: ["st", "s"],
+  summary: "shows status",
+  usage: "",
+  run: async (args, { io }) => {
+    io.out(`status:${args.join(",")}`);
+    return 0;
+  },
+};
+
+test("dispatches by alias and forwards args", async () => {
+  const c = io();
+  expect(await main(["st", "a", "b"], c.io, [aliased])).toBe(0);
+  expect(c.out).toEqual(["status:a,b"]);
+});
+
+test("help lists aliases when present", async () => {
+  const c = io();
+  await main([], c.io, [aliased]);
+  expect(c.out.join("\n")).toContain("status (st, s)");
+});
+
+test("args are forwarded to the command", async () => {
+  const c = io();
+  expect(await main(["hello", "--version"], c.io)).toBe(0);
+  expect(c.out).toEqual(["3.3.0"]);
+});
