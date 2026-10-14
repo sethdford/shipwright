@@ -1,0 +1,35 @@
+id: F10-github-writes-only-in-writer
+language: TypeScript
+severity: error
+message: "F10: GitHub writes go only through src/adapters/github/gh-github-writer.ts. Add an idempotent method (it takes an IdempotencyKey) to the GithubWriter port and call that."
+files:
+  - "src/**/*.ts"
+ignores:
+  - "src/adapters/github/gh-github-writer.ts"
+  - "src/adapters/github/gh-github-writer.test.ts"
+# Write subcommands: gh issue|pr|label create|edit|comment|close|reopen|delete|merge|ready|review|
+# lock|transfer, and gh api with a POST/PATCH/PUT/DELETE method. Keep the two regex copies in sync.
+rule:
+  kind: array
+  any:
+    - all:
+        - has: { nthChild: 1, kind: string, regex: '^["''`]gh["''`]$' }
+        - has: { nthChild: 2, kind: string, regex: '^["''`](issue|pr|label)["''`]$' }
+        - has:
+            nthChild: 3
+            kind: string
+            regex: '^["''`](create|edit|comment|close|reopen|delete|merge|ready|review|lock|transfer)["''`]$'
+    - all:
+        - has: { nthChild: 1, kind: string, regex: '^["''`](issue|pr|label)["''`]$' }
+        - has:
+            nthChild: 2
+            kind: string
+            regex: '^["''`](create|edit|comment|close|reopen|delete|merge|ready|review|lock|transfer)["''`]$'
+    - all:
+        - has: { nthChild: 1, kind: string, regex: '^["''`]gh["''`]$' }
+        - has: { nthChild: 2, kind: string, regex: '^["''`]api["''`]$' }
+        - any:
+            - all:
+                - has: { kind: string, regex: '^["''`](-X|--method)["''`]$' }
+                - has: { kind: string, regex: '^["''`](POST|PATCH|PUT|DELETE)["''`]$' }
+            - has: { kind: string, regex: '^["''`](-X|--method=)(POST|PATCH|PUT|DELETE)["''`]$' }

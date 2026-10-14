@@ -1,0 +1,25 @@
+id: F10-github-writes-only-in-writer
+valid:
+  - 'run({ argv: ["gh", "issue", "view", "1", "--json", "title"] });'
+  - 'run({ argv: ["gh", "issue", "list", "--label", "x"] });'
+  - 'run({ argv: ["gh", "pr", "list", "--state", "open"] });'
+  - 'run({ argv: ["gh", "run", "list", "--json", "conclusion"] });'
+  - 'run({ argv: ["gh", "api", "repos/o/r/issues", "-X", "GET"] });'
+  - 'run({ argv: ["git", "issue", "create"] });'
+  - 'const words = ["create", "issue"];'
+invalid:
+  - 'run({ argv: ["gh", "issue", "create", "--title", t] });'
+  - 'run({ argv: ["gh", "issue", "comment", "1", "--body", b] });'
+  - 'run({ argv: ["gh", "issue", "edit", "1", "--add-label", "x"] });'
+  - 'run({ argv: ["gh", "issue", "close", "1"] });'
+  - 'run({ argv: ["gh", "pr", "create", "--fill"] });'
+  - 'run({ argv: ["gh", "pr", "merge", "1"] });'
+  - 'run({ argv: ["gh", "pr", "comment", "1", "-b", b] });'
+  - 'run({ argv: ["gh", "label", "create", "x"] });'
+  - "run({ argv: ['gh', 'issue', 'create'] });"
+  - 'gh(["issue", "create", "--title", t]);'
+  - 'gh(["pr", "merge", "1"]);'
+  - 'run({ argv: ["gh", "api", "repos/o/r/issues", "-X", "POST"] });'
+  - 'run({ argv: ["gh", "api", "--method", "PATCH", "repos/o/r/issues/1"] });'
+  - 'run({ argv: ["gh", "api", "-X", "DELETE", "repos/o/r/labels/x"] });'
+  - 'run({ argv: ["gh", "api", "--method=PUT", "repos/o/r/x"] });'
