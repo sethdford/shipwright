@@ -133,7 +133,7 @@ daemon_patrol() {
                         existing=$(gh issue list --label "$PATROL_LABEL" --label "security" \
                             --search "Security: $name" --json number -q 'length' 2>/dev/null || echo "0")
                         if [[ "${existing:-0}" -eq 0 ]] && [[ "$issues_created" -lt "$PATROL_MAX_ISSUES" ]]; then
-                            patrol_issue_create \
+                            if patrol_issue_create \
                                 --title "Security: ${title} in ${name}" \
                                 --body "## Dependency Security Finding
 
@@ -146,9 +146,12 @@ daemon_patrol() {
 | Date | $(now_iso) |
 
 Auto-detected by \`shipwright daemon patrol\`." \
-                                --label "$(patrol_build_labels "security")" 2>/dev/null || true
-                            issues_created=$((issues_created + 1))
-                            emit_event "patrol.issue_created" "check=security" "package=$name"
+                                --label "$(patrol_build_labels "security")" 2>>"${LOG_FILE:-/dev/null}"; then
+                                issues_created=$((issues_created + 1))
+                                emit_event "patrol.issue_created" "check=security" "package=$name"
+                            else
+                                emit_event "patrol.issue_refused" "check=security" "package=$name"
+                            fi
                         fi
                     else
                         echo -e "    ${RED}●${RESET} ${BOLD}${severity}${RESET}: ${title} in ${CYAN}${name}${RESET}"
@@ -264,7 +267,7 @@ Auto-detected by \`shipwright daemon patrol\`." \
                     existing=$(gh issue list --label "$PATROL_LABEL" --label "dependencies" \
                         --search "Stale dependencies" --json number -q 'length' 2>/dev/null || echo "0")
                     if [[ "${existing:-0}" -eq 0 ]] && [[ "$issues_created" -lt "$PATROL_MAX_ISSUES" ]]; then
-                        patrol_issue_create \
+                        if patrol_issue_create \
                             --title "Update ${findings} stale dependencies" \
                             --body "## Stale Dependencies
 
@@ -272,9 +275,12 @@ The following packages are 2+ major versions behind:
 $(echo -e "$stale_packages")
 
 Auto-detected by \`shipwright daemon patrol\` on $(now_iso)." \
-                            --label "$(patrol_build_labels "dependencies")" 2>/dev/null || true
-                        issues_created=$((issues_created + 1))
-                        emit_event "patrol.issue_created" "check=stale_dependency" "count=$findings"
+                            --label "$(patrol_build_labels "dependencies")" 2>>"${LOG_FILE:-/dev/null}"; then
+                            issues_created=$((issues_created + 1))
+                            emit_event "patrol.issue_created" "check=stale_dependency" "count=$findings"
+                        else
+                            emit_event "patrol.issue_refused" "check=stale_dependency" "count=$findings"
+                        fi
                     fi
                 fi
             fi
@@ -326,7 +332,7 @@ Auto-detected by \`shipwright daemon patrol\` on $(now_iso)." \
             existing=$(gh issue list --label "$PATROL_LABEL" --label "tech-debt" \
                 --search "Dead code candidates" --json number -q 'length' 2>/dev/null || echo "0")
             if [[ "${existing:-0}" -eq 0 ]] && [[ "$issues_created" -lt "$PATROL_MAX_ISSUES" ]]; then
-                patrol_issue_create \
+                if patrol_issue_create \
                     --title "Dead code candidates (${findings} files)" \
                     --body "## Dead Code Detection
 
@@ -336,9 +342,12 @@ $(echo -e "$dead_files")
 > **Note:** Some files may be entry points or dynamically loaded. Verify before removing.
 
 Auto-detected by \`shipwright daemon patrol\` on $(now_iso)." \
-                    --label "$(patrol_build_labels "tech-debt")" 2>/dev/null || true
-                issues_created=$((issues_created + 1))
-                emit_event "patrol.issue_created" "check=dead_code" "count=$findings"
+                    --label "$(patrol_build_labels "tech-debt")" 2>>"${LOG_FILE:-/dev/null}"; then
+                    issues_created=$((issues_created + 1))
+                    emit_event "patrol.issue_created" "check=dead_code" "count=$findings"
+                else
+                    emit_event "patrol.issue_refused" "check=dead_code" "count=$findings"
+                fi
             fi
         fi
 
@@ -391,7 +400,7 @@ Auto-detected by \`shipwright daemon patrol\` on $(now_iso)." \
             existing=$(gh issue list --label "$PATROL_LABEL" --label "testing" \
                 --search "Test coverage gaps" --json number -q 'length' 2>/dev/null || echo "0")
             if [[ "${existing:-0}" -eq 0 ]] && [[ "$issues_created" -lt "$PATROL_MAX_ISSUES" ]]; then
-                patrol_issue_create \
+                if patrol_issue_create \
                     --title "Improve test coverage for ${findings} file(s)" \
                     --body "## Test Coverage Gaps
 
@@ -399,9 +408,12 @@ These files have < 50% line coverage:
 $(echo -e "$low_cov_files")
 
 Auto-detected by \`shipwright daemon patrol\` on $(now_iso)." \
-                    --label "$(patrol_build_labels "testing")" 2>/dev/null || true
-                issues_created=$((issues_created + 1))
-                emit_event "patrol.issue_created" "check=coverage" "count=$findings"
+                    --label "$(patrol_build_labels "testing")" 2>>"${LOG_FILE:-/dev/null}"; then
+                    issues_created=$((issues_created + 1))
+                    emit_event "patrol.issue_created" "check=coverage" "count=$findings"
+                else
+                    emit_event "patrol.issue_refused" "check=coverage" "count=$findings"
+                fi
             fi
         fi
 
@@ -505,7 +517,7 @@ Auto-detected by \`shipwright daemon patrol\` on $(now_iso)." \
             existing=$(gh issue list --label "$PATROL_LABEL" --label "documentation" \
                 --search "Stale documentation" --json number -q 'length' 2>/dev/null || echo "0")
             if [[ "${existing:-0}" -eq 0 ]] && [[ "$issues_created" -lt "$PATROL_MAX_ISSUES" ]]; then
-                patrol_issue_create \
+                if patrol_issue_create \
                     --title "Stale documentation detected" \
                     --body "## Documentation Staleness
 
@@ -513,9 +525,12 @@ The following docs may need updating:
 $(echo -e "$stale_docs")
 
 Auto-detected by \`shipwright daemon patrol\` on $(now_iso)." \
-                    --label "$(patrol_build_labels "documentation")" 2>/dev/null || true
-                issues_created=$((issues_created + 1))
-                emit_event "patrol.issue_created" "check=documentation" "count=$findings"
+                    --label "$(patrol_build_labels "documentation")" 2>>"${LOG_FILE:-/dev/null}"; then
+                    issues_created=$((issues_created + 1))
+                    emit_event "patrol.issue_created" "check=documentation" "count=$findings"
+                else
+                    emit_event "patrol.issue_refused" "check=documentation" "count=$findings"
+                fi
             fi
         fi
 
@@ -561,7 +576,7 @@ Auto-detected by \`shipwright daemon patrol\` on $(now_iso)." \
                         existing=$(gh issue list --label "$PATROL_LABEL" --label "performance" \
                             --search "Test suite performance regression" --json number -q 'length' 2>/dev/null || echo "0")
                         if [[ "${existing:-0}" -eq 0 ]]; then
-                            patrol_issue_create \
+                            if patrol_issue_create \
                                 --title "Test suite performance regression (${pct_slower}% slower)" \
                                 --body "## Performance Regression
 
@@ -572,9 +587,12 @@ Auto-detected by \`shipwright daemon patrol\` on $(now_iso)." \
 | Regression | ${pct_slower}% |
 
 Auto-detected by \`shipwright daemon patrol\` on $(now_iso)." \
-                                --label "$(patrol_build_labels "performance")" 2>/dev/null || true
-                            issues_created=$((issues_created + 1))
-                            emit_event "patrol.issue_created" "check=performance"
+                                --label "$(patrol_build_labels "performance")" 2>>"${LOG_FILE:-/dev/null}"; then
+                                issues_created=$((issues_created + 1))
+                                emit_event "patrol.issue_created" "check=performance"
+                            else
+                                emit_event "patrol.issue_refused" "check=performance"
+                            fi
                         fi
                     fi
 
@@ -646,7 +664,7 @@ Auto-detected by \`shipwright daemon patrol\` on $(now_iso)." \
                 existing=$(gh issue list --label "$PATROL_LABEL" --label "recurring-failure" \
                     --search "Fix recurring: ${short_pattern}" --json number -q 'length' 2>/dev/null || echo "0")
                 if [[ "${existing:-0}" -eq 0 ]] && [[ "$issues_created" -lt "$PATROL_MAX_ISSUES" ]]; then
-                    patrol_issue_create \
+                    if patrol_issue_create \
                         --title "Fix recurring: ${short_pattern}" \
                         --body "## Recurring Failure Pattern
 
@@ -666,9 +684,12 @@ Auto-detected by \`shipwright daemon patrol\` on $(now_iso)." \
 - Add a targeted test to prevent regression
 
 Auto-detected by \`shipwright daemon patrol\`." \
-                        --label "$(patrol_build_labels "recurring-failure")" 2>/dev/null || true
-                    issues_created=$((issues_created + 1))
-                    emit_event "patrol.issue_created" "check=recurring_failure" "pattern=$short_pattern"
+                        --label "$(patrol_build_labels "recurring-failure")" 2>>"${LOG_FILE:-/dev/null}"; then
+                        issues_created=$((issues_created + 1))
+                        emit_event "patrol.issue_created" "check=recurring_failure" "pattern=$short_pattern"
+                    else
+                        emit_event "patrol.issue_refused" "check=recurring_failure" "pattern=$short_pattern"
+                    fi
                 fi
             else
                 echo -e "    ${RED}●${RESET} ${BOLD}recurring${RESET}: ${short_pattern} (${seen_count}x in ${CYAN}${stage}${RESET})"
@@ -824,7 +845,7 @@ Auto-detected by \`shipwright daemon patrol\`." \
             existing=$(gh issue list --label "$PATROL_LABEL" --label "dora-regression" \
                 --search "DORA regression" --json number -q 'length' 2>/dev/null || echo "0")
             if [[ "${existing:-0}" -eq 0 ]] && [[ "$issues_created" -lt "$PATROL_MAX_ISSUES" ]]; then
-                patrol_issue_create \
+                if patrol_issue_create \
                     --title "DORA regression: ${trimmed}" \
                     --body "## DORA Metric Degradation
 
@@ -834,9 +855,12 @@ Auto-detected by \`shipwright daemon patrol\`." \
 > Compared: previous 7-day window vs current 7-day window.
 
 Auto-detected by \`shipwright daemon patrol\` on $(now_iso)." \
-                    --label "$(patrol_build_labels "dora-regression")" 2>/dev/null || true
-                issues_created=$((issues_created + 1))
-                emit_event "patrol.issue_created" "check=dora_regression" "metrics=$trimmed"
+                    --label "$(patrol_build_labels "dora-regression")" 2>>"${LOG_FILE:-/dev/null}"; then
+                    issues_created=$((issues_created + 1))
+                    emit_event "patrol.issue_created" "check=dora_regression" "metrics=$trimmed"
+                else
+                    emit_event "patrol.issue_refused" "check=dora_regression" "metrics=$trimmed"
+                fi
             fi
         else
             local trimmed
@@ -916,7 +940,7 @@ Auto-detected by \`shipwright daemon patrol\` on $(now_iso)." \
             existing=$(gh issue list --label "$PATROL_LABEL" --label "test-coverage" \
                 --search "Add tests for untested scripts" --json number -q 'length' 2>/dev/null || echo "0")
             if [[ "${existing:-0}" -eq 0 ]] && [[ "$issues_created" -lt "$PATROL_MAX_ISSUES" ]]; then
-                patrol_issue_create \
+                if patrol_issue_create \
                     --title "Add tests for ${findings} untested script(s)" \
                     --body "## Untested Scripts
 
@@ -931,9 +955,12 @@ Each test file should follow the pattern in existing test scripts (e.g., \`sw-da
 - Register in \`package.json\` test script
 
 Auto-detected by \`shipwright daemon patrol\` on $(now_iso)." \
-                    --label "$(patrol_build_labels "test-coverage")" 2>/dev/null || true
-                issues_created=$((issues_created + 1))
-                emit_event "patrol.issue_created" "check=untested_scripts" "count=$findings"
+                    --label "$(patrol_build_labels "test-coverage")" 2>>"${LOG_FILE:-/dev/null}"; then
+                    issues_created=$((issues_created + 1))
+                    emit_event "patrol.issue_created" "check=untested_scripts" "count=$findings"
+                else
+                    emit_event "patrol.issue_refused" "check=untested_scripts" "count=$findings"
+                fi
             fi
         fi
 
@@ -986,7 +1013,7 @@ Auto-detected by \`shipwright daemon patrol\` on $(now_iso)." \
             existing=$(gh issue list --label "$PATROL_LABEL" --label "reliability" \
                 --search "Retry exhaustion pattern" --json number -q 'length' 2>/dev/null || echo "0")
             if [[ "${existing:-0}" -eq 0 ]] && [[ "$issues_created" -lt "$PATROL_MAX_ISSUES" ]]; then
-                patrol_issue_create \
+                if patrol_issue_create \
                     --title "Retry exhaustion pattern (${exhausted_count} in 7 days)" \
                     --body "## Retry Exhaustion Pattern
 
@@ -1005,9 +1032,12 @@ Auto-detected by \`shipwright daemon patrol\` on $(now_iso)." \
 4. Investigate if an external dependency is flaky
 
 Auto-detected by \`shipwright daemon patrol\` on $(now_iso)." \
-                    --label "$(patrol_build_labels "reliability")" 2>/dev/null || true
-                issues_created=$((issues_created + 1))
-                emit_event "patrol.issue_created" "check=retry_exhaustion" "count=$exhausted_count"
+                    --label "$(patrol_build_labels "reliability")" 2>>"${LOG_FILE:-/dev/null}"; then
+                    issues_created=$((issues_created + 1))
+                    emit_event "patrol.issue_created" "check=retry_exhaustion" "count=$exhausted_count"
+                else
+                    emit_event "patrol.issue_refused" "check=retry_exhaustion" "count=$exhausted_count"
+                fi
             fi
         else
             echo -e "    ${RED}●${RESET} ${BOLD}retry exhaustion${RESET}: ${exhausted_count} exhaustions in 7 days (issues: ${issue_list})"

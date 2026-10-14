@@ -32,6 +32,7 @@ bun_call() {
 print_test_section "safety_gates_ok"
 
 assert_file_exists "CLI path resolves to src/cli.ts" "$SW_TS_CLI"
+assert_eq "library is executable like its siblings" "755" "$(stat -f %Lp "$SCRIPT_DIR/lib/safety-gates.sh" 2>/dev/null || stat -c %a "$SCRIPT_DIR/lib/safety-gates.sh")"
 assert_eq "CLI path is the first bun argument" "$SW_TS_CLI" "$(cd / && : > "$BUN_LOG" && safety_gates_ok 0 2>/dev/null; head -1 "$BUN_LOG")"
 
 : > "$BUN_LOG"
@@ -78,6 +79,13 @@ else
     assert_pass "missing bun fails closed"
 fi
 
+rc=0; BUN_EXIT=3 safety_gates_ok 0 2>/dev/null || rc=$?
+assert_eq "returns the CLI's exit code" "3" "$rc"
+rc=0; SW_BUN="no-such-bun-binary" safety_gates_ok 0 2>/dev/null || rc=$?
+assert_eq "missing bun returns 127" "127" "$rc"
+rc=0; safety_gates_ok "x" 2>/dev/null || rc=$?
+assert_eq "a bad retry count returns 2" "2" "$rc"
+
 # ─── patrol_issue_create ──────────────────────────────────────────────────
 print_test_section "patrol_issue_create"
 
@@ -94,6 +102,30 @@ assert_file_not_exists "title text is never executed" "$TEST_TEMP_DIR/pwned"
 : > "$BUN_LOG"
 PATROL_LABEL="patrol" patrol_issue_create --title "t" --body "b" 2>/dev/null
 assert_eq "passes a configured PATROL_LABEL" "intake check --title t --label patrol" "$(bun_call)"
+
+: > "$BUN_LOG"
+: > "$GH_LOG"
+patrol_issue_create --intake-label "shipwright:auto" --title "t" --body "b" --label "x,y" 2>/dev/null
+assert_eq "--intake-label sets the intake label" "intake check --title t --label shipwright:auto" "$(bun_call)"
+assert_eq "--intake-label is not passed to gh" "issue create --title t --body b --label x,y" \
+    "$(tr '\n' ' ' < "$GH_LOG" | sed 's/ $//')"
+
+: > "$BUN_LOG"
+: > "$GH_LOG"
+patrol_issue_create --title "$(printf 'line one\nline two\r')" --body "$(printf 'b1\nb2')" 2>/dev/null
+assert_eq "newlines in the title are replaced for the intake gate" \
+    "intake check --title line one line two --label auto-patrol" "$(bun_call)"
+assert_eq "newlines in the title are replaced for gh; the body keeps them" \
+    "issue create --title line one line two --body b1 b2" "$(tr '\n' ' ' < "$GH_LOG" | sed 's/ $//')"
+
+(
+    DLOG="$TEST_TEMP_DIR/dlog"
+    : > "$DLOG"
+    daemon_log() { echo "$*" >> "$DLOG"; }
+    BUN_EXIT=1 patrol_issue_create --title "t" --body "b" 2>/dev/null || true
+)
+assert_contains "a refusal is written to the daemon log with its exit code" \
+    "$(cat "$TEST_TEMP_DIR/dlog")" "intake gate refused (rc=1)"
 
 for code in 1 2 127; do
     : > "$GH_LOG"
@@ -131,6 +163,16 @@ if dispatch_eligible "shipwright-stuck,shipwright"; then
 else
     assert_pass "a shipwright-stuck issue is skipped"
 fi
+if dispatch_eligible "shipwright,Auto-Patrol"; then
+    assert_fail "label match ignores case"
+else
+    assert_pass "label match ignores case"
+fi
+if dispatch_eligible "SHIPWRIGHT-STUCK"; then
+    assert_fail "stuck label match ignores case"
+else
+    assert_pass "stuck label match ignores case"
+fi
 if dispatch_eligible "shipwright,auto-patrol-meta"; then
     assert_pass "only the exact label matches"
 else
@@ -149,7 +191,8 @@ fi
 issues='[{"number":1,"labels":[{"name":"shipwright"}]},
  {"number":2,"labels":[{"name":"auto-patrol"},{"name":"shipwright"}]},
  {"number":3,"labels":[]},
- {"number":4,"labels":[{"name":"shipwright-stuck"}]}]'
+ {"number":4,"labels":[{"name":"shipwright-stuck"}]},
+ {"number":5,"labels":[{"name":"Auto-Patrol"}]}]'
 assert_eq "filters gh issue list JSON" "1 3" \
     "$(dispatchable_issue_numbers <<<"$issues" | tr '\n' ' ' | sed 's/ $//')"
 if dispatchable_issue_numbers <<<"not json" >/dev/null 2>&1; then

@@ -333,16 +333,26 @@ _Escalation: $(if [[ "$retry_count" -eq 1 ]]; then echo "upgraded model + increa
                     PIPELINE_TEMPLATE="$retry_template"
                     MODEL="$retry_model"
                     # The retry number feeds the fix-loop cap in the safety gates (ADR-0007).
-                    DAEMON_RETRY_ATTEMPT="$retry_count" \
-                        daemon_spawn_pipeline "$issue_num" "retry-${retry_count}" "" "${all_extra_args[@]}"
-                    _retry_spawned_for="$issue_num"
+                    local retry_spawned=false
+                    if DAEMON_RETRY_ATTEMPT="$retry_count" \
+                        daemon_spawn_pipeline "$issue_num" "retry-${retry_count}" "" "${all_extra_args[@]}"; then
+                        retry_spawned=true
+                    fi
                     PIPELINE_TEMPLATE="$orig_template"
                     MODEL="$orig_model"
-                    return
+                    if [[ "$retry_spawned" == "true" ]]; then
+                        _retry_spawned_for="$issue_num"
+                        return
+                    fi
+                    # Refused (safety gates, budget, disk, ...): report a final failure so the issue
+                    # loses the watch label instead of being re-polled as a first dispatch.
+                    daemon_log WARN "Retry #${retry_count} refused by safety gates — final failure for issue #${issue_num}"
+                    emit_event "daemon.retry_refused" "issue=$issue_num" "retry=$retry_count"
+                else
+                    daemon_log WARN "Max retries (${effective_max}) exhausted for issue #${issue_num}"
+                    emit_event "daemon.retry_exhausted" "issue=$issue_num" "retries=$retry_count"
                 fi
 
-                daemon_log WARN "Max retries (${effective_max}) exhausted for issue #${issue_num}"
-                emit_event "daemon.retry_exhausted" "issue=$issue_num" "retries=$retry_count"
                 ;;
         esac
     fi

@@ -99,9 +99,17 @@ daemon_spawn_pipeline() {
 
     # ── Safety gates (ADR-0007): pause, breaker, budget, review WIP, fix-loop cap ──
     # DAEMON_RETRY_ATTEMPT is set by the retry path in daemon-failure.sh; 0 = first dispatch.
-    if ! safety_gates_ok "${DAEMON_RETRY_ATTEMPT:-0}"; then
-        daemon_log WARN "Safety gates closed — not dispatching issue #${issue_num}"
-        emit_event "daemon.gates_closed" "issue=${issue_num}"
+    # It is consumed here and never reaches the pipeline's environment.
+    local retry_attempt="${DAEMON_RETRY_ATTEMPT:-0}"
+    unset DAEMON_RETRY_ATTEMPT
+    local gate_rc=0
+    safety_gates_ok "$retry_attempt" || gate_rc=$?
+    if [[ "$gate_rc" -ne 0 ]]; then
+        local gate_level=WARN
+        # 127: Bun missing; 2: bad arguments — misconfiguration, not a normal block
+        [[ "$gate_rc" -eq 127 || "$gate_rc" -eq 2 ]] && gate_level=ERROR
+        daemon_log "$gate_level" "Safety gates closed (rc=${gate_rc}) — not dispatching issue #${issue_num}"
+        emit_event "daemon.gates_closed" "issue=${issue_num}" "rc=${gate_rc}"
         return 1
     fi
 
@@ -568,25 +576,11 @@ daemon_reap_completed() {
             fi
         fi
 
-        # Dequeue next issue if available AND we have capacity
-        # NOTE: locked_get_active_count prevents TOCTOU race with the
-        # active_jobs removal above.  A tiny window remains between
-        # the count read and dequeue_next's own lock acquisition, but
-        # dequeue_next is itself locked, so the worst case is a
-        # missed dequeue that the next poll cycle will pick up.
-        local current_active
-        current_active=$(locked_get_active_count)
-        if [[ "$current_active" -lt "$MAX_PARALLEL" ]]; then
-            local next_issue_key
-            next_issue_key=$(dequeue_next)
-            if [[ -n "$next_issue_key" ]]; then
-                local next_issue_num="$next_issue_key" next_repo=""
-                [[ "$next_issue_key" == *:* ]] && next_repo="${next_issue_key%%:*}" && next_issue_num="${next_issue_key##*:}"
-                local next_title
-                next_title=$(jq -r --arg n "$next_issue_key" '.titles[$n] // ""' "$STATE_FILE" 2>/dev/null || true)
-                daemon_log INFO "Dequeuing issue #${next_issue_num}${next_repo:+, repo=${next_repo}}: ${next_title}"
-                daemon_spawn_pipeline "$next_issue_num" "$next_title" "$next_repo"
-            fi
+        # Queued issues are dispatched by the next poll's queue drain, which has the issues'
+        # current labels for the eligibility check (ADR-0007). The reaper has no labels, so it
+        # never spawns from the queue.
+        if [[ -n "$(jq -r '.queued[0] // empty' "$STATE_FILE" 2>/dev/null || true)" ]]; then
+            daemon_log INFO "Queue not empty — next poll drains it"
         fi
     done <<< "$jobs"
 }

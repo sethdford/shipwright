@@ -28,6 +28,10 @@ if [[ "$(type -t emit_event 2>/dev/null)" != "function" ]]; then
     echo "${payload}}" >> "${HOME}/.shipwright/events.jsonl"
   }
 fi
+# Issue intake caps for auto-filed issues (ADR-0007); path is relative to this file
+# shellcheck source=lib/safety-gates.sh
+source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/lib/safety-gates.sh"
+
 # ─── Helper: Create issue if not duplicate ─────────────────────────────────
 patrol_meta_create_issue() {
     local title="$1"
@@ -52,11 +56,13 @@ patrol_meta_create_issue() {
         labels="${labels},${extra_labels}"
     fi
 
-    gh issue create \
+    # The intake cap counts open issues with the first label (auto-patrol)
+    patrol_issue_create --intake-label "${labels%%,*}" \
         --title "$title" \
         --body "$body" \
         --label "$labels" 2>/dev/null || {
-        warn "  Failed to create issue: $title"
+        warn "  Not filed (intake gate refused or gh failed): $title"
+        emit_event "patrol.meta_issue_refused" "title=$title"
         return 1
     }
 

@@ -227,9 +227,47 @@ print_test_section "Auto-retry passes its retry number"
     echo "some unclassified failure" > "$LOG_DIR/issue-801.log"
     daemon_on_failure 801 1 "" >/dev/null 2>&1
     cat "$SPAWN_LOG"
+    # Checked inside the subshell, where daemon_on_failure ran
+    echo "after=${DAEMON_RETRY_ATTEMPT:-unset}"
 ) > "$TEST_TEMP_DIR/retry_spawn_result" 2>/dev/null || true
 assert_eq "second retry spawns with DAEMON_RETRY_ATTEMPT=2" \
-    "issue=801 title=retry-2 retry=2" "$(cat "$TEST_TEMP_DIR/retry_spawn_result")"
-assert_eq "DAEMON_RETRY_ATTEMPT does not leak to the caller" "unset" "${DAEMON_RETRY_ATTEMPT:-unset}"
+    "issue=801 title=retry-2 retry=2" "$(head -1 "$TEST_TEMP_DIR/retry_spawn_result")"
+assert_eq "DAEMON_RETRY_ATTEMPT does not leak past the retry spawn" \
+    "after=unset" "$(tail -1 "$TEST_TEMP_DIR/retry_spawn_result")"
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# A retry refused by the safety gates is a final failure (no re-poll past the cap)
+# ═══════════════════════════════════════════════════════════════════════════════
+print_test_section "Refused retry is a final failure"
+
+(
+    REFUSE_LOG="$TEST_TEMP_DIR/refuse.log"
+    : > "$REFUSE_LOG"
+    export REFUSE_LOG
+    mock_binary "gh" 'printf "gh %s\n" "$*" >> "$REFUSE_LOG"'
+    SCRIPT_DIR="$TEST_TEMP_DIR/refuse-scripts"
+    mkdir -p "$SCRIPT_DIR"
+    printf '#!/usr/bin/env bash\nexit 0\n' > "$SCRIPT_DIR/sw-tracker.sh"
+    chmod +x "$SCRIPT_DIR/sw-tracker.sh"
+    NO_GITHUB=false
+    daemon_spawn_pipeline() { echo "spawn $1 retry=${DAEMON_RETRY_ATTEMPT:-unset}" >> "$REFUSE_LOG"; return 1; }
+    daemon_log() { echo "log $1 ${*:2}" >> "$REFUSE_LOG"; }
+    sleep() { :; }
+    MODEL="sonnet"
+    PIPELINE_TEMPLATE="autonomous"
+    MAX_PARALLEL=1
+    _retry_spawned_for=""
+    echo '{"retry_counts":{"802":1}}' > "$STATE_FILE"
+    echo "some unclassified failure" > "$LOG_DIR/issue-802.log"
+    daemon_on_failure 802 1 "" >/dev/null 2>&1
+    echo "spawned_for=${_retry_spawned_for:-none} template=${PIPELINE_TEMPLATE} model=${MODEL}" >> "$REFUSE_LOG"
+) 2>/dev/null || true
+refuse_log="$(cat "$TEST_TEMP_DIR/refuse.log")"
+assert_contains "the retry spawn was attempted" "$refuse_log" "spawn 802 retry=2"
+assert_contains "refusal is logged as a final failure" "$refuse_log" "Retry #2 refused by safety gates — final failure"
+assert_contains "final failure labels the issue and removes the watch label" "$refuse_log" \
+    "gh issue edit 802 --add-label pipeline/failed --remove-label shipwright"
+assert_contains "no retry is recorded as spawned; template and model restored" "$refuse_log" \
+    "spawned_for=none template=autonomous model=sonnet"
 
 print_test_results

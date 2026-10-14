@@ -1,3 +1,4 @@
+# shellcheck shell=bash
 # safety-gates.sh — bash callers of the Wave 1a safety gates (ADR-0007).
 # The decisions live in TypeScript (`shipwright gates`, `shipwright intake`); this file only
 # calls them. Everything fails closed: exit 0 from the CLI is the only "yes"; any other status,
@@ -18,9 +19,24 @@ _sw_ts() {
     "$bun_bin" "$SW_TS_CLI" "$@"
 }
 
-# safety_gates_ok <retry> — 0 only when dispatch is allowed; the gate report goes to stderr.
+# _safety_gates_log <level> <message> — the daemon log when loaded, else stderr.
+_safety_gates_log() {
+    if [[ "$(type -t daemon_log 2>/dev/null)" == "function" ]]; then
+        daemon_log "$1" "$2"
+    else
+        echo "safety gates: $2" >&2
+    fi
+}
+
+# _sw_lower <text> — lowercase (bash 3.2 has no ${var,,}).
+_sw_lower() {
+    printf '%s' "$1" | tr '[:upper:]' '[:lower:]'
+}
+
+# safety_gates_ok <retry> — 0 only when dispatch is allowed; otherwise the CLI's exit code
+# (1 blocked or unverifiable, 2 usage, 127 no Bun, anything else). The report goes to stderr.
 # retry: how many times this issue has already been retried (0 = first dispatch). Required:
-# a missing or non-numeric count blocks, because an unknown count must not read as "first".
+# a missing or non-numeric count returns 2, because an unknown count must not read as "first".
 # --no-github is passed only when the daemon itself runs with NO_GITHUB=true.
 safety_gates_ok() {
     local retry="${1:-}"
@@ -34,36 +50,58 @@ safety_gates_ok() {
     fi
     local rc=0
     _sw_ts "${args[@]}" >&2 || rc=$?
-    [[ "$rc" -eq 0 ]]
+    return "$rc"
 }
 
-# patrol_issue_create <gh issue create args...> — files the issue only when the intake gate
-# allows it (open auto-filed issues under the cap, no open issue with the same fingerprint).
-# The title is passed to the gate as one argv element, never through a shell string.
+# patrol_issue_create [--intake-label LABEL] <gh issue create args...> — files the issue only
+# when the intake gate allows it (open issues with LABEL under the cap, no open issue with the
+# same title fingerprint). LABEL defaults to $PATROL_LABEL (auto-patrol); pass the label the
+# site actually applies when it differs. Newlines in the title become spaces. The title goes to
+# the gate as one argv element, never through a shell string. A refusal is logged with the
+# gate's exit code and returns 1.
 patrol_issue_create() {
-    local title="" prev="" arg
+    local intake_label="${PATROL_LABEL:-auto-patrol}"
+    if [[ "${1:-}" == "--intake-label" ]]; then
+        if [[ $# -lt 2 ]]; then
+            _safety_gates_log ERROR "patrol_issue_create: --intake-label needs a value"
+            return 2
+        fi
+        intake_label="$2"
+        shift 2
+    fi
+    local args=() title="" prev="" arg
     for arg in "$@"; do
         if [[ "$prev" == "--title" ]]; then
+            arg="$(printf '%s' "$arg" | tr -s '\r\n' '  ' | sed 's/[[:space:]]*$//')"
             title="$arg"
         fi
+        args+=("$arg")
         prev="$arg"
     done
-    local rc=0
-    _sw_ts intake check --title "$title" --label "${PATROL_LABEL:-auto-patrol}" >&2 || rc=$?
+    local out="" rc=0
+    out="$(_sw_ts intake check --title "$title" --label "$intake_label" 2>&1)" || rc=$?
     if [[ "$rc" -ne 0 ]]; then
+        local reason
+        reason="$(printf '%s\n' "$out" | grep -m1 '✗' || printf '%s\n' "$out" | head -1)"
+        _safety_gates_log WARN "Patrol issue not filed: intake gate refused (rc=${rc}): ${reason}"
         return 1
     fi
-    gh issue create "$@"
+    gh issue create ${args[@]+"${args[@]}"}
 }
 
 # Auto-filed issues (label $PATROL_LABEL, default auto-patrol) are never dispatched until a human
 # opts one in by removing that label (ADR-0007); automation never removes it. Issues labelled
-# shipwright-stuck are skipped too, until a human clears the label.
+# shipwright-stuck are skipped too, until a human clears the label. Labels match ignoring case.
 
 # dispatch_eligible <labels-csv> — 0 when an issue with these labels may be dispatched.
+# Callers must treat an empty or unreadable label list as not eligible (polled issues always
+# carry the watch label).
 dispatch_eligible() {
-    case ",${1:-}," in
-        *",${PATROL_LABEL:-auto-patrol},"* | *",shipwright-stuck,"*) return 1 ;;
+    local labels auto
+    labels="$(_sw_lower "${1:-}")"
+    auto="$(_sw_lower "${PATROL_LABEL:-auto-patrol}")"
+    case ",${labels}," in
+        *",${auto},"* | *",shipwright-stuck,"*) return 1 ;;
     esac
     return 0
 }
@@ -71,6 +109,6 @@ dispatch_eligible() {
 # dispatchable_issue_numbers — reads `gh issue list --json number,labels` on stdin and prints the
 # numbers of the issues that may be dispatched, one per line. Malformed JSON exits non-zero.
 dispatchable_issue_numbers() {
-    jq -r --arg auto "${PATROL_LABEL:-auto-patrol}" --arg stuck "shipwright-stuck" \
-        '.[] | select([.labels[].name] | (index($auto) or index($stuck)) | not) | .number'
+    jq -r --arg auto "$(_sw_lower "${PATROL_LABEL:-auto-patrol}")" --arg stuck "shipwright-stuck" \
+        '.[] | select([.labels[].name | ascii_downcase] | (index($auto) or index($stuck)) | not) | .number'
 }
