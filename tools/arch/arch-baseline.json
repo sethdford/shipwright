@@ -1,9 +1,4 @@
 {
-  "files": {
-    "src/adapters/agent/agent-sdk-runner.ts": 303
-  },
-  "functions": {
-    "src/adapters/agent/agent-sdk-runner.ts#AgentSdkRunner.execute": 41,
-    "src/adapters/process/bun-process-runner.ts#BunProcessRunner.run": 42
-  }
+  "files": {},
+  "functions": {}
 }

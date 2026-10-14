@@ -71,38 +71,20 @@ export class BunProcessRunner implements ProcessRunner {
 
   async run(request: ProcessRequest): Promise<ProcessResult> {
     if (request.argv.length === 0) throw new Error("argv must not be empty");
-    const proc = Bun.spawn([...request.argv], {
-      cwd: request.cwd,
-      env: request.env ? { ...request.env } : undefined,
-      stdin: request.stdin === undefined ? "ignore" : new Blob([request.stdin]),
-      stdout: "pipe",
-      stderr: "pipe",
-      detached: true,
-    });
+    const proc = this.spawn(request);
     const pid = proc.pid;
     this.active.add(pid);
     const timers: ReturnType<typeof setTimeout>[] = [];
     let timedOut = false;
     try {
       if (request.timeoutMs !== undefined) {
-        timers.push(
-          setTimeout(() => {
-            timedOut = true;
-            killGroup(pid, "SIGTERM");
-            timers.push(setTimeout(() => killGroup(pid, "SIGKILL"), this.killGraceMs));
-          }, request.timeoutMs),
-        );
+        const onTimeout = () => {
+          timedOut = true;
+          this.terminate(pid, timers);
+        };
+        timers.push(setTimeout(onTimeout, request.timeoutMs));
       }
-      // Pipes may be held open by grandchildren: bound the drain once the child itself is gone.
-      const exited = proc.exited;
-      const deadline = exited.then(
-        () => new Promise<void>((resolve) => timers.push(setTimeout(resolve, this.drainMs))),
-      );
-      const [stdout, stderr, exitCode] = await Promise.all([
-        readAll(proc.stdout, deadline),
-        readAll(proc.stderr, deadline),
-        exited,
-      ]);
+      const [stdout, stderr, exitCode] = await this.collect(proc, timers);
       return { exitCode, stdout, stderr, timedOut };
     } finally {
       // The leader may have exited on SIGTERM while a grandchild ignored it: don't leave it behind.
@@ -110,5 +92,34 @@ export class BunProcessRunner implements ProcessRunner {
       for (const timer of timers) clearTimeout(timer);
       this.active.delete(pid);
     }
+  }
+
+  private spawn(request: ProcessRequest) {
+    return Bun.spawn([...request.argv], {
+      cwd: request.cwd,
+      env: request.env ? { ...request.env } : undefined,
+      stdin: request.stdin === undefined ? "ignore" : new Blob([request.stdin]),
+      stdout: "pipe",
+      stderr: "pipe",
+      detached: true,
+    });
+  }
+
+  /** SIGTERM now, SIGKILL after the grace period. */
+  private terminate(pid: number, timers: ReturnType<typeof setTimeout>[]): void {
+    killGroup(pid, "SIGTERM");
+    timers.push(setTimeout(() => killGroup(pid, "SIGKILL"), this.killGraceMs));
+  }
+
+  private collect(
+    proc: ReturnType<typeof Bun.spawn<"ignore" | Blob, "pipe", "pipe">>,
+    timers: ReturnType<typeof setTimeout>[],
+  ) {
+    // Pipes may be held open by grandchildren: bound the drain once the child itself is gone.
+    const exited = proc.exited;
+    const deadline = exited.then(
+      () => new Promise<void>((resolve) => timers.push(setTimeout(resolve, this.drainMs))),
+    );
+    return Promise.all([readAll(proc.stdout, deadline), readAll(proc.stderr, deadline), exited]);
   }
 }
