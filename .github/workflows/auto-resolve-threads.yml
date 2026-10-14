@@ -35,10 +35,10 @@ jobs:
       - name: Determine PR
         id: pr
         run: |
-          if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
-            PR_NUMBER="${{ github.event.inputs.pr_number }}"
+          if [[ "$GITHUB_EVENT_NAME" == "workflow_dispatch" ]]; then
+            PR_NUMBER="$INPUT_PR_NUMBER"
           else
-            PR_NUMBER="${{ github.event.check_suite.pull_requests[0].number }}"
+            PR_NUMBER="$CHECK_SUITE_PR_NUMBER"
           fi
 
           if [[ -z "$PR_NUMBER" || "$PR_NUMBER" == "null" ]]; then
@@ -52,6 +52,8 @@ jobs:
           echo "skip=false" >> "$GITHUB_OUTPUT"
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          INPUT_PR_NUMBER: ${{ github.event.inputs.pr_number }}
+          CHECK_SUITE_PR_NUMBER: ${{ github.event.check_suite.pull_requests[0].number }}
 
       - name: Load policy
         if: steps.pr.outputs.skip != 'true'
@@ -71,8 +73,6 @@ jobs:
       - name: Resolve bot-only threads
         if: steps.pr.outputs.skip != 'true' && steps.policy.outputs.auto_resolve == 'true'
         run: |
-          PR_NUMBER="${{ steps.pr.outputs.number }}"
-          HEAD_SHA="${{ steps.pr.outputs.head_sha }}"
           SHORT_SHA="${HEAD_SHA:0:7}"
 
           # Known bot suffixes/patterns
@@ -98,8 +98,7 @@ jobs:
             }
           }'
 
-          OWNER="${{ github.repository_owner }}"
-          REPO="${{ github.event.repository.name }}"
+          OWNER="${GITHUB_REPOSITORY_OWNER}"
 
           THREADS=$(gh api graphql -f query="$QUERY" \
             -f owner="$OWNER" -f repo="$REPO" -F pr="$PR_NUMBER" 2>/dev/null || echo "{}")
@@ -155,3 +154,6 @@ jobs:
           fi
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PR_NUMBER: ${{ steps.pr.outputs.number }}
+          HEAD_SHA: ${{ steps.pr.outputs.head_sha }}
+          REPO: ${{ github.event.repository.name }}

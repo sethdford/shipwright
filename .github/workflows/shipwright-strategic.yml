@@ -79,7 +79,7 @@ jobs:
           fi
 
           FORCE_FLAG=""
-          if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
+          if [[ "${GITHUB_EVENT_NAME}" == "workflow_dispatch" ]]; then
             FORCE_FLAG="--force"
             echo "--- Running Strategic Intelligence Agent (manual trigger, bypassing cooldown) ---"
           else
@@ -100,7 +100,7 @@ jobs:
           SW_STATE_DIR=$(mktemp -d)
           cd "$SW_STATE_DIR"
           git init
-          git remote add origin "https://x-access-token:${GITHUB_TOKEN}@github.com/${{ github.repository }}.git"
+          git remote add origin "https://x-access-token:${GITHUB_TOKEN}@github.com/${GITHUB_REPOSITORY}.git"
           if git fetch origin shipwright-data 2>/dev/null; then
             git checkout -b shipwright-data origin/shipwright-data
           else

@@ -31,10 +31,13 @@ jobs:
 
       - name: Write job summary
         if: always()
+        env:
+          MATRIX_OS: ${{ matrix.os }}
+          JOB_STATUS: ${{ job.status }}
         run: |
-          echo "## E2E Smoke Test Results (${{ matrix.os }})" >> $GITHUB_STEP_SUMMARY
+          echo "## E2E Smoke Test Results (${MATRIX_OS})" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
-          if [ ${{ job.status }} == 'success' ]; then
+          if [ "$JOB_STATUS" == 'success' ]; then
             echo "✅ All smoke tests passed" >> $GITHUB_STEP_SUMMARY
           else
             echo "❌ Some smoke tests failed" >> $GITHUB_STEP_SUMMARY

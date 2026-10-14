@@ -186,17 +186,19 @@ jobs:
 
           # Output issues to dispatch
           DISPATCH=$(echo -e "$DISPATCH" | grep -v '^$' || true)
+          d="ghadelim_$(openssl rand -hex 8)"
           {
-            echo "dispatch<<EOF"
+            echo "dispatch<<$d"
             echo "$DISPATCH"
-            echo "EOF"
+            echo "$d"
           } >> "$GITHUB_OUTPUT"
 
           STUCK=$(echo -e "$STUCK" | grep -v '^$' || true)
+          d="ghadelim_$(openssl rand -hex 8)"
           {
-            echo "stuck<<EOF"
+            echo "stuck<<$d"
             echo "$STUCK"
-            echo "EOF"
+            echo "$d"
           } >> "$GITHUB_OUTPUT"
 
           if [[ -n "$DISPATCH" ]]; then
@@ -214,8 +216,10 @@ jobs:
 
       - name: Dispatch pipelines for unprocessed issues
         if: steps.find.outputs.dispatch != ''
+        env:
+          DISPATCH_ISSUES: ${{ steps.find.outputs.dispatch }}
         run: |
-          echo "${{ steps.find.outputs.dispatch }}" | while read -r issue; do
+          echo "$DISPATCH_ISSUES" | while read -r issue; do
             [[ -z "$issue" ]] && continue
             echo "Dispatching pipeline for issue #$issue..."
             gh workflow run shipwright-pipeline.yml \
@@ -228,8 +232,10 @@ jobs:
 
       - name: Handle stuck issues
         if: steps.find.outputs.stuck != ''
+        env:
+          STUCK_ISSUES: ${{ steps.find.outputs.stuck }}
         run: |
-          echo "${{ steps.find.outputs.stuck }}" | while read -r issue; do
+          echo "$STUCK_ISSUES" | while read -r issue; do
             [[ -z "$issue" ]] && continue
             echo "Handling stuck issue #$issue..."
 

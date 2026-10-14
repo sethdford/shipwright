@@ -88,7 +88,7 @@ jobs:
           SW_STATE_DIR=$(mktemp -d)
           cd "$SW_STATE_DIR"
           git init
-          git remote add origin "https://x-access-token:${GITHUB_TOKEN}@github.com/${{ github.repository }}.git"
+          git remote add origin "https://x-access-token:${GITHUB_TOKEN}@github.com/${GITHUB_REPOSITORY}.git"
 
           # Try to pull existing branch
           if git fetch origin shipwright-data 2>/dev/null; then

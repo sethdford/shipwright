@@ -106,27 +106,28 @@ jobs:
           echo "backlog=$BACKLOG" >> "$GITHUB_OUTPUT"
 
           # Multi-line output
+          d="ghadelim_$(openssl rand -hex 8)"
           {
-            echo "failure_detail<<EOF"
+            echo "failure_detail<<$d"
             echo "$FAILURE_DETAIL"
-            echo "EOF"
+            echo "$d"
           } >> "$GITHUB_OUTPUT"
 
       - name: Update health issue
+        env:
+          STUCK_ISSUES: ${{ steps.metrics.outputs.stuck_issues }}
+          FAILURE_DETAIL: ${{ steps.metrics.outputs.failure_detail }}
+          TIMESTAMP: ${{ steps.metrics.outputs.timestamp }}
+          TOTAL: ${{ steps.metrics.outputs.total }}
+          SUCCEEDED: ${{ steps.metrics.outputs.succeeded }}
+          FAILED: ${{ steps.metrics.outputs.failed }}
+          CANCELLED: ${{ steps.metrics.outputs.cancelled }}
+          IN_PROGRESS: ${{ steps.metrics.outputs.in_progress }}
+          SUCCESS_RATE: ${{ steps.metrics.outputs.success_rate }}
+          RATE_STATUS: ${{ steps.metrics.outputs.rate_status }}
+          STUCK_COUNT: ${{ steps.metrics.outputs.stuck_count }}
+          BACKLOG: ${{ steps.metrics.outputs.backlog }}
         run: |
-          TIMESTAMP="${{ steps.metrics.outputs.timestamp }}"
-          TOTAL="${{ steps.metrics.outputs.total }}"
-          SUCCEEDED="${{ steps.metrics.outputs.succeeded }}"
-          FAILED="${{ steps.metrics.outputs.failed }}"
-          CANCELLED="${{ steps.metrics.outputs.cancelled }}"
-          IN_PROGRESS="${{ steps.metrics.outputs.in_progress }}"
-          SUCCESS_RATE="${{ steps.metrics.outputs.success_rate }}"
-          RATE_STATUS="${{ steps.metrics.outputs.rate_status }}"
-          STUCK_COUNT="${{ steps.metrics.outputs.stuck_count }}"
-          STUCK_ISSUES="${{ steps.metrics.outputs.stuck_issues }}"
-          BACKLOG="${{ steps.metrics.outputs.backlog }}"
-          FAILURE_DETAIL="${{ steps.metrics.outputs.failure_detail }}"
-
           # Status emoji
           if [[ "$RATE_STATUS" == "OK" ]]; then
             STATUS_EMOJI="&#9989;"  # green check
@@ -168,7 +169,7 @@ jobs:
 
           BODY="${BODY}
           ---
-          *Updated automatically every 6 hours by [Shipwright Health Check](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }})*
+          *Updated automatically every 6 hours by [Shipwright Health Check](${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID})*
           <!-- SHIPWRIGHT-HEALTH-REPORT -->
           "
 
@@ -193,13 +194,14 @@ jobs:
 
       - name: Alert on critical health
         if: steps.metrics.outputs.rate_status == 'CRITICAL' || steps.metrics.outputs.stuck_count != '0'
+        env:
+          STUCK_ISSUES: ${{ steps.metrics.outputs.stuck_issues }}
+          SUCCESS_RATE: ${{ steps.metrics.outputs.success_rate }}
+          STUCK_COUNT: ${{ steps.metrics.outputs.stuck_count }}
+          RATE_STATUS: ${{ steps.metrics.outputs.rate_status }}
         run: |
-          SUCCESS_RATE="${{ steps.metrics.outputs.success_rate }}"
-          STUCK_COUNT="${{ steps.metrics.outputs.stuck_count }}"
-          STUCK_ISSUES="${{ steps.metrics.outputs.stuck_issues }}"
-
           ALERT_REASONS=""
-          if [[ "${{ steps.metrics.outputs.rate_status }}" == "CRITICAL" ]]; then
+          if [[ "$RATE_STATUS" == "CRITICAL" ]]; then
             ALERT_REASONS="- Pipeline success rate is ${SUCCESS_RATE}% (below 50% threshold)"
           fi
           if [[ "$STUCK_COUNT" -gt 0 ]]; then
@@ -225,7 +227,7 @@ jobs:
           ### Action Required
           - Check recent pipeline runs for systemic failures
           - Review stuck issues for resource or configuration problems
-          - Check [workflow runs](${{ github.server_url }}/${{ github.repository }}/actions/workflows/shipwright-pipeline.yml) for details
+          - Check [workflow runs](${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/workflows/shipwright-pipeline.yml) for details
 
           This alert will auto-close when health returns to normal.
           EOF
@@ -238,6 +240,8 @@ jobs:
 
       - name: Close resolved alerts
         if: steps.metrics.outputs.rate_status == 'OK' && steps.metrics.outputs.stuck_count == '0'
+        env:
+          SUCCESS_RATE: ${{ steps.metrics.outputs.success_rate }}
         run: |
           # Close any open alert issues since health is OK now
           OPEN_ALERTS=$(gh issue list --repo "$GITHUB_REPOSITORY" \
@@ -246,7 +250,7 @@ jobs:
 
           for alert in $OPEN_ALERTS; do
             gh issue close "$alert" --repo "$GITHUB_REPOSITORY" \
-              --comment "Health restored — auto-closing alert. Success rate is back to ${{ steps.metrics.outputs.success_rate }}%." \
+              --comment "Health restored — auto-closing alert. Success rate is back to ${SUCCESS_RATE}%." \
               2>/dev/null || true
             echo "Closed resolved alert #$alert"
           done
