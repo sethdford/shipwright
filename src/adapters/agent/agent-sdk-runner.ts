@@ -57,6 +57,12 @@ const AUTH_STARTUP = new Set([
   "org_verify_failed",
   "org_pin_api_key_conflict",
   "org_pin_mismatch",
+  "org_config_refused",
+]);
+const TRANSIENT_STARTUP = new Set([
+  "org_config_required_unavailable",
+  "remote_settings_required_unavailable",
+  "worktree_unverified",
 ]);
 
 const ENV_ALLOWLIST = ["PATH", "HOME", "TMPDIR", "LANG", "CLAUDE_CODE_OAUTH_TOKEN"] as const;
@@ -79,7 +85,10 @@ async function collect(stream: AsyncIterable<SDKMessage>): Promise<Collected> {
   try {
     for await (const message of stream) {
       if (message.type === "result") result = message;
-      else if (message.type === "assistant" && message.error) assistantError = message.error;
+      else if (message.type === "assistant" && message.parent_tool_use_id === null) {
+        // Only the final top-level turn counts: subagent errors and recovered errors are noise.
+        assistantError = message.error;
+      }
     }
   } catch (thrown) {
     // Single-shot query() throws after yielding an error result; keep both.
@@ -146,7 +155,9 @@ function kindOf(c: Collected, message: string): AgentFailureKind {
   const r = c.result;
   if (r && r.subtype !== "success" && r.startup_failure_reason) {
     if (AUTH_STARTUP.has(r.startup_failure_reason)) return "auth";
+    if (TRANSIENT_STARTUP.has(r.startup_failure_reason)) return "transient";
   }
+  // errors[] on error results is not regex-classified: the SDK emits the typed signal for API errors.
   if (!r && c.thrown !== undefined) return classifyText(message);
   if (r?.subtype === "success" && r.is_error) return classifyText(message);
   return "execution";

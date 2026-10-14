@@ -164,7 +164,7 @@ Rules for every call:
    and the evals read from it.
 
 **Credentials.** CI has only `CLAUDE_CODE_OAUTH_TOKEN`; routing both operations through the Agent SDK
-keeps that single credential. A direct Messages API adapter (cheaper batch triage) would need
+keeps that single credential. `agentEnv` also passes ANTHROPIC_API_KEY when set (local API-key users); CI provides only CLAUDE_CODE_OAUTH_TOKEN. A direct Messages API adapter (cheaper batch triage) would need
 `ANTHROPIC_API_KEY` and is deferred.
 
 **Verification item.** Exact Agent SDK option names (structured output, budget, permission and hook

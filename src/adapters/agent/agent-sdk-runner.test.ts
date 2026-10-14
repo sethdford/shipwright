@@ -182,7 +182,13 @@ describe("runTask", () => {
   });
 });
 
-const assistantErr = (error: string) => ({ type: "assistant", error, session_id: "s1" });
+const assistantErr = (error: string, parent: string | null = null) => ({
+  type: "assistant",
+  error,
+  parent_tool_use_id: parent,
+  session_id: "s1",
+});
+const assistantOk = () => ({ type: "assistant", parent_tool_use_id: null, session_id: "s1" });
 const failSuccess = (text: string) => result({ subtype: "success", is_error: true, result: text });
 
 describe("typed failure classification", () => {
@@ -208,6 +214,43 @@ describe("typed failure classification", () => {
     const r = await runner(fn).decide(decideReq);
     if (r.ok) throw new Error("expected failure");
     expect(r.error.kind).toBe(kind as AgentFailureKind);
+  });
+
+  test("subagent assistant error is ignored; final execution error stays execution", async () => {
+    const { fn } = fakeQuery([
+      assistantErr("overloaded", "toolu_1"),
+      result({ subtype: "error_during_execution", is_error: true, errors: ["boom"] }),
+    ]);
+    const r = await runner(fn).decide(decideReq);
+    expect(!r.ok && r.error.kind).toBe("execution");
+  });
+
+  test("a top-level error cleared by a later clean top-level assistant message is dropped", async () => {
+    const { fn } = fakeQuery([
+      assistantErr("rate_limit"),
+      assistantOk(),
+      result({ subtype: "error_during_execution", is_error: true, errors: ["boom"] }),
+    ]);
+    const r = await runner(fn).decide(decideReq);
+    expect(!r.ok && r.error.kind).toBe("execution");
+  });
+
+  test.each([
+    ["org_config_refused", "auth"],
+    ["org_config_required_unavailable", "transient"],
+    ["remote_settings_required_unavailable", "transient"],
+    ["worktree_unverified", "transient"],
+  ])("startup_failure_reason %p is %p", async (reason, kind) => {
+    const { fn } = fakeQuery([
+      result({
+        subtype: "error_during_execution",
+        is_error: true,
+        errors: ["x"],
+        startup_failure_reason: reason,
+      }),
+    ]);
+    const r = await runner(fn).decide(decideReq);
+    expect(!r.ok && r.error.kind).toBe(kind as AgentFailureKind);
   });
 
   test("startup_failure_reason gateway_signin_required is auth", async () => {
