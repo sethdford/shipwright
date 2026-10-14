@@ -20,8 +20,11 @@ describe("createTestEnv", () => {
   test("two environments never share a tmux socket", () => {
     const a = createTestEnv();
     const b = createTestEnv();
-    expect(a.tmuxSocketName).not.toBe(b.tmuxSocketName);
-    a.cleanup();
-    b.cleanup();
+    try {
+      expect(a.tmuxSocketName).not.toBe(b.tmuxSocketName);
+    } finally {
+      a.cleanup();
+      b.cleanup();
+    }
   });
 });
