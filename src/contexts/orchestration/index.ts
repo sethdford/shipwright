@@ -1,4 +1,11 @@
 export {
+  type BreakerReport,
+  breakerStatus,
+  checkBreaker,
+  RUN_HISTORY_LIMIT,
+} from "./application/breaker";
+export { type PauseOptions, pause, readPause, resume } from "./application/pause";
+export {
   type BreakerPolicy,
   type BreakerState,
   breakerAllowsDispatch,
@@ -14,4 +21,5 @@ export type {
   PauseFlag,
   PauseLabel,
   RunHistory,
+  SafetyPorts,
 } from "./ports";

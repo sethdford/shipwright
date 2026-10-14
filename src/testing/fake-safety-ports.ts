@@ -1,0 +1,62 @@
+import type { GithubWriter, IncidentOutcome, IncidentReport } from "../contexts/integrations";
+import type {
+  LocalPause,
+  PauseFlag,
+  PauseLabel,
+  RunHistory,
+  RunRecord,
+  SafetyPorts,
+} from "../contexts/orchestration";
+import type { IdempotencyKey } from "../shared/kernel/durability";
+import type { AdapterError } from "../shared/kernel/ports";
+import { ok, type Result } from "../shared/kernel/result";
+
+export const NOW = Date.parse("2026-10-14T12:00:00Z");
+
+export class MemoryPauseFlag implements PauseFlag {
+  constructor(public flag: LocalPause | null = null) {}
+  async read() {
+    return ok(this.flag);
+  }
+  async write(reason: string, at: string) {
+    this.flag = { reason, since: at, resumeAfter: null };
+    return ok(undefined);
+  }
+  async clear() {
+    this.flag = null;
+    return ok(undefined);
+  }
+}
+
+export class RecordingGithubWriter implements GithubWriter {
+  readonly calls: { key: IdempotencyKey; report: IncidentReport }[] = [];
+  constructor(
+    private readonly result: Result<IncidentOutcome, AdapterError> = ok({
+      issue: 900,
+      action: "created",
+    }),
+  ) {}
+  async ensureIncident(key: IdempotencyKey, report: IncidentReport) {
+    this.calls.push({ key, report });
+    return this.result;
+  }
+}
+
+export const fixedRuns = (r: Result<readonly RunRecord[], AdapterError>): RunHistory => ({
+  recentRuns: async () => r,
+});
+export const fixedLabel = (r: Result<readonly number[], AdapterError>): PauseLabel => ({
+  labelled: async () => r,
+});
+
+/** Safety ports with harmless defaults: nothing running, paused, capped or awaiting review. */
+export function fakeSafetyPorts(over: Partial<SafetyPorts> = {}): SafetyPorts {
+  return {
+    now: () => NOW,
+    runs: fixedRuns(ok([])),
+    pauseFlag: new MemoryPauseFlag(),
+    pauseLabel: fixedLabel(ok([])),
+    github: new RecordingGithubWriter(),
+    ...over,
+  };
+}

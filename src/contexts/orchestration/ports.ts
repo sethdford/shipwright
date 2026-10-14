@@ -1,5 +1,6 @@
 import type { AdapterError } from "../../shared/kernel/ports";
 import type { Result } from "../../shared/kernel/result";
+import type { GithubWriter } from "../integrations";
 import type { RunRecord } from "./domain/breaker";
 import type { LocalPause } from "./domain/pause";
 
@@ -21,4 +22,13 @@ export interface PauseFlag {
 /** Open issues carrying the `shipwright:pause` label. */
 export interface PauseLabel {
   labelled(): Promise<Result<readonly number[], AdapterError>>;
+}
+
+/** Everything the safety gates read or write, wired in src/main.ts. */
+export interface SafetyPorts {
+  readonly now: () => number;
+  readonly runs: RunHistory;
+  readonly pauseFlag: PauseFlag;
+  readonly pauseLabel: PauseLabel;
+  readonly github: GithubWriter;
 }
