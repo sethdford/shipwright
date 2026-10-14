@@ -952,6 +952,15 @@ git commit -m "feat(ts): add gh, git and socket-scoped tmux adapters"
 
 SDK facts used here (confirmed against code.claude.com/docs/en/agent-sdk on 2026-10-13): `query({prompt, options})` yields messages; the final `type: "result"` message has `subtype` (`success`, `error_max_turns`, `error_max_budget_usd`, `error_during_execution`, `error_max_structured_output_retries`), `total_cost_usd`, `num_turns`, `session_id`, `stop_reason`, and on success `result` and `structured_output`. A single-shot `query()` throws after yielding an error result. `allowedTools` only auto-approves; `permissionMode: "dontAsk"` denies everything not pre-approved.
 
+- [ ] **Step 0: Pin the Agent SDK exactly** (it is 0.x and releases every 1–2 days; a caret range drifts)
+
+```bash
+bun add --exact @anthropic-ai/claude-agent-sdk@0.3.296
+jq -r '.dependencies["@anthropic-ai/claude-agent-sdk"]' package.json
+```
+
+Expected: `0.3.296` (no `^`).
+
 - [ ] **Step 1: Write the failing tests**
 
 `src/adapters/agent/untrusted.test.ts`:
@@ -1062,6 +1071,25 @@ describe("decide", () => {
     const { fn } = fakeQuery([result({ subtype: "error_max_budget_usd" })], { throwAfter: true });
     const r = await new AgentSdkRunner(fn, {}).decide(decideReq);
     expect(!r.ok && r.error.kind).toBe("budget");
+  });
+
+  test("a success subtype flagged is_error is a failure, reported with the SDK's errors[]", async () => {
+    const { fn } = fakeQuery([
+      result({ subtype: "success", is_error: true, errors: ["API Error: overloaded"], structured_output: {} }),
+    ]);
+    const r = await new AgentSdkRunner(fn, {}).decide(decideReq);
+    expect(r).toEqual({
+      ok: false,
+      error: { kind: "execution", message: "API Error: overloaded", costUsd: 0.01 },
+    });
+  });
+
+  test("decide does not persist a session to disk", async () => {
+    const { fn, captured } = fakeQuery([
+      result({ subtype: "success", structured_output: { approved: true, reason: "ok" } }),
+    ]);
+    await new AgentSdkRunner(fn, {}).decide(decideReq);
+    expect((captured[0] as Captured).options.persistSession).toBe(false);
   });
 
   test("a crash with no result message is an execution failure with zero cost", async () => {
@@ -1182,7 +1210,12 @@ function failure(c: Collected, aborted: boolean, timedOut: boolean): AgentFailur
     case "error_max_structured_output_retries":
       return { kind: "schema", message: "no valid structured output", costUsd };
   }
-  const message = c.error instanceof Error ? c.error.message : "agent run failed";
+  const sdkErrors = c.result && "errors" in c.result ? (c.result.errors as string[] | undefined) : undefined;
+  const message = sdkErrors?.length
+    ? sdkErrors.join("; ")
+    : c.error instanceof Error
+      ? c.error.message
+      : "agent run failed";
   return { kind: "execution", message, costUsd };
 }
 
@@ -1202,6 +1235,7 @@ export class AgentSdkRunner implements AgentRunner {
       settingSources: [],
       maxTurns: 3,
       maxBudgetUsd: req.maxBudgetUsd,
+      persistSession: false,
       outputFormat: { type: "json_schema", schema: z.toJSONSchema(req.schema) },
     });
     if (!run.ok) return run;
@@ -1251,7 +1285,7 @@ export class AgentSdkRunner implements AgentRunner {
         this.queryFn({ prompt, options: { ...options, env: this.env, abortController: controller } }),
       );
       const r = collected.result;
-      if (r && r.subtype === "success" && r.stop_reason !== "refusal") return ok(r);
+      if (r && r.subtype === "success" && !r.is_error && r.stop_reason !== "refusal") return ok(r);
       return err(failure(collected, controller.signal.aborted && !timedOut, timedOut));
     } finally {
       clearTimeout(timer);
@@ -1263,7 +1297,7 @@ export class AgentSdkRunner implements AgentRunner {
 - [ ] **Step 5: Run tests and typecheck**
 
 Run: `bun test ./src/adapters/agent && bun run typecheck`
-Expected: 10 pass; typecheck exit 0. If typecheck reports an `Options` field name mismatch (e.g. `effort`, `outputFormat`), check the installed SDK's `Options` type with `grep -n "effort\|outputFormat\|maxBudgetUsd" node_modules/@anthropic-ai/claude-agent-sdk/*.d.ts`, fix the field name, and note it in the commit message.
+Expected: 12 pass; typecheck exit 0. If typecheck reports an `Options` field name mismatch (e.g. `effort`, `outputFormat`), check the installed SDK's `Options` type with `grep -n "effort\|outputFormat\|maxBudgetUsd" node_modules/@anthropic-ai/claude-agent-sdk/*.d.ts`, fix the field name, and note it in the commit message.
 
 - [ ] **Step 6: Commit**
 
@@ -2650,8 +2684,9 @@ cd "$(git rev-parse --show-toplevel)" || exit 0
 if output=$(bun run check:fast 2>&1); then
   exit 0
 fi
-jq -n --arg r "bun run check:fast failed. Fix it before finishing:
-$(printf '%s' "$output" | tail -40)" '{decision: "block", reason: $r}'
+# Exit 2 blocks the stop and feeds stderr back to Claude (documented Stop-hook contract).
+printf 'bun run check:fast failed. Fix it before finishing:\n%s\n' "$(printf '%s' "$output" | tail -40)" >&2
+exit 2
 ```
 
 ```bash
@@ -2661,7 +2696,7 @@ chmod +x .claude/hooks/check-fast-on-stop.sh
 - [ ] **Step 5: Register the hooks in `.claude/settings.json`** (merge; keep existing hooks)
 
 ```bash
-jq '.hooks.Stop = ((.hooks.Stop // []) + [{"hooks":[{"type":"command","command":".claude/hooks/check-fast-on-stop.sh","timeout":120}]}])
+jq '.hooks.Stop = ((.hooks.Stop // []) + [{"hooks":[{"type":"command","command":".claude/hooks/check-fast-on-stop.sh","timeout":600}]}])
   | .hooks.PostToolUse = ((.hooks.PostToolUse // []) + [{"matcher":"Edit|Write","hooks":[{"type":"command","command":"bunx biome check --write src tools >/dev/null 2>&1 || true","timeout":30}]}])' \
   .claude/settings.json > /tmp/s.json && mv /tmp/s.json .claude/settings.json
 jq '.hooks | keys' .claude/settings.json
@@ -2676,7 +2711,7 @@ echo '{"stop_hook_active":false}' | .claude/hooks/check-fast-on-stop.sh; echo "e
 echo '{"stop_hook_active":true}' | .claude/hooks/check-fast-on-stop.sh; echo "exit=$?"
 ```
 
-Expected: both print nothing and `exit=0`. The first passes because check:fast is green; the second returns early.
+Expected: both print nothing and `exit=0`. The first passes because check:fast is green; the second returns early. Then prove the blocking path: temporarily add `export const x: number = "a";` to `src/contexts/platform/domain/greeting.ts`, run the first command again, and expect `exit=2` with the typecheck error on stderr; revert the line.
 
 - [ ] **Step 7: Commit**
 
