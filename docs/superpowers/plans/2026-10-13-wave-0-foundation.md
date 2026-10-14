@@ -2427,7 +2427,7 @@ It is being migrated from bash (`scripts/`) to TypeScript on Bun (`src/`). Desig
 
 ## Definition of done
 
-- `bun run check:fast` after each change (< 10 s).
+- `bun run check:fast` after each change (~10–25 s; it runs all TypeScript tests for now).
 - `bun run check` before you call work done (< 60 s). CI runs the same command.
 
 A change is done when `bun run check` passes. Failure messages name the rule and the fix.
@@ -2573,7 +2573,7 @@ git commit -m "docs: add AGENTS.md and path-scoped rules; move legacy guide out 
 grep -rnE 'agents/(code-reviewer|devops-engineer|doc-fleet-agent|pipeline-agent|shell-script-specialist|test-specialist)' scripts/*.sh scripts/lib/*.sh | grep -v -- '-test.sh'
 ```
 
-For each file the grep shows a script reading, keep that file and note the dependency in that command's progress.json entry. Remove the rest with `git rm`, for example:
+For each file the grep shows a script reading, keep that file and note the dependency in that command's progress.json entry. Remove the rest with `git rm`, for example (as built: five were removed; `doc-fleet-agent.md` is kept because `scripts/sw-doc-fleet.sh` reads it):
 
 ```bash
 git rm -q .claude/agents/code-reviewer.md .claude/agents/devops-engineer.md .claude/agents/test-specialist.md
@@ -2800,7 +2800,8 @@ Port types: `src/shared/kernel/durability.ts`. Every adapter passes
 - F4 no cycles · F5 I/O only in adapters · F6 Agent SDK only in adapters/agent
 - F7 size budgets with ratchet · F8 tests never touch the real machine
 - Planned: F9 agents get no GitHub token and no permission bypass (Wave 1) · F10 GitHub side
-  effects only through a fenced, idempotent adapter (Waves 1–2)
+  effects only through a fenced, idempotent adapter (from Wave 1 for the first GitHub-writing port
+  method; every integration by the end of Wave 2)
 - Workflows: no untrusted `${{ }}` in `run:` blocks
 
 ## Decisions

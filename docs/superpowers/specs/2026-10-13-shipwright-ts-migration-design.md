@@ -133,12 +133,12 @@ message names the rule and how to fix it.
 | F2 | `contexts/*/application/**` never imports `adapters/**` or `cli/**`. |
 | F3 | A context imports another context only through `contexts/<other>/index.ts`. |
 | F4 | No import cycles. |
-| F5 | `Bun.spawn`, `Bun.$`, `fetch`, `process.env` and `node:fs` appear only under `adapters/**` and `main.ts`. |
+| F5 | I/O (`Bun.spawn`, `Bun.$` and every other runtime `Bun` member, `fetch`, `process.env`, and imports of `bun`, `bun:sqlite`, `node:fs`, `node:process`, `child_process` and network modules) appears only under `adapters/**`, `main.ts`, `cli.ts`, `testing/**` and tests. |
 | F6 | `@anthropic-ai/claude-agent-sdk` is imported only by `adapters/agent/**`, and every call passes an output schema or a typed task spec. |
 | F7 | Size budgets: files ≤ 300 lines, functions ≤ 40 lines. Existing violations are baselined in `arch-baseline.json` and may only decrease (ratchet). |
 | F8 | Tests never resolve real user paths: adapters receive `HOME`, state directory and tmux socket from `TestEnv`. |
 | F9 | Agents get no GitHub token and no permission bypass (see below). *Enforced from Wave 1.* |
-| F10 | GitHub side effects go only through a fenced, idempotent adapter (see below). *Enforced from Wave 1.* |
+| F10 | GitHub side effects go only through a fenced, idempotent adapter (see below). *Enforced from Wave 1 for the first GitHub-writing port method; covers every integration by the end of Wave 2.* |
 
 **F9: no GitHub token and no permission bypass for agents.**
 - *What:* `adapters/agent/**` builds the agent's environment from an explicit allowlist and never
@@ -187,7 +187,10 @@ request data. That rule lands with the dashboard hardening item (Wave 1).
 | Command | Runs | Time budget |
 |---|---|---|
 | `bun run check` | typecheck → Biome → fitness rules → unit + application tests → parity suites for ported commands | < 60 s |
-| `bun run check:fast` | typecheck + fitness rules + tests for changed contexts | < 10 s |
+| `bun run check:fast` | typecheck + fitness rules + all TypeScript tests (`src`, `tools`) | ~10–25 s today |
+
+`check:fast` runs every TypeScript test for now. Selecting only the tests for changed contexts is a
+later optimization, once the suite outgrows the budget.
 
 The same commands run in CI. A change is done when `bun run check` passes.
 
@@ -198,8 +201,10 @@ The same commands run in CI. A change is done when `bun run check` passes.
   `porter` (ports one bash command into its context until its parity suite passes).
 - **Skills:** `add-command`, `add-adapter`, `port-bash-command`, `write-adr`.
 - **Hooks:** Biome format after edits; a Stop hook runs `check:fast` and blocks completion while it fails.
-- The six existing agent files in `.claude/agents/` (which have no frontmatter and never load) are
-  replaced by the subagents above.
+- Of the six existing agent files in `.claude/agents/` (which have no frontmatter and never load),
+  five were removed and replaced by the subagents above. `doc-fleet-agent.md` is kept because
+  `scripts/sw-doc-fleet.sh` reads it; doc-fleet is on the don't-port list (§7.5), so the file goes
+  when that script does.
 
 ### 4.4 Documentation
 
@@ -210,7 +215,7 @@ docs/
                          0004 parity strategy; 0005 durability contract and deployment modes (Wave 0);
                          0006 credentials and capability separation (Wave 1).
   reference/cli.md       Generated from command metadata in cli/. Never hand-edited.
-  reference/config.md    Generated from the zod config schema.
+  reference/config.md    Generated from the zod config schema (Wave 1, with the config adapter).
   guides/                Quickstart, operating the daemon, writing a pipeline template, running M2/M3.
   plans/                 In-flight multi-session work (see §7.3).
 ```
@@ -280,6 +285,10 @@ write.
 **Verification items.**
 - *Wave 0:* exact Agent SDK option names (structured output, budget, permission and hook options) are
   confirmed against the SDK documentation before the adapter is written.
+- *Wave 1:* `runTask` loads `settingSources: ["project"]` (the Wave 0 runner), so a target repo's
+  hooks and permissions run with the model token in the environment. That must change (no project
+  settings, or the scrubbed sandbox below) before any untrusted-text or external-PR stage uses
+  `runTask`.
 - *Wave 1:* confirm `sessionStore`, `resume`, `'defer'` and token isolation.
   - *Open item:* can the SDK authenticate without exposing the model token to the agent's Bash
     subprocesses?
@@ -394,9 +403,9 @@ this file.
 
 | Wave | Scope | Exit criterion |
 |---|---|---|
-| 0 | Foundation: Bun project layout, `check` commands, fitness rules F1–F8, `TestEnv`, core adapters (config, store, events, gh, git, tmux, agent), AGENTS.md / rules / subagents / skills, ADRs 1–5, durability port types and contract suite (fake + SQLite store), progress.json, parity harness in CI | `bun run check` green in CI; one trivial command (`hello`) ported end to end |
-| 1 | Delivery loop: loop, pipeline + stages, triage, daemon / dispatch, memory, cost. Safety controls (§6.2) come first; then the SQLite durability adapter with the `decide()` interpreter, durable approvals, credential scrubbing and sandbox (F9), GitHub writes only through the fenced adapter (F10), the evaluator, holdout checks and plan critic (§6.3), delivery evals and the scorecard (§8), dashboard hardening, ADR-0006, and an optional 1–2 day Temporal-on-Bun spike | Shipwright's own CI pipeline runs on TypeScript with the breaker on, **and** pass^3 is at least the bash baseline at no more than its cost per merged PR; dispatch / watchdog / auto-retry re-enabled |
-| 2 | Integrations: GitHub modules (F10, reconcile-then-act), trackers (intake only), CI, PR lifecycle. Multi-machine: Postgres adapter live, pull workers with leases and fences, worker enrollment, and `remote` / `fleet` / `connect` rebuilt on `WorkQueue` | Parity green; the contract suite is green on Postgres |
+| 0 | Foundation: Bun project layout, `check` commands, fitness rules F1–F8, `TestEnv`, core adapters (paths, process, store/events, gh, git, tmux, agent), AGENTS.md / rules / subagents / skills, ADRs 1–5, durability port types and contract suite (fake + SQLite store), progress.json, parity harness in CI | `bun run check` green in CI; one trivial command (`hello`) ported end to end |
+| 1 | Delivery loop: loop, pipeline + stages, triage, daemon / dispatch, memory, cost. The zod config adapter and generated `reference/config.md`. Safety controls (§6.2) come first; then the SQLite durability adapter with the `decide()` interpreter, durable approvals, credential scrubbing and sandbox (F9), GitHub writes only through the fenced adapter (F10, enforced from the first GitHub-writing port method), the evaluator, holdout checks and plan critic (§6.3), delivery evals and the scorecard (§8), dashboard hardening, ADR-0006, and an optional 1–2 day Temporal-on-Bun spike | Shipwright's own CI pipeline runs on TypeScript with the breaker on, **and** pass^3 is at least the bash baseline at no more than its cost per merged PR; dispatch / watchdog / auto-retry re-enabled |
+| 2 | Integrations: GitHub modules (F10 extended to every integration, reconcile-then-act), trackers (intake only), CI, PR lifecycle. Multi-machine: Postgres adapter live, pull workers with leases and fences, worker enrollment, and `remote` / `fleet` / `connect` rebuilt on `WorkQueue` | Parity green; the contract suite is green on Postgres |
 | 3 | Observability: status, dora, vitals, logs, …; one authenticated dashboard over the journal (SQLite or Postgres) replaces fleet-viz and the team dashboard; OTel GenAI span adapter; replay from the journal | Parity green |
 | 4 | Remaining commands, parallelized across `porter` agents (skipping the don't-port list); the gated optimizer; `prep` emits agent-ready scaffolding | All entries `parity-green` or on the don't-port list |
 | 5 | Delete bash scripts, remove the router shim, `bun build --compile` single binary carrying both durability adapters, Homebrew formula; review the engine triggers (§9) | No `.sh` under `scripts/` except installers; the binary runs M1–M3 by configuration |
@@ -472,6 +481,7 @@ Every test runs inside `TestEnv`: a temporary `HOME`, state database and tmux so
 | Scope pressure delays the urgent safety work | Wave 1 orders the safety controls first. Postgres stays in Wave 2. |
 | The dashboard stays exposed between the hotfix and the hardening | Bind to localhost with or right after the hotfix. No M2/M3 deployment until hardened (§6.2). |
 | Eval cost and noise | Pinned resources, k=3, 20–50 tasks; differences under 3 points are noise. |
+| TypeScript and bash disagree on locations | `resolvePaths` uses tmux socket `shipwright` (`tmux -L`, override `SHIPWRIGHT_TMUX_SOCKET`) and honors `SHIPWRIGHT_STATE_DIR`; bash uses the default tmux server and always `~/.shipwright`. Reconcile both before porting any tmux-touching command (session, ps, fleet) or any command that shares state files with bash; this is a Wave 1 prerequisite for those ports. |
 
 **What would change the engine decision** (ADR-0005; reviewed in Wave 5 and whenever a trigger fires):
 

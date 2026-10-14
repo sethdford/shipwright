@@ -27,12 +27,14 @@ observability, teams, platform.
 ## Fitness rules (spec §3.3)
 
 Enforced now by `bun run arch`: F1 pure domain · F2 application never imports adapters or cli ·
-F3 contexts only via `index.ts` · F4 no cycles · F5 `Bun.spawn`/`Bun.$`/`fetch`/`process.env`/`node:fs`
-only in adapters and `main.ts` · F6 Agent SDK only in `adapters/agent`, every call typed ·
+F3 contexts only via `index.ts` · F4 no cycles · F5 I/O (`Bun.spawn`, `Bun.$`, `fetch`,
+`process.env`, `node:fs`, other Bun and `node:process` I/O) only in `src/adapters`, `src/main.ts`,
+`src/cli.ts` and `src/testing` · F6 Agent SDK only in `adapters/agent`, every call typed ·
 F7 files ≤ 300 lines, functions ≤ 40 (baseline only shrinks) · F8 tests use `createTestEnv()`, never real paths.
 
-Enforced from Wave 1 (follow them now): F9 agents get no GitHub token and no permission bypass ·
-F10 GitHub side effects only through the fenced, idempotent `integrations` adapter.
+Follow now; enforced later: F9 agents get no GitHub token and no permission bypass (from Wave 1) ·
+F10 GitHub side effects only through the fenced, idempotent `integrations` adapter (from Wave 1 for
+the first GitHub-writing port method; every integration by the end of Wave 2).
 
 ## Deployment modes and state
 
@@ -45,7 +47,8 @@ the lease's fence token; a stale fence fails.
 ## Migration
 
 - `docs/plans/port/progress.json` is the source of truth for what is ported. Pick the next `bash`
-  entry, port it into its context, flip its router line in `scripts/sw`, and make its parity suite pass.
+  entry and port it into its context. Make its parity suite pass and set its status to
+  `parity-green` first; only then flip its router line in `scripts/sw` to `run_ts`.
 - Use the `port-bash-command` skill and the `porter` subagent for this.
 - Never route a command to TypeScript before its parity suite passes (`bun run port:check`, `bun run parity`).
 

@@ -17,8 +17,9 @@ Boundaries are fitness rules checked by `bun run arch`, which `bun run check` ru
 - F7 (file and function size) with a ratchet whose baseline, `tools/arch/arch-baseline.json`, may
   only shrink.
 
-F9 (no GitHub token or permission bypass for agents) and F10 (fenced, idempotent GitHub side
-effects) are planned for Waves 1–2.
+F9 (no GitHub token or permission bypass for agents) is enforced from Wave 1. F10 (fenced,
+idempotent GitHub side effects) is enforced from Wave 1 for the first GitHub-writing port method
+and covers every integration by the end of Wave 2.
 
 ## Consequences
 - Violations fail CI with the rule name and a fix hint, so structure survives agent edits.

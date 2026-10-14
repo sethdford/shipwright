@@ -7,7 +7,8 @@ const consoleIO: CliIO = {
   err: (text) => process.stderr.write(`${text}\n`),
 };
 
-// TODO(signals): install signal handlers that call runner.killAll when the first command constructs a BunProcessRunner.
+// TODO(signals, spec §5, Wave 1): install SIGINT/SIGTERM handlers that call runner.killAll once the
+// first command constructs a BunProcessRunner.
 
 function renderHelp(registry: readonly Command[]): string {
   const rows = registry.map((c) => {

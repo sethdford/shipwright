@@ -56,15 +56,16 @@ Enforced by `bun run arch` (part of `bun run check`). Every failure names the ru
 | F2 | Application never imports `adapters/` or `cli/` | dependency-cruiser |
 | F3 | Contexts meet only at `index.ts`; production code never imports `src/testing/` | dependency-cruiser |
 | F4 | No import cycles | dependency-cruiser |
-| F5 | `Bun.spawn`, `Bun.$`, `fetch`, `process.env`, `node:fs` only in adapters and `main.ts` | ast-grep |
+| F5 | I/O (`Bun.spawn`, `Bun.$`, other `Bun` members, `fetch`, `process.env`, `node:fs`, `node:process`, network modules) only in `src/adapters`, `src/main.ts`, `src/cli.ts` and `src/testing` | ast-grep |
 | F6 | The Agent SDK is imported only by `adapters/agent/` | ast-grep |
 | F7 | Files ≤ 300 lines, functions ≤ 40; the baseline may only shrink | size ratchet |
 | F8 | Tests use `createTestEnv()` paths, never the real home or environment | ast-grep |
 
 Planned, follow them now:
 - **F9** (Wave 1): agents get no GitHub token and no permission bypass.
-- **F10** (Waves 1–2): GitHub side effects go only through the fenced, idempotent `integrations`
-  adapter, with an `IdempotencyKey` and a `FenceToken` in the signature.
+- **F10** (from Wave 1 for the first GitHub-writing port method; every integration by the end of
+  Wave 2): GitHub side effects go only through the fenced, idempotent `integrations` adapter, with
+  an `IdempotencyKey` and a `FenceToken` in the signature.
 
 Workflows: no `${{ }}` expression of any kind inside a `run:` script or an `actions/github-script`
 `script:` body; values go through `env:`. This check is strict, with no baseline.
