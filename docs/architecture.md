@@ -24,7 +24,8 @@ Ten bounded contexts. The authoritative command → context mapping is
 | platform | Doctor, setup, init, prep, upgrade, release |
 
 Commands on the spec's don't-port list (§7.5) survive only as aliases or "removed" stubs that name
-the replacement. Today only `platform` has code: `hello`, the end-to-end reference port.
+the replacement. Code so far: `platform` (`hello`, the end-to-end reference port), `orchestration`
+(the Wave 1a safety controls) and `integrations` (the incident writer port).
 
 ## Layers and rules
 
@@ -60,20 +61,27 @@ Enforced by `bun run arch` (part of `bun run check`). Every failure names the ru
 | F6 | The Agent SDK is imported only by `adapters/agent/` | ast-grep |
 | F7 | Files ≤ 300 lines, functions ≤ 40; the baseline may only shrink | size ratchet |
 | F8 | Tests use `createTestEnv()` paths, never the real home or environment | ast-grep |
+| F10 (part) | `gh` write subcommands in `src/` only in `src/adapters/github/gh-github-writer.ts` | ast-grep |
+| — | `dashboard/**`: no shell command built from request data (interim, until the port) | ast-grep |
 
 Planned, follow them now:
 - **F9** (Wave 1): agents get no GitHub token and no permission bypass.
-- **F10** (from Wave 1 for the first GitHub-writing port method; every integration by the end of
-  Wave 2): GitHub side effects go only through the fenced, idempotent `integrations` adapter, with
-  an `IdempotencyKey` and a `FenceToken` in the signature.
+- **F10** in full (run-scoped writes from Wave 1b; every integration by the end of Wave 2): GitHub
+  side effects go only through the fenced, idempotent `integrations` adapter, with an
+  `IdempotencyKey` and a `FenceToken` in the signature. The first method, `ensureIncident`, takes no
+  fence (no lease covers a system-wide incident; ADR-0007).
 
 Workflows: no `${{ }}` expression of any kind inside a `run:` script or an `actions/github-script`
-`script:` body; values go through `env:`. This check is strict, with no baseline.
+`script:` body; values go through `env:`. This check is strict, with no baseline. A second check
+fails a workflow that pipes, `||`-defaults or discards stderr of `gates check`, `bot-comments.sh`,
+`retry-state.sh` or `pipeline-active.sh`, runs `gates check --no-github`, or sets
+`continue-on-error` on the safety gates (fail closed, ADR-0007).
 
 Config: [`.dependency-cruiser.cjs`](../.dependency-cruiser.cjs), [`sgconfig.yml`](../sgconfig.yml)
 with [`tools/arch/rules/`](../tools/arch/rules), [`tools/arch/size-ratchet.ts`](../tools/arch/size-ratchet.ts)
 with [`arch-baseline.json`](../tools/arch/arch-baseline.json),
-[`tools/arch/workflow-injection.ts`](../tools/arch/workflow-injection.ts).
+[`tools/arch/workflow-injection.ts`](../tools/arch/workflow-injection.ts),
+[`tools/arch/workflow-fail-closed.ts`](../tools/arch/workflow-fail-closed.ts).
 
 ## Claude access
 
@@ -121,6 +129,23 @@ interprets each command against the ports above. Gates are `awaitSignal('approve
 is auto-approved. Because the domain is pure, an external engine could interpret the same commands
 later (ADR-0005).
 
+## Safety controls
+
+Spec §6.2, ADR-0007. Pure policies in `orchestration/domain` (`breaker`, `pause`, `budget`, `flow`,
+`intake`) over the ports in `orchestration/ports.ts`; read adapters over `gh` and the bash state
+files in `src/adapters/{github,state}`. One composition, `shipwright gates check --retry N`
+(pause → breaker → budget → review WIP → fix loop, first closed gate wins, fail closed), is the only
+"go" for every dispatch:
+
+| Caller | Where |
+|---|---|
+| Bash daemon | `scripts/lib/safety-gates.sh` (`safety_gates_ok`): once per poll cycle and per spawn; `patrol_issue_create` runs `intake check` before every auto-filed issue |
+| `shipwright-dispatch.yml`, `shipwright-auto-retry.yml` | the composite action `.github/actions/safety-gates`; markers only from bot comments (`scripts/ci/`) |
+| Dashboard and fleet workers | fleet token and request guard: [dashboard-exposure.md](dashboard-exposure.md) |
+
+The breaker keeps no state: it folds the last 50 pipeline runs from GitHub Actions on every check,
+so every machine and CI agree. Operating them: [safety-runbook.md](safety-runbook.md).
+
 ## Migration
 
 Strangler via the router (ADR-0004). `scripts/sw` sends a command to `bun src/cli.ts` through
@@ -137,5 +162,6 @@ suites against the TypeScript command in a sealed sandbox. Tooling: [`tools/port
 - [0004 Strangler migration with bash suites as parity oracle](adr/0004-strangler-with-parity-oracle.md)
 - [0005 Durability contract and three deployment modes](adr/0005-durability-contract-and-deployment-modes.md)
 - 0006 Credentials and capability separation (planned, Wave 1)
+- [0007 Safety controls gate every dispatch](adr/0007-safety-controls.md)
 
 Generated reference: [`docs/reference/cli.md`](reference/cli.md) (`bun run docs:gen`).

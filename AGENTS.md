@@ -30,11 +30,13 @@ Enforced now by `bun run arch`: F1 pure domain · F2 application never imports a
 F3 contexts only via `index.ts` · F4 no cycles · F5 I/O (`Bun.spawn`, `Bun.$`, `fetch`,
 `process.env`, `node:fs`, other Bun and `node:process` I/O) only in `src/adapters`, `src/main.ts`,
 `src/cli.ts` and `src/testing` · F6 Agent SDK only in `adapters/agent`, every call typed ·
-F7 files ≤ 300 lines, functions ≤ 40 (baseline only shrinks) · F8 tests use `createTestEnv()`, never real paths.
+F7 files ≤ 300 lines, functions ≤ 40 (baseline only shrinks) · F8 tests use `createTestEnv()`, never real paths ·
+F10 TypeScript `gh` writes only in `src/adapters/github/gh-github-writer.ts` · dashboard: no shell
+command built from data (interim) · workflows: gate and marker reads never swallow errors.
 
 Follow now; enforced later: F9 agents get no GitHub token and no permission bypass (from Wave 1) ·
-F10 GitHub side effects only through the fenced, idempotent `integrations` adapter (from Wave 1 for
-the first GitHub-writing port method; every integration by the end of Wave 2).
+F10 in full: every `integrations` write method also takes a `FenceToken` (run-scoped writes, from
+Wave 1b), and every integration goes through it by the end of Wave 2.
 
 ## Deployment modes and state
 
@@ -62,6 +64,10 @@ the lease's fence token; a stale fence fails.
 - GitHub side effects (push, PR, comment, label, merge) only through the `integrations` adapter, with an
   `IdempotencyKey` and a `FenceToken` (F10).
 - Tests use `createTestEnv()`; never touch the real `HOME`, `~/.shipwright` or tmux server.
+- Dispatch, retries and auto-filing pass `shipwright gates check --retry N` / `intake check` first;
+  exit 0 is the only "go" and every gate fails closed. Workflows read `SHIPWRIGHT-*` markers only via
+  `scripts/ci/bot-comments.sh`. Never run `gates check`/`breaker check` on the real repo to look
+  (they write the incident issue); use `breaker status`. Operators: `docs/safety-runbook.md` (ADR-0007).
 
 ## Bash (until each command is ported)
 

@@ -1,6 +1,9 @@
 # Shipwright TypeScript migration — design
 
 - **Status:** Draft for review (revised 2026-10-14)
+- **Implementation:** Wave 1a (the §6.2 safety controls, ADR-0007) is implemented on branch
+  `wave1/safety`, awaiting review; the gated workflows stay disabled until the maintainer
+  re-enables them (`docs/safety-runbook.md`).
 - **Date:** 2026-10-13
 - **Decision:** Migrate Shipwright from ~120k lines of bash to TypeScript on Bun, incrementally,
   as a modular monolith with Clean Architecture boundaries enforced by tests.
@@ -158,7 +161,9 @@ message names the rule and how to fix it.
 - *How:* an ast-grep rule on the port interfaces checks the signatures at the type level. F5 already
   confines process and network I/O to adapters.
 - *Status:* enforced from the first GitHub-writing port method (Wave 1). It covers every integration
-  by the end of Wave 2.
+  by the end of Wave 2. Wave 1a enforces the adapter half: `gh` writes in `src/` only in
+  `adapters/github/gh-github-writer.ts`; its first method, the breaker's incident, takes no fence
+  (ADR-0007). Fenced signatures arrive with run-scoped writes in Wave 1b.
 
 Workflow files get one extra rule: no `${{ … }}` expression that reads issue, PR, comment or step
 output text inside a `run:` block (values go through `env:`). Until the dashboard is ported (Wave 3),
@@ -353,6 +358,14 @@ loop stops every machine.
 | Fix-loop cap | Evaluator gaps return to build at most 3 times, then the run escalates. | Unbounded review/retry loops |
 | Review-WIP limit | No new dispatch while more than N agent PRs (default 3–5) await human review. | Review fatigue; review capacity is the bottleneck |
 | Dashboard exposure | Binds `127.0.0.1` by default; every mutating route and all M3 worker traffic need a token; CORS is an allowlist, not `*`; no request data reaches a shell. In Wave 2, `/api/claim` is deleted in favor of `WorkQueue.claim`, and the dashboard reads the journal without shelling out. No M2/M3 deployment until this hardening (Wave 1) merges. | Unauthenticated `/api/claim` command injection |
+
+*Status (Wave 1a, ADR-0007):* implemented: the breaker, kill switch, budget guard (local only; CI
+runners have no cost data), patrol intake caps, fix-loop cap, review-WIP limit (5) and dashboard
+exposure, composed in `shipwright gates check` and wired into the bash daemon and the dispatch and
+auto-retry workflows. Until the journal exists (Wave 1b) the breaker reads GitHub Actions run
+history, so local daemon outcomes do not feed it. Not yet: error fingerprinting, per-call budgets,
+durable approval gates (Wave 1b), and gating `shipwright-pipeline.yml`'s `issues: labeled` trigger
+(Wave 1c).
 
 ### 6.3 Verification
 
