@@ -55,3 +55,53 @@ test("paused fails closed: an unreadable source counts as paused (exit 0)", asyn
 test.each([[resumeCommand, ["extra"]]])("bad arguments exit 2", async (command, args) => {
   expect(await command.run(args, commandContext(captureIO()))).toBe(2);
 });
+
+test("pause sanitizes the reason it stores and echoes", async () => {
+  const pauseFlag = new MemoryPauseFlag();
+  const io = captureIO();
+  await pauseCommand.run(
+    ["bad\u001b[2Jreason"],
+    commandContext(io, fakeSafetyPorts({ pauseFlag })),
+  );
+  expect(pauseFlag.flag?.reason).toBe("bad[2Jreason");
+  expect(io.outLines[0]).toBe("✓ paused: bad[2Jreason");
+});
+
+test("pause rejects option-like reasons with exit 2", async () => {
+  const pauseFlag = new MemoryPauseFlag();
+  const ctx = commandContext(captureIO(), fakeSafetyPorts({ pauseFlag }));
+  expect(await pauseCommand.run(["--force"], ctx)).toBe(2);
+  expect(pauseFlag.flag).toBeNull();
+});
+
+test("resume says so when no local flag was set", async () => {
+  const io = captureIO();
+  expect(await resumeCommand.run([], commandContext(io, fakeSafetyPorts()))).toBe(0);
+  expect(io.outLines[0]).toBe("✓ no local pause flag was set");
+});
+
+const throwingLabel = fakeSafetyPorts({
+  pauseLabel: {
+    labelled: async () => {
+      throw new Error("boom");
+    },
+  },
+});
+
+test("paused fails closed on bad arguments and thrown errors (exit 0)", async () => {
+  expect(await pausedCommand.run(["--bogus"], commandContext(captureIO()))).toBe(0);
+  const io = captureIO();
+  expect(await pausedCommand.run([], commandContext(io, throwingLabel))).toBe(0);
+  expect(io.errLines[0]).toContain("boom");
+});
+
+test("paused --gate: exit 0 only when not paused; every other outcome is non-zero", async () => {
+  const clear = commandContext(captureIO(), fakeSafetyPorts());
+  expect(await pausedCommand.run(["--gate"], clear)).toBe(0);
+  const labelled = fakeSafetyPorts({ pauseLabel: fixedLabel(ok([5])) });
+  expect(await pausedCommand.run(["--gate"], commandContext(captureIO(), labelled))).toBe(1);
+  const bad = fakeSafetyPorts({ pauseLabel: fixedLabel(err({ kind: "auth", message: "x" })) });
+  expect(await pausedCommand.run(["--gate"], commandContext(captureIO(), bad))).toBe(1);
+  expect(await pausedCommand.run(["--gate", "--bogus"], clear)).toBe(2);
+  expect(await pausedCommand.run(["--gate"], commandContext(captureIO(), throwingLabel))).toBe(1);
+});
