@@ -386,17 +386,18 @@ fi
 print_test_section "claim_issue / release_claim (dashboard, fleet token)"
 
 # Recording curl: argv one element per line in $CURL_ARGS, stdin in $CURL_STDIN when curl reads
-# a file from stdin (@-). Prints $CURL_BODY, then the -w format with %{http_code} = $CURL_CODE.
+# a file from stdin (@-). Prints $CURL_BODY (unless -o /dev/null), then the -w format with %{http_code} = $CURL_CODE.
 export CURL_ARGS="$TEST_TEMP_DIR/curl.args" CURL_STDIN="$TEST_TEMP_DIR/curl.stdin"
 export CURL_BODY="" CURL_CODE="200" CURL_EXIT=0
 mock_binary "curl" 'printf "%s\n" "$@" > "$CURL_ARGS"
-fmt=""; prev=""
+fmt=""; prev=""; to_null=""
 for a in "$@"; do
     [[ "$a" == "@-" ]] && cat > "$CURL_STDIN"
     [[ "$prev" == "-w" ]] && fmt="$a"
+    [[ "$prev" == "-o" && "$a" == "/dev/null" ]] && to_null=1
     prev="$a"
 done
-printf "%s" "$CURL_BODY"
+[[ -z "$to_null" ]] && printf "%s" "$CURL_BODY"
 [[ -n "$fmt" ]] && printf "%b" "${fmt//%\{http_code\}/$CURL_CODE}"
 exit "$CURL_EXIT"'
 # Recording gh: `issue view` prints $GH_VIEW_OUT when set, else no claim before our --add-label
@@ -463,11 +464,28 @@ assert_eq "200 not approved: no GitHub label write" "0" "$(added_label)"
 
 reset_fleet
 CURL_BODY='{"approved":false,"error":"boom"}' CURL_CODE=500
+NO_GITHUB=false claim_issue 42 "my-machine" || true
+assert_eq "5xx approved:false is a dashboard error, not 'claimed elsewhere' (GitHub fallback)" "1" "$(added_label)"
+assert_contains "5xx: the dashboard error is logged" "$(cat "$LOG_FILE")" "dashboard claim error (HTTP 500): boom"
+assert_contains "5xx: fallback names the status" "$(cat "$LOG_FILE")" "Dashboard unavailable (HTTP 500)"
+
+reset_fleet
+CURL_CODE=000 CURL_EXIT=7 GH_VIEW_OUT='["claimed:my-machine"]'
 if NO_GITHUB=false claim_issue 42 "my-machine"; then
-    assert_fail "500 not approved: claim not acquired"
+    assert_pass "fallback: our own existing claim label is ours"
 else
-    assert_pass "500 not approved: claim not acquired"
+    assert_fail "fallback: our own existing claim label is ours"
 fi
+assert_eq "fallback: own claim is not re-added" "0" "$(added_label)"
+
+reset_fleet
+CURL_CODE=000 CURL_EXIT=7 GH_VIEW_OUT='["claimed:other-machine"]'
+if NO_GITHUB=false claim_issue 42 "my-machine"; then
+    assert_fail "fallback: another machine's claim label blocks"
+else
+    assert_pass "fallback: another machine's claim label blocks"
+fi
+assert_eq "fallback: no label added over another claim" "0" "$(added_label)"
 
 reset_fleet
 CURL_BODY='{"approved":true}' CURL_CODE=502
@@ -482,6 +500,7 @@ else
     assert_fail "unreachable dashboard: GitHub label fallback claims"
 fi
 assert_eq "unreachable dashboard: label added once" "1" "$(added_label)"
+assert_contains "unreachable dashboard: fallback names the status" "$(cat "$LOG_FILE")" "Dashboard unavailable (HTTP 000)"
 
 reset_fleet
 CURL_BODY='{"approved":true}' CURL_CODE=200
@@ -505,6 +524,13 @@ assert_eq "release sends the token on stdin" "X-Shipwright-Token: fleet-s3cret" 
 assert_eq "release never puts the token in argv" "0" "$(grep -c 'fleet-s3cret' "$CURL_ARGS" || true)"
 assert_contains "release 401 is logged" "$(cat "$LOG_FILE")" "401"
 assert_eq "release still removes the label directly" "1" "$(grep -c -- '--remove-label claimed:my-machine' "$GH_LOG" || true)"
+
+reset_fleet
+SHIPWRIGHT_FLEET_TOKEN="" SHIPWRIGHT_FLEET_TOKEN_FILE="$TEST_TEMP_DIR/missing.token" \
+    NO_GITHUB=false release_claim 42 "my-machine" 2>/dev/null || true
+assert_contains "release with an unusable token file logs it" "$(cat "$LOG_FILE")" "fleet token unusable"
+assert_file_not_exists "release with an unusable token file: curl never runs" "$CURL_ARGS"
+assert_eq "release with an unusable token file still removes the label" "1" "$(grep -c -- '--remove-label claimed:my-machine' "$GH_LOG" || true)"
 
 unset SHIPWRIGHT_FLEET_TOKEN
 reset_fleet

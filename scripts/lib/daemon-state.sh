@@ -654,20 +654,29 @@ claim_issue() {
                 exit 1
             fi
             exit 0
-        elif [[ -n "$resp" ]] && echo "$resp" | jq -e '.approved == false' >/dev/null 2>&1; then
+        elif [[ "$code" == 2[0-9][0-9] ]] && echo "$resp" | jq -e '.approved == false' >/dev/null 2>&1; then
             local claimed_by
             claimed_by=$(echo "$resp" | jq -r '.claimed_by // "another machine"')
             daemon_log INFO "Issue #${issue_num} claimed by ${claimed_by} (via dashboard)"
             exit 1
+        elif [[ "$code" == 5[0-9][0-9] ]]; then
+            local dash_err
+            dash_err=$(echo "$resp" | jq -r '.error // empty' 2>/dev/null | head -c 200 || true)
+            daemon_log ERROR "Issue #${issue_num}: dashboard claim error (HTTP ${code}): ${dash_err:-no detail}"
         fi
 
-        # Fallback: direct GitHub label check (dashboard unreachable)
-        daemon_log WARN "Dashboard unreachable — falling back to direct GitHub label claim"
+        # Fallback: direct GitHub label check
+        daemon_log WARN "Dashboard unavailable (HTTP ${code:-none}) — falling back to direct GitHub label claim"
         local existing_claim
         existing_claim=$(gh issue view "$issue_num" --json labels --jq \
             '[.labels[].name | select(startswith("claimed:"))] | .[0] // ""' 2>/dev/null || true)
 
         if [[ -n "$existing_claim" ]]; then
+            # Our own sole claim (e.g. left by an earlier dashboard approval or a restart) is ours
+            if _verify_claim_exclusive "$issue_num" "$machine_name"; then
+                daemon_log INFO "Issue #${issue_num} already claimed by this machine"
+                exit 0
+            fi
             daemon_log INFO "Issue #${issue_num} already claimed: ${existing_claim}"
             exit 1
         fi
@@ -713,12 +722,14 @@ release_claim() {
 
     # Try dashboard-coordinated release first (best effort: the label removal below backs it up)
     if [[ -n "${DASHBOARD_URL:-}" ]]; then
-        local code=""
+        local code="" curl_rc=0
         code=$(fleet_curl -s -o /dev/null --max-time 5 -w '%{http_code}' -X POST "${DASHBOARD_URL}/api/claim/release" \
             -H "Content-Type: application/json" \
             -d "$(jq -n --argjson issue "$issue_num" --arg machine "$machine_name" \
-                '{issue: $issue, machine: $machine}')") || true
-        if [[ "$code" != 2[0-9][0-9] ]]; then
+                '{issue: $issue, machine: $machine}')") || curl_rc=$?
+        if [[ "$curl_rc" -eq 125 ]]; then
+            daemon_log ERROR "Issue #${issue_num}: fleet token unusable — dashboard release skipped, removing the label directly"
+        elif [[ "$code" != 2[0-9][0-9] ]]; then
             daemon_log WARN "Issue #${issue_num}: dashboard release failed (HTTP ${code:-none}) — removing the label directly"
         fi
     fi

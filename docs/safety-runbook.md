@@ -80,8 +80,12 @@ loop, `shipwright-sweep.yml` since 2026-10-14. In order:
    `gh workflow run` outside comment text.
 3. `shipwright breaker status`: closed, or open and cooling down after the failures.
 4. Create the `shipwright:pause` label (above) so it is one click away.
-5. Fleet hosts: set the same token on the dashboard and every worker (`SHIPWRIGHT_FLEET_TOKEN_FILE`,
-   mode 600, or `SHIPWRIGHT_FLEET_TOKEN`).
+5. Fleet hosts: set the same token on the dashboard and every worker, preferably as
+   `SHIPWRIGHT_FLEET_TOKEN_FILE` (mode 600; workers warn otherwise), else `SHIPWRIGHT_FLEET_TOKEN`.
+   Workers send it as `X-Shipwright-Token` on curl's stdin, never in argv; pipelines unset it so
+   agents never see it. For CI's dashboard notifications, set the repository secrets
+   `SHIPWRIGHT_FLEET_TOKEN` and `DASHBOARD_URL`. A claim the dashboard answers `401`/`403` fails
+   (no GitHub-label fallback): check the token if the daemon logs "dashboard rejected the claim".
 6. Clear `shipwright-stuck`, `shipwright-failed`, `shipwright-infra-issue` or stale `claimed:*`
    labels only on issues a human wants run again. Issues that already carry a dispatch, retry,
    pipeline or auth-failure comment are never dispatched again automatically; re-run them by hand

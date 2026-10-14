@@ -7322,6 +7322,28 @@ Expected: the dispatch run logs show the five gate lines from `.github/actions/s
   (v2.2.0) in `.github/actions/safety-gates` and `ts-check.yml`; `actions/checkout` is still on
   version tags (`@v4`, `@v7` in sweep) — pin those with the Wave 1c workflow pass.
 
+### Follow-ups from the Task 16 review (not in Wave 1a)
+
+- **Invite token in a URL path (I2).** `shipwright connect join` verifies with
+  `GET /api/team/invite/<token>`, so the invite token is in curl's argv and in proxy/access logs.
+  Needs a dashboard `POST` route that takes the token in the body (or a header); then send it
+  through `fleet_curl` with `--data-binary @<(...)`. (`cmd_join` also passes the token to
+  `jq --arg`, but it already arrived as a CLI argument.)
+- **Fleet token in agent environments outside pipelines.** `sw-pipeline.sh` unsets
+  `SHIPWRIGHT_FLEET_TOKEN`/`_FILE`, which covers daemon, CI and manual pipeline runs. Entry points
+  that spawn Claude directly (`sw-loop.sh`, team/swarm commands and the other `claude -p` sites)
+  inherit the caller's environment; strip it in the TypeScript `AgentRunner` adapter as those
+  commands are ported, not per bash call site. `SHIPWRIGHT_FLEET_TOKEN_FILE` keeps the token itself
+  out of environments meanwhile.
+- **Per-issue pipeline concurrency stall.** Unrelated label events on an issue start new runs in its
+  per-issue concurrency group, which bump a pending dispatched run out of the queue. Wave 1c: filter
+  `issues: labeled` events to the `shipwright` label before they reach the concurrency group.
+- **Org-mode `.final_failed` keyed by issue number only.** In org mode two repos can share an issue
+  number, so one repo's final failure can mark the other's issue. Key it by `owner/repo#N`.
+- **CI webhook body.** The `/api/webhook/ci` steps still build JSON by string interpolation
+  (`TEMPLATE`, `ISSUE_NUMBER`); switch to `jq -n --arg` in the Wave 1c workflow pass. Add the
+  `SHIPWRIGHT_FLEET_TOKEN` repository secret when the dashboard is exposed.
+
 ### Re-enable checklist (supersedes the commands in Task 18; maintainer only)
 
 1. Rotate `CLAUDE_CODE_OAUTH_TOKEN` (`claude setup-token`) and confirm one manual pipeline run passes

@@ -146,12 +146,15 @@ dispatchable_issue_numbers() {
 }
 
 
-# _fleet_token — prints the dashboard fleet token: $SHIPWRIGHT_FLEET_TOKEN, else the contents of
-# $SHIPWRIGHT_FLEET_TOKEN_FILE with surrounding whitespace trimmed (warns unless the file is mode
-# 600). Prints nothing when neither is set. Returns 1 when the file is unreadable or empty, or the
-# token contains a line break (it would inject a header). Messages never include the token.
+# _fleet_token — prints the dashboard fleet token, read as the dashboard reads it: the trimmed
+# $SHIPWRIGHT_FLEET_TOKEN, or when that is unset or blank the trimmed contents of
+# $SHIPWRIGHT_FLEET_TOKEN_FILE (the recommended form; warns unless the file is mode 600).
+# Prints nothing when neither is set. Returns 1 when the file is unreadable or empty, or the token
+# is not printable ASCII without spaces (`^[!-~]+$`; anything else could inject a header).
+# Messages never include the token.
 _fleet_token() {
     local token="${SHIPWRIGHT_FLEET_TOKEN:-}" file="${SHIPWRIGHT_FLEET_TOKEN_FILE:-}"
+    [[ -z "${token//[[:space:]]/}" ]] && token=""
     if [[ -z "$token" && -n "$file" ]]; then
         if [[ ! -f "$file" || ! -r "$file" ]]; then
             echo "fleet token: cannot read SHIPWRIGHT_FLEET_TOKEN_FILE (${file})" >&2
@@ -163,33 +166,55 @@ _fleet_token() {
             echo "fleet token: warning: SHIPWRIGHT_FLEET_TOKEN_FILE (${file}) should be mode 600 (is ${mode:-unknown})" >&2
         fi
         token="$(cat "$file")"
-        token="${token#"${token%%[![:space:]]*}"}"
-        token="${token%"${token##*[![:space:]]}"}"
-        if [[ -z "$token" ]]; then
+        if [[ -z "${token//[[:space:]]/}" ]]; then
             echo "fleet token: SHIPWRIGHT_FLEET_TOKEN_FILE (${file}) is empty" >&2
             return 1
         fi
     fi
-    if [[ "$token" == *$'\n'* || "$token" == *$'\r'* ]]; then
-        echo "fleet token: the token contains a line break — refusing to send it" >&2
+    token="${token#"${token%%[![:space:]]*}"}"
+    token="${token%"${token##*[![:space:]]}"}"
+    [[ -z "$token" ]] && return 0
+    if [[ -n "$(printf '%s' "$token" | LC_ALL=C tr -d '!-~')" ]]; then
+        echo "fleet token: the token must be printable ASCII without spaces — refusing to send it" >&2
         return 1
     fi
     printf '%s' "$token"
 }
 
 # fleet_curl <curl args...> — curl to a dashboard fleet route (/api/claim*, /api/connect/*) with
-# the `X-Shipwright-Token` header (_fleet_token). The header goes to curl on stdin (`-H @-`,
-# curl >= 7.55), so the token never appears in argv, `ps` or logs; callers must not use stdin
-# themselves. No token configured: plain curl, no header (a loopback dashboard without a token).
-# Returns curl's exit status, or 125 (curl not run) when a configured token cannot be used.
-# curl exits 0 on HTTP errors unless --fail is given: callers that gate on the call must check
-# the HTTP status (-w '%{http_code}').
+# the `X-Shipwright-Token` header (_fleet_token). The header goes to curl on stdin (`-H @-`, which
+# needs curl >= 7.55), so the token never appears in argv, `ps` or logs, and xtrace (`set -x`) is
+# suspended for the call. stdin belongs to the header: caller args `@-`, `-K`/`--config` are
+# refused (2). Send a secret body with `--data-binary @<(printf '%s' "$body")`, not `-d`.
+# No token configured: plain curl, no header (a loopback dashboard without a token).
+# Returns curl's exit status, 2 for a refused arg, or 125 (curl not run) when a configured token
+# cannot be used. curl exits 0 on HTTP errors unless --fail is given: callers that gate on the
+# call must check the HTTP status (-w '%{http_code}').
 fleet_curl() {
+    local _fleet_xtrace=0 _fleet_rc=0
+    case "$-" in *x*) _fleet_xtrace=1; set +x ;; esac
+    _fleet_curl "$@" || _fleet_rc=$?
+    [[ "$_fleet_xtrace" -eq 1 ]] && set -x
+    return "$_fleet_rc"
+}
+
+_fleet_curl() {
+    local arg
+    for arg in "$@"; do
+        case "$arg" in
+            @- | -K | -K?* | --config | --config=*)
+                echo "fleet_curl: refusing caller arg ${arg%%=*} (stdin and config carry the token header)" >&2
+                return 2
+                ;;
+        esac
+    done
     local token
     token="$(_fleet_token)" || return 125
     if [[ -z "$token" ]]; then
         curl "$@"
         return
     fi
-    { printf 'X-Shipwright-Token: %s\n' "$token" || true; } | curl -H @- "$@"
+    # A redirect, not a pipe: bash 3.2 does not pass a caller's <(...) fd (e.g. a body) into a
+    # pipeline subshell inside a function.
+    curl -H @- "$@" < <(printf 'X-Shipwright-Token: %s\n' "$token")
 }

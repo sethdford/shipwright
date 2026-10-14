@@ -9,6 +9,9 @@ trap 'echo "ERROR: $BASH_SOURCE:$LINENO exited with status $?" >&2' ERR
 
 # Allow spawning Claude CLI from within a Claude Code session (daemon, fleet, etc.)
 unset CLAUDECODE 2>/dev/null || true
+# The dashboard fleet token is for the daemon and connect only: pipelines never call fleet
+# routes, and every agent they spawn inherits this environment.
+unset SHIPWRIGHT_FLEET_TOKEN SHIPWRIGHT_FLEET_TOKEN_FILE
 # Ignore SIGHUP so tmux attach/detach doesn't kill long-running plan/design/review stages
 trap '' HUP
 trap '' SIGPIPE

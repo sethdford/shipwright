@@ -212,8 +212,9 @@ run_heartbeat_loop() {
         events="$(get_new_events "$last_event_ts")"
 
         # Build JSON payload with jq
+        # The invite token reaches jq through the environment, never argv
         local payload
-        payload="$(jq -n \
+        payload="$(SW_INVITE_TOKEN="$invite_token" jq -n \
             --arg developer_id "$developer_id" \
             --arg machine_name "$machine_name" \
             --arg hostname "$full_hostname" \
@@ -224,7 +225,6 @@ run_heartbeat_loop() {
             --argjson queued "$queued" \
             --argjson events "$events" \
             --arg ts "$(now_iso)" \
-            --arg invite_token "$invite_token" \
             '{
                 developer_id: $developer_id,
                 machine_name: $machine_name,
@@ -236,7 +236,7 @@ run_heartbeat_loop() {
                 queued: $queued,
                 events: $events,
                 ts: $ts
-            } + (if $invite_token != "" then {invite_token: $invite_token} else {} end)')"
+            } + ((env.SW_INVITE_TOKEN // "") as $inv | if $inv != "" then {invite_token: $inv} else {} end)')"
 
         # Send heartbeat
         local http_code
@@ -273,12 +273,13 @@ run_heartbeat_loop() {
 
 # send_heartbeat <dashboard_url> <payload> — POSTs one heartbeat with the fleet token and prints
 # the HTTP status: "000" when the dashboard is unreachable or the fleet token is unusable.
+# The payload may hold the invite token, so curl reads it from a file descriptor, not argv.
 send_heartbeat() {
     local code=""
     code="$(fleet_curl -s -o /dev/null -w "%{http_code}" --max-time 5 \
         -X POST \
         -H "Content-Type: application/json" \
-        -d "$2" \
+        --data-binary @<(printf '%s' "$2") \
         "${1}/api/connect/heartbeat")" || true
     [[ "$code" =~ ^[0-9]{3}$ ]] || code="000"
     echo "$code"

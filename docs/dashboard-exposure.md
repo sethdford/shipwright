@@ -10,7 +10,7 @@ How the dashboard server (`dashboard/server.ts`) decides who may call it. Spec Â
 | --- | --- |
 | `SW_DASHBOARD_HOST` (or `shipwright dashboard --host`) | Bind address. Default `127.0.0.1`. |
 | `SHIPWRIGHT_FLEET_TOKEN` | Shared secret for fleet workers (trimmed). Set the same value on every worker. |
-| `SHIPWRIGHT_FLEET_TOKEN_FILE` | Path to a file holding the token, used when the variable above is unset or blank. An unreadable or empty file stops startup. |
+| `SHIPWRIGHT_FLEET_TOKEN_FILE` | Path to a file holding the token, used when the variable above is unset or blank. **Recommended** on the dashboard host and on workers: `chmod 600` it, and the token stays out of process environments. An unreadable or empty file stops startup. |
 | `GITHUB_PAT` + `DASHBOARD_REPO`, or `GITHUB_CLIENT_ID` + `GITHUB_CLIENT_SECRET` + `DASHBOARD_REPO` | Browser sign-in (PAT or OAuth). With neither, auth is `none`. |
 | `SW_DASHBOARD_ORIGINS` | Comma-separated public origins of the dashboard, e.g. `https://fleet.example.com`. Each is normalized with `new URL(o).origin` (lowercase, default port and path dropped); entries that are not `http(s)` URLs, including `*`, are ignored. `http://localhost:<port>`, `http://127.0.0.1:<port>` and `http://[::1]:<port>` are always allowed. Listed hosts are accepted as `Host` on a loopback bind, and a non-loopback one marks the dashboard as exposed (below). |
 | `SW_DASHBOARD_SECURE_COOKIE=1` | Mark the session and OAuth-state cookies `Secure`. Automatic when any `SW_DASHBOARD_ORIGINS` entry is `https://`. |
@@ -85,6 +85,20 @@ Checks run in this order, before any route:
 - **Safari and `Secure`**: Safari (WebKit) may not store a `Secure` cookie set over plain
   `http://localhost`, unlike Chrome and Firefox, which treat localhost as a secure context. With
   `Secure` on, sign in through the `https://` origin, not `http://localhost:<port>`.
+
+## Workers
+
+The daemon's claim and release (`scripts/lib/daemon-state.sh`) and `shipwright connect` heartbeat
+and disconnect (`scripts/sw-connect.sh`) go through `fleet_curl` (`scripts/lib/safety-gates.sh`).
+It reads the token as the dashboard does (variable, else file; warns unless the file is mode 600)
+and passes the header to curl on stdin (`-H @-`, curl â‰¥ 7.55), so the token never appears in argv,
+`ps`, logs or xtrace; the heartbeat body, which may carry an invite token, is read from a file
+descriptor. With no token configured, no header is sent. An unreadable or empty token file, or a
+token outside printable ASCII, stops the call, and a claim answered `401`/`403` fails rather than
+falling back to the GitHub label claim. `sw-pipeline.sh` unsets both variables, so agents spawned by
+a pipeline never see the token. The CI pipeline's `/api/webhook/ci` notifications use the repository
+secrets `SHIPWRIGHT_FLEET_TOKEN` and `DASHBOARD_URL` (header on stdin; no header when the token
+secret is unset) and only warn when the dashboard refuses them.
 
 ## Join tokens
 

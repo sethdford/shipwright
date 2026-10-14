@@ -318,4 +318,40 @@ rc=0
 CURL_EXIT=7 fleet_curl -s "http://x/" >/dev/null || rc=$?
 assert_eq "curl's exit status is returned (no token)" "7" "$rc"
 
+reset_curl
+SHIPWRIGHT_FLEET_TOKEN=$'  env-tok \n' fleet_curl -s "http://x/" >/dev/null
+assert_eq "env token is trimmed too" "X-Shipwright-Token: env-tok" "$(curl_stdin)"
+
+reset_curl
+chmod 600 "$tokfile"
+SHIPWRIGHT_FLEET_TOKEN="   " SHIPWRIGHT_FLEET_TOKEN_FILE="$tokfile" fleet_curl -s "http://x/" >/dev/null
+assert_eq "a blank SHIPWRIGHT_FLEET_TOKEN falls through to the file (as the dashboard does)" \
+    "X-Shipwright-Token: file-token" "$(curl_stdin)"
+
+for bad in "has space" $'t\001x' "tök" "a"$'\t'"b"; do
+    reset_curl
+    rc=0
+    SHIPWRIGHT_FLEET_TOKEN="$bad" fleet_curl -s "http://x/" >/dev/null 2>&1 || rc=$?
+    assert_eq "a token outside ^[!-~]+\$ fails closed (125): $(printf '%q' "$bad")" "125" "$rc"
+    assert_file_not_exists "a token outside ^[!-~]+\$ never reaches curl" "$CURL_ARGS"
+done
+
+for bad in "@-" "-K" "-Kfile" "--config" "--config=f"; do
+    reset_curl
+    rc=0
+    SHIPWRIGHT_FLEET_TOKEN="t" fleet_curl -s --data-binary "$bad" "http://x/" >/dev/null 2>&1 || rc=$?
+    assert_eq "caller arg ${bad} is refused (2)" "2" "$rc"
+    assert_file_not_exists "caller arg ${bad}: curl never runs" "$CURL_ARGS"
+done
+
+reset_curl
+xtrace_out="$( (export SHIPWRIGHT_FLEET_TOKEN="xtrace-s3cret"; set -x; fleet_curl -s "http://x/" >/dev/null; if [[ "$-" == *x* ]]; then echo "XTRACE-RESTORED" >&3; fi) 3>&1 2>&1 )"
+assert_eq "xtrace never prints the token" "0" "$(printf '%s\n' "$xtrace_out" | grep -c 'xtrace-s3cret' || true)"
+assert_contains "xtrace is restored after the call" "$xtrace_out" "XTRACE-RESTORED"
+assert_eq "the header was still sent under xtrace" "X-Shipwright-Token: xtrace-s3cret" "$(curl_stdin)"
+
+# Pipelines spawn Claude agents and never call fleet routes: the token is dropped at entry.
+assert_contains "sw-pipeline.sh drops the fleet token before running anything" \
+    "$(sed -n '1,30p' "$SCRIPT_DIR/sw-pipeline.sh")" "unset SHIPWRIGHT_FLEET_TOKEN SHIPWRIGHT_FLEET_TOKEN_FILE"
+
 print_test_results
