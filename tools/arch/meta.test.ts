@@ -69,6 +69,7 @@ const PINNED: Record<string, { ratchet: boolean; ignores: string[] }> = {
       "dashboard/services/subprocess-guards.ts",
     ],
   },
+  "dashboard-no-raw-command-runner": { ratchet: false, ignores: [] },
   "dashboard-no-shell-from-data": {
     ratchet: false,
     ignores: ["dashboard/**/*.test.ts", "dashboard/src/**"],
@@ -205,6 +206,16 @@ test("the SDK runner asserts the exact options object it passes to query (F9, AD
   const queryAt = src.indexOf("this.queryFn({ prompt, options: sdkOptions })");
   expect(assertAt).toBeGreaterThan(-1);
   expect(queryAt).toBeGreaterThan(assertAt);
+});
+
+test("allowlisted dashboard services export no raw command runner (F12, ADR-0008)", async () => {
+  for (const file of ["dashboard/services/claims.ts", "dashboard/services/subprocess-guards.ts"]) {
+    const src = await Bun.file(join(ROOT, file)).text();
+    expect({ file, raw: /\bexport\b[^;\n]*\bdefaultRunner\b/.test(src) }).toEqual({
+      file,
+      raw: false,
+    });
+  }
 });
 
 test("bun run arch runs every checker", () => {

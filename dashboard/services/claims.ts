@@ -44,7 +44,9 @@ export type CommandRunner = (
   options: ExecFileSyncOptions,
 ) => string;
 
-export const defaultRunner: CommandRunner = (file, args, options) => {
+// Module-private on purpose: it runs any file with any arguments. Routes reach subprocesses only
+// through the validated operations below (dashboard-no-raw-command-runner, ADR-0008).
+const defaultRunner: CommandRunner = (file, args, options) => {
   const out = execFileSync(file, args, options);
   return out == null ? "" : String(out);
 };

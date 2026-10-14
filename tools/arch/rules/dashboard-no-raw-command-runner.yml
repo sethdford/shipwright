@@ -1,0 +1,22 @@
+# Dashboard: the raw command runner in an allowlisted service (claims.ts `defaultRunner`) runs any
+# file with any arguments. It stays module-private; routes and other modules reach subprocesses only
+# through the service's validated operations (handleClaim, handleClaimRelease, releaseStaleClaims).
+# Importing, re-exporting or exporting it would let a route run `sh -c` on request data while the
+# subprocess rules (F12) pass. Pinned in tools/arch/meta.test.ts.
+id: dashboard-no-raw-command-runner
+language: TypeScript
+severity: error
+message: "Dashboard: do not import or export the raw command runner (defaultRunner). Call the validated service operation (handleClaim, handleClaimRelease, releaseStaleClaims) instead."
+metadata: { owner: "@sethdford", docs: "docs/architecture.md#fitness-rules" }
+files:
+  - "dashboard/**/*.ts"
+rule:
+  any:
+    - kind: import_specifier
+      regex: '^defaultRunner(\s+as\s+\w+)?$'
+    - kind: export_specifier
+      regex: '^defaultRunner(\s+as\s+\w+)?$'
+    - kind: export_statement
+      regex: '^export\s+(const|let|var|function)\s+defaultRunner\b'
+    - kind: export_statement
+      regex: '^export\s*\{[^}]*\bdefaultRunner\b[^}]*\}'

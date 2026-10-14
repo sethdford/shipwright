@@ -1,0 +1,12 @@
+id: dashboard-no-raw-command-runner
+valid:
+  - 'import { handleClaim, type CommandRunner } from "../services/claims";'
+  - 'import type { CommandRunner } from "./claims";'
+  - 'const runner = makeRunner();'
+  - 'export function handleClaim(run: CommandRunner = fakeRunner) {}'
+invalid:
+  - 'import { defaultRunner } from "../services/claims";'
+  - 'import { defaultRunner as run } from "./claims";'
+  - 'export { defaultRunner } from "./claims";'
+  - 'export const defaultRunner = (file, args) => run(file, args);'
+  - 'export function defaultRunner(file, args) {}'
