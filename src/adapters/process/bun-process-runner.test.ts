@@ -155,3 +155,21 @@ test("killAll swallows kill failures and still signals every in-flight run", asy
   fast.killAll("SIGKILL");
   await Promise.all([a, b]);
 });
+
+test("reapGroup kills a background job left behind by a leader that exited normally", async () => {
+  const env = createTestEnv();
+  try {
+    const pidFile = `${env.root}/bg.pid`;
+    const reaping = new BunProcessRunner({ drainMs: 200, reapGroup: true });
+    const r = await reaping.run({
+      argv: ["sh", "-c", `sleep 43 >/dev/null 2>&1 & echo $! > '${pidFile}'`],
+    });
+    expect(r.exitCode).toBe(0);
+    const pid = Number(await Bun.file(pidFile).text());
+    await new Promise((resolve) => setTimeout(resolve, 100));
+    expect(() => process.kill(pid, 0)).toThrow();
+  } finally {
+    Bun.spawnSync(["pkill", "-9", "-f", "sleep 43"]);
+    env.cleanup();
+  }
+});

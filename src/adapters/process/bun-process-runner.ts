@@ -11,6 +11,8 @@ export interface BunProcessRunnerOptions {
    * not killed and may keep running after run() returns (same as the bash version).
    */
   readonly drainMs?: number;
+  /** SIGKILL the child's whole process group after every run, so leftover background jobs die. */
+  readonly reapGroup?: boolean;
 }
 
 /**
@@ -54,10 +56,12 @@ export class BunProcessRunner implements ProcessRunner {
   private readonly active = new Set<number>();
   private readonly killGraceMs: number;
   private readonly drainMs: number;
+  private readonly reapGroup: boolean;
 
   constructor(options: BunProcessRunnerOptions = {}) {
     this.killGraceMs = options.killGraceMs ?? 2000;
     this.drainMs = options.drainMs ?? 1000;
+    this.reapGroup = options.reapGroup ?? false;
   }
 
   /**
@@ -88,7 +92,7 @@ export class BunProcessRunner implements ProcessRunner {
       return { exitCode, stdout, stderr, timedOut };
     } finally {
       // The leader may have exited on SIGTERM while a grandchild ignored it: don't leave it behind.
-      if (timedOut) killGroup(pid, "SIGKILL");
+      if (timedOut || this.reapGroup) killGroup(pid, "SIGKILL");
       for (const timer of timers) clearTimeout(timer);
       this.active.delete(pid);
     }

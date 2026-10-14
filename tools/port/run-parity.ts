@@ -1,32 +1,18 @@
 import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { BunProcessRunner } from "../../src/adapters/process/bun-process-runner";
 import { loadProgress, type ProgressEntry, ROOT } from "./progress";
+import { buildSandbox, killSandboxTmux, parityEnv, suiteArgv, sweepStragglers } from "./sandbox";
 
 const ACTIVE = new Set(["porting", "parity-green", "bash-deleted"]);
 const DEFAULT_TIMEOUT_MS = 900_000;
-const KILL_GRACE_MS = 2000;
-const DRAIN_MS = 1000;
 
-export interface SuiteResult {
-  readonly code: number;
-  readonly timedOut: boolean;
-  readonly stdout: string;
-  readonly stderr: string;
-}
+// reapGroup: a suite's leftover background jobs must die when the suite ends.
+const runner = new BunProcessRunner({ reapGroup: true });
 
 export function selectSuites(progress: readonly ProgressEntry[]): ProgressEntry[] {
   return progress.filter((e) => ACTIVE.has(e.status) && e.parity);
-}
-
-/** Hermetic env: private tmux server dir and throwaway HOME; nothing else is inherited. */
-export function parityEnv(sandbox: string, base: Record<string, string | undefined>) {
-  return {
-    PATH: base.PATH ?? "",
-    HOME: join(sandbox, "home"),
-    TMUX_TMPDIR: sandbox,
-    TERM: "dumb",
-  };
 }
 
 export function parityTimeoutMs(env: Record<string, string | undefined>): number {
@@ -38,98 +24,78 @@ export function summarize(total: number, failed: number) {
   return { line: `${total - failed}/${total} parity suites passed`, exitCode: failed ? 1 : 0 };
 }
 
-function killGroup(pid: number, signal: "SIGTERM" | "SIGKILL"): void {
-  try {
-    process.kill(-pid, signal);
-  } catch {
-    // group already gone
-  }
+export function gitChanged(before: string, after: string): boolean {
+  return before !== after;
 }
 
-/** Reads a stream to the end, or stops at `deadline`. */
-async function drain(stream: ReadableStream<Uint8Array>, deadline: Promise<void>) {
-  const reader = stream.getReader();
-  const decoder = new TextDecoder();
-  let text = "";
-  const pump = (async () => {
-    for (;;) {
-      const { done, value } = await reader.read();
-      if (done) return;
-      text += decoder.decode(value, { stream: true });
-    }
-  })();
-  await Promise.race([pump, deadline]);
-  await reader.cancel().catch(() => {});
-  await pump.catch(() => {});
-  return text + decoder.decode();
-}
-
-/**
- * Runs argv in its own process group. stdout and stderr are drained concurrently so a chatty
- * suite cannot fill a pipe and block; on timeout the whole group is killed.
- */
-export async function runBashSuite(
+export function runSuite(
   argv: string[],
   env: Record<string, string>,
   timeoutMs: number,
   cwd?: string,
-): Promise<SuiteResult> {
-  const proc = Bun.spawn(argv, {
-    env,
-    cwd,
-    stdin: "ignore",
-    stdout: "pipe",
-    stderr: "pipe",
-    detached: true,
-  });
-  let timedOut = false;
-  const timers: ReturnType<typeof setTimeout>[] = [];
-  timers.push(
-    setTimeout(() => {
-      timedOut = true;
-      killGroup(proc.pid, "SIGTERM");
-      timers.push(setTimeout(() => killGroup(proc.pid, "SIGKILL"), KILL_GRACE_MS));
-    }, timeoutMs),
-  );
-  const exited = proc.exited.then(() => new Promise<void>((r) => setTimeout(r, DRAIN_MS)));
-  const [stdout, stderr, code] = await Promise.all([
-    drain(proc.stdout, exited),
-    drain(proc.stderr, exited),
-    proc.exited,
-  ]);
-  for (const t of timers) clearTimeout(t);
-  killGroup(proc.pid, "SIGKILL"); // reap stragglers left behind by a finished suite
-  return { code: timedOut && code === 0 ? 124 : code, timedOut, stdout, stderr };
+) {
+  return runner.run({ argv, env, cwd, timeoutMs });
 }
 
-function failureReport(entry: ProgressEntry, r: SuiteResult): string {
-  const tail = `${r.stdout}\n${r.stderr}`.split("\n").slice(-30).join("\n");
-  const why = r.timedOut ? "TIMED OUT" : `exit ${r.code}`;
+function gitStatus(): string {
+  const r = Bun.spawnSync(["git", "-C", ROOT, "status", "--porcelain"], { stdout: "pipe" });
+  return new TextDecoder().decode(r.stdout);
+}
+
+function failureReport(entry: ProgressEntry, why: string, out: string, err: string): string {
+  const tail = `${out}\n${err}`.split("\n").slice(-30).join("\n");
   return `✗ parity ${entry.command} (${entry.parity}) ${why}\n${tail}`;
 }
 
-async function runOne(entry: ProgressEntry): Promise<boolean> {
+function cleanup(sandbox: string): void {
+  killSandboxTmux(sandbox);
+  sweepStragglers(sandbox);
+  rmSync(sandbox, { recursive: true, force: true });
+}
+
+let activeSandbox: string | undefined;
+
+async function runOne(entry: ProgressEntry, all: readonly ProgressEntry[]): Promise<boolean> {
   const sandbox = mkdtempSync(join(tmpdir(), "sw-parity-"));
+  activeSandbox = sandbox;
   try {
+    const repo = buildSandbox(sandbox, ROOT, all);
+    const before = gitStatus();
     const env = parityEnv(sandbox, Bun.env);
-    const r = await runBashSuite(
-      ["bash", entry.parity as string],
-      env,
-      parityTimeoutMs(Bun.env),
-      ROOT,
-    );
-    if (r.code === 0 && !r.timedOut) console.log(`✓ parity ${entry.command}`);
-    else console.error(failureReport(entry, r));
-    return r.code === 0 && !r.timedOut;
+    const r = await runSuite(suiteArgv(sandbox, entry), env, parityTimeoutMs(Bun.env), repo);
+    const dirty = gitChanged(before, gitStatus());
+    const ok = r.exitCode === 0 && !r.timedOut && !dirty;
+    if (ok) console.log(`✓ parity ${entry.command}`);
+    else {
+      const why = r.timedOut
+        ? "TIMED OUT"
+        : dirty
+          ? "modified the real repo"
+          : `exit ${r.exitCode}`;
+      console.error(failureReport(entry, why, r.stdout, r.stderr));
+    }
+    return ok;
   } finally {
-    rmSync(sandbox, { recursive: true, force: true });
+    cleanup(sandbox);
+    activeSandbox = undefined;
   }
 }
 
+async function onSignal(): Promise<void> {
+  runner.killAll("SIGTERM");
+  await new Promise((r) => setTimeout(r, 2000));
+  runner.killAll("SIGKILL");
+  if (activeSandbox) cleanup(activeSandbox);
+  process.exit(130);
+}
+
 if (import.meta.main) {
-  const suites = selectSuites(await loadProgress());
+  process.on("SIGINT", onSignal);
+  process.on("SIGTERM", onSignal);
+  const all = await loadProgress();
+  const suites = selectSuites(all);
   let failed = 0;
-  for (const entry of suites) if (!(await runOne(entry))) failed++;
+  for (const entry of suites) if (!(await runOne(entry, all))) failed++;
   const { line, exitCode } = summarize(suites.length, failed);
   console.log(line);
   process.exit(exitCode);
