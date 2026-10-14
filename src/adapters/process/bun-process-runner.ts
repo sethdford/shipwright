@@ -5,16 +5,23 @@ type Signal = "SIGTERM" | "SIGKILL";
 export interface BunProcessRunnerOptions {
   /** Time between SIGTERM and SIGKILL on timeout. */
   readonly killGraceMs?: number;
-  /** Max time to keep reading pipes after the child has exited. */
+  /**
+   * Max time to keep reading pipes after the child has exited. Output written after this
+   * deadline is dropped. Without a timeout, a background grandchild that outlives the leader is
+   * not killed and may keep running after run() returns (same as the bash version).
+   */
   readonly drainMs?: number;
 }
 
-/** Signals a whole process group; a group that is already gone is not an error. */
+/**
+ * Signals a whole process group. Never throws: it runs from timers and from `killAll`'s loop,
+ * where a failed kill (already gone, EPERM) must not crash the daemon or abort the other kills.
+ */
 function killGroup(pid: number, signal: Signal): void {
   try {
     process.kill(-pid, signal);
-  } catch (error) {
-    if ((error as NodeJS.ErrnoException).code !== "ESRCH") throw error;
+  } catch {
+    // ESRCH (group already gone) or any other failure: nothing useful to do.
   }
 }
 
@@ -54,7 +61,8 @@ export class BunProcessRunner implements ProcessRunner {
   }
 
   /**
-   * Signals every in-flight child's process group. Children are detached, so they no longer
+   * Signals every in-flight child's process group with exactly the given signal; it does not
+   * escalate. Callers should send SIGTERM, wait a grace period, then send SIGKILL. Children are detached, so they no longer
    * receive the terminal's Ctrl-C; the entry point must call this from its SIGINT/SIGTERM handlers.
    */
   killAll(signal: Signal = "SIGTERM"): void {
@@ -97,6 +105,8 @@ export class BunProcessRunner implements ProcessRunner {
       ]);
       return { exitCode, stdout, stderr, timedOut };
     } finally {
+      // The leader may have exited on SIGTERM while a grandchild ignored it: don't leave it behind.
+      if (timedOut) killGroup(pid, "SIGKILL");
       for (const timer of timers) clearTimeout(timer);
       this.active.delete(pid);
     }

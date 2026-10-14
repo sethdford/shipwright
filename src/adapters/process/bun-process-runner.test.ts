@@ -87,3 +87,19 @@ test("killAll terminates an in-flight run", async () => {
   expect(ms).toBeLessThan(1500);
   expect(r.exitCode).not.toBe(0);
 });
+
+test("timed-out run leaves no surviving grandchild that ignores SIGTERM", async () => {
+  // Grace must exceed drain, or the SIGKILL timer races run() returning and hides the leak.
+  const slowGrace = new BunProcessRunner({ killGraceMs: 2000, drainMs: 300 });
+  try {
+    const r = await slowGrace.run({
+      argv: ["sh", "-c", "(trap '' TERM; exec sleep 41) & sleep 42; wait"],
+      timeoutMs: 200,
+    });
+    expect(r.timedOut).toBe(true);
+    await new Promise((resolve) => setTimeout(resolve, 100));
+    expect(Bun.spawnSync(["pgrep", "-f", "sleep 41"]).exitCode).toBe(1);
+  } finally {
+    Bun.spawnSync(["pkill", "-f", "sleep 41"]);
+  }
+});
