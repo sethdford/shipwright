@@ -7,6 +7,7 @@ import {
   readdirSync,
   readlinkSync,
   realpathSync,
+  rmSync,
   symlinkSync,
   writeFileSync,
 } from "node:fs";
@@ -126,13 +127,23 @@ export function buildSandbox(
 }
 
 function walkSockets(dir: string, root: string, out: string[]): void {
-  for (const name of readdirSync(dir)) {
+  let names: string[];
+  try {
+    names = readdirSync(dir);
+  } catch {
+    return; // unreadable or vanished
+  }
+  for (const name of names) {
     const p = join(dir, name);
-    const st = lstatSync(p); // never follow symlinks
-    if (st.isSocket()) {
-      // realpath() cannot open a socket on macOS: resolve its (symlink-free) parent instead.
-      if (join(realpathSync(dir), name).startsWith(`${root}/`)) out.push(p);
-    } else if (st.isDirectory()) walkSockets(p, root, out);
+    try {
+      const st = lstatSync(p); // never follow symlinks
+      if (st.isSocket()) {
+        // realpath() cannot open a socket on macOS: resolve its (symlink-free) parent instead.
+        if (st.nlink === 1 && join(realpathSync(dir), name).startsWith(`${root}/`)) out.push(p);
+      } else if (st.isDirectory()) walkSockets(p, root, out);
+    } catch {
+      // vanished or unreadable: skip
+    }
   }
 }
 
@@ -171,7 +182,9 @@ const SANDBOX_NAME = /\/sw-parity-[A-Za-z0-9]{6}$/;
 /** SIGKILL anything whose command line mentions a path inside the (unique) sandbox. */
 export function sweepStragglers(sandbox: string): void {
   if (!SANDBOX_NAME.test(sandbox)) throw new Error(`refusing to sweep unexpected path: ${sandbox}`);
-  const pattern = `${sandbox.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}/`;
+  const escapeRe = (p: string) => p.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const real = existsSync(sandbox) ? realpathSync(sandbox) : sandbox;
+  const pattern = `(${escapeRe(sandbox)}|${escapeRe(real)})/`;
   const out = Bun.spawnSync(["pgrep", "-f", pattern], { stdout: "pipe", stderr: "ignore" });
   const pids = new TextDecoder()
     .decode(out.stdout)
@@ -198,4 +211,45 @@ export function gitSnapshot(repoRoot: string): string {
     run("stash", "list"),
     run("worktree", "list"),
   ].join("\n--\n");
+}
+
+/** rm -rf that first restores owner access, so a mode-000 directory cannot block removal. */
+export function forceRemove(path: string): void {
+  const open = (p: string): void => {
+    try {
+      const st = lstatSync(p);
+      if (!st.isDirectory()) return;
+      chmodSync(p, 0o700);
+      for (const name of readdirSync(p)) open(join(p, name));
+    } catch {
+      // vanished: nothing to open
+    }
+  };
+  open(path);
+  rmSync(path, { recursive: true, force: true });
+}
+
+export interface CleanupSteps {
+  readonly tmux: () => void;
+  readonly sweep: () => void;
+  readonly remove: () => void;
+}
+
+/** Runs every cleanup step even if an earlier one throws; failures are logged, not raised. */
+export function cleanupSandbox(
+  sandbox: string,
+  steps: CleanupSteps = {
+    tmux: () => killSandboxTmux(sandbox),
+    sweep: () => sweepStragglers(sandbox),
+    remove: () => forceRemove(sandbox),
+  },
+  log: (message: string) => void = console.error,
+): void {
+  for (const [name, step] of Object.entries(steps)) {
+    try {
+      step();
+    } catch (err) {
+      log(`parity cleanup (${name}) failed for ${sandbox}: ${String(err)}`);
+    }
+  }
 }

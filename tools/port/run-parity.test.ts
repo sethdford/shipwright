@@ -3,7 +3,14 @@ import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import type { ProgressEntry } from "./progress";
-import { gitChanged, parityTimeoutMs, runSuite, selectSuites, summarize } from "./run-parity";
+import {
+  gitChanged,
+  parityTimeoutMs,
+  runOne,
+  runSuite,
+  selectSuites,
+  summarize,
+} from "./run-parity";
 
 const entry = (
   command: string,
@@ -72,4 +79,18 @@ test("a hung suite times out and its background job is dead afterwards", async (
 test("gitChanged flags a differing porcelain snapshot", () => {
   expect(gitChanged(" M a\n", " M a\n")).toBe(false);
   expect(gitChanged(" M a\n", " M a\n?? b\n")).toBe(true);
+});
+
+test("a shared-script refusal fails that suite with the reason instead of crashing", async () => {
+  const a = { ...entry("status", "porting", "scripts/sw-status-test.sh"), script: "sw-status.sh" };
+  const b = { ...entry("overview", "bash", null), script: "sw-status.sh" };
+  const errors: string[] = [];
+  const original = console.error;
+  console.error = (m: string) => errors.push(String(m));
+  try {
+    expect(await runOne(a, [a, b])).toBe(false);
+  } finally {
+    console.error = original;
+  }
+  expect(errors.join("\n")).toMatch(/✗ parity status.*shares it with unported command 'overview'/s);
 });

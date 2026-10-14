@@ -1,15 +1,15 @@
-import { mkdtempSync, rmSync } from "node:fs";
+import { mkdtempSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { BunProcessRunner } from "../../src/adapters/process/bun-process-runner";
 import { loadProgress, type ProgressEntry, ROOT } from "./progress";
 import {
   buildSandbox,
+  cleanupSandbox,
   gitSnapshot,
-  killSandboxTmux,
   parityEnv,
+  planStubs,
   suiteArgv,
-  sweepStragglers,
 } from "./sandbox";
 
 const ACTIVE = new Set(["porting", "parity-green", "bash-deleted"]);
@@ -49,15 +49,19 @@ function failureReport(entry: ProgressEntry, why: string, out: string, err: stri
   return `✗ parity ${entry.command} (${entry.parity}) ${why}\n${tail}`;
 }
 
-function cleanup(sandbox: string): void {
-  killSandboxTmux(sandbox);
-  sweepStragglers(sandbox);
-  rmSync(sandbox, { recursive: true, force: true });
-}
-
 let activeSandbox: string | undefined;
 
-async function runOne(entry: ProgressEntry, all: readonly ProgressEntry[]): Promise<boolean> {
+/** Runs one suite in a fresh sandbox. Never throws: setup problems are that suite's failure. */
+export async function runOne(
+  entry: ProgressEntry,
+  all: readonly ProgressEntry[],
+): Promise<boolean> {
+  try {
+    planStubs(all, ROOT); // refuse unstubbable layouts before creating anything
+  } catch (err) {
+    console.error(failureReport(entry, (err as Error).message, "", ""));
+    return false;
+  }
   const sandbox = mkdtempSync(join(tmpdir(), "sw-parity-"));
   activeSandbox = sandbox;
   try {
@@ -78,7 +82,7 @@ async function runOne(entry: ProgressEntry, all: readonly ProgressEntry[]): Prom
     }
     return ok;
   } finally {
-    cleanup(sandbox);
+    cleanupSandbox(sandbox);
     activeSandbox = undefined;
   }
 }
@@ -91,7 +95,7 @@ async function onSignal(): Promise<void> {
   runner.killAll("SIGTERM");
   await new Promise((r) => setTimeout(r, 2000));
   runner.killAll("SIGKILL");
-  if (activeSandbox) cleanup(activeSandbox);
+  if (activeSandbox) cleanupSandbox(activeSandbox);
   process.exit(130);
 }
 
@@ -105,6 +109,7 @@ if (import.meta.main) {
     if (stopping) break;
     if (!(await runOne(entry, all))) failed++;
   }
+  if (stopping) process.exit(130);
   const { line, exitCode } = summarize(suites.length, failed);
   console.log(line);
   process.exit(exitCode);

@@ -5,6 +5,7 @@ import {
   lstatSync,
   mkdirSync,
   mkdtempSync,
+  realpathSync,
   rmSync,
   symlinkSync,
   writeFileSync,
@@ -16,7 +17,9 @@ import { BunProcessRunner } from "../../src/adapters/process/bun-process-runner"
 import type { ProgressEntry } from "./progress";
 import {
   buildSandbox,
+  cleanupSandbox,
   failClosedShim,
+  forceRemove,
   gitSnapshot,
   killSandboxTmux,
   parityEnv,
@@ -231,5 +234,84 @@ test("gitSnapshot changes when ignored files, stashes or worktrees change", () =
     expect(gitSnapshot(repo)).not.toBe(base);
   } finally {
     rmSync(repo, { recursive: true, force: true });
+  }
+});
+
+test("forceRemove deletes a tree containing a mode-000 dir and tolerates missing paths", () => {
+  const sbx = tmp();
+  mkdirSync(join(sbx, "locked/inner"), { recursive: true });
+  writeFileSync(join(sbx, "locked/inner/f"), "x");
+  chmodSync(join(sbx, "locked"), 0o000);
+  forceRemove(sbx);
+  expect(existsSync(sbx)).toBe(false);
+  expect(() => forceRemove(join(sbx, "vanished"))).not.toThrow();
+});
+
+test("cleanupSandbox runs every step even when earlier ones throw, and logs failures", () => {
+  const calls: string[] = [];
+  const logged: string[] = [];
+  cleanupSandbox(
+    "/sbx",
+    {
+      tmux: () => {
+        calls.push("tmux");
+        throw new Error("boom");
+      },
+      sweep: () => {
+        calls.push("sweep");
+        throw new Error("bang");
+      },
+      remove: () => calls.push("remove"),
+    },
+    (m) => logged.push(m),
+  );
+  expect(calls).toEqual(["tmux", "sweep", "remove"]);
+  expect(logged.join("\n")).toMatch(/tmux.*boom/s);
+  expect(logged.join("\n")).toMatch(/sweep.*bang/s);
+});
+
+test("socketsIn skips unreadable directories instead of throwing", async () => {
+  const sbx = tmp();
+  try {
+    mkdirSync(join(sbx, "locked"));
+    chmodSync(join(sbx, "locked"), 0o000);
+    const s = await listenUnix(join(sbx, "s"));
+    expect(socketsIn(sbx)).toEqual([join(sbx, "s")]);
+    s.close();
+  } finally {
+    forceRemove(sbx);
+  }
+});
+
+test("socketsIn ignores sockets with extra hard links", async () => {
+  const sbx = tmp();
+  try {
+    const s = await listenUnix(join(sbx, "s"));
+    const { linkSync } = await import("node:fs");
+    linkSync(join(sbx, "s"), join(sbx, "s2"));
+    expect(socketsIn(sbx)).toEqual([]);
+    s.close();
+  } finally {
+    forceRemove(sbx);
+  }
+});
+
+test("sweepStragglers also matches the realpath form of the sandbox", async () => {
+  const sbx = tmp();
+  const real = realpathSync(sbx);
+  const proc = Bun.spawn(["bash", "-c", 'exec -a "$0" sleep 46', `${real}/marker`], {
+    stdout: "ignore",
+    stderr: "ignore",
+  });
+  try {
+    await new Promise((r) => setTimeout(r, 150));
+    sweepStragglers(sbx);
+    await Promise.race([
+      proc.exited,
+      new Promise((_, rej) => setTimeout(() => rej(new Error("alive")), 3000)),
+    ]);
+  } finally {
+    proc.kill("SIGKILL");
+    forceRemove(sbx);
   }
 });
