@@ -86,6 +86,28 @@ EXAMPLES
   shipwright hello --help          Show this help text
 ```
 
+## `intake`
+
+Issue intake caps: may automation file this issue?
+
+```text
+USAGE
+  shipwright intake check [--title TITLE]
+
+DESCRIPTION
+  Issue intake caps (spec §6.2, ADR-0007), consulted before automation files an issue.
+  A gate: exit 0 only when filing is allowed. Exits 1 when 25 or more auto-patrol issues are
+  open, when an open issue has the same title fingerprint (case, digits and punctuation
+  ignored), or when issues cannot be listed (including a possibly truncated list). Exits 2 on
+  bad arguments. Issue titles are never printed.
+
+OPTIONS
+  --title TITLE   Title of the issue about to be filed
+
+EXAMPLES
+  shipwright intake check --title "Security: lodash 4.17.20 in package-lock"
+```
+
 ## `pause`
 
 Kill switch: pause dispatch on this machine
