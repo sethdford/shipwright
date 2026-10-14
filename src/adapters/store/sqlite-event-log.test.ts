@@ -41,12 +41,14 @@ test("appends and lists events per run, oldest first", () => {
 test("reopening an existing database keeps data and does not re-run migrations", () => {
   env = createTestEnv();
   const path = join(env.stateDir, "shipwright.db");
-  const first = SqliteEventLog.open(path);
-  first.append({ runId: "r1", type: "x", at: "t", data: {} });
-  first.close();
-  const second = SqliteEventLog.open(path);
-  expect(second.list("r1")).toHaveLength(1);
-  second.close();
+  {
+    using first = SqliteEventLog.open(path);
+    first.append({ runId: "r1", type: "x", at: "t", data: {} });
+  }
+  {
+    using second = SqliteEventLog.open(path);
+    expect(second.list("r1")).toHaveLength(1);
+  }
   expect(userVersion(path)).toBe(SCHEMA_VERSION);
   expect(SCHEMA_VERSION).toBe(1);
 });

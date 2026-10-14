@@ -12,6 +12,23 @@ const MIGRATIONS: readonly string[] = [
    CREATE INDEX events_run ON events(run_id, id);`,
 ];
 
+/** Converting a fresh rollback-journal file to WAL can hit SQLITE_BUSY despite busy_timeout. */
+function enableWal(db: Database): void {
+  const mode = () =>
+    db.query<{ journal_mode: string }, []>("PRAGMA journal_mode").get()?.journal_mode;
+  for (let attempt = 1; ; attempt++) {
+    if (mode() === "wal") return;
+    try {
+      db.run("PRAGMA journal_mode = WAL");
+      return;
+    } catch (err) {
+      const busy = (err as { code?: string }).code?.startsWith("SQLITE_BUSY") ?? false;
+      if (!busy || attempt >= 5) throw err;
+      Bun.sleepSync(20 * attempt);
+    }
+  }
+}
+
 export const SCHEMA_VERSION = MIGRATIONS.length;
 
 function migrate(db: Database, migrations: readonly string[]): void {
@@ -35,7 +52,7 @@ export class SqliteEventLog implements EventLog {
     const db = new Database(path, { create: true });
     try {
       db.run("PRAGMA busy_timeout = 5000");
-      db.run("PRAGMA journal_mode = WAL");
+      enableWal(db);
       db.run("PRAGMA synchronous = NORMAL");
       migrate(db, migrations);
     } catch (err) {
