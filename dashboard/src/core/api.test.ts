@@ -273,6 +273,7 @@ describe("API Client", () => {
 
       expect(mockFetch).toHaveBeenCalledWith("/api/approval-gates/42/approve", {
         method: "POST",
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ stage: "build" }),
       });
     });
@@ -283,6 +284,7 @@ describe("API Client", () => {
 
       expect(mockFetch).toHaveBeenCalledWith("/api/approval-gates/42/reject", {
         method: "POST",
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ stage: "build", reason: "Failed QA" }),
       });
     });
@@ -295,6 +297,7 @@ describe("API Client", () => {
 
       expect(mockFetch).toHaveBeenCalledWith("/api/notifications/webhook", {
         method: "POST",
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           url: "https://slack.com/hook",
           label: "Slack",
@@ -309,6 +312,7 @@ describe("API Client", () => {
 
       expect(mockFetch).toHaveBeenCalledWith("/api/notifications/webhook", {
         method: "DELETE",
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ url: "https://slack.com/hook" }),
       });
     });
@@ -329,6 +333,7 @@ describe("API Client", () => {
 
       expect(mockFetch).toHaveBeenCalledWith("/api/claim/release", {
         method: "POST",
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ issue: 42, machine: "m1" }),
       });
     });

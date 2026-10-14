@@ -1,0 +1,15 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "Preserve",
+    "moduleResolution": "bundler",
+    "strict": true,
+    "noEmit": true,
+    "skipLibCheck": true,
+    "resolveJsonModule": true,
+    "types": ["bun-types"]
+  },
+  "files": ["server.ts"],
+  "include": ["services/**/*.ts", "middleware/**/*.ts"],
+  "exclude": ["services/**/*.test.ts"]
+}

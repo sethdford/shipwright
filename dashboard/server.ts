@@ -26,6 +26,15 @@ import {
   validateMachineFields,
   sshArgv,
 } from "./services/subprocess-guards.js";
+import {
+  guardRequest,
+  isFleetRoute,
+  isLoopbackHost,
+  loadGuardConfig,
+  readFleetToken,
+  startupProblem,
+  withCors,
+} from "./services/request-guard.js";
 import { Database } from "bun:sqlite";
 
 // ─── Config ──────────────────────────────────────────────────────────
@@ -219,6 +228,8 @@ interface Pipeline {
   stagesDone: string[];
   linesWritten: number;
   testsPassing: boolean;
+  /** Not populated today; the predictions route reads it (so it is always 0). */
+  cost?: number;
 }
 
 interface QueueItem {
@@ -2034,6 +2045,8 @@ echo "==> Machine registered. Starting daemon..."
 
 // ─── Cost Data ─────────────────────────────────────────────────────
 interface CostInfo {
+  /** Not populated today; the predictions route reads it (so it is always 0). */
+  total_spent?: number;
   today_spent: number;
   daily_budget: number;
   pct_used: number;
@@ -2587,17 +2600,36 @@ async function handlePatLogin(req: Request): Promise<Response> {
 }
 
 // ─── HTTP + WebSocket server ─────────────────────────────────────────
+// Access-Control-Allow-Origin is added per request by withCors(), for allowlisted origins only.
 const CORS_HEADERS = {
-  "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Methods": "GET, POST, PATCH, DELETE, OPTIONS",
-  "Access-Control-Allow-Headers": "Content-Type",
+  "Access-Control-Allow-Headers": "Content-Type, X-Shipwright-Token, Authorization",
 };
 
-const server = Bun.serve({
-  port: PORT,
-  hostname: HOST,
+type WsData = { type?: string; lastEventId?: number } | undefined;
 
-  async fetch(req, server) {
+// Request guard (spec §6.2): fleet token on worker routes, JSON-only mutations, CORS allowlist,
+// and auth=none only on loopback. Fail closed: a bad config refuses to start. Never log the token.
+const fleetToken = readFleetToken(process.env, (p) => readFileSync(p, "utf-8"));
+if (fleetToken.error !== undefined) {
+  console.error(`✗ dashboard: ${fleetToken.error}`);
+  process.exit(1);
+}
+const GUARD = loadGuardConfig(
+  { ...process.env, SHIPWRIGHT_FLEET_TOKEN: fleetToken.token },
+  HOST,
+  PORT,
+);
+const guardProblem = startupProblem(GUARD, isAuthEnabled());
+if (guardProblem) {
+  console.error(`✗ dashboard: ${guardProblem}`);
+  process.exit(1);
+}
+
+async function routeRequest(
+  req: Request,
+  server: Bun.Server<WsData>,
+): Promise<Response | undefined> {
     const url = new URL(req.url);
     const pathname = url.pathname;
 
@@ -2730,7 +2762,7 @@ const server = Bun.serve({
     // ── WebSocket Auth gate ──────────────────────────────────────
     // WebSocket always requires authentication (unless local connection)
     if (pathname === "/ws" || pathname === "/ws/events") {
-      const isLocal = isLocalConnection(req);
+      const isLocal = isLoopbackHost(HOST) && isLocalConnection(req);
       if (!isLocal) {
         const session = getSession(req);
         if (!session) {
@@ -2753,7 +2785,7 @@ const server = Bun.serve({
         return new Response("WebSocket upgrade failed", { status: 400 });
       }
       if (pathname === "/ws") {
-        const upgraded = server.upgrade(req);
+        const upgraded = server.upgrade(req, { data: undefined });
         if (upgraded) return undefined as unknown as Response;
         return new Response("WebSocket upgrade failed", { status: 400 });
       }
@@ -2761,7 +2793,8 @@ const server = Bun.serve({
 
     // ── HTTP Auth gate ───────────────────────────────────────────
     // If auth is enabled, enforce it on all other remaining routes
-    if (isAuthEnabled()) {
+    // Fleet routes were already authenticated by guardRequest (fleet token or session).
+    if (isAuthEnabled() && !isFleetRoute(pathname)) {
       const session = getSession(req);
       if (!session) {
         return new Response(null, {
@@ -5728,6 +5761,17 @@ const server = Bun.serve({
     if (staticResponse) return staticResponse;
 
     return new Response("Not Found", { status: 404 });
+}
+
+const server = Bun.serve<WsData>({
+  port: PORT,
+  hostname: HOST,
+
+  async fetch(req, server) {
+    const hasSession = isAuthEnabled() && getSession(req) !== null;
+    const blocked = guardRequest(req, GUARD, hasSession);
+    if (blocked) return withCors(blocked, req, GUARD);
+    return withCors(await routeRequest(req, server), req, GUARD);
   },
 
   websocket: {
@@ -5868,6 +5912,10 @@ console.log(
   `  ${GREEN}\u25CF${RESET} Health:    ${ULINE}http://localhost:${server.port}/api/health${RESET}`,
 );
 console.log(`  ${authModeLabel}`);
+// Never print the token itself, only whether one is set.
+console.log(
+  `  ${DIM}Fleet token: ${GUARD.fleetToken ? "configured" : "not set (loopback only)"} | Allowed origins: ${GUARD.allowedOrigins.join(", ")} (add more with SW_DASHBOARD_ORIGINS)${RESET}`,
+);
 console.log(
   `  ${DIM}Push interval: ${WS_PUSH_INTERVAL_MS}ms | File watcher: ${eventsWatcher ? "active" : "fallback to interval"}${RESET}\n`,
 );

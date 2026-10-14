@@ -18,8 +18,17 @@ import type {
   UserInfo,
 } from "../types/api";
 
+// The server rejects mutating requests that are not application/json (CSRF guard).
+function withJsonContentType(options?: RequestInit): RequestInit | undefined {
+  const method = (options?.method ?? "GET").toUpperCase();
+  if (method === "GET" || method === "HEAD") return options;
+  const headers = (options?.headers ?? {}) as Record<string, string>;
+  if (Object.keys(headers).some((h) => h.toLowerCase() === "content-type")) return options;
+  return { ...options, headers: { ...headers, "Content-Type": "application/json" } };
+}
+
 async function request<T>(url: string, options?: RequestInit): Promise<T> {
-  const resp = await fetch(url, options);
+  const resp = await fetch(url, withJsonContentType(options));
   if (!resp.ok) {
     const body = await resp
       .json()
