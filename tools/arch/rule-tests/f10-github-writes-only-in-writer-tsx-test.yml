@@ -1,0 +1,9 @@
+id: F10-github-writes-only-in-writer-tsx
+valid:
+  - 'run({ argv: ["gh", "issue", "view", "1"] });'
+  - 'run({ argv: ["gh", "api", "repos/o/r", "--jq", "POST"] });'
+invalid:
+  - 'run({ argv: ["gh", "issue", "create"] });'
+  - 'run({ argv: ["gh", "-R", repo, "pr", "merge"] });'
+  - 'run({ argv: ["gh", "api", "-X", "POST", "repos/o/r"] });'
+  - 'run({ argv: ["gh", "api", "repos/o/r", "-f", "a=b"] });'
