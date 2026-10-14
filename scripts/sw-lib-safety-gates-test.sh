@@ -239,4 +239,83 @@ else
     assert_pass "malformed issue JSON fails"
 fi
 
+# ─── fleet_curl ───────────────────────────────────────────────────────────
+print_test_section "fleet_curl"
+
+# Recording curl: one argv element per line in $CURL_ARGS; stdin in $CURL_STDIN only when curl is
+# told to read a file from stdin (@-), so a call that must not use stdin never blocks on it.
+export CURL_ARGS="$TEST_TEMP_DIR/curl.args" CURL_STDIN="$TEST_TEMP_DIR/curl.stdin" CURL_EXIT=0
+mock_binary "curl" 'printf "%s\n" "$@" > "$CURL_ARGS"
+for a in "$@"; do [[ "$a" == "@-" ]] && cat > "$CURL_STDIN"; done
+printf "ok"; exit "$CURL_EXIT"'
+reset_curl() { rm -f "$CURL_ARGS" "$CURL_STDIN"; }
+curl_stdin() { cat "$CURL_STDIN" 2>/dev/null || true; }
+curl_args() { cat "$CURL_ARGS" 2>/dev/null || true; }
+unset SHIPWRIGHT_FLEET_TOKEN SHIPWRIGHT_FLEET_TOKEN_FILE
+
+reset_curl
+out="$(SHIPWRIGHT_FLEET_TOKEN="s3cret-token" fleet_curl -s -X POST -d '{"a": 1}' "http://127.0.0.1:8767/api/claim" 2>"$TEST_TEMP_DIR/err")"
+assert_eq "token sent as a header line on stdin" "X-Shipwright-Token: s3cret-token" "$(curl_stdin)"
+assert_eq "curl reads that header from stdin (-H @-), caller args intact" \
+    "-H @- -s -X POST -d {\"a\": 1} http://127.0.0.1:8767/api/claim" "$(curl_args | tr '\n' ' ' | sed 's/ $//')"
+assert_eq "token never in argv" "0" "$(grep -c 's3cret-token' "$CURL_ARGS" || true)"
+assert_eq "curl stdout passes through" "ok" "$out"
+assert_eq "nothing on stderr" "" "$(cat "$TEST_TEMP_DIR/err")"
+
+reset_curl
+fleet_curl -s "http://127.0.0.1:8767/api/claim" >/dev/null
+assert_eq "no token: no stdin header" "" "$(curl_stdin)"
+assert_eq "no token: argv is exactly the caller's" "-s http://127.0.0.1:8767/api/claim" \
+    "$(curl_args | tr '\n' ' ' | sed 's/ $//')"
+
+tokfile="$TEST_TEMP_DIR/fleet.token"
+printf '  file-token\n\n' > "$tokfile"
+chmod 600 "$tokfile"
+reset_curl
+SHIPWRIGHT_FLEET_TOKEN_FILE="$tokfile" fleet_curl -s "http://x/api/claim" >/dev/null 2>"$TEST_TEMP_DIR/err"
+assert_eq "token file is read and trimmed" "X-Shipwright-Token: file-token" "$(curl_stdin)"
+assert_eq "mode-600 token file: no warning" "" "$(cat "$TEST_TEMP_DIR/err")"
+assert_eq "file token never in argv" "0" "$(grep -c 'file-token' "$CURL_ARGS" || true)"
+
+reset_curl
+SHIPWRIGHT_FLEET_TOKEN="env-token" SHIPWRIGHT_FLEET_TOKEN_FILE="$tokfile" fleet_curl -s "http://x/" >/dev/null
+assert_eq "SHIPWRIGHT_FLEET_TOKEN wins over the file" "X-Shipwright-Token: env-token" "$(curl_stdin)"
+
+chmod 644 "$tokfile"
+reset_curl
+SHIPWRIGHT_FLEET_TOKEN_FILE="$tokfile" fleet_curl -s "http://x/" >/dev/null 2>"$TEST_TEMP_DIR/err"
+assert_eq "group/world-readable token file is still used" "X-Shipwright-Token: file-token" "$(curl_stdin)"
+assert_contains "group/world-readable token file warns (mode 600)" "$(cat "$TEST_TEMP_DIR/err")" "600"
+assert_eq "the warning never prints the token" "0" "$(grep -c 'file-token' "$TEST_TEMP_DIR/err" || true)"
+
+reset_curl
+rc=0
+SHIPWRIGHT_FLEET_TOKEN_FILE="$TEST_TEMP_DIR/no-such-token" fleet_curl -s "http://x/" >/dev/null 2>"$TEST_TEMP_DIR/err" || rc=$?
+assert_eq "unreadable token file fails closed (125)" "125" "$rc"
+assert_file_not_exists "unreadable token file: curl never runs" "$CURL_ARGS"
+assert_contains "unreadable token file is named" "$(cat "$TEST_TEMP_DIR/err")" "SHIPWRIGHT_FLEET_TOKEN_FILE"
+
+printf ' \n' > "$TEST_TEMP_DIR/empty.token"
+chmod 600 "$TEST_TEMP_DIR/empty.token"
+reset_curl
+rc=0
+SHIPWRIGHT_FLEET_TOKEN_FILE="$TEST_TEMP_DIR/empty.token" fleet_curl -s "http://x/" >/dev/null 2>&1 || rc=$?
+assert_eq "empty token file fails closed (125)" "125" "$rc"
+assert_file_not_exists "empty token file: curl never runs" "$CURL_ARGS"
+
+reset_curl
+rc=0
+SHIPWRIGHT_FLEET_TOKEN=$'tok\nX-Injected: 1' fleet_curl -s "http://x/" >/dev/null 2>"$TEST_TEMP_DIR/err" || rc=$?
+assert_eq "a token with a line break fails closed (125)" "125" "$rc"
+assert_file_not_exists "a token with a line break never reaches curl" "$CURL_ARGS"
+assert_eq "the rejection never prints the token" "0" "$(grep -c 'Injected' "$TEST_TEMP_DIR/err" || true)"
+
+reset_curl
+rc=0
+CURL_EXIT=22 SHIPWRIGHT_FLEET_TOKEN="t" fleet_curl -s "http://x/" >/dev/null || rc=$?
+assert_eq "curl's exit status is returned (with a token)" "22" "$rc"
+rc=0
+CURL_EXIT=7 fleet_curl -s "http://x/" >/dev/null || rc=$?
+assert_eq "curl's exit status is returned (no token)" "7" "$rc"
+
 print_test_results

@@ -145,3 +145,51 @@ dispatchable_issue_numbers() {
         | .number'
 }
 
+
+# _fleet_token — prints the dashboard fleet token: $SHIPWRIGHT_FLEET_TOKEN, else the contents of
+# $SHIPWRIGHT_FLEET_TOKEN_FILE with surrounding whitespace trimmed (warns unless the file is mode
+# 600). Prints nothing when neither is set. Returns 1 when the file is unreadable or empty, or the
+# token contains a line break (it would inject a header). Messages never include the token.
+_fleet_token() {
+    local token="${SHIPWRIGHT_FLEET_TOKEN:-}" file="${SHIPWRIGHT_FLEET_TOKEN_FILE:-}"
+    if [[ -z "$token" && -n "$file" ]]; then
+        if [[ ! -f "$file" || ! -r "$file" ]]; then
+            echo "fleet token: cannot read SHIPWRIGHT_FLEET_TOKEN_FILE (${file})" >&2
+            return 1
+        fi
+        local mode
+        mode="$(stat -c %a "$file" 2>/dev/null || stat -f %Lp "$file" 2>/dev/null || true)"
+        if [[ ! "$mode" =~ ^[0-7]+$ ]] || (( 8#$mode & 8#077 )); then
+            echo "fleet token: warning: SHIPWRIGHT_FLEET_TOKEN_FILE (${file}) should be mode 600 (is ${mode:-unknown})" >&2
+        fi
+        token="$(cat "$file")"
+        token="${token#"${token%%[![:space:]]*}"}"
+        token="${token%"${token##*[![:space:]]}"}"
+        if [[ -z "$token" ]]; then
+            echo "fleet token: SHIPWRIGHT_FLEET_TOKEN_FILE (${file}) is empty" >&2
+            return 1
+        fi
+    fi
+    if [[ "$token" == *$'\n'* || "$token" == *$'\r'* ]]; then
+        echo "fleet token: the token contains a line break — refusing to send it" >&2
+        return 1
+    fi
+    printf '%s' "$token"
+}
+
+# fleet_curl <curl args...> — curl to a dashboard fleet route (/api/claim*, /api/connect/*) with
+# the `X-Shipwright-Token` header (_fleet_token). The header goes to curl on stdin (`-H @-`,
+# curl >= 7.55), so the token never appears in argv, `ps` or logs; callers must not use stdin
+# themselves. No token configured: plain curl, no header (a loopback dashboard without a token).
+# Returns curl's exit status, or 125 (curl not run) when a configured token cannot be used.
+# curl exits 0 on HTTP errors unless --fail is given: callers that gate on the call must check
+# the HTTP status (-w '%{http_code}').
+fleet_curl() {
+    local token
+    token="$(_fleet_token)" || return 125
+    if [[ -z "$token" ]]; then
+        curl "$@"
+        return
+    fi
+    { printf 'X-Shipwright-Token: %s\n' "$token" || true; } | curl -H @- "$@"
+}

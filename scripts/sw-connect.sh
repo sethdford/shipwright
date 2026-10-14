@@ -19,6 +19,9 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # shellcheck source=lib/helpers.sh
 [[ -f "$SCRIPT_DIR/lib/helpers.sh" ]] && source "$SCRIPT_DIR/lib/helpers.sh"
 [[ -f "$SCRIPT_DIR/lib/config.sh" ]] && source "$SCRIPT_DIR/lib/config.sh"
+# fleet_curl: dashboard calls carry the fleet token on stdin
+# shellcheck source=lib/safety-gates.sh
+source "$SCRIPT_DIR/lib/safety-gates.sh"
 # Fallbacks when helpers not loaded (e.g. test env with overridden SCRIPT_DIR)
 [[ "$(type -t info 2>/dev/null)" == "function" ]]    || info()    { echo -e "\033[38;2;0;212;255m\033[1m▸\033[0m $*"; }
 # Color fallbacks when helpers not loaded
@@ -237,11 +240,7 @@ run_heartbeat_loop() {
 
         # Send heartbeat
         local http_code
-        http_code="$(curl -s -o /dev/null -w "%{http_code}" --max-time 5 \
-            -X POST \
-            -H "Content-Type: application/json" \
-            -d "$payload" \
-            "${dashboard_url}/api/connect/heartbeat" 2>/dev/null || echo "000")"
+        http_code="$(send_heartbeat "$dashboard_url" "$payload")"
 
         if [[ "$http_code" == "200" || "$http_code" == "201" || "$http_code" == "204" ]]; then
             # Success — update event bookmark and reset backoff
@@ -254,7 +253,9 @@ run_heartbeat_loop() {
             consecutive_failures=0
         else
             consecutive_failures=$((consecutive_failures + 1))
-            if [[ "$consecutive_failures" -le 3 ]]; then
+            if [[ "$http_code" == "401" || "$http_code" == "403" ]]; then
+                echo "$(now_iso) ERROR: Dashboard rejected the fleet token (HTTP $http_code) — set SHIPWRIGHT_FLEET_TOKEN to the dashboard's token" >> "$CONNECT_LOG"
+            elif [[ "$consecutive_failures" -le 3 ]]; then
                 echo "$(now_iso) WARN: Dashboard unreachable (HTTP $http_code), retrying in ${backoff}s" >> "$CONNECT_LOG"
             fi
             sleep "$backoff"
@@ -270,6 +271,19 @@ run_heartbeat_loop() {
     done
 }
 
+# send_heartbeat <dashboard_url> <payload> — POSTs one heartbeat with the fleet token and prints
+# the HTTP status: "000" when the dashboard is unreachable or the fleet token is unusable.
+send_heartbeat() {
+    local code=""
+    code="$(fleet_curl -s -o /dev/null -w "%{http_code}" --max-time 5 \
+        -X POST \
+        -H "Content-Type: application/json" \
+        -d "$2" \
+        "${1}/api/connect/heartbeat")" || true
+    [[ "$code" =~ ^[0-9]{3}$ ]] || code="000"
+    echo "$code"
+}
+
 send_disconnect() {
     local dashboard_url="$1"
     local developer_id="$2"
@@ -281,11 +295,11 @@ send_disconnect() {
         --arg machine_name "$machine_name" \
         '{developer_id: $developer_id, machine_name: $machine_name}')"
 
-    curl -s -o /dev/null --max-time 5 \
+    fleet_curl -s -o /dev/null --max-time 5 \
         -X POST \
         -H "Content-Type: application/json" \
         -d "$payload" \
-        "${dashboard_url}/api/connect/disconnect" 2>/dev/null || true
+        "${dashboard_url}/api/connect/disconnect" || true
 
     info "Disconnected from dashboard"
 }

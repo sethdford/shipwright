@@ -2,6 +2,9 @@
 # Source from sw-daemon.sh. Requires STATE_FILE, helpers.
 [[ -n "${_DAEMON_STATE_LOADED:-}" ]] && return 0
 _DAEMON_STATE_LOADED=1
+# fleet_curl: dashboard calls carry the fleet token on stdin
+# shellcheck source=safety-gates.sh
+source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/safety-gates.sh"
 
 # Defaults for variables normally set by sw-daemon.sh (safe under set -u).
 DAEMON_DIR="${DAEMON_DIR:-${HOME}/.shipwright}"
@@ -622,14 +625,26 @@ claim_issue() {
             }
         fi
 
-        # Try dashboard-coordinated claim first (atomic label-based)
-        local resp
-        resp=$(curl -s --max-time 5 -X POST "${DASHBOARD_URL}/api/claim" \
+        # Try dashboard-coordinated claim first (atomic label-based). Only a 2xx
+        # {"approved":true} acquires it; a rejected fleet token (401/403) or an unusable
+        # token file fails closed instead of falling back to the GitHub label claim.
+        local out="" resp="" code="" curl_rc=0
+        out=$(fleet_curl -s --max-time 5 -w '\n%{http_code}' -X POST "${DASHBOARD_URL}/api/claim" \
             -H "Content-Type: application/json" \
             -d "$(jq -n --argjson issue "$issue_num" --arg machine "$machine_name" \
-                '{issue: $issue, machine: $machine}')" 2>/dev/null || echo "")
+                '{issue: $issue, machine: $machine}')") || curl_rc=$?
+        if [[ "$curl_rc" -eq 125 ]]; then
+            daemon_log ERROR "Issue #${issue_num}: fleet token unusable — not claiming"
+            exit 1
+        fi
+        code="${out##*$'\n'}"
+        [[ "$out" == *$'\n'* ]] && resp="${out%$'\n'*}"
+        if [[ "$code" == "401" || "$code" == "403" ]]; then
+            daemon_log ERROR "Issue #${issue_num}: dashboard rejected the claim (HTTP ${code}) — check SHIPWRIGHT_FLEET_TOKEN"
+            exit 1
+        fi
 
-        if [[ -n "$resp" ]] && echo "$resp" | jq -e '.approved == true' >/dev/null 2>&1; then
+        if [[ "$code" == 2[0-9][0-9] ]] && echo "$resp" | jq -e '.approved == true' >/dev/null 2>&1; then
             # VERIFY: re-read labels after random backoff to detect races
             local backoff_ms=$(( (RANDOM % 500) + 200 ))
             sleep "0.${backoff_ms}"
@@ -696,11 +711,17 @@ release_claim() {
 
     [[ "$NO_GITHUB" == "true" ]] && return 0
 
-    # Try dashboard-coordinated release first
-    curl -s --max-time 5 -X POST "${DASHBOARD_URL}/api/claim/release" \
-        -H "Content-Type: application/json" \
-        -d "$(jq -n --argjson issue "$issue_num" --arg machine "$machine_name" \
-            '{issue: $issue, machine: $machine}')" 2>/dev/null || true
+    # Try dashboard-coordinated release first (best effort: the label removal below backs it up)
+    if [[ -n "${DASHBOARD_URL:-}" ]]; then
+        local code=""
+        code=$(fleet_curl -s -o /dev/null --max-time 5 -w '%{http_code}' -X POST "${DASHBOARD_URL}/api/claim/release" \
+            -H "Content-Type: application/json" \
+            -d "$(jq -n --argjson issue "$issue_num" --arg machine "$machine_name" \
+                '{issue: $issue, machine: $machine}')") || true
+        if [[ "$code" != 2[0-9][0-9] ]]; then
+            daemon_log WARN "Issue #${issue_num}: dashboard release failed (HTTP ${code:-none}) — removing the label directly"
+        fi
+    fi
 
     # Also remove label directly as backup (idempotent)
     gh issue edit "$issue_num" --remove-label "claimed:${machine_name}" 2>/dev/null || true
