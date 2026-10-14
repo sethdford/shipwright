@@ -18,10 +18,15 @@ export function captureIO(): CapturedIO {
 }
 
 /** A command context; `safety()` throws unless ports are given (commands like hello need none). */
-export function commandContext(io: CliIO, safety?: SafetyPorts): CommandContext {
+export function commandContext(
+  io: CliIO,
+  safety?: SafetyPorts,
+  env: Readonly<Record<string, string | undefined>> = {},
+): CommandContext {
   return {
     io,
     version: "3.3.0",
+    env,
     safety: () => {
       if (!safety) throw new Error("this command was not given safety ports");
       return safety;

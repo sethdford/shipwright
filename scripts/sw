@@ -638,6 +638,9 @@ main() {
         intake)
             run_ts intake "$@"
             ;;
+        gates)
+            run_ts gates "$@"
+            ;;
         *)
             error "Unknown command: ${cmd}"
             echo ""

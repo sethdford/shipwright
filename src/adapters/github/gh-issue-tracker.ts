@@ -1,11 +1,5 @@
 import { z } from "zod";
-import type {
-  AdapterError,
-  Issue,
-  IssueTracker,
-  ProcessResult,
-  ProcessRunner,
-} from "../../shared/kernel/ports";
+import type { AdapterError, Issue, IssueTracker, ProcessRunner } from "../../shared/kernel/ports";
 import { err, ok, type Result } from "../../shared/kernel/result";
 import { runOrFail } from "../process/run-or-fail";
 import { classifyGhError } from "./gh-json";

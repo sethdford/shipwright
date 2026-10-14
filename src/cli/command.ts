@@ -8,6 +8,8 @@ export interface CliIO {
 export interface CommandContext {
   readonly io: CliIO;
   readonly version: string;
+  /** The process environment (read in main.ts; commands never touch process.env). */
+  readonly env: Readonly<Record<string, string | undefined>>;
   /** Adapters for the safety commands, built on first call (commands that need none never call it). */
   readonly safety: () => SafetyPorts;
 }

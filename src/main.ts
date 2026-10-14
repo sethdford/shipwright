@@ -66,6 +66,7 @@ export async function main(
     installShutdown(ports.runner, process);
     return ports;
   }),
+  env: Readonly<Record<string, string | undefined>> = process.env,
 ): Promise<number> {
   const [name, ...args] = argv;
   if (name === undefined || name === "--help" || name === "-h") {
@@ -83,7 +84,7 @@ export async function main(
     return 2;
   }
   try {
-    return await command.run(args, { io, version: pkg.version, safety });
+    return await command.run(args, { io, version: pkg.version, safety, env });
   } catch (error) {
     io.err(`✗ ${error instanceof Error ? error.message : String(error)}`);
     return 1;

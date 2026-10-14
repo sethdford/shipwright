@@ -880,5 +880,14 @@
     "parity": null,
     "status": "parity-green",
     "notes": "New in Wave 1a (spec §6.2 patrol hygiene): cap and title-fingerprint dedupe; a gate (exit 0 only when filing is allowed)."
+  },
+  {
+    "command": "gates",
+    "aliases": [],
+    "script": "sw-gates.sh",
+    "context": "orchestration",
+    "parity": null,
+    "status": "parity-green",
+    "notes": "New in Wave 1a: all dispatch gates in ADR-0007 order for workflows and the daemon; a gate (exit 0 only when every gate allows). --retry is required (daemon retry count, Task 12; auto-retry bot-marker count, Task 14)."
   }
 ]

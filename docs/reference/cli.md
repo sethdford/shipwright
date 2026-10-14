@@ -66,6 +66,40 @@ EXAMPLES
   shipwright budget check --estimate 2.50
 ```
 
+## `gates`
+
+All dispatch gates (pause, breaker, budget, review WIP, fix loop)
+
+```text
+USAGE
+  shipwright gates check --retry N [--no-github] [--json]
+
+DESCRIPTION
+  Every dispatch gate in order (ADR-0007): pause, breaker, budget, review WIP, fix loop.
+  Stops at the first closed gate, so a paused system never opens a breaker incident.
+  A gate: exit 0 only when every gate allows dispatch. Exits 1 when a gate blocks, when any
+  source cannot be read or judged (fail closed), or on an unexpected error. Exits 2 on bad
+  arguments, including a missing --retry. The bash daemon and workflows call this before
+  dispatching.
+
+OPTIONS
+  --retry N      Required. How many times this issue has already been retried: 0 for a first
+                 dispatch. The fix-loop cap allows the first run plus 3 retries. The daemon
+                 passes its retry count; auto-retry passes the number of its bot markers on
+                 the issue. There is no default: an unknown count must not read as "first".
+  --no-github    Skip the breaker and review-WIP gates and check only the local pause flag
+                 (not the shipwright:pause label). Also set by NO_GITHUB=true.
+  --json         Print one JSON object: allowed, and each gate's verdict (allowed, blocked,
+                 error, skipped or not_checked) and detail. Exit codes are unchanged.
+
+NOTES
+  Without cost files (a CI runner) the budget gate passes with a ⚠ warning: nothing is enforced.
+
+EXAMPLES
+  shipwright gates check --retry 0
+  shipwright gates check --retry 2 --json
+```
+
 ## `hello`
 
 Print hello world (CLI smoke test)

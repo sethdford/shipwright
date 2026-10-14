@@ -5,6 +5,16 @@ export {
   RUN_HISTORY_LIMIT,
 } from "./application/breaker";
 export { checkBudget } from "./application/budget";
+export {
+  checkDispatchGates,
+  GATE_ORDER,
+  type GateName,
+  type GateOptions,
+  type GateResult,
+  type GatesReport,
+  type GateVerdict,
+  gatePasses,
+} from "./application/gates";
 export { checkIntake } from "./application/intake";
 export { type PauseOptions, pause, readPause, resume } from "./application/pause";
 export {
@@ -30,6 +40,7 @@ export {
   describeWip,
   type FlowPolicy,
   fixLoopAllows,
+  flowPolicy,
   type PullSummary,
   reviewWip,
   type WipVerdict,
