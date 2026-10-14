@@ -59,6 +59,7 @@
     "test:ts": "bun test ./src ./tools",
     "docs:gen": "bun tools/docs/gen-cli-reference.ts",
     "docs:check": "bun tools/docs/gen-cli-reference.ts --check",
+    "port:seed": "bun tools/port/seed-progress.ts",
     "port:check": "bun tools/port/check-router.ts",
     "parity": "bun tools/port/run-parity.ts",
     "check:fast": "bun run typecheck && bun run arch && bun run test:ts",
