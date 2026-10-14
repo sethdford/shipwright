@@ -12,7 +12,7 @@ import {
 } from "node:fs";
 import { createServer } from "node:net";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
 import { BunProcessRunner } from "../../src/adapters/process/bun-process-runner";
 import type { ProgressEntry } from "./progress";
 import {
@@ -191,7 +191,9 @@ test("sandbox is a sealed copy of tracked files with only node_modules linked", 
   try {
     const copy = buildSandbox(sbx, repo, [entry("hello", "porting"), entry("other", "bash")]);
     const runner = new BunProcessRunner({ reapGroup: true });
-    const env = { ...parityEnv(sbx, { PATH: "/usr/local/bin:/opt/homebrew/bin:/usr/bin:/bin" }) };
+    // The stub execs `bun`; include the running Bun's directory (CI installs it under ~/.bun/bin).
+    const path = `${dirname(process.execPath)}:/usr/local/bin:/opt/homebrew/bin:/usr/bin:/bin`;
+    const env = { ...parityEnv(sbx, { PATH: path }) };
     const run = (name: string) => runner.run({ argv: [join(copy, "scripts", name), "x"], env });
     expect((await run("sw-hello.sh")).stdout.trim()).toBe("TS hello x");
     expect((await run("sw-other.sh")).stdout.trim()).toBe("BASH other x");
