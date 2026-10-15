@@ -244,7 +244,9 @@ print_test_results() {
     echo ""
     echo -e "${DIM}  ──────────────────────────────────────────${RESET}"
     echo ""
-    if [[ $FAIL -eq 0 ]]; then
+    if [[ $FAIL -eq 0 && $TOTAL -eq 0 ]]; then
+        echo -e "  ${YELLOW}${BOLD}No assertions ran${RESET}"
+    elif [[ $FAIL -eq 0 ]]; then
         echo -e "  ${GREEN}${BOLD}All $TOTAL tests passed${RESET}"
     else
         echo -e "  ${RED}${BOLD}$FAIL of $TOTAL tests failed${RESET}"
