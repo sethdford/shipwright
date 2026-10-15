@@ -485,6 +485,41 @@ test_memory_promotion() {
 }
 
 # ──────────────────────────────────────────────────────────────────────────────
+# 12b. Prune window holds under GNU date (#8612)
+# ──────────────────────────────────────────────────────────────────────────────
+# `date -u -r EPOCH` is BSD-only; under GNU date the old code fell back to "now", so every
+# entry not from the current second was pruned on Linux. Force GNU date where available.
+test_memory_prune_window_gnu_date() {
+    local gnu_date="" shim_dir="$TEST_TEMP_DIR/gnu-date-bin"
+    if date --version >/dev/null 2>&1; then
+        gnu_date="$(command -v date)"
+    elif command -v gdate >/dev/null 2>&1; then
+        gnu_date="$(command -v gdate)"
+    else
+        echo "    (no GNU date available; skipping)"; return 0
+    fi
+    mkdir -p "$shim_dir"
+    printf '#!/usr/bin/env bash\nexec "%s" "$@"\n' "$gnu_date" > "$shim_dir/date"
+    chmod +x "$shim_dir/date"
+
+    local now_e two_days_ago sixty_days_ago
+    now_e=$(date +%s)
+    two_days_ago=$(epoch_to_iso $((now_e - 2 * 86400)))
+    sixty_days_ago=$(epoch_to_iso $((now_e - 60 * 86400)))
+    jq -n --arg recent "$two_days_ago" --arg old "$sixty_days_ago" \
+        '{failures: [
+            {pattern: "recent pattern", stage: "build", seen_count: 1, last_seen: $recent},
+            {pattern: "stale pattern", stage: "build", seen_count: 1, last_seen: $old}
+        ]}' > "$TEST_TEMP_DIR/.shipwright/memory/repo1/failures.json"
+
+    PATH="$shim_dir:$PATH" optimize_evolve_memory > /dev/null 2>&1
+
+    local kept
+    kept=$(jq -r '[.failures[].pattern] | join(",")' "$TEST_TEMP_DIR/.shipwright/memory/repo1/failures.json")
+    [[ "$kept" == "recent pattern" ]] || { echo "    kept: [$kept]"; return 1; }
+}
+
+# ──────────────────────────────────────────────────────────────────────────────
 # 13. Full analysis runs without errors on empty data
 # ──────────────────────────────────────────────────────────────────────────────
 test_full_analysis_empty() {
@@ -786,6 +821,7 @@ main() {
         "test_memory_pruning:Memory pruning removes old patterns"
         "test_memory_strengthening:Memory strengthening boosts confirmed patterns"
         "test_memory_promotion:Memory promotion copies cross-repo patterns"
+        "test_memory_prune_window_gnu_date:Prune window holds under GNU date"
         "test_full_analysis_empty:Full analysis runs on empty data"
         "test_report_with_data:Report generates output with data"
         "test_report_empty:Report handles empty outcomes"
