@@ -21,3 +21,5 @@ invalid:
   - '"$CLAUDE_BIN" -p "$p"'
   - '${CLAUDE_CMD} -p "$p"'
   - 'claude -p "$p" GH_TOKEN GITHUB_TOKEN'
+  - 'time claude -p "$p"'
+  - 'x=$(time claude -p "$p")'

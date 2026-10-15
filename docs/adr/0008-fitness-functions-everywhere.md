@@ -63,7 +63,7 @@ allowed, a `valid` case. Rule-test YAML is in the ignore ban.
   reference to `query` and `queryFn` in code (comments excluded): `.call(…)` and a `const q = this.queryFn`
   alias add references and fail it.
 - Bash F9: `claude` is matched bare, quoted, behind an absolute path, after `command` or a wrapper
-  (`timeout`, `gtimeout`, `$TIMEOUT_CMD`), or as `"$CLAUDE_BIN"`; the token must precede `claude`.
+  (`time`, `timeout`, `gtimeout`, `$TIMEOUT_CMD`), or as `"$CLAUDE_BIN"`; the token must precede `claude`.
 - Bash F10: `gh` is matched quoted, by absolute path, or as `$GH_BIN` in any case; `git push` is matched
   behind a wrapper (`nohup git push`, `timeout 60 git push`); the write verbs of `cache`, `project`,
   `ssh-key`, `gpg-key` and `codespace` are caught; only `git stash push` is excluded.
@@ -102,5 +102,3 @@ Out of scope:
   a `Function` constructor reached through a value (`({}).constructor.constructor`), module or command
   names built by string concatenation outside the dashboard, a GraphQL mutation held in a variable,
   `gh "${args[@]}"` with the verb in an array, and bash bypass flags spelled with quotes inside a word.
-- `time claude -p …` (F9 scrub): tree-sitter-bash parses `time` so that the `claude` word is not part of
-  a command node, and the rules cannot see it. Matching it would need a text rule over the whole program.

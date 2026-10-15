@@ -23,7 +23,7 @@ rule:
         - has: { field: name, regex: '^["'']?(.*/)?claude["'']?$' }
         - has: { field: name, regex: '^"?\$\{?[A-Za-z_]*CLAUDE_?(BIN|BINARY|CMD|CLI|PATH|EXE)\}?"?$' }
         - all:
-            - has: { field: name, regex: '^(g?timeout|env|nohup|exec|nice|stdbuf|sudo|command|xargs|"?\$\{?[A-Za-z_]*(?i:timeout|cmd)[A-Za-z_]*\}?"?)$' }
+            - has: { field: name, regex: '^(time|g?timeout|env|nohup|exec|nice|stdbuf|sudo|command|xargs|"?\$\{?[A-Za-z_]*(?i:timeout|cmd)[A-Za-z_]*\}?"?)$' }
             - has: { kind: word, regex: '^["'']?(.*/)?claude["'']?$' }
             - not:
                 all:
