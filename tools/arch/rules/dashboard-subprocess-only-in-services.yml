@@ -3,10 +3,11 @@
 # only lose call sites until Wave 3 ports it. To add a subprocess call, put it in a service that
 # validates its inputs and add that file to `ignores` here and in tools/arch/meta.test.ts (PINNED),
 # a change CODEOWNERS review.
-# Also caught: aliasing Bun (`const B = Bun`, `Reflect.get(Bun, "spawn")`, `globalThis.Bun.spawn`),
-# `import { $ as sh } from "bun"` and `import * as B from "bun"`, createRequire (it loads child_process
-# unseen by the import checks), and require()/import() of a computed specifier. A string built by
-# concatenation (`require("child_" + "process")`) is caught by the computed-specifier check.
+# Also caught: aliasing Bun (`const B = Bun`, `Reflect.get(Bun, "spawn")`, `globalThis.Bun.spawn`,
+# `globalThis["Bun"]`), `import { $ as sh } from "bun"` and `import * as B from "bun"`, node:module
+# (any import or require of it: createRequire loads child_process past every other check, and
+# `nm.createRequire(…)` or `module.createRequire(…)` are member forms), and require()/import() of a
+# computed specifier. A string built by concatenation is caught by the computed-specifier check.
 id: dashboard-subprocess-only-in-services
 language: TypeScript
 severity: off
@@ -62,6 +63,11 @@ rule:
         - not: { inside: { kind: member_expression, field: object } }
         - not: { inside: { kind: type_query, stopBy: end } }
         - not: { inside: { kind: nested_type_identifier } }
+    # Bun by a computed key of a global object: globalThis["Bun"], window["Bun"] (mirrors F5)
+    - all:
+        - kind: subscript_expression
+        - has: { field: object, regex: '^(globalThis|global|window|self)$' }
+        - has: { field: index, regex: '^["''`]?Bun["''`]?$' }
     # Importing spawn/$ from bun, or the whole module as a namespace
     - all:
         - kind: import_statement
@@ -70,9 +76,24 @@ rule:
             - has: { kind: namespace_import, stopBy: end }
             - has: { kind: import_specifier, stopBy: end, regex: '^(spawn|spawnSync|\$)(\s|$)' }
         - not: { regex: '^import\s+type\s' }
-    # createRequire loads any module, child_process included, past every import check above
+    # node:module in any form: its createRequire loads child_process past the import checks above
+    - all:
+        - any:
+            - kind: import_statement
+            - kind: export_statement
+            - pattern: require($S)
+            - pattern: import($S)
+        - has: { field: source, regex: '^["'']((node:)?module)["'']$' }
+        - not: { regex: '^(import|export)\s+type\s' }
+    - all:
+        - any:
+            - pattern: require($S)
+            - pattern: import($S)
+        - has: { field: arguments, has: { kind: string, regex: '^["'']((node:)?module)["'']$' } }
     - kind: identifier
       regex: '^createRequire$'
+    - kind: member_expression
+      has: { field: property, regex: '^createRequire$' }
     # require and import with a computed specifier (a variable, a template or a concatenation)
     - all:
         - any:
