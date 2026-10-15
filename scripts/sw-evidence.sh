@@ -13,6 +13,9 @@ VERSION="3.3.0"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
 
+# shellcheck source=lib/test-gate-env.sh
+source "$SCRIPT_DIR/lib/test-gate-env.sh"
+
 # shellcheck source=lib/compat.sh
 [[ -f "$SCRIPT_DIR/lib/compat.sh" ]] && source "$SCRIPT_DIR/lib/compat.sh"
 # shellcheck source=lib/helpers.sh
@@ -294,7 +297,7 @@ collect_cli() {
     local start_time
     start_time=$(date +%s)
 
-    output=$(cd "$REPO_DIR" && _run_with_timeout "$timeout" bash -c "$command_str" 2>&1) || exit_code=$?
+    output=$(cd "$REPO_DIR" && ( sw_test_gate_scrub && _run_with_timeout "$timeout" bash -c "$command_str" ) 2>&1) || exit_code=$?
 
     local elapsed=$(( $(date +%s) - start_time ))
 
@@ -346,7 +349,7 @@ collect_database() {
 
     local exit_code=0
     local output=""
-    output=$(cd "$REPO_DIR" && _run_with_timeout "$timeout" bash -c "$command_str" 2>&1) || exit_code=$?
+    output=$(cd "$REPO_DIR" && ( sw_test_gate_scrub && _run_with_timeout "$timeout" bash -c "$command_str" ) 2>&1) || exit_code=$?
 
     local passed="false"
     [[ "$exit_code" -eq "$expected_exit" ]] && passed="true"
@@ -433,7 +436,7 @@ collect_custom() {
 
     local exit_code=0
     local output=""
-    output=$(cd "$REPO_DIR" && _run_with_timeout "$timeout" bash -c "$command_str" 2>&1) || exit_code=$?
+    output=$(cd "$REPO_DIR" && ( sw_test_gate_scrub && _run_with_timeout "$timeout" bash -c "$command_str" ) 2>&1) || exit_code=$?
 
     local passed="false"
     [[ "$exit_code" -eq "$expected_exit" ]] && passed="true"
@@ -527,7 +530,7 @@ collect_mutation() {
 
             # Run test with mutation — test should fail (mutation caught)
             local test_result=0
-            (cd "$REPO_DIR" && _run_with_timeout 30 bash -c "$test_cmd" > /dev/null 2>&1) || test_result=$?
+            (cd "$REPO_DIR" && ( sw_test_gate_scrub && _run_with_timeout 30 bash -c "$test_cmd" ) > /dev/null 2>&1) || test_result=$?
 
             # If test failed (non-zero), mutation was caught
             if [[ "$test_result" -ne 0 ]]; then
@@ -579,7 +582,7 @@ collect_property() {
     for ((i = 0; i < iterations; i++)); do
         local output=0
         local result_output=""
-        result_output=$(cd "$REPO_DIR" && _run_with_timeout 10 bash -c "$property_cmd" 2>&1) || output=$?
+        result_output=$(cd "$REPO_DIR" && ( sw_test_gate_scrub && _run_with_timeout 10 bash -c "$property_cmd" ) 2>&1) || output=$?
 
         if [[ "$output" -eq 0 ]]; then
             passed_count=$((passed_count + 1))
@@ -621,7 +624,7 @@ collect_invariant() {
 
     local exit_code=0
     local output=""
-    output=$(cd "$REPO_DIR" && _run_with_timeout 30 bash -c "$check_cmd" 2>&1) || exit_code=$?
+    output=$(cd "$REPO_DIR" && ( sw_test_gate_scrub && _run_with_timeout 30 bash -c "$check_cmd" ) 2>&1) || exit_code=$?
 
     local passed="false"
     [[ "$exit_code" -eq 0 ]] && passed="true"
