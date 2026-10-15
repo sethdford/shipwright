@@ -42,7 +42,7 @@ _log_suite_result() {
     shift
     local data=""
     for pair in "$@"; do
-        [[ -n "$data" ]] && data="$data "
+        [[ -n "$data" ]] && data="$data,"
         data="$data$pair"
     done
     local timestamp
@@ -236,8 +236,16 @@ run_suite() {
     # Run with timeout (gtimeout on macOS, timeout on Linux)
     local timeout_cmd="timeout"
     command -v gtimeout >/dev/null 2>&1 && timeout_cmd="gtimeout"
-    local exit_code=0
-    "$timeout_cmd" "$timeout" bash "$test_script" || exit_code=$?
+    local exit_code=0 status="passed"
+    local suite_log
+    suite_log=$(mktemp "${TMPDIR:-/tmp}/sw-e2e-suite.XXXXXX")
+    "$timeout_cmd" "$timeout" bash "$test_script" >"$suite_log" 2>&1 || exit_code=$?
+    cat "$suite_log"
+    # The integration suite exits 0 when it skips (no token, no gh auth). That is not a pass.
+    if [[ "$exit_code" -eq 0 ]] && grep -q "Skipping integration tests" "$suite_log"; then
+        status="skipped"
+    fi
+    rm -f "$suite_log"
 
     local end_time; end_time=$(date +%s)
     local duration=$((end_time - start_time))
@@ -247,6 +255,7 @@ run_suite() {
         "\"suite_id\":\"$suite_id\"" \
         "\"suite_name\":\"$suite_name\"" \
         "\"exit_code\":$exit_code" \
+        "\"status\":\"$status\"" \
         "\"duration_seconds\":$duration"
 
     return $exit_code
@@ -342,8 +351,12 @@ cmd_report() {
     local skip=0
 
     while IFS= read -r line; do
-        local exit_code; exit_code=$(echo "$line" | jq -r '.exit_code // 0')
-        if [[ $exit_code -eq 0 ]]; then
+        local exit_code status
+        exit_code=$(echo "$line" | jq -r '.exit_code // 0')
+        status=$(echo "$line" | jq -r '.status // ""')
+        if [[ "$status" == "skipped" ]]; then
+            skip=$((skip + 1))
+        elif [[ $exit_code -eq 0 ]]; then
             pass=$((pass + 1))
         elif [[ $exit_code -eq 124 ]]; then
             timeout=$((timeout + 1))
@@ -392,6 +405,9 @@ cmd_report() {
     if [[ $fail -gt 0 ]]; then
         error "Tests failed: $fail/$total"
         return 1
+    elif [[ $skip -gt 0 ]]; then
+        warn "Tests passed: $pass/$total, skipped: $skip (not counted as passed)"
+        return 0
     else
         success "All tests passed: $total/$total"
         return 0
@@ -413,7 +429,7 @@ cmd_flaky() {
     local flaky_analysis; flaky_analysis=$(jq -s 'group_by(.suite_id) | map({
         test: .[0].suite_id,
         runs: length,
-        passes: (map(select(.exit_code == 0)) | length),
+        passes: (map(select(.exit_code == 0 and (.status // "") != "skipped")) | length),
         failures: (map(select(.exit_code != 0)) | length)
     }) | map(select(.failures > 0 and .passes > 0))' "$RESULTS_LOG" 2>/dev/null || echo '[]')
 
