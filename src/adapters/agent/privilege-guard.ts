@@ -34,9 +34,37 @@ const ALLOWED_OPTION_KEYS = new Set([
 /** The only permission mode an agent runs in: dontAsk denies anything not pre-allowed, no prompts. */
 const REQUIRED_PERMISSION_MODE = "dontAsk";
 
-/** Throws (a bug, not an expected failure) when options would give an agent a bypass or a token. */
+/**
+ * An object's own data properties, as a plain record. Refuses what a check could read differently
+ * from the SDK: a non-plain prototype (an inherited permissionMode), a getter (its value changes on
+ * each read), and a symbol key (not on the allowlist). Values are read from the descriptors, never
+ * through the object's prototype chain.
+ */
+function ownDataProperties(value: unknown, what: string): Record<string, unknown> {
+  if (typeof value !== "object" || value === null) throw new Error(`F9: ${what} must be an object`);
+  const proto = Object.getPrototypeOf(value);
+  if (proto !== Object.prototype && proto !== null) {
+    throw new Error(
+      `F9: ${what} must be a plain object (found a ${proto?.constructor?.name ?? "custom"} prototype)`,
+    );
+  }
+  const out: Record<string, unknown> = {};
+  for (const key of Reflect.ownKeys(value)) {
+    const desc = Object.getOwnPropertyDescriptor(value, key);
+    if (typeof key !== "string" || desc === undefined || !("value" in desc)) {
+      throw new Error(`F9: ${what} has a symbol or accessor key (${String(key)}); pass plain data`);
+    }
+    out[key] = desc.value;
+  }
+  return out;
+}
+
+/**
+ * Throws (a bug, not an expected failure) when options would give an agent a bypass or a token. The
+ * runner passes this same frozen object to query(), so what is checked is what the SDK receives.
+ */
 export function assertAgentOptions(options: object): void {
-  const record = options as Record<string, unknown>;
+  const record = ownDataProperties(options, "agent options");
   for (const key of Object.keys(record)) {
     if (!ALLOWED_OPTION_KEYS.has(key)) {
       throw new Error(
@@ -49,8 +77,9 @@ export function assertAgentOptions(options: object): void {
       `F9: refusing to start an agent in permissionMode ${JSON.stringify(record.permissionMode)}; it must be "${REQUIRED_PERMISSION_MODE}"`,
     );
   }
-  const env = (record.env ?? {}) as Record<string, string | undefined>;
-  const leaked = GITHUB_TOKENS.filter((key) => env[key] !== undefined);
+  const env = record.env === undefined ? {} : ownDataProperties(record.env, "agent env");
+  // Environment names are case-insensitive on Windows and the SDK's own lookup may not be; compare upper case.
+  const leaked = Object.keys(env).filter((key) => GITHUB_TOKENS.includes(key.toUpperCase()));
   if (leaked.length > 0) {
     throw new Error(
       `F9: refusing to pass ${leaked.join(", ")} to an agent; build env with agentEnv()`,

@@ -208,11 +208,12 @@ export class AgentSdkRunner implements AgentRunner {
     try {
       // The object query() receives is the one assertAgentOptions() checks (meta-tested in
       // tools/arch/meta.test.ts), so no option can reach the SDK unchecked.
-      const sdkOptions: Options = {
+      // A frozen, flat copy: nothing the runner sets after the check can change what query() receives.
+      const sdkOptions: Options = Object.freeze({
         ...options,
-        env: { ...this.env },
+        env: Object.freeze({ ...this.env }),
         abortController: guard.controller,
-      };
+      });
       assertAgentOptions(sdkOptions);
       const collected = await collect(this.queryFn({ prompt, options: sdkOptions }));
       const usage = usageOf(collected.result, startedAt);

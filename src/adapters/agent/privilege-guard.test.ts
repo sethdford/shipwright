@@ -97,3 +97,51 @@ describe("assertAgentOptions allowlist (F9 bypass paths)", () => {
     ).not.toThrow();
   });
 });
+
+describe("assertAgentOptions hardening", () => {
+  const base = { permissionMode: "dontAsk" } as const;
+
+  test("refuses an accessor (getter) on an option or an env key", () => {
+    const getter = {
+      get permissionMode() {
+        return "dontAsk";
+      },
+    };
+    expect(() => assertAgentOptions(getter)).toThrow(/F9/);
+    const env = {
+      get GH_TOKEN() {
+        return "t";
+      },
+    };
+    expect(() =>
+      assertAgentOptions({
+        ...base,
+        env: Object.defineProperty({}, "X", { get: () => 1, enumerable: true }),
+      }),
+    ).toThrow(/F9/);
+    expect(() => assertAgentOptions({ ...base, env })).toThrow(/F9/);
+  });
+
+  test("refuses a non-plain prototype and an inherited permissionMode", () => {
+    class Opts {}
+    expect(() => assertAgentOptions(Object.assign(new Opts(), base))).toThrow(/F9/);
+    expect(() => assertAgentOptions(Object.create({ permissionMode: "dontAsk" }))).toThrow(/F9/);
+  });
+
+  test("refuses a symbol key", () => {
+    expect(() => assertAgentOptions({ ...base, [Symbol("x")]: 1 })).toThrow(/F9/);
+  });
+
+  test("checks env token names case-insensitively", () => {
+    for (const key of ["gh_token", "Github_Token", "gh_enterprise_token"]) {
+      expect(() => assertAgentOptions({ ...base, env: { [key]: "t" } })).toThrow(/F9/);
+    }
+  });
+
+  test("accepts a frozen copy and a null-prototype object", () => {
+    expect(() =>
+      assertAgentOptions(Object.freeze({ ...base, env: Object.freeze({ PATH: "/bin" }) })),
+    ).not.toThrow();
+    expect(() => assertAgentOptions(Object.assign(Object.create(null), base))).not.toThrow();
+  });
+});
