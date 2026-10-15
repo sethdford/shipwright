@@ -294,10 +294,12 @@ test("the SDK runner has exactly one query call, and it is the asserted one (F9,
     .split("\n")
     .filter((line) => !line.trim().startsWith("//"))
     .join("\n");
-  // The constructor default `= query` is the only other mention; a second call (`query(`, or
-  // `this.queryFn(` anywhere else) would run options that were never asserted.
+  // Every reference to the SDK function, not just call-shaped ones: `.call(…)`, `const q = this.queryFn`
+  // and `q(…)` are references too. The expected references are the import, the constructor default
+  // (`= query`), the field and its single call; any other use fails.
+  expect(src.match(/\bquery\b/g)?.length ?? 0).toBe(2);
+  expect(src.match(/\bqueryFn\b/g)?.length ?? 0).toBe(2);
   expect(src.match(/this\.queryFn\(/g)?.length ?? 0).toBe(1);
-  expect(src.match(/(?<![\w.])query\s*\(/g)?.length ?? 0).toBe(0);
   expect(src.match(/assertAgentOptions\(/g)?.length ?? 0).toBe(1);
 });
 
