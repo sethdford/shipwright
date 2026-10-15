@@ -1,5 +1,8 @@
 id: F5-io-only-in-adapters
 valid:
+  - 'import type { Context } from "node:vm";'
+  - 'const vmLabel = "vm";'
+  - 'const w = window["location"];'
   - 'import type { Subprocess } from "bun";'
   - 'import type { Stats } from "node:fs";'
   - 'export type { Stats } from "node:fs";'
@@ -20,6 +23,15 @@ valid:
   - 'const m = await import("./module");'
   - 'type F = Function;'
 invalid:
+  # Evasion: node:vm, node:module (createRequire), bun:ffi, import.meta.require, window/self ["fetch"]
+  - 'import vm from "node:vm";'
+  - 'import { runInNewContext } from "vm";'
+  - 'import { createRequire } from "node:module";'
+  - 'import { dlopen } from "bun:ffi";'
+  - 'const r = import.meta.require;'
+  - 'window["fetch"]("https://x");'
+  - 'self["process"].env;'
+  - 'const f = globalThis["fetch"];'
   # Bun runtime APIs, any member
   - 'Bun.spawn(["ls"]);'
   - 'Bun.spawnSync(["ls"]);'
