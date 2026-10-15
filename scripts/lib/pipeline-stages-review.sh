@@ -853,7 +853,7 @@ stage_compound_quality() {
         total=$((total + 1))
         info "Running negative test pass..."
         if [[ -n "${TEST_CMD:-}" ]]; then
-            if ( sw_test_gate_scrub; eval "$TEST_CMD" ) >> "$compound_log" 2>&1; then
+            if ( sw_test_gate_scrub && eval "$TEST_CMD" ) >> "$compound_log" 2>&1; then
                 pass_count=$((pass_count + 1))
                 success "Negative test pass passed"
             else

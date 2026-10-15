@@ -2415,11 +2415,11 @@ ${GOAL}"
             # 1. Re-run ALL test commands to double-check
             local recheck_log="${LOG_DIR}/verification-iter-${ITERATION}.log"
             if [[ -n "$TEST_CMD" ]]; then
-                ( sw_test_gate_scrub; eval "$TEST_CMD" ) > "$recheck_log" 2>&1 || verification_passed=false
+                ( sw_test_gate_scrub && eval "$TEST_CMD" ) > "$recheck_log" 2>&1 || verification_passed=false
             fi
             for _vg_cmd in "${ADDITIONAL_TEST_CMDS[@]+"${ADDITIONAL_TEST_CMDS[@]}"}"; do
                 [[ -z "$_vg_cmd" ]] && continue
-                ( sw_test_gate_scrub; eval "$_vg_cmd" ) >> "$recheck_log" 2>&1 || verification_passed=false
+                ( sw_test_gate_scrub && eval "$_vg_cmd" ) >> "$recheck_log" 2>&1 || verification_passed=false
             done
 
             # 2. Check for uncommitted changes (quality gate)

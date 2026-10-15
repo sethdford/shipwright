@@ -326,7 +326,7 @@ holdout_validate() {
 
         # Run the individual test (quote path to handle spaces), without credentials
         local test_result=0
-        if ( sw_test_gate_scrub; eval "${test_cmd} \"${full_path}\"" ) >/dev/null 2>&1; then
+        if ( sw_test_gate_scrub && eval "${test_cmd} \"${full_path}\"" ) >/dev/null 2>&1; then
             pass_count=$((pass_count + 1))
         else
             test_result=$?

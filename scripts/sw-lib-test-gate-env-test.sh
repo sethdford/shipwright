@@ -56,7 +56,7 @@ rc=0; sw_test_gate_env bash -c 'exit 7' || rc=$?
 assert_eq "the test command's exit status is returned" "7" "$rc"
 
 print_test_section "sw_test_gate_scrub (for eval call sites)"
-scrub_env="$( ( sw_test_gate_scrub; eval 'env' ) )"
+scrub_env="$( ( sw_test_gate_scrub && eval 'env' ) )"
 if grep -q 'secret' <<<"$scrub_env"; then
     assert_fail "eval inside a scrubbed subshell sees no credential"
 else
@@ -68,8 +68,19 @@ assert_eq "the scrubbed subshell's gh config dir is removed afterwards" "gone" "
 rc=0; sw_test_gate_scrub 2>/dev/null || rc=$?
 assert_eq "sw_test_gate_scrub refuses to run outside a subshell" "1" "$rc"
 assert_eq "a refused scrub leaves the caller's credentials alone" "gh-secret" "${GH_TOKEN:-}"
-rc=0; ( sw_test_gate_scrub; eval 'exit 5' ) || rc=$?
+rc=0; ( sw_test_gate_scrub && eval 'exit 5' ) || rc=$?
 assert_eq "the eval'd command's exit status is returned" "5" "$rc"
+
+print_test_section "fail closed when the scrub cannot complete"
+ran="$TEST_TEMP_DIR/ran-marker"
+rm -f "$ran"
+( export TMPDIR=/nonexistent/sw-test-gate; ( sw_test_gate_scrub && eval 'touch "$ran"' ) ) 2>/dev/null || true
+assert_eq "eval form: the command does not run when the scrub fails" "no" "$([[ -e "$ran" ]] && echo yes || echo no)"
+( export TMPDIR=/nonexistent/sw-test-gate; sw_test_gate_env touch "$ran" ) 2>/dev/null || true
+assert_eq "command form: the command does not run when the scrub fails" "no" "$([[ -e "$ran" ]] && echo yes || echo no)"
+early_env="$( ( export TMPDIR=/nonexistent/sw-test-gate; sw_test_gate_scrub 2>/dev/null; env ) )"
+assert_eq "even a failed scrub has already marked the gate" "1" "$(sed -n 's/^SHIPWRIGHT_IN_TEST_GATE=//p' <<<"$early_env")"
+assert_eq "even a failed scrub has already reset git's saved header" "3" "$(sed -n 's/^GIT_CONFIG_COUNT=//p' <<<"$early_env")"
 
 print_test_section "git credentials saved by actions/checkout are not usable"
 git_repo="$TEST_TEMP_DIR/repo"
@@ -87,14 +98,14 @@ assert_eq "outside the gate the saved header is untouched" "AUTHORIZATION: basic
 
 print_test_section "every test-command call site goes through the gate"
 # Any line that runs a test-command variable (bash -c / eval / timeout … bash -c) must use
-# sw_test_gate_env or run inside ( sw_test_gate_scrub; … ), and every file with such a line must
+# sw_test_gate_env or run inside ( sw_test_gate_scrub && … ), and every file with such a line must
 # load the lib itself.
 gated_files=(sw-loop.sh lib/pipeline-stages-build.sh lib/pipeline-stages-review.sh
     lib/pipeline-quality-checks.sh lib/test-holdout.sh lib/mutation-executor.sh)
 run_re='(bash -c|eval) "\$\{?(test_cmd|TEST_CMD|_vg_cmd|test_wrapper|extra_wrapper)'
 for f in "${gated_files[@]}"; do
     calls="$(grep -E "$run_re" "$SCRIPT_DIR/$f" | grep -c . || true)"
-    ungated="$(grep -E "$run_re" "$SCRIPT_DIR/$f" | grep -vcE 'sw_test_gate_env|\( sw_test_gate_scrub; ' || true)"
+    ungated="$(grep -E "$run_re" "$SCRIPT_DIR/$f" | grep -vcE 'sw_test_gate_env|\( sw_test_gate_scrub && ' || true)"
     assert_eq "$f: no test command runs outside the gate (${calls:-0} call sites)" "0" "${ungated:-0}"
     if grep -qE '^source "\$(SCRIPT_DIR|\(dirname "\$\{BASH_SOURCE\[0\]\}"\))(/lib)?/test-gate-env.sh"' "$SCRIPT_DIR/$f"; then
         assert_pass "$f loads test-gate-env.sh unconditionally"
