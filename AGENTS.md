@@ -28,7 +28,7 @@ observability, teams, platform.
 
 `bun run arch` enforces: F1 pure domain · F2 application never imports adapters or cli · F3 contexts
 only via `index.ts`; `src/` and `dashboard/` never import each other · F4 no cycles · F5 I/O (also
-aliased globals, `node:os`, computed imports, `eval`) only in `src/adapters`, `src/main.ts`,
+aliased globals, `node:os`, `node:vm`, `node:module`, `bun:ffi`, computed imports, `eval`) only in `src/adapters`, `src/main.ts`,
 `src/cli.ts`, `src/testing` · F6 Agent SDK only in `adapters/agent` · F7 files ≤ 300 lines,
 functions ≤ 40 · F8 tests use `createTestEnv()` · F9 no GitHub token or permission bypass for agents ·
 F10 `gh` writes only in `src/adapters/github/gh-github-writer.ts` · F11 bash: no `eval`/`sh -c`/

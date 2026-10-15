@@ -1,4 +1,7 @@
 {
+  "F10-bash-curl-github-writes": {
+    "scripts/sw-github-app.sh": 1
+  },
   "F10-bash-github-writes": {
     "scripts/lib/daemon-dispatch.sh": 6,
     "scripts/lib/daemon-failure.sh": 8,
@@ -104,7 +107,6 @@
     "scripts/sw-code-review.sh": 1,
     "scripts/sw-decompose.sh": 1,
     "scripts/sw-discovery.sh": 1,
-    "scripts/sw-doc-fleet.sh": 1,
     "scripts/sw-doctor.sh": 1,
     "scripts/sw-integration-claude-test.sh": 3,
     "scripts/sw-intelligence.sh": 2,

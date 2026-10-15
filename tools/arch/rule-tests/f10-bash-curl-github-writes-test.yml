@@ -1,0 +1,14 @@
+id: F10-bash-curl-github-writes
+valid:
+  - 'curl -fsS "https://api.github.com/repos/$r"'
+  - 'curl -sS -X GET "https://api.github.com/repos/$r/issues"'
+  - 'curl -fsSL "$url" -o "$tmp/install.sh"'
+  - 'echo "curl -X POST https://api.github.com/x"'
+  - 'curl -s "https://example.com/x" -d "a=b"'
+invalid:
+  - 'curl -sS -X POST "https://api.github.com/repos/$r/issues" -d "$body"'
+  - 'curl -sS --request PATCH "https://api.github.com/repos/$r/issues/$n"'
+  - 'curl -XDELETE "https://api.github.com/repos/$r/git/refs/heads/x"'
+  - 'curl -sS "https://api.github.com/repos/$r/issues" --data @body.json'
+  - 'curl -s -H "Authorization: Bearer $jwt" "https://api.github.com/app/installations/$id/access_tokens" -d "{}" -X POST'
+  - 'curl -sS "$GITHUB_API_URL/repos/$r/issues" -X PUT'

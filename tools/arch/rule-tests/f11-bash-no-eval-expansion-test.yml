@@ -22,3 +22,5 @@ invalid:
   - 'source /dev/stdin <<< "$code"'
   - '. /dev/stdin <<<"$code"'
   - 'source <(echo "$code")'
+  - "source /dev/stdin <<EOF\n$code\nEOF"
+  - ". /dev/stdin <<EOF\n${code}\nEOF"
