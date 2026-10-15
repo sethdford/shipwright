@@ -425,3 +425,7 @@
 {"ts":"2026-10-15T06:18:51Z","ts_epoch":1792045131,"type":"patrol.finding","check":"untested_script","script":"sw-tmux-role-color.sh","lines":81,"usage":1}
 {"ts":"2026-10-15T06:18:51Z","ts_epoch":1792045131,"type":"patrol.finding","check":"untested_script","script":"sw-test-all.sh","lines":206,"usage":0}
 {"ts":"2026-10-15T06:18:51Z","ts_epoch":1792045131,"type":"patrol.finding","check":"untested_script","script":"sw-event-schema-sync.sh","lines":93,"usage":0}
+{"ts":"2026-10-15T08:06:22Z","ts_epoch":1792051582,"type":"hygiene_platform_refactor","hardcoded":49,"fallback":69,"todo":51}
+{"ts":"2026-10-15T08:06:49Z","ts_epoch":1792051609,"type":"strategic.issue_created","title":"Add TypeScript port fast-fail check for stale fence tokens in durability ports","priority":"P0","complexity":"standard"}
+{"ts":"2026-10-15T08:06:53Z","ts_epoch":1792051613,"type":"strategic.issue_created","title":"Add `shipwright doctor` check for durability port misuse (ad-hoc file writes bypassing fence tokens)","priority":"P0","complexity":"fast"}
+{"ts":"2026-10-15T08:06:53Z","ts_epoch":1792051613,"type":"strategic.cycle_complete","issues_created":2,"issues_skipped":1}
