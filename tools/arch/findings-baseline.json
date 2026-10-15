@@ -104,7 +104,6 @@
     "scripts/sw-code-review.sh": 1,
     "scripts/sw-decompose.sh": 1,
     "scripts/sw-discovery.sh": 1,
-    "scripts/sw-doc-fleet.sh": 1,
     "scripts/sw-doctor.sh": 1,
     "scripts/sw-integration-claude-test.sh": 3,
     "scripts/sw-intelligence.sh": 2,
