@@ -1,87 +1,109 @@
 # 0009. Closed-loop learning: measured, gated, and outside the agent's reach
 
-Status: proposed (awaiting maintainer approval of spec amendments D1 to D3 in the Wave 2 plan) · Date: 2026-10-15
+Status: proposed (draft PR #8588; epic #8587; tranche plan in `docs/superpowers/plans/2026-10-15-wave-2-closed-loop.md`) · Date: 2026-10-15
 
 ## Context
-The 2026-10 incidents show that Shipwright's retries and self-tuning change behaviour without ever being
-measured. Three recorded examples: a one-line docs change ran more than 2.5 hours in the build stage and
-reported healthy (the watchdog treats timer heartbeats as liveness); 288 runs failed at the pre-flight auth
-check and were retried, because CI's auto-retry has no auth category and falls back to "build failure";
-and `loop-tuning.json` is read by the loop but nothing in the repository writes it. The bash intelligence
-layer (`classify_failure`, self-optimize, template weights, UCB1 model selection, memory injection) changes
-behaviour from data, yet its tests check source text or bookkeeping, not outcomes (survey in the Wave 2 plan).
+Shipwright's retries and self-tuning change behaviour without being measured. The incident record from
+2026-10-13 to 2026-10-15 shows three gaps:
 
-The approved spec (2026-10-13, §7.5) puts self-optimize, adaptive and bandit learning on the don't-port list
-and defers one gated optimizer to Wave 4. This ADR proposes moving a restricted version forward.
+- **Silent stalls.** Run 38744601038 (`Shipwright Pipeline #8547`, a one-line docs change) was still
+  `in_progress` at 16:39Z, about three hours after it started at 13:39Z. The CI heartbeat is a background
+  timer that posts every 10 minutes whatever the run does, and the watchdog treats it as liveness.
+- **Deterministic failures re-run.** 288 runs failed at the pre-flight auth check on 2026-10-14, and they
+  were re-run by dispatch and sweep. The CI auto-retry categoriser has no auth category, so an auth failure
+  falls through to `BUILD_FAILURE`, the "safest retry strategy". Dispatch's guard recognises the comment text
+  "Pipeline Auth Failure", which the pre-flight writes with `|| true`.
+- **Unmeasured learners.** `loop-tuning.json` is read by the loop but nothing writes it. `iteration-model.json`,
+  `template-weights.json`, UCB1 model selection, the 20% `$RANDOM` A/B and the recruit override all change
+  behaviour from data, yet their tests check source text or bookkeeping, not outcomes. UCB1, the A/B and recruit
+  set the build model, so the template's model is not what runs.
 
-External work informs the design. Status of each claim, as checked on 2026-10-15:
-- **Holdout scenarios the coding agent cannot read, scored as a satisfaction probability.** StrongDM's
-  "software factory" uses end-to-end scenarios kept outside the codebase, and digital twins of third-party
-  services. Source: [Willison, "software factory", 2026-02-07](https://simonwillison.net/2026/feb/7/software-factory/),
-  read through secondary coverage. Verified as described; transfer to Shipwright is a judgement.
-- **Evaluator outside the loop.** Weng, "Harness Engineering for Self-Improvement" (Lil'Log, 2026-07-04).
-  Read through secondary coverage only; the specific read-only requirements were **not verified** against
-  the original. The principle is kept because it matches ADR-0007 and F9.
-- **Runtime budget, not pre-task estimates.** Bai et al., [arXiv 2604.22750](https://arxiv.org/pdf/2604.22750):
-  cost for one task varies up to 30x across runs; models predict their own token use poorly (correlation up to
-  0.39) and underestimate it. Verified. The claim that accuracy peaks at intermediate cost was not verified and
-  is not relied on.
-- **Gated self-improving harness.** ModularRSI, [arXiv 2609.14857](https://arxiv.org/pdf/2609.14857): a harness
-  split into five modules, evolved with restricted scope and contrastive trajectory analysis. Verified. The
-  paper reports no ablation of the contrastive step. The proposer and held-in/held-out gate are a judgement
-  drawn from this line of work.
-- **Risk-tiered merge and review quality.** A review benchmark figure (CRBugBench, arXiv 2610.13668, "71.9%
-  of injected bugs") was **not found** and is **not cited**. [CR-Bench, arXiv 2603.11078](https://arxiv.org/pdf/2603.11078)
-  reports low signal-to-noise for review agents that aim to find every issue; it is related context only.
+The approved spec (2026-10-13) already covers most of the response: error fingerprinting and budgets (§6.2),
+the don't-port list (§7.5), and delivery evals and a scorecard (§8). The one new item is that spec §7.4 places
+a "gated optimizer" in Wave 4; this ADR keeps that timing and defers the fitter (W2-19).
+
+**Evidence, with status as checked on 2026-10-15:**
+- **Cost variance.** Bai et al., [arXiv 2604.22750](https://arxiv.org/pdf/2604.22750): cost for one task varies up
+  to 30x across runs; models predict their own token use poorly (correlation up to 0.39) and underestimate it.
+  [Verified.] The "accuracy peaks at intermediate cost" claim is **not** verified and is not used.
+- **Lights-off review.** "(When) Should a Software Factory be Lights-off? Benchmarking Code Review Agents on Bug
+  Detection", [arXiv 2610.13668](https://arxiv.org/abs/2610.13668): claude-opus-5 with copilot-cli catches 71.9% of
+  bugs in its top-5 comments; opus-4.6 47.7%. [Verified by fetch, with two corrections.] The bugs are
+  "human-verified bugs mined from repository history", not injected bugs. The page does not say the two results
+  share a harness. The paper reports weaker results on complex or non-local changes and on proprietary
+  repositories, which supports keeping merge human by default.
+- **Holdout scenarios.** StrongDM's software factory keeps end-to-end scenarios outside the codebase and scores
+  "satisfaction" across them, with digital twins of third-party services. [Verified through
+  [Willison, 2026-02-07](https://simonwillison.net/2026/feb/7/software-factory/) and secondary coverage.] Transfer
+  to Shipwright is a judgement.
+- **Harness evaluation.** Weng, "Harness Engineering for Self-Improvement" (2026-07-04). [Read only through
+  secondary coverage; the read-only claims are not used as evidence.]
+- **Gated self-improvement.** ModularRSI, [arXiv 2609.14857](https://arxiv.org/pdf/2609.14857): a five-module harness
+  evolved with restricted scope and contrastive trajectory analysis. [Verified; the paper reports no ablation of
+  the contrastive step.] The proposer and gate design in Phase J is a judgement drawn from this line of work.
 
 ## Decision
-Shipwright adopts closed-loop *measurement and gating*, not open-ended learning. Its rules:
+Shipwright adopts closed-loop **measurement and gating**, not open-ended learning. The rules:
 
-1. **Every adaptive decision is written to the run ledger** with its inputs, the policy version and the output.
-   The ledger records tool calls, handoffs and fence violations, so an incident can be replayed.
-2. **Difficulty comes from ledger history, never from the model's own estimate.** Budgets are enforced at
-   runtime by the orchestrator; the model is not asked to forecast its cost. Plateau detection stops runs.
+1. **Every adaptive decision is written to the run ledger** with its inputs, its policy version and its output.
+   The ledger records tool calls, handoffs and fence violations, so an incident can be replayed. It lands in
+   Tranche 2 (W2-08 to W2-10); Tranche 1 decisions are logged as they are made in bash and CI.
+2. **Difficulty comes from ledger history, never from the model's own estimate.** Budgets are enforced at runtime
+   by the orchestrator, and the model is not asked to forecast its cost. A stall stops the run (W2-05, W2-06).
 3. **Adaptation can only tighten.** Nothing adaptive raises a retry cap, a budget, a breaker threshold or an
-   iteration limit above the incumbent (ADR-0007).
-4. **The evaluator is outside the loop.** Tests, verifiers, holdout scenarios, the ledger, the eval set, the
-   ratchet and the routing and model configuration are read-only to the build agent. Enforcement is a
-   fence in the runner: the build worktree is made without those paths, and the holdout store is mounted
-   only into the verifier. A static rule checks configured task specs. The fence is the enforcement; the
-   denylist is advisory (judgement, to be tested on macOS and CI).
-5. **Policy changes ship only through a ratchet.** A candidate routing table or policy must beat the incumbent
-   on the holdout split by more than the noise threshold (3 points), or tie it and cut cost per success by at
-   least 10%. The ratchet is a required check, and one PR may not change both the evals and the policy.
-6. **Satisfaction is a fraction, not a single pass.** An issue's score is the fraction of its holdout scenarios
-   satisfied, averaged over k runs. The gate remains pass^k.
-7. **Holdout and twin.** Holdout scenarios are human-written and live outside every worktree. A GitHub twin
-   implements the existing ports, is checked by a contract suite that also runs nightly against real GitHub,
-   and makes replays deterministic and offline. It does not replace the real service.
-8. **Merge policy is lights-on by default.** The factory opens PRs; a human merges. Auto-merge, if ever allowed,
-   is limited to a low-risk tier with evidence attached, and only after the quality metrics (merged without
-   rework, escaped defects, reverts, cost per merged PR, time to merge) have run for 30 days.
-9. **Specifiability is checked before building.** Intake refuses or asks for clarification when acceptance
-   criteria or scope are missing.
-10. **Environment failures are their own class**, retried at most once.
-11. **A self-improving harness is optional and last.** It proposes edits only to an explicit surface (prompts,
-    skills, tool descriptions, routing values within caps), records a hypothesis and a predicted effect for
-    each, keeps an archive of candidates, and requires human approval for changes to tier structure, models or
-    caps.
+   iteration limit above the incumbent (ADR-0007). **Explicit exception:** difficulty may move a run up one tier
+   after a `budget` or `max_turns` failure, because those failures show the run was under-provisioned. The
+   exception is bounded to one tier, is recorded in the ledger, and does not change the caps the tier sets.
+4. **The evaluator is outside the loop.** Tests, verifiers, the holdout, the ledger, the eval set, the ratchet and
+   the routing and model configuration are read-only to the build agent. Enforcement for **eval replays and the
+   verifier** is a fence in the runner: the replay worktree is made with `git archive` and without the protected
+   paths, and the holdout is mounted only into the verifier. A diff that touches a protected path routes to a human
+   tier and is never auto-merged. The full fence for the local build (H2) is deferred to its own plan, because
+   macOS and CI behaviour are not yet tested. A static rule checks configured task specs; the fence, not the
+   denylist, is the enforcement.
+5. **Policy changes ship only through a paired ratchet.** The incumbent and the candidate run on the same cases,
+   in the same window, with the same CLI and SDK version, three runs per case, reporting pass^3. Non-inferiority is
+   the default (losses minus wins at most 0, and at most one loss). Superiority requires an exact one-sided sign
+   test at p ≤ 0.05. A cost-motivated change requires a median paired cost ratio of at most 0.9. Hard vetoes reject
+   any fence violation, forbidden-path touch or oracle tampering. With about 24 cases this is a **regression
+   tripwire**, not a measurement of superiority; the corpus grows to at least 50 cases before any fitter exists.
+   One PR may not change both the evals and the policy.
+6. **Satisfaction is a fraction.** An issue's score is the fraction of its holdout scenarios satisfied, averaged over
+   the runs. The gate remains pass^3. The holdout lives in a private store fetched only by eval and verifier jobs,
+   and it is not in this repository. Scenarios are human-written (Q13, default: the maintainer).
+7. **The GitHub twin is deferred.** Its scope is the `gh` surface Shipwright actually uses. It makes replays
+   deterministic and offline once it exists, and it does not replace the real service.
+8. **Merge is lights-on by default.** The factory opens PRs and a human merges. Auto-merge, if ever allowed, is for a
+   named low-risk tier with evidence attached, and only after 30 days of quality metrics. The tiers are deferred.
+9. **Specifiability is checked before building.** Intake asks for clarification or refuses when acceptance
+   criteria or scope are missing. This is deferred with the merge tiers.
+10. **Setup failures are their own class.** The environment class is retried at most once and then escalates.
+    W2-02 implements it. The claim that environment setup is the largest factor in agent success is not verified,
+    and the class is kept because the incident record shows setup failures.
+11. **Self-improvement is optional and last.** Any proposer may edit only an explicit surface (prompts, skills, tool
+    descriptions, routing values within caps). Each edit states a hypothesis and a predicted effect. Edits to tier
+    structure, models or caps need maintainer approval. The whole phase is deferred (W2-19).
+
+**Model alias conversion (D-M, needs approval).** Templates move from `claude-opus-5`, `claude-sonnet-5` and
+`claude-haiku-4-5` to the aliases in `config/models.json`, which resolve to `claude-opus-5-5`, `claude-sonnet-5-5`
+and `claude-haiku-5-5`. This is a model change for every run that uses those templates. It is recorded here so it
+is not mistaken for a hygiene edit.
 
 What is **not** adopted: reinforcement learning, bandits in production, online adaptation during a run, model
-fine-tuning, and any claim taken from the unverified sources above.
+fine-tuning, and any claim from an unverified source.
 
-Supersedes nothing yet. It amends spec §2 (a fourth exception to the no-new-features rule) and §7.5 (the
-restricted routing-table fitter replaces the Wave 4 optimizer, and the listed learners stay retired). Both
-amendments need maintainer approval.
+**Spec amendments.** Most of this is already in the spec. The only item that needs a change is the timing of the
+gated optimizer (§7.4), which this ADR keeps in Wave 4 and defers. No change to §2 is needed for Tranches 1 to 3.
 
 ## Consequences
-- Shipwright gains a measurable answer to "did this change help" for each routing, policy and model change.
-  Until the eval set and holdout exist, the ratchet cannot run, and the plan says so.
-- The ledger becomes the single source for cost, outcome and audit, and the bash intelligence it replaces is
-  retired behind aliases, not deleted without a trace.
-- The fence and the twin are real engineering costs. The twin's fidelity is a continuing maintenance task.
-- Adaptive behaviour becomes slower to change: every routing edit goes through an eval. This is intended.
-- Known gaps: the fence is untested on macOS and CI; the satisfaction judge is unvalidated until calibrated
-  against human labels; the Weng and CRBugBench claims are unverified; the "accuracy peaks at intermediate
-  cost" claim is not used.
-- The decision is reviewed when the first ratchet result exists, and at each model release (spec §7.4).
+- Each routing, policy and model change has a measurable answer, once the corpus and the replay exist. Until then
+  the ratchet is advisory and cannot block a merge.
+- The ledger becomes the single source for cost, outcome and audit. The bash learners it replaces are retired
+  behind aliases, not deleted without a trace.
+- The replay fence and the GitHub twin are real engineering costs, and the twin's fidelity needs a nightly contract
+  run against the real service.
+- Adaptive behaviour changes more slowly: every routing edit goes through the ratchet. That is intended.
+- Known gaps, stated plainly: the replay fence is untested on macOS and CI; the satisfaction judge is unvalidated
+  until calibrated against human labels; the sign test has low power at 24 cases; the Weng claims are unverified;
+  and the "accuracy peaks at intermediate cost" claim is not used.
+- The decision is reviewed when the first paired ratchet result exists, and at each model release (spec §7.4).

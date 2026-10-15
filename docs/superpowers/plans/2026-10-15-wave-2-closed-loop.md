@@ -1,941 +1,265 @@
-# Wave 2 — Closed-Loop Intelligence Implementation Plan
+# Wave 2: Closed-Loop Intelligence Implementation Plan
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking. **This document is a plan only.** Nothing here is implemented yet, and the approval items in "Decisions needing the maintainer" must be resolved before Phase A starts.
+> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans. Steps use checkbox (`- [ ]`) syntax. **This is a plan.** Nothing here is implemented yet. Each tranche starts only after the maintainer accepts the open questions it depends on.
 
-**Goal:** Make Shipwright's delivery loop measure its own outcomes and change its behaviour only when a measured change beats the incumbent. Concretely: (A) a run ledger that every mode can share; (B) a failure classifier that reads the actual error and stops repeated or non-retryable failures; (C) progress signals and a stall detector that replace timer heartbeats as liveness; (D) a difficulty estimate, a single routing table with current Claude 5 model IDs, and cost capture; (E) a replayable eval set with a behavioural ratchet; (F) an independent verifier on by default; (G) retirement of the legacy intelligence that the evals do not justify.
+**Status:** proposed. Draft PR #8588, epic #8587. Supersedes the draft at `3a137b453`, which the independent review found NOT-READY as written. This revision restructures the work into tranches and expands Tranche 1 to the Wave 1a bar.
 
-**Architecture:** Pure policies in `src/contexts/*/domain` (no I/O; F1), use cases in `application/` over ports, adapters in `src/adapters` (F5). Run state goes through the durability ports (ADR-0005). Every adaptive decision is written to the ledger with its inputs and policy version, so it can be replayed. Adaptation can lower risk, never raise a retry cap, a budget or a breaker threshold (ADR-0007).
+**Goal:** make Shipwright measure its delivery outcomes and change behaviour only when a measured change beats the incumbent, starting with the failures that stopped dispatch on 2026-10-13..15.
 
-**Tech Stack:** Bun 1.2.19, TypeScript (strict, `noUncheckedIndexedAccess`), zod 4 (adapters only), Biome 2, dependency-cruiser, `@ast-grep/cli`, `gh`, bash 3.2 for the parts that remain bash.
+**Architecture:** pure policies in `src/contexts/*/domain` (F1: domain imports only its own domain and `src/shared/kernel`), use cases over ports in `application/` (F2), adapters in `src/adapters` (F5). Bash changes are one-line bridges to TypeScript commands; `run_ts` routes new commands in `scripts/sw`. Run state goes through the durability ports (ADR-0005) in later tranches.
 
-**Spec:** `docs/superpowers/specs/2026-10-13-shipwright-ts-migration-design.md` §2, §3.1, §3.3, §5, §6.1, §6.2, §6.3, §7.4, §7.5, §8, §9 · ADR-0005, ADR-0007, ADR-0008 · the Wave 1a plans in `docs/superpowers/plans/`.
-
-**Dependencies on work that is not yet on `main`:**
-- Wave 1b: the SQLite durability adapter (`adapters/durability/sqlite`), `RunJournal` and the `decide()` interpreter. `src/adapters/durability/` does not exist yet. Phase A's M1 path depends on it.
-- Spec §6.3 evaluator (Wave 1). Phase F is the default-on use of that evaluator, so it reuses that component rather than building a second one.
-- Wave 2 Postgres adapter. Without it, M2 and M3 cannot share the ledger through `RunJournal`. This plan does not deliver M2/M3 sharing; see "Modes" below.
-- ADR-0006 (credentials, Wave 1c). Not required by this plan, but the verifier in Phase F runs with the same credential rules.
-
-**Not in this plan:** training any model, reinforcement learning, bandits in production, cross-repository transfer, automatic merging, a new workflow engine, porting `sw-loop.sh` in full (the full port is the delivery context's job and is a separate plan).
+**Tech stack:** Bun 1.2.19, TypeScript strict with `noUncheckedIndexedAccess`, zod 4 (adapters only), Biome, dependency-cruiser, ast-grep, bash 3.2, `gh`.
 
 ---
 
-## Decisions needing the maintainer
+## How to read this plan
 
-This plan conflicts with the approved spec in three places. These must be decided first; the phases below assume the recommended option.
-
-| # | Conflict | Spec text | Recommendation (assumed below) |
+| Tranche | Keys | Scope | Detail level |
 |---|---|---|---|
-| D1 | Closed-loop learning is on the don't-port list | §7.5 retires `intelligence`, `self-optimize`, `adaptive`, `rl / bandit / policy learner`, and model-router learning; §7.4 puts "one gated optimizer" in Wave 4 | Amend §7.5 and §7.4. The gated optimizer moves into Phase E and is restricted to fitting the routing table from ledger data. No RL, no bandits, no online learning. |
-| D2 | Scope during migration | §2: no new features during migration except safety (§6.2), durability (§6.1) and the evaluator (§6.3) | Amend §2 to add "closed-loop measurement and gating (ADR-0009)" as a fourth exception. |
-| D3 | Wave numbering | §7.4: Wave 2 is integrations and Postgres | Name this plan "Wave 2 (closed-loop)" and sequence it after Wave 1b. Phases A to C can run on SQLite (M1) before Postgres exists. |
+| 1 (P0, needs no ledger, unblocks dispatch) | W2-01 to W2-07 | failure classification, auth retry, progress verdict, stall stop, wall-clock cap, model routing hygiene | **Exact code, tests, commands and expected output for every step.** |
+| 2 | W2-08 to W2-12 | run ledger, CI ledger, decisions, routing and difficulty, CI cost and runtime budget | Task level, with the review fixes applied. Each task gets a full expansion before it starts. |
+| 3 | W2-13 to W2-18 | eval corpus and paired ratchet, trusted replay, verifier stage, legacy retirement, holdout MVP, scorecard | Task level, with the review fixes applied. |
+| Deferred | W2-19 | E5 fitter, full H2 fence, GitHub twin, merge tiers I1 to I3 and I5, self-improving harness (J) | Listed only. Each needs its own plan. |
 
-The ADR (`docs/adr/0009-closed-loop-learning.md`) records the decision as **proposed** until D1 to D3 are approved.
+**Evidence labels.** [V] verified by a fetch or by reading the repository; [J] a judgement; [U] unverified and not relied on.
 
 ---
 
-## Dark-factory requirements (Oct 2026 research): source check and treatment
+## Key table
 
-The coordinator's list of requirements was checked against sources before it was folded in. The
-evidence status of each claim is stated, because some numbers in the briefing could not be confirmed.
-
-| # | Requirement | Evidence status | Treatment |
-|---|---|---|---|
-| R1 | Holdout scenarios the coding agent cannot read or edit; score a fraction of scenarios satisfied | **Verified (secondary):** StrongDM's "scenarios" are end-to-end user stories kept outside the codebase, scored as a probabilistic "satisfaction" by LLM judges ([Willison, 2026-02-07](https://simonwillison.net/2026/feb/7/software-factory/); secondary coverage). Whether it transfers to Shipwright is a judgement. | Phase H1 to H3 |
-| R2 | Evaluator outside the loop: checks, models and budgets read-only to the agent | **Partly verified:** Weng's "Harness Engineering for Self-Improvement" (Lil'Log, 2026-07-04) exists and lists weak evaluators and reward hacking as open problems. The specific claim that tests and budgets must be read-only was **not verified from the original post**. The principle matches ADR-0007 and F9. | Phase H1 and H2 |
-| R3 | Digital twin of GitHub for deterministic offline validation | **Verified (secondary) for StrongDM's twins** of third-party services (Okta, Jira, Slack, Google Docs). A GitHub twin is a judgement. | Phase H4 |
-| R4 | Runtime budget control; difficulty from ledger history, not the model's estimate; plateau stops | **Verified:** [Bai et al., arXiv 2604.22750](https://arxiv.org/pdf/2604.22750): cost for the same task varies up to 30x across runs; models predict their own token use poorly (correlation up to 0.39) and underestimate it. **Not verified:** a claim that accuracy peaks at intermediate cost. The abstract says higher token use does not mean higher accuracy; this plan uses only that. | Phase D5; Phase C |
-| R5 | Gated self-improving harness: proposer, editable surface, hypothesis, held-in and held-out gate, archive, human review | **Verified:** [ModularRSI, arXiv 2609.14857](https://arxiv.org/pdf/2609.14857) evolves a harness split into five modules, with restricted modification scope and contrastive trajectory analysis; the paper reports that it does not ablate the contrastive step. The proposer and gate design is a judgement drawn from that line of work. AHE and Self-Harness were **not verified** and are not cited. | Phase J |
-| R6 | Risk-tiered merge; lights-on by default; reviewer effort scales with complexity | **Not verified:** the "CRBugBench" paper (arXiv 2610.13668) and its "71.9%" figure **could not be found** and are **not cited**. The related [CR-Bench, arXiv 2603.11078](https://arxiv.org/pdf/2603.11078) reports low signal-to-noise for review agents that try to find every issue. The lights-on default and the tiers are judgements. | Phase I1, I2 |
-| R7 | Measure quality, not volume: merged without rework, escaped defects, reverts, cost per merged PR, time to merge | **Judgement** (matches spec §8 scorecard) | Phase I4; ledger in A |
-| R8 | Intake scores specifiability and asks or refuses instead of building | **Judgement**, motivated by the ~721 auto-patrol issues recorded in spec §1 (verified in repo) | Phase I3 |
-| R9 | Audit trail that includes tool calls, handoffs and decisions | **Judgement**; the ledger in its first form had no tool-call entries, so it is added here | Phase A1 (new payload types) |
-| R10 | Environment and setup failures as their own failure class | **Not verified** (the "biggest single factor" claim was not checked); the class is cheap and the baseline shows setup failures are common in the incident record | Phase B6 |
-
-**Items cited to the coordinator's briefing but not verifiable here:** the production proof run that created issue #8547. It is not used as evidence in this plan.
-
-### Phase A addendum: tool calls and handoffs in the trace (R9)
-
-Add two variants to `LedgerPayload` in Task A1, and to the zod union in Task A3:
-
-```ts
-| {
-    readonly type: "tool_call";
-    readonly stage: string;
-    readonly tool: string;
-    /** SHA-256 of the canonical JSON of the arguments. Raw arguments are never stored (secrets). */
-    readonly argsHash: string;
-    readonly resultStatus: "ok" | "error" | "denied";
-  }
-| { readonly type: "handoff"; readonly fromStage: string; readonly toStage: string; readonly reason: string }
-| { readonly type: "fence_violation"; readonly path: string; readonly by: string }
-```
-
-The Agent SDK message stream reports tool use; the `AgentRunner` adapter maps it to `tool_call` entries. Verify the exact message fields against the pinned SDK version before writing the mapper (Wave 0 verification item).
-
-### Phase B6: environment and setup failures as their own class (R10)
-
-- [ ] **Step 1: Failing test** in `src/contexts/learning/domain/failure.test.ts`: `classifyFailure({text: "bun: command not found"})` is `environment`; `"ENOENT: no such file or directory, open 'node_modules/.bin/tsc'"` is `environment`; `"EACCES: permission denied, mkdir '/usr/local/lib'"` is `environment`; a plain assertion failure is still `unknown` or `execution`, not `environment`.
-- [ ] **Step 2: Implement.** Add `environment` to `FailureClass`. Add a rule after `auth` and before `transient`: `command not found|enoent.*(node_modules|\.bin)|eacces|could not install|lockfile|setup-bun|no such file or directory.*(tsconfig|package\.json)`.
-- [ ] **Step 3: Policy.** In `decideRetry`, `environment` is retried at most once, then escalates with "fix the environment; retrying will not help". Add a test.
-
-### Phase D5: runtime budget control (R4)
-
-Budgets are caps enforced by the orchestrator at runtime. They are not predictions, and the model is never asked to estimate its own cost.
-
-- [ ] **Step 1: Failing tests** (`src/contexts/intelligence/application/run-budget.test.ts`, using `FakeLedger`):
-  1. Cumulative spend in the ledger for the run reaches the run's cap; the next `runTask` is not called, and the run ends `escalated` with reason `budget`.
-  2. A `TaskSpec` that carries a larger `maxBudgetUsd` than the routing table allows is clamped to the table value. The orchestrator value wins.
-  3. The `TaskSpec` type has no field for a model-estimated cost (a type test).
-- [ ] **Step 2: Implement.** Before every call, read the run's `agent_call` entries, sum `usage.costUsd`, compare with the tier cap from `routeFor(tier)`, and stop when the next call would exceed it. Per-call caps (`maxBudgetUsd`, `maxTurns`, `timeoutMs`) come from the same table.
-- [ ] **Step 3: Calibration.** Set each tier's cap at the 90th percentile of ledger history for that tier once history exists (Phase D4). Until then the placeholders in D2 apply, and they are labelled as placeholders.
-- [ ] **Step 4: Plateau stop.** The Phase C `stalled` verdict also ends the run here, so a plateau cannot spend its way to the cap.
-
-
-## Modes (M1, M2, M3)
-
-Every phase must work in all three modes, or it must say which mode it does not cover.
-
-| Phase | M1 local (SQLite) | M2 server | M3 multi-machine | Notes |
+| Key | Tranche | Title | Blocks dispatch at scale? | Depends on |
 |---|---|---|---|---|
-| A ledger | `RunJournal` over SQLite (after Wave 1b). Before 1b: JSONL files under `~/.shipwright/ledger/`. | As M1, one daemon. | **Not covered until Postgres (Wave 2).** Each machine has its own JSONL, so policies would see partial history. Phase A marks ledger reads as partial when a machine has no shared store. | Concurrent writers are safe only with the journal's fence. |
-| B classifier | Stateless; reads one run's log and the run's previous attempts. | As M1. | Attempt history is read from the ledger, so M3 needs the shared store. Until then a machine uses its own history, and the policy says so in the decision. | |
-| C progress | Per-run state in the ledger. | As M1. | The stall decision must be taken by the worker that holds the lease (fence). A stale worker cannot write a verdict. | |
-| D routing | The table is static code; difficulty reads ledger history. | As M1. | Same history limit as B. | |
-| E evals | Runs on a developer machine or a CI runner. | Nightly job on the server. | Nightly job on one runner; reads the shared ledger. | The ratchet is a file in git, so all modes read the same incumbent. |
-| F verifier | Per run. | As M1. | As M1. | |
-| G retirement | No mode-specific work. | | | |
+| W2-01 | 1 | Incident fixtures | No (test input) | read-only `gh` access |
+| W2-02 | 1 | Failure classifier core | Yes (stops deterministic retries) | none |
+| W2-03 | 1 | Auto-retry: AUTH category, Bun before categorisation | Yes | W2-02 |
+| W2-04 | 1 | Daemon classify bridge with bash fallback | Yes (local daemon) | W2-02 |
+| W2-05 | 1 | Progress verdict and stall (TypeScript) | Yes | none |
+| W2-06 | 1 | Loop stall stop, one progress comment, progress-aware watchdog, build wall-clock cap | Yes (silent runs) | W2-05 |
+| W2-07 | 1 | Deterministic model routing hygiene | Yes (reproducible models) | none |
+| W2-08 | 2 | Ledger core | No | W2-02 (decision shape) |
+| W2-09 | 2 | Ledger on CI | No | W2-08 |
+| W2-10 | 2 | Decisions in the ledger | No | W2-08 |
+| W2-11 | 2 | Routing table and difficulty, tighten-only | No | W2-07, W2-08 |
+| W2-12 | 2 | CI cost and runtime budget | Yes (CI budget) | W2-08, W2-11 |
+| W2-13 | 3 | Eval corpus and paired ratchet rule | No (gates policy changes) | W2-08, W2-14 |
+| W2-14 | 3 | Trusted replay and advisory ratchet | No | W2-13 |
+| W2-15 | 3 | Verifier stage | No | sandbox and credential prerequisites |
+| W2-16 | 3 | Retire legacy learners | No | W2-14 |
+| W2-17 | 3 | Holdout MVP | No | Q13 (who writes scenarios) |
+| W2-18 | 3 | Scorecard | No | W2-08, W2-09 |
+| W2-19 | Deferred | E5 fitter, full H2 fence, H4 twin, I1 to I3 and I5, J | No | each has its own plan |
 
-CI (the GitHub Actions path) is a fourth environment. It uses the `shipwright-data` branch for cross-run state. That branch is the source of truth for CI history until Postgres exists.
+**Dispatch at scale.** Tranche 1 removes the known causes of the failures in the incident record. It is necessary but not sufficient: the breaker still reads GitHub history only, and local outcomes reach it only after Wave 1b (ADR-0007).
 
 ---
 
-## Baseline: the intelligence that exists today
+## Decisions and spec conflicts
 
-Survey at `origin/main` (commit `1cc7b95f5`). "Read back" means some later code path changes its behaviour because of the file. "Outcome-tested" means a test checks an outcome (a decision, a retry count, a measured result) rather than grepping source for text. Where a test was not read in full, the row says so.
+The spec already covers most of this work. A reviewer checked it and found one new item.
 
-| Feature (file) | Writes | Read back to change behaviour? | Outcome-tested? |
+| Spec section | What it says | What this plan does | Conflict? |
 |---|---|---|---|
-| `classify_failure` (`scripts/lib/daemon-failure.sh:22`) | Nothing; returns `auth_error`, `api_error`, `invalid_issue`, `context_exhaustion` or the default. Reads `LOG_DIR/issue-N.log` tail. | **Yes:** `auth_error` and `invalid_issue` skip retry (lines ~218–232). | **No.** `scripts/sw-daemon-test.sh:1683` `test_classify_failure_auth` greps the function's source for the string `not logged in`. It does not run the classifier. |
-| Retry escalation (`daemon-failure.sh:204–300`) | `retry_count` in SQLite or `daemon-state.json`; log lines | **Yes:** retry 1 uses opus and 30 iterations; retry 2 uses the `full` template, opus and 5 compound cycles; backoff 30 s, or 300 s for `api_error`. | No outcome test found. No measurement of whether escalation helps. |
-| Per-class retry caps (`daemon-failure.sh:78–88`) | Nothing | **Yes:** `api_error` 4, `context_exhaustion` 2, `build_failure` 2, others 2 (env overridable). | No. The caps are env-overridable and not checked against any outcome. |
-| CI auto-retry categorisation (`.github/workflows/shipwright-auto-retry.yml:126–222`) | `SHIPWRIGHT-RETRY-CATEGORY` and `SHIPWRIGHT-ERROR-MSG` markers | **Yes:** the category selects the retry strategy. **Auth failures have no category pattern**: they fall through to `BUILD_FAILURE`, the "safest retry strategy" (line ~214). | No. No workflow test in the repo. |
-| Loop circuit breaker (`scripts/sw-loop.sh:124–125`, `scripts/lib/loop-convergence.sh:66–100`) | `loop.circuit_breaker` events | **Yes:** 3 consecutive iterations with fewer than 5 inserted lines stop the loop. | No. `sw-loop-test.sh` has no `test_` functions; its 62 matches are source greps. |
-| Stuckness detection (`loop-convergence.sh:168–316`, `sw-loop.sh:2556`) | `loop.stuckness_detected`; `STUCKNESS_COUNT` | **Yes:** count ≥ 3 triggers a session restart. | No. |
-| Convergence (`scripts/lib/convergence.sh:29–564`, `sw-loop.sh:2461`) | `convergence-recommendation.json`, history file | **Yes:** return 1 stops as converged, 2 stops as diverging. The `LOOP_COMPLETE` shortcut requires tests to pass (good). | Not verified in this survey. |
-| `loop-tuning.json` (read at `sw-loop.sh:684–698`) | **Nothing.** A repo-wide search finds no writer. | Read: it would set `max_iterations`, `extension_size`, `circuit_breaker_threshold`. **Dead read path**: the file is never created. | No. |
-| `iteration-model.json` (`scripts/sw-self-optimize.sh:50, 586–599`) | Self-optimize `tune` writes per-complexity means and sample counts | **Yes:** `sw-loop.sh:702–708`, `scripts/lib/pipeline-execution.sh:231–243`, `pipeline-intelligence-scoring.sh:21` set iteration and cycle limits from it. | `sw-self-optimize-test.sh` has 25 tests, 10 of them source greps. None measures whether the limits improve outcomes. |
-| `template-weights.json` (writes `sw-self-optimize.sh:268–282, 429–431`) | Template weights | **Yes:** `scripts/lib/daemon-triage.sh:421–422` reads them for template choice. | `test_template_weight_high_success` is a unit check on the weight arithmetic, not on outcomes. |
-| UCB1 model selection (`sw-self-optimize.sh:693–899`, read at `pipeline-execution.sh:696`) | Route stats in optimization state | **Yes:** `ucb1_select_model` picks the model. | `sw-bandit-selector-test.sh` exists; not read in full. No evidence it beats a fixed model. |
-| Model router (`scripts/sw-model-router.sh:161` `route_model`) | Nothing found in this survey | Called by pipeline stages (`sw-model-router.sh:336`). Not analysed further. | Not analysed. |
-| Memory (`scripts/sw-memory.sh`, 41 functions) | `~/.shipwright/memory/` | **Yes:** injected into prompts by `scripts/lib/loop-iteration.sh` and others (13 files read it). | `sw-memory-effectiveness-test.sh`: 16 tests on injection and outcome **bookkeeping** and score arithmetic with known inputs. No test that injection improves pass rate. |
-| Outcome feedback (`scripts/lib/outcome-feedback.sh`: `generate_learned_rules`, `get_rolling_quality_score`) | Learned-rule and quality files | Readers not confirmed in this survey. | Not checked. |
-| Heartbeat, CI (`shipwright-pipeline.yml:640–646`) | `SHIPWRIGHT-HEARTBEAT` comment **every 600 s from a background `sleep` loop, regardless of progress** | **Yes:** the watchdog treats the latest heartbeat as liveness. | `sw-heartbeat-test.sh`: 17 tests on file mechanics. No test on stall detection. |
-| Watchdog (`.github/workflows/shipwright-watchdog.yml:100–256`) | Cancels runs; labels `shipwright-stuck`; posts `SHIPWRIGHT-WATCHDOG-ABANDON` | **Yes:** 45 min of silence cancels; 2 h abandons. | No workflow test. Only static checks (`workflow-fail-closed`, `workflow-injection`). |
-| File heartbeat (`scripts/sw-heartbeat.sh`) | `~/.shipwright/heartbeats/` | Read by daemon dispatch and loop (`daemon-dispatch.sh:302`, `sw-loop.sh:2534`) | As above. |
-| Stall detector (`scripts/sw-stall-detector.sh`) | `stall-detector-state.json` | **No.** Only the CLI and its test read it. Not wired into any workflow. | `sw-stall-detector-test.sh`: 12 tests, 8 of them greps. |
-| Cost (`scripts/sw-cost.sh`; `costs.json`, `budget.json`) | Cost entries | **Yes, locally:** the TS budget guard (`src/contexts/orchestration/domain/budget.ts`) reads them before dispatch. **CI:** the gate is a no-op because runners have no cost files (ADR-0007). | `sw-cost-test.sh` and `sw-cost-optimizer-test.sh` (12 tests). Not read in full. |
-| `auto_template` (`scripts/lib/daemon-poll.sh:315`) | Config flag | **Yes:** enables the fast path when lead time exceeds 2 h. | No. |
-| Adaptive model and iteration estimate (`scripts/lib/adaptive-model.sh`, `sw-intelligence.sh`, `sw-adaptive.sh`) | Intelligence cache | **Yes:** `sw-loop.sh:714` calls `intelligence_estimate_iterations`. | Mixed. `sw-adaptive-model-test.sh` has 20 tests; `sw-adaptive-test.sh` has 0 test functions and 3 greps. |
-| DORA (`scripts/sw-dora.sh`) | Reports only | **No.** No escalation logic found in `sw-dora.sh`, despite the name. | `sw-dora-test.sh`: 0 test functions, 11 greps. |
-| Weekly optimizer (`.github/workflows/shipwright-optimize.yml`, cron Sunday 03:00 UTC) | Runs `sw-self-optimize.sh tune` and `evolve-memory`; persists `memory/` and `optimization/` to `shipwright-data` | **Yes:** the restored state is read by the next runs. | No. |
-| Pipeline state persistence (`shipwright-pipeline.yml:~860–880`, `shipwright-optimize.yml:111`) | Force-pushes `shipwright-data` as a fallback | Not a learner, but it is the cross-run store for CI. A failed fast-forward is retried with `--force`, which can overwrite another run's data. | No. |
+| §6.2 error fingerprinting; per-call budgets; kill switch | Classify failures, stop identical fingerprints, enforce budgets | W2-02, W2-04, W2-12 | No |
+| §7.5 don't-port list | intelligence, self-optimize, adaptive, bandits and model-router learning are retired | W2-07 and W2-16 retire them | No |
+| §7.4 Wave 4 "one gated optimizer" | the only learner left | the E5 fitter is W2-19, deferred | **Only the timing.** It stays in Wave 4 |
+| §8 delivery evals and scorecard | 20 to 50 cases; pass^3; cost per success | W2-13, W2-14, W2-18 | No |
+| §2 non-goals | no new features except §6.1, §6.2, §6.3 | Tranches 1 to 3 sit inside §6.2 and §8 | No change needed for Tranches 1 to 3 |
 
-**What the survey shows.** Several mechanisms change behaviour from data, so "nothing reads it back" is not the problem. The problems are: (1) no outcome is ever measured against a baseline, so no change can be shown to help; (2) the CI heartbeat is a timer, not progress; (3) the CI failure classifier has no auth category; (4) one read path (`loop-tuning.json`) has no writer; (5) several tests grep source instead of checking behaviour.
+**Decision D-M (needs maintainer approval): model alias conversion.** `templates/pipelines/autonomous.json`, `full.json` and `cost-aware.json` name `claude-opus-5` and `claude-sonnet-5`, and `cost-aware.json` names `claude-haiku-4-5`. W2-07 converts these to aliases, and the aliases resolve to the 5.5 generation (`claude-opus-5-5`, `claude-sonnet-5-5`, `claude-haiku-5-5`). That is a behaviour change for every run that uses those templates. **Default: convert**, because the reviewer required it and the pricing table already covers the 5.5 family. The change is listed in the ADR as a model change.
 
 ---
 
-## Phase order and what blocks dispatch at scale
+## Evidence
 
-| Phase | Depends on | Blocks re-enabling dispatch at scale? | Why |
+| # | Claim | Status | Source and note |
 |---|---|---|---|
-| A ledger | Wave 1b (for M1 via `RunJournal`) | No | Measurement prerequisite for everything else. |
-| B classifier and retry policy | A (for attempt history in CI) | **Yes** | Without it, a deterministic failure can be retried at scale (288 runs in one day on 2026-10-14). |
-| C progress and stall | A | **Yes** | Without it, a non-converging run reports healthy for hours. |
-| D difficulty, routing, cost | A; B for cost on the same path | **Yes** for CI cost (no budget enforcement on CI otherwise) | ADR-0007 notes the CI budget is a no-op. |
-| E evals and ratchet | A, B, C, D | No, but **required before any routing or model change ships** | The ratchet is the only way a policy change can be accepted. |
-| F verifier by default | E (to prove it helps), the spec §6.3 evaluator | No | Measured in E before it becomes default. |
-| G retirement | E | No | Removes what E does not justify. |
-| H holdout, read-only surfaces, GitHub twin | E (ratchet trust); H1 and H2 before the E ratchet blocks merges | No | Makes the E ratchet's inputs untamperable and offline. |
-| I merge policy, review, specifiability, metrics | E, F | No (lights-on default) | Decides who merges; measures quality. |
-| J self-improving harness (optional) | E, H, I | No | Gated search over the editable surface; may be cut. |
+| E1 | Token cost for one task varies up to 30x across runs; self-prediction correlation up to 0.39, with underestimation | [V] | [Bai et al., arXiv 2604.22750](https://arxiv.org/pdf/2604.22750). The "accuracy peaks at intermediate cost" claim is **not** verified and is not used. |
+| E2 | Lights-off review benchmark: claude-opus-5 with copilot-cli catches 71.9% of bugs in its top-5 comments; opus-4.6 47.7% | [V] with two corrections | [CRBugBench, "(When) Should a Software Factory be Lights-off?", arXiv 2610.13668](https://arxiv.org/abs/2610.13668), fetched 2026-10-15. **Correction 1:** the bugs are "human-verified bugs mined from repository history", not injected bugs. **Correction 2:** the page does not say that opus-4.6 ran under the same harness, so the 71.9% and 47.7% figures may not be directly comparable. The paper also reports weaker results on complex or non-local changes and on proprietary repositories, which supports lights-on by default. |
+| E3 | ModularRSI: five-module harness, restricted modification scope, contrastive trajectory analysis | [V] | [arXiv 2609.14857](https://arxiv.org/pdf/2609.14857). The paper reports no ablation of the contrastive step. |
+| E4 | StrongDM's software factory: scenarios held outside the codebase; "satisfaction"; digital twins | [V] (secondary) | [Willison, 2026-02-07](https://simonwillison.net/2026/feb/7/software-factory/), read with secondary coverage. Transfer to Shipwright is [J]. |
+| E5 | Weng, "Harness Engineering for Self-Improvement" (2026-07-04): read-only evaluators | [U] | Read only through secondary coverage. The specific read-only claims are not used as evidence. |
+| E6 | Incident run `Shipwright Pipeline #8547` (run 38744601038) | [V] | At 16:39Z, about three hours after it started at 13:39Z, the pipeline job was still `in_progress` (triage succeeded at 13:41Z). This is live evidence of the progress gap. The fixture is captured after it completes (W2-01). |
+| E7 | The 288 re-runs on 2026-10-14 came from dispatch and sweep, not from auto-retry | [V] by source check | The dispatch guard matches the text "Pipeline Auth Failure" (`shipwright-dispatch.yml:107`), and the pre-flight writes that comment with `|| true`. Sweep uses "Pipeline Starting" timestamps (`shipwright-sweep.yml:95`). The exact path of each re-run is not reconstructed here. |
+| E8 | "Environment setup is the largest single factor in agent success" | [U] | Not checked. W2-02 adds an environment class because the incident record shows setup failures, not because of this claim. |
+| E9 | Auto-retry has no auth category and falls back to BUILD_FAILURE | [V] | `shipwright-auto-retry.yml` categorisation block, default at the "safest retry strategy" line. |
+| E10 | CI heartbeat is a background timer that posts every 600 seconds regardless of progress | [V] | `shipwright-pipeline.yml:641–646`. |
 
-Scale dispatch is also gated by Wave 1b, because the breaker reads only GitHub Actions history until local outcomes reach the shared journal (ADR-0007).
-
----
-
-## Conventions for every task
-
-- Run commands from the worktree root. Implementation happens on a new branch cut from `origin/main` after this plan is merged. Do not reuse `wave2/plan`.
-- `node_modules` in a worktree is a symlink. Never run `bun install` in a worktree. Use the existing install.
-- Every new source file passes the fitness rules: F1 (domain imports only its own `domain/`; it may import no shared kernel types, so domain code declares its own structural types), F5 (I/O only in `adapters/`, `main.ts`, `cli.ts`, `testing/`), F7 (files ≤ 300 lines, functions ≤ 40 lines), F8 (tests use `createTestEnv()` when they touch a path).
-- `zod` lives in adapters, where persisted data and CLI input are parsed. Domain code stays free of it.
-- Bash edits: each bash change is a one-line bridge to a TS command. Bash edits must not add `eval`, `sh -c`, `${{` or GitHub writes (F11, F10). Check with `bun run arch` before and after; the findings baseline may only go down (ADR-0008).
-- Never run a tmux-driving bash suite locally: `sw-daemon-test`, `sw-lib-daemon-dispatch-test`, `sw-lib-daemon-patrol-test`, `sw-lib-daemon-poll-test`, `sw-tmux-*`, or `sw-test-all.sh` without `--pattern`. Hermetic suites may run with `bash scripts/sw-test-all.sh --pattern <name>` and their output must not be piped (the watchdog `sleep` holds a pipe).
-- Never run `shipwright gates check` or `breaker check` without `--no-github` on the real repository.
-- Before calling any task done: `bun run format`, then stage new files, then `bun run check:fast`, then `bun run check` before the phase closes.
+**Not cited:** StrongDM's specific figures beyond the holdout framing, Weng's specific claims, AHE and Self-Harness (not verified), and the issue #8547 proof run as evidence beyond E6.
 
 ---
 
-## File map (all phases)
+## Baseline (condensed from the survey)
 
-| Path | Phase | Responsibility |
-|---|---|---|
-| `src/contexts/learning/domain/ledger.ts` | A | Ledger entry types and the validation rule. Pure. |
-| `src/contexts/learning/ports.ts` | A | `RunLedger` port. |
-| `src/contexts/learning/application/ledger.ts` | A | `appendEntry`, `readRun`, `verifyLedger` use cases. |
-| `src/contexts/learning/index.ts` | A | Public API of the context. |
-| `src/adapters/ledger/jsonl-ledger.ts` | A | File-per-run JSONL adapter (zod parse, fail-closed on corrupt lines). |
-| `src/testing/fake-ledger.ts` | A | In-memory fake. |
-| `src/testing/contracts/ledger-contract.ts` | A | One contract suite run against every adapter. |
-| `src/cli/commands/ledger.ts` | A | `shipwright ledger append | show | verify`. |
-| `src/contexts/learning/domain/failure.ts` | B | Failure class from typed kind or log text; normalized fingerprint. |
-| `src/contexts/learning/domain/retry.ts` | B | `decideRetry`: retry, or escalate with a reason. |
-| `src/contexts/learning/application/classify-failure.ts` | B | Use case: evidence + attempts → decision; appends a `decision` entry. |
-| `src/cli/commands/failure.ts` | B | `shipwright failure classify --log FILE [--attempts FILE] [--json]`. |
-| `scripts/lib/daemon-failure.sh` | B | `classify_failure` body replaced by a call to the TS command. |
-| `scripts/sw-daemon-test.sh` (`test_classify_failure_auth`) | B | Source-grep assertion rewritten as a behaviour test. |
-| `.github/workflows/shipwright-auto-retry.yml` | B | Categorisation step calls the TS classifier; `AUTH` category does not retry. |
-| `src/contexts/delivery/domain/progress.ts` | C | Iteration snapshots and `assessProgress`. |
-| `src/contexts/delivery/domain/progress.test.ts` | C | Outcome tests on snapshot histories. |
-| `src/contexts/delivery/domain/stall-watchdog.ts` | C | Pure liveness decision from the last progress marker. |
-| `src/cli/commands/progress.ts` | C | `shipwright progress assess --history FILE`. |
-| `.github/workflows/shipwright-pipeline.yml` | C | Heartbeat timer replaced by progress markers from the TS assessor. |
-| `.github/workflows/shipwright-watchdog.yml` | C | Reads `SHIPWRIGHT-PROGRESS`, not `SHIPWRIGHT-HEARTBEAT`, as liveness. |
-| `src/contexts/intelligence/domain/models.ts` | D | The one place model IDs are named. |
-| `src/contexts/intelligence/domain/routing.ts` | D | Versioned routing table (tier → model, effort, iterations, budget, verifier). |
-| `src/contexts/intelligence/domain/difficulty.ts` | D | Deterministic difficulty tier from issue facts and ledger history. |
-| `src/contexts/intelligence/index.ts` | D | Public API. |
-| `tools/models/no-pinned-models.test.ts` | D | Policy check: workflows and templates name only IDs in `models.ts`. |
-| `evals/delivery/cases/<id>/` | E | Case directories (issue, base SHA, reference diff, oracle, metadata, split). |
-| `evals/ratchet/incumbent.json` | E | Incumbent policy and its holdout scores. |
-| `src/contexts/learning/domain/eval-score.ts` | E | pass^k, cost per success, rework proxy. |
-| `src/contexts/learning/domain/ratchet.ts` | E | Pure accept/reject rule with noise threshold. |
-| `tools/eval/replay.ts`, `tools/eval/ratchet.ts` | E | Replay harness and CI ratchet check (tools may do I/O). |
-| `src/contexts/quality/domain/verdict.ts` | F | Criterion verdicts and gap handling (shared with spec §6.3 evaluator). |
-| `templates/pipelines/fast.json`, `hotfix.json`, `standard.json` | F | Add the `verify` stage; `fast` currently has `review` disabled. |
-| `scripts/sw-self-optimize.sh`, `scripts/lib/daemon-triage.sh`, `scripts/sw-loop.sh`, `scripts/lib/pipeline-execution.sh`, `scripts/lib/daemon-poll.sh`, `scripts/sw-stall-detector.sh`, `scripts/sw-heartbeat.sh`, `scripts/sw-predictive.sh`, `scripts/sw-intelligence.sh`, `scripts/sw-adaptive.sh`, `scripts/sw-model-router.sh` | G | Retire or alias to "removed" stubs. |
-| `docs/adr/0009-closed-loop-learning.md` | this plan | Decision record (proposed). |
-| `docs/plans/port/progress.json` | A–G | Entries for each retired or added command. |
-| `AGENTS.md`, `docs/architecture.md`, `docs/safety-runbook.md` | A–D | Agent and operator guidance for the ledger, classifier, progress markers and ratchet. |
+| Mechanism | Writes | Read back to change behaviour? | Outcome-tested? |
+|---|---|---|---|
+| `classify_failure` (`scripts/lib/daemon-failure.sh:22`) | nothing | yes: auth and invalid-input skip retry | **no**: `sw-daemon-test.sh:1683` greps source for `not logged in` |
+| Retry escalation (`daemon-failure.sh:204–300`) | retry count | yes: model, template and iteration escalation | no |
+| CI auto-retry categorisation (`shipwright-auto-retry.yml`) | `SHIPWRIGHT-RETRY-CATEGORY` | yes, but auth falls through to BUILD_FAILURE | no |
+| Loop circuit breaker and stuckness (`sw-loop.sh:124–125, 2556`) | events | yes: stops or restarts the loop | no |
+| `loop-tuning.json` (`sw-loop.sh:684–698`) | **nothing: no writer exists** | reads a file that is never created | no |
+| `iteration-model.json` (`sw-self-optimize.sh`) | per-complexity means | yes: iteration and cycle limits | no |
+| `template-weights.json` (`sw-self-optimize.sh`) | weights | yes: template choice (`daemon-triage.sh:421`) | no |
+| UCB1 model selection (`pipeline-execution.sh:694–698`) | route stats | yes: sets `CLAUDE_MODEL` **before** the template's model | no |
+| `$RANDOM` A/B (`pipeline-execution.sh:731–753`) | none | yes: 20% of stages use the recommended model | no |
+| Recruit override (`pipeline-stages-build.sh:395–408`) | none | yes: sets the build model when `--model` is absent | no |
+| Memory injection (`sw-memory.sh`) | memory files | yes: injected into prompts | bookkeeping only |
+| CI heartbeat | a comment every 10 min | yes: watchdog treats it as liveness | no |
+| Stall detector (`sw-stall-detector.sh`) | state file | **no**: not wired into any workflow | no |
+| Cost and budget (`sw-cost.sh`, `costs.json`) | cost entries | yes locally; CI has no cost data | no |
+
+**What the survey shows.** Several mechanisms change behaviour from data, so the problem is not that nothing reads the data. The problems are: no outcome is measured against a baseline; the CI heartbeat is a timer; auth failures have no category; one read path has no writer; several tests grep source instead of checking behaviour; and three learners (UCB1, the `$RANDOM` A/B and recruit) set the build model, so **the build model is set by them, not by the template** (answering Q8).
 
 ---
 
-## Phase A: run ledger, port, adapters, recording
+## Conventions
 
-**Exit criteria**
-1. `bun test src/contexts/learning src/testing/contracts` passes, and the ledger contract suite passes against the fake and the JSONL adapter.
-2. A corrupt line in a run's ledger makes `verifyLedger` return `corrupt` and makes `readRun` fail. No policy reads a corrupt ledger (fail closed).
-3. A CI run of `shipwright-pipeline.yml` on the sandbox repository (see "Verification on GitHub") writes one `outcome` entry to the ledger, and the entry is on the `shipwright-data` branch after the run.
-4. The `shipwright-data` persist step no longer force-pushes ledger files (fast-forward with retry).
+- Run commands from the worktree root `/Users/sethford/Documents/shipwright-wave2`. Do not run `bun install` in a worktree; `node_modules` is a symlink.
+- Standard gates: `bun test <path>` for the task; `bun run check:fast` after each change; `bun run check` before a commit. A change that adds or edits a CLI command also needs `bun run docs:gen` and `bun run docs:check`.
+- Hermetic bash suites: `bash scripts/sw-test-all.sh --pattern <name>`, output not piped. Never run the tmux suites locally: `sw-daemon-test`, `sw-lib-daemon-dispatch-test`, `sw-lib-daemon-patrol-test`, `sw-lib-daemon-poll-test`, `sw-tmux-*`, or `sw-test-all.sh` without `--pattern`.
+- Workflow rules (`.claude/rules/workflows.md`): no `${{ }}` inside `run:`; pass values through `env:`. Pin new actions to a full SHA. The Bun setup used everywhere in this plan is the one `.github/actions/safety-gates/action.yml` already pins: `oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0` with `bun-version: 1.2.19`, followed by `bun install --frozen-lockfile --ignore-scripts`.
+- Bash rules (`.claude/rules/bash.md`): Bash 3.2; no `eval`; arguments as arrays; JSON only through `jq --arg` or `--argjson`; atomic writes through a temporary file and `mv`.
+- Scratch verification: the TypeScript domain, application and CLI files of W2-02 and W2-05, and the bash bridge and daemon helper of W2-04 and W2-06, were executed in an isolated scratch copy against minimal stubs of the real interfaces. **44 TypeScript tests pass**, and the bridge and helper cases behave as specified. The repository run for each task is the verification step listed under it. Nothing in the repository was changed by the scratch run.
 
-### Task A1: Ledger domain types and validation (pure)
+---
+
+## Tranche 1 (P0): exact steps
+
+Tranche 1 needs no ledger. It can be merged and verified without GitHub writes.
+
+### W2-01: incident fixtures
+
+**Purpose:** fixtures for the classifier (W2-02, W2-03), the progress verdict (W2-05) and the stall stop (W2-06). The fixtures are test inputs, so they must not contain credentials.
 
 **Files:**
-- Create: `src/contexts/learning/domain/ledger.ts`
-- Test: `src/contexts/learning/domain/ledger.test.ts`
+- Create: `src/testing/fixtures/wave2/preflight-auth.log` (synthetic; replaced by a capture in Step 1)
+- Create: `src/testing/fixtures/wave2/stall-snapshots.json` (synthetic; replaced by a capture in Step 1)
+- Create: `src/testing/fixtures/wave2/fixtures.test.ts`
 
-- [ ] **Step 1: Write the failing test**
+- [ ] **Step 1: Capture the real fixtures (read-only).** Run 38744601038 is still in progress (E6). After it completes, capture its failed-step log, and do not commit the raw log:
+
+```bash
+gh run view 38744601038 --repo sethdford/shipwright --json status --jq '.status'
+```
+Expected: `completed`. If it still prints `in_progress`, keep the synthetic fixtures and record the capture as open.
+
+```bash
+gh run view 38744601038 --repo sethdford/shipwright --log-failed > "$SCRATCH/38744601038.failed.log"
+grep -En 'ghp_|gho_|sk-ant-|CLAUDE_CODE_OAUTH_TOKEN=' "$SCRATCH/38744601038.failed.log" || echo "no credential-shaped strings"
+```
+Expected: `no credential-shaped strings`. If anything matches, redact it by hand before copying any excerpt into a fixture.
+
+- [ ] **Step 2: Commit the synthetic fixtures (or the redacted capture).** The synthetic pre-flight fixture reproduces the exact text the workflow writes (`.github/workflows/shipwright-pipeline.yml`, step "Pre-flight auth check"):
+
+`src/testing/fixtures/wave2/preflight-auth.log`:
+```text
+Verifying Claude Code authentication...
+::error::Claude Code authentication failed — check CLAUDE_CODE_OAUTH_TOKEN secret
+--- stderr ---
+Error: 401 authentication_error: OAuth token has expired
+--- end ---
+```
+
+`src/testing/fixtures/wave2/stall-snapshots.json` (four iterations with no test movement and one repeated error, shaped like the snapshot type in W2-05):
+```json
+[
+  {"index": 1, "passingTests": null, "failingTests": ["suite"], "diffLines": 2, "newCommits": 0, "errorFingerprint": "execution:0a1b2c3d", "loopCompleteClaimed": false},
+  {"index": 2, "passingTests": null, "failingTests": ["suite"], "diffLines": 2, "newCommits": 0, "errorFingerprint": "execution:0a1b2c3d", "loopCompleteClaimed": false},
+  {"index": 3, "passingTests": null, "failingTests": ["suite"], "diffLines": 2, "newCommits": 0, "errorFingerprint": "execution:0a1b2c3d", "loopCompleteClaimed": false},
+  {"index": 4, "passingTests": null, "failingTests": ["suite"], "diffLines": 2, "newCommits": 0, "errorFingerprint": "execution:0a1b2c3d", "loopCompleteClaimed": false}
+]
+```
+
+- [ ] **Step 3: Write the fixture test.**
 
 ```ts
-// src/contexts/learning/domain/ledger.test.ts
+// src/testing/fixtures/wave2/fixtures.test.ts
 import { describe, expect, test } from "bun:test";
-import { type NewLedgerEntry, validateNewEntry } from "./ledger";
+import { readdirSync, readFileSync } from "node:fs";
 
-const base: NewLedgerEntry = {
-  runId: "run-42",
-  at: "2026-10-15T10:00:00.000Z",
-  payload: { type: "outcome", status: "failed", reason: "tests red" },
-};
+const dir = new URL("./", import.meta.url);
+const SECRET = /ghp_[A-Za-z0-9]{20,}|gho_[A-Za-z0-9]{20,}|sk-ant-[A-Za-z0-9_-]{10,}|CLAUDE_CODE_OAUTH_TOKEN=\S+/;
 
-describe("validateNewEntry", () => {
-  test("accepts a well-formed outcome", () => {
-    expect(validateNewEntry(base)).toBeNull();
+describe("wave2 incident fixtures", () => {
+  test("no fixture contains a credential-shaped string", () => {
+    for (const name of readdirSync(dir)) {
+      if (name.endsWith(".test.ts")) continue;
+      expect(readFileSync(new URL(name, dir), "utf8")).not.toMatch(SECRET);
+    }
   });
 
-  test("rejects a run id that could escape a file name", () => {
-    expect(validateNewEntry({ ...base, runId: "../etc" })).toMatch(/runId/);
+  test("the pre-flight fixture carries the auth failure line", () => {
+    const text = readFileSync(new URL("preflight-auth.log", dir), "utf8");
+    expect(text).toContain("Claude Code authentication failed");
   });
 
-  test("rejects a timestamp that does not parse", () => {
-    expect(validateNewEntry({ ...base, at: "yesterday" })).toMatch(/at/);
-  });
-
-  test("rejects non-finite usage numbers", () => {
-    const entry: NewLedgerEntry = {
-      ...base,
-      payload: {
-        type: "agent_call",
-        stage: "build",
-        model: "claude-opus-5-5",
-        effort: "high",
-        usage: { costUsd: Number.NaN, inputTokens: 1, outputTokens: 1, durationMs: 1 },
-        failureClass: null,
-        fingerprint: null,
-      },
-    };
-    expect(validateNewEntry(entry)).toMatch(/costUsd/);
+  test("the stall fixture is four iterations of one repeated error", () => {
+    const snapshots = JSON.parse(readFileSync(new URL("stall-snapshots.json", dir), "utf8")) as Array<{ errorFingerprint: string }>;
+    expect(snapshots).toHaveLength(4);
+    expect(new Set(snapshots.map((s) => s.errorFingerprint)).size).toBe(1);
   });
 });
 ```
 
-- [ ] **Step 2: Run it to verify it fails**
+- [ ] **Step 4: Run.**
 
-Run: `bun test src/contexts/learning/domain/ledger.test.ts`
-Expected: FAIL with `Cannot find module './ledger'`.
+Run: `bun test src/testing/fixtures`
+Expected: `3 pass`, `0 fail`.
 
-- [ ] **Step 3: Write the implementation**
+---
 
-```ts
-// src/contexts/learning/domain/ledger.ts
-// Run ledger entries (spec §5 rule 3, §6.1). Pure types and one validation rule; no I/O.
+### W2-02: failure classifier core
 
-export type LedgerOutcome = "succeeded" | "failed" | "escalated" | "stalled" | "cancelled";
-
-export interface Usage {
-  readonly costUsd: number;
-  readonly inputTokens: number;
-  readonly outputTokens: number;
-  readonly durationMs: number;
-}
-
-export type LedgerPayload =
-  | {
-      readonly type: "agent_call";
-      readonly stage: string;
-      readonly model: string;
-      readonly effort: string;
-      readonly usage: Usage;
-      readonly failureClass: string | null;
-      readonly fingerprint: string | null;
-    }
-  | {
-      readonly type: "decision";
-      readonly name: string;
-      readonly policyVersion: string;
-      readonly inputs: Readonly<Record<string, unknown>>;
-      readonly output: Readonly<Record<string, unknown>>;
-    }
-  | {
-      readonly type: "iteration";
-      readonly stage: string;
-      readonly index: number;
-      readonly signals: Readonly<Record<string, unknown>>;
-    }
-  | { readonly type: "outcome"; readonly status: LedgerOutcome; readonly reason: string };
-
-export interface NewLedgerEntry {
-  readonly runId: string;
-  /** ISO-8601 timestamp, written by the caller. */
-  readonly at: string;
-  readonly payload: LedgerPayload;
-}
-
-export interface LedgerEntry extends NewLedgerEntry {
-  /** 1-based, monotonic within a run. Assigned by the adapter. */
-  readonly seq: number;
-}
-
-const RUN_ID = /^[A-Za-z0-9._-]{1,128}$/;
-
-function usageError(usage: Usage): string | null {
-  const fields: ReadonlyArray<keyof Usage> = ["costUsd", "inputTokens", "outputTokens", "durationMs"];
-  for (const field of fields) {
-    if (!Number.isFinite(usage[field]) || usage[field] < 0) return `usage.${field} must be a finite number >= 0`;
-  }
-  return null;
-}
-
-/** Returns the first problem with a new entry, or `null` when it is valid. */
-export function validateNewEntry(entry: NewLedgerEntry): string | null {
-  if (!RUN_ID.test(entry.runId)) return "runId must match [A-Za-z0-9._-]{1,128}";
-  if (Number.isNaN(Date.parse(entry.at))) return "at must be an ISO-8601 timestamp";
-  if (entry.payload.type === "agent_call") return usageError(entry.payload.usage);
-  return null;
-}
-```
-
-- [ ] **Step 4: Run it to verify it passes**
-
-Run: `bun test src/contexts/learning/domain/ledger.test.ts`
-Expected: `4 pass, 0 fail`.
-
-- [ ] **Step 5: Commit** (on the implementation branch, after Task A2 passes; keep the commit path-limited)
-
-### Task A2: The `RunLedger` port and the append use case
+**Purpose:** classify a failed run from its typed kind or its log, decide retry or escalate, and expose the decision as a command. It writes nothing and calls nothing.
 
 **Files:**
-- Create: `src/contexts/learning/ports.ts`
-- Create: `src/contexts/learning/application/ledger.ts`
+- Create: `src/contexts/learning/domain/failure.ts`, `retry.ts`, `failure.test.ts`, `retry.test.ts`
+- Create: `src/contexts/learning/application/classify.ts`
 - Create: `src/contexts/learning/index.ts`
-- Test: `src/contexts/learning/application/ledger.test.ts`
-- Create: `src/testing/fake-ledger.ts`
+- Modify: `src/shared/kernel/ports.ts` (add the `FileReader` port)
+- Create: `src/adapters/state/node-file-reader.ts`
+- Create: `src/testing/fake-file-reader.ts`
+- Modify: `src/testing/cli-harness.ts` (`commandContext` takes a file reader)
+- Modify: `src/cli/command.ts` (add `files` to `CommandContext`)
+- Modify: `src/main.ts` (provide `files`)
+- Create: `src/cli/commands/failure.ts`, `failure.test.ts`
+- Modify: `src/cli/commands/index.ts` (register `failureCommand`)
+- Modify: `scripts/sw` (router line)
+- Modify: `docs/plans/port/progress.json` (entry)
+- Regenerate: `docs/reference/cli.md`
 
-- [ ] **Step 1: Write the failing test**
+**Design note (F1):** the domain imports `AgentFailureKind` from `src/shared/kernel/ports.ts`. F1 allows imports from `src/shared/kernel`, so the kind names are not redeclared. The `KIND_CLASS` table is typed `Record<AgentFailureKind, FailureClass>`, so a new kind fails the typecheck until it is mapped.
 
-```ts
-// src/contexts/learning/application/ledger.test.ts
-import { describe, expect, test } from "bun:test";
-import { FakeLedger } from "../../../testing/fake-ledger";
-import { appendEntry, readRun, verifyLedger } from "./ledger";
-
-const outcome = (runId: string, status: "succeeded" | "failed") => ({
-  runId,
-  at: "2026-10-15T10:00:00.000Z",
-  payload: { type: "outcome" as const, status, reason: "x" },
-});
-
-describe("ledger use cases", () => {
-  test("assigns increasing sequence numbers per run", async () => {
-    const ledger = new FakeLedger();
-    const a = await appendEntry(ledger, outcome("r1", "failed"));
-    const b = await appendEntry(ledger, outcome("r1", "succeeded"));
-    expect(a.ok && a.value.seq).toBe(1);
-    expect(b.ok && b.value.seq).toBe(2);
-  });
-
-  test("rejects an invalid entry without writing it", async () => {
-    const ledger = new FakeLedger();
-    const result = await appendEntry(ledger, { ...outcome("../x", "failed") });
-    expect(result.ok).toBe(false);
-    expect((await readRun(ledger, "../x")).ok).toBe(false);
-  });
-
-  test("verifyLedger reports the run count and no corruption on a clean ledger", async () => {
-    const ledger = new FakeLedger();
-    await appendEntry(ledger, outcome("r1", "failed"));
-    await appendEntry(ledger, outcome("r2", "succeeded"));
-    const report = await verifyLedger(ledger);
-    expect(report).toEqual({ ok: true, runs: 2, entries: 2 });
-  });
-});
-```
-
-- [ ] **Step 2: Run it to verify it fails**
-
-Run: `bun test src/contexts/learning/application/ledger.test.ts`
-Expected: FAIL with `Cannot find module`.
-
-- [ ] **Step 3: Write the port, the use cases, the fake, and the context index**
+- [ ] **Step 1: Domain classifier.** Copy this file as written (`src/contexts/learning/domain/failure.ts`):
 
 ```ts
-// src/contexts/learning/ports.ts
-import type { Result } from "../../shared/kernel/result";
-import type { LedgerEntry, NewLedgerEntry } from "./domain/ledger";
-
-export type LedgerError =
-  | { readonly kind: "invalid"; readonly message: string }
-  | { readonly kind: "corrupt"; readonly message: string; readonly line?: number }
-  | { readonly kind: "io"; readonly message: string };
-
-/**
- * Append-only run ledger. Adapters: JSONL files (M1 before Wave 1b; CI on `shipwright-data`),
- * then `RunJournal` over SQLite (M1) and Postgres (M2/M3). Each adapter must pass
- * src/testing/contracts/ledger-contract.ts.
- */
-export interface RunLedger {
-  append(entry: NewLedgerEntry): Promise<Result<LedgerEntry, LedgerError>>;
-  /** Entries for one run in `seq` order. Fails `corrupt` if any stored line cannot be parsed. */
-  read(runId: string): Promise<Result<readonly LedgerEntry[], LedgerError>>;
-  listRunIds(): Promise<Result<readonly string[], LedgerError>>;
-}
-```
-
-```ts
-// src/contexts/learning/application/ledger.ts
-import { err, ok, type Result } from "../../../shared/kernel/result";
-import { type LedgerEntry, type NewLedgerEntry, validateNewEntry } from "../domain/ledger";
-import type { LedgerError, RunLedger } from "../ports";
-
-export async function appendEntry(
-  ledger: RunLedger,
-  entry: NewLedgerEntry,
-): Promise<Result<LedgerEntry, LedgerError>> {
-  const problem = validateNewEntry(entry);
-  if (problem !== null) return err({ kind: "invalid", message: problem });
-  return ledger.append(entry);
-}
-
-export function readRun(ledger: RunLedger, runId: string) {
-  return ledger.read(runId);
-}
-
-export interface VerifyReport {
-  readonly ok: boolean;
-  readonly runs: number;
-  readonly entries: number;
-  readonly problem?: string;
-}
-
-/** Fail closed: any unreadable run makes the whole report not ok. */
-export async function verifyLedger(ledger: RunLedger): Promise<VerifyReport> {
-  const ids = await ledger.listRunIds();
-  if (!ids.ok) return { ok: false, runs: 0, entries: 0, problem: ids.error.message };
-  let entries = 0;
-  for (const id of ids.value) {
-    const run = await ledger.read(id);
-    if (!run.ok) return { ok: false, runs: ids.value.length, entries, problem: `${id}: ${run.error.message}` };
-    entries += run.value.length;
-  }
-  return { ok: true, runs: ids.value.length, entries };
-}
-
-export { ok };
-```
-
-```ts
-// src/testing/fake-ledger.ts
-import { err, ok, type Result } from "../shared/kernel/result";
-import { type LedgerEntry, type NewLedgerEntry, validateNewEntry } from "../contexts/learning/domain/ledger";
-import type { LedgerError, RunLedger } from "../contexts/learning/ports";
-
-/** In-memory ledger for application tests. Same rules as the real adapters. */
-export class FakeLedger implements RunLedger {
-  private readonly runs = new Map<string, LedgerEntry[]>();
-
-  async append(entry: NewLedgerEntry): Promise<Result<LedgerEntry, LedgerError>> {
-    const problem = validateNewEntry(entry);
-    if (problem !== null) return err({ kind: "invalid", message: problem });
-    const list = this.runs.get(entry.runId) ?? [];
-    const stored: LedgerEntry = { ...entry, seq: list.length + 1 };
-    this.runs.set(entry.runId, [...list, stored]);
-    return ok(stored);
-  }
-
-  async read(runId: string): Promise<Result<readonly LedgerEntry[], LedgerError>> {
-    return ok(this.runs.get(runId) ?? []);
-  }
-
-  async listRunIds(): Promise<Result<readonly string[], LedgerError>> {
-    return ok([...this.runs.keys()]);
-  }
-}
-```
-
-```ts
-// src/contexts/learning/index.ts
-export type { LedgerEntry, LedgerOutcome, LedgerPayload, NewLedgerEntry, Usage } from "./domain/ledger";
-export { validateNewEntry } from "./domain/ledger";
-export { appendEntry, readRun, verifyLedger, type VerifyReport } from "./application/ledger";
-export type { LedgerError, RunLedger } from "./ports";
-```
-
-- [ ] **Step 4: Run it to verify it passes**
-
-Run: `bun test src/contexts/learning`
-Expected: all tests pass (`4 pass` from A1 plus `3 pass` here).
-
-Run: `bun run arch`
-Expected: exit 0. `application/ledger.ts` imports only `shared/kernel` and its own `domain` and `ports`. If F2 fails, the failure text names the rule.
-
-Note on `application/ledger.ts`: the `ok` re-export at the bottom is unused; remove it before committing, because Biome flags unused exports only in strict mode, but it is noise. (Left out of the snippet on purpose so the implementer checks it.)
-
-### Task A3: JSONL adapter (file per run, fail-closed reads)
-
-**Files:**
-- Create: `src/adapters/ledger/jsonl-ledger.ts`
-- Test: `src/adapters/ledger/jsonl-ledger.test.ts`
-
-Contract: one file per run at `<stateDir>/ledger/<runId>.jsonl`. Each line is one JSON entry with `seq` set. A run has one writer (its run id is unique to that run). Reads parse every line with zod; any unparseable line returns `corrupt` with the 1-based line number.
-
-- [ ] **Step 1: Write the failing test**
-
-```ts
-// src/adapters/ledger/jsonl-ledger.test.ts
-import { describe, expect, test } from "bun:test";
-import { mkdirSync, writeFileSync } from "node:fs";
-import { join } from "node:path";
-import { createTestEnv } from "../../testing/test-env";
-import { JsonlLedger } from "./jsonl-ledger";
-
-const entry = (runId: string) => ({
-  runId,
-  at: "2026-10-15T10:00:00.000Z",
-  payload: { type: "outcome" as const, status: "succeeded" as const, reason: "ok" },
-});
-
-describe("JsonlLedger", () => {
-  test("writes one line per entry under the state directory", async () => {
-    const env = createTestEnv();
-    const ledger = new JsonlLedger(env.stateDir);
-    await ledger.append(entry("run-1"));
-    await ledger.append(entry("run-1"));
-    const run = await ledger.read("run-1");
-    expect(run.ok && run.value.map((e) => e.seq)).toEqual([1, 2]);
-  });
-
-  test("fails closed when a stored line is corrupt", async () => {
-    const env = createTestEnv();
-    const dir = join(env.stateDir, "ledger");
-    mkdirSync(dir, { recursive: true });
-    writeFileSync(join(dir, "run-2.jsonl"), `${JSON.stringify({ ...entry("run-2"), seq: 1 })}\n{not json\n`);
-    const result = await new JsonlLedger(env.stateDir).read("run-2");
-    expect(result.ok).toBe(false);
-    if (!result.ok) expect(result.error).toMatchObject({ kind: "corrupt", line: 2 });
-  });
-
-  test("lists runs by file name and rejects a traversal id before touching disk", async () => {
-    const env = createTestEnv();
-    const ledger = new JsonlLedger(env.stateDir);
-    await ledger.append(entry("run-3"));
-    const ids = await ledger.listRunIds();
-    expect(ids.ok && ids.value).toEqual(["run-3"]);
-    const bad = await ledger.append({ ...entry("x"), runId: "../escape" });
-    expect(bad.ok).toBe(false);
-  });
-});
-```
-
-- [ ] **Step 2: Run it to verify it fails**
-
-Run: `bun test src/adapters/ledger/jsonl-ledger.test.ts`
-Expected: FAIL with `Cannot find module './jsonl-ledger'`.
-
-- [ ] **Step 3: Write the adapter**
-
-```ts
-// src/adapters/ledger/jsonl-ledger.ts
-import { appendFile, mkdir, readdir, readFile } from "node:fs/promises";
-import { join } from "node:path";
-import { z } from "zod";
-import { err, ok, type Result } from "../../shared/kernel/result";
-import { type LedgerEntry, type NewLedgerEntry, validateNewEntry } from "../../contexts/learning/domain/ledger";
-import type { LedgerError, RunLedger } from "../../contexts/learning/ports";
-
-// Persisted format: zod parses every line (spec §3.4). The domain type stays zod-free.
-const usage = z.object({
-  costUsd: z.number().finite().min(0),
-  inputTokens: z.number().finite().min(0),
-  outputTokens: z.number().finite().min(0),
-  durationMs: z.number().finite().min(0),
-});
-const payload = z.discriminatedUnion("type", [
-  z.object({
-    type: z.literal("agent_call"),
-    stage: z.string(),
-    model: z.string(),
-    effort: z.string(),
-    usage,
-    failureClass: z.string().nullable(),
-    fingerprint: z.string().nullable(),
-  }),
-  z.object({
-    type: z.literal("decision"),
-    name: z.string(),
-    policyVersion: z.string(),
-    inputs: z.record(z.string(), z.unknown()),
-    output: z.record(z.string(), z.unknown()),
-  }),
-  z.object({
-    type: z.literal("iteration"),
-    stage: z.string(),
-    index: z.number().int().min(0),
-    signals: z.record(z.string(), z.unknown()),
-  }),
-  z.object({
-    type: z.literal("outcome"),
-    status: z.enum(["succeeded", "failed", "escalated", "stalled", "cancelled"]),
-    reason: z.string(),
-  }),
-]);
-const stored = z.object({
-  runId: z.string(),
-  seq: z.number().int().min(1),
-  at: z.string(),
-  payload,
-});
-
-/** One JSONL file per run. A run has one writer; its id is unique per run. */
-export class JsonlLedger implements RunLedger {
-  constructor(private readonly stateDir: string) {}
-
-  private dir(): string {
-    return join(this.stateDir, "ledger");
-  }
-
-  async append(entry: NewLedgerEntry): Promise<Result<LedgerEntry, LedgerError>> {
-    const problem = validateNewEntry(entry);
-    if (problem !== null) return err({ kind: "invalid", message: problem });
-    const current = await this.read(entry.runId);
-    if (!current.ok) return current;
-    const row: LedgerEntry = { ...entry, seq: current.value.length + 1 };
-    try {
-      await mkdir(this.dir(), { recursive: true });
-      await appendFile(join(this.dir(), `${entry.runId}.jsonl`), `${JSON.stringify(row)}\n`);
-    } catch (cause) {
-      return err({ kind: "io", message: String(cause) });
-    }
-    return ok(row);
-  }
-
-  async read(runId: string): Promise<Result<readonly LedgerEntry[], LedgerError>> {
-    const problem = validateNewEntry({ runId, at: new Date(0).toISOString(), payload: { type: "outcome", status: "failed", reason: "" } });
-    if (problem !== null) return err({ kind: "invalid", message: problem });
-    let text: string;
-    try {
-      text = await readFile(join(this.dir(), `${runId}.jsonl`), "utf8");
-    } catch (cause) {
-      if ((cause as NodeJS.ErrnoException).code === "ENOENT") return ok([]);
-      return err({ kind: "io", message: String(cause) });
-    }
-    return parseLines(text);
-  }
-
-  async listRunIds(): Promise<Result<readonly string[], LedgerError>> {
-    try {
-      const names = await readdir(this.dir());
-      return ok(names.filter((n) => n.endsWith(".jsonl")).map((n) => n.slice(0, -".jsonl".length)).sort());
-    } catch (cause) {
-      if ((cause as NodeJS.ErrnoException).code === "ENOENT") return ok([]);
-      return err({ kind: "io", message: String(cause) });
-    }
-  }
-}
-
-function parseLines(text: string): Result<readonly LedgerEntry[], LedgerError> {
-  const out: LedgerEntry[] = [];
-  const lines = text.split("\n");
-  for (let i = 0; i < lines.length; i++) {
-    const line = lines[i] ?? "";
-    if (line.trim() === "") continue;
-    let parsed: unknown;
-    try {
-      parsed = JSON.parse(line);
-    } catch {
-      return err({ kind: "corrupt", message: "line is not JSON", line: i + 1 });
-    }
-    const checked = stored.safeParse(parsed);
-    if (!checked.success) return err({ kind: "corrupt", message: checked.error.message, line: i + 1 });
-    out.push(checked.data as LedgerEntry);
-  }
-  return ok(out);
-}
-```
-
-Implementation notes for the implementer:
-- Replace the odd `validateNewEntry(...)` call inside `read` with a dedicated `validateRunId(runId)` exported from `domain/ledger.ts` (one regex, one place). The snippet above reuses the full validator to keep the example short; the single-purpose function is the correct version and is part of this task.
-- `NodeJS.ErrnoException` is a type from `@types/node`; if the project's Biome or tsconfig forbids it, use `(cause as { code?: string }).code`.
-
-- [ ] **Step 4: Run it to verify it passes**
-
-Run: `bun test src/adapters/ledger`
-Expected: `3 pass, 0 fail`.
-
-Run: `bun run check:fast`
-Expected: exit 0.
-
-### Task A4: Shared contract suite for every ledger adapter
-
-**Files:**
-- Create: `src/testing/contracts/ledger-contract.ts`
-- Create: `src/testing/contracts/ledger-contract.test.ts`
-
-- [ ] **Step 1: Write the contract (it runs against any `RunLedger`)**
-
-```ts
-// src/testing/contracts/ledger-contract.ts
-import { describe, expect, test } from "bun:test";
-import type { RunLedger } from "../../contexts/learning/ports";
-
-const at = "2026-10-15T10:00:00.000Z";
-const outcome = (runId: string) => ({
-  runId,
-  at,
-  payload: { type: "outcome" as const, status: "failed" as const, reason: "r" },
-});
-
-/** Every RunLedger adapter must pass this suite unchanged (ADR-0005 pattern). */
-export function ledgerContract(name: string, make: () => Promise<RunLedger>): void {
-  describe(`ledger contract: ${name}`, () => {
-    test("sequence numbers are per run and start at 1", async () => {
-      const ledger = await make();
-      await ledger.append(outcome("a"));
-      await ledger.append(outcome("b"));
-      const a = await ledger.append(outcome("a"));
-      expect(a.ok && a.value.seq).toBe(2);
-    });
-
-    test("reads return entries in seq order", async () => {
-      const ledger = await make();
-      for (let i = 0; i < 3; i++) await ledger.append(outcome("c"));
-      const run = await ledger.read("c");
-      expect(run.ok && run.value.map((e) => e.seq)).toEqual([1, 2, 3]);
-    });
-
-    test("unknown runs read as empty, not as an error", async () => {
-      const ledger = await make();
-      const run = await ledger.read("never-written");
-      expect(run.ok && run.value).toEqual([]);
-    });
-
-    test("invalid entries are refused and nothing is listed", async () => {
-      const ledger = await make();
-      const bad = await ledger.append({ ...outcome("x"), at: "not a time" });
-      expect(bad.ok).toBe(false);
-      const ids = await ledger.listRunIds();
-      expect(ids.ok && ids.value).toEqual([]);
-    });
-  });
-}
-```
-
-```ts
-// src/testing/contracts/ledger-contract.test.ts
-import { FakeLedger } from "../fake-ledger";
-import { JsonlLedger } from "../../adapters/ledger/jsonl-ledger";
-import { createTestEnv } from "../test-env";
-import { ledgerContract } from "./ledger-contract";
-
-ledgerContract("fake", async () => new FakeLedger());
-ledgerContract("jsonl", async () => new JsonlLedger(createTestEnv().stateDir));
-```
-
-- [ ] **Step 2: Run it**
-
-Run: `bun test src/testing/contracts/ledger-contract.test.ts`
-Expected: 8 pass (4 tests × 2 adapters), 0 fail.
-
-Adapters added later (SQLite `RunJournal`-backed in Wave 1b; Postgres in Wave 2) must add one line each to this file, and they must pass unchanged.
-
-### Task A5: `shipwright ledger` command
-
-**Files:**
-- Create: `src/cli/commands/ledger.ts`
-- Modify: `src/cli/commands/index.ts` (register the command; read the file first and follow its pattern)
-- Modify: `src/main.ts` (add `ledger: () => RunLedger` to the `CommandContext`, built lazily like `safety`)
-- Modify: `src/cli/command.ts` (add the `ledger` field to `CommandContext`)
-- Test: `src/cli/commands/ledger.test.ts` (uses `src/testing/cli-harness.ts`)
-
-Behaviour:
-- `shipwright ledger append --run <id> --file <payload.json>`: reads one JSON object with `at` and `payload`; the file path is a validated argv value, never interpolated into a shell string. Exit 0 with the stored `seq` on stdout; exit 1 with the reason on stderr otherwise.
-- `shipwright ledger show --run <id> [--json]`
-- `shipwright ledger verify`: exit 0 when `verifyLedger` is ok, exit 1 otherwise (fail closed).
-
-- [ ] **Step 1: Write the failing CLI test** using the existing harness pattern (read `src/cli/commands/gates.ts` and its test first, and copy the harness usage exactly). Cover: `append` with a valid file exits 0 and prints `seq`; `append` with a corrupt file exits 1; `verify` exits 1 after a corrupt line is planted in the test's state directory.
-
-- [ ] **Step 2: Implement** the three subcommands by calling `appendEntry` and `verifyLedger` only. The command reads the payload file through a file-reader port that the adapter layer supplies (command code does not touch `node:fs`, F5).
-
-- [ ] **Step 3: Verify**
-
-Run: `bun test src/cli/commands/ledger.test.ts`
-Expected: all pass.
-
-Run: `bun run docs:gen && bun run docs:check`
-Expected: `docs/reference/cli.md` regenerated; `docs:check` exits 0.
-
-### Task A6: Record from CI and from the bash daemon (bridges, one line each)
-
-**Files:**
-- Modify: `.github/workflows/shipwright-pipeline.yml` (final outcome step)
-- Modify: `scripts/lib/daemon-failure.sh` (one call in `record_failure`)
-- Modify: `.github/workflows/shipwright-pipeline.yml` persist step (the `cp` list gains `ledger`; the push loses `--force`)
-
-- [ ] **Step 1: CI outcome step.** After the pipeline's result is known, write the payload with `jq -n --arg` into `$RUNNER_TEMP/outcome.json` (values come through `env:`, never `${{ }}` inside `run:`), then run `shipwright ledger append --run "$GITHUB_RUN_ID" --file "$RUNNER_TEMP/outcome.json"`. The step must not swallow errors: a failed append fails the job (workflow rule, ADR-0007).
-
-- [ ] **Step 2: Bash bridge.** In `record_failure`, write the payload to a `mktemp` file with `printf` and call `shipwright ledger append --run "issue-${issue_num}-$(date +%s)" --file "$tmp"`. Never build the command string from issue text.
-
-- [ ] **Step 3: Persist without force.** Replace the `git push origin shipwright-data --force` fallback for the `ledger/` path with: fetch, `git rebase` or re-copy the new ledger files on top of `origin/shipwright-data`, push without `--force`, retry up to 5 times. Ledger files are unique per run, so a rebase never conflicts with another run's files. Add a restore step that copies `ledger/` back from the branch before the run (as the optimize workflow already does for `memory` and `optimization`).
-
-- [ ] **Step 4: Verify**
-
-Run: `bun run arch`
-Expected: exit 0; the F11 and F10 findings count does not grow (compare `tools/arch/findings-baseline.json` before and after).
-
-Run: `bash scripts/sw-lib-daemon-failure-test.sh` is **not** the check here; see the GitHub verification below.
-
----
-
-## Phase B: failure classifier and retry policy
-
-**Exit criteria**
-1. `classifyFailure` returns the typed kind when one is given, the text rule otherwise, and never returns a class from source text.
-2. For the 2026-10-14 pre-flight auth failure text, `decideRetry` escalates on the first attempt. Replaying three such attempts makes exactly one escalation and zero retries.
-3. Two identical non-transient fingerprints in a row escalate. A transient failure is retried with exponential backoff, and never beyond `maxTransient`.
-4. `scripts/sw-daemon-test.sh`'s `test_classify_failure_auth` no longer greps source; it runs the function on a fixture log.
-5. The CI auto-retry step categorises through the TS command. An `AUTH` category is never retried and posts the existing "Pipeline Auth Failure" text, which dispatch already recognises.
-
-### Task B1: Failure classes and fingerprints (pure)
-
-**Files:**
-- Create: `src/contexts/learning/domain/failure.ts`
-- Test: `src/contexts/learning/domain/failure.test.ts`
-
-- [ ] **Step 1: Write the failing test**
-
-```ts
-// src/contexts/learning/domain/failure.test.ts
-import { describe, expect, test } from "bun:test";
-import { classifyFailure, failureFingerprint } from "./failure";
-
-describe("classifyFailure", () => {
-  test("a typed kind wins over text", () => {
-    expect(classifyFailure({ kind: "auth", text: "rate limit exceeded" })).toBe("auth");
-  });
-
-  test("the 2026-10-14 pre-flight auth text is an auth failure", () => {
-    const text = "::error::Claude Code authentication failed — check CLAUDE_CODE_OAUTH_TOKEN secret";
-    expect(classifyFailure({ text })).toBe("auth");
-  });
-
-  test("auth outranks transient when a log has both", () => {
-    expect(classifyFailure({ text: "429 rate limit\nAPI Error: 401 unauthorized" })).toBe("auth");
-  });
-
-  test("a mention of the token variable alone is not an auth failure", () => {
-    expect(classifyFailure({ text: "CLAUDE_CODE_OAUTH_TOKEN is documented in README" })).toBe("unknown");
-  });
-
-  test("text with no known pattern is unknown, not a guess", () => {
-    expect(classifyFailure({ text: "TypeError: cannot read properties of undefined" })).toBe("unknown");
-  });
-});
-
-describe("failureFingerprint", () => {
-  test("is stable across digits and paths", () => {
-    const a = failureFingerprint("execution", "build failed at /tmp/x/42 line 7");
-    const b = failureFingerprint("execution", "build failed at /tmp/y/9 line 3");
-    expect(a).toBe(b);
-  });
-
-  test("differs when the class differs", () => {
-    expect(failureFingerprint("auth", "x")).not.toBe(failureFingerprint("transient", "x"));
-  });
-});
-```
-
-- [ ] **Step 2: Run it to verify it fails**
-
-Run: `bun test src/contexts/learning/domain/failure.test.ts`
-Expected: FAIL with `Cannot find module './failure'`.
-
-- [ ] **Step 3: Write the implementation**
-
-```ts
-// src/contexts/learning/domain/failure.ts
-// Failure classes (spec §6.2 error fingerprinting). Pure. Domain code declares its own kind names
-// (F1 forbids importing the shared kernel), mirroring AgentFailureKind in shared/kernel/ports.ts.
-
-export type FailureClass =
-  | "auth"
-  | "invalid_input"
-  | "transient"
-  | "budget"
-  | "max_turns"
-  | "refusal"
-  | "schema"
-  | "truncated"
-  | "timeout"
-  | "execution"
-  | "unknown";
+import type { AgentFailureKind } from "../../../shared/kernel/ports";
+
+// Failure classes (spec §6.2 error fingerprinting). Pure: F1 allows importing shared/kernel types.
+export const FAILURE_CLASSES = [
+  "auth",
+  "invalid_input",
+  "environment",
+  "transient",
+  "budget",
+  "max_turns",
+  "refusal",
+  "schema",
+  "truncated",
+  "timeout",
+  "execution",
+  "unknown",
+] as const;
+export type FailureClass = (typeof FAILURE_CLASSES)[number];
 
 export interface FailureEvidence {
-  /** The typed agent failure kind, when one exists (AgentFailureKind). Wins over text. */
-  readonly kind?: string;
-  /** Log or error text. */
+  /** The typed agent failure kind when the caller has one. It always wins over text. */
+  readonly kind?: AgentFailureKind;
+  /** Log or error text, for example the tail of a run log. */
   readonly text?: string;
 }
 
-const KIND_CLASS: Readonly<Record<string, FailureClass>> = {
+// Exhaustive over AgentFailureKind: a new kind fails the typecheck until it is mapped here.
+const KIND_CLASS: Readonly<Record<AgentFailureKind, FailureClass>> = {
   auth: "auth",
   transient: "transient",
   budget: "budget",
@@ -948,26 +272,67 @@ const KIND_CLASS: Readonly<Record<string, FailureClass>> = {
   aborted: "execution",
 };
 
-// First match wins. Auth is first: retrying an auth failure cannot help, so it must not be
-// masked by a rate-limit line in the same log. The bare variable name is deliberately not a rule.
-const TEXT_RULES: ReadonlyArray<readonly [RegExp, FailureClass]> = [
-  [
-    /authentication[ _]failed|invalid api key|api error: 401|oauth token (is )?(expired|invalid)|not logged in|unauthorized/i,
-    "auth",
-  ],
-  [/issue not found|api error: 404|no body|could not resolve|issue.*does not exist/i, "invalid_input"],
-  [
-    /rate.?limit|overloaded|api error: (429|5\d\d)|econnreset|etimedout|socket hang up|service unavailable|econnrefused|eai_again/i,
-    "transient",
-  ],
+// Error lines: only these lines are searched by rules scoped to "error" (anchoring, B6).
+const ERROR_LINE = /error|fail|fatal|exception|::error::|enoent|eacces|not found|lockfile/i;
+
+interface Rule {
+  readonly pattern: RegExp;
+  readonly cls: FailureClass;
+  /** "error" rules search error lines only; "any" rules search the whole text. */
+  readonly scope: "any" | "error";
+}
+
+// First match wins. Auth comes first: retrying an auth failure cannot help, so a rate-limit line
+// in the same log must not mask it. The bare token variable name is deliberately not a rule.
+const RULES: readonly Rule[] = [
+  {
+    pattern:
+      /authentication[ _]failed|invalid api key|api error: 401|oauth token (is )?(expired|invalid)|not logged in|unauthorized/i,
+    cls: "auth",
+    scope: "any",
+  },
+  {
+    pattern: /issue not found|api error: 404|no body|could not resolve|issue.*does not exist/i,
+    cls: "invalid_input",
+    scope: "any",
+  },
+  {
+    pattern:
+      /command not found|enoent.*(node_modules|\.bin|tsconfig|package\.json)|eacces.*(node_modules|\.bin|\.cache)|error: lockfile|lockfile is frozen|could not (install|resolve) (dependencies|packages)/i,
+    cls: "environment",
+    scope: "error",
+  },
+  {
+    pattern:
+      /rate.?limit|overloaded|api error: (429|5\d\d)|econnreset|etimedout|socket hang up|service unavailable|econnrefused|eai_again/i,
+    cls: "transient",
+    scope: "any",
+  },
 ];
 
+export function errorLines(text: string): string {
+  return text
+    .split("\n")
+    .filter((line) => ERROR_LINE.test(line))
+    .join("\n");
+}
+
+/** The last line that looks like an error; the last non-empty line when there is none. */
+export function lastErrorLine(text: string): string {
+  const lines = text
+    .split("\n")
+    .map((line) => line.trim())
+    .filter((line) => line !== "");
+  const errors = lines.filter((line) => ERROR_LINE.test(line));
+  return errors.at(-1) ?? lines.at(-1) ?? "";
+}
+
 export function classifyFailure(evidence: FailureEvidence): FailureClass {
-  const typed = evidence.kind !== undefined ? KIND_CLASS[evidence.kind] : undefined;
-  if (typed !== undefined) return typed;
+  if (evidence.kind !== undefined) return KIND_CLASS[evidence.kind];
   const text = evidence.text ?? "";
-  for (const [pattern, cls] of TEXT_RULES) {
-    if (pattern.test(text)) return cls;
+  for (const rule of RULES) {
+    const haystack = rule.scope === "error" ? errorLines(text) : text;
+    if (rule.pattern.test(haystack)) return rule.cls;
   }
   return "unknown";
 }
@@ -982,96 +347,25 @@ export function fnv1a(input: string): string {
   return (hash >>> 0).toString(16).padStart(8, "0");
 }
 
-/** Digits, paths, timestamps and hex are normalised so the same failure groups together. */
+/** Groups identical failures: the normalised last error line, not the whole tail. */
 export function failureFingerprint(cls: FailureClass, text: string): string {
-  const normalised = text
+  const normalised = lastErrorLine(text)
     .toLowerCase()
     .replace(/\/[^\s'":]+/g, "<path>")
     .replace(/\d{4}-\d{2}-\d{2}t?[\d:.z+-]*/g, "<time>")
-    .replace(/0x[0-9a-f]+|[0-9a-f]{7,40}/g, "<hex>")
+    .replace(/0x[0-9a-f]+|\b[0-9a-f]{7,40}\b/g, "<hex>")
     .replace(/\d+/g, "0")
     .replace(/\s+/g, " ")
     .trim()
-    .slice(0, 160);
+    .slice(0, 200);
   return `${cls}:${fnv1a(normalised)}`;
 }
 ```
 
-- [ ] **Step 4: Run it to verify it passes**
-
-Run: `bun test src/contexts/learning/domain/failure.test.ts`
-Expected: `7 pass, 0 fail`.
-
-### Task B2: Retry decision (pure)
-
-**Files:**
-- Create: `src/contexts/learning/domain/retry.ts`
-- Test: `src/contexts/learning/domain/retry.test.ts`
-
-- [ ] **Step 1: Write the failing test**
+- [ ] **Step 2: Retry decision.** Copy this file as written (`src/contexts/learning/domain/retry.ts`):
 
 ```ts
-// src/contexts/learning/domain/retry.test.ts
-import { describe, expect, test } from "bun:test";
-import { type Attempt, decideRetry, type RetryPolicy } from "./retry";
-
-const policy: RetryPolicy = { maxAttempts: 4, maxTransient: 3, baseDelayMs: 1000, maxDelayMs: 60_000 };
-const att = (cls: Attempt["cls"], fingerprint = `${cls}:x`): Attempt => ({ cls, fingerprint });
-
-describe("decideRetry", () => {
-  test("auth is never retried; it escalates to a human on the first attempt", () => {
-    const d = decideRetry([att("auth")], policy);
-    expect(d.action).toBe("escalate");
-  });
-
-  test("invalid input is never retried", () => {
-    expect(decideRetry([att("invalid_input")], policy).action).toBe("escalate");
-  });
-
-  test("the same non-transient failure twice escalates", () => {
-    const same = att("execution", "execution:abc");
-    const d = decideRetry([same, same], policy);
-    expect(d).toMatchObject({ action: "escalate" });
-    if (d.action === "escalate") expect(d.reason).toContain("same failure twice");
-  });
-
-  test("two distinct budget failures are retried within caps", () => {
-    const d = decideRetry([att("budget", "b:1"), att("budget", "b:2")], policy);
-    expect(d.action).toBe("retry");
-  });
-
-  test("transient failures back off exponentially", () => {
-    const d = decideRetry([att("transient", "t:1"), att("transient", "t:1")], policy);
-    expect(d).toMatchObject({ action: "retry", delayMs: 2000 });
-  });
-
-  test("transient failures escalate once they exceed maxTransient", () => {
-    const many = Array.from({ length: 4 }, () => att("transient", "t:1"));
-    const d = decideRetry(many, { ...policy, maxAttempts: 10 });
-    expect(d.action).toBe("escalate");
-  });
-
-  test("the attempt cap cannot be exceeded", () => {
-    const four = [att("budget", "1"), att("budget", "2"), att("budget", "3"), att("budget", "4")];
-    expect(decideRetry(four, policy).action).toBe("escalate");
-  });
-
-  test("no history means no decision to act on: escalate", () => {
-    expect(decideRetry([], policy).action).toBe("escalate");
-  });
-});
-```
-
-- [ ] **Step 2: Run it to verify it fails**
-
-Run: `bun test src/contexts/learning/domain/retry.test.ts`
-Expected: FAIL with `Cannot find module './retry'`.
-
-- [ ] **Step 3: Write the implementation**
-
-```ts
-// src/contexts/learning/domain/retry.ts
-import type { FailureClass } from "./failure";
+import { FAILURE_CLASSES, type FailureClass } from "./failure";
 
 export interface Attempt {
   readonly cls: FailureClass;
@@ -1079,7 +373,7 @@ export interface Attempt {
 }
 
 export interface RetryPolicy {
-  /** Total runs allowed, first run included. The fix-loop cap (ADR-0007) is 4. */
+  /** Total runs allowed, first run included. */
   readonly maxAttempts: number;
   readonly maxTransient: number;
   readonly baseDelayMs: number;
@@ -1098,7 +392,7 @@ export const DEFAULT_RETRY_POLICY: RetryPolicy = {
   maxDelayMs: 3_600_000,
 };
 
-const NEVER_RETRY: ReadonlySet<FailureClass> = new Set(["auth", "invalid_input"]);
+const NEVER_RETRY: ReadonlySet<FailureClass> = new Set<FailureClass>(["auth", "invalid_input"]);
 
 /** Decides from the attempt history of one issue. Pure; the caller records the decision. */
 export function decideRetry(history: readonly Attempt[], policy: RetryPolicy): RetryDecision {
@@ -1110,12 +404,21 @@ export function decideRetry(history: readonly Attempt[], policy: RetryPolicy): R
   if (history.length >= policy.maxAttempts) {
     return { action: "escalate", reason: `attempt cap ${policy.maxAttempts} reached` };
   }
+  if (last.cls === "environment") return environmentDecision(history);
   const prev = history.at(-2);
   if (prev !== undefined && prev.fingerprint === last.fingerprint && last.cls !== "transient") {
     return { action: "escalate", reason: `same failure twice (${last.fingerprint})` };
   }
   if (last.cls === "transient") return retryTransient(history, policy);
   return { action: "retry", delayMs: 0, reason: `${last.cls}: retry within caps` };
+}
+
+function environmentDecision(history: readonly Attempt[]): RetryDecision {
+  const environmentRuns = history.filter((a) => a.cls === "environment").length;
+  if (environmentRuns > 1) {
+    return { action: "escalate", reason: "environment: fix the setup; retrying will not help" };
+  }
+  return { action: "retry", delayMs: 0, reason: "environment: one retry, then escalate" };
 }
 
 function retryTransient(history: readonly Attempt[], policy: RetryPolicy): RetryDecision {
@@ -1126,586 +429,1731 @@ function retryTransient(history: readonly Attempt[], policy: RetryPolicy): Retry
   const delayMs = Math.min(policy.baseDelayMs * 2 ** (transients - 1), policy.maxDelayMs);
   return { action: "retry", delayMs, reason: `transient (${transients}): backoff` };
 }
+
+const CLASS_SET: ReadonlySet<string> = new Set<string>(FAILURE_CLASSES);
+
+/** Validates the `--attempts FILE` JSON: an array of {cls, fingerprint}. Fails closed. */
+export function parseAttempts(
+  value: unknown,
+): { readonly ok: true; readonly attempts: readonly Attempt[] } | { readonly ok: false; readonly reason: string } {
+  if (!Array.isArray(value)) return { ok: false, reason: "attempts must be a JSON array" };
+  const attempts: Attempt[] = [];
+  for (const [i, item] of value.entries()) {
+    if (typeof item !== "object" || item === null) return { ok: false, reason: `attempt ${i} is not an object` };
+    const { cls, fingerprint } = item as Record<string, unknown>;
+    if (typeof cls !== "string" || !CLASS_SET.has(cls)) return { ok: false, reason: `attempt ${i}: unknown class` };
+    if (typeof fingerprint !== "string" || fingerprint.length === 0) {
+      return { ok: false, reason: `attempt ${i}: missing fingerprint` };
+    }
+    attempts.push({ cls: cls as FailureClass, fingerprint });
+  }
+  return { ok: true, attempts };
+}
 ```
 
-- [ ] **Step 4: Run it to verify it passes**
+- [ ] **Step 3: Domain tests.** Copy these two files as written:
 
-Run: `bun test src/contexts/learning/domain/retry.test.ts`
-Expected: `8 pass, 0 fail`.
+`src/contexts/learning/domain/failure.test.ts`:
+```ts
+import { describe, expect, test } from "bun:test";
+import { classifyFailure, failureFingerprint, lastErrorLine } from "./failure";
 
-Note on the transient test: two transient attempts give `transients = 2`, so `delayMs = base * 2^(2-1) = 2000`. This is the expected value in the test.
+describe("classifyFailure", () => {
+  test("a typed kind wins over text", () => {
+    expect(classifyFailure({ kind: "auth", text: "rate limit exceeded" })).toBe("auth");
+  });
 
-### Task B3: Classify use case and the `shipwright failure classify` command
+  test("the pre-flight auth text from ci.yml is an auth failure", () => {
+    const text = "::error::Claude Code authentication failed — check CLAUDE_CODE_OAUTH_TOKEN secret";
+    expect(classifyFailure({ text })).toBe("auth");
+  });
 
-**Files:**
-- Create: `src/contexts/learning/application/classify-failure.ts`
-- Test: `src/contexts/learning/application/classify-failure.test.ts`
-- Create: `src/cli/commands/failure.ts`; register it; wire a file-text port through `main.ts` (as Phase A did for the ledger)
-- Test: `src/cli/commands/failure.test.ts`
+  test("auth outranks transient when a log has both", () => {
+    expect(classifyFailure({ text: "429 rate limit\nAPI Error: 401 unauthorized" })).toBe("auth");
+  });
 
-Behaviour: the use case takes `evidence` (kind and text) and the prior `attempts` list. It returns `{ class, fingerprint, decision }` and appends a `decision` ledger entry with `policyVersion: "failure-v1"`, the inputs (class, fingerprint, attempts count) and the output. The CLI takes `--log FILE` (text is read by the adapter), optional `--kind K`, optional `--attempts FILE` (JSON array of `{cls, fingerprint}`), and `--json`. Exit 0 for retry, 3 for escalate (distinct from 1, which means an error), 2 for usage errors.
+  test("a mention of the token variable alone is not an auth failure", () => {
+    expect(classifyFailure({ text: "CLAUDE_CODE_OAUTH_TOKEN is documented in README" })).toBe("unknown");
+  });
 
-- [ ] **Step 1: Failing test for the use case** (with `FakeLedger`): the auth text produces `escalate`, one `decision` entry is in the ledger, and its `output.action` is `"escalate"`.
+  test("bun install logs with a healthy lockfile are not environment failures", () => {
+    const text = "bun install v1.2.19\nLockfile: bun.lock\nInstalled 812 packages";
+    expect(classifyFailure({ text })).toBe("unknown");
+  });
 
-- [ ] **Step 2: Failing CLI test** using the command harness: `--log` pointing at a fixture file containing the pre-flight text exits 3 and prints JSON with `"class":"auth"`.
+  test("a missing binary on an error line is an environment failure", () => {
+    expect(classifyFailure({ text: "setup step\nbun: command not found" })).toBe("environment");
+  });
 
-- [ ] **Step 3: Implement** the use case by calling `classifyFailure`, `failureFingerprint` and `decideRetry`, then `appendEntry`. The CLI reads the log through the file-text port, never with `node:fs`.
+  test("a permission error outside node_modules is not an environment failure", () => {
+    expect(classifyFailure({ text: "EACCES: permission denied, open '/etc/hosts'" })).toBe("unknown");
+  });
 
-- [ ] **Step 4: Verify**
+  test("text with no known pattern is unknown, not a guess", () => {
+    expect(classifyFailure({ text: "TypeError: cannot read properties of undefined" })).toBe("unknown");
+  });
+});
+
+describe("failureFingerprint", () => {
+  test("is stable across digits and paths in the last error line", () => {
+    const a = failureFingerprint("execution", "build failed at /tmp/x/42 line 7");
+    const b = failureFingerprint("execution", "build failed at /tmp/y/9 line 3");
+    expect(a).toBe(b);
+  });
+
+  test("ignores a different preamble when the last error line is the same", () => {
+    const a = failureFingerprint("execution", "step 1 ok\nbuild failed: tsc exit 2");
+    const b = failureFingerprint("execution", "compiling 900 files\nstep 9\nbuild failed: tsc exit 2");
+    expect(a).toBe(b);
+  });
+
+  test("differs when the class differs", () => {
+    expect(failureFingerprint("auth", "x fail")).not.toBe(failureFingerprint("transient", "x fail"));
+  });
+
+  test("lastErrorLine prefers the last error-looking line", () => {
+    expect(lastErrorLine("ok\nerror: first\nmore output\nfatal: last\ntrailer")).toBe("fatal: last");
+  });
+});
+```
+
+`src/contexts/learning/domain/retry.test.ts`:
+```ts
+import { describe, expect, test } from "bun:test";
+import { type Attempt, decideRetry, DEFAULT_RETRY_POLICY, parseAttempts, type RetryPolicy } from "./retry";
+
+const policy: RetryPolicy = { maxAttempts: 4, maxTransient: 3, baseDelayMs: 1000, maxDelayMs: 60_000 };
+const att = (cls: Attempt["cls"], fingerprint = `${cls}:x`): Attempt => ({ cls, fingerprint });
+
+describe("decideRetry", () => {
+  test("auth is never retried; it escalates on the first attempt", () => {
+    expect(decideRetry([att("auth")], policy).action).toBe("escalate");
+  });
+
+  test("invalid input is never retried", () => {
+    expect(decideRetry([att("invalid_input")], policy).action).toBe("escalate");
+  });
+
+  test("the same non-transient failure twice escalates", () => {
+    const same = att("execution", "execution:abc");
+    const d = decideRetry([same, same], policy);
+    expect(d.action).toBe("escalate");
+    if (d.action === "escalate") expect(d.reason).toContain("same failure twice");
+  });
+
+  test("an environment failure is retried once, then escalates", () => {
+    expect(decideRetry([att("environment", "e:1")], policy).action).toBe("retry");
+    expect(decideRetry([att("environment", "e:1"), att("environment", "e:2")], policy).action).toBe("escalate");
+  });
+
+  test("two distinct budget failures are retried within caps", () => {
+    expect(decideRetry([att("budget", "b:1"), att("budget", "b:2")], policy).action).toBe("retry");
+  });
+
+  test("transient failures back off exponentially", () => {
+    const d = decideRetry([att("transient", "t:1"), att("transient", "t:1")], policy);
+    expect(d).toMatchObject({ action: "retry", delayMs: 2000 });
+  });
+
+  test("transient failures escalate once they exceed maxTransient", () => {
+    const many = Array.from({ length: 4 }, () => att("transient", "t:1"));
+    expect(decideRetry(many, { ...policy, maxAttempts: 10 }).action).toBe("escalate");
+  });
+
+  test("the attempt cap cannot be exceeded", () => {
+    const four = [att("budget", "1"), att("budget", "2"), att("budget", "3"), att("budget", "4")];
+    expect(decideRetry(four, policy).action).toBe("escalate");
+  });
+
+  test("no history means no decision to act on: escalate", () => {
+    expect(decideRetry([], policy).action).toBe("escalate");
+  });
+
+  test("the default policy never allows more than four runs", () => {
+    const four = [1, 2, 3, 4].map((n) => att("budget", `b:${n}`));
+    expect(decideRetry(four, DEFAULT_RETRY_POLICY).action).toBe("escalate");
+  });
+});
+
+describe("parseAttempts", () => {
+  test("accepts a well-formed array", () => {
+    const r = parseAttempts([{ cls: "transient", fingerprint: "transient:1" }]);
+    expect(r.ok).toBe(true);
+  });
+
+  test("refuses an unknown class rather than guessing", () => {
+    const r = parseAttempts([{ cls: "weather", fingerprint: "x" }]);
+    expect(r).toEqual({ ok: false, reason: "attempt 0: unknown class" });
+  });
+
+  test("refuses a non-array document", () => {
+    expect(parseAttempts({})).toEqual({ ok: false, reason: "attempts must be a JSON array" });
+  });
+});
+```
+
+- [ ] **Step 4: Run the domain tests.**
+
+Run: `bun test src/contexts/learning/domain`
+Expected: `25 pass`, `0 fail`. (12 classifier tests, 10 retry tests and 3 `parseAttempts` tests.)
+
+- [ ] **Step 5: The file-reader port.** Add to `src/shared/kernel/ports.ts`, after the existing `IssueTracker` block:
+
+```ts
+// ── Files (read-only; commands take this port, adapters implement it) ────────
+/** Reads a text file. Command code uses this port; only adapters touch the filesystem (F5). */
+export interface FileReader {
+  readText(path: string): Promise<Result<string, AdapterError>>;
+}
+```
+
+- [ ] **Step 6: The adapter.** Create `src/adapters/state/node-file-reader.ts`:
+
+```ts
+import { readFile } from "node:fs/promises";
+import { err, ok, type Result } from "../../shared/kernel/result";
+import type { AdapterError, FileReader } from "../../shared/kernel/ports";
+
+export class NodeFileReader implements FileReader {
+  async readText(path: string): Promise<Result<string, AdapterError>> {
+    try {
+      return ok(await readFile(path, "utf8"));
+    } catch (cause) {
+      const missing = (cause as { code?: string }).code === "ENOENT";
+      return err({ kind: missing ? "not_found" : "failed", message: String(cause) });
+    }
+  }
+}
+```
+
+- [ ] **Step 7: The fake and the harness.** Create `src/testing/fake-file-reader.ts`:
+
+```ts
+import { err, ok, type Result } from "../shared/kernel/result";
+import type { AdapterError, FileReader } from "../shared/kernel/ports";
+
+/** In-memory FileReader for command tests. A missing path is `not_found`. */
+export class FakeFileReader implements FileReader {
+  constructor(private readonly files: Readonly<Record<string, string>>) {}
+
+  async readText(path: string): Promise<Result<string, AdapterError>> {
+    const text = this.files[path];
+    return text === undefined ? err({ kind: "not_found", message: `no fake file ${path}` }) : ok(text);
+  }
+}
+```
+
+Replace `commandContext` in `src/testing/cli-harness.ts` with this version. It keeps the existing `safety` handling and adds `files`:
+
+```ts
+/** A command context. `files()` throws unless a reader is given (commands that read none need none). */
+export function commandContext(
+  io: CliIO,
+  safety?: SafetyPorts,
+  env: Readonly<Record<string, string | undefined>> = {},
+  files?: FileReader,
+): CommandContext {
+  return {
+    io,
+    version: "3.3.0",
+    env,
+    safety: () => {
+      if (!safety) throw new Error("this command was not given safety ports");
+      return safety;
+    },
+    files: () => {
+      if (!files) throw new Error("this command was not given a file reader");
+      return files;
+    },
+  };
+}
+```
+Add `import type { FileReader } from "../shared/kernel/ports";` to the top of that file.
+
+In `src/cli/command.ts`, add this field to `CommandContext`, and the import `import type { FileReader } from "../shared/kernel/ports";`:
+
+```ts
+  /** File reads for commands; built by main.ts from the adapter (commands never touch node:fs). */
+  readonly files: () => FileReader;
+```
+
+In `src/main.ts`, add the import `import { NodeFileReader } from "./adapters/state/node-file-reader";` and a module-level `const fileReader = new NodeFileReader();`, then pass `files: () => fileReader` in the `command.run(...)` context object next to `safety`.
+
+- [ ] **Step 8: Application.** Copy this file as written (`src/contexts/learning/application/classify.ts`):
+
+```ts
+import type { AgentFailureKind } from "../../../shared/kernel/ports";
+import { classifyFailure, type FailureClass, failureFingerprint } from "../domain/failure";
+import { type Attempt, DEFAULT_RETRY_POLICY, decideRetry, type RetryDecision, type RetryPolicy } from "../domain/retry";
+
+export interface ClassifyInput {
+  readonly kind?: AgentFailureKind;
+  readonly text: string;
+  readonly attempts: readonly Attempt[];
+}
+
+export interface ClassifyResult {
+  readonly class: FailureClass;
+  readonly fingerprint: string;
+  readonly decision: RetryDecision;
+}
+
+/** Pure composition: classify this run, then decide with the prior attempts. Writes nothing. */
+export function classifyAndDecide(
+  input: ClassifyInput,
+  policy: RetryPolicy = DEFAULT_RETRY_POLICY,
+): ClassifyResult {
+  const cls = classifyFailure(input.kind === undefined ? { text: input.text } : { kind: input.kind, text: input.text });
+  const fingerprint = failureFingerprint(cls, input.text);
+  const decision = decideRetry([...input.attempts, { cls, fingerprint }], policy);
+  return { class: cls, fingerprint, decision };
+}
+```
+
+Copy this file as written (`src/contexts/learning/index.ts`), the only file other contexts and the CLI import from:
+
+```ts
+export { type ClassifyInput, type ClassifyResult, classifyAndDecide } from "./application/classify";
+export { classifyFailure, failureFingerprint, FAILURE_CLASSES, type FailureClass, type FailureEvidence } from "./domain/failure";
+export { type Attempt, DEFAULT_RETRY_POLICY, decideRetry, parseAttempts, type RetryDecision, type RetryPolicy } from "./domain/retry";
+```
+
+- [ ] **Step 9: The command.** Copy this file as written (`src/cli/commands/failure.ts`):
+
+```ts
+import type { AgentFailureKind } from "../../shared/kernel/ports";
+import { type Attempt, classifyAndDecide, parseAttempts } from "../../contexts/learning";
+import type { Command, CommandContext } from "../command";
+
+const KINDS: readonly string[] = [
+  "refusal", "max_turns", "budget", "schema", "truncated", "timeout", "aborted", "transient", "auth", "execution",
+];
+
+const usage = `USAGE
+  shipwright failure classify --log FILE [--kind KIND] [--attempts FILE] [--json]
+
+DESCRIPTION
+  Classifies one failed run from its log (and an optional typed agent kind) and decides retry or
+  escalate. Pure: it writes nothing. Auth and invalid-input failures always escalate; an environment
+  failure is retried once. --attempts is a JSON array of {cls, fingerprint} from earlier runs.
+
+EXIT CODES
+  0  retry      3  escalate      1  could not read or decide (fails closed)      2  usage error`;
+
+interface Flags {
+  readonly log: string;
+  readonly kind?: string;
+  readonly attempts?: string;
+  readonly json: boolean;
+}
+
+function parseFlags(args: readonly string[]): Flags | string {
+  let log: string | undefined;
+  let kind: string | undefined;
+  let attempts: string | undefined;
+  let json = false;
+  for (let i = 0; i < args.length; i++) {
+    const arg = args[i];
+    if (arg === "--json") {
+      json = true;
+    } else if (arg === "--log" || arg === "--kind" || arg === "--attempts") {
+      const value = args[i + 1];
+      if (value === undefined || value.startsWith("--")) return `${arg} needs a value`;
+      if (arg === "--log") log = value;
+      else if (arg === "--kind") kind = value;
+      else attempts = value;
+      i++;
+    } else {
+      return `unknown option: ${arg}`;
+    }
+  }
+  if (log === undefined) return "--log is required";
+  return {
+    log,
+    json,
+    ...(kind === undefined ? {} : { kind }),
+    ...(attempts === undefined ? {} : { attempts }),
+  };
+}
+
+async function readAttempts(ctx: CommandContext, path: string): Promise<readonly Attempt[] | string> {
+  const raw = await ctx.files().readText(path);
+  if (!raw.ok) return `cannot read attempts: ${raw.error.message}`;
+  let json: unknown;
+  try {
+    json = JSON.parse(raw.value);
+  } catch {
+    return "--attempts is not JSON";
+  }
+  const checked = parseAttempts(json);
+  return checked.ok ? checked.attempts : checked.reason;
+}
+
+async function classify(args: readonly string[], ctx: CommandContext): Promise<number> {
+  const flags = parseFlags(args);
+  if (typeof flags === "string") {
+    ctx.io.err(`✗ ${flags}`);
+    ctx.io.out(usage);
+    return 2;
+  }
+  if (flags.kind !== undefined && !KINDS.includes(flags.kind)) {
+    ctx.io.err(`✗ unknown --kind: ${flags.kind}`);
+    return 2;
+  }
+  const log = await ctx.files().readText(flags.log);
+  if (!log.ok) {
+    ctx.io.err(`✗ cannot read log: ${log.error.message}`);
+    return 1;
+  }
+  const attempts = flags.attempts === undefined ? [] : await readAttempts(ctx, flags.attempts);
+  if (typeof attempts === "string") {
+    ctx.io.err(`✗ ${attempts}`);
+    return 1;
+  }
+  const result = classifyAndDecide({
+    ...(flags.kind === undefined ? {} : { kind: flags.kind as AgentFailureKind }),
+    text: log.value,
+    attempts,
+  });
+  const line = {
+    class: result.class,
+    fingerprint: result.fingerprint,
+    action: result.decision.action,
+    reason: result.decision.reason,
+  };
+  ctx.io.out(flags.json ? JSON.stringify(line) : `${line.action}: ${line.class} (${line.reason})`);
+  return line.action === "retry" ? 0 : 3;
+}
+
+export const failureCommand: Command = {
+  name: "failure",
+  aliases: [],
+  summary: "Classify a failed run and decide retry or escalate (ADR-0009)",
+  usage,
+  async run(args, ctx) {
+    const [sub, ...rest] = args;
+    if (sub === undefined || sub === "--help" || sub === "-h") {
+      ctx.io.out(usage);
+      return sub === undefined ? 2 : 0;
+    }
+    if (sub !== "classify") {
+      ctx.io.err(`✗ unknown subcommand: ${sub}`);
+      ctx.io.out(usage);
+      return 2;
+    }
+    return classify(rest, ctx);
+  },
+};
+```
+
+- [ ] **Step 10: Command tests.** Copy this file as written (`src/cli/commands/failure.test.ts`). It uses `commandContext(io, undefined, {}, files)` with the new signature:
+
+```ts
+import { describe, expect, test } from "bun:test";
+import { captureIO, commandContext } from "../../testing/cli-harness";
+import { FakeFileReader } from "../../testing/fake-file-reader";
+import { failureCommand } from "./failure";
+
+const files = new FakeFileReader({
+  "/logs/pre.log": "::error::Claude Code authentication failed — check CLAUDE_CODE_OAUTH_TOKEN secret\n",
+  "/logs/rate.log": "API Error: 429 rate limit\n",
+});
+
+describe("failure classify", () => {
+  test("auth text escalates with exit 3 and class auth", async () => {
+    const io = captureIO();
+    const code = await failureCommand.run(["classify", "--log", "/logs/pre.log", "--json"], commandContext(io, files));
+    expect(code).toBe(3);
+    expect(JSON.parse(io.outLines[0] ?? "{}")).toMatchObject({ class: "auth", action: "escalate" });
+  });
+
+  test("an unreadable log fails closed with exit 1", async () => {
+    const io = captureIO();
+    expect(await failureCommand.run(["classify", "--log", "/nope.log"], commandContext(io, files))).toBe(1);
+  });
+
+  test("a missing --log is a usage error with exit 2", async () => {
+    const io = captureIO();
+    expect(await failureCommand.run(["classify"], commandContext(io, files))).toBe(2);
+  });
+
+  test("a first transient failure retries with exit 0", async () => {
+    const io = captureIO();
+    expect(await failureCommand.run(["classify", "--log", "/logs/rate.log"], commandContext(io, files))).toBe(0);
+  });
+});
+```
+
+- [ ] **Step 11: Register the command and the router.** Add `failureCommand` to the array in `src/cli/commands/index.ts` (import from `./failure`). In `scripts/sw`, add this block immediately after the `gates)` block, before `*)`:
+
+```bash
+        failure)
+            run_ts failure "$@"
+            ;;
+```
+
+- [ ] **Step 12: Port entry and generated reference.** Append to `docs/plans/port/progress.json`:
+
+```json
+  {
+    "command": "failure",
+    "aliases": [],
+    "script": null,
+    "context": "learning",
+    "parity": null,
+    "status": "parity-green",
+    "notes": "New in Wave 2 (W2-02): failure classification and retry decision (ADR-0009). No bash predecessor; bash classify_failure calls it (W2-04)."
+  }
+```
+If `bun run port:check` rejects `"script": null`, use the file name of the nearest bash predecessor (`sw-daemon.sh`) and record why in `notes`.
+
+Run: `bun run docs:gen && bun run docs:check`
+Expected: both exit 0; `docs/reference/cli.md` now lists `failure`.
+
+- [ ] **Step 13: Run.**
 
 Run: `bun test src/contexts/learning src/cli/commands/failure.test.ts`
-Expected: all pass.
+Expected: `29 pass`, `0 fail`.
 
 Run: `bun run check:fast`
 Expected: exit 0.
 
-### Task B4: Bash bridge: `classify_failure` calls the TS classifier
+Run: `bun run port:check`
+Expected: exit 0.
 
-**Files:**
-- Modify: `scripts/lib/daemon-failure.sh` (lines 22–75: replace the body)
-- Modify: `scripts/sw-daemon-test.sh` (`test_classify_failure_auth`, lines ~1683–1692)
+---
 
-Mapping (the bash names stay, so callers do not change). Read `daemon-failure.sh` lines 60–75 first to confirm the bash default for an unmatched log before writing the mapping.
+### W2-03: auto-retry, AUTH category, Bun before categorisation
 
-| TS class | Bash output |
-|---|---|
-| `auth` | `auth_error` |
-| `transient` | `api_error` |
-| `invalid_input` | `invalid_issue` |
-| `max_turns`, `truncated`, `budget` | `context_exhaustion` (only when the progress file shows it; otherwise the bash default, as today) |
-| all others | the bash default used for an unmatched log today |
+**Purpose:** an auth failure is never retried, and the categorisation is typed. Two steps install Bun before the categorisation step, so the classifier is available on CI.
 
-- [ ] **Step 1: Rewrite `test_classify_failure_auth`** so it writes a fixture log containing the pre-flight text into a temporary `LOG_DIR`, sources the function, calls `classify_failure 42`, and asserts the output is `auth_error`. Delete the `grep -A 30 'classify_failure()'` assertions. (Hermetic: the suite already mocks `gh`; it must not touch the real `HOME`.)
+**Files:** Modify `.github/workflows/shipwright-auto-retry.yml` only.
 
-- [ ] **Step 2: Replace the body** of `classify_failure` with a call: write the log tail to a `mktemp` file, run `shipwright failure classify --log "$tmp" --json` (argv only, no `eval`, no `sh -c`), and map the `class` field with a `case` statement. If the TS command is missing (Bun absent), return the bash default and log a warning: the daemon fails open on classification but closed on gates. The gates still refuse to dispatch (ADR-0007).
+- [ ] **Step 1: Install Bun before categorisation.** Insert these two steps immediately before the step named `Categorize error from run logs`:
 
-- [ ] **Step 3: Verify hermetically**
+```yaml
+      # Bun runs the TypeScript failure classifier (W2-02). Pinned like the safety-gates action;
+      # no lifecycle scripts run.
+      - name: Set up Bun for the failure classifier
+        if: steps.extract.outputs.issue_number != ''
+        uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
+        with:
+          bun-version: 1.2.19
 
-Run: `bash scripts/sw-test-all.sh --pattern sw-lib-daemon-failure-test`
-Expected: the suite passes; no output piped.
+      - name: Install the Shipwright CLI dependencies
+        if: steps.extract.outputs.issue_number != ''
+        shell: bash
+        run: bun install --frozen-lockfile --ignore-scripts
+```
 
-Run: `bun run arch`
-Expected: exit 0; the F11 findings for `daemon-failure.sh` must not increase (the new call is argv-only).
+- [ ] **Step 2: Classify before the regex categories.** In the step `Categorize error from run logs`, insert this block immediately before the line `# Check for TRANSIENT patterns: timeouts, rate limits, connection errors`. It runs after the no-changes and cancelled checks, so it is the last word on the auth category:
 
-### Task B5: CI auto-retry uses the classifier; `AUTH` never retries
+```bash
+          # Typed classification (W2-02): exit 0 = retry, 3 = escalate. Any other exit fails the job.
+          # The log tail is data: it reaches the classifier as a file, never as a command string.
+          printf '%s\n' "$LOG_TAIL" > "$RUNNER_TEMP/failed-run.log"
+          if bun src/cli.ts failure classify --log "$RUNNER_TEMP/failed-run.log" --json > "$RUNNER_TEMP/classify.json"; then
+            CLASSIFY_RC=0
+          else
+            CLASSIFY_RC=$?
+          fi
+          if [[ "$CLASSIFY_RC" -ne 0 && "$CLASSIFY_RC" -ne 3 ]]; then
+            echo "::error::failure classifier failed (exit $CLASSIFY_RC); not retrying"
+            exit 1
+          fi
+          FAILURE_CLASS=$(jq -r '.class' "$RUNNER_TEMP/classify.json")
+          echo "Classifier: $FAILURE_CLASS"
+          if [[ "$FAILURE_CLASS" == "auth" ]]; then
+            ERROR_CATEGORY="AUTH"
+          fi
+```
+The later `if [[ "$ERROR_CATEGORY" == "UNKNOWN" ]]` tests leave `AUTH` alone, and the design-failure check only runs for `BUILD_FAILURE` or `UNKNOWN`.
 
-**Files:**
-- Modify: `.github/workflows/shipwright-auto-retry.yml` (categorisation block, lines ~126–222; retry branch around line 345)
+- [ ] **Step 3: Refuse AUTH in the strategy step.** In the step `Check retry count and determine strategy`, insert this block immediately after the `fi` that closes the `abandoned` check:
 
-- [ ] **Step 1:** Replace the regex categorisation with a step that writes the fetched log tail to `$RUNNER_TEMP/tail.log` and runs `shipwright failure classify --log "$RUNNER_TEMP/tail.log" --json`. The log path and the attempts file reach the step through `env:`. Map `auth` to a new `AUTH` category; keep `TRANSIENT`, `BUILD_FAILURE`, `DESIGN_FAILURE` and `INFRA` as the existing names so the strategy `case` still works. `invalid_input` maps to `DESIGN_FAILURE` with the existing "invalid issue" comment path.
+```bash
+          # Auth failures are never retried: a retry cannot repair a credential (W2-03).
+          if [[ "$ERROR_CATEGORY" == "AUTH" ]]; then
+            echo "Run $RUN_ID failed authentication: not retrying; the credential needs a human"
+            echo "should_retry=false" >> "$GITHUB_OUTPUT"
+            echo "skip_reason=auth" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+```
 
-- [ ] **Step 2:** `AUTH` posts the existing "Pipeline Auth Failure" text (already recognised by `shipwright-dispatch.yml:105–107`) and returns without dispatching. It writes `SHIPWRIGHT-RETRY-CATEGORY: AUTH` through `scripts/ci/bot-comments.sh` conventions, so only bot-authored markers count.
+- [ ] **Step 4: Post the AUTH comment.** Add this step after the step `Handle INFRA failure (no retry)`. It uses the same `if:` pattern and the wording that dispatch already recognises (`shipwright-dispatch.yml:107`):
 
-- [ ] **Step 3:** The step must not swallow classifier errors. If `shipwright failure classify` exits 1 (error, not escalation), the job fails, as the gate steps do.
+```yaml
+      - name: Handle AUTH failure (no retry)
+        if: steps.strategy.outputs.skip_reason == 'auth' && steps.extract.outputs.issue_number != ''
+        shell: bash
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          ISSUE_NUMBER: ${{ steps.extract.outputs.issue_number }}
+          RUN_ID: ${{ steps.extract.outputs.run_id }}
+        run: |
+          BODY="$RUNNER_TEMP/auth-body.md"
+          {
+            echo "## Pipeline Auth Failure"
+            echo
+            echo "Run [$RUN_ID]($GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$RUN_ID) failed authentication. Shipwright will not retry it."
+            echo
+            echo 'Check the `CLAUDE_CODE_OAUTH_TOKEN` secret, and run `claude setup-token` locally to replace it.'
+            echo
+            echo "<!-- SHIPWRIGHT-RETRY-CATEGORY: AUTH -->"
+          } > "$BODY"
+          gh issue comment "$ISSUE_NUMBER" --repo "$GITHUB_REPOSITORY" --body-file "$BODY"
+```
 
-- [ ] **Step 4: Verify**
+- [ ] **Step 5: Lint and fitness.**
 
 Run: `actionlint .github/workflows/shipwright-auto-retry.yml`
 Expected: no output, exit 0.
 
 Run: `bun run arch`
-Expected: exit 0 (`workflow-injection` and `workflow-fail-closed` pass).
+Expected: exit 0. The `workflow-injection` and `workflow-fail-closed` rules pass.
 
-GitHub verification: see "Verification on GitHub", Phase B.
+**Known residual (not fixed here):** sweep re-dispatches on its own timestamp logic (E7). W2-03 stops the auto-retry path only. The sweep path is covered by W2-06's progress marker and by W2-09's ledger.
 
 ---
 
-## Phase C: progress signals, stall detection, watchdog
+### W2-04: daemon classify bridge with bash fallback
 
-**Exit criteria**
-1. A snapshot history with no progress for 3 iterations, or the same error fingerprint for 3 iterations, is `stalled`. A history where the failing-test set shrinks, the passing count grows, or the diff grows is `progressing`.
-2. `LOOP_COMPLETE` with red tests is not `converged`.
-3. The CI watchdog decides liveness from the last `SHIPWRIGHT-PROGRESS` marker. A `SHIPWRIGHT-HEARTBEAT` alone does not count as progress.
-4. The stub non-converging run (see verification) is marked stalled within 3 iterations, and the watchdog reports it stalled, not healthy.
-
-### Task C1: Progress domain (pure)
+**Purpose:** the local daemon uses the typed classifier for the three classes that change behaviour. Everything else keeps the bash regex, so `build_failure` and `context_exhaustion` behave as before.
 
 **Files:**
-- Create: `src/contexts/delivery/domain/progress.ts`
-- Test: `src/contexts/delivery/domain/progress.test.ts`
+- Modify: `scripts/lib/daemon-failure.sh`
+- Modify: `scripts/sw-lib-daemon-failure-test.sh` (new block before `print_test_results`)
+- Modify: `scripts/sw-daemon-test.sh` (remove `test_classify_failure_auth` and its registration; the test greps source, and the behaviour is now tested in the hermetic suite)
 
-Shape (fill in during implementation; the tests below fix the behaviour):
+- [ ] **Step 1: The helper.** Add this function immediately above `classify_failure()` in `scripts/lib/daemon-failure.sh`:
+
+```bash
+# _daemon_classify_ts <log> — prints the TypeScript classifier's class (W2-04). Exit 0 with a
+# class; non-zero when Bun or the classifier is unavailable, so the caller falls back to regex.
+# Exit 3 (escalate) still carries a class and is accepted here.
+_daemon_classify_ts() {
+    local log_path="$1"
+    local bun_bin="${SW_BUN:-bun}"
+    local cli="${SW_TS_CLI:-$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)/src/cli.ts}"
+    command -v "$bun_bin" >/dev/null 2>&1 || return 1
+    local out rc=0
+    out=$("$bun_bin" "$cli" failure classify --log "$log_path" --json 2>/dev/null) || rc=$?
+    if [[ "$rc" -ne 0 && "$rc" -ne 3 ]]; then return 1; fi
+    jq -r '.class // empty' <<<"$out" 2>/dev/null || return 1
+}
+```
+
+- [ ] **Step 2: The bridge.** In `classify_failure()`, insert this block immediately after the line `tail_content=$(tail -200 "$log_path" 2>/dev/null || true)`, and leave the regex body below it unchanged:
+
+```bash
+    # W2-04: the typed classifier decides only the three classes that change behaviour. Anything
+    # else (build_failure, context_exhaustion, unknown) falls through to the regex below, as before.
+    local ts_class=""
+    if ts_class=$(_daemon_classify_ts "$log_path" 2>/dev/null); then
+        case "$ts_class" in
+            auth) echo "auth_error"; return ;;
+            transient) echo "api_error"; return ;;
+            invalid_input) echo "invalid_issue"; return ;;
+        esac
+    fi
+```
+
+- [ ] **Step 3: Behaviour tests in the hermetic suite.** Insert this block in `scripts/sw-lib-daemon-failure-test.sh` immediately before the final `print_test_results` line:
+
+```bash
+# ─── W2-04: classify_failure behaviour (typed classifier with bash fallback) ───
+printf '%s\n' "::error::Claude Code authentication failed — check CLAUDE_CODE_OAUTH_TOKEN secret" > "$LOG_DIR/issue-42.log"
+assert_eq "pre-flight auth text is auth_error" "auth_error" "$(classify_failure 42)"
+assert_eq "the bash fallback still says auth_error when Bun is missing" "auth_error" \
+    "$(SW_BUN=/nonexistent/bun classify_failure 42)"
+printf '%s\n' "build failed: test suite red" > "$LOG_DIR/issue-43.log"
+assert_eq "a build failure keeps the bash class" "build_failure" "$(classify_failure 43)"
+```
+
+- [ ] **Step 4: Remove the source grep.** In `scripts/sw-daemon-test.sh`, delete the function `test_classify_failure_auth` (it begins at line 1683) and its registration entry (the line containing `"test_classify_failure_auth:Intelligence: classify_failure detects auth errors"`, near line 1940). Do not run this suite locally (tmux).
+
+- [ ] **Step 5: Verify (hermetic).**
+
+Run: `bash scripts/sw-test-all.sh --pattern sw-lib-daemon-failure-test`
+Expected: exit 0, and the suite's summary reports 0 failures.
+
+Run: `bun run arch`
+Expected: exit 0. Bash findings must not grow; `daemon-failure.sh` adds argv-only calls.
+
+Verified in scratch: the helper returns the class for exit 0 and exit 3, and falls back (non-zero) for exit 1, as specified.
+
+---
+
+### W2-05: progress verdict and stall (TypeScript)
+
+**Purpose:** a run is progressing only when the test signal moves. Diff growth and new commits are activity, not progress.
+
+**Files:**
+- Create: `src/contexts/delivery/domain/progress.ts`, `progress.test.ts`
+- Create: `src/contexts/delivery/application/assess.ts`
+- Create: `src/contexts/delivery/index.ts`
+- Create: `src/cli/commands/progress.ts`, `progress.test.ts`
+- Modify: `src/cli/commands/index.ts` (register `progressCommand`)
+- Modify: `scripts/sw` (router line), `docs/plans/port/progress.json` (entry), `docs/reference/cli.md` (regenerated)
+
+- [ ] **Step 1: Domain.** Copy this file as written (`src/contexts/delivery/domain/progress.ts`):
 
 ```ts
+// Progress verdict for one build loop (W2-05). Pure. Progress means test-signal movement:
+// diff growth and new commits are recorded as activity, never as progress.
+
 export interface IterationSnapshot {
   readonly index: number;
-  readonly passingTests: number | null; // null: the test summary was not parseable
-  readonly failingTests: readonly string[]; // sorted names
-  readonly diffLines: number; // insertions + deletions against the base
+  /** Null when the test summary could not be parsed. */
+  readonly passingTests: number | null;
+  readonly failingTests: readonly string[];
+  readonly diffLines: number;
   readonly newCommits: number;
-  readonly errorFingerprint: string | null; // from failureFingerprint, last error of the iteration
+  readonly errorFingerprint: string | null;
   readonly loopCompleteClaimed: boolean;
 }
-export interface ProgressPolicy { readonly stallIterations: number; readonly repeatFingerprint: number }
-export type ProgressVerdict =
-  | { readonly kind: "progressing"; readonly reasons: readonly string[] }
-  | { readonly kind: "plateau"; readonly reasons: readonly string[] }
-  | { readonly kind: "stalled"; readonly reasons: readonly string[] }
-  | { readonly kind: "converged"; readonly reasons: readonly string[] };
-export function assessProgress(history: readonly IterationSnapshot[], policy: ProgressPolicy): ProgressVerdict;
+
+export interface ProgressPolicy {
+  /** Trailing iterations with no test movement that stall the run. */
+  readonly stallIterations: number;
+  /** Trailing iterations with the same error fingerprint that stall the run. */
+  readonly repeatFingerprint: number;
+}
+
+export const DEFAULT_PROGRESS_POLICY: ProgressPolicy = { stallIterations: 3, repeatFingerprint: 3 };
+
+export type ProgressKind = "progressing" | "plateau" | "stalled" | "converged";
+
+export interface ProgressVerdict {
+  readonly kind: ProgressKind;
+  readonly reasons: readonly string[];
+}
+
+/** True when the failing set strictly shrank, or the passing count rose (or was first measured). */
+export function movedTests(prev: IterationSnapshot, cur: IterationSnapshot): boolean {
+  const before = new Set(prev.failingTests);
+  const after = new Set(cur.failingTests);
+  const shrank = after.size < before.size && [...after].every((name) => before.has(name));
+  const passedMore =
+    prev.passingTests === null
+      ? cur.passingTests !== null
+      : cur.passingTests !== null && cur.passingTests > prev.passingTests;
+  return shrank || passedMore;
+}
+
+/** Trailing iterations, counting back from the last, with no test movement. */
+export function quietStreak(history: readonly IterationSnapshot[]): number {
+  let streak = 0;
+  for (let i = history.length - 1; i > 0; i--) {
+    const cur = history[i];
+    const prev = history[i - 1];
+    if (cur === undefined || prev === undefined || movedTests(prev, cur)) break;
+    streak++;
+  }
+  return streak;
+}
+
+/** Trailing iterations that share the last non-null error fingerprint. */
+export function repeatStreak(history: readonly IterationSnapshot[]): number {
+  const last = history.at(-1)?.errorFingerprint;
+  if (last === null || last === undefined) return 0;
+  let streak = 0;
+  for (let i = history.length - 1; i >= 0 && history[i]?.errorFingerprint === last; i--) streak++;
+  return streak;
+}
+
+export function assessProgress(
+  history: readonly IterationSnapshot[],
+  policy: ProgressPolicy,
+): ProgressVerdict {
+  const last = history.at(-1);
+  if (last === undefined) return { kind: "progressing", reasons: ["no iterations yet"] };
+  // A completion claim alone is not convergence: the tests must be green in the same iteration.
+  if (last.loopCompleteClaimed && last.failingTests.length === 0 && last.passingTests !== null) {
+    return { kind: "converged", reasons: ["completion claimed and tests green"] };
+  }
+  const quiet = quietStreak(history);
+  const repeats = repeatStreak(history);
+  if (quiet >= policy.stallIterations) {
+    return { kind: "stalled", reasons: [`no test movement for ${quiet} iterations`] };
+  }
+  if (repeats >= policy.repeatFingerprint) {
+    return { kind: "stalled", reasons: [`same error for ${repeats} iterations`] };
+  }
+  if (quiet >= 2) return { kind: "plateau", reasons: [`no test movement for ${quiet} iterations`] };
+  return { kind: "progressing", reasons: ["test signal moved recently or history is short"] };
+}
+
+/** Validates the `progress assess --history FILE` JSON: an array of iteration snapshots. */
+export function parseSnapshots(
+  value: unknown,
+): { readonly ok: true; readonly snapshots: readonly IterationSnapshot[] } | { readonly ok: false; readonly reason: string } {
+  if (!Array.isArray(value)) return { ok: false, reason: "history must be a JSON array" };
+  const snapshots: IterationSnapshot[] = [];
+  for (const [i, item] of value.entries()) {
+    if (typeof item !== "object" || item === null) return { ok: false, reason: `snapshot ${i} is not an object` };
+    const s = item as Record<string, unknown>;
+    const valid =
+      typeof s.index === "number" &&
+      (s.passingTests === null || typeof s.passingTests === "number") &&
+      Array.isArray(s.failingTests) &&
+      s.failingTests.every((name) => typeof name === "string") &&
+      typeof s.diffLines === "number" &&
+      typeof s.newCommits === "number" &&
+      (s.errorFingerprint === null || typeof s.errorFingerprint === "string") &&
+      typeof s.loopCompleteClaimed === "boolean";
+    if (!valid) return { ok: false, reason: `snapshot ${i} is malformed` };
+    snapshots.push(item as IterationSnapshot);
+  }
+  return { ok: true, snapshots };
+}
 ```
 
-- [ ] **Step 1: Failing tests** (outcome-based):
-
-1. The 2.5-hour docs case: four iterations, each with `diffLines: 2`, `passingTests: null`, `failingTests: []`, `newCommits: 0`, and the same `errorFingerprint`. `assessProgress` with `{stallIterations: 3, repeatFingerprint: 3}` returns `stalled`.
-2. A history where iteration 3 has `failingTests` shrinked from `["a","b"]` to `["a"]` returns `progressing`.
-3. `loopCompleteClaimed: true` with `failingTests: ["a"]` is not `converged`.
-4. `loopCompleteClaimed: true` with `passingTests: 10`, `failingTests: []` is `converged`.
-5. Two iterations without progress and then progress resumes → `progressing`.
-6. A single unparseable test summary (`passingTests: null`) does not count as "no progress" by itself: progress is judged on the other signals.
-
-- [ ] **Step 2: Implement.** Rules, in order: `converged` requires the claim, an empty `failingTests` and a non-null `passingTests`; `stalled` if the last `stallIterations` snapshots show no progress signal, or the last `repeatFingerprint` snapshots share one non-null `errorFingerprint`; `plateau` if the last two show no signal; otherwise `progressing`. A progress signal is: `failingTests` strictly smaller as a set than before, `passingTests` increased, `diffLines` increased, or `newCommits > 0`.
-
-- [ ] **Step 3: Verify**
-
-Run: `bun test src/contexts/delivery/domain/progress.test.ts`
-Expected: all pass.
-
-### Task C2: Stall-aware watchdog decision (pure)
-
-**Files:**
-- Create: `src/contexts/delivery/domain/stall-watchdog.ts`
-- Test: `src/contexts/delivery/domain/stall-watchdog.test.ts`
-
-Inputs: `now`, the timestamp of the last `SHIPWRIGHT-PROGRESS` marker (or the run start), and the last heartbeat timestamp (for information only). Output: `healthy | silent | stuck | abandoned` with the existing thresholds (45 min → cancel as stuck; 2 h → abandon). Tests: a heartbeat 1 minute ago with progress marker 90 minutes ago returns `stuck`, not `healthy`.
-
-### Task C3: `shipwright progress assess` command and the iteration bridge
-
-**Files:**
-- Create: `src/cli/commands/progress.ts` (register as in Phase A)
-- Modify: `scripts/sw-loop.sh` (one call after each iteration, after `convergence_integrate`, that appends the snapshot to a JSON history file and reads the verdict; `stalled` sets the loop status to `stalled` and exits)
-
-This is the one deliberate extension of bash in this plan. It is one line plus the status handling, it is argv-only, and it is ratcheted by `bun run arch`. The full port of `sw-loop.sh` belongs to the delivery context and to a separate plan.
-
-- [ ] **Step 1:** Failing CLI test: `progress assess --history FILE` with the 2.5-hour fixture exits 3 (stalled) and prints `"kind":"stalled"`.
-- [ ] **Step 2:** Implement, delegating to `assessProgress`. Exit codes: 0 progressing or plateau, 3 stalled, 0 converged (the loop's existing convergence path stops it).
-- [ ] **Step 3:** Bash bridge: after each iteration, write the snapshot with `printf` into a `mktemp` JSON array and call the command. Do not interpolate values into a command string.
-- [ ] **Step 4:** Verify `bun test src/cli/commands/progress.test.ts`, then `bun run arch` (no new findings).
-
-### Task C4: Progress markers in CI and the watchdog reads them
-
-**Files:**
-- Modify: `.github/workflows/shipwright-pipeline.yml` (lines ~640–646: the background `sleep 600` heartbeat loop stays as "alive", but a new `SHIPWRIGHT-PROGRESS` comment is posted only when the iteration bridge reports a new signal, from the TS assessor's output file)
-- Modify: `.github/workflows/shipwright-watchdog.yml` (lines ~100–125: `LAST_SIGNAL_DATE` takes the latest `SHIPWRIGHT-PROGRESS` marker from bot comments only; heartbeat is shown in the report but not used for the cancel decision)
-
-- [ ] **Step 1:** Add the marker writer. Values come through `env:`. Posting goes through the existing comment step (the `integrations` writer rule F10 applies to new GitHub writes in TS; in this bash workflow step the comment is posted with the same `gh issue comment` pattern the file already uses, which is ratcheted, so the count must not grow).
-- [ ] **Step 2:** Watchdog reads progress markers through `scripts/ci/bot-comments.sh`.
-- [ ] **Step 3:** `actionlint` on both workflow files; `bun run arch`.
-
-GitHub verification: see Phase C under "Verification on GitHub".
-
----
-
-## Phase D: difficulty, routing table, cost
-
-**Exit criteria**
-1. Every model ID used in `.github/workflows/`, `templates/pipelines/` and `scripts/` for a Claude call is one of the IDs in `src/contexts/intelligence/domain/models.ts`. The three pinned strings `claude-sonnet-4-20250514` (`.github/workflows/review-remediation.yml:136`), `claude-haiku-4-5-20251001` (`.github/workflows/shipwright-pipeline.yml:211`) and `claude-haiku-4-5` (`templates/pipelines/cost-aware.json`) are gone. The check is `tools/models/no-pinned-models.test.ts`. It is a policy check on files, so it is a grep, and it is labelled as one.
-2. The routing table names effort explicitly for every stage. It never sends `thinking: {type: "disabled"}` or a `budget_tokens` value to `claude-opus-5-5`, `claude-sonnet-5-5` or `claude-haiku-5-5`, which the API rejects with 400.
-3. Difficulty is a pure function; the same inputs always give the same tier, and the inputs are written to the ledger.
-4. CI spend for the day is readable from the ledger before dispatch (the budget gate reads it). Until the CI cost source is confirmed (open question Q6), the CI budget gate stays a no-op and this exit criterion is not met.
-
-### Task D1: Model IDs in one place
-
-**Files:**
-- Create: `src/contexts/intelligence/domain/models.ts`
-- Test: `tools/models/no-pinned-models.test.ts`
+- [ ] **Step 2: Domain tests.** Copy this file as written (`src/contexts/delivery/domain/progress.test.ts`):
 
 ```ts
-// src/contexts/intelligence/domain/models.ts
-// The only place Shipwright names Claude models. IDs are the exact strings from the Claude API
-// model table; no date suffixes. Change a value here, through the eval ratchet (ADR-0009), never
-// by editing a workflow or template.
-export const MODELS = {
-  opus: "claude-opus-5-5",
-  sonnet: "claude-sonnet-5-5",
-  haiku: "claude-haiku-5-5",
-} as const;
-export type ModelAlias = keyof typeof MODELS;
+import { describe, expect, test } from "bun:test";
+import { assessProgress, DEFAULT_PROGRESS_POLICY, type IterationSnapshot, movedTests, parseSnapshots } from "./progress";
+
+const snap = (index: number, over: Partial<IterationSnapshot> = {}): IterationSnapshot => ({
+  index,
+  passingTests: null,
+  failingTests: ["suite"],
+  diffLines: 2,
+  newCommits: 0,
+  errorFingerprint: null,
+  loopCompleteClaimed: false,
+  ...over,
+});
+
+describe("assessProgress", () => {
+  test("the 2.5-hour docs one-liner: no test movement and a repeated error is stalled", () => {
+    const history = [1, 2, 3, 4].map((i) => snap(i, { errorFingerprint: "execution:abc" }));
+    const v = assessProgress(history, DEFAULT_PROGRESS_POLICY);
+    expect(v.kind).toBe("stalled");
+  });
+
+  test("diff growth and commits alone do not count as progress", () => {
+    const history = [1, 2, 3, 4].map((i) => snap(i, { diffLines: i * 40, newCommits: i }));
+    expect(assessProgress(history, DEFAULT_PROGRESS_POLICY).kind).toBe("stalled");
+  });
+
+  test("a shrinking failing set is progress", () => {
+    const history = [
+      snap(1, { failingTests: ["a", "b"] }),
+      snap(2, { failingTests: ["a", "b"] }),
+      snap(3, { failingTests: ["a"] }),
+    ];
+    expect(assessProgress(history, DEFAULT_PROGRESS_POLICY).kind).toBe("progressing");
+  });
+
+  test("two quiet iterations are a plateau, not a stall", () => {
+    const history = [snap(1, { failingTests: ["a"] }), snap(2, { failingTests: ["a"] }), snap(3, { failingTests: ["a"] })];
+    const v = assessProgress(history, { stallIterations: 4, repeatFingerprint: 9 });
+    expect(v.kind).toBe("plateau");
+  });
+
+  test("a completion claim with red tests is not converged", () => {
+    const history = [snap(1, { failingTests: ["a"], loopCompleteClaimed: true })];
+    expect(assessProgress(history, DEFAULT_PROGRESS_POLICY).kind).not.toBe("converged");
+  });
+
+  test("a completion claim with green tests is converged", () => {
+    const history = [snap(1, { passingTests: 10, failingTests: [], loopCompleteClaimed: true })];
+    expect(assessProgress(history, DEFAULT_PROGRESS_POLICY).kind).toBe("converged");
+  });
+
+  test("an empty history is progressing, not stalled", () => {
+    expect(assessProgress([], DEFAULT_PROGRESS_POLICY).kind).toBe("progressing");
+  });
+});
+
+describe("movedTests", () => {
+  test("the first measured passing count counts as movement", () => {
+    expect(movedTests(snap(1), snap(2, { passingTests: 5 }))).toBe(true);
+  });
+
+  test("an unchanged failing set and count is not movement", () => {
+    expect(movedTests(snap(1, { passingTests: 5 }), snap(2, { passingTests: 5 }))).toBe(false);
+  });
+});
+
+describe("parseSnapshots", () => {
+  test("accepts a well-formed history", () => {
+    expect(parseSnapshots([snap(1)]).ok).toBe(true);
+  });
+  test("refuses a malformed snapshot rather than assessing it", () => {
+    expect(parseSnapshots([{ index: "1" }])).toEqual({ ok: false, reason: "snapshot 0 is malformed" });
+  });
+  test("refuses a non-array document", () => {
+    expect(parseSnapshots({})).toEqual({ ok: false, reason: "history must be a JSON array" });
+  });
+});
 ```
 
-- [ ] Failing test: `no-pinned-models` scans `.github/workflows/*.yml`, `templates/pipelines/*.json` and `scripts/**/*.sh` for `claude-(opus|sonnet|haiku)-[0-9a-z.-]+` and fails for any ID not in `Object.values(MODELS)`. The test lists the offending file and line.
-- [ ] Replace the three pinned strings. Each replacement is a model change, so it must pass the Phase E ratchet before it ships to the default path. Until Phase E exists, the replacements land behind the routing table's `incumbent` flag and do not change the default route.
+- [ ] **Step 3: Run.**
 
-Note on the current Claude 5 family: `claude-opus-5-5` is the default; `claude-sonnet-5-5` and `claude-haiku-5-5` are the current Sonnet and Haiku (checked against the Claude API model table, cached 2026-10-06). Opus 5.5 defaults to effort `medium`, so every route sets `output_config.effort` explicitly. Opus 5.5, Sonnet 5.5 and Haiku 5.5 reject `budget_tokens` (400) and reject `{type: "disabled"}` for thinking (400 on Opus 5.5 and Sonnet 5.5; Haiku 5.5 accepts it only at effort `high` or below). The routing table therefore sets effort, never thinking-disabled. The Agent SDK adapter (`src/adapters/agent/agent-sdk-runner.ts`) passes `effort`, `maxBudgetUsd` and `maxTurns`; the plan does not send thinking configuration directly, because the Agent SDK is the transport (ADR-0003). Whether the SDK maps `effort` onto `output_config.effort` for each model is a Wave 0 verification item and must be confirmed against the SDK version pinned in `package.json` before Phase D ships.
+Run: `bun test src/contexts/delivery/domain`
+Expected: `12 pass`, `0 fail`. (9 `assessProgress` and `movedTests` tests, and 3 `parseSnapshots` tests.)
 
-### Task D2: Versioned routing table (pure)
+- [ ] **Step 4: Application and index.** Copy these as written.
 
-**Files:**
-- Create: `src/contexts/intelligence/domain/routing.ts`
-- Test: `src/contexts/intelligence/domain/routing.test.ts`
+`src/contexts/delivery/application/assess.ts`:
+```ts
+import type { FileReader } from "../../../shared/kernel/ports";
+import { assessProgress, DEFAULT_PROGRESS_POLICY, parseSnapshots, type ProgressVerdict } from "../domain/progress";
 
-Incumbent table, `routing-v1` (initial values; they are the incumbent and are changed only through the Phase E ratchet, and the budgets are placeholders until Phase D's cost data exists):
+export type AssessResult =
+  | { readonly ok: true; readonly verdict: ProgressVerdict; readonly iterations: number }
+  | { readonly ok: false; readonly reason: string };
 
-| Tier | Build model | Build effort | Verifier model | Verifier effort | Max iterations | Budget per run (USD, placeholder) |
-|---|---|---|---|---|---|---|
-| trivial | `sonnet` | `medium` | `sonnet` | `high` | 4 | 2 |
-| small | `opus` | `high` | `opus` | `high` | 10 | 8 |
-| medium | `opus` | `xhigh` | `opus` | `high` | 20 | 20 |
-| large | `opus` | `xhigh` | `opus` | `xhigh` | 30 | 40 |
+/** Reads a history file and returns the verdict. Any read or parse failure is `ok: false`. */
+export async function assessHistoryFile(files: FileReader, path: string): Promise<AssessResult> {
+  const text = await files.readText(path);
+  if (!text.ok) return { ok: false, reason: `cannot read history: ${text.error.message}` };
+  let json: unknown;
+  try {
+    json = JSON.parse(text.value);
+  } catch {
+    return { ok: false, reason: "history is not JSON" };
+  }
+  const parsed = parseSnapshots(json);
+  if (!parsed.ok) return { ok: false, reason: parsed.reason };
+  return {
+    ok: true,
+    verdict: assessProgress(parsed.snapshots, DEFAULT_PROGRESS_POLICY),
+    iterations: parsed.snapshots.length,
+  };
+}
+```
 
-Haiku is used for `decide` tasks (triage, difficulty explanations) only, at effort `low`, following spec §5.
+`src/contexts/delivery/index.ts`:
+```ts
+export { assessHistoryFile, type AssessResult } from "./application/assess";
+export {
+  assessProgress,
+  DEFAULT_PROGRESS_POLICY,
+  type IterationSnapshot,
+  type ProgressKind,
+  type ProgressPolicy,
+  type ProgressVerdict,
+  parseSnapshots,
+} from "./domain/progress";
+```
 
-- [ ] Failing test: `routeFor("trivial")` returns the `sonnet` build route; every route names an effort; no route uses `haiku` for `build`; the version string is `routing-v1`.
-- [ ] Implement as a `const` table validated by a function that refuses a missing effort at module load (a test, not a runtime path).
+- [ ] **Step 5: Command and tests.** Copy these as written.
 
-### Task D3: Difficulty estimate (pure)
+`src/cli/commands/progress.ts`:
+```ts
+import { assessHistoryFile } from "../../contexts/delivery";
+import type { Command } from "../command";
 
-**Files:**
-- Create: `src/contexts/intelligence/domain/difficulty.ts`
-- Test: `src/contexts/intelligence/domain/difficulty.test.ts`
+const usage = `USAGE
+  shipwright progress assess --history FILE [--json]
 
-Inputs: labels, body length, the number of file paths mentioned in the body, whether acceptance criteria are present, and up to 20 prior runs for similar issues from the ledger (template, outcome, cost). Output: `{tier, reasons}`. Rules are fixed and written down in the test file. A `docs`-only label or a body under 800 characters that names one file gives `trivial`. The history can only move a tier up: if similar runs of this kind failed twice or more, the tier rises by one. Tests cover the one-line docs change (must be `trivial`), an issue naming ten files (`medium` or higher), and a history that raises a tier but never lowers it.
+DESCRIPTION
+  Reads a build loop's iteration history and prints the progress verdict. Progress means
+  test-signal movement; diff growth and new commits alone do not count.
 
-### Task D4: Cost capture and the CI budget source
+EXIT CODES
+  0  progressing, plateau or converged   3  stalled   1  could not read or assess (treat as no progress)   2  usage error`;
 
-**Files:**
-- Modify: the pipeline stage runner path that records usage (after Phase A, usage is written as `agent_call` ledger entries; before that, read the existing `costs.json` entries)
-- Test: `src/contexts/intelligence/application/budget-from-ledger.test.ts`
+export const progressCommand: Command = {
+  name: "progress",
+  aliases: [],
+  summary: "Assess a build loop's progress from its iteration history (W2-05)",
+  usage,
+  async run(args, ctx) {
+    const [sub, ...rest] = args;
+    if (sub === undefined || sub === "--help" || sub === "-h") {
+      ctx.io.out(usage);
+      return sub === undefined ? 2 : 0;
+    }
+    if (sub !== "assess") {
+      ctx.io.err(`✗ unknown subcommand: ${sub}`);
+      return 2;
+    }
+    const json = rest.includes("--json");
+    const at = rest.indexOf("--history");
+    const path = at === -1 ? undefined : rest[at + 1];
+    if (path === undefined || path.startsWith("--")) {
+      ctx.io.err("✗ --history FILE is required");
+      return 2;
+    }
+    const result = await assessHistoryFile(ctx.files(), path);
+    if (!result.ok) {
+      ctx.io.err(`✗ ${result.reason}`);
+      return 1;
+    }
+    const line = { kind: result.verdict.kind, reasons: result.verdict.reasons, iterations: result.iterations };
+    ctx.io.out(json ? JSON.stringify(line) : `${line.kind}: ${line.reasons.join("; ")}`);
+    return result.verdict.kind === "stalled" ? 3 : 0;
+  },
+};
+```
 
-- [ ] **Step 1:** Confirm which usage fields the `claude` CLI emits with JSON output in CI. This is an open question (Q6). Do not assume a field name. Verify with one sandbox run that costs a small amount (approval required; see Q4).
-- [ ] **Step 2:** `budget check` reads the ledger's `agent_call` costs for the UTC day in addition to the local `costs.json`, and takes the larger of the two so that a missing local file cannot understate spend (fail closed).
-- [ ] **Step 3:** Test: a day with ledger spend above the cap blocks; a day with an unreadable ledger blocks; a day with no entries and a readable ledger allows.
+`src/cli/commands/progress.test.ts`:
+```ts
+import { describe, expect, test } from "bun:test";
+import { captureIO, commandContext } from "../../testing/cli-harness";
+import { FakeFileReader } from "../../testing/fake-file-reader";
+import { progressCommand } from "./progress";
+
+const snap = (index: number) => ({
+  index, passingTests: null, failingTests: ["suite"], diffLines: 2, newCommits: 0,
+  errorFingerprint: "execution:abc", loopCompleteClaimed: false,
+});
+const files = new FakeFileReader({
+  "/h/stall.json": JSON.stringify([1, 2, 3, 4].map(snap)),
+  "/h/bad.json": "{not json",
+});
+
+describe("progress assess", () => {
+  test("the repeated-error history is stalled with exit 3", async () => {
+    const io = captureIO();
+    const code = await progressCommand.run(["assess", "--history", "/h/stall.json", "--json"], commandContext(io, files));
+    expect(code).toBe(3);
+    expect(JSON.parse(io.outLines[0] ?? "{}")).toMatchObject({ kind: "stalled" });
+  });
+
+  test("an unparseable history is an error with exit 1, never progress", async () => {
+    const io = captureIO();
+    expect(await progressCommand.run(["assess", "--history", "/h/bad.json"], commandContext(io, files))).toBe(1);
+  });
+
+  test("a missing --history is a usage error with exit 2", async () => {
+    const io = captureIO();
+    expect(await progressCommand.run(["assess"], commandContext(io, files))).toBe(2);
+  });
+});
+```
+
+- [ ] **Step 6: Register and route.** Add `progressCommand` to `src/cli/commands/index.ts`. In `scripts/sw`, add after the `failure)` block:
+
+```bash
+        progress)
+            run_ts progress "$@"
+            ;;
+```
+Add this entry to `docs/plans/port/progress.json`, then run `bun run docs:gen`:
+
+```json
+  {
+    "command": "progress",
+    "aliases": [],
+    "script": null,
+    "context": "delivery",
+    "parity": null,
+    "status": "parity-green",
+    "notes": "New in Wave 2 (W2-05): progress verdict from the iteration history; test-signal movement only (ADR-0009)."
+  }
+```
+
+- [ ] **Step 7: Run.**
+
+Run: `bun test src/contexts/delivery src/cli/commands/progress.test.ts`
+Expected: `15 pass`, `0 fail`.
+
+Run: `bun run check:fast && bun run port:check && bun run docs:check`
+Expected: exit 0 for each.
+
+**Known limit:** `movedTests` counts the first measured passing count as movement. The bash bridge (W2-06) records a single `suite` name, so it sees movement only when the suite goes green. That is coarse, and it is accepted for Tranche 1. Per-test names are a Tranche 2 refinement.
 
 ---
 
-## Phase E: eval set, replay, behavioural ratchet
+### W2-06: loop stall stop, one progress comment, progress-aware watchdog, build wall-clock cap
 
-**Exit criteria**
-1. At least 24 cases (6 trivial, 10 small, 6 medium, 2 negative cases where the correct outcome is escalation), each with a split label (`dev` or `holdout`). Holdout is used only to gate a change.
-2. Replay of the incumbent (`routing-v1`) over the holdout with k=3 produces pass^3, cost per success and median time, all written to `evals/ratchet/incumbent.json`.
-3. The ratchet rejects a candidate that is within the noise threshold (3 percentage points) and not cheaper. It accepts a candidate that beats the incumbent on holdout pass^3 by more than 3 points, or ties it and reduces cost per success by at least 10%.
-4. The ratchet runs as a required PR check on any change under `src/contexts/intelligence/`, `templates/pipelines/`, `.github/workflows/shipwright-pipeline.yml` or `evals/`. A PR may not change both `evals/` and the policy.
-
-### Task E1: Eval case format and the corpus
+**Purpose:** a run that stops moving its tests stops, and the watchdog measures time since the last test movement, not since the last timer tick. The build stage has a wall-clock cap from the template.
 
 **Files:**
-- Create: `evals/delivery/README.md` (format; it is the only doc in this directory)
-- Create: `evals/delivery/cases/<id>/{issue.md,base.sha,reference.diff,oracle.json,meta.json}`
+- Create: `scripts/lib/progress-bridge.sh`
+- Create: `scripts/sw-lib-progress-bridge-test.sh`
+- Modify: `scripts/sw-loop.sh` (source, initialise, call, status text)
+- Modify: `scripts/lib/pipeline-stages-build.sh` (wall-clock cap)
+- Modify: `templates/pipelines/fast.json` (`max_minutes`)
+- Modify: `.github/workflows/shipwright-pipeline.yml` (progress comment replaces the heartbeat loop)
+- Modify: `.github/workflows/shipwright-watchdog.yml` (progress-aware liveness)
 
-`oracle.json`: `{ "testCmd": "...", "mustPass": ["..."], "forbiddenPaths": ["..."] }`. `meta.json`: `{ "tier": "trivial|small|medium|large|negative", "split": "dev|holdout", "source": "PR #NNNN" }`. Cases come from merged PRs in this repository, labelled by a human (spec §6.3 calibration, about 20 PRs). The one-line docs change that ran 2.5 hours is case `docs-oneliner-01`; it is in `dev`.
+- [ ] **Step 1: The bridge.** Copy this file as written (`scripts/lib/progress-bridge.sh`):
 
-- [ ] A test in `tools/eval/cases.test.ts` checks that each case has the six files, that `split` is `dev` or `holdout`, that the tier counts meet the exit criteria, and that `oracle.json` names at least one `mustPass` test. The test reads files and so lives in `tools/`, which may do I/O.
+```bash
+# shellcheck shell=bash
+# progress-bridge.sh — per-iteration progress verdict from the TypeScript assessor (W2-05, W2-06).
+# Each iteration appends a snapshot to PROGRESS_HISTORY_FILE, then asks `shipwright progress assess`.
+# Fails closed: an assessor error is never "progressing"; an unwritable history is a plateau.
+[[ -n "${_PROGRESS_BRIDGE_LOADED:-}" ]] && return 0
+_PROGRESS_BRIDGE_LOADED=1
+_PROGRESS_BRIDGE_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
-### Task E2: Scoring and the ratchet rule (pure)
+PROGRESS_VERDICT="progressing"
 
-**Files:**
-- Create: `src/contexts/learning/domain/eval-score.ts` (pass^k, cost per success, rework proxy)
-- Create: `src/contexts/learning/domain/ratchet.ts` (accept or reject)
-- Test: `src/contexts/learning/domain/ratchet.test.ts`
+# progress_bridge_record <iteration> <tests_passed: true|false>
+progress_bridge_record() {
+    local index="$1" tests_passed="$2"
+    local bun_bin="${SW_BUN:-bun}"
+    local cli="${SW_TS_CLI:-${_PROGRESS_BRIDGE_DIR}/../../src/cli.ts}"
+    local hist="${PROGRESS_HISTORY_FILE:-}"
+    PROGRESS_VERDICT="plateau"
+    [[ -n "$hist" ]] || return 0
 
-Definitions:
-- `pass^k` for a case: 1 if all k runs pass, else 0. Suite value: the mean over cases.
-- Rework proxy: a run passes and its diff is at most 2× the reference diff's lines and touches no forbidden path.
-- Cost per success: total cost of all runs ÷ number of passing runs (infinite if none pass).
+    local failing='[]'
+    [[ "$tests_passed" == "true" ]] || failing='["suite"]'
+    local loop_complete=false
+    [[ "${LOOP_COMPLETE_SEEN:-false}" == "true" ]] && loop_complete=true
 
-Ratchet table tests (outcome-based): candidate 0.80 vs incumbent 0.78 → rejected (within 3 points, cost not lower); candidate 0.84 vs 0.78 → accepted; equal pass with cost 10% lower → accepted; candidate with a forbidden-path touch in any holdout run → rejected regardless of score.
+    local snap existing='[]' tmp
+    if ! snap=$(jq -n \
+        --argjson i "$index" \
+        --argjson f "$failing" \
+        --argjson d "${DIFF_LINES:-0}" \
+        --argjson c "${NEW_COMMITS:-0}" \
+        --arg e "${LAST_ERROR_FINGERPRINT:-}" \
+        --argjson lc "$loop_complete" \
+        '{index: $i, passingTests: null, failingTests: $f, diffLines: $d, newCommits: $c,
+          errorFingerprint: (if $e == "" then null else $e end), loopCompleteClaimed: $lc}'); then
+        return 0
+    fi
+    [[ -s "$hist" ]] && existing=$(cat "$hist")
+    tmp=$(mktemp "${hist}.tmp.XXXXXX") || return 0
+    if ! jq --argjson s "$snap" '. + [$s]' <<<"$existing" > "$tmp"; then
+        rm -f "$tmp"
+        return 0
+    fi
+    mv "$tmp" "$hist" || { rm -f "$tmp"; return 0; }
 
-### Task E3: Replay harness
+    local out rc=0
+    out=$("$bun_bin" "$cli" progress assess --history "$hist" --json 2>/dev/null) || rc=$?
+    case "$rc" in
+        0) PROGRESS_VERDICT=$(jq -r '.kind // "plateau"' <<<"$out" 2>/dev/null || echo "plateau") ;;
+        3) PROGRESS_VERDICT="stalled" ;;
+        *) PROGRESS_VERDICT="plateau" ;;
+    esac
+    return 0
+}
 
-**Files:**
-- Create: `tools/eval/replay.ts`
-- Test: `tools/eval/replay.test.ts` (uses a scripted fake runner; no model calls)
+# progress_bridge_marker <verdict> — writes the CI marker: the time of the last test movement.
+# The stamp moves only on progressing or converged verdicts, so a plateau never refreshes it.
+progress_bridge_marker() {
+    local verdict="$1" last_file="${PROGRESS_LAST_FILE:-}" marker_file="${PROGRESS_MARKER_FILE:-}"
+    [[ -n "$last_file" && -n "$marker_file" ]] || return 0
+    if [[ "$verdict" == "progressing" || "$verdict" == "converged" ]]; then
+        date -u +%Y-%m-%dT%H:%M:%SZ > "$last_file.tmp" && mv "$last_file.tmp" "$last_file"
+    fi
+    local last="none"
+    [[ -s "$last_file" ]] && last=$(cat "$last_file")
+    printf '<!-- SHIPWRIGHT-PROGRESS: %s verdict=%s -->\n' "$last" "$verdict" > "$marker_file.tmp" \
+        && mv "$marker_file.tmp" "$marker_file"
+    return 0
+}
+```
 
-The harness creates a worktree per case at `base.sha`, runs the delivery loop with the policy's model, effort and iteration cap, collects the ledger entries for each run id, and applies the oracle (`mustPass`, `forbiddenPaths`). Until the delivery context exists, it drives the bash `shipwright loop` with `--model`, `--max-iterations` and effort flags, and reads results from the ledger. Real replays cost money: never run them in PR CI. PR CI runs the scripted replay only.
+- [ ] **Step 2: The hermetic test.** Create `scripts/sw-lib-progress-bridge-test.sh`. It uses a fake Bun, so it needs no GitHub, no tmux and no model:
 
-### Task E4: CI ratchet check and nightly replay
+```bash
+#!/usr/bin/env bash
+# sw-lib-progress-bridge-test.sh — hermetic: a fake Bun answers the verdict; no GitHub, no tmux.
+set -euo pipefail
+trap 'echo "ERROR: $BASH_SOURCE:$LINENO exited with status $?" >&2' ERR
 
-**Files:**
-- Create: `tools/eval/ratchet.ts` (reads `evals/ratchet/incumbent.json` and a candidate result file; exits 0 accept, 1 reject, 2 usage)
-- Create: `evals/ratchet/incumbent.json`
-- Modify: `.github/workflows/test.yml` or a new `.github/workflows/eval-ratchet.yml` (PR check; path-filtered as in exit criterion 4)
-- Create (later, with approval): nightly replay workflow with a budget cap, modelled on `.github/workflows/shipwright-optimize.yml`
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+source "$SCRIPT_DIR/lib/test-helpers.sh"
 
-- [ ] `CODEOWNERS`: `evals/` and `evals/ratchet/` owned by the maintainer, like `tools/arch/` (ADR-0008).
+print_test_header "Lib: progress-bridge Tests"
+setup_test_env "sw-lib-progress-bridge-test"
+trap cleanup_test_env EXIT
 
-### Task E5: Gated optimizer (the one learner, restricted)
+FAKE="$TEST_TEMP_DIR/fakebun"
+cat > "$FAKE" <<'FAKE_EOF'
+#!/usr/bin/env bash
+case "$FAKE_VERDICT" in
+  stalled) echo '{"kind":"stalled","reasons":["x"]}'; exit 3 ;;
+  error) exit 1 ;;
+  *) echo "{\"kind\":\"$FAKE_VERDICT\",\"reasons\":[]}"; exit 0 ;;
+esac
+FAKE_EOF
+chmod +x "$FAKE"
 
-**Files:**
-- Create: `src/contexts/intelligence/domain/fit-routing.ts` (pure: from ledger-derived per-tier statistics, propose a candidate `routing-v{n+1}`)
-- Test: `src/contexts/intelligence/domain/fit-routing.test.ts`
+export SW_BUN="$FAKE" DIFF_LINES=2 NEW_COMMITS=0 LAST_ERROR_FINGERPRINT="execution:abc"
+export PROGRESS_HISTORY_FILE="$TEST_TEMP_DIR/hist.json"
+export PROGRESS_LAST_FILE="$TEST_TEMP_DIR/last" PROGRESS_MARKER_FILE="$TEST_TEMP_DIR/marker"
+source "$SCRIPT_DIR/lib/progress-bridge.sh"
 
-The optimizer proposes; it never ships. Its only output is a candidate table, which must pass the Task E4 ratchet on holdout. It may lower a tier's iteration cap or budget when the ledger shows the cap is never reached by passing runs; it may not raise any cap or budget above the incumbent, and it may not add a model. This keeps it inside ADR-0007.
+FAKE_VERDICT=progressing progress_bridge_record 1 false
+assert_eq "an assessor 'progressing' verdict is passed through" "progressing" "$PROGRESS_VERDICT"
+FAKE_VERDICT=stalled progress_bridge_record 2 false
+assert_eq "an assessor stall (exit 3) stops the loop" "stalled" "$PROGRESS_VERDICT"
+FAKE_VERDICT=error progress_bridge_record 3 false
+assert_eq "an assessor error counts as no progress, never progressing" "plateau" "$PROGRESS_VERDICT"
+FAKE_VERDICT=progressing progress_bridge_record 4 true
+assert_eq "each iteration appends exactly one snapshot" "4" "$(jq length "$PROGRESS_HISTORY_FILE")"
+
+PROGRESS_HISTORY_FILE="$TEST_TEMP_DIR/missing-dir/hist.json"
+FAKE_VERDICT=progressing progress_bridge_record 5 false
+assert_eq "an unwritable history is a plateau (no progress)" "plateau" "$PROGRESS_VERDICT"
+
+progress_bridge_marker plateau
+assert_contains "no movement yet: the marker says none" "$(cat "$PROGRESS_MARKER_FILE")" \
+    "SHIPWRIGHT-PROGRESS: none verdict=plateau"
+progress_bridge_marker progressing
+assert_eq "a progressing verdict stamps an ISO time" "true" \
+    "$(grep -qE 'SHIPWRIGHT-PROGRESS: [0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}Z ' "$PROGRESS_MARKER_FILE" && echo true || echo false)"
+STAMP=$(cat "$PROGRESS_LAST_FILE")
+progress_bridge_marker plateau
+assert_contains "a plateau keeps the last movement time" "$(cat "$PROGRESS_MARKER_FILE")" "$STAMP"
+
+print_test_results
+```
+
+- [ ] **Step 3: Wire the loop.** In `scripts/sw-loop.sh`:
+
+  (a) Next to the existing convergence sourcing (line 38), add:
+```bash
+[[ -f "$SCRIPT_DIR/lib/progress-bridge.sh" ]] && source "$SCRIPT_DIR/lib/progress-bridge.sh"
+```
+
+  (b) Next to `STUCKNESS_TRACKING_FILE="$LOG_DIR/stuckness-tracking.txt"` (around line 2182), add:
+```bash
+    PROGRESS_HISTORY_FILE="$LOG_DIR/progress-history.json"
+    PROGRESS_LAST_FILE="$LOG_DIR/progress-last.txt"
+    PROGRESS_MARKER_FILE="$LOG_DIR/progress.marker"
+    export PROGRESS_HISTORY_FILE PROGRESS_LAST_FILE PROGRESS_MARKER_FILE
+```
+
+  (c) Immediately before the line `# Convergence detection (issue #203) — score iteration progress and detect convergence`, insert:
+```bash
+        # W2-06: progress verdict from the typed assessor (test-signal movement). A stall stops the
+        # loop here, before the iteration cap, so a plateau cannot spend its way to the cap.
+        progress_bridge_record "$ITERATION" "${TEST_PASSED:-false}"
+        progress_bridge_marker "$PROGRESS_VERDICT"
+        if [[ "$PROGRESS_VERDICT" == "stalled" ]]; then
+            STATUS="stalled"
+            write_state
+            write_progress
+            warn "No test progress across recent iterations: stopping before the iteration cap"
+            break
+        fi
+```
+
+  (d) In the `show_summary` status `case` (around line 1706), add before the `*)` branch:
+```bash
+        stalled)          status_display="${RED}✗ Stalled (no test progress)${RESET}" ;;
+```
+
+- [ ] **Step 4: The wall-clock cap.** In `scripts/lib/pipeline-stages-build.sh`, replace the single line `sw loop "${loop_args[@]}" < /dev/null 2>"$_token_log" || {` with:
+
+```bash
+    # Wall-clock cap per template (W2-06). Fails closed: a configured cap without timeout(1) stops
+    # the stage rather than running uncapped.
+    local build_cap_min loop_cmd=(sw loop "${loop_args[@]}")
+    build_cap_min=$(jq -r '(.stages[] | select(.id == "build") | .config.max_minutes) // empty' "$PIPELINE_CONFIG" 2>/dev/null || true)
+    if [[ "$build_cap_min" =~ ^[1-9][0-9]{0,3}$ ]]; then
+        command -v timeout >/dev/null 2>&1 || { error "build wall-clock cap needs timeout(1)"; return 1; }
+        loop_cmd=(timeout "$((build_cap_min * 60))" "${loop_cmd[@]}")
+    fi
+    "${loop_cmd[@]}" < /dev/null 2>"$_token_log" || {
+```
+Then, as the first statement inside the `|| {` block (after `local _loop_exit=$?`), add:
+```bash
+        if [[ "$_loop_exit" -eq 124 ]]; then
+            warn "Build exceeded its ${build_cap_min}-minute wall-clock cap"
+            emit_event "pipeline.build_wall_clock_cap" "issue=${ISSUE_NUMBER:-0}" "minutes=${build_cap_min}"
+        fi
+```
+Known limit: `timeout` signals the loop process. Model child processes may outlive it unless the loop runs them in their own process group. Verify on the first CI run (Step 7).
+
+- [ ] **Step 5: The template.** In `templates/pipelines/fast.json`, change the `build` stage config from:
+```json
+    "config": {
+      "max_iterations": 10,
+```
+to:
+```json
+    "config": {
+      "max_iterations": 10,
+      "max_minutes": 60,
+```
+Expected: `python3 -c "import json;print([s['config'].get('max_minutes') for s in json.load(open('templates/pipelines/fast.json'))['stages'] if s['id']=='build'])"` prints `[60]`.
+
+- [ ] **Step 6: Progress comment and watchdog (CI).** In `.github/workflows/shipwright-pipeline.yml`, replace the heartbeat block (the comment `# Heartbeat: post progress marker every 10 minutes...` through `HEARTBEAT_PID=$!`) with:
+
+```bash
+          # Progress comment (W2-06): one comment, edited every 10 minutes. The marker holds the time
+          # of the last test movement, written by sw-loop. The alive line is a timer and is not progress.
+          export PROGRESS_LAST_FILE="$RUNNER_TEMP/progress.last"
+          export PROGRESS_MARKER_FILE="$RUNNER_TEMP/progress.marker"
+          (
+            COMMENT_ID=""
+            while true; do
+              sleep 600
+              MARKER=$(cat "$PROGRESS_MARKER_FILE" 2>/dev/null || echo "<!-- SHIPWRIGHT-PROGRESS: none verdict=unknown -->")
+              BODY="$MARKER"$'\n'"<!-- SHIPWRIGHT-ALIVE: $(date -u +%Y-%m-%dT%H:%M:%SZ) -->"
+              if [[ -z "$COMMENT_ID" ]]; then
+                COMMENT_ID=$(gh api "repos/$GITHUB_REPOSITORY/issues/$ISSUE_NUMBER/comments" -f body="$BODY" --jq '.id') \
+                  || echo "::warning::progress comment could not be created"
+              else
+                gh api -X PATCH "repos/$GITHUB_REPOSITORY/issues/comments/$COMMENT_ID" -f body="$BODY" >/dev/null \
+                  || echo "::warning::progress comment could not be updated"
+              fi
+            done
+          ) &
+          HEARTBEAT_PID=$!
+```
+The failure path is deliberate and not silent: a missing update does not refresh the watchdog's clock, so the watchdog eventually acts (fail closed), and the warning is in the job log.
+
+In `.github/workflows/shipwright-watchdog.yml`, replace the block from `# Find the most recent SHIPWRIGHT-HEARTBEAT or SHIPWRIGHT-STAGE marker` through the closing `fi` of `if [[ -z "$LAST_SIGNAL_DATE" ]]` with:
+
+```bash
+            # Last test movement (W2-06): the SHIPWRIGHT-PROGRESS marker's time. The heartbeat is a
+            # timer and is not progress, so it is not read here. COMMENTS_JSON is bot-authored only.
+            PROGRESS_MARKER=$(jq -r '[.[] | .body | strings | select(contains("SHIPWRIGHT-PROGRESS:"))] | last // ""' <<<"$COMMENTS_JSON")
+            PROGRESS_DATE=$(sed -n 's/.*SHIPWRIGHT-PROGRESS: \([0-9T:Z-]*\).*/\1/p' <<<"$PROGRESS_MARKER" | tail -1)
+            LAST_SIGNAL_DATE="$PROGRESS_DATE"
+            if [[ -z "$LAST_SIGNAL_DATE" ]]; then
+              START_DATE=$(jq -r --arg m "SHIPWRIGHT-RUN-ID: $RUN_ID" '.[] | select(.body | contains($m)) | .createdAt' <<<"$COMMENTS_JSON" | tail -1)
+              LAST_SIGNAL_DATE="${START_DATE:-$CREATED_AT}"
+              echo "No test progress recorded yet: using the run start time"
+            fi
+```
+The following code, which parses `LAST_SIGNAL_DATE` and applies the 45-minute and 2-hour thresholds, stays unchanged. The `none` value is not a timestamp, so the regex yields an empty date and the fallback applies.
+
+- [ ] **Step 7: Verify.**
+
+Run: `bash scripts/sw-test-all.sh --pattern sw-lib-progress-bridge-test`
+Expected: exit 0; 8 assertions pass.
+
+Run: `shellcheck -x -S warning -e SC2034,SC1090,SC2148,SC2119,SC2120 scripts/lib/progress-bridge.sh scripts/sw-lib-progress-bridge-test.sh`
+Expected: no output.
+
+Run: `actionlint .github/workflows/shipwright-pipeline.yml .github/workflows/shipwright-watchdog.yml`
+Expected: no output, exit 0.
+
+Run: `bun run arch`
+Expected: exit 0. Bash findings must not grow; the progress comment uses `gh api` in a workflow, and the fitness check for workflow injection passes.
+
+**GitHub verification (no sandbox; see the Verification section):** a manual run on this repository with an issue labelled `e2e-test`.
+
+Verified in scratch: the bridge records snapshots, passes through the assessor's verdict, treats an assessor error as a plateau, treats an unwritable history as a plateau, and keeps the marker's movement time on a plateau.
 
 ---
 
-## Phase F: independent verifier by default
+### W2-07: deterministic model routing hygiene
 
-**Exit criteria**
-1. The `verify` stage runs in every template that builds code (`fast`, `hotfix`, `standard`, `full`, `tdd`, `deployed`, `enterprise`, `autonomous`). It is skipped only when a template says so explicitly and the skip is in the ledger.
-2. The verifier runs the oracle's test command itself. It does not trust the builder's test report.
-3. The verifier receives the issue text (as data), the diff and its own test output. It does not receive the builder's transcript or reasoning.
-4. A `gap` verdict returns the run to build and counts against the fix-loop cap of 3 (ADR-0007). It cannot loop forever.
-5. The E ratchet shows verifier-on is at least as good on holdout (pass^3 and rework proxy), or the verifier is not made default.
-
-### Task F1: Verdict domain and the stage
+**Purpose:** the build model is the template's model, not a learned or random choice. The model IDs live in one file. Templates use aliases. `sw loop` accepts `xhigh`.
 
 **Files:**
-- Create: `src/contexts/quality/domain/verdict.ts`, `src/contexts/quality/domain/verdict.test.ts`
-- Modify: `templates/pipelines/fast.json` (add `verify` after `test`; the current `review` stays disabled), and the other templates listed above
+- Create: `config/models.json`
+- Create: `scripts/lib/models.sh`
+- Create: `tools/models/no-pinned-models.test.ts`
+- Modify: `scripts/lib/pipeline-execution.sh` (two conditions)
+- Modify: `scripts/lib/pipeline-stages-build.sh` (recruit guard, alias resolution)
+- Modify: `scripts/sw-loop.sh` (effort validation and help text)
+- Modify: `scripts/sw-strategic.sh` (model constant)
+- Modify: `templates/pipelines/autonomous.json`, `full.json`, `cost-aware.json` (aliases)
+- Modify: `.github/workflows/review-remediation.yml` (model from config)
+- Modify: `.github/workflows/shipwright-pipeline.yml` (triage model from config)
 
-The verdict schema is per criterion: `{id, verdict: "pass" | "gap", evidence}`. The verifier call uses structured output (`output_config.format` through the Agent SDK's schema option) and does not use forced tool choice: Opus 5.5, Sonnet 5.5 and Fable 5.1 reject `tool_choice` `any` or `tool` with 400, so the verifier relies on `auto` with a read-only allowlist and strict tool schemas.
+- [ ] **Step 1: The models file.** Create `config/models.json`:
 
-### Task F2: Verifier use case and the fix-loop bridge
+```json
+{
+  "version": 1,
+  "aliases": {
+    "opus": "claude-opus-5-5",
+    "sonnet": "claude-sonnet-5-5",
+    "haiku": "claude-haiku-5-5"
+  },
+  "efforts": ["low", "medium", "high", "xhigh"],
+  "allowlist": {
+    "files": [
+      "config/models.json",
+      "scripts/sw-cost.sh",
+      "scripts/*-test.sh",
+      "src/**/*.test.ts",
+      "tools/models/*.test.ts"
+    ]
+  }
+}
+```
+`scripts/sw-cost.sh` is allowlisted for its pricing table, which must name every generation it prices (its own comment says so). The `*-test.sh` and `*.test.ts` patterns allow fixtures.
 
-**Files:**
-- Create: `src/contexts/quality/application/verify.ts` (the spec §6.3 evaluator, minimal form if the evaluator is not yet built; reconcile with it before merging)
-- Test: `src/contexts/quality/application/verify.test.ts` (scripted fake `AgentRunner`)
+- [ ] **Step 2: The resolver.** Create `scripts/lib/models.sh`:
 
-Tests: a builder that claims tests pass while the verifier's own run fails gets `gap`; a gap sends the run to build; a fourth gap escalates (`escalated` outcome in the ledger). The fake `AgentRunner` is in `src/testing/`.
+```bash
+# shellcheck shell=bash
+# models.sh — resolves a model alias through config/models.json (W2-07). A name that is not an
+# alias passes through unchanged. The no-pinned-models test refuses any ID outside the alias values.
+models_resolve() {
+    local name="$1"
+    local root file
+    root="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
+    file="${SW_MODELS_FILE:-$root/config/models.json}"
+    if [[ ! -f "$file" ]]; then
+        echo "models: $file is missing; cannot resolve '$name'" >&2
+        return 1
+    fi
+    jq -r --arg a "$name" '.aliases[$a] // $a' "$file"
+}
+```
+
+- [ ] **Step 3: Failing test first.** Create `tools/models/no-pinned-models.test.ts`:
+
+```ts
+import { describe, expect, test } from "bun:test";
+import { readdirSync, readFileSync, statSync } from "node:fs";
+import { join, relative } from "node:path";
+
+const ROOT = process.cwd();
+const config = JSON.parse(readFileSync(join(ROOT, "config/models.json"), "utf8")) as {
+  aliases: Record<string, string>;
+  allowlist: { files: string[] };
+};
+const ID = /claude-(?:opus|sonnet|haiku)-[a-z0-9.-]+/g;
+const TARGETS = [".github/workflows", "templates/pipelines", "scripts", "src", "tools"];
+const EXTENSIONS = /\.(ya?ml|json|sh|ts)$/;
+
+function walk(dir: string): string[] {
+  return readdirSync(dir).flatMap((name) => {
+    const path = join(dir, name);
+    return statSync(path).isDirectory() ? walk(path) : EXTENSIONS.test(name) ? [path] : [];
+  });
+}
+
+/** `*` matches within a path segment; `**` matches any depth. Dots are literal. */
+function globToRegex(glob: string): RegExp {
+  const escaped = glob.replace(/[.+^${}()|[\]\\]/g, "\\$&");
+  return new RegExp(`^${escaped.replace(/\*\*/g, "\u0000").replace(/\*/g, "[^/]*").replace(/\u0000/g, ".*")}$`);
+}
+
+const allowed = config.allowlist.files.map(globToRegex);
+const isAllowlisted = (rel: string) => allowed.some((re) => re.test(rel));
+const aliasValues = new Set(Object.values(config.aliases));
+
+describe("model IDs", () => {
+  test("no file outside the allowlist names a model ID that is not an alias value", () => {
+    const violations: string[] = [];
+    for (const target of TARGETS) {
+      for (const file of walk(join(ROOT, target))) {
+        const rel = relative(ROOT, file);
+        if (isAllowlisted(rel)) continue;
+        for (const id of readFileSync(file, "utf8").match(ID) ?? []) {
+          if (!aliasValues.has(id)) violations.push(`${rel}: ${id}`);
+        }
+      }
+    }
+    expect(violations, "name models through config/models.json aliases").toEqual([]);
+  });
+
+  test("the aliases name the Claude 5.5 family", () => {
+    expect(config.aliases).toEqual({
+      opus: "claude-opus-5-5",
+      sonnet: "claude-sonnet-5-5",
+      haiku: "claude-haiku-5-5",
+    });
+  });
+
+  test("the allowlist names only test files and the pricing table", () => {
+    for (const glob of config.allowlist.files) {
+      const ok = glob.includes("test") || glob === "scripts/sw-cost.sh" || glob === "config/models.json";
+      expect(ok, `unexpected allowlist entry: ${glob}`).toBe(true);
+    }
+  });
+});
+```
+
+Run: `bun test tools/models`
+Expected before Steps 4 to 6: `1 fail`. The message lists six violations: `.github/workflows/review-remediation.yml`, `.github/workflows/shipwright-pipeline.yml`, `scripts/sw-strategic.sh`, `templates/pipelines/autonomous.json`, `templates/pipelines/cost-aware.json`, `templates/pipelines/full.json`.
+
+- [ ] **Step 4: Stop routing learners by default.** In `scripts/lib/pipeline-execution.sh`, change these two lines (both are unique in the file):
+
+From:
+```bash
+        if type ucb1_select_model >/dev/null 2>&1; then
+```
+To:
+```bash
+        # W2-07: learned routing (UCB1, A/B) is off unless SW_LEGACY_MODEL_ROUTING=true.
+        if [[ "${SW_LEGACY_MODEL_ROUTING:-false}" == "true" ]] && type ucb1_select_model >/dev/null 2>&1; then
+```
+
+From:
+```bash
+        if [[ -z "$recommended_model" ]] && type intelligence_recommend_model >/dev/null 2>&1; then
+```
+To:
+```bash
+        if [[ "${SW_LEGACY_MODEL_ROUTING:-false}" == "true" && -z "$recommended_model" ]] && type intelligence_recommend_model >/dev/null 2>&1; then
+```
+
+In `scripts/lib/pipeline-stages-build.sh`, change:
+
+From:
+```bash
+    if [[ -z "$MODEL" ]] && [[ -x "$SCRIPT_DIR/sw-recruit.sh" ]]; then
+```
+To:
+```bash
+    # W2-07: recruit's model override is off unless SW_LEGACY_MODEL_ROUTING=true.
+    if [[ "${SW_LEGACY_MODEL_ROUTING:-false}" == "true" ]] && [[ -z "$MODEL" ]] && [[ -x "$SCRIPT_DIR/sw-recruit.sh" ]]; then
+```
+
+**Answer to Q8:** with these three learners off, the build model is the template's `defaults.model` (or the stage config's model), so `fast.json` (`sonnet`) runs on Sonnet. The incident run's opus model came from one of the three learners or from the retry escalation in `daemon-failure.sh`, which sets opus on retry 1. The ledger (W2-08) records the effective model for each run, so this stops being a guess.
+
+- [ ] **Step 5: Resolve aliases at the build stage.** At the top of `scripts/lib/pipeline-stages-build.sh`, after the existing header and before the first function, add:
+```bash
+source "$(dirname "${BASH_SOURCE[0]}")/models.sh"
+```
+Then, immediately after the block that sets `build_model` from `.defaults.model` (the line `[[ -z "$build_model" || "$build_model" == "null" ]] && build_model="opus"`), add:
+```bash
+    build_model=$(models_resolve "$build_model") || return 1
+```
+Note: every other template consumer of a model (review, audit and similar stages) must also call `models_resolve`. This task covers the build stage, and W2-07 Step 9 lists the consumers that remain.
+
+- [ ] **Step 6: Allow `xhigh`.** In `scripts/sw-loop.sh`, change line 408 from:
+```bash
+if [[ -n "$EFFORT_LEVEL" ]] && [[ "$EFFORT_LEVEL" != "low" && "$EFFORT_LEVEL" != "medium" && "$EFFORT_LEVEL" != "high" ]]; then
+```
+to:
+```bash
+if [[ -n "$EFFORT_LEVEL" ]] && [[ "$EFFORT_LEVEL" != "low" && "$EFFORT_LEVEL" != "medium" && "$EFFORT_LEVEL" != "high" && "$EFFORT_LEVEL" != "xhigh" ]]; then
+```
+and the error message on line 409 to `error "--effort must be low, medium, high or xhigh (got: $EFFORT_LEVEL)"`, and the help text on line 186 to `low|medium|high|xhigh`. Before the default route uses `xhigh`, confirm that the effort string reaches the Claude CLI unchanged (`scripts/lib/compat.sh:424–456` returns the override as-is). The Step 9 check covers this.
+
+- [ ] **Step 7: Templates and workflows to aliases.** For the three templates, replace the quoted strings exactly:
+```bash
+python3 - <<'PY'
+import pathlib
+mapping = {'"claude-opus-5"': '"opus"', '"claude-sonnet-5"': '"sonnet"', '"claude-haiku-4-5"': '"haiku"'}
+for name in ["autonomous.json", "full.json", "cost-aware.json"]:
+    p = pathlib.Path("templates/pipelines") / name
+    text = p.read_text()
+    for old, new in mapping.items():
+        text = text.replace(old, new)
+    p.write_text(text)
+print("converted")
+PY
+```
+Expected: `converted`. In `scripts/sw-strategic.sh` line 52, change `STRATEGIC_MODEL="claude-sonnet-5"` to `STRATEGIC_MODEL="claude-sonnet-5-5"` (a value of the alias map, so it passes the test). In `.github/workflows/review-remediation.yml` line 136, replace `--model claude-sonnet-4-20250514` with `--model "$(jq -r '.aliases.sonnet' config/models.json)"`. In `.github/workflows/shipwright-pipeline.yml` line 211, replace `--model claude-haiku-4-5-20251001` with `--model "$(jq -r '.aliases.haiku' config/models.json)"`. Both workflow steps need the repository checked out first; confirm each step has `actions/checkout` earlier in its job.
+
+- [ ] **Step 8: Run the policy test.**
+
+Run: `bun test tools/models`
+Expected: `3 pass`, `0 fail`.
+
+- [ ] **Step 9: Check the remaining consumers and the effort flag.**
+
+Run: `grep -rn "\"model\"" templates/pipelines/*.json | grep -v '"opus"\|"sonnet"\|"haiku"' || echo "all template models are aliases"`
+Expected: `all template models are aliases`.
+
+Run: `bash scripts/sw-test-all.sh --pattern sw-loop-test`
+Expected: exit 0 with the existing loop assertions. This is a hermetic suite. The effort change is covered by the existing loop validation; the `xhigh` path is verified by running `sw loop --effort xhigh --help` and expecting exit 0.
+
+Run: `bun run check`
+Expected: exit 0.
 
 ---
 
-## Phase G: retire or prove the legacy intelligence
+## Tranche 2 (W2-08 to W2-12): task level, with fixes applied
 
-Each item is either **retired** (its reads and writes are deleted, the command becomes a "removed" stub that names its replacement, per spec §7.5), or **kept** (only if the Phase E ratchet shows a gain, recorded in the ledger). Entries follow the baseline table above.
+Each task expands to Wave 1a detail before it starts.
 
-| # | Item | Decision | When | Evidence needed |
-|---|---|---|---|---|
-| G1 | `loop-tuning.json` read (`sw-loop.sh:684–698`) | **Retire now.** It has no writer; the read path can never fire. | Any phase | Repo search (done in this survey) |
-| G2 | `iteration-model.json` and its readers (`sw-self-optimize.sh`, `pipeline-execution.sh:231–243`, `sw-loop.sh:702–708`, `pipeline-intelligence-scoring.sh:21`) | **Replace** with the fitted routing table (E5). | After E | Ratchet result of routing-v2 against routing-v1 |
-| G3 | `template-weights.json` (`sw-self-optimize.sh:268–282`, `daemon-triage.sh:421–422`) | **Replace** with difficulty tiers and the per-tier template. | After D and E | Ratchet result |
-| G4 | UCB1 model selection (`sw-self-optimize.sh:693–899`, `pipeline-execution.sh:696`) | **Retire** unless E shows it beats the fixed route on holdout. Spec §7.5 already lists bandits as not ported. | After E | Ratchet result |
-| G5 | Memory injection (`sw-memory.sh`, `loop-iteration.sh`) | **Ablate** in E: a run with injection off is a second arm. Keep only if pass^3 gains beyond noise. | In E | Ablation result |
-| G6 | Outcome feedback learned rules (`scripts/lib/outcome-feedback.sh`) | **Ablate** the same way, after confirming where its output is read (not confirmed in this survey). | In E | Readers confirmed; ablation result |
-| G7 | `sw-stall-detector.sh` | **Retire** after C (the TS detector replaces it; it is not wired into any workflow). | After C | C's exit criteria met |
-| G8 | File heartbeat (`sw-heartbeat.sh`) and the CI timer as liveness | **Retire** the liveness role after C; the timer may remain as "alive" for humans. | After C | Watchdog test |
-| G9 | Loop circuit breaker on line counts (`sw-loop.sh:124–125`, `loop-convergence.sh:66–100`) and stuckness restart (`sw-loop.sh:2556`) | **Replace** with C's progress verdict; keep the line-count rule only as a backstop with a test. | After C | C's exit criteria met |
-| G10 | `auto_template` lead-time rule (`daemon-poll.sh:315`) | **Replace** with difficulty tiers. | After D | Ratchet result |
-| G11 | `sw-predictive`, `sw-intelligence` AI triage, `sw-adaptive`, `scripts/lib/adaptive-model.sh` | **Retire** (spec §7.5 don't-port list). Aliases become "removed" stubs. | After E | Decision D1 approved |
-| G12 | `sw-dora` | **No behaviour change.** It reports. It becomes a ledger reader in observability (Wave 3). | Wave 3 | — |
+### W2-08: ledger core
 
-`docs/plans/port/progress.json` gets an entry for each retired or replaced command, with the replacement named in the `notes` field.
+- **Entries are typed journal rows.** A ledger entry is a `JournalEntry` (`src/shared/kernel/durability.ts`, `type`, `at`, `data`), written through `RunJournal.append(fence, entry)` (`durability.ts:98`). Every append is fenced, as AGENTS.md requires. Payload types: `run_started`, `agent_call`, `decision`, `iteration`, `outcome`, `tool_call`, `handoff`, `fence_violation`. A `tool_call` stores `argsHash` (SHA-256 of the canonical arguments), never the raw arguments.
+- **`run_started` header.** Repo, issue, template, machine, mode (M1, M2 or M3), and the policy versions in force (routing, classifier, progress).
+- **Partition by date.** `ledger/<yyyy-mm-dd>/<runId>.jsonl` for the JSONL adapter, so each day's directory is small and can be restored or merged separately.
+- **`RunIndex.listRuns({issue, since})`.** A read-only port for finding runs. It does not write.
+- **Read results carry `scope`.** `"local"` for this machine's files; `"shared"` for data read from the CI data branch or Postgres. Policies must say which scope they read.
+- **Run-id validation in the port.** `validateRunId` is part of the port contract and is enforced in every `read` and `append` of every adapter. This fixes the failing A2 test: `FakeLedger.read("../x")` must return an error, not `ok`. The contract suite gets traversal and corrupt-line cases.
+- **Fence.** Before Wave 1b, the JSONL adapter has no fence, so it accepts only a fence supplied by the caller. On CI the pseudo-fence is `GITHUB_RUN_ID` plus `GITHUB_RUN_ATTEMPT`, which is unique per attempt.
+- **No invented run ids.** The earlier `issue-N-$(date +%s)` ids are dropped. A run id comes from the run itself (`GITHUB_RUN_ID` on CI, the daemon's job id locally).
+- **Typed contract.** Zod validates persisted lines in the adapter. The domain type stays zod-free.
 
----
+### W2-09: ledger on CI
 
-## Phase H: read-only evaluator territory, holdout scenarios, GitHub twin (R1 to R3)
+- Install Bun with the pinned setup action and `bun install --frozen-lockfile --ignore-scripts` before any ledger command in `shipwright-pipeline.yml`.
+- The outcome append **annotates and does not fail the job** (`::warning::`). Readers treat a missing or failed entry as missing data, never as an empty history.
+- Persist ledger files with a fast-forward push and retry, never with `--force`. The force-push fallbacks at `shipwright-pipeline.yml` (around line 878) and `shipwright-optimize.yml:111` must not touch the ledger path.
+- A restore sentinel: a missing or empty ledger directory counts as unreadable, not as empty (fix D4).
+- **Verification:** until a sandbox is approved (Q3, default none), run one manual `shipwright-pipeline.yml` run on this repository against an issue labelled `e2e-test`. Expect a ledger file on `shipwright-data` after the run, whose last line is an `outcome`.
 
-**Why now:** the Phase E ratchet is only as honest as its inputs. If the build agent can read the holdout set, or can change `routing.ts`, `models.ts` or a check, a passing score means nothing. Until H1 and H2 are tested, the Phase E ratchet runs in advisory mode and cannot block a merge.
+### W2-10: decisions in the ledger
 
-**Exit criteria**
-1. A build run cannot read a holdout scenario or write a protected surface, and the attempt is recorded as a `fence_violation` in the ledger. Tested with a scripted agent that tries both.
-2. The static rule fails when a build `TaskSpec` points into a protected path.
-3. Each issue's score is the fraction of its scenarios satisfied, averaged over k runs. The ratchet gate stays pass^k.
-4. The GitHub twin passes the same contract suite as the real `gh` adapter, and the nightly contract run against real GitHub is green.
+- Every adaptive decision appends a `decision` entry with its inputs, its policy version, and its output: the failure classifier (`failure-v1`), the progress verdict (`progress-v1`), the routing choice (`routing-v1`), and the budget check.
+- Replay: given the entries for a run, the decision sequence can be recomputed from the stored inputs and must match the stored outputs.
+- Test: a fixture run whose recomputed decisions differ from its stored ones is reported as a replay failure.
 
-### Task H1: Protected surfaces and the static rule
+### W2-11: routing table and difficulty, tighten-only
 
-**Files:** `tools/arch/protected-surfaces.ts` (tool, may read files), `tools/arch/protected-surfaces.test.ts`, `evals/**` and `.github/CODEOWNERS` entries.
+- **Difficulty comes from ledger history.** The model's own estimate is never an input (E1).
+- **Tighten-only.** Difficulty may lower a tier's caps or escalate the route. The one exception is an up-tier after a `budget` or `max_turns` failure. This exception is recorded in ADR-0009 rule 3 with its reason.
+- **Incumbent.** `routing-v1` is the current defaults. Changing it is a ratchet decision (W2-13).
+- **Model IDs.** Routes name aliases; `config/models.json` (W2-07) resolves them.
+- **Effort.** Every route sets `effort` explicitly, because Opus 5.5 defaults to `medium`. Routes never send `thinking: {type: "disabled"}` or `budget_tokens` to the 5.5 models, which the API rejects.
 
-Protected surfaces (never writable by an agent run): `evals/**`, `src/contexts/intelligence/domain/routing.ts`, `src/contexts/intelligence/domain/models.ts`, `src/contexts/learning/domain/ratchet.ts`, `tools/arch/**`, `tools/eval/**`, `src/testing/contracts/**`, `.github/CODEOWNERS`, and the ledger directory.
+### W2-12: CI cost and runtime budget
 
-- [ ] Failing test: a `TaskSpec` fixture with `cwd` inside a protected path fails the rule, and the message names the path and the fix ("build runs take a copy of the base commit with protected paths removed; see H2").
-- [ ] Implement as a function over a list of configured task specs (the orchestrator exports them), so the rule tests real configuration, not source text.
-
-This static rule catches configuration mistakes. It does not stop a running agent; H2 does that.
-
-### Task H2: Runtime fence (the enforcement that matters)
-
-- [ ] **Step 1: Worktree without protected paths.** The build worktree is made from `git archive <base.sha>` with protected paths excluded into a fresh directory with no `.git` directory. The agent cannot read or change the excluded paths because they do not exist in its directory. This is the fence; it is not a permission setting.
-- [ ] **Step 2: Holdout outside the repo.** Holdout scenarios live in a directory owned by the eval runner, outside every worktree. Only the verifier's sandbox (Phase F and H3 scoring) receives a read-only mount of it. The build sandbox never receives the mount.
-- [ ] **Step 3: Second layer.** A `PreToolUse` denylist on `Read`, `Edit`, `Write` and `Bash` for the protected path names, as the spec §5 already requires for test paths. The denylist is advisory; Step 1 and Step 2 are the enforcement.
-- [ ] **Step 4: Test.** A scripted fake agent (in `src/testing/`) attempts to `cat` a holdout scenario, to edit `routing.ts`, and to write `evals/...`. Expect: the first two fail because the paths do not exist in its worktree; the third is denied; three `fence_violation` entries are in the ledger; the run's outcome is recorded as `failed` with reason `fence`.
-- [ ] **Step 5: Judgement, stated plainly.** On macOS the OS sandbox (Seatbelt) is the second layer and its behaviour under this layout must be confirmed on a real machine before H2 is accepted. On CI the container boundary is the enforcement (spec §5, "Tools run in the SDK's OS sandbox ... in a container on M2/M3 workers and in CI"). The plan does not claim either is proven yet.
-
-### Task H3: Holdout scenarios and satisfaction scoring
-
-**Files:** `evals/delivery/scenarios/<case-id>/s-NN.md` (outside the build worktree; in the runner's private store, see H2 Step 2), `src/contexts/learning/domain/satisfaction.ts`, its test.
-
-- Each scenario is a user-level story with observable checks written in plain language (what the user does, what they should see). Scenarios are written by a human for each case in `holdout`; they are not generated by the build agent.
-- A verifier (read-only, separate from the builder, Phase F) judges each scenario `satisfied` or `not satisfied` from the diff, the test output and the running app where available. Structured output, one verdict per scenario.
-- Issue score = satisfied ÷ total scenarios. Suite satisfaction = mean over cases and k runs. Reported next to pass^k.
-- Judgement: LLM-judged scenarios are noisy. Calibrate the judge against a human-labelled sample (the spec §6.3 calibration set) before any satisfaction number gates a change.
-
-**Test:** a fixture of 3 scenarios with 2 satisfied scores 0.667; a case with zero scenarios is refused, not scored 1.0.
-
-### Task H4: GitHub digital twin behind the existing ports
-
-**Scope rule:** the twin implements only the `gh` surface Shipwright uses. The surface is enumerated first, not assumed.
-
-- [ ] **Step 1: Enumerate.** Grep every `gh` call in `scripts/` and `src/`, and every workflow `gh` call, into `docs/reference/gh-surface.md` (generated by `tools/docs/` in a follow-up, or by hand in this task). Expected categories: issues (get, list, create, edit, comment, close, labels), PRs (list, create, view, checks, review state, merge), check runs, workflow runs (list, view, cancel, dispatch), and label listing. The count of distinct subcommands is an open item until this grep is done.
-- [ ] **Step 2: Port shapes.** The twin implements the existing ports, not a new interface: `RunHistory`, `PauseLabel`, `PullRequests`, `OpenIssues` (`src/contexts/orchestration/ports.ts`), `IssueTracker` (`src/shared/kernel/ports.ts`), and `GithubWriter` (`src/contexts/integrations/ports.ts`; confirm the file before implementing). F10 still holds: writes go through the writer port, and the twin is one more implementation of it.
-- [ ] **Step 3: Adapter.** `src/adapters/github/twin/` backed by files under the test state directory (`createTestEnv()`), with a fixed clock and deterministic ids, so replays are reproducible.
-- [ ] **Step 4: Contract.** `src/testing/contracts/github-contract.ts` runs against the twin on every PR (`bun test`) and against the real `gh` adapter in the nightly sandbox job (Q3). A divergence is a failing test on the twin, not a note.
-- [ ] **Step 5: Use.** Phase E replays run against the twin, so they are offline and cost no GitHub rate limit. Model calls still cost money; the twin removes only the GitHub cost. This also serves M1 local mode, where there is no shared GitHub state to test against.
-- [ ] **Judgement, stated plainly:** a twin is only as faithful as its contract. Drift is the main risk, which is why Step 4 runs nightly against the real service.
+- **Cost source (Q6).** Confirm the usage fields that `claude` emits in JSON output with one approved sandbox run. Parse them with zod, and fail closed on an unknown shape.
+- **Runtime budget.** A `budget run-check` bash bridge runs before each iteration. It sums the run's `agent_call` costs from the ledger, compares them with the tier cap from the routing table, and stops the run as `escalated` with reason `budget` when the next iteration would exceed it.
+- **CI gate.** The day's spend is read from the ledger. A missing or unreadable ledger blocks the gate (fail closed).
+- **Caps are not predictions.** Set each tier's cap from the 90th percentile of history once history exists. Until then the placeholders in `routing-v1` apply and are labelled as placeholders.
 
 ---
 
-## Phase I: merge policy, review, specifiability, quality metrics (R6 to R8, R5 review)
+## Tranche 3 (W2-13 to W2-18): task level, with fixes applied
 
-**Default: lights-on.** The factory opens the PR; a human merges. Nothing in this phase changes that until the metrics in I4 show it is safe for a named tier.
+### W2-13: eval corpus and paired ratchet rule
 
-### Task I1: Risk tiers (pure)
+- **Corpus.** 24 cases from this repository's merged PRs, human-labelled. Sixteen are holdout and eight are dev, stratified across tiers. Count by tier: trivial, small, medium, large, and negative cases where the right outcome is escalation.
+- **Honest scope.** At n=24 this is a **regression tripwire**, not a measurement of superiority. Grow the corpus to at least 50 cases before any fitter (W2-19) is considered.
+- **Paired design.** Incumbent and candidate run on the same cases, in the same time window, with the same CLI and SDK version. Three runs per case. The statistic is pass^3.
+- **Non-inferiority (default).** Losses minus wins is at most 0, and losses are at most 1. A loss is a case where the candidate's pass^3 is below the incumbent's; a win is the reverse.
+- **Superiority, only through a sign test.** Exact one-sided sign test at p ≤ 0.05, on the discordant pairs. Minimum wins for each number of discordant pairs `n`, computed from the binomial distribution with p = 0.5:
 
-**Files:** `src/contexts/quality/domain/risk-tier.ts`, its test.
-
-Inputs: paths touched (protected or not; `.github/workflows`, auth, migrations, dashboard, config as high-risk), number of contexts or packages touched (blast radius), diff size, whether the change is reversible (a revert is a clean commit), the verifier verdict, and scenario satisfaction (H3).
-
-Output: `T0` (docs or tests only, small, verifier pass, satisfaction 1.0, no high-risk path), `T1`, `T2`, `T3` (never auto-merged). Auto-merge is allowed only for T0, and only with evidence attached to the PR: the oracle test log, the verifier verdict JSON, the scenario verdicts and the ledger run id.
-
-- Test: a docs-only diff with a verifier pass is T0; the same diff touching `.github/workflows` is not T0; a protected-path touch is T3 whatever the size.
-- Judgement: the thresholds are initial values. They are backtested on the ledger after 30 days of lights-on history before any auto-merge is enabled.
-
-### Task I2: Review scaled to complexity, with repository knowledge
-
-- Review effort is a function of the tier: T0 gets the verifier only; T1 and above get a second independent review with `effort` from the routing table.
-- The reviewer receives a repository context file (the fitness rules, the ADR list, the conventions in AGENTS.md) as data in the user turn, not in the system prompt (AGENTS.md safety rule).
-- Judgement: no evidence in this plan shows this improves review quality. It is measured in I5, not assumed.
-
-### Task I3: Specifiability gate at intake
-
-- Score each issue with a `decide<T>` call (Haiku, effort `low`, zod schema): acceptance criteria present; scope bounded (named files, contexts or a clear area); not a title-fingerprint duplicate of an open issue (the spec §6.2 check, already in `intake check`).
-- Below threshold: post one clarifying question (through the `GithubWriter` port, F10) or refuse with the missing items listed. Never build.
-- Test: an issue with no acceptance criteria and an unbounded scope is refused; a bounded issue with criteria passes; a near-duplicate is refused.
-- Judgement: the threshold and the scoring prompt are not evidence-backed yet. They are calibrated against the labelled eval cases (Phase E), with the refusal rate reported.
-
-### Task I4: Quality metrics written to the ledger and the dashboard
-
-Derived from the ledger plus GitHub state (twin in tests, real GitHub in CI):
-
-| Metric | Definition | Source |
+| Discordant pairs n | Minimum wins | Exact one-sided p |
 |---|---|---|
-| Merged without substantial rework | Agent PR merged, with no human commits to the agent branch and no revert or reopen within 14 days | PR events, ledger `outcome` (extended with `merged_at`, `reverted`) |
-| Escaped defects | Issues labelled as bugs and linked to an agent PR within 14 days of merge | Issue labels and links |
-| Reverts | Agent commits reverted | Git history |
-| Cost per merged PR | Sum of `agent_call` cost for the run ÷ merged PRs | Ledger |
-| Time to merge | PR open to merge, excluding time waiting for a human who has not yet looked | PR events |
+| 1 to 4 | none reachable | superiority is impossible |
+| 5 | 5 | 0.0312 |
+| 6 | 6 | 0.0156 |
+| 7 | 7 | 0.0078 |
+| 8 | 7 | 0.0352 |
+| 9 | 8 | 0.0195 |
+| 10 | 9 | 0.0107 |
+| 11 | 9 | 0.0327 |
+| 12 | 10 | 0.0193 |
+| 13 | 10 | 0.0461 |
+| 14 | 11 | 0.0287 |
+| 15 | 12 | 0.0176 |
+| 16 | 12 | 0.0384 |
+| 17 | 13 | 0.0245 |
+| 18 | 13 | 0.0481 |
+| 19 | 14 | 0.0318 |
+| 20 | 15 | 0.0207 |
 
-- Test: a fixture history with one reworked PR and one clean PR gives 50% merged without rework. The formula is in the test.
-- The dashboard view belongs to Wave 3 (observability). This phase writes the metrics; it does not build the view.
-- Note: this is the spec §8 operational scorecard; this phase makes it real.
+  These values were computed with `math.comb`. Discordant pairs of 4 or fewer can never reach significance, so with 24 cases superiority is hard to show, which is intended.
+- **Cost.** The median paired cost ratio (candidate ÷ incumbent) is at most 0.9 for a cost-motivated change.
+- **Accept rule.** Accept when non-inferiority holds **and** (superiority by the sign test **or** a median cost ratio of at most 0.9). **Hard vetoes**, which reject regardless of the statistics: any fence violation, any touch of a forbidden path, any oracle tampering.
+- **Anti-gaming.** One PR may not change both `evals/` and the policy. The ratchet file is owned by CODEOWNERS.
 
-### Task I5: Track review quality as models change
+### W2-14: trusted replay and advisory ratchet
 
-- Add seeded defects to a subset of eval cases (a known bug injected into a reference diff). The reviewer's catch rate on seeded defects is measured per model version.
-- Changing the review model or effort is a routing change, so it goes through the Phase E ratchet with catch rate as a required non-regression metric.
-- Judgement: this is a plain measurement. No external catch rate is assumed.
+- Replays run from `git archive <base.sha>` with no `.git` directory.
+- Oracle tests are restored from the trusted copy before scoring.
+- Memory injection, UCB1 and recruit are disabled in replay (`SW_LEGACY_MODEL_ROUTING` unset, and the memory switch off).
+- The ratchet reads only an attested artifact from the trusted replay workflow, with the policy hash checked against the PR head.
+- **Advisory first.** The ratchet reports but does not block until the fence (H2) is tested. H2 is deferred (W2-19), so the ratchet stays advisory until its own plan is accepted.
 
----
+### W2-15: verifier stage
 
-## Phase J: self-improving harness, gated (R5; optional, last)
+- **There is no verify stage in the bash pipeline today.** W2-15 adds a real stage function, not a template flag.
+- **Prerequisites.** A sandbox that gives the verifier a read-only mount, and no GitHub token. Credentials reach the verifier only as the model credential it needs.
+- **Behaviour.** The verifier runs the oracle tests itself and does not trust the builder's report. A `gap` verdict returns the run to build, capped by the fix-loop limit (three).
+- **Structured output.** Schema-validated verdicts. No forced `tool_choice`, which Opus 5.5 and Sonnet 5.5 reject with a 400.
 
-**Preconditions (all required):** Phase E ratchet enforced (not advisory); Phase H fence tested on the real runner; Phase I metrics running for at least 30 days; the maintainer approves the editable surface.
+### W2-16: retire legacy learners
 
-**Honest expectation:** ModularRSI reports gains on benchmarks; nothing here shows the approach helps Shipwright. Phase J is a bet that can be cut without affecting A to I.
+Retire, with a "removed" stub that names the replacement and an alias, following spec §7.5:
+- `sw-recruit`, `policy-learner`, `bandit-selector`, `reward-aggregator` and `process-reward` (all live today);
+- the UCB1 path and the `$RANDOM` A/B, which W2-07 has switched off;
+- `sw-stall-detector.sh`, after W2-05 and W2-06;
+- the file heartbeat (`sw-heartbeat.sh`) as a liveness signal, after W2-06;
+- `auto_template` (`daemon-poll.sh:315`), replaced by difficulty tiers (W2-11);
+- `sw-predictive`, `sw-intelligence`, `sw-adaptive` and `scripts/lib/adaptive-model.sh`.
 
-### Task J1: Traces as files, with root-cause summaries
+Memory injection and the outcome-feedback learned rules are **ablated, not retired**, in the eval (W2-14). Confirm where `outcome-feedback.sh` output is read before deciding (Q10, part of G6).
 
-- Each run writes a directory `traces/<run-id>/` containing the ledger lines for the run (including `tool_call` and `handoff`), the stage outputs, and `root-cause.md` (written by a `decide<T>` summariser, schema-validated, from the trace only).
-- The proposer reads these files. It does not read the eval holdout (H2 fence).
+### W2-17: holdout MVP
 
-### Task J2: Proposer over an explicit editable surface
+- Holdout scenarios are kept in a private store, fetched only by eval and verifier jobs, and never placed in this repository.
+- Scenarios are human-written. **W2-17 is blocked on Q13**; the default is the maintainer.
+- Score: the fraction of each issue's scenarios satisfied, averaged over the runs. This is reported next to pass^3 and is not a gate until the judge is calibrated against human labels.
+- `scripts/lib/test-holdout.sh` already exists. Reuse it or retire it here; the decision is made when W2-17 starts.
 
-- Editable surface, and nothing else: `prompts/**` for stages, `skills/**`, tool descriptions in the adapter, and numeric values in `routing.ts` within their existing caps.
-- Not editable: evals, ratchet, tests, arch rules, `models.ts`, budgets above the incumbent, protected paths (H1).
-- Each proposal must state a hypothesis, the predicted effect on named failures, and the target failure ids. A proposal without them is refused by the schema.
+### W2-18: scorecard
 
-### Task J3: Gate: held-in and held-out
-
-- Held-in: the dev-split cases where the targeted failure occurred. Held-out: the holdout split.
-- Accept only if the held-in set improves and neither set regresses beyond the noise threshold (3 points) on satisfaction and pass^3. This is the Phase E ratchet with a second set.
-- Every rejected proposal is logged as a `decision` entry with the reason. The log is the archive.
-
-### Task J4: Archive, not one lineage
-
-- Keep all candidates with their scores and the edit that produced them. The next proposal samples from the archive, weighted by holdout score, and spreads over edit surfaces so the search does not collapse onto one kind of change.
-- Judgement: the sampling rule is a design choice, not evidence-backed.
-
-### Task J5: Human review at decision points
-
-- Any edit that changes routing tier structure, adds a model, or changes a cap goes to the maintainer through CODEOWNERS. Prompt and skill edits that pass the gate may be accepted by the maintainer in batch.
-- Weng's open-problems list (as reported in secondary coverage) includes reward hacking. The protections are H1 to H3 and this human step. They reduce the risk; they do not remove it.
-
----
-
-## Verification on GitHub (end to end)
-
-Real GitHub runs write issues, labels and comments. Running them on `sethdford/shipwright` itself would create incidents and touch real work. Every end-to-end check below runs on a **disposable sandbox repository**, which needs the maintainer's approval (Q3). Each check states the observable that proves it.
-
-**Phase A (ledger in CI)**
-1. Dispatch `shipwright-pipeline.yml` on a sandbox issue with a trivial change.
-2. Expect: the run's `ledger/<run-id>.jsonl` exists on the `shipwright-data` branch after the run, its last line is an `outcome` entry, and `shipwright ledger verify` on a fresh checkout exits 0.
-3. Expect: a second concurrent run does not remove the first run's ledger file (check the branch's history for a fast-forward, not a force push).
-
-**Phase B (classifier stops the 288-run loop)**
-1. In the sandbox only, set `CLAUDE_CODE_OAUTH_TOKEN` to an invalid value. Label one sandbox issue for dispatch.
-2. Expect: the pre-flight fails once; auto-retry's category is `AUTH`; no further run is dispatched for that issue; the issue carries one "Pipeline Auth Failure" comment. Count the runs: exactly one.
-3. Restore the sandbox token. Expect the next dispatch to pass the pre-flight.
-4. Replay: `shipwright failure classify` on three copies of the failing log with `--attempts` set to the previous attempts must escalate on the first.
-
-**Phase C (stall is caught, not healthy)**
-1. In the sandbox, label an issue whose requirement cannot be met by the test suite (for example, a required test that asserts an impossible value). This is a stub, not a real issue.
-2. Expect: the loop marks the run `stalled` within 3 iterations (`SHIPWRIGHT-PROGRESS` markers show no progress after iteration 1). The watchdog's report for the run says `stuck` on the progress age, not `healthy` on the heartbeat, and it cancels after 45 minutes of no progress.
-3. Compare with the baseline: the same stub on `main` runs until the watchdog's 2 h abandon.
-
-**Phase D (routing and cost)**
-1. Expect: the ledger's `decision` entry for the run names `difficulty-v1`, the tier, `routing-v1`, the model `claude-opus-5-5` or `claude-sonnet-5-5` as routed, and the effort set explicitly.
-2. Expect: `tools/models/no-pinned-models.test.ts` passes on the branch.
-
-**Phase E (ratchet)**
-1. Open a PR that changes `routing.ts` to a weaker route. Expect: the `eval-ratchet` check fails with the candidate and incumbent numbers. Close the PR without merging.
-2. Expect: the nightly replay (after approval) uploads its results as an artifact and updates nothing in git.
-
-**Phase F (verifier)**
-1. Expect: a run with a builder that claims success over a failing test ends with a verifier `gap`, the run returns to build, and a fourth gap produces an `escalated` outcome.
-
-**Phase G**
-1. Expect: each retired command still runs as a "removed" stub that names its replacement, and `docs:check` passes.
-
-**Dark-factory additions (Phases H to J):**
-- *Phase H:* the static rule (H1) tests configuration; the runtime fence (H2) is the enforcement. A test with a scripted agent shows the fence refusing the holdout read and the protected write, and the ledger records both.
-- *Phase H:* holdout satisfaction (H3) is reported beside pass^k. It is not used as a gate until the judge is calibrated against human labels.
-- *Phase I:* on the merge path, a T0 auto-merge is attempted only after 30 days of lights-on metrics show the tier's rework and revert rates are acceptable; until then the rule is enforced by the default, not by code.
-- *Phase J:* run only after the preconditions in its header are met; a pilot on the dev split must show held-out non-regression before any accepted edit is kept.
+- Metrics: merged without substantial rework (no human commits to the agent branch and no revert or reopen within 14 days); escaped defects; reverts; cost per merged PR; time to merge.
+- Source: the ledger (W2-08) plus GitHub state. The spec §8 scorecard is the same set of measures.
+- The dashboard view belongs to Wave 3 (observability). W2-18 writes the metrics.
 
 ---
 
-## Open questions (need the maintainer's decision)
+## Deferred (W2-19): each needs its own plan
 
-- **Q1 (D1–D3).** Approve the spec amendments: §7.5 (closed-loop learning restricted to the fitted routing table under the ratchet), §2 (a fourth allowed exception), and the Wave numbering. Without Q1 this plan is a proposal only.
-- **Q2 (sequencing).** Do Phases A–C run on M1 SQLite before Postgres (Wave 2)? Recommendation: yes. The M2/M3 ledger stays partial until Postgres exists, and the plan says so in each phase.
-- **Q3 (sandbox).** May I create a disposable repository (for example `sethdford/shipwright-sandbox`) with a copy of the workflows, and set a sandbox-only invalid token secret for Phase B? Every GitHub write in the verification sections happens there.
-- **Q4 (spend).** What cap per night and per week may the eval replays and any CI cost test use? The per-run cost is not yet measured; Phase D sets it. No default is assumed here.
-- **Q5 (incident data).** Can you supply the run logs and the `issue-N.log` for the 2.5-hour docs-change run, and the failing pre-flight logs? They are the fixtures for Phases B and C. Without them, the fixtures are synthetic and the plan says so.
-- **Q6 (CI cost source).** Which usage fields does the `claude` CLI emit with JSON output on CI? This is verified with one approved sandbox run; the plan does not assume a field name.
-- **Q7 (triage model).** Replace `claude-haiku-4-5-20251001` in the CI triage with `claude-haiku-5-5` now? It is a model change, so it needs the ratchet unless you accept it as a non-routing change.
-- **Q8 (fast-template model).** The incident report says the `fast` template ran with opus, but `templates/pipelines/fast.json` sets `"model": "sonnet"` in its defaults, and the escalation code defaults to opus (`daemon-failure.sh`). The ledger will record the effective model from now on; it is not known which one the incident run used.
-- **Q9 (server-side fallbacks).** The Claude API offers server-side model fallbacks on refusal (`fallbacks`), but the Agent SDK path does not expose them in this repository. Decide whether refusal fallback belongs in the runner (a separate ADR) or is out of scope.
-- **Q10 (memory and outcome-feedback).** Confirm where `outcome-feedback.sh`'s learned rules are read before Phase G decides on them.
-- **Q11 (sources).** The CRBugBench paper (arXiv 2610.13668) and its figure could not be found. If you have the correct ID or title, the figure can be checked and considered for Phase I5. Until then it is not cited.
-- **Q12 (fence).** Approve the runtime fence in H2 (a worktree built from `git archive` without protected paths, and a holdout store mounted only into the verifier). It needs a real-machine test on macOS and a container test on CI before it is accepted.
-- **Q13 (scenarios).** Who writes the holdout scenarios for each `holdout` case? They must be human-written (H3); this is a labelling cost.
-- **Q14 (twin scope).** Approve the GitHub twin (H4) and its nightly contract run against the sandbox repository (Q3). The `gh` surface is not yet enumerated; Step 1 of H4 does that.
+| Item | Why deferred | What its plan must settle |
+|---|---|---|
+| E5 fitter (proposes routing values from ledger statistics) | needs at least 50 cases and a live ratchet; the spec places it in Wave 4 | the fitter's inputs, its caps, and the ratchet it must pass |
+| Full H2 fence | needs real-machine tests on macOS and a container test on CI | the scope: **eval replays and the verifier only**; protected-path diffs route to a human tier; the holdout is in a private store |
+| H4 GitHub twin | a large, drift-prone surface; the `gh` surface is not yet enumerated | the enumerated surface, the contract suite, and its nightly run against real GitHub |
+| I1 to I3 and I5 (merge tiers, review scaling, specifiability, review quality) | lights-on is the default; tiers need about 30 days of metrics first | tier thresholds backtested on the ledger; review-catch measurement |
+| J self-improving harness | optional; ModularRSI shows gains on its benchmarks, not on this repository | the editable surface, the gate, the archive, and the human decision points |
 
 ---
 
-## Out of scope (stated plainly)
+## Verification on GitHub
 
-- No model is trained. "Learning" here means fitting a small table to ledger statistics under a ratchet, plus deterministic rules.
-- No reinforcement learning, bandits in production, or online adaptation during a run.
-- M2 and M3 share the ledger only after the Postgres adapter (Wave 2). Until then, each machine's ledger is partial and every policy records that it read partial history.
-- The eval set measures this repository's own merged PRs. It does not show that the routing transfers to other repositories.
-- Human labelling (about 20 PRs for calibration, spec §6.3) is a cost in people's time that this plan cannot remove.
-- Automatic merging is not in scope. A human still merges.
-- The full port of `sw-loop.sh` and `daemon-failure.sh` is the delivery and orchestration contexts' work. This plan only adds the bridges it needs.
+Real GitHub runs create issues, labels and comments. Until the sandbox question (Q3) is answered, every end-to-end check runs on **this** repository, on an issue labelled `e2e-test`, and is a manual run.
+
+| Tranche | Check | Expected observable |
+|---|---|---|
+| 1 | W2-01 capture of run 38744601038 | Once the run completes: `completed`, and no credential-shaped strings in the capture |
+| 1 | W2-03 | `actionlint` exit 0; `bun run arch` exit 0 |
+| 1 | W2-06 manual run | A `SHIPWRIGHT-PROGRESS` marker appears in the issue's bot comment; the watchdog reports a time since last progress, not a heartbeat time |
+| 2 | W2-09 manual run | A `ledger/<date>/<runId>.jsonl` file exists on `shipwright-data` after the run, and its last line is an `outcome` |
+| 3 | W2-14 advisory replay | The ratchet report is attached to the PR and does not block it |
+
+**What Tranche 1 does and does not fix.** It fixes the auth retry path, the silent stall, the untyped build model, and the missing wall-clock cap. It does not fix the breaker's dependence on GitHub history alone, which Wave 1b addresses. It also does not change the 288-run dispatch and sweep paths beyond what W2-03 and W2-06 touch (E7).
 
 ---
 
-- No model-trained or self-modifying learner outside the gated Phase J search; no reinforcement learning; no fine-tuning.
-- A GitHub twin is not a substitute for the real service: its fidelity is checked by the nightly contract run (H4 Step 4), and any gap is a bug in the twin.
-- No claim that the holdout fence (H2) is proven on macOS until it is tested on a real machine.
-- The "71.9%" review-catch figure and the CRBugBench citation from the briefing are not used anywhere in this plan.
+## Open questions
 
-## Self-review (against the spec, ADRs and AGENTS.md)
+| # | Question | Status and default |
+|---|---|---|
+| Q1 | Spec amendments | **Resolved narrowly.** The only new item is the E5 timing, which stays in Wave 4 as the spec says, and E5 is now deferred. §2 needs no change for Tranches 1 to 3. |
+| Q2 | Run Tranches 1 to 2 on SQLite (M1) before Postgres? | **Yes.** M2 and M3 share the ledger only once Postgres exists. |
+| Q3 | Disposable sandbox repository | **Default: none.** W2-09 uses a manual run on this repository with an `e2e-test` issue until a sandbox is approved. |
+| Q4 | Eval spend cap | **Default: $0.** No nightly replays run until a cap is approved. |
+| Q5 | Incident logs as fixtures | **Read-only fetch, as approved.** Run 38744601038 is still in progress; W2-01 Step 1 captures it after it completes. |
+| Q6 | CI cost source | **Verify on the first sandbox run; zod; fail closed.** The usage fields are not assumed. |
+| Q7 | Triage model | **Yes, through `config/models.json` in W2-07.** |
+| Q8 | Which mechanism sets the build model | **Answered.** UCB1, the `$RANDOM` A/B and recruit set the build model, not the template. W2-07 switches them off, so the template's model applies. The retry escalation in `daemon-failure.sh` sets opus on retry 1 and is separate. |
+| Q9 | Refusal fallbacks in the runner | **Out of scope.** |
+| Q10 | Where `outcome-feedback.sh` output is read | **Part of W2-16 (G6).** |
+| Q11 | The review-benchmark citation | **Resolved.** CRBugBench is confirmed, with the two corrections in E2. |
+| Q12 | Full H2 fence | **Deferred (W2-19).** |
+| Q13 | Who writes holdout scenarios | **Default: the maintainer. W2-17 is blocked on this.** |
+| Q14 | GitHub twin | **Deferred (W2-19).** |
+| D-M | Model alias conversion (`claude-opus-5` to `opus`, which is the 5.5 model) | **Default: convert.** It changes the model for runs that use those templates. Confirm before W2-07 merges. |
 
-Checked on 2026-10-15 against the sources listed at the top.
+---
 
-1. **Placeholders.** Phases A and B have complete code and tests. Phase C has complete domain tests and task-level steps; its exact progress-domain code is left to the implementer because its inputs (real iteration logs) are not available (Q5). Phases D to G are task-level. Each of those phases says what it still needs. Nothing is "TBD"; where a value is a placeholder (budgets in D2), the text says so.
-2. **Contradictions with the spec.** D1–D3 are listed at the top rather than hidden. §5's model defaults (`claude-opus-5-5` build, `claude-haiku-5-5` decide) are used. §6.2's "adaptation may not raise caps" is enforced in `decideRetry` and in the Phase E optimizer rule.
-3. **Contradictions with the ADRs.** ADR-0005: the ledger goes through `RunJournal` once Wave 1b lands; before then, the JSONL adapter is a stated, temporary adapter. ADR-0007: the breaker still reads GitHub history until local outcomes reach the journal; the plan does not change that. ADR-0008: every bash change is argv-only and ratcheted; the plan says where bash grows (one line in `sw-loop.sh`, one in `daemon-failure.sh`, one in `record_failure`).
-4. **Fitness rules.** Domain files import only their own `domain/` (F1): `failure.ts` and `retry.ts` redeclare the kind names, which is why they do not import `AgentFailureKind`. Adapters own zod and `node:fs` (F5). The contract suite lives in `src/testing/`, which F5 allows. Function and file sizes are the implementer's check (F7); `jsonl-ledger.ts` is about 120 lines, comfortably under 300.
-5. **Tasks that cannot pass `bun run check`.** Two things must be fixed before implementation: the `ok` re-export at the bottom of `application/ledger.ts` (remove it), and the `validateNewEntry` call inside `JsonlLedger.read` (replace with a `validateRunId` function, noted in A3). Both are called out in the tasks. The `NodeJS.ErrnoException` type may be disallowed by Biome; the task names the alternative.
-6. **Paths.** Every path that is cited in this plan was checked to exist on `origin/main`, except the files the plan creates. `docs/safety-runbook.md`, `scripts/ci/bot-comments.sh`, `.github/actions/safety-gates/action.yml`, `.github/CODEOWNERS`, `src/testing/fake-safety-ports.ts`, `src/testing/in-memory-durability.ts` and `src/testing/contracts/durability-fixture.ts` were checked.
-7. **Survey claims that were not fully verified.** The table marks them: `convergence.sh` outcome tests, `sw-model-router.sh` (not analysed), `outcome-feedback.sh` readers (not confirmed), `sw-bandit-selector-test.sh` and the cost tests (not read in full), and `sw-lib-daemon-failure-test.sh` (not analysed in detail). These are listed as Q10 or as Phase G evidence.
-8. **Model facts.** Model IDs and the thinking and budget constraints were checked against the claude-api skill's model table (cached 2026-10-06). The Agent SDK option names were checked against `src/adapters/agent/agent-sdk-runner.ts`. The SDK's mapping of `effort` is a Wave 0 verification item and is not assumed.
-9. **Honesty about the current state.** The plan says that today's classifier has no outcome test, that CI auth failures have no category, that one read path has no writer, that the CI heartbeat is a timer, and that the budget gate is a no-op on CI. Those statements are from source reads, not from running the system.
+## Out of scope
+
+- Training any model. "Learning" here means fitting a small table to ledger statistics under a ratchet, and deterministic rules.
+- Reinforcement learning, bandits in production, and online adaptation during a run.
+- Fine-tuning.
+- Automatic merging. A human merges (E2 and I-tiers in W2-19).
+- Claims from the unverified sources in the Evidence table.
+- The full port of `sw-loop.sh` and `daemon-failure.sh`, which belongs to the delivery and orchestration contexts.
+
+---
+
+## Self-review
+
+Checked against the spec, the ADRs, AGENTS.md, the independent review, and the repository at `origin/main`.
+
+1. **Structure.** Tranches 1 to 3 and the deferred list are separate; each item carries its key, W2-01 to W2-19. Tranche 1 has exact steps with commands and expected output. Tranches 2 and 3 are task level and say so.
+2. **Verification of the code.** Every TypeScript file in Tranche 1 was executed in an isolated scratch copy against stubs of the real interfaces: 44 tests pass. The bash bridge and the daemon helper were executed against a fake Bun. The repository run for each task is listed as its verification step, and nothing has been run in the repository yet.
+3. **Fitness rules.** Domain files import only their own domain and `src/shared/kernel` (F1). The application layer imports only ports and domain (F2). Command code reads files only through the `FileReader` port (F5). The CLI imports contexts only through their `index.ts` (F3). The bash changes are argv-only and add no `eval` (F11).
+4. **Facts checked.** The router, the census, the pinned Bun SHA, the UCB1 and A/B lines, the recruit guard, the `EFFORT_LEVEL` validation, the auto-retry and watchdog steps, the dispatch guard text, and the pre-flight comment were all read from the repository. The incident run and CRBugBench were checked with `gh` and a fetch.
+5. **Corrections to the review.** See the note below.
+6. **Known gaps, stated plainly:** the sweep path is covered by W2-06 and W2-09, not by W2-03; the `timeout` cap may leave model child processes running; `movedTests` uses a single `suite` name on the bash side, which is coarse; the classifier's first-attempt rules are not exhaustive; and the 288-run attribution is a source check (E7), not a reconstruction of each re-run.
+
+**Where I disagree with the review, or where the review needed a correction:**
+1. **CRBugBench is not "injected bugs".** The paper says "human-verified bugs mined from repository history". The 71.9% and 47.7% figures may not share a harness. The plan cites both corrections (E2). Lights-on remains the default, because the paper reports weaker results on complex changes and proprietary repositories, not because of a single number.
+2. **Tranche 1 does not "unblock dispatch" on its own.** It removes the known causes of the incident record, but the breaker reads GitHub history only until Wave 1b. The plan says so under "Dispatch at scale".
+3. **The auth-comment mechanism (E7).** The review says dispatch and sweep caused the 288 re-runs, which I confirmed from source. The dispatch guard does match "Pipeline Auth Failure", so the mechanism is the comment's `|| true` write plus sweep's timestamp logic. I did not reconstruct each re-run, so that part stays [V] by source check only.
+4. **AGENTS.md is unchanged.** Tranche 1 needs no line in it. When Tranche 2 lands, one existing line will be replaced rather than a line added.
+5. **The model-alias conversion (D-M) is a real behaviour change**, not only a hygiene fix, because `claude-opus-5` becomes `claude-opus-5-5`. The plan makes that visible rather than assuming it.
+
+The plan and ADR-0009 are the only changes in this commit.
