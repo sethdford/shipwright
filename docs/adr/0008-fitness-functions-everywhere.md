@@ -50,37 +50,47 @@ every allowlist, and forbids `ast-grep-ignore`; every dependency-cruiser rule mu
 - `bun run arch` gains about 0.7 s (a second dependency-cruiser run, one scan of all rules). The
   first estimate of 1.5 s was wrong; an independent verifier measured 0.7 s.
 
-### Known evasions (follow-up)
+### Known evasions
 
-Found by an independent verifier or in review, not yet closed. Each is a gap in a rule, not a
-decision to allow the pattern.
-- F5 misses `node:vm`, `node:module` `createRequire`, `bun:ffi`, `import.meta.require`,
-  `window`/`self` `["fetch"]` and the `Function` constructor reached through a value.
-- The meta-test pins a rule's `ignores` but not its `files`, so narrowing `files` passes it.
-- `ARCH_STEPS` is a substring check: a step followed by `|| true` still passes.
-- `.github/CODEOWNERS` does not cover the other `.github/workflows/*.yml` files or `scripts/postinstall.mjs`,
+Closed by #8582 (each has an `invalid` rule-test case, and the rule-test YAML is in the ignore ban):
+- F5 now catches `node:vm`, `node:module` (`createRequire`), `bun:ffi`, `import.meta.require`, and
+  `window`/`self`/`globalThis` with a computed key (`window["fetch"]`).
+- The meta-test pins each rule's `files` as well as its `ignores`, so narrowing coverage fails it.
+- `bun run arch` must be exactly the checkers joined by `&&`; `|| true`, `; echo` and other shell
+  operators fail the meta-test.
+- The SDK runner must have exactly one `query` call, after `assertAgentOptions`.
+- The ignore ban covers `tools/arch/rules`, `utils` and `rule-tests` YAML.
+- Bash F9: `claude` is matched bare, quoted, behind an absolute path, after `command` or a wrapper
+  (`timeout`, `gtimeout`, `$TIMEOUT_CMD`), or as `"$CLAUDE_BIN"`; the token must come before `claude`.
+- Bash F10: `gh` is matched quoted, by absolute path or as `$GH_BIN`; the write verbs of `cache`,
+  `project`, `ssh-key`, `gpg-key` and `codespace` are caught; `git push -o stash` is no longer excluded.
+- Bash F11: shells under any directory (`/usr/local/bin/bash -c`), unquoted heredocs into a shell,
+  `echo "$x" | bash`, `node --eval=` and `-p`, `perl -E`, `xargs sh -c` with `{}`, a download piped
+  into `python`/`node`/`perl`/`ruby`/`bun`/`deno`, and `source /dev/stdin <<EOF` with an expansion.
+- Dashboard: `const B = Bun`, `Reflect.get(Bun, …)`, `globalThis.Bun.spawn`, `import { $ as sh } from
+  "bun"`, `import * as B from "bun"`, `createRequire`, and a computed `require`/`import` specifier.
+
+Open, and why:
+- Bash F10 does not catch `curl` to `api.github.com` with a write method. The rule now would flag
+  `scripts/sw-github-app.sh:169` (installation token: `curl … -d '{}' -X POST`), a real write that
+  is not in the baseline. A decision is needed: port it, or accept it as a counted finding. The
+  rule is drafted and held back.
+- `.github/CODEOWNERS` does not cover the other `.github/workflows/*.yml` or `scripts/postinstall.mjs`,
   which no rule scans.
-- Bash F9, F10 and F11 are evaded by quoting, absolute paths (`/usr/bin/gh`), a `command` prefix,
-  variables, heredocs, pipes into an interpreter held in a variable, and `curl` to `api.github.com`
-  with a write method.
-- Dashboard: the subprocess rule misses `Bun` aliasing, `Reflect.get`, `import {$ as sh}`,
-  `createRequire` and a `require` built by concatenation. D2 checks direct imports only, and the
-  raw-runner rule does not see a dynamic `import()` of `claims.ts`.
-- F9 options: a variable passed as `options` is checked at run time only (its `env` is checked for
-  GitHub token names there), and an `env:` built by a helper function is not inspected for contents. The runner's
-  `settingSources: ["project"]` reads the repo's own `.claude/settings.json`, which can set
-  `permissions`. The runner passes `permissionMode: "dontAsk"` explicitly, but that it overrides a
-  project's `defaultMode` has not been verified against the SDK.
+- `scripts/postinstall.mjs` is not scanned by any rule.
 - `bun run check` has no `--against`: the baseline comparison runs only in PR CI.
-- `scripts/postinstall.mjs` is not scanned.
-- The meta-test checks only that the runner's first `assertAgentOptions` comes before its first `query`,
-  so a second, unguarded call in the runner passes.
-- A computed `require`, `createRequire` or `import.meta.require` of the SDK inside `src/adapters` is not
-  matched (F9-sdk-query-single-importer sees static imports, `import()` and `require()` only).
-- `risesAgainst` skips a group the base does not have (`if (!known) continue`), so a new rule id can be
-  seeded with any count. PINNED and CODEOWNERS are the only guard.
-- Prototype pollution (`Object.prototype.extraArgs = ...`): the guard reads own data properties, but the
-  SDK's reads of options it does not own are not checked.
-- The ignore ban does not cover `tools/arch/rule-tests/*.yml`, so a marker there is not caught.
-- `settingSources` including `"user"` or `"local"` is not refused: the runner sets only `"project"`, and
-  the guard does not check the list.
+- F9 options: a variable passed as `options` is checked at run time only, and an `env:` built by a
+  helper is not inspected statically. `settingSources` including `"user"` or `"local"` is not refused.
+  Whether `permissionMode: "dontAsk"` overrides a project's `defaultMode` is unverified against the SDK.
+- `risesAgainst` skips a group the base lacks (`if (!known) continue`), so a new rule id can be
+  seeded with any count; PINNED and CODEOWNERS are the only guard.
+- A computed `require`, `createRequire` or `import.meta.require` of the SDK inside `src/adapters` is
+  not matched (F9-sdk-query-single-importer sees static imports, `import()` and `require()` only).
+- Dashboard D2 checks direct imports only, and the raw-runner rule does not see a dynamic `import()`
+  of `claims.ts`.
+
+Out of scope (deliberate obfuscation, not an accidental path): prototype pollution
+(`Object.prototype.extraArgs = …`), a `Function` constructor reached through a value, module or
+command names built by string concatenation outside the dashboard, a GraphQL mutation held in a
+variable, `gh "${args[@]}"` with the verb in an array, and bash bypass flags spelled with quotes
+inside a word.
