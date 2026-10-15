@@ -119,6 +119,7 @@ export function isPublicRoute(pathname: string): boolean {
     pathname.startsWith("/auth/") ||
     pathname === "/api/health" ||
     pathname === "/api/ws-status" ||
+    pathname === "/api/join" ||
     pathname.startsWith("/api/join/") ||
     pathname.startsWith("/api/connect/") ||
     pathname === "/api/team" ||

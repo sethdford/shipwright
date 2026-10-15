@@ -113,7 +113,7 @@ export const fetchJoinTokens = () =>
 export const generateJoinToken = (body: {
   label: string;
   max_workers: number;
-}) => post<{ join_cmd: string }>("/api/join-token", body);
+}) => post<{ token: string; join_url: string; join_cmd: string }>("/api/join-token", body);
 
 // Costs
 export const fetchCostBreakdown = (period = 7) =>
@@ -254,7 +254,7 @@ export const createTeamInvite = (options?: {
   expires_hours?: number;
   max_uses?: number;
 }) =>
-  request<{ token: string; url: string; expires_at: string }>(
+  request<{ token: string; join_url: string; command: string; expires_at: string }>(
     "/api/team/invite",
     { method: "POST", body: JSON.stringify(options || {}) },
   );
