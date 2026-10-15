@@ -240,6 +240,7 @@ run_suite() {
     # Output streams live and is kept for the skip check. The copy is removed on exit or interrupt.
     local suite_log
     suite_log=$(mktemp "${TMPDIR:-/tmp}/sw-e2e-suite.XXXXXX")
+    # shellcheck disable=SC2064  # expand now: the path is fixed for this run
     trap "rm -f '$suite_log'" EXIT INT TERM
     set +e
     "$timeout_cmd" "$timeout" bash "$test_script" 2>&1 | tee "$suite_log"
@@ -248,6 +249,10 @@ run_suite() {
     # The integration suite exits 0 when it skips (no token, no gh auth). That is not a pass.
     if [[ "$exit_code" -eq 0 ]] && grep -q "Skipping integration tests" "$suite_log"; then
         status="skipped"
+    elif [[ "$exit_code" -eq 124 ]]; then
+        status="timeout"
+    elif [[ "$exit_code" -ne 0 ]]; then
+        status="failed"
     fi
     rm -f "$suite_log"
     trap - EXIT INT TERM
