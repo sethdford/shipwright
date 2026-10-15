@@ -380,3 +380,7 @@
 {"ts":"2026-10-14T20:05:32Z","ts_epoch":1792008332,"type":"strategic.issue_created","title":"Add context-exhaustion early-warning check to pre-build validation","priority":"P0","complexity":"standard"}
 {"ts":"2026-10-14T20:05:36Z","ts_epoch":1792008336,"type":"strategic.issue_created","title":"Add `shipwright doctor` check for untested scripts exceeding size/complexity threshold","priority":"P1","complexity":"fast"}
 {"ts":"2026-10-14T20:05:36Z","ts_epoch":1792008336,"type":"strategic.cycle_complete","issues_created":2,"issues_skipped":1}
+{"ts":"2026-10-15T00:12:41Z","ts_epoch":1792023161,"type":"hygiene_platform_refactor","hardcoded":49,"fallback":69,"todo":51}
+{"ts":"2026-10-15T00:13:07Z","ts_epoch":1792023187,"type":"strategic.issue_created","title":"Add pre-build credential/tooling fast-fail check distinct from existing validation gaps","priority":"P0","complexity":"fast"}
+{"ts":"2026-10-15T00:13:11Z","ts_epoch":1792023191,"type":"strategic.issue_created","title":"Surface build-loop iteration cost trend in `shipwright dora` output","priority":"P4","complexity":"standard"}
+{"ts":"2026-10-15T00:13:12Z","ts_epoch":1792023192,"type":"strategic.cycle_complete","issues_created":2,"issues_skipped":1}
