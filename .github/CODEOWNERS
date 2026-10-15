@@ -10,3 +10,4 @@
 /docs/architecture.md             @sethdford
 /dashboard/tsconfig.server.json   @sethdford
 /src/adapters/agent/privilege-guard.ts @sethdford
+/src/adapters/agent/agent-sdk-runner.ts @sethdford

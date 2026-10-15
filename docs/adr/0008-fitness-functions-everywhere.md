@@ -73,3 +73,14 @@ decision to allow the pattern.
   project's `defaultMode` has not been verified against the SDK.
 - `bun run check` has no `--against`: the baseline comparison runs only in PR CI.
 - `scripts/postinstall.mjs` is not scanned.
+- The meta-test checks only that the runner's first `assertAgentOptions` comes before its first `query`,
+  so a second, unguarded call in the runner passes.
+- A computed `require`, `createRequire` or `import.meta.require` of the SDK inside `src/adapters` is not
+  matched (F9-sdk-query-single-importer sees static imports, `import()` and `require()` only).
+- `risesAgainst` skips a group the base does not have (`if (!known) continue`), so a new rule id can be
+  seeded with any count. PINNED and CODEOWNERS are the only guard.
+- Prototype pollution (`Object.prototype.extraArgs = ...`): the guard reads own data properties, but the
+  SDK's reads of options it does not own are not checked.
+- The ignore ban does not cover `tools/arch/rule-tests/*.yml`, so a marker there is not caught.
+- `settingSources` including `"user"` or `"local"` is not refused: the runner sets only `"project"`, and
+  the guard does not check the list.
