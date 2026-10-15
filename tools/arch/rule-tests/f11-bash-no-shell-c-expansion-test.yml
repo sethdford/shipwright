@@ -1,5 +1,8 @@
 id: F11-bash-no-shell-c-expansion
 valid:
+  - "deno eval 'console.log(1)'"
+  - "perl -E 'say 1'"
+  - "xargs -I % sh -c 'printf \"%s\\n\" \"$1\"' _ %"
   - "bash -c 'echo hi'"
   - "bash -c 'run \"$1\"' _ \"$value\""
   - 'bash "$script" "$arg"'
@@ -17,6 +20,12 @@ valid:
   - 'node -p "1 + 1"'
   - "xargs -I{} sh -c 'echo \"$1\"' _ {}"
 invalid:
+  - 'xargs -I%  sh -c "echo %"'
+  - "xargs -I% sh -c 'echo %'"
+  - 'deno eval "$x"'
+  - 'perl -E"$x"'
+  - 'bash -c"$x"'
+  - 'xargs -I % bash -c "echo %"'
   - 'bash -c "$handler_cmd"'
   - 'sh -c "echo $y"'
   - 'bash -c $cmd'

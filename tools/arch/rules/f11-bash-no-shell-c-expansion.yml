@@ -33,8 +33,14 @@ rule:
             precedes:
               stopBy: end
               kind: word
-              regex: '^(-[A-Za-z]*[ceEp][A-Za-z]*|--eval|--print)$'
+              regex: '^(-[A-Za-z]*[ceEp][A-Za-z]*|--eval|--print|eval)$'
               precedes: { matches: bash-expansion }
+        - all:
+            - has: { regex: '^(python[0-9.]*|node|nodejs|perl|ruby|bun|deno)$' }
+            - has: { kind: concatenation, regex: '^-[A-Za-z]*[ceEp][A-Za-z]*', has: { matches: bash-expansion } }
+        - all:
+            - has: { field: name, matches: bash-shell }
+            - has: { kind: concatenation, regex: '^-[A-Za-z]*c[A-Za-z]*', has: { matches: bash-expansion } }
         - all:
             - has: { regex: '^(python[0-9.]*|node|nodejs|perl|ruby|bun|deno)$' }
             - regex: '(^|\s)(--eval|--print)='
@@ -50,6 +56,17 @@ rule:
                   - kind: string
                   - kind: raw_string
                 regex: '\{\}'
+        - all:
+            - has: { field: name, regex: '^xargs$' }
+            - has: { kind: word, matches: bash-shell }
+            - any:
+                - has: { kind: word, regex: '^-I' }
+                - has: { kind: concatenation, regex: '^-I' }
+            - has:
+                any:
+                  - kind: string
+                  - kind: raw_string
+                not: { regex: '\$' }
         - all:
             - has: { field: name, regex: '^ssh$' }
             - has:
