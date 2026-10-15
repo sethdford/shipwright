@@ -3,16 +3,21 @@ import { parse } from "yaml";
 /**
  * Gate ordering and trigger rules for workflows (ADR-0007, the labeled entry point):
  * - A step that runs `.github/actions/safety-gates` with `on-refusal: notice` turns a closed gate
- *   into a successful run. Every step after it in the same job must be conditioned on
- *   `steps.<id>.outputs.allowed == 'true'`, so nothing else runs after a refusal.
- * - `.github/actions/dispatch-pipeline` may only be used in a job that also runs the gates first.
- * - shipwright-pipeline.yml is dispatched only: its `on:` is exactly `workflow_dispatch`. The
- *   ungated `issues` trigger cannot come back silently.
+ *   into a successful run. Every step after it in the same job must be gated (below).
+ * - `.github/actions/dispatch-pipeline` may only be used in a job that runs the gates first, and
+ *   the step itself is gated on the gates' allowed output.
+ * - shipwright-pipeline.yml is dispatched only: its `on:` is exactly `workflow_dispatch`.
+ *
+ * "Gated" is strict. The step's `if:` must contain the gate's exact term
+ * `steps.<id>.outputs.allowed == 'true'` as one of its `&&`-joined terms, and nothing else may
+ * weaken it: no `||`, no negation (`!` other than `!=`), and no `always()`, `failure()` or
+ * `cancelled()`. A step with no `if:` is not gated.
  */
 
 const GATES = /(?:^|\/)\.github\/actions\/safety-gates\/?$/;
 const DISPATCH = /(?:^|\/)\.github\/actions\/dispatch-pipeline\/?$/;
 const PIPELINE_FILE = /(?:^|\/)shipwright-pipeline\.yml$/;
+const WEAKENERS = /\|\||always\(\)|failure\(\)|cancelled\(\)|!(?!=)/;
 
 interface Step {
   id?: unknown;
@@ -28,6 +33,17 @@ interface Doc {
 
 const usesOf = (st: Step, re: RegExp) => typeof st.uses === "string" && re.test(st.uses);
 const label = (st: Step, i: number) => (typeof st.name === "string" ? st.name : `step-${i}`);
+const condOf = (st: Step) => (typeof st.if === "string" ? st.if.replace(/\s+/g, " ").trim() : "");
+
+/** True only when `if:` is the gate's exact term, joined to the rest with `&&` alone. */
+export function isGatedBy(cond: string, gateId: string): boolean {
+  if (WEAKENERS.test(cond)) return false;
+  const need = `steps.${gateId}.outputs.allowed == 'true'`;
+  return cond
+    .split("&&")
+    .map((t) => t.trim())
+    .includes(need);
+}
 
 function jobSteps(job: { steps?: unknown } | null): Step[] {
   return Array.isArray(job?.steps) ? (job.steps as Step[]).map((s) => s ?? {}) : [];
@@ -44,24 +60,32 @@ export function gateOrderFindings(file: string, doc: Doc): string[] {
         found.push(`${where}: on-refusal: notice needs an id (its allowed output gates the rest)`);
         return;
       }
-      const need = `steps.${st.id}.outputs.allowed == 'true'`;
       for (const [j, after] of steps.entries()) {
         if (j <= i) continue;
-        const cond = typeof after.if === "string" ? after.if : "";
-        if (!cond.includes(need)) {
+        if (!isGatedBy(condOf(after), st.id)) {
           found.push(
-            `${file}:${job}:${label(after, j)}: runs after a notice-mode gate without \`${need}\``,
+            `${file}:${job}:${label(after, j)}: runs after a notice-mode gate without a strict \`steps.${st.id}.outputs.allowed == 'true'\` term in its if:`,
           );
         }
       }
     });
     steps.forEach((st, i) => {
       if (!usesOf(st, DISPATCH)) return;
-      const gated = steps.slice(0, i).some((s) => usesOf(s, GATES));
-      if (!gated)
+      const gate = steps
+        .slice(0, i)
+        .filter((s) => usesOf(s, GATES))
+        .pop();
+      if (typeof gate?.id !== "string" || gate.id === "") {
         found.push(
-          `${file}:${job}:${label(st, i)}: dispatch-pipeline needs the gates earlier in the job`,
+          `${file}:${job}:${label(st, i)}: dispatch-pipeline needs a gates step with an id earlier in the job`,
         );
+        return;
+      }
+      if (!isGatedBy(condOf(st), gate.id)) {
+        found.push(
+          `${file}:${job}:${label(st, i)}: dispatch-pipeline must be gated by a strict \`steps.${gate.id}.outputs.allowed == 'true'\` term in its if:`,
+        );
+      }
     });
   }
   return found;
