@@ -1,16 +1,16 @@
 {
   "repo": "sethdford/shipwright",
-  "captured_at": "2026-10-11T04:25:34Z",
+  "captured_at": "2026-10-15T16:23:58Z",
   "project": {
     "type": "node",
     "framework": "",
     "test_runner": "vitest",
     "package_manager": "npm",
-    "language": "javascript"
+    "language": "typescript"
   },
   "conventions": {
     "source_dir": "src/",
-    "test_pattern": "*.test.js",
+    "test_pattern": "*.test.ts",
     "import_style": "commonjs"
   }
 }

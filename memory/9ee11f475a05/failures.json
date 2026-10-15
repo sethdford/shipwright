@@ -108,6 +108,15 @@
       "seen_count": 2,
       "last_seen": "2026-10-10T22:10:05Z",
       "category": "test_failure"
+    },
+    {
+      "stage": "test",
+      "pattern": "FAIL: 0",
+      "root_cause": "The log shows every suite passing with 'Failed: 0'; the 'FAIL: 0' pattern matched a zero-failure summary line, so this is a false positive in the error detector, not a real test failure.",
+      "fix": "Make the failure-pattern matcher ignore zero counts (e.g. match 'FAIL: [1-9]' or 'Failed: [1-9]') and check the test runner's exit code instead of grepping for 'FAIL'; look for the real failure earlier than the last 200 lines if the stage still exited non-zero.",
+      "seen_count": 5,
+      "last_seen": "2026-10-15T16:37:19Z",
+      "category": "config"
     }
   ]
 }
