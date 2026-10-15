@@ -40,9 +40,12 @@ on:
         default: ""
         type: string
 
-# Only one pipeline per issue at a time
+# Only one pipeline per issue at a time. A labeled event for any label other than `shipwright` is
+# filtered into a group of its own, so it never queues a pending run in an issue's group and so
+# never displaces another pending run (#8573). The run then starts and every job is skipped by its
+# `if:`. Keep the label name in step with the job conditions.
 concurrency:
-  group: shipwright-issue-${{ github.event.inputs.issue_number || github.event.issue.number }}
+  group: "${{ (github.event.action == 'labeled' && github.event.label.name != 'shipwright') && format('shipwright-unrelated-{0}', github.run_id) || format('shipwright-issue-{0}', github.event.inputs.issue_number || github.event.issue.number) }}"
   cancel-in-progress: false
 
 permissions:
