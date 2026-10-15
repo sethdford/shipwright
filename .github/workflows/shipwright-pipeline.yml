@@ -1,7 +1,7 @@
 name: Shipwright Pipeline
 
 # Include issue number in run title so auto-retry and watchdog can find it
-run-name: "Shipwright Pipeline #${{ github.event.inputs.issue_number || github.event.issue.number || '?' }}"
+run-name: "Shipwright Pipeline #${{ github.event.inputs.issue_number || '?' }}"
 
 # Dispatched by shipwright-dispatch.yml (after the gates) and by shipwright-label-dispatch.yml
 # (the labeled entry point, gated). A manual workflow_dispatch is an operator action: it is not gated.
@@ -43,7 +43,7 @@ on:
 # filter lives in shipwright-label-dispatch.yml, which has no concurrency group), so this group
 # only ever sees dispatched runs (#8573).
 concurrency:
-  group: shipwright-issue-${{ github.event.inputs.issue_number || github.event.issue.number }}
+  group: shipwright-issue-${{ github.event.inputs.issue_number }}
   cancel-in-progress: false
 
 permissions:
@@ -56,9 +56,7 @@ jobs:
   # Stage 1: Triage — vet the issue and determine delivery strategy
   # ────────────────────────────────────────────────────────────────────────────
   triage:
-    if: >
-      github.event_name == 'workflow_dispatch' ||
-      (github.event.action == 'labeled' && github.event.label.name == 'shipwright')
+    if: github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
     timeout-minutes: 5
     outputs:
@@ -72,7 +70,7 @@ jobs:
       risk_score: ${{ steps.risk.outputs.risk_score }}
 
     env:
-      ISSUE_NUMBER: ${{ github.event.inputs.issue_number || github.event.issue.number }}
+      ISSUE_NUMBER: ${{ github.event.inputs.issue_number }}
       CLAUDE_CODE_OAUTH_TOKEN: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
       GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
@@ -383,7 +381,7 @@ jobs:
     timeout-minutes: 180
 
     env:
-      ISSUE_NUMBER: ${{ github.event.inputs.issue_number || github.event.issue.number }}
+      ISSUE_NUMBER: ${{ github.event.inputs.issue_number }}
       TEMPLATE: ${{ needs.triage.outputs.template || github.event.inputs.template || 'autonomous' }}
       MAX_ITERATIONS: ${{ needs.triage.outputs.max_iterations || '20' }}
       COMPLETED_STAGES: ${{ github.event.inputs.completed_stages || '' }}

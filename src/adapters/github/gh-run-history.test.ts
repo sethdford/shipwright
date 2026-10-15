@@ -148,36 +148,15 @@ test("a negative or fractional databaseId is rejected", async () => {
   expect((await new GhRunHistory(runner).recentRuns(5)).ok).toBe(false);
 });
 
-test("a refused label during half-open leaves the breaker unchanged", async () => {
-  // The breaker is half-open with one probe in flight. A refused `shipwright` label must not move it.
-  // The label workflow (shipwright-label-dispatch.yml) is a different workflow, so GhRunHistory
-  // (`gh run list --workflow shipwright-pipeline.yml`) never lists its runs. Only pipeline runs feed the breaker.
-  const M = 60_000;
-  const t0 = Date.parse("2026-10-14T10:00:00Z");
-  const failed = (id: string, start: number, end: number) => ({
-    id,
-    startedAt: t0 + start * M,
-    finished: { at: t0 + end * M, outcome: "failure" as const },
-  });
-  const trips = [1, 2, 3, 4, 5].map((i) => failed(`trip-${i}`, i, i + 1)); // open at t0+6m
-  const probe = { id: "probe", startedAt: t0 + 40 * M, finished: null }; // half_open, probe in flight
-  const now = t0 + 41 * M;
-
+test("the breaker's history lists shipwright-pipeline.yml runs only", async () => {
+  // A refused `shipwright` label is a run of shipwright-label-dispatch.yml. It can feed the breaker
+  // only if this query lists more than one workflow, so the argv must name exactly one.
   const runner = new FakeProcessRunner([
     { prefix: ["gh", "run", "list"], result: { exitCode: 0, stdout: "[]", stderr: "" } },
   ]);
   await new GhRunHistory(runner).recentRuns(50);
-  expect(runner.calls[0]?.argv).toContain("shipwright-pipeline.yml");
-
-  const before = evaluateBreaker([...trips, probe], now);
-  expect(before).toEqual({ kind: "half_open", since: t0 + 6 * M, probing: true });
-
-  // The pipeline-only history is what the breaker sees: a refused label adds nothing to it.
-  const after = evaluateBreaker([...trips, probe], now);
-  expect(after).toEqual(before);
-
-  // Contrast: had the refusal been counted as a pipeline failure, the breaker would re-open.
-  const refusedAsPipelineRun = failed("refused-label", 42, 43);
-  const counted = evaluateBreaker([...trips, probe, refusedAsPipelineRun], now + 2 * M);
-  expect(counted.kind).toBe("open");
+  const argv = runner.calls[0]?.argv ?? [];
+  const at = argv.flatMap((a, i) => (a === "--workflow" ? [i] : []));
+  expect(at.length).toBe(1);
+  expect(argv[(at[0] ?? -1) + 1]).toBe("shipwright-pipeline.yml");
 });
