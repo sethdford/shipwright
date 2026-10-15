@@ -907,7 +907,7 @@ All scripts are bash (except the dashboard server in TypeScript). Grouped by lay
 | `scripts/sw-scale-test.sh` | 151 | Dynamic agent team scaling |
 | `scripts/sw-scope-enforcement-test.sh` | 441 | Test suite for scope enforcement |
 | `scripts/sw-security-audit-test.sh` | 162 | Security auditing tests |
-| `scripts/sw-self-optimize-test.sh` | 837 | Unit tests for learning & tuning system |
+| `scripts/sw-self-optimize-test.sh` | 873 | Unit tests for learning & tuning system |
 | `scripts/sw-server-api-test.sh` | 713 | Dashboard Server API Test Suite |
 | `scripts/sw-session-restart-test.sh` | 520 | Intelligent restart briefing system |
 | `scripts/sw-session-test.sh` | 595 | E2E validation of session creation flow |
