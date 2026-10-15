@@ -253,7 +253,7 @@ run_refused_failure() {
         printf '#!/usr/bin/env bash\nexit 0\n' > "$SCRIPT_DIR/sw-tracker.sh"
         chmod +x "$SCRIPT_DIR/sw-tracker.sh"
         NO_GITHUB=false
-        daemon_spawn_pipeline() { echo "spawn $1 retry=${DAEMON_RETRY_ATTEMPT:-unset}" >> "$REFUSE_LOG"; return "${RETRY_SPAWN_RC:-75}"; }
+        daemon_spawn_pipeline() { echo "spawn $1 retry=${DAEMON_RETRY_ATTEMPT:-unset} repo=${3:-}" >> "$REFUSE_LOG"; return "${RETRY_SPAWN_RC:-75}"; }
         daemon_log() { echo "log $1 ${*:2}" >> "$REFUSE_LOG"; }
         locked_state_update() {
             local tmp
@@ -304,11 +304,14 @@ assert_eq "the entry records the labels that were applied" "pipeline/failed ship
     "$(jq -r '.final_failed["805"].marked | sort | join(" ")' "$STATE_FILE")"
 assert_eq "the entry records when" "true" "$(jq '.final_failed["805"].ts | type == "string"' "$STATE_FILE")"
 
-print_test_section "Org-mode final failure is keyed by repo and issue"
-REFUSE_REPO="acme/api" run_refused_failure 806 'printf "gh %s\n" "$*" >> "$REFUSE_LOG"; [[ "$*" == *--remove-label* ]] && exit 1; exit 0'
-assert_eq "an org-mode tombstone is keyed by repo and issue" "pipeline/failed shipwright-stuck" \
-    "$(jq -r '.final_failed["acme/api:806"].marked | sort | join(" ")' "$STATE_FILE")"
-assert_eq "and is not written under the bare number" "false" "$(jq '.final_failed | has("806")' "$STATE_FILE")"
+print_test_section "Org-mode retry that fails for good is keyed by repo and issue"
+REFUSE_REPO="acme/api" run_refused_failure 807 'printf "gh %s\n" "$*" >> "$REFUSE_LOG"; [[ "$*" == *--remove-label* ]] && exit 1; exit 0'
+refuse_log="$(cat "$TEST_TEMP_DIR/refuse.log")"
+assert_contains "the retry is spawned into the job's repo" "$refuse_log" "spawn 807 retry=2 repo=acme/api"
+assert_contains "the final failure edits the issue in that repo" "$refuse_log" "gh issue edit 807 --repo acme/api --add-label pipeline/failed"
+assert_eq "the org-mode tombstone is keyed by repo and issue" "pipeline/failed shipwright-stuck" \
+    "$(jq -r '.final_failed["acme/api:807"].marked | sort | join(" ")' "$STATE_FILE")"
+assert_eq "and is not written under the bare number" "false" "$(jq '.final_failed | has("807")' "$STATE_FILE")"
 
 run_refused_failure 803 'printf "gh %s\n" "$*" >> "$REFUSE_LOG"; [[ "${1:-} ${2:-}" == "issue edit" ]] && exit 1; exit 0'
 assert_eq "when every edit fails the entry has no marked labels (fail closed)" "0" \
