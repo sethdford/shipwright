@@ -287,6 +287,19 @@ test("the SDK runner asserts the exact options object it passes to query (F9, AD
   expect(queryAt).toBeGreaterThan(assertAt);
 });
 
+test("the SDK runner has exactly one query call, and it is the asserted one (F9, ADR-0008)", async () => {
+  const raw = await Bun.file(join(ROOT, "src/adapters/agent/agent-sdk-runner.ts")).text();
+  const src = raw
+    .split("\n")
+    .filter((line) => !line.trim().startsWith("//"))
+    .join("\n");
+  // The constructor default `= query` is the only other mention; a second call (`query(`, or
+  // `this.queryFn(` anywhere else) would run options that were never asserted.
+  expect(src.match(/this\.queryFn\(/g)?.length ?? 0).toBe(1);
+  expect(src.match(/(?<![\w.])query\s*\(/g)?.length ?? 0).toBe(0);
+  expect(src.match(/assertAgentOptions\(/g)?.length ?? 0).toBe(1);
+});
+
 test("allowlisted dashboard services export no raw command runner (F12, ADR-0008)", async () => {
   for (const file of ["dashboard/services/claims.ts", "dashboard/services/subprocess-guards.ts"]) {
     const src = await Bun.file(join(ROOT, file)).text();
