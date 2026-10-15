@@ -1,5 +1,8 @@
 # pipeline-quality-checks.sh — Quality checks (security, bundle, perf, api, coverage, adversarial, dod, bash compat, etc.) for sw-pipeline.sh
 # Source from sw-pipeline.sh. Requires pipeline-quality.sh, ARTIFACTS_DIR, SCRIPT_DIR.
+# Test commands run without credentials (#8608).
+# shellcheck source=lib/test-gate-env.sh
+source "$(dirname "${BASH_SOURCE[0]}")/test-gate-env.sh"
 [[ -n "${_PIPELINE_QUALITY_CHECKS_LOADED:-}" ]] && return 0
 _PIPELINE_QUALITY_CHECKS_LOADED=1
 
@@ -202,7 +205,7 @@ run_e2e_validation() {
     fi
 
     info "Running E2E validation: $test_cmd"
-    if bash -c "$test_cmd" > "$ARTIFACTS_DIR/e2e-validation.log" 2>&1; then
+    if sw_test_gate_env bash -c "$test_cmd" > "$ARTIFACTS_DIR/e2e-validation.log" 2>&1; then
         success "E2E validation passed"
         return 0
     else
@@ -321,7 +324,7 @@ run_test_coverage_check() {
     # Run tests and capture output
     local test_output
     local test_rc=0
-    test_output=$(bash -c "$test_cmd" 2>&1) || test_rc=$?
+    test_output=$(sw_test_gate_env bash -c "$test_cmd" 2>&1) || test_rc=$?
 
     if [[ "$test_rc" -ne 0 ]]; then
         warn "Test command failed (exit code: $test_rc) — cannot extract coverage"

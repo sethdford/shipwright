@@ -41,7 +41,7 @@
     "dashboard:test:coverage": "vitest run --config dashboard/vitest.config.ts --coverage",
     "test": "bash scripts/sw-test-all.sh",
     "test:smoke": "bash scripts/sw-e2e-smoke-test.sh",
-    "test:integration": "bash scripts/sw-e2e-integration-test.sh && bash scripts/sw-e2e-system-test.sh && bash scripts/sw-server-api-test.sh && bash scripts/sw-integration-claude-test.sh",
+    "test:integration": "SHIPWRIGHT_E2E_REAL=1 bash scripts/sw-e2e-integration-test.sh && bash scripts/sw-e2e-system-test.sh && bash scripts/sw-server-api-test.sh && bash scripts/sw-integration-claude-test.sh",
     "harness:evidence:capture": "bash scripts/sw-evidence.sh capture",
     "harness:evidence:verify": "bash scripts/sw-evidence.sh verify",
     "harness:evidence:pre-pr": "bash scripts/sw-evidence.sh pre-pr",
