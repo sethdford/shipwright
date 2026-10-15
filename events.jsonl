@@ -434,3 +434,23 @@
 {"ts":"2026-10-15T12:08:08Z","ts_epoch":1792066088,"type":"strategic.issue_created","title":"Add `shipwright template suggest` dry-run output to `shipwright prep` for visibility before pipeline start","priority":"P1","complexity":"fast"}
 {"ts":"2026-10-15T12:08:12Z","ts_epoch":1792066092,"type":"strategic.issue_created","title":"Split sw-memory.sh into storage, pattern-matching, and query modules","priority":"P4","complexity":"full"}
 {"ts":"2026-10-15T12:08:12Z","ts_epoch":1792066092,"type":"strategic.cycle_complete","issues_created":3,"issues_skipped":0}
+{"ts":"2026-10-15T12:16:08Z","ts_epoch":1792066568,"type":"patrol.started","dry_run":"false"}
+{"ts":"2026-10-15T12:16:10Z","ts_epoch":1792066570,"type":"patrol.finding","check":"stale_dependency","package":"yaml","current":"0.0.0","latest":"2.9.1"}
+{"ts":"2026-10-15T12:16:10Z","ts_epoch":1792066570,"type":"patrol.finding","check":"stale_dependency","package":"zod","current":"0.0.0","latest":"4.6.7"}
+{"ts":"2026-10-15T12:16:17Z","ts_epoch":1792066577,"type":"patrol.finding","check":"recurring_failure","pattern":"[38;2;74;222;128m[1m✓[0m reveal shows 1/3 pass count on","seen_count":52}
+{"ts":"2026-10-15T12:16:18Z","ts_epoch":1792066578,"type":"patrol.issue_created","check":"recurring_failure","pattern":"[38;2;74;222;128m[1m✓[0m reveal shows 1/3 pass count on"}
+{"ts":"2026-10-15T12:16:18Z","ts_epoch":1792066578,"type":"patrol.finding","check":"recurring_failure","pattern":"Failed: 1","seen_count":11}
+{"ts":"2026-10-15T12:16:19Z","ts_epoch":1792066579,"type":"patrol.issue_created","check":"recurring_failure","pattern":"Failed: 1"}
+{"ts":"2026-10-15T12:16:19Z","ts_epoch":1792066579,"type":"patrol.finding","check":"recurring_failure","pattern":"[2m  loop behavior: iterations on test failure[0m","seen_count":11}
+{"ts":"2026-10-15T12:16:20Z","ts_epoch":1792066580,"type":"patrol.issue_created","check":"recurring_failure","pattern":"[2m  loop behavior: iterations on test failure[0m"}
+{"ts":"2026-10-15T12:16:21Z","ts_epoch":1792066581,"type":"patrol.finding","check":"recurring_failure","pattern":"[38;2;0;212;255m▸[0m Patrol recurring failures label con","seen_count":4}
+{"ts":"2026-10-15T12:16:22Z","ts_epoch":1792066582,"type":"patrol.issue_created","check":"recurring_failure","pattern":"[38;2;0;212;255m▸[0m Patrol recurring failures label con"}
+{"ts":"2026-10-15T12:16:22Z","ts_epoch":1792066582,"type":"patrol.finding","check":"recurring_failure","pattern":"Results: [38;2;74;222;128m[1m127 PASS[0m | [38;2;248;113","seen_count":3}
+{"ts":"2026-10-15T12:16:23Z","ts_epoch":1792066583,"type":"patrol.issue_created","check":"recurring_failure","pattern":"Results: [38;2;74;222;128m[1m127 PASS[0m | [38;2;248;113"}
+{"ts":"2026-10-15T12:16:24Z","ts_epoch":1792066584,"type":"patrol.finding","check":"untested_script","script":"sw-tracker-linear.sh","lines":568,"usage":7}
+{"ts":"2026-10-15T12:16:24Z","ts_epoch":1792066584,"type":"patrol.finding","check":"untested_script","script":"sw-tracker-jira.sh","lines":474,"usage":7}
+{"ts":"2026-10-15T12:16:24Z","ts_epoch":1792066584,"type":"patrol.finding","check":"untested_script","script":"sw-tracker-github.sh","lines":212,"usage":3}
+{"ts":"2026-10-15T12:16:24Z","ts_epoch":1792066584,"type":"patrol.finding","check":"untested_script","script":"sw-tmux-status.sh","lines":151,"usage":1}
+{"ts":"2026-10-15T12:16:24Z","ts_epoch":1792066584,"type":"patrol.finding","check":"untested_script","script":"sw-tmux-role-color.sh","lines":81,"usage":1}
+{"ts":"2026-10-15T12:16:24Z","ts_epoch":1792066584,"type":"patrol.finding","check":"untested_script","script":"sw-test-all.sh","lines":206,"usage":0}
+{"ts":"2026-10-15T12:16:24Z","ts_epoch":1792066584,"type":"patrol.finding","check":"untested_script","script":"sw-event-schema-sync.sh","lines":93,"usage":0}
