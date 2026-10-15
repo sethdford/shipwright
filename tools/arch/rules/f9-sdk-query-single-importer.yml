@@ -10,7 +10,14 @@ message: "F9: only src/adapters/agent/agent-sdk-runner.ts may import the Claude 
 metadata: { owner: "@sethdford", docs: "docs/architecture.md#fitness-rules" }
 files:
   - "src/**/*.ts"
+  - "src/**/*.mts"
+  - "src/**/*.cts"
   - "dashboard/**/*.ts"
+  - "dashboard/**/*.mts"
+  - "dashboard/**/*.cts"
+  - "tools/**/*.ts"
+  - "tools/**/*.mts"
+  - "tools/**/*.cts"
 ignores:
   - "src/adapters/agent/agent-sdk-runner.ts"
 rule:

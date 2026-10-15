@@ -35,6 +35,15 @@ const PINNED: Record<string, { ratchet: boolean; ignores: string[] }> = {
     ratchet: false,
     ignores: ["src/adapters/agent/agent-sdk-runner.ts"],
   },
+  "F9-sdk-query-single-importer-tsx": {
+    ratchet: false,
+    ignores: ["src/adapters/agent/agent-sdk-runner.ts"],
+  },
+  "F9-no-agent-privilege-tsx": {
+    ratchet: false,
+    ignores: ["**/*.test.tsx", "src/adapters/github/**", "src/adapters/agent/privilege-guard.ts"],
+  },
+  "F9-agent-options-explicit-tsx": { ratchet: false, ignores: ["**/*.test.tsx"] },
   "F9-no-agent-privilege": {
     ratchet: false,
     ignores: ["**/*.test.ts", "src/adapters/github/**", "src/adapters/agent/privilege-guard.ts"],
@@ -215,6 +224,31 @@ test("allowlisted dashboard services export no raw command runner (F12, ADR-0008
       file,
       raw: false,
     });
+  }
+});
+
+/** The SDK-boundary rules: each has a TypeScript rule (.ts, .mts, .cts) and a Tsx copy (.tsx). */
+const F9_SDK_RULES = [
+  "F9-sdk-query-single-importer",
+  "F9-no-agent-privilege",
+  "F9-agent-options-explicit",
+];
+
+test("F9 covers .ts, .mts and .cts, and .tsx through a Tsx-language copy (ADR-0008)", () => {
+  const byId = new Map(rules.map((r) => [r.id, r]));
+  const covers = (r: RuleDoc | undefined, path: string) =>
+    (r?.files ?? []).some((g) => new Bun.Glob(g).match(path));
+  for (const id of F9_SDK_RULES) {
+    for (const ext of ["ts", "mts", "cts"]) {
+      expect({ id, ext, covered: covers(byId.get(id), `src/adapters/agent/b.${ext}`) }).toEqual({
+        id,
+        ext,
+        covered: true,
+      });
+    }
+    const copy = byId.get(`${id}-tsx`);
+    expect(copy?.language).toBe("Tsx");
+    expect(covers(copy, "src/adapters/agent/b.tsx")).toBe(true);
   }
 });
 

@@ -1,0 +1,56 @@
+# Tsx copy of F9-agent-options-explicit. ast-grep parses .tsx with the Tsx grammar, so the TypeScript rule cannot see
+# JSX files. Same rule body and message as f9-agent-options-explicit.yml: change both together (see
+# tools/arch/meta.test.ts for the F9 extension check).
+id: F9-agent-options-explicit-tsx
+language: Tsx
+severity: error
+message: "F9: call query() with { prompt, options } where options is an object literal with env: built by agentEnv() (never process.env or Bun.env), or a variable that assertAgentOptions() has checked. Give permissionMode as a string literal such as \"dontAsk\"."
+metadata:
+  owner: "@sethdford"
+  docs: "docs/architecture.md#fitness-rules"
+  preemptive: "src has no .tsx files yet; this keeps a .tsx file from escaping F9 (see F10-…-tsx)"
+files:
+  - "src/adapters/agent/**/*.tsx"
+ignores:
+  - "**/*.test.tsx"
+rule:
+  any:
+    # query(...) / this.queryFn(...) (also .call/.apply; db.query(...) is not an SDK call) whose first object has no options with an env
+    # object literal or an identifier. `query(args)` and `query({ options: {} })` both fail here.
+    - kind: call_expression
+      all:
+        - has: { field: function, regex: '^(this\.)?(query|queryFn)(\.(call|apply))?$' }
+        - not:
+            has:
+              field: arguments
+              stopBy: end
+              has:
+                kind: pair
+                all:
+                - has: { field: key, regex: '^options$' }
+                - has:
+                    field: value
+                    any:
+                      - kind: identifier
+                      - kind: object
+                        has:
+                          kind: pair
+                          all:
+                            - has: { field: key, regex: '^env$' }
+                            # env: must be a literal or a call such as agentEnv(...), never a variable
+                            - not: { has: { field: value, kind: identifier } }
+    # env taken from the parent process
+    - kind: pair
+      all:
+        - has: { field: key, regex: '^env$' }
+        - has: { field: value, regex: '\b(process\.env|process\[|Bun\.env)' }
+    # permissionMode from anything but a string literal (optionally `as const`)
+    - kind: pair
+      all:
+        - has: { field: key, regex: '^permissionMode$' }
+        - not:
+            has:
+              field: value
+              regex: '^("[A-Za-z]+"|''[A-Za-z]+'')( as const)?$'
+    - kind: shorthand_property_identifier
+      regex: '^permissionMode$'

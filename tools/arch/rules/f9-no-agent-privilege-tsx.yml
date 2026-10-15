@@ -1,0 +1,36 @@
+# Tsx copy of F9-no-agent-privilege. ast-grep parses .tsx with the Tsx grammar, so the TypeScript rule cannot see
+# JSX files. Same rule body and message as f9-no-agent-privilege.yml: change both together (see
+# tools/arch/meta.test.ts for the F9 extension check).
+id: F9-no-agent-privilege-tsx
+language: Tsx
+severity: error
+message: "F9: agents never get a GitHub token or a permission bypass. Use permissionMode \"dontAsk\" with a per-stage allowedTools list, build the agent env with agentEnv() (src/adapters/agent/agent-sdk-runner.ts), and route GitHub writes through GithubWriter."
+metadata:
+  owner: "@sethdford"
+  docs: "docs/architecture.md#fitness-rules"
+  preemptive: "src has no .tsx files yet; this keeps a .tsx file from escaping F9 (see F10-…-tsx)"
+files:
+  - "src/**/*.tsx"
+  - "dashboard/**/*.tsx"
+ignores:
+  - "**/*.test.tsx"
+  - "src/adapters/github/**"
+  - "src/adapters/agent/privilege-guard.ts"
+rule:
+  any:
+    - all:
+        - any:
+            - kind: string_fragment
+            - kind: identifier
+            - kind: property_identifier
+            - kind: shorthand_property_identifier
+            - kind: shorthand_property_identifier_pattern
+        - regex: '(?i)dangerously|bypass_?permissions|skip[-_]?permissions|\b(GH|GITHUB)(_ENTERPRISE)?_TOKEN\b'
+    # A spelling split across `+` pieces. Only the innermost matching expression is reported.
+    - all:
+        - kind: binary_expression
+        - regex: '(?i)bypass\W*permissions|skip\W*permissions|dangerously'
+        - not:
+            has:
+              kind: binary_expression
+              regex: '(?i)bypass\W*permissions|skip\W*permissions|dangerously'

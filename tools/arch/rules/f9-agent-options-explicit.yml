@@ -13,6 +13,8 @@ message: "F9: call query() with { prompt, options } where options is an object l
 metadata: { owner: "@sethdford", docs: "docs/architecture.md#fitness-rules" }
 files:
   - "src/adapters/agent/**/*.ts"
+  - "src/adapters/agent/**/*.mts"
+  - "src/adapters/agent/**/*.cts"
 ignores:
   - "**/*.test.ts"
 rule:

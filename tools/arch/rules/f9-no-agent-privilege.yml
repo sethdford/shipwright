@@ -12,7 +12,11 @@ message: "F9: agents never get a GitHub token or a permission bypass. Use permis
 metadata: { owner: "@sethdford", docs: "docs/architecture.md#fitness-rules" }
 files:
   - "src/**/*.ts"
+  - "src/**/*.mts"
+  - "src/**/*.cts"
   - "dashboard/**/*.ts"
+  - "dashboard/**/*.mts"
+  - "dashboard/**/*.cts"
 ignores:
   - "**/*.test.ts"
   - "src/adapters/github/**"

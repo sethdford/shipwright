@@ -1,0 +1,15 @@
+id: F9-sdk-query-single-importer-tsx
+valid:
+  - 'import type { AgentRunner } from "../shared/kernel/ports";'
+  - 'import type { Options } from "@anthropic-ai/claude-agent-sdk";'
+  - 'import { z } from "zod";'
+invalid:
+  - 'import { query } from "@anthropic-ai/claude-agent-sdk";'
+  - 'import { type Options, query } from "@anthropic-ai/claude-agent-sdk";'
+  - 'import { query as q } from "@anthropic-ai/claude-agent-sdk";'
+  - 'import * as sdk from "@anthropic-ai/claude-agent-sdk";'
+  - 'export { query } from "@anthropic-ai/claude-agent-sdk";'
+  - 'const sdk = await import("@anthropic-ai/claude-agent-sdk");'
+  - 'const sdk = require("@anthropic-ai/claude-agent-sdk");'
+  - 'const sdk = await import(`@anthropic-ai/claude-agent-sdk`);'
+  - 'const sdk = require(`@anthropic-ai/claude-agent-sdk`);'
