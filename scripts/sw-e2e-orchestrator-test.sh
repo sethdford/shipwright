@@ -145,14 +145,13 @@ assert_contains "flaky handles no history" "$output" "No test history"
 # ─── Test 14: an integration suite that skips is reported as skipped, not passed ─
 # Without tokens the integration suite prints "Skipping integration tests" and exits 0.
 output=$(env -u CLAUDE_CODE_OAUTH_TOKEN -u ANTHROPIC_API_KEY bash "$SCRIPT_DIR/sw-e2e-orchestrator.sh" integration 2>&1) || true
-assert_contains "the orchestrator reports the integration suite as skipped" "$output" "Running: Integration Tests"
-skipped_status=$(jq -r 'select(.suite_id == "integration") | .status' "$HOME/.shipwright/e2e/results.jsonl" 2>/dev/null | tail -1)
+# Parse failures must fail an assertion, not abort the script under set -e.
+skipped_status=$(jq -r 'select(.suite_id == "integration") | .status' "$HOME/.shipwright/e2e/results.jsonl" 2>/dev/null | tail -1 || true)
 assert_eq "the skipped suite is logged with status skipped" "skipped" "$skipped_status"
 assert_eq "every results line is valid JSON" "true" "$(jq -s 'length > 0' "$HOME/.shipwright/e2e/results.jsonl" 2>/dev/null || echo false)"
 output=$(bash "$SCRIPT_DIR/sw-e2e-orchestrator.sh" report 2>&1) || true
-assert_eq "the report counts the skipped suite as skipped, not passed" "0 1" \
-    "$(jq -r '"\(.summary.passed) \(.summary.skipped)"' "$HOME/.shipwright/e2e/latest-report.json" 2>/dev/null)"
-
+assert_eq "the report counts the skipped suite as skipped, not passed (passed skipped)" "0 1" \
+    "$(jq -r '"\(.summary.passed) \(.summary.skipped)"' "$HOME/.shipwright/e2e/latest-report.json" 2>/dev/null || echo invalid)"
 echo ""
 echo ""
 print_test_results

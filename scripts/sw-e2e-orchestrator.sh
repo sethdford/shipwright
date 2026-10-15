@@ -237,15 +237,20 @@ run_suite() {
     local timeout_cmd="timeout"
     command -v gtimeout >/dev/null 2>&1 && timeout_cmd="gtimeout"
     local exit_code=0 status="passed"
+    # Output streams live and is kept for the skip check. The copy is removed on exit or interrupt.
     local suite_log
     suite_log=$(mktemp "${TMPDIR:-/tmp}/sw-e2e-suite.XXXXXX")
-    "$timeout_cmd" "$timeout" bash "$test_script" >"$suite_log" 2>&1 || exit_code=$?
-    cat "$suite_log"
+    trap "rm -f '$suite_log'" EXIT INT TERM
+    set +e
+    "$timeout_cmd" "$timeout" bash "$test_script" 2>&1 | tee "$suite_log"
+    exit_code=${PIPESTATUS[0]}
+    set -e
     # The integration suite exits 0 when it skips (no token, no gh auth). That is not a pass.
     if [[ "$exit_code" -eq 0 ]] && grep -q "Skipping integration tests" "$suite_log"; then
         status="skipped"
     fi
     rm -f "$suite_log"
+    trap - EXIT INT TERM
 
     local end_time; end_time=$(date +%s)
     local duration=$((end_time - start_time))
