@@ -1,6 +1,7 @@
 # F11 (bash safety): running a download as code runs unpinned, unverified code: piped into a
-# shell (also through sudo/env, or into source /dev/stdin), or read through a process or command
-# substitution. Ratcheted (tools/arch/ast-scan.ts).
+# shell or an interpreter that reads code from stdin (also through sudo/env, or into source
+# /dev/stdin), or read through a process or command substitution. `python3 -m json.tool` is a
+# module, not stdin code, and is not flagged. Ratcheted (tools/arch/ast-scan.ts).
 id: F11-bash-no-pipe-to-shell
 language: Bash
 severity: off
@@ -21,6 +22,9 @@ utils:
       - all:
           - has: { field: name, regex: '^(sudo|env|command|exec|nice|nohup)$' }
           - has: { kind: word, matches: bash-shell }
+      - all:
+          - has: { field: name, regex: '^(python[0-9.]*|node|nodejs|perl|ruby|bun|deno|php)$' }
+          - not: { has: { kind: word, regex: '^-m$' } }
       - all:
           - has: { field: name, regex: '^(source|\.)$' }
           - has: { kind: word, regex: '^/dev/(stdin|fd/0)$' }
