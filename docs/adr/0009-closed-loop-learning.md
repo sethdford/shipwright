@@ -7,12 +7,18 @@ Shipwright's retries and self-tuning change behaviour without being measured. Th
 2026-10-13 to 2026-10-15 shows three gaps:
 
 - **Silent stalls.** Run 38744601038 (`Shipwright Pipeline #8547`, a one-line docs change) was still
-  `in_progress` at 16:39Z, about three hours after it started at 13:39Z. The CI heartbeat is a background
-  timer that posts every 10 minutes whatever the run does, and the watchdog treats it as liveness.
+  `in_progress` at 16:39Z, about three hours after it started at 13:39Z. The stall was environmental (E11):
+  the loop's test gate inherited real credentials. The gap is that nothing detected it. The CI heartbeat is a
+  background timer that posts every 10 minutes whatever the run does, and the watchdog treated it as liveness.
 - **Deterministic failures re-run.** 288 runs failed at the pre-flight auth check on 2026-10-14, and they
   were re-run by dispatch and sweep. The CI auto-retry categoriser has no auth category, so an auth failure
   falls through to `BUILD_FAILURE`, the "safest retry strategy". Dispatch's guard recognises the comment text
   "Pipeline Auth Failure", which the pre-flight writes with `|| true`.
+- **Contaminated test gate (E11).** The loop's test gate inherited the GitHub and Claude credentials, so
+  `scripts/sw-e2e-integration-test.sh` ran a nested real pipeline on each iteration. It filed real issues, switched
+  branches in the agent's checkout and deleted `.claude/pipeline-state.md`. The mechanism is [V] from PR #8610, which
+  is **open, not merged**; the counts (about 1000 leaked issues, 37 open ones since closed) are [U] and tracked in #8608.
+  The fix lives in #8610 (`sw_test_gate_env`, `SHIPWRIGHT_E2E_REAL=1` opt-in). This ADR does not change its code.
 - **Unmeasured learners.** `loop-tuning.json` is read by the loop but nothing writes it. `iteration-model.json`,
   `template-weights.json`, UCB1 model selection, the 20% `$RANDOM` A/B and the recruit override all change
   behaviour from data, yet their tests check source text or bookkeeping, not outcomes. UCB1, the A/B and recruit
@@ -77,17 +83,20 @@ Shipwright adopts closed-loop **measurement and gating**, not open-ended learnin
    named low-risk tier with evidence attached, and only after 30 days of quality metrics. The tiers are deferred.
 9. **Specifiability is checked before building.** Intake asks for clarification or refuses when acceptance
    criteria or scope are missing. This is deferred with the merge tiers.
-10. **Setup failures are their own class.** The environment class is retried at most once and then escalates.
-    W2-02 implements it. The claim that environment setup is the largest factor in agent success is not verified,
-    and the class is kept because the incident record shows setup failures.
+10. **Setup and hermeticity failures are their own classes.** `environment` (setup) is retried at most once and
+    then escalates. `contamination` (a run that reached a real service through the test gate, or changed the
+    agent's checkout) is never retried, because a retry repeats the real side effects. W2-02 implements both. The
+    claim that environment setup is the largest factor in agent success is not verified, and the class is kept
+    because the incident record shows setup failures.
 11. **Self-improvement is optional and last.** Any proposer may edit only an explicit surface (prompts, skills, tool
     descriptions, routing values within caps). Each edit states a hypothesis and a predicted effect. Edits to tier
     structure, models or caps need maintainer approval. The whole phase is deferred (W2-19).
 
 **Model alias conversion (D-M, needs approval).** Templates move from `claude-opus-5`, `claude-sonnet-5` and
 `claude-haiku-4-5` to the aliases in `config/models.json`, which resolve to `claude-opus-5-5`, `claude-sonnet-5-5`
-and `claude-haiku-5-5`. This is a model change for every run that uses those templates. It is recorded here so it
-is not mistaken for a hygiene edit.
+and `claude-haiku-5-5`. Two workflow pins also move: the triage `claude-haiku-4-5-20251001` (to the `haiku` alias)
+and the remediation `claude-sonnet-4-20250514` (to the `sonnet` alias). This is a model change for every run that
+uses those templates or workflows. It is recorded here so it is not mistaken for a hygiene edit. Default: convert.
 
 What is **not** adopted: reinforcement learning, bandits in production, online adaptation during a run, model
 fine-tuning, and any claim from an unverified source.
