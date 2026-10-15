@@ -32,5 +32,8 @@ rule:
             field: arguments
             kind: arguments
             has:
-              kind: string
-              regex: '^["'']@anthropic-ai/claude-agent-sdk(/.*)?["'']$'
+              any:
+                - kind: string
+                  regex: '^["''`]@anthropic-ai/claude-agent-sdk(/.*)?["''`]$'
+                - kind: template_string
+                  regex: '^["''`]@anthropic-ai/claude-agent-sdk(/.*)?["''`]$'

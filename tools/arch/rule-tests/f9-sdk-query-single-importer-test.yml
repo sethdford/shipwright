@@ -11,3 +11,5 @@ invalid:
   - 'export { query } from "@anthropic-ai/claude-agent-sdk";'
   - 'const sdk = await import("@anthropic-ai/claude-agent-sdk");'
   - 'const sdk = require("@anthropic-ai/claude-agent-sdk");'
+  - 'const sdk = await import(`@anthropic-ai/claude-agent-sdk`);'
+  - 'const sdk = require(`@anthropic-ai/claude-agent-sdk`);'
