@@ -78,7 +78,14 @@ const PINNED: Record<string, { ratchet: boolean; ignores: string[] }> = {
       "dashboard/services/subprocess-guards.ts",
     ],
   },
-  "dashboard-no-raw-command-runner": { ratchet: false, ignores: [] },
+  "dashboard-no-raw-command-runner": {
+    ratchet: false,
+    ignores: ["dashboard/services/claims.ts"],
+  },
+  "dashboard-no-raw-command-runner-tsx": {
+    ratchet: false,
+    ignores: ["dashboard/services/claims.ts"],
+  },
   "dashboard-no-shell-from-data": {
     ratchet: false,
     ignores: ["dashboard/**/*.test.ts", "dashboard/src/**"],
@@ -250,6 +257,30 @@ test("F9 covers .ts, .mts and .cts, and .tsx through a Tsx-language copy (ADR-00
     expect(copy?.language).toBe("Tsx");
     expect(covers(copy, "src/adapters/agent/b.tsx")).toBe(true);
   }
+});
+
+/**
+ * The validated operations claims.ts exports (its runtime exports). A new export, an aliased runner or
+ * a re-export shows up here, so a route cannot reach the raw runner through claims.ts (ADR-0008).
+ */
+const CLAIMS_EXPORTS = [
+  "MACHINE_NAME_RE",
+  "REPO_RE",
+  "ghIssueEditLabelArgv",
+  "ghIssueLabelsArgv",
+  "ghLabelCreateArgv",
+  "ghListClaimedIssuesArgv",
+  "handleClaim",
+  "handleClaimRelease",
+  "isValidMachineName",
+  "isValidRepo",
+  "parseIssueNumber",
+  "releaseStaleClaims",
+];
+
+test("claims.ts exports exactly its validated operations (no raw runner, no alias)", async () => {
+  const claims = await import(join(ROOT, "dashboard/services/claims.ts"));
+  expect(Object.keys(claims).sort()).toEqual(CLAIMS_EXPORTS);
 });
 
 test("bun run arch runs every checker", () => {

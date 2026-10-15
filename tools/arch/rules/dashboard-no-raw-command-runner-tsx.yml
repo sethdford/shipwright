@@ -1,0 +1,20 @@
+# Tsx copy of dashboard-no-raw-command-runner: ast-grep parses .tsx with the Tsx grammar, so the TypeScript
+# rule cannot see JSX files. Same rule body and message: change both together.
+id: dashboard-no-raw-command-runner-tsx
+language: Tsx
+severity: error
+message: "Dashboard: do not reference the raw command runner (defaultRunner) outside claims.ts. Call the validated service operation (handleClaim, handleClaimRelease, releaseStaleClaims) instead."
+metadata:
+  owner: "@sethdford"
+  docs: "docs/architecture.md#fitness-rules"
+  preemptive: "dashboard has no .tsx files yet; this keeps a .tsx file from escaping the runner check"
+files:
+  - "dashboard/**/*.tsx"
+ignores:
+  - "dashboard/services/claims.ts"
+rule:
+  any:
+    - kind: identifier
+      regex: '^defaultRunner$'
+    - kind: shorthand_property_identifier
+      regex: '^defaultRunner$'

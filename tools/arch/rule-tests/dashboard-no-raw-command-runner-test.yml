@@ -10,3 +10,8 @@ invalid:
   - 'export { defaultRunner } from "./claims";'
   - 'export const defaultRunner = (file, args) => run(file, args);'
   - 'export function defaultRunner(file, args) {}'
+  - 'const rawRun = defaultRunner; export { rawRun };'
+  - "export const exec =\n  defaultRunner;"
+  - "export const runners = {\n  raw: defaultRunner,\n};"
+  - 'export function runAny(file, args) { return defaultRunner(file, args, {}); }'
+  - 'const o = { defaultRunner };'
