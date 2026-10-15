@@ -37,12 +37,19 @@ setup_env() {
 # Mock curl with configurable responses
 # Usage: curl [options] <url>
 # Records argv (one element per line) to $CURL_ARGS_LOG and, when curl reads a file from
-# stdin (@-), stdin to $CURL_STDIN_LOG — only when those variables are set.
+# stdin (@-), stdin to $CURL_STDIN_LOG — only when those variables are set. $CURL_TRACE_LOG and
+# $CURL_TRACE_STDIN append every call instead, so later calls cannot overwrite an earlier one.
 if [[ -n "${CURL_ARGS_LOG:-}" ]]; then printf '%s\n' "$@" > "$CURL_ARGS_LOG"; fi
+if [[ -n "${CURL_TRACE_LOG:-}" ]]; then { printf '%s\n' "$@"; echo "---"; } >> "$CURL_TRACE_LOG"; fi
 # A --data-binary @file body goes to $CURL_BODY_LOG.
 prev=""
+stdin_seen=""
 for a in "$@"; do
-    if [[ "$a" == "@-" ]]; then cat > "${CURL_STDIN_LOG:-/dev/null}"; fi
+    if [[ "$a" == "@-" ]]; then
+        stdin_seen="$(cat)"
+        printf '%s\n' "$stdin_seen" > "${CURL_STDIN_LOG:-/dev/null}"
+        printf '%s\n' "$stdin_seen" >> "${CURL_TRACE_STDIN:-/dev/null}"
+    fi
     if [[ "$prev" == "--data-binary" && "$a" == @?* ]]; then cat "${a#@}" > "${CURL_BODY_LOG:-/dev/null}"; fi
     prev="$a"
 done
@@ -82,9 +89,9 @@ if [[ "${WRITE_OUT_CODE:-}" == "true" ]]; then
     exit 0
 fi
 
-# Mock valid token verification response
-if [[ "$url" == *"/api/team/invite/"* ]]; then
-    if [[ "$url" == *"valid-token"* ]]; then
+# Mock invite verification: the token arrives in the X-Shipwright-Invite-Token header on stdin
+if [[ "$url" == */api/team/invite/verify ]]; then
+    if [[ "$stdin_seen" == *"X-Shipwright-Invite-Token: valid-token"* ]]; then
         echo '{"valid":true,"dashboard_url":"http://localhost:8767","team_name":"test-team"}'
     else
         echo '{"valid":false,"error":"Invalid token"}'
@@ -490,95 +497,171 @@ test_status_shows_disconnected() {
 }
 
 # ─── JOIN TESTS ────────────────────────────────────────────────────────────────
+# The invite token must never reach argv or the URL: the verify call sends it in a header on stdin.
+# CURL_TRACE_LOG / CURL_TRACE_STDIN append every curl call (argv, then stdin), so cmd_start's
+# heartbeat calls cannot hide the verify call.
+
+# reset_join_env — each join test starts with no config and no recorded curl calls (one temp home is shared).
+reset_join_env() {
+    rm -rf "$TEST_TEMP_DIR/home/.shipwright" "$TEST_TEMP_DIR"/curl.trace* "$TEST_TEMP_DIR/invite.token"
+    mkdir -p "$TEST_TEMP_DIR/home/.shipwright"
+}
+
+# join_with_token <token> [join args...] — runs `join` with the token on stdin; prints combined output.
+join_with_token() {
+    local token="$1"
+    shift
+    # A redirect, not a pipe: the token reaches the script's stdin without a producer pipeline.
+    printf '%s\n' "$token" > "$TEST_TEMP_DIR/join.stdin"
+    HOME="$TEST_TEMP_DIR/home" PATH="$TEST_TEMP_DIR/bin:$PATH" \
+        CURL_TRACE_LOG="$TEST_TEMP_DIR/curl.trace" CURL_TRACE_STDIN="$TEST_TEMP_DIR/curl.trace.stdin" \
+        bash "$TEST_TEMP_DIR/sw-connect.sh" join "$@" < "$TEST_TEMP_DIR/join.stdin" 2>&1
+}
 
 # ──────────────────────────────────────────────────────────────────────────────
-# 16. cmd_join verifies token against dashboard
+# 16. cmd_join verifies the token against the dashboard, with the token in a header
 # ──────────────────────────────────────────────────────────────────────────────
 test_join_verifies_token() {
-    mkdir -p "$TEST_TEMP_DIR/home/.shipwright"
+    reset_join_env
+    join_with_token "valid-token" --url http://localhost:8767 >/dev/null || true
 
-    # Use valid-token which our mock curl recognizes
-    local exit_code=0
-    HOME="$TEST_TEMP_DIR/home" \
-    PATH="$TEST_TEMP_DIR/bin:$PATH" \
-        bash "$TEST_TEMP_DIR/sw-connect.sh" join valid-token --url http://localhost:8767 >/dev/null 2>&1 || exit_code=$?
-
-    # Accept either 0 or 1 - the important thing is that it processes the token
-    # It may fail at the start step if daemon is running
     if [[ ! -f "$TEST_TEMP_DIR/home/.shipwright/team-config.json" ]]; then
         echo -e "    ${RED}✗${RESET} Config file not created after join"
+        return 1
+    fi
+    if ! grep -qx "http://localhost:8767/api/team/invite/verify" "$TEST_TEMP_DIR/curl.trace"; then
+        echo -e "    ${RED}✗${RESET} token was not verified at POST /api/team/invite/verify"
+        return 1
+    fi
+    if ! grep -qx "X-Shipwright-Invite-Token: valid-token" "$TEST_TEMP_DIR/curl.trace.stdin"; then
+        echo -e "    ${RED}✗${RESET} invite token not sent in the X-Shipwright-Invite-Token header on stdin"
         return 1
     fi
     return 0
 }
 
 # ──────────────────────────────────────────────────────────────────────────────
-# 17. cmd_join saves team-config.json
+# 17. cmd_join saves team-config.json with the invite token
 # ──────────────────────────────────────────────────────────────────────────────
 test_join_saves_config() {
-    mkdir -p "$TEST_TEMP_DIR/home/.shipwright"
-
-    HOME="$TEST_TEMP_DIR/home" \
-    PATH="$TEST_TEMP_DIR/bin:$PATH" \
-        bash "$TEST_TEMP_DIR/sw-connect.sh" join valid-token --url http://localhost:8767 >/dev/null 2>&1
+    reset_join_env
+    join_with_token "valid-token" --url http://localhost:8767 >/dev/null || true
 
     local config_file="$TEST_TEMP_DIR/home/.shipwright/team-config.json"
     if [[ ! -f "$config_file" ]]; then
         echo -e "    ${RED}✗${RESET} Config file not created"
         return 1
     fi
-
-    # Verify config is valid JSON and has team info
     if ! jq empty "$config_file" 2>/dev/null; then
         echo -e "    ${RED}✗${RESET} Config file is not valid JSON"
+        return 1
+    fi
+    if [[ "$(jq -r '.invite_token' "$config_file")" != "valid-token" ]]; then
+        echo -e "    ${RED}✗${RESET} team config does not hold the invite token"
         return 1
     fi
     return 0
 }
 
 # ──────────────────────────────────────────────────────────────────────────────
-# 18. cmd_join rejects invalid token
+# 18. cmd_join rejects an invalid token and saves nothing
 # ──────────────────────────────────────────────────────────────────────────────
 test_join_rejects_invalid_token() {
-    mkdir -p "$TEST_TEMP_DIR/home/.shipwright"
+    reset_join_env
+    local output="" exit_code=0
+    output="$(join_with_token "invalid-token" --url http://localhost:8767)" || exit_code=$?
 
-    local exit_code=0
-    local output
-    output=$(
-        HOME="$TEST_TEMP_DIR/home" \
-        PATH="$TEST_TEMP_DIR/bin:$PATH" \
-            bash "$TEST_TEMP_DIR/sw-connect.sh" join invalid-token --url http://localhost:8767 2>&1
-    ) || exit_code=$?
-
-    # Should either return non-zero OR output an error
-    # (mock curl might just echo {"valid":false})
-    if ! echo "$output" | grep -q -i "invalid" && [[ "$exit_code" -eq 0 ]]; then
-        # Check if our mock curl returned the right response
-        if ! echo "$output" | grep -q '"valid":false'; then
-            echo -e "    ${RED}✗${RESET} Join should reject invalid token"
-            return 1
-        fi
+    if [[ "$exit_code" -eq 0 ]] || ! echo "$output" | grep -q "Invalid invite token"; then
+        echo -e "    ${RED}✗${RESET} join should reject an invalid token"
+        return 1
+    fi
+    if [[ -f "$TEST_TEMP_DIR/home/.shipwright/team-config.json" ]]; then
+        echo -e "    ${RED}✗${RESET} config written for a rejected token"
+        return 1
     fi
     return 0
 }
 
 # ──────────────────────────────────────────────────────────────────────────────
-# 19. cmd_join accepts --url and --token flags
+# 19. the token never appears in argv, the URL or the trace of a join
 # ──────────────────────────────────────────────────────────────────────────────
-test_join_accepts_flags() {
-    mkdir -p "$TEST_TEMP_DIR/home/.shipwright"
+test_join_token_stays_out_of_argv() {
+    reset_join_env
+    join_with_token "valid-token-s3cret" --url http://localhost:8767 >/dev/null || true
 
-    # Should parse flags without error
-    local output
-    output=$(
-        HOME="$TEST_TEMP_DIR/home" \
-        PATH="$TEST_TEMP_DIR/bin:$PATH" \
-            bash "$TEST_TEMP_DIR/sw-connect.sh" join --token valid-token --url http://localhost:8767 2>&1
-    )
+    if grep -q "s3cret" "$TEST_TEMP_DIR/curl.trace" 2>/dev/null; then
+        echo -e "    ${RED}✗${RESET} invite token appears in curl argv or the URL"
+        return 1
+    fi
+    if ! grep -qx "X-Shipwright-Invite-Token: valid-token-s3cret" "$TEST_TEMP_DIR/curl.trace.stdin" 2>/dev/null; then
+        echo -e "    ${RED}✗${RESET} invite token not delivered on stdin"
+        return 1
+    fi
+    return 0
+}
 
-    # Should successfully join (config file created)
-    if [[ ! -f "$TEST_TEMP_DIR/home/.shipwright/team-config.json" ]]; then
-        echo -e "    ${RED}✗${RESET} Failed to parse flags or join"
+# ──────────────────────────────────────────────────────────────────────────────
+# 20. set -x (xtrace) does not print the token
+# ──────────────────────────────────────────────────────────────────────────────
+test_join_token_stays_out_of_xtrace() {
+    reset_join_env
+    local output=""
+    printf '%s\n' "valid-token-s3cret" > "$TEST_TEMP_DIR/join.stdin"
+    output="$(HOME="$TEST_TEMP_DIR/home" PATH="$TEST_TEMP_DIR/bin:$PATH" \
+        bash -x "$TEST_TEMP_DIR/sw-connect.sh" join --url http://localhost:8767 < "$TEST_TEMP_DIR/join.stdin" 2>&1)" || true
+
+    if ! echo "$output" | grep -q "^+ "; then
+        echo -e "    ${RED}✗${RESET} xtrace did not run; the check proves nothing"
+        return 1
+    fi
+    if echo "$output" | grep -q "s3cret"; then
+        echo -e "    ${RED}✗${RESET} invite token printed under set -x"
+        return 1
+    fi
+    return 0
+}
+
+# ──────────────────────────────────────────────────────────────────────────────
+# 21. the token is refused as an argument or --token flag, and never echoed
+# ──────────────────────────────────────────────────────────────────────────────
+test_join_refuses_token_arguments() {
+    reset_join_env
+    local output="" exit_code=0
+    output="$(HOME="$TEST_TEMP_DIR/home" PATH="$TEST_TEMP_DIR/bin:$PATH" \
+        bash "$TEST_TEMP_DIR/sw-connect.sh" join valid-token-s3cret --url http://localhost:8767 2>&1)" || exit_code=$?
+    if [[ "$exit_code" -eq 0 ]] || echo "$output" | grep -q "s3cret"; then
+        echo -e "    ${RED}✗${RESET} a positional token was accepted or echoed"
+        return 1
+    fi
+
+    exit_code=0
+    output="$(HOME="$TEST_TEMP_DIR/home" PATH="$TEST_TEMP_DIR/bin:$PATH" \
+        bash "$TEST_TEMP_DIR/sw-connect.sh" join --token valid-token-s3cret --url http://localhost:8767 2>&1)" || exit_code=$?
+    if [[ "$exit_code" -eq 0 ]] || echo "$output" | grep -q "s3cret"; then
+        echo -e "    ${RED}✗${RESET} --token was accepted or echoed"
+        return 1
+    fi
+    if [[ -f "$TEST_TEMP_DIR/curl.trace" ]] || [[ -f "$TEST_TEMP_DIR/home/.shipwright/team-config.json" ]]; then
+        echo -e "    ${RED}✗${RESET} a refused token still reached the dashboard or was saved"
+        return 1
+    fi
+    return 0
+}
+
+# ──────────────────────────────────────────────────────────────────────────────
+# 22. --token-file reads the token from a file
+# ──────────────────────────────────────────────────────────────────────────────
+test_join_reads_token_file() {
+    reset_join_env
+    printf '%s\n' "valid-token-filed" > "$TEST_TEMP_DIR/invite.token"
+    chmod 600 "$TEST_TEMP_DIR/invite.token"
+    HOME="$TEST_TEMP_DIR/home" PATH="$TEST_TEMP_DIR/bin:$PATH" \
+        CURL_TRACE_LOG="$TEST_TEMP_DIR/curl.trace" CURL_TRACE_STDIN="$TEST_TEMP_DIR/curl.trace.stdin" \
+        bash "$TEST_TEMP_DIR/sw-connect.sh" join --url http://localhost:8767 \
+        --token-file "$TEST_TEMP_DIR/invite.token" >/dev/null 2>&1 || true
+
+    if ! grep -qx "X-Shipwright-Invite-Token: valid-token-filed" "$TEST_TEMP_DIR/curl.trace.stdin" 2>/dev/null; then
+        echo -e "    ${RED}✗${RESET} --token-file token not used"
         return 1
     fi
     return 0
@@ -896,7 +979,10 @@ echo -e "${PURPLE}${BOLD}Join Flow${RESET}"
 run_test "cmd_join verifies token against dashboard" test_join_verifies_token
 run_test "cmd_join saves team-config.json" test_join_saves_config
 run_test "cmd_join rejects invalid token" test_join_rejects_invalid_token
-run_test "cmd_join accepts --url and --token flags" test_join_accepts_flags
+run_test "cmd_join keeps the token out of argv and the URL" test_join_token_stays_out_of_argv
+run_test "cmd_join keeps the token out of set -x output" test_join_token_stays_out_of_xtrace
+run_test "cmd_join refuses the token as an argument or --token" test_join_refuses_token_arguments
+run_test "cmd_join reads the token from --token-file" test_join_reads_token_file
 echo ""
 
 # Payloads
