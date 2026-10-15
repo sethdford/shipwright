@@ -188,3 +188,31 @@ test("pipeline-active.sh is held to the same capture rule", () => {
     findFailOpen("wf.yml", step('if ! A=$(scripts/ci/pipeline-active.sh "$I"); then exit 1; fi')),
   ).toEqual([]);
 });
+
+test("issue-dispatch-state.sh is a marker read: || defaults and stderr discards are flagged", () => {
+  // Regression: the first-dispatch state replaced the pipeline-active and bot-comments reads in
+  // shipwright-dispatch.yml, and `|| echo ready` on it passed `bun run arch`.
+  expect(
+    findFailOpen("wf.yml", step('STATE=$(scripts/ci/issue-dispatch-state.sh "$N" || echo ready)')),
+  ).toHaveLength(1);
+  expect(
+    findFailOpen(
+      "wf.yml",
+      step('STATE=$(scripts/ci/issue-dispatch-state.sh "$N" 2>/dev/null || echo ready)'),
+    ),
+  ).toHaveLength(1);
+  expect(
+    findFailOpen("wf.yml", step('X=$(scripts/ci/issue-dispatch-state.sh "$N" | tr -d x)')),
+  ).toHaveLength(1);
+  // The required form is clean.
+  expect(
+    findFailOpen(
+      "wf.yml",
+      step('if ! STATE=$(scripts/ci/issue-dispatch-state.sh "$N"); then exit 1; fi'),
+    ),
+  ).toEqual([]);
+  // A captured read with `local` would lose the exit status.
+  expect(
+    findFailOpen("wf.yml", step('local STATE=$(scripts/ci/issue-dispatch-state.sh "$N")')).length,
+  ).toBeGreaterThan(0);
+});

@@ -15,7 +15,8 @@ import { findGateOrder } from "./workflow-gate-order";
  * other files under `.github/actions` line by line.
  */
 const SCAN_GLOBS = [".github/workflows/**/*", ".github/actions/**/*"];
-const INVOKE = /\b(?:bot-comments|retry-state|pipeline-active)\.sh\b|\bgates\s+check\b/g;
+const INVOKE =
+  /\b(?:bot-comments|retry-state|pipeline-active|issue-dispatch-state)\.sh\b|\bgates\s+check\b/g;
 const SWALLOWED = /\||[2&]>\s*\/dev\/null/;
 const NO_GITHUB = /--no-github/;
 const MASKED = /\b(?:local|export|readonly|declare|typeset)\s+(?:-\w+\s+)*[A-Za-z_]\w*="?$/;
