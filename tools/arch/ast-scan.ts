@@ -102,7 +102,9 @@ if (import.meta.main) {
   const at = Bun.argv.indexOf("--against");
   if (at > 0) {
     const ref = Bun.argv[at + 1] ?? "origin/main";
-    const rises = risesAgainst(baselineAt(ref, BASELINE_REL, ROOT) ?? {}, existing ?? {});
+    // A base without the file (the PR that introduces it) is "no base": nothing can have risen.
+    const promoted = new Set(rules.filter((r) => r.severity === "error").map((r) => r.id));
+    const rises = risesAgainst(baselineAt(ref, BASELINE_REL, ROOT) ?? {}, existing ?? {}, promoted);
     for (const r of rises)
       console.error(`RATCHET ${r}. Baselines may not grow; fix the code instead.`);
     if (rises.length > 0) process.exit(1);

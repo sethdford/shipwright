@@ -19,15 +19,20 @@ export function baselineAt(ref: string, path: string, root: string): Grouped | u
 }
 
 /** Entries that are new or higher than at the base, within groups the base already has. */
-export function risesAgainst(base: Grouped, head: Grouped): string[] {
+export function risesAgainst(
+  base: Grouped,
+  head: Grouped,
+  promoted: ReadonlySet<string> = new Set(),
+): string[] {
   const out: string[] = [];
   // A group the base has and HEAD lacks: the rule was renamed or removed, so its debt left the
-  // baseline without being paid. Rules keep their key even at zero (an empty object), so this only
-  // fires on a rename or removal.
+  // baseline without being paid. Rules keep their key even at zero (an empty object). The one
+  // exception is a promotion: a rule that is severity: error at HEAD must drop its key (checkFindings
+  // requires it), so `promoted` (the error-severity rule ids at HEAD) may be missing.
   for (const group of Object.keys(base)) {
-    if (!(group in head)) {
+    if (!(group in head) && !promoted.has(group)) {
       out.push(
-        `${group} is missing from the baseline: a rule was renamed or removed. Keep its key (an empty object when it reached zero).`,
+        `${group} is missing from the baseline: a rule was renamed or removed. Keep its key (an empty object when it reached zero)`,
       );
     }
   }
