@@ -384,3 +384,23 @@
 {"ts":"2026-10-15T00:13:07Z","ts_epoch":1792023187,"type":"strategic.issue_created","title":"Add pre-build credential/tooling fast-fail check distinct from existing validation gaps","priority":"P0","complexity":"fast"}
 {"ts":"2026-10-15T00:13:11Z","ts_epoch":1792023191,"type":"strategic.issue_created","title":"Surface build-loop iteration cost trend in `shipwright dora` output","priority":"P4","complexity":"standard"}
 {"ts":"2026-10-15T00:13:12Z","ts_epoch":1792023192,"type":"strategic.cycle_complete","issues_created":2,"issues_skipped":1}
+{"ts":"2026-10-15T00:26:58Z","ts_epoch":1792024018,"type":"patrol.started","dry_run":"false"}
+{"ts":"2026-10-15T00:26:59Z","ts_epoch":1792024019,"type":"patrol.finding","check":"stale_dependency","package":"yaml","current":"0.0.0","latest":"2.9.1"}
+{"ts":"2026-10-15T00:26:59Z","ts_epoch":1792024019,"type":"patrol.finding","check":"stale_dependency","package":"zod","current":"0.0.0","latest":"4.6.7"}
+{"ts":"2026-10-15T00:27:04Z","ts_epoch":1792024024,"type":"patrol.finding","check":"recurring_failure","pattern":"[38;2;74;222;128m[1m✓[0m reveal shows 1/3 pass count on","seen_count":52}
+{"ts":"2026-10-15T00:27:05Z","ts_epoch":1792024025,"type":"patrol.issue_created","check":"recurring_failure","pattern":"[38;2;74;222;128m[1m✓[0m reveal shows 1/3 pass count on"}
+{"ts":"2026-10-15T00:27:05Z","ts_epoch":1792024025,"type":"patrol.finding","check":"recurring_failure","pattern":"Failed: 1","seen_count":11}
+{"ts":"2026-10-15T00:27:06Z","ts_epoch":1792024026,"type":"patrol.issue_created","check":"recurring_failure","pattern":"Failed: 1"}
+{"ts":"2026-10-15T00:27:06Z","ts_epoch":1792024026,"type":"patrol.finding","check":"recurring_failure","pattern":"[2m  loop behavior: iterations on test failure[0m","seen_count":11}
+{"ts":"2026-10-15T00:27:08Z","ts_epoch":1792024028,"type":"patrol.issue_created","check":"recurring_failure","pattern":"[2m  loop behavior: iterations on test failure[0m"}
+{"ts":"2026-10-15T00:27:08Z","ts_epoch":1792024028,"type":"patrol.finding","check":"recurring_failure","pattern":"[38;2;0;212;255m▸[0m Patrol recurring failures label con","seen_count":4}
+{"ts":"2026-10-15T00:27:10Z","ts_epoch":1792024030,"type":"patrol.issue_created","check":"recurring_failure","pattern":"[38;2;0;212;255m▸[0m Patrol recurring failures label con"}
+{"ts":"2026-10-15T00:27:10Z","ts_epoch":1792024030,"type":"patrol.finding","check":"recurring_failure","pattern":"Results: [38;2;74;222;128m[1m127 PASS[0m | [38;2;248;113","seen_count":3}
+{"ts":"2026-10-15T00:27:11Z","ts_epoch":1792024031,"type":"patrol.issue_created","check":"recurring_failure","pattern":"Results: [38;2;74;222;128m[1m127 PASS[0m | [38;2;248;113"}
+{"ts":"2026-10-15T00:27:11Z","ts_epoch":1792024031,"type":"patrol.finding","check":"untested_script","script":"sw-tracker-linear.sh","lines":568,"usage":7}
+{"ts":"2026-10-15T00:27:11Z","ts_epoch":1792024031,"type":"patrol.finding","check":"untested_script","script":"sw-tracker-jira.sh","lines":474,"usage":7}
+{"ts":"2026-10-15T00:27:12Z","ts_epoch":1792024032,"type":"patrol.finding","check":"untested_script","script":"sw-tracker-github.sh","lines":212,"usage":3}
+{"ts":"2026-10-15T00:27:12Z","ts_epoch":1792024032,"type":"patrol.finding","check":"untested_script","script":"sw-tmux-status.sh","lines":151,"usage":1}
+{"ts":"2026-10-15T00:27:12Z","ts_epoch":1792024032,"type":"patrol.finding","check":"untested_script","script":"sw-tmux-role-color.sh","lines":81,"usage":1}
+{"ts":"2026-10-15T00:27:12Z","ts_epoch":1792024032,"type":"patrol.finding","check":"untested_script","script":"sw-test-all.sh","lines":206,"usage":0}
+{"ts":"2026-10-15T00:27:12Z","ts_epoch":1792024032,"type":"patrol.finding","check":"untested_script","script":"sw-event-schema-sync.sh","lines":93,"usage":0}
