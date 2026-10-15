@@ -549,6 +549,7 @@ jobs:
 
       - name: Check claim lock and pipeline start cap
         id: claim_check
+        shell: bash
         run: |
           CLAIMED=$(gh issue view "$ISSUE_NUMBER" --json labels \
             --jq '[.labels[].name | select(startswith("claimed:"))] | .[0] // ""' 2>/dev/null || echo "")
@@ -558,10 +559,22 @@ jobs:
             exit 0
           fi
 
-          # Pipeline start cap — prevent runaway retry loops
-          PIPELINE_STARTS=$(gh issue view "$ISSUE_NUMBER" --json comments \
-            --jq '[.comments[].body | select(contains("Pipeline Starting"))] | length' 2>/dev/null || echo "0")
-          if [ "${PIPELINE_STARTS:-0}" -ge 6 ]; then
+          # Pipeline start cap — prevent runaway retry loops. Counts only bot-authored "Pipeline
+          # Starting" comments (scripts/ci/bot-comments.sh, ADR-0007). An unreadable list or count
+          # stops the run instead of defaulting to 0 starts (#8574).
+          if ! BOT_COMMENTS=$(scripts/ci/bot-comments.sh "$ISSUE_NUMBER"); then
+            echo "::error::cannot read bot comments for #$ISSUE_NUMBER; not starting a pipeline"
+            exit 1
+          fi
+          if ! PIPELINE_STARTS=$(jq '[.[] | select(.body | contains("Pipeline Starting"))] | length' <<<"$BOT_COMMENTS"); then
+            echo "::error::cannot count pipeline starts for #$ISSUE_NUMBER; not starting a pipeline"
+            exit 1
+          fi
+          if ! [[ "$PIPELINE_STARTS" =~ ^[0-9]+$ ]]; then
+            echo "::error::unreadable pipeline start count for #$ISSUE_NUMBER; not starting a pipeline"
+            exit 1
+          fi
+          if [ "$PIPELINE_STARTS" -ge 6 ]; then
             echo "Pipeline start cap reached ($PIPELINE_STARTS attempts) for issue #$ISSUE_NUMBER"
             gh issue comment "$ISSUE_NUMBER" --body "$(cat <<CAPEOF
           :stop_sign: **Shipwright Pipeline — Start Cap Reached**
