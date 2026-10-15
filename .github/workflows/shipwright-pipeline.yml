@@ -1,12 +1,11 @@
 name: Shipwright Pipeline
 
 # Include issue number in run title so auto-retry and watchdog can find it
-run-name: "Shipwright Pipeline #${{ github.event.inputs.issue_number || github.event.issue.number || '?' }}"
+run-name: "Shipwright Pipeline #${{ github.event.inputs.issue_number || '?' }}"
 
-# Autonomous agents process labeled issues — Shipwright building itself
+# Dispatched by shipwright-dispatch.yml (after the gates) and by shipwright-label-dispatch.yml
+# (the labeled entry point, gated). A manual workflow_dispatch is an operator action: it is not gated.
 on:
-  issues:
-    types: [labeled]
   workflow_dispatch:
     inputs:
       issue_number:
@@ -40,9 +39,11 @@ on:
         default: ""
         type: string
 
-# Only one pipeline per issue at a time
+# Only one pipeline per issue at a time. Unrelated labels no longer reach this workflow (the label
+# filter lives in shipwright-label-dispatch.yml, which has no concurrency group), so this group
+# only ever sees dispatched runs (#8573).
 concurrency:
-  group: shipwright-issue-${{ github.event.inputs.issue_number || github.event.issue.number }}
+  group: shipwright-issue-${{ github.event.inputs.issue_number }}
   cancel-in-progress: false
 
 permissions:
@@ -55,9 +56,7 @@ jobs:
   # Stage 1: Triage — vet the issue and determine delivery strategy
   # ────────────────────────────────────────────────────────────────────────────
   triage:
-    if: >
-      github.event_name == 'workflow_dispatch' ||
-      (github.event.action == 'labeled' && github.event.label.name == 'shipwright')
+    if: github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
     timeout-minutes: 5
     outputs:
@@ -71,12 +70,12 @@ jobs:
       risk_score: ${{ steps.risk.outputs.risk_score }}
 
     env:
-      ISSUE_NUMBER: ${{ github.event.inputs.issue_number || github.event.issue.number }}
+      ISSUE_NUMBER: ${{ github.event.inputs.issue_number }}
       CLAUDE_CODE_OAUTH_TOKEN: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
       GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
 
       - name: Rate limit jitter
         run: |
@@ -382,7 +381,7 @@ jobs:
     timeout-minutes: 180
 
     env:
-      ISSUE_NUMBER: ${{ github.event.inputs.issue_number || github.event.issue.number }}
+      ISSUE_NUMBER: ${{ github.event.inputs.issue_number }}
       TEMPLATE: ${{ needs.triage.outputs.template || github.event.inputs.template || 'autonomous' }}
       MAX_ITERATIONS: ${{ needs.triage.outputs.max_iterations || '20' }}
       COMPLETED_STAGES: ${{ github.event.inputs.completed_stages || '' }}
@@ -391,7 +390,7 @@ jobs:
       NO_COLOR: "1"
 
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           fetch-depth: 0
 
@@ -492,19 +491,41 @@ jobs:
 
       - name: Check claim lock and pipeline start cap
         id: claim_check
+        shell: bash
         run: |
-          CLAIMED=$(gh issue view "$ISSUE_NUMBER" --json labels \
-            --jq '[.labels[].name | select(startswith("claimed:"))] | .[0] // ""' 2>/dev/null || echo "")
+          # A failed read stops the run and writes skip=true, so the steps that follow (the failure
+          # notices, the state persist, the dashboard webhook) do nothing for this run (#8574 review).
+          stop_closed() {
+            echo "::error::$1"
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+            exit 1
+          }
+          # A read failure is not "unclaimed": the claim lock must be readable before any run starts.
+          if ! LABELS_JSON=$(gh issue view "$ISSUE_NUMBER" --json labels); then
+            stop_closed "cannot read the labels of #$ISSUE_NUMBER; not starting a pipeline"
+          fi
+          if ! CLAIMED=$(jq -r '[.labels[].name | select(startswith("claimed:"))] | .[0] // ""' <<<"$LABELS_JSON"); then
+            stop_closed "unreadable labels of #$ISSUE_NUMBER; not starting a pipeline"
+          fi
           if [ -n "$CLAIMED" ]; then
             echo "Issue #$ISSUE_NUMBER claimed by $CLAIMED — CI yielding to local daemon"
             echo "skip=true" >> "$GITHUB_OUTPUT"
             exit 0
           fi
 
-          # Pipeline start cap — prevent runaway retry loops
-          PIPELINE_STARTS=$(gh issue view "$ISSUE_NUMBER" --json comments \
-            --jq '[.comments[].body | select(contains("Pipeline Starting"))] | length' 2>/dev/null || echo "0")
-          if [ "${PIPELINE_STARTS:-0}" -ge 6 ]; then
+          # Pipeline start cap — prevent runaway retry loops. Counts only bot-authored "Pipeline
+          # Starting" comments (scripts/ci/bot-comments.sh, ADR-0007). An unreadable list or count
+          # stops the run instead of defaulting to 0 starts (#8574).
+          if ! BOT_COMMENTS=$(scripts/ci/bot-comments.sh "$ISSUE_NUMBER"); then
+            stop_closed "cannot read bot comments for #$ISSUE_NUMBER; not starting a pipeline"
+          fi
+          if ! PIPELINE_STARTS=$(jq '[.[] | select(.body | contains("Pipeline Starting"))] | length' <<<"$BOT_COMMENTS"); then
+            stop_closed "cannot count pipeline starts for #$ISSUE_NUMBER; not starting a pipeline"
+          fi
+          if ! [[ "$PIPELINE_STARTS" =~ ^[0-9]+$ ]]; then
+            stop_closed "unreadable pipeline start count for #$ISSUE_NUMBER; not starting a pipeline"
+          fi
+          if [ "$PIPELINE_STARTS" -ge 6 ]; then
             echo "Pipeline start cap reached ($PIPELINE_STARTS attempts) for issue #$ISSUE_NUMBER"
             gh issue comment "$ISSUE_NUMBER" --body "$(cat <<CAPEOF
           :stop_sign: **Shipwright Pipeline — Start Cap Reached**
@@ -599,7 +620,18 @@ jobs:
           # Best effort: a webhook failure never fails the pipeline. The fleet token goes to curl
           # on stdin (-H @-), never in argv; with no token, no header is sent.
           if [ -n "${DASHBOARD_URL:-}" ]; then
-            BODY="{\"type\":\"ci.pipeline_started\",\"issue\":${ISSUE_NUMBER},\"run_id\":\"${GITHUB_RUN_ID}\",\"template\":\"${TEMPLATE}\"}"
+            # The issue number is the only --argjson input: check it before jq sees it.
+            if ! [[ "$ISSUE_NUMBER" =~ ^[1-9][0-9]*$ ]]; then
+              echo "::warning::Dashboard webhook ci.pipeline_started not sent: issue number is not numeric"
+              exit 0
+            fi
+            # Built with jq --arg, never by string interpolation (ADR-0007, #8579).
+            if ! BODY=$(jq -n --arg type "ci.pipeline_started" --argjson issue "$ISSUE_NUMBER" \
+              --arg run_id "$GITHUB_RUN_ID" --arg template "$TEMPLATE" \
+              '{type: $type, issue: $issue, run_id: $run_id, template: $template}'); then
+              echo "::warning::Dashboard webhook body could not be built (ci.pipeline_started)"
+              exit 0
+            fi
             if [ -n "${SHIPWRIGHT_FLEET_TOKEN:-}" ]; then
               CODE="$(printf 'X-Shipwright-Token: %s\n' "$SHIPWRIGHT_FLEET_TOKEN" | curl -sS -o /dev/null -w '%{http_code}' --max-time 5 \
                 -H @- -X POST -H "Content-Type: application/json" -d "$BODY" "${DASHBOARD_URL}/api/webhook/ci" || true)"
@@ -825,7 +857,7 @@ jobs:
 
       - name: Upload pipeline artifacts
         if: always() && steps.claim_check.outputs.skip != 'true'
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         with:
           name: pipeline-artifacts-${{ env.ISSUE_NUMBER }}
           path: |
@@ -897,7 +929,18 @@ jobs:
           if [ -n "${DASHBOARD_URL:-}" ]; then
             RESULT="success"
             if [ "${EXIT_CODE:-1}" != "0" ]; then RESULT="failure"; fi
-            BODY="{\"type\":\"ci.pipeline_completed\",\"issue\":${ISSUE_NUMBER},\"run_id\":\"${GITHUB_RUN_ID}\",\"result\":\"${RESULT}\",\"template\":\"${TEMPLATE}\"}"
+            # The issue number is the only --argjson input: check it before jq sees it.
+            if ! [[ "$ISSUE_NUMBER" =~ ^[1-9][0-9]*$ ]]; then
+              echo "::warning::Dashboard webhook ci.pipeline_completed not sent: issue number is not numeric"
+              exit 0
+            fi
+            # Built with jq --arg, never by string interpolation (ADR-0007, #8579).
+            if ! BODY=$(jq -n --arg type "ci.pipeline_completed" --argjson issue "$ISSUE_NUMBER" \
+              --arg run_id "$GITHUB_RUN_ID" --arg result "$RESULT" --arg template "$TEMPLATE" \
+              '{type: $type, issue: $issue, run_id: $run_id, result: $result, template: $template}'); then
+              echo "::warning::Dashboard webhook body could not be built (ci.pipeline_completed)"
+              exit 0
+            fi
             if [ -n "${SHIPWRIGHT_FLEET_TOKEN:-}" ]; then
               CODE="$(printf 'X-Shipwright-Token: %s\n' "$SHIPWRIGHT_FLEET_TOKEN" | curl -sS -o /dev/null -w '%{http_code}' --max-time 5 \
                 -H @- -X POST -H "Content-Type: application/json" -d "$BODY" "${DASHBOARD_URL}/api/webhook/ci" || true)"

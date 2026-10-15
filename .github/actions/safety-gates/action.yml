@@ -15,6 +15,15 @@ inputs:
   github-token:
     description: Token for the gate check's gh calls (pass secrets.GITHUB_TOKEN). Reads, plus opening the incident issue when the breaker trips.
     required: true
+  on-refusal:
+    description: >-
+      'fail' (default) fails the step on any closed gate. 'notice' turns a refusal (exit 1) into a
+      ::notice:: and a successful step with `allowed` unset, so the caller can end its run without a
+      failure. Every other exit (2, 127, a signal) still fails the step, and any value other than
+      'notice' behaves as 'fail'. Only the labeled entry point uses 'notice': its runs are not in the
+      breaker's history (ADR-0007).
+    required: false
+    default: fail
 outputs:
   allowed:
     description: "'true' when every gate allows dispatch (the step fails otherwise)"
@@ -34,13 +43,29 @@ runs:
       env:
         GH_TOKEN: ${{ inputs.github-token }}
         RETRY: ${{ inputs.retry }}
+        ON_REFUSAL: ${{ inputs.on-refusal }}
       run: |
         # Exit 0 is the only "allowed"; 1 (blocked or unverifiable), 2 (usage), 127 or a signal
-        # all stop the job. The report goes to the log.
-        if bun src/cli.ts gates check --retry "$RETRY"; then
+        # all stop the job by default. The report goes to the log.
+        # The JSON report is the same run's output, so notice mode can tell a refusal from an outage.
+        if REPORT=$(bun src/cli.ts gates check --retry "$RETRY" --json); then
+          # The report is printed on success too: the per-gate verdicts and the budget no-data warning
+          # (warning: true) stay in the log.
+          printf '%s\n' "$REPORT"
           echo "allowed=true" >> "$GITHUB_OUTPUT"
         else
           rc=$?
+          printf '%s\n' "$REPORT"
+          # A refusal is exit 1 with allowed false, at least one gate blocked, and no gate that could
+          # not be verified (verdict error: an outage, a bad token, an unreadable source). Anything
+          # else, including unparseable output, fails the step.
+          if [[ "$ON_REFUSAL" == "notice" && "$rc" -eq 1 ]] && jq -e '
+              .allowed == false
+              and any(.gates[]?; .verdict == "blocked")
+              and (any(.gates[]?; .verdict == "error") | not)' <<<"$REPORT" >/dev/null; then
+            echo "::notice::Shipwright safety gates refused dispatch; nothing dispatched"
+            exit 0
+          fi
           echo "::error::Shipwright safety gates did not allow dispatch (exit $rc); nothing dispatched"
           exit 1
         fi

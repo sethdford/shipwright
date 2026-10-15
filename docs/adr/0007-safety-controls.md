@@ -34,7 +34,14 @@ all stop dispatch. `--no-github` checks only the local flag, is refused on GitHu
   Selection skips `auto-patrol` and `shipwright-stuck`. Every auto-filing site goes through
   `patrol_issue_create` (intake); decompose files at most 8 subtasks.
 - **Workflows:** dispatch and auto-retry call `.github/actions/safety-gates` (setup-bun pinned by SHA;
-  the token reaches only the gate step). Dispatch skips `auto-patrol`, `shipwright-stuck`,
+  the token reaches only the gate step). The labeled entry point is `shipwright-label-dispatch.yml`:
+  it reads the retry count with `scripts/ci/retry-state.sh`, calls the same action with
+  `on-refusal: notice` (a refusal is decided from `gates check --json`: allowed false, a blocked gate and
+  no error gate), applies the first-dispatch rule through `scripts/ci/issue-dispatch-state.sh` (the same
+  as dispatch), then dispatches through `.github/actions/dispatch-pipeline` (the same marker and dispatch
+  as dispatch's loop). Held labels are skipped as in dispatch. The job runs in a per-issue concurrency
+  group at job level, so unrelated labels never join it. Manual `workflow_dispatch` of the pipeline is an
+  operator action and is not gated. The pipeline's `on:` is exactly `workflow_dispatch` (arch rule). Dispatch skips `auto-patrol`, `shipwright-stuck`,
   `shipwright-failed`, `shipwright-infra-issue` and `claimed:*`, posts a bot `SHIPWRIGHT-DISPATCHED`
   marker before `gh workflow run`, and never re-dispatches an issue with a bot dispatch, retry,
   pipeline or auth-failure comment. Auto-retry is the only retry path: count = highest bot
@@ -51,8 +58,22 @@ all stop dispatch. `--no-github` checks only the local flag, is refused on GitHu
 - Dispatch, watchdog, auto-retry and sweep can be re-enabled behind one tested gate (runbook). Each
   check costs about five GitHub API calls; intake lists every open issue (~7 s).
 - Local daemon outcomes do not feed the breaker until the run journal exists (Wave 1b).
-- Gaps (tracked in the Wave 1a plan's follow-ups): `shipwright-pipeline.yml` starts ungated runs on
-  `issues: labeled` (Wave 1c; bounded by the retry budget and the breaker); its per-issue
-  concurrency group can stall when unrelated labels queue a pending run; team invite tokens travel in the URL path; the budget is
-  not enforced on CI (no cost data); org-mode `.final_failed` is keyed by issue number only;
-  `actions/checkout` is pinned by tag. A title fingerprint misses paraphrased duplicates.
+- Accepted residual races (review round 3). Neither is closed by a lock, and both are bounded:
+  - Label dispatch and scheduled dispatch use different concurrency groups (a per-issue label group and
+    a single scheduled group). So a label and a scheduled scan can both see `ready` for one issue inside
+    the run-listing lag, before either's DISPATCHED marker or pipeline run is visible. Bounds: the
+    first-dispatch marker each one posts before dispatching, the pipeline start cap (6 starts per issue),
+    and the per-run dispatch cap of 3 in the scheduled scan.
+  - Labels on different issues while the breaker is half-open can each start a probe before any probe
+    run is listed, because the per-issue groups do not serialise them. The number of extra probes is
+    bounded only by how many labels arrive in that window, not by one. Bound: a failed probe re-opens the
+    breaker and the cool-down applies again. Closing this needs a shared probe lock (a fence on the
+    half-open state, Wave 1b's durability port), which is not built yet.
+- The `issues: labeled` entry point is gated (Wave 1c, `shipwright-label-dispatch.yml`). A refusal is
+  a `::notice::` and a successful run, not a failure, and the label workflow is not in the breaker's
+  history (`GhRunHistory` lists `shipwright-pipeline.yml` only), so refused labels cannot re-open or
+  trip the breaker or open an incident. Relabels after a run are refused with a notice, not dispatched. Manual `workflow_dispatch` stays ungated by design (operator
+  action), bounded by the operator.
+- Gaps (tracked in the Wave 1a plan's follow-ups): team invite tokens travel in the URL path; the budget
+  is not enforced on CI (no cost data); org-mode `.final_failed` is keyed by issue number only. A title
+  fingerprint misses paraphrased duplicates.
