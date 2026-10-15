@@ -112,9 +112,10 @@ jobs:
             exit 0
           fi
 
-          # Install Claude Code if needed
+          # Install Claude Code at a pinned version if needed (#8583). No `|| true`: a failed install
+          # fails the step instead of running remediation without the CLI.
           if ! command -v claude &>/dev/null; then
-            npm install -g @anthropic-ai/claude-code 2>/dev/null || true
+            npm install -g @anthropic-ai/claude-code@2.1.301
           fi
 
           FINDINGS=$(cat /tmp/review-findings.json)
@@ -133,7 +134,7 @@ jobs:
 
           Fix all actionable findings. Skip any that are questions or suggestions without clear action items."
 
-          claude -p "$PROMPT" --max-turns 10 --model claude-sonnet-4-20250514 2>&1 || {
+          claude -p "$PROMPT" --max-turns 10 --model claude-sonnet-5-5 2>&1 || {
             echo "::warning::Claude remediation returned non-zero — changes may be partial"
           }
         env:
