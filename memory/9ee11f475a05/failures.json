@@ -112,11 +112,20 @@
     {
       "stage": "test",
       "pattern": "FAIL: 0",
-      "root_cause": "The log shows every suite passing with 'Failed: 0'; the 'FAIL: 0' pattern matched a zero-failure summary line, so this is a false positive in the error detector, not a real test failure.",
-      "fix": "Make the failure-pattern matcher ignore zero counts (e.g. match 'FAIL: [1-9]' or 'Failed: [1-9]') and check the test runner's exit code instead of grepping for 'FAIL'; look for the real failure earlier than the last 200 lines if the stage still exited non-zero.",
-      "seen_count": 5,
-      "last_seen": "2026-10-15T16:37:19Z",
-      "category": "config"
+      "root_cause": "In sw-lib-test-gate-env-test, the assertion 'outside the gate the saved header is untouched' fails: test-gate-env.sh modifies or does not preserve the saved header when run outside a test gate. The environment may leak gate state (for example a SHIPWRIGHT_TEST_GATE variable) into the test, since CI itself runs inside a test gate.",
+      "fix": "Unset the gate env vars (e.g. SHIPWRIGHT_TEST_GATE) in the failing test's 'outside the gate' case, or fix lib/test-gate-env.sh so it leaves the saved header untouched when no gate is active. Then rerun with `bash scripts/sw-test-all.sh --pattern sw-lib-test-gate-env`.",
+      "seen_count": 7,
+      "last_seen": "2026-10-15T21:32:07Z",
+      "category": "test_failure"
+    },
+    {
+      "stage": "test",
+      "pattern": "(pass) fails closed on a variable command name [0.02ms]",
+      "root_cause": "Two unrelated suites failed: sw-lib-test-gate-env-test ('outside the gate the saved header is untouched' assertion broke, likely env leakage of the test-gate marker or header mutation) and sw-server-api-test (POST endpoints return HTTP 415 Unsupported Media Type, a Content-Type/JSON body handling mismatch in the server). Neither is related to the docs-only change.",
+      "fix": "Check the SHIPWRIGHT test-gate env var is unset in the test's 'outside the gate' case, and make the server accept POSTs (pause, notifications/test) without a JSON content-type or have the test send 'Content-Type: application/json'; if both fail on main, treat as pre-existing and rerun.",
+      "seen_count": 2,
+      "last_seen": "2026-10-15T22:28:58Z",
+      "category": "test_failure"
     }
   ]
 }
