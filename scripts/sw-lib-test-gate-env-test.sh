@@ -6,6 +6,9 @@
 # loop's test gate inherited the pipeline's GitHub and Claude credentials, so a
 # real-service suite started nested pipelines and filed real issues.
 set -euo pipefail
+
+# Agents run without GitHub credentials (#8614): claude is launched through agent-exec.sh.
+SW_AGENT_EXEC="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/lib/agent-exec.sh"
 trap 'echo "ERROR: $BASH_SOURCE:$LINENO exited with status $?" >&2' ERR
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -80,7 +83,8 @@ assert_eq "eval form: the command does not run when the scrub fails" "no" "$([[ 
 assert_eq "command form: the command does not run when the scrub fails" "no" "$([[ -e "$ran" ]] && echo yes || echo no)"
 early_env="$( ( export TMPDIR=/nonexistent/sw-test-gate; sw_test_gate_scrub 2>/dev/null; env ) )"
 assert_eq "even a failed scrub has already marked the gate" "1" "$(sed -n 's/^SHIPWRIGHT_IN_TEST_GATE=//p' <<<"$early_env")"
-assert_eq "even a failed scrub has already reset git's saved header" "3" "$(sed -n 's/^GIT_CONFIG_COUNT=//p' <<<"$early_env")"
+assert_eq "even a failed scrub has already reset git's saved header" "http.https://github.com/.extraheader" "$(sed -n 's/^GIT_CONFIG_KEY_0=//p' <<<"$early_env")"
+assert_eq "even a failed scrub has already dropped the Claude login" "" "$(sed -n 's/^CLAUDE_CODE_OAUTH_TOKEN=//p' <<<"$early_env")"
 
 print_test_section "git credentials saved by actions/checkout are not usable"
 git_repo="$TEST_TEMP_DIR/repo"
@@ -94,15 +98,15 @@ assert_eq "the credential helper resolves to empty inside the gate" "" \
 assert_eq "git never prompts for credentials inside the gate" "0" \
     "$(sed -n 's/^GIT_TERMINAL_PROMPT=//p' <<<"$child_env")"
 assert_eq "outside the gate the saved header is untouched" "AUTHORIZATION: basic SECRET" \
-    "$(git -C "$git_repo" config --get http.https://github.com/.extraheader)"
+    "$(env -i PATH="$PATH" HOME="$HOME" git -C "$git_repo" config --get http.https://github.com/.extraheader)"
 
 print_test_section "every test-command call site goes through the gate"
 # Any line that runs a test-command variable (bash -c / eval / timeout … bash -c) must use
 # sw_test_gate_env or run inside ( sw_test_gate_scrub && … ), and every file with such a line must
 # load the lib itself.
 gated_files=(sw-loop.sh lib/pipeline-stages-build.sh lib/pipeline-stages-review.sh
-    lib/pipeline-quality-checks.sh lib/test-holdout.sh lib/mutation-executor.sh)
-run_re='(bash -c|eval) "\$\{?(test_cmd|TEST_CMD|_vg_cmd|test_wrapper|extra_wrapper)'
+    lib/pipeline-quality-checks.sh lib/test-holdout.sh lib/mutation-executor.sh sw-evidence.sh)
+run_re='(bash -c|eval) "\$\{?(test_cmd|TEST_CMD|_vg_cmd|test_wrapper|extra_wrapper|command_str|property_cmd|check_cmd)'
 for f in "${gated_files[@]}"; do
     calls="$(grep -E "$run_re" "$SCRIPT_DIR/$f" | grep -c . || true)"
     ungated="$(grep -E "$run_re" "$SCRIPT_DIR/$f" | grep -vcE 'sw_test_gate_env|\( sw_test_gate_scrub && ' || true)"
@@ -115,6 +119,63 @@ for f in "${gated_files[@]}"; do
 done
 loop_calls="$(grep -cE "$run_re" "$SCRIPT_DIR/sw-loop.sh" || true)"
 assert_eq "sw-loop.sh has its four test-command call sites" "4" "${loop_calls:-0}"
+
+print_test_section "test gate: Claude CLI points at an empty config dir (#8616)"
+gate_cfg="$(sw_test_gate_env bash -c 'printf "%s\n" "$CLAUDE_CONFIG_DIR"; find "$CLAUDE_CONFIG_DIR" -mindepth 1 | wc -l')"
+claude_cfg="$(sed -n 1p <<<"$gate_cfg")"
+assert_eq "the gate sets CLAUDE_CONFIG_DIR" "true" "$([[ -n "$claude_cfg" ]] && echo true || echo false)"
+assert_eq "the gate's Claude config dir is empty" "0" "$(sed -n 2p <<<"$gate_cfg" | tr -d ' ')"
+gone_cfg="$( ( sw_test_gate_scrub && eval 'printf %s "$CLAUDE_CONFIG_DIR"' ) )"
+assert_eq "the scrubbed subshell's Claude config dir is removed afterwards" "gone" "$([[ -d "$gone_cfg" ]] && echo present || echo gone)"
+
+print_test_section "path-scoped git credentials are reset (#8617)"
+git -C "$git_repo" remote add origin https://example.invalid/acme/repo.git
+git -C "$git_repo" config http.https://example.invalid/acme/repo.git.extraheader "AUTHORIZATION: basic SECRET2"
+git -C "$git_repo" config credential.https://example.invalid/acme/repo.git.helper "store"
+assert_eq "outside the gate the remote-scoped header is set" "AUTHORIZATION: basic SECRET2" \
+    "$(env -i PATH="$PATH" HOME="$HOME" git -C "$git_repo" config --get http.https://example.invalid/acme/repo.git.extraheader)"
+scoped_gate="$(cd "$git_repo" && sw_test_gate_env bash -c 'printf "[%s]" "$(git config --get http.https://example.invalid/acme/repo.git.extraheader)"; printf "[%s]" "$(git config --get credential.https://example.invalid/acme/repo.git.helper)"')"
+assert_eq "the remote-scoped extraheader and helper resolve to empty inside the gate" "[][]" "$scoped_gate"
+if grep -q SECRET2 <<<"$scoped_gate"; then assert_fail "no remote-scoped secret reaches the gate"; else assert_pass "no remote-scoped secret reaches the gate"; fi
+
+print_test_section "agent exec: GitHub credentials removed, Claude login kept (#8614)"
+SW_AGENT_EXEC="$SCRIPT_DIR/lib/agent-exec.sh"
+assert_eq "agent-exec.sh exists and is executable" "yes" "$([[ -x "$SW_AGENT_EXEC" ]] && echo yes || echo no)"
+mock_binary "claude" 'env'
+agent_env="$(cd "$git_repo" && unset SHIPWRIGHT_IN_TEST_GATE && "$SW_AGENT_EXEC" claude 2>&1)"
+for var in GH_TOKEN GITHUB_TOKEN GH_ENTERPRISE_TOKEN GITHUB_ENTERPRISE_TOKEN SHIPWRIGHT_FLEET_TOKEN; do
+    if grep -q "^${var}=" <<<"$agent_env"; then assert_fail "agent: $var is removed"; else assert_pass "agent: $var is removed"; fi
+done
+assert_eq "agent keeps CLAUDE_CODE_OAUTH_TOKEN" "claude-secret" "$(sed -n 's/^CLAUDE_CODE_OAUTH_TOKEN=//p' <<<"$agent_env")"
+assert_eq "agent keeps ANTHROPIC_API_KEY" "anthropic-secret" "$(sed -n 's/^ANTHROPIC_API_KEY=//p' <<<"$agent_env")"
+assert_eq "agent is not marked as a test gate" "" "$(sed -n 's/^SHIPWRIGHT_IN_TEST_GATE=//p' <<<"$agent_env")"
+assert_eq "agent unrelated variables pass through" "still-here" "$(sed -n 's/^KEEP_ME=//p' <<<"$agent_env")"
+agent_gh_dir="$(sed -n 's/^GH_CONFIG_DIR=//p' <<<"$agent_env")"
+assert_eq "agent gh config dir is not the caller's" "true" "$([[ "$agent_gh_dir" != "$GH_CONFIG_DIR" ]] && echo true || echo false)"
+mock_binary "claude" 'git config --get http.https://example.invalid/acme/repo.git.extraheader; echo "rc=$?"'
+agent_scoped="$(cd "$git_repo" && "$SW_AGENT_EXEC" claude 2>&1)"
+assert_eq "agent: the remote-scoped extraheader is reset" "rc=0" "$(tail -n 1 <<<"$agent_scoped")"
+if grep -q SECRET2 <<<"$agent_scoped"; then assert_fail "agent: no remote-scoped secret"; else assert_pass "agent: no remote-scoped secret"; fi
+
+print_test_section "agent exec: exit status and process identity"
+mock_binary "claude" 'exit 7'
+rc=0; "$SW_AGENT_EXEC" claude >/dev/null 2>&1 || rc=$?
+assert_eq "agent exec returns the command's exit status" "7" "$rc"
+mock_binary "claude" 'echo "$$"'
+pid_file="$TEST_TEMP_DIR/agent-pid"
+"$SW_AGENT_EXEC" claude > "$pid_file" 2>&1 &
+bg_pid=$!
+wait "$bg_pid" 2>/dev/null || true
+assert_eq "the agent process is the caller's background pid (signals reach it)" "$bg_pid" "$(cat "$pid_file")"
+
+print_test_section "agent exec: fails closed when the scrub cannot complete"
+marker="$TEST_TEMP_DIR/agent-ran"
+mock_binary "claude" "touch '$marker'"
+mock_binary "git" 'exit 128'
+rc=0; "$SW_AGENT_EXEC" claude >/dev/null 2>&1 || rc=$?
+rm -f "$TEST_TEMP_DIR/bin/git"
+assert_eq "the agent command does not run when the scrub fails" "no" "$([[ -e "$marker" ]] && echo yes || echo no)"
+assert_eq "a failed scrub exits non-zero" "true" "$([[ "$rc" -ne 0 ]] && echo true || echo false)"
 
 print_test_section "real-service suites refuse without opt-in"
 # Run a copy of the suite in a temp tree with gh, git and claude mocked, so even a broken
@@ -149,5 +210,34 @@ cp "$SCRIPT_DIR/sw-integration-claude-test.sh" "$e2e_tree/scripts/"
 out="$(env CLAUDE_CODE_OAUTH_TOKEN=fake SHIPWRIGHT_IN_TEST_GATE=1 bash "$e2e_tree/scripts/sw-integration-claude-test.sh" 2>&1)" && rc=0 || rc=$?
 assert_eq "integration-claude exits 0 inside a test gate" "0" "$rc"
 assert_contains "integration-claude says it skipped inside a test gate" "$out" "Skipping integration-claude: inside a build-loop test gate"
+
+print_test_section "every agent claude call site goes through agent-exec (#8580)"
+# A line that runs claude as a command must route it through "$SW_AGENT_EXEC". A command word is
+# one at a line start or after | ( ; & $( then/do/else/if !, optionally behind timeout N or $VAR.
+# Every file with such a line must define SW_AGENT_EXEC. Comments, probes, quoted text and
+# `command -v claude` are not invocations.
+claude_run_re='(^|[|;&(]|\$\(|then|do|else|if|!)[[:space:]]*((timeout|gtimeout)[[:space:]]+[^[:space:]]+|\$[A-Za-z_]+([[:space:]]+("[^"]*"|[^[:space:]"]+))?)?[[:space:]]*claude([[:space:]]|$)'
+unrouted_total=0
+for f in "$SCRIPT_DIR"/*.sh "$SCRIPT_DIR/sw" "$SCRIPT_DIR"/lib/*.sh; do
+    [[ -f "$f" ]] || continue
+    name="${f#"$SCRIPT_DIR"/}"
+    calls="$(grep -nE "$claude_run_re" "$f" || true)"
+    calls="$(grep -vE '^[0-9]+:[[:space:]]*#' <<<"$calls" || true)"
+    [[ -n "$calls" ]] || continue
+    routed="$(grep 'SW_AGENT_EXEC' <<<"$calls" || true)"
+    unrouted="$(grep -vE 'SW_AGENT_EXEC|(command -v|which|type|hash) claude|grep .*'"'"'[^'"'"']*claude' <<<"$calls" || true)"
+    if [[ -n "$unrouted" ]]; then
+        unrouted_total=$((unrouted_total + $(grep -c . <<<"$unrouted")))
+        echo "    unrouted in $name: $(head -1 <<<"$unrouted" | cut -c1-120)"
+    fi
+    if [[ -n "$routed" ]] && ! grep -q '^SW_AGENT_EXEC=' "$f"; then
+        assert_fail "$name routes claude through SW_AGENT_EXEC but does not define it"
+    fi
+done
+assert_eq "no agent claude invocation bypasses agent-exec" "0" "$unrouted_total"
+# Heredoc launchers (sw-session.sh) are templates: ast-grep and the regex above cannot see them. They
+# must name the helper through the placeholder that awk fills with SW_AGENT_EXEC.
+assert_eq "session launchers run claude through agent-exec (both templates)" "2" "$(grep -c "^\"__AGENT_EXEC__\" claude __CLAUDE_FLAGS__" "$SCRIPT_DIR/sw-session.sh")"
+assert_eq "session launchers fill the placeholder from SW_AGENT_EXEC (both awk calls)" "2" "$(grep -c "gsub(/__AGENT_EXEC__/, agent_exec)" "$SCRIPT_DIR/sw-session.sh")"
 
 print_test_results

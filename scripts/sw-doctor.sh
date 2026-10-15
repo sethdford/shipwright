@@ -6,6 +6,9 @@
 # ╚═══════════════════════════════════════════════════════════════════════════╝
 VERSION="3.3.0"
 set -euo pipefail
+
+# Agents run without GitHub credentials (#8614): claude is launched through agent-exec.sh.
+SW_AGENT_EXEC="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/lib/agent-exec.sh"
 trap 'echo "ERROR: $BASH_SOURCE:$LINENO exited with status $?" >&2' ERR
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -356,7 +359,7 @@ doctor_check_intelligence() {
 
     # Claude CLI available and authenticated
     if command -v claude >/dev/null 2>&1; then
-        if claude --version >/dev/null 2>&1; then
+        if "$SW_AGENT_EXEC" claude --version >/dev/null 2>&1; then
             check_pass "Claude CLI: available and authenticated"
         else
             check_warn "Claude CLI: installed but may need authentication"

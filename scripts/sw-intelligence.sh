@@ -4,6 +4,9 @@
 # ║  Semantic issue analysis · Pipeline composition · Cost prediction       ║
 # ╚═══════════════════════════════════════════════════════════════════════════╝
 set -euo pipefail
+
+# Agents run without GitHub credentials (#8614): claude is launched through agent-exec.sh.
+SW_AGENT_EXEC="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/lib/agent-exec.sh"
 trap 'echo "ERROR: $BASH_SOURCE:$LINENO exited with status $?" >&2' ERR
 
 VERSION="3.3.0"
@@ -359,7 +362,7 @@ _intelligence_call_claude() {
     type daemon_log &>/dev/null && daemon_log INFO "Intelligence: calling Claude (model=${model:-default}, timeout=${_claude_timeout}s)"
 
     local response
-    if ! response=$($_timeout_cmd claude -p "$prompt" $_model_flag 2>/dev/null); then
+    if ! response=$("$SW_AGENT_EXEC" $_timeout_cmd claude -p "$prompt" $_model_flag 2>/dev/null); then
         error "Claude call failed or timed out"
         echo '{"error":"claude_call_failed"}'
         return 1
@@ -1421,7 +1424,7 @@ cmd_status() {
     # Claude authenticated
     local claude_ok="no"
     if command -v claude &>/dev/null; then
-        if claude --version &>/dev/null; then
+        if "$SW_AGENT_EXEC" claude --version &>/dev/null; then
             claude_ok="yes"
         fi
     fi

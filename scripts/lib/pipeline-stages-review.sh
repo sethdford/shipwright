@@ -1,4 +1,7 @@
 # pipeline-stages-review.sh — review, compound_quality, audit stages
+
+# Agents run without GitHub credentials (#8614): claude is launched through agent-exec.sh.
+SW_AGENT_EXEC="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/agent-exec.sh"
 # Source from pipeline-stages.sh. Requires all pipeline globals and dependencies.
 # Test commands run without credentials (#8608).
 # shellcheck source=lib/test-gate-env.sh
@@ -365,7 +368,7 @@ For each gap found:
 If all requirements are met, write: \"Spec compliance: PASS — all planned tasks implemented.\"
 "
             spec_prompt=$(guard_prompt_size "spec-review" "$spec_prompt")
-            claude "${review_args[@]}" "$spec_prompt" < /dev/null > "$spec_review_file" 2>"${ARTIFACTS_DIR}/.claude-tokens-spec-review.log" || true
+            "$SW_AGENT_EXEC" claude "${review_args[@]}" "$spec_prompt" < /dev/null > "$spec_review_file" 2>"${ARTIFACTS_DIR}/.claude-tokens-spec-review.log" || true
             parse_claude_tokens "${ARTIFACTS_DIR}/.claude-tokens-spec-review.log"
 
             if [[ -s "$spec_review_file" ]]; then
@@ -385,7 +388,7 @@ If all requirements are met, write: \"Spec compliance: PASS — all planned task
         fi
     fi
 
-    claude "${review_args[@]}" "$review_prompt" < /dev/null > "$review_file" 2>"${ARTIFACTS_DIR}/.claude-tokens-review.log" || true
+    "$SW_AGENT_EXEC" claude "${review_args[@]}" "$review_prompt" < /dev/null > "$review_file" 2>"${ARTIFACTS_DIR}/.claude-tokens-review.log" || true
     parse_claude_tokens "${ARTIFACTS_DIR}/.claude-tokens-review.log"
 
     if [[ ! -s "$review_file" ]]; then

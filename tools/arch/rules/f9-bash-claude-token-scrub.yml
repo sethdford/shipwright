@@ -1,11 +1,12 @@
-# F9 for bash: a claude process inherits the caller's environment, including GH_TOKEN. Every
+# F9 for bash (promoted to error once the baseline reached zero, ADR-0008): a claude process inherits the caller's environment, including GH_TOKEN. Every
 # invocation (direct, or behind timeout/nohup/exec/env/$TIMEOUT_CMD …) must unset the GitHub tokens
-# in the same command. `command -v claude` and log lines are not invocations. Ratcheted.
+# in the same command, or run through "$SW_AGENT_EXEC" (scripts/lib/agent-exec.sh), which does.
+# `command -v claude`, log lines and jq arguments named claude are not invocations.
 id: F9-bash-claude-token-scrub
 language: Bash
-severity: off
-metadata: { ratchet: true, owner: "@sethdford", docs: "docs/architecture.md#fitness-rules" }
-message: "F9: claude must not inherit GitHub tokens. Run it as env -u GH_TOKEN -u GITHUB_TOKEN -u GH_ENTERPRISE_TOKEN claude …, or call a helper such as sw_claude() that does exactly that."
+severity: error
+metadata: { owner: "@sethdford", docs: "docs/architecture.md#fitness-rules" }
+message: "F9: claude must not inherit GitHub tokens. Run it as \"$SW_AGENT_EXEC\" claude … (scripts/lib/agent-exec.sh), or as env -u GH_TOKEN -u GITHUB_TOKEN -u GH_ENTERPRISE_TOKEN claude …."
 files:
   - "scripts/**/*.sh"
   - "scripts/sw"
@@ -24,6 +25,10 @@ rule:
                 has:
                   field: name
                   regex: '^(command|type|which|hash|echo|printf|info|warn|error|success|log|debug|emit_event)$'
+            - not:
+                has:
+                  field: name
+                  regex: '^(jq|"?\$\{?SW_AGENT_EXEC\}?"?)$'
     - not:
         all:
           - has: { kind: word, regex: '^(--unset=)?GH_TOKEN$' }

@@ -1,4 +1,7 @@
 # pipeline-quality-checks.sh — Quality checks (security, bundle, perf, api, coverage, adversarial, dod, bash compat, etc.) for sw-pipeline.sh
+
+# Agents run without GitHub credentials (#8614): claude is launched through agent-exec.sh.
+SW_AGENT_EXEC="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/agent-exec.sh"
 # Source from sw-pipeline.sh. Requires pipeline-quality.sh, ARTIFACTS_DIR, SCRIPT_DIR.
 # Test commands run without credentials (#8608).
 # shellcheck source=lib/test-gate-env.sh
@@ -103,7 +106,7 @@ Diff:
 $diff_content"
 
     local review_output
-    review_output=$(claude --print "$prompt" < /dev/null 2>"${ARTIFACTS_DIR}/.claude-tokens-adversarial.log" || true)
+    review_output=$("$SW_AGENT_EXEC" claude --print "$prompt" < /dev/null 2>"${ARTIFACTS_DIR}/.claude-tokens-adversarial.log" || true)
     parse_claude_tokens "${ARTIFACTS_DIR}/.claude-tokens-adversarial.log"
 
     echo "$review_output" > "$ARTIFACTS_DIR/adversarial-review.md"
@@ -175,7 +178,7 @@ Files changed: $changed_files
 $file_contents"
 
     local review_output
-    review_output=$(claude --print "$prompt" < /dev/null 2>"${ARTIFACTS_DIR}/.claude-tokens-negative.log" || true)
+    review_output=$("$SW_AGENT_EXEC" claude --print "$prompt" < /dev/null 2>"${ARTIFACTS_DIR}/.claude-tokens-negative.log" || true)
     parse_claude_tokens "${ARTIFACTS_DIR}/.claude-tokens-negative.log"
 
     echo "$review_output" > "$ARTIFACTS_DIR/negative-review.md"

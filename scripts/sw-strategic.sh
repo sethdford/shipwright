@@ -1,4 +1,7 @@
 #!/usr/bin/env bash
+
+# Agents run without GitHub credentials (#8614): claude is launched through agent-exec.sh.
+SW_AGENT_EXEC="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/lib/agent-exec.sh"
 # ╔═══════════════════════════════════════════════════════════════════════════╗
 # ║  sw-strategic.sh — Strategic Intelligence Agent                         ║
 # ║  Reads strategy, metrics, and codebase to create high-impact issues     ║
@@ -504,7 +507,7 @@ strategic_call_api() {
     printf '%s' "$prompt" > "$tmp_prompt"
 
     local response_text
-    response_text=$(cat "$tmp_prompt" | claude -p --max-turns 1 --model "$STRATEGIC_MODEL" 2>/dev/null || echo "")
+    response_text=$(cat "$tmp_prompt" | "$SW_AGENT_EXEC" claude -p --max-turns 1 --model "$STRATEGIC_MODEL" 2>/dev/null || echo "")
     rm -f "$tmp_prompt"
 
     if [[ -z "$response_text" ]]; then

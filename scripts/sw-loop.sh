@@ -8,6 +8,9 @@
 # ║  Inspired by Anthropic's autonomous 16-agent C compiler build.          ║
 # ╚═══════════════════════════════════════════════════════════════════════════╝
 set -euo pipefail
+
+# Agents run without GitHub credentials (#8614): claude is launched through agent-exec.sh.
+SW_AGENT_EXEC="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/lib/agent-exec.sh"
 trap 'echo "ERROR: $BASH_SOURCE:$LINENO exited with status $?" >&2' ERR
 
 # Allow spawning Claude CLI from within a Claude Code session (daemon, fleet, etc.)
@@ -1265,7 +1268,7 @@ AUDIT_PROMPT
     fi
 
     local exit_code=0
-    claude -p "$audit_prompt" "${audit_flags[@]}" > "$audit_log" 2>&1 || exit_code=$?
+    "$SW_AGENT_EXEC" claude -p "$audit_prompt" "${audit_flags[@]}" > "$audit_log" 2>&1 || exit_code=$?
 
     if grep -q "AUDIT_PASS" "$audit_log" 2>/dev/null; then
         AUDIT_RESULT="pass"
@@ -1395,7 +1398,7 @@ DOD_PROMPT
         dod_flags+=("--dangerously-skip-permissions")
     fi
 
-    claude -p "$dod_prompt" "${dod_flags[@]}" > "$dod_log" 2>&1 || true
+    "$SW_AGENT_EXEC" claude -p "$dod_prompt" "${dod_flags[@]}" > "$dod_log" 2>&1 || true
 
     if grep -q "DOD_PASS" "$dod_log" 2>/dev/null; then
         echo -e "  ${GREEN}✓${RESET} Definition of Done: satisfied"
@@ -1509,7 +1512,7 @@ HOLISTIC_PROMPT
         hol_flags+=("--dangerously-skip-permissions")
     fi
 
-    claude -p "$holistic_prompt" "${hol_flags[@]}" > "$holistic_log" 2>&1 || true
+    "$SW_AGENT_EXEC" claude -p "$holistic_prompt" "${hol_flags[@]}" > "$holistic_log" 2>&1 || true
 
     if grep -q "HOLISTIC_PASS" "$holistic_log" 2>/dev/null; then
         echo -e "  ${GREEN}✓${RESET} Holistic assessment: passed"
@@ -1941,7 +1944,7 @@ PROMPT
     local ERR_FILE="$LOG_DIR/agent-${AGENT_NUM}-iter-${ITERATION}.stderr"
     LOG_FILE="$LOG_DIR/agent-${AGENT_NUM}-iter-${ITERATION}.log"
     # shellcheck disable=SC2086
-    claude -p "$PROMPT" $CLAUDE_FLAGS > "$JSON_FILE" 2>"$ERR_FILE" || true
+    "$SW_AGENT_EXEC" claude -p "$PROMPT" $CLAUDE_FLAGS > "$JSON_FILE" 2>"$ERR_FILE" || true
 
     # Extract text result from JSON into .log for backwards compat
     _extract_text_from_json "$JSON_FILE" "$LOG_FILE" "$ERR_FILE"

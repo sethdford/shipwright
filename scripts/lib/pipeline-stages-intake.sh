@@ -1,4 +1,7 @@
 # pipeline-stages-intake.sh — intake, plan, design stages
+
+# Agents run without GitHub credentials (#8614): claude is launched through agent-exec.sh.
+SW_AGENT_EXEC="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/agent-exec.sh"
 # Source from pipeline-stages.sh. Requires all pipeline globals and dependencies.
 [[ -n "${_PIPELINE_STAGES_INTAKE_LOADED:-}" ]] && return 0
 _PIPELINE_STAGES_INTAKE_LOADED=1
@@ -217,7 +220,7 @@ Labels: ${ISSUE_LABELS:-}
 
         local enhanced_spec=""
         local spec_model="${MODEL:-sonnet}"
-        enhanced_spec=$(claude -p "$enhance_prompt" --model "$spec_model" --output-format json 2>/dev/null) || true
+        enhanced_spec=$("$SW_AGENT_EXEC" claude -p "$enhance_prompt" --model "$spec_model" --output-format json 2>/dev/null) || true
 
         if [[ -n "$enhanced_spec" ]]; then
             # Validate the enhanced spec is valid JSON with required fields
@@ -578,7 +581,7 @@ ${_skill_prompts}
     local _plan_flags
     _plan_flags="$(_pipeline_claude_flags "plan" "$plan_model")"
     # shellcheck disable=SC2086
-    claude --print $_plan_flags --max-turns "$(_smart_int "max_turns.pipeline_stage" 25)" --dangerously-skip-permissions \
+    "$SW_AGENT_EXEC" claude --print $_plan_flags --max-turns "$(_smart_int "max_turns.pipeline_stage" 25)" --dangerously-skip-permissions \
         "$plan_prompt" < /dev/null > "$plan_file" 2>"$_token_log" || true
     parse_claude_tokens "$_token_log"
 
@@ -786,7 +789,7 @@ Then explain your reasoning briefly."
             local _val_flags
             _val_flags="$(_pipeline_claude_flags "plan" "$validation_model")"
             # shellcheck disable=SC2086
-            validation_result=$(claude --print --output-format text $_val_flags -p "$validation_prompt" < /dev/null 2>"${ARTIFACTS_DIR}/.claude-tokens-plan-validate.log" || true)
+            validation_result=$("$SW_AGENT_EXEC" claude --print --output-format text $_val_flags -p "$validation_prompt" < /dev/null 2>"${ARTIFACTS_DIR}/.claude-tokens-plan-validate.log" || true)
             parse_claude_tokens "${ARTIFACTS_DIR}/.claude-tokens-plan-validate.log"
 
             # Save validation result
@@ -861,7 +864,7 @@ Fix these issues in the new plan."
                 local _regen_flags
                 _regen_flags="$(_pipeline_claude_flags "plan" "$plan_model")"
                 # shellcheck disable=SC2086
-                claude --print $_regen_flags --max-turns "$(_smart_int "max_turns.pipeline_stage" 25)" \
+                "$SW_AGENT_EXEC" claude --print $_regen_flags --max-turns "$(_smart_int "max_turns.pipeline_stage" 25)" \
                     "$regen_prompt" < /dev/null > "$plan_file" 2>"$_token_log" || true
                 parse_claude_tokens "$_token_log"
 
@@ -1068,7 +1071,7 @@ ${_skill_prompts}
     local _design_flags
     _design_flags="$(_pipeline_claude_flags "design" "$design_model")"
     # shellcheck disable=SC2086
-    claude --print $_design_flags --max-turns "$(_smart_int "max_turns.pipeline_stage" 25)" --dangerously-skip-permissions \
+    "$SW_AGENT_EXEC" claude --print $_design_flags --max-turns "$(_smart_int "max_turns.pipeline_stage" 25)" --dangerously-skip-permissions \
         "$design_prompt" < /dev/null > "$design_file" 2>"$_token_log" || true
     parse_claude_tokens "$_token_log"
 

@@ -11,6 +11,9 @@
 # shellcheck disable=SC2034
 VERSION="3.3.0"
 set -euo pipefail
+
+# Agents run without GitHub credentials (#8614): claude is launched through agent-exec.sh.
+SW_AGENT_EXEC="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/lib/agent-exec.sh"
 trap 'echo "ERROR: $BASH_SOURCE:$LINENO exited with status $?" >&2' ERR
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -436,7 +439,7 @@ cd __DIR__ || exit 1
 printf '\033]2;__TEAM__-lead\033\\'
 PROMPT=$(cat __PROMPT__)
 rm -f __PROMPT__ "$0"
-claude __CLAUDE_FLAGS__ "$PROMPT"
+"__AGENT_EXEC__" claude __CLAUDE_FLAGS__ "$PROMPT"
 echo ""
 echo "Claude exited. Type 'claude' to restart, or 'exit' to close."
 exec "$SHELL" -l
@@ -446,8 +449,8 @@ LAUNCHER_STATIC
             CLAUDE_FLAGS="--dangerously-skip-permissions"
         fi
         # Use awk for safe string replacement — sed breaks on & | \ in paths
-        awk -v dir="$PROJECT_DIR" -v team="$TEAM_NAME" -v prompt="$PROMPT_FILE" -v flags="$CLAUDE_FLAGS" \
-            '{gsub(/__DIR__/, dir); gsub(/__TEAM__/, team); gsub(/__PROMPT__/, prompt); gsub(/__CLAUDE_FLAGS__/, flags); print}' \
+        awk -v dir="$PROJECT_DIR" -v team="$TEAM_NAME" -v prompt="$PROMPT_FILE" -v flags="$CLAUDE_FLAGS" -v agent_exec="$SW_AGENT_EXEC" \
+            '{gsub(/__DIR__/, dir); gsub(/__TEAM__/, team); gsub(/__PROMPT__/, prompt); gsub(/__CLAUDE_FLAGS__/, flags); gsub(/__AGENT_EXEC__/, agent_exec); print}' \
             "$LAUNCHER" > "${LAUNCHER}.tmp" && mv "${LAUNCHER}.tmp" "$LAUNCHER"
         chmod +x "$LAUNCHER"
 
@@ -469,7 +472,7 @@ LAUNCHER_STATIC
 cd __DIR__ || exit 1
 printf '\033]2;__TEAM__-lead\033\\'
 rm -f "$0"
-claude __CLAUDE_FLAGS__
+"__AGENT_EXEC__" claude __CLAUDE_FLAGS__
 echo ""
 echo "Claude exited. Type 'claude' to restart, or 'exit' to close."
 exec "$SHELL" -l
@@ -479,8 +482,8 @@ LAUNCHER_STATIC
             CLAUDE_FLAGS="--dangerously-skip-permissions"
         fi
         # Use awk for safe string replacement — sed breaks on & | \ in paths
-        awk -v dir="$PROJECT_DIR" -v team="$TEAM_NAME" -v flags="$CLAUDE_FLAGS" \
-            '{gsub(/__DIR__/, dir); gsub(/__TEAM__/, team); gsub(/__CLAUDE_FLAGS__/, flags); print}' \
+        awk -v dir="$PROJECT_DIR" -v team="$TEAM_NAME" -v flags="$CLAUDE_FLAGS" -v agent_exec="$SW_AGENT_EXEC" \
+            '{gsub(/__DIR__/, dir); gsub(/__TEAM__/, team); gsub(/__CLAUDE_FLAGS__/, flags); gsub(/__AGENT_EXEC__/, agent_exec); print}' \
             "$LAUNCHER" > "${LAUNCHER}.tmp" && mv "${LAUNCHER}.tmp" "$LAUNCHER"
         chmod +x "$LAUNCHER"
 

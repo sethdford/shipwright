@@ -7,6 +7,9 @@
 # shellcheck disable=SC2034
 VERSION="3.3.0"
 set -euo pipefail
+
+# Agents run without GitHub credentials (#8614): claude is launched through agent-exec.sh.
+SW_AGENT_EXEC="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/lib/agent-exec.sh"
 trap 'echo "ERROR: $BASH_SOURCE:$LINENO exited with status $?" >&2' ERR
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -65,7 +68,7 @@ semantic_rank_results() {
     truncated=$(echo "$raw_results" | head -200)
 
     local analysis
-    analysis=$(claude --print "You are analyzing agent log search results. The user searched for: \"${query}\"
+    analysis=$("$SW_AGENT_EXEC" claude --print "You are analyzing agent log search results. The user searched for: \"${query}\"
 
 Here are the grep results:
 ${truncated}

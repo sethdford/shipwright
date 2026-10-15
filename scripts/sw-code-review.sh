@@ -4,6 +4,9 @@
 # ║  Quality enforcement: code smells, SOLID, layer boundaries, complexity   ║
 # ╚═══════════════════════════════════════════════════════════════════════════╝
 set -euo pipefail
+
+# Agents run without GitHub credentials (#8614): claude is launched through agent-exec.sh.
+SW_AGENT_EXEC="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/lib/agent-exec.sh"
 trap 'echo "ERROR: $BASH_SOURCE:$LINENO exited with status $?" >&2' ERR
 
 # shellcheck disable=SC2034
@@ -410,7 +413,7 @@ ${requirements}
 "
 
     local claude_out
-    claude_out=$(claude -p "$prompt" --max-turns 3 2>/dev/null || true)
+    claude_out=$("$SW_AGENT_EXEC" claude -p "$prompt" --max-turns 3 2>/dev/null || true)
     [[ -z "$claude_out" ]] && return 0
 
     if echo "$claude_out" | grep -qi "Review clean — no semantic issues found"; then

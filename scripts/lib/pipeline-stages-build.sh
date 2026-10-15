@@ -1,4 +1,7 @@
 # pipeline-stages-build.sh — test_first, build, test stages
+
+# Agents run without GitHub credentials (#8614): claude is launched through agent-exec.sh.
+SW_AGENT_EXEC="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/agent-exec.sh"
 # Source from pipeline-stages.sh. Requires all pipeline globals and dependencies.
 # Test commands run without credentials (#8608).
 # shellcheck source=lib/test-gate-env.sh
@@ -89,7 +92,7 @@ Create files in the appropriate project directories (e.g. tests/, __tests__/, sr
     local output=""
     local tdd_timeout
     tdd_timeout=$(_smart_int "timeouts.tdd_generation" 120)
-    output=$(echo "$tdd_prompt" | timeout "$tdd_timeout" claude --print --model "$model" 2>/dev/null) || {
+    output=$(echo "$tdd_prompt" | "$SW_AGENT_EXEC" timeout "$tdd_timeout" claude --print --model "$model" 2>/dev/null) || {
         warn "TDD test generation failed, falling back to standard build"
         return 1
     }
@@ -508,7 +511,7 @@ ${_skill_prompts}
         local commit_msgs
         commit_msgs=$(_safe_base_log --format="%s" | head -20)
         local quality_score
-        quality_score=$(claude --print --output-format text -p "Rate the quality of these git commit messages on a scale of 0-100. Consider: focus (one thing per commit), clarity (describes the why), atomicity (small logical units). Reply with ONLY a number 0-100.
+        quality_score=$("$SW_AGENT_EXEC" claude --print --output-format text -p "Rate the quality of these git commit messages on a scale of 0-100. Consider: focus (one thing per commit), clarity (describes the why), atomicity (small logical units). Reply with ONLY a number 0-100.
 
 Commit messages:
 ${commit_msgs}" --model "$(_smart_model commit_quality haiku)" < /dev/null 2>/dev/null || true)

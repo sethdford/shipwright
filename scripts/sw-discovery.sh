@@ -5,6 +5,9 @@
 # ║  channel: broadcast, query, inject, clean, status                        ║
 # ╚═══════════════════════════════════════════════════════════════════════════╝
 set -euo pipefail
+
+# Agents run without GitHub credentials (#8614): claude is launched through agent-exec.sh.
+SW_AGENT_EXEC="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/lib/agent-exec.sh"
 trap 'echo "ERROR: $BASH_SOURCE:$LINENO exited with status $?" >&2' ERR
 
 # shellcheck disable=SC2034
@@ -185,7 +188,7 @@ ${candidate_summaries}"
         elif command -v timeout >/dev/null 2>&1; then _timeout_cmd="timeout $_claude_timeout"
         fi
 
-        ranked_json=$($_timeout_cmd claude -p "$rank_prompt" 2>/dev/null || true)
+        ranked_json=$("$SW_AGENT_EXEC" $_timeout_cmd claude -p "$rank_prompt" 2>/dev/null || true)
 
         # Extract array from response (handle markdown fences)
         local indices_str=""
