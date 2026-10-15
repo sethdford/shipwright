@@ -1,5 +1,6 @@
 import { Glob } from "bun";
 import { parse } from "yaml";
+import { findGateOrder } from "./workflow-gate-order";
 
 /**
  * Workflow fail-closed rule (ADR-0007). Retry counting and gating must stop on any read error:
@@ -154,7 +155,8 @@ export function findFailOpen(file: string, text: string): string[] {
   } catch {
     return [`${file}: unparseable YAML`];
   }
-  return docFindings(file, (doc !== null && typeof doc === "object" ? doc : {}) as Doc);
+  const d = (doc !== null && typeof doc === "object" ? doc : {}) as Doc;
+  return [...docFindings(file, d), ...findGateOrder(file, text)];
 }
 
 /** Scan every file under `.github/workflows` and `.github/actions` (dot-dir: `dot: true`). */
