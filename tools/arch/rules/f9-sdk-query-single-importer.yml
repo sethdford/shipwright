@@ -1,6 +1,6 @@
 # F9: the Agent SDK's runtime exports (query, and anything else that spawns an agent) are imported
-# by ONE module, the guarded runner. Any other value import, namespace import, re-export, import()
-# or require() of the SDK would let code reach query() without assertAgentOptions(). Type-only
+# by ONE module, the guarded runner. Any other value import, namespace import, re-export, import(),
+# require() or `import x = require()` of the SDK would let code reach query() without assertAgentOptions(). Type-only
 # imports are allowed everywhere inside src/adapters/agent (F6 keeps them out of the rest of src/).
 # Dashboard code may not import the SDK at all. Pinned in tools/arch/meta.test.ts.
 id: F9-sdk-query-single-importer
@@ -22,6 +22,14 @@ ignores:
   - "src/adapters/agent/agent-sdk-runner.ts"
 rule:
   any:
+    - all:
+        - kind: import_statement
+        - has:
+            kind: import_require_clause
+            has:
+              field: source
+              kind: string
+              regex: '^["'']@anthropic-ai/claude-agent-sdk(/.*)?["'']$'
     - all:
         - any:
             - kind: import_statement

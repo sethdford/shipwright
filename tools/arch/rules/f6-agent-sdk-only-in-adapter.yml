@@ -10,6 +10,14 @@ ignores:
 rule:
   any:
     - all:
+        - kind: import_statement
+        - has:
+            kind: import_require_clause
+            has:
+              field: source
+              kind: string
+              regex: '^["'']@anthropic-ai/claude-agent-sdk(/.*)?["'']$'
+    - all:
         - any:
             - kind: import_statement
             - kind: export_statement
