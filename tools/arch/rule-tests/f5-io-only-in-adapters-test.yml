@@ -23,6 +23,8 @@ valid:
   - 'const m = await import("./module");'
   - 'type F = Function;'
 invalid:
+  - 'import * as nm from "node:module"; const req = nm.createRequire(import.meta.url); req("child_process");'
+  - 'import module from "node:module"; module.createRequire(import.meta.url);'
   # Evasion: node:vm, node:module (createRequire), bun:ffi, import.meta.require, window/self ["fetch"]
   - 'import vm from "node:vm";'
   - 'import { runInNewContext } from "vm";'
