@@ -1,5 +1,8 @@
 # pipeline-stages-review.sh — review, compound_quality, audit stages
 # Source from pipeline-stages.sh. Requires all pipeline globals and dependencies.
+# Test commands run without credentials (#8608).
+# shellcheck source=lib/test-gate-env.sh
+source "$(dirname "${BASH_SOURCE[0]}")/test-gate-env.sh"
 [[ -n "${_PIPELINE_STAGES_REVIEW_LOADED:-}" ]] && return 0
 _PIPELINE_STAGES_REVIEW_LOADED=1
 
@@ -850,7 +853,7 @@ stage_compound_quality() {
         total=$((total + 1))
         info "Running negative test pass..."
         if [[ -n "${TEST_CMD:-}" ]]; then
-            if eval "$TEST_CMD" >> "$compound_log" 2>&1; then
+            if ( sw_test_gate_scrub; eval "$TEST_CMD" ) >> "$compound_log" 2>&1; then
                 pass_count=$((pass_count + 1))
                 success "Negative test pass passed"
             else

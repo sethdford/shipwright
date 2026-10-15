@@ -20,7 +20,7 @@ source "$SCRIPT_DIR/lib/test-gate-env.sh"
 
 export GH_TOKEN="gh-secret" GITHUB_TOKEN="github-secret" GH_ENTERPRISE_TOKEN="ghe-secret"
 export CLAUDE_CODE_OAUTH_TOKEN="claude-secret" ANTHROPIC_API_KEY="anthropic-secret"
-export SHIPWRIGHT_FLEET_TOKEN="fleet-secret"
+export SHIPWRIGHT_FLEET_TOKEN="fleet-secret" GITHUB_ENTERPRISE_TOKEN="ghe2-secret" ANTHROPIC_AUTH_TOKEN="anth-auth-secret"
 export GH_CONFIG_DIR="$TEST_TEMP_DIR/real-gh-config"
 mkdir -p "$GH_CONFIG_DIR" && echo "oauth_token: real" > "$GH_CONFIG_DIR/hosts.yml"
 export KEEP_ME="still-here"
@@ -28,7 +28,7 @@ export KEEP_ME="still-here"
 child_env="$(sw_test_gate_env bash -c 'env')"
 
 print_test_section "credentials removed"
-for var in GH_TOKEN GITHUB_TOKEN GH_ENTERPRISE_TOKEN CLAUDE_CODE_OAUTH_TOKEN ANTHROPIC_API_KEY SHIPWRIGHT_FLEET_TOKEN; do
+for var in GH_TOKEN GITHUB_TOKEN GH_ENTERPRISE_TOKEN GITHUB_ENTERPRISE_TOKEN CLAUDE_CODE_OAUTH_TOKEN ANTHROPIC_API_KEY ANTHROPIC_AUTH_TOKEN SHIPWRIGHT_FLEET_TOKEN; do
     if grep -q "^${var}=" <<<"$child_env"; then
         assert_fail "$var is not visible to the test command"
     else
@@ -55,17 +55,55 @@ print_test_section "exit status"
 rc=0; sw_test_gate_env bash -c 'exit 7' || rc=$?
 assert_eq "the test command's exit status is returned" "7" "$rc"
 
-print_test_section "the loop uses it"
-loop_src="$SCRIPT_DIR/sw-loop.sh"
-calls="$(grep -cE 'bash -c "\$(test|extra)_wrapper"' "$loop_src" || true)"
-gated="$(grep -cE 'sw_test_gate_env bash -c "\$(test|extra)_wrapper"' "$loop_src" || true)"
-assert_eq "both test-gate commands run without credentials" "${calls:-0}" "${gated:-0}"
-assert_eq "the loop has two test-gate commands" "2" "${calls:-0}"
-if grep -qE '^source "\$SCRIPT_DIR/lib/test-gate-env.sh"' "$loop_src"; then
-    assert_pass "the loop sources test-gate-env.sh unconditionally (missing lib fails loudly)"
+print_test_section "sw_test_gate_scrub (for eval call sites)"
+scrub_env="$( ( sw_test_gate_scrub; eval 'env' ) )"
+if grep -q 'secret' <<<"$scrub_env"; then
+    assert_fail "eval inside a scrubbed subshell sees no credential"
 else
-    assert_fail "the loop sources test-gate-env.sh unconditionally (missing lib fails loudly)"
+    assert_pass "eval inside a scrubbed subshell sees no credential"
 fi
+assert_eq "the scrubbed subshell is marked" "1" "$(sed -n 's/^SHIPWRIGHT_IN_TEST_GATE=//p' <<<"$scrub_env")"
+scrub_gh_dir="$(sed -n 's/^GH_CONFIG_DIR=//p' <<<"$scrub_env")"
+assert_eq "the scrubbed subshell's gh config dir is removed afterwards" "gone" "$([[ -d "$scrub_gh_dir" ]] && echo present || echo gone)"
+rc=0; sw_test_gate_scrub 2>/dev/null || rc=$?
+assert_eq "sw_test_gate_scrub refuses to run outside a subshell" "1" "$rc"
+assert_eq "a refused scrub leaves the caller's credentials alone" "gh-secret" "${GH_TOKEN:-}"
+rc=0; ( sw_test_gate_scrub; eval 'exit 5' ) || rc=$?
+assert_eq "the eval'd command's exit status is returned" "5" "$rc"
+
+print_test_section "git credentials saved by actions/checkout are not usable"
+git_repo="$TEST_TEMP_DIR/repo"
+git init -q "$git_repo"
+git -C "$git_repo" config http.https://github.com/.extraheader "AUTHORIZATION: basic SECRET"
+git -C "$git_repo" config credential.helper "store"
+assert_eq "the extraheader resolves to empty inside the gate" "" \
+    "$(sw_test_gate_env git -C "$git_repo" config --get http.https://github.com/.extraheader)"
+assert_eq "the credential helper resolves to empty inside the gate" "" \
+    "$(sw_test_gate_env git -C "$git_repo" config --get credential.helper)"
+assert_eq "git never prompts for credentials inside the gate" "0" \
+    "$(sed -n 's/^GIT_TERMINAL_PROMPT=//p' <<<"$child_env")"
+assert_eq "outside the gate the saved header is untouched" "AUTHORIZATION: basic SECRET" \
+    "$(git -C "$git_repo" config --get http.https://github.com/.extraheader)"
+
+print_test_section "every test-command call site goes through the gate"
+# Any line that runs a test-command variable (bash -c / eval / timeout … bash -c) must use
+# sw_test_gate_env or run inside ( sw_test_gate_scrub; … ), and every file with such a line must
+# load the lib itself.
+gated_files=(sw-loop.sh lib/pipeline-stages-build.sh lib/pipeline-stages-review.sh
+    lib/pipeline-quality-checks.sh lib/test-holdout.sh lib/mutation-executor.sh)
+run_re='(bash -c|eval) "\$\{?(test_cmd|TEST_CMD|_vg_cmd|test_wrapper|extra_wrapper)'
+for f in "${gated_files[@]}"; do
+    calls="$(grep -E "$run_re" "$SCRIPT_DIR/$f" | grep -c . || true)"
+    ungated="$(grep -E "$run_re" "$SCRIPT_DIR/$f" | grep -vcE 'sw_test_gate_env|\( sw_test_gate_scrub; ' || true)"
+    assert_eq "$f: no test command runs outside the gate (${calls:-0} call sites)" "0" "${ungated:-0}"
+    if grep -qE '^source "\$(SCRIPT_DIR|\(dirname "\$\{BASH_SOURCE\[0\]\}"\))(/lib)?/test-gate-env.sh"' "$SCRIPT_DIR/$f"; then
+        assert_pass "$f loads test-gate-env.sh unconditionally"
+    else
+        assert_fail "$f loads test-gate-env.sh unconditionally"
+    fi
+done
+loop_calls="$(grep -cE "$run_re" "$SCRIPT_DIR/sw-loop.sh" || true)"
+assert_eq "sw-loop.sh has its four test-command call sites" "4" "${loop_calls:-0}"
 
 print_test_section "real-service suites refuse without opt-in"
 # Run a copy of the suite in a temp tree with gh, git and claude mocked, so even a broken
@@ -95,5 +133,10 @@ if grep -qE 'issue create|pr create|workflow run' "$E2E_GH_LOG"; then
 else
     assert_pass "no GitHub write was attempted"
 fi
+
+cp "$SCRIPT_DIR/sw-integration-claude-test.sh" "$e2e_tree/scripts/"
+out="$(env CLAUDE_CODE_OAUTH_TOKEN=fake SHIPWRIGHT_IN_TEST_GATE=1 bash "$e2e_tree/scripts/sw-integration-claude-test.sh" 2>&1)" && rc=0 || rc=$?
+assert_eq "integration-claude exits 0 inside a test gate" "0" "$rc"
+assert_contains "integration-claude says it skipped inside a test gate" "$out" "Skipping integration-claude: inside a build-loop test gate"
 
 print_test_results
