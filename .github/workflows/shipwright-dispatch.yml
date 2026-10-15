@@ -127,6 +127,21 @@ jobs:
               break
             fi
 
+            # ── Half-open breaker: exactly one probe per run (#8575, ADR-0007) ──
+            # `breaker status` reports half_open once the cool-down is over. The gate check above has
+            # just passed, so no probe is in flight: this dispatch is the probe. After it, this run
+            # stops, because the new run may not be listed yet and the next gate check could miss it.
+            if ! BREAKER_JSON=$(bun src/cli.ts breaker status --json); then
+              echo "::error::cannot read the breaker state of #$issue; not dispatching — stopping"
+              READ_FAILURES=$((READ_FAILURES + 1))
+              break
+            fi
+            if ! BREAKER_STATE=$(jq -r '.state' <<<"$BREAKER_JSON"); then
+              echo "::error::unreadable breaker state for #$issue; not dispatching — stopping"
+              READ_FAILURES=$((READ_FAILURES + 1))
+              break
+            fi
+
             # ── All checks passed — mark, then dispatch ──
             # The marker goes first: if it cannot be posted, nothing is dispatched, so no run can
             # exist that a later dispatch would not see.
@@ -148,6 +163,11 @@ jobs:
             fi
             echo "Issue #$issue: pipeline dispatched"
             DISPATCHED=$((DISPATCHED + 1))
+
+            if [[ "$BREAKER_STATE" == "half_open" ]]; then
+              echo "Breaker half-open: #$issue was the probe; no further dispatch this run"
+              break
+            fi
 
             sleep 5  # Avoid rate limiting between dispatches
           done
