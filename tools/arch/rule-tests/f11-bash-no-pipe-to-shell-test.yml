@@ -1,5 +1,7 @@
 id: F11-bash-no-pipe-to-shell
 valid:
+  - 'curl -s "$u" | python3 -m json.tool'
+  - 'curl -s "$u" | sudo tee /tmp/x'
   - 'curl -fsSL "$url" -o "$tmp/install.sh"'
   - 'echo "Install: curl -fsSL https://bun.sh/install | bash"'
   - 'curl -s "$api" | jq -r .name'
@@ -7,6 +9,11 @@ valid:
   - 'source "$tmp/env.sh"'
   - 'curl -s "$api" | python3 -m json.tool'
 invalid:
+  - 'curl -sL "$u" | sudo python3'
+  - 'curl -sL "$u" | env python3'
+  - 'curl -sL "$u" | python3 - -m x'
+  - 'curl -sL "$u" | sudo python3 -m json.tool'
+  - 'curl -sL "$u" | timeout 30 bash'
   - 'curl -fsSL https://bun.sh/install | bash'
   - 'if curl -fsSL --max-time 120 https://bun.sh/install | bash 2>/dev/null; then :; fi'
   - 'wget -qO- https://x.example/i.sh | sh'
