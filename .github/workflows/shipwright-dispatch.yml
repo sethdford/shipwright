@@ -136,11 +136,21 @@ jobs:
               READ_FAILURES=$((READ_FAILURES + 1))
               break
             fi
-            if ! BREAKER_STATE=$(jq -r '.state' <<<"$BREAKER_JSON"); then
+            # Strict: .state must be a string. Empty output, a missing state or a non-string fails.
+            if ! BREAKER_STATE=$(jq -er '.state | strings' <<<"$BREAKER_JSON"); then
               echo "::error::unreadable breaker state for #$issue; not dispatching — stopping"
               READ_FAILURES=$((READ_FAILURES + 1))
               break
             fi
+            # Only closed and half_open may dispatch. Any other state (open included) is a read failure.
+            case "$BREAKER_STATE" in
+              closed|half_open) ;;
+              *)
+                echo "::error::breaker state '$BREAKER_STATE' for #$issue is not closed or half_open; not dispatching — stopping"
+                READ_FAILURES=$((READ_FAILURES + 1))
+                break
+                ;;
+            esac
 
             # ── All checks passed — mark, then dispatch (shared with shipwright-label-dispatch.yml) ──
             if ! scripts/ci/dispatch-issue.sh "$issue"; then
