@@ -100,7 +100,8 @@ loop, `shipwright-sweep.yml` since 2026-10-14. In order:
 7. Enable one at a time, checking each first scheduled run: `gh workflow enable` for
    `shipwright-watchdog.yml`, then `shipwright-sweep.yml`, `shipwright-auto-retry.yml`,
    `shipwright-dispatch.yml`.
-8. In dispatch logs: the gate lines, at most 3 dispatches, a `SHIPWRIGHT-DISPATCHED` comment before
+8. In dispatch logs: the gate report (one JSON line per check, with each gate's verdict and any budget
+   no-data warning), at most 3 dispatches, a `SHIPWRIGHT-DISPATCHED` comment before
    each, no read failures. In auto-retry logs: the backoff before the gates, and skips that name
    `held`, `active`, `abandoned`, `exhausted` or `infra`.
 9. Keep `shipwright:pause` ready. Labelling an issue `shipwright` passes the gates and the first-dispatch

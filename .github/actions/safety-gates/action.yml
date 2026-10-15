@@ -49,6 +49,9 @@ runs:
         # all stop the job by default. The report goes to the log.
         # The JSON report is the same run's output, so notice mode can tell a refusal from an outage.
         if REPORT=$(bun src/cli.ts gates check --retry "$RETRY" --json); then
+          # The report is printed on success too: the per-gate verdicts and the budget no-data warning
+          # (warning: true) stay in the log.
+          printf '%s\n' "$REPORT"
           echo "allowed=true" >> "$GITHUB_OUTPUT"
         else
           rc=$?
