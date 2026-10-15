@@ -25,6 +25,8 @@ BLUE='\033[38;2;0;102;255m'
 
 setup_env() {
     TEST_TEMP_DIR=$(mktemp -d "${TMPDIR:-/tmp}/sw-db-test.XXXXXX")
+    # Scripts under test read and write the intelligence cache here, not in the repo (#8609).
+    export SHIPWRIGHT_INTELLIGENCE_CACHE="$TEST_TEMP_DIR/project/.claude/intelligence-cache.json"
     mkdir -p "$TEST_TEMP_DIR/home/.shipwright/heartbeats"
     mkdir -p "$TEST_TEMP_DIR/home/.shipwright"
     mkdir -p "$TEST_TEMP_DIR/project"

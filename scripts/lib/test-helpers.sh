@@ -43,7 +43,7 @@ TEST_TEMP_DIR=$(mktemp -d "${TMPDIR:-/tmp}/sw-test-auto.XXXXXX")
 mkdir -p "$TEST_TEMP_DIR/home/.shipwright"
 mkdir -p "$TEST_TEMP_DIR/bin"
 # Intelligence writes its cache under the test temp dir, never the repo's .claude/ (#8609).
-export SHIPWRIGHT_INTELLIGENCE_CACHE="$TEST_TEMP_DIR/intelligence-cache.json"
+export SHIPWRIGHT_INTELLIGENCE_CACHE="$TEST_TEMP_DIR/project/.claude/intelligence-cache.json"
 
 # ─── Assertions ──────────────────────────────────────────────────────────────
 
@@ -164,7 +164,7 @@ setup_test_env() {
     mkdir -p "$TEST_TEMP_DIR/bin"
     mkdir -p "$TEST_TEMP_DIR/project"
     mkdir -p "$TEST_TEMP_DIR/logs"
-    export SHIPWRIGHT_INTELLIGENCE_CACHE="$TEST_TEMP_DIR/intelligence-cache.json"
+    export SHIPWRIGHT_INTELLIGENCE_CACHE="$TEST_TEMP_DIR/project/.claude/intelligence-cache.json"
 
     # ORIG_HOME/ORIG_PATH already saved at source time
     export HOME="$TEST_TEMP_DIR/home"
