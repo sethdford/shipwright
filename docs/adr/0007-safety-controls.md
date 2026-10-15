@@ -36,9 +36,12 @@ all stop dispatch. `--no-github` checks only the local flag, is refused on GitHu
 - **Workflows:** dispatch and auto-retry call `.github/actions/safety-gates` (setup-bun pinned by SHA;
   the token reaches only the gate step). The labeled entry point is `shipwright-label-dispatch.yml`:
   it reads the retry count with `scripts/ci/retry-state.sh`, calls the same action with
-  `on-refusal: notice`, then dispatches through `.github/actions/dispatch-pipeline` (the same marker and
-  dispatch as dispatch's loop). Manual `workflow_dispatch` of the pipeline is an operator action and is not
-  gated. Dispatch skips `auto-patrol`, `shipwright-stuck`,
+  `on-refusal: notice` (a refusal is decided from `gates check --json`: allowed false, a blocked gate and
+  no error gate), applies the first-dispatch rule through `scripts/ci/issue-dispatch-state.sh` (the same
+  as dispatch), then dispatches through `.github/actions/dispatch-pipeline` (the same marker and dispatch
+  as dispatch's loop). Held labels are skipped as in dispatch. The job runs in a per-issue concurrency
+  group at job level, so unrelated labels never join it. Manual `workflow_dispatch` of the pipeline is an
+  operator action and is not gated. The pipeline's `on:` is exactly `workflow_dispatch` (arch rule). Dispatch skips `auto-patrol`, `shipwright-stuck`,
   `shipwright-failed`, `shipwright-infra-issue` and `claimed:*`, posts a bot `SHIPWRIGHT-DISPATCHED`
   marker before `gh workflow run`, and never re-dispatches an issue with a bot dispatch, retry,
   pipeline or auth-failure comment. Auto-retry is the only retry path: count = highest bot
@@ -58,7 +61,7 @@ all stop dispatch. `--no-github` checks only the local flag, is refused on GitHu
 - The `issues: labeled` entry point is gated (Wave 1c, `shipwright-label-dispatch.yml`). A refusal is
   a `::notice::` and a successful run, not a failure, and the label workflow is not in the breaker's
   history (`GhRunHistory` lists `shipwright-pipeline.yml` only), so refused labels cannot re-open or
-  trip the breaker or open an incident. Manual `workflow_dispatch` stays ungated by design (operator
+  trip the breaker or open an incident. Relabels after a run are refused with a notice, not dispatched. Manual `workflow_dispatch` stays ungated by design (operator
   action), bounded by the operator.
 - Gaps (tracked in the Wave 1a plan's follow-ups): team invite tokens travel in the URL path; the budget
   is not enforced on CI (no cost data); org-mode `.final_failed` is keyed by issue number only. A title

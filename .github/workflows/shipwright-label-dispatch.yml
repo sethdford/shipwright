@@ -1,11 +1,11 @@
 name: Shipwright Label Dispatch
 
 # The labeled entry point (#8572, ADR-0007). Labelling an issue `shipwright` runs the safety gates
-# and, on "go", dispatches shipwright-pipeline.yml exactly as shipwright-dispatch.yml does, through
-# the same two writes (.github/actions/dispatch-pipeline). A refusal is a notice and a successful run, not a
-# failure: this workflow's runs are not in the breaker's history (GhRunHistory lists only
-# shipwright-pipeline.yml runs), so a refused label cannot move the breaker. Unrelated labels start
-# a run that every job skips, and this workflow has no concurrency group, so nothing queues.
+# and, on "go", dispatches shipwright-pipeline.yml with the same first-dispatch rule as
+# shipwright-dispatch.yml (scripts/ci/issue-dispatch-state.sh). A refusal is a notice and a successful
+# run, not a failure: this workflow's runs are not in the breaker's history (GhRunHistory lists only
+# shipwright-pipeline.yml runs), so a refused label cannot move the breaker. Unrelated labels never
+# reach the concurrency group below, so they queue nothing (#8573).
 on:
   issues:
     types: [labeled]
@@ -18,6 +18,12 @@ jobs:
     if: github.event.label.name == 'shipwright'
     runs-on: ubuntu-latest
     timeout-minutes: 10
+    # Job level, one group per issue. Two labels on one issue run in order: the second sees the
+    # first's DISPATCHED marker and stops ("handled"). A label for any other name gets a group of its
+    # own, so it never joins an issue's group even if the job's `if:` were evaluated later.
+    concurrency:
+      group: ${{ github.event.label.name == 'shipwright' && format('shipwright-label-{0}', github.event.issue.number) || format('shipwright-label-unrelated-{0}', github.run_id) }}
+      cancel-in-progress: false
     # actions: write starts the pipeline with GITHUB_TOKEN (workflow_dispatch is the one event a
     # GITHUB_TOKEN may trigger). issues: write posts the marker and the breaker's incident issue.
     permissions:
@@ -28,16 +34,43 @@ jobs:
     env:
       ISSUE_NUMBER: ${{ github.event.issue.number }}
       GH_REPO: ${{ github.repository }}
-      GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           persist-credentials: false
 
+      # Held labels (auto-patrol, shipwright-stuck, shipwright-failed, shipwright-infra-issue, claimed:*)
+      # wait for a human, exactly as in shipwright-dispatch.yml. A read failure fails the run.
+      - name: Held labels
+        id: held
+        shell: bash
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          # shellcheck source=/dev/null
+          source scripts/lib/safety-gates.sh
+          if ! ISSUE_JSON=$(gh issue view "$ISSUE_NUMBER" --repo "$GITHUB_REPOSITORY" --json number,labels); then
+            echo "::error::cannot read the labels of #$ISSUE_NUMBER; nothing dispatched"
+            exit 1
+          fi
+          if ! DISPATCHABLE=$(jq -s . <<<"$ISSUE_JSON" | dispatchable_issue_numbers); then
+            echo "::error::cannot judge the labels of #$ISSUE_NUMBER; nothing dispatched"
+            exit 1
+          fi
+          if [[ -z "$DISPATCHABLE" ]]; then
+            echo "::notice::#$ISSUE_NUMBER carries a held label (auto-patrol, shipwright-stuck, shipwright-failed, shipwright-infra-issue or claimed:*); nothing dispatched"
+            echo "held=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "held=false" >> "$GITHUB_OUTPUT"
+          fi
+
       - name: Read the retry count
         id: retries
+        if: steps.held.outputs.held == 'false'
         shell: bash
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           # A relabel counts the bot's SHIPWRIGHT-RETRY markers, so the fix-loop cap still holds.
           # Unreadable markers stop the run (retry-state.sh fails closed).
@@ -52,43 +85,38 @@ jobs:
           fi
           echo "retry=$RETRY" >> "$GITHUB_OUTPUT"
 
-      # A closed gate is a notice (on-refusal), so this run does not fail; `allowed` stays unset.
+      # on-refusal: notice. A closed gate ends this run with a notice; `allowed` stays unset, so every
+      # later step is conditioned on it (arch rule workflow-gate-order).
       - name: Safety gates
         id: gates
+        if: steps.held.outputs.held == 'false'
         uses: ./.github/actions/safety-gates
         with:
           retry: ${{ steps.retries.outputs.retry }}
           github-token: ${{ secrets.GITHUB_TOKEN }}
           on-refusal: notice
 
-      - name: Pipeline already running for this issue?
+      - name: First-dispatch state
+        id: state
         if: steps.gates.outputs.allowed == 'true'
-        id: active
         shell: bash
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          # Same check 1 as shipwright-dispatch.yml. An unreadable listing fails the run.
-          if ! ACTIVE=$(scripts/ci/pipeline-active.sh "$ISSUE_NUMBER"); then
-            echo "::error::cannot list pipeline runs for #$ISSUE_NUMBER; not dispatching"
+          # Same rule as shipwright-dispatch.yml: ready, active or handled. Unreadable fails the run.
+          if ! STATE=$(scripts/ci/issue-dispatch-state.sh "$ISSUE_NUMBER"); then
+            echo "::error::cannot read the dispatch state of #$ISSUE_NUMBER; nothing dispatched"
             exit 1
           fi
-          echo "active=$ACTIVE" >> "$GITHUB_OUTPUT"
+          if [[ "$STATE" != "ready" ]]; then
+            echo "::notice::#$ISSUE_NUMBER is $STATE (a pipeline is running, or it was already dispatched); nothing dispatched"
+          fi
+          echo "state=$STATE" >> "$GITHUB_OUTPUT"
 
       # The marker is posted before the dispatch (.github/actions/dispatch-pipeline).
       - name: Dispatch the pipeline
-        if: steps.gates.outputs.allowed == 'true' && steps.active.outputs.active == 'false'
+        if: steps.gates.outputs.allowed == 'true' && steps.state.outputs.state == 'ready'
         uses: ./.github/actions/dispatch-pipeline
         with:
           issue: ${{ github.event.issue.number }}
           github-token: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Note a skipped dispatch
-        if: steps.gates.outputs.allowed != 'true' || steps.active.outputs.active == 'true'
-        shell: bash
-        run: |
-          if [[ "$STEP_ACTIVE" == "true" ]]; then
-            echo "::notice::Pipeline already running for #$ISSUE_NUMBER; nothing dispatched"
-          else
-            echo "::notice::Safety gates did not allow a dispatch for #$ISSUE_NUMBER; nothing dispatched"
-          fi
-        env:
-          STEP_ACTIVE: ${{ steps.active.outputs.active }}
