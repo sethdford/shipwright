@@ -41,7 +41,7 @@ EVENTS_FILE="${HOME}/.shipwright/events.jsonl"
 
 # ─── Team Configuration ─────────────────────────────────────────────────────
 TEAM_STATE_DIR="${HOME}/.shipwright/team-state"
-INTELLIGENCE_CACHE="${REPO_DIR}/.claude/intelligence-cache.json"
+INTELLIGENCE_CACHE="${SHIPWRIGHT_INTELLIGENCE_CACHE:-${REPO_DIR}/.claude/intelligence-cache.json}"
 
 ensure_team_dir() {
     mkdir -p "$TEAM_STATE_DIR"
