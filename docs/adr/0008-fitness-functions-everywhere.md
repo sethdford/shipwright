@@ -52,33 +52,39 @@ every allowlist, and forbids `ast-grep-ignore`; every dependency-cruiser rule mu
 
 ### Known evasions
 
-Closed by #8582 (each has an `invalid` rule-test case, and the rule-test YAML is in the ignore ban):
-- F5 now catches `node:vm`, `node:module` (`createRequire`), `bun:ffi`, `import.meta.require`, and
-  `window`/`self`/`globalThis` with a computed key (`window["fetch"]`).
-- The meta-test pins each rule's `files` as well as its `ignores`, so narrowing coverage fails it.
-- `bun run arch` must be exactly the checkers joined by `&&`; `|| true`, `; echo` and other shell
-  operators fail the meta-test.
-- The SDK runner must have exactly one `query` call, after `assertAgentOptions`.
-- The ignore ban covers `tools/arch/rules`, `utils` and `rule-tests` YAML.
+Closed by #8582. Each has an `invalid` rule-test case (the attack) and, where a neighbour must stay
+allowed, a `valid` case. Rule-test YAML is in the ignore ban.
+- F5 catches `node:vm`, `node:module` (`createRequire`, also via a namespace or default import),
+  `bun:ffi`, `import.meta.require`, and `window`/`self`/`globalThis` with a computed key
+  (`window["fetch"]`).
+- The meta-test pins each rule's `files` as well as its `ignores`; `bun run arch` must be exactly the
+  checkers joined by `&&`; the ignore ban covers `tools/arch/rules`, `utils` and `rule-tests` YAML.
+- The SDK runner has exactly one `query` call after `assertAgentOptions`. The meta-test counts every
+  reference to `query` and `queryFn` in code (comments excluded): `.call(…)` and a `const q = this.queryFn`
+  alias add references and fail it.
 - Bash F9: `claude` is matched bare, quoted, behind an absolute path, after `command` or a wrapper
-  (`timeout`, `gtimeout`, `$TIMEOUT_CMD`), or as `"$CLAUDE_BIN"`; the token must come before `claude`.
-- Bash F10: `gh` is matched quoted, by absolute path or as `$GH_BIN`; the write verbs of `cache`,
-  `project`, `ssh-key`, `gpg-key` and `codespace` are caught; `git push -o stash` is no longer excluded.
-- Bash F11: shells under any directory (`/usr/local/bin/bash -c`), unquoted heredocs into a shell,
-  `echo "$x" | bash`, `node --eval=` and `-p`, `perl -E`, `xargs sh -c` with `{}`, a download piped
-  into `python`/`node`/`perl`/`ruby`/`bun`/`deno`, and `source /dev/stdin <<EOF` with an expansion.
-- Dashboard: `const B = Bun`, `Reflect.get(Bun, …)`, `globalThis.Bun.spawn`, `import { $ as sh } from
-  "bun"`, `import * as B from "bun"`, `createRequire`, and a computed `require`/`import` specifier.
-
-Closed in #8582, ratcheted: `curl` to `api.github.com` with a write method or a body is
-`F10-bash-curl-github-writes` (a new rule id). It has one counted finding, the GitHub App
-installation-token mint in `scripts/sw-github-app.sh:169` (`curl … -d '{}' -X POST`). That call is
-debt for the TypeScript port (an idempotent GithubWriter or auth-adapter method), not a rule gap; the
-baseline may not grow, so it can only go down when the mint is ported.
+  (`timeout`, `gtimeout`, `$TIMEOUT_CMD`), or as `"$CLAUDE_BIN"`; the token must precede `claude`.
+- Bash F10: `gh` is matched quoted, by absolute path, or as `$GH_BIN` in any case; `git push` is matched
+  behind a wrapper (`nohup git push`, `timeout 60 git push`); the write verbs of `cache`, `project`,
+  `ssh-key`, `gpg-key` and `codespace` are caught; only `git stash push` is excluded.
+- Bash F10, separate ratcheted rule `F10-bash-curl-github-writes`: `curl` to `api.github.com` or
+  `$GITHUB_API_URL` with a write method (`-X`, `--request`, `-XPOST`) or a body (`-d`, `--data*`, `-F`,
+  `--json`, `-T`). It has one counted finding, the GitHub App installation-token mint in
+  `scripts/sw-github-app.sh:169`. That call is debt for the TypeScript port (an idempotent GithubWriter
+  or auth-adapter method), not a rule gap. The baseline may not grow, so the count only goes down.
+- Bash F11 (injection): shells under any directory (`/usr/local/bin/bash -c`), attached `bash -c"$x"`,
+  unquoted heredocs into a shell, `echo "$x" | bash`, `node --eval=`, `node -p`, `perl -E`, `perl -E"$x"`,
+  `deno eval "$x"`, `xargs sh -c` with any `-I` placeholder whose code string has no positional argument,
+  and `source /dev/stdin <<EOF` with an expansion.
+- Bash F11 (download run as code): a download piped into `python`/`node`/`perl`/`ruby`/`bun`/`deno`/`php`,
+  also behind `sudo`, `env`, `command`, `nohup`, `timeout`, `time`, `xargs` and similar. The only allowed
+  interpreter form is `python3 -m <module>` with `-m` first and no wrapper.
+- Dashboard: `const B = Bun`, `Reflect.get(Bun, …)`, `globalThis.Bun.spawn`, `globalThis["Bun"]`,
+  `import { $ as sh } from "bun"`, `import * as B from "bun"`, any import or `require` of `node:module`
+  (and a member `createRequire`), and a computed `require`/`import` specifier.
 
 Open, and why:
-- `.github/CODEOWNERS` does not cover the other `.github/workflows/*.yml` or `scripts/postinstall.mjs`,
-  which no rule scans.
+- `.github/CODEOWNERS` does not cover the other `.github/workflows/*.yml` or `scripts/postinstall.mjs`.
 - `scripts/postinstall.mjs` is not scanned by any rule.
 - `bun run check` has no `--against`: the baseline comparison runs only in PR CI.
 - F9 options: a variable passed as `options` is checked at run time only, and an `env:` built by a
@@ -91,8 +97,10 @@ Open, and why:
 - Dashboard D2 checks direct imports only, and the raw-runner rule does not see a dynamic `import()`
   of `claims.ts`.
 
-Out of scope (deliberate obfuscation, not an accidental path): prototype pollution
-(`Object.prototype.extraArgs = …`), a `Function` constructor reached through a value, module or
-command names built by string concatenation outside the dashboard, a GraphQL mutation held in a
-variable, `gh "${args[@]}"` with the verb in an array, and bash bypass flags spelled with quotes
-inside a word.
+Out of scope:
+- Deliberate obfuscation, not an accidental path: prototype pollution (`Object.prototype.extraArgs = …`),
+  a `Function` constructor reached through a value (`({}).constructor.constructor`), module or command
+  names built by string concatenation outside the dashboard, a GraphQL mutation held in a variable,
+  `gh "${args[@]}"` with the verb in an array, and bash bypass flags spelled with quotes inside a word.
+- `time claude -p …` (F9 scrub): tree-sitter-bash parses `time` so that the `claude` word is not part of
+  a command node, and the rules cannot see it. Matching it would need a text rule over the whole program.
