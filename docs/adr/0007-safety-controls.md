@@ -36,8 +36,8 @@ all stop dispatch. `--no-github` checks only the local flag, is refused on GitHu
 - **Workflows:** dispatch and auto-retry call `.github/actions/safety-gates` (setup-bun pinned by SHA;
   the token reaches only the gate step). The labeled entry point is `shipwright-label-dispatch.yml`:
   it reads the retry count with `scripts/ci/retry-state.sh`, calls the same action with
-  `on-refusal: notice`, then dispatches through `scripts/ci/dispatch-issue.sh` (the same marker and
-  dispatch as dispatch). Manual `workflow_dispatch` of the pipeline is an operator action and is not
+  `on-refusal: notice`, then dispatches through `.github/actions/dispatch-pipeline` (the same marker and
+  dispatch as dispatch's loop). Manual `workflow_dispatch` of the pipeline is an operator action and is not
   gated. Dispatch skips `auto-patrol`, `shipwright-stuck`,
   `shipwright-failed`, `shipwright-infra-issue` and `claimed:*`, posts a bot `SHIPWRIGHT-DISPATCHED`
   marker before `gh workflow run`, and never re-dispatches an issue with a bot dispatch, retry,
