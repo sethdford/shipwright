@@ -669,7 +669,13 @@ jobs:
           # Best effort: a webhook failure never fails the pipeline. The fleet token goes to curl
           # on stdin (-H @-), never in argv; with no token, no header is sent.
           if [ -n "${DASHBOARD_URL:-}" ]; then
-            BODY="{\"type\":\"ci.pipeline_started\",\"issue\":${ISSUE_NUMBER},\"run_id\":\"${GITHUB_RUN_ID}\",\"template\":\"${TEMPLATE}\"}"
+            # Built with jq --arg, never by string interpolation (ADR-0007, #8579).
+            if ! BODY=$(jq -n --arg type "ci.pipeline_started" --argjson issue "$ISSUE_NUMBER" \
+              --arg run_id "$GITHUB_RUN_ID" --arg template "$TEMPLATE" \
+              '{type: $type, issue: $issue, run_id: $run_id, template: $template}'); then
+              echo "::warning::Dashboard webhook body could not be built (ci.pipeline_started)"
+              exit 0
+            fi
             if [ -n "${SHIPWRIGHT_FLEET_TOKEN:-}" ]; then
               CODE="$(printf 'X-Shipwright-Token: %s\n' "$SHIPWRIGHT_FLEET_TOKEN" | curl -sS -o /dev/null -w '%{http_code}' --max-time 5 \
                 -H @- -X POST -H "Content-Type: application/json" -d "$BODY" "${DASHBOARD_URL}/api/webhook/ci" || true)"
@@ -967,7 +973,13 @@ jobs:
           if [ -n "${DASHBOARD_URL:-}" ]; then
             RESULT="success"
             if [ "${EXIT_CODE:-1}" != "0" ]; then RESULT="failure"; fi
-            BODY="{\"type\":\"ci.pipeline_completed\",\"issue\":${ISSUE_NUMBER},\"run_id\":\"${GITHUB_RUN_ID}\",\"result\":\"${RESULT}\",\"template\":\"${TEMPLATE}\"}"
+            # Built with jq --arg, never by string interpolation (ADR-0007, #8579).
+            if ! BODY=$(jq -n --arg type "ci.pipeline_completed" --argjson issue "$ISSUE_NUMBER" \
+              --arg run_id "$GITHUB_RUN_ID" --arg result "$RESULT" --arg template "$TEMPLATE" \
+              '{type: $type, issue: $issue, run_id: $run_id, result: $result, template: $template}'); then
+              echo "::warning::Dashboard webhook body could not be built (ci.pipeline_completed)"
+              exit 0
+            fi
             if [ -n "${SHIPWRIGHT_FLEET_TOKEN:-}" ]; then
               CODE="$(printf 'X-Shipwright-Token: %s\n' "$SHIPWRIGHT_FLEET_TOKEN" | curl -sS -o /dev/null -w '%{http_code}' --max-time 5 \
                 -H @- -X POST -H "Content-Type: application/json" -d "$BODY" "${DASHBOARD_URL}/api/webhook/ci" || true)"
