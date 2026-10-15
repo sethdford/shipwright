@@ -404,3 +404,4 @@
 {"ts":"2026-10-15T00:27:12Z","ts_epoch":1792024032,"type":"patrol.finding","check":"untested_script","script":"sw-tmux-role-color.sh","lines":81,"usage":1}
 {"ts":"2026-10-15T00:27:12Z","ts_epoch":1792024032,"type":"patrol.finding","check":"untested_script","script":"sw-test-all.sh","lines":206,"usage":0}
 {"ts":"2026-10-15T00:27:12Z","ts_epoch":1792024032,"type":"patrol.finding","check":"untested_script","script":"sw-event-schema-sync.sh","lines":93,"usage":0}
+{"ts":"2026-10-15T04:05:42Z","ts_epoch":1792037142,"type":"hygiene_platform_refactor","hardcoded":49,"fallback":69,"todo":51}
