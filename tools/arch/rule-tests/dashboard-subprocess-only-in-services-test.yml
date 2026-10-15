@@ -7,6 +7,9 @@ valid:
   - 'const out = await runGh(["issue", "view", String(n)]);'
   - 'particles.spawn(x, y);'
   - 'const v = Bun.version;'
+  - 'type S = typeof Bun.spawn;'
+  - 'import type { Subprocess } from "bun";'
+  - 'const cfg = Bun.env.HOME;'
 invalid:
   - 'import { execSync } from "child_process";'
   - 'import { spawn } from "node:child_process";'
@@ -21,3 +24,12 @@ invalid:
   - 'const { spawnSync: run } = Bun;'
   - 'Bun["spawn"](["git", "status"]);'
   - "const run = Bun['spawnSync'];"
+  - 'const B = Bun; B.spawn(["git"]);'
+  - 'const r = Reflect.get(Bun, "spawn");'
+  - 'globalThis.Bun.spawn(["git"]);'
+  - 'import { $ as sh } from "bun";'
+  - 'import * as B from "bun";'
+  - 'import { createRequire } from "node:module";'
+  - 'const req = createRequire(import.meta.url); req("child_process");'
+  - 'const cp = require("child_" + "process");'
+  - 'const m = await import(name);'

@@ -3,6 +3,10 @@
 # only lose call sites until Wave 3 ports it. To add a subprocess call, put it in a service that
 # validates its inputs and add that file to `ignores` here and in tools/arch/meta.test.ts (PINNED),
 # a change CODEOWNERS review.
+# Also caught: aliasing Bun (`const B = Bun`, `Reflect.get(Bun, "spawn")`, `globalThis.Bun.spawn`),
+# `import { $ as sh } from "bun"` and `import * as B from "bun"`, createRequire (it loads child_process
+# unseen by the import checks), and require()/import() of a computed specifier. A string built by
+# concatenation (`require("child_" + "process")`) is caught by the computed-specifier check.
 id: dashboard-subprocess-only-in-services
 language: TypeScript
 severity: off
@@ -35,16 +39,43 @@ rule:
         field: function
         kind: identifier
         regex: '^(exec|execSync|execFile|execFileSync|spawn|spawnSync|fork)$'
-    # Bun.spawn, Bun.$, Bun["spawn"], and destructuring them out of Bun
+    # Bun.spawn, Bun.$, Bun["spawn"], globalThis.Bun.spawn, and destructuring them out of Bun
     - kind: member_expression
       all:
-        - has: { field: object, regex: '^Bun$' }
+        - has: { field: object, regex: '^(globalThis\.)?Bun$' }
         - has: { field: property, regex: '^(spawn|spawnSync|\$)$' }
+        - not: { inside: { kind: type_query, stopBy: end } }
     - kind: subscript_expression
       all:
-        - has: { field: object, regex: '^Bun$' }
+        - has: { field: object, regex: '^(globalThis\.)?Bun$' }
         - has: { field: index, regex: '^["''](spawn|spawnSync|\$)["'']$' }
+        - not: { inside: { kind: type_query, stopBy: end } }
     - kind: variable_declarator
       all:
-        - has: { field: value, regex: '^Bun$' }
+        - has: { field: value, regex: '^(globalThis\.)?Bun$' }
         - has: { field: name, kind: object_pattern, regex: '\b(spawn|spawnSync|\$)\b' }
+    # Bun used as a value (an alias, an argument to Reflect.get or a helper): only member access on it
+    # is a runtime Bun call site, so a bare value is flagged. Type positions (typeof Bun) are not.
+    - all:
+        - kind: identifier
+        - regex: '^Bun$'
+        - not: { inside: { kind: member_expression, field: object } }
+        - not: { inside: { kind: type_query, stopBy: end } }
+        - not: { inside: { kind: nested_type_identifier } }
+    # Importing spawn/$ from bun, or the whole module as a namespace
+    - all:
+        - kind: import_statement
+        - has: { field: source, regex: '^["'']bun["'']$' }
+        - any:
+            - has: { kind: namespace_import, stopBy: end }
+            - has: { kind: import_specifier, stopBy: end, regex: '^(spawn|spawnSync|\$)(\s|$)' }
+        - not: { regex: '^import\s+type\s' }
+    # createRequire loads any module, child_process included, past every import check above
+    - kind: identifier
+      regex: '^createRequire$'
+    # require and import with a computed specifier (a variable, a template or a concatenation)
+    - all:
+        - any:
+            - pattern: require($S)
+            - pattern: import($S)
+        - not: { has: { field: arguments, has: { nthChild: 1, kind: string } } }
