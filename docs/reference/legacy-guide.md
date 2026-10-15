@@ -788,6 +788,7 @@ All scripts are bash (except the dashboard server in TypeScript). Grouped by lay
 | `scripts/sw-chaos-test.sh` | 384 | Fault injection & recovery validation |
 | `scripts/sw-checkpoint-test.sh` | 341 | Validate checkpoint save/restore |
 | `scripts/sw-ci-bot-comments-test.sh` | 131 | SHIPWRIGHT-* markers from the bot only |
+| `scripts/sw-ci-issue-dispatch-state-test.sh` | 64 | ready, active, handled, fails |
 | `scripts/sw-ci-pipeline-active-test.sh` | 75 | is a pipeline running for an issue |
 | `scripts/sw-ci-retry-state-test.sh` | 116 | auto-retry count and abandon marker |
 | `scripts/sw-ci-test.sh` | 198 | GitHub Actions CI/CD orchestration tests |
