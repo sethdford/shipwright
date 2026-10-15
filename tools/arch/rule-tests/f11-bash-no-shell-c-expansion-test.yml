@@ -11,6 +11,11 @@ valid:
   - 'ssh "$host" uptime'
   - 'ssh -o ConnectTimeout=5 "${user}@${host}" "uptime"'
   - "bash <<< 'echo hi'"
+  - "bash <<'EOF'\necho hi\nEOF"
+  - 'echo "$x" | grep -q foo'
+  - 'printf "ok\n" | bash'
+  - 'node -p "1 + 1"'
+  - "xargs -I{} sh -c 'echo \"$1\"' _ {}"
 invalid:
   - 'bash -c "$handler_cmd"'
   - 'sh -c "echo $y"'
@@ -27,3 +32,13 @@ invalid:
   - 'bash <<< "$cmd"'
   - 'sh <<<"$(cat "$f")"'
   - 'ssh "$host" "cd $dir && shipwright status"'
+  - 'echo "$x" | bash'
+  - 'printf "%s" "$x" | sh -s'
+  - "bash <<EOF\n$cmd\nEOF"
+  - '/usr/local/bin/bash -c "$x"'
+  - '/opt/homebrew/bin/bash -c "$x"'
+  - 'node --eval="$x"'
+  - 'node -p "$x"'
+  - 'perl -E "say $x"'
+  - 'xargs -I{} sh -c "echo {}"'
+  - "xargs sh -c 'echo {}'"

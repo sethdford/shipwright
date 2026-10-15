@@ -1,8 +1,10 @@
 # F11 (bash safety): code strings built from data. `bash -c "$cmd"` (also after a wrapper such as
-# `timeout 30 bash -c`, and "$SHELL" -c), interpreters given code with -c/-e/--eval
-# (python, node, perl, ruby, bun, deno), a here-string fed to a shell, and ssh remote commands
-# (the remote shell parses the string). A literal script with positional arguments is fine:
-# `bash -c 'run "$1"' _ "$value"`. Ratcheted (tools/arch/ast-scan.ts).
+# `timeout 30 bash -c`, after an absolute path such as /usr/local/bin/bash, and "$SHELL" -c), interpreters
+# given code with -c/-e/-p/-E/--eval/--print (python, node, perl, ruby, bun, deno), a here-string or an
+# unquoted heredoc fed to a shell, a pipeline whose producer expands data into a shell, xargs running a
+# shell with {} inside its code string, and ssh remote commands (the remote shell parses the string).
+# A literal script with positional arguments is fine: `bash -c 'run "$1"' _ "$value"`. Ratcheted
+# (tools/arch/ast-scan.ts).
 id: F11-bash-no-shell-c-expansion
 language: Bash
 severity: off
@@ -16,29 +18,60 @@ files:
   - "completions/**/*.bash"
   - "install.sh"
 rule:
-  kind: command
   any:
-    - has:
-        matches: bash-shell
-        precedes:
-          stopBy: end
-          kind: word
-          regex: '^-[A-Za-z]*c[A-Za-z]*$'
-          precedes: { matches: bash-expansion }
-    - has:
-        regex: '^(python[0-9.]*|node|nodejs|perl|ruby|bun|deno)$'
-        precedes:
-          stopBy: end
-          kind: word
-          regex: '^(-c|-e|--eval)$'
-          precedes: { matches: bash-expansion }
-    - all:
-        - has: { field: name, matches: bash-shell }
-        - has: { kind: herestring_redirect, matches: bash-expansion }
-    - all:
-        - has: { field: name, regex: '^ssh$' }
+    - kind: command
+      any:
         - has:
-            kind: string
-            all:
-              - has: { kind: string_content, regex: '\s' }
-              - has: { matches: bash-expansion }
+            matches: bash-shell
+            precedes:
+              stopBy: end
+              kind: word
+              regex: '^-[A-Za-z]*c[A-Za-z]*$'
+              precedes: { matches: bash-expansion }
+        - has:
+            regex: '^(python[0-9.]*|node|nodejs|perl|ruby|bun|deno)$'
+            precedes:
+              stopBy: end
+              kind: word
+              regex: '^(-[A-Za-z]*[ceEp][A-Za-z]*|--eval|--print)$'
+              precedes: { matches: bash-expansion }
+        - all:
+            - has: { regex: '^(python[0-9.]*|node|nodejs|perl|ruby|bun|deno)$' }
+            - regex: '(^|\s)(--eval|--print)='
+            - has: { matches: bash-expansion }
+        - all:
+            - has: { field: name, matches: bash-shell }
+            - has: { kind: herestring_redirect, matches: bash-expansion }
+        - all:
+            - has: { field: name, regex: '^xargs$' }
+            - has: { kind: word, matches: bash-shell }
+            - has:
+                any:
+                  - kind: string
+                  - kind: raw_string
+                regex: '\{\}'
+        - all:
+            - has: { field: name, regex: '^ssh$' }
+            - has:
+                kind: string
+                all:
+                  - has: { kind: string_content, regex: '\s' }
+                  - has: { matches: bash-expansion }
+    - kind: redirected_statement
+      all:
+        - has: { kind: command, has: { field: name, matches: bash-shell } }
+        - has: { kind: heredoc_redirect, matches: bash-expansion }
+    - kind: pipeline
+      all:
+        - has:
+            kind: command
+            not: { has: { field: name, matches: bash-shell } }
+            has: { matches: bash-expansion }
+        - has:
+            kind: command
+            has: { field: name, matches: bash-shell }
+            not:
+              has:
+                kind: word
+                regex: '^-[A-Za-z]*c[A-Za-z]*$'
+                precedes: { matches: bash-expansion }
