@@ -18,9 +18,11 @@ Check: `shipwright paused` (exit 0 = paused, or unknown) for humans; scripts use
 `shipwright paused --gate` (exit 0 = safe to dispatch). Create the label once if it is missing:
 `gh label create shipwright:pause --color 000000 --description "Stops all Shipwright dispatch (ADR-0007)"`.
 
-The label does **not** stop a pipeline that starts from `issues: labeled` (adding the `shipwright`
-label starts `shipwright-pipeline.yml` directly, ungated, until Wave 1c). While paused, do not add
-that label; or disable `shipwright-pipeline.yml` too.
+Labelling an issue `shipwright` runs the gates first: the `gate` job of `shipwright-pipeline.yml` (Wave 1c)
+checks pause, breaker, budget, review WIP and the fix loop, with the retry count from the bot's
+`SHIPWRIGHT-RETRY` markers, before triage and the pipeline start. A closed gate fails that run, so the
+pause label stops it too. Manual `workflow_dispatch` of `shipwright-pipeline.yml` is an operator action
+and is **not** gated (see Re-run an issue manually).
 
 ## Read the gates
 
@@ -95,5 +97,6 @@ loop, `shipwright-sweep.yml` since 2026-10-14. In order:
 8. In dispatch logs: the gate lines, at most 3 dispatches, a `SHIPWRIGHT-DISPATCHED` comment before
    each, no read failures. In auto-retry logs: the backoff before the gates, and skips that name
    `held`, `active`, `abandoned`, `exhausted` or `infra`.
-9. Keep `shipwright:pause` ready: until Wave 1c, labelling an issue `shipwright` starts an ungated
-   run, bounded only by the retry cap and the breaker.
+9. Keep `shipwright:pause` ready. Labelling an issue `shipwright` passes the gates first (the `gate` job
+   above); a closed gate fails that run and nothing starts. Manual `workflow_dispatch` is an operator
+   action and is not gated: check the gates by hand first.

@@ -33,8 +33,10 @@ all stop dispatch. `--no-github` checks only the local flag, is refused on GitHu
   refused retry is a final failure (`.final_failed {ts, marked}` when the watch label stays).
   Selection skips `auto-patrol` and `shipwright-stuck`. Every auto-filing site goes through
   `patrol_issue_create` (intake); decompose files at most 8 subtasks.
-- **Workflows:** dispatch and auto-retry call `.github/actions/safety-gates` (setup-bun pinned by SHA;
-  the token reaches only the gate step). Dispatch skips `auto-patrol`, `shipwright-stuck`,
+- **Workflows:** dispatch, auto-retry and the labeled entry point of `shipwright-pipeline.yml` (its
+  `gate` job, with the retry count from `scripts/ci/retry-state.sh`) call `.github/actions/safety-gates`
+  (setup-bun pinned by SHA; the token reaches only the gate step). Manual `workflow_dispatch` of the
+  pipeline is an operator action and is not gated. Dispatch skips `auto-patrol`, `shipwright-stuck`,
   `shipwright-failed`, `shipwright-infra-issue` and `claimed:*`, posts a bot `SHIPWRIGHT-DISPATCHED`
   marker before `gh workflow run`, and never re-dispatches an issue with a bot dispatch, retry,
   pipeline or auth-failure comment. Auto-retry is the only retry path: count = highest bot
@@ -51,8 +53,8 @@ all stop dispatch. `--no-github` checks only the local flag, is refused on GitHu
 - Dispatch, watchdog, auto-retry and sweep can be re-enabled behind one tested gate (runbook). Each
   check costs about five GitHub API calls; intake lists every open issue (~7 s).
 - Local daemon outcomes do not feed the breaker until the run journal exists (Wave 1b).
-- Gaps (tracked in the Wave 1a plan's follow-ups): `shipwright-pipeline.yml` starts ungated runs on
-  `issues: labeled` (Wave 1c; bounded by the retry budget and the breaker); its per-issue
-  concurrency group can stall when unrelated labels queue a pending run; team invite tokens travel in the URL path; the budget is
-  not enforced on CI (no cost data); org-mode `.final_failed` is keyed by issue number only;
-  `actions/checkout` is pinned by tag. A title fingerprint misses paraphrased duplicates.
+- The `issues: labeled` entry point is gated (Wave 1c): a closed gate fails the run before triage.
+  Manual `workflow_dispatch` stays ungated by design (operator action), bounded by the operator.
+- Gaps (tracked in the Wave 1a plan's follow-ups): team invite tokens travel in the URL path; the budget
+  is not enforced on CI (no cost data); org-mode `.final_failed` is keyed by issue number only. A title
+  fingerprint misses paraphrased duplicates.
