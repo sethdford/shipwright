@@ -50,6 +50,9 @@ jobs:
           fi
 
       - name: Run E2E integration tests
+        # The suite skips unless asked: it files a real issue and runs a real pipeline (#8608).
+        env:
+          SHIPWRIGHT_E2E_REAL: "1"
         run: bash scripts/sw-e2e-integration-test.sh
 
       - name: Write job summary

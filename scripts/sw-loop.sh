@@ -38,6 +38,9 @@ fi
 [[ -f "$SCRIPT_DIR/lib/loop-convergence.sh" ]] && source "$SCRIPT_DIR/lib/loop-convergence.sh"
 [[ -f "$SCRIPT_DIR/lib/loop-restart.sh" ]] && source "$SCRIPT_DIR/lib/loop-restart.sh"
 [[ -f "$SCRIPT_DIR/lib/loop-progress.sh" ]] && source "$SCRIPT_DIR/lib/loop-progress.sh"
+# Required, not optional: without it the test gate would run with the pipeline's credentials (#8608).
+# shellcheck source=lib/test-gate-env.sh
+source "$SCRIPT_DIR/lib/test-gate-env.sh"
 # Intelligent session restart with enhanced briefings and cross-session tracking
 [[ -f "$SCRIPT_DIR/lib/session-restart.sh" ]] && source "$SCRIPT_DIR/lib/session-restart.sh"
 # Context window budget monitoring (issue #209)
@@ -1035,7 +1038,7 @@ run_test_gate() {
 
         local start_ts exit_code=0
         start_ts=$(date +%s)
-        bash -c "$test_wrapper" > "$test_log" 2>&1 || exit_code=$?
+        sw_test_gate_env bash -c "$test_wrapper" > "$test_log" 2>&1 || exit_code=$?
         local duration=$(( $(date +%s) - start_ts ))
 
         if command -v jq >/dev/null 2>&1; then
@@ -1072,7 +1075,7 @@ run_test_gate() {
 
         local start_ts exit_code=0
         start_ts=$(date +%s)
-        bash -c "$extra_wrapper" >> "$extra_log" 2>&1 || exit_code=$?
+        sw_test_gate_env bash -c "$extra_wrapper" >> "$extra_log" 2>&1 || exit_code=$?
         local duration=$(( $(date +%s) - start_ts ))
 
         if command -v jq >/dev/null 2>&1; then
