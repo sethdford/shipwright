@@ -38,7 +38,7 @@ touch "$LOG_FILE" "$CALLS"
 
 mock_binary "flock" 'shift 3 2>/dev/null; "$@"'
 mock_binary "gh" 'printf "gh %s\n" "$*" >> "$CALLS"
-if [[ "${1:-} ${2:-}" == "issue list" ]]; then cat "$TEST_TEMP_DIR/issues.json"; fi'
+if [[ "${1:-} ${2:-}" == "issue list" || "${1:-} ${2:-}" == "search issues" ]]; then cat "$TEST_TEMP_DIR/issues.json"; fi'
 export TEST_TEMP_DIR
 
 now_iso() { date -u +"%Y-%m-%dT%H:%M:%SZ"; }
@@ -243,6 +243,34 @@ reset_state
 locked_state_update '.final_failed = {"500": {ts: "t", marked: ["shipwright-stuck"]}}'
 daemon_poll_issues 2>/dev/null || true
 assert_eq "a truncated listing clears nothing" "500" "$(jq -r '.final_failed | keys | join(" ")' "$STATE_FILE")"
+
+# Org mode: the same number in two repos is two issues; tombstones are keyed "repo:number".
+print_test_section "daemon_poll_issues finally-failed issues in org mode"
+WATCH_MODE=org
+REPO_FILTER=""
+ORG=acme
+echo '[{"number":3,"title":"a","labels":[{"name":"shipwright"}],"repository":{"nameWithOwner":"acme/web"}}]' > "$TEST_TEMP_DIR/issues.json"
+reset_state
+locked_state_update '.final_failed = {"acme/api:3": {ts: "t", marked: ["shipwright-stuck"]}}'
+daemon_poll_issues 2>/dev/null || true
+assert_eq "a tombstone for the same number in another repo does not block the issue" "spawn 3" "$(spawns)"
+assert_eq "the other repo's tombstone is cleared once its issue left the listing" "false" \
+    "$(jq '.final_failed | has("acme/api:3")' "$STATE_FILE")"
+
+echo '[{"number":3,"title":"a","labels":[{"name":"shipwright"},{"name":"shipwright-stuck"}],"repository":{"nameWithOwner":"acme/web"}}]' > "$TEST_TEMP_DIR/issues.json"
+reset_state
+locked_state_update '.final_failed = {"acme/web:3": {ts: "t", marked: ["shipwright-stuck"]}}'
+daemon_poll_issues 2>/dev/null || true
+assert_eq "a tombstone under its own repo still blocks the issue" "" "$(spawns)"
+assert_eq "and its entry stays while the marked label is on it" "true" "$(jq '.final_failed | has("acme/web:3")' "$STATE_FILE")"
+
+reset_state
+locked_state_update '.final_failed = {"3": {ts: "t", marked: ["shipwright-stuck"]}}'
+daemon_poll_issues 2>/dev/null || true
+assert_eq "a tombstone written before org keys (bare number) still blocks until cleared" "" "$(spawns)"
+assert_eq "and it is kept while its marked label is on the issue" "true" "$(jq '.final_failed | has("3")' "$STATE_FILE")"
+WATCH_MODE=repo
+unset ORG
 rm -f "$HOME/.shipwright/machines.json"
 
 # ─── daemon_poll_issues: queue drain ─────────────────────────────────────

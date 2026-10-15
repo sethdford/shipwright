@@ -54,5 +54,5 @@ all stop dispatch. `--no-github` checks only the local flag, is refused on GitHu
 - Gaps (tracked in the Wave 1a plan's follow-ups): `shipwright-pipeline.yml` starts ungated runs on
   `issues: labeled` (Wave 1c; bounded by the retry budget and the breaker); its per-issue
   concurrency group can stall when unrelated labels queue a pending run; team invite tokens travel in the URL path; the budget is
-  not enforced on CI (no cost data); org-mode `.final_failed` is keyed by issue number only;
-  `actions/checkout` is pinned by tag. A title fingerprint misses paraphrased duplicates.
+  not enforced on CI (no cost data); org-mode `.final_failed` entries written before the `owner/repo:number` key
+  keep the bare number and block that number in every repo until cleared; `actions/checkout` is pinned by tag. A title fingerprint misses paraphrased duplicates.

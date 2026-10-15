@@ -266,7 +266,7 @@ run_refused_failure() {
         _retry_spawned_for=""
         jq -n --arg n "$issue" '{retry_counts: {($n): 1}}' > "$STATE_FILE"
         echo "some unclassified failure" > "$LOG_DIR/issue-${issue}.log"
-        daemon_on_failure "$issue" 1 "" >/dev/null 2>&1
+        daemon_on_failure "$issue" 1 "" "${REFUSE_REPO:-}" >/dev/null 2>&1
         echo "spawned_for=${_retry_spawned_for:-none} template=${PIPELINE_TEMPLATE} model=${MODEL}" >> "$REFUSE_LOG"
     ) 2>/dev/null || true
 }
@@ -303,6 +303,12 @@ assert_contains "it falls back to the shipwright-stuck label" "$refuse_log" \
 assert_eq "the entry records the labels that were applied" "pipeline/failed shipwright-stuck" \
     "$(jq -r '.final_failed["805"].marked | sort | join(" ")' "$STATE_FILE")"
 assert_eq "the entry records when" "true" "$(jq '.final_failed["805"].ts | type == "string"' "$STATE_FILE")"
+
+print_test_section "Org-mode final failure is keyed by repo and issue"
+REFUSE_REPO="acme/api" run_refused_failure 806 'printf "gh %s\n" "$*" >> "$REFUSE_LOG"; [[ "$*" == *--remove-label* ]] && exit 1; exit 0'
+assert_eq "an org-mode tombstone is keyed by repo and issue" "pipeline/failed shipwright-stuck" \
+    "$(jq -r '.final_failed["acme/api:806"].marked | sort | join(" ")' "$STATE_FILE")"
+assert_eq "and is not written under the bare number" "false" "$(jq '.final_failed | has("806")' "$STATE_FILE")"
 
 run_refused_failure 803 'printf "gh %s\n" "$*" >> "$REFUSE_LOG"; [[ "${1:-} ${2:-}" == "issue edit" ]] && exit 1; exit 0'
 assert_eq "when every edit fails the entry has no marked labels (fail closed)" "0" \
