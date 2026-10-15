@@ -70,11 +70,13 @@ Closed by #8582 (each has an `invalid` rule-test case, and the rule-test YAML is
 - Dashboard: `const B = Bun`, `Reflect.get(Bun, …)`, `globalThis.Bun.spawn`, `import { $ as sh } from
   "bun"`, `import * as B from "bun"`, `createRequire`, and a computed `require`/`import` specifier.
 
+Closed in #8582, ratcheted: `curl` to `api.github.com` with a write method or a body is
+`F10-bash-curl-github-writes` (a new rule id). It has one counted finding, the GitHub App
+installation-token mint in `scripts/sw-github-app.sh:169` (`curl … -d '{}' -X POST`). That call is
+debt for the TypeScript port (an idempotent GithubWriter or auth-adapter method), not a rule gap; the
+baseline may not grow, so it can only go down when the mint is ported.
+
 Open, and why:
-- Bash F10 does not catch `curl` to `api.github.com` with a write method. The rule now would flag
-  `scripts/sw-github-app.sh:169` (installation token: `curl … -d '{}' -X POST`), a real write that
-  is not in the baseline. A decision is needed: port it, or accept it as a counted finding. The
-  rule is drafted and held back.
 - `.github/CODEOWNERS` does not cover the other `.github/workflows/*.yml` or `scripts/postinstall.mjs`,
   which no rule scans.
 - `scripts/postinstall.mjs` is not scanned by any rule.

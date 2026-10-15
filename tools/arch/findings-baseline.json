@@ -1,4 +1,7 @@
 {
+  "F10-bash-curl-github-writes": {
+    "scripts/sw-github-app.sh": 1
+  },
   "F10-bash-github-writes": {
     "scripts/lib/daemon-dispatch.sh": 6,
     "scripts/lib/daemon-failure.sh": 8,

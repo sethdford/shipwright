@@ -118,6 +118,7 @@ const PINNED: Record<string, { ratchet: boolean; files: string[]; ignores: strin
   "F9-bash-claude-token-scrub": { ratchet: true, files: BASH_FILES, ignores: [] },
   "F9-bash-no-permission-bypass": { ratchet: true, files: BASH_FILES, ignores: [] },
   "F10-bash-github-writes": { ratchet: true, files: BASH_FILES, ignores: [] },
+  "F10-bash-curl-github-writes": { ratchet: true, files: BASH_FILES, ignores: [] },
   "F11-bash-no-eval-expansion": { ratchet: true, files: BASH_FILES, ignores: [] },
   "F11-bash-no-gha-expression": { ratchet: true, files: BASH_FILES, ignores: [] },
   "F11-bash-no-pipe-to-shell": { ratchet: true, files: BASH_FILES, ignores: [] },
