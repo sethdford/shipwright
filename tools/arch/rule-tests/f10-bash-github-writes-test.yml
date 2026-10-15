@@ -1,5 +1,7 @@
 id: F10-bash-github-writes
 valid:
+  - 'nohup git fetch origin'
+  - 'timeout 60 git stash push -m wip'
   - 'gh issue view "$n" --json title'
   - 'gh pr list --state open --json number'
   - 'gh api "repos/$repo/issues/$n/comments" --paginate'
@@ -17,6 +19,10 @@ valid:
   - 'git stash push -m "wip"'
   - 'git fetch origin'
 invalid:
+  - 'nohup git push origin "$b"'
+  - 'timeout 60 git push origin HEAD'
+  - 'sudo /usr/bin/git push origin HEAD'
+  - '$gh pr merge "$pr"'
   - 'gh issue create --title "$t" --body "$b"'
   - 'gh issue comment "$n" --body "$msg"'
   - 'gh pr merge "$pr" --squash'

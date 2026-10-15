@@ -22,7 +22,7 @@ rule:
   kind: command
   any:
     - all:
-        - has: { field: name, regex: '^["'']?(.*/)?git["'']?$' }
+        - has: { regex: '^["'']?(.*/)?git["'']?$' }
         - has: { kind: word, regex: '^push$' }
         - not:
             has:
@@ -30,7 +30,7 @@ rule:
               regex: '^stash$'
               precedes: { stopBy: end, regex: '^push$' }
     - all:
-        - has: { regex: '^["'']?((.*/)?gh|\$\{?GH_?[A-Za-z_]*\}?)["'']?$' }
+        - has: { regex: '^["'']?((.*/)?gh|(?i:\$\{?GH_?[A-Za-z_]*\}?))["'']?$' }
         - any:
             - all:
                 - has: { regex: '^["'']?(issue|pr)["'']?$' }
