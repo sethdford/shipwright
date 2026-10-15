@@ -495,8 +495,20 @@ jobs:
         id: claim_check
         shell: bash
         run: |
-          CLAIMED=$(gh issue view "$ISSUE_NUMBER" --json labels \
-            --jq '[.labels[].name | select(startswith("claimed:"))] | .[0] // ""' 2>/dev/null || echo "")
+          # A failed read stops the run and writes skip=true, so the steps that follow (the failure
+          # notices, the state persist, the dashboard webhook) do nothing for this run (#8574 review).
+          stop_closed() {
+            echo "::error::$1"
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+            exit 1
+          }
+          # A read failure is not "unclaimed": the claim lock must be readable before any run starts.
+          if ! LABELS_JSON=$(gh issue view "$ISSUE_NUMBER" --json labels); then
+            stop_closed "cannot read the labels of #$ISSUE_NUMBER; not starting a pipeline"
+          fi
+          if ! CLAIMED=$(jq -r '[.labels[].name | select(startswith("claimed:"))] | .[0] // ""' <<<"$LABELS_JSON"); then
+            stop_closed "unreadable labels of #$ISSUE_NUMBER; not starting a pipeline"
+          fi
           if [ -n "$CLAIMED" ]; then
             echo "Issue #$ISSUE_NUMBER claimed by $CLAIMED — CI yielding to local daemon"
             echo "skip=true" >> "$GITHUB_OUTPUT"
@@ -507,16 +519,13 @@ jobs:
           # Starting" comments (scripts/ci/bot-comments.sh, ADR-0007). An unreadable list or count
           # stops the run instead of defaulting to 0 starts (#8574).
           if ! BOT_COMMENTS=$(scripts/ci/bot-comments.sh "$ISSUE_NUMBER"); then
-            echo "::error::cannot read bot comments for #$ISSUE_NUMBER; not starting a pipeline"
-            exit 1
+            stop_closed "cannot read bot comments for #$ISSUE_NUMBER; not starting a pipeline"
           fi
           if ! PIPELINE_STARTS=$(jq '[.[] | select(.body | contains("Pipeline Starting"))] | length' <<<"$BOT_COMMENTS"); then
-            echo "::error::cannot count pipeline starts for #$ISSUE_NUMBER; not starting a pipeline"
-            exit 1
+            stop_closed "cannot count pipeline starts for #$ISSUE_NUMBER; not starting a pipeline"
           fi
           if ! [[ "$PIPELINE_STARTS" =~ ^[0-9]+$ ]]; then
-            echo "::error::unreadable pipeline start count for #$ISSUE_NUMBER; not starting a pipeline"
-            exit 1
+            stop_closed "unreadable pipeline start count for #$ISSUE_NUMBER; not starting a pipeline"
           fi
           if [ "$PIPELINE_STARTS" -ge 6 ]; then
             echo "Pipeline start cap reached ($PIPELINE_STARTS attempts) for issue #$ISSUE_NUMBER"
@@ -613,6 +622,11 @@ jobs:
           # Best effort: a webhook failure never fails the pipeline. The fleet token goes to curl
           # on stdin (-H @-), never in argv; with no token, no header is sent.
           if [ -n "${DASHBOARD_URL:-}" ]; then
+            # The issue number is the only --argjson input: check it before jq sees it.
+            if ! [[ "$ISSUE_NUMBER" =~ ^[1-9][0-9]*$ ]]; then
+              echo "::warning::Dashboard webhook ci.pipeline_started not sent: issue number is not numeric"
+              exit 0
+            fi
             # Built with jq --arg, never by string interpolation (ADR-0007, #8579).
             if ! BODY=$(jq -n --arg type "ci.pipeline_started" --argjson issue "$ISSUE_NUMBER" \
               --arg run_id "$GITHUB_RUN_ID" --arg template "$TEMPLATE" \
@@ -917,6 +931,11 @@ jobs:
           if [ -n "${DASHBOARD_URL:-}" ]; then
             RESULT="success"
             if [ "${EXIT_CODE:-1}" != "0" ]; then RESULT="failure"; fi
+            # The issue number is the only --argjson input: check it before jq sees it.
+            if ! [[ "$ISSUE_NUMBER" =~ ^[1-9][0-9]*$ ]]; then
+              echo "::warning::Dashboard webhook ci.pipeline_completed not sent: issue number is not numeric"
+              exit 0
+            fi
             # Built with jq --arg, never by string interpolation (ADR-0007, #8579).
             if ! BODY=$(jq -n --arg type "ci.pipeline_completed" --argjson issue "$ISSUE_NUMBER" \
               --arg run_id "$GITHUB_RUN_ID" --arg result "$RESULT" --arg template "$TEMPLATE" \
