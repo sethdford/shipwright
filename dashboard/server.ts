@@ -515,7 +515,7 @@ function saveInviteTokens(): void {
   if (!existsSync(dir)) mkdirSync(dir, { recursive: true });
   const data = JSON.stringify(Array.from(inviteTokens.values()), null, 2);
   const tmp = INVITE_TOKENS_FILE + ".tmp";
-  writeFileSync(tmp, data);
+  writeFileSync(tmp, data, { mode: 0o600 });
   renameSync(tmp, INVITE_TOKENS_FILE);
 }
 
@@ -1935,7 +1935,7 @@ function writeJoinTokensFile(tokens: JoinTokenRecord[]): void {
   const dir = join(HOME, ".shipwright");
   if (!existsSync(dir)) mkdirSync(dir, { recursive: true });
   const tokensTmp = JOIN_TOKENS_FILE + ".tmp";
-  writeFileSync(tokensTmp, JSON.stringify(tokens, null, 2), "utf-8");
+  writeFileSync(tokensTmp, JSON.stringify(tokens, null, 2), { encoding: "utf-8", mode: 0o600 });
   renameSync(tokensTmp, JOIN_TOKENS_FILE);
 }
 const MACHINE_HEALTH_FILE = join(HOME, ".shipwright", "machine-health.json");
@@ -4772,7 +4772,7 @@ async function routeRequest(
           used: false,
         });
         const tokensTmp = JOIN_TOKENS_FILE + ".tmp";
-        writeFileSync(tokensTmp, JSON.stringify(tokens, null, 2), "utf-8");
+        writeFileSync(tokensTmp, JSON.stringify(tokens, null, 2), { encoding: "utf-8", mode: 0o600 });
         renameSync(tokensTmp, JOIN_TOKENS_FILE);
 
         // The URL has no token: the join command prompts for it and sends it in a header.
@@ -5487,7 +5487,7 @@ async function routeRequest(
               return new Response(
                 JSON.stringify({
                   error: "Invite token required for new developers",
-                  hint: "Run: shipwright connect join --url <dashboard> --token <token>",
+                  hint: "Run: shipwright connect join --url <dashboard> (it asks for the invite token; never pass it as an argument)",
                 }),
                 {
                   status: 403,
