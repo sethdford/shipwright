@@ -17,7 +17,7 @@ describe("OAuthStateStore", () => {
     const s = store.issue(0);
     expect(store.consume(null, s, 1)).toBe(false);
     expect(store.consume(s, null, 1)).toBe(false);
-    expect(store.consume(s, `${s.slice(0, -1)}0`, 1)).toBe(false);
+    expect(store.consume(s, `${s.slice(0, -1)}${s.endsWith("0") ? "1" : "0"}`, 1)).toBe(false);
     expect(store.consume("f".repeat(64), "f".repeat(64), 1)).toBe(false);
     const late = store.issue(0);
     expect(store.consume(late, late, 600_001)).toBe(false);
