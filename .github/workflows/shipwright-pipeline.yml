@@ -3,10 +3,9 @@ name: Shipwright Pipeline
 # Include issue number in run title so auto-retry and watchdog can find it
 run-name: "Shipwright Pipeline #${{ github.event.inputs.issue_number || github.event.issue.number || '?' }}"
 
-# Autonomous agents process labeled issues — Shipwright building itself
+# Dispatched by shipwright-dispatch.yml (after the gates) and by shipwright-label-dispatch.yml
+# (the labeled entry point, gated). A manual workflow_dispatch is an operator action: it is not gated.
 on:
-  issues:
-    types: [labeled]
   workflow_dispatch:
     inputs:
       issue_number:
@@ -40,12 +39,11 @@ on:
         default: ""
         type: string
 
-# Only one pipeline per issue at a time. A labeled event for any label other than `shipwright` is
-# filtered into a group of its own, so it never queues a pending run in an issue's group and so
-# never displaces another pending run (#8573). The run then starts and every job is skipped by its
-# `if:`. Keep the label name in step with the job conditions.
+# Only one pipeline per issue at a time. Unrelated labels no longer reach this workflow (the label
+# filter lives in shipwright-label-dispatch.yml, which has no concurrency group), so this group
+# only ever sees dispatched runs (#8573).
 concurrency:
-  group: "${{ (github.event.action == 'labeled' && github.event.label.name != 'shipwright') && format('shipwright-unrelated-{0}', github.run_id) || format('shipwright-issue-{0}', github.event.inputs.issue_number || github.event.issue.number) }}"
+  group: shipwright-issue-${{ github.event.inputs.issue_number || github.event.issue.number }}
   cancel-in-progress: false
 
 permissions:
@@ -55,66 +53,12 @@ permissions:
 
 jobs:
   # ────────────────────────────────────────────────────────────────────────────
-  # Gate: the `issues: labeled` entry point runs the same safety gates as dispatch and auto-retry
-  # (#8572, ADR-0007). A closed gate fails this job, so triage and the pipeline never start.
-  # Manual workflow_dispatch is an operator action, not gated here: this job is skipped for it.
-  # ────────────────────────────────────────────────────────────────────────────
-  gate:
-    if: github.event_name == 'issues' && github.event.action == 'labeled' && github.event.label.name == 'shipwright'
-    runs-on: ubuntu-latest
-    timeout-minutes: 10
-    permissions:
-      contents: read
-      issues: write # the breaker's incident issue
-      pull-requests: read # review WIP
-      actions: read # breaker run history
-    env:
-      ISSUE_NUMBER: ${{ github.event.issue.number }}
-      GH_REPO: ${{ github.repository }}
-
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
-        with:
-          persist-credentials: false
-
-      - name: Read the retry count
-        id: retries
-        shell: bash
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          # A relabel counts the bot's SHIPWRIGHT-RETRY markers, so the fix-loop cap still holds.
-          # Unreadable markers stop the run (retry-state.sh fails closed).
-          if ! STATE=$(scripts/ci/retry-state.sh "$ISSUE_NUMBER" "$GITHUB_RUN_ID"); then
-            echo "::error::cannot read the retry state of #$ISSUE_NUMBER; nothing dispatched"
-            exit 1
-          fi
-          RETRY=$(jq -r '.retry' <<<"$STATE")
-          if ! [[ "$RETRY" =~ ^[0-9]+$ ]]; then
-            echo "::error::unreadable retry count for #$ISSUE_NUMBER; nothing dispatched"
-            exit 1
-          fi
-          echo "retry=$RETRY" >> "$GITHUB_OUTPUT"
-
-      # Fails the job unless every gate allows dispatch (ADR-0007).
-      - name: Safety gates
-        id: gates
-        uses: ./.github/actions/safety-gates
-        with:
-          retry: ${{ steps.retries.outputs.retry }}
-          github-token: ${{ secrets.GITHUB_TOKEN }}
-
-  # ────────────────────────────────────────────────────────────────────────────
   # Stage 1: Triage — vet the issue and determine delivery strategy
   # ────────────────────────────────────────────────────────────────────────────
   triage:
-    needs: [gate]
-    # always(): when gate is skipped (workflow_dispatch) triage must still run. The labeled path
-    # runs only after the gate job has succeeded (#8572).
     if: >
-      always() && (
       github.event_name == 'workflow_dispatch' ||
-      (needs.gate.result == 'success' && github.event.action == 'labeled' && github.event.label.name == 'shipwright'))
+      (github.event.action == 'labeled' && github.event.label.name == 'shipwright')
     runs-on: ubuntu-latest
     timeout-minutes: 5
     outputs:

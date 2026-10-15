@@ -142,23 +142,9 @@ jobs:
               break
             fi
 
-            # ── All checks passed — mark, then dispatch ──
-            # The marker goes first: if it cannot be posted, nothing is dispatched, so no run can
-            # exist that a later dispatch would not see.
-            REQUESTED_AT=$(date -u +%Y-%m-%dT%H:%M:%SZ)
-            if ! gh issue comment "$issue" --repo "$GITHUB_REPOSITORY" \
-              --body "Shipwright dispatch requested a pipeline run for this issue.
-
-          <!-- SHIPWRIGHT-DISPATCHED: run-request ${REQUESTED_AT} -->"; then
-              echo "::error::could not post the dispatch marker on #$issue; not dispatching — stopping"
-              exit 1
-            fi
-            echo "Issue #$issue: dispatching pipeline..."
-            if ! gh workflow run shipwright-pipeline.yml \
-              --repo "$GITHUB_REPOSITORY" \
-              -f issue_number="$issue" \
-              -f template=standard; then
-              echo "::error::failed to dispatch a pipeline for #$issue — stopping"
+            # ── All checks passed — mark, then dispatch (shared with shipwright-label-dispatch.yml) ──
+            if ! scripts/ci/dispatch-issue.sh "$issue"; then
+              echo "::error::could not dispatch #$issue — stopping"
               exit 1
             fi
             echo "Issue #$issue: pipeline dispatched"

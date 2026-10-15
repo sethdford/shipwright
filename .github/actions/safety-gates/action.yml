@@ -15,6 +15,15 @@ inputs:
   github-token:
     description: Token for the gate check's gh calls (pass secrets.GITHUB_TOKEN). Reads, plus opening the incident issue when the breaker trips.
     required: true
+  on-refusal:
+    description: >-
+      'fail' (default) fails the step on any closed gate. 'notice' turns a refusal (exit 1) into a
+      ::notice:: and a successful step with `allowed` unset, so the caller can end its run without a
+      failure. Every other exit (2, 127, a signal) still fails the step, and any value other than
+      'notice' behaves as 'fail'. Only the labeled entry point uses 'notice': its runs are not in the
+      breaker's history (ADR-0007).
+    required: false
+    default: fail
 outputs:
   allowed:
     description: "'true' when every gate allows dispatch (the step fails otherwise)"
@@ -34,13 +43,18 @@ runs:
       env:
         GH_TOKEN: ${{ inputs.github-token }}
         RETRY: ${{ inputs.retry }}
+        ON_REFUSAL: ${{ inputs.on-refusal }}
       run: |
         # Exit 0 is the only "allowed"; 1 (blocked or unverifiable), 2 (usage), 127 or a signal
-        # all stop the job. The report goes to the log.
+        # all stop the job by default. The report goes to the log.
         if bun src/cli.ts gates check --retry "$RETRY"; then
           echo "allowed=true" >> "$GITHUB_OUTPUT"
         else
           rc=$?
+          if [[ "$ON_REFUSAL" == "notice" && "$rc" -eq 1 ]]; then
+            echo "::notice::Shipwright safety gates did not allow dispatch (exit 1); nothing dispatched"
+            exit 0
+          fi
           echo "::error::Shipwright safety gates did not allow dispatch (exit $rc); nothing dispatched"
           exit 1
         fi
