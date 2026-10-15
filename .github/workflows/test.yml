@@ -47,7 +47,7 @@ jobs:
   # The main matrix runs bash 5 only (Homebrew on macOS), so bash-3.2-only bugs (the fleet
   # heartbeat `--data-binary @<(...)` bug, #8578) cannot show up there. This leg runs the
   # gate, daemon, fleet and self-optimize suites under macOS system bash (/bin/bash, 3.2).
-  # Each suite is invoked as `/bin/bash <file>`, so the shebang does not pick bash 5.
+  # bash resolves to system bash 3.2 for every step (asserted), so a suite's shebang picks 3.2 too.
   bash32-macos:
     runs-on: macos-latest
     timeout-minutes: 20
@@ -57,9 +57,26 @@ jobs:
       - name: Install dependencies
         run: brew install tmux jq
 
-      - name: Run bash 3.2 suites under /bin/bash
+      # Child scripts run as `bash script` or through an env shebang, so they pick up whichever bash is
+      # first on PATH. Homebrew puts bash 5 ahead of /bin/bash, so put system bash first under the name
+      # `bash` for every later step (GITHUB_PATH).
+      - name: Put system bash 3.2 first on PATH
         run: |
-          /bin/bash --version | head -1
+          mkdir -p "$RUNNER_TEMP/b32"
+          ln -sf /bin/bash "$RUNNER_TEMP/b32/bash"
+          echo "$RUNNER_TEMP/b32" >> "$GITHUB_PATH"
+
+      - name: Assert `bash` is 3.2
+        run: |
+          v=$(bash -c 'echo "$BASH_VERSION"')
+          case "$v" in
+            3.2*) echo "bash resolves to $v (system bash)" ;;
+            *) echo "::error::bash resolves to '$v', not 3.2; the bash 3.2 leg would test the wrong shell"; exit 1 ;;
+          esac
+
+      - name: Run bash 3.2 suites
+        run: |
+          bash --version | head -1
           # Fleet suites drive tmux: a private socket directory, as sw-test-all.sh does.
           export TMUX_TMPDIR="$RUNNER_TEMP/tmux"
           mkdir -p "$TMUX_TMPDIR"
@@ -69,13 +86,14 @@ jobs:
             scripts/sw-lib-safety-gates-test.sh \
             scripts/sw-lib-safety-gates-sites-test.sh \
             scripts/sw-lib-daemon-gates-test.sh \
+            scripts/sw-connect-test.sh \
             scripts/sw-fleet-test.sh \
             scripts/sw-fleet-discover-test.sh \
             scripts/sw-fleet-viz-test.sh \
             scripts/sw-self-optimize-test.sh; do
             echo "::group::$suite"
-            if ! /bin/bash "$suite"; then
-              echo "::error::$suite failed under /bin/bash 3.2"
+            if ! bash "$suite"; then
+              echo "::error::$suite failed under bash 3.2"
               failed=1
             fi
             echo "::endgroup::"
