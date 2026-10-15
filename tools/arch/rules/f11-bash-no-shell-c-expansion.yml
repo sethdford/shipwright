@@ -1,0 +1,44 @@
+# F11 (bash safety): code strings built from data. `bash -c "$cmd"` (also after a wrapper such as
+# `timeout 30 bash -c`, and "$SHELL" -c), interpreters given code with -c/-e/--eval
+# (python, node, perl, ruby, bun, deno), a here-string fed to a shell, and ssh remote commands
+# (the remote shell parses the string). A literal script with positional arguments is fine:
+# `bash -c 'run "$1"' _ "$value"`. Ratcheted (tools/arch/ast-scan.ts).
+id: F11-bash-no-shell-c-expansion
+language: Bash
+severity: off
+metadata: { ratchet: true, owner: "@sethdford", docs: "docs/architecture.md#fitness-rules" }
+message: "F11: a code string with an expansion runs the value as code. Run the command directly, or keep the code literal in single quotes and pass values as arguments (bash -c 'cmd \"$1\"' _ \"$value\"; ssh host -- cmd \"$(printf %q \"$v\")\")."
+files:
+  - "scripts/**/*.sh"
+  - "scripts/sw"
+  - ".claude/hooks/**/*.sh"
+  - "claude-code/hooks/**/*.sh"
+  - "completions/**/*.bash"
+  - "install.sh"
+rule:
+  kind: command
+  any:
+    - has:
+        matches: bash-shell
+        precedes:
+          stopBy: end
+          kind: word
+          regex: '^-[A-Za-z]*c[A-Za-z]*$'
+          precedes: { matches: bash-expansion }
+    - has:
+        regex: '^(python[0-9.]*|node|nodejs|perl|ruby|bun|deno)$'
+        precedes:
+          stopBy: end
+          kind: word
+          regex: '^(-c|-e|--eval)$'
+          precedes: { matches: bash-expansion }
+    - all:
+        - has: { field: name, matches: bash-shell }
+        - has: { kind: herestring_redirect, matches: bash-expansion }
+    - all:
+        - has: { field: name, regex: '^ssh$' }
+        - has:
+            kind: string
+            all:
+              - has: { kind: string_content, regex: '\s' }
+              - has: { matches: bash-expansion }

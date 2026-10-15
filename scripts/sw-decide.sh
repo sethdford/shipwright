@@ -16,6 +16,8 @@ source "$SCRIPT_DIR/lib/policy.sh"
 source "$SCRIPT_DIR/lib/decide-signals.sh"
 source "$SCRIPT_DIR/lib/decide-scoring.sh"
 source "$SCRIPT_DIR/lib/decide-autonomy.sh"
+# Issue intake caps for auto-filed issues (ADR-0007)
+source "$SCRIPT_DIR/lib/safety-gates.sh"
 
 # ─── Config ───────────────────────────────────────────────────────────────────
 # shellcheck disable=SC2034
@@ -127,6 +129,11 @@ _execute_decision() {
 
     local action=""
     local issue_number=""
+    # Intake cap label: the tier's shipwright:* label (shipwright:auto, shipwright:proposed)
+    local intake_label
+    intake_label=$(printf '%s' "$labels" | tr ',' '\n' | grep -m1 '^shipwright:' || true)
+    [[ -z "$intake_label" ]] && intake_label="${PATROL_LABEL:-auto-patrol}"
+    local create_out="" create_rc=0
 
     if [[ "$dry_run" == "true" ]]; then
         case "$tier" in
@@ -153,12 +160,18 @@ ${description}
 
 Auto-created by \`shipwright decide\` at $(now_iso)."
 
-                issue_number=$(gh issue create \
+                create_out=$(patrol_issue_create --intake-label "$intake_label" \
                     --title "$title" \
                     --body "$body" \
-                    --label "$labels" 2>/dev/null | grep -oE '[0-9]+$' || echo "")
-                action="issue_created"
-                success "AUTO: Created issue #${issue_number} — ${title}"
+                    --label "$labels") || create_rc=$?
+                issue_number=$(printf '%s' "$create_out" | grep -oE '[0-9]+$' || true)
+                if [[ "$create_rc" -eq 0 ]]; then
+                    action="issue_created"
+                    success "AUTO: Created issue #${issue_number} — ${title}"
+                else
+                    action="issue_refused"
+                    warn "AUTO: not filed (intake gate refused or gh failed, rc=${create_rc}) — ${title}"
+                fi
             else
                 info "AUTO (local): ${title}"
                 action="issue_created_local"
@@ -181,12 +194,18 @@ ${description}
 
 Proposed by \`shipwright decide\` at $(now_iso)."
 
-                issue_number=$(gh issue create \
+                create_out=$(patrol_issue_create --intake-label "$intake_label" \
                     --title "$title" \
                     --body "$body" \
-                    --label "$labels" 2>/dev/null | grep -oE '[0-9]+$' || echo "")
-                action="issue_proposed"
-                info "PROPOSE: Created issue #${issue_number} — ${title}"
+                    --label "$labels") || create_rc=$?
+                issue_number=$(printf '%s' "$create_out" | grep -oE '[0-9]+$' || true)
+                if [[ "$create_rc" -eq 0 ]]; then
+                    action="issue_proposed"
+                    info "PROPOSE: Created issue #${issue_number} — ${title}"
+                else
+                    action="proposal_refused"
+                    warn "PROPOSE: not filed (intake gate refused or gh failed, rc=${create_rc}) — ${title}"
+                fi
             else
                 info "PROPOSE (local): ${title}"
                 action="issue_proposed_local"
@@ -216,7 +235,10 @@ Proposed by \`shipwright decide\` at $(now_iso)."
         --arg dedup "$dedup_key" \
         --arg ts "$(now_iso)" \
         --argjson epoch "$(now_epoch)" \
-        '{id:$id, title:$title, category:$category, tier:$tier, action:$action, issue_number:$issue, value_score:$score, dedup_key:$dedup, decided_at:$ts, epoch:$epoch, estimated_cost_usd: (if $tier == "auto" then 5.0 elif $tier == "propose" then 0.01 else 0 end)}')
+        '($action | endswith("_refused")) as $refused
+         | {id:$id, title:$title, category:$category, tier:$tier, action:$action, issue_number:$issue, value_score:$score,
+            dedup_key: (if $refused then "" else $dedup end), decided_at:$ts, epoch:$epoch,
+            estimated_cost_usd: (if $refused then 0 elif $tier == "auto" then 5.0 elif $tier == "propose" then 0.01 else 0 end)}')
 
     autonomy_record_decision "$decision_record"
     emit_event "decision.executed" "id=$id" "tier=$tier" "action=$action" "score=$value_score"
@@ -688,4 +710,7 @@ main() {
     esac
 }
 
-main "$@"
+# Run only when executed, so tests can source the functions
+if [[ "${BASH_SOURCE[0]}" == "$0" ]]; then
+    main "$@"
+fi

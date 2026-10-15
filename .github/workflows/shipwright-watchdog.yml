@@ -18,20 +18,34 @@ jobs:
     timeout-minutes: 10
 
     env:
-      GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      GH_REPO: ${{ github.repository }}
 
     steps:
+      # For scripts/ci/bot-comments.sh. The watchdog never dispatches: auto-retry is the only
+      # retry path (ADR-0007), so this job needs no safety gates.
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
       - name: Monitor in-progress pipeline runs
+        shell: bash
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           echo "--- Shipwright Watchdog: $(date -u +%Y-%m-%dT%H:%M:%SZ) ---"
           NOW_EPOCH=$(date +%s)
 
-          # Get all in-progress pipeline runs
-          RUNS=$(gh run list --repo "$GITHUB_REPOSITORY" \
+          # Get all in-progress pipeline runs (an unreadable list fails the job, never reads as none)
+          if ! RUNS=$(gh run list --repo "$GITHUB_REPOSITORY" \
             --workflow=shipwright-pipeline.yml --status in_progress \
-            --json databaseId,createdAt,displayTitle --limit 50 2>/dev/null || echo "[]")
-
-          RUN_COUNT=$(echo "$RUNS" | jq 'length')
+            --json databaseId,createdAt,displayTitle --limit 50); then
+            echo "::error::cannot list in-progress pipeline runs"
+            exit 1
+          fi
+          if ! RUN_COUNT=$(jq 'if type == "array" then length else error("not an array") end' <<<"$RUNS"); then
+            echo "::error::malformed pipeline run list"
+            exit 1
+          fi
           if [[ "$RUN_COUNT" -eq 0 ]]; then
             echo "No in-progress pipeline runs. All clear."
             exit 0
@@ -41,6 +55,8 @@ jobs:
 
           STALE_COUNT=0
           CANCELLED_COUNT=0
+          READ_FAILURES=0
+          CANCEL_FAILURES=0
 
           while read -r run; do
             RUN_ID=$(echo "$run" | jq -r '.databaseId')
@@ -51,7 +67,12 @@ jobs:
             echo "--- Run $RUN_ID: $TITLE ---"
 
             # Calculate elapsed time in minutes
-            CREATED_EPOCH=$(date -d "$CREATED_AT" +%s 2>/dev/null || date -j -f "%Y-%m-%dT%H:%M:%SZ" "$CREATED_AT" +%s 2>/dev/null || echo "0")
+            # An unparseable date would read as 1970 and cancel the run: leave it alone, fail at the end.
+            if ! CREATED_EPOCH=$(date -d "$CREATED_AT" +%s); then
+              echo "::error::cannot parse the start time '$CREATED_AT' of run $RUN_ID; leaving it alone"
+              READ_FAILURES=$((READ_FAILURES + 1))
+              continue
+            fi
             ELAPSED_SECS=$((NOW_EPOCH - CREATED_EPOCH))
             ELAPSED_MINS=$((ELAPSED_SECS / 60))
             echo "Elapsed: ${ELAPSED_MINS}m"
@@ -71,21 +92,25 @@ jobs:
 
             echo "Associated issue: #$ISSUE_NUMBER"
 
-            # Get issue comments with timestamps to find latest progress signal
-            COMMENTS_JSON=$(gh issue view "$ISSUE_NUMBER" --repo "$GITHUB_REPOSITORY" \
-              --json comments --jq '.comments[] | {createdAt, body}' 2>/dev/null || echo "")
+            # Bot-authored comments only: anyone can type a SHIPWRIGHT-* marker (ADR-0007).
+            # Unreadable: leave the run alone (never cancel on missing signals), fail at the end.
+            if ! COMMENTS_JSON=$(scripts/ci/bot-comments.sh "$ISSUE_NUMBER"); then
+              echo "::error::cannot read bot comments for #$ISSUE_NUMBER; leaving run $RUN_ID alone"
+              READ_FAILURES=$((READ_FAILURES + 1))
+              continue
+            fi
 
             # Find the most recent SHIPWRIGHT-HEARTBEAT or SHIPWRIGHT-STAGE marker
             LAST_SIGNAL_DATE=""
 
             # Check for heartbeat markers: <!-- SHIPWRIGHT-HEARTBEAT: timestamp -->
-            HEARTBEAT_DATE=$(echo "$COMMENTS_JSON" | jq -r 'select(.body | contains("SHIPWRIGHT-HEARTBEAT")) | .createdAt' 2>/dev/null | tail -1 || true)
+            HEARTBEAT_DATE=$(jq -r '.[] | select(.body | contains("SHIPWRIGHT-HEARTBEAT")) | .createdAt' <<<"$COMMENTS_JSON" | tail -1)
 
             # Check for stage markers: <!-- SHIPWRIGHT-STAGE: ... -->
-            STAGE_DATE=$(echo "$COMMENTS_JSON" | jq -r 'select(.body | contains("SHIPWRIGHT-STAGE")) | .createdAt' 2>/dev/null | tail -1 || true)
+            STAGE_DATE=$(jq -r '.[] | select(.body | contains("SHIPWRIGHT-STAGE")) | .createdAt' <<<"$COMMENTS_JSON" | tail -1)
 
             # Check for the initial run ID marker: <!-- SHIPWRIGHT-RUN-ID: ... -->
-            START_DATE=$(echo "$COMMENTS_JSON" | jq -r "select(.body | contains(\"SHIPWRIGHT-RUN-ID: $RUN_ID\")) | .createdAt" 2>/dev/null | tail -1 || true)
+            START_DATE=$(jq -r --arg m "SHIPWRIGHT-RUN-ID: $RUN_ID" '.[] | select(.body | contains($m)) | .createdAt' <<<"$COMMENTS_JSON" | tail -1)
 
             # Use the most recent signal
             for date in "$HEARTBEAT_DATE" "$STAGE_DATE" "$START_DATE"; do
@@ -100,7 +125,11 @@ jobs:
             fi
 
             # Calculate minutes since last signal
-            SIGNAL_EPOCH=$(date -d "$LAST_SIGNAL_DATE" +%s 2>/dev/null || date -j -f "%Y-%m-%dT%H:%M:%SZ" "$LAST_SIGNAL_DATE" +%s 2>/dev/null || echo "0")
+            if ! SIGNAL_EPOCH=$(date -d "$LAST_SIGNAL_DATE" +%s); then
+              echo "::error::cannot parse the signal time '$LAST_SIGNAL_DATE' of run $RUN_ID; leaving it alone"
+              READ_FAILURES=$((READ_FAILURES + 1))
+              continue
+            fi
             SILENT_MINS=$(( (NOW_EPOCH - SIGNAL_EPOCH) / 60 ))
             echo "Last signal: ${LAST_SIGNAL_DATE} (${SILENT_MINS}m ago)"
 
@@ -118,7 +147,7 @@ jobs:
               STALE_COUNT=$((STALE_COUNT + 1))
 
               # Post observation comment (only if we haven't already in this window)
-              EXISTING_WATCHDOG=$(echo "$COMMENTS_JSON" | jq -r "select(.body | contains(\"SHIPWRIGHT-WATCHDOG-STALE: $RUN_ID\")) | .createdAt" 2>/dev/null | tail -1 || true)
+              EXISTING_WATCHDOG=$(jq -r --arg m "SHIPWRIGHT-WATCHDOG-STALE: $RUN_ID" '.[] | select(.body | contains($m)) | .createdAt' <<<"$COMMENTS_JSON" | tail -1)
               if [[ -z "$EXISTING_WATCHDOG" ]]; then
                 gh issue comment "$ISSUE_NUMBER" --repo "$GITHUB_REPOSITORY" --body "$(cat <<EOF
           :eye: **Shipwright Watchdog — Stale Pipeline Detected**
@@ -140,16 +169,20 @@ jobs:
               continue
             fi
 
-            # 45 min - 2h silence: cancel and retry
+            # 45 min - 2h silence: cancel. Retrying is auto-retry's job alone: it runs on the
+            # cancelled run, behind the safety gates and the fix-loop cap (ADR-0007).
             if [[ "$SILENT_MINS" -lt 120 ]]; then
-              echo "Status: STUCK (${SILENT_MINS}m silence) — cancelling and retrying"
+              echo "Status: STUCK (${SILENT_MINS}m silence) — cancelling; auto-retry decides on a retry"
+              # Cancel the run; a failed cancel is reported (and fails the job), with no comment.
+              if ! gh run cancel "$RUN_ID" --repo "$GITHUB_REPOSITORY"; then
+                echo "::error::could not cancel stuck run $RUN_ID (#$ISSUE_NUMBER)"
+                CANCEL_FAILURES=$((CANCEL_FAILURES + 1))
+                continue
+              fi
               CANCELLED_COUNT=$((CANCELLED_COUNT + 1))
 
-              # Cancel the run
-              gh run cancel "$RUN_ID" --repo "$GITHUB_REPOSITORY" 2>/dev/null || true
-
               # Extract completed stages from comments
-              COMPLETED_STAGES=$(echo "$COMMENTS_JSON" | jq -r '.body' 2>/dev/null | grep -oE 'SHIPWRIGHT-STAGE: [a-z_]+:complete' | sed 's/SHIPWRIGHT-STAGE: //' | sed 's/:complete//' | tr '\n' ',' | sed 's/,$//' || true)
+              COMPLETED_STAGES=$(jq -r '.[].body' <<<"$COMMENTS_JSON" | grep -oE 'SHIPWRIGHT-STAGE: [a-z_]+:complete' | sed 's/SHIPWRIGHT-STAGE: //' | sed 's/:complete//' | tr '\n' ',' | sed 's/,$//' || true)
 
               # Post cancellation comment
               gh issue comment "$ISSUE_NUMBER" --repo "$GITHUB_REPOSITORY" --body "$(cat <<EOF
@@ -163,37 +196,29 @@ jobs:
           | Elapsed | ${ELAPSED_MINS}m |
           | Silent | ${SILENT_MINS}m |
           | Completed Stages | \`${COMPLETED_STAGES:-none}\` |
-          | Action | Dispatching retry with resume |
+          | Action | Cancelled — auto-retry decides whether to retry (safety gates, at most 3 retries) |
 
           <!-- SHIPWRIGHT-WATCHDOG-CANCEL: $RUN_ID -->
           EOF
           )" 2>/dev/null || true
-
-              # Dispatch retry
-              gh workflow run shipwright-pipeline.yml \
-                --repo "$GITHUB_REPOSITORY" \
-                -f issue_number="$ISSUE_NUMBER" \
-                -f template=full \
-                -f max_iterations="25" \
-                -f completed_stages="$COMPLETED_STAGES" \
-                -f skip_triage=true 2>/dev/null || echo "Failed to dispatch retry for #$ISSUE_NUMBER"
-              sleep 5
               continue
             fi
 
             # > 2h silence: cancel, label stuck, DON'T retry
             echo "Status: ABANDONED (${SILENT_MINS}m silence, ${ELAPSED_MINS}m elapsed) — cancelling, no retry"
-            CANCELLED_COUNT=$((CANCELLED_COUNT + 1))
 
-            # Cancel the run
-            gh run cancel "$RUN_ID" --repo "$GITHUB_REPOSITORY" 2>/dev/null || true
+            # Label and comment BEFORE cancelling: auto-retry starts as soon as the run is
+            # cancelled, and skips it only when the SHIPWRIGHT-WATCHDOG-ABANDON marker exists.
+            # Label as stuck (dispatch and auto-retry skip shipwright-stuck issues until a human
+            # clears it); without the label, do not cancel.
+            if ! gh issue edit "$ISSUE_NUMBER" --repo "$GITHUB_REPOSITORY" --add-label "shipwright-stuck"; then
+              echo "::error::could not label #$ISSUE_NUMBER shipwright-stuck; not cancelling run $RUN_ID"
+              READ_FAILURES=$((READ_FAILURES + 1))
+              continue
+            fi
 
-            # Label as stuck
-            gh issue edit "$ISSUE_NUMBER" --repo "$GITHUB_REPOSITORY" \
-              --add-label "shipwright-stuck" 2>/dev/null || true
-
-            # Post comment
-            gh issue comment "$ISSUE_NUMBER" --repo "$GITHUB_REPOSITORY" --body "$(cat <<EOF
+            # Post the marker comment; without it, do not cancel (auto-retry would retry the run).
+            if ! gh issue comment "$ISSUE_NUMBER" --repo "$GITHUB_REPOSITORY" --body "$(cat <<EOF
           :stop_sign: **Shipwright Watchdog — Pipeline Abandoned**
 
           Run [$RUN_ID](${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/$RUN_ID) was cancelled after **${ELAPSED_MINS} minutes** with no progress for **${SILENT_MINS} minutes**.
@@ -219,7 +244,19 @@ jobs:
 
           <!-- SHIPWRIGHT-WATCHDOG-ABANDON: $RUN_ID -->
           EOF
-          )" 2>/dev/null || true
+          )"; then
+              echo "::error::could not post the abandon marker on #$ISSUE_NUMBER; not cancelling run $RUN_ID"
+              READ_FAILURES=$((READ_FAILURES + 1))
+              continue
+            fi
+
+            # Cancel the run (after the marker exists)
+            if ! gh run cancel "$RUN_ID" --repo "$GITHUB_REPOSITORY"; then
+              echo "::error::could not cancel abandoned run $RUN_ID (#$ISSUE_NUMBER)"
+              CANCEL_FAILURES=$((CANCEL_FAILURES + 1))
+              continue
+            fi
+            CANCELLED_COUNT=$((CANCELLED_COUNT + 1))
 
           done < <(echo "$RUNS" | jq -c '.[]')
 
@@ -228,3 +265,8 @@ jobs:
           echo "Runs checked: $RUN_COUNT"
           echo "Stale (warned): $STALE_COUNT"
           echo "Cancelled: $CANCELLED_COUNT"
+          echo "Read/marker failures: $READ_FAILURES"
+          echo "Cancel failures: $CANCEL_FAILURES"
+          if [[ "$READ_FAILURES" -gt 0 || "$CANCEL_FAILURES" -gt 0 ]]; then
+            exit 1
+          fi

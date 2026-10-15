@@ -826,5 +826,68 @@
     "context": "platform",
     "parity": "scripts/sw-hello-test.sh",
     "status": "parity-green"
+  },
+  {
+    "command": "breaker",
+    "aliases": [],
+    "script": "sw-breaker.sh",
+    "context": "orchestration",
+    "parity": null,
+    "status": "parity-green",
+    "notes": "New in Wave 1a (spec §6.2 global circuit breaker); no bash predecessor."
+  },
+  {
+    "command": "pause",
+    "aliases": [],
+    "script": "sw-pause.sh",
+    "context": "orchestration",
+    "parity": null,
+    "status": "parity-green",
+    "notes": "New in Wave 1a (spec §6.2 kill switch); writes the daemon's existing pause flag."
+  },
+  {
+    "command": "resume",
+    "aliases": [],
+    "script": "sw-resume.sh",
+    "context": "orchestration",
+    "parity": null,
+    "status": "parity-green",
+    "notes": "New in Wave 1a (spec §6.2 kill switch); clears the daemon's pause flag."
+  },
+  {
+    "command": "paused",
+    "aliases": [],
+    "script": "sw-paused.sh",
+    "context": "orchestration",
+    "parity": null,
+    "status": "parity-green",
+    "notes": "New in Wave 1a (spec §6.2 kill switch); exit 0 when paused, for scripts."
+  },
+  {
+    "command": "budget",
+    "aliases": [],
+    "script": "sw-budget.sh",
+    "context": "orchestration",
+    "parity": null,
+    "status": "parity-green",
+    "notes": "New in Wave 1a (spec §6.2 budget guard); reads the files sw-cost.sh writes. No cost files (CI) reports no data and is not enforced."
+  },
+  {
+    "command": "intake",
+    "aliases": [],
+    "script": "sw-intake.sh",
+    "context": "orchestration",
+    "parity": null,
+    "status": "parity-green",
+    "notes": "New in Wave 1a (spec §6.2 patrol hygiene): cap and title-fingerprint dedupe; a gate (exit 0 only when filing is allowed)."
+  },
+  {
+    "command": "gates",
+    "aliases": [],
+    "script": "sw-gates.sh",
+    "context": "orchestration",
+    "parity": null,
+    "status": "parity-green",
+    "notes": "New in Wave 1a: all dispatch gates in ADR-0007 order for workflows and the daemon; a gate (exit 0 only when every gate allows). --retry is required (daemon retry count, Task 12; auto-retry bot-marker count, Task 14)."
   }
 ]

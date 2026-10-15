@@ -1,0 +1,50 @@
+# Dashboard (F12): only allowlisted services spawn processes, so validation and argv building live
+# in one place (#8534). Ratcheted (tools/arch/ast-scan.ts): server.ts still spawns directly and may
+# only lose call sites until Wave 3 ports it. To add a subprocess call, put it in a service that
+# validates its inputs and add that file to `ignores` here and in tools/arch/meta.test.ts (PINNED),
+# a change CODEOWNERS review.
+id: dashboard-subprocess-only-in-services
+language: TypeScript
+severity: off
+metadata: { ratchet: true, owner: "@sethdford", docs: "docs/architecture.md#fitness-rules" }
+message: "Dashboard: spawn processes only from an allowlisted service (dashboard/services/claims.ts). Move the call into a service that validates its input and passes an argv array, and call that service."
+files:
+  - "dashboard/**/*.ts"
+ignores:
+  - "dashboard/**/*.test.ts"
+  - "dashboard/src/**"
+  - "dashboard/services/claims.ts"
+  - "dashboard/services/subprocess-guards.ts"
+rule:
+  any:
+    - all:
+        - any:
+            - kind: import_statement
+            - kind: export_statement
+        - has: { field: source, regex: '^["''](node:)?child_process["'']$' }
+        - not: { regex: '^(import|export)\s+type\s' }
+    - all:
+        - any:
+            - pattern: require($S)
+            - pattern: import($S)
+        - has:
+            field: arguments
+            has: { kind: string, regex: '^["''](node:)?child_process["'']$' }
+    - kind: call_expression
+      has:
+        field: function
+        kind: identifier
+        regex: '^(exec|execSync|execFile|execFileSync|spawn|spawnSync|fork)$'
+    # Bun.spawn, Bun.$, Bun["spawn"], and destructuring them out of Bun
+    - kind: member_expression
+      all:
+        - has: { field: object, regex: '^Bun$' }
+        - has: { field: property, regex: '^(spawn|spawnSync|\$)$' }
+    - kind: subscript_expression
+      all:
+        - has: { field: object, regex: '^Bun$' }
+        - has: { field: index, regex: '^["''](spawn|spawnSync|\$)["'']$' }
+    - kind: variable_declarator
+      all:
+        - has: { field: value, regex: '^Bun$' }
+        - has: { field: name, kind: object_pattern, regex: '\b(spawn|spawnSync|\$)\b' }

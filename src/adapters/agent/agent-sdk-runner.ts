@@ -18,6 +18,7 @@ import type {
 } from "../../shared/kernel/ports";
 import { err, ok, type Result } from "../../shared/kernel/result";
 import { type Collected, failure, ZERO_USAGE } from "./agent-failure";
+import { assertAgentOptions } from "./privilege-guard";
 import { wrapUntrusted } from "./untrusted";
 
 export type QueryFn = (args: { prompt: string; options: Options }) => AsyncIterable<SDKMessage>;
@@ -205,12 +206,16 @@ export class AgentSdkRunner implements AgentRunner {
     }
     const guard = armGuard(timeoutMs, signal);
     try {
-      const collected = await collect(
-        this.queryFn({
-          prompt,
-          options: { ...options, env: { ...this.env }, abortController: guard.controller },
-        }),
-      );
+      // The object query() receives is the one assertAgentOptions() checks (meta-tested in
+      // tools/arch/meta.test.ts), so no option can reach the SDK unchecked.
+      // A frozen, flat copy: nothing the runner sets after the check can change what query() receives.
+      const sdkOptions: Options = Object.freeze({
+        ...options,
+        env: Object.freeze({ ...this.env }),
+        abortController: guard.controller,
+      });
+      assertAgentOptions(sdkOptions);
+      const collected = await collect(this.queryFn({ prompt, options: sdkOptions }));
       const usage = usageOf(collected.result, startedAt);
       if (isCleanSuccess(collected.result)) return ok({ result: collected.result, usage });
       const { timedOut } = guard;

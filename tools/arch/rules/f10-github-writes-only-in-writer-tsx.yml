@@ -1,0 +1,65 @@
+# F10 for .tsx files. ast-grep parses .tsx with the Tsx grammar, so the TypeScript rule cannot see
+# them. This is a copy of f10-github-writes-only-in-writer.yml with a different id, language and
+# files glob: change both together.
+id: F10-github-writes-only-in-writer-tsx
+language: Tsx
+severity: error
+message: "F10: GitHub writes go only through src/adapters/github/gh-github-writer.ts. Add an idempotent method (it takes an IdempotencyKey) to the GithubWriter port and call that."
+metadata:
+  owner: "@sethdford"
+  docs: "docs/architecture.md#fitness-rules"
+  preemptive: "src has no .tsx files yet; this keeps a rename to .tsx from escaping F10"
+files:
+  - "src/**/*.tsx"
+ignores:
+  - "src/adapters/github/gh-github-writer.ts"
+  - "src/adapters/github/gh-github-writer.test.ts"
+rule:
+  kind: array
+  any:
+    - all:
+        - has: { nthChild: 1, regex: '^["''`]gh["''`]$' }
+        - any:
+            - all:
+                - has: { regex: '^["''`](issue|pr)["''`]$' }
+                - has: { regex: '^["''`](create|edit|comment|close|reopen|merge|review|lock|unlock|pin|unpin|develop|delete|transfer|ready|update-branch|revert)["''`]$' }
+            - all:
+                - has: { regex: '^["''`]label["''`]$' }
+                - has: { regex: '^["''`](create|edit|delete|clone)["''`]$' }
+            - all:
+                - has: { regex: '^["''`]release["''`]$' }
+                - has: { regex: '^["''`](create|edit|delete|upload|delete-asset)["''`]$' }
+            - all:
+                - has: { regex: '^["''`]workflow["''`]$' }
+                - has: { regex: '^["''`](run|enable|disable)["''`]$' }
+            - all:
+                - has: { regex: '^["''`]run["''`]$' }
+                - has: { regex: '^["''`](rerun|cancel|delete)["''`]$' }
+            - all:
+                - has: { regex: '^["''`]repo["''`]$' }
+                - has: { regex: '^["''`](edit|create|delete|rename|archive|unarchive|fork|sync)["''`]$' }
+            - all:
+                - has: { regex: '^["''`](secret|variable)["''`]$' }
+                - has: { regex: '^["''`](set|delete|remove)["''`]$' }
+            - all:
+                - has: { regex: '^["''`]cache["''`]$' }
+                - has: { regex: '^["''`]delete["''`]$' }
+            - all:
+                - has: { regex: '^["''`]api["''`]$' }
+                - any:
+                    # -X POST, --method patch: the method must directly follow the flag.
+                    - has:
+                        regex: '^["''`](-X|--method)["''`]$'
+                        precedes:
+                          regex: '^["''`](?i:POST|PATCH|PUT|DELETE)["''`]$'
+                          stopBy: { regex: '[^,\s]' }
+                    # -XPOST, -X=POST, --method=PUT
+                    - has: { regex: '^["''`](-X=?|--method=)(?i:POST|PATCH|PUT|DELETE)["''`]$' }
+                    # Field and input flags make gh send a request body (default method POST).
+                    - has: { regex: '^["''`](-[fF].*|--field(=.*)?|--raw-field(=.*)?|--input(=.*)?)["''`]$' }
+                    - has: { regex: '(?i)\bmutation\b' }
+    - all:
+        - has: { nthChild: 1, regex: '^["''`](issue|pr|label)["''`]$' }
+        - has:
+            nthChild: 2
+            regex: '^["''`](create|edit|comment|close|reopen|delete|merge|review|lock|clone|pin|unpin|transfer)["''`]$'

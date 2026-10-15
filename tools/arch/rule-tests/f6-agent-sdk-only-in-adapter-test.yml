@@ -9,3 +9,6 @@ invalid:
   - 'import { x } from "@anthropic-ai/claude-agent-sdk/sub";'
   - 'const sdk = await import("@anthropic-ai/claude-agent-sdk");'
   - 'const sdk = require("@anthropic-ai/claude-agent-sdk");'
+  - 'const sdk = await import(`@anthropic-ai/claude-agent-sdk`);'
+  - 'const sdk = require(`@anthropic-ai/claude-agent-sdk`);'
+  - 'import sdk = require("@anthropic-ai/claude-agent-sdk");'

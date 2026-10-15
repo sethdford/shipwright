@@ -210,4 +210,102 @@ touch "$LOG_DIR/issue-703.log"
 result=$(classify_failure 703)
 assert_eq "Empty log → unknown" "unknown" "$result"
 
+# ═══════════════════════════════════════════════════════════════════════════════
+# Auto-retry passes its retry number to the safety gates (fix-loop cap)
+# ═══════════════════════════════════════════════════════════════════════════════
+print_test_section "Auto-retry passes its retry number"
+
+(
+    SPAWN_LOG="$TEST_TEMP_DIR/spawn.log"
+    : > "$SPAWN_LOG"
+    daemon_spawn_pipeline() { echo "issue=$1 title=$2 retry=${DAEMON_RETRY_ATTEMPT:-unset}" >> "$SPAWN_LOG"; }
+    sleep() { :; }
+    MODEL="sonnet"
+    PIPELINE_TEMPLATE="autonomous"
+    echo '{"retry_counts":{"801":1}}' > "$STATE_FILE"
+    echo "some unclassified failure" > "$LOG_DIR/issue-801.log"
+    daemon_on_failure 801 1 "" >/dev/null 2>&1
+    cat "$SPAWN_LOG"
+    # Checked inside the subshell, where daemon_on_failure ran
+    echo "after=${DAEMON_RETRY_ATTEMPT:-unset}"
+) > "$TEST_TEMP_DIR/retry_spawn_result" 2>/dev/null || true
+assert_eq "second retry spawns with DAEMON_RETRY_ATTEMPT=2" \
+    "issue=801 title=retry-2 retry=2" "$(head -1 "$TEST_TEMP_DIR/retry_spawn_result")"
+assert_eq "DAEMON_RETRY_ATTEMPT does not leak past the retry spawn" \
+    "after=unset" "$(tail -1 "$TEST_TEMP_DIR/retry_spawn_result")"
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# A retry refused by the safety gates is a final failure (no re-poll past the cap)
+# ═══════════════════════════════════════════════════════════════════════════════
+print_test_section "Refused retry is a final failure"
+
+# run_refused_failure <issue> <gh-mock-script> — daemon_on_failure with a refused retry spawn,
+# real state updates and a gh mock; everything lands in $TEST_TEMP_DIR/refuse.log.
+run_refused_failure() {
+    local issue="$1" gh_script="$2"
+    (
+        REFUSE_LOG="$TEST_TEMP_DIR/refuse.log"
+        : > "$REFUSE_LOG"
+        export REFUSE_LOG
+        mock_binary "gh" "$gh_script"
+        SCRIPT_DIR="$TEST_TEMP_DIR/refuse-scripts"
+        mkdir -p "$SCRIPT_DIR"
+        printf '#!/usr/bin/env bash\nexit 0\n' > "$SCRIPT_DIR/sw-tracker.sh"
+        chmod +x "$SCRIPT_DIR/sw-tracker.sh"
+        NO_GITHUB=false
+        daemon_spawn_pipeline() { echo "spawn $1 retry=${DAEMON_RETRY_ATTEMPT:-unset}" >> "$REFUSE_LOG"; return "${RETRY_SPAWN_RC:-75}"; }
+        daemon_log() { echo "log $1 ${*:2}" >> "$REFUSE_LOG"; }
+        locked_state_update() {
+            local tmp
+            tmp=$(mktemp)
+            jq "$@" "$STATE_FILE" > "$tmp" && mv "$tmp" "$STATE_FILE"
+        }
+        sleep() { :; }
+        MODEL="sonnet"
+        PIPELINE_TEMPLATE="autonomous"
+        _retry_spawned_for=""
+        jq -n --arg n "$issue" '{retry_counts: {($n): 1}}' > "$STATE_FILE"
+        echo "some unclassified failure" > "$LOG_DIR/issue-${issue}.log"
+        daemon_on_failure "$issue" 1 "" >/dev/null 2>&1
+        echo "spawned_for=${_retry_spawned_for:-none} template=${PIPELINE_TEMPLATE} model=${MODEL}" >> "$REFUSE_LOG"
+    ) 2>/dev/null || true
+}
+
+run_refused_failure 802 'printf "gh %s\n" "$*" >> "$REFUSE_LOG"'
+refuse_log="$(cat "$TEST_TEMP_DIR/refuse.log")"
+assert_contains "the retry spawn was attempted" "$refuse_log" "spawn 802 retry=2"
+assert_contains "a gate/budget refusal (75) is logged as a final failure" "$refuse_log" \
+    "Retry #2 refused by gates/budget — final failure"
+assert_contains "final failure adds the failure label" "$refuse_log" "gh issue edit 802 --add-label pipeline/failed"
+assert_contains "final failure removes the watch label in its own call" "$refuse_log" "gh issue edit 802 --remove-label shipwright"
+assert_contains "no retry is recorded as spawned; template and model restored" "$refuse_log" \
+    "spawned_for=none template=autonomous model=sonnet"
+assert_contains "the failure comment says the retry was refused, not exhausted" "$refuse_log" \
+    "| Retries | 2 / 2 (refused by gates/budget) |"
+assert_eq "a final failure whose watch label was removed leaves no final_failed entry" "false" \
+    "$(jq '(.final_failed // {}) | has("802")' "$STATE_FILE")"
+
+RETRY_SPAWN_RC=1 run_refused_failure 804 'printf "gh %s\n" "$*" >> "$REFUSE_LOG"'
+refuse_log="$(cat "$TEST_TEMP_DIR/refuse.log")"
+assert_contains "any other spawn failure names its rc" "$refuse_log" \
+    "Retry #2 failed: retry spawn failed (rc=1) — final failure"
+assert_contains "the failure comment names the spawn rc" "$refuse_log" \
+    "| Retries | 2 / 2 (retry spawn failed (rc=1)) |"
+
+print_test_section "Final failure when the watch label cannot be removed"
+
+run_refused_failure 805 'printf "gh %s\n" "$*" >> "$REFUSE_LOG"; [[ "$*" == *--remove-label* ]] && exit 1; exit 0'
+refuse_log="$(cat "$TEST_TEMP_DIR/refuse.log")"
+assert_contains "a failed watch-label removal is logged at ERROR" "$refuse_log" \
+    "log ERROR Could not remove 'shipwright' from failed issue #805"
+assert_contains "it falls back to the shipwright-stuck label" "$refuse_log" \
+    "gh issue edit 805 --add-label shipwright-stuck"
+assert_eq "the entry records the labels that were applied" "pipeline/failed shipwright-stuck" \
+    "$(jq -r '.final_failed["805"].marked | sort | join(" ")' "$STATE_FILE")"
+assert_eq "the entry records when" "true" "$(jq '.final_failed["805"].ts | type == "string"' "$STATE_FILE")"
+
+run_refused_failure 803 'printf "gh %s\n" "$*" >> "$REFUSE_LOG"; [[ "${1:-} ${2:-}" == "issue edit" ]] && exit 1; exit 0'
+assert_eq "when every edit fails the entry has no marked labels (fail closed)" "0" \
+    "$(jq '.final_failed["803"].marked | length' "$STATE_FILE")"
+
 print_test_results

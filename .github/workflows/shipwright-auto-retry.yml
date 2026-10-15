@@ -10,20 +10,36 @@ permissions:
   contents: read
   issues: write
   actions: write
+  pull-requests: read
+
+# One auto-retry at a time, so two failures cannot both read the same retry count. GitHub keeps
+# at most one pending run per group: a third concurrent failure cancels the pending one. That
+# failed run is then never retried and nothing labels it (fail-safe, but silent): dispatch skips
+# the issue too (it carries SHIPWRIGHT-DISPATCHED), so a human must re-run it.
+concurrency:
+  group: shipwright-auto-retry
+  cancel-in-progress: false
 
 jobs:
   auto-retry:
     if: github.event.workflow_run.conclusion == 'failure' || github.event.workflow_run.conclusion == 'cancelled'
     runs-on: ubuntu-latest
-    timeout-minutes: 5
+    # Room for the safety gates' Bun install and the retry backoff (up to 90 s).
+    timeout-minutes: 10
 
     env:
-      GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      GH_REPO: ${{ github.repository }}
 
     steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
       - name: Extract issue number from failed run
         id: extract
+        shell: bash
         env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           RUN_ID: ${{ github.event.workflow_run.id }}
           CONCLUSION: ${{ github.event.workflow_run.conclusion }}
         run: |
@@ -32,9 +48,16 @@ jobs:
 
           echo "--- Auto-Retry: Analyzing failed run $RUN_ID ($CONCLUSION) ---"
 
-          # Get the run details to extract issue number from inputs or title
-          RUN_JSON=$(gh run view "$RUN_ID" --repo "$GITHUB_REPOSITORY" --json jobs,displayTitle 2>/dev/null || echo "{}")
-          DISPLAY_TITLE=$(echo "$RUN_JSON" | jq -r '.displayTitle // ""')
+          # Get the run details to extract issue number from inputs or title. A read failure fails
+          # the job (no retry, but visible), never reads as "no issue".
+          if ! RUN_JSON=$(gh run view "$RUN_ID" --repo "$GITHUB_REPOSITORY" --json jobs,displayTitle); then
+            echo "::error::cannot read run $RUN_ID; not retrying"
+            exit 1
+          fi
+          if ! DISPLAY_TITLE=$(jq -r '.displayTitle // ""' <<<"$RUN_JSON"); then
+            echo "::error::malformed details for run $RUN_ID; not retrying"
+            exit 1
+          fi
 
           # Try to extract issue number from run inputs
           # workflow_dispatch runs have inputs in the event payload
@@ -48,19 +71,31 @@ jobs:
 
           # Method 2: Check run logs for the issue number
           if [[ -z "$ISSUE_NUMBER" ]]; then
-            RUN_LOG=$(gh run view "$RUN_ID" --repo "$GITHUB_REPOSITORY" --log 2>/dev/null | head -200 || echo "")
+            if ! FULL_LOG=$(gh run view "$RUN_ID" --repo "$GITHUB_REPOSITORY" --log); then
+              echo "::error::cannot read the log of run $RUN_ID; not retrying"
+              exit 1
+            fi
+            RUN_LOG=$(head -200 <<<"$FULL_LOG")
             ISSUE_NUMBER=$(echo "$RUN_LOG" | grep -oE 'Issue: #[0-9]+' | head -1 | grep -oE '[0-9]+' || true)
           fi
 
           # Method 3: Look at recent shipwright-labeled issues with pipeline comments referencing this run
           if [[ -z "$ISSUE_NUMBER" ]]; then
-            OPEN_ISSUES=$(gh issue list --repo "$GITHUB_REPOSITORY" \
-              --label shipwright --state open --json number \
-              --jq '.[].number' 2>/dev/null || echo "")
+            if ! OPEN_ISSUES=$(gh issue list --repo "$GITHUB_REPOSITORY" \
+              --label shipwright --state open --limit 200 --json number --jq '.[].number'); then
+              echo "::error::cannot list shipwright issues; not retrying"
+              exit 1
+            fi
 
             for issue in $OPEN_ISSUES; do
-              HAS_RUN=$(gh issue view "$issue" --repo "$GITHUB_REPOSITORY" --json comments \
-                --jq "[.comments[] | select(.body | contains(\"$RUN_ID\"))] | length" 2>/dev/null || echo "0")
+              # Bot-authored comments only (ADR-0007); RUN_ID goes to jq as data, and only the
+              # whole marker line <!-- SHIPWRIGHT-RUN-ID: <id> --> counts (not any substring).
+              if ! COMMENTS_JSON=$(scripts/ci/bot-comments.sh "$issue"); then
+                echo "::error::cannot read bot comments; refusing to retry"
+                exit 1
+              fi
+              HAS_RUN=$(jq --arg m "<!-- SHIPWRIGHT-RUN-ID: ${RUN_ID} -->" \
+                '[.[] | .body | strings | split("\n")[] | rtrimstr("\r") | select(. == $m)] | length' <<<"$COMMENTS_JSON")
               if [[ "$HAS_RUN" -gt 0 ]]; then
                 ISSUE_NUMBER="$issue"
                 break
@@ -81,7 +116,9 @@ jobs:
       - name: Categorize error from run logs
         if: steps.extract.outputs.issue_number != ''
         id: categorize
+        shell: bash
         env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           RUN_ID: ${{ steps.extract.outputs.run_id }}
           CONCLUSION: ${{ steps.extract.outputs.conclusion }}
           ISSUE_NUMBER: ${{ steps.extract.outputs.issue_number }}
@@ -110,9 +147,13 @@ jobs:
             LAST_ERROR="${LAST_ERROR:0:200}..."
           fi
 
-          # Extract failed stage from issue comments (SHIPWRIGHT-RESULT marker)
-          COMMENTS=$(gh issue view "$ISSUE_NUMBER" --repo "$GITHUB_REPOSITORY" \
-            --json comments --jq '.comments[].body' 2>/dev/null || echo "")
+          # Extract failed stage from bot-authored comments only (SHIPWRIGHT-RESULT marker);
+          # a marker typed by anyone else is ignored (ADR-0007).
+          if ! COMMENTS_JSON=$(scripts/ci/bot-comments.sh "$ISSUE_NUMBER"); then
+            echo "::error::cannot read bot comments; refusing to retry"
+            exit 1
+          fi
+          COMMENTS=$(jq -r '.[].body' <<<"$COMMENTS_JSON")
           FAILED_STAGE=$(echo "$COMMENTS" | grep -oE 'SHIPWRIGHT-RESULT: [0-9]+:[a-z_]+' | tail -1 | cut -d: -f3 || true)
 
           # ── Categorize the failure ──
@@ -192,17 +233,67 @@ jobs:
       - name: Check retry count and determine strategy
         if: steps.extract.outputs.issue_number != ''
         id: strategy
+        shell: bash
         env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           ISSUE_NUMBER: ${{ steps.extract.outputs.issue_number }}
           RUN_ID: ${{ steps.extract.outputs.run_id }}
           ERROR_CATEGORY: ${{ steps.categorize.outputs.error_category }}
         run: |
-          # Read retry count from issue comments (hidden HTML marker)
-          COMMENTS=$(gh issue view "$ISSUE_NUMBER" --repo "$GITHUB_REPOSITORY" \
-            --json comments --jq '.comments[].body' 2>/dev/null || echo "")
+          # Bot-authored comments only (ADR-0007). Unreadable: do not retry, because a
+          # missing count would restart the loop at 0.
+          if ! COMMENTS_JSON=$(scripts/ci/bot-comments.sh "$ISSUE_NUMBER"); then
+            echo "::error::cannot read bot comments; refusing to retry"
+            exit 1
+          fi
+          COMMENTS=$(jq -r '.[].body' <<<"$COMMENTS_JSON")
 
-          RETRY_COUNT=$(echo "$COMMENTS" | grep -oE 'SHIPWRIGHT-RETRY: [0-9]+' | tail -1 | grep -oE '[0-9]+' || echo "0")
-          RETRY_COUNT="${RETRY_COUNT:-0}"
+          # Retry count = the highest bot SHIPWRIGHT-RETRY marker; refuses when retry markers
+          # exist only from other authors. Also reports the watchdog's abandon marker.
+          if ! RETRY_STATE=$(scripts/ci/retry-state.sh "$ISSUE_NUMBER" "$RUN_ID"); then
+            echo "::error::cannot establish the retry count for #$ISSUE_NUMBER; refusing to retry"
+            exit 1
+          fi
+
+          # A run the watchdog abandoned (silent over 2h) is never retried automatically.
+          if [[ "$(jq -r '.abandoned' <<<"$RETRY_STATE")" == "true" ]]; then
+            echo "Run $RUN_ID was abandoned by the watchdog — not retrying"
+            echo "should_retry=false" >> "$GITHUB_OUTPUT"
+            echo "skip_reason=abandoned" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          RETRY_COUNT=$(jq -r '.retry' <<<"$RETRY_STATE")
+
+          # Held issues (auto-patrol, shipwright-stuck, -failed, -infra-issue) wait for a human.
+          # shellcheck source=/dev/null
+          source scripts/lib/safety-gates.sh
+          if ! ISSUE_JSON=$(gh issue view "$ISSUE_NUMBER" --repo "$GITHUB_REPOSITORY" --json number,labels); then
+            echo "::error::cannot read the labels of #$ISSUE_NUMBER; refusing to retry"
+            exit 1
+          fi
+          if ! ELIGIBLE=$(jq -c '[.]' <<<"$ISSUE_JSON" | dispatchable_issue_numbers); then
+            echo "::error::cannot read the labels of #$ISSUE_NUMBER; refusing to retry"
+            exit 1
+          fi
+          if [[ "$ELIGIBLE" != "$ISSUE_NUMBER" ]]; then
+            echo "Issue #$ISSUE_NUMBER is held by a label — not retrying"
+            echo "should_retry=false" >> "$GITHUB_OUTPUT"
+            echo "skip_reason=held" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          # Another pipeline for this issue is already running or queued: nothing to retry.
+          if ! ACTIVE=$(scripts/ci/pipeline-active.sh "$ISSUE_NUMBER"); then
+            echo "::error::cannot list pipeline runs for #$ISSUE_NUMBER; refusing to retry"
+            exit 1
+          fi
+          if [[ "$ACTIVE" == "true" ]]; then
+            echo "A pipeline for #$ISSUE_NUMBER is already running or queued — not retrying"
+            echo "should_retry=false" >> "$GITHUB_OUTPUT"
+            echo "skip_reason=active" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
 
           echo "Current retry count: $RETRY_COUNT"
 
@@ -291,9 +382,33 @@ jobs:
           echo "Max Iterations: $MAX_ITERATIONS"
           echo "Resume from: ${COMPLETED_STAGES:-start}"
 
-      - name: Post retry comment with root cause
+      # Back off BEFORE the gates, so that they are read just before the dispatch.
+      - name: Back off before retrying
         if: steps.strategy.outputs.should_retry == 'true'
+        shell: bash
         env:
+          RETRY_COUNT: ${{ steps.strategy.outputs.retry_count }}
+        run: |
+          BACKOFF=$((RETRY_COUNT * 30))
+          echo "Waiting ${BACKOFF}s before retry ${RETRY_COUNT}..."
+          sleep "$BACKOFF"
+
+      # Fails the job unless every gate allows dispatch (ADR-0007); retry is the retry
+      # about to be dispatched (1-3), for the fix-loop cap.
+      - name: Safety gates
+        id: gates
+        if: steps.strategy.outputs.should_retry == 'true'
+        uses: ./.github/actions/safety-gates
+        with:
+          retry: ${{ steps.strategy.outputs.retry_count }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Post retry comment with root cause
+        id: comment
+        if: steps.strategy.outputs.should_retry == 'true' && steps.gates.outputs.allowed == 'true'
+        shell: bash
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           LAST_ERROR: ${{ steps.categorize.outputs.last_error }}
           ISSUE_NUMBER: ${{ steps.extract.outputs.issue_number }}
           RETRY_COUNT: ${{ steps.strategy.outputs.retry_count }}
@@ -306,6 +421,17 @@ jobs:
           ERROR_CATEGORY: ${{ steps.categorize.outputs.error_category }}
           FAILED_STAGE: ${{ steps.categorize.outputs.failed_stage }}
         run: |
+          # Re-check after the backoff: a pipeline may have started for this issue meanwhile.
+          if ! ACTIVE=$(scripts/ci/pipeline-active.sh "$ISSUE_NUMBER"); then
+            echo "::error::cannot list pipeline runs for #$ISSUE_NUMBER; not retrying"
+            exit 1
+          fi
+          if [[ "$ACTIVE" == "true" ]]; then
+            echo "A pipeline for #$ISSUE_NUMBER started meanwhile — not retrying"
+            echo "posted=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
           # Build human-readable category label
           case "$ERROR_CATEGORY" in
             TRANSIENT)      CATEGORY_LABEL="Transient (timeout/network)" ;;
@@ -321,7 +447,9 @@ jobs:
           > **Note**: This error has occurred in previous retries. The issue may need human review or simplification."
           fi
 
-          gh issue comment "$ISSUE_NUMBER" --repo "$GITHUB_REPOSITORY" --body "$(cat <<EOF
+          # The SHIPWRIGHT-RETRY marker below is the retry count: if it cannot be posted, fail
+          # so that nothing is dispatched (an uncounted retry would loop forever).
+          if ! gh issue comment "$ISSUE_NUMBER" --repo "$GITHUB_REPOSITORY" --body "$(cat <<EOF
           :arrows_counterclockwise: **Shipwright Auto-Retry** (attempt ${RETRY_COUNT}/3)
 
           Previous run ${CONCLUSION} at stage: \`${LAST_STAGE:-unknown}\`
@@ -349,52 +477,33 @@ jobs:
           <!-- SHIPWRIGHT-LAST-STAGE: ${LAST_STAGE} -->
           <!-- SHIPWRIGHT-FAILED-RUN: ${FAILED_RUN} -->
           EOF
-          )" 2>/dev/null || true
-
-      - name: Check budget before retry
-        if: steps.strategy.outputs.should_retry == 'true'
-        id: budget
-        run: |
-          # Ensure Shipwright is available
-          if command -v shipwright &>/dev/null || [ -x ./node_modules/.bin/sw ]; then
-            REMAINING=$(shipwright cost remaining-budget 2>/dev/null || echo "100")
-          else
-            REMAINING="100"
+          )"; then
+            echo "::error::could not post the retry marker on #$ISSUE_NUMBER; not retrying"
+            exit 1
           fi
-          echo "remaining=$REMAINING" >> "$GITHUB_OUTPUT"
-          if [ "$(echo "$REMAINING < 10" | bc 2>/dev/null || echo "0")" -eq 1 ]; then
-            echo "Budget too low (\$$REMAINING remaining), skipping retry"
-            echo "skip=true" >> "$GITHUB_OUTPUT"
-          else
-            echo "Budget OK (\$$REMAINING remaining)"
-            echo "skip=false" >> "$GITHUB_OUTPUT"
-          fi
+          echo "posted=true" >> "$GITHUB_OUTPUT"
 
       - name: Dispatch retry pipeline
-        if: steps.strategy.outputs.should_retry == 'true' && steps.budget.outputs.skip != 'true'
+        if: steps.strategy.outputs.should_retry == 'true' && steps.gates.outputs.allowed == 'true' && steps.comment.outputs.posted == 'true'
+        shell: bash
         env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           ISSUE_NUMBER: ${{ steps.extract.outputs.issue_number }}
           TEMPLATE: ${{ steps.strategy.outputs.template }}
           MAX_ITERATIONS: ${{ steps.strategy.outputs.max_iterations }}
           COMPLETED_STAGES: ${{ steps.strategy.outputs.completed_stages }}
-          RETRY_COUNT: ${{ steps.strategy.outputs.retry_count }}
         run: |
-          # Backoff delay — avoid hammering the pipeline immediately after failure
-          BACKOFF=$((RETRY_COUNT * 30))
-          echo "Waiting ${BACKOFF}s before retry (attempt ${RETRY_COUNT})..."
-          sleep "$BACKOFF"
-
           echo "Dispatching retry pipeline for issue #$ISSUE_NUMBER..."
-          gh workflow run shipwright-pipeline.yml \
+          if ! gh workflow run shipwright-pipeline.yml \
             --repo "$GITHUB_REPOSITORY" \
             -f issue_number="$ISSUE_NUMBER" \
             -f template="$TEMPLATE" \
             -f max_iterations="$MAX_ITERATIONS" \
             -f completed_stages="$COMPLETED_STAGES" \
-            -f skip_triage=true 2>&1 || {
-              echo "Failed to dispatch retry — will be caught by next sweep"
-              exit 0
-            }
+            -f skip_triage=true; then
+            echo "::error::failed to dispatch the retry for #$ISSUE_NUMBER (its retry marker is posted)"
+            exit 1
+          fi
 
           echo "Retry dispatched successfully"
 
@@ -402,6 +511,7 @@ jobs:
       - name: Handle INFRA failure (no retry)
         if: steps.strategy.outputs.skip_reason == 'infra' && steps.extract.outputs.issue_number != ''
         env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           LAST_ERROR: ${{ steps.categorize.outputs.last_error }}
           ISSUE_NUMBER: ${{ steps.extract.outputs.issue_number }}
           FAILED_RUN: ${{ steps.extract.outputs.run_id }}
@@ -445,7 +555,9 @@ jobs:
       # ── Max retries exhausted: post detailed analysis of all attempts ──
       - name: Mark issue as failed (max retries exhausted)
         if: steps.strategy.outputs.skip_reason == 'exhausted' && steps.extract.outputs.issue_number != ''
+        shell: bash
         env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           LAST_ERROR: ${{ steps.categorize.outputs.last_error }}
           ISSUE_NUMBER: ${{ steps.extract.outputs.issue_number }}
           RETRY_COUNT: ${{ steps.strategy.outputs.retry_count }}
@@ -453,9 +565,13 @@ jobs:
           ERROR_CATEGORY: ${{ steps.categorize.outputs.error_category }}
           FAILED_STAGE: ${{ steps.categorize.outputs.failed_stage }}
         run: |
-          # Build a summary of all retry attempts from issue comments
-          COMMENTS=$(gh issue view "$ISSUE_NUMBER" --repo "$GITHUB_REPOSITORY" \
-            --json comments --jq '.comments[].body' 2>/dev/null || echo "")
+          # Build a summary of all retry attempts from bot-authored comments. Display only:
+          # unreadable comments leave the history empty; the issue is still labelled failed.
+          if ! COMMENTS_JSON=$(scripts/ci/bot-comments.sh "$ISSUE_NUMBER"); then
+            echo "::warning::cannot read bot comments; retry history omitted"
+            COMMENTS_JSON="[]"
+          fi
+          COMMENTS=$(jq -r '.[].body' <<<"$COMMENTS_JSON")
 
           ATTEMPT_SUMMARY=""
           for i in 1 2 3; do

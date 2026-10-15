@@ -1,7 +1,8 @@
 id: F5-io-only-in-adapters
 language: TypeScript
 severity: error
-message: "I/O belongs in src/adapters. Define a port in the context and inject an adapter from main.ts."
+message: "F5: I/O belongs in src/adapters. Define a port in the context and inject an adapter from main.ts. (A local variable named process, Bun or global trips this too: rename it, e.g. proc.)"
+metadata: { owner: "@sethdford", docs: "docs/architecture.md#fitness-rules" }
 files:
   - "src/**/*.ts"
 ignores:
@@ -12,9 +13,35 @@ ignores:
   - "src/**/*.test.ts"
 # Module specifiers that grant I/O. Keep the three copies of this regex below in sync.
 #   bun | bun:sqlite | (node:)?fs | fs/promises | child_process | net | http | https | dns | tls
-#   | dgram | http2 | worker_threads | process
+#   | dgram | http2 | worker_threads | process | os (homedir, userInfo, hostname read the machine)
 rule:
   any:
+    # A bare global used as a value (aliasing, call arguments, computed access such as
+    # globalThis["process"], (0, eval)) would bypass the member checks below. Members
+    # (process.argv, globalThis.structuredClone), type positions (typeof Bun) and declarations of
+    # locals with these names are not values of the global.
+    - all:
+        - kind: identifier
+          regex: '^(Bun|process|globalThis|global|eval|Function)$'
+        - not: { inside: { kind: member_expression, field: object } }
+        - not: { inside: { kind: nested_type_identifier } }
+        - not: { inside: { kind: type_query, stopBy: end } }
+        - not: { inside: { kind: variable_declarator, field: name } }
+        - not: { inside: { any: [{ kind: required_parameter }, { kind: optional_parameter }], field: pattern } }
+    # I/O reached through a global object, including optional chaining (globalThis?.process)
+    - kind: member_expression
+      all:
+        - has: { field: object, regex: '^(globalThis|global|window|self)$' }
+        - has: { field: property, regex: '^(process|Bun|fetch|require|eval|Function|Worker|WebSocket)$' }
+    - pattern: import.meta.env
+    # Module loading the rule cannot read: a computed specifier
+    - all:
+        - any:
+            - pattern: import($S)
+            - pattern: require($S)
+        - not: { has: { field: arguments, has: { nthChild: 1, kind: string } } }
+    - kind: new_expression
+      has: { field: constructor, regex: '^(Worker|SharedWorker|WebSocket|EventSource|XMLHttpRequest)$' }
     # Every runtime member of the Bun global (Bun.spawn, Bun.$, Bun.file, Bun.env, ...).
     # Type positions (`Bun.Subprocess`, `typeof Bun.spawn`) are not member expressions at runtime.
     - all:
@@ -50,7 +77,7 @@ rule:
             kind: arguments
             has:
               kind: string
-              regex: '^["''](bun|bun:sqlite|(node:)?(fs|fs/promises|child_process|net|http|https|dns|tls|dgram|http2|worker_threads|process))["'']$'
+              regex: '^["''](bun|bun:sqlite|(node:)?(fs|fs/promises|child_process|net|http|https|dns|tls|dgram|http2|worker_threads|process|os))["'']$'
     - all:
         - any:
             - kind: import_statement
@@ -58,11 +85,11 @@ rule:
         - has:
             field: source
             kind: string
-            regex: '^["''](bun|bun:sqlite|(node:)?(fs|fs/promises|child_process|net|http|https|dns|tls|dgram|http2|worker_threads|process))["'']$'
+            regex: '^["''](bun|bun:sqlite|(node:)?(fs|fs/promises|child_process|net|http|https|dns|tls|dgram|http2|worker_threads|process|os))["'']$'
         - not:
             regex: '^(import|export)\s+type\s'
     - kind: import_require_clause
       has:
         field: source
         kind: string
-        regex: '^["''](bun|bun:sqlite|(node:)?(fs|fs/promises|child_process|net|http|https|dns|tls|dgram|http2|worker_threads|process))["'']$'
+        regex: '^["''](bun|bun:sqlite|(node:)?(fs|fs/promises|child_process|net|http|https|dns|tls|dgram|http2|worker_threads|process|os))["'']$'

@@ -2,6 +2,9 @@
 # Source from pipeline-stages.sh. Requires all pipeline globals and dependencies.
 [[ -n "${_PIPELINE_STAGES_MONITOR_LOADED:-}" ]] && return 0
 _PIPELINE_STAGES_MONITOR_LOADED=1
+# Issue intake caps for automated filings (ADR-0007); path is relative to this file
+# shellcheck source=safety-gates.sh
+source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/safety-gates.sh"
 
 stage_validate() {
     CURRENT_STAGE_ID="validate"
@@ -37,7 +40,8 @@ stage_validate() {
         bash -c "$smoke_cmd" > "$ARTIFACTS_DIR/smoke.log" 2>&1 || {
             error "Smoke tests failed"
             if [[ -n "$ISSUE_NUMBER" ]]; then
-                gh issue create --title "Deploy validation failed: $GOAL" \
+                patrol_issue_create --intake-label "incident" \
+                    --title "Deploy validation failed: $GOAL" \
                     --label "incident" --body "Pipeline smoke tests failed after deploy.
 
 Related issue: ${GITHUB_ISSUE}
@@ -328,7 +332,7 @@ Rollback command: \`${rollback_cmd}\`" 2>/dev/null || true
 
                     # Create hotfix issue
                     if [[ "$GH_AVAILABLE" == "true" ]]; then
-                        gh issue create \
+                        patrol_issue_create --intake-label "incident" \
                             --title "Hotfix: Deploy regression for ${GOAL}" \
                             --label "hotfix,incident" \
                             --body "Auto-rollback triggered during post-deploy monitoring.

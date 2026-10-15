@@ -1,0 +1,45 @@
+# F11 (bash safety): running a download as code runs unpinned, unverified code: piped into a
+# shell (also through sudo/env, or into source /dev/stdin), or read through a process or command
+# substitution. Ratcheted (tools/arch/ast-scan.ts).
+id: F11-bash-no-pipe-to-shell
+language: Bash
+severity: off
+metadata: { ratchet: true, owner: "@sethdford", docs: "docs/architecture.md#fitness-rules" }
+message: "F11: never run a download as code. Download to a file, verify a pinned checksum (shasum -a 256 -c), then run it; or print the install command for the user instead of running it."
+files:
+  - "scripts/**/*.sh"
+  - "scripts/sw"
+  - ".claude/hooks/**/*.sh"
+  - "claude-code/hooks/**/*.sh"
+  - "completions/**/*.bash"
+  - "install.sh"
+utils:
+  shell-sink:
+    kind: command
+    any:
+      - has: { field: name, matches: bash-shell }
+      - all:
+          - has: { field: name, regex: '^(sudo|env|command|exec|nice|nohup)$' }
+          - has: { kind: word, matches: bash-shell }
+      - all:
+          - has: { field: name, regex: '^(source|\.)$' }
+          - has: { kind: word, regex: '^/dev/(stdin|fd/0)$' }
+rule:
+  any:
+    - kind: pipeline
+      all:
+        - has: { matches: bash-download }
+        - has: { matches: shell-sink }
+    - kind: command
+      all:
+        - has:
+            field: name
+            any:
+              - matches: bash-shell
+              - regex: '^(source|\.)$'
+        - has:
+            stopBy: end
+            any:
+              - kind: process_substitution
+              - kind: command_substitution
+            has: { stopBy: end, matches: bash-download }

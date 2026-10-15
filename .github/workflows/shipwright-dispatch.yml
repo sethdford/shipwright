@@ -11,6 +11,7 @@ permissions:
   contents: read
   issues: write
   actions: write
+  pull-requests: read
 
 concurrency:
   group: shipwright-dispatch
@@ -22,17 +23,44 @@ jobs:
     timeout-minutes: 10
 
     env:
-      GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      GH_REPO: ${{ github.repository }}
 
     steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      # Fails the job unless every gate allows dispatch (ADR-0007).
+      - name: Safety gates
+        id: gates
+        uses: ./.github/actions/safety-gates
+        with:
+          retry: "0"
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+
       - name: Scan and dispatch shipwright-labeled issues
+        if: steps.gates.outputs.allowed == 'true'
+        shell: bash
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          MAX_DISPATCH: "3"
         run: |
           echo "--- Shipwright Dispatch: $(date -u +%Y-%m-%dT%H:%M:%SZ) ---"
 
-          # Get all open issues with the 'shipwright' label
-          ISSUES=$(gh issue list --repo "$GITHUB_REPOSITORY" \
-            --label shipwright --state open --json number,title \
-            --jq '.[].number' 2>/dev/null || echo "")
+          # Open issues with the 'shipwright' label, minus auto-filed (auto-patrol), shipwright-stuck,
+          # shipwright-failed and shipwright-infra-issue ones: those wait until a human removes
+          # that label (ADR-0007).
+          # shellcheck source=/dev/null
+          source scripts/lib/safety-gates.sh
+          if ! ISSUE_LIST=$(gh issue list --repo "$GITHUB_REPOSITORY" \
+            --label shipwright --state open --limit 200 --json number,labels); then
+            echo "::error::cannot list shipwright issues"
+            exit 1
+          fi
+          if ! ISSUES=$(dispatchable_issue_numbers <<<"$ISSUE_LIST"); then
+            echo "::error::cannot read the shipwright issue list"
+            exit 1
+          fi
 
           if [[ -z "$ISSUES" ]]; then
             echo "No open shipwright-labeled issues found."
@@ -43,85 +71,83 @@ jobs:
 
           DISPATCHED=0
           SKIPPED=0
+          READ_FAILURES=0
 
           for issue in $ISSUES; do
             echo ""
             echo "--- Checking issue #$issue ---"
 
-            # ── Check 1: Skip if issue has shipwright-failed label ──
-            HAS_FAILED_LABEL=$(gh issue view "$issue" --repo "$GITHUB_REPOSITORY" \
-              --json labels --jq '[.labels[].name] | index("shipwright-failed") // empty' 2>/dev/null || echo "")
-
-            if [[ -n "$HAS_FAILED_LABEL" ]]; then
-              echo "Issue #$issue: has shipwright-failed label — skipping"
-              SKIPPED=$((SKIPPED + 1))
+            # ── Check 1: a pipeline already running or queued for THIS issue ──
+            if ! ACTIVE=$(scripts/ci/pipeline-active.sh "$issue"); then
+              echo "::error::cannot list pipeline runs for #$issue; leaving it alone"
+              READ_FAILURES=$((READ_FAILURES + 1))
               continue
             fi
-
-            # ── Check 2: Active/queued pipeline runs for THIS issue ──
-            # Check by displayTitle which includes "#N" via run-name
-            # Use temp files to detect API failures (rate limiting)
-            ISSUE_ACTIVE="0"
-            if gh run list --repo "$GITHUB_REPOSITORY" \
-              --workflow=shipwright-pipeline.yml --status in_progress \
-              --json displayTitle --jq "[.[] | select(.displayTitle | test(\"#${issue}( |$)\"))] | length" > /tmp/dispatch-active-$issue.txt 2>/dev/null; then
-              ISSUE_ACTIVE=$(cat /tmp/dispatch-active-$issue.txt 2>/dev/null || echo "0")
-            else
-              echo "Issue #$issue: API call failed — skipping to avoid duplicate dispatch"
-              SKIPPED=$((SKIPPED + 1))
-              continue
-            fi
-
-            ISSUE_QUEUED="0"
-            if gh run list --repo "$GITHUB_REPOSITORY" \
-              --workflow=shipwright-pipeline.yml --status queued \
-              --json displayTitle --jq "[.[] | select(.displayTitle | test(\"#${issue}( |$)\"))] | length" > /tmp/dispatch-queued-$issue.txt 2>/dev/null; then
-              ISSUE_QUEUED=$(cat /tmp/dispatch-queued-$issue.txt 2>/dev/null || echo "0")
-            else
-              echo "Issue #$issue: API call failed — skipping to avoid duplicate dispatch"
-              SKIPPED=$((SKIPPED + 1))
-              continue
-            fi
-
-            if [[ "${ISSUE_ACTIVE:-0}" -gt 0 ]] || [[ "${ISSUE_QUEUED:-0}" -gt 0 ]]; then
+            if [[ "$ACTIVE" == "true" ]]; then
               echo "Issue #$issue: pipeline already running/queued — skipping"
               SKIPPED=$((SKIPPED + 1))
               continue
             fi
 
-            # ── Check 3: Already completed with PR ──
-            COMMENTS=""
-            if ! COMMENTS=$(gh issue view "$issue" --repo "$GITHUB_REPOSITORY" \
-              --json comments --jq '.comments[].body' 2>/dev/null); then
-              echo "Issue #$issue: failed to fetch comments — skipping"
+            # ── Check 2: first dispatch only ──
+            # Once dispatch has asked for a run (SHIPWRIGHT-DISPATCHED, posted before every
+            # dispatch), or a pipeline or retry has commented, auto-retry is the only retry path
+            # (fix-loop cap, ADR-0007). The marker matters for runs that end before "Shipwright
+            # Pipeline Starting" (auth failure, triage error, claim skip, setup failure): without
+            # it they would be re-dispatched every 15 minutes. Bot-authored comments only.
+            if ! COMMENTS_JSON=$(scripts/ci/bot-comments.sh "$issue"); then
+              echo "::error::cannot read bot comments for #$issue; leaving it alone"
+              READ_FAILURES=$((READ_FAILURES + 1))
+              continue
+            fi
+            # jq -e: 0 = a marker exists, 1 = none, anything else = unreadable (fail closed).
+            HANDLED_RC=0
+            # "Pipeline Auth Failure" covers issues whose runs failed at the auth pre-flight before
+            # dispatch posted markers (the 2026-10-14 expired-token failures).
+            jq -e 'any(.[]; .body | test("SHIPWRIGHT-DISPATCHED|SHIPWRIGHT-RETRY|Shipwright Pipeline|Pipeline Auth Failure"))' \
+              <<<"$COMMENTS_JSON" >/dev/null || HANDLED_RC=$?
+            if [[ "$HANDLED_RC" -gt 1 ]]; then
+              echo "::error::cannot read the bot comments of #$issue (jq exit $HANDLED_RC); leaving it alone"
+              READ_FAILURES=$((READ_FAILURES + 1))
+              continue
+            fi
+            if [[ "$HANDLED_RC" -eq 0 ]]; then
+              echo "Issue #$issue: already dispatched or run — auto-retry owns any retry; skipping"
               SKIPPED=$((SKIPPED + 1))
               continue
             fi
 
-            HAS_SUCCESS=$(echo "$COMMENTS" | grep -c "Pipeline Completed Successfully" || true)
-            HAS_PR=$(echo "$COMMENTS" | grep -c "Pull Request Created" || true)
-
-            if [[ "$HAS_SUCCESS" -gt 0 && "$HAS_PR" -gt 0 ]]; then
-              echo "Issue #$issue: pipeline already completed with PR — skipping"
-              SKIPPED=$((SKIPPED + 1))
-              continue
+            # ── Per-run cap, then the gates again: an earlier dispatch may have closed one ──
+            if [[ "$DISPATCHED" -ge "$MAX_DISPATCH" ]]; then
+              echo "Dispatched $DISPATCHED issue(s), the per-run cap — stopping"
+              break
+            fi
+            if ! bun src/cli.ts gates check --retry 0; then
+              echo "::warning::Safety gates no longer allow dispatch — stopping"
+              break
             fi
 
-            # ── All checks passed — dispatch pipeline ──
+            # ── All checks passed — mark, then dispatch ──
+            # The marker goes first: if it cannot be posted, nothing is dispatched, so no run can
+            # exist that a later dispatch would not see.
+            REQUESTED_AT=$(date -u +%Y-%m-%dT%H:%M:%SZ)
+            if ! gh issue comment "$issue" --repo "$GITHUB_REPOSITORY" \
+              --body "Shipwright dispatch requested a pipeline run for this issue.
+
+          <!-- SHIPWRIGHT-DISPATCHED: run-request ${REQUESTED_AT} -->"; then
+              echo "::error::could not post the dispatch marker on #$issue; not dispatching — stopping"
+              exit 1
+            fi
             echo "Issue #$issue: dispatching pipeline..."
-            if gh workflow run shipwright-pipeline.yml \
+            if ! gh workflow run shipwright-pipeline.yml \
               --repo "$GITHUB_REPOSITORY" \
               -f issue_number="$issue" \
-              -f template=standard 2>&1; then
-              echo "Issue #$issue: pipeline dispatched successfully"
-              DISPATCHED=$((DISPATCHED + 1))
-
-              # Add shipwright label so sweep can track it too
-              gh issue edit "$issue" --repo "$GITHUB_REPOSITORY" \
-                --add-label "shipwright" 2>/dev/null || true
-            else
-              echo "Issue #$issue: failed to dispatch pipeline"
+              -f template=standard; then
+              echo "::error::failed to dispatch a pipeline for #$issue — stopping"
+              exit 1
             fi
+            echo "Issue #$issue: pipeline dispatched"
+            DISPATCHED=$((DISPATCHED + 1))
 
             sleep 5  # Avoid rate limiting between dispatches
           done
@@ -130,3 +156,7 @@ jobs:
           echo "--- Dispatch Summary ---"
           echo "Dispatched: $DISPATCHED"
           echo "Skipped: $SKIPPED"
+          echo "Read failures: $READ_FAILURES"
+          if [[ "$READ_FAILURES" -gt 0 ]]; then
+            exit 1
+          fi

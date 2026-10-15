@@ -1,0 +1,13 @@
+# Fitness functions and their baselines (ADR-0008). A change to a rule, an allowlist or a baseline
+# changes what every agent is allowed to write, so it needs the maintainer's review.
+/tools/arch/                      @sethdford
+/sgconfig.yml                     @sethdford
+/.dependency-cruiser.cjs          @sethdford
+/.dependency-cruiser.dashboard.cjs @sethdford
+/package.json                     @sethdford
+/.github/CODEOWNERS               @sethdford
+/.github/workflows/ts-check.yml   @sethdford
+/docs/architecture.md             @sethdford
+/dashboard/tsconfig.server.json   @sethdford
+/src/adapters/agent/privilege-guard.ts @sethdford
+/src/adapters/agent/agent-sdk-runner.ts @sethdford

@@ -1,0 +1,9 @@
+id: F9-bash-no-permission-bypass
+valid:
+  - 'claude -p "$prompt" --allowedTools "Read,Edit" --permission-mode dontAsk'
+  - '# never pass --dangerously-skip-permissions'
+invalid:
+  - 'claude -p "$prompt" --dangerously-skip-permissions'
+  - 'flags+=(--dangerously-skip-permissions)'
+  - 'CLAUDE_FLAGS="--model $m --dangerously-skip-permissions"'
+  - 'claude --permission-mode bypassPermissions -p "$p"'

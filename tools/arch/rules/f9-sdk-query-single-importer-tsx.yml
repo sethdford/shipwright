@@ -1,0 +1,49 @@
+# Tsx copy of F9-sdk-query-single-importer. ast-grep parses .tsx with the Tsx grammar, so the TypeScript rule cannot see
+# JSX files. Same rule body and message as f9-sdk-query-single-importer.yml: change both together (see
+# tools/arch/meta.test.ts for the F9 extension check).
+id: F9-sdk-query-single-importer-tsx
+language: Tsx
+severity: error
+message: "F9: only src/adapters/agent/agent-sdk-runner.ts may import the Claude Agent SDK as a value. Use the AgentRunner port, or move the call into agent-sdk-runner.ts so assertAgentOptions() checks its options."
+metadata:
+  owner: "@sethdford"
+  docs: "docs/architecture.md#fitness-rules"
+  preemptive: "src has no .tsx files yet; this keeps a .tsx file from escaping F9 (see F10-…-tsx)"
+files:
+  - "src/**/*.tsx"
+  - "dashboard/**/*.tsx"
+  - "tools/**/*.tsx"
+ignores:
+  - "src/adapters/agent/agent-sdk-runner.ts"
+rule:
+  any:
+    - all:
+        - kind: import_statement
+        - has:
+            kind: import_require_clause
+            has:
+              field: source
+              kind: string
+              regex: '^["'']@anthropic-ai/claude-agent-sdk(/.*)?["'']$'
+    - all:
+        - any:
+            - kind: import_statement
+            - kind: export_statement
+        - not: { regex: '^(import|export)\s+type\s' }
+        - has:
+            field: source
+            kind: string
+            regex: '^["'']@anthropic-ai/claude-agent-sdk(/.*)?["'']$'
+    - all:
+        - any:
+            - pattern: import($S)
+            - pattern: require($S)
+        - has:
+            field: arguments
+            kind: arguments
+            has:
+              any:
+                - kind: string
+                  regex: '^["''`]@anthropic-ai/claude-agent-sdk(/.*)?["''`]$'
+                - kind: template_string
+                  regex: '^["''`]@anthropic-ai/claude-agent-sdk(/.*)?["''`]$'

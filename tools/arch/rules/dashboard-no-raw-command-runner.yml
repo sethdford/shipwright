@@ -1,0 +1,23 @@
+# Dashboard: the raw command runner in an allowlisted service (claims.ts `defaultRunner`) runs any
+# file with any arguments. It stays module-private, and no other dashboard file may name it: any
+# reference (an import, an alias, an export, an object value) fails here. claims.ts itself is
+# ignored, so its exports are pinned instead: meta.test.ts compares the module's runtime export names
+# with the list of validated operations. Routes reach subprocesses only through those operations.
+# Pinned in tools/arch/meta.test.ts.
+id: dashboard-no-raw-command-runner
+language: TypeScript
+severity: error
+message: "Dashboard: do not reference the raw command runner (defaultRunner) outside claims.ts. Call the validated service operation (handleClaim, handleClaimRelease, releaseStaleClaims) instead."
+metadata: { owner: "@sethdford", docs: "docs/architecture.md#fitness-rules" }
+files:
+  - "dashboard/**/*.ts"
+  - "dashboard/**/*.mts"
+  - "dashboard/**/*.cts"
+ignores:
+  - "dashboard/services/claims.ts"
+rule:
+  any:
+    - kind: identifier
+      regex: '^defaultRunner$'
+    - kind: shorthand_property_identifier
+      regex: '^defaultRunner$'

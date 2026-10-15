@@ -1,0 +1,54 @@
+# F9: the Agent SDK's runtime exports (query, and anything else that spawns an agent) are imported
+# by ONE module, the guarded runner. Any other value import, namespace import, re-export, import(),
+# require() or `import x = require()` of the SDK would let code reach query() without assertAgentOptions(). Type-only
+# imports are allowed everywhere inside src/adapters/agent (F6 keeps them out of the rest of src/).
+# Dashboard code may not import the SDK at all. Pinned in tools/arch/meta.test.ts.
+id: F9-sdk-query-single-importer
+language: TypeScript
+severity: error
+message: "F9: only src/adapters/agent/agent-sdk-runner.ts may import the Claude Agent SDK as a value. Use the AgentRunner port, or move the call into agent-sdk-runner.ts so assertAgentOptions() checks its options."
+metadata: { owner: "@sethdford", docs: "docs/architecture.md#fitness-rules" }
+files:
+  - "src/**/*.ts"
+  - "src/**/*.mts"
+  - "src/**/*.cts"
+  - "dashboard/**/*.ts"
+  - "dashboard/**/*.mts"
+  - "dashboard/**/*.cts"
+  - "tools/**/*.ts"
+  - "tools/**/*.mts"
+  - "tools/**/*.cts"
+ignores:
+  - "src/adapters/agent/agent-sdk-runner.ts"
+rule:
+  any:
+    - all:
+        - kind: import_statement
+        - has:
+            kind: import_require_clause
+            has:
+              field: source
+              kind: string
+              regex: '^["'']@anthropic-ai/claude-agent-sdk(/.*)?["'']$'
+    - all:
+        - any:
+            - kind: import_statement
+            - kind: export_statement
+        - not: { regex: '^(import|export)\s+type\s' }
+        - has:
+            field: source
+            kind: string
+            regex: '^["'']@anthropic-ai/claude-agent-sdk(/.*)?["'']$'
+    - all:
+        - any:
+            - pattern: import($S)
+            - pattern: require($S)
+        - has:
+            field: arguments
+            kind: arguments
+            has:
+              any:
+                - kind: string
+                  regex: '^["''`]@anthropic-ai/claude-agent-sdk(/.*)?["''`]$'
+                - kind: template_string
+                  regex: '^["''`]@anthropic-ai/claude-agent-sdk(/.*)?["''`]$'

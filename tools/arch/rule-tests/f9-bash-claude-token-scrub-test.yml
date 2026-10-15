@@ -1,0 +1,16 @@
+id: F9-bash-claude-token-scrub
+valid:
+  - 'env -u GH_TOKEN -u GITHUB_TOKEN -u GH_ENTERPRISE_TOKEN claude -p "$prompt"'
+  - 'timeout 300 env -u GH_TOKEN -u GITHUB_TOKEN claude -p "$prompt"'
+  - 'env --unset=GH_TOKEN --unset=GITHUB_TOKEN claude -p "$prompt"'
+  - 'sw_claude -p "$prompt"'
+  - 'command -v claude >/dev/null'
+  - 'which claude'
+  - 'info "claude is ready"'
+invalid:
+  - 'claude -p "$prompt" --model "$m"'
+  - 'out=$(claude --print "$p" 2>&1)'
+  - 'timeout "$t" claude -p "$p"'
+  - '$TIMEOUT_CMD "$CLAUDE_TIMEOUT" claude -p "$p"'
+  - 'env -u GH_TOKEN claude -p "$p"'
+  - 'nohup claude -p "$p" > "$log" 2>&1 &'

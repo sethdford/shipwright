@@ -29,12 +29,23 @@ setup_env() {
     [[ -f "$SCRIPT_DIR/lib/compat.sh" ]] && cp "$SCRIPT_DIR/lib/compat.sh" "$TEST_TEMP_DIR/lib/" 2>/dev/null || true
     [[ -f "$SCRIPT_DIR/lib/helpers.sh" ]] && cp "$SCRIPT_DIR/lib/helpers.sh" "$TEST_TEMP_DIR/lib/" 2>/dev/null || true
     [[ -f "$SCRIPT_DIR/lib/config.sh" ]] && cp "$SCRIPT_DIR/lib/config.sh" "$TEST_TEMP_DIR/lib/" 2>/dev/null || true
+    cp "$SCRIPT_DIR/lib/safety-gates.sh" "$TEST_TEMP_DIR/lib/"
 
     # Mock curl for dashboard requests
     cat > "$TEST_TEMP_DIR/bin/curl" <<'EOF'
 #!/usr/bin/env bash
 # Mock curl with configurable responses
 # Usage: curl [options] <url>
+# Records argv (one element per line) to $CURL_ARGS_LOG and, when curl reads a file from
+# stdin (@-), stdin to $CURL_STDIN_LOG — only when those variables are set.
+if [[ -n "${CURL_ARGS_LOG:-}" ]]; then printf '%s\n' "$@" > "$CURL_ARGS_LOG"; fi
+# A --data-binary @file body goes to $CURL_BODY_LOG.
+prev=""
+for a in "$@"; do
+    if [[ "$a" == "@-" ]]; then cat > "${CURL_STDIN_LOG:-/dev/null}"; fi
+    if [[ "$prev" == "--data-binary" && "$a" == @?* ]]; then cat "${a#@}" > "${CURL_BODY_LOG:-/dev/null}"; fi
+    prev="$a"
+done
 
 get_mock_response() {
     case "$1" in
@@ -650,6 +661,110 @@ test_disconnect_sends_payload() {
     return 0
 }
 
+# ──────────────────────────────────────────────────────────────────────────────
+# 21b. Heartbeat and disconnect send the fleet token on stdin, never in argv
+# ──────────────────────────────────────────────────────────────────────────────
+
+# connect_call <fn> <args...> — runs one sw-connect.sh function with the mocks and a recording curl;
+# env: FLEET_TOKEN / FLEET_TOKEN_FILE (exported as SHIPWRIGHT_FLEET_TOKEN[_FILE] when non-empty). Prints the function's stdout.
+connect_call() {
+    rm -f "$TEST_TEMP_DIR/curl.args" "$TEST_TEMP_DIR/curl.stdin" "$TEST_TEMP_DIR/curl.body"
+    (
+        unset SHIPWRIGHT_FLEET_TOKEN SHIPWRIGHT_FLEET_TOKEN_FILE
+        [[ -n "${FLEET_TOKEN:-}" ]] && export SHIPWRIGHT_FLEET_TOKEN="$FLEET_TOKEN"
+        [[ -n "${FLEET_TOKEN_FILE:-}" ]] && export SHIPWRIGHT_FLEET_TOKEN_FILE="$FLEET_TOKEN_FILE"
+        export HOME="$TEST_TEMP_DIR/home" PATH="$TEST_TEMP_DIR/bin:$PATH" WRITE_OUT_CODE=true \
+            CURL_ARGS_LOG="$TEST_TEMP_DIR/curl.args" CURL_STDIN_LOG="$TEST_TEMP_DIR/curl.stdin" \
+            CURL_BODY_LOG="$TEST_TEMP_DIR/curl.body"
+        # shellcheck source=/dev/null
+        source "$TEST_TEMP_DIR/sw-connect.sh" help >/dev/null
+        "$@"
+    )
+}
+
+# expect_token_on_stdin_only <label> — the last recorded call carried the token on stdin only.
+expect_token_on_stdin_only() {
+    if [[ "$(cat "$TEST_TEMP_DIR/curl.stdin" 2>/dev/null)" != "X-Shipwright-Token: fleet-s3cret" ]]; then
+        echo -e "    ${RED}✗${RESET} $1: token header not sent on stdin"
+        return 1
+    fi
+    if grep -q "fleet-s3cret" "$TEST_TEMP_DIR/curl.args"; then
+        echo -e "    ${RED}✗${RESET} $1: token appears in curl argv"
+        return 1
+    fi
+    if grep -qi "^Authorization" "$TEST_TEMP_DIR/curl.args"; then
+        echo -e "    ${RED}✗${RESET} $1: Authorization header would be read as an invite token"
+        return 1
+    fi
+    return 0
+}
+
+test_heartbeat_sends_fleet_token() {
+    local code
+    code="$(FLEET_TOKEN="fleet-s3cret" connect_call send_heartbeat "http://dashboard.test" '{"developer_id":"d"}')"
+    if [[ "$code" != "200" ]]; then
+        echo -e "    ${RED}✗${RESET} send_heartbeat printed '${code}', expected 200"
+        return 1
+    fi
+    if ! grep -qx "http://dashboard.test/api/connect/heartbeat" "$TEST_TEMP_DIR/curl.args"; then
+        echo -e "    ${RED}✗${RESET} heartbeat not posted to /api/connect/heartbeat"
+        return 1
+    fi
+    expect_token_on_stdin_only "heartbeat"
+}
+
+test_heartbeat_keeps_invite_token_out_of_argv() {
+    FLEET_TOKEN="fleet-s3cret" connect_call send_heartbeat "http://dashboard.test" \
+        '{"developer_id":"d","invite_token":"invite-s3cret"}' >/dev/null
+    if grep -q "invite-s3cret" "$TEST_TEMP_DIR/curl.args"; then
+        echo -e "    ${RED}✗${RESET} invite token appears in curl argv"
+        return 1
+    fi
+    if [[ "$(jq -r '.invite_token' "$TEST_TEMP_DIR/curl.body" 2>/dev/null)" != "invite-s3cret" ]]; then
+        echo -e "    ${RED}✗${RESET} heartbeat body (with the invite token) not delivered"
+        return 1
+    fi
+    # The heartbeat payload passes the invite token to jq through the environment, not --arg
+    if grep -q -- '--arg invite_token "$invite_token"' "$TEST_TEMP_DIR/sw-connect.sh" \
+        || ! grep -q 'SW_INVITE_TOKEN="$invite_token" jq' "$TEST_TEMP_DIR/sw-connect.sh"; then
+        echo -e "    ${RED}✗${RESET} heartbeat payload passes the invite token to jq in argv"
+        return 1
+    fi
+    expect_token_on_stdin_only "heartbeat with invite token"
+}
+
+test_heartbeat_without_token_sends_no_header() {
+    FLEET_TOKEN="" connect_call send_heartbeat "http://dashboard.test" '{}' >/dev/null
+    if [[ -f "$TEST_TEMP_DIR/curl.stdin" ]] || grep -qx "@-" "$TEST_TEMP_DIR/curl.args"; then
+        echo -e "    ${RED}✗${RESET} a header was sent with no token configured"
+        return 1
+    fi
+    return 0
+}
+
+test_heartbeat_unusable_token_reports_failure() {
+    local code
+    code="$(FLEET_TOKEN_FILE="$TEST_TEMP_DIR/none" connect_call send_heartbeat "http://dashboard.test" '{}' 2>/dev/null)"
+    if [[ "$code" != "000" ]]; then
+        echo -e "    ${RED}✗${RESET} an unreadable token file printed '${code}', expected 000"
+        return 1
+    fi
+    if [[ -f "$TEST_TEMP_DIR/curl.args" ]]; then
+        echo -e "    ${RED}✗${RESET} curl ran with an unreadable token file"
+        return 1
+    fi
+    return 0
+}
+
+test_disconnect_sends_fleet_token() {
+    FLEET_TOKEN="fleet-s3cret" connect_call send_disconnect "http://localhost:8767" "dev" "machine" >/dev/null
+    if ! grep -qx "http://localhost:8767/api/connect/disconnect" "$TEST_TEMP_DIR/curl.args"; then
+        echo -e "    ${RED}✗${RESET} disconnect not posted to /api/connect/disconnect"
+        return 1
+    fi
+    expect_token_on_stdin_only "disconnect"
+}
+
 # ═══════════════════════════════════════════════════════════════════════════════
 # CONFIGURATION & UTILITIES
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -788,6 +903,11 @@ echo ""
 echo -e "${PURPLE}${BOLD}Heartbeat & Disconnect Payloads${RESET}"
 run_test "Heartbeat payload includes required fields" test_heartbeat_payload_fields
 run_test "Send disconnect sends proper payload" test_disconnect_sends_payload
+run_test "Heartbeat sends the fleet token on stdin only" test_heartbeat_sends_fleet_token
+run_test "Heartbeat keeps the invite token out of argv" test_heartbeat_keeps_invite_token_out_of_argv
+run_test "Heartbeat without a token sends no header" test_heartbeat_without_token_sends_no_header
+run_test "Heartbeat with an unusable token file fails" test_heartbeat_unusable_token_reports_failure
+run_test "Disconnect sends the fleet token on stdin only" test_disconnect_sends_fleet_token
 echo ""
 
 # Configuration & Utilities

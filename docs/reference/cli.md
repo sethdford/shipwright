@@ -4,6 +4,104 @@
 
 Commands implemented in TypeScript. Commands still in bash are listed in docs/plans/port/progress.json.
 
+## `breaker`
+
+Global circuit breaker: show it, or check it as a dispatch gate
+
+```text
+USAGE
+  shipwright breaker <status|check> [--json]
+
+DESCRIPTION
+  Global circuit breaker over recent pipeline runs (spec §6.2, ADR-0007). It opens when at
+  least 5 of the last 8 finished runs failed. After a 30-minute cool-down one probe run is
+  allowed; its result closes or re-opens the breaker.
+
+COMMANDS
+  status   Print the breaker state. Never writes. Exits 0, or 1 if the run history cannot be
+           read.
+  check    Exit 0 when dispatch is allowed, 1 when it is not or the run history cannot be
+           read. While open, opens or updates the one shipwright:incident issue (once per trip).
+
+OPTIONS
+  --json   Print one JSON object: state, allowed, and since, probeAfter, incident,
+           incidentError or error when they apply. Exit codes are unchanged.
+
+NOTES
+  Both commands read GitHub Actions; if it cannot be read, check fails closed (exit 1).
+  Only `shipwright gates check --no-github` skips the breaker (never on GitHub Actions).
+
+EXAMPLES
+  shipwright breaker status
+  shipwright breaker check && gh workflow run shipwright-pipeline.yml -f issue_number=42
+```
+
+## `budget`
+
+Daily budget guard: show it, or check it as a dispatch gate
+
+```text
+USAGE
+  shipwright budget <status|check> [--estimate USD]
+
+DESCRIPTION
+  Pre-dispatch budget guard (spec §6.2, ADR-0007). Reads the daily cap and today's spend (UTC)
+  from ~/.shipwright/budget.json and costs.json, written by `shipwright cost`.
+  It blocks at exactly the cap (spend + estimate >= cap), which is stricter than `shipwright cost`
+  (blocks only above it). Any file that exists but is malformed, and a full 1000-entry ledger that
+  starts today (spend unknown), also block.
+  When neither file exists (as on a CI runner) there is nothing to check: the command exits 0 and
+  prints "no cost data ... budget not enforced". A CI budget source is deferred to Wave 1b/1c.
+  A mis-set HOME also shows "no cost data", because the files are read from $HOME/.shipwright.
+
+COMMANDS
+  status   Print today's spend against the cap. Exits 0 unless the files cannot be read.
+  check    Exit 0 when today's spend plus the estimate stays under the cap, 1 when it does not
+           or the files cannot be read. No cap configured means unlimited.
+
+OPTIONS
+  --estimate USD   Expected cost of the next run (default 0)
+
+EXAMPLES
+  shipwright budget check --estimate 2.50
+```
+
+## `gates`
+
+All dispatch gates (pause, breaker, budget, review WIP, fix loop)
+
+```text
+USAGE
+  shipwright gates check --retry N [--no-github] [--json]
+
+DESCRIPTION
+  Every dispatch gate in order (ADR-0007): pause, breaker, budget, review WIP, fix loop.
+  Stops at the first closed gate, so a paused system never opens a breaker incident.
+  A gate: exit 0 only when every gate allows dispatch. Exits 1 when a gate blocks, when any
+  source cannot be read or judged (fail closed), or on an unexpected error. Exits 2 on bad
+  arguments, including a missing --retry. The bash daemon and workflows call this before
+  dispatching.
+
+OPTIONS
+  --retry N      Required. The retry number about to be dispatched (0 = first dispatch,
+                 1 = first retry). The fix-loop cap allows the first run plus 3 retries, so
+                 --retry 4 is blocked. The daemon and auto-retry pass the retry they are about
+                 to start. There is no default: an unknown count must not read as "first".
+  --no-github    Skip the breaker and review-WIP gates and check only the local pause flag
+                 (not the shipwright:pause label); a warning naming them goes to stderr.
+                 Only this flag enables it (NO_GITHUB is ignored), and it is refused (exit 2)
+                 on GitHub Actions (GITHUB_ACTIONS set to anything but empty or "false").
+  --json         Print one JSON object: allowed, and each gate's verdict (allowed, blocked,
+                 error, skipped or not_checked) and detail. Exit codes are unchanged.
+
+NOTES
+  Without cost files (a CI runner) the budget gate passes with a ⚠ warning: nothing is enforced.
+
+EXAMPLES
+  shipwright gates check --retry 0
+  shipwright gates check --retry 2 --json
+```
+
 ## `hello`
 
 Print hello world (CLI smoke test)
@@ -22,4 +120,82 @@ OPTIONS
 EXAMPLES
   shipwright hello                 Print "hello world"
   shipwright hello --help          Show this help text
+```
+
+## `intake`
+
+Issue intake caps: may automation file this issue?
+
+```text
+USAGE
+  shipwright intake check [--title TITLE] [--label LABEL]
+
+DESCRIPTION
+  Issue intake caps (spec §6.2, ADR-0007), consulted before automation files an issue.
+  A gate: exit 0 only when filing is allowed. Exits 1 when 25 or more auto-patrol issues are
+  open, when an open issue has the same title fingerprint (case, digits and punctuation
+  ignored), or when issues cannot be listed (including a possibly truncated list). Exits 2 on
+  bad arguments. Issue titles are never printed.
+
+OPTIONS
+  --title TITLE   Title of the issue about to be filed. A title with no letters or digits is
+                  never treated as a duplicate.
+  --label LABEL   Label marking auto-filed issues (default auto-patrol; 1-50 printable chars)
+
+EXAMPLES
+  shipwright intake check --title "Security: lodash 4.17.20 in package-lock"
+```
+
+## `pause`
+
+Kill switch: pause dispatch on this machine
+
+```text
+USAGE
+  shipwright pause [REASON...]
+
+DESCRIPTION
+  Kill switch (spec §6.2, ADR-0007): sets the local pause flag (~/.shipwright/daemon-pause.flag,
+  shared with the bash daemon). No dispatch happens on this machine until `shipwright resume`.
+  To stop every machine and CI, add the shipwright:pause label to any open issue.
+
+EXAMPLES
+  shipwright pause investigating the 2026-10-13 failure loop
+```
+
+## `paused`
+
+Exit 0 when dispatch is paused (flag or label), 1 when not
+
+```text
+USAGE
+  shipwright paused [--no-github]
+  shipwright paused --gate [--no-github]
+
+DESCRIPTION
+  For humans: exits 0 when dispatch is paused (local flag or shipwright:pause label), 1 when
+  it is not. Fails closed: bad arguments or an unreadable flag or label report paused (exit 0).
+  For scripts use --gate, where exit 0 means NOT paused and anything else (paused, unreadable,
+  bad arguments, a missing shipwright) is non-zero, so a failure can never read as "go".
+
+OPTIONS
+  --gate        Gate form: exit 0 only when it is safe to dispatch
+  --no-github   Check only the local flag (warns on stderr). Refused on GitHub Actions
+                (GITHUB_ACTIONS set to anything but empty or "false"): exit 2 with --gate,
+                0 (paused, fail closed) without it
+
+EXAMPLES
+  shipwright paused --gate && dispatch_next_issue
+```
+
+## `resume`
+
+Clear the local pause flag
+
+```text
+USAGE
+  shipwright resume
+
+DESCRIPTION
+  Clears the local pause flag. A shipwright:pause label on an open issue still pauses dispatch.
 ```

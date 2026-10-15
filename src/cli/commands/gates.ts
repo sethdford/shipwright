@@ -1,0 +1,126 @@
+import {
+  checkDispatchGates,
+  GATE_ORDER,
+  type GateOptions,
+  type GateResult,
+  type GatesReport,
+  gatePasses,
+} from "../../contexts/orchestration";
+import type { CliIO, Command } from "../command";
+import { allowNoGithub, isHelpRequest, usageError } from "../shared";
+
+const usage = `USAGE
+  shipwright gates check --retry N [--no-github] [--json]
+
+DESCRIPTION
+  Every dispatch gate in order (ADR-0007): pause, breaker, budget, review WIP, fix loop.
+  Stops at the first closed gate, so a paused system never opens a breaker incident.
+  A gate: exit 0 only when every gate allows dispatch. Exits 1 when a gate blocks, when any
+  source cannot be read or judged (fail closed), or on an unexpected error. Exits 2 on bad
+  arguments, including a missing --retry. The bash daemon and workflows call this before
+  dispatching.
+
+OPTIONS
+  --retry N      Required. The retry number about to be dispatched (0 = first dispatch,
+                 1 = first retry). The fix-loop cap allows the first run plus 3 retries, so
+                 --retry 4 is blocked. The daemon and auto-retry pass the retry they are about
+                 to start. There is no default: an unknown count must not read as "first".
+  --no-github    Skip the breaker and review-WIP gates and check only the local pause flag
+                 (not the shipwright:pause label); a warning naming them goes to stderr.
+                 Only this flag enables it (NO_GITHUB is ignored), and it is refused (exit 2)
+                 on GitHub Actions (GITHUB_ACTIONS set to anything but empty or "false").
+  --json         Print one JSON object: allowed, and each gate's verdict (allowed, blocked,
+                 error, skipped or not_checked) and detail. Exit codes are unchanged.
+
+NOTES
+  Without cost files (a CI runner) the budget gate passes with a ⚠ warning: nothing is enforced.
+
+EXAMPLES
+  shipwright gates check --retry 0
+  shipwright gates check --retry 2 --json`;
+
+export interface GateArgs extends GateOptions {
+  readonly json: boolean;
+}
+
+/** Options from the arguments after `check`, or null when malformed or --retry is missing. */
+export function parseGateArgs(args: readonly string[]): GateArgs | null {
+  let github = true;
+  let json = false;
+  let retry: number | null = null;
+  for (let i = 0; i < args.length; i++) {
+    const arg = args[i];
+    const value = args[i + 1] ?? "";
+    if (arg === "--no-github" && github) {
+      github = false;
+    } else if (arg === "--json" && !json) {
+      json = true;
+    } else if (arg === "--retry" && retry === null && /^(0|[1-9]\d{0,8})$/.test(value)) {
+      retry = Number(value);
+      i++;
+    } else {
+      return null;
+    }
+  }
+  return retry === null ? null : { github, retry, json };
+}
+
+const marks: Record<GateResult["verdict"], string> = {
+  allowed: "✓",
+  blocked: "✗",
+  error: "✗",
+  skipped: "-",
+};
+
+function renderText(io: CliIO, report: GatesReport): void {
+  for (const g of report.results) {
+    const mark = g.warning && gatePasses(g) ? "⚠" : marks[g.verdict];
+    io.out(`${mark} ${g.gate}: ${g.detail}`);
+  }
+}
+
+function renderJson(io: CliIO, report: GatesReport, options: GateArgs): void {
+  const gates = GATE_ORDER.map(
+    (gate) => report.results.find((r) => r.gate === gate) ?? { gate, verdict: "not_checked" },
+  );
+  io.out(
+    JSON.stringify({
+      allowed: report.allowed,
+      retry: options.retry,
+      github: options.github,
+      gates,
+    }),
+  );
+}
+
+export const gatesCommand: Command = {
+  name: "gates",
+  aliases: [],
+  summary: "All dispatch gates (pause, breaker, budget, review WIP, fix loop)",
+  usage,
+  async run(args, { io, safety, env }) {
+    const [sub, ...rest] = args;
+    if (isHelpRequest(args, ["check"])) {
+      io.out(usage);
+      return 0;
+    }
+    const options = parseGateArgs(rest);
+    if (sub !== "check" || options === null) {
+      const got = args.join(" ") || "nothing";
+      return usageError(io, usage, `Expected check --retry N [--no-github] [--json], got: ${got}`);
+    }
+    const unchecked = "breaker, review WIP, shipwright:pause label";
+    if (!options.github && !allowNoGithub(io, usage, env, unchecked)) return 2;
+    try {
+      const report = await checkDispatchGates(safety(), options);
+      if (options.json) renderJson(io, report, options);
+      else renderText(io, report);
+      return report.allowed ? 0 : 1;
+    } catch (e) {
+      const message = e instanceof Error ? e.message : String(e);
+      if (options.json) io.out(JSON.stringify({ allowed: false, error: message }));
+      io.err(`✗ gates: cannot verify: ${message}`);
+      return 1;
+    }
+  },
+};

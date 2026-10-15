@@ -1,0 +1,67 @@
+# F10 for bash: GitHub writes move into GithubWriter as each command is ported. Ratcheted: a script
+# may lose GitHub writes but never gain one. Matches `gh` write subcommands (also behind wrappers
+# such as `timeout 30 gh …`), `gh api` calls that set a write method, send a body (not with an
+# explicit GET, where -f/-F are query parameters) or contain a literal GraphQL `mutation`, and
+# `git push`. A GraphQL mutation held in a variable is missed. The gh verb lists mirror
+# f10-github-writes-only-in-writer.yml.
+id: F10-bash-github-writes
+language: Bash
+severity: off
+metadata: { ratchet: true, owner: "@sethdford", docs: "docs/architecture.md#fitness-rules" }
+message: "F10: no new GitHub writes from bash (gh write commands, gh api writes, git push). Port the caller and add an idempotent GithubWriter method (src/adapters/github/gh-github-writer.ts), or call an existing writer."
+files:
+  - "scripts/**/*.sh"
+  - "scripts/sw"
+  - ".claude/hooks/**/*.sh"
+  - "claude-code/hooks/**/*.sh"
+  - "completions/**/*.bash"
+  - "install.sh"
+rule:
+  kind: command
+  any:
+    - all:
+        - has: { field: name, regex: '^git$' }
+        - has: { kind: word, regex: '^push$' }
+        - not: { has: { kind: word, regex: '^stash$' } }
+    - all:
+        - has: { regex: '^gh$' }
+        - any:
+            - all:
+                - has: { regex: '^["'']?(issue|pr)["'']?$' }
+                - has: { regex: '^["'']?(create|edit|comment|close|reopen|merge|review|lock|unlock|pin|unpin|develop|delete|transfer|ready|update-branch|revert)["'']?$' }
+            - all:
+                - has: { regex: '^["'']?(label|release)["'']?$' }
+                - has: { regex: '^["'']?(create|edit|delete|clone|upload|delete-asset)["'']?$' }
+            - all:
+                - has: { regex: '^["'']?repo["'']?$' }
+                - has: { regex: '^["'']?(create|delete|edit|fork|rename|archive|unarchive|sync)["'']?$' }
+            - all:
+                - has: { regex: '^["'']?gist["'']?$' }
+                - has: { regex: '^["'']?(create|edit|delete|rename)["'']?$' }
+            - all:
+                - has: { regex: '^["'']?workflow["'']?$' }
+                - has: { regex: '^["'']?(run|enable|disable)["'']?$' }
+            - all:
+                - has: { regex: '^["'']?run["'']?$' }
+                - has: { regex: '^["'']?(rerun|cancel|delete)["'']?$' }
+            - all:
+                - has: { regex: '^["'']?(secret|variable)["'']?$' }
+                - has: { regex: '^["'']?(set|delete|remove)["'']?$' }
+            - all:
+                - has: { regex: '^["'']?api["'']?$' }
+                - any:
+                    - has:
+                        regex: '^["'']?(-X|--method)["'']?$'
+                        precedes: { regex: '^["'']?(?i:POST|PATCH|PUT|DELETE)["'']?$' }
+                    - has: { regex: '^["'']?(-X=?|--method=)(?i:POST|PATCH|PUT|DELETE)["'']?$' }
+                    - all:
+                        - has: { regex: '^["'']?(-[fF]|--field|--raw-field|--input)(=.*)?' }
+                        - not: { has: { regex: '^["'']?graphql["'']?$' } }
+                        - not: { has: { regex: '^["'']?(-X=?|--method=?)(?i:GET)["'']?$' } }
+                        - not:
+                            has:
+                              regex: '^["'']?(-X|--method)["'']?$'
+                              precedes: { regex: '^["'']?(?i:GET)["'']?$' }
+                    - all:
+                        - has: { regex: '^["'']?graphql["'']?$' }
+                        - has: { regex: '\bmutation\b' }

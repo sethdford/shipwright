@@ -1,8 +1,9 @@
 // Shared constants and configuration
+// Never "*": Access-Control-Allow-Origin is set per request for allowlisted origins only
+// (services/request-guard.ts withCors).
 export const CORS_HEADERS = {
-  "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Methods": "GET, POST, PATCH, DELETE, OPTIONS",
-  "Access-Control-Allow-Headers": "Content-Type",
+  "Access-Control-Allow-Headers": "Content-Type, X-Shipwright-Token, Authorization",
 };
 
 export const WS_PUSH_INTERVAL_MS = 2000;

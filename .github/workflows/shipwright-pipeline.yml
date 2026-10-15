@@ -512,7 +512,9 @@ jobs:
           This issue has had **${PIPELINE_STARTS} pipeline attempts** — exceeding the safety cap of 6.
 
           This usually means the issue cannot be solved autonomously and needs human review.
-          Re-apply the \`shipwright\` label after clearing old pipeline comments to retry.
+          To re-run it, use \`gh workflow run shipwright-pipeline.yml -f issue_number=${ISSUE_NUMBER}\`
+          (see docs/safety-runbook.md). Do not clear old pipeline comments to retry: that also resets
+          the 3-retry budget and the SHIPWRIGHT-DISPATCHED marker.
           CAPEOF
           )" 2>/dev/null || true
             gh issue edit "$ISSUE_NUMBER" --remove-label "shipwright" 2>/dev/null || true
@@ -592,12 +594,23 @@ jobs:
         if: steps.claim_check.outputs.skip != 'true'
         env:
           DASHBOARD_URL: ${{ secrets.DASHBOARD_URL }}
+          SHIPWRIGHT_FLEET_TOKEN: ${{ secrets.SHIPWRIGHT_FLEET_TOKEN }}
         run: |
+          # Best effort: a webhook failure never fails the pipeline. The fleet token goes to curl
+          # on stdin (-H @-), never in argv; with no token, no header is sent.
           if [ -n "${DASHBOARD_URL:-}" ]; then
-            curl -s --max-time 5 -X POST "${DASHBOARD_URL}/api/webhook/ci" \
-              -H "Content-Type: application/json" \
-              -d "{\"type\":\"ci.pipeline_started\",\"issue\":${ISSUE_NUMBER},\"run_id\":\"${GITHUB_RUN_ID}\",\"template\":\"${TEMPLATE}\"}" \
-              2>/dev/null || true
+            BODY="{\"type\":\"ci.pipeline_started\",\"issue\":${ISSUE_NUMBER},\"run_id\":\"${GITHUB_RUN_ID}\",\"template\":\"${TEMPLATE}\"}"
+            if [ -n "${SHIPWRIGHT_FLEET_TOKEN:-}" ]; then
+              CODE="$(printf 'X-Shipwright-Token: %s\n' "$SHIPWRIGHT_FLEET_TOKEN" | curl -sS -o /dev/null -w '%{http_code}' --max-time 5 \
+                -H @- -X POST -H "Content-Type: application/json" -d "$BODY" "${DASHBOARD_URL}/api/webhook/ci" || true)"
+            else
+              CODE="$(curl -sS -o /dev/null -w '%{http_code}' --max-time 5 \
+                -X POST -H "Content-Type: application/json" -d "$BODY" "${DASHBOARD_URL}/api/webhook/ci" || true)"
+            fi
+            case "$CODE" in
+              2??) ;;
+              *) echo "::warning::Dashboard webhook ci.pipeline_started failed (HTTP ${CODE:-none})" ;;
+            esac
           fi
 
       - name: Run Shipwright pipeline
@@ -876,15 +889,26 @@ jobs:
         if: always() && steps.claim_check.outputs.skip != 'true'
         env:
           DASHBOARD_URL: ${{ secrets.DASHBOARD_URL }}
+          SHIPWRIGHT_FLEET_TOKEN: ${{ secrets.SHIPWRIGHT_FLEET_TOKEN }}
           EXIT_CODE: ${{ steps.pipeline.outputs.exit_code }}
         run: |
+          # Best effort: a webhook failure never fails the pipeline. The fleet token goes to curl
+          # on stdin (-H @-), never in argv; with no token, no header is sent.
           if [ -n "${DASHBOARD_URL:-}" ]; then
             RESULT="success"
             if [ "${EXIT_CODE:-1}" != "0" ]; then RESULT="failure"; fi
-            curl -s --max-time 5 -X POST "${DASHBOARD_URL}/api/webhook/ci" \
-              -H "Content-Type: application/json" \
-              -d "{\"type\":\"ci.pipeline_completed\",\"issue\":${ISSUE_NUMBER},\"run_id\":\"${GITHUB_RUN_ID}\",\"result\":\"${RESULT}\",\"template\":\"${TEMPLATE}\"}" \
-              2>/dev/null || true
+            BODY="{\"type\":\"ci.pipeline_completed\",\"issue\":${ISSUE_NUMBER},\"run_id\":\"${GITHUB_RUN_ID}\",\"result\":\"${RESULT}\",\"template\":\"${TEMPLATE}\"}"
+            if [ -n "${SHIPWRIGHT_FLEET_TOKEN:-}" ]; then
+              CODE="$(printf 'X-Shipwright-Token: %s\n' "$SHIPWRIGHT_FLEET_TOKEN" | curl -sS -o /dev/null -w '%{http_code}' --max-time 5 \
+                -H @- -X POST -H "Content-Type: application/json" -d "$BODY" "${DASHBOARD_URL}/api/webhook/ci" || true)"
+            else
+              CODE="$(curl -sS -o /dev/null -w '%{http_code}' --max-time 5 \
+                -X POST -H "Content-Type: application/json" -d "$BODY" "${DASHBOARD_URL}/api/webhook/ci" || true)"
+            fi
+            case "$CODE" in
+              2??) ;;
+              *) echo "::warning::Dashboard webhook ci.pipeline_completed failed (HTTP ${CODE:-none})" ;;
+            esac
           fi
 
       # Gatekeeper: ensure job fails if pipeline failed (triggers auto-retry)

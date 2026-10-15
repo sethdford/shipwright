@@ -1,0 +1,19 @@
+# F11 (bash safety): a GitHub Actions expression is substituted into the text before any shell
+# parses it, so a script, or a workflow it generates, must never contain one (#8533). Comments are
+# ignored. Ratcheted (tools/arch/ast-scan.ts).
+id: F11-bash-no-gha-expression
+language: Bash
+severity: off
+metadata: { ratchet: true, owner: "@sethdford", docs: "docs/architecture.md#fitness-rules" }
+message: "F11: no ${{ }} expression in scripts. Move the generated workflow into a checked-in .yml template (scanned by tools/arch/workflow-injection.ts), copy it instead of echoing it, and pass values through the step's env: block as \"$VAR\"."
+files:
+  - "scripts/**/*.sh"
+  - "scripts/sw"
+  - ".claude/hooks/**/*.sh"
+  - "claude-code/hooks/**/*.sh"
+  - "completions/**/*.bash"
+  - "install.sh"
+rule:
+  matches: bash-text
+  regex: '\$\{\{'
+  not: { has: { regex: '\$\{\{' } }

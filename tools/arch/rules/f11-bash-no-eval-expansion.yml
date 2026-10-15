@@ -1,0 +1,33 @@
+# F11 (bash safety): eval re-parses its arguments as shell code, so any expansion in them runs
+# whatever the value contains. Also: `command eval`, `builtin eval`, and `source`/`.` reading code
+# from a here-string or a process substitution built from a variable. Ratcheted (tools/arch/ast-scan.ts).
+# `has` takes no `field: argument` in the bash rules: a repeated field resolves to its first child only.
+id: F11-bash-no-eval-expansion
+language: Bash
+severity: off
+metadata: { ratchet: true, owner: "@sethdford", docs: "docs/architecture.md#fitness-rules" }
+message: "F11: eval and source re-parse text as code. Call the command directly with quoted \"$args\", use an array (\"${cmd[@]}\"), or printf -v / declare for indirect assignment."
+files:
+  - "scripts/**/*.sh"
+  - "scripts/sw"
+  - ".claude/hooks/**/*.sh"
+  - "claude-code/hooks/**/*.sh"
+  - "completions/**/*.bash"
+  - "install.sh"
+rule:
+  kind: command
+  any:
+    - all:
+        - any:
+            - has: { field: name, regex: '^eval$' }
+            - all:
+                - has: { field: name, regex: '^(command|builtin)$' }
+                - has: { kind: word, regex: '^eval$' }
+        - has: { matches: bash-expansion }
+    - all:
+        - has: { field: name, regex: '^(source|\.)$' }
+        - any:
+            - all:
+                - has: { kind: word, regex: '^/dev/(stdin|fd/0)$' }
+                - has: { kind: herestring_redirect, matches: bash-expansion }
+            - has: { kind: process_substitution, matches: bash-expansion }

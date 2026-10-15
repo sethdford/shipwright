@@ -1,0 +1,24 @@
+id: F11-bash-no-eval-expansion
+valid:
+  - "eval 'set -- a b'"
+  - 'eval "echo hi"'
+  - 'evaluate "$x"'
+  - 'echo "eval $x"'
+  - 'yq eval -o=json "$file"'
+  - 'source "$SCRIPT_DIR/lib/helpers.sh"'
+  - 'command -v eval'
+invalid:
+  - 'eval "$cmd"'
+  - 'eval $cmd'
+  - 'eval echo "$x"'
+  - 'eval "${mutations[$i]} \"$copy\""'
+  - 'eval "$(ssh-agent -s)"'
+  - 'eval "_v=\"\${${name}}\""'
+  - "eval 'v=\"${'\"$key\"':-}\"'"
+  - 'if eval "$condition"; then :; fi'
+  - 'out=$(eval "$TEST_CMD" 2>&1)'
+  - 'command eval "$x"'
+  - 'builtin eval "$x"'
+  - 'source /dev/stdin <<< "$code"'
+  - '. /dev/stdin <<<"$code"'
+  - 'source <(echo "$code")'

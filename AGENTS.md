@@ -24,17 +24,19 @@ A change is done when `bun run check` passes. Failure messages name the rule and
 Contexts: delivery, orchestration, planning, quality, learning, intelligence, integrations,
 observability, teams, platform.
 
-## Fitness rules (spec §3.3)
+## Fitness rules (spec §3.3, ADR-0008)
 
-Enforced now by `bun run arch`: F1 pure domain · F2 application never imports adapters or cli ·
-F3 contexts only via `index.ts` · F4 no cycles · F5 I/O (`Bun.spawn`, `Bun.$`, `fetch`,
-`process.env`, `node:fs`, other Bun and `node:process` I/O) only in `src/adapters`, `src/main.ts`,
-`src/cli.ts` and `src/testing` · F6 Agent SDK only in `adapters/agent`, every call typed ·
-F7 files ≤ 300 lines, functions ≤ 40 (baseline only shrinks) · F8 tests use `createTestEnv()`, never real paths.
-
-Follow now; enforced later: F9 agents get no GitHub token and no permission bypass (from Wave 1) ·
-F10 GitHub side effects only through the fenced, idempotent `integrations` adapter (from Wave 1 for
-the first GitHub-writing port method; every integration by the end of Wave 2).
+`bun run arch` enforces: F1 pure domain · F2 application never imports adapters or cli · F3 contexts
+only via `index.ts`; `src/` and `dashboard/` never import each other · F4 no cycles · F5 I/O (also
+aliased globals, `node:os`, computed imports, `eval`) only in `src/adapters`, `src/main.ts`,
+`src/cli.ts`, `src/testing` · F6 Agent SDK only in `adapters/agent` · F7 files ≤ 300 lines,
+functions ≤ 40 · F8 tests use `createTestEnv()` · F9 no GitHub token or permission bypass for agents ·
+F10 `gh` writes only in `src/adapters/github/gh-github-writer.ts` · F11 bash: no `eval`/`sh -c`/
+`python -c` with expansions, no `curl | sh`, no `${{` · F12 dashboard layers, subprocesses only in
+allowlisted services, no shell string from data · workflows never swallow gate or marker errors.
+Bash and `dashboard/server.ts` debt is ratcheted (`tools/arch/findings-baseline.json`): never add a
+finding; after removing some, run `bun tools/arch/ast-scan.ts --write-baseline`. Never suppress a rule
+in place. Enforced later: F10 in full (`FenceToken` on run-scoped writes, Wave 1b; all integrations, Wave 2).
 
 ## Deployment modes and state
 
@@ -62,6 +64,10 @@ the lease's fence token; a stale fence fails.
 - GitHub side effects (push, PR, comment, label, merge) only through the `integrations` adapter, with an
   `IdempotencyKey` and a `FenceToken` (F10).
 - Tests use `createTestEnv()`; never touch the real `HOME`, `~/.shipwright` or tmux server.
+- Dispatch, retries and auto-filing pass `shipwright gates check --retry N` / `intake check` first;
+  exit 0 is the only "go" and every gate fails closed. Workflows read `SHIPWRIGHT-*` markers only via
+  `scripts/ci/bot-comments.sh`. Never run `gates check`/`breaker check` on the real repo to look
+  (they write the incident issue); use `breaker status`. Operators: `docs/safety-runbook.md` (ADR-0007).
 
 ## Bash (until each command is ported)
 
@@ -71,4 +77,4 @@ the runner isolates tmux. Details: `.claude/rules/bash.md`. Legacy command refer
 
 ## Docs
 
-`docs/architecture.md`, `docs/adr/`, generated `docs/reference/cli.md` (`bun run docs:gen`).
+`docs/architecture.md`, `docs/adr/`, generated `docs/reference/` (`bun run docs:gen`).

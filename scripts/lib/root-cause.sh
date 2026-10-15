@@ -21,6 +21,9 @@ VERSION="3.3.0"
 
 # Module guard
 [[ -n "${_ROOT_CAUSE_LOADED:-}" ]] && return 0; _ROOT_CAUSE_LOADED=1
+# Issue intake caps for automated filings (ADR-0007); path is relative to this file
+# shellcheck source=safety-gates.sh
+source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/safety-gates.sh"
 
 # ─── Defaults ──────────────────────────────────────────────────────────────
 SCRIPT_DIR="${SCRIPT_DIR:-$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)}"
@@ -231,7 +234,8 @@ error-sig: $error_sig
 
     # Create the issue
     local issue_url
-    issue_url=$(gh issue create \
+    # Intake caps (ADR-0007): the cap counts open auto-created issues
+    issue_url=$(patrol_issue_create --intake-label "auto-created" \
         --title "$issue_title" \
         --body "$issue_body" \
         --label "platform-bug,auto-created" \

@@ -19,6 +19,9 @@ REPO_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
 # Canonical helpers (colors, output, events)
 # shellcheck source=lib/helpers.sh
 [[ -f "$SCRIPT_DIR/lib/helpers.sh" ]] && source "$SCRIPT_DIR/lib/helpers.sh"
+# Issue intake caps for automated filings (ADR-0007); path is relative to this file
+# shellcheck source=lib/safety-gates.sh
+source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/lib/safety-gates.sh"
 # Fallbacks when helpers not loaded (e.g. test env with overridden SCRIPT_DIR)
 [[ "$(type -t info 2>/dev/null)" == "function" ]]    || info()    { echo -e "\033[38;2;0;212;255m\033[1m▸\033[0m $*"; }
 [[ "$(type -t success 2>/dev/null)" == "function" ]] || success() { echo -e "\033[38;2;74;222;128m\033[1m✓\033[0m $*"; }
@@ -47,10 +50,10 @@ COMPLEXITY_THRESHOLD=70          # Decompose if complexity > this
 # shellcheck disable=SC2034
 HOURS_THRESHOLD=8                # Decompose if estimated hours > this
 # shellcheck disable=SC2034
-MAX_SUBTASKS=5
-# shellcheck disable=SC2034
 MIN_SUBTASKS=3
 DECOMPOSE_LABEL="subtask"
+# At most this many subtask issues per parent; the rest are refused (logged)
+DECOMPOSE_MAX_SUBTASKS="${DECOMPOSE_MAX_SUBTASKS:-8}"
 DECOMPOSED_MARKER_LABEL="decomposed"
 
 # ─── Helper: Check if issue has label ──────────────────────────────────────
@@ -250,6 +253,11 @@ decompose_create_subtasks() {
     if [[ "$subtask_count" -eq 0 ]]; then
         return 1
     fi
+    if [[ "$subtask_count" -gt "$DECOMPOSE_MAX_SUBTASKS" ]]; then
+        warn "  ${subtask_count} subtasks proposed; filing the first ${DECOMPOSE_MAX_SUBTASKS}, refusing the rest"
+        emit_event "decompose.subtasks_capped" "parent=$issue_num" "proposed=$subtask_count" "max=$DECOMPOSE_MAX_SUBTASKS"
+        subtask_count="$DECOMPOSE_MAX_SUBTASKS"
+    fi
 
     local created_issue_nums=""
     local idx=1
@@ -298,7 +306,7 @@ SUBEOF
         fi
 
         local subtask_issue_num
-        if subtask_issue_num=$(gh issue create \
+        if subtask_issue_num=$(patrol_issue_create --intake-label "$DECOMPOSE_LABEL" \
             --title "$subtask_title" \
             --body "$subtask_description" \
             --label "$create_labels" 2>/dev/null); then

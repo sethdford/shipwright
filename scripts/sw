@@ -620,6 +620,27 @@ main() {
         hello)
             run_ts hello "$@"
             ;;
+        breaker)
+            run_ts breaker "$@"
+            ;;
+        pause)
+            run_ts pause "$@"
+            ;;
+        resume)
+            run_ts resume "$@"
+            ;;
+        paused)
+            run_ts paused "$@"
+            ;;
+        budget)
+            run_ts budget "$@"
+            ;;
+        intake)
+            run_ts intake "$@"
+            ;;
+        gates)
+            run_ts gates "$@"
+            ;;
         *)
             error "Unknown command: ${cmd}"
             echo ""

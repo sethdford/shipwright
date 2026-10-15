@@ -1,6 +1,7 @@
 import { join, resolve } from "node:path";
 import { Glob } from "bun";
 import ts from "typescript";
+import { baselineAt, risesAgainst } from "./baseline-history";
 
 export const FILE_LIMIT = 300;
 export const FUNCTION_LIMIT = 40;
@@ -189,6 +190,16 @@ if (import.meta.main) {
   const existing = (await baselineFile.exists())
     ? ((await baselineFile.json()) as Baseline)
     : undefined;
+  const at = Bun.argv.indexOf("--against");
+  if (at > 0) {
+    // Anti-laundering (ADR-0008): the baseline may not gain or raise an entry vs the merge base.
+    const ref = Bun.argv[at + 1] ?? "origin/main";
+    const base = baselineAt(ref, "tools/arch/arch-baseline.json", ROOT) ?? {};
+    const rises = risesAgainst(base, { ...(existing ?? { files: {}, functions: {} }) });
+    for (const r of rises)
+      console.error(`F7 ${r}. Baselines may not grow; split the code instead.`);
+    if (rises.length > 0) process.exit(1);
+  }
   if (Bun.argv.includes("--write-baseline")) {
     const next = nextBaseline(ms, existing);
     if ("errors" in next) {
