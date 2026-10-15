@@ -261,7 +261,12 @@ const ruleCovered = (): string[] =>
 test("no rule is suppressed in place (no ast-grep ignore comment in any file a rule covers)", async () => {
   const marker = ["ast", "grep", "ignore"].join("-");
   const hits: string[] = [];
-  for (const f of ruleCovered()) {
+  // Rule and rule-test files are not scanned by any rule, but ast-grep reads both: a marker in one
+  // of them would switch off a check, so they are in the ban too (ADR-0008 "Known evasions").
+  const ruleFiles = [
+    ...tracked.filter((f) => /^tools\/arch\/(rules|rule-tests|utils)\/.*\.ya?ml$/.test(f)),
+  ];
+  for (const f of [...ruleCovered(), ...ruleFiles]) {
     if ((await Bun.file(join(ROOT, f)).text()).includes(marker)) hits.push(f);
   }
   expect(hits).toEqual([]);
