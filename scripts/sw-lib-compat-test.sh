@@ -389,18 +389,14 @@ _date_helper_assertions() {
 _date_helper_assertions "native $(_compat_date_is_gnu && echo GNU || echo BSD)"
 
 if ! _compat_date_is_gnu; then
-    if command -v gdate >/dev/null 2>&1; then
-        gnu_shim_dir="$TEST_TEMP_DIR/gnu-date-bin"
-        mkdir -p "$gnu_shim_dir"
-        printf '#!/usr/bin/env bash\nexec "%s" "$@"\n' "$(command -v gdate)" > "$gnu_shim_dir/date"
-        chmod +x "$gnu_shim_dir/date"
+    if gnu_shim_dir=$(gnu_date_shim_dir); then
         saved_path="$PATH"
         PATH="$gnu_shim_dir:$PATH"
         assert_eq "GNU shim is detected as GNU date" "y" "$(_compat_date_is_gnu && echo y || echo n)"
         _date_helper_assertions "GNU date shim"
         PATH="$saved_path"
     else
-        echo "    (gdate not installed; the GNU date leg is skipped)"
+        echo "    (no GNU date available; the GNU date leg is skipped)"
     fi
 fi
 
