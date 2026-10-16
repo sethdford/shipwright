@@ -385,3 +385,6 @@
 {"ts":"2026-10-15T23:37:03Z","ts_epoch":1792107423,"type":"model.outcome","issue":0,"stage":"intake","model":"haiku","success":"true"}
 {"ts":"2026-10-15T23:37:03Z","ts_epoch":1792107423,"type":"model.outcome","issue":0,"stage":"plan","model":"haiku","success":"true"}
 {"ts":"2026-10-15T23:37:03Z","ts_epoch":1792107423,"type":"pipeline.cost","input_tokens":0,"output_tokens":0,"model":"sonnet","cost_usd":0.0000}
+{"ts":"2026-10-16T00:12:07Z","ts_epoch":1792109527,"type":"hygiene_platform_refactor","hardcoded":49,"fallback":75,"todo":51}
+{"ts":"2026-10-16T00:12:33Z","ts_epoch":1792109553,"type":"strategic.issue_refused","title":"Portable-date audit follow-through: add CI lint rule blocking new BSD-only date usage"}
+{"ts":"2026-10-16T00:12:33Z","ts_epoch":1792109553,"type":"strategic.cycle_complete","issues_created":0,"issues_skipped":1}
