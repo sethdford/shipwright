@@ -42,6 +42,8 @@ ORIG_PATH="${PATH}"
 TEST_TEMP_DIR=$(mktemp -d "${TMPDIR:-/tmp}/sw-test-auto.XXXXXX")
 mkdir -p "$TEST_TEMP_DIR/home/.shipwright"
 mkdir -p "$TEST_TEMP_DIR/bin"
+# Intelligence writes its cache under the test temp dir, never the repo's .claude/ (#8609).
+export SHIPWRIGHT_INTELLIGENCE_CACHE="$TEST_TEMP_DIR/project/.claude/intelligence-cache.json"
 
 # ─── Assertions ──────────────────────────────────────────────────────────────
 
@@ -162,6 +164,7 @@ setup_test_env() {
     mkdir -p "$TEST_TEMP_DIR/bin"
     mkdir -p "$TEST_TEMP_DIR/project"
     mkdir -p "$TEST_TEMP_DIR/logs"
+    export SHIPWRIGHT_INTELLIGENCE_CACHE="$TEST_TEMP_DIR/project/.claude/intelligence-cache.json"
 
     # ORIG_HOME/ORIG_PATH already saved at source time
     export HOME="$TEST_TEMP_DIR/home"
@@ -244,7 +247,9 @@ print_test_results() {
     echo ""
     echo -e "${DIM}  ──────────────────────────────────────────${RESET}"
     echo ""
-    if [[ $FAIL -eq 0 ]]; then
+    if [[ $FAIL -eq 0 && $TOTAL -eq 0 ]]; then
+        echo -e "  ${YELLOW}${BOLD}No assertions ran${RESET}"
+    elif [[ $FAIL -eq 0 ]]; then
         echo -e "  ${GREEN}${BOLD}All $TOTAL tests passed${RESET}"
     else
         echo -e "  ${RED}${BOLD}$FAIL of $TOTAL tests failed${RESET}"

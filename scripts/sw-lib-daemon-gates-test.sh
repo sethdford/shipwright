@@ -38,7 +38,7 @@ touch "$LOG_FILE" "$CALLS"
 
 mock_binary "flock" 'shift 3 2>/dev/null; "$@"'
 mock_binary "gh" 'printf "gh %s\n" "$*" >> "$CALLS"
-if [[ "${1:-} ${2:-}" == "issue list" ]]; then cat "$TEST_TEMP_DIR/issues.json"; fi'
+if [[ "${1:-} ${2:-}" == "issue list" || "${1:-} ${2:-}" == "search issues" ]]; then cat "$TEST_TEMP_DIR/issues.json"; fi'
 export TEST_TEMP_DIR
 
 now_iso() { date -u +"%Y-%m-%dT%H:%M:%SZ"; }
@@ -75,13 +75,14 @@ SPAWN_RC=1
 SPAWN_RCS=""   # per-issue overrides: "11=1 12=75"
 daemon_spawn_pipeline() {
     printf 'spawn %s\n' "$1" >> "$CALLS"
+    echo "$1 ${3:-}" >> "$TEST_TEMP_DIR/spawn-repos"
     local pair
     for pair in $SPAWN_RCS; do
         if [[ "${pair%%=*}" == "$1" ]]; then return "${pair#*=}"; fi
     done
     return "$SPAWN_RC"
 }
-spawns() { grep '^spawn' "$CALLS" | tr '\n' ' ' | sed 's/ $//'; }
+spawns() { grep "^spawn " "$CALLS" | tr '\n' ' ' | sed 's/ $//'; }
 queued() { jq -r '.queued | join(" ")' "$STATE_FILE"; }
 
 reset_state() {
@@ -243,6 +244,44 @@ reset_state
 locked_state_update '.final_failed = {"500": {ts: "t", marked: ["shipwright-stuck"]}}'
 daemon_poll_issues 2>/dev/null || true
 assert_eq "a truncated listing clears nothing" "500" "$(jq -r '.final_failed | keys | join(" ")' "$STATE_FILE")"
+
+# Org mode: the same number in two repos is two issues; tombstones are keyed "repo:number".
+print_test_section "daemon_poll_issues finally-failed issues in org mode"
+WATCH_MODE=org
+REPO_FILTER=""
+ORG=acme
+# Keys isolate by repo: api#3 and web#3 are both listed. "held" is not filtered by the poll, so only
+# a tombstone can hold an issue back.
+echo '[{"number":3,"title":"a","labels":[{"name":"shipwright"},{"name":"held"}],"repository":{"nameWithOwner":"acme/api"}},{"number":3,"title":"b","labels":[{"name":"shipwright"}],"repository":{"nameWithOwner":"acme/web"}}]' > "$TEST_TEMP_DIR/issues.json"
+reset_state
+: > "$TEST_TEMP_DIR/spawn-repos"
+locked_state_update '.final_failed = {"acme/api:3": {ts: "t", marked: ["held"]}}'
+daemon_poll_issues 2>/dev/null || true
+assert_eq "a tombstone for acme/api:3 does not block acme/web#3" "spawn 3" "$(spawns)"
+assert_eq "and acme/api#3 is the one held back" "3 acme/web" "$(tr '\n' ' ' < "$TEST_TEMP_DIR/spawn-repos" | sed 's/ $//')"
+assert_eq "its tombstone stays while its issue is listed with the marked label" "true" "$(jq '.final_failed | has("acme/api:3")' "$STATE_FILE")"
+
+echo '[{"number":3,"title":"b","labels":[{"name":"shipwright"}],"repository":{"nameWithOwner":"acme/web"}}]' > "$TEST_TEMP_DIR/issues.json"
+reset_state
+locked_state_update '.final_failed = {"acme/api:3": {ts: "t", marked: ["held"]}}'
+daemon_poll_issues 2>/dev/null || true
+assert_eq "the other repo's tombstone is cleared once its issue left the listing" "false" \
+    "$(jq '.final_failed | has("acme/api:3")' "$STATE_FILE")"
+
+echo '[{"number":3,"title":"b","labels":[{"name":"shipwright"},{"name":"held"}],"repository":{"nameWithOwner":"acme/web"}}]' > "$TEST_TEMP_DIR/issues.json"
+reset_state
+locked_state_update '.final_failed = {"acme/web:3": {ts: "t", marked: ["held"]}}'
+daemon_poll_issues 2>/dev/null || true
+assert_eq "a tombstone under its own repo blocks that repo's issue" "" "$(spawns)"
+assert_eq "and its entry stays while the marked label is on it" "true" "$(jq '.final_failed | has("acme/web:3")' "$STATE_FILE")"
+
+reset_state
+locked_state_update '.final_failed = {"3": {ts: "t", marked: ["held"]}}'
+daemon_poll_issues 2>/dev/null || true
+assert_eq "a tombstone written before org keys (bare number) still blocks until cleared" "" "$(spawns)"
+assert_eq "and it is kept while its marked label is on the issue" "true" "$(jq '.final_failed | has("3")' "$STATE_FILE")"
+WATCH_MODE=repo
+unset ORG
 rm -f "$HOME/.shipwright/machines.json"
 
 # ─── daemon_poll_issues: queue drain ─────────────────────────────────────

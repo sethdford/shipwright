@@ -75,5 +75,6 @@ all stop dispatch. `--no-github` checks only the local flag, is refused on GitHu
   history (`GhRunHistory` lists `shipwright-pipeline.yml` only), so refused labels cannot re-open or
   trip the breaker or open an incident. Relabels after a run are refused with a notice, not dispatched. Manual `workflow_dispatch` stays ungated by design (operator
   action), bounded by the operator.
-- Gaps (tracked in the Wave 1a plan's follow-ups): the budget is not enforced on CI (no cost data); org-mode `.final_failed` is keyed by issue number only. A title
-  fingerprint misses paraphrased duplicates.
+- Gaps (tracked in the Wave 1a plan's follow-ups): the budget is not enforced on CI (no cost data);
+  org-mode `.final_failed` entries written before the `owner/repo:number` key keep the bare number and
+  block that number in every repo until cleared. A title fingerprint misses paraphrased duplicates.
