@@ -423,7 +423,7 @@ jobs:
 
       - name: Install Claude Code
         run: |
-          npm install -g @anthropic-ai/claude-code
+          npm install -g @anthropic-ai/claude-code@2.1.301
 
       - name: Install Shipwright
         run: |
