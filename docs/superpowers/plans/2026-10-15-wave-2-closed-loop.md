@@ -16,10 +16,10 @@
 
 | Tranche | Keys | Scope | Detail level |
 |---|---|---|---|
-| 1 (P0, needs no ledger, unblocks dispatch; W2-06 and W2-20 wait for #8610) | W2-01 to W2-07, W2-20 | failure classification, auth retry, progress verdict, stall stop, wall-clock cap, model routing hygiene | **Exact code, tests, commands and expected output for every step.** |
-| 2 | W2-08 to W2-12 | run ledger, CI ledger, decisions, routing and difficulty, CI cost and runtime budget | Task level, with the review fixes applied. Each task gets a full expansion before it starts. |
-| 3 | W2-13 to W2-18 | eval corpus and paired ratchet, trusted replay, verifier stage, legacy retirement, holdout MVP, scorecard | Task level, with the review fixes applied. |
-| Deferred | W2-19 | E5 fitter, full H2 fence, GitHub twin, merge tiers I1 to I3 and I5, self-improving harness (J) | Listed only. Each needs its own plan. |
+| 1 (P0, needs no ledger, unblocks dispatch; W2-06 and W2-20 need #8610, merged 2026-10-15) | W2-01 to W2-07, W2-20 | failure classification, auth retry, progress verdict, stall stop, wall-clock cap, model routing hygiene | **Exact code, tests, commands and expected output for every step.** |
+| 2 | W2-08 to W2-12 | run ledger, CI ledger, decisions, routing and difficulty, CI cost and runtime budget | Task level. Each task gets a full expansion before it starts. |
+| 3 | W2-13 to W2-18, W2-21 to W2-23 | eval corpus and paired ratchet, trusted replay, verifier stage, legacy retirement, holdout MVP, scorecard, GitHub digital twin, sandbox repository, holdout repository access | Task level. W2-21 to W2-23 are written in the same form as Tranche 1, with files, steps and verification. |
+| Deferred | W2-19 | E5 fitter, full H2 fence, merge tiers I1 to I3 and I5, self-improving harness (J) | Listed only. Each needs its own plan. |
 
 **Evidence labels.** [V] verified by a fetch or by reading the repository; [J] a judgement; [U] unverified and not relied on.
 
@@ -27,28 +27,33 @@
 
 ## Key table
 
-| Key | Tranche | Title | Blocks dispatch at scale? | Depends on |
-|---|---|---|---|---|
-| W2-01 | 1 | Incident fixtures | No (test input) | read-only `gh` access |
-| W2-02 | 1 | Failure classifier core | Yes (stops deterministic retries) | none |
-| W2-03 | 1 | Auto-retry: AUTH category, Bun before categorisation | Yes | W2-02 |
-| W2-04 | 1 | Daemon classify bridge with bash fallback | Yes (local daemon) | W2-02 |
-| W2-05 | 1 | Progress verdict and stall (TypeScript) | Yes | none |
-| W2-06 | 1 | Loop stall stop, one progress comment, progress-aware watchdog, build wall-clock cap | Yes (silent runs) | W2-05; **#8610 merged** |
-| W2-07 | 1 | Deterministic model routing hygiene | Yes (reproducible models) | none |
-| W2-20 | 1 | Arch ratchet: real-service test suites gated on `SHIPWRIGHT_E2E_REAL` (after #8610) | No (protects the loop's test gate) | #8610 merged; issue created by the maintainer |
-| W2-08 | 2 | Ledger core | No | W2-02 (decision shape) |
-| W2-09 | 2 | Ledger on CI | No | W2-08 |
-| W2-10 | 2 | Decisions in the ledger | No | W2-08 |
-| W2-11 | 2 | Routing table and difficulty, tighten-only | No | W2-07, W2-08 |
-| W2-12 | 2 | CI cost and runtime budget | Yes (CI budget) | W2-08, W2-11 |
-| W2-13 | 3 | Eval corpus and paired ratchet rule | No (gates policy changes) | W2-08, W2-14 |
-| W2-14 | 3 | Trusted replay and advisory ratchet | No | W2-13 |
-| W2-15 | 3 | Verifier stage | No | sandbox and credential prerequisites |
-| W2-16 | 3 | Retire legacy learners | No | W2-14 |
-| W2-17 | 3 | Holdout MVP | No | Q13 (who writes scenarios) |
-| W2-18 | 3 | Scorecard | No | W2-08, W2-09 |
-| W2-19 | Deferred | E5 fitter, full H2 fence, H4 twin, I1 to I3 and I5, J | No | each has its own plan |
+| Key | Issue | Tranche | Title | Blocks dispatch at scale? | Depends on |
+|---|---|---|---|---|---|
+| W2-01 | #8589 | 1 | Incident fixtures | No (test input) | read-only `gh` access |
+| W2-02 | #8590 | 1 | Failure classifier core | Yes (stops deterministic retries) | none |
+| W2-03 | #8591 | 1 | Auto-retry: AUTH category, Bun before categorisation | Yes | W2-02 |
+| W2-04 | #8592 | 1 | Daemon classify bridge with bash fallback | Yes (local daemon) | W2-02 |
+| W2-05 | #8593 | 1 | Progress verdict and stall (TypeScript) | Yes | none |
+| W2-06 | #8594 | 1 | Loop stall stop, one progress comment, progress-aware watchdog, build wall-clock cap | Yes (silent runs) | W2-05; #8610 (merged 2026-10-15) |
+| W2-07 | #8595 | 1 | Deterministic model routing hygiene | Yes (reproducible models) | none; Step 7 is superseded where #8634 has merged |
+| W2-20 | #8611 | 1 | Arch ratchet: real-service test suites gated on `SHIPWRIGHT_E2E_REAL` | No (protects the loop's test gate) | #8610 (merged 2026-10-15) |
+| W2-08 | #8596 | 2 | Ledger core | No | W2-02 (decision shape) |
+| W2-09 | #8597 | 2 | Ledger on CI | No | W2-08 |
+| W2-10 | #8598 | 2 | Decisions in the ledger | No | W2-08 |
+| W2-11 | #8599 | 2 | Routing table and difficulty, tighten-only | No | W2-07, W2-08 |
+| W2-12 | #8600 | 2 | CI cost and runtime budget | Yes (CI budget) | W2-08, W2-11 |
+| W2-13 | #8601 | 3 | Eval corpus and paired ratchet rule | No (gates policy changes) | W2-08, W2-23 |
+| W2-14 | #8602 | 3 | Trusted replay and advisory ratchet | No | W2-13, W2-21, W2-22; Q6 resolved |
+| W2-15 | #8603 | 3 | Verifier stage | No | W2-22, #8624 |
+| W2-16 | #8604 | 3 | Retire legacy learners | No | W2-14 |
+| W2-17 | #8605 | 3 | Holdout MVP | No | W2-23, #8624 |
+| W2-18 | #8606 | 3 | Scorecard | No | W2-08, W2-09 |
+| W2-21 | #8637 | 3 | GitHub digital twin for offline replays | No | none (its weekly contract run needs W2-22) |
+| W2-22 | #8638 | 3 | Sandbox repository wiring | No | #8624 |
+| W2-23 | #8639 | 3 | Holdout repository access | No | #8624; W2-22 (shared rules) |
+| W2-19 | #8607 | Deferred | E5 fitter, full H2 fence, I1 to I3 and I5, self-improving harness (J) | No | each has its own plan |
+
+Epic #8587. This plan is PR #8588.
 
 **Dispatch at scale.** Tranche 1 removes the known causes of the failures in the incident record. It is necessary but not sufficient: the breaker still reads GitHub history only, and local outcomes reach it only after Wave 1b (ADR-0007).
 
@@ -66,7 +71,7 @@ The spec already covers most of this work. A reviewer checked it and found one n
 | §8 delivery evals and scorecard | 20 to 50 cases; pass^3; cost per success | W2-13, W2-14, W2-18 | No |
 | §2 non-goals | no new features except §6.1, §6.2, §6.3 | Tranches 1 to 3 sit inside §6.2 and §8 | No change needed for Tranches 1 to 3 |
 
-**Decision D-M (needs maintainer approval): model alias conversion.** Five model pins move to aliases that resolve to the 5.5 generation (`claude-opus-5-5`, `claude-sonnet-5-5`, `claude-haiku-5-5`). Templates: `autonomous.json` and `full.json` name `claude-opus-5`; `cost-aware.json` names `claude-sonnet-5`, `claude-opus-5` and `claude-haiku-4-5`. Workflows: `shipwright-pipeline.yml` triage names `claude-haiku-4-5-20251001` (becomes the `haiku` alias), and `review-remediation.yml` names `claude-sonnet-4-20250514` (becomes the `sonnet` alias). Each conversion changes the model for every run that reaches that line. **Default: convert**, because the reviewer required it and the pricing table already covers the 5.5 family. The change is recorded in the ADR as a model change.
+**Decision D-M: the Claude 5.5 family (decided 2026-10-16).** The pins in `templates/pipelines/autonomous.json`, `full.json` and `cost-aware.json`, and the two workflow pins (`shipwright-pipeline.yml` triage `claude-haiku-4-5-20251001`, and `review-remediation.yml` `claude-sonnet-4-20250514`), move to the aliases in `config/models.json`, which resolve to `claude-opus-5-5`, `claude-sonnet-5-5` and `claude-haiku-5-5`. Each conversion changes the model for every run that reaches that line, so it is a behaviour change, recorded in ADR-0009. The change is implemented by #8634, which was open and unmerged on 2026-10-16; this branch still pins the old IDs. W2-07 Step 7 applies only to pins that #8634 has not moved.
 
 ---
 
@@ -84,7 +89,7 @@ The spec already covers most of this work. A reviewer checked it and found one n
 | E8 | "Environment setup is the largest single factor in agent success" | [U] | Not checked. W2-02 adds an environment class because the incident record shows setup failures, not because of this claim. |
 | E9 | Auto-retry has no auth category and falls back to BUILD_FAILURE | [V] | `shipwright-auto-retry.yml` categorisation block, default at the "safest retry strategy" line. |
 | E10 | CI heartbeat is a background timer that posts every 600 seconds regardless of progress | [V] | `shipwright-pipeline.yml:641–646`. |
-| E11 | The environmental cause of the #8547 stall: the loop's test gate inherited the GitHub and Claude credentials, so `scripts/sw-e2e-integration-test.sh` ran a nested real pipeline on every iteration. It filed real issues, switched branches in the agent's checkout, and deleted `.claude/pipeline-state.md`. | [V] for the mechanism, read in the diff of PR #8610, which is **open, not merged** (`scripts/sw-e2e-integration-test.sh`, `scripts/lib/test-gate-env.sh`, `scripts/sw-loop.sh`). [U] for the counts (about 1000 issues over time; 37 open ones now closed), as the maintainer reported them. | #8610 adds `sw_test_gate_env` (tokens unset, empty `GH_CONFIG_DIR`, `SHIPWRIGHT_IN_TEST_GATE=1`) and the `SHIPWRIGHT_E2E_REAL=1` opt-in. Tracked in #8608. |
+| E11 | The environmental cause of the #8547 stall: the loop's test gate inherited the GitHub and Claude credentials, so `scripts/sw-e2e-integration-test.sh` ran a nested real pipeline on every iteration. It filed real issues, switched branches in the agent's checkout, and deleted `.claude/pipeline-state.md`. | [V] for the mechanism, read in the diff of PR #8610, merged on 2026-10-15 (`scripts/sw-e2e-integration-test.sh`, `scripts/lib/test-gate-env.sh`, `scripts/sw-loop.sh`). [U] for the counts (about 1000 issues over time; 37 open ones now closed), as the maintainer reported them. | #8610 adds `sw_test_gate_env` (tokens unset, empty `GH_CONFIG_DIR`, `SHIPWRIGHT_IN_TEST_GATE=1`) and the `SHIPWRIGHT_E2E_REAL=1` opt-in. Tracked in #8608. |
 
 **Not cited:** StrongDM's specific figures beyond the holdout framing, Weng's specific claims, AHE and Self-Harness (not verified), and the issue #8547 run as evidence of an agent stall. #8547 is evidence of the watchdog gap only (E6). The 71.9% review figure is cited with its corrections (E2).
 
@@ -1649,7 +1654,7 @@ Expected: exit 0 for each.
 
 ### W2-06: loop stall stop, one progress comment, progress-aware watchdog, build wall-clock cap
 
-**Depends on:** #8610 merged. Progress signals mean nothing while the test gate can run real pipelines and mutate the checkout (E11). Until #8610 is merged, this task does not start.
+**Depends on:** #8610, merged 2026-10-15. Progress signals mean nothing while the test gate can run real pipelines and mutate the checkout (E11), so this task starts only on the merged gate.
 
 **Purpose:** a run whose tests stop moving stops, instead of running to the cap. The watchdog measures time since the last test movement, not since the last timer tick. The build stage has a wall-clock cap from its template. A run with no test signal is never judged: no test command means no record and no stall.
 
@@ -2026,7 +2031,7 @@ Expected: no output, exit 0.
 Run: `bun run arch`
 Expected: exit 0. Bash findings must not grow.
 
-**Stall path (specified, not executed in this revision).** A hermetic `scripts/sw-loop-stall-test.sh` runs `sw loop --max-restarts 2` in a temporary git repository, with a test command that always prints the same failure and a fake `claude` that prints one line per call. It expects exit 4, three iteration logs (the fingerprint repeats three times), `STATUS=stalled`, and `RESTART_COUNT=0`. It runs only after #8610 is merged, and it is not part of this revision because it needs the sw-loop edits applied to the repository.
+**Stall path (specified, not executed in this revision).** A hermetic `scripts/sw-loop-stall-test.sh` runs `sw loop --max-restarts 2` in a temporary git repository, with a test command that always prints the same failure and a fake `claude` that prints one line per call. It expects exit 4, three iteration logs (the fingerprint repeats three times), `STATUS=stalled`, and `RESTART_COUNT=0`. It needs #8610, merged on 2026-10-15, and it is not part of this revision because it needs the sw-loop edits applied to the repository.
 
 **Verified in scratch:** the bridge (13 assertions in the hermetic test, against a repository shim of the helpers), the classifier fingerprint through the bridge, the three-state test signal, committed-only diff and commit signals in a real temporary repository, and the run-scoped marker. Not executed: the sw-loop insertions beyond `bash -n` on a copy.
 
@@ -2049,7 +2054,7 @@ Expected: exit 0. Bash findings must not grow.
 - Modify: `.github/workflows/review-remediation.yml` (model from config)
 - Modify: `.github/workflows/shipwright-pipeline.yml` (triage model from config)
 
-- [ ] **Step 1: The models file.** Create `config/models.json`:
+- [ ] **Step 1: The models file.** Create `config/models.json` (if #8634 has merged, the file already exists: keep its values and do not overwrite):
 
 ```json
 {
@@ -2221,7 +2226,7 @@ if [[ -n "$EFFORT_LEVEL" ]] && [[ "$EFFORT_LEVEL" != "low" && "$EFFORT_LEVEL" !=
 ```
 and the error message on line 409 to `error "--effort must be low, medium, high or xhigh (got: $EFFORT_LEVEL)"`, and the help text on line 186 to `low|medium|high|xhigh`. Before the default route uses `xhigh`, confirm that the effort string reaches the Claude CLI unchanged (`scripts/lib/compat.sh:424–456` returns the override as-is). The Step 9 check covers this.
 
-- [ ] **Step 7: Templates and workflows to aliases.** For the three templates, replace the quoted strings exactly:
+- [ ] **Step 7: Templates and workflows to aliases.** If `grep -rlE '"claude-(opus-5|sonnet-5|haiku-4-5)"' templates/pipelines` prints nothing, the templates already use aliases, #8634 has made this change, and this step is superseded: go to Step 8. Otherwise, for the three templates, replace the quoted strings exactly:
 ```bash
 python3 - <<'PY'
 import pathlib
@@ -2255,9 +2260,9 @@ Expected: exit 0.
 
 ---
 
-### W2-20: arch ratchet for real-service test suites (after #8610 merges)
+### W2-20: arch ratchet for real-service test suites (#8610 merged)
 
-**Depends on:** #8610 merged, because the gate this rule checks (`SHIPWRIGHT_E2E_REAL`) is introduced there. The GitHub issue is created by the maintainer.
+**Depends on:** #8610, merged 2026-10-15, because the gate this rule checks (`SHIPWRIGHT_E2E_REAL`) is introduced there. The issue is #8611 (key table; Q16).
 
 **Purpose:** a test suite that reaches real services must be gated on `SHIPWRIGHT_E2E_REAL=1`. The number of ungated suites may only go down, as with the other ratchets (ADR-0008).
 
@@ -2290,7 +2295,7 @@ Expected: exit 0.
 
 ---
 
-## Tranche 2 (W2-08 to W2-12): task level, with fixes applied
+## Tranche 2 (W2-08 to W2-12): task level
 
 Each task expands to Wave 1a detail before it starts.
 
@@ -2312,7 +2317,7 @@ Each task expands to Wave 1a detail before it starts.
 - The outcome append **annotates and does not fail the job** (`::warning::`). Readers treat a missing or failed entry as missing data, never as an empty history.
 - Persist ledger files with a fast-forward push and retry, never with `--force`. The force-push fallbacks at `shipwright-pipeline.yml` (around line 878) and `shipwright-optimize.yml:111` must not touch the ledger path.
 - A restore sentinel: a missing or empty ledger directory counts as unreadable, not as empty (fix D4).
-- **Verification:** until a sandbox is approved (Q3, default none), run one manual `shipwright-pipeline.yml` run on this repository against an issue labelled `e2e-test`. Expect a ledger file on `shipwright-data` after the run, whose last line is an `outcome`.
+- **Verification:** until W2-22 wires the sandbox (Q3), run one manual `shipwright-pipeline.yml` run on this repository against an issue labelled `e2e-test`. After W2-22, live runs use the sandbox instead. Expect a ledger file on `shipwright-data` after the run, whose last line is an `outcome`.
 
 ### W2-10: decisions in the ledger
 
@@ -2332,22 +2337,27 @@ Each task expands to Wave 1a detail before it starts.
 
 ### W2-12: CI cost and runtime budget
 
-- **Cost source (Q6).** Confirm the usage fields that `claude` emits in JSON output with one approved sandbox run. Parse them with zod, and fail closed on an unknown shape.
-- **Runtime budget.** A `budget run-check` bash bridge runs before each iteration. It sums the run's `agent_call` costs from the ledger, compares them with the tier cap from the routing table, and stops the run as `escalated` with reason `budget` when the next iteration would exceed it.
+- **Cost source (Q6).** The usage fields that `claude` emits in JSON output are checked by one run in the sandbox (W2-22), not assumed. The parser uses zod and fails closed on an unknown shape. Q6 must be resolved before W2-14 starts.
+- **Two ledger sums.** The spend of one eval run and the spend of the current ISO week (Monday 00:00 UTC), both read from the ledger (W2-08). Each model call is an `agent_call` entry, and a sum counts the latest entry for each call id, so a reservation is replaced by the final cost.
+- **Reserve before calling.** Before each model call the orchestrator appends the call with `status: reserved` at its worst case (`max_tokens` at the output price, plus the full prompt at the input price). It makes the call only if both sums with the reservation stay within their caps. After the call it appends `status: final`. A failed call keeps its reservation, so the estimate errs high.
+- **Fail closed.** A missing, unreadable or empty ledger blocks the call and the gate. A sum that cannot be computed counts as at the cap.
+- **Caps.** The eval caps are $25 per eval run and $100 per ISO week. They are constants in the routing table (W2-11), and adaptation can only tighten them (ADR-0009 rule 3).
+- **Runtime budget.** `budget run-check` runs before each iteration. It stops the run as `escalated` with reason `budget` when the next reservation would exceed the tier cap.
 - **CI gate.** The day's spend is read from the ledger. A missing or unreadable ledger blocks the gate (fail closed).
 - **Caps are not predictions.** Set each tier's cap from the 90th percentile of history once history exists. Until then the placeholders in `routing-v1` apply and are labelled as placeholders.
+- **Current state.** ADR-0007 says the budget is not enforced on CI because CI has no cost data. This task changes that, and ADR-0007 is updated when it lands.
 
 ---
 
-## Tranche 3 (W2-13 to W2-18): task level, with fixes applied
+## Tranche 3 (W2-13 to W2-18, W2-21 to W2-23): task level
 
 - **Contaminated history (E11).** The same rule as W2-11: runs before #8610 merged are excluded from the p90 caps, or tagged `contaminated` and excluded. E7's attribution of the 288 runs is [U] for this purpose.
 
 ### W2-13: eval corpus and paired ratchet rule
 
-- **Corpus.** 24 cases from this repository's merged PRs, human-labelled. Sixteen are holdout and eight are dev, stratified across tiers. Count by tier: trivial, small, medium, large, and negative cases where the right outcome is escalation.
+- **Corpus.** 24 cases, mined from this repository's merged PRs with linked issues and tests. An LLM drafts each case's acceptance scenarios and oracle tests, and the maintainer approves each case by PR into `sethdford/shipwright-holdout` (Q13). Sixteen are eval cases, the held-out split the ratchet decides on, and eight are dev cases, stratified across tiers. Count by tier: trivial, small, medium, large, and negative cases where the right outcome is escalation. The agent receives each case's issue text and nothing else (Isolation).
 - **Honest scope.** At n=24 this is a **regression tripwire**, not a measurement of superiority. Grow the corpus to at least 50 cases before any fitter (W2-19) is considered.
-- **Paired design.** Incumbent and candidate run on the same cases, in the same time window, with the same CLI and SDK version. Three runs per case. The statistic is pass^3.
+- **Paired design.** Incumbent and candidate run on the same cases, in the same time window, with the same CLI and SDK version. Three runs per case. The statistic is pass^3. Decisions are made on the full corpus; the subset that W2-14 runs on policy PRs is advisory.
 - **Non-inferiority (default).** Losses minus wins is at most 0, and losses are at most 1. A loss is a case where the candidate's pass^3 is below the incumbent's; a win is the reverse.
 - **Superiority, only through a sign test.** Exact one-sided sign test at p ≤ 0.05, on the discordant pairs. Minimum wins for each number of discordant pairs `n`, computed from the binomial distribution with p = 0.5:
 
@@ -2373,27 +2383,34 @@ Each task expands to Wave 1a detail before it starts.
 
   These values were computed with `math.comb`. Discordant pairs of 4 or fewer can never reach significance, so with 24 cases superiority is hard to show, which is intended.
 - **Cost.** The median paired cost ratio (candidate ÷ incumbent) is at most 0.9 for a cost-motivated change.
-- **Accept rule.** Accept when non-inferiority holds **and** (superiority by the sign test **or** a median cost ratio of at most 0.9). **Hard vetoes**, which reject regardless of the statistics: any fence violation, any touch of a forbidden path, any oracle tampering.
-- **Anti-gaming.** One PR may not change both `evals/` and the policy. The ratchet file is owned by CODEOWNERS.
+- **Accept rule.** Accept when non-inferiority holds **and** (superiority by the sign test **or** a median cost ratio of at most 0.9). **Hard vetoes**, which reject regardless of the statistics: any fence violation, any touch of a protected path (Isolation), any oracle tampering.
+- **Anti-gaming.** One PR may not change both the policy and a protected path. The ratchet code is owned by CODEOWNERS.
+
 
 ### W2-14: trusted replay and advisory ratchet
 
-- Replays run from `git archive <base.sha>` with no `.git` directory.
-- Oracle tests are restored from the trusted copy before scoring.
-- Memory injection, UCB1 and recruit are disabled in replay (`SW_LEGACY_MODEL_ROUTING` unset, and the memory switch off).
-- The ratchet reads only an attested artifact from the trusted replay workflow, with the policy hash checked against the PR head.
+- **Source.** Replays run from `git archive <base.sha>` with no `.git` directory. Replay jobs take all code and the harness from the base ref. The PR head contributes only the policy files, copied in as data, and only for paths listed in `config/eval-triggers.json`.
+- **Triggers.** A PR job (`eval-request.yml`, no secrets) records a request when the PR touches a trigger path. The trigger list is `templates/pipelines/**`, `config/models.json`, `config/defaults.json`, `config/policy.json`, `scripts/lib/models.sh`, `scripts/lib/pipeline-execution.sh`, `scripts/lib/pipeline-stages-*.sh`, `scripts/lib/daemon-triage.sh` and `src/contexts/learning/**`. Prompt and skill paths join the list when they exist as directories (none do today). A base-ref workflow (`eval-replay.yml`, `workflow_run`) runs the subset. A weekly scheduled run on `main` runs the full corpus.
+- **Subset.** 12 of the 24 cases (half the corpus), stratified by tier in proportion to the corpus counts, drawn with a seed recorded in the ledger. A subset verdict is advisory; the full paired run decides.
+- **Budget.** The caps and reservations of W2-12 apply: $25 per eval run and $100 per ISO week, reserved before each call, failing closed. The replay workflow sets `concurrency: { group: eval-replay, cancel-in-progress: false }`, so replays never overlap and cannot double-spend the weekly cap.
+- **Curtailment (early stopping).** A paired run stops early only when every possible outcome of the remaining cases gives the same verdict under the W2-13 rule, for example when the discordant pairs already reach the sign-test minimum, or when non-inferiority is already broken. This is curtailment, not a sequential boundary: no significance level is spent, and the stop rule is not a test at intermediate looks.
+- **Prompt caching.** The stable prefix (system prompt, tool definitions and rubric) carries cache markers. The ledger records cache-creation and cache-read tokens separately, and the W2-12 parser reads them.
+- **Grading.** `claude-haiku-5-5` grades only rubric-judged dimensions that have no oracle, such as the satisfaction judge in W2-17. Its grades are reported next to pass^3 and never decide an oracle test. The gate is oracle pass^3.
+- **Oracle tests.** Oracles are read only by the holdout-score job (Isolation). They are restored from the holdout store before scoring, and every oracle test runs through `sw_test_gate_env` with `SHIPWRIGHT_E2E_REAL` unset (`scripts/lib/test-gate-env.sh`, from #8610). A real-service call during replay is a fence-violation veto (W2-13).
+- **Memory and learners.** Memory injection, UCB1 and recruit are disabled in replay (`SW_LEGACY_MODEL_ROUTING` unset, and the memory switch off).
+- **Attestation.** The ratchet reads only an attested artifact from the trusted replay workflow, with the policy hash checked against the PR head.
 - **Advisory first.** The ratchet reports but does not block until the fence (H2) is tested. H2 is deferred (W2-19), so the ratchet stays advisory until its own plan is accepted.
+- **Gate.** This task does not start until Q6 is resolved by the W2-22 sandbox run.
 
-- **Oracle tests run through the test gate.** Every oracle test runs through `sw_test_gate_env` with `SHIPWRIGHT_E2E_REAL` unset (`scripts/lib/test-gate-env.sh`, from #8610). A real-service call during replay is a fence-violation veto (W2-13's hard vetoes).
 
 ### W2-15: verifier stage
 
 - **There is no verify stage in the bash pipeline today.** W2-15 adds a real stage function, not a template flag.
-- **Prerequisites.** A sandbox that gives the verifier a read-only mount, and no GitHub token. Credentials reach the verifier only as the model credential it needs.
-- **Behaviour.** The verifier runs the oracle tests itself and does not trust the builder's report. A `gap` verdict returns the run to build, capped by the fix-loop limit (three).
+- **Prerequisites.** W2-22 (sandbox) and #8624. The verifier is an agent process, so it holds no GitHub credential and gets a read-only mount of the worktree. Its model credential is the only credential it receives.
+- **Behaviour.** The verifier runs the repository's own test commands itself, through the test gate, and does not trust the builder's report. It never runs or reads the holdout. A `gap` verdict returns the run to build with the names of the failing checks only, capped by the fix-loop limit (three).
 - **Structured output.** Schema-validated verdicts. No forced `tool_choice`, which Opus 5.5 and Sonnet 5.5 reject with a 400.
-
 - **The verifier runs its checks through the same gate.** Its test runs use `sw_test_gate_env`, so it cannot file issues, switch branches or delete state. A verifier that makes a real-service call is treated as a fence violation.
+
 
 ### W2-16: retire legacy learners
 
@@ -2409,10 +2426,12 @@ Memory injection and the outcome-feedback learned rules are **ablated, not retir
 
 ### W2-17: holdout MVP
 
-- Holdout scenarios are kept in a private store, fetched only by eval and verifier jobs, and never placed in this repository.
-- Scenarios are mined from repository history (merged PRs with linked issues and tests), drafted by an LLM and approved by the maintainer by PR into `sethdford/shipwright-holdout` (Q13, decided).
-- Score: the fraction of each issue's scenarios satisfied, averaged over the runs. This is reported next to pass^3 and is not a gate until the judge is calibrated against human labels.
+- **Depends on** W2-23 (the holdout repository, token and environment) and #8624.
+- **Scenarios** are mined from merged PRs with linked issues and tests, drafted by an LLM, and approved by the maintainer by PR into `sethdford/shipwright-holdout` (Q13). Drafting runs outside CI (on the maintainer's machine or in the sandbox) and reaches the holdout repository as a PR. The read-only token never writes.
+- **Scoring** runs in the holdout-score job after the replay: the fraction of each issue's scenarios satisfied, averaged over the runs, using the judge rule in W2-14. It is reported next to pass^3 and is not a gate until the judge is calibrated against human labels.
+- **Isolation.** Holdout scores go to the ledger and the scorecard only (Isolation).
 - `scripts/lib/test-holdout.sh` already exists. Reuse it or retire it here; the decision is made when W2-17 starts.
+
 
 ### W2-18: scorecard
 
@@ -2422,13 +2441,106 @@ Memory injection and the outcome-feedback learned rules are **ablated, not retir
 
 ---
 
-## Deferred (W2-19): each needs its own plan
+### W2-21: GitHub digital twin for offline replays
+
+**Purpose:** deterministic, offline replays of the `gh` calls Shipwright makes (Q3). The twin does not replace the real service; a weekly contract run checks it against the sandbox.
+
+**Depends on:** nothing for the twin. The weekly contract run needs `SANDBOX_GH_TOKEN` (W2-22).
+
+**Files:**
+- Create: `tools/github-twin/enumerate-surface.ts` (lists every `gh` invocation in `src/adapters/github/` and `scripts/`)
+- Create: `src/testing/github-twin/surface.json` (the generated surface)
+- Create: `src/testing/github-twin/twin.ts`, `twin.test.ts` (in-memory store and handlers)
+- Create: `tools/github-twin/contract.ts` (one scripted sequence against the twin and the sandbox; compares JSON key sets)
+- Create: `.github/workflows/twin-contract.yml` (weekly on `main`, `environment: sandbox`)
+
+- [ ] **Step 1: Enumerate the surface.** Run `bun tools/github-twin/enumerate-surface.ts --write`. Expected: a count of surface entries printed, and `src/testing/github-twin/surface.json` written. Each entry is `{command, subcommand, flags}`.
+- [ ] **Step 2: Failing tests first.** `twin.test.ts` asserts that every surface entry has a handler, that an unknown `gh` call throws instead of returning an empty success, that `issue create` followed by `issue list` returns the created issue, and that the handlers return the JSON keys recorded in the surface file. Run `bun test src/testing/github-twin`. Expected before Step 3: module-not-found failures.
+- [ ] **Step 3: Implement the twin** as an in-memory `GhRunner`, the same port `gh-github-writer.ts` uses, so the twin is injected the way the fake is. Run `bun test src/testing/github-twin`. Expected: `N pass`, `0 fail`.
+- [ ] **Step 4: Contract check.** `tools/github-twin/contract.ts` runs one scripted sequence (create issue, add label, comment, close) against the twin and against `shipwright-sandbox`, and compares the JSON key sets of each response. A mismatch fails. Local mode: `bun tools/github-twin/contract.ts --twin`. Expected: exit 0.
+- [ ] **Step 5: Weekly workflow.** `twin-contract.yml` runs on a weekly `schedule` on `main`, with `workflow_dispatch`, in `environment: sandbox`. The secret sits in the single step that calls the sandbox, and the job makes no model calls, so it spends nothing from the eval caps. Its run is still recorded in the ledger as a `contract` run.
+
+**Verification:** `bun test src/testing/github-twin` exits 0; `bun run arch` exits 0 (the twin lives under `src/testing`, F5); `actionlint .github/workflows/twin-contract.yml` exits 0. After W2-22, `gh workflow run twin-contract.yml --repo sethdford/shipwright --ref main` completes and the contract prints `match`.
+
+---
+
+### W2-22: sandbox repository wiring
+
+**Purpose:** live end-to-end and eval runs use `sethdford/shipwright-sandbox`, never this repository (Q3).
+
+**Depends on:** #8624 (a hard prerequisite: the sandbox token is used only by the orchestrator's adapter, and no agent process may hold it). #8610 is merged.
+
+**Maintainer actions (the agent does not create these):**
+- Fine-grained PAT `SANDBOX_GH_TOKEN`: resource owner `sethdford`, repository access only `shipwright-sandbox`, permissions Contents, Issues and Pull requests (read and write) and Metadata (read). Nothing else.
+- GitHub Environment `sandbox`: required reviewers (the maintainer), deployment limited to `main`, holding `SANDBOX_GH_TOKEN` and a copy of the model credential the sandbox run needs.
+
+**Files:**
+- Create: `src/adapters/github/sandbox-target.ts`, `sandbox-target.test.ts`
+- Modify: `src/adapters/github/gh-github-writer.ts` (writes take an explicit target)
+- Create: `tools/arch/secret-scope.ts`, `secret-scope.test.ts`
+- Modify: `package.json` (the `arch` script runs `secret-scope`)
+- Create: `.github/workflows/sandbox-e2e.yml`
+
+- [ ] **Step 1: Failing tests first.** `sandbox-target.test.ts`: a target whose repo is not `sethdford/shipwright-sandbox` is rejected; a missing `SANDBOX_GH_TOKEN` fails closed; `GH_TOKEN` and `GITHUB_TOKEN` are never used as the sandbox credential. `secret-scope.test.ts`: a fixture naming `SANDBOX_GH_TOKEN` outside the allowlist gives a finding; a fixture naming `HOLDOUT_READ_TOKEN` in a file with a `pull_request` trigger gives a finding; `sandbox-e2e.yml#e2e` gives none.
+- [ ] **Step 2: Implement the target.** `sandbox-target.ts` is a pure check of the target repo and token presence. `gh-github-writer.ts` takes a `GhTarget`; the default target stays this repository and its current credential path. Under `SHIPWRIGHT_SANDBOX=1` the writer refuses any other target and uses only `SANDBOX_GH_TOKEN`. All writes stay in this adapter (F10). Run `bun test src/adapters/github`. Expected: `N pass`, `0 fail`.
+- [ ] **Step 3: Implement the rule.** `secret-scope.ts` enforces the allowlist in the Isolation section, and the `arch` script runs it. Run `bun test tools/arch/secret-scope.test.ts`, then `bun tools/arch/secret-scope.ts`. Expected: pass, and `0 findings`.
+- [ ] **Step 4: Workflow.** `sandbox-e2e.yml` runs on `workflow_dispatch` only, first checks that the ref is `main`, and runs one job, `e2e`, in `environment: sandbox`. Checkout uses `persist-credentials: false`. `SANDBOX_GH_TOKEN` is set in the `env:` of the single step that runs the adapter. The model credential goes only to the step that calls `claude`. No `${{` appears in `run:`, and actions are pinned to full SHAs. Run `actionlint .github/workflows/sandbox-e2e.yml` and `bun run arch`. Expected: exit 0 for both.
+- [ ] **Step 5: Live check.** After the maintainer approves the environment, run `gh workflow run sandbox-e2e.yml --repo sethdford/shipwright --ref main`. The job creates one issue in `shipwright-sandbox`, labels it, comments, and closes it. The same run makes one `claude -p --output-format json` call with a trivial prompt and records the usage fields in a secret-free fixture; that result resolves Q6.
+
+**Verification:** Steps 1 to 4 above. Step 5 expects: run `completed`; `gh issue list --repo sethdford/shipwright --search "sandbox-e2e in:title" --state all` returns nothing; the sandbox issue is closed; the usage fields are present with input and output token counts.
+
+---
+
+### W2-23: holdout repository access
+
+**Purpose:** holdout cases and scenarios are readable only by the holdout-score job (Q13).
+
+**Depends on:** #8624 (a hard prerequisite) and W2-22 (the shared secret-scope rule and environment pattern).
+
+**Maintainer actions (the agent does not create these):**
+- Fine-grained PAT `HOLDOUT_READ_TOKEN`: resource owner `sethdford`, repository access only `shipwright-holdout`, Contents read-only. It has no write permission, so it cannot push or approve.
+- GitHub Environment `holdout`: required reviewers (the maintainer), deployment limited to `main`, holding `HOLDOUT_READ_TOKEN`.
+
+**Files:**
+- Create: `src/adapters/holdout/holdout-store.ts`, `holdout-store.test.ts` (fetches case files at a pinned commit SHA; validates them with zod; never writes)
+- Create: `.github/workflows/holdout-check.yml` (`workflow_dispatch` on `main`, `environment: holdout`, job `holdout-check`)
+- Modify: `tools/arch/secret-scope.ts` (allowlist entry `holdout-check.yml#holdout-check`; W2-14 adds `eval-replay.yml#holdout-score`)
+
+- [ ] **Step 1: Failing tests first.** A fetch returns the parsed case list at the pinned SHA; a file of unknown shape fails the whole fetch (no partial result); a missing token fails closed; the store type exposes no write method.
+- [ ] **Step 2: Implement the store.** `holdout-store.ts` takes an injected fetch, so the domain has no I/O and the adapter owns it. Run `bun test src/adapters/holdout`. Expected: `N pass`, `0 fail`.
+- [ ] **Step 3: Workflow.** Step one, `fetch`, has `HOLDOUT_READ_TOKEN` in its `env:` and writes the case files to `$RUNNER_TEMP`, outside the repository tree, and prints the case count. Step two, `token-absent`, checks `test -z "${HOLDOUT_READ_TOKEN:-}"` and the count file. No later step has the token. Checkout uses `persist-credentials: false`. Run `actionlint` and `bun run arch`. Expected: exit 0 for both.
+- [ ] **Step 4: Live check.** After the maintainer approves the environment, run `gh workflow run holdout-check.yml --repo sethdford/shipwright --ref main`. Expected: run `completed`; the fetch step reports the case count in `shipwright-holdout`; the token-absent step passes.
+
+**Verification:** Steps 2 to 4 above, and `bun run arch` exits 0 with the rule's fixture tests passing.
+
+---
+
+## Isolation and secrets
+
+These rules apply to W2-14, W2-15, W2-17 and W2-21 to W2-23. Each is stated here once.
+
+- **No agent holds GitHub credentials.** An agent process (the builder, the verifier, the replay agent) never has a GitHub credential in its environment or on disk. GitHub writes happen in the orchestrator through the integrations adapter (F10), with an explicit target, and the orchestrator scrubs secret variables from the agent's environment. This is #8624, which is open as of 2026-10-16. W2-17 and W2-23 cannot start before it merges, and W2-22 cannot run an agent against the sandbox before it merges.
+- **Two secrets, two repositories, two environments.** `SANDBOX_GH_TOKEN` and `HOLDOUT_READ_TOKEN` are fine-grained personal access tokens, each scoped to one repository: `sethdford/shipwright-sandbox` (Contents, Issues and Pull requests read and write; Metadata read) and `sethdford/shipwright-holdout` (Contents read-only). Neither has any permission on this repository. Each lives in its own GitHub Environment (`sandbox`, `holdout`) with required reviewers and deployment limited to `main`. The maintainer creates the tokens and environments.
+- **Base-ref execution only.** A job that reads a secret runs from the base ref: `workflow_dispatch` on `main`, or `workflow_run` whose workflow file comes from `main`. No secret-bearing job uses `pull_request`, `pull_request_target` or `issue_comment`, and fork PRs are skipped with a `head_repository` check. A PR's own workflow edits therefore never reach a secret. A PR job may record a replay request, but the base-ref job treats it as data: it validates the PR number and a 40-hex head SHA, and it runs no PR code. Each secret-bearing run waits for a reviewer's approval, so automatic replays wait for approval too.
+- **Scope per step.** A secret appears in the `env:` of the one step that needs it. Later steps, including any that run candidate tests, do not have it. Checkout uses `persist-credentials: false`.
+- **Enforced by a rule.** `tools/arch/secret-scope.ts` (W2-22) fails `bun run arch` when either secret name appears outside its allowlist, or when a file that names one uses a PR or comment trigger.
+
+| Secret | Allowed `workflow#job` |
+|---|---|
+| `SANDBOX_GH_TOKEN` | `sandbox-e2e.yml#e2e`, `eval-replay.yml#replay` |
+| `HOLDOUT_READ_TOKEN` | `holdout-check.yml#holdout-check`, `eval-replay.yml#holdout-score` |
+
+- **Holdout isolation.** The holdout is read only by the holdout-score job, which runs after the replay job has finished and consumes only its artifact. Holdout content never reaches the builder, the verifier, or any agent prompt or context. Holdout scores (the satisfaction fraction and oracle pass^3) go to the ledger and the scorecard, and are never fed back into the loop. The verifier never reads the holdout: its verdict is `pass` or `gap`, with the names of failing checks from the repository's own test commands.
+- **Protected paths.** In a policy-changing PR, touching a protected path is a hard veto (W2-13). Protected paths are `.github/workflows/`, `tools/arch/`, `evals/`, `config/eval-triggers.json`, `.github/CODEOWNERS`, and the ratchet code.
+
+---
+
+## W2-19 (deferred): each item needs its own plan
 
 | Item | Why deferred | What its plan must settle |
 |---|---|---|
 | E5 fitter (proposes routing values from ledger statistics) | needs at least 50 cases and a live ratchet; the spec places it in Wave 4 | the fitter's inputs, its caps, and the ratchet it must pass |
 | Full H2 fence | needs real-machine tests on macOS and a container test on CI | the scope: **eval replays and the verifier only**; protected-path diffs route to a human tier; the holdout is in a private store |
-| H4 GitHub twin | a large, drift-prone surface; the `gh` surface is not yet enumerated | the enumerated surface, the contract suite, and its nightly run against real GitHub |
 | I1 to I3 and I5 (merge tiers, review scaling, specifiability, review quality) | lights-on is the default; tiers need about 30 days of metrics first | tier thresholds backtested on the ledger; review-catch measurement |
 | J self-improving harness | optional; ModularRSI shows gains on its benchmarks, not on this repository | the editable surface, the gate, the archive, and the human decision points |
 
@@ -2446,6 +2558,9 @@ Real GitHub runs create issues, labels and comments. Live checks move to `sethdf
 | 1 | W2-20 arch ratchet | `bun run arch` exits 0; the baseline has one entry (`scripts/sw-integration-claude-test.sh`) |
 | 2 | W2-09 manual run | A `ledger/<date>/<runId>.jsonl` file exists on `shipwright-data` after the run, and its last line is an `outcome` |
 | 3 | W2-14 advisory replay | The ratchet report is attached to the PR and does not block it |
+| 3 | W2-21 contract run (weekly) | Passes against the sandbox; makes no model calls |
+| 3 | W2-22 sandbox run | `completed`; one issue created and closed in `shipwright-sandbox`, none in this repository |
+| 3 | W2-23 holdout check | `completed`; the fetch step reports the case count; the token-absent step passes |
 
 **What Tranche 1 does and does not fix.** It fixes the auth retry path, the silent stall, the untyped build model, and the missing wall-clock cap. It does not fix the breaker's dependence on GitHub history alone, which Wave 1b addresses. It also does not change the 288-run dispatch and sweep paths beyond what W2-03 and W2-06 touch (E7).
 
@@ -2457,21 +2572,21 @@ Real GitHub runs create issues, labels and comments. Live checks move to `sethdf
 |---|---|---|
 | Q1 | Spec amendments | **Resolved narrowly.** The only new item is the E5 timing, which stays in Wave 4 as the spec says, and E5 is now deferred. §2 needs no change for Tranches 1 to 3. |
 | Q2 | Run Tranches 1 to 2 on SQLite (M1) before Postgres? | **Yes.** M2 and M3 share the ledger only once Postgres exists. |
-| Q3 | Disposable sandbox repository | **Decided (2026-10-16): yes.** A dedicated private sandbox repo, `sethdford/shipwright-sandbox`, hosts live end-to-end and eval runs, so real runs never create issues, labels or PRs in this repository. Deterministic replays run offline against the GitHub digital twin (W2-19 H4, pulled forward as W2-21). Until the sandbox is wired (W2-22), checks run on this repo with an `e2e-test` issue. |
-| Q4 | Eval spend cap | **Decided (2026-10-16): paired, budget-capped, change-triggered.** Policy-changing PRs (routing, models, templates, prompts, skills) get a paired incumbent-vs-candidate replay on a stratified subset; a full replay runs weekly. Hard caps: $25 per run, $100 per week, enforced at runtime by the W2-12 budget, never by model self-estimates. Sequential early stopping ends a run once the sign-test outcome is decided. Prompt caching on; grading with `claude-haiku-5-5`. No fixed nightly schedule. |
+| Q3 | Disposable sandbox repository | **Decided (2026-10-16).** Live end-to-end and eval runs move to the private repository `sethdford/shipwright-sandbox` (W2-22), so they never create issues, labels or PRs in this repository. Deterministic replays run offline against a GitHub digital twin, pulled forward as W2-21 (#8637). Until W2-22 lands, checks run on this repository with an `e2e-test` issue. |
+| Q4 | Eval spend cap | **Decided (2026-10-16).** Paired, change-triggered replays on a 12-case stratified subset; a weekly full replay; hard caps of $25 per eval run and $100 per ISO week, enforced at runtime; curtailment for early stopping; prompt caching; `claude-haiku-5-5` grades only rubric dimensions. The terms are in W2-12 to W2-14 and ADR-0009 rule 12. No fixed nightly schedule. |
 | Q5 | Incident logs as fixtures | **Read-only fetch, as approved.** Run 38744601038 is still in progress; W2-01 Step 1 captures it after it completes. |
-| Q6 | CI cost source | **Verify on the first sandbox run; zod; fail closed.** The usage fields are not assumed. |
+| Q6 | CI cost source | **Open until the W2-22 sandbox run confirms the usage fields.** The fields are not assumed, and W2-14 does not start before this is resolved. |
 | Q7 | Triage model | **Yes, through `config/models.json` in W2-07.** |
 | Q8 | Which mechanism sets the build model | **Answered.** UCB1, the `$RANDOM` A/B and recruit set the build model, not the template. W2-07 switches them off, so the template's model applies. The retry escalation in `daemon-failure.sh` sets opus on retry 1 and is separate. |
 | Q9 | Refusal fallbacks in the runner | **Out of scope.** |
 | Q10 | Where `outcome-feedback.sh` output is read | **Part of W2-16 (G6).** |
 | Q11 | The review-benchmark citation | **Resolved.** CRBugBench is confirmed, with the two corrections in E2. |
 | Q12 | Full H2 fence | **Deferred (W2-19).** |
-| Q13 | Who writes holdout scenarios | **Decided (2026-10-16): mined from history, LLM-drafted, maintainer-approved.** Cases come from merged PRs with linked issues and tests (SWE-bench / CRBugBench-style mining); an LLM drafts each case's acceptance scenarios; the maintainer approves them by PR into a separate private repo, `sethdford/shipwright-holdout`, readable only by the eval and verifier jobs through a dedicated read-only token. Agents cannot read it: they have no GitHub credentials (#8624), and this repo's `GITHUB_TOKEN` cannot read another private repo. W2-17 is unblocked. |
-| Q14 | GitHub twin | **Deferred (W2-19).** |
-| Q15 | #8610 (the test gate) | **Blocking for W2-06 and W2-20.** #8610 is open. The maintainer merges it; no part of this plan changes its code. |
-| Q16 | Who creates the W2-20 issue | **The maintainer**, as stated in the review. The key is W2-20. |
-| D-M | Model alias conversion | **Decided (2026-10-16): Claude 5.5 everywhere.** Pinned IDs moved to `claude-opus-5-5` / `claude-sonnet-5-5` / `claude-haiku-5-5` in #8634; W2-07 finishes deterministic routing from one models file. |
+| Q13 | Holdout cases and scenarios | **Decided (2026-10-16).** Mined from merged PRs with linked issues and tests (SWE-bench and CRBugBench style), LLM-drafted, and approved by the maintainer by PR into the private repository `sethdford/shipwright-holdout` (W2-23, #8639). Read only by the holdout-score job. W2-17 (#8605) depends on W2-23 and on #8624. |
+| Q14 | GitHub twin | **Decided (2026-10-16): pulled forward as W2-21 (#8637).** See Q3. |
+| Q15 | #8610 (the test gate) | **Merged 2026-10-15.** W2-06 and W2-20 are unblocked. No part of this plan changes its code. |
+| Q16 | Who creates the W2-20 issue | **The maintainer, as the review asked.** The issue is #8611. |
+| D-M | Model alias conversion | **Decided (2026-10-16): the Claude 5.5 family.** Implemented by #8634, which was open and unmerged on 2026-10-16. This branch still pins the old IDs in the three templates and two workflows. W2-07 finishes deterministic routing from one models file; its Step 7 applies only where #8634 has not already made the change. |
 
 ---
 
@@ -2490,18 +2605,10 @@ Real GitHub runs create issues, labels and comments. Live checks move to `sethdf
 
 Checked against the spec, the ADRs, AGENTS.md, the independent review, and the repository at `origin/main`.
 
-1. **Structure.** Tranches 1 to 3 and the deferred list are separate; each item carries its key, W2-01 to W2-19. Tranche 1 has exact steps with commands and expected output. Tranches 2 and 3 are task level and say so.
+1. **Structure.** Tranches 1 to 3 and the deferred item are separate. Each key has its issue number in the key table (W2-01 to W2-23, with W2-19 deferred). Tranche 1 has exact steps with commands and expected output. Tranches 2 and 3 are task level, and W2-21 to W2-23 are in Tranche 3.
 2. **Verification of the code.** Every TypeScript file in Tranche 1 was executed in an isolated scratch copy against stubs of the real interfaces: 44 tests pass. The bash bridge and the daemon helper were executed against a fake Bun. The repository run for each task is listed as its verification step, and nothing has been run in the repository yet.
-3. **Fitness rules.** Domain files import only their own domain and `src/shared/kernel` (F1). The application layer imports only ports and domain (F2). Command code reads files only through the `FileReader` port (F5). The CLI imports contexts only through their `index.ts` (F3). The bash changes are argv-only and add no `eval` (F11).
+3. **Fitness rules.** Domain files import only their own domain and `src/shared/kernel` (F1). The application layer imports only ports and domain (F2). Command code reads files only through the `FileReader` port (F5). The CLI imports contexts only through their `index.ts` (F3). The bash changes are argv-only and add no `eval` (F11). Sandbox writes go through the integrations adapter with the sandbox token and never the repo token (F10), and workflow `run:` blocks contain no `${{` (AGENTS.md).
 4. **Facts checked.** The router, the census, the pinned Bun SHA, the UCB1 and A/B lines, the recruit guard, the `EFFORT_LEVEL` validation, the auto-retry and watchdog steps, the dispatch guard text, and the pre-flight comment were all read from the repository. The incident run and CRBugBench were checked with `gh` and a fetch.
-5. **Corrections to the review.** See the note below.
 6. **Known gaps, stated plainly:** the sweep path is covered by W2-06 and W2-09, not by W2-03; the `timeout` cap may leave model child processes running; `movedTests` uses a single `suite` name on the bash side, which is coarse; the classifier's first-attempt rules are not exhaustive; and the 288-run attribution is a source check (E7), not a reconstruction of each re-run.
-
-**Where I disagree with the review, or where the review needed a correction:**
-1. **CRBugBench is not "injected bugs".** The paper says "human-verified bugs mined from repository history". The 71.9% and 47.7% figures may not share a harness. The plan cites both corrections (E2). Lights-on remains the default, because the paper reports weaker results on complex changes and proprietary repositories, not because of a single number.
-2. **Tranche 1 does not "unblock dispatch" on its own.** It removes the known causes of the incident record, but the breaker reads GitHub history only until Wave 1b. The plan says so under "Dispatch at scale".
-3. **The auth-comment mechanism (E7).** The review says dispatch and sweep caused the 288 re-runs, which I confirmed from source. The dispatch guard does match "Pipeline Auth Failure", so the mechanism is the comment's `|| true` write plus sweep's timestamp logic. I did not reconstruct each re-run, so that part stays [V] by source check only.
-4. **AGENTS.md is unchanged.** Tranche 1 needs no line in it. When Tranche 2 lands, one existing line will be replaced rather than a line added.
-5. **The model-alias conversion (D-M) is a real behaviour change**, not only a hygiene fix, because `claude-opus-5` becomes `claude-opus-5-5`. The plan makes that visible rather than assuming it.
 
 The plan and ADR-0009 are the only changes in this commit.

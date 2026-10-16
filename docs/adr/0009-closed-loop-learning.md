@@ -17,8 +17,8 @@ Shipwright's retries and self-tuning change behaviour without being measured. Th
 - **Contaminated test gate (E11).** The loop's test gate inherited the GitHub and Claude credentials, so
   `scripts/sw-e2e-integration-test.sh` ran a nested real pipeline on each iteration. It filed real issues, switched
   branches in the agent's checkout and deleted `.claude/pipeline-state.md`. The mechanism is [V] from PR #8610, which
-  is **open, not merged**; the counts (about 1000 leaked issues, 37 open ones since closed) are [U] and tracked in #8608.
-  The fix lives in #8610 (`sw_test_gate_env`, `SHIPWRIGHT_E2E_REAL=1` opt-in). This ADR does not change its code.
+  **merged on 2026-10-15**; the counts (about 1000 leaked issues, 37 open ones since closed) are [U] and tracked in #8608.
+  The fix is `sw_test_gate_env` with the `SHIPWRIGHT_E2E_REAL=1` opt-in. This ADR does not change its code.
 - **Unmeasured learners.** `loop-tuning.json` is read by the loop but nothing writes it. `iteration-model.json`,
   `template-weights.json`, UCB1 model selection, the 20% `$RANDOM` A/B and the recruit override all change
   behaviour from data, yet their tests check source text or bookkeeping, not outcomes. UCB1, the A/B and recruit
@@ -63,22 +63,29 @@ Shipwright adopts closed-loop **measurement and gating**, not open-ended learnin
 4. **The evaluator is outside the loop.** Tests, verifiers, the holdout, the ledger, the eval set, the ratchet and
    the routing and model configuration are read-only to the build agent. Enforcement for **eval replays and the
    verifier** is a fence in the runner: the replay worktree is made with `git archive` and without the protected
-   paths, and the holdout is mounted only into the verifier. A diff that touches a protected path routes to a human
-   tier and is never auto-merged. The full fence for the local build (H2) is deferred to its own plan, because
-   macOS and CI behaviour are not yet tested. A static rule checks configured task specs; the fence, not the
-   denylist, is the enforcement.
+   paths (`.github/workflows/`, `tools/arch/`, `evals/`, `config/eval-triggers.json`, CODEOWNERS), and the holdout
+   is never mounted into any agent. It is read only by the holdout-score job, after the run (rule 6). A diff that
+   touches a protected path routes to a human tier and is never auto-merged. The full fence for the local build
+   (H2) is deferred to its own plan, because macOS and CI behaviour are not yet tested. A static rule checks
+   configured task specs; the fence, not the denylist, is the enforcement.
 5. **Policy changes ship only through a paired ratchet.** The incumbent and the candidate run on the same cases,
    in the same window, with the same CLI and SDK version, three runs per case, reporting pass^3. Non-inferiority is
    the default (losses minus wins at most 0, and at most one loss). Superiority requires an exact one-sided sign
    test at p ≤ 0.05. A cost-motivated change requires a median paired cost ratio of at most 0.9. Hard vetoes reject
-   any fence violation, forbidden-path touch or oracle tampering. With about 24 cases this is a **regression
+   any fence violation, protected-path touch or oracle tampering. With about 24 cases this is a **regression
    tripwire**, not a measurement of superiority; the corpus grows to at least 50 cases before any fitter exists.
-   One PR may not change both the evals and the policy.
-6. **Satisfaction is a fraction.** An issue's score is the fraction of its holdout scenarios satisfied, averaged over
-   the runs. The gate remains pass^3. The holdout lives in a private store fetched only by eval and verifier jobs,
-   and it is not in this repository. Scenarios are human-written (Q13, default: the maintainer).
-7. **The GitHub twin is deferred.** Its scope is the `gh` surface Shipwright actually uses. It makes replays
-   deterministic and offline once it exists, and it does not replace the real service.
+   One PR may not change both the policy and a protected path.
+6. **Satisfaction is a fraction, and the holdout is isolated.** An issue's score is the fraction of its holdout
+   scenarios satisfied, averaged over the runs. The gate remains pass^3. The holdout is a private repository,
+   `sethdford/shipwright-holdout`, and its cases are mined from merged PRs with linked issues and tests. An LLM
+   drafts their acceptance scenarios, and the maintainer approves each by PR. Only the holdout-score job reads it,
+   through a read-only token scoped to that repository. Agents never receive GitHub credentials (#8624, open as of
+   2026-10-16; a hard prerequisite of the holdout and sandbox work). Holdout content never reaches the builder,
+   the verifier or any agent context, and holdout scores are written to the ledger and never fed back into the loop.
+7. **Live runs use a sandbox; replays use a twin.** Live end-to-end and eval runs go to the private repository
+   `sethdford/shipwright-sandbox`, never to this repository. Deterministic replays run offline against a GitHub
+   digital twin, pulled forward from the deferred list. The twin covers the `gh` surface Shipwright uses, and it does
+   not replace the real service: a weekly contract run checks it against the sandbox.
 8. **Merge is lights-on by default.** The factory opens PRs and a human merges. Auto-merge, if ever allowed, is for a
    named low-risk tier with evidence attached, and only after 30 days of quality metrics. The tiers are deferred.
 9. **Specifiability is checked before building.** Intake asks for clarification or refuses when acceptance
@@ -91,12 +98,20 @@ Shipwright adopts closed-loop **measurement and gating**, not open-ended learnin
 11. **Self-improvement is optional and last.** Any proposer may edit only an explicit surface (prompts, skills, tool
     descriptions, routing values within caps). Each edit states a hypothesis and a predicted effect. Edits to tier
     structure, models or caps need maintainer approval. The whole phase is deferred (W2-19).
+12. **Eval spend is capped, and the cap fails closed.** Policy-changing PRs get a paired incumbent-versus-candidate
+    replay on a stratified subset of 12 of the 24 cases, and a full paired replay runs weekly. Hard caps of $25 per
+    eval run and $100 per ISO week are enforced at runtime from the ledger, and each model call reserves its
+    worst-case cost before it is made. Early stopping is curtailment only: a run stops when the remaining cases cannot
+    change the verdict. Prompt caching is on. `claude-haiku-5-5` grades only rubric-judged dimensions that have no
+    oracle; the gate stays oracle pass^3. Replays run only from base-ref workflows, never for fork PRs, and they never
+    overlap. The details are in the plan (W2-12 to W2-14).
 
-**Model alias conversion (D-M, needs approval).** Templates move from `claude-opus-5`, `claude-sonnet-5` and
-`claude-haiku-4-5` to the aliases in `config/models.json`, which resolve to `claude-opus-5-5`, `claude-sonnet-5-5`
-and `claude-haiku-5-5`. Two workflow pins also move: the triage `claude-haiku-4-5-20251001` (to the `haiku` alias)
-and the remediation `claude-sonnet-4-20250514` (to the `sonnet` alias). This is a model change for every run that
-uses those templates or workflows. It is recorded here so it is not mistaken for a hygiene edit. Default: convert.
+**Model alias conversion (D-M, decided 2026-10-16).** The pins in three templates and two workflows move to aliases
+that resolve to the Claude 5.5 family: `claude-opus-5` to `claude-opus-5-5`, `claude-sonnet-5` to `claude-sonnet-5-5`,
+`claude-haiku-4-5` to `claude-haiku-5-5`, and the two workflow pins (`claude-haiku-4-5-20251001` for triage and
+`claude-sonnet-4-20250514` for remediation) to the `haiku` and `sonnet` aliases. This changes the model for every run
+that reaches those lines, so it is recorded here as a model change, not a hygiene edit. The conversion is implemented
+by #8634, which was open and unmerged on 2026-10-16; this branch still pins the old IDs.
 
 What is **not** adopted: reinforcement learning, bandits in production, online adaptation during a run, model
 fine-tuning, and any claim from an unverified source.
@@ -104,25 +119,15 @@ fine-tuning, and any claim from an unverified source.
 **Spec amendments.** Most of this is already in the spec. The only item that needs a change is the timing of the
 gated optimizer (§7.4), which this ADR keeps in Wave 4 and defers. No change to §2 is needed for Tranches 1 to 3.
 
-### Maintainer decisions (2026-10-16)
-- **Sandbox (Q3):** live end-to-end and eval runs move to a private sandbox repo (`sethdford/shipwright-sandbox`);
-  deterministic replays run offline against the GitHub digital twin, pulled forward from the deferred list.
-- **Holdout (Q13):** cases are mined from merged PRs with linked issues and tests, an LLM drafts acceptance
-  scenarios, and the maintainer approves them by PR into a separate private repo (`sethdford/shipwright-holdout`)
-  that only the eval and verifier jobs can read. Agents have no GitHub credentials, and this repository's
-  `GITHUB_TOKEN` cannot read another private repository.
-- **Eval spend (Q4):** paired, change-triggered replays on a stratified subset for policy-changing PRs, a weekly full
-  replay, hard runtime caps of $25 per run and $100 per week, sequential early stopping once the sign test is
-  decided, prompt caching, and `claude-haiku-5-5` for grading. No fixed nightly schedule.
-- **Models (D-M):** every pinned model is in the Claude 5.5 family (#8634); routing becomes deterministic in W2-07.
-
 ## Consequences
 - Each routing, policy and model change has a measurable answer, once the corpus and the replay exist. Until then
   the ratchet is advisory and cannot block a merge.
 - The ledger becomes the single source for cost, outcome and audit. The bash learners it replaces are retired
   behind aliases, not deleted without a trace.
-- The replay fence and the GitHub twin are real engineering costs, and the twin's fidelity needs a nightly contract
-  run against the real service.
+- The replay fence and the GitHub twin are real engineering costs, and the twin's fidelity needs a weekly contract
+  run against the sandbox.
+- Eval spend is bounded by rule 12. ADR-0007 states that the budget is not enforced on CI because CI has no cost
+  data; that statement stops being true only when W2-12 lands.
 - Adaptive behaviour changes more slowly: every routing edit goes through the ratchet. That is intended.
 - Known gaps, stated plainly: the replay fence is untested on macOS and CI; the satisfaction judge is unvalidated
   until calibrated against human labels; the sign test has low power at 24 cases; the Weng claims are unverified;
