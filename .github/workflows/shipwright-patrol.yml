@@ -22,7 +22,7 @@ jobs:
       GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           fetch-depth: 0 # Full history for doc staleness checks
 
@@ -31,8 +31,16 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y jq
 
+      # The `shipwright` CLI runs on Bun (`src/cli.ts`); without Bun, `intake check` fails closed
+      # and patrol files nothing (#8576). Same pin as .github/actions/safety-gates.
+      - name: Set up Bun
+        uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
+        with:
+          bun-version: 1.2.19
+
       - name: Install Shipwright
         run: |
+          bun install --frozen-lockfile --ignore-scripts
           npm link
 
       - name: Restore persistent state
@@ -64,22 +72,6 @@ jobs:
           shipwright daemon patrol --once 2>&1 || {
             echo "WARNING: Patrol exited with code $? — continuing to persist state"
           }
-
-      - name: Auto-label patrol findings
-        if: always()
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          # Add shipwright label to any open auto-patrol issues so daemon picks them up
-          ISSUES=$(gh issue list --label "auto-patrol" --state open --json number --jq '.[].number' 2>/dev/null || echo "")
-          if [ -n "$ISSUES" ]; then
-            echo "$ISSUES" | while read -r num; do
-              gh issue edit "$num" --repo "$GITHUB_REPOSITORY" --add-label "shipwright" 2>/dev/null || true
-              echo "Labeled issue #$num with shipwright"
-            done
-          else
-            echo "No open auto-patrol issues to label"
-          fi
 
       - name: Persist state to shipwright-data branch
         if: always()

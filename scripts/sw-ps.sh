@@ -87,7 +87,7 @@ while IFS='|' read -r window_name pane_title pane_pid cmd pane_active pane_idle 
     [[ -z "$window_name" ]] && continue
 
     # Only show claude-* windows
-    echo "$window_name" | grep -qi "^claude" || continue
+    echo "$window_name" | grep >/dev/null -i "^claude" || continue
     HAS_AGENTS=true
 
     # Print team header when window changes
@@ -139,7 +139,7 @@ if $HAS_AGENTS; then
     total=0
 
     while IFS='|' read -r window_name _ _ cmd _ pane_idle pane_dead _; do
-        echo "$window_name" | grep -qi "^claude" || continue
+        echo "$window_name" | grep >/dev/null -i "^claude" || continue
         total=$((total + 1))
         s="$(get_status "$cmd" "$pane_idle" "$pane_dead")"
         case "$s" in

@@ -114,7 +114,7 @@ emit_event() {
     if [[ -n "$_schema_dir" && -f "${_schema_dir}/config/event-schema.json" ]]; then
         local known_types
         known_types=$(jq -r '.event_types | keys[]' "${_schema_dir}/config/event-schema.json" 2>/dev/null || true)
-        if [[ -n "$known_types" ]] && ! echo "$known_types" | grep -qx "$event_type"; then
+        if [[ -n "$known_types" ]] && ! echo "$known_types" | grep >/dev/null -x "$event_type"; then
             # Warn-only: never reject events, just log to stderr on first unknown type per session
             if [[ -z "${_SW_SCHEMA_WARNED:-}" ]]; then
                 echo "WARN: Unknown event type '$event_type' — update config/event-schema.json" >&2
@@ -315,7 +315,7 @@ gh_with_retry() {
         fi
 
         # Check for rate limit (403) or API error
-        if echo "$output" | grep -qE "HTTP 403|API rate limit|rate limited|You have exceeded"; then
+        if echo "$output" | grep >/dev/null -E "HTTP 403|API rate limit|rate limited|You have exceeded"; then
             if [[ "$attempt" -lt "$max_attempts" ]]; then
                 warn "GitHub API rate limit detected — backing off ${backoff_secs}s (attempt $attempt/$max_attempts)"
                 emit_event "github.rate_limited" "attempt=$attempt" "backoff=$backoff_secs"

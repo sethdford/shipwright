@@ -395,8 +395,9 @@ daemon_reap_completed() {
     local _retry_spawned_for=""
 
     while IFS= read -r job; do
-        local issue_num pid worktree
+        local issue_num pid worktree job_repo
         issue_num=$(echo "$job" | jq -r '.issue // empty')
+        job_repo=$(echo "$job" | jq -r '.repo // empty')
         pid=$(echo "$job" | jq -r '.pid // empty')
         worktree=$(echo "$job" | jq -r '.worktree // empty')
 
@@ -411,7 +412,7 @@ daemon_reap_completed() {
             #   Tier 2 (>1 hour): Force-reap if process doesn't match
             local _proc_cmd _is_pipeline=false
             _proc_cmd=$(ps -p "$pid" -o command= 2>/dev/null || true)
-            if [[ -n "$_proc_cmd" ]] && echo "$_proc_cmd" | grep -qE 'sw-pipeline|sw-loop|claude|shipwright' 2>/dev/null; then
+            if [[ -n "$_proc_cmd" ]] && echo "$_proc_cmd" | grep >/dev/null -E 'sw-pipeline|sw-loop|claude|shipwright' 2>/dev/null; then
                 _is_pipeline=true
             fi
 
@@ -505,7 +506,7 @@ daemon_reap_completed() {
         if [[ "$exit_code" -eq 0 ]]; then
             daemon_on_success "$issue_num" "$duration_str"
         else
-            daemon_on_failure "$issue_num" "$exit_code" "$duration_str"
+            daemon_on_failure "$issue_num" "$exit_code" "$duration_str" "$job_repo"
 
             # Cancel any lingering in_progress GitHub Check Runs for failed job
             if [[ "${NO_GITHUB:-false}" != "true" && -n "$worktree" ]]; then

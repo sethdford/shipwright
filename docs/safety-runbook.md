@@ -18,9 +18,15 @@ Check: `shipwright paused` (exit 0 = paused, or unknown) for humans; scripts use
 `shipwright paused --gate` (exit 0 = safe to dispatch). Create the label once if it is missing:
 `gh label create shipwright:pause --color 000000 --description "Stops all Shipwright dispatch (ADR-0007)"`.
 
-The label does **not** stop a pipeline that starts from `issues: labeled` (adding the `shipwright`
-label starts `shipwright-pipeline.yml` directly, ungated, until Wave 1c). While paused, do not add
-that label; or disable `shipwright-pipeline.yml` too.
+Labelling an issue `shipwright` runs `shipwright-label-dispatch.yml`. It skips held issues (below),
+checks pause, breaker, budget, review WIP and the fix loop (retry count from the bot's `SHIPWRIGHT-RETRY`
+markers), then applies the same first-dispatch rule as the scheduled dispatch. Only a `ready` issue
+gets the dispatch marker and a pipeline. A closed gate, or an issue that is already running or
+dispatched, ends that run with a notice, not a failure. An outage (a gate that cannot be verified)
+fails the run. The pause label stops it too. Its runs are not in the breaker's history, so a refused
+label never moves the breaker. Two labels on one issue run in order (a job-level concurrency group per
+issue): the second is refused as already dispatched. Manual `workflow_dispatch` of
+`shipwright-pipeline.yml` is an operator action and is **not** gated (see Re-run an issue manually).
 
 ## Read the gates
 
@@ -47,7 +53,9 @@ run through: the first run created after the cool-down is the probe.
 - **Held labels.** Dispatch and auto-retry skip `auto-patrol`, `shipwright-stuck`,
   `shipwright-failed`, `shipwright-infra-issue` and `claimed:*`; the daemon skips `auto-patrol` and
   `shipwright-stuck`. A human opts an auto-filed issue in by removing `auto-patrol`.
-- **Already handled.** `shipwright-dispatch.yml` dispatches an issue once. An issue with a bot
+- **Already handled.** `shipwright-dispatch.yml` and `shipwright-label-dispatch.yml` dispatch an issue
+  once, through `scripts/ci/issue-dispatch-state.sh` (`ready`, `active` or `handled`). A relabel after a
+  run is refused with a notice; to run it again, follow Re-run an issue manually. An issue with a bot
   comment containing `SHIPWRIGHT-DISPATCHED`, `SHIPWRIGHT-RETRY`, `Shipwright Pipeline` or
   `Pipeline Auth Failure` is never dispatched again automatically; retries belong to
   `shipwright-auto-retry.yml` (at most 3, from the highest bot `SHIPWRIGHT-RETRY` marker).
@@ -92,8 +100,11 @@ loop, `shipwright-sweep.yml` since 2026-10-14. In order:
 7. Enable one at a time, checking each first scheduled run: `gh workflow enable` for
    `shipwright-watchdog.yml`, then `shipwright-sweep.yml`, `shipwright-auto-retry.yml`,
    `shipwright-dispatch.yml`.
-8. In dispatch logs: the gate lines, at most 3 dispatches, a `SHIPWRIGHT-DISPATCHED` comment before
+8. In dispatch logs: the gate report (one JSON line per check, with each gate's verdict and any budget
+   no-data warning), at most 3 dispatches, a `SHIPWRIGHT-DISPATCHED` comment before
    each, no read failures. In auto-retry logs: the backoff before the gates, and skips that name
    `held`, `active`, `abandoned`, `exhausted` or `infra`.
-9. Keep `shipwright:pause` ready: until Wave 1c, labelling an issue `shipwright` starts an ungated
-   run, bounded only by the retry cap and the breaker.
+9. Keep `shipwright:pause` ready. Labelling an issue `shipwright` passes the gates and the first-dispatch
+   rule first (the label workflow above); a closed gate or a handled issue ends that run with a notice
+   and nothing starts. Manual `workflow_dispatch` is an operator action and is not gated: check the gates
+   by hand first.

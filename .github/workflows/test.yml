@@ -17,7 +17,7 @@ jobs:
         os: [macos-latest, ubuntu-latest]
 
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
 
       - name: Check version consistency
         run: bash scripts/check-version-consistency.sh
@@ -44,6 +44,62 @@ jobs:
         run: |
           bash scripts/sw-test-all.sh --timeout 300
 
+  # The main matrix runs bash 5 only (Homebrew on macOS), so bash-3.2-only bugs (the fleet
+  # heartbeat `--data-binary @<(...)` bug, #8578) cannot show up there. This leg runs the
+  # gate, daemon, fleet and self-optimize suites under macOS system bash (/bin/bash, 3.2).
+  # bash resolves to system bash 3.2 for every step (asserted), so a suite's shebang picks 3.2 too.
+  bash32-macos:
+    runs-on: macos-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+
+      - name: Install dependencies
+        run: brew install tmux jq
+
+      # Child scripts run as `bash script` or through an env shebang, so they pick up whichever bash is
+      # first on PATH. Homebrew puts bash 5 ahead of /bin/bash, so put system bash first under the name
+      # `bash` for every later step (GITHUB_PATH).
+      - name: Put system bash 3.2 first on PATH
+        run: |
+          mkdir -p "$RUNNER_TEMP/b32"
+          ln -sf /bin/bash "$RUNNER_TEMP/b32/bash"
+          echo "$RUNNER_TEMP/b32" >> "$GITHUB_PATH"
+
+      - name: Assert `bash` is 3.2
+        run: |
+          v=$(bash -c 'echo "$BASH_VERSION"')
+          case "$v" in
+            3.2*) echo "bash resolves to $v (system bash)" ;;
+            *) echo "::error::bash resolves to '$v', not 3.2; the bash 3.2 leg would test the wrong shell"; exit 1 ;;
+          esac
+
+      - name: Run bash 3.2 suites
+        run: |
+          bash --version | head -1
+          # Fleet suites drive tmux: a private socket directory, as sw-test-all.sh does.
+          export TMUX_TMPDIR="$RUNNER_TEMP/tmux"
+          mkdir -p "$TMUX_TMPDIR"
+          unset TMUX TMUX_PANE
+          failed=0
+          for suite in \
+            scripts/sw-lib-safety-gates-test.sh \
+            scripts/sw-lib-safety-gates-sites-test.sh \
+            scripts/sw-lib-daemon-gates-test.sh \
+            scripts/sw-connect-test.sh \
+            scripts/sw-fleet-test.sh \
+            scripts/sw-fleet-discover-test.sh \
+            scripts/sw-fleet-viz-test.sh \
+            scripts/sw-self-optimize-test.sh; do
+            echo "::group::$suite"
+            if ! bash "$suite"; then
+              echo "::error::$suite failed under bash 3.2"
+              failed=1
+            fi
+            echo "::endgroup::"
+          done
+          exit "$failed"
+
   # Budget-limited real-Claude smoke (~$0.25/PR); runs only when Claude secret is set
   integration-claude:
     runs-on: ubuntu-latest
@@ -59,7 +115,7 @@ jobs:
             echo "SKIP_CLAUDE=true" >> "$GITHUB_ENV"
           fi
 
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         if: env.SKIP_CLAUDE != 'true'
 
       - name: Install dependencies
@@ -72,7 +128,7 @@ jobs:
 
       - name: Install Claude Code CLI
         if: env.SKIP_CLAUDE != 'true'
-        run: npm install -g @anthropic-ai/claude-code
+        run: npm install -g @anthropic-ai/claude-code@2.1.301
 
       - name: Run budget-limited Claude integration smoke
         if: env.SKIP_CLAUDE != 'true'
@@ -94,7 +150,7 @@ jobs:
   integration-claude-skip:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
       - name: Run integration-claude without secrets (expect skip)
         run: |
           out=$(bash scripts/sw-integration-claude-test.sh 2>&1) || exit 1
@@ -105,10 +161,10 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
 
       - name: Setup Node.js
-        uses: actions/setup-node@v7
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7
         with:
           node-version: "22"
 
@@ -121,7 +177,7 @@ jobs:
   shellcheck:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
 
       - name: Install ShellCheck
         # Pinned, not apt: whatever version the runner image ships drifts from

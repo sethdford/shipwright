@@ -18,6 +18,20 @@ REPO_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
 
 # ─── Counters ─────────────────────────────────────────────────────────────
 
+# ─── Guard: real GitHub + real Claude only on explicit request (#8608) ──────
+# This suite files a real issue, runs a real pipeline in this checkout (it switches branches
+# and deletes .claude/pipeline-state.md) and spends money. It used to run whenever credentials
+# were present, which made every pipeline's test gate start a nested pipeline. Run it by hand:
+#   SHIPWRIGHT_E2E_REAL=1 bash scripts/sw-e2e-integration-test.sh   (in a disposable clone)
+if [[ "${SHIPWRIGHT_IN_TEST_GATE:-}" == "1" ]]; then
+    echo -e "${YELLOW}⚠ Skipping integration tests: refusing to run inside a build-loop test gate${RESET}"
+    exit 0
+fi
+if [[ "${SHIPWRIGHT_E2E_REAL:-}" != "1" ]]; then
+    echo -e "${YELLOW}⚠ Skipping integration tests: set SHIPWRIGHT_E2E_REAL=1 to run against real GitHub and Claude${RESET}"
+    exit 0
+fi
+
 # ─── Guard: skip gracefully if tokens missing ─────────────────────────────
 if [[ -z "${CLAUDE_CODE_OAUTH_TOKEN:-}" ]] && [[ -z "${ANTHROPIC_API_KEY:-}" ]]; then
     echo -e "${YELLOW}⚠ Skipping integration tests: CLAUDE_CODE_OAUTH_TOKEN not set${RESET}"
@@ -127,7 +141,7 @@ test_create_issue() {
     fi
 
     # Verify it's numeric
-    if ! echo "$ISSUE_NUMBER" | grep -qE '^[0-9]+$'; then
+    if ! echo "$ISSUE_NUMBER" | grep >/dev/null -E '^[0-9]+$'; then
         return 1
     fi
 
@@ -182,7 +196,7 @@ test_feature_branch_exists() {
     FEATURE_BRANCH="shipwright/issue-${ISSUE_NUMBER}"
 
     # Check local and remote branches
-    if git branch -a 2>/dev/null | grep -q "$FEATURE_BRANCH"; then
+    if git branch -a 2>/dev/null | grep >/dev/null "$FEATURE_BRANCH"; then
         return 0
     fi
 
@@ -273,7 +287,7 @@ test_cost_under_budget() {
     fi
 
     # Check remaining is a positive number
-    if echo "$remaining" | grep -qE '^[0-9]+\.?[0-9]*$'; then
+    if echo "$remaining" | grep >/dev/null -E '^[0-9]+\.?[0-9]*$'; then
         # Compare: remaining > 0 means we haven't exceeded budget
         local over
         over=$(echo "$remaining" | awk '{ print ($1 > 0) ? "no" : "yes" }')

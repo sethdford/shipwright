@@ -1,5 +1,8 @@
 # pipeline-stages-review.sh — review, compound_quality, audit stages
 # Source from pipeline-stages.sh. Requires all pipeline globals and dependencies.
+# Test commands run without credentials (#8608).
+# shellcheck source=lib/test-gate-env.sh
+source "$(dirname "${BASH_SOURCE[0]}")/test-gate-env.sh"
 [[ -n "${_PIPELINE_STAGES_REVIEW_LOADED:-}" ]] && return 0
 _PIPELINE_STAGES_REVIEW_LOADED=1
 
@@ -37,9 +40,9 @@ stage_review() {
         diff_files=$(_safe_base_diff --name-only || true)
         local risk_score="low"
         # Fast heuristic: flag high-risk file patterns
-        if echo "$diff_files" | grep -qiE 'migration|schema|auth|crypto|security|password|token|secret|\.env'; then
+        if echo "$diff_files" | grep >/dev/null -iE 'migration|schema|auth|crypto|security|password|token|secret|\.env'; then
             risk_score="high"
-        elif echo "$diff_files" | grep -qiE 'api|route|controller|middleware|hook'; then
+        elif echo "$diff_files" | grep >/dev/null -iE 'api|route|controller|middleware|hook'; then
             risk_score="medium"
         fi
         emit_event "review.risk_assessed" \
@@ -395,7 +398,7 @@ If all requirements are met, write: \"Spec compliance: PASS — all planned task
 
     # Check if review output is structured JSON (e.g. from structured review tools)
     local json_parsed=false
-    if head -1 "$review_file" 2>/dev/null | grep -q '^{' 2>/dev/null; then
+    if head -1 "$review_file" 2>/dev/null | grep >/dev/null '^{' 2>/dev/null; then
         local j_critical j_bug j_warning
         j_critical=$(jq -r '.issues | map(select(.severity == "Critical")) | length' "$review_file" 2>/dev/null || echo "")
         if [[ -n "$j_critical" && "$j_critical" != "null" ]]; then
@@ -850,7 +853,7 @@ stage_compound_quality() {
         total=$((total + 1))
         info "Running negative test pass..."
         if [[ -n "${TEST_CMD:-}" ]]; then
-            if eval "$TEST_CMD" >> "$compound_log" 2>&1; then
+            if ( sw_test_gate_scrub && eval "$TEST_CMD" ) >> "$compound_log" 2>&1; then
                 pass_count=$((pass_count + 1))
                 success "Negative test pass passed"
             else
@@ -948,7 +951,7 @@ stage_audit() {
         for pattern in "${secret_patterns[@]}"; do
             while IFS= read -r file; do
                 [[ -z "$file" ]] && continue
-                if grep -l "$pattern" "$file" 2>/dev/null | grep -qv node_modules; then
+                if grep -l "$pattern" "$file" 2>/dev/null | grep >/dev/null -v node_modules; then
                     echo "WARN: Potential secret found in $file: $pattern" >> "$audit_log"
                     warn "Found potential secret: $pattern in $file"
                     issues=$((issues + 1))

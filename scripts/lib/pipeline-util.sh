@@ -421,16 +421,16 @@ classify_error() {
     local classification="unknown"
 
     # Infrastructure errors: timeout, OOM, network — retry makes sense
-    if echo "$log_tail" | grep -qiE 'timeout|timed out|ETIMEDOUT|ECONNREFUSED|ECONNRESET|network|socket hang up|OOM|out of memory|killed|signal 9|Cannot allocate memory'; then
+    if echo "$log_tail" | grep >/dev/null -iE 'timeout|timed out|ETIMEDOUT|ECONNREFUSED|ECONNRESET|network|socket hang up|OOM|out of memory|killed|signal 9|Cannot allocate memory'; then
         classification="infrastructure"
     # Configuration errors: missing env, wrong path — don't retry, escalate
-    elif echo "$log_tail" | grep -qiE 'ENOENT|not found|No such file|command not found|MODULE_NOT_FOUND|Cannot find module|missing.*env|undefined variable|permission denied|EACCES'; then
+    elif echo "$log_tail" | grep >/dev/null -iE 'ENOENT|not found|No such file|command not found|MODULE_NOT_FOUND|Cannot find module|missing.*env|undefined variable|permission denied|EACCES'; then
         classification="configuration"
     # Logic errors: assertion failures, type errors — retry won't help without code change
-    elif echo "$log_tail" | grep -qiE 'AssertionError|assert.*fail|Expected.*but.*got|TypeError|ReferenceError|SyntaxError|CompileError|type mismatch|cannot assign|incompatible type'; then
+    elif echo "$log_tail" | grep >/dev/null -iE 'AssertionError|assert.*fail|Expected.*but.*got|TypeError|ReferenceError|SyntaxError|CompileError|type mismatch|cannot assign|incompatible type'; then
         classification="logic"
     # Build errors: compilation failures
-    elif echo "$log_tail" | grep -qiE 'error\[E[0-9]+\]|error: aborting|FAILED.*compile|build failed|tsc.*error|eslint.*error'; then
+    elif echo "$log_tail" | grep >/dev/null -iE 'error\[E[0-9]+\]|error: aborting|FAILED.*compile|build failed|tsc.*error|eslint.*error'; then
         classification="logic"
     # Intelligence fallback: Claude classification for unknown errors
     elif [[ "$classification" == "unknown" ]] && type intelligence_search_memory >/dev/null 2>&1 && command -v claude >/dev/null 2>&1; then

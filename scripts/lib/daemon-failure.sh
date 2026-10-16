@@ -34,17 +34,17 @@ classify_failure() {
     tail_content=$(tail -200 "$log_path" 2>/dev/null || true)
 
     # Auth errors
-    if echo "$tail_content" | grep -qiE 'not logged in|unauthorized|auth.*fail|401 |invalid.*token|CLAUDE_CODE_OAUTH_TOKEN|api key.*invalid|authentication required'; then
+    if echo "$tail_content" | grep >/dev/null -iE 'not logged in|unauthorized|auth.*fail|401 |invalid.*token|CLAUDE_CODE_OAUTH_TOKEN|api key.*invalid|authentication required'; then
         echo "auth_error"
         return
     fi
     # API errors (rate limits, timeouts, server errors)
-    if echo "$tail_content" | grep -qiE 'rate limit|429 |503 |502 |overloaded|timeout|ETIMEDOUT|ECONNRESET|socket hang up|service unavailable'; then
+    if echo "$tail_content" | grep >/dev/null -iE 'rate limit|429 |503 |502 |overloaded|timeout|ETIMEDOUT|ECONNRESET|socket hang up|service unavailable'; then
         echo "api_error"
         return
     fi
     # Invalid issue (not found, empty body)
-    if echo "$tail_content" | grep -qiE 'issue not found|404 |no body|could not resolve|GraphQL.*not found|issue.*does not exist'; then
+    if echo "$tail_content" | grep >/dev/null -iE 'issue not found|404 |no body|could not resolve|GraphQL.*not found|issue.*does not exist'; then
         echo "invalid_issue"
         return
     fi
@@ -63,7 +63,7 @@ classify_failure() {
         fi
     fi
     # Build failure (test errors, compile errors)
-    if echo "$tail_content" | grep -qiE 'test.*fail|FAIL|build.*error|compile.*error|lint.*fail|npm ERR|exit code [1-9]'; then
+    if echo "$tail_content" | grep >/dev/null -iE 'test.*fail|FAIL|build.*error|compile.*error|lint.*fail|npm ERR|exit code [1-9]'; then
         echo "build_failure"
         return
     fi
@@ -157,8 +157,22 @@ reset_failure_tracking() {
 
 # ─── Failure Handler ────────────────────────────────────────────────────────
 
+# Key of a finally-failed tombstone (.final_failed). Org mode keys it "owner/repo:number": the same
+# number can exist in two repos (ADR-0007). Repo mode keeps the bare number.
+daemon_final_failed_key() {
+    local issue_num="$1" repo="${2:-}"
+    if [[ -n "$repo" ]]; then
+        echo "${repo}:${issue_num}"
+    else
+        echo "$issue_num"
+    fi
+}
+
 daemon_on_failure() {
-    local issue_num="$1" exit_code="${2:-1}" duration="${3:-}"
+    local issue_num="$1" exit_code="${2:-1}" duration="${3:-}" repo_full_name="${4:-}"
+    # Org mode: every issue write goes to the job's repo (a bare number means the daemon's own repo).
+    local gh_repo_args=()
+    if [[ -n "$repo_full_name" ]]; then gh_repo_args=(--repo "$repo_full_name"); fi
 
     daemon_log ERROR "Pipeline failed for issue #${issue_num} (exit: ${exit_code}, ${duration:-unknown})"
 
@@ -221,14 +235,14 @@ daemon_on_failure() {
                 daemon_log ERROR "Auth error for issue #${issue_num} — skipping retry"
                 emit_event "daemon.skip_retry" "issue=$issue_num" "reason=auth_error"
                 if [[ "$NO_GITHUB" != "true" ]]; then
-                    gh issue edit "$issue_num" --add-label "pipeline/auth-error" 2>/dev/null || true
+                    gh issue edit "$issue_num" ${gh_repo_args[@]+"${gh_repo_args[@]}"} --add-label "pipeline/auth-error" 2>/dev/null || true
                 fi
                 ;;
             invalid_issue)
                 daemon_log ERROR "Invalid issue #${issue_num} — skipping retry"
                 emit_event "daemon.skip_retry" "issue=$issue_num" "reason=invalid_issue"
                 if [[ "$NO_GITHUB" != "true" ]]; then
-                    gh issue comment "$issue_num" --body "Pipeline skipped retry: issue appears invalid or has no body." 2>/dev/null || true
+                    gh issue comment "$issue_num" ${gh_repo_args[@]+"${gh_repo_args[@]}"} --body "Pipeline skipped retry: issue appears invalid or has no body." 2>/dev/null || true
                 fi
                 ;;
             *)
@@ -303,7 +317,7 @@ daemon_on_failure() {
                     [[ "$failure_class" == "api_error" ]] && daemon_log INFO "API error — exponential backoff ${backoff_secs}s"
 
                     if [[ "$NO_GITHUB" != "true" ]]; then
-                        gh issue comment "$issue_num" --body "## 🔄 Auto-Retry #${retry_count}
+                        gh issue comment "$issue_num" ${gh_repo_args[@]+"${gh_repo_args[@]}"} --body "## 🔄 Auto-Retry #${retry_count}
 
 Pipeline failed (${failure_class}) — retrying with escalated strategy.
 
@@ -338,7 +352,7 @@ _Escalation: $(if [[ "$retry_count" -eq 1 ]]; then echo "upgraded model + increa
                     # The retry number feeds the fix-loop cap in the safety gates (ADR-0007).
                     local retry_rc=0
                     DAEMON_RETRY_ATTEMPT="$retry_count" \
-                        daemon_spawn_pipeline "$issue_num" "retry-${retry_count}" "" "${all_extra_args[@]}" \
+                        daemon_spawn_pipeline "$issue_num" "retry-${retry_count}" "$repo_full_name" "${all_extra_args[@]}" \
                         || retry_rc=$?
                     PIPELINE_TEMPLATE="$orig_template"
                     MODEL="$orig_model"
@@ -375,14 +389,14 @@ _Escalation: $(if [[ "$retry_count" -eq 1 ]]; then echo "upgraded model + increa
         # Add the failure label and remove the watch label in separate calls: a missing failure
         # label must not leave the watch label in place (the issue would be re-polled as new).
         local marked_labels=()
-        if gh issue edit "$issue_num" --add-label "$ON_FAILURE_ADD_LABEL" 2>/dev/null; then
+        if gh issue edit "$issue_num" ${gh_repo_args[@]+"${gh_repo_args[@]}"} --add-label "$ON_FAILURE_ADD_LABEL" 2>/dev/null; then
             marked_labels+=("$ON_FAILURE_ADD_LABEL")
         else
             daemon_log WARN "Could not add '${ON_FAILURE_ADD_LABEL}' to failed issue #${issue_num}"
         fi
-        if ! gh issue edit "$issue_num" --remove-label "$WATCH_LABEL" 2>/dev/null; then
+        if ! gh issue edit "$issue_num" ${gh_repo_args[@]+"${gh_repo_args[@]}"} --remove-label "$WATCH_LABEL" 2>/dev/null; then
             daemon_log ERROR "Could not remove '${WATCH_LABEL}' from failed issue #${issue_num} — adding shipwright-stuck"
-            if gh issue edit "$issue_num" --add-label "shipwright-stuck" 2>/dev/null; then
+            if gh issue edit "$issue_num" ${gh_repo_args[@]+"${gh_repo_args[@]}"} --add-label "shipwright-stuck" 2>/dev/null; then
                 marked_labels+=("shipwright-stuck")
             else
                 daemon_log ERROR "Could not add shipwright-stuck to issue #${issue_num}; daemon state keeps it from being dispatched"
@@ -392,17 +406,19 @@ _Escalation: $(if [[ "$retry_count" -eq 1 ]]; then echo "upgraded model + increa
             # stays until the watch label is gone or the state is edited by hand (fail closed).
             local marked_json
             marked_json=$(printf '%s\n' ${marked_labels[@]+"${marked_labels[@]}"} | jq -R . | jq -s -c 'map(select(length > 0))')
-            locked_state_update --arg num "$issue_num" --arg ts "$(now_iso)" --argjson marked "$marked_json" \
+            local ff_key
+            ff_key=$(daemon_final_failed_key "$issue_num" "$repo_full_name")
+            locked_state_update --arg num "$ff_key" --arg ts "$(now_iso)" --argjson marked "$marked_json" \
                 '.final_failed[$num] = {ts: $ts, marked: $marked}' || \
                 daemon_log ERROR "Could not record final failure of issue #${issue_num} in daemon state"
         fi
 
         # Close any draft PR created for this issue (cleanup abandoned work)
         local draft_pr
-        draft_pr=$(gh pr list --head "daemon/issue-${issue_num}" --head "pipeline/pipeline-issue-${issue_num}" \
+        draft_pr=$(gh pr list ${gh_repo_args[@]+"${gh_repo_args[@]}"} --head "daemon/issue-${issue_num}" --head "pipeline/pipeline-issue-${issue_num}" \
             --json number,isDraft --jq '.[] | select(.isDraft == true) | .number' 2>/dev/null | head -1 || true)
         if [[ -n "$draft_pr" ]]; then
-            gh pr close "$draft_pr" --delete-branch 2>/dev/null || true
+            gh pr close "$draft_pr" ${gh_repo_args[@]+"${gh_repo_args[@]}"} --delete-branch 2>/dev/null || true
             daemon_log INFO "Closed draft PR #${draft_pr} for failed issue #${issue_num}"
         fi
 
@@ -422,7 +438,7 @@ _Escalation: $(if [[ "$retry_count" -eq 1 ]]; then echo "upgraded model + increa
             retry_info="| Retries | ${final_count} / ${final_max} (${final_reason}) |"
         fi
 
-        gh issue comment "$issue_num" --body "## ❌ Pipeline Failed
+        gh issue comment "$issue_num" ${gh_repo_args[@]+"${gh_repo_args[@]}"} --body "## ❌ Pipeline Failed
 
 The autonomous pipeline encountered an error.
 

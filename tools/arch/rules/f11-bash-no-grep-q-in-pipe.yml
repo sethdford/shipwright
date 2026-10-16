@@ -1,0 +1,38 @@
+# F11 (bash correctness under pipefail): `cmd | grep -q x` exits on the first match, so the writer
+# can die of SIGPIPE; with `set -o pipefail` the whole condition is then false although the
+# pattern matched. It made tests flake and could misclassify failures in production
+# (lib/auto-recovery.sh). Use `| grep >/dev/null x` (reads all input, same exit status) or
+# `grep -q x <<<"$var"`. Pinned in tools/arch/meta.test.ts.
+id: F11-bash-no-grep-q-in-pipe
+language: Bash
+severity: error
+message: "F11: `| grep -q` can turn a match into a failure under pipefail (SIGPIPE). Use `| grep >/dev/null …` or `grep -q … <<<\"$var\"`."
+metadata: { owner: "@sethdford", docs: "docs/architecture.md#fitness-rules" }
+files:
+  - "scripts/**/*.sh"
+  - "scripts/sw"
+  - ".claude/hooks/**/*.sh"
+  - "claude-code/hooks/**/*.sh"
+  - "completions/**/*.bash"
+  - "install.sh"
+# grep reached directly, by path, or through a wrapper (`command`, `sudo`, `env`, …). A `-q` that is
+# the argument of -e/-f/-m/--regexp/--file is a pattern, not the flag.
+utils:
+  quiet-flag:
+    kind: word
+    any:
+      - regex: '^-[A-Za-z0-9]*q[A-Za-z0-9]*$'
+      - regex: '^--(quiet|silent)$'
+    not:
+      follows: { kind: word, regex: '^(-e|-f|-m|--regexp|--file|--max-count)$', stopBy: neighbor }
+rule:
+  kind: command
+  all:
+    - inside: { kind: pipeline, stopBy: neighbor }
+    - not: { nthChild: 1 }
+    - has: { matches: quiet-flag }
+    - any:
+        - has: { field: name, regex: '(^|/)[ef]?grep$' }
+        - all:
+            - has: { field: name, regex: '(^|/)(command|builtin|sudo|env|nice|nohup|timeout|time|stdbuf)$' }
+            - has: { kind: word, regex: '(^|/)[ef]?grep$' }

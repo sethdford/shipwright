@@ -396,7 +396,7 @@ signals_collect_architecture() {
 }
 
 signals_collect_intelligence() {
-    local cache_file=".claude/intelligence-cache.json"
+    local cache_file="${SHIPWRIGHT_INTELLIGENCE_CACHE:-.claude/intelligence-cache.json}"
     [[ ! -f "$cache_file" ]] && return 0
 
     # Check for high-churn hotspot files

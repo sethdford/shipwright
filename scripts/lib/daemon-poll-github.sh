@@ -163,8 +163,9 @@ daemon_poll_issues() {
     # Finally-failed entries (daemon-failure.sh) are also cleared once the watch label is gone,
     # so a human re-adding it makes the issue dispatchable again.
     if [[ "$listing_complete" == "true" ]]; then
+        # Keys still in the listing: bare numbers (repo mode, pre-org tombstones) and "owner/repo:number".
         local present_json
-        present_json=$(echo "$issues_json" | jq -c '[.[].number | tostring]' 2>/dev/null) || present_json=""
+        present_json=$(echo "$issues_json" | jq -c '[.[] | (.number | tostring), (if (.repository.nameWithOwner // "") == "" then empty else "\(.repository.nameWithOwner):\(.number)" end)]' 2>/dev/null) || present_json=""
         if [[ -n "$present_json" ]] && \
             [[ "$(jq -r '(.final_failed // {}) | length' "$STATE_FILE" 2>/dev/null || echo 0)" != "0" ]]; then
             locked_state_update --argjson present "$present_json" \
@@ -245,7 +246,7 @@ daemon_poll_issues() {
                         dep="${dep## }"
                         dep="${dep%% }"
                         # Is this dep in our scored set and not yet scheduled?
-                        if echo "$sorted_order" | grep -q "|${dep}|" && ! echo "$scheduled" | grep -q "|${dep}|"; then
+                        if echo "$sorted_order" | grep >/dev/null "|${dep}|" && ! echo "$scheduled" | grep >/dev/null "|${dep}|"; then
                             all_deps_ready=false
                             break
                         fi
@@ -304,16 +305,22 @@ daemon_poll_issues() {
         # while any label we marked it with is still on it. Once a human removed every marked
         # label, the entry is cleared and the issue is dispatchable. An entry with nothing marked
         # (or an unreadable one) stays until the watch label is gone (ADR-0007).
-        if jq -e --arg n "$issue_num" '(.final_failed // {}) | has($n)' "$STATE_FILE" >/dev/null 2>&1; then
+        # The tombstone key is "repo:number" in org mode. A tombstone written before that keeps the
+        # bare number and still blocks the issue until cleared (fail closed).
+        local ff_key="$issue_key"
+        if [[ -n "$repo_name" ]] && ! jq -e --arg k "$issue_key" '(.final_failed // {}) | has($k)' "$STATE_FILE" >/dev/null 2>&1; then
+            ff_key="$issue_num"
+        fi
+        if jq -e --arg n "$ff_key" '(.final_failed // {}) | has($n)' "$STATE_FILE" >/dev/null 2>&1; then
             local ff_cleared
-            ff_cleared=$(jq -r --arg n "$issue_num" --arg labels "$labels_csv" '
+            ff_cleared=$(jq -r --arg n "$ff_key" --arg labels "$labels_csv" '
                 (.final_failed[$n].marked? // []) as $m
                 | ($labels | ascii_downcase | split(",")) as $have
                 | if ($m | type) == "array" and ($m | length) > 0
                      and ([$m[] | ascii_downcase | select(. as $x | $have | index($x))] | length) == 0
                   then "yes" else "no" end' "$STATE_FILE" 2>/dev/null || echo "no")
             if [[ "$ff_cleared" == "yes" && -n "$labels_csv" ]]; then
-                locked_state_update --arg n "$issue_num" 'del(.final_failed[$n])'
+                locked_state_update --arg n "$ff_key" 'del(.final_failed[$n])'
                 daemon_log INFO "Issue #${issue_num}: failure labels removed by a human — dispatchable again"
             else
                 daemon_log INFO "Issue #${issue_num} failed finally — skipped until its failure labels or '${WATCH_LABEL}' are removed"

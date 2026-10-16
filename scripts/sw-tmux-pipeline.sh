@@ -75,7 +75,7 @@ cmd_spawn() {
     window_name="$(get_window_name "$issue_num")"
 
     # Check if window already exists
-    if tmux list-windows -t "$daemon_session" 2>/dev/null | grep -q "^[0-9]*: $window_name"; then
+    if tmux list-windows -t "$daemon_session" 2>/dev/null | grep >/dev/null "^[0-9]*: $window_name"; then
         warn "Pipeline window already exists: $window_name"
         return 1
     fi
@@ -159,7 +159,7 @@ cmd_attach() {
     window_name="$(get_window_name "$issue_num")"
 
     # Check if window exists
-    if ! tmux list-windows -t "$daemon_session" 2>/dev/null | grep -q "^[0-9]*: $window_name"; then
+    if ! tmux list-windows -t "$daemon_session" 2>/dev/null | grep >/dev/null "^[0-9]*: $window_name"; then
         error "Pipeline window not found: $window_name"
         return 1
     fi
@@ -199,7 +199,7 @@ cmd_capture() {
     window_name="$(get_window_name "$issue_num")"
 
     # Check if window exists
-    if ! tmux list-windows -t "$daemon_session" 2>/dev/null | grep -q "^[0-9]*: $window_name"; then
+    if ! tmux list-windows -t "$daemon_session" 2>/dev/null | grep >/dev/null "^[0-9]*: $window_name"; then
         error "Pipeline window not found: $window_name"
         return 1
     fi
@@ -248,7 +248,7 @@ cmd_stream() {
     window_name="$(get_window_name "$issue_num")"
 
     # Check if window exists
-    if ! tmux list-windows -t "$daemon_session" 2>/dev/null | grep -q "^[0-9]*: $window_name"; then
+    if ! tmux list-windows -t "$daemon_session" 2>/dev/null | grep >/dev/null "^[0-9]*: $window_name"; then
         error "Pipeline window not found: $window_name"
         return 1
     fi
@@ -358,7 +358,7 @@ cmd_kill() {
     window_name="$(get_window_name "$issue_num")"
 
     # Check if window exists
-    if ! tmux list-windows -t "$daemon_session" 2>/dev/null | grep -q "^[0-9]*: $window_name"; then
+    if ! tmux list-windows -t "$daemon_session" 2>/dev/null | grep >/dev/null "^[0-9]*: $window_name"; then
         warn "Pipeline window not found: $window_name"
         return
     fi

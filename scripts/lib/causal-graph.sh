@@ -62,9 +62,9 @@ causal_build_graph() {
         [[ ! -f "${project_dir}/${file}" ]] && continue
 
         local file_type="source"
-        if echo "$file" | grep -qiE '(test|spec)'; then
+        if echo "$file" | grep >/dev/null -iE '(test|spec)'; then
             file_type="test"
-        elif echo "$file" | grep -qiE '(config|\.json$|\.ya?ml$|\.toml$|\.env)'; then
+        elif echo "$file" | grep >/dev/null -iE '(config|\.json$|\.ya?ml$|\.toml$|\.env)'; then
             file_type="config"
         fi
 
@@ -174,7 +174,7 @@ causal_build_graph() {
     # ─── Pass 4: Find test → source relationships ───────────────────────
     while IFS= read -r file; do
         [[ -z "$file" ]] && continue
-        if ! echo "$file" | grep -qiE '(test|spec)'; then
+        if ! echo "$file" | grep >/dev/null -iE '(test|spec)'; then
             continue
         fi
         [[ ! -f "${project_dir}/${file}" ]] && continue
@@ -287,7 +287,7 @@ causal_trace_failure() {
             [[ -z "$target" ]] && continue
 
             # Skip already visited
-            if echo "$visited" | grep -qF "$target" 2>/dev/null; then
+            if echo "$visited" | grep >/dev/null -F "$target" 2>/dev/null; then
                 continue
             fi
             visited="${visited} ${target}"
@@ -307,7 +307,7 @@ causal_trace_failure() {
             fi
 
             # Follow the chain deeper for source files
-            if echo "$target" | grep -q "^file:"; then
+            if echo "$target" | grep >/dev/null "^file:"; then
                 current="$target"
             fi
         done <<< "$targets"
@@ -415,10 +415,10 @@ causal_suggest_fix() {
     echo "Suggested fix approach:"
     echo "  Root cause: ${cause_file}"
 
-    if echo "$cause_file" | grep -qiE '(config|\.json$|\.ya?ml$|\.env)'; then
+    if echo "$cause_file" | grep >/dev/null -iE '(config|\.json$|\.ya?ml$|\.env)'; then
         echo "  Type: Configuration issue"
         echo "  Action: Check config values, defaults, and schema validation"
-    elif echo "$cause_file" | grep -qiE '(test|spec)'; then
+    elif echo "$cause_file" | grep >/dev/null -iE '(test|spec)'; then
         echo "  Type: Test issue (test itself may be wrong)"
         echo "  Action: Review test assertions and expected values"
     else

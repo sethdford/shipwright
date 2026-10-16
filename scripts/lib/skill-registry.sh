@@ -164,7 +164,7 @@ skill_has_two_stage_review() {
     local issue_type="${1:-backend}"
     local paths
     paths=$(skill_get_prompts "$issue_type" "review")
-    echo "$paths" | grep -q "two-stage-review" 2>/dev/null
+    echo "$paths" | grep >/dev/null "two-stage-review" 2>/dev/null
 }
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -190,42 +190,42 @@ skill_detect_from_body() {
     local skill_candidates=()
 
     # Accessibility/UX patterns
-    if echo "$body_lower" | grep -qE '(accessibility|a11y|wcag|aria|keyboard|screen.?reader|color.?blind|dyslexia|contrast)'; then
+    if echo "$body_lower" | grep >/dev/null -E '(accessibility|a11y|wcag|aria|keyboard|screen.?reader|color.?blind|dyslexia|contrast)'; then
         skill_candidates+=(frontend-design)
     fi
 
     # Migration/Schema patterns
-    if echo "$body_lower" | grep -qE '(migration|schema|database.?(refactor|redesign)|column|index|constraint)'; then
+    if echo "$body_lower" | grep >/dev/null -E '(migration|schema|database.?(refactor|redesign)|column|index|constraint)'; then
         skill_candidates+=(data-pipeline)
     fi
 
     # Security/Auth patterns
-    if echo "$body_lower" | grep -qE '(security|auth|owasp|xss|injection|csrf|vulnerability|encryption|ssl|tls)'; then
+    if echo "$body_lower" | grep >/dev/null -E '(security|auth|owasp|xss|injection|csrf|vulnerability|encryption|ssl|tls)'; then
         skill_candidates+=(security-audit)
     fi
 
     # Performance/Latency patterns
-    if echo "$body_lower" | grep -qE '(performance|latency|slow|timeout|p95|p99|benchmark|memory.?leak|cache)'; then
+    if echo "$body_lower" | grep >/dev/null -E '(performance|latency|slow|timeout|p95|p99|benchmark|memory.?leak|cache)'; then
         skill_candidates+=(performance)
     fi
 
     # API/REST/GraphQL patterns
-    if echo "$body_lower" | grep -qE '(api|endpoint|rest|graphql|http|json|query|mutation)'; then
+    if echo "$body_lower" | grep >/dev/null -E '(api|endpoint|rest|graphql|http|json|query|mutation)'; then
         skill_candidates+=(api-design)
     fi
 
     # Testing patterns
-    if echo "$body_lower" | grep -qE '(test|coverage|unit|integration|e2e|mock|stub|fixture)'; then
+    if echo "$body_lower" | grep >/dev/null -E '(test|coverage|unit|integration|e2e|mock|stub|fixture)'; then
         skill_candidates+=(testing-strategy)
     fi
 
     # Architecture/Design patterns
-    if echo "$body_lower" | grep -qE '(architecture|component|module|layer|boundary|dependency|coupling|cohesion)'; then
+    if echo "$body_lower" | grep >/dev/null -E '(architecture|component|module|layer|boundary|dependency|coupling|cohesion)'; then
         skill_candidates+=(architecture-design)
     fi
 
     # Debugging patterns (useful for troubleshooting in most stages)
-    if echo "$body_lower" | grep -qE '(debug|trace|log|monitor|observe|metric|alert)'; then
+    if echo "$body_lower" | grep >/dev/null -E '(debug|trace|log|monitor|observe|metric|alert)'; then
         [[ "$stage" == "build" || "$stage" == "test" ]] && skill_candidates+=(systematic-debugging)
     fi
 
@@ -273,13 +273,13 @@ skill_weight_by_complexity() {
     echo "$skills"
 
     # Add security-audit if not already present
-    if ! echo "$skills" | grep -q "security-audit.md" 2>/dev/null; then
+    if ! echo "$skills" | grep >/dev/null "security-audit.md" 2>/dev/null; then
         local sec_path="${SKILLS_DIR}/security-audit.md"
         [[ -f "$sec_path" ]] && echo "$sec_path"
     fi
 
     # Add performance if not already present
-    if ! echo "$skills" | grep -q "performance.md" 2>/dev/null; then
+    if ! echo "$skills" | grep >/dev/null "performance.md" 2>/dev/null; then
         local perf_path="${SKILLS_DIR}/performance.md"
         [[ -f "$perf_path" ]] && echo "$perf_path"
     fi

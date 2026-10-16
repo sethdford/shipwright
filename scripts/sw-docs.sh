@@ -234,11 +234,11 @@ docs_gen_feature_flags() {
     # Lines look like:    "enabled": true,
     local in_intel=false
     while IFS= read -r line; do
-        if echo "$line" | grep -q '"intelligence"' 2>/dev/null; then
+        if echo "$line" | grep >/dev/null '"intelligence"' 2>/dev/null; then
             in_intel=true
             continue
         fi
-        if [[ "$in_intel" == "true" ]] && echo "$line" | grep -q '^\s*}' 2>/dev/null; then
+        if [[ "$in_intel" == "true" ]] && echo "$line" | grep >/dev/null '^\s*}' 2>/dev/null; then
             in_intel=false
             continue
         fi

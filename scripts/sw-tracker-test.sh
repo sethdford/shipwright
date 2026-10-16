@@ -22,6 +22,8 @@ REPO_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
 
 setup_env() {
     TEST_TEMP_DIR=$(mktemp -d "${TMPDIR:-/tmp}/sw-tracker-test.XXXXXX")
+    # Scripts under test read and write the intelligence cache here, not in the repo (#8609).
+    export SHIPWRIGHT_INTELLIGENCE_CACHE="$TEST_TEMP_DIR/project/.claude/intelligence-cache.json"
     mkdir -p "$TEST_TEMP_DIR/scripts"
     mkdir -p "$TEST_TEMP_DIR/home/.shipwright"
     mkdir -p "$TEST_TEMP_DIR/home/.claude"
@@ -127,7 +129,7 @@ EOF
         bash "$TEST_TEMP_DIR/scripts/sw-tracker.sh" available 2>&1
     ) || true
 
-    if printf '%s\n' "$output" | grep -q "true" 2>/dev/null; then
+    if printf '%s\n' "$output" | grep >/dev/null "true" 2>/dev/null; then
         return 0
     fi
     echo -e "    ${RED}✗${RESET} Expected 'true' from available, got: $output"
@@ -150,7 +152,7 @@ EOF
         bash "$TEST_TEMP_DIR/scripts/sw-tracker.sh" available 2>&1
     ) || true
 
-    if printf '%s\n' "$output" | grep -q "true" 2>/dev/null; then
+    if printf '%s\n' "$output" | grep >/dev/null "true" 2>/dev/null; then
         return 0
     fi
     echo -e "    ${RED}✗${RESET} Expected 'true' from available, got: $output"

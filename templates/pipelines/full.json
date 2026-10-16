@@ -3,7 +3,7 @@
   "description": "Full deployment pipeline: all stages from intake to production monitoring",
   "defaults": {
     "test_cmd": "npm test",
-    "model": "claude-opus-5",
+    "model": "claude-opus-5-5",
     "agents": 1
   },
   "intelligence": {
@@ -28,13 +28,13 @@
       "id": "plan",
       "enabled": true,
       "gate": "approve",
-      "config": { "model": "claude-opus-5" }
+      "config": { "model": "claude-opus-5-5" }
     },
     {
       "id": "design",
       "enabled": true,
       "gate": "approve",
-      "config": { "model": "claude-opus-5" }
+      "config": { "model": "claude-opus-5-5" }
     },
     {
       "id": "build",

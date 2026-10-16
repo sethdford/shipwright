@@ -411,7 +411,7 @@ Return JSON format:
             [[ -z "$keyword" ]] && continue
             local kw_lower
             kw_lower=$(echo "$keyword" | tr '[:upper:]' '[:lower:]')
-            if echo "$issue_lower" | grep -q "$kw_lower" 2>/dev/null; then
+            if echo "$issue_lower" | grep >/dev/null "$kw_lower" 2>/dev/null; then
                 local weight
                 weight=$(echo "$keywords_json" | jq -r --arg k "$keyword" '.[$k] // 0' 2>/dev/null || echo "0")
                 total_weight=$(awk -v tw="$total_weight" -v w="$weight" 'BEGIN { printf "%.0f", tw + w }')
@@ -428,7 +428,7 @@ Return JSON format:
         # Config-driven keyword risk elevation
         local keyword_risk
         keyword_risk=$(_config_get_int "predictive.keyword_risk_score" 70 2>/dev/null || echo 70)
-        if echo "$issue_json" | grep -qiE "refactor|migration|breaking|security|deploy"; then
+        if echo "$issue_json" | grep >/dev/null -iE "refactor|migration|breaking|security|deploy"; then
             risk=$keyword_risk
             reason="Keywords suggest elevated complexity"
         fi
@@ -681,7 +681,7 @@ Recommended: Review these patterns before proceeding."
         local mem_context
         mem_context=$(bash "$SCRIPT_DIR/sw-memory.sh" inject "$stage" 2>/dev/null || true)
 
-        if [[ -n "$mem_context" ]] && echo "$mem_context" | grep -qi "failure\|pattern\|avoid"; then
+        if [[ -n "$mem_context" ]] && echo "$mem_context" | grep >/dev/null -i "failure\|pattern\|avoid"; then
             local pattern_lines
             pattern_lines=$(echo "$mem_context" | grep -iE "^\s*-\s*\[" | head -3 || true)
 

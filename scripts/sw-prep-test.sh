@@ -24,6 +24,8 @@ PREP_SCRIPT="$SCRIPT_DIR/sw-prep.sh"
 
 setup_env() {
     TEST_TEMP_DIR=$(mktemp -d "${TMPDIR:-/tmp}/sw-prep-test.XXXXXX")
+    # Scripts under test read and write the intelligence cache here, not in the repo (#8609).
+    export SHIPWRIGHT_INTELLIGENCE_CACHE="$TEST_TEMP_DIR/project/.claude/intelligence-cache.json"
 }
 
 cleanup_env() {
@@ -171,7 +173,7 @@ assert_exit_code() {
 
 assert_output_contains() {
     local pattern="$1" label="${2:-output match}"
-    if printf '%s\n' "$PREP_OUTPUT" | grep -qiE "$pattern" 2>/dev/null; then
+    if printf '%s\n' "$PREP_OUTPUT" | grep >/dev/null -iE "$pattern" 2>/dev/null; then
         return 0
     fi
     echo -e "    ${RED}✗${RESET} Output missing pattern: $pattern ($label)"

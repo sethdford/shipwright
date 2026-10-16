@@ -290,8 +290,8 @@ test_format_criteria_for_prompt() {
     local formatted
     formatted=$(format_acceptance_criteria_for_prompt "$TEMP_DIR" 2>/dev/null || true)
 
-    if [[ -n "$formatted" ]] && echo "$formatted" | grep -q "Definition of Success"; then
-        if echo "$formatted" | grep -q "Acceptance Criteria"; then
+    if [[ -n "$formatted" ]] && echo "$formatted" | grep >/dev/null "Definition of Success"; then
+        if echo "$formatted" | grep >/dev/null "Acceptance Criteria"; then
             test_pass "format_acceptance_criteria_for_prompt produces readable output"
             return 0
         fi
@@ -363,8 +363,8 @@ test_inject_failure_mode_analysis() {
     injected=$(inject_failure_mode_analysis "$prompt" "" 2>/dev/null || echo "$prompt")
 
     if [[ "$injected" != "$prompt" ]]; then
-        if echo "$injected" | grep -q "Mandatory Failure Mode Analysis"; then
-            if echo "$injected" | grep -q "at least 3 concrete failure modes"; then
+        if echo "$injected" | grep >/dev/null "Mandatory Failure Mode Analysis"; then
+            if echo "$injected" | grep >/dev/null "at least 3 concrete failure modes"; then
                 test_pass "inject_failure_mode_analysis adds requirement to prompt"
                 return 0
             fi

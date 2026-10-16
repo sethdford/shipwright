@@ -226,43 +226,43 @@ prep_detect_stack() {
         deps=$(cat "$root/package.json")
 
         # Detect framework from dependencies
-        if echo "$deps" | grep -q '"next"'; then
+        if echo "$deps" | grep >/dev/null '"next"'; then
             FRAMEWORK="next.js"
             LANG_DETECTED="typescript"
-        elif echo "$deps" | grep -q '"nuxt"'; then
+        elif echo "$deps" | grep >/dev/null '"nuxt"'; then
             FRAMEWORK="nuxt"
             LANG_DETECTED="typescript"
-        elif echo "$deps" | grep -q '"@angular/core"'; then
+        elif echo "$deps" | grep >/dev/null '"@angular/core"'; then
             FRAMEWORK="angular"
             LANG_DETECTED="typescript"
-        elif echo "$deps" | grep -q '"vue"'; then
+        elif echo "$deps" | grep >/dev/null '"vue"'; then
             FRAMEWORK="vue"
-        elif echo "$deps" | grep -q '"react"'; then
+        elif echo "$deps" | grep >/dev/null '"react"'; then
             FRAMEWORK="react"
-        elif echo "$deps" | grep -q '"@nestjs/core"'; then
+        elif echo "$deps" | grep >/dev/null '"@nestjs/core"'; then
             FRAMEWORK="nestjs"
             LANG_DETECTED="typescript"
-        elif echo "$deps" | grep -q '"express"'; then
+        elif echo "$deps" | grep >/dev/null '"express"'; then
             FRAMEWORK="express"
-        elif echo "$deps" | grep -q '"fastify"'; then
+        elif echo "$deps" | grep >/dev/null '"fastify"'; then
             FRAMEWORK="fastify"
-        elif echo "$deps" | grep -q '"hono"'; then
+        elif echo "$deps" | grep >/dev/null '"hono"'; then
             FRAMEWORK="hono"
         fi
 
         # TypeScript override
-        if echo "$deps" | grep -q '"typescript"'; then
+        if echo "$deps" | grep >/dev/null '"typescript"'; then
             LANG_DETECTED="typescript"
         fi
 
         # Detect test framework
-        if echo "$deps" | grep -q '"vitest"'; then
+        if echo "$deps" | grep >/dev/null '"vitest"'; then
             TEST_FRAMEWORK="vitest"
-        elif echo "$deps" | grep -q '"jest"'; then
+        elif echo "$deps" | grep >/dev/null '"jest"'; then
             TEST_FRAMEWORK="jest"
-        elif echo "$deps" | grep -q '"mocha"'; then
+        elif echo "$deps" | grep >/dev/null '"mocha"'; then
             TEST_FRAMEWORK="mocha"
-        elif echo "$deps" | grep -q '"ava"'; then
+        elif echo "$deps" | grep >/dev/null '"ava"'; then
             TEST_FRAMEWORK="ava"
         fi
 
@@ -363,11 +363,11 @@ prep_detect_stack() {
         local py_deps=""
         [[ -f "$root/requirements.txt" ]] && py_deps=$(cat "$root/requirements.txt")
         [[ -f "$root/pyproject.toml" ]] && py_deps="$py_deps$(cat "$root/pyproject.toml")"
-        if echo "$py_deps" | grep -qi "django"; then
+        if echo "$py_deps" | grep >/dev/null -i "django"; then
             FRAMEWORK="django"
-        elif echo "$py_deps" | grep -qi "fastapi"; then
+        elif echo "$py_deps" | grep >/dev/null -i "fastapi"; then
             FRAMEWORK="fastapi"
-        elif echo "$py_deps" | grep -qi "flask"; then
+        elif echo "$py_deps" | grep >/dev/null -i "flask"; then
             FRAMEWORK="flask"
         fi
 
@@ -799,16 +799,16 @@ prep_learn_patterns() {
 
     # Detect test file patterns present in this repo
     local test_patterns="[]"
-    if find "$PROJECT_ROOT" -name "*.test.*" -not -path "*/node_modules/*" -not -path "*/.git/*" 2>/dev/null | head -1 | grep -q .; then
+    if find "$PROJECT_ROOT" -name "*.test.*" -not -path "*/node_modules/*" -not -path "*/.git/*" 2>/dev/null | head -1 | grep >/dev/null .; then
         test_patterns=$(echo "$test_patterns" | jq '. + ["*.test.*"]')
     fi
-    if find "$PROJECT_ROOT" -name "*.spec.*" -not -path "*/node_modules/*" -not -path "*/.git/*" 2>/dev/null | head -1 | grep -q .; then
+    if find "$PROJECT_ROOT" -name "*.spec.*" -not -path "*/node_modules/*" -not -path "*/.git/*" 2>/dev/null | head -1 | grep >/dev/null .; then
         test_patterns=$(echo "$test_patterns" | jq '. + ["*.spec.*"]')
     fi
-    if find "$PROJECT_ROOT" -name "*_test.*" -not -path "*/node_modules/*" -not -path "*/.git/*" 2>/dev/null | head -1 | grep -q .; then
+    if find "$PROJECT_ROOT" -name "*_test.*" -not -path "*/node_modules/*" -not -path "*/.git/*" 2>/dev/null | head -1 | grep >/dev/null .; then
         test_patterns=$(echo "$test_patterns" | jq '. + ["*_test.*"]')
     fi
-    if find "$PROJECT_ROOT" -name "test_*" -not -path "*/node_modules/*" -not -path "*/.git/*" 2>/dev/null | head -1 | grep -q .; then
+    if find "$PROJECT_ROOT" -name "test_*" -not -path "*/node_modules/*" -not -path "*/.git/*" 2>/dev/null | head -1 | grep >/dev/null .; then
         test_patterns=$(echo "$test_patterns" | jq '. + ["test_*"]')
     fi
 

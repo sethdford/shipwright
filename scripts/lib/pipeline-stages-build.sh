@@ -1,5 +1,8 @@
 # pipeline-stages-build.sh — test_first, build, test stages
 # Source from pipeline-stages.sh. Requires all pipeline globals and dependencies.
+# Test commands run without credentials (#8608).
+# shellcheck source=lib/test-gate-env.sh
+source "$(dirname "${BASH_SOURCE[0]}")/test-gate-env.sh"
 [[ -n "${_PIPELINE_STAGES_BUILD_LOADED:-}" ]] && return 0
 _PIPELINE_STAGES_BUILD_LOADED=1
 
@@ -142,7 +145,7 @@ Create files in the appropriate project directories (e.g. tests/, __tests__/, sr
     fi
 
     if [[ "$wrote_any" == "true" ]]; then
-        if (cd "$PROJECT_ROOT" && git diff --name-only 2>/dev/null | grep -qE 'test|spec'); then
+        if (cd "$PROJECT_ROOT" && git diff --name-only 2>/dev/null | grep >/dev/null -E 'test|spec'); then
             git add -A 2>/dev/null || true
             git commit -m "test: TDD - define expected behavior before implementation" 2>/dev/null || true
             emit_event "tdd.tests_generated" "{\"stage\":\"test_first\"}"
@@ -370,7 +373,7 @@ ${_skill_prompts}
     if [[ "${agents:-1}" -le 1 ]] && [[ -s "$ARTIFACTS_DIR/design.md" ]]; then
         local design_lower
         design_lower=$(tr '[:upper:]' '[:lower:]' < "$ARTIFACTS_DIR/design.md" 2>/dev/null || true)
-        if echo "$design_lower" | grep -qE 'independent (files|modules|components|services)|separate (modules|packages|directories)|parallel|no shared state'; then
+        if echo "$design_lower" | grep >/dev/null -E 'independent (files|modules|components|services)|separate (modules|packages|directories)|parallel|no shared state'; then
             info "Design mentions independent modules — consider --agents 2 for parallelism"
             emit_event "build.parallelism_suggested" "issue=${ISSUE_NUMBER:-0}" "current_agents=$agents"
         fi
@@ -581,7 +584,7 @@ stage_test() {
 
     info "Running tests: ${DIM}$test_cmd${RESET}"
     local test_exit=0
-    bash -c "$test_cmd" > "$test_log" 2>&1 || test_exit=$?
+    sw_test_gate_env bash -c "$test_cmd" > "$test_log" 2>&1 || test_exit=$?
 
     if [[ "$test_exit" -eq 0 ]]; then
         success "Tests passed"

@@ -20,6 +20,8 @@ source "$SCRIPT_DIR/lib/test-helpers.sh"
 
 setup_env() {
     TEST_TEMP_DIR=$(mktemp -d "${TMPDIR:-/tmp}/sw-self-optimize-test.XXXXXX")
+    # Scripts under test read and write the intelligence cache here, not in the repo (#8609).
+    export SHIPWRIGHT_INTELLIGENCE_CACHE="$TEST_TEMP_DIR/project/.claude/intelligence-cache.json"
 
     mkdir -p "$TEST_TEMP_DIR/.shipwright/optimization"
     mkdir -p "$TEST_TEMP_DIR/.shipwright/memory/repo1"
@@ -485,6 +487,41 @@ test_memory_promotion() {
 }
 
 # ──────────────────────────────────────────────────────────────────────────────
+# 12b. Prune window holds under GNU date (#8612)
+# ──────────────────────────────────────────────────────────────────────────────
+# `date -u -r EPOCH` is BSD-only; under GNU date the old code fell back to "now", so every
+# entry not from the current second was pruned on Linux. Force GNU date where available.
+test_memory_prune_window_gnu_date() {
+    local gnu_date="" shim_dir="$TEST_TEMP_DIR/gnu-date-bin"
+    if date --version >/dev/null 2>&1; then
+        gnu_date="$(command -v date)"
+    elif command -v gdate >/dev/null 2>&1; then
+        gnu_date="$(command -v gdate)"
+    else
+        echo "    (no GNU date available; skipping)"; return 0
+    fi
+    mkdir -p "$shim_dir"
+    printf '#!/usr/bin/env bash\nexec "%s" "$@"\n' "$gnu_date" > "$shim_dir/date"
+    chmod +x "$shim_dir/date"
+
+    local now_e two_days_ago sixty_days_ago
+    now_e=$(date +%s)
+    two_days_ago=$(epoch_to_iso $((now_e - 2 * 86400)))
+    sixty_days_ago=$(epoch_to_iso $((now_e - 60 * 86400)))
+    jq -n --arg recent "$two_days_ago" --arg old "$sixty_days_ago" \
+        '{failures: [
+            {pattern: "recent pattern", stage: "build", seen_count: 1, last_seen: $recent},
+            {pattern: "stale pattern", stage: "build", seen_count: 1, last_seen: $old}
+        ]}' > "$TEST_TEMP_DIR/.shipwright/memory/repo1/failures.json"
+
+    PATH="$shim_dir:$PATH" optimize_evolve_memory > /dev/null 2>&1
+
+    local kept
+    kept=$(jq -r '[.failures[].pattern] | join(",")' "$TEST_TEMP_DIR/.shipwright/memory/repo1/failures.json")
+    [[ "$kept" == "recent pattern" ]] || { echo "    kept: [$kept]"; return 1; }
+}
+
+# ──────────────────────────────────────────────────────────────────────────────
 # 13. Full analysis runs without errors on empty data
 # ──────────────────────────────────────────────────────────────────────────────
 test_full_analysis_empty() {
@@ -506,9 +543,9 @@ test_report_with_data() {
     output=$(optimize_report 2>&1)
 
     # Should contain key report sections
-    echo "$output" | grep -q "Last 7 Days" || return 1
-    echo "$output" | grep -q "Pipelines:" || return 1
-    echo "$output" | grep -q "Success rate:" || return 1
+    echo "$output" | grep >/dev/null "Last 7 Days" || return 1
+    echo "$output" | grep >/dev/null "Pipelines:" || return 1
+    echo "$output" | grep >/dev/null "Success rate:" || return 1
 }
 
 # ──────────────────────────────────────────────────────────────────────────────
@@ -517,7 +554,7 @@ test_report_with_data() {
 test_report_empty() {
     local output
     output=$(optimize_report 2>&1)
-    echo "$output" | grep -q "No outcomes data" || return 1
+    echo "$output" | grep >/dev/null "No outcomes data" || return 1
 }
 
 # ──────────────────────────────────────────────────────────────────────────────
@@ -651,7 +688,7 @@ test_context_efficiency_no_events() {
 
     local output
     output=$(optimize_tune_context_efficiency 2>&1)
-    echo "$output" | grep -q "No events file\|No context efficiency\|skipping" || return 1
+    echo "$output" | grep >/dev/null "No events file\|No context efficiency\|skipping" || return 1
 }
 
 # ──────────────────────────────────────────────────────────────────────────────
@@ -671,7 +708,7 @@ test_context_efficiency_high_utilization() {
     output=$(optimize_tune_context_efficiency 2>&1)
 
     # Should recommend increasing budget
-    echo "$output" | grep -q "Budget utilization high" || { echo "Expected budget increase recommendation"; return 1; }
+    echo "$output" | grep >/dev/null "Budget utilization high" || { echo "Expected budget increase recommendation"; return 1; }
 
     # Should emit recommendation event
     grep -q "optimize.context_recommendation" "$EVENTS_FILE" || { echo "Expected recommendation event"; return 1; }
@@ -702,7 +739,7 @@ test_context_efficiency_high_trim() {
     output=$(optimize_tune_context_efficiency 2>&1)
 
     # Should recommend reducing verbose context
-    echo "$output" | grep -q "Trim ratio high" || { echo "Expected trim reduction recommendation"; return 1; }
+    echo "$output" | grep >/dev/null "Trim ratio high" || { echo "Expected trim reduction recommendation"; return 1; }
 }
 
 # ──────────────────────────────────────────────────────────────────────────────
@@ -722,7 +759,7 @@ test_context_efficiency_healthy() {
     output=$(optimize_tune_context_efficiency 2>&1)
 
     # Should report healthy
-    echo "$output" | grep -q "healthy" || { echo "Expected healthy status"; return 1; }
+    echo "$output" | grep >/dev/null "healthy" || { echo "Expected healthy status"; return 1; }
 
     # Summary should have 0 recommendations
     local summary_file="$OPTIMIZATION_DIR/context-efficiency.json"
@@ -786,6 +823,7 @@ main() {
         "test_memory_pruning:Memory pruning removes old patterns"
         "test_memory_strengthening:Memory strengthening boosts confirmed patterns"
         "test_memory_promotion:Memory promotion copies cross-repo patterns"
+        "test_memory_prune_window_gnu_date:Prune window holds under GNU date"
         "test_full_analysis_empty:Full analysis runs on empty data"
         "test_report_with_data:Report generates output with data"
         "test_report_empty:Report handles empty outcomes"

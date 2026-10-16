@@ -61,18 +61,8 @@ MOCKEOF
 
 trap cleanup_test_env EXIT
 
-assert_pass() {
-    local desc="$1"
-    echo -e "  ${GREEN}✓${RESET} ${desc}"
-}
-
-assert_fail() {
-    local desc="$1"
-    local detail="${2:-}"
-    FAILURES+=("$desc")
-    echo -e "  ${RED}✗${RESET} ${desc}"
-    [[ -n "$detail" ]] && echo -e "    ${DIM}${detail}${RESET}"
-}
+# assert_pass / assert_fail come from test-helpers.sh, which owns the counters.
+# A local copy here used to skip the counters, so the summary said "All 0 tests passed".
 
 assert_contains() {
     local desc="$1" haystack="$2" needle="$3"
@@ -283,7 +273,7 @@ echo ""
 # ─── 8. Event Analysis ───────────────────────────────────────────────────────
 echo -e "${BOLD}  Event Analysis${RESET}"
 
-if grep -q 'seven_days_ago' "$SRC" || grep -q '604800' "$SRC"; then
+if grep -q 'seven_days_ago' "$SRC" || grep >/dev/null '604800' "$SRC"; then
     assert_pass "event analysis uses 7-day window"
 else
     assert_fail "event analysis uses 7-day window"
@@ -404,7 +394,7 @@ else
     assert_fail "batch_improve looks for meta-improvement labeled issues"
 fi
 
-if grep -q 'sort -rn' "$SRC" || grep -q 'sort.*reverse' "$SRC"; then
+if grep -q 'sort -rn' "$SRC" || grep >/dev/null 'sort.*reverse' "$SRC"; then
     assert_pass "sorts issues by impact score (highest first)"
 else
     assert_pass "batch processing sorts by priority"

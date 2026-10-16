@@ -440,7 +440,7 @@ for cmd in shipwright sw
     complete -c $cmd -n "__fish_seen_subcommand_from remote" -l user -d "SSH user" -r
 
     # connect flags
-    complete -c $cmd -n "__fish_seen_subcommand_from connect" -l token -d "Invite token" -r
+    complete -c $cmd -n "__fish_seen_subcommand_from connect" -l token-file -d "File holding the invite token" -r -F
 
     # fleet flags
     complete -c $cmd -n "__fish_seen_subcommand_from fleet" -l org -d "GitHub organization" -r

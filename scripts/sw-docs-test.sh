@@ -22,6 +22,8 @@ REPO_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
 
 setup_env() {
     TEST_TEMP_DIR=$(mktemp -d "${TMPDIR:-/tmp}/sw-docs-test.XXXXXX")
+    # Scripts under test read and write the intelligence cache here, not in the repo (#8609).
+    export SHIPWRIGHT_INTELLIGENCE_CACHE="$TEST_TEMP_DIR/project/.claude/intelligence-cache.json"
 
     # Create repo structure
     mkdir -p "$TEST_TEMP_DIR/scripts/lib"
@@ -210,7 +212,7 @@ test_find_auto_files() {
     output=$(run_docs check 2>&1 || true)
     # The check command internally calls docs_find_auto_files, so verify
     # it found our CLAUDE.md by checking it processed sections
-    if ! echo "$output" | grep -q "Documentation Status"; then
+    if ! echo "$output" | grep >/dev/null "Documentation Status"; then
         return 1
     fi
     return 0
@@ -258,23 +260,23 @@ test_gen_architecture_table() {
     ' "$TEST_TEMP_DIR/docs/reference/legacy-guide.md")
 
     # Should have table headers
-    if ! echo "$content" | grep -q "| File | Lines | Purpose |"; then
+    if ! echo "$content" | grep >/dev/null "| File | Lines | Purpose |"; then
         return 1
     fi
     # Should include sw-alpha.sh (non-test, non-github)
-    if ! echo "$content" | grep -q "sw-alpha.sh"; then
+    if ! echo "$content" | grep >/dev/null "sw-alpha.sh"; then
         return 1
     fi
     # Should include sw-beta.sh
-    if ! echo "$content" | grep -q "sw-beta.sh"; then
+    if ! echo "$content" | grep >/dev/null "sw-beta.sh"; then
         return 1
     fi
     # Should NOT include test file
-    if echo "$content" | grep -q "sw-alpha-test.sh"; then
+    if echo "$content" | grep >/dev/null "sw-alpha-test.sh"; then
         return 1
     fi
     # Should NOT include github module
-    if echo "$content" | grep -q "sw-github-thing.sh"; then
+    if echo "$content" | grep >/dev/null "sw-github-thing.sh"; then
         return 1
     fi
     return 0
@@ -294,10 +296,10 @@ test_gen_table_includes_cli_router() {
         capture { print }
     ' "$TEST_TEMP_DIR/docs/reference/legacy-guide.md")
 
-    if ! echo "$content" | grep -q "scripts/sw"; then
+    if ! echo "$content" | grep >/dev/null "scripts/sw"; then
         return 1
     fi
-    if ! echo "$content" | grep -q "CLI router"; then
+    if ! echo "$content" | grep >/dev/null "CLI router"; then
         return 1
     fi
     return 0
@@ -317,19 +319,19 @@ test_gen_feature_flags() {
     ' "$TEST_TEMP_DIR/docs/reference/legacy-guide.md")
 
     # Should have table header
-    if ! echo "$content" | grep -q "| Flag | Default | Purpose |"; then
+    if ! echo "$content" | grep >/dev/null "| Flag | Default | Purpose |"; then
         return 1
     fi
     # Should have intelligence.enabled
-    if ! echo "$content" | grep -q "intelligence.enabled"; then
+    if ! echo "$content" | grep >/dev/null "intelligence.enabled"; then
         return 1
     fi
     # Should have intelligence.cache_ttl_seconds
-    if ! echo "$content" | grep -q "intelligence.cache_ttl_seconds"; then
+    if ! echo "$content" | grep >/dev/null "intelligence.cache_ttl_seconds"; then
         return 1
     fi
     # Should have intelligence.anomaly_threshold
-    if ! echo "$content" | grep -q "intelligence.anomaly_threshold"; then
+    if ! echo "$content" | grep >/dev/null "intelligence.anomaly_threshold"; then
         return 1
     fi
     return 0
@@ -349,7 +351,7 @@ test_gen_test_suites_table() {
     ' "$TEST_TEMP_DIR/docs/reference/legacy-guide.md")
 
     # Should have sw-alpha-test.sh in the test suites section
-    if ! echo "$content" | grep -q "sw-alpha-test.sh"; then
+    if ! echo "$content" | grep >/dev/null "sw-alpha-test.sh"; then
         return 1
     fi
     return 0
@@ -541,7 +543,7 @@ test_docs_sync_idempotent() {
     local output
     output=$(run_docs sync 2>&1 || true)
 
-    if ! echo "$output" | grep -qi "fresh"; then
+    if ! echo "$output" | grep >/dev/null -i "fresh"; then
         return 1
     fi
     return 0
@@ -560,7 +562,7 @@ test_help_output() {
 
     local missing=""
     for cmd in sync check wiki report help; do
-        if ! echo "$output" | grep -q "$cmd"; then
+        if ! echo "$output" | grep >/dev/null "$cmd"; then
             missing="${missing} ${cmd}"
         fi
     done
@@ -591,7 +593,7 @@ test_default_shows_help() {
     local output
     output=$(run_docs 2>&1 || true)
 
-    if ! echo "$output" | grep -q "COMMANDS"; then
+    if ! echo "$output" | grep >/dev/null "COMMANDS"; then
         return 1
     fi
     return 0
@@ -654,13 +656,13 @@ MARKDOWN
     flag_content=$(awk '/<!-- AUTO:feature-flags -->/{c=1;next}/<!-- \/AUTO:feature-flags -->/{c=0}c' "$TEST_TEMP_DIR/docs/reference/legacy-guide.md")
 
     # None should still say "stale"
-    if echo "$core_content" | grep -q "^stale$"; then
+    if echo "$core_content" | grep >/dev/null "^stale$"; then
         return 1
     fi
-    if echo "$test_content" | grep -q "^also stale$"; then
+    if echo "$test_content" | grep >/dev/null "^also stale$"; then
         return 1
     fi
-    if echo "$flag_content" | grep -q "^stale flags$"; then
+    if echo "$flag_content" | grep >/dev/null "^stale flags$"; then
         return 1
     fi
 
@@ -681,11 +683,11 @@ test_purpose_extraction() {
     content=$(awk '/<!-- AUTO:core-scripts -->/{c=1;next}/<!-- \/AUTO:core-scripts -->/{c=0}c' "$TEST_TEMP_DIR/docs/reference/legacy-guide.md")
 
     # sw-alpha.sh header says "Alpha Feature Module"
-    if ! echo "$content" | grep -q "Alpha Feature Module"; then
+    if ! echo "$content" | grep >/dev/null "Alpha Feature Module"; then
         return 1
     fi
     # sw-beta.sh header says "Beta Feature Module"
-    if ! echo "$content" | grep -q "Beta Feature Module"; then
+    if ! echo "$content" | grep >/dev/null "Beta Feature Module"; then
         return 1
     fi
     return 0

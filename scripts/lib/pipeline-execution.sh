@@ -542,7 +542,7 @@ run_pipeline() {
         if [[ -f "$ARTIFACTS_DIR/skip-stage.txt" ]]; then
             local skip_list
             skip_list="$(cat "$ARTIFACTS_DIR/skip-stage.txt" 2>/dev/null || true)"
-            if echo "$skip_list" | grep -qx "$id" 2>/dev/null; then
+            if echo "$skip_list" | grep >/dev/null -x "$id" 2>/dev/null; then
                 info "Stage ${BOLD}${id}${RESET} skipped by human directive"
                 emit_event "stage.skipped" "issue=${ISSUE_NUMBER:-0}" "stage=$id" "reason=human_skip"
                 # Remove this stage from the skip file
@@ -594,7 +594,7 @@ run_pipeline() {
         fi
 
         # CI resume: skip stages marked as completed from previous run
-        if [[ -n "${COMPLETED_STAGES:-}" ]] && echo "$COMPLETED_STAGES" | tr ',' '\n' | grep -qx "$id"; then
+        if [[ -n "${COMPLETED_STAGES:-}" ]] && echo "$COMPLETED_STAGES" | tr ',' '\n' | grep >/dev/null -x "$id"; then
             # Verify artifacts survived the merge — regenerate if missing
             if verify_stage_artifacts "$id"; then
                 echo -e "  ${GREEN}✓ ${id}${RESET} ${DIM}— skipped (CI resume)${RESET}"

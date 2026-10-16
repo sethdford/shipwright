@@ -57,19 +57,19 @@ rootcause_classify() {
     local evidence=()
 
     # ─── Rate Limit Detection ───────────────────────────────────────────────────
-    if echo "$error_message" | grep -qiE '(rate limit|429|too many requests|throttled|limited|quota|backoff)'; then
+    if echo "$error_message" | grep >/dev/null -iE '(rate limit|429|too many requests|throttled|limited|quota|backoff)'; then
         category="rate_limit"
         confidence=95
         evidence+=("Explicit rate limit message detected")
         [[ "$error_message" =~ claude ]] && evidence+=("Claude API rate limit")
         [[ "$error_message" =~ github ]] && evidence+=("GitHub API rate limit")
     # ─── Context Exhaustion ──────────────────────────────────────────────────────
-    elif echo "$error_message" | grep -qiE '(context window|context.*exceed|token.*limit|auto-compact|maximum context|context.*exhaust)'; then
+    elif echo "$error_message" | grep >/dev/null -iE '(context window|context.*exceed|token.*limit|auto-compact|maximum context|context.*exhaust)'; then
         category="context_exhaustion"
         confidence=90
         evidence+=("Context window exhaustion detected")
     # ─── Infrastructure Issues ───────────────────────────────────────────────────
-    elif echo "$error_message" | grep -qiE '(timeout|timed out|ETIMEDOUT|ECONNREFUSED|ECONNRESET|network|socket hang|OOM|out of memory|killed|signal 9|cannot allocate|disk full|no space|ENOMEM|ENOSPC)'; then
+    elif echo "$error_message" | grep >/dev/null -iE '(timeout|timed out|ETIMEDOUT|ECONNREFUSED|ECONNRESET|network|socket hang|OOM|out of memory|killed|signal 9|cannot allocate|disk full|no space|ENOMEM|ENOSPC)'; then
         category="infra_issue"
         confidence=85
         evidence+=("Infrastructure problem detected")
@@ -78,21 +78,21 @@ rootcause_classify() {
         [[ "$error_message" =~ disk|space ]] && evidence+=("Disk space issue")
         [[ "$error_message" =~ network|socket ]] && evidence+=("Network issue")
     # ─── Platform Bugs (Shipwright errors) ──────────────────────────────────────
-    elif echo "$error_message" | grep -qiE '(sw-.*\.sh|shipwright|unbound variable|command not found.*sw-|pipeline-state|unexpected end)'; then
+    elif echo "$error_message" | grep >/dev/null -iE '(sw-.*\.sh|shipwright|unbound variable|command not found.*sw-|pipeline-state|unexpected end)'; then
         category="platform_bug"
         confidence=80
         evidence+=("Shipwright platform error detected")
         [[ "$error_message" =~ unbound ]] && evidence+=("Unbound variable in Shipwright code")
         [[ "$error_message" =~ "command not found" ]] && evidence+=("Missing Shipwright function or script")
     # ─── Configuration Errors ───────────────────────────────────────────────────
-    elif echo "$error_message" | grep -qiE '(missing.*config|invalid.*json|PIPELINE_CONFIG|no such template|bad config|invalid.*template|unknown.*option)'; then
+    elif echo "$error_message" | grep >/dev/null -iE '(missing.*config|invalid.*json|PIPELINE_CONFIG|no such template|bad config|invalid.*template|unknown.*option)'; then
         category="config_error"
         confidence=85
         evidence+=("Configuration error detected")
         [[ "$error_message" =~ config ]] && evidence+=("Missing or invalid configuration")
         [[ "$error_message" =~ template ]] && evidence+=("Unknown pipeline template")
     # ─── External Dependency Failures ───────────────────────────────────────────
-    elif echo "$error_message" | grep -qiE '(npm ERR|pip.*install|gem.*install|cargo.*error|go.*get|npm:.*not found|cannot find module|dependency.*fail)'; then
+    elif echo "$error_message" | grep >/dev/null -iE '(npm ERR|pip.*install|gem.*install|cargo.*error|go.*get|npm:.*not found|cannot find module|dependency.*fail)'; then
         category="external_dep"
         confidence=80
         evidence+=("Dependency installation failure")
@@ -100,7 +100,7 @@ rootcause_classify() {
         [[ "$error_message" =~ pip ]] && evidence+=("Python pip issue")
         [[ "$error_message" =~ cargo ]] && evidence+=("Rust cargo issue")
     # ─── Code Bug Detection ──────────────────────────────────────────────────────
-    elif echo "$error_message" | grep -qiE '(AssertionError|assert.*fail|Expected.*but.*got|TypeError|ReferenceError|SyntaxError|CompileError|type mismatch|cannot assign|incompatible type|FAILED.*test|Test.*failed|test.*fail)'; then
+    elif echo "$error_message" | grep >/dev/null -iE '(AssertionError|assert.*fail|Expected.*but.*got|TypeError|ReferenceError|SyntaxError|CompileError|type mismatch|cannot assign|incompatible type|FAILED.*test|Test.*failed|test.*fail)'; then
         category="code_bug"
         confidence=85
         evidence+=("Code logic error detected")

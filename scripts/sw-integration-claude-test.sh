@@ -14,6 +14,12 @@ REPO_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
 BUDGET_TARGET_USD="0.25"
 SCRIPT_TIMEOUT=120
 
+# ─── Never inside a build-loop test gate (#8608): it would spend money per iteration ───
+if [[ "${SHIPWRIGHT_IN_TEST_GATE:-}" == "1" ]]; then
+    echo "Skipping integration-claude: inside a build-loop test gate"
+    exit 0
+fi
+
 # ─── Skip when no Claude auth (CI without secret, local dev) ─────────────────
 if [[ -z "${CLAUDE_CODE_OAUTH_TOKEN:-}" ]] && [[ -z "${ANTHROPIC_API_KEY:-}" ]]; then
     echo "Skipping integration-claude: no CLAUDE_CODE_OAUTH_TOKEN or ANTHROPIC_API_KEY (budget-limited PR gate runs only when secret is set)"
@@ -61,7 +67,7 @@ set -e
 # swallowed.
 combined_output="$(cat "$out_file" "$err_file" 2>/dev/null || true)"
 if [[ "$exit_code" -ne 0 ]] && printf '%s' "$combined_output" \
-        | grep -qiE 'weekly limit|usage limit|rate limit|rate_limit_error|overloaded_error'; then
+        | grep >/dev/null -iE 'weekly limit|usage limit|rate limit|rate_limit_error|overloaded_error'; then
     echo "SKIP: Claude account quota reached, not a code failure — the gate cannot"
     echo "      run until it resets. Reported by the CLI as:"
     printf '        %s\n' "$combined_output"

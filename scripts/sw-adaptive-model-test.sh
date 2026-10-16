@@ -277,7 +277,7 @@ test_14() {
     unset _ADAPTIVE_MODEL_LOADED
     source "$SCRIPT_DIR/lib/adaptive-model.sh"
 
-    if adaptive_model_report 2>/dev/null | grep -q "No adaptive model history"; then
+    if adaptive_model_report 2>/dev/null | grep >/dev/null "No adaptive model history"; then
         pass "report handles missing history gracefully"
     else
         fail "report handles missing history gracefully"

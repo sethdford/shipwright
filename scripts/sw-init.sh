@@ -318,7 +318,7 @@ if [[ -f "$SW_SRC" ]]; then
 fi
 
 # Ensure ~/.local/bin is in PATH via shell profile
-if ! echo "$PATH" | tr ':' '\n' | grep -qxF "$BIN_DIR"; then
+if ! echo "$PATH" | tr ':' '\n' | grep >/dev/null -xF "$BIN_DIR"; then
     _login_shell="$(basename "${SHELL:-/bin/zsh}")"
     case "$_login_shell" in
         zsh)  _rc="$HOME/.zshrc" ;;

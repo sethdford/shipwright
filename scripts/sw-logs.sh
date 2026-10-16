@@ -116,7 +116,7 @@ capture_logs() {
     # shellcheck disable=SC2034
     while IFS='|' read -r session_window window_name pane_id pane_title; do
         [[ -z "$window_name" ]] && continue
-        echo "$window_name" | grep -qi "claude" || continue
+        echo "$window_name" | grep >/dev/null -i "claude" || continue
 
         # Sanitize names for filesystem
         local safe_window safe_title
@@ -222,7 +222,7 @@ show_team_logs() {
         if [[ -n "$pane_filter" ]]; then
             local base
             base="$(basename "$f")"
-            echo "$base" | grep -qi "$pane_filter" || continue
+            echo "$base" | grep >/dev/null -i "$pane_filter" || continue
         fi
         log_files+=("$f")
     done < <(find "$team_dir" -name '*.log' -type f -print0 2>/dev/null | xargs -0 ls -t 2>/dev/null)

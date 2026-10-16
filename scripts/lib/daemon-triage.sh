@@ -82,13 +82,13 @@ triage_score_issue() {
 
     # ── 1. Priority labels (0-30 points) ──
     local priority_score=0
-    if echo "$labels_csv" | grep -qiE "urgent|p0"; then
+    if echo "$labels_csv" | grep >/dev/null -iE "urgent|p0"; then
         priority_score=30
-    elif echo "$labels_csv" | grep -qiE "^high$|^high,|,high,|,high$|p1"; then
+    elif echo "$labels_csv" | grep >/dev/null -iE "^high$|^high,|,high,|,high$|p1"; then
         priority_score=20
-    elif echo "$labels_csv" | grep -qiE "normal|p2"; then
+    elif echo "$labels_csv" | grep >/dev/null -iE "normal|p2"; then
         priority_score=10
-    elif echo "$labels_csv" | grep -qiE "^low$|^low,|,low,|,low$|p3"; then
+    elif echo "$labels_csv" | grep >/dev/null -iE "^low$|^low,|,low,|,low$|p3"; then
         priority_score=5
     fi
 
@@ -169,11 +169,11 @@ triage_score_issue() {
 
     # ── 5. Type bonus (0-10 points) ──
     local type_score=0
-    if echo "$labels_csv" | grep -qiE "security"; then
+    if echo "$labels_csv" | grep >/dev/null -iE "security"; then
         type_score=10
-    elif echo "$labels_csv" | grep -qiE "bug"; then
+    elif echo "$labels_csv" | grep >/dev/null -iE "bug"; then
         type_score=10
-    elif echo "$labels_csv" | grep -qiE "feature|enhancement"; then
+    elif echo "$labels_csv" | grep >/dev/null -iE "feature|enhancement"; then
         type_score=5
     fi
 
@@ -336,11 +336,11 @@ select_pipeline_template() {
     fi
 
     # ── Label-based overrides ──
-    if echo "$labels" | grep -qi "hotfix\|incident"; then
+    if echo "$labels" | grep >/dev/null -i "hotfix\|incident"; then
         echo "hotfix"
         return
     fi
-    if echo "$labels" | grep -qi "security"; then
+    if echo "$labels" | grep >/dev/null -i "security"; then
         echo "enterprise"
         return
     fi

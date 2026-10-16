@@ -166,16 +166,16 @@ Return JSON only."
     if [[ ${#recommended_team[@]} -eq 0 ]]; then
         recommended_team=("builder" "reviewer" "tester")
 
-        if echo "$issue_or_project" | grep -qiE "security|vulnerability|compliance"; then
+        if echo "$issue_or_project" | grep >/dev/null -iE "security|vulnerability|compliance"; then
             recommended_team+=("security-auditor")
         fi
-        if echo "$issue_or_project" | grep -qiE "architecture|design|refactor"; then
+        if echo "$issue_or_project" | grep >/dev/null -iE "architecture|design|refactor"; then
             recommended_team+=("architect")
         fi
-        if echo "$issue_or_project" | grep -qiE "deploy|infra|ci.cd|pipeline"; then
+        if echo "$issue_or_project" | grep >/dev/null -iE "deploy|infra|ci.cd|pipeline"; then
             recommended_team+=("devops")
         fi
-        if echo "$issue_or_project" | grep -qiE "performance|speed|latency|optimization"; then
+        if echo "$issue_or_project" | grep >/dev/null -iE "performance|speed|latency|optimization"; then
             recommended_team+=("optimizer")
         fi
     fi
@@ -215,7 +215,7 @@ Return JSON only."
             team_max_iterations=20
         fi
         # Security tasks get more iterations
-        if printf '%s\n' "${recommended_team[@]}" | grep -q "security-auditor"; then
+        if printf '%s\n' "${recommended_team[@]}" | grep >/dev/null "security-auditor"; then
             team_template="careful"
             [[ $team_max_iterations -lt 15 ]] && team_max_iterations=15
         fi

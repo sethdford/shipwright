@@ -1,9 +1,11 @@
 # F10 for bash: GitHub writes move into GithubWriter as each command is ported. Ratcheted: a script
 # may lose GitHub writes but never gain one. Matches `gh` write subcommands (also behind wrappers
-# such as `timeout 30 gh …`), `gh api` calls that set a write method, send a body (not with an
-# explicit GET, where -f/-F are query parameters) or contain a literal GraphQL `mutation`, and
-# `git push`. A GraphQL mutation held in a variable is missed. The gh verb lists mirror
-# f10-github-writes-only-in-writer.yml.
+# such as `timeout 30 gh …`, a quoted or absolute-path `gh`, or a `$GH_BIN` variable), `gh api`
+# calls that set a write method, send a body (not with an explicit GET, where -f/-F are query
+# parameters) or contain a literal GraphQL `mutation`, and `git push` (also by absolute path or
+# `git -C dir push`; `git stash push` is not a push). A GraphQL mutation held in a variable is missed.
+# The bash gh verb lists are a superset of f10-github-writes-only-in-writer.yml (TypeScript), which
+# does not yet know the project, ssh-key, gpg-key or codespace groups.
 id: F10-bash-github-writes
 language: Bash
 severity: off
@@ -20,11 +22,15 @@ rule:
   kind: command
   any:
     - all:
-        - has: { field: name, regex: '^git$' }
+        - has: { regex: '^["'']?(.*/)?git["'']?$' }
         - has: { kind: word, regex: '^push$' }
-        - not: { has: { kind: word, regex: '^stash$' } }
+        - not:
+            has:
+              kind: word
+              regex: '^stash$'
+              precedes: { stopBy: end, regex: '^push$' }
     - all:
-        - has: { regex: '^gh$' }
+        - has: { regex: '^["'']?((.*/)?gh|(?i:\$\{?GH_?[A-Za-z_]*\}?))["'']?$' }
         - any:
             - all:
                 - has: { regex: '^["'']?(issue|pr)["'']?$' }
@@ -48,11 +54,23 @@ rule:
                 - has: { regex: '^["'']?(secret|variable)["'']?$' }
                 - has: { regex: '^["'']?(set|delete|remove)["'']?$' }
             - all:
+                - has: { regex: '^["'']?cache["'']?$' }
+                - has: { regex: '^["'']?delete["'']?$' }
+            - all:
+                - has: { regex: '^["'']?project["'']?$' }
+                - has: { regex: '^["'']?(create|edit|close|delete|copy|link|unlink|mark-template|item-add|item-edit|item-delete|item-archive|item-create)["'']?$' }
+            - all:
+                - has: { regex: '^["'']?(ssh-key|gpg-key)["'']?$' }
+                - has: { regex: '^["'']?(add|delete)["'']?$' }
+            - all:
+                - has: { regex: '^["'']?codespace["'']?$' }
+                - has: { regex: '^["'']?(create|delete|stop|rebuild|edit)["'']?$' }
+            - all:
                 - has: { regex: '^["'']?api["'']?$' }
                 - any:
                     - has:
                         regex: '^["'']?(-X|--method)["'']?$'
-                        precedes: { regex: '^["'']?(?i:POST|PATCH|PUT|DELETE)["'']?$' }
+                        precedes: { stopBy: end, regex: '^["'']?(?i:POST|PATCH|PUT|DELETE)["'']?$' }
                     - has: { regex: '^["'']?(-X=?|--method=)(?i:POST|PATCH|PUT|DELETE)["'']?$' }
                     - all:
                         - has: { regex: '^["'']?(-[fF]|--field|--raw-field|--input)(=.*)?' }
@@ -61,7 +79,7 @@ rule:
                         - not:
                             has:
                               regex: '^["'']?(-X|--method)["'']?$'
-                              precedes: { regex: '^["'']?(?i:GET)["'']?$' }
+                              precedes: { stopBy: end, regex: '^["'']?(?i:GET)["'']?$' }
                     - all:
                         - has: { regex: '^["'']?graphql["'']?$' }
                         - has: { regex: '\bmutation\b' }

@@ -358,7 +358,7 @@ get_stage_self_awareness_hint() {
     while IFS= read -r line; do
         [[ -z "$line" ]] && continue
         total=$((total + 1))
-        echo "$line" | grep -q '"outcome":"failed"' && failures=$((failures + 1)) || true
+        echo "$line" | grep >/dev/null '"outcome":"failed"' && failures=$((failures + 1)) || true
     done <<< "$recent"
     if [[ "$total" -ge 3 ]] && [[ $((failures * 100 / total)) -ge 50 ]]; then
         case "$stage_id" in

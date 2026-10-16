@@ -21,6 +21,8 @@ FLEET_SCRIPT="$SCRIPT_DIR/sw-fleet.sh"
 
 setup_env() {
     TEST_TEMP_DIR=$(mktemp -d "${TMPDIR:-/tmp}/sw-fleet-test.XXXXXX")
+    # Scripts under test read and write the intelligence cache here, not in the repo (#8609).
+    export SHIPWRIGHT_INTELLIGENCE_CACHE="$TEST_TEMP_DIR/project/.claude/intelligence-cache.json"
 
     # Create directory structure
     mkdir -p "$TEST_TEMP_DIR/.shipwright"
@@ -119,7 +121,7 @@ assert_equals() {
 
 assert_contains() {
     local haystack="$1" needle="$2" label="${3:-contains}"
-    if printf '%s\n' "$haystack" | grep -qE -- "$needle" 2>/dev/null; then
+    if printf '%s\n' "$haystack" | grep >/dev/null -E -- "$needle" 2>/dev/null; then
         return 0
     fi
     echo -e "    ${RED}✗${RESET} Output missing pattern: $needle ($label)"
@@ -129,7 +131,7 @@ assert_contains() {
 
 assert_not_contains() {
     local haystack="$1" needle="$2" label="${3:-not contains}"
-    if ! printf '%s\n' "$haystack" | grep -qE -- "$needle" 2>/dev/null; then
+    if ! printf '%s\n' "$haystack" | grep >/dev/null -E -- "$needle" 2>/dev/null; then
         return 0
     fi
     echo -e "    ${RED}✗${RESET} Output unexpectedly contains: $needle ($label)"

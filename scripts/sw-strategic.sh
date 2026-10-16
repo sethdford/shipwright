@@ -49,7 +49,7 @@ fi
 # ─── Constants (policy overrides when config/policy.json exists) ─────────────
 STRATEGIC_MAX_ISSUES=5
 STRATEGIC_COOLDOWN_SECONDS=14400  # 4 hours
-STRATEGIC_MODEL="claude-sonnet-5"
+STRATEGIC_MODEL="claude-sonnet-5-5"
 # shellcheck disable=SC2034
 STRATEGIC_MAX_TOKENS=4096
 STRATEGIC_STRATEGY_LINES=200
@@ -653,7 +653,7 @@ strategic_create_issue() {
     # Dedup: check if an open issue with this exact title already exists
     local existing
     existing=$(gh issue list --state open --search "$title" --json number,title --jq ".[].title" 2>/dev/null || echo "")
-    if echo "$existing" | grep -qF "$title" 2>/dev/null; then
+    if echo "$existing" | grep >/dev/null -F "$title" 2>/dev/null; then
         info "  Skipping duplicate: ${title}" >&2
         return 1
     fi

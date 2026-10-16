@@ -38,6 +38,9 @@ fi
 [[ -f "$SCRIPT_DIR/lib/loop-convergence.sh" ]] && source "$SCRIPT_DIR/lib/loop-convergence.sh"
 [[ -f "$SCRIPT_DIR/lib/loop-restart.sh" ]] && source "$SCRIPT_DIR/lib/loop-restart.sh"
 [[ -f "$SCRIPT_DIR/lib/loop-progress.sh" ]] && source "$SCRIPT_DIR/lib/loop-progress.sh"
+# Required, not optional: without it the test gate would run with the pipeline's credentials (#8608).
+# shellcheck source=lib/test-gate-env.sh
+source "$SCRIPT_DIR/lib/test-gate-env.sh"
 # Intelligent session restart with enhanced briefings and cross-session tracking
 [[ -f "$SCRIPT_DIR/lib/session-restart.sh" ]] && source "$SCRIPT_DIR/lib/session-restart.sh"
 # Context window budget monitoring (issue #209)
@@ -555,7 +558,7 @@ accumulate_loop_tokens() {
     [[ ! -f "$log_file" ]] && return 0
 
     # If jq is available and the file looks like JSON, parse structured output
-    if command -v jq >/dev/null 2>&1 && head -c1 "$log_file" 2>/dev/null | grep -q '\['; then
+    if command -v jq >/dev/null 2>&1 && head -c1 "$log_file" 2>/dev/null | grep >/dev/null '\['; then
         local input_tok output_tok cache_read cache_create cost_usd
         # The result object is the last element in the JSON array
         input_tok=$(jq -r '.[-1].usage.input_tokens // 0' "$log_file" 2>/dev/null || echo "0")
@@ -897,28 +900,28 @@ diagnose_failure() {
     local strategy="retry_with_context"  # default
 
     # Pattern-based classification (fast, no Claude needed)
-    if echo "$error_output" | grep -qiE 'import.*not found|cannot find module|no module named'; then
+    if echo "$error_output" | grep >/dev/null -iE 'import.*not found|cannot find module|no module named'; then
         diagnosis="missing_import"
         strategy="fix_imports"
-    elif echo "$error_output" | grep -qiE 'syntax error|unexpected token|parse error'; then
+    elif echo "$error_output" | grep >/dev/null -iE 'syntax error|unexpected token|parse error'; then
         diagnosis="syntax_error"
         strategy="fix_syntax"
-    elif echo "$error_output" | grep -qiE 'type.*not assignable|type error|TypeError'; then
+    elif echo "$error_output" | grep >/dev/null -iE 'type.*not assignable|type error|TypeError'; then
         diagnosis="type_error"
         strategy="fix_types"
-    elif echo "$error_output" | grep -qiE 'undefined.*variable|not defined|ReferenceError'; then
+    elif echo "$error_output" | grep >/dev/null -iE 'undefined.*variable|not defined|ReferenceError'; then
         diagnosis="undefined_reference"
         strategy="fix_references"
-    elif echo "$error_output" | grep -qiE 'timeout|timed out|ETIMEDOUT'; then
+    elif echo "$error_output" | grep >/dev/null -iE 'timeout|timed out|ETIMEDOUT'; then
         diagnosis="timeout"
         strategy="optimize_performance"
-    elif echo "$error_output" | grep -qiE 'assertion.*fail|expect.*to|AssertionError'; then
+    elif echo "$error_output" | grep >/dev/null -iE 'assertion.*fail|expect.*to|AssertionError'; then
         diagnosis="test_assertion"
         strategy="fix_logic"
-    elif echo "$error_output" | grep -qiE 'permission denied|EACCES|forbidden'; then
+    elif echo "$error_output" | grep >/dev/null -iE 'permission denied|EACCES|forbidden'; then
         diagnosis="permission_error"
         strategy="fix_permissions"
-    elif echo "$error_output" | grep -qiE 'out of memory|heap|OOM|ENOMEM'; then
+    elif echo "$error_output" | grep >/dev/null -iE 'out of memory|heap|OOM|ENOMEM'; then
         diagnosis="resource_error"
         strategy="reduce_resource_usage"
     else
@@ -1035,7 +1038,7 @@ run_test_gate() {
 
         local start_ts exit_code=0
         start_ts=$(date +%s)
-        bash -c "$test_wrapper" > "$test_log" 2>&1 || exit_code=$?
+        sw_test_gate_env bash -c "$test_wrapper" > "$test_log" 2>&1 || exit_code=$?
         local duration=$(( $(date +%s) - start_ts ))
 
         if command -v jq >/dev/null 2>&1; then
@@ -1072,7 +1075,7 @@ run_test_gate() {
 
         local start_ts exit_code=0
         start_ts=$(date +%s)
-        bash -c "$extra_wrapper" >> "$extra_log" 2>&1 || exit_code=$?
+        sw_test_gate_env bash -c "$extra_wrapper" >> "$extra_log" 2>&1 || exit_code=$?
         local duration=$(( $(date +%s) - start_ts ))
 
         if command -v jq >/dev/null 2>&1; then
@@ -2300,7 +2303,7 @@ ${GOAL}"
         local stderr_content=""
         [[ -f "$stderr_file" ]] && stderr_content=$(cat "$stderr_file" 2>/dev/null || true)
 
-        if echo "${log_content}${stderr_content}" | grep -qiE "$CONTEXT_EXHAUSTION_PATTERNS" 2>/dev/null; then
+        if echo "${log_content}${stderr_content}" | grep >/dev/null -iE "$CONTEXT_EXHAUSTION_PATTERNS" 2>/dev/null; then
             if [[ "${CONTEXT_RESTART_COUNT:-0}" -lt "${CONTEXT_RESTART_LIMIT:-2}" ]]; then
                 CONTEXT_RESTART_COUNT=$(( CONTEXT_RESTART_COUNT + 1 ))
                 STATUS="context_exhaustion_restart"
@@ -2412,11 +2415,11 @@ ${GOAL}"
             # 1. Re-run ALL test commands to double-check
             local recheck_log="${LOG_DIR}/verification-iter-${ITERATION}.log"
             if [[ -n "$TEST_CMD" ]]; then
-                eval "$TEST_CMD" > "$recheck_log" 2>&1 || verification_passed=false
+                ( sw_test_gate_scrub && eval "$TEST_CMD" ) > "$recheck_log" 2>&1 || verification_passed=false
             fi
             for _vg_cmd in "${ADDITIONAL_TEST_CMDS[@]+"${ADDITIONAL_TEST_CMDS[@]}"}"; do
                 [[ -z "$_vg_cmd" ]] && continue
-                eval "$_vg_cmd" >> "$recheck_log" 2>&1 || verification_passed=false
+                ( sw_test_gate_scrub && eval "$_vg_cmd" ) >> "$recheck_log" 2>&1 || verification_passed=false
             done
 
             # 2. Check for uncommitted changes (quality gate)

@@ -138,7 +138,7 @@ get_commit_type() {
 # Check if commit contains BREAKING CHANGE
 has_breaking_change() {
     local commit_hash="$1"
-    git show "$commit_hash" | grep -q "BREAKING CHANGE:" && echo "yes" || echo ""
+    git show "$commit_hash" | grep >/dev/null "BREAKING CHANGE:" && echo "yes" || echo ""
 }
 
 # ─── Changelog generation ─────────────────────────────────────────────────
@@ -174,7 +174,7 @@ categorize_commits() {
 
         # Check for breaking change
         local breaking_flag=""
-        if echo "$body" | grep -q "BREAKING CHANGE:"; then
+        if echo "$body" | grep >/dev/null "BREAKING CHANGE:"; then
             breaking_flag="yes"
         fi
 
@@ -221,7 +221,7 @@ generate_changelog_md() {
     breaking_commits="$(get_commits "$from" "$to" | while IFS='|' read -r hash subject body; do
         [[ -z "$hash" ]] && continue
         type="$(get_commit_type "$subject")"
-        if [[ "$type" == "feat" ]] && echo "$body" | grep -q "BREAKING CHANGE:"; then
+        if [[ "$type" == "feat" ]] && echo "$body" | grep >/dev/null "BREAKING CHANGE:"; then
             echo "$hash|$subject"
         fi
     done)"
@@ -229,7 +229,7 @@ generate_changelog_md() {
     features_commits="$(get_commits "$from" "$to" | while IFS='|' read -r hash subject body; do
         [[ -z "$hash" ]] && continue
         type="$(get_commit_type "$subject")"
-        if [[ "$type" == "feat" ]] && ! echo "$body" | grep -q "BREAKING CHANGE:"; then
+        if [[ "$type" == "feat" ]] && ! echo "$body" | grep >/dev/null "BREAKING CHANGE:"; then
             echo "$hash|$subject"
         fi
     done)"
@@ -309,7 +309,7 @@ detect_next_version() {
         case "$type" in
             feat)
                 has_feature=true
-                if echo "$body" | grep -q "BREAKING CHANGE:"; then
+                if echo "$body" | grep >/dev/null "BREAKING CHANGE:"; then
                     has_breaking=true
                 fi
                 ;;

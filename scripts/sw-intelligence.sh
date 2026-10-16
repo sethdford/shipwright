@@ -47,7 +47,7 @@ if type bootstrap_optimization &>/dev/null 2>&1; then
 fi
 
 # ─── Intelligence Configuration ─────────────────────────────────────────────
-INTELLIGENCE_CACHE="${REPO_DIR}/.claude/intelligence-cache.json"
+INTELLIGENCE_CACHE="${SHIPWRIGHT_INTELLIGENCE_CACHE:-${REPO_DIR}/.claude/intelligence-cache.json}"
 INTELLIGENCE_CONFIG_DIR="${HOME}/.shipwright/optimization"
 CACHE_TTL_CONFIG="${INTELLIGENCE_CONFIG_DIR}/cache-ttl.json"
 CACHE_STATS_FILE="${INTELLIGENCE_CONFIG_DIR}/cache-stats.json"
@@ -425,38 +425,38 @@ _intelligence_fallback_analyze() {
 
     # Issue type classification from labels
     local issue_type="backend"
-    if echo "$labels" | grep -qiE 'ui|frontend|css|design' 2>/dev/null; then
+    if echo "$labels" | grep >/dev/null -iE 'ui|frontend|css|design' 2>/dev/null; then
         issue_type="frontend"
-    elif echo "$labels" | grep -qiE 'api|endpoint|rest|graphql' 2>/dev/null; then
+    elif echo "$labels" | grep >/dev/null -iE 'api|endpoint|rest|graphql' 2>/dev/null; then
         issue_type="api"
-    elif echo "$labels" | grep -qiE 'db|migration|schema|database' 2>/dev/null; then
+    elif echo "$labels" | grep >/dev/null -iE 'db|migration|schema|database' 2>/dev/null; then
         issue_type="database"
-    elif echo "$labels" | grep -qiE 'security|auth|cve' 2>/dev/null; then
+    elif echo "$labels" | grep >/dev/null -iE 'security|auth|cve' 2>/dev/null; then
         issue_type="security"
-    elif echo "$labels" | grep -qiE 'perf|slow|latency|performance' 2>/dev/null; then
+    elif echo "$labels" | grep >/dev/null -iE 'perf|slow|latency|performance' 2>/dev/null; then
         issue_type="performance"
-    elif echo "$labels" | grep -qiE 'test|coverage' 2>/dev/null; then
+    elif echo "$labels" | grep >/dev/null -iE 'test|coverage' 2>/dev/null; then
         issue_type="testing"
-    elif echo "$labels" | grep -qiE 'docs|readme|documentation' 2>/dev/null; then
+    elif echo "$labels" | grep >/dev/null -iE 'docs|readme|documentation' 2>/dev/null; then
         issue_type="documentation"
-    elif echo "$labels" | grep -qiE 'infra|ci|deploy|infrastructure' 2>/dev/null; then
+    elif echo "$labels" | grep >/dev/null -iE 'infra|ci|deploy|infrastructure' 2>/dev/null; then
         issue_type="infrastructure"
-    elif echo "$labels" | grep -qiE 'refactor|cleanup' 2>/dev/null; then
+    elif echo "$labels" | grep >/dev/null -iE 'refactor|cleanup' 2>/dev/null; then
         issue_type="refactor"
     fi
 
     # Label-based heuristics (better than nothing)
-    if echo "$labels" | grep -qiE 'bug|fix|hotfix' 2>/dev/null; then
+    if echo "$labels" | grep >/dev/null -iE 'bug|fix|hotfix' 2>/dev/null; then
         complexity=$((complexity > 3 ? complexity - 2 : complexity))
         risk="low"
         template="hotfix"
-    elif echo "$labels" | grep -qiE 'feature|enhancement' 2>/dev/null; then
+    elif echo "$labels" | grep >/dev/null -iE 'feature|enhancement' 2>/dev/null; then
         complexity=$((complexity + 1 > 10 ? 10 : complexity + 1))
         template="standard"
-    elif echo "$labels" | grep -qiE 'refactor|cleanup' 2>/dev/null; then
+    elif echo "$labels" | grep >/dev/null -iE 'refactor|cleanup' 2>/dev/null; then
         risk="low"
         template="standard"
-    elif echo "$labels" | grep -qiE 'security|vulnerability' 2>/dev/null; then
+    elif echo "$labels" | grep >/dev/null -iE 'security|vulnerability' 2>/dev/null; then
         risk="high"
         template="standard"
     fi

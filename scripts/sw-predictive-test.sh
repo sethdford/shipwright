@@ -21,6 +21,8 @@ source "$SCRIPT_DIR/lib/test-helpers.sh"
 
 setup_env() {
     TEST_TEMP_DIR=$(mktemp -d "${TMPDIR:-/tmp}/sw-predictive-test.XXXXXX")
+    # Scripts under test read and write the intelligence cache here, not in the repo (#8609).
+    export SHIPWRIGHT_INTELLIGENCE_CACHE="$TEST_TEMP_DIR/project/.claude/intelligence-cache.json"
     mkdir -p "$TEST_TEMP_DIR/home/.shipwright/baselines"
     mkdir -p "$TEST_TEMP_DIR/home/.shipwright"
     mkdir -p "$TEST_TEMP_DIR/scripts"
@@ -452,12 +454,12 @@ test_prevention_with_patterns() {
         return 1
     fi
 
-    if ! echo "$output" | grep -qi "WARNING"; then
+    if ! echo "$output" | grep >/dev/null -i "WARNING"; then
         echo -e "    ${RED}✗${RESET} Prevention text missing WARNING prefix"
         return 1
     fi
 
-    if ! echo "$output" | grep -qi "build"; then
+    if ! echo "$output" | grep >/dev/null -i "build"; then
         echo -e "    ${RED}✗${RESET} Prevention text doesn't mention the stage"
         return 1
     fi

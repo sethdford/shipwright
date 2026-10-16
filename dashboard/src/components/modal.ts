@@ -349,6 +349,8 @@ function generateJoinLink(): void {
     .then((data) => {
       const cmdText = document.getElementById("join-command-text");
       if (cmdText) cmdText.textContent = data.join_cmd || "";
+      const tokenText = document.getElementById("join-token-text");
+      if (tokenText) tokenText.textContent = data.token || "";
       const cmdDisplay = document.getElementById("join-command-display");
       if (cmdDisplay) cmdDisplay.style.display = "";
       if (btn) {
