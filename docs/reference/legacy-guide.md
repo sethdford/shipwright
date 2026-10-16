@@ -113,7 +113,7 @@ Shipwright orchestrates autonomous Claude Code agent teams with delivery pipelin
 | `shipwright remote add <name> --host <h>` | Register a remote worker machine                |
 | `shipwright remote status`                | Health check all remote machines                |
 | `shipwright connect start`                | Sync local state to team dashboard              |
-| `shipwright connect join --token <t>`     | Join a team using an invite token               |
+| `shipwright connect join [--url <url>]`   | Join a team (token prompted, or `--token-file`) |
 | `shipwright connect status`               | Show connection status                          |
 | `shipwright dashboard`                    | Real-time web dashboard                         |
 | `shipwright dashboard start`              | Start dashboard in background                   |
@@ -638,7 +638,7 @@ All scripts are bash (except the dashboard server in TypeScript). Grouped by lay
 | `scripts/sw-ci.sh` | 589 | GitHub Actions CI/CD Orchestration |
 | `scripts/sw-cleanup.sh` | 350 | Clean up orphaned Claude team sessions & artifacts |
 | `scripts/sw-code-review.sh` | 699 | Clean Code & Architecture Analysis |
-| `scripts/sw-connect.sh` | 639 | Sync local state to team dashboard |
+| `scripts/sw-connect.sh` | 687 | Sync local state to team dashboard |
 | `scripts/sw-context.sh` | 601 | Context Engine for Pipeline Stages |
 | `scripts/sw-cost.sh` | 1070 | Token Usage & Cost Intelligence |
 | `scripts/sw-daemon.sh` | 1420 | Autonomous GitHub Issue Watcher |
@@ -794,7 +794,7 @@ All scripts are bash (except the dashboard server in TypeScript). Grouped by lay
 | `scripts/sw-ci-test.sh` | 198 | GitHub Actions CI/CD orchestration tests |
 | `scripts/sw-cleanup-test.sh` | 168 | Clean up orphaned sessions & artifacts |
 | `scripts/sw-code-review-test.sh` | 175 | Clean code & architecture analysis tests |
-| `scripts/sw-connect-test.sh` | 944 | Validate dashboard connection, heartbeat |
+| `scripts/sw-connect-test.sh` | 1030 | Validate dashboard connection, heartbeat |
 | `scripts/sw-constitutional-test.sh` | 320 | Constitutional AI Test Suite |
 | `scripts/sw-context-budget-test.sh` | 335 | Context Window Budget Monitor tests |
 | `scripts/sw-context-test.sh` | 221 | Context Engine for Pipeline Stages tests |
@@ -865,7 +865,7 @@ All scripts are bash (except the dashboard server in TypeScript). Grouped by lay
 | `scripts/sw-lib-pipeline-state-test.sh` | 309 | Unit tests for pipeline state |
 | `scripts/sw-lib-safety-gates-sites-test.sh` | 167 | automated filings use intake caps |
 | `scripts/sw-lib-safety-gates-test.sh` | 357 | bash callers of the TS safety gates |
-| `scripts/sw-lib-test-gate-env-test.sh` | 153 | the loop's test gate has no creds |
+| `scripts/sw-lib-test-gate-env-test.sh` | 176 | the loop's test gate has no creds |
 | `scripts/sw-linear-test.sh` | 300 | Validate Linear ↔ GitHub bidirectional sync |
 | `scripts/sw-logs-test.sh` | 281 | Validate agent pane log viewing, searching, |
 | `scripts/sw-loop-test.sh` | 911 | Validate continuous agent loop harness |
@@ -910,7 +910,7 @@ All scripts are bash (except the dashboard server in TypeScript). Grouped by lay
 | `scripts/sw-scope-enforcement-test.sh` | 441 | Test suite for scope enforcement |
 | `scripts/sw-security-audit-test.sh` | 162 | Security auditing tests |
 | `scripts/sw-self-optimize-test.sh` | 875 | Unit tests for learning & tuning system |
-| `scripts/sw-server-api-test.sh` | 713 | Dashboard Server API Test Suite |
+| `scripts/sw-server-api-test.sh` | 716 | Dashboard Server API Test Suite |
 | `scripts/sw-session-restart-test.sh` | 522 | Intelligent restart briefing system |
 | `scripts/sw-session-test.sh` | 597 | E2E validation of session creation flow |
 | `scripts/sw-setup-test.sh` | 262 | Validate comprehensive onboarding wizard |

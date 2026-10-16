@@ -82,7 +82,9 @@ echo -e "${DIM}Testing error handling, edge cases, auth, and response schemas${R
 (cd "$REPO_ROOT" && bun build dashboard/src/main.ts --target=browser --outdir=dashboard/public/dist --sourcemap=linked 2>/dev/null) || true
 
 # Start the dashboard server with mock HOME
-HOME="$MOCK_DIR" bun "$REPO_ROOT/dashboard/server.ts" "$TEST_PORT" &
+# No GitHub credentials: handlers such as /api/claim run real `gh`, which must not reach GitHub.
+env -u GH_TOKEN -u GITHUB_TOKEN -u GH_ENTERPRISE_TOKEN -u GITHUB_ENTERPRISE_TOKEN \
+    GH_CONFIG_DIR="$MOCK_DIR/gh-config" HOME="$MOCK_DIR" bun "$REPO_ROOT/dashboard/server.ts" "$TEST_PORT" &
 SERVER_PID=$!
 
 cleanup() {
@@ -323,7 +325,7 @@ test_context_efficiency() {
 # 17. POST endpoints - Intervention
 test_intervention_pause() {
     local resp code
-    code=$(curl -s -o /dev/null -w "%{http_code}" -X POST "$BASE/api/intervention/100/pause" 2>/dev/null) || true
+    code=$(curl -s -o /dev/null -w "%{http_code}" -H "Content-Type: application/json" -d '{}' -X POST "$BASE/api/intervention/100/pause" 2>/dev/null) || true
     if [[ "$code" == "200" || "$code" == "404" ]]; then
         assert_pass "POST /api/intervention/100/pause accepted"
     else
@@ -334,8 +336,9 @@ test_intervention_pause() {
 # 18. Emergency brake
 test_emergency_brake() {
     local resp
-    resp=$(curl -s -X POST "$BASE/api/emergency-brake" 2>/dev/null)
-    if [[ -n "$resp" ]] && echo "$resp" | python3 -m json.tool >/dev/null 2>&1; then
+    # Mutating routes require Content-Type: application/json (CSRF guard); a 415 must not pass.
+    resp=$(curl -s -H "Content-Type: application/json" -d '{}' -X POST "$BASE/api/emergency-brake" 2>/dev/null)
+    if [[ -n "$resp" ]] && echo "$resp" | python3 -c 'import json,sys; d=json.load(sys.stdin); assert "paused" in d and "queued" in d' 2>/dev/null; then
         assert_pass "POST /api/emergency-brake returns response"
     else
         assert_fail "POST /api/emergency-brake returns response" "Got: $resp"
@@ -629,7 +632,7 @@ test_capacity() {
 # 40. Test notification (fire and forget)
 test_notification_test() {
     local code
-    code=$(curl -s -o /dev/null -w "%{http_code}" -X POST "$BASE/api/notifications/test" 2>/dev/null) || true
+    code=$(curl -s -o /dev/null -w "%{http_code}" -H "Content-Type: application/json" -d '{}' -X POST "$BASE/api/notifications/test" 2>/dev/null) || true
     if [[ "$code" == "200" ]]; then
         assert_pass "POST /api/notifications/test returns 200"
     else

@@ -501,7 +501,7 @@ describe("API Client", () => {
 
     it("createTeamInvite calls POST /api/team/invite", async () => {
       mockFetch.mockReturnValueOnce(
-        jsonResponse({ token: "abc", url: "...", expires_at: "..." }),
+        jsonResponse({ token: "abc", join_url: "...", command: "...", expires_at: "..." }),
       );
       await api.createTeamInvite({ expires_hours: 24 });
       expect(mockFetch).toHaveBeenCalledWith(
