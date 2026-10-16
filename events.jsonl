@@ -439,3 +439,8 @@
 {"ts":"2026-10-16T06:18:40Z","ts_epoch":1792131520,"type":"patrol.issue_refused","check":"untested_scripts","count":7}
 {"ts":"2026-10-16T06:18:43Z","ts_epoch":1792131523,"type":"patrol.meta_issue_refused","title":"[Meta] Add tests for sw-event-schema-sync.sh"}
 {"ts":"2026-10-16T08:06:14Z","ts_epoch":1792137974,"type":"hygiene_platform_refactor","hardcoded":49,"fallback":75,"todo":51}
+{"ts":"2026-10-16T12:07:29Z","ts_epoch":1792152449,"type":"hygiene_platform_refactor","hardcoded":49,"fallback":75,"todo":51}
+{"ts":"2026-10-16T12:08:15Z","ts_epoch":1792152495,"type":"strategic.issue_refused","title":"Emit a stage-failure event whenever a pipeline run ends in failure"}
+{"ts":"2026-10-16T12:08:17Z","ts_epoch":1792152497,"type":"strategic.issue_refused","title":"Add isolated test suites for the three untested tmux and tracker scripts"}
+{"ts":"2026-10-16T12:08:20Z","ts_epoch":1792152500,"type":"strategic.issue_refused","title":"Move sw-loop.sh hardcoded timeouts and thresholds into policy config with env overrides"}
+{"ts":"2026-10-16T12:08:20Z","ts_epoch":1792152500,"type":"strategic.cycle_complete","issues_created":0,"issues_skipped":3}
