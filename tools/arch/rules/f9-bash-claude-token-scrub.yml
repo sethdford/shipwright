@@ -1,7 +1,11 @@
-# F9 for bash (promoted to error once the baseline reached zero, ADR-0008): a claude process inherits the caller's environment, including GH_TOKEN. Every
-# invocation (direct, or behind timeout/nohup/exec/env/$TIMEOUT_CMD …) must unset the GitHub tokens
-# in the same command, or run through "$SW_AGENT_EXEC" (scripts/lib/agent-exec.sh), which does.
-# `command -v claude`, log lines and jq arguments named claude are not invocations.
+# F9 for bash (error, ADR-0008): a claude process inherits the caller's environment, including GH_TOKEN. Every invocation
+# must unset the GitHub tokens in the same command, and the unset must come before the claude word (`claude -p x GH_TOKEN`
+# scrubs nothing), or the invocation must run through "$SW_AGENT_EXEC" (scripts/lib/agent-exec.sh), which scrubs them.
+# An invocation is claude by name (bare, quoted, or behind an absolute path), by a CLAUDE_BIN/CLAUDE_CMD-style variable
+# name, or as any other word of a command (a wrapper such as timeout, gtimeout, env, nohup, command, $TIMEOUT_CMD, or an
+# unknown runner such as "$OTHER_EXEC"). Not invocations: the query and logging builtins and helpers (type, which, hash,
+# echo, printf, info, warn, error, success, log, debug, emit_event), grep, chmod, test, jq arguments (`jq --argjson claude`),
+# `command -v|-V claude`, and any command whose word before claude is "$SW_AGENT_EXEC". `command claude` is an invocation.
 id: F9-bash-claude-token-scrub
 language: Bash
 severity: error
@@ -18,18 +22,35 @@ rule:
   kind: command
   all:
     - any:
-        - has: { field: name, regex: '^claude$' }
+        - has: { field: name, regex: '^["'']?(.*/)?claude["'']?$' }
+        - has: { field: name, regex: '^"?\$\{?[A-Za-z_]*CLAUDE_?(BIN|BINARY|CMD|CLI|PATH|EXE)\}?"?$' }
         - all:
-            - has: { kind: word, regex: '^claude$' }
+            - any:
+                - has: { kind: word, regex: '^["'']?(.*/)?claude["'']?$' }
+                - has: { regex: '^"?\$\{?[A-Za-z_]*CLAUDE_?(BIN|BINARY|CMD|CLI|PATH|EXE)\}?"?$' }
             - not:
                 has:
                   field: name
-                  regex: '^(command|type|which|hash|echo|printf|info|warn|error|success|log|debug|emit_event)$'
+                  regex: '^(type|which|hash|echo|printf|info|warn|error|success|log|debug|emit_event|jq|grep|chmod|test|\[)$'
+            - not:
+                all:
+                  - has: { field: name, regex: '^command$' }
+                  - has: { kind: word, regex: '^-[vV]$' }
             - not:
                 has:
                   field: name
-                  regex: '^(jq|"?\$\{?SW_AGENT_EXEC\}?"?)$'
+                  regex: '^"?\$\{?SW_AGENT_EXEC\}?"?$'
+            - not:
+                has:
+                  regex: '^"?\$\{?SW_AGENT_EXEC\}?"?$'
+                  precedes: { stopBy: end, regex: '^["'']?(.*/)?claude["'']?$' }
     - not:
         all:
-          - has: { kind: word, regex: '^(--unset=)?GH_TOKEN$' }
-          - has: { kind: word, regex: '^(--unset=)?GITHUB_TOKEN$' }
+          - has:
+              kind: word
+              regex: '^(--unset=)?GH_TOKEN$'
+              precedes: { stopBy: end, regex: '^["'']?(.*/)?claude["'']?$' }
+          - has:
+              kind: word
+              regex: '^(--unset=)?GITHUB_TOKEN$'
+              precedes: { stopBy: end, regex: '^["'']?(.*/)?claude["'']?$' }

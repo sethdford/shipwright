@@ -1,0 +1,31 @@
+# F10 for bash: a curl that writes to the GitHub API is a GitHub write the gh-based rule cannot see.
+# Matches curl (bare, quoted or by absolute path) to api.github.com (or $GITHUB_API_URL) with a write
+# method (-X/--request POST|PATCH|PUT|DELETE, also -XPOST and --request=POST), or with a body (-d,
+# --data*, -F, --form, --json, -T, --upload-file). An explicit -X GET is a read. Ratcheted: the one
+# existing call (scripts/sw-github-app.sh, the GitHub App installation-token mint) is counted in the
+# baseline and is debt for the TypeScript port. A write held in a variable is missed.
+id: F10-bash-curl-github-writes
+language: Bash
+severity: off
+metadata: { ratchet: true, owner: "@sethdford", docs: "docs/architecture.md#fitness-rules" }
+message: "F10: no new GitHub API writes from curl. Port the caller and add an idempotent GithubWriter method (src/adapters/github/gh-github-writer.ts), or call an existing writer; never add a curl write to bash."
+files:
+  - "scripts/**/*.sh"
+  - "scripts/sw"
+  - ".claude/hooks/**/*.sh"
+  - "claude-code/hooks/**/*.sh"
+  - "completions/**/*.bash"
+  - "install.sh"
+rule:
+  kind: command
+  all:
+    - has: { field: name, regex: '^["'']?(.*/)?curl["'']?$' }
+    - has: { regex: '(?i)api\.github\.com|\$\{?GITHUB_API[A-Za-z_]*\}?' }
+    - any:
+        - has:
+            regex: '^["'']?(-X|--request)["'']?$'
+            precedes: { stopBy: end, regex: '^["'']?(?i:POST|PATCH|PUT|DELETE)["'']?$' }
+        - has: { regex: '^["'']?(-X=?|--request=)(?i:POST|PATCH|PUT|DELETE)["'']?$' }
+        - has: { regex: '^["'']?-X(?i:POST|PATCH|PUT|DELETE)["'']?$' }
+        - has: { regex: '^["'']?(-d|-F|--data[a-z-]*|--form|--json|--upload-file|-T)(=.*|@.*)?["'']?$' }
+        - has: { regex: '^["'']?-d.+' }

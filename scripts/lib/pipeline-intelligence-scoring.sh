@@ -142,7 +142,7 @@ pipeline_select_audits() {
     fi
 
     # Intelligence cache: upgrade targeted→full for complex changes
-    local intel_cache="${PROJECT_ROOT}/.claude/intelligence-cache.json"
+    local intel_cache="${SHIPWRIGHT_INTELLIGENCE_CACHE:-${PROJECT_ROOT}/.claude/intelligence-cache.json}"
     if [[ -f "$intel_cache" && "$default_intensity" == "targeted" ]]; then
         local complexity
         complexity=$(jq -r '.complexity // "medium"' "$intel_cache" 2>/dev/null || echo "medium")

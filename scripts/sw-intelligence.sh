@@ -50,7 +50,7 @@ if type bootstrap_optimization &>/dev/null 2>&1; then
 fi
 
 # ─── Intelligence Configuration ─────────────────────────────────────────────
-INTELLIGENCE_CACHE="${REPO_DIR}/.claude/intelligence-cache.json"
+INTELLIGENCE_CACHE="${SHIPWRIGHT_INTELLIGENCE_CACHE:-${REPO_DIR}/.claude/intelligence-cache.json}"
 INTELLIGENCE_CONFIG_DIR="${HOME}/.shipwright/optimization"
 CACHE_TTL_CONFIG="${INTELLIGENCE_CONFIG_DIR}/cache-ttl.json"
 CACHE_STATS_FILE="${INTELLIGENCE_CONFIG_DIR}/cache-stats.json"

@@ -31,7 +31,7 @@ ARTIFACTS_DIR="${REPO_DIR}/.claude/pipeline-artifacts"
 CONTEXT_BUNDLE="${ARTIFACTS_DIR}/context-bundle.md"
 # Shipwright's own legacy conventions (moved out of .claude/CLAUDE.md in the TS migration)
 CLAUDE_CONFIG="${REPO_DIR}/docs/reference/legacy-guide.md"
-INTELLIGENCE_CACHE="${REPO_DIR}/.claude/intelligence-cache.json"
+INTELLIGENCE_CACHE="${SHIPWRIGHT_INTELLIGENCE_CACHE:-${REPO_DIR}/.claude/intelligence-cache.json}"
 MEMORY_ROOT="${HOME}/.shipwright/memory"
 
 # ─── Get repo identifier for memory lookups ────────────────────────────────

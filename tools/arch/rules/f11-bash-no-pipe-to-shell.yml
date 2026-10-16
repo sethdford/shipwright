@@ -1,6 +1,9 @@
 # F11 (bash safety): running a download as code runs unpinned, unverified code: piped into a
-# shell (also through sudo/env, or into source /dev/stdin), or read through a process or command
-# substitution. Ratcheted (tools/arch/ast-scan.ts).
+# shell or an interpreter that reads code from stdin (also through sudo/env/command/nohup and the
+# like, or into source /dev/stdin), or read through a process or command substitution. The one
+# allowed interpreter form is the module form, `python3 -m <module>`, when -m is the first argument
+# and the interpreter is not behind a wrapper (`| sudo python3 -m x` is flagged). Ratcheted
+# (tools/arch/ast-scan.ts).
 id: F11-bash-no-pipe-to-shell
 language: Bash
 severity: off
@@ -19,8 +22,14 @@ utils:
     any:
       - has: { field: name, matches: bash-shell }
       - all:
-          - has: { field: name, regex: '^(sudo|env|command|exec|nice|nohup)$' }
+          - has: { field: name, regex: '^(sudo|env|command|exec|nice|nohup|xargs|time|stdbuf|timeout|gtimeout)$' }
+          - has: { kind: word, regex: '^(python[0-9.]*|node|nodejs|perl|ruby|bun|deno|php)$' }
+      - all:
+          - has: { field: name, regex: '^(sudo|env|command|exec|nice|nohup|xargs|time|stdbuf|timeout|gtimeout)$' }
           - has: { kind: word, matches: bash-shell }
+      - all:
+          - has: { field: name, regex: '^(python[0-9.]*|node|nodejs|perl|ruby|bun|deno|php)$' }
+          - not: { has: { kind: word, regex: '^-m$', nthChild: 2 } }
       - all:
           - has: { field: name, regex: '^(source|\.)$' }
           - has: { kind: word, regex: '^/dev/(stdin|fd/0)$' }

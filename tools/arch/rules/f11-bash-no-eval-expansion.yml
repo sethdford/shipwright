@@ -1,7 +1,9 @@
 # F11 (bash safety): eval re-parses its arguments as shell code, so any expansion in them runs
 # whatever the value contains. Also: `command eval`, `builtin eval`, and `source`/`.` reading code
-# from a here-string or a process substitution built from a variable. Ratcheted (tools/arch/ast-scan.ts).
+# from a here-string, an unquoted heredoc or a process substitution built from a variable.
+# Ratcheted (tools/arch/ast-scan.ts).
 # `has` takes no `field: argument` in the bash rules: a repeated field resolves to its first child only.
+# A heredoc is a `redirected_statement` (its body is the command), not a child of the command.
 id: F11-bash-no-eval-expansion
 language: Bash
 severity: off
@@ -15,19 +17,28 @@ files:
   - "completions/**/*.bash"
   - "install.sh"
 rule:
-  kind: command
   any:
-    - all:
-        - any:
-            - has: { field: name, regex: '^eval$' }
-            - all:
-                - has: { field: name, regex: '^(command|builtin)$' }
-                - has: { kind: word, regex: '^eval$' }
-        - has: { matches: bash-expansion }
-    - all:
-        - has: { field: name, regex: '^(source|\.)$' }
-        - any:
-            - all:
-                - has: { kind: word, regex: '^/dev/(stdin|fd/0)$' }
-                - has: { kind: herestring_redirect, matches: bash-expansion }
-            - has: { kind: process_substitution, matches: bash-expansion }
+    - kind: command
+      any:
+        - all:
+            - any:
+                - has: { field: name, regex: '^eval$' }
+                - all:
+                    - has: { field: name, regex: '^(command|builtin)$' }
+                    - has: { kind: word, regex: '^eval$' }
+            - has: { matches: bash-expansion }
+        - all:
+            - has: { field: name, regex: '^(source|\.)$' }
+            - any:
+                - all:
+                    - has: { kind: word, regex: '^/dev/(stdin|fd/0)$' }
+                    - has: { kind: herestring_redirect, matches: bash-expansion }
+                - has: { kind: process_substitution, matches: bash-expansion }
+    - kind: redirected_statement
+      all:
+        - has:
+            kind: command
+            all:
+              - has: { field: name, regex: '^(source|\.)$' }
+              - has: { kind: word, regex: '^/dev/(stdin|fd/0)$' }
+        - has: { kind: heredoc_redirect, matches: bash-expansion }

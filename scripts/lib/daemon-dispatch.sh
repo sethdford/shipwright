@@ -395,8 +395,9 @@ daemon_reap_completed() {
     local _retry_spawned_for=""
 
     while IFS= read -r job; do
-        local issue_num pid worktree
+        local issue_num pid worktree job_repo
         issue_num=$(echo "$job" | jq -r '.issue // empty')
+        job_repo=$(echo "$job" | jq -r '.repo // empty')
         pid=$(echo "$job" | jq -r '.pid // empty')
         worktree=$(echo "$job" | jq -r '.worktree // empty')
 
@@ -505,7 +506,7 @@ daemon_reap_completed() {
         if [[ "$exit_code" -eq 0 ]]; then
             daemon_on_success "$issue_num" "$duration_str"
         else
-            daemon_on_failure "$issue_num" "$exit_code" "$duration_str"
+            daemon_on_failure "$issue_num" "$exit_code" "$duration_str" "$job_repo"
 
             # Cancel any lingering in_progress GitHub Check Runs for failed job
             if [[ "${NO_GITHUB:-false}" != "true" && -n "$worktree" ]]; then

@@ -1,5 +1,6 @@
-# A word naming a shell: sh, bash, zsh, dash or ksh (optionally under /bin or /usr/bin), or "$SHELL".
+# A word naming a shell: sh, bash, zsh, dash or ksh, under any directory (/bin/sh, /usr/local/bin/bash,
+# /opt/homebrew/bin/bash), or "$SHELL".
 id: bash-shell
 language: Bash
 rule:
-  regex: '^((/usr)?(/bin/)?(ba|z|da|k)?sh|"?\$\{?SHELL\}?"?)$'
+  regex: '^["'']?((/[^/"'' ]+)*/)?((ba|z|da|k)?sh|\$\{?SHELL\}?)["'']?$'
