@@ -436,6 +436,9 @@ test_cost_calculation() {
     # entries still name those models and must not be repriced.
     local id expected actual
     for pair in \
+        "claude-opus-5-5:30.0000" \
+        "claude-sonnet-5-5:18.0000" \
+        "claude-haiku-5-5:6.0000" \
         "claude-opus-5:30.0000" \
         "claude-opus-4-6:30.0000" \
         "claude-sonnet-5:18.0000" \

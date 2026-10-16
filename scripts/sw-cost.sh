@@ -108,13 +108,13 @@ cost_calculate() {
     local output_tokens="${2:-0}"
     local model="${3:-sonnet}"
 
-    # Each tier matches the bare alias, the current generation (claude-opus-5),
+    # Each tier matches the bare alias, the Claude 5 family (claude-opus-5, claude-opus-5-5),
     # and the previous one (claude-opus-4*). The 4* globs are deliberately kept:
     # historical entries in costs.json still name those models, and re-costing
     # them as "unknown" would silently reprice old records at the sonnet rate.
     #
     # Adding a new generation means adding a glob HERE, not only in the pipeline
-    # templates. `claude-opus-5` does not match `claude-opus-4*`, so a template
+    # templates. `claude-opus-5-5` does not match `claude-opus-4*`, so a template
     # bumped without this case falls through to the catch-all and bills Opus at
     # sonnet rates — no error, just understated spend.
     local input_rate output_rate
