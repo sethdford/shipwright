@@ -411,7 +411,7 @@ daemon_reap_completed() {
             #   Tier 2 (>1 hour): Force-reap if process doesn't match
             local _proc_cmd _is_pipeline=false
             _proc_cmd=$(ps -p "$pid" -o command= 2>/dev/null || true)
-            if [[ -n "$_proc_cmd" ]] && echo "$_proc_cmd" | grep -qE 'sw-pipeline|sw-loop|claude|shipwright' 2>/dev/null; then
+            if [[ -n "$_proc_cmd" ]] && echo "$_proc_cmd" | grep >/dev/null -E 'sw-pipeline|sw-loop|claude|shipwright' 2>/dev/null; then
                 _is_pipeline=true
             fi
 

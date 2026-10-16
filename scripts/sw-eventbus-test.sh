@@ -95,12 +95,12 @@ fi
 
 # ─── Test 7: eventbus file has valid JSONL ─────────────────────────────────
 line=$(head -1 "$HOME/.shipwright/events.jsonl" 2>/dev/null || echo "")
-if echo "$line" | grep -qF "stage.complete"; then
+if echo "$line" | grep >/dev/null -F "stage.complete"; then
     assert_pass "events.jsonl contains published event type"
 else
     assert_fail "events.jsonl contains published event type" "line: $line"
 fi
-if echo "$line" | grep -qF "corr-123"; then
+if echo "$line" | grep >/dev/null -F "corr-123"; then
     assert_pass "events.jsonl contains correlation_id"
 else
     assert_fail "events.jsonl contains correlation_id" "line: $line"

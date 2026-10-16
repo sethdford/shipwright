@@ -201,7 +201,7 @@ _reward_score_architecture() {
 
     # Check for test files alongside source (good practice)
     local has_test=false
-    if echo "$changed_files" | grep -qE '(test|spec|_test\.)'; then
+    if echo "$changed_files" | grep >/dev/null -E '(test|spec|_test\.)'; then
         has_test=true
         score=$(( score + 10 ))
     fi

@@ -79,6 +79,10 @@ allowed, a `valid` case. Rule-test YAML is in the ignore ban.
 - Bash F11 (download run as code): a download piped into `python`/`node`/`perl`/`ruby`/`bun`/`deno`/`php`,
   also behind `sudo`, `env`, `command`, `nohup`, `timeout`, `time`, `xargs` and similar. The only allowed
   interpreter form is `python3 -m <module>` with `-m` first and no wrapper.
+- Bash F11 (pipe reliability), error rule `F11-bash-no-grep-q-in-pipe` with no baseline: `grep -q`
+  (any flag cluster containing `q`, or `--quiet`/`--silent`) reading a pipe. Under `pipefail` it exits
+  at the first match, the writer dies of SIGPIPE and the pipeline reports failure for a match. Write
+  `| grep >/dev/null -<flags>` instead. All 826 sites were rewritten when the rule landed.
 - Dashboard: `const B = Bun`, `Reflect.get(Bun, …)`, `globalThis.Bun.spawn`, `globalThis["Bun"]`,
   `import { $ as sh } from "bun"`, `import * as B from "bun"`, any import or `require` of `node:module`
   (and a member `createRequire`), and a computed `require`/`import` specifier.

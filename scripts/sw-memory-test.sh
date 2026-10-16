@@ -144,7 +144,7 @@ run_test() {
 
 assert_contains() {
     local haystack="$1" needle="$2" label="${3:-contains}"
-    if printf '%s\n' "$haystack" | grep -qiE "$needle" 2>/dev/null; then
+    if printf '%s\n' "$haystack" | grep >/dev/null -iE "$needle" 2>/dev/null; then
         return 0
     fi
     echo -e "    ${RED}✗${RESET} Missing pattern: ${needle} (${label})"
@@ -726,9 +726,9 @@ JSON
 
         # Should return formatted string with category and success rate
         [[ -n "$result" ]] || { echo "Expected non-empty inject result"; return 1; }
-        echo "$result" | grep -q "test" || { echo "Expected category 'test' in result: $result"; return 1; }
-        echo "$result" | grep -q "50%" || { echo "Expected '50%' in result: $result"; return 1; }
-        echo "$result" | grep -q "null check" || { echo "Expected fix text in result: $result"; return 1; }
+        echo "$result" | grep >/dev/null "test" || { echo "Expected category 'test' in result: $result"; return 1; }
+        echo "$result" | grep >/dev/null "50%" || { echo "Expected '50%' in result: $result"; return 1; }
+        echo "$result" | grep >/dev/null "null check" || { echo "Expected fix text in result: $result"; return 1; }
     )
 }
 

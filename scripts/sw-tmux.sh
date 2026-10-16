@@ -239,7 +239,7 @@ tmux_doctor() {
         fi
 
         # Check dark theme hooks
-        if tmux show-hooks -g 2>/dev/null | grep -q "after-split-window"; then
+        if tmux show-hooks -g 2>/dev/null | grep >/dev/null "after-split-window"; then
             check_pass "Dark theme hooks active"
         else
             check_warn "Dark theme hooks not active — new panes may flash white"
@@ -273,7 +273,7 @@ tmux_doctor() {
         # Check for MouseDown1Status fix
         local mouse_bind
         mouse_bind="$(tmux list-keys 2>/dev/null | grep 'MouseDown1Status' | head -1 || true)"
-        if echo "$mouse_bind" | grep -q "select-window"; then
+        if echo "$mouse_bind" | grep >/dev/null "select-window"; then
             check_pass "MouseDown1Status: select-window (clicks work correctly)"
         elif [[ -n "$mouse_bind" ]]; then
             check_warn "MouseDown1Status: may switch sessions instead of windows"
@@ -487,14 +487,14 @@ tmux_fix() {
     # Fix 8: MouseDown1Status
     local mouse_bind
     mouse_bind="$(tmux list-keys 2>/dev/null | grep 'MouseDown1Status' | head -1 || true)"
-    if ! echo "$mouse_bind" | grep -q "select-window"; then
+    if ! echo "$mouse_bind" | grep >/dev/null "select-window"; then
         tmux bind -T root MouseDown1Status select-window -t = 2>/dev/null
         success "Fixed: MouseDown1Status → select-window"
         fixed=$((fixed + 1))
     fi
 
     # Fix 9: dark theme hooks
-    if ! tmux show-hooks -g 2>/dev/null | grep -q "after-split-window"; then
+    if ! tmux show-hooks -g 2>/dev/null | grep >/dev/null "after-split-window"; then
         tmux set-hook -g after-split-window "select-pane -P 'bg=#1a1a2e,fg=#e4e4e7'" 2>/dev/null
         tmux set-hook -g after-new-window "select-pane -P 'bg=#1a1a2e,fg=#e4e4e7'" 2>/dev/null
         tmux set-hook -g after-new-session "select-pane -P 'bg=#1a1a2e,fg=#e4e4e7'" 2>/dev/null

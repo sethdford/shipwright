@@ -179,7 +179,7 @@ show_workers() {
     echo -e "${BOLD}Remote Machines:${RESET}"
     echo ""
 
-    if jq '.machines[]?' "$MACHINES_FILE" 2>/dev/null | grep -q . 2>/dev/null; then
+    if jq '.machines[]?' "$MACHINES_FILE" 2>/dev/null | grep >/dev/null . 2>/dev/null; then
         jq -r '.machines[]? | "\(.name) (\(.hostname)) — \(.status) — \(.active_jobs // 0) active"' "$MACHINES_FILE" 2>/dev/null | while read -r machine; do
             echo -e "  ${machine}"
         done

@@ -156,7 +156,7 @@ constitutional_check_file() {
             local check_output=""
             # Safety: only allow grep-based checks to prevent code injection
             # from untrusted constitution override files (CRITIC-001)
-            if echo "$check_cmd" | grep -qE '^grep\b'; then
+            if echo "$check_cmd" | grep >/dev/null -E '^grep\b'; then
                 check_output=$(bash -c "$check_cmd" 2>/dev/null) || true
             else
                 # Non-grep check commands are logged and skipped
@@ -176,7 +176,7 @@ constitutional_check_file() {
                     [[ -z "$match_line" ]] && continue
                     local line_num=""
                     # Extract line number if present (grep -n format: "N:content")
-                    if echo "$match_line" | grep -qE '^[0-9]+:'; then
+                    if echo "$match_line" | grep >/dev/null -E '^[0-9]+:'; then
                         line_num=$(echo "$match_line" | cut -d: -f1)
                     fi
 
@@ -254,7 +254,7 @@ constitutional_check_diff() {
                 local v_line
                 v_line=$(echo "$file_violations" | jq -r ".[$vi].line" 2>/dev/null || echo "0")
                 # Include violation if line is 0 (no line info) or in changed lines
-                if [[ "$v_line" == "0" ]] || echo "$added_lines" | grep -qx "$v_line" 2>/dev/null; then
+                if [[ "$v_line" == "0" ]] || echo "$added_lines" | grep >/dev/null -x "$v_line" 2>/dev/null; then
                     local violation
                     violation=$(echo "$file_violations" | jq ".[$vi]" 2>/dev/null)
                     all_violations=$(echo "$all_violations" | jq --argjson v "$violation" '. + [$v]' 2>/dev/null || echo "$all_violations")

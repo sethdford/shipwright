@@ -137,7 +137,7 @@ suggest_template() {
 
         while IFS= read -r kw; do
             [[ -z "$kw" ]] && continue
-            if echo "$goal_lower" | grep -qi "$kw"; then
+            if echo "$goal_lower" | grep >/dev/null -i "$kw"; then
                 score=$((score + 1))
             fi
         done < <(jq -r '(.keywords // []) | .[]' "$tpl" 2>/dev/null)
@@ -403,7 +403,7 @@ if [[ "$TERMINAL_ADAPTER" == "tmux" ]]; then
     trap 'rm -rf "$SECURE_TMPDIR"' EXIT
 
     # Check if a window with this name already exists
-    if tmux list-windows -F '#W' 2>/dev/null | grep -qx "$WINDOW_NAME"; then
+    if tmux list-windows -F '#W' 2>/dev/null | grep >/dev/null -x "$WINDOW_NAME"; then
         warn "Window '${WINDOW_NAME}' already exists. Switching to it."
         tmux select-window -t "$WINDOW_NAME"
         exit 0

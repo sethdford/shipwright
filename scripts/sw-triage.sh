@@ -56,17 +56,17 @@ analyze_type() {
     local lower_body
     lower_body=$(echo "$body" | tr '[:upper:]' '[:lower:]')
 
-    if echo "$lower_body" | grep -qE "(security|vulnerability|cve|exploit|breach)"; then
+    if echo "$lower_body" | grep >/dev/null -E "(security|vulnerability|cve|exploit|breach)"; then
         echo "security"
-    elif echo "$lower_body" | grep -qE "(performance|speed|latency|slow|optimize|memory)"; then
+    elif echo "$lower_body" | grep >/dev/null -E "(performance|speed|latency|slow|optimize|memory)"; then
         echo "performance"
-    elif echo "$lower_body" | grep -qE "(bug|broken|crash|error|fail|issue)"; then
+    elif echo "$lower_body" | grep >/dev/null -E "(bug|broken|crash|error|fail|issue)"; then
         echo "bug"
-    elif echo "$lower_body" | grep -qE "(refactor|reorgan|rewrite|clean|improve)"; then
+    elif echo "$lower_body" | grep >/dev/null -E "(refactor|reorgan|rewrite|clean|improve)"; then
         echo "refactor"
-    elif echo "$lower_body" | grep -qE "(doc|guide|readme|tutorial|howto)"; then
+    elif echo "$lower_body" | grep >/dev/null -E "(doc|guide|readme|tutorial|howto)"; then
         echo "docs"
-    elif echo "$lower_body" | grep -qE "(chore|maintain|update|bump|dependencies)"; then
+    elif echo "$lower_body" | grep >/dev/null -E "(chore|maintain|update|bump|dependencies)"; then
         echo "chore"
     else
         echo "feature"
@@ -92,14 +92,14 @@ analyze_complexity() {
     lower_body=$(echo "$body" | tr '[:upper:]' '[:lower:]')
 
     # Complexity keywords
-    if echo "$lower_body" | grep -qE "(epic|major|rewrite|redesign|architecture)"; then
+    if echo "$lower_body" | grep >/dev/null -E "(epic|major|rewrite|redesign|architecture)"; then
         score=$((score + 3))
-    elif echo "$lower_body" | grep -qE "(multiple|several|cascade|dependencies|breaking)"; then
+    elif echo "$lower_body" | grep >/dev/null -E "(multiple|several|cascade|dependencies|breaking)"; then
         score=$((score + 2))
     fi
 
     # Mentions of tests/specs suggest complexity
-    if echo "$lower_body" | grep -qE "(test|spec|coverage|validation)"; then
+    if echo "$lower_body" | grep >/dev/null -E "(test|spec|coverage|validation)"; then
         score=$((score + 1))
     fi
 
@@ -120,15 +120,15 @@ analyze_risk() {
     local lower_body
     lower_body=$(echo "$body" | tr '[:upper:]' '[:lower:]')
 
-    if echo "$lower_body" | grep -qE "(security|vulnerability|exploit|critical)"; then
+    if echo "$lower_body" | grep >/dev/null -E "(security|vulnerability|exploit|critical)"; then
         score=$((score + 3))
-    elif echo "$lower_body" | grep -qE "(breaking|migration|deprecat)"; then
+    elif echo "$lower_body" | grep >/dev/null -E "(breaking|migration|deprecat)"; then
         score=$((score + 2))
-    elif echo "$lower_body" | grep -qE "(production|staging|database)"; then
+    elif echo "$lower_body" | grep >/dev/null -E "(production|staging|database)"; then
         score=$((score + 1))
     fi
 
-    if echo "$lower_body" | grep -qE "(infrastructure|deploy|release)"; then
+    if echo "$lower_body" | grep >/dev/null -E "(infrastructure|deploy|release)"; then
         score=$((score + 1))
     fi
 
@@ -492,7 +492,7 @@ cmd_prioritize() {
             *) impact=0 ;;
         esac
 
-        if echo "$labels" | grep -qE "(urgent|blocking|critical)"; then
+        if echo "$labels" | grep >/dev/null -E "(urgent|blocking|critical)"; then
             urgency=1
         else
             urgency=0.5

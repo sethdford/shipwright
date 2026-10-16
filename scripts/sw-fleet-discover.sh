@@ -186,7 +186,7 @@ discover_repos() {
             # Check topic filter (if specified, repo must have it)
             if [[ -n "$topic_filter" ]]; then
                 local has_topic=false
-                if echo "$topics" | grep -q "$topic_filter"; then
+                if echo "$topics" | grep >/dev/null "$topic_filter"; then
                     has_topic=true
                 fi
                 if [[ "$has_topic" != "true" ]]; then
@@ -198,7 +198,7 @@ discover_repos() {
             # Check exclude topic filter
             if [[ -n "$exclude_topic" ]]; then
                 local has_exclude_topic=false
-                if echo "$topics" | grep -q "$exclude_topic"; then
+                if echo "$topics" | grep >/dev/null "$exclude_topic"; then
                     has_exclude_topic=true
                 fi
                 if [[ "$has_exclude_topic" == "true" ]]; then

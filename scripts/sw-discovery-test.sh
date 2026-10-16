@@ -157,12 +157,12 @@ echo -e "  ${CYAN}internal patterns_overlap${RESET}"
     fi
 ) > "$TEST_TEMP_DIR/overlap_output" 2>/dev/null
 overlap_result=$(cat "$TEST_TEMP_DIR/overlap_output")
-if echo "$overlap_result" | grep -qF "SAME_MATCH"; then
+if echo "$overlap_result" | grep >/dev/null -F "SAME_MATCH"; then
     assert_pass "patterns_overlap matches same pattern"
 else
     assert_fail "patterns_overlap matches same pattern" "got: $overlap_result"
 fi
-if echo "$overlap_result" | grep -qF "DIFF_NO_MATCH"; then
+if echo "$overlap_result" | grep >/dev/null -F "DIFF_NO_MATCH"; then
     assert_pass "patterns_overlap rejects different paths"
 else
     assert_fail "patterns_overlap rejects different paths" "got: $overlap_result"

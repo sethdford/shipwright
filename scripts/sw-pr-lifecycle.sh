@@ -75,7 +75,7 @@ get_pr_checks_status() {
 
 has_merge_conflicts() {
     local pr_number="$1"
-    gh pr view "$pr_number" --json mergeStateStatus 2>/dev/null | jq -r '.mergeStateStatus' | grep -qi "conflicting" && return 0 || return 1
+    gh pr view "$pr_number" --json mergeStateStatus 2>/dev/null | jq -r '.mergeStateStatus' | grep >/dev/null -i "conflicting" && return 0 || return 1
 }
 
 get_pr_reviews() {
@@ -222,7 +222,7 @@ compute_risk_tier_for_pr() {
             regex=$(echo "$pattern" | sed 's/\./\\./g; s/\*\*/DOUBLESTAR/g; s/\*/[^\/]*/g; s/DOUBLESTAR/.*/g')
             while IFS= read -r file; do
                 [[ -z "$file" ]] && continue
-                if echo "$file" | grep -qE "^${regex}$"; then
+                if echo "$file" | grep >/dev/null -E "^${regex}$"; then
                     return 0
                 fi
             done <<< "$changed_files"
@@ -290,13 +290,13 @@ pr_review() {
 
     # Check for concerning patterns
     local warnings=""
-    if echo "$diff_output" | grep -qE '(HACK|TODO|FIXME|XXX|BROKEN|DEBUG)'; then
+    if echo "$diff_output" | grep >/dev/null -E '(HACK|TODO|FIXME|XXX|BROKEN|DEBUG)'; then
         warnings="${warnings}
 - Found HACK/TODO/FIXME markers in code"
         issues_found=$((issues_found + 1))
     fi
 
-    if echo "$diff_output" | grep -qE 'console\.(log|warn|error)\('; then
+    if echo "$diff_output" | grep >/dev/null -E 'console\.(log|warn|error)\('; then
         warnings="${warnings}
 - Found console.log statements (should use proper logging)"
         issues_found=$((issues_found + 1))
@@ -408,7 +408,7 @@ pr_merge() {
     # Check CI status (legacy check, supplementary to SHA-based validation)
     local status_check_rollup
     status_check_rollup=$(echo "$pr_info" | jq -r '.statusCheckRollup[].state' 2>/dev/null | sort | uniq)
-    if [[ -z "$status_check_rollup" ]] || echo "$status_check_rollup" | grep -qi "failure\|error"; then
+    if [[ -z "$status_check_rollup" ]] || echo "$status_check_rollup" | grep >/dev/null -i "failure\|error"; then
         error "PR #${pr_number} has failing CI checks"
         emit_event "pr.merge_failed" "pr=${pr_number}" "reason=ci_failure"
         return 1
@@ -468,7 +468,7 @@ pr_cleanup() {
         title=$(echo "$line" | jq -r '.title')
 
         # Check if this is a Shipwright PR (look for issue references or pipeline markers)
-        if ! echo "$title" | grep -qiE '(pipeline|issue|shipwright)'; then
+        if ! echo "$title" | grep >/dev/null -iE '(pipeline|issue|shipwright)'; then
             continue
         fi
 

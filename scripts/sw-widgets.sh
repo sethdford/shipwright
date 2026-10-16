@@ -293,7 +293,7 @@ cmd_slack() {
             -H 'Content-Type: application/json' \
             -d "$message_json" 2>&1)
 
-        if echo "$response" | grep -qi "ok"; then
+        if echo "$response" | grep >/dev/null -i "ok"; then
             success "Slack message sent"
         else
             warn "Slack response: $response"

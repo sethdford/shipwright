@@ -32,7 +32,7 @@ aliased globals, `node:os`, `node:vm`, `node:module`, `bun:ffi`, computed import
 `src/cli.ts`, `src/testing` · F6 Agent SDK only in `adapters/agent` · F7 files ≤ 300 lines,
 functions ≤ 40 · F8 tests use `createTestEnv()` · F9 no GitHub token or permission bypass for agents ·
 F10 `gh` writes only in `src/adapters/github/gh-github-writer.ts` · F11 bash: no `eval`/`sh -c`/
-`python -c` with expansions, no `curl | sh`, no `${{` · F12 dashboard layers, subprocesses only in
+`python -c` with expansions, no `curl | sh`, no `${{`, no `| grep -q` · F12 dashboard layers, subprocesses only in
 allowlisted services, no shell string from data · workflows never swallow gate or marker errors.
 Bash and `dashboard/server.ts` debt is ratcheted (`tools/arch/findings-baseline.json`): never add a
 finding; after removing some, run `bun tools/arch/ast-scan.ts --write-baseline`. Never suppress a rule

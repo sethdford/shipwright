@@ -212,7 +212,7 @@ extract_file_previews() {
 
         while IFS= read -r file; do
             [[ -z "$file" ]] && continue
-            echo "$relevant_files" | grep -q "$file" && continue
+            echo "$relevant_files" | grep >/dev/null "$file" && continue
             relevant_files="${relevant_files}${file}"$'\n'
             ((count++)) || true
             if [[ $count -ge 3 ]]; then break 2; fi

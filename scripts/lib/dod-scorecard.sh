@@ -135,7 +135,7 @@ check_never_ship_violations() {
                 while IFS= read -r rule; do
                     [[ -z "$rule" ]] && continue
                     # Check if rule pattern appears in diff (case-insensitive)
-                    if echo "$diff_content" | grep -qi "$rule"; then
+                    if echo "$diff_content" | grep >/dev/null -i "$rule"; then
                         # Collect lines matching the rule
                         local matching_lines
                         matching_lines=$(echo "$diff_content" | grep -in "$rule" | head -3 || true)
@@ -227,7 +227,7 @@ check_acceptance_criteria() {
                 local found_count=0
                 while IFS= read -r keyword; do
                     [[ -z "$keyword" ]] && continue
-                    if echo "$test_log" | grep -qi "$keyword"; then
+                    if echo "$test_log" | grep >/dev/null -i "$keyword"; then
                         found_count=$((found_count + 1))
                     fi
                 done <<< "$keywords"

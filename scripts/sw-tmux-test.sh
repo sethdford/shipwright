@@ -244,13 +244,13 @@ test_doctor_output_counts() {
     local output
     output=$(run_tmux doctor 2>&1 || true)
 
-    if ! echo "$output" | grep -q "passed"; then
+    if ! echo "$output" | grep >/dev/null "passed"; then
         return 1
     fi
-    if ! echo "$output" | grep -q "warnings"; then
+    if ! echo "$output" | grep >/dev/null "warnings"; then
         return 1
     fi
-    if ! echo "$output" | grep -q "failed"; then
+    if ! echo "$output" | grep >/dev/null "failed"; then
         return 1
     fi
     return 0
@@ -274,7 +274,7 @@ test_doctor_all_pass() {
     output=$(run_tmux doctor 2>&1 || true)
 
     # Should have "0 failed"
-    if ! echo "$output" | grep -q "0 failed"; then
+    if ! echo "$output" | grep >/dev/null "0 failed"; then
         return 1
     fi
     return 0
@@ -288,11 +288,11 @@ test_doctor_bad_escape_time() {
     output=$(run_tmux_env "MOCK_TMUX_ESCAPE_TIME=500" doctor 2>&1 || true)
 
     # Should mention escape-time failure
-    if ! echo "$output" | grep -q "escape-time.*500"; then
+    if ! echo "$output" | grep >/dev/null "escape-time.*500"; then
         return 1
     fi
     # Should NOT have "0 failed"
-    if echo "$output" | grep -q "0 failed"; then
+    if echo "$output" | grep >/dev/null "0 failed"; then
         return 1
     fi
     return 0
@@ -305,7 +305,7 @@ test_doctor_bad_history() {
     local output
     output=$(run_tmux_env "MOCK_TMUX_HISTORY=2000" doctor 2>&1 || true)
 
-    if ! echo "$output" | grep -q "history-limit.*2000"; then
+    if ! echo "$output" | grep >/dev/null "history-limit.*2000"; then
         return 1
     fi
     return 0
@@ -318,7 +318,7 @@ test_doctor_passthrough_off() {
     local output
     output=$(run_tmux_env "MOCK_TMUX_PASSTHROUGH=off" doctor 2>&1 || true)
 
-    if ! echo "$output" | grep -q "allow-passthrough.*off"; then
+    if ! echo "$output" | grep >/dev/null "allow-passthrough.*off"; then
         return 1
     fi
     return 0
@@ -331,7 +331,7 @@ test_doctor_version_check() {
     local output
     output=$(run_tmux_env "MOCK_TMUX_VERSION=3.4" doctor 2>&1 || true)
 
-    if ! echo "$output" | grep -q "3.4"; then
+    if ! echo "$output" | grep >/dev/null "3.4"; then
         return 1
     fi
     return 0
@@ -344,7 +344,7 @@ test_doctor_terminal_detect() {
     local output
     output=$(run_tmux doctor 2>&1 || true)
 
-    if ! echo "$output" | grep -q "Ghostty"; then
+    if ! echo "$output" | grep >/dev/null "Ghostty"; then
         return 1
     fi
     return 0
@@ -380,7 +380,7 @@ test_install_tpm_already_exists() {
     local output
     output=$(run_tmux install 2>&1 || true)
 
-    if ! echo "$output" | grep -q "already installed"; then
+    if ! echo "$output" | grep >/dev/null "already installed"; then
         return 1
     fi
     return 0
@@ -426,7 +426,7 @@ test_fix_applies_fixes() {
         fix 2>&1 || true)
 
     # Should mention "Fixed" in output
-    if ! echo "$output" | grep -q "Fixed"; then
+    if ! echo "$output" | grep >/dev/null "Fixed"; then
         return 1
     fi
 
@@ -446,7 +446,7 @@ test_fix_no_fixes_needed() {
     local output
     output=$(run_tmux fix 2>&1 || true)
 
-    if ! echo "$output" | grep -q "No fixes needed\|already optimized"; then
+    if ! echo "$output" | grep >/dev/null "No fixes needed\|already optimized"; then
         return 1
     fi
     return 0
@@ -520,7 +520,7 @@ test_reload_no_conf() {
     output=$(run_tmux reload 2>&1 || true)
 
     # Should mention missing config
-    if ! echo "$output" | grep -q "No.*tmux.conf"; then
+    if ! echo "$output" | grep >/dev/null "No.*tmux.conf"; then
         return 1
     fi
     return 0
@@ -537,7 +537,7 @@ test_cli_routes_doctor() {
     local output
     output=$(run_tmux doctor 2>&1 || true)
 
-    if ! echo "$output" | grep -q "tmux Doctor"; then
+    if ! echo "$output" | grep >/dev/null "tmux Doctor"; then
         return 1
     fi
     return 0
@@ -552,7 +552,7 @@ test_help_output() {
 
     local missing=""
     for cmd in doctor install fix reload; do
-        if ! echo "$output" | grep -q "$cmd"; then
+        if ! echo "$output" | grep >/dev/null "$cmd"; then
             missing="${missing} ${cmd}"
         fi
     done
@@ -570,7 +570,7 @@ test_default_shows_help() {
     local output
     output=$(run_tmux 2>&1 || true)
 
-    if ! echo "$output" | grep -q "COMMANDS"; then
+    if ! echo "$output" | grep >/dev/null "COMMANDS"; then
         return 1
     fi
     return 0
@@ -595,12 +595,12 @@ test_unknown_command() {
 test_cli_aliases() {
     local output
     output=$(run_tmux check 2>&1 || true)
-    if ! echo "$output" | grep -q "tmux Doctor"; then
+    if ! echo "$output" | grep >/dev/null "tmux Doctor"; then
         return 1
     fi
 
     output=$(run_tmux setup 2>&1 || true)
-    if ! echo "$output" | grep -q "Plugin Installer"; then
+    if ! echo "$output" | grep >/dev/null "Plugin Installer"; then
         return 1
     fi
 
@@ -630,7 +630,7 @@ test_doctor_outside_tmux() {
     ) || exit_code=$?
 
     # Should mention checking config file
-    if ! echo "$output" | grep -q "config file\|\.tmux\.conf"; then
+    if ! echo "$output" | grep >/dev/null "config file\|\.tmux\.conf"; then
         return 1
     fi
     return 0
@@ -645,7 +645,7 @@ test_doctor_missing_tpm() {
     local output
     output=$(run_tmux doctor 2>&1 || true)
 
-    if ! echo "$output" | grep -q "TPM not installed"; then
+    if ! echo "$output" | grep >/dev/null "TPM not installed"; then
         return 1
     fi
     return 0
@@ -658,7 +658,7 @@ test_doctor_old_tmux_version() {
     local output
     output=$(run_tmux_env "MOCK_TMUX_VERSION=3.2" doctor 2>&1 || true)
 
-    if ! echo "$output" | grep -q "3.3.*recommended\|3.2"; then
+    if ! echo "$output" | grep >/dev/null "3.3.*recommended\|3.2"; then
         return 1
     fi
     return 0

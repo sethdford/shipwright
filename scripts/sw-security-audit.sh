@@ -100,7 +100,7 @@ scan_secrets() {
     fi
 
     # Check for .env files in git
-    if find "$REPO_DIR" -name ".env" -type f ! -path "*/.git/*" ! -path "*/.worktree/*" 2>/dev/null | grep -q .; then
+    if find "$REPO_DIR" -name ".env" -type f ! -path "*/.git/*" ! -path "*/.worktree/*" 2>/dev/null | grep >/dev/null .; then
         add_finding "HIGH" "secrets" ".env file in repository" \
             ".env files containing secrets should never be committed to version control" \
             "Add .env to .gitignore. Use .env.example template instead. Document required variables in README."

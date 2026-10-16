@@ -12,7 +12,7 @@ new_string=$(echo "$input" | jq -r '.tool_input.new_string // empty' 2>/dev/null
 tool_input=$(echo "$input" | jq -r '.tool_input // empty' 2>/dev/null)
 
 # Security check: Block git push --no-verify (bypasses pre-commit hooks)
-if echo "$tool_input" | grep -qE 'git\s+push.*--no-verify'; then
+if echo "$tool_input" | grep >/dev/null -E 'git\s+push.*--no-verify'; then
     echo '{"message":"Blocked: git push --no-verify bypasses safety checks. Remove --no-verify flag."}'
     exit 2
 fi
@@ -24,7 +24,7 @@ if [[ "$tool_name" == "Edit" || "$tool_name" == "Write" ]]; then
         # Check for common secret patterns
         secret_patterns="sk-ant-|ANTHROPIC_API_KEY|GITHUB_TOKEN|OPENAI_API_KEY|AWS_SECRET|DATABASE_URL|PRIVATE_KEY|api_key|BEGIN RSA PRIVATE KEY|BEGIN PRIVATE KEY"
 
-        if echo "$new_string" | grep -qE "$secret_patterns"; then
+        if echo "$new_string" | grep >/dev/null -E "$secret_patterns"; then
             cat << "SECURITY_WARNING"
 ⚠️  SECURITY WARNING: Secret pattern detected in non-secret file
 

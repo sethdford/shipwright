@@ -1,0 +1,15 @@
+id: F11-bash-no-grep-q-in-pipe
+valid:
+  - 'echo "$out" | grep >/dev/null -i "stuck"'
+  - 'grep -q "x" "$file"'
+  - 'grep -qi "x" <<<"$out"'
+  - 'cmd | grep -c "x"'
+  - 'cmd | grep "x" > "$log"'
+invalid:
+  - 'echo "$out" | grep -q "stuck"'
+  - 'echo "$out" | grep -qi "stuck"'
+  - 'cmd | grep -qE "a|b"'
+  - 'cmd | grep -q -E "a|b"'
+  - 'cmd | egrep -q "x"'
+  - 'a | b | grep -qs "x"'
+  - 'if echo "$x" | grep -qi y; then :; fi'

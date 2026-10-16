@@ -198,7 +198,7 @@ detect_dead_code() {
         local test_name
         test_name=$(basename "$fixture" .fixture)
 
-        if ! grep -r "$test_name" "$REPO_DIR/scripts" --include="*-test.sh" 2>/dev/null | grep -q .; then
+        if ! grep -r "$test_name" "$REPO_DIR/scripts" --include="*-test.sh" 2>/dev/null | grep >/dev/null .; then
             warn "Orphaned test fixture: $(basename "$fixture")"
             orphaned_tests=$((orphaned_tests + 1))
         fi
@@ -280,7 +280,7 @@ audit_dependencies() {
             [[ -z "$dep" ]] && continue
 
             # Simple check: does the dep appear in source files?
-            if ! grep -r "$dep" "$REPO_DIR/scripts" --include="*.sh" 2>/dev/null | grep -q .; then
+            if ! grep -r "$dep" "$REPO_DIR/scripts" --include="*.sh" 2>/dev/null | grep >/dev/null .; then
                 [[ $VERBOSE == true ]] && warn "Potentially unused npm dependency: $dep"
                 unused_deps=$((unused_deps + 1))
             fi

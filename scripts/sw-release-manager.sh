@@ -91,7 +91,7 @@ detect_bump_type() {
         case "$type" in
             feat)
                 has_feature=true
-                if echo "$body" | grep -q "BREAKING CHANGE:"; then
+                if echo "$body" | grep >/dev/null "BREAKING CHANGE:"; then
                     has_breaking=true
                 fi
                 ;;
@@ -205,7 +205,7 @@ check_docs_updated() {
     info "Checking documentation status..."
 
     # Check if stale documentation markers exist
-    if grep -r "AUTO:" "$REPO_DIR/docs/reference/legacy-guide.md" 2>/dev/null | grep -qv "AUTO.*:"; then
+    if grep -r "AUTO:" "$REPO_DIR/docs/reference/legacy-guide.md" 2>/dev/null | grep >/dev/null -v "AUTO.*:"; then
         warn "Documentation contains stale AUTO sections"
         return 1
     fi

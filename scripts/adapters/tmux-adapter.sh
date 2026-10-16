@@ -29,7 +29,7 @@ spawn_agent() {
     local new_pane_id=""
 
     # If no window exists yet, create one and capture the pane ID
-    if ! tmux list-windows -F '#W' 2>/dev/null | grep -qx "$WINDOW_NAME"; then
+    if ! tmux list-windows -F '#W' 2>/dev/null | grep >/dev/null -x "$WINDOW_NAME"; then
         # -P prints the new pane's ID (e.g. %5)
         new_pane_id=$(tmux new-window -n "$WINDOW_NAME" -c "$working_dir" -P -F '#{pane_id}')
     else
@@ -67,7 +67,7 @@ spawn_agent() {
 
 list_agents() {
     # List all panes in the window with their titles and IDs
-    if tmux list-windows -F '#W' 2>/dev/null | grep -qx "$WINDOW_NAME"; then
+    if tmux list-windows -F '#W' 2>/dev/null | grep >/dev/null -x "$WINDOW_NAME"; then
         tmux list-panes -t "$WINDOW_NAME" -F '#{pane_id}: #{pane_title} (#{pane_current_command})' 2>/dev/null
     fi
 }
@@ -75,7 +75,7 @@ list_agents() {
 kill_agent() {
     local name="$1"
 
-    if ! tmux list-windows -F '#W' 2>/dev/null | grep -qx "$WINDOW_NAME"; then
+    if ! tmux list-windows -F '#W' 2>/dev/null | grep >/dev/null -x "$WINDOW_NAME"; then
         return 1
     fi
 
@@ -101,7 +101,7 @@ kill_agent() {
 focus_agent() {
     local name="$1"
 
-    if ! tmux list-windows -F '#W' 2>/dev/null | grep -qx "$WINDOW_NAME"; then
+    if ! tmux list-windows -F '#W' 2>/dev/null | grep >/dev/null -x "$WINDOW_NAME"; then
         return 1
     fi
 

@@ -548,11 +548,11 @@ cost_update_pricing() {
     esac
 
     # Validate prices are numbers
-    if ! echo "$input_price" | grep -qE '^[0-9]+\.?[0-9]*$'; then
+    if ! echo "$input_price" | grep >/dev/null -E '^[0-9]+\.?[0-9]*$'; then
         error "Invalid input price: $input_price"
         return 1
     fi
-    if ! echo "$output_price" | grep -qE '^[0-9]+\.?[0-9]*$'; then
+    if ! echo "$output_price" | grep >/dev/null -E '^[0-9]+\.?[0-9]*$'; then
         error "Invalid output price: $output_price"
         return 1
     fi
@@ -921,7 +921,7 @@ budget_set() {
     fi
 
     # Validate it's a number
-    if ! echo "$amount" | grep -qE '^[0-9]+\.?[0-9]*$'; then
+    if ! echo "$amount" | grep >/dev/null -E '^[0-9]+\.?[0-9]*$'; then
         error "Invalid amount: ${amount} (must be a positive number)"
         return 1
     fi
