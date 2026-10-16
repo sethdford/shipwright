@@ -100,10 +100,31 @@ a pipeline never see the token. The CI pipeline's `/api/webhook/ci` notification
 secrets `SHIPWRIGHT_FLEET_TOKEN` and `DASHBOARD_URL` (header on stdin; no header when the token
 secret is unset) and only warn when the dashboard refuses them.
 
-## Join tokens
+## Join and invite tokens
 
-`GET /api/join/{token}` serves the worker join script once. An unknown or already-redeemed token
-gets `410` and a script that only prints an error, so a leaked join URL cannot be replayed.
+Tokens are never part of a URL: not the path, not the query string. They travel in a header, and
+the route code (`dashboard/routes/join.ts`) logs nothing and returns them in no response header.
+
+| Token | Route | Header | Result |
+| --- | --- | --- | --- |
+| Worker join (`POST /api/join-token` shows it once) | `POST /api/join` | `X-Shipwright-Join-Token` | Serves the worker script. Single use: a redeemed or unknown token gets `410` and a script that only prints an error. |
+| Team invite (`POST /api/team/invite` shows it once, 24 h) | `POST /api/team/invite/verify` | `X-Shipwright-Invite-Token` | `200` with `dashboard_url` when live; `404` when unknown or expired. |
+
+Clients: the join command prompts for the token and sends it with `curl -H @-` on stdin.
+`shipwright connect join` prompts for the invite token (or reads stdin or `--token-file`) and
+refuses `--token` and positional tokens, since argv shows in `ps` and shell history.
+
+**Retired forms.** `GET /api/join/<token>` and `GET /api/team/invite/<token>` return `410` with a
+message to upgrade the client. The token is not checked or spent, so a retired request cannot
+redeem anything. This is a deliberate break rather than a deprecation flag: the path form only
+served the bundled worker script, and every client that uses it is upgraded together with the
+dashboard. The dashboard never logs the request path, but reverse proxies and browsers may already
+have recorded old URLs.
+
+**Upgrade step.** Tokens issued before this change may already be in proxy or access logs. Delete
+the unused entries in `~/.shipwright/join-tokens.json` and `~/.shipwright/invite-tokens.json` on
+the dashboard host (or restart with them removed) and issue new tokens. A logged, unspent join
+token can still be redeemed with the header, so revoke it that way.
 
 ## Known Bun issue
 

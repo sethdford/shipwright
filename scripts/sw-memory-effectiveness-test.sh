@@ -32,6 +32,8 @@ BOLD='\033[1m'
 
 setup_env() {
     TEST_TEMP_DIR=$(mktemp -d "${TMPDIR:-/tmp}/sw-memeff-test.XXXXXX")
+    # Scripts under test read and write the intelligence cache here, not in the repo (#8609).
+    export SHIPWRIGHT_INTELLIGENCE_CACHE="$TEST_TEMP_DIR/project/.claude/intelligence-cache.json"
 
     # Override HOME so storage writes go to temp dir
     export ORIG_HOME="$HOME"

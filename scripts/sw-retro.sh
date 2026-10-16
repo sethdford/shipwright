@@ -650,9 +650,10 @@ cmd_negative_audit() {
     # Check cost vs predicted
     echo ""
     echo -e "${BOLD}3. Cost Prediction Accuracy${RESET}"
-    if [[ -f ".claude/intelligence-cache.json" ]]; then
+    local intel_cache="${SHIPWRIGHT_INTELLIGENCE_CACHE:-.claude/intelligence-cache.json}"
+    if [[ -f "$intel_cache" ]]; then
         local predicted_cost actual_cost
-        predicted_cost=$(jq -r '.cost_estimate // 0' ".claude/intelligence-cache.json" 2>/dev/null)
+        predicted_cost=$(jq -r '.cost_estimate // 0' "$intel_cache" 2>/dev/null)
         if [[ -f ".claude/pipeline-artifacts/pipeline-state.md" ]]; then
             actual_cost=$(grep -oP "Cost: \K[0-9]+" ".claude/pipeline-artifacts/pipeline-state.md" | tail -1 || echo "0")
             if [[ -n "$predicted_cost" && "$predicted_cost" != "0" ]]; then

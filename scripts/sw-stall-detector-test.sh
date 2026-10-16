@@ -22,6 +22,8 @@ FAILURES=()
 
 setup_env() {
     TEST_TEMP_DIR=$(mktemp -d "${TMPDIR:-/tmp}/sw-stall-detector-test.XXXXXX")
+    # Scripts under test read and write the intelligence cache here, not in the repo (#8609).
+    export SHIPWRIGHT_INTELLIGENCE_CACHE="$TEST_TEMP_DIR/project/.claude/intelligence-cache.json"
     mkdir -p "$TEST_TEMP_DIR/scripts"
     mkdir -p "$TEST_TEMP_DIR/home/.shipwright/heartbeats"
     mkdir -p "$TEST_TEMP_DIR/project/.claude/pipeline-artifacts"

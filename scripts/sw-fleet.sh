@@ -300,7 +300,7 @@ fleet_rebalance() {
             # Falls back to raw demand when no intelligence data exists
             local weight="$demand"
             if [[ "$intel_weighting" == "true" && "$demand" -gt 0 ]]; then
-                local intel_cache="$repo_path/.claude/intelligence-cache.json"
+                local intel_cache="${SHIPWRIGHT_INTELLIGENCE_CACHE:-$repo_path/.claude/intelligence-cache.json}"
                 local avg_complexity=50
                 local urgency_factor=1
 

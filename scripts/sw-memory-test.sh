@@ -22,6 +22,8 @@ COST_SCRIPT="$SCRIPT_DIR/sw-cost.sh"
 
 setup_env() {
     TEST_TEMP_DIR=$(mktemp -d "${TMPDIR:-/tmp}/sw-memory-test.XXXXXX")
+    # Scripts under test read and write the intelligence cache here, not in the repo (#8609).
+    export SHIPWRIGHT_INTELLIGENCE_CACHE="$TEST_TEMP_DIR/project/.claude/intelligence-cache.json"
 
     # Create a mock git repo so repo_hash() and repo_name() work
     mkdir -p "$TEST_TEMP_DIR/project"

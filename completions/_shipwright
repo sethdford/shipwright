@@ -393,7 +393,7 @@ _shipwright() {
                 checkpoint) _describe -t checkpoint-cmds 'checkpoint command' checkpoint_cmds ;;
                 connect)
                     _describe -t connect-cmds 'connect command' connect_cmds
-                    _arguments '--token[Invite token]:token'
+                    _arguments '--token-file[File holding the invite token]:file:_files' '--url[Dashboard URL]:url'
                     ;;
                 remote)
                     _describe -t remote-cmds 'remote command' remote_cmds

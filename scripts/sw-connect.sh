@@ -466,34 +466,102 @@ cmd_status() {
 
 # ─── Join ───────────────────────────────────────────────────────────────────
 
-cmd_join() {
-    local token=""
-    local url_flag=""
+# The invite token is a secret. It is never an argument (argv shows in `ps` and shell history), never
+# part of a URL, and never traced: it comes from --token-file, from stdin when stdin is not a
+# terminal, or from a hidden prompt, and reaches curl and jq only through stdin or the environment.
+# Every helper that touches it suspends `set -x` first, as fleet_curl does.
 
-    # Parse args: supports both positional and flag styles
-    #   shipwright connect join <token>
-    #   shipwright connect join --url <url> --token <token>
+# _join_read_token [token_file] — sets JOIN_INVITE_TOKEN; returns 1 when no valid token was read.
+_join_read_token() {
+    local token_file="$1" line="" ok=0 _xt=0
+    case "$-" in *x*) _xt=1; set +x ;; esac
+    if [[ -n "$token_file" ]]; then
+        if [[ -r "$token_file" ]]; then IFS= read -r line < "$token_file" || true; fi
+    elif [[ ! -t 0 ]]; then
+        IFS= read -r line || true
+    else
+        printf 'Invite token: ' >&2
+        IFS= read -rs line || true
+        echo >&2
+    fi
+    line="${line//[[:space:]]/}"
+    if [[ "$line" =~ ^[A-Za-z0-9-]{8,128}$ ]]; then
+        JOIN_INVITE_TOKEN="$line"
+        ok=1
+    fi
+    if [[ "$_xt" -eq 1 ]]; then set -x; fi
+    [[ "$ok" -eq 1 ]]
+}
+
+# _join_verify_invite <dashboard_url> — POSTs the invite token in a header on stdin and prints the
+# JSON response (empty when the dashboard is unreachable).
+_join_verify_invite() {
+    local base="$1" out="" _xt=0
+    case "$-" in *x*) _xt=1; set +x ;; esac
+    out="$(curl -s --max-time 10 \
+        -X POST \
+        -H "Content-Type: application/json" \
+        -d '{}' \
+        -H @- \
+        "${base}/api/team/invite/verify" \
+        < <(printf 'X-Shipwright-Invite-Token: %s\n' "$JOIN_INVITE_TOKEN") 2>/dev/null)" || true
+    if [[ "$_xt" -eq 1 ]]; then set -x; fi
+    printf '%s' "$out"
+}
+
+# _join_save_config <dashboard_url> <team_name> <developer_id> <machine_name> — writes team-config.json
+# (mode 600 from mktemp) with the invite token passed through the environment, never as --arg.
+_join_save_config() {
+    local _xt=0 tmp_config
+    case "$-" in *x*) _xt=1; set +x ;; esac
+    tmp_config="$(mktemp "$SHIPWRIGHT_DIR/.team-config.XXXXXX")"
+    SW_INVITE_TOKEN="$JOIN_INVITE_TOKEN" jq -n \
+        --arg dashboard_url "$1" \
+        --arg team_name "$2" \
+        --arg developer_id "$3" \
+        --arg machine_name "$4" \
+        --argjson auto_connect true \
+        '{
+            dashboard_url: $dashboard_url,
+            team_name: $team_name,
+            developer_id: $developer_id,
+            machine_name: $machine_name,
+            invite_token: (env.SW_INVITE_TOKEN // ""),
+            auto_connect: $auto_connect
+        }' > "$tmp_config"
+    mv "$tmp_config" "$TEAM_CONFIG"
+    if [[ "$_xt" -eq 1 ]]; then set -x; fi
+}
+
+cmd_join() {
+    local url_flag="" token_file=""
+    JOIN_INVITE_TOKEN=""
+
+    # shipwright connect join [--url <url>] [--token-file <path>]
+    #   The token is prompted for, or read from stdin, or from --token-file.
     while [[ $# -gt 0 ]]; do
         case "$1" in
-            --token)  token="${2:-}"; shift 2 ;;
-            --token=*) token="${1#--token=}"; shift ;;
-            --url)    url_flag="${2:-}"; shift 2 ;;
-            --url=*)  url_flag="${1#--url=}"; shift ;;
+            --url)          url_flag="${2:-}"; shift 2 ;;
+            --url=*)        url_flag="${1#--url=}"; shift ;;
+            --token-file)   token_file="${2:-}"; shift 2 ;;
+            --token-file=*) token_file="${1#--token-file=}"; shift ;;
+            --token|--token=*)
+                error "Tokens are not accepted as arguments: argv and shell history expose them."
+                echo -e "  ${DIM}Omit --token: the token is prompted for, or read from stdin or --token-file${RESET}"
+                return 1
+                ;;
             --help|-h) show_help; return 0 ;;
-            -*)       warn "Unknown flag: $1"; shift ;;
+            -*)        warn "Unknown flag: $1"; shift ;;
             *)
-                # Positional: if no token yet, treat as token
-                if [[ -z "$token" ]]; then
-                    token="$1"
-                fi
-                shift
+                error "Pass the invite token by prompt, stdin or --token-file, not as an argument."
+                return 1
                 ;;
         esac
     done
 
-    if [[ -z "$token" ]]; then
-        error "Usage: shipwright connect join <token>"
-        echo -e "  ${DIM}Or: shipwright connect join --url <dashboard-url> --token <token>${RESET}"
+    if ! _join_read_token "$token_file"; then
+        error "No valid invite token (8-128 letters, digits or hyphens)."
+        echo -e "  ${DIM}Usage: shipwright connect join [--url <dashboard-url>] [--token-file <path>]${RESET}"
         echo -e "  ${DIM}Get a token from the dashboard: Settings → Team → Invite${RESET}"
         return 1
     fi
@@ -506,9 +574,8 @@ cmd_join() {
 
     info "Verifying invite token against ${BOLD}${verify_url}${RESET}..."
 
-    # Try invite token verification endpoint first
     local response
-    response="$(curl -s --max-time 10 "${verify_url}/api/team/invite/${token}" 2>/dev/null || true)"
+    response="$(_join_verify_invite "$verify_url")"
 
     if [[ -z "$response" ]]; then
         error "Could not reach dashboard at ${verify_url}"
@@ -542,27 +609,8 @@ cmd_join() {
     local machine_name
     machine_name="$(resolve_machine_name)"
 
-    # Save team config atomically
-    local tmp_config
-    tmp_config="$(mktemp "$SHIPWRIGHT_DIR/.team-config.XXXXXX")"
-
-    jq -n \
-        --arg dashboard_url "$join_url" \
-        --arg team_name "${join_team:-}" \
-        --arg developer_id "$developer_id" \
-        --arg machine_name "$machine_name" \
-        --arg invite_token "$token" \
-        --argjson auto_connect true \
-        '{
-            dashboard_url: $dashboard_url,
-            team_name: $team_name,
-            developer_id: $developer_id,
-            machine_name: $machine_name,
-            invite_token: $invite_token,
-            auto_connect: $auto_connect
-        }' > "$tmp_config"
-
-    mv "$tmp_config" "$TEAM_CONFIG"
+    _join_save_config "$join_url" "${join_team:-}" "$developer_id" "$machine_name"
+    JOIN_INVITE_TOKEN=""
 
     success "Joined team ${BOLD}${join_team:-unknown}${RESET}"
     echo -e "  ${DIM}Dashboard: ${join_url}${RESET}"
@@ -587,7 +635,7 @@ show_help() {
     echo -e "    ${CYAN}start${RESET} [--url <url>]    Start syncing local state to dashboard"
     echo -e "    ${CYAN}stop${RESET}                   Stop the connect process"
     echo -e "    ${CYAN}status${RESET}                 Show connection status"
-    echo -e "    ${CYAN}join${RESET} <token>            Join a team using an invite token"
+    echo -e "    ${CYAN}join${RESET} [--url <url>] [--token-file <path>]  Join a team (token is prompted)"
     echo ""
     echo -e "  ${BOLD}START OPTIONS${RESET}"
     echo -e "    --url <url>          Dashboard URL (default: from team-config or localhost:8767)"
@@ -604,8 +652,8 @@ show_help() {
     echo -e "    ${DIM}# Connect to a remote dashboard${RESET}"
     echo -e "    shipwright connect start --url http://team-server:8767"
     echo ""
-    echo -e "    ${DIM}# Join a team with an invite token${RESET}"
-    echo -e "    shipwright connect join abc123"
+    echo -e "    ${DIM}# Join a team (the invite token is prompted for, never typed as an argument)${RESET}"
+    echo -e "    shipwright connect join --url http://team-server:8767"
     echo ""
     echo -e "    ${DIM}# Check connection status${RESET}"
     echo -e "    shipwright connect status"

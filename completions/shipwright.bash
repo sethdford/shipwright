@@ -202,7 +202,7 @@ _shipwright_completions() {
                 COMPREPLY=( $(compgen -W "--host --port --key --user" -- "$cur") )
                 ;;
             connect)
-                COMPREPLY=( $(compgen -W "--token" -- "$cur") )
+                COMPREPLY=( $(compgen -W "--url --token-file" -- "$cur") )
                 ;;
             cost)
                 COMPREPLY=( $(compgen -W "--period --json --by-stage --by-issue" -- "$cur") )

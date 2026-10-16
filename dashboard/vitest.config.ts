@@ -4,7 +4,7 @@ export default defineConfig({
   test: {
     environment: "happy-dom",
     root: "./dashboard",
-    include: ["src/**/*.test.ts", "services/**/*.test.ts"],
+    include: ["src/**/*.test.ts", "services/**/*.test.ts", "routes/**/*.test.ts"],
     globals: true,
     coverage: {
       provider: "v8",

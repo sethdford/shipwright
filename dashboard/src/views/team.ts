@@ -148,19 +148,34 @@ function setupInviteButton(): void {
         const result = document.getElementById("team-invite-result");
         if (result) {
           result.style.display = "";
+          // The token is never part of the command or a URL: the command prompts for it.
           result.innerHTML =
             `<div class="invite-link-box">` +
-            `<span class="invite-label">Invite link (expires in 72h):</span>` +
-            `<code class="invite-url" id="invite-url">${escapeHtml(data.url || data.token)}</code>` +
-            `<button class="btn-sm" id="copy-invite">Copy</button></div>`;
+            `<span class="invite-label">Join command:</span>` +
+            `<code class="invite-url" id="invite-url">${escapeHtml(data.command)}</code>` +
+            `<button class="btn-sm" id="copy-invite">Copy</button></div>` +
+            `<div class="invite-link-box">` +
+            `<span class="invite-label">Invite token (shown once, expires in 24h):</span>` +
+            `<code class="invite-url" id="invite-token">${escapeHtml(data.token)}</code>` +
+            `<button class="btn-sm" id="copy-invite-token">Copy</button></div>`;
           const copyBtn = document.getElementById("copy-invite");
           if (copyBtn) {
             copyBtn.addEventListener("click", () => {
-              const url = data.url || data.token;
-              navigator.clipboard.writeText(url).then(() => {
+              navigator.clipboard.writeText(data.command).then(() => {
                 copyBtn.textContent = "Copied!";
                 setTimeout(() => {
                   copyBtn.textContent = "Copy";
+                }, 2000);
+              });
+            });
+          }
+          const tokenBtn = document.getElementById("copy-invite-token");
+          if (tokenBtn) {
+            tokenBtn.addEventListener("click", () => {
+              navigator.clipboard.writeText(data.token).then(() => {
+                tokenBtn.textContent = "Copied!";
+                setTimeout(() => {
+                  tokenBtn.textContent = "Copy";
                 }, 2000);
               });
             });
