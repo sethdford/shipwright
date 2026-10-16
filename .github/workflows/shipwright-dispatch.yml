@@ -26,7 +26,7 @@ jobs:
       GH_REPO: ${{ github.repository }}
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           persist-credentials: false
 
@@ -77,45 +77,32 @@ jobs:
             echo ""
             echo "--- Checking issue #$issue ---"
 
-            # ── Check 1: a pipeline already running or queued for THIS issue ──
-            if ! ACTIVE=$(scripts/ci/pipeline-active.sh "$issue"); then
-              echo "::error::cannot list pipeline runs for #$issue; leaving it alone"
+            # ── First dispatch only (ADR-0007): the same state rule as shipwright-label-dispatch.yml ──
+            # ready: no run queued or running, and no bot comment says it was dispatched, retried or run.
+            # active or handled: skip. A read failure leaves the issue alone and fails the job.
+            if ! STATE=$(scripts/ci/issue-dispatch-state.sh "$issue"); then
+              echo "::error::cannot read the dispatch state of #$issue; leaving it alone"
               READ_FAILURES=$((READ_FAILURES + 1))
               continue
             fi
-            if [[ "$ACTIVE" == "true" ]]; then
-              echo "Issue #$issue: pipeline already running/queued — skipping"
-              SKIPPED=$((SKIPPED + 1))
-              continue
-            fi
-
-            # ── Check 2: first dispatch only ──
-            # Once dispatch has asked for a run (SHIPWRIGHT-DISPATCHED, posted before every
-            # dispatch), or a pipeline or retry has commented, auto-retry is the only retry path
-            # (fix-loop cap, ADR-0007). The marker matters for runs that end before "Shipwright
-            # Pipeline Starting" (auth failure, triage error, claim skip, setup failure): without
-            # it they would be re-dispatched every 15 minutes. Bot-authored comments only.
-            if ! COMMENTS_JSON=$(scripts/ci/bot-comments.sh "$issue"); then
-              echo "::error::cannot read bot comments for #$issue; leaving it alone"
-              READ_FAILURES=$((READ_FAILURES + 1))
-              continue
-            fi
-            # jq -e: 0 = a marker exists, 1 = none, anything else = unreadable (fail closed).
-            HANDLED_RC=0
-            # "Pipeline Auth Failure" covers issues whose runs failed at the auth pre-flight before
-            # dispatch posted markers (the 2026-10-14 expired-token failures).
-            jq -e 'any(.[]; .body | test("SHIPWRIGHT-DISPATCHED|SHIPWRIGHT-RETRY|Shipwright Pipeline|Pipeline Auth Failure"))' \
-              <<<"$COMMENTS_JSON" >/dev/null || HANDLED_RC=$?
-            if [[ "$HANDLED_RC" -gt 1 ]]; then
-              echo "::error::cannot read the bot comments of #$issue (jq exit $HANDLED_RC); leaving it alone"
-              READ_FAILURES=$((READ_FAILURES + 1))
-              continue
-            fi
-            if [[ "$HANDLED_RC" -eq 0 ]]; then
-              echo "Issue #$issue: already dispatched or run — auto-retry owns any retry; skipping"
-              SKIPPED=$((SKIPPED + 1))
-              continue
-            fi
+            case "$STATE" in
+              ready) ;;
+              active)
+                echo "Issue #$issue: pipeline already running/queued — skipping"
+                SKIPPED=$((SKIPPED + 1))
+                continue
+                ;;
+              handled)
+                echo "Issue #$issue: already dispatched or run — auto-retry owns any retry; skipping"
+                SKIPPED=$((SKIPPED + 1))
+                continue
+                ;;
+              *)
+                echo "::error::unexpected dispatch state '$STATE' for #$issue; leaving it alone"
+                READ_FAILURES=$((READ_FAILURES + 1))
+                continue
+                ;;
+            esac
 
             # ── Per-run cap, then the gates again: an earlier dispatch may have closed one ──
             if [[ "$DISPATCHED" -ge "$MAX_DISPATCH" ]]; then
@@ -126,6 +113,31 @@ jobs:
               echo "::warning::Safety gates no longer allow dispatch — stopping"
               break
             fi
+
+            # ── Half-open breaker: exactly one probe per run (#8575, ADR-0007) ──
+            # `breaker status` reports half_open once the cool-down is over. The gate check above has
+            # just passed, so no probe is in flight: this dispatch is the probe. After it, this run
+            # stops, because the new run may not be listed yet and the next gate check could miss it.
+            if ! BREAKER_JSON=$(bun src/cli.ts breaker status --json); then
+              echo "::error::cannot read the breaker state of #$issue; not dispatching — stopping"
+              READ_FAILURES=$((READ_FAILURES + 1))
+              break
+            fi
+            # Strict: .state must be a string. Empty output, a missing state or a non-string fails.
+            if ! BREAKER_STATE=$(jq -er '.state | strings' <<<"$BREAKER_JSON"); then
+              echo "::error::unreadable breaker state for #$issue; not dispatching — stopping"
+              READ_FAILURES=$((READ_FAILURES + 1))
+              break
+            fi
+            # Only closed and half_open may dispatch. Any other state (open included) is a read failure.
+            case "$BREAKER_STATE" in
+              closed|half_open) ;;
+              *)
+                echo "::error::breaker state '$BREAKER_STATE' for #$issue is not closed or half_open; not dispatching — stopping"
+                READ_FAILURES=$((READ_FAILURES + 1))
+                break
+                ;;
+            esac
 
             # ── All checks passed — mark, then dispatch ──
             # The marker goes first: if it cannot be posted, nothing is dispatched, so no run can
@@ -148,6 +160,11 @@ jobs:
             fi
             echo "Issue #$issue: pipeline dispatched"
             DISPATCHED=$((DISPATCHED + 1))
+
+            if [[ "$BREAKER_STATE" == "half_open" ]]; then
+              echo "Breaker half-open: #$issue was the probe; no further dispatch this run"
+              break
+            fi
 
             sleep 5  # Avoid rate limiting between dispatches
           done

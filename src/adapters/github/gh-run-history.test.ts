@@ -147,3 +147,16 @@ test("a negative or fractional databaseId is rejected", async () => {
   ]);
   expect((await new GhRunHistory(runner).recentRuns(5)).ok).toBe(false);
 });
+
+test("the breaker's history lists shipwright-pipeline.yml runs only", async () => {
+  // A refused `shipwright` label is a run of shipwright-label-dispatch.yml. It can feed the breaker
+  // only if this query lists more than one workflow, so the argv must name exactly one.
+  const runner = new FakeProcessRunner([
+    { prefix: ["gh", "run", "list"], result: { exitCode: 0, stdout: "[]", stderr: "" } },
+  ]);
+  await new GhRunHistory(runner).recentRuns(50);
+  const argv = runner.calls[0]?.argv ?? [];
+  const at = argv.flatMap((a, i) => (a === "--workflow" ? [i] : []));
+  expect(at.length).toBe(1);
+  expect(argv[(at[0] ?? -1) + 1]).toBe("shipwright-pipeline.yml");
+});
