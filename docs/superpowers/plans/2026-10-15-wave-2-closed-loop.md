@@ -71,7 +71,7 @@ The spec already covers most of this work. A reviewer checked it and found one n
 | §8 delivery evals and scorecard | 20 to 50 cases; pass^3; cost per success | W2-13, W2-14, W2-18 | No |
 | §2 non-goals | no new features except §6.1, §6.2, §6.3 | Tranches 1 to 3 sit inside §6.2 and §8 | No change needed for Tranches 1 to 3 |
 
-**Decision D-M: the Claude 5.5 family (decided 2026-10-16).** The pins move to the 5.5 family through the aliases in `config/models.json`, which resolve to `claude-opus-5-5`, `claude-sonnet-5-5` and `claude-haiku-5-5`. W2-07 maps both the old IDs (`claude-opus-5`, `claude-sonnet-5`, `claude-haiku-4-5`) and the 5.5 full IDs to aliases, so the change works whether or not #8634 has merged. Covered are the three templates, `scripts/sw-strategic.sh`, and two workflow pins: the `shipwright-pipeline.yml` triage pin and the `review-remediation.yml` pin. PR #8634 (`feat/claude-5-5-models`, open and unmerged on 2026-10-16) writes full 5.5 IDs into templates and scripts, changes the triage pin to `claude-haiku-5-5`, and pins the Claude Code CLI to 2.1.301 in several workflows. It creates no `config/models.json` and does not touch `review-remediation.yml`. Each conversion changes the model for every run that reaches that line, so it is a behaviour change, recorded in ADR-0009.
+**Decision D-M: the Claude 5.5 family (decided 2026-10-16).** The pins move to the 5.5 family through the aliases in `config/models.json`, which resolve to `claude-opus-5-5`, `claude-sonnet-5-5` and `claude-haiku-5-5`. W2-07 maps both the old IDs (`claude-opus-5`, `claude-sonnet-5`, `claude-haiku-4-5`) and the 5.5 full IDs to aliases, so the change works whether or not #8634 has merged. Covered are the three templates, `scripts/sw-strategic.sh`, and two workflow pins: the `shipwright-pipeline.yml` triage pin and the `review-remediation.yml` pin. PR #8634 (`feat/claude-5-5-models`, merged to main on 2026-10-16) writes full 5.5 IDs into templates and scripts, changes the triage pin to `claude-haiku-5-5`, and pins the Claude Code CLI to 2.1.301 in several workflows. It creates no `config/models.json` and does not touch `review-remediation.yml`. Each conversion changes the model for every run that reaches that line, so it is a behaviour change, recorded in ADR-0009.
 
 ---
 
@@ -2243,7 +2243,7 @@ for name in ["autonomous.json", "full.json", "cost-aware.json"]:
 print("converted")
 PY
 ```
-Expected: `converted`. In `scripts/sw-strategic.sh`, replace the constant on line 52 (`STRATEGIC_MODEL="claude-sonnet-5"`, or `"claude-sonnet-5-5"` if #8634 has merged) with `STRATEGIC_MODEL="$(models_resolve sonnet)"`, and add `source "$(dirname "${BASH_SOURCE[0]}")/lib/models.sh"` above it. In `.github/workflows/review-remediation.yml`, replace `--model claude-sonnet-4-20250514` with `--model "$(jq -r '.aliases.sonnet' config/models.json)"`. In `.github/workflows/shipwright-pipeline.yml`, replace the triage model (`--model claude-haiku-4-5-20251001`, or `--model claude-haiku-5-5` if #8634 has merged) with `--model "$(jq -r '.aliases.haiku' config/models.json)"`. Locate each by `grep -n -- '--model claude-' <file>`, because line numbers depend on whether #8634 has merged. Both workflow steps need `actions/checkout` earlier in their job; confirm it.
+Expected: `converted`. In `scripts/sw-strategic.sh`, replace the constant on line 52 (`STRATEGIC_MODEL="claude-sonnet-5-5"` since #8634; `"claude-sonnet-5"` before it) with `STRATEGIC_MODEL="$(models_resolve sonnet)"`, and add `source "$(dirname "${BASH_SOURCE[0]}")/lib/models.sh"` above it. In `.github/workflows/review-remediation.yml`, replace `--model claude-sonnet-4-20250514` with `--model "$(jq -r '.aliases.sonnet' config/models.json)"`. In `.github/workflows/shipwright-pipeline.yml`, replace the triage model (`--model claude-haiku-4-5-20251001`, or `--model claude-haiku-5-5` if #8634 has merged) with `--model "$(jq -r '.aliases.haiku' config/models.json)"`. Locate each by `grep -n -- '--model claude-' <file>`, because line numbers depend on whether #8634 has merged. Both workflow steps need `actions/checkout` earlier in their job; confirm it.
 
 
 - [ ] **Step 8: Run the policy test.**
@@ -2595,7 +2595,7 @@ Real GitHub runs create issues, labels and comments. Live checks move to `sethdf
 | Q14 | GitHub twin | **Decided (2026-10-16): pulled forward as W2-21 (#8637).** See Q3. |
 | Q15 | #8610 (the test gate) | **Merged 2026-10-15.** W2-06 and W2-20 are unblocked. No part of this plan changes its code. |
 | Q16 | Who creates the W2-20 issue | **The maintainer, as the review asked.** The issue is #8611. |
-| D-M | Model alias conversion | **Decided (2026-10-16).** See the decision paragraph under "Decisions and spec conflicts". #8634 is open and unmerged; this plan works whether or not it merges. |
+| D-M | Model alias conversion | **Decided (2026-10-16).** See the decision paragraph under "Decisions and spec conflicts". #8634 merged on 2026-10-16; the W2-07 steps are written to work on either side of it. |
 
 ---
 
