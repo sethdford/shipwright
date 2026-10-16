@@ -354,4 +354,54 @@ DAEMON_CONFIG="$TEST_TEMP_DIR/daemon-config.json"
 assert_eq "daemon-config effort_levels outranks stage default" "medium" "$(_smart_effort build)"
 assert_eq "stage absent from config still uses default" "xhigh" "$(_smart_effort review)"
 
+# ═══════════════════════════════════════════════════════════════════════════════
+# Date helpers: BSD date, GNU date and python3 must give the same answers. The
+# assertions run natively and again under a `date` shim that execs GNU date
+# (native on Linux; gdate on macOS), like the #8613 regression test.
+# ═══════════════════════════════════════════════════════════════════════════════
+print_test_section "Date helpers (BSD date, GNU date)"
+
+_expect_rc_fail() {
+    local desc="$1"; shift
+    if "$@" >/dev/null 2>&1; then assert_fail "$desc" "expected a non-zero exit"; else assert_pass "$desc"; fi
+}
+
+_date_helper_assertions() {
+    local label="$1"
+    assert_eq "$label: date_to_epoch UTC timestamp" "1792058400" "$(date_to_epoch "2026-10-15T10:00:00Z")"
+    assert_eq "$label: date_to_epoch drops fractional seconds" "1792058400" "$(date_to_epoch "2026-10-15T10:00:00.123Z")"
+    assert_eq "$label: date_to_epoch date-only is UTC midnight" "1792022400" "$(date_to_epoch "2026-10-15")"
+    _expect_rc_fail "$label: date_to_epoch rejects free text" date_to_epoch "next tuesday"
+    _expect_rc_fail "$label: date_to_epoch rejects a local-looking string" date_to_epoch "2026-10-15 10:00:00"
+    local lstart
+    lstart=$(date_local_to_epoch "Mon Oct  5 10:00:00 2026")
+    assert_eq "$label: date_local_to_epoch round-trips through epoch_format" "Mon Oct  5 10:00:00 2026" \
+        "$(epoch_format "$lstart" '%a %b %e %H:%M:%S %Y')"
+    assert_eq "$label: epoch_to_iso" "2023-11-14T22:13:20Z" "$(epoch_to_iso 1700000000)"
+    _expect_rc_fail "$label: epoch_to_iso rejects non-integers" epoch_to_iso "abc"
+    assert_eq "$label: epoch_format -u" "2023-11-14 22" "$(epoch_format -u 1700000000 '%Y-%m-%d %H')"
+    assert_eq "$label: date_days_ago 0 is today (UTC)" "$(date -u +%Y-%m-%d)" "$(date_days_ago 0)"
+    assert_eq "$label: date_add_days across a leap-year boundary" "2026-02-28" "$(date_add_days 2026-03-01 -1)"
+    assert_eq "$label: date_add_days forward" "2026-10-22" "$(date_add_days 2026-10-15 7)"
+    _expect_rc_fail "$label: date_days_ago rejects non-integers" date_days_ago "x"
+}
+
+_date_helper_assertions "native $(_compat_date_is_gnu && echo GNU || echo BSD)"
+
+if ! _compat_date_is_gnu; then
+    if command -v gdate >/dev/null 2>&1; then
+        gnu_shim_dir="$TEST_TEMP_DIR/gnu-date-bin"
+        mkdir -p "$gnu_shim_dir"
+        printf '#!/usr/bin/env bash\nexec "%s" "$@"\n' "$(command -v gdate)" > "$gnu_shim_dir/date"
+        chmod +x "$gnu_shim_dir/date"
+        saved_path="$PATH"
+        PATH="$gnu_shim_dir:$PATH"
+        assert_eq "GNU shim is detected as GNU date" "y" "$(_compat_date_is_gnu && echo y || echo n)"
+        _date_helper_assertions "GNU date shim"
+        PATH="$saved_path"
+    else
+        echo "    (gdate not installed; the GNU date leg is skipped)"
+    fi
+fi
+
 print_test_results
