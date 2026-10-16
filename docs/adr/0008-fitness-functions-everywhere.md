@@ -85,6 +85,12 @@ allowed, a `valid` case. Rule-test YAML is in the ignore ban.
   SIGPIPE and the pipeline reports failure for a match. Write `| grep >/dev/null -<flags>` instead. A
   `-q` after `-e`/`-f`/`-m` is a pattern and is not flagged. Every site was rewritten when the rule
   landed. Workflow `run:` scripts are not covered yet (#8642).
+- Bash F11 (portable dates), error rule `F11-bash-no-bsd-date` with no baseline: `date -j` and
+  `date -r <epoch>` (a short-option cluster with `j` or `r`; direct or behind `command`, `sudo`, `env`,
+  `xargs` and similar) fail on GNU date, and their callers defaulted to 0 or "now". Only
+  `scripts/lib/compat.sh` may use them. Everything else calls `date_to_epoch`, `date_local_to_epoch`,
+  `epoch_to_iso`, `epoch_format`, `date_days_ago` or `date_add_days`. Relative forms (`date -v`,
+  `date -d "N days ago"`) are not covered by the rule.
 - Dashboard: `const B = Bun`, `Reflect.get(Bun, …)`, `globalThis.Bun.spawn`, `globalThis["Bun"]`,
   `import { $ as sh } from "bun"`, `import * as B from "bun"`, any import or `require` of `node:module`
   (and a member `createRequire`), and a computed `require`/`import` specifier.
