@@ -865,7 +865,7 @@ All scripts are bash (except the dashboard server in TypeScript). Grouped by lay
 | `scripts/sw-lib-pipeline-state-test.sh` | 309 | Unit tests for pipeline state |
 | `scripts/sw-lib-safety-gates-sites-test.sh` | 167 | automated filings use intake caps |
 | `scripts/sw-lib-safety-gates-test.sh` | 357 | bash callers of the TS safety gates |
-| `scripts/sw-lib-test-gate-env-test.sh` | 153 | the loop's test gate has no creds |
+| `scripts/sw-lib-test-gate-env-test.sh` | 176 | the loop's test gate has no creds |
 | `scripts/sw-linear-test.sh` | 300 | Validate Linear ↔ GitHub bidirectional sync |
 | `scripts/sw-logs-test.sh` | 281 | Validate agent pane log viewing, searching, |
 | `scripts/sw-loop-test.sh` | 911 | Validate continuous agent loop harness |
@@ -910,7 +910,7 @@ All scripts are bash (except the dashboard server in TypeScript). Grouped by lay
 | `scripts/sw-scope-enforcement-test.sh` | 441 | Test suite for scope enforcement |
 | `scripts/sw-security-audit-test.sh` | 162 | Security auditing tests |
 | `scripts/sw-self-optimize-test.sh` | 875 | Unit tests for learning & tuning system |
-| `scripts/sw-server-api-test.sh` | 713 | Dashboard Server API Test Suite |
+| `scripts/sw-server-api-test.sh` | 716 | Dashboard Server API Test Suite |
 | `scripts/sw-session-restart-test.sh` | 522 | Intelligent restart briefing system |
 | `scripts/sw-session-test.sh` | 597 | E2E validation of session creation flow |
 | `scripts/sw-setup-test.sh` | 262 | Validate comprehensive onboarding wizard |
