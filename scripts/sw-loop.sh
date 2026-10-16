@@ -41,6 +41,9 @@ fi
 # Required, not optional: without it the test gate would run with the pipeline's credentials (#8608).
 # shellcheck source=lib/test-gate-env.sh
 source "$SCRIPT_DIR/lib/test-gate-env.sh"
+# Differential test gate: block only on failures this iteration introduced (#8633).
+# shellcheck source=lib/test-gate-baseline.sh
+source "$SCRIPT_DIR/lib/test-gate-baseline.sh"
 # Intelligent session restart with enhanced briefings and cross-session tracking
 [[ -f "$SCRIPT_DIR/lib/session-restart.sh" ]] && source "$SCRIPT_DIR/lib/session-restart.sh"
 # Context window budget monitoring (issue #209)
@@ -1022,6 +1025,7 @@ run_test_gate() {
     local test_results="[]"
     local combined_output=""
     local test_timeout="${SW_TEST_TIMEOUT:-900}"
+    tg_begin_gate
 
     # Run primary test command
     if [[ -n "$active_test_cmd" ]]; then
@@ -1041,13 +1045,10 @@ run_test_gate() {
         sw_test_gate_env bash -c "$test_wrapper" > "$test_log" 2>&1 || exit_code=$?
         local duration=$(( $(date +%s) - start_ts ))
 
-        if command -v jq >/dev/null 2>&1; then
-            test_results=$(echo "$test_results" | jq --arg cmd "$active_test_cmd" \
-                --argjson exit "$exit_code" --argjson dur "$duration" \
-                '. + [{"command": $cmd, "exit_code": $exit, "duration_s": $dur}]')
+        if [[ "$exit_code" -ne 0 ]]; then
+            tg_judge "$active_test_cmd" "$exit_code" "$test_log" "$test_timeout" 1 || all_passed=false
         fi
-
-        [[ "$exit_code" -ne 0 ]] && all_passed=false
+        test_results=$(tg_record "$test_results" "$active_test_cmd" "$exit_code" "$duration")
         combined_output+="$(cat "$test_log" 2>/dev/null)"$'\n'
     fi
 
@@ -1064,6 +1065,11 @@ run_test_gate() {
     for extra_cmd in "${all_extra[@]+"${all_extra[@]}"}"; do
         [[ -z "$extra_cmd" ]] && continue
         local extra_log="${LOG_DIR}/tests-extra-iter-${ITERATION}.log"
+        # A test created during this loop has no counterpart on the base commit (#8633).
+        local tg_eligible=1 _mid
+        for _mid in "${mid_build_cmds[@]+"${mid_build_cmds[@]}"}"; do
+            [[ "$_mid" == "$extra_cmd" ]] && tg_eligible=0
+        done
         echo -e "  ${DIM}Running additional: ${extra_cmd}${RESET}"
 
         local extra_wrapper="$extra_cmd"
@@ -1075,16 +1081,13 @@ run_test_gate() {
 
         local start_ts exit_code=0
         start_ts=$(date +%s)
-        sw_test_gate_env bash -c "$extra_wrapper" >> "$extra_log" 2>&1 || exit_code=$?
+        sw_test_gate_env bash -c "$extra_wrapper" > "$extra_log" 2>&1 || exit_code=$?
         local duration=$(( $(date +%s) - start_ts ))
 
-        if command -v jq >/dev/null 2>&1; then
-            test_results=$(echo "$test_results" | jq --arg cmd "$extra_cmd" \
-                --argjson exit "$exit_code" --argjson dur "$duration" \
-                '. + [{"command": $cmd, "exit_code": $exit, "duration_s": $dur}]')
+        if [[ "$exit_code" -ne 0 ]]; then
+            tg_judge "$extra_cmd" "$exit_code" "$extra_log" "$test_timeout" "$tg_eligible" || all_passed=false
         fi
-
-        [[ "$exit_code" -ne 0 ]] && all_passed=false
+        test_results=$(tg_record "$test_results" "$extra_cmd" "$exit_code" "$duration")
         combined_output+="$(cat "$extra_log" 2>/dev/null)"$'\n'
     done
 
@@ -1102,7 +1105,7 @@ run_test_gate() {
     fi
 
     TEST_PASSED=$all_passed
-    TEST_OUTPUT="$(echo "$combined_output" | tail -50)"
+    TEST_OUTPUT="$(tg_verdict_text; echo "$combined_output" | tail -50)"
 }
 
 write_error_summary() {
@@ -1198,7 +1201,7 @@ run_audit_agent() {
         local cmd_count total_cmds evidence_detail
         cmd_count=$(jq 'length' "$evidence_file" 2>/dev/null || echo 0)
         total_cmds=$(jq -r '[.[].command] | join(", ")' "$evidence_file" 2>/dev/null || echo "unknown")
-        evidence_detail=$(jq -r '.[] | "- \(.command): exit \(.exit_code) (\(.duration_s)s)"' "$evidence_file" 2>/dev/null || echo "")
+        evidence_detail=$(jq -r '.[] | "- \(.command): exit \(.exit_code) (\(.duration_s)s)\(if .preexisting then " [pre-existing on the base commit, not blocking: do NOT fix]" elif (.new_failures | length) > 0 then " [NEW failures: \(.new_failures | join(", "))]" else "" end)"' "$evidence_file" 2>/dev/null || echo "")
         test_context="## Verified Test Status (from harness, not from agent)
 Test commands run: ${cmd_count} (${total_cmds})
 ${evidence_detail}

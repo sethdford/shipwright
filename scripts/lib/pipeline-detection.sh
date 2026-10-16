@@ -83,6 +83,31 @@ _detect_package_manager() {
     else echo "npm"; fi
 }
 
+# _is_redundant_test_script <body> <primary_body> — 0 when an extra package.json test script only
+# repeats work the primary already does (#8633): it lists suites instead of running them, invokes
+# only the primary's runner files, or chains two or more suites that the primary runner
+# (sw-test-all.sh, which discovers every scripts/sw-*-test.sh) already runs.
+_is_redundant_test_script() {
+    local body="$1" primary="$2" f files pfiles all_in_primary=1 suites=0 all_suites=1
+    [[ "$body" == *"--list"* ]] && return 0
+    files="$(printf '%s\n' "$body" | grep -oE '[A-Za-z0-9_./-]+\.(sh|ts|js|mjs|cjs)' | sort -u || true)"
+    [[ -z "$files" ]] && return 1
+    pfiles="$(printf '%s\n' "$primary" | grep -oE '[A-Za-z0-9_./-]+\.(sh|ts|js|mjs|cjs)' | sort -u || true)"
+    while IFS= read -r f; do
+        [[ -z "$f" ]] && continue
+        printf '%s\n' "$pfiles" | grep -Fx -- "$f" >/dev/null || all_in_primary=0
+        case "$f" in
+            scripts/sw-*-test.sh) suites=$((suites + 1)) ;;
+            *) all_suites=0 ;;
+        esac
+    done <<< "$files"
+    [[ "$all_in_primary" -eq 1 ]] && return 0
+    if [[ "$all_suites" -eq 1 && "$suites" -ge 2 && "$primary" == *"sw-test-all.sh"* ]]; then
+        return 0
+    fi
+    return 1
+}
+
 # Returns newline-separated test commands (primary + additional)
 # First line is always the primary test command from detect_test_cmd()
 detect_test_commands() {
@@ -101,10 +126,14 @@ detect_test_commands() {
             | select(.key | test("integration|e2e|system") | not)
             | .key' "$root/package.json" 2>/dev/null) || true
         if [[ -n "$extra_scripts" ]]; then
-            local pm
+            local pm primary_body
             pm=$(_detect_package_manager "$root")
+            primary_body=$(jq -r '.scripts.test // ""' "$root/package.json" 2>/dev/null || true)
             while IFS= read -r script; do
                 [[ -z "$script" ]] && continue
+                local body
+                body=$(jq -r --arg k "$script" '.scripts[$k] // ""' "$root/package.json" 2>/dev/null || true)
+                _is_redundant_test_script "$body" "$primary_body" && continue
                 echo "${pm} run ${script}"
             done <<< "$extra_scripts"
         fi

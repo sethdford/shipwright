@@ -384,6 +384,35 @@ fi
 rm -rf "$PROJECT_ROOT/dashboard"
 rm -f "$PROJECT_ROOT/package.json"
 
+# Redundant extra scripts are dropped (#8633): --list, the primary runner again, and chains
+# of suites that the primary sw-test-all.sh runner already discovers.
+cat > "$PROJECT_ROOT/package.json" <<'JSON'
+{"scripts":{"test":"bash scripts/sw-test-all.sh","test:smoke":"bash scripts/sw-e2e-smoke-test.sh","test:list":"bash scripts/sw-test-all.sh --list","test:fast":"bash scripts/sw-test-all.sh --jobs 4","test:legacy-chain":"bash scripts/sw-a-test.sh && bash scripts/sw-b-test.sh && bash scripts/sw-c-test.sh","test:ts":"bun test ./src ./tools"}}
+JSON
+result=$(detect_test_commands)
+assert_eq "sw-test-all repo: keeps primary, smoke and ts only" "npm test
+npm run test:smoke
+npm run test:ts" "$result"
+
+# A --list script is never a test run
+cat > "$PROJECT_ROOT/package.json" <<'JSON'
+{"scripts":{"test":"jest","test:suites":"jest --listTests"}}
+JSON
+result=$(detect_test_commands)
+assert_eq "script with --list is dropped" "npm test" "$result"
+
+# Without sw-test-all as primary, a chain of suites is not covered and stays
+cat > "$PROJECT_ROOT/package.json" <<'JSON'
+{"scripts":{"test":"jest","test:chain":"bash scripts/sw-a-test.sh && bash scripts/sw-b-test.sh"}}
+JSON
+result=$(detect_test_commands)
+if echo "$result" | grep >/dev/null "npm run test:chain"; then
+    assert_pass "suite chain kept when the primary is not sw-test-all"
+else
+    assert_fail "suite chain kept when the primary is not sw-test-all" "got: $result"
+fi
+rm -f "$PROJECT_ROOT/package.json"
+
 # Empty project returns nothing
 result=$(detect_test_commands)
 assert_eq "Empty project returns empty" "" "$result"
