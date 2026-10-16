@@ -93,8 +93,21 @@ assert_eq "the credential helper resolves to empty inside the gate" "" \
     "$(sw_test_gate_env git -C "$git_repo" config --get credential.helper)"
 assert_eq "git never prompts for credentials inside the gate" "0" \
     "$(sed -n 's/^GIT_TERMINAL_PROMPT=//p' <<<"$child_env")"
+# "Outside" means without a gate's overrides. This suite itself runs inside the build loop's test
+# gate in every pipeline, so drop the inherited GIT_CONFIG_* before reading (#8631).
+outside_gate() { env -u GIT_CONFIG_COUNT -u GIT_CONFIG_KEY_0 -u GIT_CONFIG_VALUE_0 -u GIT_CONFIG_KEY_1 \
+    -u GIT_CONFIG_VALUE_1 -u GIT_CONFIG_KEY_2 -u GIT_CONFIG_VALUE_2 -u SHIPWRIGHT_IN_TEST_GATE "$@"; }
 assert_eq "outside the gate the saved header is untouched" "AUTHORIZATION: basic SECRET" \
-    "$(git -C "$git_repo" config --get http.https://github.com/.extraheader)"
+    "$(outside_gate git -C "$git_repo" config --get http.https://github.com/.extraheader)"
+
+if [[ -z "${SW_GATE_ENV_TEST_NESTED:-}" ]]; then
+    print_test_section "the suite passes when run inside a test gate (as pipelines run it)"
+    rc=0
+    sw_test_gate_env env SW_GATE_ENV_TEST_NESTED=1 bash "$SCRIPT_DIR/sw-lib-test-gate-env-test.sh" \
+        > "$TEST_TEMP_DIR/nested.log" 2>&1 || rc=$?
+    assert_eq "nested run exits 0 (log: nested.log)" "0" "$rc"
+    [[ "$rc" -eq 0 ]] || tail -20 "$TEST_TEMP_DIR/nested.log" >&2
+fi
 
 print_test_section "every test-command call site goes through the gate"
 # Any line that runs a test-command variable (bash -c / eval / timeout … bash -c) must use
