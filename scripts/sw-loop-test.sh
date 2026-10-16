@@ -240,7 +240,7 @@ _flags_with() {
     bash -c '
         source "'"$SCRIPT_DIR"'/lib/compat.sh" >/dev/null 2>&1
         source "'"$SCRIPT_DIR"'/lib/loop-iteration.sh" >/dev/null 2>&1
-        MODEL=claude-opus-5; SKIP_PERMISSIONS=false; MAX_TURNS=""
+        MODEL=claude-opus-5-5; SKIP_PERMISSIONS=false; MAX_TURNS=""
         EFFORT_LEVEL=""; FALLBACK_MODEL=""
         '"$1"'
         build_claude_flags
