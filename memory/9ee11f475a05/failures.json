@@ -114,18 +114,18 @@
       "pattern": "FAIL: 0",
       "root_cause": "In sw-lib-test-gate-env-test, the assertion 'outside the gate the saved header is untouched' fails: test-gate-env.sh modifies or does not preserve the saved header when run outside a test gate. The environment may leak gate state (for example a SHIPWRIGHT_TEST_GATE variable) into the test, since CI itself runs inside a test gate.",
       "fix": "Unset the gate env vars (e.g. SHIPWRIGHT_TEST_GATE) in the failing test's 'outside the gate' case, or fix lib/test-gate-env.sh so it leaves the saved header untouched when no gate is active. Then rerun with `bash scripts/sw-test-all.sh --pattern sw-lib-test-gate-env`.",
-      "seen_count": 7,
-      "last_seen": "2026-10-15T21:32:07Z",
+      "seen_count": 14,
+      "last_seen": "2026-10-16T14:22:50Z",
       "category": "test_failure"
     },
     {
       "stage": "test",
       "pattern": "(pass) fails closed on a variable command name [0.02ms]",
-      "root_cause": "Two unrelated suites failed: sw-lib-test-gate-env-test ('outside the gate the saved header is untouched' assertion broke, likely env leakage of the test-gate marker or header mutation) and sw-server-api-test (POST endpoints return HTTP 415 Unsupported Media Type, a Content-Type/JSON body handling mismatch in the server). Neither is related to the docs-only change.",
-      "fix": "Check the SHIPWRIGHT test-gate env var is unset in the test's 'outside the gate' case, and make the server accept POSTs (pause, notifications/test) without a JSON content-type or have the test send 'Content-Type: application/json'; if both fail on main, treat as pre-existing and rerun.",
+      "root_cause": "All 170 suites passed (0 failed); the flagged '(pass) fails closed on a variable command name' line is a passing bun test output, not a failure. The pipeline was marked failed by a stale state (build stage pending, cleaned by daemon) or the 544s run exceeding a stage time limit, not by a test assertion.",
+      "fix": "Re-run the pipeline/test stage (shipwright pipeline resume); the tests pass, so check stale pipeline-state and stage timeout rather than the test code.",
       "seen_count": 2,
       "last_seen": "2026-10-15T22:28:58Z",
-      "category": "test_failure"
+      "category": "flaky"
     }
   ]
 }
