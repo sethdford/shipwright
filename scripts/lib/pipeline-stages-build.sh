@@ -1,5 +1,8 @@
 # pipeline-stages-build.sh — test_first, build, test stages
 # Source from pipeline-stages.sh. Requires all pipeline globals and dependencies.
+# Test commands run without credentials (#8608).
+# shellcheck source=lib/test-gate-env.sh
+source "$(dirname "${BASH_SOURCE[0]}")/test-gate-env.sh"
 [[ -n "${_PIPELINE_STAGES_BUILD_LOADED:-}" ]] && return 0
 _PIPELINE_STAGES_BUILD_LOADED=1
 
@@ -581,7 +584,7 @@ stage_test() {
 
     info "Running tests: ${DIM}$test_cmd${RESET}"
     local test_exit=0
-    bash -c "$test_cmd" > "$test_log" 2>&1 || test_exit=$?
+    sw_test_gate_env bash -c "$test_cmd" > "$test_log" 2>&1 || test_exit=$?
 
     if [[ "$test_exit" -eq 0 ]]; then
         success "Tests passed"

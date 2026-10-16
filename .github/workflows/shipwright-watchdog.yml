@@ -23,7 +23,7 @@ jobs:
     steps:
       # For scripts/ci/bot-comments.sh. The watchdog never dispatches: auto-retry is the only
       # retry path (ADR-0007), so this job needs no safety gates.
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           persist-credentials: false
 

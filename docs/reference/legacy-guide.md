@@ -676,7 +676,7 @@ All scripts are bash (except the dashboard server in TypeScript). Grouped by lay
 | `scripts/sw-launchd.sh` | 703 | Process supervision (macOS + Linux) |
 | `scripts/sw-linear.sh` | 643 | Linear ↔ GitHub Bidirectional Sync |
 | `scripts/sw-logs.sh` | 353 | View and search agent pane logs |
-| `scripts/sw-loop.sh` | 2713 | Continuous agent loop harness for Claude Code |
+| `scripts/sw-loop.sh` | 2716 | Continuous agent loop harness for Claude Code |
 | `scripts/sw-memory.sh` | 2241 | Persistent Learning & Context System |
 | `scripts/sw-mission-control.sh` | 473 | Terminal-based pipeline mission control |
 | `scripts/sw-model-router.sh` | 1056 | Intelligent Model Routing & Cost Optimization |
@@ -788,6 +788,7 @@ All scripts are bash (except the dashboard server in TypeScript). Grouped by lay
 | `scripts/sw-chaos-test.sh` | 384 | Fault injection & recovery validation |
 | `scripts/sw-checkpoint-test.sh` | 341 | Validate checkpoint save/restore |
 | `scripts/sw-ci-bot-comments-test.sh` | 131 | SHIPWRIGHT-* markers from the bot only |
+| `scripts/sw-ci-issue-dispatch-state-test.sh` | 64 | ready, active, handled, fails |
 | `scripts/sw-ci-pipeline-active-test.sh` | 75 | is a pipeline running for an issue |
 | `scripts/sw-ci-retry-state-test.sh` | 116 | auto-retry count and abandon marker |
 | `scripts/sw-ci-test.sh` | 198 | GitHub Actions CI/CD orchestration tests |
@@ -816,7 +817,7 @@ All scripts are bash (except the dashboard server in TypeScript). Grouped by lay
 | `scripts/sw-dod-scorecard-test.sh` | 434 | Machine-Verifiable DoD Scorecard Tests |
 | `scripts/sw-dora-test.sh` | 241 | Validate DORA metrics dashboard, DX metrics, |
 | `scripts/sw-durable-test.sh` | 221 | Validate durable workflow engine |
-| `scripts/sw-e2e-integration-test.sh` | 352 | Real Claude + Real GitHub |
+| `scripts/sw-e2e-integration-test.sh` | 366 | Real Claude + Real GitHub |
 | `scripts/sw-e2e-orchestrator-test.sh` | 157 | Test suite registry & execution |
 | `scripts/sw-e2e-smoke-test.sh` | 835 | Pipeline orchestration without API keys |
 | `scripts/sw-e2e-system-test.sh` | 497 | Proves full daemon→pipeline→loop→PR flow |
@@ -840,7 +841,7 @@ All scripts are bash (except the dashboard server in TypeScript). Grouped by lay
 | `scripts/sw-incident-test.sh` | 442 | Validate incident detection & response |
 | `scripts/sw-init-test.sh` | 654 | E2E validation of init/setup flow |
 | `scripts/sw-instrument-test.sh` | 172 | Pipeline instrumentation & feedback loops |
-| `scripts/sw-integration-claude-test.sh` | 106 | Budget-limited real Claude smoke |
+| `scripts/sw-integration-claude-test.sh` | 112 | Budget-limited real Claude smoke |
 | `scripts/sw-intelligence-test.sh` | 534 | Unit tests for intelligence core |
 | `scripts/sw-intent-analysis-test.sh` | 443 | Test suite for intent analysis module |
 | `scripts/sw-jira-test.sh` | 284 | Validate Jira ↔ GitHub bidirectional sync |
@@ -864,6 +865,7 @@ All scripts are bash (except the dashboard server in TypeScript). Grouped by lay
 | `scripts/sw-lib-pipeline-state-test.sh` | 309 | Unit tests for pipeline state |
 | `scripts/sw-lib-safety-gates-sites-test.sh` | 167 | automated filings use intake caps |
 | `scripts/sw-lib-safety-gates-test.sh` | 357 | bash callers of the TS safety gates |
+| `scripts/sw-lib-test-gate-env-test.sh` | 153 | the loop's test gate has no creds |
 | `scripts/sw-linear-test.sh` | 300 | Validate Linear ↔ GitHub bidirectional sync |
 | `scripts/sw-logs-test.sh` | 281 | Validate agent pane log viewing, searching, |
 | `scripts/sw-loop-test.sh` | 911 | Validate continuous agent loop harness |

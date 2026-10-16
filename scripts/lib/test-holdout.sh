@@ -1,5 +1,8 @@
 #!/usr/bin/env bash
 # Module guard - prevent double-sourcing
+# Test commands run without credentials (#8608).
+# shellcheck source=lib/test-gate-env.sh
+source "$(dirname "${BASH_SOURCE[0]}")/test-gate-env.sh"
 [[ -n "${_TEST_HOLDOUT_LOADED:-}" ]] && return 0
 _TEST_HOLDOUT_LOADED=1
 
@@ -321,9 +324,9 @@ holdout_validate() {
             continue
         fi
 
-        # Run the individual test (quote path to handle spaces)
+        # Run the individual test (quote path to handle spaces), without credentials
         local test_result=0
-        if eval "${test_cmd} \"${full_path}\"" >/dev/null 2>&1; then
+        if ( sw_test_gate_scrub && eval "${test_cmd} \"${full_path}\"" ) >/dev/null 2>&1; then
             pass_count=$((pass_count + 1))
         else
             test_result=$?

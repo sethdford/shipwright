@@ -1,0 +1,49 @@
+name: Shipwright dispatch pipeline
+description: >-
+  Asks for one shipwright-pipeline.yml run for an issue: posts the bot's SHIPWRIGHT-DISPATCHED
+  marker first, then runs `gh workflow run`. The caller has already passed the safety gates
+  (ADR-0007). It is the single-issue form of the writes in shipwright-dispatch.yml's loop, which
+  cannot call a composite action per issue. Keep the two in step. GITHUB_TOKEN may start a
+  workflow_dispatch run; the caller grants actions: write and issues: write. The gh write calls live
+  here in YAML, not in a bash script, because the F10 ratchet (scripts/**/*.sh) forbids new bash writes.
+inputs:
+  issue:
+    description: Issue number (positive integer).
+    required: true
+  github-token:
+    description: Token for the gh calls (pass secrets.GITHUB_TOKEN).
+    required: true
+runs:
+  using: composite
+  steps:
+    - name: Post the dispatch marker
+      shell: bash
+      env:
+        GH_TOKEN: ${{ inputs.github-token }}
+        ISSUE: ${{ inputs.issue }}
+        REPO: ${{ github.repository }}
+      run: |
+        # The marker goes first: if it cannot be posted, nothing is dispatched.
+        if ! [[ "$ISSUE" =~ ^[1-9][0-9]*$ ]]; then
+          echo "::error::dispatch-pipeline: issue must be a positive integer"
+          exit 1
+        fi
+        REQUESTED_AT=$(date -u +%Y-%m-%dT%H:%M:%SZ)
+        # printf keeps the marker at column 0, where retry-state.sh and pipeline checks read it.
+        BODY=$(printf 'Shipwright dispatch requested a pipeline run for this issue.\n\n<!-- SHIPWRIGHT-DISPATCHED: run-request %s -->' "$REQUESTED_AT")
+        if ! gh issue comment "$ISSUE" --repo "$REPO" --body "$BODY" >/dev/null; then
+          echo "::error::could not post the dispatch marker on #$ISSUE; not dispatching"
+          exit 1
+        fi
+    - name: Dispatch the pipeline
+      shell: bash
+      env:
+        GH_TOKEN: ${{ inputs.github-token }}
+        ISSUE: ${{ inputs.issue }}
+        REPO: ${{ github.repository }}
+      run: |
+        if ! gh workflow run shipwright-pipeline.yml --repo "$REPO" \
+          -f issue_number="$ISSUE" -f template=standard; then
+          echo "::error::failed to dispatch a pipeline for #$ISSUE"
+          exit 1
+        fi

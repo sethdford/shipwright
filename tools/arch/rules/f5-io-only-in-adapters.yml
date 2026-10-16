@@ -12,8 +12,9 @@ ignores:
   - "src/cli.ts"
   - "src/**/*.test.ts"
 # Module specifiers that grant I/O. Keep the three copies of this regex below in sync.
-#   bun | bun:sqlite | (node:)?fs | fs/promises | child_process | net | http | https | dns | tls
+#   bun | bun:sqlite | bun:ffi | (node:)?fs | fs/promises | child_process | net | http | https | dns | tls
 #   | dgram | http2 | worker_threads | process | os (homedir, userInfo, hostname read the machine)
+#   | vm (runs code) | module (createRequire loads any module) | cluster | readline | inspector | repl
 rule:
   any:
     # A bare global used as a value (aliasing, call arguments, computed access such as
@@ -34,6 +35,12 @@ rule:
         - has: { field: object, regex: '^(globalThis|global|window|self)$' }
         - has: { field: property, regex: '^(process|Bun|fetch|require|eval|Function|Worker|WebSocket)$' }
     - pattern: import.meta.env
+    - pattern: import.meta.require
+    # I/O reached through a computed key of a global object: window["fetch"], self["process"]
+    - all:
+        - kind: subscript_expression
+        - has: { field: object, regex: '^(globalThis|global|window|self)$' }
+        - has: { field: index, regex: '^["''`]?(process|Bun|fetch|require|eval|Function|Worker|WebSocket)["''`]?$' }
     # Module loading the rule cannot read: a computed specifier
     - all:
         - any:
@@ -77,7 +84,7 @@ rule:
             kind: arguments
             has:
               kind: string
-              regex: '^["''](bun|bun:sqlite|(node:)?(fs|fs/promises|child_process|net|http|https|dns|tls|dgram|http2|worker_threads|process|os))["'']$'
+              regex: '^["''](bun|bun:sqlite|bun:ffi|(node:)?(fs|fs/promises|child_process|net|http|https|dns|tls|dgram|http2|worker_threads|process|os|vm|module|cluster|readline|inspector|repl))["'']$'
     - all:
         - any:
             - kind: import_statement
@@ -85,11 +92,11 @@ rule:
         - has:
             field: source
             kind: string
-            regex: '^["''](bun|bun:sqlite|(node:)?(fs|fs/promises|child_process|net|http|https|dns|tls|dgram|http2|worker_threads|process|os))["'']$'
+            regex: '^["''](bun|bun:sqlite|bun:ffi|(node:)?(fs|fs/promises|child_process|net|http|https|dns|tls|dgram|http2|worker_threads|process|os|vm|module|cluster|readline|inspector|repl))["'']$'
         - not:
             regex: '^(import|export)\s+type\s'
     - kind: import_require_clause
       has:
         field: source
         kind: string
-        regex: '^["''](bun|bun:sqlite|(node:)?(fs|fs/promises|child_process|net|http|https|dns|tls|dgram|http2|worker_threads|process|os))["'']$'
+        regex: '^["''](bun|bun:sqlite|bun:ffi|(node:)?(fs|fs/promises|child_process|net|http|https|dns|tls|dgram|http2|worker_threads|process|os|vm|module|cluster|readline|inspector|repl))["'']$'

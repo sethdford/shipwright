@@ -1,5 +1,8 @@
 #!/usr/bin/env bash
 # Module guard - prevent double-sourcing
+# Test commands run without credentials (#8608).
+# shellcheck source=lib/test-gate-env.sh
+source "$(dirname "${BASH_SOURCE[0]}")/test-gate-env.sh"
 [[ -n "${_MUTATION_EXECUTOR_LOADED:-}" ]] && return 0
 _MUTATION_EXECUTOR_LOADED=1
 
@@ -229,7 +232,7 @@ mutation_execute() {
 
         # Run tests against mutant
         local test_exit=0
-        (cd "$project_root" && timeout "$MUTATION_TIMEOUT" bash -c "$test_cmd" > /dev/null 2>&1) || test_exit=$?
+        (cd "$project_root" && sw_test_gate_env timeout "$MUTATION_TIMEOUT" bash -c "$test_cmd" > /dev/null 2>&1) || test_exit=$?
 
         # Revert mutation
         cp "$backup_file" "$src_file" 2>/dev/null || true

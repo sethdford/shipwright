@@ -20,36 +20,88 @@ const baseline: Record<string, Record<string, number>> = (await baselineFile.exi
 const archScript: string = (await Bun.file(join(ROOT, "package.json")).json()).scripts.arch;
 
 /**
- * The rule set, which rules are ratcheted, and every allowlist (`ignores`). A change here widens or
- * narrows what `bun run arch` enforces, so it is reviewed by the CODEOWNERS of tools/arch (ADR-0008).
+ * The rule set, which rules are ratcheted, and every allowlist (`files` and `ignores`). A change here
+ * widens or narrows what `bun run arch` enforces, so it is reviewed by the CODEOWNERS of tools/arch
+ * (ADR-0008). `files` is pinned too: narrowing a rule's coverage must fail this test.
  */
-const PINNED: Record<string, { ratchet: boolean; ignores: string[] }> = {
+const BASH_FILES = [
+  "scripts/**/*.sh",
+  "scripts/sw",
+  ".claude/hooks/**/*.sh",
+  "claude-code/hooks/**/*.sh",
+  "completions/**/*.bash",
+  "install.sh",
+];
+const PINNED: Record<string, { ratchet: boolean; files: string[]; ignores: string[] }> = {
   "F5-io-only-in-adapters": {
     ratchet: false,
+    files: ["src/**/*.ts"],
     ignores: ["src/adapters/**", "src/testing/**", "src/main.ts", "src/cli.ts", "src/**/*.test.ts"],
   },
-  "F6-agent-sdk-only-in-adapter": { ratchet: false, ignores: ["src/adapters/agent/**"] },
-  "F8-tests-no-real-home": { ratchet: false, ignores: ["src/testing/test-env.test.ts"] },
-  "F9-agent-options-explicit": { ratchet: false, ignores: ["**/*.test.ts"] },
+  "F6-agent-sdk-only-in-adapter": {
+    ratchet: false,
+    files: ["src/**/*.ts"],
+    ignores: ["src/adapters/agent/**"],
+  },
+  "F8-tests-no-real-home": {
+    ratchet: false,
+    files: ["src/**/*.test.ts", "tools/**/*.test.ts"],
+    ignores: ["src/testing/test-env.test.ts"],
+  },
+  "F9-agent-options-explicit": {
+    ratchet: false,
+    files: [
+      "src/adapters/agent/**/*.ts",
+      "src/adapters/agent/**/*.mts",
+      "src/adapters/agent/**/*.cts",
+    ],
+    ignores: ["**/*.test.ts"],
+  },
   "F9-sdk-query-single-importer": {
     ratchet: false,
+    files: [
+      "src/**/*.ts",
+      "src/**/*.mts",
+      "src/**/*.cts",
+      "dashboard/**/*.ts",
+      "dashboard/**/*.mts",
+      "dashboard/**/*.cts",
+      "tools/**/*.ts",
+      "tools/**/*.mts",
+      "tools/**/*.cts",
+    ],
     ignores: ["src/adapters/agent/agent-sdk-runner.ts"],
   },
   "F9-sdk-query-single-importer-tsx": {
     ratchet: false,
+    files: ["src/**/*.tsx", "dashboard/**/*.tsx", "tools/**/*.tsx"],
     ignores: ["src/adapters/agent/agent-sdk-runner.ts"],
   },
   "F9-no-agent-privilege-tsx": {
     ratchet: false,
+    files: ["src/**/*.tsx", "dashboard/**/*.tsx"],
     ignores: ["**/*.test.tsx", "src/adapters/github/**", "src/adapters/agent/privilege-guard.ts"],
   },
-  "F9-agent-options-explicit-tsx": { ratchet: false, ignores: ["**/*.test.tsx"] },
+  "F9-agent-options-explicit-tsx": {
+    ratchet: false,
+    files: ["src/adapters/agent/**/*.tsx"],
+    ignores: ["**/*.test.tsx"],
+  },
   "F9-no-agent-privilege": {
     ratchet: false,
+    files: [
+      "src/**/*.ts",
+      "src/**/*.mts",
+      "src/**/*.cts",
+      "dashboard/**/*.ts",
+      "dashboard/**/*.mts",
+      "dashboard/**/*.cts",
+    ],
     ignores: ["**/*.test.ts", "src/adapters/github/**", "src/adapters/agent/privilege-guard.ts"],
   },
   "F10-github-writes-only-in-writer": {
     ratchet: false,
+    files: ["src/**/*.ts", "src/**/*.tsx", "src/**/*.mts", "src/**/*.cts"],
     ignores: [
       "src/adapters/github/gh-github-writer.ts",
       "src/adapters/github/gh-github-writer.test.ts",
@@ -57,20 +109,23 @@ const PINNED: Record<string, { ratchet: boolean; ignores: string[] }> = {
   },
   "F10-github-writes-only-in-writer-tsx": {
     ratchet: false,
+    files: ["src/**/*.tsx"],
     ignores: [
       "src/adapters/github/gh-github-writer.ts",
       "src/adapters/github/gh-github-writer.test.ts",
     ],
   },
-  "F9-bash-claude-token-scrub": { ratchet: true, ignores: [] },
-  "F9-bash-no-permission-bypass": { ratchet: true, ignores: [] },
-  "F10-bash-github-writes": { ratchet: true, ignores: [] },
-  "F11-bash-no-eval-expansion": { ratchet: true, ignores: [] },
-  "F11-bash-no-gha-expression": { ratchet: true, ignores: [] },
-  "F11-bash-no-pipe-to-shell": { ratchet: true, ignores: [] },
-  "F11-bash-no-shell-c-expansion": { ratchet: true, ignores: [] },
+  "F9-bash-claude-token-scrub": { ratchet: true, files: BASH_FILES, ignores: [] },
+  "F9-bash-no-permission-bypass": { ratchet: true, files: BASH_FILES, ignores: [] },
+  "F10-bash-github-writes": { ratchet: true, files: BASH_FILES, ignores: [] },
+  "F10-bash-curl-github-writes": { ratchet: true, files: BASH_FILES, ignores: [] },
+  "F11-bash-no-eval-expansion": { ratchet: true, files: BASH_FILES, ignores: [] },
+  "F11-bash-no-gha-expression": { ratchet: true, files: BASH_FILES, ignores: [] },
+  "F11-bash-no-pipe-to-shell": { ratchet: true, files: BASH_FILES, ignores: [] },
+  "F11-bash-no-shell-c-expansion": { ratchet: true, files: BASH_FILES, ignores: [] },
   "dashboard-subprocess-only-in-services": {
     ratchet: true,
+    files: ["dashboard/**/*.ts"],
     ignores: [
       "dashboard/**/*.test.ts",
       "dashboard/src/**",
@@ -80,14 +135,17 @@ const PINNED: Record<string, { ratchet: boolean; ignores: string[] }> = {
   },
   "dashboard-no-raw-command-runner": {
     ratchet: false,
+    files: ["dashboard/**/*.ts", "dashboard/**/*.mts", "dashboard/**/*.cts"],
     ignores: ["dashboard/services/claims.ts"],
   },
   "dashboard-no-raw-command-runner-tsx": {
     ratchet: false,
+    files: ["dashboard/**/*.tsx"],
     ignores: ["dashboard/services/claims.ts"],
   },
   "dashboard-no-shell-from-data": {
     ratchet: false,
+    files: ["dashboard/**/*.ts"],
     ignores: ["dashboard/**/*.test.ts", "dashboard/src/**"],
   },
 };
@@ -139,7 +197,8 @@ test("the rule set and the ratcheted rules are exactly the pinned ones", () => {
 describe("every fitness rule", () => {
   for (const rule of rules) {
     describe(rule.id, () => {
-      test("allowlist (ignores) matches the pinned snapshot", () => {
+      test("coverage (files) and allowlist (ignores) match the pinned snapshot", () => {
+        expect([...(rule.files ?? [])]).toEqual(PINNED[rule.id]?.files ?? ["<not pinned>"]);
         expect([...(rule.ignores ?? [])]).toEqual(PINNED[rule.id]?.ignores ?? ["<not pinned>"]);
       });
 
@@ -203,7 +262,12 @@ const ruleCovered = (): string[] =>
 test("no rule is suppressed in place (no ast-grep ignore comment in any file a rule covers)", async () => {
   const marker = ["ast", "grep", "ignore"].join("-");
   const hits: string[] = [];
-  for (const f of ruleCovered()) {
+  // Rule and rule-test files are not scanned by any rule, but ast-grep reads both: a marker in one
+  // of them would switch off a check, so they are in the ban too (ADR-0008 "Known evasions").
+  const ruleFiles = [
+    ...tracked.filter((f) => /^tools\/arch\/(rules|rule-tests|utils)\/.*\.ya?ml$/.test(f)),
+  ];
+  for (const f of [...ruleCovered(), ...ruleFiles]) {
     if ((await Bun.file(join(ROOT, f)).text()).includes(marker)) hits.push(f);
   }
   expect(hits).toEqual([]);
@@ -222,6 +286,21 @@ test("the SDK runner asserts the exact options object it passes to query (F9, AD
   const queryAt = src.indexOf("this.queryFn({ prompt, options: sdkOptions })");
   expect(assertAt).toBeGreaterThan(-1);
   expect(queryAt).toBeGreaterThan(assertAt);
+});
+
+test("the SDK runner has exactly one query call, and it is the asserted one (F9, ADR-0008)", async () => {
+  const raw = await Bun.file(join(ROOT, "src/adapters/agent/agent-sdk-runner.ts")).text();
+  const src = raw
+    .split("\n")
+    .filter((line) => !line.trim().startsWith("//"))
+    .join("\n");
+  // Every reference to the SDK function, not just call-shaped ones: `.call(…)`, `const q = this.queryFn`
+  // and `q(…)` are references too. The expected references are the import, the constructor default
+  // (`= query`), the field and its single call; any other use fails.
+  expect(src.match(/\bquery\b/g)?.length ?? 0).toBe(2);
+  expect(src.match(/\bqueryFn\b/g)?.length ?? 0).toBe(2);
+  expect(src.match(/this\.queryFn\(/g)?.length ?? 0).toBe(1);
+  expect(src.match(/assertAgentOptions\(/g)?.length ?? 0).toBe(1);
 });
 
 test("allowlisted dashboard services export no raw command runner (F12, ADR-0008)", async () => {
@@ -283,6 +362,11 @@ test("claims.ts exports exactly its validated operations (no raw runner, no alia
   expect(Object.keys(claims).sort()).toEqual(CLAIMS_EXPORTS);
 });
 
-test("bun run arch runs every checker", () => {
-  for (const step of ARCH_STEPS) expect(archScript).toContain(step);
+/**
+ * `bun run arch` is exactly the checkers, in order, joined by `&&`: a substring match let a step
+ * followed by `|| true` or `; echo` pass. Any other shell operator fails the test.
+ */
+test("bun run arch runs every checker as a hard && step, with no operator that can swallow a failure", () => {
+  expect(archScript.split(" && ")).toEqual(ARCH_STEPS);
+  expect(archScript).not.toMatch(/\|\||;|\||(?<!&)&(?!&)|\$\(|`|\n/);
 });
