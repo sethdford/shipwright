@@ -7,6 +7,7 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "$SCRIPT_DIR/lib/test-helpers.sh"
+source "$SCRIPT_DIR/lib/compat.sh"
 REPO_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
 
 # ── Custom Test Harness (not in test-helpers.sh - has skip support) ──────────
@@ -151,8 +152,7 @@ test_resume_after_utc_parsing() {
     local test_ts="2026-02-15T12:00:00Z"
     local expected_epoch
     # Parse the same way the daemon does — with TZ=UTC
-    expected_epoch=$(TZ=UTC date -j -f "%Y-%m-%dT%H:%M:%SZ" "$test_ts" +%s 2>/dev/null || \
-        date -d "$test_ts" +%s 2>/dev/null || echo 0)
+    expected_epoch=$(date_to_epoch "$test_ts" || echo 0)
     [[ "$expected_epoch" -gt 0 ]] || { echo "Failed to parse ISO timestamp"; return 1; }
     # The epoch for 2026-02-15T12:00:00Z should be 1771156800 (UTC)
     local expected_utc=1771156800

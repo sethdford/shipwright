@@ -4,6 +4,7 @@
 _DAEMON_POLL_GITHUB_LOADED=1
 # shellcheck source=safety-gates.sh
 source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/safety-gates.sh"
+source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/compat.sh"
 
 # Defaults for variables normally set by sw-daemon.sh (safe under set -u).
 DAEMON_DIR="${DAEMON_DIR:-${HOME}/.shipwright}"
@@ -47,8 +48,7 @@ daemon_poll_issues() {
         if [[ -n "$resume_after" ]]; then
             local now_epoch resume_epoch
             now_epoch=$(date +%s)
-            resume_epoch=$(TZ=UTC date -j -f "%Y-%m-%dT%H:%M:%SZ" "$resume_after" +%s 2>/dev/null || \
-                date -d "$resume_after" +%s 2>/dev/null || echo 0)
+            resume_epoch=$(date_to_epoch "$resume_after" || echo 0)
             if [[ "$resume_epoch" -gt 0 ]] && [[ "$now_epoch" -ge "$resume_epoch" ]]; then
                 rm -f "$pause_file"
                 daemon_log INFO "Auto-resuming after backoff (resume_after passed)"
