@@ -15,10 +15,24 @@ files:
   - "claude-code/hooks/**/*.sh"
   - "completions/**/*.bash"
   - "install.sh"
+# grep reached directly, by path, or through a wrapper (`command`, `sudo`, `env`, …). A `-q` that is
+# the argument of -e/-f/-m/--regexp/--file is a pattern, not the flag.
+utils:
+  quiet-flag:
+    kind: word
+    any:
+      - regex: '^-[A-Za-z0-9]*q[A-Za-z0-9]*$'
+      - regex: '^--(quiet|silent)$'
+    not:
+      follows: { kind: word, regex: '^(-e|-f|-m|--regexp|--file|--max-count)$', stopBy: neighbor }
 rule:
   kind: command
   all:
-    - has: { field: name, regex: '^[ef]?grep$' }
-    - has: { kind: word, regex: '^-[A-Za-z]*q[A-Za-z]*$' }
     - inside: { kind: pipeline, stopBy: neighbor }
     - not: { nthChild: 1 }
+    - has: { matches: quiet-flag }
+    - any:
+        - has: { field: name, regex: '(^|/)[ef]?grep$' }
+        - all:
+            - has: { field: name, regex: '(^|/)(command|builtin|sudo|env|nice|nohup|timeout|time|stdbuf)$' }
+            - has: { kind: word, regex: '(^|/)[ef]?grep$' }
