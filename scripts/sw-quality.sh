@@ -211,17 +211,17 @@ audit_quality() {
     if [[ -d "$REPO_DIR" ]]; then
         # Check for common injection patterns
         if grep -r "eval\|exec\|\`.*\$\|sql.*SELECT\|where.*1=1" "$REPO_DIR" \
-            --include="*.js" --include="*.py" --include="*.go" 2>/dev/null | head -5 | grep -q .; then
+            --include="*.js" --include="*.py" --include="*.go" 2>/dev/null | head -5 | grep >/dev/null .; then
             security_findings+=("Potential code injection pattern found")
         fi
         # Check for hardcoded credentials
         if grep -r "password\s*=\|api_key\s*=\|secret\s*=" "$REPO_DIR" \
-            --include="*.js" --include="*.py" --include="*.go" 2>/dev/null | grep -v test | head -5 | grep -q .; then
+            --include="*.js" --include="*.py" --include="*.go" 2>/dev/null | grep -v test | head -5 | grep >/dev/null .; then
             security_findings+=("Hardcoded credentials detected")
         fi
         # Check for weak authentication
         if grep -r "Authorization\|Bearer\|Basic " "$REPO_DIR" \
-            --include="*.js" --include="*.py" 2>/dev/null | grep -i "hardcoded\|placeholder" | head -5 | grep -q .; then
+            --include="*.js" --include="*.py" 2>/dev/null | grep -i "hardcoded\|placeholder" | head -5 | grep >/dev/null .; then
             security_findings+=("Weak authentication pattern found")
         fi
     fi
@@ -232,15 +232,15 @@ audit_quality() {
     if [[ -d "$REPO_DIR" ]]; then
         # Check for potential off-by-one errors
         if grep -r "length.*-1\|index.*-1\|size.*-1" "$REPO_DIR" \
-            --include="*.js" --include="*.py" --include="*.go" 2>/dev/null | head -5 | grep -q .; then
+            --include="*.js" --include="*.py" --include="*.go" 2>/dev/null | head -5 | grep >/dev/null .; then
             correctness_findings+=("Potential off-by-one index pattern")
         fi
         # Check for uninitialized variables
-        if grep -r "var.*;\|let.*;" "$REPO_DIR" --include="*.js" 2>/dev/null | grep -v "=" | head -5 | grep -q .; then
+        if grep -r "var.*;\|let.*;" "$REPO_DIR" --include="*.js" 2>/dev/null | grep -v "=" | head -5 | grep >/dev/null .; then
             correctness_findings+=("Uninitialized variable declarations detected")
         fi
         # Check for async/await without error handling
-        if grep -r "await.*\n" "$REPO_DIR" --include="*.js" 2>/dev/null | grep -v "try\|catch" | head -5 | grep -q .; then
+        if grep -r "await.*\n" "$REPO_DIR" --include="*.js" 2>/dev/null | grep -v "try\|catch" | head -5 | grep >/dev/null .; then
             correctness_findings+=("Async operations without error handling found")
         fi
     fi
@@ -256,7 +256,7 @@ audit_quality() {
             fi
         fi
         # Check for mixed abstraction levels
-        if grep -r "TODO.*FIXME\|HACK\|KLUDGE" "$REPO_DIR" --include="*.js" --include="*.py" --include="*.go" 2>/dev/null | wc -l | grep -qE "[1-9]"; then
+        if grep -r "TODO.*FIXME\|HACK\|KLUDGE" "$REPO_DIR" --include="*.js" --include="*.py" --include="*.go" 2>/dev/null | wc -l | grep >/dev/null -E "[1-9]"; then
             architecture_findings+=("Code quality markers (TODO/HACK) in implementation")
         fi
     fi

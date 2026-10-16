@@ -84,7 +84,7 @@ if [[ "$JSON_OUTPUT" == "true" ]]; then
         WINDOWS_JSON=$(tmux list-windows -a -F '#{session_name}:#{window_index}|#{window_name}|#{window_panes}|#{window_active}' 2>/dev/null | \
             while IFS='|' read -r sw wn pc act; do
                 is_claude="false"
-                echo "$wn" | grep -qi "claude" && is_claude="true"
+                echo "$wn" | grep >/dev/null -i "claude" && is_claude="true"
                 is_active="false"
                 [[ "$act" == "1" ]] && is_active="true"
                 printf '%s\n' "{\"session_window\":\"$sw\",\"name\":\"$wn\",\"panes\":$pc,\"active\":$is_active,\"claude\":$is_claude}"
@@ -288,7 +288,7 @@ while IFS= read -r line; do
     pane_count="$(echo "$line" | cut -d'|' -f3)"
     active="$(echo "$line" | cut -d'|' -f4)"
 
-    if echo "$window_name" | grep -qi "claude"; then
+    if echo "$window_name" | grep >/dev/null -i "claude"; then
         HAS_CLAUDE_WINDOWS=true
         if [[ "$active" == "1" ]]; then
             status_icon="${GREEN}●${RESET}"

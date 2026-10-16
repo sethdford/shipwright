@@ -322,7 +322,7 @@ _check_precondition() {
     local has_validation=false
     while IFS= read -r kw; do
         [[ -z "$kw" ]] && continue
-        if echo "$fn_body" | grep -qE "(if.*${kw}|assert.*${kw}|throw.*${kw}|check.*${kw}|validate.*${kw}|guard.*${kw}|${kw}.*!=.*null|${kw}.*!==.*undefined)" 2>/dev/null; then
+        if echo "$fn_body" | grep >/dev/null -E "(if.*${kw}|assert.*${kw}|throw.*${kw}|check.*${kw}|validate.*${kw}|guard.*${kw}|${kw}.*!=.*null|${kw}.*!==.*undefined)" 2>/dev/null; then
             has_validation=true
             break
         fi
@@ -339,7 +339,7 @@ _check_postcondition() {
     [[ -z "$fn_body" ]] && return 1
 
     # Check that function has a return statement
-    if echo "$fn_body" | grep -qE '(return |echo |print\(|yield )' 2>/dev/null; then
+    if echo "$fn_body" | grep >/dev/null -E '(return |echo |print\(|yield )' 2>/dev/null; then
         return 0
     fi
 
@@ -368,19 +368,19 @@ _negate_condition() {
     local cond="$1"
 
     # Simple negation patterns
-    if echo "$cond" | grep -qE '>= 0|>= zero|non-negative|not negative' 2>/dev/null; then
+    if echo "$cond" | grep >/dev/null -E '>= 0|>= zero|non-negative|not negative' 2>/dev/null; then
         local var
         var=$(echo "$cond" | grep -oE '[a-zA-Z_][a-zA-Z0-9_]*' | head -1 || true)
         [[ -n "$var" ]] && echo "${var}[[:space:]]*<[[:space:]]*0" && return 0
     fi
 
-    if echo "$cond" | grep -qE 'not null|non-null|!= null|!== null' 2>/dev/null; then
+    if echo "$cond" | grep >/dev/null -E 'not null|non-null|!= null|!== null' 2>/dev/null; then
         local var
         var=$(echo "$cond" | grep -oE '[a-zA-Z_][a-zA-Z0-9_]*' | head -1 || true)
         [[ -n "$var" ]] && echo "${var}[[:space:]]*=[[:space:]]*null" && return 0
     fi
 
-    if echo "$cond" | grep -qE 'not empty|non-empty' 2>/dev/null; then
+    if echo "$cond" | grep >/dev/null -E 'not empty|non-empty' 2>/dev/null; then
         local var
         var=$(echo "$cond" | grep -oE '[a-zA-Z_][a-zA-Z0-9_]*' | head -1 || true)
         [[ -n "$var" ]] && echo "${var}[[:space:]]*=[[:space:]]*[\"']{2}" && return 0

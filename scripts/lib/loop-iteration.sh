@@ -459,7 +459,7 @@ explore_alternative_strategy() {
 
     # If quality gates are passing but evaluators disagree, suggest focusing on evaluator alignment
     if [[ "${TEST_PASSED:-}" == "true" ]] && [[ "${QUALITY_GATE_PASSED:-}" == "true" || "${AUDIT_RESULT:-}" == "pass" ]]; then
-        if ! echo "$attempted" | grep -q "evaluator_alignment"; then
+        if ! echo "$attempted" | grep >/dev/null "evaluator_alignment"; then
             echo "evaluator_alignment" >> "$strategy_file"
             strategy="## Alternative Strategy: Evaluator Alignment
 The code appears functionally complete (tests pass). Focus on satisfying the remaining
@@ -469,8 +469,8 @@ address those exact points rather than adding new features."
     fi
 
     # If no code changes in last iteration, suggest verifying existing work
-    if echo "$last_error" | grep -qi "no code changes" || [[ "$diagnosis" == *"no code"* ]]; then
-        if ! echo "$attempted" | grep -q "verify_existing"; then
+    if echo "$last_error" | grep >/dev/null -i "no code changes" || [[ "$diagnosis" == *"no code"* ]]; then
+        if ! echo "$attempted" | grep >/dev/null "verify_existing"; then
             echo "verify_existing" >> "$strategy_file"
             strategy="## Alternative Strategy: Verify Existing Work
 Recent iterations made no code changes. The work may already be complete.
@@ -481,7 +481,7 @@ commit a verification message and declare LOOP_COMPLETE with evidence."
 
     # Generic fallback: break the problem down
     if [[ -z "$strategy" ]]; then
-        if ! echo "$attempted" | grep -q "decompose"; then
+        if ! echo "$attempted" | grep >/dev/null "decompose"; then
             echo "decompose" >> "$strategy_file"
             strategy="## Alternative Strategy: Decompose
 Break the remaining work into smaller, independent steps. Focus on one specific
@@ -694,7 +694,7 @@ extract_summary() {
     summary="$(echo "$summary" | cut -c1-120)"
 
     # Sanitize: if summary is just a CLI/API error, replace with generic text
-    if echo "$summary" | grep -qiE 'Invalid API key|authentication_error|rate_limit|API key expired|ANTHROPIC_API_KEY'; then
+    if echo "$summary" | grep >/dev/null -iE 'Invalid API key|authentication_error|rate_limit|API key expired|ANTHROPIC_API_KEY'; then
         summary="(CLI error — no useful output this iteration)"
     fi
 

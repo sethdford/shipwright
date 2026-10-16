@@ -116,7 +116,7 @@ cmd_subscribe() {
             # Fallback: tail the JSONL
             [[ ! -f "$EVENTS_FILE" ]] && touch "$EVENTS_FILE"
             tail -n 0 -f "$EVENTS_FILE" 2>/dev/null | while IFS= read -r line; do
-                if [[ -z "$filter" ]] || echo "$line" | jq -r '.type // ""' 2>/dev/null | grep -q "$filter"; then
+                if [[ -z "$filter" ]] || echo "$line" | jq -r '.type // ""' 2>/dev/null | grep >/dev/null "$filter"; then
                     echo "$line"
                 fi
             done

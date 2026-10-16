@@ -50,14 +50,14 @@ _extract_comment_categories() {
     lower_comment=$(echo "$comment" | tr '[:upper:]' '[:lower:]')
 
     # Check for each category using substring matching
-    echo "$lower_comment" | grep -qiE "(error|exception|crash|fail|panic)" && categories="$categories error_handling"
-    echo "$lower_comment" | grep -qiE "(validat|check|assert|guard|verify)" && categories="$categories validation"
-    echo "$lower_comment" | grep -qiE "(nam|identifier|variable|function|class)" && categories="$categories naming"
-    echo "$lower_comment" | grep -qiE "(test|spec|coverage|mock|fixture)" && categories="$categories testing"
-    echo "$lower_comment" | grep -qiE "(secur|auth|encript|credential|token|xss|sql)" && categories="$categories security"
-    echo "$lower_comment" | grep -qiE "(perform|optim|speed|latency|cache|memory)" && categories="$categories performance"
-    echo "$lower_comment" | grep -qiE "(type|interface|contract|signature)" && categories="$categories typing"
-    echo "$lower_comment" | grep -qiE "(doc|comment|readme|example)" && categories="$categories documentation"
+    echo "$lower_comment" | grep >/dev/null -iE "(error|exception|crash|fail|panic)" && categories="$categories error_handling"
+    echo "$lower_comment" | grep >/dev/null -iE "(validat|check|assert|guard|verify)" && categories="$categories validation"
+    echo "$lower_comment" | grep >/dev/null -iE "(nam|identifier|variable|function|class)" && categories="$categories naming"
+    echo "$lower_comment" | grep >/dev/null -iE "(test|spec|coverage|mock|fixture)" && categories="$categories testing"
+    echo "$lower_comment" | grep >/dev/null -iE "(secur|auth|encript|credential|token|xss|sql)" && categories="$categories security"
+    echo "$lower_comment" | grep >/dev/null -iE "(perform|optim|speed|latency|cache|memory)" && categories="$categories performance"
+    echo "$lower_comment" | grep >/dev/null -iE "(type|interface|contract|signature)" && categories="$categories typing"
+    echo "$lower_comment" | grep >/dev/null -iE "(doc|comment|readme|example)" && categories="$categories documentation"
 
     # If no categories detected, use generic "other"
     if [[ -z "$categories" ]]; then

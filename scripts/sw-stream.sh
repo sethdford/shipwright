@@ -137,7 +137,7 @@ capture_all_panes() {
         [[ -z "$pane_id" ]] && continue
 
         # Only claude-* windows
-        echo "$window_name" | grep -q "^claude" || continue
+        echo "$window_name" | grep >/dev/null "^claude" || continue
 
         local agent_name
         agent_name=$(get_pane_agent_name "$pane_id")

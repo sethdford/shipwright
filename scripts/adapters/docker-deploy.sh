@@ -45,6 +45,6 @@ get_smoke_cmd() {
     if [[ -f "docker-compose.yml" ]] || [[ -f "docker-compose.yaml" ]]; then
         echo "docker compose ps --format json | jq -e 'all(.State == \"running\")'"
     else
-        echo "docker inspect --format='{{.State.Running}}' \$(basename \$(pwd)) | grep -q true"
+        echo "docker inspect --format='{{.State.Running}}' \$(basename \$(pwd)) | grep >/dev/null true"
     fi
 }

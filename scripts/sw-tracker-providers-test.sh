@@ -123,24 +123,24 @@ for i in $(seq 1 $#); do
         break
     fi
 done
-if echo "$*" | grep -q "api.linear.app"; then
-    if echo "$payload" | grep -q "issue(id:" 2>/dev/null; then
+if echo "$*" | grep >/dev/null "api.linear.app"; then
+    if echo "$payload" | grep >/dev/null "issue(id:" 2>/dev/null; then
         echo '{"data":{"issue":{"id":"linear-1","title":"Linear issue","description":"Body","labels":{"nodes":[{"name":"bug"}]},"state":{"name":"Started"}}}}'
-    elif echo "$payload" | grep -q "issueCreate" 2>/dev/null; then
+    elif echo "$payload" | grep >/dev/null "issueCreate" 2>/dev/null; then
         echo '{"data":{"issueCreate":{"issue":{"id":"linear-new-123"}}}}'
     else
         echo '{"data":{"team":{"issues":{"nodes":[{"id":"linear-1","title":"Linear issue","labels":{"nodes":[{"name":"bug"}]},"state":{"name":"Started"}}]}}}}'
     fi
-elif echo "$*" | grep -q "atlassian.net\|jira"; then
-    if echo "$*" | grep -q "statuses"; then
+elif echo "$*" | grep >/dev/null "atlassian.net\|jira"; then
+    if echo "$*" | grep >/dev/null "statuses"; then
         echo '[{"statuses":[{"name":"In Progress","statusCategory":{"key":"indeterminate"}},{"name":"Done","statusCategory":{"key":"done"}}]}]'
-    elif echo "$*" | grep -q "search"; then
+    elif echo "$*" | grep >/dev/null "search"; then
         echo '{"issues":[{"key":"PROJ-1","fields":{"summary":"Jira issue","labels":[{"name":"bug"}],"status":{"name":"In Progress"}}}]}'
-    elif echo "$*" | grep -q "transitions"; then
+    elif echo "$*" | grep >/dev/null "transitions"; then
         echo '{"transitions":[{"id":"1","name":"Done"}]}'
-    elif echo "$*" | grep -q "issue/"; then
+    elif echo "$*" | grep >/dev/null "issue/"; then
         echo '{"key":"PROJ-1","fields":{"summary":"Jira issue","description":"Body","labels":[{"name":"bug"}],"status":{"name":"In Progress"}}}'
-    elif echo "$*" | grep -q "rest/api/3/issue" && ! echo "$*" | grep -q "issue/PROJ\|issue/[A-Z]"; then
+    elif echo "$*" | grep >/dev/null "rest/api/3/issue" && ! echo "$*" | grep >/dev/null "issue/PROJ\|issue/[A-Z]"; then
         echo '{"key":"PROJ-99","id":"12345"}'
     else
         echo '{"key":"PROJ-1","fields":{"summary":"Jira issue","description":"Body"}}'
@@ -374,8 +374,8 @@ EOF
     content=$(cat "$CURL_CALLS" 2>/dev/null)
     [[ -n "$content" ]] || return 1
     # ARGS line has -d and graphql URL
-    echo "$content" | grep -qF -- "-d" || return 1
-    echo "$content" | grep -q "graphql" || return 1
+    echo "$content" | grep >/dev/null -F -- "-d" || return 1
+    echo "$content" | grep >/dev/null "graphql" || return 1
 }
 
 # ═══════════════════════════════════════════════════════════════════════════════

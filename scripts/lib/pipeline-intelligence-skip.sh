@@ -145,11 +145,11 @@ pipeline_should_skip_stage() {
     # Check labels for skip signals
     case "$stage" in
         compound_quality)
-            if echo "$ISSUE_LABELS" | grep -qiE 'documentation|typo|docs'; then
+            if echo "$ISSUE_LABELS" | grep >/dev/null -iE 'documentation|typo|docs'; then
                 echo "label:documentation"
                 return 0
             fi
-            if echo "$ISSUE_LABELS" | grep -qiE 'hotfix|urgent'; then
+            if echo "$ISSUE_LABELS" | grep >/dev/null -iE 'hotfix|urgent'; then
                 echo "label:hotfix"
                 return 0
             fi
@@ -163,14 +163,14 @@ pipeline_should_skip_stage() {
             ;;
         review)
             # Documentation labels skip review
-            if echo "$ISSUE_LABELS" | grep -qiE 'docs?|documentation'; then
+            if echo "$ISSUE_LABELS" | grep >/dev/null -iE 'docs?|documentation'; then
                 echo "label"
                 return 0
             fi
             ;;
         plan)
             # Hotfix labels skip plan
-            if echo "$ISSUE_LABELS" | grep -qiE 'hotfix|p0|urgent'; then
+            if echo "$ISSUE_LABELS" | grep >/dev/null -iE 'hotfix|p0|urgent'; then
                 echo "label:hotfix"
                 return 0
             fi

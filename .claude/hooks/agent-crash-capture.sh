@@ -8,7 +8,7 @@ set -euo pipefail
 INPUT="$(cat)"
 
 # Check if this looks like an agent crash
-if echo "$INPUT" | grep -qi "panic\|segfault\|killed\|oom\|fatal\|crash"; then
+if echo "$INPUT" | grep >/dev/null -i "panic\|segfault\|killed\|oom\|fatal\|crash"; then
     TIMESTAMP="$(date +%Y%m%d_%H%M%S)"
     CRASH_DIR="${HOME}/.shipwright/crash-reports"
     mkdir -p "$CRASH_DIR"

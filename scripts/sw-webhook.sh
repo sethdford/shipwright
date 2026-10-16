@@ -429,7 +429,7 @@ cmd_test() {
     if gh api "repos/${org_repo}/hooks/tests" \
         -H "Accept: application/vnd.github+json" \
         -X POST \
-        --timeout 30 2>&1 | grep -q "Test hook sent"; then
+        --timeout 30 2>&1 | grep >/dev/null "Test hook sent"; then
         success "Test ping sent to GitHub"
     else
         warn "Could not send test via GitHub API, but payload is valid:"

@@ -51,7 +51,7 @@ rerun_already_requested() {
     local comments
     comments=$(gh pr view "$pr_number" --json comments --jq '.comments[].body' 2>/dev/null || echo "")
 
-    if echo "$comments" | grep -qF "$marker" && echo "$comments" | grep -qF "$trigger"; then
+    if echo "$comments" | grep >/dev/null -F "$marker" && echo "$comments" | grep >/dev/null -F "$trigger"; then
         return 0
     fi
     return 1

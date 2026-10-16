@@ -45,17 +45,17 @@ setup_env() {
 # Mock ssh — log call and return success
 echo "$@" >> "${MOCK_SSH_LOG:-/dev/null}"
 # If asked for uptime, return mock data
-if echo "$@" | grep -q "uptime"; then
+if echo "$@" | grep >/dev/null "uptime"; then
     echo " 10:00  up 5 days, 12:30, 2 users, load averages: 1.50 2.00 1.75"
     exit 0
 fi
 # If asked for nproc, return mock data
-if echo "$@" | grep -q "nproc\|sysctl"; then
+if echo "$@" | grep >/dev/null "nproc\|sysctl"; then
     echo "8"
     exit 0
 fi
 # If asked for free/memory, return mock data
-if echo "$@" | grep -q "free\|vm_stat\|sysctl.*memsize"; then
+if echo "$@" | grep >/dev/null "free\|vm_stat\|sysctl.*memsize"; then
     echo "34359738368"
     exit 0
 fi
@@ -191,7 +191,7 @@ test_list_machines() {
         bash "$TEST_TEMP_DIR/scripts/sw-remote.sh" list 2>/dev/null)
 
     # Should contain machine info
-    if printf '%s\n' "$output" | grep -q "builder-1" 2>/dev/null; then
+    if printf '%s\n' "$output" | grep >/dev/null "builder-1" 2>/dev/null; then
         return 0
     fi
     echo -e "    ${RED}✗${RESET} List output missing machine info"
@@ -244,7 +244,7 @@ test_remote_help() {
     local output
     output=$(bash "$TEST_TEMP_DIR/scripts/sw-remote.sh" help 2>&1) || exit_code=$?
 
-    if printf '%s\n' "$output" | grep -qi "usage\|remote\|machine" 2>/dev/null; then
+    if printf '%s\n' "$output" | grep >/dev/null -i "usage\|remote\|machine" 2>/dev/null; then
         return 0
     fi
     echo -e "    ${RED}✗${RESET} Help output missing expected content"

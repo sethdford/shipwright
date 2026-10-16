@@ -166,7 +166,7 @@ gh_retry() {
         exit_code=$?
 
         # Check for rate-limit or server error indicators
-        if echo "$output" | grep -qiE "rate limit|403|429|502|503"; then
+        if echo "$output" | grep >/dev/null -iE "rate limit|403|429|502|503"; then
             daemon_log WARN "gh_retry: rate limit / server error on attempt ${attempt}/${max_retries} — backoff ${backoff}s" >&2
         else
             daemon_log WARN "gh_retry: transient error on attempt ${attempt}/${max_retries} (exit ${exit_code}) — backoff ${backoff}s" >&2

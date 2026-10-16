@@ -313,7 +313,7 @@ spec_diff() {
     if [[ -n "$affected_files" ]]; then
         while IFS= read -r af; do
             [[ -z "$af" ]] && continue
-            if git -C "$project_dir" diff --name-only HEAD 2>/dev/null | grep -q "$af"; then
+            if git -C "$project_dir" diff --name-only HEAD 2>/dev/null | grep >/dev/null "$af"; then
                 files_modified=$((files_modified + 1))
             elif [[ -f "${project_dir}/${af}" ]]; then
                 # File exists but wasn't modified

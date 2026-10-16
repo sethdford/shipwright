@@ -134,17 +134,17 @@ echo -e "  ${CYAN}internal parse_version_bump${RESET}"
 ) > "$TEST_TEMP_DIR/version_output" 2>/dev/null
 
 version_output=$(cat "$TEST_TEMP_DIR/version_output")
-if echo "$version_output" | grep -qF "PATCH:patch"; then
+if echo "$version_output" | grep >/dev/null -F "PATCH:patch"; then
     assert_pass "parse_version_bump detects patch"
 else
     assert_fail "parse_version_bump detects patch" "got: $version_output"
 fi
-if echo "$version_output" | grep -qF "MINOR:minor"; then
+if echo "$version_output" | grep >/dev/null -F "MINOR:minor"; then
     assert_pass "parse_version_bump detects minor"
 else
     assert_fail "parse_version_bump detects minor" "got: $version_output"
 fi
-if echo "$version_output" | grep -qF "MAJOR:major"; then
+if echo "$version_output" | grep >/dev/null -F "MAJOR:major"; then
     assert_pass "parse_version_bump detects major"
 else
     assert_fail "parse_version_bump detects major" "got: $version_output"

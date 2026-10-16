@@ -258,63 +258,63 @@ trap cleanup EXIT
 test_health() {
     local resp
     resp=$(curl -sf "$BASE_URL/api/health" 2>/dev/null)
-    echo "$resp" | grep -q '"status":"ok"'
+    echo "$resp" | grep >/dev/null '"status":"ok"'
 }
 
 test_status_shape() {
     local resp
     resp=$(curl -sf "$BASE_URL/api/status" 2>/dev/null)
-    echo "$resp" | grep -q '"daemon"' &&
-    echo "$resp" | grep -q '"pipelines"' &&
-    echo "$resp" | grep -q '"agents"' &&
-    echo "$resp" | grep -q '"machines"' &&
-    echo "$resp" | grep -q '"cost"' &&
-    echo "$resp" | grep -q '"dora"'
+    echo "$resp" | grep >/dev/null '"daemon"' &&
+    echo "$resp" | grep >/dev/null '"pipelines"' &&
+    echo "$resp" | grep >/dev/null '"agents"' &&
+    echo "$resp" | grep >/dev/null '"machines"' &&
+    echo "$resp" | grep >/dev/null '"cost"' &&
+    echo "$resp" | grep >/dev/null '"dora"'
 }
 
 test_status_has_active_pipelines() {
     local resp
     resp=$(curl -sf "$BASE_URL/api/status" 2>/dev/null)
-    echo "$resp" | grep -q '"issue":142'
+    echo "$resp" | grep >/dev/null '"issue":142'
 }
 
 test_status_daemon_running() {
     local resp
     resp=$(curl -sf "$BASE_URL/api/status" 2>/dev/null)
-    echo "$resp" | grep -q '"running":true'
+    echo "$resp" | grep >/dev/null '"running":true'
 }
 
 test_status_has_agents() {
     local resp
     resp=$(curl -sf "$BASE_URL/api/status" 2>/dev/null)
-    echo "$resp" | grep -q '"heartbeat_age_s"'
+    echo "$resp" | grep >/dev/null '"heartbeat_age_s"'
 }
 
 test_status_has_cost() {
     local resp
     resp=$(curl -sf "$BASE_URL/api/status" 2>/dev/null)
-    echo "$resp" | grep -q '"today_spent"' &&
-    echo "$resp" | grep -q '"daily_budget"'
+    echo "$resp" | grep >/dev/null '"today_spent"' &&
+    echo "$resp" | grep >/dev/null '"daily_budget"'
 }
 
 test_status_has_queue() {
     local resp
     resp=$(curl -sf "$BASE_URL/api/status" 2>/dev/null)
-    echo "$resp" | grep -q '"issue":55'
+    echo "$resp" | grep >/dev/null '"issue":55'
 }
 
 test_me_endpoint() {
     local resp
     resp=$(curl -sf "$BASE_URL/api/me" 2>/dev/null)
-    echo "$resp" | grep -q '"username":"local"'
+    echo "$resp" | grep >/dev/null '"username":"local"'
 }
 
 test_metrics_history() {
     local resp
     resp=$(curl -sf "$BASE_URL/api/metrics/history" 2>/dev/null)
-    echo "$resp" | grep -q '"success_rate"' &&
-    echo "$resp" | grep -q '"stage_durations"' &&
-    echo "$resp" | grep -q '"dora_grades"'
+    echo "$resp" | grep >/dev/null '"success_rate"' &&
+    echo "$resp" | grep >/dev/null '"stage_durations"' &&
+    echo "$resp" | grep >/dev/null '"dora_grades"'
 }
 
 test_timeline() {
@@ -327,20 +327,20 @@ test_timeline() {
 test_activity() {
     local resp
     resp=$(curl -sf "$BASE_URL/api/activity" 2>/dev/null)
-    echo "$resp" | grep -q '"events"'
+    echo "$resp" | grep >/dev/null '"events"'
 }
 
 test_machines() {
     local resp
     resp=$(curl -sf "$BASE_URL/api/machines" 2>/dev/null)
-    echo "$resp" | grep -q '"localhost"' &&
-    echo "$resp" | grep -q '"dev-server-01"'
+    echo "$resp" | grep >/dev/null '"localhost"' &&
+    echo "$resp" | grep >/dev/null '"dev-server-01"'
 }
 
 test_alerts() {
     local resp
     resp=$(curl -sf "$BASE_URL/api/alerts" 2>/dev/null)
-    echo "$resp" | grep -q '"alerts"'
+    echo "$resp" | grep >/dev/null '"alerts"'
 }
 
 test_daemon_config() {
@@ -353,31 +353,31 @@ test_daemon_config() {
 test_heatmap() {
     local resp
     resp=$(curl -sf "$BASE_URL/api/metrics/failure-heatmap" 2>/dev/null)
-    echo "$resp" | grep -q '"heatmap"'
+    echo "$resp" | grep >/dev/null '"heatmap"'
 }
 
 test_bottlenecks() {
     local resp
     resp=$(curl -sf "$BASE_URL/api/metrics/bottlenecks" 2>/dev/null)
-    echo "$resp" | grep -q '"bottlenecks"'
+    echo "$resp" | grep >/dev/null '"bottlenecks"'
 }
 
 test_stage_performance() {
     local resp
     resp=$(curl -sf "$BASE_URL/api/metrics/stage-performance" 2>/dev/null)
-    echo "$resp" | grep -q '"stages"'
+    echo "$resp" | grep >/dev/null '"stages"'
 }
 
 test_predictions() {
     local resp
     resp=$(curl -sf "$BASE_URL/api/predictions/142" 2>/dev/null)
-    echo "$resp" | grep -q '"eta_s"'
+    echo "$resp" | grep >/dev/null '"eta_s"'
 }
 
 test_logs() {
     local resp
     resp=$(curl -sf "$BASE_URL/api/logs/142" 2>/dev/null)
-    echo "$resp" | grep -q '"content"'
+    echo "$resp" | grep >/dev/null '"content"'
 }
 
 # WebSocket test
@@ -399,14 +399,14 @@ ws.onmessage = (e) => {
 ws.onerror = () => process.exit(1);
 setTimeout(() => process.exit(ok ? 0 : 1), 4000);
 " 2>/dev/null)
-    echo "$result" | grep -q "WS_OK"
+    echo "$result" | grep >/dev/null "WS_OK"
 }
 
 test_index_html_loads() {
     local resp
     resp=$(curl -sf "$BASE_URL/" 2>/dev/null)
-    echo "$resp" | grep -q "Fleet Command" &&
-    echo "$resp" | grep -q 'dist/main.js'
+    echo "$resp" | grep >/dev/null "Fleet Command" &&
+    echo "$resp" | grep >/dev/null 'dist/main.js'
 }
 
 test_bundle_loads() {
@@ -420,79 +420,79 @@ test_bundle_loads() {
 test_linear_status() {
     local body
     body=$(curl -sf "$BASE_URL/api/linear/status" 2>/dev/null)
-    echo "$body" | grep -q '"' 2>/dev/null
+    echo "$body" | grep >/dev/null '"' 2>/dev/null
 }
 
 test_queue_detailed() {
     local body
     body=$(curl -sf "$BASE_URL/api/queue/detailed" 2>/dev/null)
-    echo "$body" | grep -q 'queue' 2>/dev/null
+    echo "$body" | grep >/dev/null 'queue' 2>/dev/null
 }
 
 test_memory_global() {
     local body
     body=$(curl -sf "$BASE_URL/api/memory/global" 2>/dev/null)
-    echo "$body" | grep -q 'learnings' 2>/dev/null
+    echo "$body" | grep >/dev/null 'learnings' 2>/dev/null
 }
 
 test_notification_config() {
     local body
     body=$(curl -sf "$BASE_URL/api/notifications/config" 2>/dev/null)
-    echo "$body" | grep -q 'enabled' 2>/dev/null
+    echo "$body" | grep >/dev/null 'enabled' 2>/dev/null
 }
 
 test_approval_gates() {
     local body
     body=$(curl -sf "$BASE_URL/api/approval-gates" 2>/dev/null)
-    echo "$body" | grep -q 'enabled' 2>/dev/null
+    echo "$body" | grep >/dev/null 'enabled' 2>/dev/null
 }
 
 test_quality_gates() {
     local body
     body=$(curl -sf "$BASE_URL/api/quality-gates" 2>/dev/null)
-    echo "$body" | grep -q 'rules' 2>/dev/null
+    echo "$body" | grep >/dev/null 'rules' 2>/dev/null
 }
 
 test_pipeline_diff() {
     local body
     body=$(curl -sf "$BASE_URL/api/pipeline/142/diff" 2>/dev/null)
-    echo "$body" | grep -q 'diff' 2>/dev/null
+    echo "$body" | grep >/dev/null 'diff' 2>/dev/null
 }
 
 test_pipeline_files() {
     local body
     body=$(curl -sf "$BASE_URL/api/pipeline/142/files" 2>/dev/null)
-    echo "$body" | grep -q 'files' 2>/dev/null
+    echo "$body" | grep >/dev/null 'files' 2>/dev/null
 }
 
 test_pipeline_reasoning() {
     local body
     body=$(curl -sf "$BASE_URL/api/pipeline/142/reasoning" 2>/dev/null)
-    echo "$body" | grep -q 'reasoning' 2>/dev/null
+    echo "$body" | grep >/dev/null 'reasoning' 2>/dev/null
 }
 
 test_pipeline_failures() {
     local body
     body=$(curl -sf "$BASE_URL/api/pipeline/142/failures" 2>/dev/null)
-    echo "$body" | grep -q 'failures' 2>/dev/null
+    echo "$body" | grep >/dev/null 'failures' 2>/dev/null
 }
 
 test_pipeline_quality() {
     local body
     body=$(curl -sf "$BASE_URL/api/pipeline/142/quality" 2>/dev/null)
-    echo "$body" | grep -q 'quality' 2>/dev/null
+    echo "$body" | grep >/dev/null 'quality' 2>/dev/null
 }
 
 test_audit_log() {
     local body
     body=$(curl -sf "$BASE_URL/api/audit-log" 2>/dev/null)
-    echo "$body" | grep -q 'entries' 2>/dev/null
+    echo "$body" | grep >/dev/null 'entries' 2>/dev/null
 }
 
 test_rbac() {
     local body
     body=$(curl -sf "$BASE_URL/api/rbac" 2>/dev/null)
-    echo "$body" | grep -q 'default_role' 2>/dev/null
+    echo "$body" | grep >/dev/null 'default_role' 2>/dev/null
 }
 
 test_db_health() {

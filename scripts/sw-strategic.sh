@@ -653,7 +653,7 @@ strategic_create_issue() {
     # Dedup: check if an open issue with this exact title already exists
     local existing
     existing=$(gh issue list --state open --search "$title" --json number,title --jq ".[].title" 2>/dev/null || echo "")
-    if echo "$existing" | grep -qF "$title" 2>/dev/null; then
+    if echo "$existing" | grep >/dev/null -F "$title" 2>/dev/null; then
         info "  Skipping duplicate: ${title}" >&2
         return 1
     fi

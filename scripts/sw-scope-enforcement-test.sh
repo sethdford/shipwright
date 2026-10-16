@@ -61,7 +61,7 @@ assert_contains() {
     local haystack="$2"
     local needle="$3"
 
-    if echo "$haystack" | grep -q "$needle"; then
+    if echo "$haystack" | grep >/dev/null "$needle"; then
         echo -e "${PASS_COLOR}✓${RESET_COLOR} $test_name"
         PASS=$((PASS + 1))
         return 0
@@ -155,7 +155,7 @@ EOF
 
 result=$(extract_planned_files "$plan_file")
 # Should contain both files
-if echo "$result" | grep -q "src/index.ts" && echo "$result" | grep -q "src/db.ts"; then
+if echo "$result" | grep >/dev/null "src/index.ts" && echo "$result" | grep >/dev/null "src/db.ts"; then
     echo -e "${PASS_COLOR}✓${RESET_COLOR} Extract table format files"
     PASS=$((PASS + 1))
 else
@@ -406,7 +406,7 @@ src/file2.ts
 EOF
 
 result=$(extract_planned_files "$plan_file")
-if echo "$result" | grep -q "src/file"; then
+if echo "$result" | grep >/dev/null "src/file"; then
     echo -e "${PASS_COLOR}✓${RESET_COLOR} Extracts from code blocks"
     PASS=$((PASS + 1))
 else

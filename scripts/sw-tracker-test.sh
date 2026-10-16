@@ -129,7 +129,7 @@ EOF
         bash "$TEST_TEMP_DIR/scripts/sw-tracker.sh" available 2>&1
     ) || true
 
-    if printf '%s\n' "$output" | grep -q "true" 2>/dev/null; then
+    if printf '%s\n' "$output" | grep >/dev/null "true" 2>/dev/null; then
         return 0
     fi
     echo -e "    ${RED}✗${RESET} Expected 'true' from available, got: $output"
@@ -152,7 +152,7 @@ EOF
         bash "$TEST_TEMP_DIR/scripts/sw-tracker.sh" available 2>&1
     ) || true
 
-    if printf '%s\n' "$output" | grep -q "true" 2>/dev/null; then
+    if printf '%s\n' "$output" | grep >/dev/null "true" 2>/dev/null; then
         return 0
     fi
     echo -e "    ${RED}✗${RESET} Expected 'true' from available, got: $output"

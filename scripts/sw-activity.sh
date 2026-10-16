@@ -271,7 +271,7 @@ cmd_history() {
     # Parse time range
     if [ "$range" = "all" ]; then
         cutoff_epoch=0
-    elif echo "$range" | grep -qE '^[0-9]+[smhd]$'; then
+    elif echo "$range" | grep >/dev/null -E '^[0-9]+[smhd]$'; then
         local num="${range%[smhd]}"
         local unit="${range##[0-9]}"
         local seconds=0

@@ -122,7 +122,7 @@ assert_exit_code() {
 
 assert_output_contains() {
     local pattern="$1" label="${2:-output match}"
-    if printf '%s\n' "$SESSION_OUTPUT" | grep -qiE "$pattern" 2>/dev/null; then
+    if printf '%s\n' "$SESSION_OUTPUT" | grep >/dev/null -iE "$pattern" 2>/dev/null; then
         return 0
     fi
     echo -e "    ${RED}✗${RESET} Output missing pattern: $pattern ($label)"
@@ -133,7 +133,7 @@ assert_output_contains() {
 
 assert_output_not_contains() {
     local pattern="$1" label="${2:-output exclusion}"
-    if ! printf '%s\n' "$SESSION_OUTPUT" | grep -qiE "$pattern" 2>/dev/null; then
+    if ! printf '%s\n' "$SESSION_OUTPUT" | grep >/dev/null -iE "$pattern" 2>/dev/null; then
         return 0
     fi
     echo -e "    ${RED}✗${RESET} Output unexpectedly contains: $pattern ($label)"
@@ -164,7 +164,7 @@ assert_file_contains() {
 
 assert_window_exists() {
     local window_name="$1" label="${2:-window exists}"
-    if tmux list-windows -F '#W' 2>/dev/null | grep -qx "$window_name"; then
+    if tmux list-windows -F '#W' 2>/dev/null | grep >/dev/null -x "$window_name"; then
         return 0
     fi
     echo -e "    ${RED}✗${RESET} tmux window not found: $window_name ($label)"
@@ -173,7 +173,7 @@ assert_window_exists() {
 
 assert_window_not_exists() {
     local window_name="$1" label="${2:-window absent}"
-    if ! tmux list-windows -F '#W' 2>/dev/null | grep -qx "$window_name"; then
+    if ! tmux list-windows -F '#W' 2>/dev/null | grep >/dev/null -x "$window_name"; then
         return 0
     fi
     echo -e "    ${RED}✗${RESET} tmux window should not exist: $window_name ($label)"

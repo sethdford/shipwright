@@ -268,7 +268,7 @@ inject_discoveries() {
 
         # Skip if already seen
         if [[ -f "$seen_file" ]]; then
-            if jq -e ".seen | contains([${ts_epoch}])" "$seen_file" 2>/dev/null | grep -q "true"; then
+            if jq -e ".seen | contains([${ts_epoch}])" "$seen_file" 2>/dev/null | grep >/dev/null "true"; then
                 continue
             fi
         fi

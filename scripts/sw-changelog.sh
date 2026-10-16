@@ -165,7 +165,7 @@ parse_commits() {
                 ;;
             *)
                 # Treat as feature if breaking indicator present
-                if echo "$subject" | grep -qi "breaking"; then
+                if echo "$subject" | grep >/dev/null -i "breaking"; then
                     breaking_changes="${breaking_changes}${msg}
 "
                 else

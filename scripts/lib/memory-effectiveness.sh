@@ -375,7 +375,7 @@ memeff_proactive_score() {
         error_desc=$(echo "$line" | jq -r '.error_description // ""' 2>/dev/null)
 
         # Check if error_signature appears in outcomes
-        if echo "$error_desc" | grep -iqF "$error_signature" 2>/dev/null; then
+        if echo "$error_desc" | grep >/dev/null -iF "$error_signature" 2>/dev/null; then
             total_matches=$((total_matches + 1))
 
             # Count how many were successfully prevented

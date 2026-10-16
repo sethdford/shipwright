@@ -200,17 +200,17 @@ echo -e "  ${CYAN}internal stage_guidance${RESET}"
 ) > "$TEST_TEMP_DIR/guidance_output" 2>/dev/null
 guidance_result=$(cat "$TEST_TEMP_DIR/guidance_output")
 
-if echo "$guidance_result" | grep -qF "Plan Stage Guidance"; then
+if echo "$guidance_result" | grep >/dev/null -F "Plan Stage Guidance"; then
     assert_pass "stage_guidance returns plan guidance"
 else
     assert_fail "stage_guidance returns plan guidance"
 fi
-if echo "$guidance_result" | grep -qF "Build Stage Guidance"; then
+if echo "$guidance_result" | grep >/dev/null -F "Build Stage Guidance"; then
     assert_pass "stage_guidance returns build guidance"
 else
     assert_fail "stage_guidance returns build guidance"
 fi
-if echo "$guidance_result" | grep -qF "No specific guidance"; then
+if echo "$guidance_result" | grep >/dev/null -F "No specific guidance"; then
     assert_pass "stage_guidance handles unknown stage"
 else
     assert_fail "stage_guidance handles unknown stage"

@@ -161,7 +161,7 @@ cmd_up() {
 
     # Validate role
     local valid_roles="builder reviewer tester security-auditor architect docs-writer optimizer devops pm incident-responder"
-    if ! echo "$valid_roles" | grep -q "$role"; then
+    if ! echo "$valid_roles" | grep >/dev/null "$role"; then
         error "Invalid role: $role. Valid roles: $valid_roles"
         return 1
     fi
@@ -283,7 +283,7 @@ cmd_down() {
         [[ -z "$session" ]] && continue
 
         # Filter by role if specified
-        if [[ -n "$role" ]] && ! echo "$session" | grep -q "$role"; then
+        if [[ -n "$role" ]] && ! echo "$session" | grep >/dev/null "$role"; then
             continue
         fi
 
