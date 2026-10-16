@@ -113,7 +113,7 @@ Shipwright orchestrates autonomous Claude Code agent teams with delivery pipelin
 | `shipwright remote add <name> --host <h>` | Register a remote worker machine                |
 | `shipwright remote status`                | Health check all remote machines                |
 | `shipwright connect start`                | Sync local state to team dashboard              |
-| `shipwright connect join --token <t>`     | Join a team using an invite token               |
+| `shipwright connect join [--url <url>]`   | Join a team (token prompted, or `--token-file`) |
 | `shipwright connect status`               | Show connection status                          |
 | `shipwright dashboard`                    | Real-time web dashboard                         |
 | `shipwright dashboard start`              | Start dashboard in background                   |

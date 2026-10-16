@@ -52,7 +52,8 @@ all stop dispatch. `--no-github` checks only the local flag, is refused on GitHu
   `tools/arch/workflow-fail-closed.ts` forbids swallowing their errors.
 - **Dashboard and fleet:** exposure model, fleet token, Origin/Host/CORS allowlists, JSON-only writes,
   OAuth state, single-use join tokens: [dashboard-exposure.md](../dashboard-exposure.md).
-  `fleet_curl` sends the token to curl on stdin, never in argv.
+  `fleet_curl` sends the token to curl on stdin, never in argv. Join and invite tokens are sent in
+  headers only, never in URL paths: [join and invite tokens](../dashboard-exposure.md#join-and-invite-tokens).
 
 ## Consequences
 - Dispatch, watchdog, auto-retry and sweep can be re-enabled behind one tested gate (runbook). Each
@@ -74,7 +75,6 @@ all stop dispatch. `--no-github` checks only the local flag, is refused on GitHu
   history (`GhRunHistory` lists `shipwright-pipeline.yml` only), so refused labels cannot re-open or
   trip the breaker or open an incident. Relabels after a run are refused with a notice, not dispatched. Manual `workflow_dispatch` stays ungated by design (operator
   action), bounded by the operator.
-- Gaps (tracked in the Wave 1a plan's follow-ups): team invite tokens travel in the URL path; the budget
-  is not enforced on CI (no cost data); org-mode `.final_failed` entries written before the
-  `owner/repo:number` key keep the bare number and block that number in every repo until cleared. A
-  title fingerprint misses paraphrased duplicates.
+- Gaps (tracked in the Wave 1a plan's follow-ups): the budget is not enforced on CI (no cost data);
+  org-mode `.final_failed` entries written before the `owner/repo:number` key keep the bare number and
+  block that number in every repo until cleared. A title fingerprint misses paraphrased duplicates.

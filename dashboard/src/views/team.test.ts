@@ -14,7 +14,12 @@ vi.mock("../core/api", () => ({
   fetchTeamActivity: vi.fn().mockResolvedValue([]),
   createTeamInvite: vi
     .fn()
-    .mockResolvedValue({ url: "https://invite.example.com/abc" }),
+    .mockResolvedValue({
+      token: "abc",
+      join_url: "https://invite.example.com",
+      command: "shipwright connect join --url https://invite.example.com",
+      expires_at: "2026-10-16T00:00:00.000Z",
+    }),
   fetchLinearStatus: vi.fn().mockResolvedValue({ connected: false }),
   fetchDbHealth: vi.fn().mockResolvedValue({ ok: true }),
   fetchDbEvents: vi.fn().mockResolvedValue([]),
