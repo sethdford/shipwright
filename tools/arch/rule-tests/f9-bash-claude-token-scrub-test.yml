@@ -15,6 +15,10 @@ valid:
   - 'grep -q claude "$log"'
   - 'chmod +x /usr/local/bin/claude'
   - '[ -x "$CLAUDE_BIN" ]'
+  - "bash -c '\"$SW_AGENT_EXEC\" claude -p x'"
+  - 'cmd=("$SW_AGENT_EXEC" claude -p "$p")'
+  - 'timeout 5 "$SW_AGENT_EXEC" claude -p "$p"'
+  - '"$SW_AGENT_EXEC" claude -p "$SW_AGENT_EXEC" claude'
 invalid:
   - 'claude -p "$prompt" --model "$m"'
   - 'out=$(claude --print "$p" 2>&1)'
@@ -34,3 +38,15 @@ invalid:
   - 'claude -p "$p" GH_TOKEN GITHUB_TOKEN'
   - 'time claude -p "$p"'
   - 'x=$(time claude -p "$p")'
+  - '$(command -v claude) -p "$p"'
+  - '$CLAUDE -p "$p"'
+  - '$claude_bin -p "$p"'
+  - "bash -c 'claude -p \"$p\"'"
+  - 'sh -c "claude -p $p"'
+  - "eval 'claude -p x'"
+  - '\claude -p "$p"'
+  - 'cmd=(claude -p "$p")'
+  - 'cmd=("$CLAUDE_BIN" -p "$p")'
+  - 'timeout 5 claude -p "$SW_AGENT_EXEC" claude'
+  - 'x=$(claude -p "$SW_AGENT_EXEC")'
+  - 'timeout 5 "$CLAUDE_BIN" -p "$p"'

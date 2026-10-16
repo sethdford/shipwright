@@ -1,11 +1,15 @@
 # F9 for bash (error, ADR-0008): a claude process inherits the caller's environment, including GH_TOKEN. Every invocation
 # must unset the GitHub tokens in the same command, and the unset must come before the claude word (`claude -p x GH_TOKEN`
-# scrubs nothing), or the invocation must run through "$SW_AGENT_EXEC" (scripts/lib/agent-exec.sh), which scrubs them.
-# An invocation is claude by name (bare, quoted, or behind an absolute path), by a CLAUDE_BIN/CLAUDE_CMD-style variable
-# name, or as any other word of a command (a wrapper such as timeout, gtimeout, env, nohup, command, $TIMEOUT_CMD, or an
-# unknown runner such as "$OTHER_EXEC"). Not invocations: the query and logging builtins and helpers (type, which, hash,
-# echo, printf, info, warn, error, success, log, debug, emit_event), grep, chmod, test, jq arguments (`jq --argjson claude`),
-# `command -v|-V claude`, and any command whose word before claude is "$SW_AGENT_EXEC". `command claude` is an invocation.
+# scrubs nothing), or the invocation must run through "$SW_AGENT_EXEC" (scripts/lib/agent-exec.sh), which builds the agent's
+# environment from an allowlist. An invocation is: claude by name (bare, quoted, \claude, or behind an absolute path); a
+# variable named like claude ($CLAUDE, $CLAUDE_BIN, $claude_bin); $(command -v claude) as a name; claude as any argument of a
+# command (a wrapper such as timeout, gtimeout, env, nohup, command, $TIMEOUT_CMD, or an unknown runner such as "$OTHER_EXEC");
+# claude or a claude-named variable inside a bash -c / sh -c / eval string; claude as an element of an array (cmd=(claude …)).
+# Exempt: the query and logging builtins and helpers (type, which, hash, echo, printf, info, warn, error, success, log, debug,
+# emit_event), grep, chmod, test, jq arguments (`jq --argjson claude`), `command -v|-V claude` (`command claude` is an
+# invocation), and a claude word whose immediately preceding word is "$SW_AGENT_EXEC" (any command whose name is
+# "$SW_AGENT_EXEC" runs everything after it through the allowlist). `timeout 5 claude -p "$SW_AGENT_EXEC" claude` is invalid:
+# the first claude is not preceded by "$SW_AGENT_EXEC".
 id: F9-bash-claude-token-scrub
 language: Bash
 severity: error
@@ -19,31 +23,56 @@ files:
   - "completions/**/*.bash"
   - "install.sh"
 rule:
-  kind: command
   all:
     - any:
-        - has: { field: name, regex: '^["'']?(.*/)?claude["'']?$' }
-        - has: { field: name, regex: '^"?\$\{?[A-Za-z_]*CLAUDE_?(BIN|BINARY|CMD|CLI|PATH|EXE)\}?"?$' }
-        - all:
-            - any:
-                - has: { kind: word, regex: '^["'']?(.*/)?claude["'']?$' }
-                - has: { regex: '^"?\$\{?[A-Za-z_]*CLAUDE_?(BIN|BINARY|CMD|CLI|PATH|EXE)\}?"?$' }
-            - not:
-                has:
-                  field: name
-                  regex: '^(type|which|hash|echo|printf|info|warn|error|success|log|debug|emit_event|jq|grep|chmod|test|\[)$'
-            - not:
-                all:
-                  - has: { field: name, regex: '^command$' }
-                  - has: { kind: word, regex: '^-[vV]$' }
-            - not:
-                has:
-                  field: name
-                  regex: '^"?\$\{?SW_AGENT_EXEC\}?"?$'
-            - not:
-                has:
-                  regex: '^"?\$\{?SW_AGENT_EXEC\}?"?$'
-                  precedes: { stopBy: end, regex: '^["'']?(.*/)?claude["'']?$' }
+        - kind: command
+          any:
+            - has: { field: name, regex: '^[\\"'']*(.*/)?claude["'']?$' }
+            - has: { field: name, regex: '^"?\$\{?((?i:claude)|[A-Za-z_]*(?i:claude)_?(?i:bin|binary|cmd|cli|path|exe))\}?"?$' }
+            - has: { field: name, regex: '^"?\$\(\s*(command\s+-[vV]\s+|which\s+|type\s+(-p\s+)?)?["'']?(.*/)?claude["'']?\s*\)"?$' }
+            - all:
+                - any:
+                    - has:
+                        kind: word
+                        regex: '^[\\"'']*(.*/)?claude["'']?$'
+                        not: { follows: { regex: '^"?\$\{?SW_AGENT_EXEC\}?"?$', stopBy: neighbor } }
+                    - has:
+                        regex: '^"?\$\{?((?i:claude)|[A-Za-z_]*(?i:claude)_?(?i:bin|binary|cmd|cli|path|exe))\}?"?$'
+                        not: { follows: { regex: '^"?\$\{?SW_AGENT_EXEC\}?"?$', stopBy: neighbor } }
+                - not:
+                    has:
+                      field: name
+                      regex: '^(type|which|hash|echo|printf|info|warn|error|success|log|debug|emit_event|jq|grep|chmod|test|\[)$'
+                - not:
+                    has:
+                      field: name
+                      regex: '^"?\$\{?SW_AGENT_EXEC\}?"?$'
+                - not:
+                    all:
+                      - has: { field: name, regex: '^command$' }
+                      - has: { kind: word, regex: '^-[vV]$' }
+            - all:
+                - has: { field: name, regex: '^(bash|sh|zsh|dash|ksh|eval)$' }
+                - any:
+                    - has:
+                        kind: string
+                        regex: '(^|[^A-Za-z0-9_./$-])\\?claude([^A-Za-z0-9_./-]|$)'
+                        not: { regex: 'SW_AGENT_EXEC' }
+                        stopBy: end
+                    - has:
+                        kind: raw_string
+                        regex: '(^|[^A-Za-z0-9_./$-])\\?claude([^A-Za-z0-9_./-]|$)'
+                        not: { regex: 'SW_AGENT_EXEC' }
+                        stopBy: end
+        - kind: array
+          any:
+            - has:
+                kind: word
+                regex: '^[\\"'']*(.*/)?claude["'']?$'
+                not: { follows: { regex: '^"?\$\{?SW_AGENT_EXEC\}?"?$', stopBy: neighbor } }
+            - has:
+                regex: '^"?\$\{?((?i:claude)|[A-Za-z_]*(?i:claude)_?(?i:bin|binary|cmd|cli|path|exe))\}?"?$'
+                not: { follows: { regex: '^"?\$\{?SW_AGENT_EXEC\}?"?$', stopBy: neighbor } }
     - not:
         all:
           - has:
