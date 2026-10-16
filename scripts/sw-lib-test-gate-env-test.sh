@@ -17,6 +17,9 @@ setup_test_env "lib-test-gate-env"
 trap cleanup_test_env EXIT
 
 source "$SCRIPT_DIR/lib/test-gate-env.sh"
+# GIT_CONFIG_* this suite inherited (set when it runs inside a pipeline's test gate). Taken before
+# any gate call, so a gate that leaked its overrides into the caller is caught below (#8631).
+inherited_git_cfg="$(env | grep '^GIT_CONFIG_' | sort || true)"
 
 export GH_TOKEN="gh-secret" GITHUB_TOKEN="github-secret" GH_ENTERPRISE_TOKEN="ghe-secret"
 export CLAUDE_CODE_OAUTH_TOKEN="claude-secret" ANTHROPIC_API_KEY="anthropic-secret"
@@ -93,8 +96,28 @@ assert_eq "the credential helper resolves to empty inside the gate" "" \
     "$(sw_test_gate_env git -C "$git_repo" config --get credential.helper)"
 assert_eq "git never prompts for credentials inside the gate" "0" \
     "$(sed -n 's/^GIT_TERMINAL_PROMPT=//p' <<<"$child_env")"
+# "Outside" means the caller's own shell, minus only the overrides this suite inherited from an outer
+# gate (every pipeline runs it inside one). Anything a gate call leaked into this shell stays and fails.
+outside_gate() {
+    local unset_args=() name
+    while IFS='=' read -r name _; do
+        [[ -n "$name" ]] && unset_args+=(-u "$name")
+    done <<<"$inherited_git_cfg"
+    env ${unset_args[@]+"${unset_args[@]}"} "$@"
+}
+assert_eq "the gate leaves the caller's GIT_CONFIG_* unchanged" "$inherited_git_cfg" \
+    "$(env | grep '^GIT_CONFIG_' | sort || true)"
 assert_eq "outside the gate the saved header is untouched" "AUTHORIZATION: basic SECRET" \
-    "$(git -C "$git_repo" config --get http.https://github.com/.extraheader)"
+    "$(outside_gate git -C "$git_repo" config --get http.https://github.com/.extraheader)"
+
+if [[ -z "${SW_GATE_ENV_TEST_NESTED:-}" ]]; then
+    print_test_section "the suite passes when run inside a test gate (as pipelines run it)"
+    rc=0
+    sw_test_gate_env env SW_GATE_ENV_TEST_NESTED=1 bash "$SCRIPT_DIR/sw-lib-test-gate-env-test.sh" \
+        > "$TEST_TEMP_DIR/nested.log" 2>&1 || rc=$?
+    assert_eq "nested run exits 0 (log: nested.log)" "0" "$rc"
+    [[ "$rc" -eq 0 ]] || tail -20 "$TEST_TEMP_DIR/nested.log" >&2
+fi
 
 print_test_section "every test-command call site goes through the gate"
 # Any line that runs a test-command variable (bash -c / eval / timeout … bash -c) must use
