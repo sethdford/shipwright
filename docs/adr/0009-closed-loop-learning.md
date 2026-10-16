@@ -104,6 +104,18 @@ fine-tuning, and any claim from an unverified source.
 **Spec amendments.** Most of this is already in the spec. The only item that needs a change is the timing of the
 gated optimizer (§7.4), which this ADR keeps in Wave 4 and defers. No change to §2 is needed for Tranches 1 to 3.
 
+### Maintainer decisions (2026-10-16)
+- **Sandbox (Q3):** live end-to-end and eval runs move to a private sandbox repo (`sethdford/shipwright-sandbox`);
+  deterministic replays run offline against the GitHub digital twin, pulled forward from the deferred list.
+- **Holdout (Q13):** cases are mined from merged PRs with linked issues and tests, an LLM drafts acceptance
+  scenarios, and the maintainer approves them by PR into a separate private repo (`sethdford/shipwright-holdout`)
+  that only the eval and verifier jobs can read. Agents have no GitHub credentials, and this repository's
+  `GITHUB_TOKEN` cannot read another private repository.
+- **Eval spend (Q4):** paired, change-triggered replays on a stratified subset for policy-changing PRs, a weekly full
+  replay, hard runtime caps of $25 per run and $100 per week, sequential early stopping once the sign test is
+  decided, prompt caching, and `claude-haiku-5-5` for grading. No fixed nightly schedule.
+- **Models (D-M):** every pinned model is in the Claude 5.5 family (#8634); routing becomes deterministic in W2-07.
+
 ## Consequences
 - Each routing, policy and model change has a measurable answer, once the corpus and the replay exist. Until then
   the ratchet is advisory and cannot block a merge.

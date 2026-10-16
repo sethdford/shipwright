@@ -2410,7 +2410,7 @@ Memory injection and the outcome-feedback learned rules are **ablated, not retir
 ### W2-17: holdout MVP
 
 - Holdout scenarios are kept in a private store, fetched only by eval and verifier jobs, and never placed in this repository.
-- Scenarios are human-written. **W2-17 is blocked on Q13**; the default is the maintainer.
+- Scenarios are mined from repository history (merged PRs with linked issues and tests), drafted by an LLM and approved by the maintainer by PR into `sethdford/shipwright-holdout` (Q13, decided).
 - Score: the fraction of each issue's scenarios satisfied, averaged over the runs. This is reported next to pass^3 and is not a gate until the judge is calibrated against human labels.
 - `scripts/lib/test-holdout.sh` already exists. Reuse it or retire it here; the decision is made when W2-17 starts.
 
@@ -2436,7 +2436,7 @@ Memory injection and the outcome-feedback learned rules are **ablated, not retir
 
 ## Verification on GitHub
 
-Real GitHub runs create issues, labels and comments. Until the sandbox question (Q3) is answered, every end-to-end check runs on **this** repository, on an issue labelled `e2e-test`, and is a manual run.
+Real GitHub runs create issues, labels and comments. Live checks move to `sethdford/shipwright-sandbox` once it is wired (W2-22, Q3 decided); deterministic replays use the GitHub twin (W2-21). Until then, end-to-end checks run on **this** repository, on an issue labelled `e2e-test`, as manual runs.
 
 | Tranche | Check | Expected observable |
 |---|---|---|
@@ -2457,8 +2457,8 @@ Real GitHub runs create issues, labels and comments. Until the sandbox question 
 |---|---|---|
 | Q1 | Spec amendments | **Resolved narrowly.** The only new item is the E5 timing, which stays in Wave 4 as the spec says, and E5 is now deferred. §2 needs no change for Tranches 1 to 3. |
 | Q2 | Run Tranches 1 to 2 on SQLite (M1) before Postgres? | **Yes.** M2 and M3 share the ledger only once Postgres exists. |
-| Q3 | Disposable sandbox repository | **Default: none.** W2-09 uses a manual run on this repository with an `e2e-test` issue until a sandbox is approved. |
-| Q4 | Eval spend cap | **Default: $0.** No nightly replays run until a cap is approved. |
+| Q3 | Disposable sandbox repository | **Decided (2026-10-16): yes.** A dedicated private sandbox repo, `sethdford/shipwright-sandbox`, hosts live end-to-end and eval runs, so real runs never create issues, labels or PRs in this repository. Deterministic replays run offline against the GitHub digital twin (W2-19 H4, pulled forward as W2-21). Until the sandbox is wired (W2-22), checks run on this repo with an `e2e-test` issue. |
+| Q4 | Eval spend cap | **Decided (2026-10-16): paired, budget-capped, change-triggered.** Policy-changing PRs (routing, models, templates, prompts, skills) get a paired incumbent-vs-candidate replay on a stratified subset; a full replay runs weekly. Hard caps: $25 per run, $100 per week, enforced at runtime by the W2-12 budget, never by model self-estimates. Sequential early stopping ends a run once the sign-test outcome is decided. Prompt caching on; grading with `claude-haiku-5-5`. No fixed nightly schedule. |
 | Q5 | Incident logs as fixtures | **Read-only fetch, as approved.** Run 38744601038 is still in progress; W2-01 Step 1 captures it after it completes. |
 | Q6 | CI cost source | **Verify on the first sandbox run; zod; fail closed.** The usage fields are not assumed. |
 | Q7 | Triage model | **Yes, through `config/models.json` in W2-07.** |
@@ -2467,11 +2467,11 @@ Real GitHub runs create issues, labels and comments. Until the sandbox question 
 | Q10 | Where `outcome-feedback.sh` output is read | **Part of W2-16 (G6).** |
 | Q11 | The review-benchmark citation | **Resolved.** CRBugBench is confirmed, with the two corrections in E2. |
 | Q12 | Full H2 fence | **Deferred (W2-19).** |
-| Q13 | Who writes holdout scenarios | **Default: the maintainer. W2-17 is blocked on this.** |
+| Q13 | Who writes holdout scenarios | **Decided (2026-10-16): mined from history, LLM-drafted, maintainer-approved.** Cases come from merged PRs with linked issues and tests (SWE-bench / CRBugBench-style mining); an LLM drafts each case's acceptance scenarios; the maintainer approves them by PR into a separate private repo, `sethdford/shipwright-holdout`, readable only by the eval and verifier jobs through a dedicated read-only token. Agents cannot read it: they have no GitHub credentials (#8624), and this repo's `GITHUB_TOKEN` cannot read another private repo. W2-17 is unblocked. |
 | Q14 | GitHub twin | **Deferred (W2-19).** |
 | Q15 | #8610 (the test gate) | **Blocking for W2-06 and W2-20.** #8610 is open. The maintainer merges it; no part of this plan changes its code. |
 | Q16 | Who creates the W2-20 issue | **The maintainer**, as stated in the review. The key is W2-20. |
-| D-M | Model alias conversion (`claude-opus-5` to `opus`, which is the 5.5 model) | **Default: convert.** It changes the model for runs that use those templates. Confirm before W2-07 merges. |
+| D-M | Model alias conversion | **Decided (2026-10-16): Claude 5.5 everywhere.** Pinned IDs moved to `claude-opus-5-5` / `claude-sonnet-5-5` / `claude-haiku-5-5` in #8634; W2-07 finishes deterministic routing from one models file. |
 
 ---
 
