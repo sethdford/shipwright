@@ -41,3 +41,7 @@
 {"ts":"2026-10-16T14:32:50Z","ts_epoch":1792161170,"type":"session.progress_enhanced","progress_file":"/tmp/sw-session-restart-test.1nyJJN/project/.claude/loop-logs/progress.md","iteration":2}
 {"ts":"2026-10-16T14:32:50Z","ts_epoch":1792161170,"type":"session.restart_capture","state_file":"/tmp/sw-session-restart-test.YdpZr7/project/.claude/artifacts/restart-state.json","iteration":3,"restart":1}
 {"ts":"2026-10-16T14:32:50Z","ts_epoch":1792161170,"type":"session.briefing_generated","briefing_file":"/tmp/sw-session-restart-test.4hst45/project/.claude/artifacts/restart-briefing.md","iteration":0}
+{"ts":"2026-10-16T16:05:48Z","ts_epoch":1792166748,"type":"hygiene_platform_refactor","hardcoded":49,"fallback":75,"todo":51}
+{"ts":"2026-10-16T16:06:39Z","ts_epoch":1792166799,"type":"strategic.issue_refused","title":"Loop blast-radius guard: abort and revert when a task's diff deletes far more than its scope implies"}
+{"ts":"2026-10-16T16:06:42Z","ts_epoch":1792166802,"type":"strategic.issue_refused","title":"Run-failure triage report: classify the last N failed pipelines by cause and recommend the next fix"}
+{"ts":"2026-10-16T16:06:42Z","ts_epoch":1792166802,"type":"strategic.cycle_complete","issues_created":0,"issues_skipped":3}
