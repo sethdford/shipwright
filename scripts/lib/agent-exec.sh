@@ -1,12 +1,22 @@
 #!/usr/bin/env bash
 # lib/agent-exec.sh — run an agent CLI (claude) without GitHub credentials (#8614, #8580, F9).
 #
-# An agent runs tools in the working tree with the pipeline's environment. A GitHub token there
-# would let it write to GitHub directly, and GitHub writes belong to the pipeline. So the agent gets
-# none: GH_TOKEN, GITHUB_TOKEN, GH_ENTERPRISE_TOKEN, GITHUB_ENTERPRISE_TOKEN and the fleet token are
-# removed, gh is pointed at a missing config dir, and git's saved credentials are reset (globally
-# and per configured remote URL, as the test gate does). The Claude login (CLAUDE_CODE_OAUTH_TOKEN,
-# ANTHROPIC_API_KEY) is kept, because the agent needs it. The test gate's own marker is not set.
+# An agent runs tools in the working tree. A GitHub token there would let it write to GitHub
+# directly, and GitHub writes belong to the pipeline. So the agent gets an environment built from an
+# allowlist, not the caller's environment minus a blocklist: `env -i` plus the names below. Anything
+# not listed is dropped by construction (SSH_AUTH_SOCK, GIT_ASKPASS, GITHUB_PAT, GH_*/GITHUB_* tokens,
+# FOO_TOKEN, …). The allowlist mirrors agentEnv() in src/adapters/agent/agent-sdk-runner.ts.
+#
+#   PATH HOME USER LOGNAME SHELL TERM LANG LC_* TMPDIR TZ           the process basics
+#   CLAUDE_CODE_OAUTH_TOKEN ANTHROPIC_API_KEY ANTHROPIC_BASE_URL     the Claude login (kept on purpose)
+#   CLAUDE_CONFIG_DIR                                                 the Claude config dir
+#   SHIPWRIGHT_* run variables, except names with TOKEN, SECRET, KEY, PASS, CRED or WEBHOOK
+#   CLAUDE_AGENT_SDK_CLIENT_APP=shipwright, SHIPWRIGHT_IN_TEST_GATE=1 (real-service suites refuse)
+#
+# Git's saved credentials are reset too, the same way the test gate resets them (test-gate-env.sh):
+# every http.*.extraheader and credential.*.helper the repo or the user config saves (GHES and
+# path-scoped headers included) and the github.com and remote-URL entries, with GIT_TERMINAL_PROMPT=0
+# and gh pointed at a missing config dir.
 #
 #   "$SW_AGENT_EXEC" claude -p "$prompt"
 #   "$SW_AGENT_EXEC" $TIMEOUT_CMD "$secs" claude -p "$prompt"
@@ -15,9 +25,19 @@
 # (and signals, e.g. loop-iteration's CHILD_PID) is the agent itself. Fails closed: if the reset
 # cannot complete, the command does not run.
 #
-# Not covered (#8616): the Claude login itself (kept on purpose; on macOS it lives in the keychain),
-# and ~/.netrc, which curl reads from $HOME with no environment variable to redirect it. A tool
-# that stores a GitHub login in its own config file is not covered either.
+# What this does NOT stop (real isolation is a separate user or a sandbox, not this script):
+#   - Same user, same machine. The agent runs as the pipeline's own user, so it can read the files
+#     that user can read (~/.netrc, ~/.gitconfig, ~/.config/gh, keychain items the user may unlock).
+#     A GitHub login stored in any of those is reachable. Only a separate user or a sandbox changes
+#     that: the sandbox and credentials work is in the Wave 1c plan (docs/superpowers/plans/
+#     2026-10-14-wave-1a-safety.md, ADR-0006), the spec's §5 "Permissions and sandbox", and the M2/M3
+#     one-container-per-run design. No open Wave 2 issue (#8589-#8607) covers it.
+#   - On Linux, the agent runs as a child of the pipeline process, which holds the full environment
+#     (GitHub tokens included). Same-user processes may read each other's environment, so the agent
+#     can read /proc/$PPID/environ and get those tokens. The allowlist protects the agent's own
+#     environment, not its parent's.
+#   - The Claude login itself (kept on purpose; on macOS it lives in the keychain).
+#   - Tools that store a GitHub login in their own config files under $HOME.
 
 # shellcheck source=lib/test-gate-env.sh
 source "$(dirname "${BASH_SOURCE[0]}")/test-gate-env.sh"
@@ -30,4 +50,41 @@ if ! _sw_scrub_github_creds; then
     echo "agent-exec: could not remove GitHub credentials; not running $1" >&2
     exit 1
 fi
-exec "$@"
+
+# _sw_agent_secret_name NAME — true for names that must never reach the agent.
+_sw_agent_secret_name() {
+    case "$1" in
+        *TOKEN* | *SECRET* | *KEY* | *PASS* | *CRED* | *WEBHOOK*) return 0 ;;
+    esac
+    return 1
+}
+
+# Pairs of NAME=VALUE for env -i, built only from names listed here.
+_sw_agent_pairs=()
+_sw_agent_pass() {
+    local name
+    for name in "$@"; do
+        if [[ -n "${!name+x}" ]]; then
+            _sw_agent_pairs+=("$name=${!name}")
+        fi
+    done
+}
+_sw_agent_pass PATH HOME USER LOGNAME SHELL TERM LANG TMPDIR TZ \
+    CLAUDE_CODE_OAUTH_TOKEN ANTHROPIC_API_KEY ANTHROPIC_BASE_URL CLAUDE_CONFIG_DIR
+for _sw_name in $(compgen -e); do
+    case "$_sw_name" in
+        LC_*) _sw_agent_pass "$_sw_name" ;;
+        SHIPWRIGHT_*) _sw_agent_secret_name "$_sw_name" || _sw_agent_pass "$_sw_name" ;;
+    esac
+done
+# The git and gh overrides written by the scrub above (GIT_CONFIG_COUNT entries only).
+_sw_agent_pass GIT_TERMINAL_PROMPT GH_CONFIG_DIR
+_sw_agent_i=0
+while [[ "$_sw_agent_i" -lt "${GIT_CONFIG_COUNT:-0}" ]]; do
+    _sw_agent_pass "GIT_CONFIG_KEY_$_sw_agent_i" "GIT_CONFIG_VALUE_$_sw_agent_i"
+    _sw_agent_i=$((_sw_agent_i + 1))
+done
+_sw_agent_pairs+=("GIT_CONFIG_COUNT=${GIT_CONFIG_COUNT:-0}")
+_sw_agent_pairs+=("CLAUDE_AGENT_SDK_CLIENT_APP=shipwright" "SHIPWRIGHT_IN_TEST_GATE=1")
+
+exec env -i ${_sw_agent_pairs[@]+"${_sw_agent_pairs[@]}"} "$@"

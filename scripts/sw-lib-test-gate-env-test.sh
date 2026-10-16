@@ -171,14 +171,29 @@ for var in GH_TOKEN GITHUB_TOKEN GH_ENTERPRISE_TOKEN GITHUB_ENTERPRISE_TOKEN SHI
 done
 assert_eq "agent keeps CLAUDE_CODE_OAUTH_TOKEN" "claude-secret" "$(sed -n 's/^CLAUDE_CODE_OAUTH_TOKEN=//p' <<<"$agent_env")"
 assert_eq "agent keeps ANTHROPIC_API_KEY" "anthropic-secret" "$(sed -n 's/^ANTHROPIC_API_KEY=//p' <<<"$agent_env")"
-assert_eq "agent is not marked as a test gate" "" "$(sed -n 's/^SHIPWRIGHT_IN_TEST_GATE=//p' <<<"$agent_env")"
-assert_eq "agent unrelated variables pass through" "still-here" "$(sed -n 's/^KEEP_ME=//p' <<<"$agent_env")"
+assert_eq "agent is marked as a test gate (real-service suites refuse inside an agent)" "1" "$(sed -n 's/^SHIPWRIGHT_IN_TEST_GATE=//p' <<<"$agent_env")"
+assert_eq "agent drops variables that are not on the allowlist" "" "$(sed -n 's/^KEEP_ME=//p' <<<"$agent_env")"
 agent_gh_dir="$(sed -n 's/^GH_CONFIG_DIR=//p' <<<"$agent_env")"
 assert_eq "agent gh config dir is not the caller's" "true" "$([[ "$agent_gh_dir" != "$GH_CONFIG_DIR" ]] && echo true || echo false)"
 mock_binary "claude" 'git config --get http.https://example.invalid/acme/repo.git.extraheader; echo "rc=$?"'
 agent_scoped="$(cd "$git_repo" && "$SW_AGENT_EXEC" claude 2>&1)"
 assert_eq "agent: the remote-scoped extraheader is reset" "rc=0" "$(tail -n 1 <<<"$agent_scoped")"
 if grep -q SECRET2 <<<"$agent_scoped"; then assert_fail "agent: no remote-scoped secret"; else assert_pass "agent: no remote-scoped secret"; fi
+git -C "$git_repo" config http.https://ghe.example.com/acme.extraheader "AUTHORIZATION: basic SECRET3"
+mock_binary "claude" 'git config --get http.https://ghe.example.com/acme.extraheader; echo "rc=$?"'
+agent_ghes="$(cd "$git_repo" && "$SW_AGENT_EXEC" claude 2>&1)"
+assert_eq "agent: a GHES extraheader is reset too" "rc=0" "$(tail -n 1 <<<"$agent_ghes")"
+if grep -q SECRET3 <<<"$agent_ghes"; then assert_fail "agent: no GHES secret"; else assert_pass "agent: no GHES secret"; fi
+print_test_section "agent exec: environment allowlist (SSH, askpass, PAT and unknown tokens never reach the agent)"
+mock_binary "claude" 'env'
+fake_token="fake-$RANDOM$RANDOM"
+allow_env="$(cd "$git_repo" && SSH_AUTH_SOCK=/tmp/sw-fake-agent.sock GIT_ASKPASS=/tmp/sw-fake-askpass GIT_SSH_COMMAND=/tmp/sw-fake-ssh SSH_ASKPASS=/tmp/sw-fake-ssh-askpass GITHUB_PAT=fake-pat FOO_TOKEN="$fake_token" NPM_CONFIG_TOKEN=fake-npm AWS_SECRET_ACCESS_KEY=fake-aws SHIPWRIGHT_FLEET_TOKEN_FILE=/tmp/sw-fake-fleet "$SW_AGENT_EXEC" claude 2>&1)"
+for var in SSH_AUTH_SOCK GIT_ASKPASS GIT_SSH_COMMAND SSH_ASKPASS GITHUB_PAT FOO_TOKEN NPM_CONFIG_TOKEN AWS_SECRET_ACCESS_KEY SHIPWRIGHT_FLEET_TOKEN_FILE; do
+    if grep -q "^${var}=" <<<"$allow_env"; then assert_fail "allowlist: $var does not reach the agent"; else assert_pass "allowlist: $var does not reach the agent"; fi
+done
+if grep -q "$fake_token" <<<"$allow_env"; then assert_fail "allowlist: the random FOO_TOKEN value does not reach the agent"; else assert_pass "allowlist: the random FOO_TOKEN value does not reach the agent"; fi
+assert_eq "allowlist: PATH reaches the agent" "yes" "$(grep -q '^PATH=' <<<"$allow_env" && echo yes || echo no)"
+assert_eq "allowlist: a SHIPWRIGHT_* run variable reaches the agent" "fake-run" "$( (cd "$git_repo" && SHIPWRIGHT_PIPELINE_ID=fake-run "$SW_AGENT_EXEC" claude 2>&1) | sed -n 's/^SHIPWRIGHT_PIPELINE_ID=//p')"
 
 print_test_section "agent exec: exit status and process identity"
 mock_binary "claude" 'exit 7'
@@ -235,32 +250,52 @@ assert_eq "integration-claude exits 0 inside a test gate" "0" "$rc"
 assert_contains "integration-claude says it skipped inside a test gate" "$out" "Skipping integration-claude: inside a build-loop test gate"
 
 print_test_section "every agent claude call site goes through agent-exec (#8580)"
-# A line that runs claude as a command must route it through "$SW_AGENT_EXEC". A command word is
-# one at a line start or after | ( ; & $( then/do/else/if !, optionally behind timeout N or $VAR.
-# Every file with such a line must define SW_AGENT_EXEC. Comments, probes, quoted text and
-# `command -v claude` are not invocations.
+# A line that runs claude as a command must route it through "$SW_AGENT_EXEC", with the helper in
+# command position before the claude word: "$SW_AGENT_EXEC" claude …, "$SW_AGENT_EXEC" $TIMEOUT_CMD n
+# claude …, or timeout n "$SW_AGENT_EXEC" claude …. A line that only mentions the helper elsewhere
+# (x=$(claude -p "$SW_AGENT_EXEC")) is not routed. A command word is one at a line start or after
+# | ( ; & $( then/do/else/if !, optionally behind timeout N or $VAR. Every file with such a line must
+# define SW_AGENT_EXEC. Comments, probes, quoted text and `command -v claude` are not invocations.
 claude_run_re='(^|[|;&(]|\$\(|then|do|else|if|!)[[:space:]]*((timeout|gtimeout)[[:space:]]+[^[:space:]]+|\$[A-Za-z_]+([[:space:]]+("[^"]*"|[^[:space:]"]+))?)?[[:space:]]*claude([[:space:]]|$)'
+routed_re='(^|[|;&(]|\$\(|then|do|else|if|!)[[:space:]]*(timeout[[:space:]]+[^[:space:]]+[[:space:]]+|gtimeout[[:space:]]+[^[:space:]]+[[:space:]]+)?"?\$\{?SW_AGENT_EXEC\}?"?[[:space:]]+([^|;&]*[[:space:]])?claude([[:space:]]|$)'
 unrouted_total=0
-for f in "$SCRIPT_DIR"/*.sh "$SCRIPT_DIR/sw" "$SCRIPT_DIR"/lib/*.sh; do
+agent_files=("$SCRIPT_DIR"/*.sh "$SCRIPT_DIR/sw" "$SCRIPT_DIR"/lib/*.sh)
+for hook_dir in "$SCRIPT_DIR/../.claude/hooks" "$SCRIPT_DIR/../claude-code/hooks"; do
+    [[ -d "$hook_dir" ]] && agent_files+=("$hook_dir"/*.sh)
+done
+[[ -f "$SCRIPT_DIR/../install.sh" ]] && agent_files+=("$SCRIPT_DIR/../install.sh")
+for f in "${agent_files[@]}"; do
     [[ -f "$f" ]] || continue
     name="${f#"$SCRIPT_DIR"/}"
+    name="${name#"$SCRIPT_DIR"/../}"
     calls="$(grep -nE "$claude_run_re" "$f" || true)"
     calls="$(grep -vE '^[0-9]+:[[:space:]]*#' <<<"$calls" || true)"
     [[ -n "$calls" ]] || continue
-    routed="$(grep 'SW_AGENT_EXEC' <<<"$calls" || true)"
-    unrouted="$(grep -vE 'SW_AGENT_EXEC|(command -v|which|type|hash) claude|grep .*'"'"'[^'"'"']*claude' <<<"$calls" || true)"
+    unrouted="$(grep -vE "$routed_re" <<<"$calls" | grep -vE '(command -v|which|type|hash) claude|grep .*'"'"'[^'"'"']*claude' || true)"
     if [[ -n "$unrouted" ]]; then
         unrouted_total=$((unrouted_total + $(grep -c . <<<"$unrouted")))
         echo "    unrouted in $name: $(head -1 <<<"$unrouted" | cut -c1-120)"
     fi
-    if [[ -n "$routed" ]] && ! grep -q '^SW_AGENT_EXEC=' "$f"; then
+    if grep -q 'SW_AGENT_EXEC' <<<"$calls" && ! grep -q '^SW_AGENT_EXEC=' "$f"; then
         assert_fail "$name routes claude through SW_AGENT_EXEC but does not define it"
     fi
 done
-assert_eq "no agent claude invocation bypasses agent-exec" "0" "$unrouted_total"
+assert_eq "no agent claude invocation bypasses agent-exec (scripts, hooks, install.sh)" "0" "$unrouted_total"
 # Heredoc launchers (sw-session.sh) are templates: ast-grep and the regex above cannot see them. They
 # must name the helper through the placeholder that awk fills with SW_AGENT_EXEC.
 assert_eq "session launchers run claude through agent-exec (both templates)" "2" "$(grep -c "^\"__AGENT_EXEC__\" claude __CLAUDE_FLAGS__" "$SCRIPT_DIR/sw-session.sh")"
-assert_eq "session launchers fill the placeholder from SW_AGENT_EXEC (both awk calls)" "2" "$(grep -c "gsub(/__AGENT_EXEC__/, agent_exec)" "$SCRIPT_DIR/sw-session.sh")"
+assert_eq "session launchers fill the placeholder from SW_AGENT_EXEC (both fill calls)" "2" "$(grep -c '_sw_fill_launcher "\$LAUNCHER"' "$SCRIPT_DIR/sw-session.sh")"
+assert_eq "session launchers fill through the literal helper (no gsub or awk -v)" "0" "$(grep -cE 'gsub\(/__|awk -v' "$SCRIPT_DIR/sw-session.sh" || true)"
+assert_eq "no session hint tells the user to type bare claude" "0" "$(grep -c "Type 'claude' to restart" "$SCRIPT_DIR/sw-session.sh" || true)"
+# The fill is tested on the real function, with paths holding & and " (gsub() mangled them).
+fill_fn="$TEST_TEMP_DIR/fill-fn.sh"
+sed -n '/^_sw_fill_launcher() {/,/^}/p' "$SCRIPT_DIR/sw-session.sh" > "$fill_fn"
+printf '%s\n' 'cd __DIR__ || exit 1' 'PROMPT=$(cat __PROMPT__)' '"__AGENT_EXEC__" claude __CLAUDE_FLAGS__' > "$TEST_TEMP_DIR/fill-tpl.sh"
+hostile_dir='/x&y"q'
+hostile_prompt='/p&q'
+filled="$(SW_DIR="$hostile_dir" SW_PROMPT="$hostile_prompt" SW_FLAGS="--f" SW_AGENT_EXEC="/s/agent.sh" bash -c 'source "$1"; _sw_fill_launcher "$2"' _ "$fill_fn" "$TEST_TEMP_DIR/fill-tpl.sh")"
+assert_eq "the fill writes a path with & and \" literally" "cd $hostile_dir || exit 1" "$(sed -n 1p <<<"$filled")"
+assert_eq "the fill writes a prompt path with & literally" "PROMPT=\$(cat $hostile_prompt)" "$(sed -n 2p <<<"$filled")"
+assert_eq "the fill writes the agent-exec path" '"/s/agent.sh" claude --f' "$(sed -n 3p <<<"$filled")"
 
 print_test_results

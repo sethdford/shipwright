@@ -9,10 +9,11 @@
 # machine is not used either), git's saved credentials are reset, and
 # SHIPWRIGHT_IN_TEST_GATE=1 lets real-service suites refuse.
 #
-# Git's saved credentials are reset globally (http.extraheader, credential.helper) and for every
-# remote URL the repo configures (http.<url>.extraheader, credential.<url>.helper, #8617): the
-# token actions/checkout saves can be scoped to a URL. Not covered: submodule URLs and URLs that
-# url.<base>.insteadOf rewrites, which are not read as remotes. The Claude CLI gets an empty config dir
+# Git's saved credentials are reset globally (http.extraheader, credential.helper), for every remote
+# URL the repo configures (http.<url>.extraheader, credential.<url>.helper, #8617), and for every
+# http.*.extraheader and credential.*.helper key the config holds, whatever its host or path scope
+# (GHES, path-scoped headers): the token actions/checkout saves can be scoped to any URL. Not covered:
+# submodule URLs and URLs that url.<base>.insteadOf rewrites, which are not read as remotes. The Claude CLI gets an empty config dir
 # (CLAUDE_CONFIG_DIR): the login is not found from an empty dir (`claude auth status` reports
 # loggedIn false for an empty dir; no model call is made, #8616). On macOS the login may live in the keychain;
 # with the empty dir the CLI reports no login. The agent env (agent-exec.sh) keeps the Claude login and
@@ -44,7 +45,7 @@ _sw_scrub_github_creds() {
         GIT_CONFIG_KEY_0=http.https://github.com/.extraheader GIT_CONFIG_VALUE_0='' \
         GIT_CONFIG_KEY_1=http.extraheader GIT_CONFIG_VALUE_1='' \
         GIT_CONFIG_KEY_2=credential.helper GIT_CONFIG_VALUE_2=''
-    local remotes rc=0 line url n=3
+    local remotes saved rc=0 line url key n=3
     remotes="$(git config --get-regexp '^remote\..*\.(url|pushurl)$' 2>/dev/null)" || rc=$?
     # Status 1 means no remote is configured. Anything else (git missing, unreadable config) is not safe.
     [[ "$rc" -eq 0 || "$rc" -eq 1 ]] || return 1
@@ -56,6 +57,17 @@ _sw_scrub_github_creds() {
         export "GIT_CONFIG_KEY_$n=credential.$url.helper" "GIT_CONFIG_VALUE_$n="
         n=$((n + 1))
     done <<<"$remotes"
+    # Every saved header and helper the config holds, whatever its host or path scope (GHES, a
+    # path-scoped extraheader, a header saved under a remote the repo no longer lists): each key is
+    # reset by name. This is what makes the reset independent of the remote list.
+    rc=0
+    saved="$(git config --name-only --get-regexp '^(http|credential)\..*\.(extraheader|helper)$' 2>/dev/null)" || rc=$?
+    [[ "$rc" -eq 0 || "$rc" -eq 1 ]] || return 1
+    while IFS= read -r key; do
+        [[ -n "$key" ]] || continue
+        export "GIT_CONFIG_KEY_$n=$key" "GIT_CONFIG_VALUE_$n="
+        n=$((n + 1))
+    done <<<"$saved"
     export GIT_CONFIG_COUNT=$n
 }
 

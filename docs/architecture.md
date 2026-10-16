@@ -120,7 +120,11 @@ All Claude calls go through the `AgentRunner` port, implemented once in
 [`src/adapters/agent/`](../src/adapters/agent) on `@anthropic-ai/claude-agent-sdk` (pinned).
 `decide<T>` is one-shot, tool-less and schema-validated; `runTask` is agentic with an allowlist of
 tools. Untrusted text is passed only as delimited data. The child environment is built from an
-allowlist, so `GH_TOKEN` never reaches an agent. See ADR-0003.
+allowlist, so `GH_TOKEN` never reaches an agent. See ADR-0003. The bash agent launcher
+([`scripts/lib/agent-exec.sh`](../scripts/lib/agent-exec.sh)) uses the same allowlist. Its limits: the
+agent runs as the pipeline's own user, so same-user files (`~/.netrc`, gh and git config, keychain
+items the user can unlock) and, on Linux, the parent's `/proc/$PPID/environ` stay readable. Real
+isolation needs a separate user or a sandbox (the Wave 1c sandbox work, ADR-0006).
 
 ## Deployment modes and durability
 
