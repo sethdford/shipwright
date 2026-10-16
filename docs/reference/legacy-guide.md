@@ -638,7 +638,7 @@ All scripts are bash (except the dashboard server in TypeScript). Grouped by lay
 | `scripts/sw-ci.sh` | 589 | GitHub Actions CI/CD Orchestration |
 | `scripts/sw-cleanup.sh` | 350 | Clean up orphaned Claude team sessions & artifacts |
 | `scripts/sw-code-review.sh` | 699 | Clean Code & Architecture Analysis |
-| `scripts/sw-connect.sh` | 639 | Sync local state to team dashboard |
+| `scripts/sw-connect.sh` | 687 | Sync local state to team dashboard |
 | `scripts/sw-context.sh` | 601 | Context Engine for Pipeline Stages |
 | `scripts/sw-cost.sh` | 1070 | Token Usage & Cost Intelligence |
 | `scripts/sw-daemon.sh` | 1420 | Autonomous GitHub Issue Watcher |
@@ -794,7 +794,7 @@ All scripts are bash (except the dashboard server in TypeScript). Grouped by lay
 | `scripts/sw-ci-test.sh` | 198 | GitHub Actions CI/CD orchestration tests |
 | `scripts/sw-cleanup-test.sh` | 168 | Clean up orphaned sessions & artifacts |
 | `scripts/sw-code-review-test.sh` | 175 | Clean code & architecture analysis tests |
-| `scripts/sw-connect-test.sh` | 944 | Validate dashboard connection, heartbeat |
+| `scripts/sw-connect-test.sh` | 1030 | Validate dashboard connection, heartbeat |
 | `scripts/sw-constitutional-test.sh` | 320 | Constitutional AI Test Suite |
 | `scripts/sw-context-budget-test.sh` | 335 | Context Window Budget Monitor tests |
 | `scripts/sw-context-test.sh` | 221 | Context Engine for Pipeline Stages tests |
