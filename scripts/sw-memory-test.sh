@@ -349,8 +349,9 @@ test_memory_export() {
     # Capture some data first
     (cd "$TEST_TEMP_DIR/project" && bash "$MEMORY_SCRIPT" pattern project 2>&1) >/dev/null
 
+    # stdout only: warnings on stderr (e.g. macOS tooling noise) must not break the JSON (#8643)
     local output
-    output=$(cd "$TEST_TEMP_DIR/project" && bash "$MEMORY_SCRIPT" export 2>&1)
+    output=$(cd "$TEST_TEMP_DIR/project" && bash "$MEMORY_SCRIPT" export 2>/dev/null)
 
     # Should be valid JSON
     if ! echo "$output" | jq empty 2>/dev/null; then
