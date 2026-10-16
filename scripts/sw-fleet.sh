@@ -36,12 +36,6 @@ if [[ "$(type -t emit_event 2>/dev/null)" != "function" ]]; then
     echo "${payload}}" >> "${HOME}/.shipwright/events.jsonl"
   }
 fi
-epoch_to_iso() {
-    local epoch="$1"
-    date -u -r "$epoch" +"%Y-%m-%dT%H:%M:%SZ" 2>/dev/null || \
-    date -u -d "@$epoch" +"%Y-%m-%dT%H:%M:%SZ" 2>/dev/null || \
-    echo "1970-01-01T00:00:00Z"
-}
 
 format_duration() {
     local secs="$1"

@@ -30,14 +30,6 @@ if [[ "$(type -t now_iso 2>/dev/null)" != "function" ]]; then
   now_iso()   { date -u +"%Y-%m-%dT%H:%M:%SZ"; }
   now_epoch() { date +%s; }
 fi
-# epoch_to_iso from compat.sh (cross-platform: BSD date -r first, then GNU -d)
-epoch_to_iso() {
-    local epoch="$1"
-    date -u -r "$epoch" +"%Y-%m-%dT%H:%M:%SZ" 2>/dev/null || \
-    date -u -d "@$epoch" +"%Y-%m-%dT%H:%M:%SZ" 2>/dev/null || \
-    python3 -c "import datetime; print(datetime.datetime.utcfromtimestamp($epoch).strftime('%Y-%m-%dT%H:%M:%SZ'))" 2>/dev/null || \
-    echo "1970-01-01T00:00:00Z"
-}
 
 format_duration() {
     local secs="$1"
@@ -84,8 +76,8 @@ analyze_sprint_data() {
 
     # Convert dates to epoch (cross-platform: date_to_epoch from compat.sh)
     local from_epoch to_epoch
-    from_epoch=$(date_to_epoch "${from_date}T00:00:00Z")
-    to_epoch=$(date_to_epoch "${to_date}T23:59:59Z")
+    from_epoch=$(date_to_epoch "${from_date}T00:00:00Z" || echo 0)
+    to_epoch=$(date_to_epoch "${to_date}T23:59:59Z" || echo 0)
 
     # Use db_query_events_since (SQLite + JSONL fallback)
     db_query_events_since "$from_epoch" "" "$to_epoch" | jq --argjson from "$from_epoch" --argjson to "$to_epoch" '
@@ -125,8 +117,8 @@ analyze_agent_performance() {
     fi
 
     local from_epoch to_epoch
-    from_epoch=$(date_to_epoch "${from_date}T00:00:00Z")
-    to_epoch=$(date_to_epoch "${to_date}T23:59:59Z")
+    from_epoch=$(date_to_epoch "${from_date}T00:00:00Z" || echo 0)
+    to_epoch=$(date_to_epoch "${to_date}T23:59:59Z" || echo 0)
 
     db_query_events_since "$from_epoch" "" "$to_epoch" | jq --argjson from "$from_epoch" --argjson to "$to_epoch" '
         (if type == "array" then . else [] end) as $events |
@@ -154,8 +146,8 @@ analyze_velocity() {
 
     # Get current period (cross-platform: date_to_epoch from compat.sh)
     local from_epoch to_epoch prev_from_epoch prev_to_epoch
-    from_epoch=$(date_to_epoch "${from_date}T00:00:00Z")
-    to_epoch=$(date_to_epoch "${to_date}T23:59:59Z")
+    from_epoch=$(date_to_epoch "${from_date}T00:00:00Z" || echo 0)
+    to_epoch=$(date_to_epoch "${to_date}T23:59:59Z" || echo 0)
 
     # Get previous period (same duration before current)
     local duration_days
@@ -607,8 +599,8 @@ cmd_negative_audit() {
     fi
 
     local from_epoch to_epoch
-    from_epoch=$(date_to_epoch "${from_date}T00:00:00Z")
-    to_epoch=$(date_to_epoch "${to_date}T23:59:59Z")
+    from_epoch=$(date_to_epoch "${from_date}T00:00:00Z" || echo 0)
+    to_epoch=$(date_to_epoch "${to_date}T23:59:59Z" || echo 0)
 
     local findings='{"issues":[]}'
     local issue_count=0

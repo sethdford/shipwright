@@ -375,7 +375,7 @@ cmd_status() {
     echo ""
     echo -e "  Team size:          ${CYAN}${team_size}${RESET}"
     echo -e "  Scale events:       ${CYAN}${event_count}${RESET}"
-    echo -e "  Last scale:         ${CYAN}$(date -u -d @"$last_scale_time" +%Y-%m-%dT%H:%M:%SZ 2>/dev/null || echo "never")${RESET}"
+    echo -e "  Last scale:         ${CYAN}$(epoch_to_iso "$last_scale_time" || echo "never")${RESET}"
 
     local max_size
     max_size=$(jq -r '.max_team_size // 8' "$SCALE_RULES_FILE")

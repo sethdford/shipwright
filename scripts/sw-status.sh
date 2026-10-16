@@ -19,21 +19,14 @@ _COMPAT="$SCRIPT_DIR/lib/compat.sh"
 [[ -f "$SCRIPT_DIR/lib/helpers.sh" ]] && source "$SCRIPT_DIR/lib/helpers.sh"
 [[ -f "$SCRIPT_DIR/lib/config.sh" ]] && source "$SCRIPT_DIR/lib/config.sh"
 
-# Portable ISO timestamp parsing (macOS uses -j -f, Linux uses -d)
+# ISO timestamp parsing and local-time display come from compat.sh (BSD and GNU date)
 _parse_iso_epoch() {
-    local ts="$1"
-    if date -j -f "%Y-%m-%dT%H:%M:%SZ" "$ts" "+%s" 2>/dev/null; then
-        return
-    fi
-    # Linux: date -d handles ISO format
-    date -d "$ts" "+%s" 2>/dev/null || echo "0"
+    date_to_epoch "$1" || echo "0"
 }
 _format_iso_time() {
-    local ts="$1" fmt="${2:-+%H:%M}"
-    if date -j -f "%Y-%m-%dT%H:%M:%SZ" "$ts" "$fmt" 2>/dev/null; then
-        return
-    fi
-    date -d "$ts" "$fmt" 2>/dev/null || echo ""
+    local e fmt="${2:-+%H:%M}"
+    e=$(date_to_epoch "$1") || { echo ""; return 0; }
+    epoch_format "$e" "${fmt#+}" || echo ""
 }
 # Fallbacks when helpers not loaded (e.g. test env with overridden SCRIPT_DIR)
 [[ "$(type -t info 2>/dev/null)" == "function" ]]    || info()    { echo -e "\033[38;2;0;212;255m\033[1m▸\033[0m $*"; }
