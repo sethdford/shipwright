@@ -57,15 +57,53 @@ patrol_build_labels() {
 
 # ─── Docs Auto-Sync (never commits to the checked-out branch) ────────────────
 
-# Branch patrol syncs docs onto. Patrol's commits carry the trailer and the patrol identity.
-# Any other commit on that branch is user work: the branch is never reset or deleted over it,
-# and the run is skipped.
+# Branch patrol syncs docs onto. Patrol's commits carry the patrol identity (author and
+# committer) and the trailer below. Any other commit on that branch is user work: the branch is
+# never reset or deleted over it, and the run is skipped.
 PATROL_DOCS_SYNC_BRANCH="shipwright/docs-sync"
 PATROL_DOCS_SYNC_SUBJECT="docs: auto-sync stale documentation sections"
 PATROL_DOCS_SYNC_TRAILER="Shipwright-Patrol: docs-sync"
 PATROL_DOCS_SYNC_NAME="shipwright-patrol"
 PATROL_DOCS_SYNC_EMAIL="patrol@shipwright.invalid"
 PATROL_DOCS_SYNC_PIDFILE=".sw-docs-sync.pid"
+PATROL_DOCS_SYNC_MARKER=".sw-docs-sync.marker"
+# A lock older than this is stolen even if its pid is alive (backstop for pid reuse).
+PATROL_DOCS_SYNC_LOCK_MAX_SECONDS="${PATROL_DOCS_SYNC_LOCK_MAX_SECONDS:-7200}"
+
+# Sets DP_SELF_PID to the pid of the current subshell. Call it as a simple command inside the
+# subshell, never inside $(...), which forks another level. On bash 4+ that is BASHPID. On bash
+# 3.2 a child sh started here has this shell as its PPID.
+patrol_docs_autosync_self_pid() {
+    local tmp="$1"
+    if [[ "${BASH_VERSINFO[0]:-3}" -ge 4 ]]; then
+        DP_SELF_PID="$BASHPID"
+        return 0
+    fi
+    sh -c 'echo $PPID' > "$tmp" || return 1
+    read -r DP_SELF_PID < "$tmp" || return 1
+    rm -f "$tmp"
+}
+
+# Writes content to dest atomically: a temp file in the same directory, then mv.
+patrol_docs_autosync_write_atomic() {
+    local dest="$1" content="$2" tmp
+    tmp="${dest}.tmp.${DP_SELF_PID}"
+    printf '%s\n' "$content" > "$tmp" && mv -f "$tmp" "$dest"
+}
+
+# Returns 0 when the lock at $1 is held by a live pid and younger than the age cap. A lock with
+# no pid, a malformed record, a dead pid or an expired age is stale.
+patrol_docs_autosync_lock_is_live() {
+    local lock="$1" line pid epoch now
+    line=$(cat "$lock/pid" 2>/dev/null || true)
+    pid="${line%% *}"
+    epoch="${line#* }"
+    case "$pid" in ''|*[!0-9]*) return 1 ;; esac
+    case "$epoch" in ''|*[!0-9]*) return 1 ;; esac
+    now=$(date +%s)
+    [[ $((now - epoch)) -lt "$PATROL_DOCS_SYNC_LOCK_MAX_SECONDS" ]] || return 1
+    kill -0 "$pid" 2>/dev/null
+}
 
 # Prints the first of origin/HEAD, origin/main, origin/master that resolves to a commit.
 # Fails when none does, so the caller skips instead of guessing.
@@ -82,23 +120,24 @@ patrol_docs_autosync_base_ref() {
     return 1
 }
 
-# Prints how many commits on the docs-sync branch above base were not made by patrol. A commit
-# is patrol's only when it has the patrol identity and the trailer. Returns 1 when the check
-# itself fails; the caller treats that as foreign.
+# Prints how many commits on the docs-sync branch above base were not made by patrol. A commit is
+# patrol's only when both author and committer are the patrol identity and the body has the
+# trailer. Returns 1 when the check itself fails; the caller treats that as foreign.
 patrol_docs_autosync_foreign_commits() {
-    local repo_root="$1" base_ref="$2" shas sha meta name rest email body n=0
+    local repo_root="$1" base_ref="$2" shas sha meta name email cname cemail body n=0
     if ! git -C "$repo_root" rev-parse --verify -q "refs/heads/$PATROL_DOCS_SYNC_BRANCH" >/dev/null 2>&1; then
         echo 0
         return 0
     fi
     shas=$(git -C "$repo_root" rev-list "${base_ref}..refs/heads/$PATROL_DOCS_SYNC_BRANCH") || return 1
     for sha in $shas; do
-        meta=$(git -C "$repo_root" show -s --format='%an%n%ae%n%B' "$sha") || return 1
-        name="${meta%%$'\n'*}"
-        rest="${meta#*$'\n'}"
-        email="${rest%%$'\n'*}"
-        body="${rest#*$'\n'}"
-        if [[ "$name" != "$PATROL_DOCS_SYNC_NAME" || "$email" != "$PATROL_DOCS_SYNC_EMAIL" ]]; then
+        meta=$(git -C "$repo_root" show -s --format='%an%n%ae%n%cn%n%ce%n%B' "$sha") || return 1
+        name="${meta%%$'\n'*}"; meta="${meta#*$'\n'}"
+        email="${meta%%$'\n'*}"; meta="${meta#*$'\n'}"
+        cname="${meta%%$'\n'*}"; meta="${meta#*$'\n'}"
+        cemail="${meta%%$'\n'*}"; body="${meta#*$'\n'}"
+        if [[ "$name" != "$PATROL_DOCS_SYNC_NAME" || "$email" != "$PATROL_DOCS_SYNC_EMAIL" \
+            || "$cname" != "$PATROL_DOCS_SYNC_NAME" || "$cemail" != "$PATROL_DOCS_SYNC_EMAIL" ]]; then
             n=$((n + 1))
             continue
         fi
@@ -110,9 +149,11 @@ patrol_docs_autosync_foreign_commits() {
     echo "$n"
 }
 
-# Removes worktrees that hold the docs-sync branch only when each one is a leftover of a killed
-# run: a sw-docs-sync temp dir under the real TMPDIR with no live pid. Returns 2 without removing
-# anything when any holder is the main worktree, an operator worktree or a live run.
+# Removes worktrees that hold the docs-sync branch only when each one is a leftover of a dead run:
+# a sw-docs-sync temp dir under the real TMPDIR whose pid file is missing or names a dead pid, or,
+# with no pid file, which carries the marker written at add time. Returns 2 without removing
+# anything when any holder is the main worktree, an operator worktree, a live run, or a pid-less
+# worktree without the marker.
 patrol_docs_autosync_reap_leaked() {
     local repo_root="$1" tmp_real="$2" wl line path="" main_path="" victims="" holder p
     git -C "$repo_root" worktree prune >/dev/null 2>&1 || true
@@ -129,8 +170,12 @@ patrol_docs_autosync_reap_leaked() {
                     "$tmp_real"/sw-docs-sync.*) ;;
                     *) return 2 ;;
                 esac
-                holder=$(cat "$path/$PATROL_DOCS_SYNC_PIDFILE" 2>/dev/null || true)
-                if [[ -n "$holder" ]] && kill -0 "$holder" 2>/dev/null; then
+                if [[ -e "$path/$PATROL_DOCS_SYNC_PIDFILE" ]]; then
+                    holder=$(cat "$path/$PATROL_DOCS_SYNC_PIDFILE" 2>/dev/null || true)
+                    if [[ -n "$holder" ]] && kill -0 "$holder" 2>/dev/null; then
+                        return 2
+                    fi
+                elif [[ ! -e "$path/$PATROL_DOCS_SYNC_MARKER" ]]; then
                     return 2
                 fi
                 victims="${victims}${path}"$'\n'
@@ -144,10 +189,15 @@ patrol_docs_autosync_reap_leaked() {
     git -C "$repo_root" worktree prune >/dev/null 2>&1 || true
 }
 
-# Cleanup for patrol_docs_autosync (EXIT trap). Removes this run's temporary worktree, deletes the
-# docs-sync branch only when this run created or reset it and made no commit, then releases the lock.
+# Cleanup for patrol_docs_autosync (EXIT trap). Does nothing unless this run holds the lock, so a
+# run whose lock was stolen never touches the new holder's state. Otherwise it removes this run's
+# temporary worktree, deletes the docs-sync branch only when this run created or reset it and made
+# no commit, then releases the lock.
 patrol_docs_autosync_cleanup() {
-    local repo_root="$1" wt="$2" drop_branch="$3" lock_path="$4"
+    local repo_root="$1" wt="$2" drop_branch="$3" lock_path="$4" my_pid="$5" held
+    [[ -n "$lock_path" ]] || return 0
+    held=$(cat "$lock_path/pid" 2>/dev/null || true)
+    [[ "${held%% *}" == "$my_pid" ]] || return 0
     if [[ -n "$wt" ]]; then
         git -C "$repo_root" worktree remove --force "$wt" >/dev/null 2>&1 || true
         git -C "$repo_root" worktree prune >/dev/null 2>&1 || true
@@ -156,19 +206,18 @@ patrol_docs_autosync_cleanup() {
     if [[ "$drop_branch" == "1" ]]; then
         git -C "$repo_root" branch -D "$PATROL_DOCS_SYNC_BRANCH" >/dev/null 2>&1 || true
     fi
-    if [[ -n "$lock_path" ]]; then
-        rm -f "$lock_path/status.z" "$lock_path/pid"
-        rmdir "$lock_path" 2>/dev/null || true
-    fi
+    rm -f "$lock_path/status.z" "$lock_path/pid"
+    rmdir "$lock_path" 2>/dev/null || true
 }
 
 # Syncs stale AUTO documentation into a local commit on shipwright/docs-sync, built from the
 # default origin branch in a temporary worktree. The caller's branch, HEAD, index and working tree
 # are never touched, and nothing is pushed: pushing and opening a PR are GitHub writes that belong
 # to the integrations adapter (AGENTS.md, F10).
-# One run per repo: a lock under the git common dir, stolen only from a dead holder. The staleness
-# check and the sync both run in the temporary worktree. Only tracked files that sw-docs.sh sync
-# modified are staged; untracked files are never staged.
+# One run per repo: a lock under the git common dir holding "pid epoch", stolen only when stale
+# (dead pid, malformed, or older than PATROL_DOCS_SYNC_LOCK_MAX_SECONDS). The staleness check and
+# the sync both run in the temporary worktree. Only tracked files that sw-docs.sh sync modified are
+# staged; untracked files are never staged.
 # Prints the branch name on stdout when a commit was made.
 # Exit codes: 0 nothing to commit or committed; 1 error; 2 skipped (finding for the caller).
 # Callers must check NO_GITHUB and dry-run first.
@@ -182,20 +231,22 @@ patrol_docs_autosync() {
         wt=""
         drop_branch=0
         lock_dir=""
-        trap 'patrol_docs_autosync_cleanup "$dp_root" "$wt" "$drop_branch" "$lock_dir"' EXIT
+        DP_SELF_PID=""
+        trap 'patrol_docs_autosync_cleanup "$dp_root" "$wt" "$drop_branch" "$lock_dir" "$DP_SELF_PID"' EXIT
         trap 'exit 130' INT
         trap 'exit 143' TERM
         cd "$dp_root" || exit 1
 
-        local tmp_real common lock_try holder base_ref foreign reap_rc=0 status_file
+        local tmp_real common lock_try base_ref foreign reap_rc=0 status_file
         tmp_real=$(cd "${TMPDIR:-/tmp}" && pwd -P) || exit 1
         common=$(git rev-parse --git-common-dir) || exit 1
         case "$common" in /*) ;; *) common="$dp_root/$common" ;; esac
 
+        patrol_docs_autosync_self_pid "$common/shipwright-docs-sync.selfpid.$$" || exit 1
+
         lock_try="$common/shipwright-docs-sync.lock"
         if ! mkdir "$lock_try" 2>/dev/null; then
-            holder=$(cat "$lock_try/pid" 2>/dev/null || true)
-            if [[ -n "$holder" ]] && kill -0 "$holder" 2>/dev/null; then
+            if patrol_docs_autosync_lock_is_live "$lock_try"; then
                 daemon_log WARN "Docs sync skipped: another run holds ${lock_try}"
                 exit 2
             fi
@@ -205,7 +256,7 @@ patrol_docs_autosync() {
                 exit 2
             fi
         fi
-        echo $$ > "$lock_try/pid"
+        patrol_docs_autosync_write_atomic "$lock_try/pid" "$DP_SELF_PID $(date +%s)" || exit 1
         lock_dir="$lock_try"
 
         git fetch --quiet origin || exit 1
@@ -217,7 +268,7 @@ patrol_docs_autosync() {
 
         patrol_docs_autosync_reap_leaked "$dp_root" "$tmp_real" || reap_rc=$?
         if [[ "$reap_rc" -ne 0 ]]; then
-            daemon_log WARN "Docs sync skipped: ${PATROL_DOCS_SYNC_BRANCH} is held by a worktree this run does not own"
+            daemon_log WARN "Docs sync skipped: ${PATROL_DOCS_SYNC_BRANCH} is held by a worktree this run does not own, or a live run"
             exit "$reap_rc"
         fi
 
@@ -230,7 +281,8 @@ patrol_docs_autosync() {
         wt=$(mktemp -d "$tmp_real/sw-docs-sync.XXXXXX") || exit 1
         git -c core.hooksPath=/dev/null worktree add --quiet -B "$PATROL_DOCS_SYNC_BRANCH" "$wt" "$base_ref" || exit 1
         drop_branch=1
-        echo $$ > "$wt/$PATROL_DOCS_SYNC_PIDFILE"
+        : > "$wt/$PATROL_DOCS_SYNC_MARKER"
+        patrol_docs_autosync_write_atomic "$wt/$PATROL_DOCS_SYNC_PIDFILE" "$DP_SELF_PID" || exit 1
 
         [[ -f "$wt/scripts/sw-docs.sh" ]] || exit 1
 
