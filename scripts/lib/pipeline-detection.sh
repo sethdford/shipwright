@@ -83,6 +83,51 @@ _detect_package_manager() {
     else echo "npm"; fi
 }
 
+# _is_redundant_test_script <body> <primary_body> — 0 when an extra package.json test script only
+# repeats work the primary already does (#8633). Dropped when:
+#   - it lists tests instead of running them (--list as a standalone word);
+#   - its body is the primary's body, optionally plus "--jobs N" or "-j N" (the same run again);
+#   - the primary is a full sw-test-all.sh (no --pattern) and every segment of its && chain (two or
+#     more) is exactly "bash scripts/sw-<name>-test.sh": sw-test-all.sh already runs each suite.
+_is_redundant_test_script() {
+    local body="$1" primary="$2" seg n=0 all_suites=1 re
+    local rest
+    if [[ "$body" =~ (^|[[:space:]])--list($|[[:space:]]) ]]; then
+        return 0
+    fi
+    if [[ "$body" == "$primary" && -n "$primary" ]]; then
+        return 0
+    fi
+    if [[ -n "$primary" && "$body" =~ ^(.*)[[:space:]]+(--jobs|-j)[[:space:]]+[0-9]+$ ]]; then
+        [[ "${BASH_REMATCH[1]}" == "$primary" ]] && return 0
+    fi
+    if [[ "$primary" == "bash scripts/sw-test-all.sh" && "$body" == *"&&"* ]]; then
+        re='^bash scripts/sw-[a-z0-9-]+-test\.sh$'
+        rest="$body"
+        while [[ -n "$rest" ]]; do
+            if [[ "$rest" == *"&&"* ]]; then
+                seg="${rest%%&&*}"
+                rest="${rest#*&&}"
+            else
+                seg="$rest"
+                rest=""
+            fi
+            # trim surrounding spaces
+            seg="${seg#"${seg%%[![:space:]]*}"}"
+            seg="${seg%"${seg##*[![:space:]]}"}"
+            n=$((n + 1))
+            if ! [[ "$seg" =~ $re ]]; then
+                all_suites=0
+                break
+            fi
+        done
+        if [[ "$all_suites" -eq 1 && "$n" -ge 2 ]]; then
+            return 0
+        fi
+    fi
+    return 1
+}
+
 # Returns newline-separated test commands (primary + additional)
 # First line is always the primary test command from detect_test_cmd()
 detect_test_commands() {
@@ -101,10 +146,14 @@ detect_test_commands() {
             | select(.key | test("integration|e2e|system") | not)
             | .key' "$root/package.json" 2>/dev/null) || true
         if [[ -n "$extra_scripts" ]]; then
-            local pm
+            local pm primary_body
             pm=$(_detect_package_manager "$root")
+            primary_body=$(jq -r '.scripts.test // ""' "$root/package.json" 2>/dev/null || true)
             while IFS= read -r script; do
                 [[ -z "$script" ]] && continue
+                local body
+                body=$(jq -r --arg k "$script" '.scripts[$k] // ""' "$root/package.json" 2>/dev/null || true)
+                _is_redundant_test_script "$body" "$primary_body" && continue
                 echo "${pm} run ${script}"
             done <<< "$extra_scripts"
         fi

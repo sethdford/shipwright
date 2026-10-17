@@ -856,6 +856,131 @@ else
 fi
 
 # ═══════════════════════════════════════════════════════════════════════════════
+# DIFFERENTIAL TEST GATE, END TO END (#8633)
+# Extracts the real run_test_gate / write_state / resume_state from sw-loop.sh and drives them.
+# ═══════════════════════════════════════════════════════════════════════════════
+echo ""
+echo -e "${DIM}  differential test gate (run_test_gate end to end)${RESET}"
+
+_gate="$TEST_TEMP_DIR/gate"
+mkdir -p "$_gate/repo" "$_gate/logs" "$_gate/tmp"
+cat > "$_gate/repo/runner.sh" <<'RUNNER'
+#!/usr/bin/env bash
+cd "$(dirname "$0")"
+f=0; p=0; sections=""
+for s in suite-a suite-b suite-c; do
+    if grep -Fx -- "$s" fail.txt >/dev/null 2>&1; then
+        printf '  ✗ %-46s exit 1 0s\n' "$s"; f=$((f + 1))
+        # the suite's log section, as sw-test-all.sh prints it, ending with test-helpers' summary
+        sections="${sections}━━━ $s (FAIL:1) — last 25 lines ━━━"$'\n'"      ✗ check"$'\n'"    1 of 1 tests failed"$'\n'
+    else
+        printf '  ✓ %-46s 0s\n' "$s"; p=$((p + 1))
+    fi
+done
+printf '%s' "$sections"
+printf '\n  %s passed  %s failed  0 timed out  (3 suites, 0s)\n' "$p" "$f"
+[[ "$f" -eq 0 ]]
+RUNNER
+git -C "$_gate/repo" init -q
+_g() { git -C "$_gate/repo" -c user.name=t -c user.email=t@e -c commit.gpgsign=false "$@"; }
+# A root commit is not a valid base (the gate blocks on it), so the base has a parent.
+echo "project" > "$_gate/repo/README.md"
+_g add -A && _g commit -qm root
+printf 'suite-b\n' > "$_gate/repo/fail.txt"
+_g add -A && _g commit -qm base
+_gate_base="$(_g rev-parse HEAD)"
+
+# The real functions, extracted from sw-loop.sh (it has no source guard).
+_gate_fns="$_gate/fns.sh"
+{
+    sed -n '/^run_test_gate()/,/^}/p' "$SCRIPT_DIR/sw-loop.sh"
+} > "$_gate_fns"
+(
+    DIM="${DIM:-}" RESET="${RESET:-}"
+    # shellcheck disable=SC1090
+    source "$SCRIPT_DIR/lib/test-gate-env.sh"
+    source "$SCRIPT_DIR/lib/test-gate-baseline.sh"
+    source "$_gate_fns"
+    export LOG_DIR="$_gate/logs" PROJECT_ROOT="$_gate/repo" TMPDIR="$_gate/tmp"
+    export SW_TEST_TIMEOUT=120 LOOP_START_COMMIT="$_gate_base"
+    cd "$_gate/repo"
+    TEST_CMD="bash runner.sh"; FAST_TEST_CMD=""; ADDITIONAL_TEST_CMDS=(); ITERATION=1
+    MAX_ITERATIONS=5; FAST_TEST_INTERVAL=3
+
+    # Iteration 1: suite-b still fails, as on the base commit -> pre-existing, not blocking
+    run_test_gate >/dev/null 2>&1 || true
+    echo "PRE=${TEST_PASSED}"
+    echo "PREOUT=$(echo "${TEST_OUTPUT}" | grep -c 'PRE-EXISTING' || true)"
+    echo "PREEVID=$(jq -r '.[0].preexisting' "$LOG_DIR/test-evidence-iter-1.json")"
+
+    # Iteration 2: suite-c now fails too -> new failure, blocking
+    printf 'suite-b\nsuite-c\n' > fail.txt
+    ITERATION=2
+    run_test_gate >/dev/null 2>&1 || true
+    echo "NEW=${TEST_PASSED}"
+    echo "NEWOUT=$(echo "${TEST_OUTPUT}" | grep -c 'NEW FAILURES' || true)"
+    echo "NEWEVID=$(jq -r '.[0].new_failures | sort | join(",")' "$LOG_DIR/test-evidence-iter-2.json")"
+    echo "NEWVERDICT=$(jq -r '.[0].verdict' "$LOG_DIR/test-evidence-iter-2.json")"
+
+    # Iteration 3: the base commit is not the loop's base (no LOOP_START_COMMIT) -> blocks
+    ITERATION=3
+    LOOP_START_COMMIT=""
+    printf 'suite-b\n' > fail.txt
+    run_test_gate >/dev/null 2>&1 || true
+    echo "NOBASE=${TEST_PASSED}"
+) > "$_gate/results.txt" 2>"$_gate/err.txt" || true
+_gate_val() { sed -n "s/^$1=//p" "$_gate/results.txt" | head -1; }
+
+if [[ "$(_gate_val PRE)" == "true" && "$(_gate_val PREOUT)" -ge 1 && "$(_gate_val PREEVID)" == "true" ]]; then
+    assert_pass "pre-existing failure does not block run_test_gate (verdict in TEST_OUTPUT)"
+else
+    assert_fail "pre-existing failure does not block run_test_gate" "$(cat "$_gate/results.txt" "$_gate/err.txt" 2>/dev/null | tail -5)"
+fi
+if [[ "$(_gate_val NEW)" == "false" && "$(_gate_val NEWOUT)" -ge 1 && "$(_gate_val NEWEVID)" == "suite-c::check,suite-c::exit=1,suite-c::total=1" && "$(_gate_val NEWVERDICT)" == "new-failures" ]]; then
+    assert_pass "new failure blocks run_test_gate and lists only the new suite"
+else
+    assert_fail "new failure blocks run_test_gate" "$(cat "$_gate/results.txt" "$_gate/err.txt" 2>/dev/null | tail -5)"
+fi
+if [[ "$(_gate_val NOBASE)" == "false" ]]; then
+    assert_pass "missing LOOP_START_COMMIT blocks run_test_gate (fail closed)"
+else
+    assert_fail "missing LOOP_START_COMMIT blocks run_test_gate" "$(cat "$_gate/results.txt" 2>/dev/null | tail -3)"
+fi
+
+# write_state / resume_state persist and restore LOOP_START_COMMIT (#8633)
+_state_fns="$_gate/state-fns.sh"
+{
+    sed -n '/^write_state()/,/^}/p' "$SCRIPT_DIR/lib/loop-restart.sh"
+    sed -n '/^resume_state()/,/^}/p' "$SCRIPT_DIR/lib/loop-restart.sh"
+} > "$_state_fns"
+_state_out="$(
+    now_iso() { echo "2026-01-01T00:00:00Z"; }
+    now_epoch() { echo 0; }
+    info() { :; }; success() { :; }; warn() { :; }; error() { echo "$*" >&2; }
+    export SCRIPT_DIR="$_gate/no-checkpoint" PROJECT_ROOT="$_gate/repo"
+    source "$_state_fns"
+    GOAL="persist test"; ITERATION=4; MAX_ITERATIONS=10; STATUS="running"; TEST_CMD=""
+    MODEL=""; AGENTS=1; CONSECUTIVE_FAILURES=0; TOTAL_COMMITS=0; AUDIT_ENABLED=false
+    AUDIT_AGENT_ENABLED=false; QUALITY_GATES_ENABLED=false; DOD_FILE=""; AUTO_EXTEND=false
+    EXTENSION_COUNT=0; MAX_EXTENSIONS=0; LOG_ENTRIES=""; DOD_FILE=""
+    STATE_FILE="$_gate/state.md"; LOOP_START_COMMIT="$_gate_base"
+    write_state
+    LOOP_START_COMMIT=""; MAX_ITERATIONS_EXPLICIT=false; RESUME=true
+    resume_state >/dev/null 2>&1
+    echo "RESUMED=${LOOP_START_COMMIT}"
+)"
+if echo "$_state_out" | grep -Fx "RESUMED=$_gate_base" >/dev/null; then
+    assert_pass "LOOP_START_COMMIT persisted in state and restored on resume"
+else
+    assert_fail "LOOP_START_COMMIT persisted in state and restored on resume" "$_state_out"
+fi
+if grep -Fx "loop_start_commit: \"$_gate_base\"" "$_gate/state.md" >/dev/null 2>&1; then
+    assert_pass "state file records loop_start_commit"
+else
+    assert_fail "state file records loop_start_commit"
+fi
+
+# ═══════════════════════════════════════════════════════════════════════════════
 # VERIFICATION GAP TESTS
 # ═══════════════════════════════════════════════════════════════════════════════
 echo ""
