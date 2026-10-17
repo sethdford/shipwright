@@ -84,26 +84,35 @@ _detect_package_manager() {
 }
 
 # _is_redundant_test_script <body> <primary_body> — 0 when an extra package.json test script only
-# repeats work the primary already does (#8633): it lists suites instead of running them, invokes
-# only the primary's runner files, or chains two or more suites that the primary runner
-# (sw-test-all.sh, which discovers every scripts/sw-*-test.sh) already runs.
+# repeats work the primary already does (#8633). Dropped when:
+#   - it lists tests instead of running them (--list as a standalone word);
+#   - its body is the primary's body, optionally plus "--jobs N" or "-j N" (the same run again);
+#   - it chains two or more scripts/sw-*-test.sh suites, and the primary is sw-test-all.sh without
+#     --pattern: sw-test-all.sh already discovers and runs every such suite.
 _is_redundant_test_script() {
-    local body="$1" primary="$2" f files pfiles all_in_primary=1 suites=0 all_suites=1
-    [[ "$body" == *"--list"* ]] && return 0
-    files="$(printf '%s\n' "$body" | grep -oE '[A-Za-z0-9_./-]+\.(sh|ts|js|mjs|cjs)' | sort -u || true)"
-    [[ -z "$files" ]] && return 1
-    pfiles="$(printf '%s\n' "$primary" | grep -oE '[A-Za-z0-9_./-]+\.(sh|ts|js|mjs|cjs)' | sort -u || true)"
-    while IFS= read -r f; do
-        [[ -z "$f" ]] && continue
-        printf '%s\n' "$pfiles" | grep -Fx -- "$f" >/dev/null || all_in_primary=0
-        case "$f" in
-            scripts/sw-*-test.sh) suites=$((suites + 1)) ;;
-            *) all_suites=0 ;;
-        esac
-    done <<< "$files"
-    [[ "$all_in_primary" -eq 1 ]] && return 0
-    if [[ "$all_suites" -eq 1 && "$suites" -ge 2 && "$primary" == *"sw-test-all.sh"* ]]; then
+    local body="$1" primary="$2" f files suites=0 all_suites=1
+    if [[ "$body" =~ (^|[[:space:]])--list($|[[:space:]]) ]]; then
         return 0
+    fi
+    if [[ "$body" == "$primary" && -n "$primary" ]]; then
+        return 0
+    fi
+    if [[ -n "$primary" && "$body" =~ ^(.*)[[:space:]]+(--jobs|-j)[[:space:]]+[0-9]+$ ]]; then
+        [[ "${BASH_REMATCH[1]}" == "$primary" ]] && return 0
+    fi
+    if [[ "$primary" == *"sw-test-all.sh"* && "$primary" != *"--pattern"* && "$body" == *"&&"* ]]; then
+        files="$(printf '%s\n' "$body" | grep -oE 'scripts/[A-Za-z0-9_./-]+\.sh' | sort -u || true)"
+        [[ -z "$files" ]] && return 1
+        while IFS= read -r f; do
+            [[ -z "$f" ]] && continue
+            case "$f" in
+                scripts/sw-*-test.sh) suites=$((suites + 1)) ;;
+                *) all_suites=0 ;;
+            esac
+        done <<< "$files"
+        if [[ "$all_suites" -eq 1 && "$suites" -ge 2 ]]; then
+            return 0
+        fi
     fi
     return 1
 }

@@ -1201,7 +1201,7 @@ run_audit_agent() {
         local cmd_count total_cmds evidence_detail
         cmd_count=$(jq 'length' "$evidence_file" 2>/dev/null || echo 0)
         total_cmds=$(jq -r '[.[].command] | join(", ")' "$evidence_file" 2>/dev/null || echo "unknown")
-        evidence_detail=$(jq -r '.[] | "- \(.command): exit \(.exit_code) (\(.duration_s)s)\(if .preexisting then " [pre-existing on the base commit, not blocking: do NOT fix]" elif (.new_failures | length) > 0 then " [NEW failures: \(.new_failures | join(", "))]" else "" end)"' "$evidence_file" 2>/dev/null || echo "")
+        evidence_detail=$(jq -r '.[] | "- \(.command): exit \(.exit_code) (\(.duration_s)s)\(if .preexisting then " [PRE-EXISTING: verified on the base commit, not blocking; do NOT fix]" elif .exit_code != 0 then " [BLOCKING, must be fixed: \(.verdict)\(if (.new_failures | length) > 0 then "; new: " + (.new_failures | join(", ")) else "" end)]" else "" end)"' "$evidence_file" 2>/dev/null || echo "")
         test_context="## Verified Test Status (from harness, not from agent)
 Test commands run: ${cmd_count} (${total_cmds})
 ${evidence_detail}
@@ -2173,10 +2173,9 @@ run_single_agent_loop() {
         initialize_state
     fi
 
-    # Ensure LOOP_START_COMMIT is set (may not be on resume/restart)
-    if [[ -z "${LOOP_START_COMMIT:-}" ]]; then
-        LOOP_START_COMMIT="$(git -C "$PROJECT_ROOT" rev-parse HEAD 2>/dev/null || echo "")"
-    fi
+    # LOOP_START_COMMIT is set by initialize_state, or restored from the state file on resume.
+    # Never defaulted to HEAD here: on a resumed loop HEAD already includes the agent's changes,
+    # which would make the test gate's baseline wrong (#8633).
 
     # Apply adaptive budget/model before showing banner
     apply_adaptive_budget

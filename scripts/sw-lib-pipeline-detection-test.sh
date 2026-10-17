@@ -384,8 +384,9 @@ fi
 rm -rf "$PROJECT_ROOT/dashboard"
 rm -f "$PROJECT_ROOT/package.json"
 
-# Redundant extra scripts are dropped (#8633): --list, the primary runner again, and chains
-# of suites that the primary sw-test-all.sh runner already discovers.
+# Redundant extra scripts are dropped (#8633). Only the exact cases below are dropped: a --list
+# that is a standalone word, the primary's own body (optionally with --jobs/-j), and a chain of
+# two or more suites under a primary sw-test-all.sh without --pattern.
 cat > "$PROJECT_ROOT/package.json" <<'JSON'
 {"scripts":{"test":"bash scripts/sw-test-all.sh","test:smoke":"bash scripts/sw-e2e-smoke-test.sh","test:list":"bash scripts/sw-test-all.sh --list","test:fast":"bash scripts/sw-test-all.sh --jobs 4","test:legacy-chain":"bash scripts/sw-a-test.sh && bash scripts/sw-b-test.sh && bash scripts/sw-c-test.sh","test:ts":"bun test ./src ./tools"}}
 JSON
@@ -394,12 +395,47 @@ assert_eq "sw-test-all repo: keeps primary, smoke and ts only" "npm test
 npm run test:smoke
 npm run test:ts" "$result"
 
-# A --list script is never a test run
 cat > "$PROJECT_ROOT/package.json" <<'JSON'
-{"scripts":{"test":"jest","test:suites":"jest --listTests"}}
+{"scripts":{"test":"jest","test:suites":"jest --list","test:listed":"jest --listTests","test:listen":"node server.js --listen 0 && mocha test/api","test:file":"jest --list-file=x"}}
 JSON
 result=$(detect_test_commands)
-assert_eq "script with --list is dropped" "npm test" "$result"
+assert_eq "--list standalone dropped; --listTests, --listen, --list-file kept" "npm test
+npm run test:listed
+npm run test:listen
+npm run test:file" "$result"
+
+cat > "$PROJECT_ROOT/package.json" <<'JSON'
+{"scripts":{"test":"jest --config jest.config.js","test:same":"jest --config jest.config.js","test:unit":"jest --config jest.config.js --selectProjects unit"}}
+JSON
+result=$(detect_test_commands)
+assert_eq "identical body dropped; a different body kept" "npm test
+npm run test:unit" "$result"
+
+# Generic projects: none of these are duplicates of the primary
+cat > "$PROJECT_ROOT/package.json" <<'JSON'
+{"scripts":{"test":"jest","test:mocha":"node server.js --listen 0 && mocha test/api","test:smoke":"node test/run.js smoke","test:lint":"bash scripts/check.sh lint","test:vitest":"vitest run --coverage"}}
+JSON
+result=$(detect_test_commands)
+line_count=$(echo "$result" | wc -l | tr -d ' ')
+assert_eq "generic projects: no extra script dropped" "5" "$line_count"
+
+# A suite chain under a --pattern primary is not covered by it and stays
+cat > "$PROJECT_ROOT/package.json" <<'JSON'
+{"scripts":{"test":"bash scripts/sw-test-all.sh --pattern loop","test:chain":"bash scripts/sw-a-test.sh && bash scripts/sw-b-test.sh"}}
+JSON
+result=$(detect_test_commands)
+if echo "$result" | grep >/dev/null "npm run test:chain"; then
+    assert_pass "suite chain kept when the primary uses --pattern"
+else
+    assert_fail "suite chain kept when the primary uses --pattern" "got: $result"
+fi
+
+# A suite chain under a full sw-test-all.sh primary is covered and dropped
+cat > "$PROJECT_ROOT/package.json" <<'JSON'
+{"scripts":{"test":"bash scripts/sw-test-all.sh","test:chain":"bash scripts/sw-a-test.sh && bash scripts/sw-b-test.sh"}}
+JSON
+result=$(detect_test_commands)
+assert_eq "suite chain covered by full sw-test-all.sh is dropped" "npm test" "$result"
 
 # Without sw-test-all as primary, a chain of suites is not covered and stays
 cat > "$PROJECT_ROOT/package.json" <<'JSON'
