@@ -145,7 +145,7 @@ tg_parse_log() {
     if [[ "$bun" -eq 1 ]]; then
         units="${units}"$'\n'"$(_tg_bun_units "$plain")"
     fi
-    TG_UNITS="$(printf '%s\n' "$units" | grep -v '^$' | sort -u || true)"
+    TG_UNITS="$(printf '%s\n' "$units" | grep -v '^$' | sort || true)"
     pass="$(printf '%s\n' "$plain" | sed -nE 's/^ *([0-9]+) passed +[0-9]+ failed.*$/\1/p' | tail -1 || true)"
     if [[ -z "$pass" ]]; then
         pass="$(printf '%s\n' "$plain" | sed -nE 's/^ *([0-9]+) pass$/\1/p' | tail -1 || true)"
@@ -161,14 +161,17 @@ tg_parse_log() {
     return 0
 }
 
-# _tg_bun_units <plain_log> — the units of a bun test run: failing names, load errors per file (or
-# bun::error=N when no file header precedes the block), and the counts that must not grow or shrink.
+# _tg_bun_units <plain_log> — the units of a bun test run: failing names qualified by their file
+# (the "<file>:" header bun prints before each file's errors, so "<file>::<name>"), load errors per
+# file (or bun::error=N when no header precedes the block), and the counts.
 _tg_bun_units() {
     local plain="$1" ran files fail err skip
     printf '%s\n' "$plain" | awk '
         /^[^ #(-].*:$/ && !/^error:/ { hdr = $0; sub(/:$/, "", hdr); next }
         /^# Unhandled error between tests/ { if (hdr != "") print hdr "::LOAD_ERROR"; next }
-        /^\(fail\) / { line = $0; sub(/^\(fail\) /, "", line); sub(/ \[[0-9.]+m?s\]$/, "", line); print line; next }
+        /^\(fail\) / { line = $0; sub(/^\(fail\) /, "", line); sub(/ \[[0-9.]+m?s\]$/, "", line)
+                        if (hdr != "") line = hdr "::" line
+                        print line; next }
     ' || true
     ran="$(printf '%s\n' "$plain" | sed -nE 's/^Ran ([0-9]+) tests? across .*/\1/p' | tail -1)"
     files="$(printf '%s\n' "$plain" | sed -nE 's/^Ran [0-9]+ tests? across ([0-9]+) files?.*/\1/p' | tail -1)"
@@ -222,13 +225,23 @@ _tg_kill_by_path() {
     done
 }
 
+# _tg_group_alive <pgid> — 0 when the process group still has members. Never our own group (a
+# reused id could be ours), so a stale id cannot make us signal ourselves.
+_tg_group_alive() {
+    local g="$1" own
+    [[ -z "$g" ]] && return 1
+    own="$(ps -o pgid= -p "$$" 2>/dev/null | tr -d ' ')"
+    [[ "$g" == "$own" ]] && return 1
+    ps -axo pgid= 2>/dev/null | tr -d ' ' | grep -Fx -- "$g" >/dev/null
+}
+
 # _tg_kill_run <pid> <signal> — signal the run: its process group when it was started with
 # setpgrp (even when the leader has exited, so background children are reached too), then its
 # process tree.
 _tg_kill_run() {
     local pid="$1" sig="$2"
     [[ -z "$pid" ]] && return 0
-    if [[ -n "$_TG_PGRP" && "$pid" == "$_TG_PID" ]]; then
+    if [[ -n "$_TG_PGRP" && "$pid" == "$_TG_PID" ]] && _tg_group_alive "$_TG_PGRP"; then
         kill "-$sig" -- "-$_TG_PGRP" 2>/dev/null || true
     fi
     kill -0 "$pid" 2>/dev/null || return 0
@@ -237,7 +250,7 @@ _tg_kill_run() {
 
 # _tg_stop_run — stop the active base run, its process group and its watchdog. Idempotent.
 _tg_stop_run() {
-    if [[ -n "$_TG_PGRP" ]]; then
+    if _tg_group_alive "$_TG_PGRP"; then
         kill -KILL -- "-$_TG_PGRP" 2>/dev/null || true
     fi
     if [[ -n "$_TG_PID" ]]; then
@@ -441,13 +454,14 @@ _tg_base_value() {
     printf '%s\n' "$TG_BASE_UNITS" | awk -v k="$1" 'index($0, k) == 1 { print substr($0, length(k) + 1); exit }'
 }
 
-# _tg_unit_is_new <unit> — 0 when the iteration unit is not explained by the base.
-# Exact units must be on the base. Counts that describe how much ran are lower-is-bad: a suite
+# _tg_unit_is_new <unit> <iteration_count> — 0 when the iteration's units are not explained by the
+# base. Units are a multiset: a unit that occurs more often in the iteration than on the base is new. Counts that describe how much ran are lower-is-bad: a suite
 # or bun run whose test count drops has lost tests, so it blocks. Counts of failures are
 # higher-is-bad: they block when they grow.
 _tg_unit_is_new() {
-    local u="$1" bval
-    if printf '%s\n' "$TG_BASE_UNITS" | grep -Fx -- "$u" >/dev/null; then
+    local u="$1" icount="$2" bcount bval
+    bcount="$(printf '%s\n' "$TG_BASE_UNITS" | grep -Fxc -- "$u" || true)"
+    if [[ "${bcount:-0}" -ge "$icount" ]]; then
         return 1
     fi
     if [[ "$u" =~ ^(.*::(total|ran|files)=)([0-9]+)$ ]]; then
@@ -497,12 +511,12 @@ tg_judge() {
         _tg_block unattributed "BLOCKING: '${cmd}' (exit ${rc}) failed with no recognisable failing units, so it cannot be shown to be pre-existing. Fix it."
         return 1
     fi
-    while IFS= read -r u; do
+    while IFS=$'\t' read -r icount u; do
         [[ -z "$u" ]] && continue
-        if _tg_unit_is_new "$u"; then
+        if _tg_unit_is_new "$u" "$icount"; then
             new="${new}${u}"$'\n'
         fi
-    done <<< "$iter_units"
+    done <<< "$(printf '%s\n' "$iter_units" | sort | uniq -c | awk '{ c = $1; sub(/^ *[0-9]+ /, ""); print c "\t" $0 }')"
     new="$(printf '%s' "$new" | grep -v '^$' || true)"
     if [[ -n "$new" ]]; then
         TG_NEW_FAILURES="$new"

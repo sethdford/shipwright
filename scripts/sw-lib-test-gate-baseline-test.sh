@@ -346,7 +346,15 @@ tg_judge "$COUNT_CMD" "$ITER_RC" "$ITER_LOG" 120 1 || true
 tg_judge "$COUNT_CMD" "$ITER_RC" "$ITER_LOG" 120 1 || true
 tg_judge "$COUNT_CMD" "$ITER_RC" "$ITER_LOG" 120 1 || true
 assert_eq "trusted baseline: two runs for three judgements" "2" "$(wc -l < "$RUNS_FILE" | tr -d ' ')"
-if [[ -n "$(ls "$TMPDIR" 2>/dev/null | grep 'store' || true)" ]]; then
+# count_entries <glob-prefix-pattern> — number of TMPDIR entries matching the glob (no ls | grep).
+count_entries() {
+    local d n=0
+    for d in "$TMPDIR"/$1; do
+        [[ -e "$d" ]] && n=$((n + 1))
+    done
+    echo "$n"
+}
+if [[ "$(count_entries '*store*')" -gt 0 ]]; then
     assert_fail "no baseline store is written to disk"
 else
     assert_pass "no baseline store is written to disk"
@@ -361,7 +369,7 @@ scenario "suite-a:pass suite-b:fail:X suite-c:pass" "suite-a:pass suite-b:fail:X
 tg_judge "$CMD" "$ITER_RC" "$ITER_LOG" 120 1 || true
 assert_eq "only the main worktree remains" "1" "$(git_in_repo worktree list | wc -l | tr -d ' ')"
 assert_file_exists "node_modules symlink target survives worktree removal" "$REPO/node_modules/sentinel.txt"
-assert_eq "no base temp dirs left behind" "0" "$(ls "$TMPDIR" | grep -c 'sw-test-baseline' || true)"
+assert_eq "no base temp dirs left behind" "0" "$(count_entries 'sw-test-baseline*')"
 
 # SIGTERM while the base runs, in a subshell with its own handler
 scenario "" "suite-a:pass suite-b:fail:X suite-c:pass"
@@ -375,7 +383,7 @@ done
 kill -TERM "$jpid" 2>/dev/null || true
 { wait "$jpid"; } 2>/dev/null || true
 assert_eq "SIGTERM during a base run: worktree removed" "1" "$(git_in_repo worktree list | wc -l | tr -d ' ')"
-assert_eq "SIGTERM during a base run: temp dir removed" "0" "$(ls "$TMPDIR" | grep -c 'sw-test-baseline' || true)"
+assert_eq "SIGTERM during a base run: temp dir removed" "0" "$(count_entries 'sw-test-baseline*')"
 if no_sleep_left; then
     assert_pass "SIGTERM during a base run: base process tree killed"
 else
@@ -484,9 +492,58 @@ TS
     rc=0; tg_judge "bun test" 1 "$LOG_DIR/bun3.log" 60 1 || rc=$?
     assert_eq "bun: a skipped test blocks" "1" "$rc"
     export PROJECT_ROOT="$OLD_ROOT"
+
+    # DUP (review round 4): the same test name in two files. The base fails a.test.ts's
+    # "handles errors"; the iteration fixes it and breaks b.test.ts's test of the same name.
+    DREPO="$TEST_TEMP_DIR/bun-dup"
+    mkdir -p "$DREPO"
+    git -C "$DREPO" init -q
+    dg() { git -C "$DREPO" -c user.name=test -c user.email=test@example.com -c commit.gpgsign=false "$@"; }
+    echo project > "$DREPO/README.md"; dg add -A && dg commit -qm root
+    cat > "$DREPO/a.test.ts" <<'TS'
+import { test, expect } from "bun:test";
+test("handles errors", () => { expect(1).toBe(2); });
+TS
+    cat > "$DREPO/b.test.ts" <<'TS'
+import { test, expect } from "bun:test";
+test("handles errors", () => { expect(1).toBe(1); });
+test("other", () => {});
+TS
+    dg add -A && dg commit -qm base
+    DUP_BASE="$(dg rev-parse HEAD)"
+    cat > "$DREPO/a.test.ts" <<'TS'
+import { test, expect } from "bun:test";
+test("handles errors", () => { expect(1).toBe(1); });
+TS
+    cat > "$DREPO/b.test.ts" <<'TS'
+import { test, expect } from "bun:test";
+test("handles errors", () => { expect(1).toBe(3); });
+test("other", () => {});
+TS
+    OLD_ROOT="$PROJECT_ROOT"
+    export PROJECT_ROOT="$DREPO"
+    LOOP_START_COMMIT="$DUP_BASE"; tg_begin_gate
+    ( cd "$DREPO" && bun test ) > "$LOG_DIR/dup.log" 2>&1 || true
+    rc=0; tg_judge "bun test" 1 "$LOG_DIR/dup.log" 60 1 || rc=$?
+    export PROJECT_ROOT="$OLD_ROOT"
+    assert_eq "DUP: a broken same-named test in another file blocks" "1" "$rc"
+    if printf '%s\n' "$TG_NEW_FAILURES" | grep -Fx -- "b.test.ts::handles errors" >/dev/null; then
+        assert_pass "DUP: the failing unit is file-qualified (b.test.ts::handles errors)"
+    else
+        assert_fail "DUP: the failing unit is file-qualified" "got: $TG_NEW_FAILURES"
+    fi
 else
     assert_pass "bun not installed: bun fixture checks skipped"
 fi
+
+# Multiset (review round 4): a repeated assertion name in a failing suite must not hide a swap.
+# The base has suite-b's "X" once; the iteration has "X" twice.
+scenario "suite-a:pass suite-b:fail:X suite-c:pass" "suite-a:pass suite-b:fail:X,X suite-c:pass"
+judge_iter
+assert_eq "a repeated assertion name beyond the base's count blocks" "1" "$JRC"
+scenario "suite-a:pass suite-b:fail:X,X suite-c:pass" "suite-a:pass suite-b:fail:X,X suite-c:pass"
+judge_iter
+assert_eq "the same repeated names on both sides are pre-existing" "0" "$JRC"
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # Process cleanup: the group is killed even after the leader exited (orphans), and the
