@@ -54,11 +54,7 @@ ensure_dirs() {
 # Convert ISO 8601 timestamp to epoch seconds (works on macOS and Linux)
 iso_to_epoch() {
     local iso="$1"
-    if TZ=UTC date -j -f "%Y-%m-%dT%H:%M:%SZ" "$iso" +%s >/dev/null 2>&1; then
-        TZ=UTC date -j -f "%Y-%m-%dT%H:%M:%SZ" "$iso" +%s 2>/dev/null || echo 0
-    else
-        date -d "$iso" +%s 2>/dev/null || echo 0
-    fi
+    date_to_epoch "$iso" || echo 0
 }
 
 # ─── Gather Yesterday's Work ────────────────────────────────────────────────

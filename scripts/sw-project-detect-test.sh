@@ -366,6 +366,44 @@ else
     assert_fail "Cached detection returns same result"
 fi
 
+# A second call must read the cache, not re-detect. A marker written into the cache file must come
+# back. The cache age used to be computed with BSD-only `date -j`, which fails on GNU date, so the
+# cache was never valid on Linux and the marker was lost (#8621). The check runs natively and under
+# GNU date (native on Linux, gdate shim on macOS).
+_project_cache_honoured() {
+    local proj="$1" out
+    project_detect_all "$proj" >/dev/null
+    jq '. + {marker_from_cache: "yes"}' "$proj/.claude/project-detection.json" > "$proj/.claude/pd.tmp" \
+        && mv "$proj/.claude/pd.tmp" "$proj/.claude/project-detection.json"
+    out=$(project_detect_all "$proj")
+    [[ "$(echo "$out" | jq -r '.marker_from_cache // empty' 2>/dev/null)" == "yes" ]]
+}
+
+print_test_section "project_detect_all — cache honoured under GNU date (#8621)"
+
+cache_native_proj="$TEST_TEMP_DIR/cache-native-project"
+create_nodejs_project "$cache_native_proj"
+if _project_cache_honoured "$cache_native_proj"; then
+    assert_pass "Cache is read on a second call (native date)"
+else
+    assert_fail "Cache is read on a second call (native date)"
+fi
+
+if gnu_shim_dir=$(gnu_date_shim_dir); then
+    cache_gnu_proj="$TEST_TEMP_DIR/cache-gnu-project"
+    create_nodejs_project "$cache_gnu_proj"
+    saved_path="$PATH"
+    PATH="$gnu_shim_dir:$PATH"
+    if _project_cache_honoured "$cache_gnu_proj"; then
+        assert_pass "Cache is read on a second call (GNU date)"
+    else
+        assert_fail "Cache is read on a second call (GNU date)"
+    fi
+    PATH="$saved_path"
+else
+    echo "    (no GNU date available; the GNU date leg is skipped)"
+fi
+
 # ═══════════════════════════════════════════════════════════════════════════════
 # Test: Edge cases
 # ═══════════════════════════════════════════════════════════════════════════════

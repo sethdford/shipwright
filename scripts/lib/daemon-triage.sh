@@ -2,6 +2,7 @@
 # Source from sw-daemon.sh. Requires state, helpers.
 [[ -n "${_DAEMON_TRIAGE_LOADED:-}" ]] && return 0
 _DAEMON_TRIAGE_LOADED=1
+source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/compat.sh"
 
 # Defaults for variables normally set by sw-daemon.sh (safe under set -u).
 SCRIPT_DIR="${SCRIPT_DIR:-$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)}"
@@ -96,8 +97,7 @@ triage_score_issue() {
     local age_score=0
     if [[ -n "$created_at" ]]; then
         local created_epoch now_e age_secs
-        created_epoch=$(TZ=UTC date -j -f "%Y-%m-%dT%H:%M:%SZ" "$created_at" +%s 2>/dev/null || \
-                       date -d "$created_at" +%s 2>/dev/null || echo "0")
+        created_epoch=$(date_to_epoch "$created_at" || echo "0")
         now_e=$(now_epoch)
         if [[ "$created_epoch" -gt 0 ]]; then
             age_secs=$((now_e - created_epoch))
@@ -298,8 +298,8 @@ select_pipeline_template() {
             # Deploy frequency: if < 1/week, use cost-aware
             local _dora_deploy_freq=0
             local _dora_first_epoch _dora_last_epoch _dora_span_days
-            _dora_first_epoch=$(echo "$_dora_events" | head -1 | jq -r '.timestamp // empty' 2>/dev/null | xargs -I{} date -j -f "%Y-%m-%dT%H:%M:%SZ" {} +%s 2>/dev/null || echo "0")
-            _dora_last_epoch=$(echo "$_dora_events" | tail -1 | jq -r '.timestamp // empty' 2>/dev/null | xargs -I{} date -j -f "%Y-%m-%dT%H:%M:%SZ" {} +%s 2>/dev/null || echo "0")
+            _dora_first_epoch=$(date_to_epoch "$(echo "$_dora_events" | head -1 | jq -r '.timestamp // empty' 2>/dev/null)" || echo "0")
+            _dora_last_epoch=$(date_to_epoch "$(echo "$_dora_events" | tail -1 | jq -r '.timestamp // empty' 2>/dev/null)" || echo "0")
             if [[ "${_dora_first_epoch:-0}" -gt 0 && "${_dora_last_epoch:-0}" -gt 0 ]]; then
                 _dora_span_days=$(( (_dora_last_epoch - _dora_first_epoch) / 86400 ))
                 if [[ "${_dora_span_days:-0}" -gt 0 ]]; then

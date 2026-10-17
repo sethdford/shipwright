@@ -98,13 +98,7 @@ source_daemon_functions() {
     now_iso() { date -u +"%Y-%m-%dT%H:%M:%SZ"; }
     now_epoch() { date +%s; }
 
-    epoch_to_iso() {
-        local epoch="$1"
-        date -u -r "$epoch" +"%Y-%m-%dT%H:%M:%SZ" 2>/dev/null || \
-        date -u -d "@$epoch" +"%Y-%m-%dT%H:%M:%SZ" 2>/dev/null || \
-        python3 -c "import datetime; print(datetime.datetime.utcfromtimestamp($epoch).strftime('%Y-%m-%dT%H:%M:%SZ'))" 2>/dev/null || \
-        echo "1970-01-01T00:00:00Z"
-    }
+    source "$SCRIPT_DIR/lib/compat.sh"
 
     format_duration() {
         local secs="$1"
@@ -330,7 +324,7 @@ source_daemon_functions() {
                 local elapsed=0
                 if [[ -n "$started_at" ]]; then
                     local start_e
-                    start_e=$(TZ=UTC date -j -f "%Y-%m-%dT%H:%M:%SZ" "$started_at" +%s 2>/dev/null || date -d "$started_at" +%s 2>/dev/null || echo "0")
+                    start_e=$(date_to_epoch "$started_at" || echo "0")
                     elapsed=$(( now_e - start_e ))
                 fi
 
