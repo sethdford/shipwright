@@ -22,25 +22,8 @@
 [[ -n "${_SW_TEST_ISOLATE_LOADED:-}" ]] && return 0
 _SW_TEST_ISOLATE_LOADED=1
 
-# Print the pids of all descendants of the space-separated pids in $1, one per line.
-# Walks `ps -axo pid,ppid` breadth-first (BASHPID does not exist in bash 3.2).
-_sw_test_descendants() {
-    local roots="$1" snap
-    snap="$(ps -axo pid=,ppid= 2>/dev/null)" || return 0
-    awk -v roots="$roots" '
-        { kids[$2] = kids[$2] " " $1 }
-        END {
-            n = split(roots, q, " ")
-            head = 1; tail = 0
-            for (i = 1; i <= n; i++) queue[++tail] = q[i]
-            while (head <= tail) {
-                p = queue[head++]
-                m = split(kids[p], ch, " ")
-                for (j = 1; j <= m; j++)
-                    if (!(ch[j] in seen)) { seen[ch[j]] = 1; queue[++tail] = ch[j]; print ch[j] }
-            }
-        }' <<< "$snap"
-}
+# Teardown never uses command substitution: every snapshot goes to a file under the run root, so no
+# subshell of the owner can end up in the kill list (#8653 review).
 
 # SIGTERM the space-separated pids in $1, wait up to ~2 s, then SIGKILL the survivors.
 _sw_test_kill_pids() {
@@ -60,19 +43,45 @@ _sw_test_kill_pids() {
     return 0
 }
 
-# Print the pids holding this run's lock fd open. Every descendant inherits fd 190, and an orphan keeps
-# it after its parent exits (macOS ps cannot show a process environment), so lsof finds backgrounded
-# subshells after they are reparented to launchd (ppid 1). Excludes the owner shell.
-_sw_test_holder_pids() {
-    [[ -n "${_SW_TEST_LOCK:-}" ]] && command -v lsof >/dev/null 2>&1 || return 0
-    lsof -t -- "$_SW_TEST_LOCK" 2>/dev/null | awk -v me="$$" '$1 != me' || true
-}
-
-# Print the pids of processes whose command line names this run's temp root.
-_sw_test_root_pids() {
-    [[ -n "${_SW_TEST_ROOT:-}" ]] || return 0
-    ps -axwwo pid=,command= 2>/dev/null | awk -v r="$_SW_TEST_ROOT" -v me="$$" \
-        'index($0, r) && $1 != me { print $1 }' || true
+# Print the pids to kill. Only the tools teardown itself runs are exempt: a suite
+# child such as a background sleep or tail -f is a victim. $1 = ps snapshot (pid ppid command), $2 = pane pids, $3 = lock holders.
+# Victims are the owner's descendants (including orphans, which lsof and the root path still find),
+# the tmux panes and their children, and anything naming this run's root. Never the owner itself,
+# and never the helpers teardown runs (ps, lsof, awk and friends).
+_sw_test_victims() {
+    awk -v me="$$" -v root="${_SW_TEST_ROOT:-}" -v panesf="$2" -v holdf="$3" '
+        function is_helper(cmd,    p, n) {
+            n = split(cmd, p, " ")
+            if (n == 0) return 0
+            n = split(p[1], q, "/")
+            return q[n] ~ /^(ps|lsof|awk|tr)$/
+        }
+        BEGIN {
+            ns = 0
+            while ((getline line < panesf) > 0) if (line ~ /^[0-9]+$/) seeds[++ns] = line
+            while ((getline line < holdf) > 0) if (line ~ /^[0-9]+$/) holders[line] = 1
+            seeds[++ns] = me
+        }
+        {
+            pid = $1; ppid = $2
+            cmd = $0; sub(/^ *[0-9]+ +[0-9]+ +/, "", cmd)
+            kids[ppid] = kids[ppid] " " pid
+            if (root != "" && index(cmd, root) > 0) rooted[pid] = 1
+            if (is_helper(cmd)) helpers[pid] = 1
+        }
+        END {
+            head = 1; tail = 0
+            for (i = 1; i <= ns; i++) if (!(seeds[i] in seen)) { seen[seeds[i]] = 1; queue[++tail] = seeds[i] }
+            while (head <= tail) {
+                p = queue[head++]
+                m = split(kids[p], ch, " ")
+                for (j = 1; j <= m; j++) if (!(ch[j] in seen)) { seen[ch[j]] = 1; queue[++tail] = ch[j] }
+            }
+            for (p in seen) victims[p] = 1
+            for (p in holders) victims[p] = 1
+            for (p in rooted) victims[p] = 1
+            for (p in victims) if (p != me && !(p in helpers)) print p
+        }' "$1"
 }
 
 _sw_test_on_signal() {
@@ -89,24 +98,42 @@ sw_test_teardown() {
     [[ -z "${_SW_TEST_TORN_DOWN:-}" ]] || return 0
     _SW_TEST_TORN_DOWN=1
     # tmux falls back to the developer's default socket when TMUX_TMPDIR names a missing directory,
-    # so the private directory must exist for every tmux call below and after. Recreate it if an
-    # earlier EXIT trap removed it, and never delete it here.
+    # so the private directory must exist for every tmux call below and after. It is never removed
+    # here; the next isolate call collects it once it carries a .done marker and is over a day old.
     mkdir -p "$_SW_TEST_TMUX_DIR"
 
-    local panes="" pids
+    local panes="$_SW_TEST_ROOT/teardown.panes" holders="$_SW_TEST_ROOT/teardown.holders"
+    local snap="$_SW_TEST_ROOT/teardown.snap" victims="$_SW_TEST_ROOT/teardown.victims"
+    : > "$panes"
+    : > "$holders"
     if command -v tmux >/dev/null 2>&1; then
-        panes="$(TMUX_TMPDIR="$_SW_TEST_TMUX_DIR" tmux list-panes -a -F '#{pane_pid}' 2>/dev/null | tr '\n' ' ' || true)"
+        TMUX_TMPDIR="$_SW_TEST_TMUX_DIR" tmux list-panes -a -F '#{pane_pid}' > "$panes" 2>/dev/null || true
     fi
-    # Pane shells are children of the tmux server, so they are not in this shell's tree: walk from them too.
-    pids="$panes $(_sw_test_descendants "$$ $panes" | tr '\n' ' ' || true) $(_sw_test_holder_pids | tr '\n' ' ') $(_sw_test_root_pids | tr '\n' ' ')"
-    _sw_test_kill_pids "$pids"
+    if command -v lsof >/dev/null 2>&1 && [[ -n "${_SW_TEST_LOCK:-}" ]]; then
+        lsof -t -- "$_SW_TEST_LOCK" > "$holders" 2>/dev/null || true
+    fi
+    ps -axwwo pid=,ppid=,command= > "$snap" 2>/dev/null || true
+    _sw_test_victims "$snap" "$panes" "$holders" > "$victims" 2>/dev/null || true
+    _sw_test_kill_pids "$(tr '\n' ' ' < "$victims")"
 
     if command -v tmux >/dev/null 2>&1; then
         TMUX_TMPDIR="$_SW_TEST_TMUX_DIR" tmux kill-server >/dev/null 2>&1 || true
     fi
+    : > "$_SW_TEST_TMUX_DIR/.done" 2>/dev/null || true
     case "${_SW_TEST_ROOT:-}" in
         */sw-test-iso.*) rm -rf "$_SW_TEST_ROOT" ;;
     esac
+    return 0
+}
+
+# Remove private tmux directories from finished runs (marked .done, over a day old). Never the current one.
+_sw_test_collect_done_dirs() {
+    local d
+    while IFS= read -r d; do
+        if [[ -n "$d" && "$d" != "$_SW_TEST_TMUX_DIR" && -f "$d/.done" ]]; then
+            rm -rf "$d"
+        fi
+    done < <(find /tmp -maxdepth 1 -name 'sw-test-tmux.*' -type d -mtime +1 2>/dev/null)
     return 0
 }
 
@@ -117,12 +144,25 @@ sw_test_isolate() {
     export SHIPWRIGHT_TEST_MODE=1
     _SW_TEST_REAL_TMUX_TMPDIR="${TMUX_TMPDIR:-}"
     _SW_TEST_REAL_HOME="${HOME:-}"
+    # Abort rather than run against the developer's tmux server: an empty TMUX_TMPDIR is never used.
     # /tmp is short enough for a unix socket path; mktemp under $TMPDIR on macOS is not.
-    _SW_TEST_TMUX_DIR="$(mktemp -d /tmp/sw-test-tmux.XXXXXX)"
-    _SW_TEST_ROOT="$(mktemp -d "${TMPDIR:-/tmp}/sw-test-iso.XXXXXX")"
-    # Lock fd: inherited by every descendant, so teardown can find orphans with lsof (see _sw_test_holder_pids).
+    _SW_TEST_TMUX_DIR="$(mktemp -d /tmp/sw-test-tmux.XXXXXX)" || _SW_TEST_TMUX_DIR=""
+    if [[ -z "$_SW_TEST_TMUX_DIR" || ! -d "$_SW_TEST_TMUX_DIR" ]]; then
+        echo "sw_test_isolate: cannot create a private tmux directory; refusing to run this suite" >&2
+        exit 1
+    fi
+    _sw_test_collect_done_dirs
+    _SW_TEST_ROOT="$(mktemp -d "${TMPDIR:-/tmp}/sw-test-iso.XXXXXX")" || _SW_TEST_ROOT=""
+    if [[ -z "$_SW_TEST_ROOT" || ! -d "$_SW_TEST_ROOT" ]]; then
+        echo "sw_test_isolate: cannot create the run directory; refusing to run this suite" >&2
+        exit 1
+    fi
+    # Lock fd: inherited by every descendant, so teardown can find orphans with lsof (see _sw_test_victims).
     _SW_TEST_LOCK="$_SW_TEST_ROOT/owner.lock"
     : > "$_SW_TEST_LOCK"
+    # bash 3.2 does not replace an inherited fd 190 on `exec 190>>`, so close it first: a nested suite
+    # gets its own lock, not its parent's.
+    exec 190>&- 2>/dev/null || true
     exec 190>>"$_SW_TEST_LOCK"
     export TMUX_TMPDIR="$_SW_TEST_TMUX_DIR"
     unset TMUX TMUX_PANE

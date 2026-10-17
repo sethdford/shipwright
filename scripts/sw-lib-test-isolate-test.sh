@@ -49,8 +49,10 @@ if [[ "$PROBE_TMUX_DIR" != "$REAL_TMUX_DIR" ]]; then
 else
     assert_fail "private TMUX_TMPDIR differs from the real one" "both are $REAL_TMUX_DIR"
 fi
-assert_eq "TMUX_TMPDIR is an isolated directory under /tmp" "1" \
-    "$(case "$PROBE_TMUX_DIR" in /tmp/sw-test-tmux.*) echo 1 ;; *) echo 0 ;; esac)"
+case "$PROBE_TMUX_DIR" in
+    /tmp/sw-test-tmux.*) assert_pass "TMUX_TMPDIR is an isolated directory under /tmp" ;;
+    *) assert_fail "TMUX_TMPDIR is an isolated directory under /tmp" "got: $PROBE_TMUX_DIR" ;;
+esac
 
 if kill -0 "$SLEEP_PID" 2>/dev/null; then
     assert_fail "background sleep is gone after the probe exits" "pid $SLEEP_PID still alive"

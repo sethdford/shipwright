@@ -34,6 +34,9 @@ setup_env() {
 
     # Copy sw-db.sh under test
     cp "$SCRIPT_DIR/sw-db.sh" "$TEST_TEMP_DIR/"
+    # sw-db.sh sources lib/compat.sh from its own directory; without it epoch_to_iso is undefined.
+    mkdir -p "$TEST_TEMP_DIR/lib"
+    cp "$SCRIPT_DIR/lib/compat.sh" "$TEST_TEMP_DIR/lib/"
 
     # Set up mock environment
     export HOME="$TEST_TEMP_DIR/home"
