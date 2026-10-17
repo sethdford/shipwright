@@ -25,16 +25,66 @@ export type QueryFn = (args: { prompt: string; options: Options }) => AsyncItera
 export type AgentEnv = Readonly<Record<string, string>>;
 type Success = SDKResultMessage & { subtype: "success" };
 
-const ENV_ALLOWLIST = ["PATH", "HOME", "TMPDIR", "LANG", "CLAUDE_CODE_OAUTH_TOKEN"] as const;
+// Mirrors the allowlist in scripts/lib/agent-exec.sh (keep the two in step). Proxy values may embed
+// credentials (http://user:pass@proxy): those are proxy credentials, not GitHub ones, and the agent
+// needs them to reach the API from behind a proxy.
+const ENV_ALLOWLIST = [
+  "PATH",
+  "HOME",
+  "USER",
+  "LOGNAME",
+  "SHELL",
+  "TERM",
+  "TZ",
+  "TMPDIR",
+  "LANG",
+  "CI",
+  "XDG_CONFIG_HOME",
+  "CLAUDE_CODE_OAUTH_TOKEN",
+  "ANTHROPIC_API_KEY",
+  "ANTHROPIC_AUTH_TOKEN",
+  "ANTHROPIC_BASE_URL",
+  "CLAUDE_CONFIG_DIR",
+  "ANTHROPIC_MODEL",
+  "ANTHROPIC_SMALL_FAST_MODEL",
+  "ANTHROPIC_DEFAULT_OPUS_MODEL",
+  "ANTHROPIC_DEFAULT_SONNET_MODEL",
+  "ANTHROPIC_DEFAULT_HAIKU_MODEL",
+  "CLAUDE_CODE_USE_BEDROCK",
+  "CLAUDE_CODE_USE_VERTEX",
+  "AWS_REGION",
+  "AWS_PROFILE",
+  "CLOUD_ML_REGION",
+  "ANTHROPIC_VERTEX_PROJECT_ID",
+  "HTTPS_PROXY",
+  "HTTP_PROXY",
+  "NO_PROXY",
+  "https_proxy",
+  "http_proxy",
+  "no_proxy",
+  "NODE_EXTRA_CA_CERTS",
+  "SSL_CERT_FILE",
+  "SSL_CERT_DIR",
+] as const;
+
+// AWS secret material only when Bedrock is the selected provider (CLAUDE_CODE_USE_BEDROCK=1).
+const BEDROCK_CREDENTIAL_ALLOWLIST = [
+  "AWS_ACCESS_KEY_ID",
+  "AWS_SECRET_ACCESS_KEY",
+  "AWS_SESSION_TOKEN",
+] as const;
 
 /** Builds the child-process environment from an allowlist; nothing else leaks to the agent. */
 export function agentEnv(source: Record<string, string | undefined>): AgentEnv {
   const env: Record<string, string> = {};
-  for (const key of ENV_ALLOWLIST) {
+  const keys: readonly string[] =
+    source.CLAUDE_CODE_USE_BEDROCK === "1"
+      ? [...ENV_ALLOWLIST, ...BEDROCK_CREDENTIAL_ALLOWLIST]
+      : ENV_ALLOWLIST;
+  for (const key of keys) {
     const value = source[key];
     if (value !== undefined) env[key] = value;
   }
-  if (source.ANTHROPIC_API_KEY !== undefined) env.ANTHROPIC_API_KEY = source.ANTHROPIC_API_KEY;
   env.CLAUDE_AGENT_SDK_CLIENT_APP = "shipwright";
   return env;
 }

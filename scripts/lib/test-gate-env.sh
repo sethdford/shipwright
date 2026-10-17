@@ -35,6 +35,16 @@ _SW_TEST_GATE_ENV_LOADED=1
 # _sw_scrub_github_creds — drop GitHub, fleet and git credentials from the current shell. Shared
 # with agent-exec.sh. It does not check for a subshell: each caller must (see sw_test_gate_scrub).
 # Returns 1 if the remote list cannot be read, so the caller can refuse to run.
+# _sw_has_password KEY-OR-URL — true when it embeds user:password@ (a token would be copied into the env).
+_sw_has_password() {
+    [[ "$1" =~ ://[^/[:space:]]*:[^/[:space:]]*@ ]]
+}
+
+# _sw_strip_userinfo URL — the URL without any user[:password]@ part.
+_sw_strip_userinfo() {
+    sed -E 's#^([A-Za-z][A-Za-z0-9+.-]*://)[^/@]*@#\1#' <<<"$1"
+}
+
 _sw_scrub_github_creds() {
     unset GH_TOKEN GITHUB_TOKEN GH_ENTERPRISE_TOKEN GITHUB_ENTERPRISE_TOKEN \
         SHIPWRIGHT_FLEET_TOKEN SHIPWRIGHT_FLEET_TOKEN_FILE
@@ -45,12 +55,13 @@ _sw_scrub_github_creds() {
         GIT_CONFIG_KEY_0=http.https://github.com/.extraheader GIT_CONFIG_VALUE_0='' \
         GIT_CONFIG_KEY_1=http.extraheader GIT_CONFIG_VALUE_1='' \
         GIT_CONFIG_KEY_2=credential.helper GIT_CONFIG_VALUE_2=''
-    local remotes saved rc=0 line url key n=3
+    local remotes saved insteadof rc=0 line url key n=3
     remotes="$(git config --get-regexp '^remote\..*\.(url|pushurl)$' 2>/dev/null)" || rc=$?
     # Status 1 means no remote is configured. Anything else (git missing, unreadable config) is not safe.
     [[ "$rc" -eq 0 || "$rc" -eq 1 ]] || return 1
     while IFS= read -r line; do
-        url="${line#* }"
+        # The remote's userinfo is dropped: the key built from it must not carry a token into the env.
+        url="$(_sw_strip_userinfo "${line#* }")"
         [[ -n "$url" ]] || continue
         export "GIT_CONFIG_KEY_$n=http.$url.extraheader" "GIT_CONFIG_VALUE_$n="
         n=$((n + 1))
@@ -65,9 +76,25 @@ _sw_scrub_github_creds() {
     [[ "$rc" -eq 0 || "$rc" -eq 1 ]] || return 1
     while IFS= read -r key; do
         [[ -n "$key" ]] || continue
+        if _sw_has_password "$key"; then
+            echo "agent-exec: git config key '$key' embeds a password; not resetting it into the environment" >&2
+            return 1
+        fi
         export "GIT_CONFIG_KEY_$n=$key" "GIT_CONFIG_VALUE_$n="
         n=$((n + 1))
     done <<<"$saved"
+    # A url.<base>.insteadOf whose base carries a password rewrites URLs to that credential. Its key
+    # cannot be named here without copying the password into the environment, so refuse instead.
+    rc=0
+    insteadof="$(git config --name-only --get-regexp '^url\..*\.insteadof$' 2>/dev/null)" || rc=$?
+    [[ "$rc" -eq 0 || "$rc" -eq 1 ]] || return 1
+    while IFS= read -r key; do
+        [[ -n "$key" ]] || continue
+        if _sw_has_password "$key"; then
+            echo "agent-exec: git config '$key' embeds a password; remove it before running an agent" >&2
+            return 1
+        fi
+    done <<<"$insteadof"
     export GIT_CONFIG_COUNT=$n
 }
 

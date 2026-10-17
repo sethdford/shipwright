@@ -195,6 +195,47 @@ if grep -q "$fake_token" <<<"$allow_env"; then assert_fail "allowlist: the rando
 assert_eq "allowlist: PATH reaches the agent" "yes" "$(grep -q '^PATH=' <<<"$allow_env" && echo yes || echo no)"
 assert_eq "allowlist: a SHIPWRIGHT_* run variable reaches the agent" "fake-run" "$( (cd "$git_repo" && SHIPWRIGHT_PIPELINE_ID=fake-run "$SW_AGENT_EXEC" claude 2>&1) | sed -n 's/^SHIPWRIGHT_PIPELINE_ID=//p')"
 
+print_test_section "agent exec: the allowlist covers what agents need, and nothing else"
+mock_binary "claude" 'env'
+allow2="$(cd "$git_repo" && env SSH_AUTH_SOCK=/tmp/x GITHUB_PAT=fake-pat FOO_TOKEN=fake-foo \
+    ANTHROPIC_AUTH_TOKEN=auth-ok ANTHROPIC_MODEL=model-ok HTTPS_PROXY=http://u:p@proxy:3128 https_proxy=http://proxy \
+    NODE_EXTRA_CA_CERTS=/ca.pem SSL_CERT_DIR=/cas CLAUDE_CODE_USE_VERTEX=1 CLOUD_ML_REGION=us-east5 \
+    ANTHROPIC_VERTEX_PROJECT_ID=proj AWS_REGION=us-east-1 CI=true XDG_CONFIG_HOME=/xdg \
+    AWS_SECRET_ACCESS_KEY=aws-secret-no-bedrock SHIPWRIGHT_GH_PAT=fake-pat-2 SHIPWRIGHT_BEARER=fake-bearer \
+    SHIPWRIGHT_DIR=/sw-dir SHIPWRIGHT_GITHUB_REPO=o/r "$SW_AGENT_EXEC" claude 2>&1)"
+for var in ANTHROPIC_AUTH_TOKEN ANTHROPIC_MODEL HTTPS_PROXY https_proxy NODE_EXTRA_CA_CERTS SSL_CERT_DIR \
+    CLAUDE_CODE_USE_VERTEX CLOUD_ML_REGION ANTHROPIC_VERTEX_PROJECT_ID AWS_REGION CI XDG_CONFIG_HOME \
+    SHIPWRIGHT_DIR SHIPWRIGHT_GITHUB_REPO; do
+    assert_eq "allowlist: $var reaches the agent" "yes" "$(grep -q "^${var}=" <<<"$allow2" && echo yes || echo no)"
+done
+assert_eq "allowlist: a proxy value passes through unchanged" "http://u:p@proxy:3128" \
+    "$(sed -n 's/^HTTPS_PROXY=//p' <<<"$allow2")"
+for var in SSH_AUTH_SOCK GITHUB_PAT FOO_TOKEN AWS_SECRET_ACCESS_KEY SHIPWRIGHT_GH_PAT SHIPWRIGHT_BEARER; do
+    assert_eq "allowlist: $var does not reach the agent (no Bedrock)" "no" "$(grep -q "^${var}=" <<<"$allow2" && echo yes || echo no)"
+done
+bedrock2="$(cd "$git_repo" && env CLAUDE_CODE_USE_BEDROCK=1 AWS_ACCESS_KEY_ID=fake-id AWS_SECRET_ACCESS_KEY=fake-aws-secret "$SW_AGENT_EXEC" claude 2>&1)"
+assert_eq "allowlist: AWS secret key reaches the agent only with Bedrock selected" "fake-aws-secret" "$(sed -n 's/^AWS_SECRET_ACCESS_KEY=//p' <<<"$bedrock2")"
+
+print_test_section "agent exec: remote URL userinfo never reaches the agent"
+git -C "$git_repo" remote set-url origin "https://x-access-token:SECRET-REMOTE@github.com/acme/repo.git"
+mock_binary "claude" 'env'
+remote_env="$(cd "$git_repo" && "$SW_AGENT_EXEC" claude 2>&1)"
+if grep -q SECRET-REMOTE <<<"$remote_env"; then assert_fail "a remote's password is not in the agent's environment"; else assert_pass "a remote's password is not in the agent's environment"; fi
+assert_eq "the remote's reset key is built from the URL without userinfo" "yes" \
+    "$(grep -q '^GIT_CONFIG_KEY_[0-9]*=http.https://github.com/acme/repo.git.extraheader$' <<<"$remote_env" && echo yes || echo no)"
+git -C "$git_repo" remote set-url origin https://example.invalid/acme/repo.git
+
+print_test_section "agent exec: a credential in url.insteadOf makes the launcher refuse to run the agent"
+git -C "$git_repo" config "url.https://x:SECRET-INSTEAD@github.com/.insteadOf" "https://github.com/"
+marker_insteadof="$TEST_TEMP_DIR/agent-ran-insteadof"
+mock_binary "claude" "touch '$marker_insteadof'"
+rc=0; (cd "$git_repo" && "$SW_AGENT_EXEC" claude >/dev/null 2>&1) || rc=$?
+assert_eq "the agent does not run while a credential insteadOf is configured" "no" "$([[ -e "$marker_insteadof" ]] && echo yes || echo no)"
+assert_eq "the refusal exits non-zero" "true" "$([[ "$rc" -ne 0 ]] && echo true || echo false)"
+rc=0; (cd "$git_repo" && sw_test_gate_env bash -c 'exit 0') >/dev/null 2>&1 || rc=$?
+assert_eq "the test gate refuses too (fail closed)" "true" "$([[ "$rc" -ne 0 ]] && echo true || echo false)"
+git -C "$git_repo" config --unset "url.https://x:SECRET-INSTEAD@github.com/.insteadOf"
+
 print_test_section "agent exec: exit status and process identity"
 mock_binary "claude" 'exit 7'
 rc=0; "$SW_AGENT_EXEC" claude >/dev/null 2>&1 || rc=$?
@@ -283,7 +324,7 @@ done
 assert_eq "no agent claude invocation bypasses agent-exec (scripts, hooks, install.sh)" "0" "$unrouted_total"
 # Heredoc launchers (sw-session.sh) are templates: ast-grep and the regex above cannot see them. They
 # must name the helper through the placeholder that awk fills with SW_AGENT_EXEC.
-assert_eq "session launchers run claude through agent-exec (both templates)" "2" "$(grep -c "^\"__AGENT_EXEC__\" claude __CLAUDE_FLAGS__" "$SCRIPT_DIR/sw-session.sh")"
+assert_eq "session launchers run claude through agent-exec (both templates)" "2" "$(grep -c "^__AGENT_EXEC__ claude __CLAUDE_FLAGS__" "$SCRIPT_DIR/sw-session.sh")"
 assert_eq "session launchers fill the placeholder from SW_AGENT_EXEC (both fill calls)" "2" "$(grep -c '_sw_fill_launcher "\$LAUNCHER"' "$SCRIPT_DIR/sw-session.sh")"
 assert_eq "session launchers fill through the literal helper (no gsub or awk -v)" "0" "$(grep -cE 'gsub\(/__|awk -v' "$SCRIPT_DIR/sw-session.sh" || true)"
 assert_eq "no session hint tells the user to type bare claude" "0" "$(grep -c "Type 'claude' to restart" "$SCRIPT_DIR/sw-session.sh" || true)"
@@ -294,6 +335,13 @@ printf '%s\n' 'cd __DIR__ || exit 1' 'PROMPT=$(cat __PROMPT__)' '"__AGENT_EXEC__
 hostile_dir='/x&y"q'
 hostile_prompt='/p&q'
 filled="$(SW_DIR="$hostile_dir" SW_PROMPT="$hostile_prompt" SW_FLAGS="--f" SW_AGENT_EXEC="/s/agent.sh" bash -c 'source "$1"; _sw_fill_launcher "$2"' _ "$fill_fn" "$TEST_TEMP_DIR/fill-tpl.sh")"
+# printf %q values survive the shell: a filled template that prints the helper path prints it back as
+# one argument (the template is run as a file, not built into a string).
+odd_exec="/tmp/sw odd dir/agent-exec's.sh"
+odd_q="$(printf '%q' "$odd_exec")"
+printf '%s\n' 'printf "%s\n" __AGENT_EXEC__' > "$TEST_TEMP_DIR/fill-odd.sh"
+SW_AGENT_EXEC="$odd_q" bash -c 'source "$1"; _sw_fill_launcher "$2" > "$3"' _ "$fill_fn" "$TEST_TEMP_DIR/fill-odd.sh" "$TEST_TEMP_DIR/fill-odd-out.sh"
+assert_eq "a %q helper path splits back into one word" "$odd_exec" "$(bash "$TEST_TEMP_DIR/fill-odd-out.sh")"
 assert_eq "the fill writes a path with & and \" literally" "cd $hostile_dir || exit 1" "$(sed -n 1p <<<"$filled")"
 assert_eq "the fill writes a prompt path with & literally" "PROMPT=\$(cat $hostile_prompt)" "$(sed -n 2p <<<"$filled")"
 assert_eq "the fill writes the agent-exec path" '"/s/agent.sh" claude --f' "$(sed -n 3p <<<"$filled")"

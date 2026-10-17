@@ -14,6 +14,8 @@ set -euo pipefail
 
 # Agents run without GitHub credentials (#8614): claude is launched through agent-exec.sh.
 SW_AGENT_EXEC="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/lib/agent-exec.sh"
+# The helper's path as a shell word (printf %q): a path with spaces, quotes or $ stays one command.
+SW_AGENT_EXEC_Q="$(printf '%q' "$SW_AGENT_EXEC")"
 
 # _sw_fill_launcher TEMPLATE — write TEMPLATE to stdout with each __PLACEHOLDER__ replaced by the
 # value of its SW_* environment variable. Literal replacement via index(): a path with & \ or " is
@@ -389,9 +391,9 @@ cd "${PROJECT_DIR}" || exit 1
 printf '\\033]2;${TEAM_NAME}-lead\\033\\\\'
 PROMPT=\$(cat <prompt-file>)
 rm -f <prompt-file> "\$0"
-"${SW_AGENT_EXEC}" claude${DRY_RUN_FLAGS} "\$PROMPT"
+${SW_AGENT_EXEC_Q} claude${DRY_RUN_FLAGS} "\$PROMPT"
 echo ""
-echo "Claude exited. Restart with: ${SW_AGENT_EXEC} claude, or 'exit' to close."
+echo "Claude exited. Restart with: ${SW_AGENT_EXEC_Q} claude, or 'exit' to close."
 exec "\$SHELL" -l
 EOF
     else
@@ -400,9 +402,9 @@ EOF
 cd "${PROJECT_DIR}" || exit 1
 printf '\\033]2;${TEAM_NAME}-lead\\033\\\\'
 rm -f "\$0"
-"${SW_AGENT_EXEC}" claude${DRY_RUN_FLAGS}
+${SW_AGENT_EXEC_Q} claude${DRY_RUN_FLAGS}
 echo ""
-echo "Claude exited. Restart with: ${SW_AGENT_EXEC} claude, or 'exit' to close."
+echo "Claude exited. Restart with: ${SW_AGENT_EXEC_Q} claude, or 'exit' to close."
 exec "\$SHELL" -l
 EOF
     fi
@@ -460,7 +462,7 @@ cd __DIR__ || exit 1
 printf '\033]2;__TEAM__-lead\033\\'
 PROMPT=$(cat __PROMPT__)
 rm -f __PROMPT__ "$0"
-"__AGENT_EXEC__" claude __CLAUDE_FLAGS__ "$PROMPT"
+__AGENT_EXEC__ claude __CLAUDE_FLAGS__ "$PROMPT"
 echo ""
 echo "Claude exited. Restart with: __AGENT_EXEC__ claude, or 'exit' to close."
 exec "$SHELL" -l
@@ -470,7 +472,7 @@ LAUNCHER_STATIC
             CLAUDE_FLAGS="--dangerously-skip-permissions"
         fi
         # Use awk for safe string replacement — sed breaks on & | \ in paths
-        SW_DIR="$PROJECT_DIR" SW_TEAM="$TEAM_NAME" SW_PROMPT="$PROMPT_FILE" SW_FLAGS="$CLAUDE_FLAGS" SW_AGENT_EXEC="$SW_AGENT_EXEC" \
+        SW_DIR="$(printf '%q' "$PROJECT_DIR")" SW_TEAM="$TEAM_NAME" SW_PROMPT="$(printf '%q' "$PROMPT_FILE")" SW_FLAGS="$CLAUDE_FLAGS" SW_AGENT_EXEC="$SW_AGENT_EXEC_Q" \
             _sw_fill_launcher "$LAUNCHER" > "${LAUNCHER}.tmp" && mv "${LAUNCHER}.tmp" "$LAUNCHER"
         chmod +x "$LAUNCHER"
 
@@ -492,7 +494,7 @@ LAUNCHER_STATIC
 cd __DIR__ || exit 1
 printf '\033]2;__TEAM__-lead\033\\'
 rm -f "$0"
-"__AGENT_EXEC__" claude __CLAUDE_FLAGS__
+__AGENT_EXEC__ claude __CLAUDE_FLAGS__
 echo ""
 echo "Claude exited. Restart with: __AGENT_EXEC__ claude, or 'exit' to close."
 exec "$SHELL" -l
@@ -502,7 +504,7 @@ LAUNCHER_STATIC
             CLAUDE_FLAGS="--dangerously-skip-permissions"
         fi
         # Use awk for safe string replacement — sed breaks on & | \ in paths
-        SW_DIR="$PROJECT_DIR" SW_TEAM="$TEAM_NAME" SW_FLAGS="$CLAUDE_FLAGS" SW_AGENT_EXEC="$SW_AGENT_EXEC" \
+        SW_DIR="$(printf '%q' "$PROJECT_DIR")" SW_TEAM="$TEAM_NAME" SW_FLAGS="$CLAUDE_FLAGS" SW_AGENT_EXEC="$SW_AGENT_EXEC_Q" \
             _sw_fill_launcher "$LAUNCHER" > "${LAUNCHER}.tmp" && mv "${LAUNCHER}.tmp" "$LAUNCHER"
         chmod +x "$LAUNCHER"
 
@@ -515,7 +517,7 @@ LAUNCHER_STATIC
     else
         # --no-launch: create window with a regular shell
         tmux new-window -n "$WINDOW_NAME" -c "$PROJECT_DIR"
-        info "Window ready. Launch Claude manually: ${DIM}\"${SW_AGENT_EXEC}\" claude${RESET}"
+        info "Window ready. Launch Claude manually: ${DIM}${SW_AGENT_EXEC_Q} claude${RESET}"
     fi
 
     # Apply dark theme after a brief delay to ensure the shell has started.
