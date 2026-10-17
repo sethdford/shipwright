@@ -534,7 +534,7 @@ test_testgen_claude_assertions() {
 
 # ── 3.4 Testgen: prompt piped to avoid shell expansion ──────────────────────
 test_testgen_no_shell_expansion() {
-    grep -q 'cat "$prompt_file" | claude -p' "$SCRIPT_DIR/sw-testgen.sh" || {
+    grep -Fq 'cat "$prompt_file" | "$SW_AGENT_EXEC" claude -p' "$SCRIPT_DIR/sw-testgen.sh" || {
         echo "Testgen should pipe prompt to claude to avoid shell expansion"
         return 1
     }

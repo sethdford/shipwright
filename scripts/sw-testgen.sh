@@ -4,6 +4,9 @@
 # ║  Analyze coverage · Generate tests · Maintain thresholds · Score quality  ║
 # ╚═══════════════════════════════════════════════════════════════════════════╝
 set -euo pipefail
+
+# Agents run without GitHub credentials (#8614): claude is launched through agent-exec.sh.
+SW_AGENT_EXEC="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/lib/agent-exec.sh"
 trap 'echo "ERROR: $BASH_SOURCE:$LINENO exited with status $?" >&2' ERR
 
 VERSION="3.3.0"
@@ -248,7 +251,7 @@ EOF
                 } > "$prompt_file"
                 local claude_out
                 # Read prompt through pipe to avoid shell expansion of $vars in function body
-                claude_out=$(cat "$prompt_file" | claude -p --max-turns 2 2>/dev/null || true)
+                claude_out=$(cat "$prompt_file" | "$SW_AGENT_EXEC" claude -p --max-turns 2 2>/dev/null || true)
                 rm -f "$prompt_file"
                 if [[ -n "$claude_out" ]]; then
                     local code_block

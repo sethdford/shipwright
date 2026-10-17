@@ -4,10 +4,27 @@ valid:
   - 'timeout 300 env -u GH_TOKEN -u GITHUB_TOKEN claude -p "$prompt"'
   - 'env --unset=GH_TOKEN --unset=GITHUB_TOKEN claude -p "$prompt"'
   - 'sw_claude -p "$prompt"'
+  - '"$SW_AGENT_EXEC" claude -p "$prompt"'
+  - '"$SW_AGENT_EXEC" $TIMEOUT_CMD "$t" claude -p "$p"'
+  - 'timeout 300 "$SW_AGENT_EXEC" claude -p "$p"'
+  - 'jq -n --argjson claude "$c" "{}"'
   - 'command -v claude >/dev/null'
   - 'which claude'
   - 'info "claude is ready"'
   - 'echo "$CLAUDE_BIN"'
+  - 'grep -q claude "$log"'
+  - 'chmod +x /usr/local/bin/claude'
+  - '[ -x "$CLAUDE_BIN" ]'
+  - "bash -c '\"$SW_AGENT_EXEC\" claude -p x'"
+  - 'cmd=("$SW_AGENT_EXEC" claude -p "$p")'
+  - 'timeout 5 "$SW_AGENT_EXEC" claude -p "$p"'
+  - '"$SW_AGENT_EXEC" claude -p "$SW_AGENT_EXEC" claude'
+  - "pgrep -f claude"
+  - "pkill -f claude"
+  - "ln -s /usr/local/bin/claude \"$dest\""
+  - "timeout 5 bash -c '\"$SW_AGENT_EXEC\" claude -p x'"
+  - "sudo -E bash -c '\"$SW_AGENT_EXEC\" claude -p x'"
+  - "echo \"${CLAUDE:-claude}\""
 invalid:
   - 'claude -p "$prompt" --model "$m"'
   - 'out=$(claude --print "$p" 2>&1)'
@@ -15,6 +32,10 @@ invalid:
   - '$TIMEOUT_CMD "$CLAUDE_TIMEOUT" claude -p "$p"'
   - 'env -u GH_TOKEN claude -p "$p"'
   - 'nohup claude -p "$p" > "$log" 2>&1 &'
+  - 'foo claude -p "$p"'
+  - '"$OTHER_EXEC" claude -p "$p"'
+  - 'timeout 5 claude -p "$SW_AGENT_EXEC"'
+  - 'timeout 5 "$CLAUDE_BIN" -p "$p"'
   - 'command claude -p "$p"'
   - '"claude" -p "$p"'
   - '/usr/local/bin/claude -p "$p"'
@@ -23,3 +44,24 @@ invalid:
   - 'claude -p "$p" GH_TOKEN GITHUB_TOKEN'
   - 'time claude -p "$p"'
   - 'x=$(time claude -p "$p")'
+  - '$(command -v claude) -p "$p"'
+  - '$CLAUDE -p "$p"'
+  - '$claude_bin -p "$p"'
+  - "bash -c 'claude -p \"$p\"'"
+  - 'sh -c "claude -p $p"'
+  - "eval 'claude -p x'"
+  - '\claude -p "$p"'
+  - 'cmd=(claude -p "$p")'
+  - 'cmd=("$CLAUDE_BIN" -p "$p")'
+  - 'timeout 5 claude -p "$SW_AGENT_EXEC" claude'
+  - 'x=$(claude -p "$SW_AGENT_EXEC")'
+  - 'timeout 5 "$CLAUDE_BIN" -p "$p"'
+  - "timeout 5 bash -c \"claude -p $p\""
+  - "nohup sh -c 'claude -p x' &"
+  - "sudo -E bash -c \"claude -p x\""
+  - "\"${CLAUDE:-claude}\" -p \"$p\""
+  - "\"${CLAUDE_BIN:-claude}\" -p \"$p\""
+  - "`command -v claude` -p x"
+  - "eval \"$CLAUDE_CMD -p\""
+  - "bash -c '\"$SW_AGENT_EXEC\" claude -p x; claude -p y'"
+  - "timeout 5 bash -c 'claude -p x'"

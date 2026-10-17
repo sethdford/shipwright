@@ -23,6 +23,7 @@ mkdir -p "$TEST_REPO/scripts/lib" "$TEST_REPO/config" "$TEST_REPO/.claude/eviden
 cp "$SCRIPT_DIR/sw-evidence.sh" "$TEST_REPO/scripts/"
 [[ -f "$SCRIPT_DIR/lib/compat.sh" ]] && cp "$SCRIPT_DIR/lib/compat.sh" "$TEST_REPO/scripts/lib/"
 [[ -f "$SCRIPT_DIR/lib/helpers.sh" ]] && cp "$SCRIPT_DIR/lib/helpers.sh" "$TEST_REPO/scripts/lib/"
+cp "$SCRIPT_DIR/lib/test-gate-env.sh" "$TEST_REPO/scripts/lib/"
 
 # Policy fixture with evidence.collectors (CLI-only for reliability)
 cat > "$TEST_REPO/config/policy.json" <<'POLICY'

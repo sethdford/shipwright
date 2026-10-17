@@ -1,4 +1,7 @@
 #!/usr/bin/env bash
+
+# Agents run without GitHub credentials (#8614): claude is launched through agent-exec.sh.
+SW_AGENT_EXEC="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/agent-exec.sh"
 # Module guard - prevent double-sourcing
 [[ -n "${_LOOP_ITERATION_LOADED:-}" ]] && return 0
 _LOOP_ITERATION_LOADED=1
@@ -632,9 +635,9 @@ run_claude_iteration() {
     # shellcheck disable=SC2086
     local err_file="${json_file%.json}.stderr"
     if [[ -n "$TIMEOUT_CMD" ]]; then
-        $TIMEOUT_CMD "$CLAUDE_TIMEOUT" claude -p "$final_prompt" $flags > "$json_file" 2>"$err_file" &
+        "$SW_AGENT_EXEC" $TIMEOUT_CMD "$CLAUDE_TIMEOUT" claude -p "$final_prompt" $flags > "$json_file" 2>"$err_file" &
     else
-        claude -p "$final_prompt" $flags > "$json_file" 2>"$err_file" &
+        "$SW_AGENT_EXEC" claude -p "$final_prompt" $flags > "$json_file" 2>"$err_file" &
     fi
     CHILD_PID=$!
     wait "$CHILD_PID" 2>/dev/null || exit_code=$?

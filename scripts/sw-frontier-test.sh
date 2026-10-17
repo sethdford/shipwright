@@ -37,6 +37,9 @@ setup_env() {
     cp "$SCRIPT_DIR/sw-developer-simulation.sh" "$TEST_TEMP_DIR/project/scripts/"
     cp "$SCRIPT_DIR/sw-architecture-enforcer.sh" "$TEST_TEMP_DIR/project/scripts/"
     cp "$SCRIPT_DIR/sw-intelligence.sh" "$TEST_TEMP_DIR/project/scripts/"
+    # The agent launcher sits beside the scripts (SW_AGENT_EXEC=lib/agent-exec.sh); it sources test-gate-env.sh.
+    mkdir -p "$TEST_TEMP_DIR/project/scripts/lib"
+    cp "$SCRIPT_DIR/lib/agent-exec.sh" "$SCRIPT_DIR/lib/test-gate-env.sh" "$TEST_TEMP_DIR/project/scripts/lib/"
 
     # Create daemon-config with all flags enabled
     cat > "$TEST_TEMP_DIR/project/.claude/daemon-config.json" <<'EOF'

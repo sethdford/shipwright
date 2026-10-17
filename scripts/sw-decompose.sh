@@ -4,6 +4,9 @@
 # ║  Analyze complexity · Auto-create subtasks · Track progress             ║
 # ╚═══════════════════════════════════════════════════════════════════════════╝
 set -euo pipefail
+
+# Agents run without GitHub credentials (#8614): claude is launched through agent-exec.sh.
+SW_AGENT_EXEC="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/lib/agent-exec.sh"
 trap 'echo "ERROR: $BASH_SOURCE:$LINENO exited with status $?" >&2' ERR
 
 # shellcheck disable=SC2034
@@ -83,7 +86,7 @@ _decompose_call_claude() {
 
     # Call Claude (--print mode returns raw text response, max-turns 1)
     local response
-    if ! response=$(claude --print --max-turns 1 "$prompt" 2>/dev/null); then
+    if ! response=$("$SW_AGENT_EXEC" claude --print --max-turns 1 "$prompt" 2>/dev/null); then
         error "Claude call failed"
         echo '{"error":"claude_call_failed"}'
         return 1

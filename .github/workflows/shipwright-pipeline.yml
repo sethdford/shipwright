@@ -207,7 +207,7 @@ jobs:
               npm install -g @anthropic-ai/claude-code@2.1.301 2>/dev/null || true
             fi
 
-            RESPONSE=$(claude -p "$PROMPT_TEXT" --max-turns 1 --model claude-haiku-5-5 2>/dev/null || echo "")
+            RESPONSE=$(scripts/lib/agent-exec.sh claude -p "$PROMPT_TEXT" --max-turns 1 --model claude-haiku-5-5 2>/dev/null || echo "")
 
             # Fail-safe: if Claude returns empty/garbage, reject (do not auto-approve)
             if [[ -z "$RESPONSE" ]]; then
@@ -385,6 +385,24 @@ jobs:
       TEMPLATE: ${{ needs.triage.outputs.template || github.event.inputs.template || 'autonomous' }}
       MAX_ITERATIONS: ${{ needs.triage.outputs.max_iterations || '20' }}
       COMPLETED_STAGES: ${{ github.event.inputs.completed_stages || '' }}
+      # Orchestrator git network and commit ops (fetch, push, ls-remote, the state commit) authenticate per
+      # command through the inline credential helper at KEY_2. credential.helper is a list that accumulates
+      # across config scopes, so KEY_0 resets it, then KEY_1 resets the github.com-scoped list, and only
+      # then does KEY_2 add the helper (a reset after the helper would clear it for github.com). Without
+      # the reset a helper the agent adds to .git/config would receive the token on a push. KEY_3/KEY_4 stop
+      # repo config from running hooks and fsmonitor programs in these steps. The helper is a config value,
+      # not a file. agent-exec.sh drops every GIT_CONFIG_* and GITHUB_TOKEN from the agent's environment.
+      GIT_CONFIG_COUNT: "5"
+      GIT_CONFIG_KEY_0: credential.helper
+      GIT_CONFIG_VALUE_0: ''
+      GIT_CONFIG_KEY_1: credential.https://github.com.helper
+      GIT_CONFIG_VALUE_1: ''
+      GIT_CONFIG_KEY_2: credential.helper
+      GIT_CONFIG_VALUE_2: '!f() { test "$1" = get || exit 0; proto=; host=; while IFS= read -r l && [ -n "$l" ]; do case "$l" in protocol=*) proto=${l#protocol=};; host=*) host=${l#host=};; esac; done; t=${GITHUB_TOKEN:-$GH_TOKEN}; if [ "$proto" = https ] && [ "$host" = github.com ] && [ -n "$t" ]; then printf "username=x-access-token\npassword=%s\n" "$t"; fi; }; f'
+      GIT_CONFIG_KEY_3: core.hooksPath
+      GIT_CONFIG_VALUE_3: /dev/null
+      GIT_CONFIG_KEY_4: core.fsmonitor
+      GIT_CONFIG_VALUE_4: "false"
       CLAUDE_CODE_OAUTH_TOKEN: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
       GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       NO_COLOR: "1"
@@ -393,6 +411,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           fetch-depth: 0
+          persist-credentials: false
 
       - name: Configure git
         run: |
@@ -432,7 +451,7 @@ jobs:
       - name: Pre-flight auth check
         run: |
           echo "Verifying Claude Code authentication..."
-          if claude -p "Reply with exactly: AUTH_OK" --max-turns 1 2>/tmp/auth-check-err.log | grep -q "AUTH_OK"; then
+          if scripts/lib/agent-exec.sh claude -p "Reply with exactly: AUTH_OK" --max-turns 1 2>/tmp/auth-check-err.log | grep -q "AUTH_OK"; then
             echo "Claude Code authentication verified"
           else
             echo "::error::Claude Code authentication failed — check CLAUDE_CODE_OAUTH_TOKEN secret"
@@ -872,7 +891,7 @@ jobs:
           SW_STATE_DIR=$(mktemp -d)
           cd "$SW_STATE_DIR"
           git init
-          git remote add origin "https://x-access-token:${GITHUB_TOKEN}@github.com/${GITHUB_REPOSITORY}.git"
+          git remote add origin "https://github.com/${GITHUB_REPOSITORY}.git"
           if git fetch origin shipwright-data 2>/dev/null; then
             git checkout -b shipwright-data origin/shipwright-data
           else

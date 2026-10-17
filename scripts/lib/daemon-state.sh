@@ -1,4 +1,7 @@
 # daemon-state.sh — State, queue, claim (for sw-daemon.sh)
+
+# Agents run without GitHub credentials (#8614): claude is launched through agent-exec.sh.
+SW_AGENT_EXEC="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/agent-exec.sh"
 # Source from sw-daemon.sh. Requires STATE_FILE, helpers.
 [[ -n "${_DAEMON_STATE_LOADED:-}" ]] && return 0
 _DAEMON_STATE_LOADED=1
@@ -169,7 +172,7 @@ daemon_preflight_auth_check() {
     local claude_auth_ok=false
     if command -v claude >/dev/null 2>&1; then
         local _ver
-        _ver=$(unset CLAUDECODE; claude --version 2>/dev/null || true)
+        _ver=$(unset CLAUDECODE; "$SW_AGENT_EXEC" claude --version 2>/dev/null || true)
         if [[ -n "$_ver" ]]; then
             claude_auth_ok=true
         fi

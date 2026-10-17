@@ -3,6 +3,9 @@
 # Utility functions: coverage parsing, cost estimation, notifications, error classification
 set -euo pipefail
 
+# Agents run without GitHub credentials (#8614): claude is launched through agent-exec.sh.
+SW_AGENT_EXEC="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/agent-exec.sh"
+
 # Module guard
 [[ -n "${_MODULE_PIPELINE_UTIL_LOADED:-}" ]] && return 0; _MODULE_PIPELINE_UTIL_LOADED=1
 
@@ -435,7 +438,7 @@ classify_error() {
     # Intelligence fallback: Claude classification for unknown errors
     elif [[ "$classification" == "unknown" ]] && type intelligence_search_memory >/dev/null 2>&1 && command -v claude >/dev/null 2>&1; then
         local ai_class
-        ai_class=$(claude --print --output-format text -p "Classify this error as exactly one of: infrastructure, configuration, logic, unknown.
+        ai_class=$("$SW_AGENT_EXEC" claude --print --output-format text -p "Classify this error as exactly one of: infrastructure, configuration, logic, unknown.
 
 Error output:
 $(echo "$log_tail" | tail -20)

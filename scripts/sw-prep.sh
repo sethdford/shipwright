@@ -4,6 +4,9 @@
 # ║  Analyze repos · Generate configs · Equip autonomous agents            ║
 # ╚═══════════════════════════════════════════════════════════════════════════╝
 set -euo pipefail
+
+# Agents run without GitHub credentials (#8614): claude is launched through agent-exec.sh.
+SW_AGENT_EXEC="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/lib/agent-exec.sh"
 trap 'echo "ERROR: $BASH_SOURCE:$LINENO exited with status $?" >&2' ERR
 
 VERSION="3.3.0"
@@ -728,7 +731,7 @@ Style samples (analyze imports, naming, code style):
 ${style_samples}"
 
     local analysis
-    analysis=$(claude --print "$prompt" 2>/dev/null || true)
+    analysis=$("$SW_AGENT_EXEC" claude --print "$prompt" 2>/dev/null || true)
 
     [[ -z "$analysis" ]] && { warn "Smart detection returned empty — using grep results"; return 0; }
 
@@ -1459,7 +1462,7 @@ prep_with_claude() {
     fi
 
     local analysis
-    analysis=$(claude --print "Analyze this ${LANG_DETECTED:-} / ${FRAMEWORK:-} repository and provide:
+    analysis=$("$SW_AGENT_EXEC" claude --print "Analyze this ${LANG_DETECTED:-} / ${FRAMEWORK:-} repository and provide:
 1. A 2-3 sentence architecture overview
 2. Key patterns and conventions you observe
 3. Potential pitfalls for developers new to this codebase
