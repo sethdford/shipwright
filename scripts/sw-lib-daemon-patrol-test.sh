@@ -452,7 +452,7 @@ assert_eq "untracked stray.md is not committed" "0" \
 assert_eq "nothing pushed to origin" "0" \
     "$(git -C "$DOCS_REPO.git" rev-parse --verify -q shipwright/docs-sync >/dev/null && echo 1 || echo 0)"
 assert_eq "no temporary worktree remains" "1" "$(worktree_count "$DOCS_REPO")"
-assert_eq "lock is released after the run" "0" "$([[ -e "$DOCS_REPO/$DOCS_LOCK_REL" ]] && echo 1 || echo 0)"
+assert_eq "lock is released after the run" "0" "$([[ -L "$DOCS_REPO/$DOCS_LOCK_REL" ]] && echo 1 || echo 0)"
 
 # NO_GITHUB=true: no sync, no branch
 git -C "$DOCS_REPO" branch -q -D shipwright/docs-sync
@@ -473,7 +473,7 @@ assert_eq "no-op sync deletes the docs-sync branch it created" "0" "$(branch_exi
 # Leaked worktree from a SIGKILLed run (dead or absent pid): the next run removes it and succeeds
 LEAK=$(mktemp -d "$TMP_REAL/sw-docs-sync.XXXXXX")
 git -C "$DOCS_REPO" worktree add -q -B shipwright/docs-sync "$LEAK" origin/main
-: > "$LEAK/.sw-docs-sync.marker"
+: > "$LEAK.marker"
 rc=0
 synced_branch=$(patrol_docs_autosync "$DOCS_REPO") || rc=$?
 assert_eq "run after leaked worktree succeeds" "0" "$rc"
@@ -484,14 +484,14 @@ assert_eq "only the main worktree remains" "1" "$(worktree_count "$DOCS_REPO")"
 # Live run holds a leaked-looking worktree (its pid is alive): nothing is removed, run skipped
 LIVE=$(mktemp -d "$TMP_REAL/sw-docs-sync.XXXXXX")
 git -C "$DOCS_REPO" worktree add -q -B shipwright/docs-sync "$LIVE" origin/main
-: > "$LIVE/.sw-docs-sync.marker"
 sleep 300 &
 live_pid=$!
-echo "$live_pid" > "$LIVE/.sw-docs-sync.pid"
+echo "$live_pid" > "$LIVE.pid"
+: > "$LIVE.marker"
 rc=0
 patrol_docs_autosync "$DOCS_REPO" >/dev/null 2>&1 || rc=$?
 assert_eq "live-pid worktree makes the run skip (exit 2)" "2" "$rc"
-assert_eq "live-pid worktree is left intact" "1" "$([[ -f "$LIVE/.sw-docs-sync.pid" ]] && echo 1 || echo 0)"
+assert_eq "live-pid worktree is left intact" "1" "$([[ -f "$LIVE.pid" ]] && echo 1 || echo 0)"
 kill "$live_pid" 2>/dev/null || true
 wait "$live_pid" 2>/dev/null || true
 git -C "$DOCS_REPO" worktree remove --force "$LIVE"
@@ -597,7 +597,7 @@ make_docs_repo "$REPO13" main
 (export STUB_DOCS_SLEEP=3; patrol_docs_autosync "$REPO13" > "$TEST_TEMP_DIR/run-a.out" 2>/dev/null) &
 pid_a=$!
 i=0
-while [[ ! -d "$REPO13/$DOCS_LOCK_REL" ]] && [[ "$i" -lt 100 ]]; do
+while [[ ! -L "$REPO13/$DOCS_LOCK_REL" ]] && [[ "$i" -lt 100 ]]; do
     sleep 0.1
     i=$((i + 1))
 done
@@ -610,7 +610,7 @@ assert_eq "#13 first concurrent run commits and exits 0" "0" "$rc_a"
 assert_eq "#13 first run's commit survives the second run" "shipwright/docs-sync" "$(cat "$TEST_TEMP_DIR/run-a.out")"
 assert_eq "#13 docs-sync branch holds the patrol commit" "1" \
     "$(git -C "$REPO13" log -1 --format=%B shipwright/docs-sync | grep -c '^Shipwright-Patrol: docs-sync$' || true)"
-assert_eq "#13 lock released after the first run" "0" "$([[ -e "$REPO13/$DOCS_LOCK_REL" ]] && echo 1 || echo 0)"
+assert_eq "#13 lock released after the first run" "0" "$([[ -L "$REPO13/$DOCS_LOCK_REL" ]] && echo 1 || echo 0)"
 
 # Lock left by a dead holder is stolen
 REPO_STALE="$TEST_TEMP_DIR/repo-stale-lock"
@@ -618,20 +618,18 @@ make_docs_repo "$REPO_STALE" main
 (exit 0) &
 dead_pid=$!
 wait "$dead_pid" || true
-mkdir -p "$REPO_STALE/$DOCS_LOCK_REL"
-echo "$dead_pid $(date +%s)" > "$REPO_STALE/$DOCS_LOCK_REL/pid"
+ln -s "$dead_pid $(date +%s)" "$REPO_STALE/$DOCS_LOCK_REL"
 rc=0
 synced_branch=$(patrol_docs_autosync "$REPO_STALE") || rc=$?
 assert_eq "dead-holder lock is stolen and the run succeeds" "0" "$rc"
-assert_eq "dead-holder lock is released after the run" "0" "$([[ -e "$REPO_STALE/$DOCS_LOCK_REL" ]] && echo 1 || echo 0)"
+assert_eq "dead-holder lock is released after the run" "0" "$([[ -L "$REPO_STALE/$DOCS_LOCK_REL" ]] && echo 1 || echo 0)"
 
 # Lock held by a live pid but older than the age cap (pid reuse backstop): stolen
 REPO_AGE="$TEST_TEMP_DIR/repo-lock-age"
 make_docs_repo "$REPO_AGE" main
 sleep 300 &
 age_pid=$!
-mkdir -p "$REPO_AGE/$DOCS_LOCK_REL"
-echo "$age_pid 0" > "$REPO_AGE/$DOCS_LOCK_REL/pid"
+ln -s "$age_pid 0" "$REPO_AGE/$DOCS_LOCK_REL"
 rc=0
 synced_branch=$(patrol_docs_autosync "$REPO_AGE") || rc=$?
 kill "$age_pid" 2>/dev/null || true
@@ -646,11 +644,12 @@ make_docs_repo "$REPO14" main
 ( export STUB_DOCS_SLEEP=3; patrol_docs_autosync "$REPO14" >/dev/null 2>&1 ) &
 outer_pid=$!
 i=0
-while [[ ! -s "$REPO14/$DOCS_LOCK_REL/pid" ]] && [[ "$i" -lt 100 ]]; do
+while [[ ! -L "$REPO14/$DOCS_LOCK_REL" ]] && [[ "$i" -lt 100 ]]; do
     sleep 0.1
     i=$((i + 1))
 done
-inner_pid=$(cut -d' ' -f1 "$REPO14/$DOCS_LOCK_REL/pid")
+inner_pid=$(readlink "$REPO14/$DOCS_LOCK_REL")
+inner_pid="${inner_pid%% *}"
 assert_eq "recorded lock pid is the sync subshell, not the parent" "1" \
     "$([[ "$inner_pid" != "$outer_pid" ]] && kill -0 "$inner_pid" 2>/dev/null && echo 1 || echo 0)"
 kill -9 "$inner_pid" 2>/dev/null || true
@@ -659,7 +658,7 @@ rc=0
 synced_branch=$(patrol_docs_autosync "$REPO14") || rc=$?
 assert_eq "run after SIGKILLed sync subshell recovers (exit 0)" "0" "$rc"
 assert_eq "run after SIGKILLed sync subshell commits on docs-sync" "shipwright/docs-sync" "$synced_branch"
-assert_eq "lock is released after recovery" "0" "$([[ -e "$REPO14/$DOCS_LOCK_REL" ]] && echo 1 || echo 0)"
+assert_eq "lock is released after recovery" "0" "$([[ -L "$REPO14/$DOCS_LOCK_REL" ]] && echo 1 || echo 0)"
 
 # #3c: patrol commit amended by an operator: author kept, committer changed -> foreign, skipped
 REPO3C="$TEST_TEMP_DIR/repo3c"
@@ -673,5 +672,40 @@ rc=0
 patrol_docs_autosync "$REPO3C" >/dev/null 2>&1 || rc=$?
 assert_eq "#3c amended committer makes the branch foreign: exit 2" "2" "$rc"
 assert_eq "#3c amended commit is kept" "$amend_sha" "$(git -C "$REPO3C" rev-parse shipwright/docs-sync)"
+
+# Two runs started together with no stale lock, repeated. Exactly one commits and the other returns
+# 2. No run returns 0 without a commit, no worktree leaks, and the lock is released.
+RACE_TRIALS=20
+race_bad=0
+race_first_bad=""
+for i in $(seq 1 "$RACE_TRIALS"); do
+    RACE="$TEST_TEMP_DIR/race-$i"
+    make_docs_repo "$RACE" main
+    ( rc=0; export STUB_DOCS_SLEEP=0.5; patrol_docs_autosync "$RACE" > "$RACE.a.out" 2>/dev/null || rc=$?; echo "$rc" > "$RACE.a.rc" ) &
+    pa=$!
+    ( rc=0; export STUB_DOCS_SLEEP=0.5; patrol_docs_autosync "$RACE" > "$RACE.b.out" 2>/dev/null || rc=$?; echo "$rc" > "$RACE.b.rc" ) &
+    pb=$!
+    wait "$pa" || true
+    wait "$pb" || true
+    rc_a=$(cat "$RACE.a.rc"); rc_b=$(cat "$RACE.b.rc")
+    out_a=$(cat "$RACE.a.out"); out_b=$(cat "$RACE.b.out")
+    ok=0
+    if [[ "$rc_a" == "0" && -n "$out_a" && "$rc_b" == "2" && -z "$out_b" ]]; then ok=1; fi
+    if [[ "$rc_b" == "0" && -n "$out_b" && "$rc_a" == "2" && -z "$out_a" ]]; then ok=1; fi
+    if [[ "$ok" -ne 1 ]]; then
+        race_bad=$((race_bad + 1))
+        race_first_bad="${race_first_bad:-trial $i: a=$rc_a/[$out_a] b=$rc_b/[$out_b]}"
+    fi
+    if [[ "$(worktree_count "$RACE")" != "1" ]]; then
+        race_bad=$((race_bad + 1))
+        race_first_bad="${race_first_bad:-trial $i: worktree leaked}"
+    fi
+    if [[ -L "$RACE/$DOCS_LOCK_REL" ]]; then
+        race_bad=$((race_bad + 1))
+        race_first_bad="${race_first_bad:-trial $i: lock left behind}"
+    fi
+done
+assert_eq "race: $RACE_TRIALS trials, exactly one commits, the other skips, no leaks (${race_first_bad:-none})" \
+    "0" "$race_bad"
 
 print_test_results
