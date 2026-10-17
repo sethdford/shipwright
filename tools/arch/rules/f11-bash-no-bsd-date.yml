@@ -1,0 +1,38 @@
+# F11 (bash portability): BSD-only date flags. `date -j` (parse with -f) and `date -r <epoch>` (BSD
+# reads an epoch, GNU reads a file) fail on GNU/Linux, and callers that default on failure then
+# silently use 0 or "now" (the 1-hour detection cache was never valid on Linux). Use the helpers in
+# scripts/lib/compat.sh instead (date_to_epoch, date_local_to_epoch, epoch_to_iso, epoch_format,
+# date_days_ago, date_add_days). compat.sh itself is the one allowed place. Pinned in
+# tools/arch/meta.test.ts. Relative-time forms (`date -v`, `date -d "N days ago"`) are not covered.
+id: F11-bash-no-bsd-date
+language: Bash
+severity: error
+message: "F11: BSD-only `date -j` or `date -r <epoch>` fails on GNU date (Linux). Use scripts/lib/compat.sh (date_to_epoch, date_local_to_epoch, epoch_to_iso, epoch_format)."
+metadata: { owner: "@sethdford", docs: "docs/architecture.md#fitness-rules" }
+files:
+  - "scripts/**/*.sh"
+  - "scripts/sw"
+  - ".claude/hooks/**/*.sh"
+  - "claude-code/hooks/**/*.sh"
+  - "completions/**/*.bash"
+  - "install.sh"
+ignores:
+  - "scripts/lib/compat.sh"
+# A short-option cluster that carries `j` (BSD -j, -jf, -ju) or `r` (BSD -r). The flag must be a
+# direct argument of the command, so a flag inside a nested `$(...)` belongs to that command.
+utils:
+  bsd-flag:
+    kind: word
+    any:
+      - regex: '^-[A-Za-z]*j[A-Za-z]*$'
+      - regex: '^-[A-Za-z]*r[A-Za-z]*$'
+rule:
+  kind: command
+  any:
+    - all:
+        - has: { field: name, regex: '(^|/)date$' }
+        - has: { matches: bsd-flag, stopBy: neighbor }
+    - all:
+        - has: { field: name, regex: '(^|/)(command|builtin|sudo|env|nice|nohup|timeout|time|stdbuf|xargs)$' }
+        - has: { kind: word, regex: '(^|/)date$' }
+        - has: { matches: bsd-flag, stopBy: neighbor }

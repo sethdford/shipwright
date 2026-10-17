@@ -27,7 +27,7 @@ mkdir -p "$LOG_DIR" "$WORKTREE_DIR"
 # Provide stub functions that daemon-failure.sh depends on
 now_iso() { date -u +"%Y-%m-%dT%H:%M:%SZ"; }
 now_epoch() { date +%s; }
-epoch_to_iso() { date -u -r "$1" +"%Y-%m-%dT%H:%M:%SZ" 2>/dev/null || date -u -d "@$1" +"%Y-%m-%dT%H:%M:%SZ" 2>/dev/null || echo "1970-01-01T00:00:00Z"; }
+source "$SCRIPT_DIR/lib/compat.sh"
 emit_event() { :; }
 daemon_log() { :; }
 locked_state_update() { :; }

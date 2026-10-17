@@ -306,7 +306,7 @@ cmd_health() {
 
             # Convert ISO to epoch
             local last_hb_epoch
-            last_hb_epoch=$(date -j -f "%Y-%m-%dT%H:%M:%SZ" "$last_hb" +%s 2>/dev/null || echo "0")
+            last_hb_epoch=$(date_to_epoch "$last_hb" || echo "0")
             local elapsed=$((now - last_hb_epoch))
 
             if [[ $elapsed -gt $stall_threshold ]]; then

@@ -477,7 +477,7 @@ cmd_report() {
         oldest_date=$(echo "$prs" | jq -r '.[0].createdAt')
         if [[ -n "$oldest_date" && "$oldest_date" != "null" ]]; then
             local oldest_epoch
-            oldest_epoch=$(date -d "$oldest_date" '+%s' 2>/dev/null || date -jf "%Y-%m-%dT%H:%M:%SZ" "$oldest_date" '+%s' 2>/dev/null || echo "")
+            oldest_epoch=$(date_to_epoch "$oldest_date" || echo "")
             if [[ -n "$oldest_epoch" ]]; then
                 local now_e; now_e=$(date +%s)
                 local age_days=$(( (now_e - oldest_epoch) / 86400 ))

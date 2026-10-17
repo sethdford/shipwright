@@ -122,6 +122,7 @@ const PINNED: Record<string, { ratchet: boolean; files: string[]; ignores: strin
   "F11-bash-no-eval-expansion": { ratchet: true, files: BASH_FILES, ignores: [] },
   "F11-bash-no-gha-expression": { ratchet: true, files: BASH_FILES, ignores: [] },
   "F11-bash-no-grep-q-in-pipe": { ratchet: false, files: BASH_FILES, ignores: [] },
+  "F11-bash-no-bsd-date": { ratchet: false, files: BASH_FILES, ignores: ["scripts/lib/compat.sh"] },
   "F11-bash-no-pipe-to-shell": { ratchet: true, files: BASH_FILES, ignores: [] },
   "F11-bash-no-shell-c-expansion": { ratchet: true, files: BASH_FILES, ignores: [] },
   "dashboard-subprocess-only-in-services": {

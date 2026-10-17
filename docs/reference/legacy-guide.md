@@ -634,16 +634,16 @@ All scripts are bash (except the dashboard server in TypeScript). Grouped by lay
 | `scripts/sw-auth.sh` | 610 | GitHub OAuth Authentication |
 | `scripts/sw-autonomous.sh` | 1062 | Master controller for AI-building-AI loop |
 | `scripts/sw-changelog.sh` | 696 | Automated Release Notes & Migration Guides |
-| `scripts/sw-checkpoint.sh` | 605 | Save and restore agent state mid-stage |
+| `scripts/sw-checkpoint.sh` | 603 | Save and restore agent state mid-stage |
 | `scripts/sw-ci.sh` | 589 | GitHub Actions CI/CD Orchestration |
 | `scripts/sw-cleanup.sh` | 350 | Clean up orphaned Claude team sessions & artifacts |
 | `scripts/sw-code-review.sh` | 699 | Clean Code & Architecture Analysis |
 | `scripts/sw-connect.sh` | 687 | Sync local state to team dashboard |
 | `scripts/sw-context.sh` | 601 | Context Engine for Pipeline Stages |
 | `scripts/sw-cost.sh` | 1070 | Token Usage & Cost Intelligence |
-| `scripts/sw-daemon.sh` | 1420 | Autonomous GitHub Issue Watcher |
+| `scripts/sw-daemon.sh` | 1413 | Autonomous GitHub Issue Watcher |
 | `scripts/sw-dashboard.sh` | 519 | Fleet Command Dashboard |
-| `scripts/sw-db.sh` | 1939 | SQLite Persistence Layer |
+| `scripts/sw-db.sh` | 1937 | SQLite Persistence Layer |
 | `scripts/sw-decide.sh` | 716 | Shipwright Autonomous Decision Engine |
 | `scripts/sw-decompose.sh` | 872 | Intelligent Issue Decomposition |
 | `scripts/sw-deps.sh` | 533 | Automated Dependency Update Management |
@@ -663,9 +663,9 @@ All scripts are bash (except the dashboard server in TypeScript). Grouped by lay
 | `scripts/sw-fix.sh` | 474 | Bulk Fix Across Multiple Repos |
 | `scripts/sw-fleet-discover.sh` | 550 | Auto-Discovery from GitHub Orgs |
 | `scripts/sw-fleet-viz.sh` | 411 | Multi-Repo Fleet Visualization |
-| `scripts/sw-fleet.sh` | 1377 | Multi-Repo Daemon Orchestrator |
+| `scripts/sw-fleet.sh` | 1371 | Multi-Repo Daemon Orchestrator |
 | `scripts/sw-guild.sh` | 556 | Knowledge Guilds & Cross-Team Learning |
-| `scripts/sw-heartbeat.sh` | 316 | File-based agent heartbeat protocol |
+| `scripts/sw-heartbeat.sh` | 307 | File-based agent heartbeat protocol |
 | `scripts/sw-hello.sh` | 67 | Hello World Command |
 | `scripts/sw-hygiene.sh` | 724 | Repository Organization & Cleanup |
 | `scripts/sw-incident.sh` | 1141 | Autonomous Incident Detection & Response |
@@ -684,7 +684,7 @@ All scripts are bash (except the dashboard server in TypeScript). Grouped by lay
 | `scripts/sw-oversight.sh` | 757 | Quality Oversight Board |
 | `scripts/sw-patrol-meta.sh` | 786 | Shipwright Self-Improvement Patrol |
 | `scripts/sw-pipeline-composer.sh` | 444 | Dynamic Pipeline Composition |
-| `scripts/sw-pipeline-vitals.sh` | 1076 | Pipeline Vitals Engine |
+| `scripts/sw-pipeline-vitals.sh` | 1073 | Pipeline Vitals Engine |
 | `scripts/sw-pipeline.sh` | 282 | Autonomous Feature Delivery (Idea → Production) |
 | `scripts/sw-pm.sh` | 749 | Autonomous PM Agent for Team Orchestration |
 | `scripts/sw-pr-lifecycle.sh` | 688 | Autonomous PR Management |
@@ -700,16 +700,16 @@ All scripts are bash (except the dashboard server in TypeScript). Grouped by lay
 | `scripts/sw-release.sh` | 701 | Release train automation |
 | `scripts/sw-remote.sh` | 670 | Machine Registry & Remote Daemon Management |
 | `scripts/sw-replay.sh` | 542 | Pipeline run replay, timeline viewing, narratives |
-| `scripts/sw-retro.sh` | 821 | Sprint Retrospective Engine |
+| `scripts/sw-retro.sh` | 813 | Sprint Retrospective Engine |
 | `scripts/sw-review-rerun.sh` | 222 | Canonical Rerun Comment Writer |
 | `scripts/sw-scale.sh` | 609 | Dynamic agent team scaling during pipeline execution |
 | `scripts/sw-security-audit.sh` | 510 | Comprehensive Security Auditing |
 | `scripts/sw-self-optimize.sh` | 1690 | Learning & Self-Tuning System |
 | `scripts/sw-session.sh` | 553 | Launch a Claude Code team session in a new tmux window |
 | `scripts/sw-setup.sh` | 376 | Comprehensive onboarding wizard |
-| `scripts/sw-stall-detector.sh` | 406 | Pipeline Stall & Deadlock Detection |
-| `scripts/sw-standup.sh` | 721 | Automated Daily Standups for AI Agent Teams |
-| `scripts/sw-status.sh` | 869 | Dashboard showing Claude Code team status |
+| `scripts/sw-stall-detector.sh` | 402 | Pipeline Stall & Deadlock Detection |
+| `scripts/sw-standup.sh` | 717 | Automated Daily Standups for AI Agent Teams |
+| `scripts/sw-status.sh` | 862 | Dashboard showing Claude Code team status |
 | `scripts/sw-strategic.sh` | 948 | Strategic Intelligence Agent |
 | `scripts/sw-stream.sh` | 451 | Live terminal output streaming from agent panes |
 | `scripts/sw-swarm.sh` | 684 | Dynamic agent swarm management |
@@ -801,8 +801,8 @@ All scripts are bash (except the dashboard server in TypeScript). Grouped by lay
 | `scripts/sw-convergence-test.sh` | 324 | Unit tests for convergence detection |
 | `scripts/sw-cost-optimizer-test.sh` | 466 | Test suite for cost optimization |
 | `scripts/sw-cost-test.sh` | 234 | Validate token usage & cost intelligence |
-| `scripts/sw-daemon-test.sh` | 1985 | Unit tests for daemon metrics, health, alerting |
-| `scripts/sw-dashboard-e2e-test.sh` | 591 | full live validation |
+| `scripts/sw-daemon-test.sh` | 1979 | Unit tests for daemon metrics, health, alerting |
+| `scripts/sw-dashboard-e2e-test.sh` | 592 | full live validation |
 | `scripts/sw-dashboard-test.sh` | 250 | validates dashboard structure |
 | `scripts/sw-db-test.sh` | 973 | SQLite Persistence Layer Test Suite |
 | `scripts/sw-decide-test.sh` | 520 | Unit tests for the Autonomous Decision Engine |
@@ -847,9 +847,9 @@ All scripts are bash (except the dashboard server in TypeScript). Grouped by lay
 | `scripts/sw-jira-test.sh` | 284 | Validate Jira ↔ GitHub bidirectional sync |
 | `scripts/sw-launchd-test.sh` | 901 | Validate service management on |
 | `scripts/sw-lib-audit-trail-test.sh` | 311 |  |
-| `scripts/sw-lib-compat-test.sh` | 357 | Unit tests for cross-platform helpers |
+| `scripts/sw-lib-compat-test.sh` | 414 | Unit tests for cross-platform helpers |
 | `scripts/sw-lib-compound-audit-test.sh` | 281 |  |
-| `scripts/sw-lib-daemon-dispatch-test.sh` | 421 | Unit tests for spawn/reap/queue |
+| `scripts/sw-lib-daemon-dispatch-test.sh` | 417 | Unit tests for spawn/reap/queue |
 | `scripts/sw-lib-daemon-failure-test.sh` | 320 | Unit tests for failure handling |
 | `scripts/sw-lib-daemon-gates-test.sh` | 461 | safety gates at the daemon call sites |
 | `scripts/sw-lib-daemon-patrol-test.sh` | 343 | Unit tests for all patrol functions |
@@ -889,7 +889,7 @@ All scripts are bash (except the dashboard server in TypeScript). Grouped by lay
 | `scripts/sw-predictive-test.sh` | 693 | Unit tests for predictive intelligence |
 | `scripts/sw-prep-test.sh` | 638 | Validate repo preparation |
 | `scripts/sw-process-reward-test.sh` | 252 | Process Reward Model Test Suite |
-| `scripts/sw-project-detect-test.sh` | 434 | Unit tests for project detection |
+| `scripts/sw-project-detect-test.sh` | 472 | Unit tests for project detection |
 | `scripts/sw-ps-test.sh` | 296 | Validate agent process status display |
 | `scripts/sw-public-dashboard-test.sh` | 165 | Validate public dashboard generation |
 | `scripts/sw-quality-profile-test.sh` | 447 | Unit tests for quality profile library |

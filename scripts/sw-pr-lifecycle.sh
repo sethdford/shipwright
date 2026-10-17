@@ -90,7 +90,7 @@ get_pr_age_seconds() {
     created_at=$(gh pr view "$pr_number" --json createdAt 2>/dev/null | jq -r '.createdAt' | head -1)
     [[ -z "$created_at" ]] && return 1
     local created_epoch
-    created_epoch=$(date -d "$created_at" +%s 2>/dev/null || date -jf "%Y-%m-%dT%H:%M:%SZ" "$created_at" +%s 2>/dev/null || echo "0")
+    created_epoch=$(date_to_epoch "$created_at" || echo "0")
     [[ "$created_epoch" -eq 0 ]] && return 1
     echo $(($(now_epoch) - created_epoch))
 }
@@ -564,7 +564,7 @@ pr_status() {
 
         # Calculate age
         local created_epoch
-        created_epoch=$(date -d "$created_at" +%s 2>/dev/null || date -jf "%Y-%m-%dT%H:%M:%SZ" "$created_at" +%s 2>/dev/null || echo "0")
+        created_epoch=$(date_to_epoch "$created_at" || echo "0")
         local age_hours=$((( $(now_epoch) - created_epoch) / 3600))
         local age_str="${age_hours}h"
         [[ $age_hours -gt 24 ]] && age_str="$((age_hours / 24))d"

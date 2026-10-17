@@ -243,6 +243,25 @@ print_test_section() {
     echo -e "  ${CYAN}${title}${RESET}"
 }
 
+# gnu_date_shim_dir: print a directory whose `date` is GNU date (the native one on Linux, or a
+# shim that execs gdate on macOS), for prepending to PATH. Returns 1 when no GNU date exists, so the
+# caller skips its GNU leg. The shim is created under TEST_TEMP_DIR. Regression tests for #8613 and
+# #8621 use this to run date-dependent code under GNU date.
+gnu_date_shim_dir() {
+    local dir="$TEST_TEMP_DIR/gnu-date-bin" gnu=""
+    if date --version >/dev/null 2>&1; then
+        gnu="$(command -v date)"
+    elif command -v gdate >/dev/null 2>&1; then
+        gnu="$(command -v gdate)"
+    else
+        return 1
+    fi
+    mkdir -p "$dir"
+    printf '#!/usr/bin/env bash\nexec "%s" "$@"\n' "$gnu" > "$dir/date"
+    chmod +x "$dir/date"
+    printf '%s\n' "$dir"
+}
+
 print_test_results() {
     echo ""
     echo -e "${DIM}  ──────────────────────────────────────────${RESET}"

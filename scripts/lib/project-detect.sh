@@ -20,6 +20,7 @@
 
 [[ -n "${_PROJECT_DETECT_LOADED:-}" ]] && return 0
 _PROJECT_DETECT_LOADED=1
+source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/compat.sh"
 
 # ─── Helper: Read JSON field safely ────────────────────────────────────────
 _json_field() {
@@ -600,7 +601,7 @@ project_detect_all() {
 
         if [[ -n "$cached_at" ]]; then
             local cache_age
-            cache_age=$(($(date +%s) - $(date -j -f "%Y-%m-%dT%H:%M:%SZ" "$cached_at" +%s 2>/dev/null || echo 0)))
+            cache_age=$(($(date +%s) - $(date_to_epoch "$cached_at" || echo 0)))
 
             if [[ "$cache_age" -lt "$cache_ttl" ]]; then
                 cat "$cache_file"

@@ -118,10 +118,6 @@ format_duration() {
     elif [[ "$secs" -ge 60 ]]; then printf "%dm %ds" $((secs/60)) $((secs%60))
     else printf "%ds" "$secs"; fi
 }
-epoch_to_iso() {
-    local e="$1"
-    date -u -r "$e" +"%Y-%m-%dT%H:%M:%SZ" 2>/dev/null || date -u -d "@$e" +"%Y-%m-%dT%H:%M:%SZ" 2>/dev/null || echo "1970-01-01T00:00:00Z"
-}
 notify() { :; }
 record_pipeline_duration() { :; }
 record_scaling_outcome() { :; }
