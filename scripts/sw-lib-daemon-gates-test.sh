@@ -11,11 +11,12 @@ trap 'echo "ERROR: $BASH_SOURCE:$LINENO exited with status $?" >&2' ERR
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REAL_SCRIPT_DIR="$SCRIPT_DIR"
 source "$SCRIPT_DIR/lib/test-helpers.sh"
+sw_test_isolate
 
 print_test_header "Lib: daemon safety-gate call sites"
 
 setup_test_env "lib-daemon-gates"
-trap cleanup_test_env EXIT
+trap 'cleanup_test_env; sw_test_teardown' EXIT
 
 export DAEMON_DIR="$TEST_TEMP_DIR/home/.shipwright"
 export STATE_FILE="$DAEMON_DIR/daemon-state.json"

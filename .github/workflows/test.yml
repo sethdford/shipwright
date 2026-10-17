@@ -90,7 +90,8 @@ jobs:
             scripts/sw-fleet-test.sh \
             scripts/sw-fleet-discover-test.sh \
             scripts/sw-fleet-viz-test.sh \
-            scripts/sw-self-optimize-test.sh; do
+            scripts/sw-self-optimize-test.sh \
+            scripts/sw-lib-test-isolate-test.sh; do
             echo "::group::$suite"
             if ! bash "$suite"; then
               echo "::error::$suite failed under bash 3.2"

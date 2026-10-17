@@ -9,6 +9,7 @@ trap 'echo "ERROR: $BASH_SOURCE:$LINENO exited with status $?" >&2' ERR
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "$SCRIPT_DIR/lib/test-helpers.sh"
+sw_test_isolate
 # shellcheck disable=SC2034
 REPO_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
 
@@ -33,6 +34,9 @@ setup_env() {
 
     # Copy sw-db.sh under test
     cp "$SCRIPT_DIR/sw-db.sh" "$TEST_TEMP_DIR/"
+    # sw-db.sh sources lib/compat.sh from its own directory; without it epoch_to_iso is undefined.
+    mkdir -p "$TEST_TEMP_DIR/lib"
+    cp "$SCRIPT_DIR/lib/compat.sh" "$TEST_TEMP_DIR/lib/"
 
     # Set up mock environment
     export HOME="$TEST_TEMP_DIR/home"
@@ -45,7 +49,7 @@ cleanup_env() {
         rm -rf "$TEST_TEMP_DIR"
     fi
 }
-trap cleanup_env EXIT
+trap 'cleanup_env; sw_test_teardown' EXIT
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # TEST RUNNER

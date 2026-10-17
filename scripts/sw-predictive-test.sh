@@ -8,6 +8,7 @@ trap 'echo "ERROR: $BASH_SOURCE:$LINENO exited with status $?" >&2' ERR
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "$SCRIPT_DIR/lib/test-helpers.sh"
+sw_test_isolate
 
 # ─── Colors (matches shipwright theme) ──────────────────────────────────────────────
 # shellcheck disable=SC2034
@@ -106,7 +107,7 @@ cleanup_env() {
         export HOME="$ORIG_HOME"
     fi
 }
-trap cleanup_env EXIT
+trap 'cleanup_env; sw_test_teardown' EXIT
 
 # Reset between tests
 reset_test() {

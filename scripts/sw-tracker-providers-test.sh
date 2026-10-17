@@ -13,6 +13,7 @@ REPO_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
 
 # shellcheck source=lib/test-helpers.sh
 source "$SCRIPT_DIR/lib/test-helpers.sh"
+sw_test_isolate
 # shellcheck source=lib/compat.sh
 [[ -f "$SCRIPT_DIR/lib/compat.sh" ]] && source "$SCRIPT_DIR/lib/compat.sh"
 
@@ -163,7 +164,7 @@ cleanup_env() {
         rm -rf "$TEMP_DIR"
     fi
 }
-trap cleanup_env EXIT
+trap 'cleanup_env; sw_test_teardown' EXIT
 
 run_test() {
     local test_name="$1"

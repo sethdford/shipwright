@@ -152,8 +152,15 @@ estimate_pipeline_cost() {
 # ─── Heartbeat Management ──────────────────────────────────────────
 start_heartbeat() {
     local job_id="${PIPELINE_NAME:-pipeline-$$}"
+    # Tests never run a heartbeat (#8648): a background loop outlives its pipeline otherwise.
+    if [[ "${SHIPWRIGHT_TEST_MODE:-}" == "1" ]]; then
+        HEARTBEAT_PID=""
+        return 0
+    fi
+    local owner_pid=$$
     (
-        while true; do
+        # Exit with the pipeline: a heartbeat whose owner is gone must not run on as an orphan.
+        while kill -0 "$owner_pid" 2>/dev/null; do
             "$SCRIPT_DIR/sw-heartbeat.sh" write "$job_id" \
                 --pid $$ \
                 --issue "${ISSUE_NUMBER:-0}" \

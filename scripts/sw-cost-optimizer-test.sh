@@ -8,6 +8,8 @@ set -uo pipefail
 
 VERSION="3.3.0"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+source "$SCRIPT_DIR/lib/test-isolate.sh"
+sw_test_isolate
 
 # ─── Test Harness Setup ──────────────────────────────────────────────────────
 PASS=0

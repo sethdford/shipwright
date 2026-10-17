@@ -161,6 +161,7 @@ const ARCH_STEPS = [
   "bun tools/arch/size-ratchet.ts",
   "bun tools/arch/workflow-injection.ts",
   "bun tools/arch/workflow-fail-closed.ts",
+  "bun tools/arch/test-isolation.ts",
 ];
 
 // A fix names an action. Extend the list when a new rule needs another verb.

@@ -8,6 +8,7 @@ trap 'echo "ERROR: $BASH_SOURCE:$LINENO exited with status $?" >&2' ERR
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "$SCRIPT_DIR/lib/test-helpers.sh"
+sw_test_isolate
 DAEMON_SCRIPT="$SCRIPT_DIR/sw-daemon.sh"
 # Grep in main script and extracted libs (daemon-state, daemon-failure, daemon-dispatch, daemon-patrol, daemon-poll)
 DAEMON_LIB_DIR="$(cd "$(dirname "$DAEMON_SCRIPT")" && pwd)/lib"
@@ -69,7 +70,7 @@ cleanup_env() {
         rm -rf "$TEST_TEST_TEMP_DIR"
     fi
 }
-trap cleanup_env EXIT
+trap 'cleanup_env; sw_test_teardown' EXIT
 
 # Reset between tests
 reset_test() {

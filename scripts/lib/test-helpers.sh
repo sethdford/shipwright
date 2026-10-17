@@ -17,6 +17,9 @@
 [[ -n "${_TEST_HELPERS_LOADED:-}" ]] && return 0
 _TEST_HELPERS_LOADED=1
 
+# Test isolation (#8648): sw_test_isolate and sw_test_teardown. Every suite calls sw_test_isolate.
+source "$(dirname "${BASH_SOURCE[0]}")/test-isolate.sh"
+
 # ─── Colors ──────────────────────────────────────────────────────────────────
 CYAN='\033[38;2;0;212;255m'
 GREEN='\033[38;2;74;222;128m'

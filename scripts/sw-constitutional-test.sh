@@ -5,6 +5,8 @@
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+source "$SCRIPT_DIR/lib/test-isolate.sh"
+sw_test_isolate
 PASS=0
 FAIL=0
 
@@ -57,7 +59,7 @@ mkdir -p "$TEST_DIR" 2>/dev/null || true
 cleanup() {
     rm -rf "$TEST_DIR" 2>/dev/null || true
 }
-trap cleanup EXIT
+trap 'cleanup; sw_test_teardown' EXIT
 
 # Create test constitution (use printf to avoid heredoc quoting issues)
 printf '%s\n' '{

@@ -661,6 +661,10 @@ cleanup_on_exit() {
 # ─── daemon start ───────────────────────────────────────────────────────────
 
 daemon_start() {
+    if [[ "${SHIPWRIGHT_TEST_MODE:-}" == "1" ]]; then
+        error "SHIPWRIGHT_TEST_MODE=1: refusing to start a real daemon (#8648). Tests must not start daemons."
+        exit 1
+    fi
     echo -e "${PURPLE}${BOLD}━━━ shipwright daemon v${VERSION} ━━━${RESET}"
     echo ""
 

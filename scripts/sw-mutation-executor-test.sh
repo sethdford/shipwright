@@ -5,6 +5,8 @@
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+source "$SCRIPT_DIR/lib/test-isolate.sh"
+sw_test_isolate
 PASS=0
 FAIL=0
 
@@ -49,7 +51,7 @@ assert_file_exists() {
 # ─── Setup ──────────────────────────────────────────────────────────────────
 TEST_DIR=$(mktemp -d 2>/dev/null || echo "${TMPDIR:-/tmp}/mutation-test.$$")
 mkdir -p "$TEST_DIR" 2>/dev/null || true
-trap 'rm -rf "$TEST_DIR"' EXIT
+trap 'rm -rf "$TEST_DIR"; sw_test_teardown' EXIT
 
 # Source the module
 emit_event() { true; }

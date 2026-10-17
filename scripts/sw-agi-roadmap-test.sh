@@ -7,6 +7,7 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "$SCRIPT_DIR/lib/test-helpers.sh"
+sw_test_isolate
 source "$SCRIPT_DIR/lib/compat.sh"
 REPO_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
 
@@ -35,7 +36,7 @@ SKIP=0
 # ── Temp dir for test artifacts ───────────────────────────────────────────────
 TEST_TMP=$(mktemp -d "${TMPDIR:-/tmp}/sw-agi-test.XXXXXX")
 cleanup() { rm -rf "$TEST_TMP"; }
-trap cleanup EXIT
+trap 'cleanup; sw_test_teardown' EXIT
 
 # ══════════════════════════════════════════════════════════════════════════════
 # P1: FEEDBACK LOOPS — Discovery, Memory, PM, Failure Learning
