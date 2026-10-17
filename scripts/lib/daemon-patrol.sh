@@ -57,30 +57,82 @@ patrol_build_labels() {
 
 # ─── Docs Auto-Sync (never commits to the checked-out branch) ────────────────
 
-# Removes a temporary docs-sync worktree and prunes git's record of it.
+# Branch patrol syncs docs onto, and the only commit subject patrol writes there.
+# A commit on that branch with any other subject was not made by patrol, so the branch is
+# never reset over it.
+PATROL_DOCS_SYNC_BRANCH="shipwright/docs-sync"
+PATROL_DOCS_SYNC_SUBJECT="docs: auto-sync stale documentation sections"
+
+# Cleanup for patrol_docs_autosync (EXIT trap). Removes the temporary worktree and prunes git's
+# record of it. Deletes the docs-sync branch unless a patrol commit was made (keep=1).
 patrol_docs_autosync_cleanup() {
-    local repo_root="$1" wt="$2"
-    [[ -n "$wt" ]] || return 0
-    git -C "$repo_root" worktree remove --force "$wt" >/dev/null 2>&1 || true
-    git -C "$repo_root" worktree prune >/dev/null 2>&1 || true
-    rmdir "$wt" 2>/dev/null || true
+    local repo_root="$1" wt="$2" keep="$3"
+    if [[ -n "$wt" ]]; then
+        git -C "$repo_root" worktree remove --force "$wt" >/dev/null 2>&1 || true
+        git -C "$repo_root" worktree prune >/dev/null 2>&1 || true
+        rmdir "$wt" 2>/dev/null || true
+    fi
+    if [[ "$keep" != "1" ]]; then
+        git -C "$repo_root" branch -D "$PATROL_DOCS_SYNC_BRANCH" >/dev/null 2>&1 || true
+    fi
 }
 
-# Syncs stale AUTO documentation into a local commit on branch shipwright/docs-sync,
-# built from origin/<default branch> in a temporary worktree. The caller's branch, HEAD,
-# index and working tree are never touched, and nothing is pushed: pushing and opening
-# a PR are GitHub writes that belong to the integrations adapter (AGENTS.md, F10).
-# Only files that `sw-docs.sh sync` changed are staged. Prints the branch name on stdout
-# when a commit was made. Returns 1 on failure. Callers must check NO_GITHUB and dry-run first.
+# Removes registered worktrees that hold the docs-sync branch, left behind by a run that was
+# killed before its EXIT trap ran. The main worktree is never removed.
+patrol_docs_autosync_reap_leaked() {
+    local repo_root="$1" line path="" main_path="" leaked="" p
+    while IFS= read -r line; do
+        case "$line" in
+            "worktree "*)
+                path="${line#worktree }"
+                [[ -n "$main_path" ]] || main_path="$path"
+                ;;
+            "branch refs/heads/$PATROL_DOCS_SYNC_BRANCH")
+                if [[ "$path" != "$main_path" ]]; then
+                    leaked="${leaked}${path}"$'\n'
+                fi
+                ;;
+        esac
+    done < <(git -C "$repo_root" worktree list --porcelain)
+    while IFS= read -r p; do
+        [[ -n "$p" ]] || continue
+        git -C "$repo_root" worktree remove --force "$p" >/dev/null 2>&1 || true
+    done <<< "$leaked"
+    git -C "$repo_root" worktree prune >/dev/null 2>&1 || true
+}
+
+# Prints how many commits on the docs-sync branch, above base, were not made by patrol.
+patrol_docs_autosync_foreign_commits() {
+    local repo_root="$1" base_ref="$2" n
+    if ! git -C "$repo_root" rev-parse --verify -q "refs/heads/$PATROL_DOCS_SYNC_BRANCH" >/dev/null 2>&1; then
+        echo 0
+        return 0
+    fi
+    n=$(git -C "$repo_root" log --format=%s "${base_ref}..refs/heads/$PATROL_DOCS_SYNC_BRANCH" 2>/dev/null \
+        | grep -vcxF "$PATROL_DOCS_SYNC_SUBJECT" || true)
+    echo "${n:-0}"
+}
+
+# Syncs stale AUTO documentation into a local commit on shipwright/docs-sync, built from
+# origin/<default branch> in a temporary worktree. The caller's branch, HEAD, index and working
+# tree are never touched, and nothing is pushed: pushing and opening a PR are GitHub writes that
+# belong to the integrations adapter (AGENTS.md, F10).
+# The staleness check and the sync both run in that worktree, so they see the same tree.
+# Only tracked files that sw-docs.sh sync modified are staged. Untracked files are never staged.
+# Prints the branch name on stdout when a commit was made. Exit codes: 0 nothing to commit or
+# committed, 1 failure, 2 skipped because the docs-sync branch holds commits not made by patrol.
+# Callers must check NO_GITHUB and dry-run first.
 patrol_docs_autosync() {
     local repo_root="${1:-}"
-    local branch="shipwright/docs-sync"
     [[ -n "$repo_root" ]] || return 1
     [[ "${NO_GITHUB:-false}" != "true" ]] || return 0
     (
-        cd "$repo_root" || exit 1
+        # Subshell globals, not locals: bash 3.2 does not expand function locals in an EXIT trap.
+        dp_root="$repo_root"
+        cd "$dp_root" || exit 1
         wt=""
-        trap 'patrol_docs_autosync_cleanup "$repo_root" "$wt"' EXIT
+        keep=1
+        trap 'patrol_docs_autosync_cleanup "$dp_root" "$wt" "$keep"' EXIT
         trap 'exit 130' INT
         trap 'exit 143' TERM
 
@@ -88,24 +140,42 @@ patrol_docs_autosync() {
         local base_ref
         base_ref=$(git symbolic-ref --quiet --short refs/remotes/origin/HEAD 2>/dev/null) || base_ref="origin/main"
 
+        patrol_docs_autosync_reap_leaked "$repo_root"
+
+        local foreign
+        foreign=$(patrol_docs_autosync_foreign_commits "$repo_root" "$base_ref")
+        [[ "${foreign:-0}" -eq 0 ]] || exit 2
+
         wt=$(mktemp -d "${TMPDIR:-/tmp}/sw-docs-sync.XXXXXX") || exit 1
-        git -c core.hooksPath=/dev/null worktree add --quiet -B "$branch" "$wt" "$base_ref" || exit 1
+        keep=0
+        git -c core.hooksPath=/dev/null worktree add --quiet -B "$PATROL_DOCS_SYNC_BRANCH" "$wt" "$base_ref" || exit 1
         [[ -f "$wt/scripts/sw-docs.sh" ]] || exit 1
+
+        # Nothing stale on the base: no branch is kept.
+        if (cd "$wt" && bash scripts/sw-docs.sh check >/dev/null 2>&1); then
+            exit 0
+        fi
         (cd "$wt" && bash scripts/sw-docs.sh sync >/dev/null 2>&1) || exit 1
 
-        local changed=0 line path
-        while IFS= read -r line; do
-            [[ -n "$line" ]] || continue
-            path="${line:3}"
+        # NUL-delimited so quoted or spaced paths survive. Renames carry the old path as a
+        # second field. Untracked entries ("??") are skipped.
+        local changed=0 entry code path _orig
+        while IFS= read -r -d '' entry; do
+            code="${entry:0:2}"
+            path="${entry:3}"
+            case "$code" in
+                R*|C*) IFS= read -r -d '' _orig || true ;;
+            esac
+            [[ "$code" != "??" ]] || continue
             git -C "$wt" add -- "$path" || exit 1
             changed=$((changed + 1))
-        done < <(git -C "$wt" status --porcelain)
+        done < <(git -C "$wt" status --porcelain -z)
         [[ "$changed" -gt 0 ]] || exit 0
 
-        git -C "$wt" -c core.hooksPath=/dev/null commit --quiet \
-            -m "docs: auto-sync stale documentation sections" || exit 1
-        daemon_log INFO "Docs sync committed locally on ${branch} (${changed} file(s), not pushed)"
-        echo "$branch"
+        git -C "$wt" -c core.hooksPath=/dev/null commit --quiet -m "$PATROL_DOCS_SYNC_SUBJECT" || exit 1
+        keep=1
+        daemon_log INFO "Docs sync committed locally on ${PATROL_DOCS_SYNC_BRANCH} (${changed} file(s), not pushed)"
+        echo "$PATROL_DOCS_SYNC_BRANCH"
     )
 }
 
@@ -556,13 +626,26 @@ Auto-detected by \`shipwright daemon patrol\` on $(now_iso)." \
                 fi
                 # Auto-sync if not dry run
                 if [[ "$dry_run" != "true" ]] && [[ "$NO_GITHUB" != "true" ]]; then
-                    daemon_log INFO "Auto-syncing stale documentation on shipwright/docs-sync"
-                    local docs_repo_root docs_sync_branch=""
+                    local docs_repo_root docs_script_root docs_sync_branch="" docs_rc=0
                     docs_repo_root=$(git rev-parse --show-toplevel 2>/dev/null || pwd)
-                    docs_sync_branch=$(patrol_docs_autosync "$docs_repo_root") ||
-                        daemon_log WARN "Docs auto-sync failed; checked-out branch left untouched"
-                    if [[ -n "$docs_sync_branch" ]]; then
-                        stale_docs="${stale_docs}\n- Synced AUTO sections committed to local branch \`${docs_sync_branch}\` (not pushed)"
+                    docs_script_root=$(git -C "${SCRIPT_DIR:-.}" rev-parse --show-toplevel 2>/dev/null || echo "")
+                    # The staleness check above reads the repo that holds SCRIPT_DIR. Sync only
+                    # when that is the daemon's cwd repo, so check and sync describe the same tree.
+                    if [[ "$docs_script_root" != "$docs_repo_root" ]]; then
+                        daemon_log WARN "Docs sync skipped: sw-docs.sh lives in ${docs_script_root:-an unknown repo}, not ${docs_repo_root}"
+                    else
+                        daemon_log INFO "Auto-syncing stale documentation on ${PATROL_DOCS_SYNC_BRANCH}"
+                        docs_sync_branch=$(patrol_docs_autosync "$docs_repo_root") || docs_rc=$?
+                        if [[ "$docs_rc" -eq 0 ]]; then
+                            if [[ -n "$docs_sync_branch" ]]; then
+                                stale_docs="${stale_docs}\n- Synced AUTO sections committed to local branch \`${docs_sync_branch}\` (not pushed)"
+                            fi
+                        elif [[ "$docs_rc" -eq 2 ]]; then
+                            daemon_log WARN "Docs sync skipped: ${PATROL_DOCS_SYNC_BRANCH} has commits not made by patrol"
+                            stale_docs="${stale_docs}\n- AUTO sections are stale, but local branch \`${PATROL_DOCS_SYNC_BRANCH}\` has commits not made by patrol; sync skipped"
+                        else
+                            daemon_log WARN "Docs auto-sync failed; checked-out branch left untouched"
+                        fi
                     fi
                 fi
             fi
