@@ -473,6 +473,7 @@ assert_eq "no-op sync deletes the docs-sync branch it created" "0" "$(branch_exi
 # Leaked worktree from a SIGKILLed run (dead or absent pid): the next run removes it and succeeds
 LEAK=$(mktemp -d "$TMP_REAL/sw-docs-sync.XXXXXX")
 git -C "$DOCS_REPO" worktree add -q -B shipwright/docs-sync "$LEAK" origin/main
+: > "$LEAK/.sw-docs-sync.marker"
 rc=0
 synced_branch=$(patrol_docs_autosync "$DOCS_REPO") || rc=$?
 assert_eq "run after leaked worktree succeeds" "0" "$rc"
@@ -483,12 +484,27 @@ assert_eq "only the main worktree remains" "1" "$(worktree_count "$DOCS_REPO")"
 # Live run holds a leaked-looking worktree (its pid is alive): nothing is removed, run skipped
 LIVE=$(mktemp -d "$TMP_REAL/sw-docs-sync.XXXXXX")
 git -C "$DOCS_REPO" worktree add -q -B shipwright/docs-sync "$LIVE" origin/main
-echo $$ > "$LIVE/.sw-docs-sync.pid"
+: > "$LIVE/.sw-docs-sync.marker"
+sleep 300 &
+live_pid=$!
+echo "$live_pid" > "$LIVE/.sw-docs-sync.pid"
 rc=0
 patrol_docs_autosync "$DOCS_REPO" >/dev/null 2>&1 || rc=$?
 assert_eq "live-pid worktree makes the run skip (exit 2)" "2" "$rc"
 assert_eq "live-pid worktree is left intact" "1" "$([[ -f "$LIVE/.sw-docs-sync.pid" ]] && echo 1 || echo 0)"
+kill "$live_pid" 2>/dev/null || true
+wait "$live_pid" 2>/dev/null || true
 git -C "$DOCS_REPO" worktree remove --force "$LIVE"
+
+# #12b: pid-less temp worktree without the marker is never force-removed
+NOMARK=$(mktemp -d "$TMP_REAL/sw-docs-sync.XXXXXX")
+git -C "$DOCS_REPO" worktree add -q -B shipwright/docs-sync "$NOMARK" origin/main
+rc=0
+patrol_docs_autosync "$DOCS_REPO" >/dev/null 2>&1 || rc=$?
+assert_eq "#12b pid-less worktree without marker: exit 2" "2" "$rc"
+assert_eq "#12b pid-less worktree without marker is left intact" "1" "$([[ -d "$NOMARK" ]] && echo 1 || echo 0)"
+git -C "$DOCS_REPO" worktree remove --force "$NOMARK"
+git -C "$DOCS_REPO" branch -q -D shipwright/docs-sync
 
 # Sync fails on a patrol-only branch: the branch is deleted, feature branch untouched
 rc=0
@@ -603,10 +619,59 @@ make_docs_repo "$REPO_STALE" main
 dead_pid=$!
 wait "$dead_pid" || true
 mkdir -p "$REPO_STALE/$DOCS_LOCK_REL"
-echo "$dead_pid" > "$REPO_STALE/$DOCS_LOCK_REL/pid"
+echo "$dead_pid $(date +%s)" > "$REPO_STALE/$DOCS_LOCK_REL/pid"
 rc=0
 synced_branch=$(patrol_docs_autosync "$REPO_STALE") || rc=$?
 assert_eq "dead-holder lock is stolen and the run succeeds" "0" "$rc"
 assert_eq "dead-holder lock is released after the run" "0" "$([[ -e "$REPO_STALE/$DOCS_LOCK_REL" ]] && echo 1 || echo 0)"
+
+# Lock held by a live pid but older than the age cap (pid reuse backstop): stolen
+REPO_AGE="$TEST_TEMP_DIR/repo-lock-age"
+make_docs_repo "$REPO_AGE" main
+sleep 300 &
+age_pid=$!
+mkdir -p "$REPO_AGE/$DOCS_LOCK_REL"
+echo "$age_pid 0" > "$REPO_AGE/$DOCS_LOCK_REL/pid"
+rc=0
+synced_branch=$(patrol_docs_autosync "$REPO_AGE") || rc=$?
+kill "$age_pid" 2>/dev/null || true
+wait "$age_pid" 2>/dev/null || true
+assert_eq "expired lock held by a live pid is stolen" "0" "$rc"
+assert_eq "expired lock steal commits on docs-sync" "shipwright/docs-sync" "$synced_branch"
+
+# #14: only the sync subshell is SIGKILLed while the parent lives. The recorded pid must be the
+# subshell's, so the next run recovers instead of wedging.
+REPO14="$TEST_TEMP_DIR/repo14"
+make_docs_repo "$REPO14" main
+( export STUB_DOCS_SLEEP=3; patrol_docs_autosync "$REPO14" >/dev/null 2>&1 ) &
+outer_pid=$!
+i=0
+while [[ ! -s "$REPO14/$DOCS_LOCK_REL/pid" ]] && [[ "$i" -lt 100 ]]; do
+    sleep 0.1
+    i=$((i + 1))
+done
+inner_pid=$(cut -d' ' -f1 "$REPO14/$DOCS_LOCK_REL/pid")
+assert_eq "recorded lock pid is the sync subshell, not the parent" "1" \
+    "$([[ "$inner_pid" != "$outer_pid" ]] && kill -0 "$inner_pid" 2>/dev/null && echo 1 || echo 0)"
+kill -9 "$inner_pid" 2>/dev/null || true
+wait "$outer_pid" 2>/dev/null || true
+rc=0
+synced_branch=$(patrol_docs_autosync "$REPO14") || rc=$?
+assert_eq "run after SIGKILLed sync subshell recovers (exit 0)" "0" "$rc"
+assert_eq "run after SIGKILLed sync subshell commits on docs-sync" "shipwright/docs-sync" "$synced_branch"
+assert_eq "lock is released after recovery" "0" "$([[ -e "$REPO14/$DOCS_LOCK_REL" ]] && echo 1 || echo 0)"
+
+# #3c: patrol commit amended by an operator: author kept, committer changed -> foreign, skipped
+REPO3C="$TEST_TEMP_DIR/repo3c"
+make_docs_repo "$REPO3C" main
+patrol_docs_autosync "$REPO3C" >/dev/null 2>&1 || true
+git -C "$REPO3C" worktree add -q "$TEST_TEMP_DIR/amend-wt" shipwright/docs-sync
+git -C "$TEST_TEMP_DIR/amend-wt" -c user.name=operator -c user.email=operator@example.test commit -q --amend --no-edit
+git -C "$REPO3C" worktree remove --force "$TEST_TEMP_DIR/amend-wt"
+amend_sha=$(git -C "$REPO3C" rev-parse shipwright/docs-sync)
+rc=0
+patrol_docs_autosync "$REPO3C" >/dev/null 2>&1 || rc=$?
+assert_eq "#3c amended committer makes the branch foreign: exit 2" "2" "$rc"
+assert_eq "#3c amended commit is kept" "$amend_sha" "$(git -C "$REPO3C" rev-parse shipwright/docs-sync)"
 
 print_test_results
