@@ -34,7 +34,7 @@
 | W2-03 | #8591 | 1 | Auto-retry: AUTH category, Bun before categorisation | Yes | W2-02 |
 | W2-04 | #8592 | 1 | Daemon classify bridge with bash fallback | Yes (local daemon) | W2-02 |
 | W2-05 | #8593 | 1 | Progress verdict and stall (TypeScript) | Yes | none |
-| W2-06 | #8594 | 1 | Loop stall stop, one progress comment, progress-aware watchdog, build wall-clock cap | Yes (silent runs) | W2-05; #8610 (merged 2026-10-15) |
+| W2-06 | #8594 | 1 | Loop stall stop, one progress comment, progress-aware watchdog, build wall-clock cap | Yes (silent runs) | W2-05; #8610 (merged 2026-10-15); #8644 for unattended runs (external) |
 | W2-07 | #8595 | 1 | Deterministic model routing hygiene | Yes (reproducible models) | none (independent of #8634) |
 | W2-20 | #8611 | 1 | Arch ratchet: real-service test suites gated on `SHIPWRIGHT_E2E_REAL` | No (protects the loop's test gate) | #8610 (merged 2026-10-15) |
 | W2-08 | #8596 | 2 | Ledger core | No | W2-02 (decision shape) |
@@ -55,7 +55,7 @@
 
 Epic #8587. This plan is PR #8588.
 
-**Dispatch at scale.** Tranche 1 removes the known causes of the failures in the incident record. It is necessary but not sufficient: the breaker still reads GitHub history only, and local outcomes reach it only after Wave 1b (ADR-0007).
+**Dispatch at scale.** Tranche 1 removes the known causes of the failures in the incident record. It is necessary but not sufficient: the breaker still reads GitHub history only, and local outcomes reach it only after Wave 1b (ADR-0007). Unattended dispatch also needs #8644 (no blast-radius guard) addressed: W2-05 and W2-06 detect runs that stop moving, not runs that move destructively (E12). #8644 is an external prerequisite for unattended runs.
 
 ---
 
@@ -71,7 +71,7 @@ The spec already covers most of this work. A reviewer checked it and found one n
 | §8 delivery evals and scorecard | 20 to 50 cases; pass^3; cost per success | W2-13, W2-14, W2-18 | No |
 | §2 non-goals | no new features except §6.1, §6.2, §6.3 | Tranches 1 to 3 sit inside §6.2 and §8 | No change needed for Tranches 1 to 3 |
 
-**Decision D-M: the Claude 5.5 family (decided 2026-10-16).** The pins move to the 5.5 family through the aliases in `config/models.json`, which resolve to `claude-opus-5-5`, `claude-sonnet-5-5` and `claude-haiku-5-5`. W2-07 maps both the old IDs (`claude-opus-5`, `claude-sonnet-5`, `claude-haiku-4-5`) and the 5.5 full IDs to aliases, so the change works whether or not #8634 has merged. Covered are the three templates, `scripts/sw-strategic.sh`, and two workflow pins: the `shipwright-pipeline.yml` triage pin and the `review-remediation.yml` pin. PR #8634 (`feat/claude-5-5-models`, merged to main on 2026-10-16) writes full 5.5 IDs into templates and scripts, changes the triage pin to `claude-haiku-5-5`, and pins the Claude Code CLI to 2.1.301 in several workflows. It creates no `config/models.json` and does not touch `review-remediation.yml`. Each conversion changes the model for every run that reaches that line, so it is a behaviour change, recorded in ADR-0009.
+**Decision D-M: the Claude 5.5 family (decided 2026-10-16).** The pins move to the 5.5 family through the aliases in `config/models.json`, which resolve to `claude-opus-5-5`, `claude-sonnet-5-5` and `claude-haiku-5-5`. PR #8634 merged to main on 2026-10-16. It writes full 5.5 IDs into templates and scripts, changes the `shipwright-pipeline.yml` triage pin to `claude-haiku-5-5`, and pins the Claude Code CLI to 2.1.301 in several workflows. It creates no `config/models.json` and does not touch `review-remediation.yml`. That workflow's pin was moved to `claude-sonnet-5-5` on main by #8583, not by #8634. W2-07 maps the old IDs and the 5.5 full IDs to aliases and edits the workflow pins and `scripts/sw-strategic.sh`, so its steps hold for any branch state. Each conversion changes the model for every run that reaches that line, so it is a behaviour change, recorded in ADR-0009.
 
 ---
 
@@ -84,12 +84,13 @@ The spec already covers most of this work. A reviewer checked it and found one n
 | E3 | ModularRSI: five-module harness, restricted modification scope, contrastive trajectory analysis | [V] | [arXiv 2609.14857](https://arxiv.org/pdf/2609.14857). The paper reports no ablation of the contrastive step. |
 | E4 | StrongDM's software factory: scenarios held outside the codebase; "satisfaction"; digital twins | [V] (secondary) | [Willison, 2026-02-07](https://simonwillison.net/2026/feb/7/software-factory/), read with secondary coverage. Transfer to Shipwright is [J]. |
 | E5 | Weng, "Harness Engineering for Self-Improvement" (2026-07-04): read-only evaluators | [U] | Read only through secondary coverage. The specific read-only claims are not used as evidence. |
-| E6 | Run `Shipwright Pipeline #8547` (run 38744601038) shows the watchdog and heartbeat gap, not an agent stall | [V] | At 16:39Z, about three hours after it started at 13:39Z, the pipeline job was still `in_progress`. The stall was environmental (E11). The gap is that nothing detected it: the heartbeat timer kept the watchdog satisfied. The W2-05 and W2-06 fixture is synthetic; a capture of this run is taken after it completes (W2-01). |
+| E6 | Run `Shipwright Pipeline #8547` (run 38744601038) shows the watchdog and heartbeat gap, not an agent stall | [V] | At 16:39Z, about three hours after it started at 13:39Z, the pipeline job was still `in_progress`. The stall was environmental (E11). The gap is that nothing detected it: the heartbeat timer kept the watchdog satisfied. The W2-05 and W2-06 fixture is synthetic; the run completed on 2026-10-15, and its capture is W2-01 Step 1. |
 | E7 | The 288 re-runs on 2026-10-14 came from dispatch and sweep, not from auto-retry | [V] by source check; [U] whether some of the 288 runs were on issues the leaked test gate had changed (E11) | The dispatch guard matches the text "Pipeline Auth Failure" (`shipwright-dispatch.yml:107`), and the pre-flight writes that comment with `|| true`. Sweep uses "Pipeline Starting" timestamps (`shipwright-sweep.yml:95`). The exact path of each re-run is not reconstructed here. |
 | E8 | "Environment setup is the largest single factor in agent success" | [U] | Not checked. W2-02 adds an environment class because the incident record shows setup failures, not because of this claim. |
 | E9 | Auto-retry has no auth category and falls back to BUILD_FAILURE | [V] | `shipwright-auto-retry.yml` categorisation block, default at the "safest retry strategy" line. |
 | E10 | CI heartbeat is a background timer that posts every 600 seconds regardless of progress | [V] | `shipwright-pipeline.yml:641–646`. |
 | E11 | The environmental cause of the #8547 stall: the loop's test gate inherited the GitHub and Claude credentials, so `scripts/sw-e2e-integration-test.sh` ran a nested real pipeline on every iteration. It filed real issues, switched branches in the agent's checkout, and deleted `.claude/pipeline-state.md`. | [V] for the mechanism, read in the diff of PR #8610, merged on 2026-10-15 (`scripts/sw-e2e-integration-test.sh`, `scripts/lib/test-gate-env.sh`, `scripts/sw-loop.sh`). [U] for the counts (about 1000 issues over time; 37 open ones now closed), as the maintainer reported them. | #8610 adds `sw_test_gate_env` (tokens unset, empty `GH_CONFIG_DIR`, `SHIPWRIGHT_IN_TEST_GATE=1`) and the `SHIPWRIGHT_E2E_REAL=1` opt-in. Tracked in #8608. |
+| E12 | E2E run 38894394209 on issue #8547 (a one-line docs note), 2026-10-16. It ended with conclusion `cancelled` about 181 minutes after it started, reported as a 180-minute timeout. New issues filed: #8633 (the test gate blocks on pre-existing unrelated failures; PR #8646 is open for a differential gate); #8644 (no blast-radius guard: one iteration deleted up to 8,557 lines); #8648 (test suites leak real daemons, tmux windows and orphan pipelines into the developer environment); #8649 (daemon patrol commits docs sync onto the checked-out branch); #8647 (dependency alerts: 2 critical, 41 high). | [V] for the run timing and for the issue states (all open on 2026-10-16); [U] for the 8,557-line figure and the timeout cause, as reported. | Mapping: #8633 and #8644 bear on the progress sensing and stall stop of W2-05 and W2-06. #8644 is an external prerequisite for unattended runs (Dispatch at scale, W2-06). #8648 bears on the hermeticity work of W2-20. #8649 and #8647 are outside Wave 2 and are tracked in their own issues. |
 
 **Not cited:** StrongDM's specific figures beyond the holdout framing, Weng's specific claims, AHE and Self-Harness (not verified), and the issue #8547 run as evidence of an agent stall. #8547 is evidence of the watchdog gap only (E6). The 71.9% review figure is cited with its corrections (E2).
 
@@ -143,12 +144,12 @@ Tranche 1 needs no ledger. It can be merged and verified without GitHub writes.
 - Create: `src/testing/fixtures/wave2/stall-snapshots.json` (synthetic; replaced by a capture in Step 1)
 - Create: `src/testing/fixtures/wave2/fixtures.test.ts`
 
-- [ ] **Step 1: Capture the real fixtures (read-only).** Run 38744601038 completed with conclusion `cancelled` on 2026-10-16 (E6). Capture its failed-step log, and do not commit the raw log:
+- [ ] **Step 1: Capture the real fixtures (read-only).** Run 38744601038 completed with conclusion `cancelled` on 2026-10-15 (E6). Capture its failed-step log, and do not commit the raw log:
 
 ```bash
 gh run view 38744601038 --repo sethdford/shipwright --json status --jq '.status'
 ```
-Expected: `completed`. If it still prints `in_progress`, keep the synthetic fixtures and record the capture as open.
+Expected: `completed`, which it printed on 2026-10-16. If the capture fails, keep the synthetic fixtures and record the capture as open.
 
 ```bash
 gh run view 38744601038 --repo sethdford/shipwright --log-failed > "$SCRATCH/38744601038.failed.log"
@@ -1654,7 +1655,7 @@ Expected: exit 0 for each.
 
 ### W2-06: loop stall stop, one progress comment, progress-aware watchdog, build wall-clock cap
 
-**Depends on:** #8610, merged 2026-10-15. Progress signals mean nothing while the test gate can run real pipelines and mutate the checkout (E11), so this task starts only on the merged gate.
+**Depends on:** #8610, merged 2026-10-15. Progress signals mean nothing while the test gate can run real pipelines and mutate the checkout (E11), so this task starts only on the merged gate. For unattended runs, #8644 (no blast-radius guard) is an external prerequisite (E12): this task detects stalls, not destructive progress.
 
 **Purpose:** a run whose tests stop moving stops, instead of running to the cap. The watchdog measures time since the last test movement, not since the last timer tick. The build stage has a wall-clock cap from its template. A run with no test signal is never judged: no test command means no record and no stall.
 
@@ -2135,7 +2136,7 @@ const allowed = config.allowlist.files.map(globToRegex);
 const isAllowlisted = (rel: string) => allowed.some((re) => re.test(rel));
 
 describe("model IDs", () => {
-  test("no file outside the allowlist names a model ID that is not an alias value", () => {
+  test("no file outside the allowlist names any full model ID", () => {
     const violations: string[] = [];
     for (const target of TARGETS) {
       for (const file of walk(join(ROOT, target))) {
@@ -2243,7 +2244,7 @@ for name in ["autonomous.json", "full.json", "cost-aware.json"]:
 print("converted")
 PY
 ```
-Expected: `converted`. In `scripts/sw-strategic.sh`, replace the constant on line 52 (`STRATEGIC_MODEL="claude-sonnet-5-5"` since #8634; `"claude-sonnet-5"` before it) with `STRATEGIC_MODEL="$(models_resolve sonnet)"`, and add `source "$(dirname "${BASH_SOURCE[0]}")/lib/models.sh"` above it. In `.github/workflows/review-remediation.yml`, replace `--model claude-sonnet-4-20250514` with `--model "$(jq -r '.aliases.sonnet' config/models.json)"`. In `.github/workflows/shipwright-pipeline.yml`, replace the triage model (`--model claude-haiku-4-5-20251001`, or `--model claude-haiku-5-5` if #8634 has merged) with `--model "$(jq -r '.aliases.haiku' config/models.json)"`. Locate each by `grep -n -- '--model claude-' <file>`, because line numbers depend on whether #8634 has merged. Both workflow steps need `actions/checkout` earlier in their job; confirm it.
+Expected: `converted`. In `scripts/sw-strategic.sh`, replace the constant on line 52 (`STRATEGIC_MODEL="claude-sonnet-5-5"` on main, `"claude-sonnet-5"` before #8634) with `STRATEGIC_MODEL="$(models_resolve sonnet)"`, and add `source "$(dirname "${BASH_SOURCE[0]}")/lib/models.sh"` above it. In `.github/workflows/review-remediation.yml`, replace the `--model` value (`claude-sonnet-4-20250514` before #8583, `claude-sonnet-5-5` on main) with `--model "$(jq -r '.aliases.sonnet' config/models.json)"`. In `.github/workflows/shipwright-pipeline.yml`, replace the triage model (`claude-haiku-4-5-20251001` before #8634, `claude-haiku-5-5` on main) with `--model "$(jq -r '.aliases.haiku' config/models.json)"`. Locate each by `grep -n -- '--model claude-' <file>`, because line numbers differ between branch states. Both workflow steps need `actions/checkout` earlier in their job; confirm it.
 
 
 - [ ] **Step 8: Run the policy test.**
@@ -2421,9 +2422,11 @@ Each task expands to Wave 1a detail before it starts.
 
 ### W2-14: trusted replay and advisory ratchet
 
-- **Source and inputs.** Replays run from `git archive <base.sha>` with no `.git` directory, and all code and the harness come from the base ref. A replay reads two kinds of input, neither secret: the case manifest `config/eval-manifest.json` from the base ref, and the policy JSON files of the PR head, read with `git show <head.sha>:<path>` and validated by zod. Scenarios and oracles are never in the manifest and are never read by a replay.
+- **Source and inputs.** Replays run from `git archive <base.sha>` with no `.git` directory, and all code and the harness come from the base ref. A replay reads two kinds of input, neither secret: the case manifest `config/eval-manifest.json` from the base ref, and the policy JSON files of the PR head, read with `git show <head.sha>:<path>`, validated by the zod schema, and used only as data. Scenarios and oracles are never in the manifest and are never read by a replay.
+- **Executable fields come from the base ref.** The schema treats as executable every key named `command`, every key ending in `_cmd`, the keys `argv`, `script`, `run`, `hook`, `entrypoint` and `exec`, and the `type` of a check, which selects its runner, at any depth. Examples: `test_cmd`, `rollback_cmd` in `templates/pipelines/*.json`, and `command` in `config/policy.json`. For each such field the replay uses the base-ref value, never the head value. If the head changes, adds or removes one, the PR is `not evaluable`, the same as a PR that changes executable code. The schema is the source of truth: a new executable key must be added to it.
+- **Tests.** The W2-14 test file has these cases: a PR that changes `test_cmd` in `templates/pipelines/fast.json` is `not evaluable`; a PR that changes a `command` in `config/policy.json` is `not evaluable`; a PR that changes only non-executable fields is evaluable; a PR that adds a `*_cmd` key is `not evaluable`; a `command` nested inside an array is caught; and a repository test asserts that every key named `command` or ending in `_cmd` in `templates/pipelines/*.json` and `config/*.json` is in the schema's executable set, so a new one cannot slip past the schema.
 - **Offline.** Every GitHub call a replay makes goes to the GitHub twin (W2-21). The replay job holds no GitHub token (`eval-replay.yml#replay` is not on the secret allowlist). Its only credential is the model credential. Residual risk: the replay agent holds the model credential and runs the commands its model writes. Without a GitHub token it cannot write to a repository. A live run in the sandbox is a separate, manual job (`sandbox-e2e.yml`); its results are advisory and are not a ratchet input.
-- **Triggers.** A PR job (`eval-request.yml`, no secrets) records a request when the PR touches a policy path: `templates/pipelines/*.json`, `config/models.json`, `config/defaults.json` or `config/policy.json`. Prompt and skill text joins the list when such directories exist (none do today). A PR that changes executable code on a policy path (`scripts/`, `src/`) is not replayed: its ratchet result is `not evaluable` and it routes to human review. A base-ref workflow (`eval-replay.yml`, `workflow_run`) runs the subset, and a weekly scheduled run on `main` runs the full corpus.
+- **Triggers.** A PR job (`eval-request.yml`, no secrets) records a request when the PR touches a policy path: `templates/pipelines/*.json`, `config/models.json`, `config/defaults.json` or `config/policy.json`. Prompt and skill text joins the list when such directories exist (none do today). A PR that changes executable code on a policy path (`scripts/`, `src/`) is not replayed: its ratchet result is `not evaluable` and it routes to human review. A PR that changes an executable field of a policy file is `not evaluable` too (Executable fields). A base-ref workflow (`eval-replay.yml`, `workflow_run`) runs the subset, and a weekly scheduled run on `main` runs the full corpus.
 - **Subset.** 12 of the 24 cases (half the corpus), stratified by tier in proportion to the corpus counts, drawn with a seed recorded in the ledger. A subset verdict is advisory; the full paired run decides.
 - **Budget.** The per-invocation reservation and `--max-budget-usd` of W2-12 apply, under the $25 per eval run and $100 per ISO week caps. The replay workflow sets `concurrency: { group: eval-replay, cancel-in-progress: false }`, so replays never overlap and cannot double-spend the weekly cap.
 - **Curtailment (early stopping).** A paired run stops early only when every possible outcome of the remaining cases gives the same verdict under the W2-13 rule, for example when the discordant pairs already reach the sign-test minimum, or when non-inferiority is already broken. This is curtailment, not a sequential boundary: no significance level is spent, and the stop rule is not a test at intermediate looks.
@@ -2527,7 +2530,7 @@ These rules apply to W2-14, W2-15, W2-17 and W2-21 to W2-23. Each is stated here
 
 - **No agent holds GitHub credentials.** An agent process (the builder, the verifier, the replay agent) never has a GitHub credential in its environment or on disk. GitHub writes happen in the orchestrator through the integrations adapter (F10), with an explicit target, and the orchestrator scrubs secret variables from the agent's environment. This is #8624, which is open as of 2026-10-16. W2-17 and W2-23 cannot start before it merges, and W2-22 cannot run an agent against the sandbox before it merges.
 - **Two secrets, two repositories, two environments.** `SANDBOX_GH_TOKEN` and `HOLDOUT_READ_TOKEN` are fine-grained personal access tokens, each scoped to one repository: `sethdford/shipwright-sandbox` (Contents, Issues and Pull requests read and write; Metadata read) and `sethdford/shipwright-holdout` (Contents read-only). Neither has any permission on this repository. Each lives in its own GitHub Environment (`sandbox`, `holdout`) with required reviewers and deployment limited to `main`. The maintainer creates the tokens and environments.
-- **Base-ref execution only.** A job that reads a secret runs from the base ref: `workflow_dispatch` on `main`, or `workflow_run` whose workflow file comes from `main`. No secret-bearing job uses `pull_request`, `pull_request_target` or `issue_comment`, and fork PRs are skipped with a `head_repository` check, so a PR's own workflow edits never reach a secret. Secret-bearing jobs execute no PR-head content. The only PR-head content they read is declared JSON (the policy files in W2-14), read with `git show` and validated by zod. Nothing from the PR head is sourced, executed, installed or used as a command. A PR job may record a replay request; the base-ref job treats it as data and validates the PR number and a 40-hex head SHA. Each secret-bearing run waits for a reviewer's approval, so automatic replays wait for approval too.
+- **Base-ref execution only.** A job that reads a secret runs from the base ref: `workflow_dispatch` on `main`, or `workflow_run` whose workflow file comes from `main`. No secret-bearing job uses `pull_request`, `pull_request_target` or `issue_comment`, and fork PRs are skipped with a `head_repository` check, so a PR's own workflow edits never reach a secret. Secret-bearing jobs execute no PR-head content. The only PR-head content they read is declared JSON (the policy files in W2-14), read with `git show` and validated by zod. PR-head executable fields are never used: the executable fields of the policy files come from the base ref (W2-14), and a PR that changes one is `not evaluable`. Nothing from the PR head is sourced, executed or installed. A PR job may record a replay request; the base-ref job treats it as data and validates the PR number and a 40-hex head SHA. Each secret-bearing run waits for a reviewer's approval, so automatic replays wait for approval too.
 - **Scope per step.** A secret appears in the `env:` of the one step that needs it. Later steps, including any that run candidate tests, do not have it. Checkout uses `persist-credentials: false`.
 - **Enforced by a rule.** `tools/arch/secret-scope.ts` (W2-22) fails `bun run arch` when either secret name appears outside its allowlist, or when a file that names one uses a PR or comment trigger.
 
@@ -2561,7 +2564,7 @@ Real GitHub runs create issues, labels and comments. Live checks move to `sethdf
 
 | Tranche | Check | Expected observable |
 |---|---|---|
-| 1 | W2-01 capture of run 38744601038 | Once the run completes: `completed`, and no credential-shaped strings in the capture |
+| 1 | W2-01 capture of run 38744601038 | Run completed 2026-10-15 (`cancelled`); the capture has no credential-shaped strings |
 | 1 | W2-03 | `actionlint` exit 0; `bun run arch` exit 0 |
 | 1 | W2-06 manual run | A `SHIPWRIGHT-PROGRESS` marker appears in the issue's bot comment; the watchdog reports a time since last progress, not a heartbeat time |
 | 1 | W2-20 arch ratchet | `bun run arch` exits 0; the baseline has one entry (`scripts/sw-integration-claude-test.sh`) |
