@@ -377,6 +377,17 @@ _date_helper_assertions() {
     lstart=$(date_local_to_epoch "Mon Oct  5 10:00:00 2026")
     assert_eq "$label: date_local_to_epoch round-trips through epoch_format" "Mon Oct  5 10:00:00 2026" \
         "$(epoch_format "$lstart" '%a %b %e %H:%M:%S %Y')"
+    # Real ps(1) output (macOS pads lstart with trailing spaces): must parse to about now.
+    local ps_lstart ps_epoch now_epoch
+    ps_lstart=$(ps -p $$ -o lstart= 2>/dev/null || true)
+    ps_epoch=$(date_local_to_epoch "$ps_lstart" || echo "")
+    now_epoch=$(date +%s)
+    if [[ -n "$ps_epoch" ]] && (( now_epoch - ps_epoch >= 0 && now_epoch - ps_epoch < 86400 )); then
+        assert_pass "$label: date_local_to_epoch parses real ps lstart output"
+    else
+        assert_fail "$label: date_local_to_epoch parses real ps lstart output" "got '${ps_epoch}' for '${ps_lstart}'"
+    fi
+    assert_eq "$label: date_local_to_epoch trims padding" "$lstart" "$(date_local_to_epoch "  Mon Oct  5 10:00:00 2026   ")"
     assert_eq "$label: epoch_to_iso" "2023-11-14T22:13:20Z" "$(epoch_to_iso 1700000000)"
     _expect_rc_fail "$label: epoch_to_iso rejects non-integers" epoch_to_iso "abc"
     assert_eq "$label: epoch_format -u" "2023-11-14 22" "$(epoch_format -u 1700000000 '%Y-%m-%d %H')"

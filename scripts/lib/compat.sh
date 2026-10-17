@@ -270,7 +270,8 @@ _timeout() {
 #
 # Each helper prints its result and returns 0. On invalid input it prints NOTHING and returns 1,
 # so the caller picks its default explicitly, e.g. `start=$(date_to_epoch "$ts" || echo 0)`.
-# Input shapes are checked before any `date` runs, so GNU and BSD accept the same strings.
+# Input shapes are checked before any `date` runs, so both see only well-formed strings (they may
+# still differ on out-of-range values such as Feb 30, which BSD normalizes and GNU rejects).
 #
 #   date_to_epoch <ts>               UTC "YYYY-MM-DDTHH:MM:SS[.frac]Z" or "YYYY-MM-DD" -> epoch
 #   date_local_to_epoch <str>        ps(1) lstart "Thu Oct  5 10:00:00 2026" (local) -> epoch
@@ -291,6 +292,9 @@ _compat_parse_epoch() {
     if [[ "$zone" == "utc" ]]; then
         [[ "$s" =~ ^[0-9]{4}-[0-9]{2}-[0-9]{2}(T[0-9]{2}:[0-9]{2}:[0-9]{2}(\.[0-9]+)?Z)?$ ]] || return 1
     else
+        # macOS `ps -o lstart=` pads with trailing spaces; trim the ends (keep the inner day padding).
+        s="${s#"${s%%[![:space:]]*}"}"
+        s="${s%"${s##*[![:space:]]}"}"
         [[ "$s" =~ ^[A-Za-z]{3}\ [A-Za-z]{3}\ [\ 0-9]{2}\ [0-9:]{8}\ [0-9]{4}$ ]] || return 1
     fi
     if _compat_date_is_gnu; then
