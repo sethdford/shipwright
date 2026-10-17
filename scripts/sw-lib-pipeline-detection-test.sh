@@ -449,6 +449,24 @@ else
 fi
 rm -f "$PROJECT_ROOT/package.json"
 
+# Chain dedupe is per whole segment (#8633 review): every && segment must be exactly one suite
+# invocation, with no cd, no other path, no env prefix, no extra command.
+_redundant() { if _is_redundant_test_script "$1" "$2"; then echo drop; else echo keep; fi; }
+assert_eq "chain of two bare suites is dropped" "drop" "$(_redundant 'bash scripts/sw-a-test.sh && bash scripts/sw-b-test.sh' 'bash scripts/sw-test-all.sh')"
+assert_eq "--jobs N on the primary is dropped" "drop" "$(_redundant 'bash scripts/sw-test-all.sh -j 4' 'bash scripts/sw-test-all.sh')"
+assert_eq "cd prefix on a suite segment is kept" "keep" "$(_redundant 'cd sub && bash scripts/sw-a-test.sh && bash scripts/sw-b-test.sh' 'bash scripts/sw-test-all.sh')"
+assert_eq "other tree prefix is kept" "keep" "$(_redundant 'bash other/scripts/sw-a-test.sh && bash other/scripts/sw-b-test.sh' 'bash scripts/sw-test-all.sh')"
+assert_eq "non-suite segment in the chain is kept" "keep" "$(_redundant 'bash scripts/sw-a-test.sh && bash scripts/sw-b-test.sh && bun test' 'bash scripts/sw-test-all.sh')"
+assert_eq "env prefix on a suite segment is kept" "keep" "$(_redundant 'SW_EXTRA=1 bash scripts/sw-a-test.sh && bash scripts/sw-b-test.sh' 'bash scripts/sw-test-all.sh')"
+assert_eq "--list standalone is dropped" "drop" "$(_redundant 'mocha --list' 'jest')"
+assert_eq "single suite (smoke) is kept" "keep" "$(_redundant 'bash scripts/sw-e2e-smoke-test.sh' 'bash scripts/sw-test-all.sh')"
+assert_eq "chain under --pattern primary is kept" "keep" "$(_redundant 'bash scripts/sw-a-test.sh && bash scripts/sw-b-test.sh' 'bash scripts/sw-test-all.sh --pattern loop')"
+assert_eq "|| chain is kept" "keep" "$(_redundant 'bash scripts/sw-a-test.sh || bash scripts/sw-b-test.sh' 'bash scripts/sw-test-all.sh')"
+assert_eq "--listen is not --list" "keep" "$(_redundant 'node server.js --listen 0 && mocha test/api' 'jest')"
+assert_eq "--list-file is not --list" "keep" "$(_redundant 'jest --list-file=x' 'jest')"
+assert_eq "same script with different flags is kept" "keep" "$(_redundant 'jest --config jest.config.js --selectProjects integration-ish' 'jest --config jest.config.js')"
+assert_eq "same runner, different script arg is kept" "keep" "$(_redundant 'bash scripts/check.sh lint' 'bash scripts/check.sh test')"
+
 # Empty project returns nothing
 result=$(detect_test_commands)
 assert_eq "Empty project returns empty" "" "$result"

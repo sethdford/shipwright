@@ -34,9 +34,6 @@ sw_test_gate_scrub() {
     # down. The token actions/checkout saves as an http extraheader in the repo's git config (and
     # any credential helper) would still let a test push; an empty value resets each.
     export SHIPWRIGHT_IN_TEST_GATE=1 GIT_TERMINAL_PROMPT=0 GH_CONFIG_DIR=/nonexistent/sw-test-gate-gh
-    # The differential gate (#8633) attributes failures per assertion, so sw-test-all.sh must print
-    # every failing suite's full log, not its last 25 lines. Forced, not defaulted.
-    export FAIL_LOG_LINES=100000
     export GIT_CONFIG_COUNT=3 \
         GIT_CONFIG_KEY_0=http.https://github.com/.extraheader GIT_CONFIG_VALUE_0='' \
         GIT_CONFIG_KEY_1=http.extraheader GIT_CONFIG_VALUE_1='' \

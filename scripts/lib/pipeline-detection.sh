@@ -87,10 +87,11 @@ _detect_package_manager() {
 # repeats work the primary already does (#8633). Dropped when:
 #   - it lists tests instead of running them (--list as a standalone word);
 #   - its body is the primary's body, optionally plus "--jobs N" or "-j N" (the same run again);
-#   - it chains two or more scripts/sw-*-test.sh suites, and the primary is sw-test-all.sh without
-#     --pattern: sw-test-all.sh already discovers and runs every such suite.
+#   - the primary is a full sw-test-all.sh (no --pattern) and every segment of its && chain (two or
+#     more) is exactly "bash scripts/sw-<name>-test.sh": sw-test-all.sh already runs each suite.
 _is_redundant_test_script() {
-    local body="$1" primary="$2" f files suites=0 all_suites=1
+    local body="$1" primary="$2" seg n=0 all_suites=1 re
+    local rest
     if [[ "$body" =~ (^|[[:space:]])--list($|[[:space:]]) ]]; then
         return 0
     fi
@@ -100,17 +101,27 @@ _is_redundant_test_script() {
     if [[ -n "$primary" && "$body" =~ ^(.*)[[:space:]]+(--jobs|-j)[[:space:]]+[0-9]+$ ]]; then
         [[ "${BASH_REMATCH[1]}" == "$primary" ]] && return 0
     fi
-    if [[ "$primary" == *"sw-test-all.sh"* && "$primary" != *"--pattern"* && "$body" == *"&&"* ]]; then
-        files="$(printf '%s\n' "$body" | grep -oE 'scripts/[A-Za-z0-9_./-]+\.sh' | sort -u || true)"
-        [[ -z "$files" ]] && return 1
-        while IFS= read -r f; do
-            [[ -z "$f" ]] && continue
-            case "$f" in
-                scripts/sw-*-test.sh) suites=$((suites + 1)) ;;
-                *) all_suites=0 ;;
-            esac
-        done <<< "$files"
-        if [[ "$all_suites" -eq 1 && "$suites" -ge 2 ]]; then
+    if [[ "$primary" == "bash scripts/sw-test-all.sh" && "$body" == *"&&"* ]]; then
+        re='^bash scripts/sw-[a-z0-9-]+-test\.sh$'
+        rest="$body"
+        while [[ -n "$rest" ]]; do
+            if [[ "$rest" == *"&&"* ]]; then
+                seg="${rest%%&&*}"
+                rest="${rest#*&&}"
+            else
+                seg="$rest"
+                rest=""
+            fi
+            # trim surrounding spaces
+            seg="${seg#"${seg%%[![:space:]]*}"}"
+            seg="${seg%"${seg##*[![:space:]]}"}"
+            n=$((n + 1))
+            if ! [[ "$seg" =~ $re ]]; then
+                all_suites=0
+                break
+            fi
+        done
+        if [[ "$all_suites" -eq 1 && "$n" -ge 2 ]]; then
             return 0
         fi
     fi

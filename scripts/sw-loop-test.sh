@@ -867,14 +867,17 @@ mkdir -p "$_gate/repo" "$_gate/logs" "$_gate/tmp"
 cat > "$_gate/repo/runner.sh" <<'RUNNER'
 #!/usr/bin/env bash
 cd "$(dirname "$0")"
-f=0; p=0
+f=0; p=0; sections=""
 for s in suite-a suite-b suite-c; do
     if grep -Fx -- "$s" fail.txt >/dev/null 2>&1; then
         printf '  ✗ %-46s exit 1 0s\n' "$s"; f=$((f + 1))
+        # the suite's log section, as sw-test-all.sh prints it, ending with test-helpers' summary
+        sections="${sections}━━━ $s (FAIL:1) — last 25 lines ━━━"$'\n'"      ✗ check"$'\n'"    1 of 1 tests failed"$'\n'
     else
         printf '  ✓ %-46s 0s\n' "$s"; p=$((p + 1))
     fi
 done
+printf '%s' "$sections"
 printf '\n  %s passed  %s failed  0 timed out  (3 suites, 0s)\n' "$p" "$f"
 [[ "$f" -eq 0 ]]
 RUNNER
@@ -916,7 +919,7 @@ _gate_fns="$_gate/fns.sh"
     run_test_gate >/dev/null 2>&1 || true
     echo "NEW=${TEST_PASSED}"
     echo "NEWOUT=$(echo "${TEST_OUTPUT}" | grep -c 'NEW FAILURES' || true)"
-    echo "NEWEVID=$(jq -r '.[0].new_failures | join(",")' "$LOG_DIR/test-evidence-iter-2.json")"
+    echo "NEWEVID=$(jq -r '.[0].new_failures | sort | join(",")' "$LOG_DIR/test-evidence-iter-2.json")"
     echo "NEWVERDICT=$(jq -r '.[0].verdict' "$LOG_DIR/test-evidence-iter-2.json")"
 
     # Iteration 3: the base commit is not the loop's base (no LOOP_START_COMMIT) -> blocks
@@ -933,7 +936,7 @@ if [[ "$(_gate_val PRE)" == "true" && "$(_gate_val PREOUT)" -ge 1 && "$(_gate_va
 else
     assert_fail "pre-existing failure does not block run_test_gate" "$(cat "$_gate/results.txt" "$_gate/err.txt" 2>/dev/null | tail -5)"
 fi
-if [[ "$(_gate_val NEW)" == "false" && "$(_gate_val NEWOUT)" -ge 1 && "$(_gate_val NEWEVID)" == "suite-c" && "$(_gate_val NEWVERDICT)" == "new-failures" ]]; then
+if [[ "$(_gate_val NEW)" == "false" && "$(_gate_val NEWOUT)" -ge 1 && "$(_gate_val NEWEVID)" == "suite-c::check,suite-c::exit=1" && "$(_gate_val NEWVERDICT)" == "new-failures" ]]; then
     assert_pass "new failure blocks run_test_gate and lists only the new suite"
 else
     assert_fail "new failure blocks run_test_gate" "$(cat "$_gate/results.txt" "$_gate/err.txt" 2>/dev/null | tail -5)"

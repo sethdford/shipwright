@@ -1042,7 +1042,8 @@ run_test_gate() {
 
         local start_ts exit_code=0
         start_ts=$(date +%s)
-        sw_test_gate_env bash -c "$test_wrapper" > "$test_log" 2>&1 || exit_code=$?
+        # FAIL_LOG_LINES: the differential gate needs every failing suite's full log (#8633).
+        FAIL_LOG_LINES=100000 sw_test_gate_env bash -c "$test_wrapper" > "$test_log" 2>&1 || exit_code=$?
         local duration=$(( $(date +%s) - start_ts ))
 
         if [[ "$exit_code" -ne 0 ]]; then
@@ -1055,6 +1056,8 @@ run_test_gate() {
     # Run additional test commands (discovered or explicit)
     # Mid-build discovery: find test files created since loop start
     local mid_build_cmds=()
+    # Skipped without LOOP_START_COMMIT (a state file from before it was persisted, #8633): there is
+    # no base to tell a new test file from an old one. The gate still blocks on every configured command.
     if [[ -n "${LOOP_START_COMMIT:-}" ]] && type detect_created_test_files >/dev/null 2>&1; then
         while IFS= read -r _cmd; do
             [[ -n "$_cmd" ]] && mid_build_cmds+=("$_cmd")
@@ -1081,7 +1084,7 @@ run_test_gate() {
 
         local start_ts exit_code=0
         start_ts=$(date +%s)
-        sw_test_gate_env bash -c "$extra_wrapper" > "$extra_log" 2>&1 || exit_code=$?
+        FAIL_LOG_LINES=100000 sw_test_gate_env bash -c "$extra_wrapper" > "$extra_log" 2>&1 || exit_code=$?
         local duration=$(( $(date +%s) - start_ts ))
 
         if [[ "$exit_code" -ne 0 ]]; then
