@@ -871,7 +871,7 @@ All scripts are bash (except the dashboard server in TypeScript). Grouped by lay
 | `scripts/sw-loop-test.sh` | 911 | Validate continuous agent loop harness |
 | `scripts/sw-memory-discovery-e2e-test.sh` | 411 | Memory & Discovery E2E Test |
 | `scripts/sw-memory-effectiveness-test.sh` | 497 | Unit tests |
-| `scripts/sw-memory-test.sh` | 903 | Unit tests for memory system & cost tracking |
+| `scripts/sw-memory-test.sh` | 904 | Unit tests for memory system & cost tracking |
 | `scripts/sw-mission-control-test.sh` | 153 | Validate mission control dashboard |
 | `scripts/sw-model-router-test.sh` | 313 | Intelligent model routing & optimization |
 | `scripts/sw-mutation-executor-test.sh` | 309 | Mutation Testing Engine Test Suite |
