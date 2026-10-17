@@ -35,6 +35,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           fetch-depth: 0
+          persist-credentials: false
 
       - name: Determine PR number
         id: pr
@@ -134,7 +135,8 @@ jobs:
 
           Fix all actionable findings. Skip any that are questions or suggestions without clear action items."
 
-          claude -p "$PROMPT" --max-turns 10 --model claude-sonnet-5-5 2>&1 || {
+          # Through agent-exec.sh: the agent gets no GitHub token (F9).
+          scripts/lib/agent-exec.sh claude -p "$PROMPT" --max-turns 10 --model claude-sonnet-5-5 2>&1 || {
             echo "::warning::Claude remediation returned non-zero — changes may be partial"
           }
         env:
@@ -180,6 +182,11 @@ jobs:
           SHORT_SHA: ${{ steps.pr.outputs.short_sha }}
           HEAD_SHA: ${{ steps.pr.outputs.head_sha }}
           FINDING_COUNT: ${{ steps.findings.outputs.count }}
+          # The push authenticates per command from GH_TOKEN through an inline credential helper (the
+          # checkout persists no token). Same helper as the pipeline workflow; no file to rewrite.
+          GIT_CONFIG_COUNT: "1"
+          GIT_CONFIG_KEY_0: credential.helper
+          GIT_CONFIG_VALUE_0: '!f() { test "$1" = get || exit 0; proto=; host=; while IFS= read -r l && [ -n "$l" ]; do case "$l" in protocol=*) proto=${l#protocol=};; host=*) host=${l#host=};; esac; done; t=${GITHUB_TOKEN:-$GH_TOKEN}; if [ "$proto" = https ] && [ "$host" = github.com ] && [ -n "$t" ]; then printf "username=x-access-token\npassword=%s\n" "$t"; fi; }; f'
 
       - name: Request review rerun
         if: steps.findings.outputs.has_findings == 'true'

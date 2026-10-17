@@ -385,11 +385,14 @@ jobs:
       TEMPLATE: ${{ needs.triage.outputs.template || github.event.inputs.template || 'autonomous' }}
       MAX_ITERATIONS: ${{ needs.triage.outputs.max_iterations || '20' }}
       COMPLETED_STAGES: ${{ github.event.inputs.completed_stages || '' }}
-      # The orchestrator's git network ops (fetch, push) authenticate per command from GITHUB_TOKEN
-      # through this helper; the checkout persists no token. Agents get neither (agent-exec.sh).
+      # The orchestrator's git network ops (fetch, push, ls-remote) authenticate per command from
+      # GITHUB_TOKEN through the credential helper below. It is inlined as a config value, not a file:
+      # a file in the workspace is writable by the agent, and any orchestrator run of it would hand
+      # the token over. The checkout persists no token. agent-exec.sh drops GITHUB_TOKEN, GH_TOKEN and
+      # these GIT_CONFIG_* from the agent's environment, so agents do not get the helper either.
       GIT_CONFIG_COUNT: "1"
       GIT_CONFIG_KEY_0: credential.helper
-      GIT_CONFIG_VALUE_0: '!bash "$GITHUB_WORKSPACE/scripts/ci/git-token-credential.sh"'
+      GIT_CONFIG_VALUE_0: '!f() { test "$1" = get || exit 0; proto=; host=; while IFS= read -r l && [ -n "$l" ]; do case "$l" in protocol=*) proto=${l#protocol=};; host=*) host=${l#host=};; esac; done; t=${GITHUB_TOKEN:-$GH_TOKEN}; if [ "$proto" = https ] && [ "$host" = github.com ] && [ -n "$t" ]; then printf "username=x-access-token\npassword=%s\n" "$t"; fi; }; f'
       CLAUDE_CODE_OAUTH_TOKEN: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
       GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       NO_COLOR: "1"
