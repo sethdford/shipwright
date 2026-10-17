@@ -186,3 +186,8 @@
 {"ts":"2026-10-17T18:11:19Z","ts_epoch":1792260679,"type":"patrol.finding","check":"untested_script","script":"sw-event-schema-sync.sh","lines":93,"usage":0}
 {"ts":"2026-10-17T18:11:20Z","ts_epoch":1792260680,"type":"patrol.issue_refused","check":"untested_scripts","count":7}
 {"ts":"2026-10-17T18:11:21Z","ts_epoch":1792260681,"type":"patrol.meta_issue_refused","title":"[Meta] Add tests for sw-event-schema-sync.sh"}
+{"ts":"2026-10-17T20:04:29Z","ts_epoch":1792267469,"type":"hygiene_platform_refactor","hardcoded":49,"fallback":75,"todo":51}
+{"ts":"2026-10-17T20:05:12Z","ts_epoch":1792267512,"type":"strategic.issue_refused","title":"Blast-radius guard for loop commits: halt when a task's diff deletes far more than its scope implies"}
+{"ts":"2026-10-17T20:05:15Z","ts_epoch":1792267515,"type":"strategic.issue_refused","title":"Differential test gate: treat suites with no completion line as unknown, not pass or fail"}
+{"ts":"2026-10-17T20:05:18Z","ts_epoch":1792267518,"type":"strategic.issue_refused","title":"Move daemon retry, timeout and iteration tunables into policy config with a documented schema"}
+{"ts":"2026-10-17T20:05:18Z","ts_epoch":1792267518,"type":"strategic.cycle_complete","issues_created":0,"issues_skipped":3}
