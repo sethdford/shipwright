@@ -35,14 +35,41 @@ _SW_TEST_GATE_ENV_LOADED=1
 # _sw_scrub_github_creds — drop GitHub, fleet and git credentials from the current shell. Shared
 # with agent-exec.sh. It does not check for a subshell: each caller must (see sw_test_gate_scrub).
 # Returns 1 if the remote list cannot be read, so the caller can refuse to run.
-# _sw_has_password KEY-OR-URL — true when it embeds user:password@ (a token would be copied into the env).
-_sw_has_password() {
-    [[ "$1" =~ ://[^/[:space:]]*:[^/[:space:]]*@ ]]
+# _sw_has_userinfo TEXT — true when a URL in TEXT carries userinfo: user@ or user:password@. A username
+# alone can be a token (https://TOKEN@github.com), so any userinfo counts.
+_sw_has_userinfo() {
+    [[ "$1" =~ ://[^/[:space:]]*@ ]]
 }
 
-# _sw_strip_userinfo URL — the URL without any user[:password]@ part.
-_sw_strip_userinfo() {
-    sed -E 's#^([A-Za-z][A-Za-z0-9+.-]*://)[^/@]*@#\1#' <<<"$1"
+# _sw_redact_key KEY — KEY with the URL inside it replaced, so a log never shows a credential.
+_sw_redact_key() {
+    case "$1" in
+        *://*) printf '%s://<redacted>.%s' "${1%%://*}" "${1##*.}" ;;
+        *) printf '%s' "$1" ;;
+    esac
+}
+
+# _sw_refuse_creds_in_config — return 1 (refuse) when the effective git config carries credentials: in a
+# remote URL or pushurl, in a url.<base>.insteadOf / pushInsteadOf (its key or its value), or in an
+# http.<url>.extraheader or credential.<url>.helper key. The message names the config scope and a
+# redacted key. It never prints a key's URL or any value: those are the credentials.
+_sw_refuse_creds_in_config() {
+    local rc=0 out line scope rest key value bad=0
+    out="$(git config --show-scope --get-regexp '^(remote\..*\.(url|pushurl)|url\..*\.(insteadof|pushinsteadof)|http\..*\.extraheader|credential\..*\.helper)$' 2>/dev/null)" || rc=$?
+    # Status 1 means no such entry. Anything else (git missing, unreadable config) is not safe.
+    [[ "$rc" -eq 0 || "$rc" -eq 1 ]] || return 1
+    while IFS= read -r line; do
+        [[ -n "$line" ]] || continue
+        scope="${line%%$'\t'*}"
+        rest="${line#*$'\t'}"
+        key="${rest%% *}"
+        value="${rest#* }"
+        if _sw_has_userinfo "$key" || _sw_has_userinfo "$value"; then
+            echo "agent-exec: git config ($scope) has credentials in $(_sw_redact_key "$key"); remove them before running an agent" >&2
+            bad=1
+        fi
+    done <<<"$out"
+    [[ "$bad" -eq 0 ]]
 }
 
 _sw_scrub_github_creds() {
@@ -51,17 +78,21 @@ _sw_scrub_github_creds() {
     # Everything that needs no I/O first, so a later failure still leaves the shell locked down.
     # An empty value resets each saved header or helper (global scope first).
     export GIT_TERMINAL_PROMPT=0 GH_CONFIG_DIR=/nonexistent/sw-no-gh-config
-    export GIT_CONFIG_COUNT=3 \
+    export GIT_CONFIG_COUNT=4 \
         GIT_CONFIG_KEY_0=http.https://github.com/.extraheader GIT_CONFIG_VALUE_0='' \
         GIT_CONFIG_KEY_1=http.extraheader GIT_CONFIG_VALUE_1='' \
-        GIT_CONFIG_KEY_2=credential.helper GIT_CONFIG_VALUE_2=''
-    local remotes saved insteadof rc=0 line url key n=3
+        GIT_CONFIG_KEY_2=credential.helper GIT_CONFIG_VALUE_2='' \
+        GIT_CONFIG_KEY_3=credential.https://github.com.helper GIT_CONFIG_VALUE_3=''
+    local remotes saved rc=0 line key n=4
+    # A credential anywhere in the config (a remote URL, an insteadOf, a saved header) makes the agent
+    # refuse to run: its key cannot be reset without copying the credential into the environment.
+    _sw_refuse_creds_in_config || return 1
     remotes="$(git config --get-regexp '^remote\..*\.(url|pushurl)$' 2>/dev/null)" || rc=$?
     # Status 1 means no remote is configured. Anything else (git missing, unreadable config) is not safe.
     [[ "$rc" -eq 0 || "$rc" -eq 1 ]] || return 1
+    local url
     while IFS= read -r line; do
-        # The remote's userinfo is dropped: the key built from it must not carry a token into the env.
-        url="$(_sw_strip_userinfo "${line#* }")"
+        url="${line#* }"
         [[ -n "$url" ]] || continue
         export "GIT_CONFIG_KEY_$n=http.$url.extraheader" "GIT_CONFIG_VALUE_$n="
         n=$((n + 1))
@@ -76,25 +107,9 @@ _sw_scrub_github_creds() {
     [[ "$rc" -eq 0 || "$rc" -eq 1 ]] || return 1
     while IFS= read -r key; do
         [[ -n "$key" ]] || continue
-        if _sw_has_password "$key"; then
-            echo "agent-exec: git config key '$key' embeds a password; not resetting it into the environment" >&2
-            return 1
-        fi
         export "GIT_CONFIG_KEY_$n=$key" "GIT_CONFIG_VALUE_$n="
         n=$((n + 1))
     done <<<"$saved"
-    # A url.<base>.insteadOf whose base carries a password rewrites URLs to that credential. Its key
-    # cannot be named here without copying the password into the environment, so refuse instead.
-    rc=0
-    insteadof="$(git config --name-only --get-regexp '^url\..*\.insteadof$' 2>/dev/null)" || rc=$?
-    [[ "$rc" -eq 0 || "$rc" -eq 1 ]] || return 1
-    while IFS= read -r key; do
-        [[ -n "$key" ]] || continue
-        if _sw_has_password "$key"; then
-            echo "agent-exec: git config '$key' embeds a password; remove it before running an agent" >&2
-            return 1
-        fi
-    done <<<"$insteadof"
     export GIT_CONFIG_COUNT=$n
 }
 

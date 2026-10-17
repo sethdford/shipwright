@@ -26,10 +26,12 @@
 #
 # Git's saved credentials are reset too, the same way the test gate resets them (test-gate-env.sh):
 # every http.*.extraheader and credential.*.helper the repo or user config saves (GHES and path-scoped
-# headers included), the remote URLs (with their userinfo removed, so no token is copied into the
-# agent's environment), and GIT_TERMINAL_PROMPT=0 with gh pointed at a missing config dir. A
-# url.<base>.insteadOf whose base embeds a credential cannot be reset without repeating the credential
-# in the environment, so the launcher refuses to run the agent while one is configured.
+# headers included), the github.com-scoped credential.https://github.com.helper, and GIT_TERMINAL_PROMPT=0
+# with gh pointed at a missing config dir. The launcher REFUSES to run the agent (exit 1, the message
+# names the config scope and a redacted key, never a value) when the config carries credentials: in a
+# remote URL or pushurl, in a url.<base>.insteadOf or pushInsteadOf (key or value), or in a saved header or
+# helper key. A token as the username alone (https://TOKEN@github.com) counts. Their keys cannot be reset
+# without copying the credential into the environment.
 #
 #   "$SW_AGENT_EXEC" claude -p "$prompt"
 #   "$SW_AGENT_EXEC" $TIMEOUT_CMD "$secs" claude -p "$prompt"
@@ -56,6 +58,18 @@
 #     environment, not its parent's.
 #   - The Claude login itself (kept on purpose; on macOS it lives in the keychain).
 #   - Tools that store a GitHub login in their own config files under $HOME.
+#   - Repo config the agent can write (.git/config is in the working tree). The scrub resets
+#     credential.helper (the list accumulates across scopes, so every helper is cleared), the
+#     github.com-scoped credential.https://github.com.helper, and each saved http./credential. key. The
+#     orchestrator's own git ops reset hooks and fsmonitor too (core.hooksPath=/dev/null,
+#     core.fsmonitor=false, in the workflows). Still open, because they run code in the orchestrator's
+#     git ops, which carry the token: filter.<name>.clean/smudge (run on add and checkout), diff.<name>.
+#     external (run on diff), and alias.* (run as commands). The agent can set any of them; a later
+#     orchestrator git op in the same repo runs them. Closing them needs isolation (separate user or
+#     sandbox) or a clean clone for the orchestrator's git ops.
+#   - credential.<url>.helper for any other host is reset by the saved-key list only when the key is
+#     saved; the agent can add one under a new URL. The orchestrator's helper answers github.com only, so
+#     a helper for another URL receives only the requests git sends to that URL.
 
 # shellcheck source=lib/test-gate-env.sh
 source "$(dirname "${BASH_SOURCE[0]}")/test-gate-env.sh"

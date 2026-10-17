@@ -182,20 +182,39 @@ jobs:
           SHORT_SHA: ${{ steps.pr.outputs.short_sha }}
           HEAD_SHA: ${{ steps.pr.outputs.head_sha }}
           FINDING_COUNT: ${{ steps.findings.outputs.count }}
-          # The push authenticates per command from GH_TOKEN through an inline credential helper (the
-          # checkout persists no token). Same helper as the pipeline workflow; no file to rewrite.
-          GIT_CONFIG_COUNT: "1"
+          # The push authenticates per command from GH_TOKEN through the inline credential helper at KEY_2
+          # (the checkout persists no token). KEY_0 and KEY_1 reset the accumulating credential.helper list
+          # (global, then github.com-scoped) before KEY_2 adds the helper, so a helper the agent adds to
+          # .git/config gets no token; KEY_3/KEY_4 disable repo hooks and fsmonitor. Same helper text as the
+          # pipeline workflow.
+          GIT_CONFIG_COUNT: "5"
           GIT_CONFIG_KEY_0: credential.helper
-          GIT_CONFIG_VALUE_0: '!f() { test "$1" = get || exit 0; proto=; host=; while IFS= read -r l && [ -n "$l" ]; do case "$l" in protocol=*) proto=${l#protocol=};; host=*) host=${l#host=};; esac; done; t=${GITHUB_TOKEN:-$GH_TOKEN}; if [ "$proto" = https ] && [ "$host" = github.com ] && [ -n "$t" ]; then printf "username=x-access-token\npassword=%s\n" "$t"; fi; }; f'
+          GIT_CONFIG_VALUE_0: ''
+          GIT_CONFIG_KEY_1: credential.https://github.com.helper
+          GIT_CONFIG_VALUE_1: ''
+          GIT_CONFIG_KEY_2: credential.helper
+          GIT_CONFIG_VALUE_2: '!f() { test "$1" = get || exit 0; proto=; host=; while IFS= read -r l && [ -n "$l" ]; do case "$l" in protocol=*) proto=${l#protocol=};; host=*) host=${l#host=};; esac; done; t=${GITHUB_TOKEN:-$GH_TOKEN}; if [ "$proto" = https ] && [ "$host" = github.com ] && [ -n "$t" ]; then printf "username=x-access-token\npassword=%s\n" "$t"; fi; }; f'
+          GIT_CONFIG_KEY_3: core.hooksPath
+          GIT_CONFIG_VALUE_3: /dev/null
+          GIT_CONFIG_KEY_4: core.fsmonitor
+          GIT_CONFIG_VALUE_4: "false"
 
       - name: Request review rerun
         if: steps.findings.outputs.has_findings == 'true'
         run: |
-          # Use the canonical rerun writer if available
+          # Run the rerun writer from a copy of scripts/ taken at the PR head before remediation, never
+          # from the agent-edited working tree (the agent could have rewritten it, and GH_TOKEN is in
+          # this step). The writer sources its own lib/ beside it, so the whole scripts/ tree is copied.
           NEW_HEAD=$(git rev-parse HEAD)
-          if [[ -f "./scripts/sw-review-rerun.sh" ]]; then
-            bash ./scripts/sw-review-rerun.sh request "$PR_NUMBER" "$NEW_HEAD" "shipwright" || true
+          PRISTINE="$RUNNER_TEMP/pristine"
+          rm -rf "$PRISTINE"
+          mkdir -p "$PRISTINE"
+          git archive "$HEAD_SHA" scripts | tar -x -C "$PRISTINE"
+          if [[ -f "$PRISTINE/scripts/sw-review-rerun.sh" ]]; then
+            bash "$PRISTINE/scripts/sw-review-rerun.sh" request "$PR_NUMBER" "$NEW_HEAD" "shipwright" || true
           fi
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           PR_NUMBER: ${{ steps.pr.outputs.number }}
+          # The PR head before the agent ran (the pristine copy's source).
+          HEAD_SHA: ${{ steps.pr.outputs.head_sha }}

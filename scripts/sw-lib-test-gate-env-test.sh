@@ -216,25 +216,30 @@ done
 bedrock2="$(cd "$git_repo" && env CLAUDE_CODE_USE_BEDROCK=1 AWS_ACCESS_KEY_ID=fake-id AWS_SECRET_ACCESS_KEY=fake-aws-secret "$SW_AGENT_EXEC" claude 2>&1)"
 assert_eq "allowlist: AWS secret key reaches the agent only with Bedrock selected" "fake-aws-secret" "$(sed -n 's/^AWS_SECRET_ACCESS_KEY=//p' <<<"$bedrock2")"
 
-print_test_section "agent exec: remote URL userinfo never reaches the agent"
-git -C "$git_repo" remote set-url origin "https://x-access-token:SECRET-REMOTE@github.com/acme/repo.git"
-mock_binary "claude" 'env'
-remote_env="$(cd "$git_repo" && "$SW_AGENT_EXEC" claude 2>&1)"
-if grep -q SECRET-REMOTE <<<"$remote_env"; then assert_fail "a remote's password is not in the agent's environment"; else assert_pass "a remote's password is not in the agent's environment"; fi
-assert_eq "the remote's reset key is built from the URL without userinfo" "yes" \
-    "$(grep -q '^GIT_CONFIG_KEY_[0-9]*=http.https://github.com/acme/repo.git.extraheader$' <<<"$remote_env" && echo yes || echo no)"
-git -C "$git_repo" remote set-url origin https://example.invalid/acme/repo.git
-
-print_test_section "agent exec: a credential in url.insteadOf makes the launcher refuse to run the agent"
-git -C "$git_repo" config "url.https://x:SECRET-INSTEAD@github.com/.insteadOf" "https://github.com/"
-marker_insteadof="$TEST_TEMP_DIR/agent-ran-insteadof"
-mock_binary "claude" "touch '$marker_insteadof'"
-rc=0; (cd "$git_repo" && "$SW_AGENT_EXEC" claude >/dev/null 2>&1) || rc=$?
-assert_eq "the agent does not run while a credential insteadOf is configured" "no" "$([[ -e "$marker_insteadof" ]] && echo yes || echo no)"
-assert_eq "the refusal exits non-zero" "true" "$([[ "$rc" -ne 0 ]] && echo true || echo false)"
-rc=0; (cd "$git_repo" && sw_test_gate_env bash -c 'exit 0') >/dev/null 2>&1 || rc=$?
-assert_eq "the test gate refuses too (fail closed)" "true" "$([[ "$rc" -ne 0 ]] && echo true || echo false)"
-git -C "$git_repo" config --unset "url.https://x:SECRET-INSTEAD@github.com/.insteadOf"
+print_test_section "agent exec: a credential in the git config makes the launcher refuse (no secret in the message)"
+refuse_check() { # name, git-config-command... ; the agent must not run, and the message must not show the secret
+    local name="$1" marker="$TEST_TEMP_DIR/agent-ran-$1" out rc=0
+    shift
+    mock_binary "claude" "touch '$marker'"
+    git -C "$git_repo" "$@"
+    out="$(cd "$git_repo" && "$SW_AGENT_EXEC" claude 2>&1)" || rc=$?
+    assert_eq "$name: the agent does not run" "no" "$([[ -e "$marker" ]] && echo yes || echo no)"
+    assert_eq "$name: the launcher exits non-zero" "true" "$([[ "$rc" -ne 0 ]] && echo true || echo false)"
+    if grep -q 'SECRET' <<<"$out"; then assert_fail "$name: the message shows no secret"; else assert_pass "$name: the message shows no secret"; fi
+    rc=0; (cd "$git_repo" && sw_test_gate_env bash -c 'exit 0') >/dev/null 2>&1 || rc=$?
+    assert_eq "$name: the test gate refuses too (fail closed)" "true" "$([[ "$rc" -ne 0 ]] && echo true || echo false)"
+    git -C "$git_repo" remote set-url origin https://example.invalid/acme/repo.git
+    git -C "$git_repo" config --unset-all "url.https://x:SECRET-INSTEAD@github.com/.insteadOf" 2>/dev/null || true
+    git -C "$git_repo" config --unset-all "url.https://SECRET-USER@github.com/.insteadOf" 2>/dev/null || true
+    git -C "$git_repo" config --unset-all "url.https://github.com/.pushInsteadOf" 2>/dev/null || true
+    git -C "$git_repo" config --unset-all remote.origin.pushurl 2>/dev/null || true
+}
+refuse_check "remote URL with a token as username only" remote set-url origin "https://SECRET-TOKEN@github.com/acme/repo.git"
+refuse_check "remote URL with user:password" remote set-url origin "https://u:SECRET-PW@github.com/acme/repo.git"
+refuse_check "insteadOf base with a username only" config "url.https://SECRET-USER@github.com/.insteadOf" "https://github.com/"
+refuse_check "insteadOf base with user:password" config "url.https://x:SECRET-INSTEAD@github.com/.insteadOf" "https://github.com/"
+refuse_check "pushInsteadOf with a credential" config "url.https://github.com/.pushInsteadOf" "https://SECRET-PUSH@github.com/"
+refuse_check "remote pushurl with a credential" config remote.origin.pushurl "https://x:SECRET-PU@github.com/acme/repo.git"
 
 print_test_section "agent exec: exit status and process identity"
 mock_binary "claude" 'exit 7'
