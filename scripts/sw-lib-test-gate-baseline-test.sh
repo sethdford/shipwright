@@ -29,7 +29,7 @@ cat > "$REPO/runner.sh" <<'RUNNER'
 #!/usr/bin/env bash
 cd "$(dirname "$0")"
 p=0; f=0; t=0; sections=""
-while IFS=: read -r s mode asserts; do
+while IFS=: read -r s mode asserts total; do
     [[ -z "$s" ]] && continue
     case "$mode" in
         pass) printf '  ✓ %-46s 0s\n' "$s"; p=$((p + 1)); continue ;;
@@ -41,7 +41,7 @@ while IFS=: read -r s mode asserts; do
     sections="${sections}    error: command not found: foo"$'\n'
     list="${asserts//,/ }"
     for a in $list; do sections="${sections}      ✗ ${a}"$'\n'; done
-    if [[ "$mode" == fail ]]; then sections="${sections}    1 of 3 tests failed"$'\n'; fi
+    if [[ "$mode" == fail ]]; then sections="${sections}    1 of ${total:-3} tests failed"$'\n'; fi
 done < state.txt
 printf '%s' "$sections"
 printf '\n  %s passed  %s failed  %s timed out  (n suites, 0s)\n' "$p" "$f" "$t"
@@ -125,7 +125,7 @@ print_test_section "tg_parse_log"
 scenario "suite-a:pass suite-b:fail:X suite-c:pass" "suite-a:pass suite-b:fail:X,Y suite-c:pass"
 tg_parse_log "$ITER_LOG"
 assert_eq "complete failing suite: parsable" "1" "$TG_PARSABLE"
-assert_eq "complete failing suite: status and assertions, no INCOMPLETE" "$(printf 'suite-b::X\nsuite-b::Y\nsuite-b::exit=1\n' | sort)" "$(printf '%s\n' "$TG_UNITS" | sort)"
+assert_eq "complete failing suite: status, total and assertions, no INCOMPLETE" "$(printf 'suite-b::X\nsuite-b::Y\nsuite-b::exit=1\nsuite-b::total=3\n' | sort)" "$(printf '%s\n' "$TG_UNITS" | sort)"
 assert_eq "complete failing suite: pass count" "2" "$TG_PASSCOUNT"
 
 scenario "" "suite-b:crash:X"
@@ -147,7 +147,11 @@ fi
 printf 'Ran 2 tests across 1 file. [11.00ms]\n(fail) bad two [3.09ms]\n 1 pass\n 1 fail\n' > "$TEST_TEMP_DIR/bun.log"
 tg_parse_log "$TEST_TEMP_DIR/bun.log"
 assert_eq "bun log: parsable" "1" "$TG_PARSABLE"
-assert_eq "bun log: failing unit without timing" "bad two" "$TG_UNITS"
+if printf '%s\n' "$TG_UNITS" | grep -Fx -- "bad two" >/dev/null; then
+    assert_pass "bun log: failing unit without timing"
+else
+    assert_fail "bun log: failing unit without timing" "got: $TG_UNITS"
+fi
 
 printf 'Error: Cannot find module x\n' > "$TEST_TEMP_DIR/junk.log"
 tg_parse_log "$TEST_TEMP_DIR/junk.log"
@@ -189,7 +193,7 @@ assert_eq "regression: base exit 0" "0" "$TG_BASE_EXIT"
 scenario "suite-a:pass suite-b:fail:X suite-c:pass" "suite-a:pass suite-b:fail:X suite-c:fail:Z"
 judge_iter
 assert_eq "new suite failure blocks" "1" "$JRC"
-assert_eq "new failure lists only the new units" "$(printf 'suite-c::Z\nsuite-c::exit=1\n' | sort)" "$(printf '%s\n' "$TG_NEW_FAILURES" | sort)"
+assert_eq "new failure lists only the new units" "$(printf 'suite-c::Z\nsuite-c::exit=1\nsuite-c::total=3\n' | sort)" "$(printf '%s\n' "$TG_NEW_FAILURES" | sort)"
 assert_eq "new failure verdict" "new-failures" "$TG_VERDICT"
 
 scenario "suite-a:pass suite-b:fail:X suite-c:pass" "suite-a:pass suite-b:fail:X,Y suite-c:pass"
@@ -409,6 +413,115 @@ else
 fi
 
 # ═══════════════════════════════════════════════════════════════════════════════
+# ═══════════════════════════════════════════════════════════════════════════════
+# Totals and bun (round 3)
+# ═══════════════════════════════════════════════════════════════════════════════
+print_test_section "totals and bun units"
+
+# V: 20 tests vanish from an already-failing suite (1 of 30 vs 1 of 50) -> block
+scenario "suite-a:pass suite-b:fail:X:50 suite-c:pass" "suite-a:pass suite-b:fail:X:30 suite-c:pass"
+judge_iter
+assert_eq "V: tests vanishing from a failing suite block" "1" "$JRC"
+if printf '%s\n' "$TG_NEW_FAILURES" | grep -Fx -- "suite-b::total=30" >/dev/null; then
+    assert_pass "V: the shrunken total is reported"
+else
+    assert_fail "V: the shrunken total is reported" "got: $TG_NEW_FAILURES"
+fi
+
+# more tests in a failing suite, same failure -> still pre-existing
+scenario "suite-a:pass suite-b:fail:X:50 suite-c:pass" "suite-a:pass suite-b:fail:X:60 suite-c:pass"
+judge_iter
+assert_eq "a larger total with the same failure is pre-existing" "0" "$JRC"
+
+# Real bun two-file fixture: a.test.ts has a pre-existing (fail); b.test.ts is then broken
+if command -v bun >/dev/null 2>&1; then
+    BREPO="$TEST_TEMP_DIR/bun-repo"
+    mkdir -p "$BREPO"
+    git -C "$BREPO" init -q
+    bg() { git -C "$BREPO" -c user.name=test -c user.email=test@example.com -c commit.gpgsign=false "$@"; }
+    echo project > "$BREPO/README.md"; bg add -A && bg commit -qm root   # the base must not be a root commit
+    cat > "$BREPO/a.test.ts" <<'TS'
+import { test, expect } from "bun:test";
+test("T preexisting", () => { expect(1).toBe(2); });
+test("A ok", () => { expect(1).toBe(1); });
+TS
+    cat > "$BREPO/b.test.ts" <<'TS'
+import { test, expect } from "bun:test";
+test("B1 important", () => { expect(1).toBe(1); });
+test("B2 important", () => { expect(2).toBe(2); });
+TS
+    bg add -A && bg commit -qm base
+    BUN_BASE="$(bg rev-parse HEAD)"
+    OLD_ROOT="$PROJECT_ROOT"
+    export PROJECT_ROOT="$BREPO"
+    LOOP_START_COMMIT="$BUN_BASE"; tg_begin_gate
+    # BUN2: a top-level throw in b.test.ts
+    { echo 'throw new Error("boom");'; cat "$BREPO/b.test.ts"; } > "$BREPO/b.tmp" && mv "$BREPO/b.tmp" "$BREPO/b.test.ts"
+    ( cd "$BREPO" && bun test ) > "$LOG_DIR/bun2.log" 2>&1 || true
+    tg_parse_log "$LOG_DIR/bun2.log"
+    if printf '%s\n' "$TG_UNITS" | grep -Fx -- "b.test.ts::LOAD_ERROR" >/dev/null; then
+        assert_pass "bun: a load error in a file is a unit named after the file"
+    else
+        assert_fail "bun: a load error in a file is a unit named after the file" "got: $TG_UNITS"
+    fi
+    assert_eq "bun: two-file run counts files" "2" "$(printf '%s\n' "$TG_UNITS" | sed -n 's/^bun::files=//p')"
+    rc=0; tg_judge "bun test" 1 "$LOG_DIR/bun2.log" 60 1 || rc=$?
+    assert_eq "BUN2: a file that throws at load blocks despite a pre-existing (fail)" "1" "$rc"
+    if printf '%s\n' "$TG_NEW_FAILURES" | grep -Fx -- "b.test.ts::LOAD_ERROR" >/dev/null; then
+        assert_pass "BUN2: the load error is the reported new failure"
+    else
+        assert_fail "BUN2: the load error is the reported new failure" "got: $TG_NEW_FAILURES"
+    fi
+    # Control on the same fixture: the untouched repo's failure is pre-existing
+    bg checkout -q -- b.test.ts
+    LOOP_START_COMMIT="$BUN_BASE"; tg_begin_gate
+    ( cd "$BREPO" && bun test ) > "$LOG_DIR/bun0.log" 2>&1 || true
+    rc=0; tg_judge "bun test" 1 "$LOG_DIR/bun0.log" 60 1 || rc=$?
+    assert_eq "bun control: the unchanged failing test is pre-existing" "0" "$rc"
+    # BUN3: a test is skipped -> skip count grows -> block
+    sed -i.bak 's/^test("B1/test.skip("B1/' "$BREPO/b.test.ts"; rm -f "$BREPO/b.test.ts.bak"
+    ( cd "$BREPO" && bun test ) > "$LOG_DIR/bun3.log" 2>&1 || true
+    rc=0; tg_judge "bun test" 1 "$LOG_DIR/bun3.log" 60 1 || rc=$?
+    assert_eq "bun: a skipped test blocks" "1" "$rc"
+    export PROJECT_ROOT="$OLD_ROOT"
+else
+    assert_pass "bun not installed: bun fixture checks skipped"
+fi
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# Process cleanup: the group is killed even after the leader exited (orphans), and the
+# tree-walk fallback matches the worktree path.
+# ═══════════════════════════════════════════════════════════════════════════════
+print_test_section "orphaned children and path fallback"
+
+if command -v perl >/dev/null 2>&1; then
+    printf '#!/usr/bin/env bash\nsleep 4712 &\nexit 1\n' > "$REPO/orphan.sh"
+    git_in_repo add -A >/dev/null 2>&1; git_in_repo commit -q --allow-empty -m orphan >/dev/null 2>&1
+    LOOP_START_COMMIT="$(git_in_repo rev-parse HEAD)"
+    rc=0; tg_judge "bash orphan.sh" 1 "$ITER_LOG" 120 1 || rc=$?
+    if ps -axo command= | grep -x 'sleep 4712' >/dev/null; then
+        assert_fail "a background child of the base run is killed with the run"
+        for pid in $(ps -axo pid=,command= | awk '$2=="sleep" && $3=="4712" {print $1}'); do kill -KILL "$pid" 2>/dev/null || true; done
+    else
+        assert_pass "a background child of the base run is killed with the run"
+    fi
+else
+    assert_pass "perl not installed: process-group orphan check skipped"
+fi
+
+marker="$TEST_TEMP_DIR/pathmark-$$"
+sh -c 'sleep 4713; :' "$marker" & fpid=$!
+sleep 0.5
+_tg_kill_by_path "$marker"
+{ wait "$fpid"; } 2>/dev/null || true
+if ps -axo command= | grep -F -- "$marker" | grep -v grep >/dev/null; then
+    assert_fail "path fallback kills processes whose command line names the worktree"
+else
+    assert_pass "path fallback kills processes whose command line names the worktree"
+fi
+for pid in $(ps -axo pid=,command= | awk '$2=="sleep" && $3=="4713" {print $1}'); do kill -KILL "$pid" 2>/dev/null || true; done
+
+# ═══════════════════════════════════════════════════════════════════════════════
 # tg_record: evidence JSON
 # ═══════════════════════════════════════════════════════════════════════════════
 print_test_section "tg_record evidence"
@@ -418,7 +531,7 @@ if command -v jq >/dev/null 2>&1; then
     tg_judge "$CMD" "$ITER_RC" "$ITER_LOG" 120 1 || true
     results="$(tg_record "[]" "$CMD" "$ITER_RC" 7)"
     assert_eq "evidence: baseline_exit_code recorded (base fails: 1)" "1" "$(echo "$results" | jq -r '.[0].baseline_exit_code')"
-    assert_eq "evidence: new_failures listed" "suite-c::Z,suite-c::exit=1" "$(echo "$results" | jq -r '.[0].new_failures | sort | join(",")')"
+    assert_eq "evidence: new_failures listed" "suite-c::Z,suite-c::exit=1,suite-c::total=3" "$(echo "$results" | jq -r '.[0].new_failures | sort | join(",")')"
     assert_eq "evidence: verdict" "new-failures" "$(echo "$results" | jq -r '.[0].verdict')"
 
     scenario "suite-a:pass suite-b:fail:X suite-c:pass" "suite-a:pass suite-b:fail:X suite-c:pass"

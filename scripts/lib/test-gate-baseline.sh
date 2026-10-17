@@ -69,6 +69,7 @@ _TG_ROOT=""              # repository that owns the base worktree
 _TG_WT=""                # active base worktree
 _TG_TMP=""               # active temp dir (scripts only)
 _TG_PID=""               # root process of the active base run
+_TG_PGRP=""              # process group of the active base run, when it was started with setpgrp
 _TG_WD=""                # watchdog subshell of the active base run
 
 tg_begin_gate() {
@@ -112,8 +113,10 @@ _tg_block() {
 # sw-test-all.sh layout: per-suite lines "  ✗ <suite>  exit N" / "  ⧗ <suite>  TIMEOUT"; then, for
 # each failing suite, a "━━━ <suite> (…)" section with the suite's full log (the gate sets
 # FAIL_LOG_LINES). Assertion lines are indented deeper than the per-suite lines.
+# bun test layout (a top-level "Ran N tests across M files" line): "(fail) <name>" lines, a
+# "<file>:" header before each file's "# Unhandled error between tests" block, and the summary.
 tg_parse_log() {
-    local log="$1" plain units pass summary=0
+    local log="$1" plain units="" pass summary=0 bun=0
     plain="$(sed "s/$(printf '\033')\[[0-9;]*m//g" "$log" 2>/dev/null || true)"
     units="$(printf '%s\n' "$plain" | awk '
         /^━━━ [^ ]+ \(/ { cur = $2; next }
@@ -121,16 +124,27 @@ tg_parse_log() {
         # Glyph tests are regexes: this awk (macOS) compares multibyte strings wrongly.
         /^  ⧗ [^ ]+/ { cur = ""; s = $2; sfail[s] = 1; sst[s] = "TIMEOUT"; next }
         /^  ✗ [^ ]+/ { cur = ""; s = $2; sfail[s] = 1; sst[s] = "exit=" $4; next }
-        /^\(fail\) / { line = $0; sub(/^\(fail\) /, "", line); sub(/ \[[0-9.]+m?s\]$/, "", line); print line; next }
-        cur != "" && /(All [0-9]+ tests? passed|[0-9]+ of [0-9]+ tests? failed)/ { comp[cur] = 1; next }
+        cur != "" && /[0-9]+ of [0-9]+ tests? failed/ {
+            comp[cur] = 1
+            line = $0; sub(/.* of /, "", line); sub(/ tests? failed.*/, "", line)
+            tot[cur] = line; next
+        }
+        cur != "" && /All [0-9]+ tests? passed/ { comp[cur] = 1; next }
         cur != "" && /^ +✗ / { line = $0; sub(/^ +✗ /, "", line); print cur "::" line; next }
         END {
             for (s in sfail) {
                 print s "::" sst[s]
                 if (sst[s] != "TIMEOUT" && !(s in comp)) print s "::INCOMPLETE"
+                if (s in tot) print s "::total=" tot[s]
             }
         }
     ' || true)"
+    if printf '%s\n' "$plain" | grep -E '^Ran [0-9]+ tests? across [0-9]+ files?' >/dev/null; then
+        bun=1
+    fi
+    if [[ "$bun" -eq 1 ]]; then
+        units="${units}"$'\n'"$(_tg_bun_units "$plain")"
+    fi
     TG_UNITS="$(printf '%s\n' "$units" | grep -v '^$' | sort -u || true)"
     pass="$(printf '%s\n' "$plain" | sed -nE 's/^ *([0-9]+) passed +[0-9]+ failed.*$/\1/p' | tail -1 || true)"
     if [[ -z "$pass" ]]; then
@@ -139,12 +153,33 @@ tg_parse_log() {
     TG_PASSCOUNT="$pass"
     if printf '%s\n' "$plain" | grep -E ' passed +[0-9]+ failed +[0-9]+ timed out' >/dev/null; then
         summary=1
-    elif printf '%s\n' "$plain" | grep -E '^Ran [0-9]+ tests? across' >/dev/null; then
+    elif [[ "$bun" -eq 1 ]]; then
         summary=1
     fi
     TG_PARSABLE=0
     [[ "$summary" -eq 1 ]] && TG_PARSABLE=1
     return 0
+}
+
+# _tg_bun_units <plain_log> — the units of a bun test run: failing names, load errors per file (or
+# bun::error=N when no file header precedes the block), and the counts that must not grow or shrink.
+_tg_bun_units() {
+    local plain="$1" ran files fail err skip
+    printf '%s\n' "$plain" | awk '
+        /^[^ #(-].*:$/ && !/^error:/ { hdr = $0; sub(/:$/, "", hdr); next }
+        /^# Unhandled error between tests/ { if (hdr != "") print hdr "::LOAD_ERROR"; next }
+        /^\(fail\) / { line = $0; sub(/^\(fail\) /, "", line); sub(/ \[[0-9.]+m?s\]$/, "", line); print line; next }
+    ' || true
+    ran="$(printf '%s\n' "$plain" | sed -nE 's/^Ran ([0-9]+) tests? across .*/\1/p' | tail -1)"
+    files="$(printf '%s\n' "$plain" | sed -nE 's/^Ran [0-9]+ tests? across ([0-9]+) files?.*/\1/p' | tail -1)"
+    fail="$(printf '%s\n' "$plain" | sed -nE 's/^ *([0-9]+) fail$/\1/p' | tail -1)"
+    err="$(printf '%s\n' "$plain" | sed -nE 's/^ *([0-9]+) errors?$/\1/p' | tail -1)"
+    skip="$(printf '%s\n' "$plain" | sed -nE 's/^ *([0-9]+) skip$/\1/p' | tail -1)"
+    echo "bun::ran=${ran:-0}"
+    echo "bun::files=${files:-0}"
+    echo "bun::fail=${fail:-0}"
+    echo "bun::error=${err:-0}"
+    echo "bun::skip=${skip:-0}"
 }
 
 # ─── In-memory cache ──────────────────────────────────────────────────────────
@@ -177,25 +212,46 @@ _tg_kill_tree() {
     kill "-$sig" "$pid" 2>/dev/null || true
 }
 
-# _tg_kill_run <pid> <signal> — signal the run's process group (when it leads one), then its tree.
+# _tg_kill_by_path <path> — KILL every process whose command line contains <path> (the base
+# worktree). The fallback for runs without a process group; the pipeline's own greps are excluded.
+_tg_kill_by_path() {
+    local path="$1" pid
+    [[ -z "$path" ]] && return 0
+    for pid in $(ps -axo pid=,command= 2>/dev/null | grep -F -- "$path" | grep -v grep | awk -v me="$$" '$1 != me { print $1 }'); do
+        kill -0 "$pid" 2>/dev/null && kill -KILL "$pid" 2>/dev/null || true
+    done
+}
+
+# _tg_kill_run <pid> <signal> — signal the run: its process group when it was started with
+# setpgrp (even when the leader has exited, so background children are reached too), then its
+# process tree.
 _tg_kill_run() {
     local pid="$1" sig="$2"
     [[ -z "$pid" ]] && return 0
+    if [[ -n "$_TG_PGRP" && "$pid" == "$_TG_PID" ]]; then
+        kill "-$sig" -- "-$_TG_PGRP" 2>/dev/null || true
+    fi
     kill -0 "$pid" 2>/dev/null || return 0
-    kill "-$sig" -- "-$pid" 2>/dev/null || true
     _tg_kill_tree "$pid" "$sig"
 }
 
-# _tg_stop_run — stop the active base run and its watchdog. Idempotent.
+# _tg_stop_run — stop the active base run, its process group and its watchdog. Idempotent.
 _tg_stop_run() {
+    if [[ -n "$_TG_PGRP" ]]; then
+        kill -KILL -- "-$_TG_PGRP" 2>/dev/null || true
+    fi
     if [[ -n "$_TG_PID" ]]; then
-        _tg_kill_run "$_TG_PID" KILL
+        _tg_kill_tree "$_TG_PID" KILL
         _TG_PID=""
     fi
+    _TG_PGRP=""
     if [[ -n "$_TG_WD" ]]; then
         _tg_kill_run "$_TG_WD" KILL
         { wait "$_TG_WD"; } 2>/dev/null || true
         _TG_WD=""
+    fi
+    if [[ -n "$_TG_WT" ]]; then
+        _tg_kill_by_path "$_TG_WT"
     fi
 }
 
@@ -242,11 +298,13 @@ _tg_run_base_once() {
         printf 'source "%s/test-gate-env.sh"\n' "$_TG_LIB_DIR"
         printf 'sw_test_gate_env bash "%s/cmd.sh"\n' "$_TG_TMP"
     } > "$_TG_TMP/run.sh"
+    _TG_PGRP=""
     if command -v perl >/dev/null 2>&1; then
         # perl's setpgrp makes the run a process-group leader; exec keeps the same pid.
         ( trap - INT TERM EXIT
           exec perl -e 'setpgrp(0, 0) or exit 1; exec @ARGV or exit 127' bash "$_TG_TMP/run.sh"
         ) > "$log" 2>&1 &
+        _TG_PGRP="$!"
     else
         ( trap - INT TERM EXIT
           exec bash "$_TG_TMP/run.sh"
@@ -377,6 +435,36 @@ tg_baseline_for() {
 
 # ─── Judgement ────────────────────────────────────────────────────────────────
 
+# _tg_base_value <prefix> — the value of the base unit that starts with <prefix> (e.g. "s::total="),
+# empty when the base has none. Prefix match is exact (awk index), so names need no escaping.
+_tg_base_value() {
+    printf '%s\n' "$TG_BASE_UNITS" | awk -v k="$1" 'index($0, k) == 1 { print substr($0, length(k) + 1); exit }'
+}
+
+# _tg_unit_is_new <unit> — 0 when the iteration unit is not explained by the base.
+# Exact units must be on the base. Counts that describe how much ran are lower-is-bad: a suite
+# or bun run whose test count drops has lost tests, so it blocks. Counts of failures are
+# higher-is-bad: they block when they grow.
+_tg_unit_is_new() {
+    local u="$1" bval
+    if printf '%s\n' "$TG_BASE_UNITS" | grep -Fx -- "$u" >/dev/null; then
+        return 1
+    fi
+    if [[ "$u" =~ ^(.*::(total|ran|files)=)([0-9]+)$ ]]; then
+        bval="$(_tg_base_value "${BASH_REMATCH[1]}")"
+        [[ -z "$bval" ]] && return 0
+        [[ "${BASH_REMATCH[3]}" -lt "$bval" ]] && return 0
+        return 1
+    fi
+    if [[ "$u" =~ ^(.*::(fail|error|skip)=)([0-9]+)$ ]]; then
+        bval="$(_tg_base_value "${BASH_REMATCH[1]}")"
+        [[ -z "$bval" ]] && bval=0
+        [[ "${BASH_REMATCH[3]}" -gt "$bval" ]] && return 0
+        return 1
+    fi
+    return 0
+}
+
 # tg_judge <cmd> <exit> <log> <timeout_s> <baseline_eligible 0|1>
 # Call only for a failing command. Sets the TG_* judgement. Returns 1 when the failure blocks.
 # baseline_eligible=0 marks a test created during this loop: it has no base-commit counterpart.
@@ -411,7 +499,7 @@ tg_judge() {
     fi
     while IFS= read -r u; do
         [[ -z "$u" ]] && continue
-        if ! printf '%s\n' "$TG_BASE_UNITS" | grep -Fx -- "$u" >/dev/null; then
+        if _tg_unit_is_new "$u"; then
             new="${new}${u}"$'\n'
         fi
     done <<< "$iter_units"
