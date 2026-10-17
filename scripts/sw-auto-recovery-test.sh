@@ -5,6 +5,8 @@
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+source "$SCRIPT_DIR/lib/test-isolate.sh"
+sw_test_isolate
 PASS=0
 FAIL=0
 
@@ -50,7 +52,7 @@ assert_file_exists() {
 # ─── Setup ──────────────────────────────────────────────────────────────────
 TMPDIR_TEST=$(mktemp -d 2>/dev/null || mktemp -d "${TMPDIR:-/tmp}/auto-recovery-test-XXXXXX" 2>/dev/null || echo "${TMPDIR:-/tmp}/auto-recovery-test-$$")
 mkdir -p "$TMPDIR_TEST" 2>/dev/null || true
-trap 'rm -rf "$TMPDIR_TEST"' EXIT
+trap 'rm -rf "$TMPDIR_TEST"; sw_test_teardown' EXIT
 
 # Override state/log paths to temp
 export RECOVERY_STATE_FILE="$TMPDIR_TEST/recovery-state.json"

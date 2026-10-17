@@ -9,6 +9,7 @@ trap 'echo "ERROR: $BASH_SOURCE:$LINENO exited with status $?" >&2' ERR
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "$SCRIPT_DIR/lib/test-helpers.sh"
+sw_test_isolate
 # shellcheck disable=SC2034
 REPO_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
 BUDGET_TARGET_USD="0.25"
@@ -37,7 +38,7 @@ echo "Running budget-limited Claude smoke (target ~\$${BUDGET_TARGET_USD}/run, o
 out_file=$(mktemp "${TMPDIR:-/tmp}/sw-claude-smoke.XXXXXX")
 err_file=$(mktemp "${TMPDIR:-/tmp}/sw-claude-smoke-err.XXXXXX")
 cleanup() { rm -f "$out_file" "$err_file"; }
-trap cleanup EXIT
+trap 'cleanup; sw_test_teardown' EXIT
 
 run_claude() {
     if command -v gtimeout &>/dev/null; then

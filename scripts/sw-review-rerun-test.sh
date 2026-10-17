@@ -12,6 +12,7 @@ REPO_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
 
 # shellcheck source=lib/test-helpers.sh
 source "$SCRIPT_DIR/lib/test-helpers.sh"
+sw_test_isolate
 
 CYAN='\033[38;2;0;212;255m'
 PURPLE='\033[38;2;124;58;237m'
@@ -104,7 +105,7 @@ cleanup_env() {
         rm -rf "$TEMP_DIR"
     fi
 }
-trap cleanup_env EXIT
+trap 'cleanup_env; sw_test_teardown' EXIT
 
 run_test() {
     local test_name="$1"

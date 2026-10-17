@@ -8,6 +8,7 @@ trap 'echo "ERROR: $BASH_SOURCE:$LINENO exited with status $?" >&2' ERR
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "$SCRIPT_DIR/lib/test-helpers.sh"
+sw_test_isolate
 FIX_SCRIPT="$SCRIPT_DIR/sw-fix.sh"
 
 # ─── Colors (matches shipwright theme) ──────────────────────────────────────────────
@@ -88,7 +89,7 @@ cleanup_env() {
     # Clean up mock pipeline if we placed one
     rm -f "$SCRIPT_DIR/sw-pipeline.sh.mock" 2>/dev/null || true
 }
-trap cleanup_env EXIT
+trap 'cleanup_env; sw_test_teardown' EXIT
 
 # Reset between tests
 reset_test() {

@@ -844,8 +844,12 @@ fleet_start() {
         fi
 
         # Spawn daemon in detached tmux session
-        tmux new-session -d -s "$session_name" \
-            "cd '$repo_path' && '$SCRIPT_DIR/sw-daemon.sh' start $daemon_config_flag"
+        if [[ "${SHIPWRIGHT_TEST_MODE:-}" == "1" ]]; then
+            warn "SHIPWRIGHT_TEST_MODE=1: not starting a daemon for ${repo_name} (#8648)"
+        else
+            tmux new-session -d -s "$session_name" \
+                "cd '$repo_path' && '$SCRIPT_DIR/sw-daemon.sh' start $daemon_config_flag"
+        fi
 
         # Record in fleet state
         local tmp2="${fleet_state_tmp}.2"

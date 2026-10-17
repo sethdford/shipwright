@@ -10,6 +10,7 @@ set -euo pipefail
 VERSION="3.3.0"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "$SCRIPT_DIR/lib/test-helpers.sh"
+sw_test_isolate
 REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 
 # ─── Mock Environment ─────────────────────────────────────────────────
@@ -23,7 +24,7 @@ export REPO_DIR="$REPO_ROOT"
 export SKIP_GATES=true
 
 cleanup() { rm -rf "$MOCK_DIR"; }
-trap cleanup EXIT
+trap 'cleanup; sw_test_teardown' EXIT
 
 echo -e "\n${BOLD}Shipwright Autonomous Loop E2E Test${RESET}\n"
 

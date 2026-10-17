@@ -5,6 +5,8 @@
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+source "$SCRIPT_DIR/lib/test-isolate.sh"
+sw_test_isolate
 PASS=0
 FAIL=0
 
@@ -76,7 +78,7 @@ assert_json_field() {
 # ─── Setup / Teardown ──────────────────────────────────────────────────────
 
 TMPDIR_TEST="$(mktemp -d 2>/dev/null || mktemp -d -t 'policy-test')"
-trap 'rm -rf "$TMPDIR_TEST"' EXIT
+trap 'rm -rf "$TMPDIR_TEST"; sw_test_teardown' EXIT
 
 export POLICY_EPISODES_FILE="$TMPDIR_TEST/rl-episodes.jsonl"
 export POLICY_REWARDS_FILE="$TMPDIR_TEST/rewards.jsonl"

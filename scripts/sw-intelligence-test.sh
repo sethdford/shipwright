@@ -8,6 +8,7 @@ trap 'echo "ERROR: $BASH_SOURCE:$LINENO exited with status $?" >&2' ERR
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "$SCRIPT_DIR/lib/test-helpers.sh"
+sw_test_isolate
 INTELLIGENCE_SCRIPT="$SCRIPT_DIR/sw-intelligence.sh"
 
 # ─── Colors (matches shipwright theme) ────────────────────────────────────────
@@ -67,7 +68,7 @@ cleanup_env() {
         rm -rf "$TEST_TEMP_DIR"
     fi
 }
-trap cleanup_env EXIT
+trap 'cleanup_env; sw_test_teardown' EXIT
 
 reset_test() {
     rm -f "$EVENTS_FILE"

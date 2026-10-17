@@ -10,11 +10,12 @@ trap 'echo "ERROR: $BASH_SOURCE:$LINENO exited with status $?" >&2' ERR
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REAL_SCRIPT_DIR="$SCRIPT_DIR"
 source "$SCRIPT_DIR/lib/test-helpers.sh"
+sw_test_isolate
 
 print_test_header "Safety gates: automated issue-filing sites"
 
 setup_test_env "safety-gates-sites"
-trap cleanup_test_env EXIT
+trap 'cleanup_test_env; sw_test_teardown' EXIT
 
 export CALLS="$TEST_TEMP_DIR/calls.log"
 export TEST_TEMP_DIR

@@ -6,6 +6,8 @@
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+source "$SCRIPT_DIR/lib/test-isolate.sh"
+sw_test_isolate
 PASS=0
 FAIL=0
 
@@ -25,7 +27,7 @@ teardown() {
     [[ -n "$TEST_TMPDIR" ]] && rm -rf "$TEST_TMPDIR"
 }
 
-trap teardown EXIT
+trap 'teardown; sw_test_teardown' EXIT
 
 # ─── Source the library ───────────────────────────────────────────────────────
 # shellcheck source=lib/bandit-selector.sh

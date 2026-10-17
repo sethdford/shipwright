@@ -9,6 +9,7 @@ trap 'echo "ERROR: $BASH_SOURCE:$LINENO exited with status $?" >&2' ERR
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "$SCRIPT_DIR/lib/test-helpers.sh"
+sw_test_isolate
 RECRUIT_SCRIPT="${SCRIPT_DIR}/sw-recruit.sh"
 
 # Disable LLM calls in tests — ensures fast, deterministic execution

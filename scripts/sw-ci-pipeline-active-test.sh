@@ -8,11 +8,12 @@ trap 'echo "ERROR: $BASH_SOURCE:$LINENO exited with status $?" >&2' ERR
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "$SCRIPT_DIR/lib/test-helpers.sh"
+sw_test_isolate
 
 print_test_header "CI: pipeline-active Tests"
 
 setup_test_env "ci-pipeline-active"
-trap cleanup_test_env EXIT
+trap 'cleanup_test_env; sw_test_teardown' EXIT
 unset NO_GITHUB
 
 export GITHUB_REPOSITORY="o/r"

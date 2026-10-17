@@ -5,6 +5,8 @@
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+source "$SCRIPT_DIR/lib/test-isolate.sh"
+sw_test_isolate
 PASS=0
 FAIL=0
 
@@ -86,7 +88,7 @@ source "$SCRIPT_DIR/lib/rl-optimizer.sh"
 cleanup() {
     rm -rf "$TEST_DIR" 2>/dev/null || true
 }
-trap cleanup EXIT
+trap 'cleanup; sw_test_teardown' EXIT
 
 # ─── Test: record episode creates file ──────────────────────────────────────
 

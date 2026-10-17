@@ -8,6 +8,7 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "$SCRIPT_DIR/lib/test-helpers.sh"
+sw_test_isolate
 source "$SCRIPT_DIR/lib/compat.sh"
 REPO_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
 DASHBOARD_DIR="$REPO_DIR/dashboard"
@@ -250,7 +251,7 @@ cleanup() {
 }
 
 ORIGINAL_HOME="$HOME"
-trap cleanup EXIT
+trap 'cleanup; sw_test_teardown' EXIT
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # TESTS: API Endpoints

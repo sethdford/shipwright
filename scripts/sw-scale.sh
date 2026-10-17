@@ -201,6 +201,10 @@ cmd_up() {
         local agent_name
         agent_name="sw-agent-${role}-$(date +%s)-${i}"
         local session_name="shipwright-${agent_name}"
+        if [[ "${SHIPWRIGHT_TEST_MODE:-}" == "1" ]]; then
+            warn "SHIPWRIGHT_TEST_MODE=1: not starting agent ${agent_name} (#8648)"
+            continue
+        fi
 
         # Spawn a real agent in a tmux session
         tmux new-session -d -s "$session_name" \
