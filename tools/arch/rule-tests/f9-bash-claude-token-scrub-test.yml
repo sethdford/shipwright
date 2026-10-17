@@ -19,6 +19,12 @@ valid:
   - 'cmd=("$SW_AGENT_EXEC" claude -p "$p")'
   - 'timeout 5 "$SW_AGENT_EXEC" claude -p "$p"'
   - '"$SW_AGENT_EXEC" claude -p "$SW_AGENT_EXEC" claude'
+  - "pgrep -f claude"
+  - "pkill -f claude"
+  - "ln -s /usr/local/bin/claude \"$dest\""
+  - "timeout 5 bash -c '\"$SW_AGENT_EXEC\" claude -p x'"
+  - "sudo -E bash -c '\"$SW_AGENT_EXEC\" claude -p x'"
+  - "echo \"${CLAUDE:-claude}\""
 invalid:
   - 'claude -p "$prompt" --model "$m"'
   - 'out=$(claude --print "$p" 2>&1)'
@@ -50,3 +56,12 @@ invalid:
   - 'timeout 5 claude -p "$SW_AGENT_EXEC" claude'
   - 'x=$(claude -p "$SW_AGENT_EXEC")'
   - 'timeout 5 "$CLAUDE_BIN" -p "$p"'
+  - "timeout 5 bash -c \"claude -p $p\""
+  - "nohup sh -c 'claude -p x' &"
+  - "sudo -E bash -c \"claude -p x\""
+  - "\"${CLAUDE:-claude}\" -p \"$p\""
+  - "\"${CLAUDE_BIN:-claude}\" -p \"$p\""
+  - "`command -v claude` -p x"
+  - "eval \"$CLAUDE_CMD -p\""
+  - "bash -c '\"$SW_AGENT_EXEC\" claude -p x; claude -p y'"
+  - "timeout 5 bash -c 'claude -p x'"

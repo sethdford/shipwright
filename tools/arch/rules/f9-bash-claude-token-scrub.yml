@@ -30,6 +30,8 @@ rule:
             - has: { field: name, regex: '^[\\"'']*(.*/)?claude["'']?$' }
             - has: { field: name, regex: '^"?\$\{?((?i:claude)|[A-Za-z_]*(?i:claude)_?(?i:bin|binary|cmd|cli|path|exe))\}?"?$' }
             - has: { field: name, regex: '^"?\$\(\s*(command\s+-[vV]\s+|which\s+|type\s+(-p\s+)?)?["'']?(.*/)?claude["'']?\s*\)"?$' }
+            - has: { field: name, regex: '^"?\$\{[^}]*(?i:claude)[^}]*\}"?$' }
+            - has: { field: name, regex: '^"?`[^`]*(?i:claude)[^`]*`"?$' }
             - all:
                 - any:
                     - has:
@@ -39,10 +41,13 @@ rule:
                     - has:
                         regex: '^"?\$\{?((?i:claude)|[A-Za-z_]*(?i:claude)_?(?i:bin|binary|cmd|cli|path|exe))\}?"?$'
                         not: { follows: { regex: '^"?\$\{?SW_AGENT_EXEC\}?"?$', stopBy: neighbor } }
+                    - has:
+                        regex: '\$\{[^}]*:-["'']?\\?claude["'']?\}'
+                        not: { follows: { regex: '^"?\$\{?SW_AGENT_EXEC\}?"?$', stopBy: neighbor } }
                 - not:
                     has:
                       field: name
-                      regex: '^(type|which|hash|echo|printf|info|warn|error|success|log|debug|emit_event|jq|grep|chmod|test|\[)$'
+                      regex: '^(type|which|hash|echo|printf|info|warn|error|success|log|debug|emit_event|jq|grep|chmod|test|\[|pgrep|pkill|ln)$'
                 - not:
                     has:
                       field: name
@@ -52,18 +57,16 @@ rule:
                       - has: { field: name, regex: '^command$' }
                       - has: { kind: word, regex: '^-[vV]$' }
             - all:
-                - has: { field: name, regex: '^(bash|sh|zsh|dash|ksh|eval)$' }
+                - has:
+                    field: name
+                    regex: '^(bash|sh|zsh|dash|ksh|eval|timeout|gtimeout|nohup|sudo|doas|env|nice|exec|command|xargs|time|stdbuf|setsid)$'
                 - any:
                     - has:
                         kind: string
-                        regex: '(^|[^A-Za-z0-9_./$-])\\?claude([^A-Za-z0-9_./-]|$)'
-                        not: { regex: 'SW_AGENT_EXEC' }
-                        stopBy: end
+                        regex: '(^["'']|[;&|(`]|\$\()[[:space:]]*((timeout|gtimeout|env|nohup|nice|sudo|command|exec|time|stdbuf)[[:space:]]+(-[^[:space:]]+[[:space:]]+)*)?(\\?claude|\$\{?((?i:claude)|[A-Za-z_]*(?i:claude)_?(?i:bin|binary|cmd|cli|path|exe))\}?)([[:space:]"'';|&)]|$)'
                     - has:
                         kind: raw_string
-                        regex: '(^|[^A-Za-z0-9_./$-])\\?claude([^A-Za-z0-9_./-]|$)'
-                        not: { regex: 'SW_AGENT_EXEC' }
-                        stopBy: end
+                        regex: '(^["'']|[;&|(`]|\$\()[[:space:]]*((timeout|gtimeout|env|nohup|nice|sudo|command|exec|time|stdbuf)[[:space:]]+(-[^[:space:]]+[[:space:]]+)*)?(\\?claude|\$\{?((?i:claude)|[A-Za-z_]*(?i:claude)_?(?i:bin|binary|cmd|cli|path|exe))\}?)([[:space:]"'';|&)]|$)'
         - kind: array
           any:
             - has:
