@@ -43,33 +43,27 @@ _sw_test_kill_pids() {
     return 0
 }
 
-# Print the pids to kill. Only the tools teardown itself runs are exempt: a suite
-# child such as a background sleep or tail -f is a victim. $1 = ps snapshot (pid ppid command), $2 = pane pids, $3 = lock holders.
-# Victims are the owner's descendants (including orphans, which lsof and the root path still find),
-# the tmux panes and their children, and anything naming this run's root. Never the owner itself,
-# and never the helpers teardown runs (ps, lsof, awk and friends).
+# Print the pids to kill. $1 = ps snapshot (pid ppid command), $2 = pane pids, $3 = lock holders,
+# $4 = pids of teardown's own helper processes (exempt by pid, not by name, so a suite child such as a
+# background awk, tr or tail -f is still a victim). Holders count only if they are in the snapshot.
 _sw_test_victims() {
-    awk -v me="$$" -v root="${_SW_TEST_ROOT:-}" -v panesf="$2" -v holdf="$3" '
-        function is_helper(cmd,    p, n) {
-            n = split(cmd, p, " ")
-            if (n == 0) return 0
-            n = split(p[1], q, "/")
-            return q[n] ~ /^(ps|lsof|awk|tr)$/
-        }
+    awk -v me="$$" -v root="${_SW_TEST_ROOT:-}" -v panesf="$2" -v holdf="$3" -v exempt="$4" '
         BEGIN {
             ns = 0
             while ((getline line < panesf) > 0) if (line ~ /^[0-9]+$/) seeds[++ns] = line
-            while ((getline line < holdf) > 0) if (line ~ /^[0-9]+$/) holders[line] = 1
             seeds[++ns] = me
+            n = split(exempt, ex, " ")
+            for (i = 1; i <= n; i++) exempted[ex[i]] = 1
         }
         {
             pid = $1; ppid = $2
             cmd = $0; sub(/^ *[0-9]+ +[0-9]+ +/, "", cmd)
             kids[ppid] = kids[ppid] " " pid
+            inSnap[pid] = 1
             if (root != "" && index(cmd, root) > 0) rooted[pid] = 1
-            if (is_helper(cmd)) helpers[pid] = 1
         }
         END {
+            while ((getline line < holdf) > 0) if (line ~ /^[0-9]+$/ && (line in inSnap)) victims[line] = 1
             head = 1; tail = 0
             for (i = 1; i <= ns; i++) if (!(seeds[i] in seen)) { seen[seeds[i]] = 1; queue[++tail] = seeds[i] }
             while (head <= tail) {
@@ -78,9 +72,8 @@ _sw_test_victims() {
                 for (j = 1; j <= m; j++) if (!(ch[j] in seen)) { seen[ch[j]] = 1; queue[++tail] = ch[j] }
             }
             for (p in seen) victims[p] = 1
-            for (p in holders) victims[p] = 1
             for (p in rooted) victims[p] = 1
-            for (p in victims) if (p != me && !(p in helpers)) print p
+            for (p in victims) if (p != me && !(p in exempted)) print p
         }' "$1"
 }
 
@@ -109,11 +102,16 @@ sw_test_teardown() {
     if command -v tmux >/dev/null 2>&1; then
         TMUX_TMPDIR="$_SW_TEST_TMUX_DIR" tmux list-panes -a -F '#{pane_pid}' > "$panes" 2>/dev/null || true
     fi
+    local helpers=""
     if command -v lsof >/dev/null 2>&1 && [[ -n "${_SW_TEST_LOCK:-}" ]]; then
-        lsof -t -- "$_SW_TEST_LOCK" > "$holders" 2>/dev/null || true
+        lsof -t -- "$_SW_TEST_LOCK" > "$holders" 2>/dev/null &
+        helpers="$helpers $!"
+        wait "$!" 2>/dev/null || true
     fi
-    ps -axwwo pid=,ppid=,command= > "$snap" 2>/dev/null || true
-    _sw_test_victims "$snap" "$panes" "$holders" > "$victims" 2>/dev/null || true
+    ps -axwwo pid=,ppid=,command= > "$snap" 2>/dev/null &
+    helpers="$helpers $!"
+    wait "$!" 2>/dev/null || true
+    _sw_test_victims "$snap" "$panes" "$holders" "$helpers" > "$victims" 2>/dev/null || true
     _sw_test_kill_pids "$(tr '\n' ' ' < "$victims")"
 
     if command -v tmux >/dev/null 2>&1; then
@@ -126,14 +124,20 @@ sw_test_teardown() {
     return 0
 }
 
-# Remove private tmux directories from finished runs (marked .done, over a day old). Never the current one.
+# Remove private tmux directories older than a day that are finished (.done) or abandoned (their
+# owner pid in .owner is gone). Never the current directory. $1 = base directory (default /tmp/).
 _sw_test_collect_done_dirs() {
-    local d
+    local base="${1:-/tmp/}" d owner
     while IFS= read -r d; do
-        if [[ -n "$d" && "$d" != "$_SW_TEST_TMUX_DIR" && -f "$d/.done" ]]; then
-            rm -rf "$d"
+        [[ -n "$d" && "$d" != "${_SW_TEST_TMUX_DIR:-}" ]] || continue
+        if [[ ! -f "$d/.done" ]]; then
+            owner="$(cat "$d/.owner" 2>/dev/null || true)"
+            if [[ -n "$owner" ]] && kill -0 "$owner" 2>/dev/null; then
+                continue
+            fi
         fi
-    done < <(find /tmp -maxdepth 1 -name 'sw-test-tmux.*' -type d -mtime +1 2>/dev/null)
+        rm -rf "$d"
+    done < <(find "$base" -maxdepth 1 -mindepth 1 -name 'sw-test-tmux.*' -type d -mtime +1 2>/dev/null)
     return 0
 }
 
@@ -151,6 +155,7 @@ sw_test_isolate() {
         echo "sw_test_isolate: cannot create a private tmux directory; refusing to run this suite" >&2
         exit 1
     fi
+    echo "$$" > "$_SW_TEST_TMUX_DIR/.owner"
     _sw_test_collect_done_dirs
     _SW_TEST_ROOT="$(mktemp -d "${TMPDIR:-/tmp}/sw-test-iso.XXXXXX")" || _SW_TEST_ROOT=""
     if [[ -z "$_SW_TEST_ROOT" || ! -d "$_SW_TEST_ROOT" ]]; then

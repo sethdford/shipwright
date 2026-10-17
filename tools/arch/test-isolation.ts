@@ -97,6 +97,53 @@ function words(s: string): string[] {
   return out;
 }
 
+/** Split a comment-free line into simple commands at ; & | ( ) outside quotes. */
+function commands(s: string): string[] {
+  const out: string[] = [];
+  let cur = "";
+  let q: string | null = null;
+  for (let i = 0; i < s.length; i++) {
+    const c = s[i] ?? "";
+    if (q) {
+      cur += c;
+      if (c === q && !(q === '"' && s[i - 1] === "\\")) q = null;
+    } else if (c === "'" || c === '"') {
+      q = c;
+      cur += c;
+    } else if (";&|()".includes(c)) {
+      out.push(cur);
+      cur = "";
+    } else {
+      cur += c;
+    }
+  }
+  out.push(cur);
+  return out;
+}
+
+const PREFIXES = new Set([
+  "builtin",
+  "command",
+  "!",
+  "then",
+  "do",
+  "else",
+  "elif",
+  "if",
+  "while",
+  "until",
+  "time",
+  "{",
+  "}",
+]);
+/** Words of a simple command after reserved words and `builtin`/`command` prefixes. */
+function invocation(cmd: string): string[] {
+  const w = words(cmd);
+  let i = 0;
+  while (i < w.length && PREFIXES.has(w[i] ?? "")) i++;
+  return w.slice(i);
+}
+
 const unquote = (w: string): string => (/^(['"]).*\1$/s.test(w) ? w.slice(1, -1) : w);
 const BLOCK_OPEN = /^(if|while|until|for|select)\b|^case\b/;
 const BLOCK_CLOSE = /^(fi|done|esac)\b/;
@@ -120,16 +167,18 @@ export function findIsolationViolations(file: string, text: string): string[] {
     if (header) pendingFn = header[1] ?? header[2] ?? null;
     if (stack.length === 0 && blocks === 0 && exitAt === null && /^exit\b/.test(l.code))
       exitAt = l.line;
-    if (/^sw_test_isolate\b/.test(l.code))
-      isolates.push({ line: l.line, fn: stack.at(-1)?.name ?? null });
-    if (/^trap\s/.test(l.stripped)) {
-      const w = words(l.stripped);
-      const cmd = w[1] ?? "";
-      const signals = w
-        .slice(2)
-        .map((x) => unquote(x).toUpperCase().replace(/^SIG/, ""))
-        .map((x) => (x === "0" ? "EXIT" : x));
-      traps.push({ line: l.line, body: unquote(cmd), signals, reset: cmd === "-" });
+    for (const cmd of commands(l.stripped)) {
+      const inv = invocation(cmd);
+      if (inv[0] === "sw_test_isolate")
+        isolates.push({ line: l.line, fn: stack.at(-1)?.name ?? null });
+      if (inv[0] === "trap") {
+        const body = inv[1] ?? "";
+        const signals = inv
+          .slice(2)
+          .map((x) => unquote(x).toUpperCase().replace(/^SIG/, ""))
+          .map((x) => (x === "0" ? "EXIT" : x));
+        traps.push({ line: l.line, body: unquote(body), signals, reset: body === "-" });
+      }
     }
     for (const c of l.code.matchAll(/(?:^|[\s;(])([{}])(?=$|[\s;)])/g)) {
       if (c[1] === "{") {

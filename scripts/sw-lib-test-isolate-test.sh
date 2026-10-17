@@ -101,4 +101,39 @@ else
     assert_pass "real tmux server has no sw-iso-probe session"
 fi
 
+print_test_section "private tmux directory collection (#8653)"
+GC_BASE="$TEST_TEMP_DIR/gc"
+mkdir -p "$GC_BASE"
+mk_tmux_dir() { mkdir -p "$GC_BASE/$1"; }
+# Dead owner: a pid that has already exited.
+sleep 0 & DEAD_PID=$!
+wait "$DEAD_PID" 2>/dev/null || true
+mk_tmux_dir sw-test-tmux.stale-done;    : > "$GC_BASE/sw-test-tmux.stale-done/.done"
+mk_tmux_dir sw-test-tmux.recent-done;   : > "$GC_BASE/sw-test-tmux.recent-done/.done"
+mk_tmux_dir sw-test-tmux.stale-live;    echo "$$" > "$GC_BASE/sw-test-tmux.stale-live/.owner"
+mk_tmux_dir sw-test-tmux.stale-dead;    echo "$DEAD_PID" > "$GC_BASE/sw-test-tmux.stale-dead/.owner"
+# Backdate after writing the markers: writing a file changes the directory's mtime.
+for d in stale-done stale-live stale-dead; do touch -t 202001010000 "$GC_BASE/sw-test-tmux.$d"; done
+_sw_test_collect_done_dirs "$GC_BASE/"
+if [[ -d "$GC_BASE/sw-test-tmux.stale-done" ]]; then
+    assert_fail "a backdated directory with .done is removed"
+else
+    assert_pass "a backdated directory with .done is removed"
+fi
+if [[ -d "$GC_BASE/sw-test-tmux.recent-done" ]]; then
+    assert_pass "a recent .done directory is kept"
+else
+    assert_fail "a recent .done directory is kept"
+fi
+if [[ -d "$GC_BASE/sw-test-tmux.stale-live" ]]; then
+    assert_pass "a backdated directory whose owner is alive is kept"
+else
+    assert_fail "a backdated directory whose owner is alive is kept"
+fi
+if [[ -d "$GC_BASE/sw-test-tmux.stale-dead" ]]; then
+    assert_fail "a backdated abandoned directory (owner gone) is removed"
+else
+    assert_pass "a backdated abandoned directory (owner gone) is removed"
+fi
+
 print_test_results

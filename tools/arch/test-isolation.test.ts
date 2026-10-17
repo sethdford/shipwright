@@ -79,6 +79,38 @@ test("an exit inside an if block is conditional and does not make the call unrea
   );
 });
 
+test("an indented trap inside a function is checked", () => {
+  bad("sw_test_isolate\nf() {\n  trap cleanup EXIT\n}\nf", "sw_test_teardown");
+  ok("sw_test_isolate\nf() {\n  trap 'cleanup; sw_test_teardown' EXIT\n}\nf");
+});
+
+test("an indented trap inside an if block is checked", () => {
+  bad("sw_test_isolate\nif true; then\n  trap cleanup EXIT\nfi", "sw_test_teardown");
+  ok("sw_test_isolate\nif true; then\n  trap 'cleanup; sw_test_teardown' EXIT\nfi");
+});
+
+test("a trap after ; is checked", () => {
+  bad("sw_test_isolate\ncd /tmp; trap cleanup EXIT", "sw_test_teardown");
+  ok("sw_test_isolate\ncd /tmp; trap 'cleanup; sw_test_teardown' EXIT");
+});
+
+test("a trap after && is checked", () => {
+  bad("sw_test_isolate\n[[ -n x ]] && trap cleanup EXIT", "sw_test_teardown");
+  ok("sw_test_isolate\n[[ -n x ]] && trap 'cleanup; sw_test_teardown' EXIT");
+});
+
+test("a trap via builtin is checked", () => {
+  bad("sw_test_isolate\nbuiltin trap cleanup EXIT", "sw_test_teardown");
+  ok("sw_test_isolate\nbuiltin trap 'cleanup; sw_test_teardown' EXIT");
+});
+
+test("the sw-session-test.sh:20 trap without its teardown is flagged", () => {
+  const line = `    trap 'tmux kill-server 2>/dev/null; rm -rf "$TMUX_TMPDIR"' EXIT`;
+  bad(["sw_test_isolate", "if true; then", line, "fi"].join("\n"), "sw_test_teardown");
+  const fixed = line.replace('"$TMUX_TMPDIR"\'', '"$TMUX_TMPDIR"; sw_test_teardown\'');
+  ok(["sw_test_isolate", "if true; then", fixed, "fi"].join("\n"));
+});
+
 test("every bash suite in the repo calls sw_test_isolate", async () => {
   expect(await scan()).toEqual([]);
 });
