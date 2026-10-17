@@ -576,21 +576,21 @@ cmd_status_macos() {
     echo ""
 
     # Check daemon
-    if launchctl list 2>/dev/null | grep -q "com.shipwright.daemon"; then
+    if launchctl list 2>/dev/null | grep >/dev/null "com.shipwright.daemon"; then
         echo -e "  ${GREEN}●${RESET} Daemon service is ${GREEN}loaded${RESET}"
     else
         echo -e "  ${RED}○${RESET} Daemon service is ${RED}not loaded${RESET}"
     fi
 
     # Check dashboard
-    if launchctl list 2>/dev/null | grep -q "com.shipwright.dashboard"; then
+    if launchctl list 2>/dev/null | grep >/dev/null "com.shipwright.dashboard"; then
         echo -e "  ${GREEN}●${RESET} Dashboard service is ${GREEN}loaded${RESET}"
     else
         echo -e "  ${RED}○${RESET} Dashboard service is ${RED}not loaded${RESET}"
     fi
 
     # Check connect
-    if launchctl list 2>/dev/null | grep -q "com.shipwright.connect"; then
+    if launchctl list 2>/dev/null | grep >/dev/null "com.shipwright.connect"; then
         echo -e "  ${GREEN}●${RESET} Connect service is ${GREEN}loaded${RESET}"
     else
         echo -e "  ${RED}○${RESET} Connect service is ${RED}not loaded${RESET}"

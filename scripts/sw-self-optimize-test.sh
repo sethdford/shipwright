@@ -543,9 +543,9 @@ test_report_with_data() {
     output=$(optimize_report 2>&1)
 
     # Should contain key report sections
-    echo "$output" | grep -q "Last 7 Days" || return 1
-    echo "$output" | grep -q "Pipelines:" || return 1
-    echo "$output" | grep -q "Success rate:" || return 1
+    echo "$output" | grep >/dev/null "Last 7 Days" || return 1
+    echo "$output" | grep >/dev/null "Pipelines:" || return 1
+    echo "$output" | grep >/dev/null "Success rate:" || return 1
 }
 
 # ──────────────────────────────────────────────────────────────────────────────
@@ -554,7 +554,7 @@ test_report_with_data() {
 test_report_empty() {
     local output
     output=$(optimize_report 2>&1)
-    echo "$output" | grep -q "No outcomes data" || return 1
+    echo "$output" | grep >/dev/null "No outcomes data" || return 1
 }
 
 # ──────────────────────────────────────────────────────────────────────────────
@@ -688,7 +688,7 @@ test_context_efficiency_no_events() {
 
     local output
     output=$(optimize_tune_context_efficiency 2>&1)
-    echo "$output" | grep -q "No events file\|No context efficiency\|skipping" || return 1
+    echo "$output" | grep >/dev/null "No events file\|No context efficiency\|skipping" || return 1
 }
 
 # ──────────────────────────────────────────────────────────────────────────────
@@ -708,7 +708,7 @@ test_context_efficiency_high_utilization() {
     output=$(optimize_tune_context_efficiency 2>&1)
 
     # Should recommend increasing budget
-    echo "$output" | grep -q "Budget utilization high" || { echo "Expected budget increase recommendation"; return 1; }
+    echo "$output" | grep >/dev/null "Budget utilization high" || { echo "Expected budget increase recommendation"; return 1; }
 
     # Should emit recommendation event
     grep -q "optimize.context_recommendation" "$EVENTS_FILE" || { echo "Expected recommendation event"; return 1; }
@@ -739,7 +739,7 @@ test_context_efficiency_high_trim() {
     output=$(optimize_tune_context_efficiency 2>&1)
 
     # Should recommend reducing verbose context
-    echo "$output" | grep -q "Trim ratio high" || { echo "Expected trim reduction recommendation"; return 1; }
+    echo "$output" | grep >/dev/null "Trim ratio high" || { echo "Expected trim reduction recommendation"; return 1; }
 }
 
 # ──────────────────────────────────────────────────────────────────────────────
@@ -759,7 +759,7 @@ test_context_efficiency_healthy() {
     output=$(optimize_tune_context_efficiency 2>&1)
 
     # Should report healthy
-    echo "$output" | grep -q "healthy" || { echo "Expected healthy status"; return 1; }
+    echo "$output" | grep >/dev/null "healthy" || { echo "Expected healthy status"; return 1; }
 
     # Summary should have 0 recommendations
     local summary_file="$OPTIMIZATION_DIR/context-efficiency.json"

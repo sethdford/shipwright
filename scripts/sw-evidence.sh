@@ -103,27 +103,27 @@ evaluate_assertions() {
         case "$assertion" in
             # Common assertion patterns — map names to body content checks
             page-title-visible)
-                echo "$response_body" | grep -qi '<title>' && check_passed="true" ;;
+                echo "$response_body" | grep >/dev/null -i '<title>' && check_passed="true" ;;
             websocket-connected|websocket-active)
-                echo "$response_body" | grep -qi 'websocket\|ws://' && check_passed="true" ;;
+                echo "$response_body" | grep >/dev/null -i 'websocket\|ws://' && check_passed="true" ;;
             status-ok)
-                echo "$response_body" | grep -qi '"status"' && check_passed="true" ;;
+                echo "$response_body" | grep >/dev/null -i '"status"' && check_passed="true" ;;
             response-has-version)
-                echo "$response_body" | grep -qi '"version"' && check_passed="true" ;;
+                echo "$response_body" | grep >/dev/null -i '"version"' && check_passed="true" ;;
             valid-json-output|valid-json)
                 echo "$response_body" | jq empty 2>/dev/null && check_passed="true" ;;
             has-pipeline-state)
-                echo "$response_body" | grep -qi 'pipeline\|status\|stage' && check_passed="true" ;;
+                echo "$response_body" | grep >/dev/null -i 'pipeline\|status\|stage' && check_passed="true" ;;
             stage-list-rendered)
-                echo "$response_body" | grep -qi 'stage\|pipeline' && check_passed="true" ;;
+                echo "$response_body" | grep >/dev/null -i 'stage\|pipeline' && check_passed="true" ;;
             progress-indicator-visible)
-                echo "$response_body" | grep -qi 'progress\|percent\|stage' && check_passed="true" ;;
+                echo "$response_body" | grep >/dev/null -i 'progress\|percent\|stage' && check_passed="true" ;;
             schema-valid|db-accessible)
-                echo "$response_body" | grep -qi 'schema\|version\|ok\|healthy' && check_passed="true" ;;
+                echo "$response_body" | grep >/dev/null -i 'schema\|version\|ok\|healthy' && check_passed="true" ;;
             *)
                 # Generic: check if the assertion name (with hyphens as spaces) appears in body
                 local search_term="${assertion//-/ }"
-                echo "$response_body" | grep -qi "$search_term" && check_passed="true" ;;
+                echo "$response_body" | grep >/dev/null -i "$search_term" && check_passed="true" ;;
         esac
 
         if [[ "$check_passed" != "true" ]]; then

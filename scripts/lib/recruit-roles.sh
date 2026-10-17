@@ -207,7 +207,7 @@ _recruit_keyword_match() {
                 [[ -z "$keyword" ]] && continue
                 local kw_lower
                 kw_lower=$(echo "$keyword" | tr '[:upper:]' '[:lower:]')
-                if echo "$task_lower" | grep -q "$kw_lower" 2>/dev/null; then
+                if echo "$task_lower" | grep >/dev/null "$kw_lower" 2>/dev/null; then
                     local role_score
                     role_score=$(echo "$learned_weights" | jq -r --arg k "$keyword" '.[$k] | if type == "object" then .role else "" end' 2>/dev/null || echo "")
                     local weight

@@ -187,7 +187,7 @@ compound_audit_escalate() {
     for spec in security error_handling performance edge_case; do
         local varname="_COMPOUND_TRIGGERS_${spec}"
         local pattern="${!varname:-}"
-        if [[ -n "$pattern" ]] && echo "$all_text" | grep -qEi "$pattern" 2>/dev/null; then
+        if [[ -n "$pattern" ]] && echo "$all_text" | grep >/dev/null -Ei "$pattern" 2>/dev/null; then
             specialists="${specialists:+${specialists} }${spec}"
         fi
     done

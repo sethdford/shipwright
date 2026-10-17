@@ -42,7 +42,7 @@ _has_file() {
 # ─── Helper: Check any file matches glob ──────────────────────────────────
 _has_glob() {
     local root="$1" pattern="$2"
-    find "$root" -maxdepth 1 -name "$pattern" -type f 2>/dev/null | grep -q .
+    find "$root" -maxdepth 1 -name "$pattern" -type f 2>/dev/null | grep >/dev/null .
 }
 
 # ═══════════════════════════════════════════════════════════════════════════
@@ -82,34 +82,34 @@ project_detect_type() {
         pkg=$(cat "$root/package.json" 2>/dev/null)
 
         # Framework detection
-        if echo "$pkg" | grep -q '"next"'; then
+        if echo "$pkg" | grep >/dev/null '"next"'; then
             framework="next"
-        elif echo "$pkg" | grep -q '"react"'; then
+        elif echo "$pkg" | grep >/dev/null '"react"'; then
             framework="react"
-        elif echo "$pkg" | grep -q '"vue"'; then
+        elif echo "$pkg" | grep >/dev/null '"vue"'; then
             framework="vue"
-        elif echo "$pkg" | grep -q '"@angular/core"'; then
+        elif echo "$pkg" | grep >/dev/null '"@angular/core"'; then
             framework="angular"
-        elif echo "$pkg" | grep -q '"@nestjs/core"'; then
+        elif echo "$pkg" | grep >/dev/null '"@nestjs/core"'; then
             framework="nestjs"
-        elif echo "$pkg" | grep -q '"express"'; then
+        elif echo "$pkg" | grep >/dev/null '"express"'; then
             framework="express"
-        elif echo "$pkg" | grep -q '"fastify"'; then
+        elif echo "$pkg" | grep >/dev/null '"fastify"'; then
             framework="fastify"
-        elif echo "$pkg" | grep -q '"hono"'; then
+        elif echo "$pkg" | grep >/dev/null '"hono"'; then
             framework="hono"
         else
             framework="unknown"
         fi
 
         # Test runner detection
-        if echo "$pkg" | grep -q '"vitest"'; then
+        if echo "$pkg" | grep >/dev/null '"vitest"'; then
             test_runner="vitest"
-        elif echo "$pkg" | grep -q '"jest"'; then
+        elif echo "$pkg" | grep >/dev/null '"jest"'; then
             test_runner="jest"
-        elif echo "$pkg" | grep -q '"mocha"'; then
+        elif echo "$pkg" | grep >/dev/null '"mocha"'; then
             test_runner="mocha"
-        elif echo "$pkg" | grep -q '"ava"'; then
+        elif echo "$pkg" | grep >/dev/null '"ava"'; then
             test_runner="ava"
         else
             test_runner="unknown"
@@ -124,11 +124,11 @@ project_detect_type() {
         local cargo_content
         cargo_content=$(cat "$root/Cargo.toml" 2>/dev/null)
 
-        if echo "$cargo_content" | grep -q "actix-web"; then
+        if echo "$cargo_content" | grep >/dev/null "actix-web"; then
             framework="actix-web"
-        elif echo "$cargo_content" | grep -q "axum"; then
+        elif echo "$cargo_content" | grep >/dev/null "axum"; then
             framework="axum"
-        elif echo "$cargo_content" | grep -q "rocket"; then
+        elif echo "$cargo_content" | grep >/dev/null "rocket"; then
             framework="rocket"
         else
             framework="unknown"
@@ -143,13 +143,13 @@ project_detect_type() {
         local go_content
         go_content=$(cat "$root/go.mod" 2>/dev/null)
 
-        if echo "$go_content" | grep -q "gin-gonic/gin"; then
+        if echo "$go_content" | grep >/dev/null "gin-gonic/gin"; then
             framework="gin"
-        elif echo "$go_content" | grep -q "labstack/echo"; then
+        elif echo "$go_content" | grep >/dev/null "labstack/echo"; then
             framework="echo"
-        elif echo "$go_content" | grep -q "go-chi/chi"; then
+        elif echo "$go_content" | grep >/dev/null "go-chi/chi"; then
             framework="chi"
-        elif echo "$go_content" | grep -q "gofiber/fiber"; then
+        elif echo "$go_content" | grep >/dev/null "gofiber/fiber"; then
             framework="fiber"
         else
             framework="unknown"
@@ -164,9 +164,9 @@ project_detect_type() {
         if _has_file "$root" "pyproject.toml"; then
             local pyproject
             pyproject=$(cat "$root/pyproject.toml" 2>/dev/null)
-            if echo "$pyproject" | grep -q "poetry"; then
+            if echo "$pyproject" | grep >/dev/null "poetry"; then
                 build_tool="poetry"
-            elif echo "$pyproject" | grep -q "pdm"; then
+            elif echo "$pyproject" | grep >/dev/null "pdm"; then
                 build_tool="pdm"
             else
                 build_tool="pip"
@@ -180,11 +180,11 @@ project_detect_type() {
         _has_file "$root" "requirements.txt" && py_deps=$(cat "$root/requirements.txt" 2>/dev/null)
         _has_file "$root" "pyproject.toml" && py_deps="$py_deps$(cat "$root/pyproject.toml" 2>/dev/null)"
 
-        if echo "$py_deps" | grep -qi "django"; then
+        if echo "$py_deps" | grep >/dev/null -i "django"; then
             framework="django"
-        elif echo "$py_deps" | grep -qi "fastapi"; then
+        elif echo "$py_deps" | grep >/dev/null -i "fastapi"; then
             framework="fastapi"
-        elif echo "$py_deps" | grep -qi "flask"; then
+        elif echo "$py_deps" | grep >/dev/null -i "flask"; then
             framework="flask"
         else
             framework="unknown"
@@ -198,10 +198,10 @@ project_detect_type() {
         local gemfile
         gemfile=$(cat "$root/Gemfile" 2>/dev/null)
 
-        if echo "$gemfile" | grep -q "rails"; then
+        if echo "$gemfile" | grep >/dev/null "rails"; then
             framework="rails"
             test_runner="rails test"
-        elif echo "$gemfile" | grep -q "rspec"; then
+        elif echo "$gemfile" | grep >/dev/null "rspec"; then
             framework="unknown"
             test_runner="rspec"
         else
@@ -218,7 +218,7 @@ project_detect_type() {
         local pom
         pom=$(cat "$root/pom.xml" 2>/dev/null)
 
-        if echo "$pom" | grep -q "spring-boot"; then
+        if echo "$pom" | grep >/dev/null "spring-boot"; then
             framework="spring-boot"
         else
             framework="unknown"
@@ -234,7 +234,7 @@ project_detect_type() {
         _has_file "$root" "build.gradle" && gradle_content=$(cat "$root/build.gradle" 2>/dev/null)
         _has_file "$root" "build.gradle.kts" && gradle_content=$(cat "$root/build.gradle.kts" 2>/dev/null)
 
-        if echo "$gradle_content" | grep -q "spring-boot"; then
+        if echo "$gradle_content" | grep >/dev/null "spring-boot"; then
             framework="spring-boot"
         else
             framework="unknown"
@@ -343,9 +343,9 @@ project_detect_test_cmd() {
             if [[ -f "$root/Gemfile" ]]; then
                 local gemfile
                 gemfile=$(cat "$root/Gemfile" 2>/dev/null)
-                if echo "$gemfile" | grep -q "rails"; then
+                if echo "$gemfile" | grep >/dev/null "rails"; then
                     test_cmd="bundle exec rails test"
-                elif echo "$gemfile" | grep -q "rspec"; then
+                elif echo "$gemfile" | grep >/dev/null "rspec"; then
                     test_cmd="bundle exec rspec"
                 else
                     test_cmd="bundle exec rake test"

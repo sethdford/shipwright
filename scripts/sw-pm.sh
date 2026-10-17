@@ -114,11 +114,11 @@ analyze_issue() {
 
     # Analyze title and body for keywords
     local is_bugfix is_feature is_refactor is_security is_perf
-    is_bugfix=$(echo "$title $body" | grep -iq "bug\|fix\|issue" && echo "true" || echo "false")
-    is_feature=$(echo "$title $body" | grep -iq "feature\|add\|new\|implement" && echo "true" || echo "false")
-    is_refactor=$(echo "$title $body" | grep -iq "refactor\|refactoring\|cleanup" && echo "true" || echo "false")
-    is_security=$(echo "$title $body" | grep -iq "security\|vulnerability\|cve\|auth" && echo "true" || echo "false")
-    is_perf=$(echo "$title $body" | grep -iq "performance\|perf\|speed\|optimize" && echo "true" || echo "false")
+    is_bugfix=$(echo "$title $body" | grep >/dev/null -i "bug\|fix\|issue" && echo "true" || echo "false")
+    is_feature=$(echo "$title $body" | grep >/dev/null -i "feature\|add\|new\|implement" && echo "true" || echo "false")
+    is_refactor=$(echo "$title $body" | grep >/dev/null -i "refactor\|refactoring\|cleanup" && echo "true" || echo "false")
+    is_security=$(echo "$title $body" | grep >/dev/null -i "security\|vulnerability\|cve\|auth" && echo "true" || echo "false")
+    is_perf=$(echo "$title $body" | grep >/dev/null -i "performance\|perf\|speed\|optimize" && echo "true" || echo "false")
 
     # Count estimated files affected by analyzing body content
     local file_scope complexity risk estimated_hours

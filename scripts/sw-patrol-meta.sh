@@ -46,7 +46,7 @@ patrol_meta_create_issue() {
     # Dedup: check if an open issue with this exact title already exists
     local existing
     existing=$(gh issue list --state open --search "$title" --json number,title --jq ".[].title" 2>/dev/null || echo "")
-    if echo "$existing" | grep -qF "$title" 2>/dev/null; then
+    if echo "$existing" | grep >/dev/null -F "$title" 2>/dev/null; then
         info "  Skipping duplicate: $title"
         return 0
     fi
@@ -475,10 +475,10 @@ patrol_meta_score_impact() {
     esac
 
     # Adjust based on title keywords
-    if echo "$title" | grep -qi "critical\|regression\|failure"; then
+    if echo "$title" | grep >/dev/null -i "critical\|regression\|failure"; then
         score=$((score + 15))
     fi
-    if echo "$title" | grep -qi "lead.*time\|deployment"; then
+    if echo "$title" | grep >/dev/null -i "lead.*time\|deployment"; then
         score=$((score + 10))
     fi
 
@@ -652,17 +652,17 @@ patrol_meta_batch_improve() {
 
         if [[ -n "$issue_num" && -n "$title" ]]; then
             # Determine category from title
-            if echo "$title" | grep -qi "test"; then
+            if echo "$title" | grep >/dev/null -i "test"; then
                 category="untested-scripts"
-            elif echo "$title" | grep -qi "bash"; then
+            elif echo "$title" | grep >/dev/null -i "bash"; then
                 category="bash-compat"
-            elif echo "$title" | grep -qi "version"; then
+            elif echo "$title" | grep >/dev/null -i "version"; then
                 category="version-sync"
-            elif echo "$title" | grep -qi "lead.*time\|regression"; then
+            elif echo "$title" | grep >/dev/null -i "lead.*time\|regression"; then
                 category="dora-regression"
-            elif echo "$title" | grep -qi "template"; then
+            elif echo "$title" | grep >/dev/null -i "template"; then
                 category="template-effectiveness"
-            elif echo "$title" | grep -qi "memory"; then
+            elif echo "$title" | grep >/dev/null -i "memory"; then
                 category="memory-pruning"
             else
                 category="recurring-failures"

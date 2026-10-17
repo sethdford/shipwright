@@ -128,7 +128,7 @@ jobs:
 
       - name: Install Claude Code CLI
         if: env.SKIP_CLAUDE != 'true'
-        run: npm install -g @anthropic-ai/claude-code
+        run: npm install -g @anthropic-ai/claude-code@2.1.301
 
       - name: Run budget-limited Claude integration smoke
         if: env.SKIP_CLAUDE != 'true'

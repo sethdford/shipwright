@@ -122,7 +122,7 @@ memory_ranked_search() {
             local score=0
             while IFS= read -r kw; do
                 [[ -z "$kw" ]] && continue
-                if echo "$entry_text" | grep -qiF "$kw" 2>/dev/null; then
+                if echo "$entry_text" | grep >/dev/null -iF "$kw" 2>/dev/null; then
                     score=$((score + 1))
                 fi
             done <<< "$keywords"
@@ -151,7 +151,7 @@ memory_ranked_search() {
             local score=0
             while IFS= read -r kw; do
                 [[ -z "$kw" ]] && continue
-                echo "$entry_text" | grep -qiF "$kw" 2>/dev/null && score=$((score + 1))
+                echo "$entry_text" | grep >/dev/null -iF "$kw" 2>/dev/null && score=$((score + 1))
             done <<< "$keywords"
             if [[ "$score" -gt 0 ]]; then
                 local content
@@ -169,7 +169,7 @@ memory_ranked_search() {
         local score=0
         while IFS= read -r kw; do
             [[ -z "$kw" ]] && continue
-            echo "$entry_text" | grep -qiF "$kw" 2>/dev/null && score=$((score + 1))
+            echo "$entry_text" | grep >/dev/null -iF "$kw" 2>/dev/null && score=$((score + 1))
         done <<< "$keywords"
         if [[ "$score" -gt 0 ]]; then
             local content
@@ -322,7 +322,7 @@ memory_capture_pipeline() {
     if [[ -n "$artifacts_dir" && -f "$artifacts_dir/test-results.log" ]]; then
         local test_output
         test_output=$(cat "$artifacts_dir/test-results.log" 2>/dev/null || true)
-        if echo "$test_output" | grep -qiE "FAIL|ERROR|failed"; then
+        if echo "$test_output" | grep >/dev/null -iE "FAIL|ERROR|failed"; then
             memory_capture_failure "test" "$test_output"
         fi
     fi
@@ -1820,7 +1820,7 @@ memory_ab_assign_group() {
     local ab_ratio="${1:-0.2}"  # Read from daemon-config intelligence.ab_test_ratio
 
     # Validate ratio is between 0 and 1
-    if ! echo "$ab_ratio" | grep -qE '^0(\.[0-9]+)?$|^1(\.0+)?$'; then
+    if ! echo "$ab_ratio" | grep >/dev/null -E '^0(\.[0-9]+)?$|^1(\.0+)?$'; then
         ab_ratio="0.2"
     fi
 

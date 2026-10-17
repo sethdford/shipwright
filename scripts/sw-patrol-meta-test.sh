@@ -273,7 +273,7 @@ echo ""
 # ─── 8. Event Analysis ───────────────────────────────────────────────────────
 echo -e "${BOLD}  Event Analysis${RESET}"
 
-if grep -q 'seven_days_ago' "$SRC" || grep -q '604800' "$SRC"; then
+if grep -q 'seven_days_ago' "$SRC" || grep >/dev/null '604800' "$SRC"; then
     assert_pass "event analysis uses 7-day window"
 else
     assert_fail "event analysis uses 7-day window"
@@ -394,7 +394,7 @@ else
     assert_fail "batch_improve looks for meta-improvement labeled issues"
 fi
 
-if grep -q 'sort -rn' "$SRC" || grep -q 'sort.*reverse' "$SRC"; then
+if grep -q 'sort -rn' "$SRC" || grep >/dev/null 'sort.*reverse' "$SRC"; then
     assert_pass "sorts issues by impact score (highest first)"
 else
     assert_pass "batch processing sorts by priority"

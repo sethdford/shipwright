@@ -179,7 +179,7 @@ scan_and_reap() {
         [[ -z "$window_name" ]] && continue
 
         # Only target claude-* windows
-        echo "$window_name" | grep -qi "^claude" || continue
+        echo "$window_name" | grep >/dev/null -i "^claude" || continue
         scanned=$((scanned + 1))
 
         if should_reap "$pane_title" "$cmd" "$pane_idle" "$pane_dead"; then
@@ -219,7 +219,7 @@ cleanup_empty_windows() {
         win_name="$(echo "$line" | cut -d' ' -f2)"
         pane_count="$(echo "$line" | cut -d' ' -f3)"
 
-        echo "$win_name" | grep -qi "^claude" || continue
+        echo "$win_name" | grep >/dev/null -i "^claude" || continue
 
         if [[ "$pane_count" -eq 0 ]]; then
             if $DRY_RUN; then
@@ -254,7 +254,7 @@ cleanup_team_dirs() {
         # Check if ANY claude-{team}* window still exists
         local has_windows=false
         while IFS= read -r win_name; do
-            if echo "$win_name" | grep -qi "^claude-${team_name}"; then
+            if echo "$win_name" | grep >/dev/null -i "^claude-${team_name}"; then
                 has_windows=true
                 break
             fi

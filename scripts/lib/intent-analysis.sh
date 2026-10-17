@@ -357,15 +357,15 @@ validate_failure_modes() {
     # Look for: file names, function names, design patterns, architectural concepts
     local has_specificity=false
 
-    if echo "$fma_section" | grep -qEi '(\.js|\.ts|\.py|\.go|\.rs|\.java|\.cpp|\.c|\.rb|\.php)(\)|:|,|"|\s)'; then
+    if echo "$fma_section" | grep >/dev/null -Ei '(\.js|\.ts|\.py|\.go|\.rs|\.java|\.cpp|\.c|\.rb|\.php)(\)|:|,|"|\s)'; then
         has_specificity=true  # References file extensions
     fi
 
-    if echo "$fma_section" | grep -qEi '(function|class|module|component|service|database|cache|queue|api|endpoint)'; then
+    if echo "$fma_section" | grep >/dev/null -Ei '(function|class|module|component|service|database|cache|queue|api|endpoint)'; then
         has_specificity=true  # References architectural components
     fi
 
-    if echo "$fma_section" | grep -qEi '(race condition|deadlock|stale|timeout|overflow|leak|injection|validate|sanitize)'; then
+    if echo "$fma_section" | grep >/dev/null -Ei '(race condition|deadlock|stale|timeout|overflow|leak|injection|validate|sanitize)'; then
         has_specificity=true  # References specific failure modes
     fi
 
@@ -373,7 +373,7 @@ validate_failure_modes() {
     # (e.g., mentions of specific modules/patterns discussed in the plan itself)
     # -E, not BRE: `\|` alternation is a GNU grep extension and is read
     # literally by BSD grep, so this matched nothing on macOS.
-    if echo "$fma_section" | grep -qiE 'dependency|rollback|revert|transaction'; then
+    if echo "$fma_section" | grep >/dev/null -iE 'dependency|rollback|revert|transaction'; then
         has_specificity=true
     fi
 
@@ -425,7 +425,7 @@ get_failure_mode_validation_status() {
 
     # Check for specificity
     local has_specificity=false
-    if echo "$fma_section" | grep -qEi '\.(js|ts|py|go|rs|java|cpp|c|rb|php)(\)|:|,|"|\s)|function|class|module|component|service|database|cache|queue|api|endpoint'; then
+    if echo "$fma_section" | grep >/dev/null -Ei '\.(js|ts|py|go|rs|java|cpp|c|rb|php)(\)|:|,|"|\s)|function|class|module|component|service|database|cache|queue|api|endpoint'; then
         has_specificity=true
     fi
 

@@ -25,7 +25,7 @@ assert_eq() {
 
 assert_contains() {
     local haystack="$1" needle="$2" msg="$3"
-    if echo "$haystack" | grep -q "$needle" 2>/dev/null; then
+    if echo "$haystack" | grep >/dev/null "$needle" 2>/dev/null; then
         pass "$msg"
     else
         fail "$msg (expected to contain '$needle')"
@@ -81,7 +81,7 @@ assert_true() {
 
 assert_not_contains() {
     local haystack="$1" needle="$2" msg="$3"
-    if echo "$haystack" | grep -q "$needle" 2>/dev/null; then
+    if echo "$haystack" | grep >/dev/null "$needle" 2>/dev/null; then
         fail "$msg (should NOT contain '$needle')"
     else
         pass "$msg"

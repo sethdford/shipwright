@@ -86,7 +86,7 @@ _dedup_against_issues() {
         title=$(echo "$candidate" | jq -r '.title // ""')
 
         # Check against recent decision dedup keys
-        if [[ -n "$dedup_key" ]] && echo "$recent_dedup_keys" | grep -qF "$dedup_key" 2>/dev/null; then
+        if [[ -n "$dedup_key" ]] && echo "$recent_dedup_keys" | grep >/dev/null -F "$dedup_key" 2>/dev/null; then
             continue
         fi
 

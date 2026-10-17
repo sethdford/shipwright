@@ -58,7 +58,7 @@ case "$SHELL_NAME" in
         cp "$COMPLETIONS_DIR/_shipwright" "$DEST/_shipwright"
         cp "$COMPLETIONS_DIR/_shipwright" "$DEST/_sw"
         success "Installed zsh completions to $DEST"
-        if ! echo "$FPATH" | tr ':' '\n' | grep -q "$DEST"; then
+        if ! echo "$FPATH" | tr ':' '\n' | grep >/dev/null "$DEST"; then
             warn "$DEST is not in your fpath"
             info "Add to ~/.zshrc: ${DIM}fpath=(~/.zfunc \$fpath) && autoload -Uz compinit && compinit${RESET}"
         else

@@ -297,7 +297,7 @@ if command -v git >/dev/null 2>&1 && git rev-parse --is-inside-work-tree >/dev/n
         # Check if this branch has an active worktree
         has_worktree=false
         for wt in $active_worktrees; do
-            if echo "$wt" | grep -q "${branch##*/}" 2>/dev/null; then
+            if echo "$wt" | grep >/dev/null "${branch##*/}" 2>/dev/null; then
                 has_worktree=true
                 break
             fi

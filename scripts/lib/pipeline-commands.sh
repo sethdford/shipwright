@@ -564,7 +564,7 @@ pipeline_attach() {
     fi
 
     # Check window exists
-    if ! tmux list-windows -t "$SW_PIPELINE_SESSION" -F '#{window_name}' 2>/dev/null | grep -q "^${win_name}$"; then
+    if ! tmux list-windows -t "$SW_PIPELINE_SESSION" -F '#{window_name}' 2>/dev/null | grep >/dev/null "^${win_name}$"; then
         # Try heartbeat fallback
         local hb_file="$HOME/.shipwright/heartbeats/pipeline-${target}.json"
         if [[ -f "$hb_file" ]]; then
@@ -599,7 +599,7 @@ pipeline_tail() {
             win_name=$(tmux list-windows -t "$SW_PIPELINE_SESSION" -F '#{window_name}' 2>/dev/null | grep '^p-' | tail -1 || true)
         fi
 
-        if [[ -n "$win_name" ]] && tmux list-windows -t "$SW_PIPELINE_SESSION" -F '#{window_name}' 2>/dev/null | grep -q "^${win_name}$"; then
+        if [[ -n "$win_name" ]] && tmux list-windows -t "$SW_PIPELINE_SESSION" -F '#{window_name}' 2>/dev/null | grep >/dev/null "^${win_name}$"; then
             local pane_id
             pane_id=$(tmux list-panes -t "${SW_PIPELINE_SESSION}:${win_name}" -F '#{pane_id}' 2>/dev/null | head -1)
             if [[ -n "$pane_id" ]]; then
@@ -816,7 +816,7 @@ pipeline_start() {
     fi
 
     # CI resume: restore branch + goal context when intake is skipped
-    if [[ -n "${COMPLETED_STAGES:-}" ]] && echo "$COMPLETED_STAGES" | tr ',' '\n' | grep -qx "intake"; then
+    if [[ -n "${COMPLETED_STAGES:-}" ]] && echo "$COMPLETED_STAGES" | tr ',' '\n' | grep >/dev/null -x "intake"; then
         # Intake was completed in a previous run — restore context
         # The workflow merges the partial work branch, so code changes are on HEAD
 

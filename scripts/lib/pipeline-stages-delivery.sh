@@ -193,7 +193,7 @@ stage_pr() {
     [[ -z "$pr_title" ]] && pr_title="Pipeline changes for issue ${ISSUE_NUMBER:-unknown}"
 
     # Sanitize: reject PR titles that look like error messages
-    if echo "$pr_title" | grep -qiE 'Invalid API|API key|authentication_error|rate_limit|CLI error|no useful output'; then
+    if echo "$pr_title" | grep >/dev/null -iE 'Invalid API|API key|authentication_error|rate_limit|CLI error|no useful output'; then
         warn "PR title looks like an error message: $pr_title"
         pr_title="Pipeline changes for issue ${ISSUE_NUMBER:-unknown}"
     fi
@@ -213,7 +213,7 @@ stage_pr() {
     if [[ -s "$review_file" ]]; then
         local total_issues=0
         # Try JSON structured output first
-        if head -1 "$review_file" 2>/dev/null | grep -q '^{' 2>/dev/null; then
+        if head -1 "$review_file" 2>/dev/null | grep >/dev/null '^{' 2>/dev/null; then
             total_issues=$(jq -r '.issues | length' "$review_file" 2>/dev/null || echo "0")
         fi
         # Grep fallback for markdown
@@ -290,7 +290,7 @@ EOF
                     regex=$(echo "$pattern" | sed 's/\./\\./g; s/\*\*/DOUBLESTAR/g; s/\*/[^\/]*/g; s/DOUBLESTAR/.*/g')
                     while IFS= read -r file; do
                         [[ -z "$file" ]] && continue
-                        if echo "$file" | grep -qE "^${regex}$"; then
+                        if echo "$file" | grep >/dev/null -E "^${regex}$"; then
                             return 0
                         fi
                     done <<< "$changed_files"
@@ -546,7 +546,7 @@ stage_merge() {
         ag_enabled=$(jq -r '.enabled // false' "$ag_file" 2>/dev/null || echo "false")
         ag_stages=$(jq -r '.stages // [] | if type == "array" then .[] else empty end' "$ag_file" 2>/dev/null || true)
         ag_issue_num=$(echo "${ISSUE_NUMBER:-0}" | awk '{print $1+0}')
-        if [[ "$ag_enabled" == "true" ]] && echo "$ag_stages" | grep -qx "merge" 2>/dev/null; then
+        if [[ "$ag_enabled" == "true" ]] && echo "$ag_stages" | grep >/dev/null -x "merge" 2>/dev/null; then
             local ha_file="${ARTIFACTS_DIR}/human-approval.txt"
             local ha_approved="false"
             if [[ -f "$ha_file" ]]; then

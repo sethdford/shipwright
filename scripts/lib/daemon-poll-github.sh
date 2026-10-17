@@ -246,7 +246,7 @@ daemon_poll_issues() {
                         dep="${dep## }"
                         dep="${dep%% }"
                         # Is this dep in our scored set and not yet scheduled?
-                        if echo "$sorted_order" | grep -q "|${dep}|" && ! echo "$scheduled" | grep -q "|${dep}|"; then
+                        if echo "$sorted_order" | grep >/dev/null "|${dep}|" && ! echo "$scheduled" | grep >/dev/null "|${dep}|"; then
                             all_deps_ready=false
                             break
                         fi

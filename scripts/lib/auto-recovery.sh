@@ -51,31 +51,31 @@ recovery_classify_error() {
     lower_text=$(echo "$error_text" | tr '[:upper:]' '[:lower:]')
 
     # Classification by pattern (order matters — most specific first)
-    if echo "$lower_text" | grep -qE '(syntax error|unexpected token|parse error|unterminated)'; then
+    if echo "$lower_text" | grep >/dev/null -E '(syntax error|unexpected token|parse error|unterminated)'; then
         echo "syntax_error"
-    elif echo "$lower_text" | grep -qE '(type error|cannot find name|is not assignable|type.*is not)'; then
+    elif echo "$lower_text" | grep >/dev/null -E '(type error|cannot find name|is not assignable|type.*is not)'; then
         echo "type_error"
-    elif echo "$lower_text" | grep -qE '(import|require|module not found|cannot find module|no such file)'; then
+    elif echo "$lower_text" | grep >/dev/null -E '(import|require|module not found|cannot find module|no such file)'; then
         echo "import_error"
-    elif echo "$lower_text" | grep -qE '(timeout|timed out|deadline exceeded|took too long)'; then
+    elif echo "$lower_text" | grep >/dev/null -E '(timeout|timed out|deadline exceeded|took too long)'; then
         echo "timeout"
-    elif echo "$lower_text" | grep -qE '(out of memory|heap|oom|memory limit|segfault|sigsegv|enomem)'; then
+    elif echo "$lower_text" | grep >/dev/null -E '(out of memory|heap|oom|memory limit|segfault|sigsegv|enomem)'; then
         echo "resource_error"
-    elif echo "$lower_text" | grep -qE '(permission denied|eacces|forbidden|unauthorized|401|403)'; then
+    elif echo "$lower_text" | grep >/dev/null -E '(permission denied|eacces|forbidden|unauthorized|401|403)'; then
         echo "permission_error"
-    elif echo "$lower_text" | grep -qE '(connection refused|econnrefused|network|dns|enotfound)'; then
+    elif echo "$lower_text" | grep >/dev/null -E '(connection refused|econnrefused|network|dns|enotfound)'; then
         echo "network_error"
-    elif echo "$lower_text" | grep -qE '(lock|deadlock|locked|busy|resource busy)'; then
+    elif echo "$lower_text" | grep >/dev/null -E '(lock|deadlock|locked|busy|resource busy)'; then
         echo "lock_error"
-    elif echo "$lower_text" | grep -qE '(assert|expect|should|to equal|to be|not equal|mismatch)'; then
+    elif echo "$lower_text" | grep >/dev/null -E '(assert|expect|should|to equal|to be|not equal|mismatch)'; then
         echo "test_assertion"
-    elif echo "$lower_text" | grep -qE '(build|compile|linker|undefined reference|unresolved)'; then
+    elif echo "$lower_text" | grep >/dev/null -E '(build|compile|linker|undefined reference|unresolved)'; then
         echo "build_error"
-    elif echo "$lower_text" | grep -qE '(lint|eslint|prettier|format|style)'; then
+    elif echo "$lower_text" | grep >/dev/null -E '(lint|eslint|prettier|format|style)'; then
         echo "lint_error"
-    elif echo "$lower_text" | grep -qE '(deprecat|removed|obsolete|no longer supported)'; then
+    elif echo "$lower_text" | grep >/dev/null -E '(deprecat|removed|obsolete|no longer supported)'; then
         echo "deprecation_error"
-    elif echo "$lower_text" | grep -qE '(null|undefined|nil|none|reference error)'; then
+    elif echo "$lower_text" | grep >/dev/null -E '(null|undefined|nil|none|reference error)'; then
         echo "null_reference"
     else
         echo "unknown"

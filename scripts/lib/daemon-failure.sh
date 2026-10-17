@@ -34,17 +34,17 @@ classify_failure() {
     tail_content=$(tail -200 "$log_path" 2>/dev/null || true)
 
     # Auth errors
-    if echo "$tail_content" | grep -qiE 'not logged in|unauthorized|auth.*fail|401 |invalid.*token|CLAUDE_CODE_OAUTH_TOKEN|api key.*invalid|authentication required'; then
+    if echo "$tail_content" | grep >/dev/null -iE 'not logged in|unauthorized|auth.*fail|401 |invalid.*token|CLAUDE_CODE_OAUTH_TOKEN|api key.*invalid|authentication required'; then
         echo "auth_error"
         return
     fi
     # API errors (rate limits, timeouts, server errors)
-    if echo "$tail_content" | grep -qiE 'rate limit|429 |503 |502 |overloaded|timeout|ETIMEDOUT|ECONNRESET|socket hang up|service unavailable'; then
+    if echo "$tail_content" | grep >/dev/null -iE 'rate limit|429 |503 |502 |overloaded|timeout|ETIMEDOUT|ECONNRESET|socket hang up|service unavailable'; then
         echo "api_error"
         return
     fi
     # Invalid issue (not found, empty body)
-    if echo "$tail_content" | grep -qiE 'issue not found|404 |no body|could not resolve|GraphQL.*not found|issue.*does not exist'; then
+    if echo "$tail_content" | grep >/dev/null -iE 'issue not found|404 |no body|could not resolve|GraphQL.*not found|issue.*does not exist'; then
         echo "invalid_issue"
         return
     fi
@@ -63,7 +63,7 @@ classify_failure() {
         fi
     fi
     # Build failure (test errors, compile errors)
-    if echo "$tail_content" | grep -qiE 'test.*fail|FAIL|build.*error|compile.*error|lint.*fail|npm ERR|exit code [1-9]'; then
+    if echo "$tail_content" | grep >/dev/null -iE 'test.*fail|FAIL|build.*error|compile.*error|lint.*fail|npm ERR|exit code [1-9]'; then
         echo "build_failure"
         return
     fi

@@ -61,12 +61,12 @@ mutation_generate() {
         [[ "$mutation_count" -ge "$MUTATION_MAX_MUTANTS" ]] && break
 
         # Skip comments and strings (heuristic: lines starting with # or //)
-        if echo "$line" | grep -qE '^\s*(#|//)' 2>/dev/null; then
+        if echo "$line" | grep >/dev/null -E '^\s*(#|//)' 2>/dev/null; then
             continue
         fi
 
         # == → !=
-        if echo "$line" | grep -qE '==' 2>/dev/null; then
+        if echo "$line" | grep >/dev/null -E '==' 2>/dev/null; then
             _write_mutation "$output_dir" "$source_file" "$line_num" \
                 "comparison_flip" "== to !=" \
                 "s/==/!=/" "$file_hash" "$mutation_count"
@@ -74,7 +74,7 @@ mutation_generate() {
         fi
 
         # != → ==
-        if echo "$line" | grep -qE '!=' 2>/dev/null; then
+        if echo "$line" | grep >/dev/null -E '!=' 2>/dev/null; then
             _write_mutation "$output_dir" "$source_file" "$line_num" \
                 "comparison_flip" "!= to ==" \
                 "s/!=/==/" "$file_hash" "$mutation_count"
@@ -82,7 +82,7 @@ mutation_generate() {
         fi
 
         # >= → <
-        if echo "$line" | grep -qE '>=' 2>/dev/null; then
+        if echo "$line" | grep >/dev/null -E '>=' 2>/dev/null; then
             _write_mutation "$output_dir" "$source_file" "$line_num" \
                 "boundary_flip" ">= to <" \
                 "s/>=/< /" "$file_hash" "$mutation_count"
@@ -90,7 +90,7 @@ mutation_generate() {
         fi
 
         # <= → >
-        if echo "$line" | grep -qE '<=' 2>/dev/null; then
+        if echo "$line" | grep >/dev/null -E '<=' 2>/dev/null; then
             _write_mutation "$output_dir" "$source_file" "$line_num" \
                 "boundary_flip" "<= to >" \
                 "s/<=/> /" "$file_hash" "$mutation_count"
@@ -98,7 +98,7 @@ mutation_generate() {
         fi
 
         # && → ||
-        if echo "$line" | grep -qE '&&' 2>/dev/null; then
+        if echo "$line" | grep >/dev/null -E '&&' 2>/dev/null; then
             _write_mutation "$output_dir" "$source_file" "$line_num" \
                 "logical_flip" "&& to ||" \
                 "s/&&/||/" "$file_hash" "$mutation_count"
@@ -106,7 +106,7 @@ mutation_generate() {
         fi
 
         # || → &&
-        if echo "$line" | grep -qE '\|\|' 2>/dev/null; then
+        if echo "$line" | grep >/dev/null -E '\|\|' 2>/dev/null; then
             _write_mutation "$output_dir" "$source_file" "$line_num" \
                 "logical_flip" "|| to &&" \
                 "s/||/\&\&/" "$file_hash" "$mutation_count"
@@ -114,7 +114,7 @@ mutation_generate() {
         fi
 
         # true → false
-        if echo "$line" | grep -qE '\btrue\b' 2>/dev/null; then
+        if echo "$line" | grep >/dev/null -E '\btrue\b' 2>/dev/null; then
             _write_mutation "$output_dir" "$source_file" "$line_num" \
                 "boolean_flip" "true to false" \
                 "s/\\btrue\\b/false/" "$file_hash" "$mutation_count"
@@ -122,7 +122,7 @@ mutation_generate() {
         fi
 
         # false → true
-        if echo "$line" | grep -qE '\bfalse\b' 2>/dev/null; then
+        if echo "$line" | grep >/dev/null -E '\bfalse\b' 2>/dev/null; then
             _write_mutation "$output_dir" "$source_file" "$line_num" \
                 "boolean_flip" "false to true" \
                 "s/\\bfalse\\b/true/" "$file_hash" "$mutation_count"
@@ -130,7 +130,7 @@ mutation_generate() {
         fi
 
         # + → - (only in arithmetic context, not string concat)
-        if echo "$line" | grep -qE '[0-9]\s*\+\s*[0-9]' 2>/dev/null; then
+        if echo "$line" | grep >/dev/null -E '[0-9]\s*\+\s*[0-9]' 2>/dev/null; then
             _write_mutation "$output_dir" "$source_file" "$line_num" \
                 "arithmetic_flip" "+ to -" \
                 "s/+/-/" "$file_hash" "$mutation_count"

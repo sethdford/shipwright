@@ -471,7 +471,7 @@ fi
 echo ""
 
 # Tip for tmux users
-if [[ ${#UPGRADEABLE[@]} -gt 0 ]] && printf '%s\n' "${UPGRADEABLE[@]}" | grep -q "tmux\|overlay"; then
+if [[ ${#UPGRADEABLE[@]} -gt 0 ]] && printf '%s\n' "${UPGRADEABLE[@]}" | grep >/dev/null "tmux\|overlay"; then
     info "Tip: Reload tmux config with: ${DIM}prefix + r${RESET}"
     echo ""
 fi

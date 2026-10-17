@@ -257,7 +257,7 @@ EOF
                     local code_block
                     code_block=$(echo "$claude_out" | sed -n '/^test_'"${func}"'()/,/^}/p' || echo "$claude_out" | sed -n '/^test_/,/^}/p' || true)
                     [[ -z "$code_block" ]] && code_block="$claude_out"
-                    if echo "$code_block" | grep -qE 'assert_equal|assert_contains|\[\[.*\]\]|exit 1'; then
+                    if echo "$code_block" | grep >/dev/null -E 'assert_equal|assert_contains|\[\[.*\]\]|exit 1'; then
                         echo "test_${func}() {"
                         echo "$code_block" | sed 's/^test_'"${func}"'()//' | sed 's/^{//' | sed 's/^}//' | head -50
                         echo "    ((PASS++))"
@@ -404,7 +404,7 @@ maintain_tests() {
             [[ -z "$func_name" ]] && continue
 
             # Check if function signature changed
-            if git diff --no-index "$source_file" "$source_file" 2>/dev/null | grep -q "$func_name"; then
+            if git diff --no-index "$source_file" "$source_file" 2>/dev/null | grep >/dev/null "$func_name"; then
                 modified_count=$((modified_count + 1))
                 warn "Function $func_name may need test updates"
             fi

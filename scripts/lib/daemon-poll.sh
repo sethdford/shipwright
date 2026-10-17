@@ -410,7 +410,7 @@ daemon_cleanup_stale() {
     if [[ -x "$SCRIPT_DIR/sw-checkpoint.sh" ]]; then
         local expired_output
         expired_output=$(bash "$SCRIPT_DIR/sw-checkpoint.sh" expire --hours "$((age_days * 24))" 2>/dev/null || true)
-        if [[ -n "$expired_output" ]] && echo "$expired_output" | grep -q "Expired"; then
+        if [[ -n "$expired_output" ]] && echo "$expired_output" | grep >/dev/null "Expired"; then
             local expired_count
             expired_count=$(echo "$expired_output" | grep -c "Expired" || true)
             cleaned=$((cleaned + ${expired_count:-0}))

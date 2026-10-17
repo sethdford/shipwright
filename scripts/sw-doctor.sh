@@ -770,7 +770,7 @@ echo -e "${DIM}  ─────────────────────
 
 BIN_DIR="$HOME/.local/bin"
 
-if echo "$PATH" | tr ':' '\n' | grep -q "$BIN_DIR"; then
+if echo "$PATH" | tr ':' '\n' | grep >/dev/null "$BIN_DIR"; then
     check_pass "${BIN_DIR} is in PATH"
 else
     check_warn "${BIN_DIR} is NOT in PATH"
@@ -853,7 +853,7 @@ fi
 
 # Check if set-hook commands are active in tmux
 if [[ -n "${TMUX:-}" ]]; then
-    if tmux show-hooks -g 2>/dev/null | grep -q "after-split-window"; then
+    if tmux show-hooks -g 2>/dev/null | grep >/dev/null "after-split-window"; then
         check_pass "set-hook commands active in tmux"
     else
         check_warn "set-hook commands not active — reload config: prefix + r"
@@ -870,7 +870,7 @@ if [[ -n "${TMUX:-}" ]]; then
 
     # Check pane border includes cyan accent
     BORDER_FMT="$(tmux show-option -gv pane-border-format 2>/dev/null || echo "")"
-    if echo "$BORDER_FMT" | grep -q "#00d4ff"; then
+    if echo "$BORDER_FMT" | grep >/dev/null "#00d4ff"; then
         check_pass "Pane border format includes cyan accent"
     else
         check_warn "Pane border format missing cyan accent — overlay may not be loaded"
@@ -1073,9 +1073,9 @@ esac
 # Check mouse window clicking (tmux 3.4+ changed the default)
 if command -v tmux >/dev/null 2>&1 && [[ -n "${TMUX:-}" ]]; then
     MOUSE_BIND="$(tmux list-keys 2>/dev/null | grep 'MouseDown1Status' | head -1 || true)"
-    if echo "$MOUSE_BIND" | grep -q 'select-window'; then
+    if echo "$MOUSE_BIND" | grep >/dev/null 'select-window'; then
         check_pass "Mouse window click: select-window (correct)"
-    elif echo "$MOUSE_BIND" | grep -q 'switch-client'; then
+    elif echo "$MOUSE_BIND" | grep >/dev/null 'switch-client'; then
         check_fail "Mouse window click: switch-client (broken — clicking windows won't work)"
         echo -e "    ${DIM}Fix: add to tmux.conf: bind -T root MouseDown1Status select-window -t =${RESET}"
         echo -e "    ${DIM}Or run: shipwright init${RESET}"
@@ -1310,13 +1310,13 @@ if command -v gh >/dev/null 2>&1; then
         gh_scopes=""
         gh_scopes=$(gh auth status 2>&1 | grep -i "token scopes" || echo "")
         if [[ -n "$gh_scopes" ]]; then
-            if echo "$gh_scopes" | grep -qi "repo"; then
+            if echo "$gh_scopes" | grep >/dev/null -i "repo"; then
                 check_pass "Token has 'repo' scope"
             else
                 check_warn "'repo' scope not detected — some features may not work"
                 echo -e "    ${DIM}Fix: gh auth refresh -s repo${RESET}"
             fi
-            if echo "$gh_scopes" | grep -qi "read:org"; then
+            if echo "$gh_scopes" | grep >/dev/null -i "read:org"; then
                 check_pass "Token has 'read:org' scope"
             else
                 check_warn "'read:org' scope not detected — org data may be unavailable"
@@ -1425,7 +1425,7 @@ if command -v lsof >/dev/null 2>&1; then
         check_pass "Port 3000 available"
     fi
 elif command -v ss >/dev/null 2>&1; then
-    if ss -tlnp 2>/dev/null | grep -q ':3000 '; then
+    if ss -tlnp 2>/dev/null | grep >/dev/null ':3000 '; then
         check_warn "Port 3000 in use — dashboard may need a different port"
     else
         check_pass "Port 3000 available"

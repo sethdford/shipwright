@@ -795,7 +795,7 @@ Then explain your reasoning briefly."
             # Save validation result
             echo "$validation_result" > "$ARTIFACTS_DIR/plan-validation.md"
 
-            if echo "$validation_result" | head -5 | grep -qi "VALID: true"; then
+            if echo "$validation_result" | head -5 | grep >/dev/null -i "VALID: true"; then
                 success "Plan validation passed"
                 plan_valid=true
                 break
@@ -807,13 +807,13 @@ Then explain your reasoning briefly."
             local failure_mode="unknown"
             local validation_lower
             validation_lower=$(echo "$validation_result" | tr '[:upper:]' '[:lower:]')
-            if echo "$validation_lower" | grep -qE 'failure mode|risk.*analysis|fail|risk'; then
+            if echo "$validation_lower" | grep >/dev/null -E 'failure mode|risk.*analysis|fail|risk'; then
                 failure_mode="missing_failure_analysis"
-            elif echo "$validation_lower" | grep -qE 'requirements? unclear|goal.*vague|ambiguous|underspecified'; then
+            elif echo "$validation_lower" | grep >/dev/null -E 'requirements? unclear|goal.*vague|ambiguous|underspecified'; then
                 failure_mode="requirements_unclear"
-            elif echo "$validation_lower" | grep -qE 'insufficient detail|not specific|too high.level|missing.*steps|lacks.*detail'; then
+            elif echo "$validation_lower" | grep >/dev/null -E 'insufficient detail|not specific|too high.level|missing.*steps|lacks.*detail'; then
                 failure_mode="insufficient_detail"
-            elif echo "$validation_lower" | grep -qE 'scope too (large|broad)|too many|overly complex|break.*down'; then
+            elif echo "$validation_lower" | grep >/dev/null -E 'scope too (large|broad)|too many|overly complex|break.*down'; then
                 failure_mode="scope_too_large"
             fi
 

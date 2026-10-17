@@ -416,7 +416,7 @@ ${requirements}
     claude_out=$("$SW_AGENT_EXEC" claude -p "$prompt" --max-turns 3 2>/dev/null || true)
     [[ -z "$claude_out" ]] && return 0
 
-    if echo "$claude_out" | grep -qi "Review clean — no semantic issues found"; then
+    if echo "$claude_out" | grep >/dev/null -i "Review clean — no semantic issues found"; then
         return 0
     fi
     echo "$claude_out" | grep -oE '\*\*\[?(Critical|Bug|Security|Warning|Suggestion)\]?\*\*[^—]*—[^$]+' 2>/dev/null || \
