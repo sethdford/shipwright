@@ -71,3 +71,8 @@
 {"ts":"2026-10-16T18:13:15Z","ts_epoch":1792174395,"type":"patrol.issue_refused","check":"untested_scripts","count":7}
 {"ts":"2026-10-16T18:13:17Z","ts_epoch":1792174397,"type":"patrol.meta_issue_refused","title":"[Meta] Add tests for sw-event-schema-sync.sh"}
 {"ts":"2026-10-16T20:04:22Z","ts_epoch":1792181062,"type":"hygiene_platform_refactor","hardcoded":49,"fallback":75,"todo":51}
+{"ts":"2026-10-17T00:12:42Z","ts_epoch":1792195962,"type":"hygiene_platform_refactor","hardcoded":49,"fallback":75,"todo":51}
+{"ts":"2026-10-17T00:13:20Z","ts_epoch":1792196000,"type":"strategic.issue_refused","title":"Make the build loop's test gate fail closed when the project's test or lint command is missing or non-executable"}
+{"ts":"2026-10-17T00:13:23Z","ts_epoch":1792196003,"type":"strategic.issue_refused","title":"Add a blast-radius guard to the build loop that aborts when a task's diff deletes far more than it adds"}
+{"ts":"2026-10-17T00:13:25Z","ts_epoch":1792196005,"type":"strategic.issue_refused","title":"Extract the loop's iteration-state and stuck-detection logic from sw-loop.sh into a tested lib module"}
+{"ts":"2026-10-17T00:13:25Z","ts_epoch":1792196005,"type":"strategic.cycle_complete","issues_created":0,"issues_skipped":3}
