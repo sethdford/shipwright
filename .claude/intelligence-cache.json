@@ -30,14 +30,16 @@
     },
     "d41d8cd98f00b204e9800998ecf8427e": {
       "result": {
-        "primary_role": "docs-writer",
-        "secondary_roles": [],
-        "confidence": 0.9,
-        "reasoning": "The task is a documentation-only edit adding a one-line note to docs/safety-runbook.md, which matches the docs-writer role's documentation focus.",
+        "primary_role": "builder",
+        "secondary_roles": [
+          "tester"
+        ],
+        "confidence": 0.85,
+        "reasoning": "The failing suite is a bash test (sw-lib-test-gate-baseline) with 3 failing assertions about load-error unit naming, which needs code fixes in the test-gate baseline logic, then re-verification of the full suite.",
         "new_role_needed": false,
         "suggested_role": null
       },
-      "timestamp": 1792327398,
+      "timestamp": 1792335655,
       "ttl": 3600
     },
     "efd5524ad1244fd20344bf3ff5d95233": {
@@ -1529,32 +1531,32 @@
         "results": [
           {
             "file": "retry-outcomes.json",
-            "relevance": 92,
-            "summary": "Directly covers build_failure retries: model_escalation has a 5/5 success rate, which bears on the build-stage retry the active pipeline needs after its failed attempt."
+            "relevance": 90,
+            "summary": "Records build_failure retries using model_escalation with a 100% success rate over 5 attempts, which matches the failed build attempt the pipeline is retrying."
           },
           {
             "file": "failures.json",
             "relevance": 80,
-            "summary": "Recorded test-stage failures with root causes and fixes (cost dashboard context-efficiency, intent-analysis schema, e2e lock). The pipeline's previous build attempt failed tests, so these patterns are likely relevant."
-          },
-          {
-            "file": "metrics.json",
-            "relevance": 72,
-            "summary": "Build duration baseline of 2938s and test duration baseline of 1459s, which give the build stage its expected timing to compare against."
+            "summary": "Holds recent test-stage failures with root causes and fixes (cost dashboard, pipeline locks, intent-analysis schema, jq --argjson), similar to the test errors the previous build attempt hit."
           },
           {
             "file": "knowledge.json",
-            "relevance": 50,
-            "summary": "Failure entries with error signatures and fix strategies for test failures (mktemp path, sw-cleanup dry-run, JSON output from regression detection), which may match the current test errors."
+            "relevance": 60,
+            "summary": "Contains test failure signatures and fix strategies, such as the mktemp /tmp/claude directory problem, that apply when a test setup step fails during build."
           },
           {
             "file": "success-patterns.json",
-            "relevance": 42,
-            "summary": "Captured successful fix-bug approaches with files changed and test strategy, useful as a reference for how a comparable build-stage fix was done."
+            "relevance": 40,
+            "summary": "Includes a successful 'Fix bug' pattern using the standard template and a small file set, which is a relevant precedent for a small docs-level fix."
+          },
+          {
+            "file": "flaky-tests.json",
+            "relevance": 35,
+            "summary": "Tracks recurring test failures with occurrence counts and confidence, useful for checking whether the build test failures are known flakes."
           }
         ]
       },
-      "timestamp": 1792333592,
+      "timestamp": 1792335641,
       "ttl": 1800
     },
     "6336ffbe2b1719d118b0b2a12c88a679": {
@@ -1588,6 +1590,39 @@
         ]
       },
       "timestamp": 1792330883,
+      "ttl": 1800
+    },
+    "1e795c083e70c7578244a6cd58bae38c": {
+      "result": {
+        "results": [
+          {
+            "file": "failures.json",
+            "relevance": 45,
+            "summary": "Lists test-stage failures with root causes and fixes (timeouts from unbounded loops, db not started), the closest match to a test failure in the build stage, though none concern bash test-gate baselines."
+          },
+          {
+            "file": "index.json",
+            "relevance": 35,
+            "summary": "Build-stage test_failure signature with a recorded fix (increase timeout in test setup), which may apply if the failing gate tests hit timeouts."
+          },
+          {
+            "file": "test-failures.json",
+            "relevance": 25,
+            "summary": "Intended store for test failure signatures, but it is empty, so it offers no concrete fix for the failing tests."
+          },
+          {
+            "file": "fleet-shared-patterns.json",
+            "relevance": 15,
+            "summary": "Shared build and test fix pattern for missing modules (fix: npm i), only loosely related to the bun test-gate failures."
+          },
+          {
+            "file": "success-patterns.json",
+            "relevance": 10,
+            "summary": "Past build-stage patterns with test strategies, but the entries are generic and not about test-gate baseline or load-error handling."
+          }
+        ]
+      },
+      "timestamp": 1792335623,
       "ttl": 1800
     }
   }
