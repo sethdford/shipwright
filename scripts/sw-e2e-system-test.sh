@@ -45,6 +45,8 @@ setup_e2e_env() {
     cp "$REAL_PIPELINE" "$TEMP_DIR/scripts/sw-pipeline.sh"
     [[ -f "$SCRIPT_DIR/sw" ]] && cp "$SCRIPT_DIR/sw" "$TEMP_DIR/scripts/sw"
     [[ -d "$SCRIPT_DIR/lib" ]] && cp -r "$SCRIPT_DIR/lib" "$TEMP_DIR/scripts/lib"
+    # agent-exec (scripts/lib) reads config/agent-permissions.json beside scripts/ and refuses without it (#8614).
+    mkdir -p "$TEMP_DIR/config" && cp "$REPO_DIR/config/agent-permissions.json" "$TEMP_DIR/config/"
     # Copy skills directory (required by skill-registry.sh) — create empty if missing
     if [[ -d "$SCRIPT_DIR/skills" ]]; then
         cp -r "$SCRIPT_DIR/skills" "$TEMP_DIR/scripts/skills"
