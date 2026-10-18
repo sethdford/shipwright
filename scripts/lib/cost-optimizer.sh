@@ -7,6 +7,7 @@
 # Module guard
 [[ -n "${_COST_OPTIMIZER_LOADED:-}" ]] && return 0
 _COST_OPTIMIZER_LOADED=1
+source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/compat.sh"
 
 # ─── Default Paths ──────────────────────────────────────────────────────────
 COST_DIR="${COST_DIR:-${HOME}/.shipwright}"
@@ -83,7 +84,7 @@ costopt_init() {
     local today_start
     today_start=$(date -u +"%Y-%m-%dT00:00:00Z")
     local today_epoch
-    today_epoch=$(date -u -jf "%Y-%m-%dT%H:%M:%SZ" "$today_start" +%s 2>/dev/null || date -u -d "$today_start" +%s 2>/dev/null || echo "0")
+    today_epoch=$(date_to_epoch "$today_start" || echo "0")
 
     local today_spent
     today_spent=$(jq --argjson cutoff "$today_epoch" \
@@ -157,7 +158,7 @@ costopt_check_budget() {
     local today_start
     today_start=$(date -u +"%Y-%m-%dT00:00:00Z")
     local today_epoch
-    today_epoch=$(date -u -jf "%Y-%m-%dT%H:%M:%SZ" "$today_start" +%s 2>/dev/null || date -u -d "$today_start" +%s 2>/dev/null || echo "0")
+    today_epoch=$(date_to_epoch "$today_start" || echo "0")
 
     local today_spent
     today_spent=$(jq --argjson cutoff "$today_epoch" \
@@ -511,7 +512,7 @@ costopt_report() {
     local today_start
     today_start=$(date -u +"%Y-%m-%dT00:00:00Z")
     local today_epoch
-    today_epoch=$(date -u -jf "%Y-%m-%dT%H:%M:%SZ" "$today_start" +%s 2>/dev/null || date -u -d "$today_start" +%s 2>/dev/null || echo "0")
+    today_epoch=$(date_to_epoch "$today_start" || echo "0")
 
     local today_spent
     today_spent=$(jq --argjson cutoff "$today_epoch" \

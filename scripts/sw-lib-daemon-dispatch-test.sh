@@ -7,11 +7,12 @@ trap 'echo "ERROR: $BASH_SOURCE:$LINENO exited with status $?" >&2' ERR
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "$SCRIPT_DIR/lib/test-helpers.sh"
+sw_test_isolate
 
 print_test_header "Lib: daemon-dispatch Tests"
 
 setup_test_env "lib-daemon-dispatch"
-trap cleanup_test_env EXIT
+trap 'cleanup_test_env; sw_test_teardown' EXIT
 
 # ─── Daemon environment ────────────────────────────────────────────────────
 export SHIPWRIGHT_HOME="$TEST_TEMP_DIR/home/.shipwright"
@@ -117,10 +118,6 @@ format_duration() {
     if [[ "$secs" -ge 3600 ]]; then printf "%dh %dm %ds" $((secs/3600)) $((secs%3600/60)) $((secs%60))
     elif [[ "$secs" -ge 60 ]]; then printf "%dm %ds" $((secs/60)) $((secs%60))
     else printf "%ds" "$secs"; fi
-}
-epoch_to_iso() {
-    local e="$1"
-    date -u -r "$e" +"%Y-%m-%dT%H:%M:%SZ" 2>/dev/null || date -u -d "@$e" +"%Y-%m-%dT%H:%M:%SZ" 2>/dev/null || echo "1970-01-01T00:00:00Z"
 }
 notify() { :; }
 record_pipeline_duration() { :; }

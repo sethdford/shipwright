@@ -7,13 +7,15 @@
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+source "$SCRIPT_DIR/lib/test-isolate.sh"
+sw_test_isolate
 PASS=0
 FAIL=0
 
 # ─── Temp directory for isolated test state ──────────────────────────────────
 TEST_TMP="$(mktemp -d 2>/dev/null || echo "${TMPDIR:-/tmp}/autoresearch-e2e-$$")"
 [[ -d "$TEST_TMP" ]] || mkdir -p "$TEST_TMP"
-trap 'rm -rf "$TEST_TMP"' EXIT
+trap 'rm -rf "$TEST_TMP"; sw_test_teardown' EXIT
 
 # ─── Override all state files to test dir ────────────────────────────────────
 export REWARDS_FILE="$TEST_TMP/rewards.jsonl"

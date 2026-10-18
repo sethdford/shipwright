@@ -7,6 +7,8 @@
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+source "$SCRIPT_DIR/lib/test-isolate.sh"
+sw_test_isolate
 PASS=0
 FAIL=0
 
@@ -59,7 +61,7 @@ mkdir -p "$ARTIFACTS_DIR"
 cleanup() {
     rm -rf "$TEST_DIR"
 }
-trap cleanup EXIT
+trap 'cleanup; sw_test_teardown' EXIT
 
 # Override all file paths to use test directory
 export REWARDS_FILE="$TEST_DIR/rewards.jsonl"

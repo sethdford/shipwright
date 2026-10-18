@@ -262,57 +262,123 @@ _timeout() {
     fi
 }
 
-# ─── Cross-platform date helpers (GNU date -d vs BSD date -j/-v) ──────────
-# date_to_epoch: convert date string to Unix epoch
-# date_days_ago: YYYY-MM-DD for N days ago
-# date_add_days: YYYY-MM-DD for base_date + N days
-# epoch_to_iso: convert epoch to ISO 8601
-date_to_epoch() {
-    local datestr="$1"
-    local fmt=""
-    if [[ "$datestr" == *"T"* ]]; then
-        fmt="%Y-%m-%dT%H:%M:%SZ"
+# ─── Cross-platform date helpers (BSD date, GNU date, python3) ───────────────
+# BSD date (macOS) and GNU date (Linux, `gdate` on macOS) disagree on the flags these helpers
+# need: `-j -f` parses only on BSD, `-r` takes an epoch on BSD but a file on GNU, and `-d`
+# parses free text only on GNU. Scripts call these helpers instead of `date -j`, `date -jf` or
+# `date -r <epoch>`; the fitness rule F11-bash-no-bsd-date (tools/arch) enforces that.
+#
+# Each helper prints its result and returns 0. On invalid input it prints NOTHING and returns 1,
+# so the caller picks its default explicitly, e.g. `start=$(date_to_epoch "$ts" || echo 0)`.
+# Input shapes are checked before any `date` runs, so both see only well-formed strings (they may
+# still differ on out-of-range values such as Feb 30, which BSD normalizes and GNU rejects).
+#
+#   date_to_epoch <ts>               UTC "YYYY-MM-DDTHH:MM:SS[.frac]Z" or "YYYY-MM-DD" -> epoch
+#   date_local_to_epoch <str>        ps(1) lstart "Thu Oct  5 10:00:00 2026" (local) -> epoch
+#   epoch_to_iso <epoch>             epoch -> "YYYY-MM-DDTHH:MM:SSZ" (UTC)
+#   epoch_format [-u] <epoch> <fmt>  epoch -> strftime(fmt); local time unless -u
+#   date_days_ago <n>                UTC "YYYY-MM-DD" for n days ago
+#   date_add_days <date> <n>         UTC "YYYY-MM-DD" for date + n days
+
+# True when `date` is GNU coreutils. Probed per call because PATH can change (tests put a
+# `date` shim that execs gdate first on macOS).
+_compat_date_is_gnu() { date --version >/dev/null 2>&1; }
+
+_compat_is_int() { [[ "${1:-}" =~ ^-?[0-9]+$ ]]; }
+
+# _compat_parse_epoch <utc|local> <string>
+_compat_parse_epoch() {
+    local zone="$1" s="${2:-}" out="" core
+    if [[ "$zone" == "utc" ]]; then
+        [[ "$s" =~ ^[0-9]{4}-[0-9]{2}-[0-9]{2}(T[0-9]{2}:[0-9]{2}:[0-9]{2}(\.[0-9]+)?Z)?$ ]] || return 1
     else
-        fmt="%Y-%m-%d"
+        # macOS `ps -o lstart=` pads with trailing spaces; trim the ends (keep the inner day padding).
+        s="${s#"${s%%[![:space:]]*}"}"
+        s="${s%"${s##*[![:space:]]}"}"
+        [[ "$s" =~ ^[A-Za-z]{3}\ [A-Za-z]{3}\ [\ 0-9]{2}\ [0-9:]{8}\ [0-9]{4}$ ]] || return 1
     fi
-    if date -u -d "$datestr" +%s 2>/dev/null; then
-        return
+    if _compat_date_is_gnu; then
+        if [[ "$zone" == "utc" ]]; then
+            out=$(date -u -d "$s" +%s 2>/dev/null) || out=""
+        else
+            out=$(date -d "$s" +%s 2>/dev/null) || out=""
+        fi
+    elif [[ "$zone" == "utc" ]]; then
+        # Fractional seconds are dropped. BSD `-j -f` fills fields the format does not cover from
+        # the current clock, so a date-only string gets an explicit 00:00:00.
+        core="${s%Z}"
+        core="${core%%.*}"
+        if [[ "$core" == *T* ]]; then
+            out=$(TZ=UTC date -j -f "%Y-%m-%dT%H:%M:%S" "$core" +%s 2>/dev/null) || out=""
+        else
+            out=$(TZ=UTC date -j -f "%Y-%m-%d %H:%M:%S" "$core 00:00:00" +%s 2>/dev/null) || out=""
+        fi
+    else
+        # ps lstart is local time, so no TZ override here.
+        out=$(date -j -f "%a %b %e %H:%M:%S %Y" "$s" +%s 2>/dev/null) || out=""
     fi
-    # BSD date: -j = don't set date, -f = format
-    date -u -j -f "$fmt" "$datestr" +%s 2>/dev/null || echo "0"
+    if ! _compat_is_int "$out" && command -v python3 >/dev/null 2>&1; then
+        if [[ "$zone" == "utc" ]]; then
+            out=$(python3 -I -c 'import sys, calendar, datetime as d
+s = sys.argv[1].rstrip("Z").split(".")[0]
+f = "%Y-%m-%dT%H:%M:%S" if "T" in s else "%Y-%m-%d"
+print(calendar.timegm(d.datetime.strptime(s, f).timetuple()))' "$s" 2>/dev/null) || out=""
+        else
+            out=$(python3 -I -c 'import sys, time
+print(int(time.mktime(time.strptime(sys.argv[1], "%a %b %d %H:%M:%S %Y"))))' "$s" 2>/dev/null) || out=""
+        fi
+    fi
+    _compat_is_int "$out" || return 1
+    printf '%s\n' "$out"
 }
 
-date_days_ago() {
-    local days="$1"
-    if date -u -d "$days days ago" +%Y-%m-%d 2>/dev/null; then
-        return
+date_to_epoch() { _compat_parse_epoch utc "${1:-}"; }
+
+date_local_to_epoch() { _compat_parse_epoch local "${1:-}"; }
+
+# epoch_format [-u] <epoch> <fmt>
+epoch_format() {
+    local utc=0 e="${1:-}" f="${2:-}" out=""
+    if [[ "$e" == "-u" ]]; then
+        utc=1
+        e="${2:-}"
+        f="${3:-}"
     fi
-    date -u -v-${days}d +%Y-%m-%d 2>/dev/null || echo "1970-01-01"
+    [[ "$e" =~ ^[0-9]+$ && -n "$f" ]] || return 1
+    if _compat_date_is_gnu; then
+        if [[ "$utc" -eq 1 ]]; then
+            out=$(date -u -d "@$e" +"$f" 2>/dev/null) || out=""
+        else
+            out=$(date -d "@$e" +"$f" 2>/dev/null) || out=""
+        fi
+    elif [[ "$utc" -eq 1 ]]; then
+        out=$(date -u -r "$e" +"$f" 2>/dev/null) || out=""
+    else
+        out=$(date -r "$e" +"$f" 2>/dev/null) || out=""
+    fi
+    if [[ -z "$out" ]] && command -v python3 >/dev/null 2>&1; then
+        out=$(python3 -I -c 'import sys, datetime as d
+e, f, u = int(sys.argv[1]), sys.argv[2], sys.argv[3] == "1"
+t = d.datetime.fromtimestamp(e, d.timezone.utc) if u else d.datetime.fromtimestamp(e)
+print(t.strftime(f))' "$e" "$f" "$utc" 2>/dev/null) || out=""
+    fi
+    [[ -n "$out" ]] || return 1
+    printf '%s\n' "$out"
+}
+
+epoch_to_iso() { epoch_format -u "${1:-}" "%Y-%m-%dT%H:%M:%SZ"; }
+
+date_days_ago() {
+    local days="${1:-}"
+    _compat_is_int "$days" || return 1
+    epoch_format -u $(( $(date +%s) - days * 86400 )) "%Y-%m-%d"
 }
 
 date_add_days() {
-    local base_date="$1"
-    local days="$2"
-    if date -u -d "${base_date} + ${days} days" +%Y-%m-%d 2>/dev/null; then
-        return
-    fi
-    # BSD: compute via epoch arithmetic
-    local base_epoch
-    base_epoch=$(date_to_epoch "$base_date")
-    if [[ -n "$base_epoch" && "$base_epoch" != "0" ]]; then
-        local result_epoch=$((base_epoch + (days * 86400)))
-        date -u -r "$result_epoch" +%Y-%m-%d 2>/dev/null || date -u -d "@$result_epoch" +%Y-%m-%d 2>/dev/null || echo "1970-01-01"
-    else
-        echo "1970-01-01"
-    fi
-}
-
-epoch_to_iso() {
-    local epoch="$1"
-    date -u -r "$epoch" +"%Y-%m-%dT%H:%M:%SZ" 2>/dev/null || \
-    date -u -d "@$epoch" +"%Y-%m-%dT%H:%M:%SZ" 2>/dev/null || \
-    python3 -c "import datetime; print(datetime.datetime.utcfromtimestamp($epoch).strftime('%Y-%m-%dT%H:%M:%SZ'))" 2>/dev/null || \
-    echo "1970-01-01T00:00:00Z"
+    local base="${1:-}" days="${2:-}" e
+    _compat_is_int "$days" || return 1
+    e=$(date_to_epoch "$base") || return 1
+    epoch_format -u $(( e + days * 86400 )) "%Y-%m-%d"
 }
 
 # ─── Cross-platform MD5 ──────────────────────────────────────────────────

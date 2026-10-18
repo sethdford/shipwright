@@ -7,11 +7,12 @@ trap 'echo "ERROR: $BASH_SOURCE:$LINENO exited with status $?" >&2' ERR
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "$SCRIPT_DIR/lib/test-helpers.sh"
+sw_test_isolate
 
 print_test_header "Lib: pipeline-state Tests"
 
 setup_test_env "sw-lib-pipeline-state-test"
-trap cleanup_test_env EXIT
+trap 'cleanup_test_env; sw_test_teardown' EXIT
 
 # Set up pipeline env
 export ARTIFACTS_DIR="$TEST_TEMP_DIR/artifacts"

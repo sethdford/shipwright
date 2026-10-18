@@ -10,6 +10,7 @@ trap 'echo "ERROR: $BASH_SOURCE:$LINENO exited with status $?" >&2' ERR
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "$SCRIPT_DIR/lib/test-helpers.sh"
+sw_test_isolate
 REPO_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
 # shellcheck source=lib/compat.sh
 [[ -f "$SCRIPT_DIR/lib/compat.sh" ]] && source "$SCRIPT_DIR/lib/compat.sh"
@@ -92,7 +93,7 @@ cleanup() {
 
     echo -e "  ${GREEN}Cleanup complete${RESET}"
 }
-trap cleanup EXIT
+trap 'cleanup; sw_test_teardown' EXIT
 
 # ═════════════════════════════════════════════════════════════════════════════
 # HELPER FUNCTIONS

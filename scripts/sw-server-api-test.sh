@@ -9,6 +9,7 @@ set -euo pipefail
 VERSION="3.3.0"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "$SCRIPT_DIR/lib/test-helpers.sh"
+sw_test_isolate
 REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 
 # Colors
@@ -91,7 +92,7 @@ cleanup() {
     kill "$SERVER_PID" 2>/dev/null || true
     rm -rf "$MOCK_DIR"
 }
-trap cleanup EXIT
+trap 'cleanup; sw_test_teardown' EXIT
 
 # Wait for server
 # shellcheck disable=SC2034

@@ -1145,7 +1145,7 @@ if [[ -d "$HEARTBEAT_DIR" ]]; then
         [[ -f "$hb_file" ]] || continue
         hb_updated=$(jq -r '.updated_at // ""' "$hb_file" 2>/dev/null || true)
         if [[ -n "$hb_updated" && "$hb_updated" != "null" ]]; then
-            hb_epoch=$(TZ=UTC date -j -f "%Y-%m-%dT%H:%M:%SZ" "$hb_updated" +%s 2>/dev/null || echo 0)
+            hb_epoch=$(date_to_epoch "$hb_updated" || echo 0)
             if [[ "$hb_epoch" -gt 0 ]]; then
                 now_e=$(date +%s)
                 hb_age=$((now_e - hb_epoch))

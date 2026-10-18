@@ -17,6 +17,9 @@
 [[ -n "${_TEST_HELPERS_LOADED:-}" ]] && return 0
 _TEST_HELPERS_LOADED=1
 
+# Test isolation (#8648): sw_test_isolate and sw_test_teardown. Every suite calls sw_test_isolate.
+source "$(dirname "${BASH_SOURCE[0]}")/test-isolate.sh"
+
 # ─── Colors ──────────────────────────────────────────────────────────────────
 CYAN='\033[38;2;0;212;255m'
 GREEN='\033[38;2;74;222;128m'
@@ -241,6 +244,25 @@ print_test_section() {
     local title="$1"
     echo ""
     echo -e "  ${CYAN}${title}${RESET}"
+}
+
+# gnu_date_shim_dir: print a directory whose `date` is GNU date (the native one on Linux, or a
+# shim that execs gdate on macOS), for prepending to PATH. Returns 1 when no GNU date exists, so the
+# caller skips its GNU leg. The shim is created under TEST_TEMP_DIR. Regression tests for #8613 and
+# #8621 use this to run date-dependent code under GNU date.
+gnu_date_shim_dir() {
+    local dir="$TEST_TEMP_DIR/gnu-date-bin" gnu=""
+    if date --version >/dev/null 2>&1; then
+        gnu="$(command -v date)"
+    elif command -v gdate >/dev/null 2>&1; then
+        gnu="$(command -v gdate)"
+    else
+        return 1
+    fi
+    mkdir -p "$dir"
+    printf '#!/usr/bin/env bash\nexec "%s" "$@"\n' "$gnu" > "$dir/date"
+    chmod +x "$dir/date"
+    printf '%s\n' "$dir"
 }
 
 print_test_results() {

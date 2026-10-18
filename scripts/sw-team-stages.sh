@@ -216,7 +216,7 @@ cmd_status() {
             name=$(basename "$team_file" .json)
             local status
             status=$(jq -r '.status // "unknown"' "$team_file" 2>/dev/null || echo "error")
-            printf "  %-30s  %-15s  %-20s\n" "$name" "$status" "$(date -r "$ts" +'%Y-%m-%d %H:%M:%S' 2>/dev/null || echo 'unknown')"
+            printf "  %-30s  %-15s  %-20s\n" "$name" "$status" "$(epoch_format "$ts" '%Y-%m-%d %H:%M:%S' || echo 'unknown')"
         done
         return 0
     fi

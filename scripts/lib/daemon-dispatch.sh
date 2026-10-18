@@ -4,6 +4,7 @@
 _DAEMON_DISPATCH_LOADED=1
 # shellcheck source=safety-gates.sh
 source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/safety-gates.sh"
+source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/compat.sh"
 
 # Defaults for variables normally set by sw-daemon.sh (safe under set -u).
 DAEMON_DIR="${DAEMON_DIR:-${HOME}/.shipwright}"
@@ -420,13 +421,13 @@ daemon_reap_completed() {
             local _proc_start _started_at _start_e _age_s _pid_reused=false
             _started_at=$(echo "$job" | jq -r '.started_at // empty')
             if [[ -n "$_started_at" ]]; then
-                _start_e=$(TZ=UTC date -j -f "%Y-%m-%dT%H:%M:%SZ" "$_started_at" +%s 2>/dev/null || date -d "$_started_at" +%s 2>/dev/null || echo "0")
+                _start_e=$(date_to_epoch "$_started_at" || echo "0")
                 _age_s=$(( $(now_epoch) - ${_start_e:-0} ))
                 # On macOS/Linux, check process start time to detect PID reuse
                 _proc_start=$(ps -p "$pid" -o lstart= 2>/dev/null || true)
                 if [[ -n "$_proc_start" && -n "$_started_at" ]]; then
                     local _proc_start_epoch
-                    _proc_start_epoch=$(date -j -f "%a %b %d %H:%M:%S %Y" "$_proc_start" +%s 2>/dev/null || date -d "$_proc_start" +%s 2>/dev/null || echo "0")
+                    _proc_start_epoch=$(date_local_to_epoch "$_proc_start" || echo "0")
                     # If process started more than 60s after our job, PID was reused
                     if [[ "${_proc_start_epoch:-0}" -gt 0 && "${_start_e:-0}" -gt 0 ]]; then
                         local _start_diff=$(( _proc_start_epoch - _start_e ))
@@ -479,8 +480,7 @@ daemon_reap_completed() {
         local started_at duration_str="" start_epoch=0 end_epoch=0
         started_at=$(echo "$job" | jq -r '.started_at // empty')
         if [[ -n "$started_at" ]]; then
-            # macOS date -j for parsing ISO dates (TZ=UTC to parse Z-suffix correctly)
-            start_epoch=$(TZ=UTC date -j -f "%Y-%m-%dT%H:%M:%SZ" "$started_at" +%s 2>/dev/null || date -d "$started_at" +%s 2>/dev/null || echo "0")
+            start_epoch=$(date_to_epoch "$started_at" || echo "0")
             end_epoch=$(now_epoch)
             if [[ "$start_epoch" -gt 0 ]]; then
                 duration_str=$(format_duration $((end_epoch - start_epoch)))

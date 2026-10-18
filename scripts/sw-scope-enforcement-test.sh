@@ -6,6 +6,8 @@
 set -e
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+source "$SCRIPT_DIR/lib/test-isolate.sh"
+sw_test_isolate
 source "$SCRIPT_DIR/lib/helpers.sh"
 source "$SCRIPT_DIR/lib/scope-enforcement.sh"
 
@@ -31,7 +33,7 @@ TEST_DIR=$(mktemp -d "${TMPDIR:-/tmp}/sw-scope-test.XXXXXX")
 cleanup() {
     rm -rf "$TEST_DIR" 2>/dev/null || true
 }
-trap cleanup EXIT
+trap 'cleanup; sw_test_teardown' EXIT
 
 # Create test directory
 mkdir -p "$TEST_DIR"

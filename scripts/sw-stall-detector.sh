@@ -151,11 +151,7 @@ cmd_check() {
 
         # Calculate heartbeat age
         local hb_epoch
-        if TZ=UTC date -j -f "%Y-%m-%dT%H:%M:%SZ" "$updated_at" +%s >/dev/null 2>&1; then
-            hb_epoch="$(TZ=UTC date -j -f "%Y-%m-%dT%H:%M:%SZ" "$updated_at" +%s 2>/dev/null)"
-        else
-            hb_epoch="$(date -d "$updated_at" +%s 2>/dev/null || echo 0)"
-        fi
+        hb_epoch="$(date_to_epoch "$updated_at" || echo 0)"
 
         local current_age=$((now_epoch - hb_epoch))
 

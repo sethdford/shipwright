@@ -8,6 +8,7 @@ trap 'echo "ERROR: $BASH_SOURCE:$LINENO exited with status $?" >&2' ERR
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "$SCRIPT_DIR/lib/test-helpers.sh"
+sw_test_isolate
 MEMEFF_MODULE="$SCRIPT_DIR/lib/memory-effectiveness.sh"
 
 # ─── Test Counters ───────────────────────────────────────────────────────────
@@ -56,7 +57,7 @@ cleanup_env() {
     fi
 }
 
-trap cleanup_env EXIT
+trap 'cleanup_env; sw_test_teardown' EXIT
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # TEST RUNNER

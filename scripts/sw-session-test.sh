@@ -9,6 +9,7 @@ trap 'echo "ERROR: $BASH_SOURCE:$LINENO exited with status $?" >&2' ERR
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "$SCRIPT_DIR/lib/test-helpers.sh"
+sw_test_isolate
 
 # This suite creates and kills tmux windows. Never let it touch the developer's live
 # tmux server (run standalone from inside tmux, $TMUX would target the current session).
@@ -16,7 +17,7 @@ if [[ -z "${SW_TEST_PRIVATE_TMUX:-}" ]]; then
     unset TMUX TMUX_PANE
     TMUX_TMPDIR="$(mktemp -d "${TMPDIR:-/tmp}/sw-session-test-tmux.XXXXXX")"
     export TMUX_TMPDIR SW_TEST_PRIVATE_TMUX=1
-    trap 'tmux kill-server 2>/dev/null; rm -rf "$TMUX_TMPDIR"' EXIT
+    trap 'tmux kill-server 2>/dev/null; rm -rf "$TMUX_TMPDIR"; sw_test_teardown' EXIT
 fi
 REPO_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
 REAL_SESSION_SCRIPT="$SCRIPT_DIR/sw-session.sh"
@@ -84,7 +85,7 @@ cleanup_env() {
         rm -rf "$TEST_TEMP_DIR"
     fi
 }
-trap cleanup_env EXIT
+trap 'cleanup_env; sw_test_teardown' EXIT
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # SESSION INVOCATION HELPER

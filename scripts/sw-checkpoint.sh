@@ -478,9 +478,7 @@ cmd_expire() {
         if [[ -n "$created_at" ]]; then
             # Parse ISO date to epoch
             local file_epoch
-            file_epoch=$(TZ=UTC date -j -f "%Y-%m-%dT%H:%M:%SZ" "$created_at" +%s 2>/dev/null \
-                || date -d "$created_at" +%s 2>/dev/null \
-                || echo "0")
+            file_epoch=$(date_to_epoch "$created_at" || echo "0")
             if [[ "$file_epoch" -gt 0 && $((now_e - file_epoch)) -gt $max_secs ]]; then
                 local stage_name
                 stage_name=$(jq -r '.stage // "unknown"' "$file" 2>/dev/null || echo "unknown")

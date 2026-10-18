@@ -12,6 +12,8 @@ trap 'echo "ERROR: $BASH_SOURCE:$LINENO exited with status $?" >&2' ERR
 # ─── Test Harness Setup ────────────────────────────────────────────────────
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+source "$SCRIPT_DIR/lib/test-isolate.sh"
+sw_test_isolate
 source "$SCRIPT_DIR/lib/helpers.sh" 2>/dev/null || {
     info() { echo "ℹ $*"; }
     success() { echo "✓ $*"; }
@@ -21,7 +23,7 @@ source "$SCRIPT_DIR/lib/helpers.sh" 2>/dev/null || {
 
 # Temp directory for test artifacts
 TEST_ARTIFACTS_DIR="$(mktemp -d)"
-trap 'rm -rf "$TEST_ARTIFACTS_DIR"' EXIT
+trap 'rm -rf "$TEST_ARTIFACTS_DIR"; sw_test_teardown' EXIT
 
 # Source the convergence module
 source "$SCRIPT_DIR/lib/convergence.sh"

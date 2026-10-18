@@ -7,11 +7,12 @@ trap 'echo "ERROR: $BASH_SOURCE:$LINENO exited with status $?" >&2' ERR
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "$SCRIPT_DIR/lib/test-helpers.sh"
+sw_test_isolate
 
 print_test_header "Lib: daemon-failure Tests"
 
 setup_test_env "sw-lib-daemon-failure-test"
-trap cleanup_test_env EXIT
+trap 'cleanup_test_env; sw_test_teardown' EXIT
 
 # Set up daemon environment variables
 export LOG_DIR="$TEST_TEMP_DIR/logs"
@@ -27,7 +28,7 @@ mkdir -p "$LOG_DIR" "$WORKTREE_DIR"
 # Provide stub functions that daemon-failure.sh depends on
 now_iso() { date -u +"%Y-%m-%dT%H:%M:%SZ"; }
 now_epoch() { date +%s; }
-epoch_to_iso() { date -u -r "$1" +"%Y-%m-%dT%H:%M:%SZ" 2>/dev/null || date -u -d "@$1" +"%Y-%m-%dT%H:%M:%SZ" 2>/dev/null || echo "1970-01-01T00:00:00Z"; }
+source "$SCRIPT_DIR/lib/compat.sh"
 emit_event() { :; }
 daemon_log() { :; }
 locked_state_update() { :; }

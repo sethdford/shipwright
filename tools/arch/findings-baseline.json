@@ -61,7 +61,6 @@
     "scripts/sw-init.sh": 1
   },
   "F11-bash-no-shell-c-expansion": {
-    "scripts/lib/compat.sh": 1,
     "scripts/lib/constitutional.sh": 1,
     "scripts/lib/mutation-executor.sh": 1,
     "scripts/lib/pipeline-quality-checks.sh": 2,
@@ -72,8 +71,6 @@
     "scripts/sw-autonomous-e2e-test.sh": 2,
     "scripts/sw-budget-chaos-test.sh": 5,
     "scripts/sw-checkpoint-test.sh": 1,
-    "scripts/sw-daemon-test.sh": 1,
-    "scripts/sw-daemon.sh": 1,
     "scripts/sw-dashboard-e2e-test.sh": 1,
     "scripts/sw-durable.sh": 2,
     "scripts/sw-evidence.sh": 6,
@@ -88,7 +85,6 @@
     "scripts/sw-policy-e2e-test.sh": 13,
     "scripts/sw-release-test.sh": 10,
     "scripts/sw-remote.sh": 3,
-    "scripts/sw-retro.sh": 1,
     "scripts/sw-tracker-test.sh": 1
   },
   "F9-bash-no-permission-bypass": {

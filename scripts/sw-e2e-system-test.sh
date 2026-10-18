@@ -17,6 +17,7 @@ REAL_LOOP="$SCRIPT_DIR/sw-loop.sh"
 
 # Source test-helpers for assertions (note: assert_contains(desc, haystack, needle))
 source "$SCRIPT_DIR/lib/test-helpers.sh"
+sw_test_isolate
 PURPLE="${PURPLE:-\033[38;2;124;58;237m}"
 
 # ─── E2E uses its own env (not test-helpers setup) for pipeline structure ───
@@ -478,7 +479,7 @@ main() {
 
     ORIG_HOME="${HOME:-}"
     ORIG_PATH="${PATH:-}"
-    trap cleanup_e2e_env EXIT
+    trap 'cleanup_e2e_env; sw_test_teardown' EXIT
 
     echo -e "${DIM}Setting up mock environment...${RESET}"
     setup_e2e_env

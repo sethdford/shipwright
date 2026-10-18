@@ -8,6 +8,8 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "$SCRIPT_DIR/lib/test-helpers.sh"
+sw_test_isolate
+source "$SCRIPT_DIR/lib/compat.sh"
 REPO_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
 DASHBOARD_DIR="$REPO_DIR/dashboard"
 
@@ -65,7 +67,7 @@ EEOF
         local offset=$((i * 3600 + RANDOM % 3600))
         local ev_epoch=$((now_epoch - offset))
         local ev_iso
-        ev_iso=$(date -u -r "$ev_epoch" +"%Y-%m-%dT%H:%M:%SZ" 2>/dev/null || echo "$now_iso")
+        ev_iso=$(epoch_to_iso "$ev_epoch" || echo "$now_iso")
         local issue=$((100 + RANDOM % 200))
         local stages=("intake" "plan" "design" "build" "test" "review" "merge")
         local stage="${stages[$((RANDOM % ${#stages[@]}))]}"
@@ -78,7 +80,7 @@ EEOF
         local offset=$((i * 7200 + RANDOM % 7200))
         local ev_epoch=$((now_epoch - offset))
         local ev_iso
-        ev_iso=$(date -u -r "$ev_epoch" +"%Y-%m-%dT%H:%M:%SZ" 2>/dev/null || echo "$now_iso")
+        ev_iso=$(epoch_to_iso "$ev_epoch" || echo "$now_iso")
         local issue=$((100 + RANDOM % 200))
         local dur=$((300 + RANDOM % 3600))
         local result="success"
@@ -249,7 +251,7 @@ cleanup() {
 }
 
 ORIGINAL_HOME="$HOME"
-trap cleanup EXIT
+trap 'cleanup; sw_test_teardown' EXIT
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # TESTS: API Endpoints

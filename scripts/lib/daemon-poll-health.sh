@@ -2,6 +2,7 @@
 # Source from daemon-poll.sh. Requires state, helpers.
 [[ -n "${_DAEMON_POLL_HEALTH_LOADED:-}" ]] && return 0
 _DAEMON_POLL_HEALTH_LOADED=1
+source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/compat.sh"
 
 # Defaults for variables normally set by sw-daemon.sh (safe under set -u).
 DAEMON_DIR="${DAEMON_DIR:-${HOME}/.shipwright}"
@@ -52,7 +53,7 @@ daemon_health_check() {
             local elapsed=0
             if [[ -n "$started_at" ]]; then
                 local start_e
-                start_e=$(TZ=UTC date -j -f "%Y-%m-%dT%H:%M:%SZ" "$started_at" +%s 2>/dev/null || date -d "$started_at" +%s 2>/dev/null || echo "0")
+                start_e=$(date_to_epoch "$started_at" || echo "0")
                 elapsed=$(( now_e - start_e ))
             fi
 

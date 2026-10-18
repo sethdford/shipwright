@@ -238,7 +238,7 @@ cost_check_budget() {
     local today_start
     today_start=$(date -u +"%Y-%m-%dT00:00:00Z")
     local today_epoch
-    today_epoch=$(date -u -jf "%Y-%m-%dT%H:%M:%SZ" "$today_start" +%s 2>/dev/null || date -u -d "$today_start" +%s 2>/dev/null || echo "0")
+    today_epoch=$(date_to_epoch "$today_start" || echo "0")
 
     local today_spent
     today_spent=$(jq --argjson cutoff "$today_epoch" \
@@ -302,7 +302,7 @@ cost_remaining_budget() {
     local today_start
     today_start=$(date -u +"%Y-%m-%dT00:00:00Z")
     local today_epoch
-    today_epoch=$(date -u -jf "%Y-%m-%dT%H:%M:%SZ" "$today_start" +%s 2>/dev/null || date -u -d "$today_start" +%s 2>/dev/null || echo "0")
+    today_epoch=$(date_to_epoch "$today_start" || echo "0")
 
     local today_spent
     today_spent=$(jq --argjson cutoff "$today_epoch" \
@@ -729,7 +729,7 @@ cost_dashboard() {
     budget_usd=$(jq -r '.daily_budget_usd' "$BUDGET_FILE" 2>/dev/null || echo "0")
 
     local today_start_epoch
-    today_start_epoch=$(date -u -jf "%Y-%m-%dT%H:%M:%SZ" "$(date -u +%Y-%m-%dT00:00:00Z)" +%s 2>/dev/null || date -u -d "$(date -u +%Y-%m-%dT00:00:00Z)" +%s 2>/dev/null || echo "0")
+    today_start_epoch=$(date_to_epoch "$(date -u +%Y-%m-%dT00:00:00Z)" || echo "0")
     today_spent=$(jq --argjson cutoff "$today_start_epoch" \
         '[.entries[] | select(.ts_epoch >= $cutoff) | .cost_usd] | add // 0 | . * 100 | round / 100' \
         "$COST_FILE" 2>/dev/null || echo "0")
@@ -959,7 +959,7 @@ budget_show() {
 
         # Show today's usage
         local today_start_epoch
-        today_start_epoch=$(date -u -jf "%Y-%m-%dT%H:%M:%SZ" "$(date -u +%Y-%m-%dT00:00:00Z)" +%s 2>/dev/null || date -u -d "$(date -u +%Y-%m-%dT00:00:00Z)" +%s 2>/dev/null || echo "0")
+        today_start_epoch=$(date_to_epoch "$(date -u +%Y-%m-%dT00:00:00Z)" || echo "0")
         local today_spent
         today_spent=$(jq --argjson cutoff "$today_start_epoch" \
             '[.entries[] | select(.ts_epoch >= $cutoff) | .cost_usd] | add // 0 | . * 100 | round / 100' \

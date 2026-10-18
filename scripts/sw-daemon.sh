@@ -78,13 +78,6 @@ fi
 # shellcheck source=sw-github-deploy.sh
 [[ -f "$SCRIPT_DIR/sw-github-deploy.sh" ]] && source "$SCRIPT_DIR/sw-github-deploy.sh"
 
-epoch_to_iso() {
-    local epoch="$1"
-    date -u -r "$epoch" +"%Y-%m-%dT%H:%M:%SZ" 2>/dev/null || \
-    date -u -d "@$epoch" +"%Y-%m-%dT%H:%M:%SZ" 2>/dev/null || \
-    python3 -c "import datetime; print(datetime.datetime.utcfromtimestamp($epoch).strftime('%Y-%m-%dT%H:%M:%SZ'))" 2>/dev/null || \
-    echo "1970-01-01T00:00:00Z"
-}
 
 format_duration() {
     local secs="$1"
@@ -668,6 +661,10 @@ cleanup_on_exit() {
 # ─── daemon start ───────────────────────────────────────────────────────────
 
 daemon_start() {
+    if [[ "${SHIPWRIGHT_TEST_MODE:-}" == "1" ]]; then
+        error "SHIPWRIGHT_TEST_MODE=1: refusing to start a real daemon (#8648). Tests must not start daemons."
+        exit 1
+    fi
     echo -e "${PURPLE}${BOLD}━━━ shipwright daemon v${VERSION} ━━━${RESET}"
     echo ""
 
@@ -925,7 +922,7 @@ daemon_status() {
             local age=""
             if [[ "$started" != "—" ]] && [[ "$running" == "true" ]]; then
                 local start_epoch
-                start_epoch=$(TZ=UTC date -j -f "%Y-%m-%dT%H:%M:%SZ" "$started" +%s 2>/dev/null || echo 0)
+                start_epoch=$(date_to_epoch "$started" || echo 0)
                 if [[ "$start_epoch" -gt 0 ]]; then
                     age=" ($(format_duration $(($(now_epoch) - start_epoch))))"
                 fi

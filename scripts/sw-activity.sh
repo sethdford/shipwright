@@ -284,7 +284,7 @@ cmd_history() {
         cutoff_epoch=$(($(date +%s) - seconds))
     else
         # Assume ISO timestamp
-        cutoff_epoch=$(date -d "$range" +%s 2>/dev/null || date -j -f "%Y-%m-%dT%H:%M:%SZ" "$range" +%s 2>/dev/null || echo 0)
+        cutoff_epoch=$(date_to_epoch "$range" || echo 0)
     fi
 
     info "Activity from last ${range}:"

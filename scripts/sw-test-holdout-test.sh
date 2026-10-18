@@ -5,6 +5,8 @@
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+source "$SCRIPT_DIR/lib/test-isolate.sh"
+sw_test_isolate
 PASS=0
 FAIL=0
 
@@ -62,7 +64,7 @@ assert_ge() {
 # ─── Setup ──────────────────────────────────────────────────────────────────
 TMPDIR_TEST=$(mktemp -d 2>/dev/null || mktemp -d "${TMPDIR:-/tmp}/holdout-test-XXXXXX" 2>/dev/null || echo "${TMPDIR:-/tmp}/holdout-test-$$")
 mkdir -p "$TMPDIR_TEST" 2>/dev/null || true
-trap 'rm -rf "$TMPDIR_TEST"' EXIT
+trap 'rm -rf "$TMPDIR_TEST"; sw_test_teardown' EXIT
 
 # Create a mock project with test files
 TEST_PROJECT="$TMPDIR_TEST/mock-project"

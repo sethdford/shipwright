@@ -7,8 +7,10 @@ set -euo pipefail
 # ─── Test Harness Setup ──────────────────────────────────────────────────────
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+source "$SCRIPT_DIR/lib/test-isolate.sh"
+sw_test_isolate
 TEST_DIR=$(mktemp -d)
-trap 'rm -rf "$TEST_DIR"' EXIT
+trap 'rm -rf "$TEST_DIR"; sw_test_teardown' EXIT
 
 # Mock environment
 export HOME="$TEST_DIR"
