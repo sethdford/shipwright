@@ -30,7 +30,8 @@
 # with gh pointed at a missing config dir. The launcher REFUSES to run the agent (exit 1, the message
 # names the config scope and a redacted key, never a value) when the config carries credentials: in a
 # remote URL or pushurl, in a url.<base>.insteadOf or pushInsteadOf (key or value), or in a saved header or
-# helper key. A token as the username alone (https://TOKEN@github.com) counts. Their keys cannot be reset
+# helper key. For http(s) only: a password, or a token-like username (https://ghp_…@github.com). ssh://,
+# scp-style and plain usernames (user@bitbucket.org) are not refused. Keys cannot be reset
 # without copying the credential into the environment.
 #
 #   "$SW_AGENT_EXEC" claude -p "$prompt"
@@ -57,6 +58,10 @@
 #     can read /proc/$PPID/environ and get those tokens. The allowlist protects the agent's own
 #     environment, not its parent's.
 #   - The Claude login itself (kept on purpose; on macOS it lives in the keychain).
+#   - The runner's files for later steps. The agent runs as the same user and can write the GITHUB_ENV
+#     and GITHUB_PATH files of the job; a value written there (BASH_ENV, PATH, any variable) reaches the
+#     later steps that hold GITHUB_TOKEN. The agent env cannot stop that. Only the sandbox or a separate
+#     user closes it.
 #   - Tools that store a GitHub login in their own config files under $HOME.
 #   - Repo config the agent can write (.git/config is in the working tree). The scrub resets
 #     credential.helper (the list accumulates across scopes, so every helper is cleared), the

@@ -49,9 +49,13 @@ jobs:
           echo "number=$PR_NUMBER" >> "$GITHUB_OUTPUT"
 
           # Get the PR branch and head SHA
-          PR_JSON=$(gh pr view "$PR_NUMBER" --json headRefName,headRefOid)
+          PR_JSON=$(gh pr view "$PR_NUMBER" --repo "$GITHUB_REPOSITORY" --json headRefName,headRefOid,baseRefName)
           BRANCH=$(echo "$PR_JSON" | jq -r '.headRefName')
           HEAD_SHA=$(echo "$PR_JSON" | jq -r '.headRefOid')
+          # The base branch, recorded here (before the agent runs) for the rerun step to use.
+          BASE_REF=$(echo "$PR_JSON" | jq -r '.baseRefName')
+          git check-ref-format --branch "$BASE_REF" >/dev/null || { echo "::error::invalid base branch"; exit 1; }
+          echo "base_ref=$BASE_REF" >> "$GITHUB_OUTPUT"
 
           # headRefName is attacker-chosen. check-ref-format does NOT reject shell
           # metacharacters (`"`, `;`, `$`, `|` are all valid in ref names); it only
@@ -206,7 +210,6 @@ jobs:
           # the PR's BASE branch, fetched as a GitHub tarball: not the agent-edited working tree, not a git
           # remote (the agent could repoint one), and not the PR head (a PR could change the writer or its lib/).
           NEW_HEAD=$(git rev-parse HEAD)
-          BASE_REF=$(gh pr view "$PR_NUMBER" --json baseRefName --jq '.baseRefName')
           git check-ref-format --branch "$BASE_REF" >/dev/null || { echo "::error::invalid base branch"; exit 1; }
           PRISTINE="$RUNNER_TEMP/pristine"
           BASE_TREE="$RUNNER_TEMP/base-tree"
@@ -221,3 +224,5 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           PR_NUMBER: ${{ steps.pr.outputs.number }}
+          # Recorded by the PR-number step before the agent ran; passed via env, never interpolated.
+          BASE_REF: ${{ steps.pr.outputs.base_ref }}

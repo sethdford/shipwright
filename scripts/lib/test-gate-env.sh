@@ -35,10 +35,23 @@ _SW_TEST_GATE_ENV_LOADED=1
 # _sw_scrub_github_creds — drop GitHub, fleet and git credentials from the current shell. Shared
 # with agent-exec.sh. It does not check for a subshell: each caller must (see sw_test_gate_scrub).
 # Returns 1 if the remote list cannot be read, so the caller can refuse to run.
-# _sw_has_userinfo TEXT — true when a URL in TEXT carries userinfo: user@ or user:password@. A username
-# alone can be a token (https://TOKEN@github.com), so any userinfo counts.
+# _sw_token_like NAME — true when a username looks like a credential: a known token prefix, or a long
+# run of token characters. A short plain username (user@bitbucket.org) is not one.
+_sw_token_like() {
+    [[ "$1" =~ ^(ghp_|gho_|ghu_|ghs_|ghr_|github_pat_|glpat-|xox[abp]-|sk-) ]] && return 0
+    [[ "$1" =~ ^[A-Za-z0-9_-]{24,}$ ]]
+}
+
+# _sw_has_userinfo TEXT — true when TEXT holds an http(s) URL whose userinfo is a credential: a password
+# (user:password@), or a token-like username (https://TOKEN@github.com). ssh://, git:// and scp-style
+# user@host:path carry a key, not a password, and a short plain username (user@bitbucket.org) is no
+# credential: none of these is refused.
 _sw_has_userinfo() {
-    [[ "$1" =~ ://[^/[:space:]]*@ ]]
+    local auth
+    [[ "$1" =~ (^|[^A-Za-z0-9+-])https?://([^/[:space:]]*)@ ]] || return 1
+    auth="${BASH_REMATCH[2]}"
+    [[ "$auth" == *:* ]] && return 0
+    _sw_token_like "$auth"
 }
 
 # _sw_redact_key KEY — KEY with the URL inside it replaced, so a log never shows a credential.
