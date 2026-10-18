@@ -253,3 +253,7 @@
 {"ts":"2026-10-18T08:06:21Z","ts_epoch":1792310781,"type":"strategic.issue_refused","title":"Blast-radius guard for the loop: refuse diffs that delete far more than the task implies"}
 {"ts":"2026-10-18T08:06:23Z","ts_epoch":1792310783,"type":"strategic.issue_refused","title":"Make bash test suites report a completion line so the differential gate can trust them"}
 {"ts":"2026-10-18T08:06:23Z","ts_epoch":1792310783,"type":"strategic.cycle_complete","issues_created":0,"issues_skipped":3}
+{"ts":"2026-10-18T12:06:28Z","ts_epoch":1792325188,"type":"hygiene_platform_refactor","hardcoded":49,"fallback":75,"todo":51}
+{"ts":"2026-10-18T12:07:14Z","ts_epoch":1792325234,"type":"strategic.issue_refused","title":"Loop diff-size guard: abort an iteration whose diff deletes far more than the task scope implies"}
+{"ts":"2026-10-18T12:07:17Z","ts_epoch":1792325237,"type":"strategic.issue_refused","title":"Move loop and daemon tunables (timeouts, retry limits, thresholds) into policy config with adaptive overrides"}
+{"ts":"2026-10-18T12:07:17Z","ts_epoch":1792325237,"type":"strategic.cycle_complete","issues_created":0,"issues_skipped":3}
