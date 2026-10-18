@@ -936,7 +936,7 @@ if [[ "$(_gate_val PRE)" == "true" && "$(_gate_val PREOUT)" -ge 1 && "$(_gate_va
 else
     assert_fail "pre-existing failure does not block run_test_gate" "$(cat "$_gate/results.txt" "$_gate/err.txt" 2>/dev/null | tail -5)"
 fi
-if [[ "$(_gate_val NEW)" == "false" && "$(_gate_val NEWOUT)" -ge 1 && "$(_gate_val NEWEVID)" == "suite-c::check,suite-c::exit=1,suite-c::total=1" && "$(_gate_val NEWVERDICT)" == "new-failures" ]]; then
+if [[ "$(_gate_val NEW)" == "false" && "$(_gate_val NEWOUT)" -ge 1 && "$(_gate_val NEWEVID)" == "suite-c::check#1,suite-c::exit=1,suite-c::total=1" && "$(_gate_val NEWVERDICT)" == "new-failures" ]]; then
     assert_pass "new failure blocks run_test_gate and lists only the new suite"
 else
     assert_fail "new failure blocks run_test_gate" "$(cat "$_gate/results.txt" "$_gate/err.txt" 2>/dev/null | tail -5)"

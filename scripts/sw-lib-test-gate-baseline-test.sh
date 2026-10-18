@@ -40,7 +40,15 @@ while IFS=: read -r s mode asserts total; do
     sections="${sections}    log: No such file or directory: /missing/file"$'\n'
     sections="${sections}    error: command not found: foo"$'\n'
     list="${asserts//,/ }"
-    for a in $list; do sections="${sections}      ✗ ${a}"$'\n'; done
+    n=0
+    for a in $list; do
+        n=$((n + 1))
+        if [[ "$a" == +* ]]; then sections="${sections}      ✓ ${a#+}"$'\n'; else sections="${sections}      ✗ ${a}"$'\n'; fi
+    done
+    # test-helpers prints a pass line for every passing assertion: fill the rest of the total.
+    if [[ "$mode" == fail ]]; then
+        for ((k = n; k < ${total:-3}; k++)); do sections="${sections}      ✓ filler-$k"$'\n'; done
+    fi
     if [[ "$mode" == fail ]]; then sections="${sections}    1 of ${total:-3} tests failed"$'\n'; fi
 done < state.txt
 printf '%s' "$sections"
@@ -125,7 +133,7 @@ print_test_section "tg_parse_log"
 scenario "suite-a:pass suite-b:fail:X suite-c:pass" "suite-a:pass suite-b:fail:X,Y suite-c:pass"
 tg_parse_log "$ITER_LOG"
 assert_eq "complete failing suite: parsable" "1" "$TG_PARSABLE"
-assert_eq "complete failing suite: status, total and assertions, no INCOMPLETE" "$(printf 'suite-b::X\nsuite-b::Y\nsuite-b::exit=1\nsuite-b::total=3\n' | sort)" "$(printf '%s\n' "$TG_UNITS" | sort)"
+assert_eq "complete failing suite: status, total and assertions, no INCOMPLETE" "$(printf 'suite-b::X#1\nsuite-b::Y#1\nsuite-b::exit=1\nsuite-b::total=3\n' | sort)" "$(printf '%s\n' "$TG_UNITS" | sort)"
 assert_eq "complete failing suite: pass count" "2" "$TG_PASSCOUNT"
 
 scenario "" "suite-b:crash:X"
@@ -147,7 +155,7 @@ fi
 printf 'Ran 2 tests across 1 file. [11.00ms]\n(fail) bad two [3.09ms]\n 1 pass\n 1 fail\n' > "$TEST_TEMP_DIR/bun.log"
 tg_parse_log "$TEST_TEMP_DIR/bun.log"
 assert_eq "bun log: parsable" "1" "$TG_PARSABLE"
-if printf '%s\n' "$TG_UNITS" | grep -Fx -- "bad two" >/dev/null; then
+if printf '%s\n' "$TG_UNITS" | grep -Fx -- "bad two#1" >/dev/null; then
     assert_pass "bun log: failing unit without timing"
 else
     assert_fail "bun log: failing unit without timing" "got: $TG_UNITS"
@@ -193,13 +201,13 @@ assert_eq "regression: base exit 0" "0" "$TG_BASE_EXIT"
 scenario "suite-a:pass suite-b:fail:X suite-c:pass" "suite-a:pass suite-b:fail:X suite-c:fail:Z"
 judge_iter
 assert_eq "new suite failure blocks" "1" "$JRC"
-assert_eq "new failure lists only the new units" "$(printf 'suite-c::Z\nsuite-c::exit=1\nsuite-c::total=3\n' | sort)" "$(printf '%s\n' "$TG_NEW_FAILURES" | sort)"
+assert_eq "new failure lists only the new units" "$(printf 'suite-c::Z#1\nsuite-c::exit=1\nsuite-c::total=3\n' | sort)" "$(printf '%s\n' "$TG_NEW_FAILURES" | sort)"
 assert_eq "new failure verdict" "new-failures" "$TG_VERDICT"
 
 scenario "suite-a:pass suite-b:fail:X suite-c:pass" "suite-a:pass suite-b:fail:X,Y suite-c:pass"
 judge_iter
 assert_eq "new assertion inside a failing suite blocks" "1" "$JRC"
-assert_eq "new assertion listed" "suite-b::Y" "$(echo "$TG_NEW_FAILURES" | grep 'suite-b::Y')"
+assert_eq "new assertion listed" "suite-b::Y#1" "$(echo "$TG_NEW_FAILURES" | grep 'suite-b::Y')"
 
 # Repro H: suite-b times out after its pre-existing assertion X -> block
 scenario "suite-a:pass suite-b:fail:X suite-c:pass" "suite-a:pass suite-b:timeout:X suite-c:pass"
@@ -527,8 +535,8 @@ TS
     rc=0; tg_judge "bun test" 1 "$LOG_DIR/dup.log" 60 1 || rc=$?
     export PROJECT_ROOT="$OLD_ROOT"
     assert_eq "DUP: a broken same-named test in another file blocks" "1" "$rc"
-    if printf '%s\n' "$TG_NEW_FAILURES" | grep -Fx -- "b.test.ts::handles errors" >/dev/null; then
-        assert_pass "DUP: the failing unit is file-qualified (b.test.ts::handles errors)"
+    if printf '%s\n' "$TG_NEW_FAILURES" | grep -Fx -- "b.test.ts::handles errors#1" >/dev/null; then
+        assert_pass "DUP: the failing unit is file-qualified (b.test.ts::handles errors#1)"
     else
         assert_fail "DUP: the failing unit is file-qualified" "got: $TG_NEW_FAILURES"
     fi
@@ -544,6 +552,53 @@ assert_eq "a repeated assertion name beyond the base's count blocks" "1" "$JRC"
 scenario "suite-a:pass suite-b:fail:X,X suite-c:pass" "suite-a:pass suite-b:fail:X,X suite-c:pass"
 judge_iter
 assert_eq "the same repeated names on both sides are pre-existing" "0" "$JRC"
+
+# SWAP (review round 5): two assertions share a description. The base fails the first instance
+# only; the iteration fixes it and breaks the second. The output is the same line either way, so
+# only the occurrence number tells them apart: X#1 on the base, X#2 in the iteration -> block.
+scenario "suite-a:pass suite-b:fail:X,+X suite-c:pass" "suite-a:pass suite-b:fail:+X,X suite-c:pass"
+judge_iter
+assert_eq "SWAP: a swapped instance of a repeated name blocks" "1" "$JRC"
+if printf '%s\n' "$TG_NEW_FAILURES" | grep -Fx -- "suite-b::X#2" >/dev/null; then
+    assert_pass "SWAP: the second instance is the new unit (X#2)"
+else
+    assert_fail "SWAP: the second instance is the new unit (X#2)" "got: $TG_NEW_FAILURES"
+fi
+
+# GROW: the base fails the first instance; the iteration fails both.
+scenario "suite-a:pass suite-b:fail:X,+X suite-c:pass" "suite-a:pass suite-b:fail:X,X suite-c:pass"
+judge_iter
+assert_eq "GROW: a second failing instance of a repeated name blocks" "1" "$JRC"
+
+# A suite whose log lists its failing assertion but no passing one (test-helpers always prints a
+# pass line): the occurrence numbers are unknown, so it blocks. The base has passing lines, so the
+# unit is new here; the ::UNORDERED rule also blocks when the base has the same unit.
+scenario "suite-a:pass suite-b:fail:X:50 suite-c:pass" "suite-a:pass suite-b:fail:X:50 suite-c:pass"
+cat > "$LOG_DIR/unordered.log" <<'UNORD'
+  ✓ suite-a                                        0s
+  ✗ suite-b                                        exit 1 0s
+  ✓ suite-c                                        0s
+━━━ suite-b (FAIL:1) — last 25 lines ━━━
+      ✗ X
+    1 of 50 tests failed
+
+  2 passed  1 failed  0 timed out  (3 suites, 0s)
+UNORD
+rc=0; tg_judge "$CMD" 1 "$LOG_DIR/unordered.log" 120 1 || rc=$?
+assert_eq "UNORDERED: a suite with no pass lines blocks even when the base matches" "1" "$rc"
+if printf '%s\n' "$TG_NEW_FAILURES" | grep -Fx -- "suite-b::UNORDERED" >/dev/null; then
+    assert_pass "UNORDERED: the unit is reported"
+else
+    assert_fail "UNORDERED: the unit is reported" "got: $TG_NEW_FAILURES"
+fi
+
+# An unrelated passing assertion added above a pre-existing failure must not shift its unit.
+scenario "suite-a:pass suite-b:fail:X suite-c:pass" "suite-a:pass suite-b:fail:+New,X suite-c:pass"
+judge_iter
+assert_eq "an unrelated passing assertion above a pre-existing failure stays pre-existing" "0" "$JRC"
+scenario "suite-a:pass suite-b:fail:+A,X suite-c:pass" "suite-a:pass suite-b:fail:+A,+B,X suite-c:pass"
+judge_iter
+assert_eq "several unrelated additions above it stay pre-existing" "0" "$JRC"
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # Process cleanup: the group is killed even after the leader exited (orphans), and the
@@ -588,7 +643,7 @@ if command -v jq >/dev/null 2>&1; then
     tg_judge "$CMD" "$ITER_RC" "$ITER_LOG" 120 1 || true
     results="$(tg_record "[]" "$CMD" "$ITER_RC" 7)"
     assert_eq "evidence: baseline_exit_code recorded (base fails: 1)" "1" "$(echo "$results" | jq -r '.[0].baseline_exit_code')"
-    assert_eq "evidence: new_failures listed" "suite-c::Z,suite-c::exit=1,suite-c::total=3" "$(echo "$results" | jq -r '.[0].new_failures | sort | join(",")')"
+    assert_eq "evidence: new_failures listed" "suite-c::Z#1,suite-c::exit=1,suite-c::total=3" "$(echo "$results" | jq -r '.[0].new_failures | sort | join(",")')"
     assert_eq "evidence: verdict" "new-failures" "$(echo "$results" | jq -r '.[0].verdict')"
 
     scenario "suite-a:pass suite-b:fail:X suite-c:pass" "suite-a:pass suite-b:fail:X suite-c:pass"

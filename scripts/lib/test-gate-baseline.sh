@@ -130,12 +130,25 @@ tg_parse_log() {
             tot[cur] = line; next
         }
         cur != "" && /All [0-9]+ tests? passed/ { comp[cur] = 1; next }
-        cur != "" && /^ +✗ / { line = $0; sub(/^ +✗ /, "", line); print cur "::" line; next }
+        # Assertions of a failing suite, passing ones included: the n-th line with a given description
+        # is "desc#n", so the position of a repeated name is known. The list that test-helpers prints
+        # after its completion line repeats the failures and is not counted.
+        cur != "" && !(cur in comp) && /^ +[✓✗] / {
+            line = $0; sub(/^ +[✓✗] /, "", line)
+            occ[cur SUBSEP line]++
+            if ($0 ~ /^ +✗ /) { nfail[cur]++; print cur "::" line "#" occ[cur SUBSEP line] }
+            else { npass[cur]++ }
+            next
+        }
         END {
             for (s in sfail) {
                 print s "::" sst[s]
                 if (sst[s] != "TIMEOUT" && !(s in comp)) print s "::INCOMPLETE"
                 if (s in tot) print s "::total=" tot[s]
+                # test-helpers prints one line per assertion. A suite whose total has assertions that
+                # printed no pass line (npass is 0) cannot be positioned: its occurrence numbers are
+                # unknown, so it blocks.
+                if (s in tot && npass[s] == 0 && tot[s] + 0 > nfail[s] + 0) print s "::UNORDERED"
             }
         }
     ' || true)"
@@ -169,9 +182,13 @@ _tg_bun_units() {
     printf '%s\n' "$plain" | awk '
         /^[^ #(-].*:$/ && !/^error:/ { hdr = $0; sub(/:$/, "", hdr); next }
         /^# Unhandled error between tests/ { if (hdr != "") print hdr "::LOAD_ERROR"; next }
+        # Same name in one file: the n-th (fail) line of that name is "#n". bun does not list passing
+        # tests by default, so passes cannot be counted; a repeated name is therefore only ordered
+        # among its failures (a documented limit).
         /^\(fail\) / { line = $0; sub(/^\(fail\) /, "", line); sub(/ \[[0-9.]+m?s\]$/, "", line)
                         if (hdr != "") line = hdr "::" line
-                        print line; next }
+                        occ[line]++
+                        print line "#" occ[line]; next }
     ' || true
     ran="$(printf '%s\n' "$plain" | sed -nE 's/^Ran ([0-9]+) tests? across .*/\1/p' | tail -1)"
     files="$(printf '%s\n' "$plain" | sed -nE 's/^Ran [0-9]+ tests? across ([0-9]+) files?.*/\1/p' | tail -1)"
@@ -526,8 +543,8 @@ tg_judge() {
     # Every iteration unit also fails on the base. A suite that timed out, or that has no completion
     # line, has not shown its later assertions, so its units prove nothing even when the base has
     # them too: those always block.
-    if printf '%s\n' "$iter_units" | grep -E '::(TIMEOUT|INCOMPLETE)$' >/dev/null; then
-        _tg_block unverifiable "BLOCKING: '${cmd}' has a suite that timed out or did not finish ($(printf '%s\n' "$iter_units" | grep -E '::(TIMEOUT|INCOMPLETE)$' | tr '\n' ' ')). Its result cannot be shown to be pre-existing. Fix it."
+    if printf '%s\n' "$iter_units" | grep -E '::(TIMEOUT|INCOMPLETE|UNORDERED)$' >/dev/null; then
+        _tg_block unverifiable "BLOCKING: '${cmd}' has a suite that timed out, did not finish, or whose assertion order is unknown ($(printf '%s\n' "$iter_units" | grep -E '::(TIMEOUT|INCOMPLETE|UNORDERED)$' | tr '\n' ' ')). Its result cannot be shown to be pre-existing. Fix it."
         return 1
     fi
     TG_PREEXISTING="true"
