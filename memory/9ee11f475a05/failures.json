@@ -129,6 +129,15 @@
       "seen_count": 2,
       "last_seen": "2026-10-15T22:28:58Z",
       "category": "flaky"
+    },
+    {
+      "stage": "test",
+      "pattern": "BLOCKING: 'npm run test:ts' (exit 127) failed, and no trustworthy base-commit baseline could be established (the base command could not run (exit 127)). Treated as a regression. Fix it.",
+      "root_cause": "The 'npm run test:ts' command exited 127 (command not found) because the test:ts script or its runner (bun/vitest) isn't installed or on PATH in the environment; the base commit also couldn't run it, so no baseline existed and the gate treated it as a regression. The bash suite (npm test) itself passed 173/173.",
+      "fix": "Ensure bun/vitest is installed and on PATH in the test stage (e.g. run 'bun install' or set up Bun before 'npm run test:ts'), and confirm a 'test:ts' script exists in package.json.",
+      "seen_count": 1,
+      "last_seen": "2026-10-18T12:53:29Z",
+      "category": "dependency"
     }
   ]
 }
