@@ -75,16 +75,45 @@ PATROL_DOCS_SYNC_RECORDLESS_LOCK_SECONDS=30
 
 # Sets DP_SELF_PID to the pid of the current subshell. Call it as a simple command inside the
 # subshell, never inside $(...), which forks another level. On bash 4+ that is BASHPID. On bash
-# 3.2 a child sh started here has this shell as its PPID.
+# 3.2 a child sh started here has this shell as its PPID; that pid is handed back through a temp
+# file created with mktemp in dir $1. The name must be unique per call: $$ is the parent shell's
+# pid, so runs started from one parent shared a name, and one run's rm removed the file before the
+# other read it (rc=1 under contention, #8658).
 patrol_docs_autosync_self_pid() {
-    local tmp="$1"
+    local dir="$1" tmp
     if [[ "${BASH_VERSINFO[0]:-3}" -ge 4 ]]; then
         DP_SELF_PID="$BASHPID"
         return 0
     fi
-    sh -c 'echo $PPID' > "$tmp" || return 1
-    read -r DP_SELF_PID < "$tmp" || return 1
+    tmp=$(mktemp "$dir/shipwright-docs-sync.selfpid.XXXXXX") || return 1
+    if ! sh -c 'echo $PPID' > "$tmp"; then
+        rm -f "$tmp"
+        return 1
+    fi
+    if ! read -r DP_SELF_PID < "$tmp"; then
+        rm -f "$tmp"
+        return 1
+    fi
     rm -f "$tmp"
+}
+
+# Prints the host name recorded in the lock, or "unknown" when the host name is unavailable.
+patrol_docs_autosync_host() {
+    local host
+    host=$(hostname 2>/dev/null | tr -d ' ' || true)
+    [[ -n "$host" ]] || host="unknown"
+    echo "$host"
+}
+
+# Removes a lock entry that was moved aside: a symlink, or a legacy directory with a pid file.
+patrol_docs_autosync_remove_entry() {
+    local entry="$1"
+    if [[ -d "$entry" && ! -L "$entry" ]]; then
+        rm -f "$entry/pid"
+        rmdir "$entry" 2>/dev/null || true
+    else
+        rm -f "$entry"
+    fi
 }
 
 # Writes content to dest atomically: a temp file in the same directory, then mv.
@@ -94,8 +123,9 @@ patrol_docs_autosync_write_atomic() {
     printf '%s\n' "$content" > "$tmp" && mv -f "$tmp" "$dest"
 }
 
-# Prints the "pid epoch" record of the lock at $1. A lock is a symlink whose target is the record,
-# created with the record in place. A legacy lock is a directory with the record in its pid file.
+# Prints the "pid epoch host" record of the lock at $1. A lock is a symlink whose target is the
+# record, created with the record in place. A legacy lock is a directory with the record in its pid
+# file. Legacy records have no host field.
 patrol_docs_autosync_lock_record() {
     local lock="$1"
     if [[ -L "$lock" ]]; then
@@ -105,11 +135,13 @@ patrol_docs_autosync_lock_record() {
     fi
 }
 
-# Returns 0 when the lock at $1 is live. Live means the pid is alive and the record is younger than
-# PATROL_DOCS_SYNC_LOCK_MAX_SECONDS. A lock with no readable record is live only while its mtime is
-# at most PATROL_DOCS_SYNC_RECORDLESS_LOCK_SECONDS old.
+# Returns 0 when the lock at $1 is live. Live means the record is younger than
+# PATROL_DOCS_SYNC_LOCK_MAX_SECONDS and either its pid is alive on this host, or it was written by
+# another host (kill -0 cannot see those pids, so such a lock is live until it reaches the age cap).
+# A lock with no readable record is live only while its mtime is at most
+# PATROL_DOCS_SYNC_RECORDLESS_LOCK_SECONDS old.
 patrol_docs_autosync_lock_is_live() {
-    local lock="$1" line pid epoch now mt
+    local lock="$1" line pid rest epoch host now mt
     line=$(patrol_docs_autosync_lock_record "$lock")
     now=$(date +%s)
     if [[ -z "$line" ]]; then
@@ -119,20 +151,29 @@ patrol_docs_autosync_lock_is_live() {
         return
     fi
     pid="${line%% *}"
-    epoch="${line#* }"
+    rest="${line#* }"
+    epoch="${rest%% *}"
+    host=""
+    if [[ "$rest" == *" "* ]]; then
+        host="${rest#* }"
+    fi
     case "$pid" in ''|*[!0-9]*) return 1 ;; esac
     case "$epoch" in ''|*[!0-9]*) return 1 ;; esac
     [[ $((now - epoch)) -lt "$PATROL_DOCS_SYNC_LOCK_MAX_SECONDS" ]] || return 1
+    if [[ -n "$host" && "$host" != "$(patrol_docs_autosync_host)" ]]; then
+        return 0
+    fi
     kill -0 "$pid" 2>/dev/null
 }
 
 # Acquires the lock at $1 for this run. The record is in place before the lock becomes visible,
 # so no other run ever sees a half-written lock. A stale lock is moved aside under a unique name,
-# and the move is kept only when the moved entry is the stale record that was inspected.
+# and the move is kept only when the moved entry is the stale record that was inspected. The moved
+# entry is removed in both outcomes, so no "<lock>.stale.<pid>" is left behind.
 # Returns 0 when acquired, 1 when another live run holds it or the lock could not be taken.
 patrol_docs_autosync_acquire_lock() {
     local lock="$1" rec old_rec stale moved_rec
-    rec="$DP_SELF_PID $(date +%s)"
+    rec="$DP_SELF_PID $(date +%s) $(patrol_docs_autosync_host)"
     # ln -s onto an existing directory would create the link inside it and report success, so an
     # existing path (of any kind) goes straight to the stale check.
     if [[ ! -e "$lock" && ! -L "$lock" ]] && ln -s "$rec" "$lock" 2>/dev/null; then
@@ -150,14 +191,10 @@ patrol_docs_autosync_acquire_lock() {
         if [[ -n "$moved_rec" ]]; then
             ln -s "$moved_rec" "$lock" 2>/dev/null || true
         fi
+        patrol_docs_autosync_remove_entry "$stale"
         return 1
     fi
-    if [[ -d "$stale" && ! -L "$stale" ]]; then
-        rm -f "$stale/pid"
-        rmdir "$stale" 2>/dev/null || true
-    else
-        rm -f "$stale"
-    fi
+    patrol_docs_autosync_remove_entry "$stale"
     [[ ! -e "$lock" && ! -L "$lock" ]] && ln -s "$rec" "$lock" 2>/dev/null
 }
 
@@ -301,7 +338,14 @@ patrol_docs_autosync() {
         common=$(git rev-parse --git-common-dir) || exit 1
         case "$common" in /*) ;; *) common="$dp_root/$common" ;; esac
 
-        patrol_docs_autosync_self_pid "$common/shipwright-docs-sync.selfpid.$$" || exit 1
+        # A read-only common dir cannot hold the lock. That is a configuration error, not a live run,
+        # so it fails with rc=1 and says why instead of reporting another run.
+        if [[ ! -w "$common" ]]; then
+            daemon_log ERROR "Docs sync failed: git common dir ${common} is read-only, so the lock cannot be taken"
+            exit 1
+        fi
+
+        patrol_docs_autosync_self_pid "$common" || exit 1
 
         lock_try="$common/shipwright-docs-sync.lock"
         if ! patrol_docs_autosync_acquire_lock "$lock_try"; then
