@@ -60,6 +60,7 @@ resume_state() {
                 auto_extend:*)           AUTO_EXTEND="$(echo "${line#auto_extend:}" | tr -d ' ')" ;;
                 extension_count:*)       EXTENSION_COUNT="$(echo "${line#extension_count:}" | tr -d ' ')" ;;
                 max_extensions:*)        MAX_EXTENSIONS="$(echo "${line#max_extensions:}" | tr -d ' ')" ;;
+                loop_start_commit:*)     LOOP_START_COMMIT="$(echo "${line#loop_start_commit:}" | sed 's/^ *"//;s/" *$//')" ;;
             esac
         fi
     done < "$STATE_FILE"
@@ -86,11 +87,6 @@ resume_state() {
     CONSECUTIVE_FAILURES=0
     START_EPOCH="$(now_epoch)"
     STATUS="running"
-
-    # Set starting commit for cumulative diff (approximate: use earliest tracked commit)
-    if [[ -z "${LOOP_START_COMMIT:-}" ]]; then
-        LOOP_START_COMMIT="$(git -C "$PROJECT_ROOT" rev-list --max-parents=0 HEAD 2>/dev/null | tail -1 || echo "")"
-    fi
 
     # If we hit max iterations before, warn user to extend
     if [[ "$ITERATION" -ge "$MAX_ITERATIONS" ]] && ! $MAX_ITERATIONS_EXPLICIT; then
@@ -140,6 +136,7 @@ write_state() {
         printf 'auto_extend: %s\n' "$AUTO_EXTEND"
         printf 'extension_count: %s\n' "$EXTENSION_COUNT"
         printf 'max_extensions: %s\n' "$MAX_EXTENSIONS"
+        printf 'loop_start_commit: "%s"\n' "${LOOP_START_COMMIT:-}"
         printf -- '---\n\n'
         printf '## Log\n'
         printf '%s\n' "$LOG_ENTRIES"
