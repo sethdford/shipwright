@@ -113,6 +113,20 @@ jobs:
           # Save body to file (too long for env var)
           echo "$BODY" > /tmp/issue-body.txt
 
+      - name: Snapshot the agent permission policy (#8614)
+        # From the default branch, not the checkout: a PR cannot widen the policy its own agent runs under.
+        # The copy is read-only and outside the agent's working tree; agent-exec refuses a policy in the tree in CI.
+        run: |
+          git fetch --no-tags --depth=1 origin main
+          git show FETCH_HEAD:config/agent-permissions.json > "$RUNNER_TEMP/agent-permissions.json"
+          chmod 0444 "$RUNNER_TEMP/agent-permissions.json"
+          echo "SW_AGENT_POLICY=$RUNNER_TEMP/agent-permissions.json" >> "$GITHUB_ENV"
+
+      - name: Install agent sandbox (bubblewrap, socat; AppArmor on Ubuntu 24.04) (#8614)
+        # Agents refuse to start without the sandbox (sandbox.failIfUnavailable). This step fails the job
+        # with the fix if the runner cannot sandbox, instead of agents failing later as "auth" errors.
+        run: scripts/ci/agent-sandbox-setup.sh
+
       - name: Vet issue alignment and determine strategy
         if: steps.skip.conclusion == 'skipped'
         id: triage
@@ -413,6 +427,15 @@ jobs:
           fetch-depth: 0
           persist-credentials: false
 
+      - name: Snapshot the agent permission policy (#8614)
+        # From the default branch, not the checkout: a PR cannot widen the policy its own agent runs under.
+        # The copy is read-only and outside the agent's working tree; agent-exec refuses a policy in the tree in CI.
+        run: |
+          git fetch --no-tags --depth=1 origin main
+          git show FETCH_HEAD:config/agent-permissions.json > "$RUNNER_TEMP/agent-permissions.json"
+          chmod 0444 "$RUNNER_TEMP/agent-permissions.json"
+          echo "SW_AGENT_POLICY=$RUNNER_TEMP/agent-permissions.json" >> "$GITHUB_ENV"
+
       - name: Configure git
         run: |
           git config user.name "shipwright[bot]"
@@ -444,12 +467,22 @@ jobs:
         run: |
           npm install -g @anthropic-ai/claude-code@2.1.301
 
+      - name: Install agent sandbox (bubblewrap, socat; AppArmor on Ubuntu 24.04) (#8614)
+        # Agents refuse to start without the sandbox (sandbox.failIfUnavailable). This step fails the job
+        # with the fix if the runner cannot sandbox, instead of agents failing later as "auth" errors.
+        run: scripts/ci/agent-sandbox-setup.sh
+
       - name: Install Shipwright
         run: |
           npm link
 
       - name: Pre-flight auth check
         run: |
+          # The sandbox comes first: a sandbox failure is not an auth failure (#8614 review).
+          if ! bash scripts/lib/agent-sandbox.sh check; then
+            echo "::error::Agent sandbox unavailable (bubblewrap/socat); see the setup step above"
+            exit 1
+          fi
           echo "Verifying Claude Code authentication..."
           if scripts/lib/agent-exec.sh claude -p "Reply with exactly: AUTH_OK" --max-turns 1 2>/tmp/auth-check-err.log | grep -q "AUTH_OK"; then
             echo "Claude Code authentication verified"

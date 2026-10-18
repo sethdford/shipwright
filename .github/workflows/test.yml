@@ -131,6 +131,20 @@ jobs:
         if: env.SKIP_CLAUDE != 'true'
         run: npm install -g @anthropic-ai/claude-code@2.1.301
 
+      - name: Snapshot the agent permission policy (#8614)
+        if: env.SKIP_CLAUDE != 'true'
+        # From the default branch, not the checkout: a PR cannot widen the policy its own agent runs under.
+        # The copy is read-only and outside the agent's working tree; agent-exec refuses a policy in the tree in CI.
+        run: |
+          git fetch --no-tags --depth=1 origin main
+          git show FETCH_HEAD:config/agent-permissions.json > "$RUNNER_TEMP/agent-permissions.json"
+          chmod 0444 "$RUNNER_TEMP/agent-permissions.json"
+          echo "SW_AGENT_POLICY=$RUNNER_TEMP/agent-permissions.json" >> "$GITHUB_ENV"
+
+      - name: Install agent sandbox (bubblewrap, socat; AppArmor on Ubuntu 24.04) (#8614)
+        if: env.SKIP_CLAUDE != 'true'
+        run: scripts/ci/agent-sandbox-setup.sh
+
       - name: Run budget-limited Claude integration smoke
         if: env.SKIP_CLAUDE != 'true'
         # The CLI resolves ANTHROPIC_API_KEY *before* CLAUDE_CODE_OAUTH_TOKEN,
