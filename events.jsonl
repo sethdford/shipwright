@@ -191,3 +191,7 @@
 {"ts":"2026-10-17T20:05:15Z","ts_epoch":1792267515,"type":"strategic.issue_refused","title":"Differential test gate: treat suites with no completion line as unknown, not pass or fail"}
 {"ts":"2026-10-17T20:05:18Z","ts_epoch":1792267518,"type":"strategic.issue_refused","title":"Move daemon retry, timeout and iteration tunables into policy config with a documented schema"}
 {"ts":"2026-10-17T20:05:18Z","ts_epoch":1792267518,"type":"strategic.cycle_complete","issues_created":0,"issues_skipped":3}
+{"ts":"2026-10-18T00:13:29Z","ts_epoch":1792282409,"type":"hygiene_platform_refactor","hardcoded":49,"fallback":75,"todo":51}
+{"ts":"2026-10-18T00:14:14Z","ts_epoch":1792282454,"type":"strategic.issue_refused","title":"Blast-radius guard for build loop: reject iterations that delete far more than the task implies"}
+{"ts":"2026-10-18T00:14:18Z","ts_epoch":1792282458,"type":"strategic.issue_refused","title":"Add completion-line contract check so bash suites cannot silently pass or print nothing"}
+{"ts":"2026-10-18T00:14:18Z","ts_epoch":1792282458,"type":"strategic.cycle_complete","issues_created":0,"issues_skipped":3}
