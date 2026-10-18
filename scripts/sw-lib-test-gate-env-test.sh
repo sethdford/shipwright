@@ -227,6 +227,7 @@ refuse_check() { # name, git-config-command... ; the agent must not run, and the
     assert_eq "$name: the agent does not run" "no" "$([[ -e "$marker" ]] && echo yes || echo no)"
     assert_eq "$name: the launcher exits non-zero" "true" "$([[ "$rc" -ne 0 ]] && echo true || echo false)"
     if grep -q 'SECRET' <<<"$out"; then assert_fail "$name: the message shows no secret"; else assert_pass "$name: the message shows no secret"; fi
+    if grep -q 'remove the username from the https URL' <<<"$out"; then assert_pass "$name: the message says how to fix it"; else assert_fail "$name: the message says how to fix it"; fi
     rc=0; (cd "$git_repo" && sw_test_gate_env bash -c 'exit 0') >/dev/null 2>&1 || rc=$?
     assert_eq "$name: the test gate refuses too (fail closed)" "true" "$([[ "$rc" -ne 0 ]] && echo true || echo false)"
     git -C "$git_repo" remote set-url origin https://example.invalid/acme/repo.git
@@ -236,35 +237,49 @@ refuse_check() { # name, git-config-command... ; the agent must not run, and the
     git -C "$git_repo" config --unset-all remote.origin.pushurl 2>/dev/null || true
 }
 refuse_check "remote URL with a token as username only" remote set-url origin "https://ghp_SECRETTOKEN0123456789@github.com/acme/repo.git"
+refuse_check "Bitbucket remote with a username only" remote set-url origin "https://user@bitbucket.org/acme/repo.git"
+refuse_check "percent-encoded @ in an https remote" remote set-url origin "https://ghp%5FSECRETTOKEN0123456789@github.com/acme/repo.git"
+refuse_check "uppercase scheme with a username" remote set-url origin "HTTPS://ghp_SECRETTOKEN0123456789@github.com/acme/repo.git"
 refuse_check "remote URL with user:password" remote set-url origin "https://u:SECRET-PW@github.com/acme/repo.git"
 refuse_check "insteadOf base with a token as username only" config "url.https://ghp_SECRETUSER0123456789@github.com/.insteadOf" "https://github.com/"
 refuse_check "insteadOf base with user:password" config "url.https://x:SECRET-INSTEAD@github.com/.insteadOf" "https://github.com/"
 refuse_check "pushInsteadOf with a credential" config "url.https://x:SECRET-PUSH@github.com/.pushInsteadOf" "https://github.com/"
 refuse_check "remote pushurl with a credential" config remote.origin.pushurl "https://x:SECRET-PU@github.com/acme/repo.git"
 
-print_test_section "credential check: ssh, scp, plain usernames and global ssh rewrites are not refused"
-for sample in ssh://git@github.com/acme/repo.git git@github.com:acme/repo.git ssh://git@ghe.corp:7999/acme/repo.git \
-    https://user@bitbucket.org/acme/repo.git https://github.com/acme/repo.git; do
-    assert_eq "not refused: $sample" "no" "$(_sw_has_userinfo "$sample" && echo yes || echo no)"
+print_test_section "credential check: default-deny for http(s) userinfo; ssh, scp and plain https are not refused"
+for sample in \
+    'https://user@bitbucket.org/acme/repo.git' \
+    'https://ghp%5FSECRET0123456789@github.com/x' \
+    'HTTPS://ghp_SECRET0123456789@github.com/x' \
+    'https://SECRET20CHARS0123456@host.example/x' \
+    'https://secret.token.with.dots@host.example/x' \
+    'https://user:SECRET-PW@github.com/x' \
+    'https://h%40SECRET/x' \
+    'https://SECRET%2540ENC@host.example/x'; do
+    assert_eq "refused: $(sed 's/SECRET[A-Za-z0-9.%-]*/SECRET…/' <<<"$sample")" "yes" "$(_sw_has_userinfo "$sample" && echo yes || echo no)"
 done
-for sample in https://user:SECRET-PW@github.com/x https://ghp_SECRETTOKEN0123456789@github.com/x \
-    https://github_pat_SECRET0123456789@github.com/x https://glpat-SECRET0123456789@gitlab.com/x \
-    https://SECRETLONGNAME0123456789ABCDEF@host.example/x; do
-    assert_eq "refused: $(sed 's/SECRET[A-Za-z0-9-]*/SECRET…/' <<<"$sample")" "yes" "$(_sw_has_userinfo "$sample" && echo yes || echo no)"
+for sample in \
+    'ssh://git@github.com/acme/repo.git' \
+    'ssh://git@ghe.corp:7999/acme/repo.git' \
+    'git@github.com:acme/repo.git' \
+    'https://github.com/acme/repo.git' \
+    'url.ssh://git@github.com/.insteadof' \
+    'url.https://github.com/.insteadof'; do
+    assert_eq "allowed: $sample" "no" "$(_sw_has_userinfo "$sample" && echo yes || echo no)"
 done
 allow_check() { # name, git-config-command... ; the agent runs (the marker is written)
-    local name="$1" marker="$TEST_TEMP_DIR/agent-allowed-$RANDOM" rc=0
+    local name="$1" marker="$TEST_TEMP_DIR/agent-allowed-$RANDOM"
     shift
     mock_binary "claude" "touch '$marker'"
     git -C "$git_repo" "$@"
-    (cd "$git_repo" && "$SW_AGENT_EXEC" claude >/dev/null 2>&1) || rc=$?
+    (cd "$git_repo" && "$SW_AGENT_EXEC" claude >/dev/null 2>&1) || true
     assert_eq "$name: the agent runs" "yes" "$([[ -e "$marker" ]] && echo yes || echo no)"
     git -C "$git_repo" remote set-url origin https://example.invalid/acme/repo.git
     git -C "$git_repo" config --unset-all "url.ssh://git@github.com/.insteadOf" 2>/dev/null || true
 }
 allow_check "ssh remote" remote set-url origin "ssh://git@github.com/acme/repo.git"
 allow_check "scp-form remote" remote set-url origin "git@github.com:acme/repo.git"
-allow_check "Bitbucket https user without password" remote set-url origin "https://user@bitbucket.org/acme/repo.git"
+allow_check "plain https remote (no userinfo)" remote set-url origin "https://github.com/acme/repo.git"
 allow_check "global ssh insteadOf of https github" config "url.ssh://git@github.com/.insteadOf" "https://github.com/"
 
 print_test_section "agent exec: exit status and process identity"

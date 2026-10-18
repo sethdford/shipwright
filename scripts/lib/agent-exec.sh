@@ -30,10 +30,11 @@
 # with gh pointed at a missing config dir. The launcher REFUSES to run the agent (exit 1, the message
 # names the config scope and a redacted key, never a value) when the config carries credentials: in a
 # remote URL or pushurl, in a url.<base>.insteadOf or pushInsteadOf (key or value), or in a saved header or
-# helper key. For http(s) only: a password, or a token-like username (https://ghp_…@github.com). ssh://,
-# scp-style and plain usernames (user@bitbucket.org) are not refused. Keys cannot be reset
+# helper key. For http(s) only (scheme in any case), default-deny: any userinfo, username alone included
+# (https://user@host, percent-encoded @ included), is refused, because no token shape is trusted. The
+# message says to remove the username (git uses the credential helper) or use an SSH remote, and never
+# prints a value. ssh://, git:// and scp-style remotes are not refused. Keys cannot be reset
 # without copying the credential into the environment.
-#
 #   "$SW_AGENT_EXEC" claude -p "$prompt"
 #   "$SW_AGENT_EXEC" $TIMEOUT_CMD "$secs" claude -p "$prompt"
 #

@@ -35,23 +35,48 @@ _SW_TEST_GATE_ENV_LOADED=1
 # _sw_scrub_github_creds — drop GitHub, fleet and git credentials from the current shell. Shared
 # with agent-exec.sh. It does not check for a subshell: each caller must (see sw_test_gate_scrub).
 # Returns 1 if the remote list cannot be read, so the caller can refuse to run.
-# _sw_token_like NAME — true when a username looks like a credential: a known token prefix, or a long
-# run of token characters. A short plain username (user@bitbucket.org) is not one.
-_sw_token_like() {
-    [[ "$1" =~ ^(ghp_|gho_|ghu_|ghs_|ghr_|github_pat_|glpat-|xox[abp]-|sk-) ]] && return 0
-    [[ "$1" =~ ^[A-Za-z0-9_-]{24,}$ ]]
+# _sw_pct_decode TEXT — TEXT with every %XX escape decoded, repeated until stable (bounded). printf %b is
+# not used: a \c in the input would truncate the output and hide a character.
+_sw_pct_decode() {
+    local cur="$1" prev out hex i
+    for ((i = 0; i < 4; i++)); do
+        prev="$cur"
+        out=""
+        while [[ "$cur" == *%* ]]; do
+            out+="${cur%%%*}"
+            cur="${cur#*%}"
+            hex="${cur:0:2}"
+            cur="${cur:2}"
+            if [[ "$hex" =~ ^[0-9A-Fa-f]{2}$ ]]; then
+                out+="$(printf "\\x$hex")"
+            else
+                out+="%$hex"
+            fi
+        done
+        cur="$out$cur"
+        [[ "$cur" == "$prev" ]] && break
+    done
+    printf '%s' "$cur"
 }
 
-# _sw_has_userinfo TEXT — true when TEXT holds an http(s) URL whose userinfo is a credential: a password
-# (user:password@), or a token-like username (https://TOKEN@github.com). ssh://, git:// and scp-style
-# user@host:path carry a key, not a password, and a short plain username (user@bitbucket.org) is no
-# credential: none of these is refused.
+# _sw_has_userinfo TEXT — true when TEXT holds an http or https URL (scheme in any case) whose authority
+# carries any userinfo: a username with or without a password. Default-deny: a username alone can be a
+# token, and no token shape is trusted. The authority is what precedes the first / ? or # after the scheme,
+# percent-decoded first, so %40 cannot hide the @; the userinfo is everything before the last @ in it.
+# ssh://, git:// and scp-style user@host:path are not URLs of this kind and are never refused.
 _sw_has_userinfo() {
-    local auth
-    [[ "$1" =~ (^|[^A-Za-z0-9+-])https?://([^/[:space:]]*)@ ]] || return 1
-    auth="${BASH_REMATCH[2]}"
-    [[ "$auth" == *:* ]] && return 0
-    _sw_token_like "$auth"
+    local text="$1" lower rest auth decoded
+    lower="$(printf '%s' "$text" | tr 'A-Z' 'a-z')"
+    [[ "$lower" =~ (^|[^a-z0-9+-])https?:// ]] || return 1
+    # Index just after the first matched scheme in the lowercased copy (tr keeps the length), then the
+    # rest of the original text from there, with its case.
+    local m="${BASH_REMATCH[0]}" pre start
+    pre="${lower%%"$m"*}"
+    start=$(( ${#pre} + ${#m} ))
+    rest="${text:$start}"
+    auth="${rest%%[/?#]*}"
+    decoded="$(_sw_pct_decode "$auth")"
+    [[ "$decoded" == *@* ]]
 }
 
 # _sw_redact_key KEY — KEY with the URL inside it replaced, so a log never shows a credential.
@@ -78,7 +103,7 @@ _sw_refuse_creds_in_config() {
         key="${rest%% *}"
         value="${rest#* }"
         if _sw_has_userinfo "$key" || _sw_has_userinfo "$value"; then
-            echo "agent-exec: git config ($scope) has credentials in $(_sw_redact_key "$key"); remove them before running an agent" >&2
+            echo "agent-exec: git config ($scope) has a username or password in the https URL of $(_sw_redact_key "$key"); remove the username from the https URL (git will use your credential helper), or use an SSH remote. Nothing is printed beyond this." >&2
             bad=1
         fi
     done <<<"$out"
