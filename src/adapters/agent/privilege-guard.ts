@@ -17,6 +17,7 @@ const ALLOWED_OPTION_KEYS = new Set([
   "abortController",
   "allowedTools",
   "cwd",
+  "disallowedTools",
   "effort",
   "env",
   "maxBudgetUsd",

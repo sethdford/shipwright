@@ -18,6 +18,7 @@ import type {
 } from "../../shared/kernel/ports";
 import { err, ok, type Result } from "../../shared/kernel/result";
 import { type Collected, failure, ZERO_USAGE } from "./agent-failure";
+import { AGENT_DENIED_TOOLS, AGENT_SETTING_SOURCES } from "./agent-permissions";
 import { assertAgentOptions } from "./privilege-guard";
 import { wrapUntrusted } from "./untrusted";
 
@@ -220,8 +221,9 @@ export class AgentSdkRunner implements AgentRunner {
 
   async runTask(spec: TaskSpec): Promise<Result<TaskOutcome, AgentFailure>> {
     const prompt = spec.data ? `${spec.prompt}\n\n${wrapUntrusted(spec.data)}` : spec.prompt;
-    // settingSources "project": repos are the user's own and their CLAUDE.md guidance is needed,
-    // but project settings can add hooks and permissions, so only run repos you trust.
+    // settingSources: only the user's settings. The repo's .claude/settings*.json is agent-writable and
+    // could add allow rules or hooks for the next run, so it is not loaded (#8581, #8614). The agent is
+    // told to read .claude/CLAUDE.md itself. disallowedTools is the policy's deny list (agent-permissions.ts).
     // persistSession stays on so max_turns/budget runs can be resumed; that needs HOME in env.
     const run = await this.execute(prompt, spec.timeoutMs, spec.signal, {
       model: spec.model,
@@ -229,8 +231,9 @@ export class AgentSdkRunner implements AgentRunner {
       cwd: spec.cwd,
       permissionMode: "dontAsk",
       allowedTools: [...spec.allowedTools],
+      disallowedTools: [...AGENT_DENIED_TOOLS],
       strictMcpConfig: true,
-      settingSources: ["project"],
+      settingSources: [...AGENT_SETTING_SOURCES],
       maxTurns: spec.maxTurns,
       maxBudgetUsd: spec.maxBudgetUsd,
     });

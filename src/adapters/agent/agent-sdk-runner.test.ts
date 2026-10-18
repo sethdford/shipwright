@@ -167,9 +167,26 @@ describe("runTask", () => {
       cwd: "/wt/issue-1",
       permissionMode: "dontAsk",
       allowedTools: ["Read", "Edit", "Bash(bun test *)"],
-      settingSources: ["project"],
+      settingSources: ["user"],
       env: { PATH: "/bin" },
     });
+  });
+
+  test("never loads the repo's settings and always passes the policy deny list (#8581, #8614)", async () => {
+    const { fn, captured } = fakeQuery([result({ subtype: "success", result: "ok" })]);
+    const r = await new AgentSdkRunner({ PATH: "/bin" }, fn).runTask(spec);
+    if (!r.ok) throw new Error(r.error.message);
+    const options = (captured[0] as Captured).options;
+    expect(options.settingSources).not.toContain("project");
+    expect(options.settingSources).not.toContain("local");
+    expect(options.disallowedTools).toEqual(
+      expect.arrayContaining([
+        "Bash(curl *)",
+        "Bash(gh *)",
+        "Bash(git push *)",
+        "Edit(.claude/settings*.json)",
+      ]),
+    );
   });
 
   test("max turns maps to max_turns and keeps the session id so the run can be resumed", async () => {
