@@ -1,4 +1,7 @@
 # pipeline-detection.sh — Auto-detection (test cmd, lang, reviewers, task type) for sw-pipeline.sh
+
+# Agents run without GitHub credentials (#8614): claude is launched through agent-exec.sh.
+SW_AGENT_EXEC="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/agent-exec.sh"
 # Source from sw-pipeline.sh. Requires SCRIPT_DIR, REPO_DIR.
 [[ -n "${_PIPELINE_DETECTION_LOADED:-}" ]] && return 0
 _PIPELINE_DETECTION_LOADED=1
@@ -204,7 +207,7 @@ detect_project_lang() {
         config_files=$(ls "$root" 2>/dev/null | grep -E '\.(json|toml|yaml|yml|xml|gradle|lock|mod)$' | head -15)
         if [[ -n "$config_files" ]]; then
             local ai_lang
-            ai_lang=$(claude --print --output-format text -p "Based on these config files in a project root, what is the primary language/framework? Reply with ONE word (e.g., typescript, python, rust, go, java, ruby, nodejs):
+            ai_lang=$("$SW_AGENT_EXEC" claude --print --output-format text -p "Based on these config files in a project root, what is the primary language/framework? Reply with ONE word (e.g., typescript, python, rust, go, java, ruby, nodejs):
 
 Files: ${config_files}" --model "$(_smart_model detection haiku)" < /dev/null 2>/dev/null || true)
             ai_lang=$(echo "$ai_lang" | tr -d '[:space:]' | tr '[:upper:]' '[:lower:]')
@@ -321,7 +324,7 @@ detect_task_type() {
     # Intelligence: Claude classification with confidence score
     if type intelligence_search_memory >/dev/null 2>&1 && command -v claude >/dev/null 2>&1; then
         local ai_result
-        ai_result=$(claude --print --output-format text -p "Classify this task into exactly ONE category. Reply in format: CATEGORY|CONFIDENCE (0-100)
+        ai_result=$("$SW_AGENT_EXEC" claude --print --output-format text -p "Classify this task into exactly ONE category. Reply in format: CATEGORY|CONFIDENCE (0-100)
 
 Categories: bug, refactor, testing, security, docs, devops, migration, architecture, feature
 

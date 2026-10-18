@@ -115,7 +115,7 @@ const PINNED: Record<string, { ratchet: boolean; files: string[]; ignores: strin
       "src/adapters/github/gh-github-writer.test.ts",
     ],
   },
-  "F9-bash-claude-token-scrub": { ratchet: true, files: BASH_FILES, ignores: [] },
+  "F9-bash-claude-token-scrub": { ratchet: false, files: BASH_FILES, ignores: [] },
   "F9-bash-no-permission-bypass": { ratchet: true, files: BASH_FILES, ignores: [] },
   "F10-bash-github-writes": { ratchet: true, files: BASH_FILES, ignores: [] },
   "F10-bash-curl-github-writes": { ratchet: true, files: BASH_FILES, ignores: [] },

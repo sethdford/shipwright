@@ -524,4 +524,102 @@ describe("agentEnv", () => {
     expect(agentEnv({ ANTHROPIC_API_KEY: "k" })).toMatchObject({ ANTHROPIC_API_KEY: "k" });
     expect("ANTHROPIC_API_KEY" in agentEnv({})).toBe(false);
   });
+
+  test("passes the Claude auth and model selectors an agent needs", () => {
+    const env = agentEnv({
+      ANTHROPIC_AUTH_TOKEN: "auth",
+      ANTHROPIC_BASE_URL: "https://gateway.example",
+      CLAUDE_CONFIG_DIR: "/cfg",
+      ANTHROPIC_MODEL: "m1",
+      ANTHROPIC_SMALL_FAST_MODEL: "m2",
+      ANTHROPIC_DEFAULT_SONNET_MODEL: "m3",
+    });
+    expect(env).toMatchObject({
+      ANTHROPIC_AUTH_TOKEN: "auth",
+      ANTHROPIC_BASE_URL: "https://gateway.example",
+      CLAUDE_CONFIG_DIR: "/cfg",
+      ANTHROPIC_MODEL: "m1",
+      ANTHROPIC_SMALL_FAST_MODEL: "m2",
+      ANTHROPIC_DEFAULT_SONNET_MODEL: "m3",
+    });
+  });
+
+  test("passes proxy and CA settings, both cases, proxy credentials included", () => {
+    const env = agentEnv({
+      HTTPS_PROXY: "http://user:pass@proxy:3128",
+      https_proxy: "http://proxy:3128",
+      HTTP_PROXY: "http://proxy:3128",
+      http_proxy: "http://proxy:3128",
+      NO_PROXY: "localhost",
+      no_proxy: "localhost",
+      NODE_EXTRA_CA_CERTS: "/ca.pem",
+      SSL_CERT_FILE: "/ca2.pem",
+      SSL_CERT_DIR: "/cas",
+    });
+    expect(env.HTTPS_PROXY).toBe("http://user:pass@proxy:3128");
+    expect(Object.keys(env)).toEqual(
+      expect.arrayContaining([
+        "HTTPS_PROXY",
+        "https_proxy",
+        "HTTP_PROXY",
+        "http_proxy",
+        "NO_PROXY",
+        "no_proxy",
+        "NODE_EXTRA_CA_CERTS",
+        "SSL_CERT_FILE",
+        "SSL_CERT_DIR",
+      ]),
+    );
+  });
+
+  test("passes Bedrock/Vertex region and project selectors; AWS secrets only with Bedrock selected", () => {
+    const region = agentEnv({
+      CLAUDE_CODE_USE_VERTEX: "1",
+      CLOUD_ML_REGION: "us-east5",
+      ANTHROPIC_VERTEX_PROJECT_ID: "proj",
+      AWS_REGION: "us-east-1",
+      AWS_PROFILE: "dev",
+    });
+    expect(region).toMatchObject({
+      CLAUDE_CODE_USE_VERTEX: "1",
+      CLOUD_ML_REGION: "us-east5",
+      ANTHROPIC_VERTEX_PROJECT_ID: "proj",
+      AWS_REGION: "us-east-1",
+      AWS_PROFILE: "dev",
+    });
+    const secrets = {
+      AWS_ACCESS_KEY_ID: "id",
+      AWS_SECRET_ACCESS_KEY: "sec",
+      AWS_SESSION_TOKEN: "tok",
+    };
+    const notBedrock = agentEnv({ ...secrets, CLAUDE_CODE_USE_BEDROCK: "0" });
+    expect("AWS_SECRET_ACCESS_KEY" in notBedrock).toBe(false);
+    expect("AWS_ACCESS_KEY_ID" in notBedrock).toBe(false);
+    const bedrock = agentEnv({ ...secrets, CLAUDE_CODE_USE_BEDROCK: "1" });
+    expect(bedrock).toMatchObject(secrets);
+  });
+
+  test("drops SSH, askpass, PAT and unknown token variables; passes CI and XDG_CONFIG_HOME", () => {
+    const env = agentEnv({
+      SSH_AUTH_SOCK: "/s",
+      GIT_ASKPASS: "/a",
+      SSH_ASKPASS: "/a2",
+      GITHUB_PAT: "pat",
+      FOO_TOKEN: "x",
+      SHIPWRIGHT_GH_PAT: "y",
+      CI: "true",
+      XDG_CONFIG_HOME: "/xdg",
+    });
+    expect(env).toMatchObject({ CI: "true", XDG_CONFIG_HOME: "/xdg" });
+    for (const k of [
+      "SSH_AUTH_SOCK",
+      "GIT_ASKPASS",
+      "SSH_ASKPASS",
+      "GITHUB_PAT",
+      "FOO_TOKEN",
+      "SHIPWRIGHT_GH_PAT",
+    ]) {
+      expect(k in env).toBe(false);
+    }
+  });
 });

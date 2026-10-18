@@ -11,6 +11,32 @@
 # shellcheck disable=SC2034
 VERSION="3.3.0"
 set -euo pipefail
+
+# Agents run without GitHub credentials (#8614): claude is launched through agent-exec.sh.
+SW_AGENT_EXEC="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/lib/agent-exec.sh"
+# The helper's path as a shell word (printf %q): a path with spaces, quotes or $ stays one command.
+SW_AGENT_EXEC_Q="$(printf '%q' "$SW_AGENT_EXEC")"
+
+# _sw_fill_launcher TEMPLATE — write TEMPLATE to stdout with each __PLACEHOLDER__ replaced by the
+# value of its SW_* environment variable. Literal replacement via index(): a path with & \ or " is
+# written as-is (gsub() and command-line awk variables would treat them as escapes).
+_sw_fill_launcher() {
+    awk '
+    function rep(s, from, to,   out, i) {
+        out = ""
+        while ((i = index(s, from)) > 0) { out = out substr(s, 1, i - 1) to; s = substr(s, i + length(from)) }
+        return out s
+    }
+    {
+        line = $0
+        line = rep(line, "__DIR__", ENVIRON["SW_DIR"])
+        line = rep(line, "__TEAM__", ENVIRON["SW_TEAM"])
+        line = rep(line, "__PROMPT__", ENVIRON["SW_PROMPT"])
+        line = rep(line, "__CLAUDE_FLAGS__", ENVIRON["SW_FLAGS"])
+        line = rep(line, "__AGENT_EXEC__", ENVIRON["SW_AGENT_EXEC"])
+        print line
+    }' "$1"
+}
 trap 'echo "ERROR: $BASH_SOURCE:$LINENO exited with status $?" >&2' ERR
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -365,9 +391,9 @@ cd "${PROJECT_DIR}" || exit 1
 printf '\\033]2;${TEAM_NAME}-lead\\033\\\\'
 PROMPT=\$(cat <prompt-file>)
 rm -f <prompt-file> "\$0"
-claude${DRY_RUN_FLAGS} "\$PROMPT"
+${SW_AGENT_EXEC_Q} claude${DRY_RUN_FLAGS} "\$PROMPT"
 echo ""
-echo "Claude exited. Type 'claude' to restart, or 'exit' to close."
+echo "Claude exited. Restart with: ${SW_AGENT_EXEC_Q} claude, or 'exit' to close."
 exec "\$SHELL" -l
 EOF
     else
@@ -376,9 +402,9 @@ EOF
 cd "${PROJECT_DIR}" || exit 1
 printf '\\033]2;${TEAM_NAME}-lead\\033\\\\'
 rm -f "\$0"
-claude${DRY_RUN_FLAGS}
+${SW_AGENT_EXEC_Q} claude${DRY_RUN_FLAGS}
 echo ""
-echo "Claude exited. Type 'claude' to restart, or 'exit' to close."
+echo "Claude exited. Restart with: ${SW_AGENT_EXEC_Q} claude, or 'exit' to close."
 exec "\$SHELL" -l
 EOF
     fi
@@ -436,9 +462,9 @@ cd __DIR__ || exit 1
 printf '\033]2;__TEAM__-lead\033\\'
 PROMPT=$(cat __PROMPT__)
 rm -f __PROMPT__ "$0"
-claude __CLAUDE_FLAGS__ "$PROMPT"
+__AGENT_EXEC__ claude __CLAUDE_FLAGS__ "$PROMPT"
 echo ""
-echo "Claude exited. Type 'claude' to restart, or 'exit' to close."
+echo "Claude exited. Restart with: __AGENT_EXEC__ claude, or 'exit' to close."
 exec "$SHELL" -l
 LAUNCHER_STATIC
         CLAUDE_FLAGS=""
@@ -446,9 +472,8 @@ LAUNCHER_STATIC
             CLAUDE_FLAGS="--dangerously-skip-permissions"
         fi
         # Use awk for safe string replacement — sed breaks on & | \ in paths
-        awk -v dir="$PROJECT_DIR" -v team="$TEAM_NAME" -v prompt="$PROMPT_FILE" -v flags="$CLAUDE_FLAGS" \
-            '{gsub(/__DIR__/, dir); gsub(/__TEAM__/, team); gsub(/__PROMPT__/, prompt); gsub(/__CLAUDE_FLAGS__/, flags); print}' \
-            "$LAUNCHER" > "${LAUNCHER}.tmp" && mv "${LAUNCHER}.tmp" "$LAUNCHER"
+        SW_DIR="$(printf '%q' "$PROJECT_DIR")" SW_TEAM="$TEAM_NAME" SW_PROMPT="$(printf '%q' "$PROMPT_FILE")" SW_FLAGS="$CLAUDE_FLAGS" SW_AGENT_EXEC="$SW_AGENT_EXEC_Q" \
+            _sw_fill_launcher "$LAUNCHER" > "${LAUNCHER}.tmp" && mv "${LAUNCHER}.tmp" "$LAUNCHER"
         chmod +x "$LAUNCHER"
 
         # Create window with command — no race condition!
@@ -469,9 +494,9 @@ LAUNCHER_STATIC
 cd __DIR__ || exit 1
 printf '\033]2;__TEAM__-lead\033\\'
 rm -f "$0"
-claude __CLAUDE_FLAGS__
+__AGENT_EXEC__ claude __CLAUDE_FLAGS__
 echo ""
-echo "Claude exited. Type 'claude' to restart, or 'exit' to close."
+echo "Claude exited. Restart with: __AGENT_EXEC__ claude, or 'exit' to close."
 exec "$SHELL" -l
 LAUNCHER_STATIC
         CLAUDE_FLAGS=""
@@ -479,9 +504,8 @@ LAUNCHER_STATIC
             CLAUDE_FLAGS="--dangerously-skip-permissions"
         fi
         # Use awk for safe string replacement — sed breaks on & | \ in paths
-        awk -v dir="$PROJECT_DIR" -v team="$TEAM_NAME" -v flags="$CLAUDE_FLAGS" \
-            '{gsub(/__DIR__/, dir); gsub(/__TEAM__/, team); gsub(/__CLAUDE_FLAGS__/, flags); print}' \
-            "$LAUNCHER" > "${LAUNCHER}.tmp" && mv "${LAUNCHER}.tmp" "$LAUNCHER"
+        SW_DIR="$(printf '%q' "$PROJECT_DIR")" SW_TEAM="$TEAM_NAME" SW_FLAGS="$CLAUDE_FLAGS" SW_AGENT_EXEC="$SW_AGENT_EXEC_Q" \
+            _sw_fill_launcher "$LAUNCHER" > "${LAUNCHER}.tmp" && mv "${LAUNCHER}.tmp" "$LAUNCHER"
         chmod +x "$LAUNCHER"
 
         if ! tmux new-window -n "$WINDOW_NAME" -c "$PROJECT_DIR" \
@@ -493,7 +517,7 @@ LAUNCHER_STATIC
     else
         # --no-launch: create window with a regular shell
         tmux new-window -n "$WINDOW_NAME" -c "$PROJECT_DIR"
-        info "Window ready. Launch Claude manually: ${DIM}claude${RESET}"
+        info "Window ready. Launch Claude manually: ${DIM}${SW_AGENT_EXEC_Q} claude${RESET}"
     fi
 
     # Apply dark theme after a brief delay to ensure the shell has started.

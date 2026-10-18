@@ -43,14 +43,17 @@ setup_env() {
 }
 DAEMONCFG
 
-    # Create mock claude binary that returns pre-defined JSON
-    cat > "$TEST_TEMP_DIR/bin/claude" <<'MOCKBIN'
+    # Create mock claude binary that returns pre-defined JSON. It reads its response from a file, not
+    # from MOCK_CLAUDE_RESPONSE: the agent launcher (agent-exec.sh) builds the agent's environment from an
+    # allowlist, so an exported variable does not reach the mock. The path is written into the mock.
+    MOCK_RESPONSE_FILE="$TEST_TEMP_DIR/mock-claude-response"
+    sed "s|__MOCK_RESPONSE_FILE__|$MOCK_RESPONSE_FILE|" > "$TEST_TEMP_DIR/bin/claude" <<'MOCKBIN'
 #!/usr/bin/env bash
-# Mock claude CLI — reads MOCK_CLAUDE_RESPONSE env var and outputs it
+# Mock claude CLI — prints the response in __MOCK_RESPONSE_FILE__ (set by the test) and exits
 # Simulates: claude -p "..." (plain text mode, returns raw text/JSON)
 if [[ "${1:-}" == "-p" ]] || [[ "${1:-}" == "--print" ]]; then
-    if [[ -n "${MOCK_CLAUDE_RESPONSE:-}" ]]; then
-        echo "$MOCK_CLAUDE_RESPONSE"
+    if [[ -s "__MOCK_RESPONSE_FILE__" ]]; then
+        cat "__MOCK_RESPONSE_FILE__"
     else
         echo '{"complexity": 5, "risk_level": "medium", "success_probability": 50, "recommended_template": "standard", "key_risks": ["unknown"], "implementation_hints": ["review code"]}'
     fi
@@ -70,12 +73,17 @@ cleanup_env() {
 }
 trap 'cleanup_env; sw_test_teardown' EXIT
 
+# set_mock_response JSON — the response the mock claude prints next (see the mock in setup_env).
+set_mock_response() {
+    printf '%s\n' "$1" > "$MOCK_RESPONSE_FILE"
+}
+
 reset_test() {
     rm -f "$EVENTS_FILE"
     rm -f "$TEST_TEMP_DIR/project/.claude/intelligence-cache.json"
     touch "$EVENTS_FILE"
     # Reset mock response to default analyze response
-    export MOCK_CLAUDE_RESPONSE='{"complexity": 5, "risk_level": "medium", "success_probability": 50, "recommended_template": "standard", "key_risks": ["unknown"], "implementation_hints": ["review code"]}'
+    set_mock_response '{"complexity": 5, "risk_level": "medium", "success_probability": 50, "recommended_template": "standard", "key_risks": ["unknown"], "implementation_hints": ["review code"]}'
 }
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -185,7 +193,7 @@ run_test() {
 # 1. intelligence_analyze_issue returns valid schema
 # ──────────────────────────────────────────────────────────────────────────────
 test_analyze_issue_schema() {
-    export MOCK_CLAUDE_RESPONSE='{"complexity": 7, "risk_level": "high", "success_probability": 65, "recommended_template": "full", "key_risks": ["database migration", "backwards compat"], "implementation_hints": ["add migration script"]}'
+    set_mock_response '{"complexity": 7, "risk_level": "high", "success_probability": 65, "recommended_template": "full", "key_risks": ["database migration", "backwards compat"], "implementation_hints": ["add migration script"]}'
 
     local issue='{"title":"Add user authentication","body":"Implement OAuth2 login flow","labels":["feature","security"]}'
     local result
@@ -205,7 +213,7 @@ test_analyze_issue_schema() {
 # 2. Cache hit on second call with same input
 # ──────────────────────────────────────────────────────────────────────────────
 test_cache_hit() {
-    export MOCK_CLAUDE_RESPONSE='{"complexity": 3, "risk_level": "low", "success_probability": 90, "recommended_template": "fast", "key_risks": [], "implementation_hints": ["simple fix"]}'
+    set_mock_response '{"complexity": 3, "risk_level": "low", "success_probability": 90, "recommended_template": "fast", "key_risks": [], "implementation_hints": ["simple fix"]}'
 
     local issue='{"title":"Fix typo in README","body":"Line 42 has a typo","labels":["docs"]}'
 
@@ -256,7 +264,7 @@ test_graceful_no_claude() {
 # 4. intelligence_compose_pipeline produces valid pipeline JSON
 # ──────────────────────────────────────────────────────────────────────────────
 test_compose_pipeline_schema() {
-    export MOCK_CLAUDE_RESPONSE='{"stages": [{"id": "intake", "enabled": true, "model": "haiku", "config": {}}, {"id": "build", "enabled": true, "model": "sonnet", "config": {"max_iterations": 10}}, {"id": "test", "enabled": true, "model": "sonnet", "config": {}}, {"id": "review", "enabled": true, "model": "opus", "config": {}}, {"id": "pr", "enabled": true, "model": "haiku", "config": {}}], "rationale": "balanced pipeline for medium complexity"}'
+    set_mock_response '{"stages": [{"id": "intake", "enabled": true, "model": "haiku", "config": {}}, {"id": "build", "enabled": true, "model": "sonnet", "config": {"max_iterations": 10}}, {"id": "test", "enabled": true, "model": "sonnet", "config": {}}, {"id": "review", "enabled": true, "model": "opus", "config": {}}, {"id": "pr", "enabled": true, "model": "haiku", "config": {}}], "rationale": "balanced pipeline for medium complexity"}'
 
     local analysis='{"complexity": 5, "risk_level": "medium"}'
     local ctx='{"language": "typescript", "test_framework": "jest"}'
@@ -302,7 +310,7 @@ test_recommend_model_valid() {
 # 6. intelligence_predict_cost returns numeric estimates
 # ──────────────────────────────────────────────────────────────────────────────
 test_predict_cost_schema() {
-    export MOCK_CLAUDE_RESPONSE='{"estimated_cost_usd": 8.50, "estimated_iterations": 4, "estimated_tokens": 750000, "likely_failure_stage": "test", "confidence": 65}'
+    set_mock_response '{"estimated_cost_usd": 8.50, "estimated_iterations": 4, "estimated_tokens": 750000, "likely_failure_stage": "test", "confidence": 65}'
 
     local analysis='{"complexity": 6, "risk_level": "medium"}'
     local history='{"avg_cost": 7.00, "avg_iterations": 3}'
@@ -327,7 +335,7 @@ test_predict_cost_schema() {
 # 7. Cache TTL expiry
 # ──────────────────────────────────────────────────────────────────────────────
 test_cache_ttl_expiry() {
-    export MOCK_CLAUDE_RESPONSE='{"complexity": 4, "risk_level": "low", "success_probability": 80, "recommended_template": "fast", "key_risks": [], "implementation_hints": []}'
+    set_mock_response '{"complexity": 4, "risk_level": "low", "success_probability": 80, "recommended_template": "fast", "key_risks": [], "implementation_hints": []}'
 
     # Manually write a cache entry with expired timestamp
     local cache_file="$TEST_TEMP_DIR/project/.claude/intelligence-cache.json"
@@ -359,7 +367,7 @@ CACHE
 # 8. intelligence_search_memory returns ranked results
 # ──────────────────────────────────────────────────────────────────────────────
 test_search_memory() {
-    export MOCK_CLAUDE_RESPONSE='{"results": [{"file": "auth_fix.json", "relevance": 95, "summary": "Fixed OAuth token refresh"}, {"file": "db_migration.json", "relevance": 40, "summary": "Database schema changes"}]}'
+    set_mock_response '{"results": [{"file": "auth_fix.json", "relevance": 95, "summary": "Fixed OAuth token refresh"}, {"file": "db_migration.json", "relevance": 40, "summary": "Database schema changes"}]}'
 
     # Create mock memory files
     local mem_dir="$TEST_TEMP_DIR/.shipwright/memory/test_repo"
@@ -415,7 +423,7 @@ CFG
 # 10. Events are emitted for analysis
 # ──────────────────────────────────────────────────────────────────────────────
 test_events_emitted() {
-    export MOCK_CLAUDE_RESPONSE='{"complexity": 6, "risk_level": "high", "success_probability": 55, "recommended_template": "full", "key_risks": ["data loss"], "implementation_hints": ["backup first"]}'
+    set_mock_response '{"complexity": 6, "risk_level": "high", "success_probability": 55, "recommended_template": "full", "key_risks": ["data loss"], "implementation_hints": ["backup first"]}'
 
     local issue='{"title":"Migrate database","body":"Move from SQLite to Postgres","labels":["breaking"]}'
     intelligence_analyze_issue "$issue" >/dev/null

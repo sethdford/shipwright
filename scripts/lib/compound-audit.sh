@@ -1,4 +1,7 @@
 #!/usr/bin/env bash
+
+# Agents run without GitHub credentials (#8614): claude is launched through agent-exec.sh.
+SW_AGENT_EXEC="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/agent-exec.sh"
 # ╔═══════════════════════════════════════════════════════════════════════════╗
 # ║  compound-audit — Adaptive multi-agent audit cascade                    ║
 # ║                                                                         ║
@@ -289,7 +292,7 @@ compound_audit_run_cycle() {
 
         (
             local output
-            output=$(echo "$prompt" | claude -p --model "$model" 2>/dev/null) || output='{"findings":[]}'
+            output=$(echo "$prompt" | "$SW_AGENT_EXEC" claude -p --model "$model" 2>/dev/null) || output='{"findings":[]}'
             echo "$output" > "$temp_dir/${agent}.json"
         ) &
         pids+=($!)

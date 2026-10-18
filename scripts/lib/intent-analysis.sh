@@ -1,4 +1,7 @@
 #!/usr/bin/env bash
+
+# Agents run without GitHub credentials (#8614): claude is launched through agent-exec.sh.
+SW_AGENT_EXEC="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/agent-exec.sh"
 # ═══════════════════════════════════════════════════════════════════
 #   intent-analysis.sh — Issue intent analysis and acceptance criteria
 #   Source from pipeline-stages-intake.sh. Requires helpers, artifacts.
@@ -100,7 +103,7 @@ ${_ACCEPTANCE_CRITERIA_SCHEMA}
 
     # Use Claude to analyze intent
     local _token_log="${artifacts_dir}/.claude-tokens-intent.log"
-    claude --print --output-format json -p "$intent_prompt" < /dev/null > "$intent_file" 2>"$_token_log" || {
+    "$SW_AGENT_EXEC" claude --print --output-format json -p "$intent_prompt" < /dev/null > "$intent_file" 2>"$_token_log" || {
         # Fall back to defaults if Claude fails
         _generate_default_acceptance_criteria "$title" "$body" "$artifacts_dir"
         return 0

@@ -5,6 +5,9 @@
 # ╚═══════════════════════════════════════════════════════════════════════════╝
 set -euo pipefail
 
+# Agents run without GitHub credentials (#8614): claude is launched through agent-exec.sh.
+SW_AGENT_EXEC="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/lib/agent-exec.sh"
+
 trap 'echo "ERROR: $BASH_SOURCE:$LINENO exited with status $?" >&2' ERR
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -42,11 +45,11 @@ trap 'cleanup; sw_test_teardown' EXIT
 
 run_claude() {
     if command -v gtimeout &>/dev/null; then
-        gtimeout "$SCRIPT_TIMEOUT" claude -p "Reply with exactly: OK" --max-turns 1 2>"$err_file" | head -c 4096 > "$out_file"
+        "$SW_AGENT_EXEC" gtimeout "$SCRIPT_TIMEOUT" claude -p "Reply with exactly: OK" --max-turns 1 2>"$err_file" | head -c 4096 > "$out_file"
     elif command -v timeout &>/dev/null; then
-        timeout "$SCRIPT_TIMEOUT" claude -p "Reply with exactly: OK" --max-turns 1 2>"$err_file" | head -c 4096 > "$out_file"
+        "$SW_AGENT_EXEC" timeout "$SCRIPT_TIMEOUT" claude -p "Reply with exactly: OK" --max-turns 1 2>"$err_file" | head -c 4096 > "$out_file"
     else
-        claude -p "Reply with exactly: OK" --max-turns 1 2>"$err_file" | head -c 4096 > "$out_file"
+        "$SW_AGENT_EXEC" claude -p "Reply with exactly: OK" --max-turns 1 2>"$err_file" | head -c 4096 > "$out_file"
     fi
 }
 # `if ! run_claude; then exit_code=$?` captures the status of the `!` negation,

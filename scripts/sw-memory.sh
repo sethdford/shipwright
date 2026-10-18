@@ -4,6 +4,9 @@
 # ║  Captures learnings · Injects context · Searches memory · Tracks metrics║
 # ╚═══════════════════════════════════════════════════════════════════════════╝
 set -euo pipefail
+
+# Agents run without GitHub credentials (#8614): claude is launched through agent-exec.sh.
+SW_AGENT_EXEC="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/lib/agent-exec.sh"
 trap 'echo "ERROR: $BASH_SOURCE:$LINENO exited with status $?" >&2' ERR
 
 VERSION="3.3.0"
@@ -765,7 +768,7 @@ Return JSON only, no markdown fences, no explanation."
 
     # Call Claude for analysis
     local analysis
-    analysis=$(claude -p "$prompt" --model sonnet 2>/dev/null) || {
+    analysis=$("$SW_AGENT_EXEC" claude -p "$prompt" --model sonnet 2>/dev/null) || {
         warn "Claude analysis failed"
         return 1
     }

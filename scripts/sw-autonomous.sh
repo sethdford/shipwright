@@ -5,6 +5,9 @@
 # ║  Closes the loop: PM creates issues, daemon builds, system learns       ║
 # ╚═══════════════════════════════════════════════════════════════════════════╝
 set -euo pipefail
+
+# Agents run without GitHub credentials (#8614): claude is launched through agent-exec.sh.
+SW_AGENT_EXEC="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/lib/agent-exec.sh"
 trap 'echo "ERROR: $BASH_SOURCE:$LINENO exited with status $?" >&2' ERR
 
 # shellcheck disable=SC2034
@@ -390,7 +393,7 @@ run_analysis_cycle() {
     if command -v claude >/dev/null 2>&1; then
         info "Running codebase analysis with Claude..."
 
-        claude -p 'You are Shipwright'"'"'s autonomous PM. Analyze this repository for:
+        "$SW_AGENT_EXEC" claude -p 'You are Shipwright'"'"'s autonomous PM. Analyze this repository for:
 1. Bugs & Issues: Missing error handling, potential crashes, edge cases
 2. Performance: Bottlenecks, n+1 queries, memory leaks, unnecessary work
 3. Missing Tests: Uncovered code paths, critical scenarios

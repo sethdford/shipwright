@@ -20,6 +20,13 @@ Untrusted text (issues, PRs, comments) is passed only as delimited data in the u
 environment is built from an allowlist, so `GH_TOKEN` and `GITHUB_TOKEN` never reach the agent.
 Rule F6 confines the SDK import to `adapters/agent/`.
 
+The bash launcher `scripts/lib/agent-exec.sh` builds the agent's environment the same way (`env -i`
+plus an allowlist), and resets git's saved credentials for every configured host. What it does not
+stop: the agent runs as the same user, so it can read same-user files (`~/.netrc`, `~/.config/gh`,
+git and gh config, keychain items the user can unlock), and on Linux it can read its parent's
+`/proc/$PPID/environ`, which holds the pipeline's full environment. Real isolation needs a separate
+user or a sandbox; that work is the Wave 1c sandbox item (ADR-0006, not yet written).
+
 ## Consequences
 - Typed failures (refusal, budget, max turns, schema, timeout) replace silent defaults.
 - One credential works in CI.

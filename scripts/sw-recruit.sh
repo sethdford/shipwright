@@ -9,6 +9,9 @@
 # ║  Goal decomposition · Self-modifying heuristics                        ║
 # ╚═══════════════════════════════════════════════════════════════════════════╝
 set -euo pipefail
+
+# Agents run without GitHub credentials (#8614): claude is launched through agent-exec.sh.
+SW_AGENT_EXEC="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/lib/agent-exec.sh"
 trap 'echo "ERROR: $BASH_SOURCE:$LINENO exited with status $?" >&2' ERR
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -143,7 +146,7 @@ _recruit_call_claude() {
     fi
 
     if _recruit_has_claude; then
-        claude -p "$prompt" --model "$model" 2>/dev/null || echo ""
+        "$SW_AGENT_EXEC" claude -p "$prompt" --model "$model" 2>/dev/null || echo ""
         return
     fi
 

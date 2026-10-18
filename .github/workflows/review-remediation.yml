@@ -35,6 +35,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           fetch-depth: 0
+          persist-credentials: false
 
       - name: Determine PR number
         id: pr
@@ -48,9 +49,13 @@ jobs:
           echo "number=$PR_NUMBER" >> "$GITHUB_OUTPUT"
 
           # Get the PR branch and head SHA
-          PR_JSON=$(gh pr view "$PR_NUMBER" --json headRefName,headRefOid)
+          PR_JSON=$(gh pr view "$PR_NUMBER" --repo "$GITHUB_REPOSITORY" --json headRefName,headRefOid,baseRefName)
           BRANCH=$(echo "$PR_JSON" | jq -r '.headRefName')
           HEAD_SHA=$(echo "$PR_JSON" | jq -r '.headRefOid')
+          # The base branch, recorded here (before the agent runs) for the rerun step to use.
+          BASE_REF=$(echo "$PR_JSON" | jq -r '.baseRefName')
+          git check-ref-format --branch "$BASE_REF" >/dev/null || { echo "::error::invalid base branch"; exit 1; }
+          echo "base_ref=$BASE_REF" >> "$GITHUB_OUTPUT"
 
           # headRefName is attacker-chosen. check-ref-format does NOT reject shell
           # metacharacters (`"`, `;`, `$`, `|` are all valid in ref names); it only
@@ -134,7 +139,8 @@ jobs:
 
           Fix all actionable findings. Skip any that are questions or suggestions without clear action items."
 
-          claude -p "$PROMPT" --max-turns 10 --model claude-sonnet-5-5 2>&1 || {
+          # Through agent-exec.sh: the agent gets no GitHub token (F9).
+          scripts/lib/agent-exec.sh claude -p "$PROMPT" --max-turns 10 --model claude-sonnet-5-5 2>&1 || {
             echo "::warning::Claude remediation returned non-zero — changes may be partial"
           }
         env:
@@ -180,15 +186,43 @@ jobs:
           SHORT_SHA: ${{ steps.pr.outputs.short_sha }}
           HEAD_SHA: ${{ steps.pr.outputs.head_sha }}
           FINDING_COUNT: ${{ steps.findings.outputs.count }}
+          # The push authenticates per command from GH_TOKEN through the inline credential helper at KEY_2
+          # (the checkout persists no token). KEY_0 and KEY_1 reset the accumulating credential.helper list
+          # (global, then github.com-scoped) before KEY_2 adds the helper, so a helper the agent adds to
+          # .git/config gets no token; KEY_3/KEY_4 disable repo hooks and fsmonitor. Same helper text as the
+          # pipeline workflow.
+          GIT_CONFIG_COUNT: "5"
+          GIT_CONFIG_KEY_0: credential.helper
+          GIT_CONFIG_VALUE_0: ''
+          GIT_CONFIG_KEY_1: credential.https://github.com.helper
+          GIT_CONFIG_VALUE_1: ''
+          GIT_CONFIG_KEY_2: credential.helper
+          GIT_CONFIG_VALUE_2: '!f() { test "$1" = get || exit 0; proto=; host=; while IFS= read -r l && [ -n "$l" ]; do case "$l" in protocol=*) proto=${l#protocol=};; host=*) host=${l#host=};; esac; done; t=${GITHUB_TOKEN:-$GH_TOKEN}; if [ "$proto" = https ] && [ "$host" = github.com ] && [ -n "$t" ]; then printf "username=x-access-token\npassword=%s\n" "$t"; fi; }; f'
+          GIT_CONFIG_KEY_3: core.hooksPath
+          GIT_CONFIG_VALUE_3: /dev/null
+          GIT_CONFIG_KEY_4: core.fsmonitor
+          GIT_CONFIG_VALUE_4: "false"
 
       - name: Request review rerun
         if: steps.findings.outputs.has_findings == 'true'
         run: |
-          # Use the canonical rerun writer if available
+          # This step holds GH_TOKEN, so it never runs PR-head code. The rerun writer comes from scripts/ of
+          # the PR's BASE branch, fetched as a GitHub tarball: not the agent-edited working tree, not a git
+          # remote (the agent could repoint one), and not the PR head (a PR could change the writer or its lib/).
           NEW_HEAD=$(git rev-parse HEAD)
-          if [[ -f "./scripts/sw-review-rerun.sh" ]]; then
-            bash ./scripts/sw-review-rerun.sh request "$PR_NUMBER" "$NEW_HEAD" "shipwright" || true
+          git check-ref-format --branch "$BASE_REF" >/dev/null || { echo "::error::invalid base branch"; exit 1; }
+          PRISTINE="$RUNNER_TEMP/pristine"
+          BASE_TREE="$RUNNER_TEMP/base-tree"
+          rm -rf "$PRISTINE" "$BASE_TREE"
+          mkdir -p "$PRISTINE" "$BASE_TREE"
+          gh api "repos/${GITHUB_REPOSITORY}/tarball/${BASE_REF}" > "$RUNNER_TEMP/base.tgz"
+          tar -xzf "$RUNNER_TEMP/base.tgz" -C "$BASE_TREE" --strip-components=1
+          cp -R "$BASE_TREE/scripts" "$PRISTINE/"
+          if [[ -f "$PRISTINE/scripts/sw-review-rerun.sh" ]]; then
+            bash "$PRISTINE/scripts/sw-review-rerun.sh" request "$PR_NUMBER" "$NEW_HEAD" "shipwright" || true
           fi
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           PR_NUMBER: ${{ steps.pr.outputs.number }}
+          # Recorded by the PR-number step before the agent ran; passed via env, never interpolated.
+          BASE_REF: ${{ steps.pr.outputs.base_ref }}

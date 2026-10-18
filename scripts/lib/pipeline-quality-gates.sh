@@ -1,4 +1,7 @@
 # pipeline-quality-gates.sh — Quality gate checks for pipeline-quality-checks.sh
+
+# Agents run without GitHub credentials (#8614): claude is launched through agent-exec.sh.
+SW_AGENT_EXEC="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/agent-exec.sh"
 # Source from pipeline-quality-checks.sh. Requires ARTIFACTS_DIR, SCRIPT_DIR.
 [[ -n "${_PIPELINE_QUALITY_GATES_LOADED:-}" ]] && return 0
 _PIPELINE_QUALITY_GATES_LOADED=1
@@ -251,7 +254,7 @@ quality_check_perf_regression() {
             local tail_output
             tail_output=$(tail -30 "$test_log" 2>/dev/null || true)
             if [[ -n "$tail_output" ]]; then
-                duration_ms=$(claude --print -p "Extract ONLY the total test suite duration in seconds from this output. Reply with ONLY a number (e.g. 12.34). If no duration found, reply NONE.
+                duration_ms=$("$SW_AGENT_EXEC" claude --print -p "Extract ONLY the total test suite duration in seconds from this output. Reply with ONLY a number (e.g. 12.34). If no duration found, reply NONE.
 
 $tail_output" < /dev/null 2>/dev/null | grep -oE '^[0-9.]+$' | head -1 || true)
                 [[ "$duration_ms" == "NONE" ]] && duration_ms=""
@@ -423,7 +426,7 @@ quality_check_api_compat() {
         local spec_git_diff
         spec_git_diff=$(git diff "${BASE_BRANCH}...HEAD" -- "$spec_file" 2>/dev/null | head -200 || true)
         if [[ -n "$spec_git_diff" ]]; then
-            semantic_diff=$(claude --print --output-format text -p "Analyze this API spec diff for breaking changes. List: removed endpoints, changed parameters, altered response schemas, auth changes. Be concise.
+            semantic_diff=$("$SW_AGENT_EXEC" claude --print --output-format text -p "Analyze this API spec diff for breaking changes. List: removed endpoints, changed parameters, altered response schemas, auth changes. Be concise.
 
 ${spec_git_diff}" --model "$(_smart_model validation haiku)" < /dev/null 2>/dev/null || true)
         fi
@@ -486,7 +489,7 @@ quality_check_coverage() {
             local tail_cov_output
             tail_cov_output=$(tail -40 "$test_log" 2>/dev/null || true)
             if [[ -n "$tail_cov_output" ]]; then
-                coverage=$(claude --print -p "Extract ONLY the overall code coverage percentage from this test output. Reply with ONLY a number (e.g. 85.5). If no coverage found, reply NONE.
+                coverage=$("$SW_AGENT_EXEC" claude --print -p "Extract ONLY the overall code coverage percentage from this test output. Reply with ONLY a number (e.g. 85.5). If no coverage found, reply NONE.
 
 $tail_cov_output" < /dev/null 2>/dev/null | grep -oE '^[0-9.]+$' | head -1 || true)
                 [[ "$coverage" == "NONE" ]] && coverage=""
