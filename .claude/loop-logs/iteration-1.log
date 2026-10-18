@@ -1,19 +1,21 @@
-I added one line to `docs/safety-runbook.md` and committed it as `62268818`, but I couldn't run `bun run check` because Bun isn't installed on this runner.
+I haven't fixed the three failing gate-baseline assertions in the environment where they failed, so I'm not declaring the loop complete. The runbook note is done.
 
-The new line comes right after the "Every gate fails closed" paragraph (`docs/safety-runbook.md:9`):
+**What changed (commit `7b8cccec`)**
+- **Runbook:** added one line to `docs/safety-runbook.md` after the "Exit 0 …" line: "After you change gate code, run `bun run check`; CI runs the same command." That wording comes from AGENTS.md. The diff is only that line.
+- **Parser:** `tg_parse_log` in `scripts/lib/test-gate-baseline.sh` now strips carriage returns along with ANSI codes. bun ends lines with CRLF when its output is a terminal, which broke the `<file>:` header match and the `(fail)` name parsing.
+- **Regression test:** added a CRLF bun-log case to `scripts/sw-lib-test-gate-baseline-test.sh`. On the old library it fails under a pseudo-TTY and passes with the fix.
 
-> Exit 0 from `gates check` or `intake check` is the only "go"; any other exit, including a crash, is a stop.
+**Failing tests: not confirmed fixed**
+- The three failures were `bun: a load error…`, `BUN2…` and `DUP…`. All three depend on bun's `<file>:` header lines.
+- I could not reproduce them. The suite passes here, including under the runner, a pseudo-TTY, `NO_COLOR=1`, and alternate `TMPDIR`s. The fixtures redirect bun's output to a file, so bun never sees a TTY there. The CRLF fix therefore does not explain the CI failure. It is a real robustness fix, but it is not proven to be the cause.
+- I also could not replicate the loop's exact environment; my attempt with `env -i` failed on quoting.
+- Next step: look at the CI log for the actual `got:` values from those three assertions. They will show whether the header line is missing, prefixed (for example `./b.test.ts:`), or formatted differently, and the fix should target that.
 
-**Checks:** I didn't run `npm test`, which runs the whole bash suite. No script or test refers to this file, and it's a one-line docs change, so it shouldn't break anything. CI's `bun run check` will be the first real run, and its `docs:check` step may flag this line, which is about 105 characters long.
+**Checks run**
+- `scripts/sw-lib-test-gate-baseline-test.sh`: 88 of 88 pass.
+- `bun run check:fast`: 826 pass, 0 fail.
+- I did not run the full `bun run check` or `npm test`.
 
-**What to Document:** this one line in `docs/safety-runbook.md`, near the top. The issue didn't give the exact wording, so I wrote it from the rule in AGENTS.md. I didn't repeat "never run `gates check` on the real repo just to look", because the "Read the gates" section already says that.
-
-**What to Skip:** no other sections. The runbook already covers what each gate does, how the breaker works and how to re-enable the workflows.
-
-**Audience:** operators and maintainers using the safety controls, so I kept it to one direct rule.
-
-**Other notes:**
-- A formatter hook re-padded the "Stop everything" table when I made the edit. I put the table back so the commit only adds the one line.
-- Three `.claude/` state files were already modified before I started. I left them out of the commit.
-
-LOOP_COMPLETE
+**Notes**
+- The docs formatter hook reflowed an unrelated table in the runbook on each Edit. I restored it and used `sed` for the insertion, so the commit does not include that churn.
+- The `.claude/*` files that were already modified in the working tree are not part of this commit.

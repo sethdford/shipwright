@@ -1529,32 +1529,65 @@
         "results": [
           {
             "file": "retry-outcomes.json",
-            "relevance": 85,
-            "summary": "Records build_failure retries with model_escalation at 5/5 successes, which directly informs how a failing build stage should be retried."
-          },
-          {
-            "file": "patterns.json",
-            "relevance": 70,
-            "summary": "Gives the project's build-relevant conventions (TypeScript, vitest, npm, src/ layout, *.test.ts) that the build stage needs to follow."
-          },
-          {
-            "file": "metrics.json",
-            "relevance": 60,
-            "summary": "Holds the build duration baseline (7095s), which is the reference for judging whether the current build stage is running long."
+            "relevance": 92,
+            "summary": "Tracks build_failure retries and their strategy: model_escalation succeeded 5 of 5 times, which bears directly on how to retry the failed build attempt."
           },
           {
             "file": "failures.json",
-            "relevance": 45,
-            "summary": "Logs repeated failure patterns and fixes, mostly from the test stage, which the build stage's output feeds into."
+            "relevance": 85,
+            "summary": "Holds recorded test-stage failures with root causes and fixes, such as stale pipeline locks, mocked artifacts and jq parse errors. These are the likeliest causes of the failed build tests in this context."
+          },
+          {
+            "file": "knowledge.json",
+            "relevance": 60,
+            "summary": "Contains failure entries with error signatures and fix strategies for test setup problems (mktemp path, sw-cleanup dry-run, JSON output), useful for diagnosing similar build-time test errors."
+          },
+          {
+            "file": "metrics.json",
+            "relevance": 50,
+            "summary": "Gives build_duration_s (2938) and test_duration_s (1459) baselines, which help judge whether a rebuild is running abnormally long."
           },
           {
             "file": "success-patterns.json",
-            "relevance": 40,
-            "summary": "Shows prior successful approaches for bug-fix goals, including files changed and iteration counts, which can guide how this build proceeds."
+            "relevance": 42,
+            "summary": "Records past successful 'Fix bug' runs with their approach, files changed and iteration counts, a loose match for a retry that fixes test errors."
           }
         ]
       },
-      "timestamp": 1792327395,
+      "timestamp": 1792330901,
+      "ttl": 1800
+    },
+    "6336ffbe2b1719d118b0b2a12c88a679": {
+      "result": {
+        "results": [
+          {
+            "file": "failures.json",
+            "relevance": 55,
+            "summary": "Test-stage failures with root causes and applied fixes (unbounded loop, timeout wrapper, db not started). The closest match to a test-stage failure needing a fix."
+          },
+          {
+            "file": "index.json",
+            "relevance": 50,
+            "summary": "Build-stage test_failure signature with a recorded fix (increase timeout in test setup). Directly about build-stage test failures."
+          },
+          {
+            "file": "fleet-shared-patterns.json",
+            "relevance": 30,
+            "summary": "Cross-repo pattern for build and test stages (Cannot find module, fix npm i). Shares the build/test failure context but not this gate-baseline failure."
+          },
+          {
+            "file": "success-patterns.json",
+            "relevance": 25,
+            "summary": "Successful build-stage fix for a timeout (Add handler v2, Missing logic). Weak match, since it is a different timeout fix and not a test-baseline issue."
+          },
+          {
+            "file": "test-failures.json",
+            "relevance": 20,
+            "summary": "Test-failure signature store, but it is empty, so it offers no prior fixes for this failure."
+          }
+        ]
+      },
+      "timestamp": 1792330883,
       "ttl": 1800
     }
   }
