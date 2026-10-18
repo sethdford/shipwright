@@ -202,19 +202,22 @@ jobs:
       - name: Request review rerun
         if: steps.findings.outputs.has_findings == 'true'
         run: |
-          # Run the rerun writer from a copy of scripts/ taken at the PR head before remediation, never
-          # from the agent-edited working tree (the agent could have rewritten it, and GH_TOKEN is in
-          # this step). The writer sources its own lib/ beside it, so the whole scripts/ tree is copied.
+          # This step holds GH_TOKEN, so it never runs PR-head code. The rerun writer comes from scripts/ of
+          # the PR's BASE branch, fetched as a GitHub tarball: not the agent-edited working tree, not a git
+          # remote (the agent could repoint one), and not the PR head (a PR could change the writer or its lib/).
           NEW_HEAD=$(git rev-parse HEAD)
+          BASE_REF=$(gh pr view "$PR_NUMBER" --json baseRefName --jq '.baseRefName')
+          git check-ref-format --branch "$BASE_REF" >/dev/null || { echo "::error::invalid base branch"; exit 1; }
           PRISTINE="$RUNNER_TEMP/pristine"
-          rm -rf "$PRISTINE"
-          mkdir -p "$PRISTINE"
-          git archive "$HEAD_SHA" scripts | tar -x -C "$PRISTINE"
+          BASE_TREE="$RUNNER_TEMP/base-tree"
+          rm -rf "$PRISTINE" "$BASE_TREE"
+          mkdir -p "$PRISTINE" "$BASE_TREE"
+          gh api "repos/${GITHUB_REPOSITORY}/tarball/${BASE_REF}" > "$RUNNER_TEMP/base.tgz"
+          tar -xzf "$RUNNER_TEMP/base.tgz" -C "$BASE_TREE" --strip-components=1
+          cp -R "$BASE_TREE/scripts" "$PRISTINE/"
           if [[ -f "$PRISTINE/scripts/sw-review-rerun.sh" ]]; then
             bash "$PRISTINE/scripts/sw-review-rerun.sh" request "$PR_NUMBER" "$NEW_HEAD" "shipwright" || true
           fi
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           PR_NUMBER: ${{ steps.pr.outputs.number }}
-          # The PR head before the agent ran (the pristine copy's source).
-          HEAD_SHA: ${{ steps.pr.outputs.head_sha }}
