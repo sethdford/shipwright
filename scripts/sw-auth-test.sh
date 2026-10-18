@@ -7,6 +7,7 @@ trap 'echo "ERROR: $BASH_SOURCE:$LINENO exited with status $?" >&2' ERR
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "$SCRIPT_DIR/lib/test-helpers.sh"
+sw_test_isolate
 
 setup_env() {
     TEST_TEMP_DIR=$(mktemp -d "${TMPDIR:-/tmp}/sw-auth-test.XXXXXX")
@@ -65,7 +66,7 @@ MOCK
     export NO_GITHUB=true
 }
 
-trap cleanup_test_env EXIT
+trap 'cleanup_test_env; sw_test_teardown' EXIT
 
 print_test_header "Shipwright Auth Tests"
 setup_env

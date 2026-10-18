@@ -171,11 +171,7 @@ cmd_check() {
         if [[ -n "$hb_json" ]]; then
             local updated_at="$hb_json"
             local hb_epoch now_epoch age_secs
-            if TZ=UTC date -j -f "%Y-%m-%dT%H:%M:%SZ" "$updated_at" +%s >/dev/null 2>&1; then
-                hb_epoch="$(TZ=UTC date -j -f "%Y-%m-%dT%H:%M:%SZ" "$updated_at" +%s 2>/dev/null)"
-            else
-                hb_epoch="$(date -d "$updated_at" +%s 2>/dev/null || echo 0)"
-            fi
+            hb_epoch="$(date_to_epoch "$updated_at" || echo 0)"
             now_epoch="$(date +%s)"
             age_secs=$((now_epoch - hb_epoch))
             if [[ "$age_secs" -le "$timeout" ]]; then
@@ -206,12 +202,7 @@ cmd_check() {
     # Convert ISO timestamp to epoch for comparison
     local hb_epoch now_epoch age_secs
 
-    # macOS date -j -f vs GNU date -d (TZ=UTC since timestamps are UTC)
-    if TZ=UTC date -j -f "%Y-%m-%dT%H:%M:%SZ" "$updated_at" +%s >/dev/null 2>&1; then
-        hb_epoch="$(TZ=UTC date -j -f "%Y-%m-%dT%H:%M:%SZ" "$updated_at" +%s 2>/dev/null)"
-    else
-        hb_epoch="$(date -d "$updated_at" +%s 2>/dev/null || echo 0)"
-    fi
+    hb_epoch="$(date_to_epoch "$updated_at" || echo 0)"
 
     now_epoch="$(date +%s)"
     age_secs=$((now_epoch - hb_epoch))

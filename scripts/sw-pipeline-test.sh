@@ -10,6 +10,7 @@ trap 'echo "ERROR: $BASH_SOURCE:$LINENO exited with status $?" >&2' ERR
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "$SCRIPT_DIR/lib/test-helpers.sh"
+sw_test_isolate
 REPO_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
 REAL_PIPELINE_SCRIPT="$SCRIPT_DIR/sw-pipeline.sh"
 
@@ -377,7 +378,7 @@ cleanup_env() {
         rm -rf "$TEST_TEMP_DIR"
     fi
 }
-trap cleanup_env EXIT
+trap 'cleanup_env; sw_test_teardown' EXIT
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # PIPELINE INVOCATION HELPER

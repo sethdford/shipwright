@@ -221,7 +221,7 @@ cmd_replay() {
         done
     elif [[ -f "$EVENTS_FILE" ]]; then
         local cutoff_iso
-        cutoff_iso="$(date -u -j -f %s "$cutoff_epoch" +%Y-%m-%dT%H:%M:%SZ 2>/dev/null || date -u -d @"$cutoff_epoch" +%Y-%m-%dT%H:%M:%SZ 2>/dev/null)"
+        cutoff_iso="$(epoch_to_iso "$cutoff_epoch" || echo "")"
         grep "ts" "$EVENTS_FILE" 2>/dev/null | while read -r line; do
             local ts
             ts=$(echo "$line" | jq -r '.ts // ""' 2>/dev/null)
@@ -285,7 +285,7 @@ cmd_clean() {
     local cutoff_epoch
     cutoff_epoch=$(($(date +%s) - (ttl_days * 86400)))
     local cutoff_iso
-    cutoff_iso="$(date -u -j -f %s "$cutoff_epoch" +%Y-%m-%dT%H:%M:%SZ 2>/dev/null || date -u -d @"$cutoff_epoch" +%Y-%m-%dT%H:%M:%SZ 2>/dev/null)"
+    cutoff_iso="$(epoch_to_iso "$cutoff_epoch" || echo "")"
 
     if db_available 2>/dev/null; then
         local old_count new_count removed

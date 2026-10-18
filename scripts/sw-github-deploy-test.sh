@@ -12,6 +12,7 @@ unset NO_GITHUB 2>/dev/null || true
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "$SCRIPT_DIR/lib/test-helpers.sh"
+sw_test_isolate
 REPO_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
 
 # ─── Colors (matches shipwright theme) ────────────────────────────────────────
@@ -81,7 +82,7 @@ cleanup_env() {
         rm -rf "$TEST_TEMP_DIR"
     fi
 }
-trap cleanup_env EXIT
+trap 'cleanup_env; sw_test_teardown' EXIT
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # TEST RUNNER

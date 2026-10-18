@@ -1029,7 +1029,7 @@ db_cost_today() {
     local today_start
     today_start=$(date -u +"%Y-%m-%dT00:00:00Z")
     local today_epoch
-    today_epoch=$(date -u -jf "%Y-%m-%dT%H:%M:%SZ" "$today_start" +%s 2>/dev/null || date -u -d "$today_start" +%s 2>/dev/null || echo "0")
+    today_epoch=$(date_to_epoch "$today_start" || echo "0")
     _db_query "SELECT COALESCE(ROUND(SUM(cost_usd), 4), 0) FROM cost_entries WHERE ts_epoch >= ${today_epoch};" || echo "0"
 }
 
@@ -1122,7 +1122,7 @@ db_stale_heartbeats() {
     local cutoff_epoch
     cutoff_epoch=$(( $(now_epoch) - threshold ))
     local cutoff_ts
-    cutoff_ts=$(date -u -r "$cutoff_epoch" +"%Y-%m-%dT%H:%M:%SZ" 2>/dev/null || date -u -d "@${cutoff_epoch}" +"%Y-%m-%dT%H:%M:%SZ" 2>/dev/null || echo "2000-01-01T00:00:00Z")
+    cutoff_ts=$(epoch_to_iso "$cutoff_epoch" || echo "2000-01-01T00:00:00Z")
     _db_query "SELECT json_group_array(json_object('job_id', job_id, 'pid', pid, 'stage', stage, 'updated_at', updated_at)) FROM heartbeats WHERE updated_at < '${cutoff_ts}';" || echo "[]"
 }
 
@@ -1748,9 +1748,7 @@ cleanup_old_data() {
     local cutoff_epoch
     cutoff_epoch=$(( $(now_epoch) - (days * 86400) ))
     local cutoff_date
-    cutoff_date=$(date -u -r "$cutoff_epoch" +"%Y-%m-%dT%H:%M:%SZ" 2>/dev/null || \
-                 date -u -d "@${cutoff_epoch}" +"%Y-%m-%dT%H:%M:%SZ" 2>/dev/null || \
-                 date -u +"%Y-%m-%dT%H:%M:%SZ")
+    cutoff_date=$(epoch_to_iso "$cutoff_epoch" || date -u +"%Y-%m-%dT%H:%M:%SZ")
 
     info "Cleaning records older than ${days} days (before ${cutoff_date})..."
 

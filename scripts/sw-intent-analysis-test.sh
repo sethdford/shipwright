@@ -6,6 +6,8 @@
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+source "$SCRIPT_DIR/lib/test-isolate.sh"
+sw_test_isolate
 source "${SCRIPT_DIR}/lib/helpers.sh"
 source "${SCRIPT_DIR}/lib/intent-analysis.sh"
 
@@ -53,7 +55,7 @@ assert_contains() {
 
 # ─── Setup ──────────────────────────────────────────────────────
 TEMP_DIR=$(mktemp -d)
-trap 'rm -rf "$TEMP_DIR"' EXIT
+trap 'rm -rf "$TEMP_DIR"; sw_test_teardown' EXIT
 
 # ───────────────────────────────────────────────────────────────
 # Test: analyze_intent generates valid JSON

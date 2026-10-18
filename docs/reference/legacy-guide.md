@@ -634,22 +634,22 @@ All scripts are bash (except the dashboard server in TypeScript). Grouped by lay
 | `scripts/sw-auth.sh` | 610 | GitHub OAuth Authentication |
 | `scripts/sw-autonomous.sh` | 1062 | Master controller for AI-building-AI loop |
 | `scripts/sw-changelog.sh` | 696 | Automated Release Notes & Migration Guides |
-| `scripts/sw-checkpoint.sh` | 605 | Save and restore agent state mid-stage |
+| `scripts/sw-checkpoint.sh` | 603 | Save and restore agent state mid-stage |
 | `scripts/sw-ci.sh` | 589 | GitHub Actions CI/CD Orchestration |
 | `scripts/sw-cleanup.sh` | 350 | Clean up orphaned Claude team sessions & artifacts |
 | `scripts/sw-code-review.sh` | 699 | Clean Code & Architecture Analysis |
 | `scripts/sw-connect.sh` | 687 | Sync local state to team dashboard |
 | `scripts/sw-context.sh` | 601 | Context Engine for Pipeline Stages |
 | `scripts/sw-cost.sh` | 1070 | Token Usage & Cost Intelligence |
-| `scripts/sw-daemon.sh` | 1420 | Autonomous GitHub Issue Watcher |
+| `scripts/sw-daemon.sh` | 1417 | Autonomous GitHub Issue Watcher |
 | `scripts/sw-dashboard.sh` | 519 | Fleet Command Dashboard |
-| `scripts/sw-db.sh` | 1939 | SQLite Persistence Layer |
+| `scripts/sw-db.sh` | 1937 | SQLite Persistence Layer |
 | `scripts/sw-decide.sh` | 716 | Shipwright Autonomous Decision Engine |
 | `scripts/sw-decompose.sh` | 872 | Intelligent Issue Decomposition |
 | `scripts/sw-deps.sh` | 533 | Automated Dependency Update Management |
 | `scripts/sw-developer-simulation.sh` | 239 | Multi-Persona Developer Simulation |
 | `scripts/sw-discovery.sh` | 910 | Cross-Pipeline Real-Time Learning |
-| `scripts/sw-doc-fleet.sh` | 815 | Documentation Fleet Orchestrator |
+| `scripts/sw-doc-fleet.sh` | 817 | Documentation Fleet Orchestrator |
 | `scripts/sw-docs-agent.sh` | 525 | Auto-sync README, wiki, API docs |
 | `scripts/sw-docs.sh` | 626 | Documentation Keeper |
 | `scripts/sw-doctor.sh` | 1636 | Validate Shipwright setup |
@@ -663,9 +663,9 @@ All scripts are bash (except the dashboard server in TypeScript). Grouped by lay
 | `scripts/sw-fix.sh` | 474 | Bulk Fix Across Multiple Repos |
 | `scripts/sw-fleet-discover.sh` | 550 | Auto-Discovery from GitHub Orgs |
 | `scripts/sw-fleet-viz.sh` | 411 | Multi-Repo Fleet Visualization |
-| `scripts/sw-fleet.sh` | 1377 | Multi-Repo Daemon Orchestrator |
+| `scripts/sw-fleet.sh` | 1371 | Multi-Repo Daemon Orchestrator |
 | `scripts/sw-guild.sh` | 556 | Knowledge Guilds & Cross-Team Learning |
-| `scripts/sw-heartbeat.sh` | 316 | File-based agent heartbeat protocol |
+| `scripts/sw-heartbeat.sh` | 307 | File-based agent heartbeat protocol |
 | `scripts/sw-hello.sh` | 67 | Hello World Command |
 | `scripts/sw-hygiene.sh` | 724 | Repository Organization & Cleanup |
 | `scripts/sw-incident.sh` | 1141 | Autonomous Incident Detection & Response |
@@ -684,7 +684,7 @@ All scripts are bash (except the dashboard server in TypeScript). Grouped by lay
 | `scripts/sw-oversight.sh` | 757 | Quality Oversight Board |
 | `scripts/sw-patrol-meta.sh` | 786 | Shipwright Self-Improvement Patrol |
 | `scripts/sw-pipeline-composer.sh` | 444 | Dynamic Pipeline Composition |
-| `scripts/sw-pipeline-vitals.sh` | 1076 | Pipeline Vitals Engine |
+| `scripts/sw-pipeline-vitals.sh` | 1073 | Pipeline Vitals Engine |
 | `scripts/sw-pipeline.sh` | 282 | Autonomous Feature Delivery (Idea → Production) |
 | `scripts/sw-pm.sh` | 749 | Autonomous PM Agent for Team Orchestration |
 | `scripts/sw-pr-lifecycle.sh` | 688 | Autonomous PR Management |
@@ -700,16 +700,16 @@ All scripts are bash (except the dashboard server in TypeScript). Grouped by lay
 | `scripts/sw-release.sh` | 701 | Release train automation |
 | `scripts/sw-remote.sh` | 670 | Machine Registry & Remote Daemon Management |
 | `scripts/sw-replay.sh` | 542 | Pipeline run replay, timeline viewing, narratives |
-| `scripts/sw-retro.sh` | 821 | Sprint Retrospective Engine |
+| `scripts/sw-retro.sh` | 813 | Sprint Retrospective Engine |
 | `scripts/sw-review-rerun.sh` | 222 | Canonical Rerun Comment Writer |
 | `scripts/sw-scale.sh` | 609 | Dynamic agent team scaling during pipeline execution |
 | `scripts/sw-security-audit.sh` | 510 | Comprehensive Security Auditing |
 | `scripts/sw-self-optimize.sh` | 1690 | Learning & Self-Tuning System |
 | `scripts/sw-session.sh` | 553 | Launch a Claude Code team session in a new tmux window |
 | `scripts/sw-setup.sh` | 376 | Comprehensive onboarding wizard |
-| `scripts/sw-stall-detector.sh` | 406 | Pipeline Stall & Deadlock Detection |
-| `scripts/sw-standup.sh` | 721 | Automated Daily Standups for AI Agent Teams |
-| `scripts/sw-status.sh` | 869 | Dashboard showing Claude Code team status |
+| `scripts/sw-stall-detector.sh` | 402 | Pipeline Stall & Deadlock Detection |
+| `scripts/sw-standup.sh` | 717 | Automated Daily Standups for AI Agent Teams |
+| `scripts/sw-status.sh` | 862 | Dashboard showing Claude Code team status |
 | `scripts/sw-strategic.sh` | 948 | Strategic Intelligence Agent |
 | `scripts/sw-stream.sh` | 451 | Live terminal output streaming from agent panes |
 | `scripts/sw-swarm.sh` | 684 | Dynamic agent swarm management |
@@ -768,176 +768,177 @@ All scripts are bash (except the dashboard server in TypeScript). Grouped by lay
 
 | File | Lines | Purpose |
 | --- | ---: | --- |
-| `scripts/sw-activity-test.sh` | 221 | Validate live agent activity stream |
-| `scripts/sw-adapters-test.sh` | 197 | Structural/smoke tests for terminal & deploy |
-| `scripts/sw-adaptive-model-test.sh` | 417 | Test Suite for Adaptive Model Selection |
-| `scripts/sw-adaptive-test.sh` | 208 | Validate data-driven pipeline tuning |
-| `scripts/sw-adaptive-timeout-test.sh` | 406 | Test Suite for Adaptive Stage Timeout Engine |
-| `scripts/sw-adversarial-review-test.sh` | 266 | Adversarial Review Stage Tests |
-| `scripts/sw-adversarial-test.sh` | 258 | Validate adversarial agent code review |
-| `scripts/sw-agi-roadmap-test.sh` | 857 | Tests every feature we implemented |
-| `scripts/sw-architecture-enforcer-test.sh` | 301 | Validate architecture model |
-| `scripts/sw-auth-test.sh` | 143 | Validate OAuth authentication commands |
-| `scripts/sw-auto-recovery-test.sh` | 208 | Auto Recovery System Test Suite |
-| `scripts/sw-autonomous-e2e-test.sh` | 292 | Autonomous Loop E2E Test |
-| `scripts/sw-autonomous-test.sh` | 197 | AI-building-AI master controller tests |
-| `scripts/sw-autoresearch-e2e-test.sh` | 457 | Autoresearch RL System E2E Test Suite |
-| `scripts/sw-bandit-selector-test.sh` | 410 | Bandit Selector Test Suite |
-| `scripts/sw-budget-chaos-test.sh` | 251 | Budget Exhaustion & Chaos Tests |
-| `scripts/sw-changelog-test.sh` | 201 | Validate release notes generation |
-| `scripts/sw-chaos-test.sh` | 384 | Fault injection & recovery validation |
-| `scripts/sw-checkpoint-test.sh` | 341 | Validate checkpoint save/restore |
-| `scripts/sw-ci-bot-comments-test.sh` | 131 | SHIPWRIGHT-* markers from the bot only |
-| `scripts/sw-ci-issue-dispatch-state-test.sh` | 64 | ready, active, handled, fails |
-| `scripts/sw-ci-pipeline-active-test.sh` | 75 | is a pipeline running for an issue |
-| `scripts/sw-ci-retry-state-test.sh` | 116 | auto-retry count and abandon marker |
-| `scripts/sw-ci-test.sh` | 198 | GitHub Actions CI/CD orchestration tests |
-| `scripts/sw-cleanup-test.sh` | 168 | Clean up orphaned sessions & artifacts |
-| `scripts/sw-code-review-test.sh` | 175 | Clean code & architecture analysis tests |
-| `scripts/sw-connect-test.sh` | 1030 | Validate dashboard connection, heartbeat |
-| `scripts/sw-constitutional-test.sh` | 320 | Constitutional AI Test Suite |
-| `scripts/sw-context-budget-test.sh` | 335 | Context Window Budget Monitor tests |
-| `scripts/sw-context-test.sh` | 221 | Context Engine for Pipeline Stages tests |
-| `scripts/sw-convergence-test.sh` | 324 | Unit tests for convergence detection |
-| `scripts/sw-cost-optimizer-test.sh` | 466 | Test suite for cost optimization |
-| `scripts/sw-cost-test.sh` | 234 | Validate token usage & cost intelligence |
-| `scripts/sw-daemon-test.sh` | 1985 | Unit tests for daemon metrics, health, alerting |
-| `scripts/sw-dashboard-e2e-test.sh` | 591 | full live validation |
-| `scripts/sw-dashboard-test.sh` | 250 | validates dashboard structure |
-| `scripts/sw-db-test.sh` | 973 | SQLite Persistence Layer Test Suite |
-| `scripts/sw-decide-test.sh` | 520 | Unit tests for the Autonomous Decision Engine |
-| `scripts/sw-decompose-test.sh` | 221 | Intelligent Issue Decomposition tests |
-| `scripts/sw-deps-test.sh` | 165 | Automated Dependency Update Management tests |
-| `scripts/sw-developer-simulation-test.sh` | 262 | Validate multi-persona |
-| `scripts/sw-discovery-test.sh` | 268 | Cross-Pipeline Real-Time Learning tests |
-| `scripts/sw-doc-fleet-test.sh` | 345 | Validate documentation fleet operations |
-| `scripts/sw-docs-agent-test.sh` | 183 | Validate documentation agent operations |
-| `scripts/sw-docs-test.sh` | 784 | Validate documentation keeper, AUTO sections, |
-| `scripts/sw-doctor-test.sh` | 420 | Validate setup diagnostics |
-| `scripts/sw-dod-scorecard-test.sh` | 434 | Machine-Verifiable DoD Scorecard Tests |
-| `scripts/sw-dora-test.sh` | 241 | Validate DORA metrics dashboard, DX metrics, |
-| `scripts/sw-durable-test.sh` | 221 | Validate durable workflow engine |
-| `scripts/sw-e2e-integration-test.sh` | 366 | Real Claude + Real GitHub |
-| `scripts/sw-e2e-orchestrator-test.sh` | 157 | Test suite registry & execution |
-| `scripts/sw-e2e-smoke-test.sh` | 837 | Pipeline orchestration without API keys |
-| `scripts/sw-e2e-system-test.sh` | 497 | Proves full daemon→pipeline→loop→PR flow |
-| `scripts/sw-eventbus-test.sh` | 155 | Durable event bus tests |
-| `scripts/sw-evidence-test.sh` | 416 | Unit tests for sw-evidence.sh |
-| `scripts/sw-feedback-test.sh` | 302 | Production Feedback Loop tests |
-| `scripts/sw-fix-test.sh` | 621 | Unit tests for bulk fix across repos |
-| `scripts/sw-fleet-discover-test.sh` | 274 | Validate GitHub org auto-discovery, |
-| `scripts/sw-fleet-test.sh` | 824 | Unit tests for fleet orchestration |
-| `scripts/sw-fleet-viz-test.sh` | 278 | Validate fleet visualization dashboard, |
-| `scripts/sw-formal-spec-test.sh` | 297 | Formal Specification System Test Suite |
-| `scripts/sw-frontier-test.sh` | 576 | Validate adversarial review, developer |
-| `scripts/sw-github-app-test.sh` | 145 | Validate GitHub App management |
-| `scripts/sw-github-checks-test.sh` | 537 | Validate Checks API wrapper |
-| `scripts/sw-github-deploy-test.sh` | 525 | Validate Deployments API wrapper |
-| `scripts/sw-github-graphql-test.sh` | 663 | Unit tests for GitHub GraphQL client |
-| `scripts/sw-guild-test.sh` | 149 | Knowledge guilds & cross-team learning tests |
-| `scripts/sw-heartbeat-test.sh` | 583 | Validate heartbeat lifecycle, |
-| `scripts/sw-hello-test.sh` | 108 | Hello Command Test Suite |
-| `scripts/sw-hygiene-test.sh` | 198 | Repository Organization & Cleanup tests |
-| `scripts/sw-incident-test.sh` | 432 | Validate incident detection & response |
-| `scripts/sw-init-test.sh` | 656 | E2E validation of init/setup flow |
-| `scripts/sw-instrument-test.sh` | 172 | Pipeline instrumentation & feedback loops |
-| `scripts/sw-integration-claude-test.sh` | 112 | Budget-limited real Claude smoke |
-| `scripts/sw-intelligence-test.sh` | 536 | Unit tests for intelligence core |
-| `scripts/sw-intent-analysis-test.sh` | 443 | Test suite for intent analysis module |
-| `scripts/sw-jira-test.sh` | 284 | Validate Jira ↔ GitHub bidirectional sync |
-| `scripts/sw-launchd-test.sh` | 901 | Validate service management on |
-| `scripts/sw-lib-audit-trail-test.sh` | 311 |  |
-| `scripts/sw-lib-compat-test.sh` | 357 | Unit tests for cross-platform helpers |
-| `scripts/sw-lib-compound-audit-test.sh` | 281 |  |
-| `scripts/sw-lib-daemon-dispatch-test.sh` | 421 | Unit tests for spawn/reap/queue |
-| `scripts/sw-lib-daemon-failure-test.sh` | 320 | Unit tests for failure handling |
-| `scripts/sw-lib-daemon-gates-test.sh` | 461 | safety gates at the daemon call sites |
-| `scripts/sw-lib-daemon-patrol-test.sh` | 343 | Unit tests for all patrol functions |
-| `scripts/sw-lib-daemon-poll-test.sh` | 344 | Unit tests for poll, health, cleanup |
-| `scripts/sw-lib-daemon-state-test.sh` | 542 | Unit tests for state management |
-| `scripts/sw-lib-daemon-triage-test.sh` | 267 | Unit tests for triage scoring |
-| `scripts/sw-lib-error-actionability-test.sh` | 213 |  |
-| `scripts/sw-lib-helpers-test.sh` | 229 | Unit tests for shared helper functions |
-| `scripts/sw-lib-pipeline-detection-test.sh` | 391 | Unit tests for detection fns |
-| `scripts/sw-lib-pipeline-intelligence-test.sh` | 410 | Unit tests for intelligence |
-| `scripts/sw-lib-pipeline-quality-checks-test.sh` | 193 | Unit tests for quality |
-| `scripts/sw-lib-pipeline-stages-test.sh` | 291 | Unit tests for stage functions |
-| `scripts/sw-lib-pipeline-state-test.sh` | 309 | Unit tests for pipeline state |
-| `scripts/sw-lib-safety-gates-sites-test.sh` | 167 | automated filings use intake caps |
-| `scripts/sw-lib-safety-gates-test.sh` | 357 | bash callers of the TS safety gates |
-| `scripts/sw-lib-test-gate-env-test.sh` | 176 | the loop's test gate has no creds |
-| `scripts/sw-linear-test.sh` | 300 | Validate Linear ↔ GitHub bidirectional sync |
-| `scripts/sw-logs-test.sh` | 281 | Validate agent pane log viewing, searching, |
-| `scripts/sw-loop-test.sh` | 911 | Validate continuous agent loop harness |
-| `scripts/sw-memory-discovery-e2e-test.sh` | 411 | Memory & Discovery E2E Test |
-| `scripts/sw-memory-effectiveness-test.sh` | 497 | Unit tests |
-| `scripts/sw-memory-test.sh` | 903 | Unit tests for memory system & cost tracking |
-| `scripts/sw-mission-control-test.sh` | 153 | Validate mission control dashboard |
-| `scripts/sw-model-router-test.sh` | 313 | Intelligent model routing & optimization |
-| `scripts/sw-mutation-executor-test.sh` | 309 | Mutation Testing Engine Test Suite |
-| `scripts/sw-otel-test.sh` | 146 | OpenTelemetry observability |
-| `scripts/sw-outcome-feedback-test.sh` | 430 | Unit tests for review capture & quality |
-| `scripts/sw-oversight-test.sh` | 164 | Quality oversight board tests |
-| `scripts/sw-patrol-meta-test.sh` | 439 | Validate self-improvement patrol |
-| `scripts/sw-pipeline-composer-test.sh` | 634 | Test Suite |
-| `scripts/sw-pipeline-test.sh` | 1966 | E2E validation invoking the REAL pipeline |
-| `scripts/sw-pipeline-vitals-test.sh` | 226 | Validate pipeline health scoring |
-| `scripts/sw-pm-test.sh` | 225 | Autonomous PM Agent test suite |
-| `scripts/sw-policy-e2e-test.sh` | 290 | Verify config/policy.json is honored |
-| `scripts/sw-policy-learner-test.sh` | 359 | Policy Learner Test Suite |
-| `scripts/sw-pr-lifecycle-test.sh` | 317 | Validate autonomous PR management |
-| `scripts/sw-predictive-test.sh` | 693 | Unit tests for predictive intelligence |
-| `scripts/sw-prep-test.sh` | 638 | Validate repo preparation |
-| `scripts/sw-process-reward-test.sh` | 252 | Process Reward Model Test Suite |
-| `scripts/sw-project-detect-test.sh` | 434 | Unit tests for project detection |
-| `scripts/sw-ps-test.sh` | 296 | Validate agent process status display |
-| `scripts/sw-public-dashboard-test.sh` | 165 | Validate public dashboard generation |
-| `scripts/sw-quality-profile-test.sh` | 447 | Unit tests for quality profile library |
-| `scripts/sw-quality-test.sh` | 227 | Validate ruthless quality validation engine |
-| `scripts/sw-reaper-test.sh` | 232 | Validate automatic tmux pane cleanup |
-| `scripts/sw-recruit-test.sh` | 1395 | Test suite for AGI-level agent recruitment system |
-| `scripts/sw-regression-test.sh` | 258 | Validate regression detection pipeline |
-| `scripts/sw-release-manager-test.sh` | 206 | Validate release pipeline |
-| `scripts/sw-release-test.sh` | 200 | Release train automation |
-| `scripts/sw-remote-test.sh` | 398 | Validate machine registry, atomic writes, |
-| `scripts/sw-replay-test.sh` | 167 | Pipeline run replay & timeline viewing |
-| `scripts/sw-retro-test.sh` | 171 | Sprint retrospective engine tests |
-| `scripts/sw-review-rerun-test.sh` | 317 | SHA-deduped rerun comment writer |
-| `scripts/sw-reward-aggregator-test.sh` | 355 | Reward Aggregator Test Suite |
-| `scripts/sw-rl-optimizer-test.sh` | 350 | RL Optimizer Test Suite (Phase 7) |
-| `scripts/sw-root-cause-test.sh` | 374 |  |
-| `scripts/sw-scale-test.sh` | 151 | Dynamic agent team scaling |
-| `scripts/sw-scope-enforcement-test.sh` | 441 | Test suite for scope enforcement |
-| `scripts/sw-security-audit-test.sh` | 162 | Security auditing tests |
-| `scripts/sw-self-optimize-test.sh` | 875 | Unit tests for learning & tuning system |
-| `scripts/sw-server-api-test.sh` | 716 | Dashboard Server API Test Suite |
-| `scripts/sw-session-restart-test.sh` | 522 | Intelligent restart briefing system |
-| `scripts/sw-session-test.sh` | 597 | E2E validation of session creation flow |
-| `scripts/sw-setup-test.sh` | 262 | Validate comprehensive onboarding wizard |
-| `scripts/sw-spec-driven-test.sh` | 218 | Specification-Driven Development Test Suite |
-| `scripts/sw-spec-pipeline-test.sh` | 463 | Spec-Driven Pipeline Stages Test Suite |
-| `scripts/sw-stall-detector-test.sh` | 369 | Validate stall detection and abort |
-| `scripts/sw-standup-test.sh` | 241 | Validate daily standup automation |
-| `scripts/sw-status-test.sh` | 294 | Validate status dashboard and --json output |
-| `scripts/sw-strategic-test.sh` | 220 | Validate strategic intelligence agent |
-| `scripts/sw-stream-test.sh` | 140 | Live terminal output streaming |
-| `scripts/sw-swarm-test.sh` | 153 | Dynamic agent swarm management tests |
-| `scripts/sw-team-stages-test.sh` | 148 | Validate multi-agent stage execution |
-| `scripts/sw-templates-test.sh` | 251 | Validate team template browser |
-| `scripts/sw-test-holdout-test.sh` | 214 | Test Holdout System Test Suite |
-| `scripts/sw-test-optimizer-test.sh` | 395 | Test suite for test execution optimizer |
-| `scripts/sw-testgen-test.sh` | 160 | Test generation & coverage tests |
-| `scripts/sw-tmux-pipeline-test.sh` | 187 | Validate tmux pipeline management |
-| `scripts/sw-tmux-test.sh` | 748 | Validate tmux doctor, install, fix, reload, |
-| `scripts/sw-trace-test.sh` | 143 | E2E traceability (Issue → Commit → PR → Deploy) |
-| `scripts/sw-tracker-providers-test.sh` | 552 | Unit tests for GitHub, Linear, |
-| `scripts/sw-tracker-test.sh` | 536 | Validate tracker router, providers, and |
-| `scripts/sw-triage-test.sh` | 249 | Intelligent Issue Labeling & Prioritization |
-| `scripts/sw-upgrade-test.sh` | 334 | Validate upgrade detection and apply |
-| `scripts/sw-ux-test.sh` | 185 | Validate UX enhancement layer |
-| `scripts/sw-webhook-test.sh` | 167 | GitHub Webhook Receiver tests |
-| `scripts/sw-widgets-test.sh` | 357 | Validate embeddable status widgets |
-| `scripts/sw-worktree-test.sh` | 148 | Git worktree management for agent isolation |
+| `scripts/sw-activity-test.sh` | 222 | Validate live agent activity stream |
+| `scripts/sw-adapters-test.sh` | 198 | Structural/smoke tests for terminal & deploy |
+| `scripts/sw-adaptive-model-test.sh` | 419 | Test Suite for Adaptive Model Selection |
+| `scripts/sw-adaptive-test.sh` | 209 | Validate data-driven pipeline tuning |
+| `scripts/sw-adaptive-timeout-test.sh` | 408 | Test Suite for Adaptive Stage Timeout Engine |
+| `scripts/sw-adversarial-review-test.sh` | 267 | Adversarial Review Stage Tests |
+| `scripts/sw-adversarial-test.sh` | 259 | Validate adversarial agent code review |
+| `scripts/sw-agi-roadmap-test.sh` | 858 | Tests every feature we implemented |
+| `scripts/sw-architecture-enforcer-test.sh` | 302 | Validate architecture model |
+| `scripts/sw-auth-test.sh` | 144 | Validate OAuth authentication commands |
+| `scripts/sw-auto-recovery-test.sh` | 210 | Auto Recovery System Test Suite |
+| `scripts/sw-autonomous-e2e-test.sh` | 293 | Autonomous Loop E2E Test |
+| `scripts/sw-autonomous-test.sh` | 198 | AI-building-AI master controller tests |
+| `scripts/sw-autoresearch-e2e-test.sh` | 459 | Autoresearch RL System E2E Test Suite |
+| `scripts/sw-bandit-selector-test.sh` | 412 | Bandit Selector Test Suite |
+| `scripts/sw-budget-chaos-test.sh` | 252 | Budget Exhaustion & Chaos Tests |
+| `scripts/sw-changelog-test.sh` | 202 | Validate release notes generation |
+| `scripts/sw-chaos-test.sh` | 385 | Fault injection & recovery validation |
+| `scripts/sw-checkpoint-test.sh` | 342 | Validate checkpoint save/restore |
+| `scripts/sw-ci-bot-comments-test.sh` | 132 | SHIPWRIGHT-* markers from the bot only |
+| `scripts/sw-ci-issue-dispatch-state-test.sh` | 65 | ready, active, handled, fails |
+| `scripts/sw-ci-pipeline-active-test.sh` | 76 | is a pipeline running for an issue |
+| `scripts/sw-ci-retry-state-test.sh` | 117 | auto-retry count and abandon marker |
+| `scripts/sw-ci-test.sh` | 199 | GitHub Actions CI/CD orchestration tests |
+| `scripts/sw-cleanup-test.sh` | 169 | Clean up orphaned sessions & artifacts |
+| `scripts/sw-code-review-test.sh` | 176 | Clean code & architecture analysis tests |
+| `scripts/sw-connect-test.sh` | 1031 | Validate dashboard connection, heartbeat |
+| `scripts/sw-constitutional-test.sh` | 322 | Constitutional AI Test Suite |
+| `scripts/sw-context-budget-test.sh` | 336 | Context Window Budget Monitor tests |
+| `scripts/sw-context-test.sh` | 222 | Context Engine for Pipeline Stages tests |
+| `scripts/sw-convergence-test.sh` | 326 | Unit tests for convergence detection |
+| `scripts/sw-cost-optimizer-test.sh` | 468 | Test suite for cost optimization |
+| `scripts/sw-cost-test.sh` | 235 | Validate token usage & cost intelligence |
+| `scripts/sw-daemon-test.sh` | 1980 | Unit tests for daemon metrics, health, alerting |
+| `scripts/sw-dashboard-e2e-test.sh` | 593 | full live validation |
+| `scripts/sw-dashboard-test.sh` | 251 | validates dashboard structure |
+| `scripts/sw-db-test.sh` | 977 | SQLite Persistence Layer Test Suite |
+| `scripts/sw-decide-test.sh` | 521 | Unit tests for the Autonomous Decision Engine |
+| `scripts/sw-decompose-test.sh` | 222 | Intelligent Issue Decomposition tests |
+| `scripts/sw-deps-test.sh` | 166 | Automated Dependency Update Management tests |
+| `scripts/sw-developer-simulation-test.sh` | 263 | Validate multi-persona |
+| `scripts/sw-discovery-test.sh` | 269 | Cross-Pipeline Real-Time Learning tests |
+| `scripts/sw-doc-fleet-test.sh` | 346 | Validate documentation fleet operations |
+| `scripts/sw-docs-agent-test.sh` | 184 | Validate documentation agent operations |
+| `scripts/sw-docs-test.sh` | 785 | Validate documentation keeper, AUTO sections, |
+| `scripts/sw-doctor-test.sh` | 421 | Validate setup diagnostics |
+| `scripts/sw-dod-scorecard-test.sh` | 435 | Machine-Verifiable DoD Scorecard Tests |
+| `scripts/sw-dora-test.sh` | 242 | Validate DORA metrics dashboard, DX metrics, |
+| `scripts/sw-durable-test.sh` | 222 | Validate durable workflow engine |
+| `scripts/sw-e2e-integration-test.sh` | 367 | Real Claude + Real GitHub |
+| `scripts/sw-e2e-orchestrator-test.sh` | 158 | Test suite registry & execution |
+| `scripts/sw-e2e-smoke-test.sh` | 838 | Pipeline orchestration without API keys |
+| `scripts/sw-e2e-system-test.sh` | 498 | Proves full daemon→pipeline→loop→PR flow |
+| `scripts/sw-eventbus-test.sh` | 156 | Durable event bus tests |
+| `scripts/sw-evidence-test.sh` | 417 | Unit tests for sw-evidence.sh |
+| `scripts/sw-feedback-test.sh` | 303 | Production Feedback Loop tests |
+| `scripts/sw-fix-test.sh` | 622 | Unit tests for bulk fix across repos |
+| `scripts/sw-fleet-discover-test.sh` | 275 | Validate GitHub org auto-discovery, |
+| `scripts/sw-fleet-test.sh` | 825 | Unit tests for fleet orchestration |
+| `scripts/sw-fleet-viz-test.sh` | 279 | Validate fleet visualization dashboard, |
+| `scripts/sw-formal-spec-test.sh` | 299 | Formal Specification System Test Suite |
+| `scripts/sw-frontier-test.sh` | 577 | Validate adversarial review, developer |
+| `scripts/sw-github-app-test.sh` | 146 | Validate GitHub App management |
+| `scripts/sw-github-checks-test.sh` | 538 | Validate Checks API wrapper |
+| `scripts/sw-github-deploy-test.sh` | 526 | Validate Deployments API wrapper |
+| `scripts/sw-github-graphql-test.sh` | 664 | Unit tests for GitHub GraphQL client |
+| `scripts/sw-guild-test.sh` | 150 | Knowledge guilds & cross-team learning tests |
+| `scripts/sw-heartbeat-test.sh` | 584 | Validate heartbeat lifecycle, |
+| `scripts/sw-hello-test.sh` | 110 | Hello Command Test Suite |
+| `scripts/sw-hygiene-test.sh` | 199 | Repository Organization & Cleanup tests |
+| `scripts/sw-incident-test.sh` | 433 | Validate incident detection & response |
+| `scripts/sw-init-test.sh` | 657 | E2E validation of init/setup flow |
+| `scripts/sw-instrument-test.sh` | 173 | Pipeline instrumentation & feedback loops |
+| `scripts/sw-integration-claude-test.sh` | 113 | Budget-limited real Claude smoke |
+| `scripts/sw-intelligence-test.sh` | 537 | Unit tests for intelligence core |
+| `scripts/sw-intent-analysis-test.sh` | 445 | Test suite for intent analysis module |
+| `scripts/sw-jira-test.sh` | 285 | Validate Jira ↔ GitHub bidirectional sync |
+| `scripts/sw-launchd-test.sh` | 902 | Validate service management on |
+| `scripts/sw-lib-audit-trail-test.sh` | 312 |  |
+| `scripts/sw-lib-compat-test.sh` | 415 | Unit tests for cross-platform helpers |
+| `scripts/sw-lib-compound-audit-test.sh` | 282 |  |
+| `scripts/sw-lib-daemon-dispatch-test.sh` | 418 | Unit tests for spawn/reap/queue |
+| `scripts/sw-lib-daemon-failure-test.sh` | 321 | Unit tests for failure handling |
+| `scripts/sw-lib-daemon-gates-test.sh` | 462 | safety gates at the daemon call sites |
+| `scripts/sw-lib-daemon-patrol-test.sh` | 712 | Unit tests for all patrol functions |
+| `scripts/sw-lib-daemon-poll-test.sh` | 345 | Unit tests for poll, health, cleanup |
+| `scripts/sw-lib-daemon-state-test.sh` | 543 | Unit tests for state management |
+| `scripts/sw-lib-daemon-triage-test.sh` | 268 | Unit tests for triage scoring |
+| `scripts/sw-lib-error-actionability-test.sh` | 214 |  |
+| `scripts/sw-lib-helpers-test.sh` | 230 | Unit tests for shared helper functions |
+| `scripts/sw-lib-pipeline-detection-test.sh` | 392 | Unit tests for detection fns |
+| `scripts/sw-lib-pipeline-intelligence-test.sh` | 411 | Unit tests for intelligence |
+| `scripts/sw-lib-pipeline-quality-checks-test.sh` | 194 | Unit tests for quality |
+| `scripts/sw-lib-pipeline-stages-test.sh` | 292 | Unit tests for stage functions |
+| `scripts/sw-lib-pipeline-state-test.sh` | 310 | Unit tests for pipeline state |
+| `scripts/sw-lib-safety-gates-sites-test.sh` | 168 | automated filings use intake caps |
+| `scripts/sw-lib-safety-gates-test.sh` | 358 | bash callers of the TS safety gates |
+| `scripts/sw-lib-test-gate-env-test.sh` | 178 | the loop's test gate has no creds |
+| `scripts/sw-lib-test-isolate-test.sh` | 139 | regression test for test isolation (#8648) |
+| `scripts/sw-linear-test.sh` | 301 | Validate Linear ↔ GitHub bidirectional sync |
+| `scripts/sw-logs-test.sh` | 282 | Validate agent pane log viewing, searching, |
+| `scripts/sw-loop-test.sh` | 912 | Validate continuous agent loop harness |
+| `scripts/sw-memory-discovery-e2e-test.sh` | 412 | Memory & Discovery E2E Test |
+| `scripts/sw-memory-effectiveness-test.sh` | 498 | Unit tests |
+| `scripts/sw-memory-test.sh` | 905 | Unit tests for memory system & cost tracking |
+| `scripts/sw-mission-control-test.sh` | 154 | Validate mission control dashboard |
+| `scripts/sw-model-router-test.sh` | 314 | Intelligent model routing & optimization |
+| `scripts/sw-mutation-executor-test.sh` | 311 | Mutation Testing Engine Test Suite |
+| `scripts/sw-otel-test.sh` | 147 | OpenTelemetry observability |
+| `scripts/sw-outcome-feedback-test.sh` | 432 | Unit tests for review capture & quality |
+| `scripts/sw-oversight-test.sh` | 165 | Quality oversight board tests |
+| `scripts/sw-patrol-meta-test.sh` | 440 | Validate self-improvement patrol |
+| `scripts/sw-pipeline-composer-test.sh` | 635 | Test Suite |
+| `scripts/sw-pipeline-test.sh` | 1967 | E2E validation invoking the REAL pipeline |
+| `scripts/sw-pipeline-vitals-test.sh` | 227 | Validate pipeline health scoring |
+| `scripts/sw-pm-test.sh` | 226 | Autonomous PM Agent test suite |
+| `scripts/sw-policy-e2e-test.sh` | 291 | Verify config/policy.json is honored |
+| `scripts/sw-policy-learner-test.sh` | 361 | Policy Learner Test Suite |
+| `scripts/sw-pr-lifecycle-test.sh` | 318 | Validate autonomous PR management |
+| `scripts/sw-predictive-test.sh` | 694 | Unit tests for predictive intelligence |
+| `scripts/sw-prep-test.sh` | 639 | Validate repo preparation |
+| `scripts/sw-process-reward-test.sh` | 254 | Process Reward Model Test Suite |
+| `scripts/sw-project-detect-test.sh` | 473 | Unit tests for project detection |
+| `scripts/sw-ps-test.sh` | 297 | Validate agent process status display |
+| `scripts/sw-public-dashboard-test.sh` | 166 | Validate public dashboard generation |
+| `scripts/sw-quality-profile-test.sh` | 448 | Unit tests for quality profile library |
+| `scripts/sw-quality-test.sh` | 228 | Validate ruthless quality validation engine |
+| `scripts/sw-reaper-test.sh` | 233 | Validate automatic tmux pane cleanup |
+| `scripts/sw-recruit-test.sh` | 1396 | Test suite for AGI-level agent recruitment system |
+| `scripts/sw-regression-test.sh` | 259 | Validate regression detection pipeline |
+| `scripts/sw-release-manager-test.sh` | 207 | Validate release pipeline |
+| `scripts/sw-release-test.sh` | 201 | Release train automation |
+| `scripts/sw-remote-test.sh` | 399 | Validate machine registry, atomic writes, |
+| `scripts/sw-replay-test.sh` | 168 | Pipeline run replay & timeline viewing |
+| `scripts/sw-retro-test.sh` | 172 | Sprint retrospective engine tests |
+| `scripts/sw-review-rerun-test.sh` | 318 | SHA-deduped rerun comment writer |
+| `scripts/sw-reward-aggregator-test.sh` | 357 | Reward Aggregator Test Suite |
+| `scripts/sw-rl-optimizer-test.sh` | 352 | RL Optimizer Test Suite (Phase 7) |
+| `scripts/sw-root-cause-test.sh` | 375 |  |
+| `scripts/sw-scale-test.sh` | 152 | Dynamic agent team scaling |
+| `scripts/sw-scope-enforcement-test.sh` | 443 | Test suite for scope enforcement |
+| `scripts/sw-security-audit-test.sh` | 163 | Security auditing tests |
+| `scripts/sw-self-optimize-test.sh` | 876 | Unit tests for learning & tuning system |
+| `scripts/sw-server-api-test.sh` | 717 | Dashboard Server API Test Suite |
+| `scripts/sw-session-restart-test.sh` | 523 | Intelligent restart briefing system |
+| `scripts/sw-session-test.sh` | 598 | E2E validation of session creation flow |
+| `scripts/sw-setup-test.sh` | 263 | Validate comprehensive onboarding wizard |
+| `scripts/sw-spec-driven-test.sh` | 220 | Specification-Driven Development Test Suite |
+| `scripts/sw-spec-pipeline-test.sh` | 465 | Spec-Driven Pipeline Stages Test Suite |
+| `scripts/sw-stall-detector-test.sh` | 370 | Validate stall detection and abort |
+| `scripts/sw-standup-test.sh` | 242 | Validate daily standup automation |
+| `scripts/sw-status-test.sh` | 295 | Validate status dashboard and --json output |
+| `scripts/sw-strategic-test.sh` | 221 | Validate strategic intelligence agent |
+| `scripts/sw-stream-test.sh` | 141 | Live terminal output streaming |
+| `scripts/sw-swarm-test.sh` | 154 | Dynamic agent swarm management tests |
+| `scripts/sw-team-stages-test.sh` | 149 | Validate multi-agent stage execution |
+| `scripts/sw-templates-test.sh` | 252 | Validate team template browser |
+| `scripts/sw-test-holdout-test.sh` | 216 | Test Holdout System Test Suite |
+| `scripts/sw-test-optimizer-test.sh` | 396 | Test suite for test execution optimizer |
+| `scripts/sw-testgen-test.sh` | 161 | Test generation & coverage tests |
+| `scripts/sw-tmux-pipeline-test.sh` | 188 | Validate tmux pipeline management |
+| `scripts/sw-tmux-test.sh` | 749 | Validate tmux doctor, install, fix, reload, |
+| `scripts/sw-trace-test.sh` | 144 | E2E traceability (Issue → Commit → PR → Deploy) |
+| `scripts/sw-tracker-providers-test.sh` | 553 | Unit tests for GitHub, Linear, |
+| `scripts/sw-tracker-test.sh` | 537 | Validate tracker router, providers, and |
+| `scripts/sw-triage-test.sh` | 250 | Intelligent Issue Labeling & Prioritization |
+| `scripts/sw-upgrade-test.sh` | 335 | Validate upgrade detection and apply |
+| `scripts/sw-ux-test.sh` | 186 | Validate UX enhancement layer |
+| `scripts/sw-webhook-test.sh` | 168 | GitHub Webhook Receiver tests |
+| `scripts/sw-widgets-test.sh` | 358 | Validate embeddable status widgets |
+| `scripts/sw-worktree-test.sh` | 149 | Git worktree management for agent isolation |
 <!-- /AUTO:test-suites -->
 
 ### Dashboard & Infra

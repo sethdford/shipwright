@@ -348,7 +348,7 @@ incident_correlate() {
         id=$(jq -r '.id' "$incident_file" 2>/dev/null || echo "")
         created_at=$(jq -r '.created_at' "$incident_file" 2>/dev/null || echo "")
         local created_epoch
-        created_epoch=$(date -d "$created_at" +%s 2>/dev/null || echo "0")
+        created_epoch=$(date_to_epoch "$created_at" || echo "0")
 
         if [[ "$created_epoch" -lt "$window_start" ]]; then
             continue

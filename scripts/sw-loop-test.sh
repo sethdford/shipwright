@@ -7,6 +7,7 @@ trap 'echo "ERROR: $BASH_SOURCE:$LINENO exited with status $?" >&2' ERR
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "$SCRIPT_DIR/lib/test-helpers.sh"
+sw_test_isolate
 
 setup_env() {
     mkdir -p "$TEST_TEMP_DIR/home/.shipwright"
@@ -91,7 +92,7 @@ MOCKEOF
     export NO_GITHUB=true
 }
 
-trap cleanup_test_env EXIT
+trap 'cleanup_test_env; sw_test_teardown' EXIT
 
 # Use assert_pass/assert_fail from test-helpers.sh (they track TOTAL/PASS/FAIL counters)
 

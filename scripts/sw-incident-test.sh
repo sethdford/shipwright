@@ -7,6 +7,7 @@ trap 'echo "ERROR: $BASH_SOURCE:$LINENO exited with status $?" >&2' ERR
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "$SCRIPT_DIR/lib/test-helpers.sh"
+sw_test_isolate
 
 setup_env() {
     mkdir -p "$TEST_TEMP_DIR/home/.shipwright/incidents"
@@ -51,7 +52,7 @@ MOCKEOF
     export REPO_DIR="$TEST_TEMP_DIR/repo"
 }
 
-trap cleanup_test_env EXIT
+trap 'cleanup_test_env; sw_test_teardown' EXIT
 
 # assert_pass / assert_fail come from test-helpers.sh, which owns the counters.
 # A local copy here used to skip the counters, so the summary said "All 0 tests passed".

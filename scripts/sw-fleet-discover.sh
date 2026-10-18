@@ -211,7 +211,7 @@ discover_repos() {
             if [[ "$min_activity_days" -gt 0 && -n "$pushed_at" ]]; then
                 # Parse ISO timestamp to epoch
                 local pushed_epoch
-                pushed_epoch=$(date -d "$pushed_at" +%s 2>/dev/null || date -j -f "%Y-%m-%dT%H:%M:%SZ" "$pushed_at" +%s 2>/dev/null || echo 0)
+                pushed_epoch=$(date_to_epoch "$pushed_at" || echo 0)
 
                 if [[ "$pushed_epoch" -lt "$cutoff_epoch" ]]; then
                     skipped_repos+=("$name:inactive")

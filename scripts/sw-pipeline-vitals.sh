@@ -231,8 +231,7 @@ _compute_budget() {
     local today_start
     today_start=$(date -u +"%Y-%m-%dT00:00:00Z")
     local today_epoch
-    today_epoch=$(date -u -jf "%Y-%m-%dT%H:%M:%SZ" "$today_start" +%s 2>/dev/null \
-        || date -u -d "$today_start" +%s 2>/dev/null || echo "0")
+    today_epoch=$(date_to_epoch "$today_start" || echo "0")
 
     local today_spent="0"
     if [[ -f "$cost_file" ]]; then
@@ -497,8 +496,7 @@ pipeline_compute_vitals() {
             local today_start
             today_start=$(date -u +"%Y-%m-%dT00:00:00Z")
             local today_epoch
-            today_epoch=$(date -u -jf "%Y-%m-%dT%H:%M:%SZ" "$today_start" +%s 2>/dev/null \
-                || date -u -d "$today_start" +%s 2>/dev/null || echo "0")
+            today_epoch=$(date_to_epoch "$today_start" || echo "0")
             if [[ -f "$COST_FILE" ]]; then
                 today_spent=$(jq --argjson cutoff "$today_epoch" \
                     '[.entries[] | select(.ts_epoch >= $cutoff) | .cost_usd] | add // 0' \
@@ -714,8 +712,7 @@ pipeline_budget_trajectory() {
     local today_start
     today_start=$(date -u +"%Y-%m-%dT00:00:00Z")
     local today_epoch
-    today_epoch=$(date -u -jf "%Y-%m-%dT%H:%M:%SZ" "$today_start" +%s 2>/dev/null \
-        || date -u -d "$today_start" +%s 2>/dev/null || echo "0")
+    today_epoch=$(date_to_epoch "$today_start" || echo "0")
 
     today_spent="0"
     if [[ -f "$COST_FILE" ]]; then

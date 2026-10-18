@@ -5,6 +5,7 @@ _DAEMON_STATE_LOADED=1
 # fleet_curl: dashboard calls carry the fleet token on stdin
 # shellcheck source=safety-gates.sh
 source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/safety-gates.sh"
+source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/compat.sh"
 
 # Defaults for variables normally set by sw-daemon.sh (safe under set -u).
 DAEMON_DIR="${DAEMON_DIR:-${HOME}/.shipwright}"
@@ -324,7 +325,7 @@ _sync_state_to_db() {
         fi
         start_epoch=0
         if [[ -n "$started_at" ]]; then
-            start_epoch=$(TZ=UTC date -j -f "%Y-%m-%dT%H:%M:%SZ" "$started_at" +%s 2>/dev/null || date -d "$started_at" +%s 2>/dev/null || echo "0")
+            start_epoch=$(date_to_epoch "$started_at" || echo "0")
         fi
         [[ -z "$start_epoch" ]] && start_epoch=0
         job_id="daemon-${issue}-${start_epoch}"

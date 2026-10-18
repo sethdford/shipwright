@@ -396,7 +396,9 @@ Run: claude --print .claude/agents/doc-fleet-agent.md to review before starting.
 BRIEF
             mv "$brief_tmp" "$brief_file"
 
-            if [[ "$mode" == "--autonomous" ]] && [[ -x "${SCRIPT_DIR}/sw-loop.sh" ]]; then
+            if [[ "${SHIPWRIGHT_TEST_MODE:-}" == "1" ]]; then
+                warn "SHIPWRIGHT_TEST_MODE=1: not launching doc agent ${role} in tmux (#8648)"
+            elif [[ "$mode" == "--autonomous" ]] && [[ -x "${SCRIPT_DIR}/sw-loop.sh" ]]; then
                 # Launch via loop harness for autonomous mode
                 tmux new-session -d -s "$session_name" -c "$REPO_DIR" \
                     "bash \"${SCRIPT_DIR}/sw-loop.sh\" \"${agent_goal}\" --max-iterations 10 --roles docs" 2>/dev/null || true

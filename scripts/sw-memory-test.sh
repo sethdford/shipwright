@@ -8,6 +8,7 @@ trap 'echo "ERROR: $BASH_SOURCE:$LINENO exited with status $?" >&2' ERR
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "$SCRIPT_DIR/lib/test-helpers.sh"
+sw_test_isolate
 MEMORY_SCRIPT="$SCRIPT_DIR/sw-memory.sh"
 COST_SCRIPT="$SCRIPT_DIR/sw-cost.sh"
 
@@ -118,7 +119,7 @@ cleanup_env() {
         rm -rf "$TEST_TEMP_DIR"
     fi
 }
-trap cleanup_env EXIT
+trap 'cleanup_env; sw_test_teardown' EXIT
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # TEST RUNNER
@@ -349,8 +350,9 @@ test_memory_export() {
     # Capture some data first
     (cd "$TEST_TEMP_DIR/project" && bash "$MEMORY_SCRIPT" pattern project 2>&1) >/dev/null
 
+    # stdout only: warnings on stderr (e.g. macOS tooling noise) must not break the JSON (#8643)
     local output
-    output=$(cd "$TEST_TEMP_DIR/project" && bash "$MEMORY_SCRIPT" export 2>&1)
+    output=$(cd "$TEST_TEMP_DIR/project" && bash "$MEMORY_SCRIPT" export 2>/dev/null)
 
     # Should be valid JSON
     if ! echo "$output" | jq empty 2>/dev/null; then

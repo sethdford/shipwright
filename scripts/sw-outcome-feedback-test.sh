@@ -6,6 +6,8 @@
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+source "$SCRIPT_DIR/lib/test-isolate.sh"
+sw_test_isolate
 # The fallback was "/tmp/claude", which does not exist on a CI runner — TMPDIR
 # is typically unset there, so mktemp tried to create a directory inside a
 # missing parent and the suite died during setup. /tmp is the portable default
@@ -18,7 +20,7 @@ MEMORY_TEST_ROOT="$TMPBASE/sw-memory-test-$$"
 cleanup() {
     rm -rf "$TEST_DIR" "$MEMORY_TEST_ROOT" 2>/dev/null || true
 }
-trap 'cleanup' EXIT
+trap 'cleanup; sw_test_teardown' EXIT
 
 # Test counter
 PASS=0

@@ -6,6 +6,8 @@
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+source "$SCRIPT_DIR/lib/test-isolate.sh"
+sw_test_isolate
 PASS=0
 FAIL=0
 TEST_TMP=""

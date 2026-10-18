@@ -453,7 +453,7 @@ cmd_share() {
         --arg token "$token" \
         --arg privacy "$privacy" \
         --arg created "$(now_iso)" \
-        --arg expires "$(date -u -d "@$expires_at" +%Y-%m-%dT%H:%M:%SZ 2>/dev/null || date -u -v +${expiry_hours}H +%Y-%m-%dT%H:%M:%SZ)" \
+        --arg expires "$(epoch_to_iso "$expires_at")" \
         '{token:$token, privacy:$privacy, created:$created, expires:$expires, view_count:0, last_viewed:null}')
 
     # Append to share links file (atomic)
@@ -469,7 +469,7 @@ cmd_share() {
     success "Share link created!"
     echo "  Token: $token"
     echo "  Privacy: $privacy"
-    echo "  Expires: $(date -u -d "@$expires_at" +%Y-%m-%d\ %H:%M:%S 2>/dev/null || date -u -v +${expiry_hours}H +%Y-%m-%d\ %H:%M:%S)"
+    echo "  Expires: $(epoch_format -u "$expires_at" '%Y-%m-%d %H:%M:%S')"
     echo ""
     echo "  Share URL: https://your-domain.com/public-dashboard/$token"
     echo "  or embed:  <iframe src=\"https://your-domain.com/public-dashboard/$token\"></iframe>"

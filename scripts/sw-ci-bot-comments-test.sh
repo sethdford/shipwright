@@ -8,11 +8,12 @@ trap 'echo "ERROR: $BASH_SOURCE:$LINENO exited with status $?" >&2' ERR
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "$SCRIPT_DIR/lib/test-helpers.sh"
+sw_test_isolate
 
 print_test_header "CI: bot-comments Tests"
 
 setup_test_env "ci-bot-comments"
-trap cleanup_test_env EXIT
+trap 'cleanup_test_env; sw_test_teardown' EXIT
 # setup_test_env exports NO_GITHUB=true; this helper refuses to run under it (tested below).
 unset NO_GITHUB
 

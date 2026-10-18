@@ -10,11 +10,12 @@ trap 'echo "ERROR: $BASH_SOURCE:$LINENO exited with status $?" >&2' ERR
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "$SCRIPT_DIR/lib/test-helpers.sh"
+sw_test_isolate
 
 print_test_header "Lib: test-gate-env Tests"
 
 setup_test_env "lib-test-gate-env"
-trap cleanup_test_env EXIT
+trap 'cleanup_test_env; sw_test_teardown' EXIT
 
 source "$SCRIPT_DIR/lib/test-gate-env.sh"
 # GIT_CONFIG_* this suite inherited (set when it runs inside a pipeline's test gate). Taken before
@@ -146,6 +147,7 @@ e2e_tree="$TEST_TEMP_DIR/e2e-tree"
 mkdir -p "$e2e_tree/scripts/lib"
 cp "$SCRIPT_DIR/sw-e2e-integration-test.sh" "$e2e_tree/scripts/"
 cp "$SCRIPT_DIR/lib/test-helpers.sh" "$e2e_tree/scripts/lib/"
+cp "$SCRIPT_DIR/lib/test-isolate.sh" "$e2e_tree/scripts/lib/"
 [[ -f "$SCRIPT_DIR/lib/compat.sh" ]] && cp "$SCRIPT_DIR/lib/compat.sh" "$e2e_tree/scripts/lib/"
 export E2E_GH_LOG="$TEST_TEMP_DIR/e2e-gh.log"
 : > "$E2E_GH_LOG"
