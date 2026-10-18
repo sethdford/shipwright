@@ -162,6 +162,15 @@ else
     assert_fail "bun log: failing unit without timing" "got: $TG_UNITS"
 fi
 
+# bun on a terminal ends each line with CRLF; the same log must parse the same way
+printf 'b.test.ts:\r\n(fail) bad two [3.09ms]\r\nRan 2 tests across 1 file. [11.00ms]\r\n 1 pass\r\n 1 fail\r\n' > "$TEST_TEMP_DIR/bun-crlf.log"
+tg_parse_log "$TEST_TEMP_DIR/bun-crlf.log"
+if printf '%s\n' "$TG_UNITS" | grep -Fx -- "b.test.ts::bad two#1" >/dev/null; then
+    assert_pass "bun log with CRLF line ends: failing unit is file-qualified"
+else
+    assert_fail "bun log with CRLF line ends: failing unit is file-qualified" "got: $TG_UNITS"
+fi
+
 printf 'Error: Cannot find module x\n' > "$TEST_TEMP_DIR/junk.log"
 tg_parse_log "$TEST_TEMP_DIR/junk.log"
 assert_eq "unknown output: not parsable" "0" "$TG_PARSABLE"

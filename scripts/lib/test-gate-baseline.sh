@@ -117,7 +117,8 @@ _tg_block() {
 # "<file>:" header before each file's "# Unhandled error between tests" block, and the summary.
 tg_parse_log() {
     local log="$1" plain units="" pass summary=0 bun=0
-    plain="$(sed "s/$(printf '\033')\[[0-9;]*m//g" "$log" 2>/dev/null || true)"
+    # CRs too: bun ends every line with CRLF when its output is a terminal, which breaks the anchors.
+    plain="$(sed "s/$(printf '\033')\[[0-9;]*m//g" "$log" 2>/dev/null | tr -d '\r' || true)"
     units="$(printf '%s\n' "$plain" | awk '
         /^━━━ [^ ]+ \(/ { cur = $2; next }
         /^  FAILING SUITES/ { cur = ""; next }
