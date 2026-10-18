@@ -6,6 +6,7 @@ token setup: [dashboard-exposure.md](dashboard-exposure.md).
 
 Every gate fails closed. If a source cannot be read (GitHub down, a bad token, a malformed cost file,
 no Bun), nothing is dispatched, retried or filed. Fix the source; do not bypass the gate.
+Exit 0 from `gates check` or `intake check` is the only "go"; any other exit, including a crash, is a stop.
 
 ## Stop everything
 
