@@ -1258,7 +1258,7 @@ AUDIT_PROMPT
     local audit_flags=()
     audit_flags+=("--model" "$audit_model")
     # Read-only stage: no edits. Bash and the rest of the policy come from agent-exec.
-    audit_flags+=("--disallowedTools" "Edit,Write,NotebookEdit")
+    audit_flags+=("--disallowedTools=Edit,Write,NotebookEdit")
 
     # Use structured output for machine-parseable audit results
     local schema_file="${SCRIPT_DIR}/../schemas/audit-result.json"
@@ -1393,7 +1393,7 @@ DOD_PROMPT
     dod_model="$(select_audit_model)"
     local dod_flags=()
     dod_flags+=("--model" "$dod_model")
-    dod_flags+=("--disallowedTools" "Edit,Write,NotebookEdit")
+    dod_flags+=("--disallowedTools=Edit,Write,NotebookEdit")
 
     "$SW_AGENT_EXEC" claude -p "$dod_prompt" "${dod_flags[@]}" > "$dod_log" 2>&1 || true
 
@@ -1505,7 +1505,7 @@ HOLISTIC_PROMPT
     local hol_model
     hol_model="$(select_audit_model)"
     local hol_flags=("--model" "$hol_model")
-    hol_flags+=("--disallowedTools" "Edit,Write,NotebookEdit")
+    hol_flags+=("--disallowedTools=Edit,Write,NotebookEdit")
 
     "$SW_AGENT_EXEC" claude -p "$holistic_prompt" "${hol_flags[@]}" > "$holistic_log" 2>&1 || true
 

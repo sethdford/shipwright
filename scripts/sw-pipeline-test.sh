@@ -139,15 +139,27 @@ create_mock_claude() {
 #!/usr/bin/env bash
 # Mock claude CLI — detects plan vs review from prompt content
 prompt=""
+_all_args=" $* "
 while [[ $# -gt 0 ]]; do
     case "$1" in
         --print|--output-format|--verbose) shift ;;
         --model|--max-turns|--effort|--fallback-model|-p) shift 2 ;;
-        --settings|--setting-sources|--permission-mode|--permission-prompts|--disallowedTools|--allowedTools) shift 2 ;;
+        --settings|--setting-sources|--permission-mode|--permission-prompts) shift 2 ;;
+        # Commander's variadic flags take every following non-option argument, so a space-separated
+        # value followed by the prompt swallows the prompt (#8660 review). The stub does the same, so
+        # a call that puts the prompt after a variadic flag reaches here with no prompt and fails.
+        --disallowedTools|--allowedTools|--tools|--add-dir)
+            shift
+            while [[ $# -gt 0 && "$1" != -* ]]; do shift; done ;;
         -*)                      shift ;;  # Skip unknown flags
         *)                       prompt="$1"; shift ;;
     esac
 done
+# A print-mode call with no prompt means a flag swallowed it: fail loudly instead of returning empty output.
+if [[ -z "$prompt" && ( "$_all_args" == *" --print "* || "$_all_args" == *" -p "* ) ]]; then
+    echo "mock claude: no prompt reached claude (a variadic flag swallowed it?)" >&2
+    exit 2
+fi
 
 if echo "$prompt" | grep >/dev/null -iE "code review|reviewer|senior.*review|spec compliance"; then
     cat <<'REVIEW'
