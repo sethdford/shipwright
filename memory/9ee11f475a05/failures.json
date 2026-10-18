@@ -7,7 +7,8 @@
       "fix": "Make the cost dashboard render the CONTEXT EFFICIENCY section even when there are no cost entries (or have the test seed a cost entry/use an events path the dashboard reads) so the avg budget utilization assertions pass.",
       "seen_count": 52,
       "last_seen": "2026-10-11T04:38:22Z",
-      "category": "test_failure"
+      "category": "test_failure",
+      "weight": 2.25
     },
     {
       "stage": "test",
@@ -17,7 +18,8 @@
       "seen_count": 11,
       "last_seen": "2026-10-11T04:00:38Z",
       "category": "test_failure",
-      "signature": "unknown:cede96e649db9be5"
+      "signature": "unknown:cede96e649db9be5",
+      "weight": 2.25
     },
     {
       "stage": "test",
@@ -116,7 +118,8 @@
       "fix": "Unset the gate env vars (e.g. SHIPWRIGHT_TEST_GATE) in the failing test's 'outside the gate' case, or fix lib/test-gate-env.sh so it leaves the saved header untouched when no gate is active. Then rerun with `bash scripts/sw-test-all.sh --pattern sw-lib-test-gate-env`.",
       "seen_count": 14,
       "last_seen": "2026-10-16T14:22:50Z",
-      "category": "test_failure"
+      "category": "test_failure",
+      "weight": 2.25
     },
     {
       "stage": "test",
