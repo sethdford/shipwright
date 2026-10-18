@@ -91,10 +91,11 @@ while [[ $# -gt 0 ]]; do
         # Valueless flags consume ONE argument. They previously shared the
         # `shift 2` branch with value-taking flags, and `shift 2` with a single
         # argument remaining fails without shifting — so whenever sw-loop.sh
-        # passed --dangerously-skip-permissions last (it appends exactly that to
-        # its flag arrays), $# never reached 0 and this loop spun forever at
-        # 100% CPU. That was the sw-e2e-system-test hang.
-        --print|--verbose|--dangerously-skip-permissions) shift ;;
+        # passed a valueless flag last (it appends flags to its arrays), $# never
+        # reached 0 and this loop spun forever at 100% CPU. That was the
+        # sw-e2e-system-test hang.
+        --print|--verbose) shift ;;
+        --settings|--setting-sources|--permission-mode|--permission-prompts|--disallowedTools|--allowedTools) shift 2 ;;
         -p) prompt="${2:-}"; shift 2 ;;
         --output-format) [[ "${2:-}" == "json" ]] && use_json=true; shift 2 ;;
         --model|--max-turns) shift 2 ;;

@@ -139,8 +139,9 @@ create_mock_claude() {
 prompt=""
 while [[ $# -gt 0 ]]; do
     case "$1" in
-        --print|--output-format|--dangerously-skip-permissions|--verbose) shift ;;
+        --print|--output-format|--verbose) shift ;;
         --model|--max-turns|--effort|--fallback-model|-p) shift 2 ;;
+        --settings|--setting-sources|--permission-mode|--permission-prompts|--disallowedTools|--allowedTools) shift 2 ;;
         -*)                      shift ;;  # Skip unknown flags
         *)                       prompt="$1"; shift ;;
     esac

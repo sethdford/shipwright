@@ -16,6 +16,12 @@ set -euo pipefail
 SW_AGENT_EXEC="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/lib/agent-exec.sh"
 # The helper's path as a shell word (printf %q): a path with spaces, quotes or $ stays one command.
 SW_AGENT_EXEC_Q="$(printf '%q' "$SW_AGENT_EXEC")"
+# Operator opt-in only (#8614). --skip-permissions passes this bypass flag to claude through agent-exec.sh,
+# which accepts it only for an operator at a TTY (SHIPWRIGHT_OPERATOR_SKIP_PERMISSIONS=1, set below).
+# This file is the one exemption from the F9 bash rule (tools/arch/rules/f9-bash-no-permission-bypass.yml):
+# the flag is spelled once, here.
+OPERATOR_BYPASS_FLAG="--dangerously-skip-permissions"
+OPERATOR_BYPASS_ENV="SHIPWRIGHT_OPERATOR_SKIP_PERMISSIONS=1"
 
 # _sw_fill_launcher TEMPLATE — write TEMPLATE to stdout with each __PLACEHOLDER__ replaced by the
 # value of its SW_* environment variable. Literal replacement via index(): a path with & \ or " is
@@ -73,7 +79,7 @@ TEMPLATE_NAME=""
 TERMINAL_ADAPTER=""
 AUTO_LAUNCH=true
 DRY_RUN=false
-SKIP_PERMISSIONS="auto"
+SKIP_PERMISSIONS=false
 GOAL=""
 
 while [[ $# -gt 0 ]]; do
@@ -120,8 +126,8 @@ while [[ $# -gt 0 ]]; do
             echo -e "  ${CYAN}--goal, -g${RESET} <text>       Goal for the team (what to build/fix/refactor)"
             echo -e "  ${CYAN}--terminal${RESET} <adapter>    Terminal adapter: tmux (default), iterm2, wezterm"
             echo -e "  ${CYAN}--no-launch${RESET}             Create window only, don't auto-launch Claude"
-            echo -e "  ${CYAN}--skip-permissions${RESET}     Pass --dangerously-skip-permissions (default with agents)"
-            echo -e "  ${CYAN}--no-skip-permissions${RESET}  Require permission prompts even with agents"
+            echo -e "  ${CYAN}--skip-permissions${RESET}     Operator opt-in: bypass permission checks (a human at a terminal only)"
+            echo -e "  ${CYAN}--no-skip-permissions${RESET}  Accepted for compatibility (the default is already the permission policy)"
             echo -e "  ${CYAN}--dry-run${RESET}              Print team prompt and launcher script, don't create anything"
             echo ""
             echo -e "${BOLD}EXAMPLES${RESET}"
@@ -269,12 +275,15 @@ if [[ -n "$TEMPLATE_NAME" ]]; then
 fi
 
 # ─── Resolve Permissions ──────────────────────────────────────────────────
-# Default: skip permissions when agents are being spawned (autonomous teams)
-if [[ "$SKIP_PERMISSIONS" == "auto" ]]; then
-    if [[ ${#TEMPLATE_AGENTS[@]} -gt 0 || -n "$GOAL" ]]; then
-        SKIP_PERMISSIONS=true
-    else
-        SKIP_PERMISSIONS=false
+# Default: the permission policy in config/agent-permissions.json, for agents spawned here too (#8614).
+# --skip-permissions is an operator opt-in and is refused under CI, test mode, a pipeline, the test gate,
+# or without a terminal (a daemon or an agent has none).
+if [[ "$SKIP_PERMISSIONS" == "auto" ]]; then SKIP_PERMISSIONS=false; fi
+if [[ "$SKIP_PERMISSIONS" == true ]]; then
+    if [[ -n "${CI:-}" || -n "${SHIPWRIGHT_TEST_MODE:-}" || -n "${SHIPWRIGHT_PIPELINE_ID:-}" \
+        || -n "${SHIPWRIGHT_IN_TEST_GATE:-}" || ! -t 0 || ! -t 1 ]]; then
+        error "--skip-permissions is for an operator at a terminal only; refused under CI, tests, pipelines or without a TTY"
+        exit 1
     fi
 fi
 
@@ -370,7 +379,7 @@ if [[ "$DRY_RUN" == true ]]; then
     TEAM_PROMPT="$(build_team_prompt)"
     PROJECT_DIR="$(tmux display-message -p '#{pane_current_path}' 2>/dev/null || pwd)"
     DRY_RUN_FLAGS=""
-    [[ "$SKIP_PERMISSIONS" == true ]] && DRY_RUN_FLAGS=" --dangerously-skip-permissions"
+    [[ "$SKIP_PERMISSIONS" == true ]] && DRY_RUN_FLAGS=" $OPERATOR_BYPASS_FLAG"
 
     echo -e "${CYAN}${BOLD}═══ Team Prompt ═══${RESET}"
     echo ""
@@ -437,7 +446,7 @@ if [[ "$TERMINAL_ADAPTER" == "tmux" ]]; then
 
     info "Creating team session: ${CYAN}${BOLD}${TEAM_NAME}${RESET}"
     if [[ "$SKIP_PERMISSIONS" == true ]]; then
-        warn "${YELLOW}--dangerously-skip-permissions enabled${RESET}"
+        warn "${YELLOW}--skip-permissions: operator bypass of permission checks enabled${RESET}"
     fi
 
     # Resolve project directory (use current pane's path)
@@ -468,11 +477,13 @@ echo "Claude exited. Restart with: __AGENT_EXEC__ claude, or 'exit' to close."
 exec "$SHELL" -l
 LAUNCHER_STATIC
         CLAUDE_FLAGS=""
+        LAUNCH_AGENT_EXEC="$SW_AGENT_EXEC_Q"
         if [[ "$SKIP_PERMISSIONS" == true ]]; then
-            CLAUDE_FLAGS="--dangerously-skip-permissions"
+            CLAUDE_FLAGS="$OPERATOR_BYPASS_FLAG"
+            LAUNCH_AGENT_EXEC="$OPERATOR_BYPASS_ENV $SW_AGENT_EXEC_Q"
         fi
         # Use awk for safe string replacement — sed breaks on & | \ in paths
-        SW_DIR="$(printf '%q' "$PROJECT_DIR")" SW_TEAM="$TEAM_NAME" SW_PROMPT="$(printf '%q' "$PROMPT_FILE")" SW_FLAGS="$CLAUDE_FLAGS" SW_AGENT_EXEC="$SW_AGENT_EXEC_Q" \
+        SW_DIR="$(printf '%q' "$PROJECT_DIR")" SW_TEAM="$TEAM_NAME" SW_PROMPT="$(printf '%q' "$PROMPT_FILE")" SW_FLAGS="$CLAUDE_FLAGS" SW_AGENT_EXEC="$LAUNCH_AGENT_EXEC" \
             _sw_fill_launcher "$LAUNCHER" > "${LAUNCHER}.tmp" && mv "${LAUNCHER}.tmp" "$LAUNCHER"
         chmod +x "$LAUNCHER"
 
@@ -500,11 +511,13 @@ echo "Claude exited. Restart with: __AGENT_EXEC__ claude, or 'exit' to close."
 exec "$SHELL" -l
 LAUNCHER_STATIC
         CLAUDE_FLAGS=""
+        LAUNCH_AGENT_EXEC="$SW_AGENT_EXEC_Q"
         if [[ "$SKIP_PERMISSIONS" == true ]]; then
-            CLAUDE_FLAGS="--dangerously-skip-permissions"
+            CLAUDE_FLAGS="$OPERATOR_BYPASS_FLAG"
+            LAUNCH_AGENT_EXEC="$OPERATOR_BYPASS_ENV $SW_AGENT_EXEC_Q"
         fi
         # Use awk for safe string replacement — sed breaks on & | \ in paths
-        SW_DIR="$(printf '%q' "$PROJECT_DIR")" SW_TEAM="$TEAM_NAME" SW_FLAGS="$CLAUDE_FLAGS" SW_AGENT_EXEC="$SW_AGENT_EXEC_Q" \
+        SW_DIR="$(printf '%q' "$PROJECT_DIR")" SW_TEAM="$TEAM_NAME" SW_FLAGS="$CLAUDE_FLAGS" SW_AGENT_EXEC="$LAUNCH_AGENT_EXEC" \
             _sw_fill_launcher "$LAUNCHER" > "${LAUNCHER}.tmp" && mv "${LAUNCHER}.tmp" "$LAUNCHER"
         chmod +x "$LAUNCHER"
 
