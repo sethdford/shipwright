@@ -12,6 +12,8 @@ initialize_state() {
     START_EPOCH="$(now_epoch)"
     STATUS="running"
     LOG_ENTRIES=""
+    # A new build run starts with no blast-radius strikes (#8644); a resume or session restart keeps them.
+    scope_reset_strikes "${LOG_DIR:-}"
 
     # Record starting commit for cumulative diff in quality gates
     LOOP_START_COMMIT="$(git -C "$PROJECT_ROOT" rev-parse HEAD 2>/dev/null || echo "")"

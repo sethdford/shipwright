@@ -265,6 +265,13 @@ Labels: ${ISSUE_LABELS:-}
         fi
     fi
 
+    # Record the declared blast radius in the spec (#8644); the loop enforces it per iteration.
+    if type scope_attach_to_spec >/dev/null 2>&1; then
+        local scope_type="${TASK_TYPE:-}"
+        [[ -z "$scope_type" ]] && scope_type="$(scope_infer_type "${GOAL:-}" "${ISSUE_LABELS:-}")"
+        scope_attach_to_spec "$spec_file" "$scope_type" || warn "Scope not recorded in spec — loop will use the type default"
+    fi
+
     # Count spec richness for logging
     local criteria_count edge_count security_count affected_count
     criteria_count=$(jq '.acceptance_criteria | length' "$spec_file" 2>/dev/null || echo "0")

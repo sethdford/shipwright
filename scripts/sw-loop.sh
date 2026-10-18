@@ -41,6 +41,8 @@ fi
 [[ -f "$SCRIPT_DIR/lib/loop-convergence.sh" ]] && source "$SCRIPT_DIR/lib/loop-convergence.sh"
 [[ -f "$SCRIPT_DIR/lib/loop-restart.sh" ]] && source "$SCRIPT_DIR/lib/loop-restart.sh"
 [[ -f "$SCRIPT_DIR/lib/loop-progress.sh" ]] && source "$SCRIPT_DIR/lib/loop-progress.sh"
+# Blast-radius guard (#8644). Unconditional: a missing lib must fail the loop, not skip the guard.
+source "$SCRIPT_DIR/lib/scope-guard.sh"
 # Required, not optional: without it the test gate would run with the pipeline's credentials (#8608).
 # shellcheck source=lib/test-gate-env.sh
 source "$SCRIPT_DIR/lib/test-gate-env.sh"
@@ -2144,6 +2146,26 @@ cleanup_multi_agent() {
     rm -f "$LOG_DIR"/.agent-*-complete 2>/dev/null || true
 }
 
+# Blast-radius gate after a loop commit (#8644). Returns 1 when the build must stop.
+_scope_gate_after_commit() {
+    local tag="${1:-}" rc=0
+    scope_guard_check "$PROJECT_ROOT" "${LOOP_START_COMMIT:-}" "${SCOPE_PRE_SHA:-}" "$ITERATION" \
+        "${SCOPE_FILE:-}" "$LOG_DIR" "$tag" || rc=$?
+    if [[ "$rc" -eq 1 ]]; then
+        warn "Blast-radius guard reverted iteration ${ITERATION} (strike recorded; evidence: ${LOG_DIR}/scope-check-iter-${ITERATION}${tag}.json)"
+        return 0
+    fi
+    if [[ "$rc" -eq 0 ]]; then
+        return 0
+    fi
+    STATUS="scope_blocked"
+    write_state
+    write_progress
+    error "Blast-radius guard blocked the build (evidence: ${LOG_DIR}/scope-check-iter-${ITERATION}${tag}.json)"
+    show_summary
+    return 1
+}
+
 # ─── Main: Single-Agent Loop ─────────────────────────────────────────────────
 
 run_single_agent_loop() {
@@ -2183,6 +2205,13 @@ run_single_agent_loop() {
     # Never defaulted to HEAD here: on a resumed loop HEAD already includes the agent's changes,
     # which would make the test gate's baseline wrong (#8633).
 
+    # Declared blast radius for this run (#8644). A missing file makes the guard fail closed.
+    SCOPE_FILE="$LOG_DIR/scope.json"
+    if ! scope_resolve_for_loop "$ARTIFACTS_DIR" "${GOAL:-}" "${ISSUE_LABELS:-}" > "$SCOPE_FILE" 2>/dev/null; then
+        rm -f "$SCOPE_FILE"
+    fi
+    SCOPE_NOTE=""
+
     # Apply adaptive budget/model before showing banner
     apply_adaptive_budget
     MODEL="$(select_adaptive_model "build" "$MODEL")"
@@ -2214,6 +2243,14 @@ run_single_agent_loop() {
             return 1
         }
         ITERATION=$(( ITERATION + 1 ))
+        # Blast-radius guard baseline for this iteration (#8644), and the last violation note, if any.
+        SCOPE_PRE_SHA="$(git -C "$PROJECT_ROOT" rev-parse HEAD 2>/dev/null || echo "")"
+        if [[ -n "${SCOPE_NOTE:-}" ]]; then
+            GOAL="${GOAL}
+
+${SCOPE_NOTE}"
+            SCOPE_NOTE=""
+        fi
 
         # Emit iteration start event for pipeline visibility
         if type emit_event >/dev/null 2>&1; then
@@ -2353,6 +2390,7 @@ ${GOAL}"
         local commits_before
         commits_before="$(git_commit_count)"
         git_auto_commit "$PROJECT_ROOT" || true
+        _scope_gate_after_commit || return 1
         local commits_after
         commits_after="$(git_commit_count)"
         local new_commits=$(( commits_after - commits_before ))
@@ -2464,6 +2502,8 @@ ${GOAL}"
             git -C "$PROJECT_ROOT" add -A 2>/dev/null || true
             git -C "$PROJECT_ROOT" commit -m "loop: iteration $ITERATION — post-audit cleanup" --no-verify 2>/dev/null || true
         fi
+        # Cleanup commits are loop commits too: they pass the same blast-radius guard (#8644).
+        _scope_gate_after_commit "-cleanup" || return 1
 
         # Quality gates (automated checks)
         run_quality_gates
@@ -2591,6 +2631,11 @@ run_loop_with_restarts() {
         # If completed successfully or no restarts configured, exit
         if [[ "$STATUS" == "complete" ]]; then
             return 0
+        fi
+
+        # A blast-radius block is final: a fresh session would repeat the same out-of-scope change (#8644).
+        if [[ "$STATUS" == "scope_blocked" ]]; then
+            return 1
         fi
 
         # Context exhaustion: treat as restart, not failure (unless restart limit hit)

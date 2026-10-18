@@ -1021,6 +1021,76 @@ else
     assert_fail "Verification re-runs tests to dedicated log"
 fi
 
+# ─── Test: blast-radius guard drives the loop end to end (#8644) ───────────
+echo ""
+echo -e "${DIM}  blast-radius guard${RESET}"
+
+# The loop resumes from .claude/loop-state.md when one exists, so this case gets its own repo:
+# the shared repo above carries state from earlier cases.
+if setup_loop_env 2>/dev/null; then
+    # The shared suite home may carry the budget gate test's exhausted budget: drop it.
+    rm -f "$TEST_TEMP_DIR/home/.shipwright/budget.json" "$TEST_TEMP_DIR/home/.shipwright/costs.json"
+    GUARD_REPO="$(mktemp -d "$TEST_TEMP_DIR/guard-repo.XXXXXX")"
+    GIT_BIN="$TEST_TEMP_DIR/bin/git"
+    "$GIT_BIN" -C "$GUARD_REPO" init -q
+    "$GIT_BIN" -C "$GUARD_REPO" config user.email t@t
+    "$GIT_BIN" -C "$GUARD_REPO" config user.name T
+    # A protected test file and a gitignored .claude/, as in a real project: loop bookkeeping must not
+    # be committed, or a revert would remove the loop's own logs.
+    mkdir -p "$GUARD_REPO/scripts"
+    echo "protected test" > "$GUARD_REPO/scripts/demo-test.sh"
+    echo ".claude/" > "$GUARD_REPO/.gitignore"
+    # The loop calls env, sleep and grep by name; this PATH holds only the links the suite made.
+    for _cmd in env sleep grep; do
+        ln -sf "$(type -P "$_cmd")" "$TEST_TEMP_DIR/bin/$_cmd"
+    done
+    "$GIT_BIN" -C "$GUARD_REPO" add -A
+    "$GIT_BIN" -C "$GUARD_REPO" commit -q -m "add protected test"
+
+    # Mock claude that deletes the protected test on every iteration.
+    cat > "$TEST_TEMP_DIR/bin/claude" << 'CLAUDE_EOF'
+#!/usr/bin/env bash
+rm -f scripts/demo-test.sh
+echo '[{"type":"result","result":"Removed the test","usage":{"input_tokens":0,"output_tokens":0}}]'
+exit 0
+CLAUDE_EOF
+    chmod +x "$TEST_TEMP_DIR/bin/claude"
+
+    output=$(env PATH="$TEST_TEMP_DIR/bin:/usr/local/bin:/usr/bin:/bin" HOME="$TEST_TEMP_DIR/home" NO_GITHUB=true \
+        bash "$SCRIPT_DIR/sw-loop.sh" \
+        --repo "$GUARD_REPO" \
+        "Fix the demo test script" \
+        --max-iterations 5 \
+        --test-cmd "true" \
+        --local \
+        2>&1) || true
+
+    evidence="$GUARD_REPO/.claude/loop-logs/scope-check-iter-1.json"
+    if [[ -f "$evidence" ]] && [[ "$(jq -r '.verdict' "$evidence" 2>/dev/null)" == "reverted" ]]; then
+        assert_pass "Guard reverts the first protected deletion (iteration 1 evidence)"
+    else
+        assert_fail "Guard reverts the first protected deletion (iteration 1 evidence)" "output tail: $(echo "$output" | tail -3)"
+    fi
+    prompt2="$GUARD_REPO/.claude/loop-logs/iteration-2.prompt.txt"
+    if [[ -f "$prompt2" ]] && grep >/dev/null -F "Scope violation in iteration 1" "$prompt2"; then
+        assert_pass "Scope violation note is injected into the next prompt"
+    else
+        assert_fail "Scope violation note is injected into the next prompt" "no note in $prompt2"
+    fi
+    if echo "$output" | grep >/dev/null -F "Blast-radius guard blocked the build"; then
+        assert_pass "Two strikes block the build"
+    else
+        assert_fail "Two strikes block the build" "output tail: $(echo "$output" | tail -3)"
+    fi
+    if [[ -f "$GUARD_REPO/scripts/demo-test.sh" ]]; then
+        assert_pass "Protected test file is restored after the reverts"
+    else
+        assert_fail "Protected test file is restored after the reverts"
+    fi
+else
+    assert_fail "Blast-radius guard e2e" "setup failed (git missing?)"
+fi
+
 # Test: mid-build test discovery uses detect_created_test_files
 if grep -q 'detect_created_test_files' "$SCRIPT_DIR/sw-loop.sh"; then
     assert_pass "Mid-build test file discovery integrated"

@@ -16,6 +16,7 @@ _SKILL_MEMORY_SH="${SCRIPT_DIR}/lib/skill-memory.sh"
 # Source dark factory modules (test holdout, spec-driven, causal graph)
 [[ -f "$SCRIPT_DIR/lib/test-holdout.sh" ]] && source "$SCRIPT_DIR/lib/test-holdout.sh" 2>/dev/null || true
 [[ -f "$SCRIPT_DIR/lib/spec-driven.sh" ]] && source "$SCRIPT_DIR/lib/spec-driven.sh" 2>/dev/null || true
+[[ -f "$SCRIPT_DIR/lib/scope-guard.sh" ]] && source "$SCRIPT_DIR/lib/scope-guard.sh" 2>/dev/null || true
 [[ -f "$SCRIPT_DIR/lib/causal-graph.sh" ]] && source "$SCRIPT_DIR/lib/causal-graph.sh" 2>/dev/null || true
 [[ -f "$SCRIPT_DIR/lib/constitutional.sh" ]] && source "$SCRIPT_DIR/lib/constitutional.sh" 2>/dev/null || true
 [[ -f "$SCRIPT_DIR/lib/formal-spec.sh" ]] && source "$SCRIPT_DIR/lib/formal-spec.sh" 2>/dev/null || true
