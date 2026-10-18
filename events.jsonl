@@ -248,3 +248,8 @@
 {"ts":"2026-10-18T06:16:46Z","ts_epoch":1792304206,"type":"patrol.finding","check":"untested_script","script":"sw-event-schema-sync.sh","lines":93,"usage":0}
 {"ts":"2026-10-18T06:16:47Z","ts_epoch":1792304207,"type":"patrol.issue_refused","check":"untested_scripts","count":7}
 {"ts":"2026-10-18T06:16:49Z","ts_epoch":1792304209,"type":"patrol.meta_issue_refused","title":"[Meta] Add tests for sw-event-schema-sync.sh"}
+{"ts":"2026-10-18T08:05:41Z","ts_epoch":1792310741,"type":"hygiene_platform_refactor","hardcoded":49,"fallback":75,"todo":51}
+{"ts":"2026-10-18T08:06:18Z","ts_epoch":1792310778,"type":"strategic.issue_refused","title":"Quarantine issues that fail the loop N times, using the durable RunJournal"}
+{"ts":"2026-10-18T08:06:21Z","ts_epoch":1792310781,"type":"strategic.issue_refused","title":"Blast-radius guard for the loop: refuse diffs that delete far more than the task implies"}
+{"ts":"2026-10-18T08:06:23Z","ts_epoch":1792310783,"type":"strategic.issue_refused","title":"Make bash test suites report a completion line so the differential gate can trust them"}
+{"ts":"2026-10-18T08:06:23Z","ts_epoch":1792310783,"type":"strategic.cycle_complete","issues_created":0,"issues_skipped":3}
