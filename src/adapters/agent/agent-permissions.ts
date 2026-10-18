@@ -1,15 +1,23 @@
+import type { Options } from "@anthropic-ai/claude-agent-sdk";
+
 /**
  * The agent permission policy for the SDK runner (#8614, #8581). config/agent-permissions.json is the
- * source of truth: the bash path loads it (scripts/lib/agent-exec.sh). These constants mirror its
- * `permissions` block, and agent-permissions.test.ts fails when the two drift.
+ * source of truth: the bash path loads it (scripts/lib/agent-exec.sh). These constants mirror it, and
+ * agent-permissions.test.ts fails when the two drift.
  *
- * `permissionMode: "dontAsk"` denies, without a prompt, every call the allow list does not cover. A deny
- * rule wins over any allow rule in every settings scope, so the deny list holds even when a repo or a user
- * file allows more. The runner passes `settingSources: ["user"]`, so the repo's .claude/settings*.json (which
- * the agent can write) is never read. Verdict on #8581: permissionMode is set by the SDK option, and project
- * settings can change it only to a value that is not bypassPermissions/auto (those are ignored from project
- * files since v2.1.257), but project allow rules can widen the allow list, so the runner excludes project.
+ * What the SDK runner sends (the same policy the bash path sends):
+ *   - `settings`: an inline object with disableAllHooks and the permissions block. The SDK puts it in
+ *     the flag layer, above user settings, so user hooks never run for an agent and a user allow cannot
+ *     beat a policy deny.
+ *   - `sandbox`: the Bash sandbox, with failIfUnavailable (the SDK default, set explicitly here).
+ *   - `permissionMode: "dontAsk"`, `settingSources: ["user"]`: no repo settings (agent-writable).
+ *
+ * Verdict on #8581: the project scope is not loaded, so a repo's .claude/settings*.json cannot widen
+ * the policy. The SDK's permissionMode option is a flag, and project files cannot set bypass or auto.
  */
+type SdkSettings = Exclude<Options["settings"], string | undefined>;
+type SdkSandbox = NonNullable<Options["sandbox"]>;
+
 export const AGENT_PERMISSION_MODE = "dontAsk";
 
 /** settingSources the agent loads: the user's own settings, never the repo's (agent-writable). */
@@ -20,8 +28,8 @@ export const AGENT_ALLOWED_TOOLS: readonly string[] = [
   "Read",
   "Glob",
   "Grep",
-  "Edit",
-  "Write",
+  "Edit(./**)",
+  "Write(./**)",
   "Bash(git status)",
   "Bash(git status *)",
   "Bash(git diff)",
@@ -32,6 +40,15 @@ export const AGENT_ALLOWED_TOOLS: readonly string[] = [
   "Bash(git ls-files *)",
   "Bash(git add *)",
   "Bash(git commit *)",
+  "Bash(git mv *)",
+  "Bash(git rm *)",
+  "Bash(git restore *)",
+  "Bash(mkdir *)",
+  "Bash(chmod +x *)",
+  "Bash(shellcheck *)",
+  "Bash(jq *)",
+  "Bash(bash scripts/*-test.sh)",
+  "Bash(bash scripts/*-test.sh *)",
   "Bash(bun test)",
   "Bash(bun test *)",
   "Bash(bun run *)",
@@ -47,7 +64,7 @@ export const AGENT_ALLOWED_TOOLS: readonly string[] = [
   "Bash(make test *)",
 ];
 
-/** Denied for every agent: network and remote git, privilege escalation, and config the agent must not write. */
+/** Denied for every agent: network and remote git, privilege escalation, secrets, and the policy itself. */
 export const AGENT_DENIED_TOOLS: readonly string[] = [
   "Bash(curl *)",
   "Bash(wget *)",
@@ -75,15 +92,58 @@ export const AGENT_DENIED_TOOLS: readonly string[] = [
   "Bash(rm -fr /*)",
   "Bash(rm -fr ~*)",
   "Read(~/.ssh/**)",
-  "Read(~/.config/gh/**)",
-  "Read(~/.netrc)",
+  "Edit(~/.ssh/**)",
+  "Write(~/.ssh/**)",
+  "Read(~/.config/**)",
+  "Edit(~/.config/**)",
+  "Write(~/.config/**)",
   "Read(~/.aws/**)",
+  "Read(~/.netrc)",
   "Read(~/.gnupg/**)",
   "Read(~/Library/Keychains/**)",
+  "Edit(//home/runner/work/_temp/**)",
+  "Write(//home/runner/work/_temp/**)",
   "Edit(.claude/settings*.json)",
   "Write(.claude/settings*.json)",
-  "Edit(.github/workflows/**)",
-  "Write(.github/workflows/**)",
+  "Edit(config/agent-permissions.json)",
+  "Write(config/agent-permissions.json)",
+  "Edit(scripts/lib/agent-exec.sh)",
+  "Write(scripts/lib/agent-exec.sh)",
+  "Edit(scripts/lib/test-gate-env.sh)",
+  "Write(scripts/lib/test-gate-env.sh)",
+  "Edit(.github/**)",
+  "Write(.github/**)",
   "Edit(tools/arch/**)",
   "Write(tools/arch/**)",
 ];
+
+/** The Bash sandbox: no network domains, fail closed when the sandbox cannot start (mirrors the JSON). */
+export const AGENT_SANDBOX: SdkSandbox = {
+  enabled: true,
+  failIfUnavailable: true,
+  allowUnsandboxedCommands: false,
+  autoAllowBashIfSandboxed: false,
+  network: { allowedDomains: [] },
+  filesystem: {
+    denyRead: ["~/.ssh", "~/.config/gh", "~/.netrc", "~/.aws", "~/.gnupg", "~/Library/Keychains"],
+  },
+};
+
+/** The inline settings the runner sends: hooks off, and the permissions block. */
+export const AGENT_SETTINGS: SdkSettings = {
+  disableAllHooks: true,
+  permissions: {
+    defaultMode: "dontAsk",
+    blockReadsOutsideWorkingDirectories: true,
+    allow: [...AGENT_ALLOWED_TOOLS],
+    deny: [...AGENT_DENIED_TOOLS],
+  },
+};
+
+/**
+ * Scopes bare file-tool allows to the working tree: a caller's `Edit` or `Write` would match any path,
+ * so it becomes `Edit(./**)` or `Write(./**)`. Other entries pass through unchanged.
+ */
+export function scopeAllowedTools(tools: readonly string[]): string[] {
+  return tools.map((t) => (t === "Edit" ? "Edit(./**)" : t === "Write" ? "Write(./**)" : t));
+}

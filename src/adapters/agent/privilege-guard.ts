@@ -5,6 +5,8 @@
  * refuses. It is an allowlist, not a denylist: an option the runner does not set is refused, so a
  * new SDK option (one that could carry CLI flags or settings) cannot pass unreviewed (ADR-0008).
  */
+import { AGENT_SANDBOX, AGENT_SETTINGS } from "./agent-permissions";
+
 const GITHUB_TOKENS = [
   "GH_TOKEN",
   "GITHUB_TOKEN",
@@ -23,6 +25,8 @@ const ALLOWED_OPTION_KEYS = new Set([
   "maxBudgetUsd",
   "maxTurns",
   "model",
+  "sandbox",
+  "settings",
   "outputFormat",
   "permissionMode",
   "persistSession",
@@ -77,6 +81,19 @@ export function assertAgentOptions(options: object): void {
     throw new Error(
       `F9: refusing to start an agent in permissionMode ${JSON.stringify(record.permissionMode)}; it must be "${REQUIRED_PERMISSION_MODE}"`,
     );
+  }
+  // settings and sandbox may only be the policy the runner sends (agent-permissions.ts), never another value.
+  if (
+    record.settings !== undefined &&
+    JSON.stringify(record.settings) !== JSON.stringify(AGENT_SETTINGS)
+  ) {
+    throw new Error("F9: refusing settings other than the agent policy (agent-permissions.ts)");
+  }
+  if (
+    record.sandbox !== undefined &&
+    JSON.stringify(record.sandbox) !== JSON.stringify(AGENT_SANDBOX)
+  ) {
+    throw new Error("F9: refusing a sandbox other than the agent policy (agent-permissions.ts)");
   }
   const env = record.env === undefined ? {} : ownDataProperties(record.env, "agent env");
   // Environment names are case-insensitive on Windows and the SDK's own lookup may not be; compare upper case.
