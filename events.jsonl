@@ -779,3 +779,4 @@
 {"ts":"2026-10-22T06:18:34Z","ts_epoch":1792649914,"type":"patrol.issue_refused","check":"untested_scripts","count":7}
 {"ts":"2026-10-22T06:18:37Z","ts_epoch":1792649917,"type":"patrol.meta_issue_refused","title":"[Meta] Add tests for sw-event-schema-sync.sh"}
 {"ts":"2026-10-22T08:06:42Z","ts_epoch":1792656402,"type":"hygiene_platform_refactor","hardcoded":49,"fallback":75,"todo":51}
+{"ts":"2026-10-22T12:08:19Z","ts_epoch":1792670899,"type":"hygiene_platform_refactor","hardcoded":49,"fallback":75,"todo":51}
