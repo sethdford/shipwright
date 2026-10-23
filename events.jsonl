@@ -893,3 +893,4 @@
 {"ts":"2026-10-23T08:07:43Z","ts_epoch":1792742863,"type":"strategic.issue_refused","title":"Blast-radius guard for the build loop: refuse to complete when the diff deletes far more than the task implies"}
 {"ts":"2026-10-23T08:07:47Z","ts_epoch":1792742867,"type":"strategic.issue_refused","title":"Extract the quarantine decision for repeatedly failing issues into the TS orchestration context"}
 {"ts":"2026-10-23T08:07:47Z","ts_epoch":1792742867,"type":"strategic.cycle_complete","issues_created":0,"issues_skipped":3}
+{"ts":"2026-10-23T12:06:39Z","ts_epoch":1792757199,"type":"hygiene_platform_refactor","hardcoded":49,"fallback":75,"todo":51}
