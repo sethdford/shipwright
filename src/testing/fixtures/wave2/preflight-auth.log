@@ -1,0 +1,8 @@
+# source: sethdford/shipwright run 38595913688 (Shipwright Pipeline #7551, 2026-10-14), step 'Pre-flight auth check', redacted
+##[error]Claude Code authentication failed — check CLAUDE_CODE_OAUTH_TOKEN secret
+--- stderr ---
+
+⚠ Sandbox disabled: sandbox is enabled but dependencies are missing: bubblewrap (bwrap) not installed, socat not installed · install missing tools (e.g. apt install bubblewrap socat) or see https://code.claude.com/docs/en/sandboxing
+  Commands will run WITHOUT sandboxing. Network and filesystem restrictions will NOT be enforced.
+
+--- end ---
