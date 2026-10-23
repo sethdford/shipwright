@@ -98,7 +98,7 @@
     "@vitest/coverage-v8": "^4.0.18",
     "bun-types": "^1.3.9",
     "dependency-cruiser": "^18.6.0",
-    "happy-dom": "^20.6.1",
+    "happy-dom": "^21.0.4",
     "jsdom": "^28.1.0",
     "typescript": "^5.9.3",
     "vitest": "^4.0.18"
