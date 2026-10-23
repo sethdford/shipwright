@@ -888,3 +888,8 @@
 {"ts":"2026-10-23T06:18:58Z","ts_epoch":1792736338,"type":"patrol.finding","check":"untested_script","script":"sw-event-schema-sync.sh","lines":93,"usage":0}
 {"ts":"2026-10-23T06:18:59Z","ts_epoch":1792736339,"type":"patrol.issue_refused","check":"untested_scripts","count":7}
 {"ts":"2026-10-23T06:19:01Z","ts_epoch":1792736341,"type":"patrol.meta_issue_refused","title":"[Meta] Add tests for sw-event-schema-sync.sh"}
+{"ts":"2026-10-23T08:06:50Z","ts_epoch":1792742810,"type":"hygiene_platform_refactor","hardcoded":49,"fallback":75,"todo":51}
+{"ts":"2026-10-23T08:07:40Z","ts_epoch":1792742860,"type":"strategic.issue_refused","title":"Fail-closed pre-flight for build loop when test/lint commands are absent, wired into the TS gates check"}
+{"ts":"2026-10-23T08:07:43Z","ts_epoch":1792742863,"type":"strategic.issue_refused","title":"Blast-radius guard for the build loop: refuse to complete when the diff deletes far more than the task implies"}
+{"ts":"2026-10-23T08:07:47Z","ts_epoch":1792742867,"type":"strategic.issue_refused","title":"Extract the quarantine decision for repeatedly failing issues into the TS orchestration context"}
+{"ts":"2026-10-23T08:07:47Z","ts_epoch":1792742867,"type":"strategic.cycle_complete","issues_created":0,"issues_skipped":3}
