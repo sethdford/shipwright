@@ -919,3 +919,8 @@
 {"ts":"2026-10-23T12:15:16Z","ts_epoch":1792757716,"type":"patrol.finding","check":"untested_script","script":"sw-event-schema-sync.sh","lines":93,"usage":0}
 {"ts":"2026-10-23T12:15:18Z","ts_epoch":1792757718,"type":"patrol.issue_refused","check":"untested_scripts","count":7}
 {"ts":"2026-10-23T12:15:20Z","ts_epoch":1792757720,"type":"patrol.meta_issue_refused","title":"[Meta] Add tests for sw-event-schema-sync.sh"}
+{"ts":"2026-10-23T16:05:36Z","ts_epoch":1792771536,"type":"hygiene_platform_refactor","hardcoded":49,"fallback":75,"todo":51}
+{"ts":"2026-10-23T16:06:17Z","ts_epoch":1792771577,"type":"strategic.issue_refused","title":"Loop blast-radius guard: abort and roll back when a task's diff far exceeds its scope"}
+{"ts":"2026-10-23T16:06:19Z","ts_epoch":1792771579,"type":"strategic.issue_refused","title":"Retry-intelligence feedback: feed the last failing gate's output into the next build iteration as structured data"}
+{"ts":"2026-10-23T16:06:22Z","ts_epoch":1792771582,"type":"strategic.issue_refused","title":"Move hardcoded loop and daemon thresholds into policy config with adaptive overrides"}
+{"ts":"2026-10-23T16:06:22Z","ts_epoch":1792771582,"type":"strategic.cycle_complete","issues_created":0,"issues_skipped":3}
