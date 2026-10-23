@@ -45,6 +45,9 @@ setup_e2e_env() {
     cp "$REAL_PIPELINE" "$TEMP_DIR/scripts/sw-pipeline.sh"
     [[ -f "$SCRIPT_DIR/sw" ]] && cp "$SCRIPT_DIR/sw" "$TEMP_DIR/scripts/sw"
     [[ -d "$SCRIPT_DIR/lib" ]] && cp -r "$SCRIPT_DIR/lib" "$TEMP_DIR/scripts/lib"
+    # The loop's blast-radius guard reads config/scope-budgets.json from the repo root beside scripts/ (#8644).
+    mkdir -p "$TEMP_DIR/config"
+    cp "$SCRIPT_DIR/../config/scope-budgets.json" "$TEMP_DIR/config/scope-budgets.json"
     # Copy skills directory (required by skill-registry.sh) — create empty if missing
     if [[ -d "$SCRIPT_DIR/skills" ]]; then
         cp -r "$SCRIPT_DIR/skills" "$TEMP_DIR/scripts/skills"

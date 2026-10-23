@@ -2209,6 +2209,7 @@ run_single_agent_loop() {
     SCOPE_FILE="$LOG_DIR/scope.json"
     if ! scope_resolve_for_loop "$ARTIFACTS_DIR" "${GOAL:-}" "${ISSUE_LABELS:-}" > "$SCOPE_FILE" 2>/dev/null; then
         rm -f "$SCOPE_FILE"
+        warn "Blast-radius scope unavailable (config/scope-budgets.json unreadable?) — the guard will block the build"
     fi
     SCOPE_NOTE=""
 
