@@ -1,8 +1,0 @@
-{
-  "created": "2026-04-04T15:19:37Z",
-  "ratio": 30,
-  "total_tests": 22,
-  "visible_count": 20,
-  "sealed_count": 2,
-  "tests": [{"original":"tests/edge.test.js","sealed":".claude/test-holdout/.sealed/tests/edge.test.js","hash":"3815f72e3ca0f2f4733a4a5a96c49a4d"},{"original":"tests/util.test.js","sealed":".claude/test-holdout/.sealed/tests/util.test.js","hash":"fe8b5b0649713da37789013a82ee7007"}]
-}

@@ -22,6 +22,11 @@ demo/*.gif
 .claude/hygiene-report.json
 .claude/platform-hygiene.json
 .claude/pr-draft.md
+# Per-machine runtime state written by loops, the daemon and checks (#8665). Never commit these.
+.claude/daemon-config.json
+.claude/recovery-state.json
+.claude/evidence/
+.claude/test-holdout/manifest.json
 
 # Generated changelogs (produced by sw-changelog.sh)
 CHANGELOG-*.md

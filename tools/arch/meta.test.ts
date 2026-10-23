@@ -8,6 +8,7 @@ import {
   type RuleDoc,
   trackedFiles,
 } from "./rule-catalog";
+import { RUNTIME_STATE_PATTERNS, runtimeStateViolations, trackedInIndex } from "./runtime-state";
 
 const rules = await loadRules();
 const tests = await loadRuleTests();
@@ -162,6 +163,7 @@ const ARCH_STEPS = [
   "bun tools/arch/workflow-injection.ts",
   "bun tools/arch/workflow-fail-closed.ts",
   "bun tools/arch/test-isolation.ts",
+  "bun tools/arch/runtime-state.ts",
 ];
 
 // A fix names an action. Extend the list when a new rule needs another verb.
@@ -372,4 +374,39 @@ test("claims.ts exports exactly its validated operations (no raw runner, no alia
 test("bun run arch runs every checker as a hard && step, with no operator that can swallow a failure", () => {
   expect(archScript.split(" && ")).toEqual(ARCH_STEPS);
   expect(archScript).not.toMatch(/\|\||;|\||(?<!&)&(?!&)|\$\(|`|\n/);
+});
+
+/** Runtime state under .claude/ (loop logs, caches, evidence) is never tracked (#8665). */
+test("the runtime-state list is pinned and only matches runtime paths", () => {
+  expect(RUNTIME_STATE_PATTERNS.map((p) => p.source)).toEqual([
+    "^\\.claude\\/loop-logs\\/",
+    "^\\.claude\\/test-holdout\\/",
+    "^\\.claude\\/evidence\\/[^/]+\\.json$",
+    "^\\.claude\\/(pipeline-artifacts|worktrees)\\/",
+    "^\\.claude\\/(loop-state\\.md|pipeline-state\\.md|platform-hygiene\\.json|intelligence-cache\\.json)$",
+    "^\\.claude\\/(recovery-state\\.json|daemon-config\\.json|code-review\\.json|hygiene-report\\.json|pr-draft\\.md)$",
+  ]);
+  expect(
+    runtimeStateViolations([
+      ".claude/loop-logs/iteration-1.log",
+      ".claude/evidence/manifest.json",
+      ".claude/intelligence-cache.json",
+      ".claude/test-holdout/manifest.json",
+    ]),
+  ).toHaveLength(4);
+  expect(
+    runtimeStateViolations([
+      ".claude/settings.json",
+      ".claude/DEFINITION-OF-DONE.md",
+      ".claude/agents/porter.md",
+      ".claude/hooks/guard.sh",
+      ".claude/rules/bash.md",
+      ".claude/quality-profile.json",
+      "scripts/sw-loop.sh",
+    ]),
+  ).toEqual([]);
+});
+
+test("no runtime state under .claude/ is tracked in the git index (#8665)", () => {
+  expect(runtimeStateViolations(trackedInIndex())).toEqual([]);
 });
