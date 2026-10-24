@@ -48,6 +48,8 @@ setup_e2e_env() {
     # The loop's blast-radius guard reads config/scope-budgets.json from the repo root beside scripts/ (#8644).
     mkdir -p "$TEMP_DIR/config"
     cp "$SCRIPT_DIR/../config/scope-budgets.json" "$TEMP_DIR/config/scope-budgets.json"
+    # agent-exec (scripts/lib) reads config/agent-permissions.json beside scripts/ and refuses without it (#8614).
+    mkdir -p "$TEMP_DIR/config" && cp "$REPO_DIR/config/agent-permissions.json" "$TEMP_DIR/config/"
     # Copy skills directory (required by skill-registry.sh) — create empty if missing
     if [[ -d "$SCRIPT_DIR/skills" ]]; then
         cp -r "$SCRIPT_DIR/skills" "$TEMP_DIR/scripts/skills"
@@ -88,16 +90,24 @@ create_mock_claude() {
 # Mock Claude: plan/review = text; loop = JSON + create files
 prompt=""
 use_json=false
+_all_args=" $* "
 while [[ $# -gt 0 ]]; do
     _argc_before=$#
     case "$1" in
         # Valueless flags consume ONE argument. They previously shared the
         # `shift 2` branch with value-taking flags, and `shift 2` with a single
         # argument remaining fails without shifting — so whenever sw-loop.sh
-        # passed --dangerously-skip-permissions last (it appends exactly that to
-        # its flag arrays), $# never reached 0 and this loop spun forever at
-        # 100% CPU. That was the sw-e2e-system-test hang.
-        --print|--verbose|--dangerously-skip-permissions) shift ;;
+        # passed a valueless flag last (it appends flags to its arrays), $# never
+        # reached 0 and this loop spun forever at 100% CPU. That was the
+        # sw-e2e-system-test hang.
+        --print|--verbose) shift ;;
+        --settings|--setting-sources|--permission-mode|--permission-prompts) shift 2 ;;
+        # Variadic like commander: a space-separated value takes the following non-option arguments,
+        # the prompt included (#8660 review). --flag=value is one argument.
+        --disallowedTools|--allowedTools|--tools|--add-dir)
+            shift
+            while [[ $# -gt 0 && "$1" != -* ]]; do shift; done ;;
+        --*=*) shift ;;
         -p) prompt="${2:-}"; shift 2 ;;
         --output-format) [[ "${2:-}" == "json" ]] && use_json=true; shift 2 ;;
         --model|--max-turns) shift 2 ;;
@@ -109,6 +119,11 @@ while [[ $# -gt 0 ]]; do
     # the way comparing argument values would.
     [[ $# -eq $_argc_before ]] && shift
 done
+# A print-mode call with no prompt means a flag swallowed it: fail loudly instead of returning empty output.
+if [[ -z "$prompt" && ( "$_all_args" == *" --print "* || "$_all_args" == *" -p "* ) ]]; then
+    echo "mock claude: no prompt reached claude (a variadic flag swallowed it?)" >&2
+    exit 2
+fi
 
 if [[ "$use_json" == "true" ]]; then
     # Loop mode: create files, then output JSON with LOOP_COMPLETE

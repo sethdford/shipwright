@@ -199,7 +199,7 @@ show_help() {
     echo -e "  ${CYAN}--agents${RESET} N                Number of parallel agents (default: 1)"
     echo -e "  ${CYAN}--roles${RESET} \"r1,r2,...\"        Role per agent: builder,reviewer,tester,optimizer,docs,security"
     echo -e "  ${CYAN}--worktree${RESET}                Use git worktrees for isolation (auto if agents > 1)"
-    echo -e "  ${CYAN}--skip-permissions${RESET}        Pass --dangerously-skip-permissions to Claude"
+    echo -e "  ${CYAN}--skip-permissions${RESET}        Accepted and ignored: agents always run under config/agent-permissions.json (#8614)"
     echo -e "  ${CYAN}--max-turns${RESET} N             Max API turns per Claude session"
     echo -e "  ${CYAN}--resume${RESET}                  Resume from existing .claude/loop-state.md"
     echo -e "  ${CYAN}--max-restarts${RESET} N          Max session restarts on exhaustion (default: 0)"
@@ -1265,9 +1265,8 @@ AUDIT_PROMPT
     audit_model="$(select_audit_model)"
     local audit_flags=()
     audit_flags+=("--model" "$audit_model")
-    if $SKIP_PERMISSIONS; then
-        audit_flags+=("--dangerously-skip-permissions")
-    fi
+    # Read-only stage: no edits. Bash and the rest of the policy come from agent-exec.
+    audit_flags+=("--disallowedTools=Edit,Write,NotebookEdit")
 
     # Use structured output for machine-parseable audit results
     local schema_file="${SCRIPT_DIR}/../schemas/audit-result.json"
@@ -1402,9 +1401,7 @@ DOD_PROMPT
     dod_model="$(select_audit_model)"
     local dod_flags=()
     dod_flags+=("--model" "$dod_model")
-    if $SKIP_PERMISSIONS; then
-        dod_flags+=("--dangerously-skip-permissions")
-    fi
+    dod_flags+=("--disallowedTools=Edit,Write,NotebookEdit")
 
     "$SW_AGENT_EXEC" claude -p "$dod_prompt" "${dod_flags[@]}" > "$dod_log" 2>&1 || true
 
@@ -1516,9 +1513,7 @@ HOLISTIC_PROMPT
     local hol_model
     hol_model="$(select_audit_model)"
     local hol_flags=("--model" "$hol_model")
-    if $SKIP_PERMISSIONS; then
-        hol_flags+=("--dangerously-skip-permissions")
-    fi
+    hol_flags+=("--disallowedTools=Edit,Write,NotebookEdit")
 
     "$SW_AGENT_EXEC" claude -p "$holistic_prompt" "${hol_flags[@]}" > "$holistic_log" 2>&1 || true
 
@@ -1697,9 +1692,6 @@ show_banner() {
     echo -e "  ${BOLD}Model:${RESET} $MODEL ${DIM}|${RESET} ${BOLD}Max:${RESET} $MAX_ITERATIONS iterations${extend_info} ${DIM}|${RESET} ${BOLD}Test:${RESET} ${TEST_CMD:-"(none)"}"
     if [[ "$AGENTS" -gt 1 ]]; then
         echo -e "  ${BOLD}Agents:${RESET} $AGENTS ${DIM}(parallel worktree mode)${RESET}"
-    fi
-    if $SKIP_PERMISSIONS; then
-        echo -e "  ${YELLOW}${BOLD}⚠${RESET}  ${YELLOW}--dangerously-skip-permissions enabled${RESET}"
     fi
     if $AUDIT_ENABLED || $AUDIT_AGENT_ENABLED || $QUALITY_GATES_ENABLED; then
         echo -e "  ${BOLD}Audit:${RESET} ${AUDIT_ENABLED:+self-audit }${AUDIT_AGENT_ENABLED:+audit-agent }${QUALITY_GATES_ENABLED:+quality-gates}${DIM}${DOD_FILE:+ | DoD: $DOD_FILE}${RESET}"

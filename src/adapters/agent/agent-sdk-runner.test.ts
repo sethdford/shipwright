@@ -1,6 +1,10 @@
 import { describe, expect, test } from "bun:test";
+import { mkdirSync, writeFileSync } from "node:fs";
+import { join } from "node:path";
 import { z } from "zod";
 import type { AgentFailureKind } from "../../shared/kernel/ports";
+import { createTestEnv } from "../../testing/test-env";
+import { AGENT_SANDBOX, AGENT_SETTINGS } from "./agent-permissions";
 import { AgentSdkRunner, agentEnv, type QueryFn } from "./agent-sdk-runner";
 
 type Captured = { prompt: string; options: Record<string, unknown> };
@@ -166,10 +170,61 @@ describe("runTask", () => {
     expect((captured[0] as Captured).options).toMatchObject({
       cwd: "/wt/issue-1",
       permissionMode: "dontAsk",
-      allowedTools: ["Read", "Edit", "Bash(bun test *)"],
-      settingSources: ["project"],
+      allowedTools: ["Read", "Edit(./**)", "Bash(bun test *)"],
+      settingSources: ["user"],
       env: { PATH: "/bin" },
     });
+  });
+
+  test("never loads the repo's settings and always passes the policy deny list (#8581, #8614)", async () => {
+    const { fn, captured } = fakeQuery([result({ subtype: "success", result: "ok" })]);
+    const r = await new AgentSdkRunner({ PATH: "/bin" }, fn).runTask(spec);
+    if (!r.ok) throw new Error(r.error.message);
+    const options = (captured[0] as Captured).options;
+    expect(options.settingSources).not.toContain("project");
+    expect(options.settingSources).not.toContain("local");
+    expect(options.disallowedTools).toEqual(
+      expect.arrayContaining([
+        "Bash(curl *)",
+        "Bash(gh *)",
+        "Bash(git push *)",
+        "Edit(.claude/settings*.json)",
+      ]),
+    );
+  });
+
+  test("sends the policy as settings and sandbox, with hooks off and the Bash sandbox on (#8614 review)", async () => {
+    const { fn, captured } = fakeQuery([result({ subtype: "success", result: "ok" })]);
+    const r = await new AgentSdkRunner({ PATH: "/bin" }, fn).runTask(spec);
+    if (!r.ok) throw new Error(r.error.message);
+    const options = (captured[0] as Captured).options;
+    expect(options.settings).toEqual(AGENT_SETTINGS);
+    expect(options.sandbox).toEqual(AGENT_SANDBOX);
+    expect((options.sandbox as { failIfUnavailable: boolean }).failIfUnavailable).toBe(true);
+  });
+
+  test("project memory (CLAUDE.md, AGENTS.md, .claude/rules) goes in as systemPrompt.append", async () => {
+    const env = createTestEnv();
+    try {
+      writeFileSync(join(env.root, "CLAUDE.md"), "PROJECT RULE");
+      writeFileSync(join(env.root, "AGENTS.md"), "AGENT GUIDE");
+      mkdirSync(join(env.root, ".claude", "rules"), { recursive: true });
+      writeFileSync(join(env.root, ".claude", "rules", "tests.md"), "TEST RULE");
+      const { fn, captured } = fakeQuery([result({ subtype: "success", result: "ok" })]);
+      const r = await new AgentSdkRunner({ PATH: "/bin" }, fn).runTask({ ...spec, cwd: env.root });
+      if (!r.ok) throw new Error(r.error.message);
+      const systemPrompt = (captured[0] as Captured).options.systemPrompt as {
+        type: string;
+        preset: string;
+        append: string;
+      };
+      expect(systemPrompt).toMatchObject({ type: "preset", preset: "claude_code" });
+      expect(systemPrompt.append).toContain("PROJECT RULE");
+      expect(systemPrompt.append).toContain("AGENT GUIDE");
+      expect(systemPrompt.append).toContain("TEST RULE");
+    } finally {
+      env.cleanup();
+    }
   });
 
   test("max turns maps to max_turns and keeps the session id so the run can be resumed", async () => {

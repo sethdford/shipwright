@@ -493,6 +493,15 @@ else
     echo -e "    ${DIM}npm install -g @anthropic-ai/claude-code${RESET}"
 fi
 
+# Agent sandbox: agents refuse to start without bubblewrap/socat on Linux (#8614)
+# shellcheck source=lib/agent-sandbox.sh
+if source "$SCRIPT_DIR/lib/agent-sandbox.sh" && sw_agent_sandbox_check 2>/dev/null; then
+    check_pass "Agent sandbox: ready (bubblewrap/socat or sandbox-exec)"
+else
+    check_fail "Agent sandbox: not ready — agents will not run (run: scripts/ci/agent-sandbox-setup.sh on CI, or see the messages above)"
+    sw_agent_sandbox_check || true
+fi
+
 # Node.js
 if command -v node >/dev/null 2>&1; then
     NODE_VERSION="$(node -v | tr -d 'v')"

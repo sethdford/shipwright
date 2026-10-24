@@ -315,6 +315,16 @@ assert_eq "fresh run: strikes reset" "false" "$([[ -e "$EVD/scope-strikes" ]] &&
 scope_reset_strikes "$TEST_TEMP_DIR/no-such-dir"
 assert_eq "fresh run: reset with no dir does not fail" "0" "$?"
 
+# 19. deleting a file under scripts/ci is protected even inside a broad bug scope
+R="$(make_repo)"; BASE="$(head_of "$R")"; EVD="$TEST_TEMP_DIR/evd-19"; mkdir -p "$EVD"
+mkdir -p "$R/scripts/ci" && echo ci > "$R/scripts/ci/agent.sh" && commit_all "$R" "ci"
+BASE="$(head_of "$R")"
+rm "$R/scripts/ci/agent.sh"
+commit_all "$R" "delete ci"
+run_guard "$R" "$BASE" "$BASE" 1 "$BUG_SCOPE" "$EVD"
+assert_eq "scripts/ci deletion: rc 1" "1" "$RC"
+assert_has "scripts/ci deletion: protected_deleted" "protected_deleted" "$(evidence_field "$EVD" 1 '[.violations[].reason] | join(",")')"
+
 # ─── Config sanity ───────────────────────────────────────────────────────────
 
 echo ""
@@ -326,6 +336,8 @@ assert_eq "config: unknown type is no looser than docs" "true" "$(jq -r '
     and (.types.unknown.max_lines_added <= .types.docs.max_lines_added)
     and (.types.unknown.max_lines_deleted <= .types.docs.max_lines_deleted)' "$CONFIG")"
 assert_eq "config: deletion budget stricter than addition (docs)" "true" "$(jq -r '.types.docs.max_lines_deleted < .types.docs.max_lines_added' "$CONFIG")"
+assert_eq "config: protected list covers scripts/ci" "true" "$(jq -r '[.protected_paths[] | . == "scripts/ci/**"] | any' "$CONFIG")"
+assert_eq "config: protected list covers agent permissions" "true" "$(jq -r '[.protected_paths[] | . == "config/agent-permissions.json"] | any' "$CONFIG")"
 assert_eq "config: protected list covers workflows" "true" "$(jq -r '[.protected_paths[] | . == ".github/workflows/**"] | any' "$CONFIG")"
 
 print_test_results

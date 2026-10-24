@@ -588,7 +588,7 @@ ${_skill_prompts}
     local _plan_flags
     _plan_flags="$(_pipeline_claude_flags "plan" "$plan_model")"
     # shellcheck disable=SC2086
-    "$SW_AGENT_EXEC" claude --print $_plan_flags --max-turns "$(_smart_int "max_turns.pipeline_stage" 25)" --dangerously-skip-permissions \
+    "$SW_AGENT_EXEC" claude --print $_plan_flags --max-turns "$(_smart_int "max_turns.pipeline_stage" 25)" --disallowedTools=Edit,Write,NotebookEdit \
         "$plan_prompt" < /dev/null > "$plan_file" 2>"$_token_log" || true
     parse_claude_tokens "$_token_log"
 
@@ -1078,7 +1078,7 @@ ${_skill_prompts}
     local _design_flags
     _design_flags="$(_pipeline_claude_flags "design" "$design_model")"
     # shellcheck disable=SC2086
-    "$SW_AGENT_EXEC" claude --print $_design_flags --max-turns "$(_smart_int "max_turns.pipeline_stage" 25)" --dangerously-skip-permissions \
+    "$SW_AGENT_EXEC" claude --print $_design_flags --max-turns "$(_smart_int "max_turns.pipeline_stage" 25)" --disallowedTools=Edit,Write,NotebookEdit \
         "$design_prompt" < /dev/null > "$design_file" 2>"$_token_log" || true
     parse_claude_tokens "$_token_log"
 

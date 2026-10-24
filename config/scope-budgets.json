@@ -8,7 +8,8 @@
     ".github/workflows/**",
     "docs/adr/**",
     ".claude/settings*.json",
-    "config/agent-permissions.json"
+    "config/agent-permissions.json",
+    "scripts/ci/**"
   ],
   "aliases": {
     "documentation": "docs",
