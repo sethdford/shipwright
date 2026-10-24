@@ -541,9 +541,47 @@ TS
     else
         assert_fail "DUP: the failing unit is file-qualified" "got: $TG_NEW_FAILURES"
     fi
+elif [[ -n "${CI:-}" ]]; then
+    # CI pins bun (.bun-version, test.yml). A runner without it must fail here, not skip the parser
+    # checks below, which is how the bun fixtures went unverified before (#8664).
+    assert_fail "bun is installed for the bun fixtures" "bun is not on PATH in CI: the setup-bun step in test.yml did not run"
 else
-    assert_pass "bun not installed: bun fixture checks skipped"
+    assert_pass "bun not installed locally: live bun fixture checks skipped (CI fails instead)"
 fi
+
+# Golden bun logs (#8664): real `bun test` output from bun 1.2.19 (the pin), 1.3.14 and 1.4.4, each as
+# pipe output, FORCE_COLOR colour (✗ markers) and a pty capture (CRLF, colour). Every shape must parse
+# to the same units, so verdicts do not depend on the bun version or on how the log was captured.
+GOLD="$SCRIPT_DIR/fixtures/bun-test"
+tg_parse_log "$GOLD/bun-1.2.19-plain.log"
+GOLD_REF="$TG_UNITS"
+assert_eq "golden bun 1.2.19 plain: parsable" "1" "$TG_PARSABLE"
+for want in "b.test.ts::LOAD_ERROR" "syntax.test.ts::LOAD_ERROR" "a.test.ts::pre-existing failure#1" \
+    "dup.test.ts::same name#1" "dup.test.ts::same name#2" "bun::ran=9" "bun::files=5" "bun::fail=5" \
+    "bun::error=2" "bun::skip=1"; do
+    if printf '%s\n' "$GOLD_REF" | grep -Fx -- "$want" >/dev/null; then
+        assert_pass "golden bun 1.2.19 plain: unit $want"
+    else
+        assert_fail "golden bun 1.2.19 plain: unit $want" "got: $GOLD_REF"
+    fi
+done
+for name in bun-1.2.19-color bun-1.2.19-tty bun-1.3.14-plain bun-1.3.14-color bun-1.3.14-tty \
+    bun-1.4.4-plain bun-1.4.4-color bun-1.4.4-tty; do
+    tg_parse_log "$GOLD/$name.log"
+    assert_eq "golden $name: parsable" "1" "$TG_PARSABLE"
+    assert_eq "golden $name: same units as the plain 1.2.19 log" "$GOLD_REF" "$TG_UNITS"
+done
+# Singular summary variants ("Ran 1 test across 1 file", one failing test), plain and pty
+for name in bun-single-1.2.19-plain bun-single-1.2.19-tty; do
+    tg_parse_log "$GOLD/$name.log"
+    assert_eq "golden $name: one failing unit, one file" \
+        "bun::error=0
+bun::fail=1
+bun::files=1
+bun::ran=1
+bun::skip=0
+one.test.ts::only failure#1" "$TG_UNITS"
+done
 
 # Multiset (review round 4): a repeated assertion name in a failing suite must not hide a swap.
 # The base has suite-b's "X" once; the iteration has "X" twice.
