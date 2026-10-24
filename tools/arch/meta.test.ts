@@ -116,7 +116,12 @@ const PINNED: Record<string, { ratchet: boolean; files: string[]; ignores: strin
     ],
   },
   "F9-bash-claude-token-scrub": { ratchet: false, files: BASH_FILES, ignores: [] },
-  "F9-bash-no-permission-bypass": { ratchet: true, files: BASH_FILES, ignores: [] },
+  // Error severity, zero baseline (#8614). The one exemption is the operator opt-in in sw-session.sh.
+  "F9-bash-no-permission-bypass": {
+    ratchet: false,
+    files: BASH_FILES,
+    ignores: ["scripts/sw-session.sh"],
+  },
   "F10-bash-github-writes": { ratchet: true, files: BASH_FILES, ignores: [] },
   "F10-bash-curl-github-writes": { ratchet: true, files: BASH_FILES, ignores: [] },
   "F11-bash-no-eval-expansion": { ratchet: true, files: BASH_FILES, ignores: [] },
@@ -372,4 +377,18 @@ test("claims.ts exports exactly its validated operations (no raw runner, no alia
 test("bun run arch runs every checker as a hard && step, with no operator that can swallow a failure", () => {
   expect(archScript.split(" && ")).toEqual(ARCH_STEPS);
   expect(archScript).not.toMatch(/\|\||;|\||(?<!&)&(?!&)|\$\(|`|\n/);
+});
+
+test("the bash bypass exemption is narrow: sw-session.sh spells the bypass flag once (F9, #8614)", async () => {
+  const src = await Bun.file(join(ROOT, "scripts/sw-session.sh")).text();
+  const spellings = src.match(/dangerously-skip-permissions/g) ?? [];
+  expect(spellings).toHaveLength(1);
+  expect(src).toContain('OPERATOR_BYPASS_FLAG="--dangerously-skip-permissions"');
+});
+
+test("agent-exec.sh applies the shared policy and refuses policy overrides (F9, #8614)", async () => {
+  const src = await Bun.file(join(ROOT, "scripts/lib/agent-exec.sh")).text();
+  expect(src).toContain("config/agent-permissions.json");
+  expect(src).toContain("--permission-mode dontAsk");
+  expect(src).toContain("--setting-sources user");
 });

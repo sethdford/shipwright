@@ -20,6 +20,31 @@
 #   SHIPWRIGHT_SCRIPTS SHIPWRIGHT_GITHUB_REPO SHIPWRIGHT_FORCE_COLOR        the run variables agents read
 #   CLAUDE_AGENT_SDK_CLIENT_APP=shipwright, SHIPWRIGHT_IN_TEST_GATE=1  (real-service suites refuse)
 #
+# Permissions (#8614, #8581). Every claude call gets the one shared policy, config/agent-permissions.json,
+# and the caller cannot widen it. For each claude argument this adds (after the claude word):
+#   --settings <policy> --setting-sources user --permission-mode dontAsk   (and --permission-prompts none with -p)
+# dontAsk denies, without a prompt, every call the policy does not allow; a deny rule wins over any allow rule
+# in every settings scope. --setting-sources user keeps the repo's .claude/settings*.json (agent-writable) out.
+# A caller that passes --permission-mode, --settings, --setting-sources, --permission-prompts, or --allowedTools
+# (an allow list the policy does not own) is refused, and so is any bypass flag. A bypass flag is allowed only
+# for an operator: SHIPWRIGHT_OPERATOR_SKIP_PERMISSIONS=1 set by sw-session --skip-permissions, stdin and stdout
+# on a TTY, and no CI, test mode, pipeline or test gate. An agent or a daemon has no TTY and cannot set it.
+#
+# Also added: --append-system-prompt with the project memory (CLAUDE.md, AGENTS.md, .claude/rules/*.md, read
+# from the working directory), since --setting-sources user skips the project scope; and the policy's
+# disableAllHooks and blockReadsOutsideWorkingDirectories come from the policy file itself. Only claude is
+# launched through this wrapper: any other command is refused.
+#
+# Where the policy comes from: SW_AGENT_POLICY (the pipeline sets it to a read-only copy in RUNNER_TEMP, taken
+# from the default branch before any agent runs), else <repo>/config/agent-permissions.json. In CI a policy inside
+# the agent's working tree is refused. An agent's own Bash cannot choose a policy: inside an agent run
+# (SHIPWRIGHT_IN_TEST_GATE=1 and CLAUDE_AGENT_SDK_CLIENT_APP=shipwright, which agent-exec sets) SW_AGENT_POLICY is refused.
+#
+# Same-user limit (documented, not closed here): the agent runs as the pipeline's user. It can still write any file
+# that user can write unless the Edit/Write deny rules and the sandbox stop it, and it can read and change this
+# script and the snapshot in RUNNER_TEMP through Bash. The deny rules cover Edit/Write and the file commands the CLI
+# recognizes (sed, tee, redirections), not every program. Closing it needs a separate user or a container.
+#
 # Proxy values may embed credentials (http://user:pass@proxy). Those are proxy credentials, not GitHub
 # credentials, and the agent needs them to reach the API from behind a proxy; they are passed on purpose.
 # The Bedrock secret keys are passed only when Bedrock is the selected provider.
@@ -127,4 +152,118 @@ done
 _sw_agent_pairs+=("GIT_CONFIG_COUNT=${GIT_CONFIG_COUNT:-0}")
 _sw_agent_pairs+=("CLAUDE_AGENT_SDK_CLIENT_APP=shipwright" "SHIPWRIGHT_IN_TEST_GATE=1")
 
-exec env -i ${_sw_agent_pairs[@]+"${_sw_agent_pairs[@]}"} "$@"
+# ─── Permission policy (#8614, #8581) ───────────────────────────────────────
+# Where the policy comes from. In CI the workflow snapshots config/agent-permissions.json to $RUNNER_TEMP
+# before any agent runs and sets SW_AGENT_POLICY to that copy. A policy inside the agent's working tree
+# is refused in CI: the agent can write there.
+_sw_repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
+_sw_agent_policy="${SW_AGENT_POLICY:-$_sw_repo_root/config/agent-permissions.json}"
+# Inside an agent run (agent-exec sets these in every agent's environment). A nested agent may not choose
+# its own policy.
+_sw_inside_agent=false
+if [[ "${SHIPWRIGHT_IN_TEST_GATE:-}" == "1" && "${CLAUDE_AGENT_SDK_CLIENT_APP:-}" == "shipwright" ]]; then
+    _sw_inside_agent=true
+fi
+
+_sw_is_bypass_flag() {
+    # A flag (starts with --) that names a permission bypass. A glob, so this file spells no bypass
+    # flag and the F9 bash rule has nothing to flag here. Broader than the rule on purpose.
+    case "$1" in
+        --*[Dd]angerously*|--*[Bb]ypass*|--*[Ss]kip*[Pp]ermission*) return 0 ;;
+    esac
+    return 1
+}
+_sw_operator_bypass_ok() {
+    [[ "${SHIPWRIGHT_OPERATOR_SKIP_PERMISSIONS:-}" == "1" && -t 0 && -t 1 ]] \
+        && [[ -z "${CI:-}" && -z "${SHIPWRIGHT_TEST_MODE:-}" && -z "${SHIPWRIGHT_PIPELINE_ID:-}" && -z "${SHIPWRIGHT_IN_TEST_GATE:-}" ]]
+}
+# Absolute, symlink-resolved path of a file's directory plus its name.
+_sw_abs_path() {
+    local dir
+    dir="$(cd "$(dirname "$1")" 2>/dev/null && pwd -P)" || return 1
+    printf '%s/%s\n' "$dir" "$(basename "$1")"
+}
+# The project memory the CLI would have loaded from the project scope (CLAUDE.md, AGENTS.md and
+# .claude/rules/*.md), read from the working directory. `--setting-sources user` skips the project scope,
+# so the same text is passed through --append-system-prompt. Settings are NOT read from the project.
+_sw_project_memory() {
+    local out="" f
+    for f in CLAUDE.md AGENTS.md .claude/CLAUDE.md; do
+        [[ -f "$f" ]] || continue
+        out+=$'\n\n'"# $f"$'\n\n'"$(cat "$f")"
+    done
+    for f in .claude/rules/*.md; do
+        [[ -f "$f" ]] || continue
+        out+=$'\n\n'"# $f"$'\n\n'"$(cat "$f")"
+    done
+    printf '%s' "$out"
+}
+
+_sw_has_claude=false
+_sw_has_print=false
+_sw_has_bypass=false
+for _sw_arg in "$@"; do
+    case "$_sw_arg" in
+        -p|--print) _sw_has_print=true ;;
+    esac
+    if [[ "${_sw_arg##*/}" == claude ]]; then _sw_has_claude=true; fi
+    case "$_sw_arg" in
+        --permission-mode|--permission-mode=*|--settings|--settings=*|--setting-sources|--setting-sources=*|\
+--permission-prompts|--permission-prompts=*|--allowedTools|--allowedTools=*|--allowed-tools|--allowed-tools=*)
+            echo "agent-exec: refusing $_sw_arg; the permission policy is set here (config/agent-permissions.json)" >&2
+            exit 1 ;;
+    esac
+    if _sw_is_bypass_flag "$_sw_arg"; then _sw_has_bypass=true; fi
+done
+
+# Only claude is launched through this wrapper. Anything else would run outside the policy, so refuse it.
+if [[ "$_sw_has_claude" != true ]]; then
+    echo "agent-exec: refusing to run ${1:-nothing}: only claude is launched through this wrapper (F9)" >&2
+    exit 1
+fi
+
+if [[ -n "${SW_AGENT_POLICY:-}" && "$_sw_inside_agent" == true ]]; then
+    echo "agent-exec: refusing SW_AGENT_POLICY inside an agent run; the policy is set by the pipeline" >&2
+    exit 1
+fi
+if [[ "${CI:-}" != "" ]]; then
+    _sw_policy_abs="$(_sw_abs_path "$_sw_agent_policy" 2>/dev/null || echo "$_sw_agent_policy")"
+    _sw_cwd_abs="$(pwd -P)"
+    case "$_sw_policy_abs" in
+        "$_sw_cwd_abs"/*)
+            echo "agent-exec: in CI the policy must not live in the agent's working tree ($_sw_policy_abs); the pipeline snapshots it to RUNNER_TEMP (#8614)" >&2
+            exit 1 ;;
+    esac
+fi
+
+_sw_argv=()
+if [[ "$_sw_has_bypass" == true ]]; then
+    if ! _sw_operator_bypass_ok; then
+        echo "agent-exec: refusing a permission bypass flag; agents run under config/agent-permissions.json (F9)" >&2
+        exit 1
+    fi
+    # The operator's own terminal session: the caller's flags pass through unchanged.
+    _sw_argv=("$@")
+else
+    if [[ ! -f "$_sw_agent_policy" || ! -r "$_sw_agent_policy" ]]; then
+        echo "agent-exec: permission policy missing or unreadable ($_sw_agent_policy); not running $1" >&2
+        exit 1
+    fi
+    _sw_memory="$(_sw_project_memory)"
+    _sw_injected=false
+    for _sw_arg in "$@"; do
+        _sw_argv+=("$_sw_arg")
+        if [[ "$_sw_injected" == false && "${_sw_arg##*/}" == claude ]]; then
+            _sw_argv+=(--settings "$_sw_agent_policy" --setting-sources user --permission-mode dontAsk)
+            if [[ "$_sw_has_print" == true ]]; then
+                _sw_argv+=(--permission-prompts none)
+            fi
+            if [[ -n "$_sw_memory" ]]; then
+                _sw_argv+=(--append-system-prompt "$_sw_memory")
+            fi
+            _sw_injected=true
+        fi
+    done
+fi
+
+exec env -i ${_sw_agent_pairs[@]+"${_sw_agent_pairs[@]}"} ${_sw_argv[@]+"${_sw_argv[@]}"}

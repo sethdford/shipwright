@@ -1,4 +1,5 @@
 import { describe, expect, test } from "bun:test";
+import { AGENT_SANDBOX, AGENT_SETTINGS } from "./agent-permissions";
 import { assertAgentOptions } from "./privilege-guard";
 
 describe("assertAgentOptions (F9 runtime guard)", () => {
@@ -143,5 +144,24 @@ describe("assertAgentOptions hardening", () => {
       assertAgentOptions(Object.freeze({ ...base, env: Object.freeze({ PATH: "/bin" }) })),
     ).not.toThrow();
     expect(() => assertAgentOptions(Object.assign(Object.create(null), base))).not.toThrow();
+  });
+});
+
+describe("assertAgentOptions accepts only the agent policy as settings and sandbox (#8614)", () => {
+  const dontAsk = { permissionMode: "dontAsk" } as const;
+
+  test("the policy the runner sends is accepted", () => {
+    expect(() =>
+      assertAgentOptions({ ...dontAsk, settings: AGENT_SETTINGS, sandbox: AGENT_SANDBOX }),
+    ).not.toThrow();
+  });
+
+  test("any other settings or sandbox is refused", () => {
+    expect(() =>
+      assertAgentOptions({ ...dontAsk, settings: { ...AGENT_SETTINGS, disableAllHooks: false } }),
+    ).toThrow(/F9/);
+    expect(() =>
+      assertAgentOptions({ ...dontAsk, sandbox: { ...AGENT_SANDBOX, failIfUnavailable: false } }),
+    ).toThrow(/F9/);
   });
 });
