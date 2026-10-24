@@ -30,6 +30,11 @@ jobs:
         if: runner.os == 'Linux'
         run: sudo apt-get update && sudo apt-get install -y tmux jq
 
+      - name: Snapshot the agent permission policy (#8614)
+        # CI=true makes agent-exec refuse a policy inside the checkout, so the suites that run agent-exec
+        # need the snapshot outside it, exactly as the pipeline has it.
+        run: scripts/ci/snapshot-agent-policy.sh
+
       - name: Run all test suites
         # Same runner as `npm test`, so local and CI results cannot diverge.
         # It auto-discovers scripts/*-test.sh, runs each independently, and
