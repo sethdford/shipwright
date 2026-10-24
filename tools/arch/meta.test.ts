@@ -8,7 +8,7 @@ import {
   type RuleDoc,
   trackedFiles,
 } from "./rule-catalog";
-import { RUNTIME_STATE_PATTERNS, runtimeStateViolations, trackedInIndex } from "./runtime-state";
+import { runtimeStateViolations, trackedInIndex } from "./runtime-state";
 
 const rules = await loadRules();
 const tests = await loadRuleTests();
@@ -381,35 +381,54 @@ test("bun run arch runs every checker as a hard && step, with no operator that c
   expect(archScript).not.toMatch(/\|\||;|\||(?<!&)&(?!&)|\$\(|`|\n/);
 });
 
-/** Runtime state under .claude/ (loop logs, caches, evidence) is never tracked (#8665). */
-test("the runtime-state list is pinned and only matches runtime paths", () => {
-  expect(RUNTIME_STATE_PATTERNS.map((p) => p.source)).toEqual([
-    "^\\.claude\\/loop-logs\\/",
-    "^\\.claude\\/test-holdout\\/",
-    "^\\.claude\\/evidence\\/[^/]+\\.json$",
-    "^\\.claude\\/(pipeline-artifacts|worktrees)\\/",
-    "^\\.claude\\/(loop-state\\.md|pipeline-state\\.md|platform-hygiene\\.json|intelligence-cache\\.json)$",
-    "^\\.claude\\/(recovery-state\\.json|daemon-config\\.json|code-review\\.json|hygiene-report\\.json|pr-draft\\.md)$",
-  ]);
-  expect(
-    runtimeStateViolations([
-      ".claude/loop-logs/iteration-1.log",
-      ".claude/evidence/manifest.json",
-      ".claude/intelligence-cache.json",
-      ".claude/test-holdout/manifest.json",
-    ]),
-  ).toHaveLength(4);
-  expect(
-    runtimeStateViolations([
-      ".claude/settings.json",
-      ".claude/DEFINITION-OF-DONE.md",
-      ".claude/agents/porter.md",
-      ".claude/hooks/guard.sh",
-      ".claude/rules/bash.md",
-      ".claude/quality-profile.json",
-      "scripts/sw-loop.sh",
-    ]),
-  ).toEqual([]);
+/**
+ * Runtime state under .claude/ is never tracked (#8665). The list is derived from .gitignore, so these
+ * tests check the two agree: each runtime example is ignored by git, and hand-written config is neither
+ * ignored nor classified as runtime.
+ */
+const RUNTIME_EXAMPLES = [
+  ".claude/loop-logs/iteration-1.log",
+  ".claude/evidence/manifest.json",
+  ".claude/intelligence-cache.json",
+  ".claude/test-holdout/manifest.json",
+  ".claude/daemon-runtime.json",
+  ".claude/causal-graph.json",
+  ".claude/recovery-patterns.json",
+  ".claude/project-detection.json",
+  ".claude/prep-manifest.json",
+  ".claude/formal-specs.json",
+  ".claude/nudge.md",
+  ".claude/pipeline-tasks.md",
+  ".claude/decision-drafts/d1.md",
+  ".claude/mutations/m1.json",
+  ".claude/testgen/t1.ts",
+];
+const CONFIG_EXAMPLES = [
+  ".claude/settings.json",
+  ".claude/daemon-config.json",
+  ".claude/fleet-config.json",
+  ".claude/quality-profile.json",
+  ".claude/DEFINITION-OF-DONE.md",
+  ".claude/agents/porter.md",
+  ".claude/hooks/guard.sh",
+  ".claude/rules/bash.md",
+  "scripts/sw-loop.sh",
+];
+
+test("every runtime example is classified as runtime and ignored by git", () => {
+  expect(runtimeStateViolations(RUNTIME_EXAMPLES)).toEqual(RUNTIME_EXAMPLES);
+  for (const f of RUNTIME_EXAMPLES) {
+    const r = Bun.spawnSync(["git", "check-ignore", "-q", f], { cwd: ROOT });
+    expect({ f, ignored: r.exitCode }).toEqual({ f, ignored: 0 });
+  }
+});
+
+test("hand-written config is neither classified as runtime nor ignored by git", () => {
+  expect(runtimeStateViolations(CONFIG_EXAMPLES)).toEqual([]);
+  for (const f of CONFIG_EXAMPLES) {
+    const r = Bun.spawnSync(["git", "check-ignore", "-q", f], { cwd: ROOT });
+    expect({ f, ignored: r.exitCode }).toEqual({ f, ignored: 1 });
+  }
 });
 
 test("no runtime state under .claude/ is tracked in the git index (#8665)", () => {

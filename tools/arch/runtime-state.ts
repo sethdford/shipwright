@@ -1,19 +1,31 @@
+import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 
 export const ROOT = resolve(import.meta.dir, "../..");
 
 /**
- * Per-machine state that loops, the daemon, pipelines and checks write under `.claude/`. It must never
- * be tracked: a tracked file is committed by the next loop iteration (#8665).
+ * Per-machine state that loops, the daemon, pipelines and checks write under `.claude/` must never
+ * be tracked: a tracked file is committed by the next loop iteration (#8665). The list is the set of
+ * `.claude/` entries in .gitignore, so it cannot drift from what git ignores. A directory entry
+ * (trailing `/`) matches everything below it; a file entry matches exactly that path.
  */
-export const RUNTIME_STATE_PATTERNS: readonly RegExp[] = [
-  /^\.claude\/loop-logs\//,
-  /^\.claude\/test-holdout\//,
-  /^\.claude\/evidence\/[^/]+\.json$/,
-  /^\.claude\/(pipeline-artifacts|worktrees)\//,
-  /^\.claude\/(loop-state\.md|pipeline-state\.md|platform-hygiene\.json|intelligence-cache\.json)$/,
-  /^\.claude\/(recovery-state\.json|daemon-config\.json|code-review\.json|hygiene-report\.json|pr-draft\.md)$/,
-];
+export function runtimeStatePatterns(gitignore: string): RegExp[] {
+  const entries = gitignore
+    .split("\n")
+    .map((l) => l.trim())
+    .filter((l) => l.startsWith(".claude/"));
+  return entries.map((entry) => {
+    if (entry.includes("*") || entry.includes("!")) {
+      throw new Error(`.gitignore .claude entry must be a literal path or directory: ${entry}`);
+    }
+    const escaped = entry.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    return entry.endsWith("/") ? new RegExp(`^${escaped}`) : new RegExp(`^${escaped}$`);
+  });
+}
+
+export const RUNTIME_STATE_PATTERNS: readonly RegExp[] = runtimeStatePatterns(
+  readFileSync(resolve(ROOT, ".gitignore"), "utf8"),
+);
 
 /** Paths in `files` that match the runtime-state list. */
 export function runtimeStateViolations(files: readonly string[]): string[] {
