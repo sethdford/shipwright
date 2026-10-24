@@ -1006,3 +1006,7 @@
 {"ts":"2026-10-24T06:17:16Z","ts_epoch":1792822636,"type":"patrol.finding","check":"untested_script","script":"sw-event-schema-sync.sh","lines":93,"usage":0}
 {"ts":"2026-10-24T06:17:18Z","ts_epoch":1792822638,"type":"patrol.issue_refused","check":"untested_scripts","count":7}
 {"ts":"2026-10-24T06:17:20Z","ts_epoch":1792822640,"type":"patrol.meta_issue_refused","title":"[Meta] Add tests for sw-event-schema-sync.sh"}
+{"ts":"2026-10-24T08:05:50Z","ts_epoch":1792829150,"type":"hygiene_platform_refactor","hardcoded":49,"fallback":75,"todo":51}
+{"ts":"2026-10-24T08:06:29Z","ts_epoch":1792829189,"type":"strategic.issue_refused","title":"Add a blast-radius guard to the build loop that aborts iterations with out-of-scope mass deletions"}
+{"ts":"2026-10-24T08:06:32Z","ts_epoch":1792829192,"type":"strategic.issue_refused","title":"Untrack runtime state under .claude/ and add a fitness rule to keep it out of git"}
+{"ts":"2026-10-24T08:06:32Z","ts_epoch":1792829192,"type":"strategic.cycle_complete","issues_created":0,"issues_skipped":3}
