@@ -950,3 +950,8 @@
 {"ts":"2026-10-23T18:13:08Z","ts_epoch":1792779188,"type":"patrol.issue_refused","check":"untested_scripts","count":7}
 {"ts":"2026-10-23T18:13:10Z","ts_epoch":1792779190,"type":"patrol.meta_issue_refused","title":"[Meta] Add tests for sw-event-schema-sync.sh"}
 {"ts":"2026-10-23T20:05:08Z","ts_epoch":1792785908,"type":"hygiene_platform_refactor","hardcoded":49,"fallback":75,"todo":51}
+{"ts":"2026-10-24T00:12:31Z","ts_epoch":1792800751,"type":"hygiene_platform_refactor","hardcoded":49,"fallback":75,"todo":51}
+{"ts":"2026-10-24T00:13:14Z","ts_epoch":1792800794,"type":"strategic.issue_refused","title":"Pre-flight check for empty or unrunnable test and lint commands before the build loop starts"}
+{"ts":"2026-10-24T00:13:17Z","ts_epoch":1792800797,"type":"strategic.issue_refused","title":"Classify build-loop failures into a stable taxonomy and persist the class in the run journal"}
+{"ts":"2026-10-24T00:13:19Z","ts_epoch":1792800799,"type":"strategic.issue_refused","title":"Config-driven policy file for loop and daemon tunables, replacing hardcoded thresholds"}
+{"ts":"2026-10-24T00:13:19Z","ts_epoch":1792800799,"type":"strategic.cycle_complete","issues_created":0,"issues_skipped":3}
