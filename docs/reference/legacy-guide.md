@@ -652,7 +652,7 @@ All scripts are bash (except the dashboard server in TypeScript). Grouped by lay
 | `scripts/sw-doc-fleet.sh` | 817 | Documentation Fleet Orchestrator |
 | `scripts/sw-docs-agent.sh` | 525 | Auto-sync README, wiki, API docs |
 | `scripts/sw-docs.sh` | 626 | Documentation Keeper |
-| `scripts/sw-doctor.sh` | 1639 | Validate Shipwright setup |
+| `scripts/sw-doctor.sh` | 1648 | Validate Shipwright setup |
 | `scripts/sw-dora.sh` | 605 | DORA Metrics Dashboard with Engineering Intelligence |
 | `scripts/sw-durable.sh` | 708 | Durable Workflow Engine |
 | `scripts/sw-e2e-orchestrator.sh` | 561 | Test suite registry & execution |
@@ -676,7 +676,7 @@ All scripts are bash (except the dashboard server in TypeScript). Grouped by lay
 | `scripts/sw-launchd.sh` | 703 | Process supervision (macOS + Linux) |
 | `scripts/sw-linear.sh` | 643 | Linear ↔ GitHub Bidirectional Sync |
 | `scripts/sw-logs.sh` | 356 | View and search agent pane logs |
-| `scripts/sw-loop.sh` | 2724 | Continuous agent loop harness for Claude Code |
+| `scripts/sw-loop.sh` | 2716 | Continuous agent loop harness for Claude Code |
 | `scripts/sw-memory.sh` | 2244 | Persistent Learning & Context System |
 | `scripts/sw-mission-control.sh` | 473 | Terminal-based pipeline mission control |
 | `scripts/sw-model-router.sh` | 1056 | Intelligent Model Routing & Cost Optimization |
@@ -705,7 +705,7 @@ All scripts are bash (except the dashboard server in TypeScript). Grouped by lay
 | `scripts/sw-scale.sh` | 609 | Dynamic agent team scaling during pipeline execution |
 | `scripts/sw-security-audit.sh` | 510 | Comprehensive Security Auditing |
 | `scripts/sw-self-optimize.sh` | 1690 | Learning & Self-Tuning System |
-| `scripts/sw-session.sh` | 577 | Launch a Claude Code team session in a new tmux window |
+| `scripts/sw-session.sh` | 590 | Launch a Claude Code team session in a new tmux window |
 | `scripts/sw-setup.sh` | 376 | Comprehensive onboarding wizard |
 | `scripts/sw-stall-detector.sh` | 402 | Pipeline Stall & Deadlock Detection |
 | `scripts/sw-standup.sh` | 717 | Automated Daily Standups for AI Agent Teams |
@@ -821,7 +821,7 @@ All scripts are bash (except the dashboard server in TypeScript). Grouped by lay
 | `scripts/sw-e2e-integration-test.sh` | 367 | Real Claude + Real GitHub |
 | `scripts/sw-e2e-orchestrator-test.sh` | 158 | Test suite registry & execution |
 | `scripts/sw-e2e-smoke-test.sh` | 838 | Pipeline orchestration without API keys |
-| `scripts/sw-e2e-system-test.sh` | 498 | Proves full daemon→pipeline→loop→PR flow |
+| `scripts/sw-e2e-system-test.sh` | 513 | Proves full daemon→pipeline→loop→PR flow |
 | `scripts/sw-eventbus-test.sh` | 156 | Durable event bus tests |
 | `scripts/sw-evidence-test.sh` | 418 | Unit tests for sw-evidence.sh |
 | `scripts/sw-feedback-test.sh` | 303 | Production Feedback Loop tests |
@@ -830,7 +830,7 @@ All scripts are bash (except the dashboard server in TypeScript). Grouped by lay
 | `scripts/sw-fleet-test.sh` | 825 | Unit tests for fleet orchestration |
 | `scripts/sw-fleet-viz-test.sh` | 279 | Validate fleet visualization dashboard, |
 | `scripts/sw-formal-spec-test.sh` | 299 | Formal Specification System Test Suite |
-| `scripts/sw-frontier-test.sh` | 580 | Validate adversarial review, developer |
+| `scripts/sw-frontier-test.sh` | 583 | Validate adversarial review, developer |
 | `scripts/sw-github-app-test.sh` | 146 | Validate GitHub App management |
 | `scripts/sw-github-checks-test.sh` | 538 | Validate Checks API wrapper |
 | `scripts/sw-github-deploy-test.sh` | 526 | Validate Deployments API wrapper |
@@ -843,7 +843,7 @@ All scripts are bash (except the dashboard server in TypeScript). Grouped by lay
 | `scripts/sw-init-test.sh` | 657 | E2E validation of init/setup flow |
 | `scripts/sw-instrument-test.sh` | 173 | Pipeline instrumentation & feedback loops |
 | `scripts/sw-integration-claude-test.sh` | 116 | Budget-limited real Claude smoke |
-| `scripts/sw-intelligence-test.sh` | 545 | Unit tests for intelligence core |
+| `scripts/sw-intelligence-test.sh` | 550 | Unit tests for intelligence core |
 | `scripts/sw-intent-analysis-test.sh` | 445 | Test suite for intent analysis module |
 | `scripts/sw-jira-test.sh` | 285 | Validate Jira ↔ GitHub bidirectional sync |
 | `scripts/sw-launchd-test.sh` | 902 | Validate service management on |
@@ -883,7 +883,7 @@ All scripts are bash (except the dashboard server in TypeScript). Grouped by lay
 | `scripts/sw-oversight-test.sh` | 165 | Quality oversight board tests |
 | `scripts/sw-patrol-meta-test.sh` | 440 | Validate self-improvement patrol |
 | `scripts/sw-pipeline-composer-test.sh` | 635 | Test Suite |
-| `scripts/sw-pipeline-test.sh` | 1967 | E2E validation invoking the REAL pipeline |
+| `scripts/sw-pipeline-test.sh` | 1982 | E2E validation invoking the REAL pipeline |
 | `scripts/sw-pipeline-vitals-test.sh` | 227 | Validate pipeline health scoring |
 | `scripts/sw-pm-test.sh` | 226 | Autonomous PM Agent test suite |
 | `scripts/sw-policy-e2e-test.sh` | 291 | Verify config/policy.json is honored |
