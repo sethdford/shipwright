@@ -889,5 +889,14 @@
     "parity": null,
     "status": "parity-green",
     "notes": "New in Wave 1a: all dispatch gates in ADR-0007 order for workflows and the daemon; a gate (exit 0 only when every gate allows). --retry is required (daemon retry count, Task 12; auto-retry bot-marker count, Task 14)."
+  },
+  {
+    "command": "failure",
+    "aliases": [],
+    "script": "sw-failure.sh",
+    "context": "learning",
+    "parity": null,
+    "status": "parity-green",
+    "notes": "New in Wave 2 (W2-02): failure classification and retry decision (ADR-0009). No bash script of its own; the schema needs a name, so it is sw-failure.sh, which does not exist. The plan's sw-daemon.sh was rejected: the unported daemon entry shares that file and tools/port/sandbox.ts planStubs would throw. Bash classify_failure (scripts/lib/daemon-failure.sh on main) calls this command in W2-04."
   }
 ]

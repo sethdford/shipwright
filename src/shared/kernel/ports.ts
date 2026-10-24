@@ -83,6 +83,12 @@ export interface IssueTracker {
   getIssue(number: number): Promise<Result<Issue, AdapterError>>;
 }
 
+// ── Files (read-only; commands take this port, adapters implement it) ────────
+/** Reads a text file. Command code uses this port; only adapters touch the filesystem (F5). */
+export interface FileReader {
+  readText(path: string): Promise<Result<string, AdapterError>>;
+}
+
 // ── Agent runtime (rule F6: implemented only in src/adapters/agent) ──────────
 export type Effort = "low" | "medium" | "high" | "xhigh" | "max";
 
