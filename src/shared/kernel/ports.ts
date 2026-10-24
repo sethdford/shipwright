@@ -136,6 +136,11 @@ export interface TaskSpec {
   /** Untrusted input (issue text, PR bodies); appended to the prompt as inert data. */
   readonly data?: string;
   readonly cwd: string;
+  /**
+   * A git ref to read the project memory (CLAUDE.md, AGENTS.md, .claude/rules) from. A review or audit stage sets
+   * the base branch, so a builder's edits cannot steer it (#8673). Unset: the working tree (the build stage).
+   */
+  readonly memoryRef?: string;
   readonly model: string;
   readonly effort: Effort;
   /** Tools auto-approved for this task; everything else is denied. */
