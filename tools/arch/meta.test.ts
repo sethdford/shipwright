@@ -8,6 +8,7 @@ import {
   type RuleDoc,
   trackedFiles,
 } from "./rule-catalog";
+import { runtimeStateViolations, trackedInIndex } from "./runtime-state";
 
 const rules = await loadRules();
 const tests = await loadRuleTests();
@@ -167,6 +168,7 @@ const ARCH_STEPS = [
   "bun tools/arch/workflow-injection.ts",
   "bun tools/arch/workflow-fail-closed.ts",
   "bun tools/arch/test-isolation.ts",
+  "bun tools/arch/runtime-state.ts",
 ];
 
 // A fix names an action. Extend the list when a new rule needs another verb.
@@ -377,6 +379,60 @@ test("claims.ts exports exactly its validated operations (no raw runner, no alia
 test("bun run arch runs every checker as a hard && step, with no operator that can swallow a failure", () => {
   expect(archScript.split(" && ")).toEqual(ARCH_STEPS);
   expect(archScript).not.toMatch(/\|\||;|\||(?<!&)&(?!&)|\$\(|`|\n/);
+});
+
+/**
+ * Runtime state under .claude/ is never tracked (#8665). The list is derived from .gitignore, so these
+ * tests check the two agree: each runtime example is ignored by git, and hand-written config is neither
+ * ignored nor classified as runtime.
+ */
+const RUNTIME_EXAMPLES = [
+  ".claude/loop-logs/iteration-1.log",
+  ".claude/evidence/manifest.json",
+  ".claude/intelligence-cache.json",
+  ".claude/test-holdout/manifest.json",
+  ".claude/daemon-runtime.json",
+  ".claude/causal-graph.json",
+  ".claude/recovery-patterns.json",
+  ".claude/project-detection.json",
+  ".claude/prep-manifest.json",
+  ".claude/formal-specs.json",
+  ".claude/nudge.md",
+  ".claude/pipeline-tasks.md",
+  ".claude/decision-drafts/d1.md",
+  ".claude/mutations/m1.json",
+  ".claude/testgen/t1.ts",
+];
+const CONFIG_EXAMPLES = [
+  ".claude/settings.json",
+  ".claude/daemon-config.json",
+  ".claude/fleet-config.json",
+  ".claude/quality-profile.json",
+  ".claude/DEFINITION-OF-DONE.md",
+  ".claude/agents/porter.md",
+  ".claude/hooks/guard.sh",
+  ".claude/rules/bash.md",
+  "scripts/sw-loop.sh",
+];
+
+test("every runtime example is classified as runtime and ignored by git", () => {
+  expect(runtimeStateViolations(RUNTIME_EXAMPLES)).toEqual(RUNTIME_EXAMPLES);
+  for (const f of RUNTIME_EXAMPLES) {
+    const r = Bun.spawnSync(["git", "check-ignore", "-q", f], { cwd: ROOT });
+    expect({ f, ignored: r.exitCode }).toEqual({ f, ignored: 0 });
+  }
+});
+
+test("hand-written config is neither classified as runtime nor ignored by git", () => {
+  expect(runtimeStateViolations(CONFIG_EXAMPLES)).toEqual([]);
+  for (const f of CONFIG_EXAMPLES) {
+    const r = Bun.spawnSync(["git", "check-ignore", "-q", f], { cwd: ROOT });
+    expect({ f, ignored: r.exitCode }).toEqual({ f, ignored: 1 });
+  }
+});
+
+test("no runtime state under .claude/ is tracked in the git index (#8665)", () => {
+  expect(runtimeStateViolations(trackedInIndex())).toEqual([]);
 });
 
 test("the bash bypass exemption is narrow: sw-session.sh spells the bypass flag once (F9, #8614)", async () => {

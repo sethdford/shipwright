@@ -48,9 +48,5 @@
   },
   "max_turns": {
     "pipeline_stage": 30
-  },
-  "last_optimization": {
-    "timestamp": "2026-04-04T18:44:56Z",
-    "adjustments": "compound_quality enabled (CFR 25% > 20%); merge stage recommended (deploy freq 3.0/week); "
   }
 }

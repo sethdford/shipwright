@@ -349,19 +349,30 @@ daemon_self_optimize() {
                 --argjson poll_interval "$POLL_INTERVAL" \
                 --arg template "$PIPELINE_TEMPLATE" \
                 --arg auto_template "${AUTO_TEMPLATE:-false}" \
-                --arg ts "$(now_iso)" \
-                --arg adj "$adj_str" \
                 '.max_parallel = $max_parallel |
                  .poll_interval = $poll_interval |
                  .pipeline_template = $template |
-                 .auto_template = ($auto_template == "true") |
-                 .last_optimization = {timestamp: $ts, adjustments: $adj}' \
+                 .auto_template = ($auto_template == "true")' \
                 "$config_file")
             # Atomic write: tmp file + mv
             local tmp_cfg_file="${config_file}.tmp.$$"
             echo "$tmp_config" > "$tmp_cfg_file"
             mv "$tmp_cfg_file" "$config_file"
             daemon_log INFO "Self-optimize: persisted adjustments to ${config_file}"
+        fi
+
+        # The last run's record is runtime state, not config: it lives in a sibling file that is never
+        # tracked, so the hand-written config stays clean (#8665). Atomic write: tmp file + mv.
+        local runtime_file cur_runtime tmp_runtime
+        runtime_file="$(dirname "$config_file")/daemon-runtime.json"
+        cur_runtime="$(cat "$runtime_file" 2>/dev/null || echo '{}')"
+        tmp_runtime="${runtime_file}.tmp.$$"
+        if echo "$cur_runtime" | jq --arg ts "$(now_iso)" --arg adj "$adj_str" \
+            '.last_optimization = {timestamp: $ts, adjustments: $adj}' > "$tmp_runtime" 2>/dev/null; then
+            mv "$tmp_runtime" "$runtime_file"
+        else
+            rm -f "$tmp_runtime"
+            daemon_log WARN "Self-optimize: could not write ${runtime_file}"
         fi
 
         emit_event "daemon.optimize" "adjustments=${adj_str}" "cfr=$cfr" "cycle_time=$cycle_time_median" "deploy_freq=$deploy_freq" "mttr=$mttr"
