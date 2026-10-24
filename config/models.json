@@ -1,0 +1,18 @@
+{
+  "version": 1,
+  "aliases": {
+    "opus": "claude-opus-5-5",
+    "sonnet": "claude-sonnet-5-5",
+    "haiku": "claude-haiku-5-5"
+  },
+  "efforts": ["low", "medium", "high", "xhigh"],
+  "allowlist": {
+    "files": [
+      "config/models.json",
+      "scripts/sw-cost.sh",
+      "scripts/*-test.sh",
+      "src/**/*.test.ts",
+      "tools/models/*.test.ts"
+    ]
+  }
+}

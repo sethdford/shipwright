@@ -217,7 +217,7 @@ jobs:
               npm install -g @anthropic-ai/claude-code@2.1.301 2>/dev/null || true
             fi
 
-            RESPONSE=$(scripts/lib/agent-exec.sh claude -p "$PROMPT_TEXT" --max-turns 1 --model claude-haiku-5-5 2>/dev/null || echo "")
+            RESPONSE=$(scripts/lib/agent-exec.sh claude -p "$PROMPT_TEXT" --max-turns 1 --model "$(jq -r '.aliases.haiku' config/models.json)" 2>/dev/null || echo "")
 
             # Fail-safe: if Claude returns empty/garbage, reject (do not auto-approve)
             if [[ -z "$RESPONSE" ]]; then

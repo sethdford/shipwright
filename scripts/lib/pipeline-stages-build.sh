@@ -6,6 +6,7 @@ SW_AGENT_EXEC="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/agent-exec.sh"
 # Test commands run without credentials (#8608).
 # shellcheck source=lib/test-gate-env.sh
 source "$(dirname "${BASH_SOURCE[0]}")/test-gate-env.sh"
+source "$(dirname "${BASH_SOURCE[0]}")/models.sh"
 [[ -n "${_PIPELINE_STAGES_BUILD_LOADED:-}" ]] && return 0
 _PIPELINE_STAGES_BUILD_LOADED=1
 
@@ -398,7 +399,8 @@ ${_skill_prompts}
     fi
 
     # Recruit-powered model selection (when no explicit override)
-    if [[ -z "$MODEL" ]] && [[ -x "$SCRIPT_DIR/sw-recruit.sh" ]]; then
+    # W2-07: recruit's model override is off unless SW_LEGACY_MODEL_ROUTING=true.
+    if [[ "${SW_LEGACY_MODEL_ROUTING:-false}" == "true" ]] && [[ -z "$MODEL" ]] && [[ -x "$SCRIPT_DIR/sw-recruit.sh" ]]; then
         local _recruit_goal="${GOAL:-}"
         if [[ -n "$_recruit_goal" ]]; then
             local _recruit_match
@@ -419,6 +421,9 @@ ${_skill_prompts}
         [[ -n "$_extra_tc" ]] && loop_args+=(--additional-test-cmds "$_extra_tc")
     done
     loop_args+=(--max-iterations "$max_iter")
+    # W2-07: resolve the alias (opus, sonnet, haiku) through config/models.json. This is the one point where
+    # $MODEL, CLAUDE_MODEL and the template values have all been applied.
+    build_model=$(models_resolve "$build_model") || return 1
     loop_args+=(--model "$build_model")
     [[ "$agents" -gt 1 ]] 2>/dev/null && loop_args+=(--agents "$agents")
 

@@ -150,7 +150,10 @@ jobs:
           Fix all actionable findings. Skip any that are questions or suggestions without clear action items."
 
           # Through agent-exec.sh: the agent gets no GitHub token (F9).
-          scripts/lib/agent-exec.sh claude -p "$PROMPT" --max-turns 10 --model claude-sonnet-5-5 2>&1 || {
+          # The model alias comes from the trusted default-branch copy, not the PR checkout (W2-07).
+          REMEDIATION_MODEL="$(jq -r '.aliases.sonnet' "$RUNNER_TEMP/trusted/config/models.json")"
+          [[ -n "$REMEDIATION_MODEL" && "$REMEDIATION_MODEL" != "null" ]] || { echo "::error::no sonnet alias in config/models.json"; exit 1; }
+          scripts/lib/agent-exec.sh claude -p "$PROMPT" --max-turns 10 --model "$REMEDIATION_MODEL" 2>&1 || {
             echo "::warning::Claude remediation returned non-zero — changes may be partial"
           }
         env:

@@ -192,7 +192,7 @@ show_help() {
     echo -e "  ${CYAN}--fast-test-interval${RESET} N       Run full tests every N iterations (default: 5)"
     echo -e "  ${CYAN}--additional-test-cmds${RESET} \"cmd\" Extra test command (repeatable)"
     echo -e "  ${CYAN}--model${RESET} MODEL             Claude model to use (default: opus)"
-    echo -e "  ${CYAN}--effort${RESET} low|medium|high   Effort level for Claude reasoning (default: auto per stage)"
+    echo -e "  ${CYAN}--effort${RESET} low|medium|high|xhigh   Effort level for Claude reasoning (default: auto per stage)"
     echo -e "  ${CYAN}--fallback-model${RESET} MODEL      Fallback model on rate limits (default: sonnet)"
     echo -e "  ${CYAN}--agents${RESET} N                Number of parallel agents (default: 1)"
     echo -e "  ${CYAN}--roles${RESET} \"r1,r2,...\"        Role per agent: builder,reviewer,tester,optimizer,docs,security"
@@ -414,8 +414,8 @@ if ! [[ "$MAX_RESTARTS" =~ ^[0-9]+$ ]]; then
 fi
 
 # Validate effort level
-if [[ -n "$EFFORT_LEVEL" ]] && [[ "$EFFORT_LEVEL" != "low" && "$EFFORT_LEVEL" != "medium" && "$EFFORT_LEVEL" != "high" ]]; then
-    error "--effort must be low, medium, or high (got: $EFFORT_LEVEL)"
+if [[ -n "$EFFORT_LEVEL" ]] && [[ "$EFFORT_LEVEL" != "low" && "$EFFORT_LEVEL" != "medium" && "$EFFORT_LEVEL" != "high" && "$EFFORT_LEVEL" != "xhigh" ]]; then
+    error "--effort must be low, medium, high, or xhigh (got: $EFFORT_LEVEL)"
     exit 1
 fi
 
