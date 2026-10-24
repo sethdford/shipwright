@@ -624,6 +624,26 @@ rc=0
 synced_branch=$(patrol_docs_autosync "$REPO_STALE") || rc=$?
 assert_eq "dead-holder lock is stolen and the run succeeds" "0" "$rc"
 assert_eq "dead-holder lock is released after the run" "0" "$([[ -L "$REPO_STALE/$DOCS_LOCK_REL" ]] && echo 1 || echo 0)"
+stale_left=$(find "$REPO_STALE/.git" -maxdepth 1 -name 'shipwright-docs-sync.lock.stale.*' | wc -l | tr -d ' ')
+assert_eq "steal leaves no lock.stale.<pid> entry behind" "0" "${stale_left:-0}"
+
+# A fresh lock written by another host is live until the age cap, even though its pid is dead here
+REPO_HOST="$TEST_TEMP_DIR/repo-other-host"
+make_docs_repo "$REPO_HOST" main
+ln -s "$dead_pid $(date +%s) other-host.example" "$REPO_HOST/$DOCS_LOCK_REL"
+rc=0
+patrol_docs_autosync "$REPO_HOST" >/dev/null 2>&1 || rc=$?
+assert_eq "fresh lock from another host is respected: exit 2" "2" "$rc"
+assert_eq "fresh lock from another host is not stolen" "1" "$([[ -L "$REPO_HOST/$DOCS_LOCK_REL" ]] && echo 1 || echo 0)"
+
+# A read-only git common dir cannot take the lock: a configuration error, rc=1 with its own message
+REPO_RO="$TEST_TEMP_DIR/repo-readonly"
+make_docs_repo "$REPO_RO" main
+chmod u-w "$REPO_RO/.git"
+rc=0
+patrol_docs_autosync "$REPO_RO" >/dev/null 2>&1 || rc=$?
+chmod u+w "$REPO_RO/.git"
+assert_eq "read-only common dir fails with rc=1" "1" "$rc"
 
 # Lock held by a live pid but older than the age cap (pid reuse backstop): stolen
 REPO_AGE="$TEST_TEMP_DIR/repo-lock-age"
@@ -679,12 +699,20 @@ assert_eq "#3c amended commit is kept" "$amend_sha" "$(git -C "$REPO3C" rev-pars
 RACE_TRIALS=20
 race_bad=0
 race_first_bad=""
+race_first_err=""
+# Records the first failing trial: its message, and the stderr of both runs, which is printed below.
+race_note() {
+    [[ -z "$race_first_bad" ]] || return 0
+    race_first_bad="trial $1: $2"
+    race_first_err=$(printf -- '--- run a stderr:\n%s\n--- run b stderr:\n%s' \
+        "$(cat "$RACE.a.err" 2>/dev/null)" "$(cat "$RACE.b.err" 2>/dev/null)")
+}
 for i in $(seq 1 "$RACE_TRIALS"); do
     RACE="$TEST_TEMP_DIR/race-$i"
     make_docs_repo "$RACE" main
-    ( rc=0; export STUB_DOCS_SLEEP=0.5; patrol_docs_autosync "$RACE" > "$RACE.a.out" 2>/dev/null || rc=$?; echo "$rc" > "$RACE.a.rc" ) &
+    ( rc=0; export STUB_DOCS_SLEEP=0.5; patrol_docs_autosync "$RACE" > "$RACE.a.out" 2> "$RACE.a.err" || rc=$?; echo "$rc" > "$RACE.a.rc" ) &
     pa=$!
-    ( rc=0; export STUB_DOCS_SLEEP=0.5; patrol_docs_autosync "$RACE" > "$RACE.b.out" 2>/dev/null || rc=$?; echo "$rc" > "$RACE.b.rc" ) &
+    ( rc=0; export STUB_DOCS_SLEEP=0.5; patrol_docs_autosync "$RACE" > "$RACE.b.out" 2> "$RACE.b.err" || rc=$?; echo "$rc" > "$RACE.b.rc" ) &
     pb=$!
     wait "$pa" || true
     wait "$pb" || true
@@ -695,17 +723,20 @@ for i in $(seq 1 "$RACE_TRIALS"); do
     if [[ "$rc_b" == "0" && -n "$out_b" && "$rc_a" == "2" && -z "$out_a" ]]; then ok=1; fi
     if [[ "$ok" -ne 1 ]]; then
         race_bad=$((race_bad + 1))
-        race_first_bad="${race_first_bad:-trial $i: a=$rc_a/[$out_a] b=$rc_b/[$out_b]}"
+        race_note "$i" "a=$rc_a/[$out_a] b=$rc_b/[$out_b]"
     fi
     if [[ "$(worktree_count "$RACE")" != "1" ]]; then
         race_bad=$((race_bad + 1))
-        race_first_bad="${race_first_bad:-trial $i: worktree leaked}"
+        race_note "$i" "worktree leaked"
     fi
     if [[ -L "$RACE/$DOCS_LOCK_REL" ]]; then
         race_bad=$((race_bad + 1))
-        race_first_bad="${race_first_bad:-trial $i: lock left behind}"
+        race_note "$i" "lock left behind"
     fi
 done
+if [[ -n "$race_first_err" ]]; then
+    echo "$race_first_err"
+fi
 assert_eq "race: $RACE_TRIALS trials, exactly one commits, the other skips, no leaks (${race_first_bad:-none})" \
     "0" "$race_bad"
 
