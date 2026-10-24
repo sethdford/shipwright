@@ -28,13 +28,14 @@ _scope_normalize_glob() {
     local p="$1" star="*"
     p="${p//\*\*\//}"
     p="${p//\*\*/$star}"
-    echo "$p"
+    _SCOPE_PAT="$p"
 }
 
 # True when path $1 matches glob $2.
 _scope_glob_match() {
     local s="$1" pat
-    pat="$(_scope_normalize_glob "$2")"
+    _scope_normalize_glob "$2"
+    pat="$_SCOPE_PAT"
     # shellcheck disable=SC2254 # the pattern comes from config and is meant as a glob
     case "$s" in
         $pat) return 0 ;;
@@ -61,6 +62,14 @@ _scope_list_has() {
     return 1
 }
 
+# Protected globs from config, read once per process (a fork per path was the guard's main cost).
+_scope_protected_list() {
+    if [[ -z "${_SCOPE_PROTECTED:-}" ]]; then
+        _SCOPE_PROTECTED="$(jq -r '.protected_paths[]' "$(_scope_config_file)" 2>/dev/null || true)"
+    fi
+    printf '%s\n' "$_SCOPE_PROTECTED"
+}
+
 # Print the protected glob that matches path $1 (nothing and status 1 when none does).
 _scope_protected_match() {
     local path="$1" p
@@ -70,7 +79,7 @@ _scope_protected_match() {
             echo "$p"
             return 0
         fi
-    done < <(jq -r '.protected_paths[]' "$(_scope_config_file)")
+    done <<< "$(_scope_protected_list)"
     return 1
 }
 
