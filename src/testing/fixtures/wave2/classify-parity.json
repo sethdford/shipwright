@@ -1,5 +1,5 @@
 {
-  "_about": "Pins the TypeScript failure classes (src/contexts/learning) against bash classify_failure (scripts/lib/daemon-failure.sh) for the classes W2-04 maps. 'bash' is the label bash returned for the text; 'ts' is the TS class. 'differs' documents a deliberate mismatch on a mapped class. Regenerate the bash column by sourcing daemon-failure.sh with LOG_DIR set and calling classify_failure per text.",
+  "_about": "Pins the TypeScript failure classes (src/contexts/learning) against bash classify_failure (scripts/lib/daemon-failure.sh) for the classes W2-04 maps. The test runs the real bash live (src/testing/bash-classify.ts) and fails if a live label differs from 'bash' here (drift). 'ts' is the TS class. 'differs' documents a deliberate mismatch on a mapped class.",
   "mapping": {
     "auth_error": "auth",
     "api_error": "transient",
@@ -49,7 +49,8 @@
     {
       "text": "Error: 503 overloaded",
       "bash": "api_error",
-      "ts": "transient"
+      "ts": "unknown",
+      "differs": "A bare 'overloaded' with a number and no HTTP or status context is not a structured signal. TS keeps it unknown; it still retries under the normal caps."
     },
     {
       "text": "ETIMEDOUT connecting to api.anthropic.com",
@@ -64,7 +65,8 @@
     {
       "text": "socket hang up",
       "bash": "api_error",
-      "ts": "transient"
+      "ts": "unknown",
+      "differs": "Not in the structured list (ECONNRESET, ETIMEDOUT, EAI_AGAIN are errnos; this is a Node message). Unknown, retried under the normal caps."
     },
     {
       "text": "Error: request timeout after 600s",
@@ -131,7 +133,7 @@
       "text": "Failure analyzed: accurate limits on retries\nbuild failed: tsc exit 2",
       "bash": "api_error",
       "ts": "unknown",
-      "differs": "Bash matches 'rate limit' inside a model-written analysis line. TS removes model-analysis lines before classifying (review finding 3), so this is a deliberate fix, not a regression."
+      "differs": "Bash matches the words inside a model-written analysis line. TS removes model-analysis lines before classifying, so model prose cannot change the class or stop the deterministic check (round 2)."
     },
     {
       "text": "test \"returns 401 unauthorized for bad token\" FAILED",
@@ -142,12 +144,102 @@
       "text": "docs mention CLAUDE_CODE_OAUTH_TOKEN\nbuild failed",
       "bash": "auth_error",
       "ts": "unknown",
-      "differs": "A bare token variable name is not evidence of auth (plan test: a mention of the token variable alone is not an auth failure). Bash labels this auth_error and escalates nothing extra; TS labels it unknown and retries under the normal caps."
+      "differs": "A bare token variable name is not evidence of auth (plan test: a mention of the token variable alone is not an auth failure). TS labels it unknown and retries under the normal caps."
     },
     {
       "text": "⚠ Sandbox disabled: sandbox is enabled but dependencies are missing: bubblewrap (bwrap) not installed",
       "bash": "unknown",
       "ts": "environment"
+    },
+    {
+      "text": "HTTP 429 Too Many Requests",
+      "bash": "api_error",
+      "ts": "transient"
+    },
+    {
+      "text": "status: 429",
+      "bash": "unknown",
+      "ts": "transient"
+    },
+    {
+      "text": "503 Service Unavailable",
+      "bash": "api_error",
+      "ts": "transient"
+    },
+    {
+      "text": "502 Bad Gateway",
+      "bash": "api_error",
+      "ts": "transient"
+    },
+    {
+      "text": "error type rate_limit_error",
+      "bash": "unknown",
+      "ts": "transient"
+    },
+    {
+      "text": "overloaded_error from upstream",
+      "bash": "api_error",
+      "ts": "transient"
+    },
+    {
+      "text": "read ECONNRESET",
+      "bash": "api_error",
+      "ts": "transient"
+    },
+    {
+      "text": "Retry-After: 30",
+      "bash": "unknown",
+      "ts": "transient"
+    },
+    {
+      "text": "rate limit exceeded",
+      "bash": "api_error",
+      "ts": "unknown",
+      "differs": "Plain prose 'rate limit' is not transient (round 2): bash matches the words; TS takes transient only from structured signals (HTTP or status 429/5xx, API error types, ECONNRESET/ETIMEDOUT/EAI_AGAIN, Retry-After)."
+    },
+    {
+      "text": "error: rate limit exceeded",
+      "bash": "api_error",
+      "ts": "unknown",
+      "differs": "Plain prose 'rate limit' is not transient (round 2): bash matches the words; TS takes transient only from structured signals (HTTP or status 429/5xx, API error types, ECONNRESET/ETIMEDOUT/EAI_AGAIN, Retry-After)."
+    },
+    {
+      "text": "OAuth token revoked",
+      "bash": "unknown",
+      "ts": "auth"
+    },
+    {
+      "text": "Error: OAuth token is invalid",
+      "bash": "unknown",
+      "ts": "auth"
+    },
+    {
+      "text": "Failure analyzed: rate limit error in the mock",
+      "bash": "api_error",
+      "ts": "unknown",
+      "differs": "Bash matches the words inside a model-written analysis line. TS removes model-analysis lines before classifying, so model prose cannot change the class or stop the deterministic check (round 2)."
+    },
+    {
+      "text": "✓ Failure analyzed: 401 unauthorized in the mock",
+      "bash": "auth_error",
+      "ts": "unknown",
+      "differs": "Bash matches the words inside a model-written analysis line. TS removes model-analysis lines before classifying, so model prose cannot change the class or stop the deterministic check (round 2)."
+    },
+    {
+      "text": "[fix/handle-rate-limit-errors-123 abc1234] loop: iteration 1 — autonomous progress",
+      "bash": "unknown",
+      "ts": "unknown"
+    },
+    {
+      "text": "FAIL test: client retries on rate-limit error\n  ✗ Tests: failed",
+      "bash": "build_failure",
+      "ts": "unknown"
+    },
+    {
+      "text": "build failed: tsc exit 2\n✓ Failure analyzed: rate limit on retries",
+      "bash": "api_error",
+      "ts": "unknown",
+      "differs": "Bash matches the words inside a model-written analysis line. TS removes model-analysis lines before classifying, so model prose cannot change the class or stop the deterministic check (round 2)."
     }
   ]
 }

@@ -87,3 +87,17 @@ describe("parseAttempts", () => {
     expect(parseAttempts({})).toEqual({ ok: false, reason: "attempts must be a JSON array" });
   });
 });
+
+describe("identical-fingerprint cap (round 2, belt and braces)", () => {
+  test("three identical transient fingerprints in a row escalate, even though transient retries", () => {
+    const three = [att("transient", "t:9"), att("transient", "t:9"), att("transient", "t:9")];
+    const d = decideRetry(three, { ...policy, maxAttempts: 10 });
+    expect(d.action).toBe("escalate");
+    if (d.action === "escalate") expect(d.reason).toContain("same transient failure 3×");
+  });
+
+  test("two identical transient fingerprints still retry", () => {
+    const two = [att("transient", "t:9"), att("transient", "t:9")];
+    expect(decideRetry(two, policy).action).toBe("retry");
+  });
+});

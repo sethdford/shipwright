@@ -68,9 +68,10 @@ const RULES: readonly Rule[] = [
   },
   {
     pattern:
-      /authentication[ _]failed|authentication_error|invalid api key|invalid x-api-key|api error: 401|oauth token (is |has )?(expired|invalid)|not logged in|unauthorized/i,
+      /authentication[ _]failed|authentication_error|invalid api key|invalid x-api-key|api error: 401|oauth token (is |has )?(expired|invalid|revoked)|not logged in|unauthorized/i,
     cls: "auth",
-    scope: "error",
+    // "any": the input is bounded and normalized, and auth fails safe (escalate), so no error-line scope.
+    scope: "any",
   },
   {
     pattern:
@@ -92,11 +93,13 @@ const RULES: readonly Rule[] = [
     scope: "error",
   },
   {
-    // \b stops "accurate limits" (contains "rate limit") from matching.
+    // Structured signals only. Free text such as "rate limit" or "overloaded" is NOT transient:
+    // model prose, branch names and test names can say those words. Bash matches them; this is a
+    // deliberate difference (see classify-parity.json).
     pattern:
-      /\brate[ _-]?limit|overloaded|api error: (429|5\d\d)|econnreset|etimedout|socket hang up|service unavailable|econnrefused|eai_again/i,
+      /\bHTTP(?:\/\d(?:\.\d)?)?\s+(?:429|5\d\d)\b|\bstatus"?\s*:\s*"?(?:429|5\d\d)\b|\b503 Service Unavailable\b|\b502 Bad Gateway\b|\bapi error: (?:429|5\d\d)\b|\b(?:rate_limit_error|overloaded_error|api_error)\b|\b(?:ECONNRESET|ETIMEDOUT|EAI_AGAIN)\b|\bretry-after\s*:/i,
     cls: "transient",
-    scope: "error",
+    scope: "any",
   },
 ];
 

@@ -7,10 +7,19 @@ const SECRET =
 
 describe("wave2 incident fixtures", () => {
   test("no fixture contains a credential-shaped string", () => {
-    for (const name of readdirSync(dir)) {
-      if (name.endsWith(".test.ts")) continue;
-      expect(readFileSync(new URL(name, dir), "utf8")).not.toMatch(SECRET);
-    }
+    // Recurses into subdirectories (raw/) so raw captures are scanned too.
+    const walk = (base: URL, prefix: string): void => {
+      for (const entry of readdirSync(base, { withFileTypes: true })) {
+        const rel = `${prefix}${entry.name}`;
+        if (entry.isDirectory()) {
+          walk(new URL(`${entry.name}/`, base), `${rel}/`);
+          continue;
+        }
+        if (entry.name.endsWith(".test.ts")) continue;
+        expect(readFileSync(new URL(entry.name, base), "utf8"), rel).not.toMatch(SECRET);
+      }
+    };
+    walk(dir, "");
   });
 
   test("the pre-flight fixture carries the auth failure line", () => {

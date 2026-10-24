@@ -113,8 +113,12 @@ describe("transient matching is word-bounded and error-scoped (review finding 3)
     expect(classifyFailure({ text: "accurate limits on retries" })).toBe("unknown");
   });
 
-  test("'rate_limit' on an error line is transient", () => {
-    expect(classifyFailure({ text: "error: rate_limit exceeded" })).toBe("transient");
+  test("a structured rate_limit_error type is transient", () => {
+    expect(classifyFailure({ text: "error: rate_limit_error from the API" })).toBe("transient");
+  });
+
+  test("free text 'rate limit' on an error line is NOT transient (round 2)", () => {
+    expect(classifyFailure({ text: "error: rate limit exceeded" })).toBe("unknown");
   });
 });
 
@@ -133,8 +137,9 @@ describe("sandbox warning is environment, not auth (review finding 5)", () => {
 });
 
 describe("rule patterns are bounded (review finding 1, boundedness guard)", () => {
-  test("no rule uses an unbounded .* / .+ / [^\\n]* / \\S+ quantifier", () => {
-    const unbounded = /\.[*+]|\[\^\\n\][*+]|\\[sS][*+]/;
+  test("no rule uses an unbounded .*, .+, [class]* or \\S+ quantifier", () => {
+    // Any unbounded `.`, `\S` or character-class repetition. `\s+` is bounded whitespace.
+    const unbounded = /\.[*+]|\[[^\]]*\][*+]|\\S[*+]/;
     for (const pattern of RULE_PATTERNS) {
       expect(pattern.source).not.toMatch(unbounded);
     }

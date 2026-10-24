@@ -25,6 +25,9 @@ export const DEFAULT_RETRY_POLICY: RetryPolicy = {
   maxDelayMs: 3_600_000,
 };
 
+/** Identical fingerprints in a row before any class, transient included, is escalated. */
+const SAME_FINGERPRINT_CAP = 3;
+
 // A retry repeats real side effects (contamination) or cannot help (auth, invalid input).
 const NEVER_RETRY: ReadonlySet<FailureClass> = new Set<FailureClass>([
   "auth",
@@ -47,8 +50,23 @@ export function decideRetry(history: readonly Attempt[], policy: RetryPolicy): R
   if (prev !== undefined && prev.fingerprint === last.fingerprint && last.cls !== "transient") {
     return { action: "escalate", reason: `same failure twice (${last.fingerprint})` };
   }
+  // Belt and braces: a transient class can be wrong (free text, a repeated structured line). The cap
+  // is on the fingerprint: the same fingerprint three runs in a row stops the loop, whatever the class.
+  if (trailingRun(history, last.fingerprint) >= SAME_FINGERPRINT_CAP) {
+    return {
+      action: "escalate",
+      reason: `same transient failure ${SAME_FINGERPRINT_CAP}× (${last.fingerprint})`,
+    };
+  }
   if (last.cls === "transient") return retryTransient(history, policy);
   return { action: "retry", delayMs: 0, reason: `${last.cls}: retry within caps` };
+}
+
+/** Consecutive identical fingerprints at the end of the history. */
+function trailingRun(history: readonly Attempt[], fingerprint: string): number {
+  let run = 0;
+  for (let i = history.length - 1; i >= 0 && history[i]?.fingerprint === fingerprint; i--) run++;
+  return run;
 }
 
 function environmentDecision(history: readonly Attempt[]): RetryDecision {
