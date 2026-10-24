@@ -1,4 +1,4 @@
-# source: sethdford/shipwright run 38595913688 (Shipwright Pipeline #7551, 2026-10-14), step 'Pre-flight auth check', redacted
+# source: sethdford/shipwright run 38595913688 (Shipwright Pipeline #7551, 2026-10-14), step 'Pre-flight auth check', redacted. Also run 38595873066 (same output). LABEL NOTE: the auth label comes only from the workflow wrapper line ('::error::Claude Code authentication failed'). The stderr under it is a Claude CLI sandbox warning ('sandbox is enabled but dependencies are missing'), which is environment, not auth. The classifier labels the sandbox line environment on its own (see failure.test.ts). Known limit: if the wrapper line were absent, this log would classify as environment, not auth.
 ##[error]Claude Code authentication failed — check CLAUDE_CODE_OAUTH_TOKEN secret
 --- stderr ---
 

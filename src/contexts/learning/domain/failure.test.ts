@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { classifyFailure, failureFingerprint, lastErrorLine } from "./failure";
+import { classifyFailure, failureFingerprint, lastErrorLine, RULE_PATTERNS } from "./failure";
 
 describe("classifyFailure", () => {
   test("a typed kind wins over text", () => {
@@ -89,5 +89,54 @@ describe("failureFingerprint", () => {
     expect(lastErrorLine("ok\nerror: first\nmore output\nfatal: last\ntrailer")).toBe(
       "fatal: last",
     );
+  });
+});
+
+describe("auth phrases from live API errors (review finding 2)", () => {
+  test("authentication_error with 'OAuth token has expired' is auth, not unknown", () => {
+    expect(
+      classifyFailure({ text: "Error: 401 authentication_error: OAuth token has expired" }),
+    ).toBe("auth");
+  });
+
+  test("an invalid x-api-key message is auth", () => {
+    expect(classifyFailure({ text: "invalid x-api-key token" })).toBe("auth");
+  });
+
+  test("'OAuth token is invalid' is auth", () => {
+    expect(classifyFailure({ text: "Error: OAuth token is invalid" })).toBe("auth");
+  });
+});
+
+describe("transient matching is word-bounded and error-scoped (review finding 3)", () => {
+  test("'accurate limits' is not a rate limit", () => {
+    expect(classifyFailure({ text: "accurate limits on retries" })).toBe("unknown");
+  });
+
+  test("'rate_limit' on an error line is transient", () => {
+    expect(classifyFailure({ text: "error: rate_limit exceeded" })).toBe("transient");
+  });
+});
+
+describe("sandbox warning is environment, not auth (review finding 5)", () => {
+  const sandboxLine =
+    "⚠ Sandbox disabled: sandbox is enabled but dependencies are missing: bubblewrap (bwrap) not installed";
+
+  test("the sandbox warning alone is environment", () => {
+    expect(classifyFailure({ text: sandboxLine })).toBe("environment");
+  });
+
+  test("the sandbox warning under the workflow auth wrapper is auth", () => {
+    const text = `##[error]Claude Code authentication failed — check CLAUDE_CODE_OAUTH_TOKEN secret\n${sandboxLine}`;
+    expect(classifyFailure({ text })).toBe("auth");
+  });
+});
+
+describe("rule patterns are bounded (review finding 1, boundedness guard)", () => {
+  test("no rule uses an unbounded .* / .+ / [^\\n]* / \\S+ quantifier", () => {
+    const unbounded = /\.[*+]|\[\^\\n\][*+]|\\[sS][*+]/;
+    for (const pattern of RULE_PATTERNS) {
+      expect(pattern.source).not.toMatch(unbounded);
+    }
   });
 });

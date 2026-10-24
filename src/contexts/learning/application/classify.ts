@@ -7,6 +7,7 @@ import {
   type RetryDecision,
   type RetryPolicy,
 } from "../domain/retry";
+import { boundEvidence } from "./evidence";
 
 export interface ClassifyInput {
   readonly kind?: AgentFailureKind;
@@ -25,10 +26,9 @@ export function classifyAndDecide(
   input: ClassifyInput,
   policy: RetryPolicy = DEFAULT_RETRY_POLICY,
 ): ClassifyResult {
-  const cls = classifyFailure(
-    input.kind === undefined ? { text: input.text } : { kind: input.kind, text: input.text },
-  );
-  const fingerprint = failureFingerprint(cls, input.text);
+  const text = boundEvidence(input.text);
+  const cls = classifyFailure(input.kind === undefined ? { text } : { kind: input.kind, text });
+  const fingerprint = failureFingerprint(cls, text);
   const decision = decideRetry([...input.attempts, { cls, fingerprint }], policy);
   return { class: cls, fingerprint, decision };
 }

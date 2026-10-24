@@ -39,16 +39,20 @@ const KIND_CLASS: Readonly<Record<AgentFailureKind, FailureClass>> = {
   aborted: "execution",
 };
 
-// Error lines: only these lines are searched by rules scoped to "error" (anchoring, B6).
-const ERROR_LINE = /error|fail|fatal|exception|::error::|enoent|eacces|not found|lockfile/i;
+// Error-like lines. Rules scoped to "error" search only these lines. Deliberately wider than
+// "error|fail" so that a bare API message such as "invalid x-api-key" is still error-like.
+const ERROR_LINE =
+  /error|fail|fatal|exception|::error::|enoent|eacces|not found|lockfile|invalid|unauthori[sz]ed|forbidden|denied|overloaded|rate[ _-]?limit|timed? ?out|\b[45]\d\d\b|econn|etimedout|socket hang up|unavailable|authentication|not logged in/i;
 
 interface Rule {
   readonly pattern: RegExp;
   readonly cls: FailureClass;
-  /** "error" rules search error lines only; "any" rules search the whole text. */
+  /** "error" rules search error-like lines only; "any" rules search the whole text. */
   readonly scope: "any" | "error";
 }
 
+// Every quantifier is bounded (`[^\n]{0,200}`, never `.*`): an unbounded `.*` on a long line
+// backtracks super-linearly (ReDoS). A guard test in failure.test.ts enforces this.
 // First match wins. Auth comes first: retrying an auth failure cannot help, so a rate-limit line
 // in the same log must not mask it. The bare token variable name is deliberately not a rule.
 const RULES: readonly Rule[] = [
@@ -64,28 +68,40 @@ const RULES: readonly Rule[] = [
   },
   {
     pattern:
-      /authentication[ _]failed|invalid api key|api error: 401|oauth token (is )?(expired|invalid)|not logged in|unauthorized/i,
+      /authentication[ _]failed|authentication_error|invalid api key|invalid x-api-key|api error: 401|oauth token (is |has )?(expired|invalid)|not logged in|unauthorized/i,
     cls: "auth",
-    scope: "any",
-  },
-  {
-    pattern: /issue not found|api error: 404|no body|could not resolve|issue.*does not exist/i,
-    cls: "invalid_input",
-    scope: "any",
-  },
-  {
-    pattern:
-      /command not found|enoent.*(node_modules|\.bin|tsconfig|package\.json)|eacces.*(node_modules|\.bin|\.cache)|error: lockfile|lockfile is frozen|could not (install|resolve) (dependencies|packages)/i,
-    cls: "environment",
     scope: "error",
   },
   {
     pattern:
-      /rate.?limit|overloaded|api error: (429|5\d\d)|econnreset|etimedout|socket hang up|service unavailable|econnrefused|eai_again/i,
-    cls: "transient",
+      /issue not found|api error: 404|http 404|status 404|no body|could not resolve|issue[^\n]{0,200}does not exist/i,
+    cls: "invalid_input",
     scope: "any",
   },
+  {
+    // The sandbox warning the Claude CLI prints when bubblewrap or socat is missing. It is setup,
+    // not auth: a run whose only symptom is this line is environment (retried once).
+    pattern: /sandbox is enabled but dependencies are missing/i,
+    cls: "environment",
+    scope: "any",
+  },
+  {
+    pattern:
+      /command not found|enoent[^\n]{0,200}(node_modules|\.bin|tsconfig|package\.json)|eacces[^\n]{0,200}(node_modules|\.bin|\.cache)|error: lockfile|lockfile is frozen|could not (install|resolve) (dependencies|packages)/i,
+    cls: "environment",
+    scope: "error",
+  },
+  {
+    // \b stops "accurate limits" (contains "rate limit") from matching.
+    pattern:
+      /\brate[ _-]?limit|overloaded|api error: (429|5\d\d)|econnreset|etimedout|socket hang up|service unavailable|econnrefused|eai_again/i,
+    cls: "transient",
+    scope: "error",
+  },
 ];
+
+/** The rule patterns, exported so tests can check them (boundedness guard, parity corpus). */
+export const RULE_PATTERNS: readonly RegExp[] = RULES.map((rule) => rule.pattern);
 
 export function errorLines(text: string): string {
   return text

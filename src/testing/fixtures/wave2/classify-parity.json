@@ -1,0 +1,153 @@
+{
+  "_about": "Pins the TypeScript failure classes (src/contexts/learning) against bash classify_failure (scripts/lib/daemon-failure.sh) for the classes W2-04 maps. 'bash' is the label bash returned for the text; 'ts' is the TS class. 'differs' documents a deliberate mismatch on a mapped class. Regenerate the bash column by sourcing daemon-failure.sh with LOG_DIR set and calling classify_failure per text.",
+  "mapping": {
+    "auth_error": "auth",
+    "api_error": "transient",
+    "invalid_issue": "invalid_input"
+  },
+  "cases": [
+    {
+      "text": "##[error]Claude Code authentication failed — check CLAUDE_CODE_OAUTH_TOKEN secret",
+      "bash": "auth_error",
+      "ts": "auth"
+    },
+    {
+      "text": "Error: 401 authentication_error: OAuth token has expired",
+      "bash": "auth_error",
+      "ts": "auth"
+    },
+    {
+      "text": "Request failed with status 401 Unauthorized",
+      "bash": "auth_error",
+      "ts": "auth"
+    },
+    {
+      "text": "invalid x-api-key token",
+      "bash": "auth_error",
+      "ts": "auth"
+    },
+    {
+      "text": "Error: invalid api key provided",
+      "bash": "unknown",
+      "ts": "auth"
+    },
+    {
+      "text": "Not logged in · Please run /login",
+      "bash": "auth_error",
+      "ts": "auth"
+    },
+    {
+      "text": "API Error: 429 rate limit",
+      "bash": "api_error",
+      "ts": "transient"
+    },
+    {
+      "text": "HTTP 503 Service Unavailable",
+      "bash": "api_error",
+      "ts": "transient"
+    },
+    {
+      "text": "Error: 503 overloaded",
+      "bash": "api_error",
+      "ts": "transient"
+    },
+    {
+      "text": "ETIMEDOUT connecting to api.anthropic.com",
+      "bash": "api_error",
+      "ts": "transient"
+    },
+    {
+      "text": "ECONNRESET while streaming",
+      "bash": "api_error",
+      "ts": "transient"
+    },
+    {
+      "text": "socket hang up",
+      "bash": "api_error",
+      "ts": "transient"
+    },
+    {
+      "text": "Error: request timeout after 600s",
+      "bash": "api_error",
+      "ts": "unknown",
+      "differs": "TS does not treat a bare 'timeout' as transient: test and build timeouts are not API transients. Both retry; only the class differs."
+    },
+    {
+      "text": "gh: issue not found",
+      "bash": "invalid_issue",
+      "ts": "invalid_input"
+    },
+    {
+      "text": "HTTP 404 Not Found",
+      "bash": "invalid_issue",
+      "ts": "invalid_input"
+    },
+    {
+      "text": "issue 123 does not exist",
+      "bash": "invalid_issue",
+      "ts": "invalid_input"
+    },
+    {
+      "text": "build failed: tsc exit 2",
+      "bash": "build_failure",
+      "ts": "unknown"
+    },
+    {
+      "text": "FAIL src/foo.test.ts",
+      "bash": "build_failure",
+      "ts": "unknown"
+    },
+    {
+      "text": "npm ERR! code ELIFECYCLE",
+      "bash": "build_failure",
+      "ts": "unknown"
+    },
+    {
+      "text": "Process exited with exit code 1",
+      "bash": "build_failure",
+      "ts": "unknown"
+    },
+    {
+      "text": "bun: command not found",
+      "bash": "unknown",
+      "ts": "environment"
+    },
+    {
+      "text": "EACCES: permission denied, open '/etc/hosts'",
+      "bash": "unknown",
+      "ts": "unknown"
+    },
+    {
+      "text": "refusing to run inside a build-loop test gate",
+      "bash": "unknown",
+      "ts": "contamination"
+    },
+    {
+      "text": "CONTAMINATION: branch-switched a -> b",
+      "bash": "unknown",
+      "ts": "contamination"
+    },
+    {
+      "text": "Failure analyzed: accurate limits on retries\nbuild failed: tsc exit 2",
+      "bash": "api_error",
+      "ts": "unknown",
+      "differs": "Bash matches 'rate limit' inside a model-written analysis line. TS removes model-analysis lines before classifying (review finding 3), so this is a deliberate fix, not a regression."
+    },
+    {
+      "text": "test \"returns 401 unauthorized for bad token\" FAILED",
+      "bash": "auth_error",
+      "ts": "auth"
+    },
+    {
+      "text": "docs mention CLAUDE_CODE_OAUTH_TOKEN\nbuild failed",
+      "bash": "auth_error",
+      "ts": "unknown",
+      "differs": "A bare token variable name is not evidence of auth (plan test: a mention of the token variable alone is not an auth failure). Bash labels this auth_error and escalates nothing extra; TS labels it unknown and retries under the normal caps."
+    },
+    {
+      "text": "⚠ Sandbox disabled: sandbox is enabled but dependencies are missing: bubblewrap (bwrap) not installed",
+      "bash": "unknown",
+      "ts": "environment"
+    }
+  ]
+}

@@ -893,10 +893,11 @@
   {
     "command": "failure",
     "aliases": [],
-    "script": "sw-failure.sh",
+    "script": "ts-native",
     "context": "learning",
     "parity": null,
     "status": "parity-green",
-    "notes": "New in Wave 2 (W2-02): failure classification and retry decision (ADR-0009). No bash script of its own; the schema needs a name, so it is sw-failure.sh, which does not exist. The plan's sw-daemon.sh was rejected: the unported daemon entry shares that file and tools/port/sandbox.ts planStubs would throw. Bash classify_failure (scripts/lib/daemon-failure.sh on main) calls this command in W2-04."
+    "notes": "New in Wave 2 (W2-02): failure classification and retry decision (ADR-0009). script is the sentinel ts-native: no bash script exists, and the schema needs a string. Nothing in the repo is named ts-native, so the parity sandbox stub it creates (a new file nothing sources) is harmless. The plan fallback sw-daemon.sh was rejected because the unported daemon entry shares that file, and tools/port/sandbox.ts planStubs would throw. Bash classify_failure (scripts/lib/daemon-failure.sh) is the predecessor logic that W2-04 bridges to this command."
+
   }
 ]
