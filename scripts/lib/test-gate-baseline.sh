@@ -116,11 +116,14 @@ _tg_block() {
 # bun test layout (a top-level "Ran N tests across M files" line): "(fail) <name>" lines (or "✗ <name>"
 # when bun colours its output, as in a terminal or FORCE_COLOR), a "<file>:" header before each file's
 # "# Unhandled error between tests" block, and the summary. Golden logs of each shape: scripts/fixtures/bun-test.
+# Under GitHub Actions the header is a "::group::<file>:" line, see tg_parse_log.
 tg_parse_log() {
     local log="$1" plain units="" pass summary=0 bun=0
     # CRs go too: a log captured through a pty (script, a terminal-backed CI step) ends every line in
     # CRLF, which breaks the "<file>:" header and the (fail)/✗ line anchors (#8664).
-    plain="$(sed "s/$(printf '\033')\[[0-9;]*m//g" "$log" 2>/dev/null | tr -d '\r' || true)"
+    # GitHub Actions: bun wraps each file in "::group::<file>:" ... "::endgroup::" and reports failures
+    # as "::error ...::" annotations. Keep the group title as the file header; drop the rest (#8664).
+    plain="$(sed "s/$(printf '\033')\[[0-9;]*m//g" "$log" 2>/dev/null | tr -d '\r' | sed -E -e '/^::(endgroup|error|warning|notice)(::| )/d' -e 's/^::group:://' || true)"
     units="$(printf '%s\n' "$plain" | awk '
         /^━━━ [^ ]+ \(/ { cur = $2; next }
         /^  FAILING SUITES/ { cur = ""; next }

@@ -550,8 +550,9 @@ else
 fi
 
 # Golden bun logs (#8664): real `bun test` output from bun 1.2.19 (the pin), 1.3.14 and 1.4.4, each as
-# pipe output, FORCE_COLOR colour (✗ markers) and a pty capture (CRLF, colour). Every shape must parse
-# to the same units, so verdicts do not depend on the bun version or on how the log was captured.
+# pipe output, FORCE_COLOR colour (✗ markers), a pty capture (CRLF, colour) and GitHub Actions output
+# (::group:: file headers, ::error annotations). Every shape must parse to the same units, so verdicts
+# do not depend on the bun version or on how the log was captured.
 GOLD="$SCRIPT_DIR/fixtures/bun-test"
 tg_parse_log "$GOLD/bun-1.2.19-plain.log"
 GOLD_REF="$TG_UNITS"
@@ -565,14 +566,14 @@ for want in "b.test.ts::LOAD_ERROR" "syntax.test.ts::LOAD_ERROR" "a.test.ts::pre
         assert_fail "golden bun 1.2.19 plain: unit $want" "got: $GOLD_REF"
     fi
 done
-for name in bun-1.2.19-color bun-1.2.19-tty bun-1.3.14-plain bun-1.3.14-color bun-1.3.14-tty \
-    bun-1.4.4-plain bun-1.4.4-color bun-1.4.4-tty; do
+for name in bun-1.2.19-color bun-1.2.19-tty bun-1.2.19-gha bun-1.3.14-plain bun-1.3.14-color bun-1.3.14-tty \
+    bun-1.3.14-gha bun-1.4.4-plain bun-1.4.4-color bun-1.4.4-tty bun-1.4.4-gha; do
     tg_parse_log "$GOLD/$name.log"
     assert_eq "golden $name: parsable" "1" "$TG_PARSABLE"
     assert_eq "golden $name: same units as the plain 1.2.19 log" "$GOLD_REF" "$TG_UNITS"
 done
 # Singular summary variants ("Ran 1 test across 1 file", one failing test), plain and pty
-for name in bun-single-1.2.19-plain bun-single-1.2.19-tty; do
+for name in bun-single-1.2.19-plain bun-single-1.2.19-tty bun-single-1.2.19-gha; do
     tg_parse_log "$GOLD/$name.log"
     assert_eq "golden $name: one failing unit, one file" \
         "bun::error=0
