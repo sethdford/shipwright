@@ -278,6 +278,39 @@ if [[ "$_sw_cmd_idx" -lt 0 || -z "$_sw_cmd" || "${_sw_cmd##*/}" != claude ]]; th
     exit 1
 fi
 
+# Every --model value goes through config/models.json (W2-07): an alias becomes its full ID, and a value that does
+# not resolve refuses the call. An empty or null --model never reaches claude, whichever stage built the flags.
+source "$(dirname "${BASH_SOURCE[0]}")/models.sh"
+_sw_model_args=()
+_sw_model_next=false
+for _sw_arg in "$@"; do
+    if [[ "$_sw_model_next" == true ]]; then
+        _sw_model_next=false
+        _sw_resolved="$(models_resolve "$_sw_arg")" || {
+            echo "agent-exec: refusing --model '$_sw_arg' for $_sw_cmd (not a model alias or known ID); not running" >&2
+            exit 1
+        }
+        _sw_model_args+=("$_sw_resolved")
+        continue
+    fi
+    case "$_sw_arg" in
+        --model) _sw_model_next=true; _sw_model_args+=("$_sw_arg") ;;
+        --model=*)
+            _sw_resolved="$(models_resolve "${_sw_arg#--model=}")" || {
+                echo "agent-exec: refusing $_sw_arg for $_sw_cmd (not a model alias or known ID); not running" >&2
+                exit 1
+            }
+            _sw_model_args+=("--model=$_sw_resolved") ;;
+        *) _sw_model_args+=("$_sw_arg") ;;
+    esac
+done
+if [[ "$_sw_model_next" == true ]]; then
+    echo "agent-exec: --model has no value; not running $_sw_cmd" >&2
+    exit 1
+fi
+# Same count and order as the arguments the gate above checked, so the command word's position is unchanged.
+set -- ${_sw_model_args[@]+"${_sw_model_args[@]}"}
+
 if [[ -n "${SW_AGENT_POLICY:-}" && "$_sw_inside_agent" == true ]]; then
     echo "agent-exec: refusing SW_AGENT_POLICY inside an agent run; the policy is set by the pipeline" >&2
     exit 1

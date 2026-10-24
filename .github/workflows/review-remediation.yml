@@ -172,7 +172,18 @@ jobs:
           Fix all actionable findings. Skip any that are questions or suggestions without clear action items."
 
           # Through agent-exec.sh from the base branch copy (#8673): the agent gets no GitHub token (F9).
-          "$RUNNER_TEMP/trusted/scripts/lib/agent-exec.sh" claude -p "$PROMPT" --max-turns 10 --model claude-sonnet-5-5 2>&1 || {
+          # The model alias comes from the trusted default-branch copy, never the PR checkout (W2-07). Until
+          # config/models.json is on the default branch (merge order: W2-07 lands after #8675 and then the
+          # file exists), the pinned sonnet ID is used with a warning, so remediation does not hard-fail.
+          MODELS_FILE="$RUNNER_TEMP/trusted/config/models.json"
+          if [[ -f "$MODELS_FILE" ]]; then
+            REMEDIATION_MODEL="$(jq -r '.aliases.sonnet // empty' "$MODELS_FILE")"
+          else
+            echo "::warning::config/models.json is not on the default branch yet; using the pinned sonnet ID"
+            REMEDIATION_MODEL="claude-sonnet-5-5"
+          fi
+          [[ -n "$REMEDIATION_MODEL" && "$REMEDIATION_MODEL" != "null" ]] || { echo "::error::no sonnet alias in config/models.json"; exit 1; }
+          "$RUNNER_TEMP/trusted/scripts/lib/agent-exec.sh" claude -p "$PROMPT" --max-turns 10 --model "$REMEDIATION_MODEL" 2>&1 || {
             echo "::warning::Claude remediation returned non-zero — changes may be partial"
           }
         env:

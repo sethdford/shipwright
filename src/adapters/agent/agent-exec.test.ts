@@ -77,7 +77,8 @@ describe("agent-exec permission policy (#8614, #8581)", () => {
     expect(r.code).toBe(0);
     expect(r.argv).toContain("--permission-mode");
     expect(r.argv).not.toContain("--permission-prompts");
-    expect(r.argv.slice(-2)).toEqual(["--model", "sonnet"]);
+    // W2-07: the alias resolves through config/models.json before claude runs.
+    expect(r.argv.slice(-2)).toEqual(["--model", "claude-sonnet-5-5"]);
   });
 
   test("the command gate: a claude word later in argv does not pass (#8673)", () => {

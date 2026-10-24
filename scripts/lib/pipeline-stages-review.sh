@@ -334,7 +334,7 @@ ${_skill_prompts}
     # for interactive permission prompts. Same rationale as build stage (line ~1083).
     local review_args=(--print)
     local _review_flags
-    _review_flags="$(_pipeline_claude_flags "review" "$review_model")"
+    _review_flags="$(_pipeline_claude_flags "review" "$review_model")" || return 1
     # shellcheck disable=SC2206
     # Read-only review stage: no edits (permission policy comes from agent-exec, #8614).
     review_args+=($_review_flags --max-turns "$(_smart_int "max_turns.pipeline_stage" 25)" --disallowedTools=Edit,Write,NotebookEdit)
