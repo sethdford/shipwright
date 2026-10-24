@@ -232,6 +232,71 @@ export TEST_CMD="echo FAIL; exit 1"
 stage_test 2>/dev/null || rc=$?
 [[ $rc -eq 1 ]] && assert_pass "Stage test returns 1 on test failure"
 
+# ─── Tests: stage_test differential judgement (#8663) ──────────────────────
+print_test_section "stage_test differential"
+
+# Own repo, so the review and PR stages below keep their git state. The fake test command prints
+# bun-style output: one failure that the base commit also has, and a second, new one when the
+# uncommitted regression.flag exists (the base worktree never has it).
+DIFF_REPO="$TEST_TEMP_DIR/diff-repo"
+mkdir -p "$DIFF_REPO/.artifacts"
+(
+    cd "$DIFF_REPO" && git init -q -b main && git config user.email "t@t.com" && git config user.name "T"
+    echo "# root" > README.md && git add -A && git commit -q -m "root"
+    cat > fake-tests.sh <<'FAKE'
+#!/usr/bin/env bash
+echo "bun test v1.2.19"
+echo ""
+echo "old.test.ts:"
+echo "(fail) pre-existing one [1.00ms]"
+if [[ -f regression.flag ]]; then
+    echo "new.test.ts:"
+    echo "(fail) regression [1.00ms]"
+    echo " 1 pass"
+    echo " 2 fail"
+    echo "Ran 3 tests across 2 files. [3.00ms]"
+    exit 1
+fi
+echo " 1 pass"
+echo " 1 fail"
+echo "Ran 2 tests across 1 file. [2.00ms]"
+exit 1
+FAKE
+    # Like a pipeline branch: the fork point (main's tip) has a parent, and HEAD is one commit past it
+    git add -A && git commit -q -m "main: fake test command"
+    git checkout -q -b feat/diff-under-test
+    echo "pipeline change" >> README.md && git add -A && git commit -q -m "pipeline change"
+) >/dev/null 2>&1
+
+# Runs stage_test in DIFF_REPO with the given base branch. Prints the stage's exit code.
+run_diff_stage() {
+    local base_branch="$1" rc=0
+    (
+        cd "$DIFF_REPO"
+        export PROJECT_ROOT="$DIFF_REPO" ARTIFACTS_DIR="$DIFF_REPO/.artifacts" BASE_BRANCH="$base_branch"
+        export TEST_CMD="bash fake-tests.sh"
+        stage_test
+    ) >/dev/null 2>&1 || rc=$?
+    echo "$rc"
+}
+
+# Pre-existing: the same failure on the base commit does not fail the stage
+rm -f "$DIFF_REPO/regression.flag"
+assert_eq "pre-existing failure does not fail the test stage" "0" "$(run_diff_stage main)"
+assert_contains "pre-existing verdict is logged" "$(cat "$DIFF_REPO/.artifacts/test-results.log")" "PRE-EXISTING, not blocking"
+
+# Regression: a new failing unit fails the stage, and the feedback names the pre-existing one as not to fix
+touch "$DIFF_REPO/regression.flag"
+assert_eq "a regression fails the test stage" "1" "$(run_diff_stage main)"
+diff_log="$(cat "$DIFF_REPO/.artifacts/test-results.log")"
+assert_contains "regression verdict names the new failure" "$diff_log" "BLOCKING: NEW FAILURES"
+assert_contains "feedback lists the pre-existing failure" "$diff_log" "old.test.ts::pre-existing one#1"
+assert_contains "feedback tells the agent not to fix pre-existing failures" "$diff_log" "Do NOT fix them"
+rm -f "$DIFF_REPO/regression.flag"
+
+# No base commit: fail closed, the old behaviour (the same pre-existing failure blocks)
+assert_eq "no base branch: the failure blocks as before" "1" "$(run_diff_stage no-such-base-branch)"
+
 # ─── Tests: stage_review ────────────────────────────────────────────────────
 print_test_section "stage_review"
 

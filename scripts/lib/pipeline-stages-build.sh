@@ -6,6 +6,9 @@ SW_AGENT_EXEC="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/agent-exec.sh"
 # Test commands run without credentials (#8608).
 # shellcheck source=lib/test-gate-env.sh
 source "$(dirname "${BASH_SOURCE[0]}")/test-gate-env.sh"
+# Differential judgement of the test stage (#8663): the same tg_judge the build loop's gate uses.
+# shellcheck source=lib/test-gate-baseline.sh
+source "$(dirname "${BASH_SOURCE[0]}")/test-gate-baseline.sh"
 [[ -n "${_PIPELINE_STAGES_BUILD_LOADED:-}" ]] && return 0
 _PIPELINE_STAGES_BUILD_LOADED=1
 
@@ -563,6 +566,48 @@ ${commit_msgs}" --model "$(_smart_model commit_quality haiku)" < /dev/null 2>/de
     log_stage "build" "Build loop completed ($commit_count commits)"
 }
 
+# _pipeline_test_base — the commit the test stage judges against: where HEAD forked from the base
+# branch. Empty when neither origin/<base> nor <base> resolves, and the stage then blocks as before.
+_pipeline_test_base() {
+    local ref base=""
+    for ref in "origin/${BASE_BRANCH:-main}" "${BASE_BRANCH:-main}"; do
+        base="$(git -C "${PROJECT_ROOT:-.}" merge-base HEAD "$ref" 2>/dev/null || true)"
+        [[ -n "$base" ]] && break
+    done
+    printf '%s' "$base"
+}
+
+# _pipeline_test_judge <cmd> <exit> <log> — judge a failing test command against the base commit.
+# Returns 0 when every failing unit also fails on the base: those are pre-existing and do not block.
+# Returns 1 when a unit is new (a regression), or when no judgement can be made (fail closed).
+# Either way the verdict is appended to <log>, so the self-healing feedback (the log's tail) says
+# which failures are pre-existing and that they must not be fixed.
+_pipeline_test_judge() {
+    local cmd="$1" rc="$2" log="$3" base pre=""
+    base="$(_pipeline_test_base)"
+    if [[ -z "$base" ]]; then
+        warn "Test stage: no base commit for ${BASE_BRANCH:-main}; blocking without a differential judgement"
+        return 1
+    fi
+    local LOOP_START_COMMIT="$base"
+    tg_begin_gate
+    if tg_judge "$cmd" "$rc" "$log" "${SW_TEST_TIMEOUT:-900}" 1; then
+        info "Test failures are pre-existing on the base commit ${base:0:8}; not blocking the stage"
+        printf '\n%s\n' "$(tg_verdict_text)" >> "$log"
+        return 0
+    fi
+    if [[ "$TG_VERDICT" == "new-failures" ]]; then
+        pre="$(printf '%s\n' "$TG_UNITS" | grep -vE '::(total|ran|files|fail|error|skip)=' | grep -vxF -f <(printf '%s\n' "$TG_NEW_FAILURES") | grep -v '^$' || true)"
+    fi
+    {
+        printf '\n%s\n' "$(tg_verdict_text)"
+        if [[ -n "$pre" ]]; then
+            printf 'PRE-EXISTING, not blocking (these also fail on the base commit). Do NOT fix them; they are not part of this task: %s\n' "$(printf '%s' "$pre" | tr '\n' ' ')"
+        fi
+    } >> "$log"
+    return 1
+}
+
 stage_test() {
     CURRENT_STAGE_ID="test"
     local test_cmd="${TEST_CMD}"
@@ -588,6 +633,11 @@ stage_test() {
     info "Running tests: ${DIM}$test_cmd${RESET}"
     local test_exit=0
     sw_test_gate_env bash -c "$test_cmd" > "$test_log" 2>&1 || test_exit=$?
+
+    # A failure that the base commit also has does not fail the stage; a regression does (#8663).
+    if [[ "$test_exit" -ne 0 ]] && _pipeline_test_judge "$test_cmd" "$test_exit" "$test_log"; then
+        test_exit=0
+    fi
 
     if [[ "$test_exit" -eq 0 ]]; then
         success "Tests passed"
