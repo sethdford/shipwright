@@ -503,9 +503,7 @@ build_claude_flags() {
     flags+=("--model" "$MODEL")
     flags+=("--output-format" "json")
 
-    if $SKIP_PERMISSIONS; then
-        flags+=("--dangerously-skip-permissions")
-    fi
+    # Permissions: agent-exec.sh applies config/agent-permissions.json to every claude call (#8614).
 
     if [[ -n "$MAX_TURNS" ]]; then
         flags+=("--max-turns" "$MAX_TURNS")

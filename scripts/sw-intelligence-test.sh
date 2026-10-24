@@ -51,7 +51,12 @@ DAEMONCFG
 #!/usr/bin/env bash
 # Mock claude CLI — prints the response in __MOCK_RESPONSE_FILE__ (set by the test) and exits
 # Simulates: claude -p "..." (plain text mode, returns raw text/JSON)
-if [[ "${1:-}" == "-p" ]] || [[ "${1:-}" == "--print" ]]; then
+# -p may follow the flags agent-exec.sh adds after the claude word (#8614), so look at every argument.
+is_print=false
+for _arg in "$@"; do
+    case "$_arg" in -p|--print) is_print=true ;; esac
+done
+if [[ "$is_print" == true ]]; then
     if [[ -s "__MOCK_RESPONSE_FILE__" ]]; then
         cat "__MOCK_RESPONSE_FILE__"
     else

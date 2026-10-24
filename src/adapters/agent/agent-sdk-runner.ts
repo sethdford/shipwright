@@ -18,7 +18,15 @@ import type {
 } from "../../shared/kernel/ports";
 import { err, ok, type Result } from "../../shared/kernel/result";
 import { type Collected, failure, ZERO_USAGE } from "./agent-failure";
+import {
+  AGENT_DENIED_TOOLS,
+  AGENT_SANDBOX,
+  AGENT_SETTING_SOURCES,
+  AGENT_SETTINGS,
+  scopeAllowedTools,
+} from "./agent-permissions";
 import { assertAgentOptions } from "./privilege-guard";
+import { readProjectMemory } from "./project-memory";
 import { wrapUntrusted } from "./untrusted";
 
 export type QueryFn = (args: { prompt: string; options: Options }) => AsyncIterable<SDKMessage>;
@@ -220,17 +228,26 @@ export class AgentSdkRunner implements AgentRunner {
 
   async runTask(spec: TaskSpec): Promise<Result<TaskOutcome, AgentFailure>> {
     const prompt = spec.data ? `${spec.prompt}\n\n${wrapUntrusted(spec.data)}` : spec.prompt;
-    // settingSources "project": repos are the user's own and their CLAUDE.md guidance is needed,
-    // but project settings can add hooks and permissions, so only run repos you trust.
+    // Policy (agent-permissions.ts, mirrors config/agent-permissions.json): inline settings with hooks off
+    // and the permissions block, the Bash sandbox, dontAsk, and settingSources ["user"], so the repo's
+    // agent-writable .claude/settings*.json is never loaded (#8581). The project memory (CLAUDE.md,
+    // AGENTS.md, .claude/rules) is passed as systemPrompt.append, which is what the project scope gave before.
     // persistSession stays on so max_turns/budget runs can be resumed; that needs HOME in env.
+    const memory = await readProjectMemory(spec.cwd);
     const run = await this.execute(prompt, spec.timeoutMs, spec.signal, {
       model: spec.model,
       effort: spec.effort,
       cwd: spec.cwd,
       permissionMode: "dontAsk",
-      allowedTools: [...spec.allowedTools],
+      allowedTools: scopeAllowedTools(spec.allowedTools),
+      disallowedTools: [...AGENT_DENIED_TOOLS],
+      settings: AGENT_SETTINGS,
+      sandbox: AGENT_SANDBOX,
       strictMcpConfig: true,
-      settingSources: ["project"],
+      settingSources: [...AGENT_SETTING_SOURCES],
+      ...(memory
+        ? { systemPrompt: { type: "preset", preset: "claude_code", append: memory } }
+        : {}),
       maxTurns: spec.maxTurns,
       maxBudgetUsd: spec.maxBudgetUsd,
     });
