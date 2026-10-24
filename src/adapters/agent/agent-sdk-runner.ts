@@ -233,7 +233,7 @@ export class AgentSdkRunner implements AgentRunner {
     // agent-writable .claude/settings*.json is never loaded (#8581). The project memory (CLAUDE.md,
     // AGENTS.md, .claude/rules) is passed as systemPrompt.append, which is what the project scope gave before.
     // persistSession stays on so max_turns/budget runs can be resumed; that needs HOME in env.
-    const memory = await readProjectMemory(spec.cwd);
+    const memory = await readProjectMemory(spec.cwd, spec.memoryRef);
     const run = await this.execute(prompt, spec.timeoutMs, spec.signal, {
       model: spec.model,
       effort: spec.effort,
