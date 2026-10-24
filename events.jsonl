@@ -1010,3 +1010,4 @@
 {"ts":"2026-10-24T08:06:29Z","ts_epoch":1792829189,"type":"strategic.issue_refused","title":"Add a blast-radius guard to the build loop that aborts iterations with out-of-scope mass deletions"}
 {"ts":"2026-10-24T08:06:32Z","ts_epoch":1792829192,"type":"strategic.issue_refused","title":"Untrack runtime state under .claude/ and add a fitness rule to keep it out of git"}
 {"ts":"2026-10-24T08:06:32Z","ts_epoch":1792829192,"type":"strategic.cycle_complete","issues_created":0,"issues_skipped":3}
+{"ts":"2026-10-24T12:06:23Z","ts_epoch":1792843583,"type":"hygiene_platform_refactor","hardcoded":49,"fallback":75,"todo":51}
