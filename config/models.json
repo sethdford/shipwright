@@ -5,14 +5,31 @@
     "sonnet": "claude-sonnet-5-5",
     "haiku": "claude-haiku-5-5"
   },
-  "efforts": ["low", "medium", "high", "xhigh"],
+  "efforts": [
+    "low",
+    "medium",
+    "high",
+    "xhigh"
+  ],
   "allowlist": {
     "files": [
       "config/models.json",
       "scripts/sw-cost.sh",
-      "scripts/*-test.sh",
+      "scripts/sw-autonomous-e2e-test.sh",
+      "scripts/sw-budget-chaos-test.sh",
+      "scripts/sw-dashboard-e2e-test.sh",
+      "scripts/sw-loop-test.sh",
+      "scripts/sw-memory-discovery-e2e-test.sh",
+      "scripts/sw-memory-test.sh",
+      "scripts/sw-scope-enforcement-test.sh",
+      "scripts/sw-server-api-test.sh",
       "src/**/*.test.ts",
-      "tools/models/*.test.ts"
+      "tools/models/*.test.ts",
+      ".github/workflows/review-remediation.yml",
+      "docs/superpowers/**",
+      "docs/adr/**",
+      "docs/tmux-research/**",
+      ".claude/loop-logs/**"
     ]
   }
 }

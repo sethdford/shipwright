@@ -65,12 +65,94 @@ describe("agent-exec permission policy (#8614, #8581)", () => {
     expect(r.argv).toContain("dontAsk");
   });
 
-  test("a wrapped claude (env-style) is covered, and interactive runs skip -p-only flags", () => {
+  test("a wrapped claude (env-style) is refused: claude must be the command word (#8673)", () => {
     const r = run(["env", "claude", "--model", "sonnet"]);
+    expect(r.code).toBe(1);
+    expect(r.stderr).toContain("only claude is launched through this wrapper");
+    expect(existsSync(argvFile)).toBe(false);
+  });
+
+  test("interactive runs skip -p-only flags", () => {
+    const r = run(["claude", "--model", "sonnet"]);
     expect(r.code).toBe(0);
     expect(r.argv).toContain("--permission-mode");
     expect(r.argv).not.toContain("--permission-prompts");
-    expect(r.argv.slice(-2)).toEqual(["--model", "sonnet"]);
+    // W2-07: the alias resolves through config/models.json before claude runs.
+    expect(r.argv.slice(-2)).toEqual(["--model", "claude-sonnet-5-5"]);
+  });
+
+  test("the command gate: a claude word later in argv does not pass (#8673)", () => {
+    const r = run(["/bin/echo", "NOT-CLAUDE", "claude"]);
+    expect(r.code).toBe(1);
+    expect(r.stderr).toContain("only claude is launched through this wrapper");
+    expect(existsSync(argvFile)).toBe(false);
+  });
+
+  test("the command gate: a timeout prefix is allowed, and the policy goes right after claude", () => {
+    // macOS has no timeout(1) by default: a shim drops the duration and runs the rest.
+    const shim = join(env.root, "bin", "timeout");
+    writeFileSync(shim, '#!/bin/bash\nshift\nexec "$@"\n');
+    chmodSync(shim, 0o755);
+    const r = run(["timeout", "5", "claude", "-p", "hi"]);
+    expect(r.code).toBe(0);
+    expect(r.argv.slice(0, 2)).toEqual(["--settings", POLICY]);
+    expect(r.argv.slice(-2)).toEqual(["-p", "hi"]);
+  });
+
+  test("the command gate: a timeout prefix must be followed by a duration and then claude", () => {
+    expect(run(["timeout", "claude", "-p", "hi"]).code).toBe(1);
+    expect(run(["timeout", "5", "/bin/echo", "claude"]).code).toBe(1);
+    expect(run(["gtimeout", "/bin/echo", "NOT-CLAUDE", "claude"]).code).toBe(1);
+  });
+
+  test("project memory is capped at 64 KiB with a marker, never passed whole", () => {
+    writeFileSync(join(work, "CLAUDE.md"), "x".repeat(200 * 1024));
+    const r = run(["claude", "-p", "hi"]);
+    expect(r.code).toBe(0);
+    const memory = r.argv[r.argv.indexOf("--append-system-prompt") + 1] ?? "";
+    expect(Buffer.byteLength(memory)).toBeLessThanOrEqual(65536);
+    expect(memory).toContain("project memory truncated at 64 KiB");
+  });
+
+  test("a multi-byte project memory is cut at the cap without splitting a character", () => {
+    writeFileSync(join(work, "CLAUDE.md"), "é".repeat(100 * 1024));
+    const r = run(["claude", "-p", "hi"]);
+    expect(r.code).toBe(0);
+    const memory = r.argv[r.argv.indexOf("--append-system-prompt") + 1] ?? "";
+    expect(Buffer.byteLength(memory)).toBeLessThanOrEqual(65536);
+    expect(memory).not.toContain("�");
+  });
+
+  test("SW_MEMORY_REF reads the project memory from that git ref, not the working tree (#8673)", () => {
+    const git = (...args: string[]) =>
+      Bun.spawnSync(["git", "-c", "commit.gpgsign=false", ...args], {
+        cwd: work,
+        env: {
+          PATH: PATH_FOR_SHIM,
+          HOME: env.home,
+          GIT_AUTHOR_NAME: "t",
+          GIT_AUTHOR_EMAIL: "t@example.invalid",
+          GIT_COMMITTER_NAME: "t",
+          GIT_COMMITTER_EMAIL: "t@example.invalid",
+        },
+      });
+    git("init", "-q");
+    writeFileSync(join(work, "CLAUDE.md"), "BASE RULE");
+    git("add", "CLAUDE.md");
+    git("commit", "-q", "-m", "base");
+    writeFileSync(join(work, "CLAUDE.md"), "BUILDER EDIT");
+    const r = run(["claude", "-p", "audit"], { SW_MEMORY_REF: "HEAD" });
+    expect(r.code).toBe(0);
+    const memory = r.argv[r.argv.indexOf("--append-system-prompt") + 1] ?? "";
+    expect(memory).toContain("BASE RULE");
+    expect(memory).not.toContain("BUILDER EDIT");
+  });
+
+  test("SW_MEMORY_REF that names no commit is refused, not silently replaced by the working tree", () => {
+    const r = run(["claude", "-p", "audit"], { SW_MEMORY_REF: "no-such-ref" });
+    expect(r.code).toBe(1);
+    expect(r.stderr).toContain("SW_MEMORY_REF does not name a commit");
+    expect(existsSync(argvFile)).toBe(false);
   });
 
   test("a caller may narrow tools with --disallowedTools=, and the prompt reaches claude", () => {

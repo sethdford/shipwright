@@ -1,0 +1,53 @@
+# source: sethdford/shipwright run 38744601038 (Shipwright Pipeline #8547, 2026-10-15, cancelled after 3h), step 'Run Shipwright pipeline', iteration and gate lines only, timestamps stripped, redacted
+✓ Pre-flight passed
+  Issue:       #8547
+▸ Stage: intake [1/6]
+▸ Stage: spec_generation [2/6]
+▸ Stage: build [cycle 1]
+▸ Starting build loop: shipwright loop (max 10 iterations, 1 agent(s))
+▸ Iteration 1/10 — Starting...
+  ✓ Claude session completed (19s, exit 0)
+{"composite":58,"scores":{"test_progress":50,"code_quality":65,"convergence":25,"architecture":90,"security":90}}[docs/e2e-proof-add-a-one-line-note-to-docs-sa-8547 59c4be29] loop: iteration 1 — autonomous progress
+  Running full tests...
+  ✗ Tests: failed
+[docs/e2e-test-add-comment-to-readme-automated-8549 100e5079] loop: iteration 1 — post-audit cleanup
+  ✗ Quality gates: FAILED (tests failing)
+  ✗ Completion REJECTED: quality gates failed, audit agent found issues, tests failing
+▸ Iteration 2/10 — Starting...
+✓ Failure analyzed: [test_failure] Test suite reported failures in sw-e2e-integration-test and sw-intent-analysis-test (both exit 1); the log is truncated before the summary and the 'FAIL: 0' pattern is a misleading match on a passing-count line, so the real failing assertions are not shown.
+  ✓ Claude session completed (18m 24s, exit 0)
+{"composite":61,"scores":{"test_progress":50,"code_quality":75,"convergence":25,"architecture":90,"security":90}}[docs/e2e-test-add-comment-to-readme-automated-8549 6d09f902] loop: iteration 2 — autonomous progress
+  Running full tests...
+  ✗ Tests: failed
+[docs/e2e-test-add-comment-to-readme-automated-8553 22b2d039] loop: iteration 2 — post-audit cleanup
+  ✗ Quality gates: FAILED (tests failing)
+  ✗ Completion REJECTED: quality gates failed, audit agent found issues, tests failing
+▸ Iteration 3/10 — Starting...
+✓ Failure analyzed: [test_failure] The pipeline E2E test suite has 6 failures: plan.md and review.md artifacts are not generated in the mock environment (plan/review stages produce no output files, likely because the mocked claude/intelligence calls return nothing usable or jq parse errors break the flow), and the dry-run output no longer matches the 'Pipeline.*standard' pattern.
+  ✓ Claude session completed (1m 44s, exit 0)
+{"composite":64,"scores":{"test_progress":50,"code_quality":70,"convergence":55,"architecture":80,"security":90}}[docs/e2e-test-add-comment-to-readme-automated-8553 44c54269] loop: iteration 3 — autonomous progress
+  Running full tests...
+  ✗ Tests: failed
+[docs/e2e-test-add-comment-to-readme-automated-8557 48b409a7] loop: iteration 3 — post-audit cleanup
+  ✗ Quality gates: FAILED (tests failing)
+▸ Iteration 4/10 — Starting...
+✓ Failure analyzed: [config] The 'FAIL: 0' pattern is a false positive: every suite in the log (reward-aggregator, bandit-selector, policy-learner, autoresearch-e2e) passed with FAIL: 0, so the log shows no real test failure. The stage was probably flagged by a naive grep for 'FAIL' in the summary lines, or the actual failure happened in output before the last 200 lines.
+  ✓ Claude session completed (1m 3s, exit 0)
+{"composite":61,"scores":{"test_progress":50,"code_quality":70,"convergence":40,"architecture":80,"security":90}}[docs/e2e-test-add-comment-to-readme-automated-8557 bacaafd4] loop: iteration 4 — autonomous progress
+  Running full tests...
+  ✗ Tests: failed
+[test/e2e-test-add-comment-to-readme-automated-8561 8b18bc38] loop: iteration 4 — post-audit cleanup
+  ✗ Quality gates: FAILED (tests failing)
+  ✗ Completion REJECTED: quality gates failed, audit agent found issues, tests failing
+▸ Iteration 5/10 — Starting...
+✓ Failure analyzed: [test_failure] The 'Memory promotion copies cross-repo patterns' test in the sw-self-optimize suite fails: the memory promotion step did not copy patterns from the repo-level memory to the global/cross-repo memory in the isolated test environment (likely a path/HOME or threshold mismatch). The 'FAIL: 0' pattern is a false match on the 'Failed: 0' summary lines of the passing suites.
+  ✓ Claude session completed (15m 48s, exit 0)
+{"composite":63,"scores":{"test_progress":50,"code_quality":70,"convergence":40,"architecture":90,"security":90}}[test/e2e-test-add-comment-to-readme-automated-8561 dbf0b21a] loop: iteration 5 — autonomous progress
+  Running full tests...
+  ✗ Tests: failed
+[test/e2e-test-add-comment-to-readme-automated-8565 02f7be01] loop: iteration 5 — post-audit cleanup
+  ✗ Quality gates: FAILED (tests failing)
+  ✗ Completion REJECTED: quality gates failed, audit agent found issues, tests failing
+▸ Iteration 6/10 — Starting...
+✓ Failure analyzed: [config] The log shows every suite passing with 'Failed: 0'; the 'FAIL: 0' pattern matched a zero-failure summary line, so this is a false positive in the error detector, not a real test failure.
+##[error]The operation was canceled.

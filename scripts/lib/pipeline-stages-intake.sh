@@ -579,7 +579,7 @@ ${_skill_prompts}
 
     local _token_log="${ARTIFACTS_DIR}/.claude-tokens-plan.log"
     local _plan_flags
-    _plan_flags="$(_pipeline_claude_flags "plan" "$plan_model")"
+    _plan_flags="$(_pipeline_claude_flags "plan" "$plan_model")" || return 1
     # shellcheck disable=SC2086
     "$SW_AGENT_EXEC" claude --print $_plan_flags --max-turns "$(_smart_int "max_turns.pipeline_stage" 25)" --disallowedTools=Edit,Write,NotebookEdit \
         "$plan_prompt" < /dev/null > "$plan_file" 2>"$_token_log" || true
@@ -787,7 +787,7 @@ Then explain your reasoning briefly."
             local validation_model="${plan_model:-opus}"
             local validation_result
             local _val_flags
-            _val_flags="$(_pipeline_claude_flags "plan" "$validation_model")"
+            _val_flags="$(_pipeline_claude_flags "plan" "$validation_model")" || return 1
             # shellcheck disable=SC2086
             validation_result=$("$SW_AGENT_EXEC" claude --print --output-format text $_val_flags -p "$validation_prompt" < /dev/null 2>"${ARTIFACTS_DIR}/.claude-tokens-plan-validate.log" || true)
             parse_claude_tokens "${ARTIFACTS_DIR}/.claude-tokens-plan-validate.log"
@@ -862,7 +862,7 @@ GUIDANCE: ${failure_guidance}}
 Fix these issues in the new plan."
 
                 local _regen_flags
-                _regen_flags="$(_pipeline_claude_flags "plan" "$plan_model")"
+                _regen_flags="$(_pipeline_claude_flags "plan" "$plan_model")" || return 1
                 # shellcheck disable=SC2086
                 "$SW_AGENT_EXEC" claude --print $_regen_flags --max-turns "$(_smart_int "max_turns.pipeline_stage" 25)" \
                     "$regen_prompt" < /dev/null > "$plan_file" 2>"$_token_log" || true
@@ -1069,7 +1069,7 @@ ${_skill_prompts}
 
     local _token_log="${ARTIFACTS_DIR}/.claude-tokens-design.log"
     local _design_flags
-    _design_flags="$(_pipeline_claude_flags "design" "$design_model")"
+    _design_flags="$(_pipeline_claude_flags "design" "$design_model")" || return 1
     # shellcheck disable=SC2086
     "$SW_AGENT_EXEC" claude --print $_design_flags --max-turns "$(_smart_int "max_turns.pipeline_stage" 25)" --disallowedTools=Edit,Write,NotebookEdit \
         "$design_prompt" < /dev/null > "$design_file" 2>"$_token_log" || true

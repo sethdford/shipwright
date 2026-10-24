@@ -414,8 +414,10 @@ if ! [[ "$MAX_RESTARTS" =~ ^[0-9]+$ ]]; then
 fi
 
 # Validate effort level
-if [[ -n "$EFFORT_LEVEL" ]] && [[ "$EFFORT_LEVEL" != "low" && "$EFFORT_LEVEL" != "medium" && "$EFFORT_LEVEL" != "high" && "$EFFORT_LEVEL" != "xhigh" ]]; then
-    error "--effort must be low, medium, high, or xhigh (got: $EFFORT_LEVEL)"
+# W2-07: the accepted efforts come from config/models.json ("efforts").
+source "$SCRIPT_DIR/lib/models.sh"
+if [[ -n "$EFFORT_LEVEL" ]] && ! models_effort_valid "$EFFORT_LEVEL"; then
+    error "--effort must be one of: $(jq -r '.efforts | join(", ")' "$(_models_file)" 2>/dev/null || echo "low, medium, high, xhigh") (got: $EFFORT_LEVEL)"
     exit 1
 fi
 
@@ -509,6 +511,11 @@ select_adaptive_model() {
     local default_model="${2:-opus}"
     # If user explicitly set --model, respect it
     if [[ "$default_model" != "${SW_MODEL:-opus}" ]]; then
+        echo "$default_model"
+        return 0
+    fi
+    # W2-07: learned routing is off unless SW_LEGACY_MODEL_ROUTING=true (deterministic routing by default).
+    if [[ "${SW_LEGACY_MODEL_ROUTING:-false}" != "true" ]]; then
         echo "$default_model"
         return 0
     fi

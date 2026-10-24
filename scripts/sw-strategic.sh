@@ -53,7 +53,7 @@ fi
 STRATEGIC_MAX_ISSUES=5
 STRATEGIC_COOLDOWN_SECONDS=14400  # 4 hours
 source "$(dirname "${BASH_SOURCE[0]}")/lib/models.sh"
-STRATEGIC_MODEL="$(models_resolve sonnet)"
+STRATEGIC_MODEL="$(models_resolve sonnet)" || { echo "sw-strategic: cannot resolve the sonnet model (config/models.json)" >&2; exit 1; }
 # shellcheck disable=SC2034
 STRATEGIC_MAX_TOKENS=4096
 STRATEGIC_STRATEGY_LINES=200

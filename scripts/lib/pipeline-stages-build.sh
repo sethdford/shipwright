@@ -35,7 +35,13 @@ _stage_effort_level() {
 _pipeline_claude_flags() {
     local stage="$1"
     local model="$2"
-    local flags=("--model" "$model")
+    # W2-07: the flags carry the full ID. A model that does not resolve stops the stage (never --model "").
+    local resolved
+    resolved="$(models_resolve "$model")" || {
+        echo "pipeline: cannot resolve model '$model' for stage $stage" >&2
+        return 1
+    }
+    local flags=("--model" "$resolved")
 
     # Effort level: explicit override > per-stage default
     local effort="${EFFORT_LEVEL_OVERRIDE:-$(_stage_effort_level "$stage")}"

@@ -217,7 +217,15 @@ jobs:
               npm install -g @anthropic-ai/claude-code@2.1.301 2>/dev/null || true
             fi
 
-            RESPONSE=$(scripts/lib/agent-exec.sh claude -p "$PROMPT_TEXT" --max-turns 1 --model "$(jq -r '.aliases.haiku' config/models.json)" 2>/dev/null || echo "")
+            # W2-07: the triage model is the haiku alias from config/models.json. A null or missing alias is an error,
+            # never --model "null"; the empty response below then takes the fail-safe path (reject, do not approve).
+            TRIAGE_MODEL="$(jq -r '.aliases.haiku // empty' config/models.json 2>/dev/null || echo "")"
+            if [[ -n "$TRIAGE_MODEL" && "$TRIAGE_MODEL" != "null" ]]; then
+              RESPONSE=$(scripts/lib/agent-exec.sh claude -p "$PROMPT_TEXT" --max-turns 1 --model "$TRIAGE_MODEL" 2>/dev/null || echo "")
+            else
+              echo "::error::config/models.json has no haiku alias; triage cannot run"
+              RESPONSE=""
+            fi
 
             # Fail-safe: if Claude returns empty/garbage, reject (do not auto-approve)
             if [[ -z "$RESPONSE" ]]; then

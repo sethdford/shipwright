@@ -66,6 +66,23 @@ EXAMPLES
   shipwright budget check --estimate 2.50
 ```
 
+## `failure`
+
+Classify a failed run and decide retry or escalate (ADR-0009)
+
+```text
+USAGE
+  shipwright failure classify --log FILE [--kind KIND] [--attempts FILE] [--json]
+
+DESCRIPTION
+  Classifies one failed run from its log (and an optional typed agent kind) and decides retry or
+  escalate. Pure: it writes nothing. Auth and invalid-input failures always escalate; an environment
+  failure is retried once. --attempts is a JSON array of {cls, fingerprint} from earlier runs.
+
+EXIT CODES
+  0  retry      3  escalate      1  could not read or decide (fails closed)      2  usage error
+```
+
 ## `gates`
 
 All dispatch gates (pause, breaker, budget, review WIP, fix loop)
