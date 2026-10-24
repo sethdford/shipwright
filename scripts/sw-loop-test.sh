@@ -569,6 +569,7 @@ CLAUDE_EOF
         --repo "$TEST_TEMP_DIR/repo" \
         "Do nothing" \
         --max-iterations 5 \
+        --max-restarts 0 \
         --test-cmd "true" \
         --local \
         2>&1) || true
@@ -607,6 +608,7 @@ CLAUDE_EOF
         --repo "$TEST_TEMP_DIR/repo" \
         "Add iter2.txt" \
         --max-iterations 5 \
+        --max-restarts 0 \
         --test-cmd "test -f iter2.txt" \
         --local \
         2>&1) || true
@@ -642,6 +644,7 @@ CLAUDE_EOF
         --repo "$TEST_TEMP_DIR/repo" \
         "Never finish" \
         --max-iterations 3 \
+        --max-restarts 0 \
         --test-cmd "true" \
         --local \
         --no-auto-extend \
@@ -674,6 +677,7 @@ CLAUDE_EOF
         --repo "$TEST_TEMP_DIR/repo" \
         "Fix something" \
         --max-iterations 5 \
+        --max-restarts 0 \
         --test-cmd "false" \
         --local \
         --no-auto-extend \
@@ -713,6 +717,7 @@ exit 0' > "$TEST_TEMP_DIR/bin/claude"
         --repo "$TEST_TEMP_DIR/repo" \
         "Do nothing" \
         --max-iterations 2 \
+        --max-restarts 0 \
         --test-cmd "true" \
         --local \
         2>&1) || true
@@ -770,6 +775,7 @@ CLAUDE_EOF
         --repo "$TEST_TEMP_DIR/repo" \
         "Add progress.txt" \
         --max-iterations 3 \
+        --max-restarts 0 \
         --test-cmd "true" \
         --local \
         2>&1) || true

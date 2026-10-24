@@ -1,15 +1,35 @@
 {
-  "version": 1,
-  "description": "Blast-radius budgets for the build loop (#8644). A spec's scope can only tighten these defaults; a missing or unknown type gets the strictest entry.",
+  "version": 2,
+  "description": "Blast-radius budgets for the build loop (#8644). Loaded once by the loop from the base commit (or the install copy when the project has none). A spec's scope and any label or model type may only TIGHTEN these. A missing or unknown type gets the strictest entry. Globs: `*` stops at `/`, `**` crosses it.",
   "protected_paths": [
     "scripts/*-test.sh",
     "src/**/*.test.ts",
     "tools/arch/**",
     ".github/workflows/**",
+    "scripts/ci/**",
     "docs/adr/**",
     ".claude/settings*.json",
+    ".claude/hooks/**",
+    ".claude/agents/**",
+    ".claude/rules/**",
+    ".claude/skills/**",
     "config/agent-permissions.json",
-    "scripts/ci/**"
+    "config/scope-budgets.json",
+    "scripts/lib/scope-guard.sh",
+    "**/.gitattributes"
+  ],
+  "runtime_paths": [
+    ".claude/loop-logs/**",
+    ".claude/pipeline-artifacts/**",
+    ".claude/worktrees/**",
+    ".claude/loop-state.md",
+    ".claude/pipeline-state.md",
+    ".claude/intelligence-cache.json",
+    ".claude/platform-hygiene.json",
+    ".claude/code-review.json",
+    ".claude/hygiene-report.json",
+    ".claude/pr-draft.md",
+    ".claude/recovery-state.json"
   ],
   "aliases": {
     "documentation": "docs",

@@ -1880,6 +1880,9 @@ CONSECUTIVE_FAILURES=0
 # shellcheck source=lib/auto-recovery.sh
 [[ -f "__SCRIPT_DIR__/lib/auto-recovery.sh" ]] && source "__SCRIPT_DIR__/lib/auto-recovery.sh" 2>/dev/null || true
 
+# Blast-radius guard for this worker (#8644). Scope and config come from the exported SW_SCOPE_* set by the parent.
+[[ -f "__SCRIPT_DIR__/lib/scope-guard.sh" ]] && source "__SCRIPT_DIR__/lib/scope-guard.sh" 2>/dev/null || true
+
 echo -e "${CYAN}${BOLD}▸${RESET} Agent ${AGENT_NUM}/${TOTAL_AGENTS} starting in ${WORK_DIR}"
 
 while [[ "$ITERATION" -lt "$MAX_ITERATIONS" ]]; do
@@ -1964,6 +1967,11 @@ PROMPT
     git reset -- .claude/loop-logs/ .claude/loop-state.md .claude/intelligence-cache.json \
         .claude/platform-hygiene.json .claude/pipeline-artifacts/ .claude/code-review.json \
         .claude/hygiene-report.json .claude/pr-draft.md 2>/dev/null || true
+    # Blast-radius gate (#8644): judge the staged changes before committing. A violation discards them.
+    _scope_w_rc=0
+    scope_worker_precommit "$WORK_DIR" "$ITERATION" "$AGENT_NUM" "$LOG_DIR" || _scope_w_rc=$?
+    if [[ "$_scope_w_rc" -eq 2 ]]; then echo -e "  ${RED}✗${RESET} Blast-radius guard blocked agent ${AGENT_NUM}"; break; fi
+    if [[ "$_scope_w_rc" -eq 1 ]]; then continue; fi
     if git commit -m "agent-${AGENT_NUM}: iteration ${ITERATION}" --no-verify 2>/dev/null; then
         if ! git push origin "loop/agent-${AGENT_NUM}" 2>/dev/null; then
             echo -e "  ${YELLOW}⚠${RESET} git push failed for loop/agent-${AGENT_NUM} — remote may be out of sync"
@@ -2138,24 +2146,25 @@ cleanup_multi_agent() {
     rm -f "$LOG_DIR"/.agent-*-complete 2>/dev/null || true
 }
 
-# Blast-radius gate after a loop commit (#8644). Returns 1 when the build must stop.
+# Blast-radius gate after a loop commit (#8644). Returns 0 pass, 1 reverted (the caller must skip the
+# rest of this iteration: no tests, audit, convergence or completion), 2 blocked (stop the build).
 _scope_gate_after_commit() {
     local tag="${1:-}" rc=0
     scope_guard_check "$PROJECT_ROOT" "${LOOP_START_COMMIT:-}" "${SCOPE_PRE_SHA:-}" "$ITERATION" \
-        "${SCOPE_FILE:-}" "$LOG_DIR" "$tag" || rc=$?
-    if [[ "$rc" -eq 1 ]]; then
-        warn "Blast-radius guard reverted iteration ${ITERATION} (strike recorded; evidence: ${LOG_DIR}/scope-check-iter-${ITERATION}${tag}.json)"
-        return 0
-    fi
-    if [[ "$rc" -eq 0 ]]; then
-        return 0
-    fi
+        "$LOG_DIR" "$tag" || rc=$?
+    case "$rc" in
+        0) return 0 ;;
+        1)
+            warn "Blast-radius guard reverted iteration ${ITERATION} (strike ${SCOPE_STRIKES}; evidence: ${LOG_DIR}/scope-check-iter-${ITERATION}${tag}.json)"
+            return 1
+            ;;
+    esac
     STATUS="scope_blocked"
     write_state
     write_progress
     error "Blast-radius guard blocked the build (evidence: ${LOG_DIR}/scope-check-iter-${ITERATION}${tag}.json)"
     show_summary
-    return 1
+    return 2
 }
 
 # ─── Main: Single-Agent Loop ─────────────────────────────────────────────────
@@ -2197,13 +2206,17 @@ run_single_agent_loop() {
     # Never defaulted to HEAD here: on a resumed loop HEAD already includes the agent's changes,
     # which would make the test gate's baseline wrong (#8633).
 
-    # Declared blast radius for this run (#8644). A missing file makes the guard fail closed.
-    SCOPE_FILE="$LOG_DIR/scope.json"
-    if ! scope_resolve_for_loop "$ARTIFACTS_DIR" "${GOAL:-}" "${ISSUE_LABELS:-}" > "$SCOPE_FILE" 2>/dev/null; then
-        rm -f "$SCOPE_FILE"
-        warn "Blast-radius scope unavailable (config/scope-budgets.json unreadable?) — the guard will block the build"
-    fi
+    # Blast-radius guard (#8644): config from the base commit, scope resolved once, and a clean tree
+    # (or an own worktree) so a revert can never reset unrelated work. Refuses to start otherwise.
     SCOPE_NOTE=""
+    if ! scope_setup_run "$PROJECT_ROOT" "${LOOP_START_COMMIT:-}" "$ARTIFACTS_DIR" "${GOAL:-}" "${ISSUE_LABELS:-}"; then
+        STATUS="scope_blocked"
+        write_state
+        write_progress
+        error "Blast-radius guard refused to start: the base commit, scope or a clean tree could not be established (see git status)"
+        show_summary
+        return 1
+    fi
 
     # Apply adaptive budget/model before showing banner
     apply_adaptive_budget
@@ -2383,7 +2396,10 @@ ${GOAL}"
         local commits_before
         commits_before="$(git_commit_count)"
         git_auto_commit "$PROJECT_ROOT" || true
-        _scope_gate_after_commit || return 1
+        _scope_rc=0
+        _scope_gate_after_commit "" || _scope_rc=$?
+        if [[ "$_scope_rc" -eq 2 ]]; then return 1; fi
+        if [[ "$_scope_rc" -eq 1 ]]; then continue; fi
         local commits_after
         commits_after="$(git_commit_count)"
         local new_commits=$(( commits_after - commits_before ))
@@ -2496,7 +2512,10 @@ ${GOAL}"
             git -C "$PROJECT_ROOT" commit -m "loop: iteration $ITERATION — post-audit cleanup" --no-verify 2>/dev/null || true
         fi
         # Cleanup commits are loop commits too: they pass the same blast-radius guard (#8644).
-        _scope_gate_after_commit "-cleanup" || return 1
+        _scope_rc=0
+        _scope_gate_after_commit "-cleanup" || _scope_rc=$?
+        if [[ "$_scope_rc" -eq 2 ]]; then return 1; fi
+        if [[ "$_scope_rc" -eq 1 ]]; then continue; fi
 
         # Quality gates (automated checks)
         run_quality_gates
@@ -2750,6 +2769,14 @@ main() {
             resume_state
         else
             initialize_state
+        fi
+        # Blast-radius guard (#8644): resolve the trusted scope before any worker starts.
+        if ! scope_setup_run "$PROJECT_ROOT" "${LOOP_START_COMMIT:-}" "$ARTIFACTS_DIR" "${GOAL:-}" "${ISSUE_LABELS:-}"; then
+            error "Blast-radius guard refused to start: the base commit, scope or a clean tree could not be established"
+            STATUS="scope_blocked"
+            write_state
+            show_summary
+            return 1
         fi
         show_banner
         launch_multi_agent

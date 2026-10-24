@@ -100,7 +100,7 @@ while [[ $# -gt 0 ]]; do
         # passed a valueless flag last (it appends flags to its arrays), $# never
         # reached 0 and this loop spun forever at 100% CPU. That was the
         # sw-e2e-system-test hang.
-        --print|--verbose) shift ;;
+        --print|--verbose|--exclude-dynamic-system-prompt-sections) shift ;;
         --settings|--setting-sources|--permission-mode|--permission-prompts) shift 2 ;;
         # Variadic like commander: a space-separated value takes the following non-option arguments,
         # the prompt included (#8660 review). --flag=value is one argument.
@@ -111,7 +111,7 @@ while [[ $# -gt 0 ]]; do
         -p) prompt="${2:-}"; shift 2 ;;
         --output-format) [[ "${2:-}" == "json" ]] && use_json=true; shift 2 ;;
         --model|--max-turns) shift 2 ;;
-        *) prompt="${1:-}"; shift ;;
+        *) [[ -z "$prompt" ]] && prompt="${1:-}"; shift ;;
     esac
     # Guarantee progress. `shift 2` with one argument left fails and shifts
     # nothing, so any value-taking flag arriving last would spin this loop
@@ -119,6 +119,8 @@ while [[ $# -gt 0 ]]; do
     # the way comparing argument values would.
     [[ $# -eq $_argc_before ]] && shift
 done
+# The loop sends its prompt on stdin (agent-exec, #8614): '--print -'. Read it when no -p prompt was given.
+if [[ -z "$prompt" ]]; then prompt="$(cat 2>/dev/null || true)"; fi
 # A print-mode call with no prompt means a flag swallowed it: fail loudly instead of returning empty output.
 if [[ -z "$prompt" && ( "$_all_args" == *" --print "* || "$_all_args" == *" -p "* ) ]]; then
     echo "mock claude: no prompt reached claude (a variadic flag swallowed it?)" >&2
@@ -126,8 +128,9 @@ if [[ -z "$prompt" && ( "$_all_args" == *" --print "* || "$_all_args" == *" -p "
 fi
 
 if [[ "$use_json" == "true" ]]; then
-    # Loop mode: create files, then output JSON with LOOP_COMPLETE
-    if [[ -d ".git" ]]; then
+    # Loop mode: create files, then output JSON with LOOP_COMPLETE. Only the build loop asks for LOOP_COMPLETE. Other JSON calls (the spec enhancer, intent analysis)
+    # must not write into the project, or the loop would start on a dirty tree and refuse (#8644).
+    if [[ -d ".git" && "$prompt" == *LOOP_COMPLETE* ]]; then
         mkdir -p src
         cat > src/helper.sh << 'HELPER'
 #!/usr/bin/env bash
