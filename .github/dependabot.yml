@@ -1,0 +1,19 @@
+# Version updates, grouped so the alert count stays near zero without a PR flood (#8647).
+# Root installs from bun.lock only; the website keeps its own npm lockfile.
+version: 2
+updates:
+  - package-ecosystem: bun
+    directory: /
+    schedule: { interval: weekly }
+    groups:
+      root-dependencies: { patterns: ["*"] }
+  - package-ecosystem: npm
+    directory: /website
+    schedule: { interval: weekly }
+    groups:
+      website-dependencies: { patterns: ["*"] }
+  - package-ecosystem: github-actions
+    directory: /
+    schedule: { interval: weekly }
+    groups:
+      actions: { patterns: ["*"] }
