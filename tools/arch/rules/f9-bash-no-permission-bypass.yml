@@ -1,10 +1,13 @@
-# F9 for bash: agents never run with permission checks disabled. Ratcheted until each caller is
-# ported to the AgentRunner port (permissionMode "dontAsk" and a per-stage tool allowlist).
+# F9 for bash (error, zero baseline, #8614): agents never run with permission checks disabled. Every
+# claude call goes through scripts/lib/agent-exec.sh, which applies config/agent-permissions.json (dontAsk)
+# and refuses a bypass flag. One exemption: scripts/sw-session.sh, the operator's terminal opt-in
+# (--skip-permissions). It is refused under CI, test mode, pipelines and without a TTY, and the flag is
+# spelled once in that file (meta.test.ts pins both). Nothing else may name a bypass.
 id: F9-bash-no-permission-bypass
 language: Bash
-severity: off
-metadata: { ratchet: true, owner: "@sethdford", docs: "docs/architecture.md#fitness-rules" }
-message: "F9: agents never skip permission checks. Pass an explicit --allowedTools list (and --permission-mode dontAsk) instead of --dangerously-skip-permissions or bypassPermissions."
+severity: error
+metadata: { ratchet: false, owner: "@sethdford", docs: "docs/architecture.md#fitness-rules" }
+message: "F9: agents never skip permission checks. Remove the bypass; agent-exec.sh applies config/agent-permissions.json (dontAsk). Read-only stages add --disallowedTools Edit,Write,NotebookEdit."
 files:
   - "scripts/**/*.sh"
   - "scripts/sw"
@@ -12,6 +15,8 @@ files:
   - "claude-code/hooks/**/*.sh"
   - "completions/**/*.bash"
   - "install.sh"
+ignores:
+  - "scripts/sw-session.sh"
 rule:
   matches: bash-text
   regex: '(?i)dangerously-skip-permissions|bypassPermissions|allowDangerouslySkipPermissions'

@@ -87,15 +87,6 @@
     "scripts/sw-remote.sh": 3,
     "scripts/sw-tracker-test.sh": 1
   },
-  "F9-bash-no-permission-bypass": {
-    "scripts/lib/loop-iteration.sh": 1,
-    "scripts/lib/pipeline-stages-intake.sh": 2,
-    "scripts/lib/pipeline-stages-review.sh": 1,
-    "scripts/sw-e2e-system-test.sh": 1,
-    "scripts/sw-loop.sh": 5,
-    "scripts/sw-pipeline-test.sh": 1,
-    "scripts/sw-session.sh": 5
-  },
   "dashboard-subprocess-only-in-services": {
     "dashboard/server.ts": 12
   }
