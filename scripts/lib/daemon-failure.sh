@@ -19,6 +19,20 @@ ON_FAILURE_LOG_LINES="${ON_FAILURE_LOG_LINES:-50}"
 NO_GITHUB="${NO_GITHUB:-false}"
 EVENTS_FILE="${EVENTS_FILE:-${DAEMON_DIR}/events.jsonl}"
 
+# _daemon_classify_ts <log> — prints the TypeScript classifier's class (W2-04). Exit 0 with a
+# class; non-zero when Bun or the classifier is unavailable, so the caller falls back to regex.
+# Exit 3 (escalate) still carries a class and is accepted here.
+_daemon_classify_ts() {
+    local log_path="$1"
+    local bun_bin="${SW_BUN:-bun}"
+    local cli="${SW_TS_CLI:-$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)/src/cli.ts}"
+    command -v "$bun_bin" >/dev/null 2>&1 || return 1
+    local out rc=0
+    out=$("$bun_bin" "$cli" failure classify --log "$log_path" --json 2>/dev/null) || rc=$?
+    if [[ "$rc" -ne 0 && "$rc" -ne 3 ]]; then return 1; fi
+    jq -r '.class // empty' <<<"$out" 2>/dev/null || return 1
+}
+
 classify_failure() {
     local issue_num="$1"
     if [[ -z "${LOG_DIR:-}" ]]; then
@@ -32,6 +46,18 @@ classify_failure() {
     fi
     local tail_content
     tail_content=$(tail -200 "$log_path" 2>/dev/null || true)
+
+    # W2-04: the typed classifier decides the auth and invalid-input classes. Both fail safe (no
+    # retry). Its `transient` verdict is NOT used here: it comes from free log text, which an agent
+    # or issue can write (#8674). Transient must come from trusted data, so the regex below decides
+    # as before. Anything else (build_failure, context_exhaustion, unknown) also falls through.
+    local ts_class=""
+    if ts_class=$(_daemon_classify_ts "$log_path" 2>/dev/null); then
+        case "$ts_class" in
+            auth) echo "auth_error"; return ;;
+            invalid_input) echo "invalid_issue"; return ;;
+        esac
+    fi
 
     # Auth errors
     if echo "$tail_content" | grep >/dev/null -iE 'not logged in|unauthorized|auth.*fail|401 |invalid.*token|CLAUDE_CODE_OAUTH_TOKEN|api key.*invalid|authentication required'; then

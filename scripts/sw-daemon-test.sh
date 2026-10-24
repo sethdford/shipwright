@@ -1675,17 +1675,6 @@ test_auto_enable_self_optimize() {
 # 43-52. Intelligence: Failure classification, auth check, process management
 # ──────────────────────────────────────────────────────────────────────────────
 
-test_classify_failure_auth() {
-    local daemon_src
-    daemon_src="$(dirname "$DAEMON_SCRIPT")/sw-daemon.sh"
-    grep -q 'classify_failure()' "$daemon_src" $DAEMON_LIB_GLOB || \
-        { echo "classify_failure function not found"; return 1; }
-    grep -A 30 'classify_failure()' "$daemon_src" $DAEMON_LIB_GLOB | grep >/dev/null 'not logged in' || \
-        { echo "Missing auth error pattern 'not logged in'"; return 1; }
-    grep -A 30 'classify_failure()' "$daemon_src" $DAEMON_LIB_GLOB | grep >/dev/null 'unauthorized' || \
-        { echo "Missing auth error pattern 'unauthorized'"; return 1; }
-}
-
 test_classify_failure_all_classes() {
     local daemon_src
     daemon_src="$(dirname "$DAEMON_SCRIPT")/sw-daemon.sh"
@@ -1932,7 +1921,6 @@ main() {
         "test_error_classification_categories:Memory: All 12 error categories in post-tool-use.sh"
         "test_template_weights_selection:Daemon: Template weights selection reads weights file"
         "test_auto_enable_self_optimize:Daemon: Auto-enable self_optimize when auto_template is true"
-        "test_classify_failure_auth:Intelligence: classify_failure detects auth errors"
         "test_classify_failure_all_classes:Intelligence: classify_failure has all 6 failure classes"
         "test_retry_skips_non_retryable:Intelligence: Retry skips auth_error and invalid_issue"
         "test_api_error_extended_backoff:Intelligence: API errors get extended 300s backoff"

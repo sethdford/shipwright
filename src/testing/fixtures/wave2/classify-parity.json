@@ -28,7 +28,7 @@
     },
     {
       "text": "Error: invalid api key provided",
-      "bash": "unknown",
+      "bash": "auth_error",
       "ts": "auth"
     },
     {
@@ -205,12 +205,12 @@
     },
     {
       "text": "OAuth token revoked",
-      "bash": "unknown",
+      "bash": "auth_error",
       "ts": "auth"
     },
     {
       "text": "Error: OAuth token is invalid",
-      "bash": "unknown",
+      "bash": "auth_error",
       "ts": "auth"
     },
     {

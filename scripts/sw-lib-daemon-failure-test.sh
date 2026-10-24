@@ -318,4 +318,20 @@ run_refused_failure 803 'printf "gh %s\n" "$*" >> "$REFUSE_LOG"; [[ "${1:-} ${2:
 assert_eq "when every edit fails the entry has no marked labels (fail closed)" "0" \
     "$(jq '.final_failed["803"].marked | length' "$STATE_FILE")"
 
+# ─── W2-04: classify_failure behaviour (typed classifier with bash fallback) ───
+print_test_section "classify_failure: typed classifier bridge (W2-04)"
+printf '%s\n' "::error::Claude Code authentication failed — check CLAUDE_CODE_OAUTH_TOKEN secret" > "$LOG_DIR/issue-42.log"
+assert_eq "pre-flight auth text is auth_error" "auth_error" "$(classify_failure 42)"
+assert_eq "the bash fallback still says auth_error when Bun is missing" "auth_error" \
+    "$(SW_BUN=/nonexistent/bun classify_failure 42)"
+printf '%s\n' "build failed: test suite red" > "$LOG_DIR/issue-43.log"
+assert_eq "a build failure keeps the bash class" "build_failure" "$(classify_failure 43)"
+printf '%s\n' "OAuth token is invalid" > "$LOG_DIR/issue-44.log"
+assert_eq "the typed classifier reads 'OAuth token is invalid' as auth_error (needs Bun and an installed tree)" "auth_error" "$(classify_failure 44)"
+assert_eq "without Bun the regex fallback misses it (a documented gap, not a regression)" "unknown" "$(SW_BUN=/nonexistent/bun classify_failure 44)"
+printf '%s\n' "benign build output" > "$LOG_DIR/issue-45.log"
+assert_eq "a typed transient verdict is not mapped to api_error (trust rule, #8674)" "unknown" \
+    "$(_daemon_classify_ts() { echo transient; }; classify_failure 45)"
+
 print_test_results
+
