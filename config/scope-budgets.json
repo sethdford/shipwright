@@ -1,0 +1,71 @@
+{
+  "version": 2,
+  "description": "Blast-radius budgets for the build loop (#8644). Loaded once by the loop from the base commit (or the install copy when the project has none). A spec's scope and any label or model type may only TIGHTEN these. A missing or unknown type gets the strictest entry. Globs: `*` stops at `/`, `**` crosses it.",
+  "protected_paths": [
+    "scripts/*-test.sh",
+    "src/**/*.test.ts",
+    "tools/arch/**",
+    ".github/workflows/**",
+    "scripts/ci/**",
+    "docs/adr/**",
+    ".claude/settings*.json",
+    ".claude/hooks/**",
+    ".claude/agents/**",
+    ".claude/rules/**",
+    ".claude/skills/**",
+    "config/agent-permissions.json",
+    "config/scope-budgets.json",
+    "scripts/lib/scope-guard.sh",
+    "**/.gitattributes"
+  ],
+  "runtime_paths": [
+    ".claude/loop-logs/**",
+    ".claude/pipeline-artifacts/**",
+    ".claude/worktrees/**",
+    ".claude/loop-state.md",
+    ".claude/pipeline-state.md",
+    ".claude/intelligence-cache.json",
+    ".claude/platform-hygiene.json",
+    ".claude/code-review.json",
+    ".claude/hygiene-report.json",
+    ".claude/pr-draft.md",
+    ".claude/recovery-state.json"
+  ],
+  "aliases": {
+    "documentation": "docs",
+    "hotfix": "bug",
+    "enhancement": "feature"
+  },
+  "types": {
+    "docs": {
+      "allowed_paths": ["docs/**", "*.md"],
+      "max_files_changed": 3,
+      "max_lines_added": 60,
+      "max_lines_deleted": 30
+    },
+    "bug": {
+      "allowed_paths": ["scripts/**", "src/**", "dashboard/**", "tests/**", "config/**", "docs/**", "*.md"],
+      "max_files_changed": 6,
+      "max_lines_added": 200,
+      "max_lines_deleted": 100
+    },
+    "feature": {
+      "allowed_paths": ["scripts/**", "src/**", "dashboard/**", "tests/**", "config/**", "docs/**", "*.md"],
+      "max_files_changed": 12,
+      "max_lines_added": 500,
+      "max_lines_deleted": 150
+    },
+    "refactor": {
+      "allowed_paths": ["scripts/**", "src/**", "dashboard/**", "tests/**", "config/**", "docs/**", "*.md"],
+      "max_files_changed": 12,
+      "max_lines_added": 400,
+      "max_lines_deleted": 200
+    },
+    "unknown": {
+      "allowed_paths": ["docs/**", "*.md"],
+      "max_files_changed": 2,
+      "max_lines_added": 40,
+      "max_lines_deleted": 20
+    }
+  }
+}
