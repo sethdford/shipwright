@@ -802,7 +802,7 @@ All scripts are bash (except the dashboard server in TypeScript). Grouped by lay
 | `scripts/sw-convergence-test.sh` | 326 | Unit tests for convergence detection |
 | `scripts/sw-cost-optimizer-test.sh` | 468 | Test suite for cost optimization |
 | `scripts/sw-cost-test.sh` | 235 | Validate token usage & cost intelligence |
-| `scripts/sw-daemon-test.sh` | 1980 | Unit tests for daemon metrics, health, alerting |
+| `scripts/sw-daemon-test.sh` | 1968 | Unit tests for daemon metrics, health, alerting |
 | `scripts/sw-dashboard-e2e-test.sh` | 593 | full live validation |
 | `scripts/sw-dashboard-test.sh` | 251 | validates dashboard structure |
 | `scripts/sw-db-test.sh` | 977 | SQLite Persistence Layer Test Suite |
@@ -851,7 +851,7 @@ All scripts are bash (except the dashboard server in TypeScript). Grouped by lay
 | `scripts/sw-lib-compat-test.sh` | 415 | Unit tests for cross-platform helpers |
 | `scripts/sw-lib-compound-audit-test.sh` | 282 |  |
 | `scripts/sw-lib-daemon-dispatch-test.sh` | 418 | Unit tests for spawn/reap/queue |
-| `scripts/sw-lib-daemon-failure-test.sh` | 321 | Unit tests for failure handling |
+| `scripts/sw-lib-daemon-failure-test.sh` | 363 | Unit tests for failure handling |
 | `scripts/sw-lib-daemon-gates-test.sh` | 462 | safety gates at the daemon call sites |
 | `scripts/sw-lib-daemon-patrol-test.sh` | 743 | Unit tests for all patrol functions |
 | `scripts/sw-lib-daemon-poll-test.sh` | 345 | Unit tests for poll, health, cleanup |
