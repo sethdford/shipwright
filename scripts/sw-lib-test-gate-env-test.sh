@@ -204,11 +204,13 @@ allow2="$(cd "$git_repo" && env SSH_AUTH_SOCK=/tmp/x GITHUB_PAT=fake-pat FOO_TOK
     ANTHROPIC_VERTEX_PROJECT_ID=proj AWS_REGION=us-east-1 CI=true XDG_CONFIG_HOME=/xdg \
     AWS_SECRET_ACCESS_KEY=aws-secret-no-bedrock SHIPWRIGHT_GH_PAT=fake-pat-2 SHIPWRIGHT_BEARER=fake-bearer \
     SHIPWRIGHT_DIR=/sw-dir SHIPWRIGHT_GITHUB_REPO=o/r "$SW_AGENT_EXEC" claude 2>&1)"
-for var in ANTHROPIC_AUTH_TOKEN ANTHROPIC_MODEL HTTPS_PROXY https_proxy NODE_EXTRA_CA_CERTS SSL_CERT_DIR \
+for var in ANTHROPIC_AUTH_TOKEN HTTPS_PROXY https_proxy NODE_EXTRA_CA_CERTS SSL_CERT_DIR \
     CLAUDE_CODE_USE_VERTEX CLOUD_ML_REGION ANTHROPIC_VERTEX_PROJECT_ID AWS_REGION CI XDG_CONFIG_HOME \
     SHIPWRIGHT_DIR SHIPWRIGHT_GITHUB_REPO; do
     assert_eq "allowlist: $var reaches the agent" "yes" "$(grep -q "^${var}=" <<<"$allow2" && echo yes || echo no)"
 done
+# W2-07: ANTHROPIC_MODEL overrides --model, so the launcher never passes it on (aliases are resolved, not overridden).
+assert_eq "allowlist: ANTHROPIC_MODEL does not reach the agent (--model decides)" "no" "$(grep -q "^ANTHROPIC_MODEL=" <<<"$allow2" && echo yes || echo no)"
 assert_eq "allowlist: a proxy value passes through unchanged" "http://u:p@proxy:3128" \
     "$(sed -n 's/^HTTPS_PROXY=//p' <<<"$allow2")"
 for var in SSH_AUTH_SOCK GITHUB_PAT FOO_TOKEN AWS_SECRET_ACCESS_KEY SHIPWRIGHT_GH_PAT SHIPWRIGHT_BEARER; do
@@ -311,6 +313,7 @@ cp "$SCRIPT_DIR/sw-e2e-integration-test.sh" "$e2e_tree/scripts/"
 cp "$SCRIPT_DIR/lib/test-helpers.sh" "$e2e_tree/scripts/lib/"
 cp "$SCRIPT_DIR/lib/test-isolate.sh" "$e2e_tree/scripts/lib/"
 [[ -f "$SCRIPT_DIR/lib/compat.sh" ]] && cp "$SCRIPT_DIR/lib/compat.sh" "$e2e_tree/scripts/lib/"
+[[ -f "$SCRIPT_DIR/lib/models.sh" ]] && cp "$SCRIPT_DIR/lib/models.sh" "$e2e_tree/scripts/lib/"  # W2-07: compat.sh sources it
 export E2E_GH_LOG="$TEST_TEMP_DIR/e2e-gh.log"
 : > "$E2E_GH_LOG"
 mock_binary "gh" 'printf "%s\n" "$*" >> "$E2E_GH_LOG"; exit 0'

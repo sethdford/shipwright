@@ -186,6 +186,7 @@ chmod +x "$TEST_TEMP_DIR/repo/scripts/sw-doc-fleet.sh"
 # Also copy lib files if they exist
 if [[ -f "$SCRIPT_DIR/lib/compat.sh" ]]; then
     cp "$SCRIPT_DIR/lib/compat.sh" "$TEST_TEMP_DIR/repo/scripts/lib/compat.sh" 2>/dev/null || true
+    cp "$SCRIPT_DIR/lib/models.sh" "$TEST_TEMP_DIR/repo/scripts/lib/"  # W2-07: compat.sh sources it
 fi
 if [[ -f "$SCRIPT_DIR/lib/helpers.sh" ]]; then
     cp "$SCRIPT_DIR/lib/helpers.sh" "$TEST_TEMP_DIR/repo/scripts/lib/helpers.sh" 2>/dev/null || true

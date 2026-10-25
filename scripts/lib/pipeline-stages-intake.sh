@@ -220,7 +220,7 @@ Labels: ${ISSUE_LABELS:-}
 
         local enhanced_spec=""
         local spec_model="${MODEL:-sonnet}"
-        enhanced_spec=$("$SW_AGENT_EXEC" claude -p "$enhance_prompt" --model "$spec_model" --output-format json 2>/dev/null) || true
+        enhanced_spec=$("$SW_AGENT_EXEC" claude -p "$enhance_prompt" --model "$spec_model" --output-format json) || true  # W2-07: a refused model is logged, not hidden
 
         if [[ -n "$enhanced_spec" ]]; then
             # Validate the enhanced spec is valid JSON with required fields

@@ -9,7 +9,7 @@
 #
 #   PATH HOME USER LOGNAME SHELL TERM LANG LC_* TMPDIR TZ CI XDG_CONFIG_HOME   the process basics
 #   CLAUDE_CODE_OAUTH_TOKEN ANTHROPIC_API_KEY ANTHROPIC_AUTH_TOKEN ANTHROPIC_BASE_URL CLAUDE_CONFIG_DIR
-#   ANTHROPIC_MODEL ANTHROPIC_SMALL_FAST_MODEL ANTHROPIC_DEFAULT_{OPUS,SONNET,HAIKU}_MODEL
+#   ANTHROPIC_DEFAULT_{OPUS,SONNET,HAIKU}_MODEL   (not ANTHROPIC_MODEL or ANTHROPIC_SMALL_FAST_MODEL: they override --model, W2-07)
 #   CLAUDE_CODE_USE_BEDROCK CLAUDE_CODE_USE_VERTEX AWS_REGION AWS_PROFILE CLOUD_ML_REGION
 #   ANTHROPIC_VERTEX_PROJECT_ID                                              the provider selectors
 #   AWS_ACCESS_KEY_ID AWS_SECRET_ACCESS_KEY AWS_SESSION_TOKEN   ONLY when CLAUDE_CODE_USE_BEDROCK=1
@@ -128,7 +128,7 @@ _sw_agent_pass() {
 }
 _sw_agent_pass PATH HOME USER LOGNAME SHELL TERM LANG TMPDIR TZ CI XDG_CONFIG_HOME \
     CLAUDE_CODE_OAUTH_TOKEN ANTHROPIC_API_KEY ANTHROPIC_AUTH_TOKEN ANTHROPIC_BASE_URL CLAUDE_CONFIG_DIR \
-    ANTHROPIC_MODEL ANTHROPIC_SMALL_FAST_MODEL ANTHROPIC_DEFAULT_OPUS_MODEL ANTHROPIC_DEFAULT_SONNET_MODEL \
+    ANTHROPIC_DEFAULT_OPUS_MODEL ANTHROPIC_DEFAULT_SONNET_MODEL \
     ANTHROPIC_DEFAULT_HAIKU_MODEL CLAUDE_CODE_USE_BEDROCK CLAUDE_CODE_USE_VERTEX AWS_REGION AWS_PROFILE \
     CLOUD_ML_REGION ANTHROPIC_VERTEX_PROJECT_ID \
     HTTPS_PROXY HTTP_PROXY NO_PROXY https_proxy http_proxy no_proxy \
@@ -278,39 +278,79 @@ if [[ "$_sw_cmd_idx" -lt 0 || -z "$_sw_cmd" || "${_sw_cmd##*/}" != claude ]]; th
     exit 1
 fi
 
-# Every --model value goes through config/models.json (W2-07): an alias becomes its full ID, and a value that does
-# not resolve refuses the call. An empty or null --model never reaches claude, whichever stage built the flags.
+# Every model value goes through config/models.json (W2-07). --model and --fallback-model are resolved to full IDs
+# (an alias, or a listed ID); a value that does not resolve refuses the call. A call without --model gets the default
+# alias, so no claude call falls through to the CLI default. A fallback equal to the model is dropped, because the CLI
+# rejects it. Bedrock and Vertex: aliases go to the CLI unchanged, so ANTHROPIC_DEFAULT_*_MODEL maps them (#8673).
 source "$(dirname "${BASH_SOURCE[0]}")/models.sh"
-_sw_model_args=()
-_sw_model_next=false
+_sw_model_value() {  # <flag> <raw>: prints the value for claude, or fails with a message
+    local flag="$1" raw="$2" out
+    if [[ -z "$raw" ]]; then
+        echo "agent-exec: $flag has no value; not running $_sw_cmd" >&2
+        return 1
+    fi
+    if models_provider_routed && models_is_alias "$raw"; then
+        printf '%s\n' "$raw"
+        return 0
+    fi
+    out="$(models_resolve "$raw")" || {
+        echo "agent-exec: refusing $flag '$raw' for $_sw_cmd; not running" >&2
+        return 1
+    }
+    printf '%s\n' "$out"
+}
+_sw_model=""
+_sw_fallback=""
+_sw_model_next=""
+_sw_out=()
 for _sw_arg in "$@"; do
-    if [[ "$_sw_model_next" == true ]]; then
-        _sw_model_next=false
-        _sw_resolved="$(models_resolve "$_sw_arg")" || {
-            echo "agent-exec: refusing --model '$_sw_arg' for $_sw_cmd (not a model alias or known ID); not running" >&2
-            exit 1
-        }
-        _sw_model_args+=("$_sw_resolved")
+    if [[ -n "$_sw_model_next" ]]; then
+        if [[ "$_sw_model_next" == model ]]; then
+            _sw_model="$(_sw_model_value --model "$_sw_arg")" || exit 1
+        else
+            _sw_fallback="$(_sw_model_value --fallback-model "$_sw_arg")" || exit 1
+        fi
+        _sw_model_next=""
         continue
     fi
     case "$_sw_arg" in
-        --model) _sw_model_next=true; _sw_model_args+=("$_sw_arg") ;;
-        --model=*)
-            _sw_resolved="$(models_resolve "${_sw_arg#--model=}")" || {
-                echo "agent-exec: refusing $_sw_arg for $_sw_cmd (not a model alias or known ID); not running" >&2
-                exit 1
-            }
-            _sw_model_args+=("--model=$_sw_resolved") ;;
-        *) _sw_model_args+=("$_sw_arg") ;;
+        --model) _sw_model_next=model ;;
+        --fallback-model) _sw_model_next=fallback ;;
+        --model=*) _sw_model="$(_sw_model_value --model "${_sw_arg#--model=}")" || exit 1 ;;
+        --fallback-model=*) _sw_fallback="$(_sw_model_value --fallback-model "${_sw_arg#--fallback-model=}")" || exit 1 ;;
+        *) _sw_out+=("$_sw_arg") ;;
     esac
 done
-if [[ "$_sw_model_next" == true ]]; then
-    echo "agent-exec: --model has no value; not running $_sw_cmd" >&2
+if [[ -n "$_sw_model_next" ]]; then
+    echo "agent-exec: ${_sw_model_next} has no value; not running $_sw_cmd" >&2
     exit 1
 fi
-# Same count and order as the arguments the gate above checked, so the command word's position is unchanged.
-set -- ${_sw_model_args[@]+"${_sw_model_args[@]}"}
+if [[ -z "$_sw_model" ]]; then
+    _sw_default_alias="$(models_default_alias)" || { echo "agent-exec: no default model; not running $_sw_cmd" >&2; exit 1; }
+    _sw_model="$(_sw_model_value --model "$_sw_default_alias")" || exit 1
+fi
+if [[ -n "$_sw_fallback" && "$_sw_fallback" == "$_sw_model" ]]; then
+    _sw_fallback=""
+fi
+# The model flags go right after the command word. Removed flags were all after it, so its index is unchanged.
+_sw_final=()
+_sw_i=0
+for _sw_arg in ${_sw_out[@]+"${_sw_out[@]}"}; do
+    _sw_final+=("$_sw_arg")
+    if [[ "$_sw_i" -eq "$_sw_cmd_idx" ]]; then
+        _sw_final+=(--model "$_sw_model")
+        if [[ -n "$_sw_fallback" ]]; then
+            _sw_final+=(--fallback-model "$_sw_fallback")
+        fi
+    fi
+    _sw_i=$((_sw_i + 1))
+done
+set -- ${_sw_final[@]+"${_sw_final[@]}"}
 
+if [[ -n "${SW_MODELS_FILE:-}" && "$_sw_inside_agent" == true ]]; then
+    echo "agent-exec: refusing SW_MODELS_FILE inside an agent run; the model table is set by the pipeline (W2-07)" >&2
+    exit 1
+fi
 if [[ -n "${SW_AGENT_POLICY:-}" && "$_sw_inside_agent" == true ]]; then
     echo "agent-exec: refusing SW_AGENT_POLICY inside an agent run; the policy is set by the pipeline" >&2
     exit 1

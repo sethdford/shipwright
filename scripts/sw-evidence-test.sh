@@ -23,6 +23,7 @@ mkdir -p "$TEST_REPO/scripts/lib" "$TEST_REPO/config" "$TEST_REPO/.claude/eviden
 # Copy sw-evidence and its lib dependencies
 cp "$SCRIPT_DIR/sw-evidence.sh" "$TEST_REPO/scripts/"
 [[ -f "$SCRIPT_DIR/lib/compat.sh" ]] && cp "$SCRIPT_DIR/lib/compat.sh" "$TEST_REPO/scripts/lib/"
+[[ -f "$SCRIPT_DIR/lib/models.sh" ]] && cp "$SCRIPT_DIR/lib/models.sh" "$TEST_REPO/scripts/lib/"  # W2-07: compat.sh sources it
 [[ -f "$SCRIPT_DIR/lib/helpers.sh" ]] && cp "$SCRIPT_DIR/lib/helpers.sh" "$TEST_REPO/scripts/lib/"
 cp "$SCRIPT_DIR/lib/test-gate-env.sh" "$TEST_REPO/scripts/lib/"
 

@@ -44,6 +44,7 @@ fi
 # Required, not optional: without it the test gate would run with the pipeline's credentials (#8608).
 # shellcheck source=lib/test-gate-env.sh
 source "$SCRIPT_DIR/lib/test-gate-env.sh"
+source "$SCRIPT_DIR/lib/models.sh"  # W2-07: model aliases, efforts, the learned-routing gate
 # Differential test gate: block only on failures this iteration introduced (#8633).
 # shellcheck source=lib/test-gate-baseline.sh
 source "$SCRIPT_DIR/lib/test-gate-baseline.sh"
@@ -415,7 +416,6 @@ fi
 
 # Validate effort level
 # W2-07: the accepted efforts come from config/models.json ("efforts").
-source "$SCRIPT_DIR/lib/models.sh"
 if [[ -n "$EFFORT_LEVEL" ]] && ! models_effort_valid "$EFFORT_LEVEL"; then
     error "--effort must be one of: $(jq -r '.efforts | join(", ")' "$(_models_file)" 2>/dev/null || echo "low, medium, high, xhigh") (got: $EFFORT_LEVEL)"
     exit 1
@@ -515,7 +515,7 @@ select_adaptive_model() {
         return 0
     fi
     # W2-07: learned routing is off unless SW_LEGACY_MODEL_ROUTING=true (deterministic routing by default).
-    if [[ "${SW_LEGACY_MODEL_ROUTING:-false}" != "true" ]]; then
+    if ! models_legacy_routing_enabled; then
         echo "$default_model"
         return 0
     fi
@@ -550,6 +550,12 @@ select_adaptive_model() {
 select_audit_model() {
     local default_model
     default_model=$(_smart_model "audit" "haiku")
+    # W2-07: the success-rate escalation is learned routing: off unless SW_LEGACY_MODEL_ROUTING=true (see the note on
+    # SW_LEGACY_MODEL_ROUTING in scripts/lib/models.sh). By default the audit model is the configured one.
+    if ! models_legacy_routing_enabled; then
+        echo "$default_model"
+        return 0
+    fi
     local opt_file="$HOME/.shipwright/optimization/audit-tuning.json"
     if [[ -f "$opt_file" ]] && command -v jq >/dev/null 2>&1; then
         local success_rate

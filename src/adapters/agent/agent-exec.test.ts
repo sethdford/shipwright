@@ -45,6 +45,8 @@ describe("agent-exec permission policy (#8614, #8581)", () => {
   test("every claude call gets the policy, dontAsk and the user-only settings source", () => {
     const r = run(["claude", "-p", "hi"]);
     expect(r.code).toBe(0);
+    // W2-07: the policy goes right after the claude word; the default alias (resolved) follows it.
+    expect(r.argv.slice(8, 10)).toEqual(["--model", "claude-sonnet-5-5"]);
     expect(r.argv.slice(0, 8)).toEqual([
       "--settings",
       POLICY,
@@ -55,7 +57,7 @@ describe("agent-exec permission policy (#8614, #8581)", () => {
       "--permission-prompts",
       "none",
     ]);
-    expect(r.argv.slice(8)).toEqual(["-p", "hi"]);
+    expect(r.argv.slice(10)).toEqual(["-p", "hi"]);
   });
 
   test("a path-based claude binary gets the policy too", () => {
