@@ -1067,3 +1067,7 @@
 {"ts":"2026-10-24T18:11:47Z","ts_epoch":1792865507,"type":"patrol.issue_refused","check":"untested_scripts","count":7}
 {"ts":"2026-10-24T18:11:49Z","ts_epoch":1792865509,"type":"patrol.meta_issue_refused","title":"[Meta] Add tests for sw-event-schema-sync.sh"}
 {"ts":"2026-10-24T20:04:04Z","ts_epoch":1792872244,"type":"hygiene_platform_refactor","hardcoded":49,"fallback":76,"todo":51}
+{"ts":"2026-10-25T00:14:06Z","ts_epoch":1792887246,"type":"hygiene_platform_refactor","hardcoded":49,"fallback":76,"todo":51}
+{"ts":"2026-10-25T00:14:59Z","ts_epoch":1792887299,"type":"strategic.issue_refused","title":"Loop blast-radius guard: abort iteration when diff deletes far more lines than the task implies"}
+{"ts":"2026-10-25T00:15:02Z","ts_epoch":1792887302,"type":"strategic.issue_refused","title":"Stop tracking runtime state under .claude/ and exclude it from loop commits"}
+{"ts":"2026-10-25T00:15:02Z","ts_epoch":1792887302,"type":"strategic.cycle_complete","issues_created":0,"issues_skipped":3}
