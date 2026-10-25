@@ -521,8 +521,8 @@ run_pipeline() {
     enabled_count=$(jq '[.stages[] | select(.enabled == true)] | length' "$PIPELINE_CONFIG" 2>/dev/null)
     local completed=0
 
-    # The test stage judges failures against this commit. Record it before any stage runs (#8671).
-    pipeline_record_test_base
+    # The test stage judges failures against the base recorded at first start (#8671, pipeline-base.sh).
+    pipeline_base_init || true
 
     # Check which stages are enabled to determine if we use the self-healing loop
     local build_enabled test_enabled

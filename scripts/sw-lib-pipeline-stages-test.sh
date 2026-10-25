@@ -235,15 +235,16 @@ stage_test 2>/dev/null || rc=$?
 # ─── Tests: stage_test differential judgement (#8663, #8671) ───────────────
 print_test_section "stage_test differential"
 
-# Own repo, so the review and PR stages below keep their git state. The fake test command prints
-# bun-style output: one failure that the base commit also has, and a second, new one when the
-# uncommitted regression.flag exists (the base worktree never has it).
-DIFF_REPO="$TEST_TEMP_DIR/diff-repo"
-mkdir -p "$DIFF_REPO/.artifacts"
-(
-    cd "$DIFF_REPO" && git init -q -b main && git config user.email "t@t.com" && git config user.name "T"
-    echo "# root" > README.md && git add -A && git commit -q -m "root"
-    cat > fake-tests.sh <<'FAKE'
+# Each scenario gets its own repository, so a ref moved in one cannot leak into another. The fake test
+# command prints bun-style output: one failure that the base commit also has, and a second, new one when
+# the uncommitted regression.flag exists (the base worktree never has it).
+make_diff_repo() {
+    local dir="$1"
+    mkdir -p "$dir/.artifacts"
+    (
+        cd "$dir" && git init -q -b main && git config user.email "t@t.com" && git config user.name "T"
+        echo "# root" > README.md && git add -A && git commit -q -m "root"
+        cat > fake-tests.sh <<'FAKE'
 #!/usr/bin/env bash
 echo "bun test v1.2.19"
 echo ""
@@ -262,24 +263,30 @@ echo " 1 fail"
 echo "Ran 2 tests across 1 file. [2.00ms]"
 exit 1
 FAKE
-    # Like a pipeline branch: the fork point (main's tip) has a parent, and HEAD is one commit past it
-    git add -A && git commit -q -m "main: fake test command"
-    git checkout -q -b side-branch "$(git rev-list --max-parents=0 HEAD)"
-    echo side > side.txt && git add -A && git commit -q -m "side: not an ancestor of the pipeline"
-    git checkout -q main
-    git checkout -q -b feat/diff-under-test
-    echo "pipeline change" >> README.md && git add -A && git commit -q -m "pipeline change"
-) >/dev/null 2>&1
+        # Like a pipeline branch: the fork point (main's tip) has a parent, and HEAD is one commit past it
+        git add -A && git commit -q -m "main: fake test command"
+        git checkout -q -b side-branch "$(git rev-list --max-parents=0 HEAD)"
+        echo side > side.txt && git add -A && git commit -q -m "side: not an ancestor of the pipeline"
+        git checkout -q main
+        git checkout -q -b feat/diff-under-test
+        echo "pipeline change" >> README.md && git add -A && git commit -q -m "pipeline change"
+    ) >/dev/null 2>&1
+}
+DIFF_REPO="$TEST_TEMP_DIR/diff-repo"
+make_diff_repo "$DIFF_REPO"
 
-# Runs stage_test in DIFF_REPO with the given base branch, after the pipeline has recorded its base
-# (as it does at start). Prints the stage's exit code. The judgement uses only the recorded base.
+# Runs the pipeline's start (base record) and then stage_test in <repo> with the given base branch. Each run
+# has its own record home. Prints the stage's exit code.
 run_diff_stage() {
-    local base_branch="$1" rc=0
+    local repo="$1" base_branch="$2" rc=0 home name
     (
-        cd "$DIFF_REPO"
-        export PROJECT_ROOT="$DIFF_REPO" ARTIFACTS_DIR="$DIFF_REPO/.artifacts" BASE_BRANCH="$base_branch"
-        export TEST_CMD="bash fake-tests.sh"
-        pipeline_record_test_base
+        cd "$repo"
+        export PROJECT_ROOT="$repo" ARTIFACTS_DIR="$repo/.artifacts" BASE_BRANCH="$base_branch"
+        name="diff-$(basename "$repo")"
+        export ISSUE_NUMBER="" PIPELINE_NAME="$name" TEST_CMD="bash fake-tests.sh"
+        home="$(mktemp -d "$TEST_TEMP_DIR/home.XXXXXX")"
+        export SHIPWRIGHT_HOME="$home"
+        pipeline_base_init || true
         stage_test
     ) >/dev/null 2>&1 || rc=$?
     echo "$rc"
@@ -287,12 +294,12 @@ run_diff_stage() {
 
 # Pre-existing: the same failure on the base commit does not fail the stage
 rm -f "$DIFF_REPO/regression.flag"
-assert_eq "pre-existing failure does not fail the test stage" "0" "$(run_diff_stage main)"
+assert_eq "pre-existing failure does not fail the test stage" "0" "$(run_diff_stage "$DIFF_REPO" main)"
 assert_contains "pre-existing verdict is logged" "$(cat "$DIFF_REPO/.artifacts/test-results.log")" "PRE-EXISTING, not blocking"
 
 # Regression: a new failing unit fails the stage, and the feedback names the pre-existing one as not to fix
 touch "$DIFF_REPO/regression.flag"
-assert_eq "a regression fails the test stage" "1" "$(run_diff_stage main)"
+assert_eq "a regression fails the test stage" "1" "$(run_diff_stage "$DIFF_REPO" main)"
 diff_log="$(cat "$DIFF_REPO/.artifacts/test-results.log")"
 assert_contains "regression verdict names the new failure" "$diff_log" "BLOCKING: NEW FAILURES"
 assert_contains "feedback lists the pre-existing failure" "$diff_log" "old.test.ts::pre-existing one#1"
@@ -300,54 +307,143 @@ assert_contains "feedback tells the agent not to fix pre-existing failures" "$di
 rm -f "$DIFF_REPO/regression.flag"
 
 # No base commit: fail closed, the old behaviour (the same pre-existing failure blocks)
-assert_eq "no base branch: the failure blocks as before" "1" "$(run_diff_stage no-such-base-branch)"
+assert_eq "no base branch: the failure blocks as before" "1" "$(run_diff_stage "$DIFF_REPO" no-such-base-branch)"
 
-# Hijack (#8671 item 1): the agent moves origin/main to its own HEAD after the base was recorded. The
-# recorded base still judges the regression, so it blocks.
-touch "$DIFF_REPO/regression.flag"
+# Hijack (#8671 item 1): the agent moves origin/main and main to its own HEAD after the base was recorded.
+# The recorded base still judges the regression, so it blocks.
+HIJACK_REPO="$TEST_TEMP_DIR/hijack-repo"
+make_diff_repo "$HIJACK_REPO"
+HIJACK_HOME="$(mktemp -d "$TEST_TEMP_DIR/home.XXXXXX")"
+touch "$HIJACK_REPO/regression.flag"
 hijack_rc=0
 (
-    cd "$DIFF_REPO"
-    export PROJECT_ROOT="$DIFF_REPO" ARTIFACTS_DIR="$DIFF_REPO/.artifacts" BASE_BRANCH=main TEST_CMD="bash fake-tests.sh"
-    pipeline_record_test_base
+    cd "$HIJACK_REPO"
+    export PROJECT_ROOT="$HIJACK_REPO" ARTIFACTS_DIR="$HIJACK_REPO/.artifacts" BASE_BRANCH=main TEST_CMD="bash fake-tests.sh"
+    export ISSUE_NUMBER="" PIPELINE_NAME="hijack" SHIPWRIGHT_HOME="$HIJACK_HOME"
+    pipeline_base_init
     git update-ref refs/remotes/origin/main HEAD
     git update-ref refs/heads/main HEAD
     stage_test
 ) >/dev/null 2>&1 || hijack_rc=$?
 assert_eq "a moved origin/main cannot make a regression pre-existing" "1" "$hijack_rc"
-rm -f "$DIFF_REPO/regression.flag"
-(cd "$DIFF_REPO" && git update-ref -d refs/remotes/origin/main 2>/dev/null; git update-ref refs/heads/main "$(git rev-parse HEAD~1)") >/dev/null 2>&1 || true
 
-# The base is never derived at test time: without a recorded base, the stage blocks
-unrecorded_rc=0
+# P1 (#8671): resume after the agent has moved the refs. The base and the remote are the ones recorded at the
+# first start; a resume creates no record; the regression still blocks.
+RESUME_REPO="$TEST_TEMP_DIR/resume-repo"
+make_diff_repo "$RESUME_REPO"
+RESUME_HOME="$(mktemp -d "$TEST_TEMP_DIR/home.XXXXXX")"
+RESUME_OUT="$TEST_TEMP_DIR/resume.out"
 (
-    cd "$DIFF_REPO"
-    export PROJECT_ROOT="$DIFF_REPO" ARTIFACTS_DIR="$DIFF_REPO/.artifacts" BASE_BRANCH=main TEST_CMD="bash fake-tests.sh"
-    PIPELINE_TEST_BASE_SHA="" stage_test
-) >/dev/null 2>&1 || unrecorded_rc=$?
-assert_eq "no recorded base: the failure blocks (no refs are read)" "1" "$unrecorded_rc"
+    cd "$RESUME_REPO"
+    export PROJECT_ROOT="$RESUME_REPO" ARTIFACTS_DIR="$RESUME_REPO/.artifacts" BASE_BRANCH=main TEST_CMD="bash fake-tests.sh"
+    export ISSUE_NUMBER="" PIPELINE_NAME="resume-p1" SHIPWRIGHT_HOME="$RESUME_HOME"
+    git config remote.origin.url "https://example.com/original.git"
+    git config remote.origin.pushurl "https://example.com/push-original.git"
+    pipeline_base_init
+    echo "first=$SW_PIPELINE_BASE_SHA"
+    echo "firstpush=$SW_PIPELINE_PUSH_URL"
+    # the agent: a commit, moved refs, a changed remote, and a regression
+    echo agent >> README.md && git add -A && git commit -q -m "agent: more"
+    git update-ref refs/remotes/origin/main HEAD
+    git update-ref refs/heads/main HEAD
+    git config remote.origin.url "https://example.com/attacker.git"
+    git config remote.origin.pushurl "https://example.com/push-attacker.git"
+    touch regression.flag
+    PIPELINE_RESUMING=true pipeline_base_init
+    echo "resumed=$SW_PIPELINE_BASE_SHA"
+    echo "remote=$(pipeline_base_get_field "$RESUME_REPO" resume-p1 remote)"
+    echo "branch=$(pipeline_base_get_field "$RESUME_REPO" resume-p1 branch)"
+    echo "resumedpush=$SW_PIPELINE_PUSH_URL"
+    if stage_test; then echo "rc=0"; else echo "rc=$?"; fi
+) > "$RESUME_OUT" 2>&1 || true
+resume_first="$(sed -n 's/^first=//p' "$RESUME_OUT")"
+assert_eq "resume gets the base recorded at first start, after the agent moved origin/main" \
+    "$resume_first" "$(sed -n 's/^resumed=//p' "$RESUME_OUT")"
+assert_eq "resume gets the remote recorded at first start, after the agent changed it" \
+    "https://example.com/original.git" "$(sed -n 's/^remote=//p' "$RESUME_OUT")"
+assert_eq "resume gets the push URL recorded at first start, after the agent changed it" \
+    "https://example.com/push-original.git" "$(sed -n 's/^resumedpush=//p' "$RESUME_OUT")"
+assert_eq "the first start exports the push URL it recorded" \
+    "https://example.com/push-original.git" "$(sed -n 's/^firstpush=//p' "$RESUME_OUT")"
+assert_eq "resume records the branch the pipeline started on" "feat/diff-under-test" "$(sed -n 's/^branch=//p' "$RESUME_OUT")"
+assert_eq "a regression after a resume still blocks" "rc=1" "$(grep '^rc=' "$RESUME_OUT")"
+rm -f "$RESUME_REPO/regression.flag"
+(cd "$RESUME_REPO" && git config --unset remote.origin.url && git config --unset remote.origin.pushurl) >/dev/null 2>&1 || true
+
+# The record: mode 0600 and the fields the other pipeline features read
+record_file="$(find "$RESUME_HOME" -name 'resume-p1.json' | head -1)"
+assert_eq "the base record is mode 0600" "-rw-------" "$(ls -l "$record_file" | cut -c1-10)"
+assert_eq "the base record holds the base, remote, branch and node_modules fingerprint" "1" \
+    "$(jq -e 'has("base") and has("remote") and has("branch") and has("nm")' "$record_file" >/dev/null 2>&1 && echo 1 || echo 0)"
+
+# A resume without a record cannot prove the base: no record, no base, and the stage blocks
+unrecorded_home="$(mktemp -d "$TEST_TEMP_DIR/home.XXXXXX")"
+unrec_rc=0
+(
+    cd "$RESUME_REPO"
+    export PROJECT_ROOT="$RESUME_REPO" ARTIFACTS_DIR="$RESUME_REPO/.artifacts" BASE_BRANCH=main TEST_CMD="bash fake-tests.sh"
+    export ISSUE_NUMBER="" PIPELINE_NAME="never-recorded" SHIPWRIGHT_HOME="$unrecorded_home"
+    touch regression.flag
+    rec_rc=0; PIPELINE_RESUMING=true pipeline_base_init || rec_rc=$?
+    [[ "$rec_rc" -ne 0 && -z "${SW_PIPELINE_BASE_SHA:-}" ]] || exit 9
+    stage_test
+) >/dev/null 2>&1 || unrec_rc=$?
+rm -f "$RESUME_REPO/regression.flag"
+assert_eq "a resume with no record exports no base and blocks" "1" "$unrec_rc"
+
+# A corrupt record is not trusted: a resume with it blocks
+corrupt_rc=0
+(
+    cd "$RESUME_REPO"
+    export PROJECT_ROOT="$RESUME_REPO" ARTIFACTS_DIR="$RESUME_REPO/.artifacts" BASE_BRANCH=main TEST_CMD="bash fake-tests.sh"
+    export ISSUE_NUMBER="" PIPELINE_NAME="resume-p1" SHIPWRIGHT_HOME="$RESUME_HOME"
+    printf 'not json' > "$record_file"
+    PIPELINE_RESUMING=true pipeline_base_init || true
+    [[ -z "${SW_PIPELINE_BASE_SHA:-}" ]] || exit 9
+    stage_test
+) >/dev/null 2>&1 || corrupt_rc=$?
+assert_eq "a corrupt base record blocks" "1" "$corrupt_rc"
 
 # A recorded base that equals HEAD, or is not an ancestor of HEAD, blocks
 equal_rc=0
 (
     cd "$DIFF_REPO"
     export PROJECT_ROOT="$DIFF_REPO" ARTIFACTS_DIR="$DIFF_REPO/.artifacts" BASE_BRANCH=main TEST_CMD="bash fake-tests.sh"
-    PIPELINE_TEST_BASE_SHA="$(git rev-parse HEAD)" stage_test
+    SW_PIPELINE_BASE_SHA="$(git rev-parse HEAD)" stage_test
 ) >/dev/null 2>&1 || equal_rc=$?
 assert_eq "a recorded base equal to HEAD blocks" "1" "$equal_rc"
 side_rc=0
 (
     cd "$DIFF_REPO"
     export PROJECT_ROOT="$DIFF_REPO" ARTIFACTS_DIR="$DIFF_REPO/.artifacts" BASE_BRANCH=main TEST_CMD="bash fake-tests.sh"
-    PIPELINE_TEST_BASE_SHA="$(git rev-parse side-branch)" stage_test
+    SW_PIPELINE_BASE_SHA="$(git rev-parse side-branch)" stage_test
 ) >/dev/null 2>&1 || side_rc=$?
 assert_eq "a recorded base that is not an ancestor of HEAD blocks" "1" "$side_rc"
+
+# P3 (#8671): the base run symlinks node_modules, which the agent can write. A change since the start blocks.
+NM_REPO="$TEST_TEMP_DIR/nm-repo"
+make_diff_repo "$NM_REPO"
+nm_control="$(run_diff_stage "$NM_REPO" main)"
+assert_eq "control: an unchanged node_modules (none) lets the pre-existing failure pass" "0" "$nm_control"
+nm_home="$(mktemp -d "$TEST_TEMP_DIR/home.XXXXXX")"
+nm_rc=0
+(
+    cd "$NM_REPO"
+    export PROJECT_ROOT="$NM_REPO" ARTIFACTS_DIR="$NM_REPO/.artifacts" BASE_BRANCH=main TEST_CMD="bash fake-tests.sh"
+    export ISSUE_NUMBER="" PIPELINE_NAME="nm-poison" SHIPWRIGHT_HOME="$nm_home"
+    pipeline_base_init
+    mkdir -p node_modules/dep && echo poison > node_modules/dep/poison
+    stage_test
+) >"$TEST_TEMP_DIR/nm.out" 2>&1 || nm_rc=$?
+assert_eq "an agent-poisoned node_modules blocks a pre-existing failure" "1" "$nm_rc"
+assert_contains "the block says node_modules changed" "$(cat "$TEST_TEMP_DIR/nm.out")" "node_modules changed"
 
 # sw-test-all format (#8671 item 2 and item 5). One suite; its failing assertion A01 is new and sits
 # above the last 20 lines, the window sw-test-all prints by default. FAIL_LOG_LINES must lift that.
 # A second assertion (A30) is pre-existing; the suite-level exit unit must not be listed as pre-existing.
 SUITE_REPO="$TEST_TEMP_DIR/suite-repo"
 mkdir -p "$SUITE_REPO/.artifacts"
+SUITE_HOME="$(mktemp -d "$TEST_TEMP_DIR/home.XXXXXX")"
 (
     cd "$SUITE_REPO" && git init -q -b main && git config user.email "t@t.com" && git config user.name "T"
     echo "# root" > README.md && git add -A && git commit -q -m "root"
@@ -378,7 +474,8 @@ suite_rc=0
 (
     cd "$SUITE_REPO"
     export PROJECT_ROOT="$SUITE_REPO" ARTIFACTS_DIR="$SUITE_REPO/.artifacts" BASE_BRANCH=main TEST_CMD="bash runner.sh"
-    pipeline_record_test_base
+    export ISSUE_NUMBER="" PIPELINE_NAME="suite-x" SHIPWRIGHT_HOME="$SUITE_HOME"
+    pipeline_base_init
     touch new-break
     stage_test
 ) >/dev/null 2>&1 || suite_rc=$?

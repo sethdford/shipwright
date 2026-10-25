@@ -9,6 +9,9 @@ source "$(dirname "${BASH_SOURCE[0]}")/test-gate-env.sh"
 # Differential judgement of the test stage (#8663): the same tg_judge the build loop's gate uses.
 # shellcheck source=lib/test-gate-baseline.sh
 source "$(dirname "${BASH_SOURCE[0]}")/test-gate-baseline.sh"
+# The pipeline's base record: SW_PIPELINE_BASE_SHA is set at first start, before intake (#8671).
+# shellcheck source=lib/pipeline-base.sh
+source "$(dirname "${BASH_SOURCE[0]}")/pipeline-base.sh"
 [[ -n "${_PIPELINE_STAGES_BUILD_LOADED:-}" ]] && return 0
 _PIPELINE_STAGES_BUILD_LOADED=1
 
@@ -566,29 +569,21 @@ ${commit_msgs}" --model "$(_smart_model commit_quality haiku)" < /dev/null 2>/de
     log_stage "build" "Build loop completed ($commit_count commits)"
 }
 
-# pipeline_record_test_base — record the commit the test stage judges against: where HEAD forked from
-# the base branch. Called once at pipeline start, before any agent code runs, and kept in this process
-# only. Refs are not read again later, because the agent can move them (#8671). Empty when no base
-# resolves; the test stage then blocks.
-pipeline_record_test_base() {
-    local ref base=""
-    for ref in "origin/${BASE_BRANCH:-main}" "${BASE_BRANCH:-main}"; do
-        base="$(git -C "${PROJECT_ROOT:-.}" merge-base HEAD "$ref" 2>/dev/null || true)"
-        [[ -n "$base" ]] && break
-    done
-    PIPELINE_TEST_BASE_SHA="$base"
-}
-
 # _pipeline_test_judge <cmd> <exit> <log> — judge a failing test command against the base commit.
 # Returns 0 when every failing unit also fails on the base: those are pre-existing and do not block.
 # Returns 1 when a unit is new (a regression), or when no judgement can be made (fail closed).
 # Either way the verdict is appended to <log>, so the self-healing feedback (the log's tail) says
 # which failures are pre-existing and that they must not be fixed.
 _pipeline_test_judge() {
-    local cmd="$1" rc="$2" log="$3" base="${PIPELINE_TEST_BASE_SHA:-}" root="${PROJECT_ROOT:-.}" pre=""
+    local cmd="$1" rc="$2" log="$3" base="${SW_PIPELINE_BASE_SHA:-}" root="${PROJECT_ROOT:-.}" pre=""
     # Fail closed on anything but a recorded base that is a proper ancestor of HEAD.
     if [[ -z "$base" ]] || ! git -C "$root" rev-parse --verify -q "${base}^{commit}" >/dev/null 2>&1; then
         warn "Test stage: no recorded base commit; blocking without a differential judgement"
+        return 1
+    fi
+    # The base run symlinks node_modules, which the agent can write. A changed tree cannot judge (#8671).
+    if ! pipeline_base_nm_unchanged "$root" "${SW_PIPELINE_BASE_ID:-}"; then
+        warn "Test stage: node_modules changed since the pipeline started; blocking without a differential judgement"
         return 1
     fi
     if [[ "$(git -C "$root" rev-parse HEAD 2>/dev/null)" == "$base" ]]; then

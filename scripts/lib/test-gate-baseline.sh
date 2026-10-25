@@ -42,6 +42,9 @@
 [[ -n "${_SW_TEST_GATE_BASELINE_LOADED:-}" ]] && return 0
 _SW_TEST_GATE_BASELINE_LOADED=1
 _TG_LIB_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# The base run sources test-gate-env.sh as it was when this library loaded, never from a worktree the
+# agent can edit (#8671). The body is kept in memory and written into each run's temp dir.
+_TG_ENV_BODY="$(cat "$_TG_LIB_DIR/test-gate-env.sh" 2>/dev/null || true)"
 
 # Judgement of the last tg_judge call.
 TG_BLOCKING="true"
@@ -135,12 +138,14 @@ tg_parse_log() {
         # Glyph tests are regexes: this awk (macOS) compares multibyte strings wrongly.
         /^  ⧗ [^ ]+/ { cur = ""; s = $2; sfail[s] = 1; sst[s] = "TIMEOUT"; next }
         /^  ✗ [^ ]+/ { cur = ""; s = $2; sfail[s] = 1; sst[s] = "exit=" $4; next }
-        cur != "" && /[0-9]+ of [0-9]+ tests? failed/ {
+        # Anchored at both ends to the lines test-helpers prints, at any nesting depth. Output from the code under test can hide a
+        # "N of M" or "All N" inside an assertion detail, and a loose match would stop the counting early (#8671).
+        cur != "" && /^ +[0-9]+ of [0-9]+ tests? failed$/ {
             comp[cur] = 1
             line = $0; sub(/.* of /, "", line); sub(/ tests? failed.*/, "", line)
             tot[cur] = line; next
         }
-        cur != "" && /All [0-9]+ tests? passed/ { comp[cur] = 1; next }
+        cur != "" && /^ +All [0-9]+ tests? passed$/ { comp[cur] = 1; next }
         # Assertions of a failing suite, passing ones included: the n-th line with a given description
         # is "desc#n", so the position of a repeated name is known. The list that test-helpers prints
         # after its completion line repeats the failures and is not counted.
@@ -162,6 +167,9 @@ tg_parse_log() {
                 # printed no pass line (npass is 0) cannot be positioned: its occurrence numbers are
                 # unknown, so it blocks.
                 if (s in tot && npass[s] == 0 && tot[s] + 0 > nfail[s] + 0) print s "::UNORDERED"
+                # The assertions counted before the completion line must account for the whole total. A
+                # mismatch means some assertion was not seen in order, so the suite cannot be verified.
+                if (s in tot && npass[s] + nfail[s] != tot[s] + 0) print s "::UNORDERED"
             }
         }
     ' || true)"
@@ -324,7 +332,7 @@ _tg_cleanup_base() {
         _TG_WT=""
     fi
     if [[ -n "$_TG_TMP" ]]; then
-        rm -f "$_TG_TMP"/cmd.sh "$_TG_TMP"/run.sh "$_TG_TMP"/*.log 2>/dev/null || true
+        rm -f "$_TG_TMP"/cmd.sh "$_TG_TMP"/run.sh "$_TG_TMP"/test-gate-env.sh "$_TG_TMP"/*.log 2>/dev/null || true
         rmdir "$_TG_TMP" 2>/dev/null || true
         _TG_TMP=""
     fi
@@ -338,9 +346,10 @@ _tg_run_base_once() {
     {
         printf 'cd "%s" || exit 1\n' "$wt"
         printf 'export PROJECT_ROOT="%s" FAIL_LOG_LINES=100000\n' "$wt"
-        printf 'source "%s/test-gate-env.sh"\n' "$_TG_LIB_DIR"
+        printf 'source "%s/test-gate-env.sh"\n' "$_TG_TMP"
         printf 'sw_test_gate_env bash "%s/cmd.sh"\n' "$_TG_TMP"
     } > "$_TG_TMP/run.sh"
+    printf '%s\n' "$_TG_ENV_BODY" > "$_TG_TMP/test-gate-env.sh"
     _TG_PGRP=""
     if command -v perl >/dev/null 2>&1; then
         # perl's setpgrp makes the run a process-group leader; exec keeps the same pid.

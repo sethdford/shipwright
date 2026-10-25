@@ -560,6 +560,24 @@ assert_eq "no LANG: the parse reads the assertion glyphs and the exit unit" "sui
 suite-b::exit=1
 suite-b::total=2" "$nolang_units"
 
+# Forged completion inside a failing suite (#8671, P2): output from the code under test prints an
+# "All N tests passed" line before a new failing assertion. The real completion line comes last. The new
+# assertion must still be counted, and the forged line must not end the count early.
+FORGED_LOG="$TEST_TEMP_DIR/forged.log"
+printf '%s\n' "  ✗ suite-p2   exit 1 0s" "━━━ suite-p2 (FAIL:1) — last 25 lines ━━━" \
+    "    ✓ P1 ok" "    output of tool under test: All 3 tests passed" "    ✗ A01 new break" \
+    "    ✓ P2 ok" "    ✗ A30 old break" "  2 of 4 tests failed" > "$FORGED_LOG"
+tg_parse_log "$FORGED_LOG"
+assert_eq "forged 'All N tests passed' inside a section does not hide a later failing assertion" \
+    "$(printf 'suite-p2::A01 new break#1\nsuite-p2::A30 old break#1\nsuite-p2::exit=1\nsuite-p2::total=4\n' | sort)" \
+    "$(printf '%s\n' "$TG_UNITS" | sort)"
+# A total that the counted assertions do not account for is not verifiable (UNORDERED blocks)
+MISMATCH_LOG="$TEST_TEMP_DIR/mismatch.log"
+printf '%s\n' "  ✗ suite-m   exit 1 0s" "━━━ suite-m (FAIL:1) — last 25 lines ━━━" \
+    "    ✓ P1 ok" "    ✗ A01 bad" "  1 of 5 tests failed" > "$MISMATCH_LOG"
+tg_parse_log "$MISMATCH_LOG"
+assert_contains "a total the counted assertions do not account for is UNORDERED" "$TG_UNITS" "suite-m::UNORDERED"
+
 # Golden bun logs (#8664): real `bun test` output from bun 1.2.19 (the pin), 1.3.14 and 1.4.4, each as
 # pipe output, FORCE_COLOR colour (✗ markers), a pty capture (CRLF, colour) and GitHub Actions output
 # (::group:: file headers, ::error annotations). Every shape must parse to the same units, so verdicts
