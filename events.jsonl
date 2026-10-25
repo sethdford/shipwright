@@ -1181,3 +1181,8 @@
 {"ts":"2026-10-25T18:12:17Z","ts_epoch":1792951937,"type":"patrol.finding","check":"untested_script","script":"sw-event-schema-sync.sh","lines":93,"usage":0}
 {"ts":"2026-10-25T18:12:19Z","ts_epoch":1792951939,"type":"patrol.issue_refused","check":"untested_scripts","count":7}
 {"ts":"2026-10-25T18:12:21Z","ts_epoch":1792951941,"type":"patrol.meta_issue_refused","title":"[Meta] Add tests for sw-event-schema-sync.sh"}
+{"ts":"2026-10-25T20:04:27Z","ts_epoch":1792958667,"type":"hygiene_platform_refactor","hardcoded":49,"fallback":76,"todo":51}
+{"ts":"2026-10-25T20:05:16Z","ts_epoch":1792958716,"type":"strategic.issue_refused","title":"Auto-quarantine issues that fail the build loop N times, using the durable RunJournal"}
+{"ts":"2026-10-25T20:05:19Z","ts_epoch":1792958719,"type":"strategic.issue_refused","title":"Loop blast-radius guard: abort an iteration whose diff deletes far more than the task scope"}
+{"ts":"2026-10-25T20:05:22Z","ts_epoch":1792958722,"type":"strategic.issue_refused","title":"Per-stage failure-class accuracy report from outcome data in `shipwright dora`"}
+{"ts":"2026-10-25T20:05:22Z","ts_epoch":1792958722,"type":"strategic.cycle_complete","issues_created":0,"issues_skipped":3}
