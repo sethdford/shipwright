@@ -768,7 +768,7 @@ Return JSON only, no markdown fences, no explanation."
 
     # Call Claude for analysis
     local analysis
-    analysis=$("$SW_AGENT_EXEC" claude -p "$prompt" --model sonnet 2>/dev/null) || {
+    analysis=$("$SW_AGENT_EXEC" claude -p "$prompt" --model sonnet) || {  # W2-07: a refused model is reported
         warn "Claude analysis failed"
         return 1
     }

@@ -266,7 +266,7 @@ run_refused_failure() {
         PIPELINE_TEMPLATE="autonomous"
         _retry_spawned_for=""
         jq -n --arg n "$issue" '{retry_counts: {($n): 1}}' > "$STATE_FILE"
-        echo "some unclassified failure" > "$LOG_DIR/issue-${issue}.log"
+        echo "${RUN_LOG_TEXT:-some unclassified failure}" > "$LOG_DIR/issue-${issue}.log"
         daemon_on_failure "$issue" 1 "" "${REFUSE_REPO:-}" >/dev/null 2>&1
         echo "spawned_for=${_retry_spawned_for:-none} template=${PIPELINE_TEMPLATE} model=${MODEL}" >> "$REFUSE_LOG"
     ) 2>/dev/null || true
@@ -318,4 +318,46 @@ run_refused_failure 803 'printf "gh %s\n" "$*" >> "$REFUSE_LOG"; [[ "${1:-} ${2:
 assert_eq "when every edit fails the entry has no marked labels (fail closed)" "0" \
     "$(jq '.final_failed["803"].marked | length' "$STATE_FILE")"
 
+# ─── W2-04: classify_failure behaviour (typed classifier with bash fallback) ───
+print_test_section "classify_failure: typed classifier bridge (W2-04)"
+printf '%s\n' "::error::Claude Code authentication failed — check CLAUDE_CODE_OAUTH_TOKEN secret" > "$LOG_DIR/issue-42.log"
+assert_eq "pre-flight auth text is auth_error" "auth_error" "$(classify_failure 42)"
+assert_eq "the bash fallback still says auth_error when Bun is missing" "auth_error" \
+    "$(SW_BUN=/nonexistent/bun classify_failure 42)"
+printf '%s\n' "build failed: test suite red" > "$LOG_DIR/issue-43.log"
+assert_eq "a build failure keeps the bash class" "build_failure" "$(classify_failure 43)"
+printf '%s\n' "OAuth token is invalid" > "$LOG_DIR/issue-44.log"
+assert_eq "'OAuth token is invalid' is auth_error (same with or without Bun)" "auth_error" "$(classify_failure 44)"
+# No Bun: SW_BUN points at nothing, so the bridge is skipped whatever PATH holds. The regex alone must
+# classify each auth form the TS rule catches, so a host without Bun does not retry an auth failure.
+for auth_text in "OAuth token is invalid" "OAuth token revoked" "Error: invalid api key provided" \
+    "invalid x-api-key" "Error 401: authentication_error" "Not logged in"; do
+    printf '%s\n' "$auth_text" > "$LOG_DIR/issue-46.log"
+    assert_eq "no Bun: '$auth_text' is auth_error" "auth_error" "$(SW_BUN=/nonexistent/bun classify_failure 46)"
+done
+printf '%s\n' "benign build output" > "$LOG_DIR/issue-45.log"
+assert_eq "a typed transient verdict is not mapped to api_error (trust rule, #8674)" "unknown" \
+    "$(_daemon_classify_ts() { echo transient; }; classify_failure 45)"
+
+# ─── Escalations never retry; a slow classifier cannot stall the failure path (ADR-0009, #8674) ───
+print_test_section "Contamination is never retried (no Bun and with Bun)"
+printf '%s\n' "refusing to run inside a build-loop test gate" > "$LOG_DIR/issue-47.log"
+assert_eq "contamination is classified with Bun" "contamination" "$(classify_failure 47)"
+assert_eq "contamination is classified with no Bun (regex)" "contamination" "$(SW_BUN=/nonexistent/bun classify_failure 47)"
+assert_eq "contamination has a retry limit of 0" "0" "$(get_max_retries_for_class contamination)"
+RUN_LOG_TEXT="refusing to run inside a build-loop test gate" run_refused_failure 811 'printf "gh %s\n" "$*" >> "$REFUSE_LOG"'
+contam_log="$(cat "$TEST_TEMP_DIR/refuse.log")"
+assert_contains "a contamination failure is logged as skipped" "$contam_log" "Contamination for issue #811 — skipping retry"
+assert_eq "no retry is spawned for contamination" "0" "$(grep -c 'spawn 811 retry' <<<"$contam_log" || true)"
+
+print_test_section "A slow classifier falls back to the regex (bounded)"
+printf '%s\n' '#!/usr/bin/env bash' 'sleep 30' > "$TEST_TEMP_DIR/slow-bun"
+chmod +x "$TEST_TEMP_DIR/slow-bun"
+printf '%s\n' "::error::Claude Code authentication failed" > "$LOG_DIR/issue-48.log"
+SECONDS=0
+slow_result="$(SW_BUN="$TEST_TEMP_DIR/slow-bun" SW_CLASSIFY_TIMEOUT=1 classify_failure 48)"
+assert_eq "a classifier that does not answer falls back to the regex" "auth_error" "$slow_result"
+assert_eq "the fallback returns within the timeout, not after the 30 s sleep" "true" "$([[ $SECONDS -lt 15 ]] && echo true || echo false)"
+
 print_test_results
+

@@ -1,5 +1,6 @@
 import type { CliIO, CommandContext } from "../cli/command";
 import type { SafetyPorts } from "../contexts/orchestration";
+import type { FileReader } from "../shared/kernel/ports";
 
 export interface CapturedIO extends CliIO {
   readonly outLines: string[];
@@ -17,11 +18,12 @@ export function captureIO(): CapturedIO {
   };
 }
 
-/** A command context; `safety()` throws unless ports are given (commands like hello need none). */
+/** A command context. `files()` throws unless a reader is given (commands that read none need none). */
 export function commandContext(
   io: CliIO,
   safety?: SafetyPorts,
   env: Readonly<Record<string, string | undefined>> = {},
+  files?: FileReader,
 ): CommandContext {
   return {
     io,
@@ -30,6 +32,10 @@ export function commandContext(
     safety: () => {
       if (!safety) throw new Error("this command was not given safety ports");
       return safety;
+    },
+    files: () => {
+      if (!files) throw new Error("this command was not given a file reader");
+      return files;
     },
   };
 }

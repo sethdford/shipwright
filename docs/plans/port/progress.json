@@ -889,5 +889,15 @@
     "parity": null,
     "status": "parity-green",
     "notes": "New in Wave 1a: all dispatch gates in ADR-0007 order for workflows and the daemon; a gate (exit 0 only when every gate allows). --retry is required (daemon retry count, Task 12; auto-retry bot-marker count, Task 14)."
+  },
+  {
+    "command": "failure",
+    "aliases": [],
+    "script": "ts-native",
+    "context": "learning",
+    "parity": null,
+    "status": "parity-green",
+    "notes": "New in Wave 2 (W2-02): failure classification and retry decision (ADR-0009). script is the sentinel ts-native: no bash script exists, and the schema needs a string. Nothing in the repo is named ts-native, so the parity sandbox stub it creates (a new file nothing sources) is harmless. The plan fallback sw-daemon.sh was rejected because the unported daemon entry shares that file, and tools/port/sandbox.ts planStubs would throw. Bash classify_failure (scripts/lib/daemon-failure.sh) is the predecessor logic that W2-04 bridges to this command."
+
   }
 ]

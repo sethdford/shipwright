@@ -1,0 +1,3 @@
+# An agent-written test name that says rate-limit, in a failing test report.
+FAIL test: client retries on rate-limit error
+  ✗ Tests: failed

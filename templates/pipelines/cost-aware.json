@@ -3,7 +3,7 @@
   "description": "Cost-optimized pipeline: budget limits, model routing (haiku→sonnet→opus), per-stage tracking",
   "defaults": {
     "test_cmd": "npm test",
-    "model": "claude-sonnet-5-5",
+    "model": "sonnet",
     "agents": 1,
     "cost_tracking": true,
     "budget_check": true
@@ -19,7 +19,7 @@
       "enabled": true,
       "gate": "auto",
       "config": {
-        "model": "claude-haiku-5-5",
+        "model": "haiku",
         "cost_tracking": true
       }
     },
@@ -34,7 +34,7 @@
       "enabled": true,
       "gate": "approve",
       "config": {
-        "model": "claude-sonnet-5-5",
+        "model": "sonnet",
         "cost_tracking": true
       }
     },
@@ -43,7 +43,7 @@
       "enabled": true,
       "gate": "auto",
       "config": {
-        "model": "claude-sonnet-5-5",
+        "model": "sonnet",
         "max_iterations": 20,
         "audit": true,
         "quality_gates": true,
@@ -57,7 +57,7 @@
       "gate": "auto",
       "config": {
         "coverage_min": 80,
-        "model": "claude-haiku-5-5",
+        "model": "haiku",
         "cost_tracking": true
       }
     },
@@ -66,7 +66,7 @@
       "enabled": true,
       "gate": "approve",
       "config": {
-        "model": "claude-opus-5-5",
+        "model": "opus",
         "cost_tracking": true
       }
     },
@@ -88,7 +88,7 @@
         "max_cycles": 2,
         "audit_intensity": "auto",
         "compound_quality_blocking": true,
-        "model": "claude-sonnet-5-5",
+        "model": "sonnet",
         "cost_tracking": true
       }
     },
@@ -102,7 +102,7 @@
         "atomic_writes": true,
         "coverage_delta": true,
         "blocking": false,
-        "model": "claude-haiku-5-5",
+        "model": "haiku",
         "cost_tracking": true
       }
     },
@@ -112,7 +112,7 @@
       "gate": "approve",
       "config": {
         "wait_ci": false,
-        "model": "claude-haiku-5-5",
+        "model": "haiku",
         "cost_tracking": true
       }
     },

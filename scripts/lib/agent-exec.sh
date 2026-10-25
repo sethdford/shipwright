@@ -9,7 +9,7 @@
 #
 #   PATH HOME USER LOGNAME SHELL TERM LANG LC_* TMPDIR TZ CI XDG_CONFIG_HOME   the process basics
 #   CLAUDE_CODE_OAUTH_TOKEN ANTHROPIC_API_KEY ANTHROPIC_AUTH_TOKEN ANTHROPIC_BASE_URL CLAUDE_CONFIG_DIR
-#   ANTHROPIC_MODEL ANTHROPIC_SMALL_FAST_MODEL ANTHROPIC_DEFAULT_{OPUS,SONNET,HAIKU}_MODEL
+#   ANTHROPIC_DEFAULT_{OPUS,SONNET,HAIKU}_MODEL   (not ANTHROPIC_MODEL or ANTHROPIC_SMALL_FAST_MODEL: they override --model, W2-07)
 #   CLAUDE_CODE_USE_BEDROCK CLAUDE_CODE_USE_VERTEX AWS_REGION AWS_PROFILE CLOUD_ML_REGION
 #   ANTHROPIC_VERTEX_PROJECT_ID                                              the provider selectors
 #   AWS_ACCESS_KEY_ID AWS_SECRET_ACCESS_KEY AWS_SESSION_TOKEN   ONLY when CLAUDE_CODE_USE_BEDROCK=1
@@ -32,8 +32,10 @@
 #
 # Also added: --append-system-prompt with the project memory (CLAUDE.md, AGENTS.md, .claude/rules/*.md, read
 # from the working directory), since --setting-sources user skips the project scope; and the policy's
-# disableAllHooks and blockReadsOutsideWorkingDirectories come from the policy file itself. Only claude is
-# launched through this wrapper: any other command is refused.
+# disableAllHooks and blockReadsOutsideWorkingDirectories come from the policy file itself. The memory is capped at
+# 64 KiB. A review or audit stage sets SW_MEMORY_REF to a base-branch ref, and the memory is read from that ref, so a
+# builder's edits cannot steer it (#8673). Only claude is launched through this wrapper, as the command word (after an
+# optional timeout prefix): any other command is refused.
 #
 # Where the policy comes from: SW_AGENT_POLICY (the pipeline sets it to a read-only copy in RUNNER_TEMP, taken
 # from the default branch before any agent runs), else <repo>/config/agent-permissions.json. In CI a policy inside
@@ -126,7 +128,7 @@ _sw_agent_pass() {
 }
 _sw_agent_pass PATH HOME USER LOGNAME SHELL TERM LANG TMPDIR TZ CI XDG_CONFIG_HOME \
     CLAUDE_CODE_OAUTH_TOKEN ANTHROPIC_API_KEY ANTHROPIC_AUTH_TOKEN ANTHROPIC_BASE_URL CLAUDE_CONFIG_DIR \
-    ANTHROPIC_MODEL ANTHROPIC_SMALL_FAST_MODEL ANTHROPIC_DEFAULT_OPUS_MODEL ANTHROPIC_DEFAULT_SONNET_MODEL \
+    ANTHROPIC_DEFAULT_OPUS_MODEL ANTHROPIC_DEFAULT_SONNET_MODEL \
     ANTHROPIC_DEFAULT_HAIKU_MODEL CLAUDE_CODE_USE_BEDROCK CLAUDE_CODE_USE_VERTEX AWS_REGION AWS_PROFILE \
     CLOUD_ML_REGION ANTHROPIC_VERTEX_PROJECT_ID \
     HTTPS_PROXY HTTP_PROXY NO_PROXY https_proxy http_proxy no_proxy \
@@ -184,29 +186,70 @@ _sw_abs_path() {
     printf '%s/%s\n' "$dir" "$(basename "$1")"
 }
 # The project memory the CLI would have loaded from the project scope (CLAUDE.md, AGENTS.md and
-# .claude/rules/*.md), read from the working directory. `--setting-sources user` skips the project scope,
-# so the same text is passed through --append-system-prompt. Settings are NOT read from the project.
+# .claude/rules/*.md). `--setting-sources user` skips the project scope, so the same text is passed through
+# --append-system-prompt. Settings are NOT read from the project.
+# Source: the working directory (the build stage edits that tree). When SW_MEMORY_REF is set, the files come
+# from that git ref instead (#8673): review and audit stages read the base branch, so a builder cannot steer them.
+_SW_MEMORY_CAP=65536
+_sw_memory_files() {
+    local f
+    if [[ -n "${SW_MEMORY_REF:-}" ]]; then
+        for f in CLAUDE.md AGENTS.md .claude/CLAUDE.md; do
+            git cat-file -e "$SW_MEMORY_REF:$f" 2>/dev/null && printf '%s\n' "$f"
+        done
+        # Top level only, like the working-tree branch below and the TypeScript reader (#8673).
+        git ls-tree -r --name-only "$SW_MEMORY_REF" -- .claude/rules | sed -n '/^\.claude\/rules\/[^/]*\.md$/p'
+    else
+        for f in CLAUDE.md AGENTS.md .claude/CLAUDE.md; do
+            [[ -f "$f" ]] && printf '%s\n' "$f"
+        done
+        for f in .claude/rules/*.md; do
+            [[ -f "$f" ]] && printf '%s\n' "$f"
+        done
+    fi
+    return 0
+}
+_sw_read_memory_file() {
+    if [[ -n "${SW_MEMORY_REF:-}" ]]; then
+        git show "$SW_MEMORY_REF:$1" 2>/dev/null
+    else
+        cat "$1"
+    fi
+}
+# Fails closed: a memory file that cannot be read makes the launcher refuse to run, never a silent partial memory.
 _sw_project_memory() {
-    local out="" f
-    for f in CLAUDE.md AGENTS.md .claude/CLAUDE.md; do
-        [[ -f "$f" ]] || continue
-        out+=$'\n\n'"# $f"$'\n\n'"$(cat "$f")"
-    done
-    for f in .claude/rules/*.md; do
-        [[ -f "$f" ]] || continue
-        out+=$'\n\n'"# $f"$'\n\n'"$(cat "$f")"
-    done
+    local out="" f body
+    while IFS= read -r f; do
+        [[ -n "$f" ]] || continue
+        body="$(_sw_read_memory_file "$f")" || {
+            echo "agent-exec: cannot read project memory $f; not running" >&2
+            return 1
+        }
+        out+=$'\n\n'"# $f"$'\n\n'"$body"
+    done < <(_sw_memory_files)
     printf '%s' "$out"
 }
+# At most 64 KiB of project memory. A longer argument would hit the kernel's 128 KiB per-argument limit (E2BIG),
+# so the text is cut at the cap and a marker says so. Shorter text is returned unchanged.
+_sw_cap_memory() {
+    local text="$1" bytes marker
+    bytes="$(printf '%s' "$text" | wc -c | tr -d ' ')"
+    if [[ "$bytes" -le "$_SW_MEMORY_CAP" ]]; then
+        printf '%s' "$text"
+        return 0
+    fi
+    marker=$'\n\n[project memory truncated at 64 KiB by agent-exec (#8673); the rest was not passed]'
+    # iconv -c drops the partial multi-byte character a byte cut can leave at the end.
+    printf '%s' "$text" | LC_ALL=C head -c "$((_SW_MEMORY_CAP - ${#marker}))" | iconv -c -f UTF-8 -t UTF-8
+    printf '%s' "$marker"
+}
 
-_sw_has_claude=false
 _sw_has_print=false
 _sw_has_bypass=false
 for _sw_arg in "$@"; do
     case "$_sw_arg" in
         -p|--print) _sw_has_print=true ;;
     esac
-    if [[ "${_sw_arg##*/}" == claude ]]; then _sw_has_claude=true; fi
     case "$_sw_arg" in
         --permission-mode|--permission-mode=*|--settings|--settings=*|--setting-sources|--setting-sources=*|\
 --permission-prompts|--permission-prompts=*|--allowedTools|--allowedTools=*|--allowed-tools|--allowed-tools=*)
@@ -216,15 +259,113 @@ for _sw_arg in "$@"; do
     if _sw_is_bypass_flag "$_sw_arg"; then _sw_has_bypass=true; fi
 done
 
-# Only claude is launched through this wrapper. Anything else would run outside the policy, so refuse it.
-if [[ "$_sw_has_claude" != true ]]; then
-    echo "agent-exec: refusing to run ${1:-nothing}: only claude is launched through this wrapper (F9)" >&2
+# Only claude is launched through this wrapper, and claude must be the command itself: the first word, after an
+# optional `timeout N` or `gtimeout N` prefix. A claude word later in argv does not count, so
+# `/bin/echo NOT-CLAUDE claude` is refused (#8673). Anything else would run outside the policy.
+_sw_cmd_idx=0
+_sw_duration_re='^[0-9]+(\.[0-9]+)?[smhd]?$'
+if [[ "${1:-}" == timeout || "${1:-}" == gtimeout ]]; then
+    if [[ "${2:-}" =~ $_sw_duration_re ]]; then _sw_cmd_idx=2; else _sw_cmd_idx=-1; fi
+fi
+_sw_cmd=""
+_sw_i=0
+for _sw_arg in "$@"; do
+    if [[ "$_sw_i" -eq "$_sw_cmd_idx" ]]; then _sw_cmd="$_sw_arg"; break; fi
+    _sw_i=$((_sw_i + 1))
+done
+if [[ "$_sw_cmd_idx" -lt 0 || -z "$_sw_cmd" || "${_sw_cmd##*/}" != claude ]]; then
+    echo "agent-exec: refusing to run ${1:-nothing}: only claude is launched through this wrapper, as the command (F9)" >&2
     exit 1
 fi
 
+# Every model value goes through config/models.json (W2-07). --model and --fallback-model are resolved to full IDs
+# (an alias, or a listed ID); a value that does not resolve refuses the call. A call without --model gets the default
+# alias, so no claude call falls through to the CLI default. A fallback equal to the model is dropped, because the CLI
+# rejects it. Bedrock and Vertex: aliases go to the CLI unchanged, so ANTHROPIC_DEFAULT_*_MODEL maps them (#8673).
+source "$(dirname "${BASH_SOURCE[0]}")/models.sh"
+_sw_model_value() {  # <flag> <raw>: prints the value for claude, or fails with a message
+    local flag="$1" raw="$2" out
+    if [[ -z "$raw" ]]; then
+        echo "agent-exec: $flag has no value; not running $_sw_cmd" >&2
+        return 1
+    fi
+    if models_provider_routed && models_is_alias "$raw"; then
+        printf '%s\n' "$raw"
+        return 0
+    fi
+    out="$(models_resolve "$raw")" || {
+        echo "agent-exec: refusing $flag '$raw' for $_sw_cmd; not running" >&2
+        return 1
+    }
+    printf '%s\n' "$out"
+}
+_sw_model=""
+_sw_fallback=""
+_sw_model_next=""
+_sw_out=()
+for _sw_arg in "$@"; do
+    if [[ -n "$_sw_model_next" ]]; then
+        if [[ "$_sw_model_next" == model ]]; then
+            _sw_model="$(_sw_model_value --model "$_sw_arg")" || exit 1
+        else
+            _sw_fallback="$(_sw_model_value --fallback-model "$_sw_arg")" || exit 1
+        fi
+        _sw_model_next=""
+        continue
+    fi
+    case "$_sw_arg" in
+        --model) _sw_model_next=model ;;
+        --fallback-model) _sw_model_next=fallback ;;
+        --model=*) _sw_model="$(_sw_model_value --model "${_sw_arg#--model=}")" || exit 1 ;;
+        --fallback-model=*) _sw_fallback="$(_sw_model_value --fallback-model "${_sw_arg#--fallback-model=}")" || exit 1 ;;
+        *) _sw_out+=("$_sw_arg") ;;
+    esac
+done
+if [[ -n "$_sw_model_next" ]]; then
+    echo "agent-exec: ${_sw_model_next} has no value; not running $_sw_cmd" >&2
+    exit 1
+fi
+if [[ -z "$_sw_model" ]]; then
+    _sw_default_alias="$(models_default_alias)" || { echo "agent-exec: no default model; not running $_sw_cmd" >&2; exit 1; }
+    _sw_model="$(_sw_model_value --model "$_sw_default_alias")" || exit 1
+fi
+if [[ -n "$_sw_fallback" && "$_sw_fallback" == "$_sw_model" ]]; then
+    _sw_fallback=""
+fi
+# The model flags go right after the command word. Removed flags were all after it, so its index is unchanged.
+_sw_final=()
+_sw_i=0
+for _sw_arg in ${_sw_out[@]+"${_sw_out[@]}"}; do
+    _sw_final+=("$_sw_arg")
+    if [[ "$_sw_i" -eq "$_sw_cmd_idx" ]]; then
+        _sw_final+=(--model "$_sw_model")
+        if [[ -n "$_sw_fallback" ]]; then
+            _sw_final+=(--fallback-model "$_sw_fallback")
+        fi
+    fi
+    _sw_i=$((_sw_i + 1))
+done
+set -- ${_sw_final[@]+"${_sw_final[@]}"}
+
+if [[ -n "${SW_MODELS_FILE:-}" && "$_sw_inside_agent" == true ]]; then
+    echo "agent-exec: refusing SW_MODELS_FILE inside an agent run; the model table is set by the pipeline (W2-07)" >&2
+    exit 1
+fi
 if [[ -n "${SW_AGENT_POLICY:-}" && "$_sw_inside_agent" == true ]]; then
     echo "agent-exec: refusing SW_AGENT_POLICY inside an agent run; the policy is set by the pipeline" >&2
     exit 1
+fi
+if [[ -n "${SW_MEMORY_REF:-}" ]]; then
+    if [[ "$_sw_inside_agent" == true ]]; then
+        echo "agent-exec: refusing SW_MEMORY_REF inside an agent run; the project memory is set by the pipeline" >&2
+        exit 1
+    fi
+    # Pinned to a SHA once, so a later move of the ref (the agent can write .git) cannot change what is read.
+    if ! _sw_memory_sha="$(git rev-parse --verify --quiet "$SW_MEMORY_REF^{commit}" 2>/dev/null)"; then
+        echo "agent-exec: SW_MEMORY_REF does not name a commit; not running $_sw_cmd" >&2
+        exit 1
+    fi
+    SW_MEMORY_REF="$_sw_memory_sha"
 fi
 if [[ "${CI:-}" != "" ]]; then
     _sw_policy_abs="$(_sw_abs_path "$_sw_agent_policy" 2>/dev/null || echo "$_sw_agent_policy")"
@@ -249,11 +390,13 @@ else
         echo "agent-exec: permission policy missing or unreadable ($_sw_agent_policy); not running $1" >&2
         exit 1
     fi
-    _sw_memory="$(_sw_project_memory)"
-    _sw_injected=false
+    _sw_memory="$(_sw_project_memory)" || exit 1
+    _sw_memory="$(_sw_cap_memory "$_sw_memory")"
+    _sw_i=0
     for _sw_arg in "$@"; do
         _sw_argv+=("$_sw_arg")
-        if [[ "$_sw_injected" == false && "${_sw_arg##*/}" == claude ]]; then
+        # Options go right after the claude command word, never after a later argument that happens to be "claude".
+        if [[ "$_sw_i" -eq "$_sw_cmd_idx" ]]; then
             _sw_argv+=(--settings "$_sw_agent_policy" --setting-sources user --permission-mode dontAsk)
             if [[ "$_sw_has_print" == true ]]; then
                 _sw_argv+=(--permission-prompts none)
@@ -261,8 +404,8 @@ else
             if [[ -n "$_sw_memory" ]]; then
                 _sw_argv+=(--append-system-prompt "$_sw_memory")
             fi
-            _sw_injected=true
         fi
+        _sw_i=$((_sw_i + 1))
     done
 fi
 

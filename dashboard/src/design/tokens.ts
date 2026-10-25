@@ -158,3 +158,96 @@ export const STAGE_HEX: Record<StageName, string> = {
   deploy: "#fbbf24",
   monitor: "#00d4ff",
 };
+
+// ── OKLCH token contract (spec section 5, T1) ────────────────────────────────
+// The source for dashboard/public/tokens.css and website/src/styles/tokens.css,
+// rendered by ./tokens-css.ts and written by tools/web/gen-tokens.ts. The hex
+// exports above stay for canvas code until T4 retires it; do not add new hex here.
+
+export type Theme = "dark" | "light";
+
+export const colourRoles = [
+  "bg0",
+  "bg1",
+  "bg2",
+  "line",
+  "text1",
+  "text2",
+  "text3",
+  "accent",
+  "accentInk",
+  "ok",
+  "warn",
+  "danger",
+  "info",
+] as const;
+
+export type ColourRole = (typeof colourRoles)[number];
+export type ThemeColours = Record<ColourRole, string>;
+
+// Dark is the default theme. Every pair the contrast test checks is listed in
+// dashboard/src/design/tokens-contract.test.ts.
+export const themes: Record<Theme, ThemeColours> = {
+  dark: {
+    bg0: "oklch(0.15 0.015 255)",
+    bg1: "oklch(0.19 0.017 255)",
+    bg2: "oklch(0.24 0.02 255)",
+    line: "oklch(0.55 0.02 255)",
+    text1: "oklch(0.96 0.005 255)",
+    text2: "oklch(0.79 0.02 255)",
+    text3: "oklch(0.67 0.025 255)",
+    accent: "oklch(0.82 0.13 215)",
+    accentInk: "oklch(0.15 0.015 255)",
+    ok: "oklch(0.82 0.16 150)",
+    warn: "oklch(0.86 0.15 85)",
+    danger: "oklch(0.7 0.19 20)",
+    info: "oklch(0.75 0.12 265)",
+  },
+  light: {
+    bg0: "oklch(0.985 0.004 255)",
+    bg1: "oklch(1 0 0)",
+    bg2: "oklch(0.955 0.008 255)",
+    line: "oklch(0.6 0.01 255)",
+    text1: "oklch(0.2 0.02 255)",
+    text2: "oklch(0.42 0.02 255)",
+    text3: "oklch(0.5 0.02 255)",
+    accent: "oklch(0.52 0.12 230)",
+    accentInk: "oklch(0.99 0 0)",
+    ok: "oklch(0.5 0.14 150)",
+    warn: "oklch(0.5 0.13 70)",
+    danger: "oklch(0.52 0.19 25)",
+    info: "oklch(0.5 0.12 265)",
+  },
+};
+
+export const elevation = {
+  e1: "0 0 0 1px var(--sw-line)",
+  e2: "0 1px 2px oklch(0 0 0 / 0.3)",
+  e3: "0 12px 32px oklch(0 0 0 / 0.4)",
+} as const;
+
+export const sizeScale = {
+  caption: "12px",
+  body: "14px",
+  bodyLarge: "16px",
+  section: "20px",
+  page: "24px",
+  h2: "32px",
+  h1: "clamp(48px, 6vw, 64px)",
+} as const;
+
+export const lineHeight = {
+  body: "1.5",
+  heading: "1.2",
+  mono: "1.4",
+} as const;
+
+export const motion = {
+  duration: { fast: "120ms", base: "200ms", slow: "320ms" },
+  easing: {
+    standard: "cubic-bezier(0.2, 0, 0, 1)",
+    emphasized: "cubic-bezier(0.2, 0.8, 0.2, 1)",
+  },
+  // prefers-reduced-motion: opacity fades stay at 100 ms or less, transforms are removed.
+  reduced: { duration: "100ms", travel: "0" },
+} as const;

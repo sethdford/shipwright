@@ -1,17 +1,59 @@
-/* Shipwright brand overrides for Starlight */
+/* Shipwright brand overrides for Starlight.
+ * Colours and type come from tokens.css (generated from dashboard/src/design/tokens.ts),
+ * so the docs, the dashboard and the landing share one source. Dark is the default. */
+@import "./tokens.css";
+
+/* Body and mono are self-hosted. Instrument Serif is for docs page titles only. */
+@font-face {
+  font-family: "Plus Jakarta Sans";
+  src: url("/fonts/plus-jakarta-sans-latin-var.woff2") format("woff2");
+  font-weight: 200 800;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "JetBrains Mono";
+  src: url("/fonts/jetbrains-mono-latin-var.woff2") format("woff2");
+  font-weight: 100 800;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "Instrument Serif";
+  src: url("/fonts/instrument-serif-latin-regular.woff2") format("woff2");
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "Instrument Serif";
+  src: url("/fonts/instrument-serif-latin-italic.woff2") format("woff2");
+  font-weight: 400;
+  font-style: italic;
+  font-display: swap;
+}
 
 :root {
-  --sl-color-accent-low: #002c36;
-  --sl-color-accent: #00d4ff;
-  --sl-color-accent-high: #8ae8ff;
-  --sl-color-white: #e4e4e7;
-  --sl-color-gray-1: #c8c8cd;
-  --sl-color-gray-2: #a1a1aa;
-  --sl-color-gray-3: #71717a;
-  --sl-color-gray-4: #52525b;
-  --sl-color-gray-5: #333355;
-  --sl-color-gray-6: #1a1a2e;
-  --sl-color-black: #0a0a0f;
+  color-scheme: dark;
+  --sl-font: var(--sw-font-body);
+  --sl-font-mono: var(--sw-font-mono);
+  --sl-color-black: var(--sw-bg-0);
+  --sl-color-gray-6: var(--sw-bg-1);
+  --sl-color-gray-5: var(--sw-bg-2);
+  --sl-color-gray-4: var(--sw-line);
+  --sl-color-gray-3: var(--sw-text-3);
+  --sl-color-gray-2: var(--sw-text-2);
+  --sl-color-gray-1: var(--sw-text-1);
+  --sl-color-white: var(--sw-text-1);
+  --sl-color-accent-low: color-mix(in oklch, var(--sw-accent) 18%, var(--sw-bg-0));
+  --sl-color-accent: var(--sw-accent);
+  --sl-color-accent-high: var(--sw-text-1);
+  --sl-color-text-accent: var(--sw-accent);
+  --sl-color-gray-7: var(--sw-bg-1);
+  --sl-color-bg-inline-code: var(--sw-bg-2);
   --sw-gradient: linear-gradient(135deg, #00d4ff 0%, #7c3aed 100%);
   --sw-gradient-warm: linear-gradient(
     135deg,
@@ -19,31 +61,111 @@
     #0066ff 50%,
     #7c3aed 100%
   );
-  --sw-card-bg: rgba(26, 26, 46, 0.6);
-  --sw-card-border: rgba(51, 51, 85, 0.8);
-  --sw-card-hover: rgba(0, 212, 255, 0.3);
+  --sw-card-bg: color-mix(in oklch, var(--sw-bg-1) 60%, transparent);
+  --sw-card-border: var(--sw-line);
+  --sw-card-hover: color-mix(in oklch, var(--sw-accent) 30%, transparent);
 }
 
-[data-theme="light"] {
-  --sl-color-accent-low: #d0f4ff;
-  --sl-color-accent: #0098b8;
-  --sl-color-accent-high: #003d4a;
-  --sl-color-white: #111122;
-  --sl-color-gray-1: #333355;
-  --sl-color-gray-2: #52525b;
-  --sl-color-gray-3: #71717a;
-  --sl-color-gray-4: #a1a1aa;
-  --sl-color-gray-5: #c8c8cd;
-  --sl-color-gray-6: #f4f4f5;
-  --sl-color-black: #ffffff;
-  --sw-card-bg: rgba(244, 244, 245, 0.8);
-  --sw-card-border: rgba(200, 200, 205, 0.8);
-  --sw-card-hover: rgba(0, 152, 184, 0.2);
+:root[data-theme="light"] {
+  color-scheme: light;
+  --sl-color-black: var(--sw-bg-1);
+  --sl-color-gray-6: var(--sw-bg-0);
+  --sl-color-gray-5: var(--sw-bg-2);
+  --sl-color-gray-4: var(--sw-line);
+  --sl-color-gray-3: var(--sw-text-3);
+  --sl-color-gray-2: var(--sw-text-2);
+  --sl-color-gray-1: var(--sw-text-1);
+  --sl-color-white: var(--sw-text-1);
+  --sl-color-accent-low: color-mix(in oklch, var(--sw-accent) 8%, var(--sw-bg-1));
+  --sl-color-accent: var(--sw-accent);
+  --sl-color-accent-high: var(--sw-text-1);
+  --sl-color-text-accent: var(--sw-accent);
+  --sl-color-gray-7: var(--sw-bg-1);
+  --sl-color-bg-inline-code: var(--sw-bg-2);
+  --sw-card-bg: color-mix(in oklch, var(--sw-bg-0) 80%, transparent);
+  --sw-card-border: var(--sw-line);
+  --sw-card-hover: color-mix(in oklch, var(--sw-accent) 20%, transparent);
 }
 
-/* Make Starlight default to dark */
-:root {
-  color-scheme: dark;
+/* Display face for docs page titles only (spec 5.3). Body text keeps the body face. */
+.content-panel h1 {
+  font-family: var(--sw-font-display);
+  font-size: var(--sw-size-h-1);
+  font-weight: 400;
+  letter-spacing: -0.01em;
+  line-height: var(--sw-leading-heading);
+}
+
+.sl-markdown-content h2 {
+  font-weight: 500;
+}
+
+/* Focus ring for every interactive element (WCAG 2.4.7). */
+:where(a, button, input, select, textarea, summary, [tabindex]):focus-visible {
+  outline: 2px solid var(--sw-accent);
+  outline-offset: 2px;
+}
+
+/* Copy buttons in code blocks: Expressive Code resets outline, so raise specificity. */
+.expressive-code .copy button:focus-visible {
+  outline: 2px solid var(--sw-accent);
+  outline-offset: 2px;
+}
+
+/* Comparison matrix: a table on wide screens, one card per row below 50em. */
+.compare-table code {
+  overflow-wrap: anywhere;
+}
+
+@media (max-width: 50em) {
+  .compare-table table,
+  .compare-table tbody {
+    display: block;
+  }
+
+  .compare-table thead {
+    display: none;
+  }
+
+  .compare-table tr {
+    display: block;
+    border: 1px solid var(--sw-line);
+    border-radius: var(--sw-radius-lg);
+    padding: var(--sw-space-4);
+    margin-bottom: var(--sw-space-4);
+  }
+
+  .compare-table td {
+    display: block;
+    border: 0;
+    padding: var(--sw-space-1) 0;
+    width: auto;
+  }
+
+  .compare-table td:first-child {
+    font-size: var(--sw-size-section);
+    font-weight: 600;
+    color: var(--sl-color-white);
+    padding-bottom: var(--sw-space-1);
+  }
+
+  .compare-table td:nth-child(2)::before,
+  .compare-table td:nth-child(3)::before {
+    display: block;
+    font-size: var(--sw-size-caption);
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    color: var(--sl-color-gray-2);
+  }
+
+  .compare-table td:nth-child(2)::before {
+    content: "Shipwright";
+  }
+
+  .compare-table td:nth-child(3)::before {
+    content: "Vendor-hosted (category)";
+  }
 }
 
 /* ─── Pipeline Flow Visualization ──────────────────────────────── */

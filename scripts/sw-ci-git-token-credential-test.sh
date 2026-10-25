@@ -142,6 +142,8 @@ assert_eq "the orchestrator environment disables repo hooks and fsmonitor" "yes"
 print_test_section "review-remediation rerun writer: from the base branch, never PR-head code"
 assert_eq "the rerun writer is fetched as the base branch tarball" "1" \
     "$(grep -c 'gh api "repos/${GITHUB_REPOSITORY}/tarball/${BASE_REF}"' "$REMEDIATION" || true)"
+assert_eq "the trusted CI scripts (#8673) are fetched as the default branch tarball" "1" \
+    "$(grep -c 'gh api "repos/${GITHUB_REPOSITORY}/tarball/${DEFAULT_BRANCH}"' "$REMEDIATION" || true)"
 assert_eq "the rerun step does not read the PR head to build the writer (no HEAD_SHA)" "0" \
     "$(grep -c 'HEAD_SHA' <<<"$(sed -n '/name: Request review rerun/,$p' "$REMEDIATION")" || true)"
 assert_eq "the rerun step never archives the agent-edited tree or a git remote" "0" \

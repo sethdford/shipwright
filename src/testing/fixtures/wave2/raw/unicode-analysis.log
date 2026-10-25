@@ -1,0 +1,3 @@
+# A model analysis line that uses a heavy check mark (U+2714) instead of the usual glyph.
+✔ Failure analyzed: 401 unauthorized in the mock
+  ✗ Tests: failed

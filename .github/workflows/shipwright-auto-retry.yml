@@ -112,6 +112,19 @@ jobs:
           echo "issue_number=$ISSUE_NUMBER" >> "$GITHUB_OUTPUT"
           echo "Found issue #$ISSUE_NUMBER for failed run $RUN_ID"
 
+      # Bun runs the TypeScript failure classifier (W2-02). Pinned like the safety-gates action;
+      # no lifecycle scripts run.
+      - name: Set up Bun for the failure classifier
+        if: steps.extract.outputs.issue_number != ''
+        uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
+        with:
+          bun-version: 1.2.19
+
+      - name: Install the Shipwright CLI dependencies
+        if: steps.extract.outputs.issue_number != ''
+        shell: bash
+        run: bun install --frozen-lockfile --ignore-scripts
+
       # ── Error categorization: fetch logs, classify failure, extract root cause ──
       - name: Categorize error from run logs
         if: steps.extract.outputs.issue_number != ''
@@ -170,10 +183,70 @@ jobs:
             ERROR_CATEGORY="TRANSIENT"
           fi
 
-          # Check for TRANSIENT patterns: timeouts, rate limits, connection errors
+          # Typed classification (W2-02): exit 0 = retry, 3 = escalate. Any other exit fails the job.
+          # Input is the failed steps' log only (I2): `--log-failed` leaves out steps that passed, so a
+          # passing pre-flight step cannot produce a false auth match. Fails closed when unreadable.
+          # The text is data: it reaches the classifier as a file, never as a command string.
+          if ! FAILED_LOG=$(gh run view "$RUN_ID" --repo "$GITHUB_REPOSITORY" --log-failed); then
+            echo "::error::cannot read the failed-step log of run $RUN_ID; not retrying"
+            exit 1
+          fi
+          printf '%s\n' "$FAILED_LOG" > "$RUNNER_TEMP/failed-run.log"
+          if bun src/cli.ts failure classify --log "$RUNNER_TEMP/failed-run.log" --json > "$RUNNER_TEMP/classify.json"; then
+            CLASSIFY_RC=0
+          else
+            CLASSIFY_RC=$?
+          fi
+          if [[ "$CLASSIFY_RC" -ne 0 && "$CLASSIFY_RC" -ne 3 ]]; then
+            echo "::error::failure classifier failed (exit $CLASSIFY_RC); not retrying"
+            exit 1
+          fi
+          if ! FAILURE_CLASS=$(jq -r '.class' "$RUNNER_TEMP/classify.json"); then
+            echo "::error::failure classifier output is unreadable; not retrying"
+            exit 1
+          fi
+          # An unknown or empty class fails closed: no retry on a verdict this code does not know.
+          case "$FAILURE_CLASS" in
+            auth|invalid_input|environment|transient|budget|max_turns|refusal|schema|truncated|timeout|execution|contamination|unknown) ;;
+            *)
+              echo "::error::failure classifier returned an unknown class ('$FAILURE_CLASS'); not retrying"
+              exit 1
+              ;;
+          esac
+          echo "Classifier: $FAILURE_CLASS (exit $CLASSIFY_RC)"
+          if [[ "$FAILURE_CLASS" == "auth" ]]; then
+            ERROR_CATEGORY="AUTH"
+          fi
+          # Exit 3 is an escalate verdict and never a retry (ADR-0009 rule 10). Each escalating class
+          # keeps its own category, so the strategy step and the comment name it. An unmapped escalate
+          # class fails closed.
+          if [[ "$CLASSIFY_RC" -eq 3 ]]; then
+            case "$FAILURE_CLASS" in
+              auth) ERROR_CATEGORY="AUTH" ;;
+              contamination) ERROR_CATEGORY="CONTAMINATION" ;;
+              invalid_input) ERROR_CATEGORY="INVALID_INPUT" ;;
+              *)
+                echo "::error::escalate verdict for class '$FAILURE_CLASS' has no mapping; not retrying"
+                exit 1
+                ;;
+            esac
+          fi
+          # Deviation from the plan (#8674): a transient verdict from log text is never used. Log text
+          # is free text an agent, issue or model can write, so "HTTP 503" or "ECONNRESET" in it does
+          # not make a retry. Transient comes only from the trusted timed_out conclusion below.
+          if [[ "$FAILURE_CLASS" == "transient" ]]; then
+            echo "Classifier said transient from log text; not used (#8674)"
+          fi
+
+          # TRANSIENT only from trusted data (#8674): a job or step that the API reports as timed out,
+          # or a run that was cancelled (above). Log text never sets it. The job read fails closed.
           if [[ "$ERROR_CATEGORY" == "UNKNOWN" ]]; then
-            TRANSIENT_MATCH=$(echo "$LOG_TAIL" | grep -ciE "timeout|rate.limit|503|502|connection.refused|ETIMEDOUT|ECONNRESET|socket.hang.up|too many requests" || true)
-            if [[ "${TRANSIENT_MATCH:-0}" -gt 0 ]]; then
+            if ! RUN_JOBS=$(gh run view "$RUN_ID" --repo "$GITHUB_REPOSITORY" --json jobs); then
+              echo "::error::cannot read the jobs of run $RUN_ID; not retrying"
+              exit 1
+            fi
+            TIMED_OUT=$(jq '[.jobs[]? | select(.conclusion == "timed_out" or any(.steps[]?; .conclusion == "timed_out"))] | length' <<<"$RUN_JOBS")
+            if [[ "${TIMED_OUT:-0}" -gt 0 ]]; then
               ERROR_CATEGORY="TRANSIENT"
             fi
           fi
@@ -262,6 +335,18 @@ jobs:
             echo "skip_reason=abandoned" >> "$GITHUB_OUTPUT"
             exit 0
           fi
+
+          # Escalations are never retried (W2-03, ADR-0009 rule 10): auth cannot be repaired by a retry,
+          # contamination would repeat real side effects, and invalid input needs an edit to the issue.
+          case "$ERROR_CATEGORY" in
+            AUTH|CONTAMINATION|INVALID_INPUT)
+              SKIP=$(echo "$ERROR_CATEGORY" | tr 'A-Z' 'a-z')
+              echo "Run $RUN_ID escalated ($ERROR_CATEGORY): not retrying; a human must act"
+              echo "should_retry=false" >> "$GITHUB_OUTPUT"
+              echo "skip_reason=$SKIP" >> "$GITHUB_OUTPUT"
+              exit 0
+              ;;
+          esac
 
           RETRY_COUNT=$(jq -r '.retry' <<<"$RETRY_STATE")
 
@@ -551,6 +636,59 @@ jobs:
           <!-- SHIPWRIGHT-ERROR-MSG: ${LAST_ERROR} -->
           EOF
           )" 2>/dev/null || true
+
+      # ── AUTH failure: no retry; post the marker that dispatch already recognises (W2-03) ──
+      - name: Handle AUTH failure (no retry)
+        if: steps.strategy.outputs.skip_reason == 'auth' && steps.extract.outputs.issue_number != ''
+        shell: bash
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          ISSUE_NUMBER: ${{ steps.extract.outputs.issue_number }}
+          RUN_ID: ${{ steps.extract.outputs.run_id }}
+        run: |
+          BODY="$RUNNER_TEMP/auth-body.md"
+          {
+            echo "## Pipeline Auth Failure"
+            echo
+            echo "Run [$RUN_ID]($GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$RUN_ID) failed authentication. Shipwright will not retry it."
+            echo
+            echo "Check the \`CLAUDE_CODE_OAUTH_TOKEN\` secret, and run \`claude setup-token\` locally to replace it."
+            echo
+            echo "<!-- SHIPWRIGHT-RETRY-CATEGORY: AUTH -->"
+          } > "$BODY"
+          gh issue comment "$ISSUE_NUMBER" --repo "$GITHUB_REPOSITORY" --body-file "$BODY"
+
+      # ── Contamination or invalid input: no retry; post the escalation marker (W2-03) ──
+      - name: Handle escalation (no retry)
+        if: (steps.strategy.outputs.skip_reason == 'contamination' || steps.strategy.outputs.skip_reason == 'invalid_input') && steps.extract.outputs.issue_number != ''
+        shell: bash
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          ISSUE_NUMBER: ${{ steps.extract.outputs.issue_number }}
+          RUN_ID: ${{ steps.extract.outputs.run_id }}
+          SKIP_REASON: ${{ steps.strategy.outputs.skip_reason }}
+        run: |
+          case "$SKIP_REASON" in
+            contamination)
+              CATEGORY="CONTAMINATION"
+              TEXT="The run reached a real service through the test gate, or changed the agent's checkout. A retry would repeat those side effects. Review the run before re-running."
+              ;;
+            *)
+              CATEGORY="INVALID_INPUT"
+              TEXT="The issue appears invalid or has no usable body. Fix the issue, then re-add the watch label."
+              ;;
+          esac
+          BODY="$RUNNER_TEMP/escalation-body.md"
+          {
+            echo "## Pipeline Escalation: $CATEGORY"
+            echo
+            echo "Run [$RUN_ID]($GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$RUN_ID) will not be retried automatically."
+            echo
+            echo "$TEXT"
+            echo
+            echo "<!-- SHIPWRIGHT-RETRY-CATEGORY: $CATEGORY -->"
+          } > "$BODY"
+          gh issue comment "$ISSUE_NUMBER" --repo "$GITHUB_REPOSITORY" --body-file "$BODY"
 
       # ── Max retries exhausted: post detailed analysis of all attempts ──
       - name: Mark issue as failed (max retries exhausted)

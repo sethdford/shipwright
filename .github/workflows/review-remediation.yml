@@ -71,6 +71,27 @@ jobs:
           INPUT_PR_NUMBER: ${{ github.event.inputs.pr_number }}
           EVENT_PR_NUMBER: ${{ github.event.pull_request.number }}
 
+      - name: Materialize trusted CI scripts from the base branch (#8673)
+        # Before the PR branch is checked out. The policy snapshot, the sandbox setup and the agent launcher run from
+        # this copy, never from the agent-authored branch: a PR cannot change the policy its own agent runs under.
+        # Always the repository's DEFAULT branch, not the PR's base: a PR chooses its base, and an older branch would
+        # be a downgrade. Fetched as a GitHub tarball, not a checkout or a remote.
+        run: |
+          TRUSTED="$RUNNER_TEMP/trusted"
+          DEFAULT_BRANCH="$(gh api "repos/${GITHUB_REPOSITORY}" --jq '.default_branch')"
+          git check-ref-format --branch "$DEFAULT_BRANCH" >/dev/null || { echo "::error::invalid default branch"; exit 1; }
+          rm -rf "$TRUSTED"
+          mkdir -p "$TRUSTED"
+          gh api "repos/${GITHUB_REPOSITORY}/tarball/${DEFAULT_BRANCH}" > "$RUNNER_TEMP/trusted.tgz"
+          tar -xzf "$RUNNER_TEMP/trusted.tgz" -C "$TRUSTED" --strip-components=1
+          rm -f "$RUNNER_TEMP/trusted.tgz"
+          chmod -R a-w "$TRUSTED"
+          for f in scripts/ci/snapshot-agent-policy.sh scripts/ci/agent-sandbox-setup.sh scripts/lib/agent-exec.sh; do
+            [[ -f "$TRUSTED/$f" ]] || { echo "::error::base branch has no $f"; exit 1; }
+          done
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
       - name: Checkout PR branch
         # Branch name is untrusted: pass via env, never interpolate into the script.
         env:
@@ -111,12 +132,13 @@ jobs:
       - name: Snapshot the agent permission policy (#8614)
         # From the default branch, not the checkout: a PR cannot widen the policy its own agent runs under.
         # The copy is read-only and outside the agent's working tree; agent-exec refuses a policy in the tree in CI.
-        run: scripts/ci/snapshot-agent-policy.sh
+        # The script itself comes from the base branch copy (#8673), not the PR checkout.
+        run: bash "$RUNNER_TEMP/trusted/scripts/ci/snapshot-agent-policy.sh"
 
       - name: Install agent sandbox (bubblewrap, socat; AppArmor on Ubuntu 24.04) (#8614)
         # Agents refuse to start without the sandbox (sandbox.failIfUnavailable). This step fails the job
         # with the fix if the runner cannot sandbox, instead of agents failing later as "auth" errors.
-        run: scripts/ci/agent-sandbox-setup.sh
+        run: bash "$RUNNER_TEMP/trusted/scripts/ci/agent-sandbox-setup.sh"
 
       - name: Remediate with Claude
         if: steps.findings.outputs.has_findings == 'true'
@@ -149,8 +171,19 @@ jobs:
 
           Fix all actionable findings. Skip any that are questions or suggestions without clear action items."
 
-          # Through agent-exec.sh: the agent gets no GitHub token (F9).
-          scripts/lib/agent-exec.sh claude -p "$PROMPT" --max-turns 10 --model claude-sonnet-5-5 2>&1 || {
+          # Through agent-exec.sh from the base branch copy (#8673): the agent gets no GitHub token (F9).
+          # The model alias comes from the trusted default-branch copy, never the PR checkout (W2-07). Until
+          # config/models.json is on the default branch (merge order: W2-07 lands after #8675 and then the
+          # file exists), the pinned sonnet ID is used with a warning, so remediation does not hard-fail.
+          MODELS_FILE="$RUNNER_TEMP/trusted/config/models.json"
+          if [[ -f "$MODELS_FILE" ]]; then
+            REMEDIATION_MODEL="$(jq -r '.aliases.sonnet // empty' "$MODELS_FILE")"
+          else
+            echo "::warning::config/models.json is not on the default branch yet; using the pinned sonnet ID"
+            REMEDIATION_MODEL="claude-sonnet-5-5"
+          fi
+          [[ -n "$REMEDIATION_MODEL" && "$REMEDIATION_MODEL" != "null" ]] || { echo "::error::no sonnet alias in config/models.json"; exit 1; }
+          "$RUNNER_TEMP/trusted/scripts/lib/agent-exec.sh" claude -p "$PROMPT" --max-turns 10 --model "$REMEDIATION_MODEL" 2>&1 || {
             echo "::warning::Claude remediation returned non-zero — changes may be partial"
           }
         env:

@@ -1,0 +1,245 @@
+{
+  "_about": "The 'bash' column is the daemon's classify_failure with SW_BUN pointing at nothing, so it is the bash regex alone (the test harness sets SW_BUN). Its auth alternatives mirror the TS auth rule, and its contamination rule mirrors the TS contamination rule, so a host without Bun does not retry an auth or contamination failure. Rows changed to match the regex: 'invalid api key provided', 'OAuth token revoked', 'OAuth token is invalid' (auth_error), and the two contamination texts (contamination).",
+  "mapping": {
+    "auth_error": "auth",
+    "api_error": "transient",
+    "invalid_issue": "invalid_input"
+  },
+  "cases": [
+    {
+      "text": "##[error]Claude Code authentication failed — check CLAUDE_CODE_OAUTH_TOKEN secret",
+      "bash": "auth_error",
+      "ts": "auth"
+    },
+    {
+      "text": "Error: 401 authentication_error: OAuth token has expired",
+      "bash": "auth_error",
+      "ts": "auth"
+    },
+    {
+      "text": "Request failed with status 401 Unauthorized",
+      "bash": "auth_error",
+      "ts": "auth"
+    },
+    {
+      "text": "invalid x-api-key token",
+      "bash": "auth_error",
+      "ts": "auth"
+    },
+    {
+      "text": "Error: invalid api key provided",
+      "bash": "auth_error",
+      "ts": "auth"
+    },
+    {
+      "text": "Not logged in · Please run /login",
+      "bash": "auth_error",
+      "ts": "auth"
+    },
+    {
+      "text": "API Error: 429 rate limit",
+      "bash": "api_error",
+      "ts": "transient"
+    },
+    {
+      "text": "HTTP 503 Service Unavailable",
+      "bash": "api_error",
+      "ts": "transient"
+    },
+    {
+      "text": "Error: 503 overloaded",
+      "bash": "api_error",
+      "ts": "unknown",
+      "differs": "A bare 'overloaded' with a number and no HTTP or status context is not a structured signal. TS keeps it unknown; it still retries under the normal caps."
+    },
+    {
+      "text": "ETIMEDOUT connecting to api.anthropic.com",
+      "bash": "api_error",
+      "ts": "transient"
+    },
+    {
+      "text": "ECONNRESET while streaming",
+      "bash": "api_error",
+      "ts": "transient"
+    },
+    {
+      "text": "socket hang up",
+      "bash": "api_error",
+      "ts": "unknown",
+      "differs": "Not in the structured list (ECONNRESET, ETIMEDOUT, EAI_AGAIN are errnos; this is a Node message). Unknown, retried under the normal caps."
+    },
+    {
+      "text": "Error: request timeout after 600s",
+      "bash": "api_error",
+      "ts": "unknown",
+      "differs": "TS does not treat a bare 'timeout' as transient: test and build timeouts are not API transients. Both retry; only the class differs."
+    },
+    {
+      "text": "gh: issue not found",
+      "bash": "invalid_issue",
+      "ts": "invalid_input"
+    },
+    {
+      "text": "HTTP 404 Not Found",
+      "bash": "invalid_issue",
+      "ts": "invalid_input"
+    },
+    {
+      "text": "issue 123 does not exist",
+      "bash": "invalid_issue",
+      "ts": "invalid_input"
+    },
+    {
+      "text": "build failed: tsc exit 2",
+      "bash": "build_failure",
+      "ts": "unknown"
+    },
+    {
+      "text": "FAIL src/foo.test.ts",
+      "bash": "build_failure",
+      "ts": "unknown"
+    },
+    {
+      "text": "npm ERR! code ELIFECYCLE",
+      "bash": "build_failure",
+      "ts": "unknown"
+    },
+    {
+      "text": "Process exited with exit code 1",
+      "bash": "build_failure",
+      "ts": "unknown"
+    },
+    {
+      "text": "bun: command not found",
+      "bash": "unknown",
+      "ts": "environment"
+    },
+    {
+      "text": "EACCES: permission denied, open '/etc/hosts'",
+      "bash": "unknown",
+      "ts": "unknown"
+    },
+    {
+      "text": "refusing to run inside a build-loop test gate",
+      "bash": "contamination",
+      "ts": "contamination"
+    },
+    {
+      "text": "CONTAMINATION: branch-switched a -> b",
+      "bash": "contamination",
+      "ts": "contamination"
+    },
+    {
+      "text": "Failure analyzed: accurate limits on retries\nbuild failed: tsc exit 2",
+      "bash": "api_error",
+      "ts": "unknown",
+      "differs": "Bash matches the words inside a model-written analysis line. TS removes model-analysis lines before classifying, so model prose cannot change the class or stop the deterministic check (round 2)."
+    },
+    {
+      "text": "test \"returns 401 unauthorized for bad token\" FAILED",
+      "bash": "auth_error",
+      "ts": "auth"
+    },
+    {
+      "text": "docs mention CLAUDE_CODE_OAUTH_TOKEN\nbuild failed",
+      "bash": "auth_error",
+      "ts": "unknown",
+      "differs": "A bare token variable name is not evidence of auth (plan test: a mention of the token variable alone is not an auth failure). TS labels it unknown and retries under the normal caps."
+    },
+    {
+      "text": "⚠ Sandbox disabled: sandbox is enabled but dependencies are missing: bubblewrap (bwrap) not installed",
+      "bash": "unknown",
+      "ts": "environment"
+    },
+    {
+      "text": "HTTP 429 Too Many Requests",
+      "bash": "api_error",
+      "ts": "transient"
+    },
+    {
+      "text": "status: 429",
+      "bash": "unknown",
+      "ts": "transient"
+    },
+    {
+      "text": "503 Service Unavailable",
+      "bash": "api_error",
+      "ts": "transient"
+    },
+    {
+      "text": "502 Bad Gateway",
+      "bash": "api_error",
+      "ts": "transient"
+    },
+    {
+      "text": "error type rate_limit_error",
+      "bash": "unknown",
+      "ts": "transient"
+    },
+    {
+      "text": "overloaded_error from upstream",
+      "bash": "api_error",
+      "ts": "transient"
+    },
+    {
+      "text": "read ECONNRESET",
+      "bash": "api_error",
+      "ts": "transient"
+    },
+    {
+      "text": "Retry-After: 30",
+      "bash": "unknown",
+      "ts": "transient"
+    },
+    {
+      "text": "rate limit exceeded",
+      "bash": "api_error",
+      "ts": "unknown",
+      "differs": "Plain prose 'rate limit' is not transient (round 2): bash matches the words; TS takes transient only from structured signals (HTTP or status 429/5xx, API error types, ECONNRESET/ETIMEDOUT/EAI_AGAIN, Retry-After)."
+    },
+    {
+      "text": "error: rate limit exceeded",
+      "bash": "api_error",
+      "ts": "unknown",
+      "differs": "Plain prose 'rate limit' is not transient (round 2): bash matches the words; TS takes transient only from structured signals (HTTP or status 429/5xx, API error types, ECONNRESET/ETIMEDOUT/EAI_AGAIN, Retry-After)."
+    },
+    {
+      "text": "OAuth token revoked",
+      "bash": "auth_error",
+      "ts": "auth"
+    },
+    {
+      "text": "Error: OAuth token is invalid",
+      "bash": "auth_error",
+      "ts": "auth"
+    },
+    {
+      "text": "Failure analyzed: rate limit error in the mock",
+      "bash": "api_error",
+      "ts": "unknown",
+      "differs": "Bash matches the words inside a model-written analysis line. TS removes model-analysis lines before classifying, so model prose cannot change the class or stop the deterministic check (round 2)."
+    },
+    {
+      "text": "✓ Failure analyzed: 401 unauthorized in the mock",
+      "bash": "auth_error",
+      "ts": "unknown",
+      "differs": "Bash matches the words inside a model-written analysis line. TS removes model-analysis lines before classifying, so model prose cannot change the class or stop the deterministic check (round 2)."
+    },
+    {
+      "text": "[fix/handle-rate-limit-errors-123 abc1234] loop: iteration 1 — autonomous progress",
+      "bash": "unknown",
+      "ts": "unknown"
+    },
+    {
+      "text": "FAIL test: client retries on rate-limit error\n  ✗ Tests: failed",
+      "bash": "build_failure",
+      "ts": "unknown"
+    },
+    {
+      "text": "build failed: tsc exit 2\n✓ Failure analyzed: rate limit on retries",
+      "bash": "api_error",
+      "ts": "unknown",
+      "differs": "Bash matches the words inside a model-written analysis line. TS removes model-analysis lines before classifying, so model prose cannot change the class or stop the deterministic check (round 2)."
+    }
+  ]
+}

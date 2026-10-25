@@ -9,6 +9,7 @@ import { resolvePaths } from "./adapters/paths";
 import { BunProcessRunner } from "./adapters/process/bun-process-runner";
 import { FilePauseFlag } from "./adapters/state/file-pause-flag";
 import { JsonCostLedger } from "./adapters/state/json-cost-ledger";
+import { NodeFileReader } from "./adapters/state/node-file-reader";
 import type { CliIO, Command } from "./cli/command";
 import { commands, findCommand } from "./cli/commands";
 import type { SafetyPorts } from "./contexts/orchestration";
@@ -18,6 +19,9 @@ const consoleIO: CliIO = {
   out: (text) => process.stdout.write(`${text}\n`),
   err: (text) => process.stderr.write(`${text}\n`),
 };
+
+const fileReader = new NodeFileReader();
+const files = () => fileReader;
 
 /** Adapters for the safety commands (ADR-0007). */
 export function buildSafetyPorts(
@@ -86,7 +90,7 @@ export async function main(
     return 2;
   }
   try {
-    return await command.run(args, { io, version: pkg.version, safety, env });
+    return await command.run(args, { io, version: pkg.version, safety, env, files });
   } catch (error) {
     io.err(`✗ ${error instanceof Error ? error.message : String(error)}`);
     return 1;
