@@ -362,7 +362,7 @@ _intelligence_call_claude() {
     type daemon_log &>/dev/null && daemon_log INFO "Intelligence: calling Claude (model=${model:-default}, timeout=${_claude_timeout}s)"
 
     local response
-    if ! response=$("$SW_AGENT_EXEC" $_timeout_cmd claude -p "$prompt" $_model_flag 2>/dev/null); then
+    if ! response=$("$SW_AGENT_EXEC" $_timeout_cmd claude -p "$prompt" $_model_flag); then  # W2-07: a refused model is reported
         error "Claude call failed or timed out"
         echo '{"error":"claude_call_failed"}'
         return 1

@@ -28,6 +28,7 @@ cp "$SCRIPT_DIR/lib/decide-scoring.sh" "$TEST_REPO/scripts/lib/"
 cp "$SCRIPT_DIR/lib/decide-autonomy.sh" "$TEST_REPO/scripts/lib/"
 cp "$SCRIPT_DIR/lib/safety-gates.sh" "$TEST_REPO/scripts/lib/"
 [[ -f "$SCRIPT_DIR/lib/compat.sh" ]] && cp "$SCRIPT_DIR/lib/compat.sh" "$TEST_REPO/scripts/lib/"
+[[ -f "$SCRIPT_DIR/lib/models.sh" ]] && cp "$SCRIPT_DIR/lib/models.sh" "$TEST_REPO/scripts/lib/"  # W2-07: compat.sh sources it
 [[ -f "$SCRIPT_DIR/lib/policy.sh" ]] && cp "$SCRIPT_DIR/lib/policy.sh" "$TEST_REPO/scripts/lib/"
 
 # Copy tiers config

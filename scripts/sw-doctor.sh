@@ -1509,10 +1509,13 @@ if [[ -f "$_SETTINGS_FILE" ]] && command -v jq >/dev/null 2>&1; then
     # Check effort level
     _effort_val=$(jq -r '.env.CLAUDE_CODE_EFFORT_LEVEL // empty' "$_SETTINGS_FILE" 2>/dev/null || echo "")
     if [[ -n "$_effort_val" ]]; then
-        case "$_effort_val" in
-            low|medium|high) check_pass "Effort level configured: ${_effort_val}" ;;
-            *) check_fail "Invalid effort level in settings.json: ${_effort_val} (must be low/medium/high)" ;;
-        esac
+        # W2-07: the valid efforts come from config/models.json ("efforts"), so xhigh is accepted.
+        source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/lib/models.sh"
+        if models_effort_valid "$_effort_val"; then
+            check_pass "Effort level configured: ${_effort_val}"
+        else
+            check_fail "Invalid effort level in settings.json: ${_effort_val} (must be one of the efforts in config/models.json)"
+        fi
     else
         check_warn "CLAUDE_CODE_EFFORT_LEVEL not configured"
     fi

@@ -37,6 +37,7 @@ setup_env() {
     # sw-db.sh sources lib/compat.sh from its own directory; without it epoch_to_iso is undefined.
     mkdir -p "$TEST_TEMP_DIR/lib"
     cp "$SCRIPT_DIR/lib/compat.sh" "$TEST_TEMP_DIR/lib/"
+    cp "$SCRIPT_DIR/lib/models.sh" "$TEST_TEMP_DIR/lib/"  # W2-07: compat.sh sources it
 
     # Set up mock environment
     export HOME="$TEST_TEMP_DIR/home"

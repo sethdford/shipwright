@@ -1,6 +1,8 @@
 #!/usr/bin/env bash
 
 # Agents run without GitHub credentials (#8614): claude is launched through agent-exec.sh.
+# shellcheck source=lib/models.sh
+source "$(dirname "${BASH_SOURCE[0]}")/models.sh"  # W2-07: fallback comparison by resolved ID
 SW_AGENT_EXEC="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/agent-exec.sh"
 # Module guard - prevent double-sourcing
 [[ -n "${_LOOP_ITERATION_LOADED:-}" ]] && return 0
@@ -514,8 +516,14 @@ build_claude_flags() {
     fi
 
     # Only add fallback-model if it differs from primary (Claude CLI rejects same model)
-    if [[ -n "${FALLBACK_MODEL:-}" ]] && [[ "${FALLBACK_MODEL}" != "$MODEL" ]]; then
-        flags+=("--fallback-model" "$FALLBACK_MODEL")
+    # W2-07: compare the resolved IDs, so an alias and its full ID count as the same model. A value that does not
+    # resolve is passed on, and agent-exec refuses it with the reason.
+    if [[ -n "${FALLBACK_MODEL:-}" ]]; then
+        _loop_fb="$(models_resolve "$FALLBACK_MODEL" 2>/dev/null || echo "$FALLBACK_MODEL")"
+        _loop_primary="$(models_resolve "${MODEL:-}" 2>/dev/null || echo "${MODEL:-}")"
+        if [[ "$_loop_fb" != "$_loop_primary" ]]; then
+            flags+=("--fallback-model" "$FALLBACK_MODEL")
+        fi
     fi
 
     # Keep the cached prompt prefix stable across iterations. The per-machine

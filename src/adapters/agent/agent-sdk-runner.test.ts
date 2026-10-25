@@ -589,12 +589,13 @@ describe("agentEnv", () => {
       ANTHROPIC_SMALL_FAST_MODEL: "m2",
       ANTHROPIC_DEFAULT_SONNET_MODEL: "m3",
     });
+    // W2-07: ANTHROPIC_MODEL and ANTHROPIC_SMALL_FAST_MODEL override --model, so they are not passed.
+    expect(env).not.toHaveProperty("ANTHROPIC_MODEL");
+    expect(env).not.toHaveProperty("ANTHROPIC_SMALL_FAST_MODEL");
     expect(env).toMatchObject({
       ANTHROPIC_AUTH_TOKEN: "auth",
       ANTHROPIC_BASE_URL: "https://gateway.example",
       CLAUDE_CONFIG_DIR: "/cfg",
-      ANTHROPIC_MODEL: "m1",
-      ANTHROPIC_SMALL_FAST_MODEL: "m2",
       ANTHROPIC_DEFAULT_SONNET_MODEL: "m3",
     });
   });
