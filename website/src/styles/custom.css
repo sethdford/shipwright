@@ -51,6 +51,9 @@
   --sl-color-accent-low: color-mix(in oklch, var(--sw-accent) 18%, var(--sw-bg-0));
   --sl-color-accent: var(--sw-accent);
   --sl-color-accent-high: var(--sw-text-1);
+  --sl-color-text-accent: var(--sw-accent);
+  --sl-color-gray-7: var(--sw-bg-1);
+  --sl-color-bg-inline-code: var(--sw-bg-2);
   --sw-gradient: linear-gradient(135deg, #00d4ff 0%, #7c3aed 100%);
   --sw-gradient-warm: linear-gradient(
     135deg,
@@ -76,6 +79,9 @@
   --sl-color-accent-low: color-mix(in oklch, var(--sw-accent) 8%, var(--sw-bg-1));
   --sl-color-accent: var(--sw-accent);
   --sl-color-accent-high: var(--sw-text-1);
+  --sl-color-text-accent: var(--sw-accent);
+  --sl-color-gray-7: var(--sw-bg-1);
+  --sl-color-bg-inline-code: var(--sw-bg-2);
   --sw-card-bg: color-mix(in oklch, var(--sw-bg-0) 80%, transparent);
   --sw-card-border: var(--sw-line);
   --sw-card-hover: color-mix(in oklch, var(--sw-accent) 20%, transparent);
@@ -84,9 +90,75 @@
 /* Display face for docs page titles only (spec 5.3). Body text keeps the body face. */
 .content-panel h1 {
   font-family: var(--sw-font-display);
+  font-size: var(--sw-size-h-1);
   font-weight: 400;
   letter-spacing: -0.01em;
   line-height: var(--sw-leading-heading);
+}
+
+.sl-markdown-content h2 {
+  font-weight: 500;
+}
+
+/* Focus ring for every interactive element (WCAG 2.4.7). */
+:where(a, button, input, select, textarea, summary, [tabindex]):focus-visible {
+  outline: 2px solid var(--sw-accent);
+  outline-offset: 2px;
+}
+
+/* Comparison matrix: a table on wide screens, one card per row below 50em. */
+.compare-table code {
+  overflow-wrap: anywhere;
+}
+
+@media (max-width: 50em) {
+  .compare-table table,
+  .compare-table tbody {
+    display: block;
+  }
+
+  .compare-table thead {
+    display: none;
+  }
+
+  .compare-table tr {
+    display: block;
+    border: 1px solid var(--sw-line);
+    border-radius: var(--sw-radius-lg);
+    padding: var(--sw-space-4);
+    margin-bottom: var(--sw-space-4);
+  }
+
+  .compare-table td {
+    display: block;
+    border: 0;
+    padding: var(--sw-space-1) 0;
+    width: auto;
+  }
+
+  .compare-table td:first-child {
+    font-size: var(--sw-size-section);
+    font-weight: 600;
+    padding-bottom: var(--sw-space-2);
+  }
+
+  .compare-table td:nth-child(2)::before,
+  .compare-table td:nth-child(3)::before {
+    display: block;
+    font-size: var(--sw-size-caption);
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    color: var(--sl-color-gray-2);
+  }
+
+  .compare-table td:nth-child(2)::before {
+    content: "Shipwright";
+  }
+
+  .compare-table td:nth-child(3)::before {
+    content: "Vendor-hosted (category)";
+  }
 }
 
 /* ─── Pipeline Flow Visualization ──────────────────────────────── */

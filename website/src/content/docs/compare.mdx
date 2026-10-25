@@ -5,23 +5,27 @@ description: How Shipwright differs from vendor-hosted agent services. A categor
 
 Shipwright is self-hosted and fails closed. Vendor-hosted agent services run on vendor infrastructure. This page compares the two categories. It names no products.
 
-Every Shipwright cell names the file in this repository that makes the claim, and each claim was checked against the `main` branch on 2026-10-25. The vendor-hosted column describes the category, not one service, so it has no per-vendor source. Where a vendor-hosted service is stronger, the table says so.
+Every Shipwright claim names the file in this repository that makes it, and each claim was checked against the `main` branch on 2026-10-25. The vendor-hosted column describes the category, not one service, so it has no per-vendor source. Where a vendor-hosted service is stronger, the vendor cell says so.
+
+<div className="compare-table">
 
 | Area | Shipwright | Vendor-hosted agents (category) |
 | --- | --- | --- |
-| **Hosting model** | You run it. A local CLI and daemon, with embedded SQLite state (`src/adapters/store/sqlite-event-log.ts`). The dashboard server is one you start yourself (`dashboard/server.ts`). | The vendor runs the agents on its infrastructure. |
-| **Gate contract** | `shipwright gates check --retry N` exits 0 only on pass, and every gate fails closed (`src/cli/commands/gates.ts`, `docs/safety-runbook.md`). | Set by the vendor's platform. Each service documents its own. |
-| **Evidence shown** | `scripts/sw-evidence.sh` captures browser, API, database, CLI, webhook and custom evidence. It records SHA-256 hashes and checks freshness, on by default (`requireFreshArtifacts`). | Varies by service. |
-| **Multi-machine** | **Planned, not on main.** The Postgres adapter and pull workers are Wave 2 work (`src/shared/kernel/durability.ts`). | **Stronger.** A vendor service needs no machines from you. |
-| **Cost visibility** | Per-pipeline cost tracking (`scripts/sw-cost.sh`). Budget checks run when a budget is set in `budget.json`, and they are off by default. | Varies by service. |
-| **Self-hosting** | Yes. MIT licence, and `install.sh` sets up the CLI, tmux config and hooks on your machine. | Not available. The service runs on the vendor's infrastructure. |
-| **Source availability** | Public repository under the MIT licence (`LICENSE`). | Varies by service. |
-| **Operations** | **Stronger for vendor-hosted.** Nothing to install or keep running. Shipwright needs tmux, the Claude Code CLI and a machine that stays on for the daemon. | Nothing for you to run. |
-| **Tracker integrations** | GitHub, Jira and Linear trackers (`scripts/sw-tracker-github.sh`, `scripts/sw-tracker-jira.sh`, `scripts/sw-tracker-linear.sh`). | **Can be broader.** Hosted services often ship more prebuilt connectors. |
+| **Hosting model** | You run it. A local CLI and daemon keep state in embedded SQLite. The dashboard server is one you start yourself. Source: `scripts/sw-db.sh`, `dashboard/server.ts`. | The vendor runs the agents on its infrastructure. |
+| **Gate contract** | `shipwright gates check --retry N` exits 0 only on pass. Every gate fails closed: a source that cannot be read stops the run. Documented exceptions: with no cost data, the budget gate passes with a warning. `--no-github` skips the breaker, review-WIP and label gates locally. A manual `workflow_dispatch` run is not gated. Source: `src/cli/commands/gates.ts`, `docs/safety-runbook.md`. | Set by the vendor's platform. Each service documents its own. |
+| **Evidence shown** | `scripts/sw-evidence.sh` captures browser, API, CLI, database, webhook and custom evidence. It records SHA-256 hashes and checks freshness, on by default. Source: `scripts/sw-evidence.sh`, `config/policy.json`. | Varies by service. |
+| **Multi-machine** | Ships today: `shipwright remote` registers worker machines and manages their daemons, with `sw-fleet` and `sw-connect`. Planned: shared durable state across machines, on Postgres with pull workers. Source: `scripts/sw-remote.sh`, `scripts/sw-fleet.sh`, `scripts/sw-connect.sh`, `src/shared/kernel/durability.ts` (planned). | **Stronger for vendor-hosted:** capacity is provisioned and managed for you. Shipwright's machines are ones you provision. |
+| **Cost visibility** | Per-pipeline cost tracking. Budget checks run when a budget is set, and they are off by default. Source: `scripts/sw-cost.sh`. | Varies by service. |
+| **Self-hosting** | Yes. MIT licence, and `install.sh` sets up the CLI, tmux config and hooks on your machine. Source: `LICENSE`, `install.sh`. | Not available. The service runs on the vendor's infrastructure. |
+| **Source availability** | Public repository under the MIT licence. Source: `LICENSE`. | Varies by service. |
+| **Operations** | You install and keep running tmux, the Claude Code CLI, and the daemon on a machine that stays on. Source: `website/src/content/docs/quick-start.mdx` (prerequisites). | **Stronger for vendor-hosted:** nothing for you to install or keep running. |
+| **Tracker integrations** | GitHub, Jira and Linear trackers. Source: `scripts/sw-tracker-github.sh`, `scripts/sw-tracker-jira.sh`, `scripts/sw-tracker-linear.sh`. | **Stronger for vendor-hosted:** hosted services often ship more prebuilt connectors. |
+
+</div>
 
 ## What "fails closed" means here
 
-A gate that cannot read its input does not pass. If a source cannot be read, because GitHub is down, a token is bad, or a cost file is malformed, the gate stops and says why. See [Troubleshooting](/troubleshooting/) for what to do next.
+A gate that cannot read its input does not pass. If a source cannot be read, because GitHub is down, a token is bad, or a cost file is malformed, the gate stops and says why. The documented exceptions are in the gate row above. See [Troubleshooting](/troubleshooting/) for what to do next.
 
 ## Next steps
 
