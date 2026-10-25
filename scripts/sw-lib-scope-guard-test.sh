@@ -85,6 +85,7 @@ run_guard() {
 
 ev() { jq -r "$2" "$EVD/scope-check-iter-$1${3:-}.json"; }
 reasons() { ev "$1" '[.violations[].reason] | join(",")'; }
+block_reason() { jq -r '.reason' "$EVD/scope-check-iter-1.json"; }
 
 # ─── Config and type resolution ──────────────────────────────────────────────
 
@@ -434,16 +435,16 @@ fresh
 export SW_SCOPE_JSON="$DOCS_SCOPE" SW_SCOPE_CONFIG="$SCOPE_CONFIG" SW_SCOPE_BASE="$BASE"
 SCOPE_STRIKES=0
 rm "$R/scripts/demo-test.sh"; git -C "$R" add -A
-RC=0; scope_worker_precommit "$R" 1 1 "$EVD" || RC=$?
+RC=0; scope_worker_precommit "$R" 1 1 "$EVD" "$BASE" || RC=$?
 assert_eq "worker: staged protected deletion is discarded (rc 1)" "1" "$RC"
 assert_eq "worker: discard restored the test file" "true" "$([[ -f "$R/scripts/demo-test.sh" ]] && echo true || echo false)"
 git -C "$R" rm -q --cached scripts/demo-test.sh 2>/dev/null || true
-rm -f "$R/scripts/demo-test.sh"; git -C "$R" add -A; RC=0; scope_worker_precommit "$R" 2 1 "$EVD" || RC=$?
+rm -f "$R/scripts/demo-test.sh"; git -C "$R" add -A; RC=0; scope_worker_precommit "$R" 2 1 "$EVD" "$BASE" || RC=$?
 assert_eq "worker: a second violation blocks (rc 2)" "2" "$RC"
 fresh
 export SW_SCOPE_JSON="$DOCS_SCOPE" SW_SCOPE_CONFIG="$SCOPE_CONFIG" SW_SCOPE_BASE="$BASE"
 echo "ok" >> "$R/docs/safety-runbook.md"; git -C "$R" add -A
-RC=0; scope_worker_precommit "$R" 1 1 "$EVD" || RC=$?
+RC=0; scope_worker_precommit "$R" 1 1 "$EVD" "$BASE" || RC=$?
 assert_eq "worker: clean staged change passes (rc 0)" "0" "$RC"
 unset SW_SCOPE_JSON SW_SCOPE_CONFIG SW_SCOPE_BASE
 git -C "$R" reset -q --hard "$BASE"
@@ -453,7 +454,7 @@ git -C "$R" reset -q --hard "$BASE"
 echo ""
 echo -e "${DIM}  git metadata and attributes (B3)${RESET}"
 # A non-empty .git/info/attributes is refused at setup: it could make a change count as zero lines.
-GD="$(_scope_git -C "$R" rev-parse --absolute-git-dir)"
+GD="$(git -C "$R" rev-parse --absolute-git-dir)"
 fresh
 echo "* -diff" > "$GD/info/attributes"
 if scope_setup_run "$R" "$BASE" "$TEST_TEMP_DIR/no-artifacts" "Add the runbook note" "" 2>/dev/null; then
@@ -494,28 +495,113 @@ assert_has "uncountable binary change is a violation" "binary_file" "$(cat "$TES
 echo ""
 echo -e "${DIM}  trusted base and ancestry (J)${RESET}"
 fresh
-git -C "$R" branch -f main "$BASE"
+# The trusted base is never read from the repo: the helper that did that is gone.
+if type scope_trusted_base >/dev/null 2>&1; then assert_fail "J: scope_trusted_base is removed"; else assert_pass "J: scope_trusted_base is removed"; fi
 git -C "$R" checkout -q -b feature-j "$BASE"
-echo "forged" > "$R/config/scope-budgets.json"; commit_all "forged config commit"
-FORGED="$(head_of)"
 echo "a" >> "$R/docs/safety-runbook.md"; commit_all "agent commit"
-TRUSTED="$(scope_trusted_base "$R")" || TRUSTED=""
-assert_eq "J: trusted base is the fork point from the default branch, not the agent's commit" "$BASE" "$TRUSTED"
-if [[ "$TRUSTED" == "$FORGED" ]]; then assert_fail "J: forged commit must not be trusted"; else assert_pass "J: forged commit must not be trusted"; fi
 # A base that is not an ancestor of HEAD is refused at setup.
 git -C "$R" checkout -q -b sibling-j "$BASE"
 echo "sib" > "$R/docs/sibling.md"; commit_all "sibling"
 SIB="$(head_of)"
-git -C "$R" checkout -q loop-branch 2>/dev/null || git -C "$R" checkout -q feature-j
-git -C "$R" symbolic-ref HEAD refs/heads/feature-j
+git -C "$R" checkout -q feature-j
 if scope_setup_run "$R" "$SIB" "$TEST_TEMP_DIR/no-artifacts" "Add the runbook note" "" 2>/dev/null; then
     assert_fail "J: a base that is not an ancestor of HEAD is refused"
 else
     assert_pass "J: a base that is not an ancestor of HEAD is refused"
 fi
-git -C "$R" symbolic-ref HEAD refs/heads/loop-branch
-git -C "$R" checkout -q -f loop-branch 2>/dev/null || true
+git -C "$R" checkout -q loop-branch 2>/dev/null || git -C "$R" checkout -q -f -b loop-branch "$BASE"
 git -C "$R" branch -q -D feature-j sibling-j 2>/dev/null || true
+
+# Resume base (item 4): only SW_PIPELINE_BASE_SHA counts; a branch name, an empty value or a
+# non-ancestor is refused.
+fresh
+if (unset SW_PIPELINE_BASE_SHA; scope_resume_base "$R") >/dev/null 2>&1; then assert_fail "resume: no recorded base refuses"; else assert_pass "resume: no recorded base refuses"; fi
+if SW_PIPELINE_BASE_SHA=main scope_resume_base "$R" >/dev/null 2>&1; then assert_fail "resume: a branch name is refused"; else assert_pass "resume: a branch name is refused"; fi
+if SW_PIPELINE_BASE_SHA="$BASE" scope_resume_base "$R" >/dev/null 2>&1; then assert_pass "resume: the recorded base is accepted"; else assert_fail "resume: the recorded base is accepted"; fi
+git -C "$R" checkout -q -b resume-side "$BASE"
+echo "side" > "$R/docs/side.md"; commit_all "side"; SIDE="$(head_of)"
+git -C "$R" checkout -q loop-branch
+if SW_PIPELINE_BASE_SHA="$SIDE" scope_resume_base "$R" >/dev/null 2>&1; then assert_fail "resume: a base that is not an ancestor of HEAD is refused"; else assert_pass "resume: a base that is not an ancestor of HEAD is refused"; fi
+git -C "$R" branch -q -D resume-side 2>/dev/null || true
+
+# ─── Round 4 regressions (#8662 review) ──────────────────────────────────────
+
+echo ""
+echo -e "${DIM}  round-4 regressions (R1, R2, G1, W1, S1, worker reset)${RESET}"
+
+# R1: a replace ref changes what git shows for an object. The guard compares refs/replace before each check.
+fresh
+git -C "$R" update-ref refs/replace/"$BASE" "$BASE"
+echo "x" >> "$R/docs/safety-runbook.md"
+run_guard "$BASE" 1
+assert_has "R1: a replace ref created mid-run blocks the check" "git_metadata_changed" "$(block_reason)"
+git -C "$R" update-ref -d refs/replace/"$BASE"
+
+# R2: a graft file in the git dir is a metadata change, so the check blocks.
+fresh
+echo "x" >> "$R/docs/safety-runbook.md"
+printf '%s\n' "$BASE" > "$GD/info/grafts"
+run_guard "$BASE" 1
+assert_has "R2: a grafts file created mid-run blocks the check" "git_metadata_changed" "$(block_reason)"
+rm -f "$GD/info/grafts"
+
+# G1: a rewritten .git file that points elsewhere is caught: the recorded git dir no longer matches.
+fresh
+echo "x" >> "$R/docs/safety-runbook.md"
+SAVED_GD="$SCOPE_GIT_DIR"
+SCOPE_GIT_DIR="$TEST_TEMP_DIR/elsewhere.git"
+run_guard "$BASE" 1
+assert_eq "G1: a git dir that no longer matches the recorded one blocks (rc 2)" "2" "$RC"
+assert_has "G1: reason names the git dir change" "git_dir_changed" "$(block_reason)"
+SCOPE_GIT_DIR="$SAVED_GD"
+_scope_establish "$R" || true
+
+# W1: a config.worktree file in the git dir changes the metadata hash.
+fresh
+echo "x" >> "$R/docs/safety-runbook.md"
+printf '[core]\n\tpager = false\n' > "$GD/config.worktree"
+run_guard "$BASE" 1
+assert_has "W1: a config.worktree written mid-run blocks the check" "git_metadata_changed" "$(block_reason)"
+rm -f "$GD/config.worktree"
+
+# S1: a non-empty shared info/attributes refuses the run at setup.
+fresh
+COMMON="$(git -C "$R" rev-parse --git-common-dir)"
+case "$COMMON" in /*) ;; *) COMMON="$R/$COMMON" ;; esac
+printf '*.md -diff\n' > "$COMMON/info/attributes"
+if scope_setup_run "$R" "$BASE" "$TEST_TEMP_DIR/no-artifacts" "Add the runbook note" "" 0 2>/dev/null; then
+    assert_fail "S1: a non-empty info/attributes refuses the run"
+else
+    assert_pass "S1: a non-empty info/attributes refuses the run"
+fi
+rm -f "$COMMON/info/attributes"
+scope_setup_run "$R" "$BASE" "$TEST_TEMP_DIR/no-artifacts" "Add the runbook note" "" 0 2>/dev/null || true
+
+# Final check (item 5): the whole base..HEAD diff, including a commit made after the loop, is judged.
+fresh
+echo "ok" >> "$R/docs/safety-runbook.md"; commit_all "clean final commit"
+if scope_final_check "$R" "$BASE" "$EVD" "Add the runbook note" ""; then assert_pass "final: a clean base..HEAD passes"; else assert_fail "final: a clean base..HEAD passes"; fi
+fresh
+echo "forbidden" >> "$R/scripts/ci/gate.sh"; commit_all "final commit edits a protected file"
+RC=0; scope_final_check "$R" "$BASE" "$EVD" "Add the runbook note" "" || RC=$?
+assert_eq "final: a protected change in the final commit blocks (rc 2)" "2" "$RC"
+RC=0; scope_final_check "$R" "" "$EVD" "Add the runbook note" "" || RC=$?
+assert_eq "final: no pipeline base blocks (rc 2)" "2" "$RC"
+fresh
+
+# Worker: a forbidden change committed by the agent is discarded back to the worker's own start commit.
+fresh
+WSTART="$BASE"
+echo "forbidden" >> "$R/scripts/ci/gate.sh"; commit_all "agent edits a protected file"
+SW_SCOPE_JSON="$DOCS_SCOPE"
+SW_SCOPE_CONFIG="$(cat "$R/config/scope-budgets.json")"
+SW_SCOPE_BASE="$BASE"
+SW_SCOPE_UPSTREAM="$BASE"
+scope_worker_precommit "$R" 1 1 "$EVD" "$WSTART" || RC=$?
+assert_eq "worker: protected-path change is reverted (rc 1)" "1" "${RC:-0}"
+assert_eq "worker: HEAD is back at the worker's start commit" "$WSTART" "$(head_of)"
+unset SW_SCOPE_JSON SW_SCOPE_CONFIG SW_SCOPE_BASE SW_SCOPE_UPSTREAM
+RC=0
 
 # ─── Context restart and git probe (items 4, 5) ─────────────────────────────
 
@@ -555,11 +641,11 @@ SCOPE_STRIKES=0
 # the base, so a worker cannot spend its budget one commit at a time.
 echo "ok" >> "$R/docs/safety-runbook.md"; git -C "$R" add -A; git -C "$R" commit -qm "worker 1" --no-verify
 rm "$R/scripts/demo-test.sh"; git -C "$R" add -A
-RC=0; scope_worker_precommit "$R" 2 1 "$EVD" || RC=$?
+RC=0; scope_worker_precommit "$R" 2 1 "$EVD" "$BASE" || RC=$?
 assert_eq "worker: cumulative tree with a protected deletion is discarded" "1" "$RC"
 # A worker without the base fails closed.
 unset SW_SCOPE_BASE
-RC=0; scope_worker_precommit "$R" 3 1 "$EVD" || RC=$?
+RC=0; scope_worker_precommit "$R" 3 1 "$EVD" "$BASE" || RC=$?
 assert_eq "worker: missing base fails closed (rc 2)" "2" "$RC"
 unset SW_SCOPE_JSON SW_SCOPE_CONFIG SW_SCOPE_BASE
 git -C "$R" reset -q --hard "$BASE"

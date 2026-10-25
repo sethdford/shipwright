@@ -87,6 +87,14 @@ stage_pr() {
         git commit -m "chore: pipeline cleanup — commit remaining build changes" --no-verify 2>/dev/null || true
     fi
 
+    # Blast-radius guard, final check (#8644): judge base..HEAD, including the commit above, before the
+    # push. Fail closed: without the pipeline base, or on any violation, nothing is pushed.
+    if ! type scope_final_check >/dev/null 2>&1 \
+        || ! scope_final_check "$PWD" "${SW_PIPELINE_BASE_SHA:-}" "${ARTIFACTS_DIR:-}" "${GOAL:-}" "${ISSUE_LABELS:-}"; then
+        error "Blast-radius guard blocked the push: the branch changes are outside the declared scope or the pipeline base is unknown"
+        return 1
+    fi
+
     # Auto-rebase onto latest base branch before PR
     auto_rebase || {
         warn "Rebase/merge failed — pushing as-is"

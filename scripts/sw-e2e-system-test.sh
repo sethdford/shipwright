@@ -279,7 +279,12 @@ invoke_pipeline() {
     # shellcheck disable=SC2034
     PIPELINE_EXIT=0
     # shellcheck disable=SC2034
+    # The pipeline records its base outside the repo and exports it (#8644, #8671). The blast-radius
+    # guard's final check needs it before the push; this test stands in for that record.
+    local _base_sha
+    _base_sha="$(git -C "$TEMP_DIR/project" rev-parse HEAD 2>/dev/null || true)"
     PIPELINE_OUTPUT=$(cd "$TEMP_DIR/project" && PATH="$TEMP_DIR/bin:$PATH" HOME="$TEMP_DIR/home" \
+        SW_PIPELINE_BASE_SHA="$_base_sha" \
         bash "$TEMP_DIR/scripts/sw-pipeline.sh" "$@" 2>&1) || PIPELINE_EXIT=$?
 }
 

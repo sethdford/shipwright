@@ -16,7 +16,8 @@
     "config/agent-permissions.json",
     "config/scope-budgets.json",
     "scripts/lib/scope-guard.sh",
-    "**/.gitattributes"
+    "**/.gitattributes",
+    "**/.gitmodules"
   ],
   "runtime_paths": [
     ".claude/loop-logs/**",

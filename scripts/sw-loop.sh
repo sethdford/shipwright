@@ -1888,7 +1888,9 @@ type scope_worker_precommit >/dev/null 2>&1 || { echo "blast-radius guard unavai
 SW_SCOPE_JSON="$(cat "__SCOPE_DIR__/scope.json" 2>/dev/null || true)"
 SW_SCOPE_CONFIG="$(cat "__SCOPE_DIR__/config.json" 2>/dev/null || true)"
 SW_SCOPE_BASE="$(cat "__SCOPE_DIR__/base.txt" 2>/dev/null || true)"
-export SW_SCOPE_JSON SW_SCOPE_CONFIG SW_SCOPE_BASE
+SW_SCOPE_UPSTREAM="$(cat "__SCOPE_DIR__/upstream.txt" 2>/dev/null || true)"
+WORKER_START="$(git -C "__WORK_DIR__" rev-parse HEAD 2>/dev/null || true)"
+export SW_SCOPE_JSON SW_SCOPE_CONFIG SW_SCOPE_BASE SW_SCOPE_UPSTREAM
 
 echo -e "${CYAN}${BOLD}▸${RESET} Agent ${AGENT_NUM}/${TOTAL_AGENTS} starting in ${WORK_DIR}"
 
@@ -1976,7 +1978,7 @@ PROMPT
         .claude/hygiene-report.json .claude/pr-draft.md 2>/dev/null || true
     # Blast-radius gate (#8644): judge the staged changes before committing. A violation discards them.
     _scope_w_rc=0
-    scope_worker_precommit "$WORK_DIR" "$ITERATION" "$AGENT_NUM" "$LOG_DIR" || _scope_w_rc=$?
+    scope_worker_precommit "$WORK_DIR" "$ITERATION" "$AGENT_NUM" "$LOG_DIR" "$WORKER_START" || _scope_w_rc=$?
     if [[ "$_scope_w_rc" -eq 2 ]]; then echo -e "  ${RED}✗${RESET} Blast-radius guard blocked agent ${AGENT_NUM}"; break; fi
     if [[ "$_scope_w_rc" -eq 1 ]]; then continue; fi
     if git commit -m "agent-${AGENT_NUM}: iteration ${ITERATION}" --no-verify 2>/dev/null; then
@@ -2162,8 +2164,9 @@ _scope_begin_run() {
     local base="${LOOP_START_COMMIT:-}" restart=0
     [[ "${SESSION_RESTART:-false}" == "true" ]] && restart=1
     if [[ "$restart" -eq 0 ]] && $RESUME; then
-        base="$(scope_trusted_base "$PROJECT_ROOT")" || {
-            error "Blast-radius guard refused to resume: no trusted base (a fork point from the default branch) could be established"
+        # The base is recorded by the pipeline outside the repo (#8644, #8671). Refuse the resume without it.
+        base="$(scope_resume_base "$PROJECT_ROOT")" || {
+            error "Blast-radius guard refused to resume: no valid pipeline base (SW_PIPELINE_BASE_SHA) is recorded"
             return 1
         }
         LOOP_START_COMMIT="$base"
@@ -2179,7 +2182,18 @@ _scope_export_for_workers() {
     printf '%s' "$SW_SCOPE_JSON" > "$SCOPE_ENV_DIR/scope.json"
     printf '%s' "$SW_SCOPE_CONFIG" > "$SCOPE_ENV_DIR/config.json"
     printf '%s' "$SW_SCOPE_BASE" > "$SCOPE_ENV_DIR/base.txt"
+    # Workers measure the total diff against the upstream they merged (#8644): the default-branch fork point.
+    printf '%s' "${SW_LOOP_TRUSTED_UPSTREAM:-$SW_SCOPE_BASE}" > "$SCOPE_ENV_DIR/upstream.txt"
     export SCOPE_ENV_DIR
+}
+
+# Remove the worker scope files once the workers have finished (#8644).
+_scope_cleanup_workers() {
+    local d="${SCOPE_ENV_DIR:-}"
+    [[ -n "$d" && -d "$d" ]] || return 0
+    rm -f "$d/scope.json" "$d/config.json" "$d/base.txt" "$d/upstream.txt" 2>/dev/null || true
+    rmdir "$d" 2>/dev/null || true
+    unset SCOPE_ENV_DIR
 }
 
 # Blast-radius gate after a loop commit (#8644). Returns 0 pass, 1 reverted (the caller must skip the
@@ -2817,6 +2831,7 @@ main() {
         _scope_export_for_workers
         show_banner
         launch_multi_agent
+        _scope_cleanup_workers
         show_summary
     else
         run_loop_with_restarts
