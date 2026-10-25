@@ -1,25 +1,24 @@
 /*
- * Self-hosted font faces. T1 ships no font files yet: the tokens use the system
- * stack, so nothing in this file is active. Pending maintainer approval to fetch
- * the files (see the T1 PR).
- *
- * To enable a face: drop the woff2 (latin subset) and its OFL licence text into
- * this directory, then uncomment its block. Keep the URL local (/fonts/...), since
- * tools/web/no-cdn.ts fails on any external font load.
- *
- * @font-face {
- *   font-family: "Plus Jakarta Sans";
- *   src: url("/fonts/PlusJakartaSans-latin.woff2") format("woff2");
- *   font-weight: 200 800;
- *   font-style: normal;
- *   font-display: swap;
- * }
- *
- * @font-face {
- *   font-family: "JetBrains Mono";
- *   src: url("/fonts/JetBrainsMono-latin.woff2") format("woff2");
- *   font-weight: 100 800;
- *   font-style: normal;
- *   font-display: swap;
- * }
+ * Self-hosted dashboard fonts (Plus Jakarta Sans and JetBrains Mono, both SIL OFL 1.1).
+ * Files, licences and sources are listed in SOURCES.md in this directory.
+ * Latin subset, variable weight. Instrument Serif is landing-only and is not declared here.
+ * URLs are local (/fonts/...): tools/web/no-cdn.ts fails on any external font load.
  */
+
+@font-face {
+  font-family: "Plus Jakarta Sans";
+  src: url("/fonts/plus-jakarta-sans-latin-var.woff2") format("woff2");
+  font-weight: 200 800;
+  font-style: normal;
+  font-display: swap;
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+
+@font-face {
+  font-family: "JetBrains Mono";
+  src: url("/fonts/jetbrains-mono-latin-var.woff2") format("woff2");
+  font-weight: 100 800;
+  font-style: normal;
+  font-display: swap;
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
