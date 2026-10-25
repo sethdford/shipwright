@@ -437,28 +437,47 @@ test("no runtime state under .claude/ is tracked in the git index (#8665)", () =
 
 test("a force-added file is caught under every ignore form (anchored, no-slash, nested, ?/[], info/exclude)", () => {
   const repo = mkdtempSync(join(tmpdir(), "rs-bypass-"));
-  const git = (...args: string[]) => Bun.spawnSync(["git", ...args], { cwd: repo });
-  git("init", "-q");
-  const files = [
-    ".claude/anchored.json",
-    ".claude/noslashdir/x.json",
-    ".claude/q1.json",
-    ".claude/a.json",
-    ".claude/nested.json",
-    ".claude/excl.json",
-  ];
-  writeFileSync(
-    join(repo, ".gitignore"),
-    "/.claude/anchored.json\n.claude/noslashdir\n.claude/q?.json\n.claude/[a].json\n",
-  );
-  mkdirSync(join(repo, ".claude/noslashdir"), { recursive: true });
-  writeFileSync(join(repo, ".claude/.gitignore"), "nested.json\n");
-  mkdirSync(join(repo, ".git/info"), { recursive: true });
-  writeFileSync(join(repo, ".git/info/exclude"), ".claude/excl.json\n");
-  for (const f of files) writeFileSync(join(repo, f), "{}\n");
-  git("add", "-f", "--", ...files, ".claude/.gitignore");
-  expect(trackedRuntimeState(repo).sort()).toEqual([...files].sort());
-  rmSync(repo, { recursive: true, force: true });
+  try {
+    const git = (...args: string[]) => Bun.spawnSync(["git", ...args], { cwd: repo });
+    git("init", "-q");
+    const files = [
+      ".claude/anchored.json",
+      ".claude/noslashdir/x.json",
+      ".claude/q1.json",
+      ".claude/a.json",
+      ".claude/nested.json",
+      ".claude/excl.json",
+    ];
+    writeFileSync(
+      join(repo, ".gitignore"),
+      "/.claude/anchored.json\n.claude/noslashdir\n.claude/q?.json\n.claude/[a].json\n",
+    );
+    mkdirSync(join(repo, ".claude/noslashdir"), { recursive: true });
+    writeFileSync(join(repo, ".claude/.gitignore"), "nested.json\n");
+    mkdirSync(join(repo, ".git/info"), { recursive: true });
+    writeFileSync(join(repo, ".git/info/exclude"), ".claude/excl.json\n");
+    for (const f of files) writeFileSync(join(repo, f), "{}\n");
+    git("add", "-f", "--", ...files, ".claude/.gitignore");
+    expect(trackedRuntimeState(repo).sort()).toEqual([...files].sort());
+  } finally {
+    rmSync(repo, { recursive: true, force: true });
+  }
+});
+
+test("the developer's global excludes do not change the verdict (#8667)", () => {
+  const dir = mkdtempSync(join(tmpdir(), "rs-global-"));
+  try {
+    // A global ignore file that would ignore all of .claude/ and every markdown file
+    const excludes = join(dir, "excludes");
+    writeFileSync(excludes, ".claude/\n*.md\n");
+    const config = join(dir, "gitconfig");
+    writeFileSync(config, `[core]\n\texcludesFile = ${excludes}\n`);
+    const global = { GIT_CONFIG_GLOBAL: config };
+    expect(ignoredByGit(CONFIG_EXAMPLES, ROOT, global)).toEqual([]);
+    expect(ignoredByGit(RUNTIME_EXAMPLES, ROOT, global)).toEqual(RUNTIME_EXAMPLES);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
 });
 
 test("the bash bypass exemption is narrow: sw-session.sh spells the bypass flag once (F9, #8614)", async () => {
