@@ -213,9 +213,23 @@ jobs:
               exit 1
               ;;
           esac
-          echo "Classifier: $FAILURE_CLASS"
+          echo "Classifier: $FAILURE_CLASS (exit $CLASSIFY_RC)"
           if [[ "$FAILURE_CLASS" == "auth" ]]; then
             ERROR_CATEGORY="AUTH"
+          fi
+          # Exit 3 is an escalate verdict and never a retry (ADR-0009 rule 10). Each escalating class
+          # keeps its own category, so the strategy step and the comment name it. An unmapped escalate
+          # class fails closed.
+          if [[ "$CLASSIFY_RC" -eq 3 ]]; then
+            case "$FAILURE_CLASS" in
+              auth) ERROR_CATEGORY="AUTH" ;;
+              contamination) ERROR_CATEGORY="CONTAMINATION" ;;
+              invalid_input) ERROR_CATEGORY="INVALID_INPUT" ;;
+              *)
+                echo "::error::escalate verdict for class '$FAILURE_CLASS' has no mapping; not retrying"
+                exit 1
+                ;;
+            esac
           fi
           # Deviation from the plan (#8674): a transient verdict from log text is never used. Log text
           # is free text an agent, issue or model can write, so "HTTP 503" or "ECONNRESET" in it does
@@ -322,13 +336,17 @@ jobs:
             exit 0
           fi
 
-          # Auth failures are never retried: a retry cannot repair a credential (W2-03).
-          if [[ "$ERROR_CATEGORY" == "AUTH" ]]; then
-            echo "Run $RUN_ID failed authentication: not retrying; the credential needs a human"
-            echo "should_retry=false" >> "$GITHUB_OUTPUT"
-            echo "skip_reason=auth" >> "$GITHUB_OUTPUT"
-            exit 0
-          fi
+          # Escalations are never retried (W2-03, ADR-0009 rule 10): auth cannot be repaired by a retry,
+          # contamination would repeat real side effects, and invalid input needs an edit to the issue.
+          case "$ERROR_CATEGORY" in
+            AUTH|CONTAMINATION|INVALID_INPUT)
+              SKIP=$(echo "$ERROR_CATEGORY" | tr 'A-Z' 'a-z')
+              echo "Run $RUN_ID escalated ($ERROR_CATEGORY): not retrying; a human must act"
+              echo "should_retry=false" >> "$GITHUB_OUTPUT"
+              echo "skip_reason=$SKIP" >> "$GITHUB_OUTPUT"
+              exit 0
+              ;;
+          esac
 
           RETRY_COUNT=$(jq -r '.retry' <<<"$RETRY_STATE")
 
@@ -637,6 +655,38 @@ jobs:
             echo "Check the \`CLAUDE_CODE_OAUTH_TOKEN\` secret, and run \`claude setup-token\` locally to replace it."
             echo
             echo "<!-- SHIPWRIGHT-RETRY-CATEGORY: AUTH -->"
+          } > "$BODY"
+          gh issue comment "$ISSUE_NUMBER" --repo "$GITHUB_REPOSITORY" --body-file "$BODY"
+
+      # ── Contamination or invalid input: no retry; post the escalation marker (W2-03) ──
+      - name: Handle escalation (no retry)
+        if: (steps.strategy.outputs.skip_reason == 'contamination' || steps.strategy.outputs.skip_reason == 'invalid_input') && steps.extract.outputs.issue_number != ''
+        shell: bash
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          ISSUE_NUMBER: ${{ steps.extract.outputs.issue_number }}
+          RUN_ID: ${{ steps.extract.outputs.run_id }}
+          SKIP_REASON: ${{ steps.strategy.outputs.skip_reason }}
+        run: |
+          case "$SKIP_REASON" in
+            contamination)
+              CATEGORY="CONTAMINATION"
+              TEXT="The run reached a real service through the test gate, or changed the agent's checkout. A retry would repeat those side effects. Review the run before re-running."
+              ;;
+            *)
+              CATEGORY="INVALID_INPUT"
+              TEXT="The issue appears invalid or has no usable body. Fix the issue, then re-add the watch label."
+              ;;
+          esac
+          BODY="$RUNNER_TEMP/escalation-body.md"
+          {
+            echo "## Pipeline Escalation: $CATEGORY"
+            echo
+            echo "Run [$RUN_ID]($GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$RUN_ID) will not be retried automatically."
+            echo
+            echo "$TEXT"
+            echo
+            echo "<!-- SHIPWRIGHT-RETRY-CATEGORY: $CATEGORY -->"
           } > "$BODY"
           gh issue comment "$ISSUE_NUMBER" --repo "$GITHUB_REPOSITORY" --body-file "$BODY"
 

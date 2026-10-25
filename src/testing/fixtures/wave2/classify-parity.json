@@ -1,5 +1,5 @@
 {
-  "_about": "Pins the TypeScript failure classes (src/contexts/learning) against bash classify_failure (scripts/lib/daemon-failure.sh) for the classes W2-04 maps. The test runs the real bash live (src/testing/bash-classify.ts) and fails if a live label differs from 'bash' here (drift). 'ts' is the TS class. 'differs' documents a deliberate mismatch on a mapped class. The 'bash' column is the daemon's classify_failure with no Bun, so it reflects the bash regex alone: its auth alternatives mirror the TS auth rule, and 'invalid api key provided', 'OAuth token revoked' and 'OAuth token is invalid' are auth_error on both paths (a host without Bun must not retry an auth failure).",
+  "_about": "The 'bash' column is the daemon's classify_failure with SW_BUN pointing at nothing, so it is the bash regex alone (the test harness sets SW_BUN). Its auth alternatives mirror the TS auth rule, and its contamination rule mirrors the TS contamination rule, so a host without Bun does not retry an auth or contamination failure. Rows changed to match the regex: 'invalid api key provided', 'OAuth token revoked', 'OAuth token is invalid' (auth_error), and the two contamination texts (contamination).",
   "mapping": {
     "auth_error": "auth",
     "api_error": "transient",
@@ -121,12 +121,12 @@
     },
     {
       "text": "refusing to run inside a build-loop test gate",
-      "bash": "unknown",
+      "bash": "contamination",
       "ts": "contamination"
     },
     {
       "text": "CONTAMINATION: branch-switched a -> b",
-      "bash": "unknown",
+      "bash": "contamination",
       "ts": "contamination"
     },
     {

@@ -20,15 +20,31 @@ NO_GITHUB="${NO_GITHUB:-false}"
 EVENTS_FILE="${EVENTS_FILE:-${DAEMON_DIR}/events.jsonl}"
 
 # _daemon_classify_ts <log> — prints the TypeScript classifier's class (W2-04). Exit 0 with a
-# class; non-zero when Bun or the classifier is unavailable, so the caller falls back to regex.
-# Exit 3 (escalate) still carries a class and is accepted here.
+# class; non-zero when Bun or the classifier is unavailable, fails, or does not answer within
+# SW_CLASSIFY_TIMEOUT seconds (default 10), so the caller falls back to regex. Exit 3 (escalate)
+# still carries a class and is accepted here. The classifier reads only the last 200 lines, the same
+# bound the regex path uses (tail -200), copied to a temp file first.
 _daemon_classify_ts() {
     local log_path="$1"
     local bun_bin="${SW_BUN:-bun}"
     local cli="${SW_TS_CLI:-$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)/src/cli.ts}"
+    local timeout_secs="${SW_CLASSIFY_TIMEOUT:-10}"
     command -v "$bun_bin" >/dev/null 2>&1 || return 1
-    local out rc=0
-    out=$("$bun_bin" "$cli" failure classify --log "$log_path" --json 2>/dev/null) || rc=$?
+    local bounded out_file pid wd rc=0 out=""
+    bounded=$(mktemp "${TMPDIR:-/tmp}/sw-classify-in.XXXXXX") || return 1
+    out_file=$(mktemp "${TMPDIR:-/tmp}/sw-classify-out.XXXXXX") || { rm -f "$bounded"; return 1; }
+    tail -200 "$log_path" > "$bounded" 2>/dev/null || true
+    "$bun_bin" "$cli" failure classify --log "$bounded" --json > "$out_file" 2>/dev/null &
+    pid=$!
+    # Watchdog: kills the classifier after the timeout. Its output is sent away from the caller's
+    # stdout, so a sleeping watchdog cannot hold a $(...) capture open.
+    ( sleep "$timeout_secs"; kill "$pid" 2>/dev/null ) >/dev/null 2>&1 &
+    wd=$!
+    wait "$pid" || rc=$?
+    kill "$wd" 2>/dev/null || true
+    wait "$wd" 2>/dev/null || true
+    out=$(cat "$out_file" 2>/dev/null || true)
+    rm -f "$bounded" "$out_file"
     if [[ "$rc" -ne 0 && "$rc" -ne 3 ]]; then return 1; fi
     jq -r '.class // empty' <<<"$out" 2>/dev/null || return 1
 }
@@ -56,7 +72,16 @@ classify_failure() {
         case "$ts_class" in
             auth) echo "auth_error"; return ;;
             invalid_input) echo "invalid_issue"; return ;;
+            contamination) echo "contamination"; return ;;
         esac
+    fi
+
+    # Contamination: a run that reached a real service through the test gate, or changed the agent's
+    # checkout. Never retried (ADR-0009 rule 10). The same signals as the TS rule, so a host without
+    # Bun does not retry it either.
+    if echo "$tail_content" | grep >/dev/null -iE 'refusing to run inside a build-loop test gate|^CONTAMINATION: (pipeline-state-missing|branch-switched)'; then
+        echo "contamination"
+        return
     fi
 
     # Auth errors
@@ -107,7 +132,7 @@ DAEMON_CONSECUTIVE_FAILURE_COUNT=0
 get_max_retries_for_class() {
     local class="${1:-unknown}"
     case "$class" in
-        auth_error|invalid_issue) echo 0 ;;
+        auth_error|invalid_issue|contamination) echo 0 ;;
         api_error)                echo "${MAX_RETRIES_API_ERROR:-4}" ;;
         context_exhaustion)       echo "${MAX_RETRIES_CONTEXT_EXHAUSTION:-2}" ;;
         build_failure)           echo "${MAX_RETRIES_BUILD:-2}" ;;
@@ -265,6 +290,10 @@ daemon_on_failure() {
                 if [[ "$NO_GITHUB" != "true" ]]; then
                     gh issue edit "$issue_num" ${gh_repo_args[@]+"${gh_repo_args[@]}"} --add-label "pipeline/auth-error" 2>/dev/null || true
                 fi
+                ;;
+            contamination)
+                daemon_log ERROR "Contamination for issue #${issue_num} — skipping retry (a retry repeats real side effects)"
+                emit_event "daemon.skip_retry" "issue=$issue_num" "reason=contamination"
                 ;;
             invalid_issue)
                 daemon_log ERROR "Invalid issue #${issue_num} — skipping retry"

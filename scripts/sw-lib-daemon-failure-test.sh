@@ -266,7 +266,7 @@ run_refused_failure() {
         PIPELINE_TEMPLATE="autonomous"
         _retry_spawned_for=""
         jq -n --arg n "$issue" '{retry_counts: {($n): 1}}' > "$STATE_FILE"
-        echo "some unclassified failure" > "$LOG_DIR/issue-${issue}.log"
+        echo "${RUN_LOG_TEXT:-some unclassified failure}" > "$LOG_DIR/issue-${issue}.log"
         daemon_on_failure "$issue" 1 "" "${REFUSE_REPO:-}" >/dev/null 2>&1
         echo "spawned_for=${_retry_spawned_for:-none} template=${PIPELINE_TEMPLATE} model=${MODEL}" >> "$REFUSE_LOG"
     ) 2>/dev/null || true
@@ -338,6 +338,26 @@ done
 printf '%s\n' "benign build output" > "$LOG_DIR/issue-45.log"
 assert_eq "a typed transient verdict is not mapped to api_error (trust rule, #8674)" "unknown" \
     "$(_daemon_classify_ts() { echo transient; }; classify_failure 45)"
+
+# ─── Escalations never retry; a slow classifier cannot stall the failure path (ADR-0009, #8674) ───
+print_test_section "Contamination is never retried (no Bun and with Bun)"
+printf '%s\n' "refusing to run inside a build-loop test gate" > "$LOG_DIR/issue-47.log"
+assert_eq "contamination is classified with Bun" "contamination" "$(classify_failure 47)"
+assert_eq "contamination is classified with no Bun (regex)" "contamination" "$(SW_BUN=/nonexistent/bun classify_failure 47)"
+assert_eq "contamination has a retry limit of 0" "0" "$(get_max_retries_for_class contamination)"
+RUN_LOG_TEXT="refusing to run inside a build-loop test gate" run_refused_failure 811 'printf "gh %s\n" "$*" >> "$REFUSE_LOG"'
+contam_log="$(cat "$TEST_TEMP_DIR/refuse.log")"
+assert_contains "a contamination failure is logged as skipped" "$contam_log" "Contamination for issue #811 — skipping retry"
+assert_eq "no retry is spawned for contamination" "0" "$(grep -c 'spawn 811 retry' <<<"$contam_log" || true)"
+
+print_test_section "A slow classifier falls back to the regex (bounded)"
+printf '%s\n' '#!/usr/bin/env bash' 'sleep 30' > "$TEST_TEMP_DIR/slow-bun"
+chmod +x "$TEST_TEMP_DIR/slow-bun"
+printf '%s\n' "::error::Claude Code authentication failed" > "$LOG_DIR/issue-48.log"
+SECONDS=0
+slow_result="$(SW_BUN="$TEST_TEMP_DIR/slow-bun" SW_CLASSIFY_TIMEOUT=1 classify_failure 48)"
+assert_eq "a classifier that does not answer falls back to the regex" "auth_error" "$slow_result"
+assert_eq "the fallback returns within the timeout, not after the 30 s sleep" "true" "$([[ $SECONDS -lt 15 ]] && echo true || echo false)"
 
 print_test_results
 

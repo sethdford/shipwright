@@ -175,6 +175,46 @@ describe("W2-03 auto-retry: AUTH is never retried (run for real)", () => {
   });
 });
 
+describe("W2-03 every escalation is no-retry (ADR-0009 rule 10)", () => {
+  const cases: readonly { name: string; log: string; category: string; skip: string }[] = [
+    {
+      name: "contamination",
+      log: "refusing to run inside a build-loop test gate\n",
+      category: "CONTAMINATION",
+      skip: "contamination",
+    },
+    {
+      name: "invalid_input",
+      log: "Error: issue not found\n",
+      category: "INVALID_INPUT",
+      skip: "invalid_input",
+    },
+  ];
+  for (const c of cases) {
+    test(`a ${c.name} verdict is categorised ${c.category} and never retried`, () => {
+      withSandbox({ logFailed: c.log, jobs: NO_TIMEOUT }, (env, sb) => {
+        const fx = { logFailed: c.log, jobs: NO_TIMEOUT };
+        const cat = run(env, sb, fx, CATEGORIZE, { CONCLUSION: "failure" });
+        expect(cat.code).toBe(0);
+        expect(cat.out.error_category).toBe(c.category);
+        const strat = run(env, sb, fx, STRATEGY, { ERROR_CATEGORY: c.category });
+        expect(strat.out.should_retry).toBe("false");
+        expect(strat.out.skip_reason).toBe(c.skip);
+      });
+    });
+  }
+
+  test("an exit-3 verdict with an unmapped class fails closed", () => {
+    const result = categorize({
+      logFailed: "npm test\n",
+      jobs: NO_TIMEOUT,
+      stubBun: { out: '{"class":"budget"}', rc: 3 },
+    });
+    expect(result.code).not.toBe(0);
+    expect(result.out.error_category).toBeUndefined();
+  });
+});
+
 describe("W2-03 deviation: transient only from trusted channels (#8674)", () => {
   test("a forged HTTP 503 or ECONNRESET in the log is not a transient verdict", () => {
     const forged = "npm test\nHTTP 503 Service Unavailable\nECONNRESET while fetching\n";
