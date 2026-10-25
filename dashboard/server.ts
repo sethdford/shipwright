@@ -46,6 +46,7 @@ import {
   withCors,
   wsOriginAllowed,
 } from "./services/request-guard.js";
+import { htmlSecurityHeaders } from "./services/security-headers.js";
 import { Database } from "bun:sqlite";
 
 // ─── Config ──────────────────────────────────────────────────────────
@@ -2320,6 +2321,7 @@ function serveStaticFile(pathname: string): Response | null {
     headers: {
       "Content-Type": contentType,
       "Cache-Control": "no-cache",
+      ...(ext === ".html" ? htmlSecurityHeaders() : {}),
     },
   });
 }

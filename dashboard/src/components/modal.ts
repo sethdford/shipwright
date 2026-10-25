@@ -1,8 +1,13 @@
-// Modal system for intervention, machine management, and join links
+// Dialogs for intervention, bulk actions, machines, join links and notifications.
+// Every dialog is a native <dialog> (focus trap, Esc, focus return); destructive actions
+// confirm in a dialog that names the target, with Cancel focused.
 
 import * as api from "../core/api";
 import { store } from "../core/state";
-import { escapeHtml } from "../core/helpers";
+import { isViewActive } from "../core/router";
+import { h } from "./ui/dom";
+import { openDialog, closeDialog, confirmDialog } from "./ui/dialog";
+import { toast } from "./ui/toast";
 
 let interventionTarget: number | null = null;
 let removeMachineTarget: string | null = null;
@@ -10,25 +15,15 @@ let workerUpdateTimer: ReturnType<typeof setTimeout> | null = null;
 
 // Intervention Modal
 export function setupInterventionModal(): void {
-  const modal = document.getElementById("intervention-modal");
-  const closeBtn = document.getElementById("modal-close");
-  const cancelBtn = document.getElementById("modal-cancel");
   const sendBtn = document.getElementById("modal-send");
   const msgEl = document.getElementById(
     "modal-message",
   ) as HTMLTextAreaElement | null;
 
   function closeModal() {
-    if (modal) modal.style.display = "none";
+    closeDialog("intervention-modal");
     interventionTarget = null;
   }
-
-  if (closeBtn) closeBtn.addEventListener("click", closeModal);
-  if (cancelBtn) cancelBtn.addEventListener("click", closeModal);
-  if (modal)
-    modal.addEventListener("click", (e) => {
-      if (e.target === modal) closeModal();
-    });
 
   if (sendBtn) {
     sendBtn.addEventListener("click", () => {
@@ -44,22 +39,24 @@ export function setupInterventionModal(): void {
 
 export function openInterventionModal(issue: number): void {
   interventionTarget = issue;
-  const modal = document.getElementById("intervention-modal");
   const title = document.getElementById("modal-title");
   const msg = document.getElementById(
     "modal-message",
   ) as HTMLTextAreaElement | null;
-  if (modal) modal.style.display = "";
-  if (title) title.textContent = "Send Message to #" + issue;
+  if (title) title.textContent = "Send a message to run #" + issue;
   if (msg) msg.value = "";
+  openDialog("intervention-modal");
 }
 
-export function confirmAbort(issue: number): void {
-  if (
-    confirm("Abort pipeline for issue #" + issue + "? This cannot be undone.")
-  ) {
-    api.sendIntervention(issue, "abort");
-  }
+export async function confirmAbort(issue: number): Promise<void> {
+  const ok = await confirmDialog({
+    title: `Stop run #${issue}?`,
+    body: "Stopping ends the pipeline process. It cannot be resumed.",
+    confirmLabel: "Stop run",
+    cancelLabel: "Keep run",
+    danger: true,
+  });
+  if (ok) api.sendIntervention(issue, "abort");
 }
 
 // Bulk Actions
@@ -83,18 +80,20 @@ export function setupBulkActions(): void {
   }
 
   if (abortBtn) {
-    abortBtn.addEventListener("click", () => {
+    abortBtn.addEventListener("click", async () => {
       const issues = Object.keys(store.get("selectedIssues"));
       if (issues.length === 0) return;
-      if (
-        confirm(
-          "Abort " + issues.length + " pipeline(s)? This cannot be undone.",
-        )
-      ) {
-        issues.forEach((i) => api.sendIntervention(i, "abort"));
-        store.set("selectedIssues", {});
-        updateBulkToolbar();
-      }
+      const ok = await confirmDialog({
+        title: `Stop ${issues.length} run${issues.length === 1 ? "" : "s"}?`,
+        body: "Runs " + issues.map((i) => "#" + i).join(", ") + " will end. They cannot be resumed.",
+        confirmLabel: "Stop runs",
+        cancelLabel: "Keep runs",
+        danger: true,
+      });
+      if (!ok) return;
+      issues.forEach((i) => api.sendIntervention(i, "abort"));
+      store.set("selectedIssues", {});
+      updateBulkToolbar();
     });
   }
 }
@@ -120,26 +119,10 @@ export function setupMachinesModals(): void {
   const joinBtn = document.getElementById("btn-join-link");
   if (joinBtn) joinBtn.addEventListener("click", openJoinLinkModal);
 
-  // Add machine modal
-  bindClick("machine-modal-close", closeAddMachineModal);
-  bindClick("machine-modal-cancel", closeAddMachineModal);
+  // Close and Cancel buttons carry data-close; openDialog wires them.
   bindClick("machine-modal-submit", submitAddMachine);
-
-  // Join link modal
-  bindClick("join-modal-close", closeJoinLinkModal);
-  bindClick("join-modal-cancel", closeJoinLinkModal);
   bindClick("join-modal-generate", generateJoinLink);
   bindClick("join-copy-btn", copyJoinCommand);
-
-  // Remove machine modal
-  bindClick("remove-modal-close", () => {
-    const el = document.getElementById("remove-machine-modal");
-    if (el) el.style.display = "none";
-  });
-  bindClick("remove-modal-cancel", () => {
-    const el = document.getElementById("remove-machine-modal");
-    if (el) el.style.display = "none";
-  });
   bindClick("remove-modal-confirm", executeRemoveMachine);
 }
 
@@ -149,8 +132,6 @@ function bindClick(id: string, handler: () => void): void {
 }
 
 function openAddMachineModal(): void {
-  const modal = document.getElementById("add-machine-modal");
-  if (modal) modal.style.display = "flex";
   setVal("machine-name", "");
   setVal("machine-host", "");
   setVal("machine-ssh-user", "");
@@ -159,11 +140,11 @@ function openAddMachineModal(): void {
   setVal("machine-role", "worker");
   const err = document.getElementById("machine-modal-error");
   if (err) err.style.display = "none";
+  openDialog("add-machine-modal");
 }
 
 function closeAddMachineModal(): void {
-  const modal = document.getElementById("add-machine-modal");
-  if (modal) modal.style.display = "none";
+  closeDialog("add-machine-modal");
 }
 
 function submitAddMachine(): void {
@@ -295,8 +276,7 @@ export function confirmMachineRemove(name: string): void {
   if (el) el.textContent = name;
   const cb = document.getElementById("remove-stop-daemon") as HTMLInputElement;
   if (cb) cb.checked = false;
-  const modal = document.getElementById("remove-machine-modal");
-  if (modal) modal.style.display = "flex";
+  openDialog("remove-machine-modal");
 }
 
 function executeRemoveMachine(): void {
@@ -304,33 +284,25 @@ function executeRemoveMachine(): void {
   api
     .removeMachine(removeMachineTarget)
     .then(() => {
-      const modal = document.getElementById("remove-machine-modal");
-      if (modal) modal.style.display = "none";
+      closeDialog("remove-machine-modal");
       removeMachineTarget = null;
       refreshMachines();
     })
     .catch((err) => {
-      console.error("Remove machine failed:", err);
-      const modal = document.getElementById("remove-machine-modal");
-      if (modal) modal.style.display = "none";
+      closeDialog("remove-machine-modal");
+      toast(`Could not remove ${removeMachineTarget ?? "the machine"}: ${String(err)}`, "error");
       removeMachineTarget = null;
     });
 }
 
 function openJoinLinkModal(): void {
-  const modal = document.getElementById("join-link-modal");
-  if (modal) modal.style.display = "flex";
   setVal("join-label", "");
   setVal("join-workers", "4");
   const cmdDisplay = document.getElementById("join-command-display");
   if (cmdDisplay) cmdDisplay.style.display = "none";
   const cmdText = document.getElementById("join-command-text");
   if (cmdText) cmdText.textContent = "";
-}
-
-function closeJoinLinkModal(): void {
-  const modal = document.getElementById("join-link-modal");
-  if (modal) modal.style.display = "none";
+  openDialog("join-link-modal");
 }
 
 function generateJoinLink(): void {
@@ -393,8 +365,7 @@ function setVal(id: string, value: string): void {
 }
 
 function refreshMachines(): void {
-  const tab = store.get("activeTab");
-  if (tab === "machines") {
+  if (isViewActive("machines")) {
     api.fetchMachines().then((data) => {
       const machines = Array.isArray(data)
         ? data
@@ -412,4 +383,75 @@ function refreshJoinTokens(): void {
     .fetchJoinTokens()
     .then(({ tokens }) => store.set("joinTokensCache", tokens))
     .catch(() => {});
+}
+
+// Notification settings (opened from the account menu)
+export function setupNotificationsModal(): void {
+  document.getElementById("open-notifications")?.addEventListener("click", () => {
+    openDialog("notifications-modal");
+    loadWebhookList();
+  });
+  bindClick("notif-add-webhook", addWebhook);
+  const testBtn = document.getElementById("notif-test-btn");
+  testBtn?.addEventListener("click", () => {
+    testBtn.textContent = "Sending\u2026";
+    const reset = (text: string) => {
+      testBtn.textContent = text;
+      setTimeout(() => (testBtn.textContent = "Send test"), 2000);
+    };
+    api.testNotification().then(() => reset("Sent")).catch(() => reset("Failed"));
+  });
+}
+
+function checked(id: string): boolean {
+  return (document.getElementById(id) as HTMLInputElement | null)?.checked === true;
+}
+
+function addWebhook(): void {
+  const url = getVal("notif-webhook-url").trim();
+  if (!url) return;
+  const events: string[] = [];
+  if (checked("notif-evt-all")) events.push("all");
+  else {
+    if (checked("notif-evt-completed")) events.push("pipeline.completed");
+    if (checked("notif-evt-failed")) events.push("pipeline.failed");
+    if (checked("notif-evt-alert")) events.push("alert");
+  }
+  api
+    .addWebhook(url, getVal("notif-webhook-label").trim() || undefined, events.length ? events : undefined)
+    .then(() => {
+      setVal("notif-webhook-url", "");
+      setVal("notif-webhook-label", "");
+      loadWebhookList();
+    })
+    .catch((err) => toast("Could not add the webhook: " + String(err), "error"));
+}
+
+function loadWebhookList(): void {
+  const container = document.getElementById("notif-webhook-list");
+  if (!container) return;
+  const note = (text: string) => container.replaceChildren(h("p", { class: "state-body", text }));
+  note("Loading\u2026");
+  api
+    .fetchNotificationConfig()
+    .then((config) => {
+      if (!config.webhooks || config.webhooks.length === 0) return note("No webhooks configured.");
+      container.replaceChildren(
+        ...config.webhooks.map((w) =>
+          h("div", { class: "webhook-item" },
+            h("span", { class: "webhook-label", text: w.label }),
+            h("span", { class: "webhook-url", text: w.url.length > 50 ? w.url.slice(0, 50) + "\u2026" : w.url }),
+            h("span", { class: "webhook-events", text: w.events.join(", ") }),
+            h("button", {
+              type: "button",
+              class: "btn sm danger",
+              text: "Remove",
+              "aria-label": "Remove webhook " + w.label,
+              onclick: () => void api.removeWebhook(w.url).then(loadWebhookList),
+            }),
+          ),
+        ),
+      );
+    })
+    .catch(() => note("Could not load the notification config."));
 }

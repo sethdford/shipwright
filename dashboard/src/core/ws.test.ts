@@ -47,6 +47,7 @@ describe("WebSocket module", () => {
       value: {
         protocol: "http:",
         host: "localhost:18767",
+        href: "http://localhost:18767/#triage",
         hash: "",
       },
       writable: true,
@@ -67,6 +68,12 @@ describe("WebSocket module", () => {
       ws.connect();
       expect(MockWebSocket.instances).toHaveLength(1);
       expect(MockWebSocket.instances[0].url).toBe("ws://localhost:18767/ws");
+    });
+
+    it("uses wss: on an https page and drops the page path and hash", () => {
+      window.location.href = "https://fleet.example.test/sub/page?x=1#runs";
+      ws.connect();
+      expect(MockWebSocket.instances.at(-1)?.url).toBe("wss://fleet.example.test/ws");
     });
 
     it("stores the WebSocket reference", () => {
