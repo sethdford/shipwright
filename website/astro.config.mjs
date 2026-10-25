@@ -1,6 +1,28 @@
 import { defineConfig } from "astro/config";
 import starlight from "@astrojs/starlight";
 
+// Expressive Code gives the copy button only a title. This sets an explicit aria-label,
+// which screen readers announce before the title fallback.
+const copyButtonLabel = {
+  name: "copy-button-label",
+  hooks: {
+    postprocessRenderedBlock: ({ renderData }) => {
+      labelCopyButtons(renderData.blockAst);
+    },
+  },
+};
+
+function labelCopyButtons(node) {
+  if (node?.type === "element" && node.properties?.className?.includes("copy")) {
+    for (const child of node.children) {
+      if (child.type === "element" && child.tagName === "button") {
+        child.properties.ariaLabel = "Copy code to clipboard";
+      }
+    }
+  }
+  for (const child of node?.children ?? []) labelCopyButtons(child);
+}
+
 export default defineConfig({
   site: "https://sethdford.github.io",
   base: "/shipwright",
@@ -21,10 +43,14 @@ export default defineConfig({
         github: "https://github.com/sethdford/shipwright",
       },
       customCss: ["./src/styles/custom.css"],
+      expressiveCode: { plugins: [copyButtonLabel] },
       sidebar: [
         {
           label: "Getting Started",
-          items: [{ label: "Quick Start", link: "/quick-start/" }],
+          items: [
+            { label: "Quick Start", link: "/quick-start/" },
+            { label: "Compare", link: "/compare/" },
+          ],
         },
         {
           label: "Guides",
