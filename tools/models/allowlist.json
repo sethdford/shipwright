@@ -16,12 +16,17 @@
     "docs/superpowers/**",
     "docs/adr/**",
     "docs/tmux-research/**",
-    ".claude/loop-logs/**"
+    ".claude/loop-logs/**",
+    "tools/models/allowlist.json"
   ],
   "lines": [
     {
       "file": ".github/workflows/review-remediation.yml",
       "contains": "REMEDIATION_MODEL=\"claude-sonnet-5-5\""
+    },
+    {
+      "file": ".github/workflows/claude-code-review.yml",
+      "contains": "MODEL=\"claude-opus-5-5\""
     }
   ]
 }

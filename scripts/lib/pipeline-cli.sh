@@ -135,8 +135,9 @@ validate_model_flags() {
     local _mv _mvar
     for _mv in "${MODEL:-}" "${PIPELINE_FALLBACK_MODEL:-}"; do
         [[ -n "$_mv" ]] || continue
-        if ! models_resolve "$_mv" >/dev/null 2>&1; then
-            error "model '$_mv' is neither an alias nor a listed model ID; use an alias or add the ID to config/models.json"
+        local _err
+        if ! _err="$(models_resolve "$_mv" 2>&1 >/dev/null)"; then
+            error "${_err:-model '$_mv' is neither an alias nor a listed model ID; use an alias or add the ID to config/models.json}"
             return 1
         fi
     done
@@ -144,8 +145,9 @@ validate_model_flags() {
         [[ -n "$_mvar" ]] || continue
         _mv="${!_mvar}"
         [[ -n "$_mv" ]] || continue
-        if ! models_resolve "$_mv" >/dev/null 2>&1; then
-            error "$_mvar=$_mv is neither an alias nor a listed model ID; use an alias or add the ID to config/models.json"
+        local _err
+        if ! _err="$(models_resolve "$_mv" 2>&1 >/dev/null)"; then
+            error "$_mvar=$_mv: ${_err:-is neither an alias nor a listed model ID; use an alias or add the ID to config/models.json}"
             return 1
         fi
     done < <(compgen -v | sed -n '/^SW_MODEL_/p')

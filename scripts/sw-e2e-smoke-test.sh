@@ -46,6 +46,8 @@ setup_env() {
         mkdir -p "$TEST_TEMP_DIR/scripts/lib"
         cp "$SCRIPT_DIR/lib"/*.sh "$TEST_TEMP_DIR/scripts/lib/" 2>/dev/null || true
     fi
+    # The model table (W2-07): the launcher and _smart_model resolve aliases through config/models.json beside scripts/.
+    mkdir -p "$TEST_TEMP_DIR/config" && cp "$SCRIPT_DIR/../config/models.json" "$TEST_TEMP_DIR/config/"
 
     # ── Copy skills directory (required by skill-registry.sh) ────────────
     [[ -d "$SCRIPT_DIR/skills" ]] && cp -r "$SCRIPT_DIR/skills" "$TEST_TEMP_DIR/scripts/skills"

@@ -56,6 +56,29 @@ jobs:
         with:
           fetch-depth: 1
 
+      - name: Resolve the review model from the trusted default branch (W2-07)
+        id: review-model
+        if: env.SKIP_CLAUDE != 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          # config/models.json from the DEFAULT branch, not the PR checkout: a PR cannot change the reviewer's model.
+          # Until the file is on the default branch (merge order: W2-07 lands last), the pinned opus ID is used with a
+          # warning. The fallback literal is the one allowlisted line in tools/models/allowlist.json.
+          DEFAULT="$(gh api "repos/${GITHUB_REPOSITORY}" --jq '.default_branch')"
+          if gh api "repos/${GITHUB_REPOSITORY}/contents/config/models.json?ref=${DEFAULT}" --jq '.content' > "$RUNNER_TEMP/models.b64" 2>/dev/null; then
+            base64 -d < "$RUNNER_TEMP/models.b64" > "$RUNNER_TEMP/models.json"
+            MODEL="$(jq -r '.aliases.opus // empty' "$RUNNER_TEMP/models.json")"
+          else
+            echo "::warning::config/models.json is not on ${DEFAULT} yet; using the pinned opus ID"
+            MODEL="claude-opus-5-5"
+          fi
+          case "$MODEL" in
+            claude-*) ;;
+            *) echo "::error::no opus alias in the trusted config/models.json"; exit 1 ;;
+          esac
+          echo "model=$MODEL" >> "$GITHUB_OUTPUT"
+
       - name: Run Claude Code Review
         id: claude-review
         if: env.SKIP_CLAUDE != 'true'
@@ -65,6 +88,7 @@ jobs:
           plugin_marketplaces: 'https://github.com/anthropics/claude-code.git'
           plugins: 'code-review@claude-code-plugins'
           prompt: '/code-review:code-review ${{ github.repository }}/pull/${{ github.event.pull_request.number }}'
+          claude_args: --model ${{ steps.review-model.outputs.model }}
           # See https://github.com/anthropics/claude-code-action/blob/main/docs/usage.md
           # or https://code.claude.com/docs/en/cli-reference for available options
 

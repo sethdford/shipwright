@@ -109,6 +109,8 @@ export const AGENT_DENIED_TOOLS: readonly string[] = [
   "Write(config/agent-permissions.json)",
   "Edit(scripts/lib/agent-exec.sh)",
   "Write(scripts/lib/agent-exec.sh)",
+  "Edit(scripts/lib/models.sh)",
+  "Write(scripts/lib/models.sh)",
   "Edit(scripts/lib/agent-sandbox.sh)",
   "Write(scripts/lib/agent-sandbox.sh)",
   "Edit(scripts/ci/**)",

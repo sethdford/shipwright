@@ -1,6 +1,9 @@
 # Fitness functions and their baselines (ADR-0008). A change to a rule, an allowlist or a baseline
 # changes what every agent is allowed to write, so it needs the maintainer's review.
 /tools/arch/                      @sethdford
+/tools/models/                    @sethdford
+/config/models.json               @sethdford
+/scripts/lib/models.sh          @sethdford
 /sgconfig.yml                     @sethdford
 /.dependency-cruiser.cjs          @sethdford
 /.dependency-cruiser.dashboard.cjs @sethdford
