@@ -42,6 +42,7 @@ setup_env() {
     [[ -d "$SCRIPT_DIR/lib" ]] && cp -r "$SCRIPT_DIR/lib" "$TEST_TEMP_DIR/scripts/lib"
     # agent-exec (scripts/lib) reads config/agent-permissions.json beside scripts/ and refuses without it (#8614).
     mkdir -p "$TEST_TEMP_DIR/config" && cp "$REPO_DIR/config/agent-permissions.json" "$TEST_TEMP_DIR/config/"
+    cp "$REPO_DIR/config/models.json" "$TEST_TEMP_DIR/config/"  # W2-07: agent-exec resolves --model through it
     [[ -d "$SCRIPT_DIR/skills" ]] && cp -r "$SCRIPT_DIR/skills" "$TEST_TEMP_DIR/scripts/skills"
 
     # ── Mock sw-loop.sh (next to pipeline — preflight checks $SCRIPT_DIR/sw-loop.sh) ──

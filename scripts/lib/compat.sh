@@ -397,11 +397,13 @@ compute_md5() {
 }
 
 # ─── Intelligent Model Selection ──────────────────────────────────────────
+source "$(dirname "${BASH_SOURCE[0]}")/models.sh"
+
 # _smart_model <purpose> [default]
 # Returns model name from config chain: env var → daemon-config.json → default
 # Purpose: "classification", "detection", "validation", "commit_quality",
 #          "default", or any custom key under model_routing.{purpose}
-_smart_model() {
+_smart_model_chain() {
     local purpose="${1:-default}" default="${2:-haiku}"
 
     # Sanitize purpose to alphanumeric/underscore only (prevents eval injection)
@@ -444,6 +446,19 @@ _smart_model() {
 
     # 4. Default
     echo "$default"
+}
+
+# _smart_model: the model for a purpose, checked against config/models.json (W2-07). A value that is neither an alias
+# nor a listed ID (from SW_MODEL_*, model_routing or the user config) fails here, with the message to use an alias or
+# add the ID to config/models.json. Nothing is printed on failure, so an empty --model is never sent.
+_smart_model() {
+    local value
+    value="$(_smart_model_chain "$@")"
+    if ! models_resolve "$value" >/dev/null 2>&1; then
+        echo "_smart_model: '$value' (purpose ${1:-default}) is neither an alias nor a listed model ID; use an alias or add the ID to config/models.json" >&2
+        return 1
+    fi
+    printf '%s\n' "$value"
 }
 
 # _smart_int <config_key> <default>

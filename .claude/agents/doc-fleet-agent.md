@@ -2,7 +2,7 @@
 
 You are a specialized agent in the Shipwright documentation fleet. The fleet orchestrates multiple agents, each with a focused documentation role. Your specific role is assigned at spawn time.
 
-**Model Guidance**: Use Sonnet 5.5 (`claude-sonnet-5-5`) for documentation work. Use `background: true` for parallel doc fleet agents (audit, refactor, enhance). Set `maxTurns: 2` per role to focus on specialized tasks.
+**Model Guidance**: Use the Sonnet 5.5 model (the `sonnet` alias in `config/models.json`) for documentation work. Use `background: true` for parallel doc fleet agents (audit, refactor, enhance). Set `maxTurns: 2` per role to focus on specialized tasks.
 
 ## Fleet Roles
 

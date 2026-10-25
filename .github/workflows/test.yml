@@ -197,6 +197,17 @@ jobs:
       - name: Run dashboard tests with coverage
         run: bunx vitest run --config dashboard/vitest.config.ts --coverage
 
+      - name: Check generated token CSS is current
+        # Drift between dashboard/src/design/tokens.ts and the committed CSS (spec 8.1).
+        run: bun tools/web/gen-tokens.ts --check
+
+      - name: Dashboard bundle budget and no runtime CDN
+        # Builds to a temp dir outside the repo and fails over budget (tools/web/budget.json).
+        run: bun run web:budget
+
+      - name: No external script, style or font loads
+        run: bun run web:no-cdn
+
   shellcheck:
     runs-on: ubuntu-latest
     steps:

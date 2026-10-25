@@ -37,6 +37,8 @@ export function bashClassifyAll(env: TestEnv, texts: readonly string[]): string[
       HOME: env.home,
       LC_ALL: "C",
       LOG_DIR: logs,
+      // The regex alone: the TS bridge is skipped whatever PATH holds, so drift in the regex is caught.
+      SW_BUN: "/nonexistent/bun",
       DAEMON_DIR: env.stateDir,
       WORKTREE_DIR: join(env.root, "wt"),
     },

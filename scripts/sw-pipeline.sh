@@ -228,6 +228,9 @@ shift 2>/dev/null || true
 
 PIPELINE_NAME_ARG=""
 parse_args "$@"
+# W2-07: a model that is neither an alias nor a listed ID stops the pipeline before any stage runs. Checked here
+# (not in the stages) so a bad --model, --fallback-model or SW_MODEL_* fails at start.
+validate_model_flags || exit 1
 
 # Export effort and fallback variables so subprocesses can access them
 export EFFORT_LEVEL_OVERRIDE PIPELINE_FALLBACK_MODEL

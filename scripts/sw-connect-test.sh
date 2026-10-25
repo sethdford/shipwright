@@ -30,6 +30,7 @@ setup_env() {
     # Copy lib files so script can source helpers.sh and config.sh
     mkdir -p "$TEST_TEMP_DIR/lib"
     [[ -f "$SCRIPT_DIR/lib/compat.sh" ]] && cp "$SCRIPT_DIR/lib/compat.sh" "$TEST_TEMP_DIR/lib/" 2>/dev/null || true
+    [[ -f "$SCRIPT_DIR/lib/models.sh" ]] && cp "$SCRIPT_DIR/lib/models.sh" "$TEST_TEMP_DIR/lib/"  # W2-07: compat.sh sources it
     [[ -f "$SCRIPT_DIR/lib/helpers.sh" ]] && cp "$SCRIPT_DIR/lib/helpers.sh" "$TEST_TEMP_DIR/lib/" 2>/dev/null || true
     [[ -f "$SCRIPT_DIR/lib/config.sh" ]] && cp "$SCRIPT_DIR/lib/config.sh" "$TEST_TEMP_DIR/lib/" 2>/dev/null || true
     cp "$SCRIPT_DIR/lib/safety-gates.sh" "$TEST_TEMP_DIR/lib/"

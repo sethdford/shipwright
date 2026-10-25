@@ -75,6 +75,7 @@ MOCKEOF
     # Copy compat.sh if available
     if [[ -f "$SCRIPT_DIR/lib/compat.sh" ]]; then
         cp "$SCRIPT_DIR/lib/compat.sh" "$TEST_TEMP_DIR/repo/scripts/lib/compat.sh"
+        cp "$SCRIPT_DIR/lib/models.sh" "$TEST_TEMP_DIR/repo/scripts/lib/"  # W2-07: compat.sh sources it
     fi
 
     export PATH="$TEST_TEMP_DIR/bin:$PATH"

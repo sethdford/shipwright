@@ -12,6 +12,7 @@ source "$(dirname "${BASH_SOURCE[0]}")/test-gate-baseline.sh"
 # The pipeline's base record: SW_PIPELINE_BASE_SHA is set at first start, before intake (#8671).
 # shellcheck source=lib/pipeline-base.sh
 source "$(dirname "${BASH_SOURCE[0]}")/pipeline-base.sh"
+source "$(dirname "${BASH_SOURCE[0]}")/models.sh"
 [[ -n "${_PIPELINE_STAGES_BUILD_LOADED:-}" ]] && return 0
 _PIPELINE_STAGES_BUILD_LOADED=1
 
@@ -40,7 +41,13 @@ _stage_effort_level() {
 _pipeline_claude_flags() {
     local stage="$1"
     local model="$2"
-    local flags=("--model" "$model")
+    # W2-07: the flags carry the full ID. A model that does not resolve stops the stage (never --model "").
+    local resolved
+    resolved="$(models_resolve "$model")" || {
+        echo "pipeline: cannot resolve model '$model' for stage $stage" >&2
+        return 1
+    }
+    local flags=("--model" "$resolved")
 
     # Effort level: explicit override > per-stage default
     local effort="${EFFORT_LEVEL_OVERRIDE:-$(_stage_effort_level "$stage")}"
@@ -404,7 +411,8 @@ ${_skill_prompts}
     fi
 
     # Recruit-powered model selection (when no explicit override)
-    if [[ -z "$MODEL" ]] && [[ -x "$SCRIPT_DIR/sw-recruit.sh" ]]; then
+    # W2-07: recruit's model override is off unless SW_LEGACY_MODEL_ROUTING=true.
+    if [[ "${SW_LEGACY_MODEL_ROUTING:-false}" == "true" ]] && [[ -z "$MODEL" ]] && [[ -x "$SCRIPT_DIR/sw-recruit.sh" ]]; then
         local _recruit_goal="${GOAL:-}"
         if [[ -n "$_recruit_goal" ]]; then
             local _recruit_match
@@ -425,6 +433,9 @@ ${_skill_prompts}
         [[ -n "$_extra_tc" ]] && loop_args+=(--additional-test-cmds "$_extra_tc")
     done
     loop_args+=(--max-iterations "$max_iter")
+    # W2-07: resolve the alias (opus, sonnet, haiku) through config/models.json. This is the one point where
+    # $MODEL, CLAUDE_MODEL and the template values have all been applied.
+    build_model=$(models_resolve "$build_model") || return 1
     loop_args+=(--model "$build_model")
     [[ "$agents" -gt 1 ]] 2>/dev/null && loop_args+=(--agents "$agents")
 

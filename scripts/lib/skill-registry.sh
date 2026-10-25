@@ -478,8 +478,9 @@ Skills can be assigned to: plan, design, build, review, compound_quality, pr, de
 
     # Call the LLM
     local cache_key="skill_analysis_$(echo "${title}${body}" | md5sum 2>/dev/null | cut -c1-16 || echo "${RANDOM}")"
-    local result
-    if ! result=$(_intelligence_call_claude "$prompt" "$cache_key" 3600 "$(_smart_model "classification" "haiku")"); then
+    local result skill_model
+    skill_model="$(_smart_model "classification" "haiku")" || return 1  # W2-07: stop, do not fall to a default
+    if ! result=$(_intelligence_call_claude "$prompt" "$cache_key" 3600 "$skill_model"); then
         return 1
     fi
 
@@ -676,8 +677,9 @@ ${review_feedback}}
 }"
 
     local cache_key="skill_outcome_$(echo "${skill_plan}${pipeline_result}" | md5sum 2>/dev/null | cut -c1-16 || echo "${RANDOM}")"
-    local result
-    if ! result=$(_intelligence_call_claude "$prompt" "$cache_key" 3600 "$(_smart_model "classification" "haiku")"); then
+    local result skill_model
+    skill_model="$(_smart_model "classification" "haiku")" || return 1  # W2-07: stop, do not fall to a default
+    if ! result=$(_intelligence_call_claude "$prompt" "$cache_key" 3600 "$skill_model"); then
         return 1
     fi
 

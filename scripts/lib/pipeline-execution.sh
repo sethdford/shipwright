@@ -696,11 +696,12 @@ run_pipeline() {
 
         # Intelligence: per-stage model routing (UCB1 when DB has data, else A/B testing)
         local recommended_model="" from_ucb1=false
-        if type ucb1_select_model >/dev/null 2>&1; then
+        # W2-07: learned routing (UCB1, A/B) is off unless SW_LEGACY_MODEL_ROUTING=true.
+        if [[ "${SW_LEGACY_MODEL_ROUTING:-false}" == "true" ]] && type ucb1_select_model >/dev/null 2>&1; then
             recommended_model=$(ucb1_select_model "$id" 2>/dev/null || echo "")
             [[ -n "$recommended_model" ]] && from_ucb1=true
         fi
-        if [[ -z "$recommended_model" ]] && type intelligence_recommend_model >/dev/null 2>&1; then
+        if [[ "${SW_LEGACY_MODEL_ROUTING:-false}" == "true" && -z "$recommended_model" ]] && type intelligence_recommend_model >/dev/null 2>&1; then
             local stage_complexity="${INTELLIGENCE_COMPLEXITY:-5}"
             local budget_remaining=""
             if [[ -x "$SCRIPT_DIR/sw-cost.sh" ]]; then
