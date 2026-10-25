@@ -44,6 +44,7 @@ setup_env() {
     # agent-exec applies config/agent-permissions.json (#8614) and refuses to run claude without it.
     mkdir -p "$TEST_TEMP_DIR/project/config"
     cp "$SCRIPT_DIR/../config/agent-permissions.json" "$TEST_TEMP_DIR/project/config/"
+    cp "$SCRIPT_DIR/../config/models.json" "$TEST_TEMP_DIR/project/config/"  # W2-07: agent-exec resolves --model through it
 
     # Create daemon-config with all flags enabled
     cat > "$TEST_TEMP_DIR/project/.claude/daemon-config.json" <<'EOF'
