@@ -1129,3 +1129,4 @@
 {"ts":"2026-10-25T08:07:02Z","ts_epoch":1792915622,"type":"strategic.issue_refused","title":"Add test suites for the 4 remaining untested scripts (event-schema-sync, tmux-role-color, tmux-status, tracker-github)"}
 {"ts":"2026-10-25T08:07:04Z","ts_epoch":1792915624,"type":"strategic.issue_refused","title":"Reconcile STRATEGY.md with the TypeScript migration (principles, metrics, current state)"}
 {"ts":"2026-10-25T08:07:04Z","ts_epoch":1792915624,"type":"strategic.cycle_complete","issues_created":0,"issues_skipped":3}
+{"ts":"2026-10-25T12:06:41Z","ts_epoch":1792930001,"type":"hygiene_platform_refactor","hardcoded":49,"fallback":76,"todo":51}
