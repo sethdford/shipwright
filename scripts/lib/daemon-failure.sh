@@ -62,6 +62,16 @@ classify_failure() {
     fi
     local tail_content
     tail_content=$(tail -200 "$log_path" 2>/dev/null || true)
+    # The text every rule sees: ANSI colour codes and the gh log prefix (`job<TAB>step<TAB>timestamp `) removed, the
+    # same normalization as the TypeScript classifier (evidence.ts, #8696). Colour-coded lines match on hosts without Bun.
+    local esc tab
+    esc="$(printf '\033')"
+    tab="$(printf '\t')"
+    tail_content=$(printf '%s\n' "$tail_content" | sed -E "s/${esc}\[[0-9;?]*[A-Za-z]//g; s/^[^${tab}]*${tab}[^${tab}]*${tab}[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9:.]+Z ?//")
+    # The escalation rules (contamination, auth, invalid input) read error lines only: the same selection as the
+    # TypeScript errorLines(), so a bare word in prose or in forged test output does not escalate (#8696).
+    local err_lines
+    err_lines=$(printf '%s\n' "$tail_content" | grep -iE "$_DAEMON_ERROR_LINE" || true)
 
     # W2-04: the typed classifier decides the auth and invalid-input classes. Both fail safe (no
     # retry). Its `transient` verdict is NOT used here: it comes from free log text, which an agent
@@ -79,7 +89,7 @@ classify_failure() {
     # Contamination: a run that reached a real service through the test gate, or changed the agent's
     # checkout. Never retried (ADR-0009 rule 10). The same signals as the TS rule, so a host without
     # Bun does not retry it either.
-    if echo "$tail_content" | grep >/dev/null -iE 'refusing to run inside a build-loop test gate|^CONTAMINATION: (pipeline-state-missing|branch-switched)'; then
+    if printf '%s\n' "$err_lines" | grep >/dev/null -E '^[^A-Za-z0-9]{0,4}Skipping integration tests: refusing to run inside a build-loop test gate[[:space:]]{0,20}$|^CONTAMINATION: (pipeline-state-missing|branch-switched)([[:space:]]|$)'; then
         echo "contamination"
         return
     fi
@@ -87,7 +97,7 @@ classify_failure() {
     # Auth errors
     # The last alternatives mirror the TS auth rule, so a host without Bun classifies auth the same
     # way: a retry of an auth failure is fail-open, so both paths must agree (#8674 follow-up).
-    if echo "$tail_content" | grep >/dev/null -iE 'not logged in|unauthorized|auth.*fail|401 |invalid.*token|CLAUDE_CODE_OAUTH_TOKEN|api key.*invalid|authentication required|invalid api key|invalid x-api-key|authentication_error|oauth token (is |has )?(expired|invalid|revoked)'; then
+    if printf '%s\n' "$err_lines" | grep >/dev/null -iE 'not logged in|unauthorized|auth.*fail|401 |invalid.*token|CLAUDE_CODE_OAUTH_TOKEN|api key.*invalid|authentication required|invalid api key|invalid x-api-key|authentication_error|oauth token (is |has )?(expired|invalid|revoked)'; then
         echo "auth_error"
         return
     fi
@@ -96,8 +106,8 @@ classify_failure() {
         echo "api_error"
         return
     fi
-    # Invalid issue (not found, empty body)
-    if echo "$tail_content" | grep >/dev/null -iE 'issue not found|404 |no body|could not resolve|GraphQL.*not found|issue.*does not exist'; then
+    # Invalid issue: issue and PR lookup failures only, on error lines (#8696). A bare 404 or DNS error is not one.
+    if printf '%s\n' "$err_lines" | grep >/dev/null -iE 'issue not found|could not resolve to an? (issue|pullrequest)|http 404.{0,200}/(issues|pulls)/[0-9]+|issue.{0,200}(no body|does not exist)'; then
         echo "invalid_issue"
         return
     fi
@@ -122,6 +132,9 @@ classify_failure() {
     fi
     echo "unknown"
 }
+
+# Error-like lines, the same vocabulary as ERROR_LINE in src/contexts/learning/domain/failure.ts. Keep them in step.
+_DAEMON_ERROR_LINE='error|fail|fatal|exception|::error::|enoent|eacces|not found|lockfile|invalid|unauthori[sz]ed|forbidden|denied|overloaded|rate[ _-]?limit|timed? ?out|(^|[^0-9])[45][0-9][0-9]([^0-9]|$)|econn|etimedout|socket hang up|unavailable|authentication|not logged in|refus|contaminat|expired|revoked|could not resolve|does not exist|claude_code_oauth_token'
 
 # ─── Consecutive Failure Tracking (persisted + adaptive) ─────────────────────
 

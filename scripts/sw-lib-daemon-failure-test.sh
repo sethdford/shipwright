@@ -93,7 +93,7 @@ echo "issue not found: 404" > "$LOG_DIR/issue-301.log"
 result=$(classify_failure 301)
 assert_eq "Issue not found classified" "invalid_issue" "$result"
 
-echo "could not resolve to a valid issue" > "$LOG_DIR/issue-302.log"
+echo "gh: Could not resolve to an Issue with the number 302" > "$LOG_DIR/issue-302.log"
 result=$(classify_failure 302)
 assert_eq "Could not resolve classified" "invalid_issue" "$result"
 
@@ -341,11 +341,11 @@ assert_eq "a typed transient verdict is not mapped to api_error (trust rule, #86
 
 # ─── Escalations never retry; a slow classifier cannot stall the failure path (ADR-0009, #8674) ───
 print_test_section "Contamination is never retried (no Bun and with Bun)"
-printf '%s\n' "refusing to run inside a build-loop test gate" > "$LOG_DIR/issue-47.log"
+printf '%s\n' "⚠ Skipping integration tests: refusing to run inside a build-loop test gate" > "$LOG_DIR/issue-47.log"
 assert_eq "contamination is classified with Bun" "contamination" "$(classify_failure 47)"
 assert_eq "contamination is classified with no Bun (regex)" "contamination" "$(SW_BUN=/nonexistent/bun classify_failure 47)"
 assert_eq "contamination has a retry limit of 0" "0" "$(get_max_retries_for_class contamination)"
-RUN_LOG_TEXT="refusing to run inside a build-loop test gate" run_refused_failure 811 'printf "gh %s\n" "$*" >> "$REFUSE_LOG"'
+RUN_LOG_TEXT="⚠ Skipping integration tests: refusing to run inside a build-loop test gate" run_refused_failure 811 'printf "gh %s\n" "$*" >> "$REFUSE_LOG"'
 contam_log="$(cat "$TEST_TEMP_DIR/refuse.log")"
 assert_contains "a contamination failure is logged as skipped" "$contam_log" "Contamination for issue #811 — skipping retry"
 assert_eq "no retry is spawned for contamination" "0" "$(grep -c 'spawn 811 retry' <<<"$contam_log" || true)"
@@ -358,6 +358,31 @@ SECONDS=0
 slow_result="$(SW_BUN="$TEST_TEMP_DIR/slow-bun" SW_CLASSIFY_TIMEOUT=1 classify_failure 48)"
 assert_eq "a classifier that does not answer falls back to the regex" "auth_error" "$slow_result"
 assert_eq "the fallback returns within the timeout, not after the 30 s sleep" "true" "$([[ $SECONDS -lt 15 ]] && echo true || echo false)"
+
+# ─── Escalations come only from structured error lines (#8696) ───
+print_test_section "False escalations do not block dispatch; structured escalations still do"
+esc_class() { printf '%s\n' "$1" > "$LOG_DIR/issue-901.log"; classify_failure 901; }
+ESC=$(printf '\033')
+assert_eq "a bare refusal sentence is not contamination" "unknown" "$(esc_class "refusing to run inside a build-loop test gate")"
+assert_eq "a forged CONTAMINATION line in test output is not contamination" "unknown" \
+    "$(esc_class 'CONTAMINATION: x')"
+assert_eq "a DNS failure is not invalid_issue" "unknown" "$(esc_class "Could not resolve host: api.github.com")"
+assert_eq "a dependency resolution failure is not invalid_issue" "build_failure" \
+    "$(esc_class "npm ERR! could not resolve dependencies: peer react@18")"
+assert_eq "a bare HTTP 404 is not invalid_issue" "unknown" "$(esc_class "HTTP 404 Not Found")"
+assert_eq "a model 404 is not invalid_issue" "unknown" "$(esc_class "API Error: 404 model not found")"
+assert_eq "the structured refusal is contamination" "contamination" \
+    "$(esc_class "⚠ Skipping integration tests: refusing to run inside a build-loop test gate")"
+assert_eq "the gh-prefixed structured refusal is contamination" "contamination" \
+    "$(esc_class "build	Test	2026-10-24T13:51:24.7812544Z ⚠ Skipping integration tests: refusing to run inside a build-loop test gate")"
+assert_eq "a coloured structured refusal is contamination (ANSI stripped first)" "contamination" \
+    "$(esc_class "${ESC}[33m⚠ Skipping integration tests: refusing to run inside a build-loop test gate${ESC}[0m")"
+assert_eq "a coloured CONTAMINATION line is contamination" "contamination" \
+    "$(esc_class "${ESC}[31mCONTAMINATION: branch-switched a -> b${ESC}[0m")"
+assert_eq "a gh issue lookup failure is invalid_issue" "invalid_issue" \
+    "$(esc_class "gh: Could not resolve to an Issue with the number 999")"
+assert_eq "an issue HTTP 404 with its URL is invalid_issue" "invalid_issue" \
+    "$(esc_class "HTTP 404 Not Found (https://api.github.com/repos/o/r/issues/999)")"
 
 print_test_results
 

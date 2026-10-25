@@ -42,7 +42,7 @@ const KIND_CLASS: Readonly<Record<AgentFailureKind, FailureClass>> = {
 // Error-like lines. Rules scoped to "error" search only these lines. Deliberately wider than
 // "error|fail" so that a bare API message such as "invalid x-api-key" is still error-like.
 const ERROR_LINE =
-  /error|fail|fatal|exception|::error::|enoent|eacces|not found|lockfile|invalid|unauthori[sz]ed|forbidden|denied|overloaded|rate[ _-]?limit|timed? ?out|\b[45]\d\d\b|econn|etimedout|socket hang up|unavailable|authentication|not logged in/i;
+  /error|fail|fatal|exception|::error::|enoent|eacces|not found|lockfile|invalid|unauthori[sz]ed|forbidden|denied|overloaded|rate[ _-]?limit|timed? ?out|\b[45]\d\d\b|econn|etimedout|socket hang up|unavailable|authentication|not logged in|refus|contaminat|expired|revoked|could not resolve|does not exist|claude_code_oauth_token/i;
 
 interface Rule {
   readonly pattern: RegExp;
@@ -61,23 +61,19 @@ const RULES: readonly Rule[] = [
     // contamination, and a retry would repeat real side effects. Signals: the test-gate refusal
     // printed by sw-e2e-integration-test.sh (PR #8610), or a CONTAMINATION line the loop records when
     // it finds .claude/pipeline-state.md missing or the branch switched mid-run.
+    // Anchored on the whole structured line, so `echo "CONTAMINATION: x"` in test output does not match, and
+    // scoped to error lines. The refusal is the line sw-e2e-integration-test.sh prints; the reason is a fixed list.
     pattern:
-      /refusing to run inside a build-loop test gate|^CONTAMINATION: (pipeline-state-missing|branch-switched)/im,
+      /^[^A-Za-z0-9]{0,4}Skipping integration tests: refusing to run inside a build-loop test gate[ \t]{0,20}$|^CONTAMINATION: (?:pipeline-state-missing|branch-switched)(?:[ \t]|$)/im,
     cls: "contamination",
-    scope: "any",
+    scope: "error",
   },
   {
     pattern:
       /authentication[ _]failed|authentication_error|invalid api key|invalid x-api-key|api error: 401|oauth token (is |has )?(expired|invalid|revoked)|not logged in|unauthorized/i,
     cls: "auth",
-    // "any": the input is bounded and normalized, and auth fails safe (escalate), so no error-line scope.
-    scope: "any",
-  },
-  {
-    pattern:
-      /issue not found|api error: 404|http 404|status 404|no body|could not resolve|issue[^\n]{0,200}does not exist/i,
-    cls: "invalid_input",
-    scope: "any",
+    // Error lines only: the same selection as the other escalation rules. Bare words in prose are not auth.
+    scope: "error",
   },
   {
     // The sandbox warning the Claude CLI prints when bubblewrap or socat is missing. It is setup,
@@ -93,6 +89,12 @@ const RULES: readonly Rule[] = [
     scope: "error",
   },
   {
+    // DNS and host lookup failures are the network, not the input. Checked before invalid_input.
+    pattern: /\bcould not resolve host\b|\bENOTFOUND\b/i,
+    cls: "environment",
+    scope: "any",
+  },
+  {
     // Structured signals only. Free text such as "rate limit" or "overloaded" is NOT transient:
     // model prose, branch names and test names can say those words. Bash matches them; this is a
     // deliberate difference (see classify-parity.json).
@@ -100,6 +102,14 @@ const RULES: readonly Rule[] = [
       /\bHTTP(?:\/\d(?:\.\d)?)?\s+(?:429|5\d\d)\b|\bstatus"?\s*:\s*"?(?:429|5\d\d)\b|\b503 Service Unavailable\b|\b502 Bad Gateway\b|\bapi error: (?:429|5\d\d)\b|\b(?:rate_limit_error|overloaded_error|api_error)\b|\b(?:ECONNRESET|ETIMEDOUT|EAI_AGAIN)\b|\bretry-after\s*:/i,
     cls: "transient",
     scope: "any",
+  },
+  {
+    // Issue and PR lookup failures only: gh says so about the issue or PR number. A bare "404", "could not
+    // resolve" or "no body" elsewhere in a log is not an invalid input (it was a false escalation, #8696).
+    pattern:
+      /issue not found|could not resolve to an? (?:issue|pullrequest)\b|\bhttp 404\b[^\n]{0,200}\/(?:issues|pulls)\/\d+|\bissue\b[^\n]{0,200}(?:no body|does not exist)/i,
+    cls: "invalid_input",
+    scope: "error",
   },
 ];
 

@@ -63,3 +63,27 @@ describe("model prose cannot change the class or the stop (review finding 3)", (
     expect(classifyAndDecide({ text, attempts: [] }).class).toBe("unknown");
   });
 });
+
+// #8696: colour codes and the gh log prefix are removed before any rule runs, so the anchored forms still match.
+describe("normalization before the rules (#8696)", () => {
+  test("the coloured structured refusal is contamination", () => {
+    const text =
+      "\u001b[33m⚠ Skipping integration tests: refusing to run inside a build-loop test gate\u001b[0m";
+    expect(classifyAndDecide({ text, attempts: [] }).class).toBe("contamination");
+  });
+
+  test("the gh-prefixed structured refusal is contamination", () => {
+    const text =
+      "build\tTest\t2026-10-24T13:51:24.7812544Z ⚠ Skipping integration tests: refusing to run inside a build-loop test gate";
+    expect(classifyAndDecide({ text, attempts: [] }).class).toBe("contamination");
+  });
+
+  test("a coloured CONTAMINATION line is contamination", () => {
+    expect(
+      classifyAndDecide({
+        text: "\u001b[31mCONTAMINATION: branch-switched a -> b\u001b[0m",
+        attempts: [],
+      }).class,
+    ).toBe("contamination");
+  });
+});

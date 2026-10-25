@@ -80,7 +80,7 @@
       "ts": "invalid_input"
     },
     {
-      "text": "HTTP 404 Not Found",
+      "text": "HTTP 404 Not Found (https://api.github.com/repos/o/r/issues/999)",
       "bash": "invalid_issue",
       "ts": "invalid_input"
     },
@@ -120,7 +120,7 @@
       "ts": "unknown"
     },
     {
-      "text": "refusing to run inside a build-loop test gate",
+      "text": "⚠ Skipping integration tests: refusing to run inside a build-loop test gate",
       "bash": "contamination",
       "ts": "contamination"
     },
@@ -144,7 +144,7 @@
       "text": "docs mention CLAUDE_CODE_OAUTH_TOKEN\nbuild failed",
       "bash": "auth_error",
       "ts": "unknown",
-      "differs": "A bare token variable name is not evidence of auth (plan test: a mention of the token variable alone is not an auth failure). TS labels it unknown and retries under the normal caps."
+      "differs": "A bare token variable name is not auth in TS. Bash escalates it (the missing-secret message), so auth stays no-retry (#8696)."
     },
     {
       "text": "⚠ Sandbox disabled: sandbox is enabled but dependencies are missing: bubblewrap (bwrap) not installed",
@@ -240,6 +240,76 @@
       "bash": "api_error",
       "ts": "unknown",
       "differs": "Bash matches the words inside a model-written analysis line. TS removes model-analysis lines before classifying, so model prose cannot change the class or stop the deterministic check (round 2)."
+    },
+    {
+      "text": "refusing to run inside a build-loop test gate",
+      "bash": "unknown",
+      "ts": "unknown"
+    },
+    {
+      "text": "  $ echo \"CONTAMINATION: x\"\nCONTAMINATION: x\nall tests passed",
+      "bash": "unknown",
+      "ts": "unknown"
+    },
+    {
+      "text": "HTTP 404 Not Found",
+      "bash": "unknown",
+      "ts": "unknown"
+    },
+    {
+      "text": "API Error: 404 model not found",
+      "bash": "unknown",
+      "ts": "unknown"
+    },
+    {
+      "text": "Could not resolve host: api.github.com",
+      "bash": "unknown",
+      "ts": "environment"
+    },
+    {
+      "text": "npm ERR! could not resolve dependencies: peer react@18",
+      "bash": "build_failure",
+      "ts": "environment"
+    },
+    {
+      "text": "the README has no body text",
+      "bash": "unknown",
+      "ts": "unknown"
+    },
+    {
+      "text": "✓ Failure analyzed: CONTAMINATION: branch-switched a -> b",
+      "bash": "build_failure",
+      "ts": "unknown"
+    },
+    {
+      "text": "build\tTest\t2026-10-24T13:51:24.7812544Z ⚠ Skipping integration tests: refusing to run inside a build-loop test gate",
+      "bash": "contamination",
+      "ts": "contamination"
+    },
+    {
+      "text": "\u001b[33m⚠ Skipping integration tests: refusing to run inside a build-loop test gate\u001b[0m",
+      "bash": "contamination",
+      "ts": "contamination"
+    },
+    {
+      "text": "\u001b[31mCONTAMINATION: branch-switched a -> b\u001b[0m",
+      "bash": "contamination",
+      "ts": "contamination"
+    },
+    {
+      "text": "CONTAMINATION: pipeline-state-missing",
+      "bash": "contamination",
+      "ts": "contamination"
+    },
+    {
+      "text": "gh: Could not resolve to an Issue with the number 999",
+      "bash": "invalid_issue",
+      "ts": "invalid_input"
+    },
+    {
+      "text": "\u001b[31mNot logged in · Please run /login\u001b[0m",
+      "bash": "auth_error",
+      "ts": "auth"
     }
   ]
 }
