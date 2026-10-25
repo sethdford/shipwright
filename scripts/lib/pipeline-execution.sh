@@ -468,7 +468,24 @@ Focus on fixing the failing tests while keeping all passing tests working."
 }
 
 # ─── Auto-Rebase Before PR ─────────────────────────────────────────
-auto_rebase() {
+# Rebase, fetch and merge run with the repo's hooks, fsmonitor and ssh command disabled, so a setting the
+# agent wrote into .git/config cannot run code here (#8644). The override is held in a subshell.
+auto_rebase() (
+    export GIT_CONFIG_COUNT=4
+    export GIT_CONFIG_KEY_0=core.hooksPath GIT_CONFIG_VALUE_0=/dev/null
+    export GIT_CONFIG_KEY_1=core.fsmonitor GIT_CONFIG_VALUE_1=false
+    export GIT_CONFIG_KEY_2=core.untrackedCache GIT_CONFIG_VALUE_2=false
+    export GIT_CONFIG_KEY_3=core.sshCommand GIT_CONFIG_VALUE_3=
+    # A repo that sets http.* or url-scoped credential.* would send the fetch through its own proxy or
+    # helper (#8662 round 7). Refuse the rebase; the guarded push then refuses too.
+    if ! type scope_net_config_refused >/dev/null 2>&1 || [[ -n "$(scope_net_config_refused "$PWD")" ]]; then
+        warn "Rebase skipped: the repo config sets http.* or credential.<url>.* (network settings the pipeline does not trust)"
+        exit 1
+    fi
+    _auto_rebase_body
+)
+
+_auto_rebase_body() {
     info "Syncing with ${BASE_BRANCH}..."
 
     # Fetch latest
@@ -505,6 +522,14 @@ auto_rebase() {
 
 # ─── Main Pipeline Orchestration ───────────────────────────────────
 run_pipeline() {
+    # The push URL is recorded before the agent runs, so a change the agent makes to remote.origin.url
+    # cannot redirect the push (#8644). A resumed process has no memory of it: it takes the URL from the
+    # out-of-repo record (SW_PIPELINE_PUSH_URL); without one, nothing is pushed.
+    if [[ "${RESUME_FROM_CHECKPOINT:-false}" == "true" ]]; then
+        PIPELINE_PUSH_URL="${SW_PIPELINE_PUSH_URL:-}"
+    else
+        PIPELINE_PUSH_URL="$(git remote get-url --push origin 2>/dev/null || true)"
+    fi
     # Rotate event log if needed (standalone mode)
     rotate_event_log_if_needed
 
