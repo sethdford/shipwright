@@ -87,3 +87,12 @@ describe("normalization before the rules (#8696)", () => {
     ).toBe("contamination");
   });
 });
+
+test("a coloured auth line is auth (normalized before the anchored rule)", () => {
+  expect(
+    classifyAndDecide({
+      text: "\u001b[31mNot logged in · Please run /login\u001b[0m",
+      attempts: [],
+    }).class,
+  ).toBe("auth");
+});

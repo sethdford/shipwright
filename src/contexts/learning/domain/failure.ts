@@ -42,7 +42,7 @@ const KIND_CLASS: Readonly<Record<AgentFailureKind, FailureClass>> = {
 // Error-like lines. Rules scoped to "error" search only these lines. Deliberately wider than
 // "error|fail" so that a bare API message such as "invalid x-api-key" is still error-like.
 const ERROR_LINE =
-  /error|fail|fatal|exception|::error::|enoent|eacces|not found|lockfile|invalid|unauthori[sz]ed|forbidden|denied|overloaded|rate[ _-]?limit|timed? ?out|\b[45]\d\d\b|econn|etimedout|socket hang up|unavailable|authentication|not logged in|refus|contaminat|expired|revoked|could not resolve|does not exist|claude_code_oauth_token/i;
+  /error|fail|fatal|exception|::error::|enoent|eacces|not found|lockfile|invalid|unauthori[sz]ed|forbidden|denied|overloaded|rate[ _-]?limit|timed? ?out|\b[45]\d\d\b|econn|etimedout|socket hang up|unavailable|authentication|not logged in|refus|contaminat|expired|revoked|could not resolve|does not exist|claude_code_oauth_token|bad credentials/i;
 
 interface Rule {
   readonly pattern: RegExp;
@@ -69,10 +69,11 @@ const RULES: readonly Rule[] = [
     scope: "error",
   },
   {
+    // Anchored on the start of the normalized line (after a short optional prefix such as `gh: `, `error: ` or
+    // `##[error]`), so a test name or a prose sentence that mentions 401 or "not logged in" does not escalate (#8696).
     pattern:
-      /authentication[ _]failed|authentication_error|invalid api key|invalid x-api-key|api error: 401|oauth token (is |has )?(expired|invalid|revoked)|not logged in|unauthorized/i,
+      /^(?:(?:gh|error|api error|##\[error\]|::error::) ?:? ?)?(?:(?:claude code )?authentication failed|authentication_error|401 authentication_error|invalid api key|invalid x-api-key|oauth token (?:is |has )?(?:expired|invalid|revoked)|not logged in|authentication required|(?:http 401: )?bad credentials|request failed with status 401|401 unauthorized|claude_code_oauth_token (?:is )?not set)/im,
     cls: "auth",
-    // Error lines only: the same selection as the other escalation rules. Bare words in prose are not auth.
     scope: "error",
   },
   {
@@ -95,6 +96,14 @@ const RULES: readonly Rule[] = [
     scope: "any",
   },
   {
+    // Anchored: the gh lookup failures for an issue or PR number, at the start of the line. Checked before the
+    // log-text transient rule, so "HTTP 503" next to a missing issue is invalid input, not transient (#8696).
+    pattern:
+      /^(?:(?:gh|error): )?(?:graphql: could not resolve to an? (?:issue|pullrequest)\b|http 404: not found \(https:\/\/api\.github\.com\/repos\/[^/\s]{1,100}\/[^/\s]{1,100}\/(?:issues|pulls)\/\d+\)|issue not found\b|issue #?\d+ does not exist)/im,
+    cls: "invalid_input",
+    scope: "error",
+  },
+  {
     // Structured signals only. Free text such as "rate limit" or "overloaded" is NOT transient:
     // model prose, branch names and test names can say those words. Bash matches them; this is a
     // deliberate difference (see classify-parity.json).
@@ -102,14 +111,6 @@ const RULES: readonly Rule[] = [
       /\bHTTP(?:\/\d(?:\.\d)?)?\s+(?:429|5\d\d)\b|\bstatus"?\s*:\s*"?(?:429|5\d\d)\b|\b503 Service Unavailable\b|\b502 Bad Gateway\b|\bapi error: (?:429|5\d\d)\b|\b(?:rate_limit_error|overloaded_error|api_error)\b|\b(?:ECONNRESET|ETIMEDOUT|EAI_AGAIN)\b|\bretry-after\s*:/i,
     cls: "transient",
     scope: "any",
-  },
-  {
-    // Issue and PR lookup failures only: gh says so about the issue or PR number. A bare "404", "could not
-    // resolve" or "no body" elsewhere in a log is not an invalid input (it was a false escalation, #8696).
-    pattern:
-      /issue not found|could not resolve to an? (?:issue|pullrequest)\b|\bhttp 404\b[^\n]{0,200}\/(?:issues|pulls)\/\d+|\bissue\b[^\n]{0,200}(?:no body|does not exist)/i,
-    cls: "invalid_input",
-    scope: "error",
   },
 ];
 

@@ -65,7 +65,8 @@ assert_eq "Auth error classified" "auth_error" "$result"
 
 echo "unauthorized access 401 error" > "$LOG_DIR/issue-102.log"
 result=$(classify_failure 102)
-assert_eq "401 auth error classified" "auth_error" "$result"
+# Prose is not auth: auth is anchored to a structured line (#8696). A real 401 line is "401 unauthorized" or the gh line.
+assert_eq "a prose 401 is not auth (anchored, #8696)" "unknown" "$result"
 
 echo "CLAUDE_CODE_OAUTH_TOKEN is not set" > "$LOG_DIR/issue-103.log"
 result=$(classify_failure 103)
@@ -93,7 +94,7 @@ echo "issue not found: 404" > "$LOG_DIR/issue-301.log"
 result=$(classify_failure 301)
 assert_eq "Issue not found classified" "invalid_issue" "$result"
 
-echo "gh: Could not resolve to an Issue with the number 302" > "$LOG_DIR/issue-302.log"
+echo "GraphQL: Could not resolve to an Issue with the number 302." > "$LOG_DIR/issue-302.log"
 result=$(classify_failure 302)
 assert_eq "Could not resolve classified" "invalid_issue" "$result"
 
@@ -331,7 +332,7 @@ assert_eq "'OAuth token is invalid' is auth_error (same with or without Bun)" "a
 # No Bun: SW_BUN points at nothing, so the bridge is skipped whatever PATH holds. The regex alone must
 # classify each auth form the TS rule catches, so a host without Bun does not retry an auth failure.
 for auth_text in "OAuth token is invalid" "OAuth token revoked" "Error: invalid api key provided" \
-    "invalid x-api-key" "Error 401: authentication_error" "Not logged in"; do
+    "invalid x-api-key" "Error: 401 authentication_error" "Not logged in"; do
     printf '%s\n' "$auth_text" > "$LOG_DIR/issue-46.log"
     assert_eq "no Bun: '$auth_text' is auth_error" "auth_error" "$(SW_BUN=/nonexistent/bun classify_failure 46)"
 done
@@ -380,9 +381,28 @@ assert_eq "a coloured structured refusal is contamination (ANSI stripped first)"
 assert_eq "a coloured CONTAMINATION line is contamination" "contamination" \
     "$(esc_class "${ESC}[31mCONTAMINATION: branch-switched a -> b${ESC}[0m")"
 assert_eq "a gh issue lookup failure is invalid_issue" "invalid_issue" \
-    "$(esc_class "gh: Could not resolve to an Issue with the number 999")"
+    "$(esc_class "GraphQL: Could not resolve to an Issue with the number 999.")"
 assert_eq "an issue HTTP 404 with its URL is invalid_issue" "invalid_issue" \
-    "$(esc_class "HTTP 404 Not Found (https://api.github.com/repos/o/r/issues/999)")"
+    "$(esc_class "HTTP 404: Not Found (https://api.github.com/repos/o/r/issues/999)")"
+
+print_test_section "Self-triggers never escalate (#8696): test names and tool output that name an escalation"
+not_esc() { case "$1" in auth_error|invalid_issue|contamination) echo no ;; *) echo yes ;; esac; }
+assert_eq "a GraphQL lookup failure in a test name does not escalate" "yes" \
+    "$(not_esc "$(esc_class '(fail) classifies gh error "GraphQL: Could not resolve to an issue or pull request" as "not_found"')")"
+assert_eq "a 401 in a test name does not escalate" "yes" \
+    "$(not_esc "$(esc_class '(fail) classifies gh error "HTTP 401: Bad credentials" as "auth" [0.2ms]')")"
+assert_eq "jest's Expected: issue not found does not escalate" "yes" \
+    "$(not_esc "$(esc_class '    Expected: "issue not found"')")"
+assert_eq "an issue HTTP 404 named in a test does not escalate" "yes" \
+    "$(not_esc "$(esc_class '(fail) client > maps HTTP 404 on GET /repos/o/r/issues/12 to NotFound')")"
+assert_eq "a SyntaxError about an invalid token does not escalate" "yes" \
+    "$(not_esc "$(esc_class 'SyntaxError: Invalid or unexpected token')")"
+assert_eq "a jwt test named rejects invalid token does not escalate" "yes" \
+    "$(not_esc "$(esc_class '(fail) jwt > rejects invalid token')")"
+assert_eq "gh Bad credentials is auth" "auth_error" "$(esc_class 'gh: Bad credentials')"
+assert_eq "HTTP 401 Bad credentials is auth" "auth_error" "$(esc_class 'HTTP 401: Bad credentials (https://api.github.com/repos/o/r/issues/1)')"
+assert_eq "a missing issue beside a 503 is invalid, not transient" "invalid_issue" \
+    "$(esc_class $'HTTP 503 Service Unavailable\nGraphQL: Could not resolve to an Issue with the number of 9.')"
 
 print_test_results
 

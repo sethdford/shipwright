@@ -76,18 +76,14 @@ describe("escalations come only from structured error lines (#8696)", () => {
   });
 
   test("issue and PR lookup failures are invalid input", () => {
-    expect(classifyFailure({ text: "gh: Could not resolve to an Issue with the number 999" })).toBe(
-      "invalid_input",
-    );
     expect(
-      classifyFailure({ text: "HTTP 404 Not Found (https://api.github.com/repos/o/r/issues/999)" }),
+      classifyFailure({ text: "GraphQL: Could not resolve to an Issue with the number 999." }),
     ).toBe("invalid_input");
-  });
-
-  test("coloured auth lines still escalate", () => {
-    expect(classifyFailure({ text: "\u001b[31mNot logged in · Please run /login\u001b[0m" })).toBe(
-      "auth",
-    );
+    expect(
+      classifyFailure({
+        text: "HTTP 404: Not Found (https://api.github.com/repos/o/r/issues/999)",
+      }),
+    ).toBe("invalid_input");
   });
 });
 

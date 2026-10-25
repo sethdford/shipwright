@@ -95,20 +95,22 @@ classify_failure() {
     fi
 
     # Auth errors
-    # The last alternatives mirror the TS auth rule, so a host without Bun classifies auth the same
-    # way: a retry of an auth failure is fail-open, so both paths must agree (#8674 follow-up).
-    if printf '%s\n' "$err_lines" | grep >/dev/null -iE 'not logged in|unauthorized|auth.*fail|401 |invalid.*token|CLAUDE_CODE_OAUTH_TOKEN|api key.*invalid|authentication required|invalid api key|invalid x-api-key|authentication_error|oauth token (is |has )?(expired|invalid|revoked)'; then
+    # Auth: the same anchored, structured forms as the TS rule (failure.ts), on error lines only, so a test name or a
+    # prose sentence ("(fail) jwt > rejects invalid token") does not escalate (#8696). A retry of an auth failure is
+    # fail-open, so both paths must agree.
+    if printf '%s\n' "$err_lines" | grep >/dev/null -iE '^((gh|error|api error|##\[error\]|::error::) ?:? ?)?((claude code )?authentication failed|authentication_error|401 authentication_error|invalid api key|invalid x-api-key|oauth token (is |has )?(expired|invalid|revoked)|not logged in|authentication required|(http 401: )?bad credentials|request failed with status 401|401 unauthorized|claude_code_oauth_token (is )?not set)'; then
         echo "auth_error"
+        return
+    fi
+    # Invalid issue: the anchored gh lookup failures for an issue or PR number, on error lines (#8696). Before the
+    # log-text transient rule, so a 503 next to a missing issue is invalid input.
+    if printf '%s\n' "$err_lines" | grep >/dev/null -iE '^((gh|error): )?(graphql: could not resolve to an? (issue|pullrequest)|http 404: not found \(https://api\.github\.com/repos/[^/ ]{1,100}/[^/ ]{1,100}/(issues|pulls)/[0-9]+\)|issue not found|issue #?[0-9]+ does not exist)'; then
+        echo "invalid_issue"
         return
     fi
     # API errors (rate limits, timeouts, server errors)
     if echo "$tail_content" | grep >/dev/null -iE 'rate limit|429 |503 |502 |overloaded|timeout|ETIMEDOUT|ECONNRESET|socket hang up|service unavailable'; then
         echo "api_error"
-        return
-    fi
-    # Invalid issue: issue and PR lookup failures only, on error lines (#8696). A bare 404 or DNS error is not one.
-    if printf '%s\n' "$err_lines" | grep >/dev/null -iE 'issue not found|could not resolve to an? (issue|pullrequest)|http 404.{0,200}/(issues|pulls)/[0-9]+|issue.{0,200}(no body|does not exist)'; then
-        echo "invalid_issue"
         return
     fi
     # Context exhaustion — check progress file
@@ -134,7 +136,7 @@ classify_failure() {
 }
 
 # Error-like lines, the same vocabulary as ERROR_LINE in src/contexts/learning/domain/failure.ts. Keep them in step.
-_DAEMON_ERROR_LINE='error|fail|fatal|exception|::error::|enoent|eacces|not found|lockfile|invalid|unauthori[sz]ed|forbidden|denied|overloaded|rate[ _-]?limit|timed? ?out|(^|[^0-9])[45][0-9][0-9]([^0-9]|$)|econn|etimedout|socket hang up|unavailable|authentication|not logged in|refus|contaminat|expired|revoked|could not resolve|does not exist|claude_code_oauth_token'
+_DAEMON_ERROR_LINE='error|fail|fatal|exception|::error::|enoent|eacces|not found|lockfile|invalid|unauthori[sz]ed|forbidden|denied|overloaded|rate[ _-]?limit|timed? ?out|(^|[^0-9])[45][0-9][0-9]([^0-9]|$)|econn|etimedout|socket hang up|unavailable|authentication|not logged in|refus|contaminat|expired|revoked|could not resolve|does not exist|claude_code_oauth_token|bad credentials'
 
 # ─── Consecutive Failure Tracking (persisted + adaptive) ─────────────────────
 

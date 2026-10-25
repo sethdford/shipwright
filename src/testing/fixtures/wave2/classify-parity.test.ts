@@ -71,3 +71,30 @@ describe("TS classes pinned against live bash classify_failure (W2-04 mapping)",
     }
   });
 });
+
+// #8696 self-triggers: text a failing test or a tool prints about escalations. Neither classifier may escalate on it.
+const SELF_TRIGGERS: readonly string[] = [
+  '(fail) classifies gh error "GraphQL: Could not resolve to an issue or pull request with the number of 1." as "not_found" [0.4ms]\nerror: expect(received).toEqual(expected)',
+  '(fail) classifies gh error "HTTP 401: Bad credentials" as "auth" [0.2ms]',
+  "(fail) maps 401 Unauthorized to auth [1ms]",
+  '    Expected: "issue not found"\n    Received: "ok"\nerror: expect(received).toBe(expected)',
+  "(fail) client > maps HTTP 404 on GET /repos/o/r/issues/12 to NotFound\nerror: expected 1 to be 2",
+  "SyntaxError: Invalid or unexpected token\n    at file.js:3",
+  "(fail) jwt > rejects invalid token\nerror: expected",
+  "(fail) gate test\nCONTAMINATION: x\nerror: boom",
+  "  CONTAMINATION: pipeline-state-missing (echoed by test)\nerror",
+  "✗ prints refusing to run inside a build-loop test gate when gated\nerror: assertion failed",
+  "Issue #42 has no body; nothing to plan",
+];
+
+describe("#8696 self-triggers never escalate (both classifiers)", () => {
+  for (const text of SELF_TRIGGERS) {
+    test(`does not escalate: ${JSON.stringify(text).slice(0, 70)}`, () => {
+      const ts = classifyAndDecide({ text, attempts: [] }).class;
+      expect(["auth", "invalid_input", "contamination"]).not.toContain(ts);
+      const i = corpus.cases.findIndex((c) => c.text === text);
+      expect(i).toBeGreaterThanOrEqual(0);
+      expect(["auth_error", "invalid_issue", "contamination"]).not.toContain(liveBash[i] ?? "");
+    });
+  }
+});

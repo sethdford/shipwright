@@ -80,7 +80,7 @@
       "ts": "invalid_input"
     },
     {
-      "text": "HTTP 404 Not Found (https://api.github.com/repos/o/r/issues/999)",
+      "text": "HTTP 404: Not Found (https://api.github.com/repos/o/r/issues/999)",
       "bash": "invalid_issue",
       "ts": "invalid_input"
     },
@@ -137,14 +137,13 @@
     },
     {
       "text": "test \"returns 401 unauthorized for bad token\" FAILED",
-      "bash": "auth_error",
-      "ts": "auth"
+      "bash": "build_failure",
+      "ts": "unknown"
     },
     {
       "text": "docs mention CLAUDE_CODE_OAUTH_TOKEN\nbuild failed",
-      "bash": "auth_error",
-      "ts": "unknown",
-      "differs": "A bare token variable name is not auth in TS. Bash escalates it (the missing-secret message), so auth stays no-retry (#8696)."
+      "bash": "build_failure",
+      "ts": "unknown"
     },
     {
       "text": "⚠ Sandbox disabled: sandbox is enabled but dependencies are missing: bubblewrap (bwrap) not installed",
@@ -221,9 +220,8 @@
     },
     {
       "text": "✓ Failure analyzed: 401 unauthorized in the mock",
-      "bash": "auth_error",
-      "ts": "unknown",
-      "differs": "Bash matches the words inside a model-written analysis line. TS removes model-analysis lines before classifying, so model prose cannot change the class or stop the deterministic check (round 2)."
+      "bash": "build_failure",
+      "ts": "unknown"
     },
     {
       "text": "[fix/handle-rate-limit-errors-123 abc1234] loop: iteration 1 — autonomous progress",
@@ -302,7 +300,7 @@
       "ts": "contamination"
     },
     {
-      "text": "gh: Could not resolve to an Issue with the number 999",
+      "text": "GraphQL: Could not resolve to an Issue with the number 999.",
       "bash": "invalid_issue",
       "ts": "invalid_input"
     },
@@ -310,6 +308,216 @@
       "text": "\u001b[31mNot logged in · Please run /login\u001b[0m",
       "bash": "auth_error",
       "ts": "auth"
+    },
+    {
+      "text": "curl: (6) Could not resolve host: registry.npmjs.org\nError: Process completed with exit code 6.",
+      "bash": "build_failure",
+      "ts": "environment"
+    },
+    {
+      "text": "fatal: unable to access 'https://github.com/x/y/': Could not resolve host: github.com",
+      "bash": "unknown",
+      "ts": "environment"
+    },
+    {
+      "text": "npm ERR! code ENOTFOUND\nnpm ERR! getaddrinfo ENOTFOUND registry.npmjs.org",
+      "bash": "build_failure",
+      "ts": "environment"
+    },
+    {
+      "text": "[ERROR] Failed to execute goal on project app: Could not resolve dependencies for project com.x:app:jar:1.0",
+      "bash": "build_failure",
+      "ts": "environment"
+    },
+    {
+      "text": "error: could not resolve \"@foo/bar\". Maybe you need to \"bun install\"?",
+      "bash": "unknown",
+      "ts": "unknown"
+    },
+    {
+      "text": "npm ERR! code E404\nnpm ERR! 404 Not Found - GET https://registry.npmjs.org/@x%2fy - Not found",
+      "bash": "build_failure",
+      "ts": "unknown"
+    },
+    {
+      "text": "npm http fetch GET 404 https://registry.npmjs.org/nope 120ms\nnpm ERR! HTTP 404 Not Found",
+      "bash": "build_failure",
+      "ts": "unknown"
+    },
+    {
+      "text": "curl: (22) The requested URL returned error: 404\nError: HTTP 404 from https://example.com/x",
+      "bash": "unknown",
+      "ts": "unknown"
+    },
+    {
+      "text": "(fail) api > returns status 404 for missing user [3.1ms]\nerror: expect(received).toBe(expected)",
+      "bash": "build_failure",
+      "ts": "unknown"
+    },
+    {
+      "text": "(fail) client > maps HTTP 404 on GET /repos/o/r/issues/12 to NotFound\nerror: expected 1 to be 2",
+      "bash": "build_failure",
+      "ts": "unknown"
+    },
+    {
+      "text": "(fail) gate test\nCONTAMINATION: x\nerror: boom",
+      "bash": "build_failure",
+      "ts": "unknown"
+    },
+    {
+      "text": "  CONTAMINATION: pipeline-state-missing (echoed by test)\nerror",
+      "bash": "unknown",
+      "ts": "unknown"
+    },
+    {
+      "text": "✗ prints refusing to run inside a build-loop test gate when gated\nerror: assertion failed",
+      "bash": "build_failure",
+      "ts": "unknown"
+    },
+    {
+      "text": "build\tRun tests\t2026-10-25T12:00:00.1234567Z error: TypeError: x is undefined",
+      "bash": "unknown",
+      "ts": "unknown"
+    },
+    {
+      "text": "\u001b[31merror\u001b[0m: test failed \u001b[1mstatus 404\u001b[0m",
+      "bash": "build_failure",
+      "ts": "unknown"
+    },
+    {
+      "text": "(fail) parses issue with no body\nerror: expected",
+      "bash": "build_failure",
+      "ts": "unknown"
+    },
+    {
+      "text": "(fail) auth > login fails with wrong password [2ms]\nerror: expected 200 got 401",
+      "bash": "build_failure",
+      "ts": "unknown"
+    },
+    {
+      "text": "SyntaxError: Invalid or unexpected token\n    at file.js:3",
+      "bash": "unknown",
+      "ts": "unknown"
+    },
+    {
+      "text": "(fail) jwt > rejects invalid token\nerror: expected",
+      "bash": "build_failure",
+      "ts": "unknown"
+    },
+    {
+      "text": "(fail) returns 401 Unauthorized for anon\nerror: expect(received).toBe(expected)",
+      "bash": "build_failure",
+      "ts": "unknown"
+    },
+    {
+      "text": "(fail) shows banner when not logged in\nerror: expected",
+      "bash": "build_failure",
+      "ts": "unknown"
+    },
+    {
+      "text": "HTTP 401: Bad credentials (https://api.github.com/repos/o/r/issues/1)",
+      "bash": "auth_error",
+      "ts": "auth"
+    },
+    {
+      "text": "gh: Bad credentials\nerror: HTTP 401",
+      "bash": "auth_error",
+      "ts": "auth"
+    },
+    {
+      "text": "To get started with GitHub CLI, please run:  gh auth login\nerror: not logged in",
+      "bash": "auth_error",
+      "ts": "auth"
+    },
+    {
+      "text": "error: authentication required; The token in GH_TOKEN is invalid.",
+      "bash": "auth_error",
+      "ts": "auth"
+    },
+    {
+      "text": "GraphQL: Could not resolve to an Issue with the number of 99999. (repository.issue)",
+      "bash": "invalid_issue",
+      "ts": "invalid_input"
+    },
+    {
+      "text": "gh: Not Found (HTTP 404)\nerror: HTTP 404: Not Found (https://api.github.com/repos/o/r/issues/99999)",
+      "bash": "invalid_issue",
+      "ts": "invalid_input"
+    },
+    {
+      "text": "GraphQL: Could not resolve to a PullRequest with the number of 5. (repository.pullRequest)",
+      "bash": "invalid_issue",
+      "ts": "invalid_input"
+    },
+    {
+      "text": "Issue #42 has no body; nothing to plan",
+      "bash": "unknown",
+      "ts": "unknown"
+    },
+    {
+      "text": "CONTAMINATION: branch-switched from a to b",
+      "bash": "contamination",
+      "ts": "contamination"
+    },
+    {
+      "text": "\u001b[31mCONTAMINATION: branch-switched\u001b[0m",
+      "bash": "contamination",
+      "ts": "contamination"
+    },
+    {
+      "text": "build\tRun tests\t2026-10-25T12:00:00.1234567Z CONTAMINATION: pipeline-state-missing",
+      "bash": "contamination",
+      "ts": "contamination"
+    },
+    {
+      "text": "Skipping integration tests: refusing to run inside a build-loop test gate",
+      "bash": "contamination",
+      "ts": "contamination"
+    },
+    {
+      "text": "build\tRun tests\t2026-10-25T12:00:00.1234567Z \u001b[33m⚠\u001b[0m Skipping integration tests: refusing to run inside a build-loop test gate",
+      "bash": "contamination",
+      "ts": "contamination"
+    },
+    {
+      "text": "CONTAMINATION: pipeline-state-missing\r",
+      "bash": "contamination",
+      "ts": "contamination"
+    },
+    {
+      "text": "(fail) test prints\nCONTAMINATION: branch-switched\nerror",
+      "bash": "contamination",
+      "ts": "contamination"
+    },
+    {
+      "text": "API Error: 503 Service Unavailable\nError: authentication_error: invalid x-api-key",
+      "bash": "auth_error",
+      "ts": "auth"
+    },
+    {
+      "text": "HTTP 503 Service Unavailable\nGraphQL: Could not resolve to an Issue with the number of 9.",
+      "bash": "invalid_issue",
+      "ts": "invalid_input"
+    },
+    {
+      "text": "(fail) classifies gh error \"GraphQL: Could not resolve to an issue or pull request with the number of 1.\" as \"not_found\" [0.4ms]\nerror: expect(received).toEqual(expected)",
+      "bash": "build_failure",
+      "ts": "unknown"
+    },
+    {
+      "text": "(fail) classifies gh error \"HTTP 401: Bad credentials\" as \"auth\" [0.2ms]",
+      "bash": "build_failure",
+      "ts": "unknown"
+    },
+    {
+      "text": "(fail) maps 401 Unauthorized to auth [1ms]",
+      "bash": "build_failure",
+      "ts": "unknown"
+    },
+    {
+      "text": "    Expected: \"issue not found\"\n    Received: \"ok\"\nerror: expect(received).toBe(expected)",
+      "bash": "unknown",
+      "ts": "unknown"
     }
   ]
 }
