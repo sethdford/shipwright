@@ -1,11 +1,21 @@
 {
-  "js": { "maxGzipBytes": 42553 },
-  "css": { "maxGzipBytes": 25600 },
+  "js": {
+    "maxGzipBytes": 48004
+  },
+  "css": {
+    "maxGzipBytes": 25600
+  },
   "baseline": {
     "measuredOn": "2026-10-25",
     "command": "bun tools/web/budget.ts",
     "jsGzipBytes": 42553,
     "cssGzipBytes": 18009,
     "notes": "JS is main.js from dashboard/src/main.ts (bun build --minify). The JS ceiling equals the T1 baseline, so there is zero headroom until T4 lowers the target to 120 KB. This is intended. CSS is dashboard/public/styles.css, tokens.css and fonts/fonts.css, the stylesheets the dashboard ships. The CSS ceiling is the spec's 25 KB."
+  },
+  "t2": {
+    "measuredOn": "2026-10-25",
+    "jsGzipBytes": 48004,
+    "cssGzipBytes": 18853,
+    "notes": "T2 (#8699) raises the interim JS ceiling by 5,451 B over the T1 baseline (42,553 B) for the shell: destination router with legacy redirects, APG tablist, Cmd/Ctrl+K command palette, keyboard shortcuts and sheet, native-dialog confirmations, connection states, and the UI primitives in components/ui. The byte breakdown is in the T2 PR body. There is no headroom by design. T4 (#8701) deletes the canvas, sprites and retired views; re-measure and lower this ceiling then."
   }
 }

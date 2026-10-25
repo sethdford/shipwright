@@ -76,11 +76,17 @@ describe("buildCommands", () => {
     expect(c.openRun).toHaveBeenCalledWith(4187);
   });
 
-  it("offers pause for running runs, resume for paused runs, and stop for both", () => {
-    const ids = buildCommands(ctx()).map((c) => c.id);
-    expect(ids).toEqual(expect.arrayContaining(["pause-4187", "stop-4187", "resume-4171", "stop-4171", "brake"]));
-    expect(ids).not.toContain("resume-4187");
-    expect(ids).not.toContain("pause-4171");
+  it("offers pause, resume and stop for every run (the server does not report paused state)", () => {
+    const c = ctx();
+    const cmds = buildCommands(c);
+    const ids = cmds.map((x) => x.id);
+    expect(ids).toEqual(
+      expect.arrayContaining(["pause-4187", "resume-4187", "stop-4187", "pause-4171", "resume-4171", "stop-4171", "brake"]),
+    );
+    cmds.find((x) => x.id === "resume-4171")?.run();
+    cmds.find((x) => x.id === "pause-4187")?.run();
+    expect(c.resumeRun).toHaveBeenCalledWith(4171);
+    expect(c.pauseRun).toHaveBeenCalledWith(4187);
   });
 
   it("marks destructive actions and routes stop through the confirmation callback", () => {

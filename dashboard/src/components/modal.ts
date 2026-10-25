@@ -48,15 +48,21 @@ export function openInterventionModal(issue: number): void {
   openDialog("intervention-modal");
 }
 
-export async function confirmAbort(issue: number): Promise<void> {
+/** Stop (abort) one run after a confirmation that names it. */
+export async function confirmAbort(issue: number, stage?: string): Promise<void> {
+  const at = stage ? ` It is at ${stage}.` : "";
   const ok = await confirmDialog({
     title: `Stop run #${issue}?`,
-    body: "Stopping ends the pipeline process. It cannot be resumed.",
+    body: `This sends a terminate signal to the run's process.${at} A paused run ends when it is next resumed.`,
     confirmLabel: "Stop run",
     cancelLabel: "Keep run",
     danger: true,
   });
-  if (ok) api.sendIntervention(issue, "abort");
+  if (!ok) return;
+  api
+    .sendIntervention(issue, "abort")
+    .then(() => toast(`Stop sent to run #${issue}.`))
+    .catch((err) => toast(`Stop failed for run #${issue}: ${String(err)}`, "error"));
 }
 
 // Bulk Actions
@@ -85,7 +91,7 @@ export function setupBulkActions(): void {
       if (issues.length === 0) return;
       const ok = await confirmDialog({
         title: `Stop ${issues.length} run${issues.length === 1 ? "" : "s"}?`,
-        body: "Runs " + issues.map((i) => "#" + i).join(", ") + " will end. They cannot be resumed.",
+        body: "Sends a terminate signal to runs " + issues.map((i) => "#" + i).join(", ") + ". Paused runs end when next resumed.",
         confirmLabel: "Stop runs",
         cancelLabel: "Keep runs",
         danger: true,
@@ -274,8 +280,6 @@ export function confirmMachineRemove(name: string): void {
   removeMachineTarget = name;
   const el = document.getElementById("remove-machine-name");
   if (el) el.textContent = name;
-  const cb = document.getElementById("remove-stop-daemon") as HTMLInputElement;
-  if (cb) cb.checked = false;
   openDialog("remove-machine-modal");
 }
 

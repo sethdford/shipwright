@@ -1,4 +1,4 @@
-// Button. Danger buttons always open a confirmation (see dialog.ts confirmDialog).
+// Button. A danger button that ends a run or a process opens confirmDialog first.
 
 import { h } from "./dom";
 

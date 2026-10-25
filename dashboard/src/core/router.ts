@@ -98,17 +98,23 @@ export function onRouteChange(fn: (route: Route) => void): () => void {
 /** Navigates to a destination, a legacy view or an old view id. Unknown targets are ignored. */
 export function switchTab(target: string): void {
   const route = resolveRoute(target);
-  if (route) navigate(route);
+  if (route) navigate(route, "push");
 }
 
-function navigate(route: Route): void {
+/**
+ * "push" adds a history entry (a tab click, a shortcut, the palette). "replace" rewrites the
+ * current one: first load, and an old hash the browser already pushed that maps elsewhere,
+ * so Back never bounces through the old hash.
+ */
+function navigate(route: Route, mode: "push" | "replace"): void {
   const prev = current;
   const key = routeKey(route);
-  // A redirect replaces the history entry so Back does not bounce through the old hash.
   if (location.hash.replace(/^#/, "") !== key) {
-    history.replaceState(null, "", "#" + key);
+    if (mode === "push" && prev) history.pushState(null, "", "#" + key);
+    else history.replaceState(null, "", "#" + key);
   }
   if (prev && routeKey(prev) === key) {
+    current = route;
     revealSection(route);
     return;
   }
@@ -205,10 +211,11 @@ export function setupRouter(): void {
   document.querySelectorAll<HTMLElement>('[role="tab"][data-dest]').forEach((tab) => {
     tab.addEventListener("click", () => switchTab(tab.dataset.dest ?? ""));
   });
-  navigate(resolveRoute(location.hash) ?? DEFAULT_ROUTE);
+  navigate(resolveRoute(location.hash) ?? DEFAULT_ROUTE, "replace");
   window.addEventListener("hashchange", () => {
     const route = resolveRoute(location.hash);
-    if (route) navigate(route);
+    // An unknown hash snaps back to the page that is actually showing.
+    navigate(route ?? currentRoute(), "replace");
   });
   store.subscribe("fleetState", () => renderActiveView());
 }

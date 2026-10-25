@@ -18,8 +18,10 @@ export function openDialog(target: string | HTMLDialogElement): HTMLDialogElemen
   if (!dlg.dataset.wired) {
     dlg.dataset.wired = "1";
     dlg.addEventListener("close", () => {
+      // The opener may have been re-rendered away (live tables redraw); fall back to <main>.
       const back = openers.get(dlg);
-      if (back && back.isConnected && typeof back.focus === "function") back.focus();
+      const target = back && back.isConnected ? back : document.getElementById("main");
+      target?.focus();
     });
     // A click on the backdrop lands on the dialog element itself.
     dlg.addEventListener("click", (e) => {

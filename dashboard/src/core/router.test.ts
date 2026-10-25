@@ -38,7 +38,15 @@ describe("router", () => {
   let store: typeof import("./state").store;
   let router: typeof import("./router");
 
+  // Each test imports a fresh router; drop the previous instance's window listeners.
+  const added: Array<[string, EventListenerOrEventListenerObject]> = [];
+  const realAdd = window.addEventListener.bind(window);
+
   beforeEach(async () => {
+    vi.spyOn(window, "addEventListener").mockImplementation(((type: string, fn: EventListenerOrEventListenerObject) => {
+      added.push([type, fn]);
+      realAdd(type, fn);
+    }) as typeof window.addEventListener);
     mount(SHELL);
     history.replaceState(null, "", "#");
     vi.resetModules();
@@ -46,7 +54,10 @@ describe("router", () => {
     router = await import("./router");
   });
 
-  afterEach(() => vi.restoreAllMocks());
+  afterEach(() => {
+    for (const [type, fn] of added.splice(0)) window.removeEventListener(type, fn);
+    vi.restoreAllMocks();
+  });
 
   const selected = () =>
     Array.from(document.querySelectorAll('[role="tab"][aria-selected="true"]')).map((t) =>
@@ -130,6 +141,29 @@ describe("router", () => {
       expect(selected()).toEqual([]);
       expect(visible()).toEqual(["shipyard"]);
       expect(document.querySelector<HTMLElement>('[data-dest="triage"]')?.tabIndex).toBe(0);
+    });
+
+    it("adds one history entry per navigation the user starts", () => {
+      const before = history.length;
+      router.switchTab("runs");
+      router.switchTab("cost");
+      expect(history.length).toBe(before + 2);
+    });
+
+    it("replaces the entry when an old hash redirects", () => {
+      history.pushState(null, "", "#metrics");
+      const before = history.length;
+      window.dispatchEvent(new HashChangeEvent("hashchange"));
+      expect(location.hash).toBe("#cost");
+      expect(history.length).toBe(before);
+    });
+
+    it("snaps an unknown hash back to the page that is showing", () => {
+      router.switchTab("safety");
+      history.pushState(null, "", "#bogus");
+      window.dispatchEvent(new HashChangeEvent("hashchange"));
+      expect(location.hash).toBe("#safety");
+      expect(visible()).toEqual(["safety"]);
     });
 
     it("ignores unknown targets", () => {

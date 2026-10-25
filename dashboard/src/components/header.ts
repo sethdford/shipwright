@@ -14,12 +14,14 @@ import { openDialog, anyDialogOpen, confirmDialog } from "./ui/dialog";
 import { setupTablist } from "./ui/tabs";
 import { toast } from "./ui/toast";
 import { clock, offlineText } from "./ui/states";
-import { setupNotificationsModal } from "./modal";
+import { setupNotificationsModal, confirmAbort } from "./modal";
 import type { FleetState, DaemonConfig } from "../types/api";
 
 let soundEnabled = false;
 let previousPipelineIds: Set<number> = new Set();
 let palette: Palette | null = null;
+
+const BRAKE_OFFLINE = "Not connected: the brake needs a live connection to the server.";
 
 export function setupHeader(): void {
   hydrateInitialHidden();
@@ -231,7 +233,7 @@ function renderConnection(): void {
     );
   }
   const brake = document.getElementById("emergency-brake");
-  if (brake) setDisabled(brake, conn.connected ? undefined : "Not connected: the brake needs a live connection to the server.");
+  if (brake) setDisabled(brake, conn.connected ? undefined : BRAKE_OFFLINE);
 }
 
 // The breaker pill is static markup in index.html: the dashboard server does not expose
@@ -250,6 +252,7 @@ function setupEmergencyBrake(): void {
     openBrakeDialog();
   });
   document.getElementById("emergency-confirm")?.addEventListener("click", () => {
+    if (!conn.connected) return toast(BRAKE_OFFLINE, "error");
     api
       .emergencyBrake()
       .then((res) => {
@@ -261,6 +264,10 @@ function setupEmergencyBrake(): void {
 }
 
 function openBrakeDialog(): void {
+  if (!conn.connected) {
+    toast(BRAKE_OFFLINE, "error");
+    return;
+  }
   const fleet = store.get("fleetState");
   const active = document.getElementById("emergency-active-count");
   if (active) active.textContent = String(fleet?.pipelines?.length ?? 0);
@@ -281,21 +288,6 @@ function openRun(issue: number): void {
   });
 }
 
-async function stopRun(issue: number, stage: string): Promise<void> {
-  const ok = await confirmDialog({
-    title: `Stop run #${issue}?`,
-    body: `The pipeline is at ${stage || "an unknown stage"}. Stopping ends its process; it cannot be resumed.`,
-    confirmLabel: "Stop run",
-    cancelLabel: "Keep run",
-    danger: true,
-  });
-  if (!ok) return;
-  api
-    .sendIntervention(issue, "abort")
-    .then(() => toast(`Stop sent to run #${issue}.`))
-    .catch((err) => toast(`Stop failed for run #${issue}: ${String(err)}`, "error"));
-}
-
 function intervene(issue: number, action: "pause" | "resume"): void {
   api
     .sendIntervention(issue, action)
@@ -312,7 +304,7 @@ function commands() {
     openRun,
     pauseRun: (n) => intervene(n, "pause"),
     resumeRun: (n) => intervene(n, "resume"),
-    stopRun: (n, stage) => void stopRun(n, stage),
+    stopRun: (n, stage) => void confirmAbort(n, stage),
     emergencyBrake: openBrakeDialog,
     toggleTheme: cycleTheme,
     showShortcuts,
@@ -436,12 +428,18 @@ export function renderAlertBanner(_data: FleetState): void {
       const actions = h("span", { class: "alert-actions" });
       const add = (label: string, fn: () => void, cls = "btn sm") =>
         actions.append(h("button", { type: "button", class: cls, text: label, onclick: fn }));
+      const canAct = store.get("currentUser")?.role !== "viewer";
       if (alert.issue) add("View", () => switchTab("runs"));
-      if (alert.type === "failure_spike") add("Emergency brake…", openBrakeDialog, "btn sm danger");
-      if (alert.type === "stuck_pipeline" && alert.issue) {
+      if (canAct && alert.type === "failure_spike") add("Emergency brake…", openBrakeDialog, "btn sm danger");
+      if (canAct && alert.type === "stuck_pipeline" && alert.issue) {
         const n = alert.issue;
-        add("Stop run…", () => void stopRun(n, ""), "btn sm danger");
-        add("Skip stage", () => void api.sendIntervention(n, "skip_stage"));
+        add("Stop run…", () => void confirmAbort(n), "btn sm danger");
+        add("Skip stage", () =>
+          api
+            .sendIntervention(n, "skip")
+            .then(() => toast(`Skip sent to run #${n}.`))
+            .catch((err) => toast(`Skip failed for run #${n}: ${String(err)}`, "error")),
+        );
       }
       add("Dismiss", () => {
         store.set("alertDismissed", true);
@@ -513,9 +511,19 @@ function fetchDaemonConfig(): void {
 }
 
 function setupDaemonControlBar(): void {
-  for (const action of ["start", "stop", "patrol"]) {
+  for (const action of ["start", "patrol"]) {
     document.getElementById("daemon-btn-" + action)?.addEventListener("click", () => daemonControlAction(action));
   }
+  document.getElementById("daemon-btn-stop")?.addEventListener("click", async () => {
+    const ok = await confirmDialog({
+      title: "Stop the daemon?",
+      body: "The daemon stops polling for labelled issues and starting runs. Start it again from here.",
+      confirmLabel: "Stop daemon",
+      cancelLabel: "Keep running",
+      danger: true,
+    });
+    if (ok) void daemonControlAction("stop");
+  });
   document.getElementById("daemon-btn-pause")?.addEventListener("click", () => {
     const badge = document.getElementById("daemon-status-badge");
     daemonControlAction(badge?.dataset.state === "paused" ? "resume" : "pause");

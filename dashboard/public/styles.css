@@ -5437,6 +5437,24 @@ kbd {
   font-size: 13px;
   color: var(--sw-text-2);
 }
+.agent-info-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 2px 0;
+}
+.agent-info-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--sw-text-3);
+}
+.empty-state code {
+  white-space: nowrap;
+}
+.pill-short {
+  display: none;
+}
 .legacy-note {
   display: flex;
   flex-wrap: wrap;
@@ -5863,9 +5881,21 @@ dialog h2 {
   .pill-detail {
     display: none;
   }
+  .pill-short {
+    display: inline;
+  }
+  /* Scroll cue: the last tab fades at the edge while more tabs are off screen. */
+  .tabs {
+    mask-image: linear-gradient(to right, #000 calc(100% - 32px), transparent);
+  }
 }
 @media (max-width: 420px) {
   .wordmark {
+    display: none;
+  }
+}
+@media (pointer: coarse), (max-width: 600px) {
+  #palette-kbd {
     display: none;
   }
 }
