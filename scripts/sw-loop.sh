@@ -1884,6 +1884,9 @@ CONSECUTIVE_FAILURES=0
 # Fail closed: a missing or broken guard stops the worker before it can commit (no `|| true`).
 source "__SCRIPT_DIR__/lib/scope-guard.sh" || { echo "blast-radius guard unavailable; worker stopped" >&2; exit 1; }
 type scope_worker_precommit >/dev/null 2>&1 || { echo "blast-radius guard unavailable; worker stopped" >&2; exit 1; }
+# The guarded push lives in the delivery module (definitions only, no side effects at load). Fail closed.
+source "__SCRIPT_DIR__/lib/pipeline-stages-delivery.sh" || { echo "blast-radius guard unavailable; worker stopped" >&2; exit 1; }
+type scope_push_judged >/dev/null 2>&1 || { echo "blast-radius guard unavailable; worker stopped" >&2; exit 1; }
 # The scope comes from files the parent wrote outside the repo, not from the worker's environment.
 SW_SCOPE_JSON="$(cat "__SCOPE_DIR__/scope.json" 2>/dev/null || true)"
 SW_SCOPE_CONFIG="$(cat "__SCOPE_DIR__/config.json" 2>/dev/null || true)"
@@ -1891,6 +1894,14 @@ SW_SCOPE_BASE="$(cat "__SCOPE_DIR__/base.txt" 2>/dev/null || true)"
 SW_SCOPE_UPSTREAM="$(cat "__SCOPE_DIR__/upstream.txt" 2>/dev/null || true)"
 WORKER_START="$(git -C "__WORK_DIR__" rev-parse HEAD 2>/dev/null || true)"
 export SW_SCOPE_JSON SW_SCOPE_CONFIG SW_SCOPE_BASE SW_SCOPE_UPSTREAM
+# The push context, written by the parent from its own environment (#8644, #8662): goal, labels, artifacts,
+# extra type, recorded push URL and the upstream branch name.
+SW_W_GOAL="$(cat "__SCOPE_DIR__/goal.txt" 2>/dev/null || true)"
+SW_W_LABELS="$(cat "__SCOPE_DIR__/labels.txt" 2>/dev/null || true)"
+SW_W_ART="$(cat "__SCOPE_DIR__/artifacts.txt" 2>/dev/null || true)"
+SW_W_EXTRA="$(cat "__SCOPE_DIR__/extra.txt" 2>/dev/null || true)"
+SW_W_URL="$(cat "__SCOPE_DIR__/pushurl.txt" 2>/dev/null || true)"
+SW_W_UB="$(cat "__SCOPE_DIR__/upstream-branch.txt" 2>/dev/null || true)"
 
 echo -e "${CYAN}${BOLD}▸${RESET} Agent ${AGENT_NUM}/${TOTAL_AGENTS} starting in ${WORK_DIR}"
 
@@ -1982,7 +1993,9 @@ PROMPT
     if [[ "$_scope_w_rc" -eq 2 ]]; then echo -e "  ${RED}✗${RESET} Blast-radius guard blocked agent ${AGENT_NUM}"; break; fi
     if [[ "$_scope_w_rc" -eq 1 ]]; then continue; fi
     if git commit -m "agent-${AGENT_NUM}: iteration ${ITERATION}" --no-verify 2>/dev/null; then
-        if ! git push origin "loop/agent-${AGENT_NUM}" 2>/dev/null; then
+        # The push goes through the guard: the judged branch, the recorded URL and the pinned git (#8662).
+        if ! scope_push_judged "$WORK_DIR" "$SW_SCOPE_BASE" "$SW_W_ART" "$SW_W_GOAL" "$SW_W_LABELS" \
+            "loop/agent-${AGENT_NUM}" "loop/agent-${AGENT_NUM}" "$SW_W_URL" "$SW_W_EXTRA" force "$SW_W_UB" 2>/dev/null; then
             echo -e "  ${YELLOW}⚠${RESET} git push failed for loop/agent-${AGENT_NUM} — remote may be out of sync"
             type emit_event >/dev/null 2>&1 && emit_event "loop.push_failed" "branch=loop/agent-${AGENT_NUM}"
         else
@@ -2185,6 +2198,13 @@ _scope_export_for_workers() {
     printf '%s' "$SW_SCOPE_BASE" > "$SCOPE_ENV_DIR/base.txt"
     # Workers measure the total diff against the upstream they merged (#8644): the default-branch fork point.
     printf '%s' "${SW_LOOP_TRUSTED_UPSTREAM:-$SW_SCOPE_BASE}" > "$SCOPE_ENV_DIR/upstream.txt"
+    # The push context for the worker's own push (#8662 item 5).
+    printf '%s' "${GOAL:-}" > "$SCOPE_ENV_DIR/goal.txt"
+    printf '%s' "${ISSUE_LABELS:-}" > "$SCOPE_ENV_DIR/labels.txt"
+    printf '%s' "${ARTIFACTS_DIR:-}" > "$SCOPE_ENV_DIR/artifacts.txt"
+    printf '%s' "${SW_SCOPE_ISSUE_TYPE:-}" > "$SCOPE_ENV_DIR/extra.txt"
+    printf '%s' "${SW_PIPELINE_PUSH_URL:-}" > "$SCOPE_ENV_DIR/pushurl.txt"
+    printf '%s' "${SW_PIPELINE_BASE_BRANCH:-main}" > "$SCOPE_ENV_DIR/upstream-branch.txt"
     export SCOPE_ENV_DIR
 }
 

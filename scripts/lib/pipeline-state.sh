@@ -305,7 +305,7 @@ persist_artifacts() {
             local branch="shipwright/issue-${ISSUE_NUMBER}"
             # Gated push of the judged commit (#8644); refused pushes are non-fatal here.
             scope_push_judged "$PWD" "${SW_PIPELINE_BASE_SHA:-}" "${ARTIFACTS_DIR:-}" "${GOAL:-}" "${ISSUE_LABELS:-}" \
-                "${GIT_BRANCH:-}" "$branch" "${PIPELINE_PUSH_URL:-}" "$(scope_issue_type "$ISSUE_NUMBER" 2>/dev/null || true)" force || exit 1
+                "${GIT_BRANCH:-}" "$branch" "${PIPELINE_PUSH_URL:-}" "$(scope_issue_type "$ISSUE_NUMBER" 2>/dev/null || true)" force "${BASE_BRANCH:-main}" || exit 1
             emit_event "artifacts.persisted" "issue=${ISSUE_NUMBER}" "stage=$stage" "file_count=${#to_add[@]}"
         fi
     ) 2>/dev/null || {

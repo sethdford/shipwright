@@ -36,6 +36,8 @@ SCOPE_NOTE=""              # scope note for the next prompt, set after a revert
 SCOPE_CAN_REVERT=0         # 1 when a revert is safe (own worktree, or clean tree at start)
 SCOPE_LOOP_BRANCH=""       # symbolic ref the loop commits to
 SCOPE_JUDGED_SHA=""      # the commit the last passing check judged (what a push sends)
+SCOPE_LAST_PUSH_BRANCH=""  # the remote branch this process last pushed, and the commit it sent
+SCOPE_LAST_PUSH_SHA=""
 SCOPE_META_SNAPSHOT=""  # .git/config checksum and attributes state at setup
 
 # Every git call the guard makes runs with the system and global config disabled, so a machine-wide
@@ -771,40 +773,48 @@ scope_guard_check() {
     return "$rc"
 }
 
-# Final check before a push (#8644): the whole base..HEAD diff, including the pipeline's own final
-# commit, is judged against the run's scope. Nothing is reverted here (the setup sets CAN_REVERT=0),
-# so any violation blocks. Returns 0 pass, 2 blocked.
-#   $1 repo, $2 pipeline base sha, $3 evidence dir, $4 goal, $5 labels
-scope_final_check() {
-    local repo="$1" base="${2:-}" art="$3" goal="${4:-}" labels="${5:-}" branch="${6:-}" extra="${7:-}" rc=0
-    SCOPE_JUDGED_SHA=""
-    [[ -n "$base" && -n "$art" && -n "$branch" ]] || return 2
-    scope_setup_run "$repo" "$base" "$art" "$goal" "$labels" 0 "$extra" >/dev/null 2>&1 || return 2
-    # The judged branch is the one the push names. HEAD on any other branch refuses (#8706 removes the
-    # shared checkout entirely).
-    [[ "$(_scope_git symbolic-ref -q HEAD 2>/dev/null || true)" == "refs/heads/$branch" ]] || return 2
-    SCOPE_LOOP_BRANCH="refs/heads/$branch"
-    scope_guard_check "$repo" "$base" "$base" 0 "$art" "-final" || rc=$?
-    [[ "$rc" -eq 0 && -n "$SCOPE_JUDGED_SHA" ]] || return 2
-    return 0
+# Network git for the guard's fetch and ls-remote (#8662 round 6): the pinned environment, with the repo's
+# credential helpers and proxy replaced by the pinned values.
+_scope_net() {
+    _scope_git -c credential.helper= -c "credential.helper=!gh auth git-credential" -c http.proxy= "$@"
 }
 
-# Push the exact commit the final check judged (#8644). Nothing is pushed unless the check passes.
-# Hooks, fsmonitor and ssh are disabled for the push, and it goes to the URL the pipeline recorded at
-# start, not to whatever origin is at push time.
-#   $1 repo, $2 base, $3 artifacts, $4 goal, $5 labels, $6 local branch (judged), $7 remote branch,
-#   $8 push URL recorded at pipeline start, $9 extra type (optional), $10 "force" to allow a force push
-scope_push_judged() {
-    local repo="$1" base="${2:-}" art="$3" goal="${4:-}" labels="${5:-}" lbranch="${6:-}" rbranch="${7:-}"
-    local url="${8:-}" extra="${9:-}" mode="${10:-plain}" sha
-    [[ -n "$url" && -n "$rbranch" ]] || return 2
-    scope_final_check "$repo" "$base" "$art" "$goal" "$labels" "$lbranch" "$extra" || return 2
-    sha="$SCOPE_JUDGED_SHA"
-    [[ -n "$sha" ]] || return 2
-    local -a hard=(-c core.hooksPath=/dev/null -c core.fsmonitor=false -c core.sshCommand=)
-    if git -C "$repo" "${hard[@]}" push -q "$url" "${sha}:refs/heads/${rbranch}" 2>/dev/null; then return 0; fi
-    [[ "$mode" == "force" ]] || return 2
-    git -C "$repo" "${hard[@]}" push -q --force "$url" "${sha}:refs/heads/${rbranch}" 2>/dev/null || return 2
+# Repo url rewrites (url.<x>.insteadOf and pushInsteadOf) would send the guard's fetch and the push to
+# another remote. A repo can list any number of them, so they are refused rather than neutralised.
+_scope_url_rewrites() {
+    _scope_git config --includes --get-regexp '^url\..*\.(push)?insteadof$' 2>/dev/null || true
+}
+
+# Fetch the default branch from the recorded URL into a ref the guard owns, and print its tip. The
+# ref is overwritten on every fetch, so the agent cannot keep an old upstream in place (#8662 UP1).
+_scope_upstream_tip() {
+    local url="$1" ub="$2" ref
+    [[ -n "$url" && -n "$ub" ]] || return 1
+    ref="refs/shipwright/guard/upstream/${ub}"
+    _scope_net fetch -q --no-tags --no-write-fetch-head "$url" "+refs/heads/${ub}:${ref}" >/dev/null 2>&1 || return 1
+    _scope_git rev-parse --verify -q "${ref}^{commit}" 2>/dev/null
+}
+
+# Final check before a push (#8644, #8662): judge what the branch adds to the upstream. The fork point is
+# merge-base(tip, upstream), so the default branch's own changes are not counted against the agent. Nothing
+# is reverted here (the setup sets CAN_REVERT=0), so any violation blocks. Returns 0 pass, 2 blocked.
+#   $1 repo, $2 pipeline base, $3 artifacts, $4 goal, $5 labels, $6 judged branch, $7 extra type,
+#   $8 push URL recorded at pipeline start, $9 upstream (default) branch name
+scope_final_check() {
+    local repo="$1" base="${2:-}" art="$3" goal="${4:-}" labels="${5:-}" branch="${6:-}" extra="${7:-}"
+    local url="${8:-}" ub="${9:-}" rc=0 tip head mb
+    SCOPE_JUDGED_SHA=""
+    [[ -n "$base" && -n "$art" && -n "$branch" && -n "$url" && -n "$ub" ]] || return 2
+    scope_setup_run "$repo" "$base" "$art" "$goal" "$labels" 0 "$extra" >/dev/null 2>&1 || return 2
+    # The judged branch is the one the push names: HEAD on any other branch refuses.
+    [[ "$(_scope_git symbolic-ref -q HEAD 2>/dev/null || true)" == "refs/heads/$branch" ]] || return 2
+    [[ -z "$(_scope_url_rewrites)" ]] || return 2
+    SCOPE_LOOP_BRANCH="refs/heads/$branch"
+    tip="$(_scope_upstream_tip "$url" "$ub")" && [[ -n "$tip" ]] || return 2
+    head="$(_scope_git rev-parse --verify -q "refs/heads/${branch}^{commit}" 2>/dev/null)" || return 2
+    mb="$(_scope_git merge-base "$head" "$tip" 2>/dev/null)" && [[ -n "$mb" ]] || return 2
+    scope_guard_check "$repo" "$mb" "$mb" 0 "$art" "-final" || rc=$?
+    [[ "$rc" -eq 0 && -n "$SCOPE_JUDGED_SHA" ]] || return 2
     return 0
 }
 

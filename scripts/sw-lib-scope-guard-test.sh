@@ -22,6 +22,8 @@ if ! command -v jq >/dev/null 2>&1; then
 fi
 
 source "$SCRIPT_DIR/lib/scope-guard.sh"
+# The guarded push is defined with the delivery stages (definitions only).
+source "$SCRIPT_DIR/lib/pipeline-stages-delivery.sh"
 # The guard library turns on errexit for its caller; the assertions here count failures instead.
 set +e
 
@@ -48,6 +50,9 @@ printf '.claude/loop-logs/\n.claude/pipeline-artifacts/\n' > "$R/.gitignore"
 git -C "$R" add -A
 git -C "$R" commit -qm "base"
 BASE="$(git -C "$R" rev-parse HEAD)"
+UP_URL="$TEST_TEMP_DIR/up.git"
+rm -rf "$UP_URL"; git init -q --bare "$UP_URL"
+git -C "$UP_URL" fetch -q --no-tags "$R" "+$BASE:refs/heads/main"
 
 # Trusted state, as the loop sets it up: config from the base commit, a clean tree, the loop branch.
 scope_load_config "$R" "$BASE" || { echo "config load failed"; exit 1; }
@@ -580,12 +585,12 @@ scope_setup_run "$R" "$BASE" "$TEST_TEMP_DIR/no-artifacts" "Add the runbook note
 # Final check (item 5): the whole base..HEAD diff, including a commit made after the loop, is judged.
 fresh
 echo "ok" >> "$R/docs/safety-runbook.md"; commit_all "clean final commit"
-if scope_final_check "$R" "$BASE" "$EVD" "Add the runbook note" "" "loop-branch"; then assert_pass "final: a clean base..HEAD passes"; else assert_fail "final: a clean base..HEAD passes"; fi
+if scope_final_check "$R" "$BASE" "$EVD" "Add the runbook note" "" "loop-branch" "" "$UP_URL" main; then assert_pass "final: a clean base..HEAD passes"; else assert_fail "final: a clean base..HEAD passes"; fi
 fresh
 echo "forbidden" >> "$R/scripts/ci/gate.sh"; commit_all "final commit edits a protected file"
-RC=0; scope_final_check "$R" "$BASE" "$EVD" "Add the runbook note" "" "loop-branch" || RC=$?
+RC=0; scope_final_check "$R" "$BASE" "$EVD" "Add the runbook note" "" "loop-branch" "" "$UP_URL" main || RC=$?
 assert_eq "final: a protected change in the final commit blocks (rc 2)" "2" "$RC"
-RC=0; scope_final_check "$R" "" "$EVD" "Add the runbook note" "" "loop-branch" || RC=$?
+RC=0; scope_final_check "$R" "" "$EVD" "Add the runbook note" "" "loop-branch" "" "$UP_URL" main || RC=$?
 assert_eq "final: no pipeline base blocks (rc 2)" "2" "$RC"
 fresh
 
@@ -650,7 +655,7 @@ chmod +x "$TEST_TEMP_DIR/f1-fsmon.sh"
 git -C "$R" checkout -q -b f1-branch "$BASE"
 echo "x" >> "$R/docs/safety-runbook.md"; commit_all "f1 commit"
 git -C "$R" config core.fsmonitor "$TEST_TEMP_DIR/f1-fsmon.sh"
-RC=0; scope_final_check "$R" "$BASE" "$EVD" "Add the runbook note" "" "f1-branch" || RC=$?
+RC=0; scope_final_check "$R" "$BASE" "$EVD" "Add the runbook note" "" "f1-branch" "" "$UP_URL" main || RC=$?
 if [[ -e "$F1_MARK" ]]; then assert_fail "F1: the agent's core.fsmonitor must not run in the guard"; else assert_pass "F1: the agent's core.fsmonitor must not run in the guard"; fi
 assert_eq "F1: the clean change still passes the final check (rc 0)" "0" "$RC"
 git -C "$R" config --unset core.fsmonitor
@@ -662,6 +667,7 @@ git -C "$R" branch -q -D f1-branch 2>/dev/null || true
 fresh
 C1_REAL="$TEST_TEMP_DIR/c1-real.git"; C1_EVIL="$TEST_TEMP_DIR/c1-evil.git"
 rm -rf "$C1_REAL" "$C1_EVIL"; git init -q --bare "$C1_REAL"; git init -q --bare "$C1_EVIL"
+git -C "$C1_REAL" fetch -q --no-tags "$R" "+$BASE:refs/heads/main"
 git -C "$R" remote add origin "$C1_REAL"
 C1_URL="$(git -C "$R" config --get remote.origin.url)"
 git -C "$R" config remote.origin.url "$C1_EVIL"
@@ -672,7 +678,7 @@ git -C "$R" config core.hooksPath "$TEST_TEMP_DIR/c1-hooks"
 git -C "$R" checkout -q -b c1-branch "$BASE"
 echo "x" >> "$R/docs/safety-runbook.md"; commit_all "c1 commit"
 C1_SHA="$(git -C "$R" rev-parse HEAD)"
-RC=0; scope_push_judged "$R" "$BASE" "$EVD" "Add the runbook note" "" "c1-branch" "c1-branch" "$C1_URL" "" force || RC=$?
+RC=0; scope_push_judged "$R" "$BASE" "$EVD" "Add the runbook note" "" "c1-branch" "c1-branch" "$C1_URL" "" force main || RC=$?
 assert_eq "C1: the judged push succeeds (rc 0)" "0" "$RC"
 assert_eq "C1: the real remote receives the judged commit" "$C1_SHA" "$(git -C "$C1_REAL" rev-parse -q --verify refs/heads/c1-branch 2>/dev/null || true)"
 if git -C "$C1_EVIL" rev-parse -q --verify refs/heads/c1-branch >/dev/null 2>&1; then assert_fail "C1: the evil remote must not receive the push"; else assert_pass "C1: the evil remote must not receive the push"; fi
@@ -684,8 +690,80 @@ git -C "$R" branch -q -D c1-branch 2>/dev/null || true
 
 # No recorded push URL refuses the push.
 fresh
-RC=0; scope_push_judged "$R" "$BASE" "$EVD" "Add the runbook note" "" "loop-branch" "loop-branch" "" "" force || RC=$?
+RC=0; scope_push_judged "$R" "$BASE" "$EVD" "Add the runbook note" "" "loop-branch" "loop-branch" "" "" force main || RC=$?
 assert_eq "C1: no recorded push URL refuses the push (rc 2)" "2" "$RC"
+
+
+# UP1: a branch rebased onto a default branch that touched a protected test is judged on its own commits.
+# The default branch's change is not counted against the agent (upstream changes are excluded).
+fresh
+git -C "$R" checkout -q -b up1-main "$BASE"
+echo "x" >> "$R/scripts/demo-test.sh"; commit_all "upstream touches a protected test"
+UP1_TIP="$(head_of)"
+git -C "$UP_URL" fetch -q --no-tags "$R" "+$UP1_TIP:refs/heads/main"
+git -C "$R" checkout -q -b up1-feat "$UP1_TIP"
+echo "ok" >> "$R/docs/safety-runbook.md"; commit_all "agent docs note on top of main"
+RC=0; scope_final_check "$R" "$BASE" "$EVD" "Add the runbook note" "" "up1-feat" "" "$UP_URL" main || RC=$?
+assert_eq "UP1: a one-line docs change on top of a main that touched a protected test passes (rc 0)" "0" "$RC"
+git -C "$UP_URL" fetch -q --no-tags "$R" "+$BASE:refs/heads/main"
+git -C "$R" checkout -q loop-branch
+git -C "$R" branch -q -D up1-main up1-feat 2>/dev/null || true
+
+# P1: a repo url.<x>.pushInsteadOf sends the push to another remote; the guard refuses before it pushes.
+fresh
+P1_REAL="$TEST_TEMP_DIR/p1-real.git"; P1_EVIL="$TEST_TEMP_DIR/p1-evil.git"
+rm -rf "$P1_REAL" "$P1_EVIL"; git init -q --bare "$P1_REAL"; git init -q --bare "$P1_EVIL"
+git -C "$P1_REAL" fetch -q --no-tags "$R" "+$BASE:refs/heads/main"
+git -C "$R" config "url.$P1_EVIL.pushInsteadOf" "$P1_REAL"
+git -C "$R" checkout -q -b p1-branch "$BASE"
+echo "x" >> "$R/docs/safety-runbook.md"; commit_all "p1 commit"
+RC=0; scope_push_judged "$R" "$BASE" "$EVD" "Add the runbook note" "" "p1-branch" "p1-branch" "$P1_REAL" "" force main || RC=$?
+assert_eq "P1: a pushInsteadOf rewrite refuses the push (rc 2)" "2" "$RC"
+if git -C "$P1_EVIL" rev-parse -q --verify refs/heads/p1-branch >/dev/null 2>&1; then assert_fail "P1: the rewritten remote must not receive the push"; else assert_pass "P1: the rewritten remote must not receive the push"; fi
+if git -C "$P1_REAL" rev-parse -q --verify refs/heads/p1-branch >/dev/null 2>&1; then assert_fail "P1: the real remote must not receive the push either"; else assert_pass "P1: the real remote must not receive the push either"; fi
+git -C "$R" config --unset "url.$P1_EVIL.pushInsteadOf"
+git -C "$R" checkout -q loop-branch
+git -C "$R" branch -q -D p1-branch 2>/dev/null || true
+
+# H2: a pre-push hook in the repo's own hooks dir never runs on the judged push.
+fresh
+H2_REAL="$TEST_TEMP_DIR/h2-real.git"; H2_MARK="$TEST_TEMP_DIR/h2-hook-ran"
+rm -rf "$H2_REAL" "$H2_MARK"; git init -q --bare "$H2_REAL"
+git -C "$H2_REAL" fetch -q --no-tags "$R" "+$BASE:refs/heads/main"
+mkdir -p "$GD/hooks"
+printf '#!/bin/sh\ntouch %s\n' "$H2_MARK" > "$GD/hooks/pre-push"; chmod +x "$GD/hooks/pre-push"
+git -C "$R" checkout -q -b h2-branch "$BASE"
+echo "x" >> "$R/docs/safety-runbook.md"; commit_all "h2 commit"
+RC=0; scope_push_judged "$R" "$BASE" "$EVD" "Add the runbook note" "" "h2-branch" "h2-branch" "$H2_REAL" "" force main || RC=$?
+assert_eq "H2: the judged push succeeds (rc 0)" "0" "$RC"
+if [[ -e "$H2_MARK" ]]; then assert_fail "H2: the repo's pre-push hook must not run"; else assert_pass "H2: the repo's pre-push hook must not run"; fi
+rm -f "$GD/hooks/pre-push"
+git -C "$R" checkout -q loop-branch
+git -C "$R" branch -q -D h2-branch 2>/dev/null || true
+
+# L1: a forced push is a lease on the tip this process last pushed. A human fixup pushed on top is kept.
+fresh
+L1_REAL="$TEST_TEMP_DIR/l1-real.git"
+rm -rf "$L1_REAL"; git init -q --bare "$L1_REAL"
+git -C "$L1_REAL" fetch -q --no-tags "$R" "+$BASE:refs/heads/main"
+git -C "$R" checkout -q -b l1-branch "$BASE"
+echo "one" >> "$R/docs/safety-runbook.md"; commit_all "l1 first"
+SCOPE_LAST_PUSH_BRANCH=""; SCOPE_LAST_PUSH_SHA=""
+RC=0; scope_push_judged "$R" "$BASE" "$EVD" "Add the runbook note" "" "l1-branch" "l1-branch" "$L1_REAL" "" force main || RC=$?
+assert_eq "L1: the first push succeeds (rc 0)" "0" "$RC"
+# A human pushes a fixup on top of the agent's commit.
+git -C "$R" checkout -q -b l1-human "$(head_of)"
+echo "human fixup" >> "$R/docs/safety-runbook.md"; git -C "$R" commit -qam "human fixup" --no-verify
+L1_FIX="$(head_of)"
+git -C "$L1_REAL" fetch -q --no-tags "$R" "+$L1_FIX:refs/heads/l1-branch"
+git -C "$R" checkout -q l1-branch
+echo "two" >> "$R/docs/safety-runbook.md"; commit_all "l1 second"
+RC=0; scope_push_judged "$R" "$BASE" "$EVD" "Add the runbook note" "" "l1-branch" "l1-branch" "$L1_REAL" "" force main || RC=$?
+assert_eq "L1: a forced push over a human fixup is refused (rc 2)" "2" "$RC"
+assert_eq "L1: the human fixup survives on the remote" "$L1_FIX" "$(git -C "$L1_REAL" rev-parse -q --verify refs/heads/l1-branch 2>/dev/null || true)"
+git -C "$R" checkout -q loop-branch
+git -C "$R" branch -q -D l1-branch l1-human 2>/dev/null || true
+SCOPE_LAST_PUSH_BRANCH=""; SCOPE_LAST_PUSH_SHA=""
 
 # Worker: a forbidden change committed by the agent is discarded back to the worker's own start commit.
 fresh
