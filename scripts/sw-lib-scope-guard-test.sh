@@ -431,7 +431,7 @@ scope_load_config "$R" "$BASE" && assert_eq "config: base commit is the source w
 echo ""
 echo -e "${DIM}  worker gate${RESET}"
 fresh
-export SW_SCOPE_JSON="$DOCS_SCOPE" SW_SCOPE_CONFIG="$SCOPE_CONFIG"
+export SW_SCOPE_JSON="$DOCS_SCOPE" SW_SCOPE_CONFIG="$SCOPE_CONFIG" SW_SCOPE_BASE="$BASE"
 SCOPE_STRIKES=0
 rm "$R/scripts/demo-test.sh"; git -C "$R" add -A
 RC=0; scope_worker_precommit "$R" 1 1 "$EVD" || RC=$?
@@ -441,11 +441,127 @@ git -C "$R" rm -q --cached scripts/demo-test.sh 2>/dev/null || true
 rm -f "$R/scripts/demo-test.sh"; git -C "$R" add -A; RC=0; scope_worker_precommit "$R" 2 1 "$EVD" || RC=$?
 assert_eq "worker: a second violation blocks (rc 2)" "2" "$RC"
 fresh
-export SW_SCOPE_JSON="$DOCS_SCOPE" SW_SCOPE_CONFIG="$SCOPE_CONFIG"
+export SW_SCOPE_JSON="$DOCS_SCOPE" SW_SCOPE_CONFIG="$SCOPE_CONFIG" SW_SCOPE_BASE="$BASE"
 echo "ok" >> "$R/docs/safety-runbook.md"; git -C "$R" add -A
 RC=0; scope_worker_precommit "$R" 1 1 "$EVD" || RC=$?
 assert_eq "worker: clean staged change passes (rc 0)" "0" "$RC"
-unset SW_SCOPE_JSON SW_SCOPE_CONFIG
+unset SW_SCOPE_JSON SW_SCOPE_CONFIG SW_SCOPE_BASE
+git -C "$R" reset -q --hard "$BASE"
+
+# ─── Git metadata: B3 (.git/info/attributes, .git/config) ────────────────────
+
+echo ""
+echo -e "${DIM}  git metadata and attributes (B3)${RESET}"
+# A non-empty .git/info/attributes is refused at setup: it could make a change count as zero lines.
+GD="$(_scope_git -C "$R" rev-parse --absolute-git-dir)"
+fresh
+echo "* -diff" > "$GD/info/attributes"
+if scope_setup_run "$R" "$BASE" "$TEST_TEMP_DIR/no-artifacts" "Add the runbook note" "" 2>/dev/null; then
+    assert_fail "B3: non-empty .git/info/attributes refuses the run"
+else
+    assert_pass "B3: non-empty .git/info/attributes refuses the run"
+fi
+rm -f "$GD/info/attributes"
+scope_setup_run "$R" "$BASE" "$TEST_TEMP_DIR/no-artifacts" "Add the runbook note" "" || true
+
+# The loop writes the file during a run: the next check blocks (git_metadata_changed).
+fresh
+echo "* -diff" > "$GD/info/attributes"
+echo "x" >> "$R/docs/safety-runbook.md"; commit_all "note"
+run_guard "$BASE" 1
+assert_eq "B3: attributes written mid-run block the check" "2" "$RC"
+assert_eq "B3: reason is git_metadata_changed" "git_metadata_changed" "$(ev 1 '.reason')"
+rm -f "$GD/info/attributes"
+
+# A .git/config change mid-run (for example a diff driver) blocks the check too.
+fresh
+git -C "$R" config diff.zz.binary true
+echo "x" >> "$R/docs/safety-runbook.md"; commit_all "note"
+run_guard "$BASE" 1
+assert_eq "B3: .git/config change mid-run blocks the check" "2" "$RC"
+git -C "$R" config --unset diff.zz.binary
+
+# A dash in numstat (git could not count) for a path that is not deleted is a binary violation.
+fresh
+echo "x" >> "$R/docs/safety-runbook.md"; commit_all "note"
+_scope_rows_fn_check="$(declare -f scope_path_violations | head -1)"
+printf 'M\t-\t-\tok\tdocs/safety-runbook.md\n' | scope_path_violations "$DOCS_SCOPE" > "$TEST_TEMP_DIR/dash.txt" || true
+printf 'M\t0\t0\tbinary\tdocs/safety-runbook.md\n' | scope_path_violations "$DOCS_SCOPE" > "$TEST_TEMP_DIR/dash2.txt" || true
+assert_has "uncountable binary change is a violation" "binary_file" "$(cat "$TEST_TEMP_DIR/dash2.txt")"
+
+# ─── Trusted base and ancestry (J) ───────────────────────────────────────────
+
+echo ""
+echo -e "${DIM}  trusted base and ancestry (J)${RESET}"
+fresh
+git -C "$R" branch -f main "$BASE"
+git -C "$R" checkout -q -b feature-j "$BASE"
+echo "forged" > "$R/config/scope-budgets.json"; commit_all "forged config commit"
+FORGED="$(head_of)"
+echo "a" >> "$R/docs/safety-runbook.md"; commit_all "agent commit"
+TRUSTED="$(scope_trusted_base "$R")" || TRUSTED=""
+assert_eq "J: trusted base is the fork point from the default branch, not the agent's commit" "$BASE" "$TRUSTED"
+if [[ "$TRUSTED" == "$FORGED" ]]; then assert_fail "J: forged commit must not be trusted"; else assert_pass "J: forged commit must not be trusted"; fi
+# A base that is not an ancestor of HEAD is refused at setup.
+git -C "$R" checkout -q -b sibling-j "$BASE"
+echo "sib" > "$R/docs/sibling.md"; commit_all "sibling"
+SIB="$(head_of)"
+git -C "$R" checkout -q loop-branch 2>/dev/null || git -C "$R" checkout -q feature-j
+git -C "$R" symbolic-ref HEAD refs/heads/feature-j
+if scope_setup_run "$R" "$SIB" "$TEST_TEMP_DIR/no-artifacts" "Add the runbook note" "" 2>/dev/null; then
+    assert_fail "J: a base that is not an ancestor of HEAD is refused"
+else
+    assert_pass "J: a base that is not an ancestor of HEAD is refused"
+fi
+git -C "$R" symbolic-ref HEAD refs/heads/loop-branch
+git -C "$R" checkout -q -f loop-branch 2>/dev/null || true
+git -C "$R" branch -q -D feature-j sibling-j 2>/dev/null || true
+
+# ─── Context restart and git probe (items 4, 5) ─────────────────────────────
+
+echo ""
+echo -e "${DIM}  restart and git probe${RESET}"
+fresh
+echo "dirty mid-run" >> "$R/docs/safety-runbook.md"
+if scope_setup_run "$R" "$BASE" "$TEST_TEMP_DIR/no-artifacts" "Add the runbook note" "" 0 2>/dev/null; then
+    assert_fail "a dirty tree refuses a fresh start"
+else
+    assert_pass "a dirty tree refuses a fresh start"
+fi
+if scope_setup_run "$R" "$BASE" "$TEST_TEMP_DIR/no-artifacts" "Add the runbook note" "" 1 2>/dev/null; then
+    assert_pass "an in-process restart is not refused for an uncommitted edit"
+else
+    assert_fail "an in-process restart is not refused for an uncommitted edit"
+fi
+git -C "$R" checkout -q -- docs/safety-runbook.md
+
+OLDBIN="$TEST_TEMP_DIR/oldgit-bin"
+mkdir -p "$OLDBIN"
+printf '#!/bin/bash\nfor a in "$@"; do case "$a" in --attr-source=*) echo "unknown option: $a" >&2; exit 129;; esac; done\nexec %s "$@"\n' "$(command -v git)" > "$OLDBIN/git"
+chmod +x "$OLDBIN/git"
+PROBE_OUT="$(PATH="$OLDBIN:$PATH" scope_require_git "$R" 2>&1)" && PROBE_RC=0 || PROBE_RC=$?
+assert_eq "git probe: git without --attr-source is refused" "1" "$PROBE_RC"
+assert_has "git probe: the message names the 2.40 requirement" "git >= 2.40" "$PROBE_OUT"
+if scope_require_git "$R" 2>/dev/null; then assert_pass "git probe: the installed git passes"; else assert_fail "git probe: the installed git passes"; fi
+
+# ─── Cumulative worker gate (item 6) ─────────────────────────────────────────
+
+echo ""
+echo -e "${DIM}  cumulative worker gate${RESET}"
+fresh
+export SW_SCOPE_JSON="$DOCS_SCOPE" SW_SCOPE_CONFIG="$SCOPE_CONFIG" SW_SCOPE_BASE="$BASE"
+SCOPE_STRIKES=0
+# Commit 1 is clean. Commit 2 deletes a protected test. The gate must judge the whole tree against
+# the base, so a worker cannot spend its budget one commit at a time.
+echo "ok" >> "$R/docs/safety-runbook.md"; git -C "$R" add -A; git -C "$R" commit -qm "worker 1" --no-verify
+rm "$R/scripts/demo-test.sh"; git -C "$R" add -A
+RC=0; scope_worker_precommit "$R" 2 1 "$EVD" || RC=$?
+assert_eq "worker: cumulative tree with a protected deletion is discarded" "1" "$RC"
+# A worker without the base fails closed.
+unset SW_SCOPE_BASE
+RC=0; scope_worker_precommit "$R" 3 1 "$EVD" || RC=$?
+assert_eq "worker: missing base fails closed (rc 2)" "2" "$RC"
+unset SW_SCOPE_JSON SW_SCOPE_CONFIG SW_SCOPE_BASE
 git -C "$R" reset -q --hard "$BASE"
 
 print_test_results

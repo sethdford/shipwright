@@ -1031,16 +1031,38 @@ fi
 echo ""
 echo -e "${DIM}  blast-radius guard${RESET}"
 
-# The loop resumes from .claude/loop-state.md when one exists, so this case gets its own repo:
-# the shared repo above carries state from earlier cases.
+# Every fixture step reports its own failure. The guard's git calls need git 2.40+ (--attr-source);
+# the macOS runner's /usr/bin/git is older, so the case picks the newest git on the machine (#8644).
+# A git that is too old must refuse with the requirement, which the last case checks.
+_bg_git=""
+for _cand in /opt/homebrew/bin/git /usr/local/bin/git /usr/bin/git; do
+    [[ -x "$_cand" ]] || continue
+    _bg_ver="$("$_cand" version 2>/dev/null | awk '{print $3}')"
+    _bg_major="${_bg_ver%%.*}"; _bg_rest="${_bg_ver#*.}"; _bg_minor="${_bg_rest%%.*}"
+    if [[ "${_bg_major:-0}" -gt 2 ]] || { [[ "${_bg_major:-0}" -eq 2 ]] && [[ "${_bg_minor:-0}" -ge 40 ]]; }; then
+        _bg_git="$_cand"
+        break
+    fi
+done
+[[ -n "$_bg_git" ]] || _bg_git="/usr/bin/git"
+
 if setup_loop_env 2>/dev/null; then
+    set +e
     # The shared suite home may carry the budget gate test's exhausted budget: drop it.
     rm -f "$TEST_TEMP_DIR/home/.shipwright/budget.json" "$TEST_TEMP_DIR/home/.shipwright/costs.json"
     GUARD_REPO="$(mktemp -d "$TEST_TEMP_DIR/guard-repo.XXXXXX")"
+    ln -sf "$_bg_git" "$TEST_TEMP_DIR/bin/git"
     GIT_BIN="$TEST_TEMP_DIR/bin/git"
-    "$GIT_BIN" -C "$GUARD_REPO" init -q
-    "$GIT_BIN" -C "$GUARD_REPO" config user.email t@t
-    "$GIT_BIN" -C "$GUARD_REPO" config user.name T
+    _bg_fail=""
+    _bg_step() { # _bg_step <label> <command...>: run one fixture step, keep its output on failure
+        local label="$1"; shift
+        local out
+        if ! out="$("$@" 2>&1)"; then _bg_fail="${label}: ${out}"; return 1; fi
+        return 0
+    }
+    _bg_step "git init" "$GIT_BIN" -C "$GUARD_REPO" init -q
+    _bg_step "git config email" "$GIT_BIN" -C "$GUARD_REPO" config user.email t@t
+    _bg_step "git config name" "$GIT_BIN" -C "$GUARD_REPO" config user.name T
     # A protected test file and a gitignored .claude/, as in a real project: loop bookkeeping must not
     # be committed, or a revert would remove the loop's own logs.
     mkdir -p "$GUARD_REPO/scripts"
@@ -1048,10 +1070,14 @@ if setup_loop_env 2>/dev/null; then
     echo ".claude/" > "$GUARD_REPO/.gitignore"
     # The loop calls env, sleep and grep by name; this PATH holds only the links the suite made.
     for _cmd in env sleep grep; do
-        ln -sf "$(type -P "$_cmd")" "$TEST_TEMP_DIR/bin/$_cmd"
+        _bg_p="$(type -P "$_cmd" 2>/dev/null || true)"
+        [[ -n "$_bg_p" ]] && ln -sf "$_bg_p" "$TEST_TEMP_DIR/bin/$_cmd"
     done
-    "$GIT_BIN" -C "$GUARD_REPO" add -A
-    "$GIT_BIN" -C "$GUARD_REPO" commit -q -m "add protected test"
+    _bg_step "git add" "$GIT_BIN" -C "$GUARD_REPO" add -A
+    _bg_step "git commit" "$GIT_BIN" -C "$GUARD_REPO" -c commit.gpgsign=false commit -q -m "add protected test"
+    if [[ -n "$_bg_fail" ]]; then
+        assert_fail "Blast-radius fixture is set up" "$_bg_fail"
+    fi
 
     # Mock claude that deletes the protected test on every iteration.
     cat > "$TEST_TEMP_DIR/bin/claude" << 'CLAUDE_EOF'
@@ -1075,7 +1101,7 @@ CLAUDE_EOF
     if [[ -f "$evidence" ]] && [[ "$(jq -r '.verdict' "$evidence" 2>/dev/null)" == "reverted" ]]; then
         assert_pass "Guard reverts the first protected deletion (iteration 1 evidence)"
     else
-        assert_fail "Guard reverts the first protected deletion (iteration 1 evidence)" "output tail: $(echo "$output" | tail -3)"
+        assert_fail "Guard reverts the first protected deletion (iteration 1 evidence)" "git=$(_bg_git_v=$("$GIT_BIN" version 2>/dev/null); echo "$_bg_git_v") output tail: $(echo "$output" | tail -3)"
     fi
     prompt2="$GUARD_REPO/.claude/loop-logs/iteration-2.prompt.txt"
     if [[ -f "$prompt2" ]] && grep >/dev/null -F "Scope violation in iteration 1" "$prompt2"; then
@@ -1093,6 +1119,27 @@ CLAUDE_EOF
     else
         assert_fail "Protected test file is restored after the reverts"
     fi
+
+    # Too-old git refuses before any iteration, naming the requirement (#8644 item 4). The loop's git
+    # is replaced by a wrapper that rejects --attr-source the way git < 2.40 does.
+    printf '#!/bin/bash\nfor a in "$@"; do case "$a" in --attr-source=*) echo "unknown option: $a" >&2; exit 129;; esac; done\nexec %s "$@"\n' "$_bg_git" > "$TEST_TEMP_DIR/old-bin-git"
+    chmod +x "$TEST_TEMP_DIR/old-bin-git"
+    ln -sf "$TEST_TEMP_DIR/old-bin-git" "$TEST_TEMP_DIR/bin/git"
+    old_output=$(env PATH="$TEST_TEMP_DIR/bin:/usr/local/bin:/usr/bin:/bin" HOME="$TEST_TEMP_DIR/home" NO_GITHUB=true \
+        bash "$SCRIPT_DIR/sw-loop.sh" --repo "$GUARD_REPO" "Fix the demo test script" \
+        --max-iterations 5 --test-cmd "true" --local 2>&1) || true
+    ln -sf "$_bg_git" "$TEST_TEMP_DIR/bin/git"
+    if echo "$old_output" | grep >/dev/null -F "requires git >= 2.40"; then
+        assert_pass "git without --attr-source is refused up front with the 2.40 requirement"
+    else
+        assert_fail "git without --attr-source is refused up front with the 2.40 requirement" "tail: $(echo "$old_output" | tail -3)"
+    fi
+    if echo "$old_output" | grep >/dev/null -F "Iteration 1/"; then
+        assert_fail "refusal happens before the first iteration" "the loop started an iteration"
+    else
+        assert_pass "refusal happens before the first iteration"
+    fi
+    set -e
 else
     assert_fail "Blast-radius guard e2e" "setup failed (git missing?)"
 fi

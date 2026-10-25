@@ -35,6 +35,13 @@ SCOPE_STRIKES=0            # blast-radius strikes for this run
 SCOPE_NOTE=""              # scope note for the next prompt, set after a revert
 SCOPE_CAN_REVERT=0         # 1 when a revert is safe (own worktree, or clean tree at start)
 SCOPE_LOOP_BRANCH=""       # symbolic ref the loop commits to
+SCOPE_META_SNAPSHOT=""  # .git/config checksum and attributes state at setup
+
+# Every git call the guard makes runs with the system and global config disabled, so a machine-wide
+# or user-wide setting (attributes file, diff driver, excludes) cannot change how a change is judged.
+_scope_git() {
+    GIT_CONFIG_NOSYSTEM=1 GIT_CONFIG_GLOBAL=/dev/null git "$@"
+}
 
 _scope_install_config() {
     echo "$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)/config/scope-budgets.json"
@@ -57,7 +64,7 @@ _scope_set_config_json() {
 scope_load_config() {
     local repo="$1" base="${2:-}" json=""
     if [[ -n "$base" ]]; then
-        json="$(git -C "$repo" show "$base:config/scope-budgets.json" 2>/dev/null || true)"
+        json="$(_scope_git -C "$repo" show "$base:config/scope-budgets.json" 2>/dev/null || true)"
         if [[ -n "$json" ]] && _scope_set_config_json "$json"; then
             SCOPE_CONFIG_SOURCE="base:$base"
             return 0
@@ -305,32 +312,77 @@ _scope_is_linked_worktree() {
     [[ "$gd" != "$cd" ]]
 }
 
+# The diff needs git 2.40+ (--attr-source). Probe it once per run; older git refuses to start with a
+# message that names the requirement. Attributes are never read from the working tree instead.
+scope_require_git() {
+    local repo="$1" empty ver
+    empty="$(_scope_git -C "$repo" hash-object -t tree --stdin < /dev/null 2>/dev/null)" || return 1
+    if ! _scope_git -C "$repo" --attr-source="$empty" rev-parse --git-dir >/dev/null 2>&1; then
+        ver="$(git --version 2>/dev/null || echo "unknown")"
+        echo "blast-radius guard requires git >= 2.40 (--attr-source); found: ${ver}. Upgrade git to run the build loop." >&2
+        return 1
+    fi
+    return 0
+}
+
 # Resolve everything the guard trusts, once, at loop start. Returns 1 to refuse the run.
 #   $1 repo, $2 base sha (LOOP_START_COMMIT), $3 artifacts dir, $4 goal, $5 labels
 scope_setup_run() {
-    local repo="$1" base="${2:-}" artifacts="$3" goal="${4:-}" labels="${5:-}" type dirty
-    SCOPE_CAN_REVERT=0
+    local repo="$1" base="${2:-}" artifacts="$3" goal="${4:-}" labels="${5:-}" restart="${6:-0}" type dirty
+    # An in-process restart keeps the trusted state of the run it continues (clean start, same base).
+    if [[ "$restart" != "1" ]]; then
+        SCOPE_CAN_REVERT=0
+    fi
     SCOPE_JSON=""
-    if [[ -z "$base" ]] || ! git -C "$repo" rev-parse --verify -q "${base}^{commit}" >/dev/null 2>&1; then
+    if [[ -z "$base" ]] || ! _scope_git -C "$repo" rev-parse --verify -q "${base}^{commit}" >/dev/null 2>&1; then
         return 1
     fi
+    # The base must be an ancestor of HEAD. A base the agent forged onto a commit it made is still an
+    # ancestor, so the base itself must come from a trusted source (see the loop's resume path).
+    if ! _scope_git -C "$repo" merge-base --is-ancestor "$base" HEAD >/dev/null 2>&1; then
+        echo "blast-radius guard: base ${base} is not an ancestor of HEAD" >&2
+        return 1
+    fi
+    scope_require_git "$repo" || return 1
     scope_load_config "$repo" "$base" || return 1
     type="$(scope_type_for_run "$artifacts" "$goal" "$labels")"
     SCOPE_JSON="$(scope_resolve "$type" "$artifacts/spec.json")" || return 1
 
-    SCOPE_LOOP_BRANCH="$(git -C "$repo" symbolic-ref -q HEAD 2>/dev/null || true)"
+    SCOPE_LOOP_BRANCH="$(_scope_git -C "$repo" symbolic-ref -q HEAD 2>/dev/null || true)"
     [[ -n "$SCOPE_LOOP_BRANCH" ]] || return 1
+    SCOPE_META_SNAPSHOT="$(_scope_git_meta "$repo")" || return 1
+    if [[ "$SCOPE_META_SNAPSHOT" == *ATTR* ]]; then
+        echo "blast-radius guard: .git/info/attributes is not empty; remove it before the loop starts" >&2
+        return 1
+    fi
+    if [[ "$restart" == "1" ]]; then
+        export SW_SCOPE_JSON="$SCOPE_JSON" SW_SCOPE_CONFIG="$SCOPE_CONFIG" SW_SCOPE_BASE="$base"
+        return 0
+    fi
     # Reverting resets the checkout. Allowed in the loop's own worktree, or when no unrelated work is
     # pending (the .claude/ bookkeeping of this run is excluded).
     if _scope_is_linked_worktree "$repo"; then
         SCOPE_CAN_REVERT=1
     else
-        dirty="$(git -C "$repo" status --porcelain -- . ':!.claude' 2>/dev/null || true)"
+        dirty="$(_scope_git -C "$repo" status --porcelain -- . ':!.claude' 2>/dev/null || true)"
         if [[ -n "$dirty" ]]; then return 1; fi
         SCOPE_CAN_REVERT=1
     fi
-    export SW_SCOPE_JSON="$SCOPE_JSON" SW_SCOPE_CONFIG="$SCOPE_CONFIG"
+    export SW_SCOPE_JSON="$SCOPE_JSON" SW_SCOPE_CONFIG="$SCOPE_CONFIG" SW_SCOPE_BASE="$base"
     return 0
+}
+
+# Snapshot of the git metadata the guard relies on: .git/config and whether info/attributes is
+# non-empty. An agent that edits either could change how changes are counted, so each check compares.
+_scope_git_meta() {
+    local repo="$1" gd sum=""
+    gd="$(_scope_git -C "$repo" rev-parse --absolute-git-dir 2>/dev/null)" || return 1
+    sum="$(cksum < "$gd/config" 2>/dev/null || echo none)"
+    if [[ -s "$gd/info/attributes" ]]; then
+        printf 'ATTR %s\n' "$sum"
+    else
+        printf '%s\n' "$sum"
+    fi
 }
 
 # Strikes restart with each fresh run. A resumed process starts again at zero: see the PR notes.
@@ -345,7 +397,7 @@ scope_reset_strikes() {
 _scope_blob_is_binary() {
     local repo="$1" sha="$2" tmp n
     tmp="$(mktemp "${TMPDIR:-/tmp}/scope-blob.XXXXXX")"
-    if ! git -C "$repo" cat-file blob "$sha" > "$tmp" 2>/dev/null; then
+    if ! _scope_git -C "$repo" cat-file blob "$sha" > "$tmp" 2>/dev/null; then
         rm -f "$tmp"
         return 1
     fi
@@ -366,12 +418,12 @@ scope_diff_rows() {
     # --attr-source reads attributes from the empty tree, so an in-tree .gitattributes (-diff, binary,
     # text, eol) cannot change how a change is counted. Needs git 2.40+; older git fails closed.
     if [[ -z "${_SCOPE_EMPTY_TREE:-}" ]]; then
-        _SCOPE_EMPTY_TREE="$(git -C "$repo" hash-object -t tree --stdin < /dev/null)" || return 1
+        _SCOPE_EMPTY_TREE="$(_scope_git -C "$repo" hash-object -t tree --stdin < /dev/null)" || return 1
     fi
     local empty="$_SCOPE_EMPTY_TREE"
-    raw="$(git -C "$repo" --attr-source="$empty" -c core.attributesFile=/dev/null -c core.quotePath=false \
+    raw="$(_scope_git -C "$repo" --attr-source="$empty" -c core.attributesFile=/dev/null -c core.quotePath=false \
         diff -a --no-ext-diff --no-textconv --no-renames --raw "${args[@]}")" || return 1
-    num="$(git -C "$repo" --attr-source="$empty" -c core.attributesFile=/dev/null -c core.quotePath=false \
+    num="$(_scope_git -C "$repo" --attr-source="$empty" -c core.attributesFile=/dev/null -c core.quotePath=false \
         diff -a --no-ext-diff --no-textconv --no-renames --numstat "${args[@]}")" || return 1
     {
         printf '%s\n' "$raw" | awk 'NF { print "R\t" $0 }'
@@ -388,12 +440,16 @@ scope_diff_rows() {
             p = $4; for (i = 5; i <= NF; i++) p = p "\t" $i
             if (!(p in seen)) { order[++n] = p; seen[p] = 1 }
             add[p] = ($2 == "-") ? 0 : $2; del[p] = ($3 == "-") ? 0 : $3
+            if ($2 == "-" || $3 == "-") dash[p] = 1
         }
         END {
             for (k = 1; k <= n; k++) {
                 p = order[k]
                 kind = "ok"
-                if (st[p] != "D") {
+                # numstat "-" means git could not count lines (a driver or binary attribute, e.g. from
+                # .git/info/attributes or diff.<drv>.binary). Never count that as zero lines.
+                if (dash[p]) kind = "binary"
+                else if (st[p] != "D") {
                     if (nm[p] == "120000") kind = "symlink"
                     else if (nm[p] == "160000") kind = "submodule"
                 }
@@ -530,12 +586,14 @@ scope_guard_check() {
         reason="config_unloaded"
     elif [[ -z "$SCOPE_JSON" ]] || ! jq -e 'type == "object"' <<< "$SCOPE_JSON" >/dev/null 2>&1; then
         reason="scope_unreadable"
-    elif [[ -z "$base" ]] || ! git -C "$repo" rev-parse --verify -q "${base}^{commit}" >/dev/null 2>&1; then
+    elif [[ -z "$base" ]] || ! _scope_git -C "$repo" rev-parse --verify -q "${base}^{commit}" >/dev/null 2>&1; then
         reason="baseline_uncomputable"
     else
-        head="$(git -C "$repo" rev-parse HEAD 2>/dev/null || true)"
+        head="$(_scope_git -C "$repo" rev-parse HEAD 2>/dev/null || true)"
         if [[ -z "$head" ]]; then
             reason="head_unreadable"
+        elif [[ "$(_scope_git_meta "$repo" 2>/dev/null)" != "$SCOPE_META_SNAPSHOT" ]]; then
+            reason="git_metadata_changed"
         elif ! rows="$(scope_diff_rows "$repo" "$base" "$head")"; then
             reason="diff_failed"
         elif ! irows="$(scope_diff_rows "$repo" "$pre" "$head")"; then
@@ -566,14 +624,14 @@ scope_guard_check() {
     # Revert this iteration's commits on the loop's own branch, then count the strike. Every
     # precondition for a reset is checked first; any failure blocks instead of resetting.
     if [[ "$verdict" == "violation" ]]; then
-        cur="$(git -C "$repo" symbolic-ref -q HEAD 2>/dev/null || true)"
+        cur="$(_scope_git -C "$repo" symbolic-ref -q HEAD 2>/dev/null || true)"
         if [[ "${SCOPE_CAN_REVERT:-0}" != "1" ]]; then
             reason="cannot_revert_unsafe_tree"
             verdict="blocked"
         elif [[ -z "$cur" || "$cur" != "$SCOPE_LOOP_BRANCH" ]]; then
             reason="head_not_on_loop_branch"
             verdict="blocked"
-        elif ! git -C "$repo" reset --hard "$pre" >/dev/null 2>&1; then
+        elif ! _scope_git -C "$repo" reset --hard "$pre" >/dev/null 2>&1; then
             reason="revert_failed"
             verdict="blocked"
         else
@@ -625,7 +683,11 @@ scope_worker_precommit() {
     _scope_set_config_json "${SW_SCOPE_CONFIG:-}" || return 2
     SCOPE_JSON="${SW_SCOPE_JSON:-}"
     jq -e 'type == "object"' <<< "$SCOPE_JSON" >/dev/null 2>&1 || return 2
-    rows="$(scope_diff_rows "$repo" "HEAD" "INDEX")" || return 2
+    # Cumulative: the staged tree against the loop base, not against HEAD, so a worker cannot spend
+    # its budget one commit at a time. A missing base fails closed.
+    local base="${SW_SCOPE_BASE:-}"
+    [[ -n "$base" ]] && _scope_git -C "$repo" rev-parse --verify -q "${base}^{commit}" >/dev/null 2>&1 || return 2
+    rows="$(scope_diff_rows "$repo" "$base" "INDEX")" || return 2
     rows="$(printf '%s\n' "$rows" | _scope_drop_bookkeeping)"
     read -r files added deleted _ _ <<< "$(printf '%s\n' "$rows" | _scope_totals)"
     viol="$(printf '%s\n' "$rows" | scope_path_violations "$SCOPE_JSON" || true)"
@@ -634,7 +696,7 @@ scope_worker_precommit() {
     if [[ -z "$viol" ]]; then
         return 0
     fi
-    git -C "$repo" reset -q --hard HEAD >/dev/null 2>&1 || return 2
+    _scope_git -C "$repo" reset -q --hard HEAD >/dev/null 2>&1 || return 2
     SCOPE_STRIKES=$(( ${SCOPE_STRIKES:-0} + 1 ))
     _scope_write_evidence "$evidence" --argjson iteration "$iter" --arg verdict "reverted" \
         --arg reason "$(printf '%s' "$viol" | tr '\t\n' ' :')" --arg base "HEAD" --arg pre "HEAD" --arg head "INDEX" \
@@ -643,4 +705,24 @@ scope_worker_precommit() {
         --argjson violations "$(printf '%s\n' "$viol" | jq -R -s -c 'split("\n") | map(select(length > 0) | split("\t") | {reason: .[0], path: .[1]})')" || true
     if [[ "$SCOPE_STRIKES" -ge 2 ]]; then rc=2; else rc=1; fi
     return "$rc"
+}
+
+# Trusted base for a resumed run. The state file is agent-writable, so a resumed base is never read
+# from it: it is the merge-base of HEAD with the default branch, i.e. where the feature branch forked.
+# Prints nothing and returns 1 when that cannot be established, or when HEAD is the default branch
+# itself (then no fork point exists and the guard cannot tell the loop's commits apart).
+scope_trusted_base() {
+    local repo="$1" ref b head
+    head="$(_scope_git -C "$repo" rev-parse HEAD 2>/dev/null)" || return 1
+    for ref in refs/remotes/origin/HEAD refs/heads/main refs/heads/master; do
+        _scope_git -C "$repo" rev-parse --verify -q "$ref" >/dev/null 2>&1 || continue
+        b="$(_scope_git -C "$repo" merge-base HEAD "$ref" 2>/dev/null)" || continue
+        [[ -n "$b" ]] || continue
+        if [[ "$b" == "$head" ]]; then
+            return 1
+        fi
+        echo "$b"
+        return 0
+    done
+    return 1
 }

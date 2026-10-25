@@ -1881,7 +1881,14 @@ CONSECUTIVE_FAILURES=0
 [[ -f "__SCRIPT_DIR__/lib/auto-recovery.sh" ]] && source "__SCRIPT_DIR__/lib/auto-recovery.sh" 2>/dev/null || true
 
 # Blast-radius guard for this worker (#8644). Scope and config come from the exported SW_SCOPE_* set by the parent.
-[[ -f "__SCRIPT_DIR__/lib/scope-guard.sh" ]] && source "__SCRIPT_DIR__/lib/scope-guard.sh" 2>/dev/null || true
+# Fail closed: a missing or broken guard stops the worker before it can commit (no `|| true`).
+source "__SCRIPT_DIR__/lib/scope-guard.sh" || { echo "blast-radius guard unavailable; worker stopped" >&2; exit 1; }
+type scope_worker_precommit >/dev/null 2>&1 || { echo "blast-radius guard unavailable; worker stopped" >&2; exit 1; }
+# The scope comes from files the parent wrote outside the repo, not from the worker's environment.
+SW_SCOPE_JSON="$(cat "__SCOPE_DIR__/scope.json" 2>/dev/null || true)"
+SW_SCOPE_CONFIG="$(cat "__SCOPE_DIR__/config.json" 2>/dev/null || true)"
+SW_SCOPE_BASE="$(cat "__SCOPE_DIR__/base.txt" 2>/dev/null || true)"
+export SW_SCOPE_JSON SW_SCOPE_CONFIG SW_SCOPE_BASE
 
 echo -e "${CYAN}${BOLD}▸${RESET} Agent ${AGENT_NUM}/${TOTAL_AGENTS} starting in ${WORK_DIR}"
 
@@ -2021,6 +2028,8 @@ WORKEREOF
         && mv "${worker_script}.tmp" "$worker_script"
     awk -v val="$LOG_DIR" '{gsub(/__LOG_DIR__/, val); print}' "$worker_script" > "${worker_script}.tmp" \
         && mv "${worker_script}.tmp" "$worker_script"
+    awk -v val="${SCOPE_ENV_DIR:-}" '{gsub(/__SCOPE_DIR__/, val); print}' "$worker_script" > "${worker_script}.tmp" \
+        && mv "${worker_script}.tmp" "$worker_script"
     awk -v val="$SCRIPT_DIR" '{gsub(/__SCRIPT_DIR__/, val); print}' "$worker_script" > "${worker_script}.tmp" \
         && mv "${worker_script}.tmp" "$worker_script"
     awk -v val="$TEST_CMD" '{gsub(/__TEST_CMD__/, val); print}' "$worker_script" > "${worker_script}.tmp" \
@@ -2146,6 +2155,33 @@ cleanup_multi_agent() {
     rm -f "$LOG_DIR"/.agent-*-complete 2>/dev/null || true
 }
 
+# Set up the blast-radius guard for this run (#8644). Returns 1 to refuse the run.
+# A resumed run takes its base from the default-branch fork point, never from the agent-writable state
+# file. An in-process restart keeps the trusted state of the run it continues.
+_scope_begin_run() {
+    local base="${LOOP_START_COMMIT:-}" restart=0
+    [[ "${SESSION_RESTART:-false}" == "true" ]] && restart=1
+    if [[ "$restart" -eq 0 ]] && $RESUME; then
+        base="$(scope_trusted_base "$PROJECT_ROOT")" || {
+            error "Blast-radius guard refused to resume: no trusted base (a fork point from the default branch) could be established"
+            return 1
+        }
+        LOOP_START_COMMIT="$base"
+    fi
+    scope_setup_run "$PROJECT_ROOT" "$base" "$ARTIFACTS_DIR" "${GOAL:-}" "${ISSUE_LABELS:-}" "$restart"
+}
+
+# Write the trusted scope and config outside the repo, where the workers read them (#8644). The
+# workers run in tmux panes and do not inherit the parent's environment.
+_scope_export_for_workers() {
+    SCOPE_ENV_DIR="$(mktemp -d "${TMPDIR:-/tmp}/sw-scope.XXXXXX")" || return 1
+    chmod 700 "$SCOPE_ENV_DIR"
+    printf '%s' "$SW_SCOPE_JSON" > "$SCOPE_ENV_DIR/scope.json"
+    printf '%s' "$SW_SCOPE_CONFIG" > "$SCOPE_ENV_DIR/config.json"
+    printf '%s' "$SW_SCOPE_BASE" > "$SCOPE_ENV_DIR/base.txt"
+    export SCOPE_ENV_DIR
+}
+
 # Blast-radius gate after a loop commit (#8644). Returns 0 pass, 1 reverted (the caller must skip the
 # rest of this iteration: no tests, audit, convergence or completion), 2 blocked (stop the build).
 _scope_gate_after_commit() {
@@ -2209,7 +2245,7 @@ run_single_agent_loop() {
     # Blast-radius guard (#8644): config from the base commit, scope resolved once, and a clean tree
     # (or an own worktree) so a revert can never reset unrelated work. Refuses to start otherwise.
     SCOPE_NOTE=""
-    if ! scope_setup_run "$PROJECT_ROOT" "${LOOP_START_COMMIT:-}" "$ARTIFACTS_DIR" "${GOAL:-}" "${ISSUE_LABELS:-}"; then
+    if ! _scope_begin_run; then
         STATUS="scope_blocked"
         write_state
         write_progress
@@ -2771,13 +2807,14 @@ main() {
             initialize_state
         fi
         # Blast-radius guard (#8644): resolve the trusted scope before any worker starts.
-        if ! scope_setup_run "$PROJECT_ROOT" "${LOOP_START_COMMIT:-}" "$ARTIFACTS_DIR" "${GOAL:-}" "${ISSUE_LABELS:-}"; then
+        if ! _scope_begin_run; then
             error "Blast-radius guard refused to start: the base commit, scope or a clean tree could not be established"
             STATUS="scope_blocked"
             write_state
             show_summary
             return 1
         fi
+        _scope_export_for_workers
         show_banner
         launch_multi_agent
         show_summary
