@@ -95,17 +95,26 @@
     "@ast-grep/cli": "^0.50.0",
     "@biomejs/biome": "^2.5.15",
     "@testing-library/dom": "^10.4.1",
-    "@vitest/coverage-v8": "^4.0.18",
+    "@vitest/coverage-v8": "^4.1.12",
     "bun-types": "^1.3.9",
     "dependency-cruiser": "^18.6.0",
-    "happy-dom": "^20.6.1",
+    "happy-dom": "^21.0.4",
     "jsdom": "^28.1.0",
     "typescript": "^5.9.3",
-    "vitest": "^4.0.18"
+    "vitest": "^4.1.12"
   },
   "dependencies": {
     "@anthropic-ai/claude-agent-sdk": "0.3.296",
     "yaml": "^2.9.1",
     "zod": "^4.6.7"
+  },
+  "overrides": {
+    "vite": "^7.3.5",
+    "postcss": "^8.5.18",
+    "undici": "^7.29.0",
+    "nanoid": "^3.3.12",
+    "rollup": "^4.59.0",
+    "picomatch": "^4.0.4",
+    "source-map-js": "^1.2.2"
   }
 }
