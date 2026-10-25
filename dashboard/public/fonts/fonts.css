@@ -1,0 +1,25 @@
+/*
+ * Self-hosted font faces. T1 ships no font files yet: the tokens use the system
+ * stack, so nothing in this file is active. Pending maintainer approval to fetch
+ * the files (see the T1 PR).
+ *
+ * To enable a face: drop the woff2 (latin subset) and its OFL licence text into
+ * this directory, then uncomment its block. Keep the URL local (/fonts/...), since
+ * tools/web/no-cdn.ts fails on any external font load.
+ *
+ * @font-face {
+ *   font-family: "Plus Jakarta Sans";
+ *   src: url("/fonts/PlusJakartaSans-latin.woff2") format("woff2");
+ *   font-weight: 200 800;
+ *   font-style: normal;
+ *   font-display: swap;
+ * }
+ *
+ * @font-face {
+ *   font-family: "JetBrains Mono";
+ *   src: url("/fonts/JetBrainsMono-latin.woff2") format("woff2");
+ *   font-weight: 100 800;
+ *   font-style: normal;
+ *   font-display: swap;
+ * }
+ */

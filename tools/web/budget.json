@@ -1,0 +1,11 @@
+{
+  "js": { "maxGzipBytes": 42553 },
+  "css": { "maxGzipBytes": 25600 },
+  "baseline": {
+    "measuredOn": "2026-10-25",
+    "command": "bun tools/web/budget.ts",
+    "jsGzipBytes": 42553,
+    "cssGzipBytes": 16617,
+    "notes": "JS is main.js from dashboard/src/main.ts (bun build --minify). CSS is dashboard/public/styles.css. The JS ceiling is the T1 baseline (no growth until T4 brings it to 120 KB). The CSS ceiling is the spec's 25 KB."
+  }
+}

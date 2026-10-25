@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32">
+  <style>
+    .mark { fill: oklch(0.2 0.02 255); }
+    @media (prefers-color-scheme: dark) {
+      .mark { fill: oklch(0.96 0.005 255); }
+    }
+  </style>
+  <g class="mark">
+    <path d="M15 3.5h2v17.5h-2z"/>
+    <path d="M17 5 27 19H17z"/>
+    <path d="M15 8 6 19h9z"/>
+    <path d="M2.5 21h27l-4.6 6.2a2 2 0 0 1-1.6.8H8.7a2 2 0 0 1-1.6-.8z"/>
+  </g>
+</svg>
