@@ -232,7 +232,7 @@ The self-optimization module includes a context efficiency feedback loop that an
 
 - **Budget utilization tracking** — Measures what percentage of the context budget each iteration uses
 - **Trim ratio monitoring** — Tracks how much content gets trimmed by the context engineering layer
-- **Automatic recommendations** — When utilization is consistently high (>90%), recommends increasing budget; when low (<50%), recommends decreasing to save tokens; when trim ratio is high (>30%), recommends reducing verbose context sections
+- **Automatic recommendations** — When utilization is consistently high (>90%), recommends increasing budget; when low (under 50%), recommends decreasing to save tokens; when trim ratio is high (>30%), recommends reducing verbose context sections
 
 ```bash
 shipwright self-optimize tune  # Includes context efficiency analysis

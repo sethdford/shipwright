@@ -24,7 +24,10 @@ export default defineConfig({
       sidebar: [
         {
           label: "Getting Started",
-          items: [{ label: "Quick Start", link: "/quick-start/" }],
+          items: [
+            { label: "Quick Start", link: "/quick-start/" },
+            { label: "Compare", link: "/compare/" },
+          ],
         },
         {
           label: "Guides",
