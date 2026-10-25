@@ -1,6 +1,7 @@
 import type { Command } from "../command";
 import { breakerCommand } from "./breaker";
 import { budgetCommand } from "./budget";
+import { failureCommand } from "./failure";
 import { gatesCommand } from "./gates";
 import { helloCommand } from "./hello";
 import { intakeCommand } from "./intake";
@@ -15,6 +16,7 @@ export const commands: readonly Command[] = [
   budgetCommand,
   intakeCommand,
   gatesCommand,
+  failureCommand,
 ];
 
 export function findCommand(

@@ -1,0 +1,3 @@
+# Raw helpers.sh output with colour codes, NO_COLOR unset. A model analysis line says rate limit.
+[38;2;74;222;128m[1m✓[0m Failure analyzed: [test_failure] the client hit a rate limit error in the mock
+  [38;2;248;113;113m✗[0m Tests: failed

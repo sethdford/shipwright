@@ -729,7 +729,7 @@ All scripts are bash (except the dashboard server in TypeScript). Grouped by lay
 | `scripts/sw-webhook.sh` | 621 | GitHub Webhook Receiver for Instant Issue Processing |
 | `scripts/sw-widgets.sh` | 528 | Embeddable Status Widgets |
 | `scripts/sw-worktree.sh` | 421 | Git worktree management for multi-agent isolation |
-| `scripts/sw` | 653 | CLI router — dispatches subcommands via exec |
+| `scripts/sw` | 656 | CLI router — dispatches subcommands via exec |
 <!-- /AUTO:core-scripts -->
 
 ### GitHub API Modules
@@ -788,7 +788,7 @@ All scripts are bash (except the dashboard server in TypeScript). Grouped by lay
 | `scripts/sw-chaos-test.sh` | 385 | Fault injection & recovery validation |
 | `scripts/sw-checkpoint-test.sh` | 342 | Validate checkpoint save/restore |
 | `scripts/sw-ci-bot-comments-test.sh` | 132 | SHIPWRIGHT-* markers from the bot only |
-| `scripts/sw-ci-git-token-credential-test.sh` | 150 | github.com over https only, get only |
+| `scripts/sw-ci-git-token-credential-test.sh` | 152 | github.com over https only, get only |
 | `scripts/sw-ci-issue-dispatch-state-test.sh` | 65 | ready, active, handled, fails |
 | `scripts/sw-ci-pipeline-active-test.sh` | 76 | is a pipeline running for an issue |
 | `scripts/sw-ci-retry-state-test.sh` | 117 | auto-retry count and abandon marker |

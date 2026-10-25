@@ -1,0 +1,3 @@
+# gh run view --log-failed output: job, step and timestamp are tab-prefixed on every line.
+pipeline	Run Shipwright pipeline	2026-10-15T13:39:00Z ✓ Failure analyzed: [config] rate limit error
+pipeline	Run Shipwright pipeline	2026-10-15T13:39:01.5234567Z ✗ Tests: failed
