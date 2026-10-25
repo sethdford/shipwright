@@ -38,6 +38,10 @@ demo/*.gif
 .claude/testgen/
 .claude/evidence/
 .claude/test-holdout/manifest.json
+.claude/tasks.md
+.claude/.fleet-daemon-config.json
+# Temp files of atomic writes (tmp + mv), e.g. daemon-runtime.json.tmp.<pid>
+.claude/*.tmp.*
 
 # Generated changelogs (produced by sw-changelog.sh)
 CHANGELOG-*.md

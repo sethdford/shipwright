@@ -365,7 +365,11 @@ daemon_self_optimize() {
         # tracked, so the hand-written config stays clean (#8665). Atomic write: tmp file + mv.
         local runtime_file cur_runtime tmp_runtime
         runtime_file="$(dirname "$config_file")/daemon-runtime.json"
-        cur_runtime="$(cat "$runtime_file" 2>/dev/null || echo '{}')"
+        # An empty or invalid file is treated as {} and rewritten, so it repairs itself.
+        cur_runtime='{}'
+        if [[ -s "$runtime_file" ]] && jq -e 'type == "object"' "$runtime_file" >/dev/null 2>&1; then
+            cur_runtime="$(cat "$runtime_file")"
+        fi
         tmp_runtime="${runtime_file}.tmp.$$"
         if echo "$cur_runtime" | jq --arg ts "$(now_iso)" --arg adj "$adj_str" \
             '.last_optimization = {timestamp: $ts, adjustments: $adj}' > "$tmp_runtime" 2>/dev/null; then

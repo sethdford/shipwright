@@ -1,4 +1,6 @@
 import { describe, expect, test } from "bun:test";
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
 import { join } from "node:path";
 import {
   isRatcheted,
@@ -8,7 +10,7 @@ import {
   type RuleDoc,
   trackedFiles,
 } from "./rule-catalog";
-import { runtimeStateViolations, trackedInIndex } from "./runtime-state";
+import { ignoredByGit, trackedRuntimeState } from "./runtime-state";
 
 const rules = await loadRules();
 const tests = await loadRuleTests();
@@ -382,16 +384,22 @@ test("bun run arch runs every checker as a hard && step, with no operator that c
 });
 
 /**
- * Runtime state under .claude/ is never tracked (#8665). The list is derived from .gitignore, so these
- * tests check the two agree: each runtime example is ignored by git, and hand-written config is neither
- * ignored nor classified as runtime.
+ * Runtime state under .claude/ is never tracked (#8665). The arch check asks git (`check-ignore`), so
+ * these tests pin what git ignores: every runtime example is ignored, hand-written config is not, and
+ * a force-added file under an ignore rule is caught, whatever form the rule takes.
  */
 const RUNTIME_EXAMPLES = [
   ".claude/loop-logs/iteration-1.log",
-  ".claude/evidence/manifest.json",
+  ".claude/loop-state.md",
+  ".claude/platform-hygiene.json",
   ".claude/intelligence-cache.json",
+  ".claude/recovery-state.json",
+  ".claude/evidence/manifest.json",
   ".claude/test-holdout/manifest.json",
   ".claude/daemon-runtime.json",
+  ".claude/daemon-runtime.json.tmp.4242",
+  ".claude/tasks.md",
+  ".claude/.fleet-daemon-config.json",
   ".claude/causal-graph.json",
   ".claude/recovery-patterns.json",
   ".claude/project-detection.json",
@@ -415,24 +423,42 @@ const CONFIG_EXAMPLES = [
   "scripts/sw-loop.sh",
 ];
 
-test("every runtime example is classified as runtime and ignored by git", () => {
-  expect(runtimeStateViolations(RUNTIME_EXAMPLES)).toEqual(RUNTIME_EXAMPLES);
-  for (const f of RUNTIME_EXAMPLES) {
-    const r = Bun.spawnSync(["git", "check-ignore", "-q", f], { cwd: ROOT });
-    expect({ f, ignored: r.exitCode }).toEqual({ f, ignored: 0 });
-  }
+test("every runtime example is ignored by git", () => {
+  expect(ignoredByGit(RUNTIME_EXAMPLES)).toEqual(RUNTIME_EXAMPLES);
 });
 
-test("hand-written config is neither classified as runtime nor ignored by git", () => {
-  expect(runtimeStateViolations(CONFIG_EXAMPLES)).toEqual([]);
-  for (const f of CONFIG_EXAMPLES) {
-    const r = Bun.spawnSync(["git", "check-ignore", "-q", f], { cwd: ROOT });
-    expect({ f, ignored: r.exitCode }).toEqual({ f, ignored: 1 });
-  }
+test("hand-written config is not ignored by git", () => {
+  expect(ignoredByGit(CONFIG_EXAMPLES)).toEqual([]);
 });
 
 test("no runtime state under .claude/ is tracked in the git index (#8665)", () => {
-  expect(runtimeStateViolations(trackedInIndex())).toEqual([]);
+  expect(trackedRuntimeState()).toEqual([]);
+});
+
+test("a force-added file is caught under every ignore form (anchored, no-slash, nested, ?/[], info/exclude)", () => {
+  const repo = mkdtempSync(join(tmpdir(), "rs-bypass-"));
+  const git = (...args: string[]) => Bun.spawnSync(["git", ...args], { cwd: repo });
+  git("init", "-q");
+  const files = [
+    ".claude/anchored.json",
+    ".claude/noslashdir/x.json",
+    ".claude/q1.json",
+    ".claude/a.json",
+    ".claude/nested.json",
+    ".claude/excl.json",
+  ];
+  writeFileSync(
+    join(repo, ".gitignore"),
+    "/.claude/anchored.json\n.claude/noslashdir\n.claude/q?.json\n.claude/[a].json\n",
+  );
+  mkdirSync(join(repo, ".claude/noslashdir"), { recursive: true });
+  writeFileSync(join(repo, ".claude/.gitignore"), "nested.json\n");
+  mkdirSync(join(repo, ".git/info"), { recursive: true });
+  writeFileSync(join(repo, ".git/info/exclude"), ".claude/excl.json\n");
+  for (const f of files) writeFileSync(join(repo, f), "{}\n");
+  git("add", "-f", "--", ...files, ".claude/.gitignore");
+  expect(trackedRuntimeState(repo).sort()).toEqual([...files].sort());
+  rmSync(repo, { recursive: true, force: true });
 });
 
 test("the bash bypass exemption is narrow: sw-session.sh spells the bypass flag once (F9, #8614)", async () => {
