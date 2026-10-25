@@ -117,6 +117,11 @@ _tg_block() {
 # when bun colours its output, as in a terminal or FORCE_COLOR), a "<file>:" header before each file's
 # "# Unhandled error between tests" block, and the summary. Golden logs of each shape: scripts/fixtures/bun-test.
 # Under GitHub Actions the header is a "::group::<file>:" line, see tg_parse_log.
+# Known limit (#8671): the judgement reads the test command's stdout. Output the tests print themselves
+# can imitate a bun file header ("other.test.ts:"), and then a failure is filed under another file. The
+# robust input is bun's reporter output (bun 1.2.19 has --reporter=junit --reporter-outfile=...), but the
+# gate runs the project's command and cannot add that flag. Until it can, treat a pre-existing verdict
+# on a bun run whose tests print such headers as unverified.
 tg_parse_log() {
     local log="$1" plain units="" pass summary=0 bun=0
     # CRs go too: a log captured through a pty (script, a terminal-backed CI step) ends every line in
@@ -139,8 +144,10 @@ tg_parse_log() {
         # Assertions of a failing suite, passing ones included: the n-th line with a given description
         # is "desc#n", so the position of a repeated name is known. The list that test-helpers prints
         # after its completion line repeats the failures and is not counted.
-        cur != "" && !(cur in comp) && /^ +[✓✗] / {
-            line = $0; sub(/^ +[✓✗] /, "", line)
+        # Alternation, not a bracket: under a C locale (LANG unset, as in launchd and systemd) awk matches
+        # a bracket byte by byte, so a multibyte glyph inside [...] matches nothing (#8671).
+        cur != "" && !(cur in comp) && /^ +(✓|✗) / {
+            line = $0; sub(/^ +(✓|✗) /, "", line)
             occ[cur SUBSEP line]++
             if ($0 ~ /^ +✗ /) { nfail[cur]++; print cur "::" line "#" occ[cur SUBSEP line] }
             else { npass[cur]++ }

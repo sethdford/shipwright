@@ -566,15 +566,17 @@ ${commit_msgs}" --model "$(_smart_model commit_quality haiku)" < /dev/null 2>/de
     log_stage "build" "Build loop completed ($commit_count commits)"
 }
 
-# _pipeline_test_base — the commit the test stage judges against: where HEAD forked from the base
-# branch. Empty when neither origin/<base> nor <base> resolves, and the stage then blocks as before.
-_pipeline_test_base() {
+# pipeline_record_test_base — record the commit the test stage judges against: where HEAD forked from
+# the base branch. Called once at pipeline start, before any agent code runs, and kept in this process
+# only. Refs are not read again later, because the agent can move them (#8671). Empty when no base
+# resolves; the test stage then blocks.
+pipeline_record_test_base() {
     local ref base=""
     for ref in "origin/${BASE_BRANCH:-main}" "${BASE_BRANCH:-main}"; do
         base="$(git -C "${PROJECT_ROOT:-.}" merge-base HEAD "$ref" 2>/dev/null || true)"
         [[ -n "$base" ]] && break
     done
-    printf '%s' "$base"
+    PIPELINE_TEST_BASE_SHA="$base"
 }
 
 # _pipeline_test_judge <cmd> <exit> <log> — judge a failing test command against the base commit.
@@ -583,10 +585,18 @@ _pipeline_test_base() {
 # Either way the verdict is appended to <log>, so the self-healing feedback (the log's tail) says
 # which failures are pre-existing and that they must not be fixed.
 _pipeline_test_judge() {
-    local cmd="$1" rc="$2" log="$3" base pre=""
-    base="$(_pipeline_test_base)"
-    if [[ -z "$base" ]]; then
-        warn "Test stage: no base commit for ${BASE_BRANCH:-main}; blocking without a differential judgement"
+    local cmd="$1" rc="$2" log="$3" base="${PIPELINE_TEST_BASE_SHA:-}" root="${PROJECT_ROOT:-.}" pre=""
+    # Fail closed on anything but a recorded base that is a proper ancestor of HEAD.
+    if [[ -z "$base" ]] || ! git -C "$root" rev-parse --verify -q "${base}^{commit}" >/dev/null 2>&1; then
+        warn "Test stage: no recorded base commit; blocking without a differential judgement"
+        return 1
+    fi
+    if [[ "$(git -C "$root" rev-parse HEAD 2>/dev/null)" == "$base" ]]; then
+        warn "Test stage: HEAD is the recorded base (no pipeline commits); blocking without a differential judgement"
+        return 1
+    fi
+    if ! git -C "$root" merge-base --is-ancestor "$base" HEAD 2>/dev/null; then
+        warn "Test stage: the recorded base is not an ancestor of HEAD; blocking"
         return 1
     fi
     local LOOP_START_COMMIT="$base"
@@ -597,7 +607,13 @@ _pipeline_test_judge() {
         return 0
     fi
     if [[ "$TG_VERDICT" == "new-failures" ]]; then
-        pre="$(printf '%s\n' "$TG_UNITS" | grep -vE '::(total|ran|files|fail|error|skip)=' | grep -vxF -f <(printf '%s\n' "$TG_NEW_FAILURES") | grep -v '^$' || true)"
+        local new_suites
+        new_suites="$(printf '%s\n' "$TG_NEW_FAILURES" | awk -F'::' 'NF > 1 { print $1 }' | sort -u)"
+        pre="$(printf '%s\n' "$TG_UNITS" | grep -vE '::(total|ran|files|fail|error|skip)=' | grep -vxF -f <(printf '%s\n' "$TG_NEW_FAILURES") | grep -v '^$' |
+            NEW_SUITES="$new_suites" awk 'BEGIN { n = split(ENVIRON["NEW_SUITES"], a, "\n"); for (i = 1; i <= n; i++) suite[a[i]] = 1 }
+                { p = index($0, "::"); if (p > 0) { rest = substr($0, p + 2)
+                      if ((substr($0, 1, p - 1) in suite) && (rest ~ /^(exit=|total=)/ || rest == "INCOMPLETE" || rest == "TIMEOUT" || rest == "UNORDERED")) next }
+                  print }' || true)"
     fi
     {
         printf '\n%s\n' "$(tg_verdict_text)"
@@ -632,7 +648,9 @@ stage_test() {
 
     info "Running tests: ${DIM}$test_cmd${RESET}"
     local test_exit=0
-    sw_test_gate_env bash -c "$test_cmd" > "$test_log" 2>&1 || test_exit=$?
+    # FAIL_LOG_LINES: the judgement needs every failing suite's full log, or a new assertion above the
+    # tail window is cut and read as pre-existing (as sw-loop.sh does, #8671).
+    FAIL_LOG_LINES=100000 sw_test_gate_env bash -c "$test_cmd" > "$test_log" 2>&1 || test_exit=$?
 
     # A failure that the base commit also has does not fail the stage; a regression does (#8663).
     if [[ "$test_exit" -ne 0 ]] && _pipeline_test_judge "$test_cmd" "$test_exit" "$test_log"; then

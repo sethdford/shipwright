@@ -232,7 +232,7 @@ export TEST_CMD="echo FAIL; exit 1"
 stage_test 2>/dev/null || rc=$?
 [[ $rc -eq 1 ]] && assert_pass "Stage test returns 1 on test failure"
 
-# ─── Tests: stage_test differential judgement (#8663) ──────────────────────
+# ─── Tests: stage_test differential judgement (#8663, #8671) ───────────────
 print_test_section "stage_test differential"
 
 # Own repo, so the review and PR stages below keep their git state. The fake test command prints
@@ -264,17 +264,22 @@ exit 1
 FAKE
     # Like a pipeline branch: the fork point (main's tip) has a parent, and HEAD is one commit past it
     git add -A && git commit -q -m "main: fake test command"
+    git checkout -q -b side-branch "$(git rev-list --max-parents=0 HEAD)"
+    echo side > side.txt && git add -A && git commit -q -m "side: not an ancestor of the pipeline"
+    git checkout -q main
     git checkout -q -b feat/diff-under-test
     echo "pipeline change" >> README.md && git add -A && git commit -q -m "pipeline change"
 ) >/dev/null 2>&1
 
-# Runs stage_test in DIFF_REPO with the given base branch. Prints the stage's exit code.
+# Runs stage_test in DIFF_REPO with the given base branch, after the pipeline has recorded its base
+# (as it does at start). Prints the stage's exit code. The judgement uses only the recorded base.
 run_diff_stage() {
     local base_branch="$1" rc=0
     (
         cd "$DIFF_REPO"
         export PROJECT_ROOT="$DIFF_REPO" ARTIFACTS_DIR="$DIFF_REPO/.artifacts" BASE_BRANCH="$base_branch"
         export TEST_CMD="bash fake-tests.sh"
+        pipeline_record_test_base
         stage_test
     ) >/dev/null 2>&1 || rc=$?
     echo "$rc"
@@ -296,6 +301,93 @@ rm -f "$DIFF_REPO/regression.flag"
 
 # No base commit: fail closed, the old behaviour (the same pre-existing failure blocks)
 assert_eq "no base branch: the failure blocks as before" "1" "$(run_diff_stage no-such-base-branch)"
+
+# Hijack (#8671 item 1): the agent moves origin/main to its own HEAD after the base was recorded. The
+# recorded base still judges the regression, so it blocks.
+touch "$DIFF_REPO/regression.flag"
+hijack_rc=0
+(
+    cd "$DIFF_REPO"
+    export PROJECT_ROOT="$DIFF_REPO" ARTIFACTS_DIR="$DIFF_REPO/.artifacts" BASE_BRANCH=main TEST_CMD="bash fake-tests.sh"
+    pipeline_record_test_base
+    git update-ref refs/remotes/origin/main HEAD
+    git update-ref refs/heads/main HEAD
+    stage_test
+) >/dev/null 2>&1 || hijack_rc=$?
+assert_eq "a moved origin/main cannot make a regression pre-existing" "1" "$hijack_rc"
+rm -f "$DIFF_REPO/regression.flag"
+(cd "$DIFF_REPO" && git update-ref -d refs/remotes/origin/main 2>/dev/null; git update-ref refs/heads/main "$(git rev-parse HEAD~1)") >/dev/null 2>&1 || true
+
+# The base is never derived at test time: without a recorded base, the stage blocks
+unrecorded_rc=0
+(
+    cd "$DIFF_REPO"
+    export PROJECT_ROOT="$DIFF_REPO" ARTIFACTS_DIR="$DIFF_REPO/.artifacts" BASE_BRANCH=main TEST_CMD="bash fake-tests.sh"
+    PIPELINE_TEST_BASE_SHA="" stage_test
+) >/dev/null 2>&1 || unrecorded_rc=$?
+assert_eq "no recorded base: the failure blocks (no refs are read)" "1" "$unrecorded_rc"
+
+# A recorded base that equals HEAD, or is not an ancestor of HEAD, blocks
+equal_rc=0
+(
+    cd "$DIFF_REPO"
+    export PROJECT_ROOT="$DIFF_REPO" ARTIFACTS_DIR="$DIFF_REPO/.artifacts" BASE_BRANCH=main TEST_CMD="bash fake-tests.sh"
+    PIPELINE_TEST_BASE_SHA="$(git rev-parse HEAD)" stage_test
+) >/dev/null 2>&1 || equal_rc=$?
+assert_eq "a recorded base equal to HEAD blocks" "1" "$equal_rc"
+side_rc=0
+(
+    cd "$DIFF_REPO"
+    export PROJECT_ROOT="$DIFF_REPO" ARTIFACTS_DIR="$DIFF_REPO/.artifacts" BASE_BRANCH=main TEST_CMD="bash fake-tests.sh"
+    PIPELINE_TEST_BASE_SHA="$(git rev-parse side-branch)" stage_test
+) >/dev/null 2>&1 || side_rc=$?
+assert_eq "a recorded base that is not an ancestor of HEAD blocks" "1" "$side_rc"
+
+# sw-test-all format (#8671 item 2 and item 5). One suite; its failing assertion A01 is new and sits
+# above the last 20 lines, the window sw-test-all prints by default. FAIL_LOG_LINES must lift that.
+# A second assertion (A30) is pre-existing; the suite-level exit unit must not be listed as pre-existing.
+SUITE_REPO="$TEST_TEMP_DIR/suite-repo"
+mkdir -p "$SUITE_REPO/.artifacts"
+(
+    cd "$SUITE_REPO" && git init -q -b main && git config user.email "t@t.com" && git config user.name "T"
+    echo "# root" > README.md && git add -A && git commit -q -m "root"
+    cat > runner.sh <<'RUNNER'
+#!/usr/bin/env bash
+# Prints one failing suite in sw-test-all's shape. The section shows the last FAIL_LOG_LINES lines.
+lines="${FAIL_LOG_LINES:-20}"
+nfail=1
+[[ -f new-break ]] && nfail=2
+body="$(
+    [[ -f new-break ]] && echo "    ✗ A01 new break"
+    for i in $(seq 1 30); do echo "    ✓ P$i ok"; done
+    echo "    ✗ A30 old break"
+    echo "  $nfail of 31 tests failed"
+)"
+printf '  ✓ suite-ok   0s\n'
+printf '  ✗ suite-x   exit 1 0s\n'
+printf '━━━ suite-x (FAIL:1) — last %s lines ━━━\n' "$lines"
+printf '%s\n' "$body" | tail -n "$lines"
+printf '1 passed  1 failed  0 timed out  (2 suites, 1s)\n'
+exit 1
+RUNNER
+    git add -A && git commit -q -m "main: runner"
+    git checkout -q -b feat/suite
+    echo "pipeline change" >> README.md && git add -A && git commit -q -m "pipeline change"
+) >/dev/null 2>&1
+suite_rc=0
+(
+    cd "$SUITE_REPO"
+    export PROJECT_ROOT="$SUITE_REPO" ARTIFACTS_DIR="$SUITE_REPO/.artifacts" BASE_BRANCH=main TEST_CMD="bash runner.sh"
+    pipeline_record_test_base
+    touch new-break
+    stage_test
+) >/dev/null 2>&1 || suite_rc=$?
+suite_log="$(cat "$SUITE_REPO/.artifacts/test-results.log")"
+assert_eq "a new assertion above the default log window still blocks (FAIL_LOG_LINES)" "1" "$suite_rc"
+assert_contains "the new assertion is named" "$suite_log" "suite-x::A01 new break#1"
+assert_contains "the pre-existing assertion is still named" "$suite_log" "A30 old break"
+pre_line="$(printf '%s\n' "$suite_log" | grep '^PRE-EXISTING' || true)"
+assert_eq "suite-level exit unit is not listed as pre-existing when the suite has new failures" "0" "$(printf '%s' "$pre_line" | grep -c 'suite-x::exit=' || true)"
 
 # ─── Tests: stage_review ────────────────────────────────────────────────────
 print_test_section "stage_review"

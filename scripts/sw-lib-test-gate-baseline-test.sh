@@ -549,6 +549,17 @@ else
     assert_pass "bun not installed locally: live bun fixture checks skipped (CI fails instead)"
 fi
 
+# No locale: launchd and systemd start the daemon without LANG, and the parse must still read the
+# assertion glyphs (#8671). A child shell with LANG, LC_ALL and LC_CTYPE unset parses a sw-test-all log.
+NOLANG_LOG="$TEST_TEMP_DIR/nolang.log"
+printf '%s\n' "  ✗ suite-b   exit 1 0s" "━━━ suite-b (FAIL:1) — last 25 lines ━━━" \
+    "    ✓ P1 ok" "    ✗ X bad" "  1 of 2 tests failed" > "$NOLANG_LOG"
+nolang_units="$(env -u LANG -u LC_ALL -u LC_CTYPE bash -c 'source "$1"; tg_parse_log "$2"; printf "%s\n" "$TG_UNITS"' _ \
+    "$SCRIPT_DIR/lib/test-gate-baseline.sh" "$NOLANG_LOG")"
+assert_eq "no LANG: the parse reads the assertion glyphs and the exit unit" "suite-b::X bad#1
+suite-b::exit=1
+suite-b::total=2" "$nolang_units"
+
 # Golden bun logs (#8664): real `bun test` output from bun 1.2.19 (the pin), 1.3.14 and 1.4.4, each as
 # pipe output, FORCE_COLOR colour (✗ markers), a pty capture (CRLF, colour) and GitHub Actions output
 # (::group:: file headers, ::error annotations). Every shape must parse to the same units, so verdicts
