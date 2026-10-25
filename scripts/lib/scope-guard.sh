@@ -35,6 +35,7 @@ SCOPE_STRIKES=0            # blast-radius strikes for this run
 SCOPE_NOTE=""              # scope note for the next prompt, set after a revert
 SCOPE_CAN_REVERT=0         # 1 when a revert is safe (own worktree, or clean tree at start)
 SCOPE_LOOP_BRANCH=""       # symbolic ref the loop commits to
+SCOPE_JUDGED_SHA=""      # the commit the last passing check judged (what a push sends)
 SCOPE_META_SNAPSHOT=""  # .git/config checksum and attributes state at setup
 
 # Every git call the guard makes runs with the system and global config disabled, so a machine-wide
@@ -56,7 +57,8 @@ _scope_git() {
     env -u GIT_DIR -u GIT_WORK_TREE -u GIT_OBJECT_DIRECTORY -u GIT_ALTERNATE_OBJECT_DIRECTORIES \
         -u GIT_INDEX_FILE -u GIT_NAMESPACE -u GIT_COMMON_DIR \
         GIT_NO_REPLACE_OBJECTS=1 GIT_GRAFT_FILE=/nonexistent GIT_CONFIG_NOSYSTEM=1 GIT_CONFIG_GLOBAL=/dev/null \
-        git --no-replace-objects --git-dir="$SCOPE_GIT_DIR" --work-tree="$SCOPE_WORK_TREE" "$@"
+        git --no-replace-objects --no-optional-locks -c core.fsmonitor=false -c core.untrackedCache=false -c core.hooksPath=/dev/null \
+        --git-dir="$SCOPE_GIT_DIR" --work-tree="$SCOPE_WORK_TREE" "$@"
 }
 
 # Unpinned call through the repo path. Used only to establish the context (and to re-check it).
@@ -66,7 +68,8 @@ _scope_git_at() {
     env -u GIT_DIR -u GIT_WORK_TREE -u GIT_OBJECT_DIRECTORY -u GIT_ALTERNATE_OBJECT_DIRECTORIES \
         -u GIT_INDEX_FILE -u GIT_NAMESPACE -u GIT_COMMON_DIR \
         GIT_NO_REPLACE_OBJECTS=1 GIT_GRAFT_FILE=/nonexistent GIT_CONFIG_NOSYSTEM=1 GIT_CONFIG_GLOBAL=/dev/null \
-        git --no-replace-objects -C "$repo" "$@"
+        git --no-replace-objects --no-optional-locks -c core.fsmonitor=false -c core.untrackedCache=false -c core.hooksPath=/dev/null \
+        -C "$repo" "$@"
 }
 
 # Record the git context of repo $1. Resolves the .git file once; later checks compare against it.
@@ -324,13 +327,29 @@ scope_resolve() {
          source: "model_clamped"}'
 }
 
+# The issue's own type, for a resumed or delivered run (#8644): the stricter of the type from the issue
+# title and the type from its labels. Empty when there is no issue or gh cannot read it.
+scope_issue_type() {
+    local issue="${1:-}" json title labels t lab
+    [[ -n "$issue" ]] && command -v gh >/dev/null 2>&1 || return 0
+    json="$(gh issue view "$issue" --json title,labels 2>/dev/null || true)"
+    [[ -n "$json" ]] || return 0
+    title="$(jq -r '.title // ""' <<< "$json" 2>/dev/null || true)"
+    labels="$(jq -r '[.labels[].name] | join(",")' <<< "$json" 2>/dev/null || true)"
+    t="$(scope_infer_type "$title" "")"
+    lab="$(scope_label_type "$labels")"
+    if [[ -n "$lab" ]]; then t="$(scope_stricter_type "$t" "$lab")"; fi
+    echo "$t"
+}
+
 # The type for a run: the strictest of the deterministic type from the goal, the label type and the
 # intake type. Labels and the model may only tighten.
 scope_type_for_run() {
-    local artifacts="$1" goal="$2" labels="${3:-}" t lab intk
+    local artifacts="$1" goal="$2" labels="${3:-}" extra="${4:-}" t lab intk
     t="$(scope_infer_type "$goal" "")"
     lab="$(scope_label_type "$labels")"
     [[ -n "$lab" ]] && t="$(scope_stricter_type "$t" "$lab")"
+    [[ -n "$extra" ]] && t="$(scope_stricter_type "$t" "$extra")"
     if [[ -f "$artifacts/intake.json" ]]; then
         intk="$(jq -r '.type // empty' "$artifacts/intake.json" 2>/dev/null || true)"
         [[ -n "$intk" ]] && t="$(scope_stricter_type "$t" "$intk")"
@@ -390,7 +409,7 @@ scope_resume_base() {
 }
 
 scope_setup_run() {
-    local repo="$1" base="${2:-}" artifacts="$3" goal="${4:-}" labels="${5:-}" restart="${6:-0}" type dirty
+    local repo="$1" base="${2:-}" artifacts="$3" goal="${4:-}" labels="${5:-}" restart="${6:-0}" extra="${7:-}" type dirty
     # An in-process restart keeps the trusted state of the run it continues (clean start, same base).
     if [[ "$restart" != "1" ]]; then
         SCOPE_CAN_REVERT=0
@@ -416,7 +435,7 @@ scope_setup_run() {
     fi
     scope_require_git "$repo" || return 1
     scope_load_config "$repo" "$base" || return 1
-    type="$(scope_type_for_run "$artifacts" "$goal" "$labels")"
+    type="$(scope_type_for_run "$artifacts" "$goal" "$labels" "$extra")"
     SCOPE_JSON="$(scope_resolve "$type" "$artifacts/spec.json")" || return 1
 
     SCOPE_LOOP_BRANCH="$(_scope_git symbolic-ref -q HEAD 2>/dev/null || true)"
@@ -660,12 +679,15 @@ scope_guard_check() {
         reason="config_unloaded"
     elif [[ -z "$SCOPE_GIT_DIR" ]] || ! _scope_gitdir_ok; then
         reason="git_dir_changed"
+    elif [[ -z "$SCOPE_LOOP_BRANCH" || "$(_scope_git symbolic-ref -q HEAD 2>/dev/null || true)" != "$SCOPE_LOOP_BRANCH" ]]; then
+        reason="head_not_on_loop_branch"
     elif [[ -z "$SCOPE_JSON" ]] || ! jq -e 'type == "object"' <<< "$SCOPE_JSON" >/dev/null 2>&1; then
         reason="scope_unreadable"
     elif [[ -z "$base" ]] || ! _scope_git rev-parse --verify -q "${base}^{commit}" >/dev/null 2>&1; then
         reason="baseline_uncomputable"
     else
-        head="$(_scope_git rev-parse HEAD 2>/dev/null || true)"
+        # The judged commit is the named branch's tip: the push sends that branch, never whatever HEAD is.
+        head="$(_scope_git rev-parse --verify -q "${SCOPE_LOOP_BRANCH}^{commit}" 2>/dev/null || true)"
         if [[ -z "$head" ]]; then
             reason="head_unreadable"
         elif [[ "$(_scope_git_meta 2>/dev/null)" != "$SCOPE_META_SNAPSHOT" ]]; then
@@ -677,6 +699,7 @@ scope_guard_check() {
         fi
     fi
 
+    SCOPE_JUDGED_SHA=""
     if [[ -n "$reason" ]]; then
         verdict="blocked"
     else
@@ -727,7 +750,7 @@ scope_guard_check() {
     fi
 
     case "$verdict" in
-        pass) rc=0 ;;
+        pass) rc=0; SCOPE_JUDGED_SHA="$head" ;;
         reverted) rc=1 ;;
         *) rc=2 ;;
     esac
@@ -753,11 +776,35 @@ scope_guard_check() {
 # so any violation blocks. Returns 0 pass, 2 blocked.
 #   $1 repo, $2 pipeline base sha, $3 evidence dir, $4 goal, $5 labels
 scope_final_check() {
-    local repo="$1" base="${2:-}" art="$3" goal="${4:-}" labels="${5:-}" rc=0
-    [[ -n "$base" && -n "$art" ]] || return 2
-    scope_setup_run "$repo" "$base" "$art" "$goal" "$labels" 0 >/dev/null 2>&1 || return 2
+    local repo="$1" base="${2:-}" art="$3" goal="${4:-}" labels="${5:-}" branch="${6:-}" extra="${7:-}" rc=0
+    SCOPE_JUDGED_SHA=""
+    [[ -n "$base" && -n "$art" && -n "$branch" ]] || return 2
+    scope_setup_run "$repo" "$base" "$art" "$goal" "$labels" 0 "$extra" >/dev/null 2>&1 || return 2
+    # The judged branch is the one the push names. HEAD on any other branch refuses (#8706 removes the
+    # shared checkout entirely).
+    [[ "$(_scope_git symbolic-ref -q HEAD 2>/dev/null || true)" == "refs/heads/$branch" ]] || return 2
+    SCOPE_LOOP_BRANCH="refs/heads/$branch"
     scope_guard_check "$repo" "$base" "$base" 0 "$art" "-final" || rc=$?
-    [[ "$rc" -eq 0 ]] || return 2
+    [[ "$rc" -eq 0 && -n "$SCOPE_JUDGED_SHA" ]] || return 2
+    return 0
+}
+
+# Push the exact commit the final check judged (#8644). Nothing is pushed unless the check passes.
+# Hooks, fsmonitor and ssh are disabled for the push, and it goes to the URL the pipeline recorded at
+# start, not to whatever origin is at push time.
+#   $1 repo, $2 base, $3 artifacts, $4 goal, $5 labels, $6 local branch (judged), $7 remote branch,
+#   $8 push URL recorded at pipeline start, $9 extra type (optional), $10 "force" to allow a force push
+scope_push_judged() {
+    local repo="$1" base="${2:-}" art="$3" goal="${4:-}" labels="${5:-}" lbranch="${6:-}" rbranch="${7:-}"
+    local url="${8:-}" extra="${9:-}" mode="${10:-plain}" sha
+    [[ -n "$url" && -n "$rbranch" ]] || return 2
+    scope_final_check "$repo" "$base" "$art" "$goal" "$labels" "$lbranch" "$extra" || return 2
+    sha="$SCOPE_JUDGED_SHA"
+    [[ -n "$sha" ]] || return 2
+    local -a hard=(-c core.hooksPath=/dev/null -c core.fsmonitor=false -c core.sshCommand=)
+    if git -C "$repo" "${hard[@]}" push -q "$url" "${sha}:refs/heads/${rbranch}" 2>/dev/null; then return 0; fi
+    [[ "$mode" == "force" ]] || return 2
+    git -C "$repo" "${hard[@]}" push -q --force "$url" "${sha}:refs/heads/${rbranch}" 2>/dev/null || return 2
     return 0
 }
 

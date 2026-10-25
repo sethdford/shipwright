@@ -461,6 +461,9 @@ ${_skill_prompts}
 
     local _token_log="${ARTIFACTS_DIR}/.claude-tokens-build.log"
     export PIPELINE_JOB_ID="${PIPELINE_NAME:-pipeline-$$}"
+    # The issue's type, computed by the pipeline (not by the agent) for the guard's stricter-of rule (#8644).
+    export SW_SCOPE_ISSUE_TYPE
+    SW_SCOPE_ISSUE_TYPE="$(scope_issue_type "${ISSUE_NUMBER:-}" 2>/dev/null || true)"
     sw loop "${loop_args[@]}" < /dev/null 2>"$_token_log" || {
         local _loop_exit=$?
         parse_claude_tokens "$_token_log"

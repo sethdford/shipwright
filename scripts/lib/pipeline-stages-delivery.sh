@@ -87,11 +87,14 @@ stage_pr() {
         git commit -m "chore: pipeline cleanup — commit remaining build changes" --no-verify 2>/dev/null || true
     fi
 
-    # Blast-radius guard, final check (#8644): judge base..HEAD, including the commit above, before the
-    # push. Fail closed: without the pipeline base, or on any violation, nothing is pushed.
-    if ! type scope_final_check >/dev/null 2>&1 \
-        || ! scope_final_check "$PWD" "${SW_PIPELINE_BASE_SHA:-}" "${ARTIFACTS_DIR:-}" "${GOAL:-}" "${ISSUE_LABELS:-}"; then
-        error "Blast-radius guard blocked the push: the branch changes are outside the declared scope or the pipeline base is unknown"
+    # Blast-radius guard (#8644, #8662): judge base..branch tip once before the rebase, so the agent's work is
+    # checked on its own, then again after the rebase. The push sends the commit the last check judged. Fail
+    # closed: no pipeline base, no recorded push URL, a branch other than $GIT_BRANCH, or a violation blocks.
+    local _extra_type
+    _extra_type="$(scope_issue_type "${ISSUE_NUMBER:-}" 2>/dev/null || true)"
+    if ! scope_final_check "$PWD" "${SW_PIPELINE_BASE_SHA:-}" "${ARTIFACTS_DIR:-}" "${GOAL:-}" "${ISSUE_LABELS:-}" \
+        "${GIT_BRANCH:-}" "$_extra_type"; then
+        error "Blast-radius guard blocked the push before the rebase: the branch is outside the declared scope or the pipeline base is unknown"
         return 1
     fi
 
@@ -100,15 +103,13 @@ stage_pr() {
         warn "Rebase/merge failed — pushing as-is"
     }
 
-    # Push branch
+    # Push the judged commit after the rebase (the check runs again on the rebased tip)
     info "Pushing branch: $GIT_BRANCH"
-    git push -u origin "$GIT_BRANCH" --force-with-lease 2>/dev/null || {
-        # Retry with regular push if force-with-lease fails (first push)
-        git push -u origin "$GIT_BRANCH" 2>/dev/null || {
-            error "Failed to push branch"
-            return 1
-        }
-    }
+    if ! scope_push_judged "$PWD" "${SW_PIPELINE_BASE_SHA:-}" "${ARTIFACTS_DIR:-}" "${GOAL:-}" "${ISSUE_LABELS:-}" \
+        "$GIT_BRANCH" "$GIT_BRANCH" "${PIPELINE_PUSH_URL:-}" "$_extra_type" "force"; then
+        error "Blast-radius guard blocked the push after the rebase, or the push failed"
+        return 1
+    fi
 
     # ── Developer Simulation (pre-PR review) ──
     local simulation_summary=""

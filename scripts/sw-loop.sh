@@ -2171,7 +2171,8 @@ _scope_begin_run() {
         }
         LOOP_START_COMMIT="$base"
     fi
-    scope_setup_run "$PROJECT_ROOT" "$base" "$ARTIFACTS_DIR" "${GOAL:-}" "${ISSUE_LABELS:-}" "$restart"
+    scope_setup_run "$PROJECT_ROOT" "$base" "$ARTIFACTS_DIR" "${GOAL:-}" "${ISSUE_LABELS:-}" "$restart" \
+        "${SW_SCOPE_ISSUE_TYPE:-}"
 }
 
 # Write the trusted scope and config outside the repo, where the workers read them (#8644). The
