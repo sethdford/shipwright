@@ -765,6 +765,45 @@ git -C "$R" checkout -q loop-branch
 git -C "$R" branch -q -D l1-branch l1-human 2>/dev/null || true
 SCOPE_LAST_PUSH_BRANCH=""; SCOPE_LAST_PUSH_SHA=""
 
+# PX1: a repo-level url-scoped http.<url>.proxy would route the guard's fetch and the push through an
+# agent-controlled proxy. The final check refuses before any network call.
+fresh
+PX_UP="$TEST_TEMP_DIR/px1-up.git"; PX_MARK="$TEST_TEMP_DIR/px1-proxy-used"
+rm -rf "$PX_UP" "$PX_MARK"; git init -q --bare "$PX_UP"
+git -C "$PX_UP" fetch -q --no-tags "$R" "+$BASE:refs/heads/main"
+git -C "$R" checkout -q -b px1-branch "$BASE"
+echo "x" >> "$R/docs/safety-runbook.md"; commit_all "px1 commit"
+git -C "$R" config "http.$PX_UP.proxy" "http://127.0.0.1:9/$PX_MARK"
+RC=0; scope_final_check "$R" "$BASE" "$EVD" "Add the runbook note" "" "px1-branch" "" "$PX_UP" main || RC=$?
+assert_eq "PX1: a repo http.<url>.proxy refuses the final check (rc 2)" "2" "$RC"
+if [[ -e "$PX_MARK" ]]; then assert_fail "PX1: no network call may happen through the repo proxy"; else assert_pass "PX1: no network call may happen through the repo proxy"; fi
+git -C "$R" config --unset "http.$PX_UP.proxy"
+git -C "$R" checkout -q loop-branch
+git -C "$R" branch -q -D px1-branch 2>/dev/null || true
+
+# PX2: a repo http.sslVerify=false (and a url-scoped credential helper) refuse the check.
+fresh
+git -C "$R" checkout -q -b px2-branch "$BASE"
+echo "x" >> "$R/docs/safety-runbook.md"; commit_all "px2 commit"
+git -C "$R" config http.sslVerify false
+RC=0; scope_final_check "$R" "$BASE" "$EVD" "Add the runbook note" "" "px2-branch" "" "$PX_UP" main || RC=$?
+assert_eq "PX2: a repo http.sslVerify=false refuses the final check (rc 2)" "2" "$RC"
+git -C "$R" config --unset http.sslVerify
+git -C "$R" config "credential.$PX_UP.helper" "!echo hijack"
+RC=0; scope_final_check "$R" "$BASE" "$EVD" "Add the runbook note" "" "px2-branch" "" "$PX_UP" main || RC=$?
+assert_eq "PX2: a url-scoped credential helper refuses the final check (rc 2)" "2" "$RC"
+git -C "$R" config --unset "credential.$PX_UP.helper"
+git -C "$R" checkout -q loop-branch
+git -C "$R" branch -q -D px2-branch 2>/dev/null || true
+
+# PX3: the same network refusal applies to the rebase step, which does not run without a clean config.
+fresh
+git -C "$R" config "http.$PX_UP.extraHeader" "X-Evil: 1"
+PX3_OUT="$(scope_net_config_refused "$R")"
+if [[ "$PX3_OUT" == *extraheader* ]]; then assert_pass "PX3: the rebase guard lists a url-scoped extraHeader"; else assert_fail "PX3: the rebase guard lists a url-scoped extraHeader"; fi
+git -C "$R" config --unset "http.$PX_UP.extraHeader"
+if [[ -z "$(scope_net_config_refused "$R")" ]]; then assert_pass "PX3: a clean repo has no network refusal"; else assert_fail "PX3: a clean repo has no network refusal"; fi
+
 # Worker: a forbidden change committed by the agent is discarded back to the worker's own start commit.
 fresh
 WSTART="$BASE"

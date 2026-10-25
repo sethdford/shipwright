@@ -785,6 +785,17 @@ _scope_url_rewrites() {
     _scope_git config --includes --get-regexp '^url\..*\.(push)?insteadof$' 2>/dev/null || true
 }
 
+# Repo or included config that changes how a network call is made (#8662 round 7): any http.* key (a proxy,
+# sslVerify, sslCAInfo, extraHeader, a client cert, a cookie file), and url-scoped credential.* keys (which
+# pick a helper or username for one URL). Local config cannot be bypassed by environment, so these are
+# refused, not overridden. Prints the matching keys.
+scope_net_config_refused() {
+    local repo="$1" out
+    out="$(git --no-replace-objects -C "$repo" config --includes --get-regexp '^(http\.|credential\..+\.)' 2>/dev/null || true)"
+    [[ -n "$out" ]] && printf '%s\n' "$out"
+    return 0
+}
+
 # Fetch the default branch from the recorded URL into a ref the guard owns, and print its tip. The
 # ref is overwritten on every fetch, so the agent cannot keep an old upstream in place (#8662 UP1).
 _scope_upstream_tip() {
@@ -809,6 +820,8 @@ scope_final_check() {
     # The judged branch is the one the push names: HEAD on any other branch refuses.
     [[ "$(_scope_git symbolic-ref -q HEAD 2>/dev/null || true)" == "refs/heads/$branch" ]] || return 2
     [[ -z "$(_scope_url_rewrites)" ]] || return 2
+    # The fetch and the push would read http.* and url-scoped credential.* from repo config: refuse (#8662 round 7).
+    [[ -z "$(_scope_git config --includes --get-regexp '^(http\.|credential\..+\.)' 2>/dev/null || true)" ]] || return 2
     SCOPE_LOOP_BRANCH="refs/heads/$branch"
     tip="$(_scope_upstream_tip "$url" "$ub")" && [[ -n "$tip" ]] || return 2
     head="$(_scope_git rev-parse --verify -q "refs/heads/${branch}^{commit}" 2>/dev/null)" || return 2

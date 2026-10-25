@@ -476,6 +476,12 @@ auto_rebase() (
     export GIT_CONFIG_KEY_1=core.fsmonitor GIT_CONFIG_VALUE_1=false
     export GIT_CONFIG_KEY_2=core.untrackedCache GIT_CONFIG_VALUE_2=false
     export GIT_CONFIG_KEY_3=core.sshCommand GIT_CONFIG_VALUE_3=
+    # A repo that sets http.* or url-scoped credential.* would send the fetch through its own proxy or
+    # helper (#8662 round 7). Refuse the rebase; the guarded push then refuses too.
+    if ! type scope_net_config_refused >/dev/null 2>&1 || [[ -n "$(scope_net_config_refused "$PWD")" ]]; then
+        warn "Rebase skipped: the repo config sets http.* or credential.<url>.* (network settings the pipeline does not trust)"
+        exit 1
+    fi
     _auto_rebase_body
 )
 
