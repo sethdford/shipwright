@@ -14,7 +14,6 @@
   --sw-warn: oklch(0.86 0.15 85);
   --sw-danger: oklch(0.7 0.19 20);
   --sw-info: oklch(0.75 0.12 265);
-  --sw-font-display: 'Instrument Serif', Georgia, serif;
   --sw-font-body: 'Plus Jakarta Sans', system-ui, sans-serif;
   --sw-font-mono: 'JetBrains Mono', 'SF Mono', monospace;
   --sw-size-caption: 12px;

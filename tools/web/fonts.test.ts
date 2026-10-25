@@ -7,7 +7,7 @@ const DASHBOARD_FONTS = join(ROOT, "dashboard/public/fonts");
 const fontsCss = readFileSync(join(DASHBOARD_FONTS, "fonts.css"), "utf8");
 
 test("dashboard fonts.css only declares local woff2 files that exist", () => {
-  const urls = [...fontsCss.matchAll(/url\("([^"]+)"\)/g)].map((m) => m[1]);
+  const urls = [...fontsCss.matchAll(/url\("([^"]+)"\)/g)].map((m) => m[1] ?? "");
   expect(urls.length).toBeGreaterThan(0);
   for (const url of urls) {
     expect(url.startsWith("/fonts/")).toBe(true);

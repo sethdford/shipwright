@@ -15,7 +15,12 @@ import { scanDirs } from "./no-cdn";
 export const REPO_ROOT = resolve(import.meta.dir, "..", "..");
 const BUDGET_PATH = join(REPO_ROOT, "tools/web/budget.json");
 const ENTRY = join(REPO_ROOT, "dashboard/src/main.ts");
-const DASHBOARD_CSS = join(REPO_ROOT, "dashboard/public/styles.css");
+// Every stylesheet the dashboard ships. tokens.css and fonts.css are not linked yet (T2).
+const DASHBOARD_CSS = [
+  join(REPO_ROOT, "dashboard/public/styles.css"),
+  join(REPO_ROOT, "dashboard/public/tokens.css"),
+  join(REPO_ROOT, "dashboard/public/fonts/fonts.css"),
+];
 
 export interface BudgetFile {
   js: { maxGzipBytes: number };
@@ -97,7 +102,7 @@ export async function main(argv: string[]): Promise<number> {
   try {
     await buildDashboard(outdir);
     const js = measureFiles(listFiles(outdir, ".js"));
-    const css = measureFiles([...listFiles(outdir, ".css"), DASHBOARD_CSS]);
+    const css = measureFiles([...listFiles(outdir, ".css"), ...DASHBOARD_CSS]);
     const budget = loadBudget();
     for (const m of [...js, ...css])
       console.log(`${m.gzipBytes.toString().padStart(8)} B gzip  ${m.name}`);

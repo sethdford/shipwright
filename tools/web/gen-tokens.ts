@@ -4,20 +4,21 @@
 
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
+import type { TokenSurface } from "../../dashboard/src/design/tokens-css";
 import { renderTokensCss } from "../../dashboard/src/design/tokens-css";
 
 export const REPO_ROOT = resolve(import.meta.dir, "..", "..");
 
-export const TOKEN_CSS_TARGETS = [
-  "dashboard/public/tokens.css",
-  "website/src/styles/tokens.css",
-] as const;
+export const TOKEN_CSS_TARGETS: ReadonlyArray<{ path: string; surface: TokenSurface }> = [
+  { path: "dashboard/public/tokens.css", surface: "dashboard" },
+  { path: "website/src/styles/tokens.css", surface: "website" },
+];
 
 export function main(argv: string[]): number {
-  const css = renderTokensCss();
   const check = argv.includes("--check");
   let stale = false;
-  for (const rel of TOKEN_CSS_TARGETS) {
+  for (const { path: rel, surface } of TOKEN_CSS_TARGETS) {
+    const css = renderTokensCss(surface);
     const abs = resolve(REPO_ROOT, rel);
     if (check) {
       const current = existsSync(abs) ? readFileSync(abs, "utf8") : "";

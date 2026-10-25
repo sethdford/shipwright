@@ -30,9 +30,12 @@ function colourDecls(colours: ThemeColours): string[] {
   return colourRoles.map((role) => `  ${cssVarName(role)}: ${colours[role]};`);
 }
 
-function sharedDecls(): string[] {
+// Instrument Serif is landing-only (spec 5.3): the dashboard CSS never names it.
+export type TokenSurface = "dashboard" | "website";
+
+function sharedDecls(surface: TokenSurface): string[] {
   const decls: string[] = [];
-  decls.push(`  --sw-font-display: ${fonts.display};`);
+  if (surface === "website") decls.push(`  --sw-font-display: ${fonts.display};`);
   decls.push(`  --sw-font-body: ${fonts.body};`);
   decls.push(`  --sw-font-mono: ${fonts.mono};`);
   for (const [name, size] of Object.entries(sizeScale)) {
@@ -63,7 +66,7 @@ function block(selector: string, decls: string[]): string[] {
   return [`${selector} {`, ...decls, "}"];
 }
 
-export function renderTokensCss(): string {
+export function renderTokensCss(surface: TokenSurface): string {
   const reducedDecls = [
     `  --sw-motion-fast: ${motion.reduced.duration};`,
     `  --sw-motion-base: ${motion.reduced.duration};`,
@@ -72,7 +75,7 @@ export function renderTokensCss(): string {
   ];
   const lines = [
     TOKENS_CSS_HEADER,
-    ...block(":root", ["  color-scheme: dark;", ...colourDecls(themes.dark), ...sharedDecls()]),
+    ...block(":root", ["  color-scheme: dark;", ...colourDecls(themes.dark), ...sharedDecls(surface)]),
     "",
     "@media (prefers-color-scheme: light) {",
     ...block(':root:not([data-theme="dark"])', ["  color-scheme: light;", ...colourDecls(themes.light)]).map(

@@ -39,6 +39,15 @@ const TEXT_ON_SURFACE: Array<[ColourRole, ColourRole]> = [
 const UI_BOUNDARY: Array<[ColourRole, ColourRole]> = [
   ["line", "bg0"],
   ["line", "bg1"],
+  ["line", "bg2"],
+];
+
+// There is no separate focus colour: accent is the focus ring (WCAG 2.4.13 needs 3:1
+// against adjacent colours). T2 depends on this, so it is tested on every surface.
+const FOCUS_RING: Array<[ColourRole, ColourRole]> = [
+  ["accent", "bg0"],
+  ["accent", "bg1"],
+  ["accent", "bg2"],
 ];
 
 const THEMES: Theme[] = ["dark", "light"];
@@ -81,7 +90,7 @@ describe("token contract", () => {
         expect(ratio, `${fg} on ${bg} is ${ratio.toFixed(2)}:1`).toBeGreaterThanOrEqual(4.5);
       });
 
-      it.each(UI_BOUNDARY)("%s on %s meets 3:1", (fg, bg) => {
+      it.each([...UI_BOUNDARY, ...FOCUS_RING])("%s on %s meets 3:1", (fg, bg) => {
         const ratio = contrastRatio(themes[theme][fg], themes[theme][bg]);
         expect(ratio, `${fg} on ${bg} is ${ratio.toFixed(2)}:1`).toBeGreaterThanOrEqual(3);
       });
@@ -96,20 +105,26 @@ describe("token contract", () => {
 });
 
 describe("generated CSS drift", () => {
-  const rendered = renderTokensCss();
+  const dashboardCss = renderTokensCss("dashboard");
+  const websiteCss = renderTokensCss("website");
 
   it("dashboard/public/tokens.css matches the generator output", () => {
-    expect(readFileSync(TOKENS_CSS, "utf8")).toBe(rendered);
+    expect(readFileSync(TOKENS_CSS, "utf8")).toBe(dashboardCss);
   });
 
   it("website/src/styles/tokens.css matches the generator output", () => {
-    expect(readFileSync(WEBSITE_TOKENS_CSS, "utf8")).toBe(rendered);
+    expect(readFileSync(WEBSITE_TOKENS_CSS, "utf8")).toBe(websiteCss);
   });
 
   it("declares every colour role for both themes", () => {
     for (const role of colourRoles) {
-      expect(rendered).toContain(`${cssVarName(role)}: ${themes.dark[role]};`);
-      expect(rendered).toContain(`${cssVarName(role)}: ${themes.light[role]};`);
+      expect(dashboardCss).toContain(`${cssVarName(role)}: ${themes.dark[role]};`);
+      expect(dashboardCss).toContain(`${cssVarName(role)}: ${themes.light[role]};`);
     }
+  });
+
+  it("keeps Instrument Serif out of the dashboard CSS (landing only)", () => {
+    expect(dashboardCss).not.toContain("Instrument Serif");
+    expect(websiteCss).toContain("--sw-font-display");
   });
 });

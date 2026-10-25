@@ -191,7 +191,7 @@ Dark (default):
 | `--sw-bg-0` | `oklch(0.15 0.015 255)` | Page background |
 | `--sw-bg-1` | `oklch(0.19 0.017 255)` | Panels, cards |
 | `--sw-bg-2` | `oklch(0.24 0.02 255)` | Hover, inputs |
-| `--sw-line` | `oklch(0.32 0.02 255)` | Borders, dividers (non-text, 3:1 min) |
+| `--sw-line` | `oklch(0.55 0.02 255)` | Borders, dividers (non-text, 3:1 min on bg-0, bg-1 and bg-2) |
 | `--sw-text-1` | `oklch(0.96 0.005 255)` | Primary text (≥ 15:1 on bg-0) |
 | `--sw-text-2` | `oklch(0.79 0.02 255)` | Secondary text (≥ 7:1) |
 | `--sw-text-3` | `oklch(0.67 0.025 255)` | Muted text (≥ 4.5:1, the floor) |
@@ -209,13 +209,13 @@ Light (`:root[data-theme="light"]` and `prefers-color-scheme: light` when no exp
 | `--sw-bg-0` | `oklch(0.985 0.004 255)` |
 | `--sw-bg-1` | `oklch(1 0 0)` |
 | `--sw-bg-2` | `oklch(0.955 0.008 255)` |
-| `--sw-line` | `oklch(0.87 0.01 255)` |
+| `--sw-line` | `oklch(0.6 0.01 255)` |
 | `--sw-text-1` | `oklch(0.2 0.02 255)` |
 | `--sw-text-2` | `oklch(0.42 0.02 255)` |
 | `--sw-text-3` | `oklch(0.5 0.02 255)` |
 | `--sw-accent` | `oklch(0.52 0.12 230)` |
 | `--sw-ok` | `oklch(0.5 0.14 150)` |
-| `--sw-warn` | `oklch(0.6 0.15 70)` |
+| `--sw-warn` | `oklch(0.5 0.13 70)` |
 | `--sw-danger` | `oklch(0.52 0.19 25)` |
 
 Status colours never carry meaning alone: every pill has an icon and a text label.
