@@ -60,7 +60,9 @@ classify_failure() {
     fi
 
     # Auth errors
-    if echo "$tail_content" | grep >/dev/null -iE 'not logged in|unauthorized|auth.*fail|401 |invalid.*token|CLAUDE_CODE_OAUTH_TOKEN|api key.*invalid|authentication required'; then
+    # The last alternatives mirror the TS auth rule, so a host without Bun classifies auth the same
+    # way: a retry of an auth failure is fail-open, so both paths must agree (#8674 follow-up).
+    if echo "$tail_content" | grep >/dev/null -iE 'not logged in|unauthorized|auth.*fail|401 |invalid.*token|CLAUDE_CODE_OAUTH_TOKEN|api key.*invalid|authentication required|invalid api key|invalid x-api-key|authentication_error|oauth token (is |has )?(expired|invalid|revoked)'; then
         echo "auth_error"
         return
     fi

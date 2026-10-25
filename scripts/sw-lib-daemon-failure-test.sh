@@ -327,13 +327,14 @@ assert_eq "the bash fallback still says auth_error when Bun is missing" "auth_er
 printf '%s\n' "build failed: test suite red" > "$LOG_DIR/issue-43.log"
 assert_eq "a build failure keeps the bash class" "build_failure" "$(classify_failure 43)"
 printf '%s\n' "OAuth token is invalid" > "$LOG_DIR/issue-44.log"
-if command -v bun >/dev/null 2>&1; then
-    assert_eq "the typed classifier reads 'OAuth token is invalid' as auth_error (Bun on PATH)" "auth_error" "$(classify_failure 44)"
-else
-    # The CI test job installs no Bun (test.yml), so the bridge falls back to the regex there.
-    assert_eq "with no Bun on PATH the regex misses it (documented gap, not a regression)" "unknown" "$(classify_failure 44)"
-fi
-assert_eq "without Bun the regex fallback misses it (a documented gap, not a regression)" "unknown" "$(SW_BUN=/nonexistent/bun classify_failure 44)"
+assert_eq "'OAuth token is invalid' is auth_error (same with or without Bun)" "auth_error" "$(classify_failure 44)"
+# No Bun: SW_BUN points at nothing, so the bridge is skipped whatever PATH holds. The regex alone must
+# classify each auth form the TS rule catches, so a host without Bun does not retry an auth failure.
+for auth_text in "OAuth token is invalid" "OAuth token revoked" "Error: invalid api key provided" \
+    "invalid x-api-key" "Error 401: authentication_error" "Not logged in"; do
+    printf '%s\n' "$auth_text" > "$LOG_DIR/issue-46.log"
+    assert_eq "no Bun: '$auth_text' is auth_error" "auth_error" "$(SW_BUN=/nonexistent/bun classify_failure 46)"
+done
 printf '%s\n' "benign build output" > "$LOG_DIR/issue-45.log"
 assert_eq "a typed transient verdict is not mapped to api_error (trust rule, #8674)" "unknown" \
     "$(_daemon_classify_ts() { echo transient; }; classify_failure 45)"
