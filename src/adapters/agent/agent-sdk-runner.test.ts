@@ -6,6 +6,7 @@ import type { AgentFailureKind } from "../../shared/kernel/ports";
 import { createTestEnv } from "../../testing/test-env";
 import { AGENT_SANDBOX, AGENT_SETTINGS } from "./agent-permissions";
 import { AgentSdkRunner, agentEnv, type QueryFn } from "./agent-sdk-runner";
+import type { GuardTimers } from "./timeout-guard";
 
 type Captured = { prompt: string; options: Record<string, unknown> };
 
@@ -53,6 +54,49 @@ const decideReq = {
   timeoutMs: 60_000,
 };
 const runner = (fn: QueryFn) => new AgentSdkRunner({}, fn);
+
+// Deterministic timers (#8696): the guard's timeout fires only when a test fires it. Nothing depends on wall-clock
+// speed, so a loaded machine cannot reorder a timeout and an abort.
+class ManualTimers implements GuardTimers {
+  private next = 1;
+  readonly pending = new Map<number, () => void>();
+  readonly cleared: number[] = [];
+  setTimeout(fn: () => void): unknown {
+    const id = this.next++;
+    this.pending.set(id, fn);
+    return id;
+  }
+  clearTimeout(handle: unknown): void {
+    this.pending.delete(handle as number);
+    this.cleared.push(handle as number);
+  }
+  fireAll(): void {
+    for (const [id, fn] of [...this.pending]) {
+      this.pending.delete(id);
+      fn();
+    }
+  }
+}
+const manualRunner = (fn: QueryFn, timers: ManualTimers) => new AgentSdkRunner({}, fn, timers);
+
+/** Waits until the guard has armed. A readiness wait on a condition, not a timing assumption. */
+async function untilArmed(timers: ManualTimers): Promise<void> {
+  for (let i = 0; i < 5000 && timers.pending.size === 0; i++) {
+    await new Promise((resolve) => setTimeout(resolve, 1));
+  }
+  if (timers.pending.size === 0) throw new Error("the guard never armed");
+}
+
+/** A query that runs until its controller aborts, then stops. Nothing here waits on the wall clock. */
+const hangUntilAborted = (): QueryFn => (args) =>
+  (async function* () {
+    const ac = args.options.abortController as AbortController;
+    await new Promise<void>((resolve) =>
+      ac.signal.addEventListener("abort", () => resolve(), { once: true }),
+    );
+    yield* [];
+    throw new Error("stopped");
+  })();
 
 describe("decide", () => {
   test("returns the validated structured output with usage", async () => {
@@ -413,17 +457,21 @@ describe("abort and timeout", () => {
   });
 
   test("external abort mid-stream is aborted", async () => {
-    const { fn } = fakeQuery([], { hang: true });
-    const ac = new AbortController();
-    const p = runner(fn).runTask({ ...spec, signal: ac.signal });
-    setTimeout(() => ac.abort(), 10);
+    const timers = new ManualTimers();
+    const caller = new AbortController();
+    const p = manualRunner(hangUntilAborted(), timers).runTask({ ...spec, signal: caller.signal });
+    await untilArmed(timers);
+    caller.abort();
     const r = await p;
     expect(!r.ok && r.error.kind).toBe("aborted");
   });
 
   test("timeout is timeout", async () => {
-    const { fn } = fakeQuery([], { hang: true });
-    const r = await runner(fn).runTask({ ...spec, timeoutMs: 20 });
+    const timers = new ManualTimers();
+    const p = manualRunner(hangUntilAborted(), timers).runTask({ ...spec, timeoutMs: 20 });
+    await untilArmed(timers);
+    timers.fireAll();
+    const r = await p;
     expect(!r.ok && r.error.kind).toBe("timeout");
   });
 });
@@ -461,35 +509,44 @@ describe("guard cleanup", () => {
 
   test("clears the timeout timer once the run completes", async () => {
     const { fn, captured } = fakeQuery(ok());
-    const r = await runner(fn).runTask({ ...spec, timeoutMs: 30 });
+    const timers = new ManualTimers();
+    const r = await manualRunner(fn, timers).runTask({ ...spec, timeoutMs: 30 });
     expect(r.ok).toBe(true);
-    await new Promise((resolve) => setTimeout(resolve, 80));
+    expect(timers.pending.size).toBe(0);
+    expect(timers.cleared.length).toBe(1);
+    timers.fireAll();
     expect(controllerOf(captured[0] as Captured).signal.aborted).toBe(false);
   });
 
   test("timeout wins when the caller also aborts", async () => {
-    const fn: QueryFn = (args) =>
-      (async function* () {
-        const ac = args.options.abortController as AbortController;
-        await new Promise<void>((resolve) => ac.signal.addEventListener("abort", () => resolve()));
-        await new Promise((resolve) => setTimeout(resolve, 60));
-        yield* [];
-        throw new Error("stopped");
-      })();
+    const timers = new ManualTimers();
     const caller = new AbortController();
-    setTimeout(() => caller.abort(), 5);
-    const r = await runner(fn).runTask({ ...spec, timeoutMs: 30, signal: caller.signal });
+    const p = manualRunner(hangUntilAborted(), timers).runTask({
+      ...spec,
+      timeoutMs: 30,
+      signal: caller.signal,
+    });
+    await untilArmed(timers);
+    caller.abort();
+    timers.fireAll();
+    const r = await p;
     expect(!r.ok && r.error.kind).toBe("timeout");
   });
 
   test.each([
-    ["timeout", () => ({ timeoutMs: 20 })],
-    ["aborted", () => ({ signal: AbortSignal.timeout(20) })],
-  ] as const)("keeps the sessionId the SDK yielded on %s failures", async (kind, extra) => {
+    ["timeout", "timer"],
+    ["aborted", "caller"],
+  ] as const)("keeps the sessionId the SDK yielded on %s failures", async (kind, trigger) => {
     const { fn } = fakeQuery([result({ subtype: "error_during_execution", session_id: "s9" })], {
       hang: true,
     });
-    const r = await runner(fn).runTask({ ...spec, ...extra() });
+    const timers = new ManualTimers();
+    const caller = new AbortController();
+    const p = manualRunner(fn, timers).runTask({ ...spec, timeoutMs: 20, signal: caller.signal });
+    await untilArmed(timers);
+    if (trigger === "timer") timers.fireAll();
+    else caller.abort();
+    const r = await p;
     expect(!r.ok && r.error.kind).toBe(kind);
     expect(!r.ok && r.error.sessionId).toBe("s9");
   });

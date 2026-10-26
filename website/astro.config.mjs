@@ -39,9 +39,9 @@ export default defineConfig({
         dark: "./src/assets/logo-dark.svg",
         replacesTitle: false,
       },
-      social: {
-        github: "https://github.com/sethdford/shipwright",
-      },
+      social: [
+        { icon: "github", label: "GitHub", href: "https://github.com/sethdford/shipwright" },
+      ],
       customCss: ["./src/styles/custom.css"],
       expressiveCode: { plugins: [copyButtonLabel] },
       sidebar: [

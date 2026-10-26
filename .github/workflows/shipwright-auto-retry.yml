@@ -340,7 +340,7 @@ jobs:
           # contamination would repeat real side effects, and invalid input needs an edit to the issue.
           case "$ERROR_CATEGORY" in
             AUTH|CONTAMINATION|INVALID_INPUT)
-              SKIP=$(echo "$ERROR_CATEGORY" | tr 'A-Z' 'a-z')
+              SKIP=$(echo "$ERROR_CATEGORY" | tr '[:upper:]' '[:lower:]')
               echo "Run $RUN_ID escalated ($ERROR_CATEGORY): not retrying; a human must act"
               echo "should_retry=false" >> "$GITHUB_OUTPUT"
               echo "skip_reason=$SKIP" >> "$GITHUB_OUTPUT"

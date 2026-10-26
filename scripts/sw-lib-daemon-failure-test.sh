@@ -65,7 +65,8 @@ assert_eq "Auth error classified" "auth_error" "$result"
 
 echo "unauthorized access 401 error" > "$LOG_DIR/issue-102.log"
 result=$(classify_failure 102)
-assert_eq "401 auth error classified" "auth_error" "$result"
+# Prose is not auth: auth is anchored to a structured line (#8696). A real 401 line is "401 unauthorized" or the gh line.
+assert_eq "a prose 401 is not auth (anchored, #8696)" "unknown" "$result"
 
 echo "CLAUDE_CODE_OAUTH_TOKEN is not set" > "$LOG_DIR/issue-103.log"
 result=$(classify_failure 103)
@@ -93,7 +94,7 @@ echo "issue not found: 404" > "$LOG_DIR/issue-301.log"
 result=$(classify_failure 301)
 assert_eq "Issue not found classified" "invalid_issue" "$result"
 
-echo "could not resolve to a valid issue" > "$LOG_DIR/issue-302.log"
+echo "GraphQL: Could not resolve to an Issue with the number 302." > "$LOG_DIR/issue-302.log"
 result=$(classify_failure 302)
 assert_eq "Could not resolve classified" "invalid_issue" "$result"
 
@@ -331,7 +332,7 @@ assert_eq "'OAuth token is invalid' is auth_error (same with or without Bun)" "a
 # No Bun: SW_BUN points at nothing, so the bridge is skipped whatever PATH holds. The regex alone must
 # classify each auth form the TS rule catches, so a host without Bun does not retry an auth failure.
 for auth_text in "OAuth token is invalid" "OAuth token revoked" "Error: invalid api key provided" \
-    "invalid x-api-key" "Error 401: authentication_error" "Not logged in"; do
+    "invalid x-api-key" "Error: 401 authentication_error" "Not logged in"; do
     printf '%s\n' "$auth_text" > "$LOG_DIR/issue-46.log"
     assert_eq "no Bun: '$auth_text' is auth_error" "auth_error" "$(SW_BUN=/nonexistent/bun classify_failure 46)"
 done
@@ -341,11 +342,11 @@ assert_eq "a typed transient verdict is not mapped to api_error (trust rule, #86
 
 # ─── Escalations never retry; a slow classifier cannot stall the failure path (ADR-0009, #8674) ───
 print_test_section "Contamination is never retried (no Bun and with Bun)"
-printf '%s\n' "refusing to run inside a build-loop test gate" > "$LOG_DIR/issue-47.log"
+printf '%s\n' "⚠ Skipping integration tests: refusing to run inside a build-loop test gate" > "$LOG_DIR/issue-47.log"
 assert_eq "contamination is classified with Bun" "contamination" "$(classify_failure 47)"
 assert_eq "contamination is classified with no Bun (regex)" "contamination" "$(SW_BUN=/nonexistent/bun classify_failure 47)"
 assert_eq "contamination has a retry limit of 0" "0" "$(get_max_retries_for_class contamination)"
-RUN_LOG_TEXT="refusing to run inside a build-loop test gate" run_refused_failure 811 'printf "gh %s\n" "$*" >> "$REFUSE_LOG"'
+RUN_LOG_TEXT="⚠ Skipping integration tests: refusing to run inside a build-loop test gate" run_refused_failure 811 'printf "gh %s\n" "$*" >> "$REFUSE_LOG"'
 contam_log="$(cat "$TEST_TEMP_DIR/refuse.log")"
 assert_contains "a contamination failure is logged as skipped" "$contam_log" "Contamination for issue #811 — skipping retry"
 assert_eq "no retry is spawned for contamination" "0" "$(grep -c 'spawn 811 retry' <<<"$contam_log" || true)"
@@ -359,5 +360,119 @@ slow_result="$(SW_BUN="$TEST_TEMP_DIR/slow-bun" SW_CLASSIFY_TIMEOUT=1 classify_f
 assert_eq "a classifier that does not answer falls back to the regex" "auth_error" "$slow_result"
 assert_eq "the fallback returns within the timeout, not after the 30 s sleep" "true" "$([[ $SECONDS -lt 15 ]] && echo true || echo false)"
 
-print_test_results
+# ─── Escalations come only from structured error lines (#8696) ───
+print_test_section "False escalations do not block dispatch; structured escalations still do"
+esc_class() { printf '%s\n' "$1" > "$LOG_DIR/issue-901.log"; classify_failure 901; }
+ESC=$(printf '\033')
+assert_eq "a bare refusal sentence is not contamination" "unknown" "$(esc_class "refusing to run inside a build-loop test gate")"
+assert_eq "a forged CONTAMINATION line in test output is not contamination" "unknown" \
+    "$(esc_class 'CONTAMINATION: x')"
+assert_eq "a DNS failure is not invalid_issue" "unknown" "$(esc_class "Could not resolve host: api.github.com")"
+assert_eq "a dependency resolution failure is not invalid_issue" "build_failure" \
+    "$(esc_class "npm ERR! could not resolve dependencies: peer react@18")"
+assert_eq "a bare HTTP 404 is not invalid_issue" "unknown" "$(esc_class "HTTP 404 Not Found")"
+assert_eq "a model 404 is not invalid_issue" "unknown" "$(esc_class "API Error: 404 model not found")"
+assert_eq "the structured refusal is contamination" "contamination" \
+    "$(esc_class "⚠ Skipping integration tests: refusing to run inside a build-loop test gate")"
+assert_eq "the gh-prefixed structured refusal is contamination" "contamination" \
+    "$(esc_class "build	Test	2026-10-24T13:51:24.7812544Z ⚠ Skipping integration tests: refusing to run inside a build-loop test gate")"
+assert_eq "a coloured structured refusal is contamination (ANSI stripped first)" "contamination" \
+    "$(esc_class "${ESC}[33m⚠ Skipping integration tests: refusing to run inside a build-loop test gate${ESC}[0m")"
+assert_eq "a coloured CONTAMINATION line is contamination" "contamination" \
+    "$(esc_class "${ESC}[31mCONTAMINATION: branch-switched a -> b${ESC}[0m")"
+assert_eq "a gh issue lookup failure is invalid_issue" "invalid_issue" \
+    "$(esc_class "GraphQL: Could not resolve to an Issue with the number 999.")"
+assert_eq "an issue HTTP 404 with its URL is invalid_issue" "invalid_issue" \
+    "$(esc_class "HTTP 404: Not Found (https://api.github.com/repos/o/r/issues/999)")"
 
+print_test_section "Self-triggers never escalate (#8696): test names and tool output that name an escalation"
+not_esc() { case "$1" in auth_error|invalid_issue|contamination) echo no ;; *) echo yes ;; esac; }
+assert_eq "a GraphQL lookup failure in a test name does not escalate" "yes" \
+    "$(not_esc "$(esc_class '(fail) classifies gh error "GraphQL: Could not resolve to an issue or pull request" as "not_found"')")"
+assert_eq "a 401 in a test name does not escalate" "yes" \
+    "$(not_esc "$(esc_class '(fail) classifies gh error "HTTP 401: Bad credentials" as "auth" [0.2ms]')")"
+assert_eq "jest's Expected: issue not found does not escalate" "yes" \
+    "$(not_esc "$(esc_class '    Expected: "issue not found"')")"
+assert_eq "an issue HTTP 404 named in a test does not escalate" "yes" \
+    "$(not_esc "$(esc_class '(fail) client > maps HTTP 404 on GET /repos/o/r/issues/12 to NotFound')")"
+assert_eq "a SyntaxError about an invalid token does not escalate" "yes" \
+    "$(not_esc "$(esc_class 'SyntaxError: Invalid or unexpected token')")"
+assert_eq "a jwt test named rejects invalid token does not escalate" "yes" \
+    "$(not_esc "$(esc_class '(fail) jwt > rejects invalid token')")"
+assert_eq "gh Bad credentials is auth" "auth_error" "$(esc_class 'gh: Bad credentials')"
+assert_eq "HTTP 401 Bad credentials is auth" "auth_error" "$(esc_class 'HTTP 401: Bad credentials (https://api.github.com/repos/o/r/issues/1)')"
+assert_eq "a missing issue beside a 503 is invalid, not transient" "invalid_issue" \
+    "$(esc_class $'HTTP 503 Service Unavailable\nGraphQL: Could not resolve to an Issue with the number of 9.')"
+
+print_test_section "Auth is anchored to structured lines: genuine failures escalate, prose and test names do not (#8696 review)"
+ESC_=$(printf '\033')
+assert_eq "a Claude API 401 with failed-to-authenticate escalates" "auth_error" \
+    "$(esc_class 'Failed to authenticate. API Error: 401 {"type":"error","error":{"type":"authentication_error","message":"OAuth token has expired."}}')"
+assert_eq "a Claude API 401 authentication_error escalates" "auth_error" \
+    "$(esc_class 'API Error: 401 {"type":"error","error":{"type":"authentication_error","message":"invalid x-api-key"}}')"
+assert_eq "git's Authentication failed escalates" "auth_error" \
+    "$(esc_class "fatal: Authentication failed for 'https://github.com/o/r.git/'")"
+assert_eq "an indented authentication_error escalates" "auth_error" \
+    "$(esc_class '    Error: authentication_error: invalid x-api-key')"
+assert_eq "a Shipwright ✗ not-logged-in line escalates" "auth_error" \
+    "$(esc_class '✗ Not logged in · Please run /login')"
+assert_eq "a timestamped daemon ERROR auth line escalates" "auth_error" \
+    "$(esc_class '[2026-10-25T12:00:00Z] [ERROR] Claude Code authentication failed')"
+assert_eq "'Error: issue not found in cache, refetching' does not escalate" "unknown" \
+    "$(esc_class 'Error: issue not found in cache, refetching')"
+assert_eq "'error: Bad credentials for user bob in fixture db' does not escalate" "unknown" \
+    "$(esc_class 'error: Bad credentials for user bob in fixture db')"
+
+# ─── The #8696 reviewer corpus, from classify-parity.json, under both locales ───
+# Each row with an "expect" field: "noesc" or "esc:<class>". The regex alone (no Bun) must meet it under LC_ALL=C
+# (bytes) and a UTF-8 locale (characters) alike. A row with a "limit" is a documented miss and must still miss.
+print_test_section "Reviewer corpus (#8696): structured escalations only, LC_ALL=C and en_US.UTF-8"
+PARITY_JSON="$SCRIPT_DIR/../src/testing/fixtures/wave2/classify-parity.json"
+utf8_len="$(LC_ALL=en_US.UTF-8 bash -c 'x="✗"; printf %s "${#x}"')"
+assert_eq "en_US.UTF-8 is a multibyte locale here (else the UTF-8 run proves nothing)" "1" "$utf8_len"
+corpus_rows="$(jq -r '.cases | to_entries[] | select(.value.expect != null) | .key' "$PARITY_JSON")"
+corpus_count=0
+corpus_bad=""
+for row in $corpus_rows; do
+    jq -r --argjson i "$row" '.cases[$i].text' "$PARITY_JSON" > "$LOG_DIR/issue-902.log"
+    row_expect="$(jq -r --argjson i "$row" '.cases[$i].expect' "$PARITY_JSON")"
+    row_limit="$(jq -r --argjson i "$row" '.cases[$i].limit // ""' "$PARITY_JSON")"
+    row_name="$(jq -r --argjson i "$row" '.cases[$i].name' "$PARITY_JSON")"
+    case "$row_expect" in
+        noesc) want="-" ;;
+        esc:auth) want="auth_error" ;;
+        esc:invalid_input) want="invalid_issue" ;;
+        esc:contamination) want="contamination" ;;
+        *) want="?$row_expect" ;;
+    esac
+    for loc in C en_US.UTF-8; do
+        got="$(LC_ALL="$loc" SW_BUN=/nonexistent/bun classify_failure 902)"
+        case "$got" in auth_error|invalid_issue|contamination) ;; *) got="-" ;; esac
+        if [[ -n "$row_limit" ]]; then
+            [[ "$got" != "$want" ]] || corpus_bad="${corpus_bad}"$'\n'"  limit now met [$loc]: $row_name"
+        else
+            [[ "$got" == "$want" ]] || corpus_bad="${corpus_bad}"$'\n'"  [$loc] $row_name: want $want, got $got"
+        fi
+    done
+    corpus_count=$((corpus_count + 1))
+done
+assert_eq "the reviewer corpus is present (rows with an expectation)" "true" \
+    "$([[ $corpus_count -ge 94 ]] && echo true || echo "false ($corpus_count)")"
+assert_eq "every corpus row meets its expectation under both locales" "" "$corpus_bad"
+
+# A pattern grep rejects (exit 2, e.g. a repetition count over RE_DUP_MAX) silently classifies as no match.
+for pat_name in _DAEMON_CONTAMINATION _DAEMON_AUTH _DAEMON_INVALID_ISSUE _DAEMON_ERROR_LINE; do
+    for loc in C en_US.UTF-8; do
+        pat_rc=0
+        printf 'nothing here\n' | LC_ALL="$loc" grep -aiE "${!pat_name}" >/dev/null 2>&1 || pat_rc=$?
+        assert_eq "$pat_name is a valid ERE for grep under $loc" "1" "$pat_rc"
+    done
+done
+# An invalid UTF-8 byte in the log must not lose the other lines in a UTF-8 locale (BSD sed aborts there).
+printf 'job output \377 garbage\nfatal: Authentication failed for '"'"'https://github.com/o/r.git/'"'"'\n' > "$LOG_DIR/issue-903.log"
+for loc in C en_US.UTF-8; do
+    assert_eq "an invalid byte does not hide an auth line ($loc)" "auth_error" \
+        "$(LC_ALL="$loc" SW_BUN=/nonexistent/bun classify_failure 903)"
+done
+
+print_test_results

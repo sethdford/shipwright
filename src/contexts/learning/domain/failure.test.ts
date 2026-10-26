@@ -44,6 +44,49 @@ describe("classifyFailure", () => {
   });
 });
 
+describe("escalations come only from structured error lines (#8696)", () => {
+  const notEscalated: readonly (readonly [string, string])[] = [
+    ["a bare refusal sentence", "refusing to run inside a build-loop test gate"],
+    [
+      "a forged CONTAMINATION line in test output",
+      'echo "CONTAMINATION: x"\nCONTAMINATION: x\nall tests passed',
+    ],
+    ["a DNS failure", "Could not resolve host: api.github.com"],
+    ["a dependency resolution failure", "npm ERR! could not resolve dependencies: peer react@18"],
+    ["a bare HTTP 404", "HTTP 404 Not Found"],
+    ["a model 404", "API Error: 404 model not found"],
+    ["'no body' outside an issue lookup", "the README has no body text"],
+  ];
+  for (const [name, text] of notEscalated) {
+    test(`${name} does not escalate`, () => {
+      expect(["contamination", "invalid_input", "auth"]).not.toContain(classifyFailure({ text }));
+    });
+  }
+
+  test("the structured refusal is contamination", () => {
+    expect(
+      classifyFailure({
+        text: "⚠ Skipping integration tests: refusing to run inside a build-loop test gate",
+      }),
+    ).toBe("contamination");
+  });
+
+  test("a DNS error is environment, not invalid input", () => {
+    expect(classifyFailure({ text: "Could not resolve host: api.github.com" })).toBe("environment");
+  });
+
+  test("issue and PR lookup failures are invalid input", () => {
+    expect(
+      classifyFailure({ text: "GraphQL: Could not resolve to an Issue with the number 999." }),
+    ).toBe("invalid_input");
+    expect(
+      classifyFailure({
+        text: "HTTP 404: Not Found (https://api.github.com/repos/o/r/issues/999)",
+      }),
+    ).toBe("invalid_input");
+  });
+});
+
 describe("contamination signals (one test per signal)", () => {
   test("the test-gate refusal from sw-e2e-integration-test.sh is contamination", () => {
     const text = "⚠ Skipping integration tests: refusing to run inside a build-loop test gate";
