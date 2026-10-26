@@ -615,7 +615,7 @@ _pipeline_test_judge() {
         return 1
     fi
     local judged=0
-    if tg_judge "$cmd" "$rc" "$log" "${SW_TEST_TIMEOUT:-900}" 1; then judged=1; fi
+    if tg_judge_units "$cmd" "$rc" "$_PT_HEAD_UNITS" "$_PT_HEAD_PARSABLE" "${SW_TEST_TIMEOUT:-900}" 1; then judged=1; fi
     # node_modules must still be as the start left it after the base ran: the base run used it (#8671).
     if ! pipeline_base_nm_unchanged_now "$root"; then
         warn "Test stage: node_modules changed while the base commit ran; blocking"
@@ -657,6 +657,11 @@ _pipeline_run_test_group() {
     set +m
     wait "$pid" || rc=$?
     kill -KILL -- "-$pid" 2>/dev/null || true
+    # The HEAD log is parsed here, straight after the group is killed, and held in memory: the judgement reads these
+    # variables, not the file, which a surviving process can rewrite during the base run (#8671, r7).
+    _PT_HEAD_UNITS=""; _PT_HEAD_PARSABLE=""
+    tg_parse_log "$log"
+    _PT_HEAD_UNITS="$TG_UNITS"; _PT_HEAD_PARSABLE="$TG_PARSABLE"
     return "$rc"
 }
 

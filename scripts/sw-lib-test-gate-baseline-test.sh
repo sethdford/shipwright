@@ -92,6 +92,14 @@ commit_state() {
     git_in_repo commit -q --allow-empty -m "state: $1" >/dev/null 2>&1
     git_in_repo rev-parse HEAD
 }
+# owner_diag — on a failed owner-death check: the worktrees, and every process this run tagged (its sentinel sleep and the
+# scripts under TEST_TEMP_DIR), with pid, ppid, pgid, state, start time and command. The check itself is not changed (#8671, r7).
+owner_diag() {
+    echo "  owner-death diagnostics (run $$, sentinel $SLEEP_SENTINEL):"
+    git_in_repo worktree list 2>&1 | sed 's/^/    wt: /'
+    ps -axo pid=,ppid=,pgid=,stat=,lstart=,command= 2>/dev/null | grep -F -e "$SLEEP_SENTINEL" -e "$TEST_TEMP_DIR" |
+        grep -v grep | sed 's/^/    ps: /' || true
+}
 # no_sleep_left — poll (up to ~6s) until none of this run's hang sleeps is left running.
 no_sleep_left() {
     local _i
@@ -433,6 +441,7 @@ if [[ "$owner_ok" -eq 1 ]]; then
     assert_pass "owner killed without a handler: watchdog removes the worktree and the run"
 else
     assert_fail "owner killed without a handler: watchdog removes the worktree and the run"
+    owner_diag
 fi
 
 # ═══════════════════════════════════════════════════════════════════════════════

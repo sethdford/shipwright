@@ -65,6 +65,9 @@ assert_fail() {
     FAILURES+=("$desc")
     echo -e "  ${RED}✗${RESET} ${desc}"
     [[ -n "$detail" ]] && echo -e "    ${DIM}${detail}${RESET}"
+    # Explicit success: the last test above returns 1 without a detail, and under set -e that would end the suite at the
+    # first failed assertion, so the rest of the suite (and its totals) would never run (#8671, r7).
+    return 0
 }
 
 assert_eq() {

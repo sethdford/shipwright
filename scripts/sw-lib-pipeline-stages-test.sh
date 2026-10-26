@@ -1061,11 +1061,79 @@ ESC
         stage_test
     ) >"$TEST_TEMP_DIR/escape-$name.out" 2>&1 || rc=$?
     assert_eq "a process that escapes the test group and writes into the base worktree ($name) blocks" "1" "$rc"
-    assert_contains "the block says the base worktree changed ($name)" "$(cat "$repo/.artifacts/test-results.log" 2>/dev/null)" "base worktree changed"
+    # The block names the change: the base worktree check, or the node_modules check in the stage (its warning is not in the log).
+    # The text is read into a variable first: under pipefail, grep -q closing the pipe early would fail the test.
+    local block_text
+    block_text="$(cat "$repo/.artifacts/test-results.log" "$TEST_TEMP_DIR/escape-$name.out" 2>/dev/null || true)"
+    if grep -qE 'base worktree changed|node_modules changed' <<< "$block_text"; then
+        assert_pass "the block says the base worktree or node_modules changed ($name)"
+    else
+        assert_fail "the block says the base worktree or node_modules changed ($name)"
+    fi
 }
 escape_attack tracked 'touch "$1/regression.flag"'
-escape_attack dotenv 'echo REGRESS=1 > "$1/.env"'
+# The content changes on every write: an ignored file's name alone is not in git status, so a write only shows in the
+# content fingerprint when it changes after the base's first run (#8671, r7). A constant write in the first run is residual (#8706).
+escape_attack dotenv 'echo "REGRESS=$RANDOM" > "$1/.env"'
 escape_attack nodemodules 'mkdir -p "$1/node_modules" && touch "$1/node_modules/regress"'
+
+# Log attacks (#8671, round 7): while the base runs, a process the HEAD command left behind rewrites the HEAD log
+# (headlog), or the base's own run logs (logswap). The HEAD log is read before the base runs, and the base's logs are
+# not in the worktree's parent, so each attack reaches nothing: the real judgement blocks the regression (rc=1).
+log_attack() { # $1 name, $2 the writer's command, run with the base worktree as $1 and its parent as $d
+    local name="$1" writer="$TEST_TEMP_DIR/log-writer-$1.sh" repo home rc=0
+    printf 'd="$(dirname "$1")"\n%s\n' "$2" > "$writer"
+    repo="$(fresh_diff_repo "log-$name")"
+    home="$(new_home)"
+    touch "$repo/regression.flag"
+    cat > "$TEST_TEMP_DIR/log-cmd-$name.sh" <<LOGCMD
+set -m
+( seen=0
+  for i in \$(seq 1 1500); do
+    others="\$(git worktree list --porcelain | sed -n 's/^worktree //p' | grep -v -x -F "\$(pwd -P)")"
+    if [ -n "\$others" ]; then
+        seen=1
+        for w in \$others; do bash "$writer" "\$w"; done
+    elif [ "\$seen" -eq 1 ]; then
+        break
+    fi
+    sleep 0.01
+  done ) </dev/null >/dev/null 2>&1 &
+bash fake-tests.sh
+LOGCMD
+    (
+        diff_env "$repo" "$home" main
+        export TEST_CMD="bash $TEST_TEMP_DIR/log-cmd-$name.sh"
+        cd "$repo" || exit 1
+        pipeline_base_init
+        agent_commit "$repo" build
+        stage_test
+    ) >"$TEST_TEMP_DIR/log-$name.out" 2>&1 || rc=$?
+    assert_eq "a process that rewrites the logs during the base run ($name) blocks the regression" "1" "$rc"
+}
+# headlog: the HEAD log is forged to hide the regression while the base runs. The forged log says only the pre-existing
+# unit fails, which the base also has; read after the base run, it would pass the stage.
+HEADLOG_FORGED='bun test v1.2.19\n\nold.test.ts:\n(fail) pre-existing one [1.00ms]\n 1 pass\n 1 fail\nRan 2 tests across 1 file. [2.00ms]\n'
+log_attack headlog "printf '$HEADLOG_FORGED' > \"\$ARTIFACTS_DIR/test-results.log\""
+# logswap: the base's run logs are forged to show the regression as failing on the base too. Read after the base run,
+# they would make the regression pre-existing. The logs are not in the worktree's parent, so the writer finds nothing.
+log_attack logswap "for f in \"\$d\"/run1.log \"\$d\"/run2.log; do [ -f \"\$f\" ] && printf 'bun test v1.2.19\\n\\nnew.test.ts:\\n(fail) regression [1.00ms]\\n 1 pass\\n 2 fail\\nRan 3 tests across 2 files. [3.00ms]\\n' > \"\$f\"; done; true"
+
+# Benign coverage (#8671, round 7): the base writes ignored output (coverage/) on every run. That is the base's own
+# output, not a write by a process outside the group, so a failure the base also has still passes the stage.
+COV_REPO="$(fresh_diff_repo covered)"
+COV_HOME="$(new_home)"
+printf 'coverage/\n' >> "$COV_REPO/.git/info/exclude"   # shared by every worktree, so the base sees it too
+(
+    diff_env "$COV_REPO" "$COV_HOME" main
+    export TEST_CMD="mkdir -p coverage && echo lcov > coverage/lcov.info && bash fake-tests.sh"
+    cd "$COV_REPO" || exit 1
+    pipeline_base_init
+    agent_commit "$COV_REPO" build
+    stage_test
+) >"$TEST_TEMP_DIR/covered.out" 2>&1 && cov_rc=0 || cov_rc=$?
+assert_eq "a pre-existing failure with the base's own ignored output (coverage/) still passes the stage" "0" "$cov_rc"
+assert_contains "the covered base's failure is reported as pre-existing" "$(cat "$COV_REPO/.artifacts/test-results.log" 2>/dev/null)" "PRE-EXISTING"
 
 # A trusted URL spelled differently from the pin replaces it (#8671, round 4 P2/P3): the start is not blocked forever.
 PINT_REPO="$(fresh_diff_repo pin-trusted)"

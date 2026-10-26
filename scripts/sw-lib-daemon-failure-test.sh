@@ -68,6 +68,13 @@ assert_eq "Auth error classified" "auth_error" "$result"
 echo "Pipeline refused to start: evidence of a tampered checkout. [pipeline-refused:tampering]" > "$LOG_DIR/issue-103.log"
 assert_eq "a refused start is an escalation class, not a retry" "tampering_refused" "$(classify_failure 103)"
 echo "tests failed" > "$LOG_DIR/issue-104.log"
+# Same issue log, two runs (#8671, round 7): a refused earlier run must not classify the later run. The marker is scoped to
+# the last run's section, so the later run is classified by its own content.
+printf '\n\n===== Pipeline run 2026-10-01T00:00:00Z =====\nPipeline refused to start. [pipeline-refused:tampering]\n' > "$LOG_DIR/issue-105.log"
+printf '\n\n===== Pipeline run 2026-10-02T00:00:00Z =====\ntests failed\n' >> "$LOG_DIR/issue-105.log"
+assert_eq "an earlier refused run in the same log does not refuse a later run" "1" "$([[ "$(classify_failure 105)" != "tampering_refused" ]] && echo 1 || echo 0)"
+printf '\n\n===== Pipeline run 2026-10-03T00:00:00Z =====\nPipeline refused to start. [pipeline-refused:tampering]\n' >> "$LOG_DIR/issue-105.log"
+assert_eq "a refusal in the latest run of the same log is still refused" "tampering_refused" "$(classify_failure 105)"
 assert_eq "a later run of the same issue without the marker is not refused" "1" "$([[ "$(classify_failure 104)" != "tampering_refused" ]] && echo 1 || echo 0)"
 
 echo "unauthorized access 401 error" > "$LOG_DIR/issue-102.log"

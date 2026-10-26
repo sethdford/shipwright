@@ -70,10 +70,12 @@ _TG_CACHE_UNITS=()
 # Active base run (removed by _tg_cleanup_base).
 _TG_ROOT=""              # repository that owns the base worktree
 _TG_WT=""                # active base worktree
-_TG_TMP=""               # active temp dir (scripts only)
+_TG_TMP=""               # active temp dir (the worktree's parent: nothing the base reads or writes is kept here)
+_TG_OUT=""               # active output dir: the base run's scripts and logs (outside the worktree's parent, #8671 r7)
 _TG_PID=""               # root process of the active base run
 _TG_PGRP=""              # process group of the active base run, when it was started with setpgrp
 _TG_WD=""                # watchdog subshell of the active base run
+_TG_GUARD=""             # guard subshell: removes the base worktree if the loop process dies before the run starts (#8671 r7)
 
 tg_begin_gate() {
     _TG_VERDICTS=""
@@ -325,16 +327,48 @@ _tg_install_guards() {
     fi
 }
 
+# _tg_guard_start <root> <wt> <tmp> <out> — a guard for the base worktree from the moment it exists. The run watchdog
+# starts only when the run does, so a loop process killed during setup (farm, status checks) would leave the worktree
+# registered with nothing to remove it (the owner-death flake, #8671 r7). The guard is its own process group, its stdio
+# is detached, and it ignores HUP and PIPE, so the owner's terminal or pipe going away does not kill it. It removes the
+# worktree once the owner is gone; a normal exit stops it (_tg_cleanup_base).
+_tg_guard_start() {
+    local root="$1" wt="$2" tmp="$3" out="$4" owner="$$"
+    set -m
+    (
+        trap '' HUP PIPE
+        trap - INT TERM EXIT
+        while kill -0 "$owner" 2>/dev/null; do sleep 1; done
+        git -C "$root" worktree remove --force "$wt" >/dev/null 2>&1 || true
+        git -C "$root" worktree prune >/dev/null 2>&1 || true
+        rm -f "$out"/* 2>/dev/null || true
+        rmdir "$out" 2>/dev/null || true
+        rmdir "$tmp"/wt.* "$tmp"/nm.* 2>/dev/null || true
+        rmdir "$tmp" 2>/dev/null || true
+    ) </dev/null >/dev/null 2>&1 &
+    _TG_GUARD="$!"
+    set +m
+}
+
 # _tg_cleanup_base — stop the active base run and remove its worktree and temp files. Idempotent.
 _tg_cleanup_base() {
+    if [[ -n "$_TG_GUARD" ]]; then
+        kill -KILL "$_TG_GUARD" 2>/dev/null || true
+        { wait "$_TG_GUARD"; } 2>/dev/null || true
+        _TG_GUARD=""
+    fi
     _tg_stop_run
     if [[ -n "$_TG_WT" ]]; then
         git -C "$_TG_ROOT" worktree remove --force "$_TG_WT" >/dev/null 2>&1 || true
         git -C "$_TG_ROOT" worktree prune >/dev/null 2>&1 || true
         _TG_WT=""
     fi
+    if [[ -n "$_TG_OUT" ]]; then
+        rm -f "$_TG_OUT"/* 2>/dev/null || true
+        rmdir "$_TG_OUT" 2>/dev/null || true
+        _TG_OUT=""
+    fi
     if [[ -n "$_TG_TMP" ]]; then
-        rm -f "$_TG_TMP"/cmd.sh "$_TG_TMP"/run.sh "$_TG_TMP"/test-gate-env.sh "$_TG_TMP"/*.log 2>/dev/null || true
         rmdir "$_TG_TMP" 2>/dev/null || true
         _TG_TMP=""
     fi
@@ -344,24 +378,30 @@ _tg_cleanup_base() {
 # watchdog. Sets _TB_RC (124 when the watchdog stopped the run).
 _tg_run_base_once() {
     local wt="$1" cmd="$2" limit="$3" log="$4" pid wd owner="$$" elapsed=0
-    printf '%s\n' "$cmd" > "$_TG_TMP/cmd.sh"
+    printf '%s\n' "$cmd" > "$_TG_OUT/cmd.sh"
     {
         printf 'cd "%s" || exit 1\n' "$wt"
         printf 'export PROJECT_ROOT="%s" FAIL_LOG_LINES=100000\n' "$wt"
-        printf 'source "%s/test-gate-env.sh"\n' "$_TG_TMP"
-        printf 'sw_test_gate_env bash "%s/cmd.sh"\n' "$_TG_TMP"
-    } > "$_TG_TMP/run.sh"
-    printf '%s\n' "$_TG_ENV_BODY" > "$_TG_TMP/test-gate-env.sh"
+        printf 'source "%s/test-gate-env.sh"\n' "$_TG_OUT"
+        printf 'sw_test_gate_env bash "%s/cmd.sh"\n' "$_TG_OUT"
+    } > "$_TG_OUT/run.sh"
+    printf '%s\n' "$_TG_ENV_BODY" > "$_TG_OUT/test-gate-env.sh"
+    # The scripts are checked against these sums immediately before they run (#8671, r7): a process that rewrote one
+    # after it was written does not run.
+    local sums
+    sums="$(cksum "$_TG_OUT/run.sh" "$_TG_OUT/cmd.sh" "$_TG_OUT/test-gate-env.sh")"
     _TG_PGRP=""
     if command -v perl >/dev/null 2>&1; then
         # perl's setpgrp makes the run a process-group leader; exec keeps the same pid.
         ( trap - INT TERM EXIT
-          exec perl -e 'setpgrp(0, 0) or exit 1; exec @ARGV or exit 127' bash "$_TG_TMP/run.sh"
+          [[ "$(cksum "$_TG_OUT/run.sh" "$_TG_OUT/cmd.sh" "$_TG_OUT/test-gate-env.sh")" == "$sums" ]] || exit 126
+          exec perl -e 'setpgrp(0, 0) or exit 1; exec @ARGV or exit 127' bash "$_TG_OUT/run.sh"
         ) > "$log" 2>&1 &
         _TG_PGRP="$!"
     else
         ( trap - INT TERM EXIT
-          exec bash "$_TG_TMP/run.sh"
+          [[ "$(cksum "$_TG_OUT/run.sh" "$_TG_OUT/cmd.sh" "$_TG_OUT/test-gate-env.sh")" == "$sums" ]] || exit 126
+          exec bash "$_TG_OUT/run.sh"
         ) > "$log" 2>&1 &
     fi
     pid=$!
@@ -451,6 +491,23 @@ _tg_worktree_status() {
     git -C "$1" status --porcelain --ignored -- . ':!node_modules' 2>/dev/null || true
 }
 
+# _tg_ignored_fingerprint <wt> — the content of every ignored file outside node_modules, as "<cksum> <path>" lines. Git's
+# status names an ignored file but not what it holds, so a rewrite of an ignored file (a .env the agent's test wrote)
+# shows here only (#8671, r7).
+_tg_ignored_fingerprint() {
+    local wt="$1" f
+    git -C "$wt" ls-files -o -i --exclude-standard -z -- . ':!node_modules' 2>/dev/null |
+        while IFS= read -r -d '' f; do
+            [[ -f "$wt/$f" ]] && printf '%s %s\n' "$(cksum < "$wt/$f" 2>/dev/null)" "$f"
+        done
+}
+
+# _tg_base_state <wt> — the state of a base worktree that run 2 must leave as run 1 did: ignored entries and their contents.
+_tg_base_state() {
+    printf '%s\n' "$(_tg_worktree_status "$1")"
+    _tg_ignored_fingerprint "$1"
+}
+
 # _tg_nm_listing <dir> — the shape of <dir>/node_modules: every entry, with a link's target, without following links.
 # "absent" when there is no node_modules. Two listings are equal only when the tree is the same.
 _tg_nm_listing() {
@@ -471,7 +528,7 @@ _tg_nm_listing() {
 # Sets TG_BASE_OK, TG_BASE_EXIT, TG_BASE_UNITS, TG_BASE_REASON.
 _tg_compute_base() {
     local cmd="$1" limit="${SW_TEST_TIMEOUT:-900}" root="${PROJECT_ROOT:-.}" base="${LOOP_START_COMMIT:-}"
-    local wt rc1 rc2 units1 units2 pass1 parsable1
+    local wt rc1 rc2 units1 units2 pass1 parsable1 ignored1
     TG_BASE_OK=0
     TG_BASE_EXIT="untrusted"
     TG_BASE_UNITS=""
@@ -490,11 +547,16 @@ _tg_compute_base() {
     fi
     _TG_TMP="$(mktemp -d "${TMPDIR:-/tmp}/sw-test-baseline.XXXXXX")" || {
         TG_BASE_REASON="could not create a temp dir"; return 0; }
+    # The base's scripts and logs live in their own directory, not under the worktree's parent: a process the HEAD
+    # command left behind finds the worktree through git worktree list, and must not find what the judgement reads.
+    _TG_OUT="$(mktemp -d "${TMPDIR:-/tmp}/sw-tg-io.XXXXXX")" || {
+        _tg_cleanup_base; TG_BASE_REASON="could not create the base output dir"; return 0; }
     _TG_ROOT="$root"
     _tg_install_guards
     # The worktree's name is random too: the test command runs as this user and must not find it by guessing (#8671).
     wt="$(mktemp -d "$_TG_TMP/wt.XXXXXX")" || { _tg_cleanup_base; TG_BASE_REASON="could not create the base worktree dir"; return 0; }
     _TG_WT="$wt"
+    _tg_guard_start "$root" "$wt" "$_TG_TMP" "$_TG_OUT"
     if ! git -C "$root" -c core.hooksPath=/dev/null worktree add --detach "$wt" "$base" >/dev/null 2>&1; then
         _tg_cleanup_base
         TG_BASE_REASON="git worktree add failed for the base commit"
@@ -528,18 +590,26 @@ _tg_compute_base() {
         TG_BASE_REASON="the base worktree changed before the base ran (its node_modules differs from the farm that was built; a process outside the test group wrote into it)"
         return 0
     fi
-    _tg_run_base_once "$wt" "$cmd" "$limit" "$_TG_TMP/run1.log"; rc1="$_TB_RC"
-    tg_parse_log "$_TG_TMP/run1.log"
+    _tg_run_base_once "$wt" "$cmd" "$limit" "$_TG_OUT/run1.log"; rc1="$_TB_RC"
+    # After run 1, nothing tracked or untracked may differ from the fresh worktree: a file a process wrote during the run
+    # blocks. Ignored output (coverage, caches) is the base's own, so it is snapshotted here and run 2 must leave it as is.
+    if [[ -n "$(git -C "$wt" status --porcelain -- . ':!node_modules' 2>/dev/null)" ]]; then
+        _tg_cleanup_base
+        TG_BASE_REASON="the base worktree changed while the base ran (a tracked or untracked file was written)"
+        return 0
+    fi
+    ignored1="$(_tg_base_state "$wt")"
+    tg_parse_log "$_TG_OUT/run1.log"
     units1="$TG_UNITS"; pass1="$TG_PASSCOUNT"; parsable1="$TG_PARSABLE"
-    _tg_run_base_once "$wt" "$cmd" "$limit" "$_TG_TMP/run2.log"; rc2="$_TB_RC"
-    tg_parse_log "$_TG_TMP/run2.log"
+    _tg_run_base_once "$wt" "$cmd" "$limit" "$_TG_OUT/run2.log"; rc2="$_TB_RC"
+    tg_parse_log "$_TG_OUT/run2.log"
     units2="$TG_UNITS"
     # A process the HEAD command let escape its process group (set -m) can write into the base worktree while the
     # runs go on. A base the runs changed is not the base (#8671). Checked before the worktree is removed.
-    status_after="$(_tg_worktree_status "$wt")"
+    status_after="$(_tg_base_state "$wt")"
     nm_after="$(_tg_nm_listing "$wt")"
     _tg_cleanup_base
-    if [[ -n "$status_after" || "$nm_after" != "$nm_expect" ]]; then
+    if [[ "$status_after" != "$ignored1" || "$nm_after" != "$nm_expect" ]]; then
         TG_BASE_REASON="the base worktree changed while the base ran (a process outside the test group wrote into it)"
         return 0
     fi
@@ -636,8 +706,20 @@ _tg_unit_is_new() {
 # baseline_eligible=0 marks a test created during this loop: it has no base-commit counterpart.
 tg_judge() {
     local cmd="$1" rc="$2" log="$3" limit="$4" eligible="${5:-1}"
-    local iter_units new="" u
+    # The HEAD log is parsed before anything runs on the base: a process the HEAD command left behind can rewrite the
+    # file during the base run (#8671, r7). Callers that hold a parse taken earlier use tg_judge_units.
+    tg_parse_log "$log"
+    tg_judge_units "$cmd" "$rc" "$TG_UNITS" "$TG_PARSABLE" "$limit" "$eligible"
+}
+
+# tg_judge_units <cmd> <exit> <units> <parsable> <timeout_s> <baseline_eligible 0|1> — tg_judge on a HEAD log that was
+# already parsed by the caller (its units and parsable flag, as tg_parse_log sets them).
+tg_judge_units() {
+    local cmd="$1" rc="$2" iter_units="$3" parsable="$4" limit="$5" eligible="${6:-1}"
+    local new="" u
     tg_reset_judgement
+    TG_UNITS="$iter_units"
+    TG_PARSABLE="$parsable"
     if [[ "$eligible" != "1" ]]; then
         TG_BASE_EXIT="n/a"
         _tg_block created-in-loop "BLOCKING: '${cmd}' (exit ${rc}) is a test created during this loop and has no base-commit counterpart. Fix it."
@@ -652,14 +734,12 @@ tg_judge() {
         _tg_block regression "BLOCKING: NEW FAILURE: '${cmd}' exits ${rc} but passes on the base commit. Fix it."
         return 1
     fi
-    tg_parse_log "$log"
     case "$rc" in
         124|137|143)
             _tg_block timeout "BLOCKING: '${cmd}' timed out or was killed (exit ${rc}); it cannot be shown to be pre-existing. Fix it."
             return 1 ;;
     esac
-    iter_units="$TG_UNITS"
-    if [[ "$TG_PARSABLE" != "1" || -z "$iter_units" ]]; then
+    if [[ "$parsable" != "1" || -z "$iter_units" ]]; then
         _tg_block unattributed "BLOCKING: '${cmd}' (exit ${rc}) failed with no recognisable failing units, so it cannot be shown to be pre-existing. Fix it."
         return 1
     fi
