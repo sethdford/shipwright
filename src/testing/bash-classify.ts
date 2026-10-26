@@ -17,11 +17,20 @@ for ((i = 1; i <= n; i++)); do
 done
 `;
 
+/** The locales the parity tests run bash under: bytes (C) and characters (UTF-8) (#8696). */
+export const BASH_LOCALES = ["C", "en_US.UTF-8"] as const;
+export type BashLocale = (typeof BASH_LOCALES)[number];
+
 /**
  * Writes each text to $LOG_DIR/issue-N.log inside the isolated env and returns bash's label for each.
  * Nothing touches the real HOME or ~/.shipwright: DAEMON_DIR, LOG_DIR and WORKTREE_DIR all live in env.root.
+ * `locale` sets LC_ALL (default C), so a byte-versus-character difference in a bash pattern shows up as drift.
  */
-export function bashClassifyAll(env: TestEnv, texts: readonly string[]): string[] {
+export function bashClassifyAll(
+  env: TestEnv,
+  texts: readonly string[],
+  locale: BashLocale = "C",
+): string[] {
   const logs = join(env.root, "logs");
   const work = join(env.root, "work");
   mkdirSync(logs, { recursive: true });
@@ -35,7 +44,7 @@ export function bashClassifyAll(env: TestEnv, texts: readonly string[]): string[
     env: {
       PATH: process.env.PATH ?? "/usr/bin:/bin",
       HOME: env.home,
-      LC_ALL: "C",
+      LC_ALL: locale,
       LOG_DIR: logs,
       // The regex alone: the TS bridge is skipped whatever PATH holds, so drift in the regex is caught.
       SW_BUN: "/nonexistent/bun",
@@ -55,4 +64,13 @@ export function bashClassifyAll(env: TestEnv, texts: readonly string[]): string[
     throw new Error(`bash returned ${labels.length} labels for ${texts.length} texts`);
   }
   return labels;
+}
+
+/** How many characters bash counts in `text` under `locale`: 1 for "✗" only when the locale is really multibyte. */
+export function bashCharsIn(locale: BashLocale, text: string): number {
+  const proc = Bun.spawnSync(["bash", "-c", 'printf %s "$1" | wc -m', "bash", text], {
+    env: { PATH: process.env.PATH ?? "/usr/bin:/bin", LC_ALL: locale },
+    stdout: "pipe",
+  });
+  return Number(proc.stdout.toString().trim());
 }

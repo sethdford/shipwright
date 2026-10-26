@@ -27,6 +27,7 @@ import {
 } from "./agent-permissions";
 import { assertAgentOptions } from "./privilege-guard";
 import { readProjectMemory } from "./project-memory";
+import { armGuard, type GuardTimers, REAL_TIMERS } from "./timeout-guard";
 import { wrapUntrusted } from "./untrusted";
 
 export type QueryFn = (args: { prompt: string; options: Options }) => AsyncIterable<SDKMessage>;
@@ -159,30 +160,11 @@ function isCleanSuccess(r: SDKResultMessage | undefined): r is Success {
   );
 }
 
-/** Aborts the controller on timeout or when the caller's signal fires; `dispose` undoes both. */
-function armGuard(timeoutMs: number, signal: AbortSignal | undefined) {
-  const controller = new AbortController();
-  const onAbort = () => controller.abort();
-  const timer = setTimeout(() => {
-    guard.timedOut = true;
-    controller.abort();
-  }, timeoutMs);
-  signal?.addEventListener("abort", onAbort, { once: true });
-  const guard = {
-    controller,
-    timedOut: false,
-    dispose: () => {
-      clearTimeout(timer);
-      signal?.removeEventListener("abort", onAbort);
-    },
-  };
-  return guard;
-}
-
 export class AgentSdkRunner implements AgentRunner {
   constructor(
     private readonly env: AgentEnv,
     private readonly queryFn: QueryFn = query,
+    private readonly timers: GuardTimers = REAL_TIMERS,
   ) {}
 
   async decide<T>(req: DecideRequest<T>): Promise<Result<Decision<T>, AgentFailure>> {
@@ -269,7 +251,7 @@ export class AgentSdkRunner implements AgentRunner {
     if (signal?.aborted) {
       return err({ kind: "aborted", message: "agent call aborted", usage: ZERO_USAGE });
     }
-    const guard = armGuard(timeoutMs, signal);
+    const guard = armGuard(timeoutMs, signal, this.timers);
     try {
       // The object query() receives is the one assertAgentOptions() checks (meta-tested in
       // tools/arch/meta.test.ts), so no option can reach the SDK unchecked.

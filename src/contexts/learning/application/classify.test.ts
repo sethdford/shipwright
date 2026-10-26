@@ -1,6 +1,11 @@
 import { describe, expect, test } from "bun:test";
 import { type Attempt, classifyAndDecide } from "../index";
-import { boundEvidence, MAX_EVIDENCE_LINE_CHARS, MAX_EVIDENCE_LINES } from "./evidence";
+import {
+  boundEvidence,
+  dropTestTitles,
+  MAX_EVIDENCE_LINE_CHARS,
+  MAX_EVIDENCE_LINES,
+} from "./evidence";
 
 describe("bounded evidence (review finding 1)", () => {
   test("a 1 MB single line classifies in under 100 ms", () => {
@@ -61,5 +66,133 @@ describe("model prose cannot change the class or the stop (review finding 3)", (
   test("progress markers are not evidence", () => {
     const text = "▸ Iteration 2/10 — rate limit warning\nbuild failed: tsc exit 2";
     expect(classifyAndDecide({ text, attempts: [] }).class).toBe("unknown");
+  });
+});
+
+// #8696: colour codes and the gh log prefix are removed before any rule runs, so the anchored forms still match.
+describe("normalization before the rules (#8696)", () => {
+  test("the coloured structured refusal is contamination", () => {
+    const text =
+      "\u001b[33m⚠ Skipping integration tests: refusing to run inside a build-loop test gate\u001b[0m";
+    expect(classifyAndDecide({ text, attempts: [] }).class).toBe("contamination");
+  });
+
+  test("the gh-prefixed structured refusal is contamination", () => {
+    const text =
+      "build\tTest\t2026-10-24T13:51:24.7812544Z ⚠ Skipping integration tests: refusing to run inside a build-loop test gate";
+    expect(classifyAndDecide({ text, attempts: [] }).class).toBe("contamination");
+  });
+
+  test("a coloured CONTAMINATION line is contamination", () => {
+    expect(
+      classifyAndDecide({
+        text: "\u001b[31mCONTAMINATION: branch-switched a -> b\u001b[0m",
+        attempts: [],
+      }).class,
+    ).toBe("contamination");
+  });
+});
+
+test("a coloured auth line is auth (normalized before the anchored rule)", () => {
+  expect(
+    classifyAndDecide({
+      text: "\u001b[31mNot logged in · Please run /login\u001b[0m",
+      attempts: [],
+    }).class,
+  ).toBe("auth");
+});
+
+describe("test-runner title lines never reach the rules (#8696)", () => {
+  test("bun, jest, vitest, node:test and mocha title lines are dropped; other lines are kept", () => {
+    const text = [
+      "(fail) not logged in [1ms]",
+      "(pass) ok",
+      "  ✕ API Error: 401 when token missing (3 ms)",
+      "  ✓ passes",
+      "  ● not logged in",
+      "   × authentication_error maps to auth",
+      "√ ok",
+      "✔ ok",
+      "✖ failed to authenticate when password wrong",
+      "  1) issue not found: shows empty state",
+      "✗ Not logged in · Please run /login",
+      "error: expect(received).toBe(expected)",
+    ].join("\n");
+    expect(dropTestTitles(text)).toBe(
+      "✗ Not logged in · Please run /login\nerror: expect(received).toBe(expected)",
+    );
+  });
+
+  test("a failing test titled with an auth phrase is not auth", () => {
+    const text =
+      "  ✕ API Error: 401 when token missing (3 ms)\nerror: expect(received).toBe(expected)";
+    expect(classifyAndDecide({ text, attempts: [] }).class).toBe("unknown");
+  });
+
+  test("the fingerprint still sees the title, so two different failing tests group apart", () => {
+    // bun prints the assertion first and the `(fail)` title last, so the title is the last error line.
+    const a = classifyAndDecide({ text: "error: expected\n(fail) a > one", attempts: [] });
+    const b = classifyAndDecide({ text: "error: expected\n(fail) b > two", attempts: [] });
+    expect(a.class).toBe(b.class);
+    expect(a.fingerprint).not.toBe(b.fingerprint);
+  });
+});
+
+describe("test-runner blocks and line breaks are normalized as in bash (#8696 verifier)", () => {
+  test("mocha's nested suite lines and title ending in ':' are dropped after `  1) `", () => {
+    const text = "  1) outer\n       inner\n         issue not found:\n     Error: expected 404";
+    expect(dropTestTitles(text)).toBe("     Error: expected 404");
+  });
+
+  test("a jest console block is dropped up to the blank line", () => {
+    const text = "  console.error\n    Authentication failed: mocked\n\n      at x (a.ts:1:1)";
+    expect(dropTestTitles(text)).toBe("\n      at x (a.ts:1:1)");
+  });
+
+  test("Claude Code's column-0 `● ` bullet is kept; jest's indented `● ` header is dropped", () => {
+    expect(dropTestTitles("● API Error: 401\n  ● suite › test")).toBe("● API Error: 401");
+  });
+
+  test("a lone CR, U+2028 and a leading BOM become what grep sees", () => {
+    expect(boundEvidence("Cloning 50%\rfatal: x y\n﻿z")).toBe("Cloning 50%\nfatal: x\ny\nz");
+  });
+
+  test("a trailing newline does not cost the first of the last 200 lines", () => {
+    const text = `${Array.from({ length: 200 }, (_, i) => `l${i}`).join("\n")}\n`;
+    expect(boundEvidence(text).split("\n")[0]).toBe("l0");
+  });
+});
+
+describe("runner error blocks are dropped (#8696 verifier round 2)", () => {
+  test("a cargo panic message is dropped up to the note line", () => {
+    const text =
+      "thread 'auth::t' panicked at src/auth.rs:42:9:\nauthentication failed\nnote: run with `RUST_BACKTRACE=1`";
+    expect(dropTestTitles(text)).toBe("note: run with `RUST_BACKTRACE=1`");
+  });
+
+  test("the error under a vitest FAIL header is dropped up to the frame", () => {
+    const text =
+      " FAIL  src/auth.test.ts > client > refreshes\nError: OAuth token has expired.\n ❯ src/auth.ts:20:11";
+    expect(dropTestTitles(text)).toBe(" ❯ src/auth.ts:20:11");
+  });
+
+  test("a vitest stderr block and a pytest captured section are dropped", () => {
+    expect(
+      dropTestTitles("stderr | a.test.ts > x\nAuthentication failed: bad password\n\nok"),
+    ).toBe("\nok");
+    expect(
+      dropTestTitles(
+        "----- Captured stderr call -----\nfatal: Authentication failed for 'https://x/'\nFAILED t.py::x",
+      ),
+    ).toBe("FAILED t.py::x");
+  });
+
+  test("indented runner error bodies are not auth; the same line at column 0 is", () => {
+    expect(classifyAndDecide({ text: "  Error: Authentication failed", attempts: [] }).class).toBe(
+      "unknown",
+    );
+    expect(classifyAndDecide({ text: "Error: Authentication failed", attempts: [] }).class).toBe(
+      "auth",
+    );
   });
 });

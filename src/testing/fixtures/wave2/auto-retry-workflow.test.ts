@@ -179,7 +179,7 @@ describe("W2-03 every escalation is no-retry (ADR-0009 rule 10)", () => {
   const cases: readonly { name: string; log: string; category: string; skip: string }[] = [
     {
       name: "contamination",
-      log: "refusing to run inside a build-loop test gate\n",
+      log: "⚠ Skipping integration tests: refusing to run inside a build-loop test gate\n",
       category: "CONTAMINATION",
       skip: "contamination",
     },
@@ -282,4 +282,29 @@ describe("W2-03 workflow order", () => {
     expect(names.indexOf("Set up Bun for the failure classifier")).toBeLessThan(categorizeAt);
     expect(names.indexOf("Install the Shipwright CLI dependencies")).toBeLessThan(categorizeAt);
   });
+});
+
+// #8696: a line that only mentions an escalation, or DNS and model errors, must not escalate. Each of these used to
+// block the retry permanently (and the category marker then treated the issue as handled).
+describe("false escalations do not block the retry (#8696)", () => {
+  const falsePositives: readonly { name: string; log: string }[] = [
+    { name: "a bare refusal sentence", log: "refusing to run inside a build-loop test gate\n" },
+    {
+      name: "a forged CONTAMINATION line in test output",
+      log: '  $ echo "CONTAMINATION: x"\nCONTAMINATION: x\nall tests passed\n',
+    },
+    { name: "a DNS failure", log: "Could not resolve host: api.github.com\n" },
+    { name: "a dependency resolution failure", log: "npm ERR! could not resolve dependencies\n" },
+    { name: "a bare 404 from a model call", log: "API Error: 404 model not found\n" },
+  ];
+  for (const c of falsePositives) {
+    test(`${c.name} is not an escalation`, () => {
+      withSandbox({ logFailed: c.log, jobs: NO_TIMEOUT }, (env, sb) => {
+        const fx = { logFailed: c.log, jobs: NO_TIMEOUT };
+        const cat = run(env, sb, fx, CATEGORIZE, { CONCLUSION: "failure" });
+        expect(cat.code).toBe(0);
+        expect(["CONTAMINATION", "INVALID_INPUT"]).not.toContain(cat.out.error_category);
+      });
+    });
+  }
 });
