@@ -1,4 +1,6 @@
 import { describe, expect, test } from "bun:test";
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
 import { join } from "node:path";
 import {
   isRatcheted,
@@ -8,6 +10,7 @@ import {
   type RuleDoc,
   trackedFiles,
 } from "./rule-catalog";
+import { ignoredByGit, trackedRuntimeState } from "./runtime-state";
 
 const rules = await loadRules();
 const tests = await loadRuleTests();
@@ -167,6 +170,7 @@ const ARCH_STEPS = [
   "bun tools/arch/workflow-injection.ts",
   "bun tools/arch/workflow-fail-closed.ts",
   "bun tools/arch/test-isolation.ts",
+  "bun tools/arch/runtime-state.ts",
 ];
 
 // A fix names an action. Extend the list when a new rule needs another verb.
@@ -377,6 +381,103 @@ test("claims.ts exports exactly its validated operations (no raw runner, no alia
 test("bun run arch runs every checker as a hard && step, with no operator that can swallow a failure", () => {
   expect(archScript.split(" && ")).toEqual(ARCH_STEPS);
   expect(archScript).not.toMatch(/\|\||;|\||(?<!&)&(?!&)|\$\(|`|\n/);
+});
+
+/**
+ * Runtime state under .claude/ is never tracked (#8665). The arch check asks git (`check-ignore`), so
+ * these tests pin what git ignores: every runtime example is ignored, hand-written config is not, and
+ * a force-added file under an ignore rule is caught, whatever form the rule takes.
+ */
+const RUNTIME_EXAMPLES = [
+  ".claude/loop-logs/iteration-1.log",
+  ".claude/loop-state.md",
+  ".claude/platform-hygiene.json",
+  ".claude/intelligence-cache.json",
+  ".claude/recovery-state.json",
+  ".claude/evidence/manifest.json",
+  ".claude/test-holdout/manifest.json",
+  ".claude/daemon-runtime.json",
+  ".claude/daemon-runtime.json.tmp.4242",
+  ".claude/tasks.md",
+  ".claude/.fleet-daemon-config.json",
+  ".claude/causal-graph.json",
+  ".claude/recovery-patterns.json",
+  ".claude/project-detection.json",
+  ".claude/prep-manifest.json",
+  ".claude/formal-specs.json",
+  ".claude/nudge.md",
+  ".claude/pipeline-tasks.md",
+  ".claude/decision-drafts/d1.md",
+  ".claude/mutations/m1.json",
+  ".claude/testgen/t1.ts",
+];
+const CONFIG_EXAMPLES = [
+  ".claude/settings.json",
+  ".claude/daemon-config.json",
+  ".claude/fleet-config.json",
+  ".claude/quality-profile.json",
+  ".claude/DEFINITION-OF-DONE.md",
+  ".claude/agents/porter.md",
+  ".claude/hooks/guard.sh",
+  ".claude/rules/bash.md",
+  "scripts/sw-loop.sh",
+];
+
+test("every runtime example is ignored by git", () => {
+  expect(ignoredByGit(RUNTIME_EXAMPLES)).toEqual(RUNTIME_EXAMPLES);
+});
+
+test("hand-written config is not ignored by git", () => {
+  expect(ignoredByGit(CONFIG_EXAMPLES)).toEqual([]);
+});
+
+test("no runtime state under .claude/ is tracked in the git index (#8665)", () => {
+  expect(trackedRuntimeState()).toEqual([]);
+});
+
+test("a force-added file is caught under every ignore form (anchored, no-slash, nested, ?/[], info/exclude)", () => {
+  const repo = mkdtempSync(join(tmpdir(), "rs-bypass-"));
+  try {
+    const git = (...args: string[]) => Bun.spawnSync(["git", ...args], { cwd: repo });
+    git("init", "-q");
+    const files = [
+      ".claude/anchored.json",
+      ".claude/noslashdir/x.json",
+      ".claude/q1.json",
+      ".claude/a.json",
+      ".claude/nested.json",
+      ".claude/excl.json",
+    ];
+    writeFileSync(
+      join(repo, ".gitignore"),
+      "/.claude/anchored.json\n.claude/noslashdir\n.claude/q?.json\n.claude/[a].json\n",
+    );
+    mkdirSync(join(repo, ".claude/noslashdir"), { recursive: true });
+    writeFileSync(join(repo, ".claude/.gitignore"), "nested.json\n");
+    mkdirSync(join(repo, ".git/info"), { recursive: true });
+    writeFileSync(join(repo, ".git/info/exclude"), ".claude/excl.json\n");
+    for (const f of files) writeFileSync(join(repo, f), "{}\n");
+    git("add", "-f", "--", ...files, ".claude/.gitignore");
+    expect(trackedRuntimeState(repo).sort()).toEqual([...files].sort());
+  } finally {
+    rmSync(repo, { recursive: true, force: true });
+  }
+});
+
+test("the developer's global excludes do not change the verdict (#8667)", () => {
+  const dir = mkdtempSync(join(tmpdir(), "rs-global-"));
+  try {
+    // A global ignore file that would ignore all of .claude/ and every markdown file
+    const excludes = join(dir, "excludes");
+    writeFileSync(excludes, ".claude/\n*.md\n");
+    const config = join(dir, "gitconfig");
+    writeFileSync(config, `[core]\n\texcludesFile = ${excludes}\n`);
+    const global = { GIT_CONFIG_GLOBAL: config };
+    expect(ignoredByGit(CONFIG_EXAMPLES, ROOT, global)).toEqual([]);
+    expect(ignoredByGit(RUNTIME_EXAMPLES, ROOT, global)).toEqual(RUNTIME_EXAMPLES);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
 });
 
 test("the bash bypass exemption is narrow: sw-session.sh spells the bypass flag once (F9, #8614)", async () => {
