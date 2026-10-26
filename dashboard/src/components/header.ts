@@ -13,15 +13,17 @@ import { setDisabled, isDisabled } from "./ui/button";
 import { openDialog, anyDialogOpen, confirmDialog } from "./ui/dialog";
 import { setupTablist } from "./ui/tabs";
 import { toast } from "./ui/toast";
-import { clock, offlineText } from "./ui/states";
-import { setupNotificationsModal, confirmAbort } from "./modal";
+import { clock } from "./ui/states";
+import { actionBlockReason, canAct, guardAction, markRoleUnavailable } from "./ui/guard";
+import { setupNotificationsModal, confirmAbort, pausedRuns, sendRunAction } from "./modal";
 import type { FleetState, DaemonConfig } from "../types/api";
 
 let soundEnabled = false;
 let previousPipelineIds: Set<number> = new Set();
 let palette: Palette | null = null;
 
-const BRAKE_OFFLINE = "Not connected: the brake needs a live connection to the server.";
+/** Controls that change the fleet; each is disabled, with its reason, while actions are blocked. */
+const ACTION_CONTROLS = ["emergency-brake", "daemon-btn-start", "daemon-btn-stop", "daemon-btn-pause", "daemon-btn-patrol"];
 
 export function setupHeader(): void {
   hydrateInitialHidden();
@@ -33,6 +35,7 @@ export function setupHeader(): void {
   setupNotificationsModal();
   setupConnectionStatus();
   setupPaletteAndKeys();
+  setupSkipLink();
   const tabs = document.getElementById("dest-tabs");
   if (tabs) setupTablist(tabs);
   fetchDaemonConfig();
@@ -119,8 +122,43 @@ function fetchUser(): void {
       if (initials) initials.textContent = initialsFor(name);
       document.getElementById("user-avatar")?.setAttribute("aria-label", `Account: ${name}`);
       if (user.role) applyRoleRestrictions(user.role);
+      syncActionControls();
     })
-    .catch(() => {});
+    .catch(() => {
+      // Fail closed: without a role, no action is offered.
+      markRoleUnavailable();
+      syncActionControls();
+    });
+}
+
+function syncActionControls(): void {
+  const reason = actionBlockReason();
+  for (const id of ACTION_CONTROLS) {
+    const el = document.getElementById(id);
+    if (el) setDisabled(el, id === "emergency-brake" ? brakeBlockReason() : reason);
+  }
+}
+
+/** The brake also needs a current run list, so it waits for live (not stale) data. */
+function brakeBlockReason(): string | undefined {
+  const reason = actionBlockReason();
+  if (reason) return reason;
+  conn.now = Date.now();
+  return connectionState(conn) === "live" ? undefined : "Waiting for live data: the brake needs a current run list.";
+}
+
+function guardBrake(): boolean {
+  const reason = brakeBlockReason();
+  if (reason) toast(reason, "error");
+  return reason === undefined;
+}
+
+/** The skip link moves focus without adding a history entry or a hash the router would see. */
+function setupSkipLink(): void {
+  document.querySelector(".skip-link")?.addEventListener("click", (e) => {
+    e.preventDefault();
+    document.getElementById("main")?.focus();
+  });
 }
 
 function setupUserMenu(): void {
@@ -151,11 +189,12 @@ function setupUserMenu(): void {
   });
 }
 
-// ── Connection state: live, reconnecting, stale with timestamp ─────────
+// ── Connection state: one vocabulary for header and banner ─────────────
+// Live: connected with fresh data. Stale: connected, but no data for STALE_MS.
+// Reconnecting: disconnected for under STALE_MS. Offline: disconnected for longer.
 
-export type ConnState = "connecting" | "live" | "reconnecting" | "stale";
+export type ConnState = "connecting" | "live" | "stale" | "reconnecting" | "offline";
 
-/** Data older than this, or a disconnect longer than this, counts as stale. */
 export const STALE_MS = 30000;
 
 export interface ConnInputs {
@@ -167,30 +206,41 @@ export interface ConnInputs {
 
 export function connectionState(c: ConnInputs): ConnState {
   if (c.connected) {
-    return c.lastDataAt !== null && c.now - c.lastDataAt > STALE_MS ? "stale" : "live";
+    if (c.lastDataAt === null) return "connecting";
+    return c.now - c.lastDataAt > STALE_MS ? "stale" : "live";
   }
   if (c.disconnectedAt === null) return c.lastDataAt === null ? "connecting" : "reconnecting";
-  return c.now - c.disconnectedAt > STALE_MS ? "stale" : "reconnecting";
+  return c.now - c.disconnectedAt > STALE_MS ? "offline" : "reconnecting";
 }
 
+const at = (t: number | null) => (t === null ? "" : clock(new Date(t)));
+
 export function connectionText(state: ConnState, c: ConnInputs): string {
-  const age = c.lastDataAt === null ? null : Math.max(0, Math.round((c.now - c.lastDataAt) / 1000));
+  const age = c.lastDataAt === null ? 0 : Math.max(0, Math.round((c.now - c.lastDataAt) / 1000));
   switch (state) {
-    case "connecting":
-      return "Connecting";
     case "live":
-      return age === null ? "Live" : `Live, updated ${age}s ago`;
+      return age < 5 ? "Live \u00b7 just now" : `Live \u00b7 updated ${age}s ago`;
+    case "stale":
+      return `Stale \u00b7 data from ${at(c.lastDataAt)}`;
+    case "offline":
+      return `Offline since ${at(c.disconnectedAt)}`;
     case "reconnecting":
       return "Reconnecting";
-    case "stale":
-      return c.lastDataAt === null ? "Stale, no data yet" : `Stale since ${clock(new Date(c.lastDataAt))}`;
+    default:
+      return "Connecting";
   }
 }
 
-/** Compact label for narrow headers; still text, so state is never colour alone. */
-export function connectionShort(state: ConnState, c: ConnInputs): string {
-  if (state === "stale") return c.lastDataAt === null ? "Stale" : `Stale ${clock(new Date(c.lastDataAt))}`;
-  return state === "reconnecting" ? "Retrying" : state === "live" ? "Live" : "Connecting";
+/** Compact label for narrow headers: the same words, so state is never colour alone. */
+export function connectionShort(state: ConnState): string {
+  return state[0].toUpperCase() + state.slice(1);
+}
+
+/** Offline banner text, in the header's vocabulary, with the brake's status. */
+export function bannerText(state: ConnState, c: ConnInputs): string {
+  const head = state === "offline" ? `Offline since ${at(c.disconnectedAt)}.` : "Reconnecting.";
+  const data = c.lastDataAt === null ? "No data received yet." : `Showing data from ${at(c.lastDataAt)}.`;
+  return `${head} ${data} Emergency brake unavailable until reconnected.`;
 }
 
 const conn: ConnInputs = { connected: false, disconnectedAt: null, lastDataAt: null, now: 0 };
@@ -204,36 +254,38 @@ function setupConnectionStatus(): void {
   });
   store.subscribe("fleetState", () => {
     conn.lastDataAt = Date.now();
+    syncActionControls();
   });
+  store.subscribe("currentUser", syncActionControls);
   renderConnection();
   setInterval(renderConnection, 1000);
 }
 
 function renderConnection(): void {
   conn.now = Date.now();
+  // A page that never connects gets no "connected" change (it starts false), but ws.ts shows
+  // its offline banner on the first failed attempt: count the outage from then.
+  const wsBanner = document.getElementById("offline-banner");
+  if (!conn.connected && conn.disconnectedAt === null && wsBanner && wsBanner.style.display !== "none") {
+    conn.disconnectedAt = conn.now;
+  }
   const state = connectionState(conn);
   const el = document.getElementById("conn");
   const text = document.getElementById("conn-text");
+  const short = document.getElementById("conn-short");
   if (el) el.dataset.state = state;
   if (text) text.textContent = connectionText(state, conn);
-  const short = document.getElementById("conn-short");
-  if (short) short.textContent = connectionShort(state, conn);
+  if (short) short.textContent = connectionShort(state);
   // Announce transitions only; the ticking age would be noise for a screen reader.
   if (state !== announced) {
     announced = state;
     const live = document.getElementById("conn-live");
-    if (live) live.textContent = "Connection: " + connectionText(state, { ...conn, lastDataAt: null });
+    if (live) live.textContent = "Connection: " + connectionShort(state);
   }
-  // ws.ts owns the offline banner and its Reconnect button; add the timestamps here.
-  const bannerText = document.querySelector("#offline-banner > span:nth-child(2)");
-  if (bannerText && conn.disconnectedAt !== null) {
-    bannerText.textContent = offlineText(
-      new Date(conn.disconnectedAt),
-      conn.lastDataAt === null ? null : new Date(conn.lastDataAt),
-    );
-  }
-  const brake = document.getElementById("emergency-brake");
-  if (brake) setDisabled(brake, conn.connected ? undefined : BRAKE_OFFLINE);
+  // ws.ts owns the offline banner and its Reconnect button; the text comes from here.
+  const banner = document.querySelector("#offline-banner > span:nth-child(2)");
+  if (banner && !conn.connected) banner.textContent = bannerText(state, conn);
+  syncActionControls();
 }
 
 // The breaker pill is static markup in index.html: the dashboard server does not expose
@@ -251,27 +303,40 @@ function setupEmergencyBrake(): void {
     if (isDisabled(e.currentTarget as HTMLElement)) return;
     openBrakeDialog();
   });
-  document.getElementById("emergency-confirm")?.addEventListener("click", () => {
-    if (!conn.connected) return toast(BRAKE_OFFLINE, "error");
-    api
-      .emergencyBrake()
-      .then((res) => {
-        const paused = (res as { paused?: number }).paused;
-        toast(paused == null ? "Emergency brake sent." : `Emergency brake: paused ${paused} pipeline${paused === 1 ? "" : "s"}.`);
-      })
-      .catch((err) => toast("Emergency brake failed: " + String(err), "error"));
-  });
+  document.getElementById("emergency-confirm")?.addEventListener("click", () => void engageBrake());
 }
 
 function openBrakeDialog(): void {
-  if (!conn.connected) {
-    toast(BRAKE_OFFLINE, "error");
-    return;
-  }
+  if (!guardBrake()) return;
   const fleet = store.get("fleetState");
   const active = document.getElementById("emergency-active-count");
   if (active) active.textContent = String(fleet?.pipelines?.length ?? 0);
   openDialog("emergency-modal");
+}
+
+/**
+ * The brake pauses daemon intake (no new runs start) and pauses every running pipeline.
+ * Both calls are always attempted, and success is reported only when both succeed.
+ */
+export async function engageBrake(): Promise<void> {
+  if (!guardBrake()) return;
+  const running = store.get("fleetState")?.pipelines?.map((p) => p.issue) ?? [];
+  const [intake, runs] = await Promise.allSettled([api.daemonControl("pause"), api.emergencyBrake()]);
+  setTimeout(fetchDaemonConfig, 500);
+  const paused = runs.status === "fulfilled" ? ((runs.value as { paused?: number }).paused ?? 0) : 0;
+  // The endpoint answers 200 even when it could signal none of the runs, so compare counts.
+  const allPaused = runs.status === "fulfilled" && paused >= running.length;
+  if (allPaused) running.forEach((n) => pausedRuns.add(n));
+  const runPart =
+    runs.status === "rejected"
+      ? `pausing pipelines failed (${String(runs.reason)})`
+      : `pause signal sent to ${Math.min(paused, running.length)} of ${running.length} running pipeline${running.length === 1 ? "" : "s"}`;
+  if (intake.status === "fulfilled" && allPaused) {
+    toast(`Emergency brake engaged: intake paused; ${runPart}.`);
+    return;
+  }
+  const intakePart = intake.status === "rejected" ? `pausing intake failed (${String(intake.reason)})` : "intake paused";
+  toast(`Emergency brake incomplete: ${intakePart}; ${runPart}. Check the daemon now.`, "error");
 }
 
 // ── Command palette and keyboard shortcuts ─────────────────────────────
@@ -288,22 +353,16 @@ function openRun(issue: number): void {
   });
 }
 
-function intervene(issue: number, action: "pause" | "resume"): void {
-  api
-    .sendIntervention(issue, action)
-    .then(() => toast(`${action === "pause" ? "Pause" : "Resume"} sent to run #${issue}.`))
-    .catch((err) => toast(`${action} failed for run #${issue}: ${String(err)}`, "error"));
-}
-
 function commands() {
   return buildCommands({
     destinations: DESTINATIONS,
     fleet: store.get("fleetState"),
-    canAct: store.get("currentUser")?.role !== "viewer",
+    canAct: canAct(),
     go: switchTab,
     openRun,
-    pauseRun: (n) => intervene(n, "pause"),
-    resumeRun: (n) => intervene(n, "resume"),
+    isPaused: (n) => pausedRuns.has(n),
+    pauseRun: (n) => void sendRunAction(n, "pause"),
+    resumeRun: (n) => void sendRunAction(n, "resume"),
     stopRun: (n, stage) => void confirmAbort(n, stage),
     emergencyBrake: openBrakeDialog,
     toggleTheme: cycleTheme,
@@ -428,24 +487,18 @@ export function renderAlertBanner(_data: FleetState): void {
       const actions = h("span", { class: "alert-actions" });
       const add = (label: string, fn: () => void, cls = "btn sm") =>
         actions.append(h("button", { type: "button", class: cls, text: label, onclick: fn }));
-      const canAct = store.get("currentUser")?.role !== "viewer";
-      if (alert.issue) add("View", () => switchTab("runs"));
-      if (canAct && alert.type === "failure_spike") add("Emergency brake…", openBrakeDialog, "btn sm danger");
-      if (canAct && alert.type === "stuck_pipeline" && alert.issue) {
-        const n = alert.issue;
-        add("Stop run…", () => void confirmAbort(n), "btn sm danger");
-        add("Skip stage", () =>
-          api
-            .sendIntervention(n, "skip")
-            .then(() => toast(`Skip sent to run #${n}.`))
-            .catch((err) => toast(`Skip failed for run #${n}: ${String(err)}`, "error")),
-        );
-      }
+      const acts = canAct();
+      const issue = alert.issue;
+      // On phones the actions collapse into one Review button (CSS swaps which show).
+      add("Review", () => (issue ? openRun(issue) : switchTab("safety")), "btn sm alert-review");
+      if (issue) add("View", () => openRun(issue));
+      if (acts && alert.type === "failure_spike") add("Emergency brake…", openBrakeDialog, "btn sm danger");
+      if (acts && alert.type === "stuck_pipeline" && issue) add("Stop run…", () => void confirmAbort(issue), "btn sm danger");
       add("Dismiss", () => {
         store.set("alertDismissed", true);
         hide();
         setTimeout(() => store.set("alertDismissed", false), 30000);
-      }, "btn sm ghost");
+      }, "btn sm ghost alert-dismiss");
       container.dataset.tone = tone;
       container.replaceChildren(
         h("span", { class: "glyph", "aria-hidden": "true", text: tone === "danger" ? GLYPHS.fail : GLYPHS.warn }),
@@ -515,9 +568,10 @@ function setupDaemonControlBar(): void {
     document.getElementById("daemon-btn-" + action)?.addEventListener("click", () => daemonControlAction(action));
   }
   document.getElementById("daemon-btn-stop")?.addEventListener("click", async () => {
+    if (!guardAction()) return;
     const ok = await confirmDialog({
       title: "Stop the daemon?",
-      body: "The daemon stops polling for labelled issues and starting runs. Start it again from here.",
+      body: daemonStopBody(store.get("fleetState")?.pipelines?.length ?? 0),
       confirmLabel: "Stop daemon",
       cancelLabel: "Keep running",
       danger: true,
@@ -530,7 +584,17 @@ function setupDaemonControlBar(): void {
   });
 }
 
+/** What stopping the daemon does: its exit handler terminates every active pipeline (sw-daemon.sh). */
+export function daemonStopBody(running: number): string {
+  const runs =
+    running === 0
+      ? "No pipelines are running now; any that start before it exits are terminated too."
+      : `All ${running} running pipeline${running === 1 ? " is" : "s are"} terminated; they cannot be resumed from the dashboard.`;
+  return `The daemon stops polling and exits. ${runs} Queued work stays queued. Start it again from here.`;
+}
+
 async function daemonControlAction(action: string): Promise<void> {
+  if (!guardAction()) return;
   const id = action === "resume" ? "pause" : action;
   const btn = document.getElementById("daemon-btn-" + id) as HTMLButtonElement | null;
   if (btn) btn.disabled = true;
@@ -548,14 +612,11 @@ function updateDaemonControlBar(data: DaemonConfig): void {
   const badge = document.getElementById("daemon-status-badge");
   if (!badge) return;
   const pauseBtn = document.getElementById("daemon-btn-pause");
-  const [state, tone, glyph, label] = data.paused
-    ? (["paused", "warn", GLYPHS.half, "Paused"] as const)
-    : data.config?.watch_label
-      ? (["running", "ok", GLYPHS.live, "Running"] as const)
-      : (["stopped", "neutral", GLYPHS.idle, "Stopped"] as const);
-  badge.dataset.state = state;
-  setPill(badge, tone, glyph, label);
-  if (pauseBtn) pauseBtn.textContent = data.paused ? "Resume" : "Pause";
+  // The server reports the intake pause flag, not whether the daemon process is running.
+  badge.dataset.state = data.paused ? "paused" : "unknown";
+  if (data.paused) setPill(badge, "warn", GLYPHS.half, "Intake paused");
+  else setPill(badge, "neutral", GLYPHS.unknown, "Daemon: not reported");
+  if (pauseBtn) pauseBtn.textContent = data.paused ? "Resume intake" : "Pause intake";
 
   const cfg = (data.config ?? {}) as Record<string, unknown>;
   const set = (id: string, v: unknown) => {

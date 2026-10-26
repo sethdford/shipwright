@@ -29,6 +29,7 @@ function ctx(over: Partial<CommandContext> = {}): CommandContext {
     canAct: true,
     go: vi.fn(),
     openRun: vi.fn(),
+    isPaused: (n: number) => n === 4171,
     pauseRun: vi.fn(),
     resumeRun: vi.fn(),
     stopRun: vi.fn(),
@@ -76,13 +77,13 @@ describe("buildCommands", () => {
     expect(c.openRun).toHaveBeenCalledWith(4187);
   });
 
-  it("offers pause, resume and stop for every run (the server does not report paused state)", () => {
+  it("offers one Pause/Resume toggle per run, by the pause state this page knows, plus stop", () => {
     const c = ctx();
     const cmds = buildCommands(c);
     const ids = cmds.map((x) => x.id);
-    expect(ids).toEqual(
-      expect.arrayContaining(["pause-4187", "resume-4187", "stop-4187", "pause-4171", "resume-4171", "stop-4171", "brake"]),
-    );
+    expect(ids).toEqual(expect.arrayContaining(["pause-4187", "stop-4187", "resume-4171", "stop-4171", "brake"]));
+    expect(ids).not.toContain("resume-4187");
+    expect(ids).not.toContain("pause-4171");
     cmds.find((x) => x.id === "resume-4171")?.run();
     cmds.find((x) => x.id === "pause-4187")?.run();
     expect(c.resumeRun).toHaveBeenCalledWith(4171);

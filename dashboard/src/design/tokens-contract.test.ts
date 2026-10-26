@@ -34,6 +34,8 @@ const TEXT_ON_SURFACE: Array<[ColourRole, ColourRole]> = [
   ["info", "bg1"],
   ["info", "bg2"],
   ["accentInk", "accent"],
+  // Text on solid danger buttons (confirm Stop, Engage brake).
+  ["dangerInk", "danger"],
 ];
 
 const UI_BOUNDARY: Array<[ColourRole, ColourRole]> = [

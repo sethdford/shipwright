@@ -46,7 +46,7 @@ import {
   withCors,
   wsOriginAllowed,
 } from "./services/request-guard.js";
-import { htmlSecurityHeaders } from "./services/security-headers.js";
+import { htmlSecurityHeaders, inlinePageHeaders } from "./services/security-headers.js";
 import { Database } from "bun:sqlite";
 
 // ─── Config ──────────────────────────────────────────────────────────
@@ -566,7 +566,8 @@ function loginPageHTML(error?: string): string {
   const patForm = `
     ${errorHtml}
     <form method="POST" action="/auth/pat-login" style="display:flex;flex-direction:column;gap:1rem;">
-      <input name="username" type="text" required
+      <input name="username" type="text" required class="login-input"
+        aria-label="GitHub username"
         placeholder="GitHub username"
         style="
           background: rgba(0,212,255,0.04);
@@ -576,11 +577,8 @@ function loginPageHTML(error?: string): string {
           color: #e8ecf4;
           font-family: 'Plus Jakarta Sans', sans-serif;
           font-size: 0.95rem;
-          outline: none;
           transition: border-color 0.2s;
         "
-        onfocus="this.style.borderColor='rgba(0,212,255,0.4)'"
-        onblur="this.style.borderColor='rgba(0,212,255,0.15)'"
       />
       <button type="submit" class="btn-github" style="justify-content:center;">
         <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"/></svg>
@@ -608,10 +606,8 @@ function loginPageHTML(error?: string): string {
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Fleet Command \u2014 Sign In</title>
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Instrument+Serif&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
   <style>
+    .login-input:focus { border-color: rgba(0,212,255,0.6) !important; outline: 2px solid #00d4ff; outline-offset: 2px; }
     *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
     body {
       background: #060a14;
@@ -686,9 +682,6 @@ function accessDeniedHTML(repo: string): string {
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Fleet Command — Access Denied</title>
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Instrument+Serif&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
   <style>
     *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
     body {
@@ -2507,7 +2500,7 @@ async function handleAuthCallback(url: URL, req: Request): Promise<Response> {
   if (!isAdmin) {
     return new Response(accessDeniedHTML(DASHBOARD_REPO), {
       status: 403,
-      headers: { "Content-Type": "text/html; charset=utf-8" },
+      headers: inlinePageHeaders(),
     });
   }
 
@@ -2568,7 +2561,7 @@ async function handlePatLogin(req: Request): Promise<Response> {
   if (!username) {
     return new Response(loginPageHTML("Please enter a GitHub username"), {
       status: 400,
-      headers: { "Content-Type": "text/html; charset=utf-8" },
+      headers: inlinePageHeaders(),
     });
   }
 
@@ -2579,7 +2572,7 @@ async function handlePatLogin(req: Request): Promise<Response> {
   if (!isAdmin) {
     return new Response(accessDeniedHTML(DASHBOARD_REPO), {
       status: 403,
-      headers: { "Content-Type": "text/html; charset=utf-8" },
+      headers: inlinePageHeaders(),
     });
   }
 
@@ -2719,7 +2712,7 @@ async function routeRequest(
         return new Response("Dashboard not found", { status: 404 });
       }
       return new Response(loginPageHTML(), {
-        headers: { "Content-Type": "text/html; charset=utf-8" },
+        headers: inlinePageHeaders(),
       });
     }
 
@@ -2750,7 +2743,7 @@ async function routeRequest(
       if (req.method === "POST") return handleAuthLogout(req);
       if (req.method === "GET") {
         return new Response(logoutConfirmHTML(), {
-          headers: { "Content-Type": "text/html; charset=utf-8" },
+          headers: inlinePageHeaders(),
         });
       }
       return new Response("Method Not Allowed", {

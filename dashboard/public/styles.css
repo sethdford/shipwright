@@ -3890,12 +3890,6 @@
   border: 1px solid color-mix(in oklch, var(--sw-text-2) 30%, transparent);
 }
 
-.daemon-status-label {
-  font-size: 0.85rem;
-  color: var(--sw-text-2);
-  font-weight: 500;
-}
-
 .daemon-control-actions {
   display: flex;
   gap: 0.5rem;
@@ -4989,7 +4983,7 @@ kbd {
   display: grid;
   grid-template-columns: auto minmax(0, 1fr) auto;
   align-items: center;
-  gap: 12px 24px;
+  gap: 12px 20px;
   padding: 12px 24px;
   background: var(--sw-bg-0);
   border-bottom: 1px solid var(--sw-line-subtle);
@@ -5034,7 +5028,7 @@ kbd {
   position: relative;
   flex: none;
   height: 32px;
-  padding: 0 12px;
+  padding: 0 11px;
   border: 0;
   border-radius: var(--sw-radius-sm);
   background: none;
@@ -5101,10 +5095,17 @@ kbd {
   border: 2px solid var(--c);
 }
 .conn[data-state="stale"] .dot {
+  --c: var(--sw-warn);
+  border-radius: 1px;
+}
+.conn[data-state="offline"] .dot {
   --c: var(--sw-danger);
   border-radius: 1px;
 }
 .conn[data-state="stale"] {
+  color: var(--sw-warn);
+}
+.conn[data-state="offline"] {
   color: var(--sw-danger);
 }
 
@@ -5217,11 +5218,36 @@ kbd {
   border-color: var(--sw-danger);
   color: var(--sw-danger);
 }
-.btn.danger-solid {
+.btn.danger-solid,
+.btn.brake {
   background: var(--sw-danger);
   border-color: var(--sw-danger);
-  color: oklch(0.99 0 0);
+  color: var(--sw-danger-ink);
   font-weight: 600;
+}
+.btn.brake:hover {
+  background: var(--sw-danger);
+  border-color: var(--sw-danger);
+  color: var(--sw-danger-ink);
+  filter: brightness(1.08);
+}
+.btn.brake[aria-disabled="true"] {
+  background: transparent;
+  border-color: var(--sw-line);
+  color: var(--sw-text-3);
+  filter: none;
+}
+.brake-icon {
+  display: none;
+  flex: none;
+  width: 14px;
+  height: 14px;
+}
+.header-divider {
+  width: 1px;
+  height: 20px;
+  margin: 0 4px;
+  background: var(--sw-line-subtle);
 }
 .btn.danger-solid:hover {
   background: var(--sw-danger);
@@ -5543,6 +5569,9 @@ select.form-input {
   flex-wrap: wrap;
   gap: 8px;
 }
+.alert-actions .alert-review {
+  display: none;
+}
 .offline-banner {
   margin: -24px -24px 24px;
 }
@@ -5798,23 +5827,22 @@ dialog h2 {
 #conn-short {
   display: none;
 }
-@media (max-width: 1480px) {
-  .surface {
+@media (max-width: 1560px) {
+  .btn-label {
     display: none;
   }
 }
-@media (max-width: 1380px) {
-  #conn-text,
-  .btn-label {
+@media (max-width: 1439px) {
+  #conn-text {
     display: none;
   }
   #conn-short {
     display: inline;
   }
 }
-@media (max-width: 1240px) {
+@media (max-width: 1360px) {
   .app-header {
-    grid-template-columns: minmax(0, 1fr) auto;
+    grid-template-columns: auto minmax(0, 1fr);
     padding: 10px 16px 0;
     gap: 8px 12px;
   }
@@ -5830,7 +5858,7 @@ dialog h2 {
     bottom: -8px;
   }
 }
-@media (min-width: 761px) and (max-width: 1240px) {
+@media (min-width: 761px) and (max-width: 1360px) {
   /* Two-row header: the status row has room for full labels again. */
   .btn-label,
   #conn-text {
@@ -5884,6 +5912,26 @@ dialog h2 {
   .pill-short {
     display: inline;
   }
+  .brake-icon {
+    display: inline;
+  }
+  .header-divider,
+  .theme-btn,
+  .surface {
+    display: none;
+  }
+  /* Disconnected on a phone: the offline banner right below carries the words. */
+  .conn[data-state="connecting"] #conn-short,
+  .conn[data-state="reconnecting"] #conn-short,
+  .conn[data-state="offline"] #conn-short {
+    display: none;
+  }
+  .alert-actions > :not(.alert-review, .alert-dismiss) {
+    display: none;
+  }
+  .alert-actions .alert-review {
+    display: inline-flex;
+  }
   /* Scroll cue: the last tab fades at the edge while more tabs are off screen. */
   .tabs {
     mask-image: linear-gradient(to right, #000 calc(100% - 32px), transparent);
@@ -5893,10 +5941,27 @@ dialog h2 {
   .wordmark {
     display: none;
   }
+  .header-status {
+    gap: 4px;
+  }
 }
 @media (pointer: coarse), (max-width: 600px) {
   #palette-kbd {
     display: none;
+  }
+}
+@media (pointer: coarse) {
+  .btn,
+  .tab,
+  .pill {
+    min-height: 44px;
+  }
+  .btn {
+    min-width: 44px;
+  }
+  .avatar {
+    width: 44px;
+    height: 44px;
   }
 }
 
@@ -5908,6 +5973,10 @@ dialog h2 {
     animation-iteration-count: 1 !important;
     transition-duration: 100ms !important;
     scroll-behavior: auto !important;
+  }
+  /* No movement on interaction; the toast keeps its centring transform. */
+  :is(.btn, .tab, .pill, .filter-chip, .stat-card, .metric-card, .agent-card, .machine-card, .pipeline-card, .btn-primary, .btn-secondary):is(:hover, :active, :focus) {
+    transform: none !important;
   }
   dialog[open] {
     animation: none;

@@ -3,7 +3,7 @@ import { h, hydrateInitialHidden } from "./dom";
 import { pill, setPill } from "./pill";
 import { button, setDisabled, isDisabled } from "./button";
 import { confirmDialog, openDialog, anyDialogOpen } from "./dialog";
-import { errorState, offlineText, emptyState, skeleton } from "./states";
+import { errorState, emptyState, skeleton } from "./states";
 import { setupTablist } from "./tabs";
 import { toast } from "./toast";
 
@@ -121,13 +121,6 @@ describe("states", () => {
     expect(el.textContent).toContain("Showing data from 14:02.");
     el.querySelector("button")?.click();
     expect(retry).toHaveBeenCalled();
-  });
-
-  it("offline text gives both timestamps", () => {
-    expect(offlineText(new Date(2026, 9, 25, 14, 2), new Date(2026, 9, 25, 14, 1))).toBe(
-      "Offline since 14:02. Showing data from 14:01.",
-    );
-    expect(offlineText(new Date(2026, 9, 25, 9, 5), null)).toBe("Offline since 09:05. No data received yet.");
   });
 
   it("empty state and skeleton render", () => {

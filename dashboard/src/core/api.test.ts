@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeEach, vi, afterEach } from "vitest";
 import * as api from "./api";
+import { store } from "./state";
 
 // Mock global fetch
 const mockFetch = vi.fn();
@@ -24,6 +25,32 @@ function errorResponse(status: number, body?: unknown) {
 describe("API Client", () => {
   beforeEach(() => {
     mockFetch.mockReset();
+    // Mutations are gated on a live connection and a loaded role (core/guard.ts).
+    store.set("connected", true);
+    store.set("currentUser", { username: "ada", role: "operator" });
+  });
+
+  describe("action gate", () => {
+    it("refuses mutations while disconnected, without calling fetch", async () => {
+      store.set("connected", false);
+      await expect(api.sendIntervention(1, "pause")).rejects.toThrow(/Not connected/);
+      expect(mockFetch).not.toHaveBeenCalled();
+    });
+
+    it("refuses mutations until the role has loaded, and for viewers", async () => {
+      store.set("currentUser", null);
+      await expect(api.emergencyBrake()).rejects.toThrow(/role/);
+      store.set("currentUser", { username: "v", role: "viewer" });
+      await expect(api.daemonControl("pause")).rejects.toThrow(/Viewers/);
+      expect(mockFetch).not.toHaveBeenCalled();
+    });
+
+    it("never gates reads", async () => {
+      store.set("connected", false);
+      store.set("currentUser", null);
+      mockFetch.mockReturnValue(jsonResponse({ alerts: [] }));
+      await expect(api.fetchAlerts()).resolves.toEqual({ alerts: [] });
+    });
   });
 
   afterEach(() => {

@@ -33,12 +33,6 @@ export function errorState(opts: ErrorStateOptions): HTMLDivElement {
   );
 }
 
-/** Text for the offline banner: "Offline since 14:02. Showing data from 14:01." */
-export function offlineText(since: Date, lastData: Date | null): string {
-  const data = lastData ? "Showing data from " + clock(lastData) + "." : "No data received yet.";
-  return "Offline since " + clock(since) + ". " + data;
-}
-
 /** Placeholder rows sized like the final content, so nothing shifts when data lands. */
 export function skeleton(rows = 3): HTMLDivElement {
   const el = h("div", { class: "skeleton", "aria-hidden": "true" });

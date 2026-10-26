@@ -12,6 +12,23 @@ export const DASHBOARD_CSP = [
   "style-src-attr 'unsafe-inline'",
   "script-src 'self'",
   "font-src 'self'",
+  "object-src 'none'",
+  "frame-ancestors 'none'",
+  "base-uri 'none'",
+  "form-action 'self'",
+].join("; ");
+
+/**
+ * Policy for the small server-rendered pages (login, logout confirmation, access denied).
+ * They carry their styles inline and run no script, so inline style is allowed and
+ * everything else, including remote fonts, is refused.
+ */
+export const INLINE_PAGE_CSP = [
+  "default-src 'none'",
+  "style-src 'unsafe-inline'",
+  "img-src 'self' data:",
+  "font-src 'self'",
+  "object-src 'none'",
   "frame-ancestors 'none'",
   "base-uri 'none'",
   "form-action 'self'",
@@ -20,4 +37,9 @@ export const DASHBOARD_CSP = [
 /** Headers for HTML documents served from dashboard/public. */
 export function htmlSecurityHeaders(): Record<string, string> {
   return { "Content-Security-Policy": DASHBOARD_CSP };
+}
+
+/** Headers for a server-rendered HTML page. */
+export function inlinePageHeaders(): Record<string, string> {
+  return { "Content-Type": "text/html; charset=utf-8", "Content-Security-Policy": INLINE_PAGE_CSP };
 }

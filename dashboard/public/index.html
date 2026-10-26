@@ -23,7 +23,7 @@
           <path fill="currentColor" d="M2.5 21h27l-4.6 6.2a2 2 0 0 1-1.6.8H8.7a2 2 0 0 1-1.6-.8z" />
         </svg>
         <span class="wordmark">Shipwright</span>
-        <span class="surface">Fleet Command</span>
+        <span class="surface">Fleet</span>
       </div>
 
       <nav class="dest-nav" aria-label="Destinations">
@@ -41,7 +41,8 @@
         <span class="conn" id="conn" data-state="connecting"><span class="dot" aria-hidden="true"></span><span id="conn-text">Connecting</span><span id="conn-short" aria-hidden="true">Connecting</span></span>
         <span class="sr-only" role="status" id="conn-live"></span>
         <span class="pill" id="breaker-pill" data-tone="neutral" title="The dashboard server does not report circuit-breaker state yet. Run shipwright breaker status on the host."><span class="glyph" aria-hidden="true">?</span><span>Breaker<span class="pill-detail">: not reported</span><span class="pill-short"> n/a</span></span></span>
-        <button class="btn danger" type="button" id="emergency-brake"><span class="label-long">Emergency brake</span><span class="label-short" aria-hidden="true">Brake</span></button>
+        <span class="header-divider" aria-hidden="true"></span>
+        <button class="btn brake" type="button" id="emergency-brake" aria-label="Emergency brake"><svg class="brake-icon" viewBox="0 0 16 16" width="14" height="14" aria-hidden="true" focusable="false"><path d="M5.2 1.5h5.6l3.7 3.7v5.6l-3.7 3.7H5.2l-3.7-3.7V5.2z" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round" /><path d="M5 8h6" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" /></svg><span class="label-long">Emergency brake</span><span class="label-short">Brake</span></button>
         <button class="btn ghost" type="button" id="open-palette" aria-keyshortcuts="Meta+K Control+K" aria-label="Search and commands"><svg viewBox="0 0 16 16" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.75" aria-hidden="true" focusable="false"><circle cx="7" cy="7" r="4.75" /><path d="m10.5 10.5 3 3" stroke-linecap="round" /></svg><span class="btn-label">Search</span><kbd id="palette-kbd">⌘K</kbd></button>
         <button class="btn ghost theme-btn" type="button" id="theme-toggle" aria-label="Theme: system. Activate to change"><svg viewBox="0 0 16 16" width="16" height="16" aria-hidden="true" focusable="false"><circle cx="8" cy="8" r="5.25" fill="none" stroke="currentColor" stroke-width="1.5" /><path d="M8 2.75a5.25 5.25 0 0 1 0 10.5z" fill="currentColor" /></svg><span class="btn-label" id="theme-name">system</span></button>
         <div class="user-menu">
@@ -98,35 +99,30 @@
         <!-- Daemon Control Bar -->
         <div class="daemon-control-bar" id="daemon-control-bar">
           <div class="daemon-control-status">
-            <span class="pill" data-tone="neutral" id="daemon-status-badge"><span class="glyph" aria-hidden="true">?</span><span>Unknown</span></span>
-            <span class="daemon-status-label">Daemon</span>
+            <span class="pill" data-tone="neutral" id="daemon-status-badge"><span class="glyph" aria-hidden="true">?</span><span>Daemon: not reported</span></span>
           </div>
           <div class="daemon-control-actions">
             <button
               class="btn btn-sm btn-start"
               id="daemon-btn-start"
-              title="Start daemon"
             >
               Start
             </button>
             <button
               class="btn btn-sm btn-stop"
               id="daemon-btn-stop"
-              title="Stop daemon"
             >
               Stop
             </button>
             <button
               class="btn btn-sm btn-pause"
               id="daemon-btn-pause"
-              title="Pause/Resume daemon"
             >
-              Pause
+              Pause intake
             </button>
             <button
               class="btn btn-sm btn-patrol"
               id="daemon-btn-patrol"
-              title="Run patrol now"
             >
               Run Patrol
             </button>
@@ -706,7 +702,7 @@
     <dialog id="emergency-modal" aria-labelledby="brake-title" aria-describedby="brake-desc">
       <div class="confirm">
         <h2 id="brake-title">Engage the emergency brake?</h2>
-        <p id="brake-desc">This pauses all <strong class="num" id="emergency-active-count">0</strong> running pipelines. Queued work stays queued and the daemon keeps polling; pause the daemon on Triage to stop new starts. Resume paused runs from Runs or the command palette.</p>
+        <p id="brake-desc">This pauses daemon intake, so no new runs start, and sends a pause signal to each of the <strong class="num" id="emergency-active-count">0</strong> running pipelines. Queued work stays in the queue. Both steps are always attempted, and you are told if either fails or if fewer pipelines were paused than are running. Resume intake on Triage, and resume runs from Runs.</p>
         <div class="actions">
           <button class="btn" type="button" data-close autofocus>Cancel</button>
           <button class="btn danger-solid" type="button" id="emergency-confirm" data-close>Engage brake</button>

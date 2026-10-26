@@ -18,6 +18,8 @@ import type {
   UserInfo,
 } from "../types/api";
 
+import { assertCanAct } from "./guard";
+
 // The server rejects mutating requests that are not application/json (CSRF guard).
 function withJsonContentType(options?: RequestInit): RequestInit | undefined {
   const method = (options?.method ?? "GET").toUpperCase();
@@ -28,6 +30,8 @@ function withJsonContentType(options?: RequestInit): RequestInit | undefined {
 }
 
 async function request<T>(url: string, options?: RequestInit): Promise<T> {
+  const method = (options?.method ?? "GET").toUpperCase();
+  if (method !== "GET" && method !== "HEAD") assertCanAct();
   const resp = await fetch(url, withJsonContentType(options));
   if (!resp.ok) {
     const body = await resp

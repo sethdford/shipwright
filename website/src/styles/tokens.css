@@ -13,6 +13,7 @@
   --sw-ok: oklch(0.82 0.16 150);
   --sw-warn: oklch(0.86 0.15 85);
   --sw-danger: oklch(0.7 0.19 20);
+  --sw-danger-ink: oklch(0.15 0.015 255);
   --sw-info: oklch(0.75 0.12 265);
   --sw-font-display: 'Instrument Serif', Georgia, serif;
   --sw-font-body: 'Plus Jakarta Sans', system-ui, sans-serif;
@@ -69,6 +70,7 @@
     --sw-ok: oklch(0.5 0.14 150);
     --sw-warn: oklch(0.5 0.13 70);
     --sw-danger: oklch(0.52 0.19 25);
+    --sw-danger-ink: oklch(0.99 0 0);
     --sw-info: oklch(0.5 0.12 265);
   }
 }
@@ -87,6 +89,7 @@
   --sw-ok: oklch(0.5 0.14 150);
   --sw-warn: oklch(0.5 0.13 70);
   --sw-danger: oklch(0.52 0.19 25);
+  --sw-danger-ink: oklch(0.99 0 0);
   --sw-info: oklch(0.5 0.12 265);
 }
 

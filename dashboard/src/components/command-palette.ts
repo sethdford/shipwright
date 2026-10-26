@@ -67,6 +67,8 @@ export interface CommandContext {
   canAct: boolean;
   go(dest: string): void;
   openRun(issue: number): void;
+  /** Whether this page paused the run; the server does not report paused state. */
+  isPaused(issue: number): boolean;
   pauseRun(issue: number): void;
   resumeRun(issue: number): void;
   stopRun(issue: number, stage: string): void;
@@ -100,12 +102,12 @@ export function buildCommands(ctx: CommandContext): Command[] {
   out.push({ id: "keys", label: "Show keyboard shortcuts", kind: "action", keys: ["?"], keywords: "help", run: ctx.showShortcuts });
   if (!ctx.canAct) return out;
   out.push({ id: "brake", label: "Engage the emergency brake…", kind: "action", danger: true, keywords: "pause all stop", run: ctx.emergencyBrake });
-  // The server does not report whether a run is paused, so both Pause and Resume are offered.
   for (const p of runs) {
     const n = p.issue;
     out.push(
-      { id: "pause-" + n, label: `Pause run #${n}`, kind: "action", needsQuery: true, run: () => ctx.pauseRun(n) },
-      { id: "resume-" + n, label: `Resume run #${n}`, kind: "action", needsQuery: true, run: () => ctx.resumeRun(n) },
+      ctx.isPaused(n)
+        ? { id: "resume-" + n, label: `Resume run #${n}`, kind: "action", needsQuery: true, run: () => ctx.resumeRun(n) }
+        : { id: "pause-" + n, label: `Pause run #${n}`, kind: "action", needsQuery: true, run: () => ctx.pauseRun(n) },
       { id: "stop-" + n, label: `Stop run #${n}…`, kind: "action", needsQuery: true, danger: true, run: () => ctx.stopRun(n, p.stage) },
     );
   }

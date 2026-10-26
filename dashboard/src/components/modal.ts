@@ -8,6 +8,7 @@ import { isViewActive } from "../core/router";
 import { h } from "./ui/dom";
 import { openDialog, closeDialog, confirmDialog } from "./ui/dialog";
 import { toast } from "./ui/toast";
+import { guardAction } from "./ui/guard";
 
 let interventionTarget: number | null = null;
 let removeMachineTarget: string | null = null;
@@ -27,10 +28,12 @@ export function setupInterventionModal(): void {
 
   if (sendBtn) {
     sendBtn.addEventListener("click", () => {
-      if (interventionTarget && msgEl?.value.trim()) {
-        api.sendIntervention(interventionTarget, "message", {
-          message: msgEl.value.trim(),
-        });
+      if (interventionTarget && msgEl?.value.trim() && guardAction()) {
+        const issue = interventionTarget;
+        api
+          .sendIntervention(issue, "message", { message: msgEl.value.trim() })
+          .then(() => toast(`Message sent to run #${issue}.`))
+          .catch((err) => toast(`Message failed for run #${issue}: ${String(err)}`, "error"));
         closeModal();
       }
     });
@@ -48,21 +51,45 @@ export function openInterventionModal(issue: number): void {
   openDialog("intervention-modal");
 }
 
+/**
+ * Runs this page paused (pause, bulk pause, emergency brake) and has not resumed. The server
+ * does not report paused state, so this is what the palette's Pause/Resume toggle goes by.
+ */
+export const pausedRuns = new Set<number>();
+
+type RunAction = "pause" | "resume" | "abort";
+const ACTION_WORD: Record<RunAction, string> = { pause: "Pause", resume: "Resume", abort: "Stop" };
+
+/** The one path for run interventions: gated, reported, and tracked for pause state. */
+export function sendRunAction(issue: number, action: RunAction): Promise<void> {
+  if (!guardAction()) return Promise.resolve();
+  return api
+    .sendIntervention(issue, action)
+    .then(() => {
+      if (action === "pause") pausedRuns.add(issue);
+      else pausedRuns.delete(issue);
+      toast(`${ACTION_WORD[action]} requested for run #${issue}.`);
+    })
+    .catch((err) => toast(`${ACTION_WORD[action]} failed for run #${issue}: ${String(err)}`, "error"));
+}
+
+// The server signals the run's recorded process. A stopped (paused) process holds a
+// terminate signal until it is continued, so on a paused run Stop takes effect on resume.
+const STOP_OUTCOME =
+  "This sends a terminate signal to the run's process; it cannot be resumed from the dashboard. " +
+  "If the run is paused, the signal takes effect when it is resumed.";
+
 /** Stop (abort) one run after a confirmation that names it. */
 export async function confirmAbort(issue: number, stage?: string): Promise<void> {
-  const at = stage ? ` It is at ${stage}.` : "";
+  if (!guardAction()) return;
   const ok = await confirmDialog({
     title: `Stop run #${issue}?`,
-    body: `This sends a terminate signal to the run's process.${at} A paused run ends when it is next resumed.`,
+    body: (stage ? `It is at ${stage}. ` : "") + STOP_OUTCOME,
     confirmLabel: "Stop run",
     cancelLabel: "Keep run",
     danger: true,
   });
-  if (!ok) return;
-  api
-    .sendIntervention(issue, "abort")
-    .then(() => toast(`Stop sent to run #${issue}.`))
-    .catch((err) => toast(`Stop failed for run #${issue}: ${String(err)}`, "error"));
+  if (ok) await sendRunAction(issue, "abort");
 }
 
 // Bulk Actions
@@ -74,30 +101,30 @@ export function setupBulkActions(): void {
   if (pauseBtn) {
     pauseBtn.addEventListener("click", () => {
       const issues = Object.keys(store.get("selectedIssues"));
-      issues.forEach((i) => api.sendIntervention(i, "pause"));
+      if (guardAction()) issues.forEach((i) => void sendRunAction(Number(i), "pause"));
     });
   }
 
   if (resumeBtn) {
     resumeBtn.addEventListener("click", () => {
       const issues = Object.keys(store.get("selectedIssues"));
-      issues.forEach((i) => api.sendIntervention(i, "resume"));
+      if (guardAction()) issues.forEach((i) => void sendRunAction(Number(i), "resume"));
     });
   }
 
   if (abortBtn) {
     abortBtn.addEventListener("click", async () => {
       const issues = Object.keys(store.get("selectedIssues"));
-      if (issues.length === 0) return;
+      if (issues.length === 0 || !guardAction()) return;
       const ok = await confirmDialog({
         title: `Stop ${issues.length} run${issues.length === 1 ? "" : "s"}?`,
-        body: "Sends a terminate signal to runs " + issues.map((i) => "#" + i).join(", ") + ". Paused runs end when next resumed.",
+        body: "Runs " + issues.map((i) => "#" + i).join(", ") + ". " + STOP_OUTCOME,
         confirmLabel: "Stop runs",
         cancelLabel: "Keep runs",
         danger: true,
       });
       if (!ok) return;
-      issues.forEach((i) => api.sendIntervention(i, "abort"));
+      issues.forEach((i) => void sendRunAction(Number(i), "abort"));
       store.set("selectedIssues", {});
       updateBulkToolbar();
     });
@@ -451,11 +478,25 @@ function loadWebhookList(): void {
               class: "btn sm danger",
               text: "Remove",
               "aria-label": "Remove webhook " + w.label,
-              onclick: () => void api.removeWebhook(w.url).then(loadWebhookList),
+              onclick: () => void removeWebhook(w.label, w.url),
             }),
           ),
         ),
       );
     })
     .catch(() => note("Could not load the notification config."));
+}
+
+async function removeWebhook(label: string, url: string): Promise<void> {
+  const ok = await confirmDialog({
+    title: `Remove the ${label || "unnamed"} webhook?`,
+    body: `${url} stops receiving notifications. You can add it again later.`,
+    confirmLabel: "Remove webhook",
+    danger: true,
+  });
+  if (!ok) return;
+  api
+    .removeWebhook(url)
+    .then(loadWebhookList)
+    .catch((err) => toast("Could not remove the webhook: " + String(err), "error"));
 }
