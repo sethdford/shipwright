@@ -137,3 +137,28 @@ describe("test-runner title lines never reach the rules (#8696)", () => {
     expect(a.fingerprint).not.toBe(b.fingerprint);
   });
 });
+
+describe("test-runner blocks and line breaks are normalized as in bash (#8696 verifier)", () => {
+  test("mocha's nested suite lines and title ending in ':' are dropped after `  1) `", () => {
+    const text = "  1) outer\n       inner\n         issue not found:\n     Error: expected 404";
+    expect(dropTestTitles(text)).toBe("     Error: expected 404");
+  });
+
+  test("a jest console block is dropped up to the blank line", () => {
+    const text = "  console.error\n    Authentication failed: mocked\n\n      at x (a.ts:1:1)";
+    expect(dropTestTitles(text)).toBe("\n      at x (a.ts:1:1)");
+  });
+
+  test("Claude Code's column-0 `● ` bullet is kept; jest's indented `● ` header is dropped", () => {
+    expect(dropTestTitles("● API Error: 401\n  ● suite › test")).toBe("● API Error: 401");
+  });
+
+  test("a lone CR, U+2028 and a leading BOM become what grep sees", () => {
+    expect(boundEvidence("Cloning 50%\rfatal: x y\n﻿z")).toBe("Cloning 50%\nfatal: x\ny\nz");
+  });
+
+  test("a trailing newline does not cost the first of the last 200 lines", () => {
+    const text = `${Array.from({ length: 200 }, (_, i) => `l${i}`).join("\n")}\n`;
+    expect(boundEvidence(text).split("\n")[0]).toBe("l0");
+  });
+});

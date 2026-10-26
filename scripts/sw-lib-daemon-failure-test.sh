@@ -460,4 +460,19 @@ assert_eq "the reviewer corpus is present (rows with an expectation)" "true" \
     "$([[ $corpus_count -ge 94 ]] && echo true || echo "false ($corpus_count)")"
 assert_eq "every corpus row meets its expectation under both locales" "" "$corpus_bad"
 
+# A pattern grep rejects (exit 2, e.g. a repetition count over RE_DUP_MAX) silently classifies as no match.
+for pat_name in _DAEMON_CONTAMINATION _DAEMON_AUTH _DAEMON_INVALID_ISSUE _DAEMON_ERROR_LINE; do
+    for loc in C en_US.UTF-8; do
+        pat_rc=0
+        printf 'nothing here\n' | LC_ALL="$loc" grep -aiE "${!pat_name}" >/dev/null 2>&1 || pat_rc=$?
+        assert_eq "$pat_name is a valid ERE for grep under $loc" "1" "$pat_rc"
+    done
+done
+# An invalid UTF-8 byte in the log must not lose the other lines in a UTF-8 locale (BSD sed aborts there).
+printf 'job output \377 garbage\nfatal: Authentication failed for '"'"'https://github.com/o/r.git/'"'"'\n' > "$LOG_DIR/issue-903.log"
+for loc in C en_US.UTF-8; do
+    assert_eq "an invalid byte does not hide an auth line ($loc)" "auth_error" \
+        "$(LC_ALL="$loc" SW_BUN=/nonexistent/bun classify_failure 903)"
+done
+
 print_test_results

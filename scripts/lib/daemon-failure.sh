@@ -62,19 +62,24 @@ classify_failure() {
     fi
     local tail_content
     tail_content=$(tail -200 "$log_path" 2>/dev/null || true)
-    # The text every rule sees: ANSI colour codes and the gh log prefix (`job<TAB>step<TAB>timestamp `) removed, the
-    # same normalization as the TypeScript classifier (evidence.ts, #8696). Colour-coded lines match on hosts without Bun.
-    local esc tab
+    # The text every rule sees, the same normalization as the TypeScript classifier (evidence.ts, #8696): ANSI colour
+    # codes, the gh log prefix (`job<TAB>step<TAB>timestamp `, BOM allowed), a trailing CR and a leading BOM removed;
+    # a lone CR, U+2028 and U+2029 become line breaks. sed and awk run under LC_ALL=C: they only touch fixed byte
+    # sequences, and BSD sed aborts on an invalid UTF-8 byte in a UTF-8 locale.
+    local esc tab cr bom
     esc="$(printf '\033')"
     tab="$(printf '\t')"
-    local cr
     cr="$(printf '\r')"
-    tail_content=$(printf '%s\n' "$tail_content" | sed -E "s/${esc}\[[0-9;?]*[A-Za-z]//g; s/^[^${tab}]*${tab}[^${tab}]*${tab}[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9:.]+Z ?//; s/${cr}\$//")
+    bom="$(printf '\357\273\277')"
+    tail_content=$(printf '%s\n' "$tail_content" \
+        | LC_ALL=C sed -E "s/${esc}\[[0-9;?]*[A-Za-z]//g; s/^[^${tab}]*${tab}[^${tab}]*${tab}(${bom})?[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9:.]+Z ?//; s/${cr}\$//; s/^${bom}//" \
+        | LC_ALL=C awk -v cr="$cr" -v ls="$(printf '\342\200\250')" -v ps="$(printf '\342\200\251')" \
+            '{ gsub(cr, "\n"); gsub(ls, "\n"); gsub(ps, "\n"); print }')
     # The escalation rules (contamination, auth, invalid input) read error lines only: the same selection as the
     # TypeScript errorLines(), so a bare word in prose or in forged test output does not escalate (#8696).
-    # Test-runner title lines are dropped first, as dropTestTitles() does in evidence.ts.
+    # Test-runner output is dropped first, as dropTestTitles() does in evidence.ts.
     local err_lines
-    err_lines=$(printf '%s\n' "$tail_content" | grep -avE "$_DAEMON_TEST_TITLE" | grep -aiE "$_DAEMON_ERROR_LINE" || true)
+    err_lines=$(printf '%s\n' "$tail_content" | LC_ALL=C awk "$_DAEMON_DROP_TEST_OUTPUT" | grep -aiE "$_DAEMON_ERROR_LINE" || true)
 
     # W2-04: the typed classifier decides the auth and invalid-input classes. Both fail safe (no
     # retry). Its `transient` verdict is NOT used here: it comes from free log text, which an agent
@@ -137,34 +142,60 @@ classify_failure() {
 }
 
 # Error-like lines, the same vocabulary as ERROR_LINE in src/contexts/learning/domain/failure.ts. Keep them in step.
-_DAEMON_ERROR_LINE='error|fail|fatal|exception|::error::|enoent|eacces|not found|lockfile|invalid|unauthori[sz]ed|forbidden|denied|overloaded|rate[ _-]?limit|timed? ?out|(^|[^0-9])[45][0-9][0-9]([^0-9]|$)|econn|etimedout|socket hang up|unavailable|authentication|not logged in|refus|contaminat|expired|revoked|could not resolve|does not exist|claude_code_oauth_token|bad credentials|gh_token'
+_DAEMON_ERROR_LINE='gh auth login|error|fail|fatal|exception|::error::|enoent|eacces|not found|lockfile|invalid|unauthori[sz]ed|forbidden|denied|overloaded|rate[ _-]?limit|timed? ?out|(^|[^0-9])[45][0-9][0-9]([^0-9]|$)|econn|etimedout|socket hang up|unavailable|authentication|not logged in|refus|contaminat|expired|revoked|could not resolve|does not exist|claude_code_oauth_token|bad credentials|gh_token'
 
 # The escalation patterns (#8696), the same as RULES in failure.ts. Keep them in step. They are locale-independent:
 # no negated class, no `.`, no [[:space:]], and every non-ASCII glyph is a literal alternative, never inside a
 # bracket, so LC_ALL=C (bytes) and a UTF-8 locale (characters) match the same lines. Every quantifier is bounded.
 _DAEMON_TAB=$'\t'
-# Test-runner title lines, dropped before the escalation rules (dropTestTitles in evidence.ts).
-_DAEMON_TEST_TITLE="^[ ${_DAEMON_TAB}]{0,12}(\\((fail|pass|skip|todo)\\) |(✕|✓|●|×|√|✔|✖) )|^[ ${_DAEMON_TAB}]{1,12}[0-9]{1,4}\\) "
-# The lead-in before an anchored phrase (LEAD in failure.ts) and the optional tool prefix (PREFIX).
-_DAEMON_LEAD="^[ ${_DAEMON_TAB}]{0,8}(\\[[0-9][0-9TZ:. +-]{0,38}\\] {1,2})?(\\[(error|err|fatal)\\] {1,2})?([ ${_DAEMON_TAB}>*#|!-]|✗|✘|×){0,4}"
+# Test-runner output, dropped before the escalation rules (dropTestTitles in evidence.ts): bun `(fail) ` and co.,
+# the result glyphs, jest's indented `● ` header, mocha's `  1) ` title block and jest's console blocks. No intervals
+# or backslash escapes, so any awk (BSD, gawk, mawk) reads it the same.
+_DAEMON_DROP_TEST_OUTPUT='
+mode == "mocha" && /^[ \t]+[^ \t]/ { if ($0 ~ /:[ \t]*$/) mode = ""; next }
+mode == "console" && $0 !~ /^[ \t]*$/ { next }
+{ mode = "" }
+/^[ \t]*console[.](log|error|warn|info|debug)[ \t]*$/ { mode = "console"; next }
+/^[ \t]+[0-9]+[)] / { mode = "mocha"; next }
+/^[ \t]*([(](fail|pass|skip|todo)[)] |(✕|✓|×|√|✔|✖) )/ || /^[ \t]+● / { next }
+{ print }'
+# The lead-in before an anchored phrase (LEAD in failure.ts) and the optional tool prefix (PREFIX). Whitespace and
+# literal glyphs only: `- `, `+ `, `> `, `| `, `* ` and `# ` start diff, quote, table, list and heading lines.
+_DAEMON_LEAD="^[ ${_DAEMON_TAB}]{0,8}([0-9]{4}-[0-9][0-9]-[0-9][0-9][T ][0-9:.]{1,20}Z? {1,2})?(\\[[0-9][0-9TZ:. +-]{0,38}\\] {1,2})?(\\[(error|err|fatal)\\] {1,2})?([ ${_DAEMON_TAB}]|✗|✘|×|●|⏺){0,4}"
 _DAEMON_PREFIX='((gh|error|fatal)[ :]{1,3}|##\[error\] ?|::error:: ?)'
-_DAEMON_AUTH_PHRASES="(claude code )?authentication failed([ ${_DAEMON_TAB}]{0,3}\$|[.:!]| for | — | - )"
-_DAEMON_AUTH_PHRASES+="|failed to authenticate([ ${_DAEMON_TAB}]{0,3}\$|[.:!]| with | — | - )"
+_DAEMON_END="([ ${_DAEMON_TAB}]{0,3}\$|[.:;!,])"
+# A quote, optionally backslash-escaped (the body inside a stream-json "result" string).
+_DAEMON_Q="\\\\?[\"']"
+_DAEMON_AUTH_BODY="\\{${_DAEMON_Q}type${_DAEMON_Q}: ?${_DAEMON_Q}error${_DAEMON_Q}, ?${_DAEMON_Q}error${_DAEMON_Q}: ?\\{${_DAEMON_Q}type${_DAEMON_Q}: ?${_DAEMON_Q}authentication_error${_DAEMON_Q}"
+_DAEMON_AUTH_PHRASES="(claude[ ]code )?authentication failed(${_DAEMON_END}| for | — | - )"
+_DAEMON_AUTH_PHRASES+="|failed to authenticate(${_DAEMON_END}| with | — | - )"
 _DAEMON_AUTH_PHRASES+="|api error: 401([ ${_DAEMON_TAB}:.,{]|\$)"
-_DAEMON_AUTH_PHRASES+="|invalid api key|invalid x-api-key|oauth token (is |has )?(expired|invalid|revoked)"
+_DAEMON_AUTH_PHRASES+="|invalid api key(${_DAEMON_END}|[ ${_DAEMON_TAB}]{0,3}·| provided)"
+_DAEMON_AUTH_PHRASES+="|invalid x-api-key(${_DAEMON_END}| token)"
+_DAEMON_AUTH_PHRASES+="|oauth token (is |has )?(expired|invalid|revoked)${_DAEMON_END}"
 _DAEMON_AUTH_PHRASES+="|not logged in(to |[ ${_DAEMON_TAB}]{1,3}to |[ ${_DAEMON_TAB}]{0,3}·|[ ${_DAEMON_TAB}]{0,3}\$|[.:!]| with )"
-_DAEMON_AUTH_PHRASES+="|you are not logged into any github hosts|authentication required|http 401: requires authentication"
+_DAEMON_AUTH_PHRASES+="|you are not logged into any github hosts|to get started with github cli, please run: {1,2}gh auth login"
+_DAEMON_AUTH_PHRASES+="|authentication required${_DAEMON_END}|http 401: requires authentication"
 _DAEMON_AUTH_PHRASES+="|(http 401: )?bad credentials([ ${_DAEMON_TAB}]{0,3}\\(|[ ${_DAEMON_TAB}]{0,3}\$)"
-_DAEMON_AUTH_PHRASES+="|request failed with status (code )?401|401 unauthorized|claude_code_oauth_token (is )?not set"
+_DAEMON_AUTH_PHRASES+="|(unhandled error: )?(requesterror \\[httperror\\]|httperror): bad credentials"
+_DAEMON_AUTH_PHRASES+="|request failed with status (code )?401(${_DAEMON_END}| unauthorized)|401 unauthorized(${_DAEMON_END}| - )"
+_DAEMON_AUTH_PHRASES+="|claude_code_oauth_token (is )?not set${_DAEMON_END}"
 _DAEMON_AUTH_PHRASES+="|to use github cli in a github actions workflow, set the "
-_DAEMON_AUTH_PHRASES+="|could not read username for '[A-Za-z0-9:/._@%+~-]{1,200}': terminal prompts disabled"
+_DAEMON_AUTH_PHRASES+="|could not read (username|password) for '[A-Za-z0-9:/._@%+~-]{1,200}': (terminal prompts disabled|no such device or address)"
+_DAEMON_AUTH_PHRASES+="|[A-Za-z0-9._-]{1,64}@[A-Za-z0-9.-]{1,253}: permission denied \\(publickey"
+_DAEMON_AUTH_PHRASES+="|remote: permission to [A-Za-z0-9._/-]{1,200} denied to "
+_DAEMON_AUTH_PHRASES+="|(x )?failed to log in to [A-Za-z0-9.-]{1,253} account"
+_DAEMON_AUTH_PHRASES+="|npm (err!|error) (code e401|401 unauthorized)"
+_DAEMON_AUTH_PHRASES+="|error response from daemon: [A-Za-z0-9 :/._\"'?=&%@+-]{0,255}unauthorized: authentication required"
+_DAEMON_AUTH_PHRASES+="|get https?://[A-Za-z0-9:/._~%@+=?&#-]{1,255} - 401[ ${_DAEMON_TAB}]{0,3}\$"
+_DAEMON_AUTH_PHRASES+="|${_DAEMON_AUTH_BODY}"
 _DAEMON_AUTH_BARE="(error|fatal)[ :]{1,3}(401 )?authentication_error(:|[ ${_DAEMON_TAB}]{0,3}\$)"
-_DAEMON_AUTH_TYPE="[\"']type[\"'] {0,2}: {0,2}[\"']authentication_error[\"']"
-_DAEMON_AUTH="${_DAEMON_LEAD}(${_DAEMON_PREFIX}?(${_DAEMON_AUTH_PHRASES})|${_DAEMON_AUTH_BARE})|${_DAEMON_AUTH_TYPE}"
+_DAEMON_AUTH_RESPONSE="401( -)? ${_DAEMON_AUTH_BODY}"
+_DAEMON_AUTH="${_DAEMON_LEAD}(${_DAEMON_PREFIX}?(${_DAEMON_AUTH_PHRASES})|${_DAEMON_AUTH_BARE})|${_DAEMON_AUTH_RESPONSE}"
 _DAEMON_INVALID_ISSUE="${_DAEMON_LEAD}${_DAEMON_PREFIX}?(graphql: could not resolve to an? (issue|pullrequest)([ ${_DAEMON_TAB}.,]|\$)"
 _DAEMON_INVALID_ISSUE+="|http 404: not found \\(https://api\\.github\\.com/repos/[A-Za-z0-9._-]{1,100}/[A-Za-z0-9._-]{1,100}/(issues|pulls)/[0-9]{1,10}\\)"
-_DAEMON_INVALID_ISSUE+="|issue not found([ ${_DAEMON_TAB}]{0,5}\$|:)|issue #?[0-9]{1,10} does not exist)"
-_DAEMON_CONTAMINATION="^([ ${_DAEMON_TAB}>*#|!-]|⚠|"$'\xef\xb8\x8f'"|✗|✘|×){0,4}Skipping integration tests: refusing to run inside a build-loop test gate[ ${_DAEMON_TAB}]{0,20}\$"
+_DAEMON_INVALID_ISSUE+="|issue not found([ ${_DAEMON_TAB}]{0,5}\$|:)|issue #?[0-9]{1,10} does not exist${_DAEMON_END})"
+_DAEMON_CONTAMINATION="^([ ${_DAEMON_TAB}]|⚠|"$'\xef\xb8\x8f'"|✗|✘|×){0,4}Skipping integration tests: refusing to run inside a build-loop test gate[ ${_DAEMON_TAB}]{0,20}\$"
 _DAEMON_CONTAMINATION+="|^CONTAMINATION: (pipeline-state-missing|branch-switched)([ ${_DAEMON_TAB}]|\$)"
 
 # ─── Consecutive Failure Tracking (persisted + adaptive) ─────────────────────

@@ -42,7 +42,7 @@ const KIND_CLASS: Readonly<Record<AgentFailureKind, FailureClass>> = {
 // Error-like lines. Rules scoped to "error" search only these lines. Deliberately wider than
 // "error|fail" so that a bare API message such as "invalid x-api-key" is still error-like.
 const ERROR_LINE =
-  /error|fail|fatal|exception|::error::|enoent|eacces|not found|lockfile|invalid|unauthori[sz]ed|forbidden|denied|overloaded|rate[ _-]?limit|timed? ?out|\b[45]\d\d\b|econn|etimedout|socket hang up|unavailable|authentication|not logged in|refus|contaminat|expired|revoked|could not resolve|does not exist|claude_code_oauth_token|bad credentials|gh_token/i;
+  /gh auth login|error|fail|fatal|exception|::error::|enoent|eacces|not found|lockfile|invalid|unauthori[sz]ed|forbidden|denied|overloaded|rate[ _-]?limit|timed? ?out|(?:^|[^0-9])[45]\d\d(?:[^0-9]|$)|econn|etimedout|socket hang up|unavailable|authentication|not logged in|refus|contaminat|expired|revoked|could not resolve|does not exist|claude_code_oauth_token|bad credentials|gh_token/i;
 
 interface Rule {
   readonly pattern: RegExp;
@@ -53,44 +53,62 @@ interface Rule {
 
 // The escalation lead-in (#8696): what may come before an anchored auth or invalid-input phrase on its line.
 // Explicit and locale-independent, so bash (daemon-failure.sh, _DAEMON_LEAD) matches the same lines under
-// LC_ALL=C and UTF-8: up to 8 spaces or tabs, an optional `[timestamp] ` and `[ERROR] `, then up to 4 of
-// space, tab, `>`, `*`, `#`, `|`, `!`, `-` or the glyphs ✗ ✘ ×. No negated or Unicode classes: those count
-// bytes in one locale and characters in the other. Test-runner title lines are dropped before any rule runs
-// (evidence.ts dropTestTitles), so a jest `✕ ...` or bun `(fail) ...` title never reaches this.
-const LEAD = String.raw`^[ \t]{0,8}(?:\[\d[\dTZ:. +\-]{0,38}\] {1,2})?(?:\[(?:error|err|fatal)\] {1,2})?(?:[ \t>*#|!-]|✗|✘|×){0,4}`;
+// LC_ALL=C and UTF-8: up to 8 spaces or tabs, an optional bare ISO timestamp, an optional `[timestamp] ` and
+// `[ERROR] `, then up to 4 of space, tab or the glyphs ✗ ✘ × ● ⏺ (Shipwright's and Claude Code's markers).
+// No punctuation: `- `, `+ `, `> `, `| `, `* ` and `# ` start diff, quote, table, list and heading lines, which
+// is how test diffs and printed docs carry error text. No negated or Unicode classes: those count bytes in
+// one locale and characters in the other. Test-runner output is dropped before any rule runs (evidence.ts).
+const LEAD = String.raw`^[ \t]{0,8}(?:\d{4}-\d\d-\d\d[T ][\d:.]{1,20}Z? {1,2})?(?:\[\d[\dTZ:. +\-]{0,38}\] {1,2})?(?:\[(?:error|err|fatal)\] {1,2})?(?:[ \t]|✗|✘|×|●|⏺){0,4}`;
 // An optional tool or annotation prefix after the lead-in.
 const PREFIX = String.raw`(?:(?:gh|error|fatal)[ :]{1,3}|##\[error\] ?|::error:: ?)`;
+// What may end a prose-prone phrase: end of line or punctuation, never another word.
+const END = String.raw`(?:[ \t]{0,3}$|[.:;!,])`;
+// The Anthropic API's authentication error body: JSON from the CLI and JS SDK, a Python repr from the Python SDK.
+// A quote may be backslash-escaped: the body inside a stream-json "result" string.
+const Q = String.raw`\\?["']`;
+const AUTH_BODY = String.raw`\{${Q}type${Q}: ?${Q}error${Q}, ?${Q}error${Q}: ?\{${Q}type${Q}: ?${Q}authentication_error${Q}`;
 // Auth phrases, anchored after LEAD and an optional PREFIX. Prose-prone phrases are also end-anchored.
 const AUTH_PHRASES = [
-  String.raw`(?:claude code )?authentication failed(?:[ \t]{0,3}$|[.:!]| for | — | - )`,
-  String.raw`failed to authenticate(?:[ \t]{0,3}$|[.:!]| with | — | - )`,
+  String.raw`(?:claude code )?authentication failed(?:${END}| for | — | - )`,
+  String.raw`failed to authenticate(?:${END}| with | — | - )`,
   String.raw`api error: 401(?:[ \t:.,{]|$)`,
-  "invalid api key",
-  "invalid x-api-key",
-  "oauth token (?:is |has )?(?:expired|invalid|revoked)",
+  String.raw`invalid api key(?:${END}|[ \t]{0,3}·| provided)`,
+  String.raw`invalid x-api-key(?:${END}| token)`,
+  String.raw`oauth token (?:is |has )?(?:expired|invalid|revoked)${END}`,
   String.raw`not logged in(?:to |[ \t]{1,3}to |[ \t]{0,3}·|[ \t]{0,3}$|[.:!]| with )`,
   "you are not logged into any github hosts",
-  "authentication required",
+  "to get started with github cli, please run: {1,2}gh auth login",
+  String.raw`authentication required${END}`,
   "http 401: requires authentication",
   String.raw`(?:http 401: )?bad credentials(?:[ \t]{0,3}\(|[ \t]{0,3}$)`,
-  "request failed with status (?:code )?401",
-  "401 unauthorized",
-  "claude_code_oauth_token (?:is )?not set",
+  String.raw`(?:unhandled error: )?(?:requesterror \[httperror\]|httperror): bad credentials`,
+  String.raw`request failed with status (?:code )?401(?:${END}| unauthorized)`,
+  String.raw`401 unauthorized(?:${END}| - )`,
+  String.raw`claude_code_oauth_token (?:is )?not set${END}`,
   "to use github cli in a github actions workflow, set the ",
-  String.raw`could not read username for '[A-Za-z0-9:/._@%+~\-]{1,200}': terminal prompts disabled`,
+  String.raw`could not read (?:username|password) for '[A-Za-z0-9:/._@%+~\-]{1,200}': (?:terminal prompts disabled|no such device or address)`,
+  String.raw`[A-Za-z0-9._\-]{1,64}@[A-Za-z0-9.\-]{1,253}: permission denied \(publickey`,
+  String.raw`remote: permission to [A-Za-z0-9._/\-]{1,200} denied to `,
+  String.raw`(?:x )?failed to log in to [A-Za-z0-9.\-]{1,253} account`,
+  String.raw`npm (?:err!|error) (?:code e401|401 unauthorized)`,
+  String.raw`error response from daemon: [A-Za-z0-9 :/._"'?=&%@+\-]{0,255}unauthorized: authentication required`,
+  String.raw`get https?://[A-Za-z0-9:/._~%@+=?&#\-]{1,255} - 401[ \t]{0,3}$`,
+  AUTH_BODY,
 ].join("|");
 // The bare API type name needs an error prefix and must end the token (`:` or end of line), so
 // "error: authentication_error is now mapped ..." and "- authentication_error: handled" do not escalate.
 const AUTH_BARE = String.raw`(?:error|fatal)[ :]{1,3}(?:401 )?authentication_error(?::|[ \t]{0,3}$)`;
-// The structured API error type, matched anywhere on an error line: `"type":"authentication_error"` in
-// the Anthropic JSON body (CLI, JS SDK) or `'type': 'authentication_error'` in the Python SDK's repr.
-const AUTH_TYPE = `["']type["'] {0,2}: {0,2}["']authentication_error["']`;
+// The structured 401 response, matched anywhere on an error line: `401 {"type":"error","error":{"type":
+// "authentication_error"` (CLI `API Error: 401 {...}`, JS SDK `AuthenticationError: 401 {...}`) or the Python
+// SDK's `Error code: 401 - {'type': 'error', ...}`. The status is part of the token, so a test diff that
+// prints the body alone (`Expected: {"type":"error",...}`) does not escalate.
+const AUTH_RESPONSE = String.raw`401(?: -)? ${AUTH_BODY}`;
 // gh lookup failures for an issue or PR number, anchored after LEAD and an optional PREFIX.
 const INVALID_PHRASES = [
   String.raw`graphql: could not resolve to an? (?:issue|pullrequest)(?:[ \t.,]|$)`,
   String.raw`http 404: not found \(https:\/\/api\.github\.com\/repos\/[A-Za-z0-9._\-]{1,100}\/[A-Za-z0-9._\-]{1,100}\/(?:issues|pulls)\/\d{1,10}\)`,
   String.raw`issue not found(?:[ \t]{0,5}$|:)`,
-  String.raw`issue #?\d{1,10} does not exist`,
+  String.raw`issue #?\d{1,10} does not exist${END}`,
 ].join("|");
 
 // Every quantifier is bounded (`[^\n]{0,200}`, never `.*`): an unbounded `.*` on a long line
@@ -105,18 +123,30 @@ const RULES: readonly Rule[] = [
     // it finds .claude/pipeline-state.md missing or the branch switched mid-run.
     // Anchored on the whole structured line, so `echo "CONTAMINATION: x"` in test output does not match, and
     // scoped to error lines. The refusal is the line sw-e2e-integration-test.sh prints (`⚠ Skipping ...`); its
-    // lead-in is an explicit list, the same in bash under any locale. The reason is a fixed list.
+    // lead-in is whitespace and literal glyphs (⚠, U+FE0F, ✗ ✘ ×), the same in bash under any locale. The reason is a
+    // fixed list.
     pattern:
-      /^(?:[ \t>*#|!-]|⚠|\uFE0F|✗|✘|×){0,4}Skipping integration tests: refusing to run inside a build-loop test gate[ \t]{0,20}$|^CONTAMINATION: (?:pipeline-state-missing|branch-switched)(?:[ \t]|$)/im,
+      /^(?:[ \t]|⚠|\uFE0F|✗|✘|×){0,4}Skipping integration tests: refusing to run inside a build-loop test gate[ \t]{0,20}$|^CONTAMINATION: (?:pipeline-state-missing|branch-switched)(?:[ \t]|$)/im,
     cls: "contamination",
     scope: "error",
   },
   {
     // Structured lines only (#8696): an anchored phrase after LEAD, the bare type name after an error prefix,
-    // or the structured `"type":"authentication_error"` anywhere. A test name or prose sentence that mentions
+    // or the structured 401 authentication_error response anywhere. A test name or prose sentence that mentions
     // 401 or "not logged in" does not escalate.
-    pattern: new RegExp(`${LEAD}(?:${PREFIX}?(?:${AUTH_PHRASES})|${AUTH_BARE})|${AUTH_TYPE}`, "im"),
+    pattern: new RegExp(
+      `${LEAD}(?:${PREFIX}?(?:${AUTH_PHRASES})|${AUTH_BARE})|${AUTH_RESPONSE}`,
+      "im",
+    ),
     cls: "auth",
+    scope: "error",
+  },
+  {
+    // Anchored after the same LEAD and PREFIX as auth. Second, as in bash: before the environment rules (the
+    // sandbox warning prints on every run on a host without bubblewrap) and before the log-text transient rule,
+    // so "HTTP 503" next to a missing issue is invalid input, not transient (#8696).
+    pattern: new RegExp(`${LEAD}${PREFIX}?(?:${INVALID_PHRASES})`, "im"),
+    cls: "invalid_input",
     scope: "error",
   },
   {
@@ -137,13 +167,6 @@ const RULES: readonly Rule[] = [
     pattern: /\bcould not resolve host\b|\bENOTFOUND\b/i,
     cls: "environment",
     scope: "any",
-  },
-  {
-    // Anchored after the same LEAD and PREFIX as auth. Checked before the log-text transient rule, so
-    // "HTTP 503" next to a missing issue is invalid input, not transient (#8696).
-    pattern: new RegExp(`${LEAD}${PREFIX}?(?:${INVALID_PHRASES})`, "im"),
-    cls: "invalid_input",
-    scope: "error",
   },
   {
     // Structured signals only. Free text such as "rate limit" or "overloaded" is NOT transient:

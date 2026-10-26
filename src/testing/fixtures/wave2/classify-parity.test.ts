@@ -106,6 +106,7 @@ describe("#8696 self-triggers never escalate (both classifiers)", () => {
   }
 });
 
+// Live bash over every row takes several seconds under load; the default 5 s timeout is too tight.
 const ESCALATIONS: Readonly<Record<string, FailureClass>> = {
   auth_error: "auth",
   invalid_issue: "invalid_input",
@@ -135,7 +136,7 @@ describe("#8696 reviewer corpus: escalations only from structured lines, in both
       .map((c, i) => ({ text: c.text, c: liveBash[i], utf8: utf8[i] }))
       .filter((row) => row.c !== row.utf8);
     expect(diverging).toEqual([]);
-  });
+  }, 60_000);
 
   test("every case escalates the same way in TS and bash", () => {
     const diverging = corpus.cases
@@ -182,5 +183,5 @@ describe("#8696 reviewer corpus: escalations only from structured lines, in both
       expect({ i, ts, bash: bashEscalation(bash[i] ?? "") }).toEqual({ i, ts, bash: ts });
       expect({ i, ok: meets(expectation, ts) }).toEqual({ i, ok: true });
     });
-  });
+  }, 60_000);
 });

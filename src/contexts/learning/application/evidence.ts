@@ -17,25 +17,53 @@ const LOOP_COMMIT = /^\[[^\]]{1,200}\]\s*loop:/;
 const MODEL_PROSE =
   /^\s*(?:\S{1,3}\s+)?(?:Failure analyzed|Failure diagnosis|Analyzing failure)\b|^\s*\S{0,3}\s*▸/i;
 
-// Test-runner result and title lines (#8696). A test's title is written by whoever wrote the test, so
-// "✕ API Error: 401 when token missing" or "(fail) not logged in" says nothing about why the run failed.
-// A small explicit list, the same in bash (daemon-failure.sh, _DAEMON_TEST_TITLE): bun `(fail) `/`(pass) `
-// (and `(skip) `/`(todo) `), jest/vitest/node:test `✕ ✓ ● × √ ✔ ✖` followed by a space, and mocha's
-// indented `  1) `. Literal glyphs, never a character class, so both locales agree.
+// Test-runner output (#8696). A test's title and its console output are written by whoever wrote the test,
+// so "✕ API Error: 401 when token missing" or "(fail) not logged in" says nothing about why the run failed.
+// A small explicit list, the same in bash (daemon-failure.sh, _DAEMON_DROP_TEST_OUTPUT):
+// - bun `(fail) `, `(pass) `, `(skip) `, `(todo) `; vitest/node:test/jest `✕ ✓ × √ ✔ ✖` and a space;
+//   jest's failure header `●` and a space, indented (Claude Code prints `● ` at column 0, which is kept);
+// - mocha's indented `  1) suite`, and the indented suite lines after it up to the title ending in `:`;
+// - a jest `console.log|error|warn|info|debug` header and every line after it up to a blank line.
+// Literal glyphs, never a character class, so both locales agree.
+// Linear patterns (a single leading run, no nested repetition), written the same way as the awk in bash.
 const TEST_TITLE =
-  /^[ \t]{0,12}(?:\((?:fail|pass|skip|todo)\) |(?:✕|✓|●|×|√|✔|✖) )|^[ \t]{1,12}\d{1,4}\) /;
+  /^[ \t]*(?:\((?:fail|pass|skip|todo)\) |(?:✕|✓|×|√|✔|✖) )|^[ \t]+● |^[ \t]+\d+\) /;
+const MOCHA_TITLE = /^[ \t]+\d+\) /;
+const JEST_CONSOLE = /^[ \t]*console\.(?:log|error|warn|info|debug)[ \t]*$/;
 
-/** The text without test-runner title lines: what the classifier's rules see. */
+/** The text without test-runner output (titles, mocha title blocks, jest console blocks). */
 export function dropTestTitles(text: string): string {
-  return text
-    .split("\n")
-    .filter((line) => !TEST_TITLE.test(line))
-    .join("\n");
+  const kept: string[] = [];
+  let mode: "none" | "mocha" | "console" = "none";
+  for (const line of text.split("\n")) {
+    if (mode === "mocha" && /^[ \t]+[^ \t]/.test(line)) {
+      // Nested suite lines, then the test title, which ends in `:`.
+      if (/:[ \t]*$/.test(line)) mode = "none";
+      continue;
+    }
+    if (mode === "console" && !/^[ \t]*$/.test(line)) continue;
+    mode = "none";
+    if (JEST_CONSOLE.test(line)) {
+      mode = "console";
+      continue;
+    }
+    if (TEST_TITLE.test(line)) {
+      if (MOCHA_TITLE.test(line)) mode = "mocha";
+      continue;
+    }
+    kept.push(line);
+  }
+  return kept.join("\n");
 }
 
-/** Plain text of one line: colour codes, the gh prefix and a trailing CR removed. */
+// A byte-order mark at the start of a line, and the line breaks JavaScript's `m` flag honours but grep does
+// not: a lone CR (progress bars), U+2028 and U+2029. They become real line breaks, as in bash.
+const BOM = /^\uFEFF/;
+const INNER_BREAK = /\r|\u2028|\u2029/g;
+
+/** Plain text of one line: colour codes, the gh prefix, a BOM and a trailing CR removed. */
 export function normalizeLine(line: string): string {
-  return line.replace(ANSI, "").replace(GH_PREFIX, "").replace(/\r$/, "");
+  return line.replace(ANSI, "").replace(GH_PREFIX, "").replace(/\r$/, "").replace(BOM, "");
 }
 
 /**
@@ -44,10 +72,12 @@ export function normalizeLine(line: string): string {
  * see more than a bounded line.
  */
 export function boundEvidence(text: string): string {
-  return text
-    .split("\n")
+  // A trailing newline ends the last line; it does not start an empty one (as `tail -200` counts).
+  const lines = text.split("\n");
+  if (lines.length > 1 && lines.at(-1) === "") lines.pop();
+  return lines
     .slice(-MAX_EVIDENCE_LINES)
-    .map((line) => normalizeLine(line.slice(0, MAX_EVIDENCE_LINE_CHARS)))
+    .flatMap((line) => normalizeLine(line.slice(0, MAX_EVIDENCE_LINE_CHARS)).split(INNER_BREAK))
     .filter((line) => !MODEL_PROSE.test(line) && !LOOP_COMMIT.test(line))
     .join("\n");
 }

@@ -980,6 +980,571 @@
       "ts": "contamination",
       "name": "locale probe: emoji-presentation warning sign (8 bytes, 4 characters)",
       "expect": "esc:contamination"
+    },
+    {
+      "text": "  2 passing (12ms)\n  1 failing\n\n  1) classifier\n       authentication failed:\n     AssertionError: expected 'unknown' to equal 'auth'\n      at Context.<anonymous> (test/classify.test.js:10:5)",
+      "bash": "build_failure",
+      "ts": "unknown",
+      "name": "verifier a1: mocha failure summary: title on own line, 7-space indent, colon",
+      "expect": "noesc"
+    },
+    {
+      "text": "  1 failing\n\n  1) gh wrapper\n       not logged in:\n     Error: expected exit 4\n",
+      "bash": "build_failure",
+      "ts": "unknown",
+      "name": "verifier a2: mocha summary title 'not logged in:'",
+      "expect": "noesc"
+    },
+    {
+      "text": "  1 failing\n\n  1) client\n       invalid api key returns 401:\n     AssertionError: expected 200 to equal 401",
+      "bash": "build_failure",
+      "ts": "unknown",
+      "name": "verifier a3: mocha summary title 'invalid api key returns 401:'",
+      "expect": "noesc"
+    },
+    {
+      "text": "  ● classify › git auth\n\n    expect(received).toBe(expected) // Object.is equality\n\n    - Expected  - 1\n    + Received  + 1\n\n    - fatal: Authentication failed for 'https://github.com/o/r.git/'\n    + ok\n",
+      "bash": "build_failure",
+      "ts": "unknown",
+      "name": "verifier a4: jest multiline string diff, '- ' removed line",
+      "expect": "noesc"
+    },
+    {
+      "text": "    - Expected  - 1\n    + Received  + 1\n\n    - Invalid API key · Please run /login\n    + Hello\nTests: 1 failed",
+      "bash": "build_failure",
+      "ts": "unknown",
+      "name": "verifier a5: jest diff removed line 'Invalid API key · Please run /login'",
+      "expect": "noesc"
+    },
+    {
+      "text": "Summary of changes:\n* Authentication required for the staging API, so those tests are skipped\nerror: 3 tests failed",
+      "bash": "build_failure",
+      "ts": "unknown",
+      "name": "verifier a6: agent markdown bullet: 'authentication required' not end-anchored",
+      "expect": "noesc"
+    },
+    {
+      "text": "| Signal | Class |\n|---|---|\n| invalid api key | auth |\n| 401 unauthorized | auth |\nerror: lint failed",
+      "bash": "build_failure",
+      "ts": "unknown",
+      "name": "verifier a7: agent markdown table row",
+      "expect": "noesc"
+    },
+    {
+      "text": "## 3.2.0\n- 401 Unauthorized responses are now surfaced to the caller\n- fix: retry on 503\nnpm ERR! Test failed.",
+      "bash": "build_failure",
+      "ts": "unknown",
+      "name": "verifier a8: changelog bullet printed in log",
+      "expect": "noesc"
+    },
+    {
+      "text": "- Issue not found: the CLI now exits 4 instead of 1\nerror: build failed",
+      "bash": "build_failure",
+      "ts": "unknown",
+      "name": "verifier a9: changelog bullet 'Issue not found:'",
+      "expect": "noesc"
+    },
+    {
+      "text": "- I was not logged in to the npm registry locally, so I mocked it\nFAIL src/x.test.ts",
+      "bash": "build_failure",
+      "ts": "unknown",
+      "name": "verifier a10: agent prose bullet 'not logged in to'",
+      "expect": "noesc"
+    },
+    {
+      "text": "diff --git a/test/fixtures/auth.log b/test/fixtures/auth.log\n-fatal: Authentication failed for 'https://github.com/o/r.git/'\n+fatal: Authentication failed for 'https://gitlab.com/o/r.git/'\nerror: test failed",
+      "bash": "build_failure",
+      "ts": "unknown",
+      "name": "verifier a11: git diff removed fixture line",
+      "expect": "noesc"
+    },
+    {
+      "text": "error: expect(received).toBe(expected)\n\nExpected: \"auth\"\nReceived: \"unknown\"\n\n      at <anonymous> (src/x.test.ts:5:3)\n(fail) classify > git https auth [0.20ms]",
+      "bash": "build_failure",
+      "ts": "unknown",
+      "name": "verifier a12: bun string diff of expected multi-line",
+      "expect": "noesc"
+    },
+    {
+      "text": "(fail) API Error: 401 when token missing [1.0ms]\nerror: expect(received).toBe(expected)",
+      "bash": "build_failure",
+      "ts": "unknown",
+      "name": "verifier a13: bun (fail) title dropped",
+      "expect": "noesc"
+    },
+    {
+      "text": "  ✕ fatal: Authentication failed for 'https://x' (3 ms)\nTests: 1 failed",
+      "bash": "build_failure",
+      "ts": "unknown",
+      "name": "verifier a14: jest ✕ title dropped",
+      "expect": "noesc"
+    },
+    {
+      "text": " FAIL  src/auth.test.ts > gh > not logged in\nAssertionError: expected 1 to be 4",
+      "bash": "build_failure",
+      "ts": "unknown",
+      "name": "verifier a15: vitest FAIL header with > path",
+      "expect": "noesc"
+    },
+    {
+      "text": "--- FAIL: TestAuthenticationRequired (0.00s)\n    auth_test.go:12: got nil, want error: authentication required\nFAIL",
+      "bash": "build_failure",
+      "ts": "unknown",
+      "name": "verifier a16: go test FAIL",
+      "expect": "noesc"
+    },
+    {
+      "text": "E       AssertionError: assert 'unknown' == 'auth'\nE         - auth\nE         + unknown\nFAILED tests/test_c.py::test_invalid_api_key - AssertionError",
+      "bash": "build_failure",
+      "ts": "unknown",
+      "name": "verifier a17: pytest diff E lines",
+      "expect": "noesc"
+    },
+    {
+      "text": "test auth::not_logged_in ... FAILED\nfailures:\n---- auth::not_logged_in stdout ----\nthread 'main' panicked at 'assertion failed: authentication failed'",
+      "bash": "build_failure",
+      "ts": "unknown",
+      "name": "verifier a18: cargo test",
+      "expect": "noesc"
+    },
+    {
+      "text": "scripts/lib/daemon-failure.sh:151:_DAEMON_AUTH_PHRASES=\"(claude code )?authentication failed\"\nerror: test failed",
+      "bash": "build_failure",
+      "ts": "unknown",
+      "name": "verifier a19: grep -rn output of source",
+      "expect": "noesc"
+    },
+    {
+      "text": "error: authentication_error is now mapped to auth\nFAIL",
+      "bash": "build_failure",
+      "ts": "unknown",
+      "name": "verifier a20: bare type name in prose after error:",
+      "expect": "noesc"
+    },
+    {
+      "text": "- authentication_error: handled\nerror: lint",
+      "bash": "unknown",
+      "ts": "unknown",
+      "name": "verifier a21: yaml list of type names",
+      "expect": "noesc"
+    },
+    {
+      "text": "✖ not logged in (1.2ms)\n  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal",
+      "bash": "unknown",
+      "ts": "unknown",
+      "name": "verifier a22: node:test spec reporter ✖ title",
+      "expect": "noesc"
+    },
+    {
+      "text": "# Subtest: authentication failed\nnot ok 1 - authentication failed\n  ---\n  error: 'expected auth'",
+      "bash": "build_failure",
+      "ts": "unknown",
+      "name": "verifier a23: TAP subtest heading",
+      "expect": "noesc"
+    },
+    {
+      "text": "  1) outer\n       inner\n         issue not found:\n     Error: expected 404",
+      "bash": "unknown",
+      "ts": "unknown",
+      "name": "verifier a24: mocha nested suite title 9-space indent",
+      "expect": "noesc"
+    },
+    {
+      "text": "  console.error\n    Authentication failed: mocked\n\n      at Object.<anonymous> (src/x.test.ts:3:11)\nTests: 1 failed",
+      "bash": "build_failure",
+      "ts": "unknown",
+      "name": "verifier a25: jest test title printed via ● describe header dropped, but console.error block printed raw",
+      "expect": "noesc"
+    },
+    {
+      "text": "> Not logged in · Please run /login\nThis is what the user saw; I added a test for it.\nerror: 1 test failed",
+      "bash": "build_failure",
+      "ts": "unknown",
+      "name": "verifier a26: blockquote in agent output",
+      "expect": "noesc"
+    },
+    {
+      "text": "### Issue #12 does not exist in fixtures\nerror: tests failed",
+      "bash": "build_failure",
+      "ts": "unknown",
+      "name": "verifier a27: markdown heading in agent plan",
+      "expect": "noesc"
+    },
+    {
+      "text": "Expected: {\"type\":\"error\",\"error\":{\"type\":\"authentication_error\"}}\nReceived: undefined\nerror: expect(received).toEqual(expected)",
+      "bash": "unknown",
+      "ts": "unknown",
+      "name": "verifier a28: JSON fixture with authentication_error type in assertion output",
+      "expect": "noesc"
+    },
+    {
+      "text": "AssertionError: classify({'type': 'authentication_error'}) returned 'unknown'",
+      "bash": "unknown",
+      "ts": "unknown",
+      "name": "verifier a29: python repr in test log",
+      "expect": "noesc"
+    },
+    {
+      "text": "git@github.com: Permission denied (publickey).\nfatal: Could not read from remote repository.\n\nPlease make sure you have the correct access rights\nand the repository exists.",
+      "bash": "auth_error",
+      "ts": "auth",
+      "name": "verifier b2: git ssh publickey",
+      "expect": "esc:auth"
+    },
+    {
+      "text": "fatal: could not read Username for 'https://github.com': No such device or address",
+      "bash": "auth_error",
+      "ts": "auth",
+      "name": "verifier b3: git https no tty (No such device)",
+      "expect": "esc:auth"
+    },
+    {
+      "text": "API Error: 401 {\"type\":\"error\",\"error\":{\"type\":\"authentication_error\",\"message\":\"invalid x-api-key\"},\"request_id\":\"req_1\"}",
+      "bash": "auth_error",
+      "ts": "auth",
+      "name": "verifier b5: Claude CLI -p 401 JSON",
+      "expect": "esc:auth"
+    },
+    {
+      "text": "{\"type\":\"result\",\"subtype\":\"success\",\"is_error\":true,\"result\":\"API Error: 401 {\\\"type\\\":\\\"error\\\",\\\"error\\\":{\\\"type\\\":\\\"authentication_error\\\",\\\"message\\\":\\\"OAuth token has expired.\\\"}}\",\"session_id\":\"abc\"}",
+      "bash": "auth_error",
+      "ts": "auth",
+      "name": "verifier b6: Claude CLI stream-json result with escaped quotes",
+      "expect": "esc:auth"
+    },
+    {
+      "text": "● API Error: 401 {\"type\":\"error\",\"error\":{\"type\":\"authentication_error\",\"message\":\"OAuth token has expired. Please obtain a new token or refresh your existing token.\"}}",
+      "bash": "auth_error",
+      "ts": "auth",
+      "name": "verifier b8: Claude Code interactive ● bullet (dropped as test title)",
+      "expect": "esc:auth"
+    },
+    {
+      "text": "HTTP 401: Bad credentials (https://api.github.com/graphql)",
+      "bash": "auth_error",
+      "ts": "auth",
+      "name": "verifier b11: gh bad credentials",
+      "expect": "esc:auth"
+    },
+    {
+      "text": "To get started with GitHub CLI, please run:  gh auth login\nAlternatively, populate the GH_TOKEN environment variable with a GitHub API authentication token.",
+      "bash": "auth_error",
+      "ts": "auth",
+      "name": "verifier b12: gh local not authed",
+      "expect": "esc:auth"
+    },
+    {
+      "text": "gh: To use GitHub CLI in a GitHub Actions workflow, set the GH_TOKEN environment variable. Example:\n  env:\n    GH_TOKEN: ${{ github.token }}",
+      "bash": "auth_error",
+      "ts": "auth",
+      "name": "verifier b13: gh in actions no token",
+      "expect": "esc:auth"
+    },
+    {
+      "text": "github.com\n  X Failed to log in to github.com account sethdford (keyring)\n  - Active account: true\n  - The token in keyring is invalid.\n  - To re-authenticate, run: gh auth login -h github.com",
+      "bash": "auth_error",
+      "ts": "auth",
+      "name": "verifier b14: gh auth status failure",
+      "expect": "esc:auth"
+    },
+    {
+      "text": "RequestError [HttpError]: Bad credentials\nError: Unhandled error: HttpError: Bad credentials",
+      "bash": "auth_error",
+      "ts": "auth",
+      "name": "verifier b15: actions/github-script bad credentials",
+      "expect": "esc:auth"
+    },
+    {
+      "text": "##[error]Bad credentials",
+      "bash": "auth_error",
+      "ts": "auth",
+      "name": "verifier b16: GH annotation bad credentials",
+      "expect": "esc:auth"
+    },
+    {
+      "text": "npm ERR! code E401\nnpm ERR! 401 Unauthorized - GET https://registry.npmjs.org/@acme%2fpkg - authentication token not provided",
+      "bash": "auth_error",
+      "ts": "auth",
+      "name": "verifier b17: npm 401 legacy",
+      "expect": "esc:auth"
+    },
+    {
+      "text": "npm error code E401\nnpm error Unable to authenticate, need: Basic realm=\"GitHub Package Registry\"",
+      "bash": "auth_error",
+      "ts": "auth",
+      "name": "verifier b18: npm 10 E401",
+      "expect": "esc:auth"
+    },
+    {
+      "text": "error: GET https://npm.pkg.github.com/@acme%2fpkg - 401\nerror: @acme/pkg@^1.0.0 failed to resolve",
+      "bash": "auth_error",
+      "ts": "auth",
+      "name": "verifier b19: bun install 401",
+      "expect": "esc:auth"
+    },
+    {
+      "text": "2026-10-25T12:00:00.123Z fatal: Authentication failed for 'https://github.com/o/r.git/'",
+      "bash": "auth_error",
+      "ts": "auth",
+      "name": "verifier b20: ISO timestamp without brackets (ts / docker logs)",
+      "expect": "esc:auth"
+    },
+    {
+      "text": "build\tCheckout\t﻿2026-10-25T12:00:00.1234567Z fatal: Authentication failed for 'https://github.com/o/r.git/'",
+      "bash": "auth_error",
+      "ts": "auth",
+      "name": "verifier b21: gh --log-failed prefix with BOM",
+      "expect": "esc:auth"
+    },
+    {
+      "text": "build\tCheckout\t2026-10-25T12:00:00.1234567Z fatal: Authentication failed for 'https://github.com/o/r.git/'",
+      "bash": "auth_error",
+      "ts": "auth",
+      "name": "verifier b22: gh --log-failed prefix normal",
+      "expect": "esc:auth"
+    },
+    {
+      "text": "time=2026-10-25T12:00:00Z level=error msg=\"authentication failed\"",
+      "bash": "build_failure",
+      "ts": "unknown",
+      "name": "verifier b23: logfmt level=error",
+      "expect": "esc:auth",
+      "limit": "Known limit: a logfmt line (level=error msg=\"...\") is not a structured lead-in; neither classifier escalates it."
+    },
+    {
+      "text": "ERROR: Authentication failed for 'https://github.com/o/r.git/'",
+      "bash": "auth_error",
+      "ts": "auth",
+      "name": "verifier b24: bracketed level INFO style ERROR:",
+      "expect": "esc:auth"
+    },
+    {
+      "text": "GraphQL: Could not resolve to an issue or pull request with the number of 99999. (repository.issue)",
+      "bash": "invalid_issue",
+      "ts": "invalid_input",
+      "name": "verifier b26: gh issue view missing",
+      "expect": "esc:invalid_input"
+    },
+    {
+      "text": "Sandbox is enabled but dependencies are missing: bubblewrap\nGraphQL: Could not resolve to an issue or pull request with the number of 99999. (repository.issue)",
+      "bash": "invalid_issue",
+      "ts": "invalid_input",
+      "name": "verifier b28: invalid issue + claude sandbox warning on Linux host",
+      "expect": "esc:invalid_input"
+    },
+    {
+      "text": "bash: jq: command not found\nGraphQL: Could not resolve to an issue or pull request with the number of 99999. (repository.issue)",
+      "bash": "invalid_issue",
+      "ts": "invalid_input",
+      "name": "verifier b29: invalid issue + command not found earlier",
+      "expect": "esc:invalid_input"
+    },
+    {
+      "text": "\u001b[31mfatal: Authentication failed for 'https://github.com/o/r.git/'\u001b[0m",
+      "bash": "auth_error",
+      "ts": "auth",
+      "name": "verifier b30: auth with ANSI colour",
+      "expect": "esc:auth"
+    },
+    {
+      "text": "remote: Invalid username or password.\r\nfatal: Authentication failed for 'https://github.com/o/r.git/'\r",
+      "bash": "auth_error",
+      "ts": "auth",
+      "name": "verifier b31: CRLF line endings",
+      "expect": "esc:auth"
+    },
+    {
+      "text": "OAuth token has expired. Please run /login",
+      "bash": "auth_error",
+      "ts": "auth",
+      "name": "verifier b32: Claude CLI OAuth expired plain",
+      "expect": "esc:auth"
+    },
+    {
+      "text": "Error response from daemon: Get \"https://ghcr.io/v2/\": unauthorized: authentication required",
+      "bash": "auth_error",
+      "ts": "auth",
+      "name": "verifier b33: docker login",
+      "expect": "esc:auth"
+    },
+    {
+      "text": "⏺ API Error: 401 {\"type\":\"error\",\"error\":{\"type\":\"authentication_error\",\"message\":\"invalid x-api-key\"}}",
+      "bash": "auth_error",
+      "ts": "auth",
+      "name": "verifier b34: Claude Code ⏺ glyph",
+      "expect": "esc:auth"
+    },
+    {
+      "text": "remote: Permission to o/r.git denied to bot.\nfatal: unable to access 'https://github.com/o/r.git/': The requested URL returned error: 403",
+      "bash": "auth_error",
+      "ts": "auth",
+      "name": "verifier b35: git 403 permission",
+      "expect": "esc:auth"
+    },
+    {
+      "text": "Cloning 50%\rfatal: Authentication failed for 'https://x/'",
+      "bash": "auth_error",
+      "ts": "auth",
+      "name": "verifier c1: mid-line CR (progress bar) then auth"
+    },
+    {
+      "text": "fatal: Authentication failed\rremote: done",
+      "bash": "auth_error",
+      "ts": "auth",
+      "name": "verifier c2: auth then mid-line CR"
+    },
+    {
+      "text": "progress fatal: Authentication failed for 'https://x/'",
+      "bash": "auth_error",
+      "ts": "auth",
+      "name": "verifier c3: U+2028 separator"
+    },
+    {
+      "text": "{\"pad\":\"xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\",\"error\":{\"type\":\"authentication_error\"}}",
+      "bash": "unknown",
+      "ts": "unknown",
+      "name": "verifier c4: long JSON line, type after 4096 chars"
+    },
+    {
+      "text": "could not read Username for 'https://x401': terminal prompts disabled",
+      "bash": "auth_error",
+      "ts": "auth",
+      "name": "verifier c5: word-adjacent 401 error-line selection"
+    },
+    {
+      "text": "\t\t\t\t\t\t\t\tfatal: Authentication failed for 'x'",
+      "bash": "auth_error",
+      "ts": "auth",
+      "name": "verifier c10: tab lead-in, 8 tabs"
+    },
+    {
+      "text": "error: ınvalid api key",
+      "bash": "unknown",
+      "ts": "unknown",
+      "name": "verifier c11: dotless i case fold"
+    },
+    {
+      "text": "error: invalid api Key",
+      "bash": "unknown",
+      "ts": "unknown",
+      "name": "verifier c12: Kelvin sign case fold"
+    },
+    {
+      "text": "fatal: Authentication failed for 'x'\nline 0\nline 1\nline 2\nline 3\nline 4\nline 5\nline 6\nline 7\nline 8\nline 9\nline 10\nline 11\nline 12\nline 13\nline 14\nline 15\nline 16\nline 17\nline 18\nline 19\nline 20\nline 21\nline 22\nline 23\nline 24\nline 25\nline 26\nline 27\nline 28\nline 29\nline 30\nline 31\nline 32\nline 33\nline 34\nline 35\nline 36\nline 37\nline 38\nline 39\nline 40\nline 41\nline 42\nline 43\nline 44\nline 45\nline 46\nline 47\nline 48\nline 49\nline 50\nline 51\nline 52\nline 53\nline 54\nline 55\nline 56\nline 57\nline 58\nline 59\nline 60\nline 61\nline 62\nline 63\nline 64\nline 65\nline 66\nline 67\nline 68\nline 69\nline 70\nline 71\nline 72\nline 73\nline 74\nline 75\nline 76\nline 77\nline 78\nline 79\nline 80\nline 81\nline 82\nline 83\nline 84\nline 85\nline 86\nline 87\nline 88\nline 89\nline 90\nline 91\nline 92\nline 93\nline 94\nline 95\nline 96\nline 97\nline 98\nline 99\nline 100\nline 101\nline 102\nline 103\nline 104\nline 105\nline 106\nline 107\nline 108\nline 109\nline 110\nline 111\nline 112\nline 113\nline 114\nline 115\nline 116\nline 117\nline 118\nline 119\nline 120\nline 121\nline 122\nline 123\nline 124\nline 125\nline 126\nline 127\nline 128\nline 129\nline 130\nline 131\nline 132\nline 133\nline 134\nline 135\nline 136\nline 137\nline 138\nline 139\nline 140\nline 141\nline 142\nline 143\nline 144\nline 145\nline 146\nline 147\nline 148\nline 149\nline 150\nline 151\nline 152\nline 153\nline 154\nline 155\nline 156\nline 157\nline 158\nline 159\nline 160\nline 161\nline 162\nline 163\nline 164\nline 165\nline 166\nline 167\nline 168\nline 169\nline 170\nline 171\nline 172\nline 173\nline 174\nline 175\nline 176\nline 177\nline 178\nline 179\nline 180\nline 181\nline 182\nline 183\nline 184\nline 185\nline 186\nline 187\nline 188\nline 189\nline 190\nline 191\nline 192\nline 193\nline 194\nline 195\nline 196\nline 197\nline 198",
+      "bash": "auth_error",
+      "ts": "auth",
+      "name": "verifier c13: 201 lines, auth 200th from end, trailing newline"
+    },
+    {
+      "text": "fatal: Authentication \u001b[1mfailed\u001b[0m for 'x'",
+      "bash": "auth_error",
+      "ts": "auth",
+      "name": "verifier c14: ANSI in middle of phrase"
+    },
+    {
+      "text": "\u001b]8;;https://x\u001b\\fatal: Authentication failed for 'x'\u001b]8;;\u001b\\",
+      "bash": "build_failure",
+      "ts": "unknown",
+      "name": "verifier c15: ANSI OSC hyperlink"
+    },
+    {
+      "text": "× fatal: Authentication failed for 'x'",
+      "bash": "build_failure",
+      "ts": "unknown",
+      "name": "verifier c16: × followed by NBSP"
+    },
+    {
+      "text": "build\tstep\t2026-10-25T12:00:00+00:00 fatal: Authentication failed for 'x'",
+      "bash": "build_failure",
+      "ts": "unknown",
+      "name": "verifier c17: gh prefix with offset timestamp"
+    },
+    {
+      "text": "﻿fatal: Authentication failed for 'x'",
+      "bash": "auth_error",
+      "ts": "auth",
+      "name": "verifier c18: BOM at file start"
+    },
+    {
+      "text": "​fatal: Authentication failed for 'x'",
+      "bash": "build_failure",
+      "ts": "unknown",
+      "name": "verifier c19: zero-width space lead"
+    },
+    {
+      "text": "error： authentication failed",
+      "bash": "build_failure",
+      "ts": "unknown",
+      "name": "verifier c20: fullwidth colon"
+    },
+    {
+      "text": "step one\rstep two\rfatal: Authentication failed for 'x'\r",
+      "bash": "auth_error",
+      "ts": "auth",
+      "name": "verifier c21: CR-only line endings (old mac / progress)"
+    },
+    {
+      "text": "\n RUN  v4.0.18 /tmp/work/x.js\n\n ❯ x.test.mjs (2 tests | 2 failed) 4ms\n   × git log text 3ms\n   × cli text 0ms\n\n⎯⎯⎯⎯⎯⎯⎯ Failed Tests 2 ⎯⎯⎯⎯⎯⎯⎯\n\n FAIL  x.test.mjs > git log text\nAssertionError: expected 'ok\\nfine' to be 'remote: Invalid username or password.…' // Object.is equality\n\n- Expected\n+ Received\n\n- remote: Invalid username or password.\n- fatal: Authentication failed for 'https://github.com/o/r.git/'\n+ ok\n+ fine\n\n ❯ x.test.mjs:2:22\n      1| test(\"git log text\", () => {\n      2|   expect(\"ok\\nfine\").toBe(\"remote: Invalid username or password.\\nfata…\n       |                      ^\n      3| });\n      4| test(\"cli text\", () => {\n\n⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/2]⎯\n\n FAIL  x.test.mjs > cli text\nAssertionError: expected 'Hello\\nthere' to be 'Invalid API key · Please run /login\\n…' // Object.is equality\n\n- Expected\n+ Received\n\n- Invalid API key · Please run /login\n- bye\n+ Hello\n+ there\n\n ❯ x.test.mjs:5:26\n      3| });\n      4| test(\"cli text\", () => {\n      5|   expect(\"Hello\\nthere\").toBe(\"Invalid API key · Please run /login\\nby…\n       |                          ^\n      6| });\n      7| \n\n⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/2]⎯\n\n\n Test Files  1 failed (1)\n      Tests  2 failed (2)\n   Start at  23:13:35\n   Duration  68ms (transform 6ms, setup 0ms, import 8ms, tests 4ms, environment 0ms)\n\n",
+      "bash": "build_failure",
+      "ts": "unknown",
+      "name": "verifier r1: REAL vitest 4 failure output",
+      "expect": "noesc"
+    },
+    {
+      "text": "bun test v1.2.19 (aad3abea)\n\nx.test.ts:\n1 | import { test, expect } from \"bun:test\";\n2 | test(\"multiline log\", () => {\n3 |   expect(\"ok\\nfine\").toBe(\"remote: Invalid username or password.\\nfatal: Authentication failed for 'https://github.com/o/r.git/'\");\n                         ^\nerror: expect(received).toBe(expected)\n\nExpected: \"remote: Invalid username or password.\\nfatal: Authentication failed for 'https://github.com/o/r.git/'\"\nReceived: \"ok\\nfine\"\n\n      at <anonymous> (/tmp/work/x.js:3:22)\n(fail) multiline log [0.05ms]\n1 | import { test, expect } from \"bun:test\";\n2 | test(\"multiline log\", () => {\n3 |   expect(\"ok\\nfine\").toBe(\"remote: Invalid username or password.\\nfatal: Authentication failed for 'https://github.com/o/r.git/'\");\n4 | });\n5 | test(\"array of lines\", () => {\n6 |   expect([\"a\"]).toEqual([\"Invalid API key · Please run /login\"]);\n                    ^\nerror: expect(received).toEqual(expected)\n\n  [\n+   \"a\"\n-   \"Invalid API key · Please run /login\"\n  ]\n\n- Expected  - 1\n+ Received  + 1\n\n      at <anonymous> (/tmp/work/x.js:6:17)\n(fail) array of lines [0.03ms]\n4 | });\n5 | test(\"array of lines\", () => {\n6 |   expect([\"a\"]).toEqual([\"Invalid API key · Please run /login\"]);\n7 | });\n8 | test(\"object\", () => {\n9 |   expect({ m: \"x\" }).toEqual({ m: \"not logged in\" });\n                         ^\nerror: expect(received).toEqual(expected)\n\n  {\n+   m: \"x\",\n-   m: \"not logged in\",\n  }\n\n- Expected  - 1\n+ Received  + 1\n\n      at <anonymous> (/tmp/work/x.js:9:22)\n(fail) object\n\n 0 pass\n 3 fail\n 3 expect() calls\nRan 3 tests across 1 file. [8.00ms]\n",
+      "bash": "build_failure",
+      "ts": "unknown",
+      "name": "verifier r2: REAL bun 1.2 failure output",
+      "expect": "noesc"
+    },
+    {
+      "text": "fatal: authentication failed is printed by the git mock",
+      "bash": "build_failure",
+      "ts": "unknown",
+      "name": "verifier p1: PR claim: git mock prose",
+      "expect": "noesc"
+    },
+    {
+      "text": "Error: authentication_error: invalid x-api-key",
+      "bash": "auth_error",
+      "ts": "auth",
+      "name": "verifier p3: PR claim",
+      "expect": "esc:auth"
+    },
+    {
+      "text": "error: authentication_error is now mapped to auth",
+      "bash": "unknown",
+      "ts": "unknown",
+      "name": "verifier p4: PR claim",
+      "expect": "noesc"
+    },
+    {
+      "text": "- authentication_error: handled by retry policy",
+      "bash": "unknown",
+      "ts": "unknown",
+      "name": "verifier p5: PR claim",
+      "expect": "noesc"
+    },
+    {
+      "text": "✗ GraphQL: Could not resolve to an issue or pull request with the number of 9.",
+      "bash": "invalid_issue",
+      "ts": "invalid_input",
+      "name": "verifier p6: PR claim",
+      "expect": "esc:invalid_input"
+    },
+    {
+      "text": "[2026-10-25 10:00:00] [ERROR] GraphQL: Could not resolve to an issue or pull request with the number of 9.",
+      "bash": "invalid_issue",
+      "ts": "invalid_input",
+      "name": "verifier p7: PR claim",
+      "expect": "esc:invalid_input"
+    },
+    {
+      "text": "→ Not logged in",
+      "bash": "unknown",
+      "ts": "unknown",
+      "name": "verifier p8: PR limit 2",
+      "expect": "noesc"
     }
   ]
 }
