@@ -1287,6 +1287,9 @@ pipeline_start() {
 # ─── Resume, Status, Abort Commands ────────────────────────────────
 pipeline_resume() {
     setup_dirs
+    # A resumed run reuses the base recorded at first start and never creates one (#8671).
+    PIPELINE_RESUMING=true
+    export PIPELINE_RESUMING
     resume_state
     echo ""
     run_pipeline
@@ -1416,6 +1419,9 @@ pipeline_abort() {
         info "Pipeline already $current_status."
         return
     fi
+
+    # An aborted run is abandoned: its base record goes too (#8671).
+    pipeline_base_release "${PROJECT_ROOT:-.}" 2>/dev/null || true
 
     resume_state 2>/dev/null || true
     PIPELINE_STATUS="aborted"

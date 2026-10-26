@@ -75,10 +75,15 @@ fi
 printf '  2 passed  0 failed  0 timed out  (2 suites, 0s)\n'
 FLAKY
 # Hangs until killed; used for the timeout, interrupt and owner-death tests.
-printf '#!/usr/bin/env bash\nsleep 4711\n' > "$REPO/hang.sh"
+# A sentinel unique to this run: another suite or session on the same machine may hold its own sleep, and the
+# no-sleep-left check below must count only this run's processes (a shared 4711 made the check fail spuriously).
+SLEEP_SENTINEL=$((40000 + $$))
+printf '#!/usr/bin/env bash\nsleep %s\n' "$SLEEP_SENTINEL" > "$REPO/hang.sh"
 
 git_in_repo() { git -C "$REPO" -c user.name=test -c user.email=test@example.com -c commit.gpgsign=false "$@"; }
 git_in_repo init -q
+# Dependencies are not tracked (a real project ignores node_modules); the farm is built from the ignored directory.
+printf 'node_modules/\n' > "$REPO/.gitignore"
 
 # commit_state <specs> — write state.txt (space-separated specs) and commit; prints the SHA.
 commit_state() {
@@ -87,11 +92,19 @@ commit_state() {
     git_in_repo commit -q --allow-empty -m "state: $1" >/dev/null 2>&1
     git_in_repo rev-parse HEAD
 }
-# no_sleep_left — poll (up to ~6s) until no 'sleep 4711' of the tests is left running.
+# owner_diag — on a failed owner-death check: the worktrees, and every process this run tagged (its sentinel sleep and the
+# scripts under TEST_TEMP_DIR), with pid, ppid, pgid, state, start time and command. The check itself is not changed (#8671, r7).
+owner_diag() {
+    echo "  owner-death diagnostics (run $$, sentinel $SLEEP_SENTINEL):"
+    git_in_repo worktree list 2>&1 | sed 's/^/    wt: /'
+    ps -axo pid=,ppid=,pgid=,stat=,lstart=,command= 2>/dev/null | grep -F -e "$SLEEP_SENTINEL" -e "$TEST_TEMP_DIR" |
+        grep -v grep | sed 's/^/    ps: /' || true
+}
+# no_sleep_left — poll (up to ~6s) until none of this run's hang sleeps is left running.
 no_sleep_left() {
     local _i
     for _i in $(seq 1 30); do
-        ps -axo command= | grep -x 'sleep 4711' >/dev/null || return 0
+        ps -axo command= | grep -x "sleep $SLEEP_SENTINEL" >/dev/null || return 0
         sleep 0.2
     done
     return 1
@@ -419,7 +432,8 @@ done
 kill -KILL "$opid" 2>/dev/null || true
 { wait "$opid"; } 2>/dev/null || true
 owner_ok=0
-for _ in $(seq 1 50); do
+# 30 s, not 10: the watchdog's git worktree remove can take several seconds on a loaded machine.
+for _ in $(seq 1 150); do
     if [[ "$(git_in_repo worktree list | wc -l | tr -d ' ')" -eq 1 ]] && no_sleep_left; then owner_ok=1; break; fi
     sleep 0.2
 done
@@ -427,6 +441,7 @@ if [[ "$owner_ok" -eq 1 ]]; then
     assert_pass "owner killed without a handler: watchdog removes the worktree and the run"
 else
     assert_fail "owner killed without a handler: watchdog removes the worktree and the run"
+    owner_diag
 fi
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -541,9 +556,77 @@ TS
     else
         assert_fail "DUP: the failing unit is file-qualified" "got: $TG_NEW_FAILURES"
     fi
+elif [[ -n "${CI:-}" ]]; then
+    # CI pins bun (.bun-version, test.yml). A runner without it must fail here, not skip the parser
+    # checks below, which is how the bun fixtures went unverified before (#8664).
+    assert_fail "bun is installed for the bun fixtures" "bun is not on PATH in CI: the setup-bun step in test.yml did not run"
 else
-    assert_pass "bun not installed: bun fixture checks skipped"
+    assert_pass "bun not installed locally: live bun fixture checks skipped (CI fails instead)"
 fi
+
+# No locale: launchd and systemd start the daemon without LANG, and the parse must still read the
+# assertion glyphs (#8671). A child shell with LANG, LC_ALL and LC_CTYPE unset parses a sw-test-all log.
+NOLANG_LOG="$TEST_TEMP_DIR/nolang.log"
+printf '%s\n' "  ✗ suite-b   exit 1 0s" "━━━ suite-b (FAIL:1) — last 25 lines ━━━" \
+    "    ✓ P1 ok" "    ✗ X bad" "  1 of 2 tests failed" > "$NOLANG_LOG"
+nolang_units="$(env -u LANG -u LC_ALL -u LC_CTYPE bash -c 'source "$1"; tg_parse_log "$2"; printf "%s\n" "$TG_UNITS"' _ \
+    "$SCRIPT_DIR/lib/test-gate-baseline.sh" "$NOLANG_LOG")"
+assert_eq "no LANG: the parse reads the assertion glyphs and the exit unit" "suite-b::X bad#1
+suite-b::exit=1
+suite-b::total=2" "$nolang_units"
+
+# Forged completion inside a failing suite (#8671, P2): output from the code under test prints an
+# "All N tests passed" line before a new failing assertion. The real completion line comes last. The new
+# assertion must still be counted, and the forged line must not end the count early.
+FORGED_LOG="$TEST_TEMP_DIR/forged.log"
+printf '%s\n' "  ✗ suite-p2   exit 1 0s" "━━━ suite-p2 (FAIL:1) — last 25 lines ━━━" \
+    "    ✓ P1 ok" "    output of tool under test: All 3 tests passed" "    ✗ A01 new break" \
+    "    ✓ P2 ok" "    ✗ A30 old break" "  2 of 4 tests failed" > "$FORGED_LOG"
+tg_parse_log "$FORGED_LOG"
+assert_eq "forged 'All N tests passed' inside a section does not hide a later failing assertion" \
+    "$(printf 'suite-p2::A01 new break#1\nsuite-p2::A30 old break#1\nsuite-p2::exit=1\nsuite-p2::total=4\n' | sort)" \
+    "$(printf '%s\n' "$TG_UNITS" | sort)"
+# A total that the counted assertions do not account for is not verifiable (UNORDERED blocks)
+MISMATCH_LOG="$TEST_TEMP_DIR/mismatch.log"
+printf '%s\n' "  ✗ suite-m   exit 1 0s" "━━━ suite-m (FAIL:1) — last 25 lines ━━━" \
+    "    ✓ P1 ok" "    ✗ A01 bad" "  1 of 5 tests failed" > "$MISMATCH_LOG"
+tg_parse_log "$MISMATCH_LOG"
+assert_contains "a total the counted assertions do not account for is UNORDERED" "$TG_UNITS" "suite-m::UNORDERED"
+
+# Golden bun logs (#8664): real `bun test` output from bun 1.2.19 (the pin), 1.3.14 and 1.4.4, each as
+# pipe output, FORCE_COLOR colour (✗ markers), a pty capture (CRLF, colour) and GitHub Actions output
+# (::group:: file headers, ::error annotations). Every shape must parse to the same units, so verdicts
+# do not depend on the bun version or on how the log was captured.
+GOLD="$SCRIPT_DIR/fixtures/bun-test"
+tg_parse_log "$GOLD/bun-1.2.19-plain.log"
+GOLD_REF="$TG_UNITS"
+assert_eq "golden bun 1.2.19 plain: parsable" "1" "$TG_PARSABLE"
+for want in "b.test.ts::LOAD_ERROR" "syntax.test.ts::LOAD_ERROR" "a.test.ts::pre-existing failure#1" \
+    "dup.test.ts::same name#1" "dup.test.ts::same name#2" "bun::ran=9" "bun::files=5" "bun::fail=5" \
+    "bun::error=2" "bun::skip=1"; do
+    if printf '%s\n' "$GOLD_REF" | grep -Fx -- "$want" >/dev/null; then
+        assert_pass "golden bun 1.2.19 plain: unit $want"
+    else
+        assert_fail "golden bun 1.2.19 plain: unit $want" "got: $GOLD_REF"
+    fi
+done
+for name in bun-1.2.19-color bun-1.2.19-tty bun-1.2.19-gha bun-1.3.14-plain bun-1.3.14-color bun-1.3.14-tty \
+    bun-1.3.14-gha bun-1.4.4-plain bun-1.4.4-color bun-1.4.4-tty bun-1.4.4-gha; do
+    tg_parse_log "$GOLD/$name.log"
+    assert_eq "golden $name: parsable" "1" "$TG_PARSABLE"
+    assert_eq "golden $name: same units as the plain 1.2.19 log" "$GOLD_REF" "$TG_UNITS"
+done
+# Singular summary variants ("Ran 1 test across 1 file", one failing test), plain and pty
+for name in bun-single-1.2.19-plain bun-single-1.2.19-tty bun-single-1.2.19-gha; do
+    tg_parse_log "$GOLD/$name.log"
+    assert_eq "golden $name: one failing unit, one file" \
+        "bun::error=0
+bun::fail=1
+bun::files=1
+bun::ran=1
+bun::skip=0
+one.test.ts::only failure#1" "$TG_UNITS"
+done
 
 # Multiset (review round 4): a repeated assertion name in a failing suite must not hide a swap.
 # The base has suite-b's "X" once; the iteration has "X" twice.
