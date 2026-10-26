@@ -75,7 +75,10 @@ fi
 printf '  2 passed  0 failed  0 timed out  (2 suites, 0s)\n'
 FLAKY
 # Hangs until killed; used for the timeout, interrupt and owner-death tests.
-printf '#!/usr/bin/env bash\nsleep 4711\n' > "$REPO/hang.sh"
+# A sentinel unique to this run: another suite or session on the same machine may hold its own sleep, and the
+# no-sleep-left check below must count only this run's processes (a shared 4711 made the check fail spuriously).
+SLEEP_SENTINEL=$((40000 + $$))
+printf '#!/usr/bin/env bash\nsleep %s\n' "$SLEEP_SENTINEL" > "$REPO/hang.sh"
 
 git_in_repo() { git -C "$REPO" -c user.name=test -c user.email=test@example.com -c commit.gpgsign=false "$@"; }
 git_in_repo init -q
@@ -87,11 +90,11 @@ commit_state() {
     git_in_repo commit -q --allow-empty -m "state: $1" >/dev/null 2>&1
     git_in_repo rev-parse HEAD
 }
-# no_sleep_left — poll (up to ~6s) until no 'sleep 4711' of the tests is left running.
+# no_sleep_left — poll (up to ~6s) until none of this run's hang sleeps is left running.
 no_sleep_left() {
     local _i
     for _i in $(seq 1 30); do
-        ps -axo command= | grep -x 'sleep 4711' >/dev/null || return 0
+        ps -axo command= | grep -x "sleep $SLEEP_SENTINEL" >/dev/null || return 0
         sleep 0.2
     done
     return 1
