@@ -1,6 +1,11 @@
 import { describe, expect, test } from "bun:test";
 import { type Attempt, classifyAndDecide } from "../index";
-import { boundEvidence, MAX_EVIDENCE_LINE_CHARS, MAX_EVIDENCE_LINES } from "./evidence";
+import {
+  boundEvidence,
+  dropTestTitles,
+  MAX_EVIDENCE_LINE_CHARS,
+  MAX_EVIDENCE_LINES,
+} from "./evidence";
 
 describe("bounded evidence (review finding 1)", () => {
   test("a 1 MB single line classifies in under 100 ms", () => {
@@ -95,4 +100,40 @@ test("a coloured auth line is auth (normalized before the anchored rule)", () =>
       attempts: [],
     }).class,
   ).toBe("auth");
+});
+
+describe("test-runner title lines never reach the rules (#8696)", () => {
+  test("bun, jest, vitest, node:test and mocha title lines are dropped; other lines are kept", () => {
+    const text = [
+      "(fail) not logged in [1ms]",
+      "(pass) ok",
+      "  ✕ API Error: 401 when token missing (3 ms)",
+      "  ✓ passes",
+      "  ● not logged in",
+      "   × authentication_error maps to auth",
+      "√ ok",
+      "✔ ok",
+      "✖ failed to authenticate when password wrong",
+      "  1) issue not found: shows empty state",
+      "✗ Not logged in · Please run /login",
+      "error: expect(received).toBe(expected)",
+    ].join("\n");
+    expect(dropTestTitles(text)).toBe(
+      "✗ Not logged in · Please run /login\nerror: expect(received).toBe(expected)",
+    );
+  });
+
+  test("a failing test titled with an auth phrase is not auth", () => {
+    const text =
+      "  ✕ API Error: 401 when token missing (3 ms)\nerror: expect(received).toBe(expected)";
+    expect(classifyAndDecide({ text, attempts: [] }).class).toBe("unknown");
+  });
+
+  test("the fingerprint still sees the title, so two different failing tests group apart", () => {
+    // bun prints the assertion first and the `(fail)` title last, so the title is the last error line.
+    const a = classifyAndDecide({ text: "error: expected\n(fail) a > one", attempts: [] });
+    const b = classifyAndDecide({ text: "error: expected\n(fail) b > two", attempts: [] });
+    expect(a.class).toBe(b.class);
+    expect(a.fingerprint).not.toBe(b.fingerprint);
+  });
 });

@@ -7,7 +7,7 @@ import {
   type RetryDecision,
   type RetryPolicy,
 } from "../domain/retry";
-import { boundEvidence } from "./evidence";
+import { boundEvidence, dropTestTitles } from "./evidence";
 
 export interface ClassifyInput {
   readonly kind?: AgentFailureKind;
@@ -27,7 +27,12 @@ export function classifyAndDecide(
   policy: RetryPolicy = DEFAULT_RETRY_POLICY,
 ): ClassifyResult {
   const text = boundEvidence(input.text);
-  const cls = classifyFailure(input.kind === undefined ? { text } : { kind: input.kind, text });
+  // The rules never see test-runner title lines (#8696). The fingerprint keeps them: bun prints the
+  // `(fail)` title after the assertion, so two different failing tests still group apart.
+  const rulesText = dropTestTitles(text);
+  const cls = classifyFailure(
+    input.kind === undefined ? { text: rulesText } : { kind: input.kind, text: rulesText },
+  );
   const fingerprint = failureFingerprint(cls, text);
   const decision = decideRetry([...input.attempts, { cls, fingerprint }], policy);
   return { class: cls, fingerprint, decision };

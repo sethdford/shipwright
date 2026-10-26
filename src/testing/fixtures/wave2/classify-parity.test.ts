@@ -1,7 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import { readFileSync } from "node:fs";
 import { classifyAndDecide, type FailureClass } from "../../../contexts/learning";
-import { bashClassifyAll } from "../../bash-classify";
+import { type BashLocale, bashCharsIn, bashClassifyAll } from "../../bash-classify";
 import { createTestEnv } from "../../test-env";
 
 // Pins the TypeScript classes against the REAL bash classify_failure for the three classes W2-04 maps.
@@ -11,6 +11,12 @@ interface Case {
   readonly bash: string;
   readonly ts: FailureClass;
   readonly differs?: string;
+  /** A row from the #8696 reviewer corpus. */
+  readonly name?: string;
+  /** Its expected escalation: "noesc", or "esc:<class>". */
+  readonly expect?: string;
+  /** A documented limit: the row is known not to meet `expect`, in both classifiers. */
+  readonly limit?: string;
 }
 interface Corpus {
   readonly mapping: Readonly<Record<string, FailureClass>>;
@@ -20,17 +26,18 @@ const corpus = JSON.parse(
   readFileSync(new URL("classify-parity.json", import.meta.url), "utf8"),
 ) as Corpus;
 
-const liveBash = (() => {
+const liveBashIn = (locale: BashLocale, texts: readonly string[]) => {
   const env = createTestEnv();
   try {
-    return bashClassifyAll(
-      env,
-      corpus.cases.map((c) => c.text),
-    );
+    return bashClassifyAll(env, texts, locale);
   } finally {
     env.cleanup();
   }
-})();
+};
+const liveBash = liveBashIn(
+  "C",
+  corpus.cases.map((c) => c.text),
+);
 
 describe("TS classes pinned against live bash classify_failure (W2-04 mapping)", () => {
   test("the mapping covers exactly auth, transient and invalid_input", () => {
@@ -97,4 +104,83 @@ describe("#8696 self-triggers never escalate (both classifiers)", () => {
       expect(["auth_error", "invalid_issue", "contamination"]).not.toContain(liveBash[i] ?? "");
     });
   }
+});
+
+const ESCALATIONS: Readonly<Record<string, FailureClass>> = {
+  auth_error: "auth",
+  invalid_issue: "invalid_input",
+  contamination: "contamination",
+};
+const tsEscalation = (cls: FailureClass) =>
+  cls === "auth" || cls === "invalid_input" || cls === "contamination" ? cls : "-";
+const bashEscalation = (label: string) => ESCALATIONS[label] ?? "-";
+const meets = (expect: string, escalation: string) =>
+  expect === "noesc" ? escalation === "-" : escalation === expect.slice("esc:".length);
+
+describe("#8696 reviewer corpus: escalations only from structured lines, in both classifiers and both locales", () => {
+  const rows = corpus.cases.filter((c) => c.expect !== undefined);
+
+  test("the corpus is present", () => {
+    expect(rows.length).toBeGreaterThanOrEqual(94);
+  });
+
+  test("bash labels every case the same under LC_ALL=C and a UTF-8 locale", () => {
+    // The UTF-8 run must really be multibyte, or it proves nothing.
+    expect(bashCharsIn("en_US.UTF-8", "✗")).toBe(1);
+    const utf8 = liveBashIn(
+      "en_US.UTF-8",
+      corpus.cases.map((c) => c.text),
+    );
+    const diverging = corpus.cases
+      .map((c, i) => ({ text: c.text, c: liveBash[i], utf8: utf8[i] }))
+      .filter((row) => row.c !== row.utf8);
+    expect(diverging).toEqual([]);
+  });
+
+  test("every case escalates the same way in TS and bash", () => {
+    const diverging = corpus.cases
+      .map((c, i) => ({
+        text: c.text,
+        ts: tsEscalation(classifyAndDecide({ text: c.text, attempts: [] }).class),
+        bash: bashEscalation(liveBash[i] ?? ""),
+      }))
+      .filter((row) => row.ts !== row.bash);
+    expect(diverging).toEqual([]);
+  });
+
+  test("every corpus row meets its expectation, and every documented limit really misses it", () => {
+    const wrong = rows
+      .map((c) => ({
+        name: c.name,
+        expect: c.expect ?? "",
+        limit: c.limit !== undefined,
+        got: tsEscalation(classifyAndDecide({ text: c.text, attempts: [] }).class),
+      }))
+      .filter((row) => meets(row.expect, row.got) === row.limit);
+    expect(wrong).toEqual([]);
+  });
+
+  test("a structured line deep in a 10k-line log: only the last 200 lines count", () => {
+    const filler = Array.from({ length: 9990 }, (_, i) => `ok ${i} test passes`).join("\n");
+    const big: ReadonlyArray<readonly [string, string]> = [
+      [
+        `${filler}\nnote: printed CONTAMINATION: pipeline-state-missing in docs\nlog: the gate said Skipping integration tests: refusing to run inside a build-loop test gate (expected)\nError: build failed`,
+        "noesc",
+      ],
+      [`CONTAMINATION: pipeline-state-missing\n${filler}\nError: build failed`, "noesc"],
+      [
+        `${filler}\nCONTAMINATION: pipeline-state-missing\nError: build failed`,
+        "esc:contamination",
+      ],
+    ];
+    const bash = liveBashIn(
+      "C",
+      big.map(([text]) => text),
+    );
+    big.forEach(([text, expectation], i) => {
+      const ts = tsEscalation(classifyAndDecide({ text, attempts: [] }).class);
+      expect({ i, ts, bash: bashEscalation(bash[i] ?? "") }).toEqual({ i, ts, bash: ts });
+      expect({ i, ok: meets(expectation, ts) }).toEqual({ i, ok: true });
+    });
+  });
 });

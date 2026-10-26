@@ -423,5 +423,41 @@ assert_eq "'Error: issue not found in cache, refetching' does not escalate" "unk
 assert_eq "'error: Bad credentials for user bob in fixture db' does not escalate" "unknown" \
     "$(esc_class 'error: Bad credentials for user bob in fixture db')"
 
-print_test_results
+# ─── The #8696 reviewer corpus, from classify-parity.json, under both locales ───
+# Each row with an "expect" field: "noesc" or "esc:<class>". The regex alone (no Bun) must meet it under LC_ALL=C
+# (bytes) and a UTF-8 locale (characters) alike. A row with a "limit" is a documented miss and must still miss.
+print_test_section "Reviewer corpus (#8696): structured escalations only, LC_ALL=C and en_US.UTF-8"
+PARITY_JSON="$SCRIPT_DIR/../src/testing/fixtures/wave2/classify-parity.json"
+utf8_len="$(LC_ALL=en_US.UTF-8 bash -c 'x="✗"; printf %s "${#x}"')"
+assert_eq "en_US.UTF-8 is a multibyte locale here (else the UTF-8 run proves nothing)" "1" "$utf8_len"
+corpus_rows="$(jq -r '.cases | to_entries[] | select(.value.expect != null) | .key' "$PARITY_JSON")"
+corpus_count=0
+corpus_bad=""
+for row in $corpus_rows; do
+    jq -r --argjson i "$row" '.cases[$i].text' "$PARITY_JSON" > "$LOG_DIR/issue-902.log"
+    row_expect="$(jq -r --argjson i "$row" '.cases[$i].expect' "$PARITY_JSON")"
+    row_limit="$(jq -r --argjson i "$row" '.cases[$i].limit // ""' "$PARITY_JSON")"
+    row_name="$(jq -r --argjson i "$row" '.cases[$i].name' "$PARITY_JSON")"
+    case "$row_expect" in
+        noesc) want="-" ;;
+        esc:auth) want="auth_error" ;;
+        esc:invalid_input) want="invalid_issue" ;;
+        esc:contamination) want="contamination" ;;
+        *) want="?$row_expect" ;;
+    esac
+    for loc in C en_US.UTF-8; do
+        got="$(LC_ALL="$loc" SW_BUN=/nonexistent/bun classify_failure 902)"
+        case "$got" in auth_error|invalid_issue|contamination) ;; *) got="-" ;; esac
+        if [[ -n "$row_limit" ]]; then
+            [[ "$got" != "$want" ]] || corpus_bad="${corpus_bad}"$'\n'"  limit now met [$loc]: $row_name"
+        else
+            [[ "$got" == "$want" ]] || corpus_bad="${corpus_bad}"$'\n'"  [$loc] $row_name: want $want, got $got"
+        fi
+    done
+    corpus_count=$((corpus_count + 1))
+done
+assert_eq "the reviewer corpus is present (rows with an expectation)" "true" \
+    "$([[ $corpus_count -ge 94 ]] && echo true || echo "false ($corpus_count)")"
+assert_eq "every corpus row meets its expectation under both locales" "" "$corpus_bad"
 
+print_test_results

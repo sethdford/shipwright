@@ -1,5 +1,5 @@
 {
-  "_about": "The 'bash' column is the daemon's classify_failure with SW_BUN pointing at nothing, so it is the bash regex alone (the test harness sets SW_BUN). Its auth alternatives mirror the TS auth rule, and its contamination rule mirrors the TS contamination rule, so a host without Bun does not retry an auth or contamination failure. Rows changed to match the regex: 'invalid api key provided', 'OAuth token revoked', 'OAuth token is invalid' (auth_error), and the two contamination texts (contamination).",
+  "_about": "The 'bash' column is the daemon's classify_failure with SW_BUN pointing at nothing, so it is the bash regex alone (the test harness sets SW_BUN). Its auth alternatives mirror the TS auth rule, and its contamination rule mirrors the TS contamination rule, so a host without Bun does not retry an auth or contamination failure. Rows changed to match the regex: 'invalid api key provided', 'OAuth token revoked', 'OAuth token is invalid' (auth_error), and the two contamination texts (contamination). Rows with 'name' and 'expect' are the #8696 reviewer corpus plus four locale probes: 'expect' is 'noesc' or 'esc:<class>', checked for TS and for bash under LC_ALL=C and en_US.UTF-8 (classify-parity.test.ts, sw-lib-daemon-failure-test.sh). A row with 'limit' is a documented miss.",
   "mapping": {
     "auth_error": "auth",
     "api_error": "transient",
@@ -9,7 +9,9 @@
     {
       "text": "##[error]Claude Code authentication failed — check CLAUDE_CODE_OAUTH_TOKEN secret",
       "bash": "auth_error",
-      "ts": "auth"
+      "ts": "auth",
+      "name": "claude auth",
+      "expect": "esc:auth"
     },
     {
       "text": "Error: 401 authentication_error: OAuth token has expired",
@@ -122,7 +124,9 @@
     {
       "text": "⚠ Skipping integration tests: refusing to run inside a build-loop test gate",
       "bash": "contamination",
-      "ts": "contamination"
+      "ts": "contamination",
+      "name": "refusal struct emoji",
+      "expect": "esc:contamination"
     },
     {
       "text": "CONTAMINATION: branch-switched a -> b",
@@ -297,7 +301,9 @@
     {
       "text": "CONTAMINATION: pipeline-state-missing",
       "bash": "contamination",
-      "ts": "contamination"
+      "ts": "contamination",
+      "name": "contam struct",
+      "expect": "esc:contamination"
     },
     {
       "text": "GraphQL: Could not resolve to an Issue with the number 999.",
@@ -312,317 +318,668 @@
     {
       "text": "curl: (6) Could not resolve host: registry.npmjs.org\nError: Process completed with exit code 6.",
       "bash": "build_failure",
-      "ts": "environment"
+      "ts": "environment",
+      "name": "dns curl",
+      "expect": "noesc"
     },
     {
       "text": "fatal: unable to access 'https://github.com/x/y/': Could not resolve host: github.com",
       "bash": "unknown",
-      "ts": "environment"
+      "ts": "environment",
+      "name": "dns git",
+      "expect": "noesc"
     },
     {
       "text": "npm ERR! code ENOTFOUND\nnpm ERR! getaddrinfo ENOTFOUND registry.npmjs.org",
       "bash": "build_failure",
-      "ts": "environment"
+      "ts": "environment",
+      "name": "dns enotfound",
+      "expect": "noesc"
     },
     {
       "text": "[ERROR] Failed to execute goal on project app: Could not resolve dependencies for project com.x:app:jar:1.0",
       "bash": "build_failure",
-      "ts": "environment"
+      "ts": "environment",
+      "name": "maven deps",
+      "expect": "noesc"
     },
     {
       "text": "error: could not resolve \"@foo/bar\". Maybe you need to \"bun install\"?",
       "bash": "unknown",
-      "ts": "unknown"
+      "ts": "unknown",
+      "name": "bun resolve",
+      "expect": "noesc"
     },
     {
       "text": "npm ERR! code E404\nnpm ERR! 404 Not Found - GET https://registry.npmjs.org/@x%2fy - Not found",
       "bash": "build_failure",
-      "ts": "unknown"
+      "ts": "unknown",
+      "name": "npm 404",
+      "expect": "noesc"
     },
     {
       "text": "npm http fetch GET 404 https://registry.npmjs.org/nope 120ms\nnpm ERR! HTTP 404 Not Found",
       "bash": "build_failure",
-      "ts": "unknown"
+      "ts": "unknown",
+      "name": "npm http 404",
+      "expect": "noesc"
     },
     {
       "text": "curl: (22) The requested URL returned error: 404\nError: HTTP 404 from https://example.com/x",
       "bash": "unknown",
-      "ts": "unknown"
+      "ts": "unknown",
+      "name": "curl 404",
+      "expect": "noesc"
     },
     {
       "text": "(fail) api > returns status 404 for missing user [3.1ms]\nerror: expect(received).toBe(expected)",
       "bash": "build_failure",
-      "ts": "unknown"
+      "ts": "unknown",
+      "name": "test name status 404",
+      "expect": "noesc"
     },
     {
       "text": "(fail) client > maps HTTP 404 on GET /repos/o/r/issues/12 to NotFound\nerror: expected 1 to be 2",
       "bash": "build_failure",
-      "ts": "unknown"
+      "ts": "unknown",
+      "name": "test http 404 issues url",
+      "expect": "noesc"
     },
     {
       "text": "(fail) gate test\nCONTAMINATION: x\nerror: boom",
       "bash": "build_failure",
-      "ts": "unknown"
+      "ts": "unknown",
+      "name": "forged contamination",
+      "expect": "noesc"
     },
     {
       "text": "  CONTAMINATION: pipeline-state-missing (echoed by test)\nerror",
       "bash": "unknown",
-      "ts": "unknown"
+      "ts": "unknown",
+      "name": "forged contamination indented",
+      "expect": "noesc"
     },
     {
       "text": "✗ prints refusing to run inside a build-loop test gate when gated\nerror: assertion failed",
       "bash": "build_failure",
-      "ts": "unknown"
+      "ts": "unknown",
+      "name": "refusal bare in test",
+      "expect": "noesc"
     },
     {
       "text": "build\tRun tests\t2026-10-25T12:00:00.1234567Z error: TypeError: x is undefined",
       "bash": "unknown",
-      "ts": "unknown"
+      "ts": "unknown",
+      "name": "gh prefixed plain fail",
+      "expect": "noesc"
     },
     {
       "text": "\u001b[31merror\u001b[0m: test failed \u001b[1mstatus 404\u001b[0m",
       "bash": "build_failure",
-      "ts": "unknown"
+      "ts": "unknown",
+      "name": "ansi failure",
+      "expect": "noesc"
     },
     {
       "text": "(fail) parses issue with no body\nerror: expected",
       "bash": "build_failure",
-      "ts": "unknown"
+      "ts": "unknown",
+      "name": "issue word no body in test",
+      "expect": "noesc"
     },
     {
       "text": "(fail) auth > login fails with wrong password [2ms]\nerror: expected 200 got 401",
       "bash": "build_failure",
-      "ts": "unknown"
+      "ts": "unknown",
+      "name": "auth test name fails",
+      "expect": "noesc"
     },
     {
       "text": "SyntaxError: Invalid or unexpected token\n    at file.js:3",
       "bash": "unknown",
-      "ts": "unknown"
+      "ts": "unknown",
+      "name": "syntax invalid token",
+      "expect": "noesc"
     },
     {
       "text": "(fail) jwt > rejects invalid token\nerror: expected",
       "bash": "build_failure",
-      "ts": "unknown"
+      "ts": "unknown",
+      "name": "jwt invalid token test",
+      "expect": "noesc"
     },
     {
       "text": "(fail) returns 401 Unauthorized for anon\nerror: expect(received).toBe(expected)",
       "bash": "build_failure",
-      "ts": "unknown"
+      "ts": "unknown",
+      "name": "test unauthorized name",
+      "expect": "noesc"
     },
     {
       "text": "(fail) shows banner when not logged in\nerror: expected",
       "bash": "build_failure",
-      "ts": "unknown"
+      "ts": "unknown",
+      "name": "test not logged in",
+      "expect": "noesc"
     },
     {
       "text": "HTTP 401: Bad credentials (https://api.github.com/repos/o/r/issues/1)",
       "bash": "auth_error",
-      "ts": "auth"
+      "ts": "auth",
+      "name": "gh 401",
+      "expect": "esc:auth"
     },
     {
       "text": "gh: Bad credentials\nerror: HTTP 401",
       "bash": "auth_error",
-      "ts": "auth"
+      "ts": "auth",
+      "name": "gh bad creds gql",
+      "expect": "esc:auth"
     },
     {
       "text": "To get started with GitHub CLI, please run:  gh auth login\nerror: not logged in",
       "bash": "auth_error",
-      "ts": "auth"
+      "ts": "auth",
+      "name": "gh auth login",
+      "expect": "esc:auth"
     },
     {
       "text": "error: authentication required; The token in GH_TOKEN is invalid.",
       "bash": "auth_error",
-      "ts": "auth"
+      "ts": "auth",
+      "name": "gh token invalid",
+      "expect": "esc:auth"
     },
     {
       "text": "GraphQL: Could not resolve to an Issue with the number of 99999. (repository.issue)",
       "bash": "invalid_issue",
-      "ts": "invalid_input"
+      "ts": "invalid_input",
+      "name": "missing issue gql",
+      "expect": "esc:invalid_input"
     },
     {
       "text": "gh: Not Found (HTTP 404)\nerror: HTTP 404: Not Found (https://api.github.com/repos/o/r/issues/99999)",
       "bash": "invalid_issue",
-      "ts": "invalid_input"
+      "ts": "invalid_input",
+      "name": "missing issue rest",
+      "expect": "esc:invalid_input"
     },
     {
       "text": "GraphQL: Could not resolve to a PullRequest with the number of 5. (repository.pullRequest)",
       "bash": "invalid_issue",
-      "ts": "invalid_input"
+      "ts": "invalid_input",
+      "name": "missing pr gql",
+      "expect": "esc:invalid_input"
     },
     {
       "text": "Issue #42 has no body; nothing to plan",
       "bash": "unknown",
-      "ts": "unknown"
+      "ts": "unknown",
+      "name": "issue no body",
+      "expect": "noesc"
     },
     {
       "text": "CONTAMINATION: branch-switched from a to b",
       "bash": "contamination",
-      "ts": "contamination"
+      "ts": "contamination",
+      "name": "contam struct branch",
+      "expect": "esc:contamination"
     },
     {
       "text": "\u001b[31mCONTAMINATION: branch-switched\u001b[0m",
       "bash": "contamination",
-      "ts": "contamination"
+      "ts": "contamination",
+      "name": "contam ansi",
+      "expect": "esc:contamination"
     },
     {
       "text": "build\tRun tests\t2026-10-25T12:00:00.1234567Z CONTAMINATION: pipeline-state-missing",
       "bash": "contamination",
-      "ts": "contamination"
+      "ts": "contamination",
+      "name": "contam gh prefixed",
+      "expect": "esc:contamination"
     },
     {
       "text": "Skipping integration tests: refusing to run inside a build-loop test gate",
       "bash": "contamination",
-      "ts": "contamination"
+      "ts": "contamination",
+      "name": "refusal struct",
+      "expect": "esc:contamination"
     },
     {
       "text": "build\tRun tests\t2026-10-25T12:00:00.1234567Z \u001b[33m⚠\u001b[0m Skipping integration tests: refusing to run inside a build-loop test gate",
       "bash": "contamination",
-      "ts": "contamination"
+      "ts": "contamination",
+      "name": "refusal struct ansi gh",
+      "expect": "esc:contamination"
     },
     {
       "text": "CONTAMINATION: pipeline-state-missing\r",
       "bash": "contamination",
-      "ts": "contamination"
+      "ts": "contamination",
+      "name": "contam CRLF",
+      "expect": "esc:contamination"
     },
     {
       "text": "(fail) test prints\nCONTAMINATION: branch-switched\nerror",
       "bash": "contamination",
-      "ts": "contamination"
+      "ts": "contamination",
+      "name": "forged verbatim",
+      "expect": "esc:contamination"
     },
     {
       "text": "API Error: 503 Service Unavailable\nError: authentication_error: invalid x-api-key",
       "bash": "auth_error",
-      "ts": "auth"
+      "ts": "auth",
+      "name": "auth + 503 mix",
+      "expect": "esc:auth"
     },
     {
       "text": "HTTP 503 Service Unavailable\nGraphQL: Could not resolve to an Issue with the number of 9.",
       "bash": "invalid_issue",
-      "ts": "invalid_input"
+      "ts": "invalid_input",
+      "name": "invalid issue + 503 mix",
+      "expect": "esc:invalid_input"
     },
     {
       "text": "(fail) classifies gh error \"GraphQL: Could not resolve to an issue or pull request with the number of 1.\" as \"not_found\" [0.4ms]\nerror: expect(received).toEqual(expected)",
       "bash": "build_failure",
-      "ts": "unknown"
+      "ts": "unknown",
+      "name": "bun fail graphql test name",
+      "expect": "noesc"
     },
     {
       "text": "(fail) classifies gh error \"HTTP 401: Bad credentials\" as \"auth\" [0.2ms]",
       "bash": "build_failure",
-      "ts": "unknown"
+      "ts": "unknown",
+      "name": "bun fail 401 test name",
+      "expect": "noesc"
     },
     {
       "text": "(fail) maps 401 Unauthorized to auth [1ms]",
       "bash": "build_failure",
-      "ts": "unknown"
+      "ts": "unknown",
+      "name": "bun fail unauthorized test",
+      "expect": "noesc"
     },
     {
       "text": "    Expected: \"issue not found\"\n    Received: \"ok\"\nerror: expect(received).toBe(expected)",
       "bash": "unknown",
-      "ts": "unknown"
+      "ts": "unknown",
+      "name": "jest diff issue not found",
+      "expect": "noesc"
     },
     {
       "text": "::error::Claude Code authentication failed — check CLAUDE_CODE_OAUTH_TOKEN secret",
       "bash": "auth_error",
-      "ts": "auth"
+      "ts": "auth",
+      "name": "wf ::error:: claude auth",
+      "expect": "esc:auth"
     },
     {
       "text": "pipeline\tRun Claude\t2026-10-25T12:00:00.1234567Z ##[error]Claude Code authentication failed — check CLAUDE_CODE_OAUTH_TOKEN secret",
       "bash": "auth_error",
-      "ts": "auth"
+      "ts": "auth",
+      "name": "wf gh-prefixed ##[error] claude auth",
+      "expect": "esc:auth"
     },
     {
       "text": "API Error: 401 {\"type\":\"error\",\"error\":{\"type\":\"authentication_error\",\"message\":\"invalid x-api-key\"}}",
       "bash": "auth_error",
-      "ts": "auth"
+      "ts": "auth",
+      "name": "claude cli api error 401 json",
+      "expect": "esc:auth"
     },
     {
       "text": "Failed to authenticate. API Error: 401 {\"type\":\"error\",\"error\":{\"type\":\"authentication_error\",\"message\":\"OAuth token has expired.\"}}",
       "bash": "auth_error",
-      "ts": "auth"
+      "ts": "auth",
+      "name": "claude cli failed to authenticate",
+      "expect": "esc:auth"
     },
     {
       "text": "Invalid API key · Please run /login",
       "bash": "auth_error",
-      "ts": "auth"
+      "ts": "auth",
+      "name": "claude invalid api key login",
+      "expect": "esc:auth"
     },
     {
       "text": "OAuth token has expired. Please obtain a new token or refresh your existing token.",
       "bash": "auth_error",
-      "ts": "auth"
+      "ts": "auth",
+      "name": "claude oauth expired",
+      "expect": "esc:auth"
     },
     {
       "text": "gh: HTTP 401: Bad credentials (https://api.github.com/graphql)",
       "bash": "auth_error",
-      "ts": "auth"
+      "ts": "auth",
+      "name": "gh graphql bad creds",
+      "expect": "esc:auth"
     },
     {
       "text": "remote: Invalid username or password.\nfatal: Authentication failed for 'https://github.com/o/r.git/'",
       "bash": "auth_error",
-      "ts": "auth"
+      "ts": "auth",
+      "name": "git push auth failed",
+      "expect": "esc:auth"
     },
     {
       "text": "    Error: authentication_error: invalid x-api-key",
       "bash": "auth_error",
-      "ts": "auth"
+      "ts": "auth",
+      "name": "indented error auth",
+      "expect": "esc:auth"
     },
     {
       "text": "\u001b[31mError: invalid x-api-key\u001b[0m",
       "bash": "auth_error",
-      "ts": "auth"
+      "ts": "auth",
+      "name": "ansi auth",
+      "expect": "esc:auth"
     },
     {
       "text": "✗ Not logged in · Please run /login",
       "bash": "auth_error",
-      "ts": "auth"
+      "ts": "auth",
+      "name": "shipwright ✗ prefix auth",
+      "expect": "esc:auth"
     },
     {
       "text": "[2026-10-25T12:00:00Z] [ERROR] Claude Code authentication failed",
       "bash": "auth_error",
-      "ts": "auth"
+      "ts": "auth",
+      "name": "daemon log line auth",
+      "expect": "esc:auth"
     },
     {
       "text": "Error: CLAUDE_CODE_OAUTH_TOKEN is not set",
       "bash": "auth_error",
-      "ts": "auth"
+      "ts": "auth",
+      "name": "token not set",
+      "expect": "esc:auth"
     },
     {
       "text": "pipeline\tRun Claude\t2026-10-25T12:00:00.1234567Z GraphQL: Could not resolve to an issue or pull request with the number of 99999. (repository.issue)",
       "bash": "invalid_issue",
-      "ts": "invalid_input"
+      "ts": "invalid_input",
+      "name": "gh graphql missing issue w/ gh prefix",
+      "expect": "esc:invalid_input"
     },
     {
       "text": "Error: issue #99999 does not exist",
       "bash": "invalid_issue",
-      "ts": "invalid_input"
+      "ts": "invalid_input",
+      "name": "issue #N does not exist",
+      "expect": "esc:invalid_input"
     },
     {
       "text": "not logged in banner shown\n(fail) ui > banner\nerror",
       "bash": "build_failure",
-      "ts": "unknown"
+      "ts": "unknown",
+      "name": "test prints 'not logged in' at col0",
+      "expect": "noesc"
     },
     {
       "text": "Received: \"issue not found\"\nerror: expect(received).toBe(expected)",
       "bash": "unknown",
-      "ts": "unknown"
+      "ts": "unknown",
+      "name": "jest received issue not found",
+      "expect": "noesc"
     },
     {
       "text": "Error: issue not found in cache, refetching",
       "bash": "unknown",
-      "ts": "unknown"
+      "ts": "unknown",
+      "name": "log line 'Error: issue not found in cache'",
+      "expect": "noesc"
     },
     {
       "text": "npm ERR! HTTP 404: Not Found (https://api.github.com/repos/o/r/issues/1/reactions)",
       "bash": "build_failure",
-      "ts": "unknown"
+      "ts": "unknown",
+      "name": "repo named issues 404",
+      "expect": "noesc"
     },
     {
       "text": "(fail) login form > shows bad credentials message\nerror: expected",
       "bash": "build_failure",
-      "ts": "unknown"
+      "ts": "unknown",
+      "name": "prose bad credentials",
+      "expect": "noesc"
     },
     {
       "text": "error: Bad credentials for user bob in fixture db",
       "bash": "unknown",
-      "ts": "unknown"
+      "ts": "unknown",
+      "name": "error: bad credentials prose in app",
+      "expect": "noesc"
+    },
+    {
+      "text": "GraphQL: Could not resolve to an issue or pull request with the number of 1.\n(fail) mapper test\nerror: expected",
+      "bash": "invalid_issue",
+      "ts": "invalid_input",
+      "name": "test prints gh stderr at col 0",
+      "expect": "noesc",
+      "limit": "Known limit: a complete gh GraphQL lookup line printed at column 0 by a test is indistinguishable from the real gh line, so it escalates in both classifiers."
+    },
+    {
+      "text": "  ✕ returns API Error: 401 when token missing (3 ms)",
+      "bash": "unknown",
+      "ts": "unknown",
+      "name": "jest ✕ API Error 401 test name",
+      "expect": "noesc"
+    },
+    {
+      "text": "  ✕ API Error: 401 when token missing (3 ms)",
+      "bash": "unknown",
+      "ts": "unknown",
+      "name": "jest ✕ API Error 401 at start",
+      "expect": "noesc"
+    },
+    {
+      "text": "  ● API Error: 401 is mapped to auth",
+      "bash": "unknown",
+      "ts": "unknown",
+      "name": "jest ● suite title api 401",
+      "expect": "noesc"
+    },
+    {
+      "text": "(fail) API Error: 401 when token missing [1ms]",
+      "bash": "build_failure",
+      "ts": "unknown",
+      "name": "bun (fail) api 401",
+      "expect": "noesc"
+    },
+    {
+      "text": "error: authentication_error is now mapped to AgentFailure.auth (see docs)",
+      "bash": "build_failure",
+      "ts": "unknown",
+      "name": "log mentions authentication_error",
+      "expect": "noesc"
+    },
+    {
+      "text": "  ✕ authentication_error maps to auth (2 ms)",
+      "bash": "unknown",
+      "ts": "unknown",
+      "name": "test name authentication_error",
+      "expect": "noesc"
+    },
+    {
+      "text": "- authentication_error: handled by retry policy\nerror: build failed",
+      "bash": "build_failure",
+      "ts": "unknown",
+      "name": "dash bullet authentication_error",
+      "expect": "noesc"
+    },
+    {
+      "text": "  ✕ not logged in to GitHub shows prompt (4 ms)",
+      "bash": "unknown",
+      "ts": "unknown",
+      "name": "jest ✕ not logged in to",
+      "expect": "noesc"
+    },
+    {
+      "text": "  ● not logged in",
+      "bash": "unknown",
+      "ts": "unknown",
+      "name": "jest ● not logged in",
+      "expect": "noesc"
+    },
+    {
+      "text": "[auth.test.ts] [fail] not logged in",
+      "bash": "build_failure",
+      "ts": "unknown",
+      "name": "[test] [auth] prefix",
+      "expect": "noesc"
+    },
+    {
+      "text": "  ✕ failed to authenticate when password wrong (2 ms)",
+      "bash": "build_failure",
+      "ts": "unknown",
+      "name": "error: failed to authenticate in mock",
+      "expect": "noesc"
+    },
+    {
+      "text": "fatal: authentication failed is printed by the git mock\nerror",
+      "bash": "build_failure",
+      "ts": "unknown",
+      "name": "fatal prefix test text",
+      "expect": "noesc"
+    },
+    {
+      "text": "  ✕ issue not found: shows empty state",
+      "bash": "unknown",
+      "ts": "unknown",
+      "name": "issue not found: in test",
+      "expect": "noesc"
+    },
+    {
+      "text": "AuthenticationError: 401 {\"type\":\"error\",\"error\":{\"type\":\"authentication_error\",\"message\":\"invalid x-api-key\"}}",
+      "bash": "auth_error",
+      "ts": "auth",
+      "name": "anthropic js sdk",
+      "expect": "esc:auth"
+    },
+    {
+      "text": "Error: 401 {\"type\":\"error\",\"error\":{\"type\":\"authentication_error\",\"message\":\"invalid x-api-key\"}}",
+      "bash": "auth_error",
+      "ts": "auth",
+      "name": "error: 401 json",
+      "expect": "esc:auth"
+    },
+    {
+      "text": "anthropic.AuthenticationError: Error code: 401 - {'type': 'error', 'error': {'type': 'authentication_error', 'message': 'invalid x-api-key'}}",
+      "bash": "auth_error",
+      "ts": "auth",
+      "name": "python sdk",
+      "expect": "esc:auth"
+    },
+    {
+      "text": "You are not logged into any GitHub hosts. To log in, run: gh auth login",
+      "bash": "auth_error",
+      "ts": "auth",
+      "name": "gh not logged into",
+      "expect": "esc:auth"
+    },
+    {
+      "text": "HTTP 401: Requires authentication (https://api.github.com/user)",
+      "bash": "auth_error",
+      "ts": "auth",
+      "name": "gh requires authentication",
+      "expect": "esc:auth"
+    },
+    {
+      "text": "gh: To use GitHub CLI in a GitHub Actions workflow, set the GH_TOKEN environment variable. Example:",
+      "bash": "auth_error",
+      "ts": "auth",
+      "name": "gh actions GH_TOKEN",
+      "expect": "esc:auth"
+    },
+    {
+      "text": "Error: Request failed with status code 401",
+      "bash": "auth_error",
+      "ts": "auth",
+      "name": "axios 401",
+      "expect": "esc:auth"
+    },
+    {
+      "text": "pipeline\tRun Claude\t2026-10-25T12:00:00.1234567Z Failed to authenticate. API Error: 401 {\"type\":\"error\",\"error\":{\"type\":\"authentication_error\",\"message\":\"OAuth token has expired.\"}}",
+      "bash": "auth_error",
+      "ts": "auth",
+      "name": "claude 401 gh-prefixed",
+      "expect": "esc:auth"
+    },
+    {
+      "text": "fatal: could not read Username for 'https://github.com': terminal prompts disabled",
+      "bash": "auth_error",
+      "ts": "auth",
+      "name": "git could not read username",
+      "expect": "esc:auth"
+    },
+    {
+      "text": "gh: Bad credentials",
+      "bash": "auth_error",
+      "ts": "auth",
+      "name": "gh bad creds no url",
+      "expect": "esc:auth"
+    },
+    {
+      "text": "[2026-10-25 12:00:00] [ERROR] API Error: 401 authentication_error",
+      "bash": "auth_error",
+      "ts": "auth",
+      "name": "timestamp level 401",
+      "expect": "esc:auth"
+    },
+    {
+      "text": "Error: Claude Code authentication failed",
+      "bash": "auth_error",
+      "ts": "auth",
+      "name": "sh error prefix",
+      "expect": "esc:auth"
+    },
+    {
+      "text": "✗ GraphQL: Could not resolve to an issue or pull request with the number of 9. (repository.issue)",
+      "bash": "invalid_issue",
+      "ts": "invalid_input",
+      "name": "invalid_input ✗ prefix",
+      "expect": "esc:invalid_input"
+    },
+    {
+      "text": "[2026-10-25T12:00:00Z] [ERROR] GraphQL: Could not resolve to an issue or pull request with the number of 9.",
+      "bash": "invalid_issue",
+      "ts": "invalid_input",
+      "name": "invalid_input fatal ts prefix",
+      "expect": "esc:invalid_input"
+    },
+    {
+      "text": "✗✗ Not logged in · Please run /login",
+      "bash": "auth_error",
+      "ts": "auth",
+      "name": "locale probe: two listed glyphs (6 bytes, 2 characters)",
+      "expect": "esc:auth"
+    },
+    {
+      "text": "→→ Not logged in · Please run /login",
+      "bash": "unknown",
+      "ts": "unknown",
+      "name": "locale probe: an unlisted glyph is not a lead-in",
+      "expect": "noesc"
+    },
+    {
+      "text": "✘ ✘ GraphQL: Could not resolve to an issue or pull request with the number of 9.",
+      "bash": "invalid_issue",
+      "ts": "invalid_input",
+      "name": "locale probe: invalid_input after two listed glyphs",
+      "expect": "esc:invalid_input"
+    },
+    {
+      "text": "⚠️  Skipping integration tests: refusing to run inside a build-loop test gate",
+      "bash": "contamination",
+      "ts": "contamination",
+      "name": "locale probe: emoji-presentation warning sign (8 bytes, 4 characters)",
+      "expect": "esc:contamination"
     }
   ]
 }

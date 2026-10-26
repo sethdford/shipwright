@@ -17,6 +17,22 @@ const LOOP_COMMIT = /^\[[^\]]{1,200}\]\s*loop:/;
 const MODEL_PROSE =
   /^\s*(?:\S{1,3}\s+)?(?:Failure analyzed|Failure diagnosis|Analyzing failure)\b|^\s*\S{0,3}\s*▸/i;
 
+// Test-runner result and title lines (#8696). A test's title is written by whoever wrote the test, so
+// "✕ API Error: 401 when token missing" or "(fail) not logged in" says nothing about why the run failed.
+// A small explicit list, the same in bash (daemon-failure.sh, _DAEMON_TEST_TITLE): bun `(fail) `/`(pass) `
+// (and `(skip) `/`(todo) `), jest/vitest/node:test `✕ ✓ ● × √ ✔ ✖` followed by a space, and mocha's
+// indented `  1) `. Literal glyphs, never a character class, so both locales agree.
+const TEST_TITLE =
+  /^[ \t]{0,12}(?:\((?:fail|pass|skip|todo)\) |(?:✕|✓|●|×|√|✔|✖) )|^[ \t]{1,12}\d{1,4}\) /;
+
+/** The text without test-runner title lines: what the classifier's rules see. */
+export function dropTestTitles(text: string): string {
+  return text
+    .split("\n")
+    .filter((line) => !TEST_TITLE.test(line))
+    .join("\n");
+}
+
 /** Plain text of one line: colour codes, the gh prefix and a trailing CR removed. */
 export function normalizeLine(line: string): string {
   return line.replace(ANSI, "").replace(GH_PREFIX, "").replace(/\r$/, "");
