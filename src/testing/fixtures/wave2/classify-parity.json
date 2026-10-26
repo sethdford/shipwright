@@ -6100,7 +6100,7 @@
       "ts": "auth",
       "name": "verifier 8718-r2 c1/b20: turbo blank no trailing space then console block continued",
       "expect": "noesc",
-      "limit": "Known limit: in an open free-text block, an escalation-shaped line after the first content line ends the block (that recovers the real error after a truncated excerpt), so test output whose second line is auth-shaped escalates. A line introduced by `...:` or `Error: Command failed:` is exempt."
+      "limit": "Known limit: a bare runner prefix line reads as a blank line, which ends an open block as it does in the unprefixed log; an emitter-shaped fixture line after it then escalates (the same holds for a bare lowercase `x:y:` content line)."
     },
     {
       "text": "packages/web test: stderr | a > b\npackages/web test: Error: Command failed: claude -p\npackages/web test: Invalid API key · Please run /login",
