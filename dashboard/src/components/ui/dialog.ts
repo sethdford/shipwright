@@ -31,6 +31,9 @@ export function openDialog(target: string | HTMLDialogElement): HTMLDialogElemen
       btn.addEventListener("click", () => dlg.close()),
     );
   }
+  // A toast about an earlier action would read as this dialog's result.
+  const t = document.getElementById("toast");
+  if (t) t.hidden = true;
   dlg.showModal();
   dlg.querySelector<HTMLElement>("[autofocus]")?.focus();
   return dlg;

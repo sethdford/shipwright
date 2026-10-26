@@ -37,7 +37,8 @@ async function request<T>(url: string, options?: RequestInit, gate?: GateOptions
     const body = await resp
       .json()
       .catch(() => ({ error: `HTTP ${resp.status}` }));
-    throw new Error(body.error || `HTTP ${resp.status}`);
+    // The status marks it as the server's answer (not a network failure or a blocked send).
+    throw Object.assign(new Error(body.error || `HTTP ${resp.status}`), { status: resp.status });
   }
   return resp.json();
 }
@@ -139,7 +140,7 @@ export const daemonControl = (action: string) =>
 
 /** The brake's intake pause: exempt from the connection gate (core/guard.ts). */
 export const pauseIntakeForBrake = () =>
-  post<{ ok: boolean }>("/api/daemon/pause", undefined, { allowOffline: true });
+  post<{ ok: boolean; wasPaused?: boolean }>("/api/daemon/pause", undefined, { allowOffline: true });
 
 // Alerts
 export const fetchAlerts = () =>
@@ -152,6 +153,12 @@ export interface TreeSignal {
   failed: Array<{ pid: number; error: string }>;
   refused?: string;
   killed?: number[];
+  /** Stop only: processes that left the run's tree could not be traced. */
+  untraced?: string;
+  /** Pause only: the run was already paused before this call. */
+  wasPaused?: boolean;
+  /** Stop only: processes an earlier run of the issue left paused, continued (they now run on their own). */
+  continued?: number[];
 }
 
 export interface BrakeResult {

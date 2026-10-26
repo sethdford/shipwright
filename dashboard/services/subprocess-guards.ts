@@ -26,9 +26,11 @@ export function signalPid(pid: unknown, signal: Signal): void {
 // process the daemon started (a recycled PID is never signalled). Membership is tracked by
 // PID and start time across fresh snapshots, so children started while we signal are caught
 // and a PID recycled in between is never touched. This server and its ancestors are never
-// members. Limit: a descendant whose parent exits before any snapshot sees it is reparented to
-// launchd/init. It is still found through a process group led by a member (the tmux case),
-// but not when the run shares a group it does not lead or the descendant calls setsid.
+// members, and a run is signalled only while a live pipeline process for its issue is in the
+// tree (rootRefusal); the one exception is resume continuing what pause froze (`frozen`). Limit: a descendant whose parent exits before any snapshot sees it is
+// reparented to launchd/init. It is still found through a process group led by a member (the
+// tmux case), but not when the run shares a group it does not lead (the daemon's background
+// fallback: Stop then reports `untraced`) or the descendant calls setsid.
 
 export interface ProcInfo {
   pid: number;
@@ -106,19 +108,35 @@ export function processTree(root: number, table: ProcInfo[]): number[] {
   return order.filter(isSignalablePid);
 }
 
-const PIPELINE_COMMAND = /sw-pipeline|sw-loop|claude|shipwright/;
+/**
+ * The daemon starts each run as `<scripts>/sw-pipeline.sh start --issue N …` (daemon-dispatch.sh,
+ * tmux or background); ps shows it as that, or as `[/bin/]bash <scripts>/sw-pipeline.sh start
+ * --issue N …`. Only that shape matches: the program (or the script a shell runs) must be
+ * sw-pipeline and its first arguments `start --issue N`, so a command that merely mentions it
+ * (`bash -c`, an editor, grep, an agent prompt) never does. A script path containing a space
+ * cannot be told apart from other words in ps output, so it never matches: the run is refused.
+ */
+const PIPELINE_ARGV = /^(?:\S*\/)?(?:(?:ba|z)?sh\s+)?(?:\S*\/)?sw-pipeline(?:\.sh)?\s+start\s+--issue\s+(\d+)(?:\s|$)/;
+
+/** Whether a ps command line is the daemon's pipeline for this issue. */
+export function isPipelineFor(command: string, issue: number): boolean {
+  return PIPELINE_ARGV.exec(command.trim())?.[1] === String(issue);
+}
+
 /** Same tolerance the daemon uses for PID reuse (daemon-dispatch.sh). */
 const START_SLACK_MS = 60_000;
 
 /**
- * Why the recorded PID must not be signalled, or null when it is the run's process: it exists,
- * belongs to this user, is not this server or an ancestor of it, and either started with the
- * job (within 60 s) or started earlier and runs a pipeline below it (a reused tmux window).
- * Started after the job means a recycled PID.
+ * Why the recorded PID must not be signalled, or null when it is the run's process. The daemon
+ * state is trusted same-user data, but the PID in it can outlive the run (a tmux pane shell
+ * stays after the pipeline exits) or be recycled, so the record is checked against the live
+ * process table: the PID exists, belongs to this user, is not this server or an ancestor of
+ * it, did not start after the job, and has a live pipeline process for this issue in its tree.
  */
 export function rootRefusal(
   root: unknown,
   jobStartedAt: unknown,
+  issue: unknown,
   table: ProcInfo[],
   uid: number = process.getuid?.() ?? -1,
 ): string | null {
@@ -130,11 +148,10 @@ export function rootRefusal(
   const jobStart = typeof jobStartedAt === "string" ? Date.parse(jobStartedAt) : NaN;
   if (Number.isNaN(jobStart)) return "cannot verify the process: the job has no start time";
   if (proc.startMs > jobStart + START_SLACK_MS) return "stale pid: the process started after the job";
-  if (proc.startMs < jobStart - START_SLACK_MS) {
-    const tree = new Set(processTree(root, table));
-    const isPipeline = table.some((p) => tree.has(p.pid) && PIPELINE_COMMAND.test(p.command));
-    if (!isPipeline) return "stale pid: an older process with no pipeline under it";
-  }
+  if (!Number.isInteger(issue) || (issue as number) <= 0) return "cannot verify the process: the job has no issue number";
+  const tree = new Set(processTree(root, table));
+  const live = (p: ProcInfo) => tree.has(p.pid) && !/^Z/.test(p.stat) && isPipelineFor(p.command, issue as number);
+  if (!table.some(live)) return `no pipeline for #${issue} under this process`;
   return null;
 }
 
@@ -144,14 +161,23 @@ export interface TreeSignalResult {
   failed: Array<{ pid: number; error: string }>;
   refused?: string;
   killed?: number[];
+  /** Stop only: why processes that left the tree could have escaped it. */
+  untraced?: string;
+  /** Pause only: every process was already stopped before this call (paused another way). */
+  wasPaused?: boolean;
+  /** Stop only: processes an earlier run of the issue left paused, continued (they now run on their own). */
+  continued?: number[];
 }
 
 export interface TreeJob {
   root: unknown;
   startedAt: unknown;
+  issue: unknown;
 }
 
 type Snapshot = () => Promise<ProcInfo[]>;
+
+const isStopped = (p: ProcInfo) => /^[Tt]/.test(p.stat);
 
 /** Members of one run's tree, keyed by PID and start time so a recycled PID never matches. */
 class Tree {
@@ -165,11 +191,16 @@ class Tree {
    * different process leading it.
    */
   private readonly groups = new Map<number, number>();
+  /** Processes this call stopped (they were running), so a failed stop can undo its freeze. */
+  readonly stopped: ProcInfo[] = [];
+  /** Whether the root leads its own process group (tmux mode); see `untraced`. */
+  readonly leadsGroup: boolean;
   readonly result: TreeSignalResult;
 
   constructor(readonly root: number, table: ProcInfo[]) {
-    const start = table.find((p) => p.pid === root)?.startMs ?? 0;
-    this.members.set(root, start);
+    const proc = table.find((p) => p.pid === root);
+    this.members.set(root, proc?.startMs ?? 0);
+    this.leadsGroup = proc?.pgid === root;
     this.result = { pid: root, signalled: [], failed: [] };
   }
 
@@ -207,6 +238,7 @@ class Tree {
   send(p: ProcInfo, signal: Signal, record = true): boolean {
     try {
       signalPid(p.pid, signal);
+      if (signal === "SIGSTOP" && !isStopped(p)) this.stopped.push(p);
       if (record && !this.result.signalled.includes(p.pid)) this.result.signalled.push(p.pid);
       return true;
     } catch (err) {
@@ -218,7 +250,58 @@ class Tree {
   }
 }
 
-const isStopped = (p: ProcInfo) => /^[Tt]/.test(p.stat);
+
+/**
+ * What pauseTrees stopped, per issue, by PID and start time. If a run's pipeline exits while it
+ * is paused (killed, or the OOM killer), the run is refused from then on, or reaped from the
+ * daemon's state, so resume continues exactly these instead and nothing this server froze is
+ * left frozen. Limits: kept in memory, so after a dashboard restart such leftovers must be
+ * continued by hand (kill -CONT); and a process continued and stopped again by hand in between
+ * still counts as this server's.
+ */
+const frozen = new Map<number, Map<number, number>>();
+
+function remember(jobs: TreeJob[], results: TreeSignalResult[], trees: Tree[]): void {
+  for (const tree of trees) {
+    const issue = jobs[results.indexOf(tree.result)].issue as number;
+    const m = frozen.get(issue) ?? new Map<number, number>();
+    for (const p of tree.stopped) m.set(p.pid, p.startMs);
+    if (m.size) frozen.set(issue, m);
+  }
+}
+
+/**
+ * Continues what pause froze for this issue that is still that process and stopped (outside the
+ * run's live tree by now, or the run is refused). Only a failed continue stays recorded, for a retry.
+ */
+function continueFrozen(issue: unknown, result: TreeSignalResult, table: ProcInfo[]): void {
+  const m = frozen.get(issue as number);
+  if (!m) return;
+  for (const [pid, start] of m) {
+    const p = table.find((q) => q.pid === pid);
+    if (p?.startMs === start && isStopped(p)) {
+      try {
+        signalPid(pid, "SIGCONT");
+        if (!result.signalled.includes(pid)) result.signalled.push(pid);
+      } catch (err) {
+        result.failed.push({ pid, error: String((err as Error).message ?? err) });
+        continue;
+      }
+    }
+    m.delete(pid);
+  }
+  if (!m.size) frozen.delete(issue as number);
+}
+
+/** Runs the daemon has reaped from its state: continues what pause froze in them. */
+export async function resumeLeftovers(issues: number[], snap: Snapshot = readProcessTableAsync): Promise<TreeSignalResult[]> {
+  const table = await snap();
+  return issues.map((issue) => {
+    const result: TreeSignalResult = { pid: 0, signalled: [], failed: [], refused: "not running" };
+    continueFrozen(issue, result, table);
+    return result;
+  });
+}
 
 async function prepare(jobs: TreeJob[], snap: Snapshot): Promise<{ results: TreeSignalResult[]; trees: Tree[] }> {
   const table = await snap();
@@ -226,7 +309,7 @@ async function prepare(jobs: TreeJob[], snap: Snapshot): Promise<{ results: Tree
   const trees: Tree[] = [];
   for (const job of jobs) {
     const pid = typeof job.root === "number" ? job.root : 0;
-    const refused = rootRefusal(job.root, job.startedAt, table);
+    const refused = rootRefusal(job.root, job.startedAt, job.issue, table);
     if (refused) {
       results.push({ pid, signalled: [], failed: [], refused });
       continue;
@@ -256,6 +339,20 @@ async function freeze(trees: Tree[], snap: Snapshot, maxRounds = 10): Promise<vo
   }
 }
 
+/**
+ * Continues what this call stopped, skipping any PID a fresh snapshot shows was reused. Without
+ * a snapshot it is sent anyway: SIGCONT to a running process does nothing.
+ */
+async function thaw(trees: Tree[], snap: Snapshot): Promise<void> {
+  const table = await snap().catch(() => null);
+  for (const tree of trees) {
+    for (const p of tree.stopped) {
+      const now = table?.find((q) => q.pid === p.pid);
+      if (!table || now?.startMs === p.startMs) tree.send(p, "SIGCONT", false);
+    }
+  }
+}
+
 async function reportUnstopped(trees: Tree[], snap: Snapshot): Promise<void> {
   const table = await snap();
   for (const tree of trees) {
@@ -268,8 +365,17 @@ async function reportUnstopped(trees: Tree[], snap: Snapshot): Promise<void> {
 /** Pauses each run's whole tree; a run is paused only when its result has no failures. */
 export async function pauseTrees(jobs: TreeJob[], snap: Snapshot = readProcessTableAsync): Promise<TreeSignalResult[]> {
   const { results, trees } = await prepare(jobs, snap);
-  await freeze(trees, snap);
-  await reportUnstopped(trees, snap);
+  try {
+    await freeze(trees, snap);
+    await reportUnstopped(trees, snap);
+  } catch (err) {
+    // A pause that fails part way leaves nothing it froze: the caller sees an error, not a
+    // half-paused fleet it cannot see.
+    await thaw(trees, snap);
+    throw err;
+  }
+  for (const tree of trees) tree.result.wasPaused = tree.stopped.length === 0;
+  remember(jobs, results, trees);
   return results;
 }
 
@@ -284,6 +390,9 @@ export async function resumeTrees(jobs: TreeJob[], snap: Snapshot = readProcessT
       if (isStopped(p)) tree.result.failed.push({ pid: p.pid, error: "still stopped" });
     }
   }
+  // What pause froze that this tree no longer reaches (its pipeline was killed while paused, or
+  // the issue was dispatched again) is continued too.
+  results.forEach((r, i) => continueFrozen(jobs[i].issue, r, after));
   return results;
 }
 
@@ -301,6 +410,29 @@ export async function stopTrees(
   snap: Snapshot = readProcessTableAsync,
 ): Promise<TreeSignalResult[]> {
   const { results, trees } = await prepare(jobs, snap);
+  try {
+    await stopFrozen(trees, graceMs, snap);
+  } catch (err) {
+    // Never leave a run frozen because the stop failed part way (ps failed, for example).
+    await thaw(trees, snap);
+    throw err;
+  }
+  // An earlier run of the issue (re-dispatched after its pipeline was killed while paused) may
+  // have left processes this server froze outside the stopped tree: they are continued, not lost,
+  // and reported apart from the stop. One that fails to continue stays recorded for a resume.
+  const after = await snap();
+  for (const tree of trees) {
+    const left: TreeSignalResult = { pid: 0, signalled: [], failed: [] };
+    continueFrozen(jobs[results.indexOf(tree.result)].issue, left, after);
+    if (left.signalled.length) tree.result.continued = left.signalled;
+    if (!tree.leadsGroup) {
+      tree.result.untraced = "the run does not lead its own process group, so processes that left its tree cannot be traced";
+    }
+  }
+  return results;
+}
+
+async function stopFrozen(trees: Tree[], graceMs: number, snap: Snapshot): Promise<void> {
   await freeze(trees, snap);
   const frozen = await snap();
   for (const tree of trees) {
@@ -338,7 +470,6 @@ export async function stopTrees(
   trees.forEach((tree, i) => {
     for (const p of left[i]) tree.result.failed.push({ pid: p.pid, error: "survived SIGKILL" });
   });
-  return results;
 }
 
 export const SSH_USER_RE = /^[A-Za-z0-9._][A-Za-z0-9._-]{0,63}$/;

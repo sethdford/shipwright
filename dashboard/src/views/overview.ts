@@ -88,7 +88,7 @@ function renderOverviewPipelines(data: FleetState): void {
   const firstRender = store.get("firstRender");
 
   if (!data.pipelines || data.pipelines.length === 0) {
-    container.innerHTML = `<div class="empty-state">${icon("clock", 32)}<p>No active pipelines</p></div>`;
+    container.innerHTML = `<div class="empty-state">${icon("clock", 32)}<p>No active runs</p></div>`;
     return;
   }
 

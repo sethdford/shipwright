@@ -58,8 +58,16 @@ export function openInterventionModal(issue: number): void {
  */
 export const pausedRuns = new Set<number>();
 
-type RunAction = "pause" | "resume" | "abort";
+export type RunAction = "pause" | "resume" | "abort";
 const ACTION_WORD: Record<RunAction, string> = { pause: "Pause", resume: "Resume", abort: "Stop" };
+const DONE_WORD: Record<RunAction, string> = { pause: "paused", resume: "resumed", abort: "stopped" };
+const processes = (n: number) => `${n} process${n === 1 ? "" : "es"}`;
+
+const runListeners: Array<(issue: number, action: RunAction) => void> = [];
+/** Called after a run action fully succeeded (the brake keeps its engaged list current). */
+export function onRunAction(fn: (issue: number, action: RunAction) => void): void {
+  runListeners.push(fn);
+}
 
 /**
  * The one path for run interventions: gated, and reported from what the server says it
@@ -75,18 +83,36 @@ export function sendRunAction(issue: number, action: RunAction): Promise<void> {
       const signalled = res.signalled ?? [];
       const failed = res.failed ?? [];
       if (signalled.length === 0) {
-        toast(`${word} did nothing: run #${issue} is ${res.refused ?? "not running"}.`, "error");
+        const why =
+          !res.refused || res.refused === "not running"
+            ? "is not running"
+            : `could not be confirmed as this run's pipeline (${res.refused})`;
+        toast(`${word} did nothing: run #${issue} ${why}.`, "error");
         return;
       }
       if (failed.length > 0) {
-        toast(`${word} incomplete for run #${issue}: ${failed.length} of ${signalled.length + failed.length} processes failed.`, "error");
+        toast(`${word} incomplete for run #${issue}: ${processes(failed.length)} could not be signalled.`, "error");
+        return;
+      }
+      if (res.refused) {
+        // The run has ended, but resume continued what a pause had left frozen (subprocess-guards.ts).
+        pausedRuns.delete(issue);
+        toast(`Run #${issue} had already ended; continued ${processes(signalled.length)} its pause left frozen. Check the host.`, "error");
         return;
       }
       if (action === "pause") pausedRuns.add(issue);
       else pausedRuns.delete(issue);
-      const n = signalled.length;
+      for (const fn of runListeners) fn(issue, action);
       const killed = res.killed?.length ? `, ${res.killed.length} killed after the grace period` : "";
-      toast(`${word} signal sent to run #${issue}: ${n} process${n === 1 ? "" : "es"}${killed}.`);
+      if (res.untraced) {
+        // The run shares a process group it does not lead: anything that left its tree escaped.
+        toast(`${word} incomplete for run #${issue}: ${processes(signalled.length)} stopped${killed}, but processes that left the run can't be traced. Check the host.`, "error");
+        return;
+      }
+      const cont = res.continued?.length
+        ? ` Continued ${processes(res.continued.length)} an earlier run left paused; check the host.`
+        : "";
+      toast(`Run #${issue} ${DONE_WORD[action]}: ${processes(signalled.length)}${killed}.${cont}`);
     })
     .catch((err) => toast(`${word} failed for run #${issue}: ${String(err)}`, "error"));
 }

@@ -5237,6 +5237,12 @@ kbd {
   background: color-mix(in oklch, var(--sw-danger) 18%, transparent);
   color: var(--sw-danger);
 }
+/* Engaged: a held state, not an alarm; the button now opens the release path. */
+.btn.brake[aria-pressed="true"] {
+  border-color: var(--sw-warn);
+  background: color-mix(in oklch, var(--sw-warn) 16%, transparent);
+  color: var(--sw-text-1);
+}
 .btn.brake[aria-disabled="true"] {
   border-style: dashed;
   border-color: var(--sw-line);
@@ -5487,9 +5493,6 @@ kbd {
 .empty-state code {
   white-space: nowrap;
 }
-.pill-short {
-  display: none;
-}
 .legacy-note {
   display: flex;
   flex-wrap: wrap;
@@ -5604,6 +5607,52 @@ select.form-input {
 }
 .offline-banner span:nth-child(2) {
   flex: 1 1 200px;
+}
+
+/* Daemon controls wrap rather than overflow a narrow phone. */
+.daemon-control-actions {
+  flex-wrap: wrap;
+}
+
+/* Brake: engaged state and incomplete alert, under the header on every page */
+.brake-state,
+.brake-alert {
+  --tone: var(--sw-warn);
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 12px;
+  padding: 10px 24px;
+  border-bottom: 1px solid color-mix(in oklch, var(--tone) 40%, transparent);
+  background: color-mix(in oklch, var(--tone) 10%, var(--sw-bg-0));
+  color: var(--sw-text-1);
+  font-size: 13px;
+}
+.brake-state-text {
+  flex: 1 1 240px;
+  font-weight: 600;
+}
+.brake-alert {
+  --tone: var(--sw-danger);
+  display: grid;
+  justify-items: start;
+}
+.brake-alert h2 {
+  margin: 0;
+  font-size: 14px;
+}
+.brake-alert ul {
+  margin: 0;
+  padding-left: 18px;
+}
+.brake-alert p {
+  margin: 0;
+}
+.brake-alert pre {
+  margin: 6px 0 0;
+  white-space: pre-wrap;
+  font: 12px/1.4 var(--sw-font-mono);
+  color: var(--sw-text-2);
 }
 
 /* Error boundary */
@@ -5885,7 +5934,7 @@ dialog h2 {
     bottom: -8px;
   }
 }
-@media (min-width: 761px) and (max-width: 1360px) {
+@media (min-width: 1100px) and (max-width: 1360px) {
   /* Two-row header: the status row has room for full labels again. */
   .btn-label,
   #conn-text {
@@ -5904,17 +5953,29 @@ dialog h2 {
     margin: -16px -16px 16px;
     padding: 10px 16px;
   }
-  .alert-banner {
+  .alert-banner,
+  .brake-state,
+  .brake-alert {
     padding: 10px 16px;
   }
 }
-@media (max-width: 600px) {
+/* Compact status row up to 900px: short labels, and only what an operator needs. */
+@media (max-width: 900px) {
   .label-long {
     display: none;
   }
   .label-short {
     display: inline;
   }
+  /* The breaker pill only says "unknown" until the server reports it (T3); the theme is in the palette. */
+  .header-divider,
+  .theme-btn,
+  .surface,
+  #breaker-pill {
+    display: none;
+  }
+}
+@media (max-width: 600px) {
   .header-status {
     gap: 6px;
   }
@@ -5933,23 +5994,6 @@ dialog h2 {
   }
   .dora-trend-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-  .pill-detail {
-    display: none;
-  }
-  .pill-short {
-    display: inline;
-  }
-  .header-divider,
-  .theme-btn,
-  .surface {
-    display: none;
-  }
-  /* Disconnected on a phone: the offline banner right below carries the words. */
-  .conn[data-state="connecting"] #conn-short,
-  .conn[data-state="reconnecting"] #conn-short,
-  .conn[data-state="offline"] #conn-short {
-    display: none;
   }
   .alert-actions > :not(.alert-review, .alert-dismiss) {
     display: none;
@@ -5976,11 +6020,23 @@ dialog h2 {
     mask-image: linear-gradient(to right, #000 calc(100% - 32px), transparent);
   }
 }
-@media (max-width: 420px) {
+@media (max-width: 440px) {
   .wordmark {
     display: none;
   }
   .header-status {
+    gap: 4px;
+  }
+}
+@media (max-width: 360px) {
+  /* The narrowest phones: tighter buttons so "Reconnecting" still fits beside the mark. */
+  .header-status {
+    gap: 2px;
+  }
+  .header-status .btn {
+    padding: 0 6px;
+  }
+  .conn {
     gap: 4px;
   }
 }

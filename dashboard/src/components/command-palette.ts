@@ -73,6 +73,8 @@ export interface CommandContext {
   resumeRun(issue: number): void;
   stopRun(issue: number, stage: string): void;
   emergencyBrake(): void;
+  /** The brake holds runs or intake: its command releases instead of engaging. */
+  brakeEngaged?: boolean;
   toggleTheme(): void;
   showShortcuts(): void;
 }
@@ -101,7 +103,14 @@ export function buildCommands(ctx: CommandContext): Command[] {
   out.push({ id: "theme", label: "Change theme", kind: "action", keywords: "dark light system", run: ctx.toggleTheme });
   out.push({ id: "keys", label: "Show keyboard shortcuts", kind: "action", keys: ["?"], keywords: "help", run: ctx.showShortcuts });
   if (!ctx.canAct) return out;
-  out.push({ id: "brake", label: "Engage the emergency brake…", kind: "action", danger: true, keywords: "pause all stop", run: ctx.emergencyBrake });
+  out.push({
+    id: "brake",
+    label: ctx.brakeEngaged ? "Release the emergency brake…" : "Engage the emergency brake…",
+    kind: "action",
+    danger: true,
+    keywords: "pause all stop release",
+    run: ctx.emergencyBrake,
+  });
   for (const p of runs) {
     const n = p.issue;
     out.push(

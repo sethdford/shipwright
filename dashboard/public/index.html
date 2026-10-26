@@ -40,9 +40,9 @@
       <div class="header-status">
         <span class="conn" id="conn" data-state="connecting"><span class="dot" aria-hidden="true"></span><span id="conn-text">Connecting</span><span id="conn-short" aria-hidden="true">Connecting</span></span>
         <span class="sr-only" role="status" id="conn-live"></span>
-        <span class="pill" id="breaker-pill" data-tone="neutral" title="The dashboard server does not report circuit-breaker state yet. Run shipwright breaker status on the host."><span class="glyph" aria-hidden="true">?</span><span>Breaker<span class="pill-detail">: not reported</span><span class="pill-short"> n/a</span></span></span>
+        <span class="pill" id="breaker-pill" data-tone="neutral" title="The dashboard server does not report circuit-breaker state yet. Run shipwright breaker status on the host."><span class="glyph" aria-hidden="true">?</span><span>Breaker: unknown</span></span>
         <span class="header-divider" aria-hidden="true"></span>
-        <button class="btn brake" type="button" id="emergency-brake" aria-label="Emergency brake"><svg class="brake-icon" viewBox="0 0 16 16" width="14" height="14" aria-hidden="true" focusable="false"><path d="M5.2 1.5h5.6l3.7 3.7v5.6l-3.7 3.7H5.2l-3.7-3.7V5.2z" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round" /><path d="M5 8h6" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" /></svg><span class="label-long">Emergency brake</span><span class="label-short">Stop all</span></button>
+        <button class="btn brake" type="button" id="emergency-brake" aria-label="Emergency brake"><svg class="brake-icon" viewBox="0 0 16 16" width="14" height="14" aria-hidden="true" focusable="false"><path d="M5.2 1.5h5.6l3.7 3.7v5.6l-3.7 3.7H5.2l-3.7-3.7V5.2z" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round" /><path d="M5 8h6" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" /></svg><span class="label-long">Emergency brake</span><span class="label-short">Pause all</span></button>
         <button class="btn ghost" type="button" id="open-palette" aria-keyshortcuts="Meta+K Control+K" aria-label="Search and commands"><svg viewBox="0 0 16 16" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.75" aria-hidden="true" focusable="false"><circle cx="7" cy="7" r="4.75" /><path d="m10.5 10.5 3 3" stroke-linecap="round" /></svg><span class="btn-label">Search</span><kbd id="palette-kbd">⌘K</kbd></button>
         <button class="btn ghost theme-btn" type="button" id="theme-toggle" aria-label="Theme: system. Activate to change"><svg viewBox="0 0 16 16" width="16" height="16" aria-hidden="true" focusable="false"><circle cx="8" cy="8" r="5.25" fill="none" stroke="currentColor" stroke-width="1.5" /><path d="M8 2.75a5.25 5.25 0 0 1 0 10.5z" fill="currentColor" /></svg><span class="btn-label" id="theme-name">system</span></button>
         <div class="user-menu">
@@ -58,6 +58,8 @@
     </header>
 
     <div class="alert-banner" id="alert-banner" role="region" aria-label="Fleet alert" hidden></div>
+    <div class="brake-state" id="brake-state" role="status" hidden></div>
+    <div class="brake-alert" id="brake-alert" role="alert" hidden></div>
 
     <main class="main" id="main" tabindex="-1">
       <h1 class="sr-only">Shipwright Fleet Command</h1>
@@ -154,7 +156,7 @@
 
         <!-- Active Pipelines -->
         <section class="section">
-          <h3 class="section-label">Active pipelines</h3>
+          <h3 class="section-label">Active runs</h3>
           <div id="active-pipelines">
             <div class="empty-state">
               <svg
@@ -168,7 +170,7 @@
               >
                 <path d="M12 6v6l4 2M12 2a10 10 0 100 20 10 10 0 000-20z" />
               </svg>
-              <p>No active pipelines</p>
+              <p>No active runs</p>
             </div>
           </div>
         </section>
@@ -232,7 +234,7 @@
       </section>
 
       <section class="dest" id="dest-runs" data-route="runs" role="tabpanel" aria-labelledby="tab-runs" hidden>
-        <div class="dest-head"><h2>Runs</h2><p class="dest-meta">Every pipeline the daemon knows about. Select a row for its detail.</p></div>
+        <div class="dest-head"><h2>Runs</h2><p class="dest-meta">Every run the daemon knows about. Select a row for its detail.</p></div>
         <div class="view-section" id="panel-pipelines">
         <!-- Filter bar -->
         <div class="filter-bar" id="pipeline-filters">
@@ -283,7 +285,7 @@
         <div class="pipeline-detail-panel" id="pipeline-detail-panel">
           <div class="detail-panel-header">
             <h3 class="detail-panel-title" id="detail-panel-title">
-              Pipeline Detail
+              Run detail
             </h3>
             <button
               class="detail-panel-close"
@@ -354,7 +356,7 @@
       </section>
 
       <section class="dest" id="dest-safety" data-route="safety" role="tabpanel" aria-labelledby="tab-safety" hidden>
-        <div class="dest-head"><h2>Safety</h2><p class="dest-meta">Audit log of daemon, pipeline and intervention events. The emergency brake is in the header on every page.</p></div>
+        <div class="dest-head"><h2>Safety</h2><p class="dest-meta">Audit log of daemon, run and intervention events. The emergency brake is in the header on every page.</p></div>
         <div class="view-section" id="panel-activity">
         <!-- Filter chips -->
         <div class="filter-bar" id="activity-filters">
@@ -706,7 +708,7 @@
     <dialog id="emergency-modal" aria-labelledby="brake-title" aria-describedby="brake-desc">
       <div class="confirm">
         <h2 id="brake-title">Engage the emergency brake?</h2>
-        <p id="brake-desc">This pauses daemon intake, so no new runs start, and pauses every process of every running pipeline. Queued work stays in the queue. Resume intake on Triage, and resume runs from Runs.</p>
+        <p id="brake-desc">This pauses daemon intake, so no new runs start, and pauses every process of every running run. Queued work stays in the queue. Release the brake to resume them.</p>
         <div class="actions">
           <button class="btn" type="button" data-close autofocus>Cancel</button>
           <button class="btn danger-solid" type="button" id="emergency-confirm" data-close>Engage brake</button>

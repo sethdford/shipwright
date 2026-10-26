@@ -22,7 +22,9 @@ import {
   signalPid,
   pauseTrees,
   resumeTrees,
+  resumeLeftovers,
   stopTrees,
+  type TreeJob,
   type TreeSignalResult,
   isValidSshUser,
   isValidSshHost,
@@ -2283,6 +2285,12 @@ const MODEL_PRICING: Record<string, { input: number; output: number }> = {
   haiku: { input: 0.25, output: 1.25 },
 };
 
+/** "47m", "13h 8m": a duration in seconds as an operator reads it. */
+function durationText(seconds: number): string {
+  const m = Math.round(seconds / 60);
+  return m < 60 ? `${m}m` : `${Math.floor(m / 60)}h ${m % 60}m`;
+}
+
 // ─── Run interventions on the verified process tree ──────────────────
 type RunAction = "pause" | "resume" | "abort";
 
@@ -2292,19 +2300,41 @@ function activeJob(issue: number): Record<string, unknown> | null {
   return jobs.find((j) => (j.issue as number) === issue) ?? null;
 }
 
-const TREE_ACTIONS = { pause: pauseTrees, resume: resumeTrees, abort: stopTrees } as const;
+// Tests set a longer grace to prove a stop outlasts Bun's 10 s default idle timeout.
+const STOP_GRACE_MS = Number(process.env.SW_DASHBOARD_STOP_GRACE_MS) || 5000;
+const TREE_ACTIONS = {
+  pause: pauseTrees,
+  resume: resumeTrees,
+  abort: (jobs: TreeJob[]) => stopTrees(jobs, STOP_GRACE_MS),
+} as const;
+
+/** A run counts as done only when something was signalled and nothing failed, was refused or escaped. */
+function treeOk(r: TreeSignalResult): boolean {
+  return !r.refused && !r.untraced && r.failed.length === 0 && r.signalled.length > 0;
+}
 
 /**
  * Pause, resume or stop each run's whole process tree (subprocess-guards.ts verifies the PIDs).
  * The runs are handled together, so several stops share one grace period.
  */
 async function runActions(
+  issues: number[],
   jobs: Array<Record<string, unknown> | null>,
   action: RunAction,
 ): Promise<TreeSignalResult[]> {
   const live = jobs.filter((j): j is Record<string, unknown> => j !== null);
-  const done = await TREE_ACTIONS[action](live.map((j) => ({ root: j.pid, startedAt: j.started_at })));
-  return jobs.map((j) => (j ? (done.shift() as TreeSignalResult) : { pid: 0, signalled: [], failed: [], refused: "not running" }));
+  const done = await TREE_ACTIONS[action](live.map(treeJob));
+  // A run the daemon already reaped can still have processes a pause froze: resume continues them.
+  const gone = issues.filter((_, i) => !jobs[i]);
+  const reaped =
+    action === "resume"
+      ? await resumeLeftovers(gone)
+      : gone.map((): TreeSignalResult => ({ pid: 0, signalled: [], failed: [], refused: "not running" }));
+  return jobs.map((j) => (j ? done.shift() : reaped.shift()) as TreeSignalResult);
+}
+
+function treeJob(j: Record<string, unknown>): TreeJob {
+  return { root: j.pid, startedAt: j.started_at, issue: j.issue };
 }
 
 /** Who asked, for the audit log: the signed-in GitHub user, or "local" with auth off. */
@@ -2937,10 +2967,10 @@ async function routeRequest(
             headers: { "Content-Type": "application/json", ...CORS_HEADERS },
           });
         }
-        const signalled = await runActions(issues.map(activeJob), action as RunAction);
+        const signalled = await runActions(issues, issues.map(activeJob), action as RunAction);
         const results = signalled.map((r, i) => ({
           issue: issues[i],
-          ok: r.signalled.length > 0 && r.failed.length === 0 && !r.refused,
+          ok: treeOk(r),
           ...r,
         }));
         appendAuditLog("intervention-bulk", { op: action, actor: auditActor(req), results });
@@ -2993,11 +3023,9 @@ async function routeRequest(
           case "pause":
           case "resume":
           case "abort": {
-            const [r] = await runActions([runJob], action);
+            const [r] = await runActions([issueNum], [runJob], action);
             appendAuditLog("intervention", { op: action, actor: auditActor(req), issue: issueNum, ...r });
-            // ok only when something was signalled and nothing failed or was refused.
-            const ok = !r.refused && r.failed.length === 0 && r.signalled.length > 0;
-            return new Response(JSON.stringify({ ok, action, issue: issueNum, ...r }), {
+            return new Response(JSON.stringify({ ok: treeOk(r), action, issue: issueNum, ...r }), {
               headers: { "Content-Type": "application/json", ...CORS_HEADERS },
             });
           }
@@ -4191,7 +4219,7 @@ async function routeRequest(
             alerts.push({
               type: "stuck_pipeline",
               severity: "warning",
-              message: `Pipeline for issue #${issue} has had no stage change for ${Math.round((now - lastStageEpoch) / 60)}min`,
+              message: `Run #${issue} has had no stage change for ${durationText(now - lastStageEpoch)}`,
               issue,
               actions: ["pause", "abort", "message"],
             });
@@ -4409,7 +4437,7 @@ async function routeRequest(
         const queued = ((daemonState?.queued as Array<unknown>) || []).length;
         // Each run's whole process tree is stopped; a run counts as paused only when every
         // process in it was signalled and nothing was refused or failed.
-        const trees = await pauseTrees(activeJobs.map((j) => ({ root: j.pid, startedAt: j.started_at })));
+        const trees = await pauseTrees(activeJobs.map(treeJob));
         const jobs = trees.map((r, i) => ({ issue: activeJobs[i].issue as number, ...r }));
         const paused = jobs.filter((j) => !j.refused && j.failed.length === 0 && j.signalled.length > 0).length;
         const running = jobs.length;
@@ -4869,11 +4897,13 @@ async function routeRequest(
         const flagPath = join(HOME, ".shipwright", "daemon-pause.flag");
         const dir = join(HOME, ".shipwright");
         if (!existsSync(dir)) mkdirSync(dir, { recursive: true });
-        writeFileSync(
-          flagPath,
-          JSON.stringify({ paused: true, at: new Date().toISOString() }),
-        );
-        return new Response(JSON.stringify({ ok: true, action: "paused" }), {
+        // The brake records whether intake was already paused, so its release leaves it so.
+        // An existing flag (the daemon's own disk-low pause, say) keeps its reason.
+        const wasPaused = existsSync(flagPath);
+        if (!wasPaused) {
+          writeFileSync(flagPath, JSON.stringify({ paused: true, at: new Date().toISOString() }));
+        }
+        return new Response(JSON.stringify({ ok: true, action: "paused", wasPaused }), {
           headers: { "Content-Type": "application/json", ...CORS_HEADERS },
         });
       } catch (err) {
@@ -5720,6 +5750,9 @@ const server = Bun.serve<WsData>({
   hostname: HOST,
 
   async fetch(req, server) {
+    // A stop holds its request through the grace period (longer under load); Bun's default
+    // idle timeout of 10 s would cut it off and the client would report a failure.
+    if (/^\/api\/(intervention\/|emergency-brake)/.test(new URL(req.url).pathname)) server.timeout(req, 60);
     const hasSession = isAuthEnabled() && getSession(req) !== null;
     const blocked = guardRequest(req, GUARD, hasSession);
     if (blocked) return withSecurityHeaders(withCors(blocked, req, GUARD));
