@@ -97,6 +97,8 @@ const AUTH_PHRASES = [
   String.raw`npm (?:err!|error) (?:code e401|code eneedauth|401 unauthorized)`,
   String.raw`error response from daemon: [A-Za-z0-9 :/._"'?=&%@+\-]{0,255}unauthorized: authentication required`,
   String.raw`get https?://${URL_CHARS}{1,255} - 401[ \t]{0,3}$`,
+  // anthropic-sdk-go: `POST "https://api.anthropic.com/v1/messages": 401 Unauthorized (Request-ID: ...) {...}`.
+  String.raw`(?:panic: )?post "https?://${URL_CHARS}{1,255}": 40[13] (?:unauthorized|forbidden)`,
   String.raw`(?:http 403: |graphql: )?resource not accessible by (?:integration|personal access token)`,
   "the token in [a-z_]{1,40} is invalid",
   'please run [`"]?claude login',
@@ -114,10 +116,10 @@ const AUTH_INDENTED = [
 // The structured 401/403 response, after its emitter's token at the anchored lead-in: the CLI's `API Error: 401
 // {...}` (also after Claude Code's column-0 `● `/`⏺ `), `Error: 401 {...}`, the JS SDK's `AuthenticationError: 401
 // {...}`, the Python SDK's `anthropic.AuthenticationError: Error code: 401 - {...}`. Anchored, so a test code frame,
-// an assertion diff or indented prose that quotes the body does not escalate. The one unanchored form is a
-// stream-json `"result":"API Error: 401 {\"type\"...` field.
+// an assertion diff, a diff hunk or indented prose that quotes the body does not escalate. A stream-json `"result"`
+// field is not matched: the current CLI puts its own text there (`Invalid API key · ...`), which the phrases catch.
 const SDK_ERROR = String.raw`(?:[a-z_]{1,30}\.){0,3}(?:authentication|permissiondenied)error: (?:error code: )?`;
-const AUTH_RESPONSE = String.raw`${LEAD}(?:(?:●|⏺) )?${PREFIX}(?:${SDK_ERROR}|api error: |error code: )?40[13](?: -)? ${AUTH_BODY}|"result": ?"(?:failed to authenticate\. )?api error: 40[13] ${AUTH_BODY}`;
+const AUTH_RESPONSE = String.raw`${LEAD}(?:(?:●|⏺) )?${PREFIX}(?:${SDK_ERROR}|api error: |error code: )?40[13](?: -)? ${AUTH_BODY}`;
 // gh lookup failures for an issue or PR number, anchored after LEAD and PREFIX.
 const INVALID_PHRASES = [
   String.raw`graphql: could not resolve to an? (?:issue|pullrequest)(?:[ \t.,]|$)`,

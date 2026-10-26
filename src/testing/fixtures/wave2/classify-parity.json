@@ -1204,10 +1204,11 @@
     },
     {
       "text": "{\"type\":\"result\",\"subtype\":\"success\",\"is_error\":true,\"result\":\"API Error: 401 {\\\"type\\\":\\\"error\\\",\\\"error\\\":{\\\"type\\\":\\\"authentication_error\\\",\\\"message\\\":\\\"OAuth token has expired.\\\"}}\",\"session_id\":\"abc\"}",
-      "bash": "auth_error",
-      "ts": "auth",
+      "bash": "unknown",
+      "ts": "unknown",
       "name": "verifier b6: Claude CLI stream-json result with escaped quotes",
-      "expect": "esc:auth"
+      "expect": "esc:auth",
+      "limit": "Known limit 2: a raw stream-json \"result\" field is not matched (the current CLI puts its own text there, which the phrases catch)."
     },
     {
       "text": "● API Error: 401 {\"type\":\"error\",\"error\":{\"type\":\"authentication_error\",\"message\":\"OAuth token has expired. Please obtain a new token or refresh your existing token.\"}}",
@@ -3297,6 +3298,512 @@
       "bash": "build_failure",
       "ts": "unknown",
       "name": "verifier r4 c3/e2: real bun diff only (no code frame)",
+      "expect": "noesc"
+    },
+    {
+      "text": "file:///app/node_modules/@anthropic-ai/sdk/core/error.mjs:45\n            return new AuthenticationError(status, error, message, headers, type);\n                   ^\n\nAuthenticationError: 401 {\"type\":\"error\",\"error\":{\"type\":\"authentication_error\",\"message\":\"invalid x-api-key\"},\"request_id\":\"req_011CUXabc\"}\n    at APIError.generate (file:///app/node_modules/@anthropic-ai/sdk/core/error.mjs:45:20)\n    at Anthropic.makeStatusError (file:///app/node_modules/@anthropic-ai/sdk/client.mjs:160:32) {\n  status: 401,\n  requestID: 'req_011CUXabc',\n  error: {\n    type: 'error',\n    error: { type: 'authentication_error', message: 'invalid x-api-key' },\n    request_id: 'req_011CUXabc'\n  }\n}\n\nNode.js v22.22.0",
+      "bash": "auth_error",
+      "ts": "auth",
+      "name": "verifier r5 corpus/J1: node uncaught AuthenticationError (real shape, with frame + inspect props)",
+      "expect": "esc:auth"
+    },
+    {
+      "text": "PermissionDeniedError: 403 {\"type\":\"error\",\"error\":{\"type\":\"permission_error\",\"message\":\"Your API key does not have permission to use the specified resource.\"},\"request_id\":\"req_011CUXabc\"}\n    at APIError.generate (x.mjs:48:20) {\n  status: 403,",
+      "bash": "auth_error",
+      "ts": "auth",
+      "name": "verifier r5 corpus/J2: node console.error(err) PermissionDeniedError 403",
+      "expect": "esc:auth"
+    },
+    {
+      "text": "Error: 401 {\"type\":\"error\",\"error\":{\"type\":\"authentication_error\",\"message\":\"invalid x-api-key\"},\"request_id\":\"req_011CUXabc\"}",
+      "bash": "auth_error",
+      "ts": "auth",
+      "name": "verifier r5 corpus/J3: node String(err)",
+      "expect": "esc:auth"
+    },
+    {
+      "text": "4 |     }\n5 |     return AnthropicError;\n6 | })();\n7 | export class APIError extends AnthropicError {\n8 |     constructor(status, error, message, headers, type) {\n9 |         super(`${APIError.makeMessage(status, error, message)}`);\n                          ^\nerror: 401 {\"type\":\"error\",\"error\":{\"type\":\"authentication_error\",\"message\":\"invalid x-api-key\"},\"request_id\":\"req_011CUXabc\"}\n     status: 401,\n    headers: Headers {\n  \"content-type\": \"application/json\",\n  \"date\": \"Mon, 26 Oct 2026 04:44:44 GMT\",\n  \"content-length\": \"115\",\n  \"request-id\": \"req_011CUXabc\",\n},\n  requestID: \"req_011CUXabc\",\n workspaceID: null,\n      error: {\n  type: \"error\",\n  error: [Object ...],\n  request_id: \"req_011CUXabc\",\n},\n       type: \"authentication_error\",\n\n      at new AnthropicError (1:23)\n      at new APIError (/home/runner/Documents/shipwright-wave0/node_modules/@anthropic-ai/sdk/core/error.mjs:9:9)\n      at new AuthenticationError (1:23)\n      at generate (/home/runner/Documents/shipwright-wave0/node_modules/@anthropic-ai/sdk/core/error.mjs:45:20)\n      at makeRequest (/home/runner/Documents/shipwright-wave0/node_modules/@anthropic-ai/sdk/client.mjs:615:34)\n\nBun v1.2.19 (macOS arm64)\n",
+      "bash": "auth_error",
+      "ts": "auth",
+      "name": "verifier r5 corpus/J4: bun uncaught (real capture)",
+      "expect": "esc:auth"
+    },
+    {
+      "text": "2026-10-26T04:39:20.1234567Z AuthenticationError: 401 {\"type\":\"error\",\"error\":{\"type\":\"authentication_error\",\"message\":\"invalid x-api-key\"},\"request_id\":\"req_011CUXabc\"}",
+      "bash": "auth_error",
+      "ts": "auth",
+      "name": "verifier r5 corpus/J5: GH Actions ts + node uncaught line",
+      "expect": "esc:auth"
+    },
+    {
+      "text": "##[error]AuthenticationError: 401 {\"type\":\"error\",\"error\":{\"type\":\"authentication_error\",\"message\":\"invalid x-api-key\"},\"request_id\":\"req_011CUXabc\"}",
+      "bash": "auth_error",
+      "ts": "auth",
+      "name": "verifier r5 corpus/J6: ##[error] + AuthenticationError",
+      "expect": "esc:auth"
+    },
+    {
+      "text": "Uncaught AuthenticationError: 401 {\"type\":\"error\",\"error\":{\"type\":\"authentication_error\",\"message\":\"invalid x-api-key\"},\"request_id\":\"req_011CUXabc\"}",
+      "bash": "unknown",
+      "ts": "unknown",
+      "name": "verifier r5 corpus/J7: node Uncaught in REPL-like/tsx: 'Uncaught AuthenticationError'",
+      "expect": "esc:auth",
+      "limit": "Known limit 2: an emitter form, prefix or unclosed test-output block the classifier does not handle; the run is retried."
+    },
+    {
+      "text": "[AuthenticationError: 401 {\"type\":\"error\",\"error\":{\"type\":\"authentication_error\",\"message\":\"invalid x-api-key\"},\"request_id\":\"req_011CUXabc\"}]",
+      "bash": "unknown",
+      "ts": "unknown",
+      "name": "verifier r5 corpus/J8: node unhandled rejection with [AuthenticationError] in inspect brackets",
+      "expect": "esc:auth",
+      "limit": "Known limit 2: an emitter form, prefix or unclosed test-output block the classifier does not handle; the run is retried."
+    },
+    {
+      "text": "Traceback (most recent call last):\n  File \"/app/main.py\", line 5, in <module>\n    msg = client.messages.create(model=\"MODEL\", max_tokens=10, messages=[{\"role\": \"user\", \"content\": \"hi\"}])\n  File \"/app/.venv/lib/python3.12/site-packages/anthropic/_base_client.py\", line 1061, in request\n    raise self._make_status_error_from_response(err.response) from None\nanthropic.AuthenticationError: Error code: 401 - {'type': 'error', 'error': {'type': 'authentication_error', 'message': 'invalid x-api-key'}, 'request_id': 'req_011CUXabc'}",
+      "bash": "auth_error",
+      "ts": "auth",
+      "name": "verifier r5 corpus/Y1: python traceback 401",
+      "expect": "esc:auth"
+    },
+    {
+      "text": "Traceback (most recent call last):\n  File \"/app/main.py\", line 5, in <module>\n    msg = client.messages.create(model=\"MODEL\", max_tokens=10, messages=[{\"role\": \"user\", \"content\": \"hi\"}])\n  File \"/app/.venv/lib/python3.12/site-packages/anthropic/_base_client.py\", line 1061, in request\n    raise self._make_status_error_from_response(err.response) from None\nanthropic.PermissionDeniedError: Error code: 403 - {'type': 'error', 'error': {'type': 'permission_error', 'message': 'Your API key does not have permission to use the specified resource.'}, 'request_id': 'req_011CUXabc'}",
+      "bash": "auth_error",
+      "ts": "auth",
+      "name": "verifier r5 corpus/Y2: python traceback 403",
+      "expect": "esc:auth"
+    },
+    {
+      "text": "Error: Error code: 401 - {'type': 'error', 'error': {'type': 'authentication_error', 'message': 'invalid x-api-key'}, 'request_id': 'req_011CUXabc'}",
+      "bash": "auth_error",
+      "ts": "auth",
+      "name": "verifier r5 corpus/Y3: python print(f'Error: {e}')",
+      "expect": "esc:auth"
+    },
+    {
+      "text": "ERROR:root:Error code: 401 - {'type': 'error', 'error': {'type': 'authentication_error', 'message': 'invalid x-api-key'}, 'request_id': 'req_011CUXabc'}",
+      "bash": "unknown",
+      "ts": "unknown",
+      "name": "verifier r5 corpus/Y4: python logging default basicConfig logger.error(e)",
+      "expect": "esc:auth",
+      "limit": "Known limit 2: an emitter form, prefix or unclosed test-output block the classifier does not handle; the run is retried."
+    },
+    {
+      "text": "2026-10-26 04:39:20,123 - ERROR - Error code: 401 - {'type': 'error', 'error': {'type': 'authentication_error', 'message': 'invalid x-api-key'}, 'request_id': 'req_011CUXabc'}",
+      "bash": "unknown",
+      "ts": "unknown",
+      "name": "verifier r5 corpus/Y5: python logging asctime comma ms",
+      "expect": "esc:auth",
+      "limit": "Known limit 2: an emitter form, prefix or unclosed test-output block the classifier does not handle; the run is retried."
+    },
+    {
+      "text": "Error code: 401 - {'type': 'error', 'error': {'type': 'authentication_error', 'message': 'invalid x-api-key'}, 'request_id': 'req_011CUXabc'}",
+      "bash": "auth_error",
+      "ts": "auth",
+      "name": "verifier r5 corpus/Y6: python str(e) only",
+      "expect": "esc:auth"
+    },
+    {
+      "text": "anthropic._exceptions.AuthenticationError: Error code: 401 - {'type': 'error', 'error': {'type': 'authentication_error', 'message': 'invalid x-api-key'}, 'request_id': 'req_011CUXabc'}",
+      "bash": "auth_error",
+      "ts": "auth",
+      "name": "verifier r5 corpus/Y7: python _exceptions module path",
+      "expect": "esc:auth"
+    },
+    {
+      "text": "Traceback (most recent call last):\n  File \"a.py\", line 1, in <module>\n    asyncio.run(main())\nanthropic.AuthenticationError: Error code: 401 - {'type': 'error', 'error': {'type': 'authentication_error', 'message': 'invalid x-api-key'}, 'request_id': 'req_011CUXabc'}",
+      "bash": "auth_error",
+      "ts": "auth",
+      "name": "verifier r5 corpus/Y8: python async: traceback ends same",
+      "expect": "esc:auth"
+    },
+    {
+      "text": "2026/10/26 04:39:20 POST \"https://api.anthropic.com/v1/messages\": 401 Unauthorized (Request-ID: req_011CUXabc) {\"type\":\"error\",\"error\":{\"type\":\"authentication_error\",\"message\":\"invalid x-api-key\"},\"request_id\":\"req_011CUXabc\"}\nexit status 1",
+      "bash": "auth_error",
+      "ts": "auth",
+      "name": "verifier r5 corpus/G1: go log.Fatal(err) anthropic-sdk-go v1.19 Error()",
+      "expect": "esc:auth"
+    },
+    {
+      "text": "panic: POST \"https://api.anthropic.com/v1/messages\": 401 Unauthorized (Request-ID: req_011CUXabc) {\"type\":\"error\",\"error\":{\"type\":\"authentication_error\",\"message\":\"invalid x-api-key\"},\"request_id\":\"req_011CUXabc\"}\n\ngoroutine 1 [running]:\nmain.main()\n\t/app/main.go:20 +0x1d4\nexit status 2",
+      "bash": "auth_error",
+      "ts": "auth",
+      "name": "verifier r5 corpus/G2: go panic(err)",
+      "expect": "esc:auth"
+    },
+    {
+      "text": "Error: POST \"https://api.anthropic.com/v1/messages\": 401 Unauthorized (Request-ID: req_011CUXabc) {\"type\":\"error\",\"error\":{\"type\":\"authentication_error\",\"message\":\"invalid x-api-key\"},\"request_id\":\"req_011CUXabc\"}",
+      "bash": "auth_error",
+      "ts": "auth",
+      "name": "verifier r5 corpus/G3: go fmt.Println(\"Error:\", err)",
+      "expect": "esc:auth"
+    },
+    {
+      "text": "Failed to authenticate. API Error: 403 Your API key does not have permission to use the specified resource.",
+      "bash": "auth_error",
+      "ts": "auth",
+      "name": "verifier r5 corpus/C2: CLI 2.1.296 real 403 text",
+      "expect": "esc:auth"
+    },
+    {
+      "text": "API Error: 401 {\"type\":\"error\",\"error\":{\"type\":\"authentication_error\",\"message\":\"invalid x-api-key\"},\"request_id\":\"req_011CUXabc\"}",
+      "bash": "auth_error",
+      "ts": "auth",
+      "name": "verifier r5 corpus/C3: older CLI API Error: 401 body",
+      "expect": "esc:auth"
+    },
+    {
+      "text": "API Error: 403 {\"type\":\"error\",\"error\":{\"type\":\"permission_error\",\"message\":\"Your API key does not have permission to use the specified resource.\"},\"request_id\":\"req_011CUXabc\"}",
+      "bash": "auth_error",
+      "ts": "auth",
+      "name": "verifier r5 corpus/C4: older CLI API Error: 403 body",
+      "expect": "esc:auth"
+    },
+    {
+      "text": "Failed to authenticate. API Error: 401 {\"type\":\"error\",\"error\":{\"type\":\"authentication_error\",\"message\":\"invalid x-api-key\"},\"request_id\":\"req_011CUXabc\"}",
+      "bash": "auth_error",
+      "ts": "auth",
+      "name": "verifier r5 corpus/C5: Failed to authenticate. API Error: 401 body",
+      "expect": "esc:auth"
+    },
+    {
+      "text": "⏺ API Error: 403 {\"type\":\"error\",\"error\":{\"type\":\"permission_error\",\"message\":\"Your API key does not have permission to use the specified resource.\"},\"request_id\":\"req_011CUXabc\"}",
+      "bash": "auth_error",
+      "ts": "auth",
+      "name": "verifier r5 corpus/C6: ⏺ API Error 403 body",
+      "expect": "esc:auth"
+    },
+    {
+      "text": "● API Error: 401 {\"type\":\"error\",\"error\":{\"type\":\"authentication_error\",\"message\":\"invalid x-api-key\"},\"request_id\":\"req_011CUXabc\"}",
+      "bash": "auth_error",
+      "ts": "auth",
+      "name": "verifier r5 corpus/C7: ● API Error 401 body",
+      "expect": "esc:auth"
+    },
+    {
+      "text": "[2026-10-26T04:39:20Z] ✗ Claude Code returned an error result: API Error: 403 {\"type\":\"error\",\"error\":{\"type\":\"permission_error\",\"message\":\"Your API key does not have permission to use the specified resource.\"},\"request_id\":\"req_011CUXabc\"}",
+      "bash": "auth_error",
+      "ts": "auth",
+      "name": "verifier r5 corpus/C8: [ts] ✗ Claude Code returned an error result: API Error: 403 body",
+      "expect": "esc:auth"
+    },
+    {
+      "text": "Claude Code returned an error result: Failed to authenticate. API Error: 403 Your API key does not have permission to use the specified resource.",
+      "bash": "auth_error",
+      "ts": "auth",
+      "name": "verifier r5 corpus/C9: Claude Code returned an error result: Failed to authenticate. API Error: 403 msg",
+      "expect": "esc:auth"
+    },
+    {
+      "text": "CLI exited 1 with minimal output: API Error: 403 {\"type\":\"error\",\"error\":{\"type\":\"permission_error\",\"message\":\"Your API key does not have permission to use the specified resource.\"},\"request_id\":\"req_011CUXabc\"}",
+      "bash": "auth_error",
+      "ts": "auth",
+      "name": "verifier r5 corpus/C10: CLI exited 1 with minimal output: API Error 403 body",
+      "expect": "esc:auth"
+    },
+    {
+      "text": "[ERROR] ✗ API Error: 403 {\"type\":\"error\",\"error\":{\"type\":\"permission_error\",\"message\":\"Your API key does not have permission to use the specified resource.\"},\"request_id\":\"req_011CUXabc\"}",
+      "bash": "auth_error",
+      "ts": "auth",
+      "name": "verifier r5 corpus/C11: [ERROR] ✗ API Error 403 body",
+      "expect": "esc:auth"
+    },
+    {
+      "text": "API Error: 403 {\"type\":\"error\",\"error\":{\"type\":\"permission_error\",\"message\":\"OAuth token does not meet scope requirement user:profile\"},\"request_id\":\"req_1\"}",
+      "bash": "auth_error",
+      "ts": "auth",
+      "name": "verifier r5 corpus/C12: CLI 403 OAuth scope",
+      "expect": "esc:auth"
+    },
+    {
+      "text": "\u001b[31mAPI Error: 403 {\"type\":\"error\",\"error\":{\"type\":\"permission_error\",\"message\":\"Your API key does not have permission to use the specified resource.\"},\"request_id\":\"req_011CUXabc\"}\u001b[0m\r",
+      "bash": "auth_error",
+      "ts": "auth",
+      "name": "verifier r5 corpus/C13: CRLF + ANSI wrapped 403",
+      "expect": "esc:auth"
+    },
+    {
+      "text": "{\"type\":\"result\",\"subtype\":\"success\",\"is_error\":true,\"duration_ms\":47,\"result\":\"API Error: 401 {\\\"type\\\":\\\"error\\\",\\\"error\\\":{\\\"type\\\":\\\"authentication_error\\\",\\\"message\\\":\\\"invalid x-api-key\\\"},\\\"request_id\\\":\\\"req_011CUXabc\\\"}\",\"session_id\":\"x\"}",
+      "bash": "unknown",
+      "ts": "unknown",
+      "name": "verifier r5 corpus/S1: stream-json result old CLI 401",
+      "expect": "esc:auth",
+      "limit": "Known limit 2: an emitter form, prefix or unclosed test-output block the classifier does not handle; the run is retried."
+    },
+    {
+      "text": "{\"type\":\"result\",\"subtype\":\"success\",\"is_error\":true,\"result\":\"API Error: 403 {\\\"type\\\":\\\"error\\\",\\\"error\\\":{\\\"type\\\":\\\"permission_error\\\",\\\"message\\\":\\\"invalid x-api-key\\\"},\\\"request_id\\\":\\\"req_011CUXabc\\\"}\"}",
+      "bash": "unknown",
+      "ts": "unknown",
+      "name": "verifier r5 corpus/S2: stream-json result old CLI 403 body",
+      "expect": "esc:auth",
+      "limit": "Known limit 2: an emitter form, prefix or unclosed test-output block the classifier does not handle; the run is retried."
+    },
+    {
+      "text": "{\"type\":\"system\",\"subtype\":\"init\",\"cwd\":\"/tmp/work/x.ts\",\"session_id\":\"3c5da157-8325-4838-9504-36a3eeccbd6f\",\"tools\":[\"Task\",\"Bash\",\"CronCreate\",\"CronDelete\",\"CronList\",\"Edit\",\"EnterWorktree\",\"ExitWorktree\",\"ListAgents\",\"NotebookEdit\",\"Read\",\"ReportFindings\",\"ScheduleWakeup\",\"SendMessage\",\"Skill\",\"TaskStop\",\"ToolSearch\",\"WebFetch\",\"WebSearch\",\"Workflow\",\"Write\"],\"mcp_servers\":[],\"model\":\"MODEL\",\"permissionMode\":\"auto\",\"slash_commands\":[\"deep-research\",\"dataviz\",\"update-config\",\"verify\",\"debug\",\"code-review\",\"simplify\",\"batch\",\"fewer-permission-prompts\",\"doctor\",\"loop\",\"claude-api\",\"workflow-authoring\",\"run\",\"run-skill-generator\",\"plugin-authoring\",\"agents\",\"auto-mode-setup\",\"autocompact\",\"clear\",\"color\",\"compact\",\"config\",\"output-style\",\"context\",\"effort\",\"fast\",\"focus\",\"heapdump\",\"init\",\"mcp\",\"model\",\"__remote-workflow\",\"workflow-launch-exec\",\"reload-plugins\",\"reload-skills\",\"rename\",\"security-review\",\"usage\",\"insights\",\"recap\",\"goal\",\"list-agents\",\"team-onboarding\"],\"terminal_slash_commands\":[\"doctor\",\"color\",\"focus\",\"reload-plugins\"],\"apiKeySource\":\"ANTHROPIC_API_KEY\",\"claude_code_version\":\"2.1.296\",\"output_style\":\"default\",\"agents\":[\"claude\",\"Explore\",\"general-purpose\",\"Plan\",\"statusline-setup\"],\"skills\":[\"deep-research\",\"dataviz\",\"update-config\",\"verify\",\"debug\",\"code-review\",\"simplify\",\"batch\",\"fewer-permission-prompts\",\"doctor\",\"loop\",\"claude-api\",\"workflow-authoring\",\"run\",\"run-skill-generator\",\"plugin-authoring\"],\"plugins\":[{\"name\":\"cc-plugin-agents-md\",\"path\":\"builtin\",\"source\":\"cc-plugin-agents-md@builtin\"},{\"name\":\"cc-plugin-plugin-authoring\",\"path\":\"builtin\",\"source\":\"cc-plugin-plugin-authoring@builtin\"}],\"capabilities\":[\"interrupt_receipt_v1\",\"interrupt_cancel_queued_v1\",\"interrupt_send_now_v1\",\"msg_lifecycle_v1\",\"request_marker_lists_v1\",\"sdk_mcp_tools_list_changed\",\"sdk_mcp_manifests\",\"mcp_read_resource_v1\",\"mcp_tool_ui_meta_v1\",\"ui_surface_v1\"],\"analytics_disabled\":true,\"product_feedback_disabled\":true,\"uuid\":\"1753d8e7-1d1c-4bc8-b8ab-f4cdc5eb4fb9\",\"memory_paths\":{\"auto\":\"/tmp/work/x.ts\"},\"messaging_socket_path\":\"/tmp/cc-socks/56680.sock\",\"fast_mode_state\":\"off\",\"fast_mode_disabled_reason\":\"sdk_opt_in_required\",\"per_turn_effort_active\":true,\"view_mode\":\"default\"}\n{\"type\":\"assistant\",\"message\":{\"diagnostics\":null,\"id\":\"9b87289a-07ce-40f3-ade4-55d688d3c1ab\",\"container\":null,\"model\":\"<synthetic>\",\"role\":\"assistant\",\"stop_details\":null,\"stop_reason\":\"stop_sequence\",\"stop_sequence\":\"\",\"type\":\"message\",\"usage\":{\"output_tokens_details\":null,\"input_tokens\":0,\"output_tokens\":0,\"cache_creation_input_tokens\":0,\"cache_read_input_tokens\":0,\"server_tool_use\":{\"web_search_requests\":0,\"web_fetch_requests\":0},\"service_tier\":null,\"cache_creation\":{\"ephemeral_1h_input_tokens\":0,\"ephemeral_5m_input_tokens\":0},\"inference_geo\":null,\"iterations\":null,\"speed\":null,\"fallback_credit\":null},\"content\":[{\"type\":\"text\",\"text\":\"Failed to authenticate. API Error: 403 Your API key does not have permission to use the specified resource.\"}],\"context_management\":null},\"parent_tool_use_id\":null,\"session_id\":\"3c5da157-8325-4838-9504-36a3eeccbd6f\",\"uuid\":\"0628d575-bc8a-424a-a930-fa048e538b61\",\"timestamp\":\"2026-10-26T04:42:52.697Z\",\"error\":\"authentication_failed\",\"request_id\":\"req_011CUXabc\",\"is_api_error_message\":true}\n{\"duration_api_ms\":0,\"stop_reason\":\"stop_sequence\",\"session_id\":\"3c5da157-8325-4838-9504-36a3eeccbd6f\",\"total_cost_usd\":0,\"usage\":{\"output_tokens_details\":{\"thinking_tokens\":0},\"input_tokens\":0,\"cache_creation_input_tokens\":0,\"cache_read_input_tokens\":0,\"output_tokens\":0,\"server_tool_use\":{\"web_search_requests\":0,\"web_fetch_requests\":0},\"service_tier\":\"standard\",\"cache_creation\":{\"ephemeral_1h_input_tokens\":0,\"ephemeral_5m_input_tokens\":0},\"inference_geo\":\"\",\"iterations\":[],\"speed\":\"standard\",\"fallback_credit\":null},\"modelUsage\":{},\"permission_denials\":[],\"terminal_reason\":\"api_error\",\"fast_mode_state\":\"off\",\"fast_mode_disabled_reason\":\"sdk_opt_in_required\",\"subagent_stats\":{\"spawned\":0,\"requested\":{\"background\":0,\"foreground\":0,\"unset\":0},\"started_in_background\":0,\"max_depth\":0,\"spawned_by_subagents\":0,\"completed\":0,\"failed\":0,\"killed\":{\"parent\":0,\"user\":0,\"system\":0},\"refused\":{\"depth_limit\":0,\"concurrency_limit\":0,\"budget\":0},\"by_type\":{}},\"safety_stops\":0,\"is_error\":true,\"num_turns\":1,\"subtype\":\"success\",\"api_error_status\":403,\"result\":\"Failed to authenticate. API Error: 403 Your API key does not have permission to use the specified resource.\",\"type\":\"result\",\"duration_ms\":48,\"uuid\":\"51c8c62b-34d7-4069-86b5-16119f9b6934\",\"queued_turn_count\":0,\"result_index\":0}\n",
+      "bash": "build_failure",
+      "ts": "transient",
+      "name": "verifier r5 corpus/S3: stream-json current CLI 403 (real) — no body"
+    },
+    {
+      "text": "{\"type\":\"system\",\"subtype\":\"init\",\"cwd\":\"/tmp/work/x.ts\",\"session_id\":\"9eaf8ab9-8c51-4bac-bc6e-5cb083df2207\",\"tools\":[\"Task\",\"Bash\",\"CronCreate\",\"CronDelete\",\"CronList\",\"Edit\",\"EnterWorktree\",\"ExitWorktree\",\"ListAgents\",\"NotebookEdit\",\"Read\",\"ReportFindings\",\"ScheduleWakeup\",\"SendMessage\",\"Skill\",\"TaskStop\",\"ToolSearch\",\"WebFetch\",\"WebSearch\",\"Workflow\",\"Write\"],\"mcp_servers\":[],\"model\":\"MODEL\",\"permissionMode\":\"auto\",\"slash_commands\":[\"deep-research\",\"dataviz\",\"update-config\",\"verify\",\"debug\",\"code-review\",\"simplify\",\"batch\",\"fewer-permission-prompts\",\"doctor\",\"loop\",\"claude-api\",\"workflow-authoring\",\"run\",\"run-skill-generator\",\"plugin-authoring\",\"agents\",\"auto-mode-setup\",\"autocompact\",\"clear\",\"color\",\"compact\",\"config\",\"output-style\",\"context\",\"effort\",\"fast\",\"focus\",\"heapdump\",\"init\",\"mcp\",\"model\",\"__remote-workflow\",\"workflow-launch-exec\",\"reload-plugins\",\"reload-skills\",\"rename\",\"security-review\",\"usage\",\"insights\",\"recap\",\"goal\",\"list-agents\",\"team-onboarding\"],\"terminal_slash_commands\":[\"doctor\",\"color\",\"focus\",\"reload-plugins\"],\"apiKeySource\":\"ANTHROPIC_API_KEY\",\"claude_code_version\":\"2.1.296\",\"output_style\":\"default\",\"agents\":[\"claude\",\"Explore\",\"general-purpose\",\"Plan\",\"statusline-setup\"],\"skills\":[\"deep-research\",\"dataviz\",\"update-config\",\"verify\",\"debug\",\"code-review\",\"simplify\",\"batch\",\"fewer-permission-prompts\",\"doctor\",\"loop\",\"claude-api\",\"workflow-authoring\",\"run\",\"run-skill-generator\",\"plugin-authoring\"],\"plugins\":[{\"name\":\"cc-plugin-agents-md\",\"path\":\"builtin\",\"source\":\"cc-plugin-agents-md@builtin\"},{\"name\":\"cc-plugin-plugin-authoring\",\"path\":\"builtin\",\"source\":\"cc-plugin-plugin-authoring@builtin\"}],\"capabilities\":[\"interrupt_receipt_v1\",\"interrupt_cancel_queued_v1\",\"interrupt_send_now_v1\",\"msg_lifecycle_v1\",\"request_marker_lists_v1\",\"sdk_mcp_tools_list_changed\",\"sdk_mcp_manifests\",\"mcp_read_resource_v1\",\"mcp_tool_ui_meta_v1\",\"ui_surface_v1\"],\"analytics_disabled\":true,\"product_feedback_disabled\":true,\"uuid\":\"ee01791d-35fc-424d-b100-30af9f1fa86b\",\"memory_paths\":{\"auto\":\"/tmp/work/x.ts\"},\"messaging_socket_path\":\"/tmp/cc-socks/56634.sock\",\"fast_mode_state\":\"off\",\"fast_mode_disabled_reason\":\"sdk_opt_in_required\",\"per_turn_effort_active\":true,\"view_mode\":\"default\"}\n{\"type\":\"assistant\",\"message\":{\"diagnostics\":null,\"id\":\"6dceefb5-3473-48ba-9823-a0e93a19431b\",\"container\":null,\"model\":\"<synthetic>\",\"role\":\"assistant\",\"stop_details\":null,\"stop_reason\":\"stop_sequence\",\"stop_sequence\":\"\",\"type\":\"message\",\"usage\":{\"output_tokens_details\":null,\"input_tokens\":0,\"output_tokens\":0,\"cache_creation_input_tokens\":0,\"cache_read_input_tokens\":0,\"server_tool_use\":{\"web_search_requests\":0,\"web_fetch_requests\":0},\"service_tier\":null,\"cache_creation\":{\"ephemeral_1h_input_tokens\":0,\"ephemeral_5m_input_tokens\":0},\"inference_geo\":null,\"iterations\":null,\"speed\":null,\"fallback_credit\":null},\"content\":[{\"type\":\"text\",\"text\":\"Invalid API key · Fix external API key\"}],\"context_management\":null},\"parent_tool_use_id\":null,\"session_id\":\"9eaf8ab9-8c51-4bac-bc6e-5cb083df2207\",\"uuid\":\"7353f24e-d31a-49f5-8fc2-b718545c12db\",\"timestamp\":\"2026-10-26T04:42:52.058Z\",\"error\":\"authentication_failed\",\"request_id\":\"req_011CUXabc\",\"is_api_error_message\":true}\n{\"duration_api_ms\":0,\"stop_reason\":\"stop_sequence\",\"session_id\":\"9eaf8ab9-8c51-4bac-bc6e-5cb083df2207\",\"total_cost_usd\":0,\"usage\":{\"output_tokens_details\":{\"thinking_tokens\":0},\"input_tokens\":0,\"cache_creation_input_tokens\":0,\"cache_read_input_tokens\":0,\"output_tokens\":0,\"server_tool_use\":{\"web_search_requests\":0,\"web_fetch_requests\":0},\"service_tier\":\"standard\",\"cache_creation\":{\"ephemeral_1h_input_tokens\":0,\"ephemeral_5m_input_tokens\":0},\"inference_geo\":\"\",\"iterations\":[],\"speed\":\"standard\",\"fallback_credit\":null},\"modelUsage\":{},\"permission_denials\":[],\"terminal_reason\":\"api_error\",\"fast_mode_state\":\"off\",\"fast_mode_disabled_reason\":\"sdk_opt_in_required\",\"subagent_stats\":{\"spawned\":0,\"requested\":{\"background\":0,\"foreground\":0,\"unset\":0},\"started_in_background\":0,\"max_depth\":0,\"spawned_by_subagents\":0,\"completed\":0,\"failed\":0,\"killed\":{\"parent\":0,\"user\":0,\"system\":0},\"refused\":{\"depth_limit\":0,\"concurrency_limit\":0,\"budget\":0},\"by_type\":{}},\"safety_stops\":0,\"is_error\":true,\"num_turns\":1,\"subtype\":\"success\",\"api_error_status\":401,\"result\":\"Invalid API key · Fix external API key\",\"type\":\"result\",\"duration_ms\":48,\"uuid\":\"8c974f51-5a38-40f8-ae41-2541af207ba6\",\"queued_turn_count\":0,\"result_index\":0}\n",
+      "bash": "build_failure",
+      "ts": "transient",
+      "name": "verifier r5 corpus/S4: stream-json current CLI 401 (real) — no body"
+    },
+    {
+      "text": "  ● parser › extracts result\n\n    expect(received).toEqual(expected) // deep equality\n\n    - Expected  - 1\n    + Received  + 1\n\n      Object {\n        \"is_error\": true,\n    -   \"result\": \"ok\",\n    +   \"result\": \"API Error: 401 {\\\"type\\\":\\\"error\\\",\\\"error\\\":{\\\"type\\\":\\\"authentication_error\\\",\\\"message\\\":\\\"invalid x-api-key\\\"},\\\"request_id\\\":\\\"req_011CUXabc\\\"}\",\n      }\n\nTests: 1 failed",
+      "bash": "build_failure",
+      "ts": "unknown",
+      "name": "verifier r5 corpus/N1: jest toEqual diff of parsed stream-json object",
+      "expect": "noesc"
+    },
+    {
+      "text": "error: expect(received).toEqual(expected)\n\n  {\n    \"is_error\": true,\n-   \"result\": \"ok\",\n+   \"result\": \"API Error: 401 {\\\"type\\\":\\\"error\\\",\\\"error\\\":{\\\"type\\\":\\\"authentication_error\\\",\\\"message\\\":\\\"invalid x-api-key\\\"},\\\"request_id\\\":\\\"req_011CUXabc\\\"}\",\n  }\n\n- Expected  - 1\n+ Received  + 1\n\n      at <anonymous> (src/parse.test.ts:9:5)\n(fail) parse > extracts result [1.2ms]",
+      "bash": "build_failure",
+      "ts": "unknown",
+      "name": "verifier r5 corpus/N2: bun toEqual diff of stream-json object (col-0 diff)",
+      "expect": "noesc"
+    },
+    {
+      "text": "     1\t{\"type\":\"result\",\"is_error\":true,\"result\":\"API Error: 401 {\\\"type\\\":\\\"error\\\",\\\"error\\\":{\\\"type\\\":\\\"authentication_error\\\",\\\"message\\\":\\\"invalid x-api-key\\\"},\\\"request_id\\\":\\\"req_011CUXabc\\\"}\"}\n✗ Tests failed",
+      "bash": "build_failure",
+      "ts": "unknown",
+      "name": "verifier r5 corpus/N3: cat -n of stream-json fixture (agent Read tool)",
+      "expect": "noesc"
+    },
+    {
+      "text": "tests/fixtures/auth.jsonl:3:{\"type\":\"result\",\"is_error\":true,\"result\":\"API Error: 401 {\\\"type\\\":\\\"error\\\",\\\"error\\\":{\\\"type\\\":\\\"authentication_error\\\",\\\"message\\\":\\\"invalid x-api-key\\\"},\\\"request_id\\\":\\\"req_011CUXabc\\\"}\"}\nerror: build failed",
+      "bash": "build_failure",
+      "ts": "unknown",
+      "name": "verifier r5 corpus/N4: grep hit on fixture jsonl with path prefix",
+      "expect": "noesc"
+    },
+    {
+      "text": "+{\"type\":\"result\",\"is_error\":true,\"result\":\"API Error: 401 {\\\"type\\\":\\\"error\\\",\\\"error\\\":{\\\"type\\\":\\\"authentication_error\\\",\\\"message\\\":\\\"invalid x-api-key\\\"},\\\"request_id\\\":\\\"req_011CUXabc\\\"}\"}\nerror: tests failed",
+      "bash": "build_failure",
+      "ts": "unknown",
+      "name": "verifier r5 corpus/N5: git diff adding stream-json fixture",
+      "expect": "noesc"
+    },
+    {
+      "text": "✖ maps 401 (1.2ms)\n  AuthenticationError: 401 {\"type\":\"error\",\"error\":{\"type\":\"authentication_error\",\"message\":\"invalid x-api-key\"},\"request_id\":\"req_011CUXabc\"}\n      at t (a.test.mjs:3:9)\n✖ failing tests:",
+      "bash": "build_failure",
+      "ts": "unknown",
+      "name": "verifier r5 corpus/N6: node:test spec reporter error indented",
+      "expect": "noesc"
+    },
+    {
+      "text": "E       anthropic.AuthenticationError: Error code: 401 - {'type': 'error', 'error': {'type': 'authentication_error', 'message': 'invalid x-api-key'}, 'request_id': 'req_011CUXabc'}\n\n.venv/lib/python3.12/site-packages/anthropic/_base_client.py:1061: AuthenticationError\n=========================== short test summary info ============================\nFAILED tests/test_llm.py::test_call - anthropic.AuthenticationError: Error code: 401 - {'type': 'error', 'error': {'type': 'authentication_error', 'message': 'invalid x-api-key'}, 'request_id': 'req_011CUXabc'}",
+      "bash": "build_failure",
+      "ts": "unknown",
+      "name": "verifier r5 corpus/N7: pytest E-line SDK error (mocked)",
+      "expect": "noesc"
+    },
+    {
+      "text": "err = AuthenticationError(\"Error code: 401 - {\\'type\\': \\'error\\', \\'error\\': {\\'type\\': \\'authentication_error\\', \\'message\\': \\'invalid x-api-key\\'}, \\'request_id\\': \\'req_011CUXabc\\'}\")\nFAILED tests/test_x.py::test_y",
+      "bash": "build_failure",
+      "ts": "unknown",
+      "name": "verifier r5 corpus/N8: pytest showlocals col0 err = repr",
+      "expect": "noesc"
+    },
+    {
+      "text": "The earlier run failed with API Error: 401 {\"type\":\"error\",\"error\":{\"type\":\"authentication_error\",\"message\":\"invalid x-api-key\"},\"request_id\":\"req_011CUXabc\"}, I added a guard.\nerror: lint failed",
+      "bash": "build_failure",
+      "ts": "unknown",
+      "name": "verifier r5 corpus/N9: agent prose col0 quoting",
+      "expect": "noesc"
+    },
+    {
+      "text": "--- FAIL: TestAuth (0.00s)\n    client_test.go:12: got POST \"https://api.anthropic.com/v1/messages\": 401 Unauthorized {\"type\":\"error\",\"error\":{\"type\":\"authentication_error\",\"message\":\"invalid x-api-key\"},\"request_id\":\"req_011CUXabc\"}\nFAIL",
+      "bash": "build_failure",
+      "ts": "unknown",
+      "name": "verifier r5 corpus/N10: go test indented t.Errorf",
+      "expect": "noesc"
+    },
+    {
+      "text": " FAIL  src/a.test.ts > maps\nAssertionError: expected 'API Error: 401 {\"type\":\"error\",\"error\":{\"type\":\"authentication_error\",\"message\":\"invalid x-api-key\"},\"request_id\":\"req_011CUXabc\"}' to be 'auth'\n ❯ src/a.test.ts:3:3",
+      "bash": "build_failure",
+      "ts": "unknown",
+      "name": "verifier r5 corpus/N11: vitest AssertionError under FAIL header",
+      "expect": "noesc"
+    },
+    {
+      "text": "------------------------------ Captured log call -------------------------------\nERROR    root:llm.py:12 boom\nanthropic.AuthenticationError: Error code: 401 - {'type': 'error', 'error': {'type': 'authentication_error', 'message': 'invalid x-api-key'}, 'request_id': 'req_011CUXabc'}\n=========================== short test summary info ============================\nFAILED tests/test_llm.py::test_call",
+      "bash": "build_failure",
+      "ts": "unknown",
+      "name": "verifier r5 corpus/N12: pytest captured log with real-shaped line",
+      "expect": "noesc"
+    },
+    {
+      "text": "----------------------------- Captured stdout call -----------------------------\nERROR tests/test_a.py - boom\nAPI Error: 401 {\"type\":\"error\",\"error\":{\"type\":\"authentication_error\",\"message\":\"invalid x-api-key\"},\"request_id\":\"req_011CUXabc\"}\n=========================== 1 failed in 0.1s ===",
+      "bash": "build_failure",
+      "ts": "unknown",
+      "name": "verifier r5 corpus/N13: pytest captured stdout, ERROR collecting-like line w/o :: then real-shaped",
+      "expect": "noesc"
+    },
+    {
+      "text": "    Received: \"{\\\"type\\\":\\\"result\\\",\\\"result\\\":\\\"API Error: 401 {\\\\\\\"type\\\\\\\"...\"",
+      "bash": "unknown",
+      "ts": "unknown",
+      "name": "verifier r5 corpus/N14: jest Received string escaped stream-json w/ result key",
+      "expect": "noesc"
+    },
+    {
+      "text": "- `API Error: 401 {\"type\":\"error\",\"error\":{\"type\":\"authentication_error\",\"message\":\"invalid x-api-key\"},\"request_id\":\"req_011CUXabc\"}` now maps to auth",
+      "bash": "unknown",
+      "ts": "unknown",
+      "name": "verifier r5 corpus/N15: markdown inline code col0 bullet",
+      "expect": "noesc"
+    },
+    {
+      "text": "FAIL: test_auth (tests.test_x.T.test_auth)\n----------------------------------------------------------------------\nTraceback (most recent call last):\n  File \"t.py\", line 3, in test_auth\n    self.assertEqual(r, \"auth\")\nAssertionError: 'unknown' != 'auth'",
+      "bash": "build_failure",
+      "ts": "unknown",
+      "name": "verifier r5 corpus/N16: python unittest failure message col0 with mocked SDK error string",
+      "expect": "noesc"
+    },
+    {
+      "text": "----------------------------- Captured stdout call -----------------------------\nhi\nERROR tests/test_a.py::test_x - RuntimeError\nAPI Error: 401 {\"type\":\"error\",\"error\":{\"type\":\"authentication_error\",\"message\":\"invalid x-api-key\"},\"request_id\":\"req_011CUXabc\"}",
+      "bash": "auth_error",
+      "ts": "auth",
+      "name": "verifier r5 corpus/E1: pytest block then ERROR path::test terminates; real CLI line after",
+      "expect": "esc:auth"
+    },
+    {
+      "text": "----------------------------- Captured stdout call -----------------------------\nhi\nERROR tests/test_a.py - ImportError\nInvalid API key · Please run /login",
+      "bash": "unknown",
+      "ts": "unknown",
+      "name": "verifier r5 corpus/E2: pytest block then collection ERROR w/o ::, then real"
+    },
+    {
+      "text": "error: Uncaught (in promise) AuthenticationError: 401 {\"type\":\"error\",\"error\":{\"type\":\"authentication_error\",\"message\":\"invalid x-api-key\"},\"request_id\":\"req_011CUXabc\"}\n    at APIError.generate (https://esm.sh/@anthropic-ai/sdk/core/error.mjs:45:20)",
+      "bash": "unknown",
+      "ts": "unknown",
+      "name": "verifier r5 corpus2/D1: deno uncaught",
+      "expect": "esc:auth",
+      "limit": "Known limit 2: an emitter form, prefix or unclosed test-output block the classifier does not handle; the run is retried."
+    },
+    {
+      "text": "Claude request failed: AuthenticationError: 401 {\"type\":\"error\",\"error\":{\"type\":\"authentication_error\",\"message\":\"invalid x-api-key\"},\"request_id\":\"req_011CUXabc\"}\n    at APIError.generate (x.mjs:45:20) {",
+      "bash": "build_failure",
+      "ts": "unknown",
+      "name": "verifier r5 corpus2/W1: app console.error('Claude request failed:', err)",
+      "expect": "esc:auth",
+      "limit": "Known limit 2: an emitter form, prefix or unclosed test-output block the classifier does not handle; the run is retried."
+    },
+    {
+      "text": "Traceback (most recent call last):\n  File \"a.py\", line 3, in call\nanthropic.AuthenticationError: Error code: 401 - {'type': 'error', 'error': {'type': 'authentication_error', 'message': 'invalid x-api-key'}, 'request_id': 'req_011CUXabc'}\n\nThe above exception was the direct cause of the following exception:\n\nTraceback (most recent call last):\n  File \"a.py\", line 9, in <module>\nRuntimeError: LLM call failed: Error code: 401 - {'type': 'error', 'error': {'type': 'authentication_error', 'message': 'invalid x-api-key'}, 'request_id': 'req_011CUXabc'}",
+      "bash": "auth_error",
+      "ts": "auth",
+      "name": "verifier r5 corpus2/W2: python raise RuntimeError(f'LLM call failed: {e}') from e",
+      "expect": "esc:auth"
+    },
+    {
+      "text": "Error: summarize failed\n    at main (a.ts:9:11) {\n  [cause]: AuthenticationError: 401 {\"type\":\"error\",\"error\":{\"type\":\"authentication_error\",\"message\":\"invalid x-api-key\"},\"request_id\":\"req_011CUXabc\"}\n      at APIError.generate (x.mjs:45:20)",
+      "bash": "build_failure",
+      "ts": "unknown",
+      "name": "verifier r5 corpus2/W3: tsx/node: error with cause prints [cause]: indented",
+      "expect": "esc:auth",
+      "limit": "Known limit 2: an emitter form, prefix or unclosed test-output block the classifier does not handle; the run is retried."
+    },
+    {
+      "text": "> app@1.0.0 start\n> node main.mjs\n\nAuthenticationError: 401 {\"type\":\"error\",\"error\":{\"type\":\"authentication_error\",\"message\":\"invalid x-api-key\"},\"request_id\":\"req_011CUXabc\"}\n    at x (y:1:1)",
+      "bash": "auth_error",
+      "ts": "auth",
+      "name": "verifier r5 corpus2/W4: TS SDK in npm script: npm ERR wrap? (node line col0 still)",
+      "expect": "esc:auth"
+    },
+    {
+      "text": "Error: Error: 401 {\"type\":\"error\",\"error\":{\"type\":\"authentication_error\",\"message\":\"invalid x-api-key\"},\"request_id\":\"req_011CUXabc\"}",
+      "bash": "auth_error",
+      "ts": "auth",
+      "name": "verifier r5 corpus2/W5: Error: Error: 401 (double prefix)",
+      "expect": "esc:auth"
+    },
+    {
+      "text": "✗ error: AuthenticationError: 401 {\"type\":\"error\",\"error\":{\"type\":\"authentication_error\",\"message\":\"invalid x-api-key\"},\"request_id\":\"req_011CUXabc\"}",
+      "bash": "auth_error",
+      "ts": "auth",
+      "name": "verifier r5 corpus2/W6: fatal: ✗ ? order glyph then prefix twice",
+      "expect": "esc:auth"
+    },
+    {
+      "text": "API Error: 401 {\"type\":\"error\",\"error\":{\"type\":\"authentication_error\",\"message\":\"invalid x-api-key\"},\"request_id\":\"req_011CUXabc\"} · Please run /login",
+      "bash": "auth_error",
+      "ts": "auth",
+      "name": "verifier r5 corpus2/W7: API Error: 401 then · Please run /login",
+      "expect": "esc:auth"
+    },
+    {
+      "text": "Traceback (most recent call last):\n  File \"a.py\", line 5, in <module>\n    client.messages.create(**kw)\n    ~~~~~~~~~~~~~~~~~~~~~~^^^^^^\nanthropic.AuthenticationError: Error code: 401 - {'type': 'error', 'error': {'type': 'authentication_error', 'message': 'invalid x-api-key'}, 'request_id': 'req_011CUXabc'}",
+      "bash": "auth_error",
+      "ts": "auth",
+      "name": "verifier r5 corpus2/W8: Python 3.11 traceback with ^^^ markers and note",
+      "expect": "esc:auth"
+    },
+    {
+      "text": "anthropic.AuthenticationError: Error code: 401 - {'type': 'error', 'error': {'type': 'authentication_error', 'message': \"OAuth token's scope invalid\"}}",
+      "bash": "auth_error",
+      "ts": "auth",
+      "name": "verifier r5 corpus2/W9: python body with \"\" quotes because message contains apostrophe",
+      "expect": "esc:auth"
+    },
+    {
+      "text": "AuthenticationError: 401 {\"message\":\"The security token included in the request is invalid.\"}",
+      "bash": "unknown",
+      "ts": "unknown",
+      "name": "verifier r5 corpus2/W10: TS SDK message body without type:error wrapper? (bedrock)",
+      "expect": "esc:auth",
+      "limit": "Known limit 2: an emitter form, prefix or unclosed test-output block the classifier does not handle; the run is retried."
+    },
+    {
+      "text": "API Error: 403 The security token included in the request is invalid.",
+      "bash": "unknown",
+      "ts": "unknown",
+      "name": "verifier r5 corpus2/W11: Claude CLI on Bedrock 403",
+      "expect": "esc:auth",
+      "limit": "Known limit 2: an emitter form, prefix or unclosed test-output block the classifier does not handle; the run is retried."
+    },
+    {
+      "text": "API Error: 403 {\"error\":{\"code\":403,\"message\":\"Permission 'aiplatform.endpoints.predict' denied on resource\",\"status\":\"PERMISSION_DENIED\"}}",
+      "bash": "unknown",
+      "ts": "unknown",
+      "name": "verifier r5 corpus2/W12: Claude CLI on Vertex 403",
+      "expect": "esc:auth",
+      "limit": "Known limit 2: an emitter form, prefix or unclosed test-output block the classifier does not handle; the run is retried."
+    },
+    {
+      "text": " FAIL  src/p.test.ts > parse > result\nAssertionError: expected { …(2) } to deeply equal { …(2) }\n\n- Expected\n+ Received\n\n  {\n    \"is_error\": true,\n-   \"result\": \"ok\",\n+   \"result\": \"API Error: 401 {\\\"type\\\":\\\"error\\\",\\\"error\\\":{\\\"type\\\":\\\"authentication_error\\\",\\\"message\\\":\\\"invalid x-api-key\\\"},\\\"request_id\\\":\\\"req_011CUXabc\\\"}\",\n  }\n\n ❯ src/p.test.ts:9:5",
+      "bash": "build_failure",
+      "ts": "unknown",
+      "name": "verifier r5 corpus2/Q1: vitest toEqual diff of stream-json object under FAIL header",
+      "expect": "noesc"
+    },
+    {
+      "text": "  I saw `{\"result\":\"API Error: 401 {\\\"type\\\":\\\"error\\\",\\\"error\\\":{\\\"type\\\":\\\"authentication_error\\\",\\\"message\\\":\\\"invalid x-api-key\\\"},\\\"request_id\\\":\\\"req_011CUXabc\\\"}\"}` in the log.\nerror: lint failed",
+      "bash": "build_failure",
+      "ts": "unknown",
+      "name": "verifier r5 corpus2/Q2: agent prose quoting the stream-json line in backticks indented",
+      "expect": "noesc"
+    },
+    {
+      "text": "  console.log\n    {\n      \"result\": \"API Error: 401 {\\\"type\\\":\\\"error\\\",\\\"error\\\":{\\\"type\\\":\\\"authentication_error\\\",\\\"message\\\":\\\"invalid x-api-key\\\"},\\\"request_id\\\":\\\"req_011CUXabc\\\"}\"\n    }\n\n      at Object.<anonymous> (a.test.ts:3:9)\nTests: 1 failed",
+      "bash": "build_failure",
+      "ts": "unknown",
+      "name": "verifier r5 corpus2/Q3: JSON.stringify'd pretty test fixture printed by console.log in jest block",
+      "expect": "noesc"
+    },
+    {
+      "text": "12 |   const line = '{\"type\":\"result\",\"result\":\"API Error: 401 {\\\\\"type\\\\\":\\\\\"error\\\\\",\\\\\"error\\\\\":{\\\\\"type\\\\\":\\\\\"authentication_error\\\\\",\\\\\"message\\\\\":\\\\\"invalid x-api-key\\\\\"},\\\\\"request_id\\\\\":\\\\\"req_011CUXabc\\\\\"}\"}';\n                ^\nerror: expect(received).toBe(expected)\n(fail) parses result",
+      "bash": "build_failure",
+      "ts": "unknown",
+      "name": "verifier r5 corpus2/Q4: bun code frame with stream-json literal",
+      "expect": "noesc"
+    },
+    {
+      "text": "E       AssertionError: assert {'result': 'API Error: 401 {\"type\":\"error\",\"error\":{\"type\":\"authentication_error\"}}'} == {}",
+      "bash": "unknown",
+      "ts": "unknown",
+      "name": "verifier r5 corpus2/Q5: python repr result key",
       "expect": "noesc"
     }
   ]

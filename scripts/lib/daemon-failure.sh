@@ -214,6 +214,7 @@ _DAEMON_AUTH_PHRASES+="|(remote: )?permission to [A-Za-z0-9._/-]{1,200} denied t
 _DAEMON_AUTH_PHRASES+="|npm (err!|error) (code e401|code eneedauth|401 unauthorized)"
 _DAEMON_AUTH_PHRASES+="|error response from daemon: [A-Za-z0-9 :/._\"'?=&%@+-]{0,255}unauthorized: authentication required"
 _DAEMON_AUTH_PHRASES+="|get https?://${_DAEMON_URL_CHARS}{1,255} - 401[ ${_DAEMON_TAB}]{0,3}\$"
+_DAEMON_AUTH_PHRASES+="|(panic: )?post \"https?://${_DAEMON_URL_CHARS}{1,255}\": 40[13] (unauthorized|forbidden)"
 _DAEMON_AUTH_PHRASES+="|(http 403: |graphql: )?resource not accessible by (integration|personal access token)|the token in [a-z_]{1,40} is invalid"
 _DAEMON_AUTH_PHRASES+='|please run [`"]?claude login'
 _DAEMON_AUTH_PHRASES+="|${_DAEMON_AUTH_BODY}"
@@ -221,10 +222,9 @@ _DAEMON_AUTH_PHRASES+="|${_DAEMON_AUTH_BODY}"
 _DAEMON_AUTH_INDENTED="(error|fatal)[ :]{1,3}(401 )?authentication_error(:|[ ${_DAEMON_TAB}]{0,3}\$)"
 _DAEMON_AUTH_INDENTED+="|x failed to log in to ${_DAEMON_HOST} (account|using token)|x ${_DAEMON_HOST}: authentication failed"
 _DAEMON_AUTH_INDENTED+="|- the token in [a-z_]{1,40} is invalid"
-# The 401/403 response after its emitter's token at the lead-in, or in a stream-json "result" field (AUTH_RESPONSE).
+# The 401/403 response after its emitter's token at the lead-in (AUTH_RESPONSE).
 _DAEMON_SDK_ERROR='([a-z_]{1,30}[.]){0,3}(authentication|permissiondenied)error: (error code: )?'
 _DAEMON_AUTH_RESPONSE="${_DAEMON_LEAD}((●|⏺) )?${_DAEMON_PREFIX}(${_DAEMON_SDK_ERROR}|api error: |error code: )?40[13]( -)? ${_DAEMON_AUTH_BODY}"
-_DAEMON_AUTH_RESPONSE+="|\"result\": ?\"(failed to authenticate[.] )?api error: 40[13] ${_DAEMON_AUTH_BODY}"
 _DAEMON_AUTH="${_DAEMON_LEAD}${_DAEMON_PREFIX}(${_DAEMON_AUTH_PHRASES})|^[ ${_DAEMON_TAB}]{0,8}(${_DAEMON_AUTH_INDENTED})|${_DAEMON_AUTH_RESPONSE}"
 _DAEMON_INVALID_ISSUE="${_DAEMON_LEAD}${_DAEMON_PREFIX}(graphql: could not resolve to an? (issue|pullrequest)([ ${_DAEMON_TAB}.,]|\$)"
 _DAEMON_INVALID_ISSUE+="|http 404: not found \\(https://api\\.github\\.com/repos/[A-Za-z0-9._-]{1,100}/[A-Za-z0-9._-]{1,100}/(issues|pulls)/[0-9]{1,10}\\)"
