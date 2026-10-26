@@ -8,6 +8,7 @@ on:
   pull_request:
     paths:
       - 'website/**'
+      - 'package.json' # Footer.astro imports the CLI version from it at build time
       - '.github/workflows/website-check.yml'
 
 permissions:
