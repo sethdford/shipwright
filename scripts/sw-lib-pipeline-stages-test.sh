@@ -929,13 +929,13 @@ assert_eq "remote.origin.pushurl is a note, not tampering: the start is not refu
 # The global config's core.sshCommand (round 6): an earlier agent run writes ~/.gitconfig. The proof reads no global
 # core.sshCommand, so the planted command never runs and the start is not based on the evil commit. HOME is the test's.
 cfg_fixture globalssh
-cat > "$TEST_TEMP_DIR/cfg-globalssh" <<EOF
+cat > "$TEST_TEMP_DIR/cfg-globalssh-bin" <<EOF
 #!/bin/sh
 touch "$TEST_TEMP_DIR/cfg-globalssh-ran"
 exec git-upload-pack "$CFG_EVIL"
 EOF
-chmod +x "$TEST_TEMP_DIR/cfg-globalssh"
-git config --global core.sshCommand "$TEST_TEMP_DIR/cfg-globalssh"
+chmod +x "$TEST_TEMP_DIR/cfg-globalssh-bin"
+git config --global core.sshCommand "$TEST_TEMP_DIR/cfg-globalssh-bin"
 globalssh_out="$(SW_TRUSTED_REMOTE_URL="git@example.invalid:org/repo.git" cfg_start "$CFG_REPO")"
 cfg_assert_not_poisoned "a global core.sshCommand" "$globalssh_out"
 assert_eq "the global core.sshCommand is never run" "no" "$(test -e "$TEST_TEMP_DIR/cfg-globalssh-ran" && echo yes || echo no)"

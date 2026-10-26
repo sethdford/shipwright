@@ -82,6 +82,8 @@ printf '#!/usr/bin/env bash\nsleep %s\n' "$SLEEP_SENTINEL" > "$REPO/hang.sh"
 
 git_in_repo() { git -C "$REPO" -c user.name=test -c user.email=test@example.com -c commit.gpgsign=false "$@"; }
 git_in_repo init -q
+# Dependencies are not tracked (a real project ignores node_modules); the farm is built from the ignored directory.
+printf 'node_modules/\n' > "$REPO/.gitignore"
 
 # commit_state <specs> — write state.txt (space-separated specs) and commit; prints the SHA.
 commit_state() {

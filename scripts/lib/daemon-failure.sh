@@ -413,9 +413,6 @@ daemon_on_failure() {
             tampering_refused)
                 daemon_log ERROR "Pipeline refused for issue #${issue_num}: the checkout was altered — skipping retry (a person must check it)"
                 emit_event "daemon.skip_retry" "issue=$issue_num" "reason=tampering_refused"
-                if [[ "$NO_GITHUB" != "true" ]]; then
-                    gh issue edit "$issue_num" ${gh_repo_args[@]+"${gh_repo_args[@]}"} --add-label "pipeline/tampering-refused" 2>/dev/null || true
-                fi
                 ;;
             invalid_issue)
                 daemon_log ERROR "Invalid issue #${issue_num} — skipping retry"
