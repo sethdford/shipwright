@@ -425,29 +425,46 @@ _tg_link_entry() {
 # _tg_build_base_nm <root> <wt> — node_modules for the base worktree: a real directory of links, one per
 # top-level package, and one per scoped package (@scope/name).
 _tg_build_base_nm() {
-    local root="$1" wt="$2" nm rootreal entry name sub
+    local root="$1" wt="$2" dest="${3:-$2/node_modules}" nm rootreal entry name sub
     [[ -e "$root/node_modules" ]] || return 0
     nm="$(cd "$root/node_modules" 2>/dev/null && pwd -P)" || return 0
     rootreal="$(cd "$root" && pwd -P)" || return 0
-    mkdir -p "$wt/node_modules" || return 0
+    mkdir -p "$dest" || return 0
     for entry in "$nm"/* "$nm"/.[!.]*; do
         [[ -e "$entry" || -L "$entry" ]] || continue
         name="${entry##*/}"
         if [[ -d "$entry" && ! -L "$entry" && "$name" == @* ]]; then
-            mkdir -p "$wt/node_modules/$name"
+            mkdir -p "$dest/$name"
             for sub in "$entry"/* "$entry"/.[!.]*; do
                 [[ -e "$sub" || -L "$sub" ]] || continue
-                _tg_link_entry "$sub" "$wt/node_modules/$name/${sub##*/}" "$rootreal" "$wt"
+                _tg_link_entry "$sub" "$dest/$name/${sub##*/}" "$rootreal" "$wt"
             done
         else
-            _tg_link_entry "$entry" "$wt/node_modules/$name" "$rootreal" "$wt"
+            _tg_link_entry "$entry" "$dest/$name" "$rootreal" "$wt"
         fi
     done
 }
 
-# _tg_worktree_status <wt> — git status of a base worktree, outside node_modules.
+# _tg_worktree_status <wt> — git status of a base worktree, ignored files included, outside node_modules (its
+# contents are checked by _tg_nm_listing). A file a git ignore rule hides (.env, which bun loads) is still a write.
 _tg_worktree_status() {
-    git -C "$1" status --porcelain -- . ':!node_modules' 2>/dev/null || true
+    git -C "$1" status --porcelain --ignored -- . ':!node_modules' 2>/dev/null || true
+}
+
+# _tg_nm_listing <dir> — the shape of <dir>/node_modules: every entry, with a link's target, without following links.
+# "absent" when there is no node_modules. Two listings are equal only when the tree is the same.
+_tg_nm_listing() {
+    local dir="$1"
+    if [[ ! -e "$dir/node_modules" && ! -L "$dir/node_modules" ]]; then
+        printf 'absent\n'
+        return 0
+    fi
+    ( cd "$dir" && find -P node_modules 2>/dev/null | LC_ALL=C sort | while IFS= read -r p; do
+        if [ -L "$p" ]; then printf 'L %s -> %s\n' "$p" "$(readlink "$p")"
+        elif [ -d "$p" ]; then printf 'D %s\n' "$p"
+        else printf 'F %s\n' "$p"
+        fi
+      done )
 }
 
 # _tg_compute_base <cmd> — run the base twice and decide whether the result is trusted.
@@ -486,14 +503,31 @@ _tg_compute_base() {
     # A fresh worktree is clean. The status is taken outside node_modules (the farm lives there; its contents are
     # covered by the node_modules fingerprint). Any change outside it, before or after the base runs, is a write by a
     # process outside the test group, and the base is not trusted (#8671).
-    local status_after
+    local status_after nm_expect nm_after stage
     if [[ -n "$(_tg_worktree_status "$wt")" ]]; then
         _tg_cleanup_base
         TG_BASE_REASON="the base worktree changed while it was created (a process outside the test group wrote into it)"
         return 0
     fi
-    # Dependencies are not in git: a farm of links, not the live tree (#8671, P3).
-    _tg_build_base_nm "$root" "$wt"
+    # Dependencies are not in git: a farm of links, not the live tree (#8671, P3). The farm is built in a staging
+    # directory the test command cannot see through git worktree list, then moved in whole. Its listing is the expected
+    # node_modules: anything else in the worktree's node_modules afterwards is a write, and blocks.
+    stage="$(mktemp -d "$_TG_TMP/nm.XXXXXX")" || { _tg_cleanup_base; TG_BASE_REASON="could not create the staging dir"; return 0; }
+    _tg_build_base_nm "$root" "$wt" "$stage/node_modules"
+    nm_expect="$(_tg_nm_listing "$stage")"
+    if [[ -e "$stage/node_modules" ]]; then
+        if [[ -e "$wt/node_modules" || -L "$wt/node_modules" ]] || ! mv "$stage/node_modules" "$wt/node_modules"; then
+            _tg_cleanup_base
+            TG_BASE_REASON="the base worktree changed before its farm could be placed (node_modules appeared in it; a process outside the test group wrote into it)"
+            return 0
+        fi
+    fi
+    rm -rf "$stage"
+    if [[ "$(_tg_nm_listing "$wt")" != "$nm_expect" ]]; then
+        _tg_cleanup_base
+        TG_BASE_REASON="the base worktree changed before the base ran (its node_modules differs from the farm that was built; a process outside the test group wrote into it)"
+        return 0
+    fi
     _tg_run_base_once "$wt" "$cmd" "$limit" "$_TG_TMP/run1.log"; rc1="$_TB_RC"
     tg_parse_log "$_TG_TMP/run1.log"
     units1="$TG_UNITS"; pass1="$TG_PASSCOUNT"; parsable1="$TG_PARSABLE"
@@ -503,8 +537,9 @@ _tg_compute_base() {
     # A process the HEAD command let escape its process group (set -m) can write into the base worktree while the
     # runs go on. A base the runs changed is not the base (#8671). Checked before the worktree is removed.
     status_after="$(_tg_worktree_status "$wt")"
+    nm_after="$(_tg_nm_listing "$wt")"
     _tg_cleanup_base
-    if [[ -n "$status_after" ]]; then
+    if [[ -n "$status_after" || "$nm_after" != "$nm_expect" ]]; then
         TG_BASE_REASON="the base worktree changed while the base ran (a process outside the test group wrote into it)"
         return 0
     fi

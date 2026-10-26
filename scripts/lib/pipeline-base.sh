@@ -20,9 +20,15 @@
 #    (the daemon's, authoritative), or else the origin URL pinned at the first start (<record dir>/origin.url). A
 #    url.*.insteadOf in the checkout's config is evidence of tampering and refuses the start. Local refs are never
 #    consulted for the base.
-#  - Residual (same UID): rewriting the origin.url pin poisons a fresh start, not only a resume, because the pin
-#    then names the attacker's remote. Between processes, the record and pointer are ordinary files the same user can
-#    rewrite. Structurally fixing these needs state the agent cannot write, which is #8706.
+#  - Residual (same UID), pointing to #8706: rewriting the origin.url pin poisons a fresh start, not only a resume,
+#    because the pin then names the attacker's remote. Between processes, the record and pointer are ordinary files the
+#    same user can rewrite. Config and environment that the transport itself reads are also reachable by code running as
+#    this user: ~/.ssh/config (ssh reads it, including ProxyCommand and LocalCommand), the environment the daemon or the
+#    user passes (GIT_SSH, GIT_SSH_COMMAND, GIT_PROXY_COMMAND, SSH_AUTH_SOCK), and LaunchAgents. The proof reads no global
+#    core.sshCommand, so ~/.gitconfig cannot choose the proof's ssh command, but other git calls in the pipeline do read
+#    it. The agent's Edit and Write tools are denied ~/.gitconfig, ~/.config/git, ~/.ssh, ~/Library/LaunchAgents and
+#    ~/.shipwright, but the Bash tool is not covered by that deny. Structurally fixing these needs state the agent cannot
+#    write, which is #8706.
 #  - The node_modules walk is bounded by SW_PIPELINE_NM_TIMEOUT seconds (default 120); a timeout blocks.
 #
 # Storage: <SHIPWRIGHT_HOME or ~/.shipwright>/pipeline-base, never .claude/ or the worktree. Layout:
@@ -222,30 +228,48 @@ _pipeline_base_origin_url() {
 # below clear what could redirect the connection (ssh, proxies, credential helpers, a file-protocol allowance).
 _pipeline_base_git_raw() {
     local scratch="$1"; shift
+    local -a cfg
+    local n=0 pair
+    # Overrides go in through GIT_CONFIG_COUNT (git 2.31+), which the checkout's files cannot reach. Each one clears
+    # what could redirect the connection or the object reads: credentials, proxies, the file-protocol allowance, hooks,
+    # fsmonitor, the commit-graph (a forged graph can change ancestry answers), and the low-speed bounds.
+    cfg=(credential.helper= core.askPass= http.extraheader= http.proxy= https.proxy= core.gitProxy=
+         protocol.file.allow=user core.hooksPath=/dev/null core.fsmonitor=false core.commitGraph=false
+         http.lowSpeedLimit=1000 http.lowSpeedTime=30)
+    # The ssh command is the user's own only through the environment: GIT_SSH_COMMAND and GIT_SSH are honoured as they
+    # are. Without either, the default is ssh with BatchMode (no prompt can hang the pipeline). The global config's
+    # core.sshCommand is not read: a file an agent could write must not choose the command the proof runs.
+    if [[ -n "$_PB_SSH_CMD" ]]; then
+        cfg=("${cfg[@]}" "core.sshCommand=$_PB_SSH_CMD")
+    fi
+    local -a envs=()
+    for pair in "${cfg[@]}"; do
+        envs=(${envs[@]+"${envs[@]}"} "GIT_CONFIG_KEY_$n=${pair%%=*}" "GIT_CONFIG_VALUE_$n=${pair#*=}")
+        n=$((n + 1))
+    done
     (
         cd "$scratch" || exit 1
-        # GIT_SSH, GIT_SSH_COMMAND and GIT_PROXY_COMMAND are kept: they come from the user's environment, as a
-        # `git push` by the user would use them. SSH_AUTH_SOCK and HOME (so ~/.ssh/config) are kept too.
+        # GIT_SSH, GIT_SSH_COMMAND, GIT_PROXY_COMMAND and SSH_AUTH_SOCK are kept (the user's transport, as `git push`
+        # would use it). HOME is kept, so ~/.ssh/config is read by ssh.
         env -u GIT_DIR -u GIT_WORK_TREE -u GIT_INDEX_FILE -u GIT_OBJECT_DIRECTORY \
-            -u GIT_ALTERNATE_OBJECT_DIRECTORIES -u GIT_CONFIG -u GIT_CONFIG_PARAMETERS -u GIT_CONFIG_COUNT \
+            -u GIT_ALTERNATE_OBJECT_DIRECTORIES -u GIT_CONFIG -u GIT_CONFIG_PARAMETERS \
             -u GIT_EXEC_PATH -u GIT_TEMPLATE_DIR -u GIT_NAMESPACE \
             GIT_CEILING_DIRECTORIES="$scratch" GIT_CONFIG_NOSYSTEM=1 GIT_CONFIG_GLOBAL=/dev/null \
+            GIT_CONFIG_COUNT="$n" ${envs[@]+"${envs[@]}"} \
             GIT_TERMINAL_PROMPT=0 GIT_NO_REPLACE_OBJECTS=1 \
-            git -c core.sshCommand="$_PB_SSH_CMD" \
-                -c credential.helper= -c core.askPass= -c http.extraheader= \
-                -c http.proxy= -c https.proxy= -c core.gitProxy= \
-                -c protocol.file.allow=user -c core.hooksPath=/dev/null -c core.fsmonitor=false \
-                -c http.lowSpeedLimit=1000 -c http.lowSpeedTime=30 "$@"
+            git "$@"
     )
 }
 
-# _pipeline_base_user_ssh — the ssh command for the transport: the user's own global core.sshCommand when set, else
-# ssh with BatchMode (no prompt can hang the pipeline) and a connect timeout. The checkout's config is never read.
+# _pipeline_base_user_ssh — the ssh command the transport gets from the pipeline's own environment (not the repository,
+# and not the global config). Empty when the environment already sets GIT_SSH_COMMAND or GIT_SSH, so those are used as set.
 _pipeline_base_user_ssh() {
-    local c
-    c="$(git config --global --get core.sshCommand 2>/dev/null || true)"
-    if [[ -n "$c" ]]; then printf '%s' "$c"; else printf '%s' 'ssh -o BatchMode=yes -o ConnectTimeout=20'; fi
+    if [[ -n "${GIT_SSH_COMMAND:-}" || -n "${GIT_SSH:-}" ]]; then
+        return 0
+    fi
+    printf '%s' 'ssh -o BatchMode=yes -o ConnectTimeout=20'
 }
+
 
 # _pipeline_base_git <scratch> <git args...> — _pipeline_base_git_raw, inside the gate's credential scrub when loaded.
 _pipeline_base_git() {
@@ -448,7 +472,8 @@ _pipeline_base_fail() {
 # pipeline_base_repin [--yes] [repo] — the explicit reset of the origin pin, for a deliberate change of remote (a
 # rename, or https to ssh). A human runs it: `shipwright pipeline base-repin`. The pipeline never does. It prints the old
 # and new URLs, asks for a typed "yes" on the terminal (or --yes), and appends a line to <record dir>/repin.log.
-# Agents are denied this command in config/agent-permissions.json and src/adapters/agent/agent-permissions.ts.
+# Agents are denied this command in config/agent-permissions.json and src/adapters/agent/agent-permissions.ts. That
+# string match is defence in depth, not the boundary: an agent that sources this library can still call the function.
 pipeline_base_repin() {
     local yes=0 repo="" arg dir pin old="" new logf reply tmp
     for arg in "$@"; do

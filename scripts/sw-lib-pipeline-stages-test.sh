@@ -243,7 +243,7 @@ make_diff_repo() {
     mkdir -p "$dir/.artifacts"
     (
         cd "$dir" && git init -q -b main && git config user.email "t@t.com" && git config user.name "T"
-        printf 'node_modules/\n.artifacts/\n' > .gitignore
+        printf 'node_modules/\n.artifacts/\n.env\n' > .gitignore
         echo "# root" > README.md && git add -A && git commit -q -m "root"
         cat > fake-tests.sh <<'FAKE'
 #!/usr/bin/env bash
@@ -926,6 +926,21 @@ cfg_assert_not_poisoned "remote.origin.pushurl in the checkout" "$pushurl_out"
 assert_eq "remote.origin.pushurl is a note, not tampering: the start is not refused" "1" "$([[ "$pushurl_out" != init=2* ]] && echo 1 || echo 0)"
 
 
+# The global config's core.sshCommand (round 6): an earlier agent run writes ~/.gitconfig. The proof reads no global
+# core.sshCommand, so the planted command never runs and the start is not based on the evil commit. HOME is the test's.
+cfg_fixture globalssh
+cat > "$TEST_TEMP_DIR/cfg-globalssh" <<EOF
+#!/bin/sh
+touch "$TEST_TEMP_DIR/cfg-globalssh-ran"
+exec git-upload-pack "$CFG_EVIL"
+EOF
+chmod +x "$TEST_TEMP_DIR/cfg-globalssh"
+git config --global core.sshCommand "$TEST_TEMP_DIR/cfg-globalssh"
+globalssh_out="$(SW_TRUSTED_REMOTE_URL="git@example.invalid:org/repo.git" cfg_start "$CFG_REPO")"
+cfg_assert_not_poisoned "a global core.sshCommand" "$globalssh_out"
+assert_eq "the global core.sshCommand is never run" "no" "$(test -e "$TEST_TEMP_DIR/cfg-globalssh-ran" && echo yes || echo no)"
+git config --global --unset core.sshCommand
+
 # A real ssh remote works under the isolation (#8671, round 5). A fake ssh, first on PATH, stands in for the user's
 # own ssh: it runs, records the environment it was given (SSH_AUTH_SOCK and HOME must reach it), and serves the local
 # upload-pack. The start is proved, and the real base is recorded.
@@ -1007,37 +1022,50 @@ assert_eq "a fresh start after the repin proceeds" "init=0" "$repin_after"
 # The deny list names the reset, so an agent cannot run it (config is the source; the TS mirror is tested separately).
 assert_eq "agents are denied base-repin in config/agent-permissions.json" "1" \
     "$(jq '.permissions.deny | index("Bash(*base-repin*)") != null' "$SCRIPT_DIR/../config/agent-permissions.json" | grep -c true)"
+# Agents cannot Edit or Write the home files the proof's transport could reach (git and ssh config, LaunchAgents,
+# shipwright's own state). The Bash tool is not covered by this: it is listed in the residual risk.
+for home_entry in "Edit(~/.gitconfig)" "Write(~/.gitconfig)" "Edit(~/.config/git/**)" "Write(~/.config/git/**)"     "Edit(~/.ssh/**)" "Write(~/.ssh/**)" "Edit(~/Library/LaunchAgents/**)" "Write(~/Library/LaunchAgents/**)"     "Edit(~/.shipwright/**)" "Write(~/.shipwright/**)"; do
+    assert_eq "agents are denied $home_entry in config/agent-permissions.json" "1" \
+        "$(jq --arg e "$home_entry" '.permissions.deny | index($e) != null' "$SCRIPT_DIR/../config/agent-permissions.json" | grep -c true)"
+done
 
-# Group escape (#8671, P2): a process started with set -m leaves the HEAD command's group and writes into the base
-# worktree during the base runs. The worktree status check blocks: the base is not what the start recorded.
-ESC_REPO="$(fresh_diff_repo escape)"
-ESC_HOME="$(new_home)"
-cat > "$TEST_TEMP_DIR/escape-cmd.sh" <<'ESC'
+# Group escape (#8671, P2, round 6): a process the HEAD command let escape its group (set -m) finds the base worktree
+# through git worktree list and writes into it while the base runs. Each writer must block the base, whether it lands
+# in tracked files, in ignored files (.env, which bun loads), or in node_modules. The base then is not what was recorded.
+escape_attack() { # $1 name, $2 the writer's command, run with the base worktree as $1
+    local name="$1" writer="$TEST_TEMP_DIR/escape-writer-$1.sh" repo home cmd rc=0
+    printf '%s\n' "$2" > "$writer"
+    repo="$(fresh_diff_repo "esc-$name")"
+    home="$(new_home)"
+    cat > "$TEST_TEMP_DIR/escape-cmd-$name.sh" <<ESC
 set -m
 ( seen=0
-  for i in $(seq 1 1500); do
-    others="$(git worktree list --porcelain | sed -n 's/^worktree //p' | grep -v -x -F "$PWD")"
-    if [ -n "$others" ]; then
+  for i in \$(seq 1 1500); do
+    others="\$(git worktree list --porcelain | sed -n 's/^worktree //p' | grep -v -x -F "\$(pwd -P)")"
+    if [ -n "\$others" ]; then
         seen=1
-        for w in $others; do touch "$w/regression.flag"; done
-    elif [ "$seen" -eq 1 ]; then
+        for w in \$others; do bash "$writer" "\$w"; done
+    elif [ "\$seen" -eq 1 ]; then
         break
     fi
     sleep 0.01
   done ) </dev/null >/dev/null 2>&1 &
 bash fake-tests.sh
 ESC
-esc_rc=0
-(
-    diff_env "$ESC_REPO" "$ESC_HOME" main
-    export TEST_CMD="bash $TEST_TEMP_DIR/escape-cmd.sh"
-    cd "$ESC_REPO" || exit 1
-    pipeline_base_init
-    agent_commit "$ESC_REPO" build
-    stage_test
-) >"$TEST_TEMP_DIR/escape.out" 2>&1 || esc_rc=$?
-assert_eq "a process that escapes the test group and writes into the base worktree blocks" "1" "$esc_rc"
-assert_contains "the block says the base worktree changed" "$(cat "$ESC_REPO/.artifacts/test-results.log" 2>/dev/null)" "base worktree changed"
+    (
+        diff_env "$repo" "$home" main
+        export TEST_CMD="bash $TEST_TEMP_DIR/escape-cmd-$name.sh"
+        cd "$repo" || exit 1
+        pipeline_base_init
+        agent_commit "$repo" build
+        stage_test
+    ) >"$TEST_TEMP_DIR/escape-$name.out" 2>&1 || rc=$?
+    assert_eq "a process that escapes the test group and writes into the base worktree ($name) blocks" "1" "$rc"
+    assert_contains "the block says the base worktree changed ($name)" "$(cat "$repo/.artifacts/test-results.log" 2>/dev/null)" "base worktree changed"
+}
+escape_attack tracked 'touch "$1/regression.flag"'
+escape_attack dotenv 'echo REGRESS=1 > "$1/.env"'
+escape_attack nodemodules 'mkdir -p "$1/node_modules" && touch "$1/node_modules/regress"'
 
 # A trusted URL spelled differently from the pin replaces it (#8671, round 4 P2/P3): the start is not blocked forever.
 PINT_REPO="$(fresh_diff_repo pin-trusted)"

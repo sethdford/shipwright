@@ -63,6 +63,13 @@ echo "Error: not logged in to Claude API" > "$LOG_DIR/issue-101.log"
 result=$(classify_failure 101)
 assert_eq "Auth error classified" "auth_error" "$result"
 
+# A refused start (#8671, round 6): the run's log carries the refusal marker, so the class is tampering_refused, and a
+# later run's log without the marker is not affected.
+echo "Pipeline refused to start: evidence of a tampered checkout. [pipeline-refused:tampering]" > "$LOG_DIR/issue-103.log"
+assert_eq "a refused start is an escalation class, not a retry" "tampering_refused" "$(classify_failure 103)"
+echo "tests failed" > "$LOG_DIR/issue-104.log"
+assert_eq "a later run of the same issue without the marker is not refused" "1" "$([[ "$(classify_failure 104)" != "tampering_refused" ]] && echo 1 || echo 0)"
+
 echo "unauthorized access 401 error" > "$LOG_DIR/issue-102.log"
 result=$(classify_failure 102)
 # Prose is not auth: auth is anchored to a structured line (#8696). A real 401 line is "401 unauthorized" or the gh line.

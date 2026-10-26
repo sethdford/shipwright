@@ -132,6 +132,16 @@ export const AGENT_DENIED_TOOLS: readonly string[] = [
   "Write(.github/**)",
   "Edit(tools/arch/**)",
   "Write(tools/arch/**)",
+  "Edit(~/.gitconfig)",
+  "Write(~/.gitconfig)",
+  "Edit(~/.config/git/**)",
+  "Write(~/.config/git/**)",
+  "Edit(~/.ssh/**)",
+  "Write(~/.ssh/**)",
+  "Edit(~/Library/LaunchAgents/**)",
+  "Write(~/Library/LaunchAgents/**)",
+  "Edit(~/.shipwright/**)",
+  "Write(~/.shipwright/**)",
 ];
 
 /** The Bash sandbox: no network domains, fail closed when the sandbox cannot start (mirrors the JSON). */

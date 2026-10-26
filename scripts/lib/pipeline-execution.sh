@@ -527,7 +527,11 @@ run_pipeline() {
     local pb_rc=0
     pipeline_base_init || pb_rc=$?
     if [[ "$pb_rc" -eq 2 ]]; then
-        error "Pipeline refused to start: the checkout's remote configuration or origin pin was altered (see the message above)"
+        # The marker is what the daemon's classifier reads from this run's log (tampering_refused: no retry).
+        error "Pipeline refused to start: evidence of a tampered checkout (see the message above). [pipeline-refused:tampering]"
+        if declare -F emit_event >/dev/null 2>&1; then
+            emit_event "pipeline.refused" "issue=${ISSUE_NUMBER:-0}" "reason=tampering"
+        fi
         return 1
     fi
 
