@@ -1,5 +1,3 @@
-import { isEscalationLine } from "../domain/failure";
-
 // Bounds, normalizes and cleans the text a classifier sees. This is the only place input is
 // prepared, so the domain rules can assume short, plain-text, bounded lines.
 
@@ -34,8 +32,8 @@ const MODEL_PROSE =
 //   and the error under it, up to a blank or ` ❯ ` frame line;
 // - a pytest `----- Captured stdout|stderr|log` section, up to the next `-----`, `=====`, `___`, `FAILED `,
 //   `ERROR path::test` or `N failed|passed|error` line.
-// - every block also ends at a gh step boundary, and a free-text block at a column-0 escalation line after its
-//   first content line (see OPEN_TEXT_BLOCKS).
+// - every block also ends at a gh step boundary (a runner's output never spans steps). Nothing else that is
+//   inside a block ends it early: an auth-shaped line later in a block is routine negative-path test output.
 // Literal glyphs, never a character class, so both locales agree.
 // Linear patterns (a single leading run, no nested repetition), written the same way as the awk in bash.
 const TEST_TITLE =
@@ -50,15 +48,6 @@ const BLANK = /^[ \t]*$/;
 
 // A GitHub Actions step boundary ends any block: a runner's output never spans steps (#8715).
 const STEP_BOUNDARY = /^##\[(?:group|endgroup|error)\]|^::error/;
-// Blocks whose content is free text at column 0. After their first content line (the message, which test
-// output owns), a column-0 line that an escalation rule matches on its own ends the block: a truncated
-// excerpt (`grep -A5 | tail`) often leaves a block open right before the real error (#8715). pytest's captured
-// log is excluded: its content is the application's own log lines, which print the same shapes.
-const OPEN_TEXT_BLOCKS = new Set(["console", "panic", "vitest"]);
-// A content line that introduces the next one as quoted output (`git push failed:`, `claude exited 1, stderr:`, Node's
-// `Error: Command failed: cmd`): the escalation-shaped line after it is still the test's output, not a new error.
-const INTRODUCES = /:[ \t]*$|^Error: Command failed: /;
-
 type Mode = "none" | "mocha" | "jest" | "console" | "panic" | "vitest" | "pytest";
 
 const PYTEST_END = /^(?:-----|=====|___|FAILED |ERROR [^ \t]+::|\d+ (?:failed|passed|error))/;
@@ -98,20 +87,13 @@ function opens(line: string): Mode | "title" {
 export function dropTestTitles(text: string): string {
   const kept: string[] = [];
   let mode: Mode = "none";
-  let seen = 0;
-  let prev = "";
   for (const line of text.split("\n")) {
     if (mode !== "none" && STEP_BOUNDARY.test(line)) mode = "none";
-    if (OPEN_TEXT_BLOCKS.has(mode) && seen > 0 && !INTRODUCES.test(prev) && isEscalationLine(line))
-      mode = "none";
     if (insideBlock(mode, line)) {
       // mocha's nested suite lines end with the test title, which ends in `:`.
       if (mode === "mocha" && /:[ \t]*$/.test(line)) mode = "none";
-      seen++;
-      prev = line;
       continue;
     }
-    seen = 0;
     const next = opens(line);
     mode = next === "title" ? "none" : next;
     if (next === "none") kept.push(line);
@@ -122,23 +104,11 @@ export function dropTestTitles(text: string): string {
 // A byte-order mark at the start of a line, and the line breaks JavaScript's `m` flag honours but grep does
 // not: a lone CR (progress bars), U+2028 and U+2029. They become real line breaks, as in bash.
 const BOM = /^\uFEFF/;
-// A monorepo or compose runner's own line prefix (#8715), removed like the gh prefix so that block headers and the
-// rules see the tool's line: pnpm -r `packages/agent deploy: `, turbo `@acme/agent:run: `, docker compose
-// `agent-1  | `. Case-sensitive, lowercase package paths and task names, no `.` in a turbo package name, so grep
-// output of files with a `.` (`docs/x.md:Error: ...`, `config/errors.yml:key: ...`) and capitalised prose
-// (`Auth/login status: ...`) keep theirs. A bare prefix (an empty runner line, trailing space trimmed) is stripped too.
-const RUNNER =
-  /^(?:[a-z0-9@_-]{1,60}\/[a-z0-9@_/-]{1,100} [a-z0-9:_-]{1,50}:(?: |$)|@?[a-z0-9_-]{1,60}(?:\/[a-z0-9_-]{1,60})?:[a-z][a-z0-9_-]{0,49}:(?: |$)|[A-Za-z0-9._-]{1,64}[_-]\d{1,3} {1,20}\| )/;
 const INNER_BREAK = /\r|\u2028|\u2029/g;
 
 /** Plain text of one line: colour codes, the gh prefix, a BOM and a trailing CR removed. */
 export function normalizeLine(line: string): string {
-  return line
-    .replace(ANSI, "")
-    .replace(GH_PREFIX, "")
-    .replace(/\r$/, "")
-    .replace(BOM, "")
-    .replace(RUNNER, "");
+  return line.replace(ANSI, "").replace(GH_PREFIX, "").replace(/\r$/, "").replace(BOM, "");
 }
 
 /**

@@ -1,9 +1,10 @@
 // The #8709 round-7 fuzz corpus (#8715): every lead-in × prefix × phrase combination the escalation rules must agree
 // on in TS and bash. Deterministic: a combination is kept when the lead-in or the prefix is empty, or when a fixed
 // multiplicative hash of its index is divisible by 7, which gives 1786 rows. classify-fuzz.test.ts checks a sample
-// on every run; `bun src/testing/fixtures/wave2/classify-fuzz.ts` checks all of them, in both locales.
+// on every run. `bun src/testing/fixtures/wave2/classify-fuzz.ts [--locale C|en_US.UTF-8|all]` checks all of them:
+// CI runs one locale on pull requests and both on pushes to main (ts-check.yml), since each locale costs ~90 s.
 import { classifyAndDecide } from "../../../contexts/learning";
-import { BASH_LOCALES, bashClassifyAll } from "../../bash-classify";
+import { BASH_LOCALES, type BashLocale, bashClassifyAll } from "../../bash-classify";
 import { createTestEnv } from "../../test-env";
 
 const E = "\x1b";
@@ -98,11 +99,14 @@ const tsEscalation = (text: string) => {
   return cls === "auth" || cls === "invalid_input" || cls === "contamination" ? cls : "-";
 };
 
-/** Rows whose escalation differs between TS and bash, or between bash in the two locales. */
-export function fuzzDivergences(texts: readonly string[]): string[] {
+/** Rows whose escalation differs between TS and bash, or between bash in the given locales. */
+export function fuzzDivergences(
+  texts: readonly string[],
+  locales: readonly BashLocale[] = BASH_LOCALES,
+): string[] {
   const env = createTestEnv();
   try {
-    const labels = BASH_LOCALES.map((locale) => bashClassifyAll(env, texts, locale));
+    const labels = locales.map((locale) => bashClassifyAll(env, texts, locale));
     return texts.flatMap((text, i) => {
       const ts = tsEscalation(text);
       const bash = labels.map((l) => ESCALATIONS[l[i] ?? ""] ?? "-");
@@ -116,9 +120,15 @@ export function fuzzDivergences(texts: readonly string[]): string[] {
 }
 
 if (import.meta.main) {
+  const arg = process.argv[process.argv.indexOf("--locale") + 1] ?? "all";
+  const locales = BASH_LOCALES.filter((l) => arg === "all" || l === arg);
+  if (locales.length === 0) {
+    console.error(`--locale must be one of ${BASH_LOCALES.join(", ")} or all`);
+    process.exit(2);
+  }
   const texts = fuzzCorpus();
-  const bad = fuzzDivergences(texts);
+  const bad = fuzzDivergences(texts, locales);
   for (const line of bad) console.log(line);
-  console.log(`rows=${texts.length} divergences=${bad.length}`);
+  console.log(`rows=${texts.length} locales=${locales.join(",")} divergences=${bad.length}`);
   process.exit(bad.length === 0 ? 0 : 1);
 }

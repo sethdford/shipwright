@@ -2670,24 +2670,27 @@
     },
     {
       "text": "thread 'main' panicked at src/main.rs:3:5:\nboom\nHTTP 401: Bad credentials (https://api.github.com/graphql)",
-      "bash": "auth_error",
-      "ts": "auth",
+      "bash": "unknown",
+      "ts": "unknown",
       "name": "verifier r3 c1/d3: cargo panic, custom hook no note, then gh",
-      "expect": "esc:auth"
+      "expect": "esc:auth",
+      "limit": "Known limit (#8715 review): an auth line on the second or later line of an open test-output block (vitest stderr/stdout, FAIL or Unhandled, cargo panic, pytest captured) is not escalated. Routine negative-path tests print exactly that, and a false escalation stops a healthy issue for good; a missed auth costs one bounded retry. Only a gh step boundary ends a block early."
     },
     {
       "text": " FAIL  src/a.test.ts > auth > rejects\nTypeError: Cannot read properties of undefined (reading 'x')\n    at foo (src/a.ts:1:1)\n--\nfatal: Authentication failed for 'https://github.com/acme/app.git/'",
-      "bash": "auth_error",
-      "ts": "auth",
+      "bash": "build_failure",
+      "ts": "unknown",
       "name": "verifier r3 c1/d4: vitest FAIL excerpt cut by grep -A5, '--' then gh",
-      "expect": "esc:auth"
+      "expect": "esc:auth",
+      "limit": "Known limit (#8715 review): an auth line on the second or later line of an open test-output block (vitest stderr/stdout, FAIL or Unhandled, cargo panic, pytest captured) is not escalated. Routine negative-path tests print exactly that, and a false escalation stops a healthy issue for good; a missed auth costs one bounded retry. Only a gh step boundary ends a block early."
     },
     {
       "text": "stderr | src/a.test.ts > x\nwarn: thing\nGraphQL: Could not resolve to an issue or pull request with the number of 9. (repository.issueOrPullRequest)",
-      "bash": "invalid_issue",
-      "ts": "invalid_input",
+      "bash": "unknown",
+      "ts": "unknown",
       "name": "verifier r3 c1/d5: vitest stderr block then gh, no blank",
-      "expect": "esc:invalid_input"
+      "expect": "esc:invalid_input",
+      "limit": "Known limit (#8715 review): an auth line on the second or later line of an open test-output block (vitest stderr/stdout, FAIL or Unhandled, cargo panic, pytest captured) is not escalated. Routine negative-path tests print exactly that, and a false escalation stops a healthy issue for good; a missed auth costs one bounded retry. Only a gh step boundary ends a block early."
     },
     {
       "text": "  1) build\n  2) push\n  X Failed to log in to github.com account bot (keyring)\n  - The token in keyring is invalid.",
@@ -2706,10 +2709,11 @@
     },
     {
       "text": "thread 'tokio-runtime-worker' panicked at src/x.rs:1:1:\ncalled `Result::unwrap()` on an `Err` value: Io\nInvalid API key · Please run /login",
-      "bash": "auth_error",
-      "ts": "auth",
+      "bash": "unknown",
+      "ts": "unknown",
       "name": "verifier r3 c1/d8: rust panic then blank-less claude error",
-      "expect": "esc:auth"
+      "expect": "esc:auth",
+      "limit": "Known limit (#8715 review): an auth line on the second or later line of an open test-output block (vitest stderr/stdout, FAIL or Unhandled, cargo panic, pytest captured) is not escalated. Routine negative-path tests print exactly that, and a false escalation stops a healthy issue for good; a missed auth costs one bounded retry. Only a gh step boundary ends a block early."
     },
     {
       "text": "------------------------------ Captured log call -------------------------------\nINFO x\n_____________________ test_b _____________________\nfatal: Authentication failed for 'https://github.com/acme/app.git/'",
@@ -4320,10 +4324,11 @@
     },
     {
       "text": "stderr | src/a.test.ts > x\nmock said hi\nFailed to authenticate. API Error: 401 {\"type\":\"error\",\"error\":{\"type\":\"authentication_error\",\"message\":\"invalid x-api-key\"},\"request_id\":\"req_011\"}",
-      "bash": "auth_error",
-      "ts": "auth",
+      "bash": "build_failure",
+      "ts": "unknown",
       "name": "review corpus5: A2 vitest stderr then Claude 401",
-      "expect": "esc:auth"
+      "expect": "esc:auth",
+      "limit": "Known limit (#8715 review): an auth line on the second or later line of an open test-output block (vitest stderr/stdout, FAIL or Unhandled, cargo panic, pytest captured) is not escalated. Routine negative-path tests print exactly that, and a false escalation stops a healthy issue for good; a missed auth costs one bounded retry. Only a gh step boundary ends a block early."
     },
     {
       "text": "----- Captured stdout call -----\nhello\nFailed to authenticate. API Error: 401 {\"type\":\"error\",\"error\":{\"type\":\"authentication_error\",\"message\":\"invalid x-api-key\"},\"request_id\":\"req_011\"}",
@@ -4343,24 +4348,27 @@
     },
     {
       "text": "thread 'main' panicked at src/main.rs:3:5:\nboom\nfatal: Authentication failed for 'https://github.com/o/r.git/'",
-      "bash": "auth_error",
-      "ts": "auth",
+      "bash": "build_failure",
+      "ts": "unknown",
       "name": "review corpus5: A5 cargo panic then git push auth",
-      "expect": "esc:auth"
+      "expect": "esc:auth",
+      "limit": "Known limit (#8715 review): an auth line on the second or later line of an open test-output block (vitest stderr/stdout, FAIL or Unhandled, cargo panic, pytest captured) is not escalated. Routine negative-path tests print exactly that, and a false escalation stops a healthy issue for good; a missed auth costs one bounded retry. Only a gh step boundary ends a block early."
     },
     {
       "text": " FAIL  src/a.test.ts > suite > case\nAssertionError: expected 1 to be 2\ngh: HTTP 401: Bad credentials (https://api.github.com/graphql)",
-      "bash": "auth_error",
-      "ts": "auth",
+      "bash": "build_failure",
+      "ts": "unknown",
       "name": "review corpus5: A6 vitest FAIL header then gh 401",
-      "expect": "esc:auth"
+      "expect": "esc:auth",
+      "limit": "Known limit (#8715 review): an auth line on the second or later line of an open test-output block (vitest stderr/stdout, FAIL or Unhandled, cargo panic, pytest captured) is not escalated. Routine negative-path tests print exactly that, and a false escalation stops a healthy issue for good; a missed auth costs one bounded retry. Only a gh step boundary ends a block early."
     },
     {
       "text": "⎯⎯⎯⎯ Unhandled Rejection ⎯⎯⎯⎯\nError: boom\nFailed to authenticate. API Error: 401 {\"type\":\"error\",\"error\":{\"type\":\"authentication_error\",\"message\":\"invalid x-api-key\"},\"request_id\":\"req_011\"}",
-      "bash": "auth_error",
-      "ts": "auth",
+      "bash": "build_failure",
+      "ts": "unknown",
       "name": "review corpus5: A7 vitest Unhandled then Claude 401",
-      "expect": "esc:auth"
+      "expect": "esc:auth",
+      "limit": "Known limit (#8715 review): an auth line on the second or later line of an open test-output block (vitest stderr/stdout, FAIL or Unhandled, cargo panic, pytest captured) is not escalated. Routine negative-path tests print exactly that, and a false escalation stops a healthy issue for good; a missed auth costs one bounded retry. Only a gh step boundary ends a block early."
     },
     {
       "text": "  console.log\n    hi\n\nFailed to authenticate. API Error: 401 {\"type\":\"error\",\"error\":{\"type\":\"authentication_error\",\"message\":\"invalid x-api-key\"},\"request_id\":\"req_011\"}",
@@ -4457,10 +4465,11 @@
     },
     {
       "text": "\tgh: HTTP 401: Bad credentials (https://api.github.com/graphql)",
-      "bash": "auth_error",
-      "ts": "auth",
+      "bash": "unknown",
+      "ts": "unknown",
       "name": "review corpus5: B9 tab-indented gh auth",
-      "expect": "esc:auth"
+      "expect": "esc:auth",
+      "limit": "Known limit (#8715 review): an indented gh error line is not escalated (test runners indent their own output)."
     },
     {
       "text": "[2026-10-26T09:00:00Z] [ERROR] Claude Code authentication failed",
@@ -4601,24 +4610,27 @@
     },
     {
       "text": "packages/agent deploy: Error: Failed to authenticate. API Error: 401 {\"type\":\"error\",\"error\":{\"type\":\"authentication_error\",\"message\":\"invalid x-api-key\"}}",
-      "bash": "auth_error",
-      "ts": "auth",
+      "bash": "build_failure",
+      "ts": "unknown",
       "name": "review corpus6: pnpm -r prefix",
-      "expect": "esc:auth"
+      "expect": "esc:auth",
+      "limit": "Known limit (#8715 review): a line behind a monorepo or compose runner prefix (pnpm -r, turbo, docker compose) is never escalated. Those prefixes carry app and test output as often as real errors."
     },
     {
       "text": "agent:run: Error: Failed to authenticate. API Error: 401 {\"type\":\"error\",\"error\":{\"type\":\"authentication_error\",\"message\":\"invalid x-api-key\"}}",
-      "bash": "auth_error",
-      "ts": "auth",
+      "bash": "build_failure",
+      "ts": "unknown",
       "name": "review corpus6: turbo prefix",
-      "expect": "esc:auth"
+      "expect": "esc:auth",
+      "limit": "Known limit (#8715 review): a line behind a monorepo or compose runner prefix (pnpm -r, turbo, docker compose) is never escalated. Those prefixes carry app and test output as often as real errors."
     },
     {
       "text": "agent-1  | Error: Failed to authenticate. API Error: 401 {\"type\":\"error\",\"error\":{\"type\":\"authentication_error\",\"message\":\"invalid x-api-key\"}}",
-      "bash": "auth_error",
-      "ts": "auth",
+      "bash": "build_failure",
+      "ts": "unknown",
       "name": "review corpus6: docker compose prefix",
-      "expect": "esc:auth"
+      "expect": "esc:auth",
+      "limit": "Known limit (#8715 review): a line behind a monorepo or compose runner prefix (pnpm -r, turbo, docker compose) is never escalated. Those prefixes carry app and test output as often as real errors."
     },
     {
       "text": "> agent@1.0.0 start\n> node run.js\n\nError: Failed to authenticate. API Error: 401 {\"type\":\"error\",\"error\":{\"type\":\"authentication_error\",\"message\":\"invalid x-api-key\"}}",
@@ -4671,11 +4683,10 @@
     },
     {
       "text": "⎯⎯⎯⎯⎯⎯ Unhandled Rejection ⎯⎯⎯⎯⎯⎯\nError: git push failed\nfatal: Authentication failed for 'https://github.com/acme/fixture.git/'\n\n ❯ test/push.test.ts:20:3",
-      "bash": "auth_error",
-      "ts": "auth",
+      "bash": "build_failure",
+      "ts": "unknown",
       "name": "verifier 8718 k1/a4: vitest Unhandled Rejection, multi-line message",
-      "expect": "noesc",
-      "limit": "Known limit: in an open free-text block, an escalation-shaped line after the first content line ends the block (that recovers the real error after a truncated excerpt), so test output whose second line is auth-shaped escalates. A line introduced by `...:` or `Error: Command failed:` is exempt."
+      "expect": "noesc"
     },
     {
       "text": "running 3 tests\nthread 'tests::push_with_bad_token' panicked at tests/push.rs:31:5:\ngit push failed:\nfatal: Authentication failed for 'https://github.com/acme/fixture.git/'\nnote: run with `RUST_BACKTRACE=1` environment variable to display a backtrace\ntest result: FAILED. 2 passed; 1 failed",
@@ -4686,19 +4697,17 @@
     },
     {
       "text": "stderr | src/session.test.ts > session > refresh\nSessionError: refresh failed\nOAuth token has expired.\n    at refresh (src/session.ts:40:11)\n\n FAIL  src/session.test.ts > session > other\nAssertionError: expected 1 to be 2",
-      "bash": "auth_error",
-      "ts": "auth",
+      "bash": "build_failure",
+      "ts": "unknown",
       "name": "verifier 8718 k1/a6: vitest stderr console.error(err) where message multi-line",
-      "expect": "noesc",
-      "limit": "Known limit: in an open free-text block, an escalation-shaped line after the first content line ends the block (that recovers the real error after a truncated excerpt), so test output whose second line is auth-shaped escalates. A line introduced by `...:` or `Error: Command failed:` is exempt."
+      "expect": "noesc"
     },
     {
       "text": "stderr | test/auth.test.ts > guards > anonymous\nGET /api/me 401\nNot logged in.\n\n Test Files  1 failed (1)",
-      "bash": "auth_error",
-      "ts": "auth",
+      "bash": "build_failure",
+      "ts": "unknown",
       "name": "verifier 8718 k1/a7: vitest stderr, 2nd line is 'Not logged in.'",
-      "expect": "noesc",
-      "limit": "Known limit: in an open free-text block, an escalation-shaped line after the first content line ends the block (that recovers the real error after a truncated excerpt), so test output whose second line is auth-shaped escalates. A line introduced by `...:` or `Error: Command failed:` is exempt."
+      "expect": "noesc"
     },
     {
       "text": "@acme/api:test: stderr | src/auth.test.ts > middleware > rejects anonymous\n@acme/api:test: Error: Not logged in\n@acme/api:test:     at requireAuth (src/auth.ts:12:11)\n@acme/api:test: \n@acme/api:test:  FAIL  src/db.test.ts > db > connects\n@acme/api:test: Error: connect ECONNREFUSED 127.0.0.1:5432\n@acme/api:test: ERROR: command finished with error: command (/repo/apps/api) pnpm run test exited (1)",
@@ -4716,11 +4725,10 @@
     },
     {
       "text": "api-1  | Error: Not logged in\napi-1  |     at requireAuth (/app/src/auth.js:9:11)\ne2e-1  | 1 failed, 12 passed\ne2e-1 exited with code 1",
-      "bash": "auth_error",
-      "ts": "auth",
+      "bash": "build_failure",
+      "ts": "unknown",
       "name": "verifier 8718 k1/b3: docker compose e2e: app logs its own auth error",
-      "expect": "noesc",
-      "limit": "Known limit: docker compose lines are a service's own output; an app container that logs an auth failure in the same form as a real emitter escalates."
+      "expect": "noesc"
     },
     {
       "text": "$ grep -r 'Not logged in' docs\ndocs/troubleshooting.md:Error: Not logged in · Please run /login\nError: build failed",
@@ -4767,19 +4775,17 @@
     },
     {
       "text": "api-1  | 401 Unauthorized - GET /v1/me\nweb-1  | Error: e2e failed",
-      "bash": "auth_error",
-      "ts": "auth",
+      "bash": "build_failure",
+      "ts": "unknown",
       "name": "verifier 8718 k1/b10: compose app log: postgres-ish auth for test user",
-      "expect": "noesc",
-      "limit": "Known limit: docker compose lines are a service's own output; an app container that logs an auth failure in the same form as a real emitter escalates."
+      "expect": "noesc"
     },
     {
       "text": "@acme/cli:test: --- FAIL: TestLogin (0.00s)\n@acme/cli:test: Error: Not logged in.\n@acme/cli:test: FAIL",
-      "bash": "auth_error",
-      "ts": "auth",
+      "bash": "build_failure",
+      "ts": "unknown",
       "name": "verifier 8718 k1/b11: go test verbose in turbo",
-      "expect": "noesc",
-      "limit": "Known limit 1: output in the same form as the real emitter at column 0 (here after a runner prefix or under Claude Code's ⎿)."
+      "expect": "noesc"
     },
     {
       "text": "agent  | Error: Invalid API key · Please run /login\nagent exited with code 1",
@@ -4830,10 +4836,11 @@
     },
     {
       "text": "stderr | src/a.test.ts > x\nsome log\nError: Invalid API key · Please run /login",
-      "bash": "auth_error",
-      "ts": "auth",
+      "bash": "unknown",
+      "ts": "unknown",
       "name": "verifier 8718 k1/c7: vitest stderr open, real error after (truncated)",
-      "expect": "esc:auth"
+      "expect": "esc:auth",
+      "limit": "Known limit (#8715 review): an auth line on the second or later line of an open test-output block (vitest stderr/stdout, FAIL or Unhandled, cargo panic, pytest captured) is not escalated. Routine negative-path tests print exactly that, and a false escalation stops a healthy issue for good; a missed auth costs one bounded retry. Only a gh step boundary ends a block early."
     },
     {
       "text": "stderr | src/a.test.ts > x\nError: Invalid API key · Please run /login",
@@ -4845,24 +4852,27 @@
     },
     {
       "text": "@acme/agent:deploy: Error: Failed to authenticate. API Error: 401 {\"type\":\"error\",\"error\":{\"type\":\"authentication_error\",\"message\":\"invalid x-api-key\"}}",
-      "bash": "auth_error",
-      "ts": "auth",
+      "bash": "build_failure",
+      "ts": "unknown",
       "name": "verifier 8718 k1/c9: turbo deploy real",
-      "expect": "esc:auth"
+      "expect": "esc:auth",
+      "limit": "Known limit (#8715 review): a line behind a monorepo or compose runner prefix (pnpm -r, turbo, docker compose) is never escalated. Those prefixes carry app and test output as often as real errors."
     },
     {
       "text": "agent-1  | 2026-10-25T12:00:00.123456789Z Error: Invalid API key · Please run /login",
-      "bash": "auth_error",
-      "ts": "auth",
+      "bash": "unknown",
+      "ts": "unknown",
       "name": "verifier 8718 k1/c10: compose with timestamps flag",
-      "expect": "esc:auth"
+      "expect": "esc:auth",
+      "limit": "Known limit (#8715 review): a line behind a monorepo or compose runner prefix (pnpm -r, turbo, docker compose) is never escalated. Those prefixes carry app and test output as often as real errors."
     },
     {
       "text": "packages/release publish: gh: HTTP 401: Bad credentials (https://api.github.com/graphql)",
-      "bash": "auth_error",
-      "ts": "auth",
+      "bash": "unknown",
+      "ts": "unknown",
       "name": "verifier 8718 k1/c11: pnpm -r with gh error",
-      "expect": "esc:auth"
+      "expect": "esc:auth",
+      "limit": "Known limit (#8715 review): a line behind a monorepo or compose runner prefix (pnpm -r, turbo, docker compose) is never escalated. Those prefixes carry app and test output as often as real errors."
     },
     {
       "text": "thread 'main' panicked at src/main.rs:3:5:\nboom\n##[error]Process completed with exit code 101.\nError: Invalid API key · Please run /login",
@@ -5797,19 +5807,17 @@
     },
     {
       "text": "@acme/web:test:  FAIL  src/auth.test.ts > login\nError: Invalid API key · Please run /login",
-      "bash": "build_failure",
-      "ts": "unknown",
+      "bash": "auth_error",
+      "ts": "auth",
       "name": "verifier 8718-r2 c1/r1: turbo FAIL header then col0 real error (first content)",
-      "expect": "esc:auth",
-      "limit": "Known limit 2: a prefix or form the classifier does not cover (compose without -N, lerna, yarn foreach, pretty-printed or array JSON, a real error as an open block's first content line); the run is retried."
+      "expect": "esc:auth"
     },
     {
       "text": "@acme/web:test:  FAIL  src/auth.test.ts > login\n@acme/web:test: AssertionError: expected values to match:\nError: Invalid API key · Please run /login",
-      "bash": "build_failure",
-      "ts": "unknown",
+      "bash": "auth_error",
+      "ts": "auth",
       "name": "verifier 8718-r2 c1/r2: turbo FAIL, content ending ':', col0 real error",
-      "expect": "esc:auth",
-      "limit": "Known limit 2: a prefix or form the classifier does not cover (compose without -N, lerna, yarn foreach, pretty-printed or array JSON, a real error as an open block's first content line); the run is retried."
+      "expect": "esc:auth"
     },
     {
       "text": "@acme/web:test:  FAIL  src/auth.test.ts > login\n@acme/web:test: AssertionError: expected 1 to be 2\n@acme/web:test:\nError: Invalid API key · Please run /login",
@@ -5827,11 +5835,10 @@
     },
     {
       "text": "crates/core test: thread 'main' panicked at src/lib.rs:5:9:\ncrates/core test: called `Result::unwrap()` on an `Err` value:\nfatal: Authentication failed for 'https://github.com/acme/repo.git/'",
-      "bash": "build_failure",
-      "ts": "unknown",
+      "bash": "auth_error",
+      "ts": "auth",
       "name": "verifier 8718-r2 c1/r5: pnpm panic, content ending ':', fatal auth",
-      "expect": "esc:auth",
-      "limit": "Known limit 2: a prefix or form the classifier does not cover (compose without -N, lerna, yarn foreach, pretty-printed or array JSON, a real error as an open block's first content line); the run is retried."
+      "expect": "esc:auth"
     },
     {
       "text": " FAIL  src/a.test.ts > b\nAssertionError: expected:\nError: Invalid API key · Please run /login",
@@ -5843,10 +5850,11 @@
     },
     {
       "text": "@acme/web:test:  FAIL  src/a.test.ts > b\n@acme/web:test: AssertionError: x\n@acme/api:deploy: Error: Invalid API key · Please run /login",
-      "bash": "auth_error",
-      "ts": "auth",
+      "bash": "build_failure",
+      "ts": "unknown",
       "name": "verifier 8718-r2 c1/r7: turbo prefixed real error after turbo FAIL, no blank",
-      "expect": "esc:auth"
+      "expect": "esc:auth",
+      "limit": "Known limit (#8715 review): a line behind a monorepo or compose runner prefix (pnpm -r, turbo, docker compose) is never escalated. Those prefixes carry app and test output as often as real errors."
     },
     {
       "text": "web-1  | stdout | x > y\nweb-1  | hello\nError: Invalid API key · Please run /login",
@@ -5857,24 +5865,27 @@
     },
     {
       "text": "packages/agent deploy: Error: Invalid API key · Please run /login",
-      "bash": "auth_error",
-      "ts": "auth",
+      "bash": "unknown",
+      "ts": "unknown",
       "name": "verifier 8718-r2 c1/r10: real error behind pnpm",
-      "expect": "esc:auth"
+      "expect": "esc:auth",
+      "limit": "Known limit (#8715 review): a line behind a monorepo or compose runner prefix (pnpm -r, turbo, docker compose) is never escalated. Those prefixes carry app and test output as often as real errors."
     },
     {
       "text": "@acme/agent:run: Error: Invalid API key · Please run /login",
-      "bash": "auth_error",
-      "ts": "auth",
+      "bash": "unknown",
+      "ts": "unknown",
       "name": "verifier 8718-r2 c1/r11: real error behind turbo",
-      "expect": "esc:auth"
+      "expect": "esc:auth",
+      "limit": "Known limit (#8715 review): a line behind a monorepo or compose runner prefix (pnpm -r, turbo, docker compose) is never escalated. Those prefixes carry app and test output as often as real errors."
     },
     {
       "text": "agent-1  | Error: Invalid API key · Please run /login",
-      "bash": "auth_error",
-      "ts": "auth",
+      "bash": "unknown",
+      "ts": "unknown",
       "name": "verifier 8718-r2 c1/r12: real error behind compose",
-      "expect": "esc:auth"
+      "expect": "esc:auth",
+      "limit": "Known limit (#8715 review): a line behind a monorepo or compose runner prefix (pnpm -r, turbo, docker compose) is never escalated. Those prefixes carry app and test output as often as real errors."
     },
     {
       "text": "packages/MyLib deploy: Error: Invalid API key · Please run /login",
@@ -5910,109 +5921,107 @@
     },
     {
       "text": "build\tRun\t2026-10-25T12:00:00.1234Z @acme/agent:run: Error: Invalid API key · Please run /login",
-      "bash": "auth_error",
-      "ts": "auth",
+      "bash": "unknown",
+      "ts": "unknown",
       "name": "verifier 8718-r2 c1/r17: gh prefix + turbo",
-      "expect": "esc:auth"
+      "expect": "esc:auth",
+      "limit": "Known limit (#8715 review): a line behind a monorepo or compose runner prefix (pnpm -r, turbo, docker compose) is never escalated. Those prefixes carry app and test output as often as real errors."
     },
     {
       "text": "@acme/agent:run: 2026-10-25T12:00:00Z Error: Invalid API key · Please run /login",
-      "bash": "auth_error",
-      "ts": "auth",
+      "bash": "unknown",
+      "ts": "unknown",
       "name": "verifier 8718-r2 c1/r18: turbo + timestamp",
-      "expect": "esc:auth"
+      "expect": "esc:auth",
+      "limit": "Known limit (#8715 review): a line behind a monorepo or compose runner prefix (pnpm -r, turbo, docker compose) is never escalated. Those prefixes carry app and test output as often as real errors."
     },
     {
       "text": "@acme/agent:run: gh: HTTP 401: Bad credentials (https://api.github.com/graphql)",
-      "bash": "auth_error",
-      "ts": "auth",
+      "bash": "unknown",
+      "ts": "unknown",
       "name": "verifier 8718-r2 c1/r19: turbo + gh: HTTP 401",
-      "expect": "esc:auth"
+      "expect": "esc:auth",
+      "limit": "Known limit (#8715 review): a line behind a monorepo or compose runner prefix (pnpm -r, turbo, docker compose) is never escalated. Those prefixes carry app and test output as often as real errors."
     },
     {
       "text": "packages/agent deploy: fatal: Authentication failed for 'https://github.com/a/b.git/'",
-      "bash": "auth_error",
-      "ts": "auth",
+      "bash": "build_failure",
+      "ts": "unknown",
       "name": "verifier 8718-r2 c1/r20: pnpm + fatal auth",
-      "expect": "esc:auth"
+      "expect": "esc:auth",
+      "limit": "Known limit (#8715 review): a line behind a monorepo or compose runner prefix (pnpm -r, turbo, docker compose) is never escalated. Those prefixes carry app and test output as often as real errors."
     },
     {
       "text": "@acme/agent:run: GraphQL: Could not resolve to an Issue with the number of 99999. (repository.issue)",
-      "bash": "invalid_issue",
-      "ts": "invalid_input",
+      "bash": "unknown",
+      "ts": "unknown",
       "name": "verifier 8718-r2 c1/r21: turbo + graphql issue",
-      "expect": "esc:invalid_input"
+      "expect": "esc:invalid_input",
+      "limit": "Known limit (#8715 review): a line behind a monorepo or compose runner prefix (pnpm -r, turbo, docker compose) is never escalated. Those prefixes carry app and test output as often as real errors."
     },
     {
       "text": "@acme/agent:run: {\"type\":\"result\",\"subtype\":\"success\",\"is_error\":true,\"result\":\"Invalid API key · Please run /login\"}",
-      "bash": "auth_error",
-      "ts": "auth",
+      "bash": "unknown",
+      "ts": "unknown",
       "name": "verifier 8718-r2 c1/r22: Fatal CLI JSON behind turbo",
-      "expect": "esc:auth"
+      "expect": "esc:auth",
+      "limit": "Known limit (#8715 review): a line behind a monorepo or compose runner prefix (pnpm -r, turbo, docker compose) is never escalated. Those prefixes carry app and test output as often as real errors."
     },
     {
       "text": "ci/cd note: Error: Invalid API key · Please run /login was shown in the old logs",
-      "bash": "auth_error",
-      "ts": "auth",
+      "bash": "unknown",
+      "ts": "unknown",
       "name": "verifier 8718-r2 c1/b1: prose ci/cd note",
-      "expect": "noesc",
-      "limit": "Known limit: a lowercase `path task: `, `pkg:task: ` or `name-N | ` shape at column 0 (grep of an extensionless file, lowercase prose, key:value, a table cell ending in -N) is taken for a runner prefix and stripped, so an emitter-shaped rest of the line escalates."
+      "expect": "noesc"
     },
     {
       "text": "bin/sw:fatal: Authentication failed for 'https://github.com/a/b.git/'",
-      "bash": "auth_error",
-      "ts": "auth",
+      "bash": "build_failure",
+      "ts": "unknown",
       "name": "verifier 8718-r2 c1/b2: grep extensionless file",
-      "expect": "noesc",
-      "limit": "Known limit: a lowercase `path task: `, `pkg:task: ` or `name-N | ` shape at column 0 (grep of an extensionless file, lowercase prose, key:value, a table cell ending in -N) is taken for a runner prefix and stripped, so an emitter-shaped rest of the line escalates."
+      "expect": "noesc"
     },
     {
       "text": "scripts/sw:error: Invalid API key · Please run /login",
-      "bash": "auth_error",
-      "ts": "auth",
+      "bash": "unknown",
+      "ts": "unknown",
       "name": "verifier 8718-r2 c1/b3: grep extensionless file with error: content",
-      "expect": "noesc",
-      "limit": "Known limit: a lowercase `path task: `, `pkg:task: ` or `name-N | ` shape at column 0 (grep of an extensionless file, lowercase prose, key:value, a table cell ending in -N) is taken for a runner prefix and stripped, so an emitter-shaped rest of the line escalates."
+      "expect": "noesc"
     },
     {
       "text": "read/write example: gh: HTTP 401: Bad credentials (https://api.github.com/graphql)",
-      "bash": "auth_error",
-      "ts": "auth",
+      "bash": "unknown",
+      "ts": "unknown",
       "name": "verifier 8718-r2 c1/b4: prose read/write note",
-      "expect": "noesc",
-      "limit": "Known limit: a lowercase `path task: `, `pkg:task: ` or `name-N | ` shape at column 0 (grep of an extensionless file, lowercase prose, key:value, a table cell ending in -N) is taken for a runner prefix and stripped, so an emitter-shaped rest of the line escalates."
+      "expect": "noesc"
     },
     {
       "text": "case-12 | Error: Invalid API key · Please run /login | auth",
-      "bash": "auth_error",
-      "ts": "auth",
+      "bash": "unknown",
+      "ts": "unknown",
       "name": "verifier 8718-r2 c1/b5: table row",
-      "expect": "noesc",
-      "limit": "Known limit: docker compose lines are a service's own output; an app container that logs an auth failure in the same form as a real emitter escalates."
+      "expect": "noesc"
     },
     {
       "text": "docs:example: Error: Invalid API key · Please run /login",
-      "bash": "auth_error",
-      "ts": "auth",
+      "bash": "unknown",
+      "ts": "unknown",
       "name": "verifier 8718-r2 c1/b6: turbo-like doc key",
-      "expect": "noesc",
-      "limit": "Known limit: a lowercase `path task: `, `pkg:task: ` or `name-N | ` shape at column 0 (grep of an extensionless file, lowercase prose, key:value, a table cell ending in -N) is taken for a runner prefix and stripped, so an emitter-shaped rest of the line escalates."
+      "expect": "noesc"
     },
     {
       "text": "auth:message: Invalid API key · Please run /login",
-      "bash": "auth_error",
-      "ts": "auth",
+      "bash": "unknown",
+      "ts": "unknown",
       "name": "verifier 8718-r2 c1/b7: yaml-ish key:value:",
-      "expect": "noesc",
-      "limit": "Known limit: a lowercase `path task: `, `pkg:task: ` or `name-N | ` shape at column 0 (grep of an extensionless file, lowercase prose, key:value, a table cell ending in -N) is taken for a runner prefix and stripped, so an emitter-shaped rest of the line escalates."
+      "expect": "noesc"
     },
     {
       "text": "fixture-1 | Invalid API key · Please run /login",
-      "bash": "auth_error",
-      "ts": "auth",
+      "bash": "unknown",
+      "ts": "unknown",
       "name": "verifier 8718-r2 c1/b8: git diff stat no leading space",
-      "expect": "noesc",
-      "limit": "Known limit: docker compose lines are a service's own output; an app container that logs an auth failure in the same form as a real emitter escalates."
+      "expect": "noesc"
     },
     {
       "text": "https://example.com/x: Error: Invalid API key · Please run /login",
@@ -6030,27 +6039,24 @@
     },
     {
       "text": "tests/fixtures/auth-401 log: Error: Invalid API key · Please run /login",
-      "bash": "auth_error",
-      "ts": "auth",
+      "bash": "unknown",
+      "ts": "unknown",
       "name": "verifier 8718-r2 c1/b11: grep -r tests dir extensionless",
-      "expect": "noesc",
-      "limit": "Known limit: a lowercase `path task: `, `pkg:task: ` or `name-N | ` shape at column 0 (grep of an extensionless file, lowercase prose, key:value, a table cell ending in -N) is taken for a runner prefix and stripped, so an emitter-shaped rest of the line escalates."
+      "expect": "noesc"
     },
     {
       "text": "root:auth: Invalid API key · Please run /login",
-      "bash": "auth_error",
-      "ts": "auth",
+      "bash": "unknown",
+      "ts": "unknown",
       "name": "verifier 8718-r2 c1/b12: python logging lowercase logger",
-      "expect": "noesc",
-      "limit": "Known limit: a lowercase `path task: `, `pkg:task: ` or `name-N | ` shape at column 0 (grep of an extensionless file, lowercase prose, key:value, a table cell ending in -N) is taken for a runner prefix and stripped, so an emitter-shaped rest of the line escalates."
+      "expect": "noesc"
     },
     {
       "text": "@acme/web:test: stdout | src/a.test.ts > b\n@acme/web:test: starting\n@acme/web:test: Error: Invalid API key · Please run /login",
-      "bash": "auth_error",
-      "ts": "auth",
+      "bash": "unknown",
+      "ts": "unknown",
       "name": "verifier 8718-r2 c1/b13: turbo prefixed test fixture output in vitest block 2nd line",
-      "expect": "noesc",
-      "limit": "Known limit: in an open free-text block, an escalation-shaped line after the first content line ends the block (that recovers the real error after a truncated excerpt), so test output whose second line is auth-shaped escalates. A line introduced by `...:` or `Error: Command failed:` is exempt."
+      "expect": "noesc"
     },
     {
       "text": "@acme/web:test: (fail) Error: Invalid API key · Please run /login",
@@ -6096,11 +6102,10 @@
     },
     {
       "text": "@acme/web:test: stderr | a > b\n@acme/web:test: log\n@acme/web:test:\n@acme/web:test: Not logged in · Please run /login",
-      "bash": "auth_error",
-      "ts": "auth",
+      "bash": "unknown",
+      "ts": "unknown",
       "name": "verifier 8718-r2 c1/b20: turbo blank no trailing space then console block continued",
-      "expect": "noesc",
-      "limit": "Known limit: a bare runner prefix line reads as a blank line, which ends an open block as it does in the unprefixed log; an emitter-shaped fixture line after it then escalates (the same holds for a bare lowercase `x:y:` content line)."
+      "expect": "noesc"
     },
     {
       "text": "packages/web test: stderr | a > b\npackages/web test: Error: Command failed: claude -p\npackages/web test: Invalid API key · Please run /login",
@@ -6111,11 +6116,236 @@
     },
     {
       "text": "stderr | a > b\nx\n@acme/web:test: Invalid API key · Please run /login",
+      "bash": "unknown",
+      "ts": "unknown",
+      "name": "verifier 8718-r2 c1/b22: unprefixed then prefixed mix fixture",
+      "expect": "noesc"
+    },
+    {
+      "text": "api-1  | 401 Unauthorized\napi-1  | GET /me 401 3ms\ntests-1  | (fail) me > returns profile\ntests-1 exited with code 1",
+      "bash": "build_failure",
+      "ts": "unknown",
+      "name": "review corpus7: dc api 401 unauthorized access log",
+      "expect": "noesc"
+    },
+    {
+      "text": "web-1  | Error: Request failed with status code 401\nweb-1  |     at settle (/app/node_modules/axios/lib/core/settle.js:19:12)\nweb-1 exited with code 1",
+      "bash": "build_failure",
+      "ts": "unknown",
+      "name": "review corpus7: dc api axios 401 from mock",
+      "expect": "noesc"
+    },
+    {
+      "text": "auth-1  | [2026-10-26T09:00:00Z] [ERROR] Authentication failed.\ne2e-1  | ✕ login with bad password shows error\ne2e-1 exited with code 1",
+      "bash": "build_failure",
+      "ts": "unknown",
+      "name": "review corpus7: dc api 'authentication failed.'",
+      "expect": "noesc"
+    },
+    {
+      "text": "api-1  | Error: invalid token\napi-1  | JsonWebTokenError: invalid signature\nerror: e2e failed",
+      "bash": "build_failure",
+      "ts": "unknown",
+      "name": "review corpus7: dc api invalid token (word)",
+      "expect": "noesc"
+    },
+    {
+      "text": "web_1   | not logged in\nweb_1   | redirecting to /login\nerror: e2e failed",
+      "bash": "build_failure",
+      "ts": "unknown",
+      "name": "review corpus7: dc api not logged in",
+      "expect": "noesc"
+    },
+    {
+      "text": "ghmock-1  | Bad credentials\nerror: e2e failed",
+      "bash": "build_failure",
+      "ts": "unknown",
+      "name": "review corpus7: dc api bad credentials (gh mock)",
+      "expect": "noesc"
+    },
+    {
+      "text": "db-1  | 2026-10-26 09:00:00.123 UTC [61] FATAL:  password authentication failed for user \"app\"\nerror: migrate failed",
+      "bash": "build_failure",
+      "ts": "unknown",
+      "name": "review corpus7: dc postgres auth failed",
+      "expect": "noesc"
+    },
+    {
+      "text": "registry-1  | time=\"2026-10-26T09:00:00Z\" level=warning msg=\"error authorizing context: basic authentication challenge for realm\"\nerror",
+      "bash": "unknown",
+      "ts": "unknown",
+      "name": "review corpus7: dc registry 401",
+      "expect": "noesc"
+    },
+    {
+      "text": "ghmock-1  | issue not found\nerror: e2e failed",
+      "bash": "build_failure",
+      "ts": "unknown",
+      "name": "review corpus7: dc mock issue not found",
+      "expect": "noesc"
+    },
+    {
+      "text": "tests-1  | Error: Failed to authenticate.\ntests-1  | (fail) client > retries auth\nerror",
+      "bash": "build_failure",
+      "ts": "unknown",
+      "name": "review corpus7: dc compose run tests output",
+      "expect": "noesc"
+    },
+    {
+      "text": "src/auth.ts:12:  throw new Error('Not logged in');\nsrc/auth.ts:40:Error: Bad credentials\nerror: lint failed",
+      "bash": "build_failure",
+      "ts": "unknown",
+      "name": "review corpus7: grep -rn ts file",
+      "expect": "noesc"
+    },
+    {
+      "text": "raw/preflight-auth:fatal: Authentication failed for 'https://github.com/o/r.git/'\nerror: check failed",
+      "bash": "build_failure",
+      "ts": "unknown",
+      "name": "review corpus7: grep -r extensionless one-slash",
+      "expect": "noesc"
+    },
+    {
+      "text": "scripts/sw:error: not logged in\nerror: check failed",
+      "bash": "build_failure",
+      "ts": "unknown",
+      "name": "review corpus7: grep -r extensionless scripts/sw",
+      "expect": "noesc"
+    },
+    {
+      "text": "bin:error: Invalid API key.\nerror",
+      "bash": "unknown",
+      "ts": "unknown",
+      "name": "review corpus7: grep -r bin/x no slash",
+      "expect": "noesc"
+    },
+    {
+      "text": "Invalid API key · Please run /login\nnot logged in\nerror: snapshot mismatch",
       "bash": "auth_error",
       "ts": "auth",
-      "name": "verifier 8718-r2 c1/b22: unprefixed then prefixed mix fixture",
+      "name": "review corpus7: grep -h content only col0",
       "expect": "noesc",
-      "limit": "Known limit: in an open free-text block, an escalation-shaped line after the first content line ends the block (that recovers the real error after a truncated excerpt), so test output whose second line is auth-shaped escalates. A line introduced by `...:` or `Error: Command failed:` is exempt."
+      "limit": "Known limit 1: a fixture or grep -h line printed at column 0 in exactly the real emitter's form; main escalates it too (#8715 review, 2 of 32)."
+    },
+    {
+      "text": "src/testing/fixtures/wave2/preflight-auth.log\n1:##[error]Claude Code authentication failed — check CLAUDE_CODE_OAUTH_TOKEN secret\nerror",
+      "bash": "build_failure",
+      "ts": "unknown",
+      "name": "review corpus7: rg --heading block",
+      "expect": "noesc"
+    },
+    {
+      "text": "fixtures/auth.log\n##[error]Claude Code authentication failed — check CLAUDE_CODE_OAUTH_TOKEN secret\nerror: grep found leftover fixture",
+      "bash": "auth_error",
+      "ts": "auth",
+      "name": "review corpus7: rg -N --heading no numbers",
+      "expect": "noesc",
+      "limit": "Known limit 1: a fixture or grep -h line printed at column 0 in exactly the real emitter's form; main escalates it too (#8715 review, 2 of 32)."
+    },
+    {
+      "text": "tests/fixtures/git-auth:fatal: Authentication failed for 'https://github.com/o/r.git/'\nerror",
+      "bash": "build_failure",
+      "ts": "unknown",
+      "name": "review corpus7: grep extensionless deep path",
+      "expect": "noesc"
+    },
+    {
+      "text": "auth:login: not logged in\nerror: test failed",
+      "bash": "build_failure",
+      "ts": "unknown",
+      "name": "review corpus7: logfmt-ish auth:login:",
+      "expect": "noesc"
+    },
+    {
+      "text": "app:auth: Authentication failed.\nerror: test failed",
+      "bash": "build_failure",
+      "ts": "unknown",
+      "name": "review corpus7: debug ns colon",
+      "expect": "noesc"
+    },
+    {
+      "text": "error:code: 401 Unauthorized\nerror",
+      "bash": "unknown",
+      "ts": "unknown",
+      "name": "review corpus7: yaml-like error:code:",
+      "expect": "noesc"
+    },
+    {
+      "text": "deploy:check: Bad credentials\nerror",
+      "bash": "unknown",
+      "ts": "unknown",
+      "name": "review corpus7: make target prefix",
+      "expect": "noesc"
+    },
+    {
+      "text": "packages/gh test: HTTP 401: Bad credentials (https://api.github.com/graphql)\npackages/gh test: (fail) maps 401\npackages/gh test: error: expected",
+      "bash": "build_failure",
+      "ts": "unknown",
+      "name": "review corpus7: pnpm style test package logs mock",
+      "expect": "noesc"
+    },
+    {
+      "text": "@acme/gh:test: Invalid API key · Please run /login\n@acme/gh:test: (fail) parses auth line\n@acme/gh:test: error",
+      "bash": "build_failure",
+      "ts": "unknown",
+      "name": "review corpus7: turbo test task logs mock",
+      "expect": "noesc"
+    },
+    {
+      "text": "stderr | src/client.test.ts > rejects a bad key\n[client] GET /v1/me\nError: Request failed with status code 401\n\n ✓ src/client.test.ts (3 tests)\nerror: other test failed",
+      "bash": "build_failure",
+      "ts": "unknown",
+      "name": "review corpus7: vitest stderr 2nd line axios",
+      "expect": "noesc"
+    },
+    {
+      "text": "stderr | src/gh.test.ts > surfaces gh errors\nrunning gh api user\ngh: HTTP 401: Bad credentials (https://api.github.com/graphql)\n\nerror: 1 test failed",
+      "bash": "build_failure",
+      "ts": "unknown",
+      "name": "review corpus7: vitest stderr 2nd line gh 401",
+      "expect": "noesc"
+    },
+    {
+      "text": " FAIL  src/gh.test.ts > surfaces gh errors\nError: gh failed\ngh: HTTP 401: Bad credentials (https://api.github.com/graphql)\n ❯ src/gh.ts:12:9",
+      "bash": "build_failure",
+      "ts": "unknown",
+      "name": "review corpus7: vitest FAIL multi-line error",
+      "expect": "noesc"
+    },
+    {
+      "text": " FAIL  src/claude.test.ts > maps 401\nAssertionError: expected 'auth' to be 'unknown'\nAPI Error: 401 {\"type\":\"error\",\"error\":{\"type\":\"authentication_error\",\"message\":\"x\"}}\n ❯ src/claude.test.ts:9:3",
+      "bash": "build_failure",
+      "ts": "unknown",
+      "name": "review corpus7: vitest FAIL assertion msg 2nd line",
+      "expect": "noesc"
+    },
+    {
+      "text": "thread 'auth::tests::bad_key' panicked at src/auth.rs:40:9:\nassertion failed\nInvalid API key · Please run /login\nnote: run with `RUST_BACKTRACE=1`",
+      "bash": "build_failure",
+      "ts": "unknown",
+      "name": "review corpus7: cargo panic 2nd line",
+      "expect": "noesc"
+    },
+    {
+      "text": "stderr | a.test.ts > x\nclaude exited 1, stderr:\nInvalid API key · Please run /login\n\nerror",
+      "bash": "unknown",
+      "ts": "unknown",
+      "name": "review corpus7: vitest stderr 2nd line after 'stderr:' intro",
+      "expect": "noesc"
+    },
+    {
+      "text": "⎯⎯⎯ Unhandled Rejection ⎯⎯⎯\nError: mock failure\nfatal: Authentication failed for 'https://github.com/o/r.git/'\n ❯ test/git.test.ts:3:1",
+      "bash": "build_failure",
+      "ts": "unknown",
+      "name": "review corpus7: vitest Unhandled 2nd line",
+      "expect": "noesc"
+    },
+    {
+      "text": "stderr | t.test.ts > missing\nlooking up #9\nGraphQL: Could not resolve to an issue or pull request with the number of 9. (repository.issue)\n\nerror",
+      "bash": "unknown",
+      "ts": "unknown",
+      "name": "review corpus7: vitest stderr 2nd line issue not found",
+      "expect": "noesc"
     }
   ]
 }

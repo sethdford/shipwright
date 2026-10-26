@@ -74,7 +74,7 @@ classify_failure() {
     cr="$(printf '\r')"
     bom="$(printf '\357\273\277')"
     tail_content=$(printf '%s\n' "$tail_content" \
-        | LC_ALL=C sed -E "s/${esc}\[[0-9;?]*[A-Za-z]//g; s/^[^${tab}]*${tab}[^${tab}]*${tab}(${bom})?[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}([.][0-9]+)?Z ?//; s/${cr}\$//; s/^${bom}//; s#^${_DAEMON_RUNNER}##" \
+        | LC_ALL=C sed -E "s/${esc}\[[0-9;?]*[A-Za-z]//g; s/^[^${tab}]*${tab}[^${tab}]*${tab}(${bom})?[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}([.][0-9]+)?Z ?//; s/${cr}\$//; s/^${bom}//" \
         | LC_ALL=C awk -v cr="$cr" -v ls="$(printf '\342\200\250')" -v ps="$(printf '\342\200\251')" \
             '{ gsub(cr, "\n"); gsub(ls, "\n"); gsub(ps, "\n"); print }' \
         | LC_ALL=C awk "$_DAEMON_DROP_PROSE")
@@ -82,13 +82,7 @@ classify_failure() {
     # TypeScript errorLines(), so a bare word in prose or in forged test output does not escalate (#8696).
     # Test-runner output is dropped first, as dropTestTitles() does in evidence.ts.
     local err_lines
-    # Column-0 lines an escalation rule matches on their own end an open free-text block (#8715).
-    # Only when a free-text block header is present: the escalation EREs are large, and most logs have no block.
-    local esc_nums=""
-    if printf '%s\n' "$tail_content" | LC_ALL=C grep >/dev/null -aE "$_DAEMON_FREE_TEXT_BLOCK"; then
-        esc_nums=$(printf '%s\n' "$tail_content" | LC_ALL=C grep -naiE -e "$_DAEMON_AUTH" -e "$_DAEMON_INVALID_ISSUE" | LC_ALL=C sed 's/:.*//' | tr '\n' ',' || true)
-    fi
-    err_lines=$(printf '%s\n' "$tail_content" | LC_ALL=C awk -v esc=",${esc_nums}" "$_DAEMON_DROP_TEST_OUTPUT" | LC_ALL=C grep -aiE "$_DAEMON_ERROR_LINE" || true)
+    err_lines=$(printf '%s\n' "$tail_content" | LC_ALL=C awk "$_DAEMON_DROP_TEST_OUTPUT" | LC_ALL=C grep -aiE "$_DAEMON_ERROR_LINE" || true)
 
     # W2-04: the typed classifier decides the auth and invalid-input classes. Both fail safe (no
     # retry). Its `transient` verdict is NOT used here: it comes from free log text, which an agent
@@ -157,9 +151,6 @@ _DAEMON_ERROR_LINE='gh auth login|error|fail|fatal|exception|::error::|enoent|ea
 # no negated class, no `.`, no [[:space:]], and every non-ASCII glyph is a literal alternative, never inside a
 # bracket, so LC_ALL=C (bytes) and a UTF-8 locale (characters) match the same lines. Every quantifier is bounded.
 _DAEMON_TAB=$'\t'
-# A monorepo or compose runner's own line prefix, stripped with the gh prefix (RUNNER in evidence.ts, #8715):
-# pnpm -r `packages/agent deploy: `, turbo `@acme/agent:run: `, docker compose `agent-1  | `. Case-sensitive.
-_DAEMON_RUNNER='([a-z0-9@_-]{1,60}/[a-z0-9@_/-]{1,100} [a-z0-9:_-]{1,50}:( |$)|@?[a-z0-9_-]{1,60}(/[a-z0-9_-]{1,60})?:[a-z][a-z0-9_-]{0,49}:( |$)|[A-Za-z0-9._-]{1,64}[_-][0-9]{1,3} {1,20}[|] )'
 # Model-written analysis, pipeline progress markers and loop commit subjects, dropped before every rule (MODEL_PROSE
 # and LOOP_COMMIT in evidence.ts). Their text is not evidence of what failed.
 _DAEMON_DROP_PROSE='
@@ -170,23 +161,18 @@ l ~ /^[ \t]*([^ \t]+[ \t]+)?(failure analyzed|failure diagnosis|analyzing failur
 { print }'
 # Test-runner output, dropped before the escalation rules (dropTestTitles in evidence.ts): bun `(fail) ` and co.,
 # the result glyphs, jest's indented `● ` header, mocha's `  1) ` title block, jest/vitest console blocks, a cargo
-# panic message, the error under a vitest ` FAIL  file > test` header and pytest's captured output. Every block ends
-# at a gh step boundary; a free-text block (console, panic, vitest) also ends at a column-0 escalation line after
-# its first content line, unless the line before it introduces quoted output (`...:`, `Error: Command failed: `).
-# `esc` lists those line numbers (",3,9,"), found with the escalation EREs. No intervals
+# panic message, the error under a vitest ` FAIL  file > test` header and pytest's captured output. Every block also
+# ends at a gh step boundary, and nothing else ends one early. No intervals
 # or backslash escapes, so any awk (BSD, gawk, mawk) reads it the same.
-# The headers of the free-text blocks the escalation lines can end (console, panic, vitest in the awk below).
-_DAEMON_FREE_TEXT_BLOCK="^(stderr|stdout) [|] |^thread '[^']*' panicked at |^ ?FAIL  [^ ${_DAEMON_TAB}]|^(⎯)+ Unhandled (Rejection|Error)"
 _DAEMON_DROP_TEST_OUTPUT='
 /^##[[](group|endgroup|error)[]]/ || /^::error/ { mode = "" }
-(mode == "console" || mode == "panic" || mode == "vitest") && seen > 0 && prev !~ /:[ \t]*$/ && prev !~ /^Error: Command failed: / && $0 !~ /^[ \t]/ && index(esc, "," NR ",") { mode = "" }
-mode == "mocha" && /^[ \t]+[^ \t]/ { if ($0 ~ /:[ \t]*$/) mode = ""; seen++; prev = $0; next }
-mode == "jest" && /^[ \t]+[^ \t]/ { seen++; prev = $0; next }
-mode == "console" && $0 !~ /^[ \t]*$/ { seen++; prev = $0; next }
-mode == "panic" && $0 !~ /^(note|error|stack backtrace):/ && $0 !~ /^[ \t]*$/ { seen++; prev = $0; next }
-mode == "vitest" && $0 !~ /^ ❯ / && $0 !~ /^[ \t]*$/ { seen++; prev = $0; next }
-mode == "pytest" && $0 !~ /^(-----|=====|___|FAILED |ERROR [^ \t]+::|[0-9]+ (failed|passed|error))/ { seen++; prev = $0; next }
-{ mode = ""; seen = 0 }
+mode == "mocha" && /^[ \t]+[^ \t]/ { if ($0 ~ /:[ \t]*$/) mode = ""; next }
+mode == "jest" && /^[ \t]+[^ \t]/ { next }
+mode == "console" && $0 !~ /^[ \t]*$/ { next }
+mode == "panic" && $0 !~ /^(note|error|stack backtrace):/ && $0 !~ /^[ \t]*$/ { next }
+mode == "vitest" && $0 !~ /^ ❯ / && $0 !~ /^[ \t]*$/ { next }
+mode == "pytest" && $0 !~ /^(-----|=====|___|FAILED |ERROR [^ \t]+::|[0-9]+ (failed|passed|error))/ { next }
+{ mode = "" }
 /^[ \t]*console[.](log|error|warn|info|debug)[ \t]*$/ { mode = "jest"; next }
 /^(stderr|stdout) [|] / { mode = "console"; next }
 /^thread '"'"'[^'"'"']*'"'"' panicked at / { mode = "panic"; next }
@@ -238,7 +224,7 @@ _DAEMON_AUTH_PHRASES+="|${_DAEMON_AUTH_BODY}"
 _DAEMON_AUTH_INDENTED="(error|fatal)[ :]{1,3}(401 )?authentication_error(:|[ ${_DAEMON_TAB}]{0,3}\$)"
 _DAEMON_AUTH_INDENTED+="|x failed to log in to ${_DAEMON_HOST} (account|using token)|x ${_DAEMON_HOST}: authentication failed"
 _DAEMON_AUTH_INDENTED+="|- the token in [a-z_]{1,40} is invalid"
-_DAEMON_AUTH_INDENTED+="|error: failed to authenticate[.] api error: 40[13] ${_DAEMON_AUTH_BODY}|gh: http 401: bad credentials \\(https?://"
+_DAEMON_AUTH_INDENTED+="|error: failed to authenticate[.] api error: 40[13] ${_DAEMON_AUTH_BODY}"
 # The raw Claude CLI JSON result object of a failed run, at column 0 (CLI_RESULT in failure.ts).
 _DAEMON_JSON_GAP='[A-Za-z0-9_":,. -]{0,255}'
 # The CLI's own auth texts only (CLI_RESULT_TEXT): a short list keeps the ERE small.

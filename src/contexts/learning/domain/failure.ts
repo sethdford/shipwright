@@ -120,9 +120,8 @@ const AUTH_INDENTED = [
   String.raw`x failed to log in to ${HOST} (?:account|using token)`,
   String.raw`x ${HOST}: authentication failed`,
   "- the token in [a-z_]{1,40} is invalid",
-  // An indented CLI or gh error under a make recipe or a tab-indented step (#8715): the full structured form only.
+  // An indented CLI error under a make recipe (#8715): the full structured form, with the 401/403 body, only.
   String.raw`error: failed to authenticate\. api error: 40[13] ${AUTH_BODY}`,
-  String.raw`gh: http 401: bad credentials \(https?://`,
 ].join("|");
 // The structured 401/403 response, after its emitter's token at the anchored lead-in: the CLI's `API Error: 401
 // {...}` (also after Claude Code's column-0 `● `/`⏺ `), `Error: 401 {...}`, the JS SDK's `AuthenticationError: 401
@@ -259,10 +258,4 @@ export function failureFingerprint(cls: FailureClass, text: string): string {
     .trim()
     .slice(0, 200);
   return `${cls}:${fnv1a(normalised)}`;
-}
-
-/** A column-0 line an escalation rule would match on its own (auth or invalid input). */
-export function isEscalationLine(line: string): boolean {
-  if (/^[ \t]/.test(line)) return false;
-  return RULES.some((r) => (r.cls === "auth" || r.cls === "invalid_input") && r.pattern.test(line));
 }
