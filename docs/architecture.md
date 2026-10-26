@@ -25,7 +25,8 @@ Ten bounded contexts. The authoritative command → context mapping is
 
 Commands on the spec's don't-port list (§7.5) survive only as aliases or "removed" stubs that name
 the replacement. Code so far: `platform` (`hello`, the end-to-end reference port), `orchestration`
-(the Wave 1a safety controls) and `integrations` (the incident writer port).
+(the Wave 1a safety controls), `integrations` (the incident writer port) and `learning`
+(the failure classifier behind `shipwright failure classify`, ADR-0009).
 
 ## Layers and rules
 
@@ -199,6 +200,7 @@ suites against the TypeScript command in a sealed sandbox. Tooling: [`tools/port
 - 0006 Credentials and capability separation (planned, Wave 1)
 - [0007 Safety controls gate every dispatch](adr/0007-safety-controls.md)
 - [0008 Fitness functions everywhere, with ratchets for legacy code](adr/0008-fitness-functions-everywhere.md)
+- [0009 Closed-loop learning (proposed)](adr/0009-closed-loop-learning.md)
 
 Generated reference: [`docs/reference/cli.md`](reference/cli.md) and
 [`docs/reference/dependency-graph.md`](reference/dependency-graph.md) (`bun run docs:gen`).

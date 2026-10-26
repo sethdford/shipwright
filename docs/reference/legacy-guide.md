@@ -87,7 +87,7 @@ Shipwright orchestrates autonomous Claude Code agent teams with delivery pipelin
 | `shipwright predict`      | Predictive risk assessment & anomaly detection |
 | `shipwright strategic`    | Strategic intelligence agent                   |
 | `shipwright optimize`     | Self-optimization based on DORA metrics        |
-| `shipwright model-router` | Intelligent model routing & cost optimization  |
+| `shipwright model`        | Intelligent model routing & cost optimization  |
 | `shipwright adaptive`     | Data-driven pipeline tuning                    |
 
 ### Issue & Ticket Management
@@ -95,7 +95,7 @@ Shipwright orchestrates autonomous Claude Code agent teams with delivery pipelin
 | Command                            | Purpose                                     |
 | ---------------------------------- | ------------------------------------------- |
 | `shipwright triage`                | Intelligent issue labeling & prioritization |
-| `shipwright decompose --issue <N>` | AI-split complex features into subtasks     |
+| `shipwright decompose analyze <N>` | AI-split complex features into subtasks     |
 | `shipwright tracker <cmd>`         | Provider router for tracker integration     |
 | `shipwright jira <cmd>`            | Jira ↔ GitHub bidirectional sync            |
 | `shipwright linear <cmd>`          | Linear ↔ GitHub bidirectional sync          |
@@ -178,7 +178,7 @@ Shipwright orchestrates autonomous Claude Code agent teams with delivery pipelin
 
 | Command                       | Purpose                                |
 | ----------------------------- | -------------------------------------- |
-| `shipwright e2e-orchestrator` | Test suite registry & execution        |
+| `shipwright e2e`              | Test suite registry & execution        |
 | `shipwright ux`               | Premium UX enhancement layer           |
 | `shipwright widgets`          | Embeddable status widgets              |
 | `shipwright context gather`   | Assemble rich context for stages       |
@@ -186,13 +186,13 @@ Shipwright orchestrates autonomous Claude Code agent teams with delivery pipelin
 
 ## Pipeline Stages
 
-14 stages, each can be enabled/disabled and gated (auto-proceed or pause for approval):
+15 stages, each can be enabled/disabled and gated (auto-proceed or pause for approval):
 
 ```
-intake → plan → design → spec_generation → build → test → review → spec_verification → compound_quality → pr → merge → deploy → validate → monitor
+intake → spec_generation → plan → design → build → test → review → spec_verification → compound_quality → audit → pr → merge → deploy → validate → monitor
 ```
 
-- **spec_generation**: After design, generates `spec.json` with acceptance criteria, edge cases, security requirements. Disabled via `SPEC_DRIVEN_ENABLED=false`.
+- **spec_generation**: After intake, generates `spec.json` with acceptance criteria, edge cases, security requirements. Disabled via `SPEC_DRIVEN_ENABLED=false`.
 - **spec_verification**: After review, verifies implementation compliance against spec criteria. Emits compliance score and metrics.
 
 The build stage delegates to `shipwright loop` for autonomous multi-iteration development. Self-healing: when tests fail, the pipeline re-enters the build loop with error context.
@@ -208,16 +208,21 @@ The build stage delegates to `shipwright loop` for autonomous multi-iteration de
 
 ## Pipeline Templates
 
-| Template     | Stages                                     | Gates                             | Use Case                 |
-| ------------ | ------------------------------------------ | --------------------------------- | ------------------------ |
-| `fast`       | intake → build → test → PR                 | all auto                          | Quick fixes              |
-| `standard`   | intake → plan → build → test → review → PR | approve: plan, review, pr         | Normal feature work      |
-| `full`       | all stages                                 | approve: plan, review, pr, deploy | Production deployment    |
-| `hotfix`     | intake → build → test → PR                 | all auto                          | Urgent production fixes  |
-| `autonomous` | all stages                                 | all auto                          | Daemon-driven delivery   |
-| `enterprise` | all stages                                 | all approve, auto-rollback        | Maximum safety           |
-| `cost-aware` | all stages                                 | all auto, budget checks           | Budget-limited delivery  |
-| `deployed`   | all + deploy + validate + monitor          | approve: deploy                   | Full deploy + monitoring |
+Stage lists come from `templates/pipelines/*.json` (`spec` = spec_generation, `verify` = spec_verification, `quality` = compound_quality).
+
+| Template     | Stages                                                                                         | Use Case                 |
+| ------------ | ---------------------------------------------------------------------------------------------- | ------------------------ |
+| `fast`       | intake → spec → build → test → quality → pr                                                    | Quick fixes              |
+| `hotfix`     | intake → spec → build → test → quality → pr (all auto, minimal iteration)                      | Urgent production fixes  |
+| `standard`   | intake → spec → plan → design → build → test → review → verify → quality → pr → merge          | Normal feature work      |
+| `tdd`        | same stages as standard, tests generated before build                                          | Test-first work          |
+| `full`       | all 15 stages                                                                                  | Production deployment    |
+| `autonomous` | standard + audit and monitor; deploy and validate off; all auto                                | Daemon-driven delivery   |
+| `enterprise` | standard + deploy → validate → monitor; all gates on approve, auto-rollback                    | Maximum safety           |
+| `cost-aware` | intake → spec → plan → build → test → review → verify → quality → audit → pr; budget limits    | Budget-limited delivery  |
+| `deployed`   | standard + deploy → validate → monitor                                                         | Full deploy + monitoring |
+
+Gates differ per template; see each file's `gate` fields.
 
 ## CLI Flags
 
@@ -313,6 +318,10 @@ Route different models to different tasks based on cost/capability needs:
 
 Purpose keys: `default` (fallback), `classification` (issue triage), `detection` (anomaly/stall), `validation` (quality checks), `commit_quality` (commit message review), `high_risk` (security-sensitive stages).
 
+Values are aliases from `config/models.json` (`opus`, `sonnet`, `haiku`; the default is `sonnet`) or model IDs listed there. Any other value fails before the pipeline starts. To change what an alias means, edit `config/models.json`.
+
+Agents run under the least-privilege policy in `config/agent-permissions.json` and never receive GitHub credentials. See [UPGRADING.md](../UPGRADING.md).
+
 ### Loop Configuration
 
 Tune the build loop's resilience and restart behavior:
@@ -396,13 +405,12 @@ shipwright pipeline start --goal "build auth module" --local
 shipwright daemon start --no-github
 
 # What works offline
-- All 14 pipeline stages execute
+- All pipeline stages except GitHub-dependent ones execute
 - Intelligence layer operates
 - Cost tracking (estimated)
 - Memory system (local only)
 - Agent teams
 - Test execution
-- Output to ~/.shipwright/local-artifacts/
 
 # What requires --skip or degrades gracefully
 - GitHub PR creation — skipped, saved to .claude/pr-draft.md
@@ -413,21 +421,11 @@ shipwright daemon start --no-github
 - CODEOWNERS — read from repo if present
 ```
 
-Enable via config:
-
-```json
-{
-  "local_mode": true,
-  "skip_github": true,
-  "offline_enabled": true
-}
-```
-
-Or environment variables:
+Enable with the `--local` flag, or with environment variables:
 
 ```bash
 export SHIPWRIGHT_LOCAL=1
-export NO_GITHUB=1
+export NO_GITHUB=true
 ```
 
 ## Multi-Repo Operations
@@ -437,7 +435,8 @@ export NO_GITHUB=1
 Run daemon across multiple repositories with shared worker pool:
 
 ```bash
-# Initialize fleet
+# Initialize fleet config, then start
+shipwright fleet init
 shipwright fleet start
 
 # Auto-discover repos in GitHub org
@@ -446,8 +445,8 @@ shipwright fleet discover --org myorg --language go,python
 # Visualize fleet state
 shipwright fleet-viz
 
-# View fleet dashboard
-shipwright dashboard --fleet
+# View the fleet dashboard (binds 127.0.0.1 by default; --host 0.0.0.0 to serve workers)
+shipwright dashboard --host 0.0.0.0
 
 # Config at .claude/fleet-config.json
 {
@@ -478,15 +477,10 @@ Apply the same fix to multiple repositories in parallel:
 shipwright fix "upgrade Go to 1.21" --repos \
   ~/projects/api,~/projects/cli,~/projects/sdk
 
-# With custom test command per repo type
+# Choose the pipeline template and parallelism
 shipwright fix "add license header" \
   --repos ~/a,~/b,~/c \
-  --test-cmd "npm test"
-
-# With worktree isolation (true parallelism)
-shipwright fix "refactor logging" \
-  --repos ~/a,~/b,~/c \
-  --worktree
+  --pipeline fast --max-parallel 3
 ```
 
 Output:
@@ -505,17 +499,12 @@ Total: 3 PRs merged, $0.47 cost
 Control pipeline behavior per repository:
 
 ```bash
-# Via environment
-export SHIPWRIGHT_PIPELINE_TEMPLATE=fast     # global
-export REPO_a_TEMPLATE=full                  # repo-specific
-
 # Via fleet-config.json
 {
   "repos": [
     {
       "path": "/path/to/repo",
       "pipeline_template": "full",
-      "max_parallel_builds": 1,
       "auto_merge": false,
       "labels": ["shipwright", "gated"]
     }
@@ -534,14 +523,6 @@ shipwright remote add builder-1 --host 192.168.1.50
 # View health
 shipwright remote status
 
-# Configure in daemon-config.json
-{
-  "remote": {
-    "enabled": true,
-    "machines": ["builder-1", "builder-2"],
-    "load_balance": true
-  }
-}
 ```
 
 The daemon routes builds to remote workers, syncing state atomically.
@@ -619,7 +600,7 @@ shipwright tmux reload     # Reload config
 
 ## Architecture
 
-All scripts are bash (except the dashboard server in TypeScript). Grouped by layer:
+Most commands are bash. The dashboard server and the commands routed through `run_ts` in `scripts/sw` (`hello`, `breaker`, `pause`, `resume`, `paused`, `budget`, `intake`, `gates`, `failure`) are TypeScript on Bun. Grouped by layer:
 
 ### Core Scripts
 
@@ -948,10 +929,10 @@ All scripts are bash (except the dashboard server in TypeScript). Grouped by lay
 
 | File                   | Lines | Purpose                            |
 | ---------------------- | ----: | ---------------------------------- |
-| `dashboard/server.ts`  |  3501 | Bun WebSocket dashboard server     |
+| `dashboard/server.ts`  |  5887 | Bun WebSocket dashboard server     |
 | `dashboard/public/`    |     — | Dashboard frontend (HTML/CSS/JS)   |
-| `install.sh`           |   755 | Interactive installer              |
-| `templates/pipelines/` |     — | 8 pipeline template JSON files     |
+| `install.sh`           |   128 | Interactive installer              |
+| `templates/pipelines/` |     — | 9 pipeline template JSON files     |
 | `tmux/templates/`      |     — | 25 team composition JSON templates |
 
 ### Runtime State and Artifacts
@@ -1052,7 +1033,7 @@ Specialized agent definitions in `.claude/agents/` are loaded automatically by C
 
 | Agent           | File                 | Purpose                                                                       |
 | --------------- | -------------------- | ----------------------------------------------------------------------------- |
-| Reviewer        | `reviewer.md`        | Read-only diff review against fitness rules F1–F10 and the safety rules       |
+| Reviewer        | `reviewer.md`        | Read-only diff review against fitness rules F1–F12 and the safety rules       |
 | Verifier        | `verifier.md`        | Independent PASS/FAIL check: `bun run check`, parity, one adversarial input   |
 | Porter          | `porter.md`          | Ports one bash command to TypeScript with the `port-bash-command` skill       |
 | Doc Fleet Agent | `doc-fleet-agent.md` | Documentation fleet role definition, read by `sw-doc-fleet.sh` agent briefs   |
@@ -1087,13 +1068,12 @@ Repo-level hooks in `.claude/hooks/` fire on lifecycle events. Registered in `.c
 
 ### Safety Hooks
 
-- `PreToolUse` blocks `git push --no-verify` (exit code 2)
 - `PostToolUse` auto-formats edited files with Prettier
 - `PostToolUse` captures Bash errors to `error-log.jsonl`
 
 ## Documentation Keeper
 
-Auto-sync documentation from source code using HTML comment markers (`AUTO:section-id` pairs). For autonomous multi-agent documentation work, use `shipwright doc-fleet` (5 specialized agents: audit, refactor, enhance).
+Auto-sync documentation from source code using HTML comment markers (`AUTO:section-id` pairs). For autonomous multi-agent documentation work, use `shipwright doc-fleet` (specialized agents for audit, refactor and enhance work).
 
 ```bash
 shipwright docs check      # Report which sections are stale (exit 1 if any)
@@ -1212,10 +1192,10 @@ Purple (`#7c3aed`) and Blue (`#0066ff`) are used only as gradient endpoints, nev
 | Bump version everywhere                        | `shipwright version bump <x.y.z>` | `scripts/update-version.sh <x.y.z>`    |
 | Verify version consistency                     | `shipwright version check`        | `scripts/check-version-consistency.sh` |
 | Build release tarballs                         | `shipwright release build`        | `scripts/build-release.sh`             |
-| Release train (tag, changelog, GitHub release) | `shipwright release publish`      | `scripts/sw-release.sh publish`        |
+| Release train (tag, changelog, GitHub release) | `shipwright release release publish` | `scripts/sw-release.sh publish`        |
 
 - **Canonical version**: `package.json` → `version`. All script `VERSION=`, README badge, and (at build time) website footer derive from it after a bump.
-- **Before release**: Run `shipwright version check` (CI does this). Then bump with `shipwright version bump <x.y.z>`, add a `[x.y.z]` section to `CHANGELOG.md`, then `shipwright release publish` or tag and push for the release workflow.
+- **Before release**: Run `shipwright version check` (CI does this). Then bump with `shipwright version bump <x.y.z>`, add a `[x.y.z]` section to `CHANGELOG.md`, then `shipwright release release publish` or tag and push for the release workflow.
 - **Packaging**: `scripts/build-release.sh` is invoked by `.github/workflows/release.yml` on tag push; it reads version from `package.json` and creates `dist/shipwright-{platform}.tar.gz` and checksums. npm publish and Homebrew tap update are separate steps (see README/CHANGELOG).
 
 ## Setup & validation (everything working)
@@ -1230,7 +1210,7 @@ Purple (`#7c3aed`) and Blue (`#0066ff`) are used only as gradient endpoints, nev
 # Run all pipeline tests (mock binaries, no real Claude/GitHub calls)
 ./scripts/sw-pipeline-test.sh
 
-# Run all 102 test suites
+# Run all 174 shell test suites
 npm test
 ```
 

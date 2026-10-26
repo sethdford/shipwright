@@ -6,14 +6,14 @@
 
 <p align="center">
   <strong>The Autonomous Delivery Platform</strong><br>
-  From labeled GitHub issue to merged PR — with 18 new autonomous agents orchestrating every step.
+  From labeled GitHub issue to merged PR — with specialized autonomous agents orchestrating every step.
 </p>
 
 <p align="center">
   <a href="https://github.com/sethdford/shipwright/actions/workflows/test.yml"><img src="https://github.com/sethdford/shipwright/actions/workflows/test.yml/badge.svg" alt="Tests"></a>
   <a href="https://github.com/sethdford/shipwright/actions/workflows/shipwright-pipeline.yml"><img src="https://github.com/sethdford/shipwright/actions/workflows/shipwright-pipeline.yml/badge.svg" alt="Pipeline"></a>
-  <img src="https://img.shields.io/badge/tests-162_suites_passing-4ade80?style=flat-square" alt="162 suites">
-  <img src="https://img.shields.io/badge/version-3.3.0-00d4ff?style=flat-square" alt="v3.3.0">
+  <img src="https://img.shields.io/badge/tests-174_shell_suites-4ade80?style=flat-square" alt="174 shell suites">
+  <img src="https://img.shields.io/badge/version-4.0.0-00d4ff?style=flat-square" alt="v4.0.0">
   <img src="https://img.shields.io/badge/license-MIT-green?style=flat-square" alt="MIT License">
   <img src="https://img.shields.io/badge/bash-3.2%2B-555a66?style=flat-square" alt="Bash 3.2+">
 </p>
@@ -24,7 +24,8 @@
 
 - [Shipwright Builds Itself](#shipwright-builds-itself)
 - [Code Factory Pattern](#code-factory-pattern)
-- [What's New in v3.3.0](#whats-new-in-v330)
+- [What's New in v4.0.0](#whats-new-in-v400)
+- [Upgrading to 4.0](docs/UPGRADING.md)
 - [How It Works](#how-it-works)
 - [Install](#install)
 - [Quick Start](#quick-start)
@@ -65,7 +66,7 @@ Agent writes code → Risk policy gate → Tier-appropriate CI → Code review a
 | **Preflight gate**     | `risk-policy-gate.yml` classifies risk from changed files before expensive CI runs                      |
 | **SHA discipline**     | All checks, reviews, and approvals validated against current PR head — stale evidence is never trusted  |
 | **Rerun writer**       | `sw-review-rerun.sh` — SHA-deduped, single canonical writer, no duplicate bot comments                  |
-| **Remediation loop**   | `review-remediation.yml` — agent reads findings, patches code, validates, pushes fix to same branch     |
+| **Remediation loop**   | `review-remediation.yml` — agent reads findings and patches code; the workflow validates and pushes the fix |
 | **Bot thread cleanup** | `auto-resolve-threads.yml` — resolves bot-only threads after clean rerun, never touches human threads   |
 | **Evidence framework** | `sw-evidence.sh` — browser, API, database, CLI, webhook, and custom evidence with freshness enforcement |
 | **Harness-gap loop**   | `shipwright incident gap` — every regression creates a test case with SLA tracking                      |
@@ -74,18 +75,18 @@ Agent writes code → Risk policy gate → Tier-appropriate CI → Code review a
 
 Shipwright extends the Code Factory pattern with capabilities most implementations don't have:
 
-- **12-stage pipeline** with self-healing builds, adversarial review, and compound quality gates
+- **15-stage pipeline** with self-healing builds, adversarial review, and compound quality gates
 - **Predictive risk scoring** using GitHub signals (security alerts, contributor expertise, file churn)
 - **Persistent memory** — failure patterns, fix effectiveness, and prediction accuracy compound over time
 - **Auto-learning** — self-optimize runs automatically after every pipeline completion, including context efficiency tuning
 - **Decision engine** — tiered autonomous decisions with outcome learning and deduplication
-- **Unified model routing** — single source of truth for model selection across all components
+- **Unified model routing** — `config/models.json` aliases (`opus`, `sonnet`, `haiku`) are the single source of truth for model selection
 - **Evidence-gated merges** — SHA discipline ensures all evidence validated against current PR head
 - **Semantic quality audits** — Claude-powered audits with grep fallback when Claude unavailable
-- **18 autonomous agents** with specialized roles (PM, reviewer, security auditor, test generator, etc.)
+- **Specialized agent roles** (PM, reviewer, security auditor, test generator, etc.)
 - **Cross-platform compatibility** — portable date helpers, file_mtime, and compat layer for macOS/Linux
 - **Fleet operations** — the Code Factory pattern applied across every repo in your org
-- **Cost intelligence** — per-pipeline cost tracking, budget enforcement, adaptive model routing
+- **Cost intelligence** — per-pipeline cost tracking and budget enforcement
 - **Self-optimization** — DORA metrics analysis auto-tunes daemon config and template weights
 
 ```bash
@@ -97,9 +98,6 @@ npm run harness:evidence:capture:database # Database checks only
 npm run harness:evidence:verify           # Verify manifest + freshness
 npm run harness:evidence:pre-pr           # Capture + verify in one step
 
-# Risk and policy
-npm run harness:risk-tier
-
 # Incident-to-harness loop
 shipwright incident gap list
 shipwright incident gap sla
@@ -109,23 +107,21 @@ shipwright incident gap sla
 
 ---
 
-## What's New in v3.3.0
+## What's New in v4.0.0
 
-**Code Factory pattern** — deterministic, risk-aware agent delivery with machine-verifiable evidence:
+v4.0.0 hardens how agents, the dashboard and CI are trusted, and starts the move from bash to TypeScript on Bun. **It changes several defaults. Read [docs/UPGRADING.md](docs/UPGRADING.md) before you upgrade.**
 
-- **Risk policy gate** — PR-level preflight classifies risk tier from changed files; blocks before expensive CI
-- **SHA discipline** — All evidence validated against current PR head SHA; stale evidence never trusted
-- **Evidence framework** — 6 collector types (browser, API, database, CLI, webhook, custom) with freshness enforcement
-- **Review remediation** — Agent reads review findings, patches code, validates, pushes fix commit in-branch
-- **Auto-resolve bot threads** — Bot-only PR threads cleaned up after clean rerun; human threads untouched
-- **Harness-gap loop** — Every incident creates a test case requirement with SLA tracking (P0: 24h, P1: 72h)
-- **Policy contract v2** — Risk tiers, merge policy, docs drift rules, evidence specs, harness SLAs in one file
+- **Least-privilege agents** — agents run under a permission policy (`config/agent-permissions.json`) inside the Claude Code sandbox, and never receive GitHub credentials
+- **Dispatch safety gates** — a global circuit breaker, a `shipwright:pause` label, and `shipwright gates check`, `breaker`, `budget`, `intake`, `pause`/`resume`
+- **Failure classifier** — `shipwright failure classify` decides retry or escalate; escalations come only from structured error lines
+- **Model aliases** — `opus`, `sonnet`, `haiku` in `config/models.json`, mapped to the Claude 5.5 family
+- **Differential test gate** — the build loop blocks only on new test failures
+- **Dashboard on loopback by default** — use `--host 0.0.0.0` or `SW_DASHBOARD_HOST` for server or fleet mode
+- **Bun toolchain** — `bun.lock` is the only root lockfile; Bun 1.2.19+ is required
 
-**v2.3.1**: Autonomous feedback loops, testing foundation, chaos resilience
+Full list: [CHANGELOG.md](CHANGELOG.md).
 
-**v2.3.0**: Fleet Command completeness overhaul + autonomous team oversight
-
-**v2.0.0**: 18 autonomous agents, 100+ CLI commands, intelligence layer, multi-repo fleet, local mode
+**v3.3.0**: Code Factory pattern — risk policy gate, SHA discipline, evidence framework, review remediation, harness-gap loop
 
 ---
 
@@ -138,16 +134,16 @@ graph LR
     C --> D[Select Template]
     D --> E[Pipeline]
 
-    subgraph Pipeline ["12-Stage Pipeline"]
+    subgraph Pipeline ["15-Stage Pipeline"]
         direction LR
-        E1[intake] --> E2[plan] --> E3[design] --> E4[build]
-        E4 --> E5[test] --> E6[review] --> E7[quality]
-        E7 --> E8[PR] --> E9[merge] --> E10[deploy]
-        E10 --> E11[validate] --> E12[monitor]
+        E1[intake] --> E2[spec] --> E3[plan] --> E4[design] --> E5[build]
+        E5 --> E6[test] --> E7[review] --> E8[spec verify] --> E9[quality]
+        E9 --> E10[audit] --> E11[PR] --> E12[merge] --> E13[deploy]
+        E13 --> E14[validate] --> E15[monitor]
     end
 
     E --> E1
-    E12 --> F[Merged PR]
+    E15 --> F[Merged PR]
 
     subgraph Intelligence ["Intelligence Layer"]
         I1[Predictive Risk]
@@ -162,7 +158,7 @@ graph LR
     style F fill:#4ade80,color:#000
 ```
 
-When tests fail, the pipeline re-enters the build loop with error context — self-healing like a developer reading failures and fixing them. Convergence detection stops infinite loops. Error classification routes retries intelligently.
+When tests fail, the pipeline re-enters the build loop with error context — self-healing like a developer reading failures and fixing them. Convergence detection stops infinite loops. A failure classifier decides whether a failed run is retried or escalated.
 
 ---
 
@@ -188,6 +184,8 @@ curl -fsSL https://raw.githubusercontent.com/sethdford/shipwright/main/scripts/i
 ```bash
 npm install -g shipwright-cli
 ```
+
+Shipwright 4.0 needs [Bun](https://bun.sh) 1.2.19+ for the dashboard and the TypeScript commands. Upgrading from 3.x? See [docs/UPGRADING.md](docs/UPGRADING.md).
 
 **Verify**
 
@@ -229,7 +227,7 @@ shipwright fleet start
 shipwright fix "upgrade deps" --repos ~/a,~/b,~/c
 
 # Release automation
-shipwright version bump 2.4.0
+shipwright version bump 4.1.0
 shipwright changelog generate
 ```
 
@@ -237,7 +235,7 @@ shipwright changelog generate
 
 ## Features
 
-### 18 Autonomous Agents
+### Specialized Agents
 
 Wave 1 (Organizational):
 
@@ -260,30 +258,30 @@ Wave 2 (Operational Backbone):
 - **Adaptive Tuner** — DORA metrics analysis, self-optimization, performance tuning
 - **Strategic Intelligence** — Predictive analysis, trend detection, proactive recommendations
 
-Plus 10+ specialized agents for observability, UX, documentation, and more.
-
-### 12-Stage Delivery Pipeline
+### 15-Stage Delivery Pipeline
 
 ```
-intake → plan → design → build → test → review → compound_quality → pr → merge → deploy → validate → monitor
+intake → spec_generation → plan → design → build → test → review → spec_verification
+→ compound_quality → audit → pr → merge → deploy → validate → monitor
 ```
 
-Each stage is configurable with quality gates that auto-proceed or pause for approval. 8 pipeline templates:
+Each stage is configurable with quality gates that auto-proceed or pause for approval. 9 pipeline templates:
 
-| Template     | Stages                            | Use Case                  |
-| ------------ | --------------------------------- | ------------------------- |
-| `fast`       | intake → build → test → PR        | Quick fixes, score >= 70  |
-| `standard`   | + plan, design, review            | Normal feature work       |
-| `full`       | All 12 stages                     | Production deployment     |
-| `hotfix`     | Minimal, all auto                 | Urgent production fixes   |
-| `autonomous` | All stages, all auto              | Daemon-driven delivery    |
-| `enterprise` | All stages, all gated             | Maximum safety + rollback |
-| `cost-aware` | All stages + budget checks        | Budget-limited delivery   |
-| `deployed`   | All + deploy + validate + monitor | Full deploy pipeline      |
+| Template     | Stages                                                    | Use Case                  |
+| ------------ | --------------------------------------------------------- | ------------------------- |
+| `fast`       | intake → spec → build → test → quality → PR               | Quick fixes               |
+| `hotfix`     | Same as fast, all auto, minimal iteration                 | Urgent production fixes   |
+| `standard`   | + plan, design, review, spec verification, merge          | Normal feature work       |
+| `tdd`        | Like standard, tests generated before build               | Test-first work           |
+| `full`       | All 15 stages                                             | Production deployment     |
+| `autonomous` | Through audit, PR, merge, monitor; all auto               | Daemon-driven delivery    |
+| `enterprise` | Through deploy, validate, monitor; all gates on approve   | Maximum safety + rollback |
+| `cost-aware` | Through audit and PR, with budget limits                  | Budget-limited delivery   |
+| `deployed`   | Through merge, deploy, validate, monitor                  | Full deploy pipeline      |
 
 ### Intelligence Layer
 
-7 modules that make the pipeline smarter over time. **Enabled by default**: intelligence is on when Claude CLI is available, with optimization and prediction active out of the box. Set `intelligence.enabled=false` to disable. All modules degrade gracefully.
+7 modules that make the pipeline smarter over time. Intelligence is on by default once `shipwright init` has created `.claude/daemon-config.json` and the Claude CLI is available. Set `intelligence.enabled=false` to disable. All modules degrade gracefully.
 
 | Module                       | What It Does                                                                                                          |
 | ---------------------------- | --------------------------------------------------------------------------------------------------------------------- |
@@ -295,7 +293,7 @@ Each stage is configurable with quality gates that auto-proceed or pause for app
 | **Developer Simulation**     | 3-persona review (security, performance, maintainability) before PR creation                                          |
 | **Architecture Enforcement** | Living architectural model with violation detection and dependency direction rules                                    |
 
-Adaptive everything: thresholds learn from history, model routing uses SPRT evidence-based switching, poll intervals adjust to queue depth, memory timescales tune based on fix effectiveness.
+Adaptive tuning: thresholds learn from history, poll intervals adjust to queue depth, and memory timescales tune based on fix effectiveness. Model routing is deterministic through `config/models.json` aliases; the older learned routing is opt-in with `SW_LEGACY_MODEL_ROUTING=true`.
 
 ### GitHub Deep Integration
 
@@ -333,7 +331,7 @@ Watches GitHub for labeled issues and processes them 24/7:
 
 - **Auto-scaling**: Adjusts worker count based on CPU, memory, budget, and queue depth
 - **Priority lanes**: Reserve a worker slot for urgent/hotfix issues
-- **Retry with escalation**: Failed builds retry with template escalation (fast → standard → full)
+- **Retry with escalation**: a failure classifier decides retry or escalate; retries move to a stronger model first, then to the `full` template
 - **Patrol mode**: Proactively scans for security issues, stale deps, dead code, coverage gaps
 - **Self-optimization**: Tunes its own config based on DORA metrics over time
 
@@ -360,7 +358,7 @@ The pipeline learns from every run:
 shipwright cost show
 ```
 
-Per-pipeline cost tracking with model pricing, budget enforcement, and ROI analysis. Adaptive model routing picks the cheapest model that meets quality targets.
+Per-pipeline cost tracking with model pricing, budget enforcement, and ROI analysis.
 
 ### Real-Time Dashboard
 
@@ -368,15 +366,16 @@ Per-pipeline cost tracking with model pricing, budget enforcement, and ROI analy
 shipwright dashboard start
 ```
 
-Web dashboard with live pipeline progress, GitHub context (security alerts, contributors, deployments), DORA metrics, cost tracking, and context efficiency metrics. WebSocket-powered, updates in real-time.
+Web dashboard with live pipeline progress, GitHub context (security alerts, contributors, deployments), DORA metrics, cost tracking, and context efficiency metrics. WebSocket-powered, updates in real-time. Binds `127.0.0.1` by default; use `--host 0.0.0.0` or `SW_DASHBOARD_HOST` for server or fleet mode, after reading [docs/dashboard-exposure.md](docs/dashboard-exposure.md).
 
 ### Webhook Receiver
 
 ```bash
-shipwright webhook listen
+shipwright webhook setup owner/repo
+shipwright webhook start
 ```
 
-Instant issue processing via GitHub webhooks instead of polling. Register webhook with `shipwright webhook register`, receive events in real-time, process issues with zero-lag.
+Issue processing via GitHub webhooks instead of polling. `setup` registers the webhook on a repo and `start` runs the receiver.
 
 ### PR Lifecycle Automation
 
@@ -386,7 +385,7 @@ shipwright pr merge <pr#>
 shipwright pr cleanup
 ```
 
-Fully automated PR management: review based on predictive risk and coverage, intelligent auto-merge when gates pass, cleanup stale branches. Reduces manual PR overhead by 90%.
+Automated PR management: review based on predictive risk and coverage, auto-merge when gates pass, and closing stale PRs.
 
 ### Fleet Auto-Discovery
 
@@ -394,11 +393,11 @@ Fully automated PR management: review based on predictive risk and coverage, int
 shipwright fleet discover --org myorg
 ```
 
-Scan a GitHub organization and auto-populate fleet config with all repos matching criteria (language, archived status, team ownership). One command instead of manual registry building.
+Scan a GitHub organization and auto-populate fleet config with all repos matching criteria (language, topic, recent activity; archived repos are skipped). One command instead of manual registry building.
 
 ### SQLite Persistence
 
-ACID-safe state management replacing JSON files. Replaces volatile `.claude/pipeline-artifacts/` with reliable database schema. Atomic transactions ensure no partial states, crash recovery automatic.
+SQLite-backed state (`shipwright db`) with atomic transactions, alongside the JSON and JSONL artifacts that many scripts still read.
 
 ### Issue Decomposition
 
@@ -439,15 +438,15 @@ shipwright daemon start --detach
 
 # Agent teams
 shipwright swarm status
-shipwright recruit --roles builder,tester
-shipwright standup
+shipwright recruit roles
+shipwright standup today
 shipwright guild list
 
 # Quality gates
-shipwright code-review
-shipwright security-audit
-shipwright testgen
-shipwright quality validate
+shipwright code-review scan
+shipwright security-audit scan
+shipwright testgen gaps
+shipwright breaker status
 
 # Observability
 shipwright vitals
@@ -461,7 +460,7 @@ shipwright fix "feat: add auth" --repos ~/a,~/b,~/c
 shipwright fleet-viz
 
 # Release automation
-shipwright version bump 2.4.0
+shipwright version bump 4.1.0
 shipwright changelog generate
 shipwright deploys list
 
@@ -479,7 +478,7 @@ See [docs/reference/legacy-guide.md](docs/reference/legacy-guide.md) for the com
 
 ## Pipeline Templates for Teams
 
-24 team templates covering the full SDLC:
+25 team templates covering the full SDLC:
 
 ```bash
 shipwright templates list
@@ -493,8 +492,10 @@ shipwright templates list
 | `config/policy.schema.json`   | JSON Schema validation for the policy contract                                              |
 | `.claude/daemon-config.json`  | Daemon settings, intelligence flags, patrol config                                          |
 | `.claude/pipeline-state.md`   | Current pipeline state                                                                      |
-| `templates/pipelines/*.json`  | 8 pipeline template definitions                                                             |
-| `tmux/templates/*.json`       | 24 team composition templates                                                               |
+| `templates/pipelines/*.json`  | 9 pipeline template definitions                                                             |
+| `tmux/templates/*.json`       | 25 team composition templates                                                               |
+| `config/models.json`          | Model aliases (`opus`, `sonnet`, `haiku`) and the default                                   |
+| `config/agent-permissions.json` | Least-privilege permission policy every agent runs under                                  |
 | `~/.shipwright/events.jsonl`  | Event log for metrics                                                                       |
 | `~/.shipwright/costs.json`    | Cost tracking data                                                                          |
 | `~/.shipwright/budget.json`   | Budget limits                                                                               |
@@ -507,23 +508,24 @@ shipwright templates list
 | tmux            | 3.2+    | `brew install tmux`                    |
 | jq              | any     | `brew install jq`                      |
 | Claude Code CLI | latest  | `npm i -g @anthropic-ai/claude-code`   |
-| Node.js         | 20+     | For hooks and dashboard                |
+| Bun             | 1.2.19+ | `curl -fsSL https://bun.sh/install \| bash` (dashboard and TypeScript commands) |
+| Node.js         | 20+     | For npm install and hooks              |
 | Git             | any     | For installation                       |
 | gh CLI          | any     | `brew install gh` (GitHub integration) |
 
 ## Architecture
 
-100+ bash scripts (~100K lines), 125 shell test suites + 16 dashboard test files (141 total), plus E2E system test proving full daemon→pipeline→loop→PR flow. Dashboard at 98% coverage. Bash 3.2 compatible — runs on macOS and Linux out of the box.
+About 200 bash scripts (~117K lines, not counting tests) and a growing TypeScript core on Bun (`src/`). 174 shell test suites, including an E2E system test of the daemon→pipeline→loop→PR flow, plus dashboard and TypeScript test suites. Dashboard coverage is gated at 70% of lines. Bash 3.2 compatible — runs on macOS and Linux.
 
 **Core Layers:**
 
 ```
 Pipeline Layer
-  sw-pipeline.sh              # 12-stage delivery orchestration
+  sw-pipeline.sh              # 15-stage delivery orchestration
   sw-daemon.sh                # Autonomous GitHub issue watcher
   sw-loop.sh                  # Continuous multi-iteration build loop
 
-Agent Layer (18 agents)
+Agent Layer
   sw-swarm.sh                 # Dynamic agent team orchestration
   sw-pm.sh                    # Autonomous PM coordination
   sw-recruit.sh               # Agent recruitment system
@@ -532,7 +534,7 @@ Agent Layer (18 agents)
   sw-oversight.sh             # Quality oversight board
   sw-strategic.sh             # Strategic intelligence
   sw-scale.sh                 # Dynamic team scaling
-  ... 10 more agent scripts
+  ... more agent scripts
 
 Intelligence Layer
   sw-intelligence.sh          # AI analysis engine
@@ -541,7 +543,7 @@ Intelligence Layer
   sw-security-audit.sh        # Security analysis
   sw-code-review.sh           # Code quality analysis
   sw-testgen.sh               # Test generation
-  sw-architecture.sh          # Architecture enforcement
+  sw-architecture-enforcer.sh # Architecture enforcement
 
 Operational Layer
   sw-fleet.sh                 # Multi-repo orchestration
@@ -552,7 +554,7 @@ Operational Layer
   ... 20+ operational scripts
 
 Observability Layer
-  sw-vitals.sh                # Pipeline health scoring
+  sw-pipeline-vitals.sh       # Pipeline health scoring
   sw-dora.sh                  # DORA metrics dashboard
   sw-activity.sh              # Live activity streams
   sw-replay.sh                # Pipeline playback
@@ -584,7 +586,8 @@ Tools & UX
 **Manual development:** Fork, branch, then:
 
 ```bash
-npm test    # 125 shell suites + 16 dashboard test files (141 total), E2E system test
+bun run check   # typecheck, lint, architecture rules, TS and dashboard tests, docs
+npm test        # 174 shell suites, including the E2E system test
 ```
 
 ## License

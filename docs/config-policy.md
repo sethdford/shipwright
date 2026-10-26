@@ -21,11 +21,13 @@ All tunable policy — timeouts, limits, thresholds — should live in policy co
 | `sweep`     | Cron interval, stuck threshold, retry template and iteration caps                                                                                       |
 | `hygiene`   | Artifact age for cleanup                                                                                                                                |
 | `recruit`   | Agent recruitment: self_tune, match thresholds, model, promote thresholds                                                                               |
+| `riskTierRules`, `mergePolicy`, `docsDriftRules`, `evidence`, `harnessGapPolicy`, `codeReviewAgent` | Code Factory contract: risk tiers, merge policy, docs drift rules, evidence specs, harness-gap SLAs, review agent settings |
+| `decision`  | Decision engine tiers (not yet listed in `policy.schema.json`)                                                                                          |
 
 ## Usage
 
 - **From bash:** Prefer `jq` to read values, e.g. `jq -r '.daemon.poll_interval_seconds // 60' config/policy.json`.
-- **Override:** If `~/.shipwright/policy.json` exists, scripts may merge or prefer it over repo `config/policy.json`.
+- **Override:** If `~/.shipwright/policy.json` exists, `scripts/lib/policy.sh` reads it instead of the repo `config/policy.json` (it replaces the file; it does not merge).
 - **Adaptive overrides:** Daemon/pipeline already use learned timeouts and iteration counts when present; those continue to override policy.
 
 ## Schema
@@ -37,4 +39,4 @@ All tunable policy — timeouts, limits, thresholds — should live in policy co
 - ~~Add `scripts/lib/policy.sh`~~ (done)
 - ~~Migrate daemon/pipeline/quality/strategic/hygiene defaults to read from policy~~ (done)
 - Strategic agent can recommend issues like "Move more tunables to config/policy.json."
-- Future: Add `recruit` section to `policy.schema.json` for full validation; schema currently allows additional properties.
+- Add the `decision` section to `policy.schema.json`: the schema sets `additionalProperties: false`, so full validation currently rejects `config/policy.json`.
