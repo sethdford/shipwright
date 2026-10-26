@@ -1186,3 +1186,8 @@
 {"ts":"2026-10-25T20:05:19Z","ts_epoch":1792958719,"type":"strategic.issue_refused","title":"Loop blast-radius guard: abort an iteration whose diff deletes far more than the task scope"}
 {"ts":"2026-10-25T20:05:22Z","ts_epoch":1792958722,"type":"strategic.issue_refused","title":"Per-stage failure-class accuracy report from outcome data in `shipwright dora`"}
 {"ts":"2026-10-25T20:05:22Z","ts_epoch":1792958722,"type":"strategic.cycle_complete","issues_created":0,"issues_skipped":3}
+{"ts":"2026-10-26T00:13:29Z","ts_epoch":1792973609,"type":"hygiene_platform_refactor","hardcoded":49,"fallback":76,"todo":51}
+{"ts":"2026-10-26T00:14:15Z","ts_epoch":1792973655,"type":"strategic.issue_refused","title":"Pre-flight check for missing or broken test/lint commands, wired into the pipeline build stage via the TS gates port"}
+{"ts":"2026-10-26T00:14:18Z","ts_epoch":1792973658,"type":"strategic.issue_refused","title":"Loop blast-radius guard: abort an iteration whose diff deletes far more than the task scope allows"}
+{"ts":"2026-10-26T00:14:20Z","ts_epoch":1792973660,"type":"strategic.issue_refused","title":"Quarantine repeatedly failing issues in the daemon using the TS WorkQueue port"}
+{"ts":"2026-10-26T00:14:20Z","ts_epoch":1792973660,"type":"strategic.cycle_complete","issues_created":0,"issues_skipped":3}
