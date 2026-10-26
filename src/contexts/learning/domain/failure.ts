@@ -59,11 +59,7 @@ interface Rule {
 // (⚠ optionally with U+FE0F).
 // No punctuation: `- `, `+ `, `> `, `| `, `* ` and `# ` start diff, quote, table, list and heading lines.
 // Explicit and locale-independent, the same as bash (daemon-failure.sh, _DAEMON_LEAD) under LC_ALL=C and UTF-8.
-// A runner's own line prefix before the emitter's line (#8715): pnpm -r `packages/agent deploy: `, turbo
-// `agent:run: `, docker compose `agent-1  | `. Bounded ASCII forms; the pnpm form needs a `/` in the path and
-// the turbo task must start with a letter, so prose (`note: ...`) and grep output (`a.ts:12:...`) do not match.
-const RUNNER = String.raw`(?:[A-Za-z0-9@._\-]{1,60}/[A-Za-z0-9@._/\-]{1,100} [A-Za-z0-9:._\-]{1,50}: |[A-Za-z0-9@/._\-]{1,100}:[A-Za-z][A-Za-z0-9._\-]{0,49}: |[A-Za-z0-9._\-]{1,64}[_\-]\d{1,3} {1,20}\| )`;
-const LEAD = String.raw`^${RUNNER}?(?:\d{4}[\-/]\d\d[\-/]\d\d[T ][\d:.]{1,20}(?:Z|[+\-]\d\d:?\d\d)? {1,2})?(?:\[\d[\dTZ:. +\-]{0,38}\] {1,2})?(?:\[(?:error|err|fatal)\] {1,2})?(?:(?:✗|✘|×|⚠|\uFE0F) {0,2}){0,3}`;
+const LEAD = String.raw`^(?:\d{4}[\-/]\d\d[\-/]\d\d[T ][\d:.]{1,20}(?:Z|[+\-]\d\d:?\d\d)? {1,2})?(?:\[\d[\dTZ:. +\-]{0,38}\] {1,2})?(?:\[(?:error|err|fatal)\] {1,2})?(?:(?:✗|✘|×|⚠|\uFE0F) {0,2}){0,3}`;
 // Up to two tool or annotation prefixes after the lead-in (`##[error]Error: ...`, `gh: error: ...`).
 const PREFIX = String.raw`(?:(?:gh|error|fatal)[ :]{1,3}|##\[error\] ?|::error:: ?|claude code returned an error result: |fatal cli error: |cli exited \d{1,3} with minimal output: |pr creation failed: |pull request create failed: |(?:plan|design) stage produced api/cli error instead of an? (?:plan|design): ){0,2}`;
 // What may end a prose-prone phrase: end of line or punctuation, never another word.
@@ -113,7 +109,9 @@ const AUTH_PHRASES = [
 // `{"type":"result",...,"is_error":true,...,"result":"Invalid API key · Please run /login",...}` (#8715). The
 // fields between are bounded plain JSON scalars.
 const JSON_GAP = String.raw`[A-Za-z0-9_":,. \-]{0,255}`;
-const CLI_RESULT = String.raw`\{"type": ?"result",${JSON_GAP}"is_error": ?true,${JSON_GAP}"result": ?"(?:${AUTH_PHRASES})`;
+// The CLI's own auth texts only: a short list keeps the ERE small (bash compiles it on every classification).
+const CLI_RESULT_TEXT = String.raw`invalid api key|not logged in|oauth token (?:is |has |has been )?(?:expired|invalid|revoked)|failed to authenticate|api error: 40[13]|claude_code_oauth_token (?:is )?not set`;
+const CLI_RESULT = String.raw`\{"type": ?"result",${JSON_GAP}"is_error": ?true,${JSON_GAP}"result": ?"(?:${CLI_RESULT_TEXT})`;
 // Structured forms that may be indented: the bare API type name after an error prefix (ending at `:` or the end
 // of the line, so "error: authentication_error is now mapped ..." does not escalate), and `gh auth status`'s
 // indented `X` lines.

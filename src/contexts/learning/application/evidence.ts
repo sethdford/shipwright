@@ -55,6 +55,9 @@ const STEP_BOUNDARY = /^##\[(?:group|endgroup|error)\]|^::error/;
 // excerpt (`grep -A5 | tail`) often leaves a block open right before the real error (#8715). pytest's captured
 // log is excluded: its content is the application's own log lines, which print the same shapes.
 const OPEN_TEXT_BLOCKS = new Set(["console", "panic", "vitest"]);
+// A content line that introduces the next one as quoted output (`git push failed:`, `claude exited 1, stderr:`, Node's
+// `Error: Command failed: cmd`): the escalation-shaped line after it is still the test's output, not a new error.
+const INTRODUCES = /:[ \t]*$|^Error: Command failed: /;
 
 type Mode = "none" | "mocha" | "jest" | "console" | "panic" | "vitest" | "pytest";
 
@@ -96,13 +99,16 @@ export function dropTestTitles(text: string): string {
   const kept: string[] = [];
   let mode: Mode = "none";
   let seen = 0;
+  let prev = "";
   for (const line of text.split("\n")) {
     if (mode !== "none" && STEP_BOUNDARY.test(line)) mode = "none";
-    if (OPEN_TEXT_BLOCKS.has(mode) && seen > 0 && isEscalationLine(line)) mode = "none";
+    if (OPEN_TEXT_BLOCKS.has(mode) && seen > 0 && !INTRODUCES.test(prev) && isEscalationLine(line))
+      mode = "none";
     if (insideBlock(mode, line)) {
       // mocha's nested suite lines end with the test title, which ends in `:`.
       if (mode === "mocha" && /:[ \t]*$/.test(line)) mode = "none";
       seen++;
+      prev = line;
       continue;
     }
     seen = 0;
@@ -116,11 +122,22 @@ export function dropTestTitles(text: string): string {
 // A byte-order mark at the start of a line, and the line breaks JavaScript's `m` flag honours but grep does
 // not: a lone CR (progress bars), U+2028 and U+2029. They become real line breaks, as in bash.
 const BOM = /^\uFEFF/;
+// A monorepo or compose runner's own line prefix (#8715), removed like the gh prefix so that block headers and the
+// rules see the tool's line: pnpm -r `packages/agent deploy: `, turbo `@acme/agent:run: `, docker compose
+// `agent-1  | `. Case-sensitive, lowercase package paths and task names, no `.` in a turbo package name, so grep
+// output (`docs/x.md:Error: ...`, `config/errors.yml:key: ...`) and prose (`Auth/login status: ...`) keep theirs.
+const RUNNER =
+  /^(?:[a-z0-9@_-]{1,60}\/[a-z0-9@_/-]{1,100} [a-z0-9:_-]{1,50}: |@?[a-z0-9_-]{1,60}(?:\/[a-z0-9_-]{1,60})?:[a-z][a-z0-9_-]{0,49}: |[A-Za-z0-9._-]{1,64}[_-]\d{1,3} {1,20}\| )/;
 const INNER_BREAK = /\r|\u2028|\u2029/g;
 
 /** Plain text of one line: colour codes, the gh prefix, a BOM and a trailing CR removed. */
 export function normalizeLine(line: string): string {
-  return line.replace(ANSI, "").replace(GH_PREFIX, "").replace(/\r$/, "").replace(BOM, "");
+  return line
+    .replace(ANSI, "")
+    .replace(GH_PREFIX, "")
+    .replace(/\r$/, "")
+    .replace(BOM, "")
+    .replace(RUNNER, "");
 }
 
 /**

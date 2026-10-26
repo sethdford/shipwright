@@ -74,7 +74,7 @@ classify_failure() {
     cr="$(printf '\r')"
     bom="$(printf '\357\273\277')"
     tail_content=$(printf '%s\n' "$tail_content" \
-        | LC_ALL=C sed -E "s/${esc}\[[0-9;?]*[A-Za-z]//g; s/^[^${tab}]*${tab}[^${tab}]*${tab}(${bom})?[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}([.][0-9]+)?Z ?//; s/${cr}\$//; s/^${bom}//" \
+        | LC_ALL=C sed -E "s/${esc}\[[0-9;?]*[A-Za-z]//g; s/^[^${tab}]*${tab}[^${tab}]*${tab}(${bom})?[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}([.][0-9]+)?Z ?//; s/${cr}\$//; s/^${bom}//; s#^${_DAEMON_RUNNER}##" \
         | LC_ALL=C awk -v cr="$cr" -v ls="$(printf '\342\200\250')" -v ps="$(printf '\342\200\251')" \
             '{ gsub(cr, "\n"); gsub(ls, "\n"); gsub(ps, "\n"); print }' \
         | LC_ALL=C awk "$_DAEMON_DROP_PROSE")
@@ -83,8 +83,11 @@ classify_failure() {
     # Test-runner output is dropped first, as dropTestTitles() does in evidence.ts.
     local err_lines
     # Column-0 lines an escalation rule matches on their own end an open free-text block (#8715).
-    local esc_nums
-    esc_nums=$(printf '%s\n' "$tail_content" | LC_ALL=C grep -naiE -e "$_DAEMON_AUTH" -e "$_DAEMON_INVALID_ISSUE" | LC_ALL=C sed 's/:.*//' | tr '\n' ',' || true)
+    # Only when a free-text block header is present: the escalation EREs are large, and most logs have no block.
+    local esc_nums=""
+    if printf '%s\n' "$tail_content" | LC_ALL=C grep >/dev/null -aE "$_DAEMON_FREE_TEXT_BLOCK"; then
+        esc_nums=$(printf '%s\n' "$tail_content" | LC_ALL=C grep -naiE -e "$_DAEMON_AUTH" -e "$_DAEMON_INVALID_ISSUE" | LC_ALL=C sed 's/:.*//' | tr '\n' ',' || true)
+    fi
     err_lines=$(printf '%s\n' "$tail_content" | LC_ALL=C awk -v esc=",${esc_nums}" "$_DAEMON_DROP_TEST_OUTPUT" | LC_ALL=C grep -aiE "$_DAEMON_ERROR_LINE" || true)
 
     # W2-04: the typed classifier decides the auth and invalid-input classes. Both fail safe (no
@@ -154,6 +157,9 @@ _DAEMON_ERROR_LINE='gh auth login|error|fail|fatal|exception|::error::|enoent|ea
 # no negated class, no `.`, no [[:space:]], and every non-ASCII glyph is a literal alternative, never inside a
 # bracket, so LC_ALL=C (bytes) and a UTF-8 locale (characters) match the same lines. Every quantifier is bounded.
 _DAEMON_TAB=$'\t'
+# A monorepo or compose runner's own line prefix, stripped with the gh prefix (RUNNER in evidence.ts, #8715):
+# pnpm -r `packages/agent deploy: `, turbo `@acme/agent:run: `, docker compose `agent-1  | `. Case-sensitive.
+_DAEMON_RUNNER='([a-z0-9@_-]{1,60}/[a-z0-9@_/-]{1,100} [a-z0-9:_-]{1,50}: |@?[a-z0-9_-]{1,60}(/[a-z0-9_-]{1,60})?:[a-z][a-z0-9_-]{0,49}: |[A-Za-z0-9._-]{1,64}[_-][0-9]{1,3} {1,20}[|] )'
 # Model-written analysis, pipeline progress markers and loop commit subjects, dropped before every rule (MODEL_PROSE
 # and LOOP_COMMIT in evidence.ts). Their text is not evidence of what failed.
 _DAEMON_DROP_PROSE='
@@ -166,17 +172,20 @@ l ~ /^[ \t]*([^ \t]+[ \t]+)?(failure analyzed|failure diagnosis|analyzing failur
 # the result glyphs, jest's indented `● ` header, mocha's `  1) ` title block, jest/vitest console blocks, a cargo
 # panic message, the error under a vitest ` FAIL  file > test` header and pytest's captured output. Every block ends
 # at a gh step boundary; a free-text block (console, panic, vitest) also ends at a column-0 escalation line after
-# its first content line. `esc` lists those line numbers (",3,9,"), found with the escalation EREs. No intervals
+# its first content line, unless the line before it introduces quoted output (`...:`, `Error: Command failed: `).
+# `esc` lists those line numbers (",3,9,"), found with the escalation EREs. No intervals
 # or backslash escapes, so any awk (BSD, gawk, mawk) reads it the same.
+# The headers of the free-text blocks the escalation lines can end (console, panic, vitest in the awk below).
+_DAEMON_FREE_TEXT_BLOCK="^(stderr|stdout) [|] |^thread '[^']*' panicked at |^ ?FAIL  [^ ${_DAEMON_TAB}]|^(⎯)+ Unhandled (Rejection|Error)"
 _DAEMON_DROP_TEST_OUTPUT='
 /^##[[](group|endgroup|error)[]]/ || /^::error/ { mode = "" }
-(mode == "console" || mode == "panic" || mode == "vitest") && seen > 0 && $0 !~ /^[ \t]/ && index(esc, "," NR ",") { mode = "" }
-mode == "mocha" && /^[ \t]+[^ \t]/ { if ($0 ~ /:[ \t]*$/) mode = ""; seen++; next }
-mode == "jest" && /^[ \t]+[^ \t]/ { seen++; next }
-mode == "console" && $0 !~ /^[ \t]*$/ { seen++; next }
-mode == "panic" && $0 !~ /^(note|error|stack backtrace):/ && $0 !~ /^[ \t]*$/ { seen++; next }
-mode == "vitest" && $0 !~ /^ ❯ / && $0 !~ /^[ \t]*$/ { seen++; next }
-mode == "pytest" && $0 !~ /^(-----|=====|___|FAILED |ERROR [^ \t]+::|[0-9]+ (failed|passed|error))/ { seen++; next }
+(mode == "console" || mode == "panic" || mode == "vitest") && seen > 0 && prev !~ /:[ \t]*$/ && prev !~ /^Error: Command failed: / && $0 !~ /^[ \t]/ && index(esc, "," NR ",") { mode = "" }
+mode == "mocha" && /^[ \t]+[^ \t]/ { if ($0 ~ /:[ \t]*$/) mode = ""; seen++; prev = $0; next }
+mode == "jest" && /^[ \t]+[^ \t]/ { seen++; prev = $0; next }
+mode == "console" && $0 !~ /^[ \t]*$/ { seen++; prev = $0; next }
+mode == "panic" && $0 !~ /^(note|error|stack backtrace):/ && $0 !~ /^[ \t]*$/ { seen++; prev = $0; next }
+mode == "vitest" && $0 !~ /^ ❯ / && $0 !~ /^[ \t]*$/ { seen++; prev = $0; next }
+mode == "pytest" && $0 !~ /^(-----|=====|___|FAILED |ERROR [^ \t]+::|[0-9]+ (failed|passed|error))/ { seen++; prev = $0; next }
 { mode = ""; seen = 0 }
 /^[ \t]*console[.](log|error|warn|info|debug)[ \t]*$/ { mode = "jest"; next }
 /^(stderr|stdout) [|] / { mode = "console"; next }
@@ -190,10 +199,7 @@ mode == "pytest" && $0 !~ /^(-----|=====|___|FAILED |ERROR [^ \t]+::|[0-9]+ (fai
 # agent prose indent), an optional ISO timestamp, `[timestamp] `, `[ERROR] `, then up to three glyphs ✗ ✘ × ⚠. No
 # punctuation: `- `, `+ `, `> `, `| `, `* ` and `# ` start diff, quote, table, list and heading lines. Brackets are
 # matched as `[[]` and `[]]`, never `\]`, which POSIX ERE leaves undefined outside a bracket expression.
-# A runner's own line prefix (RUNNER in failure.ts): pnpm -r `packages/agent deploy: `, turbo `agent:run: `,
-# docker compose `agent-1  | ` (#8715).
-_DAEMON_RUNNER='([A-Za-z0-9@._-]{1,60}/[A-Za-z0-9@._/-]{1,100} [A-Za-z0-9:._-]{1,50}: |[A-Za-z0-9@/._-]{1,100}:[A-Za-z][A-Za-z0-9._-]{0,49}: |[A-Za-z0-9._-]{1,64}[_-][0-9]{1,3} {1,20}[|] )'
-_DAEMON_LEAD="^${_DAEMON_RUNNER}?([0-9]{4}[/-][0-9][0-9][/-][0-9][0-9][T ][0-9:.]{1,20}(Z|[+-][0-9][0-9]:?[0-9][0-9])? {1,2})?([[][0-9][0-9TZ:. +-]{0,38}[]] {1,2})?([[](error|err|fatal)[]] {1,2})?((✗|✘|×|⚠|"$'\xef\xb8\x8f'") {0,2}){0,3}"
+_DAEMON_LEAD="^([0-9]{4}[/-][0-9][0-9][/-][0-9][0-9][T ][0-9:.]{1,20}(Z|[+-][0-9][0-9]:?[0-9][0-9])? {1,2})?([[][0-9][0-9TZ:. +-]{0,38}[]] {1,2})?([[](error|err|fatal)[]] {1,2})?((✗|✘|×|⚠|"$'\xef\xb8\x8f'") {0,2}){0,3}"
 # Up to two tool or annotation prefixes (PREFIX).
 _DAEMON_PREFIX='((gh|error|fatal)[ :]{1,3}|##[[]error[]] ?|::error:: ?|claude[ ]code returned an error result: |fatal cli error: |cli exited [0-9]{1,3} with minimal output: |pr creation failed: |pull request create failed: |(plan|design) stage produced api/cli error instead of an? (plan|design): ){0,2}'
 _DAEMON_END="([ ${_DAEMON_TAB}]{0,3}\$|[.:;!,])"
@@ -235,7 +241,9 @@ _DAEMON_AUTH_INDENTED+="|- the token in [a-z_]{1,40} is invalid"
 _DAEMON_AUTH_INDENTED+="|error: failed to authenticate[.] api error: 40[13] ${_DAEMON_AUTH_BODY}|gh: http 401: bad credentials \\(https?://"
 # The raw Claude CLI JSON result object of a failed run, at column 0 (CLI_RESULT in failure.ts).
 _DAEMON_JSON_GAP='[A-Za-z0-9_":,. -]{0,255}'
-_DAEMON_CLI_RESULT="\\{\"type\": ?\"result\",${_DAEMON_JSON_GAP}\"is_error\": ?true,${_DAEMON_JSON_GAP}\"result\": ?\"(${_DAEMON_AUTH_PHRASES})"
+# The CLI's own auth texts only (CLI_RESULT_TEXT): a short list keeps the ERE small.
+_DAEMON_CLI_RESULT_TEXT='invalid api key|not logged in|oauth token (is |has |has been )?(expired|invalid|revoked)|failed to authenticate|api error: 40[13]|claude_code_oauth_token (is )?not set'
+_DAEMON_CLI_RESULT="\\{\"type\": ?\"result\",${_DAEMON_JSON_GAP}\"is_error\": ?true,${_DAEMON_JSON_GAP}\"result\": ?\"(${_DAEMON_CLI_RESULT_TEXT})"
 # The 401/403 response after its emitter's token at the lead-in (AUTH_RESPONSE).
 _DAEMON_SDK_ERROR='([a-z_]{1,30}[.]){0,3}(authentication|permissiondenied)error: (error code: )?'
 _DAEMON_AUTH_RESPONSE="${_DAEMON_LEAD}((●|⏺) |[ ${_DAEMON_TAB}]{0,4}⎿ {1,3})?${_DAEMON_PREFIX}(${_DAEMON_SDK_ERROR}|api error: |error code: )?40[13]( -)? ${_DAEMON_AUTH_BODY}"
