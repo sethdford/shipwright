@@ -16,7 +16,6 @@
     "docs/superpowers/**",
     "docs/adr/**",
     "docs/tmux-research/**",
-    ".claude/loop-logs/**",
     "tools/models/allowlist.json"
   ],
   "lines": [

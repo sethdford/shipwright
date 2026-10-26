@@ -161,7 +161,7 @@ _recovery_save_state() {
     if [[ -n "$state_json" ]]; then
         mkdir -p "$(dirname "$RECOVERY_STATE_FILE")"
         local tmp_file
-        tmp_file=$(mktemp 2>/dev/null || echo "${RECOVERY_STATE_FILE}.tmp")
+        tmp_file=$(mktemp 2>/dev/null || echo "${RECOVERY_STATE_FILE}.tmp.$$")
         echo "$state_json" > "$tmp_file"
         mv "$tmp_file" "$RECOVERY_STATE_FILE"
     fi
