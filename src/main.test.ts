@@ -51,7 +51,7 @@ test("top-level --version and -v print the package version", async () => {
   for (const flag of ["--version", "-v"]) {
     const c = io();
     expect(await main([flag], c.io)).toBe(0);
-    expect(c.out).toEqual(["3.3.0"]);
+    expect(c.out).toEqual(["4.0.0"]);
   }
 });
 
@@ -92,7 +92,7 @@ test("help lists aliases when present", async () => {
 test("args are forwarded to the command", async () => {
   const c = io();
   expect(await main(["hello", "--version"], c.io)).toBe(0);
-  expect(c.out).toEqual(["3.3.0"]);
+  expect(c.out).toEqual(["4.0.0"]);
 });
 
 test("a command gets the injected safety factory; hello never calls it", async () => {

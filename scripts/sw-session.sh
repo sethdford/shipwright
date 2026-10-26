@@ -9,7 +9,7 @@
 # ║  to select a terminal adapter (tmux, iterm2, wezterm).                  ║
 # ╚═══════════════════════════════════════════════════════════════════════════╝
 # shellcheck disable=SC2034
-VERSION="3.3.0"
+VERSION="4.0.0"
 set -euo pipefail
 
 # Agents run without GitHub credentials (#8614): claude is launched through agent-exec.sh.

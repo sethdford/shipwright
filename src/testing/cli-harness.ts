@@ -27,7 +27,7 @@ export function commandContext(
 ): CommandContext {
   return {
     io,
-    version: "3.3.0",
+    version: "4.0.0",
     env,
     safety: () => {
       if (!safety) throw new Error("this command was not given safety ports");

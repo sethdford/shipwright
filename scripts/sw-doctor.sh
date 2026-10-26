@@ -4,7 +4,7 @@
 # ║                                                                          ║
 # ║  Checks prerequisites, installed files, PATH, and common issues.        ║
 # ╚═══════════════════════════════════════════════════════════════════════════╝
-VERSION="3.3.0"
+VERSION="4.0.0"
 set -euo pipefail
 
 # Agents run without GitHub credentials (#8614): claude is launched through agent-exec.sh.

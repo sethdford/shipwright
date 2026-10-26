@@ -5,7 +5,7 @@
 # ║  Captures tmux pane scrollback and provides log browsing/search.        ║
 # ╚═══════════════════════════════════════════════════════════════════════════╝
 # shellcheck disable=SC2034
-VERSION="3.3.0"
+VERSION="4.0.0"
 set -euo pipefail
 
 # Agents run without GitHub credentials (#8614): claude is launched through agent-exec.sh.

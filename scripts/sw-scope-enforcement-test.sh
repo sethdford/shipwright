@@ -11,7 +11,7 @@ sw_test_isolate
 source "$SCRIPT_DIR/lib/helpers.sh"
 source "$SCRIPT_DIR/lib/scope-enforcement.sh"
 
-VERSION="3.3.0"
+VERSION="4.0.0"
 
 # Color codes
 PASS_COLOR="\033[32m"

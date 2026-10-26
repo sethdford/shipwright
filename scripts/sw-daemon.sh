@@ -13,7 +13,7 @@ unset CLAUDECODE 2>/dev/null || true
 trap '' HUP
 trap '' SIGPIPE
 
-VERSION="3.3.0"
+VERSION="4.0.0"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
 
