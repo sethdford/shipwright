@@ -180,7 +180,7 @@ mode == "pytest" && $0 !~ /^(-----|=====|___|FAILED |ERROR [^ \t]+::|[0-9]+ (fai
 /^[ \t]*([(](fail|pass|skip|todo)[)] |(✕|✓|√|✔|✖) )/ || /^[ \t]+(●|×) / { next }
 { print }'
 # The lead-in before an anchored phrase (LEAD in failure.ts): no leading whitespace (test runners, stack traces and
-# agent prose indent), an optional ISO timestamp, `[timestamp] `, `[ERROR] `, then up to two glyphs ✗ ✘ ×. No
+# agent prose indent), an optional ISO timestamp, `[timestamp] `, `[ERROR] `, then up to three glyphs ✗ ✘ × ⚠. No
 # punctuation: `- `, `+ `, `> `, `| `, `* ` and `# ` start diff, quote, table, list and heading lines. Brackets are
 # matched as `[[]` and `[]]`, never `\]`, which POSIX ERE leaves undefined outside a bracket expression.
 _DAEMON_LEAD="^([0-9]{4}[/-][0-9][0-9][/-][0-9][0-9][T ][0-9:.]{1,20}(Z|[+-][0-9][0-9]:?[0-9][0-9])? {1,2})?([[][0-9][0-9TZ:. +-]{0,38}[]] {1,2})?([[](error|err|fatal)[]] {1,2})?((✗|✘|×|⚠|"$'\xef\xb8\x8f'") {0,2}){0,3}"
@@ -206,7 +206,7 @@ _DAEMON_AUTH_PHRASES+="|(unhandled error: )?(requesterror [[]httperror[]]|httper
 _DAEMON_AUTH_PHRASES+="|request failed with status (code )?401(${_DAEMON_END}| unauthorized${_DAEMON_END})|401 unauthorized(${_DAEMON_END}| - )"
 _DAEMON_AUTH_PHRASES+="|claude_code_oauth_token (is )?not set${_DAEMON_END}"
 _DAEMON_AUTH_PHRASES+="|to use github cli in a github actions workflow, set the "
-_DAEMON_AUTH_PHRASES+="|could not read (username|password) for '${_DAEMON_URL_CHARS}{1,200}': (terminal prompts disabled|no such device or address)"
+_DAEMON_AUTH_PHRASES+="|could not read (username|password) for '${_DAEMON_URL_CHARS}{1,200}': (terminal prompts disabled|no such device or address|device not configured)"
 _DAEMON_AUTH_PHRASES+="|unable to access '${_DAEMON_URL_CHARS}{1,200}': the requested url returned error: 40[13]"
 _DAEMON_AUTH_PHRASES+="|remote: write access to repository not granted"
 _DAEMON_AUTH_PHRASES+="|[A-Za-z0-9._-]{1,64}@${_DAEMON_HOST}: permission denied \\(publickey"
@@ -226,7 +226,7 @@ _DAEMON_AUTH_INDENTED+="|- the token in [a-z_]{1,40} is invalid"
 _DAEMON_SDK_ERROR='([a-z_]{1,30}[.]){0,3}(authentication|permissiondenied)error: (error code: )?'
 _DAEMON_AUTH_RESPONSE="${_DAEMON_LEAD}((●|⏺) )?${_DAEMON_PREFIX}(${_DAEMON_SDK_ERROR}|api error: |error code: )?40[13]( -)? ${_DAEMON_AUTH_BODY}"
 _DAEMON_AUTH="${_DAEMON_LEAD}${_DAEMON_PREFIX}(${_DAEMON_AUTH_PHRASES})|^[ ${_DAEMON_TAB}]{0,8}(${_DAEMON_AUTH_INDENTED})|${_DAEMON_AUTH_RESPONSE}"
-_DAEMON_INVALID_ISSUE="${_DAEMON_LEAD}${_DAEMON_PREFIX}(graphql: could not resolve to an? (issue|pullrequest)([ ${_DAEMON_TAB}.,]|\$)"
+_DAEMON_INVALID_ISSUE="${_DAEMON_LEAD}${_DAEMON_PREFIX}(graphql( error)?: could not resolve to an? (issue|pullrequest)([ ${_DAEMON_TAB}.,]|\$)"
 _DAEMON_INVALID_ISSUE+="|http 404: not found \\(https://api\\.github\\.com/repos/[A-Za-z0-9._-]{1,100}/[A-Za-z0-9._-]{1,100}/(issues|pulls)/[0-9]{1,10}\\)"
 _DAEMON_INVALID_ISSUE+="|issue not found([ ${_DAEMON_TAB}]{0,5}\$|:)|issue #?[0-9]{1,10} does not exist${_DAEMON_END})"
 _DAEMON_CONTAMINATION="^([ ${_DAEMON_TAB}]|⚠|"$'\xef\xb8\x8f'"|✗|✘|×){0,4}Skipping integration tests: refusing to run inside a build-loop test gate[ ${_DAEMON_TAB}]{0,20}\$"

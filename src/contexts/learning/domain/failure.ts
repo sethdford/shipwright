@@ -55,7 +55,8 @@ interface Rule {
 // Real emitters (gh, git, the Claude CLI, Shipwright's own logs) print at column 0. Test runners (rspec, jest,
 // mocha, Playwright, node:test, go test), stack traces and verbose agent prose indent, so the lead-in allows no
 // leading whitespace. It is, in order: an optional ISO timestamp (`2026-10-25T12:00:00Z`, `+00:00`, `2026/10/25
-// 12:00:00`), an optional `[timestamp] `, an optional `[ERROR] `, then up to two of Shipwright's glyphs ✗ ✘ ×.
+// 12:00:00`), an optional `[timestamp] `, an optional `[ERROR] `, then up to three of Shipwright's glyphs ✗ ✘ × ⚠
+// (⚠ optionally with U+FE0F).
 // No punctuation: `- `, `+ `, `> `, `| `, `* ` and `# ` start diff, quote, table, list and heading lines.
 // Explicit and locale-independent, the same as bash (daemon-failure.sh, _DAEMON_LEAD) under LC_ALL=C and UTF-8.
 const LEAD = String.raw`^(?:\d{4}[\-/]\d\d[\-/]\d\d[T ][\d:.]{1,20}(?:Z|[+\-]\d\d:?\d\d)? {1,2})?(?:\[\d[\dTZ:. +\-]{0,38}\] {1,2})?(?:\[(?:error|err|fatal)\] {1,2})?(?:(?:✗|✘|×|⚠|\uFE0F) {0,2}){0,3}`;
@@ -89,7 +90,7 @@ const AUTH_PHRASES = [
   String.raw`401 unauthorized(?:${END}| - )`,
   String.raw`claude_code_oauth_token (?:is )?not set${END}`,
   "to use github cli in a github actions workflow, set the ",
-  String.raw`could not read (?:username|password) for '${URL_CHARS}{1,200}': (?:terminal prompts disabled|no such device or address)`,
+  String.raw`could not read (?:username|password) for '${URL_CHARS}{1,200}': (?:terminal prompts disabled|no such device or address|device not configured)`,
   String.raw`unable to access '${URL_CHARS}{1,200}': the requested url returned error: 40[13]`,
   "remote: write access to repository not granted",
   String.raw`[A-Za-z0-9._\-]{1,64}@${HOST}: permission denied \(publickey`,
@@ -122,7 +123,7 @@ const SDK_ERROR = String.raw`(?:[a-z_]{1,30}\.){0,3}(?:authentication|permission
 const AUTH_RESPONSE = String.raw`${LEAD}(?:(?:●|⏺) )?${PREFIX}(?:${SDK_ERROR}|api error: |error code: )?40[13](?: -)? ${AUTH_BODY}`;
 // gh lookup failures for an issue or PR number, anchored after LEAD and PREFIX.
 const INVALID_PHRASES = [
-  String.raw`graphql: could not resolve to an? (?:issue|pullrequest)(?:[ \t.,]|$)`,
+  String.raw`graphql(?: error)?: could not resolve to an? (?:issue|pullrequest)(?:[ \t.,]|$)`,
   String.raw`http 404: not found \(https:\/\/api\.github\.com\/repos\/[A-Za-z0-9._\-]{1,100}\/[A-Za-z0-9._\-]{1,100}\/(?:issues|pulls)\/\d{1,10}\)`,
   String.raw`issue not found(?:[ \t]{0,5}$|:)`,
   String.raw`issue #?\d{1,10} does not exist${END}`,

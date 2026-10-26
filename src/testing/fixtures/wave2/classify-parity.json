@@ -3992,6 +3992,333 @@
       "ts": "auth",
       "name": "verifier r6 c2/f3: design stage 401 body",
       "expect": "esc:auth"
+    },
+    {
+      "text": "\u001b[38;2;0;212;255m\u001b[1m▸\u001b[0m Creating PR...\n\u001b[38;2;248;113;113m\u001b[1m✗\u001b[0m PR creation failed: HTTP 401: Bad credentials (https://api.github.com/graphql)",
+      "bash": "auth_error",
+      "ts": "auth",
+      "name": "verifier r7 corpus/d1: delivery:427 24bit + HTTP 401 bad creds",
+      "expect": "esc:auth"
+    },
+    {
+      "text": "\u001b[38;2;248;113;113m\u001b[1m✗\u001b[0m PR creation failed: pull request create failed: GraphQL: Resource not accessible by integration (createPullRequest)",
+      "bash": "auth_error",
+      "ts": "auth",
+      "name": "verifier r7 corpus/d2: delivery:427 24bit + pull request create failed: GraphQL RNA",
+      "expect": "esc:auth"
+    },
+    {
+      "text": "\u001b[38;2;248;113;113m\u001b[1m✗\u001b[0m PR creation failed: To get started with GitHub CLI, please run:  gh auth login\nAlternatively, populate the GH_TOKEN environment variable with a GitHub API authentication token.",
+      "bash": "auth_error",
+      "ts": "auth",
+      "name": "verifier r7 corpus/d3: delivery:427 gh not logged in",
+      "expect": "esc:auth"
+    },
+    {
+      "text": "\u001b[38;2;248;113;113m\u001b[1m✗\u001b[0m PR creation failed: HTTP 401: Requires authentication (https://api.github.com/graphql)",
+      "bash": "auth_error",
+      "ts": "auth",
+      "name": "verifier r7 corpus/d4: delivery:427 HTTP 401 requires auth",
+      "expect": "esc:auth"
+    },
+    {
+      "text": "\u001b[38;2;248;113;113m\u001b[1m✗\u001b[0m PR creation failed: fatal: could not read Username for 'https://github.com': terminal prompts disabled",
+      "bash": "auth_error",
+      "ts": "auth",
+      "name": "verifier r7 corpus/d5: delivery:427 git-style could not read username via gh",
+      "expect": "esc:auth"
+    },
+    {
+      "text": "\u001b[38;2;248;113;113m\u001b[1m✗\u001b[0m PR creation failed: Warning: 1 uncommitted change\npull request create failed: HTTP 401: Bad credentials (https://api.github.com/graphql)",
+      "bash": "auth_error",
+      "ts": "auth",
+      "name": "verifier r7 corpus/d6: delivery:427 gh warn then error line2"
+    },
+    {
+      "text": "\u001b[38;2;248;113;113m\u001b[1m✗\u001b[0m PR creation failed: a pull request for branch \"fix/x\" into branch \"main\" already exists:\nhttps://github.com/o/r/pull/12",
+      "bash": "build_failure",
+      "ts": "unknown",
+      "name": "verifier r7 corpus/d7: delivery:427 PR exists (not esc)",
+      "expect": "noesc"
+    },
+    {
+      "text": "\u001b[38;2;250;204;21m\u001b[1m⚠\u001b[0m PR created with warnings: could not request reviewer: 'x' not found",
+      "bash": "unknown",
+      "ts": "unknown",
+      "name": "verifier r7 corpus/d8: delivery:425 warn PR created with warnings: reviewer 404"
+    },
+    {
+      "text": "\u001b[38;2;248;113;113m\u001b[1m✗\u001b[0m Plan stage produced API/CLI error instead of a plan: Invalid API key · Please run /login",
+      "bash": "auth_error",
+      "ts": "auth",
+      "name": "verifier r7 corpus/p1: plan:609 24bit invalid key",
+      "expect": "esc:auth"
+    },
+    {
+      "text": "\u001b[38;2;248;113;113m\u001b[1m✗\u001b[0m Plan stage produced API/CLI error instead of a plan: API Error: 401 {\"type\":\"error\",\"error\":{\"type\":\"authentication_error\",\"message\":\"invalid x-api-key\"}",
+      "bash": "auth_error",
+      "ts": "auth",
+      "name": "verifier r7 corpus/p2: plan:609 cut100 of API Error 401 body",
+      "expect": "esc:auth"
+    },
+    {
+      "text": "\u001b[38;2;248;113;113m\u001b[1m✗\u001b[0m Plan stage produced API/CLI error instead of a plan: Failed to authenticate. API Error: 401 {\"type\":\"error\",\"error\":{\"type\":\"authentication_error\",\"messa",
+      "bash": "auth_error",
+      "ts": "auth",
+      "name": "verifier r7 corpus/p3: plan:609 cut100 of Failed to authenticate. API Error 401",
+      "expect": "esc:auth"
+    },
+    {
+      "text": "\u001b[38;2;248;113;113m\u001b[1m✗\u001b[0m Design stage produced API/CLI error instead of a design: API Error: 401 {\"type\":\"error\",\"error\":{\"type\":\"authentication_error\",\"message\":\"OAuth token has exp",
+      "bash": "auth_error",
+      "ts": "auth",
+      "name": "verifier r7 corpus/p4: design:1099 cut100 OAuth",
+      "expect": "esc:auth"
+    },
+    {
+      "text": "\u001b[38;2;248;113;113m\u001b[1m✗\u001b[0m Plan stage produced API/CLI error instead of a plan: Error: Invalid API key · Please run /login",
+      "bash": "auth_error",
+      "ts": "auth",
+      "name": "verifier r7 corpus/p5: plan:609 Error: prefix invalid key",
+      "expect": "esc:auth"
+    },
+    {
+      "text": "\u001b[38;2;248;113;113m\u001b[1m✗\u001b[0m Plan stage produced API/CLI error instead of a plan: Invalid API key · Fix external API key",
+      "bash": "auth_error",
+      "ts": "auth",
+      "name": "verifier r7 corpus/p6: plan:609 credit-less: API key expired form? (Invalid API key · Fix external API key)",
+      "expect": "esc:auth"
+    },
+    {
+      "text": "\u001b[38;2;248;113;113m\u001b[1m✗\u001b[0m Plan stage produced API/CLI error instead of a plan: API Error: 429 {\"type\":\"error\",\"error\":{\"type\":\"rate_limit_error\",\"message\":\"Number of request",
+      "bash": "api_error",
+      "ts": "transient",
+      "name": "verifier r7 corpus/p8: plan:609 rate_limit (transient, not esc)",
+      "expect": "noesc"
+    },
+    {
+      "text": "\u001b[38;2;248;113;113m\u001b[1m✗\u001b[0m Plan stage produced API/CLI error instead of a plan: API Error: 529 {\"type\":\"error\",\"error\":{\"type\":\"overloaded_error\",\"message\":\"Overloaded\"}}",
+      "bash": "api_error",
+      "ts": "transient",
+      "name": "verifier r7 corpus/p9: plan:609 overloaded",
+      "expect": "noesc"
+    },
+    {
+      "text": "\u001b[38;2;248;113;113m\u001b[1m✗\u001b[0m Fatal CLI error: API Error: 401 {\"type\":\"error\",\"error\":{\"type\":\"authentication_error\",\"message\":\"invalid x-api-key\"},\"request_id\":\"req_0",
+      "bash": "auth_error",
+      "ts": "auth",
+      "name": "verifier r7 corpus/l1: loop:164 24bit cut120 401 body",
+      "expect": "esc:auth"
+    },
+    {
+      "text": "\u001b[38;2;248;113;113m\u001b[1m✗\u001b[0m CLI exited 1 with minimal output: \nInvalid API key · Please run /login",
+      "bash": "auth_error",
+      "ts": "auth",
+      "name": "verifier r7 corpus/l2: loop:176 multi-line content, first line blank",
+      "expect": "esc:auth"
+    },
+    {
+      "text": "\u001b[38;2;248;113;113m\u001b[1m✗\u001b[0m CLI exited 124 with minimal output: Not logged in · Please run /login",
+      "bash": "auth_error",
+      "ts": "auth",
+      "name": "verifier r7 corpus/l3: loop:176 exit 124",
+      "expect": "esc:auth"
+    },
+    {
+      "text": "\u001b[38;2;248;113;113m\u001b[1m✗\u001b[0m Fatal CLI error: Error: Invalid API key · Please run /login",
+      "bash": "auth_error",
+      "ts": "auth",
+      "name": "verifier r7 corpus/l4: loop:164 Error: prefix",
+      "expect": "esc:auth"
+    },
+    {
+      "text": "\u001b[38;2;248;113;113m\u001b[1m✗\u001b[0m CLI exited 1 with minimal output: Failed to authenticate. API Error: 403 {\"type\":\"error\",\"error\":{\"type\":\"permission_error\",\"message\":\"OAuth authentication is currently not supported.\"},\"request_id\":\"req_0",
+      "bash": "auth_error",
+      "ts": "auth",
+      "name": "verifier r7 corpus/l5: loop:176 403 permission_error",
+      "expect": "esc:auth"
+    },
+    {
+      "text": "\u001b[38;2;248;113;113m\u001b[1m✗\u001b[0m Fatal CLI error: Credit balance is too low · Add funds: https://console.anthropic.com/settings/billing",
+      "bash": "unknown",
+      "ts": "unknown",
+      "name": "verifier r7 corpus/l6: loop:164 billing (fatal_patterns)",
+      "expect": "noesc"
+    },
+    {
+      "text": "\u001b[38;2;248;113;113m\u001b[1m✗\u001b[0m Fatal CLI error: API Error: Connection error. connect ECONNREFUSED 127.0.0.1:443",
+      "bash": "unknown",
+      "ts": "unknown",
+      "name": "verifier r7 corpus/l7: loop:164 connection refused",
+      "expect": "noesc"
+    },
+    {
+      "text": "\u001b[38;2;250;204;21m\u001b[1m⚠\u001b[0m gh not authenticated — GitHub integration disabled",
+      "bash": "unknown",
+      "ts": "unknown",
+      "name": "verifier r7 corpus/s1: pipeline-github:43 gh not authenticated"
+    },
+    {
+      "text": "\u001b[38;2;250;204;21m\u001b[1m⚠\u001b[0m gh not authenticated — GitHub integration disabled\n\u001b[38;2;248;113;113m\u001b[1m✗\u001b[0m Failed to fetch issue #99999",
+      "bash": "build_failure",
+      "ts": "unknown",
+      "name": "verifier r7 corpus/s2: intake:38 Failed to fetch issue"
+    },
+    {
+      "text": "\u001b[38;2;248;113;113m\u001b[1m✗\u001b[0m Failed to fetch issue #99999",
+      "bash": "build_failure",
+      "ts": "unknown",
+      "name": "verifier r7 corpus/s3: intake:38 alone"
+    },
+    {
+      "text": "\u001b[38;2;250;204;21m\u001b[1m⚠\u001b[0m GraphQL error: Could not resolve to an Issue with the number of 99999.",
+      "bash": "invalid_issue",
+      "ts": "invalid_input",
+      "name": "verifier r7 corpus/s4: graphql:214 GraphQL error: could not resolve issue"
+    },
+    {
+      "text": "\u001b[38;2;248;113;113m\u001b[1m✗\u001b[0m GitHub API call failed after 4 attempts: HTTP 403: Resource not accessible by integration (https://api.github.com/repos/o/r/issues/5/labels)",
+      "bash": "build_failure",
+      "ts": "unknown",
+      "name": "verifier r7 corpus/s5: helpers:335 gh_with_retry (no callers)"
+    },
+    {
+      "text": "\u001b[38;2;0;212;255m\u001b[1m▸\u001b[0m Starting build loop: shipwright loop (max 20 iterations, 1 agent(s))\n  ✓ Claude session completed (2s, exit 1)\n\u001b[38;2;248;113;113m\u001b[1m✗\u001b[0m Build loop failed\n\u001b[38;2;248;113;113m\u001b[1m✗\u001b[0m Pipeline failed at stage: build",
+      "bash": "build_failure",
+      "ts": "unknown",
+      "name": "verifier r7 corpus/s6: build loop failed",
+      "expect": "noesc"
+    },
+    {
+      "text": "\u001b[38;2;248;113;113m\u001b[1m✗\u001b[0m Failed to push branch",
+      "bash": "build_failure",
+      "ts": "unknown",
+      "name": "verifier r7 corpus/s7: push failed",
+      "expect": "noesc"
+    },
+    {
+      "text": "\n\n===== Pipeline run 2026-10-26T12:00:00Z =====\n\u001b[38;2;0;212;255m\u001b[1m▸\u001b[0m Project: node\n\u001b[38;2;0;212;255m\u001b[1m▸\u001b[0m Issue #5: Fix x\n\u001b[38;2;0;212;255m\u001b[1m▸\u001b[0m Planning...\n\u001b[38;2;248;113;113m\u001b[1m✗\u001b[0m Plan stage produced API/CLI error instead of a plan: Invalid API key · Please run /login\n\u001b[38;2;250;204;21m\u001b[1m⚠\u001b[0m Stage plan failed (attempt 1/3, class: unknown) — retrying...\n\u001b[38;2;0;212;255m\u001b[1m▸\u001b[0m Backing off 5s before retry...\n\u001b[38;2;248;113;113m\u001b[1m✗\u001b[0m Plan stage produced API/CLI error instead of a plan: Invalid API key · Please run /login\n\u001b[38;2;248;113;113m\u001b[1m✗\u001b[0m Pipeline failed at stage: \u001b[1mplan\u001b[0m",
+      "bash": "auth_error",
+      "ts": "auth",
+      "name": "verifier r7 corpus/f1: full log tail: header, plan wrapper, failed at stage",
+      "expect": "esc:auth"
+    },
+    {
+      "text": "✗ Plan stage produced API/CLI error instead of a plan: Invalid API key · Please run /login",
+      "bash": "auth_error",
+      "ts": "auth",
+      "name": "verifier r7 corpus/n1: NO_COLOR plan wrapper",
+      "expect": "esc:auth"
+    },
+    {
+      "text": "\u001b[38;2;248;113;113m\u001b[1m✗\u001b[0m PR creation failed: GraphQL: Could not resolve to a PullRequest with the number of 99999. (repository.pullRequest)",
+      "bash": "invalid_issue",
+      "ts": "invalid_input",
+      "name": "verifier r7 corpus/i1: delivery:427 PR creation failed + could not resolve to an Issue? (unrealistic) - gh pr create --issue? use GraphQL PullRequest",
+      "expect": "esc:invalid_input"
+    },
+    {
+      "text": "fatal: could not read Username for 'https://github.com': Device not configured",
+      "bash": "auth_error",
+      "ts": "auth",
+      "name": "verifier r7 corpus2/g1: macOS git: Device not configured",
+      "expect": "esc:auth"
+    },
+    {
+      "text": "ERROR: Permission to o/r.git denied to deploy key.\nfatal: Could not read from remote repository.",
+      "bash": "auth_error",
+      "ts": "auth",
+      "name": "verifier r7 corpus2/g3: ssh ERROR: Permission to denied",
+      "expect": "esc:auth"
+    },
+    {
+      "text": "fatal: unable to access 'https://github.com/o/r.git/': The requested URL returned error: 403",
+      "bash": "auth_error",
+      "ts": "auth",
+      "name": "verifier r7 corpus2/g4: git 403 unable to access",
+      "expect": "esc:auth"
+    },
+    {
+      "text": "error validating token: HTTP 401: Bad credentials (https://api.github.com/)",
+      "bash": "unknown",
+      "ts": "unknown",
+      "name": "verifier r7 corpus2/g8: gh error validating token",
+      "expect": "esc:auth",
+      "limit": "Known limit 2: an emitter form, prefix or unclosed test-output block the classifier does not handle; the run is retried."
+    },
+    {
+      "text": "github.com\n  X Failed to log in to github.com account octocat (GH_TOKEN)\n  - Active account: true\n  - The token in GH_TOKEN is invalid.",
+      "bash": "auth_error",
+      "ts": "auth",
+      "name": "verifier r7 corpus2/g9: gh auth status token invalid (indented X)",
+      "expect": "esc:auth"
+    },
+    {
+      "text": "gh: Not Found (HTTP 404)\nHTTP 404: Not Found (https://api.github.com/repos/o/r/issues/99999)",
+      "bash": "invalid_issue",
+      "ts": "invalid_input",
+      "name": "verifier r7 corpus2/g10: gh HTTP 404 issues not found (gh api)",
+      "expect": "esc:invalid_input"
+    },
+    {
+      "text": "● Invalid API key · Please run /login",
+      "bash": "unknown",
+      "ts": "unknown",
+      "name": "verifier r7 corpus2/g12: claude 'Invalid API key · Please run /login' with ● prefix",
+      "expect": "esc:auth",
+      "limit": "Known limit 2: an emitter form, prefix or unclosed test-output block the classifier does not handle; the run is retried."
+    },
+    {
+      "text": "Error: Invalid API key · Please run /login",
+      "bash": "auth_error",
+      "ts": "auth",
+      "name": "verifier r7 corpus2/g13: claude cli: 'Error: Invalid API key'",
+      "expect": "esc:auth"
+    },
+    {
+      "text": "The test checks that the user is not logged in.",
+      "bash": "unknown",
+      "ts": "unknown",
+      "name": "verifier r7 corpus2/n1: prose: the user is not logged in.",
+      "expect": "noesc"
+    },
+    {
+      "text": "  ● auth › rejects bad token\n\n    expect(received).toBe(expected)\n\n    Expected: \"Bad credentials\"",
+      "bash": "unknown",
+      "ts": "unknown",
+      "name": "verifier r7 corpus2/n2: jest indented auth expect",
+      "expect": "noesc"
+    },
+    {
+      "text": "HTTP 401: Bad credentials (https://api.github.com/graphql)\n(fail) gh client > handles 401",
+      "bash": "auth_error",
+      "ts": "auth",
+      "name": "verifier r7 corpus2/n3: bun test file mocking gh output at col0 (limit1)",
+      "expect": "noesc",
+      "limit": "Known limit 1: output in the same form as the real emitter (at column 0, or the indented bare authentication_error after an error prefix, which the reviewer corpus requires to escalate)."
+    },
+    {
+      "text": "Authentication required.",
+      "bash": "auth_error",
+      "ts": "auth",
+      "name": "verifier r7 corpus2/n4: gh issue comment echo of agent message col0",
+      "expect": "noesc",
+      "limit": "Known limit 1: output in the same form as the real emitter (at column 0, or the indented bare authentication_error after an error prefix, which the reviewer corpus requires to escalate)."
+    },
+    {
+      "text": "Authentication failed.",
+      "bash": "auth_error",
+      "ts": "auth",
+      "name": "verifier r7 corpus2/n5: agent summary line col0 'Authentication failed.'",
+      "expect": "noesc",
+      "limit": "Known limit 1: output in the same form as the real emitter (at column 0, or the indented bare authentication_error after an error prefix, which the reviewer corpus requires to escalate)."
+    },
+    {
+      "text": "error: authentication_error mapping missing in classifier",
+      "bash": "unknown",
+      "ts": "unknown",
+      "name": "verifier r7 corpus2/n6: agent prose: Error: authentication_error is the type",
+      "expect": "noesc"
     }
   ]
 }
