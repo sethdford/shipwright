@@ -23,16 +23,16 @@ The intelligence layer consists of seven specialized modules that work together:
 
 ## Enabling Intelligence
 
-Intelligence is **enabled by default** with optimization and prediction active out of the box. Override in `.claude/daemon-config.json`:
+The intelligence flags default to `"auto"`. Each one turns on when the Claude CLI is detected, and `daemon init` writes these values. The modules that are off by default are `adversarial`, `simulation`, and `architecture`. Override in `.claude/daemon-config.json`:
 
 ```json
 {
   "intelligence": {
-    "enabled": true,
+    "enabled": "auto",
     "cache_ttl_seconds": 3600,
-    "composer_enabled": false,
-    "optimization_enabled": true,
-    "prediction_enabled": true,
+    "composer_enabled": "auto",
+    "optimization_enabled": "auto",
+    "prediction_enabled": "auto",
     "adversarial_enabled": false,
     "simulation_enabled": false,
     "architecture_enabled": false,
@@ -42,15 +42,15 @@ Intelligence is **enabled by default** with optimization and prediction active o
 }
 ```
 
-**Default configuration** (ships in `.claude/daemon-config.json`):
+**Default configuration** (written by `daemon init` to `.claude/daemon-config.json`):
 
-- `enabled: true` — Master switch (on by default)
-- `optimization_enabled: true` — Learn from every pipeline run (on by default)
-- `prediction_enabled: true` — Risk assessment before pipeline starts (on by default)
+- `enabled: "auto"` — Master switch. On when the Claude CLI is detected.
+- `optimization_enabled: "auto"` — Learn from every pipeline run
+- `prediction_enabled: "auto"` — Risk assessment before pipeline starts
 
 Enable additional modules as your workflows mature:
 
-- `composer_enabled: true` — Custom pipelines based on issue analysis (advanced)
+- `composer_enabled` — Custom pipelines based on issue analysis, set to `"auto"` by default (advanced)
 - `adversarial_enabled: true` — Extra code review pass (slower pipelines)
 - `simulation_enabled: true` — Simulate PR review before submitting
 - `architecture_enabled: true` — Enforce architectural patterns (requires initial model build)
@@ -165,7 +165,7 @@ The `sw-self-optimize.sh` module learns from every pipeline run and automaticall
 Records metrics from each completed pipeline:
 
 ```bash
-shipwright self-optimize analyze-outcome .claude/pipeline-state.md
+shipwright optimize analyze-outcome .claude/pipeline-state.md
 ```
 
 Tracks: complexity, template used, result, iterations, cost, and per-stage outcomes.
@@ -175,7 +175,7 @@ Tracks: complexity, template used, result, iterations, cost, and per-stage outco
 Analyzes success/failure rates per template and label combination:
 
 ```bash
-shipwright self-optimize tune
+shipwright optimize tune
 ```
 
 Adjusts template weights over time:
@@ -223,7 +223,7 @@ Switches from Opus to Sonnet when Sonnet achieves 90%+ success rate with suffici
 Prunes stale failure patterns, strengthens confirmed ones, and promotes cross-repo patterns:
 
 ```bash
-shipwright self-optimize evolve-memory
+shipwright optimize evolve-memory
 ```
 
 ### Context Efficiency Closed Loop
@@ -235,7 +235,7 @@ The self-optimization module includes a context efficiency feedback loop that an
 - **Automatic recommendations** — When utilization is consistently high (>90%), recommends increasing budget; when low (under 50%), recommends decreasing to save tokens; when trim ratio is high (>30%), recommends reducing verbose context sections
 
 ```bash
-shipwright self-optimize tune  # Includes context efficiency analysis
+shipwright optimize tune  # Includes context efficiency analysis
 ```
 
 Context efficiency events are also visible in the dashboard via the `/api/context-efficiency` endpoint.
@@ -423,10 +423,10 @@ shipwright intelligence cache-clear                   # Clear intelligence cache
 ### Self-Optimize
 
 ```bash
-shipwright self-optimize analyze-outcome <state-file> # Record pipeline outcome
-shipwright self-optimize tune                        # Run full optimization
-shipwright self-optimize report                      # Show 7-day report
-shipwright self-optimize evolve-memory               # Evolve memory patterns
+shipwright optimize analyze-outcome <state-file> # Record pipeline outcome
+shipwright optimize tune                        # Run full optimization
+shipwright optimize report                      # Show 7-day report
+shipwright optimize evolve-memory               # Evolve memory patterns
 ```
 
 ### Predict
@@ -464,11 +464,11 @@ All intelligence settings go in `.claude/daemon-config.json` under `intelligence
 
 | Setting                | Default | Purpose                                              |
 | ---------------------- | ------- | ---------------------------------------------------- |
-| `enabled`              | `true`  | Master switch (enabled by default)                   |
+| `enabled`              | `"auto"` | Master switch (on when the Claude CLI is detected)  |
 | `cache_ttl_seconds`    | `3600`  | How long analysis results are cached                 |
-| `composer_enabled`     | `false` | Enable dynamic pipeline composition                  |
-| `optimization_enabled` | `true`  | Enable self-tuning based on DORA metrics             |
-| `prediction_enabled`   | `true`  | Enable risk assessment and anomaly detection         |
+| `composer_enabled`     | `"auto"` | Enable dynamic pipeline composition                 |
+| `optimization_enabled` | `"auto"` | Enable self-tuning based on DORA metrics            |
+| `prediction_enabled`   | `"auto"` | Enable risk assessment and anomaly detection        |
 | `adversarial_enabled`  | `false` | Enable adversarial code review pass                  |
 | `simulation_enabled`   | `false` | Enable developer workflow simulation                 |
 | `architecture_enabled` | `false` | Enable architecture rule enforcement                 |
@@ -490,9 +490,9 @@ Clear cache with `shipwright intelligence cache-clear`.
 
 ### Feature Flag Interactions
 
-Optimization and prediction are enabled by default. Enable additional features in order of impact:
+Optimization and prediction default to `"auto"`, which turns them on when the Claude CLI is detected. Enable additional features in order of impact:
 
-1. **Default:** `optimization_enabled: true` + `prediction_enabled: true` — Active out of the box
+1. **Default:** `optimization_enabled` + `prediction_enabled` set to `"auto"` — Active when the Claude CLI is detected
 2. **Phase 2:** `simulation_enabled: true` — Simulated PR review (adds time)
 3. **Phase 3:** `adversarial_enabled: true` — Red-team review (slower)
 4. **Advanced:** `architecture_enabled: true`, `composer_enabled: true`
@@ -516,7 +516,7 @@ Shows cache hit rate and age of entries.
 ### Review Optimization Report
 
 ```bash
-shipwright self-optimize report
+shipwright optimize report
 ```
 
 Shows last 7 days of metrics, template weights, model routing recommendations, and iteration model statistics.
@@ -539,7 +539,7 @@ cat ~/.shipwright/memory/<repo-hash>/architecture.json | jq .
 
 ### Intelligence Disabled or Unavailable
 
-Ensure `enabled: true` in daemon config and Claude CLI is available:
+Ensure `intelligence.enabled` is `"auto"` or `true` in daemon config and the Claude CLI is available:
 
 ```bash
 which claude
@@ -574,7 +574,7 @@ Then validate changes. Model must exist for validation to work.
 
 See related guides for complementary features:
 
-- [Persistent Memory](/guides/memory/) — How the system learns from failures
-- [Cost Intelligence](/guides/cost/) — Token tracking and budget management
-- [Self-Optimization](/guides/cost/#continuous-optimization) — DORA-driven tuning
-- [Continuous Loop](/guides/loop/) — The autonomous development loop
+- [Persistent Memory](/shipwright/guides/memory/) — How the system learns from failures
+- [Cost Intelligence](/shipwright/guides/cost/) — Token tracking and budget management
+- [Self-Optimization](#self-optimization) — DORA-driven tuning
+- [Continuous Loop](/shipwright/guides/loop/) — The autonomous development loop

@@ -1,5 +1,6 @@
 import { defineConfig } from "astro/config";
 import starlight from "@astrojs/starlight";
+import starlightLinksValidator from "starlight-links-validator";
 
 // Expressive Code gives the copy button only a title. This sets an explicit aria-label,
 // which screen readers announce before the title fallback.
@@ -31,6 +32,9 @@ export default defineConfig({
       components: {
         Footer: "./src/components/Footer.astro",
       },
+      // Fails the build on broken internal links (missing /shipwright base, dead pages,
+      // bad #anchors). Content links only; external URLs are never fetched.
+      plugins: [starlightLinksValidator()],
       title: "Shipwright",
       description:
         "Orchestrate AI coding teams with autonomous agents, delivery pipelines, and DORA metrics.",
@@ -49,6 +53,7 @@ export default defineConfig({
           label: "Getting Started",
           items: [
             { label: "Quick Start", link: "/quick-start/" },
+            { label: "Upgrading to 4.0", link: "/upgrading/" },
             { label: "Compare", link: "/compare/" },
           ],
         },

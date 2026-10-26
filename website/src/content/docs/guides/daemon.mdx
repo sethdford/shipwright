@@ -7,7 +7,7 @@ The daemon (`shipwright daemon`) runs in the background, polling GitHub for new 
 
 ## How It Works
 
-1. The daemon polls your GitHub repo (or entire org) for issues with a configurable label (default: `ready-to-build`)
+1. The daemon polls your GitHub repo (or entire org) for issues with a configurable label (default: `shipwright`)
 2. Each issue is scored by **intelligent triage** — with the intelligence layer enabled, Claude semantically analyzes each issue for complexity, risk, and optimal approach; without it, scoring uses 6 heuristic dimensions (priority, age, complexity, dependencies, type, memory)
 3. Issues are processed in triage-score order; **priority lane** issues bypass the queue
 4. The daemon **auto-selects a pipeline template** based on issue labels and triage score (when `auto_template` is enabled)
@@ -233,9 +233,9 @@ Configure patrol behavior:
 
 ## AI-Powered Patrol
 
-When the intelligence layer is enabled (`intelligence.predictive_enabled` in daemon-config.json), patrol scans are enhanced with AI analysis. Instead of relying solely on grep-based checks, Claude reads sampled source files, test files, and recent git history to perform holistic codebase analysis. The existing grep checks serve as pre-filters, and Claude confirms or dismisses findings — reducing false positive rates significantly.
+When the intelligence layer is enabled (`intelligence.prediction_enabled` in daemon-config.json), patrol scans are enhanced with AI analysis. Instead of relying solely on grep-based checks, Claude reads sampled source files, test files, and recent git history to perform holistic codebase analysis. The existing grep checks serve as pre-filters, and Claude confirms or dismisses findings — reducing false positive rates significantly.
 
-See the [Intelligence guide](/guides/intelligence/) for details on predictive analytics and AI patrol.
+See the [Intelligence guide](/shipwright/guides/intelligence/) for details on predictive analytics and AI patrol.
 
 ## Degradation Detection
 
@@ -261,11 +261,11 @@ Alerts are logged and sent to Slack if a webhook is configured.
 
 ## Configuration
 
-After running `shipwright daemon init`, edit the configuration file at `.claude/daemon-config.json`:
+After running `shipwright daemon init`, edit the configuration file at `.claude/daemon-config.json`. `daemon init` writes `auto_template`, `self_optimize`, and `priority_lane` as `false`. The example below turns them on:
 
 ```json
 {
-  "watch_label": "ready-to-build",
+  "watch_label": "shipwright",
   "poll_interval": 60,
   "max_parallel": 2,
   "pipeline_template": "autonomous",
@@ -300,7 +300,7 @@ After running `shipwright daemon init`, edit the configuration file at `.claude/
 }
 ```
 
-See [Configuration reference](/reference/configuration/) for the full list of fields.
+See [Configuration reference](/shipwright/reference/configuration/) for the full list of fields.
 
 ## Auto-Scaling
 

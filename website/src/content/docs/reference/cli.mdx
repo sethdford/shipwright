@@ -106,8 +106,8 @@ shipwright loop "<goal>" [flags]
 | `--quality-gates`             | Run tests as gates between iterations | off           |
 | `--definition-of-done <file>` | Completion checklist                  | none          |
 | `--agents <n>`                | Number of agents                      | 1             |
-| `--max-iterations <n>`        | Maximum iterations                    | 10            |
-| `--model <model>`             | Claude model                          | default       |
+| `--max-iterations <n>`        | Maximum iterations                    | 20            |
+| `--model <model>`             | Claude model (or set `SW_MODEL`)      | `opus`        |
 | `--resume`                    | Resume interrupted loop               | —             |
 
 **Examples:**
@@ -119,7 +119,7 @@ shipwright loop "Build checkout" --definition-of-done requirements.md
 shipwright loop --resume
 ```
 
-See [Continuous Loop guide](/guides/loop/) for details.
+See [Continuous Loop guide](/shipwright/guides/loop/) for details.
 
 ## Delivery Pipeline
 
@@ -137,7 +137,7 @@ shipwright pipeline start [flags]
 | ----------------------- | ------------------------------------------------------------ |
 | `--goal <text>`         | Goal description                                             |
 | `--issue <number>`      | GitHub issue number                                          |
-| `--pipeline <template>` | Pipeline template (standard, fast, full, hotfix, autonomous) |
+| `--pipeline <template>` | Pipeline template: `standard` (default), `fast`, `hotfix`, `tdd`, `full`, `autonomous`, `deployed`, `enterprise`, or `cost-aware` |
 | `--test-cmd <cmd>`      | Override auto-detected test command                          |
 | `--agents <n>`          | Number of build agents                                       |
 | `--self-heal <n>`       | Max self-healing cycles                                      |
@@ -186,7 +186,7 @@ View details of a pipeline template.
 shipwright pipeline show <template>
 ```
 
-See [Delivery Pipeline guide](/guides/pipeline/) for details.
+See [Delivery Pipeline guide](/shipwright/guides/pipeline/) for details.
 
 ## Daemon
 
@@ -245,7 +245,7 @@ shipwright daemon patrol                         # Run proactive codebase patrol
 shipwright daemon patrol --dry-run               # Show what patrol would find
 ```
 
-See [Autonomous Daemon guide](/guides/daemon/) for details.
+See [Autonomous Daemon guide](/shipwright/guides/daemon/) for details.
 
 ## Fleet Operations
 
@@ -280,7 +280,7 @@ shipwright fleet metrics --period 30             # 30-day aggregate
 shipwright fleet stop                            # Stop everything
 ```
 
-See [Fleet Operations guide](/guides/fleet/) for details.
+See [Fleet Operations guide](/shipwright/guides/fleet/) for details.
 
 ## Bulk Fix
 
@@ -314,7 +314,7 @@ shipwright fix "Bump Node to 22" --repos-from repos.txt --pipeline hotfix
 shipwright fix --status
 ```
 
-See [Bulk Fix guide](/guides/fix/) for details.
+See [Bulk Fix guide](/shipwright/guides/fix/) for details.
 
 ## Memory
 
@@ -355,7 +355,7 @@ shipwright memory capture .claude/pipeline-state.md .claude/pipeline-artifacts
 shipwright memory inject build                                   # Get context for build stage
 ```
 
-See [Memory guide](/guides/memory/) for details.
+See [Memory guide](/shipwright/guides/memory/) for details.
 
 ## Cost Intelligence
 
@@ -391,9 +391,11 @@ Token usage tracking, budget enforcement, and spending analysis.
 
 | Model  | Input  | Output |
 | ------ | ------ | ------ |
-| opus   | $15.00 | $75.00 |
+| opus   | $5.00  | $25.00 |
 | sonnet | $3.00  | $15.00 |
-| haiku  | $0.25  | $1.25  |
+| haiku  | $1.00  | $5.00  |
+
+These are built-in defaults. Override them with `~/.shipwright/model-pricing.json`.
 
 **Examples:**
 
@@ -402,10 +404,10 @@ shipwright cost show                              # 7-day cost summary
 shipwright cost show --period 30 --by-stage       # 30-day breakdown by stage
 shipwright cost budget set 50.00                  # Set $50/day limit
 shipwright cost budget show                       # Check current budget
-shipwright cost calculate 50000 10000 opus        # Estimate cost
+shipwright cost calculate 50000 10000 opus        # Prints the estimated USD cost (0.5000)
 ```
 
-See [Cost Intelligence guide](/guides/cost/) for details.
+See [Cost Intelligence guide](/shipwright/guides/cost/) for details.
 
 ## Repo Preparation
 
@@ -419,18 +421,15 @@ shipwright prep [flags]
 
 **Flags:**
 
-| Flag             | Description                              |
-| ---------------- | ---------------------------------------- |
-| `--dry-run`      | Preview without writing files            |
-| `--path <dir>`   | Target directory                         |
-| `--force`        | Overwrite existing configs               |
-| `--no-hooks`     | Skip hook generation                     |
-| `--no-claude-md` | Skip CLAUDE.md generation                |
-| `--check`        | Check repo readiness without writing     |
-| `--update`       | Update existing configs (preserve edits) |
-| `--with-claude`  | Run Claude analysis for smarter configs  |
+| Flag            | Description                                               |
+| --------------- | --------------------------------------------------------- |
+| `--force`       | Overwrite existing files                                  |
+| `--check`       | Audit existing prep without writing (dry run)             |
+| `--update`      | Refresh auto-generated sections only, keeping your edits  |
+| `--interactive` | Interactive quality profile dialogue                      |
+| `--with-claude` | Deep analysis using Claude Code (slower, richer)          |
 
-See [Repo Preparation guide](/guides/prep/) for details.
+See [Repo Preparation guide](/shipwright/guides/prep/) for details.
 
 ## Maintenance
 
@@ -486,7 +485,16 @@ shipwright dashboard start        # Start in background
 shipwright dashboard stop         # Stop background dashboard
 ```
 
-Requires [Bun](https://bun.sh) runtime. The dashboard server runs on port 3000 and uses WebSockets for real-time updates.
+Requires [Bun](https://bun.sh) 1.2.19+. The dashboard server listens on port 8767 by default and binds to `127.0.0.1`. Use `--port <N>` to change the port.
+
+```bash
+shipwright dashboard --port 8080                  # Different port
+shipwright dashboard --host 0.0.0.0               # Bind to all interfaces (server or fleet mode)
+SW_DASHBOARD_HOST=0.0.0.0 shipwright dashboard    # Same as --host, via environment variable
+shipwright dashboard status                       # Show server status
+```
+
+Only use `--host 0.0.0.0` on a trusted network, since it exposes the dashboard beyond the local machine.
 
 ## Heartbeats
 
@@ -511,8 +519,10 @@ Save and restore pipeline state for resilience and recovery.
 | Subcommand                             | Description                 |
 | -------------------------------------- | --------------------------- |
 | `shipwright checkpoint list`           | List saved checkpoints      |
-| `shipwright checkpoint save [name]`    | Save current pipeline state |
-| `shipwright checkpoint restore <name>` | Restore from a checkpoint   |
+| `shipwright checkpoint save --stage <name>`    | Save current pipeline state for a stage |
+| `shipwright checkpoint restore --stage <name>` | Restore from a checkpoint for a stage   |
+| `shipwright checkpoint clear --stage <name>`   | Remove a stage's checkpoint (`--all` removes every checkpoint) |
+| `shipwright checkpoint expire`                 | Remove checkpoints older than N hours   |
 
 Checkpoints are stored in `.claude/pipeline-artifacts/checkpoints/`.
 
@@ -540,7 +550,7 @@ Manage distributed worker machines for scaling pipeline execution across multipl
 
 Machine registry is stored at `~/.shipwright/machines.json`.
 
-See [Advanced Features](/reference/advanced/) for details.
+See [Advanced Features](/shipwright/reference/advanced/) for details.
 
 ## Issue Tracking
 
@@ -549,7 +559,8 @@ See [Advanced Features](/reference/advanced/) for details.
 Generic issue tracker integration that routes to provider-specific implementations.
 
 ```bash
-shipwright tracker config         # Show tracker configuration
+shipwright tracker init           # Configure the tracker provider
+shipwright tracker status         # Show tracker configuration
 shipwright tracker notify <event> <issue> <data>   # Send event to tracker
 ```
 
@@ -558,7 +569,7 @@ shipwright tracker notify <event> <issue> <data>   # Send event to tracker
 Linear issue tracker integration for bidirectional sync between pipelines and Linear issues.
 
 ```bash
-shipwright linear setup           # Configure Linear integration
+shipwright linear init            # Configure Linear integration
 shipwright linear sync <issue>    # Sync issue status to Linear
 ```
 
@@ -567,15 +578,15 @@ shipwright linear sync <issue>    # Sync issue status to Linear
 Jira issue tracker integration.
 
 ```bash
-shipwright jira setup             # Configure Jira integration
+shipwright jira init              # Configure Jira integration
 shipwright jira sync <issue>      # Sync issue status to Jira
 ```
 
-Configuration is stored at `~/.shipwright/tracker-config.json`. See [Issue Tracking guide](/guides/tracking/) for setup instructions.
+Configuration is stored at `~/.shipwright/tracker-config.json`. See [Issue Tracking guide](/shipwright/guides/tracking/) for setup instructions.
 
 ## Intelligence Layer
 
-The intelligence layer provides AI-powered analysis and optimization. All intelligence features are behind feature flags and off by default — enable them in `daemon-config.json`.
+The intelligence layer provides AI-powered analysis and optimization. All intelligence features are behind feature flags in `daemon-config.json`. The flags default to `"auto"`, which turns them on when the Claude CLI is detected. Set a flag to `false` to disable it.
 
 ### `shipwright intelligence`
 
@@ -597,8 +608,8 @@ Core intelligence engine for semantic analysis, pipeline composition, cost predi
 ```bash
 shipwright intelligence analyze '{"title":"Add auth","labels":["feature"]}'
 shipwright intelligence compose <issue_json>
-shipwright intelligence predict --stage build --goal "Refactor API"
-shipwright intelligence recommend-model --stage test
+shipwright intelligence predict '{"title":"Refactor API"}'
+shipwright intelligence recommend-model test
 ```
 
 ### `shipwright optimize`
@@ -617,7 +628,7 @@ Self-optimization and learning system. Analyzes outcomes, tunes template weights
 ```bash
 shipwright optimize analyze-outcome .claude/pipeline-state.md
 shipwright optimize tune
-shipwright optimize report --period 30
+shipwright optimize report
 ```
 
 ### `shipwright predict`
@@ -636,23 +647,23 @@ Predictive analytics for risk assessment, anomaly detection, and proactive codeb
 ```bash
 shipwright predict risk '{"title":"Add payment","complexity":7}'
 shipwright predict anomaly build duration 45.3
-shipwright predict patrol src/ --git-log commits.log
+shipwright predict patrol "src/auth.ts src/db.ts" "$(git log --oneline -20)"
 ```
 
-### `shipwright developer-simulation`
+### `shipwright simulation`
 
 Multi-persona code review using simulated developer personas (security, performance, maintainability).
 
 | Subcommand                                | Description                 |
 | ----------------------------------------- | --------------------------- |
-| `shipwright developer-simulation review`  | Run 3-persona PR review     |
-| `shipwright developer-simulation address` | Address reviewer objections |
+| `shipwright simulation review`  | Run 3-persona PR review     |
+| `shipwright simulation address` | Address reviewer objections |
 
 **Examples:**
 
 ```bash
-shipwright developer-simulation review <code_diff> "<PR description>"
-shipwright developer-simulation address <objections_json> "<implementation context>"
+shipwright simulation review <code_diff> "<PR description>"
+shipwright simulation address <objections_json> "<implementation context>"
 ```
 
 ### `shipwright adversarial`
@@ -694,16 +705,17 @@ All intelligence features are controlled via feature flags in `.claude/daemon-co
 ```json
 {
   "intelligence": {
-    "enabled": true,
-    "analyze_enabled": true,
-    "compose_enabled": true,
-    "optimize_enabled": true,
-    "predict_enabled": true,
-    "adversarial_enabled": true,
-    "simulation_enabled": true,
-    "architecture_enabled": true
+    "composer_enabled": "auto",
+    "optimization_enabled": "auto",
+    "prediction_enabled": "auto",
+    "adaptive_enabled": "auto",
+    "adversarial_enabled": false,
+    "simulation_enabled": false,
+    "architecture_enabled": false
   }
 }
 ```
 
-See [Intelligence guide](/guides/intelligence/) for detailed setup and examples.
+`"auto"` turns a flag on when the Claude CLI is detected. `daemon init` writes these defaults. The adversarial, simulation, and architecture flags default to `false`.
+
+See [Intelligence guide](/shipwright/guides/intelligence/) for detailed setup and examples.

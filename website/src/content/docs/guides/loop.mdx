@@ -105,11 +105,12 @@ A DoD file is a markdown checklist that the agent must verify before declaring c
 | `--quality-gates`             | Run test command as a gate between iterations |
 | `--definition-of-done <file>` | Markdown checklist for completion criteria    |
 | `--agents <n>`                | Number of agents (default: 1)                 |
-| `--max-iterations <n>`        | Safety limit on loop iterations               |
+| `--max-iterations <n>`        | Safety limit on loop iterations (default: 20) |
 | `--resume`                    | Resume an interrupted loop                    |
-| `--model <model>`             | Claude model to use                           |
+| `--model <model>`             | Claude model to use (default: `opus`)         |
 | `--worktree`                  | Use git worktrees for agent isolation         |
-| `--skip-permissions`          | Pass --dangerously-skip-permissions to Claude |
+
+Agents always run under the least-privilege policy in `config/agent-permissions.json`. The `--skip-permissions` flag is accepted for compatibility and ignored.
 | `--max-turns <n>`             | Max API turns per Claude session              |
 | `--verbose`                   | Show full Claude output                       |
 | `--no-auto-extend`            | Disable auto-extension of iterations          |

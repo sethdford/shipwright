@@ -128,6 +128,22 @@ shipwright fleet metrics --json
 
 The per-repo breakdown shows completed pipelines, pass/fail counts, deployment frequency per week, and change failure rate for each repository.
 
+## Sharing the Fleet Dashboard
+
+To view a fleet dashboard from other machines, run the dashboard server on the host that will serve it, and bind it to all interfaces:
+
+```bash
+shipwright dashboard --host 0.0.0.0
+```
+
+The default bind address is `127.0.0.1`, so the dashboard is unreachable from other machines without `--host 0.0.0.0` (or `SW_DASHBOARD_HOST=0.0.0.0`).
+
+Team members or worker machines join with an invite token. The token is never passed as a command-line argument. Provide it by one of these methods:
+
+- **Prompt:** run `shipwright connect join --url <dashboard-url>` and enter the token when asked
+- **Stdin:** pipe the token into the command
+- **File:** `shipwright connect join --url <dashboard-url> --token-file <path>`
+
 ## Tips
 
 - **Auto-detection** — `fleet init` scans sibling directories for git repos, so run it from a directory alongside your projects.

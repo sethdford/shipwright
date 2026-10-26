@@ -26,6 +26,7 @@
       name="twitter:description"
       content="Autonomous Claude Code agent teams. Delivery pipelines, fleet ops, DORA metrics."
     />
+    <link rel="icon" href="favicon.svg" type="image/svg+xml" />
     <link rel="canonical" href="https://sethdford.github.io/shipwright/" />
 
     <link rel="preconnect" href="https://fonts.googleapis.com" />
@@ -1747,7 +1748,7 @@
 
       <div class="hero-badge">
         <span class="dot"></span>
-        v1.7.1 — Autonomous Fleet Command
+        v4.0.0 — Autonomous Fleet Command
       </div>
 
       <h1 class="hero-title">
@@ -1801,11 +1802,11 @@
       <p>Built for engineering teams who ship</p>
       <div class="stats-row">
         <div class="stat-item">
-          <div class="stat-value" data-stat="24">0</div>
+          <div class="stat-value" data-stat="25">0</div>
           <div class="stat-label">Team Templates</div>
         </div>
         <div class="stat-item">
-          <div class="stat-value" data-stat="12">0</div>
+          <div class="stat-value" data-stat="15">0</div>
           <div class="stat-label">Pipeline Stages</div>
         </div>
         <div class="stat-item">
@@ -1857,7 +1858,7 @@
               <span class="layer-role">Orchestration &amp; Delivery</span>
             </div>
             <div class="layer-chips">
-              <span class="layer-chip">12-stage pipelines</span>
+              <span class="layer-chip">15-stage pipelines</span>
               <span class="layer-chip">Autonomous daemon</span>
               <span class="layer-chip">Fleet operations</span>
               <span class="layer-chip">Persistent memory</span>
@@ -2259,31 +2260,31 @@
 
         <div class="scale-grid gs-reveal">
           <div class="scale-card">
-            <div class="scale-number" data-count="12">0</div>
+            <div class="scale-number" data-count="15">0</div>
             <div class="scale-unit">Pipeline Stages</div>
             <div class="scale-detail">
               Intake to monitoring, every step automated
             </div>
           </div>
           <div class="scale-card">
-            <div class="scale-number" data-count="48">0</div>
+            <div class="scale-number" data-count="109">0</div>
             <div class="scale-unit">Scripts</div>
             <div class="scale-detail">
-              ~51K lines of bash powering the entire platform
+              ~117K lines of non-test bash powering the entire platform
             </div>
           </div>
           <div class="scale-card">
-            <div class="scale-number" data-count="24">0</div>
+            <div class="scale-number" data-count="25">0</div>
             <div class="scale-unit">Team Templates</div>
             <div class="scale-detail">
               Full SDLC coverage — build, quality, ops, planning
             </div>
           </div>
           <div class="scale-card">
-            <div class="scale-number" data-count="400">0</div>
-            <div class="scale-unit">Tests Passing</div>
+            <div class="scale-number" data-count="174">0</div>
+            <div class="scale-unit">Shell Test Suites</div>
             <div class="scale-detail">
-              22 test suites covering every module end-to-end
+              Bash test suites covering the scripts, plus TypeScript and dashboard tests
             </div>
           </div>
         </div>
@@ -2298,7 +2299,7 @@
         <div class="gs-reveal">
           <div class="section-label">Crew Manifests</div>
           <h2 class="section-title">
-            24 specialized crews.<br />Every mission covered.
+            25 specialized crews.<br />Every mission covered.
           </h2>
           <p class="section-desc">
             From feature development to security audits — pre-configured agent
@@ -2482,7 +2483,7 @@
             <div class="os-card-icon">
               <svg class="icon"><use href="icons.svg#icon-fleet" /></svg>
             </div>
-            <h3>24 Templates, 8 Pipelines</h3>
+            <h3>25 Templates, 9 Pipelines</h3>
             <p>
               Pre-configured agent teams for every phase of the SDLC. 7
               intelligence modules, GitHub API integration, cost intelligence
@@ -2539,13 +2540,13 @@
               class="install-option"
               onclick="
                 navigator.clipboard.writeText(
-                  'curl -fsSL https://raw.githubusercontent.com/sethdford/shipwright/main/scripts/install-remote.sh | sh',
+                  'curl -fsSL https://raw.githubusercontent.com/sethdford/shipwright/main/scripts/install-remote.sh | bash',
                 )
               "
             >
               <span class="install-method">curl</span>
               <span class="install-code"
-                >curl -fsSL .../install-remote.sh | sh</span
+                >curl -fsSL .../install-remote.sh | bash</span
               >
             </div>
           </div>
@@ -2910,12 +2911,15 @@
       (function () {
         const stages = [
           { name: "intake", icon: "#icon-intake", status: "complete" },
+          { name: "spec_generation", icon: "#icon-plan", status: "complete" },
           { name: "plan", icon: "#icon-plan", status: "complete" },
           { name: "design", icon: "#icon-design", status: "complete" },
           { name: "build", icon: "#icon-build", status: "complete" },
           { name: "test", icon: "#icon-test", status: "complete" },
           { name: "review", icon: "#icon-review", status: "complete" },
-          { name: "quality", icon: "#icon-quality", status: "active" },
+          { name: "spec_verification", icon: "#icon-review", status: "complete" },
+          { name: "compound_quality", icon: "#icon-compound-quality", status: "active" },
+          { name: "audit", icon: "#icon-security-audit", status: "pending" },
           { name: "pr", icon: "#icon-pr", status: "pending" },
           { name: "merge", icon: "#icon-merge", status: "pending" },
           { name: "deploy", icon: "#icon-deploy", status: "pending" },
@@ -2990,7 +2994,7 @@
             "text",
           );
           label.setAttribute("x", cx);
-          label.setAttribute("y", cy + 34);
+          label.setAttribute("y", cy + 34 + (i % 2) * 16);
           label.setAttribute("text-anchor", "middle");
           label.setAttribute(
             "fill",
@@ -3136,7 +3140,7 @@
             html: '<span class="t-box">\u256d\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u256e</span>',
           },
           {
-            html: '<span class="t-box">\u2502</span>  <span class="t-info">&#9875; Shipwright Pipeline v1.7.1</span>               <span class="t-box">\u2502</span>',
+            html: '<span class="t-box">\u2502</span>  <span class="t-info">&#9875; Shipwright Pipeline v4.0.0</span>               <span class="t-box">\u2502</span>',
           },
           {
             html: '<span class="t-box">\u2570\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u256f</span>',
