@@ -1247,3 +1247,4 @@
 {"ts":"2026-10-26T08:13:47Z","ts_epoch":1793002427,"type":"strategic.issue_refused","title":"Build-loop blast-radius guard: abort an iteration whose diff deletes far more than the task scope"}
 {"ts":"2026-10-26T08:13:49Z","ts_epoch":1793002429,"type":"strategic.issue_refused","title":"Move the loop's hardcoded iteration, timeout and threshold tunables into policy config with adaptive overrides"}
 {"ts":"2026-10-26T08:13:49Z","ts_epoch":1793002429,"type":"strategic.cycle_complete","issues_created":0,"issues_skipped":3}
+{"ts":"2026-10-26T13:30:53Z","ts_epoch":1793021453,"type":"hygiene_platform_refactor","hardcoded":49,"fallback":76,"todo":51}
