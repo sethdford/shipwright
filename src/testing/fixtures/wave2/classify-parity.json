@@ -135,9 +135,8 @@
     },
     {
       "text": "Failure analyzed: accurate limits on retries\nbuild failed: tsc exit 2",
-      "bash": "api_error",
-      "ts": "unknown",
-      "differs": "Bash matches the words inside a model-written analysis line. TS removes model-analysis lines before classifying, so model prose cannot change the class or stop the deterministic check (round 2)."
+      "bash": "build_failure",
+      "ts": "unknown"
     },
     {
       "text": "test \"returns 401 unauthorized for bad token\" FAILED",
@@ -218,13 +217,12 @@
     },
     {
       "text": "Failure analyzed: rate limit error in the mock",
-      "bash": "api_error",
-      "ts": "unknown",
-      "differs": "Bash matches the words inside a model-written analysis line. TS removes model-analysis lines before classifying, so model prose cannot change the class or stop the deterministic check (round 2)."
+      "bash": "unknown",
+      "ts": "unknown"
     },
     {
       "text": "✓ Failure analyzed: 401 unauthorized in the mock",
-      "bash": "build_failure",
+      "bash": "unknown",
       "ts": "unknown"
     },
     {
@@ -239,9 +237,8 @@
     },
     {
       "text": "build failed: tsc exit 2\n✓ Failure analyzed: rate limit on retries",
-      "bash": "api_error",
-      "ts": "unknown",
-      "differs": "Bash matches the words inside a model-written analysis line. TS removes model-analysis lines before classifying, so model prose cannot change the class or stop the deterministic check (round 2)."
+      "bash": "build_failure",
+      "ts": "unknown"
     },
     {
       "text": "refusing to run inside a build-loop test gate",
@@ -280,7 +277,7 @@
     },
     {
       "text": "✓ Failure analyzed: CONTAMINATION: branch-switched a -> b",
-      "bash": "build_failure",
+      "bash": "unknown",
       "ts": "unknown"
     },
     {
@@ -1413,8 +1410,8 @@
     },
     {
       "text": "\t\t\t\t\t\t\t\tfatal: Authentication failed for 'x'",
-      "bash": "auth_error",
-      "ts": "auth",
+      "bash": "build_failure",
+      "ts": "unknown",
       "name": "verifier c10: tab lead-in, 8 tabs"
     },
     {
@@ -1544,6 +1541,1013 @@
       "bash": "unknown",
       "ts": "unknown",
       "name": "verifier p8: PR limit 2",
+      "expect": "noesc"
+    },
+    {
+      "text": "Failures:\n\n  1) SessionsController POST #create rejects a bad password\n     Failure/Error: raise AuthError, \"Not logged in\"\n\n     AuthError:\n       Not logged in\n     # ./app/controllers/sessions_controller.rb:12:in `create'\n\nFinished in 0.5 seconds\n3 examples, 1 failure",
+      "bash": "build_failure",
+      "ts": "unknown",
+      "name": "verifier r2 c1/a1: rspec exception message on own indented line",
+      "expect": "noesc"
+    },
+    {
+      "text": "  1) Api::Client#fetch raises on 401\n     Failure/Error: expect { client.fetch }.not_to raise_error\n\n       expected no Exception, got #<Api::AuthError: Authentication failed> with backtrace:\n\n     Api::AuthError:\n       Authentication failed\n     # ./lib/api/client.rb:40\n1 example, 1 failure",
+      "bash": "build_failure",
+      "ts": "unknown",
+      "name": "verifier r2 c1/a2: rspec RuntimeError: Authentication failed",
+      "expect": "noesc"
+    },
+    {
+      "text": "running 3 tests\ntest auth::tests::rejects_bad_token ... FAILED\n\nfailures:\n\n---- auth::tests::rejects_bad_token stdout ----\nthread 'auth::tests::rejects_bad_token' panicked at src/auth.rs:42:9:\nauthentication failed\nnote: run with `RUST_BACKTRACE=1` environment variable to display a backtrace\n\ntest result: FAILED. 2 passed; 1 failed; 0 ignored",
+      "bash": "build_failure",
+      "ts": "unknown",
+      "name": "verifier r2 c1/a3: cargo panic message (Rust >=1.73 layout)",
+      "expect": "noesc"
+    },
+    {
+      "text": "thread 'main' panicked at src/main.rs:10:30:\nfailed to authenticate: Status(401)\nerror: test failed, to rerun pass `--lib`",
+      "bash": "build_failure",
+      "ts": "unknown",
+      "name": "verifier r2 c1/a4: cargo .expect() panic",
+      "expect": "noesc"
+    },
+    {
+      "text": "✖ login rejects bad token (2.1ms)\n  Error: Authentication failed\n      at login (file:///src/auth.js:10:11)\nℹ tests 4\nℹ fail 1",
+      "bash": "build_failure",
+      "ts": "unknown",
+      "name": "verifier r2 c1/a5: node:test spec reporter error",
+      "expect": "noesc"
+    },
+    {
+      "text": "  1 passing (12ms)\n  1 failing\n\n  1) Auth\n       login:\n     Error: Authentication failed\n      at Context.<anonymous> (test/auth.spec.js:8:11)",
+      "bash": "build_failure",
+      "ts": "unknown",
+      "name": "verifier r2 c1/a6: mocha uncaught error message",
+      "expect": "noesc"
+    },
+    {
+      "text": "  1) [chromium] › tests/login.spec.ts:3:5 › login with wrong password ─────────────\n\n    Error: Authentication failed\n\n      3 | test('login with wrong password', async ({ page }) => {\n  1 failed",
+      "bash": "build_failure",
+      "ts": "unknown",
+      "name": "verifier r2 c1/a7: Playwright failure",
+      "expect": "noesc"
+    },
+    {
+      "text": " FAIL  src/auth.test.ts\n  ● Auth › login › throws on bad key\n\n    Invalid API key\n\n      4 |   it('throws on bad key', async () => {\n    at Object.<anonymous> (src/auth.test.ts:5:11)\nTests:       1 failed, 3 passed",
+      "bash": "build_failure",
+      "ts": "unknown",
+      "name": "verifier r2 c1/a8: jest thrown error (Error: stripped by jest)",
+      "expect": "noesc"
+    },
+    {
+      "text": "src/auth.test.ts:\nerror: Not logged in\n      at login (/repo/src/auth.ts:10:11)\n(fail) auth > status [0.40ms]\n\n 3 pass\n 1 fail",
+      "bash": "auth_error",
+      "ts": "auth",
+      "name": "verifier r2 c1/a9: bun test thrown error (bun prints error: at col 0)",
+      "expect": "noesc",
+      "limit": "Known limit 1: test or tool output printed at column 0 in the same form as the real emitter."
+    },
+    {
+      "text": " FAIL  src/auth.test.ts > client > refreshes\nError: OAuth token has expired.\n ❯ src/auth.ts:20:11\n Test Files  1 failed (1)",
+      "bash": "build_failure",
+      "ts": "unknown",
+      "name": "verifier r2 c1/a10: vitest thrown error",
+      "expect": "noesc"
+    },
+    {
+      "text": "src/auth.test.ts:\nAuthentication failed: invalid password for user alice\n(pass) auth > rejects bad password [0.3ms]\nsrc/db.test.ts:\nerror: expect(received).toBe(expected)\n(fail) db > migrates\n 1 fail",
+      "bash": "auth_error",
+      "ts": "auth",
+      "name": "verifier r2 c1/a11: bun console.error from code under test in a passing test",
+      "expect": "noesc",
+      "limit": "Known limit 1: test or tool output printed at column 0 in the same form as the real emitter."
+    },
+    {
+      "text": "stderr | src/auth.test.ts > login > rejects\nAuthentication failed: bad password\n\n ✓ src/auth.test.ts (3)\n FAIL  src/db.test.ts > migrate\nAssertionError: expected 1 to be 2",
+      "bash": "build_failure",
+      "ts": "unknown",
+      "name": "verifier r2 c1/a12: vitest stderr block from code under test",
+      "expect": "noesc"
+    },
+    {
+      "text": "----------------------------- Captured stderr call -----------------------------\nfatal: Authentication failed for 'https://example.invalid/repo.git/'\nFAILED tests/test_clone.py::test_clone_private - AssertionError",
+      "bash": "build_failure",
+      "ts": "unknown",
+      "name": "verifier r2 c1/a13: pytest captured stderr",
+      "expect": "noesc"
+    },
+    {
+      "text": "--- FAIL: TestLogin (0.00s)\n    auth_test.go:12: Error: authentication failed\nFAIL",
+      "bash": "build_failure",
+      "ts": "unknown",
+      "name": "verifier r2 c1/a14: pipeline grep -A5 of go test output",
+      "expect": "noesc"
+    },
+    {
+      "text": "--- FAIL: TestClient (0.01s)\n    client_test.go:30: unexpected error:\n        Bad credentials\nFAIL",
+      "bash": "build_failure",
+      "ts": "unknown",
+      "name": "verifier r2 c1/a15: go test t.Log continuation line indented",
+      "expect": "noesc"
+    },
+    {
+      "text": "1) Tests\\AuthTest::testLogin\nRuntimeException: Not logged in\n\nFAILURES!",
+      "bash": "build_failure",
+      "ts": "unknown",
+      "name": "verifier r2 c1/a16: phpunit",
+      "expect": "noesc"
+    },
+    {
+      "text": "not ok 1 - login\n  ---\n  error: 'Authentication failed'\n  ...",
+      "bash": "build_failure",
+      "ts": "unknown",
+      "name": "verifier r2 c1/a17: TAP node-tap diag",
+      "expect": "noesc"
+    },
+    {
+      "text": "not ok 2 gh fails without token\n# (in test file t.bats, line 9)\n#   `[ \"$status\" -eq 0 ]' failed\n# Bad credentials",
+      "bash": "build_failure",
+      "ts": "unknown",
+      "name": "verifier r2 c1/a18: bats output",
+      "expect": "noesc"
+    },
+    {
+      "text": "  1) Login\n       shows error banner:\n     AssertionError: Timed out retrying after 4000ms: Expected to find content: 'Bad credentials' but never did.",
+      "bash": "unknown",
+      "ts": "unknown",
+      "name": "verifier r2 c1/a19: Cypress",
+      "expect": "noesc"
+    },
+    {
+      "text": "##[error]src/auth.test.ts: Authentication failed\n::error file=src/a.test.ts,line=5::Authentication failed",
+      "bash": "build_failure",
+      "ts": "unknown",
+      "name": "verifier r2 c1/a20: GH annotation from jest reporter",
+      "expect": "noesc"
+    },
+    {
+      "text": "    Expected: \"ok\"\n    Received: \"Authentication failed\"",
+      "bash": "build_failure",
+      "ts": "unknown",
+      "name": "verifier r2 c1/a21: jest expect diff unindented Received",
+      "expect": "noesc"
+    },
+    {
+      "text": "E       AssertionError: assert 'Not logged in' == 'ok'\nE         - ok\nE         + Not logged in",
+      "bash": "unknown",
+      "ts": "unknown",
+      "name": "verifier r2 c1/a22: pytest assertion E lines",
+      "expect": "noesc"
+    },
+    {
+      "text": "------------------------------ Captured log call -------------------------------\nERROR    app.auth:auth.py:22 Authentication failed: bad password",
+      "bash": "build_failure",
+      "ts": "unknown",
+      "name": "verifier r2 c1/a23: pytest log capture",
+      "expect": "noesc"
+    },
+    {
+      "text": "Here is what the CLI prints when the token is missing:\n```\nNot logged in · Please run /login\n```",
+      "bash": "auth_error",
+      "ts": "auth",
+      "name": "verifier r2 c1/a24: agent markdown code fence col 0",
+      "expect": "noesc",
+      "limit": "Known limit 1: test or tool output printed at column 0 in the same form as the real emitter."
+    },
+    {
+      "text": "The handler should return this message:\n\n    authentication required\n\ninstead of a 500.",
+      "bash": "unknown",
+      "ts": "unknown",
+      "name": "verifier r2 c1/a25: code review indented code block",
+      "expect": "noesc"
+    },
+    {
+      "text": "error: boom\n10 |   if (!token) {\n11 |     throw new Error(\"not logged in\");\n                    ^",
+      "bash": "unknown",
+      "ts": "unknown",
+      "name": "verifier r2 c1/a26: indented source snippet in stack frame (bun code frame)",
+      "expect": "noesc"
+    },
+    {
+      "text": "Traceback (most recent call last):\n  File \"app.py\", line 3, in <module>\nPermissionError: Authentication failed",
+      "bash": "build_failure",
+      "ts": "unknown",
+      "name": "verifier r2 c1/a27: Python traceback final line",
+      "expect": "noesc"
+    },
+    {
+      "text": "--- FAIL: TestAuth (0.00s)\n    auth_test.go:9: got error:\n        authentication failed: bad password\nFAIL",
+      "bash": "build_failure",
+      "ts": "unknown",
+      "name": "verifier r2 c1/a28: go testing log with t.Error multi-line indented",
+      "expect": "noesc"
+    },
+    {
+      "text": "ERRORS\n        Authentication failed.\n              The token was rejected.",
+      "bash": "build_failure",
+      "ts": "unknown",
+      "name": "verifier r2 c1/a29: printed docs: man/usage indented",
+      "expect": "noesc"
+    },
+    {
+      "text": "    Error: expect(locator).toHaveText(expected) failed\n    Expected string: \"Welcome\"\n    Received string: \"Invalid API key\"",
+      "bash": "build_failure",
+      "ts": "unknown",
+      "name": "verifier r2 c1/a30: Playwright expect toHaveText on login page",
+      "expect": "noesc"
+    },
+    {
+      "text": "  1) Error:\nAuthTest#test_login:\nAuthError: Not logged in\n    app/auth.rb:3:in `login'",
+      "bash": "unknown",
+      "ts": "unknown",
+      "name": "verifier r2 c1/a31: ruby minitest",
+      "expect": "noesc"
+    },
+    {
+      "text": "Pending: (Failures listed here are expected and do not affect your suite's status)\n  1) Client handles not logged in\n     # Temporarily skipped with xit\n     # ./spec/client_spec.rb:3",
+      "bash": "build_failure",
+      "ts": "unknown",
+      "name": "verifier r2 c1/a32: jest console block without blank line? no: rspec pending",
+      "expect": "noesc"
+    },
+    {
+      "text": "--\nError: expected exit 0\ngh mock stderr:\nHTTP 401: Bad credentials (https://api.github.com/graphql)",
+      "bash": "auth_error",
+      "ts": "auth",
+      "name": "verifier r2 c1/a33: grep -A5 separator then gh mock output",
+      "expect": "noesc",
+      "limit": "Known limit 1: test or tool output printed at column 0 in the same form as the real emitter."
+    },
+    {
+      "text": "/src/AuthTests.swift:12: error: -[AuthTests testLogin] : XCTAssertEqual failed: (\"Not logged in\") is not equal to (\"ok\")",
+      "bash": "build_failure",
+      "ts": "unknown",
+      "name": "verifier r2 c1/a34: Swift XCTest",
+      "expect": "noesc"
+    },
+    {
+      "text": "src/auth.ts\n  12:5  error  'Authentication failed' is assigned a value but never used  no-unused-vars",
+      "bash": "build_failure",
+      "ts": "unknown",
+      "name": "verifier r2 c1/a35: shellcheck/eslint not",
+      "expect": "noesc"
+    },
+    {
+      "text": "Summary of all failing tests\n FAIL  src/a.test.ts\n  ● gh › error: authentication failed for bad token",
+      "bash": "build_failure",
+      "ts": "unknown",
+      "name": "verifier r2 c1/a36: jest each table test title prints in summary",
+      "expect": "noesc"
+    },
+    {
+      "text": "⏺ Bash(gh issue view 9)\n  ⎿  Error: GraphQL: Could not resolve to an issue or pull request with the number of 9.",
+      "bash": "unknown",
+      "ts": "unknown",
+      "name": "verifier r2 c1/a37: Claude tool output marker ⎿",
+      "expect": "noesc"
+    },
+    {
+      "text": "⏺ Authentication failed for the mock server in the test, which is expected.",
+      "bash": "build_failure",
+      "ts": "unknown",
+      "name": "verifier r2 c1/a38: Claude Code prints ⏺ assistant text quoting error",
+      "expect": "noesc"
+    },
+    {
+      "text": "⏺ Not logged in to npm is fine here; we only read the public registry.",
+      "bash": "unknown",
+      "ts": "unknown",
+      "name": "verifier r2 c1/a39: Claude Code ⏺ assistant text",
+      "expect": "noesc"
+    },
+    {
+      "text": "  error: Authentication failed",
+      "bash": "build_failure",
+      "ts": "unknown",
+      "name": "verifier r2 c1/a40: indented yaml/json in printed fixture",
+      "expect": "noesc"
+    },
+    {
+      "text": "ERROR: Permission to sethdford/shipwright.git denied to other-user.\nfatal: Could not read from remote repository.\n\nPlease make sure you have the correct access rights\nand the repository exists.",
+      "bash": "auth_error",
+      "ts": "auth",
+      "name": "verifier r2 c2/b1: git ssh wrong-user",
+      "expect": "esc:auth"
+    },
+    {
+      "text": "remote: Write access to repository not granted.\nfatal: unable to access 'https://github.com/sethdford/shipwright/': The requested URL returned error: 403",
+      "bash": "auth_error",
+      "ts": "auth",
+      "name": "verifier r2 c2/b2: git https 403 in Actions (GITHUB_TOKEN no write)",
+      "expect": "esc:auth"
+    },
+    {
+      "text": "fatal: unable to access 'https://github.com/o/r.git/': The requested URL returned error: 401",
+      "bash": "auth_error",
+      "ts": "auth",
+      "name": "verifier r2 c2/b3: git https 401",
+      "expect": "esc:auth"
+    },
+    {
+      "text": "remote: Invalid username or token. Password authentication is not supported for Git operations.\nfatal: Authentication failed for 'https://github.com/o/r.git/'",
+      "bash": "auth_error",
+      "ts": "auth",
+      "name": "verifier r2 c2/b4: remote invalid username/password + fatal",
+      "expect": "esc:auth"
+    },
+    {
+      "text": "2026-10-25T10:00:00+00:00 fatal: Authentication failed for 'https://github.com/o/r.git/'",
+      "bash": "auth_error",
+      "ts": "auth",
+      "name": "verifier r2 c2/b5: iso ts with offset (date -Iseconds)",
+      "expect": "esc:auth"
+    },
+    {
+      "text": "[2026-10-25T10:00:00+00:00] ERROR: Claude Code authentication failed",
+      "bash": "auth_error",
+      "ts": "auth",
+      "name": "verifier r2 c2/b6: bracket ts with offset",
+      "expect": "esc:auth"
+    },
+    {
+      "text": "2026/10/25 10:00:00 fatal: Authentication failed for 'https://github.com/o/r.git/'",
+      "bash": "auth_error",
+      "ts": "auth",
+      "name": "verifier r2 c2/b7: go log date slashes",
+      "expect": "esc:auth"
+    },
+    {
+      "text": "Oct 25 10:00:00 Error: Invalid API key · Please run /login",
+      "bash": "unknown",
+      "ts": "unknown",
+      "name": "verifier r2 c2/b8: syslog style ts",
+      "expect": "esc:auth",
+      "limit": "Known limit 2: an emitter form or prefix the classifier does not cover; the run is retried."
+    },
+    {
+      "text": "[10:00:00] ✗ Not logged in · Please run /login",
+      "bash": "auth_error",
+      "ts": "auth",
+      "name": "verifier r2 c2/b9: bracketed time HH:MM:SS",
+      "expect": "esc:auth"
+    },
+    {
+      "text": "\u001b[31m\u001b[1m✗\u001b[0m Claude Code authentication failed — check CLAUDE_CODE_OAUTH_TOKEN",
+      "bash": "auth_error",
+      "ts": "auth",
+      "name": "verifier r2 c2/b10: shipwright error() with ANSI and ✗",
+      "expect": "esc:auth"
+    },
+    {
+      "text": "{\"type\":\"result\",\"subtype\":\"success\",\"is_error\":true,\"duration_ms\":120,\"result\":\"Invalid API key · Please run /login\",\"session_id\":\"x\"}",
+      "bash": "unknown",
+      "ts": "unknown",
+      "name": "verifier r2 c2/b11: Claude stream-json result Invalid API key",
+      "expect": "esc:auth",
+      "limit": "Known limit 2: an emitter form or prefix the classifier does not cover; the run is retried."
+    },
+    {
+      "text": "[{\"type\":\"system\",\"subtype\":\"init\"},{\"type\":\"result\",\"subtype\":\"success\",\"is_error\":true,\"result\":\"Not logged in · Please run /login\"}]",
+      "bash": "unknown",
+      "ts": "unknown",
+      "name": "verifier r2 c2/b12: Claude --output-format json array result",
+      "expect": "esc:auth",
+      "limit": "Known limit 2: an emitter form or prefix the classifier does not cover; the run is retried."
+    },
+    {
+      "text": "{\"type\":\"result\",\"is_error\":true,\"result\":\"OAuth token has expired. Please obtain a new token or refresh your existing token.\"}",
+      "bash": "unknown",
+      "ts": "unknown",
+      "name": "verifier r2 c2/b13: Claude json OAuth expired",
+      "expect": "esc:auth",
+      "limit": "Known limit 2: an emitter form or prefix the classifier does not cover; the run is retried."
+    },
+    {
+      "text": "API Error: 401 {\"type\":\"error\",\"error\":{\"type\":\"authentication_error\",\"message\":\"OAuth authentication is currently not supported.\"},\"request_id\":\"req_011CU\"}",
+      "bash": "auth_error",
+      "ts": "auth",
+      "name": "verifier r2 c2/b14: Claude API 401 newer body w/ request_id",
+      "expect": "esc:auth"
+    },
+    {
+      "text": "Error: Claude Code returned an error result: Invalid API key · Please run /login",
+      "bash": "auth_error",
+      "ts": "auth",
+      "name": "verifier r2 c2/b15: Claude Agent SDK TS error",
+      "expect": "esc:auth"
+    },
+    {
+      "text": "AuthenticationError: 401 {\"type\":\"error\",\"error\":{\"type\":\"authentication_error\",\"message\":\"invalid x-api-key\"},\"request_id\":\"req_1\"}",
+      "bash": "auth_error",
+      "ts": "auth",
+      "name": "verifier r2 c2/b16: Anthropic TS SDK AuthenticationError",
+      "expect": "esc:auth"
+    },
+    {
+      "text": "anthropic.AuthenticationError: Error code: 401 - {'type': 'error', 'error': {'type': 'authentication_error', 'message': 'invalid x-api-key'}, 'request_id': 'req_1'}",
+      "bash": "auth_error",
+      "ts": "auth",
+      "name": "verifier r2 c2/b17: Python SDK",
+      "expect": "esc:auth"
+    },
+    {
+      "text": "HTTP 401: Bad credentials (https://api.github.com/graphql)\nTry authenticating with:  gh auth login",
+      "bash": "auth_error",
+      "ts": "auth",
+      "name": "verifier r2 c2/b18: gh HTTP 401 bad creds graphql",
+      "expect": "esc:auth"
+    },
+    {
+      "text": "github.com\n  X Failed to log in to github.com using token (GH_TOKEN)\n  - Active account: true\n  - The token in GH_TOKEN is invalid.",
+      "bash": "auth_error",
+      "ts": "auth",
+      "name": "verifier r2 c2/b19: gh auth status new format",
+      "expect": "esc:auth"
+    },
+    {
+      "text": "github.com\n  X github.com: authentication failed\n  - The github.com token in GH_TOKEN is no longer valid.",
+      "bash": "auth_error",
+      "ts": "auth",
+      "name": "verifier r2 c2/b20: gh auth status old format",
+      "expect": "esc:auth"
+    },
+    {
+      "text": "The token in GH_TOKEN is invalid.",
+      "bash": "auth_error",
+      "ts": "auth",
+      "name": "verifier r2 c2/b21: gh: The token in GH_TOKEN is invalid (alone)",
+      "expect": "esc:auth"
+    },
+    {
+      "text": "npm error code ENEEDAUTH\nnpm error need auth This command requires you to be logged in to https://registry.npmjs.org/",
+      "bash": "auth_error",
+      "ts": "auth",
+      "name": "verifier r2 c2/b22: npm ENEEDAUTH",
+      "expect": "esc:auth"
+    },
+    {
+      "text": "npm ERR! code E401\nnpm ERR! Unable to authenticate, need: Basic realm=\"GitHub Package Registry\"",
+      "bash": "auth_error",
+      "ts": "auth",
+      "name": "verifier r2 c2/b23: npm ERR! E401 old",
+      "expect": "esc:auth"
+    },
+    {
+      "text": "error An unexpected error occurred: \"https://npm.pkg.github.com/@o%2fpkg: Request failed \\\"401 Unauthorized\\\"\".",
+      "bash": "build_failure",
+      "ts": "unknown",
+      "name": "verifier r2 c2/b24: yarn 401",
+      "expect": "esc:auth",
+      "limit": "Known limit 2: an emitter form or prefix the classifier does not cover; the run is retried."
+    },
+    {
+      "text": " ERR_PNPM_FETCH_401  GET https://npm.pkg.github.com/@o%2Fpkg: Unauthorized - 401\nNo authorization header was set for the request.",
+      "bash": "unknown",
+      "ts": "unknown",
+      "name": "verifier r2 c2/b25: pnpm 401",
+      "expect": "esc:auth",
+      "limit": "Known limit 2: an emitter form or prefix the classifier does not cover; the run is retried."
+    },
+    {
+      "text": "error: GET https://npm.pkg.github.com/@o/pkg/-/pkg-1.0.0.tgz - 401",
+      "bash": "auth_error",
+      "ts": "auth",
+      "name": "verifier r2 c2/b26: bun install 401",
+      "expect": "esc:auth"
+    },
+    {
+      "text": "Error response from daemon: Head \"https://ghcr.io/v2/o/img/manifests/latest\": unauthorized",
+      "bash": "unknown",
+      "ts": "unknown",
+      "name": "verifier r2 c2/b27: docker ghcr unauthorized",
+      "expect": "esc:auth",
+      "limit": "Known limit 2: an emitter form or prefix the classifier does not cover; the run is retried."
+    },
+    {
+      "text": "Error response from daemon: denied: denied",
+      "bash": "unknown",
+      "ts": "unknown",
+      "name": "verifier r2 c2/b28: docker denied",
+      "expect": "esc:auth",
+      "limit": "Known limit 2: an emitter form or prefix the classifier does not cover; the run is retried."
+    },
+    {
+      "text": "ERROR: failed to solve: failed to fetch anonymous token: unexpected status from GET request to https://ghcr.io/token: 401 Unauthorized",
+      "bash": "build_failure",
+      "ts": "unknown",
+      "name": "verifier r2 c2/b29: buildx 401",
+      "expect": "esc:auth",
+      "limit": "Known limit 2: an emitter form or prefix the classifier does not cover; the run is retried."
+    },
+    {
+      "text": "Error response from daemon: Get \"https://registry-1.docker.io/v2/\": unauthorized: incorrect username or password",
+      "bash": "unknown",
+      "ts": "unknown",
+      "name": "verifier r2 c2/b30: docker login",
+      "expect": "esc:auth",
+      "limit": "Known limit 2: an emitter form or prefix the classifier does not cover; the run is retried."
+    },
+    {
+      "text": "RequestError [HttpError]: Requires authentication\nError: Unhandled error: HttpError: Requires authentication",
+      "bash": "auth_error",
+      "ts": "auth",
+      "name": "verifier r2 c2/b31: github-script RequestError Requires authentication",
+      "expect": "esc:auth"
+    },
+    {
+      "text": "HTTP 403: Resource not accessible by integration (https://api.github.com/repos/o/r/issues/5/labels)",
+      "bash": "auth_error",
+      "ts": "auth",
+      "name": "verifier r2 c2/b32: gh HTTP 403 Resource not accessible",
+      "expect": "esc:auth"
+    },
+    {
+      "text": "GraphQL: Resource not accessible by integration (addComment)",
+      "bash": "auth_error",
+      "ts": "auth",
+      "name": "verifier r2 c2/b33: gh GraphQL resource not accessible",
+      "expect": "esc:auth"
+    },
+    {
+      "text": "GraphQL: Could not resolve to a PullRequest with the number of 123. (repository.pullRequest)",
+      "bash": "invalid_issue",
+      "ts": "invalid_input",
+      "name": "verifier r2 c2/b34: gh pr view missing pr",
+      "expect": "esc:invalid_input"
+    },
+    {
+      "text": "no issue found with number 99999",
+      "bash": "unknown",
+      "ts": "unknown",
+      "name": "verifier r2 c2/b36: gh no such issue in other msg",
+      "expect": "esc:invalid_input",
+      "limit": "Known limit 2: an emitter form or prefix the classifier does not cover; the run is retried."
+    },
+    {
+      "text": "gh: Not Found (HTTP 404)\n{\"message\":\"Not Found\",\"documentation_url\":\"https://docs.github.com/rest/issues/issues#get-an-issue\",\"status\":\"404\"}",
+      "bash": "unknown",
+      "ts": "unknown",
+      "name": "verifier r2 c2/b37: gh api 404 issue",
+      "expect": "esc:invalid_input",
+      "limit": "Known limit 2: an emitter form or prefix the classifier does not cover; the run is retried."
+    },
+    {
+      "text": "2026-10-25T10:00:00.1234567Z ##[error]fatal: Authentication failed for 'https://github.com/o/r/'",
+      "bash": "auth_error",
+      "ts": "auth",
+      "name": "verifier r2 c2/b38: GH Actions log prefix with ##[error]",
+      "expect": "esc:auth"
+    },
+    {
+      "text": "[pipeline] fatal: Authentication failed for 'https://github.com/o/r/'",
+      "bash": "build_failure",
+      "ts": "unknown",
+      "name": "verifier r2 c2/b39: tee'd line with sw prefix label",
+      "expect": "esc:auth",
+      "limit": "Known limit 2: an emitter form or prefix the classifier does not cover; the run is retried."
+    },
+    {
+      "text": "  build | Error: Invalid API key · Please run /login",
+      "bash": "build_failure",
+      "ts": "unknown",
+      "name": "verifier r2 c2/b40: stage-prefixed",
+      "expect": "esc:auth",
+      "limit": "Known limit 2: an emitter form or prefix the classifier does not cover; the run is retried."
+    },
+    {
+      "text": "Invalid API key · Fix external API key",
+      "bash": "auth_error",
+      "ts": "auth",
+      "name": "verifier r2 c2/b41: Claude CLI 2.x Invalid API key with fix hint",
+      "expect": "esc:auth"
+    },
+    {
+      "text": "Error: Please run `claude login` or set ANTHROPIC_API_KEY.",
+      "bash": "auth_error",
+      "ts": "auth",
+      "name": "verifier r2 c2/b43: Claude CLI login required",
+      "expect": "esc:auth"
+    },
+    {
+      "text": "API Error: 401 {\"type\":\"error\",\"error\":{\"type\":\"authentication_error\",\"message\":\"OAuth token has been revoked.\"}}",
+      "bash": "auth_error",
+      "ts": "auth",
+      "name": "verifier r2 c2/b44: Claude OAuth revoked",
+      "expect": "esc:auth"
+    },
+    {
+      "text": "⚠ Not logged in · Please run /login",
+      "bash": "auth_error",
+      "ts": "auth",
+      "name": "verifier r2 c2/b45: lead-in with ⚠ glyph (warn())",
+      "expect": "esc:auth"
+    },
+    {
+      "text": "▸ GraphQL: Could not resolve to an issue or pull request with the number of 9.",
+      "bash": "unknown",
+      "ts": "unknown",
+      "name": "verifier r2 c2/b46: lead-in with ▸ (info())",
+      "expect": "esc:invalid_input",
+      "limit": "Known limit 2: an emitter form or prefix the classifier does not cover; the run is retried."
+    },
+    {
+      "text": "build\tRun\t2026-10-25T10:00:00.1234567Z fatal: Authentication failed for 'https://github.com/o/r/'",
+      "bash": "auth_error",
+      "ts": "auth",
+      "name": "verifier r2 c2/b47: gh_prefix job/step with tab, no Z (bun log)",
+      "expect": "esc:auth"
+    },
+    {
+      "text": "\u001b[0;31mError: OAuth token has expired.\u001b[0m\r",
+      "bash": "auth_error",
+      "ts": "auth",
+      "name": "verifier r2 c2/b48: CRLF + ANSI",
+      "expect": "esc:auth"
+    },
+    {
+      "text": "remote: Permission to o/r.git denied to github-actions[bot].\nfatal: unable to access 'https://github.com/o/r/': The requested URL returned error: 403",
+      "bash": "auth_error",
+      "ts": "auth",
+      "name": "verifier r2 c2/b49: git push over https with GH_TOKEN 403 permission",
+      "expect": "esc:auth"
+    },
+    {
+      "text": "remote: Permission to o/r.git denied to app/shipwright-bot.",
+      "bash": "auth_error",
+      "ts": "auth",
+      "name": "verifier r2 c2/b50: remote: Permission denied (no 'to')",
+      "expect": "esc:auth"
+    },
+    {
+      "text": "\u001b[0;31m\u001b[1m✗\u001b[0m Fatal CLI error: Invalid API key · Please run /login",
+      "bash": "auth_error",
+      "ts": "auth",
+      "name": "verifier r2 c3/s1: shipwright loop check_fatal_error line (Invalid API key)",
+      "expect": "esc:auth"
+    },
+    {
+      "text": "\u001b[0;31m\u001b[1m✗\u001b[0m CLI exited 1 with minimal output: OAuth token has expired. Please obtain a new token or refresh your existing token.",
+      "bash": "auth_error",
+      "ts": "auth",
+      "name": "verifier r2 c3/s2: shipwright loop minimal-output line (OAuth expired)",
+      "expect": "esc:auth"
+    },
+    {
+      "text": "✗ CLI exited 1 with minimal output: Not logged in · Please run /login",
+      "bash": "auth_error",
+      "ts": "auth",
+      "name": "verifier r2 c3/s3: minimal-output Not logged in",
+      "expect": "esc:auth"
+    },
+    {
+      "text": "✗ Fatal CLI error: API Error: 401 {\"type\":\"error\",\"error\":{\"type\":\"authentication_error\",\"message\":\"invalid x-api-key\"}}",
+      "bash": "auth_error",
+      "ts": "auth",
+      "name": "verifier r2 c3/s4: fatal CLI error with 401 body (cut 120)",
+      "expect": "esc:auth"
+    },
+    {
+      "text": "✗ Fatal CLI error: Failed to authenticate. API Error: 401 {\"type\":\"error\",\"error\":{\"type\":\"authentication_error\",\"message\":\"OAuth token has",
+      "bash": "auth_error",
+      "ts": "auth",
+      "name": "verifier r2 c3/s5: fatal CLI error authentication_error cut short",
+      "expect": "esc:auth"
+    },
+    {
+      "text": "  ─── Claude Output ───\n  Invalid API key · Please run /login\n  ─────────────────────",
+      "bash": "unknown",
+      "ts": "unknown",
+      "name": "verifier r2 c3/s6: verbose loop output prefixed 2 spaces",
+      "expect": "esc:auth",
+      "limit": "Known limit 2: an emitter form or prefix the classifier does not cover; the run is retried."
+    },
+    {
+      "text": "  ─── Claude Output ───\n  Authentication failed for the old fixture, so I regenerated it.\n  ─────────────────────\n✗ Tests failed",
+      "bash": "build_failure",
+      "ts": "unknown",
+      "name": "verifier r2 c3/s7: verbose loop output: agent prose 2-space",
+      "expect": "noesc"
+    },
+    {
+      "text": "  ─── Claude Output ───\n  Not logged in to npm here, so I skipped the publish step.\n  ─────────────────────",
+      "bash": "unknown",
+      "ts": "unknown",
+      "name": "verifier r2 c3/s8: verbose: agent prose not logged in to",
+      "expect": "noesc"
+    },
+    {
+      "text": "  ─── Claude Output ───\n  GraphQL: Could not resolve to an issue or pull request with the number of 12. That issue was moved, so I used #13.\n  ─────────────────────",
+      "bash": "unknown",
+      "ts": "unknown",
+      "name": "verifier r2 c3/s9: verbose: agent quoting gh output",
+      "expect": "noesc"
+    },
+    {
+      "text": "  Authentication required: the endpoint now returns 401 for anonymous users, matching the spec.",
+      "bash": "unknown",
+      "ts": "unknown",
+      "name": "verifier r2 c3/s10: agent prose 'Authentication required.' in verbose",
+      "expect": "noesc"
+    },
+    {
+      "text": "  Bad credentials (wrong password) now show a toast instead of crashing.",
+      "bash": "unknown",
+      "ts": "unknown",
+      "name": "verifier r2 c3/s11: agent prose bad credentials",
+      "expect": "noesc"
+    },
+    {
+      "text": "  Failed to authenticate - this was the bug; the header name was wrong. Fixed in auth.ts.",
+      "bash": "build_failure",
+      "ts": "unknown",
+      "name": "verifier r2 c3/s12: agent prose 'Failed to authenticate - ' ",
+      "expect": "noesc"
+    },
+    {
+      "text": "  Issue not found: the reproduction steps in the issue no longer apply.",
+      "bash": "unknown",
+      "ts": "unknown",
+      "name": "verifier r2 c3/s13: agent prose 'Issue not found:' heading",
+      "expect": "noesc"
+    },
+    {
+      "text": "▸ Last error: API Error: 401 {\"type\":\"error\",\"error\":{\"type\":\"authentication_error\",\"message\":\"invalid x-api-key\"}}",
+      "bash": "unknown",
+      "ts": "unknown",
+      "name": "verifier r2 c4/d1: info() ▸ line quoting 401 body (TS MODEL_PROSE drops)"
+    },
+    {
+      "text": "Failure analyzed: API Error: 401 {\"type\":\"error\",\"error\":{\"type\":\"authentication_error\",\"message\":\"invalid x-api-key\"}}",
+      "bash": "unknown",
+      "ts": "unknown",
+      "name": "verifier r2 c4/d2: Failure analyzed line w/ 401 body"
+    },
+    {
+      "text": "[fix/auth abc1234] loop: handle error 401 {\"type\":\"error\",\"error\":{\"type\":\"authentication_error\",\"message\":\"invalid x-api-key\"}}",
+      "bash": "unknown",
+      "ts": "unknown",
+      "name": "verifier r2 c4/d3: loop commit subject with 401 body"
+    },
+    {
+      "text": "job\tstep\t2026-10-25T10:00Z fatal: Authentication failed for 'https://github.com/o/r/'",
+      "bash": "build_failure",
+      "ts": "unknown",
+      "name": "verifier r2 c4/d4: gh prefix short ts (bash strips, TS not)"
+    },
+    {
+      "text": "İnvalid API key · Please run /login",
+      "bash": "unknown",
+      "ts": "unknown",
+      "name": "verifier r2 c4/d5: Turkish dotted I"
+    },
+    {
+      "text": "Invalid API Key · Please run /login",
+      "bash": "unknown",
+      "ts": "unknown",
+      "name": "verifier r2 c4/d6: Kelvin sign in key"
+    },
+    {
+      "text": "  Not logged in · Please run /login",
+      "bash": "unknown",
+      "ts": "unknown",
+      "name": "verifier r2 c4/d7: Kelvin in ERROR_LINE only? 'BAD CREDENTIALS' fine; NBSP lead"
+    },
+    {
+      "text": "fatal: Authentication failed for 'x'",
+      "bash": "auth_error",
+      "ts": "auth",
+      "name": "verifier r2 c4/d8: fullwidth? ſ long s in 'fatal'"
+    },
+    {
+      "text": "okNot logged in · Please run /login",
+      "bash": "unknown",
+      "ts": "unknown",
+      "name": "verifier r2 c4/d11: U+0085 NEL inside line (JS m? no)"
+    },
+    {
+      "text": "\fNot logged in · Please run /login",
+      "bash": "unknown",
+      "ts": "unknown",
+      "name": "verifier r2 c4/d12: vertical tab / form feed"
+    },
+    {
+      "text": "\u001b]8;;https://x\u0007Not logged in · Please run /login\u001b]8;;\u0007",
+      "bash": "unknown",
+      "ts": "unknown",
+      "name": "verifier r2 c4/d13: ANSI non-SGR OSC hyperlink"
+    },
+    {
+      "text": "\u001b[>4;2mNot logged in · Please run /login",
+      "bash": "unknown",
+      "ts": "unknown",
+      "name": "verifier r2 c4/d14: ANSI CSI with > private param"
+    },
+    {
+      "text": "2026-10-25T10:00:00Z ﻿Not logged in · Please run /login",
+      "bash": "unknown",
+      "ts": "unknown",
+      "name": "verifier r2 c4/d15: BOM mid-line after ts"
+    },
+    {
+      "text": "Invalid API key· Please run /login",
+      "bash": "auth_error",
+      "ts": "auth",
+      "name": "verifier r2 c4/d16: combining char after ·"
+    },
+    {
+      "text": "x\nx\nx\nx\nx\nx\nx\nx\nx\nx\nx\nx\nx\nx\nx\nx\nx\nx\nx\nx\nx\nx\nx\nx\nx\nx\nx\nx\nx\nx\nx\nx\nx\nx\nx\nx\nx\nx\nx\nx\nx\nx\nx\nx\nx\nx\nx\nx\nx\nx\nx\nx\nx\nx\nx\nx\nx\nx\nx\nx\nx\nx\nx\nx\nx\nx\nx\nx\nx\nx\nx\nx\nx\nx\nx\nx\nx\nx\nx\nx\nx\nx\nx\nx\nx\nx\nx\nx\nx\nx\nx\nx\nx\nx\nx\nx\nx\nx\nx\nx\nx\nx\nx\nx\nx\nx\nx\nx\nx\nx\nx\nx\nx\nx\nx\nx\nx\nx\nx\nx\nx\nx\nx\nx\nx\nx\nx\nx\nx\nx\nx\nx\nx\nx\nx\nx\nx\nx\nx\nx\nx\nx\nx\nx\nx\nx\nx\nx\nx\nx\nx\nx\nx\nx\nx\nx\nx\nx\nx\nx\nx\nx\nx\nx\nx\nx\nx\nx\nx\nx\nx\nx\nx\nx\nx\nx\nx\nx\nx\nx\nx\nx\nx\nx\nx\nx\nx\nx\nx\nx\nx\nx\nx\nx\nx\nx\nx\nx\nx\na\rNot logged in · Please run /login\ny",
+      "bash": "auth_error",
+      "ts": "auth",
+      "name": "verifier r2 c4/d17: 201 line > 200 tail with CR inside"
+    },
+    {
+      "text": "Not logged in x",
+      "bash": "auth_error",
+      "ts": "auth",
+      "name": "verifier r2 c4/d18: U+2028 in last line then 200 lines"
+    },
+    {
+      "text": "× × ×Not logged in · Please run /login",
+      "bash": "unknown",
+      "ts": "unknown",
+      "name": "verifier r2 c4/d19: ×× glyphs 5 count"
+    },
+    {
+      "text": "job\t\t﻿2026-10-25T10:00:00.1Z Not logged in · Please run /login",
+      "bash": "auth_error",
+      "ts": "auth",
+      "name": "verifier r2 c4/d20: tab-separated gh prefix w/ BOM no step"
+    },
+    {
+      "text": "CLAUDE_CODE_OAUTH_TOKEN not set",
+      "bash": "unknown",
+      "ts": "unknown",
+      "name": "verifier r2 c4/d21: Kelvin in ERROR_LINE token"
+    },
+    {
+      "text": "\u001b[31Not logged in · Please run /login",
+      "bash": "unknown",
+      "ts": "unknown",
+      "name": "verifier r2 c4/d22: ESC[ incomplete"
+    },
+    {
+      "text": "  console.error\r\n    Not logged in · Please run /login\r\n",
+      "bash": "unknown",
+      "ts": "unknown",
+      "name": "verifier r2 c4/d23: jest console header w/ CR line"
+    },
+    {
+      "text": "  1) suite\r    test:\r  Error: Not logged in",
+      "bash": "unknown",
+      "ts": "unknown",
+      "name": "verifier r2 c4/d24: mocha block with CR-only breaks"
+    },
+    {
+      "text": "##[error]Error: Bad credentials",
+      "bash": "auth_error",
+      "ts": "auth",
+      "name": "verifier r2 c5/e1: ##[error]Error: double prefix (core.setFailed(err))",
+      "expect": "esc:auth"
+    },
+    {
+      "text": "build\tRun script\t2026-10-25T10:00:00.1234567Z ##[error]HttpError: Bad credentials",
+      "bash": "auth_error",
+      "ts": "auth",
+      "name": "verifier r2 c5/e2: gh-prefixed ##[error]HttpError",
+      "expect": "esc:auth"
+    },
+    {
+      "text": "::error::Error: Not logged in · Please run /login",
+      "bash": "auth_error",
+      "ts": "auth",
+      "name": "verifier r2 c5/e3: ::error::Error: double",
+      "expect": "esc:auth"
+    },
+    {
+      "text": "Error: fatal: Authentication failed for 'https://github.com/o/r.git/'",
+      "bash": "auth_error",
+      "ts": "auth",
+      "name": "verifier r2 c5/e4: Error: fatal: (git via execa)",
+      "expect": "esc:auth"
+    },
+    {
+      "text": "Error: Command failed: git push origin HEAD\nfatal: Authentication failed for 'https://github.com/o/r.git/'",
+      "bash": "auth_error",
+      "ts": "auth",
+      "name": "verifier r2 c5/e5: Error: Command failed: git push / stderr next line",
+      "expect": "esc:auth"
+    },
+    {
+      "text": "gh: error: authentication required",
+      "bash": "auth_error",
+      "ts": "auth",
+      "name": "verifier r2 c5/e6: gh: prefix then error",
+      "expect": "esc:auth"
+    },
+    {
+      "text": "##[error]Authentication failed",
+      "bash": "auth_error",
+      "ts": "auth",
+      "name": "verifier r2 c5/e7: vitest github-actions reporter annotation",
+      "expect": "noesc",
+      "limit": "Known limit 1: test or tool output printed at column 0 in the same form as the real emitter."
+    },
+    {
+      "text": "::error file=/repo/src/auth.test.ts,title=src/auth.test.ts > login,line=5,column=11::Error: Authentication failed%0A ❯ src/auth.ts:20:11%0A",
+      "bash": "build_failure",
+      "ts": "unknown",
+      "name": "verifier r2 c5/e8: vitest gha reporter encoded",
+      "expect": "noesc"
+    },
+    {
+      "text": "API Error: 401 · Please run /login",
+      "bash": "auth_error",
+      "ts": "auth",
+      "name": "verifier r2 c5/e10: Claude CLI bare 401 status line",
+      "expect": "esc:auth"
+    },
+    {
+      "text": "API Error: 403 {\"type\":\"error\",\"error\":{\"type\":\"permission_error\",\"message\":\"OAuth token does not meet scope requirement\"}}",
+      "bash": "auth_error",
+      "ts": "auth",
+      "name": "verifier r2 c5/e11: Claude Credit / org disabled 403 (permission)",
+      "expect": "esc:auth"
+    },
+    {
+      "text": "▸ Running tests...\n     Failure/Error: raise AuthError, \"Not logged in\"\n\n     AuthError:\n       Not logged in\n     # ./app/controllers/sessions_controller.rb:12:in `create'\n\nFinished in 0.5 seconds\n3 examples, 1 failure\n✗ Tests failed",
+      "bash": "build_failure",
+      "ts": "unknown",
+      "name": "verifier r2 c6/Pa1: via pipeline grep -A5: rspec exception message on own indented line",
+      "expect": "noesc"
+    },
+    {
+      "text": "▸ Running tests...\n     Failure/Error: expect { client.fetch }.not_to raise_error\n\n       expected no Exception, got #<Api::AuthError: Authentication failed> with backtrace:\n\n     Api::AuthError:\n       Authentication failed\n     # ./lib/api/client.rb:40\n1 example, 1 failure\n✗ Tests failed",
+      "bash": "build_failure",
+      "ts": "unknown",
+      "name": "verifier r2 c6/Pa2: via pipeline grep -A5: rspec RuntimeError: Authentication failed",
+      "expect": "noesc"
+    },
+    {
+      "text": "▸ Running tests...\ntest auth::tests::rejects_bad_token ... FAILED\n\nfailures:\n\n---- auth::tests::rejects_bad_token stdout ----\nthread 'auth::tests::rejects_bad_token' panicked at src/auth.rs:42:9:\n--\ntest result: FAILED. 2 passed; 1 failed; 0 ignored\n✗ Tests failed",
+      "bash": "build_failure",
+      "ts": "unknown",
+      "name": "verifier r2 c6/Pa3: via pipeline grep -A5: cargo panic message (Rust >=1.73 layout)",
+      "expect": "noesc"
+    },
+    {
+      "text": "▸ Running tests...\n  Error: Authentication failed\n      at login (file:///src/auth.js:10:11)\nℹ tests 4\nℹ fail 1\n✗ Tests failed",
+      "bash": "build_failure",
+      "ts": "unknown",
+      "name": "verifier r2 c6/Pa5: via pipeline grep -A5: node:test spec reporter error",
+      "expect": "noesc"
+    },
+    {
+      "text": "▸ Running tests...\n     Error: Authentication failed\n      at Context.<anonymous> (test/auth.spec.js:8:11)\n✗ Tests failed",
+      "bash": "build_failure",
+      "ts": "unknown",
+      "name": "verifier r2 c6/Pa6: via pipeline grep -A5: mocha uncaught error message",
+      "expect": "noesc"
+    },
+    {
+      "text": "▸ Running tests...\n    Error: Authentication failed\n\n      3 | test('login with wrong password', async ({ page }) => {\n  1 failed\n✗ Tests failed",
+      "bash": "build_failure",
+      "ts": "unknown",
+      "name": "verifier r2 c6/Pa7: via pipeline grep -A5: Playwright failure",
+      "expect": "noesc"
+    },
+    {
+      "text": "▸ Running tests...\n FAIL  src/auth.test.ts\n  ● Auth › login › throws on bad key\n\n    Invalid API key\n\n      4 |   it('throws on bad key', async () => {\n✗ Tests failed",
+      "bash": "build_failure",
+      "ts": "unknown",
+      "name": "verifier r2 c6/Pa8: via pipeline grep -A5: jest thrown error (Error: stripped by jest)",
+      "expect": "noesc"
+    },
+    {
+      "text": "▸ Running tests...\n✗ Tests failed",
+      "bash": "build_failure",
+      "ts": "unknown",
+      "name": "verifier r2 c6/Pa9: via pipeline grep -A5: bun test thrown error (bun prints error: at col 0)",
+      "expect": "noesc"
+    },
+    {
+      "text": "▸ Running tests...\n FAIL  src/auth.test.ts > client > refreshes\nError: OAuth token has expired.\n ❯ src/auth.ts:20:11\n Test Files  1 failed (1)\n✗ Tests failed",
+      "bash": "build_failure",
+      "ts": "unknown",
+      "name": "verifier r2 c6/Pa10: via pipeline grep -A5: vitest thrown error",
+      "expect": "noesc"
+    },
+    {
+      "text": "▸ Running tests...\n--- FAIL: TestClient (0.01s)\n    client_test.go:30: unexpected error:\n        Bad credentials\nFAIL\n✗ Tests failed",
+      "bash": "build_failure",
+      "ts": "unknown",
+      "name": "verifier r2 c6/Pa15: via pipeline grep -A5: go test t.Log continuation line indented",
+      "expect": "noesc"
+    },
+    {
+      "text": "▸ Running tests...\n--- FAIL: TestAuth (0.00s)\n    auth_test.go:9: got error:\n        authentication failed: bad password\nFAIL\n✗ Tests failed",
+      "bash": "build_failure",
+      "ts": "unknown",
+      "name": "verifier r2 c6/Pa28: via pipeline grep -A5: go testing log with t.Error multi-line indented",
       "expect": "noesc"
     }
   ]

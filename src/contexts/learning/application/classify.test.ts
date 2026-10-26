@@ -162,3 +162,37 @@ describe("test-runner blocks and line breaks are normalized as in bash (#8696 ve
     expect(boundEvidence(text).split("\n")[0]).toBe("l0");
   });
 });
+
+describe("runner error blocks are dropped (#8696 verifier round 2)", () => {
+  test("a cargo panic message is dropped up to the note line", () => {
+    const text =
+      "thread 'auth::t' panicked at src/auth.rs:42:9:\nauthentication failed\nnote: run with `RUST_BACKTRACE=1`";
+    expect(dropTestTitles(text)).toBe("note: run with `RUST_BACKTRACE=1`");
+  });
+
+  test("the error under a vitest FAIL header is dropped up to the frame", () => {
+    const text =
+      " FAIL  src/auth.test.ts > client > refreshes\nError: OAuth token has expired.\n ❯ src/auth.ts:20:11";
+    expect(dropTestTitles(text)).toBe(" ❯ src/auth.ts:20:11");
+  });
+
+  test("a vitest stderr block and a pytest captured section are dropped", () => {
+    expect(
+      dropTestTitles("stderr | a.test.ts > x\nAuthentication failed: bad password\n\nok"),
+    ).toBe("\nok");
+    expect(
+      dropTestTitles(
+        "----- Captured stderr call -----\nfatal: Authentication failed for 'https://x/'\nFAILED t.py::x",
+      ),
+    ).toBe("FAILED t.py::x");
+  });
+
+  test("indented runner error bodies are not auth; the same line at column 0 is", () => {
+    expect(classifyAndDecide({ text: "  Error: Authentication failed", attempts: [] }).class).toBe(
+      "unknown",
+    );
+    expect(classifyAndDecide({ text: "Error: Authentication failed", attempts: [] }).class).toBe(
+      "auth",
+    );
+  });
+});
