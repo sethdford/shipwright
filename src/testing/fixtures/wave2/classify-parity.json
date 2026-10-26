@@ -1204,11 +1204,10 @@
     },
     {
       "text": "{\"type\":\"result\",\"subtype\":\"success\",\"is_error\":true,\"result\":\"API Error: 401 {\\\"type\\\":\\\"error\\\",\\\"error\\\":{\\\"type\\\":\\\"authentication_error\\\",\\\"message\\\":\\\"OAuth token has expired.\\\"}}\",\"session_id\":\"abc\"}",
-      "bash": "unknown",
-      "ts": "unknown",
+      "bash": "auth_error",
+      "ts": "auth",
       "name": "verifier b6: Claude CLI stream-json result with escaped quotes",
-      "expect": "esc:auth",
-      "limit": "Known limit 2: a raw stream-json \"result\" field is not matched (the current CLI puts its own text there, which the phrases catch)."
+      "expect": "esc:auth"
     },
     {
       "text": "● API Error: 401 {\"type\":\"error\",\"error\":{\"type\":\"authentication_error\",\"message\":\"OAuth token has expired. Please obtain a new token or refresh your existing token.\"}}",
@@ -1901,11 +1900,10 @@
     },
     {
       "text": "{\"type\":\"result\",\"subtype\":\"success\",\"is_error\":true,\"duration_ms\":120,\"result\":\"Invalid API key · Please run /login\",\"session_id\":\"x\"}",
-      "bash": "unknown",
-      "ts": "unknown",
+      "bash": "auth_error",
+      "ts": "auth",
       "name": "verifier r2 c2/b11: Claude stream-json result Invalid API key",
-      "expect": "esc:auth",
-      "limit": "Known limit 2: an emitter form or prefix the classifier does not cover; the run is retried."
+      "expect": "esc:auth"
     },
     {
       "text": "[{\"type\":\"system\",\"subtype\":\"init\"},{\"type\":\"result\",\"subtype\":\"success\",\"is_error\":true,\"result\":\"Not logged in · Please run /login\"}]",
@@ -1917,11 +1915,10 @@
     },
     {
       "text": "{\"type\":\"result\",\"is_error\":true,\"result\":\"OAuth token has expired. Please obtain a new token or refresh your existing token.\"}",
-      "bash": "unknown",
-      "ts": "unknown",
+      "bash": "auth_error",
+      "ts": "auth",
       "name": "verifier r2 c2/b13: Claude json OAuth expired",
-      "expect": "esc:auth",
-      "limit": "Known limit 2: an emitter form or prefix the classifier does not cover; the run is retried."
+      "expect": "esc:auth"
     },
     {
       "text": "API Error: 401 {\"type\":\"error\",\"error\":{\"type\":\"authentication_error\",\"message\":\"OAuth authentication is currently not supported.\"},\"request_id\":\"req_011CU\"}",
@@ -2673,27 +2670,24 @@
     },
     {
       "text": "thread 'main' panicked at src/main.rs:3:5:\nboom\nHTTP 401: Bad credentials (https://api.github.com/graphql)",
-      "bash": "unknown",
-      "ts": "unknown",
+      "bash": "auth_error",
+      "ts": "auth",
       "name": "verifier r3 c1/d3: cargo panic, custom hook no note, then gh",
-      "expect": "esc:auth",
-      "limit": "Known limit 2: an emitter form, prefix or unclosed test-output block the classifier does not handle; the run is retried."
+      "expect": "esc:auth"
     },
     {
       "text": " FAIL  src/a.test.ts > auth > rejects\nTypeError: Cannot read properties of undefined (reading 'x')\n    at foo (src/a.ts:1:1)\n--\nfatal: Authentication failed for 'https://github.com/acme/app.git/'",
-      "bash": "build_failure",
-      "ts": "unknown",
+      "bash": "auth_error",
+      "ts": "auth",
       "name": "verifier r3 c1/d4: vitest FAIL excerpt cut by grep -A5, '--' then gh",
-      "expect": "esc:auth",
-      "limit": "Known limit 2: an emitter form, prefix or unclosed test-output block the classifier does not handle; the run is retried."
+      "expect": "esc:auth"
     },
     {
       "text": "stderr | src/a.test.ts > x\nwarn: thing\nGraphQL: Could not resolve to an issue or pull request with the number of 9. (repository.issueOrPullRequest)",
-      "bash": "unknown",
-      "ts": "unknown",
+      "bash": "invalid_issue",
+      "ts": "invalid_input",
       "name": "verifier r3 c1/d5: vitest stderr block then gh, no blank",
-      "expect": "esc:invalid_input",
-      "limit": "Known limit 2: an emitter form, prefix or unclosed test-output block the classifier does not handle; the run is retried."
+      "expect": "esc:invalid_input"
     },
     {
       "text": "  1) build\n  2) push\n  X Failed to log in to github.com account bot (keyring)\n  - The token in keyring is invalid.",
@@ -2712,11 +2706,10 @@
     },
     {
       "text": "thread 'tokio-runtime-worker' panicked at src/x.rs:1:1:\ncalled `Result::unwrap()` on an `Err` value: Io\nInvalid API key · Please run /login",
-      "bash": "unknown",
-      "ts": "unknown",
+      "bash": "auth_error",
+      "ts": "auth",
       "name": "verifier r3 c1/d8: rust panic then blank-less claude error",
-      "expect": "esc:auth",
-      "limit": "Known limit 2: an emitter form, prefix or unclosed test-output block the classifier does not handle; the run is retried."
+      "expect": "esc:auth"
     },
     {
       "text": "------------------------------ Captured log call -------------------------------\nINFO x\n_____________________ test_b _____________________\nfatal: Authentication failed for 'https://github.com/acme/app.git/'",
@@ -3523,11 +3516,10 @@
     },
     {
       "text": "{\"type\":\"result\",\"subtype\":\"success\",\"is_error\":true,\"duration_ms\":47,\"result\":\"API Error: 401 {\\\"type\\\":\\\"error\\\",\\\"error\\\":{\\\"type\\\":\\\"authentication_error\\\",\\\"message\\\":\\\"invalid x-api-key\\\"},\\\"request_id\\\":\\\"req_011CUXabc\\\"}\",\"session_id\":\"x\"}",
-      "bash": "unknown",
-      "ts": "unknown",
+      "bash": "auth_error",
+      "ts": "auth",
       "name": "verifier r5 corpus/S1: stream-json result old CLI 401",
-      "expect": "esc:auth",
-      "limit": "Known limit 2: an emitter form, prefix or unclosed test-output block the classifier does not handle; the run is retried."
+      "expect": "esc:auth"
     },
     {
       "text": "{\"type\":\"result\",\"subtype\":\"success\",\"is_error\":true,\"result\":\"API Error: 403 {\\\"type\\\":\\\"error\\\",\\\"error\\\":{\\\"type\\\":\\\"permission_error\\\",\\\"message\\\":\\\"invalid x-api-key\\\"},\\\"request_id\\\":\\\"req_011CUXabc\\\"}\"}",
@@ -4319,6 +4311,343 @@
       "ts": "unknown",
       "name": "verifier r7 corpus2/n6: agent prose: Error: authentication_error is the type",
       "expect": "noesc"
+    },
+    {
+      "text": "stderr | src/a.test.ts > loads config\nwarning: using defaults\n##[error]Claude Code authentication failed — check CLAUDE_CODE_OAUTH_TOKEN secret",
+      "bash": "auth_error",
+      "ts": "auth",
+      "name": "review corpus5: A1 vitest stderr block, no blank, then ##[error] auth",
+      "expect": "esc:auth"
+    },
+    {
+      "text": "stderr | src/a.test.ts > x\nmock said hi\nFailed to authenticate. API Error: 401 {\"type\":\"error\",\"error\":{\"type\":\"authentication_error\",\"message\":\"invalid x-api-key\"},\"request_id\":\"req_011\"}",
+      "bash": "auth_error",
+      "ts": "auth",
+      "name": "review corpus5: A2 vitest stderr then Claude 401",
+      "expect": "esc:auth"
+    },
+    {
+      "text": "----- Captured stdout call -----\nhello\nFailed to authenticate. API Error: 401 {\"type\":\"error\",\"error\":{\"type\":\"authentication_error\",\"message\":\"invalid x-api-key\"},\"request_id\":\"req_011\"}",
+      "bash": "build_failure",
+      "ts": "unknown",
+      "name": "review corpus5: A3 pytest captured unterminated then Claude 401",
+      "expect": "esc:auth",
+      "limit": "Known limit: a pytest captured section that never closes still hides the line after it. Its content is the application's own log lines, which print the same shapes as real emitters (see the r4/r5 noesc rows), so an escalation line does not end it."
+    },
+    {
+      "text": "------------------------------ Captured log call -------------------------------\nINFO root:x.py:3 hi\nremote: Invalid username or password.\nfatal: Authentication failed for 'https://github.com/o/r.git/'",
+      "bash": "build_failure",
+      "ts": "unknown",
+      "name": "review corpus5: A4 pytest captured then git push auth",
+      "expect": "esc:auth",
+      "limit": "Known limit: a pytest captured section that never closes still hides the line after it. Its content is the application's own log lines, which print the same shapes as real emitters (see the r4/r5 noesc rows), so an escalation line does not end it."
+    },
+    {
+      "text": "thread 'main' panicked at src/main.rs:3:5:\nboom\nfatal: Authentication failed for 'https://github.com/o/r.git/'",
+      "bash": "auth_error",
+      "ts": "auth",
+      "name": "review corpus5: A5 cargo panic then git push auth",
+      "expect": "esc:auth"
+    },
+    {
+      "text": " FAIL  src/a.test.ts > suite > case\nAssertionError: expected 1 to be 2\ngh: HTTP 401: Bad credentials (https://api.github.com/graphql)",
+      "bash": "auth_error",
+      "ts": "auth",
+      "name": "review corpus5: A6 vitest FAIL header then gh 401",
+      "expect": "esc:auth"
+    },
+    {
+      "text": "⎯⎯⎯⎯ Unhandled Rejection ⎯⎯⎯⎯\nError: boom\nFailed to authenticate. API Error: 401 {\"type\":\"error\",\"error\":{\"type\":\"authentication_error\",\"message\":\"invalid x-api-key\"},\"request_id\":\"req_011\"}",
+      "bash": "auth_error",
+      "ts": "auth",
+      "name": "review corpus5: A7 vitest Unhandled then Claude 401",
+      "expect": "esc:auth"
+    },
+    {
+      "text": "  console.log\n    hi\n\nFailed to authenticate. API Error: 401 {\"type\":\"error\",\"error\":{\"type\":\"authentication_error\",\"message\":\"invalid x-api-key\"},\"request_id\":\"req_011\"}",
+      "bash": "auth_error",
+      "ts": "auth",
+      "name": "review corpus5: A8 jest console.log then column-0 auth",
+      "expect": "esc:auth"
+    },
+    {
+      "text": "build\tRun tests\t2026-10-26T09:00:00.1234567Z stderr | src/a.test.ts > x\nbuild\tRun tests\t2026-10-26T09:00:00.1234567Z noise\nbuild\tRun tests\t2026-10-26T09:00:00.1234567Z ##[error]Process completed with exit code 1.\nbuild\tRun Claude\t2026-10-26T09:00:00.1234567Z ##[group]Run claude -p ...\nbuild\tRun Claude\t2026-10-26T09:00:00.1234567Z ##[endgroup]\nbuild\tRun Claude\t2026-10-26T09:00:00.1234567Z Failed to authenticate. API Error: 401 {\"type\":\"error\",\"error\":{\"type\":\"authentication_error\",\"message\":\"invalid x-api-key\"},\"request_id\":\"req_011\"}",
+      "bash": "auth_error",
+      "ts": "auth",
+      "name": "review corpus5: A9 vitest stderr then ##[group] step boundary then auth (gh-prefixed)",
+      "expect": "esc:auth"
+    },
+    {
+      "text": "----- Captured stderr call -----\nx\nGraphQL: Could not resolve to an issue or pull request with the number of 77. (repository.issue)",
+      "bash": "unknown",
+      "ts": "unknown",
+      "name": "review corpus5: A10 pytest captured then missing issue",
+      "expect": "esc:invalid_input",
+      "limit": "Known limit: a pytest captured section that never closes still hides the line after it. Its content is the application's own log lines, which print the same shapes as real emitters (see the r4/r5 noesc rows), so an escalation line does not end it."
+    },
+    {
+      "text": "  1) Suite\n       does thing\n     Error: x\nFailed to authenticate. API Error: 401 {\"type\":\"error\",\"error\":{\"type\":\"authentication_error\",\"message\":\"invalid x-api-key\"},\"request_id\":\"req_011\"}",
+      "bash": "auth_error",
+      "ts": "auth",
+      "name": "review corpus5: A11 mocha title block then auth col0",
+      "expect": "esc:auth"
+    },
+    {
+      "text": "(fail) a > b [1ms]\nFailed to authenticate. API Error: 401 {\"type\":\"error\",\"error\":{\"type\":\"authentication_error\",\"message\":\"invalid x-api-key\"},\"request_id\":\"req_011\"}",
+      "bash": "auth_error",
+      "ts": "auth",
+      "name": "review corpus5: A12 bun (fail) line then auth col0",
+      "expect": "esc:auth"
+    },
+    {
+      "text": "##[group]Run gh issue view 77 --json body\n\u001b[36;1mgh issue view 77 --json body\u001b[0m\nshell: /usr/bin/bash -e {0}\nenv:\n  GH_TOKEN: ***\n##[endgroup]\nGraphQL: Could not resolve to an issue or pull request with the number of 77. (repository.issue)\n##[error]Process completed with exit code 1.",
+      "bash": "invalid_issue",
+      "ts": "invalid_input",
+      "name": "review corpus5: B1 Actions group + gh missing issue",
+      "expect": "esc:invalid_input"
+    },
+    {
+      "text": "##[group]Run git push origin HEAD\n##[endgroup]\nremote: Permission to o/r.git denied to github-actions[bot].\nfatal: unable to access 'https://github.com/o/r/': The requested URL returned error: 403\n##[error]Process completed with exit code 128.",
+      "bash": "auth_error",
+      "ts": "auth",
+      "name": "review corpus5: B2 Actions git push 403",
+      "expect": "esc:auth"
+    },
+    {
+      "text": "Traceback (most recent call last):\n  File \"run.py\", line 3, in <module>\n    client.messages.create()\nanthropic.AuthenticationError: Error code: 401 - {'type': 'error', 'error': {'type': 'authentication_error', 'message': 'invalid x-api-key'}}",
+      "bash": "auth_error",
+      "ts": "auth",
+      "name": "review corpus5: B3 python traceback (final line col0)",
+      "expect": "esc:auth"
+    },
+    {
+      "text": "/app/node_modules/@anthropic-ai/sdk/error.js:45\n        return new AuthenticationError(status, error, message, headers);\n               ^\n\nAuthenticationError: 401 {\"type\":\"error\",\"error\":{\"type\":\"authentication_error\",\"message\":\"invalid x-api-key\"},\"request_id\":\"req_011\"}\n    at APIError.generate (/app/node_modules/@anthropic-ai/sdk/error.js:45:20)",
+      "bash": "auth_error",
+      "ts": "auth",
+      "name": "review corpus5: B4 node uncaught SDK",
+      "expect": "esc:auth"
+    },
+    {
+      "text": "✗ CLI exited 1 with minimal output: Invalid API key · Please run /login",
+      "bash": "auth_error",
+      "ts": "auth",
+      "name": "review corpus5: B5 Shipwright ✗ wrapper",
+      "expect": "esc:auth"
+    },
+    {
+      "text": "✗ Fatal CLI error: {\"type\":\"result\",\"subtype\":\"success\",\"is_error\":true,\"duration_ms\":234,\"duration_api_ms\":0,\"num_turns\":1,\"result\":\"Inval\n✗ Fatal CLI error detected — aborting loop (see iteration log)",
+      "bash": "unknown",
+      "ts": "unknown",
+      "name": "review corpus5: B6 Shipwright fatal CLI error (json truncated)",
+      "expect": "esc:auth",
+      "limit": "Known limit: the old loop-restart.sh cut the JSON before its result text, so the line carries no evidence of the cause; loop-restart.sh now prints the extracted result text instead (#8715)."
+    },
+    {
+      "text": "{\"type\":\"result\",\"subtype\":\"success\",\"is_error\":true,\"duration_ms\":234,\"num_turns\":1,\"result\":\"Invalid API key · Please run /login\",\"session_id\":\"s\"}",
+      "bash": "auth_error",
+      "ts": "auth",
+      "name": "review corpus5: B7 claude json result raw",
+      "expect": "esc:auth"
+    },
+    {
+      "text": "make: *** [deploy] Error 1\n    Error: Failed to authenticate. API Error: 401 {\"type\":\"error\",\"error\":{\"type\":\"authentication_error\",\"message\":\"invalid x-api-key\"},\"request_id\":\"req_011\"}",
+      "bash": "auth_error",
+      "ts": "auth",
+      "name": "review corpus5: B8 indented Error: under make",
+      "expect": "esc:auth"
+    },
+    {
+      "text": "\tgh: HTTP 401: Bad credentials (https://api.github.com/graphql)",
+      "bash": "auth_error",
+      "ts": "auth",
+      "name": "review corpus5: B9 tab-indented gh auth",
+      "expect": "esc:auth"
+    },
+    {
+      "text": "[2026-10-26T09:00:00Z] [ERROR] Claude Code authentication failed",
+      "bash": "auth_error",
+      "ts": "auth",
+      "name": "review corpus5: B10 daemon_log wrapped auth",
+      "expect": "esc:auth"
+    },
+    {
+      "text": "2026-10-26T09:00:00.1234567Z ##[error]Claude Code authentication failed — check CLAUDE_CODE_OAUTH_TOKEN secret",
+      "bash": "auth_error",
+      "ts": "auth",
+      "name": "review corpus5: B11 raw actions log with ISO ts",
+      "expect": "esc:auth"
+    },
+    {
+      "text": "  ⎿  API Error: 401 {\"type\":\"error\",\"error\":{\"type\":\"authentication_error\",\"message\":\"invalid x-api-key\"},\"request_id\":\"req_011\"}",
+      "bash": "auth_error",
+      "ts": "auth",
+      "name": "review corpus5: B13 Claude TUI ⎿ indented",
+      "expect": "esc:auth"
+    },
+    {
+      "text": "##[error]GraphQL: Could not resolve to an issue or pull request with the number of 5. (repository.issue)",
+      "bash": "invalid_issue",
+      "ts": "invalid_input",
+      "name": "review corpus5: B15 ##[error] gh lookup",
+      "expect": "esc:invalid_input"
+    },
+    {
+      "text": "Invalid API key · Please run /login\n(fail) parses CLI auth output [1ms]\nerror: expect(received).toBe(expected)",
+      "bash": "auth_error",
+      "ts": "auth",
+      "name": "review corpus5: C1 bun console.log of fixture at col0",
+      "expect": "noesc",
+      "limit": "Known limit 1: output in the same form as the real emitter at column 0 (test fixtures, prose, code fences, heredocs, wrapped test descriptions)."
+    },
+    {
+      "text": "$ cat fixtures/preflight-auth.log\nAPI Error: 401 {\"type\":\"error\",\"error\":{\"type\":\"authentication_error\",\"message\":\"invalid x-api-key\"},\"request_id\":\"req_011\"}\n(fail) fixture > loads",
+      "bash": "auth_error",
+      "ts": "auth",
+      "name": "review corpus5: C2 cat fixture log in test",
+      "expect": "noesc",
+      "limit": "Known limit 1: output in the same form as the real emitter at column 0 (test fixtures, prose, code fences, heredocs, wrapped test descriptions)."
+    },
+    {
+      "text": "✗ Invalid API key · Please run /login classified as auth\n    expected: auth_error\n    actual:   unknown",
+      "bash": "auth_error",
+      "ts": "auth",
+      "name": "review corpus5: C3 sh test ✗ desc starting with phrase",
+      "expect": "noesc",
+      "limit": "Known limit 1: output in the same form as the real emitter at column 0 (test fixtures, prose, code fences, heredocs, wrapped test descriptions)."
+    },
+    {
+      "text": "✗ not logged in to GitHub prompt test failed",
+      "bash": "auth_error",
+      "ts": "auth",
+      "name": "review corpus5: C4 ✗ wrapper around test name",
+      "expect": "noesc",
+      "limit": "Known limit 1: output in the same form as the real emitter at column 0 (test fixtures, prose, code fences, heredocs, wrapped test descriptions)."
+    },
+    {
+      "text": "Error: authentication failed. was the old message; I changed it to be clearer.\nerror: build failed",
+      "bash": "auth_error",
+      "ts": "auth",
+      "name": "review corpus5: C5 agent prose col0 Error:",
+      "expect": "noesc",
+      "limit": "Known limit 1: output in the same form as the real emitter at column 0 (test fixtures, prose, code fences, heredocs, wrapped test descriptions)."
+    },
+    {
+      "text": "```\nfatal: Authentication failed for 'https://github.com/o/r.git/'\n```\nerror: docs lint failed",
+      "bash": "auth_error",
+      "ts": "auth",
+      "name": "review corpus5: C6 markdown code fence",
+      "expect": "noesc",
+      "limit": "Known limit 1: output in the same form as the real emitter at column 0 (test fixtures, prose, code fences, heredocs, wrapped test descriptions)."
+    },
+    {
+      "text": "+ cat <<EOF\nnot logged in\nEOF\nerror: snapshot mismatch",
+      "bash": "auth_error",
+      "ts": "auth",
+      "name": "review corpus5: C7 heredoc in test log",
+      "expect": "noesc",
+      "limit": "Known limit 1: output in the same form as the real emitter at column 0 (test fixtures, prose, code fences, heredocs, wrapped test descriptions)."
+    },
+    {
+      "text": "src/a.ts:12:Error: Bad credentials\nerror: lint failed",
+      "bash": "build_failure",
+      "ts": "unknown",
+      "name": "review corpus5: C8 grep output of source",
+      "expect": "noesc"
+    },
+    {
+      "text": "error: issue not found: cache miss for key 42\nerror: test failed",
+      "bash": "invalid_issue",
+      "ts": "invalid_input",
+      "name": "review corpus5: C9 issue-not-found from app",
+      "expect": "noesc",
+      "limit": "Known limit 1: output in the same form as the real emitter at column 0 (test fixtures, prose, code fences, heredocs, wrapped test descriptions)."
+    },
+    {
+      "text": "2026-10-26T09:00:00Z failed to authenticate.\n(fail) logger > formats",
+      "bash": "auth_error",
+      "ts": "auth",
+      "name": "review corpus5: C10 ISO ts + test console col0",
+      "expect": "noesc",
+      "limit": "Known limit 1: output in the same form as the real emitter at column 0 (test fixtures, prose, code fences, heredocs, wrapped test descriptions)."
+    },
+    {
+      "text": "GraphQL: Could not resolve to an issue or pull request with the number of 999999. (repository.issue)\n(fail) tracker > maps not found",
+      "bash": "invalid_issue",
+      "ts": "invalid_input",
+      "name": "review corpus5: C11 gh issue view of another issue in test",
+      "expect": "noesc",
+      "limit": "Known limit 1: output in the same form as the real emitter at column 0 (test fixtures, prose, code fences, heredocs, wrapped test descriptions)."
+    },
+    {
+      "text": "⚠ not logged in to optional registry; continuing\nerror: build failed",
+      "bash": "auth_error",
+      "ts": "auth",
+      "name": "review corpus5: C12 ⚠ warn wrapper",
+      "expect": "noesc",
+      "limit": "Known limit 1: output in the same form as the real emitter at column 0 (test fixtures, prose, code fences, heredocs, wrapped test descriptions)."
+    },
+    {
+      "text": "✓ authentication failed.\nerror",
+      "bash": "build_failure",
+      "ts": "unknown",
+      "name": "review corpus5: C13 vitest ✓ col0 passing",
+      "expect": "noesc"
+    },
+    {
+      "text": "error: expected 'Error: Invalid API key.' got 'ok'",
+      "bash": "unknown",
+      "ts": "unknown",
+      "name": "review corpus5: C14 sed s/ / in log",
+      "expect": "noesc"
+    },
+    {
+      "text": "packages/agent deploy: Error: Failed to authenticate. API Error: 401 {\"type\":\"error\",\"error\":{\"type\":\"authentication_error\",\"message\":\"invalid x-api-key\"}}",
+      "bash": "auth_error",
+      "ts": "auth",
+      "name": "review corpus6: pnpm -r prefix",
+      "expect": "esc:auth"
+    },
+    {
+      "text": "agent:run: Error: Failed to authenticate. API Error: 401 {\"type\":\"error\",\"error\":{\"type\":\"authentication_error\",\"message\":\"invalid x-api-key\"}}",
+      "bash": "auth_error",
+      "ts": "auth",
+      "name": "review corpus6: turbo prefix",
+      "expect": "esc:auth"
+    },
+    {
+      "text": "agent-1  | Error: Failed to authenticate. API Error: 401 {\"type\":\"error\",\"error\":{\"type\":\"authentication_error\",\"message\":\"invalid x-api-key\"}}",
+      "bash": "auth_error",
+      "ts": "auth",
+      "name": "review corpus6: docker compose prefix",
+      "expect": "esc:auth"
+    },
+    {
+      "text": "> agent@1.0.0 start\n> node run.js\n\nError: Failed to authenticate. API Error: 401 {\"type\":\"error\",\"error\":{\"type\":\"authentication_error\",\"message\":\"invalid x-api-key\"}}",
+      "bash": "auth_error",
+      "ts": "auth",
+      "name": "review corpus6: npm script wrapper col0",
+      "expect": "esc:auth"
+    },
+    {
+      "text": "stderr | a.test.ts > x\nnoise\n\nError: Failed to authenticate. API Error: 401 {\"type\":\"error\",\"error\":{\"type\":\"authentication_error\",\"message\":\"invalid x-api-key\"}}",
+      "bash": "auth_error",
+      "ts": "auth",
+      "name": "review corpus6: vitest stderr terminated by blank then auth",
+      "expect": "esc:auth"
+    },
+    {
+      "text": "build\tstep\t﻿2026-10-26T09:00:00.1Z Error: Failed to authenticate. API Error: 401 {\"type\":\"error\",\"error\":{\"type\":\"authentication_error\",\"message\":\"invalid x-api-key\"}}",
+      "bash": "auth_error",
+      "ts": "auth",
+      "name": "review corpus6: gh run log w/ BOM",
+      "expect": "esc:auth"
+    },
+    {
+      "text": "##[group]Run claude\n##[endgroup]\nInvalid API key · Please run /login\n##[error]Process completed with exit code 1.",
+      "bash": "auth_error",
+      "ts": "auth",
+      "name": "review corpus6: Claude 'Invalid API key' in ##[error] after group",
+      "expect": "esc:auth"
     }
   ]
 }

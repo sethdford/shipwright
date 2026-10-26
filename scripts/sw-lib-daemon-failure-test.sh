@@ -475,4 +475,22 @@ for loc in C en_US.UTF-8; do
         "$(LC_ALL="$loc" SW_BUN=/nonexistent/bun classify_failure 903)"
 done
 
+# loop-restart.sh prints the matched CLI line as "✗ Fatal CLI error: ..." and the classifier reads that line. For a
+# JSON result object it must print the result text, not the object's first 120 characters (#8715).
+print_test_section "Fatal CLI error lines carry the cause the classifier needs (#8715)"
+sed -n '/^check_fatal_error()/,/^}/p' "$SCRIPT_DIR/lib/loop-restart.sh" > "$TEST_TEMP_DIR/check-fatal.sh"
+# shellcheck source=/dev/null
+source "$TEST_TEMP_DIR/check-fatal.sh"
+fatal_line() {
+    printf '%s\n' "$1" > "$TEST_TEMP_DIR/iter.log"
+    ( error() { printf '✗ %s\n' "$*"; }; check_fatal_error "$TEST_TEMP_DIR/iter.log" 1 || true )
+}
+cli_json='{"type":"result","subtype":"success","is_error":true,"duration_ms":234,"duration_api_ms":0,"num_turns":1,"result":"Invalid API key · Please run /login","session_id":"0123456789abcdef"}'
+fatal_out="$(fatal_line "$cli_json")"
+assert_eq "a JSON result prints its result text" "✗ Fatal CLI error: Invalid API key · Please run /login" "$fatal_out"
+printf '%s\n' "$fatal_out" > "$LOG_DIR/issue-904.log"
+assert_eq "that line is auth to the regex classifier" "auth_error" "$(SW_BUN=/nonexistent/bun classify_failure 904)"
+assert_eq "a plain matched line is printed as before" "✗ Fatal CLI error: Error: Invalid API key" \
+    "$(fatal_line "Error: Invalid API key")"
+
 print_test_results

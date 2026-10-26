@@ -82,7 +82,10 @@ classify_failure() {
     # TypeScript errorLines(), so a bare word in prose or in forged test output does not escalate (#8696).
     # Test-runner output is dropped first, as dropTestTitles() does in evidence.ts.
     local err_lines
-    err_lines=$(printf '%s\n' "$tail_content" | LC_ALL=C awk "$_DAEMON_DROP_TEST_OUTPUT" | LC_ALL=C grep -aiE "$_DAEMON_ERROR_LINE" || true)
+    # Column-0 lines an escalation rule matches on their own end an open free-text block (#8715).
+    local esc_nums
+    esc_nums=$(printf '%s\n' "$tail_content" | LC_ALL=C grep -naiE -e "$_DAEMON_AUTH" -e "$_DAEMON_INVALID_ISSUE" | LC_ALL=C sed 's/:.*//' | tr '\n' ',' || true)
+    err_lines=$(printf '%s\n' "$tail_content" | LC_ALL=C awk -v esc=",${esc_nums}" "$_DAEMON_DROP_TEST_OUTPUT" | LC_ALL=C grep -aiE "$_DAEMON_ERROR_LINE" || true)
 
     # W2-04: the typed classifier decides the auth and invalid-input classes. Both fail safe (no
     # retry). Its `transient` verdict is NOT used here: it comes from free log text, which an agent
@@ -161,16 +164,20 @@ l ~ /^[ \t]*([^ \t]+[ \t]+)?(failure analyzed|failure diagnosis|analyzing failur
 { print }'
 # Test-runner output, dropped before the escalation rules (dropTestTitles in evidence.ts): bun `(fail) ` and co.,
 # the result glyphs, jest's indented `● ` header, mocha's `  1) ` title block, jest/vitest console blocks, a cargo
-# panic message, the error under a vitest ` FAIL  file > test` header and pytest's captured output. No intervals
+# panic message, the error under a vitest ` FAIL  file > test` header and pytest's captured output. Every block ends
+# at a gh step boundary; a free-text block (console, panic, vitest) also ends at a column-0 escalation line after
+# its first content line. `esc` lists those line numbers (",3,9,"), found with the escalation EREs. No intervals
 # or backslash escapes, so any awk (BSD, gawk, mawk) reads it the same.
 _DAEMON_DROP_TEST_OUTPUT='
-mode == "mocha" && /^[ \t]+[^ \t]/ { if ($0 ~ /:[ \t]*$/) mode = ""; next }
-mode == "jest" && /^[ \t]+[^ \t]/ { next }
-mode == "console" && $0 !~ /^[ \t]*$/ { next }
-mode == "panic" && $0 !~ /^(note|error|stack backtrace):/ && $0 !~ /^[ \t]*$/ { next }
-mode == "vitest" && $0 !~ /^ ❯ / && $0 !~ /^[ \t]*$/ { next }
-mode == "pytest" && $0 !~ /^(-----|=====|___|FAILED |ERROR [^ \t]+::|[0-9]+ (failed|passed|error))/ { next }
-{ mode = "" }
+/^##[[](group|endgroup|error)[]]/ || /^::error/ { mode = "" }
+(mode == "console" || mode == "panic" || mode == "vitest") && seen > 0 && $0 !~ /^[ \t]/ && index(esc, "," NR ",") { mode = "" }
+mode == "mocha" && /^[ \t]+[^ \t]/ { if ($0 ~ /:[ \t]*$/) mode = ""; seen++; next }
+mode == "jest" && /^[ \t]+[^ \t]/ { seen++; next }
+mode == "console" && $0 !~ /^[ \t]*$/ { seen++; next }
+mode == "panic" && $0 !~ /^(note|error|stack backtrace):/ && $0 !~ /^[ \t]*$/ { seen++; next }
+mode == "vitest" && $0 !~ /^ ❯ / && $0 !~ /^[ \t]*$/ { seen++; next }
+mode == "pytest" && $0 !~ /^(-----|=====|___|FAILED |ERROR [^ \t]+::|[0-9]+ (failed|passed|error))/ { seen++; next }
+{ mode = ""; seen = 0 }
 /^[ \t]*console[.](log|error|warn|info|debug)[ \t]*$/ { mode = "jest"; next }
 /^(stderr|stdout) [|] / { mode = "console"; next }
 /^thread '"'"'[^'"'"']*'"'"' panicked at / { mode = "panic"; next }
@@ -183,7 +190,10 @@ mode == "pytest" && $0 !~ /^(-----|=====|___|FAILED |ERROR [^ \t]+::|[0-9]+ (fai
 # agent prose indent), an optional ISO timestamp, `[timestamp] `, `[ERROR] `, then up to three glyphs ✗ ✘ × ⚠. No
 # punctuation: `- `, `+ `, `> `, `| `, `* ` and `# ` start diff, quote, table, list and heading lines. Brackets are
 # matched as `[[]` and `[]]`, never `\]`, which POSIX ERE leaves undefined outside a bracket expression.
-_DAEMON_LEAD="^([0-9]{4}[/-][0-9][0-9][/-][0-9][0-9][T ][0-9:.]{1,20}(Z|[+-][0-9][0-9]:?[0-9][0-9])? {1,2})?([[][0-9][0-9TZ:. +-]{0,38}[]] {1,2})?([[](error|err|fatal)[]] {1,2})?((✗|✘|×|⚠|"$'\xef\xb8\x8f'") {0,2}){0,3}"
+# A runner's own line prefix (RUNNER in failure.ts): pnpm -r `packages/agent deploy: `, turbo `agent:run: `,
+# docker compose `agent-1  | ` (#8715).
+_DAEMON_RUNNER='([A-Za-z0-9@._-]{1,60}/[A-Za-z0-9@._/-]{1,100} [A-Za-z0-9:._-]{1,50}: |[A-Za-z0-9@/._-]{1,100}:[A-Za-z][A-Za-z0-9._-]{0,49}: |[A-Za-z0-9._-]{1,64}[_-][0-9]{1,3} {1,20}[|] )'
+_DAEMON_LEAD="^${_DAEMON_RUNNER}?([0-9]{4}[/-][0-9][0-9][/-][0-9][0-9][T ][0-9:.]{1,20}(Z|[+-][0-9][0-9]:?[0-9][0-9])? {1,2})?([[][0-9][0-9TZ:. +-]{0,38}[]] {1,2})?([[](error|err|fatal)[]] {1,2})?((✗|✘|×|⚠|"$'\xef\xb8\x8f'") {0,2}){0,3}"
 # Up to two tool or annotation prefixes (PREFIX).
 _DAEMON_PREFIX='((gh|error|fatal)[ :]{1,3}|##[[]error[]] ?|::error:: ?|claude[ ]code returned an error result: |fatal cli error: |cli exited [0-9]{1,3} with minimal output: |pr creation failed: |pull request create failed: |(plan|design) stage produced api/cli error instead of an? (plan|design): ){0,2}'
 _DAEMON_END="([ ${_DAEMON_TAB}]{0,3}\$|[.:;!,])"
@@ -222,10 +232,14 @@ _DAEMON_AUTH_PHRASES+="|${_DAEMON_AUTH_BODY}"
 _DAEMON_AUTH_INDENTED="(error|fatal)[ :]{1,3}(401 )?authentication_error(:|[ ${_DAEMON_TAB}]{0,3}\$)"
 _DAEMON_AUTH_INDENTED+="|x failed to log in to ${_DAEMON_HOST} (account|using token)|x ${_DAEMON_HOST}: authentication failed"
 _DAEMON_AUTH_INDENTED+="|- the token in [a-z_]{1,40} is invalid"
+_DAEMON_AUTH_INDENTED+="|error: failed to authenticate[.] api error: 40[13] ${_DAEMON_AUTH_BODY}|gh: http 401: bad credentials \\(https?://"
+# The raw Claude CLI JSON result object of a failed run, at column 0 (CLI_RESULT in failure.ts).
+_DAEMON_JSON_GAP='[A-Za-z0-9_":,. -]{0,255}'
+_DAEMON_CLI_RESULT="\\{\"type\": ?\"result\",${_DAEMON_JSON_GAP}\"is_error\": ?true,${_DAEMON_JSON_GAP}\"result\": ?\"(${_DAEMON_AUTH_PHRASES})"
 # The 401/403 response after its emitter's token at the lead-in (AUTH_RESPONSE).
 _DAEMON_SDK_ERROR='([a-z_]{1,30}[.]){0,3}(authentication|permissiondenied)error: (error code: )?'
-_DAEMON_AUTH_RESPONSE="${_DAEMON_LEAD}((●|⏺) )?${_DAEMON_PREFIX}(${_DAEMON_SDK_ERROR}|api error: |error code: )?40[13]( -)? ${_DAEMON_AUTH_BODY}"
-_DAEMON_AUTH="${_DAEMON_LEAD}${_DAEMON_PREFIX}(${_DAEMON_AUTH_PHRASES})|^[ ${_DAEMON_TAB}]{0,8}(${_DAEMON_AUTH_INDENTED})|${_DAEMON_AUTH_RESPONSE}"
+_DAEMON_AUTH_RESPONSE="${_DAEMON_LEAD}((●|⏺) |[ ${_DAEMON_TAB}]{0,4}⎿ {1,3})?${_DAEMON_PREFIX}(${_DAEMON_SDK_ERROR}|api error: |error code: )?40[13]( -)? ${_DAEMON_AUTH_BODY}"
+_DAEMON_AUTH="${_DAEMON_LEAD}${_DAEMON_PREFIX}(${_DAEMON_AUTH_PHRASES}|${_DAEMON_CLI_RESULT})|^[ ${_DAEMON_TAB}]{0,8}(${_DAEMON_AUTH_INDENTED})|${_DAEMON_AUTH_RESPONSE}"
 _DAEMON_INVALID_ISSUE="${_DAEMON_LEAD}${_DAEMON_PREFIX}(graphql( error)?: could not resolve to an? (issue|pullrequest)([ ${_DAEMON_TAB}.,]|\$)"
 _DAEMON_INVALID_ISSUE+="|http 404: not found \\(https://api\\.github\\.com/repos/[A-Za-z0-9._-]{1,100}/[A-Za-z0-9._-]{1,100}/(issues|pulls)/[0-9]{1,10}\\)"
 _DAEMON_INVALID_ISSUE+="|issue not found([ ${_DAEMON_TAB}]{0,5}\$|:)|issue #?[0-9]{1,10} does not exist${_DAEMON_END})"
