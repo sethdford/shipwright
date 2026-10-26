@@ -32,15 +32,11 @@ function renderStats(data: FleetState): void {
   const statusEl = document.getElementById("stat-status");
   const statusDot = document.getElementById("status-dot");
   if (statusEl && statusDot) {
-    if (d.running) {
-      statusEl.textContent = "OPERATIONAL";
-      statusEl.className = "stat-value status-green";
-      statusDot.className = "pulse-dot operational";
-    } else {
-      statusEl.textContent = "OFFLINE";
-      statusEl.className = "stat-value status-rose";
-      statusDot.className = "pulse-dot offline";
-    }
+    // daemon.running only means the daemon's state file exists; the server does not report
+    // whether the process is alive, so say that instead of "operational" (as the header pill does).
+    statusEl.textContent = d.running ? "Daemon: not reported" : "No daemon state";
+    statusEl.className = "stat-value";
+    statusDot.className = "pulse-dot";
   }
 
   const active = data.pipelines ? data.pipelines.length : 0;

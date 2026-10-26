@@ -45,6 +45,33 @@ describe("API Client", () => {
       expect(mockFetch).not.toHaveBeenCalled();
     });
 
+    it.each([["guest"], [undefined], [null], ["superuser"], [""]])("refuses role %s (allowlist: operator, admin)", async (role) => {
+      store.set("currentUser", { username: "x", role } as never);
+      await expect(api.sendIntervention(1, "pause")).rejects.toThrow(/does not allow|Viewers/);
+      expect(mockFetch).not.toHaveBeenCalled();
+    });
+
+    it("allows operator and admin", async () => {
+      mockFetch.mockReturnValue(jsonResponse({ ok: true }));
+      await api.sendIntervention(1, "pause");
+      store.set("currentUser", { username: "a", role: "admin" });
+      await api.sendIntervention(1, "resume");
+      expect(mockFetch).toHaveBeenCalledTimes(2);
+    });
+
+    it("lets only the brake through while disconnected, and still checks its role", async () => {
+      store.set("connected", false);
+      mockFetch.mockReturnValue(jsonResponse({ paused: 0, running: 0, queued: 0, jobs: [] }));
+      await api.emergencyBrake();
+      await api.pauseIntakeForBrake();
+      expect(mockFetch).toHaveBeenCalledTimes(2);
+      await expect(api.daemonControl("pause")).rejects.toThrow(/Not connected/);
+      await expect(api.sendIntervention(1, "pause")).rejects.toThrow(/Not connected/);
+      store.set("currentUser", { username: "v", role: "viewer" });
+      await expect(api.emergencyBrake()).rejects.toThrow(/Viewers/);
+      expect(mockFetch).toHaveBeenCalledTimes(2);
+    });
+
     it("never gates reads", async () => {
       store.set("connected", false);
       store.set("currentUser", null);

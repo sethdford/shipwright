@@ -5218,27 +5218,32 @@ kbd {
   border-color: var(--sw-danger);
   color: var(--sw-danger);
 }
-.btn.danger-solid,
-.btn.brake {
+.btn.danger-solid {
   background: var(--sw-danger);
   border-color: var(--sw-danger);
   color: var(--sw-danger-ink);
   font-weight: 600;
 }
+/* Outlined at rest (solid only in its dialog), but unmistakable: a 2px danger rule, a tint
+   and the octagon set it apart from the ghost controls beside it. */
+.btn.brake {
+  border: 2px solid var(--sw-danger);
+  background: color-mix(in oklch, var(--sw-danger) 10%, transparent);
+  color: var(--sw-danger);
+  font-weight: 600;
+}
 .btn.brake:hover {
-  background: var(--sw-danger);
   border-color: var(--sw-danger);
-  color: var(--sw-danger-ink);
-  filter: brightness(1.08);
+  background: color-mix(in oklch, var(--sw-danger) 18%, transparent);
+  color: var(--sw-danger);
 }
 .btn.brake[aria-disabled="true"] {
-  background: transparent;
+  border-style: dashed;
   border-color: var(--sw-line);
+  background: transparent;
   color: var(--sw-text-3);
-  filter: none;
 }
 .brake-icon {
-  display: none;
   flex: none;
   width: 14px;
   height: 14px;
@@ -5475,6 +5480,10 @@ kbd {
   gap: 6px;
   color: var(--sw-text-3);
 }
+/* The Triage status card no longer claims a state with a coloured dot. */
+#status-dot {
+  display: none;
+}
 .empty-state code {
   white-space: nowrap;
 }
@@ -5572,8 +5581,26 @@ select.form-input {
 .alert-actions .alert-review {
   display: none;
 }
-.offline-banner {
+.offline-banner,
+.stale-data-banner {
   margin: -24px -24px 24px;
+}
+.stale-data-banner {
+  --tone: var(--sw-warn);
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  padding: 10px 24px;
+  border-bottom: 1px solid color-mix(in oklch, var(--tone) 40%, transparent);
+  background: color-mix(in oklch, var(--tone) 10%, var(--sw-bg-0));
+  font-size: 13px;
+}
+.stale-data-banner > .glyph {
+  color: var(--tone);
+}
+/* When the socket is down the offline banner already says so. */
+#offline-banner:not([style*="none"]) ~ .stale-data-banner {
+  display: none !important;
 }
 .offline-banner span:nth-child(2) {
   flex: 1 1 200px;
@@ -5872,7 +5899,8 @@ dialog h2 {
   .main {
     padding: 16px;
   }
-  .offline-banner {
+  .offline-banner,
+  .stale-data-banner {
     margin: -16px -16px 16px;
     padding: 10px 16px;
   }
@@ -5912,9 +5940,6 @@ dialog h2 {
   .pill-short {
     display: inline;
   }
-  .brake-icon {
-    display: inline;
-  }
   .header-divider,
   .theme-btn,
   .surface {
@@ -5928,6 +5953,20 @@ dialog h2 {
   }
   .alert-actions > :not(.alert-review, .alert-dismiss) {
     display: none;
+  }
+  /* One line on phones: the message truncates, the two actions stay inline. */
+  .alert-banner {
+    flex-wrap: nowrap;
+  }
+  .alert-message {
+    flex: 1 1 auto;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .alert-actions {
+    flex-wrap: nowrap;
   }
   .alert-actions .alert-review {
     display: inline-flex;

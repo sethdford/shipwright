@@ -5,7 +5,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { spawn, type ChildProcess } from "node:child_process";
 import { createServer, type AddressInfo } from "node:net";
-import { DASHBOARD_CSP, INLINE_PAGE_CSP, htmlSecurityHeaders, inlinePageHeaders } from "./security-headers";
+import { DASHBOARD_CSP, INLINE_PAGE_CSP, htmlSecurityHeaders, inlinePageHeaders, withSecurityHeaders } from "./security-headers";
 
 function directives(csp: string): Map<string, string> {
   return new Map(
@@ -45,6 +45,18 @@ describe("dashboard CSP", () => {
 
   it("is sent as a Content-Security-Policy header", () => {
     expect(htmlSecurityHeaders()).toEqual({ "Content-Security-Policy": DASHBOARD_CSP });
+  });
+
+  it("adds nosniff everywhere and a policy to HTML that has none, keeping an existing one", () => {
+    const html = withSecurityHeaders(new Response("<p>x</p>", { status: 500, headers: { "Content-Type": "text/html" } }));
+    expect(html?.headers.get("x-content-type-options")).toBe("nosniff");
+    expect(html?.headers.get("content-security-policy")).toBe(INLINE_PAGE_CSP);
+    expect(html?.status).toBe(500);
+    const page = withSecurityHeaders(new Response("", { headers: { "Content-Type": "text/html", ...htmlSecurityHeaders() } }));
+    expect(page?.headers.get("content-security-policy")).toBe(DASHBOARD_CSP);
+    expect(withSecurityHeaders(undefined)).toBeUndefined();
+    const text = withSecurityHeaders(new Response("Not found", { status: 404 }));
+    expect(text?.headers.get("content-type")).toMatch(/^text\/plain/);
   });
 
   it("blocks plugins and is mirrored by a strict policy for server-rendered pages", () => {
@@ -141,9 +153,28 @@ describe("dashboard server sends the CSP (auth off)", () => {
     expect(html).not.toMatch(INLINE_HANDLER);
   });
 
-  it("not on static assets", async () => {
-    const res = await fetch(srv.base + "/styles.css");
-    expect(res.headers.get("content-security-policy")).toBeNull();
+  it("not on stylesheets, but nosniff on every static asset and error", async () => {
+    const css = await fetch(srv.base + "/styles.css");
+    expect(css.headers.get("content-security-policy")).toBeNull();
+    expect(css.headers.get("x-content-type-options")).toBe("nosniff");
+    const missing = await fetch(srv.base + "/no-such-file");
+    expect(missing.status).toBe(404);
+    expect(missing.headers.get("x-content-type-options")).toBe("nosniff");
+    // The wrapper must keep the type Bun gives a string body, or the 404 downloads.
+    expect(missing.headers.get("content-type")).toMatch(/^text\/plain/);
+    // An allowed Origin adds CORS headers first; that must not lose the type either.
+    const cors = await fetch(srv.base + "/no-such-file", { headers: { Origin: srv.base } });
+    expect(cors.headers.get("access-control-allow-origin")).toBe(srv.base);
+    expect(cors.headers.get("content-type")).toMatch(/^text\/plain/);
+    expect(cors.headers.get("x-content-type-options")).toBe("nosniff");
+    expect(css.headers.get("content-type")).toMatch(/^text\/css/);
+    const api = await fetch(srv.base + "/api/health");
+    expect(api.headers.get("x-content-type-options")).toBe("nosniff");
+  });
+
+  it("on static SVG (an SVG document can carry script)", async () => {
+    const res = await fetch(srv.base + "/favicon.svg");
+    expect(res.headers.get("content-security-policy")).toBe(INLINE_PAGE_CSP);
   });
 });
 

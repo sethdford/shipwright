@@ -1,10 +1,23 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 
+function brakeOk() {
+  return {
+    paused: 2,
+    running: 2,
+    queued: 0,
+    jobs: [
+      { issue: 1, pid: 101, signalled: [103, 102, 101], failed: [] },
+      { issue: 2, pid: 201, signalled: [202, 201], failed: [] },
+    ],
+  };
+}
+
 vi.mock("../core/api", () => ({
   fetchMe: vi.fn(() => Promise.resolve({ username: "Ada Lovelace", role: "operator" })),
   fetchDaemonConfig: vi.fn(() => Promise.resolve({})),
   fetchAlerts: vi.fn(() => Promise.resolve({ alerts: [] })),
-  emergencyBrake: vi.fn(() => Promise.resolve({ paused: 2, queued: 0 })),
+  emergencyBrake: vi.fn(() => Promise.resolve(brakeOk())),
+  pauseIntakeForBrake: vi.fn(() => Promise.resolve({ ok: true })),
   sendIntervention: vi.fn(() => Promise.resolve({ ok: true })),
   daemonControl: vi.fn(() => Promise.resolve({ ok: true })),
 }));
@@ -68,10 +81,10 @@ describe("connection labels share one vocabulary", () => {
 
   it("banner text names the state, the data time and the brake", () => {
     expect(bannerText("offline", off)).toBe(
-      "Offline since 14:01. Showing data from 14:01. Emergency brake unavailable until reconnected.",
+      "Offline since 14:01. Showing data from 14:01. Actions are off until reconnected; the emergency brake still works and reports what it paused.",
     );
     expect(bannerText("reconnecting", { ...off, lastDataAt: null })).toBe(
-      "Reconnecting. No data received yet. Emergency brake unavailable until reconnected.",
+      "Reconnecting. No data received yet. Actions are off until reconnected; the emergency brake still works and reports what it paused.",
     );
   });
 });
@@ -99,7 +112,7 @@ describe("emergency brake", () => {
       <span id="conn"><span id="conn-text"></span></span><span id="conn-live"></span>
       <button id="emergency-brake">Emergency brake</button>
       <dialog id="emergency-modal">
-        <strong id="emergency-active-count">0</strong>
+        <p id="brake-desc"></p>
         <button data-close autofocus>Cancel</button>
         <button id="emergency-confirm" data-close>Engage brake</button>
       </dialog>
@@ -125,21 +138,27 @@ describe("emergency brake", () => {
     store.set("fleetState", { pipelines: [{ issue: 1 }, { issue: 2 }] } as never);
   };
 
-  it("is unavailable with a reason while not connected, from any entry point", () => {
-    expect(brake().getAttribute("aria-disabled")).toBe("true");
-    expect(brake().title).toMatch(/Not connected/);
+  const operator = () => store.set("currentUser", { username: "ada", role: "operator" });
+
+  it("works while disconnected: the brake is exempt from the connection gate", async () => {
+    operator();
+    expect(brake().hasAttribute("aria-disabled")).toBe(false);
     brake().click();
-    expect(dialog().open).toBe(false);
-    (document.getElementById("emergency-confirm") as HTMLButtonElement).click();
-    expect(api.emergencyBrake).not.toHaveBeenCalled();
+    expect(dialog().open).toBe(true);
+    expect(document.getElementById("brake-desc")?.textContent).toMatch(/how many are running is unknown here/);
+    await engageBrake();
+    expect(api.pauseIntakeForBrake).toHaveBeenCalledTimes(1);
+    expect(api.emergencyBrake).toHaveBeenCalledTimes(1);
+    expect(toastText()).toBe("Emergency brake engaged: intake paused; all 2 running pipelines paused (5 processes).");
   });
 
-  it("fails closed until the role has loaded", () => {
-    store.set("connected", true);
+  it("fails closed until the role has loaded, and a disabled click explains why", () => {
     expect(brake().getAttribute("aria-disabled")).toBe("true");
-    expect(brake().title).toMatch(/role/);
+    expect(brake().title).toMatch(/role is still loading/);
     brake().click();
     expect(dialog().open).toBe(false);
+    expect(toastText()).toMatch(/role is still loading/);
+    expect(document.getElementById("toast")?.getAttribute("role")).toBe("alert");
   });
 
   it("stays off, and says why, when /api/me fails", async () => {
@@ -147,55 +166,49 @@ describe("emergency brake", () => {
     setupHeader();
     await Promise.resolve();
     await Promise.resolve();
-    store.set("connected", true);
     expect(brake().getAttribute("aria-disabled")).toBe("true");
     expect(brake().title).toBe("Your role could not be loaded, so actions are off.");
   });
 
-  it("waits for live data: connected with a role but no run list yet is not enough", () => {
-    store.set("connected", true);
-    store.set("currentUser", { username: "ada", role: "operator" });
-    expect(brake().title).toMatch(/Waiting for live data/);
+  it.each([["viewer"], ["guest"], [undefined], ["superuser"]])("is refused for role %s", (role) => {
+    store.set("currentUser", { username: "x", role } as never);
+    expect(brake().getAttribute("aria-disabled")).toBe("true");
     brake().click();
     expect(dialog().open).toBe(false);
   });
 
-  it("is refused for viewers", () => {
-    store.set("connected", true);
-    store.set("currentUser", { username: "v", role: "viewer" });
-    expect(brake().title).toMatch(/Viewers/);
-  });
-
-  it("confirms with Cancel focused, then pauses intake and the running pipelines", async () => {
+  it("states the live count in the dialog when the feed is live, with Cancel focused", () => {
     ready();
-    expect(brake().hasAttribute("aria-disabled")).toBe(false);
     brake().click();
-    expect(dialog().open).toBe(true);
     expect(document.activeElement?.textContent).toBe("Cancel");
-    expect(document.getElementById("emergency-active-count")?.textContent).toBe("2");
+    expect(document.getElementById("brake-desc")?.textContent).toMatch(/each running pipeline \(2 now\)/);
     expect(api.emergencyBrake).not.toHaveBeenCalled();
-    await engageBrake();
-    expect(api.daemonControl).toHaveBeenCalledWith("pause");
-    expect(api.emergencyBrake).toHaveBeenCalledTimes(1);
-    expect(toastText()).toBe("Emergency brake engaged: intake paused; pause signal sent to 2 of 2 running pipelines.");
   });
 
-  it("reports an incomplete brake when fewer runs were paused than are running", async () => {
+  it("is incomplete, naming the runs, when any job's tree was not fully paused", async () => {
     ready();
-    vi.mocked(api.emergencyBrake).mockResolvedValueOnce({ paused: 0, queued: 0 } as never);
+    vi.mocked(api.emergencyBrake).mockResolvedValueOnce({
+      paused: 0,
+      running: 2,
+      queued: 0,
+      jobs: [
+        { issue: 1, pid: 101, signalled: [], failed: [], refused: "stale pid: the process started after the job" },
+        { issue: 2, pid: 201, signalled: [201], failed: [{ pid: 202, error: "EPERM" }] },
+      ],
+    } as never);
     await engageBrake();
     expect(toastText()).toBe(
-      "Emergency brake incomplete: intake paused; pause signal sent to 0 of 2 running pipelines. Check the daemon now.",
+      "Emergency brake incomplete: #1 stale pid: the process started after the job; #2 1 process not paused. Check the daemon now.",
     );
+    expect(document.getElementById("toast")?.getAttribute("role")).toBe("alert");
   });
 
-  it("never reports success when either half fails, and still attempts both", async () => {
+  it("never reports success when the intake pause fails, and still sends both", async () => {
     ready();
-    vi.mocked(api.daemonControl).mockRejectedValueOnce(new Error("HTTP 500"));
+    vi.mocked(api.pauseIntakeForBrake).mockRejectedValueOnce(new Error("HTTP 500"));
     await engageBrake();
     expect(api.emergencyBrake).toHaveBeenCalledTimes(1);
-    expect(toastText()).toMatch(/^Emergency brake incomplete: pausing intake failed .*HTTP 500.*pause signal sent to 2 of 2 running pipelines/);
-    expect(document.getElementById("toast")?.getAttribute("role")).toBe("alert");
+    expect(toastText()).toMatch(/^Emergency brake incomplete: pausing intake failed .*HTTP 500/);
   });
 });
 

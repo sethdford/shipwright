@@ -1,6 +1,6 @@
 {
   "js": {
-    "maxGzipBytes": 48935
+    "maxGzipBytes": 49568
   },
   "css": {
     "maxGzipBytes": 25600
@@ -14,8 +14,8 @@
   },
   "t2": {
     "measuredOn": "2026-10-25",
-    "jsGzipBytes": 48935,
-    "cssGzipBytes": 19195,
-    "notes": "T2 (#8699) raises the interim JS ceiling by 6,382 B over the T1 baseline (42,553 B). Round 1 (+5,451 B): destination router with legacy redirects and history, APG tablist, Cmd/Ctrl+K command palette, keyboard shortcuts and sheet, native-dialog confirmations, connection states, and the UI primitives in components/ui. Round 2 (+931 B): the fail-closed action gate (role and connection), enforced in api.ts for every mutating request, the two-step emergency brake (intake pause plus pipeline pause, success reported only when both succeed and every running pipeline was signalled, and only on live data), the honest daemon Stop confirmation, offline detection for a page that never connects, the pause-state toggle in the palette, the webhook removal confirmation and the mobile Review action; the no-op Skip stage button was removed. The byte breakdown is in the T2 PR body. There is no headroom by design. T4 (#8701) deletes the canvas, sprites and retired views; re-measure and lower this ceiling then."
+    "jsGzipBytes": 49568,
+    "cssGzipBytes": 19526,
+    "notes": "T2 (#8699) raises the interim JS ceiling by 7,015 B over the T1 baseline (42,553 B). Round 1 (+5,451 B): destination router with legacy redirects and history, APG tablist, Cmd/Ctrl+K command palette, keyboard shortcuts and sheet, native-dialog confirmations, connection states, and the UI primitives in components/ui. Round 2 (+931 B): the fail-closed action gate (role and connection), enforced in api.ts for every mutating request, the two-step emergency brake (intake pause plus pipeline pause, success reported only when both succeed and every running pipeline was signalled, and only on live data), the honest daemon Stop confirmation, offline detection for a page that never connects, the pause-state toggle in the palette, the webhook removal confirmation and the mobile Review action; the no-op Skip stage button was removed. Round 3 (+633 B): per-run results from the server's process-tree signalling (incomplete alerts that name the runs, pause state only from fully signalled runs), the brake working while the feed is stale or offline with an unknown-count dialog, the operator/admin role allowlist, stage labels in the stop dialog, and reasons on disabled controls. Trimming was measured: the optional completion sound costs 184 B and was kept. The byte breakdown is in the T2 PR body. There is no headroom by design. T4 (#8701) deletes the canvas, sprites and retired views; re-measure and lower this ceiling then."
   }
 }

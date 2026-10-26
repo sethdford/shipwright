@@ -9,6 +9,7 @@ import { h } from "./ui/dom";
 import { openDialog, closeDialog, confirmDialog } from "./ui/dialog";
 import { toast } from "./ui/toast";
 import { guardAction } from "./ui/guard";
+import { stageLabel } from "./ui/stage";
 
 let interventionTarget: number | null = null;
 let removeMachineTarget: string | null = null;
@@ -60,31 +61,48 @@ export const pausedRuns = new Set<number>();
 type RunAction = "pause" | "resume" | "abort";
 const ACTION_WORD: Record<RunAction, string> = { pause: "Pause", resume: "Resume", abort: "Stop" };
 
-/** The one path for run interventions: gated, reported, and tracked for pause state. */
+/**
+ * The one path for run interventions: gated, and reported from what the server says it
+ * signalled. A response that signalled nothing means the run is not running (or its PID was
+ * refused), never success. Pause state is tracked only from fully signalled runs.
+ */
 export function sendRunAction(issue: number, action: RunAction): Promise<void> {
   if (!guardAction()) return Promise.resolve();
+  const word = ACTION_WORD[action];
   return api
     .sendIntervention(issue, action)
-    .then(() => {
+    .then((res) => {
+      const signalled = res.signalled ?? [];
+      const failed = res.failed ?? [];
+      if (signalled.length === 0) {
+        toast(`${word} did nothing: run #${issue} is ${res.refused ?? "not running"}.`, "error");
+        return;
+      }
+      if (failed.length > 0) {
+        toast(`${word} incomplete for run #${issue}: ${failed.length} of ${signalled.length + failed.length} processes failed.`, "error");
+        return;
+      }
       if (action === "pause") pausedRuns.add(issue);
       else pausedRuns.delete(issue);
-      toast(`${ACTION_WORD[action]} requested for run #${issue}.`);
+      const n = signalled.length;
+      const killed = res.killed?.length ? `, ${res.killed.length} killed after the grace period` : "";
+      toast(`${word} signal sent to run #${issue}: ${n} process${n === 1 ? "" : "es"}${killed}.`);
     })
-    .catch((err) => toast(`${ACTION_WORD[action]} failed for run #${issue}: ${String(err)}`, "error"));
+    .catch((err) => toast(`${word} failed for run #${issue}: ${String(err)}`, "error"));
 }
 
-// The server signals the run's recorded process. A stopped (paused) process holds a
-// terminate signal until it is continued, so on a paused run Stop takes effect on resume.
+// The server signals the run's whole process tree: SIGTERM, then SIGKILL to anything still
+// alive after a grace period (dashboard/services/subprocess-guards.ts stopTrees).
 const STOP_OUTCOME =
-  "This sends a terminate signal to the run's process; it cannot be resumed from the dashboard. " +
-  "If the run is paused, the signal takes effect when it is resumed.";
+  "Every process in the run gets a terminate signal, and anything still running a few seconds " +
+  "later is killed. It cannot be resumed from the dashboard.";
 
 /** Stop (abort) one run after a confirmation that names it. */
 export async function confirmAbort(issue: number, stage?: string): Promise<void> {
   if (!guardAction()) return;
   const ok = await confirmDialog({
     title: `Stop run #${issue}?`,
-    body: (stage ? `It is at ${stage}. ` : "") + STOP_OUTCOME,
+    body: (stage ? `The run is in the ${stageLabel(stage)} stage. ` : "") + STOP_OUTCOME,
     confirmLabel: "Stop run",
     cancelLabel: "Keep run",
     danger: true,

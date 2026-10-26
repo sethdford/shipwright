@@ -9,7 +9,7 @@ import { buildCommands, setupCommandPalette, type Palette } from "./command-pale
 import { h, hydrateInitialHidden } from "./ui/dom";
 import { kbd, modKey } from "./ui/kbd";
 import { setPill, GLYPHS } from "./ui/pill";
-import { setDisabled, isDisabled } from "./ui/button";
+import { setDisabled } from "./ui/button";
 import { openDialog, anyDialogOpen, confirmDialog } from "./ui/dialog";
 import { setupTablist } from "./ui/tabs";
 import { toast } from "./ui/toast";
@@ -139,12 +139,12 @@ function syncActionControls(): void {
   }
 }
 
-/** The brake also needs a current run list, so it waits for live (not stale) data. */
+/**
+ * The brake is exempt from the connection check (it must work when the feed is stale or
+ * down, and it reports the server's real result); the role check still applies.
+ */
 function brakeBlockReason(): string | undefined {
-  const reason = actionBlockReason();
-  if (reason) return reason;
-  conn.now = Date.now();
-  return connectionState(conn) === "live" ? undefined : "Waiting for live data: the brake needs a current run list.";
+  return actionBlockReason({ allowOffline: true });
 }
 
 function guardBrake(): boolean {
@@ -236,11 +236,11 @@ export function connectionShort(state: ConnState): string {
   return state[0].toUpperCase() + state.slice(1);
 }
 
-/** Offline banner text, in the header's vocabulary, with the brake's status. */
+/** Offline banner text, in the header's vocabulary, saying what still works. */
 export function bannerText(state: ConnState, c: ConnInputs): string {
   const head = state === "offline" ? `Offline since ${at(c.disconnectedAt)}.` : "Reconnecting.";
   const data = c.lastDataAt === null ? "No data received yet." : `Showing data from ${at(c.lastDataAt)}.`;
-  return `${head} ${data} Emergency brake unavailable until reconnected.`;
+  return `${head} ${data} Actions are off until reconnected; the emergency brake still works and reports what it paused.`;
 }
 
 const conn: ConnInputs = { connected: false, disconnectedAt: null, lastDataAt: null, now: 0 };
@@ -293,50 +293,86 @@ function renderConnection(): void {
 
 // ── Emergency brake (always a confirmation, Cancel focused) ────────────
 
-export function updateEmergencyBrakeVisibility(data: FleetState): void {
-  const active = document.getElementById("emergency-active-count");
-  if (active) active.textContent = String(data.pipelines?.length ?? 0);
+export function updateEmergencyBrakeVisibility(_data: FleetState): void {
+  const dlg = document.getElementById("emergency-modal") as HTMLDialogElement | null;
+  if (dlg?.open) renderBrakeBody();
+}
+
+/** Running count from the live feed, or null when the feed is not live (count unknown). */
+function liveRunCount(): number | null {
+  conn.now = Date.now();
+  if (connectionState(conn) !== "live") return null;
+  return store.get("fleetState")?.pipelines?.length ?? 0;
+}
+
+export function brakeBody(running: number | null): string {
+  const runs =
+    running === null
+      ? "pauses every process of every running pipeline. The live feed is not current, so how many are running is unknown here; the result says what was paused."
+      : `pauses every process of each running pipeline (${running} now).`;
+  return `This pauses daemon intake, so no new runs start, and ${runs} Queued work stays in the queue. Resume intake on Triage, and resume runs from Runs.`;
+}
+
+function renderBrakeBody(): void {
+  const desc = document.getElementById("brake-desc");
+  if (desc) desc.textContent = brakeBody(liveRunCount());
 }
 
 function setupEmergencyBrake(): void {
-  document.getElementById("emergency-brake")?.addEventListener("click", (e) => {
-    if (isDisabled(e.currentTarget as HTMLElement)) return;
-    openBrakeDialog();
-  });
+  // A disabled brake still answers a click or Enter with its reason.
+  document.getElementById("emergency-brake")?.addEventListener("click", openBrakeDialog);
   document.getElementById("emergency-confirm")?.addEventListener("click", () => void engageBrake());
 }
 
 function openBrakeDialog(): void {
   if (!guardBrake()) return;
-  const fleet = store.get("fleetState");
-  const active = document.getElementById("emergency-active-count");
-  if (active) active.textContent = String(fleet?.pipelines?.length ?? 0);
+  renderBrakeBody();
   openDialog("emergency-modal");
 }
 
+type BrakeJob = api.BrakeResult["jobs"][number];
+
+function jobProblem(j: BrakeJob): string | null {
+  if (j.refused) return `#${j.issue} ${j.refused}`;
+  if (j.failed.length) return `#${j.issue} ${j.failed.length} process${j.failed.length === 1 ? "" : "es"} not paused`;
+  if (!j.signalled.length) return `#${j.issue} nothing to pause`;
+  return null;
+}
+
 /**
- * The brake pauses daemon intake (no new runs start) and pauses every running pipeline.
- * Both calls are always attempted, and success is reported only when both succeed.
+ * Pauses daemon intake and every process of every running pipeline. Both requests are
+ * always sent. "Engaged" only when intake paused and the server reports every running
+ * job's tree paused; anything else is an incomplete alert that names the runs.
  */
 export async function engageBrake(): Promise<void> {
   if (!guardBrake()) return;
-  const running = store.get("fleetState")?.pipelines?.map((p) => p.issue) ?? [];
-  const [intake, runs] = await Promise.allSettled([api.daemonControl("pause"), api.emergencyBrake()]);
+  const [intake, runs] = await Promise.allSettled([api.pauseIntakeForBrake(), api.emergencyBrake()]);
   setTimeout(fetchDaemonConfig, 500);
-  const paused = runs.status === "fulfilled" ? ((runs.value as { paused?: number }).paused ?? 0) : 0;
-  // The endpoint answers 200 even when it could signal none of the runs, so compare counts.
-  const allPaused = runs.status === "fulfilled" && paused >= running.length;
-  if (allPaused) running.forEach((n) => pausedRuns.add(n));
-  const runPart =
-    runs.status === "rejected"
-      ? `pausing pipelines failed (${String(runs.reason)})`
-      : `pause signal sent to ${Math.min(paused, running.length)} of ${running.length} running pipeline${running.length === 1 ? "" : "s"}`;
-  if (intake.status === "fulfilled" && allPaused) {
-    toast(`Emergency brake engaged: intake paused; ${runPart}.`);
+  const problems: string[] = [];
+  if (intake.status === "rejected") problems.push(`pausing intake failed (${String(intake.reason)})`);
+  if (runs.status === "rejected") {
+    problems.push(`pausing pipelines failed (${String(runs.reason)})`);
+  } else {
+    const res = runs.value;
+    const jobs = res.jobs ?? [];
+    for (const j of jobs) {
+      const problem = jobProblem(j);
+      if (problem) problems.push(problem);
+      else pausedRuns.add(j.issue);
+    }
+    if (jobs.length !== res.running) problems.push("the server's job list did not match its count");
+  }
+  if (problems.length === 0 && runs.status === "fulfilled") {
+    const n = runs.value.running;
+    const procs = runs.value.jobs.reduce((sum, j) => sum + j.signalled.length, 0);
+    toast(
+      n === 0
+        ? "Emergency brake engaged: intake paused; no pipelines were running."
+        : `Emergency brake engaged: intake paused; all ${n} running pipeline${n === 1 ? "" : "s"} paused (${procs} processes).`,
+    );
     return;
   }
-  const intakePart = intake.status === "rejected" ? `pausing intake failed (${String(intake.reason)})` : "intake paused";
-  toast(`Emergency brake incomplete: ${intakePart}; ${runPart}. Check the daemon now.`, "error");
+  toast(`Emergency brake incomplete: ${problems.join("; ")}. Check the daemon now.`, "error");
 }
 
 // ── Command palette and keyboard shortcuts ─────────────────────────────
@@ -502,7 +538,7 @@ export function renderAlertBanner(_data: FleetState): void {
       container.dataset.tone = tone;
       container.replaceChildren(
         h("span", { class: "glyph", "aria-hidden": "true", text: tone === "danger" ? GLYPHS.fail : GLYPHS.warn }),
-        h("span", { class: "alert-message", text: alert.message || "" }),
+        h("span", { class: "alert-message", text: alert.message || "", title: alert.message || "" }),
         actions,
       );
       container.hidden = false;

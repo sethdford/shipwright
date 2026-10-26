@@ -43,3 +43,37 @@ export function htmlSecurityHeaders(): Record<string, string> {
 export function inlinePageHeaders(): Record<string, string> {
   return { "Content-Type": "text/html; charset=utf-8", "Content-Security-Policy": INLINE_PAGE_CSP };
 }
+
+/**
+ * The response with headers that can be set. Headers are set on the response itself where
+ * possible: copying it with `new Response(body, res)` loses the type Bun infers for a string
+ * body, and a text/plain 404 would become a download. Immutable headers (a proxied fetch
+ * response) force a copy, which keeps the type explicitly. Probing sets nosniff, which every
+ * response carries anyway.
+ */
+export function mutableResponse(res: Response): Response {
+  try {
+    res.headers.set("X-Content-Type-Options", "nosniff");
+    return res;
+  } catch {
+    const type = res.headers.get("content-type");
+    const out = new Response(res.body, res);
+    if (type) out.headers.set("Content-Type", type);
+    return out;
+  }
+}
+
+/**
+ * Applied to every response: nosniff everywhere, and a policy on any HTML or SVG document
+ * that does not already carry one (error pages, static SVG).
+ */
+export function withSecurityHeaders(res: Response | undefined): Response | undefined {
+  if (!res) return res;
+  const out = mutableResponse(res);
+  out.headers.set("X-Content-Type-Options", "nosniff");
+  const type = out.headers.get("content-type") ?? "";
+  if (/^(text\/html|image\/svg\+xml)/.test(type) && !out.headers.has("content-security-policy")) {
+    out.headers.set("Content-Security-Policy", INLINE_PAGE_CSP);
+  }
+  return out;
+}

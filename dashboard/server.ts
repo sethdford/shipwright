@@ -20,6 +20,10 @@ import {
 } from "./services/claims.js";
 import {
   signalPid,
+  pauseTrees,
+  resumeTrees,
+  stopTrees,
+  type TreeSignalResult,
   isValidSshUser,
   isValidSshHost,
   isValidShipwrightPath,
@@ -46,7 +50,7 @@ import {
   withCors,
   wsOriginAllowed,
 } from "./services/request-guard.js";
-import { htmlSecurityHeaders, inlinePageHeaders } from "./services/security-headers.js";
+import { htmlSecurityHeaders, inlinePageHeaders, withSecurityHeaders } from "./services/security-headers.js";
 import { Database } from "bun:sqlite";
 
 // ─── Config ──────────────────────────────────────────────────────────
@@ -927,8 +931,9 @@ function appendAuditLog(
     const entry = JSON.stringify({
       ts: new Date().toISOString(),
       ts_epoch: Math.floor(Date.now() / 1000),
-      action,
       ...details,
+      // The event name always wins over a details key of the same name.
+      action,
     });
     appendFileSync(AUDIT_LOG_FILE, entry + "\n");
   } catch {}
@@ -2278,6 +2283,35 @@ const MODEL_PRICING: Record<string, { input: number; output: number }> = {
   haiku: { input: 0.25, output: 1.25 },
 };
 
+// ─── Run interventions on the verified process tree ──────────────────
+type RunAction = "pause" | "resume" | "abort";
+
+function activeJob(issue: number): Record<string, unknown> | null {
+  const state = readDaemonState();
+  const jobs = (state?.active_jobs as Array<Record<string, unknown>>) || [];
+  return jobs.find((j) => (j.issue as number) === issue) ?? null;
+}
+
+const TREE_ACTIONS = { pause: pauseTrees, resume: resumeTrees, abort: stopTrees } as const;
+
+/**
+ * Pause, resume or stop each run's whole process tree (subprocess-guards.ts verifies the PIDs).
+ * The runs are handled together, so several stops share one grace period.
+ */
+async function runActions(
+  jobs: Array<Record<string, unknown> | null>,
+  action: RunAction,
+): Promise<TreeSignalResult[]> {
+  const live = jobs.filter((j): j is Record<string, unknown> => j !== null);
+  const done = await TREE_ACTIONS[action](live.map((j) => ({ root: j.pid, startedAt: j.started_at })));
+  return jobs.map((j) => (j ? (done.shift() as TreeSignalResult) : { pid: 0, signalled: [], failed: [], refused: "not running" }));
+}
+
+/** Who asked, for the audit log: the signed-in GitHub user, or "local" with auth off. */
+function auditActor(req: Request): string {
+  return getSession(req)?.githubUser ?? "local";
+}
+
 // ─── Static file serving ─────────────────────────────────────────────
 const MIME_TYPES: Record<string, string> = {
   ".html": "text/html; charset=utf-8",
@@ -2897,57 +2931,19 @@ async function routeRequest(
           );
         }
 
-        const dState = readDaemonState();
-        const activeJobsList = dState
-          ? (dState.active_jobs as Array<Record<string, unknown>>) || []
-          : [];
-
-        const results: Array<{ issue: number; ok: boolean; error?: string }> =
-          [];
-        for (const issueNum of issues) {
-          try {
-            let pid: number | null = null;
-            for (const job of activeJobsList) {
-              if ((job.issue as number) === issueNum) {
-                pid = (job.pid as number) || null;
-                break;
-              }
-            }
-            if (!pid) {
-              results.push({
-                issue: issueNum,
-                ok: false,
-                error: "No active PID found",
-              });
-              continue;
-            }
-            switch (action) {
-              case "pause":
-                signalPid(pid, "SIGSTOP");
-                break;
-              case "resume":
-                signalPid(pid, "SIGCONT");
-                break;
-              case "abort":
-                signalPid(pid, "SIGTERM");
-                break;
-              default:
-                results.push({
-                  issue: issueNum,
-                  ok: false,
-                  error: `Unknown action: ${action}`,
-                });
-                continue;
-            }
-            results.push({ issue: issueNum, ok: true });
-          } catch (err) {
-            results.push({
-              issue: issueNum,
-              ok: false,
-              error: String(err),
-            });
-          }
+        if (!["pause", "resume", "abort"].includes(action)) {
+          return new Response(JSON.stringify({ error: `Unknown action: ${action}` }), {
+            status: 400,
+            headers: { "Content-Type": "application/json", ...CORS_HEADERS },
+          });
         }
+        const signalled = await runActions(issues.map(activeJob), action as RunAction);
+        const results = signalled.map((r, i) => ({
+          issue: issues[i],
+          ok: r.signalled.length > 0 && r.failed.length === 0 && !r.refused,
+          ...r,
+        }));
+        appendAuditLog("intervention-bulk", { op: action, actor: auditActor(req), results });
 
         return new Response(JSON.stringify({ results }), {
           headers: { "Content-Type": "application/json", ...CORS_HEADERS },
@@ -2976,11 +2972,13 @@ async function routeRequest(
       const daemonState = readDaemonState();
       let pid: number | null = null;
       let worktreeBase: string | null = null;
+      let runJob: Record<string, unknown> | null = null;
       if (daemonState) {
         const activeJobs =
           (daemonState.active_jobs as Array<Record<string, unknown>>) || [];
         for (const job of activeJobs) {
           if ((job.issue as number) === issueNum) {
+            runJob = job;
             pid = (job.pid as number) || null;
             const wt = (job.worktree as string) || "";
             const repo = (job.repo as string) || "";
@@ -2993,14 +2991,16 @@ async function routeRequest(
       try {
         switch (action) {
           case "pause":
-            if (pid) signalPid(pid, "SIGSTOP");
-            break;
           case "resume":
-            if (pid) signalPid(pid, "SIGCONT");
-            break;
-          case "abort":
-            if (pid) signalPid(pid, "SIGTERM");
-            break;
+          case "abort": {
+            const [r] = await runActions([runJob], action);
+            appendAuditLog("intervention", { op: action, actor: auditActor(req), issue: issueNum, ...r });
+            // ok only when something was signalled and nothing failed or was refused.
+            const ok = !r.refused && r.failed.length === 0 && r.signalled.length > 0;
+            return new Response(JSON.stringify({ ok, action, issue: issueNum, ...r }), {
+              headers: { "Content-Type": "application/json", ...CORS_HEADERS },
+            });
+          }
           case "message": {
             const body = (await req.json()) as { message?: string };
             const msg = body.message || "";
@@ -3039,7 +3039,7 @@ async function routeRequest(
               headers: { "Content-Type": "application/json", ...CORS_HEADERS },
             });
         }
-        appendAuditLog("intervention", { action, issue: issueNum, pid });
+        appendAuditLog("intervention", { op: action, actor: auditActor(req), issue: issueNum, pid });
         return new Response(
           JSON.stringify({ ok: true, action, issue: issueNum }),
           { headers: { "Content-Type": "application/json", ...CORS_HEADERS } },
@@ -4404,28 +4404,18 @@ async function routeRequest(
     if (pathname === "/api/emergency-brake" && req.method === "POST") {
       try {
         const daemonState = readDaemonState();
-        let paused = 0;
-        let queued = 0;
+        const activeJobs =
+          (daemonState?.active_jobs as Array<Record<string, unknown>>) || [];
+        const queued = ((daemonState?.queued as Array<unknown>) || []).length;
+        // Each run's whole process tree is stopped; a run counts as paused only when every
+        // process in it was signalled and nothing was refused or failed.
+        const trees = await pauseTrees(activeJobs.map((j) => ({ root: j.pid, startedAt: j.started_at })));
+        const jobs = trees.map((r, i) => ({ issue: activeJobs[i].issue as number, ...r }));
+        const paused = jobs.filter((j) => !j.refused && j.failed.length === 0 && j.signalled.length > 0).length;
+        const running = jobs.length;
 
-        if (daemonState) {
-          const activeJobs =
-            (daemonState.active_jobs as Array<Record<string, unknown>>) || [];
-          for (const job of activeJobs) {
-            const pid = (job.pid as number) || 0;
-            if (pid) {
-              try {
-                signalPid(pid, "SIGSTOP");
-                paused++;
-              } catch {
-                // process may already be gone
-              }
-            }
-          }
-          queued = ((daemonState.queued as Array<unknown>) || []).length;
-        }
-
-        appendAuditLog("emergency-brake", { paused, queued });
-        return new Response(JSON.stringify({ paused, queued }), {
+        appendAuditLog("emergency-brake", { actor: auditActor(req), paused, running, queued, jobs });
+        return new Response(JSON.stringify({ paused, running, queued, jobs }), {
           headers: { "Content-Type": "application/json", ...CORS_HEADERS },
         });
       } catch (err) {
@@ -4822,7 +4812,7 @@ async function routeRequest(
           timeout: 10000,
           stdio: "pipe",
         });
-        appendAuditLog("daemon-control", { action: "start" });
+        appendAuditLog("daemon-control", { op: "start", actor: auditActor(req) });
         return new Response(JSON.stringify({ ok: true, action: "started" }), {
           headers: { "Content-Type": "application/json", ...CORS_HEADERS },
         });
@@ -5732,8 +5722,8 @@ const server = Bun.serve<WsData>({
   async fetch(req, server) {
     const hasSession = isAuthEnabled() && getSession(req) !== null;
     const blocked = guardRequest(req, GUARD, hasSession);
-    if (blocked) return withCors(blocked, req, GUARD);
-    return withCors(await routeRequest(req, server), req, GUARD);
+    if (blocked) return withSecurityHeaders(withCors(blocked, req, GUARD));
+    return withSecurityHeaders(withCors(await routeRequest(req, server), req, GUARD));
   },
 
   websocket: {

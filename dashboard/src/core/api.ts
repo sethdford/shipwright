@@ -18,7 +18,7 @@ import type {
   UserInfo,
 } from "../types/api";
 
-import { assertCanAct } from "./guard";
+import { assertCanAct, type GateOptions } from "./guard";
 
 // The server rejects mutating requests that are not application/json (CSRF guard).
 function withJsonContentType(options?: RequestInit): RequestInit | undefined {
@@ -29,9 +29,9 @@ function withJsonContentType(options?: RequestInit): RequestInit | undefined {
   return { ...options, headers: { ...headers, "Content-Type": "application/json" } };
 }
 
-async function request<T>(url: string, options?: RequestInit): Promise<T> {
+async function request<T>(url: string, options?: RequestInit, gate?: GateOptions): Promise<T> {
   const method = (options?.method ?? "GET").toUpperCase();
-  if (method !== "GET" && method !== "HEAD") assertCanAct();
+  if (method !== "GET" && method !== "HEAD") assertCanAct(gate);
   const resp = await fetch(url, withJsonContentType(options));
   if (!resp.ok) {
     const body = await resp
@@ -42,13 +42,13 @@ async function request<T>(url: string, options?: RequestInit): Promise<T> {
   return resp.json();
 }
 
-function post<T>(url: string, body?: unknown): Promise<T> {
+function post<T>(url: string, body?: unknown, gate?: GateOptions): Promise<T> {
   const opts: RequestInit = {
     method: "POST",
     headers: { "Content-Type": "application/json" },
   };
   if (body !== undefined) opts.body = JSON.stringify(body);
-  return request<T>(url, opts);
+  return request<T>(url, opts, gate);
 }
 
 function patch<T>(url: string, body: unknown): Promise<T> {
@@ -137,20 +137,40 @@ export const fetchDaemonConfig = () =>
 export const daemonControl = (action: string) =>
   post<{ ok: boolean }>(`/api/daemon/${action}`);
 
+/** The brake's intake pause: exempt from the connection gate (core/guard.ts). */
+export const pauseIntakeForBrake = () =>
+  post<{ ok: boolean }>("/api/daemon/pause", undefined, { allowOffline: true });
+
 // Alerts
 export const fetchAlerts = () =>
   request<{ alerts: AlertInfo[] }>("/api/alerts");
 
 // Emergency brake
+export interface TreeSignal {
+  pid: number;
+  signalled: number[];
+  failed: Array<{ pid: number; error: string }>;
+  refused?: string;
+  killed?: number[];
+}
+
+export interface BrakeResult {
+  paused: number;
+  running: number;
+  queued: number;
+  jobs: Array<TreeSignal & { issue: number }>;
+}
+
+/** Exempt from the connection gate: the brake must work when the live feed is down. */
 export const emergencyBrake = () =>
-  post<{ ok: boolean }>("/api/emergency-brake");
+  post<BrakeResult>("/api/emergency-brake", undefined, { allowOffline: true });
 
 // Intervention
 export const sendIntervention = (
   issue: number | string,
   action: string,
   body?: unknown,
-) => post<{ ok: boolean }>(`/api/intervention/${issue}/${action}`, body);
+) => post<{ ok: boolean } & Partial<TreeSignal>>(`/api/intervention/${issue}/${action}`, body);
 
 // Insights
 export const fetchPatterns = () =>
