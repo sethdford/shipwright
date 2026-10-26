@@ -6931,6 +6931,97 @@
       "ts": "unknown",
       "name": "verifier 8718-fp corpus/E6: cargo panic + ##[group] + gh auth status X line indented",
       "expect": "noesc"
+    },
+    {
+      "text": "✗ Fatal CLI error: {\"type\":\"result\",\"subtype\":\"success\",\"is_error\":true,\"duration_ms\":234,\"duration_api_ms\":0,\"num_turns\":1,\"result\":\"Inval",
+      "bash": "unknown",
+      "ts": "unknown",
+      "name": "verifier 8718-fp2 corpus/A-main: A-main",
+      "expect": "noesc"
+    },
+    {
+      "text": "✗ Fatal CLI error: {\"type\":\"result\",\"subtype\":\"success\",\"is_error\":true,\"duration_ms\":120,\"num_turns\":1,\"result\":\"Failed to authenticate. A",
+      "bash": "build_failure",
+      "ts": "unknown",
+      "name": "verifier 8718-fp2 corpus/C-main: C-main",
+      "expect": "noesc"
+    },
+    {
+      "text": "✗ Fatal CLI error: {\"type\":\"result\",\"subtype\":\"success\",\"is_error\":true,\"duration_ms\":120,\"num_turns\":3,\"result\":\"API Error: 529 {\\\"type\\\":",
+      "bash": "unknown",
+      "ts": "transient",
+      "name": "verifier 8718-fp2 corpus/D-main: D-main",
+      "expect": "noesc"
+    },
+    {
+      "text": "✗ Fatal CLI error: {\"type\":\"result\",\"subtype\":\"success\",\"is_error\":true,\"num_turns\":9,\"result\":\"API Error: 500 {\\\"type\\\":\\\"error\\\",\\\"error\\",
+      "bash": "unknown",
+      "ts": "transient",
+      "name": "verifier 8718-fp2 corpus/E-main: E-main",
+      "expect": "noesc"
+    },
+    {
+      "text": "✗ Fatal CLI error: {\"type\":\"result\",\"subtype\":\"success\",\"is_error\":true,\"duration_ms\":4000,\"num_turns\":1,\"result\":\"Not logged in to the Lin",
+      "bash": "unknown",
+      "ts": "unknown",
+      "name": "verifier 8718-fp2 corpus/F-main: F-main",
+      "expect": "noesc"
+    },
+    {
+      "text": "✗ Fatal CLI error: {\"type\": \"result\", \"subtype\": \"success\", \"is_error\": true, \"result\": \"Invalid API key · Fix external API key\", \"session_",
+      "bash": "unknown",
+      "ts": "unknown",
+      "name": "verifier 8718-fp2 corpus/G-main: G-main",
+      "expect": "noesc"
+    },
+    {
+      "text": "✗ Fatal CLI error: {\"type\":\"result\",\"subtype\":\"success\",\"is_error\":true,\"result\":\"Invalid API key · Please run /login\",\"session_id\":\"...\"}",
+      "bash": "unknown",
+      "ts": "unknown",
+      "name": "verifier 8718-fp2 corpus/I-main: I-main",
+      "expect": "noesc"
+    },
+    {
+      "text": "Iteration 3/20\n\u001b[38;2;248;113;113m\u001b[1m✗\u001b[0m Fatal CLI error: {\"type\":\"result\",\"subtype\":\"success\",\"is_error\":true,\"duration_ms\":234,\"duration_api_ms\":0,\"num_turns\":1,\"result\":\"Inval\n  ✓ Claude session completed (2m 3s, exit 0)\n✗ Tests failed: 3 failed, 41 passed\nPipeline failed at stage build\n",
+      "bash": "build_failure",
+      "ts": "unknown",
+      "name": "verifier 8718-fp2 corpus2/A-main: ansi+ctx",
+      "expect": "noesc"
+    },
+    {
+      "text": "Iteration 3/20\n\u001b[38;2;248;113;113m\u001b[1m✗\u001b[0m Fatal CLI error: {\"type\":\"result\",\"subtype\":\"success\",\"is_error\":true,\"duration_ms\":120,\"num_turns\":1,\"result\":\"Failed to authenticate. A\n  ✓ Claude session completed (2m 3s, exit 0)\n✗ Tests failed: 3 failed, 41 passed\nPipeline failed at stage build\n",
+      "bash": "build_failure",
+      "ts": "unknown",
+      "name": "verifier 8718-fp2 corpus2/C-main: ansi+ctx",
+      "expect": "noesc"
+    },
+    {
+      "text": "Iteration 3/20\n\u001b[38;2;248;113;113m\u001b[1m✗\u001b[0m Fatal CLI error: {\"type\":\"result\",\"subtype\":\"success\",\"is_error\":true,\"num_turns\":9,\"result\":\"API Error: 500 {\\\"type\\\":\\\"error\\\",\\\"error\\\n  ✓ Claude session completed (2m 3s, exit 0)\n✗ Tests failed: 3 failed, 41 passed\nPipeline failed at stage build\n",
+      "bash": "build_failure",
+      "ts": "transient",
+      "name": "verifier 8718-fp2 corpus2/E-main: ansi+ctx",
+      "expect": "noesc"
+    },
+    {
+      "text": "Iteration 3/20\n\u001b[38;2;248;113;113m\u001b[1m✗\u001b[0m Fatal CLI error: {\"type\":\"result\",\"subtype\":\"success\",\"is_error\":true,\"duration_ms\":4000,\"num_turns\":1,\"result\":\"Not logged in to the Lin\n  ✓ Claude session completed (2m 3s, exit 0)\n✗ Tests failed: 3 failed, 41 passed\nPipeline failed at stage build\n",
+      "bash": "build_failure",
+      "ts": "unknown",
+      "name": "verifier 8718-fp2 corpus2/F-main: ansi+ctx",
+      "expect": "noesc"
+    },
+    {
+      "text": "Iteration 3/20\n\u001b[38;2;248;113;113m\u001b[1m✗\u001b[0m Fatal CLI error: {\"type\": \"result\", \"subtype\": \"success\", \"is_error\": true, \"result\": \"Invalid API key · Fix external API key\", \"session_\n  ✓ Claude session completed (2m 3s, exit 0)\n✗ Tests failed: 3 failed, 41 passed\nPipeline failed at stage build\n",
+      "bash": "build_failure",
+      "ts": "unknown",
+      "name": "verifier 8718-fp2 corpus2/G-main: ansi+ctx",
+      "expect": "noesc"
+    },
+    {
+      "text": "Iteration 3/20\n\u001b[38;2;248;113;113m\u001b[1m✗\u001b[0m Fatal CLI error: {\"type\":\"result\",\"subtype\":\"success\",\"is_error\":true,\"result\":\"Invalid API key · Please run /login\",\"session_id\":\"...\"}\n  ✓ Claude session completed (2m 3s, exit 0)\n✗ Tests failed: 3 failed, 41 passed\nPipeline failed at stage build\n",
+      "bash": "build_failure",
+      "ts": "unknown",
+      "name": "verifier 8718-fp2 corpus2/I-main: ansi+ctx",
+      "expect": "noesc"
     }
   ]
 }

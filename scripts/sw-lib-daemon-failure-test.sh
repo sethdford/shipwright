@@ -475,9 +475,10 @@ for loc in C en_US.UTF-8; do
         "$(LC_ALL="$loc" SW_BUN=/nonexistent/bun classify_failure 903)"
 done
 
-# loop-restart.sh prints the matched CLI line as "✗ Fatal CLI error: ..." and the classifier reads that line. For a
-# JSON result object it must print the result text, not the object's first 120 characters (#8715).
-print_test_section "Fatal CLI error lines carry the cause the classifier needs (#8715)"
+# loop-restart.sh prints the matched CLI line as "✗ Fatal CLI error: <first 120 characters>" and the classifier reads
+# that line. A CLI result record printed there is not escalated: the iteration log is mostly the model's own text,
+# and a record on a line of its own there is a fixture or a sample as often as the CLI's own (#8715 review).
+print_test_section "A Fatal CLI error line built from a result record does not escalate (#8715 review)"
 sed -n '/^check_fatal_error()/,/^}/p' "$SCRIPT_DIR/lib/loop-restart.sh" > "$TEST_TEMP_DIR/check-fatal.sh"
 # shellcheck source=/dev/null
 source "$TEST_TEMP_DIR/check-fatal.sh"
@@ -487,16 +488,11 @@ fatal_line() {
 }
 cli_json='{"type":"result","subtype":"success","is_error":true,"duration_ms":234,"duration_api_ms":0,"num_turns":1,"result":"Invalid API key · Please run /login","session_id":"0123456789abcdef"}'
 fatal_out="$(fatal_line "$cli_json")"
-assert_eq "a JSON result prints its result text" "✗ Fatal CLI error: Invalid API key · Please run /login" "$fatal_out"
+assert_eq "a record is printed cut at 120 characters" "✗ Fatal CLI error: $(printf '%s' "$cli_json" | cut -c1-120)" "$fatal_out"
 printf '%s\n' "$fatal_out" > "$LOG_DIR/issue-904.log"
-assert_eq "that line is auth to the regex classifier" "auth_error" "$(SW_BUN=/nonexistent/bun classify_failure 904)"
-assert_eq "a plain matched line is printed as before" "✗ Fatal CLI error: Error: Invalid API key" \
+assert_eq "that line does not escalate (no retry is the costlier mistake)" "yes" \
+    "$(not_esc "$(SW_BUN=/nonexistent/bun classify_failure 904)")"
+assert_eq "a plain matched line keeps its cause" "✗ Fatal CLI error: Error: Invalid API key" \
     "$(fatal_line "Error: Invalid API key")"
-model_line='Done. The billing page now works; the fixture is {"type":"result","is_error":true,"result":"Not logged in · Please run /login"}.'
-assert_eq "model text that quotes a result record is printed as before (cut at 120), not extracted" \
-    "✗ Fatal CLI error: $(printf '%s' "$model_line" | cut -c1-120)" "$(fatal_line "$model_line")"
-not_error='{"type":"result","subtype":"success","is_error":false,"result":"Authentication failed. was the old message; billing ok"}'
-assert_eq "a result record that is not an error is printed as before" \
-    "✗ Fatal CLI error: $(printf '%s' "$not_error" | cut -c1-120)" "$(fatal_line "$not_error")"
 
 print_test_results
