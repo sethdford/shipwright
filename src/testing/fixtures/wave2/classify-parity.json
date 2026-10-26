@@ -518,6 +518,111 @@
       "text": "    Expected: \"issue not found\"\n    Received: \"ok\"\nerror: expect(received).toBe(expected)",
       "bash": "unknown",
       "ts": "unknown"
+    },
+    {
+      "text": "::error::Claude Code authentication failed — check CLAUDE_CODE_OAUTH_TOKEN secret",
+      "bash": "auth_error",
+      "ts": "auth"
+    },
+    {
+      "text": "pipeline\tRun Claude\t2026-10-25T12:00:00.1234567Z ##[error]Claude Code authentication failed — check CLAUDE_CODE_OAUTH_TOKEN secret",
+      "bash": "auth_error",
+      "ts": "auth"
+    },
+    {
+      "text": "API Error: 401 {\"type\":\"error\",\"error\":{\"type\":\"authentication_error\",\"message\":\"invalid x-api-key\"}}",
+      "bash": "auth_error",
+      "ts": "auth"
+    },
+    {
+      "text": "Failed to authenticate. API Error: 401 {\"type\":\"error\",\"error\":{\"type\":\"authentication_error\",\"message\":\"OAuth token has expired.\"}}",
+      "bash": "auth_error",
+      "ts": "auth"
+    },
+    {
+      "text": "Invalid API key · Please run /login",
+      "bash": "auth_error",
+      "ts": "auth"
+    },
+    {
+      "text": "OAuth token has expired. Please obtain a new token or refresh your existing token.",
+      "bash": "auth_error",
+      "ts": "auth"
+    },
+    {
+      "text": "gh: HTTP 401: Bad credentials (https://api.github.com/graphql)",
+      "bash": "auth_error",
+      "ts": "auth"
+    },
+    {
+      "text": "remote: Invalid username or password.\nfatal: Authentication failed for 'https://github.com/o/r.git/'",
+      "bash": "auth_error",
+      "ts": "auth"
+    },
+    {
+      "text": "    Error: authentication_error: invalid x-api-key",
+      "bash": "auth_error",
+      "ts": "auth"
+    },
+    {
+      "text": "\u001b[31mError: invalid x-api-key\u001b[0m",
+      "bash": "auth_error",
+      "ts": "auth"
+    },
+    {
+      "text": "✗ Not logged in · Please run /login",
+      "bash": "auth_error",
+      "ts": "auth"
+    },
+    {
+      "text": "[2026-10-25T12:00:00Z] [ERROR] Claude Code authentication failed",
+      "bash": "auth_error",
+      "ts": "auth"
+    },
+    {
+      "text": "Error: CLAUDE_CODE_OAUTH_TOKEN is not set",
+      "bash": "auth_error",
+      "ts": "auth"
+    },
+    {
+      "text": "pipeline\tRun Claude\t2026-10-25T12:00:00.1234567Z GraphQL: Could not resolve to an issue or pull request with the number of 99999. (repository.issue)",
+      "bash": "invalid_issue",
+      "ts": "invalid_input"
+    },
+    {
+      "text": "Error: issue #99999 does not exist",
+      "bash": "invalid_issue",
+      "ts": "invalid_input"
+    },
+    {
+      "text": "not logged in banner shown\n(fail) ui > banner\nerror",
+      "bash": "build_failure",
+      "ts": "unknown"
+    },
+    {
+      "text": "Received: \"issue not found\"\nerror: expect(received).toBe(expected)",
+      "bash": "unknown",
+      "ts": "unknown"
+    },
+    {
+      "text": "Error: issue not found in cache, refetching",
+      "bash": "unknown",
+      "ts": "unknown"
+    },
+    {
+      "text": "npm ERR! HTTP 404: Not Found (https://api.github.com/repos/o/r/issues/1/reactions)",
+      "bash": "build_failure",
+      "ts": "unknown"
+    },
+    {
+      "text": "(fail) login form > shows bad credentials message\nerror: expected",
+      "bash": "build_failure",
+      "ts": "unknown"
+    },
+    {
+      "text": "error: Bad credentials for user bob in fixture db",
+      "bash": "unknown",
+      "ts": "unknown"
     }
   ]
 }

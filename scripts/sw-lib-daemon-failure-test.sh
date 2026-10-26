@@ -404,5 +404,24 @@ assert_eq "HTTP 401 Bad credentials is auth" "auth_error" "$(esc_class 'HTTP 401
 assert_eq "a missing issue beside a 503 is invalid, not transient" "invalid_issue" \
     "$(esc_class $'HTTP 503 Service Unavailable\nGraphQL: Could not resolve to an Issue with the number of 9.')"
 
+print_test_section "Auth is anchored to structured lines: genuine failures escalate, prose and test names do not (#8696 review)"
+ESC_=$(printf '\033')
+assert_eq "a Claude API 401 with failed-to-authenticate escalates" "auth_error" \
+    "$(esc_class 'Failed to authenticate. API Error: 401 {"type":"error","error":{"type":"authentication_error","message":"OAuth token has expired."}}')"
+assert_eq "a Claude API 401 authentication_error escalates" "auth_error" \
+    "$(esc_class 'API Error: 401 {"type":"error","error":{"type":"authentication_error","message":"invalid x-api-key"}}')"
+assert_eq "git's Authentication failed escalates" "auth_error" \
+    "$(esc_class "fatal: Authentication failed for 'https://github.com/o/r.git/'")"
+assert_eq "an indented authentication_error escalates" "auth_error" \
+    "$(esc_class '    Error: authentication_error: invalid x-api-key')"
+assert_eq "a Shipwright ✗ not-logged-in line escalates" "auth_error" \
+    "$(esc_class '✗ Not logged in · Please run /login')"
+assert_eq "a timestamped daemon ERROR auth line escalates" "auth_error" \
+    "$(esc_class '[2026-10-25T12:00:00Z] [ERROR] Claude Code authentication failed')"
+assert_eq "'Error: issue not found in cache, refetching' does not escalate" "unknown" \
+    "$(esc_class 'Error: issue not found in cache, refetching')"
+assert_eq "'error: Bad credentials for user bob in fixture db' does not escalate" "unknown" \
+    "$(esc_class 'error: Bad credentials for user bob in fixture db')"
+
 print_test_results
 

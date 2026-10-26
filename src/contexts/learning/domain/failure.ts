@@ -72,7 +72,7 @@ const RULES: readonly Rule[] = [
     // Anchored on the start of the normalized line (after a short optional prefix such as `gh: `, `error: ` or
     // `##[error]`), so a test name or a prose sentence that mentions 401 or "not logged in" does not escalate (#8696).
     pattern:
-      /^(?:(?:gh|error|api error|##\[error\]|::error::) ?:? ?)?(?:(?:claude code )?authentication failed|authentication_error|401 authentication_error|invalid api key|invalid x-api-key|oauth token (?:is |has )?(?:expired|invalid|revoked)|not logged in|authentication required|(?:http 401: )?bad credentials|request failed with status 401|401 unauthorized|claude_code_oauth_token (?:is )?not set)/im,
+      /^(?:\[[^\]\n]{1,40}\] ){0,2}[^A-Za-z0-9\n]{0,4}(?:(?:gh|error|fatal)[ :]{1,3}|##\[error\] ?|::error:: ?)?(?:(?:claude code )?authentication failed|failed to authenticate|api error: 401(?:[^0-9]|$)|api error: 401 .{0,200}?authentication_error|authentication_error|401 authentication_error|invalid api key|invalid x-api-key|oauth token (?:is |has )?(?:expired|invalid|revoked)|not logged in(?:[ \t]{0,3}·| ?$| to | in | with )|authentication required|(?:http 401: )?bad credentials(?:[ \t]{0,3}\(| ?$)|request failed with status 401|401 unauthorized|claude_code_oauth_token (?:is )?not set)/im,
     cls: "auth",
     scope: "error",
   },
@@ -99,7 +99,7 @@ const RULES: readonly Rule[] = [
     // Anchored: the gh lookup failures for an issue or PR number, at the start of the line. Checked before the
     // log-text transient rule, so "HTTP 503" next to a missing issue is invalid input, not transient (#8696).
     pattern:
-      /^(?:(?:gh|error): )?(?:graphql: could not resolve to an? (?:issue|pullrequest)\b|http 404: not found \(https:\/\/api\.github\.com\/repos\/[^/\s]{1,100}\/[^/\s]{1,100}\/(?:issues|pulls)\/\d+\)|issue not found\b|issue #?\d+ does not exist)/im,
+      /^(?:(?:gh|error): )?(?:graphql: could not resolve to an? (?:issue|pullrequest)\b|http 404: not found \(https:\/\/api\.github\.com\/repos\/[^/\s]{1,100}\/[^/\s]{1,100}\/(?:issues|pulls)\/\d+\)|issue not found(?:[ \t]{0,5}$|:)|issue #?\d+ does not exist)/im,
     cls: "invalid_input",
     scope: "error",
   },

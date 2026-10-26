@@ -98,13 +98,13 @@ classify_failure() {
     # Auth: the same anchored, structured forms as the TS rule (failure.ts), on error lines only, so a test name or a
     # prose sentence ("(fail) jwt > rejects invalid token") does not escalate (#8696). A retry of an auth failure is
     # fail-open, so both paths must agree.
-    if printf '%s\n' "$err_lines" | grep >/dev/null -iE '^((gh|error|api error|##\[error\]|::error::) ?:? ?)?((claude code )?authentication failed|authentication_error|401 authentication_error|invalid api key|invalid x-api-key|oauth token (is |has )?(expired|invalid|revoked)|not logged in|authentication required|(http 401: )?bad credentials|request failed with status 401|401 unauthorized|claude_code_oauth_token (is )?not set)'; then
+    if printf '%s\n' "$err_lines" | grep >/dev/null -iE '^(\[[^]]{1,40}\] ){0,2}[^A-Za-z0-9]{0,4}((gh|error|fatal)[ :]{1,3}|##\[error\] ?|::error:: ?)?((claude code )?authentication failed|failed to authenticate|api error: 401([^0-9]|$)|api error: 401 .{0,200}authentication_error|authentication_error|401 authentication_error|invalid api key|invalid x-api-key|oauth token (is |has )?(expired|invalid|revoked)|not logged in(([[:space:]]{0,3}·)|([[:space:]]{0,3}(to|in|with) )|([[:space:]]?$))|authentication required|(http 401: )?bad credentials([[:space:]]{0,3}\(|[[:space:]]?$)|request failed with status 401|401 unauthorized|claude_code_oauth_token (is )?not set)'; then
         echo "auth_error"
         return
     fi
     # Invalid issue: the anchored gh lookup failures for an issue or PR number, on error lines (#8696). Before the
     # log-text transient rule, so a 503 next to a missing issue is invalid input.
-    if printf '%s\n' "$err_lines" | grep >/dev/null -iE '^((gh|error): )?(graphql: could not resolve to an? (issue|pullrequest)|http 404: not found \(https://api\.github\.com/repos/[^/ ]{1,100}/[^/ ]{1,100}/(issues|pulls)/[0-9]+\)|issue not found|issue #?[0-9]+ does not exist)'; then
+    if printf '%s\n' "$err_lines" | grep >/dev/null -iE '^((gh|error): )?(graphql: could not resolve to an? (issue|pullrequest)|http 404: not found \(https://api\.github\.com/repos/[^/ ]{1,100}/[^/ ]{1,100}/(issues|pulls)/[0-9]+\)|issue not found(([[:space:]]{0,5}$)|:)|issue #?[0-9]+ does not exist)'; then
         echo "invalid_issue"
         return
     fi
