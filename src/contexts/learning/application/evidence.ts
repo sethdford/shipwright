@@ -32,8 +32,6 @@ const MODEL_PROSE =
 //   and the error under it, up to a blank or ` ❯ ` frame line;
 // - a pytest `----- Captured stdout|stderr|log` section, up to the next `-----`, `=====`, `___`, `FAILED `,
 //   `ERROR path::test` or `N failed|passed|error` line.
-// - every block also ends at a gh step boundary (a runner's output never spans steps). Nothing else that is
-//   inside a block ends it early: an auth-shaped line later in a block is routine negative-path test output.
 // Literal glyphs, never a character class, so both locales agree.
 // Linear patterns (a single leading run, no nested repetition), written the same way as the awk in bash.
 const TEST_TITLE =
@@ -46,57 +44,35 @@ const VITEST_FAIL = /^ ?FAIL {2}[^ \t].* (?:> |\[ )|^(?:⎯)+ Unhandled (?:Rejec
 const PYTEST_CAPTURED = /^-----+ Captured (?:stdout|stderr|log) /;
 const BLANK = /^[ \t]*$/;
 
-// A GitHub Actions step boundary ends any block: a runner's output never spans steps (#8715).
-const STEP_BOUNDARY = /^##\[(?:group|endgroup|error)\]|^::error/;
-type Mode = "none" | "mocha" | "jest" | "console" | "panic" | "vitest" | "pytest";
-
-const PYTEST_END = /^(?:-----|=====|___|FAILED |ERROR [^ \t]+::|\d+ (?:failed|passed|error))/;
-
-/** Whether `line` is still inside the open block `mode` (mocha's title line, which ends it, counts as inside). */
-function insideBlock(mode: Mode, line: string): boolean {
-  switch (mode) {
-    case "mocha":
-    case "jest":
-      // Indented lines; jest indents the logged message, so a column-0 line ends its block.
-      return /^[ \t]+[^ \t]/.test(line);
-    case "console":
-      return !BLANK.test(line);
-    case "panic":
-      return !/^(?:note|error|stack backtrace):/.test(line) && !BLANK.test(line);
-    case "vitest":
-      return !/^ ❯ /.test(line) && !BLANK.test(line);
-    case "pytest":
-      return !PYTEST_END.test(line);
-    default:
-      return false;
-  }
-}
-
-/** The block a header line opens, "title" for a dropped title line, or "none" for a line to keep. */
-function opens(line: string): Mode | "title" {
-  if (JEST_CONSOLE.test(line)) return "jest";
-  if (VITEST_OUTPUT.test(line)) return "console";
-  if (CARGO_PANIC.test(line)) return "panic";
-  if (VITEST_FAIL.test(line)) return "vitest";
-  if (PYTEST_CAPTURED.test(line)) return "pytest";
-  if (MOCHA_TITLE.test(line)) return "mocha";
-  return TEST_TITLE.test(line) ? "title" : "none";
-}
-
 /** The text without test-runner output (titles, and the blocks listed above TEST_TITLE). */
 export function dropTestTitles(text: string): string {
   const kept: string[] = [];
-  let mode: Mode = "none";
+  let mode: "none" | "mocha" | "jest" | "console" | "panic" | "vitest" | "pytest" = "none";
   for (const line of text.split("\n")) {
-    if (mode !== "none" && STEP_BOUNDARY.test(line)) mode = "none";
-    if (insideBlock(mode, line)) {
-      // mocha's nested suite lines end with the test title, which ends in `:`.
-      if (mode === "mocha" && /:[ \t]*$/.test(line)) mode = "none";
+    if (mode === "mocha" && /^[ \t]+[^ \t]/.test(line)) {
+      // Nested suite lines, then the test title, which ends in `:`.
+      if (/:[ \t]*$/.test(line)) mode = "none";
       continue;
     }
-    const next = opens(line);
-    mode = next === "title" ? "none" : next;
-    if (next === "none") kept.push(line);
+    // jest indents the logged message, so a column-0 line also ends its block.
+    if (mode === "jest" && /^[ \t]+[^ \t]/.test(line)) continue;
+    if (mode === "console" && !BLANK.test(line)) continue;
+    if (mode === "panic" && !/^(?:note|error|stack backtrace):/.test(line) && !BLANK.test(line))
+      continue;
+    if (mode === "vitest" && !/^ ❯ /.test(line) && !BLANK.test(line)) continue;
+    if (
+      mode === "pytest" &&
+      !/^(?:-----|=====|___|FAILED |ERROR [^ \t]+::|\d+ (?:failed|passed|error))/.test(line)
+    )
+      continue;
+    mode = "none";
+    if (JEST_CONSOLE.test(line)) mode = "jest";
+    else if (VITEST_OUTPUT.test(line)) mode = "console";
+    else if (CARGO_PANIC.test(line)) mode = "panic";
+    else if (VITEST_FAIL.test(line)) mode = "vitest";
+    else if (PYTEST_CAPTURED.test(line)) mode = "pytest";
+    else if (MOCHA_TITLE.test(line)) mode = "mocha";
+    else if (!TEST_TITLE.test(line)) kept.push(line);
   }
   return kept.join("\n");
 }

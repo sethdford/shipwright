@@ -197,24 +197,18 @@ describe("runner error blocks are dropped (#8696 verifier round 2)", () => {
   });
 });
 
-describe("open test-output blocks end only at a gh step boundary (#8715)", () => {
+describe("no early end for open test-output blocks, no runner prefixes (#8715 review)", () => {
   const auth =
     'Failed to authenticate. API Error: 401 {"type":"error","error":{"type":"authentication_error"}}';
-
-  test("a gh step boundary ends any block, and a real error after it escalates", () => {
-    const text = "----- Captured stdout call -----\nhello\n##[group]Run claude\nkept";
-    expect(dropTestTitles(text)).toBe("##[group]Run claude\nkept");
-    const after = `stderr | a.test.ts > x\nnoise\n##[endgroup]\n${auth}`;
-    expect(classifyAndDecide({ text: after, attempts: [] }).class).toBe("auth");
-  });
 
   test("an auth line later in a block is negative-path test output, never an escalation", () => {
     for (const header of [
       "stderr | a.test.ts > x",
       "thread 'main' panicked at a.rs:1:1:",
       " FAIL  a.test.ts > x",
+      "----- Captured stdout call -----",
     ]) {
-      const text = `${header}\nnoise\n${auth}`;
+      const text = `${header}\nnoise\n##[error]Bad credentials\n${auth}`;
       expect({ header, cls: classifyAndDecide({ text, attempts: [] }).class }).toEqual({
         header,
         cls: "unknown",
@@ -222,9 +216,17 @@ describe("open test-output blocks end only at a gh step boundary (#8715)", () =>
     }
   });
 
-  test("a line behind a runner prefix is never escalated", () => {
-    for (const prefix of ["@acme/agent:run: ", "packages/agent deploy: ", "agent-1  | "]) {
-      expect(classifyAndDecide({ text: `${prefix}${auth}`, attempts: [] }).class).toBe("unknown");
+  test("a line behind a runner prefix, under Claude Code's ⎿, or indented is never escalated", () => {
+    for (const text of [
+      `@acme/agent:run: ${auth}`,
+      `agent-1  | ${auth}`,
+      `  ⎿  API Error: 401 {"type":"error","error":{"type":"authentication_error"}}`,
+      `    Error: ${auth}`,
+    ]) {
+      expect({ text, cls: classifyAndDecide({ text, attempts: [] }).class }).toEqual({
+        text,
+        cls: "unknown",
+      });
     }
   });
 });

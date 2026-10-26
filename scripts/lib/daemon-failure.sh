@@ -161,11 +161,9 @@ l ~ /^[ \t]*([^ \t]+[ \t]+)?(failure analyzed|failure diagnosis|analyzing failur
 { print }'
 # Test-runner output, dropped before the escalation rules (dropTestTitles in evidence.ts): bun `(fail) ` and co.,
 # the result glyphs, jest's indented `● ` header, mocha's `  1) ` title block, jest/vitest console blocks, a cargo
-# panic message, the error under a vitest ` FAIL  file > test` header and pytest's captured output. Every block also
-# ends at a gh step boundary, and nothing else ends one early. No intervals
+# panic message, the error under a vitest ` FAIL  file > test` header and pytest's captured output. No intervals
 # or backslash escapes, so any awk (BSD, gawk, mawk) reads it the same.
 _DAEMON_DROP_TEST_OUTPUT='
-/^##[[](group|endgroup|error)[]]/ || /^::error/ { mode = "" }
 mode == "mocha" && /^[ \t]+[^ \t]/ { if ($0 ~ /:[ \t]*$/) mode = ""; next }
 mode == "jest" && /^[ \t]+[^ \t]/ { next }
 mode == "console" && $0 !~ /^[ \t]*$/ { next }
@@ -224,16 +222,10 @@ _DAEMON_AUTH_PHRASES+="|${_DAEMON_AUTH_BODY}"
 _DAEMON_AUTH_INDENTED="(error|fatal)[ :]{1,3}(401 )?authentication_error(:|[ ${_DAEMON_TAB}]{0,3}\$)"
 _DAEMON_AUTH_INDENTED+="|x failed to log in to ${_DAEMON_HOST} (account|using token)|x ${_DAEMON_HOST}: authentication failed"
 _DAEMON_AUTH_INDENTED+="|- the token in [a-z_]{1,40} is invalid"
-_DAEMON_AUTH_INDENTED+="|error: failed to authenticate[.] api error: 40[13] ${_DAEMON_AUTH_BODY}"
-# The raw Claude CLI JSON result object of a failed run, at column 0 (CLI_RESULT in failure.ts).
-_DAEMON_JSON_GAP='[A-Za-z0-9_":,. -]{0,255}'
-# The CLI's own auth texts only (CLI_RESULT_TEXT): a short list keeps the ERE small.
-_DAEMON_CLI_RESULT_TEXT='invalid api key|not logged in|oauth token (is |has |has been )?(expired|invalid|revoked)|failed to authenticate|api error: 40[13]|claude_code_oauth_token (is )?not set'
-_DAEMON_CLI_RESULT="\\{\"type\": ?\"result\",${_DAEMON_JSON_GAP}\"is_error\": ?true,${_DAEMON_JSON_GAP}\"result\": ?\"(${_DAEMON_CLI_RESULT_TEXT})"
 # The 401/403 response after its emitter's token at the lead-in (AUTH_RESPONSE).
 _DAEMON_SDK_ERROR='([a-z_]{1,30}[.]){0,3}(authentication|permissiondenied)error: (error code: )?'
-_DAEMON_AUTH_RESPONSE="${_DAEMON_LEAD}((●|⏺) |[ ${_DAEMON_TAB}]{0,4}⎿ {1,3})?${_DAEMON_PREFIX}(${_DAEMON_SDK_ERROR}|api error: |error code: )?40[13]( -)? ${_DAEMON_AUTH_BODY}"
-_DAEMON_AUTH="${_DAEMON_LEAD}${_DAEMON_PREFIX}(${_DAEMON_AUTH_PHRASES}|${_DAEMON_CLI_RESULT})|^[ ${_DAEMON_TAB}]{0,8}(${_DAEMON_AUTH_INDENTED})|${_DAEMON_AUTH_RESPONSE}"
+_DAEMON_AUTH_RESPONSE="${_DAEMON_LEAD}((●|⏺) )?${_DAEMON_PREFIX}(${_DAEMON_SDK_ERROR}|api error: |error code: )?40[13]( -)? ${_DAEMON_AUTH_BODY}"
+_DAEMON_AUTH="${_DAEMON_LEAD}${_DAEMON_PREFIX}(${_DAEMON_AUTH_PHRASES})|^[ ${_DAEMON_TAB}]{0,8}(${_DAEMON_AUTH_INDENTED})|${_DAEMON_AUTH_RESPONSE}"
 _DAEMON_INVALID_ISSUE="${_DAEMON_LEAD}${_DAEMON_PREFIX}(graphql( error)?: could not resolve to an? (issue|pullrequest)([ ${_DAEMON_TAB}.,]|\$)"
 _DAEMON_INVALID_ISSUE+="|http 404: not found \\(https://api\\.github\\.com/repos/[A-Za-z0-9._-]{1,100}/[A-Za-z0-9._-]{1,100}/(issues|pulls)/[0-9]{1,10}\\)"
 _DAEMON_INVALID_ISSUE+="|issue not found([ ${_DAEMON_TAB}]{0,5}\$|:)|issue #?[0-9]{1,10} does not exist${_DAEMON_END})"

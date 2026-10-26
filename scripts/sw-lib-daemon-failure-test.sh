@@ -492,5 +492,11 @@ printf '%s\n' "$fatal_out" > "$LOG_DIR/issue-904.log"
 assert_eq "that line is auth to the regex classifier" "auth_error" "$(SW_BUN=/nonexistent/bun classify_failure 904)"
 assert_eq "a plain matched line is printed as before" "✗ Fatal CLI error: Error: Invalid API key" \
     "$(fatal_line "Error: Invalid API key")"
+model_line='Done. The billing page now works; the fixture is {"type":"result","is_error":true,"result":"Not logged in · Please run /login"}.'
+assert_eq "model text that quotes a result record is printed as before (cut at 120), not extracted" \
+    "✗ Fatal CLI error: $(printf '%s' "$model_line" | cut -c1-120)" "$(fatal_line "$model_line")"
+not_error='{"type":"result","subtype":"success","is_error":false,"result":"Authentication failed. was the old message; billing ok"}'
+assert_eq "a result record that is not an error is printed as before" \
+    "✗ Fatal CLI error: $(printf '%s' "$not_error" | cut -c1-120)" "$(fatal_line "$not_error")"
 
 print_test_results

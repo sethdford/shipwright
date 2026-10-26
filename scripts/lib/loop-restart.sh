@@ -159,13 +159,17 @@ check_fatal_error() {
     fatal_patterns="${fatal_patterns}|ANTHROPIC_API_KEY.*not set|No API key"
 
     if grep -qiE "$fatal_patterns" "$log_file" 2>/dev/null; then
-        local match result_text
+        local match
         match=$(grep -iE "$fatal_patterns" "$log_file" 2>/dev/null | head -1)
-        # A CLI JSON result object names its cause in "result". Print that text, not the first 120 characters of
-        # the object, which end before it: the failure classifier reads this line (#8715).
-        result_text=$(printf '%s\n' "$match" | LC_ALL=C sed -n 's/.*"result": *"\([^"]*\)".*/\1/p' | head -1)
-        [[ -n "$result_text" ]] && match="$result_text"
-        error "Fatal CLI error: $(printf '%s' "$match" | cut -c1-200)"
+        # The CLI's own failed-run record ({"type":"result",...,"is_error":true,...}) names its cause in "result":
+        # print that text, not the record's first 120 characters, which end before it (#8715). Any other line, model
+        # text that happens to mention a pattern included, is printed as before.
+        if [[ "$match" =~ ^\{\"type\":\ ?\"result\" && "$match" =~ \"is_error\":\ ?true ]]; then
+            local result_text
+            result_text=$(printf '%s\n' "$match" | LC_ALL=C sed -n 's/.*"result": *"\([^"]*\)".*/\1/p' | head -1)
+            [[ -n "$result_text" ]] && match="$result_text"
+        fi
+        error "Fatal CLI error: $(printf '%s' "$match" | cut -c1-120)"
         return 1  # fatal error detected
     fi
 

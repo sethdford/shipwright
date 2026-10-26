@@ -105,13 +105,6 @@ const AUTH_PHRASES = [
   'please run [`"]?claude login',
   AUTH_BODY,
 ].join("|");
-// The raw Claude CLI JSON result object of a failed run (`--output-format json`/stream-json), at column 0:
-// `{"type":"result",...,"is_error":true,...,"result":"Invalid API key · Please run /login",...}` (#8715). The
-// fields between are bounded plain JSON scalars.
-const JSON_GAP = String.raw`[A-Za-z0-9_":,. \-]{0,255}`;
-// The CLI's own auth texts only: a short list keeps the ERE small (bash compiles it on every classification).
-const CLI_RESULT_TEXT = String.raw`invalid api key|not logged in|oauth token (?:is |has |has been )?(?:expired|invalid|revoked)|failed to authenticate|api error: 40[13]|claude_code_oauth_token (?:is )?not set`;
-const CLI_RESULT = String.raw`\{"type": ?"result",${JSON_GAP}"is_error": ?true,${JSON_GAP}"result": ?"(?:${CLI_RESULT_TEXT})`;
 // Structured forms that may be indented: the bare API type name after an error prefix (ending at `:` or the end
 // of the line, so "error: authentication_error is now mapped ..." does not escalate), and `gh auth status`'s
 // indented `X` lines.
@@ -120,8 +113,6 @@ const AUTH_INDENTED = [
   String.raw`x failed to log in to ${HOST} (?:account|using token)`,
   String.raw`x ${HOST}: authentication failed`,
   "- the token in [a-z_]{1,40} is invalid",
-  // An indented CLI error under a make recipe (#8715): the full structured form, with the 401/403 body, only.
-  String.raw`error: failed to authenticate\. api error: 40[13] ${AUTH_BODY}`,
 ].join("|");
 // The structured 401/403 response, after its emitter's token at the anchored lead-in: the CLI's `API Error: 401
 // {...}` (also after Claude Code's column-0 `● `/`⏺ `), `Error: 401 {...}`, the JS SDK's `AuthenticationError: 401
@@ -129,7 +120,7 @@ const AUTH_INDENTED = [
 // an assertion diff, a diff hunk or indented prose that quotes the body does not escalate. A stream-json `"result"`
 // field is not matched: the current CLI puts its own text there (`Invalid API key · ...`), which the phrases catch.
 const SDK_ERROR = String.raw`(?:[a-z_]{1,30}\.){0,3}(?:authentication|permissiondenied)error: (?:error code: )?`;
-const AUTH_RESPONSE = String.raw`${LEAD}(?:(?:●|⏺) |[ \t]{0,4}⎿ {1,3})?${PREFIX}(?:${SDK_ERROR}|api error: |error code: )?40[13](?: -)? ${AUTH_BODY}`;
+const AUTH_RESPONSE = String.raw`${LEAD}(?:(?:●|⏺) )?${PREFIX}(?:${SDK_ERROR}|api error: |error code: )?40[13](?: -)? ${AUTH_BODY}`;
 // gh lookup failures for an issue or PR number, anchored after LEAD and PREFIX.
 const INVALID_PHRASES = [
   String.raw`graphql(?: error)?: could not resolve to an? (?:issue|pullrequest)(?:[ \t.,]|$)`,
@@ -162,7 +153,7 @@ const RULES: readonly Rule[] = [
     // structured 401 authentication_error response anywhere. A test name or prose sentence that mentions
     // 401 or "not logged in" does not escalate.
     pattern: new RegExp(
-      `${LEAD}${PREFIX}(?:${AUTH_PHRASES}|${CLI_RESULT})|^[ \t]{0,8}(?:${AUTH_INDENTED})|${AUTH_RESPONSE}`,
+      `${LEAD}${PREFIX}(?:${AUTH_PHRASES})|^[ \t]{0,8}(?:${AUTH_INDENTED})|${AUTH_RESPONSE}`,
       "im",
     ),
     cls: "auth",
