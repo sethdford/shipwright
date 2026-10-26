@@ -235,9 +235,9 @@ stage_test 2>/dev/null || rc=$?
 # ─── Tests: stage_test differential judgement (#8663, #8671) ───────────────
 print_test_section "stage_test differential"
 
-# Each scenario gets its own repository, so a ref moved in one cannot leak into another. The fake test
-# command prints bun-style output: one failure that the base commit also has, and a second, new one when
-# the uncommitted regression.flag exists (the base worktree never has it).
+# Each scenario has its own repository with a bare origin, which stands in for the remote. The base is the
+# origin's main, read through ls-remote (#8671). The fake test command prints bun-style output: one failure the
+# base also has, and a second, new one when regression.flag exists.
 make_diff_repo() {
     local dir="$1"
     mkdir -p "$dir/.artifacts"
@@ -265,48 +265,40 @@ echo "Ran 2 tests across 1 file. [2.00ms]"
 exit 1
 FAKE
         git add -A && git commit -q -m "main: fake test command"
-        git checkout -q -b side-branch "$(git rev-list --max-parents=0 HEAD)"
-        echo side > side.txt && git add -A && git commit -q -m "side: not an ancestor of the pipeline"
-        git checkout -q main
-        # The pipeline's branch starts at the fork point: no commits beyond the base yet
+        git init -q --bare "$dir.origin" && git remote add origin "$dir.origin" && git -C "$dir.origin" fetch -q "$dir" main:refs/heads/main
         git checkout -q -b feat/diff-under-test
     ) >/dev/null 2>&1
 }
-# A scenario's repository: each one starts on a clean branch at the fork point (a reused repo would start
-# with the previous scenario's agent commits, and the fork-point proof would rightly refuse it).
-fresh_diff_repo() {
-    local d="$TEST_TEMP_DIR/diff-$1"
-    make_diff_repo "$d"
-    echo "$d"
+fresh_diff_repo() { local d="$TEST_TEMP_DIR/diff-$1"; make_diff_repo "$d"; printf '%s' "$d"; }
+new_home() { mktemp -d "$TEST_TEMP_DIR/home.XXXXXX"; }
+# diff_env <repo> <home> <base-branch> — the pipeline's environment for a scenario.
+diff_env() {
+    export PROJECT_ROOT="$1" ARTIFACTS_DIR="$1/.artifacts" BASE_BRANCH="$3" TEST_CMD="bash fake-tests.sh"
+    export ISSUE_NUMBER="" PIPELINE_NAME="diff" SHIPWRIGHT_HOME="$2"
+    unset PIPELINE_RESUMING RESUME_FROM_CHECKPOINT SW_PIPELINE_RUN_ID SW_PIPELINE_BASE_SHA SW_PIPELINE_PUSH_URL
 }
-
-# The agent's build commit, made after the pipeline has started
+# agent_commit <repo> <msg> — the agent's build commit, made after the pipeline started.
 agent_commit() { (cd "$1" && echo "agent $2" >> README.md && git add -A && git commit -q -m "agent: $2") >/dev/null 2>&1; }
-
-# Runs the pipeline's start and then stage_test in <repo> with the given base branch, after the agent has
-# committed. Each run has its own record home. Prints the stage's exit code.
+# run_diff_stage <repo> <base-branch> — a fresh start, the agent's commit, then stage_test. Prints the exit code.
 run_diff_stage() {
-    local repo="$1" base_branch="$2" rc=0 name home
+    local repo="$1" base_branch="$2" rc=0 home
+    home="$(new_home)"
     (
-        cd "$repo"
-        export PROJECT_ROOT="$repo" ARTIFACTS_DIR="$repo/.artifacts" BASE_BRANCH="$base_branch"
-        name="diff-$(basename "$repo")"
-        export ISSUE_NUMBER="" PIPELINE_NAME="$name" TEST_CMD="bash fake-tests.sh"
-        home="$(mktemp -d "$TEST_TEMP_DIR/home.XXXXXX")"
-        export SHIPWRIGHT_HOME="$home"
+        diff_env "$repo" "$home" "$base_branch"
+        cd "$repo" || exit 1
         pipeline_base_init || true
-        echo agent >> README.md && git add -A && git commit -q -m "agent: build"
+        agent_commit "$repo" build
         stage_test
-    ) >/dev/null 2>&1 || rc=$?
+    ) >"$TEST_TEMP_DIR/stage.out" 2>&1 || rc=$?
     echo "$rc"
 }
 
-# Pre-existing: the same failure on the base commit does not fail the stage
+# Pre-existing: the same failure on the base does not fail the stage.
 PRE_REPO="$(fresh_diff_repo pre)"
 assert_eq "pre-existing failure does not fail the test stage" "0" "$(run_diff_stage "$PRE_REPO" main)"
 assert_contains "pre-existing verdict is logged" "$(cat "$PRE_REPO/.artifacts/test-results.log")" "PRE-EXISTING, not blocking"
 
-# Regression: a new failing unit fails the stage, and the feedback names the pre-existing one as not to fix
+# Regression: a new failing unit fails the stage; the feedback names the pre-existing one as not to fix.
 REG_REPO="$(fresh_diff_repo reg)"
 touch "$REG_REPO/regression.flag"
 assert_eq "a regression fails the test stage" "1" "$(run_diff_stage "$REG_REPO" main)"
@@ -315,264 +307,448 @@ assert_contains "regression verdict names the new failure" "$diff_log" "BLOCKING
 assert_contains "feedback lists the pre-existing failure" "$diff_log" "old.test.ts::pre-existing one#1"
 assert_contains "feedback tells the agent not to fix pre-existing failures" "$diff_log" "Do NOT fix them"
 
-# No base commit: fail closed, the old behaviour (the same pre-existing failure blocks)
+# No base on the remote: the failure blocks, as before.
 NOBASE_REPO="$(fresh_diff_repo nobase)"
-assert_eq "no base branch: the failure blocks as before" "1" "$(run_diff_stage "$NOBASE_REPO" no-such-base-branch)"
+assert_eq "no base branch on the remote: the failure blocks as before" "1" "$(run_diff_stage "$NOBASE_REPO" no-such-base-branch)"
 
-# Hijack (#8671): the agent moves origin/main and main to its own HEAD after the base was recorded. The
-# recorded base still judges the regression, so it blocks.
-HIJACK_REPO="$TEST_TEMP_DIR/hijack-repo"
-make_diff_repo "$HIJACK_REPO"
+# In-process hijack: the agent moves local main and origin/main to its own commit. The judgement uses the base
+# held in memory at init, so the regression still blocks.
+HIJACK_REPO="$(fresh_diff_repo hijack)"
+HIJACK_HOME="$(new_home)"
 hijack_rc=0
-HIJACK_HOME="$(mktemp -d "$TEST_TEMP_DIR/home.XXXXXX")"
 (
-    cd "$HIJACK_REPO"
-    export PROJECT_ROOT="$HIJACK_REPO" ARTIFACTS_DIR="$HIJACK_REPO/.artifacts" BASE_BRANCH=main TEST_CMD="bash fake-tests.sh"
-    export ISSUE_NUMBER="" PIPELINE_NAME="hijack" SHIPWRIGHT_HOME="$HIJACK_HOME"
+    diff_env "$HIJACK_REPO" "$HIJACK_HOME" main
+    cd "$HIJACK_REPO" || exit 1
     pipeline_base_init
-    echo agent >> README.md && git add -A && git commit -q -m "agent: build"
+    agent_commit "$HIJACK_REPO" build
     touch regression.flag
     git update-ref refs/remotes/origin/main HEAD
     git update-ref refs/heads/main HEAD
     stage_test
 ) >/dev/null 2>&1 || hijack_rc=$?
-assert_eq "a moved origin/main cannot make a regression pre-existing" "1" "$hijack_rc"
+assert_eq "moved local main and origin/main cannot make a regression pre-existing" "1" "$hijack_rc"
 
-# P1 (#8671): resume after the agent has moved the refs. The base, run id, remote, push URL and branch are the
-# ones recorded at the first start; a resume creates no record; the regression still blocks.
-RESUME_REPO="$TEST_TEMP_DIR/resume-repo"
-make_diff_repo "$RESUME_REPO"
-RESUME_HOME="$(mktemp -d "$TEST_TEMP_DIR/home.XXXXXX")"
+# Resume in a new process after the agent moved refs and changed the remote: the run's recorded base, push URL and
+# run id are used, and the regression still blocks.
+RESUME_REPO="$(fresh_diff_repo resume)"
+RESUME_HOME="$(new_home)"
 RESUME_OUT="$TEST_TEMP_DIR/resume.out"
 (
-    cd "$RESUME_REPO"
-    export PROJECT_ROOT="$RESUME_REPO" ARTIFACTS_DIR="$RESUME_REPO/.artifacts" BASE_BRANCH=main TEST_CMD="bash fake-tests.sh"
-    export ISSUE_NUMBER="" PIPELINE_NAME="resume-p1" SHIPWRIGHT_HOME="$RESUME_HOME"
-    git config remote.origin.url "https://example.com/original.git"
-    git config remote.origin.pushurl "https://example.com/push-original.git"
+    diff_env "$RESUME_REPO" "$RESUME_HOME" main
+    cd "$RESUME_REPO" || exit 1
     pipeline_base_init
     echo "first=$SW_PIPELINE_BASE_SHA"
     echo "firstpush=$SW_PIPELINE_PUSH_URL"
     echo "run=$SW_PIPELINE_RUN_ID"
-    # the agent: a commit, moved refs, a changed remote, and a regression
-    echo agent >> README.md && git add -A && git commit -q -m "agent: more"
+) > "$RESUME_OUT" 2>&1
+(
+    diff_env "$RESUME_REPO" "$RESUME_HOME" main
+    cd "$RESUME_REPO" || exit 1
+    agent_commit "$RESUME_REPO" more
     git update-ref refs/remotes/origin/main HEAD
     git update-ref refs/heads/main HEAD
-    git config remote.origin.url "https://example.com/attacker.git"
-    git config remote.origin.pushurl "https://example.com/push-attacker.git"
+    git remote set-url origin "https://example.com/attacker.git"
     touch regression.flag
-    PIPELINE_RESUMING=true pipeline_base_init
+    export PIPELINE_RESUMING=true
+    pipeline_base_init
     echo "resumed=$SW_PIPELINE_BASE_SHA"
     echo "resumedpush=$SW_PIPELINE_PUSH_URL"
     echo "resumedrun=$SW_PIPELINE_RUN_ID"
-    echo "remote=$(pipeline_base_get_field "$RESUME_REPO" "$SW_PIPELINE_RUN_ID" remote)"
-    echo "branch=$(pipeline_base_get_field "$RESUME_REPO" "$SW_PIPELINE_RUN_ID" branch)"
     if stage_test; then echo "rc=0"; else echo "rc=$?"; fi
-) > "$RESUME_OUT" 2>&1 || true
-resume_first="$(sed -n 's/^first=//p' "$RESUME_OUT")"
-assert_eq "resume gets the base recorded at first start, after the agent moved origin/main" \
-    "$resume_first" "$(sed -n 's/^resumed=//p' "$RESUME_OUT")"
-assert_eq "resume gets the push URL recorded at first start, after the agent changed it" \
-    "https://example.com/push-original.git" "$(sed -n 's/^resumedpush=//p' "$RESUME_OUT")"
-assert_eq "the first start exports the push URL it recorded" \
-    "https://example.com/push-original.git" "$(sed -n 's/^firstpush=//p' "$RESUME_OUT")"
+) >> "$RESUME_OUT" 2>&1
+assert_eq "resume gets the base recorded at first start, after the agent moved refs" \
+    "$(sed -n 's/^first=//p' "$RESUME_OUT")" "$(sed -n 's/^resumed=//p' "$RESUME_OUT")"
+assert_eq "resume gets the push URL recorded at first start, after the remote changed" \
+    "$(sed -n 's/^firstpush=//p' "$RESUME_OUT")" "$(sed -n 's/^resumedpush=//p' "$RESUME_OUT")"
 assert_eq "resume reuses the run id of the first start" \
     "$(sed -n 's/^run=//p' "$RESUME_OUT")" "$(sed -n 's/^resumedrun=//p' "$RESUME_OUT")"
-assert_eq "resume gets the remote recorded at first start, after the agent changed it" \
-    "https://example.com/original.git" "$(sed -n 's/^remote=//p' "$RESUME_OUT")"
-assert_eq "resume records the branch the pipeline started on" "feat/diff-under-test" "$(sed -n 's/^branch=//p' "$RESUME_OUT")"
 assert_eq "a regression after a resume still blocks" "rc=1" "$(grep '^rc=' "$RESUME_OUT")"
-rm -f "$RESUME_REPO/regression.flag"
-(cd "$RESUME_REPO" && git config --unset remote.origin.url && git config --unset remote.origin.pushurl) >/dev/null 2>&1 || true
+assert_eq "a resume creates no second record" "1" "$(find "$RESUME_HOME" -name '*.json' | wc -l | tr -d ' ')"
 
-# The record: keyed by a run id, mode 0600, and holding the fields the other pipeline features read
-run_id="$(sed -n 's/^run=//p' "$RESUME_OUT")"
-record_file="$(find "$RESUME_HOME" -name "$run_id.json" | head -1)"
-assert_eq "the base record is mode 0600" "-rw-------" "$(ls -l "$record_file" | cut -c1-10)"
-assert_eq "the base record holds the base, remote, push URL, branch and node_modules fingerprint" "1" \
-    "$(jq -e 'has("base") and has("remote") and has("push_url") and has("branch") and has("nm")' "$record_file" >/dev/null 2>&1 && echo 1 || echo 0)"
-
-# P1c (#8671): a fresh start on a branch that already has agent commits is not a first start. Nothing is
-# recorded, and the stage blocks even though the failure is the same on the base.
-DIRTY_REPO="$TEST_TEMP_DIR/dirty-repo"
-make_diff_repo "$DIRTY_REPO"
-agent_commit "$DIRTY_REPO" "earlier run"
-DIRTY_HOME="$(mktemp -d "$TEST_TEMP_DIR/home.XXXXXX")"
-dirty_rc=0
+# Resume after the intake step's git checkout -b: the record is found through the worktree's pointer, not the branch.
+CKB_REPO="$(fresh_diff_repo ckb)"
+CKB_HOME="$(new_home)"
 (
-    cd "$DIRTY_REPO"
-    export PROJECT_ROOT="$DIRTY_REPO" ARTIFACTS_DIR="$DIRTY_REPO/.artifacts" BASE_BRANCH=main TEST_CMD="bash fake-tests.sh"
-    export ISSUE_NUMBER="" PIPELINE_NAME="dirty" SHIPWRIGHT_HOME="$DIRTY_HOME"
-    rec_rc=0; pipeline_base_init || rec_rc=$?
-    [[ "$rec_rc" -ne 0 && -z "${SW_PIPELINE_BASE_SHA:-}" && -z "${SW_PIPELINE_RUN_ID:-}" ]] || exit 9
-    agent_commit_inline() { echo agent >> README.md && git add -A && git commit -q -m "agent: build"; }
-    agent_commit_inline
+    diff_env "$CKB_REPO" "$CKB_HOME" main
+    cd "$CKB_REPO" || exit 1
+    pipeline_base_init
+) >/dev/null 2>&1
+CKB_OUT="$TEST_TEMP_DIR/ckb.out"
+(
+    diff_env "$CKB_REPO" "$CKB_HOME" main
+    cd "$CKB_REPO" || exit 1
+    git checkout -q -b fix/goal-1
+    export PIPELINE_RESUMING=true
+    if pipeline_base_init; then echo "init=0"; else echo "init=1"; fi
+    agent_commit "$CKB_REPO" build
+    touch regression.flag
+    if stage_test; then echo "rc=0"; else echo "rc=$?"; fi
+) > "$CKB_OUT" 2>&1
+assert_eq "a resume after git checkout -b finds the record" "init=0" "$(grep '^init=' "$CKB_OUT")"
+assert_eq "a resume after git checkout -b still blocks a regression" "rc=1" "$(grep '^rc=' "$CKB_OUT")"
+
+# Release after the intake branch change: the record and the pointer are removed.
+REL_REPO="$(fresh_diff_repo rel)"
+REL_HOME="$(new_home)"
+(
+    diff_env "$REL_REPO" "$REL_HOME" main
+    cd "$REL_REPO" || exit 1
+    pipeline_base_init
+) >/dev/null 2>&1
+(
+    diff_env "$REL_REPO" "$REL_HOME" main
+    cd "$REL_REPO" || exit 1
+    git checkout -q -b fix/goal-rel
+    pipeline_base_release "$REL_REPO"
+) >/dev/null 2>&1
+assert_eq "release after the intake branch change removes the record" "0" "$(find "$REL_HOME" -name '*.json' | wc -l | tr -d ' ')"
+assert_eq "release after the intake branch change removes the pointer" "0" "$(find "$REL_HOME" -name '*.run' | wc -l | tr -d ' ')"
+rel_resume="$(
+    diff_env "$REL_REPO" "$REL_HOME" main
+    cd "$REL_REPO" || exit 1
+    export PIPELINE_RESUMING=true
+    if pipeline_base_init 2>/dev/null; then echo 0; else echo 1; fi
+)"
+assert_eq "after release a resume has no record and fails closed" "1" "$rel_resume"
+
+# In-process rewrite (#8671, A2): the test command rewrites this run's record on disk so its base is HEAD. The judgement
+# holds the base in memory, so the pre-existing failure still passes.
+RW_REPO="$(fresh_diff_repo rw)"
+RW_HOME="$(new_home)"
+RW_SCRIPT="$TEST_TEMP_DIR/rewrite-record.sh"
+cat > "$RW_SCRIPT" <<'RW'
+rec="$(find "$SHIPWRIGHT_HOME" -name "$SW_PIPELINE_RUN_ID.json" | head -1)"
+jq --arg h "$(git rev-parse HEAD)" '.base = $h | .nm = "absent"' "$rec" > "$rec.t" && chmod 600 "$rec.t" && mv "$rec.t" "$rec"
+RW
+(
+    diff_env "$RW_REPO" "$RW_HOME" main
+    export TEST_CMD="bash $RW_SCRIPT; bash fake-tests.sh"
+    cd "$RW_REPO" || exit 1
+    pipeline_base_init
+    agent_commit "$RW_REPO" build
     stage_test
-) >"$TEST_TEMP_DIR/dirty.out" 2>&1 || dirty_rc=$?
-assert_eq "a fresh start on a branch with agent commits records nothing and blocks" "1" "$dirty_rc"
-assert_contains "the operator is told how to start clean" "$(cat "$TEST_TEMP_DIR/dirty.out")" "clean branch"
-assert_eq "no record is written for the dirty branch" "0" "$(find "$DIRTY_HOME" -name '*.json' 2>/dev/null | wc -l | tr -d ' ')"
+) >"$TEST_TEMP_DIR/rw.out" 2>&1 || true
+rw_log="$(cat "$RW_REPO/.artifacts/test-results.log")"
+assert_contains "a test command that rewrites the record does not change the judgement" "$rw_log" "PRE-EXISTING, not blocking"
 
-# P1f/P1g (#8671): records are per run. A second fresh start for the same issue (or the same template, with no
-# issue) gets its own run id and base, never an older record's.
-STALE_REPO="$TEST_TEMP_DIR/stale-repo"
-make_diff_repo "$STALE_REPO"
-STALE_HOME="$(mktemp -d "$TEST_TEMP_DIR/home.XXXXXX")"
-STALE_OUT="$TEST_TEMP_DIR/stale.out"
+# In-process rewrite with a poisoned node_modules: the test command poisons node_modules and rewrites the record's
+# fingerprint to match. The fingerprint held in memory still differs, so the stage blocks.
+RWN_REPO="$(fresh_diff_repo rwnm)"
+RWN_HOME="$(new_home)"
+RWN_SCRIPT="$TEST_TEMP_DIR/poison-and-rewrite.sh"
+cat > "$RWN_SCRIPT" <<'RWN'
+mkdir -p node_modules/dep && echo poison > node_modules/dep/poison
+source "$SW_TEST_LIB"
+rec="$(find "$SHIPWRIGHT_HOME" -name "$SW_PIPELINE_RUN_ID.json" | head -1)"
+jq --arg nm "$(_pipeline_base_nm_fingerprint .)" '.nm = $nm' "$rec" > "$rec.t" && chmod 600 "$rec.t" && mv "$rec.t" "$rec"
+RWN
 (
-    cd "$STALE_REPO"
-    export PROJECT_ROOT="$STALE_REPO" ARTIFACTS_DIR="$STALE_REPO/.artifacts" BASE_BRANCH=main TEST_CMD="bash fake-tests.sh"
-    export ISSUE_NUMBER="" PIPELINE_NAME="standard" SHIPWRIGHT_HOME="$STALE_HOME"
-    pipeline_base_init; echo "run1=$SW_PIPELINE_RUN_ID"
-    echo agent >> README.md && git add -A && git commit -q -m "agent: run one"
-    git checkout -q main && git merge -q --ff-only feat/diff-under-test 2>/dev/null || true
-    git checkout -q feat/diff-under-test
-    pipeline_base_init; echo "run2=$SW_PIPELINE_RUN_ID"; echo "base2=$SW_PIPELINE_BASE_SHA"
-    echo "resumed2=$(PIPELINE_RESUMING=true pipeline_base_init >/dev/null 2>&1; echo "$SW_PIPELINE_RUN_ID")"
-) > "$STALE_OUT" 2>&1 || true
-assert_eq "a second fresh start for the same template gets a new run id" \
-    "$(sed -n 's/^run1=//p' "$STALE_OUT" | head -1)" "$(sed -n 's/^run1=//p' "$STALE_OUT" | head -1)"
-run1="$(sed -n 's/^run1=//p' "$STALE_OUT")"
-run2="$(sed -n 's/^run2=//p' "$STALE_OUT")"
-assert_eq "a second fresh start for the same template gets a new run id" "1" "$([[ -n "$run2" && "$run2" != "$run1" ]] && echo 1 || echo 0)"
-assert_eq "a resume after the second start uses the second run" "$run2" "$(sed -n 's/^resumed2=//p' "$STALE_OUT")"
-assert_eq "the first run's record is still on disk, untouched (never reused)" "1" \
-    "$(find "$STALE_HOME" -name "$run1.json" | wc -l | tr -d ' ')"
-
-# Release (#8671): completion or abort deletes the run's record and pointer; a resume then has nothing to load
-(
-    cd "$STALE_REPO"
-    export PROJECT_ROOT="$STALE_REPO" SHIPWRIGHT_HOME="$STALE_HOME"
-    pipeline_base_release "$STALE_REPO"
-    PIPELINE_RESUMING=true pipeline_base_init || true
-    [[ -z "${SW_PIPELINE_BASE_SHA:-}" ]] || exit 9
-) >/dev/null 2>&1; release_rc=$?
-assert_eq "after release a resume loads nothing and exports no base" "0" "$release_rc"
-assert_eq "release removes the run's record" "0" "$(find "$STALE_HOME" -name "$run2.json" | wc -l | tr -d ' ')"
-
-# Expiry (#8671): records older than the TTL are swept at the next fresh start
-EXP_REPO="$TEST_TEMP_DIR/exp-repo"
-make_diff_repo "$EXP_REPO"
-EXP_HOME="$(mktemp -d "$TEST_TEMP_DIR/home.XXXXXX")"
-(
-    cd "$EXP_REPO"
-    export PROJECT_ROOT="$EXP_REPO" ARTIFACTS_DIR="$EXP_REPO/.artifacts" BASE_BRANCH=main TEST_CMD="bash fake-tests.sh"
-    export ISSUE_NUMBER="" PIPELINE_NAME="exp" SHIPWRIGHT_HOME="$EXP_HOME"
+    diff_env "$RWN_REPO" "$RWN_HOME" main
+    export TEST_CMD="bash $RWN_SCRIPT; bash fake-tests.sh" SW_TEST_LIB="$SCRIPT_DIR/lib/pipeline-base.sh"
+    cd "$RWN_REPO" || exit 1
     pipeline_base_init
-    old_file="$(dirname "$SW_PIPELINE_RUN_ID")"
-    echo '{}' > "$(find "$EXP_HOME" -name "$SW_PIPELINE_RUN_ID.json" | head -1 | sed 's/.json$/.old.json/')"
-    touch -t 202001010000 "$(find "$EXP_HOME" -name "$SW_PIPELINE_RUN_ID.old.json" | head -1)"
+    agent_commit "$RWN_REPO" build
+    stage_test
+) >"$TEST_TEMP_DIR/rwn.out" 2>&1 && rwn_rc=0 || rwn_rc=$?
+assert_eq "a poisoned node_modules with a rewritten record still blocks" "1" "$rwn_rc"
+assert_contains "the block says node_modules changed" "$(cat "$TEST_TEMP_DIR/rwn.out")" "node_modules changed"
+
+# A process the test command left running is killed before the base run (#8671, A3): it would otherwise write
+# after the judgement.
+LEAK_REPO="$(fresh_diff_repo leak)"
+LEAK_HOME="$(new_home)"
+LEAK_MARK="$TEST_TEMP_DIR/leak-marker"
+(
+    diff_env "$LEAK_REPO" "$LEAK_HOME" main
+    export TEST_CMD="( sleep 1; touch \"$LEAK_MARK\" ) & bash fake-tests.sh"
+    cd "$LEAK_REPO" || exit 1
     pipeline_base_init
+    agent_commit "$LEAK_REPO" build
+    stage_test
 ) >/dev/null 2>&1 || true
-assert_eq "an expired record is swept at the next fresh start" "0" "$(find "$EXP_HOME" -name '*.old.json' | wc -l | tr -d ' ')"
+sleep 1.5
+assert_eq "a background process of the test command is killed before the base run" "no" "$(test -e "$LEAK_MARK" && echo yes || echo no)"
 
-# A corrupt record is not trusted: a resume with it blocks
-corrupt_rc=0
+# Dirty branch (#8671, P1c): agent commits before the first start. Nothing is recorded, and the stage blocks.
+DIRTY_REPO="$(fresh_diff_repo dirty)"
+DIRTY_HOME="$(new_home)"
 (
-    cd "$RESUME_REPO"
-    export PROJECT_ROOT="$RESUME_REPO" ARTIFACTS_DIR="$RESUME_REPO/.artifacts" BASE_BRANCH=main TEST_CMD="bash fake-tests.sh"
-    export ISSUE_NUMBER="" PIPELINE_NAME="resume-p1" SHIPWRIGHT_HOME="$RESUME_HOME"
-    printf 'not json' > "$record_file"
-    PIPELINE_RESUMING=true pipeline_base_init || true
-    [[ -z "${SW_PIPELINE_BASE_SHA:-}" ]] || exit 9
-    stage_test
-) >/dev/null 2>&1 || corrupt_rc=$?
-assert_eq "a corrupt base record blocks" "1" "$corrupt_rc"
+    diff_env "$DIRTY_REPO" "$DIRTY_HOME" main
+    cd "$DIRTY_REPO" || exit 1
+    agent_commit "$DIRTY_REPO" earlier
+    if pipeline_base_init 2>/dev/null; then echo "init=0"; else echo "init=1"; fi
+    echo "run=${SW_PIPELINE_RUN_ID:-}"
+    touch regression.flag
+    if stage_test; then echo "rc=0"; else echo "rc=$?"; fi
+) > "$TEST_TEMP_DIR/dirty.out" 2>&1
+assert_eq "a fresh start on a branch with agent commits fails" "init=1" "$(grep '^init=' "$TEST_TEMP_DIR/dirty.out")"
+assert_eq "a fresh start on a branch with agent commits exports no run" "run=" "$(grep '^run=' "$TEST_TEMP_DIR/dirty.out")"
+assert_eq "no record is written for the dirty branch" "0" "$(find "$DIRTY_HOME" -name '*.json' 2>/dev/null | wc -l | tr -d ' ')"
+assert_eq "the stage blocks the dirty branch" "rc=1" "$(grep '^rc=' "$TEST_TEMP_DIR/dirty.out")"
 
-# A record that is not 0600 (or not a plain file) is not trusted (#8671, item 4)
-WIDE_REPO="$TEST_TEMP_DIR/wide-repo"
-make_diff_repo "$WIDE_REPO"
-WIDE_HOME="$(mktemp -d "$TEST_TEMP_DIR/home.XXXXXX")"
-wide_rc=0
+# Agent moved local refs to its own commit, then branched from it (#8671, A4). The remote's main does not contain
+# that commit, so the proof fails: the local refs are not trusted.
+A4_REPO="$(fresh_diff_repo a4)"
+A4_HOME="$(new_home)"
 (
-    cd "$WIDE_REPO"
-    export PROJECT_ROOT="$WIDE_REPO" ARTIFACTS_DIR="$WIDE_REPO/.artifacts" BASE_BRANCH=main TEST_CMD="bash fake-tests.sh"
-    export ISSUE_NUMBER="" PIPELINE_NAME="wide" SHIPWRIGHT_HOME="$WIDE_HOME"
+    diff_env "$A4_REPO" "$A4_HOME" main
+    cd "$A4_REPO" || exit 1
+    echo evil >> README.md && git add -A && git commit -q -m "agent: moved main"
+    c="$(git rev-parse HEAD)"
+    git update-ref refs/remotes/origin/main "$c"
+    git update-ref refs/heads/main "$c"
+    git checkout -q -B feat/a4 main
+    if pipeline_base_init 2>/dev/null; then echo "init=0"; else echo "init=1"; fi
+) > "$TEST_TEMP_DIR/a4.out" 2>&1
+assert_eq "a start on local refs the remote does not have fails closed" "init=1" "$(grep '^init=' "$TEST_TEMP_DIR/a4.out")"
+assert_eq "a start on local refs the remote does not have records nothing" "0" "$(find "$A4_HOME" -name '*.json' 2>/dev/null | wc -l | tr -d ' ')"
+
+# The repository's own config sets a push URL or a URL rewrite (#8671, A5): the start fails closed.
+for cfg in "remote.origin.pushurl=https://evil.example/x.git" "url.https://evil.example/.insteadOf=$TEST_TEMP_DIR/x"; do
+    A5_REPO="$(fresh_diff_repo a5-$RANDOM)"
+    A5_HOME="$(new_home)"
+    key="${cfg%%=*}"; val="${cfg#*=}"
+    (
+        diff_env "$A5_REPO" "$A5_HOME" main
+        cd "$A5_REPO" || exit 1
+        git config "$key" "$val"
+        if pipeline_base_init 2>/dev/null; then echo "init=0"; else echo "init=1"; fi
+    ) > "$TEST_TEMP_DIR/a5.out" 2>&1
+    assert_eq "a local config of $key fails the start closed" "init=1" "$(grep '^init=' "$TEST_TEMP_DIR/a5.out")"
+done
+
+# The origin URL changed since the first start (pinned): a fresh start fails.
+PIN_REPO="$(fresh_diff_repo pin)"
+PIN_HOME="$(new_home)"
+(
+    diff_env "$PIN_REPO" "$PIN_HOME" main
+    cd "$PIN_REPO" || exit 1
     pipeline_base_init
-    chmod 644 "$(find "$WIDE_HOME" -name "$SW_PIPELINE_RUN_ID.json")"
-    PIPELINE_RESUMING=true pipeline_base_init || true
-    [[ -z "${SW_PIPELINE_BASE_SHA:-}" ]] || exit 9
-) >/dev/null 2>&1 || wide_rc=$?
-assert_eq "a record readable by others (0644) is not trusted" "0" "$wide_rc"
+) >/dev/null 2>&1
+(
+    diff_env "$PIN_REPO" "$PIN_HOME" main
+    cd "$PIN_REPO" || exit 1
+    git remote set-url origin "$TEST_TEMP_DIR/elsewhere.git"
+    if pipeline_base_init 2>/dev/null; then echo "init=0"; else echo "init=1"; fi
+) > "$TEST_TEMP_DIR/pin.out" 2>&1
+assert_eq "a fresh start after the origin URL changed fails closed" "init=1" "$(grep '^init=' "$TEST_TEMP_DIR/pin.out")"
 
-# A recorded base that equals HEAD, or is not an ancestor of HEAD, blocks
+# SHIPWRIGHT_HOME/pipeline-base is a link to an attacker directory (#8671, A6): nothing is written there.
+A6_REPO="$(fresh_diff_repo a6)"
+A6_HOME="$(new_home)"
+A6_ATTACK="$TEST_TEMP_DIR/a6-attack"
+mkdir -p "$A6_ATTACK"
+ln -s "$A6_ATTACK" "$A6_HOME/pipeline-base"
+a6_rc=0
+(
+    diff_env "$A6_REPO" "$A6_HOME" main
+    cd "$A6_REPO" || exit 1
+    pipeline_base_init
+) >/dev/null 2>&1 || a6_rc=$?
+assert_eq "a pipeline-base directory that is a link fails the start" "1" "$a6_rc"
+assert_eq "nothing is written through the link" "0" "$(find "$A6_ATTACK" -type f | wc -l | tr -d ' ')"
+
+# SHIPWRIGHT_HOME itself is a link, or is writable by others: the start fails.
+A6L_REAL="$(new_home)"
+A6L_LINK="$TEST_TEMP_DIR/a6-home-link"
+ln -s "$A6L_REAL" "$A6L_LINK"
+a6l_rc=0
+(
+    diff_env "$A6_REPO" "$A6L_LINK" main
+    cd "$A6_REPO" || exit 1
+    pipeline_base_init
+) >/dev/null 2>&1 || a6l_rc=$?
+assert_eq "a SHIPWRIGHT_HOME that is a link fails the start" "1" "$a6l_rc"
+A6W_HOME="$(new_home)"
+chmod 775 "$A6W_HOME"
+a6w_rc=0
+(
+    diff_env "$A6_REPO" "$A6W_HOME" main
+    cd "$A6_REPO" || exit 1
+    pipeline_base_init
+) >/dev/null 2>&1 || a6w_rc=$?
+assert_eq "a SHIPWRIGHT_HOME writable by others fails the start" "1" "$a6w_rc"
+
+# Forged checkpoint (#8671, daemon-failure.sh): the agent writes a checkpoint and the daemon passes --resume. With no
+# record for the worktree, the resume fails closed, and the stage blocks even a pre-existing failure.
+FC_REPO="$(fresh_diff_repo forged)"
+FC_HOME="$(new_home)"
+mkdir -p "$FC_REPO/.claude/pipeline-artifacts/checkpoints"
+echo '{"stage":"build"}' > "$FC_REPO/.claude/pipeline-artifacts/checkpoints/build-checkpoint.json"
+(
+    diff_env "$FC_REPO" "$FC_HOME" main
+    cd "$FC_REPO" || exit 1
+    export RESUME_FROM_CHECKPOINT=true
+    if pipeline_base_init 2>/dev/null; then echo "init=0"; else echo "init=1"; fi
+    echo "run=${SW_PIPELINE_RUN_ID:-}"
+    if stage_test; then echo "rc=0"; else echo "rc=$?"; fi
+) > "$TEST_TEMP_DIR/forged.out" 2>&1
+assert_eq "a forged checkpoint with no record fails the resume closed" "init=1" "$(grep '^init=' "$TEST_TEMP_DIR/forged.out")"
+assert_eq "a forged checkpoint exports no run" "run=" "$(grep '^run=' "$TEST_TEMP_DIR/forged.out")"
+assert_eq "a forged checkpoint blocks the stage" "rc=1" "$(grep '^rc=' "$TEST_TEMP_DIR/forged.out")"
+
+# Each fresh start gets its own run (#8671, P1f and P1g): a second start on the same worktree (no issue id, same
+# template) gets a new run id, and the first run's record is never reused.
+DUP_REPO="$(fresh_diff_repo dup)"
+DUP_HOME="$(new_home)"
+(
+    diff_env "$DUP_REPO" "$DUP_HOME" main
+    cd "$DUP_REPO" || exit 1
+    pipeline_base_init
+    echo "run1=$SW_PIPELINE_RUN_ID"
+) >"$TEST_TEMP_DIR/dup.out" 2>&1
+(
+    diff_env "$DUP_REPO" "$DUP_HOME" main
+    cd "$DUP_REPO" || exit 1
+    pipeline_base_init
+    echo "run2=$SW_PIPELINE_RUN_ID"
+) >>"$TEST_TEMP_DIR/dup.out" 2>&1
+dup_run1="$(sed -n 's/^run1=//p' "$TEST_TEMP_DIR/dup.out")"
+dup_run2="$(sed -n 's/^run2=//p' "$TEST_TEMP_DIR/dup.out")"
+assert_eq "a second fresh start gets a new run id" "1" "$([[ -n "$dup_run2" && "$dup_run2" != "$dup_run1" ]] && echo 1 || echo 0)"
+assert_eq "the first run's record is still there, never reused" "1" "$(find "$DUP_HOME" -name "$dup_run1.json" | wc -l | tr -d ' ')"
+dup_resume="$(
+    diff_env "$DUP_REPO" "$DUP_HOME" main
+    cd "$DUP_REPO" || exit 1
+    export PIPELINE_RESUMING=true
+    pipeline_base_init >/dev/null 2>&1 && echo "$SW_PIPELINE_RUN_ID"
+)"
+assert_eq "a resume after the second start uses the second run" "$dup_run2" "$dup_resume"
+
+# Expiry: records older than the TTL are swept at the next fresh start.
+EXP_REPO="$(fresh_diff_repo exp)"
+EXP_HOME="$(new_home)"
+(
+    diff_env "$EXP_REPO" "$EXP_HOME" main
+    cd "$EXP_REPO" || exit 1
+    pipeline_base_init
+    echo "run=$SW_PIPELINE_RUN_ID"
+) >"$TEST_TEMP_DIR/exp.out" 2>&1
+exp_run="$(sed -n 's/^run=//p' "$TEST_TEMP_DIR/exp.out")"
+touch -t 202001010000 "$EXP_HOME"/pipeline-base/*/"$exp_run".json
+(
+    diff_env "$EXP_REPO" "$EXP_HOME" main
+    cd "$EXP_REPO" || exit 1
+    pipeline_base_init
+) >/dev/null 2>&1
+assert_eq "an expired record is swept at the next fresh start" "0" "$(find "$EXP_HOME" -name "$exp_run.json" | wc -l | tr -d ' ')"
+
+# A corrupt record is not trusted on resume.
+CR_REPO="$(fresh_diff_repo corrupt)"
+CR_HOME="$(new_home)"
+(
+    diff_env "$CR_REPO" "$CR_HOME" main
+    cd "$CR_REPO" || exit 1
+    pipeline_base_init
+) >/dev/null 2>&1
+find "$CR_HOME" -name '*.json' -exec sh -c 'printf "not json" > "$1"' _ {} \;
+cr_resume="$(
+    diff_env "$CR_REPO" "$CR_HOME" main
+    cd "$CR_REPO" || exit 1
+    export PIPELINE_RESUMING=true
+    if pipeline_base_init 2>/dev/null; then echo 0; else echo 1; fi
+)"
+assert_eq "a corrupt base record fails the resume closed" "1" "$cr_resume"
+
+# A record readable by others is not trusted on resume.
+WR_REPO="$(fresh_diff_repo wide)"
+WR_HOME="$(new_home)"
+(
+    diff_env "$WR_REPO" "$WR_HOME" main
+    cd "$WR_REPO" || exit 1
+    pipeline_base_init
+) >/dev/null 2>&1
+chmod 644 "$(find "$WR_HOME" -name '*.json')"
+wr_resume="$(
+    diff_env "$WR_REPO" "$WR_HOME" main
+    cd "$WR_REPO" || exit 1
+    export PIPELINE_RESUMING=true
+    if pipeline_base_init 2>/dev/null; then echo 0; else echo 1; fi
+)"
+assert_eq "a record readable by others is not trusted" "1" "$wr_resume"
+
+# A recorded base that equals HEAD blocks; one that is not an ancestor of HEAD blocks.
 EQ_REPO="$(fresh_diff_repo equal)"
-equal_rc=0
-(
-    cd "$EQ_REPO"
-    export PROJECT_ROOT="$EQ_REPO" ARTIFACTS_DIR="$EQ_REPO/.artifacts" BASE_BRANCH=main TEST_CMD="bash fake-tests.sh"
-    SW_PIPELINE_BASE_SHA="$(git rev-parse HEAD)" stage_test
-) >/dev/null 2>&1 || equal_rc=$?
-assert_eq "a recorded base equal to HEAD blocks" "1" "$equal_rc"
-SIDE_REPO="$(fresh_diff_repo side)"
-side_rc=0
-(
-    cd "$SIDE_REPO"
-    export PROJECT_ROOT="$SIDE_REPO" ARTIFACTS_DIR="$SIDE_REPO/.artifacts" BASE_BRANCH=main TEST_CMD="bash fake-tests.sh"
-    SW_PIPELINE_BASE_SHA="$(git rev-parse side-branch)" stage_test
-) >/dev/null 2>&1 || side_rc=$?
-assert_eq "a recorded base that is not an ancestor of HEAD blocks" "1" "$side_rc"
-
-# P3a (#8671): the base run uses node_modules, which the agent can write. A change since the start blocks.
-NM_CONTROL_REPO="$(fresh_diff_repo nm-control)"
-nm_control="$(run_diff_stage "$NM_CONTROL_REPO" main)"
-assert_eq "control: an unchanged node_modules (none) lets the pre-existing failure pass" "0" "$nm_control"
-NM_POISON_REPO="$(fresh_diff_repo nm-poison)"
-nm_home="$(mktemp -d "$TEST_TEMP_DIR/home.XXXXXX")"
-nm_rc=0
-(
-    cd "$NM_POISON_REPO"
-    export PROJECT_ROOT="$NM_POISON_REPO" ARTIFACTS_DIR="$NM_POISON_REPO/.artifacts" BASE_BRANCH=main TEST_CMD="bash fake-tests.sh"
-    export ISSUE_NUMBER="" PIPELINE_NAME="nm-poison" SHIPWRIGHT_HOME="$nm_home"
+EQ_HOME="$(new_home)"
+assert_eq "a base equal to HEAD blocks" "1" "$(
+    diff_env "$EQ_REPO" "$EQ_HOME" main
+    cd "$EQ_REPO" || exit 1
     pipeline_base_init
-    echo agent >> README.md && git add -A && git commit -q -m "agent: build"
+    stage_test >/dev/null 2>&1 && echo 0 || echo 1
+)"
+SIDE_REPO="$(fresh_diff_repo side)"
+SIDE_HOME="$(new_home)"
+assert_eq "a base that is not an ancestor of HEAD blocks" "1" "$(
+    diff_env "$SIDE_REPO" "$SIDE_HOME" main
+    cd "$SIDE_REPO" || exit 1
+    git branch side-root "$(git rev-list --max-parents=0 HEAD)"
+    pipeline_base_init
+    agent_commit "$SIDE_REPO" build
+    git reset -q --hard side-root
+    stage_test >/dev/null 2>&1 && echo 0 || echo 1
+)"
+
+# node_modules fingerprint (#8671, P3a): a poisoned node_modules blocks a pre-existing failure; an untouched one does not.
+NM_CONTROL="$(fresh_diff_repo nm-control)"
+assert_eq "control: an unchanged node_modules lets the pre-existing failure pass" "0" "$(run_diff_stage "$NM_CONTROL" main)"
+NM_REPO="$(fresh_diff_repo nm-poison)"
+NM_HOME="$(new_home)"
+(
+    diff_env "$NM_REPO" "$NM_HOME" main
+    cd "$NM_REPO" || exit 1
+    pipeline_base_init
+    agent_commit "$NM_REPO" build
     mkdir -p node_modules/dep && echo poison > node_modules/dep/poison
     stage_test
-) >"$TEST_TEMP_DIR/nm.out" 2>&1 || nm_rc=$?
-assert_eq "an agent-poisoned node_modules blocks a pre-existing failure" "1" "$nm_rc"
-assert_contains "the block says node_modules changed" "$(cat "$TEST_TEMP_DIR/nm.out")" "node_modules changed"
+) >"$TEST_TEMP_DIR/nm.out" 2>&1 || true
+assert_contains "an agent-poisoned node_modules blocks a pre-existing failure" "$(cat "$TEST_TEMP_DIR/nm.out")" "node_modules changed"
 
-# P3b (#8671): poison behind a symlink inside node_modules. The fingerprint follows links, so it is seen.
-LINK_REPO="$TEST_TEMP_DIR/link-repo"
-make_diff_repo "$LINK_REPO"
+# Poison behind a symlink inside node_modules (#8671, P3b): the fingerprint follows links.
+LINK_REPO="$(fresh_diff_repo link)"
+LINK_HOME="$(new_home)"
 mkdir -p "$LINK_REPO/node_modules/dep" && echo ok > "$LINK_REPO/node_modules/dep/index.js"
-LINK_HOME="$(mktemp -d "$TEST_TEMP_DIR/home.XXXXXX")"
-link_rc=0
 (
-    cd "$LINK_REPO"
-    export PROJECT_ROOT="$LINK_REPO" ARTIFACTS_DIR="$LINK_REPO/.artifacts" BASE_BRANCH=main TEST_CMD="bash fake-tests.sh"
-    export ISSUE_NUMBER="" PIPELINE_NAME="link-poison" SHIPWRIGHT_HOME="$LINK_HOME"
+    diff_env "$LINK_REPO" "$LINK_HOME" main
+    cd "$LINK_REPO" || exit 1
     pipeline_base_init
-    echo agent >> README.md && git add -A && git commit -q -m "agent: build"
+    agent_commit "$LINK_REPO" build
     echo poison > "$TEST_TEMP_DIR/poison-target"
     ln -s "$TEST_TEMP_DIR/poison-target" node_modules/dep/poison
     stage_test
-) >"$TEST_TEMP_DIR/link.out" 2>&1 || link_rc=$?
-assert_eq "poison behind a symlink in node_modules blocks a pre-existing failure" "1" "$link_rc"
-assert_contains "the symlink poison is reported as a node_modules change" "$(cat "$TEST_TEMP_DIR/link.out")" "node_modules changed"
+) >"$TEST_TEMP_DIR/link.out" 2>&1 || true
+assert_contains "poison behind a symlink in node_modules is reported as a node_modules change" "$(cat "$TEST_TEMP_DIR/link.out")" "node_modules changed"
 
-# P3c (#8671): a symlinked directory inside node_modules points into the repository. Its content is part of the
-# fingerprint, so an agent edit behind the link blocks.
-DIR_REPO="$TEST_TEMP_DIR/dirlink-repo"
-make_diff_repo "$DIR_REPO"
+# A symlinked directory inside node_modules points into the repository (#8671, P3c): an edit behind it blocks.
+DIR_REPO="$(fresh_diff_repo dirlink)"
+DIR_HOME="$(new_home)"
 mkdir -p "$DIR_REPO/vendor-dep" "$DIR_REPO/node_modules" && : > "$DIR_REPO/vendor-dep/flag.txt"
 ln -s ../vendor-dep "$DIR_REPO/node_modules/dep"
-DIR_HOME="$(mktemp -d "$TEST_TEMP_DIR/home.XXXXXX")"
-dir_rc=0
 (
-    cd "$DIR_REPO"
-    export PROJECT_ROOT="$DIR_REPO" ARTIFACTS_DIR="$DIR_REPO/.artifacts" BASE_BRANCH=main TEST_CMD="bash fake-tests.sh"
-    export ISSUE_NUMBER="" PIPELINE_NAME="dir-poison" SHIPWRIGHT_HOME="$DIR_HOME"
+    diff_env "$DIR_REPO" "$DIR_HOME" main
+    cd "$DIR_REPO" || exit 1
     pipeline_base_init
-    echo agent >> README.md && git add -A && git commit -q -m "agent: build"
+    agent_commit "$DIR_REPO" build
     echo poison > vendor-dep/flag.txt
     stage_test
-) >"$TEST_TEMP_DIR/dir.out" 2>&1 || dir_rc=$?
-assert_eq "an agent edit behind a symlinked node_modules directory blocks" "1" "$dir_rc"
+) >"$TEST_TEMP_DIR/dir.out" 2>&1 || true
+assert_contains "an agent edit behind a symlinked node_modules directory blocks" "$(cat "$TEST_TEMP_DIR/dir.out")" "node_modules changed"
 
-# P3d (#8671): a workspace package linked from node_modules is judged at the base commit. The agent breaks the
-# package's committed code; the regression is new, not pre-existing.
+# The fingerprint walk is bounded (#8671, P3): a walk that times out fails closed, not as an unchanged tree.
+TO_DIR="$TEST_TEMP_DIR/timeout-nm"
+mkdir -p "$TO_DIR/node_modules/dep" && echo x > "$TO_DIR/node_modules/dep/f"
+TO_SHIM="$TEST_TEMP_DIR/slow-bin"
+mkdir -p "$TO_SHIM" && printf '#!/bin/sh\nsleep 5\n' > "$TO_SHIM/cksum" && chmod +x "$TO_SHIM/cksum"
+to_rc=0
+(
+    source "$SCRIPT_DIR/lib/pipeline-base.sh"
+    SW_PIPELINE_NM_TIMEOUT=1 PATH="$TO_SHIM:$PATH" _pipeline_base_nm_fingerprint "$TO_DIR" >/dev/null
+) >/dev/null 2>&1 || to_rc=$?
+assert_eq "a node_modules walk that times out fails closed" "1" "$([[ $to_rc -ne 0 ]] && echo 1 || echo 0)"
+
+# Workspace package (#8671, P3d): a package linked from node_modules is judged at the base commit. The agent breaks
+# its committed code; the regression is new, not pre-existing.
 WS_REPO="$TEST_TEMP_DIR/ws-repo"
+WS_HOME="$(new_home)"
 mkdir -p "$WS_REPO/.artifacts"
 (
     cd "$WS_REPO" && git init -q -b main && git config user.email t@t && git config user.name T
@@ -596,15 +772,15 @@ echo "Ran $((n+1)) tests across $n files. [3.00ms]"
 exit 1
 WSFAKE
     git add -A && git commit -q -m "main: workspace package and tests"
+    git init -q --bare "$WS_REPO.origin" && git remote add origin "$WS_REPO.origin" && git -C "$WS_REPO.origin" fetch -q "$WS_REPO" main:refs/heads/main
     mkdir -p node_modules && ln -s ../packages/x node_modules/x
     git checkout -q -b feat/ws
 ) >/dev/null 2>&1
-WS_HOME="$(mktemp -d "$TEST_TEMP_DIR/home.XXXXXX")"
 ws_rc=0
 (
-    cd "$WS_REPO"
-    export PROJECT_ROOT="$WS_REPO" ARTIFACTS_DIR="$WS_REPO/.artifacts" BASE_BRANCH=main TEST_CMD="bash fake-tests.sh"
-    export ISSUE_NUMBER="" PIPELINE_NAME="ws" SHIPWRIGHT_HOME="$WS_HOME"
+    diff_env "$WS_REPO" "$WS_HOME" main
+    export TEST_CMD="bash fake-tests.sh"
+    cd "$WS_REPO" || exit 1
     pipeline_base_init
     echo broken > packages/x/impl.txt && git add -A && git commit -q -m "agent: break x"
     stage_test
@@ -641,7 +817,7 @@ printf '1 passed  1 failed  0 timed out  (2 suites, 1s)\n'
 exit 1
 RUNNER
     git add -A && git commit -q -m "main: runner"
-    git checkout -q -b feat/suite
+    git init -q --bare "$SUITE_REPO.origin" && git remote add origin "$SUITE_REPO.origin" && git -C "$SUITE_REPO.origin" fetch -q "$SUITE_REPO" main:refs/heads/main && git checkout -q -b feat/suite
 ) >/dev/null 2>&1
 suite_rc=0
 (

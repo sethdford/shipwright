@@ -419,7 +419,8 @@ done
 kill -KILL "$opid" 2>/dev/null || true
 { wait "$opid"; } 2>/dev/null || true
 owner_ok=0
-for _ in $(seq 1 50); do
+# 30 s, not 10: the watchdog's git worktree remove can take several seconds on a loaded machine.
+for _ in $(seq 1 150); do
     if [[ "$(git_in_repo worktree list | wc -l | tr -d ' ')" -eq 1 ]] && no_sleep_left; then owner_ok=1; break; fi
     sleep 0.2
 done

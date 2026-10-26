@@ -586,14 +586,16 @@ ${commit_msgs}" --model "$(_smart_model commit_quality haiku)" < /dev/null 2>/de
 # Either way the verdict is appended to <log>, so the self-healing feedback (the log's tail) says
 # which failures are pre-existing and that they must not be fixed.
 _pipeline_test_judge() {
-    local cmd="$1" rc="$2" log="$3" base="${SW_PIPELINE_BASE_SHA:-}" root="${PROJECT_ROOT:-.}" pre=""
+    local cmd="$1" rc="$2" log="$3" base="" root="." pre=""
+    # The base, the root and the node_modules fingerprint come from this process's pipeline_base_init, held in
+    # readonly variables. The record on disk is not read here: the test command can rewrite it (#8671).
+    if [[ -n "${_PB_INIT_DONE:-}" ]]; then base="$_PB_BASE"; root="$_PB_ROOT"; fi
     # Fail closed on anything but a recorded base that is a proper ancestor of HEAD.
     if [[ -z "$base" ]] || ! git -C "$root" rev-parse --verify -q "${base}^{commit}" >/dev/null 2>&1; then
         warn "Test stage: no recorded base commit; blocking without a differential judgement"
         return 1
     fi
-    # The base run symlinks node_modules, which the agent can write. A changed tree cannot judge (#8671).
-    if ! pipeline_base_nm_unchanged "$root" "${SW_PIPELINE_RUN_ID:-}"; then
+    if ! pipeline_base_nm_unchanged_now "$root"; then
         warn "Test stage: node_modules changed since the pipeline started; blocking without a differential judgement"
         return 1
     fi
@@ -607,6 +609,11 @@ _pipeline_test_judge() {
     fi
     local LOOP_START_COMMIT="$base"
     tg_begin_gate
+    # The base run uses node_modules, so re-check it immediately before judging, not only at entry.
+    if ! pipeline_base_nm_unchanged_now "$root"; then
+        warn "Test stage: node_modules changed while the test command ran; blocking without a differential judgement"
+        return 1
+    fi
     if tg_judge "$cmd" "$rc" "$log" "${SW_TEST_TIMEOUT:-900}" 1; then
         info "Test failures are pre-existing on the base commit ${base:0:8}; not blocking the stage"
         printf '\n%s\n' "$(tg_verdict_text)" >> "$log"
@@ -628,6 +635,21 @@ _pipeline_test_judge() {
         fi
     } >> "$log"
     return 1
+}
+
+# _pipeline_run_test_group <log> <cmd> — runs the HEAD test command in its own process group, and kills the whole
+# group when it returns. Background processes the tests started cannot run during the base judgement, and cannot
+# write into the base worktree (#8671). Returns the command's exit status. Not a sandbox: a process that leaves
+# the group (setsid, a daemon) survives. That residual is #8706's.
+_pipeline_run_test_group() {
+    local log="$1" cmd="$2" pid rc=0
+    set -m
+    ( FAIL_LOG_LINES=100000 sw_test_gate_env bash -c "$cmd" ) > "$log" 2>&1 < /dev/null &
+    pid=$!
+    set +m
+    wait "$pid" || rc=$?
+    kill -KILL -- "-$pid" 2>/dev/null || true
+    return "$rc"
 }
 
 stage_test() {
@@ -656,7 +678,7 @@ stage_test() {
     local test_exit=0
     # FAIL_LOG_LINES: the judgement needs every failing suite's full log, or a new assertion above the
     # tail window is cut and read as pre-existing (as sw-loop.sh does, #8671).
-    FAIL_LOG_LINES=100000 sw_test_gate_env bash -c "$test_cmd" > "$test_log" 2>&1 || test_exit=$?
+    _pipeline_run_test_group "$test_log" "$test_cmd" || test_exit=$?
 
     # A failure that the base commit also has does not fail the stage; a regression does (#8663).
     if [[ "$test_exit" -ne 0 ]] && _pipeline_test_judge "$test_cmd" "$test_exit" "$test_log"; then

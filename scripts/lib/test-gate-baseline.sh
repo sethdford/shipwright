@@ -120,7 +120,9 @@ _tg_block() {
 # when bun colours its output, as in a terminal or FORCE_COLOR), a "<file>:" header before each file's
 # "# Unhandled error between tests" block, and the summary. Golden logs of each shape: scripts/fixtures/bun-test.
 # Under GitHub Actions the header is a "::group::<file>:" line, see tg_parse_log.
-# Known limit (#8671): the judgement reads the test command's stdout. Output the tests print themselves
+# What is covered: ANSI colour codes (ESC[..m) are stripped and CRs are dropped. An ESC[2K line erase or a partial
+# line is not rewritten, so a unit cut that way is caught only by the count unit (total against pass plus fail).
+# L4, a known limit (#8671): the judgement reads the test command's stdout. Output the tests print themselves
 # can imitate a bun file header ("other.test.ts:"), and then a failure is filed under another file. The
 # robust input is bun's reporter output (bun 1.2.19 has --reporter=junit --reporter-outfile=...), but the
 # gate runs the project's command and cannot add that flag. Until it can, treat a pre-existing verdict
@@ -468,7 +470,8 @@ _tg_compute_base() {
         TG_BASE_REASON="could not create a temp dir"; return 0; }
     _TG_ROOT="$root"
     _tg_install_guards
-    wt="$_TG_TMP/wt"
+    # The worktree's name is random too: the test command runs as this user and must not find it by guessing (#8671).
+    wt="$(mktemp -d "$_TG_TMP/wt.XXXXXX")" || { _tg_cleanup_base; TG_BASE_REASON="could not create the base worktree dir"; return 0; }
     _TG_WT="$wt"
     if ! git -C "$root" -c core.hooksPath=/dev/null worktree add --detach "$wt" "$base" >/dev/null 2>&1; then
         _tg_cleanup_base
