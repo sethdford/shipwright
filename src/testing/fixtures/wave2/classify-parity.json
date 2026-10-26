@@ -2950,6 +2950,354 @@
       "name": "verifier r3 c2/r6: agent prose numbered list (indented) then gh auth status indented w/o host line",
       "expect": "esc:auth",
       "limit": "Known limit 2: an emitter form, prefix or unclosed test-output block the classifier does not handle; the run is retried."
+    },
+    {
+      "text": "src/agent/errors.test.ts:\n 8 | test(\"maps a 401 to auth\", () => {\n 9 |   const r = parseAgentError('API Error: 401 {\"type\":\"error\",\"error\":{\"type\":\"authentication_error\",\"message\":\"invalid x-api-key\"}}');\n10 |   expect(r.kind).toBe(\"auth\");\n                      ^\nerror: expect(received).toBe(expected)\n\nExpected: \"auth\"\nReceived: \"unknown\"\n\n      at <anonymous> (src/agent/errors.test.ts:10:18)\n(fail) maps a 401 to auth [0.41ms]\n\n 0 pass\n 1 fail\nerror: script \"test\" exited with code 1",
+      "bash": "build_failure",
+      "ts": "unknown",
+      "name": "verifier r4 c1/a1: bun code frame of a test fixture with the 401 body",
+      "expect": "noesc"
+    },
+    {
+      "text": " FAIL  src/agent/errors.test.ts > parseAgentError > maps a 401 to auth\nAssertionError: expected 'unknown' to be 'auth'\n\n- Expected\n+ Received\n\n- auth\n+ unknown\n\n ❯ src/agent/errors.test.ts:10:20\n      8| it(\"maps a 401 to auth\", () => {\n      9|   const r = parseAgentError('API Error: 401 {\"type\":\"error\",\"error\":{\"type\":\"authentication_error\",\"message\":\"invalid x-api-key\"}}');\n     10|   expect(r.kind).toBe(\"auth\");\n       |                  ^\n\n⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯\n\n Test Files  1 failed (1)\n      Tests  1 failed (1)",
+      "bash": "build_failure",
+      "ts": "unknown",
+      "name": "verifier r4 c1/a2: vitest code frame with 401 body fixture",
+      "expect": "noesc"
+    },
+    {
+      "text": "  ● parseAgentError › maps a 401 to auth\n\n    expect(received).toBe(expected) // Object.is equality\n\n    Expected: \"auth\"\n    Received: \"API Error: 401 {\\\"type\\\":\\\"error\\\",\\\"error\\\":{\\\"type\\\":\\\"authentication_error\\\",\\\"message\\\":\\\"x\\\"}}\"\n\n      at Object.<anonymous> (src/errors.test.ts:10:18)\n\nTests:       1 failed, 3 passed, 4 total",
+      "bash": "build_failure",
+      "ts": "unknown",
+      "name": "verifier r4 c1/a3: jest received string with 401 body (escaped quotes)",
+      "expect": "noesc"
+    },
+    {
+      "text": "    def test_auth():\n>       assert classify(err) == \"auth\"\nE       assert 'unknown' == 'auth'\nE        +  where 'unknown' = classify(\"Error code: 401 - {'type': 'error', 'error': {'type': 'authentication_error', 'message': 'x'}}\")\n\ntests/test_classify.py:12: AssertionError\n=========================== short test summary info ============================\nFAILED tests/test_classify.py::test_auth - assert 'unknown' == 'auth'",
+      "bash": "build_failure",
+      "ts": "unknown",
+      "name": "verifier r4 c1/a4: pytest E-line assertion with Python repr 401 body",
+      "expect": "noesc"
+    },
+    {
+      "text": "diff --git a/src/errors.test.ts b/src/errors.test.ts\n+  const sample = 'API Error: 401 {\"type\":\"error\",\"error\":{\"type\":\"authentication_error\",\"message\":\"invalid x-api-key\"}}';\nerror: tests failed",
+      "bash": "build_failure",
+      "ts": "unknown",
+      "name": "verifier r4 c1/a5: git diff hunk in agent log adding a fixture (indented +)",
+      "expect": "noesc"
+    },
+    {
+      "text": "  ● client › rejects bad key\n\n    Error: authentication_error: invalid x-api-key\n\n      at Client.request (src/client.ts:40:11)\n\nTests: 1 failed",
+      "bash": "auth_error",
+      "ts": "auth",
+      "name": "verifier r4 c1/a6: jest thrown error indented under ● block",
+      "expect": "noesc",
+      "limit": "Known limit 1: output in the same form as the real emitter (at column 0, or the indented bare authentication_error after an error prefix, which the reviewer corpus requires to escalate)."
+    },
+    {
+      "text": " × src/auth.test.ts > not logged in · prompts for login 3ms\n   → expected true to be false",
+      "bash": "unknown",
+      "ts": "unknown",
+      "name": "verifier r4 c1/a7: vitest 4 non-TTY result with 1-space indent ×",
+      "expect": "noesc"
+    },
+    {
+      "text": "  × Not logged in.\n   ╭─[src/a.ts:1:1]\nerror: lint failed",
+      "bash": "build_failure",
+      "ts": "unknown",
+      "name": "verifier r4 c1/a8: miette/oxlint-style indented × diagnostic",
+      "expect": "noesc"
+    },
+    {
+      "text": "  console.error\n    fatal: Authentication failed for 'https://github.com/acme/app.git/'\n\n      at Object.error (src/git.test.ts:3:11)\n\nFAIL src/git.test.ts",
+      "bash": "build_failure",
+      "ts": "unknown",
+      "name": "verifier r4 c1/a9: jest console.error block with message at column 4",
+      "expect": "noesc"
+    },
+    {
+      "text": "  console.warn\n\tNot logged in.\n\n      at x (a.js:1:1)\nTests: 1 failed",
+      "bash": "build_failure",
+      "ts": "unknown",
+      "name": "verifier r4 c1/a10: jest console.warn header, tab-indented message",
+      "expect": "noesc"
+    },
+    {
+      "text": "------------------------------ Captured log call -------------------------------\nERROR    app.git:git.py:12 push failed\nfatal: Authentication failed for 'https://github.com/acme/app.git/'\n=========================== short test summary info ============================\nFAILED tests/test_git.py::test_push - RuntimeError",
+      "bash": "build_failure",
+      "ts": "unknown",
+      "name": "verifier r4 c1/a11: pytest captured stdout, then 'ERROR' log line inside captured log ends block early",
+      "expect": "noesc"
+    },
+    {
+      "text": "----------------------------- Captured stdout call -----------------------------\n3 passed\nHTTP 401: Bad credentials (https://api.github.com/graphql)\n=========================== short test summary info ============================\nFAILED tests/test_gh.py::test_x",
+      "bash": "auth_error",
+      "ts": "auth",
+      "name": "verifier r4 c1/a12: pytest captured stdout containing '3 passed' line then mocked gh output",
+      "expect": "noesc",
+      "limit": "Known limit 1: output in the same form as the real emitter (at column 0, or the indented bare authentication_error after an error prefix, which the reviewer corpus requires to escalate)."
+    },
+    {
+      "text": "⎯⎯⎯⎯ Unhandled Rejection ⎯⎯⎯⎯⎯\nHTTP 401: Bad credentials (https://api.github.com/graphql)\n ❯ src/gh.ts:40:11",
+      "bash": "unknown",
+      "ts": "unknown",
+      "name": "verifier r4 c1/a13: vitest Unhandled Rejection then mocked gh at col0 before frame",
+      "expect": "noesc"
+    },
+    {
+      "text": " FAIL  src/gh.test.ts [ src/gh.test.ts ]\nError: HTTP 401: Bad credentials (https://api.github.com/graphql)\n ❯ src/gh.ts:1:1",
+      "bash": "build_failure",
+      "ts": "unknown",
+      "name": "verifier r4 c1/a14: vitest suite-level FAIL [ file ] with gh-shaped error",
+      "expect": "noesc"
+    },
+    {
+      "text": "\u001b[31m\u001b[1m✗\u001b[0m PR creation failed: pull request create failed: GraphQL: Resource not accessible by integration (createPullRequest)",
+      "bash": "auth_error",
+      "ts": "auth",
+      "name": "verifier r4 c1/b1: Shipwright error helper: PR creation failed + gh pr create stderr",
+      "expect": "esc:auth"
+    },
+    {
+      "text": "✗ PR creation failed: HTTP 401: Bad credentials (https://api.github.com/graphql)",
+      "bash": "auth_error",
+      "ts": "auth",
+      "name": "verifier r4 c1/b2: PR creation failed + HTTP 401 bad creds",
+      "expect": "esc:auth"
+    },
+    {
+      "text": "✗ PR creation failed: \nHTTP 401: Bad credentials (https://api.github.com/graphql)\nTry authenticating with:  gh auth login",
+      "bash": "auth_error",
+      "ts": "auth",
+      "name": "verifier r4 c1/b3: PR creation failed + multi-line stderr: second line is real",
+      "expect": "esc:auth"
+    },
+    {
+      "text": "gh: Requires authentication (HTTP 401)",
+      "bash": "auth_error",
+      "ts": "auth",
+      "name": "verifier r4 c1/b4: gh api no token tail form",
+      "expect": "esc:auth"
+    },
+    {
+      "text": "Invalid API key\t· Please run /login",
+      "bash": "auth_error",
+      "ts": "auth",
+      "name": "verifier r4 c1/b6: Claude CLI: Invalid API key with tab before ·",
+      "expect": "esc:auth"
+    },
+    {
+      "text": "Error: gh: Bad credentials (HTTP 401)",
+      "bash": "auth_error",
+      "ts": "auth",
+      "name": "verifier r4 c1/b7: Error: + gh Bad credentials (HTTP 401)",
+      "expect": "esc:auth"
+    },
+    {
+      "text": "{\"message\":\"Not Found\",\"documentation_url\":\"https://docs.github.com/rest/issues/issues#get-an-issue\",\"status\":\"404\"}\ngh: Not Found (HTTP 404)",
+      "bash": "unknown",
+      "ts": "unknown",
+      "name": "verifier r4 c1/b8: gh api 404 for issue (gh: Not Found (HTTP 404))",
+      "expect": "esc:invalid_input",
+      "limit": "Known limit 2: an emitter form, prefix or unclosed test-output block the classifier does not handle; the run is retried."
+    },
+    {
+      "text": "GraphQL: Could not resolve to an Issue with the number of 4242. (repository.issue)",
+      "bash": "invalid_issue",
+      "ts": "invalid_input",
+      "name": "verifier r4 c1/b9: gh issue view with new gh wording",
+      "expect": "esc:invalid_input"
+    },
+    {
+      "text": "  console.log\n    starting push\nfatal: Authentication failed for 'https://github.com/acme/app.git/'",
+      "bash": "auth_error",
+      "ts": "auth",
+      "name": "verifier r4 c1/b10: jest console block, then column-0 real auth",
+      "expect": "esc:auth"
+    },
+    {
+      "text": "stdout | src/a.test.ts > x\nhello\n\nHTTP 401: Bad credentials (https://api.github.com/graphql)",
+      "bash": "auth_error",
+      "ts": "auth",
+      "name": "verifier r4 c1/b11: vitest stdout block, blank, then real gh",
+      "expect": "esc:auth"
+    },
+    {
+      "text": "----------------------------- Captured stderr call -----------------------------\nboom\n1 error in 0.10s\nfatal: Authentication failed for 'https://github.com/acme/app.git/'",
+      "bash": "auth_error",
+      "ts": "auth",
+      "name": "verifier r4 c1/b12: pytest captured, '1 error in 0.1s' then git auth",
+      "expect": "esc:auth"
+    },
+    {
+      "text": "  console.log\r\n    hi\r\nNot logged in · Please run /login\r\n",
+      "bash": "auth_error",
+      "ts": "auth",
+      "name": "verifier r4 c1/b13: CRLF jest console then real auth",
+      "expect": "esc:auth"
+    },
+    {
+      "text": "× HTTP 401: Bad credentials (https://api.github.com/graphql)",
+      "bash": "auth_error",
+      "ts": "auth",
+      "name": "verifier r4 c1/b14: × glyph col0 + gh form",
+      "expect": "esc:auth"
+    },
+    {
+      "text": "[ERROR] OAuth token has expired · Please run /login",
+      "bash": "auth_error",
+      "ts": "auth",
+      "name": "verifier r4 c1/b15: ERROR level log prefix [ERROR] + oauth token has expired ·",
+      "expect": "esc:auth"
+    },
+    {
+      "text": "git@github.com: Permission denied (publickey).\nfatal: Could not read from remote repository.",
+      "bash": "auth_error",
+      "ts": "auth",
+      "name": "verifier r4 c1/b16: git push SSH key",
+      "expect": "esc:auth"
+    },
+    {
+      "text": "⎯ Unhandled Error ⎯\nNot logged in · Please run /login",
+      "bash": "unknown",
+      "ts": "unknown",
+      "name": "verifier r4 c1/c1: ⎯ count 1 Unhandled Error then col0 auth (no blank)"
+    },
+    {
+      "text": " FAIL  src/a.test.ts [src/a.test.ts]\nNot logged in · Please run /login",
+      "bash": "auth_error",
+      "ts": "auth",
+      "name": "verifier r4 c1/c2: FAIL with [ but no space after"
+    },
+    {
+      "text": "----- Captured stdout call -----\n___\tx\nNot logged in · Please run /login",
+      "bash": "auth_error",
+      "ts": "auth",
+      "name": "verifier r4 c1/c3: pytest end ___ with tab"
+    },
+    {
+      "text": "  console.log\n  Not logged in · Please run /login",
+      "bash": "unknown",
+      "ts": "unknown",
+      "name": "verifier r4 c1/c4: jest mode with NBSP indent"
+    },
+    {
+      "text": " × Not logged in · Please run /login",
+      "bash": "unknown",
+      "ts": "unknown",
+      "name": "verifier r4 c1/c5: × with NBSP-indent (U+00A0 then ×)"
+    },
+    {
+      "text": " FAIL  src/ı-ü.test.ts > x\nNot logged in · Please run /login",
+      "bash": "build_failure",
+      "ts": "unknown",
+      "name": "verifier r4 c1/c6: vitest FAIL non-ascii file name > "
+    },
+    {
+      "text": "  console.log\n    hi Not logged in · Please run /login",
+      "bash": "auth_error",
+      "ts": "auth",
+      "name": "verifier r4 c1/c7: U+2028 inside jest console block"
+    },
+    {
+      "text": "  console.log\n    hi\rNot logged in · Please run /login",
+      "bash": "auth_error",
+      "ts": "auth",
+      "name": "verifier r4 c1/c8: lone CR inside jest console line"
+    },
+    {
+      "text": "OAuth token has been revoked   · Please run /login",
+      "bash": "auth_error",
+      "ts": "auth",
+      "name": "verifier r4 c1/c9: oauth token has been revoked + 3 spaces + ·"
+    },
+    {
+      "text": "gh: REQUIRES AUTHENTICATION (http 401)",
+      "bash": "auth_error",
+      "ts": "auth",
+      "name": "verifier r4 c1/c10: Requires authentication (HTTP 401) case mix"
+    },
+    {
+      "text": "\u001b[31m×\u001b[0m Not logged in · Please run /login",
+      "bash": "auth_error",
+      "ts": "auth",
+      "name": "verifier r4 c1/c11: ANSI between × and space"
+    },
+    {
+      "text": "PR creation failed: pull request create failed: gh: HTTP 401: Bad credentials (https://api.github.com/graphql)",
+      "bash": "build_failure",
+      "ts": "unknown",
+      "name": "verifier r4 c1/c12: PR creation failed: twice + gh: three prefixes"
+    },
+    {
+      "text": "▸ Running tests...\n 9 |   const r = parseAgentError('API Error: 401 {\"type\":\"error\",\"error\":{\"type\":\"authentication_error\",\"message\":\"invalid x-api-key\"}}');\n10 |   expect(r.kind).toBe(\"auth\");\n                      ^\nerror: expect(received).toBe(expected)\n\nExpected: \"auth\"\n✗ Tests failed",
+      "bash": "build_failure",
+      "ts": "unknown",
+      "name": "verifier r4 c2/Pa1: via pipeline grep -A5: bun code frame of a test fixture with the 401 body",
+      "expect": "noesc"
+    },
+    {
+      "text": "▸ Running tests...\n FAIL  src/agent/errors.test.ts > parseAgentError > maps a 401 to auth\nAssertionError: expected 'unknown' to be 'auth'\n\n- Expected\n+ Received\n\n- auth\n--\n      9|   const r = parseAgentError('API Error: 401 {\"type\":\"error\",\"error\":{\"type\":\"authentication_error\",\"message\":\"invalid x-api-key\"}}');\n     10|   expect(r.kind).toBe(\"auth\");\n       |                  ^\n\n⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯\n\n✗ Tests failed",
+      "bash": "build_failure",
+      "ts": "unknown",
+      "name": "verifier r4 c2/Pa2: via pipeline grep -A5: vitest code frame with 401 body fixture",
+      "expect": "noesc"
+    },
+    {
+      "text": "▸ Running tests...\n    Received: \"API Error: 401 {\\\"type\\\":\\\"error\\\",\\\"error\\\":{\\\"type\\\":\\\"authentication_error\\\",\\\"message\\\":\\\"x\\\"}}\"\n\n      at Object.<anonymous> (src/errors.test.ts:10:18)\n\nTests:       1 failed, 3 passed, 4 total\n✗ Tests failed",
+      "bash": "build_failure",
+      "ts": "unknown",
+      "name": "verifier r4 c2/Pa3: via pipeline grep -A5: jest received string with 401 body (escaped quotes)",
+      "expect": "noesc"
+    },
+    {
+      "text": "▸ Running tests...\n>       assert classify(err) == \"auth\"\nE       assert 'unknown' == 'auth'\nE        +  where 'unknown' = classify(\"Error code: 401 - {'type': 'error', 'error': {'type': 'authentication_error', 'message': 'x'}}\")\n\ntests/test_classify.py:12: AssertionError\n=========================== short test summary info ============================\nFAILED tests/test_classify.py::test_auth - assert 'unknown' == 'auth'\n✗ Tests failed",
+      "bash": "build_failure",
+      "ts": "unknown",
+      "name": "verifier r4 c2/Pa4: via pipeline grep -A5: pytest E-line assertion with Python repr 401 body",
+      "expect": "noesc"
+    },
+    {
+      "text": "  The previous run failed with API Error: 401 {\"type\":\"error\",\"error\":{\"type\":\"authentication_error\",\"message\":\"invalid x-api-key\"}}, so I added a retry guard.\n  Tests now pass.\nerror: lint failed",
+      "bash": "build_failure",
+      "ts": "unknown",
+      "name": "verifier r4 c2/d1: 2-space verbose agent prose quoting an earlier 401",
+      "expect": "noesc"
+    },
+    {
+      "text": "     12\t  [\"API Error: 401 {\"type\":\"error\",\"error\":{\"type\":\"authentication_error\",\"message\":\"invalid x-api-key\"}}\", \"auth\"],\n✗ Tests failed",
+      "bash": "build_failure",
+      "ts": "unknown",
+      "name": "verifier r4 c2/d2: agent Read tool output of a fixture file (cat -n style)",
+      "expect": "noesc"
+    },
+    {
+      "text": "  1) Client raises on 401\n     Failure/Error: expect { client.call }.to raise_error(AuthError)\n       expected AuthError, got #<RuntimeError: 401 {\"type\":\"error\",\"error\":{\"type\":\"authentication_error\",\"message\":\"invalid x-api-key\"}}>\nrspec ./spec/client_spec.rb:5",
+      "bash": "build_failure",
+      "ts": "unknown",
+      "name": "verifier r4 c2/d3: rspec failure with 401 body in expected",
+      "expect": "noesc"
+    },
+    {
+      "text": "--- FAIL: TestParse (0.00s)\n    parse_test.go:12: parse(\"401 {\"type\":\"error\",\"error\":{\"type\":\"authentication_error\",\"message\":\"invalid x-api-key\"}}\") = unknown, want auth\nFAIL",
+      "bash": "build_failure",
+      "ts": "unknown",
+      "name": "verifier r4 c2/d4: go test t.Errorf with 401 body",
+      "expect": "noesc"
+    },
+    {
+      "text": "bun test v1.2.19 (aad3abea)\n\np.test.ts:\n1 | import { test, expect } from \"bun:test\";\n2 | const c = { text: 'API Error: 401 {\"type\":\"error\",\"error\":{\"type\":\"authentication_error\",\"message\":\"invalid x-api-key\"}}', ts: \"auth\" };\n3 | test(\"classify-parity: row 12 matches\", () => {\n4 |   const got = \"unknown\";\n5 |   expect({ text: c.text, class: got }).toEqual({ text: c.text, class: c.ts });\n                                           ^\nerror: expect(received).toEqual(expected)\n\n  {\n+   class: \"unknown\",\n-   class: \"auth\",\n    text: \"API Error: 401 {\\\"type\\\":\\\"error\\\",\\\"error\\\":{\\\"type\\\":\\\"authentication_error\\\",\\\"message\\\":\\\"invalid x-api-key\\\"}}\",\n  }\n\n- Expected  - 1\n+ Received  + 1\n\n      at <anonymous> (/tmp/work/x.test.ts:5:40)\n(fail) classify-parity: row 12 matches [3.88ms]\n\n 0 pass\n 1 fail\n 1 expect() calls\nRan 1 test across 1 file. [24.00ms]\n",
+      "bash": "build_failure",
+      "ts": "unknown",
+      "name": "verifier r4 c3/e1: real bun output: failing parity-style assertion on a 401 row",
+      "expect": "noesc"
+    },
+    {
+      "text": "error: expect(received).toEqual(expected)\n\n  {\n+   class: \"unknown\",\n-   class: \"auth\",\n    text: \"API Error: 401 {\\\"type\\\":\\\"error\\\",\\\"error\\\":{\\\"type\\\":\\\"authentication_error\\\",\\\"message\\\":\\\"invalid x-api-key\\\"}}\",\n  }\n(fail) classify-parity: row 12 [3.88ms]",
+      "bash": "build_failure",
+      "ts": "unknown",
+      "name": "verifier r4 c3/e2: real bun diff only (no code frame)",
+      "expect": "noesc"
     }
   ]
 }

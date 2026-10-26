@@ -31,7 +31,7 @@ const MODEL_PROSE =
 // - a vitest ` FAIL  file > test` or ` FAIL  file [ file ]` header, or a `⎯⎯ Unhandled Rejection|Error` header,
 //   and the error under it, up to a blank or ` ❯ ` frame line;
 // - a pytest `----- Captured stdout|stderr|log` section, up to the next `-----`, `=====`, `___`, `FAILED `,
-//   `ERROR ` or `N failed|passed|error` line.
+//   `ERROR path::test` or `N failed|passed|error` line.
 // Literal glyphs, never a character class, so both locales agree.
 // Linear patterns (a single leading run, no nested repetition), written the same way as the awk in bash.
 const TEST_TITLE =
@@ -62,7 +62,7 @@ export function dropTestTitles(text: string): string {
     if (mode === "vitest" && !/^ ❯ /.test(line) && !BLANK.test(line)) continue;
     if (
       mode === "pytest" &&
-      !/^(?:-----|=====|___|FAILED |ERROR |\d+ (?:failed|passed|error))/.test(line)
+      !/^(?:-----|=====|___|FAILED |ERROR [^ \t]+::|\d+ (?:failed|passed|error))/.test(line)
     )
       continue;
     mode = "none";

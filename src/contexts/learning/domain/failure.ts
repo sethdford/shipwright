@@ -111,11 +111,13 @@ const AUTH_INDENTED = [
   String.raw`x ${HOST}: authentication failed`,
   "- the token in [a-z_]{1,40} is invalid",
 ].join("|");
-// The structured 401 response, matched anywhere on an error line: `401 {"type":"error","error":{"type":
-// "authentication_error"` (CLI `API Error: 401 {...}`, JS SDK `AuthenticationError: 401 {...}`) or the Python
-// SDK's `Error code: 401 - {'type': 'error', ...}`. The status is part of the token, so a test diff that
-// prints the body alone (`Expected: {"type":"error",...}`) does not escalate.
-const AUTH_RESPONSE = String.raw`40[13](?: -)? ${AUTH_BODY}`;
+// The structured 401/403 response, after its emitter's token at the anchored lead-in: the CLI's `API Error: 401
+// {...}` (also after Claude Code's column-0 `● `/`⏺ `), `Error: 401 {...}`, the JS SDK's `AuthenticationError: 401
+// {...}`, the Python SDK's `anthropic.AuthenticationError: Error code: 401 - {...}`. Anchored, so a test code frame,
+// an assertion diff or indented prose that quotes the body does not escalate. The one unanchored form is a
+// stream-json `"result":"API Error: 401 {\"type\"...` field.
+const SDK_ERROR = String.raw`(?:[a-z_]{1,30}\.){0,3}(?:authentication|permissiondenied)error: (?:error code: )?`;
+const AUTH_RESPONSE = String.raw`${LEAD}(?:(?:●|⏺) )?${PREFIX}(?:${SDK_ERROR}|api error: |error code: )?40[13](?: -)? ${AUTH_BODY}|"result": ?"(?:failed to authenticate\. )?api error: 40[13] ${AUTH_BODY}`;
 // gh lookup failures for an issue or PR number, anchored after LEAD and PREFIX.
 const INVALID_PHRASES = [
   String.raw`graphql: could not resolve to an? (?:issue|pullrequest)(?:[ \t.,]|$)`,

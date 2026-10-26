@@ -169,7 +169,7 @@ mode == "jest" && /^[ \t]+[^ \t]/ { next }
 mode == "console" && $0 !~ /^[ \t]*$/ { next }
 mode == "panic" && $0 !~ /^(note|error|stack backtrace):/ && $0 !~ /^[ \t]*$/ { next }
 mode == "vitest" && $0 !~ /^ ❯ / && $0 !~ /^[ \t]*$/ { next }
-mode == "pytest" && $0 !~ /^(-----|=====|___|FAILED |ERROR |[0-9]+ (failed|passed|error))/ { next }
+mode == "pytest" && $0 !~ /^(-----|=====|___|FAILED |ERROR [^ \t]+::|[0-9]+ (failed|passed|error))/ { next }
 { mode = "" }
 /^[ \t]*console[.](log|error|warn|info|debug)[ \t]*$/ { mode = "jest"; next }
 /^(stderr|stdout) [|] / { mode = "console"; next }
@@ -221,7 +221,10 @@ _DAEMON_AUTH_PHRASES+="|${_DAEMON_AUTH_BODY}"
 _DAEMON_AUTH_INDENTED="(error|fatal)[ :]{1,3}(401 )?authentication_error(:|[ ${_DAEMON_TAB}]{0,3}\$)"
 _DAEMON_AUTH_INDENTED+="|x failed to log in to ${_DAEMON_HOST} (account|using token)|x ${_DAEMON_HOST}: authentication failed"
 _DAEMON_AUTH_INDENTED+="|- the token in [a-z_]{1,40} is invalid"
-_DAEMON_AUTH_RESPONSE="40[13]( -)? ${_DAEMON_AUTH_BODY}"
+# The 401/403 response after its emitter's token at the lead-in, or in a stream-json "result" field (AUTH_RESPONSE).
+_DAEMON_SDK_ERROR='([a-z_]{1,30}[.]){0,3}(authentication|permissiondenied)error: (error code: )?'
+_DAEMON_AUTH_RESPONSE="${_DAEMON_LEAD}((●|⏺) )?${_DAEMON_PREFIX}(${_DAEMON_SDK_ERROR}|api error: |error code: )?40[13]( -)? ${_DAEMON_AUTH_BODY}"
+_DAEMON_AUTH_RESPONSE+="|\"result\": ?\"(failed to authenticate[.] )?api error: 40[13] ${_DAEMON_AUTH_BODY}"
 _DAEMON_AUTH="${_DAEMON_LEAD}${_DAEMON_PREFIX}(${_DAEMON_AUTH_PHRASES})|^[ ${_DAEMON_TAB}]{0,8}(${_DAEMON_AUTH_INDENTED})|${_DAEMON_AUTH_RESPONSE}"
 _DAEMON_INVALID_ISSUE="${_DAEMON_LEAD}${_DAEMON_PREFIX}(graphql: could not resolve to an? (issue|pullrequest)([ ${_DAEMON_TAB}.,]|\$)"
 _DAEMON_INVALID_ISSUE+="|http 404: not found \\(https://api\\.github\\.com/repos/[A-Za-z0-9._-]{1,100}/[A-Za-z0-9._-]{1,100}/(issues|pulls)/[0-9]{1,10}\\)"
