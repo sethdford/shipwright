@@ -60,7 +60,7 @@ interface Rule {
 // Explicit and locale-independent, the same as bash (daemon-failure.sh, _DAEMON_LEAD) under LC_ALL=C and UTF-8.
 const LEAD = String.raw`^(?:\d{4}[\-/]\d\d[\-/]\d\d[T ][\d:.]{1,20}(?:Z|[+\-]\d\d:?\d\d)? {1,2})?(?:\[\d[\dTZ:. +\-]{0,38}\] {1,2})?(?:\[(?:error|err|fatal)\] {1,2})?(?:(?:✗|✘|×|⚠|\uFE0F) {0,2}){0,3}`;
 // Up to two tool or annotation prefixes after the lead-in (`##[error]Error: ...`, `gh: error: ...`).
-const PREFIX = String.raw`(?:(?:gh|error|fatal)[ :]{1,3}|##\[error\] ?|::error:: ?|claude code returned an error result: |fatal cli error: |cli exited \d{1,3} with minimal output: |pr creation failed: |pull request create failed: ){0,2}`;
+const PREFIX = String.raw`(?:(?:gh|error|fatal)[ :]{1,3}|##\[error\] ?|::error:: ?|claude code returned an error result: |fatal cli error: |cli exited \d{1,3} with minimal output: |pr creation failed: |pull request create failed: |(?:plan|design) stage produced api/cli error instead of an? (?:plan|design): ){0,2}`;
 // What may end a prose-prone phrase: end of line or punctuation, never another word.
 const END = String.raw`(?:[ \t]{0,3}$|[.:;!,])`;
 // A host or repository name, and a URL, as explicit ASCII sets (no negated class: see LEAD).

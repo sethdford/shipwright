@@ -185,7 +185,7 @@ mode == "pytest" && $0 !~ /^(-----|=====|___|FAILED |ERROR [^ \t]+::|[0-9]+ (fai
 # matched as `[[]` and `[]]`, never `\]`, which POSIX ERE leaves undefined outside a bracket expression.
 _DAEMON_LEAD="^([0-9]{4}[/-][0-9][0-9][/-][0-9][0-9][T ][0-9:.]{1,20}(Z|[+-][0-9][0-9]:?[0-9][0-9])? {1,2})?([[][0-9][0-9TZ:. +-]{0,38}[]] {1,2})?([[](error|err|fatal)[]] {1,2})?((✗|✘|×|⚠|"$'\xef\xb8\x8f'") {0,2}){0,3}"
 # Up to two tool or annotation prefixes (PREFIX).
-_DAEMON_PREFIX='((gh|error|fatal)[ :]{1,3}|##[[]error[]] ?|::error:: ?|claude[ ]code returned an error result: |fatal cli error: |cli exited [0-9]{1,3} with minimal output: |pr creation failed: |pull request create failed: ){0,2}'
+_DAEMON_PREFIX='((gh|error|fatal)[ :]{1,3}|##[[]error[]] ?|::error:: ?|claude[ ]code returned an error result: |fatal cli error: |cli exited [0-9]{1,3} with minimal output: |pr creation failed: |pull request create failed: |(plan|design) stage produced api/cli error instead of an? (plan|design): ){0,2}'
 _DAEMON_END="([ ${_DAEMON_TAB}]{0,3}\$|[.:;!,])"
 _DAEMON_HOST='[A-Za-z0-9.-]{1,253}'
 _DAEMON_URL_CHARS='[A-Za-z0-9:/._~%@+=?&#-]'

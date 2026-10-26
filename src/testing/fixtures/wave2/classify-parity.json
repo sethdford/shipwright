@@ -3805,6 +3805,193 @@
       "ts": "unknown",
       "name": "verifier r5 corpus2/Q5: python repr result key",
       "expect": "noesc"
+    },
+    {
+      "text": "POST \"https://api.anthropic.com/v1/messages\": 401 Unauthorized (Request-ID: req_011CXyz) {\"type\":\"error\",\"error\":{\"type\":\"authentication_error\",\"message\":\"invalid x-api-key\"},\"request_id\":\"req_011CXyz\"}",
+      "bash": "auth_error",
+      "ts": "auth",
+      "name": "verifier r6 c1/g1: go sdk 401",
+      "expect": "esc:auth"
+    },
+    {
+      "text": "POST \"https://api.anthropic.com/v1/messages\": 401 Unauthorized {\"type\":\"error\",\"error\":{\"type\":\"authentication_error\",\"message\":\"invalid x-api-key\"},\"request_id\":\"req_011CXyz\"}",
+      "bash": "auth_error",
+      "ts": "auth",
+      "name": "verifier r6 c1/g2: go sdk old (no request-id)",
+      "expect": "esc:auth"
+    },
+    {
+      "text": "2026/10/26 12:00:00 POST \"https://api.anthropic.com/v1/messages\": 401 Unauthorized {\"type\":\"error\",\"error\":{\"type\":\"authentication_error\",\"message\":\"invalid x-api-key\"},\"request_id\":\"req_011CXyz\"}",
+      "bash": "auth_error",
+      "ts": "auth",
+      "name": "verifier r6 c1/g3: log.Fatal",
+      "expect": "esc:auth"
+    },
+    {
+      "text": "panic: POST \"https://api.anthropic.com/v1/messages?beta=true\": 403 Forbidden {\"type\":\"error\",\"error\":{\"type\":\"permission_error\",\"message\":\"forbidden\"}}\n\ngoroutine 1 [running]:\nmain.main()\n\t/app/main.go:20 +0x1d",
+      "bash": "auth_error",
+      "ts": "auth",
+      "name": "verifier r6 c1/g4: panic 403",
+      "expect": "esc:auth"
+    },
+    {
+      "text": "Error: POST \"https://api.anthropic.com/v1/messages\": 401 Unauthorized {\"type\":\"error\",\"error\":{\"type\":\"authentication_error\",\"message\":\"invalid x-api-key\"},\"request_id\":\"req_011CXyz\"}",
+      "bash": "auth_error",
+      "ts": "auth",
+      "name": "verifier r6 c1/g5: Error: prefix",
+      "expect": "esc:auth"
+    },
+    {
+      "text": "--- FAIL: TestClient (0.01s)\n    client_test.go:22: POST \"https://api.anthropic.com/v1/messages\": 401 Unauthorized {\"type\":\"error\",\"error\":{\"type\":\"authentication_error\",\"message\":\"invalid x-api-key\"},\"request_id\":\"req_011CXyz\"}\nFAIL\nFAIL\texample.com/x\t0.02s",
+      "bash": "build_failure",
+      "ts": "unknown",
+      "name": "verifier r6 c1/g6: go test indented",
+      "expect": "noesc"
+    },
+    {
+      "text": "Post \"https://api.anthropic.com/v1/messages\": dial tcp: lookup api.anthropic.com: no such host",
+      "bash": "unknown",
+      "ts": "unknown",
+      "name": "verifier r6 c1/g7: url.Error dns",
+      "expect": "noesc"
+    },
+    {
+      "text": "Post \"https://api.anthropic.com/v1/messages\": context deadline exceeded (Client.Timeout exceeded while awaiting headers)",
+      "bash": "api_error",
+      "ts": "unknown",
+      "differs": "Bash matches the free-text word 'timeout'; TS transient needs a structured signal (#8674).",
+      "name": "verifier r6 c1/g8: url.Error timeout",
+      "expect": "noesc"
+    },
+    {
+      "text": "POST \"https://api.anthropic.com/v1/messages\": 429 Too Many Requests {\"type\":\"error\",\"error\":{\"type\":\"rate_limit_error\",\"message\":\"x\"}}",
+      "bash": "api_error",
+      "ts": "transient",
+      "name": "verifier r6 c1/g9: go 429",
+      "expect": "noesc"
+    },
+    {
+      "text": "POST \"https://api.anthropic.com/v1/messages\": 529 status code 529 {\"type\":\"error\",\"error\":{\"type\":\"overloaded_error\",\"message\":\"Overloaded\"}}",
+      "bash": "api_error",
+      "ts": "transient",
+      "name": "verifier r6 c1/g10: go 500",
+      "expect": "noesc"
+    },
+    {
+      "text": "+\t// POST \"https://api.anthropic.com/v1/messages\": 401 Unauthorized",
+      "bash": "unknown",
+      "ts": "unknown",
+      "name": "verifier r6 c1/g11: diff hunk",
+      "expect": "noesc"
+    },
+    {
+      "text": "=== RUN   TestAuth\n\tPOST \"https://api.anthropic.com/v1/messages\": 401 Unauthorized",
+      "bash": "unknown",
+      "ts": "unknown",
+      "name": "verifier r6 c1/g12: go test -v t.Log w/ tab",
+      "expect": "noesc"
+    },
+    {
+      "text": "=== RUN   TestUnauthorized\n2026/10/26 12:00:00 POST \"http://127.0.0.1:53211/v1/messages\": 401 Unauthorized {}\n--- PASS: TestUnauthorized (0.00s)\n=== RUN   TestOther\n    other_test.go:9: expected 3, got 4\n--- FAIL: TestOther (0.00s)",
+      "bash": "auth_error",
+      "ts": "auth",
+      "name": "verifier r6 c1/g13: go test log.Printf mock 401 col0"
+    },
+    {
+      "text": "Error: create message: POST \"https://api.anthropic.com/v1/messages\": 401 Unauthorized {\"type\":\"error\",\"error\":{\"type\":\"authentication_error\",\"message\":\"invalid x-api-key\"},\"request_id\":\"req_011CXyz\"}",
+      "bash": "unknown",
+      "ts": "unknown",
+      "name": "verifier r6 c1/g14: wrapped go err"
+    },
+    {
+      "text": "time=2026-10-26T12:00:00.000Z level=ERROR msg=\"call failed\" err=\"POST \\\"https://api.anthropic.com/v1/messages\\\": 401 Unauthorized\"",
+      "bash": "build_failure",
+      "ts": "unknown",
+      "name": "verifier r6 c1/g15: slog"
+    },
+    {
+      "text": "POST \"https://api.anthropic.com/v1/messages\": 403 Forbidden (Request-ID: req_1) {\"type\":\"error\",\"error\":{\"type\":\"permission_error\",\"message\":\"forbidden\"}}",
+      "bash": "auth_error",
+      "ts": "auth",
+      "name": "verifier r6 c1/g16: go sdk bedrock? Request-ID then 401 Forbidden",
+      "expect": "esc:auth"
+    },
+    {
+      "text": "2026/10/26 12:00:00.123456 POST \"https://api.anthropic.com/v1/messages\": 401 Unauthorized {\"type\":\"error\",\"error\":{\"type\":\"authentication_error\",\"message\":\"invalid x-api-key\"},\"request_id\":\"req_011CXyz\"}",
+      "bash": "auth_error",
+      "ts": "auth",
+      "name": "verifier r6 c1/g17: go log.Fatalf with µs",
+      "expect": "esc:auth"
+    },
+    {
+      "text": "\u001b[31m\u001b[1m✗\u001b[0m Plan stage produced API/CLI error instead of a plan: Invalid API key · Please run /login",
+      "bash": "auth_error",
+      "ts": "auth",
+      "name": "verifier r6 c1/p1: plan stage invalid key",
+      "expect": "esc:auth"
+    },
+    {
+      "text": "\u001b[31m\u001b[1m✗\u001b[0m Design stage produced API/CLI error instead of a design: Invalid API key · Please run /login",
+      "bash": "auth_error",
+      "ts": "auth",
+      "name": "verifier r6 c1/p2: design stage invalid key",
+      "expect": "esc:auth"
+    },
+    {
+      "text": "\u001b[31m\u001b[1m✗\u001b[0m Plan stage produced API/CLI error instead of a plan: Failed to authenticate. API Error: 401 {\"type\":\"error\",\"error\":{\"type\":\"authenti",
+      "bash": "auth_error",
+      "ts": "auth",
+      "name": "verifier r6 c1/p3: plan stage expired oauth",
+      "expect": "esc:auth"
+    },
+    {
+      "text": "\u001b[31m\u001b[1m✗\u001b[0m Fatal CLI error: Invalid API key · Please run /login",
+      "bash": "auth_error",
+      "ts": "auth",
+      "name": "verifier r6 c1/p4: fatal cli error invalid key",
+      "expect": "esc:auth"
+    },
+    {
+      "text": "\u001b[31m\u001b[1m✗\u001b[0m Fatal CLI error: Failed to authenticate. API Error: 401 {\"type\":\"error\",\"error\":{\"type\":\"authentication_error\",\"message\":\"OAuth token has expire",
+      "bash": "auth_error",
+      "ts": "auth",
+      "name": "verifier r6 c1/p5: fatal cli error expired oauth",
+      "expect": "esc:auth"
+    },
+    {
+      "text": "\u001b[31m\u001b[1m✗\u001b[0m CLI exited 1 with minimal output: Invalid API key · Please run /login",
+      "bash": "auth_error",
+      "ts": "auth",
+      "name": "verifier r6 c1/p6: CLI exited minimal",
+      "expect": "esc:auth"
+    },
+    {
+      "text": "API Error: 401 {\"type\":\"error\",\"error\":{\"type\":\"authentication_error\",\"message\":\"OAuth token has expired.\"},\"request_id\":\"req_1\"} · Please run /login",
+      "bash": "auth_error",
+      "ts": "auth",
+      "name": "verifier r6 c1/p9: cli api err 401 body",
+      "expect": "esc:auth"
+    },
+    {
+      "text": "\n\n===== Pipeline run 2026-10-26T12:00:00Z =====\n\u001b[36m\u001b[1m▸\u001b[0m Stage: intake\n\u001b[32m\u001b[1m✓\u001b[0m Intake complete\n\u001b[36m\u001b[1m▸\u001b[0m Enhancing specification with AI analysis...\n\u001b[36m\u001b[1m▸\u001b[0m Claude unavailable or returned empty — keeping original spec\n\u001b[36m\u001b[1m▸\u001b[0m Stage: plan\n\u001b[31m\u001b[1m✗\u001b[0m Plan stage produced API/CLI error instead of a plan: Invalid API key · Please run /login\n\u001b[31m\u001b[1m✗\u001b[0m Pipeline failed at stage: plan",
+      "bash": "auth_error",
+      "ts": "auth",
+      "name": "verifier r6 c2/f1: full tail plan invalid key",
+      "expect": "esc:auth"
+    },
+    {
+      "text": "\n\n===== Pipeline run 2026-10-26T12:00:00Z =====\n\u001b[36m\u001b[1m▸\u001b[0m Stage: intake\n\u001b[32m\u001b[1m✓\u001b[0m Intake complete\n\u001b[36m\u001b[1m▸\u001b[0m Enhancing specification with AI analysis...\n\u001b[36m\u001b[1m▸\u001b[0m Claude unavailable or returned empty — keeping original spec\n\u001b[36m\u001b[1m▸\u001b[0m Stage: plan\n\u001b[31m\u001b[1m✗\u001b[0m Plan stage produced API/CLI error instead of a plan: API Error: 401 {\"type\":\"error\",\"error\":{\"type\":\"authentication_error\",\"messa\n\u001b[31m\u001b[1m✗\u001b[0m Pipeline failed at stage: plan",
+      "bash": "auth_error",
+      "ts": "auth",
+      "name": "verifier r6 c2/f2: full tail plan 401 body",
+      "expect": "esc:auth"
+    },
+    {
+      "text": "\u001b[31m\u001b[1m✗\u001b[0m Design stage produced API/CLI error instead of a design: Failed to authenticate. API Error: 401 {\"type\":\"error\",\"error\":{\"type\":\"au",
+      "bash": "auth_error",
+      "ts": "auth",
+      "name": "verifier r6 c2/f3: design stage 401 body",
+      "expect": "esc:auth"
     }
   ]
 }
