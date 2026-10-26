@@ -39,6 +39,11 @@ jobs:
           bun tools/arch/size-ratchet.ts --against "origin/$GITHUB_BASE_REF"
       - name: Unit, application and contract tests
         run: bun test ./src ./tools
+      - name: Failure-classifier fuzz, TS vs bash (1786 rows; one locale on PRs, both on main)
+        # ~90 s per locale. The per-run unit test checks a fixed sample in both locales (#8715).
+        env:
+          FUZZ_LOCALE: ${{ github.event_name == 'push' && 'all' || 'C' }}
+        run: bun src/testing/fixtures/wave2/classify-fuzz.ts --locale "$FUZZ_LOCALE"
       - name: Generated CLI reference is current
         run: bun run docs:check
       - name: Router points at TypeScript only for parity-green commands

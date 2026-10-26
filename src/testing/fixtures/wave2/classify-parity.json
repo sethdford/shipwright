@@ -1208,7 +1208,7 @@
       "ts": "unknown",
       "name": "verifier b6: Claude CLI stream-json result with escaped quotes",
       "expect": "esc:auth",
-      "limit": "Known limit 2: a raw stream-json \"result\" field is not matched (the current CLI puts its own text there, which the phrases catch)."
+      "limit": "Known limit (#8715 review): a raw CLI JSON result record is not escalated by the classifier. Fixtures, NDJSON replays and mock-CLI dumps print the same record at column 0. The loop's own `Fatal CLI error:` line now carries the record's result text (loop-restart.sh), which the phrases catch."
     },
     {
       "text": "● API Error: 401 {\"type\":\"error\",\"error\":{\"type\":\"authentication_error\",\"message\":\"OAuth token has expired. Please obtain a new token or refresh your existing token.\"}}",
@@ -1905,7 +1905,7 @@
       "ts": "unknown",
       "name": "verifier r2 c2/b11: Claude stream-json result Invalid API key",
       "expect": "esc:auth",
-      "limit": "Known limit 2: an emitter form or prefix the classifier does not cover; the run is retried."
+      "limit": "Known limit (#8715 review): a raw CLI JSON result record is not escalated by the classifier. Fixtures, NDJSON replays and mock-CLI dumps print the same record at column 0. The loop's own `Fatal CLI error:` line now carries the record's result text (loop-restart.sh), which the phrases catch."
     },
     {
       "text": "[{\"type\":\"system\",\"subtype\":\"init\"},{\"type\":\"result\",\"subtype\":\"success\",\"is_error\":true,\"result\":\"Not logged in · Please run /login\"}]",
@@ -1921,7 +1921,7 @@
       "ts": "unknown",
       "name": "verifier r2 c2/b13: Claude json OAuth expired",
       "expect": "esc:auth",
-      "limit": "Known limit 2: an emitter form or prefix the classifier does not cover; the run is retried."
+      "limit": "Known limit (#8715 review): a raw CLI JSON result record is not escalated by the classifier. Fixtures, NDJSON replays and mock-CLI dumps print the same record at column 0. The loop's own `Fatal CLI error:` line now carries the record's result text (loop-restart.sh), which the phrases catch."
     },
     {
       "text": "API Error: 401 {\"type\":\"error\",\"error\":{\"type\":\"authentication_error\",\"message\":\"OAuth authentication is currently not supported.\"},\"request_id\":\"req_011CU\"}",
@@ -2677,7 +2677,7 @@
       "ts": "unknown",
       "name": "verifier r3 c1/d3: cargo panic, custom hook no note, then gh",
       "expect": "esc:auth",
-      "limit": "Known limit 2: an emitter form, prefix or unclosed test-output block the classifier does not handle; the run is retried."
+      "limit": "Known limit (#8715 review): an auth line on the second or later line of an open test-output block (vitest stderr/stdout, FAIL or Unhandled, cargo panic, pytest captured) is not escalated. Routine negative-path tests print exactly that, and a false escalation stops a healthy issue for good; a missed auth costs one bounded retry. Only a gh step boundary ends a block early."
     },
     {
       "text": " FAIL  src/a.test.ts > auth > rejects\nTypeError: Cannot read properties of undefined (reading 'x')\n    at foo (src/a.ts:1:1)\n--\nfatal: Authentication failed for 'https://github.com/acme/app.git/'",
@@ -2685,7 +2685,7 @@
       "ts": "unknown",
       "name": "verifier r3 c1/d4: vitest FAIL excerpt cut by grep -A5, '--' then gh",
       "expect": "esc:auth",
-      "limit": "Known limit 2: an emitter form, prefix or unclosed test-output block the classifier does not handle; the run is retried."
+      "limit": "Known limit (#8715 review): an auth line on the second or later line of an open test-output block (vitest stderr/stdout, FAIL or Unhandled, cargo panic, pytest captured) is not escalated. Routine negative-path tests print exactly that, and a false escalation stops a healthy issue for good; a missed auth costs one bounded retry. Only a gh step boundary ends a block early."
     },
     {
       "text": "stderr | src/a.test.ts > x\nwarn: thing\nGraphQL: Could not resolve to an issue or pull request with the number of 9. (repository.issueOrPullRequest)",
@@ -2693,7 +2693,7 @@
       "ts": "unknown",
       "name": "verifier r3 c1/d5: vitest stderr block then gh, no blank",
       "expect": "esc:invalid_input",
-      "limit": "Known limit 2: an emitter form, prefix or unclosed test-output block the classifier does not handle; the run is retried."
+      "limit": "Known limit (#8715 review): an auth line on the second or later line of an open test-output block (vitest stderr/stdout, FAIL or Unhandled, cargo panic, pytest captured) is not escalated. Routine negative-path tests print exactly that, and a false escalation stops a healthy issue for good; a missed auth costs one bounded retry. Only a gh step boundary ends a block early."
     },
     {
       "text": "  1) build\n  2) push\n  X Failed to log in to github.com account bot (keyring)\n  - The token in keyring is invalid.",
@@ -2716,7 +2716,7 @@
       "ts": "unknown",
       "name": "verifier r3 c1/d8: rust panic then blank-less claude error",
       "expect": "esc:auth",
-      "limit": "Known limit 2: an emitter form, prefix or unclosed test-output block the classifier does not handle; the run is retried."
+      "limit": "Known limit (#8715 review): an auth line on the second or later line of an open test-output block (vitest stderr/stdout, FAIL or Unhandled, cargo panic, pytest captured) is not escalated. Routine negative-path tests print exactly that, and a false escalation stops a healthy issue for good; a missed auth costs one bounded retry. Only a gh step boundary ends a block early."
     },
     {
       "text": "------------------------------ Captured log call -------------------------------\nINFO x\n_____________________ test_b _____________________\nfatal: Authentication failed for 'https://github.com/acme/app.git/'",
@@ -3527,7 +3527,7 @@
       "ts": "unknown",
       "name": "verifier r5 corpus/S1: stream-json result old CLI 401",
       "expect": "esc:auth",
-      "limit": "Known limit 2: an emitter form, prefix or unclosed test-output block the classifier does not handle; the run is retried."
+      "limit": "Known limit (#8715 review): a raw CLI JSON result record is not escalated by the classifier. Fixtures, NDJSON replays and mock-CLI dumps print the same record at column 0. The loop's own `Fatal CLI error:` line now carries the record's result text (loop-restart.sh), which the phrases catch."
     },
     {
       "text": "{\"type\":\"result\",\"subtype\":\"success\",\"is_error\":true,\"result\":\"API Error: 403 {\\\"type\\\":\\\"error\\\",\\\"error\\\":{\\\"type\\\":\\\"permission_error\\\",\\\"message\\\":\\\"invalid x-api-key\\\"},\\\"request_id\\\":\\\"req_011CUXabc\\\"}\"}",
@@ -3535,7 +3535,7 @@
       "ts": "unknown",
       "name": "verifier r5 corpus/S2: stream-json result old CLI 403 body",
       "expect": "esc:auth",
-      "limit": "Known limit 2: an emitter form, prefix or unclosed test-output block the classifier does not handle; the run is retried."
+      "limit": "Known limit (#8715 review): a raw CLI JSON result record is not escalated by the classifier. Fixtures, NDJSON replays and mock-CLI dumps print the same record at column 0. The loop's own `Fatal CLI error:` line now carries the record's result text (loop-restart.sh), which the phrases catch."
     },
     {
       "text": "{\"type\":\"system\",\"subtype\":\"init\",\"cwd\":\"/tmp/work/x.ts\",\"session_id\":\"3c5da157-8325-4838-9504-36a3eeccbd6f\",\"tools\":[\"Task\",\"Bash\",\"CronCreate\",\"CronDelete\",\"CronList\",\"Edit\",\"EnterWorktree\",\"ExitWorktree\",\"ListAgents\",\"NotebookEdit\",\"Read\",\"ReportFindings\",\"ScheduleWakeup\",\"SendMessage\",\"Skill\",\"TaskStop\",\"ToolSearch\",\"WebFetch\",\"WebSearch\",\"Workflow\",\"Write\"],\"mcp_servers\":[],\"model\":\"MODEL\",\"permissionMode\":\"auto\",\"slash_commands\":[\"deep-research\",\"dataviz\",\"update-config\",\"verify\",\"debug\",\"code-review\",\"simplify\",\"batch\",\"fewer-permission-prompts\",\"doctor\",\"loop\",\"claude-api\",\"workflow-authoring\",\"run\",\"run-skill-generator\",\"plugin-authoring\",\"agents\",\"auto-mode-setup\",\"autocompact\",\"clear\",\"color\",\"compact\",\"config\",\"output-style\",\"context\",\"effort\",\"fast\",\"focus\",\"heapdump\",\"init\",\"mcp\",\"model\",\"__remote-workflow\",\"workflow-launch-exec\",\"reload-plugins\",\"reload-skills\",\"rename\",\"security-review\",\"usage\",\"insights\",\"recap\",\"goal\",\"list-agents\",\"team-onboarding\"],\"terminal_slash_commands\":[\"doctor\",\"color\",\"focus\",\"reload-plugins\"],\"apiKeySource\":\"ANTHROPIC_API_KEY\",\"claude_code_version\":\"2.1.296\",\"output_style\":\"default\",\"agents\":[\"claude\",\"Explore\",\"general-purpose\",\"Plan\",\"statusline-setup\"],\"skills\":[\"deep-research\",\"dataviz\",\"update-config\",\"verify\",\"debug\",\"code-review\",\"simplify\",\"batch\",\"fewer-permission-prompts\",\"doctor\",\"loop\",\"claude-api\",\"workflow-authoring\",\"run\",\"run-skill-generator\",\"plugin-authoring\"],\"plugins\":[{\"name\":\"cc-plugin-agents-md\",\"path\":\"builtin\",\"source\":\"cc-plugin-agents-md@builtin\"},{\"name\":\"cc-plugin-plugin-authoring\",\"path\":\"builtin\",\"source\":\"cc-plugin-plugin-authoring@builtin\"}],\"capabilities\":[\"interrupt_receipt_v1\",\"interrupt_cancel_queued_v1\",\"interrupt_send_now_v1\",\"msg_lifecycle_v1\",\"request_marker_lists_v1\",\"sdk_mcp_tools_list_changed\",\"sdk_mcp_manifests\",\"mcp_read_resource_v1\",\"mcp_tool_ui_meta_v1\",\"ui_surface_v1\"],\"analytics_disabled\":true,\"product_feedback_disabled\":true,\"uuid\":\"1753d8e7-1d1c-4bc8-b8ab-f4cdc5eb4fb9\",\"memory_paths\":{\"auto\":\"/tmp/work/x.ts\"},\"messaging_socket_path\":\"/tmp/cc-socks/56680.sock\",\"fast_mode_state\":\"off\",\"fast_mode_disabled_reason\":\"sdk_opt_in_required\",\"per_turn_effort_active\":true,\"view_mode\":\"default\"}\n{\"type\":\"assistant\",\"message\":{\"diagnostics\":null,\"id\":\"9b87289a-07ce-40f3-ade4-55d688d3c1ab\",\"container\":null,\"model\":\"<synthetic>\",\"role\":\"assistant\",\"stop_details\":null,\"stop_reason\":\"stop_sequence\",\"stop_sequence\":\"\",\"type\":\"message\",\"usage\":{\"output_tokens_details\":null,\"input_tokens\":0,\"output_tokens\":0,\"cache_creation_input_tokens\":0,\"cache_read_input_tokens\":0,\"server_tool_use\":{\"web_search_requests\":0,\"web_fetch_requests\":0},\"service_tier\":null,\"cache_creation\":{\"ephemeral_1h_input_tokens\":0,\"ephemeral_5m_input_tokens\":0},\"inference_geo\":null,\"iterations\":null,\"speed\":null,\"fallback_credit\":null},\"content\":[{\"type\":\"text\",\"text\":\"Failed to authenticate. API Error: 403 Your API key does not have permission to use the specified resource.\"}],\"context_management\":null},\"parent_tool_use_id\":null,\"session_id\":\"3c5da157-8325-4838-9504-36a3eeccbd6f\",\"uuid\":\"0628d575-bc8a-424a-a930-fa048e538b61\",\"timestamp\":\"2026-10-26T04:42:52.697Z\",\"error\":\"authentication_failed\",\"request_id\":\"req_011CUXabc\",\"is_api_error_message\":true}\n{\"duration_api_ms\":0,\"stop_reason\":\"stop_sequence\",\"session_id\":\"3c5da157-8325-4838-9504-36a3eeccbd6f\",\"total_cost_usd\":0,\"usage\":{\"output_tokens_details\":{\"thinking_tokens\":0},\"input_tokens\":0,\"cache_creation_input_tokens\":0,\"cache_read_input_tokens\":0,\"output_tokens\":0,\"server_tool_use\":{\"web_search_requests\":0,\"web_fetch_requests\":0},\"service_tier\":\"standard\",\"cache_creation\":{\"ephemeral_1h_input_tokens\":0,\"ephemeral_5m_input_tokens\":0},\"inference_geo\":\"\",\"iterations\":[],\"speed\":\"standard\",\"fallback_credit\":null},\"modelUsage\":{},\"permission_denials\":[],\"terminal_reason\":\"api_error\",\"fast_mode_state\":\"off\",\"fast_mode_disabled_reason\":\"sdk_opt_in_required\",\"subagent_stats\":{\"spawned\":0,\"requested\":{\"background\":0,\"foreground\":0,\"unset\":0},\"started_in_background\":0,\"max_depth\":0,\"spawned_by_subagents\":0,\"completed\":0,\"failed\":0,\"killed\":{\"parent\":0,\"user\":0,\"system\":0},\"refused\":{\"depth_limit\":0,\"concurrency_limit\":0,\"budget\":0},\"by_type\":{}},\"safety_stops\":0,\"is_error\":true,\"num_turns\":1,\"subtype\":\"success\",\"api_error_status\":403,\"result\":\"Failed to authenticate. API Error: 403 Your API key does not have permission to use the specified resource.\",\"type\":\"result\",\"duration_ms\":48,\"uuid\":\"51c8c62b-34d7-4069-86b5-16119f9b6934\",\"queued_turn_count\":0,\"result_index\":0}\n",
@@ -4318,6 +4318,2709 @@
       "bash": "unknown",
       "ts": "unknown",
       "name": "verifier r7 corpus2/n6: agent prose: Error: authentication_error is the type",
+      "expect": "noesc"
+    },
+    {
+      "text": "stderr | src/a.test.ts > loads config\nwarning: using defaults\n##[error]Claude Code authentication failed — check CLAUDE_CODE_OAUTH_TOKEN secret",
+      "bash": "build_failure",
+      "ts": "unknown",
+      "name": "review corpus5: A1 vitest stderr block, no blank, then ##[error] auth",
+      "expect": "esc:auth",
+      "limit": "Known limit (#8715 review): ##[error]/##[group]/::error lines do not end an open test-output block: the runner rewrites any process's ::error:: and ::group:: output in place, mid-step, so test output prints them too."
+    },
+    {
+      "text": "stderr | src/a.test.ts > x\nmock said hi\nFailed to authenticate. API Error: 401 {\"type\":\"error\",\"error\":{\"type\":\"authentication_error\",\"message\":\"invalid x-api-key\"},\"request_id\":\"req_011\"}",
+      "bash": "build_failure",
+      "ts": "unknown",
+      "name": "review corpus5: A2 vitest stderr then Claude 401",
+      "expect": "esc:auth",
+      "limit": "Known limit (#8715 review): an auth line on the second or later line of an open test-output block (vitest stderr/stdout, FAIL or Unhandled, cargo panic, pytest captured) is not escalated. Routine negative-path tests print exactly that, and a false escalation stops a healthy issue for good; a missed auth costs one bounded retry. Only a gh step boundary ends a block early."
+    },
+    {
+      "text": "----- Captured stdout call -----\nhello\nFailed to authenticate. API Error: 401 {\"type\":\"error\",\"error\":{\"type\":\"authentication_error\",\"message\":\"invalid x-api-key\"},\"request_id\":\"req_011\"}",
+      "bash": "build_failure",
+      "ts": "unknown",
+      "name": "review corpus5: A3 pytest captured unterminated then Claude 401",
+      "expect": "esc:auth",
+      "limit": "Known limit: a pytest captured section that never closes still hides the line after it. Its content is the application's own log lines, which print the same shapes as real emitters (see the r4/r5 noesc rows), so an escalation line does not end it."
+    },
+    {
+      "text": "------------------------------ Captured log call -------------------------------\nINFO root:x.py:3 hi\nremote: Invalid username or password.\nfatal: Authentication failed for 'https://github.com/o/r.git/'",
+      "bash": "build_failure",
+      "ts": "unknown",
+      "name": "review corpus5: A4 pytest captured then git push auth",
+      "expect": "esc:auth",
+      "limit": "Known limit: a pytest captured section that never closes still hides the line after it. Its content is the application's own log lines, which print the same shapes as real emitters (see the r4/r5 noesc rows), so an escalation line does not end it."
+    },
+    {
+      "text": "thread 'main' panicked at src/main.rs:3:5:\nboom\nfatal: Authentication failed for 'https://github.com/o/r.git/'",
+      "bash": "build_failure",
+      "ts": "unknown",
+      "name": "review corpus5: A5 cargo panic then git push auth",
+      "expect": "esc:auth",
+      "limit": "Known limit (#8715 review): an auth line on the second or later line of an open test-output block (vitest stderr/stdout, FAIL or Unhandled, cargo panic, pytest captured) is not escalated. Routine negative-path tests print exactly that, and a false escalation stops a healthy issue for good; a missed auth costs one bounded retry. Only a gh step boundary ends a block early."
+    },
+    {
+      "text": " FAIL  src/a.test.ts > suite > case\nAssertionError: expected 1 to be 2\ngh: HTTP 401: Bad credentials (https://api.github.com/graphql)",
+      "bash": "build_failure",
+      "ts": "unknown",
+      "name": "review corpus5: A6 vitest FAIL header then gh 401",
+      "expect": "esc:auth",
+      "limit": "Known limit (#8715 review): an auth line on the second or later line of an open test-output block (vitest stderr/stdout, FAIL or Unhandled, cargo panic, pytest captured) is not escalated. Routine negative-path tests print exactly that, and a false escalation stops a healthy issue for good; a missed auth costs one bounded retry. Only a gh step boundary ends a block early."
+    },
+    {
+      "text": "⎯⎯⎯⎯ Unhandled Rejection ⎯⎯⎯⎯\nError: boom\nFailed to authenticate. API Error: 401 {\"type\":\"error\",\"error\":{\"type\":\"authentication_error\",\"message\":\"invalid x-api-key\"},\"request_id\":\"req_011\"}",
+      "bash": "build_failure",
+      "ts": "unknown",
+      "name": "review corpus5: A7 vitest Unhandled then Claude 401",
+      "expect": "esc:auth",
+      "limit": "Known limit (#8715 review): an auth line on the second or later line of an open test-output block (vitest stderr/stdout, FAIL or Unhandled, cargo panic, pytest captured) is not escalated. Routine negative-path tests print exactly that, and a false escalation stops a healthy issue for good; a missed auth costs one bounded retry. Only a gh step boundary ends a block early."
+    },
+    {
+      "text": "  console.log\n    hi\n\nFailed to authenticate. API Error: 401 {\"type\":\"error\",\"error\":{\"type\":\"authentication_error\",\"message\":\"invalid x-api-key\"},\"request_id\":\"req_011\"}",
+      "bash": "auth_error",
+      "ts": "auth",
+      "name": "review corpus5: A8 jest console.log then column-0 auth",
+      "expect": "esc:auth"
+    },
+    {
+      "text": "build\tRun tests\t2026-10-26T09:00:00.1234567Z stderr | src/a.test.ts > x\nbuild\tRun tests\t2026-10-26T09:00:00.1234567Z noise\nbuild\tRun tests\t2026-10-26T09:00:00.1234567Z ##[error]Process completed with exit code 1.\nbuild\tRun Claude\t2026-10-26T09:00:00.1234567Z ##[group]Run claude -p ...\nbuild\tRun Claude\t2026-10-26T09:00:00.1234567Z ##[endgroup]\nbuild\tRun Claude\t2026-10-26T09:00:00.1234567Z Failed to authenticate. API Error: 401 {\"type\":\"error\",\"error\":{\"type\":\"authentication_error\",\"message\":\"invalid x-api-key\"},\"request_id\":\"req_011\"}",
+      "bash": "build_failure",
+      "ts": "unknown",
+      "name": "review corpus5: A9 vitest stderr then ##[group] step boundary then auth (gh-prefixed)",
+      "expect": "esc:auth",
+      "limit": "Known limit (#8715 review): ##[error]/##[group]/::error lines do not end an open test-output block: the runner rewrites any process's ::error:: and ::group:: output in place, mid-step, so test output prints them too."
+    },
+    {
+      "text": "----- Captured stderr call -----\nx\nGraphQL: Could not resolve to an issue or pull request with the number of 77. (repository.issue)",
+      "bash": "unknown",
+      "ts": "unknown",
+      "name": "review corpus5: A10 pytest captured then missing issue",
+      "expect": "esc:invalid_input",
+      "limit": "Known limit: a pytest captured section that never closes still hides the line after it. Its content is the application's own log lines, which print the same shapes as real emitters (see the r4/r5 noesc rows), so an escalation line does not end it."
+    },
+    {
+      "text": "  1) Suite\n       does thing\n     Error: x\nFailed to authenticate. API Error: 401 {\"type\":\"error\",\"error\":{\"type\":\"authentication_error\",\"message\":\"invalid x-api-key\"},\"request_id\":\"req_011\"}",
+      "bash": "auth_error",
+      "ts": "auth",
+      "name": "review corpus5: A11 mocha title block then auth col0",
+      "expect": "esc:auth"
+    },
+    {
+      "text": "(fail) a > b [1ms]\nFailed to authenticate. API Error: 401 {\"type\":\"error\",\"error\":{\"type\":\"authentication_error\",\"message\":\"invalid x-api-key\"},\"request_id\":\"req_011\"}",
+      "bash": "auth_error",
+      "ts": "auth",
+      "name": "review corpus5: A12 bun (fail) line then auth col0",
+      "expect": "esc:auth"
+    },
+    {
+      "text": "##[group]Run gh issue view 77 --json body\n\u001b[36;1mgh issue view 77 --json body\u001b[0m\nshell: /usr/bin/bash -e {0}\nenv:\n  GH_TOKEN: ***\n##[endgroup]\nGraphQL: Could not resolve to an issue or pull request with the number of 77. (repository.issue)\n##[error]Process completed with exit code 1.",
+      "bash": "invalid_issue",
+      "ts": "invalid_input",
+      "name": "review corpus5: B1 Actions group + gh missing issue",
+      "expect": "esc:invalid_input"
+    },
+    {
+      "text": "##[group]Run git push origin HEAD\n##[endgroup]\nremote: Permission to o/r.git denied to github-actions[bot].\nfatal: unable to access 'https://github.com/o/r/': The requested URL returned error: 403\n##[error]Process completed with exit code 128.",
+      "bash": "auth_error",
+      "ts": "auth",
+      "name": "review corpus5: B2 Actions git push 403",
+      "expect": "esc:auth"
+    },
+    {
+      "text": "Traceback (most recent call last):\n  File \"run.py\", line 3, in <module>\n    client.messages.create()\nanthropic.AuthenticationError: Error code: 401 - {'type': 'error', 'error': {'type': 'authentication_error', 'message': 'invalid x-api-key'}}",
+      "bash": "auth_error",
+      "ts": "auth",
+      "name": "review corpus5: B3 python traceback (final line col0)",
+      "expect": "esc:auth"
+    },
+    {
+      "text": "/app/node_modules/@anthropic-ai/sdk/error.js:45\n        return new AuthenticationError(status, error, message, headers);\n               ^\n\nAuthenticationError: 401 {\"type\":\"error\",\"error\":{\"type\":\"authentication_error\",\"message\":\"invalid x-api-key\"},\"request_id\":\"req_011\"}\n    at APIError.generate (/app/node_modules/@anthropic-ai/sdk/error.js:45:20)",
+      "bash": "auth_error",
+      "ts": "auth",
+      "name": "review corpus5: B4 node uncaught SDK",
+      "expect": "esc:auth"
+    },
+    {
+      "text": "✗ CLI exited 1 with minimal output: Invalid API key · Please run /login",
+      "bash": "auth_error",
+      "ts": "auth",
+      "name": "review corpus5: B5 Shipwright ✗ wrapper",
+      "expect": "esc:auth"
+    },
+    {
+      "text": "✗ Fatal CLI error: {\"type\":\"result\",\"subtype\":\"success\",\"is_error\":true,\"duration_ms\":234,\"duration_api_ms\":0,\"num_turns\":1,\"result\":\"Inval\n✗ Fatal CLI error detected — aborting loop (see iteration log)",
+      "bash": "unknown",
+      "ts": "unknown",
+      "name": "review corpus5: B6 Shipwright fatal CLI error (json truncated)",
+      "expect": "esc:auth",
+      "limit": "Known limit: the old loop-restart.sh cut the JSON before its result text, so the line carries no evidence of the cause; loop-restart.sh now prints the extracted result text instead (#8715)."
+    },
+    {
+      "text": "{\"type\":\"result\",\"subtype\":\"success\",\"is_error\":true,\"duration_ms\":234,\"num_turns\":1,\"result\":\"Invalid API key · Please run /login\",\"session_id\":\"s\"}",
+      "bash": "unknown",
+      "ts": "unknown",
+      "name": "review corpus5: B7 claude json result raw",
+      "expect": "esc:auth",
+      "limit": "Known limit (#8715 review): a raw CLI JSON result record is not escalated by the classifier. Fixtures, NDJSON replays and mock-CLI dumps print the same record at column 0. The loop's own `Fatal CLI error:` line now carries the record's result text (loop-restart.sh), which the phrases catch."
+    },
+    {
+      "text": "make: *** [deploy] Error 1\n    Error: Failed to authenticate. API Error: 401 {\"type\":\"error\",\"error\":{\"type\":\"authentication_error\",\"message\":\"invalid x-api-key\"},\"request_id\":\"req_011\"}",
+      "bash": "build_failure",
+      "ts": "unknown",
+      "name": "review corpus5: B8 indented Error: under make",
+      "expect": "esc:auth",
+      "limit": "Known limit (#8715 review): an indented CLI error is not escalated: mocha, rspec, jest, go test and Playwright indent failure messages the same way."
+    },
+    {
+      "text": "\tgh: HTTP 401: Bad credentials (https://api.github.com/graphql)",
+      "bash": "unknown",
+      "ts": "unknown",
+      "name": "review corpus5: B9 tab-indented gh auth",
+      "expect": "esc:auth",
+      "limit": "Known limit (#8715 review): an indented gh error line is not escalated (test runners indent their own output)."
+    },
+    {
+      "text": "[2026-10-26T09:00:00Z] [ERROR] Claude Code authentication failed",
+      "bash": "auth_error",
+      "ts": "auth",
+      "name": "review corpus5: B10 daemon_log wrapped auth",
+      "expect": "esc:auth"
+    },
+    {
+      "text": "2026-10-26T09:00:00.1234567Z ##[error]Claude Code authentication failed — check CLAUDE_CODE_OAUTH_TOKEN secret",
+      "bash": "auth_error",
+      "ts": "auth",
+      "name": "review corpus5: B11 raw actions log with ISO ts",
+      "expect": "esc:auth"
+    },
+    {
+      "text": "  ⎿  API Error: 401 {\"type\":\"error\",\"error\":{\"type\":\"authentication_error\",\"message\":\"invalid x-api-key\"},\"request_id\":\"req_011\"}",
+      "bash": "unknown",
+      "ts": "unknown",
+      "name": "review corpus5: B13 Claude TUI ⎿ indented",
+      "expect": "esc:auth",
+      "limit": "Known limit (#8715 review): output under Claude Code's ⎿ is not escalated: ⎿ marks the first line of any tool's output (cat, grep, the app's own client), not only the CLI's error."
+    },
+    {
+      "text": "##[error]GraphQL: Could not resolve to an issue or pull request with the number of 5. (repository.issue)",
+      "bash": "invalid_issue",
+      "ts": "invalid_input",
+      "name": "review corpus5: B15 ##[error] gh lookup",
+      "expect": "esc:invalid_input"
+    },
+    {
+      "text": "Invalid API key · Please run /login\n(fail) parses CLI auth output [1ms]\nerror: expect(received).toBe(expected)",
+      "bash": "auth_error",
+      "ts": "auth",
+      "name": "review corpus5: C1 bun console.log of fixture at col0",
+      "expect": "noesc",
+      "limit": "Known limit 1: output in the same form as the real emitter at column 0 (test fixtures, prose, code fences, heredocs, wrapped test descriptions)."
+    },
+    {
+      "text": "$ cat fixtures/preflight-auth.log\nAPI Error: 401 {\"type\":\"error\",\"error\":{\"type\":\"authentication_error\",\"message\":\"invalid x-api-key\"},\"request_id\":\"req_011\"}\n(fail) fixture > loads",
+      "bash": "auth_error",
+      "ts": "auth",
+      "name": "review corpus5: C2 cat fixture log in test",
+      "expect": "noesc",
+      "limit": "Known limit 1: output in the same form as the real emitter at column 0 (test fixtures, prose, code fences, heredocs, wrapped test descriptions)."
+    },
+    {
+      "text": "✗ Invalid API key · Please run /login classified as auth\n    expected: auth_error\n    actual:   unknown",
+      "bash": "auth_error",
+      "ts": "auth",
+      "name": "review corpus5: C3 sh test ✗ desc starting with phrase",
+      "expect": "noesc",
+      "limit": "Known limit 1: output in the same form as the real emitter at column 0 (test fixtures, prose, code fences, heredocs, wrapped test descriptions)."
+    },
+    {
+      "text": "✗ not logged in to GitHub prompt test failed",
+      "bash": "auth_error",
+      "ts": "auth",
+      "name": "review corpus5: C4 ✗ wrapper around test name",
+      "expect": "noesc",
+      "limit": "Known limit 1: output in the same form as the real emitter at column 0 (test fixtures, prose, code fences, heredocs, wrapped test descriptions)."
+    },
+    {
+      "text": "Error: authentication failed. was the old message; I changed it to be clearer.\nerror: build failed",
+      "bash": "auth_error",
+      "ts": "auth",
+      "name": "review corpus5: C5 agent prose col0 Error:",
+      "expect": "noesc",
+      "limit": "Known limit 1: output in the same form as the real emitter at column 0 (test fixtures, prose, code fences, heredocs, wrapped test descriptions)."
+    },
+    {
+      "text": "```\nfatal: Authentication failed for 'https://github.com/o/r.git/'\n```\nerror: docs lint failed",
+      "bash": "auth_error",
+      "ts": "auth",
+      "name": "review corpus5: C6 markdown code fence",
+      "expect": "noesc",
+      "limit": "Known limit 1: output in the same form as the real emitter at column 0 (test fixtures, prose, code fences, heredocs, wrapped test descriptions)."
+    },
+    {
+      "text": "+ cat <<EOF\nnot logged in\nEOF\nerror: snapshot mismatch",
+      "bash": "auth_error",
+      "ts": "auth",
+      "name": "review corpus5: C7 heredoc in test log",
+      "expect": "noesc",
+      "limit": "Known limit 1: output in the same form as the real emitter at column 0 (test fixtures, prose, code fences, heredocs, wrapped test descriptions)."
+    },
+    {
+      "text": "src/a.ts:12:Error: Bad credentials\nerror: lint failed",
+      "bash": "build_failure",
+      "ts": "unknown",
+      "name": "review corpus5: C8 grep output of source",
+      "expect": "noesc"
+    },
+    {
+      "text": "error: issue not found: cache miss for key 42\nerror: test failed",
+      "bash": "invalid_issue",
+      "ts": "invalid_input",
+      "name": "review corpus5: C9 issue-not-found from app",
+      "expect": "noesc",
+      "limit": "Known limit 1: output in the same form as the real emitter at column 0 (test fixtures, prose, code fences, heredocs, wrapped test descriptions)."
+    },
+    {
+      "text": "2026-10-26T09:00:00Z failed to authenticate.\n(fail) logger > formats",
+      "bash": "auth_error",
+      "ts": "auth",
+      "name": "review corpus5: C10 ISO ts + test console col0",
+      "expect": "noesc",
+      "limit": "Known limit 1: output in the same form as the real emitter at column 0 (test fixtures, prose, code fences, heredocs, wrapped test descriptions)."
+    },
+    {
+      "text": "GraphQL: Could not resolve to an issue or pull request with the number of 999999. (repository.issue)\n(fail) tracker > maps not found",
+      "bash": "invalid_issue",
+      "ts": "invalid_input",
+      "name": "review corpus5: C11 gh issue view of another issue in test",
+      "expect": "noesc",
+      "limit": "Known limit 1: output in the same form as the real emitter at column 0 (test fixtures, prose, code fences, heredocs, wrapped test descriptions)."
+    },
+    {
+      "text": "⚠ not logged in to optional registry; continuing\nerror: build failed",
+      "bash": "auth_error",
+      "ts": "auth",
+      "name": "review corpus5: C12 ⚠ warn wrapper",
+      "expect": "noesc",
+      "limit": "Known limit 1: output in the same form as the real emitter at column 0 (test fixtures, prose, code fences, heredocs, wrapped test descriptions)."
+    },
+    {
+      "text": "✓ authentication failed.\nerror",
+      "bash": "build_failure",
+      "ts": "unknown",
+      "name": "review corpus5: C13 vitest ✓ col0 passing",
+      "expect": "noesc"
+    },
+    {
+      "text": "error: expected 'Error: Invalid API key.' got 'ok'",
+      "bash": "unknown",
+      "ts": "unknown",
+      "name": "review corpus5: C14 sed s/ / in log",
+      "expect": "noesc"
+    },
+    {
+      "text": "packages/agent deploy: Error: Failed to authenticate. API Error: 401 {\"type\":\"error\",\"error\":{\"type\":\"authentication_error\",\"message\":\"invalid x-api-key\"}}",
+      "bash": "build_failure",
+      "ts": "unknown",
+      "name": "review corpus6: pnpm -r prefix",
+      "expect": "esc:auth",
+      "limit": "Known limit (#8715 review): a line behind a monorepo or compose runner prefix (pnpm -r, turbo, docker compose) is never escalated. Those prefixes carry app and test output as often as real errors."
+    },
+    {
+      "text": "agent:run: Error: Failed to authenticate. API Error: 401 {\"type\":\"error\",\"error\":{\"type\":\"authentication_error\",\"message\":\"invalid x-api-key\"}}",
+      "bash": "build_failure",
+      "ts": "unknown",
+      "name": "review corpus6: turbo prefix",
+      "expect": "esc:auth",
+      "limit": "Known limit (#8715 review): a line behind a monorepo or compose runner prefix (pnpm -r, turbo, docker compose) is never escalated. Those prefixes carry app and test output as often as real errors."
+    },
+    {
+      "text": "agent-1  | Error: Failed to authenticate. API Error: 401 {\"type\":\"error\",\"error\":{\"type\":\"authentication_error\",\"message\":\"invalid x-api-key\"}}",
+      "bash": "build_failure",
+      "ts": "unknown",
+      "name": "review corpus6: docker compose prefix",
+      "expect": "esc:auth",
+      "limit": "Known limit (#8715 review): a line behind a monorepo or compose runner prefix (pnpm -r, turbo, docker compose) is never escalated. Those prefixes carry app and test output as often as real errors."
+    },
+    {
+      "text": "> agent@1.0.0 start\n> node run.js\n\nError: Failed to authenticate. API Error: 401 {\"type\":\"error\",\"error\":{\"type\":\"authentication_error\",\"message\":\"invalid x-api-key\"}}",
+      "bash": "auth_error",
+      "ts": "auth",
+      "name": "review corpus6: npm script wrapper col0",
+      "expect": "esc:auth"
+    },
+    {
+      "text": "stderr | a.test.ts > x\nnoise\n\nError: Failed to authenticate. API Error: 401 {\"type\":\"error\",\"error\":{\"type\":\"authentication_error\",\"message\":\"invalid x-api-key\"}}",
+      "bash": "auth_error",
+      "ts": "auth",
+      "name": "review corpus6: vitest stderr terminated by blank then auth",
+      "expect": "esc:auth"
+    },
+    {
+      "text": "build\tstep\t﻿2026-10-26T09:00:00.1Z Error: Failed to authenticate. API Error: 401 {\"type\":\"error\",\"error\":{\"type\":\"authentication_error\",\"message\":\"invalid x-api-key\"}}",
+      "bash": "auth_error",
+      "ts": "auth",
+      "name": "review corpus6: gh run log w/ BOM",
+      "expect": "esc:auth"
+    },
+    {
+      "text": "##[group]Run claude\n##[endgroup]\nInvalid API key · Please run /login\n##[error]Process completed with exit code 1.",
+      "bash": "auth_error",
+      "ts": "auth",
+      "name": "review corpus6: Claude 'Invalid API key' in ##[error] after group",
+      "expect": "esc:auth"
+    },
+    {
+      "text": " ✓ src/claude.test.ts > runner > maps auth failure 12ms\nstderr | src/claude.test.ts > runner > maps auth failure\nclaude exited 1, stderr:\nInvalid API key · Please run /login\n\n Test Files  1 failed | 3 passed (4)\nError: Process completed with exit code 1.",
+      "bash": "build_failure",
+      "ts": "unknown",
+      "name": "verifier 8718 k1/a1: vitest stderr, code under test logs 2 lines (exec stderr)",
+      "expect": "noesc"
+    },
+    {
+      "text": " FAIL  src/cli.test.ts > cli > status prints account\nError: Command failed: node bin/cli.js status\nError: Not logged in. Run `acme login` first.\n\n ❯ src/cli.test.ts:12:5\n Test Files  1 failed (1)",
+      "bash": "build_failure",
+      "ts": "unknown",
+      "name": "verifier 8718 k1/a2: vitest FAIL, execSync multi-line error message",
+      "expect": "noesc"
+    },
+    {
+      "text": "stderr | src/gh.test.ts > gh client > surfaces 401\n[gh] request failed:\ngh: HTTP 401: Bad credentials (https://api.github.com/graphql)\n\n FAIL  src/gh.test.ts > gh client > retries\nAssertionError: expected 2 to be 3\nError: Process completed with exit code 1.",
+      "bash": "build_failure",
+      "ts": "unknown",
+      "name": "verifier 8718 k1/a3: vitest stderr logger, gh 401 2nd line",
+      "expect": "noesc"
+    },
+    {
+      "text": "⎯⎯⎯⎯⎯⎯ Unhandled Rejection ⎯⎯⎯⎯⎯⎯\nError: git push failed\nfatal: Authentication failed for 'https://github.com/acme/fixture.git/'\n\n ❯ test/push.test.ts:20:3",
+      "bash": "build_failure",
+      "ts": "unknown",
+      "name": "verifier 8718 k1/a4: vitest Unhandled Rejection, multi-line message",
+      "expect": "noesc"
+    },
+    {
+      "text": "running 3 tests\nthread 'tests::push_with_bad_token' panicked at tests/push.rs:31:5:\ngit push failed:\nfatal: Authentication failed for 'https://github.com/acme/fixture.git/'\nnote: run with `RUST_BACKTRACE=1` environment variable to display a backtrace\ntest result: FAILED. 2 passed; 1 failed",
+      "bash": "build_failure",
+      "ts": "unknown",
+      "name": "verifier 8718 k1/a5: cargo panic, multi-line message",
+      "expect": "noesc"
+    },
+    {
+      "text": "stderr | src/session.test.ts > session > refresh\nSessionError: refresh failed\nOAuth token has expired.\n    at refresh (src/session.ts:40:11)\n\n FAIL  src/session.test.ts > session > other\nAssertionError: expected 1 to be 2",
+      "bash": "build_failure",
+      "ts": "unknown",
+      "name": "verifier 8718 k1/a6: vitest stderr console.error(err) where message multi-line",
+      "expect": "noesc"
+    },
+    {
+      "text": "stderr | test/auth.test.ts > guards > anonymous\nGET /api/me 401\nNot logged in.\n\n Test Files  1 failed (1)",
+      "bash": "build_failure",
+      "ts": "unknown",
+      "name": "verifier 8718 k1/a7: vitest stderr, 2nd line is 'Not logged in.'",
+      "expect": "noesc"
+    },
+    {
+      "text": "@acme/api:test: stderr | src/auth.test.ts > middleware > rejects anonymous\n@acme/api:test: Error: Not logged in\n@acme/api:test:     at requireAuth (src/auth.ts:12:11)\n@acme/api:test: \n@acme/api:test:  FAIL  src/db.test.ts > db > connects\n@acme/api:test: Error: connect ECONNREFUSED 127.0.0.1:5432\n@acme/api:test: ERROR: command finished with error: command (/repo/apps/api) pnpm run test exited (1)",
+      "bash": "build_failure",
+      "ts": "unknown",
+      "name": "verifier 8718 k1/b1: turbo vitest stderr (block not recognised behind prefix)",
+      "expect": "noesc"
+    },
+    {
+      "text": "apps/web test: stderr | src/session.test.ts > session > expired\napps/web test: OAuth token has expired.\napps/web test:  FAIL  src/x.test.ts > y\napps/web test: AssertionError: expected 1 to be 2\napps/web test: Failed\n ERR_PNPM_RECURSIVE_RUN_FIRST_FAIL  @acme/web@1.0.0 test: `vitest run`",
+      "bash": "build_failure",
+      "ts": "unknown",
+      "name": "verifier 8718 k1/b2: pnpm -r vitest stderr",
+      "expect": "noesc"
+    },
+    {
+      "text": "api-1  | Error: Not logged in\napi-1  |     at requireAuth (/app/src/auth.js:9:11)\ne2e-1  | 1 failed, 12 passed\ne2e-1 exited with code 1",
+      "bash": "build_failure",
+      "ts": "unknown",
+      "name": "verifier 8718 k1/b3: docker compose e2e: app logs its own auth error",
+      "expect": "noesc"
+    },
+    {
+      "text": "$ grep -r 'Not logged in' docs\ndocs/troubleshooting.md:Error: Not logged in · Please run /login\nError: build failed",
+      "bash": "build_failure",
+      "ts": "unknown",
+      "name": "verifier 8718 k1/b4: grep -r (no -n) over docs",
+      "expect": "noesc"
+    },
+    {
+      "text": "Auth/login status: Not logged in.\nBuild failed: 2 type errors",
+      "bash": "build_failure",
+      "ts": "unknown",
+      "name": "verifier 8718 k1/b5: prose word/word label",
+      "expect": "noesc"
+    },
+    {
+      "text": "config/errors.yml:unauthenticated: Authentication required.\nerror: lint failed",
+      "bash": "build_failure",
+      "ts": "unknown",
+      "name": "verifier 8718 k1/b6: grep -r yaml key",
+      "expect": "noesc"
+    },
+    {
+      "text": "⏺ Bash(cat test/fixtures/auth-401.txt)\n  ⎿  API Error: 401 {\"type\":\"error\",\"error\":{\"type\":\"authentication_error\",\"message\":\"invalid x-api-key\"}}\nError: tests failed",
+      "bash": "build_failure",
+      "ts": "unknown",
+      "name": "verifier 8718 k1/b7: TUI cat fixture under ⎿",
+      "expect": "noesc"
+    },
+    {
+      "text": "@acme/web:test: ✕ Not logged in. (3 ms)\n@acme/web:test: Tests: 1 failed",
+      "bash": "build_failure",
+      "ts": "unknown",
+      "name": "verifier 8718 k1/b8: turbo jest test title 'Not logged in.' unprefixed result glyph",
+      "expect": "noesc"
+    },
+    {
+      "text": "@acme/web:test: (fail) API Error: 401 when token missing\n@acme/web:test: error: script \"test\" exited with code 1",
+      "bash": "build_failure",
+      "ts": "unknown",
+      "name": "verifier 8718 k1/b9: turbo bun (fail) title",
+      "expect": "noesc"
+    },
+    {
+      "text": "api-1  | 401 Unauthorized - GET /v1/me\nweb-1  | Error: e2e failed",
+      "bash": "build_failure",
+      "ts": "unknown",
+      "name": "verifier 8718 k1/b10: compose app log: postgres-ish auth for test user",
+      "expect": "noesc"
+    },
+    {
+      "text": "@acme/cli:test: --- FAIL: TestLogin (0.00s)\n@acme/cli:test: Error: Not logged in.\n@acme/cli:test: FAIL",
+      "bash": "build_failure",
+      "ts": "unknown",
+      "name": "verifier 8718 k1/b11: go test verbose in turbo",
+      "expect": "noesc"
+    },
+    {
+      "text": "agent  | Error: Invalid API key · Please run /login\nagent exited with code 1",
+      "bash": "unknown",
+      "ts": "unknown",
+      "name": "verifier 8718 k1/c1: compose custom container_name (no -N)",
+      "expect": "esc:auth",
+      "limit": "Known limit 2: a prefix or form the classifier does not cover (compose without -N, lerna, yarn foreach, pretty-printed or array JSON, a real error as an open block's first content line); the run is retried."
+    },
+    {
+      "text": "@acme/agent: Error: Invalid API key · Please run /login\nlerna ERR! npm run deploy exited 1 in '@acme/agent'",
+      "bash": "unknown",
+      "ts": "unknown",
+      "name": "verifier 8718 k1/c2: lerna --stream prefix",
+      "expect": "esc:auth",
+      "limit": "Known limit 2: a prefix or form the classifier does not cover (compose without -N, lerna, yarn foreach, pretty-printed or array JSON, a real error as an open block's first content line); the run is retried."
+    },
+    {
+      "text": "[@acme/agent]: Invalid API key · Please run /login\nThe command failed in workspace @acme/agent",
+      "bash": "build_failure",
+      "ts": "unknown",
+      "name": "verifier 8718 k1/c3: yarn workspaces foreach prefix",
+      "expect": "esc:auth",
+      "limit": "Known limit 2: a prefix or form the classifier does not cover (compose without -N, lerna, yarn foreach, pretty-printed or array JSON, a real error as an open block's first content line); the run is retried."
+    },
+    {
+      "text": "{\n  \"type\": \"result\",\n  \"subtype\": \"success\",\n  \"is_error\": true,\n  \"result\": \"Invalid API key · Please run /login\"\n}",
+      "bash": "unknown",
+      "ts": "unknown",
+      "name": "verifier 8718 k1/c4: pretty-printed CLI json",
+      "expect": "esc:auth",
+      "limit": "Known limit 2: a prefix or form the classifier does not cover (compose without -N, lerna, yarn foreach, pretty-printed or array JSON, a real error as an open block's first content line); the run is retried."
+    },
+    {
+      "text": "{\"type\":\"result\",\"subtype\":\"success\",\"is_error\":true,\"duration_ms\":312,\"duration_api_ms\":0,\"num_turns\":1,\"result\":\"Invalid API key · Please run /login\",\"stop_reason\":null,\"session_id\":\"8f4e2a1b-1c2d-4e5f-9a8b-7c6d5e4f3a2b\",\"total_cost_usd\":0}",
+      "bash": "unknown",
+      "ts": "unknown",
+      "name": "verifier 8718 k1/c5: CLI JSON with api_error_status and uuid",
+      "expect": "esc:auth",
+      "limit": "Known limit (#8715 review): a raw CLI JSON result record is not escalated by the classifier. Fixtures, NDJSON replays and mock-CLI dumps print the same record at column 0. The loop's own `Fatal CLI error:` line now carries the record's result text (loop-restart.sh), which the phrases catch."
+    },
+    {
+      "text": "[{\"type\":\"system\",\"subtype\":\"init\"},{\"type\":\"result\",\"subtype\":\"success\",\"is_error\":true,\"result\":\"Invalid API key · Please run /login\"}]",
+      "bash": "unknown",
+      "ts": "unknown",
+      "name": "verifier 8718 k1/c6: JSON array form, whole line",
+      "expect": "esc:auth",
+      "limit": "Known limit 2: a prefix or form the classifier does not cover (compose without -N, lerna, yarn foreach, pretty-printed or array JSON, a real error as an open block's first content line); the run is retried."
+    },
+    {
+      "text": "stderr | src/a.test.ts > x\nsome log\nError: Invalid API key · Please run /login",
+      "bash": "unknown",
+      "ts": "unknown",
+      "name": "verifier 8718 k1/c7: vitest stderr open, real error after (truncated)",
+      "expect": "esc:auth",
+      "limit": "Known limit (#8715 review): an auth line on the second or later line of an open test-output block (vitest stderr/stdout, FAIL or Unhandled, cargo panic, pytest captured) is not escalated. Routine negative-path tests print exactly that, and a false escalation stops a healthy issue for good; a missed auth costs one bounded retry. Only a gh step boundary ends a block early."
+    },
+    {
+      "text": "stderr | src/a.test.ts > x\nError: Invalid API key · Please run /login",
+      "bash": "unknown",
+      "ts": "unknown",
+      "name": "verifier 8718 k1/c8: open stderr, real error is first content",
+      "expect": "esc:auth",
+      "limit": "Known limit 2: a prefix or form the classifier does not cover (compose without -N, lerna, yarn foreach, pretty-printed or array JSON, a real error as an open block's first content line); the run is retried."
+    },
+    {
+      "text": "@acme/agent:deploy: Error: Failed to authenticate. API Error: 401 {\"type\":\"error\",\"error\":{\"type\":\"authentication_error\",\"message\":\"invalid x-api-key\"}}",
+      "bash": "build_failure",
+      "ts": "unknown",
+      "name": "verifier 8718 k1/c9: turbo deploy real",
+      "expect": "esc:auth",
+      "limit": "Known limit (#8715 review): a line behind a monorepo or compose runner prefix (pnpm -r, turbo, docker compose) is never escalated. Those prefixes carry app and test output as often as real errors."
+    },
+    {
+      "text": "agent-1  | 2026-10-25T12:00:00.123456789Z Error: Invalid API key · Please run /login",
+      "bash": "unknown",
+      "ts": "unknown",
+      "name": "verifier 8718 k1/c10: compose with timestamps flag",
+      "expect": "esc:auth",
+      "limit": "Known limit (#8715 review): a line behind a monorepo or compose runner prefix (pnpm -r, turbo, docker compose) is never escalated. Those prefixes carry app and test output as often as real errors."
+    },
+    {
+      "text": "packages/release publish: gh: HTTP 401: Bad credentials (https://api.github.com/graphql)",
+      "bash": "unknown",
+      "ts": "unknown",
+      "name": "verifier 8718 k1/c11: pnpm -r with gh error",
+      "expect": "esc:auth",
+      "limit": "Known limit (#8715 review): a line behind a monorepo or compose runner prefix (pnpm -r, turbo, docker compose) is never escalated. Those prefixes carry app and test output as often as real errors."
+    },
+    {
+      "text": "thread 'main' panicked at src/main.rs:3:5:\nboom\n##[error]Process completed with exit code 101.\nError: Invalid API key · Please run /login",
+      "bash": "build_failure",
+      "ts": "unknown",
+      "name": "verifier 8718 k1/c12: open panic then real ##[error]",
+      "expect": "esc:auth",
+      "limit": "Known limit (#8715 review): ##[error]/##[group]/::error lines do not end an open test-output block: the runner rewrites any process's ::error:: and ::group:: output in place, mid-step, so test output prints them too."
+    },
+    {
+      "text": "@acme/api:test:   2 passing (12ms)\n@acme/api:test:   1 failing\n@acme/api:test: \n@acme/api:test:   1) classifier\n@acme/api:test:        authentication failed:\n@acme/api:test:      AssertionError: expected 'unknown' to equal 'auth'\n@acme/api:test:       at Context.<anonymous> (test/classify.test.js:10:5)",
+      "bash": "build_failure",
+      "ts": "unknown",
+      "name": "verifier 8718 k2c/turbo: turbo-prefixed verifier a1: mocha failure summary: title on own line, 7-space indent, colon",
+      "expect": "noesc"
+    },
+    {
+      "text": "@acme/api:test:   1 failing\n@acme/api:test: \n@acme/api:test:   1) gh wrapper\n@acme/api:test:        not logged in:\n@acme/api:test:      Error: expected exit 4\n@acme/api:test: ",
+      "bash": "build_failure",
+      "ts": "unknown",
+      "name": "verifier 8718 k2c/turbo: turbo-prefixed verifier a2: mocha summary title 'not logged in:'",
+      "expect": "noesc"
+    },
+    {
+      "text": "@acme/api:test:   1 failing\n@acme/api:test: \n@acme/api:test:   1) client\n@acme/api:test:        invalid api key returns 401:\n@acme/api:test:      AssertionError: expected 200 to equal 401",
+      "bash": "build_failure",
+      "ts": "unknown",
+      "name": "verifier 8718 k2c/turbo: turbo-prefixed verifier a3: mocha summary title 'invalid api key returns 401:'",
+      "expect": "noesc"
+    },
+    {
+      "text": "@acme/api:test:  FAIL  src/auth.test.ts > gh > not logged in\n@acme/api:test: AssertionError: expected 1 to be 4",
+      "bash": "build_failure",
+      "ts": "unknown",
+      "name": "verifier 8718 k2c/turbo: turbo-prefixed verifier a15: vitest FAIL header with > path",
+      "expect": "noesc"
+    },
+    {
+      "text": "@acme/api:test: test auth::not_logged_in ... FAILED\n@acme/api:test: failures:\n@acme/api:test: ---- auth::not_logged_in stdout ----\n@acme/api:test: thread 'main' panicked at 'assertion failed: authentication failed'",
+      "bash": "build_failure",
+      "ts": "unknown",
+      "name": "verifier 8718 k2c/turbo: turbo-prefixed verifier a18: cargo test",
+      "expect": "noesc"
+    },
+    {
+      "text": "@acme/api:test:   1) outer\n@acme/api:test:        inner\n@acme/api:test:          issue not found:\n@acme/api:test:      Error: expected 404",
+      "bash": "unknown",
+      "ts": "unknown",
+      "name": "verifier 8718 k2c/turbo: turbo-prefixed verifier a24: mocha nested suite title 9-space indent",
+      "expect": "noesc"
+    },
+    {
+      "text": "@acme/api:test:   console.error\n@acme/api:test:     Authentication failed: mocked\n@acme/api:test: \n@acme/api:test:       at Object.<anonymous> (src/x.test.ts:3:11)\n@acme/api:test: Tests: 1 failed",
+      "bash": "build_failure",
+      "ts": "unknown",
+      "name": "verifier 8718 k2c/turbo: turbo-prefixed verifier a25: jest test title printed via ● describe header dropped, but console.error block printed raw",
+      "expect": "noesc"
+    },
+    {
+      "text": "@acme/api:test: \n@acme/api:test:  RUN  v4.0.18 /tmp/work/x.js\n@acme/api:test: \n@acme/api:test:  ❯ x.test.mjs (2 tests | 2 failed) 4ms\n@acme/api:test:    × git log text 3ms\n@acme/api:test:    × cli text 0ms\n@acme/api:test: \n@acme/api:test: ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 2 ⎯⎯⎯⎯⎯⎯⎯\n@acme/api:test: \n@acme/api:test:  FAIL  x.test.mjs > git log text\n@acme/api:test: AssertionError: expected 'ok\\nfine' to be 'remote: Invalid username or password.…' // Object.is equality\n@acme/api:test: \n@acme/api:test: - Expected\n@acme/api:test: + Received\n@acme/api:test: \n@acme/api:test: - remote: Invalid username or password.\n@acme/api:test: - fatal: Authentication failed for 'https://github.com/o/r.git/'\n@acme/api:test: + ok\n@acme/api:test: + fine\n@acme/api:test: \n@acme/api:test:  ❯ x.test.mjs:2:22\n@acme/api:test:       1| test(\"git log text\", () => {\n@acme/api:test:       2|   expect(\"ok\\nfine\").toBe(\"remote: Invalid username or password.\\nfata…\n@acme/api:test:        |                      ^\n@acme/api:test:       3| });\n@acme/api:test:       4| test(\"cli text\", () => {\n@acme/api:test: \n@acme/api:test: ⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/2]⎯\n@acme/api:test: \n@acme/api:test:  FAIL  x.test.mjs > cli text\n@acme/api:test: AssertionError: expected 'Hello\\nthere' to be 'Invalid API key · Please run /login\\n…' // Object.is equality\n@acme/api:test: \n@acme/api:test: - Expected\n@acme/api:test: + Received\n@acme/api:test: \n@acme/api:test: - Invalid API key · Please run /login\n@acme/api:test: - bye\n@acme/api:test: + Hello\n@acme/api:test: + there\n@acme/api:test: \n@acme/api:test:  ❯ x.test.mjs:5:26\n@acme/api:test:       3| });\n@acme/api:test:       4| test(\"cli text\", () => {\n@acme/api:test:       5|   expect(\"Hello\\nthere\").toBe(\"Invalid API key · Please run /login\\nby…\n@acme/api:test:        |                          ^\n@acme/api:test:       6| });\n@acme/api:test:       7| \n@acme/api:test: \n@acme/api:test: ⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/2]⎯\n@acme/api:test: \n@acme/api:test: \n@acme/api:test:  Test Files  1 failed (1)\n@acme/api:test:       Tests  2 failed (2)\n@acme/api:test:    Start at  23:13:35\n@acme/api:test:    Duration  68ms (transform 6ms, setup 0ms, import 8ms, tests 4ms, environment 0ms)\n@acme/api:test: \n@acme/api:test: ",
+      "bash": "build_failure",
+      "ts": "unknown",
+      "name": "verifier 8718 k2c/turbo: turbo-prefixed verifier r1: REAL vitest 4 failure output",
+      "expect": "noesc"
+    },
+    {
+      "text": "@acme/api:test: Failures:\n@acme/api:test: \n@acme/api:test:   1) SessionsController POST #create rejects a bad password\n@acme/api:test:      Failure/Error: raise AuthError, \"Not logged in\"\n@acme/api:test: \n@acme/api:test:      AuthError:\n@acme/api:test:        Not logged in\n@acme/api:test:      # ./app/controllers/sessions_controller.rb:12:in `create'\n@acme/api:test: \n@acme/api:test: Finished in 0.5 seconds\n@acme/api:test: 3 examples, 1 failure",
+      "bash": "build_failure",
+      "ts": "unknown",
+      "name": "verifier 8718 k2c/turbo: turbo-prefixed verifier r2 c1/a1: rspec exception message on own indented line",
+      "expect": "noesc"
+    },
+    {
+      "text": "@acme/api:test:   1) Api::Client#fetch raises on 401\n@acme/api:test:      Failure/Error: expect { client.fetch }.not_to raise_error\n@acme/api:test: \n@acme/api:test:        expected no Exception, got #<Api::AuthError: Authentication failed> with backtrace:\n@acme/api:test: \n@acme/api:test:      Api::AuthError:\n@acme/api:test:        Authentication failed\n@acme/api:test:      # ./lib/api/client.rb:40\n@acme/api:test: 1 example, 1 failure",
+      "bash": "build_failure",
+      "ts": "unknown",
+      "name": "verifier 8718 k2c/turbo: turbo-prefixed verifier r2 c1/a2: rspec RuntimeError: Authentication failed",
+      "expect": "noesc"
+    },
+    {
+      "text": "@acme/api:test: running 3 tests\n@acme/api:test: test auth::tests::rejects_bad_token ... FAILED\n@acme/api:test: \n@acme/api:test: failures:\n@acme/api:test: \n@acme/api:test: ---- auth::tests::rejects_bad_token stdout ----\n@acme/api:test: thread 'auth::tests::rejects_bad_token' panicked at src/auth.rs:42:9:\n@acme/api:test: authentication failed\n@acme/api:test: note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace\n@acme/api:test: \n@acme/api:test: test result: FAILED. 2 passed; 1 failed; 0 ignored",
+      "bash": "build_failure",
+      "ts": "unknown",
+      "name": "verifier 8718 k2c/turbo: turbo-prefixed verifier r2 c1/a3: cargo panic message (Rust >=1.73 layout)",
+      "expect": "noesc"
+    },
+    {
+      "text": "@acme/api:test: thread 'main' panicked at src/main.rs:10:30:\n@acme/api:test: failed to authenticate: Status(401)\n@acme/api:test: error: test failed, to rerun pass `--lib`",
+      "bash": "build_failure",
+      "ts": "unknown",
+      "name": "verifier 8718 k2c/turbo: turbo-prefixed verifier r2 c1/a4: cargo .expect() panic",
+      "expect": "noesc"
+    },
+    {
+      "text": "@acme/api:test:   1 passing (12ms)\n@acme/api:test:   1 failing\n@acme/api:test: \n@acme/api:test:   1) Auth\n@acme/api:test:        login:\n@acme/api:test:      Error: Authentication failed\n@acme/api:test:       at Context.<anonymous> (test/auth.spec.js:8:11)",
+      "bash": "build_failure",
+      "ts": "unknown",
+      "name": "verifier 8718 k2c/turbo: turbo-prefixed verifier r2 c1/a6: mocha uncaught error message",
+      "expect": "noesc"
+    },
+    {
+      "text": "@acme/api:test:   1) [chromium] › tests/login.spec.ts:3:5 › login with wrong password ─────────────\n@acme/api:test: \n@acme/api:test:     Error: Authentication failed\n@acme/api:test: \n@acme/api:test:       3 | test('login with wrong password', async ({ page }) => {\n@acme/api:test:   1 failed",
+      "bash": "build_failure",
+      "ts": "unknown",
+      "name": "verifier 8718 k2c/turbo: turbo-prefixed verifier r2 c1/a7: Playwright failure",
+      "expect": "noesc"
+    },
+    {
+      "text": "@acme/api:test:  FAIL  src/auth.test.ts\n@acme/api:test:   ● Auth › login › throws on bad key\n@acme/api:test: \n@acme/api:test:     Invalid API key\n@acme/api:test: \n@acme/api:test:       4 |   it('throws on bad key', async () => {\n@acme/api:test:     at Object.<anonymous> (src/auth.test.ts:5:11)\n@acme/api:test: Tests:       1 failed, 3 passed",
+      "bash": "build_failure",
+      "ts": "unknown",
+      "name": "verifier 8718 k2c/turbo: turbo-prefixed verifier r2 c1/a8: jest thrown error (Error: stripped by jest)",
+      "expect": "noesc"
+    },
+    {
+      "text": "@acme/api:test:  FAIL  src/auth.test.ts > client > refreshes\n@acme/api:test: Error: OAuth token has expired.\n@acme/api:test:  ❯ src/auth.ts:20:11\n@acme/api:test:  Test Files  1 failed (1)",
+      "bash": "build_failure",
+      "ts": "unknown",
+      "name": "verifier 8718 k2c/turbo: turbo-prefixed verifier r2 c1/a10: vitest thrown error",
+      "expect": "noesc"
+    },
+    {
+      "text": "@acme/api:test: stderr | src/auth.test.ts > login > rejects\n@acme/api:test: Authentication failed: bad password\n@acme/api:test: \n@acme/api:test:  ✓ src/auth.test.ts (3)\n@acme/api:test:  FAIL  src/db.test.ts > migrate\n@acme/api:test: AssertionError: expected 1 to be 2",
+      "bash": "build_failure",
+      "ts": "unknown",
+      "name": "verifier 8718 k2c/turbo: turbo-prefixed verifier r2 c1/a12: vitest stderr block from code under test",
+      "expect": "noesc"
+    },
+    {
+      "text": "@acme/api:test: ----------------------------- Captured stderr call -----------------------------\n@acme/api:test: fatal: Authentication failed for 'https://example.invalid/repo.git/'\n@acme/api:test: FAILED tests/test_clone.py::test_clone_private - AssertionError",
+      "bash": "build_failure",
+      "ts": "unknown",
+      "name": "verifier 8718 k2c/turbo: turbo-prefixed verifier r2 c1/a13: pytest captured stderr",
+      "expect": "noesc"
+    },
+    {
+      "text": "@acme/api:test:   1) Login\n@acme/api:test:        shows error banner:\n@acme/api:test:      AssertionError: Timed out retrying after 4000ms: Expected to find content: 'Bad credentials' but never did.",
+      "bash": "unknown",
+      "ts": "unknown",
+      "name": "verifier 8718 k2c/turbo: turbo-prefixed verifier r2 c1/a19: Cypress",
+      "expect": "noesc"
+    },
+    {
+      "text": "@acme/api:test: ------------------------------ Captured log call -------------------------------\n@acme/api:test: ERROR    app.auth:auth.py:22 Authentication failed: bad password",
+      "bash": "build_failure",
+      "ts": "unknown",
+      "name": "verifier 8718 k2c/turbo: turbo-prefixed verifier r2 c1/a23: pytest log capture",
+      "expect": "noesc"
+    },
+    {
+      "text": "@acme/api:test:   1) Error:\n@acme/api:test: AuthTest#test_login:\n@acme/api:test: AuthError: Not logged in\n@acme/api:test:     app/auth.rb:3:in `login'",
+      "bash": "unknown",
+      "ts": "unknown",
+      "name": "verifier 8718 k2c/turbo: turbo-prefixed verifier r2 c1/a31: ruby minitest",
+      "expect": "noesc"
+    },
+    {
+      "text": "@acme/api:test: Pending: (Failures listed here are expected and do not affect your suite's status)\n@acme/api:test:   1) Client handles not logged in\n@acme/api:test:      # Temporarily skipped with xit\n@acme/api:test:      # ./spec/client_spec.rb:3",
+      "bash": "build_failure",
+      "ts": "unknown",
+      "name": "verifier 8718 k2c/turbo: turbo-prefixed verifier r2 c1/a32: jest console block without blank line? no: rspec pending",
+      "expect": "noesc"
+    },
+    {
+      "text": "@acme/api:test: Summary of all failing tests\n@acme/api:test:  FAIL  src/a.test.ts\n@acme/api:test:   ● gh › error: authentication failed for bad token",
+      "bash": "build_failure",
+      "ts": "unknown",
+      "name": "verifier 8718 k2c/turbo: turbo-prefixed verifier r2 c1/a36: jest each table test title prints in summary",
+      "expect": "noesc"
+    },
+    {
+      "text": "@acme/api:test: ▸ Running tests...\n@acme/api:test: test auth::tests::rejects_bad_token ... FAILED\n@acme/api:test: \n@acme/api:test: failures:\n@acme/api:test: \n@acme/api:test: ---- auth::tests::rejects_bad_token stdout ----\n@acme/api:test: thread 'auth::tests::rejects_bad_token' panicked at src/auth.rs:42:9:\n@acme/api:test: --\n@acme/api:test: test result: FAILED. 2 passed; 1 failed; 0 ignored\n@acme/api:test: ✗ Tests failed",
+      "bash": "build_failure",
+      "ts": "unknown",
+      "name": "verifier 8718 k2c/turbo: turbo-prefixed verifier r2 c6/Pa3: via pipeline grep -A5: cargo panic message (Rust >=1.73 layout)",
+      "expect": "noesc"
+    },
+    {
+      "text": "@acme/api:test: ▸ Running tests...\n@acme/api:test:  FAIL  src/auth.test.ts\n@acme/api:test:   ● Auth › login › throws on bad key\n@acme/api:test: \n@acme/api:test:     Invalid API key\n@acme/api:test: \n@acme/api:test:       4 |   it('throws on bad key', async () => {\n@acme/api:test: ✗ Tests failed",
+      "bash": "build_failure",
+      "ts": "unknown",
+      "name": "verifier 8718 k2c/turbo: turbo-prefixed verifier r2 c6/Pa8: via pipeline grep -A5: jest thrown error (Error: stripped by jest)",
+      "expect": "noesc"
+    },
+    {
+      "text": "@acme/api:test: ▸ Running tests...\n@acme/api:test:  FAIL  src/auth.test.ts > client > refreshes\n@acme/api:test: Error: OAuth token has expired.\n@acme/api:test:  ❯ src/auth.ts:20:11\n@acme/api:test:  Test Files  1 failed (1)\n@acme/api:test: ✗ Tests failed",
+      "bash": "build_failure",
+      "ts": "unknown",
+      "name": "verifier 8718 k2c/turbo: turbo-prefixed verifier r2 c6/Pa10: via pipeline grep -A5: vitest thrown error",
+      "expect": "noesc"
+    },
+    {
+      "text": "@acme/api:test:  FAIL  src/auth/client.test.ts [ src/auth/client.test.ts ]\n@acme/api:test: Error: Not logged in.\n@acme/api:test:  ❯ src/auth/client.ts:12:9",
+      "bash": "build_failure",
+      "ts": "unknown",
+      "name": "verifier 8718 k2c/turbo: turbo-prefixed verifier r3 c1/a1: vitest suite-level failure (import throws)",
+      "expect": "noesc"
+    },
+    {
+      "text": "@acme/api:test: ⎯⎯⎯⎯⎯⎯ Unhandled Errors ⎯⎯⎯⎯⎯⎯\n@acme/api:test: \n@acme/api:test: Vitest caught 1 unhandled error during the test run.\n@acme/api:test: \n@acme/api:test: ⎯⎯⎯⎯ Unhandled Rejection ⎯⎯⎯⎯⎯\n@acme/api:test: Error: Authentication failed: token rejected\n@acme/api:test:  ❯ src/git.ts:40:11",
+      "bash": "build_failure",
+      "ts": "unknown",
+      "name": "verifier 8718 k2c/turbo: turbo-prefixed verifier r3 c1/a2: vitest unhandled rejection",
+      "expect": "noesc"
+    },
+    {
+      "text": "@acme/api:test:  FAIL  src/auth.test.ts\n@acme/api:test:   ● Test suite failed to run\n@acme/api:test: \n@acme/api:test:     Not logged in.",
+      "bash": "build_failure",
+      "ts": "unknown",
+      "name": "verifier 8718 k2c/turbo: turbo-prefixed verifier r3 c1/a3: jest FAIL header + suite failed to run",
+      "expect": "noesc"
+    },
+    {
+      "text": "@acme/api:test:   1) [chromium] › auth.spec.ts:3:5 › login ──────\n@acme/api:test: \n@acme/api:test:     Error: expect(received).toHaveText(expected)\n@acme/api:test: \n@acme/api:test:     Expected string: \"Not logged in.\"",
+      "bash": "unknown",
+      "ts": "unknown",
+      "name": "verifier 8718 k2c/turbo: turbo-prefixed verifier r3 c1/a8: playwright list",
+      "expect": "noesc"
+    },
+    {
+      "text": "@acme/api:test:  FAIL  test/gh.test.ts [ test/gh.test.ts ]\n@acme/api:test: Error: HTTP 401: Bad credentials (https://api.github.com/graphql)",
+      "bash": "build_failure",
+      "ts": "unknown",
+      "name": "verifier 8718 k2c/turbo: turbo-prefixed verifier r3 c1/a10: vitest suite-level, no ❯",
+      "expect": "noesc"
+    },
+    {
+      "text": "@acme/api:test:  FAIL  src/agent/errors.test.ts > parseAgentError > maps a 401 to auth\n@acme/api:test: AssertionError: expected 'unknown' to be 'auth'\n@acme/api:test: \n@acme/api:test: - Expected\n@acme/api:test: + Received\n@acme/api:test: \n@acme/api:test: - auth\n@acme/api:test: + unknown\n@acme/api:test: \n@acme/api:test:  ❯ src/agent/errors.test.ts:10:20\n@acme/api:test:       8| it(\"maps a 401 to auth\", () => {\n@acme/api:test:       9|   const r = parseAgentError('API Error: 401 {\"type\":\"error\",\"error\":{\"type\":\"authentication_error\",\"message\":\"invalid x-api-key\"}}');\n@acme/api:test:      10|   expect(r.kind).toBe(\"auth\");\n@acme/api:test:        |                  ^\n@acme/api:test: \n@acme/api:test: ⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯\n@acme/api:test: \n@acme/api:test:  Test Files  1 failed (1)\n@acme/api:test:       Tests  1 failed (1)",
+      "bash": "build_failure",
+      "ts": "unknown",
+      "name": "verifier 8718 k2c/turbo: turbo-prefixed verifier r4 c1/a2: vitest code frame with 401 body fixture",
+      "expect": "noesc"
+    },
+    {
+      "text": "@acme/api:test:   console.error\n@acme/api:test:     fatal: Authentication failed for 'https://github.com/acme/app.git/'\n@acme/api:test: \n@acme/api:test:       at Object.error (src/git.test.ts:3:11)\n@acme/api:test: \n@acme/api:test: FAIL src/git.test.ts",
+      "bash": "build_failure",
+      "ts": "unknown",
+      "name": "verifier 8718 k2c/turbo: turbo-prefixed verifier r4 c1/a9: jest console.error block with message at column 4",
+      "expect": "noesc"
+    },
+    {
+      "text": "@acme/api:test:   console.warn\n@acme/api:test: \tNot logged in.\n@acme/api:test: \n@acme/api:test:       at x (a.js:1:1)\n@acme/api:test: Tests: 1 failed",
+      "bash": "build_failure",
+      "ts": "unknown",
+      "name": "verifier 8718 k2c/turbo: turbo-prefixed verifier r4 c1/a10: jest console.warn header, tab-indented message",
+      "expect": "noesc"
+    },
+    {
+      "text": "@acme/api:test: ------------------------------ Captured log call -------------------------------\n@acme/api:test: ERROR    app.git:git.py:12 push failed\n@acme/api:test: fatal: Authentication failed for 'https://github.com/acme/app.git/'\n@acme/api:test: =========================== short test summary info ============================\n@acme/api:test: FAILED tests/test_git.py::test_push - RuntimeError",
+      "bash": "build_failure",
+      "ts": "unknown",
+      "name": "verifier 8718 k2c/turbo: turbo-prefixed verifier r4 c1/a11: pytest captured stdout, then 'ERROR' log line inside captured log ends block early",
+      "expect": "noesc"
+    },
+    {
+      "text": "@acme/api:test: ⎯⎯⎯⎯ Unhandled Rejection ⎯⎯⎯⎯⎯\n@acme/api:test: HTTP 401: Bad credentials (https://api.github.com/graphql)\n@acme/api:test:  ❯ src/gh.ts:40:11",
+      "bash": "unknown",
+      "ts": "unknown",
+      "name": "verifier 8718 k2c/turbo: turbo-prefixed verifier r4 c1/a13: vitest Unhandled Rejection then mocked gh at col0 before frame",
+      "expect": "noesc"
+    },
+    {
+      "text": "@acme/api:test:  FAIL  src/gh.test.ts [ src/gh.test.ts ]\n@acme/api:test: Error: HTTP 401: Bad credentials (https://api.github.com/graphql)\n@acme/api:test:  ❯ src/gh.ts:1:1",
+      "bash": "build_failure",
+      "ts": "unknown",
+      "name": "verifier 8718 k2c/turbo: turbo-prefixed verifier r4 c1/a14: vitest suite-level FAIL [ file ] with gh-shaped error",
+      "expect": "noesc"
+    },
+    {
+      "text": "@acme/api:test: ▸ Running tests...\n@acme/api:test:  FAIL  src/agent/errors.test.ts > parseAgentError > maps a 401 to auth\n@acme/api:test: AssertionError: expected 'unknown' to be 'auth'\n@acme/api:test: \n@acme/api:test: - Expected\n@acme/api:test: + Received\n@acme/api:test: \n@acme/api:test: - auth\n@acme/api:test: --\n@acme/api:test:       9|   const r = parseAgentError('API Error: 401 {\"type\":\"error\",\"error\":{\"type\":\"authentication_error\",\"message\":\"invalid x-api-key\"}}');\n@acme/api:test:      10|   expect(r.kind).toBe(\"auth\");\n@acme/api:test:        |                  ^\n@acme/api:test: \n@acme/api:test: ⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯\n@acme/api:test: \n@acme/api:test: ✗ Tests failed",
+      "bash": "build_failure",
+      "ts": "unknown",
+      "name": "verifier 8718 k2c/turbo: turbo-prefixed verifier r4 c2/Pa2: via pipeline grep -A5: vitest code frame with 401 body fixture",
+      "expect": "noesc"
+    },
+    {
+      "text": "@acme/api:test:   1) Client raises on 401\n@acme/api:test:      Failure/Error: expect { client.call }.to raise_error(AuthError)\n@acme/api:test:        expected AuthError, got #<RuntimeError: 401 {\"type\":\"error\",\"error\":{\"type\":\"authentication_error\",\"message\":\"invalid x-api-key\"}}>\n@acme/api:test: rspec ./spec/client_spec.rb:5",
+      "bash": "build_failure",
+      "ts": "unknown",
+      "name": "verifier 8718 k2c/turbo: turbo-prefixed verifier r4 c2/d3: rspec failure with 401 body in expected",
+      "expect": "noesc"
+    },
+    {
+      "text": "@acme/api:test:  FAIL  src/a.test.ts > maps\n@acme/api:test: AssertionError: expected 'API Error: 401 {\"type\":\"error\",\"error\":{\"type\":\"authentication_error\",\"message\":\"invalid x-api-key\"},\"request_id\":\"req_011CUXabc\"}' to be 'auth'\n@acme/api:test:  ❯ src/a.test.ts:3:3",
+      "bash": "build_failure",
+      "ts": "unknown",
+      "name": "verifier 8718 k2c/turbo: turbo-prefixed verifier r5 corpus/N11: vitest AssertionError under FAIL header",
+      "expect": "noesc"
+    },
+    {
+      "text": "@acme/api:test: ------------------------------ Captured log call -------------------------------\n@acme/api:test: ERROR    root:llm.py:12 boom\n@acme/api:test: anthropic.AuthenticationError: Error code: 401 - {'type': 'error', 'error': {'type': 'authentication_error', 'message': 'invalid x-api-key'}, 'request_id': 'req_011CUXabc'}\n@acme/api:test: =========================== short test summary info ============================\n@acme/api:test: FAILED tests/test_llm.py::test_call",
+      "bash": "build_failure",
+      "ts": "unknown",
+      "name": "verifier 8718 k2c/turbo: turbo-prefixed verifier r5 corpus/N12: pytest captured log with real-shaped line",
+      "expect": "noesc"
+    },
+    {
+      "text": "@acme/api:test: ----------------------------- Captured stdout call -----------------------------\n@acme/api:test: ERROR tests/test_a.py - boom\n@acme/api:test: API Error: 401 {\"type\":\"error\",\"error\":{\"type\":\"authentication_error\",\"message\":\"invalid x-api-key\"},\"request_id\":\"req_011CUXabc\"}\n@acme/api:test: =========================== 1 failed in 0.1s ===",
+      "bash": "build_failure",
+      "ts": "unknown",
+      "name": "verifier 8718 k2c/turbo: turbo-prefixed verifier r5 corpus/N13: pytest captured stdout, ERROR collecting-like line w/o :: then real-shaped",
+      "expect": "noesc"
+    },
+    {
+      "text": "@acme/api:test:  FAIL  src/p.test.ts > parse > result\n@acme/api:test: AssertionError: expected { …(2) } to deeply equal { …(2) }\n@acme/api:test: \n@acme/api:test: - Expected\n@acme/api:test: + Received\n@acme/api:test: \n@acme/api:test:   {\n@acme/api:test:     \"is_error\": true,\n@acme/api:test: -   \"result\": \"ok\",\n@acme/api:test: +   \"result\": \"API Error: 401 {\\\"type\\\":\\\"error\\\",\\\"error\\\":{\\\"type\\\":\\\"authentication_error\\\",\\\"message\\\":\\\"invalid x-api-key\\\"},\\\"request_id\\\":\\\"req_011CUXabc\\\"}\",\n@acme/api:test:   }\n@acme/api:test: \n@acme/api:test:  ❯ src/p.test.ts:9:5",
+      "bash": "build_failure",
+      "ts": "unknown",
+      "name": "verifier 8718 k2c/turbo: turbo-prefixed verifier r5 corpus2/Q1: vitest toEqual diff of stream-json object under FAIL header",
+      "expect": "noesc"
+    },
+    {
+      "text": "@acme/api:test:   console.log\n@acme/api:test:     {\n@acme/api:test:       \"result\": \"API Error: 401 {\\\"type\\\":\\\"error\\\",\\\"error\\\":{\\\"type\\\":\\\"authentication_error\\\",\\\"message\\\":\\\"invalid x-api-key\\\"},\\\"request_id\\\":\\\"req_011CUXabc\\\"}\"\n@acme/api:test:     }\n@acme/api:test: \n@acme/api:test:       at Object.<anonymous> (a.test.ts:3:9)\n@acme/api:test: Tests: 1 failed",
+      "bash": "build_failure",
+      "ts": "unknown",
+      "name": "verifier 8718 k2c/turbo: turbo-prefixed verifier r5 corpus2/Q3: JSON.stringify'd pretty test fixture printed by console.log in jest block",
+      "expect": "noesc"
+    },
+    {
+      "text": "apps/api test:   2 passing (12ms)\napps/api test:   1 failing\napps/api test: \napps/api test:   1) classifier\napps/api test:        authentication failed:\napps/api test:      AssertionError: expected 'unknown' to equal 'auth'\napps/api test:       at Context.<anonymous> (test/classify.test.js:10:5)",
+      "bash": "build_failure",
+      "ts": "unknown",
+      "name": "verifier 8718 k2c/pnpm: pnpm-prefixed verifier a1: mocha failure summary: title on own line, 7-space indent, colon",
+      "expect": "noesc"
+    },
+    {
+      "text": "apps/api test:   1 failing\napps/api test: \napps/api test:   1) gh wrapper\napps/api test:        not logged in:\napps/api test:      Error: expected exit 4\napps/api test: ",
+      "bash": "build_failure",
+      "ts": "unknown",
+      "name": "verifier 8718 k2c/pnpm: pnpm-prefixed verifier a2: mocha summary title 'not logged in:'",
+      "expect": "noesc"
+    },
+    {
+      "text": "apps/api test:   1 failing\napps/api test: \napps/api test:   1) client\napps/api test:        invalid api key returns 401:\napps/api test:      AssertionError: expected 200 to equal 401",
+      "bash": "build_failure",
+      "ts": "unknown",
+      "name": "verifier 8718 k2c/pnpm: pnpm-prefixed verifier a3: mocha summary title 'invalid api key returns 401:'",
+      "expect": "noesc"
+    },
+    {
+      "text": "apps/api test:  FAIL  src/auth.test.ts > gh > not logged in\napps/api test: AssertionError: expected 1 to be 4",
+      "bash": "build_failure",
+      "ts": "unknown",
+      "name": "verifier 8718 k2c/pnpm: pnpm-prefixed verifier a15: vitest FAIL header with > path",
+      "expect": "noesc"
+    },
+    {
+      "text": "apps/api test: test auth::not_logged_in ... FAILED\napps/api test: failures:\napps/api test: ---- auth::not_logged_in stdout ----\napps/api test: thread 'main' panicked at 'assertion failed: authentication failed'",
+      "bash": "build_failure",
+      "ts": "unknown",
+      "name": "verifier 8718 k2c/pnpm: pnpm-prefixed verifier a18: cargo test",
+      "expect": "noesc"
+    },
+    {
+      "text": "apps/api test:   1) outer\napps/api test:        inner\napps/api test:          issue not found:\napps/api test:      Error: expected 404",
+      "bash": "unknown",
+      "ts": "unknown",
+      "name": "verifier 8718 k2c/pnpm: pnpm-prefixed verifier a24: mocha nested suite title 9-space indent",
+      "expect": "noesc"
+    },
+    {
+      "text": "apps/api test:   console.error\napps/api test:     Authentication failed: mocked\napps/api test: \napps/api test:       at Object.<anonymous> (src/x.test.ts:3:11)\napps/api test: Tests: 1 failed",
+      "bash": "build_failure",
+      "ts": "unknown",
+      "name": "verifier 8718 k2c/pnpm: pnpm-prefixed verifier a25: jest test title printed via ● describe header dropped, but console.error block printed raw",
+      "expect": "noesc"
+    },
+    {
+      "text": "apps/api test: \napps/api test:  RUN  v4.0.18 /tmp/work/x.js\napps/api test: \napps/api test:  ❯ x.test.mjs (2 tests | 2 failed) 4ms\napps/api test:    × git log text 3ms\napps/api test:    × cli text 0ms\napps/api test: \napps/api test: ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 2 ⎯⎯⎯⎯⎯⎯⎯\napps/api test: \napps/api test:  FAIL  x.test.mjs > git log text\napps/api test: AssertionError: expected 'ok\\nfine' to be 'remote: Invalid username or password.…' // Object.is equality\napps/api test: \napps/api test: - Expected\napps/api test: + Received\napps/api test: \napps/api test: - remote: Invalid username or password.\napps/api test: - fatal: Authentication failed for 'https://github.com/o/r.git/'\napps/api test: + ok\napps/api test: + fine\napps/api test: \napps/api test:  ❯ x.test.mjs:2:22\napps/api test:       1| test(\"git log text\", () => {\napps/api test:       2|   expect(\"ok\\nfine\").toBe(\"remote: Invalid username or password.\\nfata…\napps/api test:        |                      ^\napps/api test:       3| });\napps/api test:       4| test(\"cli text\", () => {\napps/api test: \napps/api test: ⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/2]⎯\napps/api test: \napps/api test:  FAIL  x.test.mjs > cli text\napps/api test: AssertionError: expected 'Hello\\nthere' to be 'Invalid API key · Please run /login\\n…' // Object.is equality\napps/api test: \napps/api test: - Expected\napps/api test: + Received\napps/api test: \napps/api test: - Invalid API key · Please run /login\napps/api test: - bye\napps/api test: + Hello\napps/api test: + there\napps/api test: \napps/api test:  ❯ x.test.mjs:5:26\napps/api test:       3| });\napps/api test:       4| test(\"cli text\", () => {\napps/api test:       5|   expect(\"Hello\\nthere\").toBe(\"Invalid API key · Please run /login\\nby…\napps/api test:        |                          ^\napps/api test:       6| });\napps/api test:       7| \napps/api test: \napps/api test: ⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/2]⎯\napps/api test: \napps/api test: \napps/api test:  Test Files  1 failed (1)\napps/api test:       Tests  2 failed (2)\napps/api test:    Start at  23:13:35\napps/api test:    Duration  68ms (transform 6ms, setup 0ms, import 8ms, tests 4ms, environment 0ms)\napps/api test: \napps/api test: ",
+      "bash": "build_failure",
+      "ts": "unknown",
+      "name": "verifier 8718 k2c/pnpm: pnpm-prefixed verifier r1: REAL vitest 4 failure output",
+      "expect": "noesc"
+    },
+    {
+      "text": "apps/api test: Failures:\napps/api test: \napps/api test:   1) SessionsController POST #create rejects a bad password\napps/api test:      Failure/Error: raise AuthError, \"Not logged in\"\napps/api test: \napps/api test:      AuthError:\napps/api test:        Not logged in\napps/api test:      # ./app/controllers/sessions_controller.rb:12:in `create'\napps/api test: \napps/api test: Finished in 0.5 seconds\napps/api test: 3 examples, 1 failure",
+      "bash": "build_failure",
+      "ts": "unknown",
+      "name": "verifier 8718 k2c/pnpm: pnpm-prefixed verifier r2 c1/a1: rspec exception message on own indented line",
+      "expect": "noesc"
+    },
+    {
+      "text": "apps/api test:   1) Api::Client#fetch raises on 401\napps/api test:      Failure/Error: expect { client.fetch }.not_to raise_error\napps/api test: \napps/api test:        expected no Exception, got #<Api::AuthError: Authentication failed> with backtrace:\napps/api test: \napps/api test:      Api::AuthError:\napps/api test:        Authentication failed\napps/api test:      # ./lib/api/client.rb:40\napps/api test: 1 example, 1 failure",
+      "bash": "build_failure",
+      "ts": "unknown",
+      "name": "verifier 8718 k2c/pnpm: pnpm-prefixed verifier r2 c1/a2: rspec RuntimeError: Authentication failed",
+      "expect": "noesc"
+    },
+    {
+      "text": "apps/api test: running 3 tests\napps/api test: test auth::tests::rejects_bad_token ... FAILED\napps/api test: \napps/api test: failures:\napps/api test: \napps/api test: ---- auth::tests::rejects_bad_token stdout ----\napps/api test: thread 'auth::tests::rejects_bad_token' panicked at src/auth.rs:42:9:\napps/api test: authentication failed\napps/api test: note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace\napps/api test: \napps/api test: test result: FAILED. 2 passed; 1 failed; 0 ignored",
+      "bash": "build_failure",
+      "ts": "unknown",
+      "name": "verifier 8718 k2c/pnpm: pnpm-prefixed verifier r2 c1/a3: cargo panic message (Rust >=1.73 layout)",
+      "expect": "noesc"
+    },
+    {
+      "text": "apps/api test: thread 'main' panicked at src/main.rs:10:30:\napps/api test: failed to authenticate: Status(401)\napps/api test: error: test failed, to rerun pass `--lib`",
+      "bash": "build_failure",
+      "ts": "unknown",
+      "name": "verifier 8718 k2c/pnpm: pnpm-prefixed verifier r2 c1/a4: cargo .expect() panic",
+      "expect": "noesc"
+    },
+    {
+      "text": "apps/api test:   1 passing (12ms)\napps/api test:   1 failing\napps/api test: \napps/api test:   1) Auth\napps/api test:        login:\napps/api test:      Error: Authentication failed\napps/api test:       at Context.<anonymous> (test/auth.spec.js:8:11)",
+      "bash": "build_failure",
+      "ts": "unknown",
+      "name": "verifier 8718 k2c/pnpm: pnpm-prefixed verifier r2 c1/a6: mocha uncaught error message",
+      "expect": "noesc"
+    },
+    {
+      "text": "apps/api test:   1) [chromium] › tests/login.spec.ts:3:5 › login with wrong password ─────────────\napps/api test: \napps/api test:     Error: Authentication failed\napps/api test: \napps/api test:       3 | test('login with wrong password', async ({ page }) => {\napps/api test:   1 failed",
+      "bash": "build_failure",
+      "ts": "unknown",
+      "name": "verifier 8718 k2c/pnpm: pnpm-prefixed verifier r2 c1/a7: Playwright failure",
+      "expect": "noesc"
+    },
+    {
+      "text": "apps/api test:  FAIL  src/auth.test.ts\napps/api test:   ● Auth › login › throws on bad key\napps/api test: \napps/api test:     Invalid API key\napps/api test: \napps/api test:       4 |   it('throws on bad key', async () => {\napps/api test:     at Object.<anonymous> (src/auth.test.ts:5:11)\napps/api test: Tests:       1 failed, 3 passed",
+      "bash": "build_failure",
+      "ts": "unknown",
+      "name": "verifier 8718 k2c/pnpm: pnpm-prefixed verifier r2 c1/a8: jest thrown error (Error: stripped by jest)",
+      "expect": "noesc"
+    },
+    {
+      "text": "apps/api test:  FAIL  src/auth.test.ts > client > refreshes\napps/api test: Error: OAuth token has expired.\napps/api test:  ❯ src/auth.ts:20:11\napps/api test:  Test Files  1 failed (1)",
+      "bash": "build_failure",
+      "ts": "unknown",
+      "name": "verifier 8718 k2c/pnpm: pnpm-prefixed verifier r2 c1/a10: vitest thrown error",
+      "expect": "noesc"
+    },
+    {
+      "text": "apps/api test: stderr | src/auth.test.ts > login > rejects\napps/api test: Authentication failed: bad password\napps/api test: \napps/api test:  ✓ src/auth.test.ts (3)\napps/api test:  FAIL  src/db.test.ts > migrate\napps/api test: AssertionError: expected 1 to be 2",
+      "bash": "build_failure",
+      "ts": "unknown",
+      "name": "verifier 8718 k2c/pnpm: pnpm-prefixed verifier r2 c1/a12: vitest stderr block from code under test",
+      "expect": "noesc"
+    },
+    {
+      "text": "apps/api test: ----------------------------- Captured stderr call -----------------------------\napps/api test: fatal: Authentication failed for 'https://example.invalid/repo.git/'\napps/api test: FAILED tests/test_clone.py::test_clone_private - AssertionError",
+      "bash": "build_failure",
+      "ts": "unknown",
+      "name": "verifier 8718 k2c/pnpm: pnpm-prefixed verifier r2 c1/a13: pytest captured stderr",
+      "expect": "noesc"
+    },
+    {
+      "text": "apps/api test:   1) Login\napps/api test:        shows error banner:\napps/api test:      AssertionError: Timed out retrying after 4000ms: Expected to find content: 'Bad credentials' but never did.",
+      "bash": "unknown",
+      "ts": "unknown",
+      "name": "verifier 8718 k2c/pnpm: pnpm-prefixed verifier r2 c1/a19: Cypress",
+      "expect": "noesc"
+    },
+    {
+      "text": "apps/api test: ------------------------------ Captured log call -------------------------------\napps/api test: ERROR    app.auth:auth.py:22 Authentication failed: bad password",
+      "bash": "build_failure",
+      "ts": "unknown",
+      "name": "verifier 8718 k2c/pnpm: pnpm-prefixed verifier r2 c1/a23: pytest log capture",
+      "expect": "noesc"
+    },
+    {
+      "text": "apps/api test:   1) Error:\napps/api test: AuthTest#test_login:\napps/api test: AuthError: Not logged in\napps/api test:     app/auth.rb:3:in `login'",
+      "bash": "unknown",
+      "ts": "unknown",
+      "name": "verifier 8718 k2c/pnpm: pnpm-prefixed verifier r2 c1/a31: ruby minitest",
+      "expect": "noesc"
+    },
+    {
+      "text": "apps/api test: Pending: (Failures listed here are expected and do not affect your suite's status)\napps/api test:   1) Client handles not logged in\napps/api test:      # Temporarily skipped with xit\napps/api test:      # ./spec/client_spec.rb:3",
+      "bash": "build_failure",
+      "ts": "unknown",
+      "name": "verifier 8718 k2c/pnpm: pnpm-prefixed verifier r2 c1/a32: jest console block without blank line? no: rspec pending",
+      "expect": "noesc"
+    },
+    {
+      "text": "apps/api test: Summary of all failing tests\napps/api test:  FAIL  src/a.test.ts\napps/api test:   ● gh › error: authentication failed for bad token",
+      "bash": "build_failure",
+      "ts": "unknown",
+      "name": "verifier 8718 k2c/pnpm: pnpm-prefixed verifier r2 c1/a36: jest each table test title prints in summary",
+      "expect": "noesc"
+    },
+    {
+      "text": "apps/api test: ▸ Running tests...\napps/api test: test auth::tests::rejects_bad_token ... FAILED\napps/api test: \napps/api test: failures:\napps/api test: \napps/api test: ---- auth::tests::rejects_bad_token stdout ----\napps/api test: thread 'auth::tests::rejects_bad_token' panicked at src/auth.rs:42:9:\napps/api test: --\napps/api test: test result: FAILED. 2 passed; 1 failed; 0 ignored\napps/api test: ✗ Tests failed",
+      "bash": "build_failure",
+      "ts": "unknown",
+      "name": "verifier 8718 k2c/pnpm: pnpm-prefixed verifier r2 c6/Pa3: via pipeline grep -A5: cargo panic message (Rust >=1.73 layout)",
+      "expect": "noesc"
+    },
+    {
+      "text": "apps/api test: ▸ Running tests...\napps/api test:  FAIL  src/auth.test.ts\napps/api test:   ● Auth › login › throws on bad key\napps/api test: \napps/api test:     Invalid API key\napps/api test: \napps/api test:       4 |   it('throws on bad key', async () => {\napps/api test: ✗ Tests failed",
+      "bash": "build_failure",
+      "ts": "unknown",
+      "name": "verifier 8718 k2c/pnpm: pnpm-prefixed verifier r2 c6/Pa8: via pipeline grep -A5: jest thrown error (Error: stripped by jest)",
+      "expect": "noesc"
+    },
+    {
+      "text": "apps/api test: ▸ Running tests...\napps/api test:  FAIL  src/auth.test.ts > client > refreshes\napps/api test: Error: OAuth token has expired.\napps/api test:  ❯ src/auth.ts:20:11\napps/api test:  Test Files  1 failed (1)\napps/api test: ✗ Tests failed",
+      "bash": "build_failure",
+      "ts": "unknown",
+      "name": "verifier 8718 k2c/pnpm: pnpm-prefixed verifier r2 c6/Pa10: via pipeline grep -A5: vitest thrown error",
+      "expect": "noesc"
+    },
+    {
+      "text": "apps/api test:  FAIL  src/auth/client.test.ts [ src/auth/client.test.ts ]\napps/api test: Error: Not logged in.\napps/api test:  ❯ src/auth/client.ts:12:9",
+      "bash": "build_failure",
+      "ts": "unknown",
+      "name": "verifier 8718 k2c/pnpm: pnpm-prefixed verifier r3 c1/a1: vitest suite-level failure (import throws)",
+      "expect": "noesc"
+    },
+    {
+      "text": "apps/api test: ⎯⎯⎯⎯⎯⎯ Unhandled Errors ⎯⎯⎯⎯⎯⎯\napps/api test: \napps/api test: Vitest caught 1 unhandled error during the test run.\napps/api test: \napps/api test: ⎯⎯⎯⎯ Unhandled Rejection ⎯⎯⎯⎯⎯\napps/api test: Error: Authentication failed: token rejected\napps/api test:  ❯ src/git.ts:40:11",
+      "bash": "build_failure",
+      "ts": "unknown",
+      "name": "verifier 8718 k2c/pnpm: pnpm-prefixed verifier r3 c1/a2: vitest unhandled rejection",
+      "expect": "noesc"
+    },
+    {
+      "text": "apps/api test:  FAIL  src/auth.test.ts\napps/api test:   ● Test suite failed to run\napps/api test: \napps/api test:     Not logged in.",
+      "bash": "build_failure",
+      "ts": "unknown",
+      "name": "verifier 8718 k2c/pnpm: pnpm-prefixed verifier r3 c1/a3: jest FAIL header + suite failed to run",
+      "expect": "noesc"
+    },
+    {
+      "text": "apps/api test:   1) [chromium] › auth.spec.ts:3:5 › login ──────\napps/api test: \napps/api test:     Error: expect(received).toHaveText(expected)\napps/api test: \napps/api test:     Expected string: \"Not logged in.\"",
+      "bash": "unknown",
+      "ts": "unknown",
+      "name": "verifier 8718 k2c/pnpm: pnpm-prefixed verifier r3 c1/a8: playwright list",
+      "expect": "noesc"
+    },
+    {
+      "text": "apps/api test:  FAIL  test/gh.test.ts [ test/gh.test.ts ]\napps/api test: Error: HTTP 401: Bad credentials (https://api.github.com/graphql)",
+      "bash": "build_failure",
+      "ts": "unknown",
+      "name": "verifier 8718 k2c/pnpm: pnpm-prefixed verifier r3 c1/a10: vitest suite-level, no ❯",
+      "expect": "noesc"
+    },
+    {
+      "text": "apps/api test:  FAIL  src/agent/errors.test.ts > parseAgentError > maps a 401 to auth\napps/api test: AssertionError: expected 'unknown' to be 'auth'\napps/api test: \napps/api test: - Expected\napps/api test: + Received\napps/api test: \napps/api test: - auth\napps/api test: + unknown\napps/api test: \napps/api test:  ❯ src/agent/errors.test.ts:10:20\napps/api test:       8| it(\"maps a 401 to auth\", () => {\napps/api test:       9|   const r = parseAgentError('API Error: 401 {\"type\":\"error\",\"error\":{\"type\":\"authentication_error\",\"message\":\"invalid x-api-key\"}}');\napps/api test:      10|   expect(r.kind).toBe(\"auth\");\napps/api test:        |                  ^\napps/api test: \napps/api test: ⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯\napps/api test: \napps/api test:  Test Files  1 failed (1)\napps/api test:       Tests  1 failed (1)",
+      "bash": "build_failure",
+      "ts": "unknown",
+      "name": "verifier 8718 k2c/pnpm: pnpm-prefixed verifier r4 c1/a2: vitest code frame with 401 body fixture",
+      "expect": "noesc"
+    },
+    {
+      "text": "apps/api test:   console.error\napps/api test:     fatal: Authentication failed for 'https://github.com/acme/app.git/'\napps/api test: \napps/api test:       at Object.error (src/git.test.ts:3:11)\napps/api test: \napps/api test: FAIL src/git.test.ts",
+      "bash": "build_failure",
+      "ts": "unknown",
+      "name": "verifier 8718 k2c/pnpm: pnpm-prefixed verifier r4 c1/a9: jest console.error block with message at column 4",
+      "expect": "noesc"
+    },
+    {
+      "text": "apps/api test:   console.warn\napps/api test: \tNot logged in.\napps/api test: \napps/api test:       at x (a.js:1:1)\napps/api test: Tests: 1 failed",
+      "bash": "build_failure",
+      "ts": "unknown",
+      "name": "verifier 8718 k2c/pnpm: pnpm-prefixed verifier r4 c1/a10: jest console.warn header, tab-indented message",
+      "expect": "noesc"
+    },
+    {
+      "text": "apps/api test: ------------------------------ Captured log call -------------------------------\napps/api test: ERROR    app.git:git.py:12 push failed\napps/api test: fatal: Authentication failed for 'https://github.com/acme/app.git/'\napps/api test: =========================== short test summary info ============================\napps/api test: FAILED tests/test_git.py::test_push - RuntimeError",
+      "bash": "build_failure",
+      "ts": "unknown",
+      "name": "verifier 8718 k2c/pnpm: pnpm-prefixed verifier r4 c1/a11: pytest captured stdout, then 'ERROR' log line inside captured log ends block early",
+      "expect": "noesc"
+    },
+    {
+      "text": "apps/api test: ⎯⎯⎯⎯ Unhandled Rejection ⎯⎯⎯⎯⎯\napps/api test: HTTP 401: Bad credentials (https://api.github.com/graphql)\napps/api test:  ❯ src/gh.ts:40:11",
+      "bash": "unknown",
+      "ts": "unknown",
+      "name": "verifier 8718 k2c/pnpm: pnpm-prefixed verifier r4 c1/a13: vitest Unhandled Rejection then mocked gh at col0 before frame",
+      "expect": "noesc"
+    },
+    {
+      "text": "apps/api test:  FAIL  src/gh.test.ts [ src/gh.test.ts ]\napps/api test: Error: HTTP 401: Bad credentials (https://api.github.com/graphql)\napps/api test:  ❯ src/gh.ts:1:1",
+      "bash": "build_failure",
+      "ts": "unknown",
+      "name": "verifier 8718 k2c/pnpm: pnpm-prefixed verifier r4 c1/a14: vitest suite-level FAIL [ file ] with gh-shaped error",
+      "expect": "noesc"
+    },
+    {
+      "text": "apps/api test: ▸ Running tests...\napps/api test:  FAIL  src/agent/errors.test.ts > parseAgentError > maps a 401 to auth\napps/api test: AssertionError: expected 'unknown' to be 'auth'\napps/api test: \napps/api test: - Expected\napps/api test: + Received\napps/api test: \napps/api test: - auth\napps/api test: --\napps/api test:       9|   const r = parseAgentError('API Error: 401 {\"type\":\"error\",\"error\":{\"type\":\"authentication_error\",\"message\":\"invalid x-api-key\"}}');\napps/api test:      10|   expect(r.kind).toBe(\"auth\");\napps/api test:        |                  ^\napps/api test: \napps/api test: ⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯\napps/api test: \napps/api test: ✗ Tests failed",
+      "bash": "build_failure",
+      "ts": "unknown",
+      "name": "verifier 8718 k2c/pnpm: pnpm-prefixed verifier r4 c2/Pa2: via pipeline grep -A5: vitest code frame with 401 body fixture",
+      "expect": "noesc"
+    },
+    {
+      "text": "apps/api test:   1) Client raises on 401\napps/api test:      Failure/Error: expect { client.call }.to raise_error(AuthError)\napps/api test:        expected AuthError, got #<RuntimeError: 401 {\"type\":\"error\",\"error\":{\"type\":\"authentication_error\",\"message\":\"invalid x-api-key\"}}>\napps/api test: rspec ./spec/client_spec.rb:5",
+      "bash": "build_failure",
+      "ts": "unknown",
+      "name": "verifier 8718 k2c/pnpm: pnpm-prefixed verifier r4 c2/d3: rspec failure with 401 body in expected",
+      "expect": "noesc"
+    },
+    {
+      "text": "apps/api test:  FAIL  src/a.test.ts > maps\napps/api test: AssertionError: expected 'API Error: 401 {\"type\":\"error\",\"error\":{\"type\":\"authentication_error\",\"message\":\"invalid x-api-key\"},\"request_id\":\"req_011CUXabc\"}' to be 'auth'\napps/api test:  ❯ src/a.test.ts:3:3",
+      "bash": "build_failure",
+      "ts": "unknown",
+      "name": "verifier 8718 k2c/pnpm: pnpm-prefixed verifier r5 corpus/N11: vitest AssertionError under FAIL header",
+      "expect": "noesc"
+    },
+    {
+      "text": "apps/api test: ------------------------------ Captured log call -------------------------------\napps/api test: ERROR    root:llm.py:12 boom\napps/api test: anthropic.AuthenticationError: Error code: 401 - {'type': 'error', 'error': {'type': 'authentication_error', 'message': 'invalid x-api-key'}, 'request_id': 'req_011CUXabc'}\napps/api test: =========================== short test summary info ============================\napps/api test: FAILED tests/test_llm.py::test_call",
+      "bash": "build_failure",
+      "ts": "unknown",
+      "name": "verifier 8718 k2c/pnpm: pnpm-prefixed verifier r5 corpus/N12: pytest captured log with real-shaped line",
+      "expect": "noesc"
+    },
+    {
+      "text": "apps/api test: ----------------------------- Captured stdout call -----------------------------\napps/api test: ERROR tests/test_a.py - boom\napps/api test: API Error: 401 {\"type\":\"error\",\"error\":{\"type\":\"authentication_error\",\"message\":\"invalid x-api-key\"},\"request_id\":\"req_011CUXabc\"}\napps/api test: =========================== 1 failed in 0.1s ===",
+      "bash": "build_failure",
+      "ts": "unknown",
+      "name": "verifier 8718 k2c/pnpm: pnpm-prefixed verifier r5 corpus/N13: pytest captured stdout, ERROR collecting-like line w/o :: then real-shaped",
+      "expect": "noesc"
+    },
+    {
+      "text": "apps/api test:  FAIL  src/p.test.ts > parse > result\napps/api test: AssertionError: expected { …(2) } to deeply equal { …(2) }\napps/api test: \napps/api test: - Expected\napps/api test: + Received\napps/api test: \napps/api test:   {\napps/api test:     \"is_error\": true,\napps/api test: -   \"result\": \"ok\",\napps/api test: +   \"result\": \"API Error: 401 {\\\"type\\\":\\\"error\\\",\\\"error\\\":{\\\"type\\\":\\\"authentication_error\\\",\\\"message\\\":\\\"invalid x-api-key\\\"},\\\"request_id\\\":\\\"req_011CUXabc\\\"}\",\napps/api test:   }\napps/api test: \napps/api test:  ❯ src/p.test.ts:9:5",
+      "bash": "build_failure",
+      "ts": "unknown",
+      "name": "verifier 8718 k2c/pnpm: pnpm-prefixed verifier r5 corpus2/Q1: vitest toEqual diff of stream-json object under FAIL header",
+      "expect": "noesc"
+    },
+    {
+      "text": "apps/api test:   console.log\napps/api test:     {\napps/api test:       \"result\": \"API Error: 401 {\\\"type\\\":\\\"error\\\",\\\"error\\\":{\\\"type\\\":\\\"authentication_error\\\",\\\"message\\\":\\\"invalid x-api-key\\\"},\\\"request_id\\\":\\\"req_011CUXabc\\\"}\"\napps/api test:     }\napps/api test: \napps/api test:       at Object.<anonymous> (a.test.ts:3:9)\napps/api test: Tests: 1 failed",
+      "bash": "build_failure",
+      "ts": "unknown",
+      "name": "verifier 8718 k2c/pnpm: pnpm-prefixed verifier r5 corpus2/Q3: JSON.stringify'd pretty test fixture printed by console.log in jest block",
+      "expect": "noesc"
+    },
+    {
+      "text": "api-1  |   2 passing (12ms)\napi-1  |   1 failing\napi-1  | \napi-1  |   1) classifier\napi-1  |        authentication failed:\napi-1  |      AssertionError: expected 'unknown' to equal 'auth'\napi-1  |       at Context.<anonymous> (test/classify.test.js:10:5)",
+      "bash": "build_failure",
+      "ts": "unknown",
+      "name": "verifier 8718 k2c/compose: compose-prefixed verifier a1: mocha failure summary: title on own line, 7-space indent, colon",
+      "expect": "noesc"
+    },
+    {
+      "text": "api-1  |   1 failing\napi-1  | \napi-1  |   1) gh wrapper\napi-1  |        not logged in:\napi-1  |      Error: expected exit 4\napi-1  | ",
+      "bash": "build_failure",
+      "ts": "unknown",
+      "name": "verifier 8718 k2c/compose: compose-prefixed verifier a2: mocha summary title 'not logged in:'",
+      "expect": "noesc"
+    },
+    {
+      "text": "api-1  |   1 failing\napi-1  | \napi-1  |   1) client\napi-1  |        invalid api key returns 401:\napi-1  |      AssertionError: expected 200 to equal 401",
+      "bash": "build_failure",
+      "ts": "unknown",
+      "name": "verifier 8718 k2c/compose: compose-prefixed verifier a3: mocha summary title 'invalid api key returns 401:'",
+      "expect": "noesc"
+    },
+    {
+      "text": "api-1  |  FAIL  src/auth.test.ts > gh > not logged in\napi-1  | AssertionError: expected 1 to be 4",
+      "bash": "build_failure",
+      "ts": "unknown",
+      "name": "verifier 8718 k2c/compose: compose-prefixed verifier a15: vitest FAIL header with > path",
+      "expect": "noesc"
+    },
+    {
+      "text": "api-1  | test auth::not_logged_in ... FAILED\napi-1  | failures:\napi-1  | ---- auth::not_logged_in stdout ----\napi-1  | thread 'main' panicked at 'assertion failed: authentication failed'",
+      "bash": "build_failure",
+      "ts": "unknown",
+      "name": "verifier 8718 k2c/compose: compose-prefixed verifier a18: cargo test",
+      "expect": "noesc"
+    },
+    {
+      "text": "api-1  |   1) outer\napi-1  |        inner\napi-1  |          issue not found:\napi-1  |      Error: expected 404",
+      "bash": "unknown",
+      "ts": "unknown",
+      "name": "verifier 8718 k2c/compose: compose-prefixed verifier a24: mocha nested suite title 9-space indent",
+      "expect": "noesc"
+    },
+    {
+      "text": "api-1  |   console.error\napi-1  |     Authentication failed: mocked\napi-1  | \napi-1  |       at Object.<anonymous> (src/x.test.ts:3:11)\napi-1  | Tests: 1 failed",
+      "bash": "build_failure",
+      "ts": "unknown",
+      "name": "verifier 8718 k2c/compose: compose-prefixed verifier a25: jest test title printed via ● describe header dropped, but console.error block printed raw",
+      "expect": "noesc"
+    },
+    {
+      "text": "api-1  | \napi-1  |  RUN  v4.0.18 /tmp/work/x.js\napi-1  | \napi-1  |  ❯ x.test.mjs (2 tests | 2 failed) 4ms\napi-1  |    × git log text 3ms\napi-1  |    × cli text 0ms\napi-1  | \napi-1  | ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 2 ⎯⎯⎯⎯⎯⎯⎯\napi-1  | \napi-1  |  FAIL  x.test.mjs > git log text\napi-1  | AssertionError: expected 'ok\\nfine' to be 'remote: Invalid username or password.…' // Object.is equality\napi-1  | \napi-1  | - Expected\napi-1  | + Received\napi-1  | \napi-1  | - remote: Invalid username or password.\napi-1  | - fatal: Authentication failed for 'https://github.com/o/r.git/'\napi-1  | + ok\napi-1  | + fine\napi-1  | \napi-1  |  ❯ x.test.mjs:2:22\napi-1  |       1| test(\"git log text\", () => {\napi-1  |       2|   expect(\"ok\\nfine\").toBe(\"remote: Invalid username or password.\\nfata…\napi-1  |        |                      ^\napi-1  |       3| });\napi-1  |       4| test(\"cli text\", () => {\napi-1  | \napi-1  | ⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/2]⎯\napi-1  | \napi-1  |  FAIL  x.test.mjs > cli text\napi-1  | AssertionError: expected 'Hello\\nthere' to be 'Invalid API key · Please run /login\\n…' // Object.is equality\napi-1  | \napi-1  | - Expected\napi-1  | + Received\napi-1  | \napi-1  | - Invalid API key · Please run /login\napi-1  | - bye\napi-1  | + Hello\napi-1  | + there\napi-1  | \napi-1  |  ❯ x.test.mjs:5:26\napi-1  |       3| });\napi-1  |       4| test(\"cli text\", () => {\napi-1  |       5|   expect(\"Hello\\nthere\").toBe(\"Invalid API key · Please run /login\\nby…\napi-1  |        |                          ^\napi-1  |       6| });\napi-1  |       7| \napi-1  | \napi-1  | ⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/2]⎯\napi-1  | \napi-1  | \napi-1  |  Test Files  1 failed (1)\napi-1  |       Tests  2 failed (2)\napi-1  |    Start at  23:13:35\napi-1  |    Duration  68ms (transform 6ms, setup 0ms, import 8ms, tests 4ms, environment 0ms)\napi-1  | \napi-1  | ",
+      "bash": "build_failure",
+      "ts": "unknown",
+      "name": "verifier 8718 k2c/compose: compose-prefixed verifier r1: REAL vitest 4 failure output",
+      "expect": "noesc"
+    },
+    {
+      "text": "api-1  | Failures:\napi-1  | \napi-1  |   1) SessionsController POST #create rejects a bad password\napi-1  |      Failure/Error: raise AuthError, \"Not logged in\"\napi-1  | \napi-1  |      AuthError:\napi-1  |        Not logged in\napi-1  |      # ./app/controllers/sessions_controller.rb:12:in `create'\napi-1  | \napi-1  | Finished in 0.5 seconds\napi-1  | 3 examples, 1 failure",
+      "bash": "build_failure",
+      "ts": "unknown",
+      "name": "verifier 8718 k2c/compose: compose-prefixed verifier r2 c1/a1: rspec exception message on own indented line",
+      "expect": "noesc"
+    },
+    {
+      "text": "api-1  |   1) Api::Client#fetch raises on 401\napi-1  |      Failure/Error: expect { client.fetch }.not_to raise_error\napi-1  | \napi-1  |        expected no Exception, got #<Api::AuthError: Authentication failed> with backtrace:\napi-1  | \napi-1  |      Api::AuthError:\napi-1  |        Authentication failed\napi-1  |      # ./lib/api/client.rb:40\napi-1  | 1 example, 1 failure",
+      "bash": "build_failure",
+      "ts": "unknown",
+      "name": "verifier 8718 k2c/compose: compose-prefixed verifier r2 c1/a2: rspec RuntimeError: Authentication failed",
+      "expect": "noesc"
+    },
+    {
+      "text": "api-1  | running 3 tests\napi-1  | test auth::tests::rejects_bad_token ... FAILED\napi-1  | \napi-1  | failures:\napi-1  | \napi-1  | ---- auth::tests::rejects_bad_token stdout ----\napi-1  | thread 'auth::tests::rejects_bad_token' panicked at src/auth.rs:42:9:\napi-1  | authentication failed\napi-1  | note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace\napi-1  | \napi-1  | test result: FAILED. 2 passed; 1 failed; 0 ignored",
+      "bash": "build_failure",
+      "ts": "unknown",
+      "name": "verifier 8718 k2c/compose: compose-prefixed verifier r2 c1/a3: cargo panic message (Rust >=1.73 layout)",
+      "expect": "noesc"
+    },
+    {
+      "text": "api-1  | thread 'main' panicked at src/main.rs:10:30:\napi-1  | failed to authenticate: Status(401)\napi-1  | error: test failed, to rerun pass `--lib`",
+      "bash": "build_failure",
+      "ts": "unknown",
+      "name": "verifier 8718 k2c/compose: compose-prefixed verifier r2 c1/a4: cargo .expect() panic",
+      "expect": "noesc"
+    },
+    {
+      "text": "api-1  |   1 passing (12ms)\napi-1  |   1 failing\napi-1  | \napi-1  |   1) Auth\napi-1  |        login:\napi-1  |      Error: Authentication failed\napi-1  |       at Context.<anonymous> (test/auth.spec.js:8:11)",
+      "bash": "build_failure",
+      "ts": "unknown",
+      "name": "verifier 8718 k2c/compose: compose-prefixed verifier r2 c1/a6: mocha uncaught error message",
+      "expect": "noesc"
+    },
+    {
+      "text": "api-1  |   1) [chromium] › tests/login.spec.ts:3:5 › login with wrong password ─────────────\napi-1  | \napi-1  |     Error: Authentication failed\napi-1  | \napi-1  |       3 | test('login with wrong password', async ({ page }) => {\napi-1  |   1 failed",
+      "bash": "build_failure",
+      "ts": "unknown",
+      "name": "verifier 8718 k2c/compose: compose-prefixed verifier r2 c1/a7: Playwright failure",
+      "expect": "noesc"
+    },
+    {
+      "text": "api-1  |  FAIL  src/auth.test.ts\napi-1  |   ● Auth › login › throws on bad key\napi-1  | \napi-1  |     Invalid API key\napi-1  | \napi-1  |       4 |   it('throws on bad key', async () => {\napi-1  |     at Object.<anonymous> (src/auth.test.ts:5:11)\napi-1  | Tests:       1 failed, 3 passed",
+      "bash": "build_failure",
+      "ts": "unknown",
+      "name": "verifier 8718 k2c/compose: compose-prefixed verifier r2 c1/a8: jest thrown error (Error: stripped by jest)",
+      "expect": "noesc"
+    },
+    {
+      "text": "api-1  |  FAIL  src/auth.test.ts > client > refreshes\napi-1  | Error: OAuth token has expired.\napi-1  |  ❯ src/auth.ts:20:11\napi-1  |  Test Files  1 failed (1)",
+      "bash": "build_failure",
+      "ts": "unknown",
+      "name": "verifier 8718 k2c/compose: compose-prefixed verifier r2 c1/a10: vitest thrown error",
+      "expect": "noesc"
+    },
+    {
+      "text": "api-1  | stderr | src/auth.test.ts > login > rejects\napi-1  | Authentication failed: bad password\napi-1  | \napi-1  |  ✓ src/auth.test.ts (3)\napi-1  |  FAIL  src/db.test.ts > migrate\napi-1  | AssertionError: expected 1 to be 2",
+      "bash": "build_failure",
+      "ts": "unknown",
+      "name": "verifier 8718 k2c/compose: compose-prefixed verifier r2 c1/a12: vitest stderr block from code under test",
+      "expect": "noesc"
+    },
+    {
+      "text": "api-1  | ----------------------------- Captured stderr call -----------------------------\napi-1  | fatal: Authentication failed for 'https://example.invalid/repo.git/'\napi-1  | FAILED tests/test_clone.py::test_clone_private - AssertionError",
+      "bash": "build_failure",
+      "ts": "unknown",
+      "name": "verifier 8718 k2c/compose: compose-prefixed verifier r2 c1/a13: pytest captured stderr",
+      "expect": "noesc"
+    },
+    {
+      "text": "api-1  |   1) Login\napi-1  |        shows error banner:\napi-1  |      AssertionError: Timed out retrying after 4000ms: Expected to find content: 'Bad credentials' but never did.",
+      "bash": "unknown",
+      "ts": "unknown",
+      "name": "verifier 8718 k2c/compose: compose-prefixed verifier r2 c1/a19: Cypress",
+      "expect": "noesc"
+    },
+    {
+      "text": "api-1  | ------------------------------ Captured log call -------------------------------\napi-1  | ERROR    app.auth:auth.py:22 Authentication failed: bad password",
+      "bash": "build_failure",
+      "ts": "unknown",
+      "name": "verifier 8718 k2c/compose: compose-prefixed verifier r2 c1/a23: pytest log capture",
+      "expect": "noesc"
+    },
+    {
+      "text": "api-1  |   1) Error:\napi-1  | AuthTest#test_login:\napi-1  | AuthError: Not logged in\napi-1  |     app/auth.rb:3:in `login'",
+      "bash": "unknown",
+      "ts": "unknown",
+      "name": "verifier 8718 k2c/compose: compose-prefixed verifier r2 c1/a31: ruby minitest",
+      "expect": "noesc"
+    },
+    {
+      "text": "api-1  | Pending: (Failures listed here are expected and do not affect your suite's status)\napi-1  |   1) Client handles not logged in\napi-1  |      # Temporarily skipped with xit\napi-1  |      # ./spec/client_spec.rb:3",
+      "bash": "build_failure",
+      "ts": "unknown",
+      "name": "verifier 8718 k2c/compose: compose-prefixed verifier r2 c1/a32: jest console block without blank line? no: rspec pending",
+      "expect": "noesc"
+    },
+    {
+      "text": "api-1  | Summary of all failing tests\napi-1  |  FAIL  src/a.test.ts\napi-1  |   ● gh › error: authentication failed for bad token",
+      "bash": "build_failure",
+      "ts": "unknown",
+      "name": "verifier 8718 k2c/compose: compose-prefixed verifier r2 c1/a36: jest each table test title prints in summary",
+      "expect": "noesc"
+    },
+    {
+      "text": "api-1  | ▸ Running tests...\napi-1  | test auth::tests::rejects_bad_token ... FAILED\napi-1  | \napi-1  | failures:\napi-1  | \napi-1  | ---- auth::tests::rejects_bad_token stdout ----\napi-1  | thread 'auth::tests::rejects_bad_token' panicked at src/auth.rs:42:9:\napi-1  | --\napi-1  | test result: FAILED. 2 passed; 1 failed; 0 ignored\napi-1  | ✗ Tests failed",
+      "bash": "build_failure",
+      "ts": "unknown",
+      "name": "verifier 8718 k2c/compose: compose-prefixed verifier r2 c6/Pa3: via pipeline grep -A5: cargo panic message (Rust >=1.73 layout)",
+      "expect": "noesc"
+    },
+    {
+      "text": "api-1  | ▸ Running tests...\napi-1  |  FAIL  src/auth.test.ts\napi-1  |   ● Auth › login › throws on bad key\napi-1  | \napi-1  |     Invalid API key\napi-1  | \napi-1  |       4 |   it('throws on bad key', async () => {\napi-1  | ✗ Tests failed",
+      "bash": "build_failure",
+      "ts": "unknown",
+      "name": "verifier 8718 k2c/compose: compose-prefixed verifier r2 c6/Pa8: via pipeline grep -A5: jest thrown error (Error: stripped by jest)",
+      "expect": "noesc"
+    },
+    {
+      "text": "api-1  | ▸ Running tests...\napi-1  |  FAIL  src/auth.test.ts > client > refreshes\napi-1  | Error: OAuth token has expired.\napi-1  |  ❯ src/auth.ts:20:11\napi-1  |  Test Files  1 failed (1)\napi-1  | ✗ Tests failed",
+      "bash": "build_failure",
+      "ts": "unknown",
+      "name": "verifier 8718 k2c/compose: compose-prefixed verifier r2 c6/Pa10: via pipeline grep -A5: vitest thrown error",
+      "expect": "noesc"
+    },
+    {
+      "text": "api-1  |  FAIL  src/auth/client.test.ts [ src/auth/client.test.ts ]\napi-1  | Error: Not logged in.\napi-1  |  ❯ src/auth/client.ts:12:9",
+      "bash": "build_failure",
+      "ts": "unknown",
+      "name": "verifier 8718 k2c/compose: compose-prefixed verifier r3 c1/a1: vitest suite-level failure (import throws)",
+      "expect": "noesc"
+    },
+    {
+      "text": "api-1  | ⎯⎯⎯⎯⎯⎯ Unhandled Errors ⎯⎯⎯⎯⎯⎯\napi-1  | \napi-1  | Vitest caught 1 unhandled error during the test run.\napi-1  | \napi-1  | ⎯⎯⎯⎯ Unhandled Rejection ⎯⎯⎯⎯⎯\napi-1  | Error: Authentication failed: token rejected\napi-1  |  ❯ src/git.ts:40:11",
+      "bash": "build_failure",
+      "ts": "unknown",
+      "name": "verifier 8718 k2c/compose: compose-prefixed verifier r3 c1/a2: vitest unhandled rejection",
+      "expect": "noesc"
+    },
+    {
+      "text": "api-1  |  FAIL  src/auth.test.ts\napi-1  |   ● Test suite failed to run\napi-1  | \napi-1  |     Not logged in.",
+      "bash": "build_failure",
+      "ts": "unknown",
+      "name": "verifier 8718 k2c/compose: compose-prefixed verifier r3 c1/a3: jest FAIL header + suite failed to run",
+      "expect": "noesc"
+    },
+    {
+      "text": "api-1  |   1) [chromium] › auth.spec.ts:3:5 › login ──────\napi-1  | \napi-1  |     Error: expect(received).toHaveText(expected)\napi-1  | \napi-1  |     Expected string: \"Not logged in.\"",
+      "bash": "unknown",
+      "ts": "unknown",
+      "name": "verifier 8718 k2c/compose: compose-prefixed verifier r3 c1/a8: playwright list",
+      "expect": "noesc"
+    },
+    {
+      "text": "api-1  |  FAIL  test/gh.test.ts [ test/gh.test.ts ]\napi-1  | Error: HTTP 401: Bad credentials (https://api.github.com/graphql)",
+      "bash": "build_failure",
+      "ts": "unknown",
+      "name": "verifier 8718 k2c/compose: compose-prefixed verifier r3 c1/a10: vitest suite-level, no ❯",
+      "expect": "noesc"
+    },
+    {
+      "text": "api-1  |  FAIL  src/agent/errors.test.ts > parseAgentError > maps a 401 to auth\napi-1  | AssertionError: expected 'unknown' to be 'auth'\napi-1  | \napi-1  | - Expected\napi-1  | + Received\napi-1  | \napi-1  | - auth\napi-1  | + unknown\napi-1  | \napi-1  |  ❯ src/agent/errors.test.ts:10:20\napi-1  |       8| it(\"maps a 401 to auth\", () => {\napi-1  |       9|   const r = parseAgentError('API Error: 401 {\"type\":\"error\",\"error\":{\"type\":\"authentication_error\",\"message\":\"invalid x-api-key\"}}');\napi-1  |      10|   expect(r.kind).toBe(\"auth\");\napi-1  |        |                  ^\napi-1  | \napi-1  | ⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯\napi-1  | \napi-1  |  Test Files  1 failed (1)\napi-1  |       Tests  1 failed (1)",
+      "bash": "build_failure",
+      "ts": "unknown",
+      "name": "verifier 8718 k2c/compose: compose-prefixed verifier r4 c1/a2: vitest code frame with 401 body fixture",
+      "expect": "noesc"
+    },
+    {
+      "text": "api-1  |   console.error\napi-1  |     fatal: Authentication failed for 'https://github.com/acme/app.git/'\napi-1  | \napi-1  |       at Object.error (src/git.test.ts:3:11)\napi-1  | \napi-1  | FAIL src/git.test.ts",
+      "bash": "build_failure",
+      "ts": "unknown",
+      "name": "verifier 8718 k2c/compose: compose-prefixed verifier r4 c1/a9: jest console.error block with message at column 4",
+      "expect": "noesc"
+    },
+    {
+      "text": "api-1  |   console.warn\napi-1  | \tNot logged in.\napi-1  | \napi-1  |       at x (a.js:1:1)\napi-1  | Tests: 1 failed",
+      "bash": "build_failure",
+      "ts": "unknown",
+      "name": "verifier 8718 k2c/compose: compose-prefixed verifier r4 c1/a10: jest console.warn header, tab-indented message",
+      "expect": "noesc"
+    },
+    {
+      "text": "api-1  | ------------------------------ Captured log call -------------------------------\napi-1  | ERROR    app.git:git.py:12 push failed\napi-1  | fatal: Authentication failed for 'https://github.com/acme/app.git/'\napi-1  | =========================== short test summary info ============================\napi-1  | FAILED tests/test_git.py::test_push - RuntimeError",
+      "bash": "build_failure",
+      "ts": "unknown",
+      "name": "verifier 8718 k2c/compose: compose-prefixed verifier r4 c1/a11: pytest captured stdout, then 'ERROR' log line inside captured log ends block early",
+      "expect": "noesc"
+    },
+    {
+      "text": "api-1  | ⎯⎯⎯⎯ Unhandled Rejection ⎯⎯⎯⎯⎯\napi-1  | HTTP 401: Bad credentials (https://api.github.com/graphql)\napi-1  |  ❯ src/gh.ts:40:11",
+      "bash": "unknown",
+      "ts": "unknown",
+      "name": "verifier 8718 k2c/compose: compose-prefixed verifier r4 c1/a13: vitest Unhandled Rejection then mocked gh at col0 before frame",
+      "expect": "noesc"
+    },
+    {
+      "text": "api-1  |  FAIL  src/gh.test.ts [ src/gh.test.ts ]\napi-1  | Error: HTTP 401: Bad credentials (https://api.github.com/graphql)\napi-1  |  ❯ src/gh.ts:1:1",
+      "bash": "build_failure",
+      "ts": "unknown",
+      "name": "verifier 8718 k2c/compose: compose-prefixed verifier r4 c1/a14: vitest suite-level FAIL [ file ] with gh-shaped error",
+      "expect": "noesc"
+    },
+    {
+      "text": "api-1  | ▸ Running tests...\napi-1  |  FAIL  src/agent/errors.test.ts > parseAgentError > maps a 401 to auth\napi-1  | AssertionError: expected 'unknown' to be 'auth'\napi-1  | \napi-1  | - Expected\napi-1  | + Received\napi-1  | \napi-1  | - auth\napi-1  | --\napi-1  |       9|   const r = parseAgentError('API Error: 401 {\"type\":\"error\",\"error\":{\"type\":\"authentication_error\",\"message\":\"invalid x-api-key\"}}');\napi-1  |      10|   expect(r.kind).toBe(\"auth\");\napi-1  |        |                  ^\napi-1  | \napi-1  | ⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯\napi-1  | \napi-1  | ✗ Tests failed",
+      "bash": "build_failure",
+      "ts": "unknown",
+      "name": "verifier 8718 k2c/compose: compose-prefixed verifier r4 c2/Pa2: via pipeline grep -A5: vitest code frame with 401 body fixture",
+      "expect": "noesc"
+    },
+    {
+      "text": "api-1  |   1) Client raises on 401\napi-1  |      Failure/Error: expect { client.call }.to raise_error(AuthError)\napi-1  |        expected AuthError, got #<RuntimeError: 401 {\"type\":\"error\",\"error\":{\"type\":\"authentication_error\",\"message\":\"invalid x-api-key\"}}>\napi-1  | rspec ./spec/client_spec.rb:5",
+      "bash": "build_failure",
+      "ts": "unknown",
+      "name": "verifier 8718 k2c/compose: compose-prefixed verifier r4 c2/d3: rspec failure with 401 body in expected",
+      "expect": "noesc"
+    },
+    {
+      "text": "api-1  |  FAIL  src/a.test.ts > maps\napi-1  | AssertionError: expected 'API Error: 401 {\"type\":\"error\",\"error\":{\"type\":\"authentication_error\",\"message\":\"invalid x-api-key\"},\"request_id\":\"req_011CUXabc\"}' to be 'auth'\napi-1  |  ❯ src/a.test.ts:3:3",
+      "bash": "build_failure",
+      "ts": "unknown",
+      "name": "verifier 8718 k2c/compose: compose-prefixed verifier r5 corpus/N11: vitest AssertionError under FAIL header",
+      "expect": "noesc"
+    },
+    {
+      "text": "api-1  | ------------------------------ Captured log call -------------------------------\napi-1  | ERROR    root:llm.py:12 boom\napi-1  | anthropic.AuthenticationError: Error code: 401 - {'type': 'error', 'error': {'type': 'authentication_error', 'message': 'invalid x-api-key'}, 'request_id': 'req_011CUXabc'}\napi-1  | =========================== short test summary info ============================\napi-1  | FAILED tests/test_llm.py::test_call",
+      "bash": "build_failure",
+      "ts": "unknown",
+      "name": "verifier 8718 k2c/compose: compose-prefixed verifier r5 corpus/N12: pytest captured log with real-shaped line",
+      "expect": "noesc"
+    },
+    {
+      "text": "api-1  | ----------------------------- Captured stdout call -----------------------------\napi-1  | ERROR tests/test_a.py - boom\napi-1  | API Error: 401 {\"type\":\"error\",\"error\":{\"type\":\"authentication_error\",\"message\":\"invalid x-api-key\"},\"request_id\":\"req_011CUXabc\"}\napi-1  | =========================== 1 failed in 0.1s ===",
+      "bash": "build_failure",
+      "ts": "unknown",
+      "name": "verifier 8718 k2c/compose: compose-prefixed verifier r5 corpus/N13: pytest captured stdout, ERROR collecting-like line w/o :: then real-shaped",
+      "expect": "noesc"
+    },
+    {
+      "text": "api-1  |  FAIL  src/p.test.ts > parse > result\napi-1  | AssertionError: expected { …(2) } to deeply equal { …(2) }\napi-1  | \napi-1  | - Expected\napi-1  | + Received\napi-1  | \napi-1  |   {\napi-1  |     \"is_error\": true,\napi-1  | -   \"result\": \"ok\",\napi-1  | +   \"result\": \"API Error: 401 {\\\"type\\\":\\\"error\\\",\\\"error\\\":{\\\"type\\\":\\\"authentication_error\\\",\\\"message\\\":\\\"invalid x-api-key\\\"},\\\"request_id\\\":\\\"req_011CUXabc\\\"}\",\napi-1  |   }\napi-1  | \napi-1  |  ❯ src/p.test.ts:9:5",
+      "bash": "build_failure",
+      "ts": "unknown",
+      "name": "verifier 8718 k2c/compose: compose-prefixed verifier r5 corpus2/Q1: vitest toEqual diff of stream-json object under FAIL header",
+      "expect": "noesc"
+    },
+    {
+      "text": "api-1  |   console.log\napi-1  |     {\napi-1  |       \"result\": \"API Error: 401 {\\\"type\\\":\\\"error\\\",\\\"error\\\":{\\\"type\\\":\\\"authentication_error\\\",\\\"message\\\":\\\"invalid x-api-key\\\"},\\\"request_id\\\":\\\"req_011CUXabc\\\"}\"\napi-1  |     }\napi-1  | \napi-1  |       at Object.<anonymous> (a.test.ts:3:9)\napi-1  | Tests: 1 failed",
+      "bash": "build_failure",
+      "ts": "unknown",
+      "name": "verifier 8718 k2c/compose: compose-prefixed verifier r5 corpus2/Q3: JSON.stringify'd pretty test fixture printed by console.log in jest block",
+      "expect": "noesc"
+    },
+    {
+      "text": "@acme/web:test:  FAIL  src/auth.test.ts > login\nError: Invalid API key · Please run /login",
+      "bash": "auth_error",
+      "ts": "auth",
+      "name": "verifier 8718-r2 c1/r1: turbo FAIL header then col0 real error (first content)",
+      "expect": "esc:auth"
+    },
+    {
+      "text": "@acme/web:test:  FAIL  src/auth.test.ts > login\n@acme/web:test: AssertionError: expected values to match:\nError: Invalid API key · Please run /login",
+      "bash": "auth_error",
+      "ts": "auth",
+      "name": "verifier 8718-r2 c1/r2: turbo FAIL, content ending ':', col0 real error",
+      "expect": "esc:auth"
+    },
+    {
+      "text": "@acme/web:test:  FAIL  src/auth.test.ts > login\n@acme/web:test: AssertionError: expected 1 to be 2\n@acme/web:test:\nError: Invalid API key · Please run /login",
+      "bash": "auth_error",
+      "ts": "auth",
+      "name": "verifier 8718-r2 c1/r3: turbo FAIL, content, bare prefix (no trailing space), col0 error",
+      "expect": "esc:auth"
+    },
+    {
+      "text": "packages/web test: stderr | src/a.test.ts > x\npackages/web test: retrying fetch\ngh: HTTP 401: Bad credentials (https://api.github.com/graphql)",
+      "bash": "auth_error",
+      "ts": "auth",
+      "name": "verifier 8718-r2 c1/r4: pnpm stderr block, then col0 gh error",
+      "expect": "esc:auth"
+    },
+    {
+      "text": "crates/core test: thread 'main' panicked at src/lib.rs:5:9:\ncrates/core test: called `Result::unwrap()` on an `Err` value:\nfatal: Authentication failed for 'https://github.com/acme/repo.git/'",
+      "bash": "auth_error",
+      "ts": "auth",
+      "name": "verifier 8718-r2 c1/r5: pnpm panic, content ending ':', fatal auth",
+      "expect": "esc:auth"
+    },
+    {
+      "text": " FAIL  src/a.test.ts > b\nAssertionError: expected:\nError: Invalid API key · Please run /login",
+      "bash": "build_failure",
+      "ts": "unknown",
+      "name": "verifier 8718-r2 c1/r6: unprefixed vitest FAIL, content ':' then real error (vs main also hidden)",
+      "expect": "esc:auth",
+      "limit": "Known limit 2: a prefix or form the classifier does not cover (compose without -N, lerna, yarn foreach, pretty-printed or array JSON, a real error as an open block's first content line); the run is retried."
+    },
+    {
+      "text": "@acme/web:test:  FAIL  src/a.test.ts > b\n@acme/web:test: AssertionError: x\n@acme/api:deploy: Error: Invalid API key · Please run /login",
+      "bash": "build_failure",
+      "ts": "unknown",
+      "name": "verifier 8718-r2 c1/r7: turbo prefixed real error after turbo FAIL, no blank",
+      "expect": "esc:auth",
+      "limit": "Known limit (#8715 review): a line behind a monorepo or compose runner prefix (pnpm -r, turbo, docker compose) is never escalated. Those prefixes carry app and test output as often as real errors."
+    },
+    {
+      "text": "web-1  | stdout | x > y\nweb-1  | hello\nError: Invalid API key · Please run /login",
+      "bash": "auth_error",
+      "ts": "auth",
+      "name": "verifier 8718-r2 c1/r8: compose header? stdout block then error",
+      "expect": "esc:auth"
+    },
+    {
+      "text": "packages/agent deploy: Error: Invalid API key · Please run /login",
+      "bash": "unknown",
+      "ts": "unknown",
+      "name": "verifier 8718-r2 c1/r10: real error behind pnpm",
+      "expect": "esc:auth",
+      "limit": "Known limit (#8715 review): a line behind a monorepo or compose runner prefix (pnpm -r, turbo, docker compose) is never escalated. Those prefixes carry app and test output as often as real errors."
+    },
+    {
+      "text": "@acme/agent:run: Error: Invalid API key · Please run /login",
+      "bash": "unknown",
+      "ts": "unknown",
+      "name": "verifier 8718-r2 c1/r11: real error behind turbo",
+      "expect": "esc:auth",
+      "limit": "Known limit (#8715 review): a line behind a monorepo or compose runner prefix (pnpm -r, turbo, docker compose) is never escalated. Those prefixes carry app and test output as often as real errors."
+    },
+    {
+      "text": "agent-1  | Error: Invalid API key · Please run /login",
+      "bash": "unknown",
+      "ts": "unknown",
+      "name": "verifier 8718-r2 c1/r12: real error behind compose",
+      "expect": "esc:auth",
+      "limit": "Known limit (#8715 review): a line behind a monorepo or compose runner prefix (pnpm -r, turbo, docker compose) is never escalated. Those prefixes carry app and test output as often as real errors."
+    },
+    {
+      "text": "packages/MyLib deploy: Error: Invalid API key · Please run /login",
+      "bash": "unknown",
+      "ts": "unknown",
+      "name": "verifier 8718-r2 c1/r13: pnpm uppercase dir",
+      "expect": "esc:auth",
+      "limit": "Known limit 2: a prefix or form the classifier does not cover (compose without -N, lerna, yarn foreach, pretty-printed or array JSON, a real error as an open block's first content line); the run is retried."
+    },
+    {
+      "text": "@acme/agent:deploy:prod: Error: Invalid API key · Please run /login",
+      "bash": "unknown",
+      "ts": "unknown",
+      "name": "verifier 8718-r2 c1/r14: turbo task with colon",
+      "expect": "esc:auth",
+      "limit": "Known limit 2: a prefix or form the classifier does not cover (compose without -N, lerna, yarn foreach, pretty-printed or array JSON, a real error as an open block's first content line); the run is retried."
+    },
+    {
+      "text": "packages/foo.js deploy: Error: Invalid API key · Please run /login",
+      "bash": "unknown",
+      "ts": "unknown",
+      "name": "verifier 8718-r2 c1/r15: pnpm dotted dir",
+      "expect": "esc:auth",
+      "limit": "Known limit 2: a prefix or form the classifier does not cover (compose without -N, lerna, yarn foreach, pretty-printed or array JSON, a real error as an open block's first content line); the run is retried."
+    },
+    {
+      "text": "acme.io:deploy: Error: Invalid API key · Please run /login",
+      "bash": "unknown",
+      "ts": "unknown",
+      "name": "verifier 8718-r2 c1/r16: turbo pkg with dot",
+      "expect": "esc:auth",
+      "limit": "Known limit 2: a prefix or form the classifier does not cover (compose without -N, lerna, yarn foreach, pretty-printed or array JSON, a real error as an open block's first content line); the run is retried."
+    },
+    {
+      "text": "build\tRun\t2026-10-25T12:00:00.1234Z @acme/agent:run: Error: Invalid API key · Please run /login",
+      "bash": "unknown",
+      "ts": "unknown",
+      "name": "verifier 8718-r2 c1/r17: gh prefix + turbo",
+      "expect": "esc:auth",
+      "limit": "Known limit (#8715 review): a line behind a monorepo or compose runner prefix (pnpm -r, turbo, docker compose) is never escalated. Those prefixes carry app and test output as often as real errors."
+    },
+    {
+      "text": "@acme/agent:run: 2026-10-25T12:00:00Z Error: Invalid API key · Please run /login",
+      "bash": "unknown",
+      "ts": "unknown",
+      "name": "verifier 8718-r2 c1/r18: turbo + timestamp",
+      "expect": "esc:auth",
+      "limit": "Known limit (#8715 review): a line behind a monorepo or compose runner prefix (pnpm -r, turbo, docker compose) is never escalated. Those prefixes carry app and test output as often as real errors."
+    },
+    {
+      "text": "@acme/agent:run: gh: HTTP 401: Bad credentials (https://api.github.com/graphql)",
+      "bash": "unknown",
+      "ts": "unknown",
+      "name": "verifier 8718-r2 c1/r19: turbo + gh: HTTP 401",
+      "expect": "esc:auth",
+      "limit": "Known limit (#8715 review): a line behind a monorepo or compose runner prefix (pnpm -r, turbo, docker compose) is never escalated. Those prefixes carry app and test output as often as real errors."
+    },
+    {
+      "text": "packages/agent deploy: fatal: Authentication failed for 'https://github.com/a/b.git/'",
+      "bash": "build_failure",
+      "ts": "unknown",
+      "name": "verifier 8718-r2 c1/r20: pnpm + fatal auth",
+      "expect": "esc:auth",
+      "limit": "Known limit (#8715 review): a line behind a monorepo or compose runner prefix (pnpm -r, turbo, docker compose) is never escalated. Those prefixes carry app and test output as often as real errors."
+    },
+    {
+      "text": "@acme/agent:run: GraphQL: Could not resolve to an Issue with the number of 99999. (repository.issue)",
+      "bash": "unknown",
+      "ts": "unknown",
+      "name": "verifier 8718-r2 c1/r21: turbo + graphql issue",
+      "expect": "esc:invalid_input",
+      "limit": "Known limit (#8715 review): a line behind a monorepo or compose runner prefix (pnpm -r, turbo, docker compose) is never escalated. Those prefixes carry app and test output as often as real errors."
+    },
+    {
+      "text": "@acme/agent:run: {\"type\":\"result\",\"subtype\":\"success\",\"is_error\":true,\"result\":\"Invalid API key · Please run /login\"}",
+      "bash": "unknown",
+      "ts": "unknown",
+      "name": "verifier 8718-r2 c1/r22: Fatal CLI JSON behind turbo",
+      "expect": "esc:auth",
+      "limit": "Known limit (#8715 review): a line behind a monorepo or compose runner prefix (pnpm -r, turbo, docker compose) is never escalated. Those prefixes carry app and test output as often as real errors."
+    },
+    {
+      "text": "ci/cd note: Error: Invalid API key · Please run /login was shown in the old logs",
+      "bash": "unknown",
+      "ts": "unknown",
+      "name": "verifier 8718-r2 c1/b1: prose ci/cd note",
+      "expect": "noesc"
+    },
+    {
+      "text": "bin/sw:fatal: Authentication failed for 'https://github.com/a/b.git/'",
+      "bash": "build_failure",
+      "ts": "unknown",
+      "name": "verifier 8718-r2 c1/b2: grep extensionless file",
+      "expect": "noesc"
+    },
+    {
+      "text": "scripts/sw:error: Invalid API key · Please run /login",
+      "bash": "unknown",
+      "ts": "unknown",
+      "name": "verifier 8718-r2 c1/b3: grep extensionless file with error: content",
+      "expect": "noesc"
+    },
+    {
+      "text": "read/write example: gh: HTTP 401: Bad credentials (https://api.github.com/graphql)",
+      "bash": "unknown",
+      "ts": "unknown",
+      "name": "verifier 8718-r2 c1/b4: prose read/write note",
+      "expect": "noesc"
+    },
+    {
+      "text": "case-12 | Error: Invalid API key · Please run /login | auth",
+      "bash": "unknown",
+      "ts": "unknown",
+      "name": "verifier 8718-r2 c1/b5: table row",
+      "expect": "noesc"
+    },
+    {
+      "text": "docs:example: Error: Invalid API key · Please run /login",
+      "bash": "unknown",
+      "ts": "unknown",
+      "name": "verifier 8718-r2 c1/b6: turbo-like doc key",
+      "expect": "noesc"
+    },
+    {
+      "text": "auth:message: Invalid API key · Please run /login",
+      "bash": "unknown",
+      "ts": "unknown",
+      "name": "verifier 8718-r2 c1/b7: yaml-ish key:value:",
+      "expect": "noesc"
+    },
+    {
+      "text": "fixture-1 | Invalid API key · Please run /login",
+      "bash": "unknown",
+      "ts": "unknown",
+      "name": "verifier 8718-r2 c1/b8: git diff stat no leading space",
+      "expect": "noesc"
+    },
+    {
+      "text": "https://example.com/x: Error: Invalid API key · Please run /login",
+      "bash": "unknown",
+      "ts": "unknown",
+      "name": "verifier 8718-r2 c1/b9: url",
+      "expect": "noesc"
+    },
+    {
+      "text": "level=info msg=\"Error: Invalid API key · Please run /login\"",
+      "bash": "unknown",
+      "ts": "unknown",
+      "name": "verifier 8718-r2 c1/b10: logfmt",
+      "expect": "noesc"
+    },
+    {
+      "text": "tests/fixtures/auth-401 log: Error: Invalid API key · Please run /login",
+      "bash": "unknown",
+      "ts": "unknown",
+      "name": "verifier 8718-r2 c1/b11: grep -r tests dir extensionless",
+      "expect": "noesc"
+    },
+    {
+      "text": "root:auth: Invalid API key · Please run /login",
+      "bash": "unknown",
+      "ts": "unknown",
+      "name": "verifier 8718-r2 c1/b12: python logging lowercase logger",
+      "expect": "noesc"
+    },
+    {
+      "text": "@acme/web:test: stdout | src/a.test.ts > b\n@acme/web:test: starting\n@acme/web:test: Error: Invalid API key · Please run /login",
+      "bash": "unknown",
+      "ts": "unknown",
+      "name": "verifier 8718-r2 c1/b13: turbo prefixed test fixture output in vitest block 2nd line",
+      "expect": "noesc"
+    },
+    {
+      "text": "@acme/web:test: (fail) Error: Invalid API key · Please run /login",
+      "bash": "build_failure",
+      "ts": "unknown",
+      "name": "verifier 8718-r2 c1/b14: turbo bun (fail) title",
+      "expect": "noesc"
+    },
+    {
+      "text": "@acme/web:test:  FAIL  src/a.test.ts > Error: Invalid API key\n@acme/web:test: AssertionError: x",
+      "bash": "build_failure",
+      "ts": "unknown",
+      "name": "verifier 8718-r2 c1/b15: turbo vitest FAIL header with auth title",
+      "expect": "noesc"
+    },
+    {
+      "text": "packages/web test:     console.error\npackages/web test:       Error: Invalid API key · Please run /login",
+      "bash": "unknown",
+      "ts": "unknown",
+      "name": "verifier 8718-r2 c1/b16: pnpm jest console.error block",
+      "expect": "noesc"
+    },
+    {
+      "text": "packages/web test:   1) auth\npackages/web test:        rejects:\npackages/web test:      Error: Invalid API key · Please run /login",
+      "bash": "unknown",
+      "ts": "unknown",
+      "name": "verifier 8718-r2 c1/b17: pnpm mocha",
+      "expect": "noesc"
+    },
+    {
+      "text": "@acme/py:test: ----- Captured stderr call -----\n@acme/py:test: Error: Invalid API key · Please run /login",
+      "bash": "unknown",
+      "ts": "unknown",
+      "name": "verifier 8718-r2 c1/b18: pytest captured behind turbo",
+      "expect": "noesc"
+    },
+    {
+      "text": "@acme/web:test:    × Error: Invalid API key · Please run /login 3ms",
+      "bash": "unknown",
+      "ts": "unknown",
+      "name": "verifier 8718-r2 c1/b19: turbo vitest x indented",
+      "expect": "noesc"
+    },
+    {
+      "text": "@acme/web:test: stderr | a > b\n@acme/web:test: log\n@acme/web:test:\n@acme/web:test: Not logged in · Please run /login",
+      "bash": "unknown",
+      "ts": "unknown",
+      "name": "verifier 8718-r2 c1/b20: turbo blank no trailing space then console block continued",
+      "expect": "noesc"
+    },
+    {
+      "text": "packages/web test: stderr | a > b\npackages/web test: Error: Command failed: claude -p\npackages/web test: Invalid API key · Please run /login",
+      "bash": "build_failure",
+      "ts": "unknown",
+      "name": "verifier 8718-r2 c1/b21: pnpm console block, Command failed intro",
+      "expect": "noesc"
+    },
+    {
+      "text": "stderr | a > b\nx\n@acme/web:test: Invalid API key · Please run /login",
+      "bash": "unknown",
+      "ts": "unknown",
+      "name": "verifier 8718-r2 c1/b22: unprefixed then prefixed mix fixture",
+      "expect": "noesc"
+    },
+    {
+      "text": "api-1  | 401 Unauthorized\napi-1  | GET /me 401 3ms\ntests-1  | (fail) me > returns profile\ntests-1 exited with code 1",
+      "bash": "build_failure",
+      "ts": "unknown",
+      "name": "review corpus7: dc api 401 unauthorized access log",
+      "expect": "noesc"
+    },
+    {
+      "text": "web-1  | Error: Request failed with status code 401\nweb-1  |     at settle (/app/node_modules/axios/lib/core/settle.js:19:12)\nweb-1 exited with code 1",
+      "bash": "build_failure",
+      "ts": "unknown",
+      "name": "review corpus7: dc api axios 401 from mock",
+      "expect": "noesc"
+    },
+    {
+      "text": "auth-1  | [2026-10-26T09:00:00Z] [ERROR] Authentication failed.\ne2e-1  | ✕ login with bad password shows error\ne2e-1 exited with code 1",
+      "bash": "build_failure",
+      "ts": "unknown",
+      "name": "review corpus7: dc api 'authentication failed.'",
+      "expect": "noesc"
+    },
+    {
+      "text": "api-1  | Error: invalid token\napi-1  | JsonWebTokenError: invalid signature\nerror: e2e failed",
+      "bash": "build_failure",
+      "ts": "unknown",
+      "name": "review corpus7: dc api invalid token (word)",
+      "expect": "noesc"
+    },
+    {
+      "text": "web_1   | not logged in\nweb_1   | redirecting to /login\nerror: e2e failed",
+      "bash": "build_failure",
+      "ts": "unknown",
+      "name": "review corpus7: dc api not logged in",
+      "expect": "noesc"
+    },
+    {
+      "text": "ghmock-1  | Bad credentials\nerror: e2e failed",
+      "bash": "build_failure",
+      "ts": "unknown",
+      "name": "review corpus7: dc api bad credentials (gh mock)",
+      "expect": "noesc"
+    },
+    {
+      "text": "db-1  | 2026-10-26 09:00:00.123 UTC [61] FATAL:  password authentication failed for user \"app\"\nerror: migrate failed",
+      "bash": "build_failure",
+      "ts": "unknown",
+      "name": "review corpus7: dc postgres auth failed",
+      "expect": "noesc"
+    },
+    {
+      "text": "registry-1  | time=\"2026-10-26T09:00:00Z\" level=warning msg=\"error authorizing context: basic authentication challenge for realm\"\nerror",
+      "bash": "unknown",
+      "ts": "unknown",
+      "name": "review corpus7: dc registry 401",
+      "expect": "noesc"
+    },
+    {
+      "text": "ghmock-1  | issue not found\nerror: e2e failed",
+      "bash": "build_failure",
+      "ts": "unknown",
+      "name": "review corpus7: dc mock issue not found",
+      "expect": "noesc"
+    },
+    {
+      "text": "tests-1  | Error: Failed to authenticate.\ntests-1  | (fail) client > retries auth\nerror",
+      "bash": "build_failure",
+      "ts": "unknown",
+      "name": "review corpus7: dc compose run tests output",
+      "expect": "noesc"
+    },
+    {
+      "text": "src/auth.ts:12:  throw new Error('Not logged in');\nsrc/auth.ts:40:Error: Bad credentials\nerror: lint failed",
+      "bash": "build_failure",
+      "ts": "unknown",
+      "name": "review corpus7: grep -rn ts file",
+      "expect": "noesc"
+    },
+    {
+      "text": "raw/preflight-auth:fatal: Authentication failed for 'https://github.com/o/r.git/'\nerror: check failed",
+      "bash": "build_failure",
+      "ts": "unknown",
+      "name": "review corpus7: grep -r extensionless one-slash",
+      "expect": "noesc"
+    },
+    {
+      "text": "scripts/sw:error: not logged in\nerror: check failed",
+      "bash": "build_failure",
+      "ts": "unknown",
+      "name": "review corpus7: grep -r extensionless scripts/sw",
+      "expect": "noesc"
+    },
+    {
+      "text": "bin:error: Invalid API key.\nerror",
+      "bash": "unknown",
+      "ts": "unknown",
+      "name": "review corpus7: grep -r bin/x no slash",
+      "expect": "noesc"
+    },
+    {
+      "text": "Invalid API key · Please run /login\nnot logged in\nerror: snapshot mismatch",
+      "bash": "auth_error",
+      "ts": "auth",
+      "name": "review corpus7: grep -h content only col0",
+      "expect": "noesc",
+      "limit": "Known limit 1: a fixture or grep -h line printed at column 0 in exactly the real emitter's form; main escalates it too (#8715 review, 2 of 32)."
+    },
+    {
+      "text": "src/testing/fixtures/wave2/preflight-auth.log\n1:##[error]Claude Code authentication failed — check CLAUDE_CODE_OAUTH_TOKEN secret\nerror",
+      "bash": "build_failure",
+      "ts": "unknown",
+      "name": "review corpus7: rg --heading block",
+      "expect": "noesc"
+    },
+    {
+      "text": "fixtures/auth.log\n##[error]Claude Code authentication failed — check CLAUDE_CODE_OAUTH_TOKEN secret\nerror: grep found leftover fixture",
+      "bash": "auth_error",
+      "ts": "auth",
+      "name": "review corpus7: rg -N --heading no numbers",
+      "expect": "noesc",
+      "limit": "Known limit 1: a fixture or grep -h line printed at column 0 in exactly the real emitter's form; main escalates it too (#8715 review, 2 of 32)."
+    },
+    {
+      "text": "tests/fixtures/git-auth:fatal: Authentication failed for 'https://github.com/o/r.git/'\nerror",
+      "bash": "build_failure",
+      "ts": "unknown",
+      "name": "review corpus7: grep extensionless deep path",
+      "expect": "noesc"
+    },
+    {
+      "text": "auth:login: not logged in\nerror: test failed",
+      "bash": "build_failure",
+      "ts": "unknown",
+      "name": "review corpus7: logfmt-ish auth:login:",
+      "expect": "noesc"
+    },
+    {
+      "text": "app:auth: Authentication failed.\nerror: test failed",
+      "bash": "build_failure",
+      "ts": "unknown",
+      "name": "review corpus7: debug ns colon",
+      "expect": "noesc"
+    },
+    {
+      "text": "error:code: 401 Unauthorized\nerror",
+      "bash": "unknown",
+      "ts": "unknown",
+      "name": "review corpus7: yaml-like error:code:",
+      "expect": "noesc"
+    },
+    {
+      "text": "deploy:check: Bad credentials\nerror",
+      "bash": "unknown",
+      "ts": "unknown",
+      "name": "review corpus7: make target prefix",
+      "expect": "noesc"
+    },
+    {
+      "text": "packages/gh test: HTTP 401: Bad credentials (https://api.github.com/graphql)\npackages/gh test: (fail) maps 401\npackages/gh test: error: expected",
+      "bash": "build_failure",
+      "ts": "unknown",
+      "name": "review corpus7: pnpm style test package logs mock",
+      "expect": "noesc"
+    },
+    {
+      "text": "@acme/gh:test: Invalid API key · Please run /login\n@acme/gh:test: (fail) parses auth line\n@acme/gh:test: error",
+      "bash": "build_failure",
+      "ts": "unknown",
+      "name": "review corpus7: turbo test task logs mock",
+      "expect": "noesc"
+    },
+    {
+      "text": "stderr | src/client.test.ts > rejects a bad key\n[client] GET /v1/me\nError: Request failed with status code 401\n\n ✓ src/client.test.ts (3 tests)\nerror: other test failed",
+      "bash": "build_failure",
+      "ts": "unknown",
+      "name": "review corpus7: vitest stderr 2nd line axios",
+      "expect": "noesc"
+    },
+    {
+      "text": "stderr | src/gh.test.ts > surfaces gh errors\nrunning gh api user\ngh: HTTP 401: Bad credentials (https://api.github.com/graphql)\n\nerror: 1 test failed",
+      "bash": "build_failure",
+      "ts": "unknown",
+      "name": "review corpus7: vitest stderr 2nd line gh 401",
+      "expect": "noesc"
+    },
+    {
+      "text": " FAIL  src/gh.test.ts > surfaces gh errors\nError: gh failed\ngh: HTTP 401: Bad credentials (https://api.github.com/graphql)\n ❯ src/gh.ts:12:9",
+      "bash": "build_failure",
+      "ts": "unknown",
+      "name": "review corpus7: vitest FAIL multi-line error",
+      "expect": "noesc"
+    },
+    {
+      "text": " FAIL  src/claude.test.ts > maps 401\nAssertionError: expected 'auth' to be 'unknown'\nAPI Error: 401 {\"type\":\"error\",\"error\":{\"type\":\"authentication_error\",\"message\":\"x\"}}\n ❯ src/claude.test.ts:9:3",
+      "bash": "build_failure",
+      "ts": "unknown",
+      "name": "review corpus7: vitest FAIL assertion msg 2nd line",
+      "expect": "noesc"
+    },
+    {
+      "text": "thread 'auth::tests::bad_key' panicked at src/auth.rs:40:9:\nassertion failed\nInvalid API key · Please run /login\nnote: run with `RUST_BACKTRACE=1`",
+      "bash": "build_failure",
+      "ts": "unknown",
+      "name": "review corpus7: cargo panic 2nd line",
+      "expect": "noesc"
+    },
+    {
+      "text": "stderr | a.test.ts > x\nclaude exited 1, stderr:\nInvalid API key · Please run /login\n\nerror",
+      "bash": "unknown",
+      "ts": "unknown",
+      "name": "review corpus7: vitest stderr 2nd line after 'stderr:' intro",
+      "expect": "noesc"
+    },
+    {
+      "text": "⎯⎯⎯ Unhandled Rejection ⎯⎯⎯\nError: mock failure\nfatal: Authentication failed for 'https://github.com/o/r.git/'\n ❯ test/git.test.ts:3:1",
+      "bash": "build_failure",
+      "ts": "unknown",
+      "name": "review corpus7: vitest Unhandled 2nd line",
+      "expect": "noesc"
+    },
+    {
+      "text": "stderr | t.test.ts > missing\nlooking up #9\nGraphQL: Could not resolve to an issue or pull request with the number of 9. (repository.issue)\n\nerror",
+      "bash": "unknown",
+      "ts": "unknown",
+      "name": "review corpus7: vitest stderr 2nd line issue not found",
+      "expect": "noesc"
+    },
+    {
+      "text": "stdout | src/main.test.ts > run > fails when gh is not authenticated\n::debug::checking gh auth\n##[error]Not logged in\n\n ❯ src/main.test.ts (4 tests | 1 failed) 31ms\n FAIL  src/main.test.ts > run > uploads the report\nAssertionError: expected 0 to be 1\n error: 1 test failed\nerror: script \"test\" exited with code 1",
+      "bash": "build_failure",
+      "ts": "unknown",
+      "name": "verifier 8718-fp corpus/A1: vitest stdout block: action under test core.setFailed -> ##[error]Not logged in",
+      "expect": "noesc"
+    },
+    {
+      "text": "stderr | __tests__/token.test.ts > validates the token > rejects a revoked token\n##[error]Bad credentials\n\n × __tests__/token.test.ts > uploads > posts the comment\nAssertionError: expected 'x' to be 'y'\n error: 1 test failed\nerror: script \"test\" exited with code 1",
+      "bash": "build_failure",
+      "ts": "unknown",
+      "name": "verifier 8718-fp corpus/A2: vitest stderr block: ##[error]Bad credentials from action under test",
+      "expect": "noesc"
+    },
+    {
+      "text": "stdout | src/login.test.ts > login > reports a failed CLI login\n##[group]claude auth\nrunning claude auth status\nError: Failed to authenticate.\n##[endgroup]\n\n FAIL  src/other.test.ts > other\nAssertionError: expected 1 to be 2\n error: 1 test failed\nerror: script \"test\" exited with code 1",
+      "bash": "build_failure",
+      "ts": "unknown",
+      "name": "verifier 8718-fp corpus/A3: vitest stdout block: ##[group] then col-0 'Error: Failed to authenticate.' later in the same block",
+      "expect": "noesc"
+    },
+    {
+      "text": "_________________________ test_reports_bad_token _________________________\n    def test_reports_bad_token(capsys):\n>       assert main(['--token', 'x']) == 0\nE       assert 1 == 0\n----- Captured stdout call -----\nchecking token for octo/repo\n##[error]Bad credentials\n=========================== short test summary info ============================\nFAILED tests/test_token.py::test_reports_bad_token - assert 1 == 0\n1 failed, 12 passed in 0.41s\n##[error]Process completed with exit code 1.",
+      "bash": "build_failure",
+      "ts": "unknown",
+      "name": "verifier 8718-fp corpus/A4: pytest captured stdout: script prints ::error::Bad credentials, runner shows ##[error]",
+      "expect": "noesc"
+    },
+    {
+      "text": "----- Captured stdout call -----\n::error::Not logged in\n=========================== short test summary info ============================\nFAILED tests/test_gate.py::test_requires_login - SystemExit: 1\n1 failed, 3 passed in 0.10s",
+      "bash": "build_failure",
+      "ts": "unknown",
+      "name": "verifier 8718-fp corpus/A5: pytest captured stdout: raw ::error::Not logged in (local act / tee'd file, not rewritten)",
+      "expect": "noesc"
+    },
+    {
+      "text": "----- Captured stdout call -----\n##[group]gh auth status\nYou are not logged into any GitHub hosts. To log in, run: gh auth login\n##[endgroup]\n----- Captured stderr call -----\nwarning: retrying\nFAILED tests/test_gh.py::test_status_message - AssertionError\n1 failed in 0.2s",
+      "bash": "build_failure",
+      "ts": "unknown",
+      "name": "verifier 8718-fp corpus/A6: pytest captured: ##[group] then gh 'You are not logged into any GitHub hosts' printed by fake gh",
+      "expect": "noesc"
+    },
+    {
+      "text": "----- Captured stdout call -----\n##[group]stub claude\n##[endgroup]\nAPI Error: 401 {\"type\":\"error\",\"error\":{\"type\":\"authentication_error\",\"message\":\"invalid x-api-key\"},\"request_id\":\"req_011CUXyz\"}\n=========================== short test summary info ============================\nFAILED tests/test_stub.py::test_maps_401 - AssertionError: 'unknown' != 'auth'\n1 failed in 0.3s",
+      "bash": "build_failure",
+      "ts": "unknown",
+      "name": "verifier 8718-fp corpus/A7: pytest captured: ##[endgroup] then CLI 401 body printed by a stub",
+      "expect": "noesc"
+    },
+    {
+      "text": "thread 'gh::tests::bad_token' panicked at src/gh.rs:88:9:\nassertion `left == right` failed\n##[error]HTTP 401: Bad credentials (https://api.github.com/graphql)\nnote: run with `RUST_BACKTRACE=1` environment variable to display a backtrace\ntest result: FAILED. 41 passed; 1 failed",
+      "bash": "build_failure",
+      "ts": "unknown",
+      "name": "verifier 8718-fp corpus/A8: cargo panic msg then ##[error] annotation from test helper (gha annotate crate)",
+      "expect": "noesc"
+    },
+    {
+      "text": " FAIL  src/cli.test.ts > cli > surfaces login errors\n##[error]Error: Not logged in · Please run /login\nError: expected promise to resolve\n ❯ src/cli.test.ts:22:5\n error: 1 test failed\nerror: script \"test\" exited with code 1",
+      "bash": "build_failure",
+      "ts": "unknown",
+      "name": "verifier 8718-fp corpus/A9: vitest FAIL block: error message, ##[error] annotation of the thrown error inline",
+      "expect": "noesc"
+    },
+    {
+      "text": "⎯⎯⎯⎯ Unhandled Rejection ⎯⎯⎯⎯\nError: git push failed\n##[error]fatal: Authentication failed for 'https://github.com/octo/repo.git/'\n ❯ test/push.test.ts:3:1\n error: 1 test failed\nerror: script \"test\" exited with code 1",
+      "bash": "build_failure",
+      "ts": "unknown",
+      "name": "verifier 8718-fp corpus/A10: vitest Unhandled block containing ##[error]Authentication failed for git url",
+      "expect": "noesc"
+    },
+    {
+      "text": "  console.log\n    ::error::Not logged in\n\n      at log (src/main.ts:12:11)\n\nFAIL __tests__/main.test.ts\n  ● run › fails\n\n error: 1 test failed\nerror: script \"test\" exited with code 1",
+      "bash": "build_failure",
+      "ts": "unknown",
+      "name": "verifier 8718-fp corpus/A11: jest console.log block, indented ::error:: (runner ignores indented commands) - control",
+      "expect": "noesc"
+    },
+    {
+      "text": "test\tRun tests\t2026-10-26T09:00:00.1234567Z stdout | src/claude.test.ts > maps the CLI's login error\ntest\tRun tests\t2026-10-26T09:00:00.1234567Z ##[error]Invalid API key · Please run /login\ntest\tRun tests\t2026-10-26T09:00:00.1234567Z \ntest\tRun tests\t2026-10-26T09:00:00.1234567Z  FAIL  src/claude.test.ts > other\ntest\tRun tests\t2026-10-26T09:00:00.1234567Z AssertionError: boom\n error: 1 test failed\nerror: script \"test\" exited with code 1",
+      "bash": "build_failure",
+      "ts": "unknown",
+      "name": "verifier 8718-fp corpus/A12: gh --log prefixed: vitest stdout block with ##[error]Invalid API key ·",
+      "expect": "noesc"
+    },
+    {
+      "text": "stderr | test/preflight.test.ts > preflight > fails without a token\n##[error]CLAUDE_CODE_OAUTH_TOKEN not set.\n\n FAIL  test/preflight.test.ts > preflight > passes with a token\nAssertionError: expected false to be true\n error: 1 test failed\nerror: script \"test\" exited with code 1",
+      "bash": "build_failure",
+      "ts": "unknown",
+      "name": "verifier 8718-fp corpus/A13: vitest stderr block, ##[error]claude_code_oauth_token not set from preflight under test",
+      "expect": "noesc"
+    },
+    {
+      "text": "----- Captured stdout call -----\n##[error]remote: Permission to octo/repo.git denied to github-actions[bot].\n=====\nFAILED tests/test_push.py::test_denied - assert False\n1 failed in 0.1s",
+      "bash": "build_failure",
+      "ts": "unknown",
+      "name": "verifier 8718-fp corpus/A14: pytest captured log: ##[error]remote: Permission to o/r denied to bot",
+      "expect": "noesc"
+    },
+    {
+      "text": "stdout | test/clone.test.ts > clone > reports a bad token\n##[group]git clone\nfatal: Authentication failed for 'https://github.com/octo/private.git/'\n##[endgroup]\n\n FAIL  test/clone.test.ts > clone > retries\nAssertionError: expected 1 to be 2\n error: 1 test failed\nerror: script \"test\" exited with code 1",
+      "bash": "build_failure",
+      "ts": "unknown",
+      "name": "verifier 8718-fp corpus/A15: vitest stdout: ##[group] boundary then 'fatal: Authentication failed for' git stub output",
+      "expect": "noesc"
+    },
+    {
+      "text": "----- Captured stdout call -----\n::error::HTTP 401: Requires authentication (https://api.github.com/user)\n___ test_other ___\nFAILED tests/test_api.py::test_other - KeyError\n1 failed in 0.1s",
+      "bash": "build_failure",
+      "ts": "unknown",
+      "name": "verifier 8718-fp corpus/A16: pytest captured: ::error::HTTP 401: Requires authentication (GHA python script)",
+      "expect": "noesc"
+    },
+    {
+      "text": "stderr | test/issue.test.ts > issue > reports a missing issue\n##[error]GraphQL: Could not resolve to an issue or pull request with the number of 999. (repository.issue)\n\n FAIL  test/issue.test.ts > issue > labels\nAssertionError: x\n error: 1 test failed\nerror: script \"test\" exited with code 1",
+      "bash": "build_failure",
+      "ts": "unknown",
+      "name": "verifier 8718-fp corpus/A17: vitest stderr: ##[error]::error-less GraphQL could not resolve issue (invalid_input) from test stub",
+      "expect": "noesc"
+    },
+    {
+      "text": "----- Captured stdout call -----\n##[error]issue #42 does not exist.\nFAILED tests/test_issue.py::test_missing - assert 0 == 1\n1 failed in 0.1s",
+      "bash": "build_failure",
+      "ts": "unknown",
+      "name": "verifier 8718-fp corpus/A18: pytest captured: ##[error]issue #42 does not exist (invalid input) from stub",
+      "expect": "noesc"
+    },
+    {
+      "text": "stderr | test/a.test.ts > a\nAPI Error: 401 {\"type\":\"error\",\"error\":{\"type\":\"authentication_error\",\"message\":\"invalid x-api-key\"},\"request_id\":\"req_011CUXyz\"}\n##[group]Run actions/upload-artifact@v4\nWith:\n  name: report\n##[endgroup]\nWith the provided path, there will be 1 file uploaded\nArtifact report has been successfully uploaded!\n##[error]Process completed with exit code 1.",
+      "bash": "build_failure",
+      "ts": "unknown",
+      "name": "verifier 8718-fp corpus/A19: next step after unterminated vitest block: benign Post job cleanup lines",
+      "expect": "noesc"
+    },
+    {
+      "text": "stdout | src/review.test.ts > review action > reports an API auth failure\n##[group]Calling Anthropic\n##[endgroup]\nError: 401 {\"type\":\"error\",\"error\":{\"type\":\"authentication_error\",\"message\":\"invalid x-api-key\"},\"request_id\":\"req_011CUXyz\"}\n\n FAIL  src/review.test.ts > review action > posts\nAssertionError\n error: 1 test failed\nerror: script \"test\" exited with code 1",
+      "bash": "build_failure",
+      "ts": "unknown",
+      "name": "verifier 8718-fp corpus/A20: vitest console block: ##[endgroup] from action under test then col-0 'Error: 401 {...}' SDK message",
+      "expect": "noesc"
+    },
+    {
+      "text": "----- Captured log call -----\n##[error]authentication required.\nFAILED tests/test_reg.py::test_needs_auth - AssertionError\n1 failed in 0.1s",
+      "bash": "build_failure",
+      "ts": "unknown",
+      "name": "verifier 8718-fp corpus/A21: pytest captured log section with ##[error] from logging handler (gha formatter)",
+      "expect": "noesc"
+    },
+    {
+      "text": "thread 'push::tests::denied' panicked at src/push.rs:10:5:\nexpected Ok\n::error::remote: Write access to repository not granted.\nnote: run with `RUST_BACKTRACE=1`\ntest result: FAILED. 1 failed",
+      "bash": "build_failure",
+      "ts": "unknown",
+      "name": "verifier 8718-fp corpus/A22: cargo panic, ::error:: emitted by test helper raw",
+      "expect": "noesc"
+    },
+    {
+      "text": "⏺ Bash(cat test/fixtures/cli-401.txt)\n  ⎿  API Error: 401 {\"type\":\"error\",\"error\":{\"type\":\"authentication_error\",\"message\":\"invalid x-api-key\"},\"request_id\":\"req_011CUXyz\"}\n\n⏺ The fixture is right; now the classifier test.\n\n error: 1 test failed\nerror: script \"test\" exited with code 1",
+      "bash": "build_failure",
+      "ts": "unknown",
+      "name": "verifier 8718-fp corpus/B1: TUI cat of a 401 fixture",
+      "expect": "noesc"
+    },
+    {
+      "text": "⏺ Bash(node scripts/smoke.mjs)\n  ⎿  Error: 401 {\"type\":\"error\",\"error\":{\"type\":\"authentication_error\",\"message\":\"invalid x-api-key\"},\"request_id\":\"req_011CUXyz\"}\n\n⏺ The sandbox has no ANTHROPIC_API_KEY, so the smoke test can't reach the API; I'll mock the client instead.\n⏺ Bash(bun test)\n  ⎿  Error: 3 tests failed\n error: 1 test failed\nerror: script \"test\" exited with code 1",
+      "bash": "build_failure",
+      "ts": "unknown",
+      "name": "verifier 8718-fp corpus/B2: TUI: agent runs app smoke script with sandboxed (absent) key: Error: 401 body",
+      "expect": "noesc"
+    },
+    {
+      "text": "⏺ Bash(python -m app.summarize --dry-run)\n  ⎿  Error: anthropic.AuthenticationError: Error code: 401 - {'type': 'error', 'error': {'type': 'authentication_error', 'message': 'invalid x-api-key'}}\n\n⏺ The dev key is a placeholder; switching to the recorded cassette.\n error: 1 test failed\nerror: script \"test\" exited with code 1",
+      "bash": "build_failure",
+      "ts": "unknown",
+      "name": "verifier 8718-fp corpus/B3: TUI: python app call, Bash exit!=0 shows 'Error: ' + SDK repr",
+      "expect": "noesc"
+    },
+    {
+      "text": "⏺ Bash(npx tsx src/agent.ts \"hello\")\n  ⎿  AuthenticationError: 401 {\"type\":\"error\",\"error\":{\"type\":\"authentication_error\",\"message\":\"invalid x-api-key\"},\"request_id\":\"req_011CUXyz\"}\n\n⏺ Expected: tests use a fake key.\n error: 1 test failed\nerror: script \"test\" exited with code 1",
+      "bash": "build_failure",
+      "ts": "unknown",
+      "name": "verifier 8718-fp corpus/B4: TUI: node SDK error printed via console.error(String(e))",
+      "expect": "noesc"
+    },
+    {
+      "text": "⏺ Bash(grep -h 'API Error: 401' test/fixtures/*.log | head -1)\n  ⎿  API Error: 401 {\"type\":\"error\",\"error\":{\"type\":\"authentication_error\",\"message\":\"invalid x-api-key\"},\"request_id\":\"req_011CUXyz\"}\n error: 1 test failed\nerror: script \"test\" exited with code 1",
+      "bash": "build_failure",
+      "ts": "unknown",
+      "name": "verifier 8718-fp corpus/B5: TUI: grep -h output first line is fixture body",
+      "expect": "noesc"
+    },
+    {
+      "text": "⏺ Bash(curl-wrapper models list)\n  ⎿  Error: 403 {\"type\":\"error\",\"error\":{\"type\":\"permission_error\",\"message\":\"Your API key does not have permission to use the specified resource.\"}}\n\n error: 1 test failed\nerror: script \"test\" exited with code 1",
+      "bash": "build_failure",
+      "ts": "unknown",
+      "name": "verifier 8718-fp corpus/B6: TUI: 403 permission_error from app call",
+      "expect": "noesc"
+    },
+    {
+      "text": "⏺ Bash(node x.js)\n    ⎿ Error code: 401 {\"type\":\"error\",\"error\":{\"type\":\"authentication_error\",\"message\":\"invalid x-api-key\"},\"request_id\":\"req_011CUXyz\"}\n error: 1 test failed\nerror: script \"test\" exited with code 1",
+      "bash": "build_failure",
+      "ts": "unknown",
+      "name": "verifier 8718-fp corpus/B7: TUI: ⎿ with only one space and 4-space indent",
+      "expect": "noesc"
+    },
+    {
+      "text": "⏺ Bash(python scripts/check.py)\n  ⎿  Error: anthropic.PermissionDeniedError: Error code: 403 - {'type': 'error', 'error': {'type': 'permission_error', 'message': 'no access'}}\n error: 1 test failed\nerror: script \"test\" exited with code 1",
+      "bash": "build_failure",
+      "ts": "unknown",
+      "name": "verifier 8718-fp corpus/B8: TUI: ⎿ with python SDK PermissionDeniedError",
+      "expect": "noesc"
+    },
+    {
+      "text": "⏺ Read(test/fixtures/cli-401.txt)\n  ⎿  Read 1 line (ctrl+o to expand)\n error: 1 test failed\nerror: script \"test\" exited with code 1",
+      "bash": "build_failure",
+      "ts": "unknown",
+      "name": "verifier 8718-fp corpus/B9: TUI: Read tool (control)",
+      "expect": "noesc"
+    },
+    {
+      "text": "⏺ Bash(cat a.log)\n  ⎿  line one\n     API Error: 401 {\"type\":\"error\",\"error\":{\"type\":\"authentication_error\",\"message\":\"invalid x-api-key\"},\"request_id\":\"req_011CUXyz\"}\n error: 1 test failed\nerror: script \"test\" exited with code 1",
+      "bash": "build_failure",
+      "ts": "unknown",
+      "name": "verifier 8718-fp corpus/B10: TUI: tool output 2nd line (5-space continuation, control)",
+      "expect": "noesc"
+    },
+    {
+      "text": "⏺ Bash(printf 'API Error: 401 %s\\n' \"$BODY\" > fx.log && cat fx.log)\n  ⎿  API Error: 401 {\"type\":\"error\",\"error\":{\"type\":\"authentication_error\",\"message\":\"invalid x-api-key\"},\"request_id\":\"req_011CUXyz\"}\n error: 1 test failed\nerror: script \"test\" exited with code 1",
+      "bash": "build_failure",
+      "ts": "unknown",
+      "name": "verifier 8718-fp corpus/B11: TUI: printf to build fixture, echo back",
+      "expect": "noesc"
+    },
+    {
+      "text": "⏺ Task(investigate)\n  ⎿  Bash(cat x)\n      ⎿  API Error: 401 {\"type\":\"error\",\"error\":{\"type\":\"authentication_error\",\"message\":\"invalid x-api-key\"},\"request_id\":\"req_011CUXyz\"}\n error: 1 test failed\nerror: script \"test\" exited with code 1",
+      "bash": "build_failure",
+      "ts": "unknown",
+      "name": "verifier 8718-fp corpus/B12: TUI subagent nested ⎿ (6 spaces, control)",
+      "expect": "noesc"
+    },
+    {
+      "text": "⏺ Bash(jq -r .result fixtures/stream.json)\n  ⎿  API Error: 401 {\\\"type\\\":\\\"error\\\",\\\"error\\\":{\\\"type\\\":\\\"authentication_error\\\",\\\"message\\\":\\\"x\\\"}}\n error: 1 test failed\nerror: script \"test\" exited with code 1",
+      "bash": "build_failure",
+      "ts": "unknown",
+      "name": "verifier 8718-fp corpus/B13: TUI: escaped-quote body inside JSON printed by jq -r",
+      "expect": "noesc"
+    },
+    {
+      "text": "⏺ Bash(bun test src/client.test.ts 2>&1 | grep -m1 401)\n  ⎿  Error: 401 {\"type\":\"error\",\"error\":{\"type\":\"authentication_error\",\"message\":\"invalid x-api-key\"},\"request_id\":\"req_011CUXyz\"}\n error: 1 test failed\nerror: script \"test\" exited with code 1",
+      "bash": "build_failure",
+      "ts": "unknown",
+      "name": "verifier 8718-fp corpus/B14: TUI: test run whose first line is a mocked 401",
+      "expect": "noesc"
+    },
+    {
+      "text": "⏺ Bash(go run ./cmd/ask)\n  ⎿  Error: POST \"https://api.anthropic.com/v1/messages\": 401 Unauthorized (Request-ID: req_1) {\"type\":\"error\",\"error\":{\"type\":\"authentication_error\",\"message\":\"invalid x-api-key\"},\"request_id\":\"req_011CUXyz\"}\n error: 1 test failed\nerror: script \"test\" exited with code 1",
+      "bash": "build_failure",
+      "ts": "unknown",
+      "name": "verifier 8718-fp corpus/B15: TUI: go SDK? (no body-first form, control)",
+      "expect": "noesc"
+    },
+    {
+      "text": "> ⏺ Bash(node x)\n>   ⎿  Error: 401 {\"type\":\"error\",\"error\":{\"type\":\"authentication_error\",\"message\":\"invalid x-api-key\"},\"request_id\":\"req_011CUXyz\"}\n error: 1 test failed\nerror: script \"test\" exited with code 1",
+      "bash": "build_failure",
+      "ts": "unknown",
+      "name": "verifier 8718-fp corpus/B16: TUI transcript copied into markdown doc with leading '> ' (control)",
+      "expect": "noesc"
+    },
+    {
+      "text": "⏺ Bash(node x)\n\t⎿  Error: 401 {\"type\":\"error\",\"error\":{\"type\":\"authentication_error\",\"message\":\"invalid x-api-key\"},\"request_id\":\"req_011CUXyz\"}\n error: 1 test failed\nerror: script \"test\" exited with code 1",
+      "bash": "build_failure",
+      "ts": "unknown",
+      "name": "verifier 8718-fp corpus/B17: TUI with tab before ⎿",
+      "expect": "noesc"
+    },
+    {
+      "text": "2026-10-26T09:00:00Z   ⎿  401 {\"type\":\"error\",\"error\":{\"type\":\"authentication_error\",\"message\":\"invalid x-api-key\"},\"request_id\":\"req_011CUXyz\"}\n error: 1 test failed\nerror: script \"test\" exited with code 1",
+      "bash": "build_failure",
+      "ts": "unknown",
+      "name": "verifier 8718-fp corpus/B18: TUI: ⎿ then timestamp-prefixed (LEAD) app log line",
+      "expect": "noesc"
+    },
+    {
+      "text": "  1) claude wrapper\n       surfaces the CLI auth error:\n     Error: Failed to authenticate. API Error: 401 {\"type\":\"error\",\"error\":{\"type\":\"authentication_error\",\"message\":\"invalid x-api-key\"},\"request_id\":\"req_011CUXyz\"}\n      at Context.<anonymous> (test/wrapper.test.js:22:11)\n\n  14 passing (80ms)\n  1 failing\nnpm ERR! Test failed.",
+      "bash": "build_failure",
+      "ts": "unknown",
+      "name": "verifier 8718-fp corpus/C1: mocha failure body (5-space)",
+      "expect": "noesc"
+    },
+    {
+      "text": "Failures:\n\n  1) Claude::Runner reports auth failures\n     Failure/Error: runner.call!\n\n     Claude::CliError:\n       Error: Failed to authenticate. API Error: 401 {\"type\":\"error\",\"error\":{\"type\":\"authentication_error\",\"message\":\"invalid x-api-key\"},\"request_id\":\"req_011CUXyz\"}\n     # ./spec/runner_spec.rb:14:in `block (2 levels)'\n\nFinished in 0.2 seconds\n9 examples, 1 failure",
+      "bash": "build_failure",
+      "ts": "unknown",
+      "name": "verifier 8718-fp corpus/C2: rspec exception message (7-space)",
+      "expect": "noesc"
+    },
+    {
+      "text": "not ok 3 - maps CLI errors\n  ---\n  duration_ms: 1.2\n  failureType: 'testCodeFailure'\n  error: |-\n    Error: Failed to authenticate. API Error: 401 {\"type\":\"error\",\"error\":{\"type\":\"authentication_error\",\"message\":\"invalid x-api-key\"},\"request_id\":\"req_011CUXyz\"}\n  code: 'ERR_TEST_FAILURE'\n  ...\n# fail 1",
+      "bash": "build_failure",
+      "ts": "unknown",
+      "name": "verifier 8718-fp corpus/C3: node:test TAP yaml block",
+      "expect": "noesc"
+    },
+    {
+      "text": "FAIL src/cli.test.ts\n  ● cli › rethrows CLI stderr\n\n    Error: Failed to authenticate. API Error: 401 {\"type\":\"error\",\"error\":{\"type\":\"authentication_error\",\"message\":\"invalid x-api-key\"},\"request_id\":\"req_011CUXyz\"}\n\n      12 |   it('rethrows CLI stderr', async () => {\n    > 13 |     await run();\n\n      at Object.<anonymous> (src/cli.test.ts:13:5)\n\nTests:       1 failed, 30 passed",
+      "bash": "build_failure",
+      "ts": "unknown",
+      "name": "verifier 8718-fp corpus/C4: jest ● block thrown error (4-space)",
+      "expect": "noesc"
+    },
+    {
+      "text": "--- FAIL: TestRunnerAuth (0.00s)\n    runner_test.go:41: stderr:\n        Error: Failed to authenticate. API Error: 401 {\"type\":\"error\",\"error\":{\"type\":\"authentication_error\",\"message\":\"invalid x-api-key\"},\"request_id\":\"req_011CUXyz\"}\nFAIL\nFAIL\tgithub.com/acme/runner\t0.012s",
+      "bash": "build_failure",
+      "ts": "unknown",
+      "name": "verifier 8718-fp corpus/C5: go test t.Logf multi-line (8-space continuation)",
+      "expect": "noesc"
+    },
+    {
+      "text": "diff --git a/docs/troubleshooting.md b/docs/troubleshooting.md\n@@ -10,7 +10,7 @@ When the token expires you see:\n \n     Error: Failed to authenticate. API Error: 401 {\"type\":\"error\",\"error\":{\"type\":\"authentication_error\",\"message\":\"invalid x-api-key\"},\"request_id\":\"req_011CUXyz\"}\n \n-Run `claude login`.\n+Run `claude /login`.\nerror: docs lint failed",
+      "bash": "build_failure",
+      "ts": "unknown",
+      "name": "verifier 8718-fp corpus/C6: git diff context line of a markdown doc with indented code block",
+      "expect": "noesc"
+    },
+    {
+      "text": "FAIL: classify_failure marks a 401 as auth\n  log was:\n    Error: Failed to authenticate. API Error: 401 {\"type\":\"error\",\"error\":{\"type\":\"authentication_error\",\"message\":\"invalid x-api-key\"},\"request_id\":\"req_011CUXyz\"}\n  expected: auth_error\n  got:      unknown\nerror: 1 test failed",
+      "bash": "build_failure",
+      "ts": "unknown",
+      "name": "verifier 8718-fp corpus/C7: test helper dumps fixture log indented (sed 's/^/    /')",
+      "expect": "noesc"
+    },
+    {
+      "text": "  ─── Claude Output ───\n  I reproduced the reported failure. The CLI printed:\n  Error: Failed to authenticate. API Error: 401 {\"type\":\"error\",\"error\":{\"type\":\"authentication_error\",\"message\":\"invalid x-api-key\"},\"request_id\":\"req_011CUXyz\"}\n  The fix maps this to the auth class.\n  ─────────────────────\n✗ Tests failed: 1",
+      "bash": "build_failure",
+      "ts": "unknown",
+      "name": "verifier 8718-fp corpus/C8: shipwright VERBOSE loop output: model quotes the error, indented 2",
+      "expect": "noesc"
+    },
+    {
+      "text": "    def test_maps_auth():\n        text = \"\"\"\n        Error: Failed to authenticate. API Error: 401 {\"type\":\"error\",\"error\":{\"type\":\"authentication_error\",\"message\":\"invalid x-api-key\"},\"request_id\":\"req_011CUXyz\"}\n        \"\"\"\n>       assert classify(text) == 'auth'\nE       AssertionError: assert 'unknown' == 'auth'\nFAILED tests/test_classify.py::test_maps_auth",
+      "bash": "build_failure",
+      "ts": "unknown",
+      "name": "verifier 8718-fp corpus/C9: pytest: indented string in source excerpt",
+      "expect": "noesc"
+    },
+    {
+      "text": "    Expected substring: \"Not logged in\"\n    Received message:   \"Error: Failed to authenticate. API Error: 401 {\"type\":\"error\",\"error\":{\"type\":\"authentication_error\",\"message\":\"invalid x-api-key\"},\"request_id\":\"req_011CUXyz\"}\"\n\n error: 1 test failed\nerror: script \"test\" exited with code 1",
+      "bash": "build_failure",
+      "ts": "unknown",
+      "name": "verifier 8718-fp corpus/C10: jest toThrow diff Received message (control)",
+      "expect": "noesc"
+    },
+    {
+      "text": "  1) wrapper\n       maps 403:\n     Error: Failed to authenticate. API Error: 403 {\"type\":\"error\",\"error\":{\"type\":\"permission_error\",\"message\":\"Your API key does not have permission to use the specified resource.\"}}\n      at Context.<anonymous> (test/w.js:3:1)\n  1 failing",
+      "bash": "build_failure",
+      "ts": "unknown",
+      "name": "verifier 8718-fp corpus/C11: 403 variant, mocha body",
+      "expect": "noesc"
+    },
+    {
+      "text": "cases:\n  - name: cli auth\n    log: |\n      Error: Failed to authenticate. API Error: 401 {\"type\":\"error\",\"error\":{\"type\":\"authentication_error\",\"message\":\"invalid x-api-key\"},\"request_id\":\"req_011CUXyz\"}\n    want: auth\nerror: fixture validation failed: missing 'id'",
+      "bash": "build_failure",
+      "ts": "unknown",
+      "name": "verifier 8718-fp corpus/C12: yaml fixture cat'ed (indented under key)",
+      "expect": "noesc"
+    },
+    {
+      "text": "    cat > \"$log\" <<-EOF\n\tError: Failed to authenticate. API Error: 401 {\"type\":\"error\",\"error\":{\"type\":\"authentication_error\",\"message\":\"invalid x-api-key\"},\"request_id\":\"req_011CUXyz\"}\n\tEOF\nnot ok 4 classify 401\n# (in test file test/classify.bats, line 30)",
+      "bash": "build_failure",
+      "ts": "unknown",
+      "name": "verifier 8718-fp corpus/C13: heredoc in bash test cat'ed via sed -n window (indented heredoc body in <<- form)",
+      "expect": "noesc"
+    },
+    {
+      "text": "  1) [chromium] › tests/login.spec.ts:10:5 › shows CLI auth errors ──────\n\n    Error: Failed to authenticate. API Error: 401 {\"type\":\"error\",\"error\":{\"type\":\"authentication_error\",\"message\":\"invalid x-api-key\"},\"request_id\":\"req_011CUXyz\"}\n\n  1 failed",
+      "bash": "build_failure",
+      "ts": "unknown",
+      "name": "verifier 8718-fp corpus/C14: Playwright error body (mocha-like title, dropped) - control",
+      "expect": "noesc"
+    },
+    {
+      "text": "Traceback (most recent call last):\n  File \"tests/test_cli.py\", line 9, in test_auth\n    raise CliError(\n    Error: Failed to authenticate. API Error: 401 {\"type\":\"error\",\"error\":{\"type\":\"authentication_error\",\"message\":\"invalid x-api-key\"},\"request_id\":\"req_011CUXyz\"}\n    )\nFAILED (failures=1)",
+      "bash": "build_failure",
+      "ts": "unknown",
+      "name": "verifier 8718-fp corpus/C15: python unittest traceback chained message indented",
+      "expect": "noesc"
+    },
+    {
+      "text": "README.md:\n\nIf the token is wrong, the CLI exits with:\n\n    Error: Failed to authenticate. API Error: 401 {\"type\":\"error\",\"error\":{\"type\":\"authentication_error\",\"message\":\"invalid x-api-key\"},\"request_id\":\"req_011CUXyz\"}\n\nerror: markdownlint MD046 code-block-style",
+      "bash": "build_failure",
+      "ts": "unknown",
+      "name": "verifier 8718-fp corpus/C16: markdown 4-space code block cat'ed (docs check output)",
+      "expect": "noesc"
+    },
+    {
+      "text": "  \"stderr\": \"Error: Failed to authenticate. API Error: 401 {\\\"type\\\":\\\"error\\\",\\\"error\\\":{\\\"type\\\":\\\"authentication_error\\\",\\\"message\\\":\\\"invalid x-api-key\\\"},\\\"request_id\\\":\\\"req_011CUXyz\\\"}\",\nerror: snapshot mismatch",
+      "bash": "build_failure",
+      "ts": "unknown",
+      "name": "verifier 8718-fp corpus/C17: JSON pretty-printed string in snapshot? (indented key) - control",
+      "expect": "noesc"
+    },
+    {
+      "text": "  1) test maps auth error (Runner.Test)\n     test/runner_test.exs:12\n     ** (RuntimeError) boom\n     code: Runner.run!()\n     stacktrace:\n       Error: Failed to authenticate. API Error: 401 {\"type\":\"error\",\"error\":{\"type\":\"authentication_error\",\"message\":\"invalid x-api-key\"},\"request_id\":\"req_011CUXyz\"}\n\nFinished in 0.1 seconds\n1 failure",
+      "bash": "build_failure",
+      "ts": "unknown",
+      "name": "verifier 8718-fp corpus/C18: Elixir ExUnit failure message indented",
+      "expect": "noesc"
+    },
+    {
+      "text": "$ cat test/fixtures/claude-auth.jsonl\n{\"type\":\"result\",\"subtype\":\"success\",\"is_error\":true,\"duration_ms\":234,\"duration_api_ms\":0,\"num_turns\":1,\"result\":\"Invalid API key · Please run /login\",\"session_id\":\"0123-4567-89ab\",\"total_cost_usd\":0}\nerror: fixture test failed",
+      "bash": "build_failure",
+      "ts": "unknown",
+      "name": "verifier 8718-fp corpus/D1: cat of an NDJSON fixture",
+      "expect": "noesc"
+    },
+    {
+      "text": "{\"type\":\"result\",\"subtype\":\"success\",\"is_error\":true,\"duration_ms\":234,\"duration_api_ms\":0,\"num_turns\":1,\"result\":\"Not logged in · Please run /login\",\"session_id\":\"0123-4567-89ab\",\"total_cost_usd\":0}\n{\"type\":\"result\",\"subtype\":\"success\",\"is_error\":true,\"duration_ms\":234,\"duration_api_ms\":0,\"num_turns\":1,\"result\":\"API Error: 401 {\\\"type\\\":\\\"error\\\"}\",\"session_id\":\"0123-4567-89ab\",\"total_cost_usd\":0}\nerror: 2 fixtures did not round-trip",
+      "bash": "unknown",
+      "ts": "unknown",
+      "name": "verifier 8718-fp corpus/D2: jq -c select(.is_error) over recorded fixtures",
+      "expect": "noesc"
+    },
+    {
+      "text": "--- mock claude stdout ---\n{\"type\":\"result\",\"subtype\":\"success\",\"is_error\":true,\"duration_ms\":234,\"duration_api_ms\":0,\"num_turns\":1,\"result\":\"OAuth token has expired. Please obtain a new token or refresh your existing token.\",\"session_id\":\"0123-4567-89ab\",\"total_cost_usd\":0}\n--- end ---\nFAIL: loop aborts on an expired token (expected exit 1, got 0)",
+      "bash": "build_failure",
+      "ts": "unknown",
+      "name": "verifier 8718-fp corpus/D3: shipwright test mock claude dumps its output on failure",
+      "expect": "noesc"
+    },
+    {
+      "text": "{\"type\":\"system\",\"subtype\":\"init\",\"session_id\":\"s\"}\n{\"type\":\"result\",\"subtype\":\"success\",\"is_error\":true,\"duration_ms\":234,\"duration_api_ms\":0,\"num_turns\":1,\"result\":\"Failed to authenticate. API Error: 401\",\"session_id\":\"0123-4567-89ab\",\"total_cost_usd\":0}\n FAIL  src/stream.test.ts > parses result\nAssertionError: expected undefined to be 'auth'\n error: 1 test failed\nerror: script \"test\" exited with code 1",
+      "bash": "build_failure",
+      "ts": "unknown",
+      "name": "verifier 8718-fp corpus/D4: stream-json test transcript printed by a failing vitest (no stdout | header, raw)",
+      "expect": "noesc"
+    },
+    {
+      "text": "not ok 7 loop aborts on auth\n# (in test file test/loop.bats, line 40)\n#   `[ \"$status\" -eq 1 ]' failed\n{\"type\":\"result\",\"subtype\":\"success\",\"is_error\":true,\"duration_ms\":234,\"duration_api_ms\":0,\"num_turns\":1,\"result\":\"Invalid API key · Please run /login\",\"session_id\":\"0123-4567-89ab\",\"total_cost_usd\":0}\n error: 1 test failed\nerror: script \"test\" exited with code 1",
+      "bash": "build_failure",
+      "ts": "unknown",
+      "name": "verifier 8718-fp corpus/D5: bats failure output: col-0 `output` lines from run",
+      "expect": "noesc"
+    },
+    {
+      "text": "{\"type\": \"result\", \"subtype\": \"success\", \"is_error\": true, \"num_turns\": 1, \"result\": \"Not logged in · Please run /login\"}\nerror: test_parse failed",
+      "bash": "build_failure",
+      "ts": "unknown",
+      "name": "verifier 8718-fp corpus/D6: fixture with spaces after colons (python json.dumps)",
+      "expect": "noesc"
+    },
+    {
+      "text": "{\"type\":\"result\",\"subtype\":\"success\",\"is_error\":true,\"duration_ms\":234,\"duration_api_ms\":0,\"num_turns\":1,\"result\":\"CLAUDE_CODE_OAUTH_TOKEN not set\",\"session_id\":\"0123-4567-89ab\",\"total_cost_usd\":0}\nerror: preflight fixture test failed",
+      "bash": "build_failure",
+      "ts": "unknown",
+      "name": "verifier 8718-fp corpus/D7: CLAUDE_CODE_OAUTH_TOKEN not set text",
+      "expect": "noesc"
+    },
+    {
+      "text": "{\"type\":\"result\",\"subtype\":\"success\",\"is_error\":true,\"duration_ms\":234,\"duration_api_ms\":0,\"num_turns\":1,\"result\":\"Not logged in users are now redirected to /login. All tests pass.\",\"session_id\":\"0123-4567-89ab\",\"total_cost_usd\":0}\nerror: type check failed",
+      "bash": "build_failure",
+      "ts": "unknown",
+      "name": "verifier 8718-fp corpus/D8: is_error true, result is model prose starting 'Not logged in users ...'",
+      "expect": "noesc"
+    },
+    {
+      "text": "{\"type\":\"result\",\"subtype\":\"error_during_execution\",\"is_error\":true,\"num_turns\":12,\"result\":\"Invalid API key handling added; build still red.\"}\nerror",
+      "bash": "unknown",
+      "ts": "unknown",
+      "name": "verifier 8718-fp corpus/D9: result 'Invalid API key handling added' model text, is_error true (error_during_execution)",
+      "expect": "noesc"
+    },
+    {
+      "text": "+{\"type\":\"result\",\"subtype\":\"success\",\"is_error\":true,\"duration_ms\":234,\"duration_api_ms\":0,\"num_turns\":1,\"result\":\"Invalid API key · Please run /login\",\"session_id\":\"0123-4567-89ab\",\"total_cost_usd\":0}\nerror",
+      "bash": "unknown",
+      "ts": "unknown",
+      "name": "verifier 8718-fp corpus/D10: jq -c . on golden file inside 'git diff' (control: + prefix)",
+      "expect": "noesc"
+    },
+    {
+      "text": "{\"type\":\"result\",\"subtype\":\"success\",\"is_error\":false,\"duration_ms\":234,\"duration_api_ms\":0,\"num_turns\":1,\"result\":\"Invalid API key · Please run /login\",\"session_id\":\"0123-4567-89ab\",\"total_cost_usd\":0}\nerror",
+      "bash": "unknown",
+      "ts": "unknown",
+      "name": "verifier 8718-fp corpus/D11: is_error false (control)",
+      "expect": "noesc"
+    },
+    {
+      "text": "##[error]{\"type\":\"result\",\"subtype\":\"success\",\"is_error\":true,\"duration_ms\":234,\"duration_api_ms\":0,\"num_turns\":1,\"result\":\"Invalid API key · Please run /login\",\"session_id\":\"0123-4567-89ab\",\"total_cost_usd\":0}\n##[error]Process completed with exit code 1.",
+      "bash": "build_failure",
+      "ts": "unknown",
+      "name": "verifier 8718-fp corpus/D12: LEAD+PREFIX: '##[error]' annotation of a fixture line printed by a jsonl linter",
+      "expect": "noesc"
+    },
+    {
+      "text": "exports[`cli auth 1`] = `{\"type\":\"result\",\"subtype\":\"success\",\"is_error\":true,\"duration_ms\":234,\"duration_api_ms\":0,\"num_turns\":1,\"result\":\"Invalid API key · Please run /login\",\"session_id\":\"0123-4567-89ab\",\"total_cost_usd\":0}`;\nerror",
+      "bash": "unknown",
+      "ts": "unknown",
+      "name": "verifier 8718-fp corpus/D13: result object as a jest snapshot line (exports[] form, control)",
+      "expect": "noesc"
+    },
+    {
+      "text": "{\"type\":\"result\",\"subtype\":\"success\",\"is_error\":true,\"duration_ms\":234,\"duration_api_ms\":0,\"num_turns\":1,\"result\":\"API Error: 403 {\\\"type\\\":\\\"error\\\",\\\"error\\\":{\\\"type\\\":\\\"forbidden\\\"}}\",\"session_id\":\"0123-4567-89ab\",\"total_cost_usd\":0}\nerror: replay test failed",
+      "bash": "build_failure",
+      "ts": "unknown",
+      "name": "verifier 8718-fp corpus/D14: result text 'API Error: 403' from fixture",
+      "expect": "noesc"
+    },
+    {
+      "text": "test\tRun fixture check\t2026-10-26T09:00:00.1234567Z {\"type\":\"result\",\"subtype\":\"success\",\"is_error\":true,\"duration_ms\":234,\"duration_api_ms\":0,\"num_turns\":1,\"result\":\"Not logged in · Please run /login\",\"session_id\":\"0123-4567-89ab\",\"total_cost_usd\":0}\ntest\tRun fixture check\t2026-10-26T09:00:00.1234567Z error: fixtures out of date",
+      "bash": "unknown",
+      "ts": "unknown",
+      "name": "verifier 8718-fp corpus/D15: gh-prefixed log: fixture echo in CI step",
+      "expect": "noesc"
+    },
+    {
+      "text": "2026-10-26T09:00:00Z {\"type\":\"result\",\"subtype\":\"success\",\"is_error\":true,\"duration_ms\":234,\"duration_api_ms\":0,\"num_turns\":1,\"result\":\"Not logged in · Please run /login\",\"session_id\":\"0123-4567-89ab\",\"total_cost_usd\":0}\nerror: replay mismatch",
+      "bash": "unknown",
+      "ts": "unknown",
+      "name": "verifier 8718-fp corpus/D16: LEAD timestamped app log emitting a recorded result (log replay tool)",
+      "expect": "noesc"
+    },
+    {
+      "text": "stdout | src/parse.test.ts > parse > reads an auth result\n{\"type\":\"result\",\"subtype\":\"success\",\"is_error\":true,\"duration_ms\":234,\"duration_api_ms\":0,\"num_turns\":1,\"result\":\"Invalid API key · Please run /login\",\"session_id\":\"0123-4567-89ab\",\"total_cost_usd\":0}\n\n FAIL  src/parse.test.ts > other\nAssertionError\n error: 1 test failed\nerror: script \"test\" exited with code 1",
+      "bash": "build_failure",
+      "ts": "unknown",
+      "name": "verifier 8718-fp corpus/D17: vitest stdout block containing the result object at col 0 (block drops it?)",
+      "expect": "noesc"
+    },
+    {
+      "text": "stdout | src/parse.test.ts > parse > reads an auth result\n##[group]fixture\n{\"type\":\"result\",\"subtype\":\"success\",\"is_error\":true,\"duration_ms\":234,\"duration_api_ms\":0,\"num_turns\":1,\"result\":\"Invalid API key · Please run /login\",\"session_id\":\"0123-4567-89ab\",\"total_cost_usd\":0}\n##[endgroup]\n\n FAIL  src/parse.test.ts > other\nAssertionError\n error: 1 test failed\nerror: script \"test\" exited with code 1",
+      "bash": "build_failure",
+      "ts": "unknown",
+      "name": "verifier 8718-fp corpus/D18: vitest stdout block + ##[group] boundary + result object",
+      "expect": "noesc"
+    },
+    {
+      "text": "  1) auth\n##[group]x\n       Error: Failed to authenticate. API Error: 401 {\"type\":\"error\",\"error\":{\"type\":\"authentication_error\",\"message\":\"invalid x-api-key\"},\"request_id\":\"req_011CUXyz\"}\n  1 failing",
+      "bash": "build_failure",
+      "ts": "unknown",
+      "name": "verifier 8718-fp corpus/E1: mocha title block interrupted by ##[group] (title lines then kept?)",
+      "expect": "noesc"
+    },
+    {
+      "text": "  console.error\n    claude failed\n##[error]x\n    Error: Failed to authenticate. API Error: 401 {\"type\":\"error\",\"error\":{\"type\":\"authentication_error\",\"message\":\"invalid x-api-key\"},\"request_id\":\"req_011CUXyz\"}\n\n      at src/c.ts:1:1\n error: 1 test failed\nerror: script \"test\" exited with code 1",
+      "bash": "build_failure",
+      "ts": "unknown",
+      "name": "verifier 8718-fp corpus/E2: jest console.error block interrupted by ##[error] then indented CLI error",
+      "expect": "noesc"
+    },
+    {
+      "text": "----- Captured stderr call -----\nclaude stderr:\n::error title=claude::stub\n    Error: Failed to authenticate. API Error: 401 {\"type\":\"error\",\"error\":{\"type\":\"authentication_error\",\"message\":\"invalid x-api-key\"},\"request_id\":\"req_011CUXyz\"}\nFAILED tests/test_c.py::test_c\n1 failed",
+      "bash": "build_failure",
+      "ts": "unknown",
+      "name": "verifier 8718-fp corpus/E3: pytest captured interrupted by ::error then indented CLI error",
+      "expect": "noesc"
+    },
+    {
+      "text": "stdout | src/tui.test.ts > renders tool errors\n##[error]render mismatch\n  ⎿  API Error: 401 {\"type\":\"error\",\"error\":{\"type\":\"authentication_error\",\"message\":\"invalid x-api-key\"},\"request_id\":\"req_011CUXyz\"}\n\n FAIL  src/tui.test.ts > x\nAssertionError\n error: 1 test failed\nerror: script \"test\" exited with code 1",
+      "bash": "build_failure",
+      "ts": "unknown",
+      "name": "verifier 8718-fp corpus/E4: vitest stdout + ##[error] + TUI ⎿ replay",
+      "expect": "noesc"
+    },
+    {
+      "text": "::error file=src/a.test.ts,line=3,col=1,title=src/a.test.ts > maps::AssertionError: expected 'Not logged in' to be 'x'\n\n error: 1 test failed\nerror: script \"test\" exited with code 1",
+      "bash": "build_failure",
+      "ts": "unknown",
+      "name": "verifier 8718-fp corpus/E5: vitest gha reporter ::error with title (thrown msg not anchored, control)",
+      "expect": "noesc"
+    },
+    {
+      "text": "thread 't' panicked at src/a.rs:1:1:\nboom\n##[group]gh auth status\n  X Failed to log in to github.com account octocat (GH_TOKEN)\n##[endgroup]\nnote: run with RUST_BACKTRACE=1",
+      "bash": "build_failure",
+      "ts": "unknown",
+      "name": "verifier 8718-fp corpus/E6: cargo panic + ##[group] + gh auth status X line indented",
+      "expect": "noesc"
+    },
+    {
+      "text": "✗ Fatal CLI error: {\"type\":\"result\",\"subtype\":\"success\",\"is_error\":true,\"duration_ms\":234,\"duration_api_ms\":0,\"num_turns\":1,\"result\":\"Inval",
+      "bash": "unknown",
+      "ts": "unknown",
+      "name": "verifier 8718-fp2 corpus/A-main: A-main",
+      "expect": "noesc"
+    },
+    {
+      "text": "✗ Fatal CLI error: {\"type\":\"result\",\"subtype\":\"success\",\"is_error\":true,\"duration_ms\":120,\"num_turns\":1,\"result\":\"Failed to authenticate. A",
+      "bash": "build_failure",
+      "ts": "unknown",
+      "name": "verifier 8718-fp2 corpus/C-main: C-main",
+      "expect": "noesc"
+    },
+    {
+      "text": "✗ Fatal CLI error: {\"type\":\"result\",\"subtype\":\"success\",\"is_error\":true,\"duration_ms\":120,\"num_turns\":3,\"result\":\"API Error: 529 {\\\"type\\\":",
+      "bash": "unknown",
+      "ts": "transient",
+      "name": "verifier 8718-fp2 corpus/D-main: D-main",
+      "expect": "noesc"
+    },
+    {
+      "text": "✗ Fatal CLI error: {\"type\":\"result\",\"subtype\":\"success\",\"is_error\":true,\"num_turns\":9,\"result\":\"API Error: 500 {\\\"type\\\":\\\"error\\\",\\\"error\\",
+      "bash": "unknown",
+      "ts": "transient",
+      "name": "verifier 8718-fp2 corpus/E-main: E-main",
+      "expect": "noesc"
+    },
+    {
+      "text": "✗ Fatal CLI error: {\"type\":\"result\",\"subtype\":\"success\",\"is_error\":true,\"duration_ms\":4000,\"num_turns\":1,\"result\":\"Not logged in to the Lin",
+      "bash": "unknown",
+      "ts": "unknown",
+      "name": "verifier 8718-fp2 corpus/F-main: F-main",
+      "expect": "noesc"
+    },
+    {
+      "text": "✗ Fatal CLI error: {\"type\": \"result\", \"subtype\": \"success\", \"is_error\": true, \"result\": \"Invalid API key · Fix external API key\", \"session_",
+      "bash": "unknown",
+      "ts": "unknown",
+      "name": "verifier 8718-fp2 corpus/G-main: G-main",
+      "expect": "noesc"
+    },
+    {
+      "text": "✗ Fatal CLI error: {\"type\":\"result\",\"subtype\":\"success\",\"is_error\":true,\"result\":\"Invalid API key · Please run /login\",\"session_id\":\"...\"}",
+      "bash": "unknown",
+      "ts": "unknown",
+      "name": "verifier 8718-fp2 corpus/I-main: I-main",
+      "expect": "noesc"
+    },
+    {
+      "text": "Iteration 3/20\n\u001b[38;2;248;113;113m\u001b[1m✗\u001b[0m Fatal CLI error: {\"type\":\"result\",\"subtype\":\"success\",\"is_error\":true,\"duration_ms\":234,\"duration_api_ms\":0,\"num_turns\":1,\"result\":\"Inval\n  ✓ Claude session completed (2m 3s, exit 0)\n✗ Tests failed: 3 failed, 41 passed\nPipeline failed at stage build\n",
+      "bash": "build_failure",
+      "ts": "unknown",
+      "name": "verifier 8718-fp2 corpus2/A-main: ansi+ctx",
+      "expect": "noesc"
+    },
+    {
+      "text": "Iteration 3/20\n\u001b[38;2;248;113;113m\u001b[1m✗\u001b[0m Fatal CLI error: {\"type\":\"result\",\"subtype\":\"success\",\"is_error\":true,\"duration_ms\":120,\"num_turns\":1,\"result\":\"Failed to authenticate. A\n  ✓ Claude session completed (2m 3s, exit 0)\n✗ Tests failed: 3 failed, 41 passed\nPipeline failed at stage build\n",
+      "bash": "build_failure",
+      "ts": "unknown",
+      "name": "verifier 8718-fp2 corpus2/C-main: ansi+ctx",
+      "expect": "noesc"
+    },
+    {
+      "text": "Iteration 3/20\n\u001b[38;2;248;113;113m\u001b[1m✗\u001b[0m Fatal CLI error: {\"type\":\"result\",\"subtype\":\"success\",\"is_error\":true,\"num_turns\":9,\"result\":\"API Error: 500 {\\\"type\\\":\\\"error\\\",\\\"error\\\n  ✓ Claude session completed (2m 3s, exit 0)\n✗ Tests failed: 3 failed, 41 passed\nPipeline failed at stage build\n",
+      "bash": "build_failure",
+      "ts": "transient",
+      "name": "verifier 8718-fp2 corpus2/E-main: ansi+ctx",
+      "expect": "noesc"
+    },
+    {
+      "text": "Iteration 3/20\n\u001b[38;2;248;113;113m\u001b[1m✗\u001b[0m Fatal CLI error: {\"type\":\"result\",\"subtype\":\"success\",\"is_error\":true,\"duration_ms\":4000,\"num_turns\":1,\"result\":\"Not logged in to the Lin\n  ✓ Claude session completed (2m 3s, exit 0)\n✗ Tests failed: 3 failed, 41 passed\nPipeline failed at stage build\n",
+      "bash": "build_failure",
+      "ts": "unknown",
+      "name": "verifier 8718-fp2 corpus2/F-main: ansi+ctx",
+      "expect": "noesc"
+    },
+    {
+      "text": "Iteration 3/20\n\u001b[38;2;248;113;113m\u001b[1m✗\u001b[0m Fatal CLI error: {\"type\": \"result\", \"subtype\": \"success\", \"is_error\": true, \"result\": \"Invalid API key · Fix external API key\", \"session_\n  ✓ Claude session completed (2m 3s, exit 0)\n✗ Tests failed: 3 failed, 41 passed\nPipeline failed at stage build\n",
+      "bash": "build_failure",
+      "ts": "unknown",
+      "name": "verifier 8718-fp2 corpus2/G-main: ansi+ctx",
+      "expect": "noesc"
+    },
+    {
+      "text": "Iteration 3/20\n\u001b[38;2;248;113;113m\u001b[1m✗\u001b[0m Fatal CLI error: {\"type\":\"result\",\"subtype\":\"success\",\"is_error\":true,\"result\":\"Invalid API key · Please run /login\",\"session_id\":\"...\"}\n  ✓ Claude session completed (2m 3s, exit 0)\n✗ Tests failed: 3 failed, 41 passed\nPipeline failed at stage build\n",
+      "bash": "build_failure",
+      "ts": "unknown",
+      "name": "verifier 8718-fp2 corpus2/I-main: ansi+ctx",
       "expect": "noesc"
     }
   ]
