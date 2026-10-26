@@ -5794,6 +5794,328 @@
       "ts": "unknown",
       "name": "verifier 8718 k2c/compose: compose-prefixed verifier r5 corpus2/Q3: JSON.stringify'd pretty test fixture printed by console.log in jest block",
       "expect": "noesc"
+    },
+    {
+      "text": "@acme/web:test:  FAIL  src/auth.test.ts > login\nError: Invalid API key · Please run /login",
+      "bash": "build_failure",
+      "ts": "unknown",
+      "name": "verifier 8718-r2 c1/r1: turbo FAIL header then col0 real error (first content)",
+      "expect": "esc:auth",
+      "limit": "Known limit 2: a prefix or form the classifier does not cover (compose without -N, lerna, yarn foreach, pretty-printed or array JSON, a real error as an open block's first content line); the run is retried."
+    },
+    {
+      "text": "@acme/web:test:  FAIL  src/auth.test.ts > login\n@acme/web:test: AssertionError: expected values to match:\nError: Invalid API key · Please run /login",
+      "bash": "build_failure",
+      "ts": "unknown",
+      "name": "verifier 8718-r2 c1/r2: turbo FAIL, content ending ':', col0 real error",
+      "expect": "esc:auth",
+      "limit": "Known limit 2: a prefix or form the classifier does not cover (compose without -N, lerna, yarn foreach, pretty-printed or array JSON, a real error as an open block's first content line); the run is retried."
+    },
+    {
+      "text": "@acme/web:test:  FAIL  src/auth.test.ts > login\n@acme/web:test: AssertionError: expected 1 to be 2\n@acme/web:test:\nError: Invalid API key · Please run /login",
+      "bash": "auth_error",
+      "ts": "auth",
+      "name": "verifier 8718-r2 c1/r3: turbo FAIL, content, bare prefix (no trailing space), col0 error",
+      "expect": "esc:auth"
+    },
+    {
+      "text": "packages/web test: stderr | src/a.test.ts > x\npackages/web test: retrying fetch\ngh: HTTP 401: Bad credentials (https://api.github.com/graphql)",
+      "bash": "auth_error",
+      "ts": "auth",
+      "name": "verifier 8718-r2 c1/r4: pnpm stderr block, then col0 gh error",
+      "expect": "esc:auth"
+    },
+    {
+      "text": "crates/core test: thread 'main' panicked at src/lib.rs:5:9:\ncrates/core test: called `Result::unwrap()` on an `Err` value:\nfatal: Authentication failed for 'https://github.com/acme/repo.git/'",
+      "bash": "build_failure",
+      "ts": "unknown",
+      "name": "verifier 8718-r2 c1/r5: pnpm panic, content ending ':', fatal auth",
+      "expect": "esc:auth",
+      "limit": "Known limit 2: a prefix or form the classifier does not cover (compose without -N, lerna, yarn foreach, pretty-printed or array JSON, a real error as an open block's first content line); the run is retried."
+    },
+    {
+      "text": " FAIL  src/a.test.ts > b\nAssertionError: expected:\nError: Invalid API key · Please run /login",
+      "bash": "build_failure",
+      "ts": "unknown",
+      "name": "verifier 8718-r2 c1/r6: unprefixed vitest FAIL, content ':' then real error (vs main also hidden)",
+      "expect": "esc:auth",
+      "limit": "Known limit 2: a prefix or form the classifier does not cover (compose without -N, lerna, yarn foreach, pretty-printed or array JSON, a real error as an open block's first content line); the run is retried."
+    },
+    {
+      "text": "@acme/web:test:  FAIL  src/a.test.ts > b\n@acme/web:test: AssertionError: x\n@acme/api:deploy: Error: Invalid API key · Please run /login",
+      "bash": "auth_error",
+      "ts": "auth",
+      "name": "verifier 8718-r2 c1/r7: turbo prefixed real error after turbo FAIL, no blank",
+      "expect": "esc:auth"
+    },
+    {
+      "text": "web-1  | stdout | x > y\nweb-1  | hello\nError: Invalid API key · Please run /login",
+      "bash": "auth_error",
+      "ts": "auth",
+      "name": "verifier 8718-r2 c1/r8: compose header? stdout block then error",
+      "expect": "esc:auth"
+    },
+    {
+      "text": "packages/agent deploy: Error: Invalid API key · Please run /login",
+      "bash": "auth_error",
+      "ts": "auth",
+      "name": "verifier 8718-r2 c1/r10: real error behind pnpm",
+      "expect": "esc:auth"
+    },
+    {
+      "text": "@acme/agent:run: Error: Invalid API key · Please run /login",
+      "bash": "auth_error",
+      "ts": "auth",
+      "name": "verifier 8718-r2 c1/r11: real error behind turbo",
+      "expect": "esc:auth"
+    },
+    {
+      "text": "agent-1  | Error: Invalid API key · Please run /login",
+      "bash": "auth_error",
+      "ts": "auth",
+      "name": "verifier 8718-r2 c1/r12: real error behind compose",
+      "expect": "esc:auth"
+    },
+    {
+      "text": "packages/MyLib deploy: Error: Invalid API key · Please run /login",
+      "bash": "unknown",
+      "ts": "unknown",
+      "name": "verifier 8718-r2 c1/r13: pnpm uppercase dir",
+      "expect": "esc:auth",
+      "limit": "Known limit 2: a prefix or form the classifier does not cover (compose without -N, lerna, yarn foreach, pretty-printed or array JSON, a real error as an open block's first content line); the run is retried."
+    },
+    {
+      "text": "@acme/agent:deploy:prod: Error: Invalid API key · Please run /login",
+      "bash": "unknown",
+      "ts": "unknown",
+      "name": "verifier 8718-r2 c1/r14: turbo task with colon",
+      "expect": "esc:auth",
+      "limit": "Known limit 2: a prefix or form the classifier does not cover (compose without -N, lerna, yarn foreach, pretty-printed or array JSON, a real error as an open block's first content line); the run is retried."
+    },
+    {
+      "text": "packages/foo.js deploy: Error: Invalid API key · Please run /login",
+      "bash": "unknown",
+      "ts": "unknown",
+      "name": "verifier 8718-r2 c1/r15: pnpm dotted dir",
+      "expect": "esc:auth",
+      "limit": "Known limit 2: a prefix or form the classifier does not cover (compose without -N, lerna, yarn foreach, pretty-printed or array JSON, a real error as an open block's first content line); the run is retried."
+    },
+    {
+      "text": "acme.io:deploy: Error: Invalid API key · Please run /login",
+      "bash": "unknown",
+      "ts": "unknown",
+      "name": "verifier 8718-r2 c1/r16: turbo pkg with dot",
+      "expect": "esc:auth",
+      "limit": "Known limit 2: a prefix or form the classifier does not cover (compose without -N, lerna, yarn foreach, pretty-printed or array JSON, a real error as an open block's first content line); the run is retried."
+    },
+    {
+      "text": "build\tRun\t2026-10-25T12:00:00.1234Z @acme/agent:run: Error: Invalid API key · Please run /login",
+      "bash": "auth_error",
+      "ts": "auth",
+      "name": "verifier 8718-r2 c1/r17: gh prefix + turbo",
+      "expect": "esc:auth"
+    },
+    {
+      "text": "@acme/agent:run: 2026-10-25T12:00:00Z Error: Invalid API key · Please run /login",
+      "bash": "auth_error",
+      "ts": "auth",
+      "name": "verifier 8718-r2 c1/r18: turbo + timestamp",
+      "expect": "esc:auth"
+    },
+    {
+      "text": "@acme/agent:run: gh: HTTP 401: Bad credentials (https://api.github.com/graphql)",
+      "bash": "auth_error",
+      "ts": "auth",
+      "name": "verifier 8718-r2 c1/r19: turbo + gh: HTTP 401",
+      "expect": "esc:auth"
+    },
+    {
+      "text": "packages/agent deploy: fatal: Authentication failed for 'https://github.com/a/b.git/'",
+      "bash": "auth_error",
+      "ts": "auth",
+      "name": "verifier 8718-r2 c1/r20: pnpm + fatal auth",
+      "expect": "esc:auth"
+    },
+    {
+      "text": "@acme/agent:run: GraphQL: Could not resolve to an Issue with the number of 99999. (repository.issue)",
+      "bash": "invalid_issue",
+      "ts": "invalid_input",
+      "name": "verifier 8718-r2 c1/r21: turbo + graphql issue",
+      "expect": "esc:invalid_input"
+    },
+    {
+      "text": "@acme/agent:run: {\"type\":\"result\",\"subtype\":\"success\",\"is_error\":true,\"result\":\"Invalid API key · Please run /login\"}",
+      "bash": "auth_error",
+      "ts": "auth",
+      "name": "verifier 8718-r2 c1/r22: Fatal CLI JSON behind turbo",
+      "expect": "esc:auth"
+    },
+    {
+      "text": "ci/cd note: Error: Invalid API key · Please run /login was shown in the old logs",
+      "bash": "auth_error",
+      "ts": "auth",
+      "name": "verifier 8718-r2 c1/b1: prose ci/cd note",
+      "expect": "noesc",
+      "limit": "Known limit: a lowercase `path task: `, `pkg:task: ` or `name-N | ` shape at column 0 (grep of an extensionless file, lowercase prose, key:value, a table cell ending in -N) is taken for a runner prefix and stripped, so an emitter-shaped rest of the line escalates."
+    },
+    {
+      "text": "bin/sw:fatal: Authentication failed for 'https://github.com/a/b.git/'",
+      "bash": "auth_error",
+      "ts": "auth",
+      "name": "verifier 8718-r2 c1/b2: grep extensionless file",
+      "expect": "noesc",
+      "limit": "Known limit: a lowercase `path task: `, `pkg:task: ` or `name-N | ` shape at column 0 (grep of an extensionless file, lowercase prose, key:value, a table cell ending in -N) is taken for a runner prefix and stripped, so an emitter-shaped rest of the line escalates."
+    },
+    {
+      "text": "scripts/sw:error: Invalid API key · Please run /login",
+      "bash": "auth_error",
+      "ts": "auth",
+      "name": "verifier 8718-r2 c1/b3: grep extensionless file with error: content",
+      "expect": "noesc",
+      "limit": "Known limit: a lowercase `path task: `, `pkg:task: ` or `name-N | ` shape at column 0 (grep of an extensionless file, lowercase prose, key:value, a table cell ending in -N) is taken for a runner prefix and stripped, so an emitter-shaped rest of the line escalates."
+    },
+    {
+      "text": "read/write example: gh: HTTP 401: Bad credentials (https://api.github.com/graphql)",
+      "bash": "auth_error",
+      "ts": "auth",
+      "name": "verifier 8718-r2 c1/b4: prose read/write note",
+      "expect": "noesc",
+      "limit": "Known limit: a lowercase `path task: `, `pkg:task: ` or `name-N | ` shape at column 0 (grep of an extensionless file, lowercase prose, key:value, a table cell ending in -N) is taken for a runner prefix and stripped, so an emitter-shaped rest of the line escalates."
+    },
+    {
+      "text": "case-12 | Error: Invalid API key · Please run /login | auth",
+      "bash": "auth_error",
+      "ts": "auth",
+      "name": "verifier 8718-r2 c1/b5: table row",
+      "expect": "noesc",
+      "limit": "Known limit: docker compose lines are a service's own output; an app container that logs an auth failure in the same form as a real emitter escalates."
+    },
+    {
+      "text": "docs:example: Error: Invalid API key · Please run /login",
+      "bash": "auth_error",
+      "ts": "auth",
+      "name": "verifier 8718-r2 c1/b6: turbo-like doc key",
+      "expect": "noesc",
+      "limit": "Known limit: a lowercase `path task: `, `pkg:task: ` or `name-N | ` shape at column 0 (grep of an extensionless file, lowercase prose, key:value, a table cell ending in -N) is taken for a runner prefix and stripped, so an emitter-shaped rest of the line escalates."
+    },
+    {
+      "text": "auth:message: Invalid API key · Please run /login",
+      "bash": "auth_error",
+      "ts": "auth",
+      "name": "verifier 8718-r2 c1/b7: yaml-ish key:value:",
+      "expect": "noesc",
+      "limit": "Known limit: a lowercase `path task: `, `pkg:task: ` or `name-N | ` shape at column 0 (grep of an extensionless file, lowercase prose, key:value, a table cell ending in -N) is taken for a runner prefix and stripped, so an emitter-shaped rest of the line escalates."
+    },
+    {
+      "text": "fixture-1 | Invalid API key · Please run /login",
+      "bash": "auth_error",
+      "ts": "auth",
+      "name": "verifier 8718-r2 c1/b8: git diff stat no leading space",
+      "expect": "noesc",
+      "limit": "Known limit: docker compose lines are a service's own output; an app container that logs an auth failure in the same form as a real emitter escalates."
+    },
+    {
+      "text": "https://example.com/x: Error: Invalid API key · Please run /login",
+      "bash": "unknown",
+      "ts": "unknown",
+      "name": "verifier 8718-r2 c1/b9: url",
+      "expect": "noesc"
+    },
+    {
+      "text": "level=info msg=\"Error: Invalid API key · Please run /login\"",
+      "bash": "unknown",
+      "ts": "unknown",
+      "name": "verifier 8718-r2 c1/b10: logfmt",
+      "expect": "noesc"
+    },
+    {
+      "text": "tests/fixtures/auth-401 log: Error: Invalid API key · Please run /login",
+      "bash": "auth_error",
+      "ts": "auth",
+      "name": "verifier 8718-r2 c1/b11: grep -r tests dir extensionless",
+      "expect": "noesc",
+      "limit": "Known limit: a lowercase `path task: `, `pkg:task: ` or `name-N | ` shape at column 0 (grep of an extensionless file, lowercase prose, key:value, a table cell ending in -N) is taken for a runner prefix and stripped, so an emitter-shaped rest of the line escalates."
+    },
+    {
+      "text": "root:auth: Invalid API key · Please run /login",
+      "bash": "auth_error",
+      "ts": "auth",
+      "name": "verifier 8718-r2 c1/b12: python logging lowercase logger",
+      "expect": "noesc",
+      "limit": "Known limit: a lowercase `path task: `, `pkg:task: ` or `name-N | ` shape at column 0 (grep of an extensionless file, lowercase prose, key:value, a table cell ending in -N) is taken for a runner prefix and stripped, so an emitter-shaped rest of the line escalates."
+    },
+    {
+      "text": "@acme/web:test: stdout | src/a.test.ts > b\n@acme/web:test: starting\n@acme/web:test: Error: Invalid API key · Please run /login",
+      "bash": "auth_error",
+      "ts": "auth",
+      "name": "verifier 8718-r2 c1/b13: turbo prefixed test fixture output in vitest block 2nd line",
+      "expect": "noesc",
+      "limit": "Known limit: in an open free-text block, an escalation-shaped line after the first content line ends the block (that recovers the real error after a truncated excerpt), so test output whose second line is auth-shaped escalates. A line introduced by `...:` or `Error: Command failed:` is exempt."
+    },
+    {
+      "text": "@acme/web:test: (fail) Error: Invalid API key · Please run /login",
+      "bash": "build_failure",
+      "ts": "unknown",
+      "name": "verifier 8718-r2 c1/b14: turbo bun (fail) title",
+      "expect": "noesc"
+    },
+    {
+      "text": "@acme/web:test:  FAIL  src/a.test.ts > Error: Invalid API key\n@acme/web:test: AssertionError: x",
+      "bash": "build_failure",
+      "ts": "unknown",
+      "name": "verifier 8718-r2 c1/b15: turbo vitest FAIL header with auth title",
+      "expect": "noesc"
+    },
+    {
+      "text": "packages/web test:     console.error\npackages/web test:       Error: Invalid API key · Please run /login",
+      "bash": "unknown",
+      "ts": "unknown",
+      "name": "verifier 8718-r2 c1/b16: pnpm jest console.error block",
+      "expect": "noesc"
+    },
+    {
+      "text": "packages/web test:   1) auth\npackages/web test:        rejects:\npackages/web test:      Error: Invalid API key · Please run /login",
+      "bash": "unknown",
+      "ts": "unknown",
+      "name": "verifier 8718-r2 c1/b17: pnpm mocha",
+      "expect": "noesc"
+    },
+    {
+      "text": "@acme/py:test: ----- Captured stderr call -----\n@acme/py:test: Error: Invalid API key · Please run /login",
+      "bash": "unknown",
+      "ts": "unknown",
+      "name": "verifier 8718-r2 c1/b18: pytest captured behind turbo",
+      "expect": "noesc"
+    },
+    {
+      "text": "@acme/web:test:    × Error: Invalid API key · Please run /login 3ms",
+      "bash": "unknown",
+      "ts": "unknown",
+      "name": "verifier 8718-r2 c1/b19: turbo vitest x indented",
+      "expect": "noesc"
+    },
+    {
+      "text": "@acme/web:test: stderr | a > b\n@acme/web:test: log\n@acme/web:test:\n@acme/web:test: Not logged in · Please run /login",
+      "bash": "auth_error",
+      "ts": "auth",
+      "name": "verifier 8718-r2 c1/b20: turbo blank no trailing space then console block continued",
+      "expect": "noesc",
+      "limit": "Known limit: in an open free-text block, an escalation-shaped line after the first content line ends the block (that recovers the real error after a truncated excerpt), so test output whose second line is auth-shaped escalates. A line introduced by `...:` or `Error: Command failed:` is exempt."
+    },
+    {
+      "text": "packages/web test: stderr | a > b\npackages/web test: Error: Command failed: claude -p\npackages/web test: Invalid API key · Please run /login",
+      "bash": "build_failure",
+      "ts": "unknown",
+      "name": "verifier 8718-r2 c1/b21: pnpm console block, Command failed intro",
+      "expect": "noesc"
+    },
+    {
+      "text": "stderr | a > b\nx\n@acme/web:test: Invalid API key · Please run /login",
+      "bash": "auth_error",
+      "ts": "auth",
+      "name": "verifier 8718-r2 c1/b22: unprefixed then prefixed mix fixture",
+      "expect": "noesc",
+      "limit": "Known limit: in an open free-text block, an escalation-shaped line after the first content line ends the block (that recovers the real error after a truncated excerpt), so test output whose second line is auth-shaped escalates. A line introduced by `...:` or `Error: Command failed:` is exempt."
     }
   ]
 }

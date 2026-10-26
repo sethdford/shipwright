@@ -159,7 +159,7 @@ _DAEMON_ERROR_LINE='gh auth login|error|fail|fatal|exception|::error::|enoent|ea
 _DAEMON_TAB=$'\t'
 # A monorepo or compose runner's own line prefix, stripped with the gh prefix (RUNNER in evidence.ts, #8715):
 # pnpm -r `packages/agent deploy: `, turbo `@acme/agent:run: `, docker compose `agent-1  | `. Case-sensitive.
-_DAEMON_RUNNER='([a-z0-9@_-]{1,60}/[a-z0-9@_/-]{1,100} [a-z0-9:_-]{1,50}: |@?[a-z0-9_-]{1,60}(/[a-z0-9_-]{1,60})?:[a-z][a-z0-9_-]{0,49}: |[A-Za-z0-9._-]{1,64}[_-][0-9]{1,3} {1,20}[|] )'
+_DAEMON_RUNNER='([a-z0-9@_-]{1,60}/[a-z0-9@_/-]{1,100} [a-z0-9:_-]{1,50}:( |$)|@?[a-z0-9_-]{1,60}(/[a-z0-9_-]{1,60})?:[a-z][a-z0-9_-]{0,49}:( |$)|[A-Za-z0-9._-]{1,64}[_-][0-9]{1,3} {1,20}[|] )'
 # Model-written analysis, pipeline progress markers and loop commit subjects, dropped before every rule (MODEL_PROSE
 # and LOOP_COMMIT in evidence.ts). Their text is not evidence of what failed.
 _DAEMON_DROP_PROSE='

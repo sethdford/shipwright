@@ -125,9 +125,10 @@ const BOM = /^\uFEFF/;
 // A monorepo or compose runner's own line prefix (#8715), removed like the gh prefix so that block headers and the
 // rules see the tool's line: pnpm -r `packages/agent deploy: `, turbo `@acme/agent:run: `, docker compose
 // `agent-1  | `. Case-sensitive, lowercase package paths and task names, no `.` in a turbo package name, so grep
-// output (`docs/x.md:Error: ...`, `config/errors.yml:key: ...`) and prose (`Auth/login status: ...`) keep theirs.
+// output of files with a `.` (`docs/x.md:Error: ...`, `config/errors.yml:key: ...`) and capitalised prose
+// (`Auth/login status: ...`) keep theirs. A bare prefix (an empty runner line, trailing space trimmed) is stripped too.
 const RUNNER =
-  /^(?:[a-z0-9@_-]{1,60}\/[a-z0-9@_/-]{1,100} [a-z0-9:_-]{1,50}: |@?[a-z0-9_-]{1,60}(?:\/[a-z0-9_-]{1,60})?:[a-z][a-z0-9_-]{0,49}: |[A-Za-z0-9._-]{1,64}[_-]\d{1,3} {1,20}\| )/;
+  /^(?:[a-z0-9@_-]{1,60}\/[a-z0-9@_/-]{1,100} [a-z0-9:_-]{1,50}:(?: |$)|@?[a-z0-9_-]{1,60}(?:\/[a-z0-9_-]{1,60})?:[a-z][a-z0-9_-]{0,49}:(?: |$)|[A-Za-z0-9._-]{1,64}[_-]\d{1,3} {1,20}\| )/;
 const INNER_BREAK = /\r|\u2028|\u2029/g;
 
 /** Plain text of one line: colour codes, the gh prefix, a BOM and a trailing CR removed. */
