@@ -1420,6 +1420,9 @@ pipeline_abort() {
         return
     fi
 
+    # An aborted run is abandoned: its base record goes too (#8671).
+    pipeline_base_release "${PROJECT_ROOT:-.}" 2>/dev/null || true
+
     resume_state 2>/dev/null || true
     PIPELINE_STATUS="aborted"
     write_state

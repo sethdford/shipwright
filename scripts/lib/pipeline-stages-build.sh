@@ -593,7 +593,7 @@ _pipeline_test_judge() {
         return 1
     fi
     # The base run symlinks node_modules, which the agent can write. A changed tree cannot judge (#8671).
-    if ! pipeline_base_nm_unchanged "$root" "${SW_PIPELINE_BASE_ID:-}"; then
+    if ! pipeline_base_nm_unchanged "$root" "${SW_PIPELINE_RUN_ID:-}"; then
         warn "Test stage: node_modules changed since the pipeline started; blocking without a differential judgement"
         return 1
     fi

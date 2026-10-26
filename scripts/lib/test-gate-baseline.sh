@@ -387,6 +387,62 @@ _tg_run_base_once() {
     return 0
 }
 
+# _tg_resolve <path> [depth] — the physical path of a file or directory, following symlinks. Fails when the
+# path does not resolve.
+_tg_resolve() {
+    local p="$1" depth="${2:-0}" d b t
+    [[ "$depth" -lt 20 ]] || return 1
+    d="$(cd -P "$(dirname "$p")" 2>/dev/null && pwd -P)" || return 1
+    b="$(basename "$p")"
+    if [[ -L "$d/$b" ]]; then
+        t="$(readlink "$d/$b")" || return 1
+        case "$t" in
+            /*) _tg_resolve "$t" $((depth + 1)) ;;
+            *) _tg_resolve "$d/$t" $((depth + 1)) ;;
+        esac
+        return
+    fi
+    printf '%s/%s' "$d" "$b"
+}
+
+# _tg_link_entry <entry> <dest> <rootreal> <wt> — link one installed package into the base's node_modules.
+# A workspace package (it resolves inside the repository) links to the base commit's copy, so the base judges
+# committed code, not the iteration's. Anything else links to its real location (#8671, P3d).
+_tg_link_entry() {
+    local entry="$1" dest="$2" rootreal="$3" wt="$4" real rel
+    real="$(_tg_resolve "$entry")" || return 0
+    case "$real" in
+        "$rootreal"/node_modules|"$rootreal"/node_modules/*) ln -s "$real" "$dest" 2>/dev/null || true ;;
+        "$rootreal"/*)
+            rel="${real#"$rootreal"/}"
+            ln -s "$wt/$rel" "$dest" 2>/dev/null || true ;;
+        *) ln -s "$real" "$dest" 2>/dev/null || true ;;
+    esac
+}
+
+# _tg_build_base_nm <root> <wt> — node_modules for the base worktree: a real directory of links, one per
+# top-level package, and one per scoped package (@scope/name).
+_tg_build_base_nm() {
+    local root="$1" wt="$2" nm rootreal entry name sub
+    [[ -e "$root/node_modules" ]] || return 0
+    nm="$(cd "$root/node_modules" 2>/dev/null && pwd -P)" || return 0
+    rootreal="$(cd "$root" && pwd -P)" || return 0
+    mkdir -p "$wt/node_modules" || return 0
+    for entry in "$nm"/* "$nm"/.[!.]*; do
+        [[ -e "$entry" || -L "$entry" ]] || continue
+        name="${entry##*/}"
+        if [[ -d "$entry" && ! -L "$entry" && "$name" == @* ]]; then
+            mkdir -p "$wt/node_modules/$name"
+            for sub in "$entry"/* "$entry"/.[!.]*; do
+                [[ -e "$sub" || -L "$sub" ]] || continue
+                _tg_link_entry "$sub" "$wt/node_modules/$name/${sub##*/}" "$rootreal" "$wt"
+            done
+        else
+            _tg_link_entry "$entry" "$wt/node_modules/$name" "$rootreal" "$wt"
+        fi
+    done
+}
+
 # _tg_compute_base <cmd> — run the base twice and decide whether the result is trusted.
 # Sets TG_BASE_OK, TG_BASE_EXIT, TG_BASE_UNITS, TG_BASE_REASON.
 _tg_compute_base() {
@@ -419,10 +475,8 @@ _tg_compute_base() {
         TG_BASE_REASON="git worktree add failed for the base commit"
         return 0
     fi
-    # Dependencies are not in git: reuse the project's installed tree.
-    if [[ -e "$root/node_modules" && ! -e "$wt/node_modules" ]]; then
-        ln -s "$root/node_modules" "$wt/node_modules" 2>/dev/null || true
-    fi
+    # Dependencies are not in git: a farm of links, not the live tree (#8671, P3).
+    _tg_build_base_nm "$root" "$wt"
     _tg_run_base_once "$wt" "$cmd" "$limit" "$_TG_TMP/run1.log"; rc1="$_TB_RC"
     tg_parse_log "$_TG_TMP/run1.log"
     units1="$TG_UNITS"; pass1="$TG_PASSCOUNT"; parsable1="$TG_PARSABLE"

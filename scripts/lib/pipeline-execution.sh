@@ -856,7 +856,8 @@ run_pipeline() {
         fi
     done 3<<< "$stages"
 
-    # Pipeline complete!
+    # Pipeline complete! The base record has done its job: remove it (#8671).
+    pipeline_base_release "${PROJECT_ROOT:-.}" 2>/dev/null || true
     update_status "complete" ""
     PIPELINE_STAGES_PASSED="$completed"
     PIPELINE_SLOWEST_STAGE=""
