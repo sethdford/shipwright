@@ -165,17 +165,19 @@ l ~ /^[ \t]*([^ \t]+[ \t]+)?(failure analyzed|failure diagnosis|analyzing failur
 # or backslash escapes, so any awk (BSD, gawk, mawk) reads it the same.
 _DAEMON_DROP_TEST_OUTPUT='
 mode == "mocha" && /^[ \t]+[^ \t]/ { if ($0 ~ /:[ \t]*$/) mode = ""; next }
+mode == "jest" && /^[ \t]+[^ \t]/ { next }
 mode == "console" && $0 !~ /^[ \t]*$/ { next }
 mode == "panic" && $0 !~ /^(note|error|stack backtrace):/ && $0 !~ /^[ \t]*$/ { next }
 mode == "vitest" && $0 !~ /^ ❯ / && $0 !~ /^[ \t]*$/ { next }
-mode == "pytest" && $0 !~ /^(-----|=====|FAILED |ERROR )/ { next }
+mode == "pytest" && $0 !~ /^(-----|=====|___|FAILED |ERROR |[0-9]+ (failed|passed|error))/ { next }
 { mode = "" }
-/^[ \t]*console[.](log|error|warn|info|debug)[ \t]*$/ || /^(stderr|stdout) [|] / { mode = "console"; next }
+/^[ \t]*console[.](log|error|warn|info|debug)[ \t]*$/ { mode = "jest"; next }
+/^(stderr|stdout) [|] / { mode = "console"; next }
 /^thread '"'"'[^'"'"']*'"'"' panicked at / { mode = "panic"; next }
-/^ ?FAIL  [^ \t].* > / { mode = "vitest"; next }
+/^ ?FAIL  [^ \t].* (> |[[] )/ || /^(⎯)+ Unhandled (Rejection|Error)/ { mode = "vitest"; next }
 /^-----+ Captured (stdout|stderr|log) / { mode = "pytest"; next }
 /^[ \t]+[0-9]+[)] / { mode = "mocha"; next }
-/^[ \t]*([(](fail|pass|skip|todo)[)] |(✕|✓|×|√|✔|✖) )/ || /^[ \t]+● / { next }
+/^[ \t]*([(](fail|pass|skip|todo)[)] |(✕|✓|√|✔|✖) )/ || /^[ \t]+(●|×) / { next }
 { print }'
 # The lead-in before an anchored phrase (LEAD in failure.ts): no leading whitespace (test runners, stack traces and
 # agent prose indent), an optional ISO timestamp, `[timestamp] `, `[ERROR] `, then up to two glyphs ✗ ✘ ×. No
@@ -183,7 +185,7 @@ mode == "pytest" && $0 !~ /^(-----|=====|FAILED |ERROR )/ { next }
 # matched as `[[]` and `[]]`, never `\]`, which POSIX ERE leaves undefined outside a bracket expression.
 _DAEMON_LEAD="^([0-9]{4}[/-][0-9][0-9][/-][0-9][0-9][T ][0-9:.]{1,20}(Z|[+-][0-9][0-9]:?[0-9][0-9])? {1,2})?([[][0-9][0-9TZ:. +-]{0,38}[]] {1,2})?([[](error|err|fatal)[]] {1,2})?((✗|✘|×|⚠|"$'\xef\xb8\x8f'") {0,2}){0,3}"
 # Up to two tool or annotation prefixes (PREFIX).
-_DAEMON_PREFIX='((gh|error|fatal)[ :]{1,3}|##[[]error[]] ?|::error:: ?|claude[ ]code returned an error result: |fatal cli error: |cli exited [0-9]{1,3} with minimal output: ){0,2}'
+_DAEMON_PREFIX='((gh|error|fatal)[ :]{1,3}|##[[]error[]] ?|::error:: ?|claude[ ]code returned an error result: |fatal cli error: |cli exited [0-9]{1,3} with minimal output: |pr creation failed: |pull request create failed: ){0,2}'
 _DAEMON_END="([ ${_DAEMON_TAB}]{0,3}\$|[.:;!,])"
 _DAEMON_HOST='[A-Za-z0-9.-]{1,253}'
 _DAEMON_URL_CHARS='[A-Za-z0-9:/._~%@+=?&#-]'
@@ -195,11 +197,11 @@ _DAEMON_AUTH_PHRASES+="|failed to authenticate${_DAEMON_END}"
 _DAEMON_AUTH_PHRASES+="|api error: 401([ ${_DAEMON_TAB}:.,{]|\$)"
 _DAEMON_AUTH_PHRASES+="|invalid api key(${_DAEMON_END}|[ ${_DAEMON_TAB}]{0,3}·| provided${_DAEMON_END})"
 _DAEMON_AUTH_PHRASES+="|invalid x-api-key(${_DAEMON_END}| token${_DAEMON_END})"
-_DAEMON_AUTH_PHRASES+="|oauth token (is |has )?(expired|invalid|revoked)${_DAEMON_END}"
+_DAEMON_AUTH_PHRASES+="|oauth token (is |has |has been )?(expired|invalid|revoked)(${_DAEMON_END}|[ ${_DAEMON_TAB}]{0,3}·)"
 _DAEMON_AUTH_PHRASES+="|not logged in(${_DAEMON_END}|[ ${_DAEMON_TAB}]{0,3}·| to )"
 _DAEMON_AUTH_PHRASES+="|you are not logged into any github hosts|to get started with github cli, please run: {1,2}gh auth login"
-_DAEMON_AUTH_PHRASES+="|authentication required${_DAEMON_END}|http 401: requires authentication"
-_DAEMON_AUTH_PHRASES+="|(http 401: )?bad credentials([ ${_DAEMON_TAB}]{0,3}\\(https?://|[ ${_DAEMON_TAB}]{0,3}\$)"
+_DAEMON_AUTH_PHRASES+="|authentication required${_DAEMON_END}|http 401: requires authentication|requires authentication \\(http 401\\)"
+_DAEMON_AUTH_PHRASES+="|(http 401: )?bad credentials([ ${_DAEMON_TAB}]{0,3}\\((https?://|http 401\\))|[ ${_DAEMON_TAB}]{0,3}\$)"
 _DAEMON_AUTH_PHRASES+="|(unhandled error: )?(requesterror [[]httperror[]]|httperror): (bad credentials|requires authentication)"
 _DAEMON_AUTH_PHRASES+="|request failed with status (code )?401(${_DAEMON_END}| unauthorized${_DAEMON_END})|401 unauthorized(${_DAEMON_END}| - )"
 _DAEMON_AUTH_PHRASES+="|claude_code_oauth_token (is )?not set${_DAEMON_END}"
@@ -212,7 +214,7 @@ _DAEMON_AUTH_PHRASES+="|(remote: )?permission to [A-Za-z0-9._/-]{1,200} denied t
 _DAEMON_AUTH_PHRASES+="|npm (err!|error) (code e401|code eneedauth|401 unauthorized)"
 _DAEMON_AUTH_PHRASES+="|error response from daemon: [A-Za-z0-9 :/._\"'?=&%@+-]{0,255}unauthorized: authentication required"
 _DAEMON_AUTH_PHRASES+="|get https?://${_DAEMON_URL_CHARS}{1,255} - 401[ ${_DAEMON_TAB}]{0,3}\$"
-_DAEMON_AUTH_PHRASES+="|(http 403: |graphql: )?resource not accessible by integration|the token in [a-z_]{1,40} is invalid"
+_DAEMON_AUTH_PHRASES+="|(http 403: |graphql: )?resource not accessible by (integration|personal access token)|the token in [a-z_]{1,40} is invalid"
 _DAEMON_AUTH_PHRASES+='|please run [`"]?claude login'
 _DAEMON_AUTH_PHRASES+="|${_DAEMON_AUTH_BODY}"
 # Structured forms that may be indented (AUTH_INDENTED): the bare type name after an error prefix, gh auth status.

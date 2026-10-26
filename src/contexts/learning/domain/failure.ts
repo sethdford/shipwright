@@ -60,7 +60,7 @@ interface Rule {
 // Explicit and locale-independent, the same as bash (daemon-failure.sh, _DAEMON_LEAD) under LC_ALL=C and UTF-8.
 const LEAD = String.raw`^(?:\d{4}[\-/]\d\d[\-/]\d\d[T ][\d:.]{1,20}(?:Z|[+\-]\d\d:?\d\d)? {1,2})?(?:\[\d[\dTZ:. +\-]{0,38}\] {1,2})?(?:\[(?:error|err|fatal)\] {1,2})?(?:(?:✗|✘|×|⚠|\uFE0F) {0,2}){0,3}`;
 // Up to two tool or annotation prefixes after the lead-in (`##[error]Error: ...`, `gh: error: ...`).
-const PREFIX = String.raw`(?:(?:gh|error|fatal)[ :]{1,3}|##\[error\] ?|::error:: ?|claude code returned an error result: |fatal cli error: |cli exited \d{1,3} with minimal output: ){0,2}`;
+const PREFIX = String.raw`(?:(?:gh|error|fatal)[ :]{1,3}|##\[error\] ?|::error:: ?|claude code returned an error result: |fatal cli error: |cli exited \d{1,3} with minimal output: |pr creation failed: |pull request create failed: ){0,2}`;
 // What may end a prose-prone phrase: end of line or punctuation, never another word.
 const END = String.raw`(?:[ \t]{0,3}$|[.:;!,])`;
 // A host or repository name, and a URL, as explicit ASCII sets (no negated class: see LEAD).
@@ -77,13 +77,13 @@ const AUTH_PHRASES = [
   String.raw`api error: 401(?:[ \t:.,{]|$)`,
   String.raw`invalid api key(?:${END}|[ \t]{0,3}·| provided${END})`,
   String.raw`invalid x-api-key(?:${END}| token${END})`,
-  String.raw`oauth token (?:is |has )?(?:expired|invalid|revoked)${END}`,
+  String.raw`oauth token (?:is |has |has been )?(?:expired|invalid|revoked)(?:${END}|[ \t]{0,3}·)`,
   String.raw`not logged in(?:${END}|[ \t]{0,3}·| to )`,
   "you are not logged into any github hosts",
   "to get started with github cli, please run: {1,2}gh auth login",
   String.raw`authentication required${END}`,
-  "http 401: requires authentication",
-  String.raw`(?:http 401: )?bad credentials(?:[ \t]{0,3}\(https?://|[ \t]{0,3}$)`,
+  String.raw`http 401: requires authentication|requires authentication \(http 401\)`,
+  String.raw`(?:http 401: )?bad credentials(?:[ \t]{0,3}\((?:https?://|http 401\))|[ \t]{0,3}$)`,
   String.raw`(?:unhandled error: )?(?:requesterror \[httperror\]|httperror): (?:bad credentials|requires authentication)`,
   String.raw`request failed with status (?:code )?401(?:${END}| unauthorized${END})`,
   String.raw`401 unauthorized(?:${END}| - )`,
@@ -97,7 +97,7 @@ const AUTH_PHRASES = [
   String.raw`npm (?:err!|error) (?:code e401|code eneedauth|401 unauthorized)`,
   String.raw`error response from daemon: [A-Za-z0-9 :/._"'?=&%@+\-]{0,255}unauthorized: authentication required`,
   String.raw`get https?://${URL_CHARS}{1,255} - 401[ \t]{0,3}$`,
-  String.raw`(?:http 403: |graphql: )?resource not accessible by integration`,
+  String.raw`(?:http 403: |graphql: )?resource not accessible by (?:integration|personal access token)`,
   "the token in [a-z_]{1,40} is invalid",
   'please run [`"]?claude login',
   AUTH_BODY,

@@ -2368,8 +2368,8 @@
     },
     {
       "text": "× × ×Not logged in · Please run /login",
-      "bash": "unknown",
-      "ts": "unknown",
+      "bash": "auth_error",
+      "ts": "auth",
       "name": "verifier r2 c4/d19: ×× glyphs 5 count"
     },
     {
@@ -2549,6 +2549,407 @@
       "ts": "unknown",
       "name": "verifier r2 c6/Pa28: via pipeline grep -A5: go testing log with t.Error multi-line indented",
       "expect": "noesc"
+    },
+    {
+      "text": "{\"message\":\"Bad credentials\",\"documentation_url\":\"https://docs.github.com/rest\",\"status\":\"401\"}\ngh: Bad credentials (HTTP 401)",
+      "bash": "auth_error",
+      "ts": "auth",
+      "name": "verifier r3 c1/b1: gh api bad token",
+      "expect": "esc:auth"
+    },
+    {
+      "text": "{\"message\":\"Requires authentication\",\"documentation_url\":\"https://docs.github.com/rest\",\"status\":\"401\"}\ngh: Requires authentication (HTTP 401)",
+      "bash": "auth_error",
+      "ts": "auth",
+      "name": "verifier r3 c1/b2: gh api no token",
+      "expect": "esc:auth"
+    },
+    {
+      "text": "pull request create failed: GraphQL: Resource not accessible by integration (createPullRequest)",
+      "bash": "auth_error",
+      "ts": "auth",
+      "name": "verifier r3 c1/b3: gh pr create, Actions token lacks scope",
+      "expect": "esc:auth"
+    },
+    {
+      "text": "HTTP 403: Resource not accessible by personal access token (https://api.github.com/repos/acme/app/issues/12/labels)",
+      "bash": "auth_error",
+      "ts": "auth",
+      "name": "verifier r3 c1/b4: fine-grained PAT lacks permission",
+      "expect": "esc:auth"
+    },
+    {
+      "text": "GraphQL: Resource not accessible by personal access token (addComment)",
+      "bash": "auth_error",
+      "ts": "auth",
+      "name": "verifier r3 c1/b5: fine-grained PAT graphql",
+      "expect": "esc:auth"
+    },
+    {
+      "text": "pull request create failed: HTTP 401: Bad credentials (https://api.github.com/graphql)",
+      "bash": "auth_error",
+      "ts": "auth",
+      "name": "verifier r3 c1/b6: gh pr create bad creds",
+      "expect": "esc:auth"
+    },
+    {
+      "text": "OAuth token revoked · Please run /login",
+      "bash": "auth_error",
+      "ts": "auth",
+      "name": "verifier r3 c1/b7: claude oauth revoked",
+      "expect": "esc:auth"
+    },
+    {
+      "text": "remote: Invalid username or token. Password authentication is not supported for Git operations.\nfatal: Authentication failed for 'https://github.com/acme/app.git/'",
+      "bash": "auth_error",
+      "ts": "auth",
+      "name": "verifier r3 c1/b8: git push expired PAT",
+      "expect": "esc:auth"
+    },
+    {
+      "text": "remote: Permission to acme/app.git denied to shipwright-bot.\nfatal: unable to access 'https://github.com/acme/app.git/': The requested URL returned error: 403",
+      "bash": "auth_error",
+      "ts": "auth",
+      "name": "verifier r3 c1/b9: git 403 push",
+      "expect": "esc:auth"
+    },
+    {
+      "text": "Error: fatal: could not read Username for 'https://github.com': terminal prompts disabled",
+      "bash": "auth_error",
+      "ts": "auth",
+      "name": "verifier r3 c1/b10: actions checkout wrapped",
+      "expect": "esc:auth"
+    },
+    {
+      "text": "GraphQL: Could not resolve to an issue or pull request with the number of 99999. (repository.issueOrPullRequest)",
+      "bash": "invalid_issue",
+      "ts": "invalid_input",
+      "name": "verifier r3 c1/b11: gh issue view missing",
+      "expect": "esc:invalid_input"
+    },
+    {
+      "text": "API Error: 401 {\"type\":\"error\",\"error\":{\"type\":\"authentication_error\",\"message\":\"OAuth token has expired. Please obtain a new token or refresh your existing token.\"},\"request_id\":\"req_011CU\"} · Please run /login",
+      "bash": "auth_error",
+      "ts": "auth",
+      "name": "verifier r3 c1/b12: claude API 401 with request id + login hint",
+      "expect": "esc:auth"
+    },
+    {
+      "text": "[2026-10-25T12:00:00Z] ✗ HTTP 401: Bad credentials (https://api.github.com/graphql)",
+      "bash": "auth_error",
+      "ts": "auth",
+      "name": "verifier r3 c1/b13: shipwright error glyph + timestamp + gh",
+      "expect": "esc:auth"
+    },
+    {
+      "text": "failed to update https://github.com/acme/app/issues/12: HTTP 401: Bad credentials (https://api.github.com/graphql)",
+      "bash": "build_failure",
+      "ts": "unknown",
+      "name": "verifier r3 c1/b15: gh issue edit wrapper",
+      "expect": "esc:invalid_input",
+      "limit": "Known limit 2: an emitter form, prefix or unclosed test-output block the classifier does not handle; the run is retried."
+    },
+    {
+      "text": "ERROR: Permission to acme/app.git denied to deploy key\nfatal: Could not read from remote repository.",
+      "bash": "auth_error",
+      "ts": "auth",
+      "name": "verifier r3 c1/b16: ERROR: deploy key",
+      "expect": "esc:auth"
+    },
+    {
+      "text": "----------------------------- Captured stdout call -----------------------------\nhello\n1 failed, 3 passed in 0.12s\nfatal: Authentication failed for 'https://github.com/acme/app.git/'",
+      "bash": "auth_error",
+      "ts": "auth",
+      "name": "verifier r3 c1/d1: pytest -rN (no summary) then git push auth",
+      "expect": "esc:auth"
+    },
+    {
+      "text": "    console.error\n      boom\nHTTP 401: Bad credentials (https://api.github.com/graphql)",
+      "bash": "auth_error",
+      "ts": "auth",
+      "name": "verifier r3 c1/d2: jest console block w/o trailing blank (truncated excerpt) then gh",
+      "expect": "esc:auth"
+    },
+    {
+      "text": "thread 'main' panicked at src/main.rs:3:5:\nboom\nHTTP 401: Bad credentials (https://api.github.com/graphql)",
+      "bash": "unknown",
+      "ts": "unknown",
+      "name": "verifier r3 c1/d3: cargo panic, custom hook no note, then gh",
+      "expect": "esc:auth",
+      "limit": "Known limit 2: an emitter form, prefix or unclosed test-output block the classifier does not handle; the run is retried."
+    },
+    {
+      "text": " FAIL  src/a.test.ts > auth > rejects\nTypeError: Cannot read properties of undefined (reading 'x')\n    at foo (src/a.ts:1:1)\n--\nfatal: Authentication failed for 'https://github.com/acme/app.git/'",
+      "bash": "build_failure",
+      "ts": "unknown",
+      "name": "verifier r3 c1/d4: vitest FAIL excerpt cut by grep -A5, '--' then gh",
+      "expect": "esc:auth",
+      "limit": "Known limit 2: an emitter form, prefix or unclosed test-output block the classifier does not handle; the run is retried."
+    },
+    {
+      "text": "stderr | src/a.test.ts > x\nwarn: thing\nGraphQL: Could not resolve to an issue or pull request with the number of 9. (repository.issueOrPullRequest)",
+      "bash": "unknown",
+      "ts": "unknown",
+      "name": "verifier r3 c1/d5: vitest stderr block then gh, no blank",
+      "expect": "esc:invalid_input",
+      "limit": "Known limit 2: an emitter form, prefix or unclosed test-output block the classifier does not handle; the run is retried."
+    },
+    {
+      "text": "  1) build\n  2) push\n  X Failed to log in to github.com account bot (keyring)\n  - The token in keyring is invalid.",
+      "bash": "build_failure",
+      "ts": "unknown",
+      "name": "verifier r3 c1/d6: mocha numbered list then gh auth status indented",
+      "expect": "esc:auth",
+      "limit": "Known limit 2: an emitter form, prefix or unclosed test-output block the classifier does not handle; the run is retried."
+    },
+    {
+      "text": "console.log\nfatal: Authentication failed for 'https://github.com/acme/app.git/'",
+      "bash": "auth_error",
+      "ts": "auth",
+      "name": "verifier r3 c1/d7: agent code listing: bare console.log line, then real auth",
+      "expect": "esc:auth"
+    },
+    {
+      "text": "thread 'tokio-runtime-worker' panicked at src/x.rs:1:1:\ncalled `Result::unwrap()` on an `Err` value: Io\nInvalid API key · Please run /login",
+      "bash": "unknown",
+      "ts": "unknown",
+      "name": "verifier r3 c1/d8: rust panic then blank-less claude error",
+      "expect": "esc:auth",
+      "limit": "Known limit 2: an emitter form, prefix or unclosed test-output block the classifier does not handle; the run is retried."
+    },
+    {
+      "text": "------------------------------ Captured log call -------------------------------\nINFO x\n_____________________ test_b _____________________\nfatal: Authentication failed for 'https://github.com/acme/app.git/'",
+      "bash": "auth_error",
+      "ts": "auth",
+      "name": "verifier r3 c1/d9: pytest captured then __ header then git",
+      "expect": "esc:auth"
+    },
+    {
+      "text": " FAIL  src/auth/client.test.ts [ src/auth/client.test.ts ]\nError: Not logged in.\n ❯ src/auth/client.ts:12:9",
+      "bash": "build_failure",
+      "ts": "unknown",
+      "name": "verifier r3 c1/a1: vitest suite-level failure (import throws)",
+      "expect": "noesc"
+    },
+    {
+      "text": "⎯⎯⎯⎯⎯⎯ Unhandled Errors ⎯⎯⎯⎯⎯⎯\n\nVitest caught 1 unhandled error during the test run.\n\n⎯⎯⎯⎯ Unhandled Rejection ⎯⎯⎯⎯⎯\nError: Authentication failed: token rejected\n ❯ src/git.ts:40:11",
+      "bash": "build_failure",
+      "ts": "unknown",
+      "name": "verifier r3 c1/a2: vitest unhandled rejection",
+      "expect": "noesc"
+    },
+    {
+      "text": " FAIL  src/auth.test.ts\n  ● Test suite failed to run\n\n    Not logged in.",
+      "bash": "build_failure",
+      "ts": "unknown",
+      "name": "verifier r3 c1/a3: jest FAIL header + suite failed to run",
+      "expect": "noesc"
+    },
+    {
+      "text": "✖ failing tests:\n\ntest at src/a.test.ts:3:1\n✖ rejects (1.2ms)\n  Error: Not logged in.",
+      "bash": "build_failure",
+      "ts": "unknown",
+      "name": "verifier r3 c1/a4: node:test spec reporter",
+      "expect": "noesc"
+    },
+    {
+      "text": "--- FAIL: TestLogin (0.00s)\n    auth_test.go:12: not logged in.\nFAIL",
+      "bash": "build_failure",
+      "ts": "unknown",
+      "name": "verifier r3 c1/a5: go test",
+      "expect": "noesc"
+    },
+    {
+      "text": "  × Not logged in.\n  ╰─▶ run login",
+      "bash": "unknown",
+      "ts": "unknown",
+      "name": "verifier r3 c1/a6: uv/miette style ×",
+      "expect": "noesc"
+    },
+    {
+      "text": "not ok 3 not logged in.\n# (in test file test/auth.bats, line 12)\n#   `[ \"$output\" = \"Not logged in.\" ]' failed",
+      "bash": "build_failure",
+      "ts": "unknown",
+      "name": "verifier r3 c1/a7: bats",
+      "expect": "noesc"
+    },
+    {
+      "text": "  1) [chromium] › auth.spec.ts:3:5 › login ──────\n\n    Error: expect(received).toHaveText(expected)\n\n    Expected string: \"Not logged in.\"",
+      "bash": "unknown",
+      "ts": "unknown",
+      "name": "verifier r3 c1/a8: playwright list",
+      "expect": "noesc"
+    },
+    {
+      "text": "error: expect(received).toThrow(expected)\n\nExpected substring: \"Authentication failed.\"\nReceived message: \"boom\"\n(fail) auth > throws [0.30ms]",
+      "bash": "build_failure",
+      "ts": "unknown",
+      "name": "verifier r3 c1/a9: bun toThrow message",
+      "expect": "noesc"
+    },
+    {
+      "text": " FAIL  test/gh.test.ts [ test/gh.test.ts ]\nError: HTTP 401: Bad credentials (https://api.github.com/graphql)",
+      "bash": "build_failure",
+      "ts": "unknown",
+      "name": "verifier r3 c1/a10: vitest suite-level, no ❯",
+      "expect": "noesc"
+    },
+    {
+      "text": "Traceback (most recent call last):\n  File \"x.py\", line 1, in <module>\nRuntimeError: Not logged in.",
+      "bash": "unknown",
+      "ts": "unknown",
+      "name": "verifier r3 c1/a11: python traceback last line",
+      "expect": "noesc"
+    },
+    {
+      "text": "⚠ gh not authenticated — GitHub integration disabled",
+      "bash": "unknown",
+      "ts": "unknown",
+      "name": "verifier r3 c1/a12: Shipwright warn gh not authenticated",
+      "expect": "noesc"
+    },
+    {
+      "text": "✗ fatal: Authentication failed for 'https://github.com/a/b.git/'",
+      "bash": "build_failure",
+      "ts": "unknown",
+      "name": "verifier r3 c1/c1: NBSP after glyph",
+      "expect": "esc:auth",
+      "limit": "Known limit 2: an emitter form, prefix or unclosed test-output block the classifier does not handle; the run is retried."
+    },
+    {
+      "text": "× fatal: Authentication failed for 'https://github.com/a/b.git/'",
+      "bash": "auth_error",
+      "ts": "auth",
+      "name": "verifier r3 c1/c2: × column-0 then auth (dropped as test title)",
+      "expect": "esc:auth"
+    },
+    {
+      "text": "  １) x\n  fatal: authentication_error",
+      "bash": "auth_error",
+      "ts": "auth",
+      "name": "verifier r3 c1/c5: fullwidth digit mocha"
+    },
+    {
+      "text": "  console.error fatal: Authentication failed for 'https://github.com/a/b.git/'",
+      "bash": "auth_error",
+      "ts": "auth",
+      "name": "verifier r3 c1/c6: U+2028 inside console header line"
+    },
+    {
+      "text": "progress 10%\r FAIL  a > b\nfatal: Authentication failed for 'https://github.com/a/b.git/'",
+      "bash": "build_failure",
+      "ts": "unknown",
+      "name": "verifier r3 c1/c7: CR then header"
+    },
+    {
+      "text": "﻿thread 'main' panicked at x:\nfatal: Authentication failed for 'https://github.com/a/b.git/'",
+      "bash": "build_failure",
+      "ts": "unknown",
+      "name": "verifier r3 c1/c8: BOM before panic header"
+    },
+    {
+      "text": "  \u001b[2mconsole.error\u001b[22m\nfatal: Authentication failed for 'https://github.com/a/b.git/'",
+      "bash": "auth_error",
+      "ts": "auth",
+      "name": "verifier r3 c1/c9: ANSI inside console header"
+    },
+    {
+      "text": "test\tRun tests\t2026-10-25T12:00:00.1234567Z  FAIL  a > b\ntest\tRun tests\t2026-10-25T12:00:01.1234567Z fatal: Authentication failed for 'https://github.com/a/b.git/'",
+      "bash": "build_failure",
+      "ts": "unknown",
+      "name": "verifier r3 c1/c10: gh prefix + vitest FAIL"
+    },
+    {
+      "text": "▸ Creating PR...\n✗ PR creation failed: pull request create failed: GraphQL: Resource not accessible by integration (createPullRequest)",
+      "bash": "auth_error",
+      "ts": "auth",
+      "name": "verifier r3 c2/s1: Shipwright delivery.sh:427, Actions token scope",
+      "expect": "esc:auth"
+    },
+    {
+      "text": "▸ Creating PR...\n✗ PR creation failed: HTTP 401: Bad credentials (https://api.github.com/graphql)",
+      "bash": "auth_error",
+      "ts": "auth",
+      "name": "verifier r3 c2/s2: Shipwright delivery.sh:427, bad token",
+      "expect": "esc:auth"
+    },
+    {
+      "text": "▸ Creating PR...\n✗ PR creation failed: To get started with GitHub CLI, please run:  gh auth login\nAlternatively, populate the GH_TOKEN environment variable with a GitHub API authentication token.",
+      "bash": "auth_error",
+      "ts": "auth",
+      "name": "verifier r3 c2/s3: Shipwright delivery.sh:427, 2-line stderr",
+      "expect": "esc:auth"
+    },
+    {
+      "text": "API Error: 401 {\"type\":\"error\",\"error\":{\"type\":\"authentication_error\",\"message\":\"OAuth token has been revoked. Please obtain a new token.\"}}",
+      "bash": "auth_error",
+      "ts": "auth",
+      "name": "verifier r3 c2/s4: claude real msg: has been revoked",
+      "expect": "esc:auth"
+    },
+    {
+      "text": "OAuth token has been revoked. Please run /login",
+      "bash": "auth_error",
+      "ts": "auth",
+      "name": "verifier r3 c2/s5: claude real msg plain: has been revoked",
+      "expect": "esc:auth"
+    },
+    {
+      "text": "Not logged in · Run /login",
+      "bash": "auth_error",
+      "ts": "auth",
+      "name": "verifier r3 c2/s6: claude Not logged in · Run /login",
+      "expect": "esc:auth"
+    },
+    {
+      "text": "Not logged in. Run claude auth login to authenticate.",
+      "bash": "auth_error",
+      "ts": "auth",
+      "name": "verifier r3 c2/s7: claude Not logged in. Run claude auth login",
+      "expect": "esc:auth"
+    },
+    {
+      "text": "stderr | src/a.test.ts > x\nwarn: y\n\n✗ PR creation failed: HTTP 401: Bad credentials (https://api.github.com/graphql)\nfatal: Authentication failed for 'https://github.com/acme/app.git/'",
+      "bash": "auth_error",
+      "ts": "auth",
+      "name": "verifier r3 c2/r1: vitest stderr block (closed by blank) then auth",
+      "expect": "esc:auth"
+    },
+    {
+      "text": "thread 'main' panicked at src/main.rs:3:5:\nboom\nnote: run with `RUST_BACKTRACE=1` environment variable to display a backtrace\nfatal: Authentication failed for 'https://github.com/acme/app.git/'",
+      "bash": "auth_error",
+      "ts": "auth",
+      "name": "verifier r3 c2/r2: cargo panic real layout then git push auth",
+      "expect": "esc:auth"
+    },
+    {
+      "text": "----------------------------- Captured stdout call -----------------------------\nhi\n=========================== short test summary info ============================\nFAILED tests/test_a.py::test_x - assert 1 == 2\n========================= 1 failed, 2 passed in 0.05s ==========================\nfatal: Authentication failed for 'https://github.com/acme/app.git/'",
+      "bash": "auth_error",
+      "ts": "auth",
+      "name": "verifier r3 c2/r3: pytest standard then git push",
+      "expect": "esc:auth"
+    },
+    {
+      "text": "  1) suite\n       title:\n     Error: boom\nfatal: Authentication failed for 'https://github.com/acme/app.git/'",
+      "bash": "auth_error",
+      "ts": "auth",
+      "name": "verifier r3 c2/r4: mocha block then column-0",
+      "expect": "esc:auth"
+    },
+    {
+      "text": "  1) suite\n       nested\nfatal: Authentication failed for 'https://github.com/acme/app.git/'",
+      "bash": "auth_error",
+      "ts": "auth",
+      "name": "verifier r3 c2/r5: mocha block unterminated then col 0",
+      "expect": "esc:auth"
+    },
+    {
+      "text": "  1) Run gh auth status\n  X Failed to log in to github.com account bot (keyring)\n  - The token in keyring is invalid.",
+      "bash": "build_failure",
+      "ts": "unknown",
+      "name": "verifier r3 c2/r6: agent prose numbered list (indented) then gh auth status indented w/o host line",
+      "expect": "esc:auth",
+      "limit": "Known limit 2: an emitter form, prefix or unclosed test-output block the classifier does not handle; the run is retried."
     }
   ]
 }
