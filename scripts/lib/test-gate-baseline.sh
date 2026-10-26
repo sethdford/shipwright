@@ -445,6 +445,11 @@ _tg_build_base_nm() {
     done
 }
 
+# _tg_worktree_status <wt> — git status of a base worktree, outside node_modules.
+_tg_worktree_status() {
+    git -C "$1" status --porcelain -- . ':!node_modules' 2>/dev/null || true
+}
+
 # _tg_compute_base <cmd> — run the base twice and decide whether the result is trusted.
 # Sets TG_BASE_OK, TG_BASE_EXIT, TG_BASE_UNITS, TG_BASE_REASON.
 _tg_compute_base() {
@@ -478,6 +483,15 @@ _tg_compute_base() {
         TG_BASE_REASON="git worktree add failed for the base commit"
         return 0
     fi
+    # A fresh worktree is clean. The status is taken outside node_modules (the farm lives there; its contents are
+    # covered by the node_modules fingerprint). Any change outside it, before or after the base runs, is a write by a
+    # process outside the test group, and the base is not trusted (#8671).
+    local status_after
+    if [[ -n "$(_tg_worktree_status "$wt")" ]]; then
+        _tg_cleanup_base
+        TG_BASE_REASON="the base worktree changed while it was created (a process outside the test group wrote into it)"
+        return 0
+    fi
     # Dependencies are not in git: a farm of links, not the live tree (#8671, P3).
     _tg_build_base_nm "$root" "$wt"
     _tg_run_base_once "$wt" "$cmd" "$limit" "$_TG_TMP/run1.log"; rc1="$_TB_RC"
@@ -486,7 +500,14 @@ _tg_compute_base() {
     _tg_run_base_once "$wt" "$cmd" "$limit" "$_TG_TMP/run2.log"; rc2="$_TB_RC"
     tg_parse_log "$_TG_TMP/run2.log"
     units2="$TG_UNITS"
+    # A process the HEAD command let escape its process group (set -m) can write into the base worktree while the
+    # runs go on. A base the runs changed is not the base (#8671). Checked before the worktree is removed.
+    status_after="$(_tg_worktree_status "$wt")"
     _tg_cleanup_base
+    if [[ -n "$status_after" ]]; then
+        TG_BASE_REASON="the base worktree changed while the base ran (a process outside the test group wrote into it)"
+        return 0
+    fi
     if [[ "$rc1" != "$rc2" || "$units1" != "$units2" ]]; then
         TG_BASE_REASON="two base runs disagree (exit $rc1 then $rc2): the base is flaky"
         return 0

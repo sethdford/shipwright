@@ -614,7 +614,15 @@ _pipeline_test_judge() {
         warn "Test stage: node_modules changed while the test command ran; blocking without a differential judgement"
         return 1
     fi
-    if tg_judge "$cmd" "$rc" "$log" "${SW_TEST_TIMEOUT:-900}" 1; then
+    local judged=0
+    if tg_judge "$cmd" "$rc" "$log" "${SW_TEST_TIMEOUT:-900}" 1; then judged=1; fi
+    # node_modules must still be as the start left it after the base ran: the base run used it (#8671).
+    if ! pipeline_base_nm_unchanged_now "$root"; then
+        warn "Test stage: node_modules changed while the base commit ran; blocking"
+        printf '\nBLOCKING: node_modules changed while the base commit ran, so the judgement cannot be trusted. Fix the failures.\n' >> "$log"
+        return 1
+    fi
+    if [[ "$judged" == 1 ]]; then
         info "Test failures are pre-existing on the base commit ${base:0:8}; not blocking the stage"
         printf '\n%s\n' "$(tg_verdict_text)" >> "$log"
         return 0

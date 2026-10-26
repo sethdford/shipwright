@@ -512,9 +512,13 @@ for cfg in "remote.origin.pushurl=https://evil.example/x.git" "url.https://evil.
         diff_env "$A5_REPO" "$A5_HOME" main
         cd "$A5_REPO" || exit 1
         git config "$key" "$val"
-        if pipeline_base_init 2>/dev/null; then echo "init=0"; else echo "init=1"; fi
+        rc=0; pipeline_base_init 2>/dev/null || rc=$?; echo "init=$rc"
     ) > "$TEST_TEMP_DIR/a5.out" 2>&1
-    assert_eq "a local config of $key fails the start closed" "init=1" "$(grep '^init=' "$TEST_TEMP_DIR/a5.out")"
+    if [[ "$key" == url.* ]]; then
+        assert_eq "a local insteadOf refuses the start as tampering" "init=2" "$(grep '^init=' "$TEST_TEMP_DIR/a5.out")"
+    else
+        assert_eq "a local pushurl is a note: the start is not refused" "init=0" "$(grep '^init=' "$TEST_TEMP_DIR/a5.out")"
+    fi
 done
 
 # The origin URL changed since the first start (pinned): a fresh start fails.
@@ -529,9 +533,9 @@ PIN_HOME="$(new_home)"
     diff_env "$PIN_REPO" "$PIN_HOME" main
     cd "$PIN_REPO" || exit 1
     git remote set-url origin "$TEST_TEMP_DIR/elsewhere.git"
-    if pipeline_base_init 2>/dev/null; then echo "init=0"; else echo "init=1"; fi
+    rc=0; pipeline_base_init 2>/dev/null || rc=$?; echo "init=$rc"
 ) > "$TEST_TEMP_DIR/pin.out" 2>&1
-assert_eq "a fresh start after the origin URL changed fails closed" "init=1" "$(grep '^init=' "$TEST_TEMP_DIR/pin.out")"
+assert_eq "a fresh start after the origin URL changed is refused as tampering" "init=2" "$(grep '^init=' "$TEST_TEMP_DIR/pin.out")"
 
 # SHIPWRIGHT_HOME/pipeline-base is a link to an attacker directory (#8671, A6): nothing is written there.
 A6_REPO="$(fresh_diff_repo a6)"
@@ -835,6 +839,234 @@ assert_contains "the new assertion is named" "$suite_log" "suite-x::A01 new brea
 assert_contains "the pre-existing assertion is still named" "$suite_log" "A30 old break"
 pre_line="$(printf '%s\n' "$suite_log" | grep '^PRE-EXISTING' || true)"
 assert_eq "suite-level exit unit is not listed as pre-existing when the suite has new failures" "0" "$(printf '%s' "$pre_line" | grep -c 'suite-x::exit=' || true)"
+
+# ─── Local config and escapes (#8671 round 5, P0/P1/P2) ────────────────────
+# The remote a start is proved against must not depend on this checkout's config. Each attack makes a previous
+# agent's local config point at an attacker's remote, whose main is an evil commit on top of the real base. A start
+# that is poisoned has base = EVIL. A start that is refused has no base. Both are fine; only base = EVIL is a failure.
+CFG_EVIL_BASE=""
+cfg_fixture() { # $1 name → sets CFG_REPO CFG_ORIGIN CFG_EVIL CFG_REAL, HEAD at the evil commit
+    local t="$TEST_TEMP_DIR/cfg-$1"
+    mkdir -p "$t"
+    git init -q --bare -b main "$t/origin.git"
+    git init -q --bare -b main "$t/evil.git"
+    (
+        cd "$t" && git init -q -b main seed && cd seed && git config user.email t@t && git config user.name T
+        echo base > base.txt && git add -A && git commit -qm base && git -C "$t/origin.git" fetch -q "$t/seed" main:refs/heads/main
+        echo planted > planted.txt && git add -A && git commit -qm evil && git -C "$t/evil.git" fetch -q "$t/seed" main:refs/heads/main
+    ) >/dev/null 2>&1
+    CFG_ORIGIN="$t/origin.git"
+    CFG_EVIL="$(git -C "$t/evil.git" rev-parse main)"
+    CFG_REAL="$(git -C "$t/origin.git" rev-parse main)"
+    CFG_REPO="$t/repo"
+    git clone -q "$CFG_ORIGIN" "$CFG_REPO" >/dev/null 2>&1
+    git -C "$CFG_REPO" -c user.email=t@t -c user.name=T fetch -q "$t/evil.git" main >/dev/null 2>&1
+    git -C "$CFG_REPO" reset -q --hard "$CFG_EVIL"
+    git -C "$CFG_REPO" checkout -q -b feat/cfg
+}
+# cfg_start <repo> — one fresh start in its own process, as the pipeline runs it. Prints init=<rc> base=<sha>.
+cfg_start() {
+    local home; home="$(new_home)"
+    (
+        diff_env "$1" "$home" main
+        cd "$1" || exit 1
+        rc=0
+        pipeline_base_init >/dev/null 2>"$TEST_TEMP_DIR/cfg-init.err" || rc=$?
+        if [[ "$rc" -eq 0 ]]; then echo "init=0 base=${SW_PIPELINE_BASE_SHA:-}"; else echo "init=$rc base="; fi
+    )
+}
+cfg_assert_not_poisoned() { # $1 label, $2 start output
+    local base="${2##*base=}"
+    assert_eq "$1: a start under a poisoned local config is not based on the evil commit" "1" "$([[ "$base" != "$CFG_EVIL" ]] && echo 1 || echo 0)"
+}
+
+cfg_fixture include
+printf '[url "%s"]\n\tinsteadOf = %s\n' "$CFG_EVIL" "$CFG_ORIGIN" > "$CFG_REPO/.git/evil.cfg"
+git -C "$CFG_REPO" config --local include.path evil.cfg
+include_out="$(cfg_start "$CFG_REPO")"
+cfg_assert_not_poisoned "include.path → insteadOf" "$include_out"
+assert_eq "include.path → insteadOf is evidence of tampering: the start is refused" "init=2 base=" "$include_out"
+
+cfg_fixture includeif
+printf '[url "%s"]\n\tinsteadOf = %s\n' "$CFG_EVIL" "$CFG_ORIGIN" > "$CFG_REPO/.git/evil2.cfg"
+# includeIf matches the real path (/private/var, not the /var symlink)
+git -C "$CFG_REPO" config --local "includeIf.gitdir:$(cd "$CFG_REPO/.git" && pwd -P).path" evil2.cfg
+includeif_out="$(cfg_start "$CFG_REPO")"
+cfg_assert_not_poisoned "includeIf → insteadOf" "$includeif_out"
+assert_eq "includeIf → insteadOf is refused as tampering" "init=2 base=" "$includeif_out"
+
+# core.sshCommand, with SW_TRUSTED_REMOTE_URL as an ssh URL. The fake ssh runs git-upload-pack on the evil remote and
+# records that it ran. The start must not use it: the proof's ssh is the one the pipeline sets, not the checkout's.
+cfg_fixture ssh
+cat > "$TEST_TEMP_DIR/cfg-fakessh" <<EOF
+#!/bin/sh
+touch "$TEST_TEMP_DIR/cfg-ssh-ran"
+exec git-upload-pack "$CFG_EVIL"
+EOF
+chmod +x "$TEST_TEMP_DIR/cfg-fakessh"
+git -C "$CFG_REPO" config --local core.sshCommand "$TEST_TEMP_DIR/cfg-fakessh"
+rm_ssh_ran="$TEST_TEMP_DIR/cfg-ssh-ran"
+ssh_out="$(SW_TRUSTED_REMOTE_URL="git@github.invalid:org/repo.git" cfg_start "$CFG_REPO")"
+cfg_assert_not_poisoned "core.sshCommand with an ssh trusted URL" "$ssh_out"
+assert_eq "the checkout's core.sshCommand is never run" "no" "$(test -e "$rm_ssh_ran" && echo yes || echo no)"
+
+# http.proxy in the checkout: the proof reads no checkout config, so a proxy there cannot redirect the remote. The start
+# proves against the real remote and records the real HEAD (base = the real base commit, not EVIL).
+cfg_fixture proxy
+git -C "$CFG_REPO" reset -q --hard "$CFG_REAL"
+git -C "$CFG_REPO" config --local http.proxy "http://127.0.0.1:9"
+proxy_out="$(cfg_start "$CFG_REPO")"
+assert_eq "http.proxy in the checkout does not stop or redirect a start (the real base is recorded)" "init=0 base=$CFG_REAL" "$proxy_out"
+
+# Pushurl in the checkout, under an insteadOf that rewrites the remote: refused early as a diagnostic.
+cfg_fixture pushurl
+git -C "$CFG_REPO" config --local remote.origin.pushurl "$CFG_EVIL"
+pushurl_out="$(cfg_start "$CFG_REPO")"
+cfg_assert_not_poisoned "remote.origin.pushurl in the checkout" "$pushurl_out"
+assert_eq "remote.origin.pushurl is a note, not tampering: the start is not refused" "1" "$([[ "$pushurl_out" != init=2* ]] && echo 1 || echo 0)"
+
+
+# A real ssh remote works under the isolation (#8671, round 5). A fake ssh, first on PATH, stands in for the user's
+# own ssh: it runs, records the environment it was given (SSH_AUTH_SOCK and HOME must reach it), and serves the local
+# upload-pack. The start is proved, and the real base is recorded.
+cfg_fixture legitssh
+git -C "$CFG_REPO" reset -q --hard "$CFG_REAL"
+LEGIT_BIN="$TEST_TEMP_DIR/legit-bin"
+mkdir -p "$LEGIT_BIN"
+cat > "$LEGIT_BIN/ssh" <<EOF
+#!/bin/sh
+{ echo "ran"; echo "agent=\$SSH_AUTH_SOCK"; echo "home=\$HOME"; } > "$TEST_TEMP_DIR/legit-ssh.log"
+exec git-upload-pack "$CFG_ORIGIN"
+EOF
+chmod +x "$LEGIT_BIN/ssh"
+legit_out="$(PATH="$LEGIT_BIN:$PATH" SSH_AUTH_SOCK=/tmp/sw-test-agent.sock SW_TRUSTED_REMOTE_URL="git@example.invalid:org/repo.git" cfg_start "$CFG_REPO")"
+assert_eq "a real ssh remote starts and records the real base" "init=0 base=$CFG_REAL" "$legit_out"
+assert_eq "the user's ssh runs, and gets the agent socket" "1" "$(grep -c '^agent=/tmp/sw-test-agent.sock$' "$TEST_TEMP_DIR/legit-ssh.log" 2>/dev/null || echo 0)"
+assert_eq "the user's ssh gets HOME (for ~/.ssh/config)" "1" "$(grep -c '^home=.' "$TEST_TEMP_DIR/legit-ssh.log" 2>/dev/null || echo 0)"
+
+# An unreachable remote is a failed proof, not tampering: the start is not refused (init 1), and the pipeline runs on.
+cfg_fixture unreachable
+git -C "$CFG_REPO" reset -q --hard "$CFG_REAL"
+git -C "$CFG_REPO" remote set-url origin "$TEST_TEMP_DIR/cfg-unreachable/nowhere.git"
+unreach_out="$(cfg_start "$CFG_REPO")"
+assert_eq "an unreachable remote does not refuse the start (only the judgement is lost)" "init=1 base=" "$unreach_out"
+
+# A deliberate origin change (a rename, or https to ssh) is refused as tampering, and the reset is explicit (#8671, round
+# 5): `shipwright pipeline base-repin`. A person runs it. Without a terminal and without --yes it changes nothing. With
+# --yes it repins, and the change is logged. The next fresh start then proceeds.
+REPIN_REPO="$(fresh_diff_repo repin)"
+REPIN_HOME="$(new_home)"
+(
+    diff_env "$REPIN_REPO" "$REPIN_HOME" main
+    cd "$REPIN_REPO" || exit 1
+    pipeline_base_init
+) >/dev/null 2>&1
+REPIN_NEW="$TEST_TEMP_DIR/diff-repin-renamed.origin"
+cp -R "$REPIN_REPO.origin" "$REPIN_NEW"
+git -C "$REPIN_REPO" remote set-url origin "$REPIN_NEW"
+repin_refused="$(
+    diff_env "$REPIN_REPO" "$REPIN_HOME" main
+    cd "$REPIN_REPO" || exit 1
+    rc=0; pipeline_base_init 2>"$TEST_TEMP_DIR/repin-refused.err" || rc=$?; echo "init=$rc"
+)"
+assert_eq "a renamed origin is refused as tampering" "init=2" "$repin_refused"
+assert_contains "the refusal names the reset command" "$(cat "$TEST_TEMP_DIR/repin-refused.err")" "shipwright pipeline base-repin"
+REPIN_PIN="$(find "$REPIN_HOME" -name origin.url)"
+REPIN_OLD="$(head -n 1 "$REPIN_PIN")"
+
+# No terminal, no --yes: nothing changes. perl's setsid gives the process no controlling terminal.
+repin_noterm_rc=0
+perl -e 'use POSIX; POSIX::setsid(); exec @ARGV or exit 127' env SHIPWRIGHT_HOME="$REPIN_HOME" PROJECT_ROOT="$REPIN_REPO" \
+    bash -c 'cd "$1" && source "$2" && pipeline_base_repin' _ "$REPIN_REPO" "$SCRIPT_DIR/lib/pipeline-base.sh" \
+    > "$TEST_TEMP_DIR/repin-noterm.out" 2>&1 || repin_noterm_rc=$?
+assert_eq "base-repin without a terminal or --yes refuses" "1" "$repin_noterm_rc"
+assert_eq "a refused base-repin leaves the pin unchanged" "$REPIN_OLD" "$(head -n 1 "$REPIN_PIN")"
+assert_contains "the refusal says a terminal or --yes is needed" "$(cat "$TEST_TEMP_DIR/repin-noterm.out")" "pass --yes"
+
+# --yes: the pin moves, prints both URLs, and is logged.
+repin_yes_rc=0
+perl -e 'use POSIX; POSIX::setsid(); exec @ARGV or exit 127' env SHIPWRIGHT_HOME="$REPIN_HOME" PROJECT_ROOT="$REPIN_REPO" \
+    bash -c 'cd "$1" && source "$2" && pipeline_base_repin --yes' _ "$REPIN_REPO" "$SCRIPT_DIR/lib/pipeline-base.sh" \
+    > "$TEST_TEMP_DIR/repin-yes.out" 2>&1 || repin_yes_rc=$?
+assert_eq "base-repin --yes repins" "0" "$repin_yes_rc"
+assert_eq "the pin now names the new origin" "$REPIN_NEW" "$(head -n 1 "$REPIN_PIN")"
+assert_contains "base-repin prints the old URL" "$(cat "$TEST_TEMP_DIR/repin-yes.out")" "Pinned origin URL: $REPIN_OLD"
+assert_contains "base-repin prints the new URL" "$(cat "$TEST_TEMP_DIR/repin-yes.out")" "New origin URL:    $REPIN_NEW"
+REPIN_LOG="$(find "$REPIN_HOME" -name repin.log)"
+assert_contains "the repin is logged with the old and new URLs" "$(cat "$REPIN_LOG")" "old=$REPIN_OLD new=$REPIN_NEW"
+assert_eq "the repin log is private (0600)" "-rw-------" "$(ls -l "$REPIN_LOG" | cut -c1-10)"
+
+# The next fresh start proceeds against the new origin.
+repin_after="$(
+    diff_env "$REPIN_REPO" "$REPIN_HOME" main
+    cd "$REPIN_REPO" || exit 1
+    rc=0; pipeline_base_init 2>/dev/null || rc=$?; echo "init=$rc"
+)"
+assert_eq "a fresh start after the repin proceeds" "init=0" "$repin_after"
+
+# The deny list names the reset, so an agent cannot run it (config is the source; the TS mirror is tested separately).
+assert_eq "agents are denied base-repin in config/agent-permissions.json" "1" \
+    "$(jq '.permissions.deny | index("Bash(*base-repin*)") != null' "$SCRIPT_DIR/../config/agent-permissions.json" | grep -c true)"
+
+# Group escape (#8671, P2): a process started with set -m leaves the HEAD command's group and writes into the base
+# worktree during the base runs. The worktree status check blocks: the base is not what the start recorded.
+ESC_REPO="$(fresh_diff_repo escape)"
+ESC_HOME="$(new_home)"
+cat > "$TEST_TEMP_DIR/escape-cmd.sh" <<'ESC'
+set -m
+( seen=0
+  for i in $(seq 1 1500); do
+    others="$(git worktree list --porcelain | sed -n 's/^worktree //p' | grep -v -x -F "$PWD")"
+    if [ -n "$others" ]; then
+        seen=1
+        for w in $others; do touch "$w/regression.flag"; done
+    elif [ "$seen" -eq 1 ]; then
+        break
+    fi
+    sleep 0.01
+  done ) </dev/null >/dev/null 2>&1 &
+bash fake-tests.sh
+ESC
+esc_rc=0
+(
+    diff_env "$ESC_REPO" "$ESC_HOME" main
+    export TEST_CMD="bash $TEST_TEMP_DIR/escape-cmd.sh"
+    cd "$ESC_REPO" || exit 1
+    pipeline_base_init
+    agent_commit "$ESC_REPO" build
+    stage_test
+) >"$TEST_TEMP_DIR/escape.out" 2>&1 || esc_rc=$?
+assert_eq "a process that escapes the test group and writes into the base worktree blocks" "1" "$esc_rc"
+assert_contains "the block says the base worktree changed" "$(cat "$ESC_REPO/.artifacts/test-results.log" 2>/dev/null)" "base worktree changed"
+
+# A trusted URL spelled differently from the pin replaces it (#8671, round 4 P2/P3): the start is not blocked forever.
+PINT_REPO="$(fresh_diff_repo pin-trusted)"
+PINT_HOME="$(new_home)"
+(
+    diff_env "$PINT_REPO" "$PINT_HOME" main
+    cd "$PINT_REPO" || exit 1
+    pipeline_base_init
+) >/dev/null 2>&1
+pint_rc=0
+(
+    diff_env "$PINT_REPO" "$PINT_HOME" main
+    export SW_TRUSTED_REMOTE_URL="file://$PINT_REPO.origin"
+    cd "$PINT_REPO" || exit 1
+    pipeline_base_init
+) >/dev/null 2>&1 || pint_rc=$?
+assert_eq "a trusted URL spelled differently from the pin starts" "0" "$pint_rc"
+assert_eq "the trusted URL replaces the pin" "file://$PINT_REPO.origin" "$(head -n 1 "$(find "$PINT_HOME" -name origin.url)")"
+
+# No origin remote: the start says so (#8671, round 4 P3).
+NOORIG_REPO="$(fresh_diff_repo noorigin)"
+NOORIG_HOME="$(new_home)"
+git -C "$NOORIG_REPO" remote remove origin
+(
+    diff_env "$NOORIG_REPO" "$NOORIG_HOME" main
+    cd "$NOORIG_REPO" || exit 1
+    pipeline_base_init
+) > "$TEST_TEMP_DIR/noorig.out" 2>&1 || true
+assert_contains "the no-origin message says there is no origin remote" "$(cat "$TEST_TEMP_DIR/noorig.out")" "no origin remote"
 
 # ─── Tests: stage_review ────────────────────────────────────────────────────
 print_test_section "stage_review"

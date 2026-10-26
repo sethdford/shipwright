@@ -77,6 +77,7 @@ export const AGENT_DENIED_TOOLS: readonly string[] = [
   "Bash(telnet *)",
   "Bash(sudo *)",
   "Bash(doas *)",
+  "Bash(*base-repin*)",
   "Bash(git push *)",
   "Bash(git fetch *)",
   "Bash(git pull *)",

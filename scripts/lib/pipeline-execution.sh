@@ -521,8 +521,15 @@ run_pipeline() {
     enabled_count=$(jq '[.stages[] | select(.enabled == true)] | length' "$PIPELINE_CONFIG" 2>/dev/null)
     local completed=0
 
-    # The test stage judges failures against the base recorded at first start (#8671, pipeline-base.sh).
-    pipeline_base_init || true
+    # The test stage judges failures against the base recorded at first start (#8671, pipeline-base.sh). A start that
+    # cannot be proved only loses that judgement: the pipeline runs on. Only evidence of a tampered checkout (status 2)
+    # refuses the start.
+    local pb_rc=0
+    pipeline_base_init || pb_rc=$?
+    if [[ "$pb_rc" -eq 2 ]]; then
+        error "Pipeline refused to start: the checkout's remote configuration or origin pin was altered (see the message above)"
+        return 1
+    fi
 
     # Check which stages are enabled to determine if we use the self-healing loop
     local build_enabled test_enabled

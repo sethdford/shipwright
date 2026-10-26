@@ -14,10 +14,15 @@
 #  - A resume crosses a process boundary, so it reads the record from disk, validating owner, mode, shape,
 #    worktree and commit. Between processes, code running as this user can still rewrite the record. That
 #    residual is what #8706 fixes structurally (a record the agent cannot write).
-#  - A fresh start takes the base from the remote: git ls-remote against the URL from SW_TRUSTED_REMOTE_URL
-#    (set by the daemon), or else the repository's own origin URL, read with the global and system config
-#    ignored and pinned at the first start. A local config that sets pushurl or insteadOf blocks the start.
-#    Local refs and replace objects are never consulted for the base.
+#  - A fresh start takes the base from the remote, and only from the remote. ls-remote, and the fetch that
+#    proves the fork point, run in an empty scratch directory with no repository context: the checkout's config
+#    (includes, insteadOf, sshCommand, proxies, credential helpers) is never read. The URL is SW_TRUSTED_REMOTE_URL
+#    (the daemon's, authoritative), or else the origin URL pinned at the first start (<record dir>/origin.url). A
+#    url.*.insteadOf in the checkout's config is evidence of tampering and refuses the start. Local refs are never
+#    consulted for the base.
+#  - Residual (same UID): rewriting the origin.url pin poisons a fresh start, not only a resume, because the pin
+#    then names the attacker's remote. Between processes, the record and pointer are ordinary files the same user can
+#    rewrite. Structurally fixing these needs state the agent cannot write, which is #8706.
 #  - The node_modules walk is bounded by SW_PIPELINE_NM_TIMEOUT seconds (default 120); a timeout blocks.
 #
 # Storage: <SHIPWRIGHT_HOME or ~/.shipwright>/pipeline-base, never .claude/ or the worktree. Layout:
@@ -37,6 +42,7 @@
 #   pipeline_base_get_field <repo> <run-id> F   print base | remote | push_url | branch | nm.
 #   pipeline_base_nm_unchanged_now [repo]    0 when node_modules matches this process's start fingerprint.
 #   pipeline_base_release [repo]             delete the run's record and pointer (completion, abort).
+#   pipeline_base_repin [--yes] [repo]       a human's reset of the origin pin: `shipwright pipeline base-repin`.
 #
 # Resumes set PIPELINE_RESUMING or RESUME_FROM_CHECKPOINT. A resume never creates a record. A resume without a
 # valid record fails closed, so a forged checkpoint can only lead to that path.
@@ -45,7 +51,8 @@
 _PIPELINE_BASE_LOADED=1
 
 _PIPELINE_BASE_TTL_DAYS=14
-_PIPELINE_BASE_BAD_CFG='^(remote\..*\.pushurl|url\..*\.(pushinsteadof|insteadof))$'
+_PIPELINE_BASE_TAMPER_CFG='^url\..*\.insteadof$'
+_PIPELINE_BASE_NOTE_CFG='^(remote\..*\.pushurl|url\..*\.pushinsteadof)$'
 
 _pipeline_base_home() { printf '%s' "${SHIPWRIGHT_HOME:-$HOME/.shipwright}"; }
 _pipeline_base_root() { printf '%s/pipeline-base' "$(_pipeline_base_home)"; }
@@ -154,61 +161,148 @@ _pipeline_base_nm_fingerprint() {
 }
 
 # _pipeline_base_config_clean <repo> — the repository's own config sets no push URL and no URL rewrite.
+# _pipeline_base_config_clean <repo> — a DIAGNOSTIC, not the defence. The start reads nothing from this checkout's
+# config (see _pipeline_base_git). This fails early, with a clear message, when the repository's config (including
+# its includes) rewrites or redirects the origin remote.
 _pipeline_base_config_clean() {
-    local bad
-    bad="$(GIT_CONFIG_NOSYSTEM=1 GIT_CONFIG_GLOBAL=/dev/null git -C "$1" config --local --get-regexp "$_PIPELINE_BASE_BAD_CFG" 2>/dev/null || true)"
-    bad="$bad$(GIT_CONFIG_NOSYSTEM=1 GIT_CONFIG_GLOBAL=/dev/null git -C "$1" config --worktree --get-regexp "$_PIPELINE_BASE_BAD_CFG" 2>/dev/null || true)"
-    [[ -z "$bad" ]]
+    local bad note
+    bad="$(GIT_NO_REPLACE_OBJECTS=1 git -C "$1" config --local --includes --get-regexp "$_PIPELINE_BASE_TAMPER_CFG" 2>/dev/null || true)"
+    bad="$bad$(GIT_NO_REPLACE_OBJECTS=1 git -C "$1" config --worktree --includes --get-regexp "$_PIPELINE_BASE_TAMPER_CFG" 2>/dev/null || true)"
+    if [[ -n "$bad" ]]; then
+        _PB_WHY="the checkout's config rewrites the origin URL (url.*.insteadOf), so the URL it names is not the one git would use. Remove that entry from the checkout's config, then start again"
+        _PB_TAMPER=1
+        return 1
+    fi
+    # pushurl and pushInsteadOf change only where pushes go. The proof reads only the fetch URL, so they are a note.
+    note="$(GIT_NO_REPLACE_OBJECTS=1 git -C "$1" config --local --includes --get-regexp "$_PIPELINE_BASE_NOTE_CFG" 2>/dev/null || true)"
+    if [[ -n "$note" ]]; then
+        echo "Pipeline base: note: the checkout sets a push-only URL (pushurl or pushInsteadOf). It does not affect the base proof." >&2
+    fi
+    return 0
 }
 
 # _pipeline_base_origin_url <repo> <dir> — the URL the start is proved against. SW_TRUSTED_REMOTE_URL (the daemon's)
 # wins. Otherwise the repository's origin URL, read with global and system config ignored, pinned in <dir>/origin.url
 # at the first start: a later start that finds another URL blocks. Delete the pin only when the remote was moved on purpose.
+# _pipeline_base_origin_url <repo> <dir> — the URL the start is proved against, in _PB_URL. SW_TRUSTED_REMOTE_URL (the
+# daemon's) is authoritative: it replaces the pin, so a differently spelled URL cannot block forever. Otherwise the
+# origin URL is read from this repository's own config without following includes, and pinned in <dir>/origin.url at
+# the first start. A later start that finds another URL blocks. Rewriting the pin poisons a fresh start, as well as a
+# resume (a same-UID residual, see the header).
 _pipeline_base_origin_url() {
-    local repo="$1" dir="$2" url="" pin tmp
+    local repo="$1" dir="$2" url="" pin="$2/origin.url" tmp
     if [[ -n "${SW_TRUSTED_REMOTE_URL:-}" ]]; then
         url="$SW_TRUSTED_REMOTE_URL"
-    else
-        url="$(GIT_CONFIG_NOSYSTEM=1 GIT_CONFIG_GLOBAL=/dev/null git -C "$repo" config --local --get remote.origin.url 2>/dev/null || true)"
+        tmp="$(mktemp "$dir/.origin.XXXXXX")" || { _PB_WHY="the origin URL pin could not be written"; return 1; }
+        if printf '%s\n' "$url" > "$tmp" && mv "$tmp" "$pin"; then _PB_URL="$url"; return 0; fi
+        rm -f "$tmp"; _PB_WHY="the origin URL pin could not be written"; return 1
     fi
-    [[ -n "$url" ]] || return 1
-    pin="$dir/origin.url"
+    url="$(cd "$repo" && GIT_NO_REPLACE_OBJECTS=1 git config --local --get remote.origin.url 2>/dev/null || true)"
+    if [[ -z "$url" ]]; then
+        _PB_WHY="there is no origin remote, so the base cannot be proved against the remote"
+        return 1
+    fi
     if [[ -e "$pin" || -L "$pin" ]]; then
-        _pipeline_base_secure "$pin" file || return 1
-        [[ "$(head -n 1 "$pin")" == "$url" ]] || return 1
+        _pipeline_base_secure "$pin" file || { _PB_WHY="the origin URL pin is not a private file"; return 1; }
+        if [[ "$(head -n 1 "$pin")" != "$url" ]]; then
+            _PB_WHY="the origin URL differs from the one pinned at the first start. If the change is deliberate (a rename, or https to ssh), a person runs: shipwright pipeline base-repin"
+            _PB_TAMPER=1
+            return 1
+        fi
     else
-        tmp="$(mktemp "$dir/.origin.XXXXXX")" || return 1
-        printf '%s\n' "$url" > "$tmp" && mv "$tmp" "$pin" || { rm -f "$tmp"; return 1; }
+        tmp="$(mktemp "$dir/.origin.XXXXXX")" || { _PB_WHY="the origin URL pin could not be written"; return 1; }
+        if printf '%s\n' "$url" > "$tmp" && mv "$tmp" "$pin"; then :; else rm -f "$tmp"; _PB_WHY="the origin URL pin could not be written"; return 1; fi
     fi
-    printf '%s' "$url"
+    _PB_URL="$url"
+}
+
+# _pipeline_base_git_raw <scratch> <git args...> — git with no repository and no config from this checkout. The
+# command runs in an empty scratch directory, with GIT_DIR and the other GIT_* repository variables unset, and
+# GIT_CEILING_DIRECTORIES set so git cannot discover a repository. Global and system config are ignored. The overrides
+# below clear what could redirect the connection (ssh, proxies, credential helpers, a file-protocol allowance).
+_pipeline_base_git_raw() {
+    local scratch="$1"; shift
+    (
+        cd "$scratch" || exit 1
+        # GIT_SSH, GIT_SSH_COMMAND and GIT_PROXY_COMMAND are kept: they come from the user's environment, as a
+        # `git push` by the user would use them. SSH_AUTH_SOCK and HOME (so ~/.ssh/config) are kept too.
+        env -u GIT_DIR -u GIT_WORK_TREE -u GIT_INDEX_FILE -u GIT_OBJECT_DIRECTORY \
+            -u GIT_ALTERNATE_OBJECT_DIRECTORIES -u GIT_CONFIG -u GIT_CONFIG_PARAMETERS -u GIT_CONFIG_COUNT \
+            -u GIT_EXEC_PATH -u GIT_TEMPLATE_DIR -u GIT_NAMESPACE \
+            GIT_CEILING_DIRECTORIES="$scratch" GIT_CONFIG_NOSYSTEM=1 GIT_CONFIG_GLOBAL=/dev/null \
+            GIT_TERMINAL_PROMPT=0 GIT_NO_REPLACE_OBJECTS=1 \
+            git -c core.sshCommand="$_PB_SSH_CMD" \
+                -c credential.helper= -c core.askPass= -c http.extraheader= \
+                -c http.proxy= -c https.proxy= -c core.gitProxy= \
+                -c protocol.file.allow=user -c core.hooksPath=/dev/null -c core.fsmonitor=false \
+                -c http.lowSpeedLimit=1000 -c http.lowSpeedTime=30 "$@"
+    )
+}
+
+# _pipeline_base_user_ssh — the ssh command for the transport: the user's own global core.sshCommand when set, else
+# ssh with BatchMode (no prompt can hang the pipeline) and a connect timeout. The checkout's config is never read.
+_pipeline_base_user_ssh() {
+    local c
+    c="$(git config --global --get core.sshCommand 2>/dev/null || true)"
+    if [[ -n "$c" ]]; then printf '%s' "$c"; else printf '%s' 'ssh -o BatchMode=yes -o ConnectTimeout=20'; fi
+}
+
+# _pipeline_base_git <scratch> <git args...> — _pipeline_base_git_raw, inside the gate's credential scrub when loaded.
+_pipeline_base_git() {
+    local ssh_cmd
+    ssh_cmd="$(_pipeline_base_user_ssh)"
+    if declare -F sw_test_gate_env >/dev/null 2>&1; then
+        _PB_SSH_CMD="$ssh_cmd" sw_test_gate_env _pipeline_base_git_raw "$@"
+    else
+        _PB_SSH_CMD="$ssh_cmd" _pipeline_base_git_raw "$@"
+    fi
+}
+
+# _pipeline_base_scrub <dir> — remove a temporary directory this file created.
+_pipeline_base_scrub() {
+    case "$1" in
+        "${TMPDIR:-/tmp}"/sw-base-proof.*) [[ -d "$1" && ! -L "$1" ]] && rm -rf "$1" ;;
+    esac
+    return 0
 }
 
 # _pipeline_base_remote_sha <url> <branch> — the remote's head of the branch, from ls-remote. Global and system
 # config are ignored, so the agent's config cannot rewrite the URL or the credentials used.
+# _pipeline_base_remote_sha <url> <branch> <scratch> — the remote's head of the branch, from ls-remote, run in isolation.
 _pipeline_base_remote_sha() {
-    local url="$1" branch="$2" sha
-    sha="$(GIT_CONFIG_NOSYSTEM=1 GIT_CONFIG_GLOBAL=/dev/null GIT_TERMINAL_PROMPT=0 \
-        git -c core.hooksPath=/dev/null -c http.lowSpeedLimit=1000 -c http.lowSpeedTime=30 \
-        ls-remote --heads "$url" "refs/heads/$branch" 2>/dev/null |
+    local url="$1" branch="$2" scratch="$3" sha
+    sha="$(_pipeline_base_git "$scratch" ls-remote --heads "$url" "refs/heads/$branch" 2>/dev/null |
         BR="$branch" awk 'BEGIN { want = "refs/heads/" ENVIRON["BR"] } $2 == want { print $1; exit }')" || return 1
     [[ "$sha" =~ ^[0-9a-f]{40}$ ]] && printf '%s' "$sha"
 }
 
 # _pipeline_base_proof <repo> <url> — the base for a fresh start. HEAD must be the fork point of the remote's base
 # branch, so the branch has no commits beyond it. Prints HEAD. Local refs and replace objects are not consulted.
+# _pipeline_base_proof <repo> <url> — the base for a fresh start, in _PB_BASE_SHA: HEAD, when HEAD is the fork point of the remote's
+# base branch. The remote's history is fetched into a temporary bare repository, which reads the local objects through
+# an alternates file (no config of this checkout is read, and no transport runs in it). Its merge-base with HEAD must be
+# HEAD. Local refs and replace objects are not consulted for the base.
 _pipeline_base_proof() {
-    local repo="$1" url="$2" branch sha head fork
+    local repo="$1" url="$2" branch sha head fork scratch proof objdir
     branch="${BASE_BRANCH:-main}"
-    sha="$(_pipeline_base_remote_sha "$url" "$branch")" || return 1
-    if ! GIT_NO_REPLACE_OBJECTS=1 git -C "$repo" cat-file -e "$sha^{commit}" 2>/dev/null; then
-        GIT_CONFIG_NOSYSTEM=1 GIT_CONFIG_GLOBAL=/dev/null GIT_NO_REPLACE_OBJECTS=1 GIT_TERMINAL_PROMPT=0 \
-            git -C "$repo" -c core.hooksPath=/dev/null fetch -q --no-tags --no-write-fetch-head "$url" "$sha" >/dev/null 2>&1 || return 1
-        GIT_NO_REPLACE_OBJECTS=1 git -C "$repo" cat-file -e "$sha^{commit}" 2>/dev/null || return 1
+    scratch="$(mktemp -d "${TMPDIR:-/tmp}/sw-base-proof.XXXXXX")" || { _PB_WHY="no temporary directory for the proof"; return 1; }
+    proof="$scratch/proof.git"
+    _PB_WHY="the branch is not at the fork point of origin/$branch as the remote reports it, or the remote could not be read"
+    sha="$(_pipeline_base_remote_sha "$url" "$branch" "$scratch")" || sha=""
+    [[ -n "$sha" ]] || { _pipeline_base_scrub "$scratch"; return 1; }
+    head="$(cd "$repo" && GIT_NO_REPLACE_OBJECTS=1 git rev-parse --verify -q HEAD 2>/dev/null)" || head=""
+    [[ "$head" =~ ^[0-9a-f]{40}$ ]] || { _pipeline_base_scrub "$scratch"; return 1; }
+    objdir="$(cd "$repo" && cd "$(git rev-parse --git-common-dir 2>/dev/null)/objects" 2>/dev/null && pwd -P)" || objdir=""
+    [[ -n "$objdir" ]] || { _pipeline_base_scrub "$scratch"; return 1; }
+    fork=""
+    if _pipeline_base_git "$scratch" init -q --bare "$proof" \
+        && printf '%s\n' "$objdir" > "$proof/objects/info/alternates" \
+        && _pipeline_base_git "$scratch" --git-dir="$proof" fetch -q --no-tags --no-write-fetch-head "$url" "$sha" >/dev/null 2>&1; then
+        fork="$(_pipeline_base_git "$scratch" --git-dir="$proof" merge-base "$head" "$sha" 2>/dev/null)" || fork=""
     fi
-    head="$(GIT_NO_REPLACE_OBJECTS=1 git -C "$repo" rev-parse --verify -q HEAD)" || return 1
-    fork="$(GIT_NO_REPLACE_OBJECTS=1 git -C "$repo" merge-base HEAD "$sha" 2>/dev/null)" || return 1
+    _pipeline_base_scrub "$scratch"
     [[ -n "$fork" && "$fork" == "$head" ]] || return 1
-    printf '%s' "$head"
+    _PB_BASE_SHA="$head"
 }
 
 # _pipeline_base_load <repo> <run-id> <field> — validate a run's record and print one field. Non-zero when the
@@ -263,28 +357,33 @@ _pipeline_base_expire() {
 # worktree's resumes at it.
 pipeline_base_record() {
     local repo="$1" id="$2" dir file url base nm top common branch tmp ptr
-    _pipeline_base_valid_id "$id" || return 1
-    dir="$(_pipeline_base_prepare "$repo")" || return 1
+    _PB_WHY=""
+    _PB_TAMPER=""
+    _pipeline_base_valid_id "$id" || { _PB_WHY="the run id is not valid"; return 1; }
+    dir="$(_pipeline_base_prepare "$repo")" || { _PB_WHY="the record directories are not private directories of this user (a link, another owner, or a mode other than 0700)"; return 1; }
     file="$dir/$id.json"
-    [[ ! -e "$file" && ! -L "$file" ]] || return 1
+    [[ ! -e "$file" && ! -L "$file" ]] || { _PB_WHY="a record for this run already exists"; return 1; }
     _pipeline_base_config_clean "$repo" || return 1
-    url="$(_pipeline_base_origin_url "$repo" "$dir")" || return 1
-    base="$(_pipeline_base_proof "$repo" "$url")" || return 1
-    nm="$(_pipeline_base_nm_fingerprint "$repo")" || return 1
-    top="$(_pipeline_base_top "$repo")" || return 1
-    common="$(cd "$repo" && cd "$(git rev-parse --git-common-dir)" && pwd -P)" || return 1
+    _pipeline_base_origin_url "$repo" "$dir" || return 1
+    url="$_PB_URL"
+    _pipeline_base_proof "$repo" "$url" || return 1
+    base="$_PB_BASE_SHA"
+    nm="$(_pipeline_base_nm_fingerprint "$repo")" || { _PB_WHY="node_modules could not be fingerprinted (the walk timed out or the tree is unreadable)"; return 1; }
+    top="$(_pipeline_base_top "$repo")" || { _PB_WHY="the worktree path could not be read"; return 1; }
+    common="$(cd "$repo" && cd "$(git rev-parse --git-common-dir)" && pwd -P)" || { _PB_WHY="the git directory could not be read"; return 1; }
     branch="$(git -C "$repo" rev-parse --abbrev-ref HEAD 2>/dev/null || true)"
-    tmp="$(mktemp "$dir/.base.XXXXXX")" || return 1
+    tmp="$(mktemp "$dir/.base.XXXXXX")" || { _PB_WHY="the record could not be written"; return 1; }
     if jq -n --arg repo "$common" --arg wt "$top" --arg run "$id" --arg base "$base" --arg url "$url" \
         --arg branch "$branch" --arg nm "$nm" --arg at "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
         '{version: 1, repo: $repo, worktree: $wt, run: $run, base: $base, remote: $url, push_url: $url, branch: $branch, nm: $nm, created_at: $at}' \
         > "$tmp" && chmod 600 "$tmp" && mv "$tmp" "$file"; then
-        ptr="$(_pipeline_base_pointer "$repo")" || return 1
-        tmp="$(mktemp "$dir/.ptr.XXXXXX")" || return 1
-        printf '%s\n' "$id" > "$tmp" && mv "$tmp" "$ptr" || { rm -f "$tmp"; return 1; }
+        ptr="$(_pipeline_base_pointer "$repo")" || { _PB_WHY="the pointer path could not be read"; return 1; }
+        tmp="$(mktemp "$dir/.ptr.XXXXXX")" || { _PB_WHY="the pointer could not be written"; return 1; }
+        printf '%s\n' "$id" > "$tmp" && mv "$tmp" "$ptr" || { rm -f "$tmp"; _PB_WHY="the pointer could not be written"; return 1; }
         return 0
     fi
     rm -f "$tmp"
+    _PB_WHY="the record could not be written"
     return 1
 }
 
@@ -332,7 +431,11 @@ pipeline_base_init() {
         _pipeline_base_adopt "$id" "$base" "$push" "$nm" "$root"
         return 0
     fi
-    _pipeline_base_fail "the start could not be proved. The branch must be at the fork point of origin/${BASE_BRANCH:-main} as the remote reports it, the repository's config must not set pushurl or insteadOf, the origin URL must match the one pinned at the first start, and SHIPWRIGHT_HOME must be a real directory. The test stage is blocked."
+    if [[ "${_PB_TAMPER:-}" == 1 ]]; then
+        _pipeline_base_fail "refusing to start: ${_PB_WHY}. This is evidence that the checkout was altered, so the pipeline does not run."
+        return 2
+    fi
+    _pipeline_base_fail "the start could not be proved: ${_PB_WHY:-unknown reason}. The test stage blocks failing tests only; the pipeline still runs, and passing tests pass."
     return 1
 }
 
@@ -340,6 +443,45 @@ _pipeline_base_fail() {
     unset SW_PIPELINE_RUN_ID SW_PIPELINE_BASE_SHA SW_PIPELINE_PUSH_URL
     # stderr: callers capture stdout (a resume's exit is judged by its status, not by captured text).
     if declare -F warn >/dev/null 2>&1; then warn "Pipeline base: $1" >&2; else echo "Pipeline base: $1" >&2; fi
+}
+
+# pipeline_base_repin [--yes] [repo] — the explicit reset of the origin pin, for a deliberate change of remote (a
+# rename, or https to ssh). A human runs it: `shipwright pipeline base-repin`. The pipeline never does. It prints the old
+# and new URLs, asks for a typed "yes" on the terminal (or --yes), and appends a line to <record dir>/repin.log.
+# Agents are denied this command in config/agent-permissions.json and src/adapters/agent/agent-permissions.ts.
+pipeline_base_repin() {
+    local yes=0 repo="" arg dir pin old="" new logf reply tmp
+    for arg in "$@"; do
+        case "$arg" in
+            --yes) yes=1 ;;
+            *) repo="$arg" ;;
+        esac
+    done
+    repo="${repo:-${PROJECT_ROOT:-.}}"
+    dir="$(_pipeline_base_prepare "$repo")" || { echo "base-repin: the record directory is not a private directory of this user" >&2; return 1; }
+    pin="$dir/origin.url"
+    if [[ -n "${SW_TRUSTED_REMOTE_URL:-}" ]]; then
+        new="$SW_TRUSTED_REMOTE_URL"
+    else
+        new="$(cd "$repo" && git config --local --get remote.origin.url 2>/dev/null || true)"
+    fi
+    [[ -n "$new" ]] || { echo "base-repin: there is no origin remote to pin" >&2; return 1; }
+    if [[ -f "$pin" && ! -L "$pin" ]]; then old="$(head -n 1 "$pin")"; fi
+    echo "Pinned origin URL: ${old:-(none)}"
+    echo "New origin URL:    $new"
+    if [[ "$old" == "$new" ]]; then echo "Already pinned to this URL; nothing to change."; return 0; fi
+    if [[ "$yes" -ne 1 ]]; then
+        { : < /dev/tty; } 2>/dev/null || { echo "base-repin: confirming needs a terminal; pass --yes to confirm non-interactively" >&2; return 1; }
+        printf 'Repin the base record of %s to the new URL? Type yes to confirm: ' "$repo" > /dev/tty
+        read -r reply < /dev/tty || reply=""
+        [[ "$reply" == "yes" ]] || { echo "base-repin: not confirmed; nothing changed" >&2; return 1; }
+    fi
+    tmp="$(mktemp "$dir/.origin.XXXXXX")" || { echo "base-repin: could not write the pin" >&2; return 1; }
+    if printf '%s\n' "$new" > "$tmp" && mv "$tmp" "$pin"; then :; else rm -f "$tmp"; echo "base-repin: could not write the pin" >&2; return 1; fi
+    logf="$dir/repin.log"
+    ( umask 077; printf '%s user=%s old=%s new=%s\n' "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$(id -un)" "${old:-none}" "$new" >> "$logf" )
+    chmod 600 "$logf" 2>/dev/null || true
+    echo "Repinned. The change is in $logf."
 }
 
 # pipeline_base_release [repo] — remove this run's record and the worktree's pointer. Call on completion or abort,
