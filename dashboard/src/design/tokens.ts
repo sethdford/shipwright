@@ -179,6 +179,7 @@ export const colourRoles = [
   "ok",
   "warn",
   "danger",
+  "dangerInk",
   "info",
 ] as const;
 
@@ -201,6 +202,7 @@ export const themes: Record<Theme, ThemeColours> = {
     ok: "oklch(0.82 0.16 150)",
     warn: "oklch(0.86 0.15 85)",
     danger: "oklch(0.7 0.19 20)",
+    dangerInk: "oklch(0.15 0.015 255)",
     info: "oklch(0.75 0.12 265)",
   },
   light: {
@@ -216,6 +218,7 @@ export const themes: Record<Theme, ThemeColours> = {
     ok: "oklch(0.5 0.14 150)",
     warn: "oklch(0.5 0.13 70)",
     danger: "oklch(0.52 0.19 25)",
+    dangerInk: "oklch(0.99 0 0)",
     info: "oklch(0.5 0.12 265)",
   },
 };

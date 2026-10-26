@@ -117,7 +117,7 @@ describe("OverviewView", () => {
     overviewView.render(data);
     const container = document.getElementById("active-pipelines");
     expect(container).toBeTruthy();
-    expect(container!.innerHTML).toContain("No active pipelines");
+    expect(container!.innerHTML).toContain("No active runs");
   });
 
   it("renders pipeline cards when pipelines exist", async () => {
@@ -150,7 +150,7 @@ describe("OverviewView", () => {
     (data as any).events = undefined;
     expect(() => overviewView.render(data)).not.toThrow();
     const pipelinesEl = document.getElementById("active-pipelines");
-    expect(pipelinesEl!.innerHTML).toContain("No active pipelines");
+    expect(pipelinesEl!.innerHTML).toContain("No active runs");
   });
 
   it("renders queue empty state", async () => {

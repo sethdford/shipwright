@@ -20,6 +20,12 @@ import {
 } from "./services/claims.js";
 import {
   signalPid,
+  pauseTrees,
+  resumeTrees,
+  resumeLeftovers,
+  stopTrees,
+  type TreeJob,
+  type TreeSignalResult,
   isValidSshUser,
   isValidSshHost,
   isValidShipwrightPath,
@@ -46,6 +52,7 @@ import {
   withCors,
   wsOriginAllowed,
 } from "./services/request-guard.js";
+import { htmlSecurityHeaders, inlinePageHeaders, withSecurityHeaders } from "./services/security-headers.js";
 import { Database } from "bun:sqlite";
 
 // ─── Config ──────────────────────────────────────────────────────────
@@ -565,7 +572,8 @@ function loginPageHTML(error?: string): string {
   const patForm = `
     ${errorHtml}
     <form method="POST" action="/auth/pat-login" style="display:flex;flex-direction:column;gap:1rem;">
-      <input name="username" type="text" required
+      <input name="username" type="text" required class="login-input"
+        aria-label="GitHub username"
         placeholder="GitHub username"
         style="
           background: rgba(0,212,255,0.04);
@@ -575,11 +583,8 @@ function loginPageHTML(error?: string): string {
           color: #e8ecf4;
           font-family: 'Plus Jakarta Sans', sans-serif;
           font-size: 0.95rem;
-          outline: none;
           transition: border-color 0.2s;
         "
-        onfocus="this.style.borderColor='rgba(0,212,255,0.4)'"
-        onblur="this.style.borderColor='rgba(0,212,255,0.15)'"
       />
       <button type="submit" class="btn-github" style="justify-content:center;">
         <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"/></svg>
@@ -607,10 +612,8 @@ function loginPageHTML(error?: string): string {
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Fleet Command \u2014 Sign In</title>
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Instrument+Serif&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
   <style>
+    .login-input:focus { border-color: rgba(0,212,255,0.6) !important; outline: 2px solid #00d4ff; outline-offset: 2px; }
     *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
     body {
       background: #060a14;
@@ -685,9 +688,6 @@ function accessDeniedHTML(repo: string): string {
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Fleet Command — Access Denied</title>
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Instrument+Serif&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
   <style>
     *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
     body {
@@ -933,8 +933,9 @@ function appendAuditLog(
     const entry = JSON.stringify({
       ts: new Date().toISOString(),
       ts_epoch: Math.floor(Date.now() / 1000),
-      action,
       ...details,
+      // The event name always wins over a details key of the same name.
+      action,
     });
     appendFileSync(AUDIT_LOG_FILE, entry + "\n");
   } catch {}
@@ -2284,6 +2285,63 @@ const MODEL_PRICING: Record<string, { input: number; output: number }> = {
   haiku: { input: 0.25, output: 1.25 },
 };
 
+/** "47m", "13h 8m": a duration in seconds as an operator reads it. */
+function durationText(seconds: number): string {
+  const m = Math.round(seconds / 60);
+  return m < 60 ? `${m}m` : `${Math.floor(m / 60)}h ${m % 60}m`;
+}
+
+// ─── Run interventions on the verified process tree ──────────────────
+type RunAction = "pause" | "resume" | "abort";
+
+function activeJob(issue: number): Record<string, unknown> | null {
+  const state = readDaemonState();
+  const jobs = (state?.active_jobs as Array<Record<string, unknown>>) || [];
+  return jobs.find((j) => (j.issue as number) === issue) ?? null;
+}
+
+// Tests set a longer grace to prove a stop outlasts Bun's 10 s default idle timeout.
+const STOP_GRACE_MS = Number(process.env.SW_DASHBOARD_STOP_GRACE_MS) || 5000;
+const TREE_ACTIONS = {
+  pause: pauseTrees,
+  resume: resumeTrees,
+  abort: (jobs: TreeJob[]) => stopTrees(jobs, STOP_GRACE_MS),
+} as const;
+
+/** A run counts as done only when something was signalled and nothing failed, was refused or escaped. */
+function treeOk(r: TreeSignalResult): boolean {
+  return !r.refused && !r.untraced && r.failed.length === 0 && r.signalled.length > 0;
+}
+
+/**
+ * Pause, resume or stop each run's whole process tree (subprocess-guards.ts verifies the PIDs).
+ * The runs are handled together, so several stops share one grace period.
+ */
+async function runActions(
+  issues: number[],
+  jobs: Array<Record<string, unknown> | null>,
+  action: RunAction,
+): Promise<TreeSignalResult[]> {
+  const live = jobs.filter((j): j is Record<string, unknown> => j !== null);
+  const done = await TREE_ACTIONS[action](live.map(treeJob));
+  // A run the daemon already reaped can still have processes a pause froze: resume continues them.
+  const gone = issues.filter((_, i) => !jobs[i]);
+  const reaped =
+    action === "resume"
+      ? await resumeLeftovers(gone)
+      : gone.map((): TreeSignalResult => ({ pid: 0, signalled: [], failed: [], refused: "not running" }));
+  return jobs.map((j) => (j ? done.shift() : reaped.shift()) as TreeSignalResult);
+}
+
+function treeJob(j: Record<string, unknown>): TreeJob {
+  return { root: j.pid, startedAt: j.started_at, issue: j.issue };
+}
+
+/** Who asked, for the audit log: the signed-in GitHub user, or "local" with auth off. */
+function auditActor(req: Request): string {
+  return getSession(req)?.githubUser ?? "local";
+}
+
 // ─── Static file serving ─────────────────────────────────────────────
 const MIME_TYPES: Record<string, string> = {
   ".html": "text/html; charset=utf-8",
@@ -2320,6 +2378,7 @@ function serveStaticFile(pathname: string): Response | null {
     headers: {
       "Content-Type": contentType,
       "Cache-Control": "no-cache",
+      ...(ext === ".html" ? htmlSecurityHeaders() : {}),
     },
   });
 }
@@ -2505,7 +2564,7 @@ async function handleAuthCallback(url: URL, req: Request): Promise<Response> {
   if (!isAdmin) {
     return new Response(accessDeniedHTML(DASHBOARD_REPO), {
       status: 403,
-      headers: { "Content-Type": "text/html; charset=utf-8" },
+      headers: inlinePageHeaders(),
     });
   }
 
@@ -2566,7 +2625,7 @@ async function handlePatLogin(req: Request): Promise<Response> {
   if (!username) {
     return new Response(loginPageHTML("Please enter a GitHub username"), {
       status: 400,
-      headers: { "Content-Type": "text/html; charset=utf-8" },
+      headers: inlinePageHeaders(),
     });
   }
 
@@ -2577,7 +2636,7 @@ async function handlePatLogin(req: Request): Promise<Response> {
   if (!isAdmin) {
     return new Response(accessDeniedHTML(DASHBOARD_REPO), {
       status: 403,
-      headers: { "Content-Type": "text/html; charset=utf-8" },
+      headers: inlinePageHeaders(),
     });
   }
 
@@ -2717,7 +2776,7 @@ async function routeRequest(
         return new Response("Dashboard not found", { status: 404 });
       }
       return new Response(loginPageHTML(), {
-        headers: { "Content-Type": "text/html; charset=utf-8" },
+        headers: inlinePageHeaders(),
       });
     }
 
@@ -2748,7 +2807,7 @@ async function routeRequest(
       if (req.method === "POST") return handleAuthLogout(req);
       if (req.method === "GET") {
         return new Response(logoutConfirmHTML(), {
-          headers: { "Content-Type": "text/html; charset=utf-8" },
+          headers: inlinePageHeaders(),
         });
       }
       return new Response("Method Not Allowed", {
@@ -2902,57 +2961,19 @@ async function routeRequest(
           );
         }
 
-        const dState = readDaemonState();
-        const activeJobsList = dState
-          ? (dState.active_jobs as Array<Record<string, unknown>>) || []
-          : [];
-
-        const results: Array<{ issue: number; ok: boolean; error?: string }> =
-          [];
-        for (const issueNum of issues) {
-          try {
-            let pid: number | null = null;
-            for (const job of activeJobsList) {
-              if ((job.issue as number) === issueNum) {
-                pid = (job.pid as number) || null;
-                break;
-              }
-            }
-            if (!pid) {
-              results.push({
-                issue: issueNum,
-                ok: false,
-                error: "No active PID found",
-              });
-              continue;
-            }
-            switch (action) {
-              case "pause":
-                signalPid(pid, "SIGSTOP");
-                break;
-              case "resume":
-                signalPid(pid, "SIGCONT");
-                break;
-              case "abort":
-                signalPid(pid, "SIGTERM");
-                break;
-              default:
-                results.push({
-                  issue: issueNum,
-                  ok: false,
-                  error: `Unknown action: ${action}`,
-                });
-                continue;
-            }
-            results.push({ issue: issueNum, ok: true });
-          } catch (err) {
-            results.push({
-              issue: issueNum,
-              ok: false,
-              error: String(err),
-            });
-          }
+        if (!["pause", "resume", "abort"].includes(action)) {
+          return new Response(JSON.stringify({ error: `Unknown action: ${action}` }), {
+            status: 400,
+            headers: { "Content-Type": "application/json", ...CORS_HEADERS },
+          });
         }
+        const signalled = await runActions(issues, issues.map(activeJob), action as RunAction);
+        const results = signalled.map((r, i) => ({
+          issue: issues[i],
+          ok: treeOk(r),
+          ...r,
+        }));
+        appendAuditLog("intervention-bulk", { op: action, actor: auditActor(req), results });
 
         return new Response(JSON.stringify({ results }), {
           headers: { "Content-Type": "application/json", ...CORS_HEADERS },
@@ -2981,11 +3002,13 @@ async function routeRequest(
       const daemonState = readDaemonState();
       let pid: number | null = null;
       let worktreeBase: string | null = null;
+      let runJob: Record<string, unknown> | null = null;
       if (daemonState) {
         const activeJobs =
           (daemonState.active_jobs as Array<Record<string, unknown>>) || [];
         for (const job of activeJobs) {
           if ((job.issue as number) === issueNum) {
+            runJob = job;
             pid = (job.pid as number) || null;
             const wt = (job.worktree as string) || "";
             const repo = (job.repo as string) || "";
@@ -2998,14 +3021,14 @@ async function routeRequest(
       try {
         switch (action) {
           case "pause":
-            if (pid) signalPid(pid, "SIGSTOP");
-            break;
           case "resume":
-            if (pid) signalPid(pid, "SIGCONT");
-            break;
-          case "abort":
-            if (pid) signalPid(pid, "SIGTERM");
-            break;
+          case "abort": {
+            const [r] = await runActions([issueNum], [runJob], action);
+            appendAuditLog("intervention", { op: action, actor: auditActor(req), issue: issueNum, ...r });
+            return new Response(JSON.stringify({ ok: treeOk(r), action, issue: issueNum, ...r }), {
+              headers: { "Content-Type": "application/json", ...CORS_HEADERS },
+            });
+          }
           case "message": {
             const body = (await req.json()) as { message?: string };
             const msg = body.message || "";
@@ -3044,7 +3067,7 @@ async function routeRequest(
               headers: { "Content-Type": "application/json", ...CORS_HEADERS },
             });
         }
-        appendAuditLog("intervention", { action, issue: issueNum, pid });
+        appendAuditLog("intervention", { op: action, actor: auditActor(req), issue: issueNum, pid });
         return new Response(
           JSON.stringify({ ok: true, action, issue: issueNum }),
           { headers: { "Content-Type": "application/json", ...CORS_HEADERS } },
@@ -4196,7 +4219,7 @@ async function routeRequest(
             alerts.push({
               type: "stuck_pipeline",
               severity: "warning",
-              message: `Pipeline for issue #${issue} has had no stage change for ${Math.round((now - lastStageEpoch) / 60)}min`,
+              message: `Run #${issue} has had no stage change for ${durationText(now - lastStageEpoch)}`,
               issue,
               actions: ["pause", "abort", "message"],
             });
@@ -4409,28 +4432,18 @@ async function routeRequest(
     if (pathname === "/api/emergency-brake" && req.method === "POST") {
       try {
         const daemonState = readDaemonState();
-        let paused = 0;
-        let queued = 0;
+        const activeJobs =
+          (daemonState?.active_jobs as Array<Record<string, unknown>>) || [];
+        const queued = ((daemonState?.queued as Array<unknown>) || []).length;
+        // Each run's whole process tree is stopped; a run counts as paused only when every
+        // process in it was signalled and nothing was refused or failed.
+        const trees = await pauseTrees(activeJobs.map(treeJob));
+        const jobs = trees.map((r, i) => ({ issue: activeJobs[i].issue as number, ...r }));
+        const paused = jobs.filter((j) => !j.refused && j.failed.length === 0 && j.signalled.length > 0).length;
+        const running = jobs.length;
 
-        if (daemonState) {
-          const activeJobs =
-            (daemonState.active_jobs as Array<Record<string, unknown>>) || [];
-          for (const job of activeJobs) {
-            const pid = (job.pid as number) || 0;
-            if (pid) {
-              try {
-                signalPid(pid, "SIGSTOP");
-                paused++;
-              } catch {
-                // process may already be gone
-              }
-            }
-          }
-          queued = ((daemonState.queued as Array<unknown>) || []).length;
-        }
-
-        appendAuditLog("emergency-brake", { paused, queued });
-        return new Response(JSON.stringify({ paused, queued }), {
+        appendAuditLog("emergency-brake", { actor: auditActor(req), paused, running, queued, jobs });
+        return new Response(JSON.stringify({ paused, running, queued, jobs }), {
           headers: { "Content-Type": "application/json", ...CORS_HEADERS },
         });
       } catch (err) {
@@ -4827,7 +4840,7 @@ async function routeRequest(
           timeout: 10000,
           stdio: "pipe",
         });
-        appendAuditLog("daemon-control", { action: "start" });
+        appendAuditLog("daemon-control", { op: "start", actor: auditActor(req) });
         return new Response(JSON.stringify({ ok: true, action: "started" }), {
           headers: { "Content-Type": "application/json", ...CORS_HEADERS },
         });
@@ -4884,11 +4897,13 @@ async function routeRequest(
         const flagPath = join(HOME, ".shipwright", "daemon-pause.flag");
         const dir = join(HOME, ".shipwright");
         if (!existsSync(dir)) mkdirSync(dir, { recursive: true });
-        writeFileSync(
-          flagPath,
-          JSON.stringify({ paused: true, at: new Date().toISOString() }),
-        );
-        return new Response(JSON.stringify({ ok: true, action: "paused" }), {
+        // The brake records whether intake was already paused, so its release leaves it so.
+        // An existing flag (the daemon's own disk-low pause, say) keeps its reason.
+        const wasPaused = existsSync(flagPath);
+        if (!wasPaused) {
+          writeFileSync(flagPath, JSON.stringify({ paused: true, at: new Date().toISOString() }));
+        }
+        return new Response(JSON.stringify({ ok: true, action: "paused", wasPaused }), {
           headers: { "Content-Type": "application/json", ...CORS_HEADERS },
         });
       } catch (err) {
@@ -5735,10 +5750,13 @@ const server = Bun.serve<WsData>({
   hostname: HOST,
 
   async fetch(req, server) {
+    // A stop holds its request through the grace period (longer under load); Bun's default
+    // idle timeout of 10 s would cut it off and the client would report a failure.
+    if (/^\/api\/(intervention\/|emergency-brake)/.test(new URL(req.url).pathname)) server.timeout(req, 60);
     const hasSession = isAuthEnabled() && getSession(req) !== null;
     const blocked = guardRequest(req, GUARD, hasSession);
-    if (blocked) return withCors(blocked, req, GUARD);
-    return withCors(await routeRequest(req, server), req, GUARD);
+    if (blocked) return withSecurityHeaders(withCors(blocked, req, GUARD));
+    return withSecurityHeaders(withCors(await routeRequest(req, server), req, GUARD));
   },
 
   websocket: {

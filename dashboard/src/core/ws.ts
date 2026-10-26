@@ -97,9 +97,10 @@ function showOfflineBanner(show: boolean): void {
 }
 
 export function connect(): void {
-  const protocol = location.protocol === "https:" ? "wss:" : "ws:";
-  const wsUrl = `${protocol}//${location.host}/ws`;
-  ws = new WebSocket(wsUrl);
+  // Same-origin by construction: resolve /ws against the page, then swap the scheme.
+  const url = new URL("/ws", location.href);
+  url.protocol = url.protocol === "https:" ? "wss:" : "ws:";
+  ws = new WebSocket(url.href);
 
   ws.onopen = () => {
     reconnectDelay = 1000;

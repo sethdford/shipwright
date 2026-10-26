@@ -1,198 +1,222 @@
-// Tab navigation with hash routing and view lifecycle
+// Destination routing: six destinations in a tablist, legacy hashes redirect to their new home,
+// and every registered view keeps its init/render/destroy lifecycle and error boundary.
 
 import { store } from "./state";
-import type { TabId, View, FleetState } from "../types/api";
+import type { FleetState, TabId, View } from "../types/api";
 
-const views = new Map<TabId, View>();
-const initializedViews = new Set<TabId>();
+export type DestinationId =
+  | "triage"
+  | "runs"
+  | "agents"
+  | "safety"
+  | "cost"
+  | "settings";
 
-const VALID_TABS: TabId[] = [
-  "overview",
-  "agents",
-  "pipelines",
-  "timeline",
-  "activity",
-  "metrics",
-  "machines",
-  "insights",
-  "team",
+export interface Destination {
+  readonly id: DestinationId;
+  readonly label: string;
+  /** Second key of the `g` shortcut (`g t` goes to Triage). */
+  readonly key: string;
+  /** Views mounted in this destination until T3 rebuilds it, first view primary. */
+  readonly views: readonly TabId[];
+}
+
+export const DESTINATIONS: readonly Destination[] = [
+  { id: "triage", label: "Triage", key: "t", views: ["overview"] },
+  { id: "runs", label: "Runs", key: "r", views: ["pipelines", "timeline"] },
+  { id: "agents", label: "Agents", key: "a", views: ["agents", "machines"] },
+  { id: "safety", label: "Safety", key: "s", views: ["activity"] },
+  { id: "cost", label: "Cost and DORA", key: "c", views: ["metrics", "insights"] },
+  { id: "settings", label: "Settings", key: "d", views: ["team"] },
+];
+
+/** Retired views kept reachable on their old hash, outside the tab bar, until T4 deletes them. */
+export const LEGACY_ROUTES: readonly TabId[] = [
   "fleet-map",
   "pipeline-theater",
   "agent-cockpit",
   "shipyard",
 ];
 
-let teamRefreshTimer: ReturnType<typeof setInterval> | null = null;
+export type Route =
+  | { kind: "destination"; dest: DestinationId; section?: TabId }
+  | { kind: "legacy"; view: TabId };
 
-/** Test hook: set team refresh timer so switchTab can clear it when leaving team tab */
-export function __setTeamRefreshTimerForTest(
-  timer: ReturnType<typeof setInterval> | null,
-): void {
-  teamRefreshTimer = timer;
+const DEFAULT_ROUTE: Route = { kind: "destination", dest: "triage" };
+
+/** Maps a hash (with or without `#`) to a route. Old view hashes land on the destination that hosts the view. */
+export function resolveRoute(hash: string): Route | null {
+  const id = hash.replace(/^#/, "");
+  if (!id) return null;
+  const dest = DESTINATIONS.find((d) => d.id === id);
+  if (dest) return { kind: "destination", dest: dest.id };
+  if ((LEGACY_ROUTES as readonly string[]).includes(id)) {
+    return { kind: "legacy", view: id as TabId };
+  }
+  const host = DESTINATIONS.find((d) => (d.views as readonly string[]).includes(id));
+  if (!host) return null;
+  return id === host.views[0]
+    ? { kind: "destination", dest: host.id }
+    : { kind: "destination", dest: host.id, section: id as TabId };
 }
+
+export function routeKey(route: Route): string {
+  return route.kind === "legacy" ? route.view : route.dest;
+}
+
+export function viewsFor(route: Route): readonly TabId[] {
+  if (route.kind === "legacy") return [route.view];
+  return DESTINATIONS.find((d) => d.id === route.dest)?.views ?? [];
+}
+
+const views = new Map<TabId, View>();
+const initializedViews = new Set<TabId>();
+const routeListeners = new Set<(route: Route) => void>();
+let current: Route | null = null;
 
 export function registerView(tabId: TabId, view: View): void {
   views.set(tabId, view);
 }
 
-export function switchTab(tab: TabId): void {
-  const prev = store.get("activeTab");
-  if (prev === tab) return;
+export function getRegisteredViews(): Map<TabId, View> {
+  return views;
+}
 
-  // Destroy previous view
-  const prevView = views.get(prev);
-  if (prevView && initializedViews.has(prev)) {
-    prevView.destroy();
-    initializedViews.delete(prev);
+export function currentRoute(): Route {
+  return current ?? DEFAULT_ROUTE;
+}
+
+export function isViewActive(tabId: TabId): boolean {
+  return viewsFor(currentRoute()).includes(tabId);
+}
+
+export function onRouteChange(fn: (route: Route) => void): () => void {
+  routeListeners.add(fn);
+  return () => routeListeners.delete(fn);
+}
+
+/** Navigates to a destination, a legacy view or an old view id. Unknown targets are ignored. */
+export function switchTab(target: string): void {
+  const route = resolveRoute(target);
+  if (route) navigate(route, "push");
+}
+
+/**
+ * "push" adds a history entry (a tab click, a shortcut, the palette). "replace" rewrites the
+ * current one: first load, and an old hash the browser already pushed that maps elsewhere,
+ * so Back never bounces through the old hash.
+ */
+function navigate(route: Route, mode: "push" | "replace"): void {
+  const prev = current;
+  const key = routeKey(route);
+  if (location.hash.replace(/^#/, "") !== key) {
+    if (mode === "push" && prev) history.pushState(null, "", "#" + key);
+    else history.replaceState(null, "", "#" + key);
   }
-
-  // Clear team refresh timer if leaving team tab
-  if (prev === "team" && teamRefreshTimer) {
-    clearInterval(teamRefreshTimer);
-    teamRefreshTimer = null;
+  if (prev && routeKey(prev) === key) {
+    current = route;
+    revealSection(route);
+    return;
   }
-
-  store.set("activeTab", tab);
-  location.hash = "#" + tab;
-
-  // Update tab button classes
-  const btns = document.querySelectorAll(".tab-btn");
-  btns.forEach((btn) => {
-    if (btn.getAttribute("data-tab") === tab) {
-      btn.classList.add("active");
-    } else {
-      btn.classList.remove("active");
-    }
-  });
-
-  // Update panel visibility
-  const panels = document.querySelectorAll(".tab-panel");
-  panels.forEach((panel) => {
-    if (panel.id === "panel-" + tab) {
-      panel.classList.add("active");
-    } else {
-      panel.classList.remove("active");
-    }
-  });
-
-  // Initialize the new view with error boundary
-  const view = views.get(tab);
-  if (view && !initializedViews.has(tab)) {
-    try {
-      view.init();
-      initializedViews.add(tab);
-    } catch (err) {
-      console.error(`[Error Boundary] Tab "${tab}" init failed:`, err);
-      showTabError(tab, err);
-    }
+  current = route;
+  const next = viewsFor(route);
+  for (const id of prev ? viewsFor(prev) : []) {
+    if (!next.includes(id)) destroyView(id);
   }
-
-  // Render with current data
+  store.set("activeTab", next[0] ?? "overview");
+  syncChrome(route);
   const fleetState = store.get("fleetState");
-  if (fleetState && view) {
-    try {
-      view.render(fleetState);
-    } catch (err) {
-      console.error(`[Error Boundary] Tab "${tab}" render failed:`, err);
-      showTabError(tab, err);
+  for (const id of next) mountView(id, fleetState);
+  revealSection(route);
+  routeListeners.forEach((fn) => fn(route));
+}
+
+function syncChrome(route: Route): void {
+  const key = routeKey(route);
+  document.querySelectorAll<HTMLElement>('[role="tab"][data-dest]').forEach((tab) => {
+    const on = tab.dataset.dest === key;
+    tab.setAttribute("aria-selected", String(on));
+    tab.tabIndex = on ? 0 : -1;
+  });
+  // On a legacy route no tab is selected; keep the first tab reachable.
+  if (route.kind === "legacy") {
+    const first = document.querySelector<HTMLElement>('[role="tab"][data-dest]');
+    if (first) first.tabIndex = 0;
+  }
+  document.querySelectorAll<HTMLElement>("[data-route]").forEach((panel) => {
+    panel.hidden = panel.dataset.route !== key;
+  });
+}
+
+function revealSection(route: Route): void {
+  if (route.kind !== "destination" || !route.section) return;
+  const el = document.getElementById("panel-" + route.section);
+  if (el && typeof el.scrollIntoView === "function") el.scrollIntoView({ block: "start" });
+}
+
+function destroyView(id: TabId): void {
+  const view = views.get(id);
+  if (view && initializedViews.has(id)) {
+    view.destroy();
+    initializedViews.delete(id);
+  }
+}
+
+function mountView(id: TabId, fleetState: FleetState | null): void {
+  const view = views.get(id);
+  if (!view) return;
+  try {
+    if (!initializedViews.has(id)) {
+      view.init();
+      initializedViews.add(id);
     }
+    if (fleetState) view.render(fleetState);
+  } catch (err) {
+    console.error(`[Error Boundary] View "${id}" failed:`, err);
+    showViewError(id, err);
   }
 }
 
 export function renderActiveView(): void {
-  const tab = store.get("activeTab");
-  const view = views.get(tab);
   const fleetState = store.get("fleetState");
-  if (!view || !fleetState) return;
-
-  try {
-    if (!initializedViews.has(tab)) {
-      view.init();
-      initializedViews.add(tab);
-    }
-    view.render(fleetState);
-  } catch (err) {
-    console.error(`[Error Boundary] Tab "${tab}" render failed:`, err);
-    showTabError(tab, err);
-  }
+  if (!fleetState) return;
+  for (const id of viewsFor(currentRoute())) mountView(id, fleetState);
 }
 
-function showTabError(tab: TabId, err: unknown): void {
-  const panel = document.getElementById("panel-" + tab);
-  if (!panel) return;
-  const msg = err instanceof Error ? err.message : String(err);
-  const existing = panel.querySelector(".tab-error-boundary");
-  if (existing) return; // don't stack errors
-  const div = document.createElement("div");
-  div.className = "tab-error-boundary";
-  div.innerHTML =
-    `<div class="error-boundary-content">` +
-    `<span class="error-boundary-icon">\u26A0</span>` +
-    `<div><strong>This tab encountered an error</strong>` +
-    `<pre class="error-boundary-msg">${msg.replace(/</g, "&lt;")}</pre></div>` +
-    `<button class="btn-sm error-boundary-retry">Retry</button></div>`;
-  panel.prepend(div);
-  const retryBtn = div.querySelector(".error-boundary-retry");
-  if (retryBtn) {
-    retryBtn.addEventListener("click", () => {
-      div.remove();
-      initializedViews.delete(tab);
-      const v = views.get(tab);
-      if (v) {
-        try {
-          v.init();
-          initializedViews.add(tab);
-          const state = store.get("fleetState");
-          if (state) v.render(state);
-        } catch (retryErr) {
-          console.error(
-            `[Error Boundary] Retry failed for "${tab}":`,
-            retryErr,
-          );
-          showTabError(tab, retryErr);
-        }
-      }
-    });
-  }
+function showViewError(id: TabId, err: unknown): void {
+  const panel = document.getElementById("panel-" + id);
+  if (!panel || panel.querySelector(".tab-error-boundary")) return;
+  const box = document.createElement("div");
+  box.className = "tab-error-boundary";
+  box.setAttribute("role", "alert");
+  const title = document.createElement("strong");
+  title.textContent = "This section failed to load";
+  const msg = document.createElement("pre");
+  msg.className = "error-boundary-msg";
+  msg.textContent = err instanceof Error ? err.message : String(err);
+  const retry = document.createElement("button");
+  retry.type = "button";
+  retry.className = "btn sm error-boundary-retry";
+  retry.textContent = "Retry";
+  retry.addEventListener("click", () => {
+    box.remove();
+    initializedViews.delete(id);
+    mountView(id, store.get("fleetState"));
+  });
+  box.append(title, msg, retry);
+  panel.prepend(box);
 }
 
 export function setupRouter(): void {
-  // Tab button click handlers
-  const btns = document.querySelectorAll(".tab-btn");
-  btns.forEach((btn) => {
-    btn.addEventListener("click", () => {
-      const tab = btn.getAttribute("data-tab") as TabId;
-      if (tab) switchTab(tab);
-    });
+  document.querySelectorAll<HTMLElement>('[role="tab"][data-dest]').forEach((tab) => {
+    tab.addEventListener("click", () => switchTab(tab.dataset.dest ?? ""));
   });
-
-  // Hash-based routing
-  const hash = location.hash.replace("#", "") as TabId;
-  if (VALID_TABS.includes(hash)) {
-    switchTab(hash);
-  } else {
-    // Default to overview
-    const activeTab = store.get("activeTab");
-    const view = views.get(activeTab);
-    if (view && !initializedViews.has(activeTab)) {
-      view.init();
-      initializedViews.add(activeTab);
-    }
-  }
-
+  navigate(resolveRoute(location.hash) ?? DEFAULT_ROUTE, "replace");
   window.addEventListener("hashchange", () => {
-    const h = location.hash.replace("#", "") as TabId;
-    if (VALID_TABS.includes(h) && h !== store.get("activeTab")) {
-      switchTab(h);
-    }
+    const route = resolveRoute(location.hash);
+    // An unknown hash snaps back to the page that is actually showing.
+    navigate(route ?? currentRoute(), "replace");
   });
-
-  // Subscribe to fleet state changes to re-render active view
-  store.subscribe("fleetState", () => {
-    renderActiveView();
-  });
+  store.subscribe("fleetState", () => renderActiveView());
 }
 
-export function getRegisteredViews(): Map<TabId, View> {
-  return views;
-}

@@ -369,6 +369,7 @@ describe("helpers", () => {
 describe("withCors", () => {
   it("echoes an allowed origin and never sends *", () => {
     const res = withCors(new Response("ok"), req("GET", "/", { Origin: LOCAL }), cfg());
+    expect(res?.headers.get("content-type")).toMatch(/^text\/plain/);
     expect(res?.headers.get("Access-Control-Allow-Origin")).toBe(LOCAL);
     expect(res?.headers.get("Vary")).toContain("Origin");
   });

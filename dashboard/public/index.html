@@ -2,164 +2,101 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Fleet Command — Shipwright</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="color-scheme" content="dark light" />
+    <title>Fleet Command · Shipwright</title>
+    <link rel="icon" href="favicon.svg" type="image/svg+xml" />
+    <link rel="preload" href="/fonts/plus-jakarta-sans-latin-var.woff2" as="font" type="font/woff2" crossorigin />
+    <link rel="stylesheet" href="fonts/fonts.css" />
+    <link rel="stylesheet" href="tokens.css" />
     <link rel="stylesheet" href="styles.css" />
-    <link
-      rel="icon"
-      href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><text y='28' font-size='28'>⚓</text></svg>"
-    />
   </head>
   <body>
-    <!-- Header -->
-    <header class="header" id="header">
-      <div class="header-left">
-        <svg
-          class="header-icon"
-          viewBox="0 0 28 28"
-          width="28"
-          height="28"
-          fill="none"
-          xmlns="http://www.w3.org/2000/svg"
-        >
-          <defs>
-            <linearGradient
-              id="ship-grad"
-              x1="0"
-              y1="0"
-              x2="28"
-              y2="28"
-              gradientUnits="userSpaceOnUse"
-            >
-              <stop offset="0%" stop-color="#00d4ff" />
-              <stop offset="50%" stop-color="#0066ff" />
-              <stop offset="100%" stop-color="#7c3aed" />
-            </linearGradient>
-          </defs>
-          <path
-            d="M14 2L4 22h4l2-4h8l2 4h4L14 2zm0 6l3.5 8h-7L14 8z"
-            fill="url(#ship-grad)"
-          />
-          <path
-            d="M2 24c2-2 5-2 7 0s5 2 7 0 5-2 7 0"
-            stroke="url(#ship-grad)"
-            stroke-width="1.5"
-            fill="none"
-            stroke-linecap="round"
-          />
+    <a class="skip-link" href="#main">Skip to content</a>
+
+    <header class="app-header" id="header">
+      <div class="brand">
+        <svg class="mark" viewBox="0 0 32 32" width="22" height="22" aria-hidden="true" focusable="false">
+          <path fill="currentColor" d="M15 3.5h2v17.5h-2z" />
+          <path fill="currentColor" d="M17 5 27 19H17z" />
+          <path fill="currentColor" d="M15 8 6 19h9z" />
+          <path fill="currentColor" d="M2.5 21h27l-4.6 6.2a2 2 0 0 1-1.6.8H8.7a2 2 0 0 1-1.6-.8z" />
         </svg>
-        <span class="header-title">Fleet Command</span>
+        <span class="wordmark">Shipwright</span>
+        <span class="surface">Fleet</span>
       </div>
-      <div class="header-center" id="connection">
-        <span class="connection-dot offline" id="connection-dot"></span>
-        <span class="connection-text" id="connection-text">OFFLINE</span>
-        <span class="cost-ticker" id="cost-ticker">
-          <span id="cost-24h"></span>
-          <span id="cost-budget"></span>
-        </span>
-      </div>
-      <div class="header-right header-actions">
-        <button
-          class="emergency-brake-btn"
-          id="emergency-brake"
-          style="display: none"
-          title="Emergency Brake — Pause All"
-        >
-          <svg
-            viewBox="0 0 24 24"
-            width="18"
-            height="18"
-            fill="none"
-            stroke="currentColor"
-            stroke-width="2"
-          >
-            <circle cx="12" cy="12" r="10" />
-            <rect x="8" y="8" width="8" height="8" rx="1" fill="currentColor" />
-          </svg>
-        </button>
-        <div class="user-menu" id="user-menu">
-          <button class="user-avatar" id="user-avatar" aria-label="User menu">
-            <span class="avatar-initials" id="avatar-initials">?</span>
-          </button>
-          <div class="user-dropdown" id="user-dropdown">
-            <div class="dropdown-username" id="dropdown-username">—</div>
-            <button class="dropdown-link" id="open-notifications">
-              Notifications
-            </button>
-            <a class="dropdown-link" href="/auth/logout">Sign out</a>
+
+      <nav class="dest-nav" aria-label="Destinations">
+        <div class="tabs" role="tablist" aria-label="Destinations" id="dest-tabs">
+          <button class="tab" type="button" role="tab" id="tab-triage" data-dest="triage" aria-controls="dest-triage" aria-selected="true" tabindex="0">Triage</button>
+          <button class="tab" type="button" role="tab" id="tab-runs" data-dest="runs" aria-controls="dest-runs" aria-selected="false" tabindex="-1">Runs<span class="tab-count" id="count-runs" hidden></span></button>
+          <button class="tab" type="button" role="tab" id="tab-agents" data-dest="agents" aria-controls="dest-agents" aria-selected="false" tabindex="-1">Agents</button>
+          <button class="tab" type="button" role="tab" id="tab-safety" data-dest="safety" aria-controls="dest-safety" aria-selected="false" tabindex="-1">Safety</button>
+          <button class="tab" type="button" role="tab" id="tab-cost" data-dest="cost" aria-controls="dest-cost" aria-selected="false" tabindex="-1">Cost and DORA</button>
+          <button class="tab" type="button" role="tab" id="tab-settings" data-dest="settings" aria-controls="dest-settings" aria-selected="false" tabindex="-1">Settings</button>
+        </div>
+      </nav>
+
+      <div class="header-status">
+        <span class="conn" id="conn" data-state="connecting"><span class="dot" aria-hidden="true"></span><span id="conn-text">Connecting</span><span id="conn-short" aria-hidden="true">Connecting</span></span>
+        <span class="sr-only" role="status" id="conn-live"></span>
+        <span class="pill" id="breaker-pill" data-tone="neutral" title="The dashboard server does not report circuit-breaker state yet. Run shipwright breaker status on the host."><span class="glyph" aria-hidden="true">?</span><span>Breaker: unknown</span></span>
+        <span class="header-divider" aria-hidden="true"></span>
+        <button class="btn brake" type="button" id="emergency-brake" aria-label="Emergency brake"><svg class="brake-icon" viewBox="0 0 16 16" width="14" height="14" aria-hidden="true" focusable="false"><path d="M5.2 1.5h5.6l3.7 3.7v5.6l-3.7 3.7H5.2l-3.7-3.7V5.2z" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round" /><path d="M5 8h6" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" /></svg><span class="label-long">Emergency brake</span><span class="label-short">Pause all</span></button>
+        <button class="btn ghost" type="button" id="open-palette" aria-keyshortcuts="Meta+K Control+K" aria-label="Search and commands"><svg viewBox="0 0 16 16" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.75" aria-hidden="true" focusable="false"><circle cx="7" cy="7" r="4.75" /><path d="m10.5 10.5 3 3" stroke-linecap="round" /></svg><span class="btn-label">Search</span><kbd id="palette-kbd">⌘K</kbd></button>
+        <button class="btn ghost theme-btn" type="button" id="theme-toggle" aria-label="Theme: system. Activate to change"><svg viewBox="0 0 16 16" width="16" height="16" aria-hidden="true" focusable="false"><circle cx="8" cy="8" r="5.25" fill="none" stroke="currentColor" stroke-width="1.5" /><path d="M8 2.75a5.25 5.25 0 0 1 0 10.5z" fill="currentColor" /></svg><span class="btn-label" id="theme-name">system</span></button>
+        <div class="user-menu">
+          <button class="avatar" type="button" id="user-avatar" aria-haspopup="true" aria-expanded="false" aria-controls="user-dropdown" aria-label="Account"><span id="avatar-initials" aria-hidden="true">?</span></button>
+          <div class="menu" id="user-dropdown" hidden>
+            <p class="menu-user" id="dropdown-username">Signed in</p>
+            <button class="menu-item" type="button" id="open-notifications">Notification settings</button>
+            <button class="menu-item" type="button" id="sound-toggle" aria-pressed="false">Sound on completion</button>
+            <a class="menu-item" href="/auth/logout">Sign out</a>
           </div>
         </div>
       </div>
     </header>
 
-    <!-- Tab Navigation -->
-    <nav class="tab-bar" id="tab-bar">
-      <div class="tab-bar-inner">
-        <button class="tab-btn active" data-tab="overview">Overview</button>
-        <button class="tab-btn" data-tab="agents">Agents</button>
-        <button class="tab-btn" data-tab="pipelines">Pipelines</button>
-        <button class="tab-btn" data-tab="timeline">Timeline</button>
-        <button class="tab-btn" data-tab="activity">Activity</button>
-        <button class="tab-btn" data-tab="metrics">Metrics</button>
-        <button class="tab-btn" data-tab="machines">Machines</button>
-        <button class="tab-btn" data-tab="insights">Insights</button>
-        <button class="tab-btn" data-tab="team">Team</button>
-        <button class="tab-btn" data-tab="fleet-map">Map</button>
-        <button class="tab-btn" data-tab="pipeline-theater">Theater</button>
-        <button class="tab-btn" data-tab="agent-cockpit">Cockpit</button>
-        <button class="tab-btn" data-tab="shipyard">Shipyard</button>
-        <div class="tab-indicator" id="tab-indicator"></div>
-      </div>
-    </nav>
+    <div class="alert-banner" id="alert-banner" role="region" aria-label="Fleet alert" hidden></div>
+    <div class="brake-state" id="brake-state" role="status" hidden></div>
+    <div class="brake-alert" id="brake-alert" role="alert" hidden></div>
 
-    <!-- Alert Banner -->
-    <div class="alert-banner" id="alert-banner" style="display: none">
-      <div class="alert-banner-inner">
-        <span class="alert-icon" id="alert-icon"></span>
-        <span class="alert-message" id="alert-message"></span>
-        <div class="alert-actions" id="alert-actions"></div>
-        <button class="alert-dismiss" id="alert-dismiss" aria-label="Dismiss">
-          &times;
-        </button>
+    <main class="main" id="main" tabindex="-1">
+      <h1 class="sr-only">Shipwright Fleet Command</h1>
+      <div class="stale-data-banner" id="stale-data-banner" role="status" data-hidden>
+        <span class="glyph" aria-hidden="true">▲</span>
+        <span>Stale: data last updated <span id="stale-data-age">?</span> ago. Counts on this page may be out of date; the emergency brake still works and reports what it paused.</span>
       </div>
-    </div>
 
-    <!-- Main Content -->
-    <main class="main" id="main-content">
-      <!-- Stale Data Banner -->
-      <div
-        class="stale-data-banner"
-        id="stale-data-banner"
-        style="display: none"
-      >
-        <span class="stale-icon">\u23F1</span>
-        Data last updated <span id="stale-data-age">?</span> ago
-      </div>
-      <!-- ═══ OVERVIEW TAB ═══ -->
-      <div class="tab-panel active" id="panel-overview">
+      <section class="dest" id="dest-triage" data-route="triage" role="tabpanel" aria-labelledby="tab-triage">
+        <div class="dest-head">
+          <h2>Triage</h2>
+          <p class="dest-meta">Cost today <strong class="num" id="cost-24h">–</strong> <span class="num" id="cost-budget"></span></p>
+        </div>
+        <div class="view-section" id="panel-overview">
         <!-- Stats Row -->
         <section class="stats-row" id="stats-row">
           <div class="stat-card">
-            <span class="stat-label">STATUS</span>
+            <span class="stat-label">Status</span>
             <div class="stat-value-row">
-              <span class="pulse-dot offline" id="status-dot"></span>
-              <span class="stat-value" id="stat-status">OFFLINE</span>
+              <span class="pulse-dot" id="status-dot"></span>
+              <span class="stat-value" id="stat-status">Not reported</span>
             </div>
           </div>
           <div class="stat-card">
-            <span class="stat-label">ACTIVE</span>
+            <span class="stat-label">Active</span>
             <div class="stat-value gradient-text" id="stat-active">0 / 0</div>
             <div class="stat-bar-track">
               <div class="stat-bar-fill" id="stat-active-bar"></div>
             </div>
           </div>
           <div class="stat-card">
-            <span class="stat-label">QUEUE</span>
+            <span class="stat-label">Queue</span>
             <div class="stat-value" id="stat-queue">0</div>
             <div class="stat-subtitle" id="stat-queue-sub">issues waiting</div>
           </div>
           <div class="stat-card">
-            <span class="stat-label">COMPLETED</span>
+            <span class="stat-label">Completed</span>
             <div class="stat-value gradient-text" id="stat-completed">0</div>
             <div class="stat-subtitle" id="stat-failed-sub">0 failed</div>
           </div>
@@ -168,37 +105,30 @@
         <!-- Daemon Control Bar -->
         <div class="daemon-control-bar" id="daemon-control-bar">
           <div class="daemon-control-status">
-            <span class="daemon-status-badge" id="daemon-status-badge"
-              >Unknown</span
-            >
-            <span class="daemon-status-label">Daemon</span>
+            <span class="pill" data-tone="neutral" id="daemon-status-badge"><span class="glyph" aria-hidden="true">?</span><span>Daemon: not reported</span></span>
           </div>
           <div class="daemon-control-actions">
             <button
               class="btn btn-sm btn-start"
               id="daemon-btn-start"
-              title="Start daemon"
             >
               Start
             </button>
             <button
               class="btn btn-sm btn-stop"
               id="daemon-btn-stop"
-              title="Stop daemon"
             >
               Stop
             </button>
             <button
               class="btn btn-sm btn-pause"
               id="daemon-btn-pause"
-              title="Pause/Resume daemon"
             >
-              Pause
+              Pause intake
             </button>
             <button
               class="btn btn-sm btn-patrol"
               id="daemon-btn-patrol"
-              title="Run patrol now"
             >
               Run Patrol
             </button>
@@ -226,7 +156,7 @@
 
         <!-- Active Pipelines -->
         <section class="section">
-          <h2 class="section-label">ACTIVE PIPELINES</h2>
+          <h3 class="section-label">Active runs</h3>
           <div id="active-pipelines">
             <div class="empty-state">
               <svg
@@ -240,14 +170,14 @@
               >
                 <path d="M12 6v6l4 2M12 2a10 10 0 100 20 10 10 0 000-20z" />
               </svg>
-              <p>No active pipelines</p>
+              <p>No active runs</p>
             </div>
           </div>
         </section>
 
         <!-- Queue Section -->
         <section class="section">
-          <h2 class="section-label">AWAITING DEPLOYMENT</h2>
+          <h3 class="section-label">Awaiting deployment</h3>
           <div id="queue-list">
             <div class="empty-state"><p>Queue clear</p></div>
           </div>
@@ -257,7 +187,7 @@
         <div class="bottom-grid">
           <!-- Activity Feed (compact, recent 10) -->
           <section class="section">
-            <h2 class="section-label">ACTIVITY</h2>
+            <h3 class="section-label">Activity</h3>
             <div class="activity-feed" id="activity-feed">
               <div class="empty-state"><p>Awaiting events...</p></div>
             </div>
@@ -265,7 +195,7 @@
 
           <!-- Resource Scaling -->
           <section class="section">
-            <h2 class="section-label">RESOURCE SCALING</h2>
+            <h3 class="section-label">Resource scaling</h3>
             <div class="resources-panel" id="resources-panel">
               <div class="resource-row">
                 <span class="resource-label">CPU</span>
@@ -296,21 +226,16 @@
         </div>
 
         <!-- Machines (only shown if registered) -->
-        <section class="section" id="machines-section" style="display: none">
-          <h2 class="section-label">MACHINES</h2>
+        <section class="section" id="machines-section" data-hidden>
+          <h3 class="section-label">Machines</h3>
           <div class="machines-grid" id="machines-grid"></div>
         </section>
-      </div>
-
-      <!-- ═══ AGENTS TAB ═══ -->
-      <div class="tab-panel" id="panel-agents">
-        <div class="agents-grid" id="agents-grid">
-          <div class="empty-state"><p>No active agents</p></div>
         </div>
-      </div>
+      </section>
 
-      <!-- ═══ PIPELINES TAB ═══ -->
-      <div class="tab-panel" id="panel-pipelines">
+      <section class="dest" id="dest-runs" data-route="runs" role="tabpanel" aria-labelledby="tab-runs" hidden>
+        <div class="dest-head"><h2>Runs</h2><p class="dest-meta">Every run the daemon knows about. Select a row for its detail.</p></div>
+        <div class="view-section" id="panel-pipelines">
         <!-- Filter bar -->
         <div class="filter-bar" id="pipeline-filters">
           <button class="filter-chip active" data-filter="all">All</button>
@@ -319,7 +244,7 @@
           <button class="filter-chip" data-filter="failed">Failed</button>
         </div>
 
-        <div class="bulk-actions" id="bulk-actions" style="display: none">
+        <div class="bulk-actions" id="bulk-actions" data-hidden>
           <span class="bulk-count" id="bulk-count">0 selected</span>
           <button class="bulk-btn" id="bulk-pause">Pause Selected</button>
           <button class="bulk-btn" id="bulk-resume">Resume Selected</button>
@@ -360,7 +285,7 @@
         <div class="pipeline-detail-panel" id="pipeline-detail-panel">
           <div class="detail-panel-header">
             <h3 class="detail-panel-title" id="detail-panel-title">
-              Pipeline Detail
+              Run detail
             </h3>
             <button
               class="detail-panel-close"
@@ -374,10 +299,10 @@
             <!-- Populated dynamically -->
           </div>
         </div>
-      </div>
-
-      <!-- ═══ TIMELINE TAB ═══ -->
-      <div class="tab-panel" id="panel-timeline">
+        </div>
+        <section class="view-section" aria-labelledby="h-timeline">
+          <h3 class="sub-head" id="h-timeline">Timeline</h3>
+          <div id="panel-timeline">
         <div class="timeline-controls">
           <select class="timeline-range-select" id="timeline-range">
             <option value="6">Last 6 hours</option>
@@ -389,10 +314,50 @@
         <div class="gantt-chart" id="gantt-chart">
           <div class="empty-state"><p>No timeline data</p></div>
         </div>
-      </div>
+          </div>
+        </section>
+      </section>
 
-      <!-- ═══ ACTIVITY TAB ═══ -->
-      <div class="tab-panel" id="panel-activity">
+      <section class="dest" id="dest-agents" data-route="agents" role="tabpanel" aria-labelledby="tab-agents" hidden>
+        <div class="dest-head"><h2>Agents</h2><p class="dest-meta">Live agent sessions, and the machines in the fleet.</p></div>
+        <div class="view-section" id="panel-agents">
+        <div class="agents-grid" id="agents-grid">
+          <div class="empty-state"><p>No active agents</p></div>
+        </div>
+        </div>
+        <section class="view-section" aria-labelledby="h-fleet">
+          <h3 class="sub-head" id="h-fleet">Fleet</h3>
+          <div id="panel-machines">
+        <!-- Summary row -->
+        <div class="machines-summary" id="machines-summary"></div>
+
+        <!-- Action bar -->
+        <div class="machines-actions">
+          <button class="btn-primary" id="btn-add-machine">
+            + Add Machine
+          </button>
+          <button class="btn-secondary" id="btn-join-link">
+            Generate Join Link
+          </button>
+        </div>
+
+        <!-- Machine cards grid -->
+        <div class="machines-grid" id="machines-tab-grid">
+          <div class="empty-state"><p>No machines registered</p></div>
+        </div>
+
+        <!-- Active join tokens -->
+        <section class="section" id="join-tokens-section" data-hidden>
+          <h3 class="section-label">Active join links</h3>
+          <div id="join-tokens-list"></div>
+        </section>
+          </div>
+        </section>
+      </section>
+
+      <section class="dest" id="dest-safety" data-route="safety" role="tabpanel" aria-labelledby="tab-safety" hidden>
+        <div class="dest-head"><h2>Safety</h2><p class="dest-meta">Audit log of daemon, run and intervention events. The emergency brake is in the header on every page.</p></div>
+        <div class="view-section" id="panel-activity">
         <!-- Filter chips -->
         <div class="filter-bar" id="activity-filters">
           <button class="filter-chip active" data-filter="all">All</button>
@@ -420,38 +385,39 @@
         <!-- Load more button -->
         <div
           class="load-more-wrap"
-          id="activity-load-more"
-          style="display: none"
+          id="activity-load-more" data-hidden
         >
           <button class="load-more-btn" id="load-more-btn">Load more</button>
         </div>
-      </div>
+        </div>
+      </section>
 
-      <!-- ═══ METRICS TAB ═══ -->
-      <div class="tab-panel" id="panel-metrics">
+      <section class="dest" id="dest-cost" data-route="cost" role="tabpanel" aria-labelledby="tab-cost" hidden>
+        <div class="dest-head"><h2>Cost and DORA</h2><p class="dest-meta">Spend, throughput, stage performance and delivery metrics.</p></div>
+        <div class="view-section" id="panel-metrics">
         <div class="metrics-grid" id="metrics-grid">
           <!-- Top row: big numbers -->
           <div class="metrics-top-row">
             <div class="metric-card metric-card-lg">
-              <span class="metric-label">SUCCESS RATE</span>
+              <span class="metric-label">Success rate</span>
               <div id="metric-donut-wrap" class="donut-wrap">
-                <div class="donut" id="metric-donut" style="--pct: 0%">
+                <div class="donut" id="metric-donut">
                   <span class="donut-value" id="metric-success-rate">—</span>
                 </div>
               </div>
             </div>
             <div class="metric-card metric-card-lg">
-              <span class="metric-label">AVG DURATION</span>
+              <span class="metric-label">Avg duration</span>
               <div class="metric-big-value" id="metric-avg-duration">—</div>
               <span class="metric-sub">per pipeline</span>
             </div>
             <div class="metric-card metric-card-lg">
-              <span class="metric-label">THROUGHPUT</span>
+              <span class="metric-label">Throughput</span>
               <div class="metric-big-value" id="metric-throughput">—</div>
               <span class="metric-sub">issues / hour</span>
             </div>
             <div class="metric-card metric-card-lg">
-              <span class="metric-label">TOTAL</span>
+              <span class="metric-label">Total</span>
               <div
                 class="metric-big-value gradient-text"
                 id="metric-total-completed"
@@ -464,7 +430,7 @@
 
           <!-- Stage duration breakdown -->
           <div class="metric-card metric-card-wide">
-            <span class="metric-label">STAGE DURATION BREAKDOWN</span>
+            <span class="metric-label">Stage duration breakdown</span>
             <div class="stage-breakdown" id="stage-breakdown">
               <div class="empty-state"><p>No data</p></div>
             </div>
@@ -472,7 +438,7 @@
 
           <!-- Daily activity chart -->
           <div class="metric-card metric-card-wide">
-            <span class="metric-label">DAILY ACTIVITY</span>
+            <span class="metric-label">Daily activity</span>
             <div class="daily-chart-wrap" id="daily-chart">
               <div class="empty-state"><p>No data</p></div>
             </div>
@@ -481,10 +447,9 @@
           <!-- DORA Grades -->
           <div
             class="metric-card metric-card-wide"
-            id="dora-grades-container"
-            style="display: none"
+            id="dora-grades-container" data-hidden
           >
-            <span class="metric-label">DORA GRADES</span>
+            <span class="metric-label">DORA grades</span>
           </div>
 
           <!-- Bottleneck alerts -->
@@ -535,41 +500,14 @@
             id="capacity-forecast-container"
           ></div>
         </div>
-      </div>
-
-      <!-- ═══ MACHINES TAB ═══ -->
-      <div class="tab-panel" id="panel-machines">
-        <!-- Summary row -->
-        <div class="machines-summary" id="machines-summary"></div>
-
-        <!-- Action bar -->
-        <div class="machines-actions">
-          <button class="btn-primary" id="btn-add-machine">
-            + Add Machine
-          </button>
-          <button class="btn-secondary" id="btn-join-link">
-            Generate Join Link
-          </button>
         </div>
-
-        <!-- Machine cards grid -->
-        <div class="machines-grid" id="machines-tab-grid">
-          <div class="empty-state"><p>No machines registered</p></div>
-        </div>
-
-        <!-- Active join tokens -->
-        <section class="section" id="join-tokens-section" style="display: none">
-          <h2 class="section-label">ACTIVE JOIN LINKS</h2>
-          <div id="join-tokens-list"></div>
-        </section>
-      </div>
-
-      <!-- ═══ INSIGHTS TAB ═══ -->
-      <div class="tab-panel" id="panel-insights">
+        <section class="view-section" aria-labelledby="h-insights">
+          <h3 class="sub-head" id="h-insights">Insights</h3>
+          <div id="panel-insights">
         <div class="insights-grid">
           <!-- Failure Patterns -->
           <section class="section">
-            <h2 class="section-label">FAILURE PATTERNS</h2>
+            <h3 class="section-label">Failure patterns</h3>
             <div id="failure-patterns">
               <div class="empty-state"><p>Loading patterns...</p></div>
             </div>
@@ -577,7 +515,7 @@
 
           <!-- Patrol Findings -->
           <section class="section">
-            <h2 class="section-label">PATROL FINDINGS</h2>
+            <h3 class="section-label">Patrol findings</h3>
             <div id="patrol-findings">
               <div class="empty-state"><p>No patrol data</p></div>
             </div>
@@ -585,7 +523,7 @@
 
           <!-- Decision Log -->
           <section class="section">
-            <h2 class="section-label">DECISION LOG</h2>
+            <h3 class="section-label">Decision log</h3>
             <div id="decision-log">
               <div class="empty-state"><p>No decisions recorded</p></div>
             </div>
@@ -593,52 +531,53 @@
 
           <!-- Failure Heatmap -->
           <section class="section">
-            <h2 class="section-label">FAILURE HEATMAP</h2>
+            <h3 class="section-label">Failure heatmap</h3>
             <div id="failure-heatmap">
               <div class="empty-state"><p>No data</p></div>
             </div>
           </section>
         </div>
-      </div>
+          </div>
+        </section>
+      </section>
 
-      <!-- ═══ TEAM TAB ═══ -->
-      <div class="tab-panel" id="panel-team">
+      <section class="dest" id="dest-settings" data-route="settings" role="tabpanel" aria-labelledby="tab-settings" hidden>
+        <div class="dest-head"><h2>Settings</h2><p class="dest-meta">Team, invites, integrations and machine claims. Notification settings are in the account menu.</p></div>
+        <div class="view-section" id="panel-team">
         <!-- Team Stats Bar -->
         <section class="team-stats-bar" id="team-stats-bar">
           <div class="team-stat">
-            <span class="team-stat-label">DEVELOPERS ONLINE</span>
+            <span class="team-stat-label">Developers online</span>
             <div class="team-stat-value gradient-text" id="team-stat-online">
               0
             </div>
           </div>
           <div class="team-stat">
-            <span class="team-stat-label">ACTIVE PIPELINES</span>
+            <span class="team-stat-label">Active pipelines</span>
             <div class="team-stat-value" id="team-stat-pipelines">0</div>
           </div>
           <div class="team-stat">
-            <span class="team-stat-label">TOTAL QUEUED</span>
+            <span class="team-stat-label">Total queued</span>
             <div class="team-stat-value" id="team-stat-queued">0</div>
           </div>
         </section>
 
         <!-- Team Actions -->
         <div
-          class="team-actions"
-          style="margin: 1rem 0; display: flex; gap: 0.5rem"
+          class="team-actions row-actions"
         >
           <button class="btn-primary" id="btn-create-invite">
             Create Invite Link
           </button>
         </div>
         <div
-          id="team-invite-result"
-          style="display: none"
+          id="team-invite-result" data-hidden
           class="invite-result"
         ></div>
 
         <!-- Developer Cards -->
         <section class="section-header">
-          <h2 class="section-label">CONNECTED DEVELOPERS</h2>
+          <h3 class="section-label">Connected developers</h3>
         </section>
         <div class="team-grid" id="team-grid">
           <div class="empty-state">
@@ -648,29 +587,28 @@
         </div>
 
         <!-- Team Activity Feed -->
-        <section class="section-header" style="margin-top: 2rem">
-          <h2 class="section-label">TEAM ACTIVITY</h2>
+        <section class="section-header mt-6">
+          <h3 class="section-label">Team activity</h3>
         </section>
         <div class="team-activity" id="team-activity">
           <div class="empty-state">No team activity yet.</div>
         </div>
 
         <!-- Integrations Status -->
-        <section class="section-header" style="margin-top: 2rem">
-          <h2 class="section-label">INTEGRATIONS</h2>
+        <section class="section-header mt-6">
+          <h3 class="section-label">Integrations</h3>
         </section>
         <div id="integrations-status" class="integrations-panel">
           <div class="empty-state"><p>Loading...</p></div>
         </div>
 
         <!-- Admin/Debug Panel (admin only) -->
-        <section class="section-header" style="margin-top: 2rem">
-          <h2 class="section-label">ADMIN / DEBUG</h2>
+        <section class="section-header mt-6">
+          <h3 class="section-label">Admin / debug</h3>
         </section>
         <div id="admin-debug-panel" class="admin-debug-panel">
           <div
-            class="admin-debug-controls"
-            style="display: flex; gap: 0.5rem; margin-bottom: 1rem"
+            class="admin-debug-controls row-actions"
           >
             <button class="btn-secondary btn-sm" id="btn-db-health">
               DB Health
@@ -694,19 +632,18 @@
         </div>
 
         <!-- Machine Claim/Release -->
-        <section class="section-header" style="margin-top: 2rem">
-          <h2 class="section-label">ISSUE CLAIM</h2>
+        <section class="section-header mt-6">
+          <h3 class="section-label">Issue claim</h3>
         </section>
         <div id="claim-panel" class="claim-panel">
-          <div class="form-row" style="gap: 0.5rem; align-items: end">
+          <div class="form-row align-end">
             <div class="form-group">
               <label class="form-label" for="claim-issue">Issue #</label>
               <input
                 type="number"
                 id="claim-issue"
-                class="form-input"
+                class="form-input w-sm"
                 placeholder="123"
-                style="width: 100px"
               />
             </div>
             <div class="form-group">
@@ -714,9 +651,8 @@
               <input
                 type="text"
                 id="claim-machine"
-                class="form-input"
+                class="form-input w-md"
                 placeholder="build-01"
-                style="width: 150px"
               />
             </div>
             <button class="btn-primary btn-sm" id="btn-claim">Claim</button>
@@ -725,312 +661,168 @@
             </button>
           </div>
           <div
-            id="claim-result"
-            style="margin-top: 0.5rem; font-size: 0.85rem"
+            id="claim-result" class="form-note" role="status"
           ></div>
         </div>
-      </div>
+        </div>
+      </section>
+
+      <!-- Retired views: reachable on their old hash until T4 removes them; not in the tab bar. -->
+      <section class="dest legacy" data-route="fleet-map" aria-label="Map (retiring)" hidden>
+        <p class="legacy-note"><span class="pill" data-tone="neutral"><span class="glyph" aria-hidden="true">–</span><span>Retiring</span></span> Map is not in the tab bar any more. Its machine list moves to Agents, Fleet.</p>
+        <div id="panel-fleet-map"></div>
+      </section>
+      <section class="dest legacy" data-route="pipeline-theater" aria-label="Theater (retiring)" hidden>
+        <p class="legacy-note"><span class="pill" data-tone="neutral"><span class="glyph" aria-hidden="true">–</span><span>Retiring</span></span> Theater is not in the tab bar any more. It duplicates run detail, which lives in Runs.</p>
+        <div id="panel-pipeline-theater"></div>
+      </section>
+      <section class="dest legacy" data-route="agent-cockpit" aria-label="Cockpit (retiring)" hidden>
+        <p class="legacy-note"><span class="pill" data-tone="neutral"><span class="glyph" aria-hidden="true">–</span><span>Retiring</span></span> Cockpit is not in the tab bar any more. Per-agent logs move into run detail in Runs.</p>
+        <div id="panel-agent-cockpit"></div>
+      </section>
+      <section class="dest legacy" data-route="shipyard" aria-label="Shipyard (retiring)" hidden>
+        <p class="legacy-note"><span class="pill" data-tone="neutral"><span class="glyph" aria-hidden="true">–</span><span>Retiring</span></span> Shipyard is not in the tab bar any more. It is decorative and is being removed.</p>
+        <div id="panel-shipyard"></div>
+      </section>
     </main>
 
-    <!-- Footer -->
-    <footer class="footer">
-      <span>Shipwright Fleet Command v2.4.0</span>
-      <span>Dashboard refreshes via WebSocket</span>
-    </footer>
+    <dialog class="palette" id="palette" aria-labelledby="palette-label">
+      <h2 class="sr-only" id="palette-label">Command palette</h2>
+      <div class="palette-input-wrap">
+        <svg viewBox="0 0 16 16" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.75" aria-hidden="true" focusable="false"><circle cx="7" cy="7" r="4.75" /><path d="m10.5 10.5 3 3" stroke-linecap="round" /></svg>
+        <input id="palette-input" type="text" role="combobox" aria-expanded="true" aria-controls="palette-list" aria-autocomplete="list" aria-label="Search destinations, runs and actions" placeholder="Go to, open a run, or run an action" autocomplete="off" spellcheck="false" />
+      </div>
+      <ul class="palette-list" id="palette-list" role="listbox" aria-label="Commands"></ul>
+      <div class="palette-foot"><span><kbd>↑</kbd> <kbd>↓</kbd> move</span><span><kbd>Enter</kbd> run</span><span><kbd>Esc</kbd> close</span></div>
+    </dialog>
 
-    <!-- Intervention Modal -->
-    <div class="modal-overlay" id="intervention-modal" style="display: none">
-      <div class="modal-card">
-        <div class="modal-header">
-          <h3 class="modal-title" id="modal-title">Send Message</h3>
-          <button class="modal-close" id="modal-close">&times;</button>
-        </div>
-        <div class="modal-body">
-          <textarea
-            class="modal-textarea"
-            id="modal-message"
-            placeholder="Type a message for the agent..."
-            rows="4"
-          ></textarea>
-        </div>
-        <div class="modal-footer">
-          <button class="modal-btn modal-btn-cancel" id="modal-cancel">
-            Cancel
-          </button>
-          <button class="modal-btn modal-btn-send" id="modal-send">Send</button>
+    <dialog id="shortcuts-modal" aria-labelledby="shortcuts-title">
+      <div class="dialog-head">
+        <h2 id="shortcuts-title">Keyboard shortcuts</h2>
+        <button class="btn ghost sm" type="button" data-close autofocus>Close</button>
+      </div>
+      <dl class="shortcut-list" id="shortcut-list"></dl>
+      <p class="dialog-note">Shortcuts are off while you type in a field. Stopping a run, the daemon or the whole fleet always asks first.</p>
+    </dialog>
+
+    <dialog id="emergency-modal" aria-labelledby="brake-title" aria-describedby="brake-desc">
+      <div class="confirm">
+        <h2 id="brake-title">Engage the emergency brake?</h2>
+        <p id="brake-desc">This pauses daemon intake, so no new runs start, and pauses every process of every running run. Queued work stays in the queue. Release the brake to resume them.</p>
+        <div class="actions">
+          <button class="btn" type="button" data-close autofocus>Cancel</button>
+          <button class="btn danger-solid" type="button" id="emergency-confirm" data-close>Engage brake</button>
         </div>
       </div>
-    </div>
+    </dialog>
 
-    <!-- Emergency Brake Modal -->
-    <div class="modal-overlay" id="emergency-modal" style="display: none">
-      <div class="modal-card">
-        <div class="modal-header">
-          <h3 class="modal-title">Emergency Brake</h3>
-          <button class="modal-close" id="emergency-modal-close">
-            &times;
-          </button>
-        </div>
-        <div class="modal-body">
-          <p class="emergency-warning">
-            This will pause
-            <strong id="emergency-active-count">0</strong> active pipelines and
-            <strong id="emergency-queue-count">0</strong> queued items.
-          </p>
-        </div>
-        <div class="modal-footer">
-          <button class="modal-btn modal-btn-cancel" id="emergency-cancel">
-            Cancel
-          </button>
-          <button class="modal-btn modal-btn-danger" id="emergency-confirm">
-            Pause Everything
-          </button>
-        </div>
+    <dialog id="intervention-modal" aria-labelledby="modal-title">
+      <div class="dialog-head">
+        <h2 id="modal-title">Send a message</h2>
+        <button class="btn ghost sm" type="button" data-close>Close</button>
       </div>
-    </div>
-
-    <!-- Notifications Settings Modal -->
-    <div class="modal-overlay" id="notifications-modal" style="display: none">
-      <div class="modal-card modal-wide">
-        <div class="modal-header">
-          <h3 class="modal-title">Notification Settings</h3>
-          <button class="modal-close" id="notif-modal-close">&times;</button>
-        </div>
-        <div class="modal-body">
-          <p class="text-muted">
-            Configure webhooks to receive alerts when pipelines complete, fail,
-            or trigger alerts.
-          </p>
-          <div class="form-row" style="margin-top: 1rem">
-            <div class="form-group" style="flex: 3">
-              <label class="form-label" for="notif-webhook-url"
-                >Webhook URL</label
-              >
-              <input
-                type="url"
-                id="notif-webhook-url"
-                class="form-input"
-                placeholder="https://hooks.slack.com/services/..."
-              />
-            </div>
-            <div class="form-group" style="flex: 1">
-              <label class="form-label" for="notif-webhook-label">Label</label>
-              <input
-                type="text"
-                id="notif-webhook-label"
-                class="form-input"
-                placeholder="Slack"
-              />
-            </div>
-          </div>
-          <div class="form-row" style="margin-top: 0.5rem">
-            <label class="form-label" style="margin-right: 0.5rem"
-              >Events:</label
-            >
-            <label
-              ><input type="checkbox" id="notif-evt-all" checked /> All</label
-            >
-            <label
-              ><input type="checkbox" id="notif-evt-completed" />
-              Completed</label
-            >
-            <label
-              ><input type="checkbox" id="notif-evt-failed" /> Failed</label
-            >
-            <label><input type="checkbox" id="notif-evt-alert" /> Alerts</label>
-          </div>
-          <button
-            class="btn-primary"
-            id="notif-add-webhook"
-            style="margin-top: 0.75rem"
-          >
-            Add Webhook
-          </button>
-          <div id="notif-webhook-list" style="margin-top: 1rem"></div>
-          <div style="margin-top: 1rem; display: flex; gap: 0.5rem">
-            <button class="btn-secondary" id="notif-test-btn">Send Test</button>
-          </div>
-        </div>
+      <div class="dialog-body">
+        <label class="form-label" for="modal-message">Message for the agent</label>
+        <textarea class="form-input" id="modal-message" rows="4" autofocus></textarea>
       </div>
-    </div>
-
-    <!-- Add Machine Modal -->
-    <div class="modal-overlay" id="add-machine-modal" style="display: none">
-      <div class="modal-card modal-wide">
-        <div class="modal-header">
-          <h3 class="modal-title">Register Machine</h3>
-          <button class="modal-close" id="machine-modal-close">&times;</button>
-        </div>
-        <div class="modal-body">
-          <div class="form-row">
-            <div class="form-group">
-              <label class="form-label" for="machine-name">Name</label>
-              <input
-                type="text"
-                id="machine-name"
-                class="form-input"
-                placeholder="e.g. build-server-1"
-              />
-            </div>
-            <div class="form-group">
-              <label class="form-label" for="machine-host">Host</label>
-              <input
-                type="text"
-                id="machine-host"
-                class="form-input"
-                placeholder="e.g. 10.0.1.5 or localhost"
-              />
-            </div>
-          </div>
-          <div class="form-row">
-            <div class="form-group">
-              <label class="form-label" for="machine-ssh-user">SSH User</label>
-              <input
-                type="text"
-                id="machine-ssh-user"
-                class="form-input"
-                placeholder="optional"
-              />
-            </div>
-            <div class="form-group">
-              <label class="form-label" for="machine-path"
-                >Shipwright Path</label
-              >
-              <input
-                type="text"
-                id="machine-path"
-                class="form-input"
-                placeholder="/opt/shipwright"
-              />
-            </div>
-          </div>
-          <div class="form-row">
-            <div class="form-group">
-              <label class="form-label" for="machine-workers"
-                >Max Workers</label
-              >
-              <input
-                type="number"
-                id="machine-workers"
-                class="form-input"
-                value="4"
-                min="1"
-                max="64"
-              />
-            </div>
-            <div class="form-group">
-              <label class="form-label" for="machine-role">Role</label>
-              <select id="machine-role" class="form-input">
-                <option value="worker">Worker</option>
-                <option value="primary">Primary</option>
-              </select>
-            </div>
-          </div>
-          <div
-            id="machine-modal-error"
-            class="form-error"
-            style="display: none"
-          ></div>
-        </div>
-        <div class="modal-footer">
-          <button class="modal-btn modal-btn-cancel" id="machine-modal-cancel">
-            Cancel
-          </button>
-          <button class="modal-btn modal-btn-send" id="machine-modal-submit">
-            Register
-          </button>
-        </div>
+      <div class="dialog-foot">
+        <button class="btn" type="button" data-close>Cancel</button>
+        <button class="btn primary" type="button" id="modal-send">Send</button>
       </div>
-    </div>
+    </dialog>
 
-    <!-- Join Link Modal -->
-    <div class="modal-overlay" id="join-link-modal" style="display: none">
-      <div class="modal-card">
-        <div class="modal-header">
-          <h3 class="modal-title">Generate Join Link</h3>
-          <button class="modal-close" id="join-modal-close">&times;</button>
-        </div>
-        <div class="modal-body">
-          <div class="form-group">
-            <label class="form-label" for="join-label">Label (optional)</label>
-            <input
-              type="text"
-              id="join-label"
-              class="form-input"
-              placeholder="e.g. Seth's laptop"
-            />
+    <dialog class="wide" id="notifications-modal" aria-labelledby="notif-title">
+      <div class="dialog-head">
+        <h2 id="notif-title">Notification settings</h2>
+        <button class="btn ghost sm" type="button" data-close>Close</button>
+      </div>
+      <div class="dialog-body">
+        <p class="dialog-note">Webhooks receive a POST when pipelines complete or fail, or when an alert fires.</p>
+        <div class="form-row">
+          <div class="form-group grow-3">
+            <label class="form-label" for="notif-webhook-url">Webhook URL</label>
+            <input type="url" id="notif-webhook-url" class="form-input" placeholder="https://hooks.example.com/…" autofocus />
           </div>
           <div class="form-group">
-            <label class="form-label" for="join-workers">Max Workers</label>
-            <input
-              type="number"
-              id="join-workers"
-              class="form-input"
-              value="4"
-              min="1"
-              max="64"
-            />
-          </div>
-          <div id="join-command-display" style="display: none">
-            <label class="form-label">Join token (shown once; the command asks for it):</label>
-            <div class="join-command"><code id="join-token-text"></code></div>
-            <label class="form-label">Run this command on the machine:</label>
-            <div class="join-command">
-              <code id="join-command-text"></code>
-              <button
-                class="join-copy-btn"
-                id="join-copy-btn"
-                title="Copy to clipboard"
-              >
-                Copy
-              </button>
-            </div>
+            <label class="form-label" for="notif-webhook-label">Label</label>
+            <input type="text" id="notif-webhook-label" class="form-input" placeholder="Team channel" />
           </div>
         </div>
-        <div class="modal-footer">
-          <button class="modal-btn modal-btn-cancel" id="join-modal-cancel">
-            Cancel
-          </button>
-          <button class="modal-btn modal-btn-send" id="join-modal-generate">
-            Generate
-          </button>
+        <fieldset class="form-row checks">
+          <legend class="form-label">Events</legend>
+          <label><input type="checkbox" id="notif-evt-all" checked /> All</label>
+          <label><input type="checkbox" id="notif-evt-completed" /> Completed</label>
+          <label><input type="checkbox" id="notif-evt-failed" /> Failed</label>
+          <label><input type="checkbox" id="notif-evt-alert" /> Alerts</label>
+        </fieldset>
+        <div class="row-actions">
+          <button class="btn primary" type="button" id="notif-add-webhook">Add webhook</button>
+          <button class="btn" type="button" id="notif-test-btn">Send test</button>
+        </div>
+        <div id="notif-webhook-list" class="webhook-list"></div>
+      </div>
+    </dialog>
+
+    <dialog class="wide" id="add-machine-modal" aria-labelledby="machine-title">
+      <div class="dialog-head">
+        <h2 id="machine-title">Register a machine</h2>
+        <button class="btn ghost sm" type="button" data-close>Close</button>
+      </div>
+      <div class="dialog-body">
+        <div class="form-row">
+          <div class="form-group"><label class="form-label" for="machine-name">Name</label><input type="text" id="machine-name" class="form-input" placeholder="build-server-1" autofocus /></div>
+          <div class="form-group"><label class="form-label" for="machine-host">Host</label><input type="text" id="machine-host" class="form-input" placeholder="10.0.1.5 or localhost" /></div>
+        </div>
+        <div class="form-row">
+          <div class="form-group"><label class="form-label" for="machine-ssh-user">SSH user</label><input type="text" id="machine-ssh-user" class="form-input" placeholder="optional" /></div>
+          <div class="form-group"><label class="form-label" for="machine-path">Shipwright path</label><input type="text" id="machine-path" class="form-input" placeholder="/opt/shipwright" /></div>
+        </div>
+        <div class="form-row">
+          <div class="form-group"><label class="form-label" for="machine-workers">Max workers</label><input type="number" id="machine-workers" class="form-input" value="4" min="1" max="64" /></div>
+          <div class="form-group"><label class="form-label" for="machine-role">Role</label><select id="machine-role" class="form-input"><option value="worker">Worker</option><option value="primary">Primary</option></select></div>
+        </div>
+        <p id="machine-modal-error" class="form-error" role="alert" data-hidden></p>
+      </div>
+      <div class="dialog-foot">
+        <button class="btn" type="button" data-close>Cancel</button>
+        <button class="btn primary" type="button" id="machine-modal-submit">Register</button>
+      </div>
+    </dialog>
+
+    <dialog id="join-link-modal" aria-labelledby="join-title">
+      <div class="dialog-head">
+        <h2 id="join-title">Generate a join link</h2>
+        <button class="btn ghost sm" type="button" data-close>Close</button>
+      </div>
+      <div class="dialog-body">
+        <div class="form-group"><label class="form-label" for="join-label">Label (optional)</label><input type="text" id="join-label" class="form-input" placeholder="build laptop" autofocus /></div>
+        <div class="form-group"><label class="form-label" for="join-workers">Max workers</label><input type="number" id="join-workers" class="form-input" value="4" min="1" max="64" /></div>
+        <div id="join-command-display" data-hidden>
+          <p class="form-label">Join token (shown once; the command asks for it):</p>
+          <div class="join-command"><code id="join-token-text"></code></div>
+          <p class="form-label">Run this command on the machine:</p>
+          <div class="join-command"><code id="join-command-text"></code><button class="btn sm" type="button" id="join-copy-btn">Copy</button></div>
         </div>
       </div>
-    </div>
+      <div class="dialog-foot">
+        <button class="btn" type="button" data-close>Cancel</button>
+        <button class="btn primary" type="button" id="join-modal-generate">Generate</button>
+      </div>
+    </dialog>
 
-    <!-- Remove Machine Modal -->
-    <div class="modal-overlay" id="remove-machine-modal" style="display: none">
-      <div class="modal-card">
-        <div class="modal-header">
-          <h3 class="modal-title">Remove Machine</h3>
-          <button class="modal-close" id="remove-modal-close">&times;</button>
-        </div>
-        <div class="modal-body">
-          <p class="emergency-warning">
-            Remove <strong id="remove-machine-name"></strong> from the fleet?
-          </p>
-          <label class="form-checkbox-label">
-            <input type="checkbox" id="remove-stop-daemon" />
-            Also stop daemon on this machine
-          </label>
-        </div>
-        <div class="modal-footer">
-          <button class="modal-btn modal-btn-cancel" id="remove-modal-cancel">
-            Cancel
-          </button>
-          <button class="modal-btn modal-btn-danger" id="remove-modal-confirm">
-            Remove
-          </button>
+    <dialog id="remove-machine-modal" aria-labelledby="remove-title" aria-describedby="remove-desc">
+      <div class="confirm">
+        <h2 id="remove-title">Remove this machine?</h2>
+        <p id="remove-desc"><strong id="remove-machine-name"></strong> leaves the fleet. It is removed from the fleet registry.</p>
+        <div class="actions">
+          <button class="btn" type="button" data-close autofocus>Cancel</button>
+          <button class="btn danger-solid" type="button" id="remove-modal-confirm">Remove machine</button>
         </div>
       </div>
-    </div>
+    </dialog>
 
-    <!-- New visualization tab panels -->
-    <div class="tab-panel" id="panel-fleet-map"></div>
-    <div class="tab-panel" id="panel-pipeline-theater"></div>
-    <div class="tab-panel" id="panel-agent-cockpit"></div>
-    <div class="tab-panel" id="panel-shipyard"></div>
+    <div class="toast" id="toast" role="status" hidden></div>
 
-    <script src="dist/main.js"></script>
+    <script src="dist/main.js" defer></script>
   </body>
 </html>

@@ -12,6 +12,7 @@
 //   SW_DASHBOARD_ORIGINS): DNS rebinding gets 421. WebSocket upgrades from a foreign Origin get 403.
 
 import { createHash, timingSafeEqual } from "node:crypto";
+import { mutableResponse } from "./security-headers";
 
 export interface GuardConfig {
   /** Shared fleet token (SHIPWRIGHT_FLEET_TOKEN). Empty when none is configured. */
@@ -275,7 +276,7 @@ export function withCors(
 ): Response | undefined {
   const origin = req.headers.get("origin");
   if (!res || origin === null || !cfg.allowedOrigins.includes(origin)) return res;
-  const out = new Response(res.body, res);
+  const out = mutableResponse(res);
   out.headers.set("Access-Control-Allow-Origin", origin);
   out.headers.append("Vary", "Origin");
   return out;
