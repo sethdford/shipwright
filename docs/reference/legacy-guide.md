@@ -783,7 +783,7 @@ Most commands are bash. The dashboard server and the commands routed through `ru
 | `scripts/sw-dashboard-test.sh` | 251 | validates dashboard structure |
 | `scripts/sw-db-test.sh` | 978 | SQLite Persistence Layer Test Suite |
 | `scripts/sw-decide-test.sh` | 522 | Unit tests for the Autonomous Decision Engine |
-| `scripts/sw-decompose-test.sh` | 222 | Intelligent Issue Decomposition tests |
+| `scripts/sw-decompose-test.sh` | 223 | Intelligent Issue Decomposition tests |
 | `scripts/sw-deps-test.sh` | 166 | Automated Dependency Update Management tests |
 | `scripts/sw-developer-simulation-test.sh` | 263 | Validate multi-persona |
 | `scripts/sw-discovery-test.sh` | 269 | Cross-Pipeline Real-Time Learning tests |
