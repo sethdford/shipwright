@@ -11,7 +11,7 @@ _SCOPE_ENFORCEMENT_LOADED=1
 SCRIPT_DIR="${SCRIPT_DIR:-$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)}"
 source "${SCRIPT_DIR}/lib/helpers.sh"
 
-VERSION="3.3.0"
+VERSION="4.0.0"
 
 # ─── Extract planned files from plan.md "Files to Modify" section ─────────
 # Handles multiple markdown formats: bullet lists, numbered lists, tables, code blocks

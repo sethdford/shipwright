@@ -25,7 +25,7 @@ describe("hello", () => {
   test.each([["--version"], ["-v"]])("%s prints the version", async (flag) => {
     const io = capture();
     expect(await helloCommand.run([flag], commandContext(io))).toBe(0);
-    expect(io.out_).toEqual(["3.3.0"]);
+    expect(io.out_).toEqual(["4.0.0"]);
   });
 
   test("unknown option errors to stderr, prints usage, exits 1", async () => {

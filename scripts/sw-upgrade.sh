@@ -3,7 +3,7 @@
 # ║  sw upgrade — Detect and apply updates from the repo                   ║
 # ╚═══════════════════════════════════════════════════════════════════════════╝
 # shellcheck disable=SC2034
-VERSION="3.3.0"
+VERSION="4.0.0"
 set -euo pipefail
 trap 'echo "ERROR: $BASH_SOURCE:$LINENO exited with status $?" >&2' ERR
 
@@ -279,7 +279,7 @@ bootstrap_manifest() {
 
 # ─── Main logic ────────────────────────────────────────────────────────────
 echo ""
-echo -e "${CYAN}${BOLD}shipwright${RESET} ${DIM}v1.3.0${RESET} — ${BOLD}$(if $APPLY; then echo "Applying Upgrade"; else echo "Upgrade Check"; fi)${RESET}"
+echo -e "${CYAN}${BOLD}shipwright${RESET} ${DIM}v${VERSION}${RESET} — ${BOLD}$(if $APPLY; then echo "Applying Upgrade"; else echo "Upgrade Check"; fi)${RESET}"
 echo -e "${CYAN}═══════════════════════════════════════════════${RESET}"
 echo ""
 echo -e "Comparing installed files against repo at:"

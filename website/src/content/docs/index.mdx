@@ -7,7 +7,7 @@ hero:
   tagline: Label a GitHub issue. Walk away. Shipwright triages with AI, composes an intelligent pipeline, builds with self-healing agents, and creates a PR — learning from every outcome.
   actions:
     - text: Get Started
-      link: /quick-start/
+      link: /shipwright/quick-start/
       icon: right-arrow
       variant: primary
     - text: View on GitHub
@@ -70,7 +70,7 @@ import { Card, CardGrid, Tabs, TabItem } from "@astrojs/starlight/components";
 
 <div class="stats-grid">
   <div class="stat">
-    <div class="stat-number">12</div>
+    <div class="stat-number">15</div>
     <div class="stat-label">Pipeline Stages</div>
   </div>
   <div class="stat">
@@ -78,20 +78,20 @@ import { Card, CardGrid, Tabs, TabItem } from "@astrojs/starlight/components";
     <div class="stat-label">Intelligence Modules</div>
   </div>
   <div class="stat">
-    <div class="stat-number">24</div>
+    <div class="stat-number">25</div>
     <div class="stat-label">Team Templates</div>
   </div>
   <div class="stat">
-    <div class="stat-number">8</div>
-    <div class="stat-label">Pipeline Configurations</div>
+    <div class="stat-number">9</div>
+    <div class="stat-label">Pipeline Templates</div>
   </div>
   <div class="stat">
-    <div class="stat-number">278</div>
-    <div class="stat-label">Tests Passing</div>
+    <div class="stat-number">174</div>
+    <div class="stat-label">Shell Test Suites</div>
   </div>
   <div class="stat">
-    <div class="stat-number">38k+</div>
-    <div class="stat-label">Lines of Bash</div>
+    <div class="stat-number">~117K</div>
+    <div class="stat-label">Lines of Non-Test Bash</div>
   </div>
 </div>
 
@@ -102,8 +102,10 @@ import { Card, CardGrid, Tabs, TabItem } from "@astrojs/starlight/components";
 Every stage can be enabled, disabled, or gated. The intelligence layer composes the optimal combination for each issue.
 
 ```
-intake → plan → design → build → test → review → compound_quality → pr → merge → deploy → validate → monitor
+intake → spec_generation → plan → design → build → test → review → spec_verification → compound_quality → audit → pr → merge → deploy → validate → monitor
 ```
+
+The full template runs all 15 stages. Stages can be disabled per template, and gated (auto or approve).
 
 <CardGrid>
   <Card title="Intelligent Triage" icon="star">
@@ -201,9 +203,9 @@ shipwright fix "Update lodash to 4.17.21" --repos ~/api,~/web,~/mobile
 
 <CardGrid>
   <Card title="Delivery Pipeline" icon="rocket">
-    12-stage pipeline from intake to monitoring. Self-healing builds, GitHub
-    integration, quality gates, and eight templates — from fast hotfixes to
-    enterprise deployments with auto-rollback.
+    15-stage pipeline from intake to monitoring. Self-healing builds, GitHub
+    integration, quality gates, and nine templates — from fast hotfixes to
+    enterprise deployments with approval gates.
   </Card>
   <Card title="Autonomous Daemon" icon="setting">
     Background process that polls GitHub for labeled issues, triages with AI,
@@ -211,7 +213,7 @@ shipwright fix "Update lodash to 4.17.21" --repos ~/api,~/web,~/mobile
     based on DORA metrics. Set it and forget it.
   </Card>
   <Card title="Agent Teams" icon="group">
-    24 team templates covering the full SDLC — feature development, code review,
+    25 team templates covering the full SDLC — feature development, code review,
     security audit, testing, refactoring, migration, incident response, and
     more. Each agent gets its own tmux pane with strict file ownership.
   </Card>
@@ -261,8 +263,8 @@ Shipwright implements the complete **Code Factory** pattern — the control-plan
   </Card>
   <Card title="Multi-Type Evidence" icon="information">
     Not just browser screenshots. Machine-verifiable proof for API contracts,
-    database schema, CLI commands, webhooks, and custom checks. Six evidence
-    types with freshness enforcement and per-tier merge requirements.
+    database schema, CLI commands, webhooks, and custom checks. Evidence types
+    have freshness enforcement and per-tier merge requirements.
   </Card>
   <Card title="Harness-Gap Loop" icon="warning">
     Every production regression automatically creates a harness gap issue with
@@ -323,4 +325,4 @@ Shipwright implements the complete **Code Factory** pattern — the control-plan
   </TabItem>
 </Tabs>
 
-Open source under the MIT license. Requires Claude Code and tmux.
+Open source under the MIT license. Requires Claude Code, tmux, and Bun 1.2.19+ (for the dashboard and TypeScript commands). See the [Quick Start](/shipwright/quick-start/) for the full prerequisites.

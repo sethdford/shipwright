@@ -11,7 +11,7 @@ sw_test_isolate
 source "${SCRIPT_DIR}/lib/helpers.sh"
 source "${SCRIPT_DIR}/lib/intent-analysis.sh"
 
-VERSION="3.3.0"
+VERSION="4.0.0"
 
 # ─── Test Counters ──────────────────────────────────────────────
 TESTS_PASSED=0

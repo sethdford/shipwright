@@ -7,6 +7,78 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ---
 
+## [4.0.0] — 2026-10-26
+
+Shipwright 4.0 hardens how agents, the dashboard and CI are trusted. It also starts the
+move from bash to TypeScript on Bun. Several defaults changed, so read the upgrade notes
+below (or [docs/UPGRADING.md](docs/UPGRADING.md)) before you upgrade a server, fleet or CI setup.
+
+### Breaking changes / upgrade notes
+
+1. **The dashboard binds `127.0.0.1` by default** ([#8534](https://github.com/sethdford/shipwright/pull/8534)). Before this release it listened on every interface.
+   *Migrate:* for server or fleet mode, run `shipwright dashboard --host 0.0.0.0` or set `SW_DASHBOARD_HOST=0.0.0.0`. See [docs/dashboard-exposure.md](docs/dashboard-exposure.md) before you expose it.
+2. **`shipwright connect join` no longer accepts the invite token on the command line** ([#8627](https://github.com/sethdford/shipwright/pull/8627)). `--token <t>` and a positional token are refused. `GET /api/join/<token>` and `GET /api/team/invite/<token>` return 410.
+   *Migrate:* run `shipwright connect join --url <url>` and paste the token at the prompt, pipe it on stdin, or pass `--token-file <path>`. Upgrade workers and the dashboard together.
+3. **Bun is the root toolchain, and `package-lock.json` is gone** ([#8670](https://github.com/sethdford/shipwright/pull/8670), [#8535](https://github.com/sethdford/shipwright/pull/8535)). `bun.lock` is the only root lockfile. Commands that moved to TypeScript (`hello`, plus the new `gates`, `failure`, `breaker`, `budget`, `intake`, `pause`, `resume` and `paused`) need Bun ≥ 1.2.19.
+   *Migrate:* install Bun (<https://bun.sh>) and use `bun install` in a source checkout instead of `npm install`/`npm ci`.
+4. **Agents never receive GitHub credentials** ([#8624](https://github.com/sethdford/shipwright/pull/8624)). `GH_TOKEN`, `GITHUB_TOKEN` and similar variables are removed from every agent's environment.
+   *Migrate:* keep `gh` calls, `git push` and private-repo fetches in the pipeline or your own scripts, not in agent prompts or custom agent instructions.
+5. **Agents run under a least-privilege permission policy** ([#8660](https://github.com/sethdford/shipwright/pull/8660), [#8675](https://github.com/sethdford/shipwright/pull/8675)). Every Claude call gets `config/agent-permissions.json`: an allowlist of tools and commands, the Claude Code sandbox with no network access for shell commands, and no reads of `~/.ssh`, `~/.config/gh`, `~/.aws` and similar paths. The CLI refuses to start when the sandbox is unavailable.
+   *Migrate:* on Linux hosts and runners that run agents, install `bubblewrap` and `socat` (CI workflows run `scripts/ci/agent-sandbox-setup.sh`). If your tasks need extra commands, adjust `config/agent-permissions.json` in your checkout.
+6. **Models are chosen by alias from `config/models.json`** ([#8676](https://github.com/sethdford/shipwright/pull/8676), [#8634](https://github.com/sethdford/shipwright/pull/8634)). The aliases are `opus`, `sonnet` (the default) and `haiku`, mapped to the Claude 5.5 family. `ANTHROPIC_MODEL` and `ANTHROPIC_SMALL_FAST_MODEL` are no longer passed to agents. A pipeline refuses to start when `--model`, `--fallback-model` or `SW_MODEL_*` is neither an alias nor a model ID listed in `config/models.json`.
+   *Migrate:* use `--model opus|sonnet|haiku`. To use another model ID, add it as an alias in `config/models.json`, and change model choices there rather than through `ANTHROPIC_MODEL`.
+7. **`.claude/` runtime state is no longer tracked** ([#8667](https://github.com/sethdford/shipwright/pull/8667)). Loop logs, loop state, caches and evidence files are now git-ignored. The daemon writes its `last_optimization` record to `.claude/daemon-runtime.json` instead of `.claude/daemon-config.json`.
+   *Migrate:* if a branch committed those files, resolve the modify/delete conflicts with `git rm --cached <path>` and keep your working copies. `.claude/daemon-config.json` stays tracked.
+
+### Features
+
+- **Dispatch safety gates** ([#8539](https://github.com/sethdford/shipwright/pull/8539)): a global circuit breaker and a `shipwright:pause` label stop all dispatch. New commands: `shipwright gates check`, `breaker`, `budget`, `intake`, `pause`, `resume` and `paused`. Workflows fail closed. See [docs/safety-runbook.md](docs/safety-runbook.md).
+- **Failure classifier** ([#8669](https://github.com/sethdford/shipwright/pull/8669), [#8678](https://github.com/sethdford/shipwright/pull/8678)): `shipwright failure classify --log FILE` decides retry or escalate for a failed run. The CI auto-retry workflow and the daemon use it to categorise failures.
+- **Model aliases** ([#8676](https://github.com/sethdford/shipwright/pull/8676)) and the **Claude 5.5 models** across templates and CI ([#8634](https://github.com/sethdford/shipwright/pull/8634)).
+- **Differential test gate** ([#8646](https://github.com/sethdford/shipwright/pull/8646)): the build loop blocks only on test failures that are new compared with the loop's start commit.
+- **Cheaper build loop** ([#816](https://github.com/sethdford/shipwright/pull/816)): a stable prompt prefix keeps the prompt cache warm (on by default; set `LOOP_STABLE_PROMPT_PREFIX=false` to opt out). `shipwright loop --session-continuity` (off by default) continues one Claude session across iterations.
+- **TypeScript foundation** ([#8535](https://github.com/sethdford/shipwright/pull/8535)): a typed core, architecture fitness rules enforced by `bun run arch`, and the first command (`hello`) ported from bash.
+- **Website and dashboard design** ([#8705](https://github.com/sethdford/shipwright/pull/8705), [#8707](https://github.com/sethdford/shipwright/pull/8707), [#8717](https://github.com/sethdford/shipwright/pull/8717)): shared design tokens and a new brand mark, a themed docs site with light and dark modes, and a move to Astro 7 and Starlight 0.42.
+- **Daemon auto-scaling reference** ([#8630](https://github.com/sethdford/shipwright/pull/8630)): [docs/daemon-autoscaling.md](docs/daemon-autoscaling.md).
+
+### Fixes
+
+- Linux no longer prunes all self-optimize memory, because epoch-to-date conversion is portable ([#8613](https://github.com/sethdford/shipwright/pull/8613)). Date handling is portable everywhere else too, and BSD-only `date` flags are banned ([#8629](https://github.com/sethdford/shipwright/pull/8629)).
+- The loop's test gate runs without credentials, and the real-service e2e suite runs only when you opt in ([#8610](https://github.com/sethdford/shipwright/pull/8610), [#8641](https://github.com/sethdford/shipwright/pull/8641)).
+- Daemon patrol never commits to the checked-out branch: docs sync runs in its own worktree ([#8651](https://github.com/sethdford/shipwright/pull/8651)). A concurrent docs-sync run skips instead of failing ([#8661](https://github.com/sethdford/shipwright/pull/8661)).
+- Org-mode failure tombstones are keyed per repository, and issue writes target the job's repository ([#8622](https://github.com/sethdford/shipwright/pull/8622)).
+- Piped `grep -q` no longer causes SIGPIPE failures under `pipefail` ([#8640](https://github.com/sethdford/shipwright/pull/8640)).
+- CI is green again: the dead-code scan is linear instead of O(N²), and model pricing defaults are current ([#815](https://github.com/sethdford/shipwright/pull/815)).
+- Test suites run against a private tmux server, HOME and process tree, so they never touch your live session ([#8532](https://github.com/sethdford/shipwright/pull/8532), [#8653](https://github.com/sethdford/shipwright/pull/8653), [#8645](https://github.com/sethdford/shipwright/pull/8645)).
+
+### Security hardening
+
+- **Workflow injection:** no `run:` script interpolates `${{ }}` expressions, and an architecture rule enforces it ([#8531](https://github.com/sethdford/shipwright/pull/8531), [#8533](https://github.com/sethdford/shipwright/pull/8533), [#8618](https://github.com/sethdford/shipwright/pull/8618)).
+- **Dashboard:** command injection in the server is fixed and it binds to loopback by default ([#8534](https://github.com/sethdford/shipwright/pull/8534)). Wave 1a added a fleet token for workers, CORS, Origin and Host allowlists, a WebSocket Origin check and single-use join tokens ([#8539](https://github.com/sethdford/shipwright/pull/8539)).
+- **Fleet invite tokens** never travel in URLs or argv ([#8627](https://github.com/sethdford/shipwright/pull/8627)).
+- **Agents:** they get no GitHub credentials ([#8624](https://github.com/sethdford/shipwright/pull/8624)) and run under a least-privilege permission policy with a sandbox ([#8660](https://github.com/sethdford/shipwright/pull/8660)). Review remediation runs CI scripts from the default branch, never from the PR branch ([#8675](https://github.com/sethdford/shipwright/pull/8675)).
+- **Classifier escalations** (auth, contamination, invalid input) come only from structured error lines, so log text cannot forge them ([#8709](https://github.com/sethdford/shipwright/pull/8709)). A 1,012-row corpus and a CI fuzz job guard this ([#8718](https://github.com/sethdford/shipwright/pull/8718)).
+- **Runtime state untracked:** `.claude/` runtime files are git-ignored, an architecture check enforces it, and the loop never commits them ([#8667](https://github.com/sethdford/shipwright/pull/8667)).
+- **Pinned actions:** third-party GitHub Actions are pinned to commit SHAs. This release bumps `claude-code-action`, `action-gh-release` and `repository-dispatch` ([#8683](https://github.com/sethdford/shipwright/pull/8683)).
+- **Dependencies:** vitest, vite, postcss, undici and happy-dom are patched ([#8670](https://github.com/sethdford/shipwright/pull/8670)). The website build check runs on every website PR ([#8717](https://github.com/sethdford/shipwright/pull/8717)) and now also fails on broken internal links ([#8719](https://github.com/sethdford/shipwright/issues/8719)).
+- Architecture rules close fitness-rule evasions: they catch GitHub tokens passed to `claude` and flag GitHub API writes from scripts ([#8619](https://github.com/sethdford/shipwright/pull/8619)).
+
+### Website
+
+- Fixed 35 internal links that were missing the `/shipwright` base, and one that pointed to a missing anchor. Added the favicon. A version bump now redeploys the site ([#8719](https://github.com/sethdford/shipwright/issues/8719)).
+
+### Known limitations / coming next
+
+- The dashboard does not yet enforce role authorization on every mutating route ([#8720](https://github.com/sethdford/shipwright/issues/8720)). Keep it on loopback or behind your own access control.
+- Known classifier limits: forged structured tokens and prose-filter gaps ([#8674](https://github.com/sethdford/shipwright/issues/8674)), benign rows that still escalate ([#8722](https://github.com/sethdford/shipwright/issues/8722)), and build-stage auth failures that are retried ([#8714](https://github.com/sethdford/shipwright/issues/8714)).
+- Coming next, not in this release:
+  - a differential pipeline test stage and a pinned Bun for the gate fixtures ([#8671](https://github.com/sethdford/shipwright/pull/8671), for [#8663](https://github.com/sethdford/shipwright/issues/8663) and [#8664](https://github.com/sethdford/shipwright/issues/8664));
+  - a blast-radius guard for the build loop ([#8662](https://github.com/sethdford/shipwright/pull/8662), for [#8644](https://github.com/sethdford/shipwright/issues/8644));
+  - the new dashboard shell and command palette ([#8712](https://github.com/sethdford/shipwright/pull/8712), for [#8699](https://github.com/sethdford/shipwright/issues/8699));
+  - a trust boundary where agent output reaches the pipeline only as a patch ([#8706](https://github.com/sethdford/shipwright/issues/8706)).
+
+---
+
 ## [3.3.0] — 2026-04-04
 
 ### SOTA Dark Factory — Fully Autonomous Pipeline
@@ -849,6 +921,7 @@ This release turns Shipwright from a team session manager into a full autonomous
 
 ---
 
+[4.0.0]: https://github.com/sethdford/shipwright/compare/v3.3.0...v4.0.0
 [2.1.0]: https://github.com/sethdford/shipwright/compare/v2.0.0...v2.1.0
 [2.0.0]: https://github.com/sethdford/shipwright/compare/v1.10.0...v2.0.0
 [1.12.0]: https://github.com/sethdford/shipwright/compare/v1.10.0...v1.12.0

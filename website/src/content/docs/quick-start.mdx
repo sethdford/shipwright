@@ -13,17 +13,18 @@ import { Tabs, TabItem, Steps } from "@astrojs/starlight/components";
 | **jq**              | any     | `brew install jq`                          |
 | **Claude Code CLI** | latest  | `npm install -g @anthropic-ai/claude-code` |
 | **Node.js**         | 20+     | For hooks                                  |
+| **Bun**             | 1.2.19+ | `curl -fsSL https://bun.sh/install \| bash` (dashboard and TypeScript commands) |
 | **Git**             | any     | For installation                           |
 
 :::caution[Terminal Compatibility]
-Split-pane agent teams require a real terminal emulator. **VS Code's integrated terminal and Ghostty are not supported.** Use iTerm2, Alacritty, Kitty, or WezTerm. See [Troubleshooting](/troubleshooting/) for details.
+Split-pane agent teams require a real terminal emulator. **VS Code's integrated terminal and Ghostty are not supported.** Use iTerm2, Alacritty, Kitty, or WezTerm. See [Troubleshooting](/shipwright/troubleshooting/) for details.
 :::
 
 ## Installation
 
 <Tabs>
   <TabItem label="Full Install (Recommended)">
-    Interactive installer that sets up tmux config, Claude Code settings, hooks, and the `shipwright` CLI:
+    `install.sh` checks the prerequisites above, then runs the same installer as `scripts/sw-init.sh`. The installer sets up the tmux config and overlay, team and pipeline templates, Claude Code settings, quality gate hooks, and `.claude/CLAUDE.md`:
 
     ```bash
     git clone https://github.com/sethdford/shipwright.git
@@ -32,8 +33,8 @@ Split-pane agent teams require a real terminal emulator. **VS Code's integrated 
     ```
 
   </TabItem>
-  <TabItem label="Quick Setup (tmux only)">
-    One-command setup with no prompts — installs just the tmux configuration:
+  <TabItem label="Installer only (skip prerequisite check)">
+    Runs the installer directly, without the prerequisite check in `install.sh`:
 
     ```bash
     git clone https://github.com/sethdford/shipwright.git
@@ -93,7 +94,8 @@ This checks tmux version, jq availability, overlay hooks, color configuration, a
 
 ## What's Next?
 
-- **[Delivery Pipeline](/guides/pipeline/)** — Automate the full SDLC from issue to PR
-- **[Continuous Loop](/guides/loop/)** — Run agents autonomously with quality gates
-- **[Team Templates](/reference/templates/)** — Browse all 24 team compositions
-- **[CLI Reference](/reference/cli/)** — Full command documentation
+- **[Delivery Pipeline](/shipwright/guides/pipeline/)** — Automate the full SDLC from issue to PR
+- **[Continuous Loop](/shipwright/guides/loop/)** — Run agents autonomously with quality gates
+- **[Team Templates](/shipwright/reference/templates/)** — Browse all 25 team compositions
+- **[CLI Reference](/shipwright/reference/cli/)** — Full command documentation
+- **[Upgrading](/shipwright/upgrading/)** — Move an existing install to a newer version

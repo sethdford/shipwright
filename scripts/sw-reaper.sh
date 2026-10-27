@@ -12,7 +12,7 @@
 # ║    shipwright reaper --dry-run    Preview what would be reaped          ║
 # ╚═══════════════════════════════════════════════════════════════════════════╝
 # shellcheck disable=SC2034
-VERSION="3.3.0"
+VERSION="4.0.0"
 set -euo pipefail
 
 # shellcheck source=lib/bootstrap.sh

@@ -39,10 +39,10 @@ All risk tiers, merge requirements, docs drift rules, evidence specs, and harnes
     "critical": {
       "requiredChecks": [
         "risk-policy-gate",
-        "tests",
-        "e2e-smoke",
+        "test",
+        "smoke",
         "platform-health",
-        "code-review-agent"
+        "shellcheck"
       ],
       "requireDocsDriftCheck": true
     },
@@ -146,7 +146,7 @@ The blog post recommends browser evidence for UI changes. Shipwright generalizes
 | **browser**   | UI renders correctly            | Dashboard loads, pipeline status page shows stages          |
 | **api**       | REST/GraphQL contracts hold     | Health endpoint returns 200, response is valid JSON         |
 | **database**  | Schema integrity maintained     | Migrations are current, no orphaned tables                  |
-| **cli**       | Commands produce correct output | `shipwright pipeline status --json` exits 0 with valid JSON |
+| **cli**       | Commands produce correct output | CLI command exits 0 and prints the expected output |
 | **webhook**   | Callback endpoints respond      | Webhook receiver accepts POST with expected status          |
 | **custom**    | Anything else                   | User-defined verification scripts                           |
 
@@ -247,8 +247,8 @@ Gaps that exceed SLA are flagged as overdue. GitHub issues are auto-created for 
 ## How Shipwright Goes Beyond the Baseline
 
 <CardGrid>
-  <Card title="12-Stage Pipeline" icon="rocket">
-    Not just build-test-merge. A full 12-stage pipeline with intake, planning,
+  <Card title="15-Stage Pipeline" icon="rocket">
+    Not just build-test-merge. A full 15-stage pipeline with intake, planning,
     design, adversarial review, compound quality gates, deployment, validation,
     and monitoring. Each stage has configurable quality gates.
   </Card>
@@ -268,7 +268,7 @@ Gaps that exceed SLA are flagged as overdue. GitHub issues are auto-created for 
     effectiveness, prediction accuracy. The next run benefits from every
     previous one. Cross-repo global memory shares learnings across projects.
   </Card>
-  <Card title="18 Autonomous Agents" icon="group">
+  <Card title="Autonomous Agents" icon="group">
     Specialized agents for every role: PM, code reviewer, security auditor, test
     generator, incident commander, architecture enforcer, and more. Each agent
     has defined responsibilities and quality standards.
@@ -293,10 +293,6 @@ npm run harness:evidence:capture:database # Database checks only
 npm run harness:evidence:capture:browser  # Browser/UI only
 npm run harness:evidence:verify           # Verify manifest + freshness
 npm run harness:evidence:pre-pr           # Capture + verify in one step
-
-# Risk and policy
-npm run harness:risk-tier
-npm run harness:policy-gate
 
 # Core pipeline
 npm test

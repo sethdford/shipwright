@@ -11,6 +11,7 @@ Navigation hub for all Shipwright docs. Start here or jump to a section.
 | [../README.md](../README.md)                 | Project overview, quick start, features             |
 | [../STRATEGY.md](../STRATEGY.md)             | Vision, priorities, technical principles            |
 | [../CHANGELOG.md](../CHANGELOG.md)           | Version history                                     |
+| [UPGRADING.md](UPGRADING.md)                 | What to change when upgrading (3.x to 4.0)          |
 | [reference/legacy-guide.md](reference/legacy-guide.md) | 100+ commands, architecture, development guidelines |
 
 ---

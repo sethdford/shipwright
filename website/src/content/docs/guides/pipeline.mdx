@@ -10,25 +10,28 @@ The delivery pipeline (`shipwright pipeline`) automates the entire software deve
 ## Pipeline Stages
 
 ```
-intake → plan → design → build → test → review → compound_quality → pr → merge → deploy → validate → monitor
+intake → spec_generation → plan → design → build → test → review → spec_verification → compound_quality → audit → pr → merge → deploy → validate → monitor
 ```
 
-12 stages, each can be enabled/disabled and gated (auto-proceed or pause for approval).
+15 stages. Each template enables a subset of them, and each enabled stage has a gate: `auto` proceeds immediately, `approve` pauses for approval.
 
-| Stage                | What Happens                                                              |
-| -------------------- | ------------------------------------------------------------------------- |
-| **intake**           | Fetch issue metadata from GitHub, or parse the goal description           |
-| **plan**             | Claude generates an implementation plan with tasks and approach           |
-| **design**           | Design interfaces, data models, and API contracts                         |
-| **build**            | Delegates to `shipwright loop` for autonomous multi-iteration development |
-| **test**             | Run the test suite and validate coverage                                  |
-| **review**           | Claude reviews the changes for quality, security, and correctness         |
-| **compound_quality** | Multi-dimensional quality audit — adversarial, negative, e2e, DoD         |
-| **pr**               | Create a GitHub PR with labels, milestone, and reviewers                  |
-| **merge**            | Auto-merge with CI wait and squash (deployed/enterprise templates)        |
-| **deploy**           | Deploy to staging/production (if configured)                              |
-| **validate**         | Post-deploy smoke tests and health URL checks                             |
-| **monitor**          | Watch for errors post-deploy with auto-rollback                           |
+| Stage                 | What Happens                                                                 |
+| --------------------- | ---------------------------------------------------------------------------- |
+| **intake**            | Fetch issue metadata from GitHub, or parse the goal description              |
+| **spec_generation**   | Turn the issue or goal into acceptance criteria and edge cases               |
+| **plan**              | Claude generates an implementation plan with tasks and approach              |
+| **design**            | Design interfaces, data models, and API contracts                            |
+| **build**             | Delegates to `shipwright loop` for autonomous multi-iteration development    |
+| **test**              | Run the test suite and validate coverage                                     |
+| **review**            | Claude reviews the changes for quality, security, and correctness            |
+| **spec_verification** | Check the implementation against the acceptance criteria                     |
+| **compound_quality**  | Multi-dimensional quality audit — adversarial, negative, e2e, DoD            |
+| **audit**             | Additional checks such as secret scanning, file permissions, and coverage delta |
+| **pr**                | Create a GitHub PR with labels, milestone, and reviewers                     |
+| **merge**             | Squash-merge the PR, with an optional CI wait                                |
+| **deploy**            | Deploy to staging or production (if configured)                              |
+| **validate**          | Post-deploy smoke tests and health URL checks                                |
+| **monitor**           | Watch for errors post-deploy, with auto-rollback where configured            |
 
 ## Quick Start
 
@@ -60,16 +63,21 @@ intake → plan → design → build → test → review → compound_quality �
 
 ## Pipeline Templates
 
-| Template     | Stages                                          | Gates                             | Use Case                   |
-| ------------ | ----------------------------------------------- | --------------------------------- | -------------------------- |
-| `standard`   | intake → plan → build → test → review → PR      | approve: plan, review, pr         | Normal feature work        |
-| `fast`       | intake → build → test → PR                      | all auto                          | Quick fixes                |
-| `full`       | all 12 stages                                   | approve: plan, review, pr, deploy | Production deployment      |
-| `hotfix`     | intake → build → test → PR                      | all auto                          | Urgent production fixes    |
-| `autonomous` | all 12 stages                                   | all auto                          | Fully autonomous operation |
-| `deployed`   | all 12 stages (incl. deploy, validate, monitor) | approve: deploy                   | Full deploy + monitoring   |
-| `enterprise` | all 12 stages                                   | all approve, auto-rollback        | Maximum safety             |
-| `cost-aware` | intake → plan → build → test → review → PR      | auto, budget checks               | Budget-limited delivery    |
+Pass a template with `--pipeline <name>` (default: `standard`). There are nine templates:
+
+| Template     | Enabled stages | Approval gates                                   | Use Case                   |
+| ------------ | -------------- | ------------------------------------------------ | -------------------------- |
+| `fast`       | 6              | none (all auto)                                  | Quick fixes                |
+| `hotfix`     | 6              | none (all auto)                                  | Urgent production fixes    |
+| `standard`   | 11             | plan, design, review, pr, merge                  | Normal feature work        |
+| `tdd`        | 11             | plan, design, review, pr, merge                  | Test-first feature work    |
+| `full`       | 15             | plan, design, review, pr, merge, deploy          | Production deployment      |
+| `autonomous` | 13             | none (all auto; deploy and validate disabled)    | Fully autonomous operation |
+| `deployed`   | 14             | deploy                                           | Deploy plus monitoring     |
+| `enterprise` | 14             | all except spec_generation and spec_verification | Maximum safety             |
+| `cost-aware` | 10             | plan, review, pr (deploy and validate disabled)  | Budget-limited delivery    |
+
+See the [Templates reference](/shipwright/reference/templates/) for the full stage list and key config of each template.
 
 Browse templates:
 
@@ -82,7 +90,7 @@ shipwright pipeline show standard  # View template details
 
 When the intelligence layer is enabled, Shipwright can compose custom pipelines dynamically instead of using static templates. The intelligence engine analyzes the issue semantically and builds a tailored stage configuration — adding extra stages for high-risk changes, removing unnecessary stages for simple fixes, and routing each stage to the optimal model (opus, sonnet, or haiku) based on task complexity and remaining budget.
 
-Static templates remain as fallbacks when intelligence is disabled or when a Claude API call fails. See the [Intelligence guide](/guides/intelligence/) for configuration details.
+Static templates remain as fallbacks when intelligence is disabled or when a Claude API call fails. See the [Intelligence guide](/shipwright/guides/intelligence/) for configuration details.
 
 ## Self-Healing Builds
 
@@ -97,19 +105,19 @@ The compound quality stage orchestrates this: it runs tests, and if they fail, f
 
 ## GitHub Integration
 
-The pipeline deeply integrates with GitHub when starting from an issue:
+The pipeline integrates with GitHub when starting from an issue:
 
 - **Auto-fetches** issue title, body, labels, and milestone
 - **Self-assigns** the issue to signal work has started
 - **Posts progress comments** as stages complete
 - **Creates PRs** with labels, milestone, and reviewers propagated from the issue
-- **Closes the issue** when the PR is ready
+- **Closes the issue** in the monitor stage, but only when `close_issue` is `true` in the validate stage config (`validate.config.close_issue`) and the monitor stage runs
 
 ## Auto-Detection
 
 Shipwright automatically detects your project configuration:
 
-- **Test command** — supports 9+ project types (npm, pytest, go test, cargo test, etc.)
+- **Test command** — detected for common project types such as npm, pytest, go test, and cargo test
 - **Branch prefix** — derived from task type (feature/, fix/, hotfix/)
 - **Reviewers** — from CODEOWNERS or git history
 - **Language and framework** — for context-aware planning

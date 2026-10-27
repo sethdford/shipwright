@@ -10,7 +10,7 @@ SW_AGENT_EXEC="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/lib/agent-exec.sh"
 # When sourced, do NOT add set -euo pipefail — the parent handles that.
 # When run directly, main() sets up the error handling.
 
-VERSION="3.3.0"
+VERSION="4.0.0"
 
 # ─── Paths (set defaults if not provided by parent) ──────────────────────────
 SCRIPT_DIR="${SCRIPT_DIR:-$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)}"

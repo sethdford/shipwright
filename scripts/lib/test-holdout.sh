@@ -13,7 +13,7 @@ _TEST_HOLDOUT_LOADED=1
 # ╚═══════════════════════════════════════════════════════════════════════════╝
 
 # shellcheck disable=SC2034
-VERSION="3.3.0"
+VERSION="4.0.0"
 
 # ─── Output Helpers (fallback if not already loaded) ─────────────────────────
 [[ "$(type -t info 2>/dev/null)" == "function" ]]    || info()    { echo -e "\033[38;2;0;212;255m\033[1m▸\033[0m $*"; }

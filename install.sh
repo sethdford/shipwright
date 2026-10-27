@@ -105,7 +105,7 @@ if command -v bun &>/dev/null || [[ -x "$HOME/.bun/bin/bun" ]]; then
     command -v bun &>/dev/null && BUN_CMD="bun"
     echo -e "${GREEN}✓${RESET} Bun $($BUN_CMD --version 2>/dev/null || echo "installed")"
 else
-    echo -e "${YELLOW}!${RESET} Bun not found — required for ${BOLD}shipwright dashboard${RESET}"
+    echo -e "${YELLOW}!${RESET} Bun not found — required for ${BOLD}shipwright dashboard${RESET} and the TypeScript commands (gates, failure, breaker, budget, intake, pause, hello)"
     echo -e "    ${DIM}Install: curl -fsSL https://bun.sh/install | bash${RESET}"
 fi
 

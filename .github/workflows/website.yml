@@ -5,6 +5,10 @@ on:
     branches: [main]
     paths:
       - 'website/**'
+      # Footer.astro imports the CLI version from the root package.json at build time,
+      # so a version bump must redeploy the site or the footer shows the old version (#8719).
+      - 'package.json'
+      - '.github/workflows/website.yml'
   workflow_dispatch:
 
 permissions:

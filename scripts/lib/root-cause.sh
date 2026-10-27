@@ -17,7 +17,7 @@
 # ╚═══════════════════════════════════════════════════════════════════════════╝
 set -euo pipefail
 
-VERSION="3.3.0"
+VERSION="4.0.0"
 
 # Module guard
 [[ -n "${_ROOT_CAUSE_LOADED:-}" ]] && return 0; _ROOT_CAUSE_LOADED=1

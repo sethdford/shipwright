@@ -104,7 +104,8 @@ Memory is stored per-repo at `~/.shipwright/memory/<repo-hash>/`:
 | `failures.json`  | Failure patterns with frequency and fixes (capped at 100) |
 | `decisions.json` | Design decisions / ADRs (capped at 100)                   |
 | `metrics.json`   | Performance baselines with regression detection           |
-| `global.json`    | Cross-repo learnings (capped at 50)                       |
+
+Cross-repo learnings are stored separately in `~/.shipwright/memory/global.json` (capped at 50 entries).
 
 ## Tips
 
@@ -121,4 +122,4 @@ When the intelligence layer is enabled, two memory features are enhanced:
 
 **Memory Evolution** — The self-optimization module automatically prunes patterns not confirmed in 30 days, strengthens patterns seen 3+ times recently, and promotes recurring cross-repo patterns to global memory.
 
-See the [Intelligence guide](/guides/intelligence/) for details on self-optimization and memory evolution.
+See the [Intelligence guide](/shipwright/guides/intelligence/) for details on self-optimization and memory evolution.

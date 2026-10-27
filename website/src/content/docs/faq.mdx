@@ -13,7 +13,7 @@ Shipwright is a CLI tool that orchestrates Claude Code agent teams in tmux. It p
 
 Claude Code has built-in agent teams support, but Shipwright adds the infrastructure around it:
 
-- **Team templates** — 24 pre-built compositions for common SDLC tasks, plus 8 pipeline templates
+- **Team templates** — 25 pre-built compositions for common SDLC tasks, plus 9 pipeline templates
 - **Quality gate hooks** — block agents until code passes checks
 - **Delivery pipeline** — full issue-to-PR automation with self-healing builds
 - **Autonomous daemon** — background issue processing with DORA metrics
@@ -70,7 +70,7 @@ Cost depends on your Claude Code plan and usage. Each agent in a team uses its o
 
 ### Can the daemon create PRs automatically?
 
-Yes. When the daemon spawns a pipeline for a GitHub issue, the pipeline can run through to PR creation fully autonomously (depending on the pipeline template and gate settings). The `autonomous` template has all gates set to auto-approve.
+Yes. When the daemon spawns a pipeline for a GitHub issue, the pipeline can run through to PR creation fully autonomously (depending on the pipeline template and gate settings). The `autonomous` template runs every enabled stage with an `auto` gate (`deploy` and `validate` are disabled in that template).
 
 ### Does the pipeline work without GitHub?
 
@@ -78,13 +78,13 @@ Yes, but with reduced functionality. Without GitHub:
 
 - Use `--goal` instead of `--issue`
 - No auto-assignment or progress comments
-- PR creation step is skipped (or creates a local branch)
+- GitHub-only steps (progress comments, PR creation) depend on the `gh` CLI and may be skipped
 
 ## Intelligence
 
 ### What is the intelligence layer?
 
-The intelligence layer is a set of 7 modules that replace hardcoded heuristics with AI-powered analysis. Instead of word-count scoring and label regex for triage, Claude semantically analyzes each issue. Instead of picking from static templates, Claude composes a custom pipeline per issue. All intelligence features are behind feature flags and off by default — enable them in daemon-config.json.
+The intelligence layer is a set of 7 modules that replace hardcoded heuristics with AI-powered analysis. Instead of word-count scoring and label regex for triage, Claude semantically analyzes each issue. Instead of picking from static templates, Claude composes a custom pipeline per issue. All intelligence features are behind feature flags. They default to `"auto"` in daemon-config.json, which turns them on when the Claude CLI is detected; set a flag to `false` to disable it.
 
 ### Does intelligence cost extra?
 
@@ -108,10 +108,10 @@ Persistent memory captures learnings from every pipeline run -- failure patterns
 
 ### How do I customize the tmux theme?
 
-Edit the hex color values in `tmux/tmux.conf` and reload with `prefix + r`. The main colors to change:
+Edit the hex color values in `tmux/tmux.conf` and `tmux/shipwright-overlay.conf`, then reload with `prefix + r`. The main colors to change:
 
-- `#1a1a2e` — background
-- `#e4e4e7` — foreground
+- `#1a1a2e` — pane background
+- `#8888a0` — pane foreground
 - `#00d4ff` — accent (active borders, highlights)
 
 ### Can I use my own tmux config?
@@ -120,4 +120,4 @@ Yes. The installer can add Shipwright's config as a source overlay rather than r
 
 ### How do I add custom hooks?
 
-Create a shell script in `~/.claude/hooks/` and wire it up in `~/.claude/settings.json`. See the [Configuration reference](/reference/configuration/) for examples.
+Create a shell script in `~/.claude/hooks/` and wire it up in `~/.claude/settings.json`. See the [Configuration reference](/shipwright/reference/configuration/) for examples.

@@ -131,7 +131,7 @@ This compacts the conversation when it hits 70% of the context window (default i
 
 ### Watch all agents at once
 
-Use `shipwright status` (alias: `sw`) to see a dashboard of running team sessions:
+Use `shipwright status` (or `sw status`; `sw` is short for `shipwright`) to see a dashboard of running team sessions:
 
 ```bash
 shipwright status
@@ -154,7 +154,7 @@ Press `prefix + S` or `prefix + Alt-t` (M-t) to toggle synchronized panes. When 
 
 ### Capture pane contents
 
-Press `prefix + Alt-s` (M-s) to save the current pane's visible content to a file in `/tmp/`. Useful for debugging agent output after the fact.
+Press `prefix + Alt-s` (M-s) to save the current pane's full scrollback to a file in `/tmp/`. Useful for debugging agent output after the fact.
 
 ---
 
@@ -370,11 +370,11 @@ Use a DoD file with `shipwright loop` to prevent premature completion:
 shipwright loop "Add RBAC" --quality-gates --definition-of-done dod.md
 ```
 
-Template at `docs/definition-of-done.example.md` (or `~/.shipwright/templates/` after install).
+Template at `docs/definition-of-done.example.md` (or `~/.shipwright/templates/` after `shipwright upgrade`).
 
 ### Run all test suites
 
 ```bash
-npm test              # All 96+ test suites
+npm test              # All 174 shell test suites
 ./scripts/sw-pipeline-test.sh   # Pipeline tests only (no real Claude/GitHub)
 ```

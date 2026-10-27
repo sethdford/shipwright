@@ -1,0 +1,111 @@
+---
+title: Upgrading
+description: What to change when you upgrade Shipwright from 3.x to 4.0.
+---
+
+## 3.x to 4.0
+
+Shipwright 4.0 changes several defaults around the dashboard, fleet invites, agent
+permissions and model selection. Work through this checklist before you upgrade a server,
+a fleet or a CI setup. The full list of changes is in [CHANGELOG.md](https://github.com/sethdford/shipwright/blob/main/CHANGELOG.md).
+
+### 1. Install Bun
+
+Bun 1.2.19 or later is required. The commands that moved to TypeScript need it: `hello`,
+plus the new `gates`, `failure`, `breaker`, `budget`, `intake`, `pause`, `resume` and
+`paused`. In a source checkout, `bun.lock` is the only root lockfile and `package-lock.json`
+is gone, so use `bun install` instead of `npm install` or `npm ci` ([#8670](https://github.com/sethdford/shipwright/pull/8670), [#8535](https://github.com/sethdford/shipwright/pull/8535)).
+
+```bash
+curl -fsSL https://bun.sh/install | bash
+bun --version   # 1.2.19 or later
+```
+
+### 2. Dashboard: choose the bind address
+
+The dashboard now binds `127.0.0.1` by default. Before 4.0 it listened on every interface
+([#8534](https://github.com/sethdford/shipwright/pull/8534)). For server or fleet mode, opt in explicitly:
+
+```bash
+shipwright dashboard --host 0.0.0.0
+# or
+SW_DASHBOARD_HOST=0.0.0.0 shipwright dashboard
+```
+
+Read [dashboard-exposure.md](https://github.com/sethdford/shipwright/blob/main/docs/dashboard-exposure.md) before you expose it. Role authorization
+is not yet enforced on every mutating route ([#8720](https://github.com/sethdford/shipwright/issues/8720)).
+
+### 3. Fleet invites: no tokens on the command line
+
+`shipwright connect join` refuses `--token <t>` and a positional token. The old
+`GET /api/join/<token>` and `GET /api/team/invite/<token>` routes return 410 ([#8627](https://github.com/sethdford/shipwright/pull/8627)).
+Upgrade the dashboard and its workers together, then join like this:
+
+```bash
+shipwright connect join --url https://dashboard.example:8767            # prompts for the token
+shipwright connect join --url https://dashboard.example:8767 < token.txt # token on stdin
+shipwright connect join --url https://dashboard.example:8767 --token-file ~/.shipwright/invite-token
+```
+
+### 4. Agents: no GitHub credentials
+
+Agents never receive `GH_TOKEN`, `GITHUB_TOKEN` or similar credentials ([#8624](https://github.com/sethdford/shipwright/pull/8624)). Keep `gh`
+calls, `git push` and private-repo fetches in the pipeline or your own scripts, not in agent
+prompts or custom agent instructions.
+
+### 5. Agents: least-privilege permission policy
+
+Every Claude call runs under `config/agent-permissions.json` ([#8660](https://github.com/sethdford/shipwright/pull/8660), [#8675](https://github.com/sethdford/shipwright/pull/8675)). The policy is an
+allowlist of tools and commands. Shell commands run in the Claude Code sandbox with no network
+access, and agents cannot read `~/.ssh`, `~/.config/gh`, `~/.aws` and similar paths. The CLI
+refuses to start when the sandbox is unavailable.
+
+- **Linux hosts and self-hosted runners** that run agents need `bubblewrap` and `socat`.
+  On Ubuntu 24.04 and later, bubblewrap also needs an AppArmor profile that allows user
+  namespaces. `scripts/ci/agent-sandbox-setup.sh` does this on GitHub runners, and
+  `scripts/lib/agent-sandbox.sh check` tells you what is missing.
+- **macOS** uses the built-in sandbox and needs no setup.
+- If your tasks need commands that the policy does not allow, adjust
+  `config/agent-permissions.json` in your checkout.
+
+### 6. Models: use aliases
+
+Models are chosen by alias from `config/models.json` ([#8676](https://github.com/sethdford/shipwright/pull/8676)). The aliases are `opus`,
+`sonnet` (the default) and `haiku`, mapped to the Claude 5.5 family ([#8634](https://github.com/sethdford/shipwright/pull/8634)). Agents no longer
+receive `ANTHROPIC_MODEL` or `ANTHROPIC_SMALL_FAST_MODEL`. A pipeline refuses to start when
+`--model`, `--fallback-model` or a `SW_MODEL_*` value is neither an alias nor a model
+ID listed in `config/models.json`.
+
+```bash
+shipwright pipeline start --issue 42 --model opus
+```
+
+To change which model an alias means, or to use another model ID, edit or add an alias in
+`config/models.json`.
+Do not use `ANTHROPIC_MODEL`.
+
+### 7. Repositories: `.claude/` runtime state is untracked
+
+Loop logs, loop state, caches and evidence files under `.claude/` are now git-ignored ([#8667](https://github.com/sethdford/shipwright/pull/8667)).
+The daemon writes its `last_optimization` record to `.claude/daemon-runtime.json`.
+`.claude/daemon-config.json` stays tracked, because it is hand-written config.
+
+If a branch committed those runtime files, merging 4.0 gives you modify/delete conflicts.
+Resolve them by untracking the files and keeping your working copies:
+
+```bash
+git rm --cached -r --ignore-unmatch .claude/loop-logs .claude/loop-state.md
+```
+
+### Then upgrade
+
+```bash
+# Source install
+git pull && ./install.sh
+
+# Or compare and apply from the repo
+shipwright upgrade          # show what would change
+shipwright upgrade --apply
+
+shipwright doctor           # verify
+```

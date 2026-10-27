@@ -18,7 +18,8 @@ Shipwright integrates with issue trackers to provide bidirectional sync between 
 Shipwright uses a **router pattern** for tracker integration:
 
 ```
-Pipeline → sw-tracker.sh (router) → sw-tracker-linear.sh
+Pipeline → sw-tracker.sh (router) → sw-tracker-github.sh
+                                   → sw-tracker-linear.sh
                                    → sw-tracker-jira.sh
 ```
 
@@ -30,10 +31,10 @@ The router reads `~/.shipwright/tracker-config.json` to determine which provider
 
 ```bash
 # Configure Linear
-shipwright linear setup
+shipwright linear init
 
 # Configure Jira
-shipwright jira setup
+shipwright jira init
 ```
 
 ### Configuration File
@@ -57,7 +58,7 @@ For Jira:
 {
   "provider": "jira",
   "jira": {
-    "url": "https://yourcompany.atlassian.net",
+    "base_url": "https://yourcompany.atlassian.net",
     "email": "you@company.com",
     "api_token": "...",
     "project_key": "PROJ"
@@ -91,17 +92,17 @@ The daemon also integrates with the tracker:
 
 ```bash
 # Check current tracker configuration
-shipwright tracker config
+shipwright tracker status
 
 # Manual sync (usually automatic)
 shipwright tracker notify stage_complete <issue> "<stage>|<duration>|<description>"
 
 # Linear-specific commands
-shipwright linear setup          # Configure Linear
+shipwright linear init             # Configure Linear
 shipwright linear sync <issue>   # Manual sync
 
 # Jira-specific commands
-shipwright jira setup            # Configure Jira
+shipwright jira init               # Configure Jira
 shipwright jira sync <issue>     # Manual sync
 ```
 
@@ -109,8 +110,4 @@ shipwright jira sync <issue>     # Manual sync
 
 If you only want GitHub Issues (the default), simply don't configure a tracker. The pipeline always posts progress comments to GitHub Issues regardless of tracker configuration.
 
-To temporarily disable tracker notifications:
 
-```bash
-NO_TRACKER=true shipwright pipeline start --issue 42
-```

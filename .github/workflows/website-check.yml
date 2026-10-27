@@ -35,6 +35,9 @@ jobs:
         run: npm ci
         working-directory: website
 
-      - name: Build
+      # starlight-links-validator (website devDependency, astro.config.mjs) runs at the end
+      # of the build and fails it on any broken internal link: a missing /shipwright base,
+      # a dead page or a bad #anchor. External links are not fetched.
+      - name: Build and check internal links
         run: npm run build
         working-directory: website

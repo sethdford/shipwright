@@ -87,7 +87,7 @@ When the intelligence layer is enabled, the dashboard displays prediction data f
 - Estimated cost
 - Risk factors for each stage
 
-This data comes from the predictive analytics module. See the [Intelligence guide](/guides/intelligence/) for configuration.
+This data comes from the predictive analytics module. See the [Intelligence guide](/shipwright/guides/intelligence/) for configuration.
 
 ## Architecture
 
@@ -110,5 +110,14 @@ The dashboard reads from standard Shipwright configuration locations. No additio
 To change the port:
 
 ```bash
-PORT=8080 shipwright dashboard
+shipwright dashboard --port 8080
 ```
+
+The dashboard listens on `127.0.0.1` (localhost only) by default. To reach it from another machine, opt in with `--host` or the `SW_DASHBOARD_HOST` environment variable:
+
+```bash
+shipwright dashboard --host 0.0.0.0                # Server or fleet mode
+SW_DASHBOARD_HOST=0.0.0.0 shipwright dashboard     # Same, via environment variable
+```
+
+Binding to `0.0.0.0` exposes the dashboard on every network interface. Only do this on a network you trust, and see [Fleet](/shipwright/guides/fleet/) for how workers join a shared dashboard.

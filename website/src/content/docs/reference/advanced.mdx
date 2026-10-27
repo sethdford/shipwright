@@ -11,9 +11,9 @@ Agent heartbeats provide liveness monitoring for running pipeline jobs. The pipe
 
 ### How It Works
 
-1. When a pipeline starts, it begins writing heartbeat files every 60 seconds
+1. When a pipeline starts, it begins writing heartbeat files every 30 seconds
 2. Each heartbeat file contains the job ID, timestamp, current stage, and process info
-3. The daemon checks heartbeats to detect stale jobs (no update in 5+ minutes)
+3. The daemon checks heartbeats to detect stale jobs (no update for 30 minutes, `health.stale_timeout_s` 1800)
 4. The doctor includes heartbeat health in its diagnostic output
 
 ### Storage
@@ -55,11 +55,11 @@ Pipeline checkpoints save the complete state of a pipeline at a point in time, e
 ### Saving Checkpoints
 
 ```bash
-# Save current pipeline state with auto-generated name
-shipwright checkpoint save
+# Save the build stage checkpoint (--stage is required)
+shipwright checkpoint save --stage build
 
-# Save with a specific name
-shipwright checkpoint save "before-refactor"
+# Save with an iteration count
+shipwright checkpoint save --stage build --iteration 5
 ```
 
 ### Restoring Checkpoints
@@ -69,7 +69,7 @@ shipwright checkpoint save "before-refactor"
 shipwright checkpoint list
 
 # Restore from a checkpoint
-shipwright checkpoint restore "before-refactor"
+shipwright checkpoint restore --stage build
 ```
 
 ### Storage
@@ -176,7 +176,7 @@ Enable with `intelligence.simulation_enabled` in daemon-config.json.
 
 ```bash
 # Manual developer simulation
-shipwright developer-simulation review "$(git diff main)"
+shipwright simulation review "$(git diff main)"
 ```
 
 ### Architecture Enforcer
@@ -224,4 +224,4 @@ Enable with `intelligence.composer_enabled` in daemon-config.json.
 
 ---
 
-For a comprehensive overview of all intelligence capabilities, configuration options, and best practices, see the [Intelligence guide](/guides/intelligence/).
+For a comprehensive overview of all intelligence capabilities, configuration options, and best practices, see the [Intelligence guide](/shipwright/guides/intelligence/).

@@ -9,7 +9,7 @@ Cost intelligence (`shipwright cost`) tracks every token spent across your pipel
 
 1. Each pipeline stage records its input and output token counts
 2. Costs are calculated using model-specific pricing (Opus, Sonnet, Haiku)
-3. A daily budget gate checks spending before each pipeline starts — warning at 80% and blocking at 100%
+3. A daily budget gate checks spending before each pipeline starts. It warns at 80% of the daily budget and blocks a pipeline when today's spend plus the estimated cost would exceed the budget
 4. All cost entries are stored with timestamps for trend analysis
 
 ## Quick Start
@@ -32,7 +32,7 @@ shipwright cost budget show
 
 # Estimate cost for a specific workload
 shipwright cost calculate 50000 10000 opus
-# → $1.5000
+# → 0.5000 (USD)
 ```
 
 ## Model Pricing
@@ -41,9 +41,11 @@ Costs are calculated using per-model rates (USD per 1M tokens):
 
 | Model      | Input  | Output |
 | ---------- | ------ | ------ |
-| **Opus**   | $15.00 | $75.00 |
+| **Opus**   | $5.00  | $25.00 |
 | **Sonnet** | $3.00  | $15.00 |
-| **Haiku**  | $0.25  | $1.25  |
+| **Haiku**  | $1.00  | $5.00  |
+
+These are the built-in defaults. Override them per machine with `~/.shipwright/model-pricing.json`.
 
 ## Commands
 
@@ -81,14 +83,14 @@ The budget system has two thresholds:
 
 | Threshold         | Behavior                           |
 | ----------------- | ---------------------------------- |
-| **80% used**      | Warning logged, pipeline continues |
-| **100% exceeded** | Pipeline blocked, event emitted    |
+| **80% used**      | Warning logged, pipeline continues                              |
+| **Projected over budget** | Pipeline blocked (today's spend + estimate > budget), event emitted |
 
 The budget resets daily at midnight UTC.
 
 ## Cost Dashboard
 
-`shipwright cost show` displays a summary with spending totals, token counts, and trend analysis:
+`shipwright cost show` displays a summary with spending totals, token counts, and trend analysis. The block below is an example layout with illustrative numbers:
 
 ```
 ━━━ Cost Intelligence ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -124,13 +126,13 @@ The dashboard compares spending in the first and second halves of the period to 
 
 ## Cost Optimization Tips
 
-- **Use Sonnet for most stages** — It's 5x cheaper than Opus with strong results for build and test stages.
-- **Reserve Opus for planning** — The plan stage benefits most from Opus's deeper reasoning.
-- **Use Haiku for review** — Quick review passes can use the cheapest model effectively.
+- **Use Sonnet for most stages** — At the default rates, Opus costs about 1.7x Sonnet per token ($5 vs $3 input, $25 vs $15 output).
+- **Reserve Opus for the stages that need it** — The cost-aware template routes plan and build to Sonnet and reserves Opus for review.
+- **Use Haiku where the task is simple** — The cost-aware template uses Haiku for intake, test, audit, and PR stages. Keep review on a stronger model.
 - **Set budgets early** — A daily budget prevents surprises during autonomous daemon operation.
 - **Monitor by stage** — Use `--by-stage` to identify which stages consume the most tokens and optimize accordingly.
 - **Track by issue** — Use `--by-issue` to understand cost per feature and estimate future work.
 
 ## Intelligent Cost Prediction
 
-With the intelligence layer enabled, the `intelligence_predict_cost` function estimates token usage and cost before a pipeline runs, based on issue complexity and historical data. The `intelligence_recommend_model` function routes each stage to the cheapest model that can handle the task — using haiku for simple stages and opus only when complexity warrants it. See the [Intelligence guide](/guides/intelligence/) for details.
+With the intelligence layer enabled, the `intelligence_predict_cost` function estimates token usage and cost before a pipeline runs, based on issue complexity and historical data. The `intelligence_recommend_model` function routes each stage to the cheapest model that can handle the task — using haiku for simple stages and opus only when complexity warrants it. See the [Intelligence guide](/shipwright/guides/intelligence/) for details.

@@ -1,9 +1,9 @@
 ---
 title: Templates
-description: 24 team templates and 8 pipeline templates — from feature development to autonomous deployment.
+description: 25 team templates and 9 pipeline templates — from feature development to autonomous deployment.
 ---
 
-Shipwright includes **24 team templates** organized by SDLC phase and **8 pipeline templates** for different delivery strategies. Team templates define agent roles, focus areas, and file ownership. Pipeline templates define which stages run and how they're gated.
+Shipwright includes **25 team templates** organized by SDLC phase and **9 pipeline templates** for different delivery strategies. Team templates define agent roles, focus areas, and file ownership. Pipeline templates define which stages run and how they're gated.
 
 Browse team templates with `shipwright templates list` and pipeline templates with `shipwright pipeline list`.
 
@@ -97,6 +97,18 @@ Team templates define agent roles, their focus areas, and the files they should 
 | **rollback** | Rollback scripts, backward compat  | Verify safe reversal |
 
 **Best for:** Database migrations and schema changes that need forward and rollback paths.
+
+### Documentation Fleet (`doc-fleet`) — 5 agents
+
+| Agent               | Focus                                                                | Example Files                                              |
+| ------------------- | -------------------------------------------------------------------- | ---------------------------------------------------------- |
+| **doc-architect**   | Documentation structure, information architecture, cross-linking     | `docs/`, `.claude/`, `README.md`, `STRATEGY.md`            |
+| **claude-md**       | CLAUDE.md files, agent role definitions, development guidelines      | `.claude/agents/`, `claude-code/`                          |
+| **strategy-curator**| Strategic docs, plans, roadmap, backlog triage, metrics updates      | `STRATEGY.md`, `docs/strategy/`                            |
+| **pattern-writer**  | Developer guides, patterns, tips, known issues, policy docs          | `docs/patterns/`, `docs/TIPS.md`, `docs/config-policy.md`  |
+| **readme-optimizer**| README, onboarding, install flow, command tables                     | `README.md`, `install.sh`                                  |
+
+**Best for:** Documentation refactoring and cleanup across the repo, with each agent owning a separate set of docs.
 
 ## Planning Phase
 
@@ -262,98 +274,67 @@ Team templates define agent roles, their focus areas, and the files they should 
 
 ## Pipeline Templates
 
-In addition to team templates, Shipwright includes pipeline templates that define which stages run and how they're configured. Browse them with `shipwright pipeline list` and view details with `shipwright pipeline show <name>`.
+In addition to team templates, Shipwright includes **9 pipeline templates** that define which stages run and how they're gated. Browse them with `shipwright pipeline list` and view details with `shipwright pipeline show <name>`.
 
-### Standard (`standard`)
+The full set of 15 stages, in order: intake, spec_generation, plan, design, build, test, review, spec_verification, compound_quality, audit, pr, merge, deploy, validate, monitor. Each template enables a subset of them, and each enabled stage has a gate: `auto` proceeds immediately, `approve` pauses for approval.
 
-The default balanced pipeline.
-
-| Stage                                                         | Gate | Notes                           |
-| ------------------------------------------------------------- | ---- | ------------------------------- |
-| intake → plan → build → test → review → compound_quality → pr | auto | Standard stages with auto-gates |
+| Template     | Enabled stages | Approval gates                                  |
+| ------------ | -------------- | ----------------------------------------------- |
+| `fast`       | 6              | none (all auto)                                 |
+| `hotfix`     | 6              | none (all auto)                                 |
+| `standard`   | 11             | plan, design, review, pr, merge                 |
+| `tdd`        | 11             | plan, design, review, pr, merge                 |
+| `full`       | 15             | plan, design, review, pr, merge, deploy         |
+| `autonomous` | 13             | none (all auto; deploy and validate disabled)   |
+| `deployed`   | 14             | deploy (rest auto; no audit stage)              |
+| `enterprise` | 14             | all except spec_generation and spec_verification |
+| `cost-aware` | 10             | plan, review, pr (deploy and validate disabled) |
 
 ### Fast (`fast`)
 
-Minimal pipeline for quick changes.
-
-| Stage                      | Gate | Notes                                    |
-| -------------------------- | ---- | ---------------------------------------- |
-| intake → build → test → pr | auto | Skips plan, review, and compound quality |
-
-### Full (`full`)
-
-Maximum thoroughness with all stages enabled.
-
-| Stage                                                                  | Gate    | Notes                      |
-| ---------------------------------------------------------------------- | ------- | -------------------------- |
-| intake → plan → design → build → test → review → compound_quality → pr | approve | All stages, approval gates |
+Quick changes. Stages: intake, spec_generation, build, test, compound_quality, pr. Plan, review, deploy, and validate are disabled. All enabled stages are auto.
 
 ### Hotfix (`hotfix`)
 
-Emergency pipeline for critical fixes.
+Urgent production fixes with minimal iteration. Same stages as `fast`, all auto.
 
-| Stage                      | Gate | Notes                 |
-| -------------------------- | ---- | --------------------- |
-| intake → build → test → pr | auto | Fast path, auto-gates |
+### Standard (`standard`)
+
+Feature work. Stages: intake, spec_generation, plan, design, build, test, review, spec_verification, compound_quality, pr, merge. Deploy, validate, and monitor are disabled. Plan, design, review, pr, and merge require approval.
+
+### TDD (`tdd`)
+
+Test-first feature work. Stages: intake, spec_generation, plan, design, build, test, review, spec_verification, compound_quality, pr, merge. Deploy is disabled. Plan, design, review, pr, and merge require approval.
+
+### Full (`full`)
+
+All 15 stages enabled. Plan, design, review, pr, merge, and deploy require approval. Validate and monitor run automatically.
 
 ### Autonomous (`autonomous`)
 
-Fully autonomous — no human gates.
-
-| Stage                                                                  | Gate | Notes                    |
-| ---------------------------------------------------------------------- | ---- | ------------------------ |
-| intake → plan → design → build → test → review → compound_quality → pr | auto | All stages auto-approved |
+Runs without human gates. 13 stages are enabled: all except deploy and validate, which are disabled. The `audit` stage runs here, and `merge` and `monitor` are enabled.
 
 ### Deployed (`deployed`)
 
-Full autonomous pipeline extended with deploy, validate, and monitor stages. Generated by `shipwright init --deploy`.
+Autonomous delivery through deploy, validate, and monitor, generated by `shipwright init --deploy`. Stages: all except `audit`. Only `deploy` requires approval. Key config from the template:
 
-| Stage                                                                                                        | Gate                        | Notes                                                                                           |
-| ------------------------------------------------------------------------------------------------------------ | --------------------------- | ----------------------------------------------------------------------------------------------- |
-| intake → plan → design → build → test → review → compound_quality → pr → merge → deploy → validate → monitor | deploy: approve, rest: auto | Deploy requires approval; merge auto-squashes; monitor watches for 5 minutes with auto-rollback |
-
-Key config:
-
-- `merge` — squash merge with CI wait (600s timeout), auto-delete branch
-- `deploy` — staging and production commands with rollback
-- `validate` — smoke test command and health URL check
-- `monitor` — 5-minute health watch, error threshold of 5, auto-rollback on `ERROR|FATAL|PANIC`
+- `merge`: squash merge, waits up to 600s for CI, deletes the branch afterwards
+- `monitor`: 5-minute health watch, error threshold 5, auto-rollback on `ERROR|FATAL|PANIC`
+- `validate`: smoke command and health URL check
 
 ### Enterprise (`enterprise`)
 
-Maximum safety — all stages, all gates on `approve`, strict quality, auto-rollback.
+Strict delivery. 14 stages enabled (all except `audit`). Every stage requires approval except spec_generation and spec_verification. Key config from the template:
 
-| Stage                                                                                                        | Gate         | Notes                         |
-| ------------------------------------------------------------------------------------------------------------ | ------------ | ----------------------------- |
-| intake → plan → design → build → test → review → compound_quality → pr → merge → deploy → validate → monitor | all: approve | Every stage requires approval |
-
-Key config:
-
-- `test` — 90% minimum coverage
-- `compound_quality` — adversarial + negative + e2e + DoD audit, 5 max cycles, strict quality enabled
-- `pr` — waits for CI to pass
-- `merge` — CI wait timeout 900s
-- `monitor` — 10-minute watch, error threshold of 3
+- `test`: 90% minimum coverage
+- `compound_quality`: 5 max cycles, strict quality enabled
+- `pr`: waits for CI to pass
+- `merge`: CI wait timeout 900s
+- `monitor`: 10-minute watch, error threshold 3, auto-rollback enabled
 
 ### Cost-Aware (`cost-aware`)
 
-Cost-optimized pipeline with intelligent model routing, per-stage cost tracking, and budget enforcement.
-
-| Stage  | Gate    | Model  | Notes                         |
-| ------ | ------- | ------ | ----------------------------- |
-| intake | auto    | haiku  | Cheap model for intake        |
-| plan   | approve | sonnet | Mid-tier for planning         |
-| build  | auto    | sonnet | Aborts if budget exceeded     |
-| test   | auto    | haiku  | Cheap model for test analysis |
-| review | approve | opus   | Best model for code review    |
-| pr     | approve | haiku  | Cheap model for PR creation   |
-
-Key config:
-
-- `cost_tracking: true` on every stage
-- `abort_on_budget: true` on build stage
-- `budget_check: true` in defaults
-- Deploy and validate stages disabled by default
+Budget-conscious delivery. Stages: intake, spec_generation, plan, build, test, review, spec_verification, compound_quality, audit, pr. Deploy and validate are disabled. Plan, review, and pr require approval. Stages are routed to models in the template: intake, test, audit, and pr use haiku; plan, build, and compound_quality use sonnet; review uses opus. Cost tracking is on for each stage, and `build` aborts if the budget is exceeded.
 
 ## Using Templates
 

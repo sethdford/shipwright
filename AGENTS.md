@@ -21,8 +21,8 @@ A change is done when `bun run check` passes. Failure messages name the rule and
 - `src/adapters` — the only code that touches processes, files, network, env, tmux or Claude.
 - `src/cli` — thin commands; `src/main.ts` wires adapters into use cases.
 
-Contexts: delivery, orchestration, planning, quality, learning, intelligence, integrations,
-observability, teams, platform.
+Target contexts: delivery, orchestration, planning, quality, learning, intelligence, integrations,
+observability, teams, platform. In code so far: orchestration, learning, integrations, platform.
 
 ## Fitness rules (spec §3.3, ADR-0008)
 

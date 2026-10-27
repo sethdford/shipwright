@@ -11,41 +11,36 @@ The theme lives in `tmux/tmux.conf`. It uses a dark blue-gray background with cy
 
 ### Color Palette
 
-| Element                             | Color          | Hex       |
-| ----------------------------------- | -------------- | --------- |
-| Background                          | Dark blue-gray | `#1a1a2e` |
-| Foreground                          | Warm gray      | `#a8a8b0` |
-| Accent (active borders, highlights) | Cyan           | `#00d4ff` |
-| Secondary                           | Blue           | `#0066ff` |
-| Tertiary                            | Purple         | `#7c3aed` |
-| Inactive borders                    | Muted indigo   | `#333355` |
-| Inactive elements                   | Zinc           | `#71717a` |
-| Active pane background              | Lifted dark    | `#1e1e34` |
+The tmux overlay uses these values (`tmux/shipwright-overlay.conf` and `tmux/tmux.conf`):
 
-:::note[v2.1.0 Color Update]
-Near-white text (`#e4e4e7`) was replaced with warm grays across all tmux chrome for reduced glare during extended sessions.
-:::
+| Element                     | Hex       |
+| --------------------------- | --------- |
+| Pane background             | `#1a1a2e` |
+| Active pane background      | `#1e1e36` |
+| Pane foreground             | `#8888a0` |
+| Active pane foreground      | `#b4b4c8` |
+| Accent (active pane border) | `#00d4ff` |
+| Inactive pane border        | `#333355` |
+| Inactive window label       | `#71717a` |
 
-### Visual Features (v2.1.0)
+To customize colors, edit the hex values in `tmux/shipwright-overlay.conf` and `tmux/tmux.conf`, then reload with `prefix + r`.
 
-**Role-Colored Pane Borders** — active pane border color reflects the agent role:
+### Visual Features
 
-| Role      | Color  | Hex       |
-| --------- | ------ | --------- |
-| Builder   | Blue   | `#0066ff` |
-| Reviewer  | Orange | `#f59e0b` |
-| Tester    | Yellow | `#eab308` |
-| Optimizer | Purple | `#7c3aed` |
-| Security  | Red    | `#ef4444` |
-| Docs      | Green  | `#4ade80` |
+**Role-colored pane borders:** `scripts/sw-tmux-role-color.sh` sets the active pane border color from the agent's role. Unknown roles fall back to cyan.
 
-**Pipeline Stage Badge** — the status bar shows a live pipeline stage indicator (`⚙ BUILD`, `⚡ TEST`, `↑ PR`) with stage-specific colors.
+| Role         | Color  | Hex       |
+| ------------ | ------ | --------- |
+| leader, pm   | Cyan   | `#00d4ff` |
+| builder, dev | Blue   | `#0066ff` |
+| reviewer     | Orange | `#f97316` |
+| tester       | Yellow | `#facc15` |
+| security     | Red    | `#ef4444` |
+| docs, writer | Violet | `#a78bfa` |
+| optimizer    | Green  | `#4ade80` |
+| researcher   | Purple | `#7c3aed` |
 
-**Agent Count Widget** — displays `λN` in the status bar showing the count of active agents from heartbeat files.
-
-**Active Pane Lift** — subtle background depth effect distinguishes the active pane from inactive panes.
-
-To customize colors, edit the hex values in `tmux/tmux.conf` and reload with `prefix + r`.
+**Pipeline stage indicator:** the status bar shows the current pipeline stage.
 
 ### Keybindings
 
@@ -143,10 +138,17 @@ Then wire them up in `~/.claude/settings.json`:
 ```json
 {
   "hooks": {
-    "teammate-idle": {
-      "command": "~/.claude/hooks/teammate-idle.sh",
-      "timeout": 30000
-    }
+    "TeammateIdle": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "~/.claude/hooks/teammate-idle.sh",
+            "timeout": 30
+          }
+        ]
+      }
+    ]
   }
 }
 ```
@@ -181,7 +183,7 @@ The daemon configuration file at `.claude/daemon-config.json` controls all daemo
 
 | Field               | Default            | Description                      |
 | ------------------- | ------------------ | -------------------------------- |
-| `watch_label`       | `"ready-to-build"` | GitHub label to watch for        |
+| `watch_label`       | `"shipwright"`     | GitHub label to watch for        |
 | `poll_interval`     | `60`               | Seconds between polls            |
 | `max_parallel`      | `2`                | Maximum concurrent pipeline jobs |
 | `pipeline_template` | `"autonomous"`     | Default pipeline template        |
@@ -225,21 +227,14 @@ Automatically retries failed pipelines with optional model/template escalation.
 
 ### Self-Optimizing Metrics
 
-Automatically tunes daemon parameters based on DORA metric thresholds. Enabled by default in the shipped daemon config.
+Automatically tunes daemon parameters based on DORA metric thresholds. Off by default: `daemon init` writes `false`.
 
 | Field               | Default | Description                                               |
 | ------------------- | ------- | --------------------------------------------------------- |
-| `self_optimize`     | `true`  | Enable self-optimizing loop (includes context efficiency) |
+| `self_optimize`     | `false` | Enable self-optimizing loop (includes context efficiency) |
 | `optimize_interval` | `10`    | Poll cycles between optimization checks                   |
 
-Self-optimization adjustments:
-
-- **CFR > 40%** — switches to `full` template
-- **CFR > 20%** — enables compound quality
-- **Lead time > 4hrs** — increases `max_parallel`, halves `poll_interval`
-- **Lead time > 2hrs** — enables `auto_template`
-- **Deploy freq < 1/day** — recommends merge stage
-- **MTTR > 2hrs** — recommends auto-rollback
+The adjustments the daemon makes depend on its current DORA metrics. See the [Daemon guide](/shipwright/guides/daemon/) for how DORA metrics are used.
 
 ### Priority Lanes
 
@@ -291,7 +286,7 @@ Monitors pipeline success rates and alerts on quality declines.
 
 | Field                          | Default               | Description                             |
 | ------------------------------ | --------------------- | --------------------------------------- |
-| `on_success.remove_label`      | `"ready-to-build"`    | Label to remove on success              |
+| `on_success.remove_label`      | `"shipwright"`       | Label to remove on success              |
 | `on_success.add_label`         | `"pipeline/complete"` | Label to add on success                 |
 | `on_success.close_issue`       | `false`               | Close issue on success                  |
 | `on_failure.add_label`         | `"pipeline/failed"`   | Label to add on failure                 |
@@ -307,7 +302,7 @@ Monitors pipeline success rates and alerts on quality declines.
 
 ```json
 {
-  "watch_label": "ready-to-build",
+  "watch_label": "shipwright",
   "poll_interval": 60,
   "max_parallel": 2,
   "pipeline_template": "autonomous",
@@ -348,7 +343,7 @@ Monitors pipeline success rates and alerts on quality declines.
     "stale_timeout_s": 1800
   },
   "on_success": {
-    "remove_label": "ready-to-build",
+    "remove_label": "shipwright",
     "add_label": "pipeline/complete",
     "close_issue": false
   },
@@ -377,9 +372,9 @@ The intelligence layer adds semantic codebase analysis, predictive risk assessme
 
 | Field                               | Default | Description                                                                     |
 | ----------------------------------- | ------- | ------------------------------------------------------------------------------- |
-| `intelligence.composer_enabled`     | `false` | Enable dynamic pipeline composition (replaces static template selection)        |
-| `intelligence.optimization_enabled` | `true`  | Enable self-optimization (outcome analysis, template tuning, model A/B testing) |
-| `intelligence.prediction_enabled`   | `true`  | Enable predictive analytics (risk assessment, anomaly detection, AI patrol)     |
+| `intelligence.composer_enabled`     | `"auto"` | Enable dynamic pipeline composition (replaces static template selection)        |
+| `intelligence.optimization_enabled` | `"auto"` | Enable self-optimization (outcome analysis, template tuning, model A/B testing) |
+| `intelligence.prediction_enabled`   | `"auto"` | Enable predictive analytics (risk assessment, anomaly detection, AI patrol)     |
 | `intelligence.adversarial_enabled`  | `false` | Enable adversarial code review (red-team review after primary agent)            |
 | `intelligence.simulation_enabled`   | `false` | Enable developer simulation (simulated PR review with multiple personas)        |
 | `intelligence.architecture_enabled` | `false` | Enable architecture enforcer (living architectural model and validation)        |
@@ -418,7 +413,7 @@ Context engineering controls how pipeline agents compose and trim their context 
 | `loop.context_trim_hotspot_files` | `5`      | Max hotspot files included              |
 | `loop.context_trim_test_lines`    | `50`     | Max lines of test output included       |
 
-The self-optimization loop monitors context efficiency events (`loop.context_efficiency`) and recommends budget adjustments automatically. See the [Intelligence guide](/guides/intelligence/#context-efficiency-closed-loop) for details.
+The self-optimization loop monitors context efficiency events (`loop.context_efficiency`) and recommends budget adjustments automatically. See the [Intelligence guide](/shipwright/guides/intelligence/#context-efficiency-closed-loop) for details.
 
 ## Auto-Scaling Configuration
 
@@ -511,23 +506,26 @@ The `deployed` pipeline template uses placeholder commands (`__STAGING_CMD__`, `
 
 ## Environment Variables
 
-| Variable                               | Default      | Description                                            |
-| -------------------------------------- | ------------ | ------------------------------------------------------ |
-| `CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS` | —            | **Required.** Enables agent teams                      |
-| `CLAUDE_CODE_SUBAGENT_MODEL`           | parent model | Model for subagent lookups (`"haiku"` recommended)     |
-| `CLAUDE_CODE_AUTOCOMPACT_PCT_OVERRIDE` | `"80"`       | Context compaction threshold (lower = more aggressive) |
-| `CLAUDE_CODE_MAX_TOOL_USE_CONCURRENCY` | `"3"`        | Parallel tool calls per agent                          |
-| `SHIPWRIGHT_WEBHOOK_URL`               | —            | Custom webhook URL for pipeline notifications          |
+Shipped values come from `claude-code/settings.json.template` (the `env` block):
+
+| Variable                               | Shipped value | Description                                            |
+| -------------------------------------- | ------------- | ------------------------------------------------------ |
+| `CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS` | `"1"`         | **Required.** Enables agent teams                      |
+| `CLAUDE_CODE_SUBAGENT_MODEL`           | `"haiku"`     | Model for subagent lookups                             |
+| `CLAUDE_CODE_AUTOCOMPACT_PCT_OVERRIDE` | `"70"`        | Context compaction threshold (lower = more aggressive) |
+| `CLAUDE_CODE_MAX_TOOL_USE_CONCURRENCY` | `"5"`         | Parallel tool calls per agent                          |
+| `SHIPWRIGHT_WEBHOOK_URL`               | unset         | Custom webhook URL for pipeline notifications          |
 
 ## tmux Plugins (TPM)
 
-After installation, press `prefix + I` to install plugins.
+After installation, press `prefix + I` to install plugins. The plugins loaded by `tmux/tmux.conf` are:
 
-| Plugin             | Key            | What It Does                                    |
-| ------------------ | -------------- | ----------------------------------------------- |
-| **tmux-fingers**   | `prefix + F`   | Vimium-style copy hints for URLs, paths, hashes |
-| **tmux-fzf-url**   | `prefix + u`   | Fuzzy-find and open URLs                        |
-| **tmux-fzf**       | `F5`           | Fuzzy finder for sessions, windows, panes       |
-| **extrakto**       | `prefix + tab` | Extract and copy text from pane output          |
-| **tmux-resurrect** | auto           | Save and restore sessions across restarts       |
-| **tmux-continuum** | auto           | Automatic continuous session saving             |
+| Plugin             | Key               | What It Does                                                       |
+| ------------------ | ----------------- | ------------------------------------------------------------------ |
+| **tmux-sensible**  | —                 | Sensible base tmux defaults                                        |
+| **tmux-resurrect** | —                 | Saves and restores sessions, including pane contents               |
+| **tmux-continuum** | —                 | Saves sessions every 15 minutes and restores them when tmux starts |
+| **tmux-yank**      | mouse selection   | Copies selections to the system clipboard                          |
+| **tmux-fzf**       | `prefix + Ctrl-f` | Fuzzy finder for sessions, windows, and panes in a popup           |
+
+`prefix + F` opens a floating popup terminal in the current directory. It is defined in `tmux/tmux.conf`, not by a plugin.

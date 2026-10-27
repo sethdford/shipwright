@@ -9,7 +9,7 @@
 _MEMEFF_LOADED=1
 set -euo pipefail
 
-VERSION="3.3.0"
+VERSION="4.0.0"
 
 # ─── Helpers (loaded from parent context) ───────────────────────────────────
 # Expects: info(), success(), warn(), error(), emit_event(), now_iso()
