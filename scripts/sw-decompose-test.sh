@@ -70,7 +70,8 @@ echo ""
 echo -e "  ${CYAN}version flag${RESET}"
 output=$(bash "$SCRIPT_DIR/sw-decompose.sh" --version 2>&1) && rc=0 || rc=$?
 assert_eq "--version exits 0" "0" "$rc"
-assert_contains "--version shows version" "$output" "3."
+expected_version="$(sed -n 's/^VERSION="\([^"]*\)".*/\1/p' "$SCRIPT_DIR/sw-decompose.sh")"
+assert_contains "--version shows version" "$output" "$expected_version"
 
 # ─── Test 4: unknown command ──────────────────────────────────────────────
 echo ""
