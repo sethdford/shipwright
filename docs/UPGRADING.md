@@ -77,7 +77,8 @@ ID listed in `config/models.json`.
 shipwright pipeline start --issue 42 --model opus
 ```
 
-To change which model an alias means, or to allow another model ID, edit `config/models.json`.
+To change which model an alias means, or to use another model ID, edit or add an alias in
+`config/models.json`.
 Do not use `ANTHROPIC_MODEL`.
 
 ### 7. Repositories: `.claude/` runtime state is untracked
@@ -90,7 +91,7 @@ If a branch committed those runtime files, merging 4.0 gives you modify/delete c
 Resolve them by untracking the files and keeping your working copies:
 
 ```bash
-git rm --cached -r .claude/loop-logs .claude/loop-state.md
+git rm --cached -r --ignore-unmatch .claude/loop-logs .claude/loop-state.md
 ```
 
 ### Then upgrade

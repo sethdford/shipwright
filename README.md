@@ -281,7 +281,7 @@ Each stage is configurable with quality gates that auto-proceed or pause for app
 
 ### Intelligence Layer
 
-7 modules that make the pipeline smarter over time. Intelligence is on by default once `shipwright init` has created `.claude/daemon-config.json` and the Claude CLI is available. Set `intelligence.enabled=false` to disable. All modules degrade gracefully.
+7 modules that make the pipeline smarter over time. Intelligence defaults to `auto` (on when the Claude CLI is available) once `shipwright daemon init` has created `.claude/daemon-config.json`; without that file it is off. Set `intelligence.enabled=false` to disable. All modules degrade gracefully.
 
 | Module                       | What It Does                                                                                                          |
 | ---------------------------- | --------------------------------------------------------------------------------------------------------------------- |

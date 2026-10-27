@@ -421,12 +421,7 @@ shipwright daemon start --no-github
 - CODEOWNERS — read from repo if present
 ```
 
-Enable with the `--local` flag, or with environment variables:
-
-```bash
-export SHIPWRIGHT_LOCAL=1
-export NO_GITHUB=true
-```
+Enable with `shipwright pipeline start --local` (no GitHub calls, no label changes) or `--no-github`.
 
 ## Multi-Repo Operations
 
@@ -1033,7 +1028,7 @@ Specialized agent definitions in `.claude/agents/` are loaded automatically by C
 
 | Agent           | File                 | Purpose                                                                       |
 | --------------- | -------------------- | ----------------------------------------------------------------------------- |
-| Reviewer        | `reviewer.md`        | Read-only diff review against fitness rules F1–F12 and the safety rules       |
+| Reviewer        | `reviewer.md`        | Read-only diff review against fitness rules F1–F10 and the safety rules       |
 | Verifier        | `verifier.md`        | Independent PASS/FAIL check: `bun run check`, parity, one adversarial input   |
 | Porter          | `porter.md`          | Ports one bash command to TypeScript with the `port-bash-command` skill       |
 | Doc Fleet Agent | `doc-fleet-agent.md` | Documentation fleet role definition, read by `sw-doc-fleet.sh` agent briefs   |

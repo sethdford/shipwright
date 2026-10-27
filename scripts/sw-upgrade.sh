@@ -279,7 +279,7 @@ bootstrap_manifest() {
 
 # ─── Main logic ────────────────────────────────────────────────────────────
 echo ""
-echo -e "${CYAN}${BOLD}shipwright${RESET} ${DIM}v1.3.0${RESET} — ${BOLD}$(if $APPLY; then echo "Applying Upgrade"; else echo "Upgrade Check"; fi)${RESET}"
+echo -e "${CYAN}${BOLD}shipwright${RESET} ${DIM}v${VERSION}${RESET} — ${BOLD}$(if $APPLY; then echo "Applying Upgrade"; else echo "Upgrade Check"; fi)${RESET}"
 echo -e "${CYAN}═══════════════════════════════════════════════${RESET}"
 echo ""
 echo -e "Comparing installed files against repo at:"
