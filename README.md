@@ -275,7 +275,7 @@ Each stage is configurable with quality gates that auto-proceed or pause for app
 | `tdd`        | Like standard, tests generated before build               | Test-first work           |
 | `full`       | All 15 stages                                             | Production deployment     |
 | `autonomous` | Through audit, PR, merge, monitor; all auto               | Daemon-driven delivery    |
-| `enterprise` | Through deploy, validate, monitor; all gates on approve   | Maximum safety + rollback |
+| `enterprise` | Through deploy, validate, monitor; approve gates (spec stages auto) | Maximum safety + rollback |
 | `cost-aware` | Through audit and PR, with budget limits                  | Budget-limited delivery   |
 | `deployed`   | Through merge, deploy, validate, monitor                  | Full deploy pipeline      |
 
