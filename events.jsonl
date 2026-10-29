@@ -1538,3 +1538,4 @@
 {"ts":"2026-10-29T00:21:57Z","ts_epoch":1793233317,"type":"patrol.finding","check":"untested_script","script":"sw-event-schema-sync.sh","lines":93,"usage":0}
 {"ts":"2026-10-29T00:21:59Z","ts_epoch":1793233319,"type":"patrol.issue_refused","check":"untested_scripts","count":7}
 {"ts":"2026-10-29T00:22:01Z","ts_epoch":1793233321,"type":"patrol.meta_issue_refused","title":"[Meta] Add tests for sw-event-schema-sync.sh"}
+{"ts":"2026-10-29T04:04:48Z","ts_epoch":1793246688,"type":"hygiene_platform_refactor","hardcoded":49,"fallback":76,"todo":51}
