@@ -1705,3 +1705,7 @@
 {"ts":"2026-10-30T12:12:50Z","ts_epoch":1793362370,"type":"patrol.finding","check":"untested_script","script":"sw-event-schema-sync.sh","lines":93,"usage":0}
 {"ts":"2026-10-30T12:12:52Z","ts_epoch":1793362372,"type":"patrol.issue_refused","check":"untested_scripts","count":7}
 {"ts":"2026-10-30T12:12:54Z","ts_epoch":1793362374,"type":"patrol.meta_issue_refused","title":"[Meta] Add tests for sw-event-schema-sync.sh"}
+{"ts":"2026-10-30T16:03:45Z","ts_epoch":1793376225,"type":"hygiene_platform_refactor","hardcoded":49,"fallback":76,"todo":51}
+{"ts":"2026-10-30T16:04:36Z","ts_epoch":1793376276,"type":"strategic.issue_refused","title":"Blast-radius guard for the build loop: abort and revert iterations that delete or rewrite far more than the task implies"}
+{"ts":"2026-10-30T16:04:38Z","ts_epoch":1793376278,"type":"strategic.issue_refused","title":"Route auth failures to a terminal stop instead of retrying them: fix the check_fatal_error inversion and stderr misrouting"}
+{"ts":"2026-10-30T16:04:38Z","ts_epoch":1793376278,"type":"strategic.cycle_complete","issues_created":0,"issues_skipped":3}
