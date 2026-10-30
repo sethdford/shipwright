@@ -1679,3 +1679,4 @@
 {"ts":"2026-10-30T08:05:45Z","ts_epoch":1793347545,"type":"strategic.issue_refused","title":"Pre-build validation: fail fast when the test or lint command is missing or broken"}
 {"ts":"2026-10-30T08:05:48Z","ts_epoch":1793347548,"type":"strategic.issue_refused","title":"Loop blast-radius guard that is budgeted by the task's expected diff size"}
 {"ts":"2026-10-30T08:05:48Z","ts_epoch":1793347548,"type":"strategic.cycle_complete","issues_created":0,"issues_skipped":3}
+{"ts":"2026-10-30T12:05:33Z","ts_epoch":1793361933,"type":"hygiene_platform_refactor","hardcoded":49,"fallback":76,"todo":51}
