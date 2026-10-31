@@ -1796,3 +1796,28 @@
 {"ts":"2026-10-31T08:04:33Z","ts_epoch":1793433873,"type":"strategic.issue_refused","title":"Port the next `bash` entry in progress.json to TypeScript with a green parity suite"}
 {"ts":"2026-10-31T08:04:33Z","ts_epoch":1793433873,"type":"strategic.cycle_complete","issues_created":0,"issues_skipped":3}
 {"ts":"2026-10-31T12:03:41Z","ts_epoch":1793448221,"type":"hygiene_platform_refactor","hardcoded":49,"fallback":76,"todo":51}
+{"ts":"2026-10-31T12:08:53Z","ts_epoch":1793448533,"type":"patrol.started","dry_run":"false"}
+{"ts":"2026-10-31T12:08:54Z","ts_epoch":1793448534,"type":"patrol.finding","check":"stale_dependency","package":"jsdom","current":"28.1.0","latest":"30.1.3"}
+{"ts":"2026-10-31T12:08:54Z","ts_epoch":1793448534,"type":"patrol.finding","check":"stale_dependency","package":"typescript","current":"5.9.3","latest":"7.0.2"}
+{"ts":"2026-10-31T12:08:59Z","ts_epoch":1793448539,"type":"patrol.issue_refused","check":"stale_dependency","count":2}
+{"ts":"2026-10-31T12:09:13Z","ts_epoch":1793448553,"type":"patrol.finding","check":"recurring_failure","pattern":"[38;2;74;222;128m[1m✓[0m reveal shows 1/3 pass count on","seen_count":52}
+{"ts":"2026-10-31T12:09:16Z","ts_epoch":1793448556,"type":"patrol.issue_refused","check":"recurring_failure","pattern":"[38;2;74;222;128m[1m✓[0m reveal shows 1/3 pass count on"}
+{"ts":"2026-10-31T12:09:16Z","ts_epoch":1793448556,"type":"patrol.finding","check":"recurring_failure","pattern":"FAIL: 0","seen_count":14}
+{"ts":"2026-10-31T12:09:18Z","ts_epoch":1793448558,"type":"patrol.issue_refused","check":"recurring_failure","pattern":"FAIL: 0"}
+{"ts":"2026-10-31T12:09:18Z","ts_epoch":1793448558,"type":"patrol.finding","check":"recurring_failure","pattern":"Failed: 1","seen_count":11}
+{"ts":"2026-10-31T12:09:20Z","ts_epoch":1793448560,"type":"patrol.issue_refused","check":"recurring_failure","pattern":"Failed: 1"}
+{"ts":"2026-10-31T12:09:20Z","ts_epoch":1793448560,"type":"patrol.finding","check":"recurring_failure","pattern":"[2m  loop behavior: iterations on test failure[0m","seen_count":11}
+{"ts":"2026-10-31T12:09:22Z","ts_epoch":1793448562,"type":"patrol.issue_refused","check":"recurring_failure","pattern":"[2m  loop behavior: iterations on test failure[0m"}
+{"ts":"2026-10-31T12:09:22Z","ts_epoch":1793448562,"type":"patrol.finding","check":"recurring_failure","pattern":"[38;2;0;212;255m▸[0m Patrol recurring failures label con","seen_count":4}
+{"ts":"2026-10-31T12:09:24Z","ts_epoch":1793448564,"type":"patrol.issue_refused","check":"recurring_failure","pattern":"[38;2;0;212;255m▸[0m Patrol recurring failures label con"}
+{"ts":"2026-10-31T12:09:24Z","ts_epoch":1793448564,"type":"patrol.finding","check":"recurring_failure","pattern":"Results: [38;2;74;222;128m[1m127 PASS[0m | [38;2;248;113","seen_count":3}
+{"ts":"2026-10-31T12:09:26Z","ts_epoch":1793448566,"type":"patrol.issue_refused","check":"recurring_failure","pattern":"Results: [38;2;74;222;128m[1m127 PASS[0m | [38;2;248;113"}
+{"ts":"2026-10-31T12:09:27Z","ts_epoch":1793448567,"type":"patrol.finding","check":"untested_script","script":"sw-tracker-linear.sh","lines":568,"usage":7}
+{"ts":"2026-10-31T12:09:27Z","ts_epoch":1793448567,"type":"patrol.finding","check":"untested_script","script":"sw-tracker-jira.sh","lines":474,"usage":7}
+{"ts":"2026-10-31T12:09:27Z","ts_epoch":1793448567,"type":"patrol.finding","check":"untested_script","script":"sw-tracker-github.sh","lines":212,"usage":3}
+{"ts":"2026-10-31T12:09:27Z","ts_epoch":1793448567,"type":"patrol.finding","check":"untested_script","script":"sw-test-all.sh","lines":206,"usage":3}
+{"ts":"2026-10-31T12:09:27Z","ts_epoch":1793448567,"type":"patrol.finding","check":"untested_script","script":"sw-tmux-status.sh","lines":151,"usage":1}
+{"ts":"2026-10-31T12:09:27Z","ts_epoch":1793448567,"type":"patrol.finding","check":"untested_script","script":"sw-tmux-role-color.sh","lines":81,"usage":1}
+{"ts":"2026-10-31T12:09:27Z","ts_epoch":1793448567,"type":"patrol.finding","check":"untested_script","script":"sw-event-schema-sync.sh","lines":93,"usage":0}
+{"ts":"2026-10-31T12:09:29Z","ts_epoch":1793448569,"type":"patrol.issue_refused","check":"untested_scripts","count":7}
+{"ts":"2026-10-31T12:09:31Z","ts_epoch":1793448571,"type":"patrol.meta_issue_refused","title":"[Meta] Add tests for sw-event-schema-sync.sh"}
