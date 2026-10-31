@@ -1795,3 +1795,4 @@
 {"ts":"2026-10-31T08:04:30Z","ts_epoch":1793433870,"type":"strategic.issue_refused","title":"Add test suites for the five scripts that have none"}
 {"ts":"2026-10-31T08:04:33Z","ts_epoch":1793433873,"type":"strategic.issue_refused","title":"Port the next `bash` entry in progress.json to TypeScript with a green parity suite"}
 {"ts":"2026-10-31T08:04:33Z","ts_epoch":1793433873,"type":"strategic.cycle_complete","issues_created":0,"issues_skipped":3}
+{"ts":"2026-10-31T12:03:41Z","ts_epoch":1793448221,"type":"hygiene_platform_refactor","hardcoded":49,"fallback":76,"todo":51}
