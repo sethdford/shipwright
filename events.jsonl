@@ -1735,3 +1735,7 @@
 {"ts":"2026-10-30T18:08:10Z","ts_epoch":1793383690,"type":"patrol.issue_refused","check":"untested_scripts","count":7}
 {"ts":"2026-10-30T18:08:12Z","ts_epoch":1793383692,"type":"patrol.meta_issue_refused","title":"[Meta] Add tests for sw-event-schema-sync.sh"}
 {"ts":"2026-10-30T20:03:40Z","ts_epoch":1793390620,"type":"hygiene_platform_refactor","hardcoded":49,"fallback":76,"todo":51}
+{"ts":"2026-10-31T00:07:57Z","ts_epoch":1793405277,"type":"hygiene_platform_refactor","hardcoded":49,"fallback":76,"todo":51}
+{"ts":"2026-10-31T00:08:45Z","ts_epoch":1793405325,"type":"strategic.issue_refused","title":"Loop blast-radius guard: abort an iteration whose diff deletes far more than the task scope implies"}
+{"ts":"2026-10-31T00:08:49Z","ts_epoch":1793405329,"type":"strategic.issue_refused","title":"Port the next `bash` entry from docs/plans/port/progress.json to TypeScript with a parity suite"}
+{"ts":"2026-10-31T00:08:49Z","ts_epoch":1793405329,"type":"strategic.cycle_complete","issues_created":0,"issues_skipped":3}
