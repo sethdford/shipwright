@@ -1852,3 +1852,8 @@
 {"ts":"2026-10-31T18:08:07Z","ts_epoch":1793470087,"type":"patrol.issue_refused","check":"untested_scripts","count":7}
 {"ts":"2026-10-31T18:08:09Z","ts_epoch":1793470089,"type":"patrol.meta_issue_refused","title":"[Meta] Add tests for sw-event-schema-sync.sh"}
 {"ts":"2026-10-31T20:02:57Z","ts_epoch":1793476977,"type":"hygiene_platform_refactor","hardcoded":49,"fallback":76,"todo":51}
+{"ts":"2026-11-01T00:10:31Z","ts_epoch":1793491831,"type":"hygiene_platform_refactor","hardcoded":49,"fallback":76,"todo":51}
+{"ts":"2026-11-01T00:11:36Z","ts_epoch":1793491896,"type":"strategic.issue_refused","title":"Quarantine issues after N consecutive build-loop failures using the durable WorkQueue"}
+{"ts":"2026-11-01T00:11:39Z","ts_epoch":1793491899,"type":"strategic.issue_refused","title":"Make pre-build validation a fail-closed gate that checks test and lint commands in the TypeScript pipeline"}
+{"ts":"2026-11-01T00:11:41Z","ts_epoch":1793491901,"type":"strategic.issue_refused","title":"Add a blast-radius guard that aborts a loop iteration when its diff far exceeds the task's expected scope"}
+{"ts":"2026-11-01T00:11:41Z","ts_epoch":1793491901,"type":"strategic.cycle_complete","issues_created":0,"issues_skipped":3}
