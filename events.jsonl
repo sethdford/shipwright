@@ -1970,3 +1970,8 @@
 {"ts":"2026-11-01T20:04:06Z","ts_epoch":1793563446,"type":"strategic.issue_refused","title":"Add test suites for the five untested scripts"}
 {"ts":"2026-11-01T20:04:09Z","ts_epoch":1793563449,"type":"strategic.issue_refused","title":"Port the next `bash` entry in progress.json to TypeScript with a green parity suite"}
 {"ts":"2026-11-01T20:04:09Z","ts_epoch":1793563449,"type":"strategic.cycle_complete","issues_created":0,"issues_skipped":3}
+{"ts":"2026-11-02T00:08:49Z","ts_epoch":1793578129,"type":"hygiene_platform_refactor","hardcoded":49,"fallback":76,"todo":51}
+{"ts":"2026-11-02T00:09:42Z","ts_epoch":1793578182,"type":"strategic.issue_refused","title":"Add test suites for the four untested scripts: event-schema-sync, tmux-role-color, tmux-status, tracker-github"}
+{"ts":"2026-11-02T00:09:45Z","ts_epoch":1793578185,"type":"strategic.issue_refused","title":"Record a failure reason for each closed-without-shipping strategic suggestion and feed it back to the PM prompt"}
+{"ts":"2026-11-02T00:09:47Z","ts_epoch":1793578187,"type":"strategic.issue_refused","title":"Move hardcoded loop and daemon timeouts and limits into policy config with validated defaults"}
+{"ts":"2026-11-02T00:09:47Z","ts_epoch":1793578187,"type":"strategic.cycle_complete","issues_created":0,"issues_skipped":3}
