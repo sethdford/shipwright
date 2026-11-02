@@ -2030,3 +2030,4 @@
 {"ts":"2026-11-02T08:05:59Z","ts_epoch":1793606759,"type":"strategic.issue_refused","title":"Build-loop blast-radius guard: abort and revert iterations that delete far more than the task scope"}
 {"ts":"2026-11-02T08:06:02Z","ts_epoch":1793606762,"type":"strategic.issue_refused","title":"Port the next `bash` entry in progress.json to TypeScript with a green parity suite"}
 {"ts":"2026-11-02T08:06:02Z","ts_epoch":1793606762,"type":"strategic.cycle_complete","issues_created":0,"issues_skipped":3}
+{"ts":"2026-11-02T12:05:19Z","ts_epoch":1793621119,"type":"hygiene_platform_refactor","hardcoded":49,"fallback":76,"todo":51}
