@@ -2026,3 +2026,7 @@
 {"ts":"2026-11-02T06:16:37Z","ts_epoch":1793600197,"type":"patrol.finding","check":"untested_script","script":"sw-event-schema-sync.sh","lines":93,"usage":0}
 {"ts":"2026-11-02T06:16:39Z","ts_epoch":1793600199,"type":"patrol.issue_refused","check":"untested_scripts","count":7}
 {"ts":"2026-11-02T06:16:41Z","ts_epoch":1793600201,"type":"patrol.meta_issue_refused","title":"[Meta] Add tests for sw-event-schema-sync.sh"}
+{"ts":"2026-11-02T08:05:13Z","ts_epoch":1793606713,"type":"hygiene_platform_refactor","hardcoded":49,"fallback":76,"todo":51}
+{"ts":"2026-11-02T08:05:59Z","ts_epoch":1793606759,"type":"strategic.issue_refused","title":"Build-loop blast-radius guard: abort and revert iterations that delete far more than the task scope"}
+{"ts":"2026-11-02T08:06:02Z","ts_epoch":1793606762,"type":"strategic.issue_refused","title":"Port the next `bash` entry in progress.json to TypeScript with a green parity suite"}
+{"ts":"2026-11-02T08:06:02Z","ts_epoch":1793606762,"type":"strategic.cycle_complete","issues_created":0,"issues_skipped":3}
