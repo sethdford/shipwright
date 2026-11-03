@@ -2087,3 +2087,8 @@
 {"ts":"2026-11-02T20:04:14Z","ts_epoch":1793649854,"type":"strategic.issue_refused","title":"Add test suites for the five untested scripts (tracker-github, tmux-status, tmux-role-color, event-schema-sync, test-all)"}
 {"ts":"2026-11-02T20:04:17Z","ts_epoch":1793649857,"type":"strategic.issue_refused","title":"Port the next bash entry in progress.json to TypeScript with a parity suite"}
 {"ts":"2026-11-02T20:04:17Z","ts_epoch":1793649857,"type":"strategic.cycle_complete","issues_created":0,"issues_skipped":3}
+{"ts":"2026-11-03T00:08:32Z","ts_epoch":1793664512,"type":"hygiene_platform_refactor","hardcoded":49,"fallback":76,"todo":51}
+{"ts":"2026-11-03T00:09:12Z","ts_epoch":1793664552,"type":"strategic.issue_refused","title":"Port `shipwright quality validate` and `release publish` routes to TypeScript and fix the broken router lines"}
+{"ts":"2026-11-03T00:09:15Z","ts_epoch":1793664555,"type":"strategic.issue_refused","title":"Retry-aware failure feedback: carry the classified failure reason and the failing test excerpt into the next build iteration"}
+{"ts":"2026-11-03T00:09:17Z","ts_epoch":1793664557,"type":"strategic.issue_refused","title":"Move loop and retry tunables (iteration caps, timeouts, stall thresholds) into a validated policy file with a typed loader"}
+{"ts":"2026-11-03T00:09:17Z","ts_epoch":1793664557,"type":"strategic.cycle_complete","issues_created":0,"issues_skipped":3}
