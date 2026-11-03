@@ -2173,3 +2173,8 @@
 {"ts":"2026-11-03T12:10:32Z","ts_epoch":1793707832,"type":"patrol.finding","check":"untested_script","script":"sw-event-schema-sync.sh","lines":93,"usage":0}
 {"ts":"2026-11-03T12:10:34Z","ts_epoch":1793707834,"type":"patrol.issue_refused","check":"untested_scripts","count":7}
 {"ts":"2026-11-03T12:10:36Z","ts_epoch":1793707836,"type":"patrol.meta_issue_refused","title":"[Meta] Add tests for sw-event-schema-sync.sh"}
+{"ts":"2026-11-03T16:04:12Z","ts_epoch":1793721852,"type":"hygiene_platform_refactor","hardcoded":49,"fallback":76,"todo":51}
+{"ts":"2026-11-03T16:05:05Z","ts_epoch":1793721905,"type":"strategic.issue_refused","title":"Pre-build gate: detect missing or broken test/lint commands in the TypeScript pipeline path before the first build iteration"}
+{"ts":"2026-11-03T16:05:08Z","ts_epoch":1793721908,"type":"strategic.issue_refused","title":"Record per-stage failure classification outcomes in the learning context for accuracy reporting"}
+{"ts":"2026-11-03T16:05:11Z","ts_epoch":1793721911,"type":"strategic.issue_refused","title":"Loop blast-radius guard: abort an iteration whose diff deletes far more than the task scope"}
+{"ts":"2026-11-03T16:05:11Z","ts_epoch":1793721911,"type":"strategic.cycle_complete","issues_created":0,"issues_skipped":3}
