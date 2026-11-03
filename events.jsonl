@@ -2147,3 +2147,4 @@
 {"ts":"2026-11-03T08:04:53Z","ts_epoch":1793693093,"type":"strategic.issue_refused","title":"Loop blast-radius guard: abort an iteration whose diff deletes far more than the task implies"}
 {"ts":"2026-11-03T08:04:57Z","ts_epoch":1793693097,"type":"strategic.issue_refused","title":"Pre-build validation: detect missing or broken test/lint commands before the first build iteration"}
 {"ts":"2026-11-03T08:04:57Z","ts_epoch":1793693097,"type":"strategic.cycle_complete","issues_created":0,"issues_skipped":3}
+{"ts":"2026-11-03T12:04:26Z","ts_epoch":1793707466,"type":"hygiene_platform_refactor","hardcoded":49,"fallback":76,"todo":51}
