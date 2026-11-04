@@ -2230,3 +2230,8 @@
 {"ts":"2026-11-04T00:18:33Z","ts_epoch":1793751513,"type":"patrol.finding","check":"untested_script","script":"sw-event-schema-sync.sh","lines":93,"usage":0}
 {"ts":"2026-11-04T00:18:35Z","ts_epoch":1793751515,"type":"patrol.issue_refused","check":"untested_scripts","count":7}
 {"ts":"2026-11-04T00:18:37Z","ts_epoch":1793751517,"type":"patrol.meta_issue_refused","title":"[Meta] Add tests for sw-event-schema-sync.sh"}
+{"ts":"2026-11-04T04:03:37Z","ts_epoch":1793765017,"type":"hygiene_platform_refactor","hardcoded":49,"fallback":76,"todo":51}
+{"ts":"2026-11-04T04:04:20Z","ts_epoch":1793765060,"type":"strategic.issue_refused","title":"Make the build loop abort early on repeated identical failures and emit a classified reason"}
+{"ts":"2026-11-04T04:04:23Z","ts_epoch":1793765063,"type":"strategic.issue_refused","title":"Add a blast-radius guard that rejects loop iterations whose diff exceeds the task's declared scope"}
+{"ts":"2026-11-04T04:04:25Z","ts_epoch":1793765065,"type":"strategic.issue_refused","title":"Pre-flight check that test and lint commands exist and run before the first build iteration"}
+{"ts":"2026-11-04T04:04:25Z","ts_epoch":1793765065,"type":"strategic.cycle_complete","issues_created":0,"issues_skipped":3}
