@@ -2265,3 +2265,4 @@
 {"ts":"2026-11-04T08:05:20Z","ts_epoch":1793779520,"type":"strategic.issue_refused","title":"Pre-build validation: fail fast when the repo's test or lint command is missing or broken"}
 {"ts":"2026-11-04T08:05:23Z","ts_epoch":1793779523,"type":"strategic.issue_refused","title":"Move daemon and loop tunables (timeouts, retry limits, thresholds) into a validated policy file with adaptive overrides"}
 {"ts":"2026-11-04T08:05:23Z","ts_epoch":1793779523,"type":"strategic.cycle_complete","issues_created":0,"issues_skipped":3}
+{"ts":"2026-11-04T12:04:45Z","ts_epoch":1793793885,"type":"hygiene_platform_refactor","hardcoded":49,"fallback":76,"todo":51}
