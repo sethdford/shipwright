@@ -2382,3 +2382,4 @@
 {"ts":"2026-11-05T08:05:09Z","ts_epoch":1793865909,"type":"strategic.issue_refused","title":"Blast-radius guard for the build loop: abort an iteration whose diff deletes or rewrites far more than the task scope"}
 {"ts":"2026-11-05T08:05:12Z","ts_epoch":1793865912,"type":"strategic.issue_refused","title":"Port `shipwright doctor` preflight into the TypeScript platform context and add a build-loop preflight for missing test and lint commands"}
 {"ts":"2026-11-05T08:05:12Z","ts_epoch":1793865912,"type":"strategic.cycle_complete","issues_created":0,"issues_skipped":3}
+{"ts":"2026-11-05T12:04:58Z","ts_epoch":1793880298,"type":"hygiene_platform_refactor","hardcoded":49,"fallback":76,"todo":51}
