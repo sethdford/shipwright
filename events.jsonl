@@ -2378,3 +2378,7 @@
 {"ts":"2026-11-05T06:12:38Z","ts_epoch":1793859158,"type":"patrol.finding","check":"untested_script","script":"sw-event-schema-sync.sh","lines":93,"usage":0}
 {"ts":"2026-11-05T06:12:39Z","ts_epoch":1793859159,"type":"patrol.issue_refused","check":"untested_scripts","count":7}
 {"ts":"2026-11-05T06:12:41Z","ts_epoch":1793859161,"type":"patrol.meta_issue_refused","title":"[Meta] Add tests for sw-event-schema-sync.sh"}
+{"ts":"2026-11-05T08:04:16Z","ts_epoch":1793865856,"type":"hygiene_platform_refactor","hardcoded":49,"fallback":76,"todo":51}
+{"ts":"2026-11-05T08:05:09Z","ts_epoch":1793865909,"type":"strategic.issue_refused","title":"Blast-radius guard for the build loop: abort an iteration whose diff deletes or rewrites far more than the task scope"}
+{"ts":"2026-11-05T08:05:12Z","ts_epoch":1793865912,"type":"strategic.issue_refused","title":"Port `shipwright doctor` preflight into the TypeScript platform context and add a build-loop preflight for missing test and lint commands"}
+{"ts":"2026-11-05T08:05:12Z","ts_epoch":1793865912,"type":"strategic.cycle_complete","issues_created":0,"issues_skipped":3}
