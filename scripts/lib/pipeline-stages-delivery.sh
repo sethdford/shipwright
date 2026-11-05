@@ -3,6 +3,42 @@
 [[ -n "${_PIPELINE_STAGES_DELIVERY_LOADED:-}" ]] && return 0
 _PIPELINE_STAGES_DELIVERY_LOADED=1
 
+# Push the exact commit the final check judged (#8644). Nothing is pushed unless the check passes. The
+# push runs in the pinned environment with hooks, fsmonitor and ssh overridden, and goes to the URL the
+# pipeline recorded at start. A forced push is a lease: it only replaces the remote tip the guard just read.
+#   $1 repo, $2 base, $3 artifacts, $4 goal, $5 labels, $6 local branch (judged), $7 remote branch,
+#   $8 push URL recorded at pipeline start, $9 extra type, $10 "force" to allow a lease-protected push,
+#   $11 upstream (default) branch name
+scope_push_judged() {
+    local repo="$1" base="${2:-}" art="$3" goal="${4:-}" labels="${5:-}" lbranch="${6:-}" rbranch="${7:-}"
+    local url="${8:-}" extra="${9:-}" mode="${10:-plain}" ub="${11:-}" sha rsha out expect
+    local -a lease=()
+    [[ -n "$rbranch" ]] || return 2
+    scope_final_check "$repo" "$base" "$art" "$goal" "$labels" "$lbranch" "$extra" "$url" "$ub" || return 2
+    sha="$SCOPE_JUDGED_SHA"
+    [[ -n "$sha" ]] || return 2
+    out="$(_scope_net ls-remote "$url" "refs/heads/${rbranch}" 2>/dev/null)" || return 2
+    rsha="$(printf '%s\n' "$out" | awk 'NR==1 { print $1 }')"
+    # A forced push is a lease on the tip this process last pushed. A commit someone else pushed after that
+    # makes the lease fail, so a human's fixup is never replaced. Without a known last push, the lease is on
+    # the tip read just now.
+    if [[ "$mode" == "force" ]]; then
+        expect="$rsha"
+        if [[ "$SCOPE_LAST_PUSH_BRANCH" == "$rbranch" && -n "$SCOPE_LAST_PUSH_SHA" ]]; then expect="$SCOPE_LAST_PUSH_SHA"; fi
+        if [[ -n "$expect" ]]; then lease=(--force-with-lease="refs/heads/${rbranch}:${expect}"); fi
+    fi
+    env -u GIT_DIR -u GIT_WORK_TREE -u GIT_OBJECT_DIRECTORY -u GIT_ALTERNATE_OBJECT_DIRECTORIES \
+        -u GIT_INDEX_FILE -u GIT_NAMESPACE -u GIT_COMMON_DIR \
+        GIT_NO_REPLACE_OBJECTS=1 GIT_GRAFT_FILE=/nonexistent GIT_CONFIG_NOSYSTEM=1 GIT_CONFIG_GLOBAL=/dev/null \
+        git --no-replace-objects --no-optional-locks --git-dir="$SCOPE_GIT_DIR" --work-tree="$SCOPE_WORK_TREE" \
+        -c core.hooksPath=/dev/null -c core.fsmonitor=false -c core.sshCommand= \
+        -c credential.helper= -c "credential.helper=!gh auth git-credential" -c http.proxy= \
+        push -q ${lease[@]+"${lease[@]}"} "$url" "${sha}:refs/heads/${rbranch}" >/dev/null 2>&1 || return 2
+    SCOPE_LAST_PUSH_BRANCH="$rbranch"
+    SCOPE_LAST_PUSH_SHA="$sha"
+    return 0
+}
+
 stage_pr() {
     CURRENT_STAGE_ID="pr"
     # Consume retry context if this is a retry attempt
@@ -87,20 +123,29 @@ stage_pr() {
         git commit -m "chore: pipeline cleanup — commit remaining build changes" --no-verify 2>/dev/null || true
     fi
 
+    # Blast-radius guard (#8644, #8662): judge base..branch tip once before the rebase, so the agent's work is
+    # checked on its own, then again after the rebase. The push sends the commit the last check judged. Fail
+    # closed: no pipeline base, no recorded push URL, a branch other than $GIT_BRANCH, or a violation blocks.
+    local _extra_type
+    _extra_type="$(scope_issue_type "${ISSUE_NUMBER:-}" 2>/dev/null || true)"
+    if ! scope_final_check "$PWD" "${SW_PIPELINE_BASE_SHA:-}" "${ARTIFACTS_DIR:-}" "${GOAL:-}" "${ISSUE_LABELS:-}" \
+        "${GIT_BRANCH:-}" "$_extra_type" "${PIPELINE_PUSH_URL:-}" "${BASE_BRANCH:-main}"; then
+        error "Blast-radius guard blocked the push before the rebase: the branch is outside the declared scope or the pipeline base is unknown"
+        return 1
+    fi
+
     # Auto-rebase onto latest base branch before PR
     auto_rebase || {
         warn "Rebase/merge failed — pushing as-is"
     }
 
-    # Push branch
+    # Push the judged commit after the rebase (the check runs again on the rebased tip)
     info "Pushing branch: $GIT_BRANCH"
-    git push -u origin "$GIT_BRANCH" --force-with-lease 2>/dev/null || {
-        # Retry with regular push if force-with-lease fails (first push)
-        git push -u origin "$GIT_BRANCH" 2>/dev/null || {
-            error "Failed to push branch"
-            return 1
-        }
-    }
+    if ! scope_push_judged "$PWD" "${SW_PIPELINE_BASE_SHA:-}" "${ARTIFACTS_DIR:-}" "${GOAL:-}" "${ISSUE_LABELS:-}" \
+        "$GIT_BRANCH" "$GIT_BRANCH" "${PIPELINE_PUSH_URL:-}" "$_extra_type" "force" "${BASE_BRANCH:-main}"; then
+        error "Blast-radius guard blocked the push after the rebase, or the push failed"
+        return 1
+    fi
 
     # ── Developer Simulation (pre-PR review) ──
     local simulation_summary=""

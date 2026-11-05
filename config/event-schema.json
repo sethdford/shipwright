@@ -1761,6 +1761,10 @@
       "required": [],
       "optional": []
     },
+    "loop.scope_violation": {
+      "required": [],
+      "optional": ["iteration", "verdict", "strikes", "reason", "violations"]
+    },
     "memeff.archive": {
       "required": [],
       "optional": []

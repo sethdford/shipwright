@@ -303,7 +303,9 @@ persist_artifacts() {
         if ! git diff --cached --quiet 2>/dev/null; then
             git commit -m "chore: persist ${stage} artifacts for #${ISSUE_NUMBER} [skip ci]" --no-verify 2>/dev/null || true
             local branch="shipwright/issue-${ISSUE_NUMBER}"
-            git push origin "HEAD:refs/heads/$branch" --force 2>/dev/null || true
+            # Gated push of the judged commit (#8644); refused pushes are non-fatal here.
+            scope_push_judged "$PWD" "${SW_PIPELINE_BASE_SHA:-}" "${ARTIFACTS_DIR:-}" "${GOAL:-}" "${ISSUE_LABELS:-}" \
+                "${GIT_BRANCH:-}" "$branch" "${PIPELINE_PUSH_URL:-}" "$(scope_issue_type "$ISSUE_NUMBER" 2>/dev/null || true)" force "${BASE_BRANCH:-main}" || exit 1
             emit_event "artifacts.persisted" "issue=${ISSUE_NUMBER}" "stage=$stage" "file_count=${#to_add[@]}"
         fi
     ) 2>/dev/null || {

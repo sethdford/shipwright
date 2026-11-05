@@ -198,9 +198,10 @@ ci_push_partial_work() {
         git commit -m "WIP: partial pipeline progress for #${ISSUE_NUMBER}" --no-verify 2>/dev/null || true
     fi
 
-    # Push branch (create if needed, force to overwrite previous WIP)
-    if ! git push origin "HEAD:refs/heads/$branch" --force 2>/dev/null; then
-        warn "git push failed for $branch — remote may be out of sync"
+    # Push the judged commit only (#8644). Without a recorded base, a judged branch or a push URL, nothing is pushed.
+    if ! scope_push_judged "$PWD" "${SW_PIPELINE_BASE_SHA:-}" "${ARTIFACTS_DIR:-}" "${GOAL:-}" "${ISSUE_LABELS:-}" \
+        "${GIT_BRANCH:-}" "$branch" "${PIPELINE_PUSH_URL:-}" "$(scope_issue_type "$ISSUE_NUMBER" 2>/dev/null || true)" force "${BASE_BRANCH:-main}"; then
+        warn "push of $branch refused by the blast-radius guard or failed — remote may be out of sync"
         emit_event "pipeline.push_failed" "branch=$branch"
     fi
 }

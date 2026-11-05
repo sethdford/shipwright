@@ -41,6 +41,8 @@ fi
 [[ -f "$SCRIPT_DIR/lib/loop-convergence.sh" ]] && source "$SCRIPT_DIR/lib/loop-convergence.sh"
 [[ -f "$SCRIPT_DIR/lib/loop-restart.sh" ]] && source "$SCRIPT_DIR/lib/loop-restart.sh"
 [[ -f "$SCRIPT_DIR/lib/loop-progress.sh" ]] && source "$SCRIPT_DIR/lib/loop-progress.sh"
+# Blast-radius guard (#8644). Unconditional: a missing lib must fail the loop, not skip the guard.
+source "$SCRIPT_DIR/lib/scope-guard.sh"
 # Required, not optional: without it the test gate would run with the pipeline's credentials (#8608).
 # shellcheck source=lib/test-gate-env.sh
 source "$SCRIPT_DIR/lib/test-gate-env.sh"
@@ -1891,6 +1893,29 @@ CONSECUTIVE_FAILURES=0
 # shellcheck source=lib/auto-recovery.sh
 [[ -f "__SCRIPT_DIR__/lib/auto-recovery.sh" ]] && source "__SCRIPT_DIR__/lib/auto-recovery.sh" 2>/dev/null || true
 
+# Blast-radius guard for this worker (#8644). Scope and config come from the exported SW_SCOPE_* set by the parent.
+# Fail closed: a missing or broken guard stops the worker before it can commit (no `|| true`).
+source "__SCRIPT_DIR__/lib/scope-guard.sh" || { echo "blast-radius guard unavailable; worker stopped" >&2; exit 1; }
+type scope_worker_precommit >/dev/null 2>&1 || { echo "blast-radius guard unavailable; worker stopped" >&2; exit 1; }
+# The guarded push lives in the delivery module (definitions only, no side effects at load). Fail closed.
+source "__SCRIPT_DIR__/lib/pipeline-stages-delivery.sh" || { echo "blast-radius guard unavailable; worker stopped" >&2; exit 1; }
+type scope_push_judged >/dev/null 2>&1 || { echo "blast-radius guard unavailable; worker stopped" >&2; exit 1; }
+# The scope comes from files the parent wrote outside the repo, not from the worker's environment.
+SW_SCOPE_JSON="$(cat "__SCOPE_DIR__/scope.json" 2>/dev/null || true)"
+SW_SCOPE_CONFIG="$(cat "__SCOPE_DIR__/config.json" 2>/dev/null || true)"
+SW_SCOPE_BASE="$(cat "__SCOPE_DIR__/base.txt" 2>/dev/null || true)"
+SW_SCOPE_UPSTREAM="$(cat "__SCOPE_DIR__/upstream.txt" 2>/dev/null || true)"
+WORKER_START="$(git -C "__WORK_DIR__" rev-parse HEAD 2>/dev/null || true)"
+export SW_SCOPE_JSON SW_SCOPE_CONFIG SW_SCOPE_BASE SW_SCOPE_UPSTREAM
+# The push context, written by the parent from its own environment (#8644, #8662): goal, labels, artifacts,
+# extra type, recorded push URL and the upstream branch name.
+SW_W_GOAL="$(cat "__SCOPE_DIR__/goal.txt" 2>/dev/null || true)"
+SW_W_LABELS="$(cat "__SCOPE_DIR__/labels.txt" 2>/dev/null || true)"
+SW_W_ART="$(cat "__SCOPE_DIR__/artifacts.txt" 2>/dev/null || true)"
+SW_W_EXTRA="$(cat "__SCOPE_DIR__/extra.txt" 2>/dev/null || true)"
+SW_W_URL="$(cat "__SCOPE_DIR__/pushurl.txt" 2>/dev/null || true)"
+SW_W_UB="$(cat "__SCOPE_DIR__/upstream-branch.txt" 2>/dev/null || true)"
+
 echo -e "${CYAN}${BOLD}▸${RESET} Agent ${AGENT_NUM}/${TOTAL_AGENTS} starting in ${WORK_DIR}"
 
 while [[ "$ITERATION" -lt "$MAX_ITERATIONS" ]]; do
@@ -1975,8 +2000,15 @@ PROMPT
     git reset -- .claude/loop-logs/ .claude/loop-state.md .claude/intelligence-cache.json \
         .claude/platform-hygiene.json .claude/pipeline-artifacts/ .claude/code-review.json \
         .claude/hygiene-report.json .claude/pr-draft.md 2>/dev/null || true
+    # Blast-radius gate (#8644): judge the staged changes before committing. A violation discards them.
+    _scope_w_rc=0
+    scope_worker_precommit "$WORK_DIR" "$ITERATION" "$AGENT_NUM" "$LOG_DIR" "$WORKER_START" || _scope_w_rc=$?
+    if [[ "$_scope_w_rc" -eq 2 ]]; then echo -e "  ${RED}✗${RESET} Blast-radius guard blocked agent ${AGENT_NUM}"; break; fi
+    if [[ "$_scope_w_rc" -eq 1 ]]; then continue; fi
     if git commit -m "agent-${AGENT_NUM}: iteration ${ITERATION}" --no-verify 2>/dev/null; then
-        if ! git push origin "loop/agent-${AGENT_NUM}" 2>/dev/null; then
+        # The push goes through the guard: the judged branch, the recorded URL and the pinned git (#8662).
+        if ! scope_push_judged "$WORK_DIR" "$SW_SCOPE_BASE" "$SW_W_ART" "$SW_W_GOAL" "$SW_W_LABELS" \
+            "loop/agent-${AGENT_NUM}" "loop/agent-${AGENT_NUM}" "$SW_W_URL" "$SW_W_EXTRA" force "$SW_W_UB" 2>/dev/null; then
             echo -e "  ${YELLOW}⚠${RESET} git push failed for loop/agent-${AGENT_NUM} — remote may be out of sync"
             type emit_event >/dev/null 2>&1 && emit_event "loop.push_failed" "branch=loop/agent-${AGENT_NUM}"
         else
@@ -2023,6 +2055,8 @@ WORKEREOF
     awk -v val="$wt_path" '{gsub(/__WORK_DIR__/, val); print}' "$worker_script" > "${worker_script}.tmp" \
         && mv "${worker_script}.tmp" "$worker_script"
     awk -v val="$LOG_DIR" '{gsub(/__LOG_DIR__/, val); print}' "$worker_script" > "${worker_script}.tmp" \
+        && mv "${worker_script}.tmp" "$worker_script"
+    awk -v val="${SCOPE_ENV_DIR:-}" '{gsub(/__SCOPE_DIR__/, val); print}' "$worker_script" > "${worker_script}.tmp" \
         && mv "${worker_script}.tmp" "$worker_script"
     awk -v val="$SCRIPT_DIR" '{gsub(/__SCRIPT_DIR__/, val); print}' "$worker_script" > "${worker_script}.tmp" \
         && mv "${worker_script}.tmp" "$worker_script"
@@ -2149,6 +2183,74 @@ cleanup_multi_agent() {
     rm -f "$LOG_DIR"/.agent-*-complete 2>/dev/null || true
 }
 
+# Set up the blast-radius guard for this run (#8644). Returns 1 to refuse the run.
+# A resumed run takes its base from the default-branch fork point, never from the agent-writable state
+# file. An in-process restart keeps the trusted state of the run it continues.
+_scope_begin_run() {
+    local base="${LOOP_START_COMMIT:-}" restart=0
+    [[ "${SESSION_RESTART:-false}" == "true" ]] && restart=1
+    if [[ "$restart" -eq 0 ]] && $RESUME; then
+        # The base is recorded by the pipeline outside the repo (#8644, #8671). Refuse the resume without it.
+        base="$(scope_resume_base "$PROJECT_ROOT")" || {
+            error "Blast-radius guard refused to resume: no valid pipeline base (SW_PIPELINE_BASE_SHA) is recorded"
+            return 1
+        }
+        LOOP_START_COMMIT="$base"
+    fi
+    scope_setup_run "$PROJECT_ROOT" "$base" "$ARTIFACTS_DIR" "${GOAL:-}" "${ISSUE_LABELS:-}" "$restart" \
+        "${SW_SCOPE_ISSUE_TYPE:-}"
+}
+
+# Write the trusted scope and config outside the repo, where the workers read them (#8644). The
+# workers run in tmux panes and do not inherit the parent's environment.
+_scope_export_for_workers() {
+    SCOPE_ENV_DIR="$(mktemp -d "${TMPDIR:-/tmp}/sw-scope.XXXXXX")" || return 1
+    chmod 700 "$SCOPE_ENV_DIR"
+    printf '%s' "$SW_SCOPE_JSON" > "$SCOPE_ENV_DIR/scope.json"
+    printf '%s' "$SW_SCOPE_CONFIG" > "$SCOPE_ENV_DIR/config.json"
+    printf '%s' "$SW_SCOPE_BASE" > "$SCOPE_ENV_DIR/base.txt"
+    # Workers measure the total diff against the upstream they merged (#8644): the default-branch fork point.
+    printf '%s' "${SW_LOOP_TRUSTED_UPSTREAM:-$SW_SCOPE_BASE}" > "$SCOPE_ENV_DIR/upstream.txt"
+    # The push context for the worker's own push (#8662 item 5).
+    printf '%s' "${GOAL:-}" > "$SCOPE_ENV_DIR/goal.txt"
+    printf '%s' "${ISSUE_LABELS:-}" > "$SCOPE_ENV_DIR/labels.txt"
+    printf '%s' "${ARTIFACTS_DIR:-}" > "$SCOPE_ENV_DIR/artifacts.txt"
+    printf '%s' "${SW_SCOPE_ISSUE_TYPE:-}" > "$SCOPE_ENV_DIR/extra.txt"
+    printf '%s' "${SW_PIPELINE_PUSH_URL:-}" > "$SCOPE_ENV_DIR/pushurl.txt"
+    printf '%s' "${SW_PIPELINE_BASE_BRANCH:-main}" > "$SCOPE_ENV_DIR/upstream-branch.txt"
+    export SCOPE_ENV_DIR
+}
+
+# Remove the worker scope files once the workers have finished (#8644).
+_scope_cleanup_workers() {
+    local d="${SCOPE_ENV_DIR:-}"
+    [[ -n "$d" && -d "$d" ]] || return 0
+    rm -f "$d/scope.json" "$d/config.json" "$d/base.txt" "$d/upstream.txt" 2>/dev/null || true
+    rmdir "$d" 2>/dev/null || true
+    unset SCOPE_ENV_DIR
+}
+
+# Blast-radius gate after a loop commit (#8644). Returns 0 pass, 1 reverted (the caller must skip the
+# rest of this iteration: no tests, audit, convergence or completion), 2 blocked (stop the build).
+_scope_gate_after_commit() {
+    local tag="${1:-}" rc=0
+    scope_guard_check "$PROJECT_ROOT" "${LOOP_START_COMMIT:-}" "${SCOPE_PRE_SHA:-}" "$ITERATION" \
+        "$LOG_DIR" "$tag" || rc=$?
+    case "$rc" in
+        0) return 0 ;;
+        1)
+            warn "Blast-radius guard reverted iteration ${ITERATION} (strike ${SCOPE_STRIKES}; evidence: ${LOG_DIR}/scope-check-iter-${ITERATION}${tag}.json)"
+            return 1
+            ;;
+    esac
+    STATUS="scope_blocked"
+    write_state
+    write_progress
+    error "Blast-radius guard blocked the build (evidence: ${LOG_DIR}/scope-check-iter-${ITERATION}${tag}.json)"
+    show_summary
+    return 2
+}
+
 # ─── Main: Single-Agent Loop ─────────────────────────────────────────────────
 
 run_single_agent_loop() {
@@ -2188,6 +2290,18 @@ run_single_agent_loop() {
     # Never defaulted to HEAD here: on a resumed loop HEAD already includes the agent's changes,
     # which would make the test gate's baseline wrong (#8633).
 
+    # Blast-radius guard (#8644): config from the base commit, scope resolved once, and a clean tree
+    # (or an own worktree) so a revert can never reset unrelated work. Refuses to start otherwise.
+    SCOPE_NOTE=""
+    if ! _scope_begin_run; then
+        STATUS="scope_blocked"
+        write_state
+        write_progress
+        error "Blast-radius guard refused to start: the base commit, scope or a clean tree could not be established (see git status)"
+        show_summary
+        return 1
+    fi
+
     # Apply adaptive budget/model before showing banner
     apply_adaptive_budget
     MODEL="$(select_adaptive_model "build" "$MODEL")"
@@ -2219,6 +2333,14 @@ run_single_agent_loop() {
             return 1
         }
         ITERATION=$(( ITERATION + 1 ))
+        # Blast-radius guard baseline for this iteration (#8644), and the last violation note, if any.
+        SCOPE_PRE_SHA="$(git -C "$PROJECT_ROOT" rev-parse HEAD 2>/dev/null || echo "")"
+        if [[ -n "${SCOPE_NOTE:-}" ]]; then
+            GOAL="${GOAL}
+
+${SCOPE_NOTE}"
+            SCOPE_NOTE=""
+        fi
 
         # Emit iteration start event for pipeline visibility
         if type emit_event >/dev/null 2>&1; then
@@ -2358,6 +2480,10 @@ ${GOAL}"
         local commits_before
         commits_before="$(git_commit_count)"
         git_auto_commit "$PROJECT_ROOT" || true
+        _scope_rc=0
+        _scope_gate_after_commit "" || _scope_rc=$?
+        if [[ "$_scope_rc" -eq 2 ]]; then return 1; fi
+        if [[ "$_scope_rc" -eq 1 ]]; then continue; fi
         local commits_after
         commits_after="$(git_commit_count)"
         local new_commits=$(( commits_after - commits_before ))
@@ -2469,6 +2595,11 @@ ${GOAL}"
             git -C "$PROJECT_ROOT" add -A 2>/dev/null || true
             git -C "$PROJECT_ROOT" commit -m "loop: iteration $ITERATION — post-audit cleanup" --no-verify 2>/dev/null || true
         fi
+        # Cleanup commits are loop commits too: they pass the same blast-radius guard (#8644).
+        _scope_rc=0
+        _scope_gate_after_commit "-cleanup" || _scope_rc=$?
+        if [[ "$_scope_rc" -eq 2 ]]; then return 1; fi
+        if [[ "$_scope_rc" -eq 1 ]]; then continue; fi
 
         # Quality gates (automated checks)
         run_quality_gates
@@ -2598,6 +2729,11 @@ run_loop_with_restarts() {
             return 0
         fi
 
+        # A blast-radius block is final: a fresh session would repeat the same out-of-scope change (#8644).
+        if [[ "$STATUS" == "scope_blocked" ]]; then
+            return 1
+        fi
+
         # Context exhaustion: treat as restart, not failure (unless restart limit hit)
         if [[ "$STATUS" == "context_exhaustion_restart" ]]; then
             if [[ "$CONTEXT_RESTART_COUNT" -lt "$CONTEXT_RESTART_LIMIT" ]]; then
@@ -2718,8 +2854,18 @@ main() {
         else
             initialize_state
         fi
+        # Blast-radius guard (#8644): resolve the trusted scope before any worker starts.
+        if ! _scope_begin_run; then
+            error "Blast-radius guard refused to start: the base commit, scope or a clean tree could not be established"
+            STATUS="scope_blocked"
+            write_state
+            show_summary
+            return 1
+        fi
+        _scope_export_for_workers
         show_banner
         launch_multi_agent
+        _scope_cleanup_workers
         show_summary
     else
         run_loop_with_restarts
