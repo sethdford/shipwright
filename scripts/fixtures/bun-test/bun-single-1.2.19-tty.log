@@ -1,0 +1,18 @@
+[0m[1mbun test [0m[2mv1.2.19 (aad3abea)[0m
+[0m
+one.test.ts:
+[0m[1m1 |[0m [0m[35mimport[0m { test, expect } [0m[35mfrom[0m [0m[32m"bun:test"[0m[0m[2m;[0m
+[0m[1m2 |[0m test([0m[32m"only failure"[0m, () => { expect([0m[33m1[0m)[0m[3m[1m.toBe[0m([0m[33m2[0m)[0m[2m;[0m })[0m[2m;[0m
+                                           [31m[1m^[0m
+[0m[31merror[0m[2m:[0m [1m[2mexpect([0m[31mreceived[0m[2m).[0mtoBe[2m([0m[32mexpected[0m[2m)[0m
+
+Expected: [32m2[0m
+Received: [31m1[0m
+[0m
+[0m      [2mat [0m[0m[2m<anonymous>[0m[2m ([0m[0m[36m/fixture/one.test.ts[0m[2m:[0m[33m2[0m[2m:[33m40[0m[2m)[0m
+[0m[31m✗[0m[0m[1m only failure[0m [0m[2m[0.12ms[0m[2m][0m
+[0m
+ 0 pass[0m
+[0m[31m 1 fail[0m
+ 1 expect() calls
+Ran 1 test across 1 file. [0m[2m[[1m5.00ms[0m[2m][0m

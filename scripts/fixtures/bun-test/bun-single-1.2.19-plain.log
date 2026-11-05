@@ -1,0 +1,18 @@
+bun test v1.2.19 (aad3abea)
+
+one.test.ts:
+1 | import { test, expect } from "bun:test";
+2 | test("only failure", () => { expect(1).toBe(2); });
+                                           ^
+error: expect(received).toBe(expected)
+
+Expected: 2
+Received: 1
+
+      at <anonymous> (/fixture/one.test.ts:2:40)
+(fail) only failure
+
+ 0 pass
+ 1 fail
+ 1 expect() calls
+Ran 1 test across 1 file. [5.00ms]

@@ -227,6 +227,11 @@ SUBCOMMAND="${1:-help}"
 shift 2>/dev/null || true
 
 PIPELINE_NAME_ARG=""
+# base-repin takes its own arguments (--yes), so it is dispatched before the general parser.
+if [[ "$SUBCOMMAND" == "base-repin" ]]; then
+    pipeline_base_repin "$@"
+    exit $?
+fi
 parse_args "$@"
 # W2-07: a model that is neither an alias nor a listed ID stops the pipeline before any stage runs. Checked here
 # (not in the stages) so a bad --model, --fallback-model or SW_MODEL_* fails at start.

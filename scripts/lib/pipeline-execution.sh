@@ -521,6 +521,20 @@ run_pipeline() {
     enabled_count=$(jq '[.stages[] | select(.enabled == true)] | length' "$PIPELINE_CONFIG" 2>/dev/null)
     local completed=0
 
+    # The test stage judges failures against the base recorded at first start (#8671, pipeline-base.sh). A start that
+    # cannot be proved only loses that judgement: the pipeline runs on. Only evidence of a tampered checkout (status 2)
+    # refuses the start.
+    local pb_rc=0
+    pipeline_base_init || pb_rc=$?
+    if [[ "$pb_rc" -eq 2 ]]; then
+        # The marker is what the daemon's classifier reads from this run's log (tampering_refused: no retry).
+        error "Pipeline refused to start: evidence of a tampered checkout (see the message above). [pipeline-refused:tampering]"
+        if declare -F emit_event >/dev/null 2>&1; then
+            emit_event "pipeline.refused" "issue=${ISSUE_NUMBER:-0}" "reason=tampering"
+        fi
+        return 1
+    fi
+
     # Check which stages are enabled to determine if we use the self-healing loop
     local build_enabled test_enabled
     build_enabled=$(jq -r '.stages[] | select(.id == "build") | .enabled' "$PIPELINE_CONFIG" 2>/dev/null)
@@ -853,7 +867,8 @@ run_pipeline() {
         fi
     done 3<<< "$stages"
 
-    # Pipeline complete!
+    # Pipeline complete! The base record has done its job: remove it (#8671).
+    pipeline_base_release "${PROJECT_ROOT:-.}" 2>/dev/null || true
     update_status "complete" ""
     PIPELINE_STAGES_PASSED="$completed"
     PIPELINE_SLOWEST_STAGE=""
