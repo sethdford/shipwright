@@ -2322,3 +2322,8 @@
 {"ts":"2026-11-04T18:08:34Z","ts_epoch":1793815714,"type":"patrol.issue_refused","check":"untested_scripts","count":7}
 {"ts":"2026-11-04T18:08:36Z","ts_epoch":1793815716,"type":"patrol.meta_issue_refused","title":"[Meta] Add tests for sw-event-schema-sync.sh"}
 {"ts":"2026-11-04T20:03:25Z","ts_epoch":1793822605,"type":"hygiene_platform_refactor","hardcoded":49,"fallback":76,"todo":51}
+{"ts":"2026-11-05T00:08:37Z","ts_epoch":1793837317,"type":"hygiene_platform_refactor","hardcoded":49,"fallback":76,"todo":51}
+{"ts":"2026-11-05T00:09:23Z","ts_epoch":1793837363,"type":"strategic.issue_refused","title":"Loop blast-radius guard: abort an iteration whose diff deletes far more than the task implies"}
+{"ts":"2026-11-05T00:09:25Z","ts_epoch":1793837365,"type":"strategic.issue_refused","title":"Fix auth-failure retry classification so fatal auth errors stop the build loop immediately"}
+{"ts":"2026-11-05T00:09:28Z","ts_epoch":1793837368,"type":"strategic.issue_refused","title":"Per-issue failure quarantine in the daemon: stop redispatching after N consecutive failures"}
+{"ts":"2026-11-05T00:09:28Z","ts_epoch":1793837368,"type":"strategic.cycle_complete","issues_created":0,"issues_skipped":3}
