@@ -2492,3 +2492,8 @@
 {"ts":"2026-11-06T06:13:24Z","ts_epoch":1793945604,"type":"patrol.issue_refused","check":"untested_scripts","count":7}
 {"ts":"2026-11-06T06:13:26Z","ts_epoch":1793945606,"type":"patrol.meta_issue_refused","title":"[Meta] Add tests for sw-event-schema-sync.sh"}
 {"ts":"2026-11-06T08:04:02Z","ts_epoch":1793952242,"type":"hygiene_platform_refactor","hardcoded":49,"fallback":76,"todo":51}
+{"ts":"2026-11-06T12:04:57Z","ts_epoch":1793966697,"type":"hygiene_platform_refactor","hardcoded":49,"fallback":76,"todo":51}
+{"ts":"2026-11-06T12:05:56Z","ts_epoch":1793966756,"type":"strategic.issue_refused","title":"Emit a terminal pipeline event with failing stage and failure class on every failed run"}
+{"ts":"2026-11-06T12:05:59Z","ts_epoch":1793966759,"type":"strategic.issue_refused","title":"Add test suites for the five untested scripts (tmux role color/status, tracker-github, event-schema-sync, test-all)"}
+{"ts":"2026-11-06T12:06:02Z","ts_epoch":1793966762,"type":"strategic.issue_refused","title":"Stop the strategic agent re-proposing ideas whose earlier issues were closed without shipping"}
+{"ts":"2026-11-06T12:06:02Z","ts_epoch":1793966762,"type":"strategic.cycle_complete","issues_created":0,"issues_skipped":3}
