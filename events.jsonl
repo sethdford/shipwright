@@ -2548,3 +2548,8 @@
 {"ts":"2026-11-06T18:10:03Z","ts_epoch":1793988603,"type":"patrol.finding","check":"untested_script","script":"sw-event-schema-sync.sh","lines":93,"usage":0}
 {"ts":"2026-11-06T18:10:05Z","ts_epoch":1793988605,"type":"patrol.issue_refused","check":"untested_scripts","count":7}
 {"ts":"2026-11-06T18:10:08Z","ts_epoch":1793988608,"type":"patrol.meta_issue_refused","title":"[Meta] Add tests for sw-event-schema-sync.sh"}
+{"ts":"2026-11-06T20:03:16Z","ts_epoch":1793995396,"type":"hygiene_platform_refactor","hardcoded":49,"fallback":76,"todo":51}
+{"ts":"2026-11-06T20:04:15Z","ts_epoch":1793995455,"type":"strategic.issue_refused","title":"Blast-radius guard in the build loop: abort iterations that delete or rewrite far more than the task implies"}
+{"ts":"2026-11-06T20:04:19Z","ts_epoch":1793995459,"type":"strategic.issue_refused","title":"Stop retrying non-retryable failures: single source of truth for the fatal-error classification used by retry and quarantine"}
+{"ts":"2026-11-06T20:04:22Z","ts_epoch":1793995462,"type":"strategic.issue_refused","title":"Port the next `bash` entry in progress.json to TypeScript: add a `port:next` report that ranks unported commands by size, test coverage and failure involvement"}
+{"ts":"2026-11-06T20:04:22Z","ts_epoch":1793995462,"type":"strategic.cycle_complete","issues_created":0,"issues_skipped":3}
