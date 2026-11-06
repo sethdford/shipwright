@@ -2461,3 +2461,8 @@
 {"ts":"2026-11-06T00:20:20Z","ts_epoch":1793924420,"type":"patrol.finding","check":"untested_script","script":"sw-event-schema-sync.sh","lines":93,"usage":0}
 {"ts":"2026-11-06T00:20:22Z","ts_epoch":1793924422,"type":"patrol.issue_refused","check":"untested_scripts","count":7}
 {"ts":"2026-11-06T00:20:24Z","ts_epoch":1793924424,"type":"patrol.meta_issue_refused","title":"[Meta] Add tests for sw-event-schema-sync.sh"}
+{"ts":"2026-11-06T04:03:52Z","ts_epoch":1793937832,"type":"hygiene_platform_refactor","hardcoded":49,"fallback":76,"todo":51}
+{"ts":"2026-11-06T04:04:38Z","ts_epoch":1793937878,"type":"strategic.issue_refused","title":"Fail-closed scheduler guard: pause daemon dispatch after N consecutive pipeline failures with a single actionable incident summary"}
+{"ts":"2026-11-06T04:04:40Z","ts_epoch":1793937880,"type":"strategic.issue_refused","title":"Port the pre-build preflight (test/lint command validation) into a TypeScript use case with a parity suite"}
+{"ts":"2026-11-06T04:04:43Z","ts_epoch":1793937883,"type":"strategic.issue_refused","title":"Blast-radius guard for build-loop iterations: abort and revert when a diff far exceeds the task's expected scope"}
+{"ts":"2026-11-06T04:04:43Z","ts_epoch":1793937883,"type":"strategic.cycle_complete","issues_created":0,"issues_skipped":3}
