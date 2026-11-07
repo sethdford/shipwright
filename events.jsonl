@@ -2553,3 +2553,8 @@
 {"ts":"2026-11-06T20:04:19Z","ts_epoch":1793995459,"type":"strategic.issue_refused","title":"Stop retrying non-retryable failures: single source of truth for the fatal-error classification used by retry and quarantine"}
 {"ts":"2026-11-06T20:04:22Z","ts_epoch":1793995462,"type":"strategic.issue_refused","title":"Port the next `bash` entry in progress.json to TypeScript: add a `port:next` report that ranks unported commands by size, test coverage and failure involvement"}
 {"ts":"2026-11-06T20:04:22Z","ts_epoch":1793995462,"type":"strategic.cycle_complete","issues_created":0,"issues_skipped":3}
+{"ts":"2026-11-07T00:07:55Z","ts_epoch":1794010075,"type":"hygiene_platform_refactor","hardcoded":49,"fallback":76,"todo":51}
+{"ts":"2026-11-07T00:08:56Z","ts_epoch":1794010136,"type":"strategic.issue_refused","title":"Record failure stage and reason in a machine-readable run summary so the strategic agent can see why pipelines fail"}
+{"ts":"2026-11-07T00:08:59Z","ts_epoch":1794010139,"type":"strategic.issue_refused","title":"Add suggestion-outcome feedback: record why strategic issues were closed without shipping"}
+{"ts":"2026-11-07T00:09:03Z","ts_epoch":1794010143,"type":"strategic.issue_refused","title":"Add test suites for the 5 untested scripts (tracker-github, event-schema-sync, tmux-status, tmux-role-color, test-all)"}
+{"ts":"2026-11-07T00:09:03Z","ts_epoch":1794010143,"type":"strategic.cycle_complete","issues_created":0,"issues_skipped":3}
