@@ -2614,3 +2614,4 @@
 {"ts":"2026-11-07T08:04:32Z","ts_epoch":1794038672,"type":"strategic.issue_refused","title":"Build-loop blast-radius guard that aborts an iteration when the diff far exceeds the task scope"}
 {"ts":"2026-11-07T08:04:35Z","ts_epoch":1794038675,"type":"strategic.issue_refused","title":"Move the next 3 `bash` entries in progress.json into TypeScript with parity suites"}
 {"ts":"2026-11-07T08:04:35Z","ts_epoch":1794038675,"type":"strategic.cycle_complete","issues_created":0,"issues_skipped":3}
+{"ts":"2026-11-07T12:03:52Z","ts_epoch":1794053032,"type":"hygiene_platform_refactor","hardcoded":49,"fallback":76,"todo":51}
