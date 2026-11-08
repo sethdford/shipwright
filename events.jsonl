@@ -2703,3 +2703,4 @@
 {"ts":"2026-11-08T00:20:28Z","ts_epoch":1794097228,"type":"patrol.meta_issue_refused","title":"[Meta] Add tests for sw-event-schema-sync.sh"}
 {"ts":"2026-11-08T03:07:51Z","ts_epoch":1794107271,"type":"optimize.memory_pruned","pruned":3,"strengthened":3,"promoted":0}
 {"ts":"2026-11-08T03:07:52Z","ts_epoch":1794107272,"type":"optimize.memory_pruned","pruned":0,"strengthened":3,"promoted":0}
+{"ts":"2026-11-08T04:03:18Z","ts_epoch":1794110598,"type":"hygiene_platform_refactor","hardcoded":49,"fallback":76,"todo":51}
