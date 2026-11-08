@@ -2671,3 +2671,8 @@
 {"ts":"2026-11-07T18:07:34Z","ts_epoch":1794074854,"type":"patrol.issue_refused","check":"untested_scripts","count":7}
 {"ts":"2026-11-07T18:07:36Z","ts_epoch":1794074856,"type":"patrol.meta_issue_refused","title":"[Meta] Add tests for sw-event-schema-sync.sh"}
 {"ts":"2026-11-07T20:03:03Z","ts_epoch":1794081783,"type":"hygiene_platform_refactor","hardcoded":49,"fallback":76,"todo":51}
+{"ts":"2026-11-08T00:09:07Z","ts_epoch":1794096547,"type":"hygiene_platform_refactor","hardcoded":49,"fallback":76,"todo":51}
+{"ts":"2026-11-08T00:09:49Z","ts_epoch":1794096589,"type":"strategic.issue_refused","title":"Per-issue build-loop circuit breaker: stop after N identical-failure iterations and escalate with diagnosis"}
+{"ts":"2026-11-08T00:09:52Z","ts_epoch":1794096592,"type":"strategic.issue_refused","title":"Differential failure baseline for the test stage using the TS gate parser, with a clear \"pre-existing\" report"}
+{"ts":"2026-11-08T00:09:55Z","ts_epoch":1794096595,"type":"strategic.issue_refused","title":"Diagnose why the last 7 days produced zero successful pipelines: add a `shipwright doctor pipelines` failure-cause rollup"}
+{"ts":"2026-11-08T00:09:55Z","ts_epoch":1794096595,"type":"strategic.cycle_complete","issues_created":0,"issues_skipped":3}
