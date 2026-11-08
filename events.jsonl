@@ -2760,3 +2760,8 @@
 {"ts":"2026-11-08T12:09:14Z","ts_epoch":1794139754,"type":"patrol.finding","check":"untested_script","script":"sw-event-schema-sync.sh","lines":93,"usage":0}
 {"ts":"2026-11-08T12:09:16Z","ts_epoch":1794139756,"type":"patrol.issue_refused","check":"untested_scripts","count":7}
 {"ts":"2026-11-08T12:09:18Z","ts_epoch":1794139758,"type":"patrol.meta_issue_refused","title":"[Meta] Add tests for sw-event-schema-sync.sh"}
+{"ts":"2026-11-08T16:03:02Z","ts_epoch":1794153782,"type":"hygiene_platform_refactor","hardcoded":49,"fallback":76,"todo":51}
+{"ts":"2026-11-08T16:03:55Z","ts_epoch":1794153835,"type":"strategic.issue_refused","title":"Fix strategic feedback telemetry: record failure stage, reason and success counts for pipeline outcomes"}
+{"ts":"2026-11-08T16:03:58Z","ts_epoch":1794153838,"type":"strategic.issue_refused","title":"Record why strategic issues close without shipping, and feed the reason back to the PM prompt"}
+{"ts":"2026-11-08T16:04:02Z","ts_epoch":1794153842,"type":"strategic.issue_refused","title":"Port the next `bash` entry in progress.json to TypeScript, with parity suite green before routing"}
+{"ts":"2026-11-08T16:04:02Z","ts_epoch":1794153842,"type":"strategic.cycle_complete","issues_created":0,"issues_skipped":3}
