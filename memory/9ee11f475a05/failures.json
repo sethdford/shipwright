@@ -23,15 +23,6 @@
     },
     {
       "stage": "test",
-      "pattern": "\u001b[38;2;248;113;113m\u001b[1m1 of 78 tests failed\u001b[0m",
-      "root_cause": "sw-intent-analysis-test.sh failed with 1 of 78 tests failing (exit 1 after 38s); sw-e2e-integration-test also timed out at 301s, likely because it needs real Claude/GitHub access",
-      "fix": "Run scripts/sw-intent-analysis-test.sh directly to identify the failing assertion and fix it; separately skip or mock sw-e2e-integration-test in CI so it can't hit the 300s timeout",
-      "seen_count": 1,
-      "last_seen": "2026-10-04T20:45:20Z",
-      "category": "test_failure"
-    },
-    {
-      "stage": "test",
       "pattern": "Results: \u001b[38;2;74;222;128m\u001b[1m127 PASS\u001b[0m | \u001b[38;2;248;113;113m\u001b[1m1 FAIL\u001b[0m",
       "root_cause": "sw-e2e-integration-test timed out after 301s (300s suite limit) because it makes real Claude/GitHub calls that hang or run too slowly in CI, causing the single FAIL among 128 suites",
       "fix": "Skip or mock sw-e2e-integration-test in CI (gate on API credentials), or raise its per-suite timeout above 300s",
@@ -50,29 +41,11 @@
     },
     {
       "stage": "test",
-      "pattern": "Results: \u001b[38;2;74;222;128m\u001b[1m126 PASS\u001b[0m | \u001b[38;2;248;113;113m\u001b[1m2 FAIL\u001b[0m",
-      "root_cause": "The E2E pipeline test suite (sw-pipeline-test.sh) fails 6 tests: plan.md and review.md artifacts are not generated (the mocked claude call isn't producing them), and the intelligence-skip and cleanup tests fail on jq parse errors from non-JSON output and a non-zero pipeline exit.",
-      "fix": "Fix the mock claude/plan and review stage setup so plan.md and review.md are written to .claude/pipeline-artifacts, and make the intelligence/RL code emit valid JSON (or have the test filter ANSI/non-JSON lines) so jq parsing and pipeline exit 0 succeed.",
-      "seen_count": 1,
-      "last_seen": "2026-10-05T14:09:15Z",
-      "category": "test_failure"
-    },
-    {
-      "stage": "test",
       "pattern": "\u001b[2m  loop behavior: iterations on test failure\u001b[0m",
       "root_cause": "sw-cost-test.sh 'context efficiency' assertions fail because the cost dashboard reports 'No cost entries in the last 30 days' and exits before rendering the CONTEXT EFFICIENCY section from the seeded loop.context_efficiency events (test events/timestamps are not seen, or the section is skipped when costs.json is empty).",
       "fix": "In sw-cost-test.sh, seed at least one cost entry (and events with current timestamps in the events file the script reads) before running the dashboard, or change sw-cost.sh to render the CONTEXT EFFICIENCY section even when there are no cost entries.",
       "seen_count": 11,
       "last_seen": "2026-10-10T15:57:53Z",
-      "category": "test_failure"
-    },
-    {
-      "stage": "test",
-      "pattern": "\u001b[38;2;0;212;255m▸\u001b[0m Progress detects repeated error loop... \u001b[38;2;74;222;128m✓\u001b[0m",
-      "root_cause": "The self-optimize test 'Memory promotion copies cross-repo patterns' failed (15/16 passed); the promotion step did not copy patterns to the global memory location, likely due to test environment or HOME/repo-hash path differences. The 'repeated error loop' line is just a passing progress test, not the real failure.",
-      "fix": "Run scripts/sw-self-optimize-test.sh to see the memory promotion assertion, then fix the promotion function or its test setup so the cross-repo patterns file is created in the expected temp HOME path.",
-      "seen_count": 1,
-      "last_seen": "2026-10-05T17:18:58Z",
       "category": "test_failure"
     },
     {
