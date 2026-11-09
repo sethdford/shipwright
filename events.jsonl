@@ -2847,3 +2847,8 @@
 {"ts":"2026-11-09T06:16:35Z","ts_epoch":1794204995,"type":"patrol.finding","check":"untested_script","script":"sw-event-schema-sync.sh","lines":93,"usage":0}
 {"ts":"2026-11-09T06:16:36Z","ts_epoch":1794204996,"type":"patrol.issue_refused","check":"untested_scripts","count":7}
 {"ts":"2026-11-09T06:16:38Z","ts_epoch":1794204998,"type":"patrol.meta_issue_refused","title":"[Meta] Add tests for sw-event-schema-sync.sh"}
+{"ts":"2026-11-09T08:05:07Z","ts_epoch":1794211507,"type":"hygiene_platform_refactor","hardcoded":49,"fallback":76,"todo":51}
+{"ts":"2026-11-09T08:05:56Z","ts_epoch":1794211556,"type":"strategic.issue_refused","title":"Enforce a per-task blast-radius guard in the build loop (diff-size and deletion limits)"}
+{"ts":"2026-11-09T08:05:59Z","ts_epoch":1794211559,"type":"strategic.issue_refused","title":"Retire failed-suggestion loops: record why strategic suggestions failed and feed the reason back into the next run"}
+{"ts":"2026-11-09T08:06:02Z","ts_epoch":1794211562,"type":"strategic.issue_refused","title":"Add a daemon pipeline-health circuit report: pause strategic issue creation while the recent success rate is zero"}
+{"ts":"2026-11-09T08:06:02Z","ts_epoch":1794211562,"type":"strategic.cycle_complete","issues_created":0,"issues_skipped":3}
