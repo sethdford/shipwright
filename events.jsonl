@@ -2791,3 +2791,8 @@
 {"ts":"2026-11-08T18:07:37Z","ts_epoch":1794161257,"type":"patrol.issue_refused","check":"untested_scripts","count":7}
 {"ts":"2026-11-08T18:07:39Z","ts_epoch":1794161259,"type":"patrol.meta_issue_refused","title":"[Meta] Add tests for sw-event-schema-sync.sh"}
 {"ts":"2026-11-08T20:03:01Z","ts_epoch":1794168181,"type":"hygiene_platform_refactor","hardcoded":49,"fallback":76,"todo":51}
+{"ts":"2026-11-09T00:08:55Z","ts_epoch":1794182935,"type":"hygiene_platform_refactor","hardcoded":49,"fallback":76,"todo":51}
+{"ts":"2026-11-09T00:09:43Z","ts_epoch":1794182983,"type":"strategic.issue_refused","title":"Record failure stage and reason on every failed daemon pipeline so strategic and metrics stop reporting \"N/A\""}
+{"ts":"2026-11-09T00:09:46Z","ts_epoch":1794182986,"type":"strategic.issue_refused","title":"Fix strategic outcome attribution so completed issues are not recorded as FAILED suggestions"}
+{"ts":"2026-11-09T00:09:49Z","ts_epoch":1794182989,"type":"strategic.issue_refused","title":"Port the next `bash` entry in progress.json to TypeScript with a green parity suite"}
+{"ts":"2026-11-09T00:09:49Z","ts_epoch":1794182989,"type":"strategic.cycle_complete","issues_created":0,"issues_skipped":3}
