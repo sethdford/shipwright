@@ -2852,3 +2852,4 @@
 {"ts":"2026-11-09T08:05:59Z","ts_epoch":1794211559,"type":"strategic.issue_refused","title":"Retire failed-suggestion loops: record why strategic suggestions failed and feed the reason back into the next run"}
 {"ts":"2026-11-09T08:06:02Z","ts_epoch":1794211562,"type":"strategic.issue_refused","title":"Add a daemon pipeline-health circuit report: pause strategic issue creation while the recent success rate is zero"}
 {"ts":"2026-11-09T08:06:02Z","ts_epoch":1794211562,"type":"strategic.cycle_complete","issues_created":0,"issues_skipped":3}
+{"ts":"2026-11-09T12:05:26Z","ts_epoch":1794225926,"type":"hygiene_platform_refactor","hardcoded":49,"fallback":76,"todo":51}
