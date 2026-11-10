@@ -2969,3 +2969,4 @@
 {"ts":"2026-11-10T08:04:49Z","ts_epoch":1794297889,"type":"strategic.issue_refused","title":"Stop retrying auth and fatal errors at the build stage, and route stderr to the classifier correctly"}
 {"ts":"2026-11-10T08:04:52Z","ts_epoch":1794297892,"type":"strategic.issue_refused","title":"Port the next `bash` entry in `progress.json` to TypeScript and flip its router line only after parity is green"}
 {"ts":"2026-11-10T08:04:52Z","ts_epoch":1794297892,"type":"strategic.cycle_complete","issues_created":0,"issues_skipped":3}
+{"ts":"2026-11-10T12:04:44Z","ts_epoch":1794312284,"type":"hygiene_platform_refactor","hardcoded":49,"fallback":76,"todo":51}
