@@ -2908,3 +2908,8 @@
 {"ts":"2026-11-09T18:09:57Z","ts_epoch":1794247797,"type":"patrol.issue_refused","check":"untested_scripts","count":7}
 {"ts":"2026-11-09T18:10:00Z","ts_epoch":1794247800,"type":"patrol.meta_issue_refused","title":"[Meta] Add tests for sw-event-schema-sync.sh"}
 {"ts":"2026-11-09T20:03:05Z","ts_epoch":1794254585,"type":"hygiene_platform_refactor","hardcoded":49,"fallback":76,"todo":51}
+{"ts":"2026-11-10T00:07:54Z","ts_epoch":1794269274,"type":"hygiene_platform_refactor","hardcoded":49,"fallback":76,"todo":51}
+{"ts":"2026-11-10T00:08:44Z","ts_epoch":1794269324,"type":"strategic.issue_refused","title":"Record a structured outcome reason for every failed or abandoned pipeline run"}
+{"ts":"2026-11-10T00:08:47Z","ts_epoch":1794269327,"type":"strategic.issue_refused","title":"Add test suites for the five untested scripts (tmux-status, tmux-role-color, tracker-github, event-schema-sync)"}
+{"ts":"2026-11-10T00:08:50Z","ts_epoch":1794269330,"type":"strategic.issue_refused","title":"Cap strategic-issue scope so each suggestion touches a bounded set of files"}
+{"ts":"2026-11-10T00:08:50Z","ts_epoch":1794269330,"type":"strategic.cycle_complete","issues_created":0,"issues_skipped":3}
