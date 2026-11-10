@@ -2995,3 +2995,7 @@
 {"ts":"2026-11-10T12:10:02Z","ts_epoch":1794312602,"type":"patrol.finding","check":"untested_script","script":"sw-event-schema-sync.sh","lines":93,"usage":0}
 {"ts":"2026-11-10T12:10:04Z","ts_epoch":1794312604,"type":"patrol.issue_refused","check":"untested_scripts","count":7}
 {"ts":"2026-11-10T12:10:06Z","ts_epoch":1794312606,"type":"patrol.meta_issue_refused","title":"[Meta] Add tests for sw-event-schema-sync.sh"}
+{"ts":"2026-11-10T16:03:37Z","ts_epoch":1794326617,"type":"hygiene_platform_refactor","hardcoded":49,"fallback":76,"todo":51}
+{"ts":"2026-11-10T16:04:26Z","ts_epoch":1794326666,"type":"strategic.issue_refused","title":"Loop blast-radius guard: abort an iteration whose diff deletes far more than the task scope implies"}
+{"ts":"2026-11-10T16:04:29Z","ts_epoch":1794326669,"type":"strategic.issue_refused","title":"Single-purpose pre-flight: verify the test command runs before the first build iteration"}
+{"ts":"2026-11-10T16:04:29Z","ts_epoch":1794326669,"type":"strategic.cycle_complete","issues_created":0,"issues_skipped":3}
