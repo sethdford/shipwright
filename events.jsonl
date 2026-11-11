@@ -3077,3 +3077,8 @@
 {"ts":"2026-11-11T06:12:15Z","ts_epoch":1794377535,"type":"patrol.finding","check":"untested_script","script":"sw-event-schema-sync.sh","lines":93,"usage":0}
 {"ts":"2026-11-11T06:12:16Z","ts_epoch":1794377536,"type":"patrol.issue_refused","check":"untested_scripts","count":7}
 {"ts":"2026-11-11T06:12:18Z","ts_epoch":1794377538,"type":"patrol.meta_issue_refused","title":"[Meta] Add tests for sw-event-schema-sync.sh"}
+{"ts":"2026-11-11T08:03:59Z","ts_epoch":1794384239,"type":"hygiene_platform_refactor","hardcoded":49,"fallback":76,"todo":51}
+{"ts":"2026-11-11T08:04:50Z","ts_epoch":1794384290,"type":"strategic.issue_refused","title":"Blast-radius guard for the build loop: halt and revert iterations that delete or rewrite far more than the task scope"}
+{"ts":"2026-11-11T08:04:53Z","ts_epoch":1794384293,"type":"strategic.issue_refused","title":"Differential test gate: make the 21 bash suites that print no completion line visible to the gate, and emit an explicit completion marker from `sw-test-all.sh`"}
+{"ts":"2026-11-11T08:04:57Z","ts_epoch":1794384297,"type":"strategic.issue_refused","title":"Fix auth-failure retry loop: route build-stage stderr to the classifier and make fatal-error detection retry-correct"}
+{"ts":"2026-11-11T08:04:57Z","ts_epoch":1794384297,"type":"strategic.cycle_complete","issues_created":0,"issues_skipped":3}
