@@ -3199,3 +3199,7 @@
 {"ts":"2026-11-12T08:04:57Z","ts_epoch":1794470697,"type":"strategic.issue_refused","title":"Differential pre-build baseline: record pre-existing test and lint failures once and reuse them across the pipeline"}
 {"ts":"2026-11-12T08:04:59Z","ts_epoch":1794470699,"type":"strategic.issue_refused","title":"Daemon quarantine for issues that exhaust their retry budget, with `shipwright daemon quarantine list|release`"}
 {"ts":"2026-11-12T08:04:59Z","ts_epoch":1794470699,"type":"strategic.cycle_complete","issues_created":0,"issues_skipped":3}
+{"ts":"2026-11-12T12:05:09Z","ts_epoch":1794485109,"type":"hygiene_platform_refactor","hardcoded":49,"fallback":76,"todo":51}
+{"ts":"2026-11-12T12:05:56Z","ts_epoch":1794485156,"type":"strategic.issue_refused","title":"Blast-radius guard for the build loop: abort an iteration that deletes far more than the task implies"}
+{"ts":"2026-11-12T12:06:00Z","ts_epoch":1794485160,"type":"strategic.issue_refused","title":"Differential test gate: make the 21 suites with no completion line count as failures that can be compared"}
+{"ts":"2026-11-12T12:06:00Z","ts_epoch":1794485160,"type":"strategic.cycle_complete","issues_created":0,"issues_skipped":3}
