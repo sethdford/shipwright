@@ -3194,3 +3194,8 @@
 {"ts":"2026-11-12T06:12:38Z","ts_epoch":1794463958,"type":"patrol.finding","check":"untested_script","script":"sw-event-schema-sync.sh","lines":93,"usage":0}
 {"ts":"2026-11-12T06:12:40Z","ts_epoch":1794463960,"type":"patrol.issue_refused","check":"untested_scripts","count":7}
 {"ts":"2026-11-12T06:12:42Z","ts_epoch":1794463962,"type":"patrol.meta_issue_refused","title":"[Meta] Add tests for sw-event-schema-sync.sh"}
+{"ts":"2026-11-12T08:04:13Z","ts_epoch":1794470653,"type":"hygiene_platform_refactor","hardcoded":49,"fallback":76,"todo":51}
+{"ts":"2026-11-12T08:04:54Z","ts_epoch":1794470694,"type":"strategic.issue_refused","title":"Build-loop blast-radius guard: abort an iteration that deletes or rewrites far more lines than the task implies"}
+{"ts":"2026-11-12T08:04:57Z","ts_epoch":1794470697,"type":"strategic.issue_refused","title":"Differential pre-build baseline: record pre-existing test and lint failures once and reuse them across the pipeline"}
+{"ts":"2026-11-12T08:04:59Z","ts_epoch":1794470699,"type":"strategic.issue_refused","title":"Daemon quarantine for issues that exhaust their retry budget, with `shipwright daemon quarantine list|release`"}
+{"ts":"2026-11-12T08:04:59Z","ts_epoch":1794470699,"type":"strategic.cycle_complete","issues_created":0,"issues_skipped":3}
