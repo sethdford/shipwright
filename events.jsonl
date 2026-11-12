@@ -3168,3 +3168,4 @@
 {"ts":"2026-11-12T00:19:25Z","ts_epoch":1794442765,"type":"patrol.finding","check":"untested_script","script":"sw-event-schema-sync.sh","lines":93,"usage":0}
 {"ts":"2026-11-12T00:19:27Z","ts_epoch":1794442767,"type":"patrol.issue_refused","check":"untested_scripts","count":7}
 {"ts":"2026-11-12T00:19:29Z","ts_epoch":1794442769,"type":"patrol.meta_issue_refused","title":"[Meta] Add tests for sw-event-schema-sync.sh"}
+{"ts":"2026-11-12T04:03:28Z","ts_epoch":1794456208,"type":"hygiene_platform_refactor","hardcoded":49,"fallback":76,"todo":51}
