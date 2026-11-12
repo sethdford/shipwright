@@ -3139,3 +3139,7 @@
 {"ts":"2026-11-11T20:04:16Z","ts_epoch":1794427456,"type":"strategic.issue_refused","title":"Feed real failure-stage data into the strategic agent's \"Recent Pipeline Performance\" section"}
 {"ts":"2026-11-11T20:04:19Z","ts_epoch":1794427459,"type":"strategic.issue_refused","title":"Make strategic issue creation fail closed on scope: reject recommendations that restate a past FAILED title"}
 {"ts":"2026-11-11T20:04:19Z","ts_epoch":1794427459,"type":"strategic.cycle_complete","issues_created":0,"issues_skipped":3}
+{"ts":"2026-11-12T00:08:36Z","ts_epoch":1794442116,"type":"hygiene_platform_refactor","hardcoded":49,"fallback":76,"todo":51}
+{"ts":"2026-11-12T00:09:28Z","ts_epoch":1794442168,"type":"strategic.issue_refused","title":"Blast-radius guard for the build loop: abort iterations that delete or rewrite far more than the task implies"}
+{"ts":"2026-11-12T00:09:31Z","ts_epoch":1794442171,"type":"strategic.issue_refused","title":"Wire stage-level auth-failure fast-fail so the daemon stops retrying non-retryable errors"}
+{"ts":"2026-11-12T00:09:31Z","ts_epoch":1794442171,"type":"strategic.cycle_complete","issues_created":0,"issues_skipped":3}
