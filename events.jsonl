@@ -3255,3 +3255,8 @@
 {"ts":"2026-11-12T18:08:33Z","ts_epoch":1794506913,"type":"patrol.issue_refused","check":"untested_scripts","count":7}
 {"ts":"2026-11-12T18:08:35Z","ts_epoch":1794506915,"type":"patrol.meta_issue_refused","title":"[Meta] Add tests for sw-event-schema-sync.sh"}
 {"ts":"2026-11-12T20:03:25Z","ts_epoch":1794513805,"type":"hygiene_platform_refactor","hardcoded":49,"fallback":76,"todo":51}
+{"ts":"2026-11-13T00:08:15Z","ts_epoch":1794528495,"type":"hygiene_platform_refactor","hardcoded":49,"fallback":76,"todo":51}
+{"ts":"2026-11-13T00:08:59Z","ts_epoch":1794528539,"type":"strategic.issue_refused","title":"Record the failing stage and classified reason on every closed-unshipped strategic issue"}
+{"ts":"2026-11-13T00:09:02Z","ts_epoch":1794528542,"type":"strategic.issue_refused","title":"Add test suites for the remaining untested tmux and tracker scripts"}
+{"ts":"2026-11-13T00:09:05Z","ts_epoch":1794528545,"type":"strategic.issue_refused","title":"Port the next `bash` entry in progress.json to TypeScript with a parity suite"}
+{"ts":"2026-11-13T00:09:05Z","ts_epoch":1794528545,"type":"strategic.cycle_complete","issues_created":0,"issues_skipped":3}
