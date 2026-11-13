@@ -3372,3 +3372,8 @@
 {"ts":"2026-11-13T18:07:45Z","ts_epoch":1794593265,"type":"patrol.finding","check":"untested_script","script":"sw-event-schema-sync.sh","lines":93,"usage":0}
 {"ts":"2026-11-13T18:07:47Z","ts_epoch":1794593267,"type":"patrol.issue_refused","check":"untested_scripts","count":7}
 {"ts":"2026-11-13T18:07:49Z","ts_epoch":1794593269,"type":"patrol.meta_issue_refused","title":"[Meta] Add tests for sw-event-schema-sync.sh"}
+{"ts":"2026-11-13T20:03:31Z","ts_epoch":1794600211,"type":"hygiene_platform_refactor","hardcoded":49,"fallback":76,"todo":51}
+{"ts":"2026-11-13T20:04:29Z","ts_epoch":1794600269,"type":"strategic.issue_refused","title":"Loop blast-radius guard: abort an iteration whose diff deletes far more than the task scope allows"}
+{"ts":"2026-11-13T20:04:32Z","ts_epoch":1794600272,"type":"strategic.issue_refused","title":"Retry classifier: stop retrying build-stage auth and permission failures and surface the cause once"}
+{"ts":"2026-11-13T20:04:34Z","ts_epoch":1794600274,"type":"strategic.issue_refused","title":"Daemon health summary: one `shipwright doctor --daemon` report of dispatch gates, breaker state and recent failure causes"}
+{"ts":"2026-11-13T20:04:34Z","ts_epoch":1794600274,"type":"strategic.cycle_complete","issues_created":0,"issues_skipped":3}
