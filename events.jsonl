@@ -3311,3 +3311,8 @@
 {"ts":"2026-11-13T06:12:15Z","ts_epoch":1794550335,"type":"patrol.finding","check":"untested_script","script":"sw-event-schema-sync.sh","lines":93,"usage":0}
 {"ts":"2026-11-13T06:12:17Z","ts_epoch":1794550337,"type":"patrol.issue_refused","check":"untested_scripts","count":7}
 {"ts":"2026-11-13T06:12:19Z","ts_epoch":1794550339,"type":"patrol.meta_issue_refused","title":"[Meta] Add tests for sw-event-schema-sync.sh"}
+{"ts":"2026-11-13T08:03:40Z","ts_epoch":1794557020,"type":"hygiene_platform_refactor","hardcoded":49,"fallback":76,"todo":51}
+{"ts":"2026-11-13T08:04:21Z","ts_epoch":1794557061,"type":"strategic.issue_refused","title":"Add a blast-radius guard to the build loop that aborts an iteration on mass deletions"}
+{"ts":"2026-11-13T08:04:24Z","ts_epoch":1794557064,"type":"strategic.issue_refused","title":"Make the daemon's quarantine of repeatedly failing issues a durable, gate-checked state"}
+{"ts":"2026-11-13T08:04:27Z","ts_epoch":1794557067,"type":"strategic.issue_refused","title":"Failure-class-aware retry budget: stop retrying auth and environment failures at the build stage"}
+{"ts":"2026-11-13T08:04:27Z","ts_epoch":1794557067,"type":"strategic.cycle_complete","issues_created":0,"issues_skipped":3}
