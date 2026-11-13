@@ -3316,3 +3316,8 @@
 {"ts":"2026-11-13T08:04:24Z","ts_epoch":1794557064,"type":"strategic.issue_refused","title":"Make the daemon's quarantine of repeatedly failing issues a durable, gate-checked state"}
 {"ts":"2026-11-13T08:04:27Z","ts_epoch":1794557067,"type":"strategic.issue_refused","title":"Failure-class-aware retry budget: stop retrying auth and environment failures at the build stage"}
 {"ts":"2026-11-13T08:04:27Z","ts_epoch":1794557067,"type":"strategic.cycle_complete","issues_created":0,"issues_skipped":3}
+{"ts":"2026-11-13T12:04:36Z","ts_epoch":1794571476,"type":"hygiene_platform_refactor","hardcoded":49,"fallback":76,"todo":51}
+{"ts":"2026-11-13T12:05:31Z","ts_epoch":1794571531,"type":"strategic.issue_refused","title":"Record a per-issue failure post-mortem (stage, classified cause, last error) when a daemon pipeline fails"}
+{"ts":"2026-11-13T12:05:34Z","ts_epoch":1794571534,"type":"strategic.issue_refused","title":"Add test suites for the five untested scripts (tmux-status, tmux-role-color, event-schema-sync, tracker-github, test-all)"}
+{"ts":"2026-11-13T12:05:36Z","ts_epoch":1794571536,"type":"strategic.issue_refused","title":"Cap strategic-issue scope: refuse to file issues whose likely edit set touches files over 1500 lines or exceeds a blast-radius budget"}
+{"ts":"2026-11-13T12:05:37Z","ts_epoch":1794571537,"type":"strategic.cycle_complete","issues_created":0,"issues_skipped":3}
