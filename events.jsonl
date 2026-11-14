@@ -3437,3 +3437,4 @@
 {"ts":"2026-11-14T08:04:15Z","ts_epoch":1794643455,"type":"strategic.issue_refused","title":"Add test suites for the five untested scripts (tracker-github, tmux-status, tmux-role-color, event-schema-sync, test-all)"}
 {"ts":"2026-11-14T08:04:18Z","ts_epoch":1794643458,"type":"strategic.issue_refused","title":"Size-and-scope gate for strategic issues: reject or split issues likely to exceed one pipeline run"}
 {"ts":"2026-11-14T08:04:18Z","ts_epoch":1794643458,"type":"strategic.cycle_complete","issues_created":0,"issues_skipped":3}
+{"ts":"2026-11-14T12:03:55Z","ts_epoch":1794657835,"type":"hygiene_platform_refactor","hardcoded":49,"fallback":76,"todo":51}
