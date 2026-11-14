@@ -3377,3 +3377,7 @@
 {"ts":"2026-11-13T20:04:32Z","ts_epoch":1794600272,"type":"strategic.issue_refused","title":"Retry classifier: stop retrying build-stage auth and permission failures and surface the cause once"}
 {"ts":"2026-11-13T20:04:34Z","ts_epoch":1794600274,"type":"strategic.issue_refused","title":"Daemon health summary: one `shipwright doctor --daemon` report of dispatch gates, breaker state and recent failure causes"}
 {"ts":"2026-11-13T20:04:34Z","ts_epoch":1794600274,"type":"strategic.cycle_complete","issues_created":0,"issues_skipped":3}
+{"ts":"2026-11-14T00:08:01Z","ts_epoch":1794614881,"type":"hygiene_platform_refactor","hardcoded":49,"fallback":76,"todo":51}
+{"ts":"2026-11-14T00:08:49Z","ts_epoch":1794614929,"type":"strategic.issue_refused","title":"Add blast-radius guard to the build loop that aborts and reverts iterations deleting or rewriting far more than the task implies"}
+{"ts":"2026-11-14T00:08:52Z","ts_epoch":1794614932,"type":"strategic.issue_refused","title":"Move hardcoded loop and daemon tunables (timeouts, retry caps, iteration limits) into policy config with a validated schema"}
+{"ts":"2026-11-14T00:08:52Z","ts_epoch":1794614932,"type":"strategic.cycle_complete","issues_created":0,"issues_skipped":3}
