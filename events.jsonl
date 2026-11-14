@@ -3432,3 +3432,8 @@
 {"ts":"2026-11-14T06:10:49Z","ts_epoch":1794636649,"type":"patrol.finding","check":"untested_script","script":"sw-event-schema-sync.sh","lines":93,"usage":0}
 {"ts":"2026-11-14T06:10:51Z","ts_epoch":1794636651,"type":"patrol.issue_refused","check":"untested_scripts","count":7}
 {"ts":"2026-11-14T06:10:53Z","ts_epoch":1794636653,"type":"patrol.meta_issue_refused","title":"[Meta] Add tests for sw-event-schema-sync.sh"}
+{"ts":"2026-11-14T08:03:23Z","ts_epoch":1794643403,"type":"hygiene_platform_refactor","hardcoded":49,"fallback":76,"todo":51}
+{"ts":"2026-11-14T08:04:12Z","ts_epoch":1794643452,"type":"strategic.issue_refused","title":"Emit stage-level failure events so \"common failure stages\" and the success rate are never empty"}
+{"ts":"2026-11-14T08:04:15Z","ts_epoch":1794643455,"type":"strategic.issue_refused","title":"Add test suites for the five untested scripts (tracker-github, tmux-status, tmux-role-color, event-schema-sync, test-all)"}
+{"ts":"2026-11-14T08:04:18Z","ts_epoch":1794643458,"type":"strategic.issue_refused","title":"Size-and-scope gate for strategic issues: reject or split issues likely to exceed one pipeline run"}
+{"ts":"2026-11-14T08:04:18Z","ts_epoch":1794643458,"type":"strategic.cycle_complete","issues_created":0,"issues_skipped":3}
