@@ -3463,3 +3463,8 @@
 {"ts":"2026-11-14T12:09:08Z","ts_epoch":1794658148,"type":"patrol.finding","check":"untested_script","script":"sw-event-schema-sync.sh","lines":93,"usage":0}
 {"ts":"2026-11-14T12:09:09Z","ts_epoch":1794658149,"type":"patrol.issue_refused","check":"untested_scripts","count":7}
 {"ts":"2026-11-14T12:09:11Z","ts_epoch":1794658151,"type":"patrol.meta_issue_refused","title":"[Meta] Add tests for sw-event-schema-sync.sh"}
+{"ts":"2026-11-14T16:03:13Z","ts_epoch":1794672193,"type":"hygiene_platform_refactor","hardcoded":49,"fallback":76,"todo":51}
+{"ts":"2026-11-14T16:04:07Z","ts_epoch":1794672247,"type":"strategic.issue_refused","title":"Fix \"Recent Pipeline Performance\" so it reports real success and failure counts instead of N/A"}
+{"ts":"2026-11-14T16:04:10Z","ts_epoch":1794672250,"type":"strategic.issue_refused","title":"Add test suites for the 4 remaining untested scripts (tmux status/role-color, event-schema-sync, tracker-github)"}
+{"ts":"2026-11-14T16:04:12Z","ts_epoch":1794672252,"type":"strategic.issue_refused","title":"Port the next `bash` entry in progress.json to TypeScript with its parity suite"}
+{"ts":"2026-11-14T16:04:12Z","ts_epoch":1794672252,"type":"strategic.cycle_complete","issues_created":0,"issues_skipped":3}
