@@ -3547,3 +3547,4 @@
 {"ts":"2026-11-15T08:04:26Z","ts_epoch":1794729866,"type":"strategic.issue_refused","title":"Differential test gate: treat suites with no completion line as unparseable and fail closed with an explicit report"}
 {"ts":"2026-11-15T08:04:29Z","ts_epoch":1794729869,"type":"strategic.issue_refused","title":"Port the pre-build validation gate to a TypeScript use case in the orchestration context (retry of earlier failed attempts, narrower scope)"}
 {"ts":"2026-11-15T08:04:29Z","ts_epoch":1794729869,"type":"strategic.cycle_complete","issues_created":0,"issues_skipped":3}
+{"ts":"2026-11-15T12:03:47Z","ts_epoch":1794744227,"type":"hygiene_platform_refactor","hardcoded":49,"fallback":76,"todo":51}
