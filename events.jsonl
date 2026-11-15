@@ -3542,3 +3542,8 @@
 {"ts":"2026-11-15T06:11:23Z","ts_epoch":1794723083,"type":"patrol.finding","check":"untested_script","script":"sw-event-schema-sync.sh","lines":93,"usage":0}
 {"ts":"2026-11-15T06:11:25Z","ts_epoch":1794723085,"type":"patrol.issue_refused","check":"untested_scripts","count":7}
 {"ts":"2026-11-15T06:11:27Z","ts_epoch":1794723087,"type":"patrol.meta_issue_refused","title":"[Meta] Add tests for sw-event-schema-sync.sh"}
+{"ts":"2026-11-15T08:03:38Z","ts_epoch":1794729818,"type":"hygiene_platform_refactor","hardcoded":49,"fallback":76,"todo":51}
+{"ts":"2026-11-15T08:04:24Z","ts_epoch":1794729864,"type":"strategic.issue_refused","title":"Blast-radius guard for the build loop: abort iterations that delete or rewrite far more than the task implies"}
+{"ts":"2026-11-15T08:04:26Z","ts_epoch":1794729866,"type":"strategic.issue_refused","title":"Differential test gate: treat suites with no completion line as unparseable and fail closed with an explicit report"}
+{"ts":"2026-11-15T08:04:29Z","ts_epoch":1794729869,"type":"strategic.issue_refused","title":"Port the pre-build validation gate to a TypeScript use case in the orchestration context (retry of earlier failed attempts, narrower scope)"}
+{"ts":"2026-11-15T08:04:29Z","ts_epoch":1794729869,"type":"strategic.cycle_complete","issues_created":0,"issues_skipped":3}
