@@ -3563,3 +3563,8 @@
 {"ts":"2026-11-15T12:09:25Z","ts_epoch":1794744565,"type":"patrol.finding","check":"untested_script","script":"sw-event-schema-sync.sh","lines":93,"usage":0}
 {"ts":"2026-11-15T12:09:27Z","ts_epoch":1794744567,"type":"patrol.issue_refused","check":"untested_scripts","count":7}
 {"ts":"2026-11-15T12:09:29Z","ts_epoch":1794744569,"type":"patrol.meta_issue_refused","title":"[Meta] Add tests for sw-event-schema-sync.sh"}
+{"ts":"2026-11-15T16:03:05Z","ts_epoch":1794758585,"type":"hygiene_platform_refactor","hardcoded":49,"fallback":76,"todo":51}
+{"ts":"2026-11-15T16:03:54Z","ts_epoch":1794758634,"type":"strategic.issue_refused","title":"Pre-dispatch quarantine for issues whose last N attempts failed at the same stage"}
+{"ts":"2026-11-15T16:03:57Z","ts_epoch":1794758637,"type":"strategic.issue_refused","title":"Blast-radius guard for loop iterations (diff-size and deletion ceiling before commit)"}
+{"ts":"2026-11-15T16:04:00Z","ts_epoch":1794758640,"type":"strategic.issue_refused","title":"Extract hardcoded retry, timeout and iteration limits into one policy module with adaptive overrides"}
+{"ts":"2026-11-15T16:04:00Z","ts_epoch":1794758640,"type":"strategic.cycle_complete","issues_created":0,"issues_skipped":3}
