@@ -3641,3 +3641,8 @@
 {"ts":"2026-11-16T12:14:24Z","ts_epoch":1794831264,"type":"patrol.finding","check":"untested_script","script":"sw-event-schema-sync.sh","lines":93,"usage":0}
 {"ts":"2026-11-16T12:14:26Z","ts_epoch":1794831266,"type":"patrol.issue_refused","check":"untested_scripts","count":7}
 {"ts":"2026-11-16T12:14:28Z","ts_epoch":1794831268,"type":"patrol.meta_issue_refused","title":"[Meta] Add tests for sw-event-schema-sync.sh"}
+{"ts":"2026-11-16T16:03:32Z","ts_epoch":1794845012,"type":"hygiene_platform_refactor","hardcoded":49,"fallback":76,"todo":51}
+{"ts":"2026-11-16T16:04:19Z","ts_epoch":1794845059,"type":"strategic.issue_refused","title":"Differential gate: treat suites with no completion line as a single unit and emit a structured result line"}
+{"ts":"2026-11-16T16:04:22Z","ts_epoch":1794845062,"type":"strategic.issue_refused","title":"Loop blast-radius guard: abort an iteration whose diff deletes far more than the task scope allows"}
+{"ts":"2026-11-16T16:04:25Z","ts_epoch":1794845065,"type":"strategic.issue_refused","title":"Strategic agent: record suggestion outcomes with failure reasons so \"FAILED\" history is actionable"}
+{"ts":"2026-11-16T16:04:25Z","ts_epoch":1794845065,"type":"strategic.cycle_complete","issues_created":0,"issues_skipped":3}
