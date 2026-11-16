@@ -3584,3 +3584,8 @@
 {"ts":"2026-11-15T18:07:37Z","ts_epoch":1794766057,"type":"patrol.issue_refused","check":"untested_scripts","count":7}
 {"ts":"2026-11-15T18:07:39Z","ts_epoch":1794766059,"type":"patrol.meta_issue_refused","title":"[Meta] Add tests for sw-event-schema-sync.sh"}
 {"ts":"2026-11-15T20:03:12Z","ts_epoch":1794772992,"type":"hygiene_platform_refactor","hardcoded":49,"fallback":76,"todo":51}
+{"ts":"2026-11-16T00:10:28Z","ts_epoch":1794787828,"type":"hygiene_platform_refactor","hardcoded":49,"fallback":76,"todo":51}
+{"ts":"2026-11-16T00:11:19Z","ts_epoch":1794787879,"type":"strategic.issue_refused","title":"Add bash test suites for the four untested helper scripts (tmux role color, tmux status, event schema sync, GitHub tracker)"}
+{"ts":"2026-11-16T00:11:21Z","ts_epoch":1794787881,"type":"strategic.issue_refused","title":"Record a structured failure reason for every failed pipeline run and show it in `shipwright status`"}
+{"ts":"2026-11-16T00:11:24Z","ts_epoch":1794787884,"type":"strategic.issue_refused","title":"Port the next `bash` command in `progress.json` to TypeScript with its parity suite"}
+{"ts":"2026-11-16T00:11:24Z","ts_epoch":1794787884,"type":"strategic.cycle_complete","issues_created":0,"issues_skipped":3}
