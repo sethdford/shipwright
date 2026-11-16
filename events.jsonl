@@ -3646,3 +3646,18 @@
 {"ts":"2026-11-16T16:04:22Z","ts_epoch":1794845062,"type":"strategic.issue_refused","title":"Loop blast-radius guard: abort an iteration whose diff deletes far more than the task scope allows"}
 {"ts":"2026-11-16T16:04:25Z","ts_epoch":1794845065,"type":"strategic.issue_refused","title":"Strategic agent: record suggestion outcomes with failure reasons so \"FAILED\" history is actionable"}
 {"ts":"2026-11-16T16:04:25Z","ts_epoch":1794845065,"type":"strategic.cycle_complete","issues_created":0,"issues_skipped":3}
+{"ts":"2026-11-16T18:08:26Z","ts_epoch":1794852506,"type":"patrol.started","dry_run":"false"}
+{"ts":"2026-11-16T18:08:28Z","ts_epoch":1794852508,"type":"patrol.finding","check":"stale_dependency","package":"jsdom","current":"28.1.0","latest":"31.0.1"}
+{"ts":"2026-11-16T18:08:28Z","ts_epoch":1794852508,"type":"patrol.finding","check":"stale_dependency","package":"typescript","current":"5.9.3","latest":"7.0.2"}
+{"ts":"2026-11-16T18:08:30Z","ts_epoch":1794852510,"type":"patrol.issue_refused","check":"stale_dependency","count":2}
+{"ts":"2026-11-16T18:08:46Z","ts_epoch":1794852526,"type":"patrol.finding","check":"recurring_failure","pattern":"FAIL: 0","seen_count":14}
+{"ts":"2026-11-16T18:08:48Z","ts_epoch":1794852528,"type":"patrol.issue_refused","check":"recurring_failure","pattern":"FAIL: 0"}
+{"ts":"2026-11-16T18:08:50Z","ts_epoch":1794852530,"type":"patrol.finding","check":"untested_script","script":"sw-tracker-linear.sh","lines":568,"usage":7}
+{"ts":"2026-11-16T18:08:50Z","ts_epoch":1794852530,"type":"patrol.finding","check":"untested_script","script":"sw-tracker-jira.sh","lines":474,"usage":7}
+{"ts":"2026-11-16T18:08:50Z","ts_epoch":1794852530,"type":"patrol.finding","check":"untested_script","script":"sw-tracker-github.sh","lines":212,"usage":3}
+{"ts":"2026-11-16T18:08:50Z","ts_epoch":1794852530,"type":"patrol.finding","check":"untested_script","script":"sw-test-all.sh","lines":206,"usage":3}
+{"ts":"2026-11-16T18:08:50Z","ts_epoch":1794852530,"type":"patrol.finding","check":"untested_script","script":"sw-tmux-status.sh","lines":151,"usage":1}
+{"ts":"2026-11-16T18:08:50Z","ts_epoch":1794852530,"type":"patrol.finding","check":"untested_script","script":"sw-tmux-role-color.sh","lines":81,"usage":1}
+{"ts":"2026-11-16T18:08:50Z","ts_epoch":1794852530,"type":"patrol.finding","check":"untested_script","script":"sw-event-schema-sync.sh","lines":93,"usage":0}
+{"ts":"2026-11-16T18:08:51Z","ts_epoch":1794852531,"type":"patrol.issue_refused","check":"untested_scripts","count":7}
+{"ts":"2026-11-16T18:08:53Z","ts_epoch":1794852533,"type":"patrol.meta_issue_refused","title":"[Meta] Add tests for sw-event-schema-sync.sh"}
