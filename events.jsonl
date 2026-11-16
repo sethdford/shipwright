@@ -3589,3 +3589,18 @@
 {"ts":"2026-11-16T00:11:21Z","ts_epoch":1794787881,"type":"strategic.issue_refused","title":"Record a structured failure reason for every failed pipeline run and show it in `shipwright status`"}
 {"ts":"2026-11-16T00:11:24Z","ts_epoch":1794787884,"type":"strategic.issue_refused","title":"Port the next `bash` command in `progress.json` to TypeScript with its parity suite"}
 {"ts":"2026-11-16T00:11:24Z","ts_epoch":1794787884,"type":"strategic.cycle_complete","issues_created":0,"issues_skipped":3}
+{"ts":"2026-11-16T00:22:56Z","ts_epoch":1794788576,"type":"patrol.started","dry_run":"false"}
+{"ts":"2026-11-16T00:22:57Z","ts_epoch":1794788577,"type":"patrol.finding","check":"stale_dependency","package":"jsdom","current":"28.1.0","latest":"31.0.1"}
+{"ts":"2026-11-16T00:22:57Z","ts_epoch":1794788577,"type":"patrol.finding","check":"stale_dependency","package":"typescript","current":"5.9.3","latest":"7.0.2"}
+{"ts":"2026-11-16T00:22:59Z","ts_epoch":1794788579,"type":"patrol.issue_refused","check":"stale_dependency","count":2}
+{"ts":"2026-11-16T00:23:14Z","ts_epoch":1794788594,"type":"patrol.finding","check":"recurring_failure","pattern":"FAIL: 0","seen_count":14}
+{"ts":"2026-11-16T00:23:15Z","ts_epoch":1794788595,"type":"patrol.issue_refused","check":"recurring_failure","pattern":"FAIL: 0"}
+{"ts":"2026-11-16T00:23:16Z","ts_epoch":1794788596,"type":"patrol.finding","check":"untested_script","script":"sw-tracker-linear.sh","lines":568,"usage":7}
+{"ts":"2026-11-16T00:23:16Z","ts_epoch":1794788596,"type":"patrol.finding","check":"untested_script","script":"sw-tracker-jira.sh","lines":474,"usage":7}
+{"ts":"2026-11-16T00:23:17Z","ts_epoch":1794788597,"type":"patrol.finding","check":"untested_script","script":"sw-tracker-github.sh","lines":212,"usage":3}
+{"ts":"2026-11-16T00:23:17Z","ts_epoch":1794788597,"type":"patrol.finding","check":"untested_script","script":"sw-test-all.sh","lines":206,"usage":3}
+{"ts":"2026-11-16T00:23:17Z","ts_epoch":1794788597,"type":"patrol.finding","check":"untested_script","script":"sw-tmux-status.sh","lines":151,"usage":1}
+{"ts":"2026-11-16T00:23:17Z","ts_epoch":1794788597,"type":"patrol.finding","check":"untested_script","script":"sw-tmux-role-color.sh","lines":81,"usage":1}
+{"ts":"2026-11-16T00:23:17Z","ts_epoch":1794788597,"type":"patrol.finding","check":"untested_script","script":"sw-event-schema-sync.sh","lines":93,"usage":0}
+{"ts":"2026-11-16T00:23:18Z","ts_epoch":1794788598,"type":"patrol.issue_refused","check":"untested_scripts","count":7}
+{"ts":"2026-11-16T00:23:20Z","ts_epoch":1794788600,"type":"patrol.meta_issue_refused","title":"[Meta] Add tests for sw-event-schema-sync.sh"}
