@@ -3625,3 +3625,4 @@
 {"ts":"2026-11-16T08:12:52Z","ts_epoch":1794816772,"type":"strategic.issue_refused","title":"Add test suites for the 5 untested scripts to reach the 90% script-test target"}
 {"ts":"2026-11-16T08:12:55Z","ts_epoch":1794816775,"type":"strategic.issue_refused","title":"Port the next `bash` entry in `progress.json` to TypeScript with a green parity suite"}
 {"ts":"2026-11-16T08:12:55Z","ts_epoch":1794816775,"type":"strategic.cycle_complete","issues_created":0,"issues_skipped":3}
+{"ts":"2026-11-16T12:07:18Z","ts_epoch":1794830838,"type":"hygiene_platform_refactor","hardcoded":49,"fallback":76,"todo":51}
