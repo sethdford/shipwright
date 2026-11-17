@@ -3703,3 +3703,8 @@
 {"ts":"2026-11-17T08:04:40Z","ts_epoch":1794902680,"type":"strategic.issue_refused","title":"Move hardcoded loop and daemon thresholds into a validated policy file with env override"}
 {"ts":"2026-11-17T08:04:43Z","ts_epoch":1794902683,"type":"strategic.issue_refused","title":"Daemon pre-dispatch scope check: flag multi-part issues and queue them for splitting"}
 {"ts":"2026-11-17T08:04:43Z","ts_epoch":1794902683,"type":"strategic.cycle_complete","issues_created":0,"issues_skipped":3}
+{"ts":"2026-11-17T12:04:42Z","ts_epoch":1794917082,"type":"hygiene_platform_refactor","hardcoded":49,"fallback":76,"todo":51}
+{"ts":"2026-11-17T12:05:31Z","ts_epoch":1794917131,"type":"strategic.issue_refused","title":"Add a pipeline-wide preflight that verifies the repo's test and lint commands before the build loop starts"}
+{"ts":"2026-11-17T12:05:35Z","ts_epoch":1794917135,"type":"strategic.issue_refused","title":"Fix inverted auth-failure handling so the build stage stops retrying unrecoverable auth errors"}
+{"ts":"2026-11-17T12:05:38Z","ts_epoch":1794917138,"type":"strategic.issue_refused","title":"Add a blast-radius guard that aborts a loop iteration when the diff deletes far more than the task implies"}
+{"ts":"2026-11-17T12:05:38Z","ts_epoch":1794917138,"type":"strategic.cycle_complete","issues_created":0,"issues_skipped":3}
