@@ -3662,3 +3662,8 @@
 {"ts":"2026-11-16T18:08:51Z","ts_epoch":1794852531,"type":"patrol.issue_refused","check":"untested_scripts","count":7}
 {"ts":"2026-11-16T18:08:53Z","ts_epoch":1794852533,"type":"patrol.meta_issue_refused","title":"[Meta] Add tests for sw-event-schema-sync.sh"}
 {"ts":"2026-11-16T20:03:35Z","ts_epoch":1794859415,"type":"hygiene_platform_refactor","hardcoded":49,"fallback":76,"todo":51}
+{"ts":"2026-11-17T00:08:16Z","ts_epoch":1794874096,"type":"hygiene_platform_refactor","hardcoded":49,"fallback":76,"todo":51}
+{"ts":"2026-11-17T00:09:00Z","ts_epoch":1794874140,"type":"strategic.issue_refused","title":"Add test suites for the four untested helper scripts (event-schema-sync, tmux-role-color, tmux-status, tracker-github)"}
+{"ts":"2026-11-17T00:09:03Z","ts_epoch":1794874143,"type":"strategic.issue_refused","title":"Port the next `bash` entry in `docs/plans/port/progress.json` to TypeScript with a green parity suite"}
+{"ts":"2026-11-17T00:09:06Z","ts_epoch":1794874146,"type":"strategic.issue_refused","title":"Move hardcoded daemon timeouts and thresholds into policy config with a drift test"}
+{"ts":"2026-11-17T00:09:06Z","ts_epoch":1794874146,"type":"strategic.cycle_complete","issues_created":0,"issues_skipped":3}
