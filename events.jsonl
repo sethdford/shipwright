@@ -3743,3 +3743,7 @@
 {"ts":"2026-11-17T20:03:50Z","ts_epoch":1794945830,"type":"strategic.issue_refused","title":"Cap build-loop blast radius: abort an iteration whose diff deletes far more than the task scope"}
 {"ts":"2026-11-17T20:03:53Z","ts_epoch":1794945833,"type":"strategic.issue_refused","title":"Fix build-stage auth-failure retry routing so fatal errors short-circuit retries"}
 {"ts":"2026-11-17T20:03:53Z","ts_epoch":1794945833,"type":"strategic.cycle_complete","issues_created":0,"issues_skipped":3}
+{"ts":"2026-11-18T00:08:24Z","ts_epoch":1794960504,"type":"hygiene_platform_refactor","hardcoded":49,"fallback":76,"todo":51}
+{"ts":"2026-11-18T00:09:12Z","ts_epoch":1794960552,"type":"strategic.issue_refused","title":"Port-aware blast-radius guard in the build loop: abort an iteration that deletes more than N lines outside the task scope"}
+{"ts":"2026-11-18T00:09:15Z","ts_epoch":1794960555,"type":"strategic.issue_refused","title":"Port the next `bash` entry from progress.json to TypeScript, starting with the smallest untested script (`sw-tmux-role-color`)"}
+{"ts":"2026-11-18T00:09:15Z","ts_epoch":1794960555,"type":"strategic.cycle_complete","issues_created":0,"issues_skipped":3}
