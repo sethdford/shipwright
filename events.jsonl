@@ -3747,3 +3747,18 @@
 {"ts":"2026-11-18T00:09:12Z","ts_epoch":1794960552,"type":"strategic.issue_refused","title":"Port-aware blast-radius guard in the build loop: abort an iteration that deletes more than N lines outside the task scope"}
 {"ts":"2026-11-18T00:09:15Z","ts_epoch":1794960555,"type":"strategic.issue_refused","title":"Port the next `bash` entry from progress.json to TypeScript, starting with the smallest untested script (`sw-tmux-role-color`)"}
 {"ts":"2026-11-18T00:09:15Z","ts_epoch":1794960555,"type":"strategic.cycle_complete","issues_created":0,"issues_skipped":3}
+{"ts":"2026-11-18T00:18:41Z","ts_epoch":1794961121,"type":"patrol.started","dry_run":"false"}
+{"ts":"2026-11-18T00:18:42Z","ts_epoch":1794961122,"type":"patrol.finding","check":"stale_dependency","package":"jsdom","current":"28.1.0","latest":"31.0.1"}
+{"ts":"2026-11-18T00:18:42Z","ts_epoch":1794961122,"type":"patrol.finding","check":"stale_dependency","package":"typescript","current":"5.9.3","latest":"7.0.2"}
+{"ts":"2026-11-18T00:18:44Z","ts_epoch":1794961124,"type":"patrol.issue_refused","check":"stale_dependency","count":2}
+{"ts":"2026-11-18T00:18:59Z","ts_epoch":1794961139,"type":"patrol.finding","check":"recurring_failure","pattern":"FAIL: 0","seen_count":14}
+{"ts":"2026-11-18T00:19:01Z","ts_epoch":1794961141,"type":"patrol.issue_refused","check":"recurring_failure","pattern":"FAIL: 0"}
+{"ts":"2026-11-18T00:19:02Z","ts_epoch":1794961142,"type":"patrol.finding","check":"untested_script","script":"sw-tracker-linear.sh","lines":568,"usage":7}
+{"ts":"2026-11-18T00:19:02Z","ts_epoch":1794961142,"type":"patrol.finding","check":"untested_script","script":"sw-tracker-jira.sh","lines":474,"usage":7}
+{"ts":"2026-11-18T00:19:02Z","ts_epoch":1794961142,"type":"patrol.finding","check":"untested_script","script":"sw-tracker-github.sh","lines":212,"usage":3}
+{"ts":"2026-11-18T00:19:02Z","ts_epoch":1794961142,"type":"patrol.finding","check":"untested_script","script":"sw-test-all.sh","lines":206,"usage":3}
+{"ts":"2026-11-18T00:19:02Z","ts_epoch":1794961142,"type":"patrol.finding","check":"untested_script","script":"sw-tmux-status.sh","lines":151,"usage":1}
+{"ts":"2026-11-18T00:19:02Z","ts_epoch":1794961142,"type":"patrol.finding","check":"untested_script","script":"sw-tmux-role-color.sh","lines":81,"usage":1}
+{"ts":"2026-11-18T00:19:02Z","ts_epoch":1794961142,"type":"patrol.finding","check":"untested_script","script":"sw-event-schema-sync.sh","lines":93,"usage":0}
+{"ts":"2026-11-18T00:19:04Z","ts_epoch":1794961144,"type":"patrol.issue_refused","check":"untested_scripts","count":7}
+{"ts":"2026-11-18T00:19:06Z","ts_epoch":1794961146,"type":"patrol.meta_issue_refused","title":"[Meta] Add tests for sw-event-schema-sync.sh"}
