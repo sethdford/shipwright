@@ -3783,3 +3783,8 @@
 {"ts":"2026-11-18T08:04:36Z","ts_epoch":1794989076,"type":"strategic.issue_refused","title":"Blast-radius guard for the build loop: abort an iteration whose diff deletes far more than the task scope"}
 {"ts":"2026-11-18T08:04:39Z","ts_epoch":1794989079,"type":"strategic.issue_refused","title":"Fix quarantine for repeatedly failing issues by reusing the existing breaker and gates-check path"}
 {"ts":"2026-11-18T08:04:39Z","ts_epoch":1794989079,"type":"strategic.cycle_complete","issues_created":0,"issues_skipped":3}
+{"ts":"2026-11-18T12:04:43Z","ts_epoch":1795003483,"type":"hygiene_platform_refactor","hardcoded":49,"fallback":76,"todo":51}
+{"ts":"2026-11-18T12:05:36Z","ts_epoch":1795003536,"type":"strategic.issue_refused","title":"Add bash test suites for the four untested scripts (tmux-role-color, tmux-status, tracker-github, event-schema-sync)"}
+{"ts":"2026-11-18T12:05:39Z","ts_epoch":1795003539,"type":"strategic.issue_refused","title":"Record the failure reason and stage when a strategic-agent issue's pipeline fails"}
+{"ts":"2026-11-18T12:05:42Z","ts_epoch":1795003542,"type":"strategic.issue_refused","title":"Port the next bash entry in `progress.json` to TypeScript with a green parity suite"}
+{"ts":"2026-11-18T12:05:42Z","ts_epoch":1795003542,"type":"strategic.cycle_complete","issues_created":0,"issues_skipped":3}
