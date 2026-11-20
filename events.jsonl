@@ -3968,3 +3968,8 @@
 {"ts":"2026-11-20T18:08:44Z","ts_epoch":1795198124,"type":"patrol.finding","check":"untested_script","script":"sw-event-schema-sync.sh","lines":93,"usage":0}
 {"ts":"2026-11-20T18:08:46Z","ts_epoch":1795198126,"type":"patrol.issue_refused","check":"untested_scripts","count":7}
 {"ts":"2026-11-20T18:08:49Z","ts_epoch":1795198129,"type":"patrol.meta_issue_refused","title":"[Meta] Add tests for sw-event-schema-sync.sh"}
+{"ts":"2026-11-20T20:03:29Z","ts_epoch":1795205009,"type":"hygiene_platform_refactor","hardcoded":49,"fallback":76,"todo":51}
+{"ts":"2026-11-20T20:04:27Z","ts_epoch":1795205067,"type":"strategic.issue_refused","title":"Pipeline test-stage differential gate: treat suites without a completion line as unknown, not pre-existing"}
+{"ts":"2026-11-20T20:04:30Z","ts_epoch":1795205070,"type":"strategic.issue_refused","title":"Loop blast-radius guard: abort an iteration whose diff deletes far more than the task scope"}
+{"ts":"2026-11-20T20:04:32Z","ts_epoch":1795205072,"type":"strategic.issue_refused","title":"Port the next `bash` command from progress.json to TypeScript, starting with a small leaf command"}
+{"ts":"2026-11-20T20:04:32Z","ts_epoch":1795205072,"type":"strategic.cycle_complete","issues_created":0,"issues_skipped":3}
