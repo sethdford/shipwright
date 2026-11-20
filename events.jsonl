@@ -3891,3 +3891,8 @@
 {"ts":"2026-11-19T18:08:46Z","ts_epoch":1795111726,"type":"patrol.issue_refused","check":"untested_scripts","count":7}
 {"ts":"2026-11-19T18:08:48Z","ts_epoch":1795111728,"type":"patrol.meta_issue_refused","title":"[Meta] Add tests for sw-event-schema-sync.sh"}
 {"ts":"2026-11-19T20:03:19Z","ts_epoch":1795118599,"type":"hygiene_platform_refactor","hardcoded":49,"fallback":76,"todo":51}
+{"ts":"2026-11-20T00:07:54Z","ts_epoch":1795133274,"type":"hygiene_platform_refactor","hardcoded":49,"fallback":76,"todo":51}
+{"ts":"2026-11-20T00:08:44Z","ts_epoch":1795133324,"type":"strategic.issue_refused","title":"Failure-stage attribution for pipeline outcomes so the PM and DORA can see why runs fail"}
+{"ts":"2026-11-20T00:08:47Z","ts_epoch":1795133327,"type":"strategic.issue_refused","title":"Blast-radius guard for the build loop: abort an iteration that deletes or rewrites far more than the task scope"}
+{"ts":"2026-11-20T00:08:50Z","ts_epoch":1795133330,"type":"strategic.issue_refused","title":"Port `shipwright cost show` aggregation to the TypeScript cost context with a cost-per-successful-pipeline figure"}
+{"ts":"2026-11-20T00:08:50Z","ts_epoch":1795133330,"type":"strategic.cycle_complete","issues_created":0,"issues_skipped":3}
