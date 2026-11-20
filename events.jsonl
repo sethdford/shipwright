@@ -3932,3 +3932,8 @@
 {"ts":"2026-11-20T08:04:49Z","ts_epoch":1795161889,"type":"strategic.issue_refused","title":"Auth and fatal-error short-circuit: stop retrying non-retryable build failures"}
 {"ts":"2026-11-20T08:04:52Z","ts_epoch":1795161892,"type":"strategic.issue_refused","title":"Port the next `bash` entry in `progress.json` to TypeScript, with a parity suite"}
 {"ts":"2026-11-20T08:04:52Z","ts_epoch":1795161892,"type":"strategic.cycle_complete","issues_created":0,"issues_skipped":3}
+{"ts":"2026-11-20T12:05:01Z","ts_epoch":1795176301,"type":"hygiene_platform_refactor","hardcoded":49,"fallback":76,"todo":51}
+{"ts":"2026-11-20T12:05:59Z","ts_epoch":1795176359,"type":"strategic.issue_refused","title":"Record a failure-cause ledger so the strategic report can name failing stages"}
+{"ts":"2026-11-20T12:06:02Z","ts_epoch":1795176362,"type":"strategic.issue_refused","title":"Intake scope guard: reject or decompose oversized issues before the daemon dispatches them"}
+{"ts":"2026-11-20T12:06:06Z","ts_epoch":1795176366,"type":"strategic.issue_refused","title":"Port the next bash entry in docs/plans/port/progress.json to TypeScript with a green parity suite"}
+{"ts":"2026-11-20T12:06:06Z","ts_epoch":1795176366,"type":"strategic.cycle_complete","issues_created":0,"issues_skipped":3}
