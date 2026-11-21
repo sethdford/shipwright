@@ -3978,3 +3978,18 @@
 {"ts":"2026-11-21T00:08:58Z","ts_epoch":1795219738,"type":"strategic.issue_refused","title":"Make the build stage fail fast when the repo's test or lint command is missing or broken"}
 {"ts":"2026-11-21T00:09:01Z","ts_epoch":1795219741,"type":"strategic.issue_refused","title":"Add a blast-radius guard to the build loop that aborts when a diff deletes far more than the task implies"}
 {"ts":"2026-11-21T00:09:01Z","ts_epoch":1795219741,"type":"strategic.cycle_complete","issues_created":0,"issues_skipped":3}
+{"ts":"2026-11-21T00:18:29Z","ts_epoch":1795220309,"type":"patrol.started","dry_run":"false"}
+{"ts":"2026-11-21T00:18:30Z","ts_epoch":1795220310,"type":"patrol.finding","check":"stale_dependency","package":"jsdom","current":"28.1.0","latest":"31.0.1"}
+{"ts":"2026-11-21T00:18:30Z","ts_epoch":1795220310,"type":"patrol.finding","check":"stale_dependency","package":"typescript","current":"5.9.3","latest":"7.0.2"}
+{"ts":"2026-11-21T00:18:33Z","ts_epoch":1795220313,"type":"patrol.issue_refused","check":"stale_dependency","count":2}
+{"ts":"2026-11-21T00:18:48Z","ts_epoch":1795220328,"type":"patrol.finding","check":"recurring_failure","pattern":"FAIL: 0","seen_count":14}
+{"ts":"2026-11-21T00:18:50Z","ts_epoch":1795220330,"type":"patrol.issue_refused","check":"recurring_failure","pattern":"FAIL: 0"}
+{"ts":"2026-11-21T00:18:51Z","ts_epoch":1795220331,"type":"patrol.finding","check":"untested_script","script":"sw-tracker-linear.sh","lines":568,"usage":7}
+{"ts":"2026-11-21T00:18:51Z","ts_epoch":1795220331,"type":"patrol.finding","check":"untested_script","script":"sw-tracker-jira.sh","lines":474,"usage":7}
+{"ts":"2026-11-21T00:18:51Z","ts_epoch":1795220331,"type":"patrol.finding","check":"untested_script","script":"sw-tracker-github.sh","lines":212,"usage":3}
+{"ts":"2026-11-21T00:18:51Z","ts_epoch":1795220331,"type":"patrol.finding","check":"untested_script","script":"sw-test-all.sh","lines":206,"usage":3}
+{"ts":"2026-11-21T00:18:51Z","ts_epoch":1795220331,"type":"patrol.finding","check":"untested_script","script":"sw-tmux-status.sh","lines":151,"usage":1}
+{"ts":"2026-11-21T00:18:51Z","ts_epoch":1795220331,"type":"patrol.finding","check":"untested_script","script":"sw-tmux-role-color.sh","lines":81,"usage":1}
+{"ts":"2026-11-21T00:18:51Z","ts_epoch":1795220331,"type":"patrol.finding","check":"untested_script","script":"sw-event-schema-sync.sh","lines":93,"usage":0}
+{"ts":"2026-11-21T00:18:53Z","ts_epoch":1795220333,"type":"patrol.issue_refused","check":"untested_scripts","count":7}
+{"ts":"2026-11-21T00:18:56Z","ts_epoch":1795220336,"type":"patrol.meta_issue_refused","title":"[Meta] Add tests for sw-event-schema-sync.sh"}
