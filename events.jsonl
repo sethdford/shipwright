@@ -3973,3 +3973,8 @@
 {"ts":"2026-11-20T20:04:30Z","ts_epoch":1795205070,"type":"strategic.issue_refused","title":"Loop blast-radius guard: abort an iteration whose diff deletes far more than the task scope"}
 {"ts":"2026-11-20T20:04:32Z","ts_epoch":1795205072,"type":"strategic.issue_refused","title":"Port the next `bash` command from progress.json to TypeScript, starting with a small leaf command"}
 {"ts":"2026-11-20T20:04:32Z","ts_epoch":1795205072,"type":"strategic.cycle_complete","issues_created":0,"issues_skipped":3}
+{"ts":"2026-11-21T00:08:12Z","ts_epoch":1795219692,"type":"hygiene_platform_refactor","hardcoded":49,"fallback":76,"todo":51}
+{"ts":"2026-11-21T00:08:56Z","ts_epoch":1795219736,"type":"strategic.issue_refused","title":"Add a pre-dispatch quarantine check that stops the daemon from re-dispatching issues that failed twice at the same stage"}
+{"ts":"2026-11-21T00:08:58Z","ts_epoch":1795219738,"type":"strategic.issue_refused","title":"Make the build stage fail fast when the repo's test or lint command is missing or broken"}
+{"ts":"2026-11-21T00:09:01Z","ts_epoch":1795219741,"type":"strategic.issue_refused","title":"Add a blast-radius guard to the build loop that aborts when a diff deletes far more than the task implies"}
+{"ts":"2026-11-21T00:09:01Z","ts_epoch":1795219741,"type":"strategic.cycle_complete","issues_created":0,"issues_skipped":3}
