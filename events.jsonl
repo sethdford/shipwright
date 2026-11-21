@@ -4014,3 +4014,4 @@
 {"ts":"2026-11-21T08:04:30Z","ts_epoch":1795248270,"type":"strategic.issue_refused","title":"Blast-radius guard for build-loop iterations: abort when a commit deletes far more than the task scope"}
 {"ts":"2026-11-21T08:04:33Z","ts_epoch":1795248273,"type":"strategic.issue_refused","title":"Port the failure-classification gate to the TypeScript orchestration context with a parity suite"}
 {"ts":"2026-11-21T08:04:33Z","ts_epoch":1795248273,"type":"strategic.cycle_complete","issues_created":0,"issues_skipped":3}
+{"ts":"2026-11-21T12:03:57Z","ts_epoch":1795262637,"type":"hygiene_platform_refactor","hardcoded":49,"fallback":76,"todo":51}
