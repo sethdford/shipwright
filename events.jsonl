@@ -4092,3 +4092,4 @@
 {"ts":"2026-11-22T08:04:18Z","ts_epoch":1795334658,"type":"strategic.issue_refused","title":"Auth and fatal-error short-circuit: stop the build loop retrying non-retryable failures"}
 {"ts":"2026-11-22T08:04:22Z","ts_epoch":1795334662,"type":"strategic.issue_refused","title":"Port the next bash command in `progress.json` to TypeScript, with parity suite green first"}
 {"ts":"2026-11-22T08:04:22Z","ts_epoch":1795334662,"type":"strategic.cycle_complete","issues_created":0,"issues_skipped":3}
+{"ts":"2026-11-22T12:04:12Z","ts_epoch":1795349052,"type":"hygiene_platform_refactor","hardcoded":49,"fallback":76,"todo":51}
