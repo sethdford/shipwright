@@ -4087,3 +4087,8 @@
 {"ts":"2026-11-22T06:11:43Z","ts_epoch":1795327903,"type":"patrol.finding","check":"untested_script","script":"sw-event-schema-sync.sh","lines":93,"usage":0}
 {"ts":"2026-11-22T06:11:45Z","ts_epoch":1795327905,"type":"patrol.issue_refused","check":"untested_scripts","count":7}
 {"ts":"2026-11-22T06:11:47Z","ts_epoch":1795327907,"type":"patrol.meta_issue_refused","title":"[Meta] Add tests for sw-event-schema-sync.sh"}
+{"ts":"2026-11-22T08:03:26Z","ts_epoch":1795334606,"type":"hygiene_platform_refactor","hardcoded":49,"fallback":76,"todo":51}
+{"ts":"2026-11-22T08:04:15Z","ts_epoch":1795334655,"type":"strategic.issue_refused","title":"Loop blast-radius guard: abort and roll back an iteration whose diff deletes far more than the task scope"}
+{"ts":"2026-11-22T08:04:18Z","ts_epoch":1795334658,"type":"strategic.issue_refused","title":"Auth and fatal-error short-circuit: stop the build loop retrying non-retryable failures"}
+{"ts":"2026-11-22T08:04:22Z","ts_epoch":1795334662,"type":"strategic.issue_refused","title":"Port the next bash command in `progress.json` to TypeScript, with parity suite green first"}
+{"ts":"2026-11-22T08:04:22Z","ts_epoch":1795334662,"type":"strategic.cycle_complete","issues_created":0,"issues_skipped":3}
