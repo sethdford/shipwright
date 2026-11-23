@@ -4130,3 +4130,16 @@
 {"ts":"2026-11-23T00:10:13Z","ts_epoch":1795392613,"type":"strategic.issue_refused","title":"Record a failure reason when a strategic issue closes unshipped, and feed it into the strategic prompt"}
 {"ts":"2026-11-23T00:10:16Z","ts_epoch":1795392616,"type":"strategic.issue_refused","title":"Move hardcoded timeouts, iteration limits and thresholds in sw-loop.sh into the policy config with defaults"}
 {"ts":"2026-11-23T00:10:16Z","ts_epoch":1795392616,"type":"strategic.cycle_complete","issues_created":0,"issues_skipped":3}
+{"ts":"2026-11-23T00:20:20Z","ts_epoch":1795393220,"type":"patrol.started","dry_run":"false"}
+{"ts":"2026-11-23T00:20:21Z","ts_epoch":1795393221,"type":"patrol.finding","check":"stale_dependency","package":"jsdom","current":"28.1.0","latest":"31.0.1"}
+{"ts":"2026-11-23T00:20:21Z","ts_epoch":1795393221,"type":"patrol.finding","check":"stale_dependency","package":"typescript","current":"5.9.3","latest":"7.0.2"}
+{"ts":"2026-11-23T00:20:23Z","ts_epoch":1795393223,"type":"patrol.issue_refused","check":"stale_dependency","count":2}
+{"ts":"2026-11-23T00:20:39Z","ts_epoch":1795393239,"type":"patrol.finding","check":"untested_script","script":"sw-tracker-linear.sh","lines":568,"usage":7}
+{"ts":"2026-11-23T00:20:39Z","ts_epoch":1795393239,"type":"patrol.finding","check":"untested_script","script":"sw-tracker-jira.sh","lines":474,"usage":7}
+{"ts":"2026-11-23T00:20:39Z","ts_epoch":1795393239,"type":"patrol.finding","check":"untested_script","script":"sw-tracker-github.sh","lines":212,"usage":3}
+{"ts":"2026-11-23T00:20:39Z","ts_epoch":1795393239,"type":"patrol.finding","check":"untested_script","script":"sw-test-all.sh","lines":206,"usage":3}
+{"ts":"2026-11-23T00:20:39Z","ts_epoch":1795393239,"type":"patrol.finding","check":"untested_script","script":"sw-tmux-status.sh","lines":151,"usage":1}
+{"ts":"2026-11-23T00:20:39Z","ts_epoch":1795393239,"type":"patrol.finding","check":"untested_script","script":"sw-tmux-role-color.sh","lines":81,"usage":1}
+{"ts":"2026-11-23T00:20:39Z","ts_epoch":1795393239,"type":"patrol.finding","check":"untested_script","script":"sw-event-schema-sync.sh","lines":93,"usage":0}
+{"ts":"2026-11-23T00:20:41Z","ts_epoch":1795393241,"type":"patrol.issue_refused","check":"untested_scripts","count":7}
+{"ts":"2026-11-23T00:20:43Z","ts_epoch":1795393243,"type":"patrol.meta_issue_refused","title":"[Meta] Add tests for sw-event-schema-sync.sh"}
