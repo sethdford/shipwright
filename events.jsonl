@@ -4157,3 +4157,8 @@
 {"ts":"2026-11-23T06:16:46Z","ts_epoch":1795414606,"type":"patrol.finding","check":"untested_script","script":"sw-event-schema-sync.sh","lines":93,"usage":0}
 {"ts":"2026-11-23T06:16:48Z","ts_epoch":1795414608,"type":"patrol.issue_refused","check":"untested_scripts","count":7}
 {"ts":"2026-11-23T06:16:50Z","ts_epoch":1795414610,"type":"patrol.meta_issue_refused","title":"[Meta] Add tests for sw-event-schema-sync.sh"}
+{"ts":"2026-11-23T08:05:08Z","ts_epoch":1795421108,"type":"hygiene_platform_refactor","hardcoded":49,"fallback":76,"todo":51}
+{"ts":"2026-11-23T08:05:57Z","ts_epoch":1795421157,"type":"strategic.issue_refused","title":"Port loop blast-radius guard into the build stage: abort when an iteration deletes or rewrites far more lines than the task implies"}
+{"ts":"2026-11-23T08:06:01Z","ts_epoch":1795421161,"type":"strategic.issue_refused","title":"Make the differential test gate treat suites with no completion line as unknown rather than failing the pipeline"}
+{"ts":"2026-11-23T08:06:04Z","ts_epoch":1795421164,"type":"strategic.issue_refused","title":"Move hardcoded loop and retry tunables into a typed policy config with adaptive overrides"}
+{"ts":"2026-11-23T08:06:04Z","ts_epoch":1795421164,"type":"strategic.cycle_complete","issues_created":0,"issues_skipped":3}
