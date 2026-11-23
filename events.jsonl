@@ -4176,3 +4176,8 @@
 {"ts":"2026-11-23T12:10:38Z","ts_epoch":1795435838,"type":"patrol.finding","check":"untested_script","script":"sw-event-schema-sync.sh","lines":93,"usage":0}
 {"ts":"2026-11-23T12:10:41Z","ts_epoch":1795435841,"type":"patrol.issue_refused","check":"untested_scripts","count":7}
 {"ts":"2026-11-23T12:10:43Z","ts_epoch":1795435843,"type":"patrol.meta_issue_refused","title":"[Meta] Add tests for sw-event-schema-sync.sh"}
+{"ts":"2026-11-23T16:03:15Z","ts_epoch":1795449795,"type":"hygiene_platform_refactor","hardcoded":49,"fallback":76,"todo":51}
+{"ts":"2026-11-23T16:04:43Z","ts_epoch":1795449883,"type":"strategic.issue_refused","title":"Fix strategic-PM failure telemetry: record failed stage and reason for every failed pipeline run"}
+{"ts":"2026-11-23T16:04:47Z","ts_epoch":1795449887,"type":"strategic.issue_refused","title":"Add test suites for the 4 untested scripts that carry runtime logic (tracker-github, tmux-status, tmux-role-color, event-schema-sync)"}
+{"ts":"2026-11-23T16:04:50Z","ts_epoch":1795449890,"type":"strategic.issue_refused","title":"Port the smallest remaining `bash` entry in progress.json to TypeScript with a green parity suite"}
+{"ts":"2026-11-23T16:04:50Z","ts_epoch":1795449890,"type":"strategic.cycle_complete","issues_created":0,"issues_skipped":3}
