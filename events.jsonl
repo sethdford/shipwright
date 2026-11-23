@@ -4125,3 +4125,8 @@
 {"ts":"2026-11-22T20:04:09Z","ts_epoch":1795377849,"type":"strategic.issue_refused","title":"Record strategic-suggestion outcomes with failure reasons so the PM agent can learn from them"}
 {"ts":"2026-11-22T20:04:12Z","ts_epoch":1795377852,"type":"strategic.issue_refused","title":"Add test suites for the 4 remaining untested scripts (tracker-github, tmux-status, tmux-role-color, event-schema-sync)"}
 {"ts":"2026-11-22T20:04:12Z","ts_epoch":1795377852,"type":"strategic.cycle_complete","issues_created":0,"issues_skipped":3}
+{"ts":"2026-11-23T00:09:23Z","ts_epoch":1795392563,"type":"hygiene_platform_refactor","hardcoded":49,"fallback":76,"todo":51}
+{"ts":"2026-11-23T00:10:11Z","ts_epoch":1795392611,"type":"strategic.issue_refused","title":"Add test suites for the four untested scripts: tmux-status, tmux-role-color, event-schema-sync and tracker-github"}
+{"ts":"2026-11-23T00:10:13Z","ts_epoch":1795392613,"type":"strategic.issue_refused","title":"Record a failure reason when a strategic issue closes unshipped, and feed it into the strategic prompt"}
+{"ts":"2026-11-23T00:10:16Z","ts_epoch":1795392616,"type":"strategic.issue_refused","title":"Move hardcoded timeouts, iteration limits and thresholds in sw-loop.sh into the policy config with defaults"}
+{"ts":"2026-11-23T00:10:16Z","ts_epoch":1795392616,"type":"strategic.cycle_complete","issues_created":0,"issues_skipped":3}
