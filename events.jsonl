@@ -4195,3 +4195,8 @@
 {"ts":"2026-11-23T18:08:29Z","ts_epoch":1795457309,"type":"patrol.issue_refused","check":"untested_scripts","count":7}
 {"ts":"2026-11-23T18:08:32Z","ts_epoch":1795457312,"type":"patrol.meta_issue_refused","title":"[Meta] Add tests for sw-event-schema-sync.sh"}
 {"ts":"2026-11-23T20:03:15Z","ts_epoch":1795464195,"type":"hygiene_platform_refactor","hardcoded":49,"fallback":76,"todo":51}
+{"ts":"2026-11-24T00:08:15Z","ts_epoch":1795478895,"type":"hygiene_platform_refactor","hardcoded":49,"fallback":76,"todo":51}
+{"ts":"2026-11-24T00:09:03Z","ts_epoch":1795478943,"type":"strategic.issue_refused","title":"Differential build-loop blast-radius guard: abort an iteration that deletes or rewrites far more lines than the task plausibly needs"}
+{"ts":"2026-11-24T00:09:06Z","ts_epoch":1795478946,"type":"strategic.issue_refused","title":"Stop retrying auth and fatal build errors: consolidate fatal-error detection into one tested classifier path"}
+{"ts":"2026-11-24T00:09:10Z","ts_epoch":1795478950,"type":"strategic.issue_refused","title":"Cost-per-successful-pipeline in `shipwright cost show`, built on the cost ledger and kept to one small slice"}
+{"ts":"2026-11-24T00:09:10Z","ts_epoch":1795478950,"type":"strategic.cycle_complete","issues_created":0,"issues_skipped":3}
