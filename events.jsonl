@@ -4245,3 +4245,16 @@
 {"ts":"2026-11-24T12:10:38Z","ts_epoch":1795522238,"type":"patrol.issue_refused","check":"untested_scripts","count":7}
 {"ts":"2026-11-24T12:10:41Z","ts_epoch":1795522241,"type":"patrol.meta_issue_refused","title":"[Meta] Add tests for sw-event-schema-sync.sh"}
 {"ts":"2026-11-24T16:03:56Z","ts_epoch":1795536236,"type":"hygiene_platform_refactor","hardcoded":49,"fallback":76,"todo":51}
+{"ts":"2026-11-24T18:08:20Z","ts_epoch":1795543700,"type":"patrol.started","dry_run":"false"}
+{"ts":"2026-11-24T18:08:21Z","ts_epoch":1795543701,"type":"patrol.finding","check":"stale_dependency","package":"jsdom","current":"28.1.0","latest":"31.0.1"}
+{"ts":"2026-11-24T18:08:21Z","ts_epoch":1795543701,"type":"patrol.finding","check":"stale_dependency","package":"typescript","current":"5.9.3","latest":"7.0.2"}
+{"ts":"2026-11-24T18:08:24Z","ts_epoch":1795543704,"type":"patrol.issue_refused","check":"stale_dependency","count":2}
+{"ts":"2026-11-24T18:08:43Z","ts_epoch":1795543723,"type":"patrol.finding","check":"untested_script","script":"sw-tracker-linear.sh","lines":568,"usage":7}
+{"ts":"2026-11-24T18:08:43Z","ts_epoch":1795543723,"type":"patrol.finding","check":"untested_script","script":"sw-tracker-jira.sh","lines":474,"usage":7}
+{"ts":"2026-11-24T18:08:43Z","ts_epoch":1795543723,"type":"patrol.finding","check":"untested_script","script":"sw-tracker-github.sh","lines":212,"usage":3}
+{"ts":"2026-11-24T18:08:43Z","ts_epoch":1795543723,"type":"patrol.finding","check":"untested_script","script":"sw-test-all.sh","lines":206,"usage":3}
+{"ts":"2026-11-24T18:08:43Z","ts_epoch":1795543723,"type":"patrol.finding","check":"untested_script","script":"sw-tmux-status.sh","lines":151,"usage":1}
+{"ts":"2026-11-24T18:08:43Z","ts_epoch":1795543723,"type":"patrol.finding","check":"untested_script","script":"sw-tmux-role-color.sh","lines":81,"usage":1}
+{"ts":"2026-11-24T18:08:43Z","ts_epoch":1795543723,"type":"patrol.finding","check":"untested_script","script":"sw-event-schema-sync.sh","lines":93,"usage":0}
+{"ts":"2026-11-24T18:08:46Z","ts_epoch":1795543726,"type":"patrol.issue_refused","check":"untested_scripts","count":7}
+{"ts":"2026-11-24T18:08:48Z","ts_epoch":1795543728,"type":"patrol.meta_issue_refused","title":"[Meta] Add tests for sw-event-schema-sync.sh"}
