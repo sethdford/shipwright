@@ -4300,3 +4300,8 @@
 {"ts":"2026-11-25T08:05:04Z","ts_epoch":1795593904,"type":"strategic.issue_refused","title":"Make the differential test gate treat bash suites without a completion line as unknown, not new failures"}
 {"ts":"2026-11-25T08:05:08Z","ts_epoch":1795593908,"type":"strategic.issue_refused","title":"Show per-issue cost against the $5 target in `shipwright cost show`, backed by a TypeScript use case"}
 {"ts":"2026-11-25T08:05:08Z","ts_epoch":1795593908,"type":"strategic.cycle_complete","issues_created":0,"issues_skipped":3}
+{"ts":"2026-11-25T12:05:19Z","ts_epoch":1795608319,"type":"hygiene_platform_refactor","hardcoded":49,"fallback":76,"todo":51}
+{"ts":"2026-11-25T12:06:10Z","ts_epoch":1795608370,"type":"strategic.issue_refused","title":"Blast-radius guard in the build loop: abort an iteration that deletes or rewrites far more than the task implies"}
+{"ts":"2026-11-25T12:06:13Z","ts_epoch":1795608373,"type":"strategic.issue_refused","title":"Differential test gate: treat suites with no completion line as unknown instead of failing the run"}
+{"ts":"2026-11-25T12:06:16Z","ts_epoch":1795608376,"type":"strategic.issue_refused","title":"Port the next bash entry from progress.json to TypeScript with parity suite and router flip"}
+{"ts":"2026-11-25T12:06:16Z","ts_epoch":1795608376,"type":"strategic.cycle_complete","issues_created":0,"issues_skipped":3}
