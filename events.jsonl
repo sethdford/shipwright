@@ -4268,3 +4268,16 @@
 {"ts":"2026-11-25T00:09:09Z","ts_epoch":1795565349,"type":"strategic.issue_refused","title":"Fail-closed pre-build preflight in TypeScript: verify test, lint and typecheck commands run before the first iteration"}
 {"ts":"2026-11-25T00:09:12Z","ts_epoch":1795565352,"type":"strategic.issue_refused","title":"Cost-per-successful-pipeline report in the TypeScript observability context, with budget headroom against the $5 target"}
 {"ts":"2026-11-25T00:09:12Z","ts_epoch":1795565352,"type":"strategic.cycle_complete","issues_created":0,"issues_skipped":3}
+{"ts":"2026-11-25T00:18:47Z","ts_epoch":1795565927,"type":"patrol.started","dry_run":"false"}
+{"ts":"2026-11-25T00:18:48Z","ts_epoch":1795565928,"type":"patrol.finding","check":"stale_dependency","package":"jsdom","current":"28.1.0","latest":"31.0.1"}
+{"ts":"2026-11-25T00:18:48Z","ts_epoch":1795565928,"type":"patrol.finding","check":"stale_dependency","package":"typescript","current":"5.9.3","latest":"7.0.2"}
+{"ts":"2026-11-25T00:18:51Z","ts_epoch":1795565931,"type":"patrol.issue_refused","check":"stale_dependency","count":2}
+{"ts":"2026-11-25T00:19:09Z","ts_epoch":1795565949,"type":"patrol.finding","check":"untested_script","script":"sw-tracker-linear.sh","lines":568,"usage":7}
+{"ts":"2026-11-25T00:19:09Z","ts_epoch":1795565949,"type":"patrol.finding","check":"untested_script","script":"sw-tracker-jira.sh","lines":474,"usage":7}
+{"ts":"2026-11-25T00:19:09Z","ts_epoch":1795565949,"type":"patrol.finding","check":"untested_script","script":"sw-tracker-github.sh","lines":212,"usage":3}
+{"ts":"2026-11-25T00:19:09Z","ts_epoch":1795565949,"type":"patrol.finding","check":"untested_script","script":"sw-test-all.sh","lines":206,"usage":3}
+{"ts":"2026-11-25T00:19:09Z","ts_epoch":1795565949,"type":"patrol.finding","check":"untested_script","script":"sw-tmux-status.sh","lines":151,"usage":1}
+{"ts":"2026-11-25T00:19:09Z","ts_epoch":1795565949,"type":"patrol.finding","check":"untested_script","script":"sw-tmux-role-color.sh","lines":81,"usage":1}
+{"ts":"2026-11-25T00:19:09Z","ts_epoch":1795565949,"type":"patrol.finding","check":"untested_script","script":"sw-event-schema-sync.sh","lines":93,"usage":0}
+{"ts":"2026-11-25T00:19:11Z","ts_epoch":1795565951,"type":"patrol.issue_refused","check":"untested_scripts","count":7}
+{"ts":"2026-11-25T00:19:13Z","ts_epoch":1795565953,"type":"patrol.meta_issue_refused","title":"[Meta] Add tests for sw-event-schema-sync.sh"}
