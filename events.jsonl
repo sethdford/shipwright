@@ -4295,3 +4295,8 @@
 {"ts":"2026-11-25T06:12:28Z","ts_epoch":1795587148,"type":"patrol.finding","check":"untested_script","script":"sw-event-schema-sync.sh","lines":93,"usage":0}
 {"ts":"2026-11-25T06:12:30Z","ts_epoch":1795587150,"type":"patrol.issue_refused","check":"untested_scripts","count":7}
 {"ts":"2026-11-25T06:12:32Z","ts_epoch":1795587152,"type":"patrol.meta_issue_refused","title":"[Meta] Add tests for sw-event-schema-sync.sh"}
+{"ts":"2026-11-25T08:04:09Z","ts_epoch":1795593849,"type":"hygiene_platform_refactor","hardcoded":49,"fallback":76,"todo":51}
+{"ts":"2026-11-25T08:05:00Z","ts_epoch":1795593900,"type":"strategic.issue_refused","title":"Port the build-loop blast-radius guard to fail closed on mass deletions"}
+{"ts":"2026-11-25T08:05:04Z","ts_epoch":1795593904,"type":"strategic.issue_refused","title":"Make the differential test gate treat bash suites without a completion line as unknown, not new failures"}
+{"ts":"2026-11-25T08:05:08Z","ts_epoch":1795593908,"type":"strategic.issue_refused","title":"Show per-issue cost against the $5 target in `shipwright cost show`, backed by a TypeScript use case"}
+{"ts":"2026-11-25T08:05:08Z","ts_epoch":1795593908,"type":"strategic.cycle_complete","issues_created":0,"issues_skipped":3}
