@@ -4263,3 +4263,8 @@
 {"ts":"2026-11-24T20:03:59Z","ts_epoch":1795550639,"type":"strategic.issue_refused","title":"Differential failure-classification report for pipeline runs (pre-existing vs. introduced)"}
 {"ts":"2026-11-24T20:04:02Z","ts_epoch":1795550642,"type":"strategic.issue_refused","title":"Add a fail-closed role-authorization check shared by all mutating dashboard routes"}
 {"ts":"2026-11-24T20:04:02Z","ts_epoch":1795550642,"type":"strategic.cycle_complete","issues_created":0,"issues_skipped":3}
+{"ts":"2026-11-25T00:08:19Z","ts_epoch":1795565299,"type":"hygiene_platform_refactor","hardcoded":49,"fallback":76,"todo":51}
+{"ts":"2026-11-25T00:09:06Z","ts_epoch":1795565346,"type":"strategic.issue_refused","title":"Differential build-loop blast-radius guard: abort iterations that delete or rewrite far more than the task scope"}
+{"ts":"2026-11-25T00:09:09Z","ts_epoch":1795565349,"type":"strategic.issue_refused","title":"Fail-closed pre-build preflight in TypeScript: verify test, lint and typecheck commands run before the first iteration"}
+{"ts":"2026-11-25T00:09:12Z","ts_epoch":1795565352,"type":"strategic.issue_refused","title":"Cost-per-successful-pipeline report in the TypeScript observability context, with budget headroom against the $5 target"}
+{"ts":"2026-11-25T00:09:12Z","ts_epoch":1795565352,"type":"strategic.cycle_complete","issues_created":0,"issues_skipped":3}
