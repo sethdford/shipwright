@@ -104,11 +104,11 @@ reset_fakes() {
 
 echo ""
 echo -e "${DIM}  mode${RESET}"
-assert_eq "default mode is enforce" "enforce" "$(SW_ACCEPTANCE= acceptance_mode)"
+assert_eq "default mode is enforce" "enforce" "$(SW_ACCEPTANCE="" acceptance_mode)"
 assert_eq "off" "off" "$(SW_ACCEPTANCE=off acceptance_mode)"
 assert_eq "advisory maps to warn" "warn" "$(SW_ACCEPTANCE=advisory acceptance_mode)"
 echo '{"acceptance":{"mode":"off"}}' > "$TEST_TEMP_DIR/config.json"
-assert_eq "pipeline config sets the mode" "off" "$(SW_ACCEPTANCE= PIPELINE_CONFIG="$TEST_TEMP_DIR/config.json" acceptance_mode)"
+assert_eq "pipeline config sets the mode" "off" "$(SW_ACCEPTANCE="" PIPELINE_CONFIG="$TEST_TEMP_DIR/config.json" acceptance_mode)"
 
 echo ""
 echo -e "${DIM}  generate: red on the first try${RESET}"
