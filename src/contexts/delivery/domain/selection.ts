@@ -15,11 +15,19 @@ export interface CandidateScore {
   readonly rubric: number | null;
   /** How many attempts produced this identical patch (1 when unique). */
   readonly votes: number;
+  /**
+   * The merge verifier's predicted chance that this patch merges and stays merged (ADR-0012), or
+   * null/absent when no verifier ran. It captures what tests and the rubric miss: run output in
+   * the diff, scope creep, weakened tests, oversized changes.
+   */
+  readonly verifier?: number | null;
 }
 
 export const SELECTION_RULE = {
   crossWeight: 0.5,
   rubricWeight: 0.5,
+  /** Half the weight of the execution signals: it already reads them, so it must not dominate. */
+  verifierWeight: 0.25,
   /** Candidates within this much of the best score go to the judge. */
   finalistMargin: 0.15,
   maxFinalists: 3,
@@ -44,6 +52,7 @@ export function compositeScore(c: CandidateScore): number {
   const parts: [number, number][] = [];
   if (c.cross !== null) parts.push([c.cross, SELECTION_RULE.crossWeight]);
   if (c.rubric !== null) parts.push([c.rubric, SELECTION_RULE.rubricWeight]);
+  if (c.verifier != null) parts.push([c.verifier, SELECTION_RULE.verifierWeight]);
   if (parts.length === 0) return 0.5;
   const weight = parts.reduce((s, [, w]) => s + w, 0);
   return parts.reduce((s, [v, w]) => s + v * w, 0) / weight;

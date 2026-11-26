@@ -253,10 +253,61 @@ mkdir -p "$TEST_TEMP_DIR/own"
 printf '#!/usr/bin/env bash\ntouch "%s/own-sw-ran"\necho "{}"\n' "$TEST_TEMP_DIR" > "$TEST_TEMP_DIR/own/sw"
 chmod +x "$TEST_TEMP_DIR/own/sw"
 mock_binary "sw" "touch '$TEST_TEMP_DIR/path-sw-ran'; echo '{}'"
-( unset SHIPWRIGHT_SW_BIN; SCRIPT_DIR="$TEST_TEMP_DIR/own"; _build_tournament "Fix it" "bun test" "opus" 2 >/dev/null 2>&1 ) || true
+( unset SHIPWRIGHT_SW_BIN; export SW_PATCH_HANDOFF=false; SCRIPT_DIR="$TEST_TEMP_DIR/own"; _build_tournament "Fix it" "bun test" "opus" 2 >/dev/null 2>&1 ) || true
 [[ -e "$TEST_TEMP_DIR/own-sw-ran" && ! -e "$TEST_TEMP_DIR/path-sw-ran" ]] \
     && assert_pass "Tournament runs the pipeline's own sw, not PATH's" \
     || assert_fail "Tournament runs the pipeline's own sw, not PATH's"
+
+# Patch handoff (ADR-0011): the tournament runs in a disposable clone without credentials, and the
+# winner reaches the trusted checkout only as a judged patch.
+# Pipeline artifacts are untracked in a real checkout (.gitignore); earlier tests here committed some.
+(cd "$PROJECT_ROOT" && { git rm -r -q --cached .claude >/dev/null 2>&1 || true; } \
+    && git add -A -- . ':(exclude).claude' >/dev/null 2>&1 \
+    && git commit -q -m "tournament fixture" >/dev/null 2>&1) || true
+_t_base=$(git -C "$PROJECT_ROOT" rev-parse HEAD)
+mock_binary "sw" "pwd > '$TEST_TEMP_DIR/tournament-cwd.txt'
+printf '%s\\n' \"\${GH_TOKEN:-none}\" > '$TEST_TEMP_DIR/tournament-token.txt'
+git log -1 --format=%s > '$TEST_TEMP_DIR/tournament-clone-head.txt'
+mkdir -p src && echo 'module.exports = 1;' > src/winner.js
+echo '{\"selection\":{\"winner\":\"a1\",\"confidence\":\"high\"},\"costUsd\":1}'"
+echo "carried" > "$PROJECT_ROOT/carried.txt"
+_t_rc=0
+GH_TOKEN=secret-token _build_tournament "Add the winner" "bun test" "opus" 2 >/dev/null 2>&1 || _t_rc=$?
+assert_eq "Handoff tournament with a winner succeeds" "0" "$_t_rc"
+_t_cwd=$(cat "$TEST_TEMP_DIR/tournament-cwd.txt" 2>/dev/null || true)
+[[ -n "$_t_cwd" && "$_t_cwd" != "$PROJECT_ROOT" && "$_t_cwd" == */sw-agent.*/repo ]] \
+    && assert_pass "Tournament runs in a disposable clone, not the trusted checkout" \
+    || assert_fail "Tournament runs in a disposable clone, not the trusted checkout" "cwd: $_t_cwd"
+assert_eq "Tournament gets no GitHub token under handoff" "none" "$(cat "$TEST_TEMP_DIR/tournament-token.txt" 2>/dev/null)"
+assert_eq "Earlier stages' edits are committed in the clone first" "pre-build edits (carried over)" \
+    "$(cat "$TEST_TEMP_DIR/tournament-clone-head.txt" 2>/dev/null)"
+assert_eq "Winner lands as one judged pipeline commit on the base" "$_t_base" \
+    "$(git -C "$PROJECT_ROOT" rev-parse HEAD~1 2>/dev/null)"
+assert_contains "Pipeline commit names the goal" "$(git -C "$PROJECT_ROOT" log -1 --format=%s)" "build:"
+assert_eq "Winner's file is in the commit" "module.exports = 1;" "$(git -C "$PROJECT_ROOT" show HEAD:src/winner.js 2>/dev/null)"
+assert_eq "Carried-over edit is judged and committed with it" "carried" "$(git -C "$PROJECT_ROOT" show HEAD:carried.txt 2>/dev/null)"
+[[ ! -d "${_t_cwd%/repo}" ]] && assert_pass "Tournament clone removed after apply" \
+    || assert_fail "Tournament clone removed after apply"
+
+_t_head=$(git -C "$PROJECT_ROOT" rev-parse HEAD)
+mock_binary "sw" "mkdir -p .github/workflows && echo 'on: push' > .github/workflows/evil.yml
+echo '{\"selection\":{\"winner\":\"a1\",\"confidence\":\"high\"},\"costUsd\":1}'"
+rm -f "$ARTIFACTS_DIR/agent.patch.refused"
+_t_rc=0
+_build_tournament "Touch CI" "bun test" "opus" 2 >/dev/null 2>&1 || _t_rc=$?
+assert_eq "Winner touching a protected path fails the build" "1" "$_t_rc"
+assert_eq "Refused winner never reaches the trusted checkout" "$_t_head" "$(git -C "$PROJECT_ROOT" rev-parse HEAD)"
+[[ ! -e "$PROJECT_ROOT/.github/workflows/evil.yml" ]] && assert_pass "Refused file not written to the checkout" \
+    || assert_fail "Refused file not written to the checkout"
+assert_contains "Refusal reason saved" "$(cat "$ARTIFACTS_DIR/agent.patch.refused" 2>/dev/null)" "protected path"
+
+mock_binary "sw" "pwd > '$TEST_TEMP_DIR/tournament-cwd.txt'
+echo '{\"selection\":{\"winner\":\"a1\",\"confidence\":\"high\"},\"costUsd\":1}'"
+_t_rc=0
+SW_PATCH_HANDOFF=false _build_tournament "Old path" "bun test" "opus" 2 >/dev/null 2>&1 || _t_rc=$?
+assert_eq "SW_PATCH_HANDOFF=false still runs the tournament" "0" "$_t_rc"
+assert_eq "SW_PATCH_HANDOFF=false runs it in the checkout" "$(cd "$PROJECT_ROOT" && pwd)" \
+    "$(cat "$TEST_TEMP_DIR/tournament-cwd.txt" 2>/dev/null)"
 
 # ─── Tests: stage_test ──────────────────────────────────────────────────────
 print_test_section "stage_test"

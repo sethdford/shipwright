@@ -56,6 +56,21 @@ read-only tools over it.
    `repo_model.mcp_attached` and `repo_model.mcp_skipped` record the arm and the files a brief named, so paired
    runs can be compared with `shipwright eval ratchet` (W2-13) and a brief's localization can be scored against
    the files a merged PR actually changed.
+8. **Reviewers get the change's reach (2026-11-26).** `repomodel impact --diff FILE` reads a unified diff and
+   reports the definitions it edits, files outside the change that import or use them, linked tests it does or
+   does not change, and deleted files that are still imported. The review stage puts it before the diff; the
+   merge critic gets it as data when `SHIPWRIGHT_VERIFIER_CRITIC=on`. The off arm leaves it out.
+9. **A semantic channel, measured before it is trusted.** `SHIPWRIGHT_REPO_MODEL_SEMANTIC=on` adds latent semantic
+   analysis over the files (a truncated SVD of the TF-IDF matrix by seeded randomized power iteration, pure
+   TypeScript, about 0.6 s on 900 files, built only when a query needs it) as a third localize signal beside
+   lexical hits and mentions. It stays off by default: on 48 past PRs it found a changed file in the top 5 for
+   30 against 28 (3 wins, 1 loss), which the ratchet does not accept as better. A learned embedding model can
+   replace it behind the same `SemanticIndex` shape when a provider is allowed.
+10. **The localization check is repeatable and leak-free.** `repomodel eval` takes the last N first-parent PRs,
+   rebuilds the model at each parent commit in a scratch worktree, localizes the PR title and records where the
+   files it really changed rank. `--export` writes eval-ratchet results (pass = a changed file in the top 5), so
+   a change to extraction, ranking or the semantic channel is compared case by case with
+   `shipwright eval ratchet --k 1` and no model spend.
 
 ## Consequences
 - Agents can ask "who calls this", "which tests cover this file" and "where is this defined" in one call instead
@@ -64,7 +79,8 @@ read-only tools over it.
 - Extraction is heuristic. Multi-line signatures, decorators and dynamic dispatch are missed, and reference edges
   are name-based, not type-resolved, so the brief says it is a starting point to check. Bump `EXTRACTOR_VERSION`
   whenever a rule changes so stored models are rebuilt.
-- The search index is lexical. LocAgent's baselines show code embeddings retrieving better than BM25 alone; an
-  embedding index is the next slice, behind a port, once there is an embedding provider the deployment allows.
-- The model is not yet in the review stage or the tournament judge, and coverage data does not yet sharpen the
-  test map. Both are follow-ups once the paired comparison shows the on arm wins.
+- Lexical search plus the graph is the default. The semantic channel lifts top-10 hits (63% to 73% on one
+  sample) more than top-5 ones; it turns on when `repomodel eval` exports make the ratchet accept it.
+- Impact is name-based like the rest of the graph, so it lists places to check, not proven breakage.
+- Coverage data does not yet sharpen the test map; the paired agent A/B (on against off on the benchmark) is
+  what decides whether the model pays for itself in resolved tasks, not just in localization.

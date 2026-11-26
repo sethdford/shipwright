@@ -114,6 +114,16 @@ test("the critic is one feature: its probability and concerns are reported and i
   expect(agent.requests[0]?.instructions).not.toContain("+a");
 });
 
+test("the critic gets the repository model's impact section as data, before the diff", async () => {
+  const agent = fakeCritic({ checks: [], mergeProbability: 0.6 });
+  const ports = fakeVerifierPorts({ local: { files: [f("src/a.ts")], patch: "+a" }, agent });
+  const impact = "## Change impact (repository model)\n- src/a.ts\n    imported by: src/b.ts";
+  await scoreChange(ports, req({ critic: { model: "sonnet", budgetUsd: 0.5, impact } }));
+  const data = agent.requests[0]?.data ?? "";
+  expect(data).toContain("imported by: src/b.ts");
+  expect(data.indexOf("Change impact")).toBeLessThan(data.indexOf("## Diff"));
+});
+
 test("a failing critic is a note, not an error", async () => {
   const r = await scoreChange(
     fakeVerifierPorts(),

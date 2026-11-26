@@ -323,59 +323,18 @@ assert_eq "and the edit is gone from the checkout" "" "$(git -C "$T/trusted" sta
 assert_contains "but kept in the patch file" "$(cat "$T/left.patch")" ".github/workflows/ci.yml"
 
 # ═══════════════════════════════════════════════════════════════════════════════
-print_test_section "test_first (TDD) output lands only as a judged patch"
+print_test_section "handoff_export with paths reads only those paths"
 # ═══════════════════════════════════════════════════════════════════════════════
 
-run_tdd_land() {
-    (
-        set +e
-        _PIPELINE_STAGES_BUILD_LOADED=""
-        source "$SCRIPT_DIR/lib/pipeline-stages-build.sh" 2>/dev/null
-        info() { :; }; success() { :; }; warn() { :; }; error() { :; }
-        emit_event() { echo "$*" >> "$T/events"; }
-        PROJECT_ROOT="$T/trusted" ARTIFACTS_DIR="$T/artifacts" ISSUE_NUMBER=7
-        _tdd_land_output "$1"
-    )
-}
-fence='```'
-TDD_OK="${fence}tests/app.test.sh
-echo ok
-${fence}"
-TDD_ESCAPE="${fence}../outside.txt
-pwned
-${fence}
-${fence}tests/app.test.sh
-echo ok
-${fence}"
-TDD_WORKFLOW="${fence}.github/workflows/ci.yml
-on: push
-${fence}"
-
-BASE=$(new_trusted "$T/trusted"); rm -rf "$T/artifacts" "$T/events"
-rc=0; run_tdd_land "$TDD_OK" || rc=$?
-assert_exit_code "generated tests are applied" "0" "$rc"
-assert_eq "as a pipeline commit on the base" "$BASE" "$(git -C "$T/trusted" rev-parse HEAD~1)"
-assert_eq "authored by the pipeline" "shipwright-pipeline" "$(git -C "$T/trusted" log -1 --format=%an)"
-assert_eq "with the test file" "echo ok" "$(git -C "$T/trusted" show HEAD:tests/app.test.sh)"
-
-BASE=$(new_trusted "$T/trusted"); rm -rf "$T/artifacts" "$T/events" "$T/outside.txt"
-run_tdd_land "$TDD_ESCAPE" || true
-assert_file_not_exists "a ../ path from the model is never written" "$T/outside.txt"
-assert_contains "the refused path is an event" "$(cat "$T/events")" "tdd.path_refused issue=7 path=../outside.txt"
-assert_eq "the safe block still lands" "echo ok" "$(git -C "$T/trusted" show HEAD:tests/app.test.sh 2>/dev/null)"
-
-BASE=$(new_trusted "$T/trusted"); rm -rf "$T/artifacts" "$T/events"
-rc=0; run_tdd_land "$TDD_WORKFLOW" || rc=$?
-assert_exit_code "TDD output that edits a workflow is refused" "1" "$rc"
-assert_eq "the trusted checkout stays at the base" "$BASE" "$(git -C "$T/trusted" rev-parse HEAD)"
-assert_eq "and clean" "" "$(git -C "$T/trusted" status --porcelain)"
-assert_contains "the refusal is an event" "$(cat "$T/events")" "tdd.patch_refused issue=7"
-
-BASE=$(new_trusted "$T/trusted"); rm -rf "$T/artifacts" "$T/events" "$T/outside.txt"
-( cd "$T/trusted" && SW_PATCH_HANDOFF=false run_tdd_land "$TDD_ESCAPE" ) || true
-assert_file_not_exists "with handoff off, ../ paths are still refused" "$T/outside.txt"
-assert_eq "and only the written test is committed" "tests/app.test.sh" \
-    "$(git -C "$T/trusted" show --name-only --format= HEAD)"
+BASE=$(new_trusted "$T/trusted")
+mkdir -p "$T/trusted/tests"; echo ok > "$T/trusted/tests/a.test.sh"; echo other > "$T/trusted/other.txt"
+echo '*' > "$T/trusted/tests/[x].sh"
+handoff_export "$T/trusted" "$BASE" "$T/trusted" "$T/only.patch" "tests/a.test.sh" 2>/dev/null
+assert_contains "the named file is in the patch" "$(cat "$T/only.patch")" "tests/a.test.sh"
+assert_eq "other changes are left out" "0" "$(grep -c 'other.txt\|\[x\]' "$T/only.patch" || true)"
+handoff_export "$T/trusted" "$BASE" "$T/trusted" "$T/lit.patch" "tests/[x].sh" 2>/dev/null
+assert_eq "paths are literal, not globs" "1" "$(grep -c '^diff --git' "$T/lit.patch" || true)"
+rm -rf "$T/trusted/tests" "$T/trusted/other.txt"
 
 # ═══════════════════════════════════════════════════════════════════════════════
 print_test_section "agent stages in the trusted checkout cannot commit"

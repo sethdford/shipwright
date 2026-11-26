@@ -1,11 +1,17 @@
 export { ARM_KINDS, type ArmKind, type BenchArm, expandArgv, parseArms } from "./arm";
 export { toEvalResults } from "./eval-export";
 export {
+  classifyCommit,
+  classifyFiles,
   classifyPull,
+  commitTaskId,
+  type DirectCommit,
   filterDiff,
   type HoldoutCandidate,
   linkedIssue,
   type MergedPull,
+  type OracleFiles,
+  parseProblems,
   patchPaths,
   type Rejection,
   testCommandFor,

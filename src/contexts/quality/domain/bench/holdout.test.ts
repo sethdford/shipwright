@@ -1,9 +1,11 @@
 import { describe, expect, test } from "bun:test";
 import {
+  classifyCommit,
   classifyPull,
   filterDiff,
   linkedIssue,
   type MergedPull,
+  parseProblems,
   patchPaths,
   testCommandFor,
 } from "./holdout";
@@ -38,6 +40,48 @@ describe("classifyPull", () => {
     const c = classifyPull(pull(over));
     expect("reason" in c ? c.reason : "").toContain(reason);
   });
+});
+
+test("a curated PR needs no linked issue", () => {
+  const c = classifyPull(pull({ body: "no link" }), true);
+  expect("issue" in c && c.issue).toBeNull();
+});
+
+test("classifyCommit applies the file rules, then asks for a curated problem", () => {
+  const c = {
+    sha: "c".repeat(40),
+    parentSha: "a".repeat(40),
+    message: "fix: thing\n\nbody",
+    author: "sethdford",
+    committedAtMs: 0,
+    files: ["src/x.ts", "src/x.test.ts"],
+  };
+  expect(classifyCommit(c, true)).toEqual({
+    testFiles: ["src/x.test.ts"],
+    testCommands: [["bun", "test", "./src/x.test.ts"]],
+  });
+  expect(classifyCommit(c, false)).toEqual({
+    ref: "ccccccc",
+    reason: "needs a curated problem: fix: thing",
+  });
+  expect(classifyCommit({ ...c, files: ["src/x.ts"] }, true)).toEqual({
+    ref: "ccccccc",
+    reason: "no runnable test change",
+  });
+  expect(classifyCommit({ ...c, author: "github-actions[bot]" }, true)).toMatchObject({
+    reason: "bot author",
+  });
+});
+
+test("parseProblems takes id to statement and rejects stubs", () => {
+  const ok = parseProblems({
+    "c-1": " The CLI exits 0 when the config file is missing entirely. ",
+  });
+  expect(ok.ok && ok.value).toEqual({
+    "c-1": "The CLI exits 0 when the config file is missing entirely.",
+  });
+  expect(parseProblems({ "c-1": "fix it" }).ok).toBe(false);
+  expect(parseProblems([]).ok).toBe(false);
 });
 
 test("linkedIssue and testCommandFor", () => {

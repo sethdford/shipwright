@@ -23,7 +23,7 @@ export async function buildBrief(
   const snap = await session.current();
   if (!snap.ok) return snap;
   const { graph, index, owners, stats } = snap.value;
-  const located = localize(graph, index, task, 12);
+  const located = localize(graph, index, task, 12, snap.value.semantic(task, 30));
   const src = located.filter((f) => !f.test).slice(0, 8);
   const text = renderBrief({
     located,

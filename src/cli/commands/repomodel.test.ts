@@ -1,5 +1,6 @@
 import { describe, expect, test } from "bun:test";
-import type { LineChannel } from "../../contexts/intelligence";
+import type { HistorySource, LineChannel } from "../../contexts/intelligence";
+import { ok } from "../../shared/kernel/result";
 import { captureIO, commandContext } from "../../testing/cli-harness";
 import { FakeFileReader } from "../../testing/fake-file-reader";
 import { fakeRepoPorts } from "../../testing/repo-model-fixture";
@@ -10,10 +11,29 @@ const FILES = {
   "src/budget.test.ts": 'import { evaluateBudget } from "./budget";\n',
 };
 
+const HISTORY: HistorySource = {
+  commits: async () =>
+    ok([
+      {
+        sha: "a".repeat(40),
+        parent: "b".repeat(40),
+        subject: "fix: the daily budget is ignored (#9)",
+        body: "",
+        files: ["src/budget.ts"],
+      },
+    ]),
+  checkout: async () => ok("/repo"),
+  release: async () => {},
+};
+
 function run(args: string[], env: Record<string, string> = {}, stdio?: LineChannel) {
   const io = captureIO();
-  const { ports } = fakeRepoPorts(FILES);
-  const files = new FakeFileReader({ "/task.md": "the daily budget is ignored" });
+  const ports = { ...fakeRepoPorts(FILES).ports, history: HISTORY };
+  const files = new FakeFileReader({
+    "/task.md": "the daily budget is ignored",
+    "/change.diff":
+      "diff --git a/src/budget.ts b/src/budget.ts\n--- a/src/budget.ts\n+++ b/src/budget.ts\n@@ -1,2 +1,2 @@\n export function evaluateBudget(spent: number) {\n+  return spent;\n",
+  });
   const ctx = commandContext(io, undefined, { PWD: "/repo", ...env }, files, {
     repoModel: ports,
     stdio,
@@ -29,6 +49,30 @@ describe("shipwright repomodel", () => {
     expect((await run(["def", "evaluateBudget"])).out).toContain("src/budget.ts:1");
     expect((await run(["tests", "src/budget.ts"])).out).toBe("src/budget.test.ts (imports)");
     expect((await run(["localize", "--task", "/task.md"])).out).toContain("src/budget.ts");
+  });
+
+  test("impact: the section for a diff; nothing on the off arm; --diff is required", async () => {
+    const on = await run(["impact", "--diff", "/change.diff"]);
+    expect(on.out).toContain("edits public: evaluateBudget");
+    expect(on.out).toContain("tests: src/budget.test.ts");
+    const json = JSON.parse((await run(["impact", "--diff", "/change.diff", "--json"])).out);
+    expect(json.untested).toEqual(["src/budget.ts"]);
+    expect(json.arm).toBe("on");
+    const off = await run(["impact", "--diff", "/change.diff"], { SHIPWRIGHT_REPO_MODEL: "off" });
+    expect(off.out).toBe("");
+    expect((await run(["impact"])).code).toBe(2);
+  });
+
+  test("eval: the localization check, and its export for the ratchet", async () => {
+    const text = (await run(["eval", "--commits", "5"])).out;
+    expect(text).toContain("1 past PRs");
+    expect(text).toContain("in top 5: 100%");
+    const exported = JSON.parse((await run(["eval", "--export", "--policy", "lex"])).out);
+    expect(exported).toEqual({
+      policy: "lex",
+      runs: [{ case: "aaaaaaaaaaaa", pass: true, costUsd: 0 }],
+    });
+    expect((await run(["eval", "--commits", "0"])).code).toBe(2);
   });
 
   test("brief: JSON with the files it named; nothing on the off arm", async () => {
