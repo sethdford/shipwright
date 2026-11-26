@@ -652,7 +652,7 @@ Most commands are bash. The dashboard server and the commands routed through `ru
 | `scripts/sw-launchd.sh` | 703 | Process supervision (macOS + Linux) |
 | `scripts/sw-linear.sh` | 643 | Linear ↔ GitHub Bidirectional Sync |
 | `scripts/sw-logs.sh` | 356 | View and search agent pane logs |
-| `scripts/sw-loop.sh` | 2681 | Continuous agent loop harness for Claude Code |
+| `scripts/sw-loop.sh` | 2682 | Continuous agent loop harness for Claude Code |
 | `scripts/sw-memory.sh` | 2244 | Persistent Learning & Context System |
 | `scripts/sw-mission-control.sh` | 473 | Terminal-based pipeline mission control |
 | `scripts/sw-model-router.sh` | 1056 | Intelligent Model Routing & Cost Optimization |
@@ -661,7 +661,7 @@ Most commands are bash. The dashboard server and the commands routed through `ru
 | `scripts/sw-patrol-meta.sh` | 786 | Shipwright Self-Improvement Patrol |
 | `scripts/sw-pipeline-composer.sh` | 444 | Dynamic Pipeline Composition |
 | `scripts/sw-pipeline-vitals.sh` | 1073 | Pipeline Vitals Engine |
-| `scripts/sw-pipeline.sh` | 287 | Autonomous Feature Delivery (Idea → Production) |
+| `scripts/sw-pipeline.sh` | 289 | Autonomous Feature Delivery (Idea → Production) |
 | `scripts/sw-pm.sh` | 749 | Autonomous PM Agent for Team Orchestration |
 | `scripts/sw-pr-lifecycle.sh` | 688 | Autonomous PR Management |
 | `scripts/sw-predictive.sh` | 834 | Predictive & Proactive Intelligence |
@@ -705,7 +705,7 @@ Most commands are bash. The dashboard server and the commands routed through `ru
 | `scripts/sw-webhook.sh` | 621 | GitHub Webhook Receiver for Instant Issue Processing |
 | `scripts/sw-widgets.sh` | 528 | Embeddable Status Widgets |
 | `scripts/sw-worktree.sh` | 421 | Git worktree management for multi-agent isolation |
-| `scripts/sw` | 668 | CLI router — dispatches subcommands via exec |
+| `scripts/sw` | 671 | CLI router — dispatches subcommands via exec |
 <!-- /AUTO:core-scripts -->
 
 ### GitHub API Modules
@@ -842,9 +842,11 @@ Most commands are bash. The dashboard server and the commands routed through `ru
 | `scripts/sw-lib-pipeline-detection-test.sh` | 483 | Unit tests for detection fns |
 | `scripts/sw-lib-pipeline-intelligence-test.sh` | 411 | Unit tests for intelligence |
 | `scripts/sw-lib-pipeline-quality-checks-test.sh` | 194 | Unit tests for quality |
+| `scripts/sw-lib-pipeline-router-test.sh` | 127 | ADR-0014 adaptive compute router |
 | `scripts/sw-lib-pipeline-stages-test.sh` | 299 | Unit tests for stage functions |
 | `scripts/sw-lib-pipeline-state-test.sh` | 310 | Unit tests for pipeline state |
 | `scripts/sw-lib-pr-content-test.sh` | 130 | PR titles, bodies and artifact scrubbing |
+| `scripts/sw-lib-repo-model-test.sh` | 106 | ADR-0016 brief and MCP attach |
 | `scripts/sw-lib-safety-gates-sites-test.sh` | 168 | automated filings use intake caps |
 | `scripts/sw-lib-safety-gates-test.sh` | 358 | bash callers of the TS safety gates |
 | `scripts/sw-lib-skill-registry-test.sh` | 36 | complexity weighting |
