@@ -11,18 +11,18 @@ export function scorecardRows(c: Scorecard): [string, string, string][] {
     ["Agent PRs closed", String(c.closed), `${c.merged} merged, ${c.abandoned} closed unmerged`],
     ["Merge rate", pct(c.mergeRate), "merged ÷ closed"],
     [
-      "Merged without rework",
+      "Merged without human help",
       pct(c.cleanMergeRate),
-      `${c.mergedClean} of ${c.merged}: no human commit after opening, not reverted`,
+      `${c.mergedClean} of ${c.merged}: every commit by the factory, not reverted`,
     ],
     [
       "Revert rate",
       pct(c.revertRate),
       `${c.reverted} reverted within 14 days; ${c.revertWindowOpen} still inside the window`,
     ],
-    ["Reworked by a human", String(c.reworked), "a non-factory commit after the PR opened"],
+    ["With human commits", String(c.reworked), "merged PRs with any commit not by the factory"],
     ["Median time to merge", hrs(c.medianHoursToMerge), "PR opened → merged"],
-    ["Model spend", usd(c.spendUsd), "from the local cost ledger"],
+    ["Model spend", usd(c.spendUsd), "local cost ledger; unknown when it holds no real cost"],
     ["Cost per merged PR", usd(c.costPerMergeUsd), "spend ÷ merged"],
   ];
 }

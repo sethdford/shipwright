@@ -24,6 +24,7 @@ function quality(truncated = false): QualityPorts {
     now: () => NOW,
     pulls: {
       closedSince: async () => ok({ pulls: [pull(1), pull(2, { mergedAtMs: null })], truncated }),
+      commits: async () => ok([]),
     },
     spend: { between: async () => ok(null) },
   };
@@ -73,7 +74,10 @@ describe("scorecard", () => {
   test("an unreadable source exits 1", async () => {
     const ports = {
       ...quality(),
-      pulls: { closedSince: async () => err({ kind: "auth" as const, message: "401" }) },
+      pulls: {
+        closedSince: async () => err({ kind: "auth" as const, message: "401" }),
+        commits: async () => ok([]),
+      },
     };
     expect((await run([], ports)).code).toBe(1);
   });

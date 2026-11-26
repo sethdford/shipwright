@@ -1,5 +1,5 @@
 import { z } from "zod";
-import type { ClosedPulls, PullRecord } from "../../contexts/quality";
+import type { ClosedPulls, PullCommit, PullRecord } from "../../contexts/quality";
 import type { ProcessRunner } from "../../shared/kernel/ports";
 import { ok } from "../../shared/kernel/result";
 import { runGhJson } from "./gh-json";
@@ -18,13 +18,17 @@ const GhClosedPull = z.object({
   createdAt: z.string(),
   mergedAt: z.string().nullable(),
   closedAt: z.string().nullable(),
-  commits: z.array(Commit),
 });
+const GhCommits = z.object({ commits: z.array(Commit) });
 
-/** One page; more than this in the window is reported as truncated, never silently dropped. */
-export const MAX_CLOSED_PULLS = 300;
+/**
+ * Closed PRs read per call. More than this is reported as truncated, never silently dropped.
+ * Commits are not in this query: with them, GitHub's 500,000-node GraphQL cap fails at about 50
+ * PRs. They are read per PR, and only for the PRs the scorecard inspects.
+ */
+export const MAX_CLOSED_PULLS = 1000;
 
-const FIELDS = "number,title,body,headRefName,createdAt,mergedAt,closedAt,commits";
+const FIELDS = "number,title,body,headRefName,createdAt,mergedAt,closedAt";
 
 function epoch(iso: string | null): number | null {
   if (iso === null || iso === "") return null;
@@ -41,10 +45,14 @@ function toRecord(p: z.infer<typeof GhClosedPull>): PullRecord {
     createdAtMs: epoch(p.createdAt) ?? 0,
     mergedAtMs: epoch(p.mergedAt),
     closedAtMs: epoch(p.closedAt),
-    commits: p.commits.map((c) => ({
-      identities: c.authors.flatMap((a) => [a.login ?? "", a.name ?? "", a.email ?? ""]),
-      atMs: epoch(c.committedDate) ?? 0,
-    })),
+    commits: [],
+  };
+}
+
+function toCommit(c: z.infer<typeof Commit>): PullCommit {
+  return {
+    identities: c.authors.flatMap((a) => [a.login ?? "", a.name ?? "", a.email ?? ""]),
+    atMs: epoch(c.committedDate) ?? 0,
   };
 }
 
@@ -52,25 +60,27 @@ function toRecord(p: z.infer<typeof GhClosedPull>): PullRecord {
 export class GhClosedPulls implements ClosedPulls {
   constructor(private readonly runner: ProcessRunner) {}
 
+  /**
+   * No `--search`: GitHub's search index drops some closed PRs (bulk-closed ones among them), so
+   * every closed PR is listed and the window is applied here, by close time.
+   */
   async closedSince(sinceMs: number) {
-    const day = new Date(sinceMs).toISOString().slice(0, 10);
-    const argv = [
-      "gh",
-      "pr",
-      "list",
-      "--state",
-      "closed",
-      "--search",
-      `closed:>=${day}`,
-      "--limit",
-      String(MAX_CLOSED_PULLS + 1),
-      "--json",
-      FIELDS,
-    ];
-    const r = await runGhJson(this.runner, argv, z.array(GhClosedPull));
+    const argv = ["gh", "pr", "list", "--state", "closed"];
+    const limit = ["--limit", String(MAX_CLOSED_PULLS + 1), "--json", FIELDS];
+    const r = await runGhJson(this.runner, [...argv, ...limit], z.array(GhClosedPull));
     if (!r.ok) return r;
     const truncated = r.value.length > MAX_CLOSED_PULLS;
-    const pulls = r.value.slice(0, MAX_CLOSED_PULLS).map(toRecord);
+    const pulls = r.value
+      .slice(0, MAX_CLOSED_PULLS)
+      .map(toRecord)
+      .filter((p) => p.closedAtMs !== null && p.closedAtMs >= sinceMs);
     return ok({ pulls, truncated });
+  }
+
+  async commits(pr: number) {
+    const argv = ["gh", "pr", "view", String(pr), "--json", "commits"];
+    const r = await runGhJson(this.runner, argv, GhCommits);
+    if (!r.ok) return r;
+    return ok(r.value.commits.map(toCommit));
   }
 }

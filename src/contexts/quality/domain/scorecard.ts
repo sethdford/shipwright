@@ -29,7 +29,7 @@ export interface ScorecardConfig {
   readonly agentMarkers: readonly string[];
   /** Head-branch prefixes that mark a PR as written by Shipwright. */
   readonly agentBranchPrefixes: readonly string[];
-  /** Commit authors that are the factory itself; any other author after the PR opened is rework. */
+  /** Commit authors that are the factory itself; a commit by anyone else is human work. */
   readonly agentAuthors: readonly string[];
 }
 
@@ -50,7 +50,7 @@ export interface Scorecard {
   readonly merged: number;
   readonly abandoned: number;
   readonly mergeRate: number | null;
-  /** Merged with no human commit after it opened and not reverted: "merged without rework". */
+  /** Merged with every commit by the factory and not reverted: "merged without human help". */
   readonly mergedClean: number;
   readonly cleanMergeRate: number | null;
   readonly reworked: number;
@@ -85,12 +85,14 @@ export function revertsByTarget(pulls: readonly PullRecord[]): Map<number, numbe
   return out;
 }
 
-function humanCommitAfterOpen(pull: PullRecord, agentAuthors: readonly string[]): boolean {
+/**
+ * True when any commit on the PR was written by someone other than the factory, before or after
+ * the PR opened: a human-authored commit means the change was not the factory's alone.
+ */
+function hasHumanCommit(pull: PullRecord, agentAuthors: readonly string[]): boolean {
   const agents = new Set(agentAuthors.map((a) => a.toLowerCase()));
   return pull.commits.some(
-    (c) =>
-      c.atMs > pull.createdAtMs &&
-      !c.identities.some((id) => id !== "" && agents.has(id.toLowerCase())),
+    (c) => !c.identities.some((id) => id !== "" && agents.has(id.toLowerCase())),
   );
 }
 
@@ -120,10 +122,21 @@ function outcomes(
       return at !== undefined && p.mergedAtMs !== null && at - p.mergedAtMs <= revertMs;
     }),
   );
-  const reworked = new Set(merged.filter((p) => humanCommitAfterOpen(p, config.agentAuthors)));
+  const reworked = new Set(merged.filter((p) => hasHumanCommit(p, config.agentAuthors)));
   const clean = merged.filter((p) => !reverted.has(p) && !reworked.has(p)).length;
   const windowOpen = merged.filter((p) => (p.mergedAtMs ?? 0) > config.nowMs - revertMs).length;
   return { reverted: reverted.size, reworked: reworked.size, clean, windowOpen };
+}
+
+/**
+ * Merged agent PRs closed in the window: the only PRs whose commits the scorecard reads. The
+ * caller fetches their commits; every other record may carry an empty commit list.
+ */
+export function pullsNeedingCommits(pulls: readonly PullRecord[], config: ScorecardConfig) {
+  const fromMs = config.nowMs - config.windowDays * DAY_MS;
+  return closedInWindow(pulls, config, fromMs)
+    .filter((p) => p.mergedAtMs !== null)
+    .map((p) => p.number);
 }
 
 /** W2-18 delivery scorecard over agent PRs closed in the window. Pure. */

@@ -3,6 +3,7 @@ import {
   computeScorecard,
   DEFAULT_SCORECARD,
   isAgentPull,
+  pullsNeedingCommits,
   type PullRecord,
   revertsByTarget,
   type ScorecardConfig,
@@ -78,6 +79,22 @@ test("counts merged, abandoned, reverted and reworked agent PRs in the window", 
     costPerMergeUsd: 4,
     revertWindowOpen: 0,
   });
+});
+
+test("a human commit made before the PR opened is human work too", () => {
+  const early = { identities: ["sethdford", "Seth", ""], atMs: NOW - 25 * DAY };
+  const card = computeScorecard([pull(1, { commits: [early] })], config, null);
+  expect(card).toMatchObject({ merged: 1, reworked: 1, mergedClean: 0 });
+});
+
+test("only merged agent PRs in the window need their commits read", () => {
+  const pulls = [
+    pull(1),
+    pull(2, { mergedAtMs: null }),
+    pull(3, { body: "human" }),
+    pull(4, { closedAtMs: NOW - 40 * DAY }),
+  ];
+  expect(pullsNeedingCommits(pulls, config)).toEqual([1]);
 });
 
 test("a revert after the revert window does not count, and fresh merges are flagged", () => {

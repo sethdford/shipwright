@@ -23,6 +23,7 @@ export {
   DEFAULT_SCORECARD,
   type PullCommit,
   type PullRecord,
+  pullsNeedingCommits,
   type Scorecard,
   type ScorecardConfig,
 } from "./domain/scorecard";
