@@ -1,5 +1,6 @@
 import { join } from "node:path";
 import pkg from "../package.json";
+import { GitRepoDocs } from "./adapters/git/git-repo-docs";
 import { GhGithubWriter } from "./adapters/github/gh-github-writer";
 import { GhOpenIssues } from "./adapters/github/gh-open-issues";
 import { GhPauseLabel } from "./adapters/github/gh-pause-label";
@@ -22,6 +23,7 @@ const consoleIO: CliIO = {
 
 const fileReader = new NodeFileReader();
 const files = () => fileReader;
+const repoDocs = once(() => new GitRepoDocs(new BunProcessRunner(), fileReader));
 
 /** Adapters for the safety commands (ADR-0007). */
 export function buildSafetyPorts(
@@ -90,7 +92,7 @@ export async function main(
     return 2;
   }
   try {
-    return await command.run(args, { io, version: pkg.version, safety, env, files });
+    return await command.run(args, { io, version: pkg.version, safety, env, files, repoDocs });
   } catch (error) {
     io.err(`✗ ${error instanceof Error ? error.message : String(error)}`);
     return 1;
