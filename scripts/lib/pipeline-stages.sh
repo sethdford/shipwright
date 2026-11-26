@@ -5,6 +5,9 @@
 [[ -n "${_PIPELINE_STAGES_LOADED:-}" ]] && return 0
 _PIPELINE_STAGES_LOADED=1
 
+# Prompt-injection defenses for issue text. Required: no fallback, the stages fail closed.
+source "$(dirname "${BASH_SOURCE[0]}")/untrusted.sh"
+
 # Source skill registry for dynamic prompt injection
 _SKILL_REGISTRY_SH="${SCRIPT_DIR}/lib/skill-registry.sh"
 [[ -f "$_SKILL_REGISTRY_SH" ]] && source "$_SKILL_REGISTRY_SH"
