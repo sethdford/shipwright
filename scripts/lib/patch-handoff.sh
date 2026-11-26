@@ -60,6 +60,11 @@ CODEOWNERS
 .github/CODEOWNERS'
 HANDOFF_PROTECTED="${HANDOFF_PROTECTED:-$HANDOFF_PROTECTED_DEFAULT}"
 
+# Never part of the agent's output: .claude/ holds loop and pipeline runtime state (logs, state
+# files, artifacts) and agent configuration. Runtime state is not code, and the configuration is
+# for humans to change. Changes there are dropped, not delivered.
+HANDOFF_EXCLUDE_PATHSPEC=(':(exclude,top).claude')
+
 _handoff_err() { printf 'patch-handoff: %s\n' "$*" >&2; }
 
 # _handoff_git ARGS... — git with nothing from the environment, system, user or repo that could run
@@ -112,6 +117,27 @@ handoff_prepare() {
         || { _handoff_err "checkout of $base failed"; return 1; }
 }
 
+# handoff_carry_over TRUSTED_REPO BASE_SHA AGENT_DIR OUT_PATCH — moves uncommitted work out of the
+# trusted checkout and into the agent's clone. Earlier stages (plan, design, spec) run agents in the
+# trusted checkout, and what they wrote there is untrusted too: carried over, it is judged with the
+# build agent's work instead of riding along unjudged. Tracked files are reset to HEAD; untracked,
+# non-ignored files outside .claude/ are moved (their paths are listed in OUT_PATCH.moved).
+handoff_carry_over() {
+    local trusted="$1" base="$2" dir="$3" out="$4"
+    handoff_export "$trusted" "$base" "$trusted" "$out" || return 1
+    [[ -s "$out" ]] || return 0
+    _handoff_in "$dir" apply --index --binary --whitespace=nowarn "$out" \
+        || { _handoff_err "could not carry the trusted checkout's changes into the agent clone"; return 1; }
+    _handoff_in "$trusted" ls-files -z --others --exclude-standard -- . "${HANDOFF_EXCLUDE_PATHSPEC[@]}" \
+        > "$out.moved" || return 1
+    _handoff_in "$trusted" reset -q --hard HEAD || { _handoff_err "could not reset the trusted checkout"; return 1; }
+    local path
+    while IFS= read -r -d '' path; do
+        rm -f -- "$trusted/$path"
+    done < "$out.moved"
+    tr '\0' '\n' < "$out.moved" > "$out.moved.txt" && mv "$out.moved.txt" "$out.moved"
+}
+
 # handoff_export AGENT_DIR BASE_SHA TRUSTED_REPO OUT_PATCH — the agent's files, as a binary patch
 # against BASE_SHA. Uses a scratch git dir whose objects borrow from TRUSTED_REPO (read only).
 handoff_export() {
@@ -137,7 +163,8 @@ _handoff_export_in() {
     # The scratch index starts at the base tree; `add -A` records the agent's files as they are.
     GIT_DIR="$gd" GIT_INDEX_FILE="$scratch/index" _handoff_git read-tree "$base" || return 1
     GIT_DIR="$gd" GIT_WORK_TREE="$dir" GIT_INDEX_FILE="$scratch/index" \
-        _handoff_git add -A -- . || { _handoff_err "could not read the agent's files"; return 1; }
+        _handoff_git add -A -- . "${HANDOFF_EXCLUDE_PATHSPEC[@]}" \
+        || { _handoff_err "could not read the agent's files"; return 1; }
     local tmp="$out.tmp.$$"
     GIT_DIR="$gd" GIT_WORK_TREE="$dir" GIT_INDEX_FILE="$scratch/index" \
         _handoff_git diff --cached --binary --full-index --no-renames --no-ext-diff --no-textconv \
@@ -222,7 +249,10 @@ handoff_apply() {
     [[ "$head" == "$base" ]] || { _handoff_err "trusted checkout is at $head, not the base $base"; return 1; }
     local dirty
     dirty=$(_handoff_in "$repo" status --porcelain --untracked-files=no) || return 1
-    [[ -z "$dirty" ]] || { _handoff_err "trusted checkout has uncommitted changes"; return 1; }
+    [[ -z "$dirty" ]] || {
+        _handoff_err "trusted checkout has uncommitted changes: $(printf '%s' "$dirty" | head -5 | tr '\n' ';')"
+        return 1
+    }
     local why
     if ! why=$(handoff_judge "$patch"); then
         _handoff_err "patch refused: $(printf '%s' "$why" | tr '\n' ';')"

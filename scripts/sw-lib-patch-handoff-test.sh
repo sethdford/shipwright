@@ -77,6 +77,9 @@ assert_contains "patch has the committed edit" "$patch" "+TWO"
 assert_contains "patch has the untracked new file" "$patch" "b/src/new.txt"
 assert_contains "patch has the deletion" "$patch" "deleted file mode"
 expect_ok "a small source change passes the judge" handoff_judge "$T/p1.patch"
+mkdir -p "$T/agent/.claude/loop-logs" && echo log > "$T/agent/.claude/loop-logs/x.log"
+handoff_export "$T/agent" "$BASE" "$T/trusted" "$T/p1b.patch"
+if grep -q '\.claude/' "$T/p1b.patch"; then assert_fail ".claude/ runtime state is never in the patch"; else assert_pass ".claude/ runtime state is never in the patch"; fi
 
 # ═══════════════════════════════════════════════════════════════════════════════
 print_test_section "handoff_export ignores everything in the agent's .git"
@@ -121,6 +124,30 @@ fi
 assert_contains "the agent's .gitattributes is a protected path in the patch" "$(handoff_judge "$T/p2.patch" || true)" "protected path: .gitattributes"
 
 # ═══════════════════════════════════════════════════════════════════════════════
+print_test_section "handoff_carry_over (earlier stages' edits)"
+# ═══════════════════════════════════════════════════════════════════════════════
+
+BASE=$(new_trusted "$T/trusted")
+rm -rf "$T/agent"; handoff_prepare "$T/trusted" "$BASE" "$T/agent"
+printf 'planner edit\n' >> "$T/trusted/src/app.txt"
+printf 'x\n' >> "$T/trusted/.github/workflows/ci.yml"
+printf 'planned\n' > "$T/trusted/src/planned.txt"
+mkdir -p "$T/trusted/.claude/pipeline-artifacts" && echo state > "$T/trusted/.claude/pipeline-artifacts/plan.md"
+expect_ok "carries edits over" handoff_carry_over "$T/trusted" "$BASE" "$T/agent" "$T/pre.patch"
+assert_eq "the trusted checkout is clean again" "" "$(git -C "$T/trusted" status --porcelain --untracked-files=no)"
+assert_eq "the edit is now in the agent clone" "planner edit" "$(tail -1 "$T/agent/src/app.txt")"
+assert_file_exists "an untracked file moved to the agent clone" "$T/agent/src/planned.txt"
+assert_file_not_exists "and out of the trusted checkout" "$T/trusted/src/planned.txt"
+assert_contains "the move is listed" "$(cat "$T/pre.patch.moved")" "src/planned.txt"
+assert_file_exists "pipeline state under .claude/ stays in the trusted checkout" "$T/trusted/.claude/pipeline-artifacts/plan.md"
+assert_file_not_exists "and is not copied to the agent" "$T/agent/.claude/pipeline-artifacts/plan.md"
+handoff_export "$T/agent" "$BASE" "$T/trusted" "$T/carried.patch"
+assert_contains "and it is judged with the build (workflow edit refused)" "$(handoff_judge "$T/carried.patch" || true)" "protected path: .github/workflows/ci.yml"
+rm -f "$T/pre.patch"
+expect_ok "a clean checkout carries nothing" handoff_carry_over "$T/trusted" "$BASE" "$T/agent" "$T/pre.patch"
+assert_eq "and writes an empty patch" "0" "$(wc -c < "$T/pre.patch" | tr -d ' ')"
+
+# ═══════════════════════════════════════════════════════════════════════════════
 print_test_section "handoff_judge (blast radius)"
 # ═══════════════════════════════════════════════════════════════════════════════
 
@@ -149,7 +176,7 @@ newline_path() { printf x > "$(printf 'src/a\nb')"; }
 ordinary() { printf 'z\n' >> src/app.txt; echo doc > docs/new.md; }
 
 judge_case "workflow edit is refused" edit_workflow "protected path: .github/workflows/ci.yml"
-judge_case "new hook settings are refused" add_settings "protected path: .claude/settings.json"
+judge_case "agent settings under .claude/ are dropped, not delivered" add_settings "ok"
 judge_case "symlink is refused" add_symlink "symlink or submodule"
 judge_case "binary file is refused" add_binary "binary change: src/blob.bin"
 judge_case "mass deletion is refused" delete_big "deleted lines 2000 > budget"
@@ -197,7 +224,7 @@ assert_eq "and clean" "" "$(git -C "$T/trusted" status --porcelain)"
 expect_fail "refuses an empty patch (nothing to deliver)" handoff_apply "$T/trusted" "$BASE" "$T/empty.patch" "m"
 
 # ═══════════════════════════════════════════════════════════════════════════════
-print_test_section "build stage wiring (SW_PATCH_HANDOFF=true)"
+print_test_section "build stage wiring (patch handoff on by default)"
 # ═══════════════════════════════════════════════════════════════════════════════
 
 # A fake `sw` on PATH stands in for the loop: it records its environment and edits the clone.
@@ -208,6 +235,7 @@ repo=""
 while [[ $# -gt 0 ]]; do [[ "$1" == "--repo" ]] && repo="$2"; shift; done
 env > "$FAKE_SW_ENV"
 cd "$repo" || exit 1
+[[ -n "${FAKE_SW_NOOP:-}" ]] && exit 0
 printf 'one\ntwo\nthree\nloop\n' > src/app.txt
 mkdir -p .claude/loop-logs && echo '{"input_tokens":5}' > .claude/loop-logs/loop-tokens.json
 [[ -n "${FAKE_SW_EVIL:-}" ]] && printf 'x\n' >> .github/workflows/ci.yml
@@ -228,7 +256,8 @@ run_build_handoff() {
         emit_event() { echo "$*" >> "$T/events"; }
         export PATH="$T/bin:$PATH" FAKE_SW_ENV="$T/sw-env"
         export GH_TOKEN=secret-gh GITHUB_TOKEN=secret-gha SHIPWRIGHT_FLEET_TOKEN=secret-fleet
-        SW_PATCH_HANDOFF=true PROJECT_ROOT="$T/trusted" ARTIFACTS_DIR="$T/artifacts" ISSUE_NUMBER=7 GOAL="Fix app"
+        unset SW_PATCH_HANDOFF
+        PROJECT_ROOT="$T/trusted" ARTIFACTS_DIR="$T/artifacts" ISSUE_NUMBER=7 GOAL="Fix app"
         local base dir
         base=$(git -C "$PROJECT_ROOT" rev-parse HEAD)
         dir="$(mktemp -d "$T/agent.XXXXXX")/repo"
@@ -260,5 +289,11 @@ assert_exit_code "a build that edits a workflow fails" "5" "$rc"
 assert_eq "and the trusted checkout stays at the base" "$BASE" "$(git -C "$T/trusted" rev-parse HEAD)"
 assert_contains "the reason is kept" "$(cat "$T/artifacts/agent.patch.refused")" "protected path: .github/workflows/ci.yml"
 assert_contains "the refusal is an event" "$(cat "$T/events")" "build.patch_refused issue=7"
+
+BASE=$(new_trusted "$T/trusted"); rm -rf "$T/artifacts" "$T/events"
+rc=0; FAKE_SW_NOOP=1 run_build_handoff 2>/dev/null || rc=$?
+assert_exit_code "a build with no changes succeeds without a commit" "0" "$rc"
+assert_eq "the trusted checkout stays at the base" "$BASE" "$(git -C "$T/trusted" rev-parse HEAD)"
+assert_contains "the empty result is an event" "$(cat "$T/events")" "build.patch_empty issue=7"
 
 print_test_results

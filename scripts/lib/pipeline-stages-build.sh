@@ -6,7 +6,8 @@ SW_AGENT_EXEC="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/agent-exec.sh"
 # Test commands run without credentials (#8608).
 # shellcheck source=lib/test-gate-env.sh
 source "$(dirname "${BASH_SOURCE[0]}")/test-gate-env.sh"
-# Patch handoff (#8706): with SW_PATCH_HANDOFF=true the build agent works in a disposable clone.
+# Patch handoff (#8706): the build agent works in a disposable clone and only a judged patch comes
+# back. On by default; SW_PATCH_HANDOFF=false turns it off (the old shared-checkout build).
 # shellcheck source=lib/patch-handoff.sh
 source "$(dirname "${BASH_SOURCE[0]}")/patch-handoff.sh"
 source "$(dirname "${BASH_SOURCE[0]}")/models.sh"
@@ -174,7 +175,7 @@ Create files in the appropriate project directories (e.g. tests/, __tests__/, sr
 # _build_run_loop ARGS... — runs `sw loop`. Under patch handoff the loop holds no GitHub or fleet
 # credentials: it works in the agent's clone, and nothing it does there is trusted.
 _build_run_loop() {
-    if [[ "${SW_PATCH_HANDOFF:-false}" != "true" ]]; then
+    if [[ "${SW_PATCH_HANDOFF:-true}" == "false" ]]; then
         sw loop "$@"
         return
     fi
@@ -197,6 +198,13 @@ _build_handoff_return() {
     # Loop logs come back as data for humans and token accounting, never into the repo.
     cp -R "${dir}/.claude/loop-logs/." "${ARTIFACTS_DIR}/agent-loop-logs/" 2>/dev/null || true
     handoff_export "$dir" "$base" "$PROJECT_ROOT" "$patch" || { error "Patch handoff: export failed"; return 1; }
+    if [[ ! -s "$patch" ]]; then
+        # Nothing changed (for example a self-heal pass that needed no edit): nothing to apply.
+        warn "Patch handoff: the build produced no changes"
+        emit_event "build.patch_empty" "issue=${ISSUE_NUMBER:-0}" "base=$base"
+        rm -rf "$(dirname "$dir")"
+        return 0
+    fi
     local why
     if ! why=$(handoff_judge "$patch"); then
         printf '%s\n' "$why" > "${ARTIFACTS_DIR}/agent.patch.refused"
@@ -504,7 +512,7 @@ ${_skill_prompts}
     # Checkpoint resume: when pipeline resumed from build-stage checkpoint, pass --resume to loop.
     # Not under patch handoff: each build gets a fresh agent clone, so there is no loop state to resume.
     if [[ "${RESUME_FROM_CHECKPOINT:-false}" == "true" && "${checkpoint_stage:-}" == "build" \
-        && "${SW_PATCH_HANDOFF:-false}" != "true" ]]; then
+        && "${SW_PATCH_HANDOFF:-true}" == "false" ]]; then
         loop_args+=(--resume)
     fi
 
@@ -526,11 +534,16 @@ ${_skill_prompts}
     # only a judged patch comes back. Loop logs are read from where the loop ran.
     local _handoff_base="" _handoff_dir="" _loop_logs="${PROJECT_ROOT}/.claude/loop-logs"
     local _progress_file="${PWD}/.claude/loop-logs/progress.md"
-    if [[ "${SW_PATCH_HANDOFF:-false}" == "true" ]]; then
+    if [[ "${SW_PATCH_HANDOFF:-true}" != "false" ]]; then
         _handoff_base=$(git -C "$PROJECT_ROOT" rev-parse HEAD) || { error "Patch handoff: no base commit"; return 1; }
         _handoff_dir="$(mktemp -d "${TMPDIR:-/tmp}/sw-agent.XXXXXX")/repo"
         handoff_prepare "$PROJECT_ROOT" "$_handoff_base" "$_handoff_dir" \
             || { error "Patch handoff: could not prepare the agent clone"; return 1; }
+        mkdir -p "$ARTIFACTS_DIR"
+        handoff_carry_over "$PROJECT_ROOT" "$_handoff_base" "$_handoff_dir" "${ARTIFACTS_DIR}/pre-build.patch" \
+            || { error "Patch handoff: could not move earlier stages' edits into the agent clone"; return 1; }
+        [[ -s "${ARTIFACTS_DIR}/pre-build.patch" ]] \
+            && warn "Patch handoff: moved uncommitted edits from earlier stages into the agent clone (they are judged with the build)"
         loop_args+=(--repo "$_handoff_dir")
         _loop_logs="${_handoff_dir}/.claude/loop-logs"
         _progress_file="${_loop_logs}/progress.md"
