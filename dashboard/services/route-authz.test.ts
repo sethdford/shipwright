@@ -133,7 +133,7 @@ describe("authorizeRequest", () => {
         const res = authorizeRequest(request(r.method, r.path), ctx(role));
         expect(res?.status).toBe(403);
         expect(await res?.json()).toEqual({
-          error: "forbidden",
+          error: `Your role does not allow this action (needs "${r.permission}")`,
           code: "role_forbidden",
           required: r.permission,
         });

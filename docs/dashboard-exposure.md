@@ -103,7 +103,8 @@ is only a convenience; the server is the authorization.
   role is `admin`; an exposed multi-user dashboard should set `"default_role": "viewer"`.
 - **Deny by default**: a mutating route that is not classified in `MUTATING_ROUTES` needs `admin`,
   and `route-authz.test.ts` fails until it is classified.
-- A refusal is `403` with the body `{"error":"forbidden","code":"role_forbidden","required":"<permission>"}`.
+- A refusal is `403` with the body `{"error":"Your role does not allow this action (needs \"<permission>\")","code":"role_forbidden","required":"<permission>"}`.
+  Programs read `code` and `required`; the UI shows `error`.
 - Login, logout, and join or invite redemption carry their own credential and skip the role check.
   Fleet routes pass with the fleet token; a browser session calling them needs the route's role.
 - **Auth off** (`none`) is single-user local mode: it is only allowed on a loopback bind, every

@@ -655,14 +655,6 @@ describe("API Client", () => {
       await expect(api.fetchMe()).rejects.toThrow("Not found");
     });
 
-    it("explains a server role refusal (403 role_forbidden)", async () => {
-      mockFetch.mockReturnValueOnce(
-        errorResponse(403, { error: "forbidden", code: "role_forbidden", required: "configure" }),
-      );
-
-      await expect(api.fetchMe()).rejects.toThrow('Your role does not allow this action (needs "configure")');
-    });
-
     it("falls back to HTTP status on unparseable error", async () => {
       mockFetch.mockReturnValueOnce(
         Promise.resolve({

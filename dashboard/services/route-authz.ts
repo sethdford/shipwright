@@ -129,9 +129,13 @@ export interface AuthzContext {
   readonly sessionRole: unknown;
 }
 
-/** The stable 403 body. The client gate reads `code` and surfaces `required`. */
+/**
+ * The 403 body. `code` and `required` are stable for programs; `error` is the sentence the client
+ * already shows for any failed request (core/api.ts), so no client change is needed.
+ */
 export function forbidden(required: Permission): Response {
-  return new Response(JSON.stringify({ error: "forbidden", code: "role_forbidden", required }), {
+  const error = `Your role does not allow this action (needs "${required}")`;
+  return new Response(JSON.stringify({ error, code: "role_forbidden", required }), {
     status: 403,
     headers: { "Content-Type": "application/json", "Cache-Control": "no-store" },
   });
