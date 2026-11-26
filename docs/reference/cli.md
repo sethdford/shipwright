@@ -4,6 +4,83 @@
 
 Commands implemented in TypeScript. Commands still in bash are listed in docs/plans/port/progress.json.
 
+## `acceptance`
+
+Spec-first acceptance tests: write, prove red, lock, gate the build on them
+
+```text
+USAGE
+  shipwright acceptance materialize  --answer FILE --manifest FILE [--root DIR]
+  shipwright acceptance verify-red   --manifest FILE [--test-cmd CMD] [--command JSON] [--timeout SEC] [--root DIR] [--json]
+  shipwright acceptance lock         --manifest FILE --lock FILE [--test-cmd CMD] [--command JSON] [--root DIR]
+  shipwright acceptance verify-green --lock FILE [--integrity enforce|warn] [--timeout SEC] [--root DIR] [--json]
+
+DESCRIPTION
+  Spec-first acceptance tests (ADR-0015). Before any implementation, each issue becomes numbered
+  acceptance criteria (AC-1, AC-2, ...) and new test files that check them.
+
+  materialize   Writes the test writer's answer (fenced blocks: acceptance.json plus one per test file).
+                All or nothing: paths must be new test files inside the repository, every criterion
+                needs a test, and every test must name the criteria it claims.
+  verify-red    Runs each test file alone and requires it to fail for the right reason: an assertion
+                or the missing feature, not a syntax error, a missing framework, no tests or a pass.
+  lock          Records the commit that holds the proven-red tests and each file's blob id.
+  verify-green  The build gate: flags test tampering since the lock (edited acceptance tests, deleted
+                tests, skip/only markers, dropped assertions, narrowed test collection), restores the
+                locked tests exactly, and requires every one to pass.
+
+OPTIONS
+  --test-cmd CMD   The project's test command; a per-file command is derived from it when its shape is
+                   known (bun test, vitest, jest, pytest, go test, cargo test, npm test, ...).
+  --command JSON   A configured per-file argv, e.g. '["bun","test","{file}"]' ({file} {dir} {stem}).
+  --integrity      enforce (default): a blocking finding fails the gate. warn: report only.
+  --timeout SEC    Per test file (default 300).
+
+EXIT CODES
+  0  passed      1  failed or could not verify (fails closed)      2  usage error
+```
+
+## `bench`
+
+Head-to-head benchmark: Shipwright vs bare Claude Code and other agents, graded by hidden tests
+
+```text
+USAGE
+  shipwright bench plan     --tasks FILE --arms FILE [--trials N] [--out DIR]
+  shipwright bench run      --tasks FILE --arms FILE --out DIR --budget USD [--trials N] [--arm ID]
+  shipwright bench report   --tasks FILE --arms FILE --out DIR [--k N] [--format md|html|json]
+  shipwright bench validate --tasks FILE --out DIR
+  shipwright bench export-eval     --out DIR --arm ID
+  shipwright bench export-swebench --out DIR --arm ID [--trial N]
+  shipwright bench import-swebench --out DIR --arm ID --report FILE [--trial N]
+  shipwright bench sample-swebench --from FILE.jsonl --n N [--seed S] [--name NAME]
+  shipwright bench mine-holdout    --repo OWNER/NAME --since DATE [--max N] [--setup "CMD"]...
+
+DESCRIPTION
+  Head-to-head benchmark (ADR-0013): runs each arm (bare Claude Code, Shipwright, or any other
+  agent CLI) on the same tasks, from the same base commit, with the same model and time limit,
+  and grades every run with hidden tests. Holdout tasks are graded here; SWE-bench Verified
+  tasks are graded by the official harness (export-swebench, then import-swebench).
+
+  Results go to DIR/results.jsonl (append-only; run is resumable) and DIR/patches/. run stops
+  before any run the budget cannot cover, counting reported spend or the arm's estimate.
+  report writes report.md, report.html and report.json: resolve rate with a 95% Wilson
+  interval, pass^k, spend, $ per resolved task, and an exact sign test of each arm against
+  the baseline on per-task results. sample-swebench and mine-holdout print a task manifest.
+
+  Agents never get a GitHub token. Bare Claude Code runs under the same permission
+  policy as Shipwright's agents (config/agent-permissions.json).
+
+OPTIONS
+  --trials N   Runs per task per arm, 1 to 10 (default 1)
+  --k N        pass^k: runs that must all pass, 1 to 10 (default 1)
+  --budget USD Hard spend cap for this results directory
+  --arm ID     Only this arm
+
+EXIT CODES
+  0  done      1  failed      2  usage error      3  stopped by budget, or an unfair oracle
+```
+
 ## `breaker`
 
 Global circuit breaker: show it, or check it as a dispatch gate
@@ -271,6 +348,44 @@ EXAMPLES
   shipwright paused --gate && dispatch_next_issue
 ```
 
+## `repomodel`
+
+Query the repository world model: definitions, references, tests, owners, repo map (ADR-0016)
+
+Aliases: `code`
+
+```text
+USAGE
+  shipwright repomodel build    [--root DIR] [--json]
+  shipwright repomodel search   QUERY [--limit N] [--root DIR]
+  shipwright repomodel def      NAME            (where NAME is defined; Class.method works)
+  shipwright repomodel refs     NAME            (every use, with the enclosing definition)
+  shipwright repomodel outline  PATH
+  shipwright repomodel deps     PATH
+  shipwright repomodel tests    PATH
+  shipwright repomodel owners   PATH
+  shipwright repomodel map      [--focus FILE] [--budget CHARS]
+  shipwright repomodel localize --task FILE [--limit N]
+  shipwright repomodel brief    --task FILE [--with-tools] [--json]
+  shipwright repomodel mcp      [--root DIR]
+
+DESCRIPTION
+  A persistent, incrementally updated model of a repository (ADR-0016): definitions, imports, a reference graph,
+  a search index, a test-to-code map and ownership. It is rebuilt only for files whose content changed, and
+  every query refreshes it first, so answers include uncommitted edits. The cache lives in the state directory.
+
+  build     Refresh the model and print what changed.
+  brief     The prompt section for a task (--task FILE): likely files and definitions with their tests and
+            owners; with --with-tools, also how to use the MCP tools. Prints nothing when SHIPWRIGHT_REPO_MODEL=off.
+  mcp       A read-only MCP server on stdio (server name "repomodel") with the same queries as tools.
+
+ABLATION (for paired eval runs)
+  SHIPWRIGHT_REPO_MODEL=off leaves the brief out and the pipeline does not attach the MCP server.
+
+EXIT CODES
+  0  done      1  the repository could not be read      2  usage error
+```
+
 ## `resume`
 
 Clear the local pause flag
@@ -281,6 +396,41 @@ USAGE
 
 DESCRIPTION
   Clears the local pause flag. A shipwright:pause label on an open issue still pauses dispatch.
+```
+
+## `route`
+
+Adaptive compute router: pick template, model, effort and attempts by issue difficulty
+
+```text
+USAGE
+  shipwright route decide  (--issue-json FILE | --goal TEXT) [--issue N] [--repo OWNER/NAME]
+                           [--remaining-usd X] [--failure-class C] [--mode shadow|apply]
+                           [--template T] [--model M] [--effort E] [--attempts N] [--json]
+  shipwright route outcome --decision ID --result success|failure [--failure-class C]
+                           [--cost-usd X] [--pr N] [--json]
+  shipwright route stats   [--json]
+
+DESCRIPTION
+  Adaptive compute router (ADR-0014). Predicts how hard an issue is from its text and labels, corrects
+  that with the results of earlier routed runs, and picks the pipeline template, model, effort,
+  number of parallel attempts and run budget from the routing table (routing-v1).
+
+  decide   Prints the route and appends the decision, with every input, to the routing log. Values
+           passed with --template, --model, --effort or --attempts are kept as given. --remaining-usd
+           (money left under the daily cap) only lowers attempts and the cap; at 0 the action is
+           "defer". --failure-class budget or max_turns (a retry) moves the route up one tier.
+  outcome  Records how a routed run ended, so history and stats can use it.
+  stats    Runs, success rate and cost per success for each tier.
+
+  The bash pipeline calls decide at start and outcome at the end. SHIPWRIGHT_ROUTER=shadow (the
+  default) logs the route without using it; apply uses it; off skips the router.
+
+FILES
+  ~/.shipwright/routing/decisions.jsonl   one decision or outcome per line
+
+EXIT CODES
+  0  done      1  could not read or write the routing log      2  usage error
 ```
 
 ## `scorecard`

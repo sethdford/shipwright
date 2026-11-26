@@ -1,8 +1,10 @@
 import type { CliIO, CommandContext } from "../cli/command";
 import type { DeliveryPorts } from "../contexts/delivery";
 import type { RepoDocs } from "../contexts/governance";
+import type { LineChannel, RepoModelPorts, RoutingPorts } from "../contexts/intelligence";
 import type { SafetyPorts } from "../contexts/orchestration";
-import type { QualityPorts, VerifierPorts } from "../contexts/quality";
+import type { AcceptancePorts } from "../contexts/planning";
+import type { BenchFactory, QualityPorts, VerifierPorts } from "../contexts/quality";
 import type { FileReader } from "../shared/kernel/ports";
 
 export interface CapturedIO extends CliIO {
@@ -21,7 +23,7 @@ export function captureIO(): CapturedIO {
   };
 }
 
-/** A getter that returns `value`, or throws naming what the command was not given. */
+/** A getter that throws unless the test supplied the dependency. */
 function given<T>(value: T | undefined, what: string): () => T {
   return () => {
     if (value === undefined) throw new Error(`this command was not given ${what}`);
@@ -29,7 +31,7 @@ function given<T>(value: T | undefined, what: string): () => T {
   };
 }
 
-/** A command context. `files()` throws unless a reader is given (commands that read none need none). */
+/** A command context. Each port getter throws unless the test gave it (commands that use none need none). */
 export function commandContext(
   io: CliIO,
   safety?: SafetyPorts,
@@ -38,8 +40,13 @@ export function commandContext(
   ports: {
     readonly repoDocs?: RepoDocs;
     readonly quality?: QualityPorts;
+    readonly routing?: RoutingPorts;
+    readonly bench?: BenchFactory;
     readonly verifier?: VerifierPorts;
     readonly delivery?: DeliveryPorts;
+    readonly repoModel?: RepoModelPorts;
+    readonly stdio?: LineChannel;
+    readonly acceptance?: (root?: string) => AcceptancePorts;
   } = {},
 ): CommandContext {
   return {
@@ -50,7 +57,12 @@ export function commandContext(
     files: given(files, "a file reader"),
     repoDocs: given(ports.repoDocs, "repository documents"),
     quality: given(ports.quality, "quality ports"),
-    verifier: given(ports.verifier, "verifier ports"),
     delivery: given(ports.delivery, "delivery ports"),
+    bench: given(ports.bench, "bench ports"),
+    verifier: given(ports.verifier, "verifier ports"),
+    routing: given(ports.routing, "routing ports"),
+    repoModel: given(ports.repoModel, "repository model ports"),
+    stdio: given(ports.stdio, "a stdio channel"),
+    acceptance: (root) => given(ports.acceptance, "acceptance ports")()(root),
   };
 }

@@ -659,6 +659,12 @@ main() {
         tournament)
             run_ts tournament "$@"
             ;;
+        acceptance)
+            run_ts acceptance "$@"
+            ;;
+        repomodel|code)
+            run_ts repomodel "$@"
+            ;;
         *)
             error "Unknown command: ${cmd}"
             echo ""

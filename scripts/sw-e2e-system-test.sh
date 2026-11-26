@@ -40,6 +40,8 @@ setup_e2e_env() {
     export PATH="$TEMP_DIR/bin:$PATH"
     # Allow gh for daemon poll test
     export NO_GITHUB="${NO_GITHUB:-false}"
+    # The mock claude does not write acceptance tests (covered by sw-lib-acceptance-tests-test.sh).
+    export SW_ACCEPTANCE=off
 
     # Copy real pipeline and dependencies
     cp "$REAL_PIPELINE" "$TEMP_DIR/scripts/sw-pipeline.sh"

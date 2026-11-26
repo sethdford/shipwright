@@ -1,3 +1,7 @@
+export { type MineRequest, type MineResult, mineHoldout } from "./application/bench/mine";
+export { type BenchReport, buildBenchReport, type TaskLine } from "./application/bench/report";
+export { type RunRequest, type RunSummary, runBenchmark } from "./application/bench/run";
+export { type OracleCheck, oracleOk, validateTask } from "./application/bench/validate";
 export {
   CRITIC_CHECKS,
   CRITIC_INSTRUCTIONS,
@@ -25,6 +29,7 @@ export {
   type TrainOptions,
   trainVerifier,
 } from "./application/verifier-train";
+export * from "./domain/bench";
 export type { Calibration } from "./domain/calibration";
 export {
   type ChangeSignals,
@@ -60,7 +65,9 @@ export {
   type Scorecard,
   type ScorecardConfig,
 } from "./domain/scorecard";
+
 export { PRIOR_MODEL, predict, type VerifierModel } from "./domain/verifier-model";
+
 export {
   type Decision,
   type Evidence,
@@ -70,7 +77,15 @@ export {
   type VerifierMode,
 } from "./domain/verifier-policy";
 export type {
+  ArmOutcome,
+  ArmRunner,
+  BenchFactory,
+  BenchGrader,
+  BenchPorts,
+  BenchStore,
+  BenchWorkspaces,
   ClosedPulls,
+  HoldoutSource,
   LocalChange,
   PullFiles,
   QualityPorts,

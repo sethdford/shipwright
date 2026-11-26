@@ -142,6 +142,8 @@ fi
 [[ -f "$SCRIPT_DIR/lib/pipeline-execution.sh" ]] && source "$SCRIPT_DIR/lib/pipeline-execution.sh"
 # shellcheck source=lib/pipeline-commands.sh
 [[ -f "$SCRIPT_DIR/lib/pipeline-commands.sh" ]] && source "$SCRIPT_DIR/lib/pipeline-commands.sh"
+# shellcheck source=lib/pipeline-router.sh
+[[ -f "$SCRIPT_DIR/lib/pipeline-router.sh" ]] && source "$SCRIPT_DIR/lib/pipeline-router.sh"
 
 # ─── Defaults ───────────────────────────────────────────────────────────────
 GOAL=""
