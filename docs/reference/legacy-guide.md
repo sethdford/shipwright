@@ -652,7 +652,7 @@ Most commands are bash. The dashboard server and the commands routed through `ru
 | `scripts/sw-launchd.sh` | 703 | Process supervision (macOS + Linux) |
 | `scripts/sw-linear.sh` | 643 | Linear ↔ GitHub Bidirectional Sync |
 | `scripts/sw-logs.sh` | 356 | View and search agent pane logs |
-| `scripts/sw-loop.sh` | 2682 | Continuous agent loop harness for Claude Code |
+| `scripts/sw-loop.sh` | 2690 | Continuous agent loop harness for Claude Code |
 | `scripts/sw-memory.sh` | 2244 | Persistent Learning & Context System |
 | `scripts/sw-mission-control.sh` | 473 | Terminal-based pipeline mission control |
 | `scripts/sw-model-router.sh` | 1056 | Intelligent Model Routing & Cost Optimization |
@@ -846,7 +846,7 @@ Most commands are bash. The dashboard server and the commands routed through `ru
 | `scripts/sw-lib-pipeline-intelligence-test.sh` | 411 | Unit tests for intelligence |
 | `scripts/sw-lib-pipeline-quality-checks-test.sh` | 194 | Unit tests for quality |
 | `scripts/sw-lib-pipeline-router-test.sh` | 127 | ADR-0014 adaptive compute router |
-| `scripts/sw-lib-pipeline-stages-test.sh` | 377 | Unit tests for stage functions |
+| `scripts/sw-lib-pipeline-stages-test.sh` | 388 | Unit tests for stage functions |
 | `scripts/sw-lib-pipeline-state-test.sh` | 310 | Unit tests for pipeline state |
 | `scripts/sw-lib-pr-content-test.sh` | 130 | PR titles, bodies and artifact scrubbing |
 | `scripts/sw-lib-proof-gate-test.sh` | 76 | run-the-app proof before a PR |
@@ -861,7 +861,7 @@ Most commands are bash. The dashboard server and the commands routed through `ru
 | `scripts/sw-lib-verifier-gate-test.sh` | 102 | the merge verifier before a PR |
 | `scripts/sw-linear-test.sh` | 302 | Validate Linear ↔ GitHub bidirectional sync |
 | `scripts/sw-logs-test.sh` | 282 | Validate agent pane log viewing, searching, |
-| `scripts/sw-loop-test.sh` | 1039 | Validate continuous agent loop harness |
+| `scripts/sw-loop-test.sh` | 1041 | Validate continuous agent loop harness |
 | `scripts/sw-memory-discovery-e2e-test.sh` | 412 | Memory & Discovery E2E Test |
 | `scripts/sw-memory-effectiveness-test.sh` | 498 | Unit tests |
 | `scripts/sw-memory-test.sh` | 905 | Unit tests for memory system & cost tracking |
