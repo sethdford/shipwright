@@ -6,6 +6,8 @@ SW_AGENT_EXEC="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/agent-exec.sh"
 # shellcheck source=lib/untrusted.sh
 source "$(dirname "${BASH_SOURCE[0]}")/untrusted.sh"
 # Source from pipeline-stages.sh. Requires all pipeline globals and dependencies.
+# shellcheck source=lib/claude-usage.sh
+source "$(dirname "${BASH_SOURCE[0]}")/claude-usage.sh"
 [[ -n "${_PIPELINE_STAGES_INTAKE_LOADED:-}" ]] && return 0
 _PIPELINE_STAGES_INTAKE_LOADED=1
 
@@ -598,9 +600,9 @@ ${_skill_prompts}
     local _plan_flags
     _plan_flags="$(_pipeline_claude_flags "plan" "$plan_model")" || return 1
     # shellcheck disable=SC2086
-    "$SW_AGENT_EXEC" claude --print $_plan_flags --max-turns "$(_smart_int "max_turns.pipeline_stage" 25)" --disallowedTools=Edit,Write,NotebookEdit \
-        "$plan_prompt" < /dev/null > "$plan_file" 2>"$_token_log" || true
-    parse_claude_tokens "$_token_log"
+    claude_run_json "$plan_file" "${ARTIFACTS_DIR}/.claude-usage-plan.json" "$_token_log" \
+        --print $_plan_flags --max-turns "$(_smart_int "max_turns.pipeline_stage" 25)" --disallowedTools=Edit,Write,NotebookEdit \
+        "$plan_prompt" || true
 
     # Claude may write to disk via tools instead of stdout — rescue those files
     local _plan_rescue
@@ -805,9 +807,12 @@ Then explain your reasoning briefly."
             local validation_result
             local _val_flags
             _val_flags="$(_pipeline_claude_flags "plan" "$validation_model")" || return 1
+            # Not $(...): the call adds this run's usage to the pipeline totals, which a subshell would drop.
+            local _val_out="${ARTIFACTS_DIR}/.plan-validate-result.txt"
             # shellcheck disable=SC2086
-            validation_result=$("$SW_AGENT_EXEC" claude --print --output-format text $_val_flags -p "$validation_prompt" < /dev/null 2>"${ARTIFACTS_DIR}/.claude-tokens-plan-validate.log" || true)
-            parse_claude_tokens "${ARTIFACTS_DIR}/.claude-tokens-plan-validate.log"
+            claude_run_json "$_val_out" "${ARTIFACTS_DIR}/.claude-usage-plan-validate.json" \
+                "${ARTIFACTS_DIR}/.claude-tokens-plan-validate.log" --print $_val_flags -p "$validation_prompt" || true
+            validation_result=$(cat "$_val_out" 2>/dev/null || true)
 
             # Save validation result
             echo "$validation_result" > "$ARTIFACTS_DIR/plan-validation.md"
@@ -881,9 +886,9 @@ Fix these issues in the new plan."
                 local _regen_flags
                 _regen_flags="$(_pipeline_claude_flags "plan" "$plan_model")" || return 1
                 # shellcheck disable=SC2086
-                "$SW_AGENT_EXEC" claude --print $_regen_flags --max-turns "$(_smart_int "max_turns.pipeline_stage" 25)" \
-                    "$regen_prompt" < /dev/null > "$plan_file" 2>"$_token_log" || true
-                parse_claude_tokens "$_token_log"
+                claude_run_json "$plan_file" "${ARTIFACTS_DIR}/.claude-usage-plan-regen.json" "$_token_log" \
+                    --print $_regen_flags --max-turns "$(_smart_int "max_turns.pipeline_stage" 25)" \
+                    "$regen_prompt" || true
 
                 line_count=$(wc -l < "$plan_file" | xargs)
                 info "Regenerated plan: ${DIM}$plan_file${RESET} (${line_count} lines)"
@@ -1088,9 +1093,9 @@ ${_skill_prompts}
     local _design_flags
     _design_flags="$(_pipeline_claude_flags "design" "$design_model")" || return 1
     # shellcheck disable=SC2086
-    "$SW_AGENT_EXEC" claude --print $_design_flags --max-turns "$(_smart_int "max_turns.pipeline_stage" 25)" --disallowedTools=Edit,Write,NotebookEdit \
-        "$design_prompt" < /dev/null > "$design_file" 2>"$_token_log" || true
-    parse_claude_tokens "$_token_log"
+    claude_run_json "$design_file" "${ARTIFACTS_DIR}/.claude-usage-design.json" "$_token_log" \
+        --print $_design_flags --max-turns "$(_smart_int "max_turns.pipeline_stage" 25)" --disallowedTools=Edit,Write,NotebookEdit \
+        "$design_prompt" || true
 
     # Claude may write to disk via tools instead of stdout — rescue those files
     local _design_rescue
