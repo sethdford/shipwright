@@ -24,7 +24,8 @@ shipwright bench report --tasks ~/bench/holdout.json --arms docs/benchmark/arms.
   --out ~/bench/results --k 3
 ```
 
-Stop the daemon while a benchmark runs: Shipwright's spend is read from the cost ledger for each
+Set `SHIPWRIGHT_BENCH_BIN` to benchmark an installed Shipwright (for example `$(command -v shipwright)`)
+instead of this checkout's `scripts/sw`. Stop the daemon while a benchmark runs: Shipwright's spend is read from the cost ledger for each
 run's time window. Drop tasks that `validate` marks ✗ from the manifest before running.
 
 ## SWE-bench Verified

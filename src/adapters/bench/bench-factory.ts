@@ -13,7 +13,8 @@ import { ProcessBenchGrader } from "./process-bench-grader";
 
 /**
  * Wires the benchmark adapters. Checkouts live under `<state dir>/bench`; agents run under the
- * repo's `config/agent-permissions.json`; set CLAUDE_BIN to use a specific `claude` binary.
+ * repo's `config/agent-permissions.json`. CLAUDE_BIN picks the `claude` binary; SHIPWRIGHT_BENCH_BIN
+ * picks the Shipwright under test (default: this checkout's scripts/sw), e.g. an installed release.
  */
 export function buildBenchFactory(
   env: Readonly<Record<string, string | undefined>>,
@@ -34,7 +35,7 @@ export function buildBenchFactory(
         new LedgerSpend(new JsonCostLedger(join(paths.home, ".shipwright"))),
         {
           claudeBin: env.CLAUDE_BIN ?? "claude",
-          shipwrightBin: join(repoRoot, "scripts", "sw"),
+          shipwrightBin: env.SHIPWRIGHT_BENCH_BIN ?? join(repoRoot, "scripts", "sw"),
           policyPath: join(repoRoot, "config", "agent-permissions.json"),
           env,
           now,
