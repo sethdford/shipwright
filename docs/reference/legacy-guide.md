@@ -705,7 +705,7 @@ Most commands are bash. The dashboard server and the commands routed through `ru
 | `scripts/sw-webhook.sh` | 621 | GitHub Webhook Receiver for Instant Issue Processing |
 | `scripts/sw-widgets.sh` | 528 | Embeddable Status Widgets |
 | `scripts/sw-worktree.sh` | 421 | Git worktree management for multi-agent isolation |
-| `scripts/sw` | 674 | CLI router — dispatches subcommands via exec |
+| `scripts/sw` | 677 | CLI router — dispatches subcommands via exec |
 <!-- /AUTO:core-scripts -->
 
 ### GitHub API Modules
@@ -845,7 +845,7 @@ Most commands are bash. The dashboard server and the commands routed through `ru
 | `scripts/sw-lib-pipeline-intelligence-test.sh` | 411 | Unit tests for intelligence |
 | `scripts/sw-lib-pipeline-quality-checks-test.sh` | 194 | Unit tests for quality |
 | `scripts/sw-lib-pipeline-router-test.sh` | 127 | ADR-0014 adaptive compute router |
-| `scripts/sw-lib-pipeline-stages-test.sh` | 299 | Unit tests for stage functions |
+| `scripts/sw-lib-pipeline-stages-test.sh` | 326 | Unit tests for stage functions |
 | `scripts/sw-lib-pipeline-state-test.sh` | 310 | Unit tests for pipeline state |
 | `scripts/sw-lib-pr-content-test.sh` | 130 | PR titles, bodies and artifact scrubbing |
 | `scripts/sw-lib-repo-model-test.sh` | 106 | ADR-0016 brief and MCP attach |
