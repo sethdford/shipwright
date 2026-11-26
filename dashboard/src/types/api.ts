@@ -339,10 +339,65 @@ export type TabId =
   | "fleet-map"
   | "pipeline-theater"
   | "agent-cockpit"
-  | "shipyard";
+  | "shipyard"
+  | "quality";
 
 export interface View {
   init(): void;
   render(state: FleetState): void;
   destroy(): void;
+}
+
+// ── Quality tab (GET /api/quality; server: dashboard/services/quality.ts) ──
+
+export type QualityRow = Record<string, unknown>;
+
+export interface QualityEventGroup {
+  counts: Record<string, number>;
+  recent: QualityRow[];
+}
+
+export interface QualitySummary {
+  generatedAt: string;
+  windowDays: number;
+  scorecard: { available: boolean; savedAt: string | null; card: QualityRow | null; truncated: boolean };
+  router: {
+    decisions: number;
+    runs: number;
+    open: number;
+    byMode: { shadow: number; apply: number };
+    tiers: {
+      tier: string;
+      runs: number;
+      successes: number;
+      successRate: number | null;
+      costPerSuccessUsd: number | null;
+    }[];
+    recent: QualityRow[];
+  };
+  verifier: {
+    model: {
+      available: boolean;
+      source: string | null;
+      trainedAt: string | null;
+      evidence: QualityRow | null;
+      trusted: boolean;
+      untrustedReason: string | null;
+    };
+    gate: QualityEventGroup;
+  };
+  tournament: QualityEventGroup;
+  acceptance: QualityEventGroup;
+  governance: QualityEventGroup;
+  safety: QualityEventGroup;
+  repoModel: QualityEventGroup;
+  cost: {
+    runs: number;
+    totalUsd: number;
+    reported: number;
+    estimated: number;
+    unknownSource: number;
+    withPr: number;
+    recent: QualityRow[];
+  };
 }

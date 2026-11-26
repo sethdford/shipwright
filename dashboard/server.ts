@@ -33,6 +33,7 @@ import {
   oauthStateFromCookie,
 } from "./services/auth-flow.js";
 import { handleJoinRoutes, joinCommand, teamJoinCommand } from "./routes/join.js";
+import { handleQualityRoute } from "./routes/quality.js";
 import type { JoinTokenRecord } from "./routes/join.js";
 import {
   guardRequest,
@@ -3688,6 +3689,13 @@ async function routeRequest(
         headers: { "Content-Type": "application/json", ...CORS_HEADERS },
       });
     }
+
+    // REST: Quality tab (scorecard, router, verifier, tournaments, acceptance, governance)
+    const quality = handleQualityRoute(req, url, {
+      home: HOME,
+      stateDir: process.env.SHIPWRIGHT_STATE_DIR,
+    });
+    if (quality) return quality;
 
     // REST: Cost breakdown by stage, model, issue
     if (pathname === "/api/costs/breakdown") {

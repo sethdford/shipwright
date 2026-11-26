@@ -30,6 +30,7 @@ import { fleetMapView } from "./views/fleet-map";
 import { pipelineTheaterView } from "./views/pipeline-theater";
 import { agentCockpitView } from "./views/agent-cockpit";
 import { shipyardView } from "./views/shipyard";
+import { qualityView } from "./views/quality";
 
 // Register all views
 registerView("overview", overviewView);
@@ -45,6 +46,7 @@ registerView("fleet-map", fleetMapView);
 registerView("pipeline-theater", pipelineTheaterView);
 registerView("agent-cockpit", agentCockpitView);
 registerView("shipyard", shipyardView);
+registerView("quality", qualityView);
 
 // Setup header (user menu, daemon control, emergency brake)
 setupHeader();

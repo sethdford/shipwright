@@ -78,6 +78,27 @@ The dashboard includes a context efficiency widget that visualizes how pipeline 
 
 Data comes from `loop.context_efficiency` events emitted during build iterations. The `/api/context-efficiency` endpoint provides the raw metrics with a configurable time period (default: 7 days).
 
+### Quality
+
+The **Quality** tab shows the proof, verification and safety stack for the last 30 days, read from
+files that Shipwright already writes (no subprocesses, read-only):
+
+| Panel | Source |
+| --- | --- |
+| **Delivery scorecard**: merge rate, merged without help, 14-day reverts, median time to merge, cost per merged PR | `~/.shipwright/scorecard.json`, saved with `shipwright scorecard --format json > ~/.shipwright/scorecard.json` (it reads GitHub, so the dashboard does not run it for you) |
+| **Merge verifier**: whether the model is trusted to block, its leave-one-out AUC and Brier score against the base rate, and recent verdicts | `~/.shipwright/verifier/model.json` and `pr.verifier` events |
+| **Compute router**: decisions, shadow vs apply, success rate and cost per success by tier, recent routes | `~/.shipwright/routing/decisions.jsonl` |
+| **Tournaments**: attempts, winner, confidence and cost | `build.tournament` events |
+| **Acceptance tests**: locked, passed, failed, gate failures, not testable | `acceptance.*` events |
+| **Governance and lessons**: briefs, the lessons that went in, the ablation arms, drafted lessons | `governance.brief`, `lessons.drafted` events |
+| **Trust boundary**: refused issues, applied, empty and refused patches | `intake.untrusted_refused`, `decompose.untrusted_refused`, `build.patch_*` events |
+| **Cost per run**: total, reported vs estimated, runs linked to a PR | `pipeline.cost` events |
+| **Repository model**: briefs and MCP attachment, with the A/B arm | `repo_model.*` events |
+
+The same data is available as JSON from `GET /api/quality?days=N` (1 to 365, default 30). Router and
+verifier state is read from `SHIPWRIGHT_STATE_DIR` when it is set. See [Proof Engine](/shipwright/guides/proof/)
+and [How a Change Earns Its PR](/shipwright/guides/verification/) for what each number means.
+
 ### Predictions
 
 When the intelligence layer is enabled, the dashboard displays prediction data for active pipelines:
