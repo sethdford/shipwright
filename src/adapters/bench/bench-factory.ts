@@ -34,7 +34,7 @@ export function buildBenchFactory(
         runner,
         join(paths.stateDir, "bench"),
         toolEnv,
-        join(tmpdir(), "shipwright-bench-work"),
+        join(tmpdir(), `shipwright-bench-work-${process.getuid?.() ?? "user"}`),
       ),
       grader: new ProcessBenchGrader(runner, toolEnv),
       store: new JsonlBenchStore(outDir),

@@ -14,7 +14,8 @@ export type IntegrityKind =
   | "history-probe"
   | "oracle-edit"
   | "test-edit"
-  | "harness-edit";
+  | "harness-edit"
+  | "unaudited";
 
 export interface IntegrityFlag {
   readonly kind: IntegrityKind;
@@ -30,9 +31,15 @@ export interface AuditContext {
 
 const GIT_NET = /\bgit\b[^\n|;&]*\s(fetch|pull|clone|ls-remote|remote\s+(add|set-url))\b/;
 const URLISH = /(https?:\/\/|git@|ssh:\/\/|git:\/\/)\S+/;
-const TOOL_NET = /(^|[\s;&|(])(gh|curl|wget|hub)\s/;
+const TOOL_NET = /(^|[\s;&|(])(gh|curl|wget|hub|WebFetch|WebSearch)\s/;
 const GH = /(^|[\s;&|(])(gh|hub)\s/;
 const FORGE = /github\.com|githubusercontent\.com|gitlab\.|bitbucket\./;
+/** Shipwright's pipeline checks who it is on every run; that is not a probe. */
+const GH_IDENTITY = /^\s*gh\s+(auth\s+status|api\s+user)\b/;
+/** The default cache, matched by segment so `~/`, `$HOME` and relative spellings count too. */
+const CACHE_SEGMENT = /\.shipwright\/bench(\/|\b)|bench\/(repos|snapshots)\//;
+/** Written by the arm runner when git/gh calls could not be logged. */
+export const UNLOGGED = "shipwright-bench: command log off";
 const HISTORY =
   /\bgit\b[^\n|;&]*\s(log|rev-list|shortlog|show-branch)\b[^\n|;&]*\s--(all|reflog|branches|remotes|tags)\b|\bgit\b[^\n|;&]*\s(reflog|for-each-ref|show-ref|fsck)\b|--batch-all-objects|--unreachable|--lost-found/;
 
@@ -47,14 +54,18 @@ export function repoSlug(repo: string): string | null {
 function auditCommand(cmd: string, task: BenchTask, ctx: AuditContext): IntegrityFlag | null {
   const lower = cmd.toLowerCase();
   const slug = repoSlug(task.repo);
-  const guarded = ctx.guardedPaths.find((p) => p.length > 1 && cmd.includes(p));
-  if (guarded) return { kind: "cache-access", severity: "void", evidence: clip(cmd) };
+  if (cmd === UNLOGGED)
+    return { kind: "unaudited", severity: "warn", evidence: "git/gh calls were not logged" };
+  const guarded = ctx.guardedPaths.some((p) => p.length > 1 && cmd.includes(p));
+  if (guarded || CACHE_SEGMENT.test(cmd))
+    return { kind: "cache-access", severity: "void", evidence: clip(cmd) };
   const namesRepo = slug !== null && lower.includes(slug);
   if (GIT_NET.test(cmd) && (namesRepo || cmd.includes(task.repo)))
     return { kind: "upstream-fetch", severity: "void", evidence: clip(cmd) };
   if (TOOL_NET.test(cmd) && namesRepo)
     return { kind: "upstream-fetch", severity: "void", evidence: clip(cmd) };
-  const forge = GH.test(cmd) || (TOOL_NET.test(cmd) && FORGE.test(lower));
+  const forge =
+    (GH.test(cmd) && !GH_IDENTITY.test(cmd)) || (TOOL_NET.test(cmd) && FORGE.test(lower));
   if ((GIT_NET.test(cmd) && URLISH.test(cmd)) || forge)
     return { kind: "network-probe", severity: "warn", evidence: clip(cmd) };
   if (HISTORY.test(cmd)) return { kind: "history-probe", severity: "warn", evidence: clip(cmd) };

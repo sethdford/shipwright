@@ -19,7 +19,8 @@ const failed = (message: string): AdapterError => ({ kind: "failed", message });
  * - `repos/<repo>.git`: a full mirror, fetched once. Agents never see it.
  * - `snapshots/<repo>-<base>.git`: only `baseCommit` and its ancestors, on one branch, no tags.
  * - one throwaway clone per run under `workRoot` (outside `root`), copied, not linked, from the
- *   snapshot. Its `origin` is the snapshot, so a `git fetch` there finds nothing new.
+ *   snapshot. Its `origin` then points at the workspace itself, so `git fetch origin` works and
+ *   finds nothing new, and nothing in the workspace names the snapshot or the mirror.
  * Every workspace is checked before use: a commit that is not an ancestor of the base fails it.
  */
 export class GitBenchWorkspaces implements BenchWorkspaces {
@@ -30,7 +31,7 @@ export class GitBenchWorkspaces implements BenchWorkspaces {
     private readonly runner: ProcessRunner,
     private readonly root: string,
     private readonly env: Readonly<Record<string, string>>,
-    private readonly workRoot: string = join(root, "work"),
+    private readonly workRoot: string = `${root}-work`,
   ) {}
 
   private async git(args: readonly string[], cwd?: string) {
@@ -47,9 +48,9 @@ export class GitBenchWorkspaces implements BenchWorkspaces {
     return ok(r.stdout);
   }
 
-  /** Only the mirror: snapshots hold nothing past the base, and a workspace's origin names one. */
+  /** The whole cache: the mirror, and other tasks' snapshots (a later base can hold this gold). */
   guardedPaths(): readonly string[] {
-    return [join(this.root, "repos")];
+    return [this.root];
   }
 
   private async mirror(task: BenchTask, commit: string): Promise<Result<string, AdapterError>> {
@@ -75,6 +76,8 @@ export class GitBenchWorkspaces implements BenchWorkspaces {
       ["init", "--quiet", "--bare", tmp],
       ["--git-dir", tmp, "fetch", "--quiet", "--no-tags", mirror, `${base}:refs/heads/main`],
       ["--git-dir", tmp, "symbolic-ref", "HEAD", "refs/heads/main"],
+      // FETCH_HEAD names the mirror's path; nothing in a snapshot may lead back to it.
+      ["--git-dir", tmp, "update-ref", "-d", "FETCH_HEAD"],
     ];
     for (const args of steps) {
       const r = await this.git(args);
@@ -103,6 +106,7 @@ export class GitBenchWorkspaces implements BenchWorkspaces {
     const steps = [
       ["clone", "--quiet", "--no-hardlinks", "--no-tags", snap, dir],
       ["-C", dir, "checkout", "--quiet", "--detach", task.baseCommit],
+      ["-C", dir, "remote", "set-url", "origin", dir],
       ["-C", dir, "config", "user.name", "shipwright-bench"],
       ["-C", dir, "config", "user.email", "bench@shipwright.invalid"],
     ];
@@ -118,7 +122,7 @@ export class GitBenchWorkspaces implements BenchWorkspaces {
     if (!mirror.ok) return mirror;
     const snap = await this.snapshot(task, mirror.value);
     if (!snap.ok) return snap;
-    await mkdir(this.workRoot, { recursive: true });
+    await mkdir(this.workRoot, { recursive: true, mode: 0o700 });
     const dir = join(this.workRoot, `${task.id}-${label}-${randomBytes(4).toString("hex")}`);
     const cloned = await this.clone(task, snap.value, dir);
     if (!cloned.ok) {

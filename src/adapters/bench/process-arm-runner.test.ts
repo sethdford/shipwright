@@ -8,6 +8,7 @@ import { createTestEnv, type TestEnv } from "../../testing/test-env";
 import { BunProcessRunner } from "../process/bun-process-runner";
 import { agentEnv } from "./agent-env";
 import { parseClaudeStream } from "./claude-stream";
+import { startCommandLog } from "./command-log";
 import { ProcessArmRunner } from "./process-arm-runner";
 
 let tenv: TestEnv;
@@ -74,7 +75,7 @@ test("bare Claude Code: same model, the shared permission policy, prompt on stdi
     "/sw/config/agent-permissions.json",
   ]);
   expect(call?.cwd).toBe(w);
-  expect(call?.env?.PATH).toBe(`${w}.agent/bin:/bin`);
+  expect(call?.env?.PATH).toMatch(/\/sw-bench-log-[^:/]+:\/bin$/);
   expect(call?.stdin).toContain("<issue>\nfix the bug\n</issue>");
   expect(call?.env?.GH_TOKEN).toBeUndefined();
   expect(call?.env?.GITHUB_TOKEN).toBeUndefined();
@@ -134,23 +135,41 @@ test("parseClaudeStream reads the single-object format and streams", () => {
   });
 });
 
-test("the command log records git calls an arm makes, and is removed afterwards", async () => {
+test("the command log records git calls an arm makes", async () => {
   const runner = new BunProcessRunner();
   let t = 0;
+  const PATH = "/usr/local/bin:/opt/homebrew/bin:/usr/bin:/bin";
+  const env = { PATH, HOME: tenv.home };
   const cfg = {
     claudeBin: "claude",
     shipwrightBin: "sw",
     policyPath: "p",
-    env: { PATH: "/usr/local/bin:/opt/homebrew/bin:/usr/bin:/bin", HOME: tenv.home },
+    env,
     now: () => (t += 1000),
   };
   const arms = new ProcessArmRunner(runner, { between: async () => ok(null) }, cfg);
   mkdirSync(w, { recursive: true });
-  const a = arm({ kind: "command", argv: ["git", "--version"] });
-  const out = await arms.run(a, task, w);
+  const out = await arms.run(arm({ kind: "command", argv: ["git", "--version"] }), task, w);
   expect(out.status).toBe("ok");
   expect(out.commands).toEqual(["git --version"]);
-  expect(existsSync(`${w}.agent`)).toBe(false);
+});
+
+test("a wrapper runs the real tool by absolute path, so PATH order cannot make it loop", async () => {
+  const log = await startCommandLog("/usr/local/bin:/opt/homebrew/bin:/usr/bin:/bin");
+  expect(log.active).toBe(true);
+  const dir = log.path.split(":")[0] ?? "";
+  const runner = new BunProcessRunner();
+  // Only the wrapper dir on PATH: a wrapper that looked git up by name would find itself forever.
+  const r = await runner.run({
+    argv: [join(dir, "git"), "--version"],
+    env: { PATH: dir },
+    timeoutMs: 10_000,
+  });
+  expect(r.timedOut).toBe(false);
+  expect(r.stdout).toStartWith("git version");
+  expect(await log.read()).toEqual(["git --version"]);
+  await log.remove();
+  expect(existsSync(dir)).toBe(false);
 });
 
 test("agentEnv drops GitHub tokens and adds the arm's variables", () => {

@@ -1,5 +1,5 @@
 import { expect, test } from "bun:test";
-import { auditCommands, auditPatch, isVoid, repoSlug, topFlags } from "./integrity";
+import { auditCommands, auditPatch, isVoid, repoSlug, topFlags, UNLOGGED } from "./integrity";
 import type { BenchTask } from "./task";
 
 const task = {
@@ -34,6 +34,22 @@ test("touching the harness mirror or fetching the task's own repo voids the run"
   ]);
 });
 
+test("the cache counts however it is spelled, and web tools count as fetches", () => {
+  expect(
+    kinds(["git --git-dir ~/.shipwright/bench/repos/x.git log", "ls $HOME/.shipwright/bench"]),
+  ).toEqual(["void:cache-access", "void:cache-access"]);
+  expect(kinds(["cat ../../bench/snapshots/x.git/packed-refs"])).toEqual(["void:cache-access"]);
+  expect(kinds(["WebFetch https://github.com/acme/widget/pull/9"])).toEqual([
+    "void:upstream-fetch",
+  ]);
+  expect(kinds(["WebSearch github.com widget add fix"])).toEqual(["warn:network-probe"]);
+});
+
+test("Shipwright's own identity check is not a probe, and an unlogged run is a warning", () => {
+  expect(kinds(["gh api user --jq .login", "gh auth status"])).toEqual([]);
+  expect(kinds([UNLOGGED])).toEqual(["warn:unaudited"]);
+});
+
 test("history probing and other network use are warnings", () => {
   expect(
     kinds([
@@ -42,10 +58,9 @@ test("history probing and other network use are warnings", () => {
       "git cat-file --batch-all-objects --batch-check",
     ]),
   ).toEqual(["warn:history-probe", "warn:history-probe", "warn:history-probe"]);
-  expect(kinds(["git clone https://github.com/other/lib /tmp/lib", "gh api user"])).toEqual([
-    "warn:network-probe",
-    "warn:network-probe",
-  ]);
+  expect(
+    kinds(["git clone https://github.com/other/lib /tmp/lib", "gh api repos/other/lib"]),
+  ).toEqual(["warn:network-probe", "warn:network-probe"]);
 });
 
 test("ordinary work raises nothing", () => {

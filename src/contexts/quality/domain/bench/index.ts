@@ -20,6 +20,7 @@ export {
   isVoid,
   repoSlug,
   topFlags,
+  UNLOGGED,
 } from "./integrity";
 export type { Parsed } from "./parsed";
 export {

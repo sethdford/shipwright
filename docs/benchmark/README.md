@@ -79,12 +79,16 @@ Here, each run gets a fresh clone that holds only the base commit and its ancest
 commits, no branches, tags or pull refs, no reflog, and no objects beyond the base. It is copied
 from a per-base snapshot, never linked to the full-history mirror, and every workspace is checked
 before use (any commit that is not an ancestor of the base, or the gold commit, fails it). The
-mirror cache stays under `~/.shipwright/bench`; checkouts live in the system temp dir.
+mirror cache stays under `~/.shipwright/bench`; checkouts live in the system temp dir. A
+workspace's `origin` points at the workspace itself, so `git fetch origin` works, finds nothing
+new, and names no cache path.
 
 Every run is then audited, and the flags land in `results.jsonl`:
 
-- **Voided** (counted as unresolved): reading the harness's mirror (`cache-access`), or fetching
-  the task's own upstream repo with git, `gh`, `curl` or `wget` (`upstream-fetch`).
+- **Voided** (counted as unresolved): touching the harness cache, meaning the mirror or another
+  task's snapshot, whose later base can hold this task's gold fix (`cache-access`), or fetching
+  the task's own upstream repo with git, `gh`, `curl`, `wget` or Claude's web tools
+  (`upstream-fetch`).
 - **Warnings** (the result stands; read them before publishing): probing history
   (`git log --all`, `reflog`, `for-each-ref`, `cat-file --batch-all-objects`), other forge or
   network calls, edits to the hidden oracle's files (reset before grading anyway), changes to
@@ -92,7 +96,7 @@ Every run is then audited, and the flags land in `results.jsonl`:
 
 Sources: the `claude-code` arm's full transcript (`--output-format stream-json`, saved as
 `patches/<arm>/<task>.t<n>.trajectory.jsonl`), and for every arm, `git` and `gh` wrappers put first
-on its PATH that log each call. Shipwright's own agents are covered by the wrappers. An agent that
+on its PATH that log each call to a separate temp dir and then run the real tool by absolute path. Shipwright's own agents are covered by the wrappers. An agent that
 calls git by absolute path inside Claude Code's sandbox (which cannot write the log) is seen only
 in its transcript. The report's Flagged/Voided column counts both.
 

@@ -25,7 +25,14 @@ const text = (v: unknown) => (typeof v === "string" ? v : "");
 
 function describe(name: string, input: Record<string, unknown>): string {
   if (name === "Bash") return text(input.command);
-  const where = [input.file_path, input.path, input.notebook_path, input.pattern]
+  const where = [
+    input.file_path,
+    input.path,
+    input.notebook_path,
+    input.pattern,
+    input.url,
+    input.query,
+  ]
     .map(text)
     .filter((s) => s !== "");
   return `${name} ${where.join(" ") || JSON.stringify(input).slice(0, 300)}`;

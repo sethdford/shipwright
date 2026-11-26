@@ -116,6 +116,7 @@ const DIG = `cd "$1"
     while read -r o t; do echo "$o $t"; [ "$t" = tree ] || git cat-file -p "$o"; done
   git fetch --quiet origin '+refs/*:refs/dig/*' 2>&1; git log --all --format='%H %s'
   git fsck --lost-found 2>&1
+  git remote -v; cat .git/config; ls .git
 } > dig.txt 2>&1
 exit 0
 `;
@@ -131,6 +132,7 @@ test("a workspace holds no future commit, tag, branch or pull ref", async () => 
   expect(patch).not.toContain(GOLD_MARK);
   expect(patch).not.toContain("$1 + $2");
   expect(patch).not.toContain("later work");
+  expect(patch).not.toContain(join(env.root, "bench/"));
   const rows = await p.store.rows();
   const flags = rows.ok ? (rows.value[0]?.flags ?? []) : [];
   expect(flags.some((f) => f.startsWith("warn:history-probe: git log --all"))).toBe(true);

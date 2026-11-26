@@ -8,6 +8,7 @@ import {
   benchPrompt,
   expandArgv,
   type SpendSource,
+  UNLOGGED,
 } from "../../contexts/quality";
 import type { ProcessResult, ProcessRunner } from "../../shared/kernel/ports";
 import { agentEnv } from "./agent-env";
@@ -32,6 +33,9 @@ function statusOf(r: ProcessResult): ArmOutcome["status"] {
 
 type Env = Record<string, string>;
 
+/** A marker the audit turns into a warning when git/gh calls could not be logged. */
+const unlogged = (active: boolean) => (active ? [] : [UNLOGGED]);
+
 const tail = (r: ProcessResult) => (r.stderr.trim() || r.stdout.trim()).slice(-300);
 
 /**
@@ -50,10 +54,10 @@ export class ProcessArmRunner implements ArmRunner {
     const start = this.cfg.now();
     const own: Env = arm.kind === "shipwright" ? { PIPELINE_ATTEMPTS: String(arm.attempts) } : {};
     const env = agentEnv(this.cfg.env, { ...own, ...arm.env });
-    const log = await startCommandLog(`${dir}.agent`, env.PATH ?? "");
+    const log = await startCommandLog(env.PATH ?? "");
     try {
       const out = await this.dispatch(arm, task, dir, start, { ...env, PATH: log.path });
-      const commands = [...(out.commands ?? []), ...(await log.read())];
+      const commands = [...(out.commands ?? []), ...(await log.read()), ...unlogged(log.active)];
       return { ...out, commands, durationMs: this.cfg.now() - start };
     } catch (e) {
       const note = e instanceof Error ? e.message : String(e);
