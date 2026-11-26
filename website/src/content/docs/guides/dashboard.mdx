@@ -121,3 +121,23 @@ SW_DASHBOARD_HOST=0.0.0.0 shipwright dashboard     # Same, via environment varia
 ```
 
 Binding to `0.0.0.0` exposes the dashboard on every network interface. Only do this on a network you trust, and see [Fleet](/shipwright/guides/fleet/) for how workers join a shared dashboard.
+
+An exposed dashboard needs **GitHub OAuth** and a fleet token (`SHIPWRIGHT_FLEET_TOKEN` or `SHIPWRIGHT_FLEET_TOKEN_FILE`). It refuses to start with `auth=none`, and it refuses PAT sign-in, because PAT sign-in trusts a typed GitHub username. PAT sign-in still works on loopback. Full rules: [docs/dashboard-exposure.md](https://github.com/sethdford/shipwright/blob/main/docs/dashboard-exposure.md).
+
+## Roles and access
+
+Every state-changing request is checked on the server against the signed-in user's role before any handler runs. Hiding a button in the UI is only a convenience.
+
+| Role | Can |
+| --- | --- |
+| `viewer` (default) | See everything |
+| `operator` | Also intervene in runs (abort, pause, resume, skip, message, claim), approve or reject gates, and start, stop, pause or resume the daemon |
+| `admin` | Also configure machines, notifications and gates, and manage users, join tokens and invites |
+
+How a user gets a role, in order:
+
+1. An entry in `~/.shipwright/rbac.json` under `users`.
+2. A GitHub admin of `DASHBOARD_REPO` is an `admin`, so a fresh install is never locked out of user management.
+3. Everyone else gets `default_role` from `rbac.json`, which is `viewer` when the file is missing or invalid.
+
+An unknown role string, or a session with no role, is treated as `viewer`. A refused request returns `403` with `{"code":"role_forbidden","required":"<permission>"}` and a readable `error`, which the UI shows. Auth-off mode is single-user, is allowed only on loopback, and has no role check.

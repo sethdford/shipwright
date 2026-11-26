@@ -1,0 +1,157 @@
+---
+title: How a Change Earns Its PR
+description: Spec-first acceptance tests, tournament builds and the merge verifier, the three independent checks a pipeline change passes before a pull request exists.
+---
+
+import { Aside, Steps } from "@astrojs/starlight/components";
+
+Most pipeline PRs that never merged failed in the same few ways: the change did not do what the
+issue asked, the tests passed because they did not test the issue, or the PR carried run output and
+model chatter instead of a change. Three checks now stand between a build and a pull request. Each
+one is independent of the build agent's own opinion of its work.
+
+```
+issue ─► acceptance tests ─► build (1 loop, or a tournament) ─► test ─► review ─► merge verifier ─► PR
+         proven red, locked   cross-tests, rubric, blind judge   locked tests     hard stops +
+                                                                 restored first   calibrated model
+```
+
+## 1. Spec-first acceptance tests
+
+**On by default** (`SW_ACCEPTANCE=enforce`). Design: [ADR-0015](https://github.com/sethdford/shipwright/blob/main/docs/adr/0015-spec-first-acceptance-tests.md).
+
+Before any implementation, the issue becomes numbered acceptance criteria (AC-1, AC-2, …) and new
+test files that check them. The tests must fail first, for the right reason, and they are locked
+where the build agent cannot reach them.
+
+<Steps>
+
+1. **Write.** A test writer answers in text only: an `acceptance.json` with the criteria plus one
+   fenced block per test file. If it edits or commits anything with its tools, those changes are
+   undone and the answer is rejected.
+
+2. **Materialize** (`shipwright acceptance materialize`). All or nothing. Only new files, only
+   test-shaped paths inside the repository (never `.git`, `.github` or `.claude`). Every criterion
+   needs a test, and every test must name the criteria it covers.
+
+3. **Prove red** (`verify-red`). Each file runs alone, with no credentials. It must fail on an
+   **assertion** or on the **missing feature** (missing module, export or symbol). These are
+   rejected, with the reason fed back to the writer: already passing, no tests, a timeout, a syntax
+   error in the test, a missing framework, and any failure it cannot explain. Unknown output fails
+   closed.
+
+4. **Lock** (`lock`). The tests are committed alone, with the criteria ids in the message. The lock
+   records that commit and each file's blob id, and lives in the state directory, outside the
+   build agent's writable tree.
+
+5. **Gate** (`verify-green`, at the start of the test stage). First an integrity check of the diff
+   since the lock, including untracked files. These **block**: an edited or deleted acceptance test,
+   a deleted test, added `skip`/`only`/`todo`/`xfail` markers, fewer assertion lines in an existing
+   test, and narrowed test collection in a test config. Then each locked file is restored byte for
+   byte from the lock commit and must pass. The tests that run are always the originals.
+
+</Steps>
+
+The build prompt lists the locked tests and their criteria, and says that edits are reverted and
+fail the build. When the gate fails, its output goes to `test-results.log`, so the self-healing
+retry hands it to the builder.
+
+| Setting | Values |
+| --- | --- |
+| `SW_ACCEPTANCE`, `acceptance.mode`, `--acceptance` | `enforce` (default): no proven-red tests after 3 tries stops the run. `warn`: report only. `off`: skip (the ablation arm). `--tdd` means `enforce`. |
+| `acceptance.attempts` | Writer attempts (default 3) |
+| `SW_ACCEPTANCE_COMMAND`, `acceptance.command` | A JSON argv that runs one file, e.g. `["bun","test","{file}"]`. Otherwise derived from the project's test command (bun, vitest, jest, pytest, go, cargo, npm and others). Never a shell string. |
+
+A change with no observable behaviour can be answered `not_testable` with a reason; the run records
+it and continues.
+
+<Aside type="note">
+`enforce` costs one more agent call per run, and an issue the writer cannot test stops the run
+instead of producing an unverified PR. Use `warn` while the eval ratchet measures the default on
+your repository.
+</Aside>
+
+## 2. Tournament builds
+
+**Opt in** with `PIPELINE_ATTEMPTS=2` to `5` (or `defaults.attempts` in the pipeline config). A test
+command must be known. Run it directly with `shipwright tournament`.
+
+Instead of one build loop, the pipeline runs N independent attempts and keeps the best one. On 2026
+results, parallel attempts with comparative verification are the largest proven quality gain for
+coding agents, but only with a good selector. The selector is the point of this design.
+
+| Step | What happens |
+| --- | --- |
+| **Attempts** | Each attempt runs in its own git worktree under the state directory, with a different opening strategy: smallest fix, test first, follow local patterns, edge cases first, check callers. Byte-identical patches merge into one candidate, and the agreement counts as votes. |
+| **Gate** | A candidate needs a non-empty patch that passes the repository's test command. |
+| **Cross-tests** | Every attempt's new tests run against every other attempt's patch. A suite counts as evidence only when its own author's patch passes it. |
+| **Rubric** | While the attempts build, a judge drafts 3 to 10 weighted, binary, repository-specific criteria from the task. Shipwright adds two fixed integrity criteria: no weakened tests, and no CI or test-config changes. Failing an integrity criterion scores the candidate 0. |
+| **Merge verifier** | When available, the verifier's probability joins the composite score at a quarter weight. |
+| **Blind judge** | When finalists score within 0.15 of each other, one judge call compares them under shuffled letters. It must first challenge what every finalist assumes, and it may answer "none". |
+| **Result** | The winner is fast-forwarded onto the pipeline branch; nothing is pushed. Every worktree is removed. `tournament.json` records each candidate's scores, the margin and a confidence level (low when the judge overruled the scores). |
+
+```bash
+# In the pipeline
+PIPELINE_ATTEMPTS=3 shipwright pipeline start --issue 42
+
+# Directly, without touching the branch
+shipwright tournament --goal-file goal.md --test-cmd "bun test" \
+  --setup-cmd "bun install" --attempts 3 --budget-usd 15 --no-adopt --format markdown
+```
+
+**Budget.** `--budget-usd` (default $15, or `PIPELINE_TOURNAMENT_BUDGET_USD`) is split up front:
+80% shared by the attempts, 20% for the rubric, grading and judge. Every agent call carries its own
+cap, so the total cannot exceed the budget. Exit 3 means no attempt was good enough, and the build
+fails with `tournament_no_winner`.
+
+**Safety.** Builders get a subset of the agent permission policy, and task text, rubrics and
+patches only travel as data. Test and setup commands are operator configuration and run without
+GitHub tokens in the environment.
+
+## 3. Merge verifier
+
+**Advisory by default** (`SHIPWRIGHT_VERIFIER=advisory`). Design: [ADR-0012](https://github.com/sethdford/shipwright/blob/main/docs/adr/0012-learned-merge-verifier.md).
+
+`shipwright verify` predicts whether a change will **merge and stay merged** (not reverted within
+14 days). The pipeline asks it in the PR stage, before `gh pr create`, and adds a one-line note to
+the PR body.
+
+**Features.** Diff size and spread, run output in the diff, plan-only changes, CI or test-config
+edits, tests added or weakened, model chatter in the title or summary, a conventional title, and a
+factory offset, plus the run's own signals when measured: test result, cross-test pass rate and
+rubric score. An optional critic (`--critic`, an LLM judge on the final diff, default budget $0.50)
+adds its stated chance as one more feature, trusted at a third of its confidence.
+
+**Model.** Logistic regression. It starts from hand-set prior weights (from the 2026-11-26
+diagnosis of why pipeline PRs closed). `shipwright verify train` fits it to the repository's closed
+PRs around that prior, so a dozen PRs barely move it and hundreds dominate it, and measures it
+leave-one-out (Brier, log loss, AUC, calibration error) against the base rate and the prior.
+
+**Gate.**
+
+| Mode | Hard stops (no real change, failing tests, run output in the diff) | Predicted chance under 20% |
+| --- | --- | --- |
+| `off` | not checked | not checked |
+| `advisory` (default) | reported | reported |
+| `enforce` | **block** | **blocks only when the model is trusted on factory PRs**: 20+ labelled, 5 of each outcome, leave-one-out AUC ≥ 0.7, and a Brier score below the base rate. Otherwise it warns. |
+
+A verifier that cannot run never blocks: it is a quality signal, not a safety gate.
+
+```bash
+shipwright verify score --base origin/main --title "fix: …" --tests pass --format json
+shipwright verify train --days 365          # read-only through gh; saves ~/.shipwright/verifier/model.json
+shipwright verify show
+```
+
+<Aside type="note" title="Measured, and honest about it">
+On this repository's 68 closed PRs, the trained model scores a leave-one-out Brier of 0.110 against
+a base-rate 0.215 (AUC 0.85). On the factory's own 12 PRs, with only 2 merges, it is not yet
+better than the base rate, so it is **not trusted to block on probability** and says so. The hard
+stops are what pay off today: they flag 9 of the 10 factory PRs that never merged.
+</Aside>
+
+## See also
+
+- [Proof Engine](/shipwright/guides/proof/): measure whether these checks move the merge rate
+- [Delivery Pipeline](/shipwright/guides/pipeline/)
+- [Trust Boundary](/shipwright/guides/trust-boundary/)
