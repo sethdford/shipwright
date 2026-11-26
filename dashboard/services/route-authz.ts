@@ -115,6 +115,28 @@ export function normalizeRole(value: unknown): Role | null {
   return value === "viewer" || value === "operator" || value === "admin" ? value : null;
 }
 
+export interface RbacConfig {
+  readonly default_role?: unknown;
+  readonly users?: Readonly<Record<string, unknown>>;
+}
+
+/**
+ * A user's role at sign-in. An explicit `users` entry in rbac.json wins. Otherwise a GitHub repo
+ * admin is a dashboard admin, so a fresh install is never locked out of user management. Everyone
+ * else gets `default_role`, which is `viewer` when rbac.json is missing, unreadable or invalid.
+ */
+export function resolveRole(
+  config: RbacConfig | null,
+  username: string,
+  repoPermission: string | null,
+): Role {
+  const users = config?.users;
+  const explicit = users && Object.hasOwn(users, username) ? normalizeRole(users[username]) : null;
+  if (explicit) return explicit;
+  if (repoPermission === "admin") return "admin";
+  return normalizeRole(config?.default_role) ?? "viewer";
+}
+
 export function roleHasPermission(role: Role | null, permission: Permission): boolean {
   if (role === null) return false;
   return ROLE_PERMISSIONS[role].has(permission);

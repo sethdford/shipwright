@@ -48,7 +48,7 @@ import {
   withCors,
   wsOriginAllowed,
 } from "./services/request-guard.js";
-import { authorizeRequest, normalizeRole } from "./services/route-authz.js";
+import { authorizeRequest, normalizeRole, resolveRole } from "./services/route-authz.js";
 import { Database } from "bun:sqlite";
 
 // ─── Config ──────────────────────────────────────────────────────────
@@ -876,15 +876,16 @@ interface RBACConfig {
   users: Record<string, "viewer" | "operator" | "admin">;
 }
 
-function loadRBACConfig(): RBACConfig {
+// Missing, unreadable or invalid rbac.json means no config: roles fall back to viewer
+// (resolveRole in services/route-authz.ts).
+function loadRBACConfig(): RBACConfig | null {
   try {
     if (existsSync(RBAC_CONFIG_FILE)) {
-      return JSON.parse(
-        readFileOr(RBAC_CONFIG_FILE, '{"default_role":"admin","users":{}}'),
-      );
+      const parsed = JSON.parse(readFileOr(RBAC_CONFIG_FILE, "null"));
+      if (parsed && typeof parsed === "object") return parsed as RBACConfig;
     }
   } catch {}
-  return { default_role: "admin", users: {} };
+  return null;
 }
 
 function saveRBACConfig(config: RBACConfig): void {
@@ -898,9 +899,11 @@ function saveRBACConfig(config: RBACConfig): void {
 }
 
 // rbac.json is operator-edited: an unknown role string resolves to viewer, never to admin.
-function resolveUserRole(username: string): "viewer" | "operator" | "admin" {
-  const config = loadRBACConfig();
-  return normalizeRole(config.users?.[username] ?? config.default_role) ?? "viewer";
+function resolveUserRole(
+  username: string,
+  repoPermission: string | null,
+): "viewer" | "operator" | "admin" {
+  return resolveRole(loadRBACConfig(), username, repoPermission);
 }
 
 // Role permissions and the per-route check live in services/route-authz.ts (#8720).
@@ -2500,7 +2503,7 @@ async function handleAuthCallback(url: URL, req: Request): Promise<Response> {
     accessToken,
     avatarUrl: user.avatar_url,
     isAdmin,
-    role: resolveUserRole(user.login),
+    role: resolveUserRole(user.login, permission),
   });
 
   return new Response(null, {
@@ -2592,7 +2595,7 @@ async function handlePatLogin(req: Request): Promise<Response> {
     accessToken: "", // PAT mode doesn't give per-user tokens
     avatarUrl,
     isAdmin,
-    role: resolveUserRole(username),
+    role: resolveUserRole(username, permission),
   });
 
   return new Response(null, {
@@ -2625,7 +2628,7 @@ const GUARD = loadGuardConfig(
   HOST,
   PORT,
 );
-const guardProblem = startupProblem(GUARD, isAuthEnabled());
+const guardProblem = startupProblem(GUARD, isAuthEnabled(), getAuthMode());
 if (guardProblem) {
   console.error(`✗ dashboard: ${guardProblem}`);
   process.exit(1);
@@ -4989,7 +4992,7 @@ async function routeRequest(
     // ─── RBAC Management ──────────────────────────────────────────
     // GET /api/rbac — Get RBAC configuration
     if (pathname === "/api/rbac" && req.method === "GET") {
-      return new Response(JSON.stringify(loadRBACConfig()), {
+      return new Response(JSON.stringify(loadRBACConfig() ?? { default_role: "viewer", users: {} }), {
         headers: { "Content-Type": "application/json", ...CORS_HEADERS },
       });
     }
@@ -4998,7 +5001,7 @@ async function routeRequest(
     if (pathname === "/api/rbac" && req.method === "POST") {
       try {
         const body = (await req.json()) as Partial<RBACConfig>;
-        const current = loadRBACConfig();
+        const current: RBACConfig = loadRBACConfig() ?? { default_role: "viewer", users: {} };
         if (body.default_role) current.default_role = body.default_role;
         if (body.users) current.users = { ...current.users, ...body.users };
         saveRBACConfig(current);

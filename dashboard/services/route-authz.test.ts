@@ -9,6 +9,7 @@ import {
   MUTATING_ROUTES,
   normalizeRole,
   PUBLIC_MUTATIONS,
+  resolveRole,
   ROLE_PERMISSIONS,
   UNCLASSIFIED_PERMISSION,
 } from "./route-authz";
@@ -206,5 +207,30 @@ describe("normalizeRole", () => {
     expect(normalizeRole("operator")).toBe("operator");
     expect(normalizeRole("admin")).toBe("admin");
     for (const v of ["Admin", "", undefined, null, 1, {}]) expect(normalizeRole(v)).toBeNull();
+  });
+});
+
+describe("resolveRole (sign-in)", () => {
+  it("defaults to viewer with no rbac.json", () => {
+    expect(resolveRole(null, "alice", "write")).toBe("viewer");
+    expect(resolveRole(null, "alice", null)).toBe("viewer");
+  });
+
+  it("a GitHub repo admin is a dashboard admin, so a fresh install is not locked out", () => {
+    expect(resolveRole(null, "owner", "admin")).toBe("admin");
+  });
+
+  it("an explicit users entry wins, in both directions", () => {
+    const cfg = { default_role: "operator", users: { owner: "viewer", bob: "admin" } };
+    expect(resolveRole(cfg, "owner", "admin")).toBe("viewer");
+    expect(resolveRole(cfg, "bob", "write")).toBe("admin");
+    expect(resolveRole(cfg, "carol", "write")).toBe("operator");
+  });
+
+  it("invalid values fall back to viewer, never admin", () => {
+    expect(resolveRole({ default_role: "root" }, "x", "write")).toBe("viewer");
+    expect(resolveRole({ users: { x: "superuser" } }, "x", "write")).toBe("viewer");
+    expect(resolveRole({ users: {} }, "__proto__", "write")).toBe("viewer");
+    expect(resolveRole({ users: {} }, "constructor", "write")).toBe("viewer");
   });
 });
