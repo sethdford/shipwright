@@ -16,10 +16,12 @@ export { isTestPath, renderMatrix, type TestMatrix } from "./domain/cross-tests"
 export { INTEGRITY_CRITERIA, type Rubric, renderRubric } from "./domain/rubric";
 export { SELECTION_RULE, type Selection } from "./domain/selection";
 export type {
+  CandidateVerifier,
   CommandOutcome,
   CommandRunner,
   DeliveryPorts,
   Snapshot,
+  VerifierInput,
   Workspace,
   Workspaces,
 } from "./ports";

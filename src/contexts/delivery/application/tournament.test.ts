@@ -129,3 +129,41 @@ test("a repository that cannot be read is an error before any agent runs", async
   expect(!r.ok && r.error.kind).toBe("not_found");
   expect(fake.tasks).toHaveLength(0);
 });
+
+test("a wired merge verifier is one more signal: it can move a close race and sees each patch", async () => {
+  // Two different patches that both pass everything: without a verifier they tie.
+  const script: FakeScript = {
+    patches: {
+      a1: { patch: "NOISY", files: ["src/parse.ts", ".claude/loop-state.md"] },
+      a2: { patch: "CLEAN", files: ["src/parse.ts", "src/parse.test.ts"] },
+    },
+    tests: () => true,
+    grades: { NOISY: ALL, CLEAN: ALL },
+    judge: () => "none",
+  };
+  const seen: string[] = [];
+  const ports = {
+    ...new FakeDelivery(script).ports(),
+    verifier: {
+      score: async (input: { patch: string; ownTestsPass: boolean }) => {
+        seen.push(input.patch);
+        return input.patch === "CLEAN" ? 0.9 : 0.1;
+      },
+    },
+  };
+  const r = await runTournament(ports, { ...REQ, attempts: 2 });
+  if (!r.ok) throw new Error(r.error.message);
+  const byId = Object.fromEntries(r.value.candidates.map((c) => [c.id, c]));
+  expect(byId.a2?.verifier).toBe(0.9);
+  expect(byId.a1?.verifier).toBe(0.1);
+  expect(byId.a2?.composite).toBeGreaterThan(byId.a1?.composite ?? 1);
+  expect(seen.sort()).toEqual(["CLEAN", "NOISY"]);
+});
+
+test("a verifier that cannot score leaves the candidates as they were", async () => {
+  const ports = { ...new FakeDelivery(SCRIPT).ports(), verifier: { score: async () => null } };
+  const r = await runTournament(ports, REQ);
+  if (!r.ok) throw new Error(r.error.message);
+  expect(r.value.candidates.every((c) => c.verifier === undefined)).toBe(true);
+  expect(r.value.selection).toMatchObject({ winner: "a1", confidence: "high" });
+});

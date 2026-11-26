@@ -93,7 +93,40 @@ async function scoreContenders(
     const cross = matrix ? crossPassRate(matrix, i) : null;
     return scoreOf(c, groups[i]?.members ?? [c.id], cross, grade);
   });
-  return { cs, matrix, scored };
+  return { cs, matrix, scored: await withVerifier(ports, req, cs, scored) };
+}
+
+/**
+ * Adds the merge verifier's chance to every eligible candidate when a verifier is wired; the
+ * composite is recomputed with it. A verifier that cannot score leaves the candidate as it was.
+ */
+async function withVerifier(
+  ports: DeliveryPorts,
+  req: TournamentRequest,
+  cs: readonly Contender[],
+  scored: readonly ScoredCandidate[],
+): Promise<ScoredCandidate[]> {
+  const v = ports.verifier;
+  if (!v) return [...scored];
+  const chances = await Promise.all(
+    scored.map((s, i) =>
+      s.ownTestsPass
+        ? v.score({
+            goal: req.goal,
+            patch: cs[i]?.snapshot.patch ?? "",
+            ownTestsPass: s.ownTestsPass,
+            cross: s.cross,
+            rubric: s.rubric,
+          })
+        : Promise.resolve(null),
+    ),
+  );
+  return scored.map((s, i) => {
+    const verifier = chances[i] ?? null;
+    if (verifier === null) return s;
+    const next = { ...s, verifier };
+    return { ...next, composite: compositeScore(next) };
+  });
 }
 
 async function choose(

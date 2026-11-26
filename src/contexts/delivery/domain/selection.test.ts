@@ -23,6 +23,10 @@ test("the composite score averages the signals it has", () => {
   expect(compositeScore(cand("a", { cross: 1, rubric: 0.5 }))).toBe(0.75);
   expect(compositeScore(cand("a", { rubric: 0.4 }))).toBe(0.4);
   expect(compositeScore(cand("a"))).toBe(0.5);
+  // The verifier counts at half the weight of each execution signal.
+  expect(compositeScore(cand("a", { cross: 1, rubric: 1, verifier: 0 }))).toBeCloseTo(0.8);
+  expect(compositeScore(cand("a", { verifier: 0.3 }))).toBeCloseTo(0.3);
+  expect(compositeScore(cand("a", { rubric: 0.4, verifier: null }))).toBe(0.4);
 });
 
 test("candidates that failed the gate are never ranked", () => {
