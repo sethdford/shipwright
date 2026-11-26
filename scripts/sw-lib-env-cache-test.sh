@@ -53,8 +53,11 @@ assert_eq "restores only, never builds" \
     "$SW_TS_CLI env hydrate --root /repo --dir /tmp/box --restore-only" "$(cat "$BUN_LOG")"
 
 print_test_section "env-exec.sh"
-out="$(cd "$TEST_TEMP_DIR" && GH_TOKEN=secret SW_ENV_NO_JAIL=1 bash "$SCRIPT_DIR/lib/env-exec.sh" printenv GH_TOKEN SHIPWRIGHT_IN_TEST_GATE || true)"
-assert_eq "strips credentials and marks the test gate" "1" "$out"
+# One name per printenv: BSD printenv (macOS) takes a single argument.
+out="$(cd "$TEST_TEMP_DIR" && GH_TOKEN=secret SW_ENV_NO_JAIL=1 bash "$SCRIPT_DIR/lib/env-exec.sh" printenv GH_TOKEN || true)"
+assert_eq "strips credentials" "" "$out"
+out="$(cd "$TEST_TEMP_DIR" && SW_ENV_NO_JAIL=1 bash "$SCRIPT_DIR/lib/env-exec.sh" printenv SHIPWRIGHT_IN_TEST_GATE || true)"
+assert_eq "and marks the test gate" "1" "$out"
 rc=0; bash "$SCRIPT_DIR/lib/env-exec.sh" 2>/dev/null || rc=$?
 assert_eq "no command is a usage error" "2" "$rc"
 rc=0; SW_ENV_NO_JAIL=1 bash "$SCRIPT_DIR/lib/env-exec.sh" false || rc=$?
@@ -78,7 +81,7 @@ source "$TEST_TEMP_DIR/prepare.sh"
 assert_eq "the operator's own checkout is never touched" "" "$(cat "$BUN_LOG")"
 (cd "$TEST_TEMP_DIR" && SW_ENV_HYDRATE_ROOT=/repo SW_ENV_HYDRATE_REF=main pipeline_prepare_env)
 assert_eq "a daemon worktree is hydrated from the base branch's recipe" \
-    "$SW_TS_CLI env hydrate --root /repo --dir $TEST_TEMP_DIR --ref main" "$(cat "$BUN_LOG")"
+    "$SW_TS_CLI env hydrate --root /repo --dir $(cd "$TEST_TEMP_DIR" && pwd) --ref main" "$(cat "$BUN_LOG")"
 : > "$BUN_LOG"
 (cd "$TEST_TEMP_DIR" && unset SW_ENV_HYDRATE_ROOT && AUTO_WORKTREE=true ORIGINAL_REPO_DIR=/orig pipeline_prepare_env)
 assert_contains "a --worktree run hydrates from the original checkout" "$(cat "$BUN_LOG")" "--root /orig"
