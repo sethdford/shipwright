@@ -30,6 +30,7 @@ done
 case " $* " in
     *" brief "*) printf "%s\n" "{\"brief\":\"## Repository model\\n- src/a.ts\",\"files\":[\"src/a.ts\",\"src/b.ts\"],\"stats\":{\"extracted\":2},\"arm\":\"on\"}" ;;
     *" build "*) echo "built" ;;
+    *" impact "*) printf "%s\n" "{\"text\":\"## Change impact (repository model)\\n- src/a.ts\",\"files\":[{}],\"untested\":[\"src/a.ts\"],\"orphaned\":[],\"arm\":\"on\"}" ;;
 esac'
 
 # The shipwright CLI lives outside the repository the agent works in, as it does for any target repository.
@@ -74,6 +75,22 @@ assert_eq "a failing command gives no brief" "" "$(BUN_EXIT=1 repo_model_brief_s
 assert_contains "and says why" "$(cat "$EVENTS_LOG")" "repo_model.brief_unavailable"
 assert_eq "no Bun gives no brief" "" "$(SW_BUN=/nonexistent/bun repo_model_brief_section x)"
 
+print_test_section "impact"
+reset_logs
+printf 'diff --git a/src/a.ts b/src/a.ts\n' > "$TEST_TEMP_DIR/change.diff"
+impact="$(repo_model_impact_section "$TEST_TEMP_DIR/change.diff")"
+assert_contains "the section is the command's .text" "$impact" "## Change impact (repository model)"
+assert_contains "the command gets the root and the diff" "$(tr '\n' ' ' < "$BUN_LOG")" \
+    "repomodel impact --root ${repo_abs} --diff ${TEST_TEMP_DIR}/change.diff --json"
+assert_contains "an event records the arm and counts" "$(cat "$EVENTS_LOG")" "repo_model.impact arm=on files=1 untested=1 orphaned=0"
+reset_logs
+assert_eq "off: no section" "" "$(SHIPWRIGHT_REPO_MODEL=off repo_model_impact_section "$TEST_TEMP_DIR/change.diff")"
+assert_eq "off: the command does not run" "" "$(cat "$BUN_LOG")"
+assert_eq "an empty diff gives nothing" "" "$(repo_model_impact_section /nonexistent)"
+reset_logs
+assert_eq "a failing command gives nothing" "" "$(BUN_EXIT=1 repo_model_impact_section "$TEST_TEMP_DIR/change.diff")"
+assert_contains "and says why" "$(cat "$EVENTS_LOG")" "repo_model.impact_unavailable"
+
 print_test_section "MCP server"
 reset_logs
 flags="$(repo_model_mcp_flags)"
@@ -101,6 +118,8 @@ print_test_section "wiring"
 assert_contains "the loop sources the library" "$(cat "$SCRIPT_DIR/sw-loop.sh")" 'source "$SCRIPT_DIR/lib/repo-model.sh"'
 assert_contains "build iterations get the MCP flags" "$(cat "$SCRIPT_DIR/lib/loop-iteration.sh")" 'repo_model_mcp_flags'
 assert_contains "pipeline stages get the MCP flags" "$(cat "$SCRIPT_DIR/lib/pipeline-stages-build.sh")" 'repo_model_mcp_flags'
+assert_contains "the review stage gets the impact section" "$(cat "$SCRIPT_DIR/lib/pipeline-stages-review.sh")" 'repo_model_impact_section "$diff_file"'
+assert_contains "the merge critic gets it too" "$(cat "$SCRIPT_DIR/lib/verifier-gate.sh")" '--impact-file'
 assert_contains "the policy allows the server's tools" "$(cat "$SCRIPT_DIR/../config/agent-permissions.json")" '"mcp__repomodel"'
 
 print_test_results

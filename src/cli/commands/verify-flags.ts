@@ -6,6 +6,7 @@ export interface ScoreFlags {
   base: string;
   title: string;
   bodyFile: string | null;
+  impactFile: string | null;
   tests: boolean | null;
   cross: number | null;
   rubric: number | null;
@@ -43,6 +44,7 @@ const SCORE: Record<string, (v: string) => Patch<ScoreFlags>> = {
   "--base": (v) => ({ base: v }),
   "--title": (v) => ({ title: v }),
   "--body-file": (v) => ({ bodyFile: v }),
+  "--impact-file": (v) => ({ impactFile: v }),
   "--tests": (v) =>
     v === "pass"
       ? { tests: true }
@@ -108,6 +110,7 @@ export function parseScoreFlags(
       base: "origin/main",
       title: "",
       bodyFile: null,
+      impactFile: null,
       tests: null,
       cross: null,
       rubric: null,

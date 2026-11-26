@@ -13,7 +13,11 @@ const FILES = {
 function run(args: string[], env: Record<string, string> = {}, stdio?: LineChannel) {
   const io = captureIO();
   const { ports } = fakeRepoPorts(FILES);
-  const files = new FakeFileReader({ "/task.md": "the daily budget is ignored" });
+  const files = new FakeFileReader({
+    "/task.md": "the daily budget is ignored",
+    "/change.diff":
+      "diff --git a/src/budget.ts b/src/budget.ts\n--- a/src/budget.ts\n+++ b/src/budget.ts\n@@ -1,2 +1,2 @@\n export function evaluateBudget(spent: number) {\n+  return spent;\n",
+  });
   const ctx = commandContext(io, undefined, { PWD: "/repo", ...env }, files, {
     repoModel: ports,
     stdio,
@@ -29,6 +33,18 @@ describe("shipwright repomodel", () => {
     expect((await run(["def", "evaluateBudget"])).out).toContain("src/budget.ts:1");
     expect((await run(["tests", "src/budget.ts"])).out).toBe("src/budget.test.ts (imports)");
     expect((await run(["localize", "--task", "/task.md"])).out).toContain("src/budget.ts");
+  });
+
+  test("impact: the section for a diff; nothing on the off arm; --diff is required", async () => {
+    const on = await run(["impact", "--diff", "/change.diff"]);
+    expect(on.out).toContain("edits public: evaluateBudget");
+    expect(on.out).toContain("tests: src/budget.test.ts");
+    const json = JSON.parse((await run(["impact", "--diff", "/change.diff", "--json"])).out);
+    expect(json.untested).toEqual(["src/budget.ts"]);
+    expect(json.arm).toBe("on");
+    const off = await run(["impact", "--diff", "/change.diff"], { SHIPWRIGHT_REPO_MODEL: "off" });
+    expect(off.out).toBe("");
+    expect((await run(["impact"])).code).toBe(2);
   });
 
   test("brief: JSON with the files it named; nothing on the off arm", async () => {

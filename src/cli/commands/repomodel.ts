@@ -1,4 +1,5 @@
 import {
+  analyzeChange,
   buildBrief,
   callTool,
   handleMcpLine,
@@ -22,6 +23,7 @@ const usage = `USAGE
   shipwright repomodel map      [--focus FILE] [--budget CHARS]
   shipwright repomodel localize --task FILE [--limit N]
   shipwright repomodel brief    --task FILE [--with-tools] [--json]
+  shipwright repomodel impact   --diff FILE [--json]
   shipwright repomodel mcp      [--root DIR]
 
 DESCRIPTION
@@ -32,10 +34,13 @@ DESCRIPTION
   build     Refresh the model and print what changed.
   brief     The prompt section for a task (--task FILE): likely files and definitions with their tests and
             owners; with --with-tools, also how to use the MCP tools. Prints nothing when SHIPWRIGHT_REPO_MODEL=off.
+  impact    For a unified diff (--diff FILE, as git diff prints it): the definitions it edits, the files outside
+            the change that import or use them, linked tests it does or does not change, and deleted files that
+            are still imported. The review stage and the merge critic read it. Prints nothing when off.
   mcp       A read-only MCP server on stdio (server name "repomodel") with the same queries as tools.
 
 ABLATION (for paired eval runs)
-  SHIPWRIGHT_REPO_MODEL=off leaves the brief out and the pipeline does not attach the MCP server.
+  SHIPWRIGHT_REPO_MODEL=off leaves the brief and the impact section out, and the pipeline does not attach the MCP server.
 
 EXIT CODES
   0  done      1  the repository could not be read      2  usage error`;
@@ -50,7 +55,7 @@ const TOOL_OF: Readonly<Record<string, { tool: string; arg: string }>> = {
   owners: { tool: "owners", arg: "path" },
 };
 
-const SUBCOMMANDS = [...Object.keys(TOOL_OF), "build", "map", "localize", "brief", "mcp"];
+const SUBCOMMANDS = [...Object.keys(TOOL_OF), "build", "map", "localize", "brief", "impact", "mcp"];
 
 async function build(ctx: CommandContext, a: ModelArgs): Promise<number> {
   const r = await refreshModel(ctx.repoModel(), rootOf(ctx, a));
@@ -109,6 +114,22 @@ async function brief(ctx: CommandContext, a: ModelArgs): Promise<number> {
   return 0;
 }
 
+async function impact(ctx: CommandContext, a: ModelArgs): Promise<number> {
+  const json = a.switches.has("--json");
+  if (envOff(ctx.env.SHIPWRIGHT_REPO_MODEL)) {
+    if (json) ctx.io.out(JSON.stringify({ text: "", arm: "off" }));
+    return 0;
+  }
+  const file = a.values["--diff"] ?? "";
+  const patch = await ctx.files().readText(file);
+  if (!patch.ok) return adapterFailure(ctx.io, `read ${file}`, patch.error);
+  const r = await analyzeChange(new RepoSession(ctx.repoModel(), rootOf(ctx, a)), patch.value);
+  if (!r.ok) return adapterFailure(ctx.io, "repository model", r.error);
+  if (json) ctx.io.out(JSON.stringify({ text: r.value.text, ...r.value.impact, arm: "on" }));
+  else if (r.value.text.length > 0) ctx.io.out(r.value.text);
+  return 0;
+}
+
 async function serve(ctx: CommandContext, a: ModelArgs): Promise<number> {
   const session = new RepoSession(ctx.repoModel(), rootOf(ctx, a));
   const channel = ctx.stdio();
@@ -130,6 +151,7 @@ async function dispatch(ctx: CommandContext, sub: string, a: ModelArgs): Promise
   }
   if (sub === "build") return build(ctx, a);
   if (sub === "brief") return brief(ctx, a);
+  if (sub === "impact") return impact(ctx, a);
   if (sub === "mcp") return serve(ctx, a);
   const task = await readTask(ctx, a);
   if (typeof task === "number") return task;

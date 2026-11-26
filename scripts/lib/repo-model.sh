@@ -71,6 +71,25 @@ repo_model_brief_section() {
     return 0
 }
 
+# repo_model_impact_section <diff-file> — the change-impact section for a unified diff (who imports or uses the
+# definitions it edits, linked tests it does not change, deleted files still imported), or nothing.
+repo_model_impact_section() {
+    local diff_file="${1:-}" root out
+    repo_model_enabled || { _repo_model_event "repo_model.impact" "arm=off"; return 0; }
+    [[ -s "$diff_file" ]] || return 0
+    root="$(_repo_model_root)" || return 0
+    if out="$(_repo_model_cli impact --root "$root" --diff "$diff_file" --json 2>/dev/null)"; then
+        _repo_model_event "repo_model.impact" "arm=on" \
+            "files=$(printf '%s' "$out" | jq -r '.files | length' 2>/dev/null || echo 0)" \
+            "untested=$(printf '%s' "$out" | jq -r '.untested | length' 2>/dev/null || echo 0)" \
+            "orphaned=$(printf '%s' "$out" | jq -r '.orphaned | length' 2>/dev/null || echo 0)"
+        printf '%s' "$out" | jq -r '.text // ""' 2>/dev/null || true
+    else
+        _repo_model_event "repo_model.impact_unavailable" "arm=on" "reason=command_failed"
+    fi
+    return 0
+}
+
 # _repo_model_server_cli — the absolute path of the CLI the MCP server would run, or exit 1 when no server can be
 # attached: the model is off, Bun is missing, or the CLI lives inside the agent's working tree. An MCP server runs
 # outside the agent's sandbox, so code the agent can edit must never be started that way (when shipwright works on

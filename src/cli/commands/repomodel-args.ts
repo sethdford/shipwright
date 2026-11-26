@@ -13,12 +13,14 @@ const VALUES: Readonly<Record<string, readonly string[]>> = {
   map: ["--root", "--focus", "--budget"],
   localize: ["--root", "--task", "--limit"],
   brief: ["--root", "--task"],
+  impact: ["--root", "--diff"],
   mcp: ["--root"],
 };
 
 const SWITCHES: Readonly<Record<string, readonly string[]>> = {
   build: ["--json"],
   brief: ["--json", "--with-tools"],
+  impact: ["--json"],
 };
 
 function positiveInt(v: string): boolean {
@@ -65,6 +67,7 @@ export function parseModelArgs(
   if (sub === "brief" && flags.values["--task"] === undefined) return "brief needs --task FILE";
   if (sub === "localize" && flags.values["--task"] === undefined)
     return "localize needs --task FILE";
+  if (sub === "impact" && flags.values["--diff"] === undefined) return "impact needs --diff FILE";
   return { positional, ...flags };
 }
 

@@ -381,6 +381,7 @@ USAGE
   shipwright repomodel map      [--focus FILE] [--budget CHARS]
   shipwright repomodel localize --task FILE [--limit N]
   shipwright repomodel brief    --task FILE [--with-tools] [--json]
+  shipwright repomodel impact   --diff FILE [--json]
   shipwright repomodel mcp      [--root DIR]
 
 DESCRIPTION
@@ -391,10 +392,13 @@ DESCRIPTION
   build     Refresh the model and print what changed.
   brief     The prompt section for a task (--task FILE): likely files and definitions with their tests and
             owners; with --with-tools, also how to use the MCP tools. Prints nothing when SHIPWRIGHT_REPO_MODEL=off.
+  impact    For a unified diff (--diff FILE, as git diff prints it): the definitions it edits, the files outside
+            the change that import or use them, linked tests it does or does not change, and deleted files that
+            are still imported. The review stage and the merge critic read it. Prints nothing when off.
   mcp       A read-only MCP server on stdio (server name "repomodel") with the same queries as tools.
 
 ABLATION (for paired eval runs)
-  SHIPWRIGHT_REPO_MODEL=off leaves the brief out and the pipeline does not attach the MCP server.
+  SHIPWRIGHT_REPO_MODEL=off leaves the brief and the impact section out, and the pipeline does not attach the MCP server.
 
 EXIT CODES
   0  done      1  the repository could not be read      2  usage error
@@ -484,7 +488,8 @@ Merge verifier: predict whether a change will merge, and gate PRs on it
 USAGE
   shipwright verify score [--base REF] [--title T] [--body-file F] [--tests pass|fail|unknown]
                           [--cross R] [--rubric R] [--critic] [--critic-model M]
-                          [--critic-budget USD] [--mode off|advisory|enforce] [--format text|json]
+                          [--critic-budget USD] [--impact-file F] [--mode off|advisory|enforce]
+                          [--format text|json]
   shipwright verify train [--days N] [--agent N,...] [--exclude N,...] [--human-weight W]
                           [--dry-run] [--format text|json]
   shipwright verify show
@@ -500,7 +505,8 @@ DESCRIPTION
          --rubric pass the run's own signals (test result, tournament cross-test pass rate, rubric
          score, each 0 to 1). --critic adds a prompted reviewer (LLM-as-judge) whose stated chance
          is one more feature, trusted at a third of its stated confidence until training says
-         otherwise; it spends up to --critic-budget (default 0.50 USD).
+         otherwise; it spends up to --critic-budget (default 0.50 USD). --impact-file gives the
+         critic the repository model's change-impact section (`repomodel impact`).
   train  Learns the weights from this repository's closed PRs (read-only, through gh): labels
          them, fits a logistic model around the hand-set prior, and measures it leave-one-out
          (Brier, AUC, calibration error) against the prior. Factory PRs weigh 1; human PRs weigh

@@ -2,6 +2,8 @@
 # verifier-gate.sh — the merge verifier before a PR opens (ADR-0012).
 # The decision lives in TypeScript (`shipwright verify score`); this file only calls it.
 # SHIPWRIGHT_VERIFIER: off | advisory (default) | enforce.
+# SHIPWRIGHT_VERIFIER_CRITIC=on adds the prompted critic (model spend), given the repository model's
+#   change-impact section (ADR-0016) when repo-model.sh is loaded and the model is on.
 #   advisory  never blocks; the verdict is logged, emitted and noted in the PR body.
 #   enforce   blocks when the CLI exits 3: a hard stop (no real change, failing tests, run output
 #             in the diff) or, once the model is trusted, a predicted merge chance below 20%.
@@ -53,13 +55,41 @@ verifier_gate() {
         _verifier_emit "pr.verifier_unavailable" "issue=${ISSUE_NUMBER:-0}" "reason=no_bun_or_base"
         return 0
     fi
-    local body_file out rc=0
+    local body_file impact_file="" out rc=0
     body_file="$(mktemp "${TMPDIR:-/tmp}/sw-verifier-body.XXXXXX")"
     printf '%s' "$body" > "$body_file"
-    out="$("$bun_bin" "$VERIFIER_TS_CLI" verify score --base "$base" --title "$title" \
-        --body-file "$body_file" --tests "$tests" --mode "$mode" --format json 2>/dev/null)" || rc=$?
+    local args=(verify score --base "$base" --title "$title" --body-file "$body_file" \
+        --tests "$tests" --mode "$mode" --format json)
+    if _verifier_critic_on; then
+        args+=(--critic)
+        impact_file="$(_verifier_impact_file "$base")"
+        [[ -n "$impact_file" ]] && args+=(--impact-file "$impact_file")
+    fi
+    out="$("$bun_bin" "$VERIFIER_TS_CLI" "${args[@]}" 2>/dev/null)" || rc=$?
     rm -f "$body_file"
+    [[ -n "$impact_file" ]] && rm -f "$impact_file"
     _verifier_result "$rc" "$out"
+}
+
+_verifier_critic_on() {
+    case "$(printf '%s' "${SHIPWRIGHT_VERIFIER_CRITIC:-off}" | tr '[:upper:]' '[:lower:]')" in
+        on | 1 | true | yes) return 0 ;;
+    esac
+    return 1
+}
+
+# _verifier_impact_file <base> — a temp file holding the change-impact section for base...HEAD, or nothing.
+_verifier_impact_file() {
+    local base="$1" diff_file impact_file text
+    [[ "$(type -t repo_model_impact_section 2>/dev/null)" == "function" ]] || return 0
+    diff_file="$(mktemp "${TMPDIR:-/tmp}/sw-verifier-diff.XXXXXX")" || return 0
+    git diff "${base}...HEAD" -- > "$diff_file" 2>/dev/null || true
+    text="$(repo_model_impact_section "$diff_file")"
+    rm -f "$diff_file"
+    [[ -n "$text" ]] || return 0
+    impact_file="$(mktemp "${TMPDIR:-/tmp}/sw-verifier-impact.XXXXXX")" || return 0
+    printf '%s\n' "$text" > "$impact_file"
+    printf '%s\n' "$impact_file"
 }
 
 # _verifier_result <rc> <json> — turns the CLI's answer into the gate's return and PR note.

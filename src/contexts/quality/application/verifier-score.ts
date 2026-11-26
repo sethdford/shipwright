@@ -32,7 +32,12 @@ export interface ScoreRequest {
   /** Signals the run measured (tests, cross-tests, rubric); the critic's is filled in here. */
   readonly signals: Omit<ChangeSignals, "criticProbability">;
   /** Run the prompted critic with this model and budget; null skips it (no model spend). */
-  readonly critic: { readonly model: string; readonly budgetUsd: number } | null;
+  readonly critic: {
+    readonly model: string;
+    readonly budgetUsd: number;
+    /** The repository model's change-impact section, given to the critic as more data. */
+    readonly impact?: string;
+  } | null;
 }
 
 export interface ScoreReport {
