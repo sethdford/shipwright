@@ -33,10 +33,11 @@ token. Never run `auth=none` behind a proxy.
 | --- | --- | --- | --- | --- |
 | loopback | loopback hosts only, or unset | any | any | starts |
 | loopback | names a non-loopback host | `none` | any | exits 1: `refusing to serve … behind a proxy … with auth=none` |
-| loopback | names a non-loopback host | PAT or OAuth | unset | exits 1: `… without SHIPWRIGHT_FLEET_TOKEN` |
+| loopback | names a non-loopback host | OAuth | unset | exits 1: `… without SHIPWRIGHT_FLEET_TOKEN` |
 | other | any | `none` | any | exits 1: `refusing to serve … with auth=none` |
-| other | any | PAT or OAuth | unset | exits 1: `… without SHIPWRIGHT_FLEET_TOKEN` |
-| other, or proxied loopback | any | PAT or OAuth | set | starts |
+| other | any | OAuth | unset | exits 1: `… without SHIPWRIGHT_FLEET_TOKEN` |
+| other, or proxied loopback | any | PAT | any | exits 1: `… with PAT sign-in` |
+| other, or proxied loopback | any | OAuth | set | starts |
 | any | any | any | `SHIPWRIGHT_FLEET_TOKEN_FILE` unreadable or empty | exits 1 |
 
 The startup banner says whether a fleet token is configured and lists the allowed origins; it
@@ -85,6 +86,33 @@ Checks run in this order, before any route:
 - **Safari and `Secure`**: Safari (WebKit) may not store a `Secure` cookie set over plain
   `http://localhost`, unlike Chrome and Firefox, which treat localhost as a secure context. With
   `Secure` on, sign in through the `https://` origin, not `http://localhost:<port>`.
+
+## Roles
+
+Every mutating request (any method but `GET`, `HEAD` or `OPTIONS`) passes one server-side role
+check before any handler runs (`dashboard/services/route-authz.ts`, #8720). The UI's button gating
+is only a convenience; the server is the authorization.
+
+| Role | Can |
+| --- | --- |
+| `viewer` | read |
+| `operator` | read; intervene (abort, pause, resume, skip, message, claim); approve or reject gates; start, stop, pause and resume the daemon |
+| `admin` | everything, including configuration (machines, notifications, gate config) and users (RBAC, join tokens, invites) |
+
+- Roles are set at sign-in: an explicit entry in `~/.shipwright/rbac.json` `users` wins; otherwise
+  a GitHub admin of `DASHBOARD_REPO` is `admin` (so a fresh install is never locked out of user
+  management); everyone else gets `default_role`. With no, or an invalid, `rbac.json` that is
+  `viewer`. An unknown role string, or a session with no role, is treated as `viewer`.
+- **PAT sign-in is local-only.** It trusts a typed GitHub username, so an exposed dashboard refuses
+  to start with it (`… with PAT sign-in`); use OAuth.
+- **Deny by default**: a mutating route that is not classified in `MUTATING_ROUTES` needs `admin`,
+  and `route-authz.test.ts` fails until it is classified.
+- A refusal is `403` with the body `{"error":"Your role does not allow this action (needs \"<permission>\")","code":"role_forbidden","required":"<permission>"}`.
+  Programs read `code` and `required`; the UI shows `error`.
+- Login, logout, and join or invite redemption carry their own credential and skip the role check.
+  Fleet routes pass with the fleet token; a browser session calling them needs the route's role.
+- **Auth off** (`none`) is single-user local mode: it is only allowed on a loopback bind, every
+  caller is the local operator, and no role check applies.
 
 ## Workers
 

@@ -1,6 +1,7 @@
 import type { RepoDocs } from "../contexts/governance";
 import type { RoutingPorts } from "../contexts/intelligence";
 import type { SafetyPorts } from "../contexts/orchestration";
+import type { QualityPorts } from "../contexts/quality";
 import type { FileReader } from "../shared/kernel/ports";
 
 export interface CliIO {
@@ -17,6 +18,8 @@ export interface CommandContext {
   readonly safety: () => SafetyPorts;
   /** File reads for commands; built by main.ts from the adapter (commands never touch node:fs). */
   readonly files: () => FileReader;
+  /** Read-only delivery data for the scorecard, built on first call. */
+  readonly quality: () => QualityPorts;
   /** Governance documents and lessons from git (ADR-0010), built by main.ts. */
   readonly repoDocs: () => RepoDocs;
   /** The routing log and clock for `shipwright route` (ADR-0014), built by main.ts. */

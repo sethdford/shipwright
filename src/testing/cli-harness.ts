@@ -2,6 +2,7 @@ import type { CliIO, CommandContext } from "../cli/command";
 import type { RepoDocs } from "../contexts/governance";
 import type { RoutingPorts } from "../contexts/intelligence";
 import type { SafetyPorts } from "../contexts/orchestration";
+import type { QualityPorts } from "../contexts/quality";
 import type { FileReader } from "../shared/kernel/ports";
 
 export interface CapturedIO extends CliIO {
@@ -26,8 +27,11 @@ export function commandContext(
   safety?: SafetyPorts,
   env: Readonly<Record<string, string | undefined>> = {},
   files?: FileReader,
-  repoDocs?: RepoDocs,
-  routing?: RoutingPorts,
+  ports: {
+    readonly repoDocs?: RepoDocs;
+    readonly quality?: QualityPorts;
+    readonly routing?: RoutingPorts;
+  } = {},
 ): CommandContext {
   return {
     io,
@@ -42,12 +46,16 @@ export function commandContext(
       return files;
     },
     repoDocs: () => {
-      if (!repoDocs) throw new Error("this command was not given repository documents");
-      return repoDocs;
+      if (!ports.repoDocs) throw new Error("this command was not given repository documents");
+      return ports.repoDocs;
+    },
+    quality: () => {
+      if (!ports.quality) throw new Error("this command was not given quality ports");
+      return ports.quality;
     },
     routing: () => {
-      if (!routing) throw new Error("this command was not given routing ports");
-      return routing;
+      if (!ports.routing) throw new Error("this command was not given routing ports");
+      return ports.routing;
     },
   };
 }

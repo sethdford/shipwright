@@ -16,7 +16,7 @@ function setup(env: Record<string, string> = {}, files: Record<string, string> =
   };
   const routing: RoutingPorts = { log, now: () => Date.UTC(2026, 10, 26) };
   const io = captureIO();
-  const ctx = commandContext(io, undefined, env, new FakeFileReader(files), undefined, routing);
+  const ctx = commandContext(io, undefined, env, new FakeFileReader(files), { routing });
   return { io, ctx, records };
 }
 
