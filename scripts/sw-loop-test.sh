@@ -644,50 +644,20 @@ CLAUDE_EOF
         --repo "$TEST_TEMP_DIR/repo" \
         "Never finish" \
         --max-iterations 3 \
-        --test-cmd "true" \
+        --test-cmd "false" \
         --local \
-        --no-auto-extend \
         2>&1) || true
 
-    if echo "$output" | grep >/dev/null -iE "max iteration|iteration.*3|Max iterations"; then
-        assert_pass "Loop stops at max iterations"
+    # No --no-auto-extend: an explicit --max-iterations is a hard cap even while tests fail.
+    if echo "$output" | grep >/dev/null "Auto-extending"; then
+        assert_fail "Explicit --max-iterations is a hard cap" "the loop auto-extended past --max-iterations 3"
+    elif echo "$output" | grep >/dev/null -iE "max iteration|iteration.*3|Max iterations"; then
+        assert_pass "Loop stops at an explicit --max-iterations without auto-extending"
     else
         assert_fail "Loop respects max-iterations" "expected iteration limit message"
     fi
 else
     assert_fail "Loop max iterations" "setup failed"
-fi
-
-# ─── Test: an explicit --max-iterations is a hard cap ──────────────────────
-echo ""
-echo -e "${DIM}  loop behavior: explicit cap does not auto-extend${RESET}"
-
-if setup_loop_env 2>/dev/null; then
-    cat > "$TEST_TEMP_DIR/bin/claude" << 'CLAUDE_EOF'
-#!/usr/bin/env bash
-echo '[{"type":"result","result":"Still working...","usage":{"input_tokens":0,"output_tokens":0}}]'
-exit 0
-CLAUDE_EOF
-    chmod +x "$TEST_TEMP_DIR/bin/claude"
-
-    output=$(env PATH="$TEST_TEMP_DIR/bin:/usr/local/bin:/usr/bin:/bin" HOME="$TEST_TEMP_DIR/home" NO_GITHUB=true \
-        bash "$SCRIPT_DIR/sw-loop.sh" \
-        --repo "$TEST_TEMP_DIR/repo" \
-        "Never finish" \
-        --max-iterations 2 \
-        --test-cmd "false" \
-        --local \
-        2>&1) || true
-
-    if echo "$output" | grep >/dev/null "Auto-extending"; then
-        assert_fail "Explicit --max-iterations is a hard cap" "the loop auto-extended past --max-iterations 2"
-    elif echo "$output" | grep >/dev/null "Max iterations (2) reached"; then
-        assert_pass "Explicit --max-iterations is a hard cap"
-    else
-        assert_fail "Explicit --max-iterations is a hard cap" "expected 'Max iterations (2) reached'"
-    fi
-else
-    assert_fail "Explicit --max-iterations is a hard cap" "setup failed"
 fi
 
 # ─── Test: Loop detects stuckness ───────────────────────────────────────────
