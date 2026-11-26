@@ -1,10 +1,25 @@
 import { expect, test } from "bun:test";
-import { realpathSync } from "node:fs";
+import { readFileSync, realpathSync } from "node:fs";
 import { createTestEnv } from "../../testing/test-env";
 import { BunProcessRunner } from "./bun-process-runner";
 
 const runner = new BunProcessRunner();
 const fast = new BunProcessRunner({ killGraceMs: 300, drainMs: 300 });
+
+/** True while `pid` runs. A zombie counts as dead: where PID 1 never reaps orphans (some containers), a killed
+ *  process stays a zombie, `kill(pid, 0)` still succeeds, and the check would report a kill that worked as a failure. */
+function isRunning(pid: number): boolean {
+  try {
+    process.kill(pid, 0);
+  } catch {
+    return false;
+  }
+  try {
+    return readFileSync(`/proc/${pid}/stat`, "utf8").split(") ")[1]?.[0] !== "Z";
+  } catch {
+    return true; // no /proc (macOS): kill(pid, 0) succeeded, so it runs
+  }
+}
 
 async function timed<T>(p: Promise<T>): Promise<{ value: T; ms: number }> {
   const t = Date.now();
@@ -167,7 +182,7 @@ test("reapGroup kills a background job left behind by a leader that exited norma
     expect(r.exitCode).toBe(0);
     const pid = Number(await Bun.file(pidFile).text());
     await new Promise((resolve) => setTimeout(resolve, 100));
-    expect(() => process.kill(pid, 0)).toThrow();
+    expect(isRunning(pid)).toBe(false);
   } finally {
     try {
       process.kill(Number(await Bun.file(pidFile).text()), "SIGKILL");

@@ -230,7 +230,15 @@ cost_check_budget() {
     budget_enabled="${budget_enabled:-$(jq -r '.enabled' "$BUDGET_FILE" 2>/dev/null || echo "false")}"
     budget_usd="${budget_usd:-$(jq -r '.daily_budget_usd' "$BUDGET_FILE" 2>/dev/null || echo "0")}"
 
-    if [[ "$budget_enabled" != "true" || "$budget_usd" == "0" ]]; then
+    [[ "$budget_enabled" == "true" ]] || return 0
+    # A budget we cannot read blocks (fail closed), as the TypeScript gate does.
+    if [[ ! "$budget_usd" =~ ^[0-9]+\.?[0-9]*$ ]]; then
+        error "Budget is enabled but daily_budget_usd is not a number (${budget_usd}); fix it with: shipwright cost budget set <usd>"
+        return 2
+    fi
+    # Numeric test, not `== "0"`: SQLite returns a REAL column as "0.0", so `budget set 0` (unlimited)
+    # read back from the DB was enforced as a $0 cap and blocked every run.
+    if awk -v b="$budget_usd" 'BEGIN { exit !(b + 0 == 0) }'; then
         return 0
     fi
 

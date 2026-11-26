@@ -402,8 +402,9 @@ Task: ${goal}" --model "$(_smart_model classification haiku)" < /dev/null 2>/dev
         *refactor*|*clean*|*reorganize*|*extract*) echo "refactor" ;;
         *test*|*coverage*|*spec*)                  echo "testing" ;;
         *security*|*audit*|*vuln*|*cve*)           echo "security" ;;
+        *docker*)                                  echo "devops" ;;  # before *doc*, which would match it
         *doc*|*readme*|*guide*)                    echo "docs" ;;
-        *deploy*|*ci*|*pipeline*|*docker*|*infra*) echo "devops" ;;
+        *deploy*|*ci*|*pipeline*|*infra*)          echo "devops" ;;
         *migrate*|*migration*|*schema*)            echo "migration" ;;
         *architect*|*design*|*rfc*|*adr*)          echo "architecture" ;;
         *)                                          echo "feature" ;;

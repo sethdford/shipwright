@@ -241,6 +241,7 @@ assert_eq "Testing keyword" "testing" "$(detect_task_type "Add test coverage for
 assert_eq "Security keyword" "security" "$(detect_task_type "Security audit for API")"
 assert_eq "Docs keyword" "docs" "$(detect_task_type "Update the README guide")"
 assert_eq "DevOps keyword" "devops" "$(detect_task_type "Setup CI pipeline")"
+assert_eq "Docker is devops, not docs" "devops" "$(detect_task_type "Add a Docker image")"
 assert_eq "Migration keyword" "migration" "$(detect_task_type "Database migration for users")"
 assert_eq "Architecture keyword" "architecture" "$(detect_task_type "Design new architecture RFC")"
 assert_eq "Feature default" "feature" "$(detect_task_type "Add user profile page")"
