@@ -130,7 +130,7 @@ rootcause_analyze_error_log() {
 
     local tmp_dir
     tmp_dir=$(mktemp -d) || return 1
-    trap "rm -rf '$tmp_dir'" RETURN
+    trap "rm -rf '$tmp_dir'; trap - RETURN" RETURN
 
     # Analyze each error entry and collect classifications
     local classifications="$tmp_dir/classifications.json"

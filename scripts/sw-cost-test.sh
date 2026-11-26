@@ -226,6 +226,23 @@ else
     assert_fail "Dashboard shows avg budget utilization"
 fi
 
+# ─── check-budget: a zero cap is unlimited however it is spelled; a non-number blocks ───
+_cb() {
+    printf '%s\n' "$1" > "$TEST_TEMP_DIR/home/.shipwright/budget.json"
+    env HOME="$TEST_TEMP_DIR/home" PATH="$TEST_TEMP_DIR/bin:/usr/local/bin:/usr/bin:/bin" \
+        bash "$SCRIPT_DIR/sw-cost.sh" check-budget 1 >/dev/null 2>&1 && echo 0 || echo $?
+}
+# SQLite reads `budget set 0` back as 0.0; that used to be enforced as a $0 cap.
+assert_eq "check-budget: enabled cap 0.0 is unlimited" "0" "$(_cb '{"daily_budget_usd":0.0,"enabled":true}')"
+assert_eq "check-budget: enabled cap \"0.00\" is unlimited" "0" "$(_cb '{"daily_budget_usd":"0.00","enabled":true}')"
+assert_eq "check-budget: enabled cap that is not a number blocks" "2" "$(_cb '{"daily_budget_usd":null,"enabled":true}')"
+assert_eq "check-budget: estimate over the cap blocks" "2" "$(_cb '{"daily_budget_usd":0.5,"enabled":true}')"
+# Cap rule shared with the TS gate: an estimate landing exactly on the cap is allowed; spend at the cap blocks.
+_today="$(date -u +%s)"
+printf '{"entries":[{"ts_epoch":%s,"cost_usd":4}],"summary":{}}\n' "$_today" > "$TEST_TEMP_DIR/home/.shipwright/costs.json"
+assert_eq "check-budget: estimate landing exactly on the cap is allowed" "1" "$(_cb '{"daily_budget_usd":5,"enabled":true}')"
+assert_eq "check-budget: spend already at the cap blocks" "2" "$(_cb '{"daily_budget_usd":4,"enabled":true}')"
+
 # ═══════════════════════════════════════════════════════════════════════════════
 # RESULTS
 # ═══════════════════════════════════════════════════════════════════════════════

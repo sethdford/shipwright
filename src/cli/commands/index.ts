@@ -3,6 +3,7 @@ import { breakerCommand } from "./breaker";
 import { budgetCommand } from "./budget";
 import { failureCommand } from "./failure";
 import { gatesCommand } from "./gates";
+import { governanceCommand } from "./governance";
 import { helloCommand } from "./hello";
 import { intakeCommand } from "./intake";
 import { pauseCommand, pausedCommand, resumeCommand } from "./pause";
@@ -17,6 +18,7 @@ export const commands: readonly Command[] = [
   intakeCommand,
   gatesCommand,
   failureCommand,
+  governanceCommand,
 ];
 
 export function findCommand(

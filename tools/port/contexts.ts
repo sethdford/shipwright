@@ -5,6 +5,7 @@ export const CONTEXTS = [
   "planning",
   "quality",
   "learning",
+  "governance",
   "intelligence",
   "integrations",
   "teams",
