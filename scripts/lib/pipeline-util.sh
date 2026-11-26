@@ -112,8 +112,11 @@ $(grep -E '^#{1,3} ' "$design_file" 2>/dev/null | head -10 || true)
 }
 
 # ─── Token & Cost Parsing ──────────────────────────────────────────
+# Guarded: some suites concatenate this file elsewhere, where the sibling lib is absent, and bash 3.2
+# stops reading a sourced file at a failed `source`. The stage modules source claude-usage.sh themselves.
+_CLAUDE_USAGE_LIB="$(dirname "${BASH_SOURCE[0]}")/claude-usage.sh"
 # shellcheck source=lib/claude-usage.sh
-source "$(dirname "${BASH_SOURCE[0]}")/claude-usage.sh"
+[[ -f "$_CLAUDE_USAGE_LIB" ]] && source "$_CLAUDE_USAGE_LIB"
 
 parse_claude_tokens() {
     local log_file="$1"
