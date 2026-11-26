@@ -29,6 +29,12 @@ const INLINE_MAX = 1500;
 const ICON = { pass: "✅", fail: "❌", skipped: "⏭️" } as const;
 
 /** Text safe inside a markdown table cell or inline code: no pipes, backticks or newlines. */
+/** Text from the app, git or proof.json as an inline code span: never read as markdown or HTML. */
+export function code(text: string): string {
+  const c = cell(text);
+  return c === "" ? "(none)" : `\`${c}\``;
+}
+
 export function cell(text: string): string {
   return text.replace(/[`|]/g, "'").replace(/\s+/g, " ").trim().slice(0, 200);
 }
@@ -46,7 +52,7 @@ function link(view: ProofReportView, file: string, label: string): string {
 
 function flowBlock(view: ProofReportView, flow: FlowResult): string[] {
   const failed = flowFailures(flow).length > 0;
-  const lines = [`**${failed ? ICON.fail : ICON.pass} ${cell(flow.name)}**`, ""];
+  const lines = [`**${failed ? ICON.fail : ICON.pass}** ${code(flow.name)}`, ""];
   for (const s of flow.screenshots) {
     lines.push(
       view.baseUrl === null
@@ -56,7 +62,7 @@ function flowBlock(view: ProofReportView, flow: FlowResult): string[] {
   }
   if (flow.video) lines.push(`- ${link(view, flow.video, "video of this flow")}`);
   const bad = flow.steps.find((s) => !s.ok);
-  if (bad) lines.push(`- failed at \`${cell(bad.step)}\`: ${cell(bad.error ?? "")}`);
+  if (bad) lines.push(`- failed at ${code(bad.step)}: ${code(bad.error ?? "")}`);
   for (const e of flow.pageErrors.slice(0, 3)) lines.push(`- page error: \`${cell(e)}\``);
   for (const h of flow.httpErrors.slice(0, 3)) lines.push(`- HTTP ${h.status}: \`${cell(h.url)}\``);
   if (flow.consoleErrors.length > 0)
@@ -72,7 +78,7 @@ function webSection(view: ProofReportView, web: WebResult): string[] {
   const log = link(view, web.serverLog, "server log");
   if (web.status !== "ran") {
     const icon = web.status === "start_failed" ? ICON.fail : ICON.skipped;
-    const lines = [`#### Web app`, "", `${icon} ${cell(web.reason)} (${log})`, ""];
+    const lines = [`#### Web app`, "", `${icon} ${code(web.reason)} (${log})`, ""];
     const text = view.texts[web.serverLog];
     if (text !== undefined && text.trim() !== "")
       lines.push(
@@ -121,8 +127,8 @@ function summary(verdict: ProofVerdict): string[] {
     skipped: "Nothing could be run.",
   }[verdict.status];
   const lines = [`${ICON[verdict.status]} **${head}**`, ""];
-  for (const f of verdict.failures.slice(0, 5)) lines.push(`- ${cell(f)}`);
-  for (const w of verdict.warnings.slice(0, 3)) lines.push(`- note: ${cell(w)}`);
+  for (const f of verdict.failures.slice(0, 5)) lines.push(`- ${code(f)}`);
+  for (const w of verdict.warnings.slice(0, 3)) lines.push(`- note: ${code(w)}`);
   return lines.length > 2 ? [...lines, ""] : lines;
 }
 

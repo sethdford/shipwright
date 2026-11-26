@@ -1,6 +1,13 @@
 import { expect, test } from "bun:test";
 import type { ProofPlan } from "./plan";
-import { cell, fenced, PROOF_MARKER, type ProofReportView, renderProofSection } from "./render";
+import {
+  cell,
+  code,
+  fenced,
+  PROOF_MARKER,
+  type ProofReportView,
+  renderProofSection,
+} from "./render";
 import { judgeProof, type WebResult } from "./result";
 
 const plan: ProofPlan = {
@@ -16,6 +23,7 @@ const plan: ProofPlan = {
   },
   cli: [],
   notes: [],
+  problems: [],
 };
 const web: WebResult = {
   status: "ran",
@@ -94,4 +102,20 @@ test("a failed start shows the end of the server log; CLI output is fenced", () 
 test("model or app text cannot break the markdown", () => {
   expect(cell("a|b`c\nd")).toBe("a'b'c d");
   expect(fenced("x")).toBe("```text\nx\n```");
+});
+
+test("free text from the app, git or proof.json is always inside a code span", () => {
+  const evil = "<!-- hide @org/team [x](https://evil) <img src=x>";
+  const failed: WebResult = { status: "start_failed", reason: evil, serverLog: "web/server.log" };
+  const md = renderProofSection(
+    view({
+      web: failed,
+      verdict: { status: "fail", failures: [evil], warnings: [evil] },
+    }),
+  );
+  const outside = md.replace(/`[^`\n]*`/g, "").replace(/```[\s\S]*?```/g, "");
+  expect(outside).not.toContain("<!-- hide");
+  expect(outside).not.toContain("@org/team");
+  expect(outside).not.toContain("<img");
+  expect(code("")).toBe("(none)");
 });

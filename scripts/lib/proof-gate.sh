@@ -8,6 +8,8 @@
 #   enforce   blocks when the CLI exits 3: the app did not start, a flow step failed, a page threw,
 #             the app answered 4xx/5xx on a changed page, or a CLI run exited unexpectedly.
 # SHIPWRIGHT_PROOF_PUBLISH=off keeps the artifacts on this machine (no push); so does NO_GITHUB.
+# SHIPWRIGHT_PROOF_TIMEOUT caps the whole run in seconds (default 900); past it the proof is
+# "could not run" and never blocks.
 # A proof that cannot run (no Bun, a crash, a bad proof.json) never blocks; it is logged as
 # `pr.proof_unavailable`.
 [[ -n "${_PROOF_GATE_LOADED:-}" ]] && return 0
@@ -64,9 +66,17 @@ proof_gate() {
     local args=(proof run --base "$base" --mode "$mode" --label "${label:-run}" --format json)
     [[ -n "$out_dir" ]] && args+=(--out "$out_dir")
     if _proof_publish_on; then args+=(--publish); else args+=(--no-publish); fi
+    # One deadline for the whole run (app start, every flow, every CLI run, the push).
+    local limit="${SHIPWRIGHT_PROOF_TIMEOUT:-900}" runner=()
+    [[ "$limit" =~ ^[0-9]+$ ]] || limit=900
+    if command -v timeout >/dev/null 2>&1; then
+        runner=(timeout "$limit")
+    elif command -v gtimeout >/dev/null 2>&1; then
+        runner=(gtimeout "$limit")
+    fi
     local out rc=0
-    _proof_say info "Running the app for proof (${mode})"
-    out="$("$bun_bin" "$PROOF_TS_CLI" "${args[@]}" 2>/dev/null)" || rc=$?
+    _proof_say info "Running the app for proof (${mode}, up to ${limit}s)"
+    out="$(${runner[@]+"${runner[@]}"} "$bun_bin" "$PROOF_TS_CLI" "${args[@]}" 2>/dev/null)" || rc=$?
     _proof_result "$rc" "$out"
 }
 

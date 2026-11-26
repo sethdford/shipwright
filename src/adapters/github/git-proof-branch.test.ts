@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, expect, test } from "bun:test";
-import { mkdirSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { idempotencyKey } from "../../shared/kernel/durability";
 import type { ProcessRunner } from "../../shared/kernel/ports";
@@ -15,11 +15,12 @@ let bare: string;
 let artifacts: string;
 const real = new BunProcessRunner();
 const PATH = "/usr/local/bin:/opt/homebrew/bin:/usr/bin:/bin";
+// The global config plays the user's: it sends the github.com URL to the bare repository.
 const gitEnv = () => ({
   PATH,
   HOME: env.home,
   GIT_CONFIG_NOSYSTEM: "1",
-  GIT_CONFIG_GLOBAL: "/dev/null",
+  GIT_CONFIG_GLOBAL: join(env.home, ".gitconfig"),
 });
 const runner: ProcessRunner = {
   run: (req) => real.run({ ...req, env: { ...gitEnv(), ...(req.env ?? {}) } }),
@@ -43,7 +44,10 @@ beforeEach(async () => {
   await git(env.root, "init", "-q", "--bare", bare);
   await git(repo, "init", "-q", "-b", "main");
   await git(repo, "remote", "add", "origin", "https://github.com/acme/app.git");
-  await git(repo, "config", `url.${bare}.insteadOf`, "https://github.com/acme/app.git");
+  writeFileSync(
+    join(env.home, ".gitconfig"),
+    `[url "${bare}"]\n\tinsteadOf = https://github.com/acme/app.git\n`,
+  );
   writeFileSync(join(repo, "a.txt"), "a\n");
   await git(repo, "add", "a.txt");
   await git(repo, "-c", "user.name=t", "-c", "user.email=t@t", "commit", "-q", "-m", "base");
@@ -93,6 +97,24 @@ test("the same key reuses the commit; a new run stacks on the tip with a small t
   if (!second.ok || !first.ok) return;
   expect(await git(bare, "rev-parse", `${second.value.commit}^`)).toBe(first.value.commit);
   expect(await git(bare, "ls-tree", "--name-only", second.value.commit)).toBe("feat-y");
+});
+
+test("the clone's hooks, filters and attributes never run, and the clone stays unshallow", async () => {
+  const pwned = join(env.root, "pwned");
+  writeFileSync(join(repo, ".gitattributes"), "*.png filter=evil\n*.log filter=evil\n");
+  await git(repo, "config", "filter.evil.clean", `touch ${pwned}`);
+  mkdirSync(join(repo, ".git", "hooks"), { recursive: true });
+  writeFileSync(join(repo, ".git", "hooks", "pre-push"), `#!/bin/sh\ntouch ${pwned}\n`, {
+    mode: 0o755,
+  });
+  const writer = new GitProofBranch(runner, gitEnv());
+  expect((await writer.publishProof(idempotencyKey("proof", "1"), upload())).ok).toBe(true);
+  const r = await writer.publishProof(idempotencyKey("proof", "2"), upload("b/c"));
+  expect(r.ok).toBe(true);
+  expect(existsSync(pwned)).toBe(false);
+  if (r.ok)
+    expect(await git(bare, "show", `${r.value.commit}:b/c/web/1-home.png`)).toBe("png-bytes");
+  expect(await git(repo, "rev-parse", "--is-shallow-repository")).toBe("false");
 });
 
 test("a non-GitHub origin is refused before anything is written", async () => {

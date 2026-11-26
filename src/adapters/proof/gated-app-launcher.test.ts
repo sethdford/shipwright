@@ -81,3 +81,20 @@ test("an app that never answers times out", async () => {
   expect(r.ok).toBe(false);
   if (!r.ok) expect(r.reason).toContain("nothing answered");
 }, 20_000);
+
+test("a port another server holds is refused before anything starts", async () => {
+  const other = Bun.serve({ port: 0, hostname: "127.0.0.1", fetch: () => new Response("other") });
+  try {
+    const r = await launcher().start({
+      argv: ["sleep", "30"],
+      port: Number(other.port),
+      url: null,
+      readyPath: "/",
+      readyTimeoutMs: 5_000,
+    });
+    expect(r.ok).toBe(false);
+    if (!r.ok) expect(r.reason).toBe(`port ${other.port} is already in use`);
+  } finally {
+    other.stop(true);
+  }
+});

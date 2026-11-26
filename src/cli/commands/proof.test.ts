@@ -56,8 +56,8 @@ test("run: a failure exits 3 only in enforce mode", async () => {
   expect((await run(["run"], failing, { SHIPWRIGHT_PROOF: "enforce" })).code).toBe(3);
 });
 
-test("run: an unreadable repository exits 1", async () => {
-  const r = await run(["run"], { config: "{" });
-  expect(r.code).toBe(1);
-  expect(r.err).toContain("proof");
+test("run: an unreadable proof.json fails the proof, exit 3 in enforce", async () => {
+  const r = await run(["run", "--mode", "enforce"], { config: "{" });
+  expect(r.code).toBe(3);
+  expect(r.out).toContain("not valid JSON");
 });

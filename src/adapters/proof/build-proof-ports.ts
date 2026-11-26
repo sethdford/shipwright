@@ -1,3 +1,4 @@
+import { mkdirSync, mkdtempSync } from "node:fs";
 import { join } from "node:path";
 import type { ProofPorts } from "../../contexts/quality";
 import { GitProofBranch } from "../github/git-proof-branch";
@@ -24,9 +25,14 @@ export function buildProofPorts(
 ): ProofPorts {
   const runner = new BunProcessRunner({ reapGroup: true });
   const gate = join(shipwrightRoot, "scripts", "lib", "test-gate-exec.sh");
-  const run = `${new Date().toISOString().replace(/[:.]/g, "-")}-${process.pid}`;
-  const dir = outDir ?? join(resolvePaths(env).stateDir, "proof", run);
+  // A fresh, private folder per run (mkdtemp, 0700) unless the caller names one.
+  const base = join(resolvePaths(env).stateDir, "proof");
+  mkdirSync(base, { recursive: true, mode: 0o700 });
+  const dir = outDir ?? mkdtempSync(join(base, `${new Date().toISOString().slice(0, 10)}-`));
   const clean = testEnv(env);
+  // The push runs here, in this trusted process, with the pipeline's own git credentials.
+  const full: Record<string, string> = {};
+  for (const [k, v] of Object.entries(env)) if (v !== undefined) full[k] = v;
   const chromium = env.SHIPWRIGHT_PROOF_CHROMIUM;
   return {
     repo: new FsProofRepo(runner, root),
@@ -34,6 +40,6 @@ export function buildProofPorts(
     browser: new PlaywrightBrowser(undefined, chromium && chromium !== "" ? chromium : undefined),
     cli: new TestGateExecutor(runner, gate, root),
     artifacts: new NodeProofArtifacts(dir),
-    publisher: new GitProofPublisher(new GitProofBranch(runner, clean), root),
+    publisher: new GitProofPublisher(new GitProofBranch(runner, full), root),
   };
 }

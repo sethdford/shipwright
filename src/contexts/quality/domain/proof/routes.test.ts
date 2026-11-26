@@ -43,3 +43,18 @@ test("flows visit and capture each route", () => {
     { name: "page /a", steps: [{ goto: "/a" }, { screenshot: "a" }] },
   ]);
 });
+
+test("files that are not pages, and pages that are not routes, are skipped", () => {
+  expect(
+    changedRoutes("next", [
+      "app/foo/notpage.tsx",
+      "app/_private/page.tsx",
+      "app/@modal/page.tsx",
+      "pages/404.tsx",
+      "app/page.tsx",
+    ]),
+  ).toEqual(["/"]);
+  expect(changedRoutes("remix", ["app/routes/_auth.login.tsx"])).toEqual(["/", "/login"]);
+  expect(changedRoutes("astro", ["src/pages/_draft.astro", "src/pages/404.astro"])).toEqual(["/"]);
+  expect(changedRoutes("sveltekit", ["src/routes/+page.svelte"])).toEqual(["/"]);
+});

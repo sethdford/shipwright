@@ -35,10 +35,21 @@ test("reads root facts and proof.json", async () => {
 test("changed files: committed, uncommitted and untracked, once each", async () => {
   const runner = new FakeProcessRunner([
     {
-      prefix: ["git", "-C", env.root, "diff", "--name-only", "origin/main...HEAD"],
+      prefix: [
+        "git",
+        "-C",
+        env.root,
+        "diff",
+        "--name-only",
+        "--diff-filter=d",
+        "origin/main...HEAD",
+      ],
       result: git("app/page.tsx\nlib/a.ts\n"),
     },
-    { prefix: ["git", "-C", env.root, "diff", "--name-only", "HEAD"], result: git("lib/a.ts\n") },
+    {
+      prefix: ["git", "-C", env.root, "diff", "--name-only", "--diff-filter=d", "HEAD"],
+      result: git("lib/a.ts\n"),
+    },
     { prefix: ["git", "-C", env.root, "ls-files"], result: git("app/new/page.tsx\n") },
   ]);
   const r = await new FsProofRepo(runner, env.root).changedFiles("origin/main");

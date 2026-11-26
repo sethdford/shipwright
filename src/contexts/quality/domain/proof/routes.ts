@@ -20,31 +20,43 @@ const groups = (p: string): string => p.replace(/\([^/)]*\)\/?/g, "");
 
 const ROUTERS: Partial<Record<WebFramework, readonly Router[]>> = {
   next: [
-    { pattern: /^(?:src\/)?app\/(.*?)\/?page\.(?:tsx|jsx|ts|js|mdx)$/, toRoute: (p) => groups(p) },
+    {
+      pattern: /^(?:src\/)?app\/(?:(.*)\/)?page\.(?:tsx|jsx|ts|js|mdx)$/,
+      toRoute: (p) => groups(p),
+    },
     {
       pattern: /^(?:src\/)?pages\/(.+)\.(?:tsx|jsx|ts|js|mdx)$/,
       toRoute: (p) => (/^(api\/|_app|_document|_error)/.test(p) ? null : indexless(p)),
     },
   ],
-  sveltekit: [{ pattern: /^src\/routes\/(.*?)\/?\+page\.svelte$/, toRoute: (p) => groups(p) }],
+  sveltekit: [{ pattern: /^src\/routes\/(?:(.*)\/)?\+page\.svelte$/, toRoute: (p) => groups(p) }],
   astro: [{ pattern: /^src\/pages\/(.+)\.(?:astro|md|mdx)$/, toRoute: (p) => indexless(p) }],
   nuxt: [{ pattern: /^(?:app\/)?pages\/(.+)\.vue$/, toRoute: (p) => indexless(p) }],
   remix: [
     {
       pattern: /^app\/routes\/(.+)\.(?:tsx|jsx)$/,
-      toRoute: (p) => indexless(p.replace(/\._index$|^_index$/, "").replace(/\./g, "/")),
+      // Segments starting with _ are pathless layouts in Remix: they add no URL segment.
+      toRoute: (p) =>
+        indexless(
+          p
+            .split(".")
+            .filter((seg) => !seg.startsWith("_"))
+            .join("/"),
+        ),
     },
   ],
 };
 
 const DYNAMIC = /\[|\]|(^|\/)[:$]/;
+/** Private (_x) and parallel (@x) folders and error pages are not pages to visit. */
+const NOT_A_PAGE = /(^|\/)[_@]|(^|\/)(404|500)$/;
 
 function routeOf(framework: WebFramework, file: string): string | null {
   for (const router of ROUTERS[framework] ?? []) {
     const m = router.pattern.exec(file);
     if (!m) continue;
     const page = router.toRoute(m[1] ?? "");
-    if (page === null || DYNAMIC.test(page)) return null;
+    if (page === null || DYNAMIC.test(page) || NOT_A_PAGE.test(page)) return null;
     return `/${page}`.replace(/\/+/g, "/");
   }
   return null;

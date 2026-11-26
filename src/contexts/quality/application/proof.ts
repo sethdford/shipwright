@@ -1,6 +1,6 @@
 import type { AdapterError } from "../../../shared/kernel/ports";
 import { err, ok, type Result } from "../../../shared/kernel/result";
-import { parseProofConfig } from "../domain/proof/config";
+import { NO_CONFIG, parseProofConfig } from "../domain/proof/config";
 import { detectApp } from "../domain/proof/detect";
 import { type ProofPlan, planProof, type WebPlan } from "../domain/proof/plan";
 import { redact, tail } from "../domain/proof/redact";
@@ -48,7 +48,7 @@ const LOG_MAX = 200_000;
 /** Server log lines shown in the PR when the app did not start. */
 const START_LOG_INLINE = 2_000;
 const CLI_TIMEOUT_MS = 120_000;
-const EMPTY_PLAN: ProofPlan = { web: null, cli: [], notes: [] };
+const EMPTY_PLAN: ProofPlan = { web: null, cli: [], notes: [], problems: [] };
 
 async function makePlan(
   ports: ProofPorts,
@@ -57,18 +57,14 @@ async function makePlan(
   const raw = await ports.repo.config();
   if (!raw.ok) return raw;
   const parsed = parseProofConfig(raw.value);
-  if (!parsed.ok)
-    return err({
-      kind: "failed",
-      message: `.shipwright/proof.json: ${parsed.problems.join("; ")}`,
-    });
   const facts = await ports.repo.facts();
   if (!facts.ok) return facts;
   const changed = await ports.repo.changedFiles(baseRef);
   const port = await ports.launcher.freePort();
   return ok(
     planProof({
-      config: parsed.config,
+      config: parsed.ok ? parsed.config : NO_CONFIG,
+      configProblems: parsed.ok ? [] : parsed.problems,
       profile: detectApp(facts.value),
       changed: changed.ok ? changed.value : [],
       port,
@@ -118,15 +114,22 @@ async function browse(
     const serverLog = await saveLog(ports, "web/server.log", app.log());
     return { status: "browser_unavailable", reason, serverLog };
   }
-  const flows = await ports.browser.run({
-    baseUrl: app.url,
-    flows: plan.flows,
-    outDir: `${ports.artifacts.dir}/web`,
-    allowHosts: plan.allowHosts,
-    video,
-  });
+  const save = async (rel: string, bytes: Uint8Array) => {
+    await ports.artifacts.write(`web/${rel}`, bytes);
+  };
+  const request = { baseUrl: app.url, flows: plan.flows, save, allowHosts: plan.allowHosts, video };
+  const flows = await ports.browser.run(request).catch((e: unknown) => e);
   const serverLog = await saveLog(ports, "web/server.log", app.log());
-  return { status: "ran", url: app.url, flows: flows.map(prefixWeb), serverLog };
+  if (!Array.isArray(flows)) {
+    const reason = `the app started at ${app.url}, but the browser failed: ${String(flows)}`;
+    return { status: "browser_unavailable", reason: reason.slice(0, 300), serverLog };
+  }
+  return {
+    status: "ran",
+    url: app.url,
+    flows: (flows as readonly FlowResult[]).map(prefixWeb),
+    serverLog,
+  };
 }
 
 /** The driver names files relative to web/; the report names them relative to the run folder. */
@@ -179,7 +182,12 @@ export function reportedFiles(web: WebResult | null, cli: readonly CliResult[]):
   return [...new Set(files)];
 }
 
-async function publish(ports: ProofPorts, req: ProofRequest, files: readonly string[]) {
+async function publish(ports: ProofPorts, req: ProofRequest, paths: readonly string[]) {
+  const digests = ports.artifacts.digests();
+  const files = paths.flatMap((path) => {
+    const sha256 = digests.get(path);
+    return sha256 === undefined ? [] : [{ path, sha256 }];
+  });
   if (!req.publish || files.length === 0) return { baseUrl: null, publishError: null };
   const r = await ports.publisher.publish(ports.artifacts.dir, req.label, files);
   return r.ok
@@ -199,7 +207,7 @@ function finish(
     publishError: string | null;
   },
 ): ProofReport {
-  const verdict = judgeProof(parts.web, parts.cli);
+  const verdict = judgeProof(parts.web, parts.cli, parts.plan.problems);
   const shown = parts.publishError
     ? {
         ...verdict,

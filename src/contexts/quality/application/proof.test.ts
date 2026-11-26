@@ -93,9 +93,22 @@ test("off and dry runs start nothing", async () => {
   expect([...off.started, ...dry.started, ...off.cliRuns, ...dry.cliRuns]).toEqual([]);
 });
 
-test("a broken proof.json is an error, not a silent skip", async () => {
-  const r = await runProof(fakeProof({ config: '{"web":{"port":1}}' }).ports, req());
-  expect(r.ok).toBe(false);
-  if (r.ok) return;
-  expect(r.error.message).toContain(".shipwright/proof.json: web.port");
+test("a broken proof.json fails the proof (and blocks in enforce); the app still runs", async () => {
+  const f = fakeProof({ config: '{"web":{"port":1}}' });
+  const r = await runProof(f.ports, req({ mode: "enforce" }));
+  expect(r.ok && r.value.blocked).toBe(true);
+  if (!r.ok) return;
+  expect(r.value.verdict.failures[0]).toContain(".shipwright/proof.json: web.port");
+  expect(f.started).toEqual([["npm", "run", "start"]]);
+});
+
+test("a proof.json this change turned off fails; one that was already off is skipped", async () => {
+  const off = '{"enabled":false}';
+  const changed = await runProof(
+    fakeProof({ config: off, changed: [".shipwright/proof.json"] }).ports,
+    req({ mode: "enforce" }),
+  );
+  expect(changed.ok && changed.value.blocked).toBe(true);
+  const before = await runProof(fakeProof({ config: off }).ports, req({ mode: "enforce" }));
+  expect(before.ok && before.value.verdict.status).toBe("skipped");
 });

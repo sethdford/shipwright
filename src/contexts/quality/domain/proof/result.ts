@@ -86,9 +86,14 @@ function webFindings(web: WebResult | null): { failures: string[]; warnings: str
 }
 
 /** pass: something ran and nothing failed. skipped: nothing could run. fail: anything failed. */
-export function judgeProof(web: WebResult | null, cli: readonly CliResult[]): ProofVerdict {
+export function judgeProof(
+  web: WebResult | null,
+  cli: readonly CliResult[],
+  problems: readonly string[] = [],
+): ProofVerdict {
   const w = webFindings(web);
   const failures = [
+    ...problems,
     ...w.failures,
     ...cli
       .filter((r) => !cliPassed(r))

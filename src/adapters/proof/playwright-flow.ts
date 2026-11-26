@@ -30,7 +30,7 @@ export interface PwPage {
   locator(selector: string): PwLocator;
   getByText(text: string): PwLocator;
   keyboard: { press(key: string): Promise<void> };
-  screenshot(o: { path: string; fullPage: boolean }): Promise<unknown>;
+  screenshot(o: { fullPage: boolean }): Promise<Uint8Array>;
   on(event: string, listener: (arg: never) => void): void;
 }
 
@@ -111,12 +111,12 @@ export interface FlowRun {
   readonly index: number;
   readonly flow: Flow;
   readonly baseUrl: string;
-  readonly outDir: string;
+  readonly save: (relPath: string, bytes: Uint8Array) => Promise<void>;
 }
 
 async function shoot(page: PwPage, run: FlowRun, name: string, shots: Capture[]): Promise<void> {
   const file = `${run.index + 1}-${name}.png`;
-  await page.screenshot({ path: `${run.outDir}/${file}`, fullPage: true });
+  await run.save(file, await page.screenshot({ fullPage: true }));
   shots.push({ name, file });
 }
 

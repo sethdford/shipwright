@@ -34,11 +34,20 @@ flows, and returns a "Proof it runs" section for the PR body. The bash PR stage 
   `expectText`, `screenshot`, each mapped to one fixed Playwright call. Nothing is evaluated, so
   an agent may write proof.json for its own change without widening what the stage can do.
 - **Trust boundary.** The app and every CLI run go through `test-gate-exec.sh`: no GitHub, git
-  or Claude credentials, an empty gh and Claude config. The app gets its own process group and
-  the whole group is killed afterwards. In the browser, requests to anything but the app, local
-  hosts and proof.json's `allowHosts` are aborted before they leave the machine. Logs and
-  transcripts pass through `redact()` (tokens, keys, `*_PASSWORD=`, URL credentials) before they
-  are written. Only regular files with plain names are published (no dot-files), with size caps.
+  or Claude credentials, an empty gh and Claude config. The app gets its own process group; the
+  whole group is killed afterwards, and also if Shipwright itself is stopped. Its port must be
+  free before it starts, so a different server cannot answer for it. In the browser, requests
+  and WebSockets to anything but the app's own origin and proof.json's `allowHosts` are aborted
+  (other localhost ports included) and service workers are off. Logs and transcripts pass through
+  `redact()` (tokens, keys, `*_PASSWORD=`, URL credentials) before they are written.
+- **Artifacts cannot be swapped.** The app runs as the same user as Shipwright, so it could
+  rewrite a screenshot with a secret file before the push. The run folder is a fresh `mkdtemp`
+  outside the worktree; screenshots and videos reach it as bytes handed over by the driver, and
+  every write records its sha256. Writes refuse symlinked folders. The publisher opens each file
+  with `O_NOFOLLOW`, checks the digest, and copies it to a private staging folder; one mismatch
+  stops the publish. Only the files the report names are published.
+- **The agent cannot switch it off.** A proof.json that this change made invalid, or turned off,
+  is a failure (it blocks in `enforce`); an invalid one is otherwise ignored and the app detected.
 - **Verdict.** Fail: the app does not start, a step fails, a changed page answers 4xx/5xx or
   throws, a CLI run exits unexpectedly. Console errors are noted, not failed (dev servers are
   noisy). No browser available, or nothing detected, is `skipped`. `SHIPWRIGHT_PROOF` is
@@ -49,15 +58,19 @@ flows, and returns a "Proof it runs" section for the PR body. The bash PR stage 
   (`github.com/<repo>/raw/<sha>/...`), which renders inline for anyone who can read the repo. The
   push (F10: a GitHub side effect) lives in `src/adapters/github/git-proof-branch.ts` behind the
   `ProofBranchWriter` port, keyed by an `IdempotencyKey` recorded in the commit message, so a
-  retry reuses the commit. Each commit is built with plumbing in a throwaway index (the checkout
-  is never touched), holds only its own run's files and sits on the previous tip, so the tip
-  stays small while every old URL keeps working. `SHIPWRIGHT_PROOF_PUBLISH=off` or `NO_GITHUB`
+  retry reuses the commit. All git work happens in a throwaway bare repository that fetches only
+  the proof branch tip: the user's clone is never fetched into (or made shallow), and its hooks,
+  `.gitattributes` filters and config never run in the process that holds push credentials
+  (only the origin URL and actions/checkout's auth header are read). Blobs are stored with
+  `--no-filters`; hooks are off and the push uses `--no-verify`. Each commit holds only its own
+  run's files and sits on the previous tip, so the tip stays small while old URLs keep working. `SHIPWRIGHT_PROOF_PUBLISH=off` or `NO_GITHUB`
   keeps everything local.
 
 Playwright is an optional dependency, loaded at run time from Shipwright's or the global install.
 
 ## Consequences
 
+- `SHIPWRIGHT_PROOF_TIMEOUT` (default 900 s) caps a whole run from the gate.
 - Every pipeline PR for a web app or CLI shows it running: screenshots inline, a video and the
   server log one click away, or the server log's last lines when it did not start.
 - A broken app is caught before review even when tests pass; in `enforce` it never becomes a PR.

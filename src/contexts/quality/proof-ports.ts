@@ -45,8 +45,11 @@ export interface AppLauncher {
 export interface BrowseRequest {
   readonly baseUrl: string;
   readonly flows: readonly Flow[];
-  /** Directory screenshots and videos are written to; results name files relative to it. */
-  readonly outDir: string;
+  /**
+   * Stores one screenshot or video; results name files by the same relative path. The driver
+   * hands over bytes rather than writing files itself, so what is published is what was captured.
+   */
+  readonly save: (relPath: string, bytes: Uint8Array) => Promise<void>;
   /** Hosts besides the app's own that pages may load from. Everything else is blocked. */
   readonly allowHosts: readonly string[];
   readonly video: boolean;
@@ -64,21 +67,32 @@ export interface CliExecutor {
   run(argv: readonly string[], timeoutMs: number): Promise<ProcessResult>;
 }
 
-/** The run's output directory. */
+/**
+ * The run's output directory. Every write records the sha256 of the bytes written, so the
+ * publisher can refuse a file that changed afterwards (the app under test runs as the same user).
+ */
 export interface ProofArtifacts {
   readonly dir: string;
-  write(relPath: string, text: string): Promise<Result<void, AdapterError>>;
+  write(relPath: string, data: string | Uint8Array): Promise<Result<void, AdapterError>>;
+  /** sha256 (hex) of each file as this run wrote it, by relative path. */
+  digests(): ReadonlyMap<string, string>;
+}
+
+export interface ProofFile {
+  readonly path: string;
+  readonly sha256: string;
 }
 
 /**
  * Puts a run's artifacts where a PR can show them; returns their base URL (ending in "/").
- * `files` are the run's own artifacts, relative to `dir`.
+ * `files` are the run's own artifacts, relative to `dir`, each with the digest recorded when it
+ * was written; a file whose bytes no longer match is never published.
  */
 export interface ProofPublisher {
   publish(
     dir: string,
     label: string,
-    files: readonly string[],
+    files: readonly ProofFile[],
   ): Promise<Result<string, AdapterError>>;
 }
 

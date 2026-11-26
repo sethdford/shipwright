@@ -59,6 +59,34 @@ function fakeRuns(o: FakeProofOptions, state: FakeProof): Pick<ProofPorts, "laun
   };
 }
 
+function fakeCapture(
+  o: FakeProofOptions,
+  state: FakeProof,
+  digests: Map<string, string>,
+): Pick<ProofPorts, "browser" | "artifacts"> {
+  return {
+    browser: {
+      unavailable: async () => o.browserMissing ?? null,
+      run: async (req) => {
+        for (const f of o.flows ?? []) {
+          for (const s of f.screenshots) await req.save(s.file, new Uint8Array([1]));
+          if (f.video !== null) await req.save(f.video, new Uint8Array([2]));
+        }
+        return o.flows ?? [];
+      },
+    },
+    artifacts: {
+      dir: "/out",
+      write: async (path, data) => {
+        state.written[path] = typeof data === "string" ? data : `<${data.length} bytes>`;
+        digests.set(path, `sha-${path}`);
+        return ok(undefined);
+      },
+      digests: () => digests,
+    },
+  };
+}
+
 /** In-memory proof ports: nothing starts, nothing is pushed, every call is recorded. */
 export function fakeProof(o: FakeProofOptions = {}): FakeProof {
   const state = {
@@ -69,6 +97,7 @@ export function fakeProof(o: FakeProofOptions = {}): FakeProof {
     publishedFiles: [],
     stopped: 0,
   } as Omit<FakeProof, "ports"> as FakeProof;
+  const digests = new Map<string, string>();
   const ports: ProofPorts = {
     repo: {
       facts: async () => ok(o.facts ?? nodeApp),
@@ -76,18 +105,11 @@ export function fakeProof(o: FakeProofOptions = {}): FakeProof {
       changedFiles: async () => ok(o.changed ?? []),
     },
     ...fakeRuns(o, state),
-    browser: { unavailable: async () => o.browserMissing ?? null, run: async () => o.flows ?? [] },
-    artifacts: {
-      dir: "/out",
-      write: async (path, text) => {
-        state.written[path] = text;
-        return ok(undefined);
-      },
-    },
+    ...fakeCapture(o, state, digests),
     publisher: {
       publish: async (_dir, label, files) => {
         state.published.push(label);
-        state.publishedFiles.push(files);
+        state.publishedFiles.push(files.map((f) => f.path));
         return o.publish ?? ok(`https://github.com/o/r/raw/abc/${label}/`);
       },
     },

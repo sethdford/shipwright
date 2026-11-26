@@ -1,4 +1,5 @@
-import { mkdirSync, renameSync, rmSync } from "node:fs";
+import { mkdtempSync, readFileSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
 import { join } from "node:path";
 import type { BrowseRequest, BrowserDriver, FlowResult } from "../../contexts/quality";
 import { driveFlow, type FlowSink, listen, type PwPage } from "./playwright-flow";
@@ -6,8 +7,9 @@ import { driveFlow, type FlowSink, listen, type PwPage } from "./playwright-flow
 /**
  * Headless Chromium through Playwright (ADR-0019). Playwright is optional: when it cannot be
  * loaded or has no browser, unavailable() says so and the proof records that instead of failing.
- * Pages may only reach the app itself and the hosts proof.json allows; every other request is
- * aborted before it leaves the machine, so a page cannot send data out or pull in remote code.
+ * Pages may only reach the app's own origin and the hosts proof.json allows: every other request,
+ * WebSocket included, is aborted before it leaves the browser, and service workers are off so
+ * none can bypass the routing. Other services on localhost are outside the fence too.
  */
 
 interface PwRoute {
@@ -16,9 +18,16 @@ interface PwRoute {
   continue(): Promise<void>;
 }
 
+interface PwWebSocketRoute {
+  url(): string;
+  connectToServer(): unknown;
+  close(o?: { code?: number; reason?: string }): Promise<void>;
+}
+
 interface PwContext {
   newPage(): Promise<PwPage & { video(): { path(): Promise<string> } | null }>;
   route(pattern: string, handler: (route: PwRoute) => Promise<void>): Promise<void>;
+  routeWebSocket?(pattern: RegExp, handler: (ws: PwWebSocketRoute) => unknown): Promise<void>;
   close(): Promise<void>;
 }
 
@@ -42,25 +51,33 @@ const defaultLoader: PlaywrightLoader = async () => {
   }
 };
 
-const LOCAL_HOSTS = new Set(["localhost", "127.0.0.1", "[::1]", "::1"]);
+const LOCAL = new Set(["localhost", "127.0.0.1", "[::1]"]);
+const VIEWPORT = { width: 1280, height: 800 };
 
-/** True for the app's own host, local hosts, and allowHosts entries (`*.example.com` matches subdomains). */
-export function hostAllowed(url: string, appHost: string, allow: readonly string[]): boolean {
-  let host: string;
+/** host:port with the scheme's default port filled in, so origins compare by value. */
+function hostPort(u: URL): string {
+  const port = u.port || (u.protocol === "https:" || u.protocol === "wss:" ? "443" : "80");
+  return `${LOCAL.has(u.hostname) ? "local" : u.hostname}:${port}`;
+}
+
+/**
+ * True for the app's own host and port (localhost and 127.0.0.1 count as one), inline data, and
+ * allowHosts entries (`*.example.com` matches subdomains). Other local ports are refused.
+ */
+export function hostAllowed(url: string, appUrl: string, allow: readonly string[]): boolean {
+  let u: URL;
   try {
-    const u = new URL(url);
-    if (u.protocol === "data:" || u.protocol === "blob:" || u.protocol === "about:") return true;
-    host = u.hostname;
+    u = new URL(url);
   } catch {
     return false;
   }
-  if (host === appHost || LOCAL_HOSTS.has(host)) return true;
+  if (u.protocol === "data:" || u.protocol === "blob:" || u.protocol === "about:") return true;
+  if (hostPort(u) === hostPort(new URL(appUrl))) return true;
+  const host = u.hostname;
   return allow.some((a) => (a.startsWith("*.") ? host.endsWith(a.slice(1)) : host === a));
 }
 
 export class PlaywrightBrowser implements BrowserDriver {
-  private launchError: string | null = null;
-
   constructor(
     private readonly load: PlaywrightLoader = defaultLoader,
     private readonly executablePath?: string,
@@ -75,15 +92,14 @@ export class PlaywrightBrowser implements BrowserDriver {
       await browser.close();
       return null;
     } catch (e) {
-      this.launchError = e instanceof Error ? (e.message.split("\n")[0] ?? "") : String(e);
-      return `Chromium could not start (bunx playwright install chromium): ${this.launchError.slice(0, 200)}`;
+      const why = e instanceof Error ? (e.message.split("\n")[0] ?? "") : String(e);
+      return `Chromium could not start (bunx playwright install chromium): ${why.slice(0, 200)}`;
     }
   }
 
   async run(request: BrowseRequest): Promise<readonly FlowResult[]> {
     const pw = await this.load();
     if (pw === null) return [];
-    mkdirSync(request.outDir, { recursive: true });
     const browser = await this.launch(pw);
     try {
       const results: FlowResult[] = [];
@@ -92,14 +108,28 @@ export class PlaywrightBrowser implements BrowserDriver {
       return results;
     } finally {
       await browser.close().catch(() => {});
-      rmSync(join(request.outDir, ".video"), { recursive: true, force: true });
     }
   }
 
   private launch(pw: Playwright): Promise<PwBrowser> {
-    return pw.chromium.launch({
-      headless: true,
-      ...(this.executablePath ? { executablePath: this.executablePath } : {}),
+    const path = this.executablePath ? { executablePath: this.executablePath } : {};
+    return pw.chromium.launch({ headless: true, ...path });
+  }
+
+  private async fence(context: PwContext, req: BrowseRequest, blocked: string[]): Promise<void> {
+    const note = (url: string) => {
+      if (blocked.length < 20) blocked.push(url.slice(0, 200));
+    };
+    await context.route("**/*", async (route) => {
+      const url = route.request().url();
+      if (hostAllowed(url, req.baseUrl, req.allowHosts)) return route.continue();
+      note(url);
+      return route.abort("blockedbyclient");
+    });
+    await context.routeWebSocket?.(/.*/, (ws) => {
+      if (hostAllowed(ws.url(), req.baseUrl, req.allowHosts)) return ws.connectToServer();
+      note(ws.url());
+      return ws.close({ code: 1008, reason: "blocked by shipwright proof" });
     });
   }
 
@@ -109,40 +139,38 @@ export class PlaywrightBrowser implements BrowserDriver {
     index: number,
     flow: BrowseRequest["flows"][number],
   ): Promise<FlowResult> {
-    const videoDir = join(req.outDir, ".video");
-    const context = await browser.newContext({
-      viewport: { width: 1280, height: 800 },
-      ...(req.video ? { recordVideo: { dir: videoDir, size: { width: 1280, height: 800 } } } : {}),
-    });
-    const blocked: string[] = [];
-    const appHost = new URL(req.baseUrl).hostname;
-    await context.route("**/*", async (route) => {
-      const url = route.request().url();
-      if (hostAllowed(url, appHost, req.allowHosts)) return route.continue();
-      if (blocked.length < 20) blocked.push(url.slice(0, 200));
-      return route.abort("blockedbyclient");
-    });
-    const page = await context.newPage();
-    const sink: FlowSink = { consoleErrors: [], pageErrors: [], httpErrors: [] };
-    listen(page, sink);
-    const driven = await driveFlow(page, { index, flow, baseUrl: req.baseUrl, outDir: req.outDir });
-    const recording = page.video();
-    await context.close().catch(() => {});
-    const video = recording ? await this.keepVideo(recording, req.outDir, index) : null;
-    return { ...driven, ...sink, blocked, video };
-  }
-
-  private async keepVideo(
-    recording: { path(): Promise<string> },
-    outDir: string,
-    index: number,
-  ): Promise<string | null> {
+    // A private folder for the raw recording; its bytes are handed to save() and it is removed.
+    const videoDir = req.video ? mkdtempSync(join(tmpdir(), "sw-proof-video-")) : null;
     try {
-      const file = `${index + 1}-flow.webm`;
-      renameSync(await recording.path(), join(outDir, file));
-      return file;
-    } catch {
-      return null;
+      const recordVideo = videoDir ? { recordVideo: { dir: videoDir, size: VIEWPORT } } : {};
+      const options = { viewport: VIEWPORT, serviceWorkers: "block", ...recordVideo };
+      const context = await browser.newContext(options);
+      const blocked: string[] = [];
+      await this.fence(context, req, blocked);
+      const page = await context.newPage();
+      const sink: FlowSink = { consoleErrors: [], pageErrors: [], httpErrors: [] };
+      listen(page, sink);
+      const driven = await driveFlow(page, { index, flow, baseUrl: req.baseUrl, save: req.save });
+      const recording = page.video();
+      await context.close().catch(() => {});
+      const video = recording ? await keepVideo(recording, req, index) : null;
+      return { ...driven, ...sink, blocked, video };
+    } finally {
+      if (videoDir) rmSync(videoDir, { recursive: true, force: true });
     }
+  }
+}
+
+async function keepVideo(
+  recording: { path(): Promise<string> },
+  req: BrowseRequest,
+  index: number,
+): Promise<string | null> {
+  try {
+    const file = `${index + 1}-flow.webm`;
+    await req.save(file, readFileSync(await recording.path()));
+    return file;
+  } catch {
+    return null;
   }
 }

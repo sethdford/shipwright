@@ -56,8 +56,9 @@ export class FsProofRepo implements ProofRepo {
     if (!/^[A-Za-z0-9._/@^~-]{1,200}$/.test(baseRef) || baseRef.startsWith("-"))
       return err({ kind: "failed", message: `invalid base ref ${baseRef}` });
     const lists = await Promise.all([
-      this.git(["diff", "--name-only", `${baseRef}...HEAD`]),
-      this.git(["diff", "--name-only", "HEAD"]),
+      // Deleted files are left out: a page the change removed is not a page to visit.
+      this.git(["diff", "--name-only", "--diff-filter=d", `${baseRef}...HEAD`]),
+      this.git(["diff", "--name-only", "--diff-filter=d", "HEAD"]),
       this.git(["ls-files", "--others", "--exclude-standard"]),
     ]);
     if (lists[0] === null)

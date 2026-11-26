@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, expect, test } from "bun:test";
-import { existsSync } from "node:fs";
+import { existsSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { createTestEnv, type TestEnv } from "../../testing/test-env";
 import { hostAllowed, PlaywrightBrowser } from "./playwright-browser";
@@ -10,24 +10,31 @@ beforeEach(() => {
 });
 afterEach(() => env.cleanup());
 
-test("pages reach only the app, local hosts and the allow list", () => {
-  expect(hostAllowed("http://127.0.0.1:3000/a.js", "127.0.0.1", [])).toBe(true);
-  expect(hostAllowed("http://localhost:3000/", "127.0.0.1", [])).toBe(true);
-  expect(hostAllowed("data:image/png;base64,xx", "127.0.0.1", [])).toBe(true);
-  expect(hostAllowed("https://fonts.googleapis.com/css", "127.0.0.1", [])).toBe(false);
-  expect(
-    hostAllowed("https://fonts.googleapis.com/css", "127.0.0.1", ["fonts.googleapis.com"]),
-  ).toBe(true);
-  expect(hostAllowed("https://a.cdn.example.com/x", "127.0.0.1", ["*.example.com"])).toBe(true);
-  expect(hostAllowed("https://example.com.evil.io/x", "127.0.0.1", ["*.example.com"])).toBe(false);
-  expect(hostAllowed("not a url", "127.0.0.1", [])).toBe(false);
+test("pages reach only the app's own origin and the allow list", () => {
+  const app = "http://127.0.0.1:3000";
+  expect(hostAllowed("http://127.0.0.1:3000/a.js", app, [])).toBe(true);
+  expect(hostAllowed("http://localhost:3000/", app, [])).toBe(true);
+  expect(hostAllowed("ws://localhost:3000/_hmr", app, [])).toBe(true);
+  expect(hostAllowed("http://127.0.0.1:8767/api/secrets", app, [])).toBe(false);
+  expect(hostAllowed("data:image/png;base64,xx", app, [])).toBe(true);
+  expect(hostAllowed("https://fonts.googleapis.com/css", app, [])).toBe(false);
+  expect(hostAllowed("https://fonts.googleapis.com/c", app, ["fonts.googleapis.com"])).toBe(true);
+  expect(hostAllowed("https://a.cdn.example.com/x", app, ["*.example.com"])).toBe(true);
+  expect(hostAllowed("https://example.com.evil.io/x", app, ["*.example.com"])).toBe(false);
+  expect(hostAllowed("not a url", app, [])).toBe(false);
 });
 
 test("without Playwright the driver says how to install it", async () => {
   const b = new PlaywrightBrowser(async () => null);
   expect(await b.unavailable()).toContain("playwright install chromium");
   expect(
-    await b.run({ baseUrl: "http://x", flows: [], outDir: env.root, allowHosts: [], video: false }),
+    await b.run({
+      baseUrl: "http://x",
+      flows: [],
+      save: async () => {},
+      allowHosts: [],
+      video: false,
+    }),
   ).toEqual([]);
 });
 
@@ -67,7 +74,7 @@ test.skipIf(!hasPlaywright)(
       const b = new PlaywrightBrowser();
       const results = await b.run({
         baseUrl: `http://127.0.0.1:${server.port}`,
-        outDir: env.root,
+        save: async (rel, bytes) => writeFileSync(join(env.root, rel), bytes),
         allowHosts: [],
         video: true,
         flows: [
@@ -89,7 +96,6 @@ test.skipIf(!hasPlaywright)(
       expect(add?.screenshots).toEqual([{ name: "added", file: "1-added.png" }]);
       expect(existsSync(join(env.root, "1-added.png"))).toBe(true);
       expect(add?.video).toBe("1-flow.webm");
-      expect(existsSync(join(env.root, ".video"))).toBe(false);
       expect(add?.blocked[0]).toContain("tracker.example.com");
       expect(add?.consoleErrors).toEqual([]);
       expect(broken?.steps[0]?.ok).toBe(false);

@@ -25,6 +25,8 @@ export interface ProofPlan {
   readonly cli: readonly CliRun[];
   /** Why nothing (or less than expected) will run; shown in the PR section. */
   readonly notes: readonly string[];
+  /** Problems that fail the proof whatever runs: a broken proof.json, or one this change turned off. */
+  readonly problems: readonly string[];
 }
 
 export interface PlanInput {
@@ -33,7 +35,11 @@ export interface PlanInput {
   readonly changed: readonly string[];
   /** A free port the adapter picked. */
   readonly port: number;
+  /** Why proof.json could not be used (it is then ignored and the app detected). */
+  readonly configProblems?: readonly string[];
 }
+
+export const CONFIG_FILE = ".shipwright/proof.json";
 
 const DEFAULT_READY_MS = 120_000;
 
@@ -77,9 +83,20 @@ function cliRuns(input: PlanInput): readonly CliRun[] {
   return [{ name: `${cli.name} --help`, argv: [...cli.argv, "--help"], expectExit: 0 }];
 }
 
+/**
+ * The agent writes the change, so it could also write a proof.json that hides a broken app: a
+ * proof.json this change made unreadable or turned off is a failure, not a skip.
+ */
+function configProblems(input: PlanInput): string[] {
+  const broken = (input.configProblems ?? []).map((p) => `${CONFIG_FILE}: ${p}`);
+  const turnedOff = !input.config.enabled && input.changed.includes(CONFIG_FILE);
+  return turnedOff ? [...broken, `this change turned the proof off in ${CONFIG_FILE}`] : broken;
+}
+
 export function planProof(input: PlanInput): ProofPlan {
+  const problems = configProblems(input);
   if (!input.config.enabled) {
-    return { web: null, cli: [], notes: ["proof is turned off in .shipwright/proof.json"] };
+    return { web: null, cli: [], notes: [`proof is turned off in ${CONFIG_FILE}`], problems };
   }
   const web = webPlan(input);
   const cli = cliRuns(input);
@@ -89,5 +106,5 @@ export function planProof(input: PlanInput): ProofPlan {
       "no web app or CLI was detected; add .shipwright/proof.json to say how to run this app",
     );
   }
-  return { web, cli, notes };
+  return { web, cli, notes, problems };
 }

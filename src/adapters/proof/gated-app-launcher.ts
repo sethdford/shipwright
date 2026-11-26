@@ -31,6 +31,40 @@ function killGroup(pid: number, signal: "SIGTERM" | "SIGKILL"): void {
   }
 }
 
+/** Listens on 127.0.0.1:port (0 = any) and closes again: the port, or null when it is taken. */
+function listenOn(port: number): Promise<number | null> {
+  return new Promise((resolve) => {
+    const server = createServer();
+    server.once("error", () => resolve(null));
+    server.listen(port, "127.0.0.1", () => {
+      const address = server.address();
+      const got = typeof address === "object" && address ? address.port : null;
+      server.close(() => resolve(got));
+    });
+  });
+}
+
+/**
+ * Kills the app's group if Shipwright itself exits or is signalled first, so a detached dev
+ * server never outlives it; returns the normal stop, which also removes those handlers.
+ */
+function guardExit(pid: number, stop: () => Promise<void>): () => Promise<void> {
+  const reap = () => killGroup(pid, "SIGKILL");
+  const onSignal = (signal: NodeJS.Signals) => {
+    reap();
+    process.kill(process.pid, signal);
+  };
+  process.once("exit", reap);
+  process.once("SIGTERM", onSignal);
+  process.once("SIGINT", onSignal);
+  return async () => {
+    await stop();
+    process.off("exit", reap);
+    process.off("SIGTERM", onSignal);
+    process.off("SIGINT", onSignal);
+  };
+}
+
 class Output {
   text = "";
   async pump(stream: ReadableStream<Uint8Array>): Promise<void> {
@@ -54,18 +88,13 @@ export class GatedAppLauncher implements AppLauncher {
   ) {}
 
   freePort(): Promise<number> {
-    return new Promise((resolve, reject) => {
-      const server = createServer();
-      server.once("error", reject);
-      server.listen(0, "127.0.0.1", () => {
-        const address = server.address();
-        const port = typeof address === "object" && address ? address.port : 0;
-        server.close(() => resolve(port));
-      });
-    });
+    return listenOn(0).then((port) => port ?? 0);
   }
 
   async start(request: StartRequest): Promise<StartOutcome> {
+    // Another server on the port would answer the readiness probe and be screenshotted instead.
+    if ((await listenOn(request.port)) === null)
+      return { ok: false, reason: `port ${request.port} is already in use`, log: "" };
     const proc = Bun.spawn(["bash", this.gateScript, ...request.argv], {
       cwd: this.cwd,
       env: { ...this.env, PORT: String(request.port), BROWSER: "none", CI: "1" },
@@ -81,7 +110,7 @@ export class GatedAppLauncher implements AppLauncher {
     void proc.exited.then(() => {
       exited = true;
     });
-    const stop = () => this.stop(proc.pid, proc.exited);
+    const stop = guardExit(proc.pid, () => this.stop(proc.pid, proc.exited));
     const url = await this.waitReady(request, out, () => exited);
     if (url === null) {
       // Decide why before stop(): stopping makes every app look like it exited.

@@ -122,6 +122,7 @@ export type {
   BrowserDriver,
   CliExecutor,
   ProofArtifacts,
+  ProofFile,
   ProofPorts,
   ProofPublisher,
   ProofRepo,

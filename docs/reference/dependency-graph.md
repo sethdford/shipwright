@@ -91,7 +91,6 @@ flowchart LR
   adapters_proof --> adapters
   adapters_proof --> adapters_github
   adapters_proof --> adapters_process
-  adapters_proof --> adapters_state
   adapters_proof --> integrations
   adapters_proof --> kernel
   adapters_proof --> quality
