@@ -243,7 +243,7 @@ EXAMPLES
 
 ## `repomodel`
 
-Query the repository world model: definitions, references, tests, owners, repo map (ADR-0012)
+Query the repository world model: definitions, references, tests, owners, repo map (ADR-0016)
 
 Aliases: `code`
 
@@ -263,7 +263,7 @@ USAGE
   shipwright repomodel mcp      [--root DIR]
 
 DESCRIPTION
-  A persistent, incrementally updated model of a repository (ADR-0012): definitions, imports, a reference graph,
+  A persistent, incrementally updated model of a repository (ADR-0016): definitions, imports, a reference graph,
   a search index, a test-to-code map and ownership. It is rebuilt only for files whose content changed, and
   every query refreshes it first, so answers include uncommitted edits. The cache lives in the state directory.
 

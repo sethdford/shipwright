@@ -8,7 +8,7 @@ export interface SourceFileStat {
   readonly mtimeMs: number;
 }
 
-/** The working tree of one repository: what the model is built from (ADR-0012). */
+/** The working tree of one repository: what the model is built from (ADR-0016). */
 export interface RepoSource {
   /** Tracked files and untracked files git does not ignore, repository-relative. */
   list(root: string): Promise<Result<readonly SourceFileStat[], AdapterError>>;

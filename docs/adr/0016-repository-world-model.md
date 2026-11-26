@@ -1,4 +1,4 @@
-# 0012. A repository world model that agents query through tools
+# 0016. A repository world model that agents query through tools
 
 Status: accepted · Date: 2026-11-26
 

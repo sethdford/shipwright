@@ -55,7 +55,7 @@ _pipeline_claude_flags() {
         flags+=("--fallback-model" "$_fallback")
     fi
 
-    # Repository world model tools (ADR-0012): nothing when SHIPWRIGHT_REPO_MODEL=off.
+    # Repository world model tools (ADR-0016): nothing when SHIPWRIGHT_REPO_MODEL=off.
     local _rm_flag
     for _rm_flag in $(repo_model_mcp_flags); do flags+=("$_rm_flag"); done
 

@@ -14,7 +14,7 @@ export interface Brief {
   readonly stats: RefreshStats;
 }
 
-/** The repository-model section of an agent prompt for a task (ADR-0012). */
+/** The repository-model section of an agent prompt for a task (ADR-0016). */
 export async function buildBrief(
   session: RepoSession,
   task: string,

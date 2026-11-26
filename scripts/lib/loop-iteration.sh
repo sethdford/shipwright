@@ -144,7 +144,7 @@ Fix these specific errors. Each line above is one distinct error from the test o
         governance_section="$(governance_brief_section "${GOAL:-}")"
     fi
 
-    # Repository world model: likely files and definitions for the goal, plus its MCP tools (ADR-0012)
+    # Repository world model: likely files and definitions for the goal, plus its MCP tools (ADR-0016)
     local repo_model_section=""
     if type repo_model_brief_section >/dev/null 2>&1; then
         local _rm_tools=""
@@ -564,7 +564,7 @@ build_claude_flags() {
         flags+=("--session-id" "$LOOP_SESSION_ID")
     fi
 
-    # Repository world model tools (ADR-0012): nothing when SHIPWRIGHT_REPO_MODEL=off.
+    # Repository world model tools (ADR-0016): nothing when SHIPWRIGHT_REPO_MODEL=off.
     if type repo_model_mcp_flags >/dev/null 2>&1; then
         local _rm_flag
         for _rm_flag in $(repo_model_mcp_flags); do flags+=("$_rm_flag"); done

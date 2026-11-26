@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # ╔═══════════════════════════════════════════════════════════════════════════╗
-# ║  shipwright lib/repo-model test — ADR-0012 brief and MCP attach           ║
+# ║  shipwright lib/repo-model test — ADR-0016 brief and MCP attach           ║
 # ╚═══════════════════════════════════════════════════════════════════════════╝
 # Hermetic: bun is a mock (the TypeScript command has its own tests), a temp git repo, temp HOME, no network.
 # Checks what the bash side owns: the root and task it passes, the MCP config it writes, the events and the

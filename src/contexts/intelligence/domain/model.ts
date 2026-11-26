@@ -1,5 +1,5 @@
 /**
- * The repository world model (ADR-0012): what each source file defines, imports and refers to, kept per file
+ * The repository world model (ADR-0016): what each source file defines, imports and refers to, kept per file
  * and keyed by a content hash so a refresh re-reads only the files that changed.
  */
 

@@ -30,7 +30,7 @@ const files = () => fileReader;
 const repoDocs = once(() => new GitRepoDocs(new BunProcessRunner(), fileReader));
 const stdio = once(processStdio);
 
-/** Adapters for the repository world model (ADR-0012): the working tree via git, the cache in the state dir. */
+/** Adapters for the repository world model (ADR-0016): the working tree via git, the cache in the state dir. */
 export function buildRepoModelPorts(
   env: Readonly<Record<string, string | undefined>>,
 ): RepoModelPorts {

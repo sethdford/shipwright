@@ -4,7 +4,7 @@ import type { Lang, SymbolKind } from "./model";
  * Line rules for definitions, one table per language. These are deliberately tag-level (the facts ctags or
  * tree-sitter tag queries give: name, kind, line, container), not a full parse: enough for search, a repo map and
  * a reference graph, with no native dependency. A tree-sitter extractor can replace a table without changing the
- * model (ADR-0012).
+ * model (ADR-0016).
  */
 export interface DefRule {
   readonly re: RegExp;

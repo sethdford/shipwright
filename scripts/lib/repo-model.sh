@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# repo-model.sh — the repository world model for agent prompts and tools (ADR-0012).
+# repo-model.sh — the repository world model for agent prompts and tools (ADR-0016).
 # The TypeScript command `shipwright repomodel` does the work; this file calls it, adds its brief to prompts and
 # attaches its read-only MCP server ("repomodel") to claude calls, so agents query a persistent, incrementally
 # updated model (definitions, references, imports, tests, owners) instead of grepping fresh on every run.

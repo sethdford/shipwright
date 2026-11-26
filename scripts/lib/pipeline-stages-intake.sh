@@ -318,7 +318,7 @@ stage_plan() {
         "$context_script" gather --goal "$GOAL" --stage plan 2>/dev/null || true
     fi
 
-    # Architecture context: the repository world model's brief when it is on (ADR-0012), else the older
+    # Architecture context: the repository world model's brief when it is on (ADR-0016), else the older
     # grep-based structure dump. SHIPWRIGHT_REPO_MODEL=off is the control arm of the paired comparison.
     local arch_context=""
     if type repo_model_enabled >/dev/null 2>&1 && repo_model_enabled; then

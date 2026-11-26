@@ -19,7 +19,7 @@ export interface CommandContext {
   readonly files: () => FileReader;
   /** Governance documents and lessons from git (ADR-0010), built by main.ts. */
   readonly repoDocs: () => RepoDocs;
-  /** The repository world model's adapters (ADR-0012), built by main.ts. */
+  /** The repository world model's adapters (ADR-0016), built by main.ts. */
   readonly repoModel: () => RepoModelPorts;
   /** This process's stdin and stdout as lines, for a stdio server (the MCP transport). */
   readonly stdio: () => LineChannel;
