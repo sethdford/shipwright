@@ -22,7 +22,11 @@ const list = (stdout: string, exitCode = 0, stderr = "") =>
   runner(["gh", "pr", "list"], stdout, exitCode, stderr);
 
 test("keeps the merge commit when GitHub returns one", async () => {
-  const merged = { ...ghPull(8), mergedAt: "2026-11-02T00:00:00Z", mergeCommit: { oid: "abc1234def" } };
+  const merged = {
+    ...ghPull(8),
+    mergedAt: "2026-11-02T00:00:00Z",
+    mergeCommit: { oid: "abc1234def" },
+  };
   const r = await new GhClosedPulls(list(JSON.stringify([merged]))).closedSince(SINCE);
   expect(r.ok && r.value.pulls[0]?.mergeSha).toBe("abc1234def");
 });

@@ -1,4 +1,9 @@
-import { SURVIVAL_RULE, type SurvivalSample, type SurvivalVerdict, survivalVerdict } from "./code-survival";
+import {
+  SURVIVAL_RULE,
+  type SurvivalSample,
+  type SurvivalVerdict,
+  survivalVerdict,
+} from "./code-survival";
 import { type PullRecord, revertsByTarget } from "./scorecard";
 
 /**

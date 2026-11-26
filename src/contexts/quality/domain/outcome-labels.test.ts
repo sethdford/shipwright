@@ -78,7 +78,12 @@ test("factory PRs weigh 1, human PRs weigh humanWeight, and 0 drops them", () =>
 
 test("survival relabels merged PRs old enough to measure; others keep the merge label", () => {
   const now = T + 30 * DAY;
-  const pulls = [pull(1), pull(2), pull(3), pull(4, { mergedAtMs: now - DAY, closedAtMs: now - DAY })];
+  const pulls = [
+    pull(1),
+    pull(2),
+    pull(3),
+    pull(4, { mergedAtMs: now - DAY, closedAtMs: now - DAY }),
+  ];
   const labelled = labelPulls(pulls, DEFAULT_LABELS);
   const due = survivalCandidates(labelled, DEFAULT_LABELS, now);
   expect(due.map((l) => l.pull.number)).toEqual([1, 2, 3]);

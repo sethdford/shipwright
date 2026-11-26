@@ -111,7 +111,11 @@ async function record(ports: VerifierPorts, req: ScoreRequest, report: ScoreRepo
     branch: head.value.branch,
     headSha: head.value.sha,
     probability: report.probability,
-    signals: { ...NO_SIGNALS, ...req.signals, criticProbability: report.critic?.probability ?? null },
+    signals: {
+      ...NO_SIGNALS,
+      ...req.signals,
+      criticProbability: report.critic?.probability ?? null,
+    },
   });
   return r.ok ? null : `score not logged: ${r.error.message}`;
 }

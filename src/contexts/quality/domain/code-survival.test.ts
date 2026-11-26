@@ -28,7 +28,8 @@ test("added lines per file; deleted files add nothing", () => {
 });
 
 test("trivial lines are not tracked", () => {
-  for (const l of ["", "   ", "}", "});", "fi", "else", "x=1"]) expect(isSignificant(l)).toBe(false);
+  for (const l of ["", "   ", "}", "});", "fi", "else", "x=1"])
+    expect(isSignificant(l)).toBe(false);
   expect(isSignificant("  const total = a + b;")).toBe(true);
 });
 

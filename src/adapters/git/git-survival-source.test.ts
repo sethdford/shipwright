@@ -10,7 +10,10 @@ const fail: ScriptedCall["result"] = { exitCode: 1, stdout: "", stderr: "no" };
 
 function script(over: Partial<Record<string, ScriptedCall["result"]>> = {}): ScriptedCall[] {
   return [
-    { prefix: ["git", "rev-parse", "--verify", "--quiet", "refs/remotes/origin/HEAD"], result: over.base ?? okRun() },
+    {
+      prefix: ["git", "rev-parse", "--verify", "--quiet", "refs/remotes/origin/HEAD"],
+      result: over.base ?? okRun(),
+    },
     { prefix: ["git", "rev-parse"], result: fail },
     { prefix: ["git", "cat-file"], result: over.cat ?? okRun() },
     { prefix: ["git", "rev-list"], result: over.snap ?? okRun(`${SNAP}\n`) },
@@ -22,13 +25,20 @@ function script(over: Partial<Record<string, ScriptedCall["result"]>> = {}): Scr
 
 test("reads the merge's added lines and each file at the horizon commit", async () => {
   const fake = new FakeProcessRunner(script());
-  const r = await new GitSurvivalSource(fake, "/repo").read(MERGE, Date.UTC(2026, 9, 1), 86_400_000);
+  const r = await new GitSurvivalSource(fake, "/repo").read(
+    MERGE,
+    Date.UTC(2026, 9, 1),
+    86_400_000,
+  );
   if (!r.ok || r.value === null) throw new Error("expected input");
   expect(r.value.added.get("a.ts")).toEqual(["const kept = 1;"]);
   expect(r.value.later.get("a.ts")).toBe("const kept = 1;\n");
   const revList = fake.calls.find((c) => c.argv[1] === "rev-list")?.argv;
   expect(revList).toEqual([
-    "git", "rev-list", "-1", "--first-parent",
+    "git",
+    "rev-list",
+    "-1",
+    "--first-parent",
     `--before=@${Math.floor((Date.UTC(2026, 9, 1) + 86_400_000) / 1000)}`,
     "refs/remotes/origin/HEAD",
   ]);
@@ -37,13 +47,21 @@ test("reads the merge's added lines and each file at the horizon commit", async 
 });
 
 test("a file gone at the horizon reads as null", async () => {
-  const r = await new GitSurvivalSource(new FakeProcessRunner(script({ show: fail })), "/r").read(MERGE, 0, 1000);
+  const r = await new GitSurvivalSource(new FakeProcessRunner(script({ show: fail })), "/r").read(
+    MERGE,
+    0,
+    1000,
+  );
   expect(r.ok && r.value?.later.get("a.ts")).toBeNull();
 });
 
 test("missing history is null, not an error: unknown merge, no horizon commit, not an ancestor", async () => {
   for (const over of [{ cat: fail }, { snap: okRun("") }, { ancestor: fail }]) {
-    const r = await new GitSurvivalSource(new FakeProcessRunner(script(over)), "/r").read(MERGE, 0, 1000);
+    const r = await new GitSurvivalSource(new FakeProcessRunner(script(over)), "/r").read(
+      MERGE,
+      0,
+      1000,
+    );
     expect(r).toEqual({ ok: true, value: null });
   }
 });

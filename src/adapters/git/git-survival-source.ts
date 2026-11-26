@@ -39,7 +39,14 @@ export class GitSurvivalSource implements SurvivalSource {
     const at = snap.out.trim();
     if (snap.code !== 0 || !SHA.test(at)) return ok(null);
     if ((await this.git(["merge-base", "--is-ancestor", mergeSha, at])).code !== 0) return ok(null);
-    const diff = await this.git(["diff", "-U0", "--no-color", "--no-renames", `${mergeSha}^1`, mergeSha]);
+    const diff = await this.git([
+      "diff",
+      "-U0",
+      "--no-color",
+      "--no-renames",
+      `${mergeSha}^1`,
+      mergeSha,
+    ]);
     if (diff.code !== 0) return ok(null);
     const added = parseAddedLines(diff.out);
     const later = new Map<string, string | null>();
@@ -63,7 +70,11 @@ export class GitSurvivalSource implements SurvivalSource {
   }
 
   private async git(args: readonly string[]): Promise<Git> {
-    const r = await runOrFail(this.runner, { argv: ["git", ...args], cwd: this.cwd, timeoutMs: 60_000 });
+    const r = await runOrFail(this.runner, {
+      argv: ["git", ...args],
+      cwd: this.cwd,
+      timeoutMs: 60_000,
+    });
     return { code: r.timedOut ? 124 : r.exitCode, out: r.stdout };
   }
 }

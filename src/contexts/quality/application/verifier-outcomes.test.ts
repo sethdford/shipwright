@@ -10,7 +10,11 @@ const NOW = Date.UTC(2026, 10, 26);
 const OLD = NOW - 60 * DAY;
 const FACTORY = "via `shipwright pipeline`";
 
-const pull = (number: number, mergedAtMs: number | null, sha: string | null = null): PullRecord => ({
+const pull = (
+  number: number,
+  mergedAtMs: number | null,
+  sha: string | null = null,
+): PullRecord => ({
   number,
   title: `fix(x): change ${number}`,
   body: FACTORY,
@@ -23,7 +27,8 @@ const pull = (number: number, mergedAtMs: number | null, sha: string | null = nu
   mergeSha: sha,
 });
 
-const lines = (n: number, tag: string) => Array.from({ length: n }, (_, i) => `const ${tag}${i} = ${i};`);
+const lines = (n: number, tag: string) =>
+  Array.from({ length: n }, (_, i) => `const ${tag}${i} = ${i};`);
 const survival = (kept: number) => ({
   added: new Map([["src/a.ts", lines(10, "v")]]),
   later: new Map([["src/a.ts", lines(kept, "v").join("\n")]]),

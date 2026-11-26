@@ -37,7 +37,8 @@ export interface SurvivalSample {
   readonly rate: number | null;
 }
 
-const TRIVIAL = /^[\s{}()[\];,]*$|^(else|end|fi|done|esac|then|do|return;?|break;?|\*\/|\/\*\*?|#|\/\/)$/;
+const TRIVIAL =
+  /^[\s{}()[\];,]*$|^(else|end|fi|done|esac|then|do|return;?|break;?|\*\/|\/\*\*?|#|\/\/)$/;
 
 /** A line worth tracking: not blank, not punctuation only, not a bare keyword or comment marker. */
 export function isSignificant(line: string): boolean {

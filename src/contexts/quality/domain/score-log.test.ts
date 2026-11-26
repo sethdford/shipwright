@@ -1,7 +1,7 @@
 import { expect, test } from "bun:test";
 import { NO_SIGNALS } from "./change-features";
-import type { PullRecord } from "./scorecard";
 import { JOIN_LEAD_MS, type ScoreRecord, signalsFor } from "./score-log";
+import type { PullRecord } from "./scorecard";
 
 const T = Date.UTC(2026, 10, 1);
 const pull: PullRecord = {

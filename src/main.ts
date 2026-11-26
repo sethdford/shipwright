@@ -4,10 +4,10 @@ import { AgentSdkRunner, agentEnv } from "./adapters/agent/agent-sdk-runner";
 import { buildBenchFactory } from "./adapters/bench/bench-factory";
 import { GitAcceptanceWorkspace } from "./adapters/git/git-acceptance-workspace";
 import { GitHistorySource } from "./adapters/git/git-history-source";
-import { GitSurvivalSource } from "./adapters/git/git-survival-source";
 import { GitLocalChange } from "./adapters/git/git-local-change";
 import { GitRepoDocs } from "./adapters/git/git-repo-docs";
 import { GitRepoSource } from "./adapters/git/git-repo-source";
+import { GitSurvivalSource } from "./adapters/git/git-survival-source";
 import { GitWorkspaces } from "./adapters/git/git-workspaces";
 import { GhClosedPulls } from "./adapters/github/gh-closed-pulls";
 import { GhGithubWriter } from "./adapters/github/gh-github-writer";
@@ -25,8 +25,8 @@ import { FilePauseFlag } from "./adapters/state/file-pause-flag";
 import { JsonCostLedger } from "./adapters/state/json-cost-ledger";
 import { JsonModelStore } from "./adapters/state/json-model-store";
 import { JsonVerifierStore } from "./adapters/state/json-verifier-store";
-import { JsonlScoreLog } from "./adapters/state/jsonl-score-log";
 import { JsonlRoutingLog } from "./adapters/state/jsonl-routing-log";
+import { JsonlScoreLog } from "./adapters/state/jsonl-score-log";
 import { LedgerSpend } from "./adapters/state/ledger-spend";
 import { NodeArtifactStore } from "./adapters/state/node-artifact-store";
 import { NodeFileReader } from "./adapters/state/node-file-reader";
@@ -36,7 +36,12 @@ import type { DeliveryPorts } from "./contexts/delivery";
 import type { RepoModelPorts, RoutingPorts } from "./contexts/intelligence";
 import type { SafetyPorts } from "./contexts/orchestration";
 import type { AcceptancePorts } from "./contexts/planning";
-import type { BenchFactory, QualityPorts, VerifierPorts } from "./contexts/quality";
+import {
+  type BenchFactory,
+  candidateVerifier,
+  type QualityPorts,
+  type VerifierPorts,
+} from "./contexts/quality";
 import { installShutdown } from "./shutdown";
 
 const consoleIO: CliIO = {
@@ -142,6 +147,7 @@ export function buildVerifierPorts(
 export function buildDeliveryPorts(
   env: Readonly<Record<string, string | undefined>>,
   cwd: string,
+  verifier: () => VerifierPorts = () => buildVerifierPorts(env, cwd),
 ): DeliveryPorts {
   const runner = new BunProcessRunner();
   const run = `${new Date().toISOString().replace(/[:.]/g, "-")}-${process.pid}`;
@@ -150,6 +156,8 @@ export function buildDeliveryPorts(
     agent: new AgentSdkRunner(agentEnv(env)),
     workspaces: new GitWorkspaces(runner, cwd, root),
     commands: new BashCommandRunner(runner, testEnv(env)),
+    // The merge verifier is one selection signal and decides adaptive early stop (ADR-0018).
+    verifier: env.SHIPWRIGHT_VERIFIER === "off" ? undefined : candidateVerifier(verifier()),
     random: Math.random,
   };
 }
