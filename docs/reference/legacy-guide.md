@@ -768,6 +768,7 @@ Most commands are bash. The dashboard server and the commands routed through `ru
 | `scripts/sw-ci-issue-dispatch-state-test.sh` | 65 | ready, active, handled, fails |
 | `scripts/sw-ci-pipeline-active-test.sh` | 76 | is a pipeline running for an issue |
 | `scripts/sw-ci-retry-state-test.sh` | 117 | auto-retry count and abandon marker |
+| `scripts/sw-ci-state-sync-test.sh` | 136 | shipwright-data restore and merge-persist |
 | `scripts/sw-ci-test.sh` | 199 | GitHub Actions CI/CD orchestration tests |
 | `scripts/sw-cleanup-test.sh` | 169 | Clean up orphaned sessions & artifacts |
 | `scripts/sw-code-review-test.sh` | 176 | Clean code & architecture analysis tests |
