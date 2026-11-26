@@ -4406,3 +4406,4 @@
 {"ts":"2026-11-26T20:04:03Z","ts_epoch":1795723443,"type":"strategic.issue_refused","title":"Strategic intake: reject recommendations that resemble past failed suggestions or exceed a size budget"}
 {"ts":"2026-11-26T20:04:06Z","ts_epoch":1795723446,"type":"strategic.issue_refused","title":"Add test suites for the five untested scripts, starting with sw-tracker-github.sh and sw-tmux-status.sh"}
 {"ts":"2026-11-26T20:04:06Z","ts_epoch":1795723446,"type":"strategic.cycle_complete","issues_created":0,"issues_skipped":3}
+{"ts":"2026-11-26T21:05:35Z","ts_epoch":1795727135,"type":"regression.baseline","timestamp":"2026-11-26T21:05:35Z","test_count":0,"pass_rate":0,"script_count":302,"total_lines":291568}
