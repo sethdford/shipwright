@@ -187,4 +187,4 @@ shipwright pipeline start --goal "Add auth"
 
 Pipeline progress is tracked in `.claude/pipeline-state.md` and artifacts are stored in `.claude/pipeline-artifacts/`. This allows pipelines to be resumed after interruption.
 
-Artifacts added by the run-wide steps include `tournament.json` (candidates, scores, margin and confidence), the acceptance manifest and a copy of the lock (the lock the gate trusts lives in the state directory), `pre-build.patch.moved` and `agent.patch.refused` from the patch handoff, and per-stage `.claude-usage-<stage>.json` files with token and cost usage.
+Artifacts added by the run-wide steps include `tournament.json` (candidates, scores, margin and confidence), the acceptance manifest and a copy of the lock (the lock the gate trusts lives in the state directory), `pre-build.patch.moved` and `agent.patch.refused` from the patch handoff, and `.claude-usage-<step>.json` files (one per Claude call, such as `plan` or `adversarial`) with the tokens and USD that call reported.

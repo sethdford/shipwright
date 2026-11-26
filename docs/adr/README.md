@@ -5,8 +5,8 @@ Each record states one decision, why it was made, and what it costs. Add one wit
 re-debate. Records are numbered in the order they were agreed, and a number is never reused.
 
 **Agents read these.** The governance brief (ADR-0010) puts the Decision section of every ADR
-in force into the build prompt, read from the base commit. `proposed`, `superseded`,
-`deprecated`, `rejected` and `retired` records are left out; anything else, including a record
+in force into the build prompt, read from the base commit. `proposed`, `draft`, `superseded`,
+`deprecated`, `rejected`, `retired` and `withdrawn` records are left out; anything else, including a record
 with no status, is in force. Changing a status therefore changes
 what agents are told, so do it in its own reviewed PR.
 

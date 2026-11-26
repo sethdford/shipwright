@@ -24,6 +24,7 @@ then the default.** The pipeline config is the template JSON the run uses (`PIPE
 | `PIPELINE_TOURNAMENT_BUDGET_USD` | `15` (the command's default) | | Total model spend cap for one tournament: 80% shared by the attempts, 20% for the rubric, grading and judge. | `scripts/lib/pipeline-stages-build.sh` |
 | `PIPELINE_SETUP_CMD` | unset | | Run once in each tournament worktree before the attempt (for example `bun install`). | `scripts/lib/pipeline-stages-build.sh` |
 | `SHIPWRIGHT_VERIFIER` | `advisory`, `enforce`, `off` | `shipwright verify score --mode` | Merge verifier before PR creation (ADR-0012). `advisory` never blocks and reports what `enforce` would do. `enforce` blocks on hard stops at once, and on a predicted chance under 20% only when the model is trusted on factory PRs. A verifier that cannot run never blocks. | `scripts/lib/verifier-gate.sh` |
+| `SHIPWRIGHT_VERIFIER_CRITIC` | `off`, `on` | | Adds a prompted critic to the verifier (it costs model calls), given the repository model's change-impact section when the model is on. Off by default. | `scripts/lib/verifier-gate.sh` |
 
 ## Routing and context
 
@@ -31,6 +32,7 @@ then the default.** The pipeline config is the template JSON the run uses (`PIPE
 |---|---|---|---|
 | `SHIPWRIGHT_ROUTER` | `shadow`, `apply` (or `on`), `off` (or `0`, `false`, `no`) | Adaptive compute router (ADR-0014). `shadow` decides and logs, and changes nothing. `apply` also uses the route's template, model, effort and attempts wherever the caller set none, and exports `PIPELINE_ATTEMPTS` and `PIPELINE_TOURNAMENT_BUDGET_USD`. Any other value is logged as `router.bad_mode` and treated as `shadow`. | `scripts/lib/pipeline-router.sh` |
 | `SHIPWRIGHT_REPO_MODEL` | `on`, `off` | Repository world model (ADR-0016). `off` gives no brief, attaches no MCP server, and the plan stage falls back to the grep-based architecture context. | `scripts/lib/repo-model.sh` |
+| `SHIPWRIGHT_REPO_MODEL_SEMANTIC` | `off`, `on` | Adds a semantic channel (LSA over the files) to `localize`, `map` and the brief. Off by default; the arm is recorded with each brief. | `scripts/lib/repo-model.sh` |
 | `SHIPWRIGHT_GOVERNANCE` | `on`, `off` | Governance pack (ADR-0010): accepted ADRs, policies and standards in the build brief, and the review checklist. Also `--no-governance` on `shipwright governance brief`. | `scripts/lib/governance-brief.sh`, `shipwright governance` |
 | `SHIPWRIGHT_LESSONS` | `on`, `off` | Active repository lessons in the build brief. Also `--no-lessons`. | same |
 | `SHIPWRIGHT_LESSONS_TRIAL` | unset | Comma-separated proposed lesson ids (`L-0007,L-0008`) treated as active for this run only: the trial arm of the self-improvement loop. Also `--trial`. | same |

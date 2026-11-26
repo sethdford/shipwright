@@ -532,8 +532,10 @@ list with source locations is [docs/reference/switches.md](https://github.com/se
 | `PIPELINE_TOURNAMENT_BUDGET_USD` | `15` | dollars | | Tournament spend cap |
 | `PIPELINE_SETUP_CMD` | unset | command | | Setup in each tournament worktree |
 | `SHIPWRIGHT_VERIFIER` | `advisory` | `off`, `advisory`, `enforce` | | Merge verifier before the PR |
+| `SHIPWRIGHT_VERIFIER_CRITIC` | `off` | `off`, `on` | | Adds a prompted critic to the verifier (model spend) |
 | `SHIPWRIGHT_ROUTER` | `shadow` | `shadow`, `apply`, `off` | | Adaptive compute router |
 | `SHIPWRIGHT_REPO_MODEL` | `on` | `on`, `off` | | Repository-model brief and MCP server |
+| `SHIPWRIGHT_REPO_MODEL_SEMANTIC` | `off` | `off`, `on` | | Semantic (LSA) channel for localize, map and the brief |
 | `SHIPWRIGHT_GOVERNANCE` | `on` | `on`, `off` | `--no-governance` | ADRs, policies and standards in prompts |
 | `SHIPWRIGHT_LESSONS` | `on` | `on`, `off` | `--no-lessons` | Active lessons in the build brief |
 | `SHIPWRIGHT_LESSONS_TRIAL` | unset | `L-0007,L-0008` | `--trial` | Treat proposed lessons as active for this run |
