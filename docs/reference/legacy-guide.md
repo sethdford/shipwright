@@ -846,7 +846,7 @@ Most commands are bash. The dashboard server and the commands routed through `ru
 | `scripts/sw-lib-pipeline-intelligence-test.sh` | 411 | Unit tests for intelligence |
 | `scripts/sw-lib-pipeline-quality-checks-test.sh` | 194 | Unit tests for quality |
 | `scripts/sw-lib-pipeline-router-test.sh` | 127 | ADR-0014 adaptive compute router |
-| `scripts/sw-lib-pipeline-stages-test.sh` | 326 | Unit tests for stage functions |
+| `scripts/sw-lib-pipeline-stages-test.sh` | 377 | Unit tests for stage functions |
 | `scripts/sw-lib-pipeline-state-test.sh` | 310 | Unit tests for pipeline state |
 | `scripts/sw-lib-pr-content-test.sh` | 130 | PR titles, bodies and artifact scrubbing |
 | `scripts/sw-lib-repo-model-test.sh` | 128 | ADR-0016 brief and MCP attach |
