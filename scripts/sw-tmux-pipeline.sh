@@ -102,7 +102,7 @@ cmd_spawn() {
     local tmp_file
     tmp_file=$(mktemp)
     # shellcheck disable=SC2064
-    trap "rm -f '$tmp_file'" RETURN
+    trap "rm -f '$tmp_file'; trap - RETURN" RETURN
     cat > "$tmp_file" << EOF
 {
   "job_id": "pipeline-${issue_num}",

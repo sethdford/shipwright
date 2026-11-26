@@ -119,7 +119,7 @@ composer_create_pipeline() {
                 local tmp_file
                 tmp_file=$(mktemp "${output_file}.XXXXXX")
                 # shellcheck disable=SC2064
-                trap "rm -f '$tmp_file'" RETURN
+                trap "rm -f '$tmp_file'; trap - RETURN" RETURN
                 echo "$composed" | jq '.' > "$tmp_file"
                 mv "$tmp_file" "$output_file"
 
@@ -149,7 +149,7 @@ composer_create_pipeline() {
         local tmp_file
         tmp_file=$(mktemp "${output_file}.XXXXXX")
         # shellcheck disable=SC2064
-        trap "rm -f '$tmp_file'" RETURN
+        trap "rm -f '$tmp_file'; trap - RETURN" RETURN
         cp "$fallback_template" "$tmp_file"
         mv "$tmp_file" "$output_file"
 
