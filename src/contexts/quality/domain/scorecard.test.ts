@@ -3,8 +3,8 @@ import {
   computeScorecard,
   DEFAULT_SCORECARD,
   isAgentPull,
-  pullsNeedingCommits,
   type PullRecord,
+  pullsNeedingCommits,
   revertsByTarget,
   type ScorecardConfig,
 } from "./scorecard";
