@@ -12,7 +12,8 @@ import {
   select,
 } from "../domain/selection";
 import type { DeliveryPorts } from "../ports";
-import { type AttemptResult, hasPatch, runAttempt, type TournamentRequest } from "./attempts";
+import { type EarlyStopReport, earlyStopReport, resolveAdaptive, runAttempts } from "./adaptive";
+import { type AttemptResult, hasPatch, type TournamentRequest } from "./attempts";
 import {
   type Contender,
   crossTest,
@@ -39,6 +40,8 @@ export interface TournamentReport {
   readonly adopted: boolean;
   readonly costUsd: number;
   readonly notes: readonly string[];
+  /** Adaptive attempts: what early stopping did or would have done; null when it was off. */
+  readonly earlyStop: EarlyStopReport | null;
 }
 
 class Spend {
@@ -174,7 +177,8 @@ async function adoptWinner(
 /**
  * Tournament mode: N independent attempts in separate worktrees, a rubric drafted from the task in
  * parallel, a cross-test matrix, rubric grades, and a blind group-wise judge among the finalists.
- * Worktrees are always removed. Only an infrastructure failure before any attempt is an error;
+ * Adaptive attempts (shadow by default) report where a verifier would have stopped adding
+ * attempts; enforce actually stops, when the verifier says it is ready. Worktrees are always removed. Only an infrastructure failure before any attempt is an error;
  * "no winner" is a normal outcome in the report.
  */
 export async function runTournament(
@@ -185,11 +189,12 @@ export async function runTournament(
   if (!base.ok) return err(base.error);
   const plan = planBudget(req.budgetUsd, req.attempts);
   const spend = new Spend();
-  const indexes = Array.from({ length: req.attempts }, (_, i) => i);
-  const [rubricDraft, attempts] = await Promise.all([
+  const adaptive = await resolveAdaptive(ports, req);
+  const [rubricDraft, run] = await Promise.all([
     draftRubric(ports, req, plan.rubricUsd),
-    Promise.all(indexes.map((i) => runAttempt(ports, req, base.value, i, plan.perAttemptUsd))),
+    runAttempts(ports, req, base.value, plan.perAttemptUsd, adaptive),
   ]);
+  const attempts = run.attempts;
   try {
     const rubric = spend.add(rubricDraft);
     for (const a of attempts) spend.costUsd += a.costUsd;
@@ -197,6 +202,7 @@ export async function runTournament(
     const { judged, selection } = await choose(ports, req, cs, scored, spend);
     const winnerSha = cs.find((c) => c.id === selection.winner)?.snapshot.sha ?? null;
     const adopted = await adoptWinner(ports, req, winnerSha, spend);
+    const outcome = { winner: selection.winner, candidates: scored };
     return ok({
       baseSha: base.value,
       attempts: attempts.map(({ workspace: _, ...rest }) => rest),
@@ -209,6 +215,7 @@ export async function runTournament(
       adopted,
       costUsd: Math.round(spend.costUsd * 100) / 100,
       notes: spend.notes,
+      earlyStop: earlyStopReport(adaptive, req, run, outcome, plan.perAttemptUsd),
     });
   } finally {
     await cleanup(ports, attempts, spend);

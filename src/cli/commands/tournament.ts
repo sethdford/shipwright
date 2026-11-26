@@ -33,6 +33,12 @@ OPTIONS
   --build-timeout-min N  Per attempt (default 45)
   --test-timeout-min N   Per test run (default 15)
   --no-adopt             Report the winner without touching the current branch
+  --adaptive MODE        Early stop once an attempt is clearly good enough (needs the merge
+                         verifier): off; shadow (default: run every attempt, report where it would
+                         have stopped and what that would have saved); enforce (attempts run one at
+                         a time and stop at the first one the verifier scores at --stop-at or
+                         above; only when the verifier reports itself ready, otherwise shadow)
+  --stop-at X            Early-stop threshold, the verifier's probability, 0.5 to 0.99 (default 0.8)
   --format F             text (default), json, or markdown (a section for the PR body)
 
 EXIT CODES

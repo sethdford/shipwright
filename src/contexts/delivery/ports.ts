@@ -69,6 +69,11 @@ export interface VerifierInput {
  */
 export interface CandidateVerifier {
   score(input: VerifierInput): Promise<number | null>;
+  /**
+   * Optional: null when the verifier is trusted to stop a tournament early (adaptive enforce), or
+   * the reason it is not (for example "only 12 labelled PRs"). Absent means not trusted.
+   */
+  readiness?(): Promise<string | null>;
 }
 
 export interface DeliveryPorts {
