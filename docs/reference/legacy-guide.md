@@ -619,7 +619,7 @@ Most commands are bash. The dashboard server and the commands routed through `ru
 | `scripts/sw-cost.sh` | 1080 | Token Usage & Cost Intelligence |
 | `scripts/sw-daemon.sh` | 1417 | Autonomous GitHub Issue Watcher |
 | `scripts/sw-dashboard.sh` | 519 | Fleet Command Dashboard |
-| `scripts/sw-db.sh` | 1937 | SQLite Persistence Layer |
+| `scripts/sw-db.sh` | 2016 | SQLite Persistence Layer |
 | `scripts/sw-decide.sh` | 716 | Shipwright Autonomous Decision Engine |
 | `scripts/sw-decompose.sh` | 875 | Intelligent Issue Decomposition |
 | `scripts/sw-deps.sh` | 533 | Automated Dependency Update Management |
@@ -781,7 +781,7 @@ Most commands are bash. The dashboard server and the commands routed through `ru
 | `scripts/sw-daemon-test.sh` | 1968 | Unit tests for daemon metrics, health, alerting |
 | `scripts/sw-dashboard-e2e-test.sh` | 593 | full live validation |
 | `scripts/sw-dashboard-test.sh` | 251 | validates dashboard structure |
-| `scripts/sw-db-test.sh` | 978 | SQLite Persistence Layer Test Suite |
+| `scripts/sw-db-test.sh` | 989 | SQLite Persistence Layer Test Suite |
 | `scripts/sw-decide-test.sh` | 522 | Unit tests for the Autonomous Decision Engine |
 | `scripts/sw-decompose-test.sh` | 223 | Intelligent Issue Decomposition tests |
 | `scripts/sw-deps-test.sh` | 166 | Automated Dependency Update Management tests |
@@ -826,11 +826,11 @@ Most commands are bash. The dashboard server and the commands routed through `ru
 | `scripts/sw-lib-audit-trail-test.sh` | 312 |  |
 | `scripts/sw-lib-compat-test.sh` | 423 | Unit tests for cross-platform helpers |
 | `scripts/sw-lib-compound-audit-test.sh` | 282 |  |
-| `scripts/sw-lib-daemon-dispatch-test.sh` | 418 | Unit tests for spawn/reap/queue |
+| `scripts/sw-lib-daemon-dispatch-test.sh` | 485 | Unit tests for spawn/reap/queue |
 | `scripts/sw-lib-daemon-failure-test.sh` | 498 | Unit tests for failure handling |
 | `scripts/sw-lib-daemon-gates-test.sh` | 462 | safety gates at the daemon call sites |
 | `scripts/sw-lib-daemon-patrol-test.sh` | 743 | Unit tests for all patrol functions |
-| `scripts/sw-lib-daemon-poll-test.sh` | 345 | Unit tests for poll, health, cleanup |
+| `scripts/sw-lib-daemon-poll-test.sh` | 375 | Unit tests for poll, health, cleanup |
 | `scripts/sw-lib-daemon-state-test.sh` | 543 | Unit tests for state management |
 | `scripts/sw-lib-daemon-triage-test.sh` | 268 | Unit tests for triage scoring |
 | `scripts/sw-lib-error-actionability-test.sh` | 214 |  |
