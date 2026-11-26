@@ -78,6 +78,7 @@ flowchart LR
   governance_application --> governance
   governance_application --> governance_domain
   governance_application --> kernel
+  governance_application --> learning
   integrations --> kernel
   learning --> learning_application
   learning --> learning_domain

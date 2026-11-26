@@ -162,6 +162,10 @@ USAGE
   shipwright governance check   --changed FILE [--root DIR] [--ref REF] [--json]
   shipwright governance list    [--root DIR] [--ref REF] [--json]
   shipwright governance propose --log FILE --source TEXT [--kind KIND] [--root DIR] [--ref REF] [--json]
+  shipwright governance mine    --manifest FILE [--min N] [--limit N] [--root DIR] [--ref REF] [--json]
+  shipwright governance reflect --draft FILE
+  shipwright governance apply-reflection --draft FILE --reply FILE
+  shipwright governance promote --draft FILE --verdict FILE [--trial TEXT] [--json]
 
 DESCRIPTION
   Reads the repository's ADRs (docs/adr, docs/decisions, adr), policies (docs/policies, .shipwright/policies),
@@ -177,12 +181,22 @@ DESCRIPTION
   propose  Drafts a lesson (status: proposed) from a failed run's log, or names the lesson that already covers
            that failure. Writes nothing: the draft goes to stdout for a maintainer to finish and merge.
 
-ABLATION (for paired eval runs)
+SELF-IMPROVEMENT LOOP (ADR-0010)
+  mine     Classifies failed-run logs (--manifest: "<source> <log path>" per line) and drafts a proposed lesson for
+           each failure that recurs at least --min times (default 2) in a learnable class and that no lesson covers.
+  reflect  Prints the prompt that asks an agent to write a draft's rule, hypothesis, paths and keywords.
+  apply-reflection  Validates the agent's JSON reply and prints the draft with it written in (still proposed).
+  promote  Reads a paired-ratchet verdict (shipwright eval ratchet --json) for a trialled draft and prints it as
+           active (accepted on at least 12 cases, exit 0) or retired (exit 3), with an Evaluation section.
+  Nothing here writes a lesson file or opens a pull request. A person merges every status change.
+
+ABLATION AND TRIAL ARMS (for paired eval runs)
   SHIPWRIGHT_LESSONS=off or --no-lessons leaves lessons out; SHIPWRIGHT_GOVERNANCE=off or --no-governance leaves
-  the documents out.
+  the documents out. SHIPWRIGHT_LESSONS_TRIAL=L-0007,L-0008 or --trial treats those proposed lessons as active.
 
 EXIT CODES
-  0  done      1  could not read (fails closed)      2  usage error      3  propose: already covered
+  0  done      1  could not read (fails closed)      2  usage error
+  3  propose: already covered; reflect: nothing to do; promote: retired
 ```
 
 ## `hello`

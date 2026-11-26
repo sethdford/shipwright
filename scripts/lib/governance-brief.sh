@@ -58,7 +58,8 @@ governance_brief_section() {
         ids="$(printf '%s' "$out" | jq -r '[.lessons[].id] | join(",")' 2>/dev/null || true)"
         _governance_event "governance.brief" "ref=${ref}" "lessons=${ids}" \
             "docs=$(printf '%s' "$out" | jq -r '.docs | length' 2>/dev/null || echo 0)" \
-            "lessons_arm=${SHIPWRIGHT_LESSONS:-on}" "governance_arm=${SHIPWRIGHT_GOVERNANCE:-on}"
+            "lessons_arm=${SHIPWRIGHT_LESSONS:-on}" "governance_arm=${SHIPWRIGHT_GOVERNANCE:-on}" \
+            "lessons_trial=${SHIPWRIGHT_LESSONS_TRIAL:-}"
         printf '%s' "$out" | jq -r '.brief // ""' 2>/dev/null || true
     else
         _governance_event "governance.brief_unavailable" "reason=command_failed"

@@ -13,8 +13,18 @@ import type { AgentFailureKind } from "../../shared/kernel/ports";
 import type { Command, CommandContext } from "../command";
 import { adapterFailure, isHelpRequest, usageError } from "../shared";
 import { envOff, type GovFlags, parseGovFlags, pathLines, SWITCH_FLAGS } from "./governance-flags";
+import { LEARN_ALLOWED, LEARN_RUNNERS } from "./governance-learn";
 
-const SUBCOMMANDS = ["brief", "check", "list", "propose"] as const;
+const SUBCOMMANDS = [
+  "brief",
+  "check",
+  "list",
+  "propose",
+  "mine",
+  "reflect",
+  "apply-reflection",
+  "promote",
+] as const;
 
 const usage = `USAGE
   shipwright governance brief   [--root DIR] [--ref REF] [--issue FILE] [--paths FILE]
@@ -22,6 +32,10 @@ const usage = `USAGE
   shipwright governance check   --changed FILE [--root DIR] [--ref REF] [--json]
   shipwright governance list    [--root DIR] [--ref REF] [--json]
   shipwright governance propose --log FILE --source TEXT [--kind KIND] [--root DIR] [--ref REF] [--json]
+  shipwright governance mine    --manifest FILE [--min N] [--limit N] [--root DIR] [--ref REF] [--json]
+  shipwright governance reflect --draft FILE
+  shipwright governance apply-reflection --draft FILE --reply FILE
+  shipwright governance promote --draft FILE --verdict FILE [--trial TEXT] [--json]
 
 DESCRIPTION
   Reads the repository's ADRs (docs/adr, docs/decisions, adr), policies (docs/policies, .shipwright/policies),
@@ -37,14 +51,25 @@ DESCRIPTION
   propose  Drafts a lesson (status: proposed) from a failed run's log, or names the lesson that already covers
            that failure. Writes nothing: the draft goes to stdout for a maintainer to finish and merge.
 
-ABLATION (for paired eval runs)
+SELF-IMPROVEMENT LOOP (ADR-0010)
+  mine     Classifies failed-run logs (--manifest: "<source> <log path>" per line) and drafts a proposed lesson for
+           each failure that recurs at least --min times (default 2) in a learnable class and that no lesson covers.
+  reflect  Prints the prompt that asks an agent to write a draft's rule, hypothesis, paths and keywords.
+  apply-reflection  Validates the agent's JSON reply and prints the draft with it written in (still proposed).
+  promote  Reads a paired-ratchet verdict (shipwright eval ratchet --json) for a trialled draft and prints it as
+           active (accepted on at least 12 cases, exit 0) or retired (exit 3), with an Evaluation section.
+  Nothing here writes a lesson file or opens a pull request. A person merges every status change.
+
+ABLATION AND TRIAL ARMS (for paired eval runs)
   SHIPWRIGHT_LESSONS=off or --no-lessons leaves lessons out; SHIPWRIGHT_GOVERNANCE=off or --no-governance leaves
-  the documents out.
+  the documents out. SHIPWRIGHT_LESSONS_TRIAL=L-0007,L-0008 or --trial treats those proposed lessons as active.
 
 EXIT CODES
-  0  done      1  could not read (fails closed)      2  usage error      3  propose: already covered`;
+  0  done      1  could not read (fails closed)      2  usage error
+  3  propose: already covered; reflect: nothing to do; promote: retired`;
 
-const ALLOWED: Readonly<Record<(typeof SUBCOMMANDS)[number], readonly string[]>> = {
+const ALLOWED: Readonly<Record<string, readonly string[]>> = {
+  ...LEARN_ALLOWED,
   brief: [
     "--root",
     "--ref",
@@ -52,6 +77,7 @@ const ALLOWED: Readonly<Record<(typeof SUBCOMMANDS)[number], readonly string[]>>
     "--paths",
     "--failure-class",
     "--fingerprint",
+    "--trial",
     ...SWITCH_FLAGS,
   ],
   check: ["--root", "--ref", "--changed", "--json"],
@@ -89,7 +115,12 @@ async function brief(ctx: CommandContext, flags: GovFlags): Promise<number> {
   const paths = pathLines(pathsText);
   const failureClass = flags.values["--failure-class"];
   const fingerprint = flags.values["--fingerprint"];
+  const trial = (flags.values["--trial"] ?? ctx.env.SHIPWRIGHT_LESSONS_TRIAL ?? "")
+    .split(",")
+    .map((t) => t.trim())
+    .filter((t) => t.length > 0);
   const inputs = briefInputs(g, {
+    trial,
     lessons: !flags.switches.has("--no-lessons") && !envOff(ctx.env.SHIPWRIGHT_LESSONS),
     governance: !flags.switches.has("--no-governance") && !envOff(ctx.env.SHIPWRIGHT_GOVERNANCE),
     context: {
@@ -177,7 +208,13 @@ async function propose(ctx: CommandContext, flags: GovFlags): Promise<number> {
   return p.kind === "draft" ? 0 : 3;
 }
 
-const RUNNERS = { brief, check, list, propose } as const;
+const RUNNERS: Readonly<Record<string, (ctx: CommandContext, flags: GovFlags) => Promise<number>>> =
+  {
+    brief,
+    check,
+    list,
+    propose,
+  };
 
 export const governanceCommand: Command = {
   name: "governance",
@@ -195,9 +232,11 @@ export const governanceCommand: Command = {
     if (!(SUBCOMMANDS as readonly string[]).includes(sub)) {
       return usageError(ctx.io, usage, `unknown subcommand: ${sub}`);
     }
-    const name = sub as (typeof SUBCOMMANDS)[number];
-    const flags = parseGovFlags(rest, ALLOWED[name]);
+    const flags = parseGovFlags(rest, ALLOWED[sub] ?? []);
     if (typeof flags === "string") return usageError(ctx.io, usage, flags);
-    return RUNNERS[name](ctx, flags);
+    const learn = LEARN_RUNNERS[sub];
+    if (learn) return learn(ctx, flags, (m) => usageError(ctx.io, usage, m));
+    const run = RUNNERS[sub];
+    return run ? run(ctx, flags) : usageError(ctx.io, usage, `unknown subcommand: ${sub}`);
   },
 };
