@@ -1,0 +1,6 @@
+$ node bin/todo.js --help
+usage: todo [add ITEM] [list]
+
+A tiny todo CLI.
+
+[exit 0]
