@@ -1,4 +1,11 @@
-import type { FileChange, PullRecord, StoredVerifier, VerifierPorts } from "../contexts/quality";
+import type {
+  FileChange,
+  PullRecord,
+  ScoreRecord,
+  StoredVerifier,
+  SurvivalInput,
+  VerifierPorts,
+} from "../contexts/quality";
 import type { AgentRunner, DecideRequest } from "../shared/kernel/ports";
 import { err, ok } from "../shared/kernel/result";
 
@@ -29,16 +36,23 @@ export interface FakeVerifierOptions {
   readonly local?: { readonly files: readonly FileChange[]; readonly patch: string };
   readonly stored?: StoredVerifier | null;
   readonly agent?: AgentRunner;
+  /** Survival inputs by merge sha; a sha not listed reads as "not in local history". */
+  readonly survival?: Readonly<Record<string, SurvivalInput>>;
+  readonly scores?: readonly ScoreRecord[];
+  readonly branch?: string;
 }
 
 /** In-memory verifier ports; `saved` collects what training wrote. */
 export function fakeVerifierPorts(o: FakeVerifierOptions = {}): VerifierPorts & {
   saved: StoredVerifier[];
+  logged: ScoreRecord[];
 } {
   const saved: StoredVerifier[] = [];
+  const logged: ScoreRecord[] = [...(o.scores ?? [])];
   let stored = o.stored ?? null;
   return {
     saved,
+    logged,
     now: () => o.now ?? Date.UTC(2026, 10, 26),
     pulls: {
       closedSince: async () => ok({ pulls: [...(o.pulls ?? [])], truncated: false }),
@@ -50,7 +64,10 @@ export function fakeVerifierPorts(o: FakeVerifierOptions = {}): VerifierPorts & 
         return f ? ok(f) : err({ kind: "not_found", message: `no PR ${pr}` });
       },
     },
-    change: { diff: async () => ok(o.local ?? { files: [], patch: "" }) },
+    change: {
+      diff: async () => ok(o.local ?? { files: [], patch: "" }),
+      head: async () => ok({ branch: o.branch ?? "feat/x", sha: "abc1234" }),
+    },
     store: {
       load: async () => ok(stored),
       save: async (v) => {
@@ -60,5 +77,17 @@ export function fakeVerifierPorts(o: FakeVerifierOptions = {}): VerifierPorts & 
       },
     },
     agent: o.agent ?? fakeCritic(null),
+    survival: { read: async (sha) => ok(o.survival?.[sha] ?? null) },
+    scores: memoryScoreLog(logged),
+  };
+}
+
+function memoryScoreLog(logged: ScoreRecord[]): VerifierPorts["scores"] {
+  return {
+    all: async () => ok([...logged]),
+    append: async (r) => {
+      logged.push(r);
+      return ok(undefined);
+    },
   };
 }

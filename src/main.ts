@@ -4,6 +4,7 @@ import { AgentSdkRunner, agentEnv } from "./adapters/agent/agent-sdk-runner";
 import { buildBenchFactory } from "./adapters/bench/bench-factory";
 import { GitAcceptanceWorkspace } from "./adapters/git/git-acceptance-workspace";
 import { GitHistorySource } from "./adapters/git/git-history-source";
+import { GitSurvivalSource } from "./adapters/git/git-survival-source";
 import { GitLocalChange } from "./adapters/git/git-local-change";
 import { GitRepoDocs } from "./adapters/git/git-repo-docs";
 import { GitRepoSource } from "./adapters/git/git-repo-source";
@@ -24,6 +25,7 @@ import { FilePauseFlag } from "./adapters/state/file-pause-flag";
 import { JsonCostLedger } from "./adapters/state/json-cost-ledger";
 import { JsonModelStore } from "./adapters/state/json-model-store";
 import { JsonVerifierStore } from "./adapters/state/json-verifier-store";
+import { JsonlScoreLog } from "./adapters/state/jsonl-score-log";
 import { JsonlRoutingLog } from "./adapters/state/jsonl-routing-log";
 import { LedgerSpend } from "./adapters/state/ledger-spend";
 import { NodeArtifactStore } from "./adapters/state/node-artifact-store";
@@ -120,13 +122,16 @@ export function buildVerifierPorts(
   cwd: string,
 ): VerifierPorts {
   const runner = new BunProcessRunner();
+  const dir = join(resolvePaths(env).stateDir, "verifier");
   return {
     now: () => Date.now(),
     pulls: new GhClosedPulls(runner),
     files: new GhPullFiles(runner),
     change: new GitLocalChange(runner, cwd),
-    store: new JsonVerifierStore(join(resolvePaths(env).stateDir, "verifier", "model.json")),
+    store: new JsonVerifierStore(join(dir, "model.json")),
     agent: new AgentSdkRunner(agentEnv(env)),
+    survival: new GitSurvivalSource(runner, cwd),
+    scores: new JsonlScoreLog(join(dir, "scores.jsonl")),
   };
 }
 

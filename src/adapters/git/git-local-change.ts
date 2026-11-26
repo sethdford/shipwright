@@ -37,6 +37,14 @@ export class GitLocalChange implements LocalChange {
     return ok({ files: parseNumstat(stat.value), patch: patch.value });
   }
 
+  async head() {
+    const sha = await this.git(["rev-parse", "HEAD"]);
+    if (!sha.ok) return sha;
+    const branch = await this.git(["branch", "--show-current"]);
+    if (!branch.ok) return branch;
+    return ok({ branch: branch.value.trim(), sha: sha.value.trim() });
+  }
+
   private async git(args: readonly string[]): Promise<Result<string, AdapterError>> {
     const r = await runOrFail(this.runner, {
       argv: ["git", ...args],

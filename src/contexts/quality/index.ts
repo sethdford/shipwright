@@ -29,6 +29,7 @@ export {
   type TrainOptions,
   trainVerifier,
 } from "./application/verifier-train";
+export type { LabelSummary } from "./application/verifier-labels";
 export * from "./domain/bench";
 export type { Calibration } from "./domain/calibration";
 export {
@@ -42,7 +43,15 @@ export {
   NO_SIGNALS,
 } from "./domain/change-features";
 export { type EvalResults, type EvalRun, parseEvalResults, scoreRuns } from "./domain/eval-results";
+export {
+  measureSurvival,
+  parseAddedLines,
+  SURVIVAL_RULE,
+  type SurvivalInput,
+  type SurvivalSample,
+} from "./domain/code-survival";
 export { DEFAULT_LABELS, type LabelConfig } from "./domain/outcome-labels";
+export type { ScoreRecord } from "./domain/score-log";
 export { choose, passHatK } from "./domain/pass-k";
 export {
   type CaseScore,
@@ -89,8 +98,10 @@ export type {
   LocalChange,
   PullFiles,
   QualityPorts,
+  ScoreLog,
   SpendSource,
   StoredVerifier,
+  SurvivalSource,
   VerifierPorts,
   VerifierStore,
 } from "./ports";

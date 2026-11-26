@@ -143,6 +143,17 @@ function trainOption(flag: string, v: string, f: TrainFlags): string | null {
     const out = format(v);
     if (out !== "text" && out !== "json") return out;
     f.format = out;
+  } else return outcomeOption(flag, v, f);
+  return null;
+}
+
+function outcomeOption(flag: string, v: string, f: TrainFlags): string | null {
+  if (flag === "--outcome") {
+    if (v !== "merge" && v !== "survival") return "--outcome must be merge or survival";
+    f.labels = { ...f.labels, outcome: v };
+  } else if (flag === "--survival-days") {
+    if (!/^[1-9][0-9]{0,2}$/.test(v) || Number(v) > 365) return "--survival-days must be 1 to 365";
+    f.labels = { ...f.labels, survivalDays: Number(v) };
   } else {
     return `unknown option: ${flag}`;
   }
