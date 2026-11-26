@@ -656,6 +656,9 @@ main() {
         governance|gov)
             run_ts governance "$@"
             ;;
+        repomodel|code)
+            run_ts repomodel "$@"
+            ;;
         *)
             error "Unknown command: ${cmd}"
             echo ""

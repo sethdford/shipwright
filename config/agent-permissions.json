@@ -8,6 +8,7 @@
       "Read",
       "Glob",
       "Grep",
+      "mcp__repomodel",
       "Edit(./**)",
       "Write(./**)",
       "Bash(git status)",

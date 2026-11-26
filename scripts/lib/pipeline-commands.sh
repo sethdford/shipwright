@@ -751,6 +751,12 @@ pipeline_start() {
         fi
     fi
 
+    # Adaptive compute router (ADR-0014): logs a route in shadow mode; in apply mode sets the template,
+    # model, effort and attempts the caller did not set. Never blocks the run.
+    if type pipeline_route_start >/dev/null 2>&1; then
+        pipeline_route_start "$user_specified_pipeline" || true
+    fi
+
     # Check for existing pipeline
     if [[ -f "$STATE_FILE" ]]; then
         local existing_status
@@ -1006,6 +1012,10 @@ pipeline_start() {
     local model_key="${MODEL:-sonnet}"
     local total_cost
     total_cost="$(_pipeline_total_cost "$model_key")"
+
+    if type pipeline_route_finish >/dev/null 2>&1; then
+        pipeline_route_finish "$exit_code" "$total_cost" || true
+    fi
 
     # Send completion notification + event
     local total_dur_s=""

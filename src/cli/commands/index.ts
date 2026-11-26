@@ -1,4 +1,5 @@
 import type { Command } from "../command";
+import { benchCommand } from "./bench";
 import { breakerCommand } from "./breaker";
 import { budgetCommand } from "./budget";
 import { evalCommand } from "./eval";
@@ -8,6 +9,8 @@ import { governanceCommand } from "./governance";
 import { helloCommand } from "./hello";
 import { intakeCommand } from "./intake";
 import { pauseCommand, pausedCommand, resumeCommand } from "./pause";
+import { repomodelCommand } from "./repomodel";
+import { routeCommand } from "./route";
 import { scorecardCommand } from "./scorecard";
 import { verifyCommand } from "./verify";
 
@@ -25,6 +28,9 @@ export const commands: readonly Command[] = [
   evalCommand,
   verifyCommand,
   governanceCommand,
+  repomodelCommand,
+  routeCommand,
+  benchCommand,
 ];
 
 export function findCommand(
