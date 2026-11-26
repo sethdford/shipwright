@@ -7,7 +7,8 @@ import { renderScore, renderStored, renderTraining } from "./verify-render";
 const usage = `USAGE
   shipwright verify score [--base REF] [--title T] [--body-file F] [--tests pass|fail|unknown]
                           [--cross R] [--rubric R] [--critic] [--critic-model M]
-                          [--critic-budget USD] [--mode off|advisory|enforce] [--format text|json]
+                          [--critic-budget USD] [--impact-file F] [--mode off|advisory|enforce]
+                          [--format text|json]
   shipwright verify train [--days N] [--agent N,...] [--exclude N,...] [--human-weight W]
                           [--dry-run] [--format text|json]
   shipwright verify show
@@ -23,7 +24,8 @@ DESCRIPTION
          --rubric pass the run's own signals (test result, tournament cross-test pass rate, rubric
          score, each 0 to 1). --critic adds a prompted reviewer (LLM-as-judge) whose stated chance
          is one more feature, trusted at a third of its stated confidence until training says
-         otherwise; it spends up to --critic-budget (default 0.50 USD).
+         otherwise; it spends up to --critic-budget (default 0.50 USD). --impact-file gives the
+         critic the repository model's change-impact section (\`repomodel impact\`).
   train  Learns the weights from this repository's closed PRs (read-only, through gh): labels
          them, fits a logistic model around the hand-set prior, and measures it leave-one-out
          (Brier, AUC, calibration error) against the prior. Factory PRs weigh 1; human PRs weigh
@@ -61,13 +63,17 @@ async function score(args: readonly string[], ctx: CommandContext): Promise<numb
   if (typeof flags === "string") return usageError(ctx.io, usage, flags);
   const body = await readBody(ctx, flags.bodyFile);
   if (body === null) return 1;
+  const impact = await readBody(ctx, flags.impactFile);
+  if (impact === null) return 1;
   const r = await scoreChange(ctx.verifier(), {
     baseRef: flags.base,
     title: flags.title,
     body,
     mode: flags.mode,
     signals: { ownTestsPass: flags.tests, crossPassRate: flags.cross, rubricScore: flags.rubric },
-    critic: flags.critic ? { model: flags.criticModel, budgetUsd: flags.criticBudget } : null,
+    critic: flags.critic
+      ? { model: flags.criticModel, budgetUsd: flags.criticBudget, impact }
+      : null,
   });
   if (!r.ok) return adapterFailure(ctx.io, "verify", r.error);
   ctx.io.out(flags.format === "json" ? JSON.stringify(r.value, null, 2) : renderScore(r.value));

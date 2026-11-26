@@ -33,6 +33,32 @@ export interface RepoModelPorts {
   readonly source: RepoSource;
   readonly store: ModelStore;
   readonly now: () => string;
+  /** Git history, for the localization check (`repomodel eval`) only. */
+  readonly history?: HistorySource;
+}
+
+/** One merged change in first-parent history, as git records it (ADR-0016 localization check). */
+export interface HistoryCommit {
+  readonly sha: string;
+  readonly parent: string;
+  readonly subject: string;
+  readonly body: string;
+  /** Paths the change touched (`git diff --name-only parent sha`). */
+  readonly files: readonly string[];
+}
+
+/** Past changes and a scratch checkout to rebuild the model at a parent commit. Read-only on the real tree. */
+export interface HistorySource {
+  /** The newest `limit` first-parent commits of `ref`, newest first. */
+  commits(
+    root: string,
+    ref: string,
+    limit: number,
+  ): Promise<Result<readonly HistoryCommit[], AdapterError>>;
+  /** Checks `rev` out in a scratch worktree beside the state directory and returns its path. */
+  checkout(root: string, rev: string): Promise<Result<string, AdapterError>>;
+  /** Removes the scratch worktree. */
+  release(root: string): Promise<void>;
 }
 
 /** A line-oriented stdio channel (the MCP stdio transport): one JSON message per line each way. */

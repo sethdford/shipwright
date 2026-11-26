@@ -1,6 +1,13 @@
 import type { AdapterError, AgentRunner } from "../../shared/kernel/ports";
 import type { Result } from "../../shared/kernel/result";
-import type { BenchArm, BenchRow, BenchTask, MergedPull, RunStatus } from "./domain/bench";
+import type {
+  BenchArm,
+  BenchRow,
+  BenchTask,
+  DirectCommit,
+  MergedPull,
+  RunStatus,
+} from "./domain/bench";
 import type { FileChange } from "./domain/change-features";
 import type { PullCommit, PullRecord } from "./domain/scorecard";
 import type { VerifierModel } from "./domain/verifier-model";
@@ -95,6 +102,11 @@ export interface BenchPorts {
 export interface HoldoutSource {
   /** Merged PRs since `sinceMs`, newest first, with changed files and the merge commit's parent. */
   mergedSince(sinceMs: number, max: number): Promise<Result<readonly MergedPull[], AdapterError>>;
+  /** Non-merge commits on the default branch since `sinceMs`, newest first, with files. */
+  commitsSince(
+    sinceMs: number,
+    max: number,
+  ): Promise<Result<readonly DirectCommit[], AdapterError>>;
   issue(
     n: number,
   ): Promise<Result<{ title: string; body: string; createdAt: string }, AdapterError>>;

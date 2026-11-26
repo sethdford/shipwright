@@ -10,6 +10,8 @@ source "$(dirname "${BASH_SOURCE[0]}")/test-gate-env.sh"
 source "$(dirname "${BASH_SOURCE[0]}")/test-sandbox.sh"
 # shellcheck source=lib/claude-usage.sh
 source "$(dirname "${BASH_SOURCE[0]}")/claude-usage.sh"
+# shellcheck source=lib/repo-model.sh
+source "$(dirname "${BASH_SOURCE[0]}")/repo-model.sh"
 [[ -n "${_PIPELINE_STAGES_REVIEW_LOADED:-}" ]] && return 0
 _PIPELINE_STAGES_REVIEW_LOADED=1
 
@@ -310,6 +312,17 @@ ${_review_skills}
             review_prompt+="
 ## Review Skill Guidance (${INTELLIGENCE_ISSUE_TYPE:-backend} issue)
 ${_review_skills}
+"
+        fi
+    fi
+
+    # Repository world model (ADR-0016): who outside the diff depends on the code it edits.
+    if type repo_model_impact_section >/dev/null 2>&1; then
+        local _review_impact
+        _review_impact="$(repo_model_impact_section "$diff_file")"
+        if [[ -n "$_review_impact" ]]; then
+            review_prompt+="
+${_review_impact}
 "
         fi
     fi

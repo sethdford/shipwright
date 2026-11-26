@@ -1,0 +1,35 @@
+{
+  "baseline": "sw-model-off",
+  "arms": [
+    {
+      "id": "sw-model-off",
+      "label": "Shipwright, repository model off (control)",
+      "kind": "shipwright",
+      "model": "opus",
+      "attempts": 1,
+      "timeoutMin": 120,
+      "estimateUsd": 6,
+      "env": { "SHIPWRIGHT_REPO_MODEL": "off" }
+    },
+    {
+      "id": "sw-model-on",
+      "label": "Shipwright, repository model on (brief, MCP tools, review impact)",
+      "kind": "shipwright",
+      "model": "opus",
+      "attempts": 1,
+      "timeoutMin": 120,
+      "estimateUsd": 6,
+      "env": { "SHIPWRIGHT_REPO_MODEL": "on" }
+    },
+    {
+      "id": "sw-model-semantic",
+      "label": "Shipwright, repository model on with the semantic channel",
+      "kind": "shipwright",
+      "model": "opus",
+      "attempts": 1,
+      "timeoutMin": 120,
+      "estimateUsd": 6,
+      "env": { "SHIPWRIGHT_REPO_MODEL": "on", "SHIPWRIGHT_REPO_MODEL_SEMANTIC": "on" }
+    }
+  ]
+}

@@ -62,6 +62,9 @@ command or external diff.
   stage's "commit remaining changes" and CI partial-work commits go through `handoff_commit_dirty`; a commit
   made during intake, plan, design or review is undone (`reset --mixed`) so its content meets the next judge;
   artifact commits name their paths. Self-heal re-runs the build stage, so it was already covered.
+- Tournament builds (`PIPELINE_ATTEMPTS=2..5`) run whole in one disposable clone without credentials: their
+  attempt worktrees hang off the clone's git dir, never the trusted one, and the adopted winner comes back
+  through the same export, judge and apply as a single build loop.
 - The acceptance gate restores tampered locked tests in its sandbox before running them, and afterwards puts
   the locked blobs back in the trusted checkout where they differ (a plain blob checkout, hooks and filters
   off).

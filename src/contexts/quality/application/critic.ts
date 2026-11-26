@@ -20,7 +20,7 @@ export const CRITIC_INSTRUCTIONS = [
   "- real-change: the diff changes behaviour; it is not only a plan, notes, or a claim the work already exists.",
   "- artifacts: no logs, caches, state files, build output or generated noise are committed.",
   "- tests: behaviour changes come with tests that would fail without the change; no test is deleted, skipped or weakened.",
-  "- correctness: no visible bug, unhandled error path, or broken caller.",
+  "- correctness: no visible bug, unhandled error path, or broken caller. When the data has a change-impact section, check the callers and importers it lists against the changed code.",
   "- risk: no change to CI, permissions, secrets handling or security-sensitive code that the title does not call for.",
   "- description: the title and description are accurate, specific and free of model chatter.",
   "Then give mergeProbability between 0 and 1. Be calibrated: most automated PRs are not merged as-is, and one serious concern should put you below 0.5.",
@@ -63,6 +63,8 @@ export interface CriticRequest {
   readonly patch: string;
   readonly model: string;
   readonly budgetUsd: number;
+  /** The repository model's change-impact section (who depends on the edited code), when there is one. */
+  readonly impact?: string;
 }
 
 /** Diffs beyond this many characters are cut for the critic, and the cut is stated. */
@@ -74,7 +76,8 @@ export function criticData(req: CriticRequest): string {
     cut > 0
       ? `${req.patch.slice(0, MAX_CRITIC_PATCH)}\n[… ${cut} more characters not shown]`
       : req.patch;
-  return `## Title\n${req.title}\n\n## Description\n${req.body.slice(0, 4000)}\n\n## Diff\n${patch}`;
+  const impact = req.impact ? `\n\n${req.impact.slice(0, 8000)}` : "";
+  return `## Title\n${req.title}\n\n## Description\n${req.body.slice(0, 4000)}${impact}\n\n## Diff\n${patch}`;
 }
 
 export async function runCritic(agent: AgentRunner, req: CriticRequest): Promise<CriticResult> {

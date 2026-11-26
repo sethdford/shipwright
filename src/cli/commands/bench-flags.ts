@@ -47,6 +47,8 @@ const VALUE_FLAGS = [
   "max",
   "format",
   "clone-url",
+  "source",
+  "problems",
 ];
 const INT = (lo: number, hi: number) => (v: string) =>
   /^\d+$/.test(v) && Number(v) >= lo && Number(v) <= hi;
@@ -60,6 +62,8 @@ function checkValues(values: Record<string, string>): string | null {
   if (values.max !== undefined && !INT(1, 2000)(values.max)) return "--max must be 1 to 2000";
   if (values.since !== undefined && Number.isNaN(Date.parse(values.since)))
     return "--since must be a date";
+  if (values.source !== undefined && !["pulls", "commits"].includes(values.source))
+    return "--source must be pulls or commits";
   if (values.format !== undefined && !["md", "html", "json"].includes(values.format))
     return "--format must be md, html or json";
   return null;
