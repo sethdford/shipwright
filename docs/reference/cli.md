@@ -190,6 +190,42 @@ EXAMPLES
   shipwright gates check --retry 2 --json
 ```
 
+## `governance`
+
+ADRs, policies, standards and lessons for agents: brief, review checklist, lesson drafts
+
+Aliases: `gov`
+
+```text
+USAGE
+  shipwright governance brief   [--root DIR] [--ref REF] [--issue FILE] [--paths FILE]
+                                [--failure-class C] [--fingerprint F] [--no-lessons] [--no-governance] [--json]
+  shipwright governance check   --changed FILE [--root DIR] [--ref REF] [--json]
+  shipwright governance list    [--root DIR] [--ref REF] [--json]
+  shipwright governance propose --log FILE --source TEXT [--kind KIND] [--root DIR] [--ref REF] [--json]
+
+DESCRIPTION
+  Reads the repository's ADRs (docs/adr, docs/decisions, adr), policies (docs/policies, .shipwright/policies),
+  standards (docs/standards, .shipwright/standards) and lessons (.shipwright/lessons). Tracked files only; with
+  --ref, the files committed at that ref, so an agent's edits cannot change what it is told (ADR-0010).
+
+  brief    The governance brief for an agent prompt: documents in force, then the active lessons that fit the
+           issue (--issue), the planned or changed paths (--paths, one per line) and an earlier failure. Prints
+           nothing when there is nothing to say. --json also lists which documents and lessons went in.
+  check    The checklist a reviewer checks a change against: documents whose applies_to matches a changed path
+           (--changed, one per line), then repository-wide policies and standards.
+  list     Every document and lesson with its id, kind and status.
+  propose  Drafts a lesson (status: proposed) from a failed run's log, or names the lesson that already covers
+           that failure. Writes nothing: the draft goes to stdout for a maintainer to finish and merge.
+
+ABLATION (for paired eval runs)
+  SHIPWRIGHT_LESSONS=off or --no-lessons leaves lessons out; SHIPWRIGHT_GOVERNANCE=off or --no-governance leaves
+  the documents out.
+
+EXIT CODES
+  0  done      1  could not read (fails closed)      2  usage error      3  propose: already covered
+```
+
 ## `hello`
 
 Print hello world (CLI smoke test)

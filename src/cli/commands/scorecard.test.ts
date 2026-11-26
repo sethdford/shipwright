@@ -35,7 +35,7 @@ async function run(args: string[], ports: QualityPorts = quality()) {
   const io = captureIO();
   const code = await scorecardCommand.run(
     args,
-    commandContext(io, undefined, {}, undefined, ports),
+    commandContext(io, undefined, {}, undefined, { quality: ports }),
   );
   return { code, io };
 }

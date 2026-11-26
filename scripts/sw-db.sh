@@ -688,6 +688,13 @@ db_add_event() {
         return 1
     fi
 
+    [[ "$duration_secs" =~ ^[0-9]+$ ]] || duration_secs=0
+    event_type="${event_type//$_SQL_SQ/$_SQL_SQ$_SQL_SQ}"
+    job_id="${job_id//$_SQL_SQ/$_SQL_SQ$_SQL_SQ}"
+    metadata="${metadata//$_SQL_SQ/$_SQL_SQ$_SQL_SQ}"
+    stage="${stage//$_SQL_SQ/$_SQL_SQ$_SQL_SQ}"
+    status="${status//$_SQL_SQ/$_SQL_SQ$_SQL_SQ}"
+    ts="${ts//$_SQL_SQ/$_SQL_SQ$_SQL_SQ}"
     _db_exec "INSERT OR IGNORE INTO events (ts, ts_epoch, type, job_id, stage, status, duration_secs, metadata, created_at, synced) VALUES ('${ts}', ${ts_epoch}, '${event_type}', '${job_id}', '${stage}', '${status}', ${duration_secs}, '${metadata}', '${ts}', 0);" || return 1
 }
 
@@ -825,9 +832,19 @@ add_event() {
 
     # Try SQLite first
     if db_available; then
+        # Subshell: the SQL-escaped values must not leak into the JSONL record below.
+        (
+        [[ "$duration_secs" =~ ^[0-9]+$ ]] || duration_secs=0
+        event_type="${event_type//$_SQL_SQ/$_SQL_SQ$_SQL_SQ}"
+        job_id="${job_id//$_SQL_SQ/$_SQL_SQ$_SQL_SQ}"
+        metadata="${metadata//$_SQL_SQ/$_SQL_SQ$_SQL_SQ}"
+        stage="${stage//$_SQL_SQ/$_SQL_SQ$_SQL_SQ}"
+        status="${status//$_SQL_SQ/$_SQL_SQ$_SQL_SQ}"
+        ts="${ts//$_SQL_SQ/$_SQL_SQ$_SQL_SQ}"
         if ! _db_exec "INSERT OR IGNORE INTO events (ts, ts_epoch, type, job_id, stage, status, duration_secs, metadata, created_at, synced) VALUES ('${ts}', ${ts_epoch}, '${event_type}', '${job_id}', '${stage}', '${status}', ${duration_secs}, '${metadata}', '${ts}', 0);" 2>/dev/null; then
             warn "db_add_event: SQLite insert failed for event type=${event_type}" >&2
         fi
+        ) || true
     fi
 
     # Always write to JSONL for backward compat (dual-write period)
@@ -866,6 +883,11 @@ db_save_job() {
     title="${title//$_SQL_SQ/$_SQL_SQ$_SQL_SQ}"
     goal="${goal//$_SQL_SQ/$_SQL_SQ$_SQL_SQ}"
 
+    branch="${branch//$_SQL_SQ/$_SQL_SQ$_SQL_SQ}"
+    job_id="${job_id//$_SQL_SQ/$_SQL_SQ$_SQL_SQ}"
+    template="${template//$_SQL_SQ/$_SQL_SQ$_SQL_SQ}"
+    ts="${ts//$_SQL_SQ/$_SQL_SQ$_SQL_SQ}"
+    worktree="${worktree//$_SQL_SQ/$_SQL_SQ$_SQL_SQ}"
     _db_exec "INSERT OR REPLACE INTO daemon_state (job_id, issue_number, title, goal, pid, worktree, branch, status, template, started_at, updated_at) VALUES ('${job_id}', ${issue_num}, '${title}', '${goal}', ${pid}, '${worktree}', '${branch}', 'active', '${template}', '${ts}', '${ts}');"
 }
 
@@ -882,6 +904,10 @@ db_complete_job() {
 
     error_msg="${error_msg//$_SQL_SQ/$_SQL_SQ$_SQL_SQ}"
 
+    duration="${duration//$_SQL_SQ/$_SQL_SQ$_SQL_SQ}"
+    job_id="${job_id//$_SQL_SQ/$_SQL_SQ$_SQL_SQ}"
+    result="${result//$_SQL_SQ/$_SQL_SQ$_SQL_SQ}"
+    ts="${ts//$_SQL_SQ/$_SQL_SQ$_SQL_SQ}"
     _db_exec "UPDATE daemon_state SET status = 'completed', result = '${result}', duration = '${duration}', error_message = '${error_msg}', completed_at = '${ts}', updated_at = '${ts}' WHERE job_id = '${job_id}' AND status = 'active';"
 }
 
@@ -896,6 +922,8 @@ db_fail_job() {
 
     error_msg="${error_msg//$_SQL_SQ/$_SQL_SQ$_SQL_SQ}"
 
+    job_id="${job_id//$_SQL_SQ/$_SQL_SQ$_SQL_SQ}"
+    ts="${ts//$_SQL_SQ/$_SQL_SQ$_SQL_SQ}"
     _db_exec "UPDATE daemon_state SET status = 'failed', result = 'failure', error_message = '${error_msg}', completed_at = '${ts}', updated_at = '${ts}' WHERE job_id = '${job_id}' AND status = 'active';"
 }
 
@@ -931,6 +959,7 @@ db_is_issue_active() {
 db_remove_active_job() {
     local job_id="$1"
     if ! db_available; then return 1; fi
+    job_id="${job_id//$_SQL_SQ/$_SQL_SQ$_SQL_SQ}"
     _db_exec "DELETE FROM daemon_state WHERE job_id = '${job_id}' AND status = 'active';"
 }
 
@@ -1020,6 +1049,10 @@ db_record_cost() {
 
     if ! db_available; then return 1; fi
 
+    issue="${issue//$_SQL_SQ/$_SQL_SQ$_SQL_SQ}"
+    model="${model//$_SQL_SQ/$_SQL_SQ$_SQL_SQ}"
+    stage="${stage//$_SQL_SQ/$_SQL_SQ$_SQL_SQ}"
+    ts="${ts//$_SQL_SQ/$_SQL_SQ$_SQL_SQ}"
     _db_exec "INSERT INTO cost_entries (input_tokens, output_tokens, model, stage, issue, cost_usd, ts, ts_epoch, synced) VALUES (${input_tokens}, ${output_tokens}, '${model}', '${stage}', '${issue}', ${cost_usd}, '${ts}', ${ts_epoch}, 0);"
 }
 
@@ -1082,6 +1115,8 @@ db_remaining_budget() {
 # db_set_budget <amount_usd>
 db_set_budget() {
     local amount="$1"
+    # The amount goes into SQL unquoted: accept a plain non-negative number only.
+    [[ "$amount" =~ ^[0-9]+(\.[0-9]+)?$ ]] || return 1
     if ! db_available; then return 1; fi
     _db_exec "INSERT OR REPLACE INTO budgets (id, daily_budget_usd, enabled, updated_at) VALUES (1, ${amount}, 1, '$(now_iso)');"
 }
@@ -1112,6 +1147,9 @@ db_record_heartbeat() {
 
     activity="${activity//$_SQL_SQ/$_SQL_SQ$_SQL_SQ}"
 
+    job_id="${job_id//$_SQL_SQ/$_SQL_SQ$_SQL_SQ}"
+    stage="${stage//$_SQL_SQ/$_SQL_SQ$_SQL_SQ}"
+    ts="${ts//$_SQL_SQ/$_SQL_SQ$_SQL_SQ}"
     _db_exec "INSERT OR REPLACE INTO heartbeats (job_id, pid, issue, stage, iteration, last_activity, memory_mb, updated_at) VALUES ('${job_id}', ${pid}, ${issue}, '${stage}', ${iteration}, '${activity}', ${memory_mb}, '${ts}');"
 }
 
@@ -1123,6 +1161,7 @@ db_stale_heartbeats() {
     cutoff_epoch=$(( $(now_epoch) - threshold ))
     local cutoff_ts
     cutoff_ts=$(epoch_to_iso "$cutoff_epoch" || echo "2000-01-01T00:00:00Z")
+    cutoff_ts="${cutoff_ts//$_SQL_SQ/$_SQL_SQ$_SQL_SQ}"
     _db_query "SELECT json_group_array(json_object('job_id', job_id, 'pid', pid, 'stage', stage, 'updated_at', updated_at)) FROM heartbeats WHERE updated_at < '${cutoff_ts}';" || echo "[]"
 }
 
@@ -1130,6 +1169,7 @@ db_stale_heartbeats() {
 db_clear_heartbeat() {
     local job_id="$1"
     if ! db_available; then return 1; fi
+    job_id="${job_id//$_SQL_SQ/$_SQL_SQ$_SQL_SQ}"
     _db_exec "DELETE FROM heartbeats WHERE job_id = '${job_id}';"
 }
 
@@ -1163,6 +1203,11 @@ db_record_failure() {
     fix_desc="${fix_desc//$_SQL_SQ/$_SQL_SQ$_SQL_SQ}"
 
     # Upsert: increment occurrences if same signature exists
+    failure_class="${failure_class//$_SQL_SQ/$_SQL_SQ$_SQL_SQ}"
+    file_path="${file_path//$_SQL_SQ/$_SQL_SQ$_SQL_SQ}"
+    repo_hash="${repo_hash//$_SQL_SQ/$_SQL_SQ$_SQL_SQ}"
+    stage="${stage//$_SQL_SQ/$_SQL_SQ$_SQL_SQ}"
+    ts="${ts//$_SQL_SQ/$_SQL_SQ$_SQL_SQ}"
     _db_exec "INSERT INTO memory_failures (repo_hash, failure_class, error_signature, root_cause, fix_description, file_path, stage, occurrences, last_seen_at, created_at, synced) VALUES ('${repo_hash}', '${failure_class}', '${error_sig}', '${root_cause}', '${fix_desc}', '${file_path}', '${stage}', 1, '${ts}', '${ts}', 0) ON CONFLICT(id) DO UPDATE SET occurrences = occurrences + 1, last_seen_at = '${ts}';"
 }
 
@@ -1309,6 +1354,9 @@ add_pipeline_run() {
     goal="${goal//$_SQL_SQ/$_SQL_SQ$_SQL_SQ}"
     branch="${branch//$_SQL_SQ/$_SQL_SQ$_SQL_SQ}"
 
+    job_id="${job_id//$_SQL_SQ/$_SQL_SQ$_SQL_SQ}"
+    template="${template//$_SQL_SQ/$_SQL_SQ$_SQL_SQ}"
+    ts="${ts//$_SQL_SQ/$_SQL_SQ$_SQL_SQ}"
     _db_exec "INSERT OR IGNORE INTO pipeline_runs (job_id, issue_number, goal, branch, status, template, started_at, created_at) VALUES ('${job_id}', ${issue_number}, '${goal}', '${branch}', 'pending', '${template}', '${ts}', '${ts}');" || return 1
 }
 
@@ -1324,6 +1372,11 @@ update_pipeline_status() {
     local ts
     ts="$(now_iso)"
 
+    job_id="${job_id//$_SQL_SQ/$_SQL_SQ$_SQL_SQ}"
+    stage_name="${stage_name//$_SQL_SQ/$_SQL_SQ$_SQL_SQ}"
+    stage_status="${stage_status//$_SQL_SQ/$_SQL_SQ$_SQL_SQ}"
+    status="${status//$_SQL_SQ/$_SQL_SQ$_SQL_SQ}"
+    ts="${ts//$_SQL_SQ/$_SQL_SQ$_SQL_SQ}"
     _db_exec "UPDATE pipeline_runs SET status = '${status}', stage_name = '${stage_name}', stage_status = '${stage_status}', duration_secs = ${duration_secs}, completed_at = CASE WHEN '${status}' IN ('completed', 'failed') THEN '${ts}' ELSE completed_at END WHERE job_id = '${job_id}';" || return 1
 }
 
@@ -1340,6 +1393,10 @@ record_stage() {
     ts="$(now_iso)"
     error_msg="${error_msg//$_SQL_SQ/$_SQL_SQ$_SQL_SQ}"
 
+    job_id="${job_id//$_SQL_SQ/$_SQL_SQ$_SQL_SQ}"
+    stage_name="${stage_name//$_SQL_SQ/$_SQL_SQ$_SQL_SQ}"
+    status="${status//$_SQL_SQ/$_SQL_SQ$_SQL_SQ}"
+    ts="${ts//$_SQL_SQ/$_SQL_SQ$_SQL_SQ}"
     _db_exec "INSERT INTO pipeline_stages (job_id, stage_name, status, started_at, completed_at, duration_secs, error_message, created_at) VALUES ('${job_id}', '${stage_name}', '${status}', '${ts}', '${ts}', ${duration_secs}, '${error_msg}', '${ts}');" || return 1
 }
 
@@ -1461,6 +1518,11 @@ db_sync_pull() {
         e_epoch=$(echo "$evt" | jq -r '.ts_epoch // 0')
         e_type=$(echo "$evt" | jq -r '.type // ""')
         e_job=$(echo "$evt" | jq -r '.job_id // ""')
+        # Pulled from a remote server: numbers must be numbers, text is escaped.
+        [[ "$e_epoch" =~ ^[0-9]+$ ]] || continue
+        e_job="${e_job//$_SQL_SQ/$_SQL_SQ$_SQL_SQ}"
+        e_ts="${e_ts//$_SQL_SQ/$_SQL_SQ$_SQL_SQ}"
+        e_type="${e_type//$_SQL_SQ/$_SQL_SQ$_SQL_SQ}"
         _db_exec "INSERT OR IGNORE INTO events (ts, ts_epoch, type, job_id, created_at, synced) VALUES ('${e_ts}', ${e_epoch}, '${e_type}', '${e_job}', '${e_ts}', 1);" 2>/dev/null && event_count=$((event_count + 1))
     done < <(echo "$response_body" | jq -c '.events[]' 2>/dev/null)
 
@@ -1501,6 +1563,11 @@ migrate_json_data() {
             e_stage=$(echo "$line" | jq -r '.stage // ""' 2>/dev/null || true)
             e_status=$(echo "$line" | jq -r '.status // ""' 2>/dev/null || true)
 
+            e_job="${e_job//$_SQL_SQ/$_SQL_SQ$_SQL_SQ}"
+            e_stage="${e_stage//$_SQL_SQ/$_SQL_SQ$_SQL_SQ}"
+            e_status="${e_status//$_SQL_SQ/$_SQL_SQ$_SQL_SQ}"
+            e_ts="${e_ts//$_SQL_SQ/$_SQL_SQ$_SQL_SQ}"
+            e_type="${e_type//$_SQL_SQ/$_SQL_SQ$_SQL_SQ}"
             if _db_exec "INSERT OR IGNORE INTO events (ts, ts_epoch, type, job_id, stage, status, created_at, synced) VALUES ('${e_ts}', ${e_epoch}, '${e_type}', '${e_job}', '${e_stage}', '${e_status}', '${e_ts}', 0);" 2>/dev/null; then
                 evt_count=$((evt_count + 1))
             else
@@ -1526,6 +1593,10 @@ migrate_json_data() {
             j_at=$(echo "$job" | jq -r '.completed_at // ""')
             local j_id
             j_id="migrated-${j_issue}-$(echo "$j_at" | tr -dc '0-9' | tail -c 10)"
+            j_at="${j_at//$_SQL_SQ/$_SQL_SQ$_SQL_SQ}"
+            j_dur="${j_dur//$_SQL_SQ/$_SQL_SQ$_SQL_SQ}"
+            j_id="${j_id//$_SQL_SQ/$_SQL_SQ$_SQL_SQ}"
+            j_result="${j_result//$_SQL_SQ/$_SQL_SQ$_SQL_SQ}"
             _db_exec "INSERT OR IGNORE INTO daemon_state (job_id, issue_number, status, result, duration, completed_at, started_at, updated_at) VALUES ('${j_id}', ${j_issue}, 'completed', '${j_result}', '${j_dur}', '${j_at}', '${j_at}', '$(now_iso)');" 2>/dev/null && job_count=$((job_count + 1))
         done < <(jq -c '.completed[]' "$DAEMON_STATE_FILE" 2>/dev/null)
 
@@ -1548,6 +1619,10 @@ migrate_json_data() {
             c_cost=$(echo "$entry" | jq -r '.cost_usd // 0')
             c_ts=$(echo "$entry" | jq -r '.ts // ""')
             c_epoch=$(echo "$entry" | jq -r '.ts_epoch // 0')
+            c_issue="${c_issue//$_SQL_SQ/$_SQL_SQ$_SQL_SQ}"
+            c_model="${c_model//$_SQL_SQ/$_SQL_SQ$_SQL_SQ}"
+            c_stage="${c_stage//$_SQL_SQ/$_SQL_SQ$_SQL_SQ}"
+            c_ts="${c_ts//$_SQL_SQ/$_SQL_SQ$_SQL_SQ}"
             _db_exec "INSERT INTO cost_entries (input_tokens, output_tokens, model, stage, issue, cost_usd, ts, ts_epoch, synced) VALUES (${c_input}, ${c_output}, '${c_model}', '${c_stage}', '${c_issue}', ${c_cost}, '${c_ts}', ${c_epoch}, 0);" 2>/dev/null && cost_count=$((cost_count + 1))
         done < <(jq -c '.entries[]' "$COST_FILE_JSON" 2>/dev/null)
 
@@ -1583,6 +1658,9 @@ migrate_json_data() {
             hb_updated=$(jq -r '.updated_at // ""' "$hb_file" 2>/dev/null || echo "$(now_iso)")
 
             hb_activity="${hb_activity//$_SQL_SQ/$_SQL_SQ$_SQL_SQ}"
+            hb_job="${hb_job//$_SQL_SQ/$_SQL_SQ$_SQL_SQ}"
+            hb_stage="${hb_stage//$_SQL_SQ/$_SQL_SQ$_SQL_SQ}"
+            hb_updated="${hb_updated//$_SQL_SQ/$_SQL_SQ$_SQL_SQ}"
             _db_exec "INSERT OR REPLACE INTO heartbeats (job_id, pid, issue, stage, iteration, last_activity, memory_mb, updated_at) VALUES ('${hb_job}', ${hb_pid}, ${hb_issue}, '${hb_stage}', ${hb_iter}, '${hb_activity}', ${hb_mem}, '${hb_updated}');" 2>/dev/null && hb_count=$((hb_count + 1))
         done
         success "Heartbeats: ${hb_count} imported"
@@ -1753,6 +1831,7 @@ cleanup_old_data() {
     info "Cleaning records older than ${days} days (before ${cutoff_date})..."
 
     local d_events d_costs d_daemon d_stages
+    cutoff_date="${cutoff_date//$_SQL_SQ/$_SQL_SQ$_SQL_SQ}"
     _db_exec "DELETE FROM events WHERE ts < '${cutoff_date}';"
     d_events=$(_db_query "SELECT changes();" || echo "0")
     _db_exec "DELETE FROM cost_entries WHERE ts < '${cutoff_date}';"

@@ -71,7 +71,7 @@ const files = new FakeFileReader({
 
 async function run(args: string[], bench = fakeBench()) {
   const io = captureIO();
-  const ctx = commandContext(io, undefined, {}, files, undefined, bench.factory);
+  const ctx = commandContext(io, undefined, {}, files, { bench: bench.factory });
   return { code: await benchCommand.run(args, ctx), io, bench };
 }
 

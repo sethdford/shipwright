@@ -222,7 +222,7 @@ _compute_budget() {
     budget_enabled=$(jq -r '.enabled' "$budget_file" 2>/dev/null || echo "false")
     budget_usd=$(jq -r '.daily_budget_usd' "$budget_file" 2>/dev/null || echo "0")
 
-    if [[ "$budget_enabled" != "true" || "$budget_usd" == "0" ]]; then
+    if [[ "$budget_enabled" != "true" ]] || budget_is_unlimited "$budget_usd"; then
         echo "100"
         return
     fi
@@ -242,7 +242,7 @@ _compute_budget() {
     today_spent=$(_safe_num "$today_spent")
     budget_usd=$(_safe_num "$budget_usd")
 
-    if [[ "$budget_usd" == "0" ]]; then
+    if budget_is_unlimited "$budget_usd"; then
         echo "100"
         return
     fi
@@ -704,7 +704,7 @@ pipeline_budget_trajectory() {
     budget_usd=$(jq -r '.daily_budget_usd' "$BUDGET_FILE" 2>/dev/null || echo "0")
     budget_usd=$(_safe_num "$budget_usd")
 
-    if [[ "$budget_usd" == "0" ]]; then
+    if budget_is_unlimited "$budget_usd"; then
         echo "ok"
         return
     fi

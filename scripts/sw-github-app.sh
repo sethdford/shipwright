@@ -84,7 +84,7 @@ cmd_setup() {
     local tmp_config
     tmp_config=$(mktemp)
     # shellcheck disable=SC2064
-    trap "rm -f '$tmp_config'" RETURN
+    trap "rm -f '$tmp_config'; trap - RETURN" RETURN
     # shellcheck disable=SC2046
     jq -n \
         --arg app_id "$app_id" \
@@ -191,7 +191,7 @@ _cache_token() {
     local tmp_tokens
     tmp_tokens=$(mktemp)
     # shellcheck disable=SC2064
-    trap "rm -f '$tmp_tokens'" RETURN
+    trap "rm -f '$tmp_tokens'; trap - RETURN" RETURN
 
     local new_entry
     new_entry=$(jq -n \

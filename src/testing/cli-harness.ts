@@ -1,4 +1,5 @@
 import type { CliIO, CommandContext } from "../cli/command";
+import type { RepoDocs } from "../contexts/governance";
 import type { SafetyPorts } from "../contexts/orchestration";
 import type { BenchFactory, QualityPorts } from "../contexts/quality";
 import type { FileReader } from "../shared/kernel/ports";
@@ -25,8 +26,11 @@ export function commandContext(
   safety?: SafetyPorts,
   env: Readonly<Record<string, string | undefined>> = {},
   files?: FileReader,
-  quality?: QualityPorts,
-  bench?: BenchFactory,
+  ports: {
+    readonly repoDocs?: RepoDocs;
+    readonly quality?: QualityPorts;
+    readonly bench?: BenchFactory;
+  } = {},
 ): CommandContext {
   return {
     io,
@@ -40,13 +44,17 @@ export function commandContext(
       if (!files) throw new Error("this command was not given a file reader");
       return files;
     },
+    repoDocs: () => {
+      if (!ports.repoDocs) throw new Error("this command was not given repository documents");
+      return ports.repoDocs;
+    },
     quality: () => {
-      if (!quality) throw new Error("this command was not given quality ports");
-      return quality;
+      if (!ports.quality) throw new Error("this command was not given quality ports");
+      return ports.quality;
     },
     bench: () => {
-      if (!bench) throw new Error("this command was not given bench ports");
-      return bench;
+      if (!ports.bench) throw new Error("this command was not given bench ports");
+      return ports.bench;
     },
   };
 }
