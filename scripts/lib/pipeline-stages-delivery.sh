@@ -2,6 +2,8 @@
 # Source from pipeline-stages.sh. Requires all pipeline globals and dependencies.
 [[ -n "${_PIPELINE_STAGES_DELIVERY_LOADED:-}" ]] && return 0
 _PIPELINE_STAGES_DELIVERY_LOADED=1
+# shellcheck source=lib/patch-handoff.sh
+source "$(dirname "${BASH_SOURCE[0]}")/patch-handoff.sh"
 # shellcheck source=pr-content.sh
 source "$(dirname "${BASH_SOURCE[0]}")/pr-content.sh"
 
@@ -66,7 +68,15 @@ stage_pr() {
     fi
 
     # Commit any uncommitted changes left by the build agent
-    if ! git diff --quiet 2>/dev/null || ! git diff --cached --quiet 2>/dev/null; then
+    if [[ "${SW_PATCH_HANDOFF:-true}" != "false" ]]; then
+        # Agents in later stages (review, tests) ran in this checkout: what they left is judged
+        # like the build agent's patch, or dropped, never swept into the PR unjudged.
+        if ! handoff_commit_dirty "$PROJECT_ROOT" "chore: pipeline cleanup — commit remaining build changes" \
+            "${ARTIFACTS_DIR}/leftover.patch" >/dev/null; then
+            warn "Leftover changes refused by the patch judge; they stay out of the PR (${ARTIFACTS_DIR}/leftover.patch)"
+            emit_event "pr.leftover_refused" "issue=${ISSUE_NUMBER:-0}"
+        fi
+    elif ! git diff --quiet 2>/dev/null || ! git diff --cached --quiet 2>/dev/null; then
         info "Committing remaining uncommitted changes..."
         git add -A 2>/dev/null || true
         git commit -m "chore: pipeline cleanup — commit remaining build changes" --no-verify 2>/dev/null || true
@@ -353,6 +363,16 @@ EOF
                 emit_event "pr.warning" "issue=${ISSUE_NUMBER:-0}" "reason=oversized_pr" "lines=${total_lines}" "max=${max_pr_lines}"
             fi
         fi
+    fi
+
+    # ── Merge verifier (ADR-0012): stop changes that should not become PRs ──
+    if type verifier_gate >/dev/null 2>&1; then
+        local verifier_tests="unknown"
+        [[ "$(get_stage_status test 2>/dev/null || true)" == "complete" ]] && verifier_tests="pass"
+        verifier_gate "origin/$BASE_BRANCH" "$pr_title" "$pr_body" "$verifier_tests" || return 1
+        [[ -n "${VERIFIER_PR_NOTE:-}" ]] && pr_body="${pr_body}
+
+<sub>${VERIFIER_PR_NOTE}</sub>"
     fi
 
     # Build gh pr create args

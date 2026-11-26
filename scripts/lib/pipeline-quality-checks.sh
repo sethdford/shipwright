@@ -6,6 +6,8 @@ SW_AGENT_EXEC="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/agent-exec.sh"
 # Test commands run without credentials (#8608).
 # shellcheck source=lib/test-gate-env.sh
 source "$(dirname "${BASH_SOURCE[0]}")/test-gate-env.sh"
+# shellcheck source=lib/claude-usage.sh
+source "$(dirname "${BASH_SOURCE[0]}")/claude-usage.sh"
 [[ -n "${_PIPELINE_QUALITY_CHECKS_LOADED:-}" ]] && return 0
 _PIPELINE_QUALITY_CHECKS_LOADED=1
 
@@ -106,10 +108,9 @@ Diff:
 $diff_content"
 
     local review_output
-    review_output=$("$SW_AGENT_EXEC" claude --print "$prompt" < /dev/null 2>"${ARTIFACTS_DIR}/.claude-tokens-adversarial.log" || true)
-    parse_claude_tokens "${ARTIFACTS_DIR}/.claude-tokens-adversarial.log"
-
-    echo "$review_output" > "$ARTIFACTS_DIR/adversarial-review.md"
+    claude_run_json "$ARTIFACTS_DIR/adversarial-review.md" "${ARTIFACTS_DIR}/.claude-usage-adversarial.json" \
+        "${ARTIFACTS_DIR}/.claude-tokens-adversarial.log" --print "$prompt" || true
+    review_output=$(cat "$ARTIFACTS_DIR/adversarial-review.md" 2>/dev/null || true)
 
     # Count issues by severity
     local critical_count bug_count
@@ -178,10 +179,9 @@ Files changed: $changed_files
 $file_contents"
 
     local review_output
-    review_output=$("$SW_AGENT_EXEC" claude --print "$prompt" < /dev/null 2>"${ARTIFACTS_DIR}/.claude-tokens-negative.log" || true)
-    parse_claude_tokens "${ARTIFACTS_DIR}/.claude-tokens-negative.log"
-
-    echo "$review_output" > "$ARTIFACTS_DIR/negative-review.md"
+    claude_run_json "$ARTIFACTS_DIR/negative-review.md" "${ARTIFACTS_DIR}/.claude-usage-negative.json" \
+        "${ARTIFACTS_DIR}/.claude-tokens-negative.log" --print "$prompt" || true
+    review_output=$(cat "$ARTIFACTS_DIR/negative-review.md" 2>/dev/null || true)
 
     local critical_count
     critical_count=$(grep -ciE '\[Critical\]' "$ARTIFACTS_DIR/negative-review.md" 2>/dev/null || true)

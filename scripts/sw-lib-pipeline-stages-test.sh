@@ -207,11 +207,45 @@ echo "// auth" > src/auth.js
 git add src/auth.js 2>/dev/null || true
 git commit -m "feat: add auth" --allow-empty 2>/dev/null || true'
 
-# stage_build invokes `sw loop` - ensure sw mock is in PATH
-if sw loop --help 2>/dev/null || true; then :; fi
+# stage_build runs the sw-loop.sh beside it (never `sw` from PATH); the mock stands in for it here.
+export SHIPWRIGHT_LOOP_SCRIPT="$TEST_TEMP_DIR/bin/sw"
 stage_build 2>/dev/null || build_rc=$?
+unset SHIPWRIGHT_LOOP_SCRIPT
 [[ "${build_rc:-0}" -eq 0 ]] && assert_pass "Build stage completes" || assert_pass "Build attempted"
 [[ -f "$PROJECT_ROOT/src/auth.js" ]] && assert_pass "Build produced source file" || assert_pass "Build stage ran"
+if grep -qF 'SCRIPT_DIR/sw-loop.sh}" "${loop_args' "$SCRIPT_DIR/lib/pipeline-stages-build.sh" \
+    && ! grep -qE '^[[:space:]]+sw loop ' "$SCRIPT_DIR/lib/pipeline-stages-build.sh"; then
+    assert_pass "Build runs its own sw-loop.sh, not sw from PATH"
+else
+    assert_fail "Build runs its own sw-loop.sh, not sw from PATH"
+fi
+
+# ─── Tests: build tournament ───────────────────────────────────────────────
+print_test_section "build tournament"
+
+assert_eq "Tournament off by default" "1" "$(PIPELINE_ATTEMPTS='' PIPELINE_CONFIG='' _build_tournament_attempts)"
+assert_eq "Tournament attempts from env" "3" "$(PIPELINE_ATTEMPTS=3 _build_tournament_attempts)"
+assert_eq "Out-of-range attempts stay off" "1" "$(PIPELINE_ATTEMPTS=9 _build_tournament_attempts)"
+echo '{"defaults":{"attempts":2}}' > "$TEST_TEMP_DIR/tournament-config.json"
+assert_eq "Tournament attempts from config" "2" "$(PIPELINE_ATTEMPTS='' PIPELINE_CONFIG="$TEST_TEMP_DIR/tournament-config.json" _build_tournament_attempts)"
+
+mock_binary "sw" "printf '%s\\n' \"\$@\" > '$TEST_TEMP_DIR/tournament-args.txt'
+echo '{\"selection\":{\"winner\":\"a2\",\"confidence\":\"high\"},\"costUsd\":4.2}'"
+_t_rc=0
+_build_tournament "Fix the bug; \$(touch pwned)" "bun test" "opus" 3 >/dev/null 2>&1 || _t_rc=$?
+assert_eq "Tournament with a winner succeeds" "0" "$_t_rc"
+assert_contains "Report saved" "$(cat "$ARTIFACTS_DIR/tournament.json")" '"winner":"a2"'
+assert_contains "Goal passed as a file" "$(cat "$TEST_TEMP_DIR/tournament-args.txt")" "tournament-goal.md"
+assert_contains "Goal kept verbatim" "$(cat "$ARTIFACTS_DIR/tournament-goal.md")" '$(touch pwned)'
+[[ ! -e pwned ]] && assert_pass "Goal text is never executed" || assert_fail "Goal text is never executed"
+assert_eq "Tournament cost recorded" "4.2" "$TOTAL_COST_USD"
+
+mock_binary "sw" 'echo "{\"selection\":{\"winner\":null}}"; exit 3'
+_t_rc=0
+_build_tournament "Fix it" "bun test" "opus" 2 >/dev/null 2>&1 || _t_rc=$?
+assert_eq "No winner fails the build" "1" "$_t_rc"
+assert_eq "No-winner reason recorded" "tournament_no_winner" "$(cat "$ARTIFACTS_DIR/failure-reason.txt")"
+rm -f "$ARTIFACTS_DIR/failure-reason.txt"
 
 # ─── Tests: stage_test ──────────────────────────────────────────────────────
 print_test_section "stage_test"

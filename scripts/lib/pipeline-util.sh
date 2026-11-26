@@ -112,8 +112,15 @@ $(grep -E '^#{1,3} ' "$design_file" 2>/dev/null | head -10 || true)
 }
 
 # ─── Token & Cost Parsing ──────────────────────────────────────────
+# Guarded: some suites concatenate this file elsewhere, where the sibling lib is absent, and bash 3.2
+# stops reading a sourced file at a failed `source`. The stage modules source claude-usage.sh themselves.
+_CLAUDE_USAGE_LIB="$(dirname "${BASH_SOURCE[0]}")/claude-usage.sh"
+# shellcheck source=lib/claude-usage.sh
+[[ -f "$_CLAUDE_USAGE_LIB" ]] && source "$_CLAUDE_USAGE_LIB"
+
 parse_claude_tokens() {
     local log_file="$1"
+    parse_claude_usage "$log_file" && return 0
     local input_tok output_tok
     input_tok=$(grep -oE 'input[_ ]tokens?[: ]+[0-9,]+' "$log_file" 2>/dev/null | tail -1 | grep -oE '[0-9,]+' | tr -d ',' || echo "0")
     output_tok=$(grep -oE 'output[_ ]tokens?[: ]+[0-9,]+' "$log_file" 2>/dev/null | tail -1 | grep -oE '[0-9,]+' | tr -d ',' || echo "0")
@@ -193,7 +200,14 @@ ci_push_partial_work() {
     local branch="shipwright/issue-${ISSUE_NUMBER}"
 
     # Only push if we have uncommitted changes
-    if ! git diff --quiet 2>/dev/null || ! git diff --cached --quiet 2>/dev/null; then
+    if [[ "${SW_PATCH_HANDOFF:-true}" != "false" ]]; then
+        # Judged like the build agent's patch; fails closed when the handoff library is missing.
+        if ! type handoff_commit_dirty >/dev/null 2>&1 \
+            || ! handoff_commit_dirty "$PROJECT_ROOT" "WIP: partial pipeline progress for #${ISSUE_NUMBER}" \
+                "${ARTIFACTS_DIR}/partial.patch" >/dev/null; then
+            warn "Partial work not committed: the patch judge refused it or is unavailable"
+        fi
+    elif ! git diff --quiet 2>/dev/null || ! git diff --cached --quiet 2>/dev/null; then
         git add -A 2>/dev/null || true
         git commit -m "WIP: partial pipeline progress for #${ISSUE_NUMBER}" --no-verify 2>/dev/null || true
     fi

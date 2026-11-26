@@ -15,6 +15,13 @@ export const VALUE_FLAGS = [
   "--log",
   "--kind",
   "--source",
+  "--manifest",
+  "--min",
+  "--limit",
+  "--draft",
+  "--reply",
+  "--verdict",
+  "--trial",
 ] as const;
 
 export const SWITCH_FLAGS = ["--json", "--no-lessons", "--no-governance"] as const;
@@ -43,6 +50,10 @@ export function parseGovFlags(
 /** An ablation switch from the environment: off, 0, false or no (any case) turns the feature off. */
 export function envOff(value: string | undefined): boolean {
   return ["off", "0", "false", "no"].includes((value ?? "").trim().toLowerCase());
+}
+
+export function envOn(value: string | undefined): boolean {
+  return ["on", "1", "true", "yes"].includes((value ?? "").trim().toLowerCase());
 }
 
 /** One path per line; blank lines and surrounding space are dropped. */

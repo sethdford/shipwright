@@ -1,4 +1,4 @@
-import { type GovernanceDoc, parseDoc } from "./doc";
+import { type GovernanceDoc, parseDoc, ruleText } from "./doc";
 import { metaList, metaString, parseFrontmatter } from "./frontmatter";
 import { anyGlobMatches } from "./glob";
 
@@ -38,6 +38,8 @@ export function parseLesson(path: string, raw: string): Lesson {
   return {
     ...doc,
     kind: "lesson",
+    // The rule only: no title line, no Evidence or Evaluation section (those are for the reviewer, not the agent).
+    text: ruleText(doc.text),
     keywords: metaList(meta, "keywords").map((k) => k.toLowerCase()),
     ...optional("failureClass", metaString(meta, "failure_class")),
     ...optional("fingerprint", metaString(meta, "fingerprint")),
@@ -48,6 +50,14 @@ export function parseLesson(path: string, raw: string): Lesson {
 
 export function lessonActive(lesson: Pick<Lesson, "status">): boolean {
   return lesson.status === "active";
+}
+
+/** Active lessons, plus the proposed lessons named for a trial arm (ADR-0010 amendment). Retired ones never. */
+export function lessonEligible(
+  lesson: Pick<Lesson, "status" | "id">,
+  trial: readonly string[],
+): boolean {
+  return lessonActive(lesson) || (lesson.status === "proposed" && trial.includes(lesson.id));
 }
 
 function hasTriggers(l: Lesson): boolean {
@@ -90,9 +100,10 @@ export function selectLessons(
   lessons: readonly Lesson[],
   ctx: LessonContext,
   limit: number = MAX_LESSONS,
+  trial: readonly string[] = [],
 ): readonly ScoredLesson[] {
   return lessons
-    .filter(lessonActive)
+    .filter((l) => lessonEligible(l, trial))
     .map((l) => scoreLesson(l, ctx))
     .filter((s) => s.score > 0)
     .sort((a, b) => b.score - a.score || a.lesson.id.localeCompare(b.lesson.id))
