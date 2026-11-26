@@ -35,7 +35,10 @@ const files = new FakeFileReader({
 
 async function run(args: string[], env: Record<string, string> = {}) {
   const io = captureIO();
-  const code = await governanceCommand.run(args, commandContext(io, undefined, env, files, repo));
+  const code = await governanceCommand.run(
+    args,
+    commandContext(io, undefined, env, files, { repoDocs: repo }),
+  );
   return { code, out: io.outLines.join("\n"), err: io.errLines.join("\n") };
 }
 
