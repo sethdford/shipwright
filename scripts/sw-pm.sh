@@ -517,7 +517,7 @@ cmd_recommend() {
         local tmp_hist
         tmp_hist=$(mktemp)
         # shellcheck disable=SC2064
-        trap "rm -f '$tmp_hist'" RETURN
+        trap "rm -f '$tmp_hist'; trap - RETURN" RETURN
         jq --argjson rec "$recommendation" '.decisions += [$rec]' "$PM_HISTORY" > "$tmp_hist" && mv "$tmp_hist" "$PM_HISTORY"
         emit_event "pm.recommend" "issue=${issue_num}"
         return 0
@@ -546,7 +546,7 @@ cmd_recommend() {
     local tmp_hist
     tmp_hist=$(mktemp)
     # shellcheck disable=SC2064
-    trap "rm -f '$tmp_hist'" RETURN
+    trap "rm -f '$tmp_hist'; trap - RETURN" RETURN
     jq --argjson rec "$recommendation" '.decisions += [$rec]' "$PM_HISTORY" > "$tmp_hist" && mv "$tmp_hist" "$PM_HISTORY"
 
     success "Recommendation saved to history"
@@ -611,7 +611,7 @@ cmd_learn() {
     local tmp_hist
     tmp_hist=$(mktemp)
     # shellcheck disable=SC2064
-    trap "rm -f '$tmp_hist'" RETURN
+    trap "rm -f '$tmp_hist'; trap - RETURN" RETURN
     jq --argjson outcome "$outcome_record" '.outcomes += [$outcome]' "$PM_HISTORY" > "$tmp_hist" && mv "$tmp_hist" "$PM_HISTORY"
 
     success "Recorded ${outcome} outcome for issue #${issue_num}"

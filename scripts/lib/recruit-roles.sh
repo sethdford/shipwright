@@ -162,7 +162,7 @@ EOF
 )
     local _tmp_roles
     _tmp_roles=$(mktemp)
-    trap "rm -f '$_tmp_roles'" RETURN
+    trap "rm -f '$_tmp_roles'; trap - RETURN" RETURN
     if echo "$roles_json" | jq '.' > "$_tmp_roles" 2>/dev/null && [[ -s "$_tmp_roles" ]]; then
         mv "$_tmp_roles" "$ROLES_DB"
     else
@@ -301,7 +301,7 @@ _recruit_record_match() {
     if [[ "$current_lines" -gt "$max_history" ]]; then
         local tmp_trunc
         tmp_trunc=$(mktemp)
-        trap "rm -f '$tmp_trunc'" RETURN
+        trap "rm -f '$tmp_trunc'; trap - RETURN" RETURN
         tail -n "$max_history" "$MATCH_HISTORY" > "$tmp_trunc" && _recruit_locked_write "$MATCH_HISTORY" "$tmp_trunc" || rm -f "$tmp_trunc"
     fi
 
@@ -368,7 +368,7 @@ Return JSON only."
             # Persist to roles DB
             local tmp_file
             tmp_file=$(mktemp)
-            trap "rm -f '$tmp_file'" RETURN
+            trap "rm -f '$tmp_file'; trap - RETURN" RETURN
             if jq --arg key "$role_key" --argjson role "$(echo "$result" | jq 'del(.key)')" '.[$key] = $role' "$ROLES_DB" > "$tmp_file"; then
                 _recruit_locked_write "$ROLES_DB" "$tmp_file"
             else
@@ -421,7 +421,7 @@ Return JSON only."
 
     local tmp_file
     tmp_file=$(mktemp)
-    trap "rm -f '$tmp_file'" RETURN
+    trap "rm -f '$tmp_file'; trap - RETURN" RETURN
     if jq --arg key "$role_key" --argjson role "$role_json" '.[$key] = $role' "$ROLES_DB" > "$tmp_file"; then
         _recruit_locked_write "$ROLES_DB" "$tmp_file"
     else

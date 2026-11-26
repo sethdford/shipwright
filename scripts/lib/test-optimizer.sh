@@ -232,7 +232,7 @@ testopt_prioritize() {
     # Build temp file with scoring
     local tmp_score_file
     tmp_score_file=$(mktemp)
-    trap "rm -f '$tmp_score_file'" RETURN
+    trap "rm -f '$tmp_score_file'; trap - RETURN" RETURN
 
     for test_file in "${tests_to_sort[@]}"; do
         local fail_rate duration
@@ -267,7 +267,7 @@ testopt_run_with_fast_fail() {
     local all_passed=true
     local tmp_results
     tmp_results=$(mktemp)
-    trap "rm -f '$tmp_results'" RETURN
+    trap "rm -f '$tmp_results'; trap - RETURN" RETURN
 
     info "Running ${#tests[@]} test(s) with fast-fail..."
 
@@ -357,7 +357,7 @@ testopt_run_parallel() {
     # Run groups in parallel
     local tmp_results
     tmp_results=$(mktemp)
-    trap "rm -f '$tmp_results'" RETURN
+    trap "rm -f '$tmp_results'; trap - RETURN" RETURN
 
     local all_passed=true
     local job_count=0
@@ -431,7 +431,7 @@ testopt_record_history() {
     # Atomic write: temp file + move
     local tmp_history
     tmp_history=$(mktemp)
-    trap "rm -f '$tmp_history'" RETURN
+    trap "rm -f '$tmp_history'; trap - RETURN" RETURN
 
     # Build JSON entry (single line JSONL format)
     local changed_files_json="[]"
