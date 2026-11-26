@@ -476,6 +476,49 @@ EXIT CODES
   0  printed      1  could not read GitHub or the cost ledger      2  usage error
 ```
 
+## `tournament`
+
+Build stage tournament: parallel attempts, cross-tests, rubric and a blind judge
+
+```text
+USAGE
+  shipwright tournament --goal-file F --test-cmd CMD [options]
+
+DESCRIPTION
+  Tournament mode for the build stage: N independent attempts at the same task, each in its own git
+  worktree with a different opening strategy, then one winner chosen in four steps:
+    1. Gate: the patch is not empty and the repository's tests (--test-cmd) pass on it.
+    2. Cross-tests: every attempt's new tests run against every other attempt's patch.
+    3. Rubric: a rubric drafted from the task (plus Shipwright's fixed test-integrity criteria)
+       is graded against each diff.
+    4. Judge: when several candidates are close, a blind group-wise judge challenges what they all
+       assume and picks one.
+  The winner is fast-forwarded onto the current branch (unless --no-adopt). Nothing is pushed.
+  Worktrees live under the state directory and are always removed. The goal file is task text and
+  is passed to agents only as data. --test-cmd and --setup-cmd are operator configuration, run with
+  bash in each worktree without GitHub tokens in the environment.
+
+OPTIONS
+  --goal-file F          The task (issue text and pipeline context). Required.
+  --test-cmd CMD         The repository's test command. Required.
+  --setup-cmd CMD        Run once in each new worktree first (for example "bun install").
+  --attempts N           1 to 5 (default 3)
+  --budget-usd X         Total model spend cap for the tournament (default 15)
+  --model M              Builder model (default opus)
+  --judge-model M        Rubric, grading and judge model (default: the builder model)
+  --max-turns N          Builder turn cap per attempt (default 60)
+  --build-timeout-min N  Per attempt (default 45)
+  --test-timeout-min N   Per test run (default 15)
+  --no-adopt             Report the winner without touching the current branch
+  --format F             text (default), json, or markdown (a section for the PR body)
+
+EXIT CODES
+  0  a winner was chosen (and adopted, unless --no-adopt)
+  1  could not start (no git repository, unreadable goal file) or could not adopt the winner
+  2  usage error
+  3  no attempt was good enough
+```
+
 ## `verify`
 
 Merge verifier: predict whether a change will merge, and gate PRs on it

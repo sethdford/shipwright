@@ -18,6 +18,11 @@ flowchart LR
     adapters_store["adapters/store"]
     adapters_tmux["adapters/tmux"]
   end
+  subgraph ctx_delivery["delivery"]
+    delivery["delivery"]
+    delivery_application["delivery/application"]
+    delivery_domain["delivery/domain"]
+  end
   subgraph ctx_governance["governance"]
     governance["governance"]
     governance_application["governance/application"]
@@ -67,6 +72,7 @@ flowchart LR
   adapters_bench --> kernel
   adapters_bench --> quality
   adapters_git --> adapters_process
+  adapters_git --> delivery
   adapters_git --> governance
   adapters_git --> intelligence
   adapters_git --> kernel
@@ -77,6 +83,7 @@ flowchart LR
   adapters_github --> kernel
   adapters_github --> orchestration
   adapters_github --> quality
+  adapters_process --> delivery
   adapters_process --> intelligence
   adapters_process --> kernel
   adapters_process --> planning
@@ -88,6 +95,7 @@ flowchart LR
   adapters_store --> kernel
   adapters_tmux --> adapters_process
   adapters_tmux --> kernel
+  cli --> delivery
   cli --> governance
   cli --> intelligence
   cli --> kernel
@@ -97,6 +105,12 @@ flowchart LR
   cli --> planning
   cli --> platform
   cli --> quality
+  delivery --> delivery_application
+  delivery --> delivery_domain
+  delivery --> kernel
+  delivery_application --> delivery
+  delivery_application --> delivery_domain
+  delivery_application --> kernel
   governance --> governance_application
   governance --> governance_domain
   governance --> kernel
@@ -125,6 +139,7 @@ flowchart LR
   main --> adapters_process
   main --> adapters_state
   main --> cli
+  main --> delivery
   main --> intelligence
   main --> orchestration
   main --> planning

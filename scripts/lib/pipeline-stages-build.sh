@@ -109,6 +109,61 @@ stage_test_first() {
     return 1
 }
 
+# ── Tournament mode (shipwright tournament) ─────────────────────────────────
+# N independent attempts in separate worktrees; a cross-test matrix, a per-issue rubric and a
+# blind group-wise judge pick one patch, which is fast-forwarded onto the pipeline branch.
+# On when PIPELINE_ATTEMPTS (or .defaults.attempts in the pipeline config) is 2 to 5 and the
+# pipeline knows a test command: the tournament gates every attempt on the repository's tests.
+_build_tournament_attempts() {
+    local n="${PIPELINE_ATTEMPTS:-}"
+    if [[ -z "$n" && -n "${PIPELINE_CONFIG:-}" && -f "${PIPELINE_CONFIG}" ]]; then
+        n=$(jq -r '.defaults.attempts // empty' "$PIPELINE_CONFIG" 2>/dev/null || true)
+    fi
+    case "$n" in
+        2|3|4|5) echo "$n" ;;
+        *) echo "1" ;;
+    esac
+}
+
+_build_tournament() {
+    local goal="$1" test_cmd="$2" model="$3" attempts="$4"
+    local goal_file="$ARTIFACTS_DIR/tournament-goal.md"
+    local report="$ARTIFACTS_DIR/tournament.json"
+    mkdir -p "$ARTIFACTS_DIR"
+    printf '%s\n' "$goal" > "$goal_file"
+    local args=(--goal-file "$goal_file" --test-cmd "$test_cmd" --attempts "$attempts" --model "$model" --format json)
+    [[ -n "${PIPELINE_TOURNAMENT_BUDGET_USD:-}" ]] && args+=(--budget-usd "$PIPELINE_TOURNAMENT_BUDGET_USD")
+    [[ -n "${PIPELINE_SETUP_CMD:-}" ]] && args+=(--setup-cmd "$PIPELINE_SETUP_CMD")
+
+    info "Starting build tournament: ${attempts} parallel attempts, model ${model}"
+    if [[ -n "${ISSUE_NUMBER:-}" ]]; then
+        gh_comment_issue "$ISSUE_NUMBER" "🔨 **Build started** — tournament mode: ${attempts} independent attempts, model: ${model}"
+    fi
+    local rc=0
+    sw tournament "${args[@]}" < /dev/null > "${report}.tmp" || rc=$?
+    mv "${report}.tmp" "$report"
+
+    local winner confidence cost
+    winner=$(jq -r '.selection.winner // empty' "$report" 2>/dev/null || true)
+    confidence=$(jq -r '.selection.confidence // empty' "$report" 2>/dev/null || true)
+    cost=$(jq -r '.costUsd // 0' "$report" 2>/dev/null || echo "0")
+    if [[ -n "$cost" && "$cost" != "0" && "$cost" != "null" ]]; then
+        TOTAL_COST_USD="$cost"
+    fi
+    emit_event "build.tournament" "issue=${ISSUE_NUMBER:-0}" "attempts=$attempts" \
+        "winner=${winner:-none}" "confidence=${confidence:-none}" "cost_usd=${cost:-0}" "exit=$rc"
+    if [[ "$rc" -eq 3 ]]; then
+        echo "tournament_no_winner" > "$ARTIFACTS_DIR/failure-reason.txt" 2>/dev/null || true
+        error "Build tournament: no attempt passed the tests and the judge (see tournament.json)"
+        return 1
+    fi
+    if [[ "$rc" -ne 0 ]]; then
+        error "Build tournament failed (exit $rc)"
+        return 1
+    fi
+    info "Build tournament winner: ${winner} (${confidence} confidence, \$${cost})"
+}
+
 # _tdd_safe_path PATH — 0 when the model-chosen PATH stays inside the repo and out of .git and
 # .claude. The fence regex already limits it to [A-Za-z0-9_/.-].
 _tdd_safe_path() {
@@ -552,74 +607,80 @@ ${_skill_prompts}
     # for interactive permission prompts. Without this flag, agents can't write files.
     loop_args+=(--skip-permissions)
 
-    info "Starting build loop: ${DIM}shipwright loop${RESET} (max ${max_iter} iterations, ${agents} agent(s))"
+    local _attempts
+    _attempts=$(_build_tournament_attempts)
+    if [[ "$_attempts" -gt 1 && -n "$test_cmd" && "$test_cmd" != "null" ]]; then
+        _build_tournament "$enriched_goal" "$test_cmd" "$build_model" "$_attempts" || return 1
+    else
+        info "Starting build loop: ${DIM}shipwright loop${RESET} (max ${max_iter} iterations, ${agents} agent(s))"
 
-    # Post build start to GitHub
-    if [[ -n "$ISSUE_NUMBER" ]]; then
-        gh_comment_issue "$ISSUE_NUMBER" "🔨 **Build started** — \`shipwright loop\` with ${max_iter} max iterations, ${agents} agent(s), model: ${build_model}"
-    fi
-
-    local _token_log="${ARTIFACTS_DIR}/.claude-tokens-build.log"
-    # sw-loop writes its token and USD totals under the git top level of the directory it runs in (a
-    # --worktree run's worktree, which PROJECT_ROOT may not name). Drop a previous run's file first, so
-    # a loop that dies before writing one adds nothing rather than an old run's spend.
-    local _loop_root
-    _loop_root="$(git rev-parse --show-toplevel 2>/dev/null || echo "$PROJECT_ROOT")"
-    local _loop_token_file="${_loop_root}/.claude/loop-logs/loop-tokens.json"
-    [[ -f "$_loop_token_file" ]] && rm -f "$_loop_token_file"
-    export PIPELINE_JOB_ID="${PIPELINE_NAME:-pipeline-$$}"
-
-    # Patch handoff (#8706): the loop and its agents work in a disposable clone of the recorded base;
-    # only a judged patch comes back. Loop logs are read from where the loop ran.
-    local _handoff_base="" _handoff_dir="" _loop_logs="${PROJECT_ROOT}/.claude/loop-logs"
-    local _progress_file="${PWD}/.claude/loop-logs/progress.md"
-    if [[ "${SW_PATCH_HANDOFF:-true}" != "false" ]]; then
-        _handoff_base=$(git -C "$PROJECT_ROOT" rev-parse HEAD) || { error "Patch handoff: no base commit"; return 1; }
-        _handoff_dir="$(mktemp -d "${TMPDIR:-/tmp}/sw-agent.XXXXXX")/repo"
-        handoff_prepare "$PROJECT_ROOT" "$_handoff_base" "$_handoff_dir" \
-            || { error "Patch handoff: could not prepare the agent clone"; return 1; }
-        mkdir -p "$ARTIFACTS_DIR"
-        handoff_carry_over "$PROJECT_ROOT" "$_handoff_base" "$_handoff_dir" "${ARTIFACTS_DIR}/pre-build.patch" \
-            || { error "Patch handoff: could not move earlier stages' edits into the agent clone"; return 1; }
-        [[ -s "${ARTIFACTS_DIR}/pre-build.patch" ]] \
-            && warn "Patch handoff: moved uncommitted edits from earlier stages into the agent clone (they are judged with the build)"
-        loop_args+=(--repo "$_handoff_dir")
-        _loop_logs="${_handoff_dir}/.claude/loop-logs"
-        _progress_file="${_loop_logs}/progress.md"
-        _loop_token_file="${_loop_logs}/loop-tokens.json"
-        info "Patch handoff: agent works in ${DIM}${_handoff_dir}${RESET} (base ${_handoff_base:0:12})"
-    fi
-
-    # Run the loop that ships with this pipeline, not whatever `sw` is first on PATH: an older global
-    # install there runs an old sw-loop.sh (one that recorded 0 tokens and $0 for every build).
-    # SHIPWRIGHT_LOOP_SCRIPT replaces it in tests only.
-    _build_run_loop "${SHIPWRIGHT_LOOP_SCRIPT:-$SCRIPT_DIR/sw-loop.sh}" "${loop_args[@]}" < /dev/null 2>"$_token_log" || {
-        local _loop_exit=$?
-        # A failed build still spent money: count it before returning.
-        _pipeline_add_loop_tokens "$_loop_token_file"
-
-        # Detect context exhaustion from progress file
-        if [[ -f "$_progress_file" ]]; then
-            local _prog_tests
-            _prog_tests=$(grep -oE 'Tests passing: (true|false)' "$_progress_file" 2>/dev/null | awk '{print $NF}' || echo "unknown")
-            if [[ "$_prog_tests" != "true" ]]; then
-                warn "Build loop exhausted with failing tests (context exhaustion)"
-                emit_event "pipeline.context_exhaustion" "issue=${ISSUE_NUMBER:-0}" "stage=build"
-                # Write flag for daemon retry logic
-                mkdir -p "$ARTIFACTS_DIR" 2>/dev/null || true
-                echo "context_exhaustion" > "$ARTIFACTS_DIR/failure-reason.txt" 2>/dev/null || true
-            fi
+        # Post build start to GitHub
+        if [[ -n "$ISSUE_NUMBER" ]]; then
+            gh_comment_issue "$ISSUE_NUMBER" "🔨 **Build started** — \`shipwright loop\` with ${max_iter} max iterations, ${agents} agent(s), model: ${build_model}"
         fi
 
-        error "Build loop failed"
-        return 1
-    }
-    if [[ -n "$_handoff_dir" ]]; then
-        _build_handoff_return "$_handoff_dir" "$_handoff_base" || return 1
-        # The agent clone is gone; its loop logs (with loop-tokens.json) were copied here.
-        _loop_token_file="${ARTIFACTS_DIR}/agent-loop-logs/loop-tokens.json"
+        local _token_log="${ARTIFACTS_DIR}/.claude-tokens-build.log"
+        # sw-loop writes its token and USD totals under the git top level of the directory it runs in (a
+        # --worktree run's worktree, which PROJECT_ROOT may not name). Drop a previous run's file first, so
+        # a loop that dies before writing one adds nothing rather than an old run's spend.
+        local _loop_root
+        _loop_root="$(git rev-parse --show-toplevel 2>/dev/null || echo "$PROJECT_ROOT")"
+        local _loop_token_file="${_loop_root}/.claude/loop-logs/loop-tokens.json"
+        [[ -f "$_loop_token_file" ]] && rm -f "$_loop_token_file"
+        export PIPELINE_JOB_ID="${PIPELINE_NAME:-pipeline-$$}"
+
+        # Patch handoff (#8706): the loop and its agents work in a disposable clone of the recorded base;
+        # only a judged patch comes back. Loop logs are read from where the loop ran.
+        local _handoff_base="" _handoff_dir="" _loop_logs="${PROJECT_ROOT}/.claude/loop-logs"
+        local _progress_file="${PWD}/.claude/loop-logs/progress.md"
+        if [[ "${SW_PATCH_HANDOFF:-true}" != "false" ]]; then
+            _handoff_base=$(git -C "$PROJECT_ROOT" rev-parse HEAD) || { error "Patch handoff: no base commit"; return 1; }
+            _handoff_dir="$(mktemp -d "${TMPDIR:-/tmp}/sw-agent.XXXXXX")/repo"
+            handoff_prepare "$PROJECT_ROOT" "$_handoff_base" "$_handoff_dir" \
+                || { error "Patch handoff: could not prepare the agent clone"; return 1; }
+            mkdir -p "$ARTIFACTS_DIR"
+            handoff_carry_over "$PROJECT_ROOT" "$_handoff_base" "$_handoff_dir" "${ARTIFACTS_DIR}/pre-build.patch" \
+                || { error "Patch handoff: could not move earlier stages' edits into the agent clone"; return 1; }
+            [[ -s "${ARTIFACTS_DIR}/pre-build.patch" ]] \
+                && warn "Patch handoff: moved uncommitted edits from earlier stages into the agent clone (they are judged with the build)"
+            loop_args+=(--repo "$_handoff_dir")
+            _loop_logs="${_handoff_dir}/.claude/loop-logs"
+            _progress_file="${_loop_logs}/progress.md"
+            _loop_token_file="${_loop_logs}/loop-tokens.json"
+            info "Patch handoff: agent works in ${DIM}${_handoff_dir}${RESET} (base ${_handoff_base:0:12})"
+        fi
+
+        # Run the loop that ships with this pipeline, not whatever `sw` is first on PATH: an older global
+        # install there runs an old sw-loop.sh (one that recorded 0 tokens and $0 for every build).
+        # SHIPWRIGHT_LOOP_SCRIPT replaces it in tests only.
+        _build_run_loop "${SHIPWRIGHT_LOOP_SCRIPT:-$SCRIPT_DIR/sw-loop.sh}" "${loop_args[@]}" < /dev/null 2>"$_token_log" || {
+            local _loop_exit=$?
+            # A failed build still spent money: count it before returning.
+            _pipeline_add_loop_tokens "$_loop_token_file"
+
+            # Detect context exhaustion from progress file
+            if [[ -f "$_progress_file" ]]; then
+                local _prog_tests
+                _prog_tests=$(grep -oE 'Tests passing: (true|false)' "$_progress_file" 2>/dev/null | awk '{print $NF}' || echo "unknown")
+                if [[ "$_prog_tests" != "true" ]]; then
+                    warn "Build loop exhausted with failing tests (context exhaustion)"
+                    emit_event "pipeline.context_exhaustion" "issue=${ISSUE_NUMBER:-0}" "stage=build"
+                    # Write flag for daemon retry logic
+                    mkdir -p "$ARTIFACTS_DIR" 2>/dev/null || true
+                    echo "context_exhaustion" > "$ARTIFACTS_DIR/failure-reason.txt" 2>/dev/null || true
+                fi
+            fi
+
+            error "Build loop failed"
+            return 1
+        }
+        if [[ -n "$_handoff_dir" ]]; then
+            _build_handoff_return "$_handoff_dir" "$_handoff_base" || return 1
+            # The agent clone is gone; its loop logs (with loop-tokens.json) were copied here.
+            _loop_token_file="${ARTIFACTS_DIR}/agent-loop-logs/loop-tokens.json"
+        fi
+        _pipeline_add_loop_tokens "$_loop_token_file"
     fi
-    _pipeline_add_loop_tokens "$_loop_token_file"
 
     # Count commits made during build
     local commit_count

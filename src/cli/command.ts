@@ -1,3 +1,4 @@
+import type { DeliveryPorts } from "../contexts/delivery";
 import type { RepoDocs } from "../contexts/governance";
 import type { LineChannel, RepoModelPorts, RoutingPorts } from "../contexts/intelligence";
 import type { SafetyPorts } from "../contexts/orchestration";
@@ -25,6 +26,8 @@ export interface CommandContext {
   readonly verifier: () => VerifierPorts;
   /** Governance documents and lessons from git (ADR-0010), built by main.ts. */
   readonly repoDocs: () => RepoDocs;
+  /** Agents, worktrees and the test runner for the build tournament, built on first call. */
+  readonly delivery: () => DeliveryPorts;
   /** Acceptance-test ports for a repository root (default: the working directory), built by main.ts. */
   readonly acceptance: (root?: string) => AcceptancePorts;
   /** The repository world model's adapters (ADR-0016), built by main.ts. */

@@ -656,6 +656,9 @@ main() {
         governance|gov)
             run_ts governance "$@"
             ;;
+        tournament)
+            run_ts tournament "$@"
+            ;;
         acceptance)
             run_ts acceptance "$@"
             ;;

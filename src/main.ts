@@ -6,6 +6,7 @@ import { GitAcceptanceWorkspace } from "./adapters/git/git-acceptance-workspace"
 import { GitLocalChange } from "./adapters/git/git-local-change";
 import { GitRepoDocs } from "./adapters/git/git-repo-docs";
 import { GitRepoSource } from "./adapters/git/git-repo-source";
+import { GitWorkspaces } from "./adapters/git/git-workspaces";
 import { GhClosedPulls } from "./adapters/github/gh-closed-pulls";
 import { GhGithubWriter } from "./adapters/github/gh-github-writer";
 import { GhOpenIssues } from "./adapters/github/gh-open-issues";
@@ -14,6 +15,7 @@ import { GhPullFiles } from "./adapters/github/gh-pull-files";
 import { GhPullRequests } from "./adapters/github/gh-pull-requests";
 import { GhRunHistory } from "./adapters/github/gh-run-history";
 import { resolvePaths } from "./adapters/paths";
+import { BashCommandRunner, testEnv } from "./adapters/process/bash-command-runner";
 import { BunProcessRunner } from "./adapters/process/bun-process-runner";
 import { processStdio } from "./adapters/process/stdio-lines";
 import { TestGateExecutor } from "./adapters/process/test-gate-executor";
@@ -27,6 +29,7 @@ import { NodeArtifactStore } from "./adapters/state/node-artifact-store";
 import { NodeFileReader } from "./adapters/state/node-file-reader";
 import type { CliIO, Command, CommandContext } from "./cli/command";
 import { commands, findCommand } from "./cli/commands";
+import type { DeliveryPorts } from "./contexts/delivery";
 import type { RepoModelPorts, RoutingPorts } from "./contexts/intelligence";
 import type { SafetyPorts } from "./contexts/orchestration";
 import type { AcceptancePorts } from "./contexts/planning";
@@ -122,6 +125,25 @@ export function buildVerifierPorts(
   };
 }
 
+/**
+ * Adapters for the build tournament. Worktrees go under the state directory, one folder per run, so
+ * attempts never appear in the repository's own status or diffs.
+ */
+export function buildDeliveryPorts(
+  env: Readonly<Record<string, string | undefined>>,
+  cwd: string,
+): DeliveryPorts {
+  const runner = new BunProcessRunner();
+  const run = `${new Date().toISOString().replace(/[:.]/g, "-")}-${process.pid}`;
+  const root = join(resolvePaths(env).stateDir, "tournaments", run);
+  return {
+    agent: new AgentSdkRunner(agentEnv(env)),
+    workspaces: new GitWorkspaces(runner, cwd, root),
+    commands: new BashCommandRunner(runner, testEnv(env)),
+    random: Math.random,
+  };
+}
+
 function once<T>(make: () => T): () => T {
   let value: T | undefined;
   return () => {
@@ -171,6 +193,18 @@ function topLevel(
   return undefined;
 }
 
+/** Ports every command run gets that main() does not take as parameters; each builds on first use. */
+function sharedPorts(env: Readonly<Record<string, string | undefined>>) {
+  return {
+    files,
+    repoDocs,
+    stdio,
+    acceptance,
+    routing: once(() => buildRoutingPorts(env)),
+    repoModel: once(() => buildRepoModelPorts(env)),
+  };
+}
+
 /** Composition root. Adapters are constructed here as commands start needing them. */
 export async function main(
   argv: readonly string[],
@@ -185,6 +219,7 @@ export async function main(
   quality: () => QualityPorts = once(() => buildQualityPorts(env)),
   bench: () => BenchFactory = once(() => buildBenchFactory(env, join(import.meta.dir, ".."))),
   verifier: () => VerifierPorts = once(() => buildVerifierPorts(env, process.cwd())),
+  delivery: () => DeliveryPorts = once(() => buildDeliveryPorts(env, process.cwd())),
 ): Promise<number> {
   const [name, ...args] = argv;
   const early = topLevel(argv, io, registry);
@@ -195,20 +230,15 @@ export async function main(
     io.err(`✗ Unknown command: ${name}`);
     return 2;
   }
-  const routing = once(() => buildRoutingPorts(env));
   return runCommand(command, args, {
     io,
     version: pkg.version,
     safety,
     env,
-    files,
-    repoDocs,
     quality,
     bench,
     verifier,
-    routing,
-    repoModel: once(() => buildRepoModelPorts(env)),
-    stdio,
-    acceptance,
+    delivery,
+    ...sharedPorts(env),
   });
 }
