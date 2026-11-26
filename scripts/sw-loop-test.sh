@@ -294,7 +294,9 @@ else
 fi
 
 # ─── Test 12: Token accumulation parses JSON ────────────────────────────────
-if grep -q 'jq.*usage.input_tokens' "$SCRIPT_DIR/sw-loop.sh"; then
+# Behaviour is covered by sw-lib-claude-usage-test.sh; this checks sw-loop loads the parser.
+if grep -q 'usage.input_tokens' "$SCRIPT_DIR/lib/claude-usage.sh" \
+    && grep -q 'source "$SCRIPT_DIR/lib/claude-usage.sh"' "$SCRIPT_DIR/sw-loop.sh"; then
     assert_pass "accumulate_loop_tokens parses JSON usage"
 else
     assert_fail "accumulate_loop_tokens parses JSON usage"

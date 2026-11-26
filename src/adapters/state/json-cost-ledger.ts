@@ -8,7 +8,12 @@ import { err, ok, type Result } from "../../shared/kernel/result";
 // Formats written by scripts/sw-cost.sh (always dual-written next to the SQLite db). Everything
 // that exists must match exactly: a file we cannot interpret must block, never read as "no spend".
 const BudgetFile = z.object({ daily_budget_usd: z.number().nonnegative(), enabled: z.boolean() });
-const Entry = z.object({ cost_usd: z.number().nonnegative(), ts_epoch: z.number() });
+const Entry = z.object({
+  cost_usd: z.number().nonnegative(),
+  ts_epoch: z.number(),
+  pr: z.number().int().positive().optional(),
+  issue: z.string().optional(),
+});
 const CostsFile = z.object({ entries: z.array(Entry) });
 
 type Read = Result<{ found: false } | { found: true; value: unknown }, AdapterError>;
@@ -38,6 +43,15 @@ function toBudget(read: Read, path: string): Result<DailyBudget | null, AdapterE
   return ok(on ? { limitUsd: b.data.daily_budget_usd } : null);
 }
 
+function toEntry(e: z.infer<typeof Entry>): CostEntry {
+  return {
+    costUsd: e.cost_usd,
+    atEpochS: e.ts_epoch,
+    ...(e.pr !== undefined && { pr: e.pr }),
+    ...(e.issue && { issue: e.issue }),
+  };
+}
+
 /** Any malformed entry fails the whole read (jq would not skip it either: it errors or sums wrong). */
 function toEntries(read: Read, path: string): Result<CostEntry[], AdapterError> {
   if (!read.ok) return read;
@@ -46,7 +60,7 @@ function toEntries(read: Read, path: string): Result<CostEntry[], AdapterError> 
   if (!file.success) {
     return err({ kind: "failed", message: `${path}: ${describeIssues(file.error)}` });
   }
-  return ok(file.data.entries.map((e) => ({ costUsd: e.cost_usd, atEpochS: e.ts_epoch })));
+  return ok(file.data.entries.map(toEntry));
 }
 
 /** Reads `costs.json` and `budget.json` from the bash cost directory (`~/.shipwright`). */
