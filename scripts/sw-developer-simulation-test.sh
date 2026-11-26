@@ -30,6 +30,8 @@ setup_env() {
     mkdir -p "$TEST_TEMP_DIR/repo/scripts/lib"
     touch "$TEST_TEMP_DIR/repo/scripts/lib/compat.sh"
     [[ -f "$SCRIPT_DIR/lib/helpers.sh" ]] && cp "$SCRIPT_DIR/lib/helpers.sh" "$TEST_TEMP_DIR/repo/scripts/lib/"
+    # sw-intelligence.sh sources lib/untrusted.sh (prompt-injection defenses) beside itself.
+    cp "$SCRIPT_DIR/lib/untrusted.sh" "$TEST_TEMP_DIR/repo/scripts/lib/"
 
     # Mock git
     cat > "$TEST_TEMP_DIR/bin/git" <<'MOCKEOF'
