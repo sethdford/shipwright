@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, expect, test } from "bun:test";
-import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import {
   type BenchArm,
@@ -168,6 +168,9 @@ test("bench validate still reaches the gold commit through the harness", async (
   const ws = ports().workspaces;
   const dir = await ws.prepare(task, "validate");
   if (!dir.ok) throw new Error(dir.error.message);
+  const snaps = join(env.root, "bench", "snapshots");
+  for (const snap of readdirSync(snaps))
+    expect(existsSync(join(snaps, snap, "FETCH_HEAD"))).toBe(false);
   expect((await ws.checkout(dir.value, task.goldCommit ?? "")).ok).toBe(true);
   expect(readFileSync(join(dir.value, "add.sh"), "utf8")).toBe(FIXED);
   await ws.dispose(dir.value);

@@ -76,8 +76,6 @@ export class GitBenchWorkspaces implements BenchWorkspaces {
       ["init", "--quiet", "--bare", tmp],
       ["--git-dir", tmp, "fetch", "--quiet", "--no-tags", mirror, `${base}:refs/heads/main`],
       ["--git-dir", tmp, "symbolic-ref", "HEAD", "refs/heads/main"],
-      // FETCH_HEAD names the mirror's path; nothing in a snapshot may lead back to it.
-      ["--git-dir", tmp, "update-ref", "-d", "FETCH_HEAD"],
     ];
     for (const args of steps) {
       const r = await this.git(args);
@@ -86,6 +84,9 @@ export class GitBenchWorkspaces implements BenchWorkspaces {
         return r;
       }
     }
+    // FETCH_HEAD names the mirror's path; nothing in a snapshot may lead back to it. (A file, not a
+    // ref: newer git refuses `update-ref -d FETCH_HEAD`.)
+    await rm(join(tmp, "FETCH_HEAD"), { force: true });
     await rm(dir, { recursive: true, force: true });
     await rename(tmp, dir);
     return ok(dir);
