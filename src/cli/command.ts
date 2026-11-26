@@ -1,4 +1,5 @@
 import type { DeliveryPorts } from "../contexts/delivery";
+import type { RepoDocs } from "../contexts/governance";
 import type { SafetyPorts } from "../contexts/orchestration";
 import type { FileReader } from "../shared/kernel/ports";
 
@@ -16,6 +17,8 @@ export interface CommandContext {
   readonly safety: () => SafetyPorts;
   /** File reads for commands; built by main.ts from the adapter (commands never touch node:fs). */
   readonly files: () => FileReader;
+  /** Governance documents and lessons from git (ADR-0010), built by main.ts. */
+  readonly repoDocs: () => RepoDocs;
   /** Agents, worktrees and the test runner for the build tournament, built on first call. */
   readonly delivery: () => DeliveryPorts;
 }

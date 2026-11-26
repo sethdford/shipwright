@@ -243,6 +243,15 @@ find_pipeline_config() {
     return 1
 }
 
+# True when a template has enabled plan and review stages (or cannot be found, so the
+# loader reports the real error). Used to vet templates chosen automatically.
+pipeline_template_is_reviewed() {
+    local cfg
+    cfg=$(find_pipeline_config "$1") || return 0
+    jq -e '[.stages[]? | select(.enabled == true) | .id] as $s
+        | ($s | index("plan")) != null and ($s | index("review")) != null' "$cfg" >/dev/null 2>&1
+}
+
 load_pipeline_config() {
     # Check for intelligence-composed pipeline first
     local composed_pipeline="${ARTIFACTS_DIR}/composed-pipeline.json"

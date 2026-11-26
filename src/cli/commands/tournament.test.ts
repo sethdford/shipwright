@@ -22,7 +22,7 @@ async function run(args: string[], script: FakeScript = WIN, goal = "Fix @someon
   const io = captureIO();
   const fake = new FakeDelivery(script);
   const files = new FakeFileReader({ "/goal.md": goal });
-  const ctx = commandContext(io, undefined, {}, files, fake.ports());
+  const ctx = commandContext(io, undefined, {}, files, undefined, fake.ports());
   const code = await tournamentCommand.run(args, ctx);
   return { code, io, fake };
 }

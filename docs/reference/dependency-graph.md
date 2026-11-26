@@ -22,6 +22,11 @@ flowchart LR
     delivery_application["delivery/application"]
     delivery_domain["delivery/domain"]
   end
+  subgraph ctx_governance["governance"]
+    governance["governance"]
+    governance_application["governance/application"]
+    governance_domain["governance/domain"]
+  end
   subgraph ctx_learning["learning"]
     learning["learning"]
     learning_application["learning/application"]
@@ -46,6 +51,7 @@ flowchart LR
   adapters_agent --> kernel
   adapters_git --> adapters_process
   adapters_git --> delivery
+  adapters_git --> governance
   adapters_git --> kernel
   adapters_github --> adapters_process
   adapters_github --> integrations
@@ -59,6 +65,7 @@ flowchart LR
   adapters_tmux --> adapters_process
   adapters_tmux --> kernel
   cli --> delivery
+  cli --> governance
   cli --> kernel
   cli --> learning
   cli --> main
@@ -70,6 +77,12 @@ flowchart LR
   delivery_application --> delivery
   delivery_application --> delivery_domain
   delivery_application --> kernel
+  governance --> governance_application
+  governance --> governance_domain
+  governance --> kernel
+  governance_application --> governance
+  governance_application --> governance_domain
+  governance_application --> kernel
   integrations --> kernel
   learning --> learning_application
   learning --> learning_domain
