@@ -108,68 +108,97 @@ Create files in the appropriate project directories (e.g. tests/, __tests__/, sr
         return 1
     }
 
-    # Parse output: extract fenced code blocks and write to files
-    local wrote_any=false
-    local block_path="" in_block=false block_content=""
+    _tdd_land_output "$output"
+}
+
+# _tdd_safe_path PATH — 0 when the model-chosen PATH stays inside the repo and out of .git and
+# .claude. The fence regex already limits it to [A-Za-z0-9_/.-].
+_tdd_safe_path() {
+    local p="$1"
+    [[ -n "$p" && "$p" != /* && "$p" != .git && "$p" != .git/* && "$p" != .claude/* ]] || return 1
+    case "/$p/" in */../*|*/./*|*//*) return 1 ;; esac
+    return 0
+}
+
+# _tdd_write_blocks ROOT OUTPUT — writes each fenced ```path block of OUTPUT under ROOT and prints
+# the paths written. Unsafe paths are skipped with a warning.
+_tdd_write_blocks() {
+    local root="$1" output="$2"
+    local block_path="" in_block=false block_content="" line
     while IFS= read -r line; do
-        if [[ "$line" =~ ^\`\`\`([a-zA-Z0-9_/\.\-]+)$ ]]; then
-            if [[ -n "$block_path" && -n "$block_content" ]]; then
-                local out_file="${PROJECT_ROOT}/${block_path}"
-                local out_dir
-                out_dir=$(dirname "$out_file")
-                mkdir -p "$out_dir" 2>/dev/null || true
-                if echo "$block_content" > "$out_file" 2>/dev/null; then
-                    wrote_any=true
-                    info "  Wrote: $block_path"
-                fi
+        if [[ "$line" =~ ^\`\`\`([a-zA-Z0-9_/\.\-]+)$ ]] || [[ "$line" == "\`\`\`" && "$in_block" == "true" ]]; then
+            _tdd_write_one "$root" "$block_path" "$block_content"
+            block_path="" block_content="" in_block=false
+            if [[ "$line" != "\`\`\`" ]]; then
+                block_path="${BASH_REMATCH[1]}" in_block=true
             fi
-            block_path="${BASH_REMATCH[1]}"
-            block_content=""
-            in_block=true
-        elif [[ "$line" == "\`\`\`" && "$in_block" == "true" ]]; then
-            if [[ -n "$block_path" && -n "$block_content" ]]; then
-                local out_file="${PROJECT_ROOT}/${block_path}"
-                local out_dir
-                out_dir=$(dirname "$out_file")
-                mkdir -p "$out_dir" 2>/dev/null || true
-                if echo "$block_content" > "$out_file" 2>/dev/null; then
-                    wrote_any=true
-                    info "  Wrote: $block_path"
-                fi
-            fi
-            block_path=""
-            block_content=""
-            in_block=false
         elif [[ "$in_block" == "true" && -n "$block_path" ]]; then
             [[ -n "$block_content" ]] && block_content="${block_content}"$'\n'
             block_content="${block_content}${line}"
         fi
     done <<< "$output"
+    _tdd_write_one "$root" "$block_path" "$block_content"
+}
 
-    # Flush last block if unclosed
-    if [[ -n "$block_path" && -n "$block_content" ]]; then
-        local out_file="${PROJECT_ROOT}/${block_path}"
-        local out_dir
-        out_dir=$(dirname "$out_file")
-        mkdir -p "$out_dir" 2>/dev/null || true
-        if echo "$block_content" > "$out_file" 2>/dev/null; then
-            wrote_any=true
-            info "  Wrote: $block_path"
-        fi
+_tdd_write_one() {
+    local root="$1" path="$2" content="$3"
+    [[ -n "$path" && -n "$content" ]] || return 0
+    if ! _tdd_safe_path "$path"; then
+        warn "  Skipped unsafe path from TDD output: $path" >&2
+        emit_event "tdd.path_refused" "issue=${ISSUE_NUMBER:-0}" "path=$path"
+        return 0
     fi
+    mkdir -p "$(dirname "$root/$path")" 2>/dev/null || return 0
+    printf '%s\n' "$content" > "$root/$path" 2>/dev/null || return 0
+    info "  Wrote: $path" >&2
+    printf '%s\n' "$path"
+}
 
-    if [[ "$wrote_any" == "true" ]]; then
-        if (cd "$PROJECT_ROOT" && git diff --name-only 2>/dev/null | grep >/dev/null -E 'test|spec'); then
-            git add -A 2>/dev/null || true
-            git commit -m "test: TDD - define expected behavior before implementation" 2>/dev/null || true
-            emit_event "tdd.tests_generated" "{\"stage\":\"test_first\"}"
-        fi
+# _tdd_land_output OUTPUT — under patch handoff the tests are written into a disposable clone and
+# reach the trusted checkout only as a judged patch, like the build agent's work. Without it, they
+# are written in place and only the written files are committed.
+_tdd_land_output() {
+    local output="$1" msg="test: TDD - define expected behavior before implementation"
+    if [[ "${SW_PATCH_HANDOFF:-true}" == "false" ]]; then
+        local written
+        written=$(_tdd_write_blocks "$PROJECT_ROOT" "$output")
+        [[ -n "$written" ]] || { warn "No test files extracted from TDD output — check format"; return 0; }
+        local files=()
+        while IFS= read -r f; do files+=("$f"); done <<< "$written"
+        (cd "$PROJECT_ROOT" && git add -- "${files[@]}" && git commit -q -m "$msg") 2>/dev/null || true
+        emit_event "tdd.tests_generated" "{\"stage\":\"test_first\"}"
         success "TDD tests generated"
-    else
+        return 0
+    fi
+    local base work patch="${ARTIFACTS_DIR}/tdd.patch"
+    base=$(git -C "$PROJECT_ROOT" rev-parse HEAD) || return 1
+    work=$(mktemp -d "${TMPDIR:-/tmp}/sw-tdd.XXXXXX") || return 1
+    mkdir -p "$ARTIFACTS_DIR"
+    local rc=0
+    _tdd_land_via_handoff "$work/clone" "$base" "$output" "$patch" "$msg" || rc=$?
+    rm -rf "$work"
+    return "$rc"
+}
+
+_tdd_land_via_handoff() {
+    local dir="$1" base="$2" output="$3" patch="$4" msg="$5"
+    handoff_prepare "$PROJECT_ROOT" "$base" "$dir" || return 1
+    # Earlier stages' uncommitted edits ride along and are judged with the tests.
+    handoff_carry_over "$PROJECT_ROOT" "$base" "$dir" "${patch}.carried" || return 1
+    if [[ -z "$(_tdd_write_blocks "$dir" "$output")" ]]; then
         warn "No test files extracted from TDD output — check format"
     fi
-
-    return 0
+    handoff_export "$dir" "$base" "$PROJECT_ROOT" "$patch" || return 1
+    [[ -s "$patch" ]] || return 0
+    # On refusal the carried edits are dropped too (fail closed); both stay in the patch file.
+    local sha
+    if ! sha=$(handoff_apply "$PROJECT_ROOT" "$base" "$patch" "$msg"); then
+        warn "TDD tests refused by the patch judge; building without them"
+        emit_event "tdd.patch_refused" "issue=${ISSUE_NUMBER:-0}" "base=$base"
+        return 1
+    fi
+    emit_event "tdd.tests_generated" "{\"stage\":\"test_first\",\"head\":\"${sha}\"}"
+    success "TDD tests generated and applied as ${sha:0:12}"
 }
 
 # _build_run_loop ARGS... — runs `sw loop`. Under patch handoff the loop holds no GitHub or fleet

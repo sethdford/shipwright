@@ -37,6 +37,33 @@ elif [[ -f "$SCRIPT_DIR/lib/pipeline-intelligence-skip.sh" ]]; then
 fi
 
 # ─── Stage Execution with Retry Logic ──────────────────────────────
+# Stages whose agents run in the trusted checkout with git commit allowed by the agent policy, but
+# whose job is to read and write artifacts, not to commit. Under patch handoff a commit they make is
+# undone with `reset --mixed`, so its content stays as unstaged work that the next judge sees
+# (the build's carry-over, or the PR stage's leftover check) instead of riding along in HEAD.
+_HEAD_PINNED_STAGES=" intake plan design review "
+
+_run_stage_pinned() {
+    local stage_id="$1"
+    if [[ "${SW_PATCH_HANDOFF:-true}" == "false" || "$_HEAD_PINNED_STAGES" != *" ${stage_id} "* ]]; then
+        "stage_${stage_id}"
+        return
+    fi
+    local before after rc=0
+    before=$(git -C "$PROJECT_ROOT" rev-parse HEAD 2>/dev/null) || before=""
+    "stage_${stage_id}" || rc=$?
+    after=$(git -C "$PROJECT_ROOT" rev-parse HEAD 2>/dev/null) || after=""
+    if [[ -n "$before" && "$after" != "$before" ]]; then
+        warn "Stage ${stage_id} committed (${after:0:12}); undoing it so the patch judge sees the changes"
+        emit_event "stage.head_moved" "issue=${ISSUE_NUMBER:-0}" "stage=${stage_id}" "from=${before}" "to=${after}"
+        git -C "$PROJECT_ROOT" reset -q --mixed "$before" || {
+            error "Could not undo stage ${stage_id}'s commit; stopping"
+            return 1
+        }
+    fi
+    return "$rc"
+}
+
 run_stage_with_retry() {
     local stage_id="$1"
     local max_retries
@@ -46,7 +73,7 @@ run_stage_with_retry() {
     local attempt=0
     local prev_error_class=""
     while true; do
-        if "stage_${stage_id}"; then
+        if _run_stage_pinned "$stage_id"; then
             return 0
         fi
 

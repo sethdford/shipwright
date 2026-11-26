@@ -44,7 +44,12 @@ command or external diff.
 - Each build gets a fresh clone, so loop `--resume` does not apply under handoff.
 - The branch gets one pipeline commit per build (`build: <goal>`); the loop's own commits stay in its
   clone. A build with no changes applies nothing and succeeds.
-- **Not covered yet**: the TDD and self-heal agents still run in the trusted checkout; test commands run the
+- Every other write into the trusted checkout is judged the same way: test-first (TDD) files are written into
+  a disposable clone and applied as a judged patch (model-chosen paths with `..` are never written); the PR
+  stage's "commit remaining changes" and CI partial-work commits go through `handoff_commit_dirty`; a commit
+  made during intake, plan, design or review is undone (`reset --mixed`) so its content meets the next judge;
+  artifact commits name their paths. Self-heal re-runs the build stage, so it was already covered.
+- **Not covered yet**: test commands run the
   agent's code in the trusted checkout (credentials are already stripped, #8608); the agent runs as the same
   OS user, so isolation from the host is the sandbox backends' job. Base sha, goal and branch should come only
   from the out-of-repo record (#8671).
