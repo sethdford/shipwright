@@ -1,12 +1,14 @@
 import type { Command } from "../command";
 import { breakerCommand } from "./breaker";
 import { budgetCommand } from "./budget";
+import { evalCommand } from "./eval";
 import { failureCommand } from "./failure";
 import { gatesCommand } from "./gates";
 import { governanceCommand } from "./governance";
 import { helloCommand } from "./hello";
 import { intakeCommand } from "./intake";
 import { pauseCommand, pausedCommand, resumeCommand } from "./pause";
+import { scorecardCommand } from "./scorecard";
 import { tournamentCommand } from "./tournament";
 
 export const commands: readonly Command[] = [
@@ -19,6 +21,8 @@ export const commands: readonly Command[] = [
   intakeCommand,
   gatesCommand,
   failureCommand,
+  scorecardCommand,
+  evalCommand,
   governanceCommand,
   tournamentCommand,
 ];

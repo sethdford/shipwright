@@ -252,7 +252,10 @@ skill_weight_by_complexity() {
     [[ -z "$skills" ]] && return 0
 
     # Parse complexity level
-    complexity=$(printf '%d' "$complexity" 2>/dev/null || echo "5")
+    # A failed printf still prints its partial value, so `printf || echo 5` turned "7.5" into "75" (clamped to 10).
+    complexity="${complexity%%.*}"
+    [[ "$complexity" =~ ^[0-9]+$ ]] || complexity=5
+    complexity=$((10#$complexity))
     [[ "$complexity" -lt 1 ]] && complexity=1
     [[ "$complexity" -gt 10 ]] && complexity=10
 

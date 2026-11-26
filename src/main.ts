@@ -3,6 +3,7 @@ import pkg from "../package.json";
 import { AgentSdkRunner, agentEnv } from "./adapters/agent/agent-sdk-runner";
 import { GitRepoDocs } from "./adapters/git/git-repo-docs";
 import { GitWorkspaces } from "./adapters/git/git-workspaces";
+import { GhClosedPulls } from "./adapters/github/gh-closed-pulls";
 import { GhGithubWriter } from "./adapters/github/gh-github-writer";
 import { GhOpenIssues } from "./adapters/github/gh-open-issues";
 import { GhPauseLabel } from "./adapters/github/gh-pause-label";
@@ -13,11 +14,13 @@ import { BashCommandRunner, testEnv } from "./adapters/process/bash-command-runn
 import { BunProcessRunner } from "./adapters/process/bun-process-runner";
 import { FilePauseFlag } from "./adapters/state/file-pause-flag";
 import { JsonCostLedger } from "./adapters/state/json-cost-ledger";
+import { LedgerSpend } from "./adapters/state/ledger-spend";
 import { NodeFileReader } from "./adapters/state/node-file-reader";
 import type { CliIO, Command } from "./cli/command";
 import { commands, findCommand } from "./cli/commands";
 import type { DeliveryPorts } from "./contexts/delivery";
 import type { SafetyPorts } from "./contexts/orchestration";
+import type { QualityPorts } from "./contexts/quality";
 import { installShutdown } from "./shutdown";
 
 const consoleIO: CliIO = {
@@ -47,6 +50,17 @@ export function buildSafetyPorts(
     costs: new JsonCostLedger(legacyDir),
     pulls: new GhPullRequests(runner),
     issues: new GhOpenIssues(runner),
+  };
+}
+
+/** Read-only adapters for the scorecard. */
+export function buildQualityPorts(env: Readonly<Record<string, string | undefined>>): QualityPorts {
+  const legacyDir = join(resolvePaths(env).home, ".shipwright");
+  const runner = new BunProcessRunner();
+  return {
+    now: () => Date.now(),
+    pulls: new GhClosedPulls(runner),
+    spend: new LedgerSpend(new JsonCostLedger(legacyDir)),
   };
 }
 
@@ -86,6 +100,25 @@ function renderHelp(registry: readonly Command[]): string {
 }
 
 /** Composition root. Adapters are constructed here as commands start needing them. */
+/** Top-level help and version, only when they are the whole request; anything more is a command. */
+function topLevel(
+  argv: readonly string[],
+  io: CliIO,
+  registry: readonly Command[],
+): number | undefined {
+  const [name] = argv;
+  const alone = argv.length <= 1;
+  if (name === undefined || (alone && (name === "--help" || name === "-h"))) {
+    io.out(renderHelp(registry));
+    return 0;
+  }
+  if (alone && (name === "--version" || name === "-v")) {
+    io.out(pkg.version);
+    return 0;
+  }
+  return undefined;
+}
+
 export async function main(
   argv: readonly string[],
   io: CliIO = consoleIO,
@@ -96,26 +129,19 @@ export async function main(
     return ports;
   }),
   env: Readonly<Record<string, string | undefined>> = process.env,
+  quality: () => QualityPorts = once(() => buildQualityPorts(env)),
   delivery: () => DeliveryPorts = once(() => buildDeliveryPorts(env, process.cwd())),
 ): Promise<number> {
   const [name, ...args] = argv;
-  // Top-level help and version only when they are the whole request; anything more exits 2 below.
-  const alone = argv.length <= 1;
-  if (name === undefined || (alone && (name === "--help" || name === "-h"))) {
-    io.out(renderHelp(registry));
-    return 0;
-  }
-  if (alone && (name === "--version" || name === "-v")) {
-    io.out(pkg.version);
-    return 0;
-  }
+  const early = topLevel(argv, io, registry);
+  if (early !== undefined || name === undefined) return early ?? 0;
   const command = findCommand(name, registry);
   if (!command) {
     // 2 = usage error (bash sw exited 1); 1 = command failed.
     io.err(`✗ Unknown command: ${name}`);
     return 2;
   }
-  const ctx = { io, version: pkg.version, safety, env, files, repoDocs, delivery };
+  const ctx = { io, version: pkg.version, safety, env, files, repoDocs, quality, delivery };
   try {
     return await command.run(args, ctx);
   } catch (error) {

@@ -102,11 +102,13 @@ score_freshness() {
 
     # Find most recent code change matching pattern
     local code_mtime
-    code_mtime=$(find "$REPO_DIR" -name "$code_pattern" -type f -exec stat -c %Y {} \; 2>/dev/null | sort -rn | head -1 || echo "0")
+    # file_mtime, not GNU-only `stat -c`: on macOS that printed nothing, so every doc scored fresh.
+    code_mtime=$(find "$REPO_DIR" -name "$code_pattern" -type f 2>/dev/null | while IFS= read -r _f; do file_mtime "$_f"; done | sort -rn | head -1 || true)
+    code_mtime="${code_mtime:-0}"
 
     # Get doc file modification time
     local doc_mtime
-    doc_mtime=$(stat -c %Y "$doc_file" 2>/dev/null || echo "0")
+    doc_mtime=$(file_mtime "$doc_file")
 
     if [[ "$code_mtime" -eq 0 ]]; then
         echo "100"
@@ -434,7 +436,7 @@ watch_mode() {
         # Create state string from file modification times
         local current_state=""
         for pattern in "${watch_paths[@]}"; do
-            current_state="${current_state}$(find "$REPO_DIR" -path "$pattern" -type f -exec stat -c %Y {} \; 2>/dev/null | sort -n | tail -1 || echo 0),"
+            current_state="${current_state}$(find "$REPO_DIR" -path "$pattern" -type f 2>/dev/null | while IFS= read -r _f; do file_mtime "$_f"; done | sort -n | tail -1 || true),"
         done
 
         if [[ "$current_state" != "$last_state" ]]; then

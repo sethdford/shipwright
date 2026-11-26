@@ -461,6 +461,14 @@ _smart_model() {
     printf '%s\n' "$value"
 }
 
+# budget_is_unlimited <usd> — 0 when a daily cap means "no cap": zero however it is spelled (0, 0.0,
+# "0.00"; SQLite and jq 1.7 print a stored 0 as 0.0), empty, or not a number. Use it instead of
+# `== "0"`, which treated 0.0 as a $0 cap. The dispatch gate (sw-cost.sh check-budget) blocks on a
+# non-number instead; this helper is for reports and optional features.
+budget_is_unlimited() {
+    awk -v b="${1:-}" 'BEGIN { exit !(b !~ /^[0-9]+\.?[0-9]*$/ || b + 0 == 0) }'
+}
+
 # _smart_int <config_key> <default>
 # Read int from daemon-config with env override and default fallback
 _smart_int() {

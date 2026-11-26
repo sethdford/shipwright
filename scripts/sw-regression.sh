@@ -193,7 +193,7 @@ cmd_baseline() {
     local tmp_file
     tmp_file=$(mktemp "${baseline_file}.tmp.XXXXXX")
     # shellcheck disable=SC2064
-    trap "rm -f '$tmp_file'" RETURN
+    trap "rm -f '$tmp_file'; trap - RETURN" RETURN
 
     echo "$metrics" > "$tmp_file"
     mv "$tmp_file" "$baseline_file"

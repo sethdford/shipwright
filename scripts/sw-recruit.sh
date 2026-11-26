@@ -365,7 +365,7 @@ cmd_audit() {
     if [[ -f "$META_LEARNING_DB" ]]; then
         local tmp_audit
         tmp_audit=$(mktemp)
-        trap "rm -f '$tmp_audit'" RETURN
+        trap "rm -f '$tmp_audit'; trap - RETURN" RETURN
         jq --argjson score "$score" --arg ts "$(now_iso)" --argjson fails "$fail_count" '
             .audit_trend = ((.audit_trend // []) + [{score: $score, ts: $ts, failures: $fails}] | .[-50:])
         ' "$META_LEARNING_DB" > "$tmp_audit" && _recruit_locked_write "$META_LEARNING_DB" "$tmp_audit" || rm -f "$tmp_audit"

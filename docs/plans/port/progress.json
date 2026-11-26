@@ -900,6 +900,24 @@
     "notes": "New in Wave 2 (W2-02): failure classification and retry decision (ADR-0009). script is the sentinel ts-native: no bash script exists, and the schema needs a string. Nothing in the repo is named ts-native, so the parity sandbox stub it creates (a new file nothing sources) is harmless. The plan fallback sw-daemon.sh was rejected because the unported daemon entry shares that file, and tools/port/sandbox.ts planStubs would throw. Bash classify_failure (scripts/lib/daemon-failure.sh) is the predecessor logic that W2-04 bridges to this command."
   },
   {
+    "command": "scorecard",
+    "aliases": [],
+    "script": "sw-scorecard.sh",
+    "context": "quality",
+    "parity": null,
+    "status": "parity-green",
+    "notes": "New (Wave 2 W2-18 delivery scorecard); no bash predecessor."
+  },
+  {
+    "command": "eval",
+    "aliases": [],
+    "script": "sw-eval.sh",
+    "context": "quality",
+    "parity": null,
+    "status": "parity-green",
+    "notes": "New (Wave 2 W2-13 pass^k and paired ratchet rule); no bash predecessor."
+  },
+  {
     "command": "governance",
     "aliases": ["gov"],
     "script": "ts-native",

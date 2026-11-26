@@ -616,17 +616,17 @@ Most commands are bash. The dashboard server and the commands routed through `ru
 | `scripts/sw-code-review.sh` | 702 | Clean Code & Architecture Analysis |
 | `scripts/sw-connect.sh` | 687 | Sync local state to team dashboard |
 | `scripts/sw-context.sh` | 601 | Context Engine for Pipeline Stages |
-| `scripts/sw-cost.sh` | 1070 | Token Usage & Cost Intelligence |
+| `scripts/sw-cost.sh` | 1080 | Token Usage & Cost Intelligence |
 | `scripts/sw-daemon.sh` | 1417 | Autonomous GitHub Issue Watcher |
 | `scripts/sw-dashboard.sh` | 519 | Fleet Command Dashboard |
-| `scripts/sw-db.sh` | 1937 | SQLite Persistence Layer |
+| `scripts/sw-db.sh` | 2016 | SQLite Persistence Layer |
 | `scripts/sw-decide.sh` | 716 | Shipwright Autonomous Decision Engine |
 | `scripts/sw-decompose.sh` | 875 | Intelligent Issue Decomposition |
 | `scripts/sw-deps.sh` | 533 | Automated Dependency Update Management |
 | `scripts/sw-developer-simulation.sh` | 239 | Multi-Persona Developer Simulation |
 | `scripts/sw-discovery.sh` | 913 | Cross-Pipeline Real-Time Learning |
 | `scripts/sw-doc-fleet.sh` | 817 | Documentation Fleet Orchestrator |
-| `scripts/sw-docs-agent.sh` | 525 | Auto-sync README, wiki, API docs |
+| `scripts/sw-docs-agent.sh` | 527 | Auto-sync README, wiki, API docs |
 | `scripts/sw-docs.sh` | 626 | Documentation Keeper |
 | `scripts/sw-doctor.sh` | 1651 | Validate Shipwright setup |
 | `scripts/sw-dora.sh` | 605 | DORA Metrics Dashboard with Engineering Intelligence |
@@ -640,7 +640,7 @@ Most commands are bash. The dashboard server and the commands routed through `ru
 | `scripts/sw-fleet-discover.sh` | 550 | Auto-Discovery from GitHub Orgs |
 | `scripts/sw-fleet-viz.sh` | 411 | Multi-Repo Fleet Visualization |
 | `scripts/sw-fleet.sh` | 1371 | Multi-Repo Daemon Orchestrator |
-| `scripts/sw-guild.sh` | 556 | Knowledge Guilds & Cross-Team Learning |
+| `scripts/sw-guild.sh` | 557 | Knowledge Guilds & Cross-Team Learning |
 | `scripts/sw-heartbeat.sh` | 307 | File-based agent heartbeat protocol |
 | `scripts/sw-hello.sh` | 67 | Hello World Command |
 | `scripts/sw-hygiene.sh` | 724 | Repository Organization & Cleanup |
@@ -777,11 +777,11 @@ Most commands are bash. The dashboard server and the commands routed through `ru
 | `scripts/sw-context-test.sh` | 222 | Context Engine for Pipeline Stages tests |
 | `scripts/sw-convergence-test.sh` | 326 | Unit tests for convergence detection |
 | `scripts/sw-cost-optimizer-test.sh` | 468 | Test suite for cost optimization |
-| `scripts/sw-cost-test.sh` | 235 | Validate token usage & cost intelligence |
+| `scripts/sw-cost-test.sh` | 252 | Validate token usage & cost intelligence |
 | `scripts/sw-daemon-test.sh` | 1968 | Unit tests for daemon metrics, health, alerting |
 | `scripts/sw-dashboard-e2e-test.sh` | 593 | full live validation |
 | `scripts/sw-dashboard-test.sh` | 251 | validates dashboard structure |
-| `scripts/sw-db-test.sh` | 978 | SQLite Persistence Layer Test Suite |
+| `scripts/sw-db-test.sh` | 989 | SQLite Persistence Layer Test Suite |
 | `scripts/sw-decide-test.sh` | 522 | Unit tests for the Autonomous Decision Engine |
 | `scripts/sw-decompose-test.sh` | 223 | Intelligent Issue Decomposition tests |
 | `scripts/sw-deps-test.sh` | 166 | Automated Dependency Update Management tests |
@@ -811,7 +811,7 @@ Most commands are bash. The dashboard server and the commands routed through `ru
 | `scripts/sw-github-checks-test.sh` | 538 | Validate Checks API wrapper |
 | `scripts/sw-github-deploy-test.sh` | 526 | Validate Deployments API wrapper |
 | `scripts/sw-github-graphql-test.sh` | 664 | Unit tests for GitHub GraphQL client |
-| `scripts/sw-guild-test.sh` | 150 | Knowledge guilds & cross-team learning tests |
+| `scripts/sw-guild-test.sh` | 158 | Knowledge guilds & cross-team learning tests |
 | `scripts/sw-heartbeat-test.sh` | 584 | Validate heartbeat lifecycle, |
 | `scripts/sw-hello-test.sh` | 110 | Hello Command Test Suite |
 | `scripts/sw-hygiene-test.sh` | 199 | Repository Organization & Cleanup tests |
@@ -824,20 +824,20 @@ Most commands are bash. The dashboard server and the commands routed through `ru
 | `scripts/sw-jira-test.sh` | 286 | Validate Jira ↔ GitHub bidirectional sync |
 | `scripts/sw-launchd-test.sh` | 902 | Validate service management on |
 | `scripts/sw-lib-audit-trail-test.sh` | 312 |  |
-| `scripts/sw-lib-compat-test.sh` | 415 | Unit tests for cross-platform helpers |
+| `scripts/sw-lib-compat-test.sh` | 423 | Unit tests for cross-platform helpers |
 | `scripts/sw-lib-compound-audit-test.sh` | 282 |  |
-| `scripts/sw-lib-daemon-dispatch-test.sh` | 418 | Unit tests for spawn/reap/queue |
+| `scripts/sw-lib-daemon-dispatch-test.sh` | 485 | Unit tests for spawn/reap/queue |
 | `scripts/sw-lib-daemon-failure-test.sh` | 498 | Unit tests for failure handling |
 | `scripts/sw-lib-daemon-gates-test.sh` | 462 | safety gates at the daemon call sites |
 | `scripts/sw-lib-daemon-patrol-test.sh` | 743 | Unit tests for all patrol functions |
-| `scripts/sw-lib-daemon-poll-test.sh` | 345 | Unit tests for poll, health, cleanup |
+| `scripts/sw-lib-daemon-poll-test.sh` | 375 | Unit tests for poll, health, cleanup |
 | `scripts/sw-lib-daemon-state-test.sh` | 543 | Unit tests for state management |
 | `scripts/sw-lib-daemon-triage-test.sh` | 268 | Unit tests for triage scoring |
 | `scripts/sw-lib-error-actionability-test.sh` | 214 |  |
 | `scripts/sw-lib-governance-brief-test.sh` | 98 | ADR-0010 prompt sections |
 | `scripts/sw-lib-helpers-test.sh` | 230 | Unit tests for shared helper functions |
 | `scripts/sw-lib-models-test.sh` | 174 | deterministic model routing (W2-07, #8595) |
-| `scripts/sw-lib-pipeline-detection-test.sh` | 475 | Unit tests for detection fns |
+| `scripts/sw-lib-pipeline-detection-test.sh` | 483 | Unit tests for detection fns |
 | `scripts/sw-lib-pipeline-intelligence-test.sh` | 411 | Unit tests for intelligence |
 | `scripts/sw-lib-pipeline-quality-checks-test.sh` | 194 | Unit tests for quality |
 | `scripts/sw-lib-pipeline-stages-test.sh` | 292 | Unit tests for stage functions |
@@ -845,6 +845,7 @@ Most commands are bash. The dashboard server and the commands routed through `ru
 | `scripts/sw-lib-pr-content-test.sh` | 130 | PR titles, bodies and artifact scrubbing |
 | `scripts/sw-lib-safety-gates-sites-test.sh` | 168 | automated filings use intake caps |
 | `scripts/sw-lib-safety-gates-test.sh` | 358 | bash callers of the TS safety gates |
+| `scripts/sw-lib-skill-registry-test.sh` | 36 | complexity weighting |
 | `scripts/sw-lib-test-gate-baseline-test.sh` | 662 | differential test gate (#8633) |
 | `scripts/sw-lib-test-gate-env-test.sh` | 399 | the loop's test gate has no creds |
 | `scripts/sw-lib-test-isolate-test.sh` | 139 | regression test for test isolation (#8648) |
@@ -907,14 +908,14 @@ Most commands are bash. The dashboard server and the commands routed through `ru
 | `scripts/sw-team-stages-test.sh` | 149 | Validate multi-agent stage execution |
 | `scripts/sw-templates-test.sh` | 252 | Validate team template browser |
 | `scripts/sw-test-holdout-test.sh` | 216 | Test Holdout System Test Suite |
-| `scripts/sw-test-optimizer-test.sh` | 396 | Test suite for test execution optimizer |
+| `scripts/sw-test-optimizer-test.sh` | 407 | Test suite for test execution optimizer |
 | `scripts/sw-testgen-test.sh` | 161 | Test generation & coverage tests |
 | `scripts/sw-tmux-pipeline-test.sh` | 188 | Validate tmux pipeline management |
 | `scripts/sw-tmux-test.sh` | 749 | Validate tmux doctor, install, fix, reload, |
 | `scripts/sw-trace-test.sh` | 144 | E2E traceability (Issue → Commit → PR → Deploy) |
 | `scripts/sw-tracker-providers-test.sh` | 553 | Unit tests for GitHub, Linear, |
 | `scripts/sw-tracker-test.sh` | 537 | Validate tracker router, providers, and |
-| `scripts/sw-triage-test.sh` | 250 | Intelligent Issue Labeling & Prioritization |
+| `scripts/sw-triage-test.sh` | 254 | Intelligent Issue Labeling & Prioritization |
 | `scripts/sw-upgrade-test.sh` | 335 | Validate upgrade detection and apply |
 | `scripts/sw-ux-test.sh` | 186 | Validate UX enhancement layer |
 | `scripts/sw-webhook-test.sh` | 168 | GitHub Webhook Receiver tests |
