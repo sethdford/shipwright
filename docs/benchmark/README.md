@@ -24,6 +24,28 @@ shipwright bench report --tasks ~/bench/holdout.json --arms docs/benchmark/arms.
   --out ~/bench/results --k 3
 ```
 
+### Commits and curated problems
+
+Few changes in this repo arrive as a PR that closes an issue, so most holdout tasks come from
+direct commits on the default branch:
+
+```bash
+# 1. List candidates: commits with a source change and a runnable test change.
+shipwright bench mine-holdout --repo sethdford/shipwright --since 2026-06-01 --source commits \
+  2>&1 >/dev/null | grep "needs a curated problem"
+# 2. Write ~/bench/problems.json: { "c-<sha10>": "<problem statement>" }.
+# 3. Mine again with the statements, then validate.
+shipwright bench mine-holdout --repo sethdford/shipwright --since 2026-06-01 --source commits \
+  --problems ~/bench/problems.json --setup "bun install --frozen-lockfile" > ~/bench/commits.json
+```
+
+A commit message describes the fix, so it is never used as the problem. Write each statement the
+way a user would file the bug or request: the symptom or the missing behavior, and any name the
+hidden tests call (a function, flag or file) the agent could not otherwise guess. Never describe
+the gold change. Keep the problems file private with the manifest. `--problems` also admits a PR
+that closes no issue (key `pr-<number>`). Merge manifests with
+`jq -s '{name: "holdout", tasks: (map(.tasks) | add)}' a.json b.json`.
+
 Set `SHIPWRIGHT_BENCH_BIN` to benchmark an installed Shipwright (for example `$(command -v shipwright)`)
 instead of this checkout's `scripts/sw`. Stop the daemon while a benchmark runs: Shipwright's spend is read from the cost ledger for each
 run's time window. Drop tasks that `validate` marks ✗ from the manifest before running.
