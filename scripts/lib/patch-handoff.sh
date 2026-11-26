@@ -161,22 +161,30 @@ handoff_commit_dirty() {
     handoff_apply "$trusted" "$base" "$out" "$msg"
 }
 
-# handoff_export AGENT_DIR BASE_SHA TRUSTED_REPO OUT_PATCH — the agent's files, as a binary patch
-# against BASE_SHA. Uses a scratch git dir whose objects borrow from TRUSTED_REPO (read only).
+# handoff_export AGENT_DIR BASE_SHA TRUSTED_REPO OUT_PATCH [PATH...] — the agent's files, as a
+# binary patch against BASE_SHA. With PATHs, only those repository-relative paths (taken literally,
+# no globs) are read. Uses a scratch git dir whose objects borrow from TRUSTED_REPO (read only).
 handoff_export() {
     local dir="$1" base="$2" trusted="$3" out="$4"
+    shift 4
     handoff_check_git || return 1
     [[ -d "$dir" ]] || { _handoff_err "no agent dir: $dir"; return 1; }
     local scratch
     scratch=$(mktemp -d "${TMPDIR:-/tmp}/sw-handoff.XXXXXX") || return 1
     local rc=0
-    _handoff_export_in "$scratch" "$dir" "$base" "$trusted" "$out" || rc=$?
+    _handoff_export_in "$scratch" "$dir" "$base" "$trusted" "$out" "$@" || rc=$?
     rm -rf "$scratch"
     return "$rc"
 }
 
 _handoff_export_in() {
     local scratch="$1" dir="$2" base="$3" trusted="$4" out="$5"
+    shift 5
+    local specs=(.) p
+    if [[ $# -gt 0 ]]; then
+        specs=()
+        for p in "$@"; do specs+=(":(literal,top)$p"); done
+    fi
     local gd="$scratch/git"
     _handoff_git init -q --bare "$gd" || return 1
     local objects
@@ -186,7 +194,7 @@ _handoff_export_in() {
     # The scratch index starts at the base tree; `add -A` records the agent's files as they are.
     GIT_DIR="$gd" GIT_INDEX_FILE="$scratch/index" _handoff_git read-tree "$base" || return 1
     GIT_DIR="$gd" GIT_WORK_TREE="$dir" GIT_INDEX_FILE="$scratch/index" \
-        _handoff_git add -A -- . "${HANDOFF_EXCLUDE_PATHSPEC[@]}" \
+        _handoff_git add -A -- "${specs[@]}" "${HANDOFF_EXCLUDE_PATHSPEC[@]}" \
         || { _handoff_err "could not read the agent's files"; return 1; }
     local tmp="$out.tmp.$$"
     GIT_DIR="$gd" GIT_WORK_TREE="$dir" GIT_INDEX_FILE="$scratch/index" \
