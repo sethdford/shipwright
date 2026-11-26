@@ -53,3 +53,13 @@ Add `shipwright bench`, a harness in the `quality` context that runs several **a
   task records the issue's `createdAt`; publish results only for tasks filed after the model's
   training cutoff, and say so on the page.
 - Live runs need model credentials; they run on a maintainer machine, not in CI.
+
+## Amendment (2026-11-26): history-free workspaces and a run audit
+Workspaces were detached worktrees of a full `--mirror` clone, so `git log --all` reached the gold
+fix, the pattern SWE-bench Pro measured on about 21% of tasks. Each run now gets a copied clone
+of a snapshot that holds only the base commit and its ancestors (no refs, tags or objects past
+the base), checked before use, in the system temp dir away from the mirror. `bench validate`
+alone fetches the gold commit in from the mirror. Every run is audited from the agent's
+transcript and from logging `git`/`gh` wrappers on its PATH: touching the mirror or fetching the
+task's upstream repo voids the run (unresolved); history probing, forge calls and edits to tests,
+test config or the oracle are warnings shown in the report. See `docs/benchmark/README.md`.

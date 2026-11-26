@@ -1,3 +1,4 @@
+import { tmpdir } from "node:os";
 import { join } from "node:path";
 import type { BenchFactory } from "../../contexts/quality";
 import { GhHoldoutSource } from "../github/gh-holdout-source";
@@ -12,7 +13,8 @@ import { ProcessArmRunner } from "./process-arm-runner";
 import { ProcessBenchGrader } from "./process-bench-grader";
 
 /**
- * Wires the benchmark adapters. Checkouts live under `<state dir>/bench`; agents run under the
+ * Wires the benchmark adapters. The mirror cache lives under `<state dir>/bench`, checkouts under
+ * the system temp dir; agents run under the
  * repo's `config/agent-permissions.json`. CLAUDE_BIN picks the `claude` binary; SHIPWRIGHT_BENCH_BIN
  * picks the Shipwright under test (default: this checkout's scripts/sw), e.g. an installed release.
  */
@@ -27,7 +29,13 @@ export function buildBenchFactory(
   return {
     ports: (outDir) => ({
       now,
-      workspaces: new GitBenchWorkspaces(runner, join(paths.stateDir, "bench"), toolEnv),
+      // Checkouts live away from the mirror cache, so `..` from a workspace does not lead to it.
+      workspaces: new GitBenchWorkspaces(
+        runner,
+        join(paths.stateDir, "bench"),
+        toolEnv,
+        join(tmpdir(), "shipwright-bench-work"),
+      ),
       grader: new ProcessBenchGrader(runner, toolEnv),
       store: new JsonlBenchStore(outDir),
       arms: new ProcessArmRunner(

@@ -1,5 +1,15 @@
 import type { BenchArm, BenchRow, BenchTask, PlannedRun } from "../../domain/bench";
-import { mayStart, pendingRuns, planRuns, spentUsd } from "../../domain/bench";
+import {
+  auditCommands,
+  auditPatch,
+  flagLine,
+  isVoid,
+  mayStart,
+  pendingRuns,
+  planRuns,
+  spentUsd,
+  topFlags,
+} from "../../domain/bench";
 import type { ArmOutcome, BenchPorts } from "../../ports";
 
 export interface RunRequest {
@@ -29,7 +39,13 @@ async function grade(task: BenchTask, dir: string, out: ArmOutcome, ports: Bench
 
 type RowBase = Pick<BenchRow, "taskId" | "armId" | "trial" | "at">;
 
-/** Runs the arm in a prepared workspace, saves its patch and grades it. */
+/** Integrity flags for a finished run: what the agent ran, and what its patch touches. */
+function audit(task: BenchTask, out: ArmOutcome, patch: string, ports: BenchPorts) {
+  const ctx = { guardedPaths: ports.workspaces.guardedPaths() };
+  return topFlags([...auditCommands(out.commands ?? [], task, ctx), ...auditPatch(patch, task)]);
+}
+
+/** Runs the arm in a prepared workspace, saves its patch, audits and grades it. */
 async function workOn(
   dir: string,
   base: RowBase,
@@ -41,6 +57,9 @@ async function workOn(
   const diff = await ports.workspaces.diff(dir, task.baseCommit);
   const patch = diff.ok ? diff.value : "";
   await ports.store.savePatch(arm.id, task.id, base.trial, patch);
+  if (out.trajectory) await ports.store.saveTrajectory(arm.id, task.id, base.trial, out.trajectory);
+  const flags = audit(task, out, patch, ports);
+  const voided = isVoid(flags);
   const g =
     patch.trim() === "" && out.status === "ok"
       ? { resolved: false, note: "empty patch" }
@@ -48,11 +67,12 @@ async function workOn(
   const row: BenchRow = {
     ...base,
     status: diff.ok ? out.status : "error",
-    resolved: g.resolved,
+    resolved: voided ? false : g.resolved,
     costUsd: out.costUsd,
     durationMs: out.durationMs,
     patchBytes: patch.length,
-    note: g.note,
+    note: voided ? `voided by integrity check; ${g.note}` : g.note,
+    flags: flags.map(flagLine),
   };
   return row;
 }

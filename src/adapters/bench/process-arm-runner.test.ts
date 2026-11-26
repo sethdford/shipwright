@@ -1,9 +1,22 @@
-import { expect, test } from "bun:test";
+import { afterEach, beforeEach, expect, test } from "bun:test";
+import { existsSync, mkdirSync } from "node:fs";
+import { join } from "node:path";
 import type { BenchArm, BenchTask } from "../../contexts/quality";
 import { ok } from "../../shared/kernel/result";
 import { FakeProcessRunner } from "../../testing/fake-process-runner";
+import { createTestEnv, type TestEnv } from "../../testing/test-env";
+import { BunProcessRunner } from "../process/bun-process-runner";
 import { agentEnv } from "./agent-env";
-import { ProcessArmRunner, parseClaudeJson } from "./process-arm-runner";
+import { parseClaudeStream } from "./claude-stream";
+import { ProcessArmRunner } from "./process-arm-runner";
+
+let tenv: TestEnv;
+let w: string;
+beforeEach(() => {
+  tenv = createTestEnv();
+  w = join(tenv.root, "w", "t1");
+});
+afterEach(() => tenv.cleanup());
 
 const task = { id: "t1", problem: "fix the bug" } as BenchTask;
 const arm = (over: Partial<BenchArm>): BenchArm => ({
@@ -37,24 +50,31 @@ function make(
 }
 
 test("bare Claude Code: same model, the shared permission policy, prompt on stdin, no GitHub token", async () => {
-  const stdout = JSON.stringify({ total_cost_usd: 1.25, is_error: false });
+  const tool = { type: "tool_use", name: "Bash", input: { command: "git log --all" } };
+  const stdout = [
+    JSON.stringify({ type: "assistant", message: { content: [tool] } }),
+    JSON.stringify({ type: "result", total_cost_usd: 1.25, is_error: false }),
+  ].join("\n");
   const { runner, arms } = make([
     { prefix: ["claude"], result: { exitCode: 0, stdout, stderr: "" } },
   ]);
-  const out = await arms.run(arm({}), task, "/w/t1");
-  expect(out).toMatchObject({ status: "ok", costUsd: 1.25 });
+  const out = await arms.run(arm({}), task, w);
+  expect(out).toMatchObject({ status: "ok", costUsd: 1.25, commands: ["git log --all"] });
+  expect(out.trajectory).toBe(stdout);
   const call = runner.calls[0];
   expect(call?.argv).toEqual([
     "claude",
     "-p",
     "--output-format",
-    "json",
+    "stream-json",
+    "--verbose",
     "--model",
     "claude-opus-5-5",
     "--settings",
     "/sw/config/agent-permissions.json",
   ]);
-  expect(call?.cwd).toBe("/w/t1");
+  expect(call?.cwd).toBe(w);
+  expect(call?.env?.PATH).toBe(`${w}.agent/bin:/bin`);
   expect(call?.stdin).toContain("<issue>\nfix the bug\n</issue>");
   expect(call?.env?.GH_TOKEN).toBeUndefined();
   expect(call?.env?.GITHUB_TOKEN).toBeUndefined();
@@ -67,7 +87,7 @@ test("Shipwright: local headless pipeline, attempts and arm env, spend from the 
     { prefix: ["/sw/scripts/sw"], result: { exitCode: 0, stdout: "", stderr: "" } },
   ]);
   const a = arm({ kind: "shipwright", attempts: 3, env: { SHIPWRIGHT_LESSONS: "off" } });
-  const out = await arms.run(a, task, "/w/t1");
+  const out = await arms.run(a, task, w);
   expect(out).toMatchObject({ status: "ok", costUsd: 4 });
   const call = runner.calls[0];
   expect(call?.argv.slice(1, 4)).toEqual(["pipeline", "start", "--goal"]);
@@ -81,22 +101,56 @@ test("timeouts, errors and a missing binary are outcomes, never throws", async (
   const { arms } = make([
     { prefix: ["claude"], result: { exitCode: 0, stdout: "", stderr: "", timedOut: true } },
   ]);
-  expect((await arms.run(arm({}), task, "/w")).status).toBe("timeout");
+  expect((await arms.run(arm({}), task, w)).status).toBe("timeout");
   const failing = make([
     { prefix: ["claude"], result: { exitCode: 1, stdout: "{}", stderr: "boom" } },
   ]);
-  expect(await failing.arms.run(arm({}), task, "/w")).toMatchObject({
+  expect(await failing.arms.run(arm({}), task, w)).toMatchObject({
     status: "error",
     note: "boom",
   });
   const missing = make([]);
-  expect((await missing.arms.run(arm({}), task, "/w")).status).toBe("error");
+  expect((await missing.arms.run(arm({}), task, w)).status).toBe("error");
 });
 
-test("parseClaudeJson", () => {
-  expect(parseClaudeJson('{"total_cost_usd":0.5}')).toEqual({ costUsd: 0.5, isError: false });
-  expect(parseClaudeJson('{"is_error":true}')).toEqual({ costUsd: null, isError: true });
-  expect(parseClaudeJson("not json")).toEqual({ costUsd: null, isError: true });
+test("parseClaudeStream reads the single-object format and streams", () => {
+  const none = { commands: [] };
+  expect(parseClaudeStream('{"total_cost_usd":0.5}')).toEqual({
+    costUsd: 0.5,
+    isError: false,
+    ...none,
+  });
+  expect(parseClaudeStream('{"is_error":true}')).toEqual({ costUsd: null, isError: true, ...none });
+  expect(parseClaudeStream("not json")).toEqual({ costUsd: null, isError: true, ...none });
+  const read = { type: "tool_use", name: "Read", input: { file_path: "/x/repos/r.git/HEAD" } };
+  const stream = [
+    JSON.stringify({ type: "assistant", message: { content: [{ type: "text" }, read] } }),
+    "garbage",
+  ].join("\n");
+  expect(parseClaudeStream(stream)).toEqual({
+    costUsd: null,
+    isError: true,
+    commands: ["Read /x/repos/r.git/HEAD"],
+  });
+});
+
+test("the command log records git calls an arm makes, and is removed afterwards", async () => {
+  const runner = new BunProcessRunner();
+  let t = 0;
+  const cfg = {
+    claudeBin: "claude",
+    shipwrightBin: "sw",
+    policyPath: "p",
+    env: { PATH: "/usr/local/bin:/opt/homebrew/bin:/usr/bin:/bin", HOME: tenv.home },
+    now: () => (t += 1000),
+  };
+  const arms = new ProcessArmRunner(runner, { between: async () => ok(null) }, cfg);
+  mkdirSync(w, { recursive: true });
+  const a = arm({ kind: "command", argv: ["git", "--version"] });
+  const out = await arms.run(a, task, w);
+  expect(out.status).toBe("ok");
+  expect(out.commands).toEqual(["git --version"]);
+  expect(existsSync(`${w}.agent`)).toBe(false);
 });
 
 test("agentEnv drops GitHub tokens and adds the arm's variables", () => {

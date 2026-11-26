@@ -72,11 +72,36 @@ shipwright bench import-swebench --out ~/bench/swe --arm claude-code \
 - **Paired comparison**: per task, wins, losses and ties against the baseline arm, with an exact
   two-sided sign test. With 30 tasks, 21 wins to 9 losses is roughly p = 0.04.
 
+## Integrity: no future history, and an audit of every run
+
+SWE-bench Pro found agents running `git log --all` to read the gold fix on about 21% of tasks.
+Here, each run gets a fresh clone that holds only the base commit and its ancestors: no later
+commits, no branches, tags or pull refs, no reflog, and no objects beyond the base. It is copied
+from a per-base snapshot, never linked to the full-history mirror, and every workspace is checked
+before use (any commit that is not an ancestor of the base, or the gold commit, fails it). The
+mirror cache stays under `~/.shipwright/bench`; checkouts live in the system temp dir.
+
+Every run is then audited, and the flags land in `results.jsonl`:
+
+- **Voided** (counted as unresolved): reading the harness's mirror (`cache-access`), or fetching
+  the task's own upstream repo with git, `gh`, `curl` or `wget` (`upstream-fetch`).
+- **Warnings** (the result stands; read them before publishing): probing history
+  (`git log --all`, `reflog`, `for-each-ref`, `cat-file --batch-all-objects`), other forge or
+  network calls, edits to the hidden oracle's files (reset before grading anyway), changes to
+  existing tests, and edits to test config or CI workflows.
+
+Sources: the `claude-code` arm's full transcript (`--output-format stream-json`, saved as
+`patches/<arm>/<task>.t<n>.trajectory.jsonl`), and for every arm, `git` and `gh` wrappers put first
+on its PATH that log each call. Shipwright's own agents are covered by the wrappers. An agent that
+calls git by absolute path inside Claude Code's sandbox (which cannot write the log) is seen only
+in its transcript. The report's Flagged/Voided column counts both.
+
 ## Publishing rules
 
 Publish the manifest name, task count, seed, arms file, model ids, dates and the full
 `report.json`. Never publish a holdout manifest (it leaks the oracle). Report holdout results only
-for tasks filed after the model's training cutoff, and say which cutoff you used.
+for tasks filed after the model's training cutoff, and say which cutoff you used. Read every
+flagged run's trajectory before publishing, and publish the voided count with the results.
 
 ## Paired A/B of one feature (repository model)
 
