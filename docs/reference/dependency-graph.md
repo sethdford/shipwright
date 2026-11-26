@@ -17,6 +17,11 @@ flowchart LR
     adapters_store["adapters/store"]
     adapters_tmux["adapters/tmux"]
   end
+  subgraph ctx_delivery["delivery"]
+    delivery["delivery"]
+    delivery_application["delivery/application"]
+    delivery_domain["delivery/domain"]
+  end
   subgraph ctx_learning["learning"]
     learning["learning"]
     learning_application["learning/application"]
@@ -40,22 +45,31 @@ flowchart LR
   adapters --> kernel
   adapters_agent --> kernel
   adapters_git --> adapters_process
+  adapters_git --> delivery
   adapters_git --> kernel
   adapters_github --> adapters_process
   adapters_github --> integrations
   adapters_github --> kernel
   adapters_github --> orchestration
+  adapters_process --> delivery
   adapters_process --> kernel
   adapters_state --> kernel
   adapters_state --> orchestration
   adapters_store --> kernel
   adapters_tmux --> adapters_process
   adapters_tmux --> kernel
+  cli --> delivery
   cli --> kernel
   cli --> learning
   cli --> main
   cli --> orchestration
   cli --> platform
+  delivery --> delivery_application
+  delivery --> delivery_domain
+  delivery --> kernel
+  delivery_application --> delivery
+  delivery_application --> delivery_domain
+  delivery_application --> kernel
   integrations --> kernel
   learning --> learning_application
   learning --> learning_domain
@@ -63,10 +77,13 @@ flowchart LR
   learning_application --> learning_domain
   learning_domain --> kernel
   main --> adapters
+  main --> adapters_agent
+  main --> adapters_git
   main --> adapters_github
   main --> adapters_process
   main --> adapters_state
   main --> cli
+  main --> delivery
   main --> orchestration
   main --> shutdown
   orchestration --> integrations

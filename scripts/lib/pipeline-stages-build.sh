@@ -168,6 +168,61 @@ Create files in the appropriate project directories (e.g. tests/, __tests__/, sr
     return 0
 }
 
+# ── Tournament mode (shipwright tournament) ─────────────────────────────────
+# N independent attempts in separate worktrees; a cross-test matrix, a per-issue rubric and a
+# blind group-wise judge pick one patch, which is fast-forwarded onto the pipeline branch.
+# On when PIPELINE_ATTEMPTS (or .defaults.attempts in the pipeline config) is 2 to 5 and the
+# pipeline knows a test command: the tournament gates every attempt on the repository's tests.
+_build_tournament_attempts() {
+    local n="${PIPELINE_ATTEMPTS:-}"
+    if [[ -z "$n" && -n "${PIPELINE_CONFIG:-}" && -f "${PIPELINE_CONFIG}" ]]; then
+        n=$(jq -r '.defaults.attempts // empty' "$PIPELINE_CONFIG" 2>/dev/null || true)
+    fi
+    case "$n" in
+        2|3|4|5) echo "$n" ;;
+        *) echo "1" ;;
+    esac
+}
+
+_build_tournament() {
+    local goal="$1" test_cmd="$2" model="$3" attempts="$4"
+    local goal_file="$ARTIFACTS_DIR/tournament-goal.md"
+    local report="$ARTIFACTS_DIR/tournament.json"
+    mkdir -p "$ARTIFACTS_DIR"
+    printf '%s\n' "$goal" > "$goal_file"
+    local args=(--goal-file "$goal_file" --test-cmd "$test_cmd" --attempts "$attempts" --model "$model" --format json)
+    [[ -n "${PIPELINE_TOURNAMENT_BUDGET_USD:-}" ]] && args+=(--budget-usd "$PIPELINE_TOURNAMENT_BUDGET_USD")
+    [[ -n "${PIPELINE_SETUP_CMD:-}" ]] && args+=(--setup-cmd "$PIPELINE_SETUP_CMD")
+
+    info "Starting build tournament: ${attempts} parallel attempts, model ${model}"
+    if [[ -n "${ISSUE_NUMBER:-}" ]]; then
+        gh_comment_issue "$ISSUE_NUMBER" "🔨 **Build started** — tournament mode: ${attempts} independent attempts, model: ${model}"
+    fi
+    local rc=0
+    sw tournament "${args[@]}" < /dev/null > "${report}.tmp" || rc=$?
+    mv "${report}.tmp" "$report"
+
+    local winner confidence cost
+    winner=$(jq -r '.selection.winner // empty' "$report" 2>/dev/null || true)
+    confidence=$(jq -r '.selection.confidence // empty' "$report" 2>/dev/null || true)
+    cost=$(jq -r '.costUsd // 0' "$report" 2>/dev/null || echo "0")
+    if [[ -n "$cost" && "$cost" != "0" && "$cost" != "null" ]]; then
+        TOTAL_COST_USD="$cost"
+    fi
+    emit_event "build.tournament" "issue=${ISSUE_NUMBER:-0}" "attempts=$attempts" \
+        "winner=${winner:-none}" "confidence=${confidence:-none}" "cost_usd=${cost:-0}" "exit=$rc"
+    if [[ "$rc" -eq 3 ]]; then
+        echo "tournament_no_winner" > "$ARTIFACTS_DIR/failure-reason.txt" 2>/dev/null || true
+        error "Build tournament: no attempt passed the tests and the judge (see tournament.json)"
+        return 1
+    fi
+    if [[ "$rc" -ne 0 ]]; then
+        error "Build tournament failed (exit $rc)"
+        return 1
+    fi
+    info "Build tournament winner: ${winner} (${confidence} confidence, \$${cost})"
+}
+
 stage_build() {
     CURRENT_STAGE_ID="build"
     # Consume retry context if this is a retry attempt
@@ -463,52 +518,58 @@ ${_skill_prompts}
     # for interactive permission prompts. Without this flag, agents can't write files.
     loop_args+=(--skip-permissions)
 
-    info "Starting build loop: ${DIM}shipwright loop${RESET} (max ${max_iter} iterations, ${agents} agent(s))"
+    local _attempts
+    _attempts=$(_build_tournament_attempts)
+    if [[ "$_attempts" -gt 1 && -n "$test_cmd" && "$test_cmd" != "null" ]]; then
+        _build_tournament "$enriched_goal" "$test_cmd" "$build_model" "$_attempts" || return 1
+    else
+        info "Starting build loop: ${DIM}shipwright loop${RESET} (max ${max_iter} iterations, ${agents} agent(s))"
 
-    # Post build start to GitHub
-    if [[ -n "$ISSUE_NUMBER" ]]; then
-        gh_comment_issue "$ISSUE_NUMBER" "🔨 **Build started** — \`shipwright loop\` with ${max_iter} max iterations, ${agents} agent(s), model: ${build_model}"
-    fi
+        # Post build start to GitHub
+        if [[ -n "$ISSUE_NUMBER" ]]; then
+            gh_comment_issue "$ISSUE_NUMBER" "🔨 **Build started** — \`shipwright loop\` with ${max_iter} max iterations, ${agents} agent(s), model: ${build_model}"
+        fi
 
-    local _token_log="${ARTIFACTS_DIR}/.claude-tokens-build.log"
-    export PIPELINE_JOB_ID="${PIPELINE_NAME:-pipeline-$$}"
-    sw loop "${loop_args[@]}" < /dev/null 2>"$_token_log" || {
-        local _loop_exit=$?
+        local _token_log="${ARTIFACTS_DIR}/.claude-tokens-build.log"
+        export PIPELINE_JOB_ID="${PIPELINE_NAME:-pipeline-$$}"
+        sw loop "${loop_args[@]}" < /dev/null 2>"$_token_log" || {
+            local _loop_exit=$?
+            parse_claude_tokens "$_token_log"
+
+            # Detect context exhaustion from progress file
+            local _progress_file="${PWD}/.claude/loop-logs/progress.md"
+            if [[ -f "$_progress_file" ]]; then
+                local _prog_tests
+                _prog_tests=$(grep -oE 'Tests passing: (true|false)' "$_progress_file" 2>/dev/null | awk '{print $NF}' || echo "unknown")
+                if [[ "$_prog_tests" != "true" ]]; then
+                    warn "Build loop exhausted with failing tests (context exhaustion)"
+                    emit_event "pipeline.context_exhaustion" "issue=${ISSUE_NUMBER:-0}" "stage=build"
+                    # Write flag for daemon retry logic
+                    mkdir -p "$ARTIFACTS_DIR" 2>/dev/null || true
+                    echo "context_exhaustion" > "$ARTIFACTS_DIR/failure-reason.txt" 2>/dev/null || true
+                fi
+            fi
+
+            error "Build loop failed"
+            return 1
+        }
         parse_claude_tokens "$_token_log"
 
-        # Detect context exhaustion from progress file
-        local _progress_file="${PWD}/.claude/loop-logs/progress.md"
-        if [[ -f "$_progress_file" ]]; then
-            local _prog_tests
-            _prog_tests=$(grep -oE 'Tests passing: (true|false)' "$_progress_file" 2>/dev/null | awk '{print $NF}' || echo "unknown")
-            if [[ "$_prog_tests" != "true" ]]; then
-                warn "Build loop exhausted with failing tests (context exhaustion)"
-                emit_event "pipeline.context_exhaustion" "issue=${ISSUE_NUMBER:-0}" "stage=build"
-                # Write flag for daemon retry logic
-                mkdir -p "$ARTIFACTS_DIR" 2>/dev/null || true
-                echo "context_exhaustion" > "$ARTIFACTS_DIR/failure-reason.txt" 2>/dev/null || true
+        # Read accumulated token counts from build loop (written by sw-loop.sh)
+        local _loop_token_file="${PROJECT_ROOT}/.claude/loop-logs/loop-tokens.json"
+        if [[ -f "$_loop_token_file" ]] && command -v jq >/dev/null 2>&1; then
+            local _loop_in _loop_out _loop_cost
+            _loop_in=$(jq -r '.input_tokens // 0' "$_loop_token_file" 2>/dev/null || echo "0")
+            _loop_out=$(jq -r '.output_tokens // 0' "$_loop_token_file" 2>/dev/null || echo "0")
+            _loop_cost=$(jq -r '.cost_usd // 0' "$_loop_token_file" 2>/dev/null || echo "0")
+            TOTAL_INPUT_TOKENS=$(( TOTAL_INPUT_TOKENS + ${_loop_in:-0} ))
+            TOTAL_OUTPUT_TOKENS=$(( TOTAL_OUTPUT_TOKENS + ${_loop_out:-0} ))
+            if [[ -n "$_loop_cost" && "$_loop_cost" != "0" && "$_loop_cost" != "null" ]]; then
+                TOTAL_COST_USD="${_loop_cost}"
             fi
-        fi
-
-        error "Build loop failed"
-        return 1
-    }
-    parse_claude_tokens "$_token_log"
-
-    # Read accumulated token counts from build loop (written by sw-loop.sh)
-    local _loop_token_file="${PROJECT_ROOT}/.claude/loop-logs/loop-tokens.json"
-    if [[ -f "$_loop_token_file" ]] && command -v jq >/dev/null 2>&1; then
-        local _loop_in _loop_out _loop_cost
-        _loop_in=$(jq -r '.input_tokens // 0' "$_loop_token_file" 2>/dev/null || echo "0")
-        _loop_out=$(jq -r '.output_tokens // 0' "$_loop_token_file" 2>/dev/null || echo "0")
-        _loop_cost=$(jq -r '.cost_usd // 0' "$_loop_token_file" 2>/dev/null || echo "0")
-        TOTAL_INPUT_TOKENS=$(( TOTAL_INPUT_TOKENS + ${_loop_in:-0} ))
-        TOTAL_OUTPUT_TOKENS=$(( TOTAL_OUTPUT_TOKENS + ${_loop_out:-0} ))
-        if [[ -n "$_loop_cost" && "$_loop_cost" != "0" && "$_loop_cost" != "null" ]]; then
-            TOTAL_COST_USD="${_loop_cost}"
-        fi
-        if [[ "${_loop_in:-0}" -gt 0 || "${_loop_out:-0}" -gt 0 ]]; then
-            info "Build loop tokens: in=${_loop_in} out=${_loop_out} cost=\$${_loop_cost:-0}"
+            if [[ "${_loop_in:-0}" -gt 0 || "${_loop_out:-0}" -gt 0 ]]; then
+                info "Build loop tokens: in=${_loop_in} out=${_loop_out} cost=\$${_loop_cost:-0}"
+            fi
         fi
     fi
 

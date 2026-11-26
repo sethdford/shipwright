@@ -6,6 +6,7 @@ import { gatesCommand } from "./gates";
 import { helloCommand } from "./hello";
 import { intakeCommand } from "./intake";
 import { pauseCommand, pausedCommand, resumeCommand } from "./pause";
+import { tournamentCommand } from "./tournament";
 
 export const commands: readonly Command[] = [
   helloCommand,
@@ -17,6 +18,7 @@ export const commands: readonly Command[] = [
   intakeCommand,
   gatesCommand,
   failureCommand,
+  tournamentCommand,
 ];
 
 export function findCommand(

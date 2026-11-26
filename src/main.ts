@@ -1,17 +1,21 @@
 import { join } from "node:path";
 import pkg from "../package.json";
+import { AgentSdkRunner, agentEnv } from "./adapters/agent/agent-sdk-runner";
+import { GitWorkspaces } from "./adapters/git/git-workspaces";
 import { GhGithubWriter } from "./adapters/github/gh-github-writer";
 import { GhOpenIssues } from "./adapters/github/gh-open-issues";
 import { GhPauseLabel } from "./adapters/github/gh-pause-label";
 import { GhPullRequests } from "./adapters/github/gh-pull-requests";
 import { GhRunHistory } from "./adapters/github/gh-run-history";
 import { resolvePaths } from "./adapters/paths";
+import { BashCommandRunner, testEnv } from "./adapters/process/bash-command-runner";
 import { BunProcessRunner } from "./adapters/process/bun-process-runner";
 import { FilePauseFlag } from "./adapters/state/file-pause-flag";
 import { JsonCostLedger } from "./adapters/state/json-cost-ledger";
 import { NodeFileReader } from "./adapters/state/node-file-reader";
 import type { CliIO, Command } from "./cli/command";
 import { commands, findCommand } from "./cli/commands";
+import type { DeliveryPorts } from "./contexts/delivery";
 import type { SafetyPorts } from "./contexts/orchestration";
 import { installShutdown } from "./shutdown";
 
@@ -44,6 +48,25 @@ export function buildSafetyPorts(
   };
 }
 
+/**
+ * Adapters for the build tournament. Worktrees go under the state directory, one folder per run, so
+ * attempts never appear in the repository's own status or diffs.
+ */
+export function buildDeliveryPorts(
+  env: Readonly<Record<string, string | undefined>>,
+  cwd: string,
+): DeliveryPorts {
+  const runner = new BunProcessRunner();
+  const run = `${new Date().toISOString().replace(/[:.]/g, "-")}-${process.pid}`;
+  const root = join(resolvePaths(env).stateDir, "tournaments", run);
+  return {
+    agent: new AgentSdkRunner(agentEnv(env)),
+    workspaces: new GitWorkspaces(runner, cwd, root),
+    commands: new BashCommandRunner(runner, testEnv(env)),
+    random: Math.random,
+  };
+}
+
 function once<T>(make: () => T): () => T {
   let value: T | undefined;
   return () => {
@@ -71,6 +94,7 @@ export async function main(
     return ports;
   }),
   env: Readonly<Record<string, string | undefined>> = process.env,
+  delivery: () => DeliveryPorts = once(() => buildDeliveryPorts(env, process.cwd())),
 ): Promise<number> {
   const [name, ...args] = argv;
   // Top-level help and version only when they are the whole request; anything more exits 2 below.
@@ -90,7 +114,7 @@ export async function main(
     return 2;
   }
   try {
-    return await command.run(args, { io, version: pkg.version, safety, env, files });
+    return await command.run(args, { io, version: pkg.version, safety, env, files, delivery });
   } catch (error) {
     io.err(`✗ ${error instanceof Error ? error.message : String(error)}`);
     return 1;

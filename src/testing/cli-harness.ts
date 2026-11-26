@@ -1,4 +1,5 @@
 import type { CliIO, CommandContext } from "../cli/command";
+import type { DeliveryPorts } from "../contexts/delivery";
 import type { SafetyPorts } from "../contexts/orchestration";
 import type { FileReader } from "../shared/kernel/ports";
 
@@ -24,6 +25,7 @@ export function commandContext(
   safety?: SafetyPorts,
   env: Readonly<Record<string, string | undefined>> = {},
   files?: FileReader,
+  delivery?: DeliveryPorts,
 ): CommandContext {
   return {
     io,
@@ -36,6 +38,10 @@ export function commandContext(
     files: () => {
       if (!files) throw new Error("this command was not given a file reader");
       return files;
+    },
+    delivery: () => {
+      if (!delivery) throw new Error("this command was not given delivery ports");
+      return delivery;
     },
   };
 }

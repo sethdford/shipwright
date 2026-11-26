@@ -644,6 +644,9 @@ main() {
         failure)
             run_ts failure "$@"
             ;;
+        tournament)
+            run_ts tournament "$@"
+            ;;
         *)
             error "Unknown command: ${cmd}"
             echo ""
