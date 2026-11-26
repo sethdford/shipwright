@@ -27,7 +27,7 @@ const fileReader = new NodeFileReader();
 const files = () => fileReader;
 const repoDocs = once(() => new GitRepoDocs(new BunProcessRunner(), fileReader));
 
-/** The routing log lives with the bash cost files in ~/.shipwright (ADR-0012). */
+/** The routing log lives with the bash cost files in ~/.shipwright (ADR-0014). */
 export function buildRoutingPorts(env: Readonly<Record<string, string | undefined>>): RoutingPorts {
   const legacyDir = join(resolvePaths(env).home, ".shipwright");
   return {

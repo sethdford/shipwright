@@ -2,7 +2,7 @@ import type { Tier } from "./features";
 
 /**
  * The routing table: what each difficulty tier gets. Static and versioned; a change to it is a
- * policy change that goes through the paired ratchet (ADR-0009 rule 5, ADR-0012).
+ * policy change that goes through the paired ratchet (ADR-0009 rule 5, ADR-0014).
  *
  * Shape of routing-v1, from the test-time compute literature:
  * - Easy work gets one attempt and the cheaper model: sequential refinement (the build loop's own

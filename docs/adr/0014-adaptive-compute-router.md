@@ -1,4 +1,4 @@
-# 0012. Adaptive compute router: route by difficulty, log every decision, apply only by opt-in
+# 0014. Adaptive compute router: route by difficulty, log every decision, apply only by opt-in
 
 Status: accepted · Date: 2026-11-26
 

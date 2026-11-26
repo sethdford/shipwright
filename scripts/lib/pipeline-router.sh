@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# pipeline-router.sh — adaptive compute router for pipeline runs (ADR-0012).
+# pipeline-router.sh — adaptive compute router for pipeline runs (ADR-0014).
 # The TypeScript command `shipwright route` does the work; this file calls it at the start and the end
 # of a run. SHIPWRIGHT_ROUTER picks the mode:
 #   shadow (default)  decide and log the route, change nothing (data for the scorecard and the ratchet)

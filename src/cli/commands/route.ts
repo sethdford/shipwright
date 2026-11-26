@@ -31,7 +31,7 @@ const usage = `USAGE
   shipwright route stats   [--json]
 
 DESCRIPTION
-  Adaptive compute router (ADR-0012). Predicts how hard an issue is from its text and labels, corrects
+  Adaptive compute router (ADR-0014). Predicts how hard an issue is from its text and labels, corrects
   that with the results of earlier routed runs, and picks the pipeline template, model, effort,
   number of parallel attempts and run budget from the routing table (routing-v1).
 

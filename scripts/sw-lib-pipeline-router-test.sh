@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # ╔═══════════════════════════════════════════════════════════════════════════╗
-# ║  shipwright lib/pipeline-router test — ADR-0012 adaptive compute router  ║
+# ║  shipwright lib/pipeline-router test — ADR-0014 adaptive compute router  ║
 # ╚═══════════════════════════════════════════════════════════════════════════╝
 # Hermetic: bun and gh are mocks (the TypeScript command has its own tests), temp HOME, no network.
 # Checks what the bash side owns: the modes, what it passes, what apply mode changes, and the outcome.

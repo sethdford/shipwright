@@ -728,7 +728,7 @@ pipeline_start() {
         fi
     fi
 
-    # Adaptive compute router (ADR-0012): logs a route in shadow mode; in apply mode sets the template,
+    # Adaptive compute router (ADR-0014): logs a route in shadow mode; in apply mode sets the template,
     # model, effort and attempts the caller did not set. Never blocks the run.
     if type pipeline_route_start >/dev/null 2>&1; then
         pipeline_route_start "$user_specified_pipeline" || true

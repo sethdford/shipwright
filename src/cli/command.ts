@@ -19,7 +19,7 @@ export interface CommandContext {
   readonly files: () => FileReader;
   /** Governance documents and lessons from git (ADR-0010), built by main.ts. */
   readonly repoDocs: () => RepoDocs;
-  /** The routing log and clock for `shipwright route` (ADR-0012), built by main.ts. */
+  /** The routing log and clock for `shipwright route` (ADR-0014), built by main.ts. */
   readonly routing: () => RoutingPorts;
 }
 

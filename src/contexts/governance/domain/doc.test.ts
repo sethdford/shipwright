@@ -63,7 +63,7 @@ describe("parseDoc", () => {
     expect(
       parseDoc("adr", "adr/adr-12-x.md", "# X\n\n## Status\n\nSuperseded by 13\n").status,
     ).toBe("superseded");
-    expect(parseDoc("adr", "adr/adr-12-x.md", "# X\n").id).toBe("ADR-0012");
+    expect(parseDoc("adr", "adr/adr-12-x.md", "# X\n").id).toBe("ADR-0014");
   });
 
   test("proposed, superseded and retired documents are not in force; unknown is", () => {
