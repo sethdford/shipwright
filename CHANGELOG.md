@@ -41,6 +41,7 @@ read the upgrade notes first.
 - Prompt-injection defenses for issue text ([#8738](https://github.com/sethdford/shipwright/pull/8738)), extended to triage, decompose, context and the issue analyzer ([#8753](https://github.com/sethdford/shipwright/pull/8753)).
 - Every remaining write into the trusted checkout is judged ([#8754](https://github.com/sethdford/shipwright/pull/8754)).
 - The acceptance-test writer runs in a disposable clone, and its tests pass the patch judge before they run or are committed ([#8757](https://github.com/sethdford/shipwright/pull/8757)).
+- Tournament builds run in a disposable clone without credentials, and the winning patch passes the patch judge ([#8768](https://github.com/sethdford/shipwright/pull/8768)).
 
 ### Fixes
 
@@ -51,10 +52,6 @@ read the upgrade notes first.
 - Daemon tracks pipelines rather than tmux shells, a safe branch reaper, escaped SQL and self-clearing RETURN traps ([#8743](https://github.com/sethdford/shipwright/pull/8743)).
 - Correctness fixes from a full audit: the test gate on mawk, a $0 budget, test selection and portability ([#8734](https://github.com/sethdford/shipwright/pull/8734)).
 - CI installs Bun in the pipeline build job so the TypeScript commands run ([#8741](https://github.com/sethdford/shipwright/pull/8741)).
-
-### Known limitations
-
-- Tournament builds (opt-in) do not go through patch handoff yet: attempts run in git worktrees and the winning patch is fast-forwarded without the patch judge.
 
 ---
 
