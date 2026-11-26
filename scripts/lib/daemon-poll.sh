@@ -538,15 +538,20 @@ daemon_cleanup_stale() {
         while IFS= read -r branch; do
             [[ -z "$branch" ]] && continue
             branch="${branch## }"
-            [[ "$branch" == pipeline/* ]] || continue
+            # Only the daemon's own issue branches, only once merged into the base. The old check would
+            # have deleted every local and remote pipeline/* branch not in daemon state (manual
+            # `pipeline start --worktree` runs, goal branches); it only never fired because
+            # `git branch --list` indents names, which --format now avoids.
+            [[ "$branch" =~ ^pipeline/pipeline-issue-[0-9]+$ ]] || continue
             local br_issue="${branch#pipeline/pipeline-issue-}"
+            git merge-base --is-ancestor "$branch" "origin/${BASE_BRANCH:-main}" 2>/dev/null || continue
             if ! daemon_is_inflight "$br_issue" 2>/dev/null; then
                 daemon_log INFO "Removing orphaned pipeline branch: ${branch}"
                 git branch -D "$branch" 2>/dev/null || true
                 git push origin --delete "$branch" 2>/dev/null || true
                 cleaned=$((cleaned + 1))
             fi
-        done < <(git branch --list 'pipeline/*' 2>/dev/null)
+        done < <(git branch --list 'pipeline/*' --format='%(refname:short)' 2>/dev/null)
     fi
 
     if [[ "$cleaned" -gt 0 ]]; then
