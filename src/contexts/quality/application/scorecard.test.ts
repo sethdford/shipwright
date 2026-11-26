@@ -12,6 +12,7 @@ const merged: PullRecord = {
   title: "fix",
   body: "",
   headRef: "ci/issue-1",
+  labels: [],
   createdAtMs: NOW - 2 * DAY,
   mergedAtMs: NOW - DAY,
   closedAtMs: NOW - DAY,

@@ -3,6 +3,7 @@ import {
   computeScorecard,
   DEFAULT_SCORECARD,
   isAgentPull,
+  isTestRun,
   type PullRecord,
   pullsNeedingCommits,
   revertsByTarget,
@@ -20,6 +21,7 @@ function pull(n: number, over: Partial<PullRecord> = {}): PullRecord {
     title: `fix ${n}`,
     body: `Closes #${n + 1000}\n\n${MARK}`,
     headRef: `fix/thing-${n}`,
+    labels: [],
     createdAtMs: NOW - 20 * DAY,
     mergedAtMs: NOW - 19 * DAY,
     closedAtMs: NOW - 19 * DAY,
@@ -110,6 +112,20 @@ test("a revert after the revert window does not count, and fresh merges are flag
     revertWindowOpen: 1,
     costPerMergeUsd: null,
   });
+});
+
+test("test runs are left out by label, branch prefix or number, and counted", () => {
+  const pulls = [
+    pull(1),
+    pull(2, { labels: ["shipwright:test-run"] }),
+    pull(3, { headRef: "test/e2e-test-add-comment-6764" }),
+    pull(4, { mergedAtMs: null }),
+  ];
+  const card = computeScorecard(pulls, { ...config, excludeNumbers: [4] }, null);
+  expect(card).toMatchObject({ closed: 1, merged: 1, excluded: 3, mergeRate: 1 });
+  expect(isTestRun(pulls[1] as PullRecord, config)).toBe(true);
+  expect(isTestRun(pulls[0] as PullRecord, config)).toBe(false);
+  expect(pullsNeedingCommits(pulls, config)).toEqual([1]);
 });
 
 test("no agent PRs gives null rates, never zero", () => {

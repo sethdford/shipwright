@@ -21,6 +21,7 @@ export {
 export {
   computeScorecard,
   DEFAULT_SCORECARD,
+  isTestRun,
   type PullCommit,
   type PullRecord,
   pullsNeedingCommits,

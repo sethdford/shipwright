@@ -15,6 +15,7 @@ const GhClosedPull = z.object({
   title: z.string(),
   body: z.string(),
   headRefName: z.string(),
+  labels: z.array(z.object({ name: z.string() })),
   createdAt: z.string(),
   mergedAt: z.string().nullable(),
   closedAt: z.string().nullable(),
@@ -28,7 +29,7 @@ const GhCommits = z.object({ commits: z.array(Commit) });
  */
 export const MAX_CLOSED_PULLS = 1000;
 
-const FIELDS = "number,title,body,headRefName,createdAt,mergedAt,closedAt";
+const FIELDS = "number,title,body,headRefName,labels,createdAt,mergedAt,closedAt";
 
 function epoch(iso: string | null): number | null {
   if (iso === null || iso === "") return null;
@@ -42,6 +43,7 @@ function toRecord(p: z.infer<typeof GhClosedPull>): PullRecord {
     title: p.title,
     body: p.body,
     headRef: p.headRefName,
+    labels: p.labels.map((l) => l.name),
     createdAtMs: epoch(p.createdAt) ?? 0,
     mergedAtMs: epoch(p.mergedAt),
     closedAtMs: epoch(p.closedAt),
