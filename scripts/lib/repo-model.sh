@@ -28,11 +28,11 @@ repo_model_arm() {
     if repo_model_enabled; then echo "on"; else echo "off"; fi
 }
 
-# The semantic channel's arm (SHIPWRIGHT_REPO_MODEL_SEMANTIC, same values), recorded with each brief.
+# The semantic channel's arm (SHIPWRIGHT_REPO_MODEL_SEMANTIC=on|1|true|yes; off by default), recorded with each brief.
 repo_model_semantic_arm() {
-    case "$(printf '%s' "${SHIPWRIGHT_REPO_MODEL_SEMANTIC:-on}" | tr '[:upper:]' '[:lower:]' | tr -d '[:space:]')" in
-        off|0|false|no) echo "off" ;;
-        *) echo "on" ;;
+    case "$(printf '%s' "${SHIPWRIGHT_REPO_MODEL_SEMANTIC:-off}" | tr '[:upper:]' '[:lower:]' | tr -d '[:space:]')" in
+        on|1|true|yes) echo "on" ;;
+        *) echo "off" ;;
     esac
 }
 

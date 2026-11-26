@@ -3,6 +3,7 @@ import pkg from "../package.json";
 import { AgentSdkRunner, agentEnv } from "./adapters/agent/agent-sdk-runner";
 import { buildBenchFactory } from "./adapters/bench/bench-factory";
 import { GitAcceptanceWorkspace } from "./adapters/git/git-acceptance-workspace";
+import { GitHistorySource } from "./adapters/git/git-history-source";
 import { GitLocalChange } from "./adapters/git/git-local-change";
 import { GitRepoDocs } from "./adapters/git/git-repo-docs";
 import { GitRepoSource } from "./adapters/git/git-repo-source";
@@ -51,6 +52,10 @@ export function buildRepoModelPorts(
     source: new GitRepoSource(new BunProcessRunner()),
     store: new JsonModelStore(join(resolvePaths(env).stateDir, "repo-model")),
     now: () => new Date().toISOString(),
+    history: new GitHistorySource(
+      new BunProcessRunner(),
+      join(resolvePaths(env).stateDir, "repo-model"),
+    ),
   };
 }
 

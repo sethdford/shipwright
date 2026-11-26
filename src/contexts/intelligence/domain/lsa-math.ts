@@ -1,4 +1,7 @@
-import type { SemanticDoc } from "./lsa";
+export interface SemanticDoc {
+  readonly path: string;
+  readonly tokens: readonly string[];
+}
 
 /** A sparse terms × docs matrix in compressed-column form: column j holds entries ptr[j]..ptr[j+1]. */
 export interface Sparse {

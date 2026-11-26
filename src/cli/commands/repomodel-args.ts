@@ -14,6 +14,7 @@ const VALUES: Readonly<Record<string, readonly string[]>> = {
   localize: ["--root", "--task", "--limit"],
   brief: ["--root", "--task"],
   impact: ["--root", "--diff"],
+  eval: ["--root", "--ref", "--commits", "--policy"],
   mcp: ["--root"],
 };
 
@@ -21,6 +22,7 @@ const SWITCHES: Readonly<Record<string, readonly string[]>> = {
   build: ["--json"],
   brief: ["--json", "--with-tools"],
   impact: ["--json"],
+  eval: ["--json", "--export"],
 };
 
 function positiveInt(v: string): boolean {
@@ -41,7 +43,7 @@ function parseFlags(sub: string, args: readonly string[]) {
     if (!allowedValues.includes(arg)) return `unknown option: ${arg}`;
     const value = args[i + 1];
     if (value === undefined || value.startsWith("--")) return `${arg} needs a value`;
-    if ((arg === "--limit" || arg === "--budget") && !positiveInt(value))
+    if ((arg === "--limit" || arg === "--budget" || arg === "--commits") && !positiveInt(value))
       return `${arg} must be a positive integer`;
     values[arg] = value;
     i += 1;

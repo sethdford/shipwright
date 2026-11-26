@@ -77,3 +77,22 @@ shipwright bench import-swebench --out ~/bench/swe --arm claude-code \
 Publish the manifest name, task count, seed, arms file, model ids, dates and the full
 `report.json`. Never publish a holdout manifest (it leaks the oracle). Report holdout results only
 for tasks filed after the model's training cutoff, and say which cutoff you used.
+
+## Paired A/B of one feature (repository model)
+
+`arms.repo-model-ab.json` runs the same Shipwright three ways: the repository model off (the control),
+on, and on with its semantic channel (ADR-0016). Run it on the holdout suite, then compare each arm to the
+control in the report, or export both and apply the ratchet:
+
+```bash
+shipwright bench run --tasks ~/bench/holdout.json --arms docs/benchmark/arms.repo-model-ab.json \
+  --out ~/bench/repo-model --trials 3 --budget 600
+shipwright bench report --tasks ~/bench/holdout.json --arms docs/benchmark/arms.repo-model-ab.json \
+  --out ~/bench/repo-model --k 3
+shipwright bench export-eval --out ~/bench/repo-model --arm sw-model-off
+shipwright bench export-eval --out ~/bench/repo-model --arm sw-model-on
+shipwright eval ratchet --incumbent <off export> --candidate <on export> --k 3
+```
+
+Run the cheap localization check first; it needs no model spend:
+`shipwright repomodel eval --export` with `SHIPWRIGHT_REPO_MODEL_SEMANTIC` off and on.

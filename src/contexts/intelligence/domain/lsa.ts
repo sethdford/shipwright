@@ -4,6 +4,7 @@ import {
   dot,
   orthonormalize,
   rng,
+  type SemanticDoc,
   type Sparse,
   symmetricEigen,
   times,
@@ -29,10 +30,7 @@ export interface SemanticIndex {
   readonly idf: ReadonlyMap<string, number>;
 }
 
-export interface SemanticDoc {
-  readonly path: string;
-  readonly tokens: readonly string[];
-}
+export type { SemanticDoc } from "./lsa-math";
 
 /** One document per file: its path, definition names and doc comments, and the identifiers it uses. */
 export function semanticDocs(files: readonly FileEntry[]): SemanticDoc[] {
