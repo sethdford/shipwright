@@ -1,5 +1,5 @@
 import type { CliIO, CommandContext } from "../cli/command";
-import type { DeliveryPorts } from "../contexts/delivery";
+import type { DeliveryPorts, StewardPorts } from "../contexts/delivery";
 import type { RepoDocs } from "../contexts/governance";
 import type { LineChannel, RepoModelPorts, RoutingPorts } from "../contexts/intelligence";
 import type { SafetyPorts } from "../contexts/orchestration";
@@ -44,6 +44,7 @@ export function commandContext(
     readonly bench?: BenchFactory;
     readonly verifier?: VerifierPorts;
     readonly delivery?: DeliveryPorts;
+    readonly steward?: StewardPorts;
     readonly repoModel?: RepoModelPorts;
     readonly stdio?: LineChannel;
     readonly acceptance?: (root?: string) => AcceptancePorts;
@@ -58,6 +59,7 @@ export function commandContext(
     repoDocs: given(ports.repoDocs, "repository documents"),
     quality: given(ports.quality, "quality ports"),
     delivery: given(ports.delivery, "delivery ports"),
+    steward: given(ports.steward, "steward ports"),
     bench: given(ports.bench, "bench ports"),
     verifier: given(ports.verifier, "verifier ports"),
     routing: given(ports.routing, "routing ports"),

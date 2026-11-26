@@ -1,4 +1,4 @@
-import type { DeliveryPorts } from "../contexts/delivery";
+import type { DeliveryPorts, StewardPorts } from "../contexts/delivery";
 import type { RepoDocs } from "../contexts/governance";
 import type { LineChannel, RepoModelPorts, RoutingPorts } from "../contexts/intelligence";
 import type { SafetyPorts } from "../contexts/orchestration";
@@ -38,6 +38,8 @@ export interface CommandContext {
   readonly routing: () => RoutingPorts;
   /** Benchmark adapters (workspaces, agents, grader, results store), built on first call. */
   readonly bench: () => BenchFactory;
+  /** GitHub reads and writes and the local diff for the PR steward (ADR-0017), built on first call. */
+  readonly steward: () => StewardPorts;
 }
 
 /** Metadata is the single source for help text and docs/reference/cli.md. */

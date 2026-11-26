@@ -138,6 +138,7 @@ get_stage_description() {
         review)           echo "Code quality, security audit, performance review" ;;
         compound_quality) echo "Adversarial testing, E2E validation, DoD checklist" ;;
         pr)               echo "Creating pull request with CI integration" ;;
+        steward)          echo "Fixing failing CI and answering review comments" ;;
         merge)            echo "Merging PR with branch cleanup" ;;
         deploy)           echo "Deploying to staging/production" ;;
         validate)         echo "Smoke tests and health checks post-deploy" ;;

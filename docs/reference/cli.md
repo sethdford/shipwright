@@ -496,6 +496,53 @@ EXIT CODES
   0  printed      1  could not read GitHub or the cost ledger      2  usage error
 ```
 
+## `steward`
+
+PR steward: fix failing CI and answer review comments after a PR opens
+
+```text
+USAGE
+  shipwright steward inspect --pr N [--history FILE] [--max-rounds N] [--bots a[bot],b[bot]]
+                             [--no-checks-ok yes|no] [--format text|json]
+  shipwright steward reply   --pr N --sha SHA --report FILE --changed yes|no [--replies FILE]
+                             [--format text|json]
+  shipwright steward rerun   --pr N --jobs ID,ID
+  shipwright steward push    --pr N --branch B --sha SHA --from SHA [--repo-dir DIR]
+  shipwright steward scan    [--base REF] [--format text|json]
+
+DESCRIPTION
+  The PR steward (ADR-0017) keeps a pipeline PR moving after it opens: it fixes failing CI and
+  answers review comments, a bounded number of rounds, until the PR is green. The bash pipeline
+  stage "steward" drives it; each subcommand is one step.
+
+  inspect  Reads the PR (checks, failed job logs, review comments) and decides the next action:
+           fix, rerun, wait, done or stop. Failures are triaged as code (fix), infra (re-run once)
+           or baseline (also failing on the base commit: not this PR's fault). Only comments from
+           OWNER, MEMBER or COLLABORATOR authors and the listed review bots count; the steward's own
+           replies and comments it has answered do not. A commit with no checks is "wait" unless
+           --no-checks-ok yes (the caller waited long enough: the PR has no CI). For fix, the report carries the brief:
+           trusted instructions plus untrusted items the caller wraps as data.
+  reply    Posts the fix round's replies: each inline comment in its thread, the rest in one PR
+           comment. --report is that round's inspect JSON (which comments were offered); --replies
+           is the fixer's report file; --changed (required) is no when the round committed nothing ("fixed" is
+           then posted as no change). Notes are cleaned: no HTML, links, images or hidden
+           characters, mentions and #-references defused, and a note that looks like it holds a
+           credential is withheld. Prints which comments got a reply and which did not.
+  rerun    Re-runs the given Actions jobs (skips jobs already running).
+  push     Fast-forwards the PR branch on origin to SHA, the round's commit on top of --from, the
+           PR head the round started from. Refuses unless the branch is the PR's own head branch
+           in this repository, the PR is still at --from, and the round's change passes the scan
+           (no secret, focused test, conflict marker or debugger statement). Never a force push;
+           hooks are off.
+  scan     The pre-PR self-scan of the lines this branch adds (default base origin/main): secrets
+           block, conflict markers, focused tests and debugger statements need a fix, skipped tests
+           and console.log are notes.
+
+EXIT CODES
+  0  done (scan: pass)   1  could not read or write GitHub or git   2  usage error
+  3  scan: blocked (a secret)   4  scan: needs a fix
+```
+
 ## `tournament`
 
 Build stage tournament: parallel attempts, cross-tests, rubric and a blind judge

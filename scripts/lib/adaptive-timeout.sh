@@ -24,6 +24,7 @@ _timeout_default() {
         review)         echo 600 ;;
         compound_quality) echo 900 ;;
         pr)             echo 120 ;;
+        steward)        echo 4200 ;;
         merge)          echo 120 ;;
         deploy)         echo 300 ;;
         validate)       echo 300 ;;
@@ -245,7 +246,7 @@ timeout_report() {
     printf "│  %s\n" "$(printf '%.0s─' {1..80})"
 
     # List of all known stages
-    local stages=(intake plan design build test review compound_quality pr merge deploy validate monitor)
+    local stages=(intake plan design build test review compound_quality pr steward merge deploy validate monitor)
 
     for stage in "${stages[@]}"; do
         local default_timeout

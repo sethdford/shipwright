@@ -13,6 +13,7 @@ import { pauseCommand, pausedCommand, resumeCommand } from "./pause";
 import { repomodelCommand } from "./repomodel";
 import { routeCommand } from "./route";
 import { scorecardCommand } from "./scorecard";
+import { stewardCommand } from "./steward";
 import { tournamentCommand } from "./tournament";
 import { verifyCommand } from "./verify";
 
@@ -35,6 +36,7 @@ export const commands: readonly Command[] = [
   repomodelCommand,
   routeCommand,
   benchCommand,
+  stewardCommand,
 ];
 
 export function findCommand(
