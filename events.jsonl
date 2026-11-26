@@ -4401,3 +4401,8 @@
 {"ts":"2026-11-26T18:08:49Z","ts_epoch":1795716529,"type":"patrol.finding","check":"untested_script","script":"sw-event-schema-sync.sh","lines":93,"usage":0}
 {"ts":"2026-11-26T18:08:50Z","ts_epoch":1795716530,"type":"patrol.issue_refused","check":"untested_scripts","count":7}
 {"ts":"2026-11-26T18:08:52Z","ts_epoch":1795716532,"type":"patrol.meta_issue_refused","title":"[Meta] Add tests for sw-event-schema-sync.sh"}
+{"ts":"2026-11-26T20:03:09Z","ts_epoch":1795723389,"type":"hygiene_platform_refactor","hardcoded":49,"fallback":74,"todo":54}
+{"ts":"2026-11-26T20:04:00Z","ts_epoch":1795723440,"type":"strategic.issue_refused","title":"Record a failure post-mortem for every pipeline that closes without shipping"}
+{"ts":"2026-11-26T20:04:03Z","ts_epoch":1795723443,"type":"strategic.issue_refused","title":"Strategic intake: reject recommendations that resemble past failed suggestions or exceed a size budget"}
+{"ts":"2026-11-26T20:04:06Z","ts_epoch":1795723446,"type":"strategic.issue_refused","title":"Add test suites for the five untested scripts, starting with sw-tracker-github.sh and sw-tmux-status.sh"}
+{"ts":"2026-11-26T20:04:06Z","ts_epoch":1795723446,"type":"strategic.cycle_complete","issues_created":0,"issues_skipped":3}
