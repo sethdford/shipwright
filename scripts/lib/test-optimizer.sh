@@ -155,7 +155,13 @@ testopt_get_changed_files() {
 # Map changed files to affected test files
 # Returns: test files that import/source changed files or are in same directory
 testopt_select_affected() {
-    local -a changed_files=("$@")
+    # Arguments win; with none, use CHANGED_FILES from testopt_get_changed_files (the usual call).
+    local -a changed_files=()
+    if [[ $# -gt 0 ]]; then
+        changed_files=("$@")
+    elif [[ ${#CHANGED_FILES[@]} -gt 0 ]]; then
+        changed_files=("${CHANGED_FILES[@]}")
+    fi
     AFFECTED_TESTS=()
 
     if [[ ${#changed_files[@]} -eq 0 ]]; then
@@ -190,15 +196,11 @@ testopt_select_affected() {
         # Check 2: Test sources/imports changed file
         if [[ "$is_affected" -eq 0 ]]; then
             for changed_file in "${changed_files[@]}"; do
-                # Check if test file sources the changed file
-                if grep -qF "source.*$changed_file\|source.*./$(basename "$changed_file")" "$test_file" 2>/dev/null || true; then
-                    is_affected=1
-                    break
-                fi
-                # Check by pattern (lib imports)
+                # The test names the changed file (source, import or require): a fixed-string match on
+                # its basename. No "|| true" here: it made every test count as affected.
                 local changed_base
                 changed_base=$(basename "$changed_file")
-                if grep -qF "source.*$changed_base" "$test_file" 2>/dev/null || true; then
+                if grep -qF -- "$changed_base" "$test_file" 2>/dev/null; then
                     is_affected=1
                     break
                 fi

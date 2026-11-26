@@ -138,6 +138,12 @@ Fix these specific errors. Each line above is one distinct error from the test o
         memory_section="$("$SCRIPT_DIR/sw-memory.sh" inject build 2>/dev/null || true)"
     fi
 
+    # Governance brief: ADRs, policies, standards and approved lessons, read from the base commit (ADR-0010)
+    local governance_section=""
+    if type governance_brief_section >/dev/null 2>&1; then
+        governance_section="$(governance_brief_section "${GOAL:-}")"
+    fi
+
     # Cross-pipeline discovery injection (learnings from other pipeline runs)
     local discovery_section=""
     if type inject_discoveries >/dev/null 2>&1; then
@@ -395,6 +401,8 @@ ${git_log}
 ${test_section}
 
 ${error_summary_section:+$error_summary_section
+}
+${governance_section:+$governance_section
 }
 ${memory_section:+## Memory Context
 $memory_section

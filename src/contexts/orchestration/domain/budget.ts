@@ -33,7 +33,11 @@ export function utcDayStartEpochS(nowMs: number): number {
   return Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate()) / 1000;
 }
 
-/** Blocks when today's spend plus `estimateUsd` reaches the cap (the daemon's `remaining <= 0`). */
+/**
+ * The rule shared with `sw-cost.sh check-budget` and the daemon: something must be left
+ * (spend below the cap, the daemon's `remaining <= 0` block) and the estimate must fit
+ * (spend plus estimate at most the cap). An estimate that lands exactly on the cap is allowed.
+ */
 export function evaluateBudget(
   budget: DailyBudget | null,
   entries: readonly CostEntry[],
@@ -60,7 +64,7 @@ export function evaluateBudget(
     };
   }
   return {
-    allowed: spentTodayUsd + estimateUsd < budget.limitUsd,
+    allowed: spentTodayUsd < budget.limitUsd && spentTodayUsd + estimateUsd <= budget.limitUsd,
     limitUsd: budget.limitUsd,
     spentTodayUsd,
     remainingUsd: budget.limitUsd - spentTodayUsd,
