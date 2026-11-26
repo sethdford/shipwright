@@ -33,6 +33,12 @@ test("runs the detected web app and CLI, publishes, and renders the PR section",
   expect(f.stopped).toBe(1);
   expect(f.cliRuns).toEqual([["node", "bin/todo.js", "--help"]]);
   expect(f.published).toEqual(["feat-x"]);
+  expect(f.publishedFiles[0]).toEqual([
+    "cli/1.txt",
+    "web/server.log",
+    "web/1-home.png",
+    "web/1-flow.webm",
+  ]);
   expect(r.value.verdict.status).toBe("pass");
   expect(r.value.blocked).toBe(false);
   expect(r.value.section).toContain(

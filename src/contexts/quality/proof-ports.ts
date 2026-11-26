@@ -70,9 +70,16 @@ export interface ProofArtifacts {
   write(relPath: string, text: string): Promise<Result<void, AdapterError>>;
 }
 
-/** Puts a run's artifacts where a PR can show them; returns their base URL (ending in "/"). */
+/**
+ * Puts a run's artifacts where a PR can show them; returns their base URL (ending in "/").
+ * `files` are the run's own artifacts, relative to `dir`.
+ */
 export interface ProofPublisher {
-  publish(dir: string, label: string): Promise<Result<string, AdapterError>>;
+  publish(
+    dir: string,
+    label: string,
+    files: readonly string[],
+  ): Promise<Result<string, AdapterError>>;
 }
 
 export interface ProofPorts {

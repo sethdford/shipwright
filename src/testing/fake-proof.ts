@@ -19,6 +19,7 @@ export interface FakeProof {
   readonly started: (readonly string[])[];
   readonly cliRuns: (readonly string[])[];
   readonly published: string[];
+  readonly publishedFiles: (readonly string[])[];
   stopped: number;
 }
 
@@ -60,10 +61,14 @@ function fakeRuns(o: FakeProofOptions, state: FakeProof): Pick<ProofPorts, "laun
 
 /** In-memory proof ports: nothing starts, nothing is pushed, every call is recorded. */
 export function fakeProof(o: FakeProofOptions = {}): FakeProof {
-  const state = { written: {}, started: [], cliRuns: [], published: [], stopped: 0 } as Omit<
-    FakeProof,
-    "ports"
-  > as FakeProof;
+  const state = {
+    written: {},
+    started: [],
+    cliRuns: [],
+    published: [],
+    publishedFiles: [],
+    stopped: 0,
+  } as Omit<FakeProof, "ports"> as FakeProof;
   const ports: ProofPorts = {
     repo: {
       facts: async () => ok(o.facts ?? nodeApp),
@@ -80,8 +85,9 @@ export function fakeProof(o: FakeProofOptions = {}): FakeProof {
       },
     },
     publisher: {
-      publish: async (_dir, label) => {
+      publish: async (_dir, label, files) => {
         state.published.push(label);
+        state.publishedFiles.push(files);
         return o.publish ?? ok(`https://github.com/o/r/raw/abc/${label}/`);
       },
     },

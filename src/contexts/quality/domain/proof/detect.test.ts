@@ -46,6 +46,13 @@ test("package.json bin is a CLI; unsafe names and paths are ignored", () => {
   expect(cli).toEqual({ name: "todo", argv: ["bun", "bin/todo.js"] });
   const scoped = detectApp(facts({ packageJson: pkg({ name: "@me/tool", bin: "./cli.js" }) })).cli;
   expect(scoped).toEqual({ name: "tool", argv: ["node", "./cli.js"] });
+  expect(detectApp(facts({ packageJson: pkg({ bin: { sw: "scripts/sw" } }) })).cli?.argv).toEqual([
+    "./scripts/sw",
+  ]);
+  expect(detectApp(facts({ packageJson: pkg({ bin: { t: "src/cli.ts" } }) })).cli?.argv).toEqual([
+    "bun",
+    "src/cli.ts",
+  ]);
   expect(detectApp(facts({ packageJson: pkg({ bin: { x: "$(rm -rf /)" } }) })).cli).toBeNull();
   expect(detectApp(facts({ packageJson: pkg({ bin: { x: "/etc/passwd" } }) })).cli).toBeNull();
 });

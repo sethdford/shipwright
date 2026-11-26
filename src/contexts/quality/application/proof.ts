@@ -167,9 +167,21 @@ async function runCli(
   return { results, texts };
 }
 
-async function publish(ports: ProofPorts, req: ProofRequest, hasArtifacts: boolean) {
-  if (!req.publish || !hasArtifacts) return { baseUrl: null, publishError: null };
-  const r = await ports.publisher.publish(ports.artifacts.dir, req.label);
+/** Exactly the files this run reported: a reused output folder never leaks an older run's files. */
+export function reportedFiles(web: WebResult | null, cli: readonly CliResult[]): string[] {
+  const files = cli.map((r) => r.transcript);
+  if (web !== null) files.push(web.serverLog);
+  if (web?.status === "ran")
+    for (const f of web.flows) {
+      files.push(...f.screenshots.map((s) => s.file));
+      if (f.video !== null) files.push(f.video);
+    }
+  return [...new Set(files)];
+}
+
+async function publish(ports: ProofPorts, req: ProofRequest, files: readonly string[]) {
+  if (!req.publish || files.length === 0) return { baseUrl: null, publishError: null };
+  const r = await ports.publisher.publish(ports.artifacts.dir, req.label, files);
   return r.ok
     ? { baseUrl: r.value, publishError: null }
     : { baseUrl: null, publishError: r.error.message };
@@ -222,7 +234,7 @@ export async function runProof(
   const startLogs: Record<string, string> = {};
   const web = plan.value.web ? await runWeb(ports, plan.value.web, req.video, startLogs) : null;
   const cli = await runCli(ports, plan.value);
-  const pub = await publish(ports, req, web !== null || cli.results.length > 0);
+  const pub = await publish(ports, req, reportedFiles(web, cli.results));
   const report = finish(ports, req, {
     plan: plan.value,
     web,

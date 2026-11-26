@@ -125,8 +125,12 @@ function binEntry(pkg: PackageJson): [string, string] | null {
 function detectNodeCli(pkg: PackageJson, markers: readonly string[]): CliApp | null {
   const entry = binEntry(pkg);
   if (entry === null || !SAFE_NAME.test(entry[0]) || !SAFE_PATH.test(entry[1])) return null;
-  const node = markers.includes("bun.lock") || markers.includes("bun.lockb") ? "bun" : "node";
-  return { name: entry[0], argv: [node, entry[1]] };
+  const path = entry[1];
+  const bun = markers.includes("bun.lock") || markers.includes("bun.lockb");
+  if (/\.(ts|tsx|mts)$/.test(path)) return { name: entry[0], argv: ["bun", path] };
+  if (/\.(js|mjs|cjs)$/.test(path)) return { name: entry[0], argv: [bun ? "bun" : "node", path] };
+  // No JavaScript extension: a script with its own shebang (bash, python). Run it directly.
+  return { name: entry[0], argv: [path.startsWith("./") ? path : `./${path}`] };
 }
 
 function detectCargoCli(cargo: string | null): CliApp | null {

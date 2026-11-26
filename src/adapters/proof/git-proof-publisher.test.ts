@@ -37,12 +37,15 @@ test("publishes under label/content-hash with a matching key, so a repeat is ide
     },
   };
   const p = new GitProofPublisher(writer, "/repo");
-  const a = await p.publish(dir, "feat/x");
-  const b = await p.publish(dir, "feat/x");
+  const want = ["cli-1.txt", "web/1-home.png", ".env", "web/.video/raw.webm"];
+  const a = await p.publish(dir, "feat/x", want);
+  const b = await p.publish(dir, "feat/x", want);
   expect(a.ok && a.value).toMatch(/^https:\/\/x\/feat-x\/[0-9a-f]{12}\/$/);
   expect(calls[0]?.key).toBe(calls[1]?.key ?? "");
   expect(calls[0]?.upload.files).toEqual(["cli-1.txt", "web/1-home.png"]);
   writeFileSync(join(dir, "cli-1.txt"), "changed");
-  await p.publish(dir, "feat/x");
+  await p.publish(dir, "feat/x", want);
   expect(calls[2]?.key).not.toBe(calls[0]?.key ?? "");
+  await p.publish(dir, "feat/x", ["web/1-home.png"]);
+  expect(calls[3]?.upload.files).toEqual(["web/1-home.png"]);
 });

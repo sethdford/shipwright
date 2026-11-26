@@ -43,8 +43,12 @@ export class GitProofPublisher implements ProofPublisher {
     private readonly repoRoot: string,
   ) {}
 
-  async publish(dir: string, label: string): Promise<Result<string, AdapterError>> {
-    const picked = this.pick(dir);
+  async publish(
+    dir: string,
+    label: string,
+    wanted: readonly string[],
+  ): Promise<Result<string, AdapterError>> {
+    const picked = this.pick(dir, new Set(wanted));
     if (picked.files.length === 0)
       return err({ kind: "failed", message: "no artifacts to publish" });
     const prefix = `${labelSlug(label)}/${picked.hash.slice(0, 12)}`;
@@ -58,11 +62,12 @@ export class GitProofPublisher implements ProofPublisher {
     return r.ok ? ok(r.value.baseUrl) : r;
   }
 
-  private pick(dir: string): { files: string[]; hash: string } {
+  /** The wanted files that exist as plain files in `dir`, within the size caps. */
+  private pick(dir: string, wanted: ReadonlySet<string>): { files: string[]; hash: string } {
     const hash = createHash("sha256");
     const files: string[] = [];
     let total = 0;
-    for (const file of listFiles(dir)) {
+    for (const file of listFiles(dir).filter((f) => wanted.has(f))) {
       const size = statSync(join(dir, file)).size;
       if (size > MAX_FILE || total + size > MAX_TOTAL) continue;
       total += size;
