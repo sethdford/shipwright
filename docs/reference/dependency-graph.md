@@ -10,6 +10,7 @@ flowchart LR
   subgraph ctx_adapters["adapters"]
     adapters["adapters"]
     adapters_agent["adapters/agent"]
+    adapters_bench["adapters/bench"]
     adapters_git["adapters/git"]
     adapters_github["adapters/github"]
     adapters_process["adapters/process"]
@@ -44,6 +45,12 @@ flowchart LR
   shutdown["shutdown"]
   adapters --> kernel
   adapters_agent --> kernel
+  adapters_bench --> adapters
+  adapters_bench --> adapters_github
+  adapters_bench --> adapters_process
+  adapters_bench --> adapters_state
+  adapters_bench --> kernel
+  adapters_bench --> quality
   adapters_git --> adapters_process
   adapters_git --> kernel
   adapters_github --> adapters_process
@@ -71,6 +78,7 @@ flowchart LR
   learning_application --> learning_domain
   learning_domain --> kernel
   main --> adapters
+  main --> adapters_bench
   main --> adapters_github
   main --> adapters_process
   main --> adapters_state

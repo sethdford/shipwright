@@ -1,4 +1,5 @@
 import type { Command } from "../command";
+import { benchCommand } from "./bench";
 import { breakerCommand } from "./breaker";
 import { budgetCommand } from "./budget";
 import { evalCommand } from "./eval";
@@ -21,6 +22,7 @@ export const commands: readonly Command[] = [
   failureCommand,
   scorecardCommand,
   evalCommand,
+  benchCommand,
 ];
 
 export function findCommand(

@@ -1,3 +1,7 @@
+export { type MineRequest, type MineResult, mineHoldout } from "./application/bench/mine";
+export { type BenchReport, buildBenchReport, type TaskLine } from "./application/bench/report";
+export { type RunRequest, type RunSummary, runBenchmark } from "./application/bench/run";
+export { type OracleCheck, oracleOk, validateTask } from "./application/bench/validate";
 export {
   compareEval,
   type EvalSummary,
@@ -5,6 +9,7 @@ export {
   summarizeEval,
 } from "./application/eval";
 export { buildScorecard, type ScorecardReport } from "./application/scorecard";
+export * from "./domain/bench";
 export { type EvalResults, type EvalRun, parseEvalResults, scoreRuns } from "./domain/eval-results";
 export { choose, passHatK } from "./domain/pass-k";
 export {
@@ -28,4 +33,16 @@ export {
   type Scorecard,
   type ScorecardConfig,
 } from "./domain/scorecard";
-export type { ClosedPulls, QualityPorts, SpendSource } from "./ports";
+export type {
+  ArmOutcome,
+  ArmRunner,
+  BenchFactory,
+  BenchGrader,
+  BenchPorts,
+  BenchStore,
+  BenchWorkspaces,
+  ClosedPulls,
+  HoldoutSource,
+  QualityPorts,
+  SpendSource,
+} from "./ports";

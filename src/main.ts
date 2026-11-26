@@ -1,5 +1,6 @@
 import { join } from "node:path";
 import pkg from "../package.json";
+import { buildBenchFactory } from "./adapters/bench/bench-factory";
 import { GhClosedPulls } from "./adapters/github/gh-closed-pulls";
 import { GhGithubWriter } from "./adapters/github/gh-github-writer";
 import { GhOpenIssues } from "./adapters/github/gh-open-issues";
@@ -15,7 +16,7 @@ import { NodeFileReader } from "./adapters/state/node-file-reader";
 import type { CliIO, Command } from "./cli/command";
 import { commands, findCommand } from "./cli/commands";
 import type { SafetyPorts } from "./contexts/orchestration";
-import type { QualityPorts } from "./contexts/quality";
+import type { BenchFactory, QualityPorts } from "./contexts/quality";
 import { installShutdown } from "./shutdown";
 
 const consoleIO: CliIO = {
@@ -74,6 +75,21 @@ function renderHelp(registry: readonly Command[]): string {
   return ["USAGE", "  shipwright <command> [args]", "", "COMMANDS", ...rows].join("\n");
 }
 
+/** Top-level help and version, only when they are the whole request; anything more exits 2. */
+function topLevel(argv: readonly string[], io: CliIO, registry: readonly Command[]): boolean {
+  const [name] = argv;
+  const alone = argv.length <= 1;
+  if (name === undefined || (alone && (name === "--help" || name === "-h"))) {
+    io.out(renderHelp(registry));
+    return true;
+  }
+  if (alone && (name === "--version" || name === "-v")) {
+    io.out(pkg.version);
+    return true;
+  }
+  return false;
+}
+
 /** Composition root. Adapters are constructed here as commands start needing them. */
 export async function main(
   argv: readonly string[],
@@ -86,18 +102,10 @@ export async function main(
   }),
   env: Readonly<Record<string, string | undefined>> = process.env,
   quality: () => QualityPorts = once(() => buildQualityPorts(env)),
+  bench: () => BenchFactory = once(() => buildBenchFactory(env, join(import.meta.dir, ".."))),
 ): Promise<number> {
   const [name, ...args] = argv;
-  // Top-level help and version only when they are the whole request; anything more exits 2 below.
-  const alone = argv.length <= 1;
-  if (name === undefined || (alone && (name === "--help" || name === "-h"))) {
-    io.out(renderHelp(registry));
-    return 0;
-  }
-  if (alone && (name === "--version" || name === "-v")) {
-    io.out(pkg.version);
-    return 0;
-  }
+  if (name === undefined || topLevel(argv, io, registry)) return 0;
   const command = findCommand(name, registry);
   if (!command) {
     // 2 = usage error (bash sw exited 1); 1 = command failed.
@@ -105,7 +113,15 @@ export async function main(
     return 2;
   }
   try {
-    return await command.run(args, { io, version: pkg.version, safety, env, files, quality });
+    return await command.run(args, {
+      io,
+      version: pkg.version,
+      safety,
+      env,
+      files,
+      quality,
+      bench,
+    });
   } catch (error) {
     io.err(`✗ ${error instanceof Error ? error.message : String(error)}`);
     return 1;

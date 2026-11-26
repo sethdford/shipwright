@@ -1,5 +1,5 @@
 import type { SafetyPorts } from "../contexts/orchestration";
-import type { QualityPorts } from "../contexts/quality";
+import type { BenchFactory, QualityPorts } from "../contexts/quality";
 import type { FileReader } from "../shared/kernel/ports";
 
 export interface CliIO {
@@ -18,6 +18,8 @@ export interface CommandContext {
   readonly files: () => FileReader;
   /** Read-only delivery data for the scorecard, built on first call. */
   readonly quality: () => QualityPorts;
+  /** Benchmark adapters (workspaces, agents, grader, results store), built on first call. */
+  readonly bench: () => BenchFactory;
 }
 
 /** Metadata is the single source for help text and docs/reference/cli.md. */
