@@ -35,6 +35,18 @@ The agent's work crosses the boundary as data, a binary patch, and nothing else
 Every trusted-side git call runs without system or global config, replace objects, hooks, fsmonitor, ssh
 command or external diff.
 
+5. **Test in a sandbox.** Running tests runs the agent's code, so no test command runs in the trusted
+   checkout (`scripts/lib/test-sandbox.sh`). The test stage (suite, holdout and mutation runs, also on each
+   self-heal cycle), `acceptance verify-red`/`verify-green`, the quality checks' E2E and coverage runs and
+   the compound review's negative pass each get a disposable clone at HEAD (made by `handoff_prepare`), plus
+   the checkout's uncommitted work (read by `handoff_export`) and copy-on-write copies of ignored dependency
+   directories. Every test command in it runs under an OS write jail (`sandbox-exec` on macOS, `bubblewrap`
+   on Linux): it may write only in its sandbox, a private `TMPDIR` and package-manager caches, so it cannot
+   touch the trusted checkout, its `.git`, `~/.shipwright` (where the acceptance lock lives) or the
+   pipeline's artifacts. Only exit codes and logs come back; the sandbox is deleted. `SW_TEST_SANDBOX`:
+   `auto` (default: the jail where the machine can start one, else a warning and `test.sandbox_unjailed`),
+   `jail` (fail closed without one), `clone`, `off`. A sandbox that cannot be prepared fails the run.
+
 ## Consequences
 
 - The structural guarantee replaces a growing blocklist: the trusted side reads only a patch file.
@@ -50,8 +62,13 @@ command or external diff.
   stage's "commit remaining changes" and CI partial-work commits go through `handoff_commit_dirty`; a commit
   made during intake, plan, design or review is undone (`reset --mixed`) so its content meets the next judge;
   artifact commits name their paths. Self-heal re-runs the build stage, so it was already covered.
-- **Not covered yet**: test commands (including `acceptance verify-red`/`verify-green`) run the
-  agent's code in the trusted checkout (credentials are already stripped, #8608); the agent runs as the same
-  OS user, so isolation from the host is the sandbox backends' job. Base sha, goal and branch should come only
-  from the out-of-repo record (#8671).
+- The acceptance gate restores tampered locked tests in its sandbox before running them, and afterwards puts
+  the locked blobs back in the trusted checkout where they differ (a plain blob checkout, hooks and filters
+  off).
+- **Not covered yet**: the jail limits writes, not reads or the network: a test runs as the same OS user and
+  can read what that user can (credentials are stripped from its environment, #8608). Package-manager caches
+  stay writable, so a test could poison a cache entry. Hiding the home directory and cutting the network are
+  the sandbox backends' job. Standalone commands outside the pipeline (`shipwright evidence`) still run their
+  checks in the directory they are given. Base sha, goal and branch should come only from the out-of-repo
+  record (#8671).
 - The TS port's `delivery` context and `SideEffects` port should take this as their design.

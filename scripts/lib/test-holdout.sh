@@ -324,9 +324,10 @@ holdout_validate() {
             continue
         fi
 
-        # Run the individual test (quote path to handle spaces), without credentials
+        # Run the individual test without credentials (and jailed while SW_TEST_JAIL is set). The
+        # path is passed as $1, never spliced into the command string.
         local test_result=0
-        if ( sw_test_gate_scrub && eval "${test_cmd} \"${full_path}\"" ) >/dev/null 2>&1; then
+        if (cd "$project_dir" && sw_test_gate_run "${test_cmd} \"\$1\"" "$full_path") >/dev/null 2>&1; then
             pass_count=$((pass_count + 1))
         else
             test_result=$?
