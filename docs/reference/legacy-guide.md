@@ -616,7 +616,7 @@ Most commands are bash. The dashboard server and the commands routed through `ru
 | `scripts/sw-code-review.sh` | 702 | Clean Code & Architecture Analysis |
 | `scripts/sw-connect.sh` | 687 | Sync local state to team dashboard |
 | `scripts/sw-context.sh` | 601 | Context Engine for Pipeline Stages |
-| `scripts/sw-cost.sh` | 1080 | Token Usage & Cost Intelligence |
+| `scripts/sw-cost.sh` | 1112 | Token Usage & Cost Intelligence |
 | `scripts/sw-daemon.sh` | 1417 | Autonomous GitHub Issue Watcher |
 | `scripts/sw-dashboard.sh` | 519 | Fleet Command Dashboard |
 | `scripts/sw-db.sh` | 2016 | SQLite Persistence Layer |
@@ -652,7 +652,7 @@ Most commands are bash. The dashboard server and the commands routed through `ru
 | `scripts/sw-launchd.sh` | 703 | Process supervision (macOS + Linux) |
 | `scripts/sw-linear.sh` | 643 | Linear ↔ GitHub Bidirectional Sync |
 | `scripts/sw-logs.sh` | 356 | View and search agent pane logs |
-| `scripts/sw-loop.sh` | 2730 | Continuous agent loop harness for Claude Code |
+| `scripts/sw-loop.sh` | 2681 | Continuous agent loop harness for Claude Code |
 | `scripts/sw-memory.sh` | 2244 | Persistent Learning & Context System |
 | `scripts/sw-mission-control.sh` | 473 | Terminal-based pipeline mission control |
 | `scripts/sw-model-router.sh` | 1056 | Intelligent Model Routing & Cost Optimization |
@@ -661,7 +661,7 @@ Most commands are bash. The dashboard server and the commands routed through `ru
 | `scripts/sw-patrol-meta.sh` | 786 | Shipwright Self-Improvement Patrol |
 | `scripts/sw-pipeline-composer.sh` | 444 | Dynamic Pipeline Composition |
 | `scripts/sw-pipeline-vitals.sh` | 1073 | Pipeline Vitals Engine |
-| `scripts/sw-pipeline.sh` | 285 | Autonomous Feature Delivery (Idea → Production) |
+| `scripts/sw-pipeline.sh` | 287 | Autonomous Feature Delivery (Idea → Production) |
 | `scripts/sw-pm.sh` | 749 | Autonomous PM Agent for Team Orchestration |
 | `scripts/sw-pr-lifecycle.sh` | 688 | Autonomous PR Management |
 | `scripts/sw-predictive.sh` | 834 | Predictive & Proactive Intelligence |
@@ -824,6 +824,7 @@ Most commands are bash. The dashboard server and the commands routed through `ru
 | `scripts/sw-jira-test.sh` | 286 | Validate Jira ↔ GitHub bidirectional sync |
 | `scripts/sw-launchd-test.sh` | 902 | Validate service management on |
 | `scripts/sw-lib-audit-trail-test.sh` | 312 |  |
+| `scripts/sw-lib-claude-usage-test.sh` | 122 | pipeline runs record real tokens and USD |
 | `scripts/sw-lib-compat-test.sh` | 423 | Unit tests for cross-platform helpers |
 | `scripts/sw-lib-compound-audit-test.sh` | 282 |  |
 | `scripts/sw-lib-daemon-dispatch-test.sh` | 485 | Unit tests for spawn/reap/queue |
@@ -840,7 +841,7 @@ Most commands are bash. The dashboard server and the commands routed through `ru
 | `scripts/sw-lib-pipeline-detection-test.sh` | 483 | Unit tests for detection fns |
 | `scripts/sw-lib-pipeline-intelligence-test.sh` | 411 | Unit tests for intelligence |
 | `scripts/sw-lib-pipeline-quality-checks-test.sh` | 194 | Unit tests for quality |
-| `scripts/sw-lib-pipeline-stages-test.sh` | 292 | Unit tests for stage functions |
+| `scripts/sw-lib-pipeline-stages-test.sh` | 299 | Unit tests for stage functions |
 | `scripts/sw-lib-pipeline-state-test.sh` | 310 | Unit tests for pipeline state |
 | `scripts/sw-lib-pr-content-test.sh` | 130 | PR titles, bodies and artifact scrubbing |
 | `scripts/sw-lib-safety-gates-sites-test.sh` | 168 | automated filings use intake caps |
@@ -853,7 +854,7 @@ Most commands are bash. The dashboard server and the commands routed through `ru
 | `scripts/sw-lib-verifier-gate-test.sh` | 84 | the merge verifier before a PR |
 | `scripts/sw-linear-test.sh` | 302 | Validate Linear ↔ GitHub bidirectional sync |
 | `scripts/sw-logs-test.sh` | 282 | Validate agent pane log viewing, searching, |
-| `scripts/sw-loop-test.sh` | 1037 | Validate continuous agent loop harness |
+| `scripts/sw-loop-test.sh` | 1039 | Validate continuous agent loop harness |
 | `scripts/sw-memory-discovery-e2e-test.sh` | 412 | Memory & Discovery E2E Test |
 | `scripts/sw-memory-effectiveness-test.sh` | 498 | Unit tests |
 | `scripts/sw-memory-test.sh` | 905 | Unit tests for memory system & cost tracking |
