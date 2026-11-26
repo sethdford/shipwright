@@ -1,4 +1,5 @@
 import type { SafetyPorts } from "../contexts/orchestration";
+import type { QualityPorts } from "../contexts/quality";
 import type { FileReader } from "../shared/kernel/ports";
 
 export interface CliIO {
@@ -15,6 +16,8 @@ export interface CommandContext {
   readonly safety: () => SafetyPorts;
   /** File reads for commands; built by main.ts from the adapter (commands never touch node:fs). */
   readonly files: () => FileReader;
+  /** Read-only delivery data for the scorecard, built on first call. */
+  readonly quality: () => QualityPorts;
 }
 
 /** Metadata is the single source for help text and docs/reference/cli.md. */

@@ -1,5 +1,6 @@
 import { join } from "node:path";
 import pkg from "../package.json";
+import { GhClosedPulls } from "./adapters/github/gh-closed-pulls";
 import { GhGithubWriter } from "./adapters/github/gh-github-writer";
 import { GhOpenIssues } from "./adapters/github/gh-open-issues";
 import { GhPauseLabel } from "./adapters/github/gh-pause-label";
@@ -9,10 +10,12 @@ import { resolvePaths } from "./adapters/paths";
 import { BunProcessRunner } from "./adapters/process/bun-process-runner";
 import { FilePauseFlag } from "./adapters/state/file-pause-flag";
 import { JsonCostLedger } from "./adapters/state/json-cost-ledger";
+import { LedgerSpend } from "./adapters/state/ledger-spend";
 import { NodeFileReader } from "./adapters/state/node-file-reader";
 import type { CliIO, Command } from "./cli/command";
 import { commands, findCommand } from "./cli/commands";
 import type { SafetyPorts } from "./contexts/orchestration";
+import type { QualityPorts } from "./contexts/quality";
 import { installShutdown } from "./shutdown";
 
 const consoleIO: CliIO = {
@@ -44,6 +47,17 @@ export function buildSafetyPorts(
   };
 }
 
+/** Read-only adapters for the scorecard. */
+export function buildQualityPorts(env: Readonly<Record<string, string | undefined>>): QualityPorts {
+  const legacyDir = join(resolvePaths(env).home, ".shipwright");
+  const runner = new BunProcessRunner();
+  return {
+    now: () => Date.now(),
+    pulls: new GhClosedPulls(runner),
+    spend: new LedgerSpend(new JsonCostLedger(legacyDir)),
+  };
+}
+
 function once<T>(make: () => T): () => T {
   let value: T | undefined;
   return () => {
@@ -71,6 +85,7 @@ export async function main(
     return ports;
   }),
   env: Readonly<Record<string, string | undefined>> = process.env,
+  quality: () => QualityPorts = once(() => buildQualityPorts(env)),
 ): Promise<number> {
   const [name, ...args] = argv;
   // Top-level help and version only when they are the whole request; anything more exits 2 below.
@@ -90,7 +105,7 @@ export async function main(
     return 2;
   }
   try {
-    return await command.run(args, { io, version: pkg.version, safety, env, files });
+    return await command.run(args, { io, version: pkg.version, safety, env, files, quality });
   } catch (error) {
     io.err(`✗ ${error instanceof Error ? error.message : String(error)}`);
     return 1;

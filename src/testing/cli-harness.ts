@@ -1,5 +1,6 @@
 import type { CliIO, CommandContext } from "../cli/command";
 import type { SafetyPorts } from "../contexts/orchestration";
+import type { QualityPorts } from "../contexts/quality";
 import type { FileReader } from "../shared/kernel/ports";
 
 export interface CapturedIO extends CliIO {
@@ -24,6 +25,7 @@ export function commandContext(
   safety?: SafetyPorts,
   env: Readonly<Record<string, string | undefined>> = {},
   files?: FileReader,
+  quality?: QualityPorts,
 ): CommandContext {
   return {
     io,
@@ -36,6 +38,10 @@ export function commandContext(
     files: () => {
       if (!files) throw new Error("this command was not given a file reader");
       return files;
+    },
+    quality: () => {
+      if (!quality) throw new Error("this command was not given quality ports");
+      return quality;
     },
   };
 }
