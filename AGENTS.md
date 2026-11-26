@@ -23,7 +23,7 @@ A change is done when `bun run check` passes. Failure messages name the rule and
 
 Target contexts: delivery, orchestration, planning, quality, learning, governance, intelligence,
 integrations, observability, teams, platform. In code so far: orchestration, learning, governance,
-integrations, planning, platform.
+integrations, intelligence, planning, platform.
 
 ## Fitness rules (spec §3.3, ADR-0008)
 

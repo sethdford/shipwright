@@ -504,7 +504,7 @@ strategic_call_api() {
     local tmp_prompt
     tmp_prompt=$(mktemp)
     # shellcheck disable=SC2064
-    trap "rm -f '$tmp_prompt'" RETURN
+    trap "rm -f '$tmp_prompt'; trap - RETURN" RETURN
     printf '%s' "$prompt" > "$tmp_prompt"
 
     local response_text

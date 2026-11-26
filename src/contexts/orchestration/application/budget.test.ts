@@ -12,7 +12,9 @@ test("checks today's spend plus the estimate against the cap", async () => {
     ok: true,
     value: { allowed: true, limitUsd: 5, spentTodayUsd: 4, remainingUsd: 1 },
   });
-  const over = await checkBudget(ports, 1);
+  const exact = await checkBudget(ports, 1);
+  expect(exact.ok && exact.value.allowed).toBe(true);
+  const over = await checkBudget(ports, 1.01);
   expect(over.ok && over.value.allowed).toBe(false);
 });
 

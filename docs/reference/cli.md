@@ -40,6 +40,47 @@ EXIT CODES
   0  passed      1  failed or could not verify (fails closed)      2  usage error
 ```
 
+## `bench`
+
+Head-to-head benchmark: Shipwright vs bare Claude Code and other agents, graded by hidden tests
+
+```text
+USAGE
+  shipwright bench plan     --tasks FILE --arms FILE [--trials N] [--out DIR]
+  shipwright bench run      --tasks FILE --arms FILE --out DIR --budget USD [--trials N] [--arm ID]
+  shipwright bench report   --tasks FILE --arms FILE --out DIR [--k N] [--format md|html|json]
+  shipwright bench validate --tasks FILE --out DIR
+  shipwright bench export-eval     --out DIR --arm ID
+  shipwright bench export-swebench --out DIR --arm ID [--trial N]
+  shipwright bench import-swebench --out DIR --arm ID --report FILE [--trial N]
+  shipwright bench sample-swebench --from FILE.jsonl --n N [--seed S] [--name NAME]
+  shipwright bench mine-holdout    --repo OWNER/NAME --since DATE [--max N] [--setup "CMD"]...
+
+DESCRIPTION
+  Head-to-head benchmark (ADR-0013): runs each arm (bare Claude Code, Shipwright, or any other
+  agent CLI) on the same tasks, from the same base commit, with the same model and time limit,
+  and grades every run with hidden tests. Holdout tasks are graded here; SWE-bench Verified
+  tasks are graded by the official harness (export-swebench, then import-swebench).
+
+  Results go to DIR/results.jsonl (append-only; run is resumable) and DIR/patches/. run stops
+  before any run the budget cannot cover, counting reported spend or the arm's estimate.
+  report writes report.md, report.html and report.json: resolve rate with a 95% Wilson
+  interval, pass^k, spend, $ per resolved task, and an exact sign test of each arm against
+  the baseline on per-task results. sample-swebench and mine-holdout print a task manifest.
+
+  Agents never get a GitHub token. Bare Claude Code runs under the same permission
+  policy as Shipwright's agents (config/agent-permissions.json).
+
+OPTIONS
+  --trials N   Runs per task per arm, 1 to 10 (default 1)
+  --k N        pass^k: runs that must all pass, 1 to 10 (default 1)
+  --budget USD Hard spend cap for this results directory
+  --arm ID     Only this arm
+
+EXIT CODES
+  0  done      1  failed      2  usage error      3  stopped by budget, or an unfair oracle
+```
+
 ## `breaker`
 
 Global circuit breaker: show it, or check it as a dispatch gate
@@ -100,6 +141,36 @@ OPTIONS
 
 EXAMPLES
   shipwright budget check --estimate 2.50
+```
+
+## `eval`
+
+Score eval runs (pass^k) and apply the paired ratchet rule to a candidate policy
+
+```text
+USAGE
+  shipwright eval score --results FILE [--k N] [--json]
+  shipwright eval ratchet --incumbent FILE --candidate FILE [--k N] [--json]
+
+DESCRIPTION
+  Scores eval runs and applies the paired ratchet rule (Wave 2 plan W2-13). Pure: it reads the
+  files and writes nothing. A results file is JSON:
+    { "policy": "routing-v1",
+      "runs": [ { "case": "c01", "pass": true, "costUsd": 0.42 }, ... ],
+      "vetoes": { "fenceViolations": 0, "protectedPathTouched": false, "oracleTampering": false } }
+  Every case needs at least k runs. pass^k is the unbiased estimate C(passes,k)/C(runs,k).
+
+  ratchet accepts the candidate when it is non-inferior (losses - wins <= 0 and losses <= 1) and
+  either superior (exact one-sided sign test, p <= 0.05) or cheaper (median paired cost ratio
+  <= 0.9). A fence violation, a protected-path touch or oracle tampering rejects it outright.
+
+OPTIONS
+  --k N    Runs that must all pass, 1 to 10 (default 3)
+  --json   Print the full result as JSON
+
+EXIT CODES
+  0  scored, or candidate accepted      3  candidate rejected
+  1  could not read or score the files  2  usage error
 ```
 
 ## `failure`
@@ -277,6 +348,44 @@ EXAMPLES
   shipwright paused --gate && dispatch_next_issue
 ```
 
+## `repomodel`
+
+Query the repository world model: definitions, references, tests, owners, repo map (ADR-0016)
+
+Aliases: `code`
+
+```text
+USAGE
+  shipwright repomodel build    [--root DIR] [--json]
+  shipwright repomodel search   QUERY [--limit N] [--root DIR]
+  shipwright repomodel def      NAME            (where NAME is defined; Class.method works)
+  shipwright repomodel refs     NAME            (every use, with the enclosing definition)
+  shipwright repomodel outline  PATH
+  shipwright repomodel deps     PATH
+  shipwright repomodel tests    PATH
+  shipwright repomodel owners   PATH
+  shipwright repomodel map      [--focus FILE] [--budget CHARS]
+  shipwright repomodel localize --task FILE [--limit N]
+  shipwright repomodel brief    --task FILE [--with-tools] [--json]
+  shipwright repomodel mcp      [--root DIR]
+
+DESCRIPTION
+  A persistent, incrementally updated model of a repository (ADR-0016): definitions, imports, a reference graph,
+  a search index, a test-to-code map and ownership. It is rebuilt only for files whose content changed, and
+  every query refreshes it first, so answers include uncommitted edits. The cache lives in the state directory.
+
+  build     Refresh the model and print what changed.
+  brief     The prompt section for a task (--task FILE): likely files and definitions with their tests and
+            owners; with --with-tools, also how to use the MCP tools. Prints nothing when SHIPWRIGHT_REPO_MODEL=off.
+  mcp       A read-only MCP server on stdio (server name "repomodel") with the same queries as tools.
+
+ABLATION (for paired eval runs)
+  SHIPWRIGHT_REPO_MODEL=off leaves the brief out and the pipeline does not attach the MCP server.
+
+EXIT CODES
+  0  done      1  the repository could not be read      2  usage error
+```
+
 ## `resume`
 
 Clear the local pause flag
@@ -287,4 +396,114 @@ USAGE
 
 DESCRIPTION
   Clears the local pause flag. A shipwright:pause label on an open issue still pauses dispatch.
+```
+
+## `route`
+
+Adaptive compute router: pick template, model, effort and attempts by issue difficulty
+
+```text
+USAGE
+  shipwright route decide  (--issue-json FILE | --goal TEXT) [--issue N] [--repo OWNER/NAME]
+                           [--remaining-usd X] [--failure-class C] [--mode shadow|apply]
+                           [--template T] [--model M] [--effort E] [--attempts N] [--json]
+  shipwright route outcome --decision ID --result success|failure [--failure-class C]
+                           [--cost-usd X] [--pr N] [--json]
+  shipwright route stats   [--json]
+
+DESCRIPTION
+  Adaptive compute router (ADR-0014). Predicts how hard an issue is from its text and labels, corrects
+  that with the results of earlier routed runs, and picks the pipeline template, model, effort,
+  number of parallel attempts and run budget from the routing table (routing-v1).
+
+  decide   Prints the route and appends the decision, with every input, to the routing log. Values
+           passed with --template, --model, --effort or --attempts are kept as given. --remaining-usd
+           (money left under the daily cap) only lowers attempts and the cap; at 0 the action is
+           "defer". --failure-class budget or max_turns (a retry) moves the route up one tier.
+  outcome  Records how a routed run ended, so history and stats can use it.
+  stats    Runs, success rate and cost per success for each tier.
+
+  The bash pipeline calls decide at start and outcome at the end. SHIPWRIGHT_ROUTER=shadow (the
+  default) logs the route without using it; apply uses it; off skips the router.
+
+FILES
+  ~/.shipwright/routing/decisions.jsonl   one decision or outcome per line
+
+EXIT CODES
+  0  done      1  could not read or write the routing log      2  usage error
+```
+
+## `scorecard`
+
+Delivery scorecard: merge, rework and revert rates and cost per merged PR
+
+```text
+USAGE
+  shipwright scorecard [--days N] [--exclude N[,N...]] [--format text|json|markdown]
+
+DESCRIPTION
+  Delivery scorecard for the factory's own PRs in this repository (Wave 2 plan W2-18): merge rate,
+  merged without human help, revert rate (within 14 days), median time to merge, and cost per
+  merged PR. Read-only: it lists closed PRs through gh, reads commits only for merged agent PRs,
+  and reads spend from ~/.shipwright/costs.json. Spend is "unknown" when the ledger is missing or
+  holds no real cost in the window (as on a CI runner).
+  An agent PR carries "Generated by `shipwright pipeline`" in its body or a ci/issue- branch.
+  A merged agent PR needed human help when any of its commits, before or after it opened, is by
+  an author other than shipwright[bot], github-actions[bot] or claude[bot].
+  Test runs of the pipeline are left out of every metric and counted as excluded: PRs labelled
+  shipwright:test-run, PRs on a test/ branch, and the PR numbers given with --exclude.
+
+OPTIONS
+  --days N     Window in days, 1 to 365 (default 30)
+  --exclude L  Comma-separated PR numbers to leave out as test runs (e.g. 195,6765)
+  --format F   text (default), json, or markdown (for the public scorecard page)
+
+EXIT CODES
+  0  printed      1  could not read GitHub or the cost ledger      2  usage error
+```
+
+## `verify`
+
+Merge verifier: predict whether a change will merge, and gate PRs on it
+
+```text
+USAGE
+  shipwright verify score [--base REF] [--title T] [--body-file F] [--tests pass|fail|unknown]
+                          [--cross R] [--rubric R] [--critic] [--critic-model M]
+                          [--critic-budget USD] [--mode off|advisory|enforce] [--format text|json]
+  shipwright verify train [--days N] [--agent N,...] [--exclude N,...] [--human-weight W]
+                          [--dry-run] [--format text|json]
+  shipwright verify show
+
+DESCRIPTION
+  A merge verifier: predicts whether a change will merge and stay merged (not reverted within
+  14 days), before its PR is opened, and stops changes that should not become PRs.
+
+  score  Scores the current branch against --base (git diff base...HEAD; default origin/main)
+         with the trained model, or with the hand-set prior when nothing was trained. Features
+         come from the diff (size, run output, plan-only changes, CI or test-config edits, tests
+         added or weakened) and the title and description (model chatter). --tests, --cross and
+         --rubric pass the run's own signals (test result, tournament cross-test pass rate, rubric
+         score, each 0 to 1). --critic adds a prompted reviewer (LLM-as-judge) whose stated chance
+         is one more feature, trusted at a third of its stated confidence until training says
+         otherwise; it spends up to --critic-budget (default 0.50 USD).
+  train  Learns the weights from this repository's closed PRs (read-only, through gh): labels
+         them, fits a logistic model around the hand-set prior, and measures it leave-one-out
+         (Brier, AUC, calibration error) against the prior. Factory PRs weigh 1; human PRs weigh
+         --human-weight (default 0.5; 0 learns from factory PRs only). Dependency-bot PRs and test
+         runs are left out. --agent marks older factory PRs that carry no marker. Saves to
+         $SHIPWRIGHT_STATE_DIR/verifier/model.json unless --dry-run.
+  show   Prints the trained weights and their evidence.
+
+GATE (score)
+  Hard stops block in enforce mode from day one: no change beyond plans or run output, failing
+  tests, run output in the diff. A low predicted chance (below 20%) blocks only once the model
+  is trusted: 20 or more labelled PRs, 5 of each outcome, leave-one-out AUC 0.7 or more, and a
+  Brier score better than guessing the base rate. Until then it warns.
+  The mode comes from --mode, else SHIPWRIGHT_VERIFIER (off, advisory, enforce; default
+  advisory). Advisory never blocks and reports what enforce would do.
+
+EXIT CODES
+  0  pass or warn (score), done (train, show)   1  could not read git, GitHub or the model
+  2  usage error                                 3  blocked (score, enforce mode only)
 ```

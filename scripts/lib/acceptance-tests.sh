@@ -133,9 +133,17 @@ PROMPT
 # _acceptance_requirements — plan, goal file, or issue text.
 _acceptance_requirements() {
     local plan_file="${ARTIFACTS_DIR}/plan.md" goal_file="${PROJECT_ROOT}/.claude/goal.md"
-    local text="${GOAL:-}
+    # Issue text is untrusted (trust boundary): wrapped so the model treats it as data, not instructions.
+    local text
+    if type untrusted_wrap >/dev/null 2>&1; then
+        text=$(untrusted_wrap "issue title and body" "${GOAL:-}
+
+${ISSUE_BODY:-}")
+    else
+        text="${GOAL:-}
 
 ${ISSUE_BODY:-}"
+    fi
     if [[ -s "$plan_file" ]]; then
         text="${text}
 

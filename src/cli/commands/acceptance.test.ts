@@ -49,7 +49,7 @@ async function run(args: string[], ports: AcceptancePorts) {
   const files = new FakeFileReader({ "/answer.md": ANSWER });
   const code = await acceptanceCommand.run(
     args,
-    commandContext(io, undefined, {}, files, undefined, () => ports),
+    commandContext(io, undefined, {}, files, { acceptance: () => ports }),
   );
   return { code, out: io.outLines.join("\n"), err: io.errLines.join("\n") };
 }

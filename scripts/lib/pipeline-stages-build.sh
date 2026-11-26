@@ -6,9 +6,14 @@ SW_AGENT_EXEC="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/agent-exec.sh"
 # Test commands run without credentials (#8608).
 # shellcheck source=lib/test-gate-env.sh
 source "$(dirname "${BASH_SOURCE[0]}")/test-gate-env.sh"
+# Prompt-injection defenses for issue text (trust boundary).
+# shellcheck source=lib/untrusted.sh
+source "$(dirname "${BASH_SOURCE[0]}")/untrusted.sh"
 source "$(dirname "${BASH_SOURCE[0]}")/models.sh"
 # shellcheck source=lib/acceptance-tests.sh
 source "$(dirname "${BASH_SOURCE[0]}")/acceptance-tests.sh"
+# shellcheck source=lib/repo-model.sh
+source "$(dirname "${BASH_SOURCE[0]}")/repo-model.sh"
 [[ -n "${_PIPELINE_STAGES_BUILD_LOADED:-}" ]] && return 0
 _PIPELINE_STAGES_BUILD_LOADED=1
 
@@ -54,6 +59,10 @@ _pipeline_claude_flags() {
     if [[ -n "$_fallback" ]] && [[ "$_fallback" != "$model" ]]; then
         flags+=("--fallback-model" "$_fallback")
     fi
+
+    # Repository world model tools (ADR-0016): nothing when SHIPWRIGHT_REPO_MODEL=off.
+    local _rm_flag
+    for _rm_flag in $(repo_model_mcp_flags); do flags+=("$_rm_flag"); done
 
     echo "${flags[*]}"
 }

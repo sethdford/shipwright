@@ -549,7 +549,7 @@ run_pipeline() {
                 local tmp_skip
                 tmp_skip="$(mktemp)" || { warn "mktemp failed"; continue; }
                 # shellcheck disable=SC2064  # intentional expansion at definition time
-                trap "rm -f '$tmp_skip'" RETURN
+                trap "rm -f '$tmp_skip'; trap - RETURN" RETURN
                 grep -vx "$id" "$ARTIFACTS_DIR/skip-stage.txt" > "$tmp_skip" 2>/dev/null || true
                 mv "$tmp_skip" "$ARTIFACTS_DIR/skip-stage.txt"
                 continue

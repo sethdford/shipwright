@@ -5,6 +5,9 @@
 [[ -n "${_PIPELINE_STAGES_LOADED:-}" ]] && return 0
 _PIPELINE_STAGES_LOADED=1
 
+# Prompt-injection defenses for issue text. Required: no fallback, the stages fail closed.
+source "$(dirname "${BASH_SOURCE[0]}")/untrusted.sh"
+
 # Source skill registry for dynamic prompt injection
 _SKILL_REGISTRY_SH="${SCRIPT_DIR}/lib/skill-registry.sh"
 [[ -f "$_SKILL_REGISTRY_SH" ]] && source "$_SKILL_REGISTRY_SH"
@@ -216,6 +219,9 @@ _PIPELINE_STAGES_BUILD_SH="${SCRIPT_DIR}/lib/pipeline-stages-build.sh"
 
 _PIPELINE_STAGES_REVIEW_SH="${SCRIPT_DIR}/lib/pipeline-stages-review.sh"
 [[ -f "$_PIPELINE_STAGES_REVIEW_SH" ]] && source "$_PIPELINE_STAGES_REVIEW_SH"
+
+_VERIFIER_GATE_SH="${SCRIPT_DIR}/lib/verifier-gate.sh"
+[[ -f "$_VERIFIER_GATE_SH" ]] && source "$_VERIFIER_GATE_SH"
 
 _PIPELINE_STAGES_DELIVERY_SH="${SCRIPT_DIR}/lib/pipeline-stages-delivery.sh"
 [[ -f "$_PIPELINE_STAGES_DELIVERY_SH" ]] && source "$_PIPELINE_STAGES_DELIVERY_SH"

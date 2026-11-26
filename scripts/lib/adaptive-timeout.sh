@@ -155,7 +155,7 @@ timeout_record() {
     # Atomic write (mktemp + mv pattern for safety under pipefail)
     local tmpfile
     tmpfile=$(mktemp) || return 1
-    trap "rm -f '$tmpfile'" RETURN
+    trap "rm -f '$tmpfile'; trap - RETURN" RETURN
 
     # Append new entry and existing data
     {

@@ -282,7 +282,7 @@ adaptive_model_learn() {
     # Update preferences file
     local tmp_prefs
     tmp_prefs=$(mktemp)
-    trap "rm -f '$tmp_prefs'" RETURN
+    trap "rm -f '$tmp_prefs'; trap - RETURN" RETURN
 
     jq \
         --argjson esc_success "$escalation_success" \

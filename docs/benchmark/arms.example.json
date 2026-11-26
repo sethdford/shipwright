@@ -1,0 +1,31 @@
+{
+  "baseline": "claude-code",
+  "arms": [
+    {
+      "id": "claude-code",
+      "label": "Claude Code (bare)",
+      "kind": "claude-code",
+      "model": "opus",
+      "timeoutMin": 60,
+      "estimateUsd": 2.5
+    },
+    {
+      "id": "shipwright-k1",
+      "label": "Shipwright, 1 attempt",
+      "kind": "shipwright",
+      "model": "opus",
+      "attempts": 1,
+      "timeoutMin": 120,
+      "estimateUsd": 6
+    },
+    {
+      "id": "shipwright-k3",
+      "label": "Shipwright, tournament of 3",
+      "kind": "shipwright",
+      "model": "opus",
+      "attempts": 3,
+      "timeoutMin": 180,
+      "estimateUsd": 15
+    }
+  ]
+}

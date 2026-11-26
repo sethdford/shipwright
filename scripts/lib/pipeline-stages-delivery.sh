@@ -355,6 +355,16 @@ EOF
         fi
     fi
 
+    # ── Merge verifier (ADR-0012): stop changes that should not become PRs ──
+    if type verifier_gate >/dev/null 2>&1; then
+        local verifier_tests="unknown"
+        [[ "$(get_stage_status test 2>/dev/null || true)" == "complete" ]] && verifier_tests="pass"
+        verifier_gate "origin/$BASE_BRANCH" "$pr_title" "$pr_body" "$verifier_tests" || return 1
+        [[ -n "${VERIFIER_PR_NOTE:-}" ]] && pr_body="${pr_body}
+
+<sub>${VERIFIER_PR_NOTE}</sub>"
+    fi
+
     # Build gh pr create args
     local pr_args=(--title "$pr_title" --body "$pr_body" --base "$BASE_BRANCH")
     [[ "$pr_draft" == "true" ]] && pr_args+=(--draft)
