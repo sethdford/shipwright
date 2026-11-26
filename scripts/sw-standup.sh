@@ -497,7 +497,7 @@ cmd_notify() {
         # Generate a digest
         message_file=$(mktemp)
         # shellcheck disable=SC2064
-        trap "rm -f '$message_file'" RETURN
+        trap "rm -f '$message_file'; trap - RETURN" RETURN
         cmd_digest > "$message_file" 2>&1 || true
     fi
 

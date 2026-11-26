@@ -133,8 +133,8 @@ tg_parse_log() {
         # Assertions of a failing suite, passing ones included: the n-th line with a given description
         # is "desc#n", so the position of a repeated name is known. The list that test-helpers prints
         # after its completion line repeats the failures and is not counted.
-        cur != "" && !(cur in comp) && /^ +[✓✗] / {
-            line = $0; sub(/^ +[✓✗] /, "", line)
+        cur != "" && !(cur in comp) && /^ +(✓|✗) / {
+            line = $0; sub(/^ +(✓|✗) /, "", line)
             occ[cur SUBSEP line]++
             if ($0 ~ /^ +✗ /) { nfail[cur]++; print cur "::" line "#" occ[cur SUBSEP line] }
             else { npass[cur]++ }
