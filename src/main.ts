@@ -10,9 +10,11 @@ import { resolvePaths } from "./adapters/paths";
 import { BunProcessRunner } from "./adapters/process/bun-process-runner";
 import { FilePauseFlag } from "./adapters/state/file-pause-flag";
 import { JsonCostLedger } from "./adapters/state/json-cost-ledger";
+import { JsonlRoutingLog } from "./adapters/state/jsonl-routing-log";
 import { NodeFileReader } from "./adapters/state/node-file-reader";
 import type { CliIO, Command } from "./cli/command";
 import { commands, findCommand } from "./cli/commands";
+import type { RoutingPorts } from "./contexts/intelligence";
 import type { SafetyPorts } from "./contexts/orchestration";
 import { installShutdown } from "./shutdown";
 
@@ -24,6 +26,15 @@ const consoleIO: CliIO = {
 const fileReader = new NodeFileReader();
 const files = () => fileReader;
 const repoDocs = once(() => new GitRepoDocs(new BunProcessRunner(), fileReader));
+
+/** The routing log lives with the bash cost files in ~/.shipwright (ADR-0012). */
+export function buildRoutingPorts(env: Readonly<Record<string, string | undefined>>): RoutingPorts {
+  const legacyDir = join(resolvePaths(env).home, ".shipwright");
+  return {
+    log: new JsonlRoutingLog(join(legacyDir, "routing", "decisions.jsonl")),
+    now: () => Date.now(),
+  };
+}
 
 /** Adapters for the safety commands (ADR-0007). */
 export function buildSafetyPorts(
@@ -92,7 +103,9 @@ export async function main(
     return 2;
   }
   try {
-    return await command.run(args, { io, version: pkg.version, safety, env, files, repoDocs });
+    const routing = once(() => buildRoutingPorts(env));
+    const ctx = { io, version: pkg.version, safety, env, files, repoDocs, routing };
+    return await command.run(args, ctx);
   } catch (error) {
     io.err(`✗ ${error instanceof Error ? error.message : String(error)}`);
     return 1;

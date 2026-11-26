@@ -1,5 +1,6 @@
 import type { CliIO, CommandContext } from "../cli/command";
 import type { RepoDocs } from "../contexts/governance";
+import type { RoutingPorts } from "../contexts/intelligence";
 import type { SafetyPorts } from "../contexts/orchestration";
 import type { FileReader } from "../shared/kernel/ports";
 
@@ -26,6 +27,7 @@ export function commandContext(
   env: Readonly<Record<string, string | undefined>> = {},
   files?: FileReader,
   repoDocs?: RepoDocs,
+  routing?: RoutingPorts,
 ): CommandContext {
   return {
     io,
@@ -42,6 +44,10 @@ export function commandContext(
     repoDocs: () => {
       if (!repoDocs) throw new Error("this command was not given repository documents");
       return repoDocs;
+    },
+    routing: () => {
+      if (!routing) throw new Error("this command was not given routing ports");
+      return routing;
     },
   };
 }

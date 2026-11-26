@@ -252,3 +252,38 @@ USAGE
 DESCRIPTION
   Clears the local pause flag. A shipwright:pause label on an open issue still pauses dispatch.
 ```
+
+## `route`
+
+Adaptive compute router: pick template, model, effort and attempts by issue difficulty
+
+```text
+USAGE
+  shipwright route decide  (--issue-json FILE | --goal TEXT) [--issue N] [--repo OWNER/NAME]
+                           [--remaining-usd X] [--failure-class C] [--mode shadow|apply]
+                           [--template T] [--model M] [--effort E] [--attempts N] [--json]
+  shipwright route outcome --decision ID --result success|failure [--failure-class C]
+                           [--cost-usd X] [--pr N] [--json]
+  shipwright route stats   [--json]
+
+DESCRIPTION
+  Adaptive compute router (ADR-0012). Predicts how hard an issue is from its text and labels, corrects
+  that with the results of earlier routed runs, and picks the pipeline template, model, effort,
+  number of parallel attempts and run budget from the routing table (routing-v1).
+
+  decide   Prints the route and appends the decision, with every input, to the routing log. Values
+           passed with --template, --model, --effort or --attempts are kept as given. --remaining-usd
+           (money left under the daily cap) only lowers attempts and the cap; at 0 the action is
+           "defer". --failure-class budget or max_turns (a retry) moves the route up one tier.
+  outcome  Records how a routed run ended, so history and stats can use it.
+  stats    Runs, success rate and cost per success for each tier.
+
+  The bash pipeline calls decide at start and outcome at the end. SHIPWRIGHT_ROUTER=shadow (the
+  default) logs the route without using it; apply uses it; off skips the router.
+
+FILES
+  ~/.shipwright/routing/decisions.jsonl   one decision or outcome per line
+
+EXIT CODES
+  0  done      1  could not read or write the routing log      2  usage error
+```

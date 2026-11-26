@@ -22,6 +22,11 @@ flowchart LR
     governance_application["governance/application"]
     governance_domain["governance/domain"]
   end
+  subgraph ctx_intelligence["intelligence"]
+    intelligence["intelligence"]
+    intelligence_application["intelligence/application"]
+    intelligence_domain["intelligence/domain"]
+  end
   subgraph ctx_learning["learning"]
     learning["learning"]
     learning_application["learning/application"]
@@ -52,12 +57,14 @@ flowchart LR
   adapters_github --> kernel
   adapters_github --> orchestration
   adapters_process --> kernel
+  adapters_state --> intelligence
   adapters_state --> kernel
   adapters_state --> orchestration
   adapters_store --> kernel
   adapters_tmux --> adapters_process
   adapters_tmux --> kernel
   cli --> governance
+  cli --> intelligence
   cli --> kernel
   cli --> learning
   cli --> main
@@ -70,6 +77,12 @@ flowchart LR
   governance_application --> governance_domain
   governance_application --> kernel
   integrations --> kernel
+  intelligence --> intelligence_application
+  intelligence --> intelligence_domain
+  intelligence --> kernel
+  intelligence_application --> intelligence
+  intelligence_application --> intelligence_domain
+  intelligence_application --> kernel
   learning --> learning_application
   learning --> learning_domain
   learning_application --> kernel
@@ -81,6 +94,7 @@ flowchart LR
   main --> adapters_process
   main --> adapters_state
   main --> cli
+  main --> intelligence
   main --> orchestration
   main --> shutdown
   orchestration --> integrations
