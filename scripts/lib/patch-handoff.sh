@@ -128,14 +128,37 @@ handoff_carry_over() {
     [[ -s "$out" ]] || return 0
     _handoff_in "$dir" apply --index --binary --whitespace=nowarn "$out" \
         || { _handoff_err "could not carry the trusted checkout's changes into the agent clone"; return 1; }
+    _handoff_clean_trusted "$trusted" "$out.moved"
+}
+
+# _handoff_clean_trusted TRUSTED_REPO MOVED_LIST — resets tracked files to HEAD and deletes the
+# untracked, non-ignored files outside .claude/; their paths are written to MOVED_LIST.
+_handoff_clean_trusted() {
+    local trusted="$1" moved="$2"
     _handoff_in "$trusted" ls-files -z --others --exclude-standard -- . "${HANDOFF_EXCLUDE_PATHSPEC[@]}" \
-        > "$out.moved" || return 1
+        > "$moved" || return 1
     _handoff_in "$trusted" reset -q --hard HEAD || { _handoff_err "could not reset the trusted checkout"; return 1; }
     local path
     while IFS= read -r -d '' path; do
         rm -f -- "$trusted/$path"
-    done < "$out.moved"
-    tr '\0' '\n' < "$out.moved" > "$out.moved.txt" && mv "$out.moved.txt" "$out.moved"
+    done < "$moved"
+    tr '\0' '\n' < "$moved" > "$moved.txt" && mv "$moved.txt" "$moved"
+}
+
+# handoff_commit_dirty TRUSTED_REPO MESSAGE OUT_PATCH — commits uncommitted work in the trusted
+# checkout only after the judge accepts it, as handoff_apply does for the build agent's patch.
+# Replaces `git add -A && git commit`, which would publish whatever an agent left behind.
+# Returns 0 with nothing printed when there is nothing to commit, 0 and the new sha on commit, and
+# 1 on refusal; either way the trusted checkout is left clean (the work stays in OUT_PATCH).
+handoff_commit_dirty() {
+    local trusted="$1" msg="$2" out="$3"
+    handoff_check_git || return 1
+    local base
+    base=$(_handoff_in "$trusted" rev-parse HEAD) || return 1
+    handoff_export "$trusted" "$base" "$trusted" "$out" || return 1
+    _handoff_clean_trusted "$trusted" "$out.moved" || return 1
+    [[ -s "$out" ]] || return 0
+    handoff_apply "$trusted" "$base" "$out" "$msg"
 }
 
 # handoff_export AGENT_DIR BASE_SHA TRUSTED_REPO OUT_PATCH — the agent's files, as a binary patch

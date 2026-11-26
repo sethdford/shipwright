@@ -296,4 +296,138 @@ assert_exit_code "a build with no changes succeeds without a commit" "0" "$rc"
 assert_eq "the trusted checkout stays at the base" "$BASE" "$(git -C "$T/trusted" rev-parse HEAD)"
 assert_contains "the empty result is an event" "$(cat "$T/events")" "build.patch_empty issue=7"
 
+# ═══════════════════════════════════════════════════════════════════════════════
+print_test_section "handoff_commit_dirty (leftovers at the PR stage)"
+# ═══════════════════════════════════════════════════════════════════════════════
+
+BASE=$(new_trusted "$T/trusted")
+out=$(handoff_commit_dirty "$T/trusted" "cleanup" "$T/left.patch") && rc=0 || rc=$?
+assert_exit_code "a clean checkout: nothing to do" "0" "$rc"
+assert_eq "and no commit" "$BASE" "$(git -C "$T/trusted" rev-parse HEAD)"
+
+printf 'four\n' >> "$T/trusted/src/app.txt"; echo new > "$T/trusted/src/new.txt"
+mkdir -p "$T/trusted/.claude/pipeline-artifacts" && echo plan > "$T/trusted/.claude/pipeline-artifacts/plan.md"
+out=$(handoff_commit_dirty "$T/trusted" "cleanup" "$T/left.patch") && rc=0 || rc=$?
+assert_exit_code "ordinary leftovers are committed" "0" "$rc"
+assert_eq "as one commit on the base" "$BASE" "$(git -C "$T/trusted" rev-parse HEAD~1)"
+assert_eq "including new files" "new" "$(git -C "$T/trusted" show HEAD:src/new.txt)"
+assert_eq "the checkout is clean afterwards" "" "$(git -C "$T/trusted" status --porcelain -- src)"
+assert_file_exists ".claude/ is never part of it and stays in place" "$T/trusted/.claude/pipeline-artifacts/plan.md"
+
+BASE=$(new_trusted "$T/trusted")
+printf 'x\n' >> "$T/trusted/.github/workflows/ci.yml"; git -C "$T/trusted" add -A
+rc=0; handoff_commit_dirty "$T/trusted" "cleanup" "$T/left.patch" >/dev/null 2>&1 || rc=$?
+assert_exit_code "a leftover workflow edit is refused" "1" "$rc"
+assert_eq "nothing is committed" "$BASE" "$(git -C "$T/trusted" rev-parse HEAD)"
+assert_eq "and the edit is gone from the checkout" "" "$(git -C "$T/trusted" status --porcelain)"
+assert_contains "but kept in the patch file" "$(cat "$T/left.patch")" ".github/workflows/ci.yml"
+
+# ═══════════════════════════════════════════════════════════════════════════════
+print_test_section "test_first (TDD) output lands only as a judged patch"
+# ═══════════════════════════════════════════════════════════════════════════════
+
+run_tdd_land() {
+    (
+        set +e
+        _PIPELINE_STAGES_BUILD_LOADED=""
+        source "$SCRIPT_DIR/lib/pipeline-stages-build.sh" 2>/dev/null
+        info() { :; }; success() { :; }; warn() { :; }; error() { :; }
+        emit_event() { echo "$*" >> "$T/events"; }
+        PROJECT_ROOT="$T/trusted" ARTIFACTS_DIR="$T/artifacts" ISSUE_NUMBER=7
+        _tdd_land_output "$1"
+    )
+}
+fence='```'
+TDD_OK="${fence}tests/app.test.sh
+echo ok
+${fence}"
+TDD_ESCAPE="${fence}../outside.txt
+pwned
+${fence}
+${fence}tests/app.test.sh
+echo ok
+${fence}"
+TDD_WORKFLOW="${fence}.github/workflows/ci.yml
+on: push
+${fence}"
+
+BASE=$(new_trusted "$T/trusted"); rm -rf "$T/artifacts" "$T/events"
+rc=0; run_tdd_land "$TDD_OK" || rc=$?
+assert_exit_code "generated tests are applied" "0" "$rc"
+assert_eq "as a pipeline commit on the base" "$BASE" "$(git -C "$T/trusted" rev-parse HEAD~1)"
+assert_eq "authored by the pipeline" "shipwright-pipeline" "$(git -C "$T/trusted" log -1 --format=%an)"
+assert_eq "with the test file" "echo ok" "$(git -C "$T/trusted" show HEAD:tests/app.test.sh)"
+
+BASE=$(new_trusted "$T/trusted"); rm -rf "$T/artifacts" "$T/events" "$T/outside.txt"
+run_tdd_land "$TDD_ESCAPE" || true
+assert_file_not_exists "a ../ path from the model is never written" "$T/outside.txt"
+assert_contains "the refused path is an event" "$(cat "$T/events")" "tdd.path_refused issue=7 path=../outside.txt"
+assert_eq "the safe block still lands" "echo ok" "$(git -C "$T/trusted" show HEAD:tests/app.test.sh 2>/dev/null)"
+
+BASE=$(new_trusted "$T/trusted"); rm -rf "$T/artifacts" "$T/events"
+rc=0; run_tdd_land "$TDD_WORKFLOW" || rc=$?
+assert_exit_code "TDD output that edits a workflow is refused" "1" "$rc"
+assert_eq "the trusted checkout stays at the base" "$BASE" "$(git -C "$T/trusted" rev-parse HEAD)"
+assert_eq "and clean" "" "$(git -C "$T/trusted" status --porcelain)"
+assert_contains "the refusal is an event" "$(cat "$T/events")" "tdd.patch_refused issue=7"
+
+BASE=$(new_trusted "$T/trusted"); rm -rf "$T/artifacts" "$T/events" "$T/outside.txt"
+( cd "$T/trusted" && SW_PATCH_HANDOFF=false run_tdd_land "$TDD_ESCAPE" ) || true
+assert_file_not_exists "with handoff off, ../ paths are still refused" "$T/outside.txt"
+assert_eq "and only the written test is committed" "tests/app.test.sh" \
+    "$(git -C "$T/trusted" show --name-only --format= HEAD)"
+
+# ═══════════════════════════════════════════════════════════════════════════════
+print_test_section "agent stages in the trusted checkout cannot commit"
+# ═══════════════════════════════════════════════════════════════════════════════
+
+run_pinned() {
+    local stage="$1"
+    (
+        set +e
+        source "$SCRIPT_DIR/lib/pipeline-execution.sh" 2>/dev/null
+        info() { :; }; warn() { :; }; error() { :; }
+        emit_event() { echo "$*" >> "$T/events"; }
+        PROJECT_ROOT="$T/trusted" ISSUE_NUMBER=7
+        stage_plan() { (cd "$PROJECT_ROOT" && echo evil > src/evil.txt && git add -A && git commit -qm sneaky); }
+        stage_build() { (cd "$PROJECT_ROOT" && echo ok > src/built.txt && git add -A && git commit -qm build); }
+        _run_stage_pinned "$stage"
+    )
+}
+BASE=$(new_trusted "$T/trusted"); rm -f "$T/events"
+rc=0; run_pinned plan || rc=$?
+assert_exit_code "the stage itself still succeeds" "0" "$rc"
+assert_eq "a commit made by the plan agent is undone" "$BASE" "$(git -C "$T/trusted" rev-parse HEAD)"
+assert_eq "its content stays as unstaged work for the build's judge" "?? src/evil.txt" \
+    "$(git -C "$T/trusted" status --porcelain)"
+assert_contains "the undo is an event" "$(cat "$T/events")" "stage.head_moved issue=7 stage=plan"
+
+BASE=$(new_trusted "$T/trusted")
+run_pinned build || true
+assert_eq "the build stage's own commit is kept" "$BASE" "$(git -C "$T/trusted" rev-parse HEAD~1)"
+
+BASE=$(new_trusted "$T/trusted")
+( SW_PATCH_HANDOFF=false run_pinned plan ) || true
+assert_eq "with handoff off, nothing changes" "$BASE" "$(git -C "$T/trusted" rev-parse HEAD~1)"
+
+# ═══════════════════════════════════════════════════════════════════════════════
+print_test_section "persist_artifacts commits only the artifact paths"
+# ═══════════════════════════════════════════════════════════════════════════════
+
+BASE=$(new_trusted "$T/trusted")
+(
+    set +e
+    cd "$T/trusted" || exit 1
+    source "$SCRIPT_DIR/lib/pipeline-state.sh" 2>/dev/null
+    info() { :; }; warn() { :; }; emit_event() { :; }
+    git() { if [[ "$1" == "push" ]]; then return 0; fi; command git "$@"; }
+    ARTIFACTS_DIR="$T/trusted/.claude/pipeline-artifacts" ISSUE_NUMBER=7 CI_MODE=true
+    mkdir -p "$ARTIFACTS_DIR" && echo plan > "$ARTIFACTS_DIR/plan.md"
+    echo evil > src/evil.txt && command git add src/evil.txt
+    persist_artifacts plan plan.md >/dev/null 2>&1
+) || true
+assert_eq "the artifact commit holds only the artifact" ".claude/pipeline-artifacts/plan.md" \
+    "$(git -C "$T/trusted" show --name-only --format= HEAD)"
+assert_eq "what an agent staged stays out of it" "A  src/evil.txt" "$(git -C "$T/trusted" status --porcelain -- src)"
+
 print_test_results
