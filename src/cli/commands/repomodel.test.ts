@@ -14,7 +14,7 @@ function run(args: string[], env: Record<string, string> = {}, stdio?: LineChann
   const io = captureIO();
   const { ports } = fakeRepoPorts(FILES);
   const files = new FakeFileReader({ "/task.md": "the daily budget is ignored" });
-  const ctx = commandContext(io, undefined, { PWD: "/repo", ...env }, files, undefined, {
+  const ctx = commandContext(io, undefined, { PWD: "/repo", ...env }, files, {
     repoModel: ports,
     stdio,
   });

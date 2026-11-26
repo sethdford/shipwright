@@ -412,4 +412,12 @@ if ! _compat_date_is_gnu; then
     fi
 fi
 
+print_test_section "budget_is_unlimited"
+for _b in 0 0.0 0.00 null ""; do
+    if budget_is_unlimited "$_b"; then assert_pass "cap '$_b' means no cap"; else assert_fail "cap '$_b' means no cap"; fi
+done
+for _b in 5 2.50 0.01; do
+    if budget_is_unlimited "$_b"; then assert_fail "cap '$_b' is enforced"; else assert_pass "cap '$_b' is enforced"; fi
+done
+
 print_test_results

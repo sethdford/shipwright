@@ -1,7 +1,8 @@
 import type { CliIO, CommandContext } from "../cli/command";
 import type { RepoDocs } from "../contexts/governance";
-import type { LineChannel, RepoModelPorts } from "../contexts/intelligence";
+import type { LineChannel, RepoModelPorts, RoutingPorts } from "../contexts/intelligence";
 import type { SafetyPorts } from "../contexts/orchestration";
+import type { BenchFactory, QualityPorts, VerifierPorts } from "../contexts/quality";
 import type { FileReader } from "../shared/kernel/ports";
 
 export interface CapturedIO extends CliIO {
@@ -20,38 +21,42 @@ export function captureIO(): CapturedIO {
   };
 }
 
-/** A command context. `files()` throws unless a reader is given (commands that read none need none). */
+/** A getter that throws unless the test supplied the dependency. */
+function given<T>(value: T | undefined, what: string): () => T {
+  return () => {
+    if (value === undefined) throw new Error(`this command was not given ${what}`);
+    return value;
+  };
+}
+
+/** A command context. Each port getter throws unless the test gave it (commands that use none need none). */
 export function commandContext(
   io: CliIO,
   safety?: SafetyPorts,
   env: Readonly<Record<string, string | undefined>> = {},
   files?: FileReader,
-  repoDocs?: RepoDocs,
-  extra: { readonly repoModel?: RepoModelPorts; readonly stdio?: LineChannel } = {},
+  ports: {
+    readonly repoDocs?: RepoDocs;
+    readonly quality?: QualityPorts;
+    readonly routing?: RoutingPorts;
+    readonly bench?: BenchFactory;
+    readonly verifier?: VerifierPorts;
+    readonly repoModel?: RepoModelPorts;
+    readonly stdio?: LineChannel;
+  } = {},
 ): CommandContext {
   return {
     io,
     version: "4.0.0",
     env,
-    safety: () => {
-      if (!safety) throw new Error("this command was not given safety ports");
-      return safety;
-    },
-    files: () => {
-      if (!files) throw new Error("this command was not given a file reader");
-      return files;
-    },
-    repoDocs: () => {
-      if (!repoDocs) throw new Error("this command was not given repository documents");
-      return repoDocs;
-    },
-    repoModel: () => {
-      if (!extra.repoModel) throw new Error("this command was not given repository model ports");
-      return extra.repoModel;
-    },
-    stdio: () => {
-      if (!extra.stdio) throw new Error("this command was not given a stdio channel");
-      return extra.stdio;
-    },
+    safety: given(safety, "safety ports"),
+    files: given(files, "a file reader"),
+    repoDocs: given(ports.repoDocs, "repository documents"),
+    quality: given(ports.quality, "quality ports"),
+    bench: given(ports.bench, "bench ports"),
+    verifier: given(ports.verifier, "verifier ports"),
+    routing: given(ports.routing, "routing ports"),
+    repoModel: given(ports.repoModel, "repository model ports"),
+    stdio: given(ports.stdio, "a stdio channel"),
   };
 }

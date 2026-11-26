@@ -695,7 +695,7 @@ write_loop_tokens() {
     local tmp_file
     tmp_file=$(mktemp "${token_file}.XXXXXX" 2>/dev/null || mktemp)
     # shellcheck disable=SC2064
-    trap "rm -f '$tmp_file'" RETURN
+    trap "rm -f '$tmp_file'; trap - RETURN" RETURN
     cat > "$tmp_file" <<TOKJSON
 {"input_tokens":${LOOP_INPUT_TOKENS},"output_tokens":${LOOP_OUTPUT_TOKENS},"cost_usd":${cost_usd},"iterations":${ITERATION:-0}}
 TOKJSON

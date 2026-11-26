@@ -76,7 +76,7 @@ pipeline_post_completion_cleanup() {
         local tmp_state
         tmp_state=$(mktemp "${TMPDIR:-/tmp}/sw-state.XXXXXX") || { warn "mktemp failed for state reset"; return 0; }
         # shellcheck disable=SC2064  # intentional expansion at definition time
-        trap "rm -f '$tmp_state'" RETURN
+        trap "rm -f '$tmp_state'; trap - RETURN" RETURN
         sed 's/^status: .*/status: idle/' "$STATE_FILE" > "$tmp_state" 2>/dev/null || true
         mv "$tmp_state" "$STATE_FILE"
     fi
@@ -728,6 +728,12 @@ pipeline_start() {
         fi
     fi
 
+    # Adaptive compute router (ADR-0014): logs a route in shadow mode; in apply mode sets the template,
+    # model, effort and attempts the caller did not set. Never blocks the run.
+    if type pipeline_route_start >/dev/null 2>&1; then
+        pipeline_route_start "$user_specified_pipeline" || true
+    fi
+
     # Check for existing pipeline
     if [[ -f "$STATE_FILE" ]]; then
         local existing_status
@@ -989,6 +995,10 @@ pipeline_start() {
         input_cost=$(awk -v tokens="$TOTAL_INPUT_TOKENS" -v rate="$(echo "$COST_MODEL_RATES" | jq -r ".${model_key}.input // 3")" 'BEGIN{printf "%.4f", (tokens / 1000000) * rate}')
         output_cost=$(awk -v tokens="$TOTAL_OUTPUT_TOKENS" -v rate="$(echo "$COST_MODEL_RATES" | jq -r ".${model_key}.output // 15")" 'BEGIN{printf "%.4f", (tokens / 1000000) * rate}')
         total_cost=$(awk -v i="$input_cost" -v o="$output_cost" 'BEGIN{printf "%.4f", i + o}')
+    fi
+
+    if type pipeline_route_finish >/dev/null 2>&1; then
+        pipeline_route_finish "$exit_code" "$total_cost" || true
     fi
 
     # Send completion notification + event

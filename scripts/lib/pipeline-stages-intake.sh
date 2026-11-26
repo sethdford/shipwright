@@ -2,6 +2,9 @@
 
 # Agents run without GitHub credentials (#8614): claude is launched through agent-exec.sh.
 SW_AGENT_EXEC="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/agent-exec.sh"
+# Prompt-injection defenses for issue text (trust boundary).
+# shellcheck source=lib/untrusted.sh
+source "$(dirname "${BASH_SOURCE[0]}")/untrusted.sh"
 # Source from pipeline-stages.sh. Requires all pipeline globals and dependencies.
 [[ -n "${_PIPELINE_STAGES_INTAKE_LOADED:-}" ]] && return 0
 _PIPELINE_STAGES_INTAKE_LOADED=1
@@ -39,6 +42,18 @@ stage_intake() {
                 return 1
             }
         fi
+
+        # Trust boundary (prompt injection): the issue title and body are untrusted. Stop on a
+        # clear injection attempt, then keep only what a maintainer sees on the rendered issue.
+        local _untrusted_reason=""
+        if ! _untrusted_reason=$(untrusted_gate_input "${ISSUE_LABELS:-}" "$GOAL" "${ISSUE_BODY:-}" 2>&1); then
+            error "Issue #$ISSUE_NUMBER: ${_untrusted_reason}"
+            emit_event "intake.untrusted_refused" "issue=$ISSUE_NUMBER"
+            return 1
+        fi
+        [[ -n "$_untrusted_reason" ]] && warn "Issue #$ISSUE_NUMBER: ${_untrusted_reason}"
+        GOAL=$(printf '%s' "$GOAL" | untrusted_sanitize | tr '\n\t' '  ')
+        ISSUE_BODY=$(printf '%s' "${ISSUE_BODY:-}" | untrusted_sanitize)
 
         GITHUB_ISSUE="#$ISSUE_NUMBER"
         info "Issue #$ISSUE_NUMBER: ${BOLD}$GOAL${RESET}"
@@ -200,7 +215,8 @@ stage_spec_generation() {
         local current_spec
         current_spec=$(cat "$spec_file")
 
-        local enhance_prompt="You are a specification analyst. Given the following auto-generated specification and issue context, enhance it by:
+        local enhance_prompt
+        enhance_prompt="You are a specification analyst. Given the following auto-generated specification and issue context, enhance it by:
 
 1. Adding missing acceptance criteria (each must have 'criterion', 'testable' (bool), and 'verification_method' fields)
 2. Adding edge cases (each must have 'scenario' and 'expected_behavior' fields)
@@ -213,9 +229,9 @@ Return ONLY valid JSON matching the same schema as the input spec. Do not add co
 ${current_spec}
 
 ## Issue Context
-Goal: ${GOAL:-}
+$(untrusted_wrap "issue title, body and labels" "Goal: ${GOAL:-}
 Body: ${ISSUE_BODY:-}
-Labels: ${ISSUE_LABELS:-}
+Labels: ${ISSUE_LABELS:-}")
 "
 
         local enhanced_spec=""
@@ -332,17 +348,18 @@ ${ISSUE_BODY:-}" "$_rm_tools")"
     fi
 
     # Build rich prompt with all available context
-    local plan_prompt="You are an autonomous development agent. Analyze this codebase and create a detailed implementation plan.
+    local plan_prompt
+    plan_prompt="You are an autonomous development agent. Analyze this codebase and create a detailed implementation plan.
 
 ## Goal
-${GOAL}
+$(untrusted_wrap "issue title" "${GOAL}")
 "
 
-    # Add issue context
+    # Add issue context (untrusted: wrapped as data, see scripts/lib/untrusted.sh)
     if [[ -n "$ISSUE_BODY" ]]; then
         plan_prompt="${plan_prompt}
 ## Issue Description
-${ISSUE_BODY}
+$(untrusted_wrap "issue body" "${ISSUE_BODY}")
 "
     fi
 
