@@ -30,8 +30,13 @@ test("only today's entries count against the cap", () => {
 
 test("spend at or over the cap blocks; so does an estimate that would cross it", () => {
   expect(evaluateBudget({ limitUsd: 10 }, [spent(10, TODAY)], NOW).allowed).toBe(false);
-  expect(evaluateBudget({ limitUsd: 10 }, [spent(8, TODAY)], NOW, 2).allowed).toBe(false);
+  expect(evaluateBudget({ limitUsd: 10 }, [spent(10, TODAY)], NOW, 0).allowed).toBe(false);
+  expect(evaluateBudget({ limitUsd: 10 }, [spent(8, TODAY)], NOW, 2.01).allowed).toBe(false);
   expect(evaluateBudget({ limitUsd: 10 }, [spent(8, TODAY)], NOW, 1.99).allowed).toBe(true);
+});
+
+test("an estimate that lands exactly on the cap is allowed (same as sw-cost.sh check-budget)", () => {
+  expect(evaluateBudget({ limitUsd: 10 }, [spent(8, TODAY)], NOW, 2).allowed).toBe(true);
 });
 
 test("a verdict with no cost data says so instead of reading as a pass", () => {

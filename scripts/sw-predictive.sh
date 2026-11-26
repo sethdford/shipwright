@@ -184,7 +184,7 @@ predictive_confirm_anomaly() {
     local tmp_file
     tmp_file=$(mktemp "${TMPDIR:-/tmp}/sw-anomaly-confirm.XXXXXX")
     # shellcheck disable=SC2064
-    trap "rm -f '$tmp_file'" RETURN
+    trap "rm -f '$tmp_file'; trap - RETURN" RETURN
     local found=false
 
     # Process file in reverse to find most recent unconfirmed
@@ -281,7 +281,7 @@ _predictive_update_alarm_rates() {
     local tmp_file
     tmp_file=$(mktemp "${TMPDIR:-/tmp}/sw-anomaly-thresh.XXXXXX")
     # shellcheck disable=SC2064
-    trap "rm -f '$tmp_file'" RETURN
+    trap "rm -f '$tmp_file'; trap - RETURN" RETURN
     jq --arg m "$metric_name" \
        --argjson crit "$new_critical" \
        --argjson warn "$new_warning" \
@@ -763,7 +763,7 @@ predict_update_baseline() {
     local tmp_file
     tmp_file=$(mktemp)
     # shellcheck disable=SC2064
-    trap "rm -f '$tmp_file'" RETURN
+    trap "rm -f '$tmp_file'; trap - RETURN" RETURN
     jq --arg key "$key" \
        --argjson val "$new_value" \
        --argjson cnt "$new_count" \

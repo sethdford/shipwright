@@ -340,7 +340,7 @@ memory_capture_pipeline() {
             local tmp_global
             tmp_global=$(mktemp)
     # shellcheck disable=SC2064
-            trap "rm -f '$tmp_global'" RETURN
+            trap "rm -f '$tmp_global'; trap - RETURN" RETURN
             jq --arg repo "$repo" \
                --arg ts "$captured_at" \
                --argjson bugs "${bug_count:-0}" \
@@ -650,7 +650,7 @@ _memory_aggregate_global() {
         local tmp_global
         tmp_global=$(mktemp "${global_file}.tmp.XXXXXX")
     # shellcheck disable=SC2064
-        trap "rm -f '$tmp_global'" RETURN
+        trap "rm -f '$tmp_global'; trap - RETURN" RETURN
         jq --arg p "$pattern" \
            --arg ts "$(now_iso)" \
            --arg cat "general" \
@@ -803,7 +803,7 @@ Return JSON only, no markdown fences, no explanation."
     local tmp_file
     tmp_file=$(mktemp)
     # shellcheck disable=SC2064
-    trap "rm -f '$tmp_file'" RETURN
+    trap "rm -f '$tmp_file'; trap - RETURN" RETURN
     jq --arg rc "$root_cause" \
        --arg fix "$fix" \
        --arg cat "$category" \
@@ -834,7 +834,7 @@ memory_capture_pattern() {
     local tmp_file
     tmp_file=$(mktemp)
     # shellcheck disable=SC2064
-    trap "rm -f '$tmp_file'" RETURN
+    trap "rm -f '$tmp_file'; trap - RETURN" RETURN
 
     case "$pattern_type" in
         project)
@@ -1353,7 +1353,7 @@ memory_update_metrics() {
     local tmp_file
     tmp_file=$(mktemp)
     # shellcheck disable=SC2064
-    trap "rm -f '$tmp_file'" RETURN
+    trap "rm -f '$tmp_file'; trap - RETURN" RETURN
     jq --arg m "$metric_name" \
        --argjson v "$value" \
        --arg ts "$(now_iso)" \
@@ -1378,7 +1378,7 @@ memory_capture_decision() {
     local tmp_file
     tmp_file=$(mktemp)
     # shellcheck disable=SC2064
-    trap "rm -f '$tmp_file'" RETURN
+    trap "rm -f '$tmp_file'; trap - RETURN" RETURN
     jq --arg type "$dec_type" \
        --arg summary "$summary" \
        --arg detail "$detail" \
@@ -1720,7 +1720,7 @@ memory_import() {
     local tmp_file
     tmp_file=$(mktemp)
     # shellcheck disable=SC2064
-    trap "rm -f '$tmp_file'" RETURN
+    trap "rm -f '$tmp_file'; trap - RETURN" RETURN
 
     jq '.patterns // {}' "$import_file" > "$tmp_file" && mv "$tmp_file" "$mem_dir/patterns.json"
     jq '.failures // {"failures":[]}' "$import_file" > "$tmp_file" && mv "$tmp_file" "$mem_dir/failures.json"

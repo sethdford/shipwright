@@ -76,7 +76,7 @@ pipeline_post_completion_cleanup() {
         local tmp_state
         tmp_state=$(mktemp "${TMPDIR:-/tmp}/sw-state.XXXXXX") || { warn "mktemp failed for state reset"; return 0; }
         # shellcheck disable=SC2064  # intentional expansion at definition time
-        trap "rm -f '$tmp_state'" RETURN
+        trap "rm -f '$tmp_state'; trap - RETURN" RETURN
         sed 's/^status: .*/status: idle/' "$STATE_FILE" > "$tmp_state" 2>/dev/null || true
         mv "$tmp_state" "$STATE_FILE"
     fi

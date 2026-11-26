@@ -151,6 +151,36 @@ assert_pass "daemon_cleanup_stale runs"
 # Verify STATE_FILE updated (completed entries pruned if any old)
 assert_file_exists "State file exists after cleanup" "$STATE_FILE"
 
+# Branch reaping: only merged pipeline/pipeline-issue-N branches, never manual or goal branches
+print_test_section "daemon_cleanup_stale branch reaping"
+_br_repo="$TEST_TEMP_DIR/br-repo"
+(
+    rm -f "$TEST_TEMP_DIR/bin/git"; hash -r
+    set -e
+    # The "origin" is a plain repo holding the branches; the daemon's clone tracks them locally.
+    git init -q -b main "$TEST_TEMP_DIR/br-origin"; cd "$TEST_TEMP_DIR/br-origin"
+    git config user.email t@t; git config user.name T
+    git commit -q --allow-empty -m base
+    git branch pipeline/pipeline-issue-5                       # merged (at main)
+    git checkout -q -b pipeline/pipeline-issue-6; git commit -q --allow-empty -m wip; git checkout -q main
+    git checkout -q -b pipeline/auth-refactor; git commit -q --allow-empty -m wip; git checkout -q main
+    git branch pipeline/pipeline-issue-7                       # merged, but in flight
+    git clone -q "$TEST_TEMP_DIR/br-origin" "$_br_repo"; cd "$_br_repo"
+    for b in pipeline/pipeline-issue-5 pipeline/pipeline-issue-6 pipeline/auth-refactor pipeline/pipeline-issue-7; do
+        git branch -q "$b" "origin/$b"
+    done
+) >/dev/null 2>&1
+init_state
+jq '.active_jobs = [{issue: 7, pid: 1}]' "$STATE_FILE" > "$STATE_FILE.tmp" && mv "$STATE_FILE.tmp" "$STATE_FILE"
+(
+    rm -f "$TEST_TEMP_DIR/bin/git"; hash -r
+    cd "$_br_repo" && NO_GITHUB=false daemon_cleanup_stale >/dev/null 2>&1
+) || true
+_left="$(git -C "$_br_repo" branch --list 'pipeline/*' --format='%(refname:short)' 2>/dev/null | sort | tr '\n' ' ')"
+_remote="$(git -C "$TEST_TEMP_DIR/br-origin" branch --list 'pipeline/*' --format='%(refname:short)' 2>/dev/null | sort | tr '\n' ' ')"
+assert_eq "only the merged, idle issue branch is deleted locally" "pipeline/auth-refactor pipeline/pipeline-issue-6 pipeline/pipeline-issue-7 " "$_left"
+assert_eq "and on the remote" "pipeline/auth-refactor pipeline/pipeline-issue-6 pipeline/pipeline-issue-7 " "$_remote"
+
 # ═══════════════════════════════════════════════════════════════════════════════
 # locked_state_update / daemon_is_inflight (used by cleanup)
 # ═══════════════════════════════════════════════════════════════════════════════
