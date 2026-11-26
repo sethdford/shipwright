@@ -20,7 +20,8 @@ const REPO = {
     "  if (!evaluateBudget(n, 3)) return;",
     "}",
   ].join("\n"),
-  "src/fleet.ts": 'import { dispatchIssue } from "./daemon";\nexport const go = () => dispatchIssue(1);\n',
+  "src/fleet.ts":
+    'import { dispatchIssue } from "./daemon";\nexport const go = () => dispatchIssue(1);\n',
   "src/budget.test.ts": 'import { evaluateBudget } from "./budget";\n',
 };
 const graph = buildGraph(modelOf(REPO));
@@ -85,7 +86,10 @@ describe("changeImpact", () => {
     expect(f?.touched.map((s) => s.name)).toEqual(["evaluateBudget"]);
     expect(f?.dependents.shown).toEqual(["src/budget.test.ts", "src/daemon.ts"]);
     expect(f?.callers).toEqual([
-      { name: "evaluateBudget", files: { shown: ["src/budget.test.ts", "src/daemon.ts"], more: 0 } },
+      {
+        name: "evaluateBudget",
+        files: { shown: ["src/budget.test.ts", "src/daemon.ts"], more: 0 },
+      },
     ]);
     expect(f?.tests).toEqual([{ path: "src/budget.test.ts", inChange: false }]);
     expect(impact.untested).toEqual(["src/budget.ts"]);
@@ -94,12 +98,15 @@ describe("changeImpact", () => {
 
   test("a deleted file that is still imported", () => {
     const after = buildGraph(modelOf({ "src/fleet.ts": REPO["src/fleet.ts"] }));
-    const patch = "diff --git a/src/daemon.ts b/src/daemon.ts\n--- a/src/daemon.ts\n+++ /dev/null\n";
+    const patch =
+      "diff --git a/src/daemon.ts b/src/daemon.ts\n--- a/src/daemon.ts\n+++ /dev/null\n";
     const impact = changeImpact(after, parseUnifiedDiff(patch));
     expect(impact.orphaned).toEqual([
       { path: "src/daemon.ts", importers: { shown: ["src/fleet.ts"], more: 0 } },
     ]);
-    expect(renderImpact(impact)).toContain("DELETED src/daemon.ts is still imported by: src/fleet.ts");
+    expect(renderImpact(impact)).toContain(
+      "DELETED src/daemon.ts is still imported by: src/fleet.ts",
+    );
   });
 
   test("a change with its test edited is not flagged untested; render names everything", () => {
@@ -114,7 +121,8 @@ describe("changeImpact", () => {
   });
 
   test("nothing indexed: no section", () => {
-    const patch = "diff --git a/README.md b/README.md\n--- a/README.md\n+++ b/README.md\n@@ -1 +1 @@\n+x\n";
+    const patch =
+      "diff --git a/README.md b/README.md\n--- a/README.md\n+++ b/README.md\n@@ -1 +1 @@\n+x\n";
     expect(renderImpact(changeImpact(graph, parseUnifiedDiff(patch)))).toBe("");
   });
 });

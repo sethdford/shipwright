@@ -23,10 +23,9 @@ export {
 export { RepoSession, type Snapshot } from "./application/session";
 export { callTool, toolSpecs } from "./application/tools";
 export { decideRoute, fitBudget, HISTORY_RULE, UNDER_PROVISIONED } from "./domain/decide";
-export { difficultyPrior, tierOfScore, tierUp } from "./domain/difficulty";
 export { type ChangedFile, parseUnifiedDiff } from "./domain/diff";
+export { difficultyPrior, tierOfScore, tierUp } from "./domain/difficulty";
 export { extractFacts } from "./domain/extract";
-export { type ChangeImpact, changeImpact, type FileImpact } from "./domain/impact";
 export {
   extractFeatures,
   ISSUE_KINDS,
@@ -37,6 +36,7 @@ export {
   TIERS,
   type Tier,
 } from "./domain/features";
+export { type ChangeImpact, changeImpact, type FileImpact } from "./domain/impact";
 export {
   type AuthorStat,
   type FileEntry,

@@ -65,7 +65,10 @@ assert_contains "the brief is the command's .brief" "$brief" "## Repository mode
 assert_contains "the command gets the absolute repository root" "$(tr '\n' ' ' < "$BUN_LOG")" "repomodel brief --root ${repo_abs} --task"
 assert_contains "and --with-tools when the tools are attached" "$(tr '\n' ' ' < "$BUN_LOG")" "--json --with-tools"
 assert_contains "the goal is the task text" "$(cat "$TASK_COPY")" "Fix the budget cap"
-assert_contains "an event records the arm and the files named" "$(cat "$EVENTS_LOG")" "repo_model.brief arm=on files=src/a.ts,src/b.ts"
+assert_contains "an event records the arm and the files named" "$(cat "$EVENTS_LOG")" "repo_model.brief arm=on files=src/a.ts,src/b.ts semantic=on"
+reset_logs
+SHIPWRIGHT_REPO_MODEL_SEMANTIC=off repo_model_brief_section "x" >/dev/null
+assert_contains "and the semantic arm" "$(cat "$EVENTS_LOG")" "semantic=off"
 reset_logs
 assert_eq "off: no brief" "" "$(SHIPWRIGHT_REPO_MODEL=off repo_model_brief_section "x")"
 assert_eq "off: the command does not run" "" "$(cat "$BUN_LOG")"

@@ -40,7 +40,10 @@ DESCRIPTION
   mcp       A read-only MCP server on stdio (server name "repomodel") with the same queries as tools.
 
 ABLATION (for paired eval runs)
-  SHIPWRIGHT_REPO_MODEL=off leaves the brief and the impact section out, and the pipeline does not attach the MCP server.
+  SHIPWRIGHT_REPO_MODEL=off leaves the brief and the impact section out, and the pipeline does not attach the
+  MCP server.
+  SHIPWRIGHT_REPO_MODEL_SEMANTIC=off keeps the model but drops its semantic channel (LSA over the files) from
+  localize, map and brief, leaving lexical search, mentions and the code graph.
 
 EXIT CODES
   0  done      1  the repository could not be read      2  usage error`;
@@ -56,6 +59,15 @@ const TOOL_OF: Readonly<Record<string, { tool: string; arg: string }>> = {
 };
 
 const SUBCOMMANDS = [...Object.keys(TOOL_OF), "build", "map", "localize", "brief", "impact", "mcp"];
+
+/** SHIPWRIGHT_REPO_MODEL_SEMANTIC=off turns the semantic channel off (the lexical-only ablation arm). */
+function sessionOf(ctx: CommandContext, a: ModelArgs): RepoSession {
+  return new RepoSession(
+    ctx.repoModel(),
+    rootOf(ctx, a),
+    !envOff(ctx.env.SHIPWRIGHT_REPO_MODEL_SEMANTIC),
+  );
+}
 
 async function build(ctx: CommandContext, a: ModelArgs): Promise<number> {
   const r = await refreshModel(ctx.repoModel(), rootOf(ctx, a));
@@ -75,7 +87,7 @@ async function query(
   tool: string,
   args: Record<string, unknown>,
 ) {
-  const out = await callTool(new RepoSession(ctx.repoModel(), rootOf(ctx, a)), tool, args);
+  const out = await callTool(sessionOf(ctx, a), tool, args);
   if (out.isError) {
     ctx.io.err(`✗ ${out.text}`);
     return out.text.startsWith("Repository model unavailable") ? 1 : 2;
@@ -98,7 +110,7 @@ async function brief(ctx: CommandContext, a: ModelArgs): Promise<number> {
   }
   const task = await readTask(ctx, a);
   if (typeof task === "number") return task;
-  const session = new RepoSession(ctx.repoModel(), rootOf(ctx, a));
+  const session = sessionOf(ctx, a);
   const r = await buildBrief(session, task, a.switches.has("--with-tools"));
   if (!r.ok) return adapterFailure(ctx.io, "repository model", r.error);
   if (a.switches.has("--json")) {
@@ -123,7 +135,7 @@ async function impact(ctx: CommandContext, a: ModelArgs): Promise<number> {
   const file = a.values["--diff"] ?? "";
   const patch = await ctx.files().readText(file);
   if (!patch.ok) return adapterFailure(ctx.io, `read ${file}`, patch.error);
-  const r = await analyzeChange(new RepoSession(ctx.repoModel(), rootOf(ctx, a)), patch.value);
+  const r = await analyzeChange(sessionOf(ctx, a), patch.value);
   if (!r.ok) return adapterFailure(ctx.io, "repository model", r.error);
   if (json) ctx.io.out(JSON.stringify({ text: r.value.text, ...r.value.impact, arm: "on" }));
   else if (r.value.text.length > 0) ctx.io.out(r.value.text);
@@ -131,7 +143,7 @@ async function impact(ctx: CommandContext, a: ModelArgs): Promise<number> {
 }
 
 async function serve(ctx: CommandContext, a: ModelArgs): Promise<number> {
-  const session = new RepoSession(ctx.repoModel(), rootOf(ctx, a));
+  const session = sessionOf(ctx, a);
   const channel = ctx.stdio();
   for await (const line of channel.lines()) {
     const out = await handleMcpLine(session, ctx.version, line);

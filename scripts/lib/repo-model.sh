@@ -28,6 +28,14 @@ repo_model_arm() {
     if repo_model_enabled; then echo "on"; else echo "off"; fi
 }
 
+# The semantic channel's arm (SHIPWRIGHT_REPO_MODEL_SEMANTIC, same values), recorded with each brief.
+repo_model_semantic_arm() {
+    case "$(printf '%s' "${SHIPWRIGHT_REPO_MODEL_SEMANTIC:-on}" | tr '[:upper:]' '[:lower:]' | tr -d '[:space:]')" in
+        off|0|false|no) echo "off" ;;
+        *) echo "on" ;;
+    esac
+}
+
 _repo_model_cli_path() {
     printf '%s\n' "${SW_TS_CLI:-$(cd "${_REPO_MODEL_DIR}/../.." && pwd)/src/cli.ts}"
 }
@@ -61,7 +69,7 @@ repo_model_brief_section() {
     [[ "$tools" == "--with-tools" ]] && args+=(--with-tools)
     if out="$(_repo_model_cli "${args[@]}" 2>/dev/null)"; then
         files="$(printf '%s' "$out" | jq -r '[.files[]] | join(",")' 2>/dev/null || true)"
-        _repo_model_event "repo_model.brief" "arm=on" "files=${files}" \
+        _repo_model_event "repo_model.brief" "arm=on" "files=${files}" "semantic=$(repo_model_semantic_arm)" \
             "extracted=$(printf '%s' "$out" | jq -r '.stats.extracted // 0' 2>/dev/null || echo 0)"
         printf '%s' "$out" | jq -r '.brief // ""' 2>/dev/null || true
     else

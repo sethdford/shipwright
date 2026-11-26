@@ -37,6 +37,7 @@ export interface LocalizedFile {
 
 interface Evidence {
   lexical: number;
+  semantic: number;
   named: boolean;
   terms: Set<string>;
   symbols: Map<string, SymbolDef>;
@@ -45,7 +46,7 @@ interface Evidence {
 function evidenceFor(map: Map<string, Evidence>, path: string): Evidence {
   let e = map.get(path);
   if (!e) {
-    e = { lexical: 0, named: false, terms: new Set(), symbols: new Map() };
+    e = { lexical: 0, semantic: 0, named: false, terms: new Set(), symbols: new Map() };
     map.set(path, e);
   }
   return e;
@@ -92,9 +93,23 @@ function lexical(index: Bm25Index<Entity>, text: string, ev: Map<string, Evidenc
   }
 }
 
+/** How much the semantic channel counts, as a seed and in the final score, next to lexical matches (1). */
+const SEM_SEED = 0.5;
+const SEM_SCORE = 0.4;
+
+/** Paths the semantic index ranks close to the text: scores scaled so the best is 1. */
+function semanticHits(
+  hits: readonly { readonly path: string; readonly score: number }[],
+  ev: Map<string, Evidence>,
+): void {
+  const top = hits[0]?.score ?? 1;
+  for (const h of hits) evidenceFor(ev, h.path).semantic = h.score / top;
+}
+
 function seedsOf(ev: ReadonlyMap<string, Evidence>): Map<string, number> {
   const seeds = new Map<string, number>();
-  for (const [path, e] of ev) seeds.set(path, (e.named ? 2 : 0) + e.lexical);
+  for (const [path, e] of ev)
+    seeds.set(path, (e.named ? 2 : 0) + e.lexical + SEM_SEED * e.semantic);
   return seeds;
 }
 
@@ -102,6 +117,7 @@ function whyOf(e: Evidence | undefined, graphRank: number): string[] {
   const why: string[] = [];
   if (e?.named) why.push("named in the task");
   if (e && e.terms.size > 0) why.push(`matches ${[...e.terms].slice(0, 4).join(", ")}`);
+  else if (e && e.semantic >= 0.6) why.push("related in meaning (shared vocabulary)");
   if (graphRank > 0.5) why.push("close in the code graph to the matches");
   return why;
 }
@@ -114,18 +130,20 @@ function maxOf(values: Iterable<number>): number {
 
 /**
  * Hierarchical localization (Agentless, LocAgent): find the files and then the definitions a task is about.
- * Lexical hits and outright mentions seed a personalized PageRank, so files the hits depend on, or that depend
- * on them, rise too. Returns at most `limit` files, best first.
+ * Lexical hits, outright mentions and (when given) semantic neighbours seed a personalized PageRank, so files
+ * the hits depend on, or that depend on them, rise too. Returns at most `limit` files, best first.
  */
 export function localize(
   graph: RepoGraph,
   index: Bm25Index<Entity>,
   text: string,
   limit = 10,
+  semantic: readonly { readonly path: string; readonly score: number }[] = [],
 ): LocalizedFile[] {
   const ev = new Map<string, Evidence>();
   mentions(graph, text, ev);
   lexical(index, text, ev);
+  semanticHits(semantic, ev);
   if (ev.size === 0) return [];
   const rank = rankFiles(graph, seedsOf(ev));
   const topRank = maxOf(rank.values());
@@ -133,7 +151,8 @@ export function localize(
   for (const f of graph.model.files) {
     const e = ev.get(f.path);
     const g = (rank.get(f.path) ?? 0) / topRank;
-    const score = (e?.named ? 1 : 0) + 0.6 * (e?.lexical ?? 0) + 0.4 * g;
+    const score =
+      (e?.named ? 1 : 0) + 0.6 * (e?.lexical ?? 0) + SEM_SCORE * (e?.semantic ?? 0) + 0.4 * g;
     if (score < 0.05 || (!e && g < 0.2)) continue;
     const symbols = e ? [...e.symbols.values()] : f.symbols.filter((s) => s.exported).slice(0, 3);
     out.push({ path: f.path, score, why: whyOf(e, g), symbols: symbols.slice(0, 6), test: f.test });
