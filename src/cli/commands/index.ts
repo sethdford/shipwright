@@ -1,11 +1,14 @@
 import type { Command } from "../command";
 import { breakerCommand } from "./breaker";
 import { budgetCommand } from "./budget";
+import { evalCommand } from "./eval";
 import { failureCommand } from "./failure";
 import { gatesCommand } from "./gates";
+import { governanceCommand } from "./governance";
 import { helloCommand } from "./hello";
 import { intakeCommand } from "./intake";
 import { pauseCommand, pausedCommand, resumeCommand } from "./pause";
+import { scorecardCommand } from "./scorecard";
 
 export const commands: readonly Command[] = [
   helloCommand,
@@ -17,6 +20,9 @@ export const commands: readonly Command[] = [
   intakeCommand,
   gatesCommand,
   failureCommand,
+  scorecardCommand,
+  evalCommand,
+  governanceCommand,
 ];
 
 export function findCommand(

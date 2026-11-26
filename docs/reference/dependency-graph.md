@@ -17,6 +17,11 @@ flowchart LR
     adapters_store["adapters/store"]
     adapters_tmux["adapters/tmux"]
   end
+  subgraph ctx_governance["governance"]
+    governance["governance"]
+    governance_application["governance/application"]
+    governance_domain["governance/domain"]
+  end
   subgraph ctx_learning["learning"]
     learning["learning"]
     learning_application["learning/application"]
@@ -32,6 +37,11 @@ flowchart LR
     platform_application["platform/application"]
     platform_domain["platform/domain"]
   end
+  subgraph ctx_quality["quality"]
+    quality["quality"]
+    quality_application["quality/application"]
+    quality_domain["quality/domain"]
+  end
   cli["cli"]
   integrations["integrations"]
   kernel["kernel"]
@@ -40,22 +50,33 @@ flowchart LR
   adapters --> kernel
   adapters_agent --> kernel
   adapters_git --> adapters_process
+  adapters_git --> governance
   adapters_git --> kernel
   adapters_github --> adapters_process
   adapters_github --> integrations
   adapters_github --> kernel
   adapters_github --> orchestration
+  adapters_github --> quality
   adapters_process --> kernel
   adapters_state --> kernel
   adapters_state --> orchestration
+  adapters_state --> quality
   adapters_store --> kernel
   adapters_tmux --> adapters_process
   adapters_tmux --> kernel
+  cli --> governance
   cli --> kernel
   cli --> learning
   cli --> main
   cli --> orchestration
   cli --> platform
+  cli --> quality
+  governance --> governance_application
+  governance --> governance_domain
+  governance --> kernel
+  governance_application --> governance
+  governance_application --> governance_domain
+  governance_application --> kernel
   integrations --> kernel
   learning --> learning_application
   learning --> learning_domain
@@ -63,11 +84,13 @@ flowchart LR
   learning_application --> learning_domain
   learning_domain --> kernel
   main --> adapters
+  main --> adapters_git
   main --> adapters_github
   main --> adapters_process
   main --> adapters_state
   main --> cli
   main --> orchestration
+  main --> quality
   main --> shutdown
   orchestration --> integrations
   orchestration --> kernel
@@ -79,4 +102,10 @@ flowchart LR
   orchestration_application --> orchestration_domain
   platform --> platform_application
   platform_application --> platform_domain
+  quality --> kernel
+  quality --> quality_application
+  quality --> quality_domain
+  quality_application --> kernel
+  quality_application --> quality
+  quality_application --> quality_domain
 ```

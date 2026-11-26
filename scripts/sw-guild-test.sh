@@ -93,6 +93,14 @@ else
     assert_fail "guild config is valid JSON"
 fi
 
+# created_at is stamped on every platform (GNU sed used to leave the "NOW" placeholder)
+_created="$(jq -r '.created_at' "$HOME/.shipwright/guilds/config.json" 2>/dev/null)"
+if [[ "$_created" =~ ^[0-9]{4}-[0-9]{2}-[0-9]{2}T ]]; then
+    assert_pass "guild config created_at is a timestamp"
+else
+    assert_fail "guild config created_at is a timestamp" "got: $_created"
+fi
+
 # ─── Test 8: Data file created ───────────────────────────────────────────────
 if [[ -f "$HOME/.shipwright/guilds/guilds.json" ]]; then
     assert_pass "guilds.json data file created"

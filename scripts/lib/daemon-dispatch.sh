@@ -5,6 +5,7 @@ _DAEMON_DISPATCH_LOADED=1
 # shellcheck source=safety-gates.sh
 source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/safety-gates.sh"
 source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/compat.sh"
+_DAEMON_DISPATCH_LIB_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 # Defaults for variables normally set by sw-daemon.sh (safe under set -u).
 DAEMON_DIR="${DAEMON_DIR:-${HOME}/.shipwright}"
@@ -289,6 +290,20 @@ daemon_spawn_pipeline() {
     spawn_in_tmux=$(_smart_int "spawn_in_tmux" 1)
     echo -e "\n\n===== Pipeline run $(date -u +%Y-%m-%dT%H:%M:%SZ) =====" >> "$LOG_DIR/issue-${issue_num}.log" 2>/dev/null || true
 
+    # Both modes run the pipeline under daemon-pipeline-runner.sh, which lives exactly as long as the
+    # pipeline and records its exit code in issue-N.exit. The daemon tracks the runner's PID. (The
+    # tmux path used to type a command string into an interactive shell and track the shell: the
+    # job never looked finished, was force-reaped after an hour even mid-run, and its outcome was
+    # guessed from the log.) Arguments go to tmux as argv, never as a shell string.
+    # tmux -c silently falls back to its own directory, so a missing work dir must stop the spawn.
+    if [[ ! -d "$work_dir" ]]; then
+        daemon_log ERROR "Work directory missing for issue #${issue_num}: ${work_dir}"
+        return 1
+    fi
+    local _runner="${_DAEMON_DISPATCH_LIB_DIR}/daemon-pipeline-runner.sh"
+    local _exit_file="$LOG_DIR/issue-${issue_num}.exit"
+    local _log_file="$LOG_DIR/issue-${issue_num}.log"
+    rm -f "$_exit_file"
     local pid=0
     if [[ "$spawn_in_tmux" == "1" ]] && command -v tmux >/dev/null 2>&1; then
         # Spawn in tmux window for visibility
@@ -297,27 +312,35 @@ daemon_spawn_pipeline() {
         if ! tmux has-session -t "$_tmux_session" 2>/dev/null; then
             tmux new-session -d -s "$_tmux_session" -n "daemon" 2>/dev/null || true
         fi
-        tmux new-window -t "$_tmux_session" -n "$_tmux_win" 2>/dev/null || true
-        local _tmux_cmd="cd '${work_dir}' && '${SCRIPT_DIR}/sw-pipeline.sh' ${pipeline_args[*]} 2>&1 | tee -a '${LOG_DIR}/issue-${issue_num}.log'"
-        tmux send-keys -t "${_tmux_session}:${_tmux_win}" "$_tmux_cmd" Enter 2>/dev/null || true
+        # The window gets the tmux server's environment, not the daemon's: pass what the pipeline reads.
+        local _tmux_env=()
+        [[ -n "${INTELLIGENCE_ISSUE_TYPE:-}" ]] && _tmux_env+=(-e "INTELLIGENCE_ISSUE_TYPE=${INTELLIGENCE_ISSUE_TYPE}")
+        [[ -n "${CLAUDE_MODEL:-}" ]] && _tmux_env+=(-e "CLAUDE_MODEL=${CLAUDE_MODEL}")
+        local _pane_info=""
+        _pane_info=$(tmux new-window -d -P -F '#{pane_id} #{pane_pid}' -t "$_tmux_session" -n "$_tmux_win" \
+            -c "$work_dir" ${_tmux_env[@]+"${_tmux_env[@]}"} \
+            bash "$_runner" "$_exit_file" "$_log_file" "${SCRIPT_DIR}/sw-pipeline.sh" "${pipeline_args[@]}" 2>/dev/null) || _pane_info=""
+        local _pane_id="${_pane_info%% *}"
+        pid="${_pane_info##* }"
+        if [[ -z "$_pane_info" || ! "$pid" =~ ^[0-9]+$ ]]; then
+            daemon_log ERROR "Failed to open a tmux window for issue #${issue_num}"
+            return 1
+        fi
         # Store heartbeat
         local _hb_dir="$HOME/.shipwright/heartbeats"
         mkdir -p "$_hb_dir"
-        local _pane_id
-        _pane_id=$(tmux list-panes -t "${_tmux_session}:${_tmux_win}" -F '#{pane_id}' 2>/dev/null | head -1 || true)
-        cat > "${_hb_dir}/pipeline-${issue_num}.json" <<HB_EOF
-{"job_id":"pipeline-${issue_num}","pane_id":"${_pane_id:-}","window":"${_tmux_win}","session":"${_tmux_session}","status":"running","started_at":"$(date -u +%Y-%m-%dT%H:%M:%SZ)"}
-HB_EOF
-        # Get PID from tmux pane
-        pid=$(tmux list-panes -t "${_tmux_session}:${_tmux_win}" -F '#{pane_pid}' 2>/dev/null | head -1 || echo "0")
+        jq -n --arg job "pipeline-${issue_num}" --arg pane "$_pane_id" --arg win "$_tmux_win" \
+            --arg sess "$_tmux_session" --arg at "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
+            '{job_id: $job, pane_id: $pane, window: $win, session: $sess, status: "running", started_at: $at}' \
+            > "${_hb_dir}/pipeline-${issue_num}.json" 2>/dev/null || true
         daemon_log INFO "Pipeline spawned in tmux: ${_tmux_session}:${_tmux_win}"
     else
-        # Fallback: background subprocess (original behavior)
+        # Background subprocess
         (
             trap '' HUP
             cd "$work_dir" || exit 1
-            exec "$SCRIPT_DIR/sw-pipeline.sh" "${pipeline_args[@]}"
-        ) >> "$LOG_DIR/issue-${issue_num}.log" 2>&1 200>&- &
+            exec bash "$_runner" "$_exit_file" "$_log_file" "$SCRIPT_DIR/sw-pipeline.sh" "${pipeline_args[@]}"
+        ) >/dev/null 2>&1 200>&- &
         pid=$!
     fi
 
@@ -382,6 +405,34 @@ daemon_track_job() {
 
 # ─── Reap Completed Jobs ────────────────────────────────────────────────────
 
+# daemon_job_outcome <issue> — the exit code of the issue's latest run: the runner's exit file, else
+# the result line of the latest run in the log (only the part after the last "===== Pipeline run"
+# header, so an earlier run's success never counts). Prints "unknown" when neither says.
+daemon_job_outcome() {
+    local issue_num="$1" exit_file="$LOG_DIR/issue-${1}.exit" log="$LOG_DIR/issue-${1}.log" rc="" last=""
+    if [[ -f "$exit_file" ]]; then
+        rc="$(head -1 "$exit_file" 2>/dev/null || true)"
+        if [[ "$rc" =~ ^[0-9]+$ ]]; then
+            printf '%s\n' "$rc"
+            return 0
+        fi
+    fi
+    if [[ -f "$log" ]]; then
+        last="$(awk '/^===== Pipeline run / { buf = ""; next } { buf = buf $0 "\n" } END { printf "%s", buf }' "$log" 2>/dev/null || true)"
+        last="$(printf '%s' "$last" | sed "s/$(printf '\033')\[[0-9;]*m//g")"
+        # "Pipeline complete!" is what sw-pipeline prints; "completed successfully" is sw-autonomous.
+        if printf '%s\n' "$last" | grep -E 'Pipeline complete!|Pipeline completed successfully' >/dev/null; then
+            echo 0
+            return 0
+        fi
+        if printf '%s\n' "$last" | grep -E 'Pipeline failed|ERROR.*stage.*failed|exited with status' >/dev/null; then
+            echo 1
+            return 0
+        fi
+    fi
+    echo unknown
+}
+
 daemon_reap_completed() {
     if [[ ! -f "$STATE_FILE" ]]; then
         return
@@ -413,7 +464,7 @@ daemon_reap_completed() {
             #   Tier 2 (>1 hour): Force-reap if process doesn't match
             local _proc_cmd _is_pipeline=false
             _proc_cmd=$(ps -p "$pid" -o command= 2>/dev/null || true)
-            if [[ -n "$_proc_cmd" ]] && echo "$_proc_cmd" | grep >/dev/null -E 'sw-pipeline|sw-loop|claude|shipwright' 2>/dev/null; then
+            if [[ -n "$_proc_cmd" ]] && echo "$_proc_cmd" | grep >/dev/null -E 'daemon-pipeline-runner|sw-pipeline|sw-loop|claude|shipwright' 2>/dev/null; then
                 _is_pipeline=true
             fi
 
@@ -461,18 +512,10 @@ daemon_reap_completed() {
         local exit_code=0
         wait "$pid" 2>/dev/null || exit_code=$?
         if [[ "$exit_code" -eq 127 ]]; then
-            # Process already reaped — check log file for real outcome
-            local issue_log="$LOG_DIR/issue-${issue_num}.log"
-            if [[ -f "$issue_log" ]]; then
-                if grep -q "Pipeline completed successfully" "$issue_log" 2>/dev/null; then
-                    exit_code=0
-                elif grep -q "Pipeline failed\|ERROR.*stage.*failed\|exited with status" "$issue_log" 2>/dev/null; then
-                    exit_code=1
-                else
-                    daemon_log WARN "Could not determine exit code for issue #${issue_num} (PID ${pid} already reaped) — marking as failure"
-                    exit_code=1
-                fi
-            else
+            # Not our child (tmux window, or a restarted daemon): the runner's exit file is the outcome.
+            exit_code="$(daemon_job_outcome "$issue_num")"
+            if [[ "$exit_code" == "unknown" ]]; then
+                daemon_log WARN "Could not determine exit code for issue #${issue_num} (PID ${pid} not a child, no exit file or result line) — marking as failure"
                 exit_code=1
             fi
         fi
@@ -524,11 +567,12 @@ daemon_reap_completed() {
                             _detected=$(git remote get-url origin 2>/dev/null | sed 's|.*github.com[:/]\(.*\)\.git$|\1|' || true)
                             if [[ -n "$_detected" ]]; then
                                 local _owner="${_detected%%/*}" _repo="${_detected##*/}"
-                                gh api "repos/${_owner}/${_repo}/check-runs/${_run_id}" \
+                                # _timeout, not `gh api --timeout` (no such flag: the call always failed).
+                                _timeout 30 gh api "repos/${_owner}/${_repo}/check-runs/${_run_id}" \
                                     --method PATCH \
                                     --field status=completed \
                                     --field conclusion=cancelled \
-                                    --silent --timeout 30 2>/dev/null || true
+                                    --silent 2>/dev/null || true
                             fi
                         fi
                     done < <(jq -r 'keys[]' "$check_ids_file" 2>/dev/null || true)

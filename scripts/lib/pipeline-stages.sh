@@ -5,6 +5,9 @@
 [[ -n "${_PIPELINE_STAGES_LOADED:-}" ]] && return 0
 _PIPELINE_STAGES_LOADED=1
 
+# Prompt-injection defenses for issue text. Required: no fallback, the stages fail closed.
+source "$(dirname "${BASH_SOURCE[0]}")/untrusted.sh"
+
 # Source skill registry for dynamic prompt injection
 _SKILL_REGISTRY_SH="${SCRIPT_DIR}/lib/skill-registry.sh"
 [[ -f "$_SKILL_REGISTRY_SH" ]] && source "$_SKILL_REGISTRY_SH"
@@ -152,14 +155,27 @@ guard_prompt_size() {
 # ─── Safe git helpers ────────────────────────────────────────────────────────
 # BASE_BRANCH may not exist locally (e.g. --local mode with no remote).
 # These helpers return empty output instead of crashing under set -euo pipefail.
-_safe_base_log() {
+# Base ref for diffs and logs: origin/<base> when present (CI checkouts have no local
+# base branch, which used to fall back to HEAD~5), else the local branch.
+_safe_base_ref() {
     local branch="${BASE_BRANCH:-main}"
+    if git rev-parse --verify --quiet "origin/${branch}" >/dev/null 2>&1; then
+        echo "origin/${branch}"
+    else
+        echo "$branch"
+    fi
+}
+
+_safe_base_log() {
+    local branch
+    branch=$(_safe_base_ref)
     git rev-parse --verify "$branch" >/dev/null 2>&1 || { echo ""; return 0; }
     git log "$@" "${branch}..HEAD" 2>/dev/null || true
 }
 
 _safe_base_diff() {
-    local branch="${BASE_BRANCH:-main}"
+    local branch
+    branch=$(_safe_base_ref)
     git rev-parse --verify "$branch" >/dev/null 2>&1 || { git diff HEAD~5 "$@" 2>/dev/null || true; return 0; }
     git diff "${branch}...HEAD" "$@" 2>/dev/null || true
 }
@@ -197,6 +213,9 @@ _PIPELINE_STAGES_INTAKE_SH="${SCRIPT_DIR}/lib/pipeline-stages-intake.sh"
 
 _PIPELINE_STAGES_BUILD_SH="${SCRIPT_DIR}/lib/pipeline-stages-build.sh"
 [[ -f "$_PIPELINE_STAGES_BUILD_SH" ]] && source "$_PIPELINE_STAGES_BUILD_SH"
+
+# ADR-0010: the governance checklist for the review prompt.
+[[ -f "${SCRIPT_DIR}/lib/governance-brief.sh" ]] && source "${SCRIPT_DIR}/lib/governance-brief.sh"
 
 _PIPELINE_STAGES_REVIEW_SH="${SCRIPT_DIR}/lib/pipeline-stages-review.sh"
 [[ -f "$_PIPELINE_STAGES_REVIEW_SH" ]] && source "$_PIPELINE_STAGES_REVIEW_SH"
