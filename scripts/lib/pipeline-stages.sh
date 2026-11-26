@@ -152,14 +152,27 @@ guard_prompt_size() {
 # ─── Safe git helpers ────────────────────────────────────────────────────────
 # BASE_BRANCH may not exist locally (e.g. --local mode with no remote).
 # These helpers return empty output instead of crashing under set -euo pipefail.
-_safe_base_log() {
+# Base ref for diffs and logs: origin/<base> when present (CI checkouts have no local
+# base branch, which used to fall back to HEAD~5), else the local branch.
+_safe_base_ref() {
     local branch="${BASE_BRANCH:-main}"
+    if git rev-parse --verify --quiet "origin/${branch}" >/dev/null 2>&1; then
+        echo "origin/${branch}"
+    else
+        echo "$branch"
+    fi
+}
+
+_safe_base_log() {
+    local branch
+    branch=$(_safe_base_ref)
     git rev-parse --verify "$branch" >/dev/null 2>&1 || { echo ""; return 0; }
     git log "$@" "${branch}..HEAD" 2>/dev/null || true
 }
 
 _safe_base_diff() {
-    local branch="${BASE_BRANCH:-main}"
+    local branch
+    branch=$(_safe_base_ref)
     git rev-parse --verify "$branch" >/dev/null 2>&1 || { git diff HEAD~5 "$@" 2>/dev/null || true; return 0; }
     git diff "${branch}...HEAD" "$@" 2>/dev/null || true
 }
