@@ -37,6 +37,8 @@ fi
 # Cross-pipeline discovery (learnings from other pipeline runs)
 [[ -f "$SCRIPT_DIR/sw-discovery.sh" ]] && source "$SCRIPT_DIR/sw-discovery.sh" 2>/dev/null || true
 # Source loop sub-modules for modular iteration management
+# shellcheck source=lib/claude-usage.sh
+source "$SCRIPT_DIR/lib/claude-usage.sh"  # accumulate_loop_tokens
 [[ -f "$SCRIPT_DIR/lib/loop-iteration.sh" ]] && source "$SCRIPT_DIR/lib/loop-iteration.sh"
 [[ -f "$SCRIPT_DIR/lib/governance-brief.sh" ]] && source "$SCRIPT_DIR/lib/governance-brief.sh"  # ADR-0010
 [[ -f "$SCRIPT_DIR/lib/repo-model.sh" ]] && source "$SCRIPT_DIR/lib/repo-model.sh"  # ADR-0016
@@ -568,57 +570,6 @@ select_audit_model() {
         fi
     fi
     echo "$default_model"
-}
-
-# ─── Token Accumulation ─────────────────────────────────────────────────────
-# Parse token counts from Claude CLI JSON output and accumulate running totals.
-# With --output-format json, the output is a JSON array containing a "result"
-# object with usage.input_tokens, usage.output_tokens, and total_cost_usd.
-accumulate_loop_tokens() {
-    local log_file="$1"
-    [[ ! -f "$log_file" ]] && return 0
-
-    # If jq is available and the file looks like JSON, parse structured output
-    if command -v jq >/dev/null 2>&1 && head -c1 "$log_file" 2>/dev/null | grep >/dev/null '\['; then
-        local input_tok output_tok cache_read cache_create cost_usd
-        # The result object is the last element in the JSON array
-        input_tok=$(jq -r '.[-1].usage.input_tokens // 0' "$log_file" 2>/dev/null || echo "0")
-        output_tok=$(jq -r '.[-1].usage.output_tokens // 0' "$log_file" 2>/dev/null || echo "0")
-        cache_read=$(jq -r '.[-1].usage.cache_read_input_tokens // 0' "$log_file" 2>/dev/null || echo "0")
-        cache_create=$(jq -r '.[-1].usage.cache_creation_input_tokens // 0' "$log_file" 2>/dev/null || echo "0")
-        cost_usd=$(jq -r '.[-1].total_cost_usd // 0' "$log_file" 2>/dev/null || echo "0")
-
-        LOOP_INPUT_TOKENS=$(( LOOP_INPUT_TOKENS + ${input_tok:-0} + ${cache_read:-0} + ${cache_create:-0} ))
-        LOOP_OUTPUT_TOKENS=$(( LOOP_OUTPUT_TOKENS + ${output_tok:-0} ))
-        # Accumulate cost in millicents for integer arithmetic
-        if [[ -n "$cost_usd" && "$cost_usd" != "0" && "$cost_usd" != "null" ]]; then
-            local cost_millicents
-            cost_millicents=$(echo "$cost_usd" | awk '{printf "%.0f", $1 * 100000}' 2>/dev/null || echo "0")
-            LOOP_COST_MILLICENTS=$(( ${LOOP_COST_MILLICENTS:-0} + ${cost_millicents:-0} ))
-        else
-            # Estimate cost from tokens when Claude doesn't provide it (rates per million tokens)
-            local total_in total_out
-            total_in=$(( ${input_tok:-0} + ${cache_read:-0} + ${cache_create:-0} ))
-            total_out=${output_tok:-0}
-            local cost=0
-            case "${MODEL:-${CLAUDE_MODEL:-sonnet}}" in
-                *opus*)   cost=$(awk -v i="$total_in" -v o="$total_out" 'BEGIN{printf "%.6f", (i * 15 + o * 75) / 1000000}') ;;
-                *sonnet*) cost=$(awk -v i="$total_in" -v o="$total_out" 'BEGIN{printf "%.6f", (i * 3 + o * 15) / 1000000}') ;;
-                *haiku*)  cost=$(awk -v i="$total_in" -v o="$total_out" 'BEGIN{printf "%.6f", (i * 0.25 + o * 1.25) / 1000000}') ;;
-                *)       cost=$(awk -v i="$total_in" -v o="$total_out" 'BEGIN{printf "%.6f", (i * 3 + o * 15) / 1000000}') ;;
-            esac
-            cost_millicents=$(echo "$cost" | awk '{printf "%.0f", $1 * 100000}' 2>/dev/null || echo "0")
-            LOOP_COST_MILLICENTS=$(( ${LOOP_COST_MILLICENTS:-0} + ${cost_millicents:-0} ))
-        fi
-    else
-        # Fallback: regex-based parsing for non-JSON output
-        local input_tok output_tok
-        input_tok=$(grep -oE 'input[_ ]tokens?[: ]+[0-9,]+' "$log_file" 2>/dev/null | tail -1 | grep -oE '[0-9,]+' | tr -d ',' || echo "0")
-        output_tok=$(grep -oE 'output[_ ]tokens?[: ]+[0-9,]+' "$log_file" 2>/dev/null | tail -1 | grep -oE '[0-9,]+' | tr -d ',' || echo "0")
-
-        LOOP_INPUT_TOKENS=$(( LOOP_INPUT_TOKENS + ${input_tok:-0} ))
-        LOOP_OUTPUT_TOKENS=$(( LOOP_OUTPUT_TOKENS + ${output_tok:-0} ))
-    fi
 }
 
 # ─── JSON→Text Extraction ──────────────────────────────────────────────────
