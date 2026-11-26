@@ -30,7 +30,7 @@ export interface QualityPorts {
   readonly spend: SpendSource;
 }
 
-// ── Head-to-head benchmark (ADR-0012) ────────────────────────────────────────
+// ── Head-to-head benchmark (ADR-0013) ────────────────────────────────────────
 
 /** A fresh checkout of a task's repo at its base commit, with setup already run. */
 export interface BenchWorkspaces {

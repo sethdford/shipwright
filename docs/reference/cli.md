@@ -21,7 +21,7 @@ USAGE
   shipwright bench mine-holdout    --repo OWNER/NAME --since DATE [--max N] [--setup "CMD"]...
 
 DESCRIPTION
-  Head-to-head benchmark (ADR-0012): runs each arm (bare Claude Code, Shipwright, or any other
+  Head-to-head benchmark (ADR-0013): runs each arm (bare Claude Code, Shipwright, or any other
   agent CLI) on the same tasks, from the same base commit, with the same model and time limit,
   and grades every run with hidden tests. Holdout tasks are graded here; SWE-bench Verified
   tasks are graded by the official harness (export-swebench, then import-swebench).

@@ -1,4 +1,4 @@
-# 0012. Head-to-head benchmark: Shipwright against bare Claude Code on hidden tests
+# 0013. Head-to-head benchmark: Shipwright against bare Claude Code on hidden tests
 
 Status: proposed (stacked on PR #8735) · Date: 2026-11-26
 

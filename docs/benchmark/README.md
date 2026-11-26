@@ -2,7 +2,7 @@
 
 `shipwright bench` runs Shipwright, bare Claude Code and any other agent CLI on the same tasks,
 from the same base commit, with the same model and time limit, and grades every run with tests the
-agent never saw. Design and trade-offs: [ADR-0012](../adr/0012-head-to-head-benchmark.md).
+agent never saw. Design and trade-offs: [ADR-0013](../adr/0013-head-to-head-benchmark.md).
 
 ## Quick start (holdout suite)
 
