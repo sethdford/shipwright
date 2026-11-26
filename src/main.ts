@@ -105,7 +105,7 @@ export async function main(
   bench: () => BenchFactory = once(() => buildBenchFactory(env, join(import.meta.dir, ".."))),
 ): Promise<number> {
   const [name, ...args] = argv;
-  if (name === undefined || topLevel(argv, io, registry)) return 0;
+  if (topLevel(argv, io, registry) || name === undefined) return 0;
   const command = findCommand(name, registry);
   if (!command) {
     // 2 = usage error (bash sw exited 1); 1 = command failed.

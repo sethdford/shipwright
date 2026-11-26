@@ -49,10 +49,10 @@ shipwright bench import-swebench --out ~/bench/swe --arm claude-code \
 ```json
 { "baseline": "claude-code",
   "arms": [
-    { "id": "claude-code", "kind": "claude-code", "model": "claude-opus-5-5", "estimateUsd": 2.5 },
-    { "id": "shipwright-k3", "kind": "shipwright", "model": "claude-opus-5-5", "attempts": 3,
+    { "id": "claude-code", "kind": "claude-code", "model": "opus", "estimateUsd": 2.5 },
+    { "id": "shipwright-k3", "kind": "shipwright", "model": "opus", "attempts": 3,
       "estimateUsd": 12, "timeoutMin": 120 },
-    { "id": "aider", "kind": "command", "model": "claude-opus-5-5", "estimateUsd": 2,
+    { "id": "aider", "kind": "command", "model": "opus", "estimateUsd": 2,
       "argv": ["aider", "--yes-always", "--model", "{model}", "--message-file", "{problem_file}"] }
   ] }
 ```
