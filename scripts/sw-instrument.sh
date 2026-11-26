@@ -193,7 +193,7 @@ cmd_start() {
     local tmp_file
     tmp_file="$(mktemp "${INSTRUMENT_ACTIVE}/.tmp.XXXXXX")"
     # shellcheck disable=SC2064
-    trap "rm -f '$tmp_file'" RETURN
+    trap "rm -f '$tmp_file'; trap - RETURN" RETURN
 
     # Get repo info if not provided
     if [[ "$repo" == "." ]]; then
@@ -261,7 +261,7 @@ cmd_record() {
     local tmp_file
     tmp_file="$(mktemp "${INSTRUMENT_ACTIVE}/.tmp.XXXXXX")"
     # shellcheck disable=SC2064
-    trap "rm -f '$tmp_file'" RETURN
+    trap "rm -f '$tmp_file'; trap - RETURN" RETURN
 
     # Parse value as number if it's numeric
     local value_json
@@ -325,7 +325,7 @@ cmd_stage_start() {
     local tmp_file
     tmp_file="$(mktemp "${INSTRUMENT_ACTIVE}/.tmp.XXXXXX")"
     # shellcheck disable=SC2064
-    trap "rm -f '$tmp_file'" RETURN
+    trap "rm -f '$tmp_file'; trap - RETURN" RETURN
 
     jq \
         --arg stage "$stage" \
@@ -372,7 +372,7 @@ cmd_stage_end() {
     local tmp_file
     tmp_file="$(mktemp "${INSTRUMENT_ACTIVE}/.tmp.XXXXXX")"
     # shellcheck disable=SC2064
-    trap "rm -f '$tmp_file'" RETURN
+    trap "rm -f '$tmp_file'; trap - RETURN" RETURN
 
     jq \
         --arg stage "$stage" \
@@ -423,7 +423,7 @@ cmd_finish() {
     local tmp_file
     tmp_file="$(mktemp "${INSTRUMENT_ACTIVE}/.tmp.XXXXXX")"
     # shellcheck disable=SC2064
-    trap "rm -f '$tmp_file'" RETURN
+    trap "rm -f '$tmp_file'; trap - RETURN" RETURN
 
     # Update run record with finish data
     jq \
@@ -484,7 +484,7 @@ cmd_summary() {
         grep "\"run_id\":\"${run_id}\"" "$INSTRUMENT_COMPLETED" | head -1 > "$tmp_file"
         run_file="$tmp_file"
     # shellcheck disable=SC2064
-        trap "rm -f '$tmp_file'" RETURN
+        trap "rm -f '$tmp_file'; trap - RETURN" RETURN
     fi
 
     # Extract data

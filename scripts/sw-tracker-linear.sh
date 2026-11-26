@@ -107,7 +107,7 @@ provider_discover_statuses() {
     local tmp_cache
     tmp_cache=$(mktemp)
     # shellcheck disable=SC2064
-    trap "rm -f '$tmp_cache'" RETURN
+    trap "rm -f '$tmp_cache'; trap - RETURN" RETURN
     # shellcheck disable=SC1010
     jq -n \
         --arg ts "$(date +%s)" \

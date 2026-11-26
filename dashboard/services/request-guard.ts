@@ -114,14 +114,25 @@ export function isExposed(cfg: GuardConfig): boolean {
   );
 }
 
-/** Why the server must not start with this config, or null. auth=none is local-only. */
-export function startupProblem(cfg: GuardConfig, authEnabled: boolean): string | null {
+/**
+ * Why the server must not start with this config, or null. auth=none is local-only. PAT sign-in is
+ * local-only too: it asks for a GitHub username and proves nothing about who typed it, so on an
+ * exposed dashboard anyone could sign in as a repo admin. Exposed dashboards need OAuth.
+ */
+export function startupProblem(
+  cfg: GuardConfig,
+  authEnabled: boolean,
+  authMode: "oauth" | "pat" | "none" = authEnabled ? "oauth" : "none",
+): string | null {
   if (!isExposed(cfg)) return null;
   const where = isLoopbackHost(cfg.host)
     ? `${cfg.host} behind a proxy (SW_DASHBOARD_ORIGINS names a non-loopback host)`
     : cfg.host;
   if (!authEnabled) {
-    return `refusing to serve ${where} with auth=none: configure GITHUB_PAT + DASHBOARD_REPO (or OAuth), or bind 127.0.0.1 with no public origins`;
+    return `refusing to serve ${where} with auth=none: configure GitHub OAuth (GITHUB_CLIENT_ID + GITHUB_CLIENT_SECRET + DASHBOARD_REPO), or bind 127.0.0.1 with no public origins`;
+  }
+  if (authMode === "pat") {
+    return `refusing to serve ${where} with PAT sign-in: it trusts a typed username, so anyone could sign in as a repo admin. Configure GitHub OAuth (GITHUB_CLIENT_ID + GITHUB_CLIENT_SECRET + DASHBOARD_REPO), or bind 127.0.0.1 with no public origins`;
   }
   if (!cfg.fleetToken) {
     return `refusing to serve ${where} without SHIPWRIGHT_FLEET_TOKEN (or SHIPWRIGHT_FLEET_TOKEN_FILE): /api/claim, /api/connect/* and /api/webhook/ci would be unauthenticated`;

@@ -341,7 +341,7 @@ update_version_in_files() {
             local tmp_file
             tmp_file=$(mktemp)
             # shellcheck disable=SC2064
-            trap "rm -f '$tmp_file'" RETURN
+            trap "rm -f '$tmp_file'; trap - RETURN" RETURN
             sed 's/^VERSION="[^"]*"$/VERSION="'"$version_num"'"/' "$file" > "$tmp_file"
             mv "$tmp_file" "$file"
             success "Updated VERSION in $(basename "$file")"

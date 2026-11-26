@@ -279,7 +279,7 @@ set_config() {
     local tmp_config
     tmp_config=$(mktemp)
     # shellcheck disable=SC2064
-    trap "rm -f '$tmp_config'" RETURN
+    trap "rm -f '$tmp_config'; trap - RETURN" RETURN
 
     if [[ "$value" == "true" ]] || [[ "$value" == "false" ]]; then
         jq ".${key} = ${value}" "$MODEL_ROUTING_CONFIG" > "$tmp_config"
@@ -414,7 +414,7 @@ configure_ab_test() {
     local tmp_config
     tmp_config=$(mktemp)
     # shellcheck disable=SC2064
-    trap "rm -f '$tmp_config'" RETURN
+    trap "rm -f '$tmp_config'; trap - RETURN" RETURN
 
     jq ".a_b_test = {\"enabled\": true, \"percentage\": $percentage, \"variant\": \"$variant\"}" \
         "$MODEL_ROUTING_CONFIG" > "$tmp_config"
@@ -587,7 +587,7 @@ chain_define() {
     local tmp_config
     tmp_config=$(mktemp)
     # shellcheck disable=SC2064
-    trap "rm -f '$tmp_config'" RETURN
+    trap "rm -f '$tmp_config'; trap - RETURN" RETURN
 
     # Validate that steps_json is valid JSON
     if ! jq empty <<< "$steps_json" 2>/dev/null; then
@@ -993,7 +993,7 @@ main() {
                     local tmp_config
                     tmp_config=$(mktemp)
     # shellcheck disable=SC2064
-                    trap "rm -f '$tmp_config'" RETURN
+                    trap "rm -f '$tmp_config'; trap - RETURN" RETURN
                     jq ".a_b_test.enabled = false" "$MODEL_ROUTING_CONFIG" > "$tmp_config"
                     mv "$tmp_config" "$MODEL_ROUTING_CONFIG"
                     success "Disabled A/B testing"

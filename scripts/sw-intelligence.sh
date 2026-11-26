@@ -167,7 +167,7 @@ _intelligence_track_cache_access() {
     local tmp_file
     tmp_file=$(mktemp "${TMPDIR:-/tmp}/sw-cache-stats.XXXXXX")
     # shellcheck disable=SC2064
-    trap "rm -f '$tmp_file'" RETURN
+    trap "rm -f '$tmp_file'; trap - RETURN" RETURN
     if [[ "$hit_or_miss" == "hit" ]]; then
         jq '.hits += 1 | .total += 1' "$CACHE_STATS_FILE" > "$tmp_file" && mv "$tmp_file" "$CACHE_STATS_FILE" || rm -f "$tmp_file"
     else
@@ -213,7 +213,7 @@ _intelligence_adjust_cache_ttl() {
         local tmp_file
         tmp_file=$(mktemp "${TMPDIR:-/tmp}/sw-cache-ttl.XXXXXX")
         # shellcheck disable=SC2064
-        trap "rm -f '$tmp_file'" RETURN
+        trap "rm -f '$tmp_file'; trap - RETURN" RETURN
         jq -n \
             --argjson ttl "$new_ttl" \
             --argjson miss_rate "$miss_rate" \
@@ -231,7 +231,7 @@ _intelligence_adjust_cache_ttl() {
     local tmp_reset
     tmp_reset=$(mktemp "${TMPDIR:-/tmp}/sw-cache-reset.XXXXXX")
     # shellcheck disable=SC2064
-    trap "rm -f '$tmp_reset'" RETURN
+    trap "rm -f '$tmp_reset'; trap - RETURN" RETURN
     echo '{"hits":0,"misses":0,"total":0}' > "$tmp_reset" && mv "$tmp_reset" "$CACHE_STATS_FILE" || rm -f "$tmp_reset"
 }
 
@@ -318,7 +318,7 @@ _intelligence_cache_set() {
     local tmp_file
     tmp_file=$(mktemp "${TMPDIR:-/tmp}/sw-intel-cache.XXXXXX")
     # shellcheck disable=SC2064
-    trap "rm -f '$tmp_file'" RETURN
+    trap "rm -f '$tmp_file'; trap - RETURN" RETURN
     jq --arg h "$hash" \
        --argjson result "$result" \
        --argjson ts "$now" \

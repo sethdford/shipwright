@@ -399,6 +399,15 @@ assert_file_exists() {
     return 1
 }
 
+assert_file_not_exists() {
+    local filepath="$1" label="${2:-file absent}"
+    if [[ ! -e "$TEST_TEMP_DIR/project/$filepath" ]]; then
+        return 0
+    fi
+    echo -e "    ${RED}✗${RESET} Unexpected file: $filepath ($label)"
+    return 1
+}
+
 assert_dir_exists() {
     local dirpath="$1" label="${2:-dir exists}"
     local full_path="$TEST_TEMP_DIR/project/$dirpath"
@@ -489,23 +498,26 @@ test_dryrun_exits_zero() {
 }
 
 # ──────────────────────────────────────────────────────────────────────────────
-# 2. State file created after dry-run
+# 2. Dry-run leaves no state file behind
+# A "status: running" state file from a dry run made the next real start refuse.
 # ──────────────────────────────────────────────────────────────────────────────
-test_state_file_created() {
+test_dryrun_writes_no_state() {
+    rm -f "$TEST_TEMP_DIR/project/.claude/pipeline-state.md"
     invoke_pipeline start --issue 42 --dry-run --skip-gates
     assert_exit_code 0 "dry-run should succeed" &&
-    assert_file_exists ".claude/pipeline-state.md" "state file created"
+    assert_file_not_exists ".claude/pipeline-state.md" "dry run writes no state"
 }
 
 # ──────────────────────────────────────────────────────────────────────────────
-# 3. State file has required fields
+# 3. Dry-run can be repeated: it leaks no state or lock that blocks the next start
 # ──────────────────────────────────────────────────────────────────────────────
-test_state_has_required_fields() {
+test_dryrun_repeatable() {
     invoke_pipeline start --issue 42 --dry-run --skip-gates
-    assert_exit_code 0 "dry-run should succeed" &&
-    assert_state_contains "status:" "state has status field" &&
-    assert_state_contains "current_stage:" "state has current_stage field" &&
-    assert_state_contains "pipeline:" "state has pipeline field"
+    assert_exit_code 0 "first dry-run should succeed" || return 1
+    invoke_pipeline start --issue 42 --dry-run --skip-gates
+    assert_exit_code 0 "second dry-run should succeed" &&
+    assert_output_not_contains "already in progress" "no leftover running state" &&
+    assert_output_not_contains "already running" "no leftover lock"
 }
 
 # ──────────────────────────────────────────────────────────────────────────────
@@ -784,8 +796,8 @@ main() {
     # Define all tests
     local -a tests=(
         "test_dryrun_exits_zero:Dry-run exits zero"
-        "test_state_file_created:State file created after dry-run"
-        "test_state_has_required_fields:State file has required fields"
+        "test_dryrun_writes_no_state:Dry-run writes no state file"
+        "test_dryrun_repeatable:Dry-run is repeatable"
         "test_fast_template_loads:Fast template loads correctly"
         "test_all_templates_parse:All templates parse as valid JSON"
         "test_stage_ordering_preserved:Stage ordering preserved in output"
