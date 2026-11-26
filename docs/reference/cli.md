@@ -55,6 +55,7 @@ USAGE
   shipwright bench import-swebench --out DIR --arm ID --report FILE [--trial N]
   shipwright bench sample-swebench --from FILE.jsonl --n N [--seed S] [--name NAME]
   shipwright bench mine-holdout    --repo OWNER/NAME --since DATE [--max N] [--setup "CMD"]...
+                                   [--source pulls|commits] [--problems FILE]
 
 DESCRIPTION
   Head-to-head benchmark (ADR-0013): runs each arm (bare Claude Code, Shipwright, or any other
@@ -76,6 +77,10 @@ OPTIONS
   --k N        pass^k: runs that must all pass, 1 to 10 (default 1)
   --budget USD Hard spend cap for this results directory
   --arm ID     Only this arm
+  --source     mine-holdout: merged PRs that close an issue (pulls, default) or direct commits
+  --problems   mine-holdout: JSON of task id to a curated problem statement. Commits need one
+               (their message describes the fix); for a PR it replaces the linked issue. Keep
+               it private with the manifest.
 
 EXIT CODES
   0  done      1  failed      2  usage error      3  stopped by budget, or an unfair oracle
