@@ -35,6 +35,9 @@ setup_env() {
     TEST_TEMP_DIR=$(mktemp -d "${TMPDIR:-/tmp}/sw-pipeline-test.XXXXXX")
     # Scripts under test read and write the intelligence cache here, not in the repo (#8609).
     export SHIPWRIGHT_INTELLIGENCE_CACHE="$TEST_TEMP_DIR/project/.claude/intelligence-cache.json"
+    # The mock claude does not write acceptance tests; that stage has its own suite
+    # (sw-lib-acceptance-tests-test.sh) and TS tests (ADR-0015).
+    export SW_ACCEPTANCE=off
 
     # ── Copy real pipeline script and libs (pipeline sources lib/*.sh) ──────
     mkdir -p "$TEST_TEMP_DIR/scripts"
@@ -48,7 +51,11 @@ setup_env() {
     # ── Mock sw-loop.sh (next to pipeline — preflight checks $SCRIPT_DIR/sw-loop.sh) ──
     cat > "$TEST_TEMP_DIR/scripts/sw-loop.sh" <<'LOOP_EOF'
 #!/usr/bin/env bash
-# Mock sw-loop: simulate build by creating a feature file and committing
+# Mock sw-loop: simulate build by creating a feature file and committing. Like the real loop,
+# honour --repo (the patch handoff runs the loop in a disposable clone, #8706).
+_repo=""
+while [[ $# -gt 0 ]]; do [[ "$1" == "--repo" ]] && _repo="$2"; shift; done
+[[ -n "$_repo" ]] && { cd "$_repo" || exit 1; }
 mkdir -p src
 cat > src/feature.js <<'FEAT'
 function authenticate(token) { return token && token.length > 0; }
@@ -306,7 +313,11 @@ create_mock_sw() {
 # Mock sw CLI — handles loop subcommand
 case "\$1" in
     loop)
-        # Simulate build: create feature file and commit
+        # Simulate build: create feature file and commit. Like the real loop, honour --repo
+        # (the patch handoff runs the loop in a disposable clone, #8706).
+        _repo=""
+        while [[ \$# -gt 0 ]]; do [[ "\$1" == "--repo" ]] && _repo="\$2"; shift; done
+        [[ -n "\$_repo" ]] && { cd "\$_repo" || exit 1; }
         mkdir -p src
         cat > src/feature.js <<'FEAT'
 function authenticate(token) { return token && token.length > 0; }
@@ -631,11 +642,12 @@ test_build_invokes_sw() {
     assert_file_exists "src/feature.js" "build created feature file" &&
     assert_state_contains "build.*complete" "build marked complete"
 
-    # Verify a commit exists with "feat:" prefix (from mock sw loop)
+    # The loop's work arrives as one pipeline commit (patch handoff, #8706); the loop's own
+    # commits stay in its disposable clone.
     local commits
-    commits=$(cd "$TEST_TEMP_DIR/project" && git log --oneline 2>/dev/null)
-    if ! printf '%s\n' "$commits" | grep >/dev/null "feat:" 2>/dev/null; then
-        echo -e "    ${RED}✗${RESET} No 'feat:' commit found"
+    commits=$(cd "$TEST_TEMP_DIR/project" && git log --format='%s|%an' 2>/dev/null)
+    if ! printf '%s\n' "$commits" | grep >/dev/null "^build: Add auth|shipwright-pipeline$" 2>/dev/null; then
+        echo -e "    ${RED}✗${RESET} No pipeline commit 'build: Add auth' found"
         return 1
     fi
 }

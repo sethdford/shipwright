@@ -6,7 +6,20 @@ SW_AGENT_EXEC="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/agent-exec.sh"
 # Test commands run without credentials (#8608).
 # shellcheck source=lib/test-gate-env.sh
 source "$(dirname "${BASH_SOURCE[0]}")/test-gate-env.sh"
+# Patch handoff (#8706): the build agent works in a disposable clone and only a judged patch comes
+# back. On by default; SW_PATCH_HANDOFF=false turns it off (the old shared-checkout build).
+# shellcheck source=lib/patch-handoff.sh
+source "$(dirname "${BASH_SOURCE[0]}")/patch-handoff.sh"
+# Prompt-injection defenses for issue text (trust boundary).
+# shellcheck source=lib/untrusted.sh
+source "$(dirname "${BASH_SOURCE[0]}")/untrusted.sh"
 source "$(dirname "${BASH_SOURCE[0]}")/models.sh"
+# shellcheck source=lib/acceptance-tests.sh
+source "$(dirname "${BASH_SOURCE[0]}")/acceptance-tests.sh"
+# shellcheck source=lib/repo-model.sh
+source "$(dirname "${BASH_SOURCE[0]}")/repo-model.sh"
+# shellcheck source=lib/claude-usage.sh
+source "$(dirname "${BASH_SOURCE[0]}")/claude-usage.sh"
 [[ -n "${_PIPELINE_STAGES_BUILD_LOADED:-}" ]] && return 0
 _PIPELINE_STAGES_BUILD_LOADED=1
 
@@ -53,119 +66,245 @@ _pipeline_claude_flags() {
         flags+=("--fallback-model" "$_fallback")
     fi
 
+    # Repository world model tools (ADR-0016): nothing when SHIPWRIGHT_REPO_MODEL=off.
+    local _rm_flag
+    for _rm_flag in $(repo_model_mcp_flags); do flags+=("$_rm_flag"); done
+
     echo "${flags[*]}"
 }
 
+# _pipeline_test_cmd — the project's test command: TEST_CMD, the test stage config, else auto-detected.
+_pipeline_test_cmd() {
+    local test_cmd="${TEST_CMD:-}"
+    if [[ -z "$test_cmd" && -n "${PIPELINE_CONFIG:-}" ]]; then
+        test_cmd=$(jq -r --arg id "test" '(.stages[] | select(.id == $id) | .config.test_cmd) // .defaults.test_cmd // ""' "$PIPELINE_CONFIG" 2>/dev/null) || true
+        [[ "$test_cmd" == "null" ]] && test_cmd=""
+    fi
+    [[ -z "$test_cmd" ]] && test_cmd=$(detect_test_cmd 2>/dev/null || true)
+    printf '%s' "$test_cmd"
+}
+
+# stage_test_first — spec-first acceptance tests (ADR-0015, lib/acceptance-tests.sh). Returns 1 only
+# in enforce mode when no proven-red tests could be written; the caller stops the pipeline then.
 stage_test_first() {
     CURRENT_STAGE_ID="test_first"
-    info "Generating tests from requirements (TDD mode)"
-
-    local plan_file="${ARTIFACTS_DIR}/plan.md"
-    local goal_file="${PROJECT_ROOT}/.claude/goal.md"
-    local requirements=""
-    if [[ -f "$plan_file" ]]; then
-        requirements=$(cat "$plan_file" 2>/dev/null || true)
-    elif [[ -f "$goal_file" ]]; then
-        requirements=$(cat "$goal_file" 2>/dev/null || true)
-    else
-        requirements="${GOAL:-}: ${ISSUE_BODY:-}"
+    local mode test_cmd
+    mode=$(acceptance_mode)
+    [[ "$mode" == "off" ]] && return 0
+    test_cmd=$(_pipeline_test_cmd)
+    if [[ -z "$test_cmd" ]]; then
+        warn "Acceptance tests skipped: no test command found (set TEST_CMD or the test stage's test_cmd)"
+        emit_event "acceptance.skipped" "issue=${ISSUE_NUMBER:-0}" "reason=no_test_cmd" 2>/dev/null || true
+        return 0
     fi
+    info "Spec-first: turning the issue into acceptance tests that must fail before implementation"
+    if acceptance_generate "$test_cmd"; then
+        return 0
+    fi
+    if [[ "$mode" == "warn" ]]; then
+        warn "No proven-red acceptance tests (warn mode): building without an acceptance gate"
+        return 0
+    fi
+    error "No acceptance tests could be proven red for the right reason; see ${ARTIFACTS_DIR}/acceptance-red.log"
+    return 1
+}
 
-    local tdd_prompt="You are writing tests BEFORE implementation (TDD).
+# ── Tournament mode (shipwright tournament) ─────────────────────────────────
+# N independent attempts in separate worktrees; a cross-test matrix, a per-issue rubric and a
+# blind group-wise judge pick one patch, which is fast-forwarded onto the pipeline branch.
+# On when PIPELINE_ATTEMPTS (or .defaults.attempts in the pipeline config) is 2 to 5 and the
+# pipeline knows a test command: the tournament gates every attempt on the repository's tests.
+_build_tournament_attempts() {
+    local n="${PIPELINE_ATTEMPTS:-}"
+    if [[ -z "$n" && -n "${PIPELINE_CONFIG:-}" && -f "${PIPELINE_CONFIG}" ]]; then
+        n=$(jq -r '.defaults.attempts // empty' "$PIPELINE_CONFIG" 2>/dev/null || true)
+    fi
+    case "$n" in
+        2|3|4|5) echo "$n" ;;
+        *) echo "1" ;;
+    esac
+}
 
-Based on the following plan/requirements, generate test files that define the expected behavior. These tests should FAIL initially (since the implementation doesn't exist yet) but define the correct interface and behavior.
+_build_tournament() {
+    local goal="$1" test_cmd="$2" model="$3" attempts="$4"
+    local goal_file="$ARTIFACTS_DIR/tournament-goal.md"
+    local report="$ARTIFACTS_DIR/tournament.json"
+    mkdir -p "$ARTIFACTS_DIR"
+    printf '%s\n' "$goal" > "$goal_file"
+    local args=(--goal-file "$goal_file" --test-cmd "$test_cmd" --attempts "$attempts" --model "$model" --format json)
+    [[ -n "${PIPELINE_TOURNAMENT_BUDGET_USD:-}" ]] && args+=(--budget-usd "$PIPELINE_TOURNAMENT_BUDGET_USD")
+    [[ -n "${PIPELINE_SETUP_CMD:-}" ]] && args+=(--setup-cmd "$PIPELINE_SETUP_CMD")
 
-Requirements:
-${requirements}
+    info "Starting build tournament: ${attempts} parallel attempts, model ${model}"
+    if [[ -n "${ISSUE_NUMBER:-}" ]]; then
+        gh_comment_issue "$ISSUE_NUMBER" "🔨 **Build started** — tournament mode: ${attempts} independent attempts, model: ${model}"
+    fi
+    local rc=0
+    sw tournament "${args[@]}" < /dev/null > "${report}.tmp" || rc=$?
+    mv "${report}.tmp" "$report"
 
-Instructions:
-1. Create test files for each component mentioned in the plan
-2. Tests should verify the PUBLIC interface and expected behavior
-3. Include edge cases and error handling tests
-4. Tests should be runnable with the project's test framework
-5. Mark tests that need implementation with clear TODO comments
-6. Do NOT write implementation code — only tests
-
-Output format: For each test file, use a fenced code block with the file path as the language identifier (e.g. \`\`\`tests/auth.test.ts):
-\`\`\`path/to/test.test.ts
-// file content
-\`\`\`
-
-Create files in the appropriate project directories (e.g. tests/, __tests__/, src/**/*.test.ts) per project convention."
-
-    local model="${CLAUDE_MODEL:-${MODEL:-sonnet}}"
-    [[ -z "$model" || "$model" == "null" ]] && model="sonnet"
-
-    local output=""
-    local tdd_timeout
-    tdd_timeout=$(_smart_int "timeouts.tdd_generation" 120)
-    output=$(echo "$tdd_prompt" | "$SW_AGENT_EXEC" timeout "$tdd_timeout" claude --print --model "$model" 2>/dev/null) || {
-        warn "TDD test generation failed, falling back to standard build"
+    local winner confidence cost
+    winner=$(jq -r '.selection.winner // empty' "$report" 2>/dev/null || true)
+    confidence=$(jq -r '.selection.confidence // empty' "$report" 2>/dev/null || true)
+    cost=$(jq -r '.costUsd // 0' "$report" 2>/dev/null || echo "0")
+    if [[ -n "$cost" && "$cost" != "0" && "$cost" != "null" ]]; then
+        TOTAL_COST_USD="$cost"
+    fi
+    emit_event "build.tournament" "issue=${ISSUE_NUMBER:-0}" "attempts=$attempts" \
+        "winner=${winner:-none}" "confidence=${confidence:-none}" "cost_usd=${cost:-0}" "exit=$rc"
+    if [[ "$rc" -eq 3 ]]; then
+        echo "tournament_no_winner" > "$ARTIFACTS_DIR/failure-reason.txt" 2>/dev/null || true
+        error "Build tournament: no attempt passed the tests and the judge (see tournament.json)"
         return 1
-    }
+    fi
+    if [[ "$rc" -ne 0 ]]; then
+        error "Build tournament failed (exit $rc)"
+        return 1
+    fi
+    info "Build tournament winner: ${winner} (${confidence} confidence, \$${cost})"
+}
 
-    # Parse output: extract fenced code blocks and write to files
-    local wrote_any=false
-    local block_path="" in_block=false block_content=""
+# _tdd_safe_path PATH — 0 when the model-chosen PATH stays inside the repo and out of .git and
+# .claude. The fence regex already limits it to [A-Za-z0-9_/.-].
+_tdd_safe_path() {
+    local p="$1"
+    [[ -n "$p" && "$p" != /* && "$p" != .git && "$p" != .git/* && "$p" != .claude/* ]] || return 1
+    case "/$p/" in */../*|*/./*|*//*) return 1 ;; esac
+    return 0
+}
+
+# _tdd_write_blocks ROOT OUTPUT — writes each fenced ```path block of OUTPUT under ROOT and prints
+# the paths written. Unsafe paths are skipped with a warning.
+_tdd_write_blocks() {
+    local root="$1" output="$2"
+    local block_path="" in_block=false block_content="" line
     while IFS= read -r line; do
-        if [[ "$line" =~ ^\`\`\`([a-zA-Z0-9_/\.\-]+)$ ]]; then
-            if [[ -n "$block_path" && -n "$block_content" ]]; then
-                local out_file="${PROJECT_ROOT}/${block_path}"
-                local out_dir
-                out_dir=$(dirname "$out_file")
-                mkdir -p "$out_dir" 2>/dev/null || true
-                if echo "$block_content" > "$out_file" 2>/dev/null; then
-                    wrote_any=true
-                    info "  Wrote: $block_path"
-                fi
+        if [[ "$line" =~ ^\`\`\`([a-zA-Z0-9_/\.\-]+)$ ]] || [[ "$line" == "\`\`\`" && "$in_block" == "true" ]]; then
+            _tdd_write_one "$root" "$block_path" "$block_content"
+            block_path="" block_content="" in_block=false
+            if [[ "$line" != "\`\`\`" ]]; then
+                block_path="${BASH_REMATCH[1]}" in_block=true
             fi
-            block_path="${BASH_REMATCH[1]}"
-            block_content=""
-            in_block=true
-        elif [[ "$line" == "\`\`\`" && "$in_block" == "true" ]]; then
-            if [[ -n "$block_path" && -n "$block_content" ]]; then
-                local out_file="${PROJECT_ROOT}/${block_path}"
-                local out_dir
-                out_dir=$(dirname "$out_file")
-                mkdir -p "$out_dir" 2>/dev/null || true
-                if echo "$block_content" > "$out_file" 2>/dev/null; then
-                    wrote_any=true
-                    info "  Wrote: $block_path"
-                fi
-            fi
-            block_path=""
-            block_content=""
-            in_block=false
         elif [[ "$in_block" == "true" && -n "$block_path" ]]; then
             [[ -n "$block_content" ]] && block_content="${block_content}"$'\n'
             block_content="${block_content}${line}"
         fi
     done <<< "$output"
+    _tdd_write_one "$root" "$block_path" "$block_content"
+}
 
-    # Flush last block if unclosed
-    if [[ -n "$block_path" && -n "$block_content" ]]; then
-        local out_file="${PROJECT_ROOT}/${block_path}"
-        local out_dir
-        out_dir=$(dirname "$out_file")
-        mkdir -p "$out_dir" 2>/dev/null || true
-        if echo "$block_content" > "$out_file" 2>/dev/null; then
-            wrote_any=true
-            info "  Wrote: $block_path"
-        fi
+_tdd_write_one() {
+    local root="$1" path="$2" content="$3"
+    [[ -n "$path" && -n "$content" ]] || return 0
+    if ! _tdd_safe_path "$path"; then
+        warn "  Skipped unsafe path from TDD output: $path" >&2
+        emit_event "tdd.path_refused" "issue=${ISSUE_NUMBER:-0}" "path=$path"
+        return 0
     fi
+    mkdir -p "$(dirname "$root/$path")" 2>/dev/null || return 0
+    printf '%s\n' "$content" > "$root/$path" 2>/dev/null || return 0
+    info "  Wrote: $path" >&2
+    printf '%s\n' "$path"
+}
 
-    if [[ "$wrote_any" == "true" ]]; then
-        if (cd "$PROJECT_ROOT" && git diff --name-only 2>/dev/null | grep >/dev/null -E 'test|spec'); then
-            git add -A 2>/dev/null || true
-            git commit -m "test: TDD - define expected behavior before implementation" 2>/dev/null || true
-            emit_event "tdd.tests_generated" "{\"stage\":\"test_first\"}"
-        fi
+# _tdd_land_output OUTPUT — under patch handoff the tests are written into a disposable clone and
+# reach the trusted checkout only as a judged patch, like the build agent's work. Without it, they
+# are written in place and only the written files are committed.
+_tdd_land_output() {
+    local output="$1" msg="test: TDD - define expected behavior before implementation"
+    if [[ "${SW_PATCH_HANDOFF:-true}" == "false" ]]; then
+        local written
+        written=$(_tdd_write_blocks "$PROJECT_ROOT" "$output")
+        [[ -n "$written" ]] || { warn "No test files extracted from TDD output — check format"; return 0; }
+        local files=()
+        while IFS= read -r f; do files+=("$f"); done <<< "$written"
+        (cd "$PROJECT_ROOT" && git add -- "${files[@]}" && git commit -q -m "$msg") 2>/dev/null || true
+        emit_event "tdd.tests_generated" "{\"stage\":\"test_first\"}"
         success "TDD tests generated"
-    else
+        return 0
+    fi
+    local base work patch="${ARTIFACTS_DIR}/tdd.patch"
+    base=$(git -C "$PROJECT_ROOT" rev-parse HEAD) || return 1
+    work=$(mktemp -d "${TMPDIR:-/tmp}/sw-tdd.XXXXXX") || return 1
+    mkdir -p "$ARTIFACTS_DIR"
+    local rc=0
+    _tdd_land_via_handoff "$work/clone" "$base" "$output" "$patch" "$msg" || rc=$?
+    rm -rf "$work"
+    return "$rc"
+}
+
+_tdd_land_via_handoff() {
+    local dir="$1" base="$2" output="$3" patch="$4" msg="$5"
+    handoff_prepare "$PROJECT_ROOT" "$base" "$dir" || return 1
+    # Earlier stages' uncommitted edits ride along and are judged with the tests.
+    handoff_carry_over "$PROJECT_ROOT" "$base" "$dir" "${patch}.carried" || return 1
+    if [[ -z "$(_tdd_write_blocks "$dir" "$output")" ]]; then
         warn "No test files extracted from TDD output — check format"
     fi
+    handoff_export "$dir" "$base" "$PROJECT_ROOT" "$patch" || return 1
+    [[ -s "$patch" ]] || return 0
+    # On refusal the carried edits are dropped too (fail closed); both stay in the patch file.
+    local sha
+    if ! sha=$(handoff_apply "$PROJECT_ROOT" "$base" "$patch" "$msg"); then
+        warn "TDD tests refused by the patch judge; building without them"
+        emit_event "tdd.patch_refused" "issue=${ISSUE_NUMBER:-0}" "base=$base"
+        return 1
+    fi
+    emit_event "tdd.tests_generated" "{\"stage\":\"test_first\",\"head\":\"${sha}\"}"
+    success "TDD tests generated and applied as ${sha:0:12}"
+}
 
-    return 0
+# _build_run_loop LOOP_SCRIPT ARGS... — runs the loop script (the sw-loop.sh beside this pipeline,
+# never `sw` from PATH). Under patch handoff the loop holds no GitHub or fleet credentials: it works
+# in the agent's clone, and nothing it does there is trusted.
+_build_run_loop() {
+    local loop_script="$1"
+    shift
+    if [[ "${SW_PATCH_HANDOFF:-true}" == "false" ]]; then
+        "$loop_script" "$@"
+        return
+    fi
+    local _empty_gh rc=0
+    _empty_gh=$(mktemp -d "${TMPDIR:-/tmp}/sw-nogh.XXXXXX") || return 1
+    env -u GH_TOKEN -u GITHUB_TOKEN -u GH_ENTERPRISE_TOKEN -u GITHUB_PAT \
+        -u SHIPWRIGHT_FLEET_TOKEN -u SHIPWRIGHT_FLEET_TOKEN_FILE -u SSH_AUTH_SOCK \
+        -u SW_PIPELINE_PUSH_URL GH_CONFIG_DIR="$_empty_gh" GIT_CONFIG_GLOBAL=/dev/null \
+        GIT_TERMINAL_PROMPT=0 "$loop_script" "$@" || rc=$?
+    rm -rf "$_empty_gh"
+    return "$rc"
+}
+
+# _build_handoff_return AGENT_DIR BASE — export the agent's work as a patch, judge it, and commit
+# it to the trusted checkout. Any refusal fails the build (fail closed).
+_build_handoff_return() {
+    local dir="$1" base="$2"
+    local patch="${ARTIFACTS_DIR}/agent.patch"
+    mkdir -p "$ARTIFACTS_DIR" "${ARTIFACTS_DIR}/agent-loop-logs"
+    # Loop logs come back as data for humans and token accounting, never into the repo.
+    cp -R "${dir}/.claude/loop-logs/." "${ARTIFACTS_DIR}/agent-loop-logs/" 2>/dev/null || true
+    handoff_export "$dir" "$base" "$PROJECT_ROOT" "$patch" || { error "Patch handoff: export failed"; return 1; }
+    if [[ ! -s "$patch" ]]; then
+        # Nothing changed (for example a self-heal pass that needed no edit): nothing to apply.
+        warn "Patch handoff: the build produced no changes"
+        emit_event "build.patch_empty" "issue=${ISSUE_NUMBER:-0}" "base=$base"
+        rm -rf "$(dirname "$dir")"
+        return 0
+    fi
+    local why
+    if ! why=$(handoff_judge "$patch"); then
+        printf '%s\n' "$why" > "${ARTIFACTS_DIR}/agent.patch.refused"
+        error "Patch handoff: patch refused: $(printf '%s' "$why" | tr '\n' ';')"
+        emit_event "build.patch_refused" "issue=${ISSUE_NUMBER:-0}" "base=$base"
+        return 1
+    fi
+    local sha
+    sha=$(handoff_apply "$PROJECT_ROOT" "$base" "$patch" "build: ${GOAL:-issue ${ISSUE_NUMBER:-}}") || {
+        error "Patch handoff: apply failed"
+        return 1
+    }
+    emit_event "build.patch_applied" "issue=${ISSUE_NUMBER:-0}" "base=$base" "head=$sha"
+    success "Patch handoff: applied the agent's patch as ${sha:0:12}"
+    rm -rf "$(dirname "$dir")"
 }
 
 stage_build() {
@@ -219,11 +358,13 @@ ${_formal_context}"
         fi
     fi
 
-    # TDD: when test_first ran, tell build to make existing tests pass
-    if [[ "${TDD_ENABLED:-false}" == "true" || "${PIPELINE_TDD:-}" == "true" ]]; then
+    # Spec-first: the locked acceptance tests define done (ADR-0015)
+    local acceptance_brief
+    acceptance_brief=$(acceptance_build_brief 2>/dev/null || true)
+    if [[ -n "$acceptance_brief" ]]; then
         enriched_goal="${enriched_goal}
 
-IMPORTANT (TDD mode): Test files already exist and define the expected behavior. Write implementation code to make ALL tests pass. Do not delete or modify the test files."
+${acceptance_brief}"
     fi
 
     # Inject memory context
@@ -452,10 +593,13 @@ ${_skill_prompts}
     [[ -z "${FALLBACK_MODEL_OVERRIDE:-}" && -n "${PIPELINE_FALLBACK_MODEL:-}" ]] && loop_args+=(--fallback-model "$PIPELINE_FALLBACK_MODEL")
 
     # Definition of Done: use plan-extracted DoD if available
-    [[ -s "$dod_file" ]] && loop_args+=(--definition-of-done "$dod_file")
+    # (absolute: under patch handoff the loop runs in another directory)
+    [[ -s "$dod_file" ]] && loop_args+=(--definition-of-done "$(cd "$(dirname "$dod_file")" && pwd)/$(basename "$dod_file")")
 
-    # Checkpoint resume: when pipeline resumed from build-stage checkpoint, pass --resume to loop
-    if [[ "${RESUME_FROM_CHECKPOINT:-false}" == "true" && "${checkpoint_stage:-}" == "build" ]]; then
+    # Checkpoint resume: when pipeline resumed from build-stage checkpoint, pass --resume to loop.
+    # Not under patch handoff: each build gets a fresh agent clone, so there is no loop state to resume.
+    if [[ "${RESUME_FROM_CHECKPOINT:-false}" == "true" && "${checkpoint_stage:-}" == "build" \
+        && "${SW_PATCH_HANDOFF:-true}" == "false" ]]; then
         loop_args+=(--resume)
     fi
 
@@ -463,53 +607,79 @@ ${_skill_prompts}
     # for interactive permission prompts. Without this flag, agents can't write files.
     loop_args+=(--skip-permissions)
 
-    info "Starting build loop: ${DIM}shipwright loop${RESET} (max ${max_iter} iterations, ${agents} agent(s))"
+    local _attempts
+    _attempts=$(_build_tournament_attempts)
+    if [[ "$_attempts" -gt 1 && -n "$test_cmd" && "$test_cmd" != "null" ]]; then
+        _build_tournament "$enriched_goal" "$test_cmd" "$build_model" "$_attempts" || return 1
+    else
+        info "Starting build loop: ${DIM}shipwright loop${RESET} (max ${max_iter} iterations, ${agents} agent(s))"
 
-    # Post build start to GitHub
-    if [[ -n "$ISSUE_NUMBER" ]]; then
-        gh_comment_issue "$ISSUE_NUMBER" "🔨 **Build started** — \`shipwright loop\` with ${max_iter} max iterations, ${agents} agent(s), model: ${build_model}"
-    fi
+        # Post build start to GitHub
+        if [[ -n "$ISSUE_NUMBER" ]]; then
+            gh_comment_issue "$ISSUE_NUMBER" "🔨 **Build started** — \`shipwright loop\` with ${max_iter} max iterations, ${agents} agent(s), model: ${build_model}"
+        fi
 
-    local _token_log="${ARTIFACTS_DIR}/.claude-tokens-build.log"
-    export PIPELINE_JOB_ID="${PIPELINE_NAME:-pipeline-$$}"
-    sw loop "${loop_args[@]}" < /dev/null 2>"$_token_log" || {
-        local _loop_exit=$?
-        parse_claude_tokens "$_token_log"
+        local _token_log="${ARTIFACTS_DIR}/.claude-tokens-build.log"
+        # sw-loop writes its token and USD totals under the git top level of the directory it runs in (a
+        # --worktree run's worktree, which PROJECT_ROOT may not name). Drop a previous run's file first, so
+        # a loop that dies before writing one adds nothing rather than an old run's spend.
+        local _loop_root
+        _loop_root="$(git rev-parse --show-toplevel 2>/dev/null || echo "$PROJECT_ROOT")"
+        local _loop_token_file="${_loop_root}/.claude/loop-logs/loop-tokens.json"
+        [[ -f "$_loop_token_file" ]] && rm -f "$_loop_token_file"
+        export PIPELINE_JOB_ID="${PIPELINE_NAME:-pipeline-$$}"
 
-        # Detect context exhaustion from progress file
+        # Patch handoff (#8706): the loop and its agents work in a disposable clone of the recorded base;
+        # only a judged patch comes back. Loop logs are read from where the loop ran.
+        local _handoff_base="" _handoff_dir="" _loop_logs="${PROJECT_ROOT}/.claude/loop-logs"
         local _progress_file="${PWD}/.claude/loop-logs/progress.md"
-        if [[ -f "$_progress_file" ]]; then
-            local _prog_tests
-            _prog_tests=$(grep -oE 'Tests passing: (true|false)' "$_progress_file" 2>/dev/null | awk '{print $NF}' || echo "unknown")
-            if [[ "$_prog_tests" != "true" ]]; then
-                warn "Build loop exhausted with failing tests (context exhaustion)"
-                emit_event "pipeline.context_exhaustion" "issue=${ISSUE_NUMBER:-0}" "stage=build"
-                # Write flag for daemon retry logic
-                mkdir -p "$ARTIFACTS_DIR" 2>/dev/null || true
-                echo "context_exhaustion" > "$ARTIFACTS_DIR/failure-reason.txt" 2>/dev/null || true
+        if [[ "${SW_PATCH_HANDOFF:-true}" != "false" ]]; then
+            _handoff_base=$(git -C "$PROJECT_ROOT" rev-parse HEAD) || { error "Patch handoff: no base commit"; return 1; }
+            _handoff_dir="$(mktemp -d "${TMPDIR:-/tmp}/sw-agent.XXXXXX")/repo"
+            handoff_prepare "$PROJECT_ROOT" "$_handoff_base" "$_handoff_dir" \
+                || { error "Patch handoff: could not prepare the agent clone"; return 1; }
+            mkdir -p "$ARTIFACTS_DIR"
+            handoff_carry_over "$PROJECT_ROOT" "$_handoff_base" "$_handoff_dir" "${ARTIFACTS_DIR}/pre-build.patch" \
+                || { error "Patch handoff: could not move earlier stages' edits into the agent clone"; return 1; }
+            [[ -s "${ARTIFACTS_DIR}/pre-build.patch" ]] \
+                && warn "Patch handoff: moved uncommitted edits from earlier stages into the agent clone (they are judged with the build)"
+            loop_args+=(--repo "$_handoff_dir")
+            _loop_logs="${_handoff_dir}/.claude/loop-logs"
+            _progress_file="${_loop_logs}/progress.md"
+            _loop_token_file="${_loop_logs}/loop-tokens.json"
+            info "Patch handoff: agent works in ${DIM}${_handoff_dir}${RESET} (base ${_handoff_base:0:12})"
+        fi
+
+        # Run the loop that ships with this pipeline, not whatever `sw` is first on PATH: an older global
+        # install there runs an old sw-loop.sh (one that recorded 0 tokens and $0 for every build).
+        # SHIPWRIGHT_LOOP_SCRIPT replaces it in tests only.
+        _build_run_loop "${SHIPWRIGHT_LOOP_SCRIPT:-$SCRIPT_DIR/sw-loop.sh}" "${loop_args[@]}" < /dev/null 2>"$_token_log" || {
+            local _loop_exit=$?
+            # A failed build still spent money: count it before returning.
+            _pipeline_add_loop_tokens "$_loop_token_file"
+
+            # Detect context exhaustion from progress file
+            if [[ -f "$_progress_file" ]]; then
+                local _prog_tests
+                _prog_tests=$(grep -oE 'Tests passing: (true|false)' "$_progress_file" 2>/dev/null | awk '{print $NF}' || echo "unknown")
+                if [[ "$_prog_tests" != "true" ]]; then
+                    warn "Build loop exhausted with failing tests (context exhaustion)"
+                    emit_event "pipeline.context_exhaustion" "issue=${ISSUE_NUMBER:-0}" "stage=build"
+                    # Write flag for daemon retry logic
+                    mkdir -p "$ARTIFACTS_DIR" 2>/dev/null || true
+                    echo "context_exhaustion" > "$ARTIFACTS_DIR/failure-reason.txt" 2>/dev/null || true
+                fi
             fi
-        fi
 
-        error "Build loop failed"
-        return 1
-    }
-    parse_claude_tokens "$_token_log"
-
-    # Read accumulated token counts from build loop (written by sw-loop.sh)
-    local _loop_token_file="${PROJECT_ROOT}/.claude/loop-logs/loop-tokens.json"
-    if [[ -f "$_loop_token_file" ]] && command -v jq >/dev/null 2>&1; then
-        local _loop_in _loop_out _loop_cost
-        _loop_in=$(jq -r '.input_tokens // 0' "$_loop_token_file" 2>/dev/null || echo "0")
-        _loop_out=$(jq -r '.output_tokens // 0' "$_loop_token_file" 2>/dev/null || echo "0")
-        _loop_cost=$(jq -r '.cost_usd // 0' "$_loop_token_file" 2>/dev/null || echo "0")
-        TOTAL_INPUT_TOKENS=$(( TOTAL_INPUT_TOKENS + ${_loop_in:-0} ))
-        TOTAL_OUTPUT_TOKENS=$(( TOTAL_OUTPUT_TOKENS + ${_loop_out:-0} ))
-        if [[ -n "$_loop_cost" && "$_loop_cost" != "0" && "$_loop_cost" != "null" ]]; then
-            TOTAL_COST_USD="${_loop_cost}"
+            error "Build loop failed"
+            return 1
+        }
+        if [[ -n "$_handoff_dir" ]]; then
+            _build_handoff_return "$_handoff_dir" "$_handoff_base" || return 1
+            # The agent clone is gone; its loop logs (with loop-tokens.json) were copied here.
+            _loop_token_file="${ARTIFACTS_DIR}/agent-loop-logs/loop-tokens.json"
         fi
-        if [[ "${_loop_in:-0}" -gt 0 || "${_loop_out:-0}" -gt 0 ]]; then
-            info "Build loop tokens: in=${_loop_in} out=${_loop_out} cost=\$${_loop_cost:-0}"
-        fi
+        _pipeline_add_loop_tokens "$_loop_token_file"
     fi
 
     # Count commits made during build
@@ -576,18 +746,17 @@ ${commit_msgs}" --model "$(_smart_model commit_quality haiku)" < /dev/null 2>/de
 
 stage_test() {
     CURRENT_STAGE_ID="test"
-    local test_cmd="${TEST_CMD}"
-    if [[ -z "$test_cmd" ]]; then
-        test_cmd=$(jq -r --arg id "test" '(.stages[] | select(.id == $id) | .config.test_cmd) // .defaults.test_cmd // ""' "$PIPELINE_CONFIG" 2>/dev/null) || true
-        [[ -z "$test_cmd" || "$test_cmd" == "null" ]] && test_cmd=""
-    fi
-    # Auto-detect
-    if [[ -z "$test_cmd" ]]; then
-        test_cmd=$(detect_test_cmd)
-    fi
+    local test_cmd
+    test_cmd=$(_pipeline_test_cmd)
     if [[ -z "$test_cmd" ]]; then
         warn "No test command found — skipping test stage"
         return 0
+    fi
+
+    # Spec-first gate (ADR-0015): the locked acceptance tests, restored byte for byte, must pass
+    # (fail-to-pass) before the full suite runs (pass-to-pass).
+    if ! acceptance_gate "$ARTIFACTS_DIR/test-results.log"; then
+        return 1
     fi
 
     local coverage_min

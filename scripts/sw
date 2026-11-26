@@ -644,8 +644,26 @@ main() {
         failure)
             run_ts failure "$@"
             ;;
+        scorecard)
+            run_ts scorecard "$@"
+            ;;
+        eval)
+            run_ts eval "$@"
+            ;;
+        verify)
+            run_ts verify "$@"
+            ;;
         governance|gov)
             run_ts governance "$@"
+            ;;
+        tournament)
+            run_ts tournament "$@"
+            ;;
+        acceptance)
+            run_ts acceptance "$@"
+            ;;
+        repomodel|code)
+            run_ts repomodel "$@"
             ;;
         *)
             error "Unknown command: ${cmd}"

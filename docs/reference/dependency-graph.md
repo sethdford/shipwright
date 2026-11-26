@@ -10,6 +10,7 @@ flowchart LR
   subgraph ctx_adapters["adapters"]
     adapters["adapters"]
     adapters_agent["adapters/agent"]
+    adapters_bench["adapters/bench"]
     adapters_git["adapters/git"]
     adapters_github["adapters/github"]
     adapters_process["adapters/process"]
@@ -17,10 +18,20 @@ flowchart LR
     adapters_store["adapters/store"]
     adapters_tmux["adapters/tmux"]
   end
+  subgraph ctx_delivery["delivery"]
+    delivery["delivery"]
+    delivery_application["delivery/application"]
+    delivery_domain["delivery/domain"]
+  end
   subgraph ctx_governance["governance"]
     governance["governance"]
     governance_application["governance/application"]
     governance_domain["governance/domain"]
+  end
+  subgraph ctx_intelligence["intelligence"]
+    intelligence["intelligence"]
+    intelligence_application["intelligence/application"]
+    intelligence_domain["intelligence/domain"]
   end
   subgraph ctx_learning["learning"]
     learning["learning"]
@@ -32,10 +43,20 @@ flowchart LR
     orchestration_application["orchestration/application"]
     orchestration_domain["orchestration/domain"]
   end
+  subgraph ctx_planning["planning"]
+    planning["planning"]
+    planning_application["planning/application"]
+    planning_domain["planning/domain"]
+  end
   subgraph ctx_platform["platform"]
     platform["platform"]
     platform_application["platform/application"]
     platform_domain["platform/domain"]
+  end
+  subgraph ctx_quality["quality"]
+    quality["quality"]
+    quality_application["quality/application"]
+    quality_domain["quality/domain"]
   end
   cli["cli"]
   integrations["integrations"]
@@ -44,44 +65,85 @@ flowchart LR
   shutdown["shutdown"]
   adapters --> kernel
   adapters_agent --> kernel
+  adapters_bench --> adapters
+  adapters_bench --> adapters_github
+  adapters_bench --> adapters_process
+  adapters_bench --> adapters_state
+  adapters_bench --> kernel
+  adapters_bench --> quality
   adapters_git --> adapters_process
+  adapters_git --> delivery
   adapters_git --> governance
+  adapters_git --> intelligence
   adapters_git --> kernel
+  adapters_git --> planning
+  adapters_git --> quality
   adapters_github --> adapters_process
   adapters_github --> integrations
   adapters_github --> kernel
   adapters_github --> orchestration
+  adapters_github --> quality
+  adapters_process --> delivery
+  adapters_process --> intelligence
   adapters_process --> kernel
+  adapters_process --> planning
+  adapters_state --> intelligence
   adapters_state --> kernel
   adapters_state --> orchestration
+  adapters_state --> planning
+  adapters_state --> quality
   adapters_store --> kernel
   adapters_tmux --> adapters_process
   adapters_tmux --> kernel
+  cli --> delivery
   cli --> governance
+  cli --> intelligence
   cli --> kernel
   cli --> learning
   cli --> main
   cli --> orchestration
+  cli --> planning
   cli --> platform
+  cli --> quality
+  delivery --> delivery_application
+  delivery --> delivery_domain
+  delivery --> kernel
+  delivery_application --> delivery
+  delivery_application --> delivery_domain
+  delivery_application --> kernel
   governance --> governance_application
   governance --> governance_domain
   governance --> kernel
   governance_application --> governance
   governance_application --> governance_domain
   governance_application --> kernel
+  governance_application --> learning
   integrations --> kernel
+  intelligence --> intelligence_application
+  intelligence --> intelligence_domain
+  intelligence --> kernel
+  intelligence_application --> governance
+  intelligence_application --> intelligence
+  intelligence_application --> intelligence_domain
+  intelligence_application --> kernel
   learning --> learning_application
   learning --> learning_domain
   learning_application --> kernel
   learning_application --> learning_domain
   learning_domain --> kernel
   main --> adapters
+  main --> adapters_agent
+  main --> adapters_bench
   main --> adapters_git
   main --> adapters_github
   main --> adapters_process
   main --> adapters_state
   main --> cli
+  main --> delivery
+  main --> intelligence
   main --> orchestration
+  main --> planning
+  main --> quality
   main --> shutdown
   orchestration --> integrations
   orchestration --> kernel
@@ -91,6 +153,17 @@ flowchart LR
   orchestration_application --> kernel
   orchestration_application --> orchestration
   orchestration_application --> orchestration_domain
+  planning --> kernel
+  planning --> planning_application
+  planning --> planning_domain
+  planning_application --> planning
+  planning_application --> planning_domain
   platform --> platform_application
   platform_application --> platform_domain
+  quality --> kernel
+  quality --> quality_application
+  quality --> quality_domain
+  quality_application --> kernel
+  quality_application --> quality
+  quality_application --> quality_domain
 ```

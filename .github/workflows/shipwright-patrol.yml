@@ -44,27 +44,8 @@ jobs:
           npm link
 
       - name: Restore persistent state
-        run: |
-          # Restore events/memory/costs from shipwright-data branch
-          mkdir -p ~/.shipwright/memory
-
-          if git fetch origin shipwright-data 2>/dev/null; then
-            echo "Restoring state from shipwright-data branch..."
-            for file in events.jsonl costs.json budget.json; do
-              git show "origin/shipwright-data:${file}" > ~/.shipwright/"${file}" 2>/dev/null || true
-            done
-            # Restore memory directory
-            for file in $(git ls-tree -r --name-only origin/shipwright-data -- memory/ 2>/dev/null); do
-              mkdir -p ~/.shipwright/"$(dirname "$file")"
-              git show "origin/shipwright-data:${file}" > ~/.shipwright/"${file}" 2>/dev/null || true
-            done
-            echo "State restored successfully"
-          else
-            echo "No shipwright-data branch found — first run, starting fresh"
-            echo "[]" > ~/.shipwright/events.jsonl
-            echo "{}" > ~/.shipwright/costs.json
-            echo "{}" > ~/.shipwright/budget.json
-          fi
+        # Merge-safe restore/persist: scripts/ci/state-sync.sh (concurrent runs no longer erase each other's costs).
+        run: scripts/ci/state-sync.sh restore
 
       - name: Run patrol checks
         run: |
@@ -75,44 +56,6 @@ jobs:
 
       - name: Persist state to shipwright-data branch
         if: always()
-        run: |
-          # Clone or create shipwright-data branch in a temp directory
-          SW_STATE_DIR=$(mktemp -d)
-          cd "$SW_STATE_DIR"
-          git init
-          git remote add origin "https://x-access-token:${GITHUB_TOKEN}@github.com/${GITHUB_REPOSITORY}.git"
-
-          # Try to pull existing branch
-          if git fetch origin shipwright-data 2>/dev/null; then
-            git checkout -b shipwright-data origin/shipwright-data
-          else
-            echo "Creating shipwright-data branch for the first time"
-            git checkout --orphan shipwright-data
-            echo "# Shipwright Persistent State" > README.md
-            echo "" >> README.md
-            echo "This branch stores events, costs, and memory across ephemeral CI runs." >> README.md
-            echo "Do not merge this branch into main." >> README.md
-          fi
-
-          # Copy state files
-          cp ~/.shipwright/events.jsonl . 2>/dev/null || true
-          cp ~/.shipwright/costs.json . 2>/dev/null || true
-          cp ~/.shipwright/budget.json . 2>/dev/null || true
-          if [[ -d ~/.shipwright/memory ]]; then
-            cp -r ~/.shipwright/memory . 2>/dev/null || true
-          fi
-
-          # Commit and push
-          git config user.name "shipwright[bot]"
-          git config user.email "shipwright[bot]@users.noreply.github.com"
-          git add -A
-          if git diff --cached --quiet 2>/dev/null; then
-            echo "No state changes to persist"
-          else
-            git commit -m "chore: persist patrol state [skip ci]"
-            git push origin shipwright-data 2>/dev/null || {
-              # Force push on conflict (last writer wins for state data)
-              git push origin shipwright-data --force
-            }
-            echo "State persisted to shipwright-data branch"
-          fi
+        # Never fails the job: a state write that loses every push race is a warning, not a failed run.
+        continue-on-error: true
+        run: scripts/ci/state-sync.sh persist patrol

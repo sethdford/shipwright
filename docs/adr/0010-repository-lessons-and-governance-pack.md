@@ -44,5 +44,27 @@ ADR-0009's constraints. It is the first, smallest slice of phase J: the only sur
 - Until the eval harness runs paired replays, the lift is not measured; the events make it measurable later.
 - An eleventh bounded context, `governance`; lessons live there, and `learning` keeps classification.
 - Retire a lesson by setting `status: retired`, never by deleting it, so the record of what was tried remains.
-- Not done here: a reflection step that has an agent draft the rule, and a workflow that opens the lesson PR
-  after a failed run. Both need the ledger (W2-08) to show which runs a lesson touched.
+- Not done here: a workflow that opens the lesson PR after a failed run. It needs the ledger (W2-08) to show
+  which runs a lesson touched.
+
+## Amendment 1 (2026-11-26): the self-improvement loop
+Drafting, testing and judging a lesson are now automated; activating one still is not. Rule 4 holds: a lesson
+reaches a normal run only after a person merges it as `active`.
+
+1. **Mine.** `governance mine --manifest FILE` classifies each failed run's log, groups the learnable failures by
+   fingerprint, and drafts one `proposed` lesson for each fingerprint seen in at least 2 runs (`--min`), at most 3
+   per call (`--limit`), most frequent first. Fingerprints a lesson already covers are skipped. Auth, billing,
+   rate-limit and other infrastructure classes are never mined.
+2. **Reflect.** `governance reflect` prints a one-turn prompt for an agent to write the title, rule and hypothesis.
+   The log is passed as fenced, untrusted data. `apply-reflection` checks the JSON reply (length caps, no
+   placeholder) and writes it into the draft, which stays `proposed`. `scripts/lib/lessons-loop.sh` runs both; if
+   the agent fails, the placeholder draft is kept. It writes files only to the directory it is given.
+3. **Trial arm.** `SHIPWRIGHT_LESSONS_TRIAL=L-0003,…` (or `brief --trial`) adds those `proposed` lessons to the
+   brief for that run only. The `governance.brief` event records the trial ids, so the eval ratchet (#8735) can
+   compare the trial arm with the incumbent on the same cases.
+4. **Promote.** `governance promote --draft F --verdict V` reads the ratchet's verdict. Only an accepted verdict on
+   at least 12 cases makes the lesson `active`; anything else makes it `retired`. Either way it adds an
+   `## Evaluation` section with the counts, and prints the file; it never commits, pushes or opens a PR.
+5. **The merge is the gate.** The promoted file goes through a normal pull request. Per ADR-0009, that PR changes
+   only `.shipwright/lessons/`, never a protected path.
+

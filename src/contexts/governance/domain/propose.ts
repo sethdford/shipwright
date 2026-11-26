@@ -1,4 +1,9 @@
 import type { Lesson } from "./lesson";
+import { fenced, renderLesson } from "./render-lesson";
+
+export const TODO_HYPOTHESIS = "TODO: what should change in later runs if agents follow this rule";
+export const TODO_RULE =
+  "TODO: one rule an agent can follow before it builds. Say what to do, not what went wrong.";
 
 export interface ProposalInput {
   readonly failureClass: string;
@@ -41,36 +46,20 @@ export function evidenceExcerpt(log: string): string {
   return cut.replace(/```/g, "'''");
 }
 
-function oneLine(text: string): string {
-  return text
-    .replace(/[\r\n]+/g, " ")
-    .replace(/"/g, "'")
-    .trim();
-}
-
 function render(id: string, input: ProposalInput): string {
-  return [
-    "---",
-    `id: ${id}`,
-    "status: proposed",
-    `failure_class: ${input.failureClass}`,
-    `fingerprint: ${input.fingerprint}`,
-    "applies_to: []",
-    "keywords: []",
-    `source: "${oneLine(input.source)}"`,
-    'hypothesis: "TODO: what should change in later runs if agents follow this rule"',
-    "---",
-    "# TODO: a short title",
-    "",
-    "TODO: one rule an agent can follow before it builds. Say what to do, not what went wrong.",
-    "",
-    "## Evidence",
-    "",
-    "```text",
-    evidenceExcerpt(input.log),
-    "```",
-    "",
-  ].join("\n");
+  return renderLesson({
+    id,
+    status: "proposed",
+    failureClass: input.failureClass,
+    fingerprint: input.fingerprint,
+    appliesTo: [],
+    keywords: [],
+    source: input.source,
+    hypothesis: TODO_HYPOTHESIS,
+    title: "TODO: a short title",
+    rule: TODO_RULE,
+    sections: [{ heading: "Evidence", body: fenced(evidenceExcerpt(input.log)) }],
+  });
 }
 
 /**
@@ -78,10 +67,13 @@ function render(id: string, input: ProposalInput): string {
  * and the hypothesis and merges it as `active` (ADR-0010). A failure whose fingerprint a lesson already covers
  * (in any status) is a duplicate, so one failure never yields two drafts.
  */
-export function proposeLesson(existing: readonly Lesson[], input: ProposalInput): Proposal {
+export function proposeLesson(
+  existing: readonly Lesson[],
+  input: ProposalInput,
+  id: string = nextLessonId(existing),
+): Proposal {
   const dup = existing.find((l) => l.fingerprint === input.fingerprint);
   if (dup) return { kind: "duplicate", id: dup.id, path: dup.path };
-  const id = nextLessonId(existing);
   const path = `.shipwright/lessons/${id}.md`;
   return { kind: "draft", id, path, markdown: render(id, input) };
 }
