@@ -1,12 +1,11 @@
 import { afterEach, beforeEach, expect, test } from "bun:test";
 import {
-  chmodSync,
   existsSync,
   lstatSync,
   mkdirSync,
+  readdirSync,
   readFileSync,
   readlinkSync,
-  rmSync,
   symlinkSync,
   writeFileSync,
 } from "node:fs";
@@ -148,16 +147,21 @@ test("save refuses a symlinked parent", async () => {
 });
 
 test("a restore that cannot copy leaves the target as it was", async () => {
-  const c = cache();
-  const entry = await savedEntry(c);
+  const entry = await savedEntry(cache());
   const fresh = join(env.root, "fresh");
   mkdirSync(join(fresh, "node_modules", "old"), { recursive: true });
-  rmSync(join(env.stateDir, "env-cache", REPO, KEY, "files", "node_modules", "pkg"), {
-    recursive: true,
+  // Every cp fails (disk full, the entry pruned mid-copy, a timeout).
+  const failingCp = {
+    run: async (req: { argv: readonly string[] }) =>
+      req.argv[0] === "cp"
+        ? { exitCode: 1, stdout: "", stderr: "No space left on device", timedOut: false }
+        : runner.run(req as never),
+  };
+  const c = new FsEnvCache(failingCp, join(env.stateDir, "env-cache"), {
+    platform: "test-fallback",
   });
-  chmodSync(join(env.stateDir, "env-cache", REPO, KEY, "files", "node_modules"), 0o000);
   const r = await c.restore(entry, fresh);
-  chmodSync(join(env.stateDir, "env-cache", REPO, KEY, "files", "node_modules"), 0o755);
-  if (process.getuid?.() !== 0) expect(r.ok).toBe(false);
-  expect(existsSync(join(fresh, "node_modules", r.ok ? ".bin" : "old"))).toBe(true);
+  expect(r.ok).toBe(false);
+  expect(existsSync(join(fresh, "node_modules", "old"))).toBe(true);
+  expect(readdirSync(fresh)).toEqual(["node_modules"]);
 });
