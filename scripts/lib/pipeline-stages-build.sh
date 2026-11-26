@@ -10,6 +10,8 @@ source "$(dirname "${BASH_SOURCE[0]}")/test-gate-env.sh"
 # shellcheck source=lib/untrusted.sh
 source "$(dirname "${BASH_SOURCE[0]}")/untrusted.sh"
 source "$(dirname "${BASH_SOURCE[0]}")/models.sh"
+# shellcheck source=lib/claude-usage.sh
+source "$(dirname "${BASH_SOURCE[0]}")/claude-usage.sh"
 [[ -n "${_PIPELINE_STAGES_BUILD_LOADED:-}" ]] && return 0
 _PIPELINE_STAGES_BUILD_LOADED=1
 
@@ -474,10 +476,21 @@ ${_skill_prompts}
     fi
 
     local _token_log="${ARTIFACTS_DIR}/.claude-tokens-build.log"
+    # sw-loop writes its token and USD totals under the git top level of the directory it runs in (a
+    # --worktree run's worktree, which PROJECT_ROOT may not name). Drop a previous run's file first, so
+    # a loop that dies before writing one adds nothing rather than an old run's spend.
+    local _loop_root
+    _loop_root="$(git rev-parse --show-toplevel 2>/dev/null || echo "$PROJECT_ROOT")"
+    local _loop_token_file="${_loop_root}/.claude/loop-logs/loop-tokens.json"
+    [[ -f "$_loop_token_file" ]] && rm -f "$_loop_token_file"
     export PIPELINE_JOB_ID="${PIPELINE_NAME:-pipeline-$$}"
-    sw loop "${loop_args[@]}" < /dev/null 2>"$_token_log" || {
+    # Run the loop that ships with this pipeline, not whatever `sw` is first on PATH: an older global
+    # install there runs an old sw-loop.sh (one that recorded 0 tokens and $0 for every build).
+    # SHIPWRIGHT_LOOP_SCRIPT replaces it in tests only.
+    "${SHIPWRIGHT_LOOP_SCRIPT:-$SCRIPT_DIR/sw-loop.sh}" "${loop_args[@]}" < /dev/null 2>"$_token_log" || {
         local _loop_exit=$?
-        parse_claude_tokens "$_token_log"
+        # A failed build still spent money: count it before returning.
+        _pipeline_add_loop_tokens "$_loop_token_file"
 
         # Detect context exhaustion from progress file
         local _progress_file="${PWD}/.claude/loop-logs/progress.md"
@@ -496,24 +509,7 @@ ${_skill_prompts}
         error "Build loop failed"
         return 1
     }
-    parse_claude_tokens "$_token_log"
-
-    # Read accumulated token counts from build loop (written by sw-loop.sh)
-    local _loop_token_file="${PROJECT_ROOT}/.claude/loop-logs/loop-tokens.json"
-    if [[ -f "$_loop_token_file" ]] && command -v jq >/dev/null 2>&1; then
-        local _loop_in _loop_out _loop_cost
-        _loop_in=$(jq -r '.input_tokens // 0' "$_loop_token_file" 2>/dev/null || echo "0")
-        _loop_out=$(jq -r '.output_tokens // 0' "$_loop_token_file" 2>/dev/null || echo "0")
-        _loop_cost=$(jq -r '.cost_usd // 0' "$_loop_token_file" 2>/dev/null || echo "0")
-        TOTAL_INPUT_TOKENS=$(( TOTAL_INPUT_TOKENS + ${_loop_in:-0} ))
-        TOTAL_OUTPUT_TOKENS=$(( TOTAL_OUTPUT_TOKENS + ${_loop_out:-0} ))
-        if [[ -n "$_loop_cost" && "$_loop_cost" != "0" && "$_loop_cost" != "null" ]]; then
-            TOTAL_COST_USD="${_loop_cost}"
-        fi
-        if [[ "${_loop_in:-0}" -gt 0 || "${_loop_out:-0}" -gt 0 ]]; then
-            info "Build loop tokens: in=${_loop_in} out=${_loop_out} cost=\$${_loop_cost:-0}"
-        fi
-    fi
+    _pipeline_add_loop_tokens "$_loop_token_file"
 
     # Count commits made during build
     local commit_count
