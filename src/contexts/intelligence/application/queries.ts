@@ -121,7 +121,7 @@ export function ownersText(snap: Snapshot, path: string): string {
 export function repoMapText(snap: Snapshot, focus: string, budget: number): string {
   if (focus.trim().length === 0)
     return renderMap(snap.graph, topRanked(rankFiles(snap.graph), 200), budget);
-  const located = localize(snap.graph, snap.index, focus, 200);
+  const located = localize(snap.graph, snap.index, focus, 200, snap.semantic(focus, 30));
   return renderMap(
     snap.graph,
     located.map((l) => [l.path, l.score] as const),
@@ -130,7 +130,7 @@ export function repoMapText(snap: Snapshot, focus: string, budget: number): stri
 }
 
 export function localizeText(snap: Snapshot, task: string, limit: number): string {
-  const located = localize(snap.graph, snap.index, task, limit);
+  const located = localize(snap.graph, snap.index, task, limit, snap.semantic(task, 30));
   if (located.length === 0)
     return "Nothing in the index matches this task. Try search with other words.";
   return located

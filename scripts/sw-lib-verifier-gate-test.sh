@@ -19,7 +19,7 @@ export BUN_LOG="$TEST_TEMP_DIR/bun.log"
 export BUN_EXIT=0
 export BUN_OUT='{"probability":0.62,"decision":{"verdict":"pass","wouldBe":"pass","reasons":[]}}'
 # Logs each argument on its own line and copies the body file so tests can read it.
-mock_binary "bun" 'printf "%s\n" "$@" >> "$BUN_LOG"; prev=""; for a in "$@"; do [[ "$prev" == "--body-file" ]] && cp "$a" "$BUN_LOG.body"; prev="$a"; done; printf "%s" "$BUN_OUT"; exit "$BUN_EXIT"'
+mock_binary "bun" 'printf "%s\n" "$@" >> "$BUN_LOG"; prev=""; for a in "$@"; do [[ "$prev" == "--body-file" ]] && cp "$a" "$BUN_LOG.body"; [[ "$prev" == "--impact-file" ]] && cp "$a" "$BUN_LOG.impact"; prev="$a"; done; printf "%s" "$BUN_OUT"; exit "$BUN_EXIT"'
 
 source "$SCRIPT_DIR/lib/verifier-gate.sh"
 
@@ -74,6 +74,24 @@ verifier_gate "origin/main" "t" "b" bogus 2>/dev/null || true
 assert_contains "an unknown test status becomes unknown" "$(tr '\n' ' ' < "$BUN_LOG")" "--tests unknown"
 SHIPWRIGHT_VERIFIER=loud verifier_gate "origin/main" "t" "b" 2>/dev/null || true
 assert_contains "an unknown mode falls back to advisory" "$(tr '\n' ' ' < "$BUN_LOG")" "--mode advisory"
+
+print_test_section "critic and repository-model impact"
+: > "$BUN_LOG"
+verifier_gate "origin/main" "t" "b" 2>/dev/null || true
+n="$(grep -c -- "--critic" "$BUN_LOG" || true)"
+assert_eq "no critic by default (no model spend)" "0" "${n:-0}"
+: > "$BUN_LOG"
+repo_model_impact_section() { printf '## Change impact (repository model)\n- src/a.ts\n'; }
+SHIPWRIGHT_VERIFIER_CRITIC=on verifier_gate "origin/main" "t" "b" 2>/dev/null || true
+assert_contains "SHIPWRIGHT_VERIFIER_CRITIC=on adds the critic" "$(cat "$BUN_LOG")" "--critic"
+assert_contains "with the impact section as a file" "$(cat "$BUN_LOG.impact")" "## Change impact (repository model)"
+assert_eq "and the temp files are removed" "0" \
+    "$(find "${TMPDIR:-/tmp}" -maxdepth 1 -name 'sw-verifier-impact.*' -newer "$BUN_LOG.body" 2>/dev/null | wc -l | tr -d ' ')"
+unset -f repo_model_impact_section
+: > "$BUN_LOG"
+SHIPWRIGHT_VERIFIER_CRITIC=on verifier_gate "origin/main" "t" "b" 2>/dev/null || true
+n="$(grep -c -- "--impact-file" "$BUN_LOG" || true)"
+assert_eq "without the repository model, no impact file" "0" "${n:-0}"
 
 print_test_section "pipeline wiring"
 assert_contains "stage_pr calls the verifier before creating the PR" \

@@ -13,12 +13,16 @@ const VALUES: Readonly<Record<string, readonly string[]>> = {
   map: ["--root", "--focus", "--budget"],
   localize: ["--root", "--task", "--limit"],
   brief: ["--root", "--task"],
+  impact: ["--root", "--diff"],
+  eval: ["--root", "--ref", "--commits", "--policy"],
   mcp: ["--root"],
 };
 
 const SWITCHES: Readonly<Record<string, readonly string[]>> = {
   build: ["--json"],
   brief: ["--json", "--with-tools"],
+  impact: ["--json"],
+  eval: ["--json", "--export"],
 };
 
 function positiveInt(v: string): boolean {
@@ -39,7 +43,7 @@ function parseFlags(sub: string, args: readonly string[]) {
     if (!allowedValues.includes(arg)) return `unknown option: ${arg}`;
     const value = args[i + 1];
     if (value === undefined || value.startsWith("--")) return `${arg} needs a value`;
-    if ((arg === "--limit" || arg === "--budget") && !positiveInt(value))
+    if ((arg === "--limit" || arg === "--budget" || arg === "--commits") && !positiveInt(value))
       return `${arg} must be a positive integer`;
     values[arg] = value;
     i += 1;
@@ -65,6 +69,7 @@ export function parseModelArgs(
   if (sub === "brief" && flags.values["--task"] === undefined) return "brief needs --task FILE";
   if (sub === "localize" && flags.values["--task"] === undefined)
     return "localize needs --task FILE";
+  if (sub === "impact" && flags.values["--diff"] === undefined) return "impact needs --diff FILE";
   return { positional, ...flags };
 }
 

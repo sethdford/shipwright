@@ -52,6 +52,10 @@ export function envOff(value: string | undefined): boolean {
   return ["off", "0", "false", "no"].includes((value ?? "").trim().toLowerCase());
 }
 
+export function envOn(value: string | undefined): boolean {
+  return ["on", "1", "true", "yes"].includes((value ?? "").trim().toLowerCase());
+}
+
 /** One path per line; blank lines and surrounding space are dropped. */
 export function pathLines(text: string): readonly string[] {
   return text

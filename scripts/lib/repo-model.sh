@@ -28,6 +28,14 @@ repo_model_arm() {
     if repo_model_enabled; then echo "on"; else echo "off"; fi
 }
 
+# The semantic channel's arm (SHIPWRIGHT_REPO_MODEL_SEMANTIC=on|1|true|yes; off by default), recorded with each brief.
+repo_model_semantic_arm() {
+    case "$(printf '%s' "${SHIPWRIGHT_REPO_MODEL_SEMANTIC:-off}" | tr '[:upper:]' '[:lower:]' | tr -d '[:space:]')" in
+        on|1|true|yes) echo "on" ;;
+        *) echo "off" ;;
+    esac
+}
+
 _repo_model_cli_path() {
     printf '%s\n' "${SW_TS_CLI:-$(cd "${_REPO_MODEL_DIR}/../.." && pwd)/src/cli.ts}"
 }
@@ -61,13 +69,32 @@ repo_model_brief_section() {
     [[ "$tools" == "--with-tools" ]] && args+=(--with-tools)
     if out="$(_repo_model_cli "${args[@]}" 2>/dev/null)"; then
         files="$(printf '%s' "$out" | jq -r '[.files[]] | join(",")' 2>/dev/null || true)"
-        _repo_model_event "repo_model.brief" "arm=on" "files=${files}" \
+        _repo_model_event "repo_model.brief" "arm=on" "files=${files}" "semantic=$(repo_model_semantic_arm)" \
             "extracted=$(printf '%s' "$out" | jq -r '.stats.extracted // 0' 2>/dev/null || echo 0)"
         printf '%s' "$out" | jq -r '.brief // ""' 2>/dev/null || true
     else
         _repo_model_event "repo_model.brief_unavailable" "arm=on" "reason=command_failed"
     fi
     rm -f "$tmp"
+    return 0
+}
+
+# repo_model_impact_section <diff-file> — the change-impact section for a unified diff (who imports or uses the
+# definitions it edits, linked tests it does not change, deleted files still imported), or nothing.
+repo_model_impact_section() {
+    local diff_file="${1:-}" root out
+    repo_model_enabled || { _repo_model_event "repo_model.impact" "arm=off"; return 0; }
+    [[ -s "$diff_file" ]] || return 0
+    root="$(_repo_model_root)" || return 0
+    if out="$(_repo_model_cli impact --root "$root" --diff "$diff_file" --json 2>/dev/null)"; then
+        _repo_model_event "repo_model.impact" "arm=on" \
+            "files=$(printf '%s' "$out" | jq -r '.files | length' 2>/dev/null || echo 0)" \
+            "untested=$(printf '%s' "$out" | jq -r '.untested | length' 2>/dev/null || echo 0)" \
+            "orphaned=$(printf '%s' "$out" | jq -r '.orphaned | length' 2>/dev/null || echo 0)"
+        printf '%s' "$out" | jq -r '.text // ""' 2>/dev/null || true
+    else
+        _repo_model_event "repo_model.impact_unavailable" "arm=on" "reason=command_failed"
+    fi
     return 0
 }
 
