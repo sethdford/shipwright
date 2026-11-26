@@ -181,7 +181,8 @@ _build_tournament() {
     fi
     local rc=0
     # Under handoff it holds no GitHub or fleet credentials, like the build loop (_build_run_loop).
-    (cd "$run_dir" && _build_run_loop sw tournament "${args[@]}") < /dev/null > "${report}.tmp" || rc=$?
+    # It runs the sw beside this pipeline, never one from PATH (an older install would run instead).
+    (cd "$run_dir" && _build_run_loop "${SHIPWRIGHT_SW_BIN:-$SCRIPT_DIR/sw}" tournament "${args[@]}") < /dev/null > "${report}.tmp" || rc=$?
     mv "${report}.tmp" "$report"
 
     local winner confidence cost
@@ -524,6 +525,8 @@ ${_skill_prompts}
         [[ -n "$_extra_tc" ]] && loop_args+=(--additional-test-cmds "$_extra_tc")
     done
     loop_args+=(--max-iterations "$max_iter")
+    # A template's iteration count may auto-extend; a --max-iterations the operator set is a hard cap.
+    [[ -z "${MAX_ITERATIONS_OVERRIDE:-}" ]] && loop_args+=(--auto-extend)
     # W2-07: resolve the alias (opus, sonnet, haiku) through config/models.json. This is the one point where
     # $MODEL, CLAUDE_MODEL and the template values have all been applied.
     build_model=$(models_resolve "$build_model") || return 1

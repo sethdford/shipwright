@@ -644,13 +644,15 @@ CLAUDE_EOF
         --repo "$TEST_TEMP_DIR/repo" \
         "Never finish" \
         --max-iterations 3 \
-        --test-cmd "true" \
+        --test-cmd "false" \
         --local \
-        --no-auto-extend \
         2>&1) || true
 
-    if echo "$output" | grep >/dev/null -iE "max iteration|iteration.*3|Max iterations"; then
-        assert_pass "Loop stops at max iterations"
+    # No --no-auto-extend: an explicit --max-iterations is a hard cap even while tests fail.
+    if echo "$output" | grep >/dev/null "Auto-extending"; then
+        assert_fail "Explicit --max-iterations is a hard cap" "the loop auto-extended past --max-iterations 3"
+    elif echo "$output" | grep >/dev/null -iE "max iteration|iteration.*3|Max iterations"; then
+        assert_pass "Loop stops at an explicit --max-iterations without auto-extending"
     else
         assert_fail "Loop respects max-iterations" "expected iteration limit message"
     fi
