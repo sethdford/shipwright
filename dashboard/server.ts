@@ -40,12 +40,15 @@ import {
   isFleetRoute,
   isLoopbackRequest,
   loadGuardConfig,
+  presentedToken,
   readFleetToken,
   sessionCookieAttributes,
   startupProblem,
+  tokenMatches,
   withCors,
   wsOriginAllowed,
 } from "./services/request-guard.js";
+import { authorizeRequest, normalizeRole } from "./services/route-authz.js";
 import { Database } from "bun:sqlite";
 
 // ─── Config ──────────────────────────────────────────────────────────
@@ -894,31 +897,13 @@ function saveRBACConfig(config: RBACConfig): void {
   } catch {}
 }
 
+// rbac.json is operator-edited: an unknown role string resolves to viewer, never to admin.
 function resolveUserRole(username: string): "viewer" | "operator" | "admin" {
   const config = loadRBACConfig();
-  return config.users[username] || config.default_role;
+  return normalizeRole(config.users?.[username] ?? config.default_role) ?? "viewer";
 }
 
-// Role permissions: what each role can do
-const ROLE_PERMISSIONS = {
-  viewer: new Set(["read"]),
-  operator: new Set(["read", "intervene", "approve", "control-daemon"]),
-  admin: new Set([
-    "read",
-    "intervene",
-    "approve",
-    "control-daemon",
-    "configure",
-    "manage-users",
-  ]),
-};
-
-function hasPermission(
-  role: "viewer" | "operator" | "admin",
-  permission: string,
-): boolean {
-  return ROLE_PERMISSIONS[role]?.has(permission) ?? false;
-}
+// Role permissions and the per-route check live in services/route-authz.ts (#8720).
 
 // ─── Audit Log ──────────────────────────────────────────────────────
 const AUDIT_LOG_FILE = join(HOME, ".shipwright", "audit-log.jsonl");
@@ -3089,7 +3074,7 @@ async function routeRequest(
           username: session.githubUser,
           avatarUrl: session.avatarUrl,
           isAdmin: session.isAdmin,
-          role: session.role || "admin",
+          role: normalizeRole(session.role) ?? "viewer",
         }),
         { headers: { "Content-Type": "application/json", ...CORS_HEADERS } },
       );
@@ -5738,6 +5723,13 @@ const server = Bun.serve<WsData>({
     const hasSession = isAuthEnabled() && getSession(req) !== null;
     const blocked = guardRequest(req, GUARD, hasSession);
     if (blocked) return withCors(blocked, req, GUARD);
+    // Role authorization for every mutating route, before any handler runs (#8720).
+    const denied = authorizeRequest(req, {
+      authEnabled: isAuthEnabled(),
+      fleetTokenValid: tokenMatches(GUARD.fleetToken, presentedToken(req)),
+      sessionRole: isAuthEnabled() ? getSession(req)?.role : undefined,
+    });
+    if (denied) return withCors(denied, req, GUARD);
     return withCors(await routeRequest(req, server), req, GUARD);
   },
 

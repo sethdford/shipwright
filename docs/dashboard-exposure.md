@@ -86,6 +86,29 @@ Checks run in this order, before any route:
   `http://localhost`, unlike Chrome and Firefox, which treat localhost as a secure context. With
   `Secure` on, sign in through the `https://` origin, not `http://localhost:<port>`.
 
+## Roles
+
+Every mutating request (any method but `GET`, `HEAD` or `OPTIONS`) passes one server-side role
+check before any handler runs (`dashboard/services/route-authz.ts`, #8720). The UI's button gating
+is only a convenience; the server is the authorization.
+
+| Role | Can |
+| --- | --- |
+| `viewer` | read |
+| `operator` | read; intervene (abort, pause, resume, skip, message, claim); approve or reject gates; start, stop, pause and resume the daemon |
+| `admin` | everything, including configuration (machines, notifications, gate config) and users (RBAC, join tokens, invites) |
+
+- Roles come from `~/.shipwright/rbac.json` (`users`, then `default_role`) at sign-in. An unknown
+  role string, or a session with no role, is treated as `viewer`. With no `rbac.json` the default
+  role is `admin`; an exposed multi-user dashboard should set `"default_role": "viewer"`.
+- **Deny by default**: a mutating route that is not classified in `MUTATING_ROUTES` needs `admin`,
+  and `route-authz.test.ts` fails until it is classified.
+- A refusal is `403` with the body `{"error":"forbidden","code":"role_forbidden","required":"<permission>"}`.
+- Login, logout, and join or invite redemption carry their own credential and skip the role check.
+  Fleet routes pass with the fleet token; a browser session calling them needs the route's role.
+- **Auth off** (`none`) is single-user local mode: it is only allowed on a loopback bind, every
+  caller is the local operator, and no role check applies.
+
 ## Workers
 
 The daemon's claim and release (`scripts/lib/daemon-state.sh`) and `shipwright connect` heartbeat

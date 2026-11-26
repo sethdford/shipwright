@@ -33,6 +33,10 @@ async function request<T>(url: string, options?: RequestInit): Promise<T> {
     const body = await resp
       .json()
       .catch(() => ({ error: `HTTP ${resp.status}` }));
+    // The server's role check (services/route-authz.ts) answers 403 with code role_forbidden.
+    if (body.code === "role_forbidden") {
+      throw new Error(`Your role does not allow this action (needs "${body.required}")`);
+    }
     throw new Error(body.error || `HTTP ${resp.status}`);
   }
   return resp.json();
