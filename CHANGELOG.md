@@ -52,6 +52,10 @@ read the upgrade notes first.
 - Correctness fixes from a full audit: the test gate on mawk, a $0 budget, test selection and portability ([#8734](https://github.com/sethdford/shipwright/pull/8734)).
 - CI installs Bun in the pipeline build job so the TypeScript commands run ([#8741](https://github.com/sethdford/shipwright/pull/8741)).
 
+### Known limitations
+
+- Tournament builds (opt-in) do not go through patch handoff yet: attempts run in git worktrees and the winning patch is fast-forwarded without the patch judge.
+
 ---
 
 ## [4.0.0] — 2026-10-26
