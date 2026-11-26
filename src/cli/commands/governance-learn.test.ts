@@ -63,7 +63,10 @@ function files(extra: Record<string, string> = {}) {
 
 async function run(args: string[], env: Record<string, string> = {}, f = files()) {
   const io = captureIO();
-  const code = await governanceCommand.run(args, commandContext(io, undefined, env, f, repo));
+  const code = await governanceCommand.run(
+    args,
+    commandContext(io, undefined, env, f, { repoDocs: repo }),
+  );
   return { code, out: io.outLines.join("\n"), err: io.errLines.join("\n") };
 }
 
