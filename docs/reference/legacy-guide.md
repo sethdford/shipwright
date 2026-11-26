@@ -705,7 +705,7 @@ Most commands are bash. The dashboard server and the commands routed through `ru
 | `scripts/sw-webhook.sh` | 621 | GitHub Webhook Receiver for Instant Issue Processing |
 | `scripts/sw-widgets.sh` | 528 | Embeddable Status Widgets |
 | `scripts/sw-worktree.sh` | 421 | Git worktree management for multi-agent isolation |
-| `scripts/sw` | 671 | CLI router — dispatches subcommands via exec |
+| `scripts/sw` | 677 | CLI router — dispatches subcommands via exec |
 <!-- /AUTO:core-scripts -->
 
 ### GitHub API Modules
@@ -797,7 +797,7 @@ Most commands are bash. The dashboard server and the commands routed through `ru
 | `scripts/sw-e2e-integration-test.sh` | 367 | Real Claude + Real GitHub |
 | `scripts/sw-e2e-orchestrator-test.sh` | 158 | Test suite registry & execution |
 | `scripts/sw-e2e-smoke-test.sh` | 852 | Pipeline orchestration without API keys |
-| `scripts/sw-e2e-system-test.sh` | 514 | Proves full daemon→pipeline→loop→PR flow |
+| `scripts/sw-e2e-system-test.sh` | 516 | Proves full daemon→pipeline→loop→PR flow |
 | `scripts/sw-eventbus-test.sh` | 156 | Durable event bus tests |
 | `scripts/sw-evidence-test.sh` | 419 | Unit tests for sw-evidence.sh |
 | `scripts/sw-feedback-test.sh` | 303 | Production Feedback Loop tests |
@@ -823,6 +823,7 @@ Most commands are bash. The dashboard server and the commands routed through `ru
 | `scripts/sw-intent-analysis-test.sh` | 445 | Test suite for intent analysis module |
 | `scripts/sw-jira-test.sh` | 286 | Validate Jira ↔ GitHub bidirectional sync |
 | `scripts/sw-launchd-test.sh` | 902 | Validate service management on |
+| `scripts/sw-lib-acceptance-tests-test.sh` | 209 | spec-first acceptance (ADR-0015) |
 | `scripts/sw-lib-audit-trail-test.sh` | 312 |  |
 | `scripts/sw-lib-claude-usage-test.sh` | 122 | pipeline runs record real tokens and USD |
 | `scripts/sw-lib-compat-test.sh` | 423 | Unit tests for cross-platform helpers |
@@ -844,7 +845,7 @@ Most commands are bash. The dashboard server and the commands routed through `ru
 | `scripts/sw-lib-pipeline-intelligence-test.sh` | 411 | Unit tests for intelligence |
 | `scripts/sw-lib-pipeline-quality-checks-test.sh` | 194 | Unit tests for quality |
 | `scripts/sw-lib-pipeline-router-test.sh` | 127 | ADR-0014 adaptive compute router |
-| `scripts/sw-lib-pipeline-stages-test.sh` | 299 | Unit tests for stage functions |
+| `scripts/sw-lib-pipeline-stages-test.sh` | 326 | Unit tests for stage functions |
 | `scripts/sw-lib-pipeline-state-test.sh` | 310 | Unit tests for pipeline state |
 | `scripts/sw-lib-pr-content-test.sh` | 130 | PR titles, bodies and artifact scrubbing |
 | `scripts/sw-lib-repo-model-test.sh` | 106 | ADR-0016 brief and MCP attach |
@@ -870,7 +871,7 @@ Most commands are bash. The dashboard server and the commands routed through `ru
 | `scripts/sw-oversight-test.sh` | 165 | Quality oversight board tests |
 | `scripts/sw-patrol-meta-test.sh` | 440 | Validate self-improvement patrol |
 | `scripts/sw-pipeline-composer-test.sh` | 635 | Test Suite |
-| `scripts/sw-pipeline-test.sh` | 1992 | E2E validation invoking the REAL pipeline |
+| `scripts/sw-pipeline-test.sh` | 1995 | E2E validation invoking the REAL pipeline |
 | `scripts/sw-pipeline-vitals-test.sh` | 227 | Validate pipeline health scoring |
 | `scripts/sw-pm-test.sh` | 226 | Autonomous PM Agent test suite |
 | `scripts/sw-policy-e2e-test.sh` | 291 | Verify config/policy.json is honored |
