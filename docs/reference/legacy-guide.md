@@ -615,13 +615,13 @@ Most commands are bash. The dashboard server and the commands routed through `ru
 | `scripts/sw-cleanup.sh` | 350 | Clean up orphaned Claude team sessions & artifacts |
 | `scripts/sw-code-review.sh` | 702 | Clean Code & Architecture Analysis |
 | `scripts/sw-connect.sh` | 687 | Sync local state to team dashboard |
-| `scripts/sw-context.sh` | 601 | Context Engine for Pipeline Stages |
+| `scripts/sw-context.sh` | 606 | Context Engine for Pipeline Stages |
 | `scripts/sw-cost.sh` | 1112 | Token Usage & Cost Intelligence |
 | `scripts/sw-daemon.sh` | 1417 | Autonomous GitHub Issue Watcher |
 | `scripts/sw-dashboard.sh` | 519 | Fleet Command Dashboard |
 | `scripts/sw-db.sh` | 2016 | SQLite Persistence Layer |
 | `scripts/sw-decide.sh` | 716 | Shipwright Autonomous Decision Engine |
-| `scripts/sw-decompose.sh` | 875 | Intelligent Issue Decomposition |
+| `scripts/sw-decompose.sh` | 887 | Intelligent Issue Decomposition |
 | `scripts/sw-deps.sh` | 533 | Automated Dependency Update Management |
 | `scripts/sw-developer-simulation.sh` | 239 | Multi-Persona Developer Simulation |
 | `scripts/sw-discovery.sh` | 913 | Cross-Pipeline Real-Time Learning |
@@ -647,7 +647,7 @@ Most commands are bash. The dashboard server and the commands routed through `ru
 | `scripts/sw-incident.sh` | 1141 | Autonomous Incident Detection & Response |
 | `scripts/sw-init.sh` | 871 | Complete setup for Shipwright + Shipwright |
 | `scripts/sw-instrument.sh` | 691 | Pipeline Instrumentation & Feedback Loops |
-| `scripts/sw-intelligence.sh` | 1551 | AI-Powered Analysis & Decision Engine |
+| `scripts/sw-intelligence.sh` | 1555 | AI-Powered Analysis & Decision Engine |
 | `scripts/sw-jira.sh` | 628 | Jira ↔ GitHub Bidirectional Sync |
 | `scripts/sw-launchd.sh` | 703 | Process supervision (macOS + Linux) |
 | `scripts/sw-linear.sh` | 643 | Linear ↔ GitHub Bidirectional Sync |
@@ -699,7 +699,7 @@ Most commands are bash. The dashboard server and the commands routed through `ru
 | `scripts/sw-tmux.sh` | 625 | tmux Health & Plugin Management |
 | `scripts/sw-trace.sh` | 480 | E2E Traceability (Issue → Commit → PR → Deploy) |
 | `scripts/sw-tracker.sh` | 517 | Provider Router for Issue Tracker Integration |
-| `scripts/sw-triage.sh` | 812 | Intelligent Issue Labeling & Prioritization |
+| `scripts/sw-triage.sh` | 820 | Intelligent Issue Labeling & Prioritization |
 | `scripts/sw-upgrade.sh` | 477 | Detect and apply updates from the repo |
 | `scripts/sw-ux.sh` | 685 | Premium UX Enhancement Layer |
 | `scripts/sw-webhook.sh` | 621 | GitHub Webhook Receiver for Instant Issue Processing |
@@ -785,7 +785,7 @@ Most commands are bash. The dashboard server and the commands routed through `ru
 | `scripts/sw-decide-test.sh` | 522 | Unit tests for the Autonomous Decision Engine |
 | `scripts/sw-decompose-test.sh` | 223 | Intelligent Issue Decomposition tests |
 | `scripts/sw-deps-test.sh` | 166 | Automated Dependency Update Management tests |
-| `scripts/sw-developer-simulation-test.sh` | 263 | Validate multi-persona |
+| `scripts/sw-developer-simulation-test.sh` | 265 | Validate multi-persona |
 | `scripts/sw-discovery-test.sh` | 269 | Cross-Pipeline Real-Time Learning tests |
 | `scripts/sw-doc-fleet-test.sh` | 347 | Validate documentation fleet operations |
 | `scripts/sw-docs-agent-test.sh` | 184 | Validate documentation agent operations |
@@ -806,7 +806,7 @@ Most commands are bash. The dashboard server and the commands routed through `ru
 | `scripts/sw-fleet-test.sh` | 825 | Unit tests for fleet orchestration |
 | `scripts/sw-fleet-viz-test.sh` | 279 | Validate fleet visualization dashboard, |
 | `scripts/sw-formal-spec-test.sh` | 299 | Formal Specification System Test Suite |
-| `scripts/sw-frontier-test.sh` | 584 | Validate adversarial review, developer |
+| `scripts/sw-frontier-test.sh` | 586 | Validate adversarial review, developer |
 | `scripts/sw-github-app-test.sh` | 146 | Validate GitHub App management |
 | `scripts/sw-github-checks-test.sh` | 538 | Validate Checks API wrapper |
 | `scripts/sw-github-deploy-test.sh` | 526 | Validate Deployments API wrapper |
@@ -850,7 +850,7 @@ Most commands are bash. The dashboard server and the commands routed through `ru
 | `scripts/sw-lib-test-gate-baseline-test.sh` | 662 | differential test gate (#8633) |
 | `scripts/sw-lib-test-gate-env-test.sh` | 399 | the loop's test gate has no creds |
 | `scripts/sw-lib-test-isolate-test.sh` | 139 | regression test for test isolation (#8648) |
-| `scripts/sw-lib-untrusted-test.sh` | 172 | prompt-injection defenses for issue text |
+| `scripts/sw-lib-untrusted-test.sh` | 295 | prompt-injection defenses for issue text |
 | `scripts/sw-lib-verifier-gate-test.sh` | 84 | the merge verifier before a PR |
 | `scripts/sw-linear-test.sh` | 302 | Validate Linear ↔ GitHub bidirectional sync |
 | `scripts/sw-logs-test.sh` | 282 | Validate agent pane log viewing, searching, |
