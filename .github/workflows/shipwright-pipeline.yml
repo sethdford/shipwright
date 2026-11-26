@@ -221,7 +221,7 @@ jobs:
             # never --model "null"; the empty response below then takes the fail-safe path (reject, do not approve).
             TRIAGE_MODEL="$(jq -r '.aliases.haiku // empty' config/models.json 2>/dev/null || echo "")"
             if [[ -n "$TRIAGE_MODEL" && "$TRIAGE_MODEL" != "null" ]]; then
-              RESPONSE=$(scripts/lib/agent-exec.sh claude -p "$PROMPT_TEXT" --max-turns 1 --model "$TRIAGE_MODEL" 2>/dev/null || echo "")
+              RESPONSE=$(scripts/lib/agent-exec.sh claude -p "$PROMPT_TEXT" --max-turns 1 --model "$TRIAGE_MODEL" 2>/tmp/triage-err.log || echo "")
             else
               echo "::error::config/models.json has no haiku alias; triage cannot run"
               RESPONSE=""
@@ -238,10 +238,19 @@ jobs:
             fi
           fi
 
-          # Parse response
-          APPROVED=$(echo "$RESPONSE" | grep -i "^APPROVED:" | head -1 | awk '{print $2}' | tr '[:upper:]' '[:lower:]')
-          COMPLEXITY=$(echo "$RESPONSE" | grep -i "^COMPLEXITY:" | head -1 | awk '{print $2}' | tr '[:upper:]' '[:lower:]')
-          REASON=$(echo "$RESPONSE" | grep -i "^REASON:" | head -1 | sed 's/^REASON: *//')
+          # Parse response. Models often bold the keys (**APPROVED:** true) or indent them: drop markdown
+          # emphasis, heading marks and leading space before matching, so a formatted answer still parses.
+          PARSED=$(printf '%s\n' "$RESPONSE" | sed -e 's/[*`#]//g' -e 's/^[[:space:]-]*//')
+          APPROVED=$(echo "$PARSED" | grep -i "^APPROVED:" | head -1 | awk '{print $2}' | tr '[:upper:]' '[:lower:]')
+          COMPLEXITY=$(echo "$PARSED" | grep -i "^COMPLEXITY:" | head -1 | awk '{print $2}' | tr '[:upper:]' '[:lower:]')
+          REASON=$(echo "$PARSED" | grep -i "^REASON:" | head -1 | sed 's/^REASON: *//')
+          if [[ -z "$APPROVED" ]]; then
+            # Shown so an unparseable answer (an error string, a refusal) is diagnosable from the log.
+            echo "::warning::triage response did not parse; first lines follow"
+            printf '%s\n' "$RESPONSE" | head -8
+            echo "--- triage stderr (tail) ---"
+            tail -20 /tmp/triage-err.log 2>/dev/null || true
+          fi
 
           # Fail-safe defaults: never auto-approve on parse failure
           APPROVED="${APPROVED:-false}"
