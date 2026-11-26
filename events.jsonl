@@ -4411,3 +4411,5 @@
 {"ts":"2026-11-26T21:06:17Z","ts_epoch":1795727177,"type":"intelligence.analysis","complexity":2,"risk_level":"low","success_probability":92,"recommended_template":"fast","issue_type":"backend"}
 {"ts":"2026-11-26T21:06:17Z","ts_epoch":1795727177,"type":"reasoning.trace","job_id":"pipeline-5037-8759","complexity":"medium","risk":50,"template":"standard"}
 {"ts":"2026-11-26T21:06:18Z","ts_epoch":1795727178,"type":"router.decision","issue":8759,"decision":"rt-mwy1liq1-8759","mode":"shadow","tier":"small","prior":"small","template":"cost-aware","model":"sonnet","effort":"medium","attempts":1,"action":"build"}
+{"ts":"2026-11-26T21:31:18Z","ts_epoch":1795728678,"type":"regression.check","status":"pass","regressions":0,"improvements":2}
+{"ts":"2026-11-26T21:33:07Z","ts_epoch":1795728787,"type":"regression.baseline","timestamp":"2026-11-26T21:33:07Z","test_count":0,"pass_rate":0,"script_count":303,"total_lines":291920}
