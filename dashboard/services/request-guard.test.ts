@@ -135,6 +135,12 @@ describe("startupProblem", () => {
   it("refuses a public address without a fleet token", () => {
     expect(startupProblem(cfg({ host: "0.0.0.0" }), true)).toMatch(/SHIPWRIGHT_FLEET_TOKEN/);
   });
+  it("refuses PAT sign-in on a public address (a typed username proves nothing)", () => {
+    const pub = cfg({ host: "0.0.0.0", fleetToken: "t" });
+    expect(startupProblem(pub, true, "pat")).toMatch(/PAT sign-in/);
+    expect(startupProblem(pub, true, "oauth")).toBeNull();
+    expect(startupProblem(cfg({ fleetToken: "t" }), true, "pat")).toBeNull();
+  });
   it("accepts a public address with auth and a fleet token", () => {
     expect(startupProblem(cfg({ host: "0.0.0.0", fleetToken: "t" }), true)).toBeNull();
   });

@@ -1,12 +1,14 @@
 import { join } from "node:path";
 import pkg from "../package.json";
 import { AgentSdkRunner, agentEnv } from "./adapters/agent/agent-sdk-runner";
+import { GitLocalChange } from "./adapters/git/git-local-change";
 import { GitRepoDocs } from "./adapters/git/git-repo-docs";
 import { GitWorkspaces } from "./adapters/git/git-workspaces";
 import { GhClosedPulls } from "./adapters/github/gh-closed-pulls";
 import { GhGithubWriter } from "./adapters/github/gh-github-writer";
 import { GhOpenIssues } from "./adapters/github/gh-open-issues";
 import { GhPauseLabel } from "./adapters/github/gh-pause-label";
+import { GhPullFiles } from "./adapters/github/gh-pull-files";
 import { GhPullRequests } from "./adapters/github/gh-pull-requests";
 import { GhRunHistory } from "./adapters/github/gh-run-history";
 import { resolvePaths } from "./adapters/paths";
@@ -14,13 +16,14 @@ import { BashCommandRunner, testEnv } from "./adapters/process/bash-command-runn
 import { BunProcessRunner } from "./adapters/process/bun-process-runner";
 import { FilePauseFlag } from "./adapters/state/file-pause-flag";
 import { JsonCostLedger } from "./adapters/state/json-cost-ledger";
+import { JsonVerifierStore } from "./adapters/state/json-verifier-store";
 import { LedgerSpend } from "./adapters/state/ledger-spend";
 import { NodeFileReader } from "./adapters/state/node-file-reader";
-import type { CliIO, Command } from "./cli/command";
+import type { CliIO, Command, CommandContext } from "./cli/command";
 import { commands, findCommand } from "./cli/commands";
 import type { DeliveryPorts } from "./contexts/delivery";
 import type { SafetyPorts } from "./contexts/orchestration";
-import type { QualityPorts } from "./contexts/quality";
+import type { QualityPorts, VerifierPorts } from "./contexts/quality";
 import { installShutdown } from "./shutdown";
 
 const consoleIO: CliIO = {
@@ -64,6 +67,22 @@ export function buildQualityPorts(env: Readonly<Record<string, string | undefine
   };
 }
 
+/** Adapters for the merge verifier: read-only git and GitHub, the model file, the critic agent. */
+export function buildVerifierPorts(
+  env: Readonly<Record<string, string | undefined>>,
+  cwd: string,
+): VerifierPorts {
+  const runner = new BunProcessRunner();
+  return {
+    now: () => Date.now(),
+    pulls: new GhClosedPulls(runner),
+    files: new GhPullFiles(runner),
+    change: new GitLocalChange(runner, cwd),
+    store: new JsonVerifierStore(join(resolvePaths(env).stateDir, "verifier", "model.json")),
+    agent: new AgentSdkRunner(agentEnv(env)),
+  };
+}
+
 /**
  * Adapters for the build tournament. Worktrees go under the state directory, one folder per run, so
  * attempts never appear in the repository's own status or diffs.
@@ -99,7 +118,20 @@ function renderHelp(registry: readonly Command[]): string {
   return ["USAGE", "  shipwright <command> [args]", "", "COMMANDS", ...rows].join("\n");
 }
 
-/** Composition root. Adapters are constructed here as commands start needing them. */
+/** Runs one command; an exception becomes exit 1 with its message on stderr. */
+async function runCommand(
+  command: Command,
+  args: readonly string[],
+  ctx: CommandContext,
+): Promise<number> {
+  try {
+    return await command.run(args, ctx);
+  } catch (error) {
+    ctx.io.err(`✗ ${error instanceof Error ? error.message : String(error)}`);
+    return 1;
+  }
+}
+
 /** Top-level help and version, only when they are the whole request; anything more is a command. */
 function topLevel(
   argv: readonly string[],
@@ -119,6 +151,7 @@ function topLevel(
   return undefined;
 }
 
+/** Composition root. Adapters are constructed here as commands start needing them. */
 export async function main(
   argv: readonly string[],
   io: CliIO = consoleIO,
@@ -130,6 +163,7 @@ export async function main(
   }),
   env: Readonly<Record<string, string | undefined>> = process.env,
   quality: () => QualityPorts = once(() => buildQualityPorts(env)),
+  verifier: () => VerifierPorts = once(() => buildVerifierPorts(env, process.cwd())),
   delivery: () => DeliveryPorts = once(() => buildDeliveryPorts(env, process.cwd())),
 ): Promise<number> {
   const [name, ...args] = argv;
@@ -141,11 +175,15 @@ export async function main(
     io.err(`✗ Unknown command: ${name}`);
     return 2;
   }
-  const ctx = { io, version: pkg.version, safety, env, files, repoDocs, quality, delivery };
-  try {
-    return await command.run(args, ctx);
-  } catch (error) {
-    io.err(`✗ ${error instanceof Error ? error.message : String(error)}`);
-    return 1;
-  }
+  return runCommand(command, args, {
+    io,
+    version: pkg.version,
+    safety,
+    env,
+    files,
+    repoDocs,
+    quality,
+    verifier,
+    delivery,
+  });
 }

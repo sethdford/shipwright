@@ -6,6 +6,9 @@ SW_AGENT_EXEC="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/agent-exec.sh"
 # Test commands run without credentials (#8608).
 # shellcheck source=lib/test-gate-env.sh
 source "$(dirname "${BASH_SOURCE[0]}")/test-gate-env.sh"
+# Prompt-injection defenses for issue text (trust boundary).
+# shellcheck source=lib/untrusted.sh
+source "$(dirname "${BASH_SOURCE[0]}")/untrusted.sh"
 source "$(dirname "${BASH_SOURCE[0]}")/models.sh"
 [[ -n "${_PIPELINE_STAGES_BUILD_LOADED:-}" ]] && return 0
 _PIPELINE_STAGES_BUILD_LOADED=1
@@ -68,7 +71,7 @@ stage_test_first() {
     elif [[ -f "$goal_file" ]]; then
         requirements=$(cat "$goal_file" 2>/dev/null || true)
     else
-        requirements="${GOAL:-}: ${ISSUE_BODY:-}"
+        requirements=$(untrusted_wrap "issue title and body" "${GOAL:-}: ${ISSUE_BODY:-}")
     fi
 
     local tdd_prompt="You are writing tests BEFORE implementation (TDD).

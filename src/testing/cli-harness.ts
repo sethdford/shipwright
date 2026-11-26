@@ -2,7 +2,7 @@ import type { CliIO, CommandContext } from "../cli/command";
 import type { DeliveryPorts } from "../contexts/delivery";
 import type { RepoDocs } from "../contexts/governance";
 import type { SafetyPorts } from "../contexts/orchestration";
-import type { QualityPorts } from "../contexts/quality";
+import type { QualityPorts, VerifierPorts } from "../contexts/quality";
 import type { FileReader } from "../shared/kernel/ports";
 
 export interface CapturedIO extends CliIO {
@@ -21,6 +21,14 @@ export function captureIO(): CapturedIO {
   };
 }
 
+/** A getter that returns `value`, or throws naming what the command was not given. */
+function given<T>(value: T | undefined, what: string): () => T {
+  return () => {
+    if (value === undefined) throw new Error(`this command was not given ${what}`);
+    return value;
+  };
+}
+
 /** A command context. `files()` throws unless a reader is given (commands that read none need none). */
 export function commandContext(
   io: CliIO,
@@ -30,6 +38,7 @@ export function commandContext(
   ports: {
     readonly repoDocs?: RepoDocs;
     readonly quality?: QualityPorts;
+    readonly verifier?: VerifierPorts;
     readonly delivery?: DeliveryPorts;
   } = {},
 ): CommandContext {
@@ -37,25 +46,11 @@ export function commandContext(
     io,
     version: "4.0.0",
     env,
-    safety: () => {
-      if (!safety) throw new Error("this command was not given safety ports");
-      return safety;
-    },
-    files: () => {
-      if (!files) throw new Error("this command was not given a file reader");
-      return files;
-    },
-    repoDocs: () => {
-      if (!ports.repoDocs) throw new Error("this command was not given repository documents");
-      return ports.repoDocs;
-    },
-    quality: () => {
-      if (!ports.quality) throw new Error("this command was not given quality ports");
-      return ports.quality;
-    },
-    delivery: () => {
-      if (!ports.delivery) throw new Error("this command was not given delivery ports");
-      return ports.delivery;
-    },
+    safety: given(safety, "safety ports"),
+    files: given(files, "a file reader"),
+    repoDocs: given(ports.repoDocs, "repository documents"),
+    quality: given(ports.quality, "quality ports"),
+    verifier: given(ports.verifier, "verifier ports"),
+    delivery: given(ports.delivery, "delivery ports"),
   };
 }
