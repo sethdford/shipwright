@@ -78,6 +78,16 @@ SB=$(SW_TEST_SANDBOX_DEPS="" test_sandbox_open "$T/trusted")
 expect_fail "SW_TEST_SANDBOX_DEPS empty copies no dependency dirs" test -e "$SB/node_modules"
 test_sandbox_close "$SB"
 
+test_sandbox_hydrate() { printf 'cached\n' > "$2/.hydrated"; }
+SB=$(test_sandbox_open "$T/trusted")
+assert_eq "a defined test_sandbox_hydrate restores into the sandbox" "cached" "$(cat "$SB/.hydrated")"
+test_sandbox_close "$SB"
+test_sandbox_hydrate() { return 1; }
+SB=$(test_sandbox_open "$T/trusted" 2>/dev/null)
+expect_ok "a failed restore does not fail the sandbox" test -d "$SB/.git"
+test_sandbox_close "$SB"
+unset -f test_sandbox_hydrate
+
 mkdir -p "$T/notgit"
 expect_fail "open refuses a directory that is not a checkout" test_sandbox_open "$T/notgit"
 assert_eq "a failed open leaves nothing behind" "0" "$(sandboxes_left)"

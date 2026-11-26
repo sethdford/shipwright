@@ -158,7 +158,12 @@ _test_sandbox_fill() {
             || { _test_sandbox_err "could not copy the checkout's uncommitted work"; return 1; }
     fi
     rm -f "$patch" "$patch.moved"
-    _test_sandbox_copy_deps "$root" "$dir"
+    _test_sandbox_copy_deps "$root" "$dir" || return 1
+    # Optional hook for a run-environment cache: restores prepared dependencies into DIR, outside the
+    # jail, before any test runs. A failed restore only costs speed, so it does not fail the sandbox.
+    if declare -F test_sandbox_hydrate >/dev/null; then
+        test_sandbox_hydrate "$root" "$dir" || _test_sandbox_err "environment restore failed; continuing without it"
+    fi
 }
 
 # test_sandbox_close DIR — removes a sandbox made by test_sandbox_open. Anything else is left alone.
