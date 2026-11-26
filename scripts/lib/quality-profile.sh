@@ -155,7 +155,7 @@ qp_add_learned_rule() {
     # Atomic write: read, modify, write
     local tmp_file
     tmp_file=$(mktemp)
-    trap "rm -f '$tmp_file'" RETURN
+    trap "rm -f '$tmp_file'; trap - RETURN" RETURN
 
     # Add rule to learned_rules array
     if ! jq ".quality.learned_rules += [$new_rule]" "$QUALITY_PROFILE_PATH" > "$tmp_file" 2>/dev/null; then
@@ -251,7 +251,7 @@ qp_save() {
 
     local tmp_file
     tmp_file=$(mktemp)
-    trap "rm -f '$tmp_file'" RETURN
+    trap "rm -f '$tmp_file'; trap - RETURN" RETURN
 
     # Pretty-print and write atomically
     if ! echo "$profile_json" | jq '.' > "$tmp_file" 2>/dev/null; then

@@ -479,7 +479,7 @@ Reply with ONLY the classification word, nothing else." --model "$(_smart_model 
         local tmp_class
         tmp_class="$(mktemp)" || { warn "mktemp failed"; return 1; }
         # shellcheck disable=SC2064  # intentional expansion at definition time
-        trap "rm -f '$tmp_class'" RETURN
+        trap "rm -f '$tmp_class'; trap - RETURN" RETURN
         if [[ -f "$class_history" ]]; then
             jq --arg sig "$error_sig" --arg cls "$classification" --arg canon "$canonical_category" --arg stage "$stage_id" \
                 '.[$sig] = {"classification": $cls, "canonical": $canon, "stage": $stage, "recorded_at": now}' \

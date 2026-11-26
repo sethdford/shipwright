@@ -416,7 +416,7 @@ generate_learned_rules() {
         # Add rule to quality profile
         local tmp_file
         tmp_file=$(mktemp)
-        trap "rm -f '$tmp_file'" RETURN
+        trap "rm -f '$tmp_file'; trap - RETURN" RETURN
 
         jq \
             --arg rule "$rule_text" \

@@ -832,7 +832,7 @@ prep_learn_patterns() {
     local tmp_patterns
     tmp_patterns=$(mktemp)
     # shellcheck disable=SC2064
-    trap "rm -f '$tmp_patterns'" RETURN
+    trap "rm -f '$tmp_patterns'; trap - RETURN" RETURN
     jq -n \
         --arg ts "$(date -u +"%Y-%m-%dT%H:%M:%SZ")" \
         --arg lang "${LANG_DETECTED:-}" \
