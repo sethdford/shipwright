@@ -54,7 +54,7 @@ init_config() {
         local tmp_file
         tmp_file=$(mktemp)
     # shellcheck disable=SC2064
-        trap "rm -f '$tmp_file'" RETURN
+        trap "rm -f '$tmp_file'; trap - RETURN" RETURN
         cat > "$tmp_file" << 'JSON'
 {
   "auto_scaling_enabled": false,
@@ -81,7 +81,7 @@ init_registry() {
         local tmp_file
         tmp_file=$(mktemp)
     # shellcheck disable=SC2064
-        trap "rm -f '$tmp_file'" RETURN
+        trap "rm -f '$tmp_file'; trap - RETURN" RETURN
         cat > "$tmp_file" << 'JSON'
 {
   "agents": [],
@@ -171,7 +171,7 @@ cmd_spawn() {
     local tmp_file
     tmp_file=$(mktemp)
     # shellcheck disable=SC2064
-    trap "rm -f '$tmp_file'" RETURN
+    trap "rm -f '$tmp_file'; trap - RETURN" RETURN
 
     jq --arg agent_id "$agent_id" \
        --arg agent_type "$agent_type" \
@@ -254,7 +254,7 @@ cmd_retire() {
     local tmp_file
     tmp_file=$(mktemp)
     # shellcheck disable=SC2064
-    trap "rm -f '$tmp_file'" RETURN
+    trap "rm -f '$tmp_file'; trap - RETURN" RETURN
 
     # shellcheck disable=SC2046
     jq --arg aid "$agent_id" \
@@ -539,7 +539,7 @@ cmd_config() {
             local tmp_file
             tmp_file=$(mktemp)
     # shellcheck disable=SC2064
-            trap "rm -f '$tmp_file'" RETURN
+            trap "rm -f '$tmp_file'; trap - RETURN" RETURN
 
             jq --arg key "$key" --arg value "$value" \
                 'if ($value | test("^[0-9]+$")) then
