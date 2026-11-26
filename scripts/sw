@@ -650,6 +650,9 @@ main() {
         eval)
             run_ts eval "$@"
             ;;
+        verify)
+            run_ts verify "$@"
+            ;;
         governance|gov)
             run_ts governance "$@"
             ;;
