@@ -216,6 +216,8 @@ NOTIFICATION_ENABLED=false
 # Placeholder to accumulate input/output tokens from all pipeline stages
 TOTAL_INPUT_TOKENS=0
 TOTAL_OUTPUT_TOKENS=0
+# USD the claude CLI reported (total_cost_usd), summed over every stage and loop iteration
+TOTAL_COST_USD=0
 
 # Build-test retry limit (configurable via --self-heal)
 BUILD_TEST_RETRIES="${BUILD_TEST_RETRIES:-2}"
