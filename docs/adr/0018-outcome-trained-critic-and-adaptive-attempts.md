@@ -20,7 +20,9 @@ ran every attempt, with the verifier not wired into it at all.
    before the horizon, matched as a multiset. Below 50% is label 0. It is read from local git history
    (`GitSurvivalSource`, read-only). PRs too recent, with fewer than 3 significant lines, or whose commits are
    not in the clone keep the merge label, and the report counts each group. Renamed files count as not
-   surviving, which errs toward the stricter label. `--outcome merge` keeps the old label.
+   surviving, which errs toward the stricter label. A clone not fetched past the horizon measures nothing.
+   Survival is read from the merge commit against its first parent, which covers merge and squash merges; a
+   rebase-merged PR would be measured on its last commit only (this repository uses merge commits). `--outcome merge` keeps the old label.
 2. **Score log.** Every `verify score` appends its signals (own tests, cross-tests, rubric, the critic's chance)
    to `$SHIPWRIGHT_STATE_DIR/verifier/scores.jsonl` under the current branch. Training joins the latest score
    taken on a PR's head branch between 6 hours before it opened and when it closed. A logging failure is a

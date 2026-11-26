@@ -157,7 +157,10 @@ export function buildDeliveryPorts(
     workspaces: new GitWorkspaces(runner, cwd, root),
     commands: new BashCommandRunner(runner, testEnv(env)),
     // The merge verifier is one selection signal and decides adaptive early stop (ADR-0018).
-    verifier: env.SHIPWRIGHT_VERIFIER === "off" ? undefined : candidateVerifier(verifier()),
+    verifier:
+      env.SHIPWRIGHT_VERIFIER?.trim().toLowerCase() === "off"
+        ? undefined
+        : candidateVerifier(verifier()),
     random: Math.random,
   };
 }

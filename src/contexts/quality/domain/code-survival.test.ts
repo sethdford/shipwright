@@ -54,10 +54,27 @@ test("a repeated line in the change needs as many copies at the horizon", () => 
   expect(s.kept).toBe(1);
 });
 
-test("verdicts: survived, rewritten, too small, unmeasured", () => {
+test("verdicts: survived, rewritten, too small, unmeasured (no sample)", () => {
   expect(survivalVerdict({ added: 10, kept: 6, rate: 0.6 })).toBe("survived");
   expect(survivalVerdict({ added: 10, kept: 4, rate: 0.4 })).toBe("rewritten");
   expect(survivalVerdict({ added: 2, kept: 0, rate: 0 })).toBe("too-small");
-  expect(survivalVerdict({ added: 0, kept: 0, rate: null })).toBe("unmeasured");
   expect(survivalVerdict(null)).toBe("unmeasured");
+});
+
+test("an added line starting with '++ ' is content, not a file header; quoted paths are unquoted", () => {
+  const diff = [
+    'diff --git "a/caf\\303\\251 x.txt" "b/caf\\303\\251 x.txt"',
+    '--- "a/caf\\303\\251 x.txt"',
+    '+++ "b/caf\\303\\251 x.txt"',
+    "@@ -0,0 +1,2 @@",
+    "+++ added marker",
+    "+second line here",
+  ].join("\n");
+  const added = parseAddedLines(diff);
+  expect([...added.keys()]).toEqual(["café x.txt"]);
+  expect(added.get("café x.txt")).toEqual(["++ added marker", "second line here"]);
+});
+
+test("a change with only trivial lines is too small, not unmeasured", () => {
+  expect(survivalVerdict({ added: 0, kept: 0, rate: null })).toBe("too-small");
 });

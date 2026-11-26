@@ -39,6 +39,9 @@ export class GitSurvivalSource implements SurvivalSource {
     const at = snap.out.trim();
     if (snap.code !== 0 || !SHA.test(at)) return ok(null);
     if ((await this.git(["merge-base", "--is-ancestor", mergeSha, at])).code !== 0) return ok(null);
+    // A clone last fetched before the horizon would measure survival too early: require history past it.
+    const past = await this.git(["rev-list", "-1", "--first-parent", `--since=${before}`, base]);
+    if (past.code !== 0 || past.out.trim() === "") return ok(null);
     const diff = await this.git([
       "diff",
       "-U0",
@@ -48,9 +51,9 @@ export class GitSurvivalSource implements SurvivalSource {
       mergeSha,
     ]);
     if (diff.code !== 0) return ok(null);
-    const added = parseAddedLines(diff.out);
+    const added = new Map([...parseAddedLines(diff.out)].slice(0, MAX_SURVIVAL_FILES));
     const later = new Map<string, string | null>();
-    for (const path of [...added.keys()].slice(0, MAX_SURVIVAL_FILES)) {
+    for (const path of added.keys()) {
       const show = await this.git(["show", `${at}:${path}`]);
       later.set(path, show.code === 0 ? show.out : null);
     }
@@ -71,7 +74,7 @@ export class GitSurvivalSource implements SurvivalSource {
 
   private async git(args: readonly string[]): Promise<Git> {
     const r = await runOrFail(this.runner, {
-      argv: ["git", ...args],
+      argv: ["git", "-c", "core.quotePath=false", ...args],
       cwd: this.cwd,
       timeoutMs: 60_000,
     });

@@ -1,3 +1,5 @@
+import { headerPath } from "./diff-paths";
+
 /**
  * Code survival: how much of a merged change is still in the codebase some days later. Pure.
  *
@@ -46,25 +48,28 @@ export function isSignificant(line: string): boolean {
   return t.length >= 4 && !TRIVIAL.test(t);
 }
 
-const DIFF_FILE = /^\+\+\+ (?:b\/)?(.+?)\s*$/;
-
 /**
  * Added lines per file from a unified diff (`git diff -U0 A B`). Deleted files (`+++ /dev/null`)
- * and binary files add nothing.
+ * and binary files add nothing. A file's `---`/`+++` headers are read only before its first hunk,
+ * so an added line that itself starts with "++ " is never taken for a header.
  */
 export function parseAddedLines(diff: string): Map<string, string[]> {
   const out = new Map<string, string[]>();
   let current: string[] | null = null;
+  let header = false;
   for (const line of diff.split("\n")) {
-    if (line.startsWith("+++ ")) {
-      const m = DIFF_FILE.exec(line);
-      const path = m?.[1];
-      current = path && path !== "/dev/null" ? [] : null;
-      if (current && path) out.set(path, current);
-      continue;
+    if (line.startsWith("diff --git ")) {
+      current = null;
+      header = true;
+    } else if (header && line.startsWith("+++ ")) {
+      const path = headerPath(line.slice(4));
+      current = path === null ? null : [];
+      if (current && path !== null) out.set(path, current);
+    } else if (line.startsWith("@@")) {
+      header = false;
+    } else if (!header && current && line.startsWith("+")) {
+      current.push(line.slice(1));
     }
-    if (line.startsWith("diff --git ")) current = null;
-    else if (current && line.startsWith("+")) current.push(line.slice(1));
   }
   return out;
 }
@@ -108,7 +113,7 @@ export function survivalVerdict(
   s: SurvivalSample | null,
   rule: { readonly minRate: number; readonly minLines: number } = SURVIVAL_RULE,
 ): SurvivalVerdict {
-  if (s === null || s.rate === null) return "unmeasured";
-  if (s.added < rule.minLines) return "too-small";
+  if (s === null) return "unmeasured";
+  if (s.rate === null || s.added < rule.minLines) return "too-small";
   return s.rate >= rule.minRate ? "survived" : "rewritten";
 }
