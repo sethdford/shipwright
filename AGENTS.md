@@ -65,8 +65,8 @@ the lease's fence token; a stale fence fails.
   In bash, issue, PR and comment text goes through `scripts/lib/untrusted.sh` (sanitize, then refuse
   clear injection attempts) before any prompt.
 - Agent output reaches the trusted checkout only as a judged patch (`scripts/lib/patch-handoff.sh`,
-  ADR-0011). Never add a path that commits or copies agent-written files into the checkout another way.
-  Tournament builds are not covered yet.
+  ADR-0011), tournament winners included. Never add a path that commits or copies agent-written files
+  into the checkout another way.
 - Agents never receive `GH_TOKEN`/`GITHUB_TOKEN`, `bypassPermissions` or `--dangerously-skip-permissions` (F9).
 - GitHub side effects (push, PR, comment, label, merge) only through the `integrations` adapter, with an
   `IdempotencyKey` and a `FenceToken` (F10).

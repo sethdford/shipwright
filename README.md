@@ -143,12 +143,12 @@ graph LR
 | **Eval ratchet** | Scores eval runs with pass^k and accepts a candidate policy only if it is non-inferior and either better (sign test, p ≤ 0.05) or at least 10% cheaper | `shipwright eval score\|ratchet` | on demand |
 | **Head-to-head benchmark** | Shipwright against bare Claude Code (and any agent CLI) on the same tasks, graded by hidden tests, with a hard budget | `shipwright bench` | on demand |
 | **Spec-first acceptance tests** | The issue becomes numbered criteria and new tests, each proven to fail for the right reason, committed and locked before the build; the build passes only if the locked tests pass untouched | `shipwright acceptance` | `enforce` |
-| **Tournament mode** | 2 to 5 independent attempts in separate worktrees, a cross-test matrix, a per-issue rubric with fixed integrity criteria, and a blind group-wise judge | `shipwright tournament` | off (1 attempt) |
+| **Tournament mode** | 2 to 5 independent attempts in separate worktrees of a disposable clone, a cross-test matrix, a per-issue rubric with fixed integrity criteria, and a blind group-wise judge | `shipwright tournament` | off (1 attempt) |
 | **Merge verifier** | Predicts whether a change will merge and stay merged; hard stops block in `enforce`, the learned probability blocks only once it is calibrated on factory PRs | `shipwright verify` | `advisory` |
 | **Compute router** | Estimates difficulty from the issue and run history, then picks template, model, effort, attempts and a cost cap from a versioned table | `shipwright route` | `shadow` (logs only) |
 | **Repository world model** | Definitions, references, imports, tests and owners, refreshed incrementally; a brief in the prompt and a read-only MCP server for agents | `shipwright repomodel` | on |
 | **Lessons and governance** | Accepted ADRs, policies and approved lessons go into the build prompt from the base commit; the review gets a checklist; failed runs are mined into lesson drafts that must win a trial | `shipwright governance` | on |
-| **Patch handoff** | The build agent works in a disposable clone with no credentials; its work reaches the trusted checkout only as a patch that is judged first (single-attempt builds; tournaments are not covered yet) | (pipeline) | on |
+| **Patch handoff** | The build agent works in a disposable clone with no credentials; its work reaches the trusted checkout only as a patch that is judged first (single builds and tournaments alike) | (pipeline) | on |
 | **Untrusted input** | Issue text is stripped of hidden content, framed as data, and clear injection attempts stop intake until a maintainer adds `shipwright:input-reviewed` | (pipeline) | on |
 | **Dashboard roles** | Every mutating route checks the caller's role; the default role is `viewer` | (dashboard) | on |
 

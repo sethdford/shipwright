@@ -83,13 +83,11 @@ paths with `..`, absolute paths, `.git` or `.claude/` are never written (`tdd.pa
 stage's leftover changes and CI partial-work commits are judged too, and a refused leftover is kept in
 `leftover.patch` (`pr.leftover_refused`). A commit made during intake, plan, design or review is
 undone (`stage.head_moved`), so its content meets the next judge. Self-heal re-runs the build stage,
-so it is covered.
+so it is covered. A tournament (`PIPELINE_ATTEMPTS=2..5`) runs whole in one disposable clone without
+credentials, and its winner comes back through the same export, judge and apply as a single build.
 
 **Not covered yet:**
 
-- **Tournament builds** (`PIPELINE_ATTEMPTS=2..5`). Attempts run in git worktrees that share the
-  repository's `.git`. The winner is fast-forwarded onto the branch without going through the patch
-  judge. Leave tournaments off for untrusted input until they use the handoff.
 - **Test commands** still run agent-written code in the trusted checkout. Credentials are stripped.
 - **Host isolation.** The agent runs as the same OS user, so isolating it from the host is the
   sandbox backend's job.

@@ -42,7 +42,7 @@ then the default.** The pipeline config is the template JSON the run uses (`PIPE
 
 | Variable | Values (default first) | Effect | Read in |
 |---|---|---|---|
-| `SW_PATCH_HANDOFF` | `true`, `false` | Patch handoff (ADR-0011). The build loop runs in a disposable clone with no remote and no GitHub or fleet tokens, and its work is exported, judged and applied as a patch. `false` restores the shared-checkout build. | `scripts/lib/pipeline-stages-build.sh`, `scripts/lib/patch-handoff.sh` |
+| `SW_PATCH_HANDOFF` | `true`, `false` | Patch handoff (ADR-0011). The build loop, or a whole tournament, runs in a disposable clone with no remote and no GitHub or fleet tokens, and its work is exported, judged and applied as a patch. `false` restores the shared-checkout build. | `scripts/lib/pipeline-stages-build.sh`, `scripts/lib/patch-handoff.sh` |
 | `SW_UNTRUSTED_REVIEWED_LABEL` | `shipwright:input-reviewed` | The issue label with which a maintainer lets a refused issue through the injection gate after reading its raw text. | `scripts/lib/untrusted.sh` |
 
 ## Dashboard
