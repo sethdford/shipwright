@@ -705,7 +705,7 @@ Most commands are bash. The dashboard server and the commands routed through `ru
 | `scripts/sw-webhook.sh` | 621 | GitHub Webhook Receiver for Instant Issue Processing |
 | `scripts/sw-widgets.sh` | 528 | Embeddable Status Widgets |
 | `scripts/sw-worktree.sh` | 421 | Git worktree management for multi-agent isolation |
-| `scripts/sw` | 659 | CLI router — dispatches subcommands via exec |
+| `scripts/sw` | 665 | CLI router — dispatches subcommands via exec |
 <!-- /AUTO:core-scripts -->
 
 ### GitHub API Modules
