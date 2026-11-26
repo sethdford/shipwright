@@ -644,6 +644,12 @@ main() {
         failure)
             run_ts failure "$@"
             ;;
+        scorecard)
+            run_ts scorecard "$@"
+            ;;
+        eval)
+            run_ts eval "$@"
+            ;;
         governance|gov)
             run_ts governance "$@"
             ;;

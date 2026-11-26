@@ -37,6 +37,11 @@ flowchart LR
     platform_application["platform/application"]
     platform_domain["platform/domain"]
   end
+  subgraph ctx_quality["quality"]
+    quality["quality"]
+    quality_application["quality/application"]
+    quality_domain["quality/domain"]
+  end
   cli["cli"]
   integrations["integrations"]
   kernel["kernel"]
@@ -51,9 +56,11 @@ flowchart LR
   adapters_github --> integrations
   adapters_github --> kernel
   adapters_github --> orchestration
+  adapters_github --> quality
   adapters_process --> kernel
   adapters_state --> kernel
   adapters_state --> orchestration
+  adapters_state --> quality
   adapters_store --> kernel
   adapters_tmux --> adapters_process
   adapters_tmux --> kernel
@@ -63,6 +70,7 @@ flowchart LR
   cli --> main
   cli --> orchestration
   cli --> platform
+  cli --> quality
   governance --> governance_application
   governance --> governance_domain
   governance --> kernel
@@ -83,6 +91,7 @@ flowchart LR
   main --> adapters_state
   main --> cli
   main --> orchestration
+  main --> quality
   main --> shutdown
   orchestration --> integrations
   orchestration --> kernel
@@ -94,4 +103,10 @@ flowchart LR
   orchestration_application --> orchestration_domain
   platform --> platform_application
   platform_application --> platform_domain
+  quality --> kernel
+  quality --> quality_application
+  quality --> quality_domain
+  quality_application --> kernel
+  quality_application --> quality
+  quality_application --> quality_domain
 ```
