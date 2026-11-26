@@ -242,7 +242,7 @@ EOF
                 local prompt_file
                 prompt_file=$(mktemp "${TMPDIR:-/tmp}/sw-testgen-prompt.XXXXXX")
                 # shellcheck disable=SC2064
-                trap "rm -f '$prompt_file'" RETURN
+                trap "rm -f '$prompt_file'; trap - RETURN" RETURN
                 {
                     echo "Generate a bash test function for the following shell function. Use real assertions (assert_equal, assert_contains, or test exit code). Test happy path and at least one edge or error case. Output only the bash function body."
                     echo "Function name: ${func}"

@@ -1,5 +1,5 @@
 import { expect, test } from "bun:test";
-import { mkdtempSync, rmSync } from "node:fs";
+import { mkdtempSync, readFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import type { ProgressEntry } from "./progress";
@@ -11,6 +11,21 @@ import {
   selectSuites,
   summarize,
 } from "./run-parity";
+
+/** True while `pid` runs. A zombie counts as dead: where PID 1 never reaps orphans (some containers), a killed
+ *  process stays a zombie, `kill(pid, 0)` still succeeds, and the check would report a kill that worked as a failure. */
+function isRunning(pid: number): boolean {
+  try {
+    process.kill(pid, 0);
+  } catch {
+    return false;
+  }
+  try {
+    return readFileSync(`/proc/${pid}/stat`, "utf8").split(") ")[1]?.[0] !== "Z";
+  } catch {
+    return true; // no /proc (macOS): kill(pid, 0) succeeded, so it runs
+  }
+}
 
 const entry = (
   command: string,
@@ -70,7 +85,7 @@ test("a hung suite times out and its background job is dead afterwards", async (
     expect(r.timedOut).toBe(true);
     const pid = Number(await Bun.file(pidFile).text());
     await new Promise((res) => setTimeout(res, 100));
-    expect(() => process.kill(pid, 0)).toThrow();
+    expect(isRunning(pid)).toBe(false);
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }

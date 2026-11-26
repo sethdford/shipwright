@@ -230,7 +230,15 @@ cost_check_budget() {
     budget_enabled="${budget_enabled:-$(jq -r '.enabled' "$BUDGET_FILE" 2>/dev/null || echo "false")}"
     budget_usd="${budget_usd:-$(jq -r '.daily_budget_usd' "$BUDGET_FILE" 2>/dev/null || echo "0")}"
 
-    if [[ "$budget_enabled" != "true" || "$budget_usd" == "0" ]]; then
+    [[ "$budget_enabled" == "true" ]] || return 0
+    # A budget we cannot read blocks (fail closed), as the TypeScript gate does.
+    if [[ ! "$budget_usd" =~ ^[0-9]+\.?[0-9]*$ ]]; then
+        error "Budget is enabled but daily_budget_usd is not a number (${budget_usd}); fix it with: shipwright cost budget set <usd>"
+        return 2
+    fi
+    # Numeric test, not `== "0"`: SQLite returns a REAL column as "0.0", so `budget set 0` (unlimited)
+    # read back from the DB was enforced as a $0 cap and blocked every run.
+    if awk -v b="$budget_usd" 'BEGIN { exit !(b + 0 == 0) }'; then
         return 0
     fi
 
@@ -251,7 +259,9 @@ cost_check_budget() {
     local pct_used
     pct_used=$(awk -v spent="$today_spent" -v budget="$budget_usd" 'BEGIN { printf "%.0f", (spent / budget) * 100 }')
 
-    if awk -v proj="$projected" -v budget="$budget_usd" 'BEGIN { exit !(proj > budget) }'; then
+    # Same rule as the TypeScript gate and the daemon: something must be left (spent < cap) and the
+    # estimate must fit (spent + estimate <= cap). An estimate that lands exactly on the cap is allowed.
+    if awk -v proj="$projected" -v spent="$today_spent" -v budget="$budget_usd" 'BEGIN { exit !(proj > budget || spent >= budget) }'; then
         error "Budget exceeded! Today: \$${today_spent} + estimated \$${estimated} > \$${budget_usd} daily limit"
         emit_event "cost.budget_exceeded" "today_spent=${today_spent}" "estimated=${estimated}" "budget=${budget_usd}"
         return 2
@@ -288,7 +298,7 @@ cost_remaining_budget() {
     budget_enabled=$(jq -r '.enabled' "$BUDGET_FILE" 2>/dev/null || echo "false")
     budget_usd=$(jq -r '.daily_budget_usd' "$BUDGET_FILE" 2>/dev/null || echo "0")
 
-    if [[ "$budget_enabled" != "true" || "$budget_usd" == "0" ]]; then
+    if [[ "$budget_enabled" != "true" ]] || budget_is_unlimited "$budget_usd"; then
         if [[ -z "${_BUDGET_UNCONFIGURED_WARNED:-}" ]]; then
             info "Budget not configured — unlimited. Use 'shipwright cost budget set <amount>'"
             emit_event "cost.budget_unconfigured" "status=unlimited"
