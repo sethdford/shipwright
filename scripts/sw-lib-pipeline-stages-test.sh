@@ -216,11 +216,11 @@ stage_build 2>/dev/null || build_rc=$?
 # ─── Tests: build tournament ───────────────────────────────────────────────
 print_test_section "build tournament"
 
-assert_eq "Tournament off by default" "1" "$(PIPELINE_ATTEMPTS= PIPELINE_CONFIG= _build_tournament_attempts)"
+assert_eq "Tournament off by default" "1" "$(PIPELINE_ATTEMPTS='' PIPELINE_CONFIG='' _build_tournament_attempts)"
 assert_eq "Tournament attempts from env" "3" "$(PIPELINE_ATTEMPTS=3 _build_tournament_attempts)"
 assert_eq "Out-of-range attempts stay off" "1" "$(PIPELINE_ATTEMPTS=9 _build_tournament_attempts)"
 echo '{"defaults":{"attempts":2}}' > "$TEST_TEMP_DIR/tournament-config.json"
-assert_eq "Tournament attempts from config" "2" "$(PIPELINE_ATTEMPTS= PIPELINE_CONFIG="$TEST_TEMP_DIR/tournament-config.json" _build_tournament_attempts)"
+assert_eq "Tournament attempts from config" "2" "$(PIPELINE_ATTEMPTS='' PIPELINE_CONFIG="$TEST_TEMP_DIR/tournament-config.json" _build_tournament_attempts)"
 
 mock_binary "sw" "printf '%s\\n' \"\$@\" > '$TEST_TEMP_DIR/tournament-args.txt'
 echo '{\"selection\":{\"winner\":\"a2\",\"confidence\":\"high\"},\"costUsd\":4.2}'"
