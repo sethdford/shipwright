@@ -15,6 +15,13 @@ export const VALUE_FLAGS = [
   "--log",
   "--kind",
   "--source",
+  "--manifest",
+  "--min",
+  "--limit",
+  "--draft",
+  "--reply",
+  "--verdict",
+  "--trial",
 ] as const;
 
 export const SWITCH_FLAGS = ["--json", "--no-lessons", "--no-governance"] as const;

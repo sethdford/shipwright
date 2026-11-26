@@ -17,9 +17,16 @@ function unquote(text: string): string {
 }
 
 function stripComment(text: string): string {
+  const t = text.trim();
+  // A quoted value ends at its closing quote; a " #" inside it is text, not a comment.
+  const q = t[0];
+  if (q === '"' || q === "'") {
+    const close = t.indexOf(q, 1);
+    if (close !== -1) return t.slice(0, close + 1);
+  }
   // A " #" starts a comment, as in YAML; a "#" inside a word (an issue number like #8644) does not.
-  const at = text.search(/\s#/);
-  return at === -1 ? text : text.slice(0, at);
+  const at = t.search(/\s#/);
+  return at === -1 ? t : t.slice(0, at);
 }
 
 function inlineList(text: string): readonly string[] | null {

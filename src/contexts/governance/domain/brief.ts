@@ -47,7 +47,7 @@ function lessonSection(lessons: readonly ScoredLesson[]): string {
     const why = l.hypothesis === undefined ? "" : ` Why: ${l.hypothesis}`;
     return `- [${l.id}] ${clip(l.text.replace(/\n+/g, " "), 400)}${why}`;
   });
-  return `## Lessons from earlier runs\n\nEach was learned from a failed run and approved by a maintainer.\n\n${rows.join("\n")}`;
+  return `## Lessons from earlier runs\n\nEach was learned from a failed run.\n\n${rows.join("\n")}`;
 }
 
 /**
