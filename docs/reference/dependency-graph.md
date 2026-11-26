@@ -46,6 +46,7 @@ flowchart LR
   adapters_agent --> kernel
   adapters_git --> adapters_process
   adapters_git --> kernel
+  adapters_git --> quality
   adapters_github --> adapters_process
   adapters_github --> integrations
   adapters_github --> kernel
@@ -71,6 +72,8 @@ flowchart LR
   learning_application --> learning_domain
   learning_domain --> kernel
   main --> adapters
+  main --> adapters_agent
+  main --> adapters_git
   main --> adapters_github
   main --> adapters_process
   main --> adapters_state

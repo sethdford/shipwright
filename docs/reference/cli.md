@@ -275,3 +275,49 @@ OPTIONS
 EXIT CODES
   0  printed      1  could not read GitHub or the cost ledger      2  usage error
 ```
+
+## `verify`
+
+Merge verifier: predict whether a change will merge, and gate PRs on it
+
+```text
+USAGE
+  shipwright verify score [--base REF] [--title T] [--body-file F] [--tests pass|fail|unknown]
+                          [--cross R] [--rubric R] [--critic] [--critic-model M]
+                          [--critic-budget USD] [--mode off|advisory|enforce] [--format text|json]
+  shipwright verify train [--days N] [--agent N,...] [--exclude N,...] [--human-weight W]
+                          [--dry-run] [--format text|json]
+  shipwright verify show
+
+DESCRIPTION
+  A merge verifier: predicts whether a change will merge and stay merged (not reverted within
+  14 days), before its PR is opened, and stops changes that should not become PRs.
+
+  score  Scores the current branch against --base (git diff base...HEAD; default origin/main)
+         with the trained model, or with the hand-set prior when nothing was trained. Features
+         come from the diff (size, run output, plan-only changes, CI or test-config edits, tests
+         added or weakened) and the title and description (model chatter). --tests, --cross and
+         --rubric pass the run's own signals (test result, tournament cross-test pass rate, rubric
+         score, each 0 to 1). --critic adds a prompted reviewer (LLM-as-judge) whose stated chance
+         is one more feature, trusted at a third of its stated confidence until training says
+         otherwise; it spends up to --critic-budget (default 0.50 USD).
+  train  Learns the weights from this repository's closed PRs (read-only, through gh): labels
+         them, fits a logistic model around the hand-set prior, and measures it leave-one-out
+         (Brier, AUC, calibration error) against the prior. Factory PRs weigh 1; human PRs weigh
+         --human-weight (default 0.5; 0 learns from factory PRs only). Dependency-bot PRs and test
+         runs are left out. --agent marks older factory PRs that carry no marker. Saves to
+         $SHIPWRIGHT_STATE_DIR/verifier/model.json unless --dry-run.
+  show   Prints the trained weights and their evidence.
+
+GATE (score)
+  Hard stops block in enforce mode from day one: no change beyond plans or run output, failing
+  tests, run output in the diff. A low predicted chance (below 20%) blocks only once the model
+  is trusted: 20 or more labelled PRs, 5 of each outcome, leave-one-out AUC 0.7 or more, and a
+  Brier score better than guessing the base rate. Until then it warns.
+  The mode comes from --mode, else SHIPWRIGHT_VERIFIER (off, advisory, enforce; default
+  advisory). Advisory never blocks and reports what enforce would do.
+
+EXIT CODES
+  0  pass or warn (score), done (train, show)   1  could not read git, GitHub or the model
+  2  usage error                                 3  blocked (score, enforce mode only)
+```

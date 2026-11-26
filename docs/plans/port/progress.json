@@ -916,5 +916,14 @@
     "parity": null,
     "status": "parity-green",
     "notes": "New (Wave 2 W2-13 pass^k and paired ratchet rule); no bash predecessor."
+  },
+  {
+    "command": "verify",
+    "aliases": [],
+    "script": "sw-verify.sh",
+    "context": "quality",
+    "parity": null,
+    "status": "parity-green",
+    "notes": "New: learned merge verifier (ADR-0012); no bash predecessor."
   }
 ]

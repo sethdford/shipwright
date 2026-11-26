@@ -1,6 +1,6 @@
 import type { CliIO, CommandContext } from "../cli/command";
 import type { SafetyPorts } from "../contexts/orchestration";
-import type { QualityPorts } from "../contexts/quality";
+import type { QualityPorts, VerifierPorts } from "../contexts/quality";
 import type { FileReader } from "../shared/kernel/ports";
 
 export interface CapturedIO extends CliIO {
@@ -26,6 +26,7 @@ export function commandContext(
   env: Readonly<Record<string, string | undefined>> = {},
   files?: FileReader,
   quality?: QualityPorts,
+  verifier?: VerifierPorts,
 ): CommandContext {
   return {
     io,
@@ -42,6 +43,10 @@ export function commandContext(
     quality: () => {
       if (!quality) throw new Error("this command was not given quality ports");
       return quality;
+    },
+    verifier: () => {
+      if (!verifier) throw new Error("this command was not given verifier ports");
+      return verifier;
     },
   };
 }
