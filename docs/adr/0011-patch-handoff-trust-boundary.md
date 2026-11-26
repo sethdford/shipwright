@@ -1,4 +1,4 @@
-# 0010. Agent output crosses into the trusted pipeline only as a patch
+# 0011. Agent output crosses into the trusted pipeline only as a patch
 
 Status: proposed (#8706; interim guard #8662) · Date: 2026-11-26
 
