@@ -6,6 +6,9 @@ SW_AGENT_EXEC="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/agent-exec.sh"
 # Test commands run without credentials (#8608).
 # shellcheck source=lib/test-gate-env.sh
 source "$(dirname "${BASH_SOURCE[0]}")/test-gate-env.sh"
+# Patch handoff (#8706): with SW_PATCH_HANDOFF=true the build agent works in a disposable clone.
+# shellcheck source=lib/patch-handoff.sh
+source "$(dirname "${BASH_SOURCE[0]}")/patch-handoff.sh"
 source "$(dirname "${BASH_SOURCE[0]}")/models.sh"
 [[ -n "${_PIPELINE_STAGES_BUILD_LOADED:-}" ]] && return 0
 _PIPELINE_STAGES_BUILD_LOADED=1
@@ -166,6 +169,49 @@ Create files in the appropriate project directories (e.g. tests/, __tests__/, sr
     fi
 
     return 0
+}
+
+# _build_run_loop ARGS... — runs `sw loop`. Under patch handoff the loop holds no GitHub or fleet
+# credentials: it works in the agent's clone, and nothing it does there is trusted.
+_build_run_loop() {
+    if [[ "${SW_PATCH_HANDOFF:-false}" != "true" ]]; then
+        sw loop "$@"
+        return
+    fi
+    local _empty_gh rc=0
+    _empty_gh=$(mktemp -d "${TMPDIR:-/tmp}/sw-nogh.XXXXXX") || return 1
+    env -u GH_TOKEN -u GITHUB_TOKEN -u GH_ENTERPRISE_TOKEN -u GITHUB_PAT \
+        -u SHIPWRIGHT_FLEET_TOKEN -u SHIPWRIGHT_FLEET_TOKEN_FILE -u SSH_AUTH_SOCK \
+        -u SW_PIPELINE_PUSH_URL GH_CONFIG_DIR="$_empty_gh" GIT_CONFIG_GLOBAL=/dev/null \
+        GIT_TERMINAL_PROMPT=0 sw loop "$@" || rc=$?
+    rm -rf "$_empty_gh"
+    return "$rc"
+}
+
+# _build_handoff_return AGENT_DIR BASE — export the agent's work as a patch, judge it, and commit
+# it to the trusted checkout. Any refusal fails the build (fail closed).
+_build_handoff_return() {
+    local dir="$1" base="$2"
+    local patch="${ARTIFACTS_DIR}/agent.patch"
+    mkdir -p "$ARTIFACTS_DIR" "${ARTIFACTS_DIR}/agent-loop-logs"
+    # Loop logs come back as data for humans and token accounting, never into the repo.
+    cp -R "${dir}/.claude/loop-logs/." "${ARTIFACTS_DIR}/agent-loop-logs/" 2>/dev/null || true
+    handoff_export "$dir" "$base" "$PROJECT_ROOT" "$patch" || { error "Patch handoff: export failed"; return 1; }
+    local why
+    if ! why=$(handoff_judge "$patch"); then
+        printf '%s\n' "$why" > "${ARTIFACTS_DIR}/agent.patch.refused"
+        error "Patch handoff: patch refused: $(printf '%s' "$why" | tr '\n' ';')"
+        emit_event "build.patch_refused" "issue=${ISSUE_NUMBER:-0}" "base=$base"
+        return 1
+    fi
+    local sha
+    sha=$(handoff_apply "$PROJECT_ROOT" "$base" "$patch" "build: ${GOAL:-issue ${ISSUE_NUMBER:-}}") || {
+        error "Patch handoff: apply failed"
+        return 1
+    }
+    emit_event "build.patch_applied" "issue=${ISSUE_NUMBER:-0}" "base=$base" "head=$sha"
+    success "Patch handoff: applied the agent's patch as ${sha:0:12}"
+    rm -rf "$(dirname "$dir")"
 }
 
 stage_build() {
@@ -452,10 +498,13 @@ ${_skill_prompts}
     [[ -z "${FALLBACK_MODEL_OVERRIDE:-}" && -n "${PIPELINE_FALLBACK_MODEL:-}" ]] && loop_args+=(--fallback-model "$PIPELINE_FALLBACK_MODEL")
 
     # Definition of Done: use plan-extracted DoD if available
-    [[ -s "$dod_file" ]] && loop_args+=(--definition-of-done "$dod_file")
+    # (absolute: under patch handoff the loop runs in another directory)
+    [[ -s "$dod_file" ]] && loop_args+=(--definition-of-done "$(cd "$(dirname "$dod_file")" && pwd)/$(basename "$dod_file")")
 
-    # Checkpoint resume: when pipeline resumed from build-stage checkpoint, pass --resume to loop
-    if [[ "${RESUME_FROM_CHECKPOINT:-false}" == "true" && "${checkpoint_stage:-}" == "build" ]]; then
+    # Checkpoint resume: when pipeline resumed from build-stage checkpoint, pass --resume to loop.
+    # Not under patch handoff: each build gets a fresh agent clone, so there is no loop state to resume.
+    if [[ "${RESUME_FROM_CHECKPOINT:-false}" == "true" && "${checkpoint_stage:-}" == "build" \
+        && "${SW_PATCH_HANDOFF:-false}" != "true" ]]; then
         loop_args+=(--resume)
     fi
 
@@ -472,12 +521,27 @@ ${_skill_prompts}
 
     local _token_log="${ARTIFACTS_DIR}/.claude-tokens-build.log"
     export PIPELINE_JOB_ID="${PIPELINE_NAME:-pipeline-$$}"
-    sw loop "${loop_args[@]}" < /dev/null 2>"$_token_log" || {
+
+    # Patch handoff (#8706): the loop and its agents work in a disposable clone of the recorded base;
+    # only a judged patch comes back. Loop logs are read from where the loop ran.
+    local _handoff_base="" _handoff_dir="" _loop_logs="${PROJECT_ROOT}/.claude/loop-logs"
+    local _progress_file="${PWD}/.claude/loop-logs/progress.md"
+    if [[ "${SW_PATCH_HANDOFF:-false}" == "true" ]]; then
+        _handoff_base=$(git -C "$PROJECT_ROOT" rev-parse HEAD) || { error "Patch handoff: no base commit"; return 1; }
+        _handoff_dir="$(mktemp -d "${TMPDIR:-/tmp}/sw-agent.XXXXXX")/repo"
+        handoff_prepare "$PROJECT_ROOT" "$_handoff_base" "$_handoff_dir" \
+            || { error "Patch handoff: could not prepare the agent clone"; return 1; }
+        loop_args+=(--repo "$_handoff_dir")
+        _loop_logs="${_handoff_dir}/.claude/loop-logs"
+        _progress_file="${_loop_logs}/progress.md"
+        info "Patch handoff: agent works in ${DIM}${_handoff_dir}${RESET} (base ${_handoff_base:0:12})"
+    fi
+
+    _build_run_loop "${loop_args[@]}" < /dev/null 2>"$_token_log" || {
         local _loop_exit=$?
         parse_claude_tokens "$_token_log"
 
         # Detect context exhaustion from progress file
-        local _progress_file="${PWD}/.claude/loop-logs/progress.md"
         if [[ -f "$_progress_file" ]]; then
             local _prog_tests
             _prog_tests=$(grep -oE 'Tests passing: (true|false)' "$_progress_file" 2>/dev/null | awk '{print $NF}' || echo "unknown")
@@ -495,8 +559,13 @@ ${_skill_prompts}
     }
     parse_claude_tokens "$_token_log"
 
+    if [[ -n "$_handoff_dir" ]]; then
+        _build_handoff_return "$_handoff_dir" "$_handoff_base" || return 1
+        _loop_logs="${ARTIFACTS_DIR}/agent-loop-logs"
+    fi
+
     # Read accumulated token counts from build loop (written by sw-loop.sh)
-    local _loop_token_file="${PROJECT_ROOT}/.claude/loop-logs/loop-tokens.json"
+    local _loop_token_file="${_loop_logs}/loop-tokens.json"
     if [[ -f "$_loop_token_file" ]] && command -v jq >/dev/null 2>&1; then
         local _loop_in _loop_out _loop_cost
         _loop_in=$(jq -r '.input_tokens // 0' "$_loop_token_file" 2>/dev/null || echo "0")
