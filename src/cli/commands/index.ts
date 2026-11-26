@@ -3,6 +3,7 @@ import { acceptanceCommand } from "./acceptance";
 import { benchCommand } from "./bench";
 import { breakerCommand } from "./breaker";
 import { budgetCommand } from "./budget";
+import { envCommand } from "./env";
 import { evalCommand } from "./eval";
 import { failureCommand } from "./failure";
 import { gatesCommand } from "./gates";
@@ -35,6 +36,7 @@ export const commands: readonly Command[] = [
   repomodelCommand,
   routeCommand,
   benchCommand,
+  envCommand,
 ];
 
 export function findCommand(

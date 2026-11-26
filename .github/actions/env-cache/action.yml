@@ -1,0 +1,83 @@
+name: Shipwright environment cache
+description: >-
+  Makes a checkout ready to build and test from its environment recipe (.shipwright/env.json, or a
+  detected one; ADR-0020), and keeps the built environment in the GitHub Actions cache so the next
+  run restores it instead of installing again. Requires actions/checkout, Bun and the Shipwright
+  CLI dependencies (bun install) first. Never fails the job on a cache miss; fails it only when the
+  recipe is invalid or its setup fails, unless fail-on-error is 'false'.
+inputs:
+  root:
+    description: The repository the recipe belongs to (default the workspace).
+    required: false
+    default: "."
+  dir:
+    description: The checkout to make ready (default root).
+    required: false
+    default: ""
+  ref:
+    description: Git ref to read the committed recipe from.
+    required: false
+    default: HEAD
+  fail-on-error:
+    description: "'true' (default) fails the step when setup fails; 'false' only warns."
+    required: false
+    default: "true"
+outputs:
+  key:
+    description: The environment cache key ('' when there is no recipe).
+    value: ${{ steps.key.outputs.key }}
+  status:
+    description: hit, built, skipped, no-recipe, invalid or failed.
+    value: ${{ steps.hydrate.outputs.status }}
+runs:
+  using: composite
+  steps:
+    - name: Compute the environment key
+      id: key
+      shell: bash
+      env:
+        SW_ROOT: ${{ inputs.root }}
+        SW_DIR: ${{ inputs.dir }}
+        SW_REF: ${{ inputs.ref }}
+      run: |
+        cli="$GITHUB_ACTION_PATH/../../../src/cli.ts"
+        dir="${SW_DIR:-$SW_ROOT}"
+        if out=$(bun "$cli" env key --root "$SW_ROOT" --dir "$dir" --ref "$SW_REF" --json); then
+          echo "key=$(jq -r .key <<<"$out")" >> "$GITHUB_OUTPUT"
+          echo "dir=$(jq -r .cacheDir <<<"$out")" >> "$GITHUB_OUTPUT"
+        else
+          echo "::notice::No environment recipe; nothing to cache"
+          echo "key=" >> "$GITHUB_OUTPUT"
+        fi
+    - name: Restore the environment
+      id: restore
+      if: steps.key.outputs.key != ''
+      uses: actions/cache/restore@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5.0.5
+      with:
+        path: ${{ steps.key.outputs.dir }}
+        key: sw-env-${{ runner.os }}-${{ runner.arch }}-${{ steps.key.outputs.key }}
+    - name: Hydrate the checkout
+      id: hydrate
+      shell: bash
+      env:
+        SW_ROOT: ${{ inputs.root }}
+        SW_DIR: ${{ inputs.dir }}
+        SW_REF: ${{ inputs.ref }}
+        FAIL_ON_ERROR: ${{ inputs.fail-on-error }}
+      run: |
+        cli="$GITHUB_ACTION_PATH/../../../src/cli.ts"
+        dir="${SW_DIR:-$SW_ROOT}"
+        rc=0
+        out=$(bun "$cli" env hydrate --root "$SW_ROOT" --dir "$dir" --ref "$SW_REF" --json) || rc=$?
+        printf '%s\n' "$out"
+        echo "status=$(jq -r '.status // "failed"' <<<"$out" 2>/dev/null || echo failed)" >> "$GITHUB_OUTPUT"
+        if [[ "$rc" -ne 0 ]]; then
+          echo "::warning::Shipwright environment setup failed (exit $rc)"
+          if [[ "$FAIL_ON_ERROR" != "false" ]]; then exit "$rc"; fi
+        fi
+    - name: Save the environment
+      if: steps.key.outputs.key != '' && steps.restore.outputs.cache-hit != 'true' && steps.hydrate.outputs.status == 'built'
+      uses: actions/cache/save@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5.0.5
+      with:
+        path: ${{ steps.key.outputs.dir }}
+        key: sw-env-${{ runner.os }}-${{ runner.arch }}-${{ steps.key.outputs.key }}

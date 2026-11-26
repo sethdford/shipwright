@@ -1,7 +1,12 @@
+import { createHash } from "node:crypto";
 import { join } from "node:path";
 import pkg from "../package.json";
 import { AgentSdkRunner, agentEnv } from "./adapters/agent/agent-sdk-runner";
 import { buildBenchFactory } from "./adapters/bench/bench-factory";
+import { FsEnvCache } from "./adapters/env/fs-env-cache";
+import { GitEnvSource } from "./adapters/env/git-env-source";
+import { GitScratch } from "./adapters/env/git-scratch";
+import { JailedEnvExecutor } from "./adapters/env/jailed-env-executor";
 import { GitAcceptanceWorkspace } from "./adapters/git/git-acceptance-workspace";
 import { GitHistorySource } from "./adapters/git/git-history-source";
 import { GitLocalChange } from "./adapters/git/git-local-change";
@@ -34,6 +39,7 @@ import type { DeliveryPorts } from "./contexts/delivery";
 import type { RepoModelPorts, RoutingPorts } from "./contexts/intelligence";
 import type { SafetyPorts } from "./contexts/orchestration";
 import type { AcceptancePorts } from "./contexts/planning";
+import type { EnvPorts } from "./contexts/platform";
 import type { BenchFactory, QualityPorts, VerifierPorts } from "./contexts/quality";
 import { installShutdown } from "./shutdown";
 
@@ -79,6 +85,24 @@ function acceptance(root: string = process.cwd()): AcceptancePorts {
     ws: new GitAcceptanceWorkspace(runner, root),
     exec: new TestGateExecutor(runner, gate, root),
     artifacts: new NodeArtifactStore(),
+  };
+}
+
+/** Environment recipes and their cache (ADR-0020); setup commands run through env-exec.sh. */
+export function buildEnvPorts(env: Readonly<Record<string, string | undefined>>): EnvPorts {
+  const { stateDir } = resolvePaths(env);
+  const runner = new BunProcessRunner({ reapGroup: true });
+  const script = join(import.meta.dir, "..", "scripts", "lib", "env-exec.sh");
+  return {
+    source: new GitEnvSource(new BunProcessRunner()),
+    cache: new FsEnvCache(runner, join(stateDir, "env-cache"), { platform: process.platform }),
+    exec: new JailedEnvExecutor(runner, script, env),
+    scratch: new GitScratch(new BunProcessRunner(), join(stateDir, "env-scratch")),
+    agent: once(() => new AgentSdkRunner(agentEnv(env))),
+    digest: (text) => createHash("sha256").update(text).digest("hex"),
+    platform: { os: process.platform, arch: process.arch },
+    sleep: (ms) => Bun.sleep(ms),
+    now: () => Date.now(),
   };
 }
 
@@ -207,6 +231,7 @@ function sharedPorts(env: Readonly<Record<string, string | undefined>>) {
     acceptance,
     routing: once(() => buildRoutingPorts(env)),
     repoModel: once(() => buildRepoModelPorts(env)),
+    environments: once(() => buildEnvPorts(env)),
   };
 }
 
