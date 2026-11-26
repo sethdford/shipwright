@@ -463,6 +463,16 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y tmux jq
 
+      # Bun runs the TypeScript commands the bash pipeline calls: the governance brief and review checklist
+      # (ADR-0010) and the failure classifier (W2-04). Without it they fall back or are skipped.
+      # Same pin as test.yml and ts-check.yml; bun.lock is the only root lockfile (#8647).
+      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
+        with:
+          bun-version: 1.2.19
+
+      - name: Install TypeScript dependencies
+        run: bun install --frozen-lockfile --ignore-scripts
+
       - name: Install Claude Code
         run: |
           npm install -g @anthropic-ai/claude-code@2.1.301
