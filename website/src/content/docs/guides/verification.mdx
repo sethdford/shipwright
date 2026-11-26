@@ -86,7 +86,7 @@ coding agents, but only with a good selector. The selector is the point of this 
 | **Gate** | A candidate needs a non-empty patch that passes the repository's test command. |
 | **Cross-tests** | Every attempt's new tests run against every other attempt's patch. A suite counts as evidence only when its own author's patch passes it. |
 | **Rubric** | While the attempts build, a judge drafts 3 to 10 weighted, binary, repository-specific criteria from the task. Shipwright adds two fixed integrity criteria: no weakened tests, and no CI or test-config changes. Failing an integrity criterion scores the candidate 0. |
-| **Merge verifier** | When available, the verifier's probability joins the composite score at a quarter weight. |
+| **Merge verifier** | The selection rule can add the verifier's probability to the composite at a quarter weight, but pipeline runs do not wire the verifier into the tournament yet, so today candidates are ranked on tests, cross-tests and the rubric. |
 | **Blind judge** | When finalists score within 0.15 of each other, one judge call compares them under shuffled letters. It must first challenge what every finalist assumes, and it may answer "none". |
 | **Result** | The winner is fast-forwarded onto the pipeline branch; nothing is pushed. Every worktree is removed. `tournament.json` records each candidate's scores, the margin and a confidence level (low when the judge overruled the scores). |
 

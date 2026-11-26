@@ -148,7 +148,7 @@ graph LR
 | **Compute router** | Estimates difficulty from the issue and run history, then picks template, model, effort, attempts and a cost cap from a versioned table | `shipwright route` | `shadow` (logs only) |
 | **Repository world model** | Definitions, references, imports, tests and owners, refreshed incrementally; a brief in the prompt and a read-only MCP server for agents | `shipwright repomodel` | on |
 | **Lessons and governance** | Accepted ADRs, policies and approved lessons go into the build prompt from the base commit; the review gets a checklist; failed runs are mined into lesson drafts that must win a trial | `shipwright governance` | on |
-| **Patch handoff** | The build agent works in a disposable clone with no credentials; its work reaches the trusted checkout only as a patch that is judged first | (pipeline) | on |
+| **Patch handoff** | The build agent works in a disposable clone with no credentials; its work reaches the trusted checkout only as a patch that is judged first (single-attempt builds; tournaments are not covered yet) | (pipeline) | on |
 | **Untrusted input** | Issue text is stripped of hidden content, framed as data, and clear injection attempts stop intake until a maintainer adds `shipwright:input-reviewed` | (pipeline) | on |
 | **Dashboard roles** | Every mutating route checks the caller's role; the default role is `viewer` | (dashboard) | on |
 
@@ -166,7 +166,10 @@ Head-to-head benchmark results will be published once live runs finish; none are
 
 ## What's New
 
-### Unreleased
+### v4.1.0
+
+v4.1.0 is about proof: each run shows what it delivered and what it cost, and a change gets checked before its pull request exists.
+
 
 - **Proof engine**: `shipwright scorecard`, `shipwright eval`, and `shipwright bench` (ADR-0013)
 - **Better builds**: spec-first acceptance tests on by default (ADR-0015), opt-in tournament mode
@@ -178,6 +181,10 @@ Head-to-head benchmark results will be published once live runs finish; none are
 - **Trust boundary**: patch handoff on by default (ADR-0011), prompt-injection defenses for issue
   text, and role checks on every mutating dashboard route (viewer by default; exposed dashboards
   need GitHub OAuth)
+- **Cost you can trust**: one ledger row per run with the real USD, the PR it produced and whether
+  the cost was reported or estimated
+- **Dashboard Quality tab**: scorecard, verifier, router, tournaments, acceptance tests, lessons,
+  trust-boundary events and cost per run on one page
 - **Pipeline PRs** carry only the change, get real titles, and runs clean up after themselves
 
 Details and upgrade notes: [CHANGELOG.md](CHANGELOG.md) and [docs/UPGRADING.md](docs/UPGRADING.md).
@@ -447,6 +454,8 @@ shipwright dashboard start
 ```
 
 Web dashboard with live pipeline progress, GitHub context (security alerts, contributors, deployments), DORA metrics, cost tracking, and context efficiency metrics. WebSocket-powered, updates in real-time. Binds `127.0.0.1` by default; use `--host 0.0.0.0` or `SW_DASHBOARD_HOST` for server or fleet mode, after reading [docs/dashboard-exposure.md](docs/dashboard-exposure.md).
+
+The **Quality** tab shows the proof and safety stack in one place: the saved delivery scorecard, the merge verifier's model and verdicts, compute-router decisions by difficulty tier, tournaments, acceptance tests, governance briefs and lessons, trust-boundary refusals, and cost per run. It reads local files only (`GET /api/quality?days=N`). See [the dashboard guide](https://sethdford.github.io/shipwright/guides/dashboard/#quality).
 
 Every state-changing route checks the signed-in user's role (`viewer`, `operator`, `admin`). Unknown or missing roles resolve to `viewer`, a GitHub admin of `DASHBOARD_REPO` is a dashboard admin, and an exposed dashboard requires GitHub OAuth (it refuses to start with PAT sign-in).
 

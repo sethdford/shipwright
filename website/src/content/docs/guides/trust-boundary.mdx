@@ -77,9 +77,23 @@ another was found. Now the trusted side never runs git in a directory the agent 
 Every trusted-side git call runs without system or global config, replace objects, hooks,
 fsmonitor, ssh command or external diff.
 
-**Not covered yet** (listed in ADR-0011): the TDD and self-heal agents still run in the trusted
-checkout, test commands run agent-written code there (with credentials stripped), and the agent runs
-as the same OS user, so host isolation is the sandbox backend's job.
+The same judge covers every other write into the trusted checkout. Test-first (TDD) files are
+written in a disposable clone and applied as a judged patch (`tdd.patch_refused`), and model-chosen
+paths with `..`, absolute paths, `.git` or `.claude/` are never written (`tdd.path_refused`). The PR
+stage's leftover changes and CI partial-work commits are judged too, and a refused leftover is kept in
+`leftover.patch` (`pr.leftover_refused`). A commit made during intake, plan, design or review is
+undone (`stage.head_moved`), so its content meets the next judge. Self-heal re-runs the build stage,
+so it is covered.
+
+**Not covered yet:**
+
+- **Tournament builds** (`PIPELINE_ATTEMPTS=2..5`). Attempts run in git worktrees that share the
+  repository's `.git`. The winner is fast-forwarded onto the branch without going through the patch
+  judge. Leave tournaments off for untrusted input until they use the handoff.
+- **Test commands** still run agent-written code in the trusted checkout. Credentials are stripped.
+- **Host isolation.** The agent runs as the same OS user, so isolating it from the host is the
+  sandbox backend's job.
+- **Base sha, goal and branch** should come only from the out-of-repo record (#8671).
 
 ## Locked acceptance tests
 
