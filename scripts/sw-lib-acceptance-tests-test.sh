@@ -36,6 +36,12 @@ case "$sub" in
         answer=$(arg --answer "$@"); manifest=$(arg --manifest "$@"); root=$(arg --root "$@")
         if grep -q NOT_TESTABLE "$answer"; then echo '{"not_testable":"docs only"}' > "$manifest"; exit 0; fi
         if grep -q BAD_ANSWER "$answer"; then echo "✗ acceptance answer rejected; nothing was written:"; echo "  - tests: bad"; exit 1; fi
+        if grep -q WORKFLOW_ANSWER "$answer"; then
+            mkdir -p "$root/.github/workflows"
+            echo 'on: push' > "$root/.github/workflows/acceptance.yml"
+            echo '{"criteria":[{"id":"AC-1","text":"works"}],"tests":[{"path":".github/workflows/acceptance.yml","criteria":["AC-1"]}]}' > "$manifest"
+            exit 0
+        fi
         mkdir -p "$root/tests"
         echo 'test("AC-1: works")' > "$root/tests/feature.test.sh"
         echo '{"criteria":[{"id":"AC-1","text":"works"}],"tests":[{"path":"tests/feature.test.sh","criteria":["AC-1"]}]}' > "$manifest"
@@ -64,6 +70,7 @@ cat > "$FAKE/agent-exec.sh" <<'AGENT'
 dir="$(cd "$(dirname "$0")" && pwd)"
 cat > "$dir/last-prompt.txt"
 echo "call" >> "$dir/agent-calls.log"
+pwd > "$dir/writer-cwd"
 if [[ -f "$dir/side-effect" ]]; then echo "hacked" > src/app.sh; echo "x" > stray.txt; fi
 answer=$(head -1 "$dir/answers" 2>/dev/null || echo GOOD)
 tail -n +2 "$dir/answers" > "$dir/answers.next" 2>/dev/null || true; mv "$dir/answers.next" "$dir/answers" 2>/dev/null || true
@@ -96,7 +103,8 @@ SW_AGENT_EXEC="$FAKE/agent-exec.sh"
 
 reset_fakes() {
     rm -f "$FAKE"/calls.log "$FAKE"/agent-calls.log "$FAKE"/events.log "$FAKE"/red-rc "$FAKE"/green-rc \
-        "$FAKE"/answers "$FAKE"/side-effect "$ARTIFACTS_DIR"/acceptance*
+        "$FAKE"/answers "$FAKE"/side-effect "$FAKE"/writer-cwd "$ARTIFACTS_DIR"/acceptance*
+    rm -rf "$REPO/.github"
     rm -rf "$SHIPWRIGHT_STATE_DIR/acceptance"
     rm -rf "$REPO/tests"
     git -C "$REPO" reset -q --hard "$(git -C "$REPO" rev-list --max-parents=0 HEAD)"
@@ -152,15 +160,50 @@ assert_eq "recovers" "0" "$rc"
 assert_contains "feedback names the problem" "$(cat "$FAKE/last-prompt.txt")" "tests: bad"
 
 echo ""
-echo -e "${DIM}  generate: a writer that edits files is undone and rejected${RESET}"
+echo -e "${DIM}  generate: a writer that edits files is undone and rejected (handoff off)${RESET}"
 reset_fakes
 touch "$FAKE/side-effect"
 printf 'GOOD\nGOOD\nGOOD\n' > "$FAKE/answers"
-rc=0; acceptance_generate "bash run-tests.sh" || rc=$?
+rc=0; SW_PATCH_HANDOFF=false acceptance_generate "bash run-tests.sh" || rc=$?
 assert_eq "every attempt rejected" "1" "$rc"
 assert_eq "tracked edit reverted" "echo app" "$(cat "$REPO/src/app.sh")"
 assert_file_not_exists "untracked stray file removed" "$REPO/stray.txt"
 assert_contains "writer told not to edit" "$(cat "$FAKE/last-prompt.txt")" "Do not write, edit or commit anything"
+
+echo ""
+echo -e "${DIM}  generate: under handoff the writer works in a disposable clone${RESET}"
+reset_fakes
+touch "$FAKE/side-effect"
+rc=0; acceptance_generate "bash run-tests.sh" || rc=$?
+assert_eq "the writer's edits never reach the checkout, so the answer is used" "0" "$rc"
+assert_eq "tracked file untouched" "echo app" "$(cat "$REPO/src/app.sh")"
+assert_file_not_exists "no stray file in the checkout" "$REPO/stray.txt"
+cwd=$(cat "$FAKE/writer-cwd")
+assert_eq "the writer did not run in the trusted checkout" "no" "$([[ "$cwd" == "$REPO" ]] && echo yes || echo no)"
+assert_file_not_exists "the clone is removed afterwards" "$cwd"
+assert_eq "one file in the commit" "1" "$(git -C "$REPO" show --name-only --format= HEAD | grep -c . || true)"
+assert_file_exists "the judged patch is kept in the artifacts" "$ARTIFACTS_DIR/acceptance.patch"
+
+echo ""
+echo -e "${DIM}  generate: test files on a protected path are refused before they run${RESET}"
+reset_fakes
+printf 'WORKFLOW_ANSWER\nWORKFLOW_ANSWER\nWORKFLOW_ANSWER\n' > "$FAKE/answers"
+head_before=$(git -C "$REPO" rev-parse HEAD)
+rc=0; acceptance_generate "bash run-tests.sh" || rc=$?
+assert_eq "every attempt refused" "1" "$rc"
+assert_eq "nothing committed" "$head_before" "$(git -C "$REPO" rev-parse HEAD)"
+assert_file_not_exists "the workflow file is removed" "$REPO/.github/workflows/acceptance.yml"
+assert_eq "verify-red never ran the refused files" "0" "$(grep -c verify-red "$FAKE/calls.log" || true)"
+assert_contains "event: patch_refused" "$(cat "$FAKE/events.log")" "acceptance.patch_refused"
+assert_contains "feedback names the protected path" "$(cat "$FAKE/last-prompt.txt")" "protected path: .github/workflows/acceptance.yml"
+
+echo ""
+echo -e "${DIM}  generate: refused, then an ordinary test file is accepted${RESET}"
+reset_fakes
+printf 'WORKFLOW_ANSWER\nGOOD\n' > "$FAKE/answers"
+rc=0; acceptance_generate "bash run-tests.sh" || rc=$?
+assert_eq "recovers on the second attempt" "0" "$rc"
+assert_contains "commit holds the ordinary test file" "$(git -C "$REPO" show --name-only --format= HEAD)" "tests/feature.test.sh"
 
 echo ""
 echo -e "${DIM}  generate: not testable${RESET}"

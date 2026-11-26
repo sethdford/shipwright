@@ -130,6 +130,7 @@ LOOP_COST_MILLICENTS=0
 
 # ─── Flexible Iteration Defaults (all config-driven) ───────────────────────
 AUTO_EXTEND=true
+AUTO_EXTEND_EXPLICIT=false
 EXTENSION_SIZE=$(_smart_int "loop.extension_size" 5)
 MAX_EXTENSIONS=$(_smart_int "loop.max_extensions" 3)
 EXTENSION_COUNT=0
@@ -215,6 +216,7 @@ show_help() {
     echo -e "  ${CYAN}--quality-gates${RESET}           Enable automated quality gates before accepting completion"
     echo -e "  ${CYAN}--definition-of-done${RESET} FILE DoD checklist file — evaluated by AI against git diff"
     echo -e "  ${CYAN}--no-auto-extend${RESET}          Disable auto-extension when max iterations reached"
+    echo -e "  ${CYAN}--auto-extend${RESET}             Auto-extend even with an explicit --max-iterations (a set cap is hard otherwise)"
     echo -e "  ${CYAN}--extension-size${RESET} N         Additional iterations per extension (default: 5)"
     echo -e "  ${CYAN}--max-extensions${RESET} N         Max number of auto-extensions (default: 3)"
     echo ""
@@ -313,7 +315,8 @@ while [[ $# -gt 0 ]]; do
             ;;
         --definition-of-done=*) DOD_FILE="${1#--definition-of-done=}"; shift ;;
         --quality-gates) QUALITY_GATES_ENABLED=true; shift ;;
-        --no-auto-extend) AUTO_EXTEND=false; shift ;;
+        --no-auto-extend) AUTO_EXTEND=false; AUTO_EXTEND_EXPLICIT=true; shift ;;
+        --auto-extend) AUTO_EXTEND=true; AUTO_EXTEND_EXPLICIT=true; shift ;;
         --extension-size)
             EXTENSION_SIZE="${2:-}"
             [[ -z "$EXTENSION_SIZE" ]] && { error "Missing value for --extension-size"; exit 1; }
@@ -378,6 +381,11 @@ while [[ $# -gt 0 ]]; do
             ;;
     esac
 done
+
+# An explicit --max-iterations is a hard cap unless --auto-extend asks for extensions too.
+if $MAX_ITERATIONS_EXPLICIT && ! $AUTO_EXTEND_EXPLICIT; then
+    AUTO_EXTEND=false
+fi
 
 # Auto-enable worktree for multi-agent
 if [[ "$AGENTS" -gt 1 ]]; then

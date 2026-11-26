@@ -14,6 +14,7 @@ flowchart LR
     adapters_git["adapters/git"]
     adapters_github["adapters/github"]
     adapters_process["adapters/process"]
+    adapters_proof["adapters/proof"]
     adapters_state["adapters/state"]
     adapters_store["adapters/store"]
     adapters_tmux["adapters/tmux"]
@@ -87,6 +88,12 @@ flowchart LR
   adapters_process --> intelligence
   adapters_process --> kernel
   adapters_process --> planning
+  adapters_proof --> adapters
+  adapters_proof --> adapters_github
+  adapters_proof --> adapters_process
+  adapters_proof --> integrations
+  adapters_proof --> kernel
+  adapters_proof --> quality
   adapters_state --> intelligence
   adapters_state --> kernel
   adapters_state --> orchestration
@@ -137,6 +144,7 @@ flowchart LR
   main --> adapters_git
   main --> adapters_github
   main --> adapters_process
+  main --> adapters_proof
   main --> adapters_state
   main --> cli
   main --> delivery
