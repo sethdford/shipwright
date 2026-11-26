@@ -91,7 +91,7 @@ files that Shipwright already writes (no subprocesses, read-only):
 | **Tournaments**: attempts, winner, confidence and cost | `build.tournament` events |
 | **Acceptance tests**: locked, passed, failed, gate failures, not testable | `acceptance.*` events |
 | **Governance and lessons**: briefs, the lessons that went in, the ablation arms, drafted lessons | `governance.brief`, `lessons.drafted` events |
-| **Trust boundary**: refused issues, applied, empty and refused patches | `intake.untrusted_refused`, `decompose.untrusted_refused`, `build.patch_*` events |
+| **Trust boundary**: refused issues, judged build and TDD patches, refused PR leftovers, undone stage commits | `intake.untrusted_refused`, `decompose.untrusted_refused`, `build.patch_*`, `tdd.patch_refused`, `tdd.path_refused`, `pr.leftover_refused`, `stage.head_moved` events |
 | **Cost per run**: total, reported vs estimated, runs linked to a PR | `pipeline.cost` events |
 | **Repository model**: briefs and MCP attachment, with the A/B arm | `repo_model.*` events |
 

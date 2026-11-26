@@ -209,7 +209,8 @@ export const EVENT_FAMILIES = {
   governance: ["governance.brief", "governance.brief_unavailable", "lessons.drafted"],
   safety: [
     "intake.untrusted_refused", "decompose.untrusted_refused", "build.patch_applied",
-    "build.patch_empty", "build.patch_refused",
+    "build.patch_empty", "build.patch_refused", "tdd.patch_refused", "tdd.path_refused",
+    "pr.leftover_refused", "stage.head_moved",
   ],
   repoModel: ["repo_model.brief", "repo_model.brief_unavailable", "repo_model.mcp_attached",
     "repo_model.mcp_skipped"],
