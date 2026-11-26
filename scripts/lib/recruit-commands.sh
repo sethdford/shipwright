@@ -348,7 +348,7 @@ Return JSON only."
 
             local tmp_file
             tmp_file=$(mktemp)
-            trap "rm -f '$tmp_file'" RETURN
+            trap "rm -f '$tmp_file'; trap - RETURN" RETURN
             jq --arg key "$role_key" --argjson role "$role_json" '.[$key] = $role' "$ROLES_DB" > "$tmp_file" && _recruit_locked_write "$ROLES_DB" "$tmp_file" || rm -f "$tmp_file"
 
             # Update heuristics with trigger keywords
@@ -357,7 +357,7 @@ Return JSON only."
             if [[ -n "$keywords" ]]; then
                 local heur_tmp
                 heur_tmp=$(mktemp)
-                trap "rm -f '$heur_tmp'" RETURN
+                trap "rm -f '$heur_tmp'; trap - RETURN" RETURN
                 while IFS= read -r kw; do
                     [[ -z "$kw" ]] && continue
                     jq --arg kw "$kw" --arg role "$role_key" \
@@ -485,7 +485,7 @@ Return JSON only."
             # Save the LLM-generated mind profile
             local tmp_file
             tmp_file=$(mktemp)
-            trap "rm -f '$tmp_file'" RETURN
+            trap "rm -f '$tmp_file'; trap - RETURN" RETURN
             jq --arg id "$agent_id" --argjson mind "$result" '.[$id] = ($mind + {updated: (now | todate)})' "$AGENT_MINDS_DB" > "$tmp_file" && _recruit_locked_write "$AGENT_MINDS_DB" "$tmp_file" || rm -f "$tmp_file"
 
             success "Mind profile generated:"
@@ -527,7 +527,7 @@ Return JSON only."
 
     local tmp_file
     tmp_file=$(mktemp)
-    trap "rm -f '$tmp_file'" RETURN
+    trap "rm -f '$tmp_file'; trap - RETURN" RETURN
     jq --arg id "$agent_id" --argjson mind "$mind_json" '.[$id] = $mind' "$AGENT_MINDS_DB" > "$tmp_file" && _recruit_locked_write "$AGENT_MINDS_DB" "$tmp_file" || rm -f "$tmp_file"
 
     local strengths_display="none detected"

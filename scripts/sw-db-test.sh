@@ -473,6 +473,17 @@ test_budget() {
         return 1
     fi
 
+    # The amount is SQL: anything but a plain number is refused and changes nothing.
+    if db_set_budget "1, 1, ''); DELETE FROM budgets; --"; then
+        echo -e "    ${RED}✗${RESET} Non-numeric budget accepted"
+        return 1
+    fi
+    budget=$(db_get_budget)
+    if ! echo "$budget" | grep >/dev/null -E "10\.0"; then
+        echo -e "    ${RED}✗${RESET} Budget changed by a refused amount (got $budget)"
+        return 1
+    fi
+
     return 0
 }
 

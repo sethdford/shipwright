@@ -2,6 +2,7 @@ import { join } from "node:path";
 import pkg from "../package.json";
 import { AgentSdkRunner, agentEnv } from "./adapters/agent/agent-sdk-runner";
 import { GitLocalChange } from "./adapters/git/git-local-change";
+import { GitRepoDocs } from "./adapters/git/git-repo-docs";
 import { GhClosedPulls } from "./adapters/github/gh-closed-pulls";
 import { GhGithubWriter } from "./adapters/github/gh-github-writer";
 import { GhOpenIssues } from "./adapters/github/gh-open-issues";
@@ -29,6 +30,7 @@ const consoleIO: CliIO = {
 
 const fileReader = new NodeFileReader();
 const files = () => fileReader;
+const repoDocs = once(() => new GitRepoDocs(new BunProcessRunner(), fileReader));
 
 /** Adapters for the safety commands (ADR-0007). */
 export function buildSafetyPorts(
@@ -108,6 +110,25 @@ async function runCommand(
   }
 }
 
+/** Top-level help and version, only when they are the whole request; anything more is a command. */
+function topLevel(
+  argv: readonly string[],
+  io: CliIO,
+  registry: readonly Command[],
+): number | undefined {
+  const [name] = argv;
+  const alone = argv.length <= 1;
+  if (name === undefined || (alone && (name === "--help" || name === "-h"))) {
+    io.out(renderHelp(registry));
+    return 0;
+  }
+  if (alone && (name === "--version" || name === "-v")) {
+    io.out(pkg.version);
+    return 0;
+  }
+  return undefined;
+}
+
 /** Composition root. Adapters are constructed here as commands start needing them. */
 export async function main(
   argv: readonly string[],
@@ -123,16 +144,8 @@ export async function main(
   verifier: () => VerifierPorts = once(() => buildVerifierPorts(env, process.cwd())),
 ): Promise<number> {
   const [name, ...args] = argv;
-  // Top-level help and version only when they are the whole request; anything more exits 2 below.
-  const alone = argv.length <= 1;
-  if (name === undefined || (alone && (name === "--help" || name === "-h"))) {
-    io.out(renderHelp(registry));
-    return 0;
-  }
-  if (alone && (name === "--version" || name === "-v")) {
-    io.out(pkg.version);
-    return 0;
-  }
+  const early = topLevel(argv, io, registry);
+  if (early !== undefined || name === undefined) return early ?? 0;
   const command = findCommand(name, registry);
   if (!command) {
     // 2 = usage error (bash sw exited 1); 1 = command failed.
@@ -145,6 +158,7 @@ export async function main(
     safety,
     env,
     files,
+    repoDocs,
     quality,
     verifier,
   });

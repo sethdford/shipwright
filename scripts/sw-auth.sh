@@ -208,7 +208,7 @@ store_user() {
     temp_file=$(mktemp)
     # shellcheck disable=SC2064
     # shellcheck disable=SC2064
-    trap "rm -f '$temp_file'" RETURN
+    trap "rm -f '$temp_file'; trap - RETURN" RETURN
 
     local updated
     updated=$(jq --arg login "$login" \
@@ -254,7 +254,7 @@ switch_user() {
     temp_file=$(mktemp)
     # shellcheck disable=SC2064
     # shellcheck disable=SC2064
-    trap "rm -f '$temp_file'" RETURN
+    trap "rm -f '$temp_file'; trap - RETURN" RETURN
 
     jq --arg login "$login" '.active_user = $login' "$AUTH_FILE" > "$temp_file"
     mv "$temp_file" "$AUTH_FILE"
@@ -271,7 +271,7 @@ remove_user() {
     temp_file=$(mktemp)
     # shellcheck disable=SC2064
     # shellcheck disable=SC2064
-    trap "rm -f '$temp_file'" RETURN
+    trap "rm -f '$temp_file'; trap - RETURN" RETURN
 
     jq --arg login "$login" \
         '.users |= map(select(.login != $login)) |

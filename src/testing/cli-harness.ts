@@ -1,4 +1,5 @@
 import type { CliIO, CommandContext } from "../cli/command";
+import type { RepoDocs } from "../contexts/governance";
 import type { SafetyPorts } from "../contexts/orchestration";
 import type { QualityPorts, VerifierPorts } from "../contexts/quality";
 import type { FileReader } from "../shared/kernel/ports";
@@ -25,8 +26,11 @@ export function commandContext(
   safety?: SafetyPorts,
   env: Readonly<Record<string, string | undefined>> = {},
   files?: FileReader,
-  quality?: QualityPorts,
-  verifier?: VerifierPorts,
+  ports: {
+    readonly repoDocs?: RepoDocs;
+    readonly quality?: QualityPorts;
+    readonly verifier?: VerifierPorts;
+  } = {},
 ): CommandContext {
   return {
     io,
@@ -40,13 +44,17 @@ export function commandContext(
       if (!files) throw new Error("this command was not given a file reader");
       return files;
     },
+    repoDocs: () => {
+      if (!ports.repoDocs) throw new Error("this command was not given repository documents");
+      return ports.repoDocs;
+    },
     quality: () => {
-      if (!quality) throw new Error("this command was not given quality ports");
-      return quality;
+      if (!ports.quality) throw new Error("this command was not given quality ports");
+      return ports.quality;
     },
     verifier: () => {
-      if (!verifier) throw new Error("this command was not given verifier ports");
-      return verifier;
+      if (!ports.verifier) throw new Error("this command was not given verifier ports");
+      return ports.verifier;
     },
   };
 }

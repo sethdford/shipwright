@@ -408,6 +408,73 @@ echo '{"active_jobs":[]}' > "$STATE_FILE"
 daemon_reap_completed
 assert_pass "Reap with empty active_jobs returns early"
 
+# ─── Tests: daemon_job_outcome (exit file, then the latest run in the log) ──
+print_test_section "daemon_job_outcome"
+mkdir -p "$LOG_DIR"
+rm -f "$LOG_DIR/issue-300.exit" "$LOG_DIR/issue-300.log"
+assert_eq "no exit file and no log is unknown" "unknown" "$(daemon_job_outcome 300)"
+echo 0 > "$LOG_DIR/issue-300.exit"
+assert_eq "exit file 0 is success" "0" "$(daemon_job_outcome 300)"
+echo 3 > "$LOG_DIR/issue-300.exit"
+assert_eq "exit file keeps the real code" "3" "$(daemon_job_outcome 300)"
+rm -f "$LOG_DIR/issue-300.exit"
+printf '===== Pipeline run A =====\nPipeline complete! 8/8 stages passed\n' > "$LOG_DIR/issue-300.log"
+assert_eq "sw-pipeline's real success line counts" "0" "$(daemon_job_outcome 300)"
+printf '===== Pipeline run B =====\nPipeline failed at stage: build\n' >> "$LOG_DIR/issue-300.log"
+assert_eq "an earlier run's success does not count for the latest run" "1" "$(daemon_job_outcome 300)"
+printf '===== Pipeline run C =====\nstill running\n' >> "$LOG_DIR/issue-300.log"
+assert_eq "latest run with no result line is unknown" "unknown" "$(daemon_job_outcome 300)"
+
+# ─── Tests: spawned pipelines are tracked by the runner, in both modes ─────
+print_test_section "daemon_spawn_pipeline runner"
+# An earlier section stubbed daemon_spawn_pipeline; load the real one again.
+_DAEMON_DISPATCH_LOADED=""
+source "$SCRIPT_DIR/lib/daemon-dispatch.sh"
+_spawn_mode_test() {
+    local mode="$1" issue="$2"
+    local scripts="$TEST_TEMP_DIR/runner-scripts-$mode"
+    mkdir -p "$scripts"
+    # The mock pipeline records its argv (one per line) and fails with 7.
+    printf '%s\n' '#!/bin/bash' "printf '%s\\n' \"\$@\" > '$TEST_TEMP_DIR/argv-$mode'" 'echo "Pipeline failed at stage: build"' 'exit 7' > "$scripts/sw-pipeline.sh"
+    chmod +x "$scripts/sw-pipeline.sh"
+    init_daemon_state
+    (
+        export SCRIPT_DIR="$scripts" SW_SPAWN_IN_TMUX="$mode"
+        export FAST_TEST_CMD_CFG="npm test -- --grep 'a b'"
+        safety_gates_ok() { return 0; }
+        cd "$REPO_DIR" && daemon_spawn_pipeline "$issue" "Runner test" "" >/dev/null 2>&1
+    ) || true
+    local pid i
+    pid=$(jq -r '.active_jobs[0].pid // empty' "$STATE_FILE" 2>/dev/null)
+    for i in $(seq 1 50); do [[ -f "$LOG_DIR/issue-${issue}.exit" ]] && break; sleep 0.1; done
+    sleep 0.2
+    assert_eq "[$mode] exit file has the pipeline's real exit code" "7" "$(cat "$LOG_DIR/issue-${issue}.exit" 2>/dev/null)"
+    if [[ -n "$pid" ]] && ! kill -0 "$pid" 2>/dev/null; then
+        assert_pass "[$mode] tracked PID ends when the pipeline ends"
+    else
+        assert_fail "[$mode] tracked PID ends when the pipeline ends" "pid=$pid still alive"
+    fi
+    if grep -Fx -- "npm test -- --grep 'a b'" "$TEST_TEMP_DIR/argv-$mode" >/dev/null 2>&1; then
+        assert_pass "[$mode] an argument with spaces reaches the pipeline intact"
+    else
+        assert_fail "[$mode] an argument with spaces reaches the pipeline intact" "argv: $(tr '\n' '|' < "$TEST_TEMP_DIR/argv-$mode" 2>/dev/null)"
+    fi
+    assert_eq "[$mode] outcome reads as failure" "7" "$(daemon_job_outcome "$issue")"
+}
+# Earlier sections mock git; worktrees need the real one.
+rm -f "$TEST_TEMP_DIR/bin/git"
+hash -r
+mkdir -p "$TEST_TEMP_DIR/project"
+(cd "$TEST_TEMP_DIR/project" && { git rev-parse --git-dir >/dev/null 2>&1 || { git init -q -b main && git config user.email t@t.com && git config user.name T && touch .gitignore && git add .gitignore && git commit -q -m init; }; }) || true
+export WORKTREE_DIR="$TEST_TEMP_DIR/project/.worktrees"
+mkdir -p "$WORKTREE_DIR"
+_spawn_mode_test 0 310
+if command -v tmux >/dev/null 2>&1; then
+    _spawn_mode_test 1 311
+else
+    echo "    (no tmux: the tmux spawn leg is skipped)"
+fi
+
 # ─── Tests: get_max_retries_for_class (from daemon-failure) ─────────────────
 print_test_section "get_max_retries_for_class"
 

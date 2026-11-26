@@ -12,7 +12,7 @@ async function run(args: string[], ports = fakeVerifierPorts(), env: Record<stri
   const files = new FakeFileReader({ "/tmp/body.md": "## Summary\nAdds a flag." });
   const code = await verifyCommand.run(
     args,
-    commandContext(io, undefined, env, files, undefined, ports),
+    commandContext(io, undefined, env, files, { verifier: ports }),
   );
   return { code, out: io.outLines.join("\n"), err: io.errLines.join("\n") };
 }

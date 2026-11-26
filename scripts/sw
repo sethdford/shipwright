@@ -653,6 +653,9 @@ main() {
         verify)
             run_ts verify "$@"
             ;;
+        governance|gov)
+            run_ts governance "$@"
+            ;;
         *)
             error "Unknown command: ${cmd}"
             echo ""

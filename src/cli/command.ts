@@ -1,3 +1,4 @@
+import type { RepoDocs } from "../contexts/governance";
 import type { SafetyPorts } from "../contexts/orchestration";
 import type { QualityPorts, VerifierPorts } from "../contexts/quality";
 import type { FileReader } from "../shared/kernel/ports";
@@ -20,6 +21,8 @@ export interface CommandContext {
   readonly quality: () => QualityPorts;
   /** Git, GitHub reads, the stored model and the critic agent for `verify`, built on first call. */
   readonly verifier: () => VerifierPorts;
+  /** Governance documents and lessons from git (ADR-0010), built by main.ts. */
+  readonly repoDocs: () => RepoDocs;
 }
 
 /** Metadata is the single source for help text and docs/reference/cli.md. */

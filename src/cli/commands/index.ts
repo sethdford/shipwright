@@ -4,6 +4,7 @@ import { budgetCommand } from "./budget";
 import { evalCommand } from "./eval";
 import { failureCommand } from "./failure";
 import { gatesCommand } from "./gates";
+import { governanceCommand } from "./governance";
 import { helloCommand } from "./hello";
 import { intakeCommand } from "./intake";
 import { pauseCommand, pausedCommand, resumeCommand } from "./pause";
@@ -23,6 +24,7 @@ export const commands: readonly Command[] = [
   scorecardCommand,
   evalCommand,
   verifyCommand,
+  governanceCommand,
 ];
 
 export function findCommand(

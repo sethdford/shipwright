@@ -925,5 +925,14 @@
     "parity": null,
     "status": "parity-green",
     "notes": "New: learned merge verifier (ADR-0012); no bash predecessor."
+  },
+  {
+    "command": "governance",
+    "aliases": ["gov"],
+    "script": "ts-native",
+    "context": "governance",
+    "parity": null,
+    "status": "parity-green",
+    "notes": "New (ADR-0010): ADRs, policies, standards and approved lessons for build and review prompts. script is the ts-native sentinel, as for failure. scripts/lib/governance-brief.sh calls it from the loop and the review stage."
   }
 ]

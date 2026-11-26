@@ -213,6 +213,17 @@ else
     assert_fail "Select affected falls back to all tests on no changes"
 fi
 
+# CHANGED_FILES narrows the selection: only the test that names the changed file is affected
+printf '# source ../src/utils.sh\n' >> "$TEST_TEMP_DIR/project/tests/utils-test.sh"
+CHANGED_FILES=("$TEST_TEMP_DIR/project/src/utils.sh")
+testopt_select_affected
+_aff="$(printf '%s\n' "${AFFECTED_TESTS[@]}")"
+if printf '%s\n' "$_aff" | grep -F "utils-test.sh" >/dev/null && ! printf '%s\n' "$_aff" | grep -F "fast-test.sh" >/dev/null; then
+    assert_pass "Select affected uses CHANGED_FILES and skips unrelated tests"
+else
+    assert_fail "Select affected uses CHANGED_FILES and skips unrelated tests" "got: $_aff"
+fi
+
 # ─── Test Prioritization ───────────────────────────────────────────────────
 
 print_test_section "Test Prioritization"
