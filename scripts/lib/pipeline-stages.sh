@@ -186,7 +186,7 @@ show_stage_preview() {
         plan)     echo -e "  Generate plan via Claude, post task checklist to issue" ;;
         design)   echo -e "  Generate Architecture Decision Record (ADR), evaluate alternatives" ;;
         build)    echo -e "  Delegate to ${CYAN}shipwright loop${RESET} for autonomous building" ;;
-        test_first) echo -e "  Generate tests from requirements (TDD mode) before implementation" ;;
+        test_first) echo -e "  Spec-first acceptance tests (TDD mode): written, proven red and locked before implementation" ;;
         test)     echo -e "  Run test suite and check coverage" ;;
         review)   echo -e "  AI code review on the diff, post findings" ;;
         compound_quality) echo -e "  Adversarial review, negative tests, e2e, DoD audit" ;;

@@ -1,5 +1,6 @@
 import { join } from "node:path";
 import pkg from "../package.json";
+import { GitAcceptanceWorkspace } from "./adapters/git/git-acceptance-workspace";
 import { GitRepoDocs } from "./adapters/git/git-repo-docs";
 import { GhGithubWriter } from "./adapters/github/gh-github-writer";
 import { GhOpenIssues } from "./adapters/github/gh-open-issues";
@@ -8,12 +9,15 @@ import { GhPullRequests } from "./adapters/github/gh-pull-requests";
 import { GhRunHistory } from "./adapters/github/gh-run-history";
 import { resolvePaths } from "./adapters/paths";
 import { BunProcessRunner } from "./adapters/process/bun-process-runner";
+import { TestGateExecutor } from "./adapters/process/test-gate-executor";
 import { FilePauseFlag } from "./adapters/state/file-pause-flag";
 import { JsonCostLedger } from "./adapters/state/json-cost-ledger";
+import { NodeArtifactStore } from "./adapters/state/node-artifact-store";
 import { NodeFileReader } from "./adapters/state/node-file-reader";
 import type { CliIO, Command } from "./cli/command";
 import { commands, findCommand } from "./cli/commands";
 import type { SafetyPorts } from "./contexts/orchestration";
+import type { AcceptancePorts } from "./contexts/planning";
 import { installShutdown } from "./shutdown";
 
 const consoleIO: CliIO = {
@@ -24,6 +28,17 @@ const consoleIO: CliIO = {
 const fileReader = new NodeFileReader();
 const files = () => fileReader;
 const repoDocs = once(() => new GitRepoDocs(new BunProcessRunner(), fileReader));
+
+/** Acceptance-test ports (ADR-0012). Tests run through test-gate-exec.sh, without credentials. */
+function acceptance(root: string = process.cwd()): AcceptancePorts {
+  const runner = new BunProcessRunner({ reapGroup: true });
+  const gate = join(import.meta.dir, "..", "scripts", "lib", "test-gate-exec.sh");
+  return {
+    ws: new GitAcceptanceWorkspace(runner, root),
+    exec: new TestGateExecutor(runner, gate, root),
+    artifacts: new NodeArtifactStore(),
+  };
+}
 
 /** Adapters for the safety commands (ADR-0007). */
 export function buildSafetyPorts(
@@ -92,7 +107,8 @@ export async function main(
     return 2;
   }
   try {
-    return await command.run(args, { io, version: pkg.version, safety, env, files, repoDocs });
+    const ctx = { io, version: pkg.version, safety, env, files, repoDocs, acceptance };
+    return await command.run(args, ctx);
   } catch (error) {
     io.err(`✗ ${error instanceof Error ? error.message : String(error)}`);
     return 1;

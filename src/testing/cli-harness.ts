@@ -1,6 +1,7 @@
 import type { CliIO, CommandContext } from "../cli/command";
 import type { RepoDocs } from "../contexts/governance";
 import type { SafetyPorts } from "../contexts/orchestration";
+import type { AcceptancePorts } from "../contexts/planning";
 import type { FileReader } from "../shared/kernel/ports";
 
 export interface CapturedIO extends CliIO {
@@ -26,6 +27,7 @@ export function commandContext(
   env: Readonly<Record<string, string | undefined>> = {},
   files?: FileReader,
   repoDocs?: RepoDocs,
+  acceptance?: (root?: string) => AcceptancePorts,
 ): CommandContext {
   return {
     io,
@@ -42,6 +44,10 @@ export function commandContext(
     repoDocs: () => {
       if (!repoDocs) throw new Error("this command was not given repository documents");
       return repoDocs;
+    },
+    acceptance: (root) => {
+      if (!acceptance) throw new Error("this command was not given acceptance ports");
+      return acceptance(root);
     },
   };
 }

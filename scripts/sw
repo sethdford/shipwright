@@ -647,6 +647,9 @@ main() {
         governance|gov)
             run_ts governance "$@"
             ;;
+        acceptance)
+            run_ts acceptance "$@"
+            ;;
         *)
             error "Unknown command: ${cmd}"
             echo ""

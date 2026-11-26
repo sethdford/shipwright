@@ -1,5 +1,6 @@
 import type { RepoDocs } from "../contexts/governance";
 import type { SafetyPorts } from "../contexts/orchestration";
+import type { AcceptancePorts } from "../contexts/planning";
 import type { FileReader } from "../shared/kernel/ports";
 
 export interface CliIO {
@@ -18,6 +19,8 @@ export interface CommandContext {
   readonly files: () => FileReader;
   /** Governance documents and lessons from git (ADR-0010), built by main.ts. */
   readonly repoDocs: () => RepoDocs;
+  /** Acceptance-test ports for a repository root (default: the working directory), built by main.ts. */
+  readonly acceptance: (root?: string) => AcceptancePorts;
 }
 
 /** Metadata is the single source for help text and docs/reference/cli.md. */

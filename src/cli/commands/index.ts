@@ -1,4 +1,5 @@
 import type { Command } from "../command";
+import { acceptanceCommand } from "./acceptance";
 import { breakerCommand } from "./breaker";
 import { budgetCommand } from "./budget";
 import { failureCommand } from "./failure";
@@ -19,6 +20,7 @@ export const commands: readonly Command[] = [
   gatesCommand,
   failureCommand,
   governanceCommand,
+  acceptanceCommand,
 ];
 
 export function findCommand(

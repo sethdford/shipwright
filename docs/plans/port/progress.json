@@ -908,5 +908,14 @@
     "parity": null,
     "status": "parity-green",
     "notes": "New (ADR-0010): ADRs, policies, standards and approved lessons for build and review prompts. script is the ts-native sentinel, as for failure. scripts/lib/governance-brief.sh calls it from the loop and the review stage."
+  },
+  {
+    "command": "acceptance",
+    "aliases": [],
+    "script": "ts-native",
+    "context": "planning",
+    "parity": null,
+    "status": "parity-green",
+    "notes": "New (ADR-0012): spec-first acceptance tests. The test_first stage (scripts/lib/pipeline-stages-build.sh) calls materialize, verify-red and lock; stage_test calls verify-green before the full suite."
   }
 ]
