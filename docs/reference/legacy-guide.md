@@ -796,7 +796,7 @@ Most commands are bash. The dashboard server and the commands routed through `ru
 | `scripts/sw-durable-test.sh` | 222 | Validate durable workflow engine |
 | `scripts/sw-e2e-integration-test.sh` | 367 | Real Claude + Real GitHub |
 | `scripts/sw-e2e-orchestrator-test.sh` | 158 | Test suite registry & execution |
-| `scripts/sw-e2e-smoke-test.sh` | 840 | Pipeline orchestration without API keys |
+| `scripts/sw-e2e-smoke-test.sh` | 852 | Pipeline orchestration without API keys |
 | `scripts/sw-e2e-system-test.sh` | 514 | Proves full daemon→pipeline→loop→PR flow |
 | `scripts/sw-eventbus-test.sh` | 156 | Durable event bus tests |
 | `scripts/sw-evidence-test.sh` | 419 | Unit tests for sw-evidence.sh |
@@ -842,6 +842,7 @@ Most commands are bash. The dashboard server and the commands routed through `ru
 | `scripts/sw-lib-pipeline-quality-checks-test.sh` | 194 | Unit tests for quality |
 | `scripts/sw-lib-pipeline-stages-test.sh` | 292 | Unit tests for stage functions |
 | `scripts/sw-lib-pipeline-state-test.sh` | 310 | Unit tests for pipeline state |
+| `scripts/sw-lib-pr-content-test.sh` | 130 | PR titles, bodies and artifact scrubbing |
 | `scripts/sw-lib-safety-gates-sites-test.sh` | 168 | automated filings use intake caps |
 | `scripts/sw-lib-safety-gates-test.sh` | 358 | bash callers of the TS safety gates |
 | `scripts/sw-lib-test-gate-baseline-test.sh` | 662 | differential test gate (#8633) |
