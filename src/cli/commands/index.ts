@@ -1,4 +1,5 @@
 import type { Command } from "../command";
+import { acceptanceCommand } from "./acceptance";
 import { benchCommand } from "./bench";
 import { breakerCommand } from "./breaker";
 import { budgetCommand } from "./budget";
@@ -28,6 +29,7 @@ export const commands: readonly Command[] = [
   evalCommand,
   verifyCommand,
   governanceCommand,
+  acceptanceCommand,
   repomodelCommand,
   routeCommand,
   benchCommand,

@@ -637,9 +637,11 @@ run_pipeline() {
 
         # Self-healing build→test loop: when we hit build, run both together
         if [[ "$id" == "build" && "$use_self_healing" == "true" ]]; then
-            # TDD: generate tests before build when enabled
-            if [[ "${TDD_ENABLED:-false}" == "true" || "${PIPELINE_TDD:-}" == "true" ]]; then
-                stage_test_first || true
+            # Spec-first acceptance tests before build (ADR-0015); enforce mode stops without them
+            if ! stage_test_first; then
+                update_status "failed" "test_first"
+                error "Pipeline failed: no acceptance tests proven red"
+                return 1
             fi
             # Gate check for build
             local build_gate
@@ -674,9 +676,11 @@ run_pipeline() {
             continue
         fi
 
-        # TDD: generate tests before build when enabled (non-self-healing path)
-        if [[ "$id" == "build" && "$use_self_healing" != "true" ]] && [[ "${TDD_ENABLED:-false}" == "true" || "${PIPELINE_TDD:-}" == "true" ]]; then
-            stage_test_first || true
+        # Spec-first acceptance tests before build (non-self-healing path, ADR-0015)
+        if [[ "$id" == "build" && "$use_self_healing" != "true" ]] && ! stage_test_first; then
+            update_status "failed" "test_first"
+            error "Pipeline failed: no acceptance tests proven red"
+            return 1
         fi
 
         # Skip test if already handled by self-healing loop

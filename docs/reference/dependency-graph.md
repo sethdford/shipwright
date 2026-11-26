@@ -38,6 +38,11 @@ flowchart LR
     orchestration_application["orchestration/application"]
     orchestration_domain["orchestration/domain"]
   end
+  subgraph ctx_planning["planning"]
+    planning["planning"]
+    planning_application["planning/application"]
+    planning_domain["planning/domain"]
+  end
   subgraph ctx_platform["platform"]
     platform["platform"]
     platform_application["platform/application"]
@@ -65,6 +70,7 @@ flowchart LR
   adapters_git --> governance
   adapters_git --> intelligence
   adapters_git --> kernel
+  adapters_git --> planning
   adapters_git --> quality
   adapters_github --> adapters_process
   adapters_github --> integrations
@@ -73,9 +79,11 @@ flowchart LR
   adapters_github --> quality
   adapters_process --> intelligence
   adapters_process --> kernel
+  adapters_process --> planning
   adapters_state --> intelligence
   adapters_state --> kernel
   adapters_state --> orchestration
+  adapters_state --> planning
   adapters_state --> quality
   adapters_store --> kernel
   adapters_tmux --> adapters_process
@@ -86,6 +94,7 @@ flowchart LR
   cli --> learning
   cli --> main
   cli --> orchestration
+  cli --> planning
   cli --> platform
   cli --> quality
   governance --> governance_application
@@ -118,6 +127,7 @@ flowchart LR
   main --> cli
   main --> intelligence
   main --> orchestration
+  main --> planning
   main --> quality
   main --> shutdown
   orchestration --> integrations
@@ -128,6 +138,11 @@ flowchart LR
   orchestration_application --> kernel
   orchestration_application --> orchestration
   orchestration_application --> orchestration_domain
+  planning --> kernel
+  planning --> planning_application
+  planning --> planning_domain
+  planning_application --> planning
+  planning_application --> planning_domain
   platform --> platform_application
   platform_application --> platform_domain
   quality --> kernel

@@ -2,6 +2,7 @@ import { join } from "node:path";
 import pkg from "../package.json";
 import { AgentSdkRunner, agentEnv } from "./adapters/agent/agent-sdk-runner";
 import { buildBenchFactory } from "./adapters/bench/bench-factory";
+import { GitAcceptanceWorkspace } from "./adapters/git/git-acceptance-workspace";
 import { GitLocalChange } from "./adapters/git/git-local-change";
 import { GitRepoDocs } from "./adapters/git/git-repo-docs";
 import { GitRepoSource } from "./adapters/git/git-repo-source";
@@ -15,17 +16,20 @@ import { GhRunHistory } from "./adapters/github/gh-run-history";
 import { resolvePaths } from "./adapters/paths";
 import { BunProcessRunner } from "./adapters/process/bun-process-runner";
 import { processStdio } from "./adapters/process/stdio-lines";
+import { TestGateExecutor } from "./adapters/process/test-gate-executor";
 import { FilePauseFlag } from "./adapters/state/file-pause-flag";
 import { JsonCostLedger } from "./adapters/state/json-cost-ledger";
 import { JsonModelStore } from "./adapters/state/json-model-store";
 import { JsonVerifierStore } from "./adapters/state/json-verifier-store";
 import { JsonlRoutingLog } from "./adapters/state/jsonl-routing-log";
 import { LedgerSpend } from "./adapters/state/ledger-spend";
+import { NodeArtifactStore } from "./adapters/state/node-artifact-store";
 import { NodeFileReader } from "./adapters/state/node-file-reader";
 import type { CliIO, Command, CommandContext } from "./cli/command";
 import { commands, findCommand } from "./cli/commands";
 import type { RepoModelPorts, RoutingPorts } from "./contexts/intelligence";
 import type { SafetyPorts } from "./contexts/orchestration";
+import type { AcceptancePorts } from "./contexts/planning";
 import type { BenchFactory, QualityPorts, VerifierPorts } from "./contexts/quality";
 import { installShutdown } from "./shutdown";
 
@@ -56,6 +60,17 @@ export function buildRoutingPorts(env: Readonly<Record<string, string | undefine
   return {
     log: new JsonlRoutingLog(join(legacyDir, "routing", "decisions.jsonl")),
     now: () => Date.now(),
+  };
+}
+
+/** Acceptance-test ports (ADR-0015). Tests run through test-gate-exec.sh, without credentials. */
+function acceptance(root: string = process.cwd()): AcceptancePorts {
+  const runner = new BunProcessRunner({ reapGroup: true });
+  const gate = join(import.meta.dir, "..", "scripts", "lib", "test-gate-exec.sh");
+  return {
+    ws: new GitAcceptanceWorkspace(runner, root),
+    exec: new TestGateExecutor(runner, gate, root),
+    artifacts: new NodeArtifactStore(),
   };
 }
 
@@ -194,5 +209,6 @@ export async function main(
     routing,
     repoModel: once(() => buildRepoModelPorts(env)),
     stdio,
+    acceptance,
   });
 }

@@ -656,6 +656,9 @@ main() {
         governance|gov)
             run_ts governance "$@"
             ;;
+        acceptance)
+            run_ts acceptance "$@"
+            ;;
         repomodel|code)
             run_ts repomodel "$@"
             ;;

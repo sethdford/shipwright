@@ -4,6 +4,42 @@
 
 Commands implemented in TypeScript. Commands still in bash are listed in docs/plans/port/progress.json.
 
+## `acceptance`
+
+Spec-first acceptance tests: write, prove red, lock, gate the build on them
+
+```text
+USAGE
+  shipwright acceptance materialize  --answer FILE --manifest FILE [--root DIR]
+  shipwright acceptance verify-red   --manifest FILE [--test-cmd CMD] [--command JSON] [--timeout SEC] [--root DIR] [--json]
+  shipwright acceptance lock         --manifest FILE --lock FILE [--test-cmd CMD] [--command JSON] [--root DIR]
+  shipwright acceptance verify-green --lock FILE [--integrity enforce|warn] [--timeout SEC] [--root DIR] [--json]
+
+DESCRIPTION
+  Spec-first acceptance tests (ADR-0015). Before any implementation, each issue becomes numbered
+  acceptance criteria (AC-1, AC-2, ...) and new test files that check them.
+
+  materialize   Writes the test writer's answer (fenced blocks: acceptance.json plus one per test file).
+                All or nothing: paths must be new test files inside the repository, every criterion
+                needs a test, and every test must name the criteria it claims.
+  verify-red    Runs each test file alone and requires it to fail for the right reason: an assertion
+                or the missing feature, not a syntax error, a missing framework, no tests or a pass.
+  lock          Records the commit that holds the proven-red tests and each file's blob id.
+  verify-green  The build gate: flags test tampering since the lock (edited acceptance tests, deleted
+                tests, skip/only markers, dropped assertions, narrowed test collection), restores the
+                locked tests exactly, and requires every one to pass.
+
+OPTIONS
+  --test-cmd CMD   The project's test command; a per-file command is derived from it when its shape is
+                   known (bun test, vitest, jest, pytest, go test, cargo test, npm test, ...).
+  --command JSON   A configured per-file argv, e.g. '["bun","test","{file}"]' ({file} {dir} {stem}).
+  --integrity      enforce (default): a blocking finding fails the gate. warn: report only.
+  --timeout SEC    Per test file (default 300).
+
+EXIT CODES
+  0  passed      1  failed or could not verify (fails closed)      2  usage error
+```
+
 ## `bench`
 
 Head-to-head benchmark: Shipwright vs bare Claude Code and other agents, graded by hidden tests

@@ -14,6 +14,8 @@ source "$(dirname "${BASH_SOURCE[0]}")/patch-handoff.sh"
 # shellcheck source=lib/untrusted.sh
 source "$(dirname "${BASH_SOURCE[0]}")/untrusted.sh"
 source "$(dirname "${BASH_SOURCE[0]}")/models.sh"
+# shellcheck source=lib/acceptance-tests.sh
+source "$(dirname "${BASH_SOURCE[0]}")/acceptance-tests.sh"
 # shellcheck source=lib/repo-model.sh
 source "$(dirname "${BASH_SOURCE[0]}")/repo-model.sh"
 # shellcheck source=lib/claude-usage.sh
@@ -71,55 +73,40 @@ _pipeline_claude_flags() {
     echo "${flags[*]}"
 }
 
+# _pipeline_test_cmd — the project's test command: TEST_CMD, the test stage config, else auto-detected.
+_pipeline_test_cmd() {
+    local test_cmd="${TEST_CMD:-}"
+    if [[ -z "$test_cmd" && -n "${PIPELINE_CONFIG:-}" ]]; then
+        test_cmd=$(jq -r --arg id "test" '(.stages[] | select(.id == $id) | .config.test_cmd) // .defaults.test_cmd // ""' "$PIPELINE_CONFIG" 2>/dev/null) || true
+        [[ "$test_cmd" == "null" ]] && test_cmd=""
+    fi
+    [[ -z "$test_cmd" ]] && test_cmd=$(detect_test_cmd 2>/dev/null || true)
+    printf '%s' "$test_cmd"
+}
+
+# stage_test_first — spec-first acceptance tests (ADR-0015, lib/acceptance-tests.sh). Returns 1 only
+# in enforce mode when no proven-red tests could be written; the caller stops the pipeline then.
 stage_test_first() {
     CURRENT_STAGE_ID="test_first"
-    info "Generating tests from requirements (TDD mode)"
-
-    local plan_file="${ARTIFACTS_DIR}/plan.md"
-    local goal_file="${PROJECT_ROOT}/.claude/goal.md"
-    local requirements=""
-    if [[ -f "$plan_file" ]]; then
-        requirements=$(cat "$plan_file" 2>/dev/null || true)
-    elif [[ -f "$goal_file" ]]; then
-        requirements=$(cat "$goal_file" 2>/dev/null || true)
-    else
-        requirements=$(untrusted_wrap "issue title and body" "${GOAL:-}: ${ISSUE_BODY:-}")
+    local mode test_cmd
+    mode=$(acceptance_mode)
+    [[ "$mode" == "off" ]] && return 0
+    test_cmd=$(_pipeline_test_cmd)
+    if [[ -z "$test_cmd" ]]; then
+        warn "Acceptance tests skipped: no test command found (set TEST_CMD or the test stage's test_cmd)"
+        emit_event "acceptance.skipped" "issue=${ISSUE_NUMBER:-0}" "reason=no_test_cmd" 2>/dev/null || true
+        return 0
     fi
-
-    local tdd_prompt="You are writing tests BEFORE implementation (TDD).
-
-Based on the following plan/requirements, generate test files that define the expected behavior. These tests should FAIL initially (since the implementation doesn't exist yet) but define the correct interface and behavior.
-
-Requirements:
-${requirements}
-
-Instructions:
-1. Create test files for each component mentioned in the plan
-2. Tests should verify the PUBLIC interface and expected behavior
-3. Include edge cases and error handling tests
-4. Tests should be runnable with the project's test framework
-5. Mark tests that need implementation with clear TODO comments
-6. Do NOT write implementation code — only tests
-
-Output format: For each test file, use a fenced code block with the file path as the language identifier (e.g. \`\`\`tests/auth.test.ts):
-\`\`\`path/to/test.test.ts
-// file content
-\`\`\`
-
-Create files in the appropriate project directories (e.g. tests/, __tests__/, src/**/*.test.ts) per project convention."
-
-    local model="${CLAUDE_MODEL:-${MODEL:-sonnet}}"
-    [[ -z "$model" || "$model" == "null" ]] && model="sonnet"
-
-    local output=""
-    local tdd_timeout
-    tdd_timeout=$(_smart_int "timeouts.tdd_generation" 120)
-    output=$(echo "$tdd_prompt" | "$SW_AGENT_EXEC" timeout "$tdd_timeout" claude --print --model "$model" 2>/dev/null) || {
-        warn "TDD test generation failed, falling back to standard build"
-        return 1
-    }
-
-    _tdd_land_output "$output"
+    info "Spec-first: turning the issue into acceptance tests that must fail before implementation"
+    if acceptance_generate "$test_cmd"; then
+        return 0
+    fi
+    if [[ "$mode" == "warn" ]]; then
+        warn "No proven-red acceptance tests (warn mode): building without an acceptance gate"
+        return 0
+    fi
+    error "No acceptance tests could be proven red for the right reason; see ${ARTIFACTS_DIR}/acceptance-red.log"
+    return 1
 }
 
 # _tdd_safe_path PATH — 0 when the model-chosen PATH stays inside the repo and out of .git and
@@ -316,11 +303,13 @@ ${_formal_context}"
         fi
     fi
 
-    # TDD: when test_first ran, tell build to make existing tests pass
-    if [[ "${TDD_ENABLED:-false}" == "true" || "${PIPELINE_TDD:-}" == "true" ]]; then
+    # Spec-first: the locked acceptance tests define done (ADR-0015)
+    local acceptance_brief
+    acceptance_brief=$(acceptance_build_brief 2>/dev/null || true)
+    if [[ -n "$acceptance_brief" ]]; then
         enriched_goal="${enriched_goal}
 
-IMPORTANT (TDD mode): Test files already exist and define the expected behavior. Write implementation code to make ALL tests pass. Do not delete or modify the test files."
+${acceptance_brief}"
     fi
 
     # Inject memory context
@@ -696,18 +685,17 @@ ${commit_msgs}" --model "$(_smart_model commit_quality haiku)" < /dev/null 2>/de
 
 stage_test() {
     CURRENT_STAGE_ID="test"
-    local test_cmd="${TEST_CMD}"
-    if [[ -z "$test_cmd" ]]; then
-        test_cmd=$(jq -r --arg id "test" '(.stages[] | select(.id == $id) | .config.test_cmd) // .defaults.test_cmd // ""' "$PIPELINE_CONFIG" 2>/dev/null) || true
-        [[ -z "$test_cmd" || "$test_cmd" == "null" ]] && test_cmd=""
-    fi
-    # Auto-detect
-    if [[ -z "$test_cmd" ]]; then
-        test_cmd=$(detect_test_cmd)
-    fi
+    local test_cmd
+    test_cmd=$(_pipeline_test_cmd)
     if [[ -z "$test_cmd" ]]; then
         warn "No test command found — skipping test stage"
         return 0
+    fi
+
+    # Spec-first gate (ADR-0015): the locked acceptance tests, restored byte for byte, must pass
+    # (fail-to-pass) before the full suite runs (pass-to-pass).
+    if ! acceptance_gate "$ARTIFACTS_DIR/test-results.log"; then
+        return 1
     fi
 
     local coverage_min

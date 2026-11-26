@@ -1,6 +1,7 @@
 import type { RepoDocs } from "../contexts/governance";
 import type { LineChannel, RepoModelPorts, RoutingPorts } from "../contexts/intelligence";
 import type { SafetyPorts } from "../contexts/orchestration";
+import type { AcceptancePorts } from "../contexts/planning";
 import type { BenchFactory, QualityPorts, VerifierPorts } from "../contexts/quality";
 import type { FileReader } from "../shared/kernel/ports";
 
@@ -24,6 +25,8 @@ export interface CommandContext {
   readonly verifier: () => VerifierPorts;
   /** Governance documents and lessons from git (ADR-0010), built by main.ts. */
   readonly repoDocs: () => RepoDocs;
+  /** Acceptance-test ports for a repository root (default: the working directory), built by main.ts. */
+  readonly acceptance: (root?: string) => AcceptancePorts;
   /** The repository world model's adapters (ADR-0016), built by main.ts. */
   readonly repoModel: () => RepoModelPorts;
   /** This process's stdin and stdout as lines, for a stdio server (the MCP transport). */
