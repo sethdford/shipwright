@@ -837,6 +837,7 @@ Most commands are bash. The dashboard server and the commands routed through `ru
 | `scripts/sw-lib-error-actionability-test.sh` | 214 |  |
 | `scripts/sw-lib-governance-brief-test.sh` | 98 | ADR-0010 prompt sections |
 | `scripts/sw-lib-helpers-test.sh` | 230 | Unit tests for shared helper functions |
+| `scripts/sw-lib-lessons-loop-test.sh` | 64 | mine and reflect (ADR-0010) |
 | `scripts/sw-lib-models-test.sh` | 174 | deterministic model routing (W2-07, #8595) |
 | `scripts/sw-lib-pipeline-detection-test.sh` | 483 | Unit tests for detection fns |
 | `scripts/sw-lib-pipeline-intelligence-test.sh` | 411 | Unit tests for intelligence |
