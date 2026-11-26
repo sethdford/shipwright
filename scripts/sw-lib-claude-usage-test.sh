@@ -100,7 +100,7 @@ assert_eq "verbose array still parsed" "53210" "$LOOP_COST_MILLICENTS"
 print_test_section "cost_record (sw-cost.sh)"
 
 COSTS="$HOME/.shipwright/costs.json"
-bash "$SCRIPT_DIR/sw-cost.sh" record 32000 2500 claude-opus-5-5 pipeline 42 1.2345 8736 run-77 acme/widgets >/dev/null 2>&1
+bash "$SCRIPT_DIR/sw-cost.sh" record 32000 2500 opus pipeline 42 1.2345 8736 run-77 acme/widgets >/dev/null 2>&1
 entry=$(jq -c '.entries[-1]' "$COSTS")
 assert_json_key "reported USD is recorded, not re-estimated" "$entry" ".cost_usd" "1.2345"
 assert_json_key "cost source says reported" "$entry" ".cost_source" "reported"
