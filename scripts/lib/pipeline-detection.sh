@@ -394,20 +394,22 @@ Task: ${goal}" --model "$(_smart_model classification haiku)" < /dev/null 2>/dev
         fi
     fi
 
-    # Fallback: keyword matching
-    local lower
-    lower=$(echo "$goal" | tr '[:upper:]' '[:lower:]')
-    case "$lower" in
-        *fix*|*bug*|*broken*|*error*|*crash*)     echo "bug" ;;
-        *refactor*|*clean*|*reorganize*|*extract*) echo "refactor" ;;
-        *test*|*coverage*|*spec*)                  echo "testing" ;;
-        *security*|*audit*|*vuln*|*cve*)           echo "security" ;;
-        *docker*)                                  echo "devops" ;;  # before *doc*, which would match it
-        *doc*|*readme*|*guide*)                    echo "docs" ;;
-        *deploy*|*ci*|*pipeline*|*infra*)          echo "devops" ;;
-        *migrate*|*migration*|*schema*)            echo "migration" ;;
-        *architect*|*design*|*rfc*|*adr*)          echo "architecture" ;;
-        *)                                          echo "feature" ;;
+    # Fallback: keyword matching on word starts, not substrings: "prefix" is not a fix, "latest" is
+    # not a test, "specific" is not CI. Short or ambiguous keywords (ci, spec, cve, rfc, adr) must
+    # be whole words. Words are runs of [a-z0-9], so "ci/cd" and "CI:" still match.
+    local words
+    words=" $(printf '%s' "$goal" | tr '[:upper:]' '[:lower:]' | tr -c 'a-z0-9' ' ') "
+    case "$words" in
+        *" fix"*|*" bug"*|*" broken"*|*" error"*|*" crash"*)      echo "bug" ;;
+        *" refactor"*|*" clean"*|*" reorganiz"*|*" extract"*)     echo "refactor" ;;
+        *" test"*|*" coverage"*|*" spec "*|*" specs "*)           echo "testing" ;;
+        *" security"*|*" audit"*|*" vuln"*|*" cve "*)             echo "security" ;;
+        *" docker"*)                                              echo "devops" ;;  # before " doc"
+        *" doc"*|*" readme"*|*" guide"*)                          echo "docs" ;;
+        *" deploy"*|*" ci "*|*" pipeline"*|*" infra"*)            echo "devops" ;;
+        *" migrat"*|*" schema"*)                                  echo "migration" ;;
+        *" architect"*|*" design"*|*" rfc "*|*" adr "*)           echo "architecture" ;;
+        *)                                                        echo "feature" ;;
     esac
 }
 

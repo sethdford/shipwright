@@ -237,6 +237,11 @@ assert_eq "check-budget: enabled cap 0.0 is unlimited" "0" "$(_cb '{"daily_budge
 assert_eq "check-budget: enabled cap \"0.00\" is unlimited" "0" "$(_cb '{"daily_budget_usd":"0.00","enabled":true}')"
 assert_eq "check-budget: enabled cap that is not a number blocks" "2" "$(_cb '{"daily_budget_usd":null,"enabled":true}')"
 assert_eq "check-budget: estimate over the cap blocks" "2" "$(_cb '{"daily_budget_usd":0.5,"enabled":true}')"
+# Cap rule shared with the TS gate: an estimate landing exactly on the cap is allowed; spend at the cap blocks.
+_today="$(date -u +%s)"
+printf '{"entries":[{"ts_epoch":%s,"cost_usd":4}],"summary":{}}\n' "$_today" > "$TEST_TEMP_DIR/home/.shipwright/costs.json"
+assert_eq "check-budget: estimate landing exactly on the cap is allowed" "1" "$(_cb '{"daily_budget_usd":5,"enabled":true}')"
+assert_eq "check-budget: spend already at the cap blocks" "2" "$(_cb '{"daily_budget_usd":4,"enabled":true}')"
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # RESULTS

@@ -259,7 +259,9 @@ cost_check_budget() {
     local pct_used
     pct_used=$(awk -v spent="$today_spent" -v budget="$budget_usd" 'BEGIN { printf "%.0f", (spent / budget) * 100 }')
 
-    if awk -v proj="$projected" -v budget="$budget_usd" 'BEGIN { exit !(proj > budget) }'; then
+    # Same rule as the TypeScript gate and the daemon: something must be left (spent < cap) and the
+    # estimate must fit (spent + estimate <= cap). An estimate that lands exactly on the cap is allowed.
+    if awk -v proj="$projected" -v spent="$today_spent" -v budget="$budget_usd" 'BEGIN { exit !(proj > budget || spent >= budget) }'; then
         error "Budget exceeded! Today: \$${today_spent} + estimated \$${estimated} > \$${budget_usd} daily limit"
         emit_event "cost.budget_exceeded" "today_spent=${today_spent}" "estimated=${estimated}" "budget=${budget_usd}"
         return 2
@@ -296,7 +298,7 @@ cost_remaining_budget() {
     budget_enabled=$(jq -r '.enabled' "$BUDGET_FILE" 2>/dev/null || echo "false")
     budget_usd=$(jq -r '.daily_budget_usd' "$BUDGET_FILE" 2>/dev/null || echo "0")
 
-    if [[ "$budget_enabled" != "true" || "$budget_usd" == "0" ]]; then
+    if [[ "$budget_enabled" != "true" ]] || budget_is_unlimited "$budget_usd"; then
         if [[ -z "${_BUDGET_UNCONFIGURED_WARNED:-}" ]]; then
             info "Budget not configured — unlimited. Use 'shipwright cost budget set <amount>'"
             emit_event "cost.budget_unconfigured" "status=unlimited"
