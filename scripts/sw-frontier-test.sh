@@ -41,6 +41,8 @@ setup_env() {
     # The agent launcher sits beside the scripts (SW_AGENT_EXEC=lib/agent-exec.sh); it sources test-gate-env.sh.
     mkdir -p "$TEST_TEMP_DIR/project/scripts/lib"
     cp "$SCRIPT_DIR/lib/agent-exec.sh" "$SCRIPT_DIR/lib/test-gate-env.sh" "$SCRIPT_DIR/lib/models.sh" "$TEST_TEMP_DIR/project/scripts/lib/"
+    # sw-intelligence.sh sources lib/untrusted.sh (prompt-injection defenses) beside itself.
+    cp "$SCRIPT_DIR/lib/untrusted.sh" "$TEST_TEMP_DIR/project/scripts/lib/"
     # agent-exec applies config/agent-permissions.json (#8614) and refuses to run claude without it.
     mkdir -p "$TEST_TEMP_DIR/project/config"
     cp "$SCRIPT_DIR/../config/agent-permissions.json" "$TEST_TEMP_DIR/project/config/"
