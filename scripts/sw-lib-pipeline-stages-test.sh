@@ -209,6 +209,7 @@ git commit -m "feat: add auth" --allow-empty 2>/dev/null || true'
 
 # stage_build runs the sw-loop.sh beside it (never `sw` from PATH); the mock stands in for it here.
 export SHIPWRIGHT_LOOP_SCRIPT="$TEST_TEMP_DIR/bin/sw"
+export SHIPWRIGHT_SW_BIN="$TEST_TEMP_DIR/bin/sw"
 stage_build 2>/dev/null || build_rc=$?
 unset SHIPWRIGHT_LOOP_SCRIPT
 [[ "${build_rc:-0}" -eq 0 ]] && assert_pass "Build stage completes" || assert_pass "Build attempted"
@@ -246,6 +247,16 @@ _build_tournament "Fix it" "bun test" "opus" 2 >/dev/null 2>&1 || _t_rc=$?
 assert_eq "No winner fails the build" "1" "$_t_rc"
 assert_eq "No-winner reason recorded" "tournament_no_winner" "$(cat "$ARTIFACTS_DIR/failure-reason.txt")"
 rm -f "$ARTIFACTS_DIR/failure-reason.txt"
+
+# The tournament runs the sw beside the pipeline, not one found on PATH.
+mkdir -p "$TEST_TEMP_DIR/own"
+printf '#!/usr/bin/env bash\ntouch "%s/own-sw-ran"\necho "{}"\n' "$TEST_TEMP_DIR" > "$TEST_TEMP_DIR/own/sw"
+chmod +x "$TEST_TEMP_DIR/own/sw"
+mock_binary "sw" "touch '$TEST_TEMP_DIR/path-sw-ran'; echo '{}'"
+( unset SHIPWRIGHT_SW_BIN; SCRIPT_DIR="$TEST_TEMP_DIR/own"; _build_tournament "Fix it" "bun test" "opus" 2 >/dev/null 2>&1 ) || true
+[[ -e "$TEST_TEMP_DIR/own-sw-ran" && ! -e "$TEST_TEMP_DIR/path-sw-ran" ]] \
+    && assert_pass "Tournament runs the pipeline's own sw, not PATH's" \
+    || assert_fail "Tournament runs the pipeline's own sw, not PATH's"
 
 # ─── Tests: stage_test ──────────────────────────────────────────────────────
 print_test_section "stage_test"

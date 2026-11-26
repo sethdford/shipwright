@@ -140,7 +140,8 @@ _build_tournament() {
         gh_comment_issue "$ISSUE_NUMBER" "🔨 **Build started** — tournament mode: ${attempts} independent attempts, model: ${model}"
     fi
     local rc=0
-    sw tournament "${args[@]}" < /dev/null > "${report}.tmp" || rc=$?
+    # The sw beside this pipeline, never one from PATH (an older install would run instead).
+    "${SHIPWRIGHT_SW_BIN:-$SCRIPT_DIR/sw}" tournament "${args[@]}" < /dev/null > "${report}.tmp" || rc=$?
     mv "${report}.tmp" "$report"
 
     local winner confidence cost
