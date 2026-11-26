@@ -473,12 +473,18 @@ ${_skill_prompts}
     fi
 
     local _token_log="${ARTIFACTS_DIR}/.claude-tokens-build.log"
-    # sw-loop writes its token and USD totals here. Drop a previous run's file first, so a loop that
-    # dies before writing one adds nothing rather than an old run's spend.
-    local _loop_token_file="${PROJECT_ROOT}/.claude/loop-logs/loop-tokens.json"
+    # sw-loop writes its token and USD totals under the git top level of the directory it runs in (a
+    # --worktree run's worktree, which PROJECT_ROOT may not name). Drop a previous run's file first, so
+    # a loop that dies before writing one adds nothing rather than an old run's spend.
+    local _loop_root
+    _loop_root="$(git rev-parse --show-toplevel 2>/dev/null || echo "$PROJECT_ROOT")"
+    local _loop_token_file="${_loop_root}/.claude/loop-logs/loop-tokens.json"
     [[ -f "$_loop_token_file" ]] && rm -f "$_loop_token_file"
     export PIPELINE_JOB_ID="${PIPELINE_NAME:-pipeline-$$}"
-    sw loop "${loop_args[@]}" < /dev/null 2>"$_token_log" || {
+    # Run the loop that ships with this pipeline, not whatever `sw` is first on PATH: an older global
+    # install there runs an old sw-loop.sh (one that recorded 0 tokens and $0 for every build).
+    # SHIPWRIGHT_LOOP_SCRIPT replaces it in tests only.
+    "${SHIPWRIGHT_LOOP_SCRIPT:-$SCRIPT_DIR/sw-loop.sh}" "${loop_args[@]}" < /dev/null 2>"$_token_log" || {
         local _loop_exit=$?
         # A failed build still spent money: count it before returning.
         _pipeline_add_loop_tokens "$_loop_token_file"
