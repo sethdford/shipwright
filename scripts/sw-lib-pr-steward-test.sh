@@ -71,7 +71,7 @@ if [[ -n "${FAKE_EDIT:-}" ]]; then
 fi
 echo '{"replies":[{"id":7,"status":"fixed","note":"done"}]}' > "$dir/.claude/steward-replies.json"
 EOF
-chmod +x "$T/bin/"*
+chmod +x "$T/bin/fake-bun" "$T/bin/gh" "$T/bin/fake-loop"
 export NO_GITHUB=false
 export FAKE_DIR="$T/fake" SW_BUN="$T/bin/fake-bun" STEWARD_TS_CLI="cli.ts" SHIPWRIGHT_LOOP_SCRIPT="$T/bin/fake-loop"
 export PATH="$T/bin:$PATH"
