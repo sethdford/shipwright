@@ -14,6 +14,7 @@ export {
   type RatchetReport,
   summarizeEval,
 } from "./application/eval";
+export { type ProofReport, type ProofRequest, runProof } from "./application/proof";
 export { buildScorecard, type ScorecardReport } from "./application/scorecard";
 export {
   type CandidateRequest,
@@ -45,6 +46,29 @@ export { type EvalResults, type EvalRun, parseEvalResults, scoreRuns } from "./d
 export { DEFAULT_LABELS, type LabelConfig } from "./domain/outcome-labels";
 export { choose, passHatK } from "./domain/pass-k";
 export {
+  type CliRun,
+  type Flow,
+  NO_CONFIG,
+  PROOF_LIMITS,
+  type ProofConfig,
+  parseProofConfig,
+  type Step,
+} from "./domain/proof/config";
+export { type AppProfile, detectApp, MARKER_FILES, type RepoFacts } from "./domain/proof/detect";
+export { type ProofPlan, planProof, type WebPlan } from "./domain/proof/plan";
+export { redact } from "./domain/proof/redact";
+export { PROOF_MARKER, renderProofSection } from "./domain/proof/render";
+export type {
+  Capture,
+  CliResult,
+  FlowResult,
+  HttpError,
+  ProofMode,
+  ProofVerdict,
+  StepOutcome,
+  WebResult,
+} from "./domain/proof/result";
+export {
   type CaseScore,
   decideRatchet,
   median,
@@ -65,9 +89,7 @@ export {
   type Scorecard,
   type ScorecardConfig,
 } from "./domain/scorecard";
-
 export { PRIOR_MODEL, predict, type VerifierModel } from "./domain/verifier-model";
-
 export {
   type Decision,
   type Evidence,
@@ -94,3 +116,16 @@ export type {
   VerifierPorts,
   VerifierStore,
 } from "./ports";
+export type {
+  AppLauncher,
+  BrowseRequest,
+  BrowserDriver,
+  CliExecutor,
+  ProofArtifacts,
+  ProofPorts,
+  ProofPublisher,
+  ProofRepo,
+  RunningApp,
+  StartOutcome,
+  StartRequest,
+} from "./proof-ports";

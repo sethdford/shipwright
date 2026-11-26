@@ -375,6 +375,16 @@ EOF
 <sub>${VERIFIER_PR_NOTE}</sub>"
     fi
 
+    # ── Run-the-app proof (ADR-0019): screenshots, video and logs of the change running ──
+    if type proof_gate >/dev/null 2>&1; then
+        local proof_out=""
+        [[ -n "${ARTIFACTS_DIR:-}" ]] && proof_out="${ARTIFACTS_DIR}/proof"
+        proof_gate "origin/$BASE_BRANCH" "${GIT_BRANCH:-run}" "$proof_out" || return 1
+        [[ -n "${PROOF_PR_SECTION:-}" ]] && pr_body="${pr_body}
+
+${PROOF_PR_SECTION}"
+    fi
+
     # Build gh pr create args
     local pr_args=(--title "$pr_title" --body "$pr_body" --base "$BASE_BRANCH")
     [[ "$pr_draft" == "true" ]] && pr_args+=(--draft)

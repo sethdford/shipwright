@@ -362,6 +362,50 @@ EXAMPLES
   shipwright paused --gate && dispatch_next_issue
 ```
 
+## `proof`
+
+Run the changed app and record screenshots, video and logs as PR proof
+
+```text
+USAGE
+  shipwright proof run  [--base REF] [--mode off|advisory|enforce] [--publish|--no-publish]
+                        [--label NAME] [--out DIR] [--no-video] [--format text|json|markdown]
+  shipwright proof plan [--base REF] [--format text|json]
+
+DESCRIPTION
+  Run-the-app proof (ADR-0019): starts the app the current branch changed, drives the changed
+  flows in a headless browser (or runs the CLI), and writes screenshots, a video, the server log
+  and CLI transcripts, plus a "Proof it runs" section for the PR body.
+
+  run   Detects the app from the repository root (package.json dev/start scripts and framework,
+        a package.json bin, Cargo or Go mains), or follows .shipwright/proof.json. Web pages come
+        from the files the change touched (file-system routes: Next.js, SvelteKit, Astro, Nuxt,
+        Remix), always starting at "/". The app runs through scripts/lib/test-gate-exec.sh,
+        without GitHub, git or Claude credentials; pages may only reach the app and the hosts
+        proof.json allows. --publish pushes the artifacts to the shipwright-proof branch so the
+        PR can show them. Artifacts go to --out (default: the state dir, proof/<run>).
+  plan  Prints what run would do, and runs nothing.
+
+PROOF.JSON
+  { "web": { "start": ["npm","run","dev"], "port": 3000, "readyPath": "/",
+             "allowHosts": ["fonts.googleapis.com"],
+             "flows": [ { "name": "login", "steps": [ {"goto": "/login"},
+               {"fill": {"selector": "#email", "value": "a@b.co"}}, {"click": "text=Sign in"},
+               {"expectText": "Welcome"}, {"screenshot": "signed-in"} ] } ] },
+    "cli": { "runs": [ { "name": "help", "argv": ["node","bin/cli.js","--help"] } ] } }
+  Steps: goto, click, fill, press, waitFor, expectText, screenshot. They are data, never code.
+
+GATE
+  The mode comes from --mode, else SHIPWRIGHT_PROOF (default advisory). A run fails when the
+  app does not start, a step fails, a page throws, the app answers 5xx, or a CLI run exits with
+  an unexpected code. Enforce blocks the PR on a failure; advisory only reports. Nothing to run
+  (or no browser) is "skipped" and never blocks.
+
+EXIT CODES
+  0  pass, skipped, or a failure in advisory mode   1  could not read the repository
+  2  usage error                                    3  blocked (enforce mode only)
+```
+
 ## `repomodel`
 
 Query the repository world model: definitions, references, tests, owners, repo map (ADR-0016)
