@@ -10,6 +10,7 @@ flowchart LR
   subgraph ctx_adapters["adapters"]
     adapters["adapters"]
     adapters_agent["adapters/agent"]
+    adapters_bench["adapters/bench"]
     adapters_git["adapters/git"]
     adapters_github["adapters/github"]
     adapters_process["adapters/process"]
@@ -21,6 +22,11 @@ flowchart LR
     governance["governance"]
     governance_application["governance/application"]
     governance_domain["governance/domain"]
+  end
+  subgraph ctx_intelligence["intelligence"]
+    intelligence["intelligence"]
+    intelligence_application["intelligence/application"]
+    intelligence_domain["intelligence/domain"]
   end
   subgraph ctx_learning["learning"]
     learning["learning"]
@@ -49,8 +55,15 @@ flowchart LR
   shutdown["shutdown"]
   adapters --> kernel
   adapters_agent --> kernel
+  adapters_bench --> adapters
+  adapters_bench --> adapters_github
+  adapters_bench --> adapters_process
+  adapters_bench --> adapters_state
+  adapters_bench --> kernel
+  adapters_bench --> quality
   adapters_git --> adapters_process
   adapters_git --> governance
+  adapters_git --> intelligence
   adapters_git --> kernel
   adapters_git --> quality
   adapters_github --> adapters_process
@@ -58,7 +71,9 @@ flowchart LR
   adapters_github --> kernel
   adapters_github --> orchestration
   adapters_github --> quality
+  adapters_process --> intelligence
   adapters_process --> kernel
+  adapters_state --> intelligence
   adapters_state --> kernel
   adapters_state --> orchestration
   adapters_state --> quality
@@ -66,6 +81,7 @@ flowchart LR
   adapters_tmux --> adapters_process
   adapters_tmux --> kernel
   cli --> governance
+  cli --> intelligence
   cli --> kernel
   cli --> learning
   cli --> main
@@ -78,7 +94,15 @@ flowchart LR
   governance_application --> governance
   governance_application --> governance_domain
   governance_application --> kernel
+  governance_application --> learning
   integrations --> kernel
+  intelligence --> intelligence_application
+  intelligence --> intelligence_domain
+  intelligence --> kernel
+  intelligence_application --> governance
+  intelligence_application --> intelligence
+  intelligence_application --> intelligence_domain
+  intelligence_application --> kernel
   learning --> learning_application
   learning --> learning_domain
   learning_application --> kernel
@@ -86,11 +110,13 @@ flowchart LR
   learning_domain --> kernel
   main --> adapters
   main --> adapters_agent
+  main --> adapters_bench
   main --> adapters_git
   main --> adapters_github
   main --> adapters_process
   main --> adapters_state
   main --> cli
+  main --> intelligence
   main --> orchestration
   main --> quality
   main --> shutdown

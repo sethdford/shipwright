@@ -1,8 +1,10 @@
 import { join } from "node:path";
 import pkg from "../package.json";
 import { AgentSdkRunner, agentEnv } from "./adapters/agent/agent-sdk-runner";
+import { buildBenchFactory } from "./adapters/bench/bench-factory";
 import { GitLocalChange } from "./adapters/git/git-local-change";
 import { GitRepoDocs } from "./adapters/git/git-repo-docs";
+import { GitRepoSource } from "./adapters/git/git-repo-source";
 import { GhClosedPulls } from "./adapters/github/gh-closed-pulls";
 import { GhGithubWriter } from "./adapters/github/gh-github-writer";
 import { GhOpenIssues } from "./adapters/github/gh-open-issues";
@@ -12,15 +14,19 @@ import { GhPullRequests } from "./adapters/github/gh-pull-requests";
 import { GhRunHistory } from "./adapters/github/gh-run-history";
 import { resolvePaths } from "./adapters/paths";
 import { BunProcessRunner } from "./adapters/process/bun-process-runner";
+import { processStdio } from "./adapters/process/stdio-lines";
 import { FilePauseFlag } from "./adapters/state/file-pause-flag";
 import { JsonCostLedger } from "./adapters/state/json-cost-ledger";
+import { JsonModelStore } from "./adapters/state/json-model-store";
 import { JsonVerifierStore } from "./adapters/state/json-verifier-store";
+import { JsonlRoutingLog } from "./adapters/state/jsonl-routing-log";
 import { LedgerSpend } from "./adapters/state/ledger-spend";
 import { NodeFileReader } from "./adapters/state/node-file-reader";
 import type { CliIO, Command, CommandContext } from "./cli/command";
 import { commands, findCommand } from "./cli/commands";
+import type { RepoModelPorts, RoutingPorts } from "./contexts/intelligence";
 import type { SafetyPorts } from "./contexts/orchestration";
-import type { QualityPorts, VerifierPorts } from "./contexts/quality";
+import type { BenchFactory, QualityPorts, VerifierPorts } from "./contexts/quality";
 import { installShutdown } from "./shutdown";
 
 const consoleIO: CliIO = {
@@ -31,6 +37,27 @@ const consoleIO: CliIO = {
 const fileReader = new NodeFileReader();
 const files = () => fileReader;
 const repoDocs = once(() => new GitRepoDocs(new BunProcessRunner(), fileReader));
+const stdio = once(processStdio);
+
+/** Adapters for the repository world model (ADR-0016): the working tree via git, the cache in the state dir. */
+export function buildRepoModelPorts(
+  env: Readonly<Record<string, string | undefined>>,
+): RepoModelPorts {
+  return {
+    source: new GitRepoSource(new BunProcessRunner()),
+    store: new JsonModelStore(join(resolvePaths(env).stateDir, "repo-model")),
+    now: () => new Date().toISOString(),
+  };
+}
+
+/** The routing log lives with the bash cost files in ~/.shipwright (ADR-0014). */
+export function buildRoutingPorts(env: Readonly<Record<string, string | undefined>>): RoutingPorts {
+  const legacyDir = join(resolvePaths(env).home, ".shipwright");
+  return {
+    log: new JsonlRoutingLog(join(legacyDir, "routing", "decisions.jsonl")),
+    now: () => Date.now(),
+  };
+}
 
 /** Adapters for the safety commands (ADR-0007). */
 export function buildSafetyPorts(
@@ -141,6 +168,7 @@ export async function main(
   }),
   env: Readonly<Record<string, string | undefined>> = process.env,
   quality: () => QualityPorts = once(() => buildQualityPorts(env)),
+  bench: () => BenchFactory = once(() => buildBenchFactory(env, join(import.meta.dir, ".."))),
   verifier: () => VerifierPorts = once(() => buildVerifierPorts(env, process.cwd())),
 ): Promise<number> {
   const [name, ...args] = argv;
@@ -152,6 +180,7 @@ export async function main(
     io.err(`✗ Unknown command: ${name}`);
     return 2;
   }
+  const routing = once(() => buildRoutingPorts(env));
   return runCommand(command, args, {
     io,
     version: pkg.version,
@@ -160,6 +189,10 @@ export async function main(
     files,
     repoDocs,
     quality,
+    bench,
     verifier,
+    routing,
+    repoModel: once(() => buildRepoModelPorts(env)),
+    stdio,
   });
 }

@@ -21,6 +21,9 @@ REPO_DIR="${REPO_DIR:-$(cd "$SCRIPT_DIR/.." && pwd)}"
 # shellcheck source=lib/helpers.sh
 [[ -f "$SCRIPT_DIR/lib/helpers.sh" ]] && source "$SCRIPT_DIR/lib/helpers.sh"
 [[ -f "$SCRIPT_DIR/lib/config.sh" ]] && source "$SCRIPT_DIR/lib/config.sh"
+# Prompt-injection defenses for issue text (trust boundary); path is relative to this file
+# shellcheck source=lib/untrusted.sh
+source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/lib/untrusted.sh"
 [[ -f "$SCRIPT_DIR/sw-db.sh" ]] && source "$SCRIPT_DIR/sw-db.sh"
 # Fallbacks when helpers not loaded (e.g. test env with overridden SCRIPT_DIR)
 [[ "$(type -t info 2>/dev/null)" == "function" ]]    || info()    { echo -e "\033[38;2;0;212;255m\033[1m▸\033[0m $*"; }
@@ -533,9 +536,10 @@ intelligence_analyze_issue() {
     local prompt
     prompt="Analyze this GitHub issue for a software project and return ONLY a JSON object (no markdown, no explanation).
 
-Issue title: ${title}
-Issue body: ${body}
+$(untrusted_block "GitHub issue title, body and labels" "Title: ${title}
 Labels: ${labels}
+
+${body}")
 
 Return JSON with exactly these fields:
 {

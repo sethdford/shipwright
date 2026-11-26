@@ -14,6 +14,8 @@ source "$(dirname "${BASH_SOURCE[0]}")/patch-handoff.sh"
 # shellcheck source=lib/untrusted.sh
 source "$(dirname "${BASH_SOURCE[0]}")/untrusted.sh"
 source "$(dirname "${BASH_SOURCE[0]}")/models.sh"
+# shellcheck source=lib/repo-model.sh
+source "$(dirname "${BASH_SOURCE[0]}")/repo-model.sh"
 # shellcheck source=lib/claude-usage.sh
 source "$(dirname "${BASH_SOURCE[0]}")/claude-usage.sh"
 [[ -n "${_PIPELINE_STAGES_BUILD_LOADED:-}" ]] && return 0
@@ -61,6 +63,10 @@ _pipeline_claude_flags() {
     if [[ -n "$_fallback" ]] && [[ "$_fallback" != "$model" ]]; then
         flags+=("--fallback-model" "$_fallback")
     fi
+
+    # Repository world model tools (ADR-0016): nothing when SHIPWRIGHT_REPO_MODEL=off.
+    local _rm_flag
+    for _rm_flag in $(repo_model_mcp_flags); do flags+=("$_rm_flag"); done
 
     echo "${flags[*]}"
 }

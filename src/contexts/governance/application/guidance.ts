@@ -42,12 +42,16 @@ export interface BriefOptions {
   readonly lessons: boolean;
   readonly governance: boolean;
   readonly context: LessonContext;
+  /** Proposed lesson ids to include for a trial arm (SHIPWRIGHT_LESSONS_TRIAL). */
+  readonly trial?: readonly string[];
 }
 
 /** What goes into a prompt: the documents in force (when governance is on) and the lessons that fit (when on). */
 export function briefInputs(g: Guidance, opts: BriefOptions) {
   return {
     docs: opts.governance ? g.docs : [],
-    lessons: opts.lessons ? selectLessons(g.lessons, opts.context) : [],
+    lessons: opts.lessons
+      ? selectLessons(g.lessons, opts.context, undefined, opts.trial ?? [])
+      : [],
   };
 }
