@@ -1,6 +1,7 @@
 import { join } from "node:path";
 import pkg from "../package.json";
 import { GitRepoDocs } from "./adapters/git/git-repo-docs";
+import { GitRepoSource } from "./adapters/git/git-repo-source";
 import { GhGithubWriter } from "./adapters/github/gh-github-writer";
 import { GhOpenIssues } from "./adapters/github/gh-open-issues";
 import { GhPauseLabel } from "./adapters/github/gh-pause-label";
@@ -8,11 +9,14 @@ import { GhPullRequests } from "./adapters/github/gh-pull-requests";
 import { GhRunHistory } from "./adapters/github/gh-run-history";
 import { resolvePaths } from "./adapters/paths";
 import { BunProcessRunner } from "./adapters/process/bun-process-runner";
+import { processStdio } from "./adapters/process/stdio-lines";
 import { FilePauseFlag } from "./adapters/state/file-pause-flag";
 import { JsonCostLedger } from "./adapters/state/json-cost-ledger";
+import { JsonModelStore } from "./adapters/state/json-model-store";
 import { NodeFileReader } from "./adapters/state/node-file-reader";
-import type { CliIO, Command } from "./cli/command";
+import type { CliIO, Command, CommandContext } from "./cli/command";
 import { commands, findCommand } from "./cli/commands";
+import type { RepoModelPorts } from "./contexts/intelligence";
 import type { SafetyPorts } from "./contexts/orchestration";
 import { installShutdown } from "./shutdown";
 
@@ -24,6 +28,18 @@ const consoleIO: CliIO = {
 const fileReader = new NodeFileReader();
 const files = () => fileReader;
 const repoDocs = once(() => new GitRepoDocs(new BunProcessRunner(), fileReader));
+const stdio = once(processStdio);
+
+/** Adapters for the repository world model (ADR-0012): the working tree via git, the cache in the state dir. */
+export function buildRepoModelPorts(
+  env: Readonly<Record<string, string | undefined>>,
+): RepoModelPorts {
+  return {
+    source: new GitRepoSource(new BunProcessRunner()),
+    store: new JsonModelStore(join(resolvePaths(env).stateDir, "repo-model")),
+    now: () => new Date().toISOString(),
+  };
+}
 
 /** Adapters for the safety commands (ADR-0007). */
 export function buildSafetyPorts(
@@ -62,6 +78,15 @@ function renderHelp(registry: readonly Command[]): string {
   return ["USAGE", "  shipwright <command> [args]", "", "COMMANDS", ...rows].join("\n");
 }
 
+function contextFor(
+  io: CliIO,
+  safety: () => SafetyPorts,
+  env: Readonly<Record<string, string | undefined>>,
+): CommandContext {
+  const repoModel = once(() => buildRepoModelPorts(env));
+  return { io, version: pkg.version, safety, env, files, repoDocs, repoModel, stdio };
+}
+
 /** Composition root. Adapters are constructed here as commands start needing them. */
 export async function main(
   argv: readonly string[],
@@ -92,7 +117,7 @@ export async function main(
     return 2;
   }
   try {
-    return await command.run(args, { io, version: pkg.version, safety, env, files, repoDocs });
+    return await command.run(args, contextFor(io, safety, env));
   } catch (error) {
     io.err(`✗ ${error instanceof Error ? error.message : String(error)}`);
     return 1;

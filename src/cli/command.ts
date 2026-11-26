@@ -1,4 +1,5 @@
 import type { RepoDocs } from "../contexts/governance";
+import type { LineChannel, RepoModelPorts } from "../contexts/intelligence";
 import type { SafetyPorts } from "../contexts/orchestration";
 import type { FileReader } from "../shared/kernel/ports";
 
@@ -18,6 +19,10 @@ export interface CommandContext {
   readonly files: () => FileReader;
   /** Governance documents and lessons from git (ADR-0010), built by main.ts. */
   readonly repoDocs: () => RepoDocs;
+  /** The repository world model's adapters (ADR-0012), built by main.ts. */
+  readonly repoModel: () => RepoModelPorts;
+  /** This process's stdin and stdout as lines, for a stdio server (the MCP transport). */
+  readonly stdio: () => LineChannel;
 }
 
 /** Metadata is the single source for help text and docs/reference/cli.md. */

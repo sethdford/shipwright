@@ -318,9 +318,16 @@ stage_plan() {
         "$context_script" gather --goal "$GOAL" --stage plan 2>/dev/null || true
     fi
 
-    # Gather rich architecture context (call-graph, dependencies)
+    # Architecture context: the repository world model's brief when it is on (ADR-0012), else the older
+    # grep-based structure dump. SHIPWRIGHT_REPO_MODEL=off is the control arm of the paired comparison.
     local arch_context=""
-    if type gather_architecture_context &>/dev/null; then
+    if type repo_model_enabled >/dev/null 2>&1 && repo_model_enabled; then
+        local _rm_tools=""
+        repo_model_tools_available && _rm_tools="--with-tools"
+        arch_context="$(repo_model_brief_section "${GOAL}
+${ISSUE_BODY:-}" "$_rm_tools")"
+    fi
+    if [[ -z "$arch_context" ]] && type gather_architecture_context &>/dev/null; then
         arch_context=$(gather_architecture_context "${PROJECT_ROOT:-.}" 2>/dev/null || true)
     fi
 

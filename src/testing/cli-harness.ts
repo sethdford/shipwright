@@ -1,5 +1,6 @@
 import type { CliIO, CommandContext } from "../cli/command";
 import type { RepoDocs } from "../contexts/governance";
+import type { LineChannel, RepoModelPorts } from "../contexts/intelligence";
 import type { SafetyPorts } from "../contexts/orchestration";
 import type { FileReader } from "../shared/kernel/ports";
 
@@ -26,6 +27,7 @@ export function commandContext(
   env: Readonly<Record<string, string | undefined>> = {},
   files?: FileReader,
   repoDocs?: RepoDocs,
+  extra: { readonly repoModel?: RepoModelPorts; readonly stdio?: LineChannel } = {},
 ): CommandContext {
   return {
     io,
@@ -42,6 +44,14 @@ export function commandContext(
     repoDocs: () => {
       if (!repoDocs) throw new Error("this command was not given repository documents");
       return repoDocs;
+    },
+    repoModel: () => {
+      if (!extra.repoModel) throw new Error("this command was not given repository model ports");
+      return extra.repoModel;
+    },
+    stdio: () => {
+      if (!extra.stdio) throw new Error("this command was not given a stdio channel");
+      return extra.stdio;
     },
   };
 }

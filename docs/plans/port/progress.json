@@ -908,5 +908,14 @@
     "parity": null,
     "status": "parity-green",
     "notes": "New (ADR-0010): ADRs, policies, standards and approved lessons for build and review prompts. script is the ts-native sentinel, as for failure. scripts/lib/governance-brief.sh calls it from the loop and the review stage."
+  },
+  {
+    "command": "repomodel",
+    "aliases": ["code"],
+    "script": "ts-native",
+    "context": "intelligence",
+    "parity": null,
+    "status": "parity-green",
+    "notes": "New (ADR-0012): the repository world model (definitions, imports, reference graph, BM25 entity index, test map, ownership), refreshed incrementally, with a read-only MCP server. scripts/lib/repo-model.sh adds its brief to the loop and plan prompts and attaches the server to claude calls; SHIPWRIGHT_REPO_MODEL=off is the control arm."
   }
 ]

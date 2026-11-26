@@ -241,6 +241,44 @@ EXAMPLES
   shipwright paused --gate && dispatch_next_issue
 ```
 
+## `repomodel`
+
+Query the repository world model: definitions, references, tests, owners, repo map (ADR-0012)
+
+Aliases: `code`
+
+```text
+USAGE
+  shipwright repomodel build    [--root DIR] [--json]
+  shipwright repomodel search   QUERY [--limit N] [--root DIR]
+  shipwright repomodel def      NAME            (where NAME is defined; Class.method works)
+  shipwright repomodel refs     NAME            (every use, with the enclosing definition)
+  shipwright repomodel outline  PATH
+  shipwright repomodel deps     PATH
+  shipwright repomodel tests    PATH
+  shipwright repomodel owners   PATH
+  shipwright repomodel map      [--focus FILE] [--budget CHARS]
+  shipwright repomodel localize --task FILE [--limit N]
+  shipwright repomodel brief    --task FILE [--with-tools] [--json]
+  shipwright repomodel mcp      [--root DIR]
+
+DESCRIPTION
+  A persistent, incrementally updated model of a repository (ADR-0012): definitions, imports, a reference graph,
+  a search index, a test-to-code map and ownership. It is rebuilt only for files whose content changed, and
+  every query refreshes it first, so answers include uncommitted edits. The cache lives in the state directory.
+
+  build     Refresh the model and print what changed.
+  brief     The prompt section for a task (--task FILE): likely files and definitions with their tests and
+            owners; with --with-tools, also how to use the MCP tools. Prints nothing when SHIPWRIGHT_REPO_MODEL=off.
+  mcp       A read-only MCP server on stdio (server name "repomodel") with the same queries as tools.
+
+ABLATION (for paired eval runs)
+  SHIPWRIGHT_REPO_MODEL=off leaves the brief out and the pipeline does not attach the MCP server.
+
+EXIT CODES
+  0  done      1  the repository could not be read      2  usage error
+```
+
 ## `resume`
 
 Clear the local pause flag
