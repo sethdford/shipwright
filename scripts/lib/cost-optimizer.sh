@@ -75,7 +75,7 @@ costopt_init() {
     budget_usd=$(jq -r '.daily_budget_usd // 0' "$BUDGET_FILE" 2>/dev/null || echo "0")
 
     # If budget not enabled, gracefully return
-    if [[ "$budget_enabled" != "true" || "$budget_usd" == "0" ]]; then
+    if [[ "$budget_enabled" != "true" ]] || budget_is_unlimited "$budget_usd"; then
         # Silent no-op: budget not configured
         return 0
     fi
@@ -149,7 +149,7 @@ costopt_check_budget() {
     budget_usd=$(jq -r '.daily_budget_usd // 0' "$BUDGET_FILE" 2>/dev/null || echo "0")
 
     # If budget not enabled, return under_budget
-    if [[ "$budget_enabled" != "true" || "$budget_usd" == "0" ]]; then
+    if [[ "$budget_enabled" != "true" ]] || budget_is_unlimited "$budget_usd"; then
         echo "under_budget"
         return 0
     fi
@@ -383,7 +383,7 @@ costopt_burst_mode() {
     budget_usd=$(jq -r '.daily_budget_usd // 0' "$BUDGET_FILE" 2>/dev/null || echo "0")
 
     # Burst requires budget to be enabled
-    if [[ "$budget_enabled" != "true" || "$budget_usd" == "0" ]]; then
+    if [[ "$budget_enabled" != "true" ]] || budget_is_unlimited "$budget_usd"; then
         return 1
     fi
 
@@ -499,7 +499,7 @@ costopt_report() {
     budget_usd=$(jq -r '.daily_budget_usd // 0' "$BUDGET_FILE" 2>/dev/null || echo "0")
 
     # If budget not enabled, return minimal report
-    if [[ "$budget_enabled" != "true" || "$budget_usd" == "0" ]]; then
+    if [[ "$budget_enabled" != "true" ]] || budget_is_unlimited "$budget_usd"; then
         if [[ "$format" == "json" ]]; then
             echo '{"status":"budget_not_configured","daily_budget_usd":0}'
         else

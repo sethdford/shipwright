@@ -208,6 +208,10 @@ chmod +x "$TEST_TEMP_DIR/bin/sw-recruit.sh"
 cp "$SCRIPT_DIR/sw-triage.sh" "$TEST_TEMP_DIR/bin/sw-triage.sh"
 mkdir -p "$TEST_TEMP_DIR/bin/lib"
 cp "$SCRIPT_DIR/lib"/*.sh "$TEST_TEMP_DIR/bin/lib/" 2>/dev/null || true
+# lib/models.sh resolves model aliases from ../../config/models.json relative to itself, as in a real
+# install; without it the heuristic fallback fails closed on every alias (W2-07).
+mkdir -p "$TEST_TEMP_DIR/config"
+cp "$SCRIPT_DIR/../config/models.json" "$TEST_TEMP_DIR/config/models.json"
 
 output=$(NO_GITHUB=1 SCRIPT_DIR="$TEST_TEMP_DIR/bin" bash "$TEST_TEMP_DIR/bin/sw-triage.sh" team 42 2>&1) && rc=0 || rc=$?
 if [[ "$rc" -eq 0 ]]; then
