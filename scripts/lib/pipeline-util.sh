@@ -200,7 +200,14 @@ ci_push_partial_work() {
     local branch="shipwright/issue-${ISSUE_NUMBER}"
 
     # Only push if we have uncommitted changes
-    if ! git diff --quiet 2>/dev/null || ! git diff --cached --quiet 2>/dev/null; then
+    if [[ "${SW_PATCH_HANDOFF:-true}" != "false" ]]; then
+        # Judged like the build agent's patch; fails closed when the handoff library is missing.
+        if ! type handoff_commit_dirty >/dev/null 2>&1 \
+            || ! handoff_commit_dirty "$PROJECT_ROOT" "WIP: partial pipeline progress for #${ISSUE_NUMBER}" \
+                "${ARTIFACTS_DIR}/partial.patch" >/dev/null; then
+            warn "Partial work not committed: the patch judge refused it or is unavailable"
+        fi
+    elif ! git diff --quiet 2>/dev/null || ! git diff --cached --quiet 2>/dev/null; then
         git add -A 2>/dev/null || true
         git commit -m "WIP: partial pipeline progress for #${ISSUE_NUMBER}" --no-verify 2>/dev/null || true
     fi

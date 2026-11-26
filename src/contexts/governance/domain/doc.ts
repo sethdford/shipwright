@@ -99,3 +99,9 @@ export function parseDoc(kind: DocKind, path: string, raw: string): GovernanceDo
 export function inForce(doc: Pick<GovernanceDoc, "status">): boolean {
   return !NOT_IN_FORCE.has(doc.status);
 }
+
+/** A lesson's or policy's rule: the body before its first `## ` section, without the `# ` title line. */
+export function ruleText(body: string): string {
+  const cut = body.search(/^##\s/m);
+  return (cut === -1 ? body : body.slice(0, cut)).replace(/^#\s[^\n]*\n?/m, "").trim();
+}

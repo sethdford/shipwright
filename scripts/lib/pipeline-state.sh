@@ -300,8 +300,10 @@ persist_artifacts() {
 
     (
         git add "${to_add[@]}" 2>/dev/null || true
-        if ! git diff --cached --quiet 2>/dev/null; then
-            git commit -m "chore: persist ${stage} artifacts for #${ISSUE_NUMBER} [skip ci]" --no-verify 2>/dev/null || true
+        if ! git diff --cached --quiet -- "${to_add[@]}" 2>/dev/null; then
+            # Only the artifact paths: anything else an agent staged is never swept into this commit.
+            git commit -m "chore: persist ${stage} artifacts for #${ISSUE_NUMBER} [skip ci]" --no-verify \
+                -- "${to_add[@]}" 2>/dev/null || true
             local branch="shipwright/issue-${ISSUE_NUMBER}"
             git push origin "HEAD:refs/heads/$branch" --force 2>/dev/null || true
             emit_event "artifacts.persisted" "issue=${ISSUE_NUMBER}" "stage=$stage" "file_count=${#to_add[@]}"

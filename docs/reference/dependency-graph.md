@@ -103,6 +103,7 @@ flowchart LR
   governance_application --> governance
   governance_application --> governance_domain
   governance_application --> kernel
+  governance_application --> learning
   integrations --> kernel
   intelligence --> intelligence_application
   intelligence --> intelligence_domain

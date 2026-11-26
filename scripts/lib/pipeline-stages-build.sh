@@ -6,6 +6,10 @@ SW_AGENT_EXEC="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/agent-exec.sh"
 # Test commands run without credentials (#8608).
 # shellcheck source=lib/test-gate-env.sh
 source "$(dirname "${BASH_SOURCE[0]}")/test-gate-env.sh"
+# Patch handoff (#8706): the build agent works in a disposable clone and only a judged patch comes
+# back. On by default; SW_PATCH_HANDOFF=false turns it off (the old shared-checkout build).
+# shellcheck source=lib/patch-handoff.sh
+source "$(dirname "${BASH_SOURCE[0]}")/patch-handoff.sh"
 # Prompt-injection defenses for issue text (trust boundary).
 # shellcheck source=lib/untrusted.sh
 source "$(dirname "${BASH_SOURCE[0]}")/untrusted.sh"
@@ -103,6 +107,149 @@ stage_test_first() {
     fi
     error "No acceptance tests could be proven red for the right reason; see ${ARTIFACTS_DIR}/acceptance-red.log"
     return 1
+}
+
+# _tdd_safe_path PATH — 0 when the model-chosen PATH stays inside the repo and out of .git and
+# .claude. The fence regex already limits it to [A-Za-z0-9_/.-].
+_tdd_safe_path() {
+    local p="$1"
+    [[ -n "$p" && "$p" != /* && "$p" != .git && "$p" != .git/* && "$p" != .claude/* ]] || return 1
+    case "/$p/" in */../*|*/./*|*//*) return 1 ;; esac
+    return 0
+}
+
+# _tdd_write_blocks ROOT OUTPUT — writes each fenced ```path block of OUTPUT under ROOT and prints
+# the paths written. Unsafe paths are skipped with a warning.
+_tdd_write_blocks() {
+    local root="$1" output="$2"
+    local block_path="" in_block=false block_content="" line
+    while IFS= read -r line; do
+        if [[ "$line" =~ ^\`\`\`([a-zA-Z0-9_/\.\-]+)$ ]] || [[ "$line" == "\`\`\`" && "$in_block" == "true" ]]; then
+            _tdd_write_one "$root" "$block_path" "$block_content"
+            block_path="" block_content="" in_block=false
+            if [[ "$line" != "\`\`\`" ]]; then
+                block_path="${BASH_REMATCH[1]}" in_block=true
+            fi
+        elif [[ "$in_block" == "true" && -n "$block_path" ]]; then
+            [[ -n "$block_content" ]] && block_content="${block_content}"$'\n'
+            block_content="${block_content}${line}"
+        fi
+    done <<< "$output"
+    _tdd_write_one "$root" "$block_path" "$block_content"
+}
+
+_tdd_write_one() {
+    local root="$1" path="$2" content="$3"
+    [[ -n "$path" && -n "$content" ]] || return 0
+    if ! _tdd_safe_path "$path"; then
+        warn "  Skipped unsafe path from TDD output: $path" >&2
+        emit_event "tdd.path_refused" "issue=${ISSUE_NUMBER:-0}" "path=$path"
+        return 0
+    fi
+    mkdir -p "$(dirname "$root/$path")" 2>/dev/null || return 0
+    printf '%s\n' "$content" > "$root/$path" 2>/dev/null || return 0
+    info "  Wrote: $path" >&2
+    printf '%s\n' "$path"
+}
+
+# _tdd_land_output OUTPUT — under patch handoff the tests are written into a disposable clone and
+# reach the trusted checkout only as a judged patch, like the build agent's work. Without it, they
+# are written in place and only the written files are committed.
+_tdd_land_output() {
+    local output="$1" msg="test: TDD - define expected behavior before implementation"
+    if [[ "${SW_PATCH_HANDOFF:-true}" == "false" ]]; then
+        local written
+        written=$(_tdd_write_blocks "$PROJECT_ROOT" "$output")
+        [[ -n "$written" ]] || { warn "No test files extracted from TDD output — check format"; return 0; }
+        local files=()
+        while IFS= read -r f; do files+=("$f"); done <<< "$written"
+        (cd "$PROJECT_ROOT" && git add -- "${files[@]}" && git commit -q -m "$msg") 2>/dev/null || true
+        emit_event "tdd.tests_generated" "{\"stage\":\"test_first\"}"
+        success "TDD tests generated"
+        return 0
+    fi
+    local base work patch="${ARTIFACTS_DIR}/tdd.patch"
+    base=$(git -C "$PROJECT_ROOT" rev-parse HEAD) || return 1
+    work=$(mktemp -d "${TMPDIR:-/tmp}/sw-tdd.XXXXXX") || return 1
+    mkdir -p "$ARTIFACTS_DIR"
+    local rc=0
+    _tdd_land_via_handoff "$work/clone" "$base" "$output" "$patch" "$msg" || rc=$?
+    rm -rf "$work"
+    return "$rc"
+}
+
+_tdd_land_via_handoff() {
+    local dir="$1" base="$2" output="$3" patch="$4" msg="$5"
+    handoff_prepare "$PROJECT_ROOT" "$base" "$dir" || return 1
+    # Earlier stages' uncommitted edits ride along and are judged with the tests.
+    handoff_carry_over "$PROJECT_ROOT" "$base" "$dir" "${patch}.carried" || return 1
+    if [[ -z "$(_tdd_write_blocks "$dir" "$output")" ]]; then
+        warn "No test files extracted from TDD output — check format"
+    fi
+    handoff_export "$dir" "$base" "$PROJECT_ROOT" "$patch" || return 1
+    [[ -s "$patch" ]] || return 0
+    # On refusal the carried edits are dropped too (fail closed); both stay in the patch file.
+    local sha
+    if ! sha=$(handoff_apply "$PROJECT_ROOT" "$base" "$patch" "$msg"); then
+        warn "TDD tests refused by the patch judge; building without them"
+        emit_event "tdd.patch_refused" "issue=${ISSUE_NUMBER:-0}" "base=$base"
+        return 1
+    fi
+    emit_event "tdd.tests_generated" "{\"stage\":\"test_first\",\"head\":\"${sha}\"}"
+    success "TDD tests generated and applied as ${sha:0:12}"
+}
+
+# _build_run_loop LOOP_SCRIPT ARGS... — runs the loop script (the sw-loop.sh beside this pipeline,
+# never `sw` from PATH). Under patch handoff the loop holds no GitHub or fleet credentials: it works
+# in the agent's clone, and nothing it does there is trusted.
+_build_run_loop() {
+    local loop_script="$1"
+    shift
+    if [[ "${SW_PATCH_HANDOFF:-true}" == "false" ]]; then
+        "$loop_script" "$@"
+        return
+    fi
+    local _empty_gh rc=0
+    _empty_gh=$(mktemp -d "${TMPDIR:-/tmp}/sw-nogh.XXXXXX") || return 1
+    env -u GH_TOKEN -u GITHUB_TOKEN -u GH_ENTERPRISE_TOKEN -u GITHUB_PAT \
+        -u SHIPWRIGHT_FLEET_TOKEN -u SHIPWRIGHT_FLEET_TOKEN_FILE -u SSH_AUTH_SOCK \
+        -u SW_PIPELINE_PUSH_URL GH_CONFIG_DIR="$_empty_gh" GIT_CONFIG_GLOBAL=/dev/null \
+        GIT_TERMINAL_PROMPT=0 "$loop_script" "$@" || rc=$?
+    rm -rf "$_empty_gh"
+    return "$rc"
+}
+
+# _build_handoff_return AGENT_DIR BASE — export the agent's work as a patch, judge it, and commit
+# it to the trusted checkout. Any refusal fails the build (fail closed).
+_build_handoff_return() {
+    local dir="$1" base="$2"
+    local patch="${ARTIFACTS_DIR}/agent.patch"
+    mkdir -p "$ARTIFACTS_DIR" "${ARTIFACTS_DIR}/agent-loop-logs"
+    # Loop logs come back as data for humans and token accounting, never into the repo.
+    cp -R "${dir}/.claude/loop-logs/." "${ARTIFACTS_DIR}/agent-loop-logs/" 2>/dev/null || true
+    handoff_export "$dir" "$base" "$PROJECT_ROOT" "$patch" || { error "Patch handoff: export failed"; return 1; }
+    if [[ ! -s "$patch" ]]; then
+        # Nothing changed (for example a self-heal pass that needed no edit): nothing to apply.
+        warn "Patch handoff: the build produced no changes"
+        emit_event "build.patch_empty" "issue=${ISSUE_NUMBER:-0}" "base=$base"
+        rm -rf "$(dirname "$dir")"
+        return 0
+    fi
+    local why
+    if ! why=$(handoff_judge "$patch"); then
+        printf '%s\n' "$why" > "${ARTIFACTS_DIR}/agent.patch.refused"
+        error "Patch handoff: patch refused: $(printf '%s' "$why" | tr '\n' ';')"
+        emit_event "build.patch_refused" "issue=${ISSUE_NUMBER:-0}" "base=$base"
+        return 1
+    fi
+    local sha
+    sha=$(handoff_apply "$PROJECT_ROOT" "$base" "$patch" "build: ${GOAL:-issue ${ISSUE_NUMBER:-}}") || {
+        error "Patch handoff: apply failed"
+        return 1
+    }
+    emit_event "build.patch_applied" "issue=${ISSUE_NUMBER:-0}" "base=$base" "head=$sha"
+    success "Patch handoff: applied the agent's patch as ${sha:0:12}"
+    rm -rf "$(dirname "$dir")"
 }
 
 stage_build() {
@@ -391,10 +538,13 @@ ${_skill_prompts}
     [[ -z "${FALLBACK_MODEL_OVERRIDE:-}" && -n "${PIPELINE_FALLBACK_MODEL:-}" ]] && loop_args+=(--fallback-model "$PIPELINE_FALLBACK_MODEL")
 
     # Definition of Done: use plan-extracted DoD if available
-    [[ -s "$dod_file" ]] && loop_args+=(--definition-of-done "$dod_file")
+    # (absolute: under patch handoff the loop runs in another directory)
+    [[ -s "$dod_file" ]] && loop_args+=(--definition-of-done "$(cd "$(dirname "$dod_file")" && pwd)/$(basename "$dod_file")")
 
-    # Checkpoint resume: when pipeline resumed from build-stage checkpoint, pass --resume to loop
-    if [[ "${RESUME_FROM_CHECKPOINT:-false}" == "true" && "${checkpoint_stage:-}" == "build" ]]; then
+    # Checkpoint resume: when pipeline resumed from build-stage checkpoint, pass --resume to loop.
+    # Not under patch handoff: each build gets a fresh agent clone, so there is no loop state to resume.
+    if [[ "${RESUME_FROM_CHECKPOINT:-false}" == "true" && "${checkpoint_stage:-}" == "build" \
+        && "${SW_PATCH_HANDOFF:-true}" == "false" ]]; then
         loop_args+=(--resume)
     fi
 
@@ -418,16 +568,37 @@ ${_skill_prompts}
     local _loop_token_file="${_loop_root}/.claude/loop-logs/loop-tokens.json"
     [[ -f "$_loop_token_file" ]] && rm -f "$_loop_token_file"
     export PIPELINE_JOB_ID="${PIPELINE_NAME:-pipeline-$$}"
+
+    # Patch handoff (#8706): the loop and its agents work in a disposable clone of the recorded base;
+    # only a judged patch comes back. Loop logs are read from where the loop ran.
+    local _handoff_base="" _handoff_dir="" _loop_logs="${PROJECT_ROOT}/.claude/loop-logs"
+    local _progress_file="${PWD}/.claude/loop-logs/progress.md"
+    if [[ "${SW_PATCH_HANDOFF:-true}" != "false" ]]; then
+        _handoff_base=$(git -C "$PROJECT_ROOT" rev-parse HEAD) || { error "Patch handoff: no base commit"; return 1; }
+        _handoff_dir="$(mktemp -d "${TMPDIR:-/tmp}/sw-agent.XXXXXX")/repo"
+        handoff_prepare "$PROJECT_ROOT" "$_handoff_base" "$_handoff_dir" \
+            || { error "Patch handoff: could not prepare the agent clone"; return 1; }
+        mkdir -p "$ARTIFACTS_DIR"
+        handoff_carry_over "$PROJECT_ROOT" "$_handoff_base" "$_handoff_dir" "${ARTIFACTS_DIR}/pre-build.patch" \
+            || { error "Patch handoff: could not move earlier stages' edits into the agent clone"; return 1; }
+        [[ -s "${ARTIFACTS_DIR}/pre-build.patch" ]] \
+            && warn "Patch handoff: moved uncommitted edits from earlier stages into the agent clone (they are judged with the build)"
+        loop_args+=(--repo "$_handoff_dir")
+        _loop_logs="${_handoff_dir}/.claude/loop-logs"
+        _progress_file="${_loop_logs}/progress.md"
+        _loop_token_file="${_loop_logs}/loop-tokens.json"
+        info "Patch handoff: agent works in ${DIM}${_handoff_dir}${RESET} (base ${_handoff_base:0:12})"
+    fi
+
     # Run the loop that ships with this pipeline, not whatever `sw` is first on PATH: an older global
     # install there runs an old sw-loop.sh (one that recorded 0 tokens and $0 for every build).
     # SHIPWRIGHT_LOOP_SCRIPT replaces it in tests only.
-    "${SHIPWRIGHT_LOOP_SCRIPT:-$SCRIPT_DIR/sw-loop.sh}" "${loop_args[@]}" < /dev/null 2>"$_token_log" || {
+    _build_run_loop "${SHIPWRIGHT_LOOP_SCRIPT:-$SCRIPT_DIR/sw-loop.sh}" "${loop_args[@]}" < /dev/null 2>"$_token_log" || {
         local _loop_exit=$?
         # A failed build still spent money: count it before returning.
         _pipeline_add_loop_tokens "$_loop_token_file"
 
         # Detect context exhaustion from progress file
-        local _progress_file="${PWD}/.claude/loop-logs/progress.md"
         if [[ -f "$_progress_file" ]]; then
             local _prog_tests
             _prog_tests=$(grep -oE 'Tests passing: (true|false)' "$_progress_file" 2>/dev/null | awk '{print $NF}' || echo "unknown")
@@ -443,6 +614,11 @@ ${_skill_prompts}
         error "Build loop failed"
         return 1
     }
+    if [[ -n "$_handoff_dir" ]]; then
+        _build_handoff_return "$_handoff_dir" "$_handoff_base" || return 1
+        # The agent clone is gone; its loop logs (with loop-tokens.json) were copied here.
+        _loop_token_file="${ARTIFACTS_DIR}/agent-loop-logs/loop-tokens.json"
+    fi
     _pipeline_add_loop_tokens "$_loop_token_file"
 
     # Count commits made during build
