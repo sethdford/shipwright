@@ -116,6 +116,7 @@ StandardError=journal
 SyslogIdentifier=${unit_name}
 Environment="PATH=/usr/local/bin:/usr/bin:/bin:/opt/homebrew/bin:\$HOME/.local/bin"
 Environment="HOME=\$HOME"
+Environment="LANG=C.UTF-8"
 
 [Install]
 WantedBy=default.target
@@ -191,6 +192,8 @@ cmd_install_macos() {
         <string>/opt/homebrew/bin:\$HOME/.local/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin</string>
         <key>HOME</key>
         <string>\$HOME</string>
+        <key>LANG</key>
+        <string>en_US.UTF-8</string>
     </dict>
 </dict>
 </plist>
@@ -238,6 +241,8 @@ EOF
         <string>/opt/homebrew/bin:\$HOME/.local/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin</string>
         <key>HOME</key>
         <string>\$HOME</string>
+        <key>LANG</key>
+        <string>en_US.UTF-8</string>
     </dict>
 </dict>
 </plist>
@@ -277,6 +282,8 @@ EOF
         <string>/opt/homebrew/bin:\$HOME/.local/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin</string>
         <key>HOME</key>
         <string>\$HOME</string>
+        <key>LANG</key>
+        <string>en_US.UTF-8</string>
     </dict>
 </dict>
 </plist>

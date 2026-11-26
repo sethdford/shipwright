@@ -1,0 +1,86 @@
+bun test v1.4.4 (38afee6c8)
+
+::group::a.test.ts:
+(pass) passes [0.48ms]
+1 | import { test, expect } from "bun:test";
+2 | test("passes", () => { expect(1).toBe(1); });
+3 | test("pre-existing failure", () => { expect(1).toBe(2); });
+                                                   ^
+error: expect(received).toBe(expected)
+
+Expected: 2
+Received: 1
+
+      at <anonymous> (/fixture/a.test.ts:3:48)
+
+::error file=a.test.ts,line=3,col=48,title=error: expect(received).toBe(expected)::Expected: 2%0AReceived: 1%0A%0A      at <anonymous> (/fixture/a.test.ts:3:48)
+(fail) pre-existing failure [9.09ms]
+
+::endgroup::
+
+::group::b.test.ts:
+
+# Unhandled error between tests
+-------------------------------
+error: Cannot find module './does-not-exist' from '/fixture/b.test.ts'
+-------------------------------
+
+
+::group::dup.test.ts:
+1 | import { test, expect } from "bun:test";
+2 | test("same name", () => { expect(1).toBe(2); });
+                                        ^
+error: expect(received).toBe(expected)
+
+Expected: 2
+Received: 1
+
+      at <anonymous> (/fixture/dup.test.ts:2:37)
+
+::error file=dup.test.ts,line=2,col=37,title=error: expect(received).toBe(expected)::Expected: 2%0AReceived: 1%0A%0A      at <anonymous> (/fixture/dup.test.ts:2:37)
+(fail) same name [0.11ms]
+1 | import { test, expect } from "bun:test";
+2 | test("same name", () => { expect(1).toBe(2); });
+3 | test("same name", () => { expect(1).toBe(3); });
+                                        ^
+error: expect(received).toBe(expected)
+
+Expected: 3
+Received: 1
+
+      at <anonymous> (/fixture/dup.test.ts:3:37)
+
+::error file=dup.test.ts,line=3,col=37,title=error: expect(received).toBe(expected)::Expected: 3%0AReceived: 1%0A%0A      at <anonymous> (/fixture/dup.test.ts:3:37)
+(fail) same name [0.07ms]
+(pass) ok [0.02ms]
+
+::endgroup::
+
+::group::skip.test.ts:
+(skip) skipped one
+(pass) runs [0.01ms]
+
+::endgroup::
+
+::group::syntax.test.ts:
+
+# Unhandled error between tests
+-------------------------------
+2 | test("x", () => { const = ; });
+                            ^
+error: Expected identifier but found "="
+    at /fixture/syntax.test.ts:2:25
+
+2 | test("x", () => { const = ; });
+                            ^
+error: This constant must be initialized
+    at /fixture/syntax.test.ts:2:25
+-------------------------------
+
+
+ 3 pass
+ 1 skip
+ 5 fail
+ 2 errors
+ 6 expect() calls
+Ran 9 tests across 5 files. [55.00ms]

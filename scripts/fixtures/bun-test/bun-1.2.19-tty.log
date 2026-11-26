@@ -1,0 +1,68 @@
+[0m[1mbun test [0m[2mv1.2.19 (aad3abea)[0m
+[0m
+dup.test.ts:
+[0m[1m1 |[0m [0m[35mimport[0m { test, expect } [0m[35mfrom[0m [0m[32m"bun:test"[0m[0m[2m;[0m
+[0m[1m2 |[0m test([0m[32m"same name"[0m, () => { expect([0m[33m1[0m)[0m[3m[1m.toBe[0m([0m[33m2[0m)[0m[2m;[0m })[0m[2m;[0m
+                                        [31m[1m^[0m
+[0m[31merror[0m[2m:[0m [1m[2mexpect([0m[31mreceived[0m[2m).[0mtoBe[2m([0m[32mexpected[0m[2m)[0m
+
+Expected: [32m2[0m
+Received: [31m1[0m
+[0m
+[0m      [2mat [0m[0m[2m<anonymous>[0m[2m ([0m[0m[36m/fixture/dup.test.ts[0m[2m:[0m[33m2[0m[2m:[33m37[0m[2m)[0m
+[0m[31m✗[0m[0m[1m same name[0m [0m[2m[0.34ms[0m[2m][0m
+[0m[0m[1m1 |[0m [0m[35mimport[0m { test, expect } [0m[35mfrom[0m [0m[32m"bun:test"[0m[0m[2m;[0m
+[0m[1m2 |[0m test([0m[32m"same name"[0m, () => { expect([0m[33m1[0m)[0m[3m[1m.toBe[0m([0m[33m2[0m)[0m[2m;[0m })[0m[2m;[0m
+[0m[1m3 |[0m test([0m[32m"same name"[0m, () => { expect([0m[33m1[0m)[0m[3m[1m.toBe[0m([0m[33m3[0m)[0m[2m;[0m })[0m[2m;[0m
+                                        [31m[1m^[0m
+[0m[31merror[0m[2m:[0m [1m[2mexpect([0m[31mreceived[0m[2m).[0mtoBe[2m([0m[32mexpected[0m[2m)[0m
+
+Expected: [32m3[0m
+Received: [31m1[0m
+[0m
+[0m      [2mat [0m[0m[2m<anonymous>[0m[2m ([0m[0m[36m/fixture/dup.test.ts[0m[2m:[0m[33m3[0m[2m:[33m37[0m[2m)[0m
+[0m[31m✗[0m[0m[1m same name[0m [0m[2m[0.09ms[0m[2m][0m
+[0m[0m
+syntax.test.ts:
+[0m
+[1m[2m#[0m [31m[1mUnhandled error[0m[2m between tests[0m
+[2m-------------------------------[0m
+[1m2 | [0mtest([0m[32m"x"[0m, () => { [0m[35mconst[0m = [0m[2m;[0m })[0m[2m;[0m
+                            [1m[31m[1m^[0m
+[31merror[0m[2m: [0m[1mExpected identifier but found "="[0m
+    [2mat [0m[36m/fixture/syntax.test.ts[0m[2m:[0m[33m2[0m[2m:[0m[33m25[0m
+
+[1m2 | [0mtest([0m[32m"x"[0m, () => { [0m[35mconst[0m = [0m[2m;[0m })[0m[2m;[0m
+                            [1m[31m[1m^[0m
+[31merror[0m[2m: [0m[1mThis constant must be initialized[0m
+    [2mat [0m[36m/fixture/syntax.test.ts[0m[2m:[0m[33m2[0m[2m:[0m[33m25[0m
+[0m[2m-------------------------------[0m
+
+[0m
+b.test.ts:
+[0m
+[1m[2m#[0m [31m[1mUnhandled error[0m[2m between tests[0m
+[2m-------------------------------[0m
+[31merror[0m[2m: [0m[1mCannot find module './does-not-exist' from '/fixture/b.test.ts'[0m
+[0m[2m-------------------------------[0m
+
+[0m
+a.test.ts:
+[0m[1m1 |[0m [0m[35mimport[0m { test, expect } [0m[35mfrom[0m [0m[32m"bun:test"[0m[0m[2m;[0m
+[0m[1m2 |[0m test([0m[32m"passes"[0m, () => { expect([0m[33m1[0m)[0m[3m[1m.toBe[0m([0m[33m1[0m)[0m[2m;[0m })[0m[2m;[0m
+[0m[1m3 |[0m test([0m[32m"pre-existing failure"[0m, () => { expect([0m[33m1[0m)[0m[3m[1m.toBe[0m([0m[33m2[0m)[0m[2m;[0m })[0m[2m;[0m
+                                                   [31m[1m^[0m
+[0m[31merror[0m[2m:[0m [1m[2mexpect([0m[31mreceived[0m[2m).[0mtoBe[2m([0m[32mexpected[0m[2m)[0m
+
+Expected: [32m2[0m
+Received: [31m1[0m
+[0m
+[0m      [2mat [0m[0m[2m<anonymous>[0m[2m ([0m[0m[36m/fixture/a.test.ts[0m[2m:[0m[33m3[0m[2m:[33m48[0m[2m)[0m
+[0m[31m✗[0m[0m[1m pre-existing failure[0m [0m[2m[0.09ms[0m[2m][0m
+[0m
+[0m[32m 3 pass[0m
+ [0m[33m1 skip[0m
+[0m[31m 5 fail[0m
+ [0m[31m2 errors[0m
+ 6 expect() calls
+Ran 9 tests across 5 files. [0m[2m[[1m18.00ms[0m[2m][0m

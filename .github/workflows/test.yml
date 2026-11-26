@@ -22,6 +22,13 @@ jobs:
       - name: Check version consistency
         run: bash scripts/check-version-consistency.sh
 
+      # Pinned bun, so the gate's bun-fixture cases (sw-lib-test-gate-baseline-test.sh) run here instead
+      # of skipping. Version from .bun-version; the action is pinned to a commit like the other workflows.
+      - name: Set up Bun
+        uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
+        with:
+          bun-version-file: .bun-version
+
       - name: Install dependencies (macOS)
         if: runner.os == 'macOS'
         run: brew install tmux jq

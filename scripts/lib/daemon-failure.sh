@@ -62,6 +62,20 @@ classify_failure() {
     fi
     local tail_content
     tail_content=$(tail -200 "$log_path" 2>/dev/null || true)
+    # A pipeline refused for a tampered checkout (#8671, round 6) is an escalation, not a retry: its run log carries the
+    # marker that run's start printed. The marker is per run, so a later run of the same issue is not affected.
+    # Only the last run's section counts: an earlier refused run of the same issue (same log) is not this run.
+    local run_start run_section
+    run_start=$(grep -n '^===== Pipeline run ' "$log_path" 2>/dev/null | tail -1 | cut -d: -f1 || true)
+    if [[ -n "$run_start" ]]; then
+        run_section=$(tail -n +"$run_start" "$log_path" 2>/dev/null || true)
+    else
+        run_section="$tail_content"
+    fi
+    if [[ "$run_section" == *"[pipeline-refused:tampering]"* ]]; then
+        echo "tampering_refused"
+        return
+    fi
     # The text every rule sees, the same normalization as the TypeScript classifier (evidence.ts, #8696): ANSI colour
     # codes, the gh log prefix (`job<TAB>step<TAB>timestamp `, BOM allowed), a trailing CR and a leading BOM removed;
     # a lone CR, U+2028 and U+2029 become line breaks; model prose and loop commit lines are dropped. Every sed, awk
@@ -404,6 +418,10 @@ daemon_on_failure() {
                 daemon_log ERROR "Contamination for issue #${issue_num} — skipping retry (a retry repeats real side effects)"
                 emit_event "daemon.skip_retry" "issue=$issue_num" "reason=contamination"
                 ;;
+            tampering_refused)
+                daemon_log ERROR "Pipeline refused for issue #${issue_num}: the checkout was altered — skipping retry (a person must check it)"
+                emit_event "daemon.skip_retry" "issue=$issue_num" "reason=tampering_refused"
+                ;;
             invalid_issue)
                 daemon_log ERROR "Invalid issue #${issue_num} — skipping retry"
                 emit_event "daemon.skip_retry" "issue=$issue_num" "reason=invalid_issue"
@@ -604,9 +622,19 @@ _Escalation: $(if [[ "$retry_count" -eq 1 ]]; then echo "upgraded model + increa
             retry_info="| Retries | ${final_count} / ${final_max} (${final_reason}) |"
         fi
 
-        gh issue comment "$issue_num" ${gh_repo_args[@]+"${gh_repo_args[@]}"} --body "## ❌ Pipeline Failed
+        # A refused start (tampering) is not retried, and the comment and notification say so (#8671, round 7).
+        local fail_title="## ❌ Pipeline Failed" fail_intro="The autonomous pipeline encountered an error." fail_footer="_Re-add the \`${WATCH_LABEL}\` label to retry._"
+        local notify_title="Pipeline Failed — Issue #${issue_num}"
+        if [[ "$failure_class" == "tampering_refused" ]]; then
+            fail_title="## ❌ Refused: possible tampering (tampering_refused)"
+            fail_intro="The pipeline refused to start: the checkout does not match its recorded origin. It was not retried."
+            fail_footer="_Not retried. A person must check the checkout. See the base-repin docs (\`shipwright pipeline base-repin\`) before re-adding the label._"
+            notify_title="Pipeline Refused (possible tampering) — Issue #${issue_num}"
+        fi
 
-The autonomous pipeline encountered an error.
+        gh issue comment "$issue_num" ${gh_repo_args[@]+"${gh_repo_args[@]}"} --body "${fail_title}
+
+${fail_intro}
 
 | Field | Value |
 |-------|-------|
@@ -624,10 +652,10 @@ ${log_tail}
 
 </details>
 
-_Re-add the \`${WATCH_LABEL}\` label to retry._" 2>/dev/null || true
+${fail_footer}" 2>/dev/null || true
     fi
 
-    notify "Pipeline Failed — Issue #${issue_num}" \
+    notify "${notify_title}" \
         "Exit code: ${exit_code}, Duration: ${duration:-unknown}" "error"
     "$SCRIPT_DIR/sw-tracker.sh" notify "failed" "$issue_num" "Exit code: ${exit_code}, Duration: ${duration:-unknown}" 2>/dev/null || true
 }
