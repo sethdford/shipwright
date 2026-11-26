@@ -1,0 +1,162 @@
+{
+  "plan": {
+    "web": {
+      "start": [
+        "node",
+        "server.js"
+      ],
+      "port": 39207,
+      "url": null,
+      "readyPath": "/",
+      "readyTimeoutMs": 120000,
+      "allowHosts": [],
+      "flows": [
+        {
+          "name": "home",
+          "steps": [
+            {
+              "goto": "/"
+            },
+            {
+              "screenshot": "home"
+            }
+          ]
+        },
+        {
+          "name": "add item",
+          "steps": [
+            {
+              "goto": "/"
+            },
+            {
+              "fill": {
+                "selector": "#item",
+                "value": "Buy milk"
+              }
+            },
+            {
+              "click": "button[type=submit]"
+            },
+            {
+              "expectText": "Added: Buy milk"
+            },
+            {
+              "screenshot": "added"
+            }
+          ]
+        }
+      ],
+      "source": "config"
+    },
+    "cli": [
+      {
+        "name": "todo --help",
+        "argv": [
+          "node",
+          "bin/todo.js",
+          "--help"
+        ],
+        "expectExit": 0
+      }
+    ],
+    "notes": []
+  },
+  "web": {
+    "status": "ran",
+    "url": "http://127.0.0.1:39207",
+    "flows": [
+      {
+        "name": "home",
+        "steps": [
+          {
+            "step": "goto /",
+            "ok": true
+          },
+          {
+            "step": "screenshot home",
+            "ok": true
+          }
+        ],
+        "screenshots": [
+          {
+            "name": "home",
+            "file": "web/1-home.png"
+          }
+        ],
+        "consoleErrors": [],
+        "pageErrors": [],
+        "httpErrors": [],
+        "blocked": [
+          "https://fonts.googleapis.com/css?family=Inter"
+        ],
+        "video": "web/1-flow.webm"
+      },
+      {
+        "name": "add item",
+        "steps": [
+          {
+            "step": "goto /",
+            "ok": true
+          },
+          {
+            "step": "fill {\"selector\":\"#item\",\"value\":\"Buy milk\"}",
+            "ok": true
+          },
+          {
+            "step": "click button[type=submit]",
+            "ok": true
+          },
+          {
+            "step": "expectText Added: Buy milk",
+            "ok": true
+          },
+          {
+            "step": "screenshot added",
+            "ok": true
+          }
+        ],
+        "screenshots": [
+          {
+            "name": "added",
+            "file": "web/2-added.png"
+          }
+        ],
+        "consoleErrors": [],
+        "pageErrors": [],
+        "httpErrors": [],
+        "blocked": [
+          "https://fonts.googleapis.com/css?family=Inter",
+          "https://fonts.googleapis.com/css?family=Inter"
+        ],
+        "video": "web/2-flow.webm"
+      }
+    ],
+    "serverLog": "web/server.log"
+  },
+  "cli": [
+    {
+      "name": "todo --help",
+      "argv": [
+        "node",
+        "bin/todo.js",
+        "--help"
+      ],
+      "exitCode": 0,
+      "expectExit": 0,
+      "timedOut": false,
+      "transcript": "cli/1.txt"
+    }
+  ],
+  "texts": {
+    "cli/1.txt": "$ node bin/todo.js --help\nusage: todo [add ITEM] [list]\n\nA tiny todo CLI.\n\n[exit 0]"
+  },
+  "baseUrl": "https://github.com/sethdford/shipwright/raw/633b40eb9531f85d3d06d926d0039b31e79d865d/demo-todo-app/0d743fe03ac1/",
+  "publishError": null,
+  "verdict": {
+    "status": "pass",
+    "failures": [],
+    "warnings": []
+  },
+  "blocked": false,
+  "outDir": "/tmp/claude-0/proof-pub"
+}
