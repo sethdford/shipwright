@@ -610,7 +610,7 @@ run_pipeline() {
 
         # Self-healing build→test loop: when we hit build, run both together
         if [[ "$id" == "build" && "$use_self_healing" == "true" ]]; then
-            # Spec-first acceptance tests before build (ADR-0012); enforce mode stops without them
+            # Spec-first acceptance tests before build (ADR-0015); enforce mode stops without them
             if ! stage_test_first; then
                 update_status "failed" "test_first"
                 error "Pipeline failed: no acceptance tests proven red"
@@ -649,7 +649,7 @@ run_pipeline() {
             continue
         fi
 
-        # Spec-first acceptance tests before build (non-self-healing path, ADR-0012)
+        # Spec-first acceptance tests before build (non-self-healing path, ADR-0015)
         if [[ "$id" == "build" && "$use_self_healing" != "true" ]] && ! stage_test_first; then
             update_status "failed" "test_first"
             error "Pipeline failed: no acceptance tests proven red"

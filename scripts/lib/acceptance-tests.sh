@@ -1,4 +1,4 @@
-# acceptance-tests.sh — spec-first acceptance tests for the pipeline (ADR-0012).
+# acceptance-tests.sh — spec-first acceptance tests for the pipeline (ADR-0015).
 #
 # Before any implementation, a test writer turns the issue into numbered acceptance criteria
 # (AC-1, AC-2, ...) and new test files that check them. `shipwright acceptance` (TypeScript)

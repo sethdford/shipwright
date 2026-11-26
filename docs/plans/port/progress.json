@@ -916,6 +916,6 @@
     "context": "planning",
     "parity": null,
     "status": "parity-green",
-    "notes": "New (ADR-0012): spec-first acceptance tests. The test_first stage (scripts/lib/pipeline-stages-build.sh) calls materialize, verify-red and lock; stage_test calls verify-green before the full suite."
+    "notes": "New (ADR-0015): spec-first acceptance tests. The test_first stage (scripts/lib/pipeline-stages-build.sh) calls materialize, verify-red and lock; stage_test calls verify-green before the full suite."
   }
 ]

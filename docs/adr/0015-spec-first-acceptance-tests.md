@@ -1,4 +1,4 @@
-# 0012. Spec-first acceptance tests: proven red, locked, and the build gate
+# 0015. Spec-first acceptance tests: proven red, locked, and the build gate
 
 Status: accepted · Date: 2026-11-26
 

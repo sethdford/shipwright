@@ -69,7 +69,7 @@ _pipeline_test_cmd() {
     printf '%s' "$test_cmd"
 }
 
-# stage_test_first — spec-first acceptance tests (ADR-0012, lib/acceptance-tests.sh). Returns 1 only
+# stage_test_first — spec-first acceptance tests (ADR-0015, lib/acceptance-tests.sh). Returns 1 only
 # in enforce mode when no proven-red tests could be written; the caller stops the pipeline then.
 stage_test_first() {
     CURRENT_STAGE_ID="test_first"
@@ -145,7 +145,7 @@ ${_formal_context}"
         fi
     fi
 
-    # Spec-first: the locked acceptance tests define done (ADR-0012)
+    # Spec-first: the locked acceptance tests define done (ADR-0015)
     local acceptance_brief
     acceptance_brief=$(acceptance_build_brief 2>/dev/null || true)
     if [[ -n "$acceptance_brief" ]]; then
@@ -511,7 +511,7 @@ stage_test() {
         return 0
     fi
 
-    # Spec-first gate (ADR-0012): the locked acceptance tests, restored byte for byte, must pass
+    # Spec-first gate (ADR-0015): the locked acceptance tests, restored byte for byte, must pass
     # (fail-to-pass) before the full suite runs (pass-to-pass).
     if ! acceptance_gate "$ARTIFACTS_DIR/test-results.log"; then
         return 1

@@ -29,7 +29,7 @@ const fileReader = new NodeFileReader();
 const files = () => fileReader;
 const repoDocs = once(() => new GitRepoDocs(new BunProcessRunner(), fileReader));
 
-/** Acceptance-test ports (ADR-0012). Tests run through test-gate-exec.sh, without credentials. */
+/** Acceptance-test ports (ADR-0015). Tests run through test-gate-exec.sh, without credentials. */
 function acceptance(root: string = process.cwd()): AcceptancePorts {
   const runner = new BunProcessRunner({ reapGroup: true });
   const gate = join(import.meta.dir, "..", "scripts", "lib", "test-gate-exec.sh");

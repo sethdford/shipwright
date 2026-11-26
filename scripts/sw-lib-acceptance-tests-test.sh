@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # ╔═══════════════════════════════════════════════════════════════════════════╗
-# ║  shipwright lib/acceptance-tests test — spec-first acceptance (ADR-0012)  ║
+# ║  shipwright lib/acceptance-tests test — spec-first acceptance (ADR-0015)  ║
 # ╚═══════════════════════════════════════════════════════════════════════════╝
 # The decisions (red/green verdicts, integrity) are tested in TypeScript; this suite checks the
 # bash orchestration with a fake `sw` and a fake test writer, since CI's bash matrix has no bun.

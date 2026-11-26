@@ -20,7 +20,7 @@ const usage = `USAGE
   shipwright acceptance verify-green --lock FILE [--integrity enforce|warn] [--timeout SEC] [--root DIR] [--json]
 
 DESCRIPTION
-  Spec-first acceptance tests (ADR-0012). Before any implementation, each issue becomes numbered
+  Spec-first acceptance tests (ADR-0015). Before any implementation, each issue becomes numbered
   acceptance criteria (AC-1, AC-2, ...) and new test files that check them.
 
   materialize   Writes the test writer's answer (fenced blocks: acceptance.json plus one per test file).
